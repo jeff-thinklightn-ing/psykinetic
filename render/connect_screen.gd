@@ -154,10 +154,17 @@ func set_state(text: String, is_failed := false) -> void:
 	visible = true
 
 
-## An update's progress (maps' in-game update): [param fraction] 0..1 fills
-## the bar, -1 (not known yet) keeps the dots alone; [param text] says what
-## is happening ("downloading v0.1.150: 34 of 112 MB"). Cancel is offered.
+## An update's progress (maps' in-game update, 430): [param fraction] 0..1
+## fills the bar, -1 (not known yet) keeps the dots alone; [param text] says
+## what is happening ("downloading v0.1.150: 34 of 112 MB"). Cancel is
+## offered. -1 with no words: the progress is over (the bar and Cancel go;
+## the state stays as the last set_state left it).
 func set_progress(fraction: float, text: String) -> void:
+	if fraction < 0.0 and text.is_empty():
+		progressing = false
+		_progress.visible = false
+		_show_parts()
+		return
 	editing = false
 	failed = false
 	progressing = true

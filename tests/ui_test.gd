@@ -88,6 +88,11 @@ func _test_connect_screen() -> void:
 	_check(cancelled[0], "Cancel asks Main to stop it")
 	screen.set_state("the download stopped", true)
 	_check(not screen.progressing and "Cancel" not in screen.buttons_shown(), "a state after it: Cancel gone")
+	screen.set_progress(0.9, "unpacking v0.1.150")
+	screen.set_progress(-1.0, "")
+	_check(not screen.progressing and "Cancel" not in screen.buttons_shown() and screen.progress_shown() < 0.0
+			and screen.state_shown() == "unpacking v0.1.150",
+		"progress over (maps' end call): the bar and Cancel go, the last words stay")
 	screen.set_status("online, v0.1.150, 3 players")
 	_check(screen.status_shown() == "online, v0.1.150, 3 players", "the server's status shown under the fields")
 	var dot := " · "
