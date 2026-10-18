@@ -9545,3 +9545,57 @@ and the stranger, not to another faction; experience and the log; restock
 after its days; free_held by a group's id; the draw leaning to lacking
 trades; the fletcher mends, the carpenter stands in). items_test's mend
 recipe is the fletcher's.
+## 422. Gossip: what a town's person believes or saw passes to a neighbour
+
+npc's step 5 (the coordinator's approval 2026-10-17), on companions' hearsay
+(378: a resident keeps what is said near it, believed by a seeded roll on
+its intellect, and its voice repeats the newest it believes), the cards
+(398) and the routines (404). Townsfolk already kept what they heard from a
+player or a companion; nothing moved between them. Now it does, and with
+no model call.
+
+Every residents.json "gossip.every" steps (1200) in each town, its
+residents (not away, not companions) are grouped by where they are now
+(Townsfolk.whereabouts, on the clock alone, so it needs no bodies). In each
+group of two or more at one of "gossip.places" (the well, the inn, the
+square, the temple; never at work or at home) one teller passes one thing
+to one hearer (Townsfolk.gossip, _pass), by a roll seeded by the town, the
+place and the step, so a save replays the same. What passes: the teller's
+newest believed hearsay the hearer does not hold (Hearsay.holds, by the
+words alone, from anyone), else the teller's newest card fact the hearer
+has not heard, told as its own ("Mara saw raiders at the walls" becomes
+"she saw raiders at the walls"), never one that names the hearer. The
+hearer keeps it through Hearsay.hear from the teller's name, with 378's
+believe roll on its intellect: a passed-on belief as "beyond" (a sharp
+hearer doubts it: chance (11 - intellect) / 10), a first-hand fact as the
+new fits "witnessed", believed always (a neighbour saying what she saw is
+no rumour). The entry gains "where" (the place; "" for a line said to the
+resident), and Hearsay.prompt_words tells the voice "At the well, Tam told
+you that the mine is cursed." Kin are picked first as hearers, and nobody
+gossips with one they hold a grudge against, either way: the cards keep
+kin and grudges by id now beside the facts (Townsfolk._found_among writes
+"kin" {id: kind} and "grudge" [ids] into both cards; cards from before have
+neither and gossip freely). An official (Lore.binding) tells only what it
+saw, never a rumour, and what it hears never reaches its voice (378 as it
+is). One pass per group per tick; the heard cap (8) as it is, the oldest
+unbelieved going first. Each pass goes to the transcript under both names
+("[At the well, Tam told Mara: the mine is cursed]") and to mind.log (kind
+"gossip", from, where, fits, believed or doubted), so a lie's path through
+the town can be read back. A planted lie thus walks: told to Tam at the
+inn, Tam tells Mara at the well next morning, Mara repeats it to the
+player, naming Tam and the well.
+
+gossip_test (pure sim, no port or scratch): a belief passes between two at
+the well and not across places; never at home; a first-hand fact is
+witnessed and believed by the sharpest while a passed lie is doubted by
+them; never across a grudge; kin first; an official passes on no rumour
+but what she saw; the cap; the same state gives the same pass; the voice's
+words. Also met: a stint whose "to" is 24 wraps to 0 under the season shift
+and vanishes (whereabouts); residents.json has none, the test's day is two
+stints. Protocol unchanged; no new class_name.
+
+Rejected: a claims ask per pass (a model call for every pair every hour);
+residents speaking aloud to each other (336 rejected idle chatter, and
+nothing reads lines not said to a player); passing lore (Lore.known_by has
+it already); believing a neighbour's sighting by the intellect roll (it is
+first-hand; the roll is for rumours).

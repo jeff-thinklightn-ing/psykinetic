@@ -191,9 +191,13 @@ static func _found_among(production: Production, worker_id: String, card: Dictio
 	if kin_draw < float(kin.get("chance", 0.0)) and kin.get("kinds") is Array and not kin["kinds"].is_empty():
 		var other := others[kin_pick % others.size()]
 		var theirs: Dictionary = production.worker(other)["card"]
-		var both := ResidentCard.kin_facts(card, theirs, str(kin["kinds"][kind_pick % kin["kinds"].size()]))
+		var kind := str(kin["kinds"][kind_pick % kin["kinds"].size()])
+		var both := ResidentCard.kin_facts(card, theirs, kind)
 		_true(card, step, both[0])
 		_true(theirs, step, both[1])
+		# Kept by id too (decision 422: kin hear gossip first).
+		card.get_or_add("kin", {})[other] = kind
+		theirs.get_or_add("kin", {})[worker_id] = kind
 		production.set_card(other, theirs)
 	if grudge_draw < float(grudge.get("chance", 0.0)) and grudge.get("causes") is Array and not grudge["causes"].is_empty():
 		var other := others[grudge_pick % others.size()]
@@ -201,6 +205,9 @@ static func _found_among(production: Production, worker_id: String, card: Dictio
 		var text := ResidentCard.grudge_fact(card, theirs, str(grudge["causes"][cause_pick % grudge["causes"].size()]))
 		_true(card, step, text)
 		_true(theirs, step, text)
+		# Kept by id too (decision 422: no gossip across a grudge).
+		card.get_or_add("grudge", []).append(other)
+		theirs.get_or_add("grudge", []).append(worker_id)
 		production.set_card(other, theirs)
 
 
@@ -232,6 +239,160 @@ static func watch(production: Production, towns: Towns) -> void:
 			var kept: Production = weak.get_ref()
 			if kept != null:
 				_rescued(kept, town, who_id, by))
+
+
+## Gossip (decision 422): what a town's person believes or saw passes to a
+## neighbour standing at the same meeting place. Every "gossip.every" steps
+## (residents.json) per town, its residents (not away, not companions) are
+## grouped by where they are now (whereabouts); in each group of two or
+## more at one of "gossip.places" (the well, the inn, the square, the
+## temple: never at work or at home) one teller passes one thing to one
+## hearer, by a roll seeded by the town, the place and the step: the
+## teller's newest believed hearsay the hearer does not hold, else the
+## teller's newest card fact the hearer has not heard (never one naming the
+## hearer). The hearer keeps it through Hearsay.hear from the teller's name,
+## with the believe roll on its intellect: a passed-on belief as "beyond",
+## a first-hand fact as "witnessed" (believed always), "where" the place.
+## Kin are picked first as hearers; nobody gossips with one they hold a
+## grudge against, either way. An official (Lore.binding) tells only what
+## it saw, and what it hears never reaches its voice (378 as it is). One
+## pass per group per tick; the heard cap as it is. No model call. Each
+## pass to the transcript under both names and to mind.log (kind "gossip").
+static var _gossip_due: Dictionary = {}
+
+static func gossip(production: Production) -> void:
+	if production == null:
+		return
+	var rule: Dictionary = days().get("gossip", {})
+	var every := int(rule.get("every", 0))
+	if every <= 0:
+		return
+	var at := production.now()
+	var hour := DayNight.hour(at)
+	if is_nan(hour) or is_inf(hour):
+		return  # No day length set: nobody knows where anyone is.
+	var towns := {}  # town -> [worker ids]
+	for id: String in production.worker_ids():
+		if id.begins_with(COMPANION):
+			continue
+		var who := production.worker(id)
+		if bool(who.get("away", false)) or str(who.get("town", "")).is_empty():
+			continue
+		towns.get_or_add(str(who["town"]), []).append(id)
+	var places: Array = rule.get("places", ["well", "inn", "square", "temple"])
+	var names: Array = towns.keys()
+	names.sort()
+	for town: String in names:
+		var due := int(_gossip_due.get(town, 0))
+		if due == 0:
+			_gossip_due[town] = at + every
+			continue
+		if at < due:
+			continue
+		_gossip_due[town] = at + every
+		var groups := {}  # place -> [worker ids]
+		for id: String in towns[town]:
+			var where := whereabouts(_trade_of(production, id), hour, Season.name_at(at),
+				str(production.worker(id).get("type", "")), id, day_of(at))
+			if where in places:
+				groups.get_or_add(where, []).append(id)
+		var keys: Array = groups.keys()
+		keys.sort()
+		for place: String in keys:
+			if groups[place].size() >= 2:
+				_pass(production, town, place, groups[place], at)
+
+
+## One pass of gossip at [param place] in [param town] among [param
+## members] (worker ids): what was told, or "" for nothing.
+static func _pass(production: Production, town: String, place: String, members: Array, at: int) -> String:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash("gossip:%s:%s:%d" % [town, place, at])
+	members.sort()
+	var teller: String = members[rng.randi_range(0, members.size() - 1)]
+	var card := card_of(production, teller)
+	if card.is_empty():
+		return ""
+	var grudges: Array = card.get("grudge", [])
+	var kin: Dictionary = card.get("kin", {})
+	var hearers: Array = []
+	for id: String in members:
+		if id != teller and id not in grudges and teller not in card_of(production, id).get("grudge", []):
+			hearers.append(id)
+	if hearers.is_empty():
+		return ""
+	var close := hearers.filter(func(id: String) -> bool: return kin.has(id))
+	var pool: Array = close if not close.is_empty() else hearers
+	var hearer: String = pool[rng.randi_range(0, pool.size() - 1)]
+	var hearer_name := str(production.worker(hearer).get("name", ""))
+	var teller_name := str(production.worker(teller).get("name", ""))
+	var heard: Array = production.worker(hearer).get("heard", []).duplicate(true)
+	var text := ""
+	var fits := ""
+	var omen := false
+	var official := Lore.binding(_trade_of(production, teller), str(production.worker(teller).get("type", ""))) == "official"
+	if not official:
+		var beliefs: Array = production.worker(teller).get("heard", [])
+		for i in range(beliefs.size() - 1, -1, -1):
+			var entry: Dictionary = beliefs[i]
+			var said := str(entry.get("text", ""))
+			if bool(entry.get("believed", false)) and not said.is_empty() and not said.contains(hearer_name) and not Hearsay.holds(heard, said):
+				text = said
+				fits = "beyond"
+				omen = bool(entry.get("omen", false))
+				break
+	if text.is_empty():
+		var facts: Array = card.get("facts", [])
+		for i in range(facts.size() - 1, -1, -1):
+			var fact := str(facts[i].get("text", "")) if facts[i] is Dictionary else ""
+			var told := _as_told(fact, card)
+			if fact.is_empty() or fact.contains(hearer_name) or Hearsay.holds(heard, told):
+				continue
+			text = told
+			fits = Hearsay.WITNESSED
+			break
+	if text.is_empty():
+		return ""
+	var entry := Hearsay.hear(heard, hearer, leaning_of(production, hearer, "intellect"), text, fits, teller_name, at,
+		omen, leaning_of(production, hearer, "superstition"), place)
+	if entry.is_empty():
+		return ""
+	production.set_heard(hearer, heard)
+	var where := Hearsay.place_words(place)
+	var line := "[%s, %s told %s: %s]" % [where.left(1).to_upper() + where.substr(1), teller_name, hearer_name, text]
+	Transcript.record(hearer_name, teller_name, line)
+	if teller_name != hearer_name:
+		Transcript.record(teller_name, teller_name, line)
+	MindLog.record({"kind": "gossip", "companion": hearer_name, "mind": "resident", "say": text, "from": teller_name,
+		"where": place, "fits": fits, "outcome": "believed" if bool(entry.get("believed", false)) else "doubted"})
+	return text
+
+
+## A card fact as its own teller tells it: "Mara saw Bram carried off"
+## becomes "she saw Bram carried off".
+static func _as_told(fact: String, card: Dictionary) -> String:
+	var traits: Dictionary = card.get("traits", {})
+	var name := str(traits.get("name", ""))
+	if name.is_empty() or not fact.begins_with(name + " "):
+		return fact
+	return str(traits.get("pronoun", "they")) + fact.substr(name.length())
+
+
+## [param worker_id]'s first trade, "" for none.
+static func _trade_of(production: Production, worker_id: String) -> String:
+	var trades: Array = production.worker(worker_id).get("trades", [])
+	return str(trades[0]) if not trades.is_empty() else ""
+
+
+## One of [param worker_id]'s leanings ("intellect", "superstition",
+## "creativity", "integrity"), 1..10: the record's own when economy rolled
+## it, else about its trade's and type's profile (Production.mind_of).
+static func leaning_of(production: Production, worker_id: String, key: String) -> int:
+	var who := production.worker(worker_id)
+	var own: Variant = who.get(key)
+	if own is int or own is float:
+		return int(own)
+	return Production.mind_of(worker_id, _trade_of(production, worker_id), key, str(who.get("type", "")))
 
 
 ## [param text] is now true of resident [param worker_id]: on the card

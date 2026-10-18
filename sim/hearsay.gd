@@ -21,6 +21,11 @@ extends RefCounted
 
 const FILE := "res://levels/residents.json"
 const DEFAULTS := {"max": 8, "shown": 3, "claims_ticks": 150, "against": [7, 6], "beyond": [11, 10], "omen": [3, 6], "min_words": 4}
+## A thing a neighbour saw herself, passed on as gossip (decision 422):
+## believed always.
+const WITNESSED := "witnessed"
+## Where gossip is heard (Townsfolk.PLACES' meeting places), in words.
+const PLACE_WORDS := {"well": "at the well", "inn": "at the inn", "square": "in the square", "temple": "at the temple"}
 ## Words that make a line worth a claims ask: a statement about something,
 ## not a greeting or a bare question.
 ## Words that make a claim an omen when the claims ask did not say.
@@ -53,6 +58,8 @@ static func setting(key: String) -> Variant:
 ## beyond what they know: the higher of that and max(0, (superstition - a)
 ## / b), "omen"'s [a, b].
 static func p_believe(fits: String, intellect: int, omen := false, superstition := 5) -> float:
+	if fits == WITNESSED:
+		return 1.0  # A neighbour saying what she saw herself is no rumour (decision 422).
 	if fits not in ["against", "beyond"]:
 		return 0.0
 	var curve: Array = setting(fits)
@@ -91,11 +98,13 @@ static func worth_asking(line: String) -> bool:
 ## worker's "heard", changed in place) with whether it is believed, unless
 ## it agrees with what they know or is held already from them; the entry
 ## kept, or {}. [param who] seeds the roll (the worker id); [param intellect]
-## sets the curve; [param step] is when.
+## sets the curve; [param step] is when. [param where] is the place it was
+## heard (gossip, decision 422: "well", "inn", "square", "temple"), "" for
+## a line said to them.
 static func hear(heard: Array, who: String, intellect: int, claim: String, fits: String, from: String, step: int,
-		omen := false, superstition := 5) -> Dictionary:
+		omen := false, superstition := 5, where := "") -> Dictionary:
 	var text := claim.strip_edges().trim_suffix(".")
-	if text.is_empty() or fits not in ["against", "beyond"]:
+	if text.is_empty() or fits not in ["against", "beyond", WITNESSED]:
 		return {}
 	for entry: Dictionary in heard:
 		if _key(str(entry.get("text", ""))) == _key(text) and str(entry.get("from", "")) == from:
@@ -104,9 +113,25 @@ static func hear(heard: Array, who: String, intellect: int, claim: String, fits:
 	var rolled := roll(who, text)
 	var entry := {"id": _next_id(heard), "text": text, "from": from, "step": step, "fits": fits, "omen": omen,
 		"believed": rolled < chance, "roll": snappedf(rolled, 0.001), "chance": snappedf(chance, 0.001)}
+	if not where.is_empty():
+		entry["where"] = where
 	heard.append(entry)
 	_cap(heard)
 	return entry
+
+
+## Whether [param heard] holds [param text] already, from anyone.
+static func holds(heard: Array, text: String) -> bool:
+	var key := _key(text.strip_edges().trim_suffix("."))
+	for entry: Dictionary in heard:
+		if _key(str(entry.get("text", ""))) == key:
+			return true
+	return false
+
+
+## Where a thing was heard, in words: "at the well"; "" for no place.
+static func place_words(place: String) -> String:
+	return str(PLACE_WORDS.get(place, ""))
 
 
 ## The entries of [param heard] whose id is in [param ids], no longer
@@ -137,7 +162,9 @@ static func prompt_words(heard: Array) -> String:
 	var said: Array[String] = []
 	for entry in believed(heard):
 		var from := str(entry.get("from", ""))
-		said.append("%s told you that %s." % [from if not from.is_empty() else "Someone", _lower_first(str(entry["text"]))])
+		var where := place_words(str(entry.get("where", "")))
+		said.append("%s%s told you that %s." % [_upper_first(where) + ", " if not where.is_empty() else "",
+			from if not from.is_empty() else "Someone", _lower_first(str(entry["text"]))])
 	if said.is_empty():
 		return ""
 	return "You have heard, and believe it though you are not sure: %s" % " ".join(said)
@@ -178,6 +205,10 @@ static func _next_id(heard: Array) -> String:
 
 static func _key(text: String) -> String:
 	return RegEx.create_from_string("[^a-z0-9 ]").sub(text.to_lower(), "", true).strip_edges()
+
+
+static func _upper_first(text: String) -> String:
+	return text.left(1).to_upper() + text.substr(1)
 
 
 static func _lower_first(text: String) -> String:

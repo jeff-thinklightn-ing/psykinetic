@@ -19,5 +19,6 @@
 		"winter": {"morning": 1.0, "evening": -1.0},
 		"summer": {"morning": -0.5, "evening": 1.0}
 	},
-	"temple": {"every_days": 7, "from": 9, "to": 10}
+	"temple": {"every_days": 7, "from": 9, "to": 10},
+	"gossip": {"_": "Decision 422: every 'every' steps, in each town, residents standing at one of 'places' (never at work or home) pass one thing between two of them: a belief, or something the teller saw. No model call.", "every": 1200, "places": ["well", "inn", "square", "temple"]}
 }

@@ -597,8 +597,10 @@ func world_tick(slice := -1) -> void:
 		# Then its residents buy what they need (decision 353).
 		if economy != null:
 			economy.tick()
-		# Then what they do on the side (decision 393: the thief's lift).
+		# Then what they do on the side (decision 393: the thief's lift) and
+		# what they tell each other (decision 422: gossip).
 		Townsfolk.tick(production, stockpile)
+		Townsfolk.gossip(production)
 		if raid_groups != null:
 			raid_groups.world_tick()
 	if herds != null and slice <= 0:
