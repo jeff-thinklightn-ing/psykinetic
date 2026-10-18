@@ -208,7 +208,7 @@ func note_rescue(town: String, who_id: String, name: String, trade: String, orig
 		# A companion (decision 314): Main frees her into this town, a
 		# resident working her trade till her player comes.
 		record["captives"].erase(held[0])
-		_note(town, "%s, a companion taken by %s, is rescued and home" % [held[0]["name"], held[0]["by"]])
+		_note(town, "%s, a companion taken by %s, is rescued and home" % [held[0]["name"], faction_name(str(held[0]["by"]))])
 		add_xp(town, int(rules.get("xp", {}).get("rescue", 10)), "%s rescued" % held[0]["name"])
 		if companion_freed.is_valid():
 			companion_freed.call(who_id.trim_prefix("companion:"), town)
@@ -219,7 +219,7 @@ func note_rescue(town: String, who_id: String, name: String, trade: String, orig
 		record["captives"].erase(held[0])
 		record["residents"].append(who_id)
 		production.set_away(who_id, false)
-		_note(town, "%s the %s, taken by %s, is rescued and home" % [held[0]["name"], str(held[0]["trade"]).replace("_", " "), held[0]["by"]])
+		_note(town, "%s the %s, taken by %s, is rescued and home" % [held[0]["name"], str(held[0]["trade"]).replace("_", " "), faction_name(str(held[0]["by"]))])
 		add_xp(town, int(rules.get("xp", {}).get("rescue", 10)), "%s rescued" % held[0]["name"])
 		_seat(town)
 		rescued.emit(town, who_id, str(held[0]["by"]))
@@ -601,7 +601,7 @@ func carried_home(town: String, group_id: String, faction: String, captives: Arr
 		var her_name := str(her.get("name", who))
 		_town(town)["captives"].append({"id": who, "name": her_name, "trade": str(her.get("trade", "")), "origin": who,
 			"purse": 0, "taken_at": now(), "by": faction, "held_by": holder})
-		_note(town, "%s, a companion, is held by %s (%s)" % [her_name, faction, group_id])
+		_note(town, "%s, a companion, is held by %s (%s)" % [her_name, faction_name(faction), group_id])
 		out.append(who)
 	return out
 
@@ -634,7 +634,7 @@ func raid_arrives(town: String, group: Dictionary) -> Dictionary:
 		"margin": margin, "took": {"items": []}, "damaged": "", "captives": []}
 	var by := "raid:%s" % faction
 	if margin <= 0.0:
-		_note(town, "a raid by %s (%.1f) is fought off (defence %.1f)" % [faction, strength, defence(town)])
+		_note(town, "a raid by %s (%.1f) is fought off (defence %.1f)" % [faction_name(faction), strength, defence(town)])
 		raided.emit(town, report)
 		return report
 	var scale := clampf(margin / strength, 0.0, 1.0)
@@ -699,7 +699,7 @@ func raid_arrives(town: String, group: Dictionary) -> Dictionary:
 				_take(town, who, faction, group_id)
 			var taken: Dictionary = record["captives"].back()
 			report["captives"].append({"id": taken["id"], "name": taken["name"], "trade": taken["trade"]})
-	_note(town, "a raid by %s (%.1f against %.1f) took %s%s%s" % [faction, strength, strength - margin,
+	_note(town, "a raid by %s (%.1f against %.1f) took %s%s%s" % [faction_name(faction), strength, strength - margin,
 		report["took"], ", damaged the %s" % report["damaged"] if report["damaged"] != "" else "",
 		", carried off %s" % ", ".join(report["captives"].map(func(each: Dictionary) -> String: return each["name"]))
 			if not report["captives"].is_empty() else ""])
@@ -715,8 +715,9 @@ func raid_arrives(town: String, group: Dictionary) -> Dictionary:
 func resident_taken(town: String, who: String, by: String, faction := "") -> bool:
 	if who.begins_with("companion:") or who not in _towns.get(town, {}).get("residents", []) or production.worker(who).is_empty():
 		return false
-	_take(town, who, faction if not faction.is_empty() else str(rules.get("raids", {}).get("raiders", "raiders")), by)
-	_note(town, "%s is beaten down and carried off by %s" % [production.worker(who)["name"], by])
+	var taker := faction if not faction.is_empty() else str(rules.get("raids", {}).get("raiders", "raiders"))
+	_take(town, who, taker, by)
+	_note(town, "%s is beaten down and carried off by %s (%s)" % [production.worker(who)["name"], faction_name(taker), by])
 	return true
 
 
@@ -755,6 +756,15 @@ func _take_companion(town: String, who: String, faction: String, by: String) -> 
 func _on_hunted(town: String, who: String, kind: String) -> void:
 	var name := str(production.worker(who).get("name", who))
 	_note(town, "%s the hunter found no game" % name if kind.is_empty() else "%s the hunter brought home a %s" % [name, kind])
+
+
+## Faction [param id] as the town's log names it (Factions.display_name:
+## "the Blood Rot"); the id itself with no holdings (tests). Records keep
+## the id.
+func faction_name(id: String) -> String:
+	if production.holdings != null and production.holdings.factions != null:
+		return production.holdings.factions.display_name(id)
+	return id
 
 
 func _seated(who: String) -> bool:

@@ -4515,6 +4515,11 @@ Towns.buildings_of(town) gives {kind: {state, level}}. They are what the
 buildings worktree's views draw from (agreed with buildings): the state
 lives only in Towns, never in level files.
 
+Amended 2026-10-17 (maps' Blood Rot factions): the town's log names a
+faction by Factions.display_name ("a raid by the Blood Rot", Towns.faction_name,
+through production.holdings; the id with none). What is stored, a captive's
+"by" and the raid's faction, keeps the id ("goblins"), so saves read the same.
+
 ## 296. Art slots are made once before a room is built; the forest is measured from its edge
 
 A 256x256 outdoor map (the wilds) took 6 to 7 s to be ready, against

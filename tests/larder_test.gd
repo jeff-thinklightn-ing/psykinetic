@@ -135,6 +135,12 @@ func _test_raid() -> void:
 	var report := towns.raid_arrives(TOWN, {"id": "g1", "faction": "goblins", "strength": 100.0, "from": "x"})
 	_check(int(report["took"].get("meat", 0)) > 0 and int(report["took"].get("food", 0)) > 0, "meat and food taken (%s)" % [report["took"]])
 	_check(work.stockpile.count(TOWN, "hide") == 10 and work.stockpile.count(TOWN, "gold") == 10, "hides and gold left alone")
+	var empty: Array[String] = []
+	work.holdings = Holdings.new(WorldMap.build(empty), Factions.read())
+	var named := Factions.read().display_name("goblins")
+	_check(towns.faction_name("goblins") == named and named != "goblins", "the log names a faction by its display name (%s)" % named)
+	work.holdings = null
+	_check(towns.faction_name("goblins") == "goblins", "with no holdings, by its id")
 	for want in ["", "food", "gold"]:
 		work = _work()
 		towns = Towns.new({}, work, _rules, func() -> int: return _now)
