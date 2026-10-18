@@ -43,6 +43,7 @@ art-gen runs the slot again with the note.
 | 2026-10-15 | building.house roof | (awaits pick) | c5/c7 stretched x 1.8, z 1.65 to the 4.6×1.5×6.6 roof box, pivot at the eaves |
 | 2026-10-15 | plant.fern | (awaits pick) | budget 500 tris (was 250): c7 keeps its fronds at ~480 and is a lump at 250; no alpha cards, the kit stays mesh-on-palette (art-kit) |
 | 2026-10-15 | tree.log | (awaits pick) | c8 reads best; cleanup stretches it along z to the slot's 2 m |
+| 2026-10-17 | ground.needles | pass (p1–p4 as one set) | Jeff: "needle floor tile looks realistic"; art-gen's four procedural variants on the preview sheet; art-kit drops them in as the needle floor |
 | 2026-10-17 | item.bow | c2 | Jeff: "c2 bow" (art-kit had suggested c4; c2's mesh is crumbly, cleanup from its concept) |
 | 2026-10-17 | creature.deer, creature.stag, creature.wolf | pack meshes, palette-coloured | Jeff: "deer stag wolf look amazing"; Quaternius Ultimate Animated Animal Pack (CC0) on their own rigs, recoloured by pc-character's animal_palette tool |
 | 2026-10-17 | creature.rabbit | c4 | Jeff: "rabbit c4 - all look good"; rigged by pc-character (rabbit_rig, seven clips) |
