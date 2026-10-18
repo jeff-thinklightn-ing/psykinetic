@@ -1133,6 +1133,11 @@ var _trees: Dictionary[Vector2i, Node3D] = {}
 ## Past the forest, outdoors: its canopy and far floor (TerrainBorder),
 ## under the room; null indoors or where level.json says "border": "none".
 var _border: TerrainBorder
+## A grown forest's trees (decision 467) where the level has a canopy and
+## a trees.json: null elsewhere. The void cells under their trunks, which
+## the forest's ring leaves to them and the ground runs under.
+var _grown: GrownTrees
+var _grown_trunks: Dictionary[Vector2i, bool] = {}
 ## Glimpses of the levels past this one's ways out (decision 327): each
 ## planned ({to, terrain: the target's cells nearest us, moved into ours,
 ## cells: theirs and the lane to them}) before the forest is measured, so
@@ -1249,6 +1254,7 @@ func _process(delta: float) -> void:
 	_follow(delta)
 	_fade_clock += delta
 	_update_fade()
+	_update_grown()
 	_update_shadows()
 	_update_sky(delta)
 	_grow_scatter()
@@ -2395,6 +2401,8 @@ func rebuild(terrain: Dictionary, centre: Vector2i) -> void:
 	_trees.clear()
 	_saplings.clear()
 	_border = null
+	_grown = null
+	_grown_trunks.clear()
 	_glimpses.clear()
 	_buildings.clear()
 	_building_at.clear()
@@ -2592,6 +2600,13 @@ func _build_room() -> void:
 		for plan: Dictionary in _glimpse_plans:
 			for cell: Vector2i in plan["cells"]:
 				_wooded[cell] = true
+	var grown := {}
+	if _outdoor and str(_terrain.get("canopy_kind", "")) != "":
+		grown = GrownTrees.data_for(str(_terrain.get("level", "")))
+		_grown_trunks = GrownTrees.trunk_cells(grown, _land)
+		if not _grown_trunks.is_empty():
+			_wooded = _wooded.duplicate()
+			_wooded.merge(_grown_trunks)
 	_forest_distance.clear()
 	if _outdoor:
 		_forest_distance = _measure_forest()
@@ -2612,6 +2627,14 @@ func _build_room() -> void:
 	_add_walls()
 	if _outdoor:
 		_add_forest()
+		if not _grown_trunks.is_empty():
+			var ground: Dictionary[Vector2i, bool] = {}
+			for cell: Vector2i in _terrain["floor"]:
+				ground[cell] = true
+			_grown = GrownTrees.new()
+			_grown.name = "GrownTrees"
+			_room.add_child(_grown)
+			_grown.build(grown, _land, ground, _terrain.get("heights", {}), LEVEL_RISE, str(_terrain["canopy_kind"]) == "broadleaf")
 		if str(_terrain.get("border", "forest")) != "none":
 			_border = TerrainBorder.new()
 			_border.name = "Border"
@@ -4076,6 +4099,8 @@ func _build_ground(kinds: Dictionary) -> void:
 	for cell: Vector2i in _forest_distance:
 		if _forest_distance[cell] >= 1 and _forest_distance[cell] <= ground_ring:
 			cells.append(cell)
+	# The ground runs under a grown forest's trunks (decision 467).
+	cells.append_array(_grown_trunks.keys())
 	_ground_cells = cells
 	_ground_water_end = water_end
 	_ground_floor_end = floor_count
@@ -5936,6 +5961,15 @@ func _hiding_pieces(points: Array[Vector3], toward: Vector3) -> Dictionary[Node3
 
 ## Where the local player and their companion are, at FADE_HEIGHTS: as
 ## drawn, or at their tile before they have a puppet.
+## A grown forest's cutaway on the local player (else the view's middle),
+## its near chunks round the view's middle.
+func _update_grown() -> void:
+	if _grown == null:
+		return
+	var points := _focus_points()
+	_grown.set_focus(_room.to_local(points[0]) if not points.is_empty() else _camera_target, _camera_target)
+
+
 func _focus_points() -> Array[Vector3]:
 	var out: Array[Vector3] = []
 	for entity in World.get_entities():

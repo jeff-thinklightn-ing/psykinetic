@@ -11822,12 +11822,57 @@ trees.json; the game draws from it and grows nothing.
   trees_yN.json at those years.
 - Grown crowns close over small clearings, as real ones do: a clearing that
   should stay sunlit needs a radius of 6 or more.
-The client's drawing of trees.json (a trunk, needle pads along each live
-branch, a bare stick for each dead one, a snag grey and broken) lands next,
-under this number. Rejected: growing at level load (minutes in GDScript, and
-the same every load); growing per player chunk (the same stand everywhere is
-the point); the space-colonisation broadleaf of the first study (no years,
-no light, a preset crown).
+Rejected: growing at level load (minutes in GDScript, and the same every
+load); growing per player chunk (the same stand everywhere is the point);
+the space-colonisation broadleaf of the first study (no years, no light, a
+preset crown).
+
+The client's drawing (GrownTrees, client3d/grown_trees.gd; the coordinator's
+approval of the pad pass, 2026-10-18):
+- In a level with a canopy (466) and a trees.json in its own folder (never
+  an overlay's), a tree of 3 m or more is drawn where its cell is not land
+  (ForestPack's trunk), a smaller one where it is floor; any tree the
+  layout no longer agrees with is left out. A tree's cell is its "at"
+  floored (the grower's cell x spans x to x + 1). Those trunk cells are left
+  out of the forest's ring and the border (put in the "wooded" set) and the
+  ground runs under them.
+- A trunk, needles as small pads along each live branch (one each 0.62 to
+  0.88 m by tree, none over 0.55 m), a stick for each dead branch; every
+  crown its own by its place: droop, pad size and shape, reach, tone, turn.
+  A tall tree's live branch below 2.1 m is a stick only; a pad below 3.4 m
+  droops and thickens to a branch's tip, not a shelf at head height.
+- Chunks of 8 x 8 cells, two ways: far (a trunk and one pad a whorl) built
+  for all with the room; near (every pad) built on worker threads for the
+  chunks within 34 m of the view's middle (panned or not), dropped past
+  46 m, and added one a frame (16-cell chunks cost a 14 to 27 ms frame each
+  as they came in).
+- The see-through (Jeff, 2026-10-18: "use transparency that moves with
+  player to see through the tree tops since its a isometric game"):
+  round the line from the player's body toward the camera, 4.5 m, its edge
+  soft over 2 m, whatever is above their knees and on the camera's side is
+  faded toward the near walls' NEAR_ALPHA (see_through.gdshaderinc). It is
+  decision 188's fade: the chunks within 20 m of the player draw three
+  passes, opaque but for the region (season_cut, dithered where the two
+  meet, at alpha near 1), the region's depth (season_see_depth, at
+  NEAR_DEPTH_PRIORITY), its colour faded (season_see, at NEAR_PRIORITY), so
+  a faded crown shows its nearest surface only; the rest draw the opaque
+  pass alone. It moves with the player's drawn place, so nothing pops. Each
+  piece has a shadow-only twin, so the canopy's shadows and the dark under
+  it stay whole; the crowns stay opaque outside the region, in the rain's
+  heightfield.
+- levels/forest: its trees grown from maps' 464 layout (740 at 100 years,
+  710 trunks about 2 m apart, 12.6 m tall), 716 void cells (snags too) laid
+  by make_forest. In the game's view there (map_bench, 6 s each): 500 to
+  780 fps on average; the worst single frame 4.5 to 6.5 ms standing, 7.5 to
+  10 ms while the view pans into new chunks or turns and walks.
+  With the see-through, standing under the roof: 575 to 605 fps on
+  average, the worst frame 7.5 to 13.5 ms.
+Rejected: fading whole trees as the ring's are (hundreds of nodes to test
+a frame, and a whole 13 m tree gone for one crown in the way); a dithered
+hole over the player (the first cut: Jeff asked for transparency); every
+chunk drawing the see-through's passes (three times the vertices for
+crowns it never reaches); full pads for every chunk (2.5 M triangles,
+150 MB for a 96 x 96 forest).
 tests/farm_test (the look through a year with a late storm: bare, sown,
 growing, flattened, ripe, bare; each change told once); protocol_test.
 

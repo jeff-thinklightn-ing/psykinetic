@@ -39,6 +39,7 @@ func _ready() -> void:
 	_test_pine_stands()
 	_test_ground_textures()
 	_test_canopy_mask()
+	_test_grown_trees()
 	_test_seasons()
 	_test_heights()
 	_test_hills()
@@ -1813,6 +1814,78 @@ func _test_canopy_mask() -> void:
 			and absf(image.get_pixel(2, 1).r - 0.5) < 0.01 and image.get_pixel(0, 0).r == 0.0,
 			"each cell's cover at its texel from the origin, none elsewhere, a cell off the grid left out")
 	_check(Client3D.canopy_mask({}, Vector2i.ZERO, Vector2i(8, 6)) == null, "no canopy: no texture")
+
+
+func _test_grown_trees() -> void:
+	print("\n== a grown forest's trees: on their trunks' void, the ring left out, near pads by the view, seen through round the player ==")
+	var map := LevelMap.new(Vector2i(64, 24))
+	for y in 24:
+		for x in 64:
+			map.set_cell(Vector2i(x, y), "grass")
+	map.set_cell(Vector2i(2, 2), "start")
+	var whorls := [{"y": 1.2, "branches": [[0.3, 1.4]]}, {"y": 5.0, "branches": [[0.0, 1.6], [2.1, 1.5], [4.2, 1.3]]}, {"y": 8.0, "branches": [[1.0, 1.0]]}]
+	var tree := func(at: Vector2, height: float) -> Dictionary:
+		return {"at": [at.x, at.y], "height": height, "radius": 0.2, "lean": [0.0, 0.0], "state": "live", "whorls": whorls if height >= 3.0 else [], "dead": [[2.0, 1.0, 0.8]]}
+	var trees: Array = [tree.call(Vector2(5.5, 5.5), 10.0), tree.call(Vector2(8.4, 6.7), 9.0), tree.call(Vector2(60.5, 20.5), 11.0),
+		tree.call(Vector2(10.5, 10.5), 1.5), tree.call(Vector2(12.5, 12.5), 8.0)]
+	for cell: Vector2i in [Vector2i(5, 5), Vector2i(8, 6), Vector2i(60, 20)]:
+		map.set_cell(cell, "void")
+	var level := Level.parse(map.to_image(), null, {"canopy": {"kind": "evergreen"}})
+	var terrain: Dictionary = level["terrain"]
+	terrain["level"] = "view_test_grown"
+	terrain["outdoor"] = true
+	GrownTrees.registered["view_test_grown"] = {"trees": trees}
+	_rig.rebuild(terrain, Vector2i(4, 4))
+	var grown := _rig._grown
+	var chunk_of := func(cell: Vector2i) -> Vector2i: return Vector2i(floori(cell.x / float(GrownTrees.CHUNK)), floori(cell.y / float(GrownTrees.CHUNK)))
+	var expected := {}
+	for cell: Vector2i in [Vector2i(5, 5), Vector2i(8, 6), Vector2i(10, 10), Vector2i(60, 20)]:
+		expected[chunk_of.call(cell)] = true
+	_check(grown != null and grown.tree_count == 4 and grown.chunks.size() == expected.size(),
+			"the three on void and the undergrowth on grass drawn; the tall one on grass not (%s trees, %s chunks)" % [grown.tree_count if grown else -1, grown.chunks.size() if grown else -1])
+	_check(not _rig._trees.has(Vector2i(5, 5)) and not _rig._trees.has(Vector2i(8, 6)) and _rig._grounds.has(Vector2i(5, 5)),
+			"no ring tree on a grown trunk's cell, and the ground runs under it")
+	grown.set_focus(Vector3(5.0, 0.0, 5.0), Vector3(5.0, 0.0, 5.0))
+	grown.finish()
+	var near_one: Node3D = grown.chunks[chunk_of.call(Vector2i(5, 5))]["near"]
+	var far_one: Node3D = grown.chunks[chunk_of.call(Vector2i(60, 20))]["near"]
+	_check(near_one != null and not (grown.chunks[chunk_of.call(Vector2i(5, 5))]["far"] as Node3D).visible and far_one == null
+			and (grown.chunks[chunk_of.call(Vector2i(60, 20))]["far"] as Node3D).visible,
+			"the chunk by the focus drawn near, its far hidden; one past NEAR_REACH stays far")
+	var drawn := near_one.get_node("Drawn") as MeshInstance3D
+	var twin := near_one.get_node("Shadow") as MeshInstance3D
+	var far_drawn := (grown.chunks[chunk_of.call(Vector2i(5, 5))]["far"] as Node3D).get_node("Drawn") as MeshInstance3D
+	_check(drawn.cast_shadow == GeometryInstance3D.SHADOW_CASTING_SETTING_OFF and twin.cast_shadow == GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY
+			and twin.mesh == drawn.mesh, "drawn with no shadow of its own; a twin casts it, uncut")
+	var near_tris: int = drawn.mesh.surface_get_array_len(0) / 3
+	var far_tris: int = far_drawn.mesh.surface_get_array_len(0) / 3
+	_check(far_tris * 2 < near_tris, "the far a fraction of the near (%d to %d triangles)" % [far_tris, near_tris])
+	var material := drawn.material_override as ShaderMaterial
+	var see_colour := material.next_pass as ShaderMaterial
+	var depth := see_colour.next_pass as ShaderMaterial if see_colour != null else null
+	_check((material.get_shader_parameter("focus") as Vector3).is_equal_approx(Vector3(5.0, 0.9, 5.0)) and see_colour != null and depth != null
+			and see_colour.render_priority == Client3D.NEAR_PRIORITY and depth.render_priority == Client3D.NEAR_DEPTH_PRIORITY
+			and is_equal_approx(float(see_colour.get_shader_parameter("alpha")), Client3D.NEAR_ALPHA)
+			and (see_colour.get_shader_parameter("focus") as Vector3).is_equal_approx(Vector3(5.0, 0.9, 5.0)),
+			"by the player, seen through: opaque but for it, its depth, then its colour at NEAR_ALPHA after (decision 188's order), on the player")
+	var far_drawn_off := (grown.chunks[chunk_of.call(Vector2i(60, 20))]["far"] as Node3D).get_node("Drawn") as MeshInstance3D
+	_check((far_drawn_off.material_override as ShaderMaterial).next_pass == null, "a chunk far from the player the opaque pass alone")
+	var arrays := drawn.mesh.surface_get_arrays(0)
+	var low := 0
+	for i in (arrays[Mesh.ARRAY_VERTEX] as PackedVector3Array).size():
+		var colour: Color = arrays[Mesh.ARRAY_COLOR][i]
+		if arrays[Mesh.ARRAY_VERTEX][i].y < GrownTrees.PAD_CLEAR - 0.3 and colour.g > colour.r + 0.05:
+			low += 1
+	_check(low == 0, "a tall tree's low branch a stick, no pad of needles at head height (%d points)" % low)
+	grown.set_focus(Vector3(5.0, 0.0, 5.0), Vector3(60.0, 0.0, 20.0))
+	grown.finish()
+	_check(grown.chunks[chunk_of.call(Vector2i(5, 5))]["near"] == null and (grown.chunks[chunk_of.call(Vector2i(5, 5))]["far"] as Node3D).visible,
+			"the view moved off past DROP_REACH, the player not: the near dropped there and the far back")
+	GrownTrees.registered.erase("view_test_grown")
+	terrain.erase("canopy_kind")
+	_rig.rebuild(terrain, Vector2i(4, 4))
+	_check(_rig._grown == null and [Vector2i(5, 5), Vector2i(8, 6), Vector2i(60, 20)].any(func(cell: Vector2i) -> bool: return _rig._trees.has(cell)),
+			"no canopy: no grown trees, the ring's trees on the void as before")
 
 
 func _test_ground_textures() -> void:

@@ -20,6 +20,12 @@ uniform sampler2D tile_texture : source_color, filter_linear_mipmap, repeat_enab
 uniform float world_tile = 0.0;
 varying float up;
 varying vec2 world_xz;
+#ifdef CUTAWAY
+// A grown forest's trees (GrownTrees, decision 467): the see-through round
+// the player. The opaque pass leaves out what is in it (dithered at its
+// edge); SEE_THROUGH draws only that, faded toward alpha as a near wall is.
+#include "res://client3d/see_through.gdshaderinc"
+#endif
 
 vec3 to_linear(vec3 c) {
 	return mix(pow((c + vec3(0.055)) * (1.0 / 1.055), vec3(2.4)), c * (1.0 / 12.92), lessThan(c, vec3(0.04045)));
@@ -28,9 +34,24 @@ vec3 to_linear(vec3 c) {
 void vertex() {
 	up = normalize((MODEL_MATRIX * vec4(NORMAL, 0.0)).xyz).y;
 	world_xz = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xz;
+#ifdef CUTAWAY
+	see_world = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
+#endif
 }
 
 void fragment() {
+#ifdef CUTAWAY
+	float see = see_weight(INV_VIEW_MATRIX);
+#ifdef SEE_THROUGH
+	if (see <= see_bayer(FRAGCOORD.xy)) {
+		discard;
+	}
+#else
+	if (see > see_bayer(FRAGCOORD.xy)) {
+		discard;
+	}
+#endif
+#endif
 	vec3 colour = albedo_color.rgb;
 	if (use_texture) {
 		colour *= texture(albedo_texture, UV).rgb;
@@ -57,5 +78,8 @@ void fragment() {
 	ROUGHNESS = roughness;
 #ifdef NEAR
 	ALPHA = alpha;
+#endif
+#ifdef SEE_THROUGH
+	ALPHA = mix(1.0, alpha, see);
 #endif
 }
