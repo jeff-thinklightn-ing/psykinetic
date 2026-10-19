@@ -3600,6 +3600,8 @@ func _on_counter_message(data: Dictionary) -> void:
 func _on_shop_message(data: Dictionary) -> void:
 	if data.has("gold"):
 		gold = int(data["gold"])
+		if converse != null:
+			converse.gold = gold
 	if shop_panel != null:
 		shop_panel.gold = gold
 		if data.has("shop"):
@@ -5720,8 +5722,23 @@ func open_converse(body: GridEntity) -> void:
 		return
 	converse.open(body, _display_name(body))
 	var player := _local_player()
+	converse.gold = gold
+	converse.at_counter = player != null and shop_counter_in_reach(player)
 	if player != null and "offers" in Net.MESSAGE_KINDS:
 		World.command(player, "offers", {"entity": str(body.get_path())})
+
+
+## Client: whether a shop counter stands within [param player]'s reach, the
+## test the server makes for a buy from the talk (_counter_near, without
+## the town, which the client cannot name); for ConversePanel.at_counter
+## (decision 512).
+func shop_counter_in_reach(player: GridEntity) -> bool:
+	if player == null:
+		return false
+	for entity: GridEntity in World.get_entities():
+		if entity is Chest and (entity as Chest).shop and entity.spawned and World.reaches(player, entity):
+			return true
+	return false
 
 
 ## An offer accepted on the panel: npc's "offer" command ({id}, and gold
@@ -6766,6 +6783,8 @@ func _on_world_ticked(tick: int) -> void:
 		elif player.raised == "draw":
 			hp_text += "   bow drawn"  # How far: the body, the ring and the creak (decision 475); F3 has the number.
 	_hud_tick = tick
+	if converse != null and converse.visible and player != null:
+		converse.at_counter = shop_counter_in_reach(player)  # Decision 512: the buy's place, as the player moves.
 	hud.text = hp_text
 	if player != null and _connect_joining and connect_screen != null:
 		_connect_joining = false
@@ -7838,6 +7857,9 @@ func _test_converse(player: Player) -> bool:
 		{"id": "t2", "kind": "shop", "title": "A loaf, 2 gold", "words": "Baked this morning.", "accept": "buy", "cost": 2},
 		{"id": "t3", "kind": "rumour", "title": "What Tam said", "words": "At the well, Tam told me the mine is cursed.", "accept": "", "cost": 0}],
 		[{"id": "t0", "kind": "commission", "title": "Walk Tam home", "open": true}])
+	converse.gold = 1  # Decision 512: a purse too short for the loaf, in the shot.
+	if shop_panel != null:
+		shop_panel.gold = 1  # The badge by the pack says the same purse.
 	return true
 
 

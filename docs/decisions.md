@@ -14342,7 +14342,7 @@ UiCost): each panel adds the microseconds its frame work took under a name,
 and --test-ui-cost prints the average per frame at exit. Before: pack 0.295
 ms/frame every frame, the HUD block (compass place, counter placement, the
 cursor hint with its picks) 0.055, shop 0.006, talk 0.003; all 0.360
-ms/frame. After: the off-peak run's numbers follow in an amendment to this entry.
+ms/frame. After (amended 2026-10-19, the off-peak run): pack 0.004 ms/frame (from 0.295), hud block 0.011 (from 0.055), shop 0.005, talk 0.002; all 0.023 ms/frame (from 0.360), over 16303 frames; the frame budget after, tools/frame_budget.ps1 on the same town (9 players, 4 herds, storm at night, minimap open, 1080p): median 2.26 ms, 99th 5.07 ms, worst 19.3 ms (no before was captured: the first run deadlocked the gate).
 
 - PackPanel laid out both rows every frame (Items lookups, icon lookups,
   label overrides). It now keeps a signature of what it shows (the player,
@@ -14360,8 +14360,9 @@ ms/frame. After: the off-peak run's numbers follow in an amendment to this entry
   compass's place out when the player's cell or the tick changes, and
   places the counter panel only when the pack's rect, the shop's box or its
   own minimum size changed.
-- Not mine, reported to maps and perf: render/minimap.gd queue_redraw()s
-  every frame.
+- The minimap looked like a redraw every frame in this tree's copy, but
+  maps' 482 (ab96edb) had already keyed it to the marks' hash; nothing to
+  do.
 
 Behaviour unchanged (ui_test, items_test); client only; protocol unchanged.
 ## 507. Builder mode places every monster kind, from data
@@ -14656,3 +14657,33 @@ of sight are unchanged (no thinning: a meadow is seen over).
 A companion on Heel keeps her player through grass both ways: Heel reads no
 Senses, and her Senses never hide her keeper. Server only, protocol
 unchanged. tests/monster_test (_test_cover).
+
+## 512. The merchant's trade read in the conversation panel
+
+Ui, the coordinator's item 3 (Snagfin's counter). Npc's 471 seats him at
+his stall and his stock reaches the player as one "shop" offer row a talk
+(435, 440: title "A knife, 12 gold", accept "buy", what {uid, id, price,
+town}); accepting buys through World.try_buy at the town's counter (438),
+which the player must stand within reach of, else a party-log line; his
+stall has no counter of its own; prices are fixed and nothing haggles
+(npc: an economy + npc design if Jeff wants it, with the "cheated" key as
+its other half). The interface's part is to make that trade readable
+where it is offered, client only:
+
+- ConversePanel.gold (Main's purse, from the "shop" message) and
+  ConversePanel.at_counter (Main.shop_counter_in_reach: a spawned shop
+  Chest within World.reaches of the player, the server's own test without
+  the town, which the client cannot name; set when the talk opens and
+  re-read each world tick while it is open). A change to either shows the
+  same offers again; nothing is rebuilt otherwise.
+- A shop row: its price in brass, or in rust as "12 gold, you carry 8"
+  when short; a caption "at the town's counter", or "walk to the town's
+  counter first" while no counter is in reach, when the button reads "Buy
+  at the counter" instead of "Buy". The button still sends the accept;
+  the server still decides.
+- The foot: "You carry N gold" whenever anything is for sale.
+- --test-show=converse sets a purse of 1 for the shot; ui_test checks the
+  row both ways and the client's reach test.
+
+Haggling words wait for Jeff's answer (economy and npc). Protocol
+unchanged; no new class_name.

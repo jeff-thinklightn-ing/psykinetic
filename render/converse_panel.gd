@@ -30,6 +30,27 @@ const KIND_WORDS := {"shop": "for sale", "commission": "work", "rumour": "rumour
 
 ## The resident spoken with (null: closed).
 var resident: GridEntity
+## The local player's purse, as Main last heard it (the "shop" message):
+## a shop row's price reads in rust with "you carry N" when it is short,
+## and the foot says what they carry while anything is for sale
+## (decision 512).
+var gold := 0:
+	set(value):
+		if gold == value:
+			return
+		gold = value
+		_show_trade()
+## Whether a shop counter stands within the player's reach, Main's own
+## reach test re-read each tick while the panel is open (decision 512): a
+## buy from the talk happens at the town's counter, so a shop row's button
+## says "Buy at the counter" and its caption where to stand until then.
+## The server still decides.
+var at_counter := true:
+	set(value):
+		if at_counter == value:
+			return
+		at_counter = value
+		_show_trade()
 ## The offers shown, as sent.
 var offers: Array[Dictionary] = []
 var thinking := false
@@ -40,6 +61,9 @@ var _dots: Label
 var _lines: VBoxContainer
 var _offer_rows: VBoxContainer
 var _owed: Label
+var _purse: Label
+## What show_offers was last given as owed, for _show_trade.
+var _owed_given: Array = []
 var _asks: HBoxContainer
 var _thinking_since := 0.0
 var _since := 0.0
@@ -89,6 +113,10 @@ func _ready() -> void:
 	_owed.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_owed.visible = false
 	column.add_child(_owed)
+	_purse = Label.new()
+	_purse.theme_type_variation = &"Caption"
+	_purse.visible = false
+	column.add_child(_purse)
 	_asks = HBoxContainer.new()
 	_asks.add_theme_constant_override("separation", UiTheme.constant("unit"))
 	for ask: String in ASKS:
@@ -167,6 +195,7 @@ func set_thinking(on: bool) -> void:
 ## what, accept, cost); [param owed]: the open commissions the player holds
 ## for them ("open" true), listed as what they owe.
 func show_offers(given: Array, owed: Array) -> void:
+	_owed_given = owed.duplicate()
 	offers.clear()
 	for child in _offer_rows.get_children():
 		_offer_rows.remove_child(child)
@@ -181,6 +210,16 @@ func show_offers(given: Array, owed: Array) -> void:
 			owing.append(str(each.get("title", each.get("words", ""))))
 	_owed.text = "You owe them: %s" % ", ".join(owing) if not owing.is_empty() else ""
 	_owed.visible = not owing.is_empty()
+	var selling := offers.any(func(each: Dictionary) -> bool: return str(each.get("accept", "")) == "buy")
+	_purse.text = "You carry %d gold" % gold if selling else ""
+	_purse.visible = selling
+
+
+## The rows and the foot again from the same offers, once the purse or the
+## counter's reach changed (nothing is rebuilt otherwise).
+func _show_trade() -> void:
+	if is_node_ready() and not offers.is_empty():
+		show_offers(offers.duplicate(), _owed_given)
 
 
 ## The offers' titles and their buttons' words, in order (tests).
@@ -218,10 +257,19 @@ func _offer_row(offer: Dictionary) -> HBoxContainer:
 	row.add_child(words)
 	var cost := int(offer.get("cost", 0))
 	var accept := str(offer.get("accept", ""))
+	var sale := accept == "buy"
+	if sale:
+		var where := Label.new()
+		where.name = "Where"
+		where.theme_type_variation = &"Caption"
+		where.text = "at the town's counter" if at_counter else "walk to the town's counter first"
+		words.add_child(where)
 	if cost > 0 and accept != "lend":
 		var price := Label.new()
-		price.text = "%d gold" % cost
-		price.add_theme_color_override("font_color", UiTheme.color("brass"))
+		price.name = "Price"
+		var short := sale and gold < cost
+		price.text = "%d gold, you carry %d" % [cost, gold] if short else "%d gold" % cost
+		price.add_theme_color_override("font_color", UiTheme.color("rust" if short else "brass"))
 		price.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		row.add_child(price)
 	if not accept.is_empty():
@@ -239,7 +287,7 @@ func _offer_row(offer: Dictionary) -> HBoxContainer:
 			row.add_child(amount)
 		var button := Button.new()
 		button.name = "Accept"
-		button.text = str(ACCEPT_WORDS.get(accept, accept.capitalize()))
+		button.text = "Buy at the counter" if sale and not at_counter else str(ACCEPT_WORDS.get(accept, accept.capitalize()))
 		button.focus_mode = Control.FOCUS_NONE
 		button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		button.pressed.connect(func() -> void:

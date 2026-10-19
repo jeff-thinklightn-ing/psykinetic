@@ -302,6 +302,22 @@ func _test_converse_panel() -> void:
 	_check(panel.offers_shown() == ["Bring Bram home [Take it on]", "A loaf, 2 gold [Buy]", "What Tam said", "A loan of 10 [Lend]"],
 		"the offers: a title, the accept's words, none for a rumour (%s)" % [panel.offers_shown()])
 	_check(panel._owed.visible and panel._owed.text == "You owe them: Walk Tam home", "an open commission as what the player owes")
+	# Decision 512: the shop row reads the purse and the counter's reach.
+	panel.gold = 5
+	panel.at_counter = true
+	var loaf: HBoxContainer = panel._offer_rows.get_child(1)
+	_check(panel.offers_shown()[1] == "A loaf, 2 gold [Buy]" and (loaf.get_node("Price") as Label).text == "2 gold"
+		and (loaf.find_child("Where", true, false) as Label).text == "at the town's counter" and panel._purse.visible and panel._purse.text == "You carry 5 gold",
+		"at the counter with gold enough: Buy, the price in brass, the purse in the foot (%s)" % [panel.offers_shown()])
+	panel.gold = 1
+	panel.at_counter = false
+	loaf = panel._offer_rows.get_child(1)
+	_check(panel.offers_shown()[1] == "A loaf, 2 gold [Buy at the counter]" and (loaf.get_node("Price") as Label).text == "2 gold, you carry 1"
+		and (loaf.find_child("Where", true, false) as Label).text == "walk to the town's counter first",
+		"away from it and short: Buy at the counter, the price with what they carry, where to stand (%s)" % [panel.offers_shown()])
+	_check(_main.shop_counter_in_reach(_main._local_player()) == false, "the client's reach test: no shop counter near the test player")
+	panel.gold = 5
+	panel.at_counter = true
 	var got := []
 	panel.offer_accepted.connect(func(id: String, gold: int) -> void: got.assign([id, gold]))
 	(panel._offer_rows.get_child(0).get_node("Accept") as Button).pressed.emit()
