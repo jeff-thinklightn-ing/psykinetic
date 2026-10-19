@@ -915,7 +915,8 @@ func _crop(town: String) -> void:
 	if season != crop_now["season"]:
 		_crop_turn(town, crop_now, str(crop_now["season"]), season)
 		crop_now["season"] = season
-	var farming := production.manned("%s:field" % town)
+	# Only while the town holds its farm, if it has one (decision 521).
+	var farming := production.manned("%s:field" % town) and production.site_works(town, "farmer")
 	match season:
 		"spring":
 			if crop_now["stage"] == "" and farming:
@@ -1147,14 +1148,22 @@ func _woodcut(town: String) -> void:
 	var levels := int(shed.get("level", 0)) if shed.get("state") in [STANDING, BUILDING] else 0
 	for who in residents(town):
 		var worker := production.worker(who)
-		if worker.is_empty() or trade not in worker.get("trades", []) or Production.off_work(worker) or production.outside(who):
+		if worker.is_empty() or trade not in worker.get("trades", []) or Production.off_work(worker):
 			continue
 		if not due.has(who):
 			due[who] = now() + every
 			continue
 		if now() < int(due[who]):
 			continue
+		# At the town's woodlot, if it has one (decision 521).
+		var trip := production.site_turn(town, who, trade)
+		if trip == Production.WALKING:
+			continue
+		if trip == Production.NO_SITE and production.outside(who):
+			continue
 		due[who] = now() + every
+		if trip == Production.BLOCKED:
+			continue
 		var wood := int(rule.get("wood", 2)) + int(rule.get("per_level", 1)) * levels
 		production.deliver_to(town, who, "wood", wood, "woodcutter:%s" % who, "%s's cutting" % worker["name"])
 

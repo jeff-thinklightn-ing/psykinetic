@@ -15262,3 +15262,45 @@ patch read as the lawn's tufts from the game's camera.
   monster's strikes for its weapon list one clip, so every swing after its
   first erred (a modulo by zero). With none left it picks among them all.
   pc-character adds the test on 390's side.
+## 521. A trade works from its town's site
+
+Builder's places-and-holdings design, the coordinator's approval: maps'
+517 gave places the kinds woodlot, hunting_ground and quarry and a "town",
+builder's 520 marks them; this is economy's rule that makes them yield.
+Jeff's "everything has to be gathered and someone paid to do it" meeting
+holdings: raiders on the woodlot stop the wood.
+- Holdings.place(id) carries "town" (maps' OK, in this landing): the full
+  place id of the stockpile it works for ("<area>/<key>"), "" for none.
+  Not saved: places are rebuilt from the map.
+- economy.json sites.trades: woodcutter -> woodlot, hunter ->
+  hunting_ground, farmer -> farm (quarry and mine wait for a miner).
+  Production.site_of(town, trade): the first Holdings place of that kind
+  whose town is the town.
+- No site of the kind: today's yield, unchanged; old levels are as they
+  were.
+- A site the town holds (its faction's, strength left, its ground not
+  contested): when the work is due the worker walks there and back,
+  Production.site_walk: the cells from the store there and back at
+  sites.steps_per_cell (4), sites.other_area (3000) for a site in another
+  area. Bodiless, on the slow tick (Towns' woodcut, Production's hunts):
+  the worker is outside the walls (Production.outside: no hauling, no
+  caravan) and the yield comes in when they are back (site_turn WALKING
+  then BACK; the trips saved, Production "trips"). The hunter hunts the
+  site's area and cell (Production.hunt_at, Main: Herds.hunt_one there).
+  The farmer's sowing and harvest count only while the farm is held
+  (site_works).
+- A site held by another faction or contested: no yield (site_turn
+  BLOCKED), one "[production] <town>'s woodlot is held by goblins: Bran
+  gets nothing from it" line a change, and the town UNEASY
+  (Production._safety: its uneasy_extra wants). Retaken: worked again at
+  once, said once.
+- Not checked at runtime: a site that can't be reached on foot. Builder's
+  site_checks (520) warns of it when the level is made; the server has no
+  cheap reach test across an area yet.
+Soak (30 days, 3 players, a woodlot 30 cells from the store put in by
+tools/town_soak --woodlot=30,0, taken by goblins at day 15
+(--woodlot-taken=15)): wood a day 37, 21, 15, 12, 15, 6 ... 3, 15 (day
+15), then 0 every day after, the one line said; officials unpaid 207,
+treasury end 1 (the inn never stood, short of wood and leather).
+Protocol unchanged. production_test.
+

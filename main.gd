@@ -2278,6 +2278,8 @@ func _boot() -> void:
 	# Gathered and made raws bought by the store, materials by the makers (decision 498).
 	World.production.deliver = World.economy.deliver
 	World.production.buy_materials = World.economy.buy_materials
+	World.production.hunt_at = func(_town: String, site: Dictionary) -> String:
+		return World.herds.hunt_one(str(site["area"]), site["cell"]) if World.herds != null else ""
 	World.production.hunt = func(town: String) -> String:
 		var place := World.holdings.place(town)
 		var cell: Vector2i = place.get("cell", Vector2i.ZERO)

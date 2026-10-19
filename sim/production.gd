@@ -76,6 +76,14 @@ var returned := Callable()
 ## (decision 407; Main sets it: Herds.hunt_one near its store): the kind
 ## caught, or "" for no game.
 var hunt := Callable()
+## (town, site place) -> the kind caught: a hunter hunting at the town's
+## hunting ground (decision 521); hunt's at the store without one.
+var hunt_at := Callable()
+## Workers on the way to or at their trade's site: worker id -> the step
+## they are back (decision 521).
+var _trips: Dictionary = {}
+## Each site's last state said (decision 521): site id -> why ("" worked).
+var _site_said: Dictionary = {}
 ## (town, worker_id, what, count, why) -> bool: a gatherer's delivery to
 ## the town's store, bought and hauled (Economy.deliver, decision 498);
 ## false when the store won't take it. Unset (tests), it is banked free.
@@ -552,6 +560,8 @@ func manned(workshop_id: String) -> bool:
 ## Whether [param worker_id] lives outside any town's purse (rules'
 ## return.places with "outside": the medicine man): no rent, no needs.
 func outside(worker_id: String) -> bool:
+	if _trips.has(worker_id):
+		return true
 	var trades: Array = _workers.get(worker_id, {}).get("trades", [])
 	for place: Dictionary in rules.get("return", {}).get("places", {}).values():
 		if bool(place.get("outside", false)) and str(place.get("trade", "")) in trades:
@@ -880,16 +890,22 @@ func _hunts(at: int) -> void:
 	var every := maxi(int(rule.get("every", 3000)), 1)
 	for id in worker_ids():
 		var worker_record: Dictionary = _workers[id]
-		if trade not in worker_record["trades"] or off_work(worker_record):
+		if trade not in worker_record["trades"] or off_work(worker_record) and not _trips.has(id):
 			continue
 		if int(worker_record["hunt_due"]) == 0:
 			worker_record["hunt_due"] = at + every
 			continue
 		if at < int(worker_record["hunt_due"]):
 			continue
-		worker_record["hunt_due"] = at + every
 		var town: String = worker_record["town"]
-		var kind := str(hunt.call(town))
+		var trip := site_turn(town, id, trade)
+		if trip == WALKING:
+			continue
+		worker_record["hunt_due"] = at + every
+		if trip == BLOCKED:
+			continue
+		var site := site_of(town, trade)
+		var kind := str(hunt_at.call(town, site)) if not site.is_empty() and hunt_at.is_valid() else str(hunt.call(town))
 		var by := "hunter:%s" % id
 		for drop: Variant in Monster.kinds().get(kind, {}).get("drops", []):
 			var item := str(drop.get("item", "")) if drop is Dictionary else ""
@@ -989,7 +1005,102 @@ func _safety(town: String, since: int) -> String:
 	for id in holdings.places_in(place["area"]):
 		if holdings.factions.hostile(Stockpile.TOWN, holdings.holder(id)):
 			return UNEASY
+	# A work site of its own the town doesn't hold (decision 521).
+	for trade: String in rules.get("sites", {}).get("trades", {}):
+		var site := site_of(town, trade)
+		if not site.is_empty() and not site_blocked(town, site).is_empty():
+			return UNEASY
 	return SAFE
+
+
+# --- Work sites (decision 521) -----------------------------------------------------
+
+## site_turn's answers: no site (today's yield, at once), the site held by
+## another or contested (no yield), the worker walking there and back (the
+## yield when back), back from it (the yield now).
+const NO_SITE := ""
+const BLOCKED := "blocked"
+const WALKING := "walking"
+const BACK := "back"
+
+
+## [param town]'s site for [param trade] (decision 521, on maps' 517 and
+## builder's 520): the first Holdings place of the kind economy.json's
+## sites.trades names for it whose town is [param town]; {} for none.
+func site_of(town: String, trade: String) -> Dictionary:
+	var kind := str(rules.get("sites", {}).get("trades", {}).get(trade, ""))
+	if kind.is_empty() or holdings == null:
+		return {}
+	for id in holdings.all_places():
+		var place := holdings.place(id)
+		if str(place.get("kind", "")) == kind and str(place.get("town", "")) == town:
+			return place
+	return {}
+
+
+## Why [param town] can't work [param site] now: "" when it holds it (its
+## faction's, strength left, its ground not contested), else "contested" or
+## "held by <faction>".
+func site_blocked(town: String, site: Dictionary) -> String:
+	var id := str(site["id"])
+	if holdings.ground(str(site["area"]), site["cell"]) == Factions.CONTESTED:
+		return "contested"
+	if holdings.holder(id) != Stockpile.TOWN or holdings.strength(id) <= 0:
+		return "held by %s" % holdings.holder(id)
+	return ""
+
+
+## Steps for [param town]'s worker to walk to [param site] and back: the
+## cells between its store and the site there and back at
+## sites.steps_per_cell, sites.other_area for one in another area.
+func site_walk(town: String, site: Dictionary) -> int:
+	var rule: Dictionary = rules.get("sites", {})
+	var home := holdings.place(town) if holdings != null else {}
+	if home.is_empty() or str(home["area"]) != str(site["area"]):
+		return int(rule.get("other_area", 3000))
+	var cells := Vector2(site["cell"] - home["cell"]).length()
+	return 2 * ceili(cells * float(rule.get("steps_per_cell", 4)))
+
+
+## Worker [param id] of [param town], their [param trade]'s work due: whether
+## it yields now (decision 521). NO_SITE with no site of its kind (today's
+## yield); BLOCKED when the town doesn't hold it, said once a change, the
+## work not done; WALKING while the worker is on the way there and back
+## (outside the walls, at no other work), BACK when they are home and it
+## yields. A trip in hand when the site is lost ends: home with nothing.
+func site_turn(town: String, id: String, trade: String) -> String:
+	var site := site_of(town, trade)
+	if site.is_empty():
+		_trips.erase(id)
+		return NO_SITE
+	var why := site_blocked(town, site)
+	if why != str(_site_said.get(site["id"], "")):
+		_site_said[site["id"]] = why
+		var who := str(_workers.get(id, {}).get("name", id))
+		if why.is_empty():
+			print("[production] %s's %s is the town's again: %s works it, step %d" % [town, site["kind"].replace("_", " "), who, now()])
+		else:
+			print("[production] %s's %s is %s: %s gets nothing from it, step %d" % [town, site["kind"].replace("_", " "), why, who, now()])
+	if not why.is_empty():
+		_trips.erase(id)
+		return BLOCKED
+	if not _trips.has(id):
+		var walk := site_walk(town, site)
+		if walk <= 0:
+			return BACK
+		_trips[id] = now() + walk
+		return WALKING
+	if now() < int(_trips[id]):
+		return WALKING
+	_trips.erase(id)
+	return BACK
+
+
+## Whether [param town]'s [param trade] may work its site now: no site, or
+## one the town holds (the farmer's field work, decision 521).
+func site_works(town: String, trade: String) -> bool:
+	var site := site_of(town, trade)
+	return site.is_empty() or site_blocked(town, site).is_empty()
 
 
 ## [param town]'s gear (store and shop) counted by tag.
@@ -1393,7 +1504,7 @@ func to_dict() -> Dictionary:
 		var window := int(rules.get("window", 6000))
 		state["sales"] = state["sales"].filter(func(sale: Dictionary) -> bool: return int(sale["step"]) >= now() - window)
 		towns[town] = state
-	return {"workers": _workers.duplicate(true), "workshops": _workshops.duplicate(true), "jobs": saved_jobs,
+	return {"trips": _trips.duplicate(), "workers": _workers.duplicate(true), "workshops": _workshops.duplicate(true), "jobs": saved_jobs,
 		"next_job": _next_job, "towns": towns}
 
 
@@ -1467,6 +1578,10 @@ func from_dict(saved: Dictionary) -> void:
 						state["sales"].append({"step": int(sale.get("step", 0)), "what": str(sale.get("what", "")),
 							"count": int(sale.get("count", 0))})
 	_next_job = maxi(int(saved.get("next_job", 1)), 1)
+	var trips: Variant = saved.get("trips", {})
+	if trips is Dictionary:
+		for id: Variant in trips:
+			_trips[str(id)] = int(trips[id])
 	var saved_jobs: Variant = saved.get("jobs", {})
 	if saved_jobs is Dictionary:
 		for key: Variant in saved_jobs:

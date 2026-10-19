@@ -9,6 +9,7 @@ notes (decision 324).
 
 - Fixed: a monster with one strike clip erred on every swing after the first (390).
 - Tall grass is drawn: a patch of blades about a metre high with pale seed heads, swaying in the wind, and grass trampled flat shows as a pressed mat along the path until it stands again (508).
+- A town's woodcutter, hunter and farmer work from the town's woodlot, hunting ground and farm where a level has them (521), walking there and back. If goblins hold the site, or it is contested, it yields nothing and the town grows uneasy until it is retaken.
 - Sheep and wool (500): once a town's field is farmed it builds a pasture, and a shepherd comes with a flock. The flock is sheared in spring and autumn and has lambs each spring. When wool fills the store, the town builds a loom and a weaver comes to turn the wool into cloth.
 - Talking to the town's official about the building fund: the give lines read as "a gift" with a Give button and the gold in brass, and the foot says what you carry whenever a line would take gold; a long offer title wraps instead of running off the panel.
 - Luxuries for the rich (514): a well-off resident sometimes wants wine or spice from the castle market, or the smith's silver ring, and has the merchant fetch it by caravan. Luxuries are taxed at half the merchant's margin, and that tax helps the town pay its wages and the makers it owes. The rich keep a ring and enjoy the rest.

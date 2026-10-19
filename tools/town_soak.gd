@@ -41,6 +41,12 @@ var _asks_answered := 0
 ## the town's next build (economy's 499, Economy.contribute), for the
 ## contributions soak.
 var _give := 0
+## --woodlot=DX,DY: the town gets a woodlot that far from its store (economy's
+## 521, a work site the woodcutter walks to), held by the town;
+## --woodlot-taken=DAY: goblins take it at the start of that day.
+var _woodlot := Vector2i(-99999, -99999)
+var _woodlot_taken := -1
+const WOODLOT := "wilds/soak_woodlot"
 const QUESTIONS := ["Who are you?", "What is new in the town?", "What do you need?", "What do you think of %s?", "Is it true that %s"]
 var _prev := {}  # Main's own context callbacks, put back before the quit.
 
@@ -63,6 +69,11 @@ func _run() -> void:
 			_ask = true
 		elif arg.begins_with("--give="):
 			_give = maxi(int(arg.trim_prefix("--give=")), 0)
+		elif arg.begins_with("--woodlot="):
+			var parts := arg.trim_prefix("--woodlot=").split(",")
+			_woodlot = Vector2i(int(parts[0]), int(parts[1]) if parts.size() > 1 else 0)
+		elif arg.begins_with("--woodlot-taken="):
+			_woodlot_taken = int(arg.trim_prefix("--woodlot-taken="))
 	if _out.is_empty() or _out.begins_with("/var/lib/psykinetic") or _out.begins_with("user://"):
 		push_error("town_soak: --out=<a local folder> is needed, never the box's or user://")
 		get_tree().quit(2)
@@ -103,6 +114,15 @@ func _run() -> void:
 			_players.append(entity)
 	for player: Player in _players:
 		World.economy.add_gold(player.player_id, 60, "soak")
+	if _woodlot != Vector2i(-99999, -99999):
+		# A place the level doesn't have, for the measure only: put straight into Holdings.
+		var store: Dictionary = World.holdings.place(TOWN)
+		World.holdings._places[WOODLOT] = {"id": WOODLOT, "area": store["area"], "key": "soak_woodlot", "cell": store["cell"] + _woodlot,
+			"name": "the soak's woodlot", "kind": "woodlot", "radius": 2, "worth": 1, "start": "town", "town": TOWN}
+		World.holdings._holder[WOODLOT] = "town"
+		World.holdings._strength[WOODLOT] = 1
+		World.holdings._since[WOODLOT] = World.steps
+		print("SOAK woodlot at %s, %s from the store" % [store["cell"] + _woodlot, _woodlot])
 	print("SOAK players %s" % [_players.map(func(p: Player) -> String: return "%s@%s" % [p.player_id.left(8), p.tile])])
 	# What the town's people offer and do, counted as it happens.
 	for key: String in ["done", "asked", "say"]:
@@ -211,6 +231,9 @@ func _hourly() -> void:
 						_count("given_gold", given)
 	if _ask and hour == 9:
 		await _ask_round(day)
+	if hour == 0 and day == _woodlot_taken and World.holdings.place(WOODLOT).size() > 0:
+		World.holdings.take(WOODLOT, "goblins")
+		print("SOAK day %d: goblins take the woodlot" % day)
 	if hour == 0:
 		print("SOAK day %d: treasury %d, residents %d, bodies %d, inn %s" % [day, World.stockpile.count(TOWN, "gold"), World.towns.residents(TOWN).size(),
 			World.townsfolk().size(), "standing" if inn.size != Vector2i.ZERO else "none"])

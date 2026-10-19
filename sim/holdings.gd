@@ -61,7 +61,8 @@ func rebind(world_map: WorldMap) -> Array[String]:
 			var place: Dictionary = listed[key]
 			var id := "%s/%s" % [area_name, key]
 			places[id] = {"id": id, "area": area_name, "key": key, "cell": place["cell"], "name": place["name"],
-				"kind": place["kind"], "radius": place["radius"], "worth": place["worth"], "start": place["holder"]}
+				"kind": place["kind"], "radius": place["radius"], "worth": place["worth"], "start": place["holder"],
+				"town": "%s/%s" % [area_name, place["town"]] if place.has("town") else ""}
 	var gone: Array[String] = []
 	for id: String in _places:
 		if not places.has(id):
@@ -102,7 +103,8 @@ func places_of(faction: String) -> Array[String]:
 
 
 ## Place [param id]: {id, area, key, cell, name, kind, radius, worth,
-## start}; {} if there is none.
+## start, town (a work site's town, decision 517: its stockpile place's id,
+## "" for none)}; {} if there is none.
 func place(id: String) -> Dictionary:
 	return _places.get(id, {})
 

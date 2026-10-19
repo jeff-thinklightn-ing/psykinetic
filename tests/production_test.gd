@@ -59,6 +59,7 @@ func _ready() -> void:
 	_test_surplus_and_idle()
 	_test_wages_and_rent()
 	_test_world_tick()
+	_test_sites()
 
 	Level.unregister(TOWN)
 	print("")
@@ -75,6 +76,8 @@ func _register_town() -> void:
 	Level.register(TOWN, Level.image_from_rows(rows), null, {"places": {
 		"store": {"at": [4, 4], "kind": "stockpile", "radius": 3, "holder": "town"},
 		"camp": {"at": [15, 5], "kind": "camp", "radius": 3, "holder": "nobody"},
+		"woodlot": {"at": [30, 4], "kind": "woodlot", "radius": 2, "holder": "town", "town": "store"},
+		"grounds": {"at": [30, 14], "kind": "hunting_ground", "radius": 2, "holder": "town", "town": "store"},
 	}})
 
 
@@ -317,3 +320,47 @@ func _check(ok: bool, label: String) -> void:
 	if not ok:
 		_failures += 1
 	print("  %s  %s" % ["PASS" if ok else "FAIL", label])
+
+
+## Work sites (decision 521): a trade works from its town's site of its
+## kind, the worker away for the walk there and back; a site the town
+## doesn't hold yields nothing and makes it uneasy.
+func _test_sites() -> void:
+	print("
+== work sites ==")
+	var rules := RULES.duplicate(true)
+	rules["sites"] = {"trades": {"woodcutter": "woodlot", "hunter": "hunting_ground"}, "steps_per_cell": 4, "other_area": 3000}
+	rules["hunter"] = {"trade": "hunter", "every": 100}
+	_fresh({}, rules)
+	_check(_holdings.place("pt_town/woodlot")["town"] == STORE and _holdings.place(CAMP)["town"] == "",
+		"a place's town is its stockpile place's id (517), \"\" for none")
+	_work.add_worker("wc", "Wynn", ["woodcutter"], STORE)
+	_check(str(_work.site_of(STORE, "woodcutter").get("id", "")) == "pt_town/woodlot" and _work.site_of(STORE, "smith").is_empty(),
+		"the woodcutter's site is the town's woodlot; the smith has none")
+	var walk := _work.site_walk(STORE, _work.site_of(STORE, "woodcutter"))
+	_check(walk == 2 * ceili(26.0 * 4), "the walk there and back: %d steps" % walk)
+	_check(_work.site_turn(STORE, "wc", "woodcutter") == Production.WALKING and _work.outside("wc"), "due: off to the woodlot, outside the walls")
+	_now = walk - 1
+	_check(_work.site_turn(STORE, "wc", "woodcutter") == Production.WALKING, "still on the way")
+	_now = walk
+	_check(_work.site_turn(STORE, "wc", "woodcutter") == Production.BACK and not _work.outside("wc"), "back: the wood comes in")
+	_check(_work._safety(STORE, 0) == Production.SAFE, "the town holds its sites: safe")
+	_holdings.take("pt_town/woodlot", "goblins")
+	_check(_work.site_turn(STORE, "wc", "woodcutter") == Production.BLOCKED and not _work.site_works(STORE, "woodcutter"),
+		"goblins hold the woodlot: no wood")
+	_check(_work._safety(STORE, 0) == Production.UNEASY, "and the town is uneasy")
+	_holdings.take("pt_town/woodlot", "town")
+	_check(_work.site_turn(STORE, "wc", "woodcutter") == Production.WALKING, "retaken: worked again at once")
+	var at_site: Array = []
+	_work.hunt_at = func(_town: String, site: Dictionary) -> String:
+		at_site.append(site["id"])
+		return ""
+	_work.hunt = func(_town: String) -> String:
+		at_site.append("store")
+		return ""
+	_work.add_worker("hn", "Hob", ["hunter"], STORE)
+	for i in 12:
+		_at(_now + 100)
+	_check(not at_site.is_empty() and at_site.all(func(id: String) -> bool: return id == "pt_town/grounds"),
+		"the hunter hunts at the town's hunting ground (%s)" % [at_site])
+
