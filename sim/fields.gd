@@ -187,6 +187,14 @@ func mark_dirty_near(cells: Array[Vector2i]) -> void:
 				break
 
 
+## Works the fixed heat and light out now if due, so the first hazard check
+## or light asked for in play does not: a lit map's whole field (every
+## source's lines, World.line_doors) takes seconds on a big one. Called as
+## a zone opens, its doors in (Main._open_zone).
+func warm(world: Node) -> void:
+	_refresh(world)
+
+
 ## Every fixed source in the order its share is added: [cell, spec].
 ## Not a copy: read it, do not change it.
 func _sources() -> Array:

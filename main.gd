@@ -2241,7 +2241,13 @@ func _open_zone(zone_name: String, saved := {}) -> Zone:
 			_spawn(_slot_spec(slot))
 	_test_herds()
 	_restore_ground(saved.get("ground", []))
-	print("[zone] %s loaded%s" % [zone_name, " from the snapshot" if not saved.is_empty() else ""])
+	# The fixed heat and light now, with the doors in, not in a tick with
+	# a player waiting (perf: 1.5-3 s on a 256 dungeon's first tick).
+	var started := Time.get_ticks_msec()
+	if Net.is_authority():
+		World.fields.warm(World)
+	print("[zone] %s loaded%s (its heat and light in %d ms)" % [zone_name, " from the snapshot" if not saved.is_empty() else "",
+			Time.get_ticks_msec() - started])
 	World.enter(was)
 	return opened
 

@@ -6970,6 +6970,19 @@ fails all 40).
 Fields' refresh a tick: 1.73 to 1.00 ms at 9 players, 2.26 to 1.21 at 16.
 Server only.
 
+Amended 2026-10-18 (perf's first-tick stall): the whole field was still
+built lazily, by the first hazard check or light asked for, so it landed
+in the first tick with a player waiting: 1.5-3 s on netbench 256's 1,024
+sources and 1,984 doors (`_refresh`, nearly all of it in World.line_doors
+and `_sight_edge`). Now `Fields.warm` builds it as the zone opens
+(Main._open_zone, after its doors and entities are in), and the "[zone] X
+loaded" line says how long it took: netbench 1,338 ms at open and tick 1's
+hazards about 1 ms; the real levels wilds 3 ms, forest 0, castle 19,
+hills 0, sample 4, test_room 3, small enough for a zone opened in play
+(on a join or by travel). A trace of netbench's whole run found no other
+whole build: doors register before the warm and unregister only as the
+zone closes. Server only.
+
 ## 353. A town's starting gold, and residents' own trade
 
 Jeff (2026-10-15): "give the town 50 starting gold and a flowing economy,
