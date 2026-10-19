@@ -2620,8 +2620,8 @@ func _build_room() -> void:
 					_building_dry.append(cell)
 					_dry_water[cell] = true
 			continue
-		if building["slot"] in Level.OPEN_AIR:
-			continue  # Its fence is its slot's mesh (_add_walls draws none).
+		if building["slot"] in Level.OPEN_AIR or building["slot"] in Level.SPANS_WATER:
+			continue  # Its fence (a bridge's railings) is its slot's mesh; a bridge's water stays.
 		# A kind (decision 488) names its sets and eaves; a slot's spec does.
 		var spec: Dictionary = {"wall_set": building["wall_set"], "wall_height": building["eaves"], "floor_set": building["floor_set"]} \
 				if building.has("kind") else ArtKit.spec(str(building["slot"]))
@@ -2747,6 +2747,8 @@ func _add_walls() -> void:
 		if building["slot"] in Level.OPEN_AIR:
 			for key in Level.building_outline(building):
 				fences[key] = true
+	for key: Vector3i in _terrain.get("railings", []):
+		fences[key] = true  # A bridge's railings (decision 505): its slot draws them.
 	for key: Vector3i in edges:
 		if _outdoor and _is_outline(key):
 			continue  # The forest's edge, not a wall (_add_forest).
@@ -2780,6 +2782,8 @@ func _add_buildings() -> void:
 		if building.has("kind"):
 			_add_kind(building)
 			continue
+		if str(building["slot"]) in Level.SPANS_WATER:
+			continue  # A bridge (decision 505): terrain draws its deck, rails and ends.
 		var rect: Rect2i = building["rect"]
 		var slot := str(building["slot"])
 		var facing: Vector2i = building["facing"]

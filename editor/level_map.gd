@@ -205,6 +205,31 @@ static func moved_config(config: Dictionary, move: Callable, turns := 0, dropped
 			else:
 				places.erase(key)
 				dropped.append("place %s" % key)
+	if out.get("markets") is Dictionary:
+		var markets: Dictionary = out["markets"]
+		for key: Variant in markets.keys():
+			var market: Variant = markets[key]
+			var to: Variant = cell.call(market.get("at") if market is Dictionary else null)
+			if to != null:
+				market["at"] = to
+			else:
+				markets.erase(key)
+				dropped.append("market %s" % key)
+	if out.get("streams") is Array:
+		# A stream's course goes with it, cell by cell; one cut by the edge
+		# keeps the part still on the map (decision 505).
+		var streams: Array = []
+		for entry: Variant in out["streams"]:
+			var path: Array = []
+			for point: Variant in (entry.get("path", []) if entry is Dictionary else []):
+				var to: Variant = cell.call(point)
+				if to != null:
+					path.append(to)
+			if path.size() >= 2:
+				streams.append({"path": path})
+			else:
+				dropped.append("stream %s" % [entry])
+		out["streams"] = streams
 	if out.get("buildings") is Array:
 		# A footprint goes by two opposite corners: wherever a turn puts
 		# them, its top-left is the lesser of each, its size theirs.
@@ -336,7 +361,7 @@ func to_image() -> Image:
 ## when they are all the same ground, water or fire; "" otherwise.
 static func _filler(around: Array) -> String:
 	var first: String = around[0]
-	if first not in Level.GROUNDS and first not in ["water", "fire"]:
+	if first not in Level.GROUNDS and first not in ["water", "fire", "ford"]:
 		return ""
 	for each: String in around:
 		if each != first:

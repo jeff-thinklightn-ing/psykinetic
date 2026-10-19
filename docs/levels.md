@@ -49,6 +49,7 @@ In the order of the swatches above:
 | `#4f9a3c` | grass | cell | walkable |
 | `#8a6440` | dirt | cell | walkable |
 | `#2f6fd0` | water | cell | not walkable, but no wall: nothing is built along it, sight passes over, a pushed body stops at its edge unhurt |
+| `#6fa8e0` | ford | cell | shallow water, walked through: a step into it takes twice as long and costs routes twice (decision 505); its footing is the ground round it |
 | `#ff6a00` | fire | cell | walkable; burns any creature standing in it |
 | `#3c2a22` | wall | edge | a thin wall |
 | `#c88a3c` | door | edge | a door (wood, 20 hp) |
@@ -202,6 +203,18 @@ All of it is optional.
   a closed canopy; `"clearings": [{"centre": [x, y], "radius": r}]` are kept
   open to the sky (radius 6 or more stays sunlit; environment hangs its
   light there). levels/forest is the first.
+- `streams` (decision 505): `[{"path": [[x, y], ...]}]`, each a stream's
+  cells from its source to its mouth along its middle, the way it flows
+  (terrain draws the current from it). Every cell is water (a ford, or
+  under a bridge) beside the one before; water with no entry is still.
+  The editor's path tool lays one ("as a stream"); `Streams.lay` lays one
+  in a generator.
+- a bridge is a building entry: `{"slot": "bridge", "at": [x, y],
+  "facing": [dx, dy], "length": n, "width": 1 or 2}` (decision 505), its
+  length along its facing, all of it over water or fords, a bank of one
+  height beyond each end. Its cells are walked on at the banks' height
+  with the water still under them, and railings along its sides stop
+  walkers but not sight. levels/sample has one, with a ford.
 - `markets` (decision 504): `{"castle": {"at": [x, y], "name": "the
   castle market"}}`, where trade routes end that are no town's store; the
   id is `market:<key>`, the cell must be floor. levels/castle has the one.

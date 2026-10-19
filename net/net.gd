@@ -197,7 +197,10 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## sown, growing, ripe, flattened or "", decision 457).
 ## 18: the "map" message carries "generation", the regenerating level's
 ## generation the client is sent (decision 465).
-const PROTOCOL_REVISION := 18
+## 19: a level carries fords (the "ford" legend kind, walked as floor at
+## half pace) and bridges (building slot "bridge", floor over water), in the
+## "terrain" message's files and the levels served (decision 505).
+const PROTOCOL_REVISION := 19
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]
 ## Every kind of message (message, message_to, broadcast, broadcast_to).

@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Streams can be crossed at fords, wading slowly, or over bridges. The sample level has one; the bridge and the shallows are drawn once terrain's art lands (505).
 - Trade routes: the world map shows the way from the town to the castle market as a dashed line, with any caravan on it; the caravans themselves come with the town's trade (504).
 - The store pays 8 gold for a piece of leather, not 4: at 4 the tanner lost money on every piece he made from his two hides, ran out of credit and kept the inn from being built.
 - Makers take apprentices (498 amended): a smith, tanner or other maker who has stayed well off for three days takes a hauler on, works a quarter faster with them, and pays them two gold a day; when the maker's purse runs low, the apprentice is let go.

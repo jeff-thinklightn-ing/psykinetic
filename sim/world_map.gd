@@ -67,6 +67,13 @@ func _read(area_name: String, made: Dictionary) -> void:
 		ways.append(way.duplicate())
 
 
+static func _set_of(cells: Array) -> Dictionary[Vector2i, bool]:
+	var out: Dictionary[Vector2i, bool] = {}
+	for cell: Vector2i in cells:
+		out[cell] = true
+	return out
+
+
 ## What [param layout], [param height] and [param config] are, as a string:
 ## the same for the same level, another for any change to it.
 static func _digest(layout: Image, height: Image, config: Dictionary) -> String:
@@ -103,6 +110,8 @@ func _parse_area(area_name: String, layout: Image, height: Image, config: Dictio
 		"neighbours": level["neighbours"], "warnings": level["warnings"], "floor": floor_cells,
 		"edges": level["terrain"]["edges"], "heights": level["terrain"]["heights"], "stairs": level["terrain"]["stairs"],
 		"places": level["places"], "buildings": level["buildings"], "markets": level["markets"],
+		# Fords (decision 505): floor, a step into one costing FORD_COST.
+		"fords": _set_of(level["terrain"].get("fords", [])),
 		# Its roofs (decision 383: damage_roof's index is into this) and
 		# its lore region (its weather), for what works on every level.
 		"roofs": level["roofs"], "region": level["terrain"]["region"],

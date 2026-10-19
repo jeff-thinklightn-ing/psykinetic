@@ -14024,3 +14024,75 @@ sat at his loan cap from day 7 to 17, unable to buy hides, and the inn
 (leather 5) waited; at 8 he keeps 1.4 for the work. larder_test checks
 it from the value table. Other made raws already pay (the weaver's bolt:
 wool 2 at 2 for cloth 3 at 3).
+
+## 505. Streams with fords and bridges
+
+Infrastructure for streams (the outdoors backlog; the coordinator's split:
+maps the level data, the walking and routing, the editor and a generator;
+terrain the drawing; art-kit the bridge's slots; environment's spate later).
+Agreed with terrain on the data, with art-kit on the slots.
+
+- Streams are ordinary water cells. level.json "streams": [{"path":
+  [[x, y], ...]}], each stream's cells in order from source to mouth along
+  its middle (Level.streams_from, terrain "streams"); terrain takes the
+  flow from the order. A path cell that is no water, or not beside the one
+  before, warns and the stream is left out; water with no entry is still.
+- A ford is a legend kind, "ford" #6fa8e0: floor, its footing the ground
+  round it (Level terrain "fords"). World.is_ford is new; World.is_water
+  stays deep water (the throw splash and the walk checks read it so), false
+  on a ford. World.step_ticks makes a step into a ford FORD_TICK_SCALE (2)
+  times as long, the same on the server and in a client's prediction;
+  WorldRoutes charges FORD_COST (2) a step into one (step_cost, in _flood's
+  _relax, A* and distances_from), WorldMap areas carrying "fords". A ford
+  beside no water warns ("in no stream").
+- A bridge is a building entry {slot: "bridge", at, facing, length, width
+  1 or 2} (Level.BRIDGE, in the new Level.SPANS_WATER: the well stands in
+  water, a bridge spans it). Its rect is width across by length along its
+  facing; all of it over water or fords, clear of other buildings, with a
+  floor bank of one height beyond each end (Level._bridge), else left out
+  and said. Laid into the terrain (Level._lay_bridges): its cells floor at
+  the banks' height and footing, out of "water" and "fords" into "bridged"
+  (the water still drawn under it), railing wall edges on its long sides
+  ("railings"), which Fields.fences lets sight through, as a field's fence.
+  No inside (has_inside), no roof (Fields skips it), no walls drawn (the
+  client's fences), no slot node: terrain draws art-kit's bridge.<set>.deck
+  (a 1x1 segment repeated), .rail (on the outer long edges) and .end.
+  Level banks only for now: heights are whole levels, and a ramp between
+  two is a stair's work; art-kit's tilt (capped near 0.3 m a cell) comes
+  with ramps if wanted.
+- Companions and every walker use World's terrain rules, so they wade the
+  ford and cross the bridge with no change of their own; stream_test walks
+  a companion over the bridge behind her player.
+- The editor: "ford" in the palette; the path tool's "as a stream" lays
+  water path_width wide (3 at most) through its points and writes their
+  course to "streams", one undo step; a resize or turn moves "streams"
+  (and 504's "markets", which it did not).
+- Streams.lay(map, from, to, {seed, width, waver, fords, bridges,
+  keep_dry}) in sim/ (dungeon's runtime generators too): a wavering course
+  1 to 3 wide, a ford where a given path crosses it or a bridge entry, cells
+  in keep_dry left dry (terrain's ask: no stream under canopy over 0.6
+  unless meant); the same seed the same stream. Streams.course and widen
+  are the editor's.
+- levels/sample has a stream at x 12 (rows 7 to 10), a ford at (12, 8) and
+  a bridge at (12, 10); no stream in the wilds, the forest or the castle
+  until Jeff asks.
+- PROTOCOL_REVISION 19 (release): a level carried in the "terrain" message,
+  or served (the box serves sample), now holds a legend kind and a slot an
+  older peer cannot represent, and it would predict water where the server
+  walks.
+
+tests/stream_test (new, port 17862): the level's ford, bridge, railings and
+stream; a stream with a gap or off the water, a bridge on dry ground or
+between banks of two heights, said; the world's water, ford and bridge, the
+ford's pace, the railing stopping a step and not sight; routes through the
+ford (5 steps for 4) and over the bridge; a player through the ford and
+over the bridge, the companion following across; Streams.lay's course,
+ford, bridge and seed; a ford beside no water among the world map's
+problems. level_test: the sample's stream. editor_test: "as a stream" and
+its undo.
+
+Rejected: fords as water with a flag (is_water read as deep everywhere); a
+bridge as a new cell kind (no length, no slot, no editor placing); one mesh
+per bridge length (art-kit: a repeated deck); fords in spate now
+(environment's Weather.water_at later, with routes replanning and a
+gameplay yes on being cut off by water).

@@ -130,10 +130,14 @@ func load(terrain: Dictionary) -> void:
 			for key in Level.building_outline(building):
 				fences[key] = true
 			continue
+		if str(building.get("slot", "")) in Level.SPANS_WATER:
+			continue  # A bridge is open to the sky (decision 505); its railings below.
 		if building.get("ruined", false):
 			continue  # A ruin has no roof (decision 488).
 		for cell in Level.building_cells(building):
 			_roofed_whole[cell] = true
+	for key: Vector3i in terrain.get("railings", []):
+		fences[key] = true  # A bridge's railings stop walkers, not sight.
 	canopy.assign(terrain.get("canopy", {}))
 	canopy_kind = str(terrain.get("canopy_kind", ""))
 	clearings.assign(terrain.get("clearings", []))

@@ -87,7 +87,7 @@ const IDLE_CHOICES: Array[String] = ["", "guard", "wander", "patrol", "gather", 
 const PALETTE: Array[String] = [
 	"stone", "grass", "dirt", "water", "fire", "stair", "wall", "door", "clear", "void",
 	"start", "monster_imp", "monster_brute", "monster_sneak", "crate", "boulder", "cart", "chest", "torch", "lantern",
-	"link", "select", "area", "stamp", "path", "height", "stairs",
+	"link", "select", "area", "stamp", "path", "height", "stairs", "ford",
 ]
 ## Tools, not things to paint, and the key that picks each.
 const TOOLS := {"select": "V", "area": "A", "stamp": "P", "path": "T", "height": "H", "stairs": "S"}
@@ -615,6 +615,35 @@ func fill_again() -> void:
 
 
 ## Lays the path through the points clicked, as one undo step, and starts a new one.
+## The path's points laid as a stream (decision 505): water path_width wide
+## (3 at most) through them, and its course as a level.json "streams" path
+## (the way it flows: from the first point to the last), one undo step.
+func lay_stream() -> void:
+	if path_points.size() < 2:
+		report = "a stream needs two points or more: where it rises and where it goes"
+		_refresh_panel()
+		return
+	var middle := Streams.course(path_points)
+	var cells := {}
+	for cell in Streams.widen(middle, path_width):
+		if map.in_bounds(cell):
+			cells[cell] = "water"
+	for cell in middle:
+		if map.cell(cell) == "ford":
+			cells.erase(cell)  # A ford already laid stays one.
+	var course := []
+	for cell in middle:
+		course.append([cell.x, cell.y])
+	var streams: Array = (doc.config.get("streams", []) as Array).duplicate(true)
+	streams.append({"path": course})
+	var changed := apply_changes({"cells": cells, "config": {"streams": streams}})
+	report = "a stream, %d wide, %d cells from %s to %s%s" % [mini(path_width, 3), middle.size(), middle[0], middle[-1],
+		"" if changed else ": nothing to change"]
+	path_points.clear()
+	_refresh_panel()
+	queue_redraw()
+
+
 func lay_path() -> void:
 	if path_points.is_empty():
 		return
@@ -1169,6 +1198,7 @@ func _path_panel() -> void:
 	var lay := HBoxContainer.new()
 	_panel.add_child(lay)
 	_panel_button(lay, "lay it (Enter)", lay_path)
+	_panel_button(lay, "as a stream", lay_stream)
 	_panel_button(lay, "clear (Esc)", func() -> void:
 		path_points.clear()
 		_refresh_panel()
@@ -1407,7 +1437,7 @@ func _draw() -> void:
 			if meaning == "void":
 				draw_rect(rect, VOID_CELL)
 				continue
-			var ground := meaning if meaning in Level.GROUNDS or meaning in ["water", "fire"] else map.ground_under(at)
+			var ground := meaning if meaning in Level.GROUNDS or meaning in ["water", "fire", "ford"] else map.ground_under(at)
 			draw_rect(rect, map.colours.get(ground, VOID_CELL))
 			if ground != meaning:
 				draw_rect(rect.grow(-CELL * 0.18), map.colours.get(meaning, Color.MAGENTA))
@@ -1503,7 +1533,7 @@ func _draw_ghost(at: Vector2i) -> void:
 		var meaning: String = piece.cells[cell]
 		var rect := Rect2(Vector2(cell + at) * CELL, Vector2.ONE * CELL)
 		draw_rect(rect, Color(map.colours.get(meaning, Color.MAGENTA), 0.55))
-		if meaning not in Level.GROUNDS and meaning not in ["water", "fire"]:
+		if meaning not in Level.GROUNDS and meaning not in ["water", "fire", "ford"]:
 			var letter: String = LETTERS.get(meaning, meaning.trim_prefix("monster_").left(1).to_upper())
 			draw_string(ThemeDB.fallback_font, rect.position + Vector2(0, CELL * 0.68), letter, HORIZONTAL_ALIGNMENT_CENTER, CELL, 26, Color(0, 0, 0, 0.7))
 	for key: Vector3i in piece.edges:

@@ -371,6 +371,10 @@ func _test_forest() -> void:
 	var path := World.find_path(player.tile, east)
 	_check(not path.is_empty(), "a way from the way in to the way on (%d steps)" % path.size())
 	_check(_main.load_map("test_room"), "back to the test room")
+	var sample := Level.load_level("sample")
+	var bridges: Array = sample["buildings"].filter(func(b: Dictionary) -> bool: return b["slot"] == Level.BRIDGE)
+	_check(sample["terrain"]["streams"].size() == 1 and Array(sample["terrain"]["fords"]) == [Vector2i(12, 8)] and bridges.size() == 1
+		and Array(sample["terrain"]["bridged"]) == [Vector2i(12, 10)], "the sample's stream, with its ford and its bridge (decision 505)")
 	var markets := WorldMap.build().markets()
 	_check(markets.get("market:castle", {}).get("cell") == Vector2i(16, 9) and markets["market:castle"]["area"] == "castle"
 		and markets["market:castle"]["name"] == "the castle market", "the castle market, in the keep (decision 504; %s)" % [markets])

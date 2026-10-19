@@ -205,6 +205,8 @@ const CLOCK_LEAD_MAX := 2.5
 ## timer carries the fraction (see try_move), so a 2.5-tick step is
 ## taken on ticks 0, 3, 5, 8, 10... and drawn at its exact times.
 const DIAGONAL_TICK_SCALE := 1.5
+## A step into a ford (decision 505) takes this many times as long: wading.
+const FORD_TICK_SCALE := 2.0
 ## WASD steps queued on the server for one player at most; more are
 ## dropped (the client never sends more than one ahead).
 const MAX_QUEUED_STEPS := 3
@@ -381,6 +383,9 @@ var _fire: Dictionary[Vector2i, bool] = {}
 var _height: Dictionary[Vector2i, int] = {}
 var _stairs: Dictionary[Vector2i, Vector2i] = {}
 var _water: Dictionary[Vector2i, bool] = {}
+## Fords (decision 505): shallow water walked through at FORD_TICK_SCALE;
+## floor.
+var _fords: Dictionary[Vector2i, bool] = {}
 ## Torches on their posts (cells), for what a companion sees around her.
 var _torches: Dictionary[Vector2i, bool] = {}
 ## Heat and light per cell (Fields).
@@ -1140,6 +1145,7 @@ func enter(to: Zone) -> Zone:
 	from.height = _height
 	from.stairs = _stairs
 	from.water = _water
+	from.fords = _fords
 	from.torches = _torches
 	from.fields = fields
 	from.north = north
@@ -1158,6 +1164,7 @@ func enter(to: Zone) -> Zone:
 	_height = to.height
 	_stairs = to.stairs
 	_water = to.water
+	_fords = to.fords
 	_torches = to.torches
 	fields = to.fields
 	north = to.north
@@ -1268,6 +1275,7 @@ func reset() -> void:
 	_height.clear()
 	_stairs.clear()
 	_water.clear()
+	_fords.clear()
 	_next_id = 1
 	zone.tier_origins = []
 	tick = 0
@@ -1371,6 +1379,7 @@ func _set_terrain(terrain: Dictionary) -> void:
 	_height.clear()
 	_stairs.clear()
 	_water.clear()
+	_fords.clear()
 	_torches.clear()
 	for cell: Vector2i in terrain.get("torches", []):
 		_torches[cell] = true
@@ -1388,6 +1397,8 @@ func _set_terrain(terrain: Dictionary) -> void:
 		_stairs[cell] = stairs[cell]
 	for cell: Vector2i in terrain.get("water", []):
 		_water[cell] = true
+	for cell: Vector2i in terrain.get("fords", []):
+		_fords[cell] = true
 	for t: Vector2i in terrain["floor"]:
 		_floor[t] = true
 	for t: Vector2i in terrain["fire"]:
@@ -4573,6 +4584,7 @@ func mirror_reset() -> void:
 	_height.clear()
 	_stairs.clear()
 	_water.clear()
+	_fords.clear()
 	tick = 0
 	tick_alpha = 0.0
 	_clock = 0.0
@@ -5047,6 +5059,12 @@ func is_water(at: Vector2i) -> bool:
 	return _water.has(at)
 
 
+## Whether [param at] is a ford (decision 505): floor, walked into at
+## FORD_TICK_SCALE; not water (is_water is deep water only).
+func is_ford(at: Vector2i) -> bool:
+	return _fords.has(at)
+
+
 func is_torch(at: Vector2i) -> bool:
 	return _torches.has(at)
 
@@ -5216,9 +5234,8 @@ func distance(a: Vector2i, b: Vector2i) -> int:
 ## Ticks one walking step in [param direction] takes for [param entity];
 ## may be fractional.
 func step_ticks(entity: GridEntity, direction: Vector2i) -> float:
-	if direction.x != 0 and direction.y != 0:
-		return entity.move_ticks * DIAGONAL_TICK_SCALE
-	return entity.move_ticks
+	var ticks := entity.move_ticks * (DIAGONAL_TICK_SCALE if direction.x != 0 and direction.y != 0 else 1.0)
+	return ticks * FORD_TICK_SCALE if _fords.has(entity.tile + direction) else ticks
 
 
 func are_adjacent(a: Vector2i, b: Vector2i) -> bool:

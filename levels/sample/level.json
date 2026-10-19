@@ -7,5 +7,7 @@
 		{"at": [13, 9], "name": "Brute"}
 	],
 	"spawn_points": {"path_end": [13, 5]},
-	"links": [{"at": [14, 5], "to_map": "test_room", "to_spawn": "from_sample"}]
+	"links": [{"at": [14, 5], "to_map": "test_room", "to_spawn": "from_sample"}],
+	"streams": [{"path": [[12, 7], [12, 8], [12, 9], [12, 10]]}],
+	"buildings": [{"slot": "bridge", "at": [12, 10], "facing": [1, 0], "length": 1}]
 }

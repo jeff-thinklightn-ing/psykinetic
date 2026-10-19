@@ -548,6 +548,16 @@ func _test_area_tools() -> void:
 	_key(editor, KEY_Z, true)
 	_check(not editor.map.cells.values().has("dirt") and editor.map.edge(Vector3i(8, 11, Terrain.SOUTH)) == "door",
 			"Ctrl+Z takes the path back, fence and all")
+	var points: Array[Vector2i] = [Vector2i(24, 2), Vector2i(24, 8)]
+	editor.path_points = points
+	editor.path_width = 2
+	editor.lay_stream()
+	var streams: Array = editor.doc.config.get("streams", [])
+	_check(streams.size() == 1 and streams[0]["path"].size() == 7 and streams[0]["path"][0] == [24, 2]
+		and editor.map.cell(Vector2i(24, 5)) == "water" and editor.path_points.is_empty(),
+		"as a stream: water through the points, its course saved to \"streams\" (decision 505; %s)" % [streams])
+	_key(editor, KEY_Z, true)
+	_check(editor.doc.config.get("streams", []).is_empty() and editor.map.cell(Vector2i(24, 5)) != "water", "Ctrl+Z takes the stream back")
 	_key(editor, KEY_S, true)
 	var level := Level.parse(Image.load_from_file(dir.path_join("layout.png")), null,
 			JSON.parse_string(FileAccess.get_file_as_string(FOLDER + "level.json")))

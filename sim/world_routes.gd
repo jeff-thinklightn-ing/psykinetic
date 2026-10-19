@@ -40,6 +40,9 @@ extends RefCounted
 const DIAGONAL := 1.5
 ## What crossing a way costs, in steps.
 const CROSSING := 1.0
+## A step into a ford costs this many times a dry one (decision 505;
+## World.FORD_TICK_SCALE).
+const FORD_COST := 2
 ## A blocked way's cost: a route over one is no route.
 const BLOCKED := 1.0e9
 const STRAIGHTS: Array[Vector2i] = [Vector2i(1, 0), Vector2i(0, 1), Vector2i(-1, 0), Vector2i(0, -1)]
@@ -359,10 +362,10 @@ func distances_from(starts: Array[Dictionary]) -> Dictionary[String, PackedFloat
 				continue
 			for direction in STRAIGHTS:
 				if can_step(area, cell, direction):
-					_reach(area_name, cell + direction, cost + 2, best, buckets)
+					_reach(area_name, cell + direction, cost + step_cost(area, cell + direction, 2), best, buckets)
 			for direction in DIAGONALS:
 				if can_step(area, cell, direction):
-					_reach(area_name, cell + direction, cost + 3, best, buckets)
+					_reach(area_name, cell + direction, cost + step_cost(area, cell + direction, 3), best, buckets)
 			for lead: Array in leads.get(area_name, {}).get(cell, []):
 				_reach(lead[0], lead[1], cost + roundi(CROSSING * 2.0), best, buckets)
 		buckets[cost] = []
@@ -785,7 +788,7 @@ static func _steps_between(area: Dictionary, from: Vector2i, to: Vector2i, obsta
 			for pair: Array in [[STRAIGHTS, 2], [DIAGONALS, 3]]:
 				for direction: Vector2i in pair[0]:
 					var next := cell + direction
-					var next_cost: int = cost + pair[1]
+					var next_cost: int = cost + step_cost(area, next, pair[1])
 					if best.get(next, 1 << 30) <= next_cost or obstacles.has(next) or not can_step(area, cell, direction):
 						continue
 					best[next] = next_cost
@@ -805,8 +808,17 @@ static func _octile(a: Vector2i, b: Vector2i) -> int:
 	return 3 * mini(dx, dy) + 2 * absi(dx - dy)
 
 
+## A step into [param to] of [param area] costing [param half_steps]
+## (2 straight, 3 diagonal) on dry ground: FORD_COST times as much into a
+## ford (decision 505), as World.step_ticks paces it.
+static func step_cost(area: Dictionary, to: Vector2i, half_steps: int) -> int:
+	return half_steps * FORD_COST if area.get("fords", {}).has(to) else half_steps
+
+
 static func _relax(area: Dictionary, cell: Vector2i, direction: Vector2i, cost: int, best: Dictionary[Vector2i, int], buckets: Array[Array], obstacles: Dictionary) -> void:
 	var to := cell + direction
+	if area.get("fords", {}).has(to):
+		cost += (cost - best[cell]) * (FORD_COST - 1)
 	if best.get(to, 1 << 30) <= cost or obstacles.has(to) or not can_step(area, cell, direction):
 		return
 	best[to] = cost

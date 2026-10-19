@@ -60,6 +60,7 @@ const LEGEND := {
 	"grass": "#4f9a3c",
 	"dirt": "#8a6440",
 	"water": "#2f6fd0",
+	"ford": "#6fa8e0",
 	"fire": "#ff6a00",
 	"wall": "#3c2a22",
 	"door": "#c88a3c",
@@ -107,6 +108,17 @@ const ON_WATER: Array[String] = ["building.well"]
 ## (the slot's own mesh draws it): they stop walkers, not sight, and are
 ## not drawn as walls; a gap in it is an open edge.
 const OPEN_AIR: Array[String] = ["building.field"]
+## A bridge (decision 505): a building entry {slot: "bridge", at, facing,
+## length, width (1 or 2)} across water, its long axis along its facing,
+## from a bank to a bank of one height. Its cells are walked on at the
+## banks' height, the water still under them (terrain "bridged"), and its
+## long sides have railings: wall edges that stop walkers, not sight
+## (terrain "railings", Fields.fences), drawn by its slot (art-kit's
+## bridge.<set>.deck, .rail and .end), not as walls.
+const BRIDGE := "bridge"
+## The buildings that span water rather than stand in it (a well): the
+## water is not dried under them, they have no inside and no walls.
+const SPANS_WATER: Array[String] = [BRIDGE]
 ## Building kinds (decision 488), each a composition of blocks of cells in
 ## sizes: levels/buildings.json's "kinds" (its "_about" says the format).
 ## A level.json building entry names a "kind" (and "size") instead of a
@@ -368,6 +380,7 @@ static func parse(layout: Image, height: Image, config: Dictionary) -> Dictionar
 	var wall: int = code_of.get("wall", -2)
 	var door: int = code_of.get("door", -2)
 	var water_code: int = code_of.get("water", -2)
+	var ford_code: int = code_of.get("ford", -2)
 	# The meaning of the pixel at (px, py), by code; the last colour looked
 	# up is kept, as neighbouring pixels are mostly the same colour.
 	var last_colour := -1
@@ -398,6 +411,7 @@ static func parse(layout: Image, height: Image, config: Dictionary) -> Dictionar
 	var floor_tiles: Array[Vector2i] = []
 	var fire: Array[Vector2i] = []
 	var water: Array[Vector2i] = []
+	var fords: Array[Vector2i] = []
 	var kinds: Dictionary[Vector2i, String] = {}
 	var markers: Array[Dictionary] = []
 	var stair_cells: Array[Vector2i] = []
@@ -416,6 +430,12 @@ static func parse(layout: Image, height: Image, config: Dictionary) -> Dictionar
 				water.append(cell)
 				continue
 			floor_tiles.append(cell)
+			if code == ford_code:
+				# Shallow water walked through, slowly (decision 505): floor,
+				# its footing the ground round it.
+				fords.append(cell)
+				kinds[cell] = _ground_around(cell, cell_codes, cells, names)
+				continue
 			var meaning := names[code]
 			if ground[code]:
 				kinds[cell] = meaning
@@ -517,7 +537,7 @@ static func parse(layout: Image, height: Image, config: Dictionary) -> Dictionar
 		warnings.append("\"zone\" in level.json is %s: one of %s; it is %s" % [config["zone"], ", ".join(DayNight.ZONES), zone])
 	var level := {
 		"terrain": {
-			"floor": floor_tiles, "fire": fire, "edges": edges, "kinds": kinds, "water": water,
+			"floor": floor_tiles, "fire": fire, "edges": edges, "kinds": kinds, "water": water, "fords": fords,
 			"heights": heights, "stairs": stairs, "torches": torches, "lanterns": lanterns,
 			"ambient": clampf(float(config.get("ambient", DayNight.base_ambient(zone))), 0.0, 1.0),
 			"north": NORTHS.get(str(config.get("north", "up")), Vector2i(0, -1)),
@@ -544,6 +564,9 @@ static func parse(layout: Image, height: Image, config: Dictionary) -> Dictionar
 	level["regenerate"] = regenerate_from(config, warnings)
 	_check_anchors(level, warnings)
 	level["buildings"] = buildings_from(config, level["terrain"], warnings)
+	_lay_bridges(level)
+	level["terrain"]["streams"] = streams_from(config, level["terrain"], warnings)
+	_check_fords(level["terrain"], warnings)
 	level["building_cells"] = inside_cells(level["buildings"])
 	building_places(level["buildings"], level["places"])
 	# The views draw them (roofs, inside floors) from the terrain they are given.
@@ -1016,6 +1039,11 @@ static func buildings_from(config: Dictionary, terrain: Dictionary, warnings: Ar
 		var cells := _union(blocks)
 		var what := str(entry.get("slot", entry.get("kind", "")))
 		var on_water := str(entry.get("slot", "")) in ON_WATER
+		if str(entry.get("slot", "")) in SPANS_WATER:
+			var bridge := _bridge(entry, rect, cells, terrain, wet, ground, taken, warnings)
+			if not bridge.is_empty():
+				out.append(bridge)
+			continue
 		var under := wet if on_water else ground
 		var height: int = terrain["heights"].get(cells[0], 0)
 		var bad := cells.filter(func(cell: Vector2i) -> bool:
@@ -1038,6 +1066,138 @@ static func buildings_from(config: Dictionary, terrain: Dictionary, warnings: Ar
 		_link(building, entry, config, linked, warnings)
 		out.append(building)
 	return out
+
+
+## Bridge [param entry] over [param cells] ([param rect]) checked: water
+## (or a ford) all of it, clear of other buildings, a floor cell of one
+## height beyond each end along its facing (the banks); the parsed building
+## with "height" (the banks') and "banks" (the cells before its first and
+## after its last), or {} and said in [param warnings]. Level banks only
+## for now: heights are whole levels, and a ramp between two is a stair's.
+static func _bridge(entry: Dictionary, rect: Rect2i, cells: Array[Vector2i], terrain: Dictionary, wet: Dictionary, ground: Dictionary,
+		taken: Dictionary, warnings: Array[String]) -> Dictionary:
+	var fords: Array = terrain.get("fords", [])
+	var bad := cells.filter(func(cell: Vector2i) -> bool: return not (wet.has(cell) or cell in fords) or taken.has(cell))
+	if not bad.is_empty():
+		warnings.append("the bridge at %s is not all over water (%s): left out" % [rect.position, bad[0]])
+		return {}
+	var facing := building_facing(entry)
+	var along := Vector2i(absi(facing.x), absi(facing.y))
+	var first := rect.position - along
+	var last := rect.position + Vector2i((rect.size.x - 1) * along.x, (rect.size.y - 1) * along.y) + along
+	var banks: Array[Vector2i] = []
+	var width := rect.size.x if along.y != 0 else rect.size.y
+	for across in width:
+		var side := Vector2i(across, 0) if along.y != 0 else Vector2i(0, across)
+		banks.append(first + side)
+		banks.append(last + side)
+	var height: int = terrain["heights"].get(banks[0], 0)
+	for bank in banks:
+		if not ground.has(bank) or wet.has(bank) or bank in fords:
+			warnings.append("the bridge at %s does not end on a bank at %s: left out" % [rect.position, bank])
+			return {}
+		if terrain["heights"].get(bank, 0) != height:
+			warnings.append("the bridge at %s has banks of two heights (%s): left out (level banks only)" % [rect.position, bank])
+			return {}
+	for cell in cells:
+		taken[cell] = true
+	var blocks: Array[Rect2i] = [rect]
+	return {"slot": BRIDGE, "cell": rect.position, "facing": facing, "rect": rect, "blocks": blocks, "use": "", "town": "",
+		"height": height, "banks": [first, last]}
+
+
+## level.json's "streams" (decision 505): [{"path": [[x, y], ...]}], each a
+## stream's cells in order from its source to its mouth along its middle,
+## the way it flows (terrain draws the current from the order); as
+## [{path: [Vector2i]}]. A path cell that is no water (a ford, or under a
+## bridge, is), or that is not beside the one before, is said in
+## [param warnings] and the stream left out.
+static func streams_from(config: Dictionary, terrain: Dictionary, warnings: Array[String]) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var listed: Variant = config.get("streams", [])
+	if not listed is Array:
+		warnings.append("\"streams\" in level.json is not a list")
+		return out
+	var wet := {}
+	for key in ["water", "fords", "bridged"]:
+		for cell: Vector2i in terrain.get(key, []):
+			wet[cell] = true
+	for index in (listed as Array).size():
+		var entry: Variant = listed[index]
+		var raw: Variant = entry.get("path", []) if entry is Dictionary else null
+		if not raw is Array or (raw as Array).size() < 2:
+			warnings.append("stream %d has no path of two cells or more: left out" % index)
+			continue
+		var path: Array[Vector2i] = []
+		var bad := ""
+		for each: Variant in raw:
+			var cell: Variant = _tile(each)
+			if cell == null or not wet.has(cell):
+				bad = "%s is no water" % [each]
+				break
+			if not path.is_empty():
+				var step: Vector2i = cell - path[-1]
+				if maxi(absi(step.x), absi(step.y)) != 1:
+					bad = "%s is not beside %s" % [cell, path[-1]]
+					break
+			path.append(cell)
+		if not bad.is_empty():
+			warnings.append("stream %d: %s: left out" % [index, bad])
+			continue
+		out.append({"path": path})
+	return out
+
+
+## A ford beside no water (nor another ford, nor under a bridge) is in no
+## stream: said in [param warnings] (decision 505).
+static func _check_fords(terrain: Dictionary, warnings: Array[String]) -> void:
+	var wet := {}
+	for key in ["water", "fords", "bridged"]:
+		for cell: Vector2i in terrain.get(key, []):
+			wet[cell] = true
+	for cell: Vector2i in terrain.get("fords", []):
+		var beside := false
+		for direction: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+			beside = beside or wet.has(cell + direction)
+		if not beside:
+			warnings.append("the ford at %s is beside no water: in no stream" % [cell])
+
+
+## The bridges in [param level]'s buildings laid into its terrain: their
+## cells floor at the banks' height (footing the banks' ground), no longer
+## water but "bridged" (drawn with the water under), railings on their long
+## sides ("railings", wall edges).
+static func _lay_bridges(level: Dictionary) -> void:
+	var terrain: Dictionary = level["terrain"]
+	var bridged: Array[Vector2i] = []
+	var railings: Array[Vector3i] = []
+	for building: Dictionary in level["buildings"]:
+		if building["slot"] != BRIDGE:
+			continue
+		var rect: Rect2i = building["rect"]
+		var along := Vector2i(absi(building["facing"].x), absi(building["facing"].y))
+		var sides: Array[Vector2i] = [Vector2i(1, 0), Vector2i(-1, 0)]
+		if along.x != 0:
+			sides = [Vector2i(0, 1), Vector2i(0, -1)]
+		var bank_kind := str(terrain["kinds"].get(building["banks"][0], "stone"))
+		for y in range(rect.position.y, rect.end.y):
+			for x in range(rect.position.x, rect.end.x):
+				var cell := Vector2i(x, y)
+				terrain["water"].erase(cell)
+				terrain["fords"].erase(cell)
+				if not cell in terrain["floor"]:
+					terrain["floor"].append(cell)
+				terrain["kinds"][cell] = bank_kind
+				if int(building["height"]) > 0:
+					terrain["heights"][cell] = int(building["height"])
+				bridged.append(cell)
+				for side in sides:
+					if not rect.has_point(cell + side):
+						var key := Terrain.edge_key(cell, side)
+						terrain["edges"][key] = Terrain.Edge.WALL
+						railings.append(key)
+	terrain["bridged"] = bridged
+	terrain["railings"] = railings
 
 
 ## A building entry's link to its town's records ("use": what it is to the
@@ -1220,6 +1380,8 @@ static func building_rect(entry: Variant) -> Variant:
 	if not entry is Dictionary:
 		return null
 	var size: Variant = BUILDINGS.get(str(entry.get("slot", "")))
+	if str(entry.get("slot", "")) == BRIDGE:
+		size = Vector2i(clampi(int(entry.get("width", 1)), 1, 2), maxi(int(entry.get("length", 1)), 1))
 	if size == null:
 		var spec := kind_size(entry)
 		size = _frame(spec) if not spec.is_empty() else null
@@ -1381,7 +1543,7 @@ static func blocks_outline(cells: Array[Vector2i]) -> Array[Vector3i]:
 ## well, a field or a ruin).
 static func has_inside(building: Dictionary) -> bool:
 	return not str(building.get("slot", "")) in ON_WATER and not str(building.get("slot", "")) in OPEN_AIR \
-			and not building.get("ruined", false)
+			and not str(building.get("slot", "")) in SPANS_WATER and not building.get("ruined", false)
 
 
 ## Each cell inside [param buildings] (has_inside) -> that building's index:
