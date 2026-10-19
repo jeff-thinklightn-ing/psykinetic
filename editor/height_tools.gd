@@ -50,7 +50,7 @@ static func _edge(map: LevelMap, key: Vector3i, changes: Dictionary) -> String:
 
 
 static func _walkable(map: LevelMap, at: Vector2i, changes: Dictionary) -> bool:
-	return map.in_bounds(at) and _cell(map, at, changes) not in ["void", "water"]
+	return map.in_bounds(at) and _cell(map, at, changes) not in ["void", "water", "rock"]
 
 
 ## Sets [param at]'s height in [param out] (clamped), unless it is void or
@@ -195,10 +195,10 @@ static func _make_stair(map: LevelMap, out: Dictionary, at: Vector2i, dir: Vecto
 			out["edges"][beside] = "wall"
 
 
-## Where the stair at [param at] climbs to (Level.parse's rule), or
-## Vector2i.ZERO if it is not a stair or climbs nowhere.
+## Where the stair (or slope, maps' 513) at [param at] climbs to
+## (Level.parse's rule), or Vector2i.ZERO if it is neither or climbs nowhere.
 static func climbs(map: LevelMap, at: Vector2i) -> Vector2i:
-	if map.cell(at) != "stair":
+	if map.cell(at) not in ["stair", "slope"]:
 		return Vector2i.ZERO
 	var level := int(map.heights.get(at, 0))
 	for side in FOUR:

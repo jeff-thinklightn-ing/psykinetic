@@ -21,7 +21,7 @@ const MAX_TURNS := 16
 ## A grid line per row of the area, a character per cell: CHARS, and one
 ## for each other monster kind (chars, decision 507).
 const CHARS := {
-	"void": "#", "stone": "_", "grass": ".", "dirt": ",", "water": "~", "fire": "*", "stair": "^", "ford": "=", "tall_grass": "\"",
+	"void": "#", "stone": "_", "grass": ".", "dirt": ",", "water": "~", "fire": "*", "stair": "^", "ford": "=", "tall_grass": "\"", "slope": "/", "rock": "R",
 	"start": "S", "monster_imp": "i", "monster_brute": "b", "monster_sneak": "s", "crate": "k",
 	"boulder": "o", "cart": "a", "chest": "h", "torch": "t", "lantern": "l", "link": ">",
 }
@@ -46,7 +46,7 @@ const ROLE_WORDS := {
 	"game": "bolts, but charges when struck or cornered",
 	"predator": "hunts %s; players only at night or with its pack about",
 }
-const GROUNDS: Array[String] = ["stone", "grass", "dirt", "tall_grass", "water", "ford", "fire", "void", "stair"]
+const GROUNDS: Array[String] = ["stone", "grass", "dirt", "tall_grass", "water", "ford", "fire", "void", "stair", "slope", "rock"]
 const SIDES := {"north": Vector2i(0, -1), "east": Vector2i(1, 0), "south": Vector2i(0, 1), "west": Vector2i(-1, 0)}
 ## Context shown round the area, in cells.
 const MARGIN := 3
@@ -359,7 +359,7 @@ Levels join at their edges: walking off one edge arrives on the neighbour's oppo
 
 Places are what factions hold (the goblins, the town, or nobody): a camp, a keep, a farm, a gate, a mine. Each is a cell and a radius; the ground within the radius is its holder's, and no one else's group may walk through it. mark_place names one (its key, kind, cell, radius, who holds it at the start). Mark a place when you build one: a camp's place on its gather point (where its monsters gather), a farmstead's in its yard. Some prefabs bring their place with them. A building prefab is a roofed building players walk into: stamp it whole, door and all, rather than drawing its walls yourself. A building can serve a town: set_building gives one in the area a use (%s) and its town, the key of a stockpile place in this level (a place of kind stockpile, held by the town). A town has one building of each use. Stamping over a building drops its use: set it again. town_wall walls a town in: give the rectangle of cells it encloses (its buildings, its store, room to walk) and the wall stands on the edges just outside it, with gates (doors) where roads come in, one in the middle of each side if you name none. One wall per town; it looks as strong as the town has built it (a bank of rubble at first). roof puts a roof over a rectangle of floor of one height that no building covers: a room you walled yourself, or an open shelter (a market stall, a woodshed) on posts at its corners; give it a use and town and it serves the town as a building does.
 
-Ground has a height, 0 to 6 (the grid's Heights block, shown when any cell has one). A step of a level or more between two cells is a ledge: a wall to anyone walking, though a body pushed off it falls to the ground below, and higher ground sees over walls. Stairs join one level to the next: a stair climbs to the one cell beside it a level up. height raises, lowers or sets cells; hill makes a rounded hill of rings a level each, with stairs up the sides asked; stairs puts a stair or a flight onto a ledge or up from flat ground. Whatever stands on raised ground (things, starts, buildings) needs stairs to it, and a building stands on one height: when a change leaves something cut off or a stair climbing nowhere, the tool's answer says so: put it right.
+Ground has a height, 0 to 6 (the grid's Heights block, shown when any cell has one). A step of a level or more between two cells is a ledge: a wall to anyone walking, though a body pushed off it falls to the ground below, and higher ground sees over walls. Stairs join one level to the next: a stair climbs to the one cell beside it a level up. A slope is a stair that looks like a ramp of earth: use slopes outdoors (on hills, banks, outcrops) and stairs in and round buildings; hill and stairs make slopes when asked. Rock is bare rock standing out of the ground, walled round: no one walks on or through it. height raises, lowers or sets cells; hill makes a rounded hill of rings a level each, with stairs up the sides asked; stairs puts a stair or a flight onto a ledge or up from flat ground. Whatever stands on raised ground (things, starts, buildings) needs stairs to it, and a building stands on one height: when a change leaves something cut off or a stair climbing nowhere, the tool's answer says so: put it right.
 
 A town keeps what players bring home in its store: a place of kind stockpile that the town holds. Stamp town_store for one (an open yard with its depot, its shop counter and the store's place, all in one), once per town, near the middle of town on open ground reachable from the gate, its counter facing where players will stand. A depot is a chest placed with use depot: what is put in it is banked. A shop counter is a chest placed with use shop: players buy what the town's workers made and sell what it is short of. Either works only inside the town's store, and is never given items. When a change leaves the store wrong, the tool's answer says so: put it right.
 
@@ -483,9 +483,9 @@ const _RECT := {"type": "object", "description": "a rectangle of cells: its top-
 const _SEED := {"type": "integer", "description": "any number; another gives another shape"}
 
 const TOOLS := [
-	{"name": "paint", "description": "Sets cells to a ground (stone, grass, dirt, tall grass), water, a ford, fire, a stair or void (forest outdoors). Give rectangles, single cells, or both. A thing on a painted cell is gone.",
+	{"name": "paint", "description": "Sets cells to a ground (stone, grass, dirt, tall grass), water, a ford, fire, a stair or a slope, rock or void (forest outdoors). Give rectangles, single cells, or both. A thing on a painted cell is gone.",
 		"input_schema": {"type": "object", "properties": {
-			"ground": {"type": "string", "enum": ["stone", "grass", "dirt", "tall_grass", "water", "ford", "fire", "void", "stair"]},
+			"ground": {"type": "string", "enum": ["stone", "grass", "dirt", "tall_grass", "water", "ford", "fire", "void", "stair", "slope", "rock"]},
 			"rects": {"type": "array", "items": _RECT},
 			"cells": {"type": "array", "items": _CELL}},
 			"required": ["ground"]}},
@@ -535,12 +535,14 @@ const TOOLS := [
 		"input_schema": {"type": "object", "properties": {
 			"at": _CELL, "radius": {"type": "integer", "minimum": 1, "maximum": 30},
 			"top": {"type": "integer", "minimum": 1, "maximum": 6},
-			"stairs": {"type": "array", "items": {"type": "string", "enum": ["north", "east", "south", "west"]}, "description": "the sides a flight of stairs climbs up from"}},
+			"stairs": {"type": "array", "items": {"type": "string", "enum": ["north", "east", "south", "west"]}, "description": "the sides a flight of stairs climbs up from"},
+			"slope": {"type": "boolean", "description": "its stairs as slopes (a ramp of earth, outdoors)"}},
 			"required": ["at", "radius", "top"]}},
 	{"name": "stairs", "description": "Stairs at a cell climbing toward a side. Beside a ledge that way, a flight up onto it (a stair a level, the cell given the top one, starting as many cells back); otherwise count stairs in a row climbing a level each from the cell's height, the cell after the last one the landing. Other sides a level above a stair are walled, so it climbs only the way asked.",
 		"input_schema": {"type": "object", "properties": {
 			"at": _CELL, "up": {"type": "string", "enum": ["north", "east", "south", "west"]},
-			"count": {"type": "integer", "minimum": 1, "maximum": 6}},
+			"count": {"type": "integer", "minimum": 1, "maximum": 6},
+			"slope": {"type": "boolean", "description": "slopes (a ramp of earth, outdoors) rather than stairs"}},
 			"required": ["at", "up"]}},
 	{"name": "place", "description": "Puts a thing on a cell (its ground stays), with its settings: a monster's facing and idling, a chest's items, a loot table for a chest or a monster, a name.",
 		"input_schema": {"type": "object", "properties": {
@@ -711,7 +713,7 @@ func run_tool(tool: String, input: Variant) -> Dictionary:
 				if SIDES.has(str(side)):
 					sides.append(SIDES[str(side)])
 			var radius := clampi(int(given.get("radius", 4)), 1, 30)
-			return _lay(HeightTools.hill(working.map, at, radius, clampi(int(given.get("top", 2)), 1, Level.MAX_HEIGHT), sides),
+			return _lay(_sloped(HeightTools.hill(working.map, at, radius, clampi(int(given.get("top", 2)), 1, Level.MAX_HEIGHT), sides), given),
 				"a hill round %s, radius %d" % [at, radius])
 		"stairs":
 			var at: Variant = Level._tile(given.get("at"))
@@ -723,7 +725,7 @@ func run_tool(tool: String, input: Variant) -> Dictionary:
 			var ledge := HeightTools.height_of(working.map, at + dir) > HeightTools.height_of(working.map, at) + 1
 			var changes := HeightTools.stair(working.map, at, dir) if ledge or count == 1 \
 					else HeightTools.flight(working.map, at, at + dir * count)
-			return _lay(changes, "%d stairs climbing %s" % [(changes["cells"] as Dictionary).size(), up])
+			return _lay(_sloped(changes, given), "%d %s climbing %s" % [(changes["cells"] as Dictionary).size(), "slopes" if bool(given.get("slope", false)) else "stairs", up])
 		"place":
 			return _place(given)
 		"stamp":
@@ -1130,6 +1132,16 @@ func _place(given: Dictionary) -> Dictionary:
 	return _lay(changes, "placed %s at %s" % [thing, at])
 
 
+## [param changes] with its stairs made slopes when [param given] asks
+## ("slope": true; maps' 513, a stair to the sim, a ramp to the eye).
+static func _sloped(changes: Dictionary, given: Dictionary) -> Dictionary:
+	if bool(given.get("slope", false)):
+		for at: Vector2i in changes.get("cells", {}):
+			if changes["cells"][at] == "stair":
+				changes["cells"][at] = "slope"
+	return changes
+
+
 ## Lays [param changes] on the working copy, kept to the area; {ok, text}.
 func _lay(changes: Dictionary, done: String) -> Dictionary:
 	if not str(changes.get("reason", "")).is_empty():
@@ -1185,13 +1197,13 @@ func height_checks() -> Array[String]:
 		for x in range(area.position.x, area.end.x):
 			var at := Vector2i(x, y)
 			var meaning := map.cell(at)
-			if meaning == "stair":
+			if meaning in ["stair", "slope"]:
 				var ups := HeightTools.FOUR.filter(func(side: Vector2i) -> bool:
 					return map.walkable(at + side) and int(map.heights.get(at + side, 0)) == int(map.heights.get(at, 0)) + 1 							and map.edge(Terrain.edge_key(at, side)) == "clear")
 				if ups.is_empty():
-					out.append("the stair at %s has no cell a level up beside it: it is floor" % at)
+					out.append("the %s at %s has no cell a level up beside it: it is floor" % [meaning, at])
 				elif ups.size() > 1:
-					out.append("the stair at %s could climb two ways: wall one or level it" % at)
+					out.append("the %s at %s could climb two ways: wall one or level it" % [meaning, at])
 			elif meaning not in GROUNDS and meaning not in ["water", "void"]:
 				things.append(at)
 	for building: Variant in working.config.get("buildings", []):

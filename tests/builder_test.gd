@@ -27,6 +27,7 @@ func _ready() -> void:
 	await _test_loot()
 	await _test_stream()
 	await _test_kind_building()
+	await _test_slopes()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -516,6 +517,31 @@ func _test_kind_building() -> void:
 	var answer := session.run_tool("set_building", {"at": [cell.x, cell.y], "use": use})
 	_check(answer.get("ok", false) and "the cottage at" in str(answer["text"]) and use in str(answer["text"]),
 			"set_building gives a composed building a use, named by its kind (%s)" % answer)
+
+
+func _test_slopes() -> void:
+	print("\n== slopes and rock (510 amended, maps' 513) ==")
+	var doc := _doc()
+	var stub := StubClaude.new([
+		[{"name": "height", "input": {"change": "set", "level": 2, "rects": [{"x": 5, "y": 5, "w": 12, "h": 3}]}},
+			{"name": "place", "input": {"at": [8, 6], "thing": "chest"}},
+			{"name": "stairs", "input": {"at": [10, 8], "up": "north", "slope": true}},
+			{"name": "paint", "input": {"ground": "rock", "cells": [[14, 12]]}}],
+		"A bank with a ramp.",
+	])
+	var session := BuilderSession.new(doc, Rect2i(5, 5, 12, 10), "test_field", stub)
+	await session.ask("a bank with a ramp up")
+	var results: Array = stub.sent[1]["messages"][2]["content"]
+	var map := session.working.map
+	_check(not results[2]["is_error"] and "slopes climbing north" in str(results[2]["content"])
+			and map.cell(Vector2i(10, 8)) == "slope" and map.cell(Vector2i(10, 9)) == "slope", "a flight of slopes onto the bank (%s)" % results[2]["content"])
+	_check(session.height_checks().is_empty() and HeightTools.climbs(map, Vector2i(10, 9)) == Vector2i(0, -1),
+			"the slopes climb, so nothing is cut off (%s)" % [session.height_checks()])
+	var grid := BuilderSession.grid(map, session.working.config, session.area, session.area)
+	_check("/" in grid and "R" in grid and not map.walkable(Vector2i(14, 12)), "the grid draws slopes and rock; rock is not walked")
+	session.accept()
+	var warnings := (doc.parsed()["warnings"] as Array).filter(func(w: String) -> bool: return "slope" in w)
+	_check(warnings.is_empty(), "Level reads the slopes as made (%s)" % [warnings])
 
 
 func _check(ok: bool, label: String) -> void:

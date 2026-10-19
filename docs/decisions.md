@@ -14636,6 +14636,14 @@ Claude could paint water, but couldn't give it a course or a crossing.
 
 Protocol unchanged. builder_test _test_stream.
 
+510 amended (maps' 513): slope ("/") and rock ("R") are paintable too.
+A slope is a stair to the sim and a ramp to the eye, so HeightTools.climbs
+and builder's height checks treat it as a stair (ledge_warnings no longer
+calls ground reached by slopes cut off), and the hill and stairs tools take
+"slope": true to lay slopes instead of stairs. Rock isn't walkable in
+HeightTools either. The prompt: slopes outdoors, stairs by buildings; rock
+is walled round. builder_test _test_slopes. Protocol unchanged.
+
 ## 514, items' side: the luxury goods
 
 For phase 3 of Jeff's gold economy (economy's 514, the coordinator's
