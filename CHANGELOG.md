@@ -19,6 +19,8 @@ notes (decision 324).
 - Fixed: winter tufts no longer turn pure white like a field of flowers. Snow sits on their tips with straw below, in the wilds and in the forest, where less of it gets under the trees; the forest's crowns keep their green under a patchy dusting (467 amended).
 - Streams are heard before they are seen: running water from the nearest stretch of a stream, following you along its bank; wading through a ford splashes.
 - The living-world soak tool puts each of its players on a counter cell of their own, in reach of the shopkeeper (496 amended): the 30-day run's 360 refused buys were the tool's placement, not the shop's.
+- Towns send caravans to the castle market (504): a hauler takes the town's spare food, wood and hides down the road, is paid for the trip, and the sale goes to the town's treasury. They never sell what the town's next building needs, and a caravan carries no gold, so raiders take only its goods and people.
+
 - The medicine man gathers his herbs whether or not anyone is near his hut (502 amended): one a day, on his way when you are there, else at the hut in the afternoon.
 - Streams can be crossed at fords, wading slowly, or over bridges. The sample level has one; the bridge and the shallows are drawn once terrain's art lands (505).
 - Boars no longer walk and run backwards (Jeff: "boars walk/run backwards"): the boar's body had been fitted to its skeleton back to front, its snout on the skeleton's tail end, so it moved rump first. It is refitted facing forward, and the farm pig, made from the boar, is rebuilt from it.

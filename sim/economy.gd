@@ -54,6 +54,13 @@ var building_stands := Callable()
 ## (town) -> {kind, job, steps, needs}: what the town's next build lacks
 ## (Towns.shortfall, set by Main; decision 499). {} while unset.
 var shortfall := Callable()
+## (town) -> [{id, market, eta (world ticks), risk (0..1)}]: the trade
+## routes from the town to a market (maps' TradeRoutes, set by Main;
+## decision 504). None while unset.
+var trade_routes := Callable()
+## (route_id, cargo {items, goods, members}, from_end) -> caravan id, ""
+## for none: TradeRoutes.send, set by Main.
+var send_caravan := Callable()
 ## Town -> how many it fed or let go hungry, as last told (dole_changed).
 var _dole := {}
 
@@ -74,6 +81,14 @@ var _player_owed: Dictionary = {}
 var _apprentice_paid: Dictionary = {}
 ## Town -> building id -> gold players gave toward it, not yet spent (499).
 var _funds: Dictionary = {}
+## Caravan id -> {town, route, market, risk, eta, members, goods, home}:
+## the town's caravans on the road (504; home true on the way back).
+var _caravans: Dictionary = {}
+## Market id -> resource -> how much it bought lately (its price falls).
+var _bought: Dictionary = {}
+## The day (now / day_steps) caravans were last thought of, and the
+## market's buying last eased.
+var _trade_day := -1
 const LOG_SIZE := 50
 
 
@@ -400,6 +415,7 @@ func tick() -> void:
 	for player_id: String in _player_owed.keys():
 		_pay_player(player_id)
 	_drop_funds()
+	_trade_turn(towns.keys())
 	for town: String in _dole:
 		towns[town] = true
 	var keys: Array = towns.keys()
@@ -894,6 +910,254 @@ func _drop_funds() -> void:
 				_keep_fund(town, kind, "no longer planned")
 
 
+# --- Caravans to market (decision 504, economy's side) -------------------------------
+
+## Whether goods of [param kind] are food, which a raid on a caravan takes
+## (TradeRoutes.is_food): the store's food and meat, or a thing tagged food.
+func is_food(kind: String) -> bool:
+	return kind in ["food", "meat"] or "food" in Items.def(kind).get("tags", [])
+
+
+## Once a day: the markets' buying eases (trade.caravan.recover), and each
+## of [param town_ids] with a route to a market and no caravan out may send
+## one (_send_caravan).
+func _trade_turn(town_ids: Array) -> void:
+	var day := now() / maxi(DayNight.day_steps, 1)
+	if day == _trade_day:
+		return
+	var ease := float(rules.get("trade", {}).get("caravan", {}).get("recover", 0.0)) * (day - _trade_day if _trade_day >= 0 else 0)
+	_trade_day = day
+	for market: String in _bought:
+		for what: String in _bought[market]:
+			_bought[market][what] = maxf(float(_bought[market][what]) - ease, 0.0)
+	town_ids.sort()
+	for town: String in town_ids:
+		if not trade_routes.is_valid() or _caravans.values().any(func(each: Dictionary) -> bool: return each["town"] == town):
+			continue
+		for way: Dictionary in trade_routes.call(town):
+			if _send_caravan(town, way):
+				break
+
+
+## What the market [param market] pays for one [param what] from a town
+## over a route of [param risk] (Jeff's trade routes; the coordinator's
+## approval): its value x the market's want x (1 + risk_premium x risk), x
+## 1 / (1 + bought / saturation) as it has bought more of it lately. The
+## castle market's gold has no end in phase 2: saturation is its only
+## brake.
+func market_price(market: String, what: String, risk: float, more := 0) -> float:
+	var rule: Dictionary = rules.get("trade", {}).get("caravan", {})
+	var want := float(rules.get("trade", {}).get("markets", {}).get(market, {}).get("wants", {}).get(what, 0.0))
+	var bought := float(_bought.get(market, {}).get(what, 0.0)) + more
+	return float(rules.get("value", {}).get(what, 1)) * want * (1.0 + float(rule.get("risk_premium", 0.0)) * risk) \
+		/ (1.0 + bought / maxf(float(rule.get("saturation", 20)), 1.0))
+
+
+## [param count] of [param what] sold at [param market], each unit at the
+## price after the last: the gold.
+func _sale_of(market: String, what: String, count: int, risk: float) -> int:
+	var gold := 0.0
+	for i in count:
+		gold += market_price(market, what, risk, i)
+	return roundi(gold)
+
+
+## The trip wage of a caravan's [param members] over [param eta] world
+## ticks each way: trade.caravan.wage a day each.
+func _trip_wage(eta: int) -> int:
+	var days := 2.0 * eta * World.WORLD_TICK_STEPS / maxf(float(DayNight.day_steps), 1.0)
+	return ceili(float(rules.get("trade", {}).get("caravan", {}).get("wage", 0)) * days)
+
+
+## [param town] sends a caravan over route [param way] if it pays: who
+## goes (one free traveller of trade.caravan.goes, never the seated
+## merchant, 471, and a free hauler: both away while on the road), the
+## store's surplus the market wants most (above its comfort or
+## trade.caravan.keep and what a queued build needs), up to
+## trade.caravan.load each; only when what it would fetch beats the trip
+## wages and risk x the load's value. True if it went.
+func _send_caravan(town: String, way: Dictionary) -> bool:
+	var rule: Dictionary = rules.get("trade", {}).get("caravan", {})
+	var market := str(way["market"])
+	var wants: Dictionary = rules.get("trade", {}).get("markets", {}).get(market, {}).get("wants", {})
+	if wants.is_empty():
+		return false
+	var members: Array[String] = []
+	var goes: Array = rule.get("goes", [])
+	var hauler := str(rules.get("haul", {}).get("trade", "hauler"))
+	for wanted: Array in [goes, [hauler]]:
+		for id in production.worker_ids(town):
+			var who := production.worker(id)
+			if id in members or Production.off_work(who) or production.outside(id) or not str(who.get("master", "")).is_empty() \
+					or not str(who.get("apprentice", "")).is_empty() or not who["trades"].any(func(trade: String) -> bool: return trade in wanted):
+				continue
+			members.append(id)
+			break
+	if members.is_empty():
+		return false
+	var build: Dictionary = shortfall.call(town) if shortfall.is_valid() else {}
+	var held: Dictionary = (production.job(int(build.get("job", 0))).get("cost", {}) if not build.is_empty() else {}).duplicate()
+	# And what the town makes what the build lacks from (the tanner's hides
+	# for the inn's leather), so a caravan never sells it away.
+	var lacking: Dictionary = build.get("needs", {})
+	if not lacking.is_empty() and catalog.is_valid():
+		var cat: Dictionary = catalog.call()
+		for id: String in cat:
+			var made: Variant = cat[id].get("made", {})
+			var yields: Variant = cat[id].get("yield", {})
+			if not made is Dictionary or not yields is Dictionary:
+				continue
+			for what: String in yields:
+				if lacking.has(what) and int(yields[what]) > 0:
+					var batches := ceili(float(lacking[what]) / int(yields[what]))
+					var from: Dictionary = made.get("from", {})
+					for input: String in from:
+						held[input] = int(held.get(input, 0)) + int(from[input]) * batches
+	var kinds: Array = wants.keys()
+	kinds.sort_custom(func(a: String, b: String) -> bool: return float(wants[a]) > float(wants[b]) or wants[a] == wants[b] and a < b)
+	var room := int(rule.get("load", 10)) * members.size()
+	var goods := {}
+	var worth := 0.0
+	var fetch := 0
+	for what: String in kinds:
+		var keep := maxi(int(rules.get("comfort", {}).get(what, 0)), int(rule.get("keep", 5))) + int(held.get(what, 0))
+		var spare := mini(stockpile.count(town, what) - keep, room)
+		if spare <= 0 or float(wants[what]) <= 0.0:
+			continue
+		goods[what] = spare
+		room -= spare
+		worth += float(rules.get("value", {}).get(what, 1)) * spare
+		fetch += _sale_of(market, what, spare, float(way["risk"]))
+		if room <= 0:
+			break
+	var wages := _trip_wage(int(way["eta"])) * members.size()
+	if goods.is_empty() or float(fetch) <= wages + float(way["risk"]) * worth:
+		return false
+	for what: String in goods:
+		stockpile.take(town, what, int(goods[what]), "caravan to %s" % market)
+	for id in members:
+		production.set_away(id, true)
+	var caravan := str(send_caravan.call(str(way["id"]), {"items": [], "goods": goods, "members": members}, town)) if send_caravan.is_valid() else ""
+	if caravan.is_empty():
+		for what: String in goods:
+			stockpile.deposit(town, what, int(goods[what]), "caravan", "a caravan that couldn't set out")
+		for id in members:
+			production.set_away(id, false)
+		return false
+	_caravans[caravan] = {"town": town, "route": str(way["id"]), "market": market, "risk": float(way["risk"]), "eta": int(way["eta"]),
+		"members": members.duplicate(), "goods": goods.duplicate(), "home": false}
+	print("[economy] %s sends a caravan to %s with %s (%s), to fetch about %d gold, step %d" % [town, market, goods,
+		", ".join(members.map(func(id: String) -> String: return str(production.worker(id).get("name", id)))), fetch, now()])
+	return true
+
+
+## TradeRoutes.caravan_arrived: one of the town's caravans at the market
+## sells there (the proceeds, whole and untaxed, to the treasury, the trip
+## wages paid from them; trade.caravan.buy_share of the rest buys what the
+## store is shortest of, carried home); one home again unloads into the
+## store and its people are back.
+func caravan_arrived(id: String, route_id: String, at_end: String, cargo: Dictionary) -> void:
+	if not _caravans.has(id):
+		return
+	var caravan: Dictionary = _caravans[id]
+	_caravans.erase(id)
+	var town := str(caravan["town"])
+	var members: Array = cargo.get("members", [])
+	if bool(caravan["home"]):
+		for what: String in cargo.get("goods", {}):
+			stockpile.deposit(town, what, int(cargo["goods"][what]), "caravan", "brought home from %s" % caravan["market"])
+		for who: String in members:
+			production.set_away(who, false)
+		print("[economy] %s's caravan is home from %s with %s, step %d" % [town, caravan["market"], cargo.get("goods", {}), now()])
+		return
+	var market := at_end
+	var rule: Dictionary = rules.get("trade", {}).get("caravan", {})
+	var proceeds := 0
+	for what: String in cargo.get("goods", {}):
+		var count := int(cargo["goods"][what])
+		proceeds += _sale_of(market, what, count, float(caravan["risk"]))
+		if not _bought.has(market):
+			_bought[market] = {}
+		_bought[market][what] = float(_bought[market].get(what, 0.0)) + count
+	var wage := _trip_wage(int(caravan["eta"]))
+	var wages := 0
+	for who: String in members:
+		var paid := mini(wage, proceeds - wages)
+		if paid > 0:
+			production.pay(who, paid, "the trip to %s" % market)
+			wages += paid
+	var rest := proceeds - wages
+	var home := {}
+	var budget := floori(rest * float(rule.get("buy_share", 0.0)))
+	var sells: Array = rules.get("trade", {}).get("markets", {}).get(market, {}).get("sells", [])
+	var shortest := ""
+	for what: String in sells:
+		var need := float(stockpile.count(town, what)) / maxf(float(rules.get("comfort", {}).get(what, 1)), 1.0)
+		if shortest.is_empty() or need < float(stockpile.count(town, shortest)) / maxf(float(rules.get("comfort", {}).get(shortest, 1)), 1.0):
+			shortest = what
+	if not shortest.is_empty() and budget > 0:
+		var unit := float(rules.get("value", {}).get(shortest, 1)) * float(rule.get("sell", 1.2))
+		var count := mini(floori(budget / maxf(unit, 0.01)), int(rule.get("load", 10)) * maxi(members.size(), 1))
+		if count > 0:
+			home[shortest] = count
+			rest -= ceili(count * unit)
+	if rest > 0:
+		stockpile.deposit(town, "gold", rest, "trade:%s" % market, "sold %s at %s for %d (wages %d)" % [cargo.get("goods", {}), market, proceeds, wages])
+	print("[economy] %s's caravan sells %s at %s for %d gold: %d in wages, %d to the treasury, %s bought to bring home, step %d" % [town,
+		cargo.get("goods", {}), market, proceeds, wages, maxi(rest, 0), home, now()])
+	if members.is_empty():
+		return
+	var back := str(send_caravan.call(route_id, {"items": [], "goods": home, "members": members}, market)) if send_caravan.is_valid() else ""
+	if back.is_empty():
+		_caravan_home(town, home, members, "no way back")
+		return
+	caravan["home"] = true
+	caravan["goods"] = home
+	caravan["members"] = members.duplicate()
+	_caravans[back] = caravan
+
+
+## Goods [param goods] and people [param members] of [param town]'s
+## caravan home at once (no way to walk): unloaded, and back.
+func _caravan_home(town: String, goods: Dictionary, members: Array, why: String) -> void:
+	for what: String in goods:
+		stockpile.deposit(town, what, int(goods[what]), "caravan", "a caravan home (%s)" % why)
+	for who: String in members:
+		production.set_away(str(who), false)
+
+
+## TradeRoutes.caravan_raided: what a camp took (food and people only:
+## Jeff's rule; the people already captives, Towns) is off the caravan.
+func caravan_raided(id: String, _route_id: String, camp_id: String, taken: Dictionary) -> void:
+	if not _caravans.has(id):
+		return
+	var caravan: Dictionary = _caravans[id]
+	for who: Variant in taken.get("members", []):
+		caravan["members"].erase(str(who))
+	for what: String in taken.get("goods", {}):
+		caravan["goods"][what] = int(caravan["goods"].get(what, 0)) - int(taken["goods"][what])
+		if int(caravan["goods"][what]) <= 0:
+			caravan["goods"].erase(what)
+	print("[economy] %s's caravan is struck by %s, who take %s, step %d" % [caravan["town"], camp_id, taken, now()])
+
+
+## TradeRoutes.caravan_lost: the goods are gone (never gold: none travels);
+## with no way on, its people come home.
+func caravan_lost(id: String, _route_id: String, why: String) -> void:
+	if not _caravans.has(id):
+		return
+	var caravan: Dictionary = _caravans[id]
+	_caravans.erase(id)
+	if why != "taken":
+		_caravan_home(str(caravan["town"]), {}, caravan["members"], why)
+	print("[economy] %s's caravan is lost (%s), with %s, step %d" % [caravan["town"], why, caravan["goods"], now()])
+
+
+## The town's caravans on the road: id -> {town, market, goods, members, home}.
+func caravans() -> Dictionary:
+	return _caravans.duplicate(true)
+
+
 ## A maker's apprentice (decision 498 amended; Jeff: "makers have more
 ## expense - raw material and apprentices"): a maker (Items.TRADES) whose
 ## purse has stood above apprentice.above for apprentice.days takes one,
@@ -1032,7 +1296,8 @@ func pay_commission(player_id: String, town: String, gold_owed: int) -> int:
 ## For the snapshot: {purses: {player id: gold}, log}.
 func to_dict() -> Dictionary:
 	return {"purses": _purses.duplicate(), "log": _log.duplicate(true), "paid": _paid.duplicate(true), "hauled": _hauled.duplicate(),
-		"player_owed": _player_owed.duplicate(true), "apprentice_paid": _apprentice_paid.duplicate(), "funds": _funds.duplicate(true)}
+		"player_owed": _player_owed.duplicate(true), "apprentice_paid": _apprentice_paid.duplicate(), "funds": _funds.duplicate(true),
+		"caravans": _caravans.duplicate(true), "bought": _bought.duplicate(true), "trade_day": _trade_day}
 
 
 func from_dict(saved: Dictionary) -> void:
@@ -1043,6 +1308,19 @@ func from_dict(saved: Dictionary) -> void:
 				_paid[str(town)] = {}
 				for what: Variant in paid[town]:
 					_paid[str(town)][str(what)] = maxf(float(paid[town][what]), 0.0)
+	var caravans: Variant = saved.get("caravans", {})
+	if caravans is Dictionary:
+		for id: Variant in caravans:
+			if caravans[id] is Dictionary:
+				_caravans[str(id)] = (caravans[id] as Dictionary).duplicate(true)
+	var bought: Variant = saved.get("bought", {})
+	if bought is Dictionary:
+		for market: Variant in bought:
+			if bought[market] is Dictionary:
+				_bought[str(market)] = {}
+				for what: Variant in bought[market]:
+					_bought[str(market)][str(what)] = maxf(float(bought[market][what]), 0.0)
+	_trade_day = int(saved.get("trade_day", -1))
 	var funds: Variant = saved.get("funds", {})
 	if funds is Dictionary:
 		for town: Variant in funds:

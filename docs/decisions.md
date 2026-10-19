@@ -14480,3 +14480,43 @@ Rejected: a concealed() rule beside Senses' (two rules drift); thinning the
 line of sight through grass (a hot path, and seeing over a meadow is the
 point); a route cost (too small to matter, and every route would change);
 trampled cells as level edits (they are play state: the snapshot's).
+## 504, economy's side: a town's caravans sell its surplus at the market
+
+Jeff (2026-10-18): "trade with other town. think about establishing trade
+routes" and "everything has to be gathered and someone paid to do it".
+Phase 2 of his gold economy, the coordinator's approval; maps' routes and
+caravans are 504 itself (TradeRoutes).
+- Once a day (Economy's tick, _trade_turn), for each route between a town
+  and a market (Main sets economy.trade_routes from World.trade.routes(),
+  with each road's eta and risk), a town with no caravan out may send one:
+  a member of each trade in trade.caravan.goes, then a hauler, none off
+  work, outside, a master or an apprentice. It loads what the market wants
+  (markets.<id>.wants), most wanted first, up to caravan.load a member,
+  only what stands above the larger of the town's comfort and caravan.keep,
+  plus what the first queued build costs and what the town makes what that
+  build lacks from (the hides for the inn's leather). It goes only if the
+  sale would fetch more than the members' trip wages and risk x the goods'
+  worth. Members are away until home.
+- The market pays value x want x (1 + risk_premium x risk), less as it
+  fills: / (1 + bought / saturation), bought falling by caravan.recover a
+  day. Phase 2's market has no purse of its own: its gold is unbounded and
+  is the known source of new gold in the economy; saturation is its brake.
+- At the market each member is paid the trip wage (caravan.wage a day of
+  the round trip, eta x WORLD_TICK_STEPS each way); buy_share of what's
+  left buys the market's "sells" good the town is shortest of, at value x
+  caravan.sell, carried home; the rest goes to the treasury whole and
+  untaxed ("trade:<market>", the coordinator's ruling).
+- Raids take goods and members only (Jeff: raids take food and people):
+  no gold travels, and a lost caravan's members come home unless taken.
+- Each going, sale, return, raid and loss prints an "[economy]" line.
+- Saved: Economy "caravans", "bought", "trade_day".
+Soak (30 days, 3 players, against the apprentice soak): 21 caravans to
+market:castle, mostly food and wood, fetched 112 gold, 21 in wages and 86
+to the treasury, none raided on its road. Officials unpaid 236 against
+254; the treasury still ends at its floor (2 against 4), the new gold
+going out at once to what the town owed. The inn didn't stand in 30 days
+(28.2 before): the tanner reaches his loan cap after day 21 and buys no
+more hides, the leather the town owes him unpaid while the treasury is at
+its floor, the shortfall phase 3's luxury tax is for. Protocol unchanged.
+larder_test.
+

@@ -42,6 +42,7 @@ func _ready() -> void:
 	_test_delivery()
 	_test_apprentice()
 	_test_contribute()
+	_test_caravan()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -610,6 +611,84 @@ func _test_contribute() -> void:
 	economy._drop_funds()
 	_check(shed == 5 and economy.fund(TOWN, "woodshed") == 0 and stock.count(TOWN, "gold") == treasury + 5 and economy.gold("p1") == 100 - expect - 5,
 		"the plan dropped: what was given is the town's, the player's gold not returned")
+
+## Caravans to market (decision 504, economy's side): the surplus the
+## market wants most goes with a hauler when it pays; sold whole to the
+## treasury less the trip wages; some bought home; the market's price
+## falls with what it bought; a raid takes the people, never gold.
+func _test_caravan() -> void:
+	print("
+== a caravan to market ==")
+	_now = 0
+	var clock := func() -> int: return _now
+	var stock := Stockpile.new({}, clock, ItemBook.new(clock))
+	var work := Production.new({}, stock, null, clock, _rules)
+	var economy := Economy.new({}, stock, work, clock, _rules)
+	var rule: Dictionary = _rules["trade"]["caravan"]
+	var eta := 20
+	var way := {"id": "r1", "market": "market:castle", "eta": eta, "risk": 0.0}
+	economy.trade_routes = func(_town: String) -> Array: return [way]
+	var sent: Array = []
+	economy.send_caravan = func(route_id: String, cargo: Dictionary, from_end: String) -> String:
+		sent.append([route_id, cargo.duplicate(true), from_end])
+		return "c%d" % sent.size()
+	stock.deposit(TOWN, "leather", 20)
+	stock.deposit(TOWN, "wood", 40)
+	economy._trade_turn([TOWN])
+	_check(sent.is_empty(), "nobody to go: no caravan")
+	work.add_worker("h1", "Ash", ["hauler"], TOWN, "test", "steady")
+	_now = DayNight.day_steps
+	economy._trade_turn([TOWN])
+	var load := int(rule["load"])
+	_check(sent.size() == 1 and sent[0][1]["goods"] == {"leather": load} and sent[0][1]["members"] == ["h1"] and sent[0][2] == TOWN
+		and stock.count(TOWN, "leather") == 20 - load and bool(work.worker("h1")["away"]),
+		"the leather the market wants most goes, %d a member, the hauler away (%s)" % [load, sent])
+	economy._trade_turn([TOWN])
+	_now += DayNight.day_steps
+	economy._trade_turn([TOWN])
+	_check(sent.size() == 1, "one caravan out at a time")
+	var before := economy.market_price("market:castle", "leather", 0.0)
+	var proceeds := economy._sale_of("market:castle", "leather", load, 0.0)
+	var wage := economy._trip_wage(eta)
+	var treasury := stock.count(TOWN, "gold")
+	economy.caravan_arrived("c1", "r1", "market:castle", sent[0][1])
+	_check(int(work.worker("h1")["purse"]) == wage, "the hauler paid the trip's wage (%d)" % wage)
+	_check(sent.size() == 2 and sent[1][2] == "market:castle" and sent[1][1]["members"] == ["h1"], "sets out home (%s)" % [sent[-1]])
+	var home: Dictionary = sent[1][1]["goods"]
+	var spent := 0
+	for what: String in home:
+		spent += ceili(int(home[what]) * float(_rules["value"][what]) * float(rule["sell"]))
+	_check(stock.count(TOWN, "gold") - treasury == proceeds - wage - spent and proceeds - wage - spent > 0,
+		"sold for %d: %d to the treasury, untaxed, after the wage and %s bought" % [proceeds, proceeds - wage - spent, home])
+	_check(economy.market_price("market:castle", "leather", 0.0) < before, "the market pays less for leather now (%.2f < %.2f)" % [economy.market_price("market:castle", "leather", 0.0), before])
+	var had := {}
+	for what: String in home:
+		had[what] = stock.count(TOWN, what)
+	economy.caravan_arrived("c2", "r1", TOWN, sent[1][1])
+	_check(not bool(work.worker("h1")["away"]) and home.keys().all(func(what: String) -> bool: return stock.count(TOWN, what) == int(had[what]) + int(home[what]))
+		and economy.caravans().is_empty(), "home: unloaded, the hauler back")
+	way["eta"] = 20000
+	_now += DayNight.day_steps
+	economy._trade_turn([TOWN])
+	_check(sent.size() == 2, "a road too long to pay its wages: no caravan")
+	way["eta"] = eta
+	_now += DayNight.day_steps
+	economy._trade_turn([TOWN])
+	var gold_before := stock.count(TOWN, "gold")
+	economy.caravan_raided("c3", "r1", "camp:x", {"goods": {}, "members": ["h1"]})
+	economy.caravan_lost("c3", "r1", "taken")
+	_check(sent.size() == 3 and economy.caravans().is_empty() and stock.count(TOWN, "gold") == gold_before, "struck and lost: its goods gone, no gold lost")
+	_check(economy.is_food("meat") and economy.is_food("ration") and not economy.is_food("leather"), "food is food, meat and things tagged food")
+	# The hides the inn's lacking leather is made from stay home.
+	work.add_worker("h2", "Bea", ["hauler"], TOWN, "test", "steady")
+	stock.take(TOWN, "leather", stock.count(TOWN, "leather"))
+	stock.take(TOWN, "wood", stock.count(TOWN, "wood"))
+	stock.deposit(TOWN, "hide", 20)
+	economy.shortfall = func(_town: String) -> Dictionary: return {"kind": "inn", "job": 0, "steps": 0, "needs": {"leather": 3}}
+	_now += DayNight.day_steps
+	economy._trade_turn([TOWN])
+	var kept := maxi(int(_rules.get("comfort", {}).get("hide", 0)), int(rule["keep"])) + 2 * 3
+	_check(sent.size() == 4 and sent[3][1]["goods"] == {"hide": 20 - kept}, "the hides for the inn's leather kept: %d sent (%s)" % [20 - kept, sent[-1]])
 
 func _check(ok: bool, what: String) -> void:
 	print("%s  %s" % ["PASS" if ok else "FAIL", what])

@@ -2202,6 +2202,19 @@ func _boot() -> void:
 	World.economy.owed_paid.connect(func(player_id: String, gold: int) -> void: World.gold_changed.emit(player_id, gold))
 	# Players' contributions toward the next build (decision 499).
 	World.economy.shortfall = World.towns.shortfall
+	# Caravans to market over maps' trade routes (decision 504, economy's side).
+	if World.trade != null:
+		World.economy.trade_routes = func(town: String) -> Array:
+			var out: Array = []
+			for way: Dictionary in World.trade.routes():
+				var market := str(way["to"]) if str(way["from"]) == town else str(way["from"]) if str(way["to"]) == town else ""
+				if market.begins_with(TradeRoutes.MARKET):
+					out.append({"id": way["id"], "market": market, "eta": World.trade.eta(way["id"]), "risk": World.trade.risk(way["id"])})
+			return out
+		World.economy.send_caravan = World.trade.send
+		World.trade.caravan_arrived.connect(World.economy.caravan_arrived)
+		World.trade.caravan_raided.connect(World.economy.caravan_raided)
+		World.trade.caravan_lost.connect(World.economy.caravan_lost)
 	World.production.settle_fund = World.economy.settle_fund
 	World.economy.contributed.connect(func(town: String, player_id: String, kind: String, gold: int, xp: int) -> void:
 		World.towns.add_xp(town, xp, "%s gave %d gold toward the %s" % [player_id, gold, kind]))
