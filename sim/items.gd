@@ -36,7 +36,7 @@ const CARRIED := 6
 const FIELDS := ["id", "name", "short", "color", "art", "kind", "size", "weight", "hands", "tags", "effects", "use", "yield", "verb", "made",
 	"opens", "value", "blunt", "ammo", "condition", "mend"]
 ## Who makes things (made's "by"), as economy's production has them.
-const TRADES: Array[String] = ["smith", "cook", "carpenter", "tanner", "fletcher"]
+const TRADES: Array[String] = ["smith", "cook", "carpenter", "tanner", "fletcher", "weaver", "healer"]
 
 ## The makes a thing can be of (decision 474): set at mint by its source
 ## (a drop row, a chest's or a monster's props "style", a level's

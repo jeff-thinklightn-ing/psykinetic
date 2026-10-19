@@ -3,7 +3,7 @@
 	"counts": {
 		"own": 169,
 		"fill": 0,
-		"placeholder": 16
+		"placeholder": 17
 	},
 	"slots": [
 		{
@@ -2036,10 +2036,21 @@
 			"budget": 500
 		},
 		{
-			"slot": "item.leather",
+			"slot": "item.herbs",
 			"status": "placeholder",
 			"group": "rest",
 			"order": 184,
+			"type": "mesh",
+			"kind": "held",
+			"category": "items",
+			"size": "0.2 x 0.1 x 0.15",
+			"budget": 500
+		},
+		{
+			"slot": "item.leather",
+			"status": "placeholder",
+			"group": "rest",
+			"order": 185,
 			"type": "mesh",
 			"kind": "held",
 			"category": "items",
@@ -2050,7 +2061,7 @@
 			"slot": "item.roast",
 			"status": "placeholder",
 			"group": "rest",
-			"order": 185,
+			"order": 186,
 			"type": "mesh",
 			"kind": "held",
 			"category": "items",

@@ -273,6 +273,25 @@
 			"type": "mesh",
 			"uses": "war hammer (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
 		},
+		"item.herbs": {
+			"budget": 500,
+			"category": "items",
+			"kind": "held",
+			"size": [
+				0.2,
+				0.1,
+				0.15
+			],
+			"sockets": {
+				"grip": [
+					0,
+					0,
+					0
+				]
+			},
+			"type": "mesh",
+			"uses": "bunch of herbs (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
+		},
 		"item.hide": {
 			"budget": 500,
 			"category": "items",

@@ -13784,3 +13784,27 @@ Protocol unchanged; no new class_name.
 Rejected: contagion and plague; sickness for players (372 stands); a
 companion dying of it; sickness as a stint word in residents.json (it is
 a state on the card, not a routine).
+## 500, items' side: the weaver's bolt of cloth
+
+For economy's sheep, wool and the weaver (500; Jeff: "sheep and wool yes",
+the coordinator's approval). "weaver" joins Items.TRADES, and items.json's
+"cloth_bolt" (since items step 1: "bolt of cloth", tag resource, yield
+{cloth: 3}, art item.cloth_bolt) gains a "made": by the weaver from wool 2
+over 1500 steps. Its yield stays 3, so bolts already in levels and chests
+are unchanged, and it has no catalog value: economy's value_of prices it
+from its wool and work (economy: 4 gold of wool into 3 cloth is the
+weaver's margin, the reason to bring sheep in). It is measured, so a scoundrel weaver's short measure (493) applies. Wool is a
+store resource from economy's c3130ddc. Protocol unchanged.
+
+## 501 amended, items' side: herbs, and the remedy's recipe
+
+The coordinator, on economy's word that a remedy stocked from nothing
+breaks Jeff's gathered-and-paid rule: the healer makes it. "healer" joins
+Items.TRADES; the remedy's "made" is {by: healer, from: {herbs: 2},
+steps: 600}. items.json gains "herbs" ("bunch of herbs", tag resource,
+yield {herbs: 1}, value 1, art slot item.herbs: it lies in the wilds for
+players to pick up and bank at the store, Jeff's player-banking rule).
+Herbs is a store resource from economy's c3130ddc, so the recipe takes it
+from the store, not from herb things on a shelf. Herbs are measured; the
+remedy, one dose, still is not. slots_items.json and the art status
+regenerated. Protocol unchanged; no new class_name.
