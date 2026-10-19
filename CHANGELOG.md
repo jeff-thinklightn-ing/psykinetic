@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The ground no longer looks like polygons (524): grass, dirt, stone and sand meet along soft, ragged edges that wander freely, and grass wears through the dirt in patches.
 - Beds are rebuilt in clean planks: a posted frame, a mattress and pillow, and a blue-grey wool blanket folded back.
 - Dirt is soft, mottled earth instead of a patchwork of flat polygons.
 - Tables are rebuilt in clean planks: a planked top on cleats, square legs and stretchers.

@@ -5,8 +5,10 @@ shader_type spatial;
 // b: at the foot of a drop, a: at its top, so a ledge's foot is shaded and
 // its edge caught by the light.
 // Which ground is where comes from kinds, a texel a cell (r grass, g dirt,
-// b stone, a sand), read where the noise pushes it, so kinds meet along
-// ragged borders, not cell edges. Each kind's look is noise (noise_tex,
+// b stone, a sand), read smoothly (Catmull-Rom, not the texels' bilinear
+// diamonds) where a two-scale noise pushes it, so kinds meet along soft,
+// ragged borders that follow no cell (decision 524), grass wearing through
+// the dirt here and there. Each kind's look is noise (noise_tex,
 // made at run time) until its ground.<kind> texture has art (decision 437),
 // then that texture in world metres, a slow swell on it against the tile's
 // repeat; everything over the kinds (the season, wet, the forest's edge,
@@ -89,6 +91,33 @@ varying vec2 relief;
 // repeats), turned at an odd angle so no repeat lines up with the cells.
 float noise(vec2 p) {
 	return texture(noise_tex, mat2(vec2(0.913, 0.408), vec2(-0.408, 0.913)) * p / 64.0).r;
+}
+
+// [param tex] at [param uv] by Catmull-Rom over its texels ([param size]):
+// smooth, and through each texel's own value, so a lone cell of a kind
+// still shows (a B-spline would lose it); nine bilinear reads.
+vec4 smooth_read(sampler2D tex, vec2 uv, vec2 size) {
+	vec2 at = uv * size;
+	vec2 one = floor(at - 0.5) + 0.5;
+	vec2 f = at - one;
+	vec2 w0 = f * (-0.5 + f * (1.0 - 0.5 * f));
+	vec2 w1 = 1.0 + f * f * (-2.5 + 1.5 * f);
+	vec2 w2 = f * (0.5 + f * (2.0 - 1.5 * f));
+	vec2 w3 = f * f * (-0.5 + 0.5 * f);
+	vec2 w12 = w1 + w2;
+	vec2 at0 = (one - 1.0) / size;
+	vec2 at3 = (one + 2.0) / size;
+	vec2 at12 = (one + w2 / w12) / size;
+	vec4 sum = texture(tex, vec2(at0.x, at0.y)) * w0.x * w0.y;
+	sum += texture(tex, vec2(at12.x, at0.y)) * w12.x * w0.y;
+	sum += texture(tex, vec2(at3.x, at0.y)) * w3.x * w0.y;
+	sum += texture(tex, vec2(at0.x, at12.y)) * w0.x * w12.y;
+	sum += texture(tex, vec2(at12.x, at12.y)) * w12.x * w12.y;
+	sum += texture(tex, vec2(at3.x, at12.y)) * w3.x * w12.y;
+	sum += texture(tex, vec2(at0.x, at3.y)) * w0.x * w3.y;
+	sum += texture(tex, vec2(at12.x, at3.y)) * w12.x * w3.y;
+	sum += texture(tex, vec2(at3.x, at3.y)) * w3.x * w3.y;
+	return max(sum, vec4(0.0));
 }
 
 float fbm(vec2 p) {
@@ -193,18 +222,29 @@ void vertex() {
 	relief = CUSTOM0.ba;
 }
 
+// How far the kinds are pushed (cells), at the slow scale and the quick;
+// how wide the band where two kinds meet; how much grass wears through dirt.
+const float KIND_DRIFT = 1.5;
+const float KIND_WOBBLE = 0.35;
+const float KIND_EDGE = 0.25;
+const float GRASS_WEAR = 0.7;
+
 void fragment() {
 	vec2 at = world.xz;
-	// Where the kinds are read: pushed about by up to most of a cell, so a
-	// border wanders across cells.
-	vec2 push = vec2(fbm(at * 0.45), fbm(at * 0.45 + 31.0)) - 0.5;
-	vec2 uv = (at - kinds_origin + 0.5 + push * 1.1) / kinds_size;
-	vec4 weights = texture(kinds, uv);
-	// Each kind's own ragged edge, then the strongest kept, with a short
-	// soft band where two meet.
-	weights += (vec4(noise(at * 2.3), noise(at * 2.3 + 5.0), noise(at * 2.3 + 9.0), noise(at * 2.3 + 13.0)) - 0.5) * 0.35;
+	// Where the kinds are read: pushed about at two scales, a slow drift of
+	// up to a cell and a half (about 3 m across) and a quicker wobble (about
+	// 0.7 m), so a border wanders and frays and never follows the cells.
+	vec2 drift = vec2(fbm(at * 0.33), fbm(at * 0.33 + 31.0)) - 0.5;
+	vec2 wobble = vec2(noise(at * 1.4 + 17.0), noise(at * 1.4 + 43.0)) - 0.5;
+	vec2 uv = (at - kinds_origin + 0.5 + drift * KIND_DRIFT + wobble * KIND_WOBBLE) / kinds_size;
+	vec4 weights = smooth_read(kinds, uv, kinds_size);
+	// Grass wears through the dirt in patches.
+	weights.r += weights.g * GRASS_WEAR * smoothstep(0.55, 0.8, fbm(at * 0.9 + 50.0));
+	// Each kind's own ragged edge, then the strongest kept, with a soft band
+	// where two meet.
+	weights += (vec4(noise(at * 2.3), noise(at * 2.3 + 5.0), noise(at * 2.3 + 9.0), noise(at * 2.3 + 13.0)) - 0.5) * 0.3;
 	float strongest = max(max(weights.r, weights.g), max(weights.b, weights.a));
-	weights = max(weights - (strongest - 0.18), vec4(0.0));
+	weights = smoothstep(vec4(0.0), vec4(KIND_EDGE), weights - (strongest - KIND_EDGE));
 	weights /= max(weights.r + weights.g + weights.b + weights.a, 0.0001);
 
 	// Each kind's look, worked out only where it shows.

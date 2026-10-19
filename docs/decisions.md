@@ -15562,3 +15562,35 @@ level with no relief.png is unchanged (every level builder makes today).
   a pad are.
 
 Protocol unchanged. builder_test _test_relief.
+## 524. The ground's kinds meet softly: no "polys"
+
+Jeff: "dirt having polys is not what i meant by elevation .. i meant hills
+and valleys and ridges." Two things made the ground read as polygons: art-kit's
+ground.dirt, whose flat polygon cells art-kit has remade soft (its own landing,
+docs/art_picks.md), and the way ground.gdshader met one kind with the next,
+which is this. The hills themselves are 525. Client only (ground.gdshader).
+
+- The kinds texture (a texel a cell) was read bilinear, pushed by one fbm of
+  up to 1.1 cells, then the strongest kind kept with a hard 0.18 band: the
+  borders followed the bilinear tent's diamonds, so a dirt patch's outline
+  was facets along the cell grid.
+- Now it is read by Catmull-Rom (smooth_read: nine bilinear reads, smooth and
+  through each texel's own value, so a lone cell of a kind, a one-cell path,
+  still shows, where a B-spline would lose it), pushed at two scales: a slow
+  drift of up to KIND_DRIFT 1.5 cells (an fbm about 3 m across) and a quicker
+  wobble of KIND_WOBBLE 0.35 (about 0.7 m). The strongest kind is kept with a
+  soft band (KIND_EDGE 0.25, a smoothstep, not a cut), so kinds meet along
+  soft, frayed borders that follow no cell.
+- Grass wears through the dirt in patches (GRASS_WEAR 0.7 of the dirt's
+  weight given to grass where an fbm runs high), so a patch of dirt reads as
+  worn ground, not a cut-out.
+- Everything over the kinds (the season, wet, the forest's edge, light and
+  heat, the floors) is unchanged.
+
+Shots: the wilds town and the sample before and after, on art-kit's soft
+dirt, beside the tone pairs (C:\dev\review\tone).
+
+Rejected: a B-spline read (smoother, but a one-cell path of a kind vanishes);
+a finer kinds texture (four texels a cell: the level's data is a cell's kind,
+the warp gives the shape); dropping the strongest-kind band for a plain mix
+(kinds would mud into each other).
