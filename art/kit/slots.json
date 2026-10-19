@@ -2089,7 +2089,7 @@
 		"ground.dirt": {
 			"category": "ground",
 			"type": "texture",
-			"source": {"by": "art-gen, procedural", "tool": "numpy (art-gen)", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/ground.dirt/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): p1, procedural and seamless, 1024 px taken down to the slot's 512"},
+			"source": {"by": "art-kit, procedural", "tool": "numpy", "license": "own", "date": "2026-10-19", "notes": "remade soft for Jeff (2026-10-19: \"dirt having polys is not what i meant\"; the coordinator's pick, terrain's ask beside 524): mottled packed earth with no hard edges, band-limited noise made on the 512 torus so it wraps seamlessly, a broad mottle about a metre across at tile_m 4, a mid layer and a fine grain, sparse soft grit and pebble specks, row 3's earths held to the old tile's mean (#755b39)"},
 			"tile_m": 4.0,
 			"pixels": 512,
 			"uses": "terrain's ground shader on dirt; procedural colour while empty"

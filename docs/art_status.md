@@ -69,7 +69,7 @@ Drawn as a grey box (a texture slot: terrain's procedural colour).
 | `floor.wood` | 1 | art-gen | own | 2026-10-18 |
 | `frame.cruck` | 1 | art-kit, by hand | own | 2026-10-18 |
 | `fx.arrow` | 3 | art-kit | own | 2026-10-17 |
-| `ground.dirt` | 1 | art-gen, procedural | own | 2026-10-18 |
+| `ground.dirt` | 1 | art-kit, procedural | own | 2026-10-19 |
 | `ground.needles` | 4 | art-gen, procedural (no model) | own | 2026-10-17 |
 | `ground.sand` | 1 | art-gen, procedural | own | 2026-10-18 |
 | `item.antlers` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
