@@ -431,6 +431,11 @@ const SKY_STEPS := 1440
 ## The sun's shadows reach this far from the camera (it stands
 ## CAMERA_DISTANCE from what it looks at).
 const SHADOW_DISTANCE := 70.0
+## The sun's shadow map (px) and its blur: at 4096 and 1.5 the shadows were
+## speckled blobs, at these clean shapes for no frame time perf could
+## measure (decision 526).
+const SUN_SHADOW_SIZE := 8192
+const SUN_SHADOW_BLUR := 1.0
 ## Below the water's bed.
 const FOREST_FLOOR_DEPTH := 0.2
 ## A piece fades when the line from the camera to the local player or
@@ -1392,7 +1397,8 @@ func _build_environment() -> void:
 	sun.rotation_degrees = Vector3(-55.0, 160.0, 0.0)
 	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_ORTHOGONAL
 	sun.directional_shadow_max_distance = SHADOW_DISTANCE
-	sun.shadow_blur = 1.5
+	sun.shadow_blur = SUN_SHADOW_BLUR
+	RenderingServer.directional_shadow_atlas_set_size(SUN_SHADOW_SIZE, true)
 	add_child(sun)
 	_sun = sun
 	_weather_view = WeatherView.new()

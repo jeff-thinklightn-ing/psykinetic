@@ -15368,3 +15368,26 @@ shepherd (16) as well as the tanner, who was paid 8 times (25) and made 5
 leather (13); the inn ended 2 leather short. Officials unpaid 198 (201),
 treasury end 1 (5). Protocol unchanged. towns_test.
 
+
+## 526. The sun's shadow map at 8192, blur 1.0
+
+The sun (DirectionalLight3D, decisions 290-292) drew its shadows into the
+default 4096 px directional atlas with shadow_blur 1.5, over
+SHADOW_DISTANCE 70 m in one orthogonal split: a body's or a well's shadow
+came out a mushy, speckled blob. Perf's sharpness bench (the coordinator,
+from Jeff's "not crisp" note, 2026-10-19) found 8192 px and blur 1.0 turn
+them into clean shapes: docs/shots/environment/sun_shadow_8k.jpg, today
+left, 8192 right.
+
+- Client3D sets RenderingServer.directional_shadow_atlas_set_size(
+  SUN_SHADOW_SIZE 8192, 16-bit) as it builds the sun, and SUN_SHADOW_BLUR
+  1.0; project.godot is untouched.
+- Cost, measured (wilds town, clear noon, 9 players, 1920x1080, zoom 1.1,
+  RTX 5090, 3 interleaved passes of 20 s): frame median 1.92 ms against
+  today's 1.87 (today's own passes span 1.84-1.98), 99th 3.69 / 3.45 /
+  3.89 against 4.61 / 3.52 / 3.84, GPU 0.4 ms either way.
+- Memory: the atlas is 16-bit depth, 8192 squared is 128 MB of VRAM
+  against 32 MB. There is no graphics preset yet; a smaller GPU pays the
+  same 128 MB and a little more fill. If a low preset comes it sets
+  SUN_SHADOW_SIZE back to 4096.
+Client only, protocol unchanged.

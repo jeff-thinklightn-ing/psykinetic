@@ -8,6 +8,7 @@ notes (decision 324).
 ## Unreleased
 
 - A torch that stands on its own is a pole packed upright in a ring of stones, its pitch-wrapped head ready for the flame.
+- Sharper sun shadows: a body's, a well's and a wall's shadows are clean shapes instead of speckled blobs (526).
 
 ## v0.1.157
 
