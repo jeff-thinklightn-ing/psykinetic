@@ -1220,6 +1220,12 @@ func _test_short() -> void:
 	_check(Items.def("cloth_bolt")["made"].get("by") == "weaver" and Items.def("remedy")["made"].get("by") == "healer"
 			and Items.yield_of("cloth_bolt") == {"cloth": 3} and Items.yield_of("herbs") == {"herbs": 1},
 			"the weaver's bolt (500) and the healer's remedy from herbs (501)")
+	var luxuries := true
+	for id: String in ["wine", "spice", "silver_ring"]:
+		luxuries = luxuries and Items.has_tag(id, "luxury") and Items.yield_of(id).is_empty() \
+				and not Items.has_tag(id, "food") and not Items.has_tag(id, "resource")
+	_check(luxuries and Items.def("silver_ring")["made"].get("by") == "smith" and Items.def("wine")["made"].is_empty(),
+			"the luxuries: tagged luxury, no yield, not food nor resource; the ring the smith's, wine imported")
 	var sword := World.items.mint("sword", "made")
 	_check(not World.items.make_short(sword) and World.items.short_of(sword) == 1.0, "a sword is never short")
 	var sack := World.items.mint("food_sack", "made")

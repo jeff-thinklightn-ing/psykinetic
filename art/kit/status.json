@@ -3,7 +3,7 @@
 	"counts": {
 		"own": 173,
 		"fill": 0,
-		"placeholder": 16
+		"placeholder": 19
 	},
 	"slots": [
 		{
@@ -2099,6 +2099,39 @@
 			"kind": "held",
 			"category": "items",
 			"size": "0.2 x 0.1 x 0.15",
+			"budget": 500
+		},
+		{
+			"slot": "item.silver_ring",
+			"status": "placeholder",
+			"group": "rest",
+			"order": 190,
+			"type": "mesh",
+			"kind": "held",
+			"category": "items",
+			"size": "0.03 x 0.03 x 0.01",
+			"budget": 500
+		},
+		{
+			"slot": "item.spice",
+			"status": "placeholder",
+			"group": "rest",
+			"order": 191,
+			"type": "mesh",
+			"kind": "held",
+			"category": "items",
+			"size": "0.1 x 0.12 x 0.08",
+			"budget": 500
+		},
+		{
+			"slot": "item.wine",
+			"status": "placeholder",
+			"group": "rest",
+			"order": 192,
+			"type": "mesh",
+			"kind": "held",
+			"category": "items",
+			"size": "0.1 x 0.25 x 0.1",
 			"budget": 500
 		}
 	]

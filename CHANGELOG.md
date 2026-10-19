@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- New luxury goods: a flask of wine and a pouch of spice, brought in by caravan, and a silver ring the smith makes.
 - Wading into tall grass rustles; a trodden path through it is quiet.
 - Builder mode can lay streams: ask for "a stream through here with a ford" and Claude gives it a winding course, fords where paths cross it and bridges on level banks. It can also paint fords and tall grass.
 - Tall grass: a new cell kind that hides whoever stands in it, slows you a little and is trampled flat where people walk, growing back in two days. The level editor paints it and can fill an area with meadow patches and wood edges; the sample level has a patch (508).

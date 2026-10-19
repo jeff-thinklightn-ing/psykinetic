@@ -14618,3 +14618,21 @@ Claude could paint water, but couldn't give it a course or a crossing.
   they are and that a path meeting a stream needs a ford or a bridge.
 
 Protocol unchanged. builder_test _test_stream.
+
+## 514, items' side: the luxury goods
+
+For phase 3 of Jeff's gold economy (economy's 514, the coordinator's
+approval): three things the rich buy, taxed as luxury (Economy.goods_class
+reads the "luxury" tag; tax_class luxury 0.5). In levels/items.json, each
+held, one hand, with no yield and no food or resource tag, so they stay
+out of the meal need and the store's resources:
+- wine ("flask of wine", tags luxury and drink, value 10, 1 kg) and spice
+  ("pouch of spice", tag luxury, value 12, 0.3 kg): imported only, no
+  "made"; economy's caravans bring them to the castle market and the buyer
+  consumes them.
+- silver_ring ("silver ring", tags luxury and jewellery, value 16, 0.02 kg):
+  made by the smith from ore 2 over 2400 steps, kept by its buyer. Held,
+  not worn: no worn slot yet, and v1 needs none.
+Art slots item.wine, item.spice and item.silver_ring, placeholders for
+art-kit; slots_items.json and the art status regenerated. items_test.
+Protocol unchanged; no new class_name.

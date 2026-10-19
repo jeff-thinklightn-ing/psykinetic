@@ -507,6 +507,25 @@
 			"type": "mesh",
 			"uses": "round shield (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
 		},
+		"item.silver_ring": {
+			"budget": 500,
+			"category": "items",
+			"kind": "held",
+			"size": [
+				0.03,
+				0.03,
+				0.01
+			],
+			"sockets": {
+				"grip": [
+					0,
+					0,
+					0
+				]
+			},
+			"type": "mesh",
+			"uses": "silver ring (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
+		},
 		"item.spear": {
 			"budget": 500,
 			"category": "items",
@@ -525,6 +544,25 @@
 			},
 			"type": "mesh",
 			"uses": "spear (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
+		},
+		"item.spice": {
+			"budget": 500,
+			"category": "items",
+			"kind": "held",
+			"size": [
+				0.1,
+				0.12,
+				0.08
+			],
+			"sockets": {
+				"grip": [
+					0,
+					0,
+					0
+				]
+			},
+			"type": "mesh",
+			"uses": "pouch of spice (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
 		},
 		"item.sword": {
 			"budget": 500,
@@ -563,6 +601,25 @@
 			},
 			"type": "mesh",
 			"uses": "pair of tusks (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
+		},
+		"item.wine": {
+			"budget": 500,
+			"category": "items",
+			"kind": "held",
+			"size": [
+				0.1,
+				0.25,
+				0.1
+			],
+			"sockets": {
+				"grip": [
+					0,
+					0,
+					0
+				]
+			},
+			"type": "mesh",
+			"uses": "flask of wine (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
 		},
 		"item.wood_bundle": {
 			"budget": 500,
