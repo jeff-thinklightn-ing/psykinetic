@@ -126,7 +126,7 @@ Drawn as a grey box (a texture slot: terrain's procedural colour).
 | `prop.crate` | 1 | art-kit, by hand | own | 2026-10-19 |
 | `prop.fence` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
 | `prop.fence_post` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
-| `prop.forge` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
+| `prop.forge` | 1 | art-kit, by hand | own | 2026-10-19 |
 | `prop.grave` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
 | `prop.ladder` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
 | `prop.lantern` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |

@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The smith's forge is rebuilt as a hearth of coursed stone with a glowing coal bed under a sooty hood and chimney.
 - Signposts are rebuilt as a square post with two clean arrow boards.
 - Builder mode can cut a flat pad into a hillside for a building it stamps (stamp with pad), and only there (527 amended).
 - Bookshelves are rebuilt with shelves you can see and rows of books in leathers and muted colours.

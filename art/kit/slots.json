@@ -1589,7 +1589,7 @@
 			"size": [1.6, 1.8, 1.2],
 			"budget": 800,
 			"materials": 2,
-			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/prop.forge/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; c2, its 800 mesh, 476 tris after the weld): stone on row 1 in blocks, the coal bed ember and flame"},
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-19", "notes": "rebuilt by hand in big clean planes for Jeff's crispness note (2026-10-19, \"the graphics not crisp\"; the coordinator's ask; art-gen's c2 fit (a lumpy rock streaked with flame swatches) read as mush at game zoom): a hearth of stone blocks in three courses, the top course ringing a coal bed with embers hot round the flame socket (0, 0.9, 0.3) and red toward the rim, a low back wall carrying a sooty hood that narrows into a chimney at the back; 198 tris"},
 			"uses": "the smith's forge; its fire glows at the flame socket",
 			"sockets": {"flame": [0, 0.9, 0.3]}
 		},
