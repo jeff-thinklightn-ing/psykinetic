@@ -45,6 +45,7 @@ func _ready() -> void:
 	_test_heights()
 	_test_hills()
 	_test_water()
+	_test_streams()
 	await _test_wall_runs()
 	_test_cave_walls()
 	_test_scatter()
@@ -1497,6 +1498,69 @@ func _test_water() -> void:
 			"dry water: no surface, no sunk bed, drawn as the land; the map still has it as water")
 	_rig._dry_water.clear()
 	_rig.rebuild(terrain, castle["centre"])
+	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+
+
+## levels/sample's stream (decision 505, terrain's side): the ford and the
+## water under the bridge in the water mask with the stream's (a ford's
+## shallow), the flow down the path and none on still water, the bed under
+## the bridge at the stream's level, no scatter on the ford, and the bridge's
+## deck, rails and ends.
+func _test_streams() -> void:
+	print("\n== streams: fords and bridged water in the mask, the flow down the path, the bridge's pieces ==")
+	var sample := Level.load_level("sample")
+	var terrain: Dictionary = sample["terrain"]
+	var fords: Array = terrain.get("fords", [])
+	var bridged: Array = terrain.get("bridged", [])
+	var streams: Array = terrain.get("streams", [])
+	_check(not fords.is_empty() and not bridged.is_empty() and not streams.is_empty(),
+			"the sample has a stream, a ford and a bridge (%d, %d, %d)" % [streams.size(), fords.size(), bridged.size()])
+	if fords.is_empty() or bridged.is_empty() or streams.is_empty():
+		return
+	_rig.rebuild(terrain, sample["centre"])
+	var mask := _rig._water_mask.get_image()
+	var texel := func(cell: Vector2i) -> Color: return mask.get_pixelv(cell - _rig._mask_origin)
+	var ford: Vector2i = fords[0]
+	var under: Vector2i = bridged[0]
+	var plain: Vector2i = terrain["water"].filter(func(cell: Vector2i) -> bool: return not fords.has(cell))[0]
+	_check(texel.call(ford).r > 0.9 and texel.call(ford).b > 0.9 and texel.call(under).r > 0.9 and texel.call(under).b < 0.1
+			and texel.call(plain).r > 0.9 and texel.call(plain).b < 0.1,
+			"the mask: the ford water and shallow, the bridge's cell water, the stream's water not shallow")
+	var flow := _rig._flow_mask.get_image()
+	var path: Array = streams[0]["path"]
+	var down := Vector2(path[-1] - path[0]).normalized()
+	var all_down := path.all(func(cell: Vector2i) -> bool:
+		var way := Vector2(flow.get_pixelv(cell - _rig._mask_origin).r, flow.get_pixelv(cell - _rig._mask_origin).g) * 2.0 - Vector2.ONE
+		return way.dot(down) > 0.9)
+	var away: Vector2i = terrain["floor"].filter(func(cell: Vector2i) -> bool:
+		return path.all(func(on: Vector2i) -> bool: return (cell - on).length() > Client3D.STREAM_REACH + 1))[0]
+	var dry_way := flow.get_pixelv(away - _rig._mask_origin)
+	_check(all_down and absf(dry_way.r - 0.5) < 0.01 and absf(dry_way.g - 0.5) < 0.01,
+			"the flow runs down the path at each of its cells, none away from it")
+	var bed := _rig._grounds.get(under, -1) as int
+	_check(bed >= _rig._ground_floor_end and bed < _rig._ground_water_end and _rig._bed_levels.get(under, -1) == int(terrain["heights"].get(plain, 0)),
+			"under the bridge the ground is the stream's bed, at its level")
+	var on_ford := false
+	for chunk: Vector2i in _rig._scatter_chunks:
+		for kind: String in _rig._scatter_plan(chunk):
+			for item: Array in _rig._scatter_plan(chunk)[kind]:
+				on_ford = on_ford or item[0] == ford
+	_check(not on_ford, "no scatter on the ford")
+	var bridge_entry: Dictionary = terrain["buildings"].filter(func(b: Dictionary) -> bool: return str(b["slot"]) in Level.SPANS_WATER)[0]
+	var rect: Rect2i = bridge_entry["rect"]
+	var bridge := _rig._room.get_node_or_null("Bridge_%d_%d" % [rect.position.x, rect.position.y]) as Node3D
+	var counts := {"deck": 0, "rail": 0, "end": 0}
+	if bridge != null:
+		for many: MultiMeshInstance3D in bridge.find_children("*", "MultiMeshInstance3D", false, false):
+			# Named piece_variant_mesh: a piece of several meshes counted once.
+			var kind := String(many.name).get_slice("_", 0)
+			if String(many.name).get_slice("_", 2) == "0" and counts.has(kind):
+				counts[kind] += many.multimesh.instance_count
+	var facing: Vector2i = bridge_entry["facing"]
+	var length := rect.size.x if facing.x != 0 else rect.size.y
+	var width := rect.size.y if facing.x != 0 else rect.size.x
+	_check(bridge != null and counts["deck"] == length * width and counts["rail"] == 2 * length and counts["end"] == 2 * width,
+			"the bridge: a deck a cell, a rail along each long side, an end at each end (%s)" % [counts])
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
 

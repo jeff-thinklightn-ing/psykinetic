@@ -15038,3 +15038,44 @@ mode now writes them, as the coordinator approved:
   knows.
 
 Protocol unchanged. builder_test _test_captives.
+## 505, terrain's side: streams, fords and bridges drawn
+
+The client half of maps' 505 (the coordinator's split; the design approved
+as sent). Client only.
+
+- The water mask (ground.gdshader and water.gdshader read it) grows from
+  RG8 to RGBA8: r water, now a ford's and a bridge's water too, so a
+  stream's shore runs on unbroken through its crossings; g the forest's
+  ground as before; b a ford's shallows.
+- Under a bridge the ground is the stream's bed, not the deck: its cells,
+  floor to the sim at the banks' height, are water to the ground and the
+  surface (Client3D._measure_streams: each bridged cell's bed the lowest
+  level of the water and fords round its bridge, _bed_levels), their cliff
+  faces as water's. A ford is floor under a shallow sheet: in the water's
+  body, no scatter on it, its footing showing through.
+- Client3D.flow_mask: an RG8 texture of the way each stream runs, a texel a
+  cell, from the paths' order (each path cell the step from the one before
+  to the one after; out across the width STREAM_REACH, 2, cells); still
+  water none. water.gdshader carries its ripples and churn down it at
+  FLOW_SPEED (0.6 m/s), two phases FLOW_CYCLE (1.6 s) long cross-faded so
+  the drift never stretches; ponds as before. Over a ford it is pale and
+  clear (0.4 of the alpha, no depth), with foam across its edges where the
+  current meets it and flecks on it.
+- A bridge: art-kit's bridge.wood.deck on each cell (its variant by the
+  cell), .rail along the outer long edges, .end onto the bank past each end
+  (art-kit's conventions: z along the facing; an end's +z onto the bank),
+  at the deck's height BRIDGE_LIFT (0.04 m) up, so the water drawn under,
+  WATER_LIFT up at a stream level with its banks, never shows through; a
+  MultiMesh for each piece, variant and mesh. A bridge 2 wide takes an end
+  a column (art-kit offers bridge.wood.end_wide if it reads wrong).
+- Sound is sound's (8a4a61fc): the ford's footstep and amb.stream read the
+  same terrain keys.
+
+tests/view_test (the sample's stream: the mask's ford and bridged water,
+the flow down the path and none away from it, the bed under the bridge at
+the stream's level, no scatter on the ford, the bridge's pieces).
+
+Rejected: the water drawn lower than its banks under a bridge (a stream one
+cell wide has no sunk bed to show it); a mesh a bridge (art-kit: a repeated
+deck); the flow worked out from the water's shape (the paths have it, and
+a pond has none).

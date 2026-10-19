@@ -194,6 +194,17 @@ const WATER_LIFT := 0.01
 ## (Above FOREST_FLOOR_DEPTH, or the forest floor under the map hides it.)
 const WATER_BED_DEPTH := 0.15
 const WATER_BED_KIND := "dirt"
+## A stream's flow (decision 505, terrain's side) reaches this many cells out
+## from its path, across its width (Streams.lay's are 1 to 3 wide).
+const STREAM_REACH := 2
+## A bridge's pieces stand this far over the banks' height, so the water
+## drawn under (WATER_LIFT up) never shows through the deck.
+const BRIDGE_LIFT := 0.04
+## art-kit's bridge pieces (decision 505): a deck a cell, a rail along each
+## outer long edge, an end onto each bank.
+const BRIDGE_DECK := "bridge.wood.deck"
+const BRIDGE_RAIL := "bridge.wood.rail"
+const BRIDGE_END := "bridge.wood.end"
 const WATER_SHADER := preload("res://client3d/water.gdshader")
 ## Drawn before the marks on it (hover, ripple, builder's ghost: 0) and the
 ## faded walls (188).
@@ -1039,6 +1050,11 @@ var _building_dry: Array[Vector2i] = []
 ## no surface, no sunk bed, no wet shore; their ground the land's beside
 ## them. The sim still has them as water. Filled the same way.
 var _dry_water: Dictionary[Vector2i, bool] = {}
+## The water under a bridge (terrain "bridged", decision 505): its bed's
+## level, the stream's, not the deck's (_measure_streams).
+var _bed_levels: Dictionary[Vector2i, int] = {}
+## Fords (terrain "fords"): floor under a shallow sheet of the stream.
+var _fords: Dictionary[Vector2i, bool] = {}
 var _posts: Dictionary[Vector2i, Node3D] = {}
 ## Door edge key -> the doorway node (jambs, lintel, hinge). A double
 ## door's two edges share theirs (decision 403).
@@ -1164,6 +1180,9 @@ var _ramp_levels: Dictionary[Vector2i, PackedInt32Array] = {}
 ## Where the map's water is, a texel a cell (_build_ground), for the ground's
 ## wet shore and the water's own; its first cell and size; the bodies drawn.
 var _water_mask: ImageTexture
+## The streams' flow, a texel a cell as the water mask (flow_mask); null
+## with no streams.
+var _flow_mask: ImageTexture
 ## How far each void cell outdoors is from the land, out to FOREST_REACH
 ## (_measure_forest); the ground's cells in index order, and where its
 ## forest ones (after floor and water) begin.
@@ -2822,7 +2841,8 @@ func _add_buildings() -> void:
 			_add_kind(building)
 			continue
 		if str(building["slot"]) in Level.SPANS_WATER:
-			continue  # A bridge (decision 505): terrain draws its deck, rails and ends.
+			_add_bridge(building)
+			continue
 		var rect: Rect2i = building["rect"]
 		var slot := str(building["slot"])
 		var facing: Vector2i = building["facing"]
@@ -3546,7 +3566,7 @@ func _scatter_plan(chunk: Vector2i) -> Dictionary[String, Array]:
 	var roof: Dictionary = _terrain.get("canopy", {})
 	for index: int in _scatter_chunks[chunk]:
 		var cell: Vector2i = _ground_cells[index]
-		if index >= _ground_floor_end and index < _ground_water_end or fire.has(cell) or _dry_water.has(cell):
+		if index >= _ground_floor_end and index < _ground_water_end or fire.has(cell) or _dry_water.has(cell) or _fords.has(cell):
 			continue
 		# Grass under a grown forest's roof (its cover past SCATTER_ROOF) is
 		# its floor of needles, as the ground draws it: the forest's scatter.
@@ -4341,13 +4361,20 @@ func _build_ground(kinds: Dictionary) -> void:
 	# under the forest: the land runs into the forest floor along a ragged
 	# line (the mask's g), not the cells' outline.
 	# Dry water (_dry_water) is drawn as the land: placed with it, before
-	# the water; floor_count is where the land ends.
-	var floor_size: int = _terrain["floor"].size()
+	# the water; floor_count is where the land ends. A bridge's cells are
+	# floor to the sim but water here, at the stream's bed (_bed_levels).
+	_measure_streams()
+	var land: Array = []
+	for cell: Vector2i in _terrain["floor"]:
+		if not _bed_levels.has(cell):
+			land.append(cell)
+	var floor_size: int = land.size()
 	var dry: Array = []
 	var wet: Array = []
 	for cell: Vector2i in _terrain.get("water", []):
 		(dry if _dry_water.has(cell) else wet).append(cell)
-	var cells: Array = _terrain["floor"] + dry + wet
+	wet.append_array(_bed_levels.keys())
+	var cells: Array = land + dry + wet
 	var floor_count := floor_size + dry.size()
 	var water_end := cells.size()
 	# Under the stands the floor is their needles (the forest floor's), so
@@ -4391,8 +4418,10 @@ func _build_ground(kinds: Dictionary) -> void:
 	levels.resize(cells.size() * 4)
 	var kind_bytes := PackedByteArray()
 	kind_bytes.resize(across * down * 4)
+	# The water mask: r water (a ford's and a bridge's too), g the forest's
+	# ground, b a ford's shallows.
 	var water_bytes := PackedByteArray()
-	water_bytes.resize(across * down * 2)
+	water_bytes.resize(across * down * 4)
 	_floor_bytes = PackedByteArray()
 	_floor_bytes.resize(across * down)
 	var chunks: Dictionary[Vector2i, PackedInt32Array] = {}
@@ -4404,6 +4433,8 @@ func _build_ground(kinds: Dictionary) -> void:
 		_grounds[cell] = i
 		_ground_kinds[cell] = kind
 		var corner_levels := _corner_levels(cell)
+		if _bed_levels.has(cell):
+			corner_levels = PackedInt32Array([_bed_levels[cell], _bed_levels[cell], _bed_levels[cell], _bed_levels[cell]])
 		for c in 4:
 			levels[i * 4 + c] = clampi(corner_levels[c], 0, MAX_GROUND_HEIGHT + 1)
 		var place := (cell.y - origin.y) * across + cell.x - origin.x
@@ -4412,9 +4443,11 @@ func _build_ground(kinds: Dictionary) -> void:
 		if i < floor_count:
 			_floor_bytes[place] = FLOOR_SETS.get(_floor_set(cell, kind), 0)
 		if i >= water_end:
-			water_bytes[place * 2 + 1] = 255
-		elif i >= floor_count:
-			water_bytes[place * 2] = 255
+			water_bytes[place * 4 + 1] = 255
+		elif i >= floor_count or _fords.has(cell):
+			water_bytes[place * 4] = 255
+		if _fords.has(cell):
+			water_bytes[place * 4 + 2] = 255
 		var chunk := Vector2i(floori(cell.x / float(FLOOR_CHUNK)), floori(cell.y / float(FLOOR_CHUNK)))
 		if not chunks.has(chunk):
 			chunks[chunk] = PackedInt32Array()
@@ -4427,7 +4460,12 @@ func _build_ground(kinds: Dictionary) -> void:
 			| Mesh.ARRAY_FORMAT_CUSTOM0 | (Mesh.ARRAY_CUSTOM_RGBA8_UNORM << Mesh.ARRAY_FORMAT_CUSTOM0_SHIFT)
 	_ground_stride = RenderingServer.mesh_surface_get_format_attribute_stride(format, 1)
 	_ground_custom = RenderingServer.mesh_surface_get_format_offset(format, 1, Mesh.ARRAY_CUSTOM0)
-	_water_mask = ImageTexture.create_from_image(Image.create_from_data(across, down, false, Image.FORMAT_RG8, water_bytes))
+	_water_mask = ImageTexture.create_from_image(Image.create_from_data(across, down, false, Image.FORMAT_RGBA8, water_bytes))
+	var wet_cells: Dictionary[Vector2i, bool] = {}
+	for cell: Vector2i in wet:
+		wet_cells[cell] = true
+	wet_cells.merge(_fords)
+	_flow_mask = flow_mask(_terrain.get("streams", []), wet_cells, origin, Vector2i(across, down))
 	_floor_mask = ImageTexture.create_from_image(Image.create_from_data(across, down, false, Image.FORMAT_R8, _floor_bytes))
 	_mask_origin = origin
 	_mask_size = Vector2i(across, down)
@@ -4702,10 +4740,15 @@ func _ground_colour(kind: String, bright: float, warm: float) -> Color:
 ## about a third of a cell from the true edge) with foam on the land side.
 ## The bed under it is the ground's (_build_ground).
 func _build_water() -> void:
+	# A stream's fords and the water under its bridges are its water too.
 	var water: Dictionary[Vector2i, bool] = {}
 	for cell: Vector2i in _terrain.get("water", []):
 		if not _dry_water.has(cell):
 			water[cell] = true
+	for cell: Vector2i in _fords:
+		water[cell] = true
+	for cell: Vector2i in _bed_levels:
+		water[cell] = true
 	if water.is_empty():
 		return
 	var material := _water_material()
@@ -4721,7 +4764,7 @@ func _build_water() -> void:
 		while head < body.size():
 			var cell := body[head]
 			head += 1
-			level = maxi(level, _height(cell))
+			level = maxi(level, _bed_levels.get(cell, _height(cell)))
 			for side in sides:
 				var next := cell + side
 				if water.has(next) and not seen.has(next):
@@ -4771,6 +4814,126 @@ func _build_water() -> void:
 		_water_bodies.append(drawn)
 
 
+## The streams' cells as the ground and water draw them (decision 505,
+## terrain's side): the fords, and each bridged cell's bed level, the lowest
+## of the water and fords round its bridge (the sim has the deck's).
+func _measure_streams() -> void:
+	_fords.clear()
+	for cell: Vector2i in _terrain.get("fords", []):
+		_fords[cell] = true
+	_bed_levels.clear()
+	var bridged: Dictionary[Vector2i, bool] = {}
+	for cell: Vector2i in _terrain.get("bridged", []):
+		bridged[cell] = true
+	if bridged.is_empty():
+		return
+	var wet: Dictionary[Vector2i, bool] = _fords.duplicate()
+	for cell: Vector2i in _terrain.get("water", []):
+		wet[cell] = true
+	for building: Dictionary in _terrain.get("buildings", []):
+		if not str(building.get("slot", "")) in Level.SPANS_WATER or not building.has("rect"):
+			continue
+		var rect: Rect2i = building["rect"]
+		var level := MAX_GROUND_HEIGHT + 1
+		for y in range(rect.position.y - 1, rect.end.y + 1):
+			for x in range(rect.position.x - 1, rect.end.x + 1):
+				if wet.has(Vector2i(x, y)):
+					level = mini(level, _height(Vector2i(x, y)))
+		for cell in Level.rect_cells(rect):
+			if bridged.has(cell):
+				_bed_levels[cell] = level if level <= MAX_GROUND_HEIGHT else _height(cell)
+
+
+## The way [param streams] (terrain "streams": {path}, source to mouth) run
+## as an RG8 texture of [param size] texels from cell [param origin]: each
+## of the [param wet] cells within STREAM_REACH of a path takes the way the
+## path runs at its nearest path cell (the step from the cell before to the
+## cell after), 128 + 127 times it; elsewhere still (128, 128). Null with no
+## streams.
+static func flow_mask(streams: Array, wet: Dictionary, origin: Vector2i, size: Vector2i) -> ImageTexture:
+	if streams.is_empty():
+		return null
+	var ways: Dictionary[Vector2i, Vector2] = {}
+	var frontier: Array[Vector2i] = []
+	for stream: Dictionary in streams:
+		var path: Array = stream.get("path", [])
+		for i in path.size():
+			var before: Vector2i = path[maxi(i - 1, 0)]
+			var after: Vector2i = path[mini(i + 1, path.size() - 1)]
+			if not ways.has(path[i]):
+				ways[path[i]] = Vector2(after - before).normalized()
+				frontier.append(path[i])
+	for ring in STREAM_REACH:
+		var reached: Array[Vector2i] = []
+		for cell in frontier:
+			for direction: Vector2i in World.DIRECTIONS:
+				var near := cell + direction
+				if wet.has(near) and not ways.has(near):
+					ways[near] = ways[cell]
+					reached.append(near)
+		frontier = reached
+	var bytes := PackedByteArray()
+	bytes.resize(size.x * size.y * 2)
+	bytes.fill(128)
+	for cell: Vector2i in ways:
+		var at := cell - origin
+		if at.x >= 0 and at.y >= 0 and at.x < size.x and at.y < size.y:
+			bytes[(at.y * size.x + at.x) * 2] = clampi(roundi(128.0 + 127.0 * ways[cell].x), 0, 255)
+			bytes[(at.y * size.x + at.x) * 2 + 1] = clampi(roundi(128.0 + 127.0 * ways[cell].y), 0, 255)
+	return ImageTexture.create_from_image(Image.create_from_data(size.x, size.y, false, Image.FORMAT_RG8, bytes))
+
+
+## A bridge (decision 505, terrain's side): art-kit's BRIDGE_DECK on each
+## of its cells (its variant by the cell), BRIDGE_RAIL along its outer long
+## edges and BRIDGE_END onto the bank past each end, at the deck's height
+## (the sim's) BRIDGE_LIFT up, the water running on under it. A MultiMesh
+## for each piece's variant and mesh, named piece_variant_mesh.
+func _add_bridge(building: Dictionary) -> void:
+	var rect: Rect2i = building["rect"]
+	var facing: Vector2i = building["facing"]
+	var along := Vector2i(absi(facing.x), absi(facing.y))
+	var across := Vector2i(along.y, along.x)
+	var top := _height(rect.position) * LEVEL_RISE + BRIDGE_LIFT
+	var pieces: Dictionary[String, Array] = {}
+	for cell in Level.rect_cells(rect):
+		var deck := "%s/%d" % [BRIDGE_DECK, 1 + posmod(hash(cell), maxi(ArtKit.variant_count(BRIDGE_DECK), 1))]
+		pieces.get_or_add(deck, []).append(Transform3D(_turned_to(along), Vector3(cell.x, top, cell.y)))
+		for side: Vector2i in [across, -across]:
+			if not rect.has_point(cell + side):
+				var edge := Vector2(cell) + Vector2(side) * 0.5
+				pieces.get_or_add(BRIDGE_RAIL + "/1", []).append(Transform3D(_turned_to(along), Vector3(edge.x, top, edge.y)))
+		for end: Vector2i in [along, -along]:
+			if not rect.has_point(cell + end):
+				var edge := Vector2(cell) + Vector2(end) * 0.5
+				pieces.get_or_add(BRIDGE_END + "/1", []).append(Transform3D(_turned_to(end), Vector3(edge.x, top, edge.y)))
+	var bridge := Node3D.new()
+	bridge.name = "Bridge_%d_%d" % [rect.position.x, rect.position.y]
+	for key: String in pieces:
+		var slot := key.get_slice("/", 0)
+		var made := ArtKit.instance(slot, int(key.get_slice("/", 1)))
+		var meshes := made.find_children("*", "MeshInstance3D", true, false)
+		for m in meshes.size():
+			var drawn := meshes[m] as MeshInstance3D
+			var local := ArtKit._place_in(drawn, made)
+			var multimesh := MultiMesh.new()
+			multimesh.transform_format = MultiMesh.TRANSFORM_3D
+			multimesh.mesh = drawn.mesh
+			multimesh.instance_count = pieces[key].size()
+			for i in pieces[key].size():
+				multimesh.set_instance_transform(i, pieces[key][i] * local)
+			var many := MultiMeshInstance3D.new()
+			many.name = "%s_%s_%d" % [slot.get_slice(".", 2), key.get_slice("/", 1), m]
+			many.multimesh = multimesh
+			many.material_override = drawn.material_override
+			bridge.add_child(many)
+		made.free()
+	_room.add_child(bridge)
+
+
+## A basis turning a piece's +Z toward [param direction] (a step on the grid).
+static func _turned_to(direction: Vector2i) -> Basis:
+	return Basis(Vector3.UP, atan2(float(direction.x), float(direction.y)))
+
 ## [param canopy] (cell -> cover) as an R8 texture of [param size] texels
 ## from cell [param origin]; null for none.
 static func canopy_mask(canopy: Dictionary, origin: Vector2i, size: Vector2i) -> ImageTexture:
@@ -4802,6 +4965,8 @@ func _water_material() -> ShaderMaterial:
 	material.set_shader_parameter("shallow", swatch(WATER_SHALLOW.x, WATER_SHALLOW.y))
 	material.set_shader_parameter("deep", swatch(WATER_DEEP.x, WATER_DEEP.y))
 	material.set_shader_parameter("foam", swatch(WATER_FOAM.x, WATER_FOAM.y))
+	material.set_shader_parameter("flow", _flow_mask)
+	material.set_shader_parameter("flowing", _flow_mask != null)
 	return material
 
 
@@ -4814,9 +4979,12 @@ func _water_material() -> ShaderMaterial:
 func _add_cliffs() -> void:
 	var floor_cells: Dictionary[Vector2i, bool] = {}
 	for cell: Vector2i in _terrain["floor"]:
-		floor_cells[cell] = true
+		if not _bed_levels.has(cell):
+			floor_cells[cell] = true
 	var water: Dictionary[Vector2i, bool] = {}
 	for cell: Vector2i in _terrain.get("water", []):
+		water[cell] = true
+	for cell: Vector2i in _bed_levels:
 		water[cell] = true
 	# Each side: the corners on it (GROUND_CORNERS indices), as the cell
 	# and as its neighbour has them.
@@ -4836,7 +5004,7 @@ func _add_cliffs() -> void:
 			if floor_cells.has(next):
 				theirs = _corner_levels(next)
 			elif water.has(next):
-				var level := _height(next)
+				var level: int = _bed_levels.get(next, _height(next))
 				theirs = PackedInt32Array([level, level, level, level])
 			var mine: Array = sides[direction][0]
 			var their: Array = sides[direction][1]
