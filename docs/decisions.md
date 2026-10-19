@@ -15391,3 +15391,20 @@ left, 8192 right.
   same 128 MB and a little more fill. If a low preset comes it sets
   SUN_SHADOW_SIZE back to 4096.
 Client only, protocol unchanged.
+## 522 amended: the head build's suppliers paid first
+
+The coordinator, on 522's soak (the inn 2 leather short as the treasury
+paid the weaver and the shepherd too). Economy remembers what each worker
+the town owes is owed for ("owed_what", saved: the resources of the
+deliveries it couldn't pay for), and at the start of its tick pays first,
+from the treasury above its floor, those owed for what each town's next
+build lacks (Towns.shortfall's needs: the tanner while the inn waits on
+leather); the rest are paid in turn as before.
+Soak (30 days, 3 players, against 522's): the tanner paid what he was
+owed 9 times (8), 5 leather made (5), the inn still 2 leather short;
+officials unpaid 198 (198), treasury end 1 (1). The order of payment is
+not what holds the inn up: the tanner reaches the bank's cap by day 7 and
+can't buy hides (36 banked in the store over the run), his margin on a
+piece of leather (about 1.4 gold over two hides) less than his keep.
+larder_test. Protocol unchanged.
+

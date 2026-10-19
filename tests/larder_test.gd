@@ -44,6 +44,7 @@ func _ready() -> void:
 	_test_contribute()
 	_test_caravan()
 	_test_luxury()
+	_test_head_first()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -794,6 +795,36 @@ func _test_luxury() -> void:
 	var cut := stock.count(TOWN, "gold") - treasury
 	_check(stock.shop(TOWN).size() == 0 and rest > 0 and cut > 0 and int(work.worker("m1")["purse"]) == merchant + rest - cut,
 		"home, it's Pell's: %d more, %d to Snagfin and %d tax to the treasury" % [rest, rest - cut, cut])
+
+
+## The treasury pays first those it owes for what the next build lacks
+## (522 amended): the tanner before the weaver while the inn waits on
+## leather.
+func _test_head_first() -> void:
+	print("
+== the head build's suppliers paid first ==")
+	_now = 0
+	var clock := func() -> int: return _now
+	var stock := Stockpile.new({}, clock, ItemBook.new(clock))
+	var work := Production.new({}, stock, null, clock, _rules)
+	var economy := Economy.new({}, stock, work, clock, _rules)
+	var towns := Towns.new({}, work, _rules, clock)
+	economy.shortfall = towns.shortfall
+	var floor_gold := int(_rules["gold_floor"])
+	stock.deposit(TOWN, "gold", floor_gold)
+	work.add_worker("a1", "Wenna", ["weaver"], TOWN, "test", "steady")
+	work.add_worker("z1", "Hew", ["tanner"], TOWN, "test", "steady")
+	work.order_build(TOWN, "inn", "carpenter", {"wood": 0, "leather": 5}, 1200)
+	economy.deliver(TOWN, "a1", "cloth", 3, "test")
+	economy.deliver(TOWN, "z1", "leather", 1, "test")
+	var weaver := int(work.worker("a1")["owed"])
+	var tanner := int(work.worker("z1")["owed"])
+	_check(weaver > 0 and tanner > 0, "the treasury at its floor: both owed (weaver %d, tanner %d)" % [weaver, tanner])
+	stock.deposit(TOWN, "gold", tanner)
+	_now += 1
+	economy.tick()
+	_check(int(work.worker("z1")["owed"]) == 0 and int(work.worker("a1")["owed"]) == weaver,
+		"gold comes in: the tanner, whose leather the inn lacks, is paid first; the weaver waits (%d, %d)" % [int(work.worker("z1")["owed"]), int(work.worker("a1")["owed"])])
 
 
 func _check(ok: bool, what: String) -> void:

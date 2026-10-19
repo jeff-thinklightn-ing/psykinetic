@@ -10,6 +10,7 @@ notes (decision 324).
 - Chests, crates and barrels are rebuilt in clean planks: a chest with a rounded lid, iron straps and a brass clasp, a crate with a framed, braced side, and a barrel with staves and iron hoops.
 - A torch that stands on its own is a pole packed upright in a ring of stones, its pitch-wrapped head ready for the flame.
 - Sharper sun shadows: a body's, a well's and a wall's shadows are clean shapes instead of speckled blobs (526).
+- When gold comes in, a town now first pays what it owes whoever supplies the building it is waiting on, such as the tanner while the inn waits on leather (522).
 
 ## v0.1.157
 

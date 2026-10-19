@@ -93,6 +93,9 @@ var _bought: Dictionary = {}
 ## The day (now / day_steps) caravans were last thought of, and the
 ## market's buying last eased.
 var _trade_day := -1
+## What each worker the town owes is owed for: worker id -> [resource]
+## (522 amended: the head build's suppliers paid first).
+var _owed_what: Dictionary = {}
 ## Each import on the shelf's landed cost: uid -> gold (decision 514).
 var _landed: Dictionary = {}
 ## A rich resident's want the shelf couldn't meet, a commission for the
@@ -396,6 +399,7 @@ func tick() -> void:
 		return
 	var cat: Dictionary = catalog.call()
 	var at := now()
+	_pay_head_first()
 	var names: Array = needs.keys()
 	names.sort()
 	var skip: Dictionary = folk.get("skip", {})
@@ -740,6 +744,10 @@ func _owe_or_pay(town: String, id: String, amount: int, why: String, what := "")
 	paid += given
 	if paid < amount:
 		production.set_owed(id, int(production.worker(id).get("owed", 0)) + amount - paid)
+		if not what.is_empty():
+			var owed_for: Array = _owed_what.get_or_add(id, [])
+			if what not in owed_for:
+				owed_for.append(what)
 
 
 ## What the town owes worker [param id], paid as its treasury has gold
@@ -753,6 +761,8 @@ func _pay_owed(id: String, town: String) -> void:
 		production.pay(id, paid, "what the town owed")
 		production.set_owed(id, owed - paid)
 		owed -= paid
+		if owed <= 0:
+			_owed_what.erase(id)
 	# The treasury at its floor: what players gave pays the town's debts (499).
 	for kind: String in _funds.get(town, {}).keys():
 		if owed <= 0:
@@ -762,6 +772,28 @@ func _pay_owed(id: String, town: String) -> void:
 			production.pay(id, given, "what the town owed (given toward the %s)" % kind)
 			owed -= given
 			production.set_owed(id, owed)
+
+
+## Before anyone else, the treasury pays those it owes for what each
+## town's next build lacks (522 amended, the coordinator: the tanner while
+## the inn waits on leather), so the build isn't held up by a debt the
+## town pays to others first. The rest are paid as before, in turn.
+func _pay_head_first() -> void:
+	if not shortfall.is_valid():
+		return
+	var ids: Array = _owed_what.keys()
+	ids.sort()
+	var lacking := {}
+	for id: String in ids:
+		var who := production.worker(id)
+		if who.is_empty() or int(who.get("owed", 0)) <= 0:
+			_owed_what.erase(id)
+			continue
+		var town := str(who["town"])
+		if not lacking.has(town):
+			lacking[town] = shortfall.call(town).get("needs", {})
+		if (_owed_what[id] as Array).any(func(what: Variant) -> bool: return lacking[town].has(str(what))):
+			_pay_owed(id, town)
 
 
 ## The hauler of [param town] to carry the next load (in town, not away,
@@ -1568,7 +1600,7 @@ func pay_commission(player_id: String, town: String, gold_owed: int) -> int:
 func to_dict() -> Dictionary:
 	return {"purses": _purses.duplicate(), "log": _log.duplicate(true), "paid": _paid.duplicate(true), "hauled": _hauled.duplicate(),
 		"player_owed": _player_owed.duplicate(true), "apprentice_paid": _apprentice_paid.duplicate(), "funds": _funds.duplicate(true),
-		"caravans": _caravans.duplicate(true), "bought": _bought.duplicate(true), "trade_day": _trade_day, "landed": _landed.duplicate(),
+		"caravans": _caravans.duplicate(true), "bought": _bought.duplicate(true), "trade_day": _trade_day, "landed": _landed.duplicate(), "owed_what": _owed_what.duplicate(true),
 		"commissions": _commissions.duplicate()}
 
 
@@ -1593,6 +1625,11 @@ func from_dict(saved: Dictionary) -> void:
 				for what: Variant in bought[market]:
 					_bought[str(market)][str(what)] = maxf(float(bought[market][what]), 0.0)
 	_trade_day = int(saved.get("trade_day", -1))
+	var owed_what: Variant = saved.get("owed_what", {})
+	if owed_what is Dictionary:
+		for id: Variant in owed_what:
+			if owed_what[id] is Array:
+				_owed_what[str(id)] = (owed_what[id] as Array).map(func(what: Variant) -> String: return str(what))
 	var commissions: Variant = saved.get("commissions", {})
 	if commissions is Dictionary:
 		for town: Variant in commissions:
