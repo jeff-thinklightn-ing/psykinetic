@@ -15533,3 +15533,32 @@ grey (the loader); relief added to whole levels (two meanings for one
 cell); the metre sight rule on levels with no relief.png (a 0.5 m step
 would stop blocking sight in the castle); the uphill cost in
 World.find_path (its tick costs and memo; routes are where it shows).
+
+## 527. Builder mode on maps' relief
+
+Maps' 525 gave outdoor levels relief.png, the ground in metres: a rise
+over Relief.WALK_RISE (0.45 m) between neighbours is a cliff, and a
+building's cells must lie within Relief.PAD_FLAT (0.05 m) or Level.parse
+leaves it out. Builder mode now reads it, as the coordinator approved. A
+level with no relief.png is unchanged (every level builder makes today).
+
+- The working copy carries the doc's relief, read and never changed:
+  BuilderSession.relief() is {field, size} or {}.
+- Pads: stamp and set_building refuse a building whose cells fail
+  Relief.flat (pad_problem), naming the cell furthest from the pad's
+  middle height and by how much. A bridge's banks stay Level's check.
+  Roofs already were (Level.parse's pad rule, read back by _roof).
+- Ways: HeightTools.steps, reaches and ledge_warnings take an optional
+  relief, and over it walk by Relief.step (Relief.cliff_between, stairs
+  and slopes climbing half a level to STAIR_RISE, climbs_over). So
+  site_checks and height_checks say a site or a thing cut off by cliffs.
+- height, hill and stairs are refused on a relief level ("shaped in
+  metres: shape it in the editor"): they paint whole levels the relief
+  would hide. Maps' part two brings a brush; a level_pad tool on
+  Relief.pad, only under a building builder places, is approved to
+  follow it as 527 amended.
+- The grid's Heights block shows relief in half metres (0-9, a-z, A-Z),
+  the request says the level has it, and the prompt says what a cliff and
+  a pad are.
+
+Protocol unchanged. builder_test _test_relief.

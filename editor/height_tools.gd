@@ -207,19 +207,46 @@ static func climbs(map: LevelMap, at: Vector2i) -> Vector2i:
 	return Vector2i.ZERO
 
 
+## Where the stair or slope at [param at] climbs to over [param relief]
+## ({field, size}: a level's relief.png, decision 525; Level.parse's rule,
+## a walkable neighbour half a level to STAIR_RISE up with no edge
+## between), or [method climbs] with no relief.
+static func climbs_over(map: LevelMap, at: Vector2i, relief := {}) -> Vector2i:
+	if relief.is_empty():
+		return climbs(map, at)
+	if map.cell(at) not in ["stair", "slope"]:
+		return Vector2i.ZERO
+	for side in FOUR:
+		var rise := _metres(relief, at + side) - _metres(relief, at)
+		if map.walkable(at + side) and rise >= Relief.LEVEL_M * 0.5 and rise <= Relief.STAIR_RISE + Relief.EPSILON \
+				and map.edge(Terrain.edge_key(at, side)) == "clear":
+			return side
+	return Vector2i.ZERO
+
+
+static func _metres(relief: Dictionary, at: Vector2i) -> float:
+	return Relief.at(relief["field"], relief["size"], at)
+
+
 ## Whether a walker gets from [param a] to its neighbour [param b] on
-## [param map]: both ground, no wall, the same height or a stair between.
-static func steps(map: LevelMap, a: Vector2i, b: Vector2i) -> bool:
+## [param map]: both ground, no wall, the same height or a stair between;
+## over [param relief] ({field, size}, decision 527) Relief.step's rule, a
+## rise of WALK_RISE or less or a stair (Relief.cliff_between).
+static func steps(map: LevelMap, a: Vector2i, b: Vector2i, relief := {}) -> bool:
 	if not map.walkable(a) or not map.walkable(b) or map.edge(Terrain.edge_key(a, b - a)) == "wall":
 		return false
+	if not relief.is_empty():
+		var stairs := {a: climbs_over(map, a, relief), b: climbs_over(map, b, relief)}
+		return Relief.step(relief["field"], relief["size"], stairs, a, b - a) == 0
 	var rise := int(map.heights.get(b, 0)) - int(map.heights.get(a, 0))
 	return rise == 0 or (rise == 1 and climbs(map, a) == b - a) or (rise == -1 and climbs(map, b) == a - b)
 
 
 ## Whether a walker gets from [param from] to [param to] on [param map]
-## (steps: no wall, the same height or a stair between), looking through
-## at most [param limit] cells (decision 520: a work site and its town).
-static func reaches(map: LevelMap, from: Vector2i, to: Vector2i, limit := 70000) -> bool:
+## (steps: no wall, the same height or a stair between, or over
+## [param relief] no cliff), looking through at most [param limit] cells
+## (decision 520: a work site and its town).
+static func reaches(map: LevelMap, from: Vector2i, to: Vector2i, limit := 70000, relief := {}) -> bool:
 	if from == to:
 		return true
 	var seen: Dictionary[Vector2i, bool] = {from: true}
@@ -230,7 +257,7 @@ static func reaches(map: LevelMap, from: Vector2i, to: Vector2i, limit := 70000)
 		head += 1
 		for side in FOUR:
 			var next := at + side
-			if seen.has(next) or not steps(map, at, next):
+			if seen.has(next) or not steps(map, at, next, relief):
 				continue
 			if next == to:
 				return true
@@ -242,14 +269,15 @@ static func reaches(map: LevelMap, from: Vector2i, to: Vector2i, limit := 70000)
 ## For each of [param cells] (things, starts, buildings) on [param map]:
 ## a line if it stands on a patch of ground that ledges cut off from bigger
 ## ground beyond them, with no stair to or from it (walls or forest closing
-## in are not ledges). Ground open past REACH cells is never cut off.
-static func ledge_warnings(map: LevelMap, cells: Array[Vector2i]) -> Array[String]:
+## in are not ledges). Ground open past REACH cells is never cut off. Over
+## [param relief] ({field, size}, decision 527) a ledge is a cliff.
+static func ledge_warnings(map: LevelMap, cells: Array[Vector2i], relief := {}) -> Array[String]:
 	var out: Array[String] = []
 	var told: Dictionary[Vector2i, bool] = {}
 	for start in cells:
 		if told.has(start) or not map.walkable(start):
 			continue
-		var patch := _patch(map, start)
+		var patch := _patch(map, start, relief)
 		var seen: Dictionary = patch["cells"]
 		for at: Vector2i in seen:
 			told[at] = true
@@ -261,22 +289,23 @@ static func ledge_warnings(map: LevelMap, cells: Array[Vector2i]) -> Array[Strin
 		for next: Vector2i in patch["beyond"]:
 			if looked.has(next):
 				continue
-			var other := _patch(map, next)
+			var other := _patch(map, next, relief)
 			biggest = maxi(biggest, (other["cells"] as Dictionary).size())
 			for at: Vector2i in other["cells"]:
 				looked[at] = true
 			if biggest > seen.size():
 				break
 		if biggest > seen.size():
-			out.append("%s is on a patch of %d cells at height %d with ledges round it and no stair to it" % [
-				start, seen.size(), int(map.heights.get(start, 0))])
+			out.append("%s is on a patch of %d cells at %s with %s round it and no stair to it" % [
+				start, seen.size(), "height %d" % int(map.heights.get(start, 0)) if relief.is_empty() else "%.2f m" % _metres(relief, start),
+				"ledges" if relief.is_empty() else "cliffs"])
 	return out
 
 
 ## The ground a walker reaches from [param start] (up to REACH cells):
 ## {cells, beyond: the cells across a ledge from it, climbs: whether it
 ## takes a stair to another height}.
-static func _patch(map: LevelMap, start: Vector2i) -> Dictionary:
+static func _patch(map: LevelMap, start: Vector2i, relief := {}) -> Dictionary:
 	var seen: Dictionary[Vector2i, bool] = {start: true}
 	var queue: Array[Vector2i] = [start]
 	var beyond: Array[Vector2i] = []
@@ -287,8 +316,9 @@ static func _patch(map: LevelMap, start: Vector2i) -> Dictionary:
 			var next := at + side
 			if seen.has(next) or not map.walkable(next):
 				continue
-			if steps(map, at, next):
-				if int(map.heights.get(next, 0)) != int(map.heights.get(at, 0)):
+			if steps(map, at, next, relief):
+				if int(map.heights.get(next, 0)) != int(map.heights.get(at, 0)) if relief.is_empty() \
+						else Relief.cliff_between(_metres(relief, at), _metres(relief, next)):
 					climbs_out = true
 				seen[next] = true
 				queue.append(next)

@@ -30,6 +30,7 @@ func _ready() -> void:
 	await _test_slopes()
 	await _test_captives()
 	await _test_work_sites()
+	_test_relief()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -607,6 +608,42 @@ func _test_work_sites() -> void:
 	_check(session.proposal()["config"]["places"]["woods"].get("town") == "store", "the proposal's level.json has its town")
 	_check(HeightTools.reaches(doc.map, Vector2i(20, 20), Vector2i(8, 8)) and not HeightTools.reaches(session.working.map, Vector2i(20, 20), Vector2i(8, 8)),
 			"HeightTools.reaches: open ground reached, a walled cell not")
+
+
+func _test_relief() -> void:
+	print("\n== relief (527, on maps' 525): pads flat, cliffs cut ways, height tools refused ==")
+	_check("a rise of more than 0.45 m between neighbours is a cliff" in BuilderSession.system_prompt(), "the prompt says what relief means")
+	var size := Vector2i(40, 30)
+	var field := PackedFloat32Array()
+	field.resize(size.x * size.y)
+	for y in size.y:
+		for x in size.x:
+			# A plateau 2 m up east of x 24, a gentle 0.3 m rise at x 15, a 0.1 m bump at (7, 7).
+			field[y * size.x + x] = 2.0 if x >= 25 else 0.3 if x >= 15 else 0.0
+	field[7 * size.x + 7] = 0.1
+	var doc := _doc()
+	doc.relief = Relief.image(field, size)
+	doc.config["places"] = {"store": {"at": [10, 20], "kind": "stockpile", "holder": "town"},
+		"woods": {"at": [18, 20], "kind": "woodlot", "holder": "town", "town": "store"},
+		"high": {"at": [30, 20], "kind": "hunting_ground", "holder": "town", "town": "store"}}
+	var session := BuilderSession.new(doc, Rect2i(0, 0, 40, 30), "test_field", StubClaude.new([]))
+	var bumpy: Dictionary = session.run_tool("stamp", {"prefab": "building_hut", "at": [6, 6]})
+	_check(not bumpy["ok"] and "is not flat: (7, 7) is +0.10 m off the rest" in str(bumpy["text"]), "a hut over a 0.1 m bump: refused, naming the cell (%s)" % bumpy["text"])
+	var flat: Dictionary = session.run_tool("stamp", {"prefab": "building_hut", "at": [2, 12]})
+	_check(flat["ok"] and (session.working.config.get("buildings", []) as Array).size() == 1, "on flat ground: stamped (%s)" % flat["text"])
+	var sites := session.site_checks()
+	_check(sites.size() == 1 and "hunting_ground high at (30, 20) can't be reached on foot" in sites[0],
+		"a 0.3 m rise is walked, a 1.7 m cliff is not (%s)" % [sites])
+	_check(HeightTools.reaches(session.working.map, Vector2i(10, 20), Vector2i(30, 20)), "with no relief the same ground is one height: reached")
+	var heights := session.height_checks()
+	_check(heights.size() == 1 and "(30, 5) is on a patch of 450 cells at 2.00 m with cliffs round it" in heights[0], "the brute up on the plateau: said (%s)" % [heights])
+	var hill: Dictionary = session.run_tool("hill", {"at": [20, 10]})
+	_check(not hill["ok"] and "shaped in metres" in str(hill["text"]), "hill refused on a relief level (%s)" % hill["text"])
+	_check(not session.run_tool("height", {"change": "raise", "cells": [[3, 3]]})["ok"], "height refused too")
+	var grid := BuilderSession.grid(session.working.map, session.working.config, Rect2i(20, 20, 10, 1), session.area, session.relief())
+	_check("in half metres" in grid and "  20 111114444" in grid, "the grid's Heights are half metres (%s)" % grid)
+	_check(BuilderSession.new(_doc(), Rect2i(0, 0, 40, 30), "test_field", StubClaude.new([])).run_tool("hill", {"at": [20, 10]})["ok"],
+		"a level with no relief keeps hill")
 
 
 func _check(ok: bool, label: String) -> void:

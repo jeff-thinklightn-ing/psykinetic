@@ -10,6 +10,7 @@ notes (decision 324).
 - Beds are rebuilt in clean planks: a posted frame, a mattress and pillow, and a blue-grey wool blanket folded back.
 - Dirt is soft, mottled earth instead of a patchwork of flat polygons.
 - Tables are rebuilt in clean planks: a planked top on cleats, square legs and stretchers.
+- Builder mode reads a level's relief: it refuses a building on ground that isn't flat (naming the cell off), counts a rise over 0.45 m as a cliff when it checks ways to work sites and things, shows the ground in half metres, and leaves shaping the ground to the editor (527).
 - The ground can now have real hills and valleys: an outdoor level's new relief.png gives each cell's height in centimetres. A gentle slope is walked (slower uphill, and wandering groups take the valleys), a steep one is a cliff to fall from, a ridge hides what lies behind it, buildings need level ground and water lies level under its banks. Levels without one play as before; the sample level has a gentle rise (525). Server and client: protocol 22.
 - Fire looks like fire (523): torches and burning ground have flickering flames with rising embers and a faint wisp of smoke, and their light flickers and warms the ground around them. By day outdoors a torch's light fades to a glint.
 - Chests, crates and barrels are rebuilt in clean planks: a chest with a rounded lid, iron straps and a brass clasp, a crate with a framed, braced side, and a barrel with staves and iron hoops.

@@ -46,7 +46,10 @@ const ROLE_WORDS := {
 	"game": "bolts, but charges when struck or cornered",
 	"predator": "hunts %s; players only at night or with its pack about",
 }
-const GROUNDS: Array[String] = ["stone", "grass", "dirt", "tall_grass", "water", "ford", "fire", "void", "stair", "slope", "rock"]
+## The grid's Heights over relief (decision 527): a character per half
+## metre, 0 for the lowest; past the last, the last.
+const HALF_METRES := "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+const GROUNDS: Array[String] =["stone", "grass", "dirt", "tall_grass", "water", "ford", "fire", "void", "stair", "slope", "rock"]
 const SIDES := {"north": Vector2i(0, -1), "east": Vector2i(1, 0), "south": Vector2i(0, 1), "west": Vector2i(-1, 0)}
 ## Context shown round the area, in cells.
 const MARGIN := 3
@@ -96,6 +99,8 @@ func _fresh_working() -> void:
 	working.map = doc.map.copy()
 	working.config = doc.config.duplicate(true)
 	working.had_heights = doc.had_heights
+	# Read, never changed here (decision 527): the ground's shape comes from the editor.
+	working.relief = doc.relief
 
 
 ## Asks for [param text] (the first request, or a follow-up), running
@@ -386,7 +391,7 @@ Levels join at their edges: walking off one edge arrives on the neighbour's oppo
 
 Places are what factions hold (the goblins, the town, or nobody): a camp, a keep, a farm, a gate, a mine. Each is a cell and a radius; the ground within the radius is its holder's, and no one else's group may walk through it. mark_place names one (its key, kind, cell, radius, who holds it at the start). Mark a place when you build one: a camp's place on its gather point (where its monsters gather), a farmstead's in its yard. A goblin camp can hold captives from the start (mark_place's holds), each taken from a town (the request lists them): someone of that town, or kin of one of its workers ("the smith's daughter"). In town their kin asks players to bring them home, and they go free when the camp falls, so a camp holding a captive is worth clearing. A town's work sites are places too: a woodlot (woods its woodcutter fells: put it at the forest's edge), a hunting ground (open land with game, its hunter's), a quarry (rock to cut stone from), a farm (fields), a mine. Mark one with the town it works for (mark_place's town: the key of the town's stockpile place), held by the town, not far from it, and with a way on foot from the store to it: a site the goblins hold, or that can't be reached, is worked by no one, and the tool's answer says so. %s Some prefabs bring their place with them. A building prefab is a roofed building players walk into: stamp it whole, door and all, rather than drawing its walls yourself. A building can serve a town: set_building gives one in the area a use (%s) and its town, the key of a stockpile place in this level (a place of kind stockpile, held by the town). A town has one building of each use. Stamping over a building drops its use: set it again. town_wall walls a town in: give the rectangle of cells it encloses (its buildings, its store, room to walk) and the wall stands on the edges just outside it, with gates (doors) where roads come in, one in the middle of each side if you name none. One wall per town; it looks as strong as the town has built it (a bank of rubble at first). roof puts a roof over a rectangle of floor of one height that no building covers: a room you walled yourself, or an open shelter (a market stall, a woodshed) on posts at its corners; give it a use and town and it serves the town as a building does.
 
-Ground has a height, 0 to 6 (the grid's Heights block, shown when any cell has one). A step of a level or more between two cells is a ledge: a wall to anyone walking, though a body pushed off it falls to the ground below, and higher ground sees over walls. Stairs join one level to the next: a stair climbs to the one cell beside it a level up. A slope is a stair that looks like a ramp of earth: use slopes outdoors (on hills, banks, outcrops) and stairs in and round buildings; hill and stairs make slopes when asked. Rock is bare rock standing out of the ground, walled round: no one walks on or through it. height raises, lowers or sets cells; hill makes a rounded hill of rings a level each, with stairs up the sides asked; stairs puts a stair or a flight onto a ledge or up from flat ground. Whatever stands on raised ground (things, starts, buildings) needs stairs to it, and a building stands on one height: when a change leaves something cut off or a stair climbing nowhere, the tool's answer says so: put it right.
+Ground has a height, 0 to 6 (the grid's Heights block, shown when any cell has one). A step of a level or more between two cells is a ledge: a wall to anyone walking, though a body pushed off it falls to the ground below, and higher ground sees over walls. Stairs join one level to the next: a stair climbs to the one cell beside it a level up. A slope is a stair that looks like a ramp of earth: use slopes outdoors (on hills, banks, outcrops) and stairs in and round buildings; hill and stairs make slopes when asked. Rock is bare rock standing out of the ground, walled round: no one walks on or through it. height raises, lowers or sets cells; hill makes a rounded hill of rings a level each, with stairs up the sides asked; stairs puts a stair or a flight onto a ledge or up from flat ground. Whatever stands on raised ground (things, starts, buildings) needs stairs to it, and a building stands on one height: when a change leaves something cut off or a stair climbing nowhere, the tool's answer says so: put it right. Some outdoor levels have their ground shaped in metres (the request says so): there the Heights block is in half metres (0-9, then a, b, c ...), a rise of more than 0.45 m between neighbours is a cliff no one walks, height, hill and stairs are refused (the ground is shaped in the editor), and a building needs ground flat within 0.05 m under it: stamp it where the ground is flat, or the tool refuses it.
 
 A town keeps what players bring home in its store: a place of kind stockpile that the town holds. Stamp town_store for one (an open yard with its depot, its shop counter and the store's place, all in one), once per town, near the middle of town on open ground reachable from the gate, its counter facing where players will stand. A depot is a chest placed with use depot: what is put in it is banked. A shop counter is a chest placed with use shop: players buy what the town's workers made and sell what it is short of. Either works only inside the town's store, and is never given items. When a change leaves the store wrong, the tool's answer says so: put it right.
 
@@ -402,7 +407,7 @@ func _situation() -> String:
 		map_name, str(doc.config.get("name", map_name)), doc.map.size.x, doc.map.size.y,
 		"outdoors (void is forest)" if zone == "outdoors" else "%s (void is nothing, walled off)" % {"indoors": "indoors", "cave": "a cave", "dungeon": "a dungeon"}.get(zone, zone),
 		area.position.x, area.end.x - 1, area.position.y, area.end.y - 1, area.size.x, area.size.y,
-		grid(doc.map, doc.config, shown, area)]
+		grid(doc.map, doc.config, shown, area, relief())]
 	var edges := edges_touched()
 	if not edges.is_empty():
 		var beyond := PackedStringArray()
@@ -418,6 +423,8 @@ func _situation() -> String:
 			places.append("%s (%s at %s, radius %d, held by %s)" % [key, place["kind"], place["cell"], place["radius"], place["holder"]])
 	if not places.is_empty():
 		text += "\n\nPlaces here: " + ", ".join(places) + "."
+	if not relief().is_empty():
+		text += "\n\nThis level's ground is shaped in metres: the Heights block is in half metres."
 	var towns := town_ids()
 	if not towns.is_empty():
 		text += "\n\nTowns a camp may hold captives from: " + ", ".join(towns) + "."
@@ -449,7 +456,7 @@ func edges_touched() -> Array[String]:
 ## by its y, after a line saying the x of the first column and where
 ## [param inside] (the area) is; then the walls and doors and the settings
 ## (level.json's entries and links) of the things in it.
-static func grid(map: LevelMap, config: Dictionary, shown: Rect2i, inside: Rect2i) -> String:
+static func grid(map: LevelMap, config: Dictionary, shown: Rect2i, inside: Rect2i, ground := {}) -> String:
 	var lines := PackedStringArray()
 	lines.append("x from %d%s" % [shown.position.x, "" if shown == inside else " (area: x %d-%d, y %d-%d)" % [
 		inside.position.x, inside.end.x - 1, inside.position.y, inside.end.y - 1]])
@@ -459,18 +466,23 @@ static func grid(map: LevelMap, config: Dictionary, shown: Rect2i, inside: Rect2
 		for x in range(shown.position.x, shown.end.x):
 			row += str(chars_here.get(map.cell(Vector2i(x, y)), "?"))
 		lines.append("%4d %s" % [y, row])
-	# Heights, when any cell shown has one: a digit a cell, the same rows.
-	var raised := false
-	for at: Vector2i in map.heights:
+	# Heights, when any cell shown has one: a digit a cell, the same rows;
+	# over relief (decision 527) its half metres, a character a cell.
+	var heights: Dictionary = map.heights if ground.is_empty() else Relief.whole_levels(ground["field"], ground["size"])
+	var raised := not ground.is_empty()
+	for at: Variant in heights if not raised else {}:
 		if shown.has_point(at):
 			raised = true
 			break
 	if raised:
-		lines.append("Heights (0 to 6, a digit a cell, the same rows):")
+		lines.append("Heights (0 to 6, a digit a cell, the same rows):" if ground.is_empty()
+			else "Heights (the ground in half metres, %s a character a cell, the same rows):" % HALF_METRES.substr(0, 12))
 		for y in range(shown.position.y, shown.end.y):
 			var row := ""
 			for x in range(shown.position.x, shown.end.x):
-				row += str(int(map.heights.get(Vector2i(x, y), 0))) if map.cell(Vector2i(x, y)) != "void" else "#"
+				var level := int(heights.get(Vector2i(x, y), 0))
+				row += "#" if map.cell(Vector2i(x, y)) == "void" else str(level) if ground.is_empty() \
+					else HALF_METRES[clampi(level, 0, HALF_METRES.length() - 1)]
 			lines.append("%4d %s" % [y, row])
 	var walls := PackedStringArray()
 	for key: Vector3i in map.edges:
@@ -654,6 +666,9 @@ func run_tool(tool: String, input: Variant) -> Dictionary:
 	if not input is Dictionary:
 		return _no("the input is not an object")
 	var given: Dictionary = input
+	if tool in ["height", "hill", "stairs"] and working.relief != null:
+		# Whole levels the relief would hide (decision 527).
+		return _no("this level's ground is shaped in metres: shape it in the editor")
 	match tool:
 		"paint":
 			var ground := str(given.get("ground", ""))
@@ -778,7 +793,13 @@ func run_tool(tool: String, input: Variant) -> Dictionary:
 			var size: Vector2i = (prefab["map"] as LevelMap).size
 			if not area.encloses(Rect2i(at, size)):
 				return _no("%s turned so is %d x %d: at %s it does not fit in the area" % [prefab_name, size.x, size.y, at])
-			return _lay(Prefab.stamp_changes(prefab, working.map, at, working.config), "stamped %s" % prefab_name)
+			var stamped := Prefab.stamp_changes(prefab, working.map, at, working.config)
+			var had: Array = working.config.get("buildings", []) if working.config.get("buildings") is Array else []
+			for entry: Variant in stamped.get("config", {}).get("buildings", []):
+				var uneven := "" if entry in had else pad_problem(entry)
+				if not uneven.is_empty():
+					return _no(uneven)
+			return _lay(stamped, "stamped %s" % prefab_name)
 		"mark_place":
 			return _mark_place(given)
 		"set_building":
@@ -788,7 +809,7 @@ func run_tool(tool: String, input: Variant) -> Dictionary:
 		"roof":
 			return _roof(given)
 		"look":
-			return {"ok": true, "text": grid(working.map, working.config, area, area)}
+			return {"ok": true, "text": grid(working.map, working.config, area, area, relief())}
 		"new_area":
 			return _new_area(given)
 	return _no("no tool \"%s\"" % tool)
@@ -929,6 +950,48 @@ static func building_uses() -> Array[String]:
 	return out
 
 
+## The level's relief (relief.png, maps' 525) as HeightTools reads it,
+## {field, size}, or {} with none (decision 527).
+func relief() -> Dictionary:
+	if working.relief == null:
+		return {}
+	var warnings: Array[String] = []
+	var field := Relief.read(working.relief, working.map.size, warnings)
+	return {} if field.is_empty() else {"field": field, "size": working.map.size}
+
+
+## Why the building [param entry] can't stand on this level's relief
+## (decision 527): its cells not within Relief.PAD_FLAT of each other
+## (Level.parse would leave it out), naming the cell furthest off; "" if
+## they are, or the level has no relief (whole levels: height_checks).
+## A bridge's banks are Level's own check.
+func pad_problem(entry: Variant) -> String:
+	var ground := relief()
+	if ground.is_empty() or not entry is Dictionary or str(entry.get("slot", "")) in Level.SPANS_WATER:
+		return ""
+	var cells: Array[Vector2i] = []
+	for rect in Level.building_blocks(entry):
+		for y in range(rect.position.y, rect.end.y):
+			for x in range(rect.position.x, rect.end.x):
+				if Vector2i(x, y) not in cells:
+					cells.append(Vector2i(x, y))
+	if cells.is_empty() or Relief.flat(ground["field"], ground["size"], cells):
+		return ""
+	# Measured from the pad's middle height, so one bump is the cell named.
+	var levels: Array[float] = []
+	for cell in cells:
+		levels.append(Relief.at(ground["field"], ground["size"], cell))
+	levels.sort()
+	var middle := levels[levels.size() / 2]
+	var furthest := cells[0]
+	for cell in cells:
+		if absf(Relief.at(ground["field"], ground["size"], cell) - middle) > absf(Relief.at(ground["field"], ground["size"], furthest) - middle):
+			furthest = cell
+	return "the ground under the %s at %s is not flat: %s is %+.2f m off the rest, and a building needs its cells within %.2f m" % [
+		str(entry.get("slot", entry.get("kind", "building"))).trim_prefix("building."), Level._tile(entry.get("at")), furthest,
+		Relief.at(ground["field"], ground["size"], furthest) - middle, Relief.PAD_FLAT]
+
+
 func _set_building(given: Dictionary) -> Dictionary:
 	var at: Variant = Level._tile(given.get("at"))
 	if at == null:
@@ -940,6 +1003,9 @@ func _set_building(given: Dictionary) -> Dictionary:
 		return Level.building_blocks(entry).any(func(rect: Rect2i) -> bool: return rect.has_point(at)))
 	if index < 0:
 		return _no("no building stands on %s: stamp a building prefab first" % [at])
+	var uneven := pad_problem(buildings[index])
+	if not uneven.is_empty():
+		return _no(uneven + ": the level leaves it out, so it serves no town")
 	var use := str(given.get("use", "")).strip_edges()
 	var town := str(given.get("town", "")).strip_edges()
 	if not use.is_empty() and use not in building_uses():
@@ -1271,10 +1337,11 @@ func _lay(changes: Dictionary, done: String) -> Dictionary:
 
 ## Each work site that names its town (decision 520) and can't serve it:
 ## held by someone else, or cut off on foot from the town's store
-## (HeightTools.reaches: walls, ledges, water, forest).
+## (HeightTools.reaches: walls, ledges or cliffs, water, forest).
 func site_checks() -> Array[String]:
 	var out: Array[String] = []
 	var places: Dictionary = Level.places_from(working.config, [] as Array[String])
+	var ground := relief()
 	for key: String in places:
 		var town := str(places[key].get("town", ""))
 		if town.is_empty() or not places.has(town):
@@ -1282,7 +1349,7 @@ func site_checks() -> Array[String]:
 		var site: Dictionary = places[key]
 		if site["holder"] != places[town]["holder"]:
 			out.append("the %s %s is held by %s, not by its town %s: its worker can't work it until the town holds it" % [site["kind"], key, site["holder"], town])
-		elif not HeightTools.reaches(working.map, places[town]["cell"], site["cell"]):
+		elif not HeightTools.reaches(working.map, places[town]["cell"], site["cell"], 70000, ground):
 			out.append("the %s %s at %s can't be reached on foot from its town's store %s at %s: open a way" % [site["kind"], key, site["cell"], town, places[town]["cell"]])
 	return out
 
@@ -1290,11 +1357,14 @@ func site_checks() -> Array[String]:
 ## What is wrong with the area's heights on the working copy: a stair
 ## that climbs nowhere or could climb two ways (Level.parse's rule), and a
 ## thing, start or building cut off by ledges (HeightTools.ledge_warnings)
-## or a building standing on more than one height.
+## or a building standing on more than one height. Over the level's relief
+## (decision 527) a stair climbs half a level to Relief.STAIR_RISE, a ledge
+## is a cliff, and a building's pad is pad_problem's.
 func height_checks() -> Array[String]:
 	var out: Array[String] = []
 	var map := working.map
-	if map.heights.is_empty() and doc.map.heights.is_empty():
+	var ground := relief()
+	if ground.is_empty() and map.heights.is_empty() and doc.map.heights.is_empty():
 		return out
 	var things: Array[Vector2i] = []
 	for y in range(area.position.y, area.end.y):
@@ -1303,7 +1373,7 @@ func height_checks() -> Array[String]:
 			var meaning := map.cell(at)
 			if meaning in ["stair", "slope"]:
 				var ups := HeightTools.FOUR.filter(func(side: Vector2i) -> bool:
-					return map.walkable(at + side) and int(map.heights.get(at + side, 0)) == int(map.heights.get(at, 0)) + 1 							and map.edge(Terrain.edge_key(at, side)) == "clear")
+					return map.walkable(at + side) and _climbs_to(at, side, ground) and map.edge(Terrain.edge_key(at, side)) == "clear")
 				if ups.is_empty():
 					out.append("the %s at %s has no cell a level up beside it: it is floor" % [meaning, at])
 				elif ups.size() > 1:
@@ -1314,6 +1384,12 @@ func height_checks() -> Array[String]:
 		var rect: Variant = Level.building_rect(building)
 		if rect == null or not area.intersects(rect):
 			continue
+		if not ground.is_empty():
+			var uneven := pad_problem(building)
+			if not uneven.is_empty():
+				out.append(uneven)
+			things.append(rect.position)
+			continue
 		var levels := {}
 		for y in range(rect.position.y, rect.end.y):
 			for x in range(rect.position.x, rect.end.x):
@@ -1322,8 +1398,18 @@ func height_checks() -> Array[String]:
 		if levels.size() > 1:
 			out.append("the building at %s stands on more than one height: level it" % rect.position)
 		things.append(rect.position)
-	out.append_array(HeightTools.ledge_warnings(map, things))
+	out.append_array(HeightTools.ledge_warnings(map, things, ground))
 	return out
+
+
+## Whether the ground beside [param at] toward [param side] stands where a
+## stair climbs: a level up, or over [param ground] (relief) half a level
+## to Relief.STAIR_RISE up.
+func _climbs_to(at: Vector2i, side: Vector2i, ground: Dictionary) -> bool:
+	if ground.is_empty():
+		return int(working.map.heights.get(at + side, 0)) == int(working.map.heights.get(at, 0)) + 1
+	var rise := Relief.at(ground["field"], ground["size"], at + side) - Relief.at(ground["field"], ground["size"], at)
+	return rise >= Relief.LEVEL_M * 0.5 and rise <= Relief.STAIR_RISE + Relief.EPSILON
 
 
 static func _no(text: String) -> Dictionary:
