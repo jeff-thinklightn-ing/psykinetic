@@ -54,6 +54,9 @@
 			"healers_hut": {"trade": "medicine_man", "outside": true, "names": ["Ned", "Old Tam", "Hob", "Gile"]}
 		}
 	},
+	"forage": {
+		"herbs": {"per_day": 4, "most": 10, "reach": 48, "ring": 14, "clear": 4, "wither_days": 3}
+	},
 	"herds": {
 		"out_per_group": 6, "out_per_zone": 24, "seed": 0.5, "sample": 4,
 		"take_share": 0.05, "camp_eats": 0.5, "camp_prey": ["deer", "boar", "rabbit"], "hunter_prey": ["deer", "boar", "rabbit"], "starve": 0.1,

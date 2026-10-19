@@ -711,6 +711,9 @@ const TREE_HEIGHT := 3.6
 ## A thing thrown onto a pile is drawn flying there if the pile shows it
 ## within this many ticks of the throw, for THROW_FLIGHT_SECONDS.
 const THROWN_SHOWN_TICKS := 10
+## A pile of what grows wild (Forage.HERBS, decision 502) stands as the
+## plant it was picked from, about this wide.
+const GROWING_WIDE := 0.5
 const THROW_FLIGHT_SECONDS := 0.4
 const PILE_RING := Color(0.95, 0.85, 0.55, 0.55)
 ## Trees: lean up to this far (radians), sit up to this far off their
@@ -4042,21 +4045,43 @@ func _on_pile_shown(pile: GroundPile) -> void:
 	ring.mesh = _pile_ring()
 	ring.position.y = 0.01
 	heap.add_child(ring)
+	var growing := growing_slot(pile.ids)
 	for i in pile.ids.size():
-		var slot := str(Items.def(pile.ids[i]).get("art", ""))
+		var slot := growing if not growing.is_empty() else str(Items.def(pile.ids[i]).get("art", ""))
 		if not ArtKit.has(slot):
 			continue
 		var thing := ArtKit.instance(slot)
-		# On its side, its length along the ground, turned by the cell and
-		# its place in the heap, a little apart from the others.
-		thing.rotation = Vector3(0.0, _roll(pile.tile, 10 + i) * TAU, PI * 0.5)
-		thing.position = Vector3(cos(i * 2.4) * 0.18 * mini(i, 1), ArtKit.size(slot).z * 0.5,
-				sin(i * 2.4) * 0.18 * mini(i, 1))
+		if not growing.is_empty():
+			# Standing, small, turned by the cell, the others round it.
+			var size := ArtKit.size(slot)
+			thing.scale = Vector3.ONE * minf(GROWING_WIDE / maxf(maxf(size.x, size.z), 0.01), 1.0)
+			thing.rotation = Vector3(0.0, _roll(pile.tile, 10 + i) * TAU, 0.0)
+			thing.position = Vector3(cos(i * 2.4) * 0.25 * mini(i, 1), 0.0, sin(i * 2.4) * 0.25 * mini(i, 1))
+		else:
+			# On its side, its length along the ground, turned by the cell and
+			# its place in the heap, a little apart from the others.
+			thing.rotation = Vector3(0.0, _roll(pile.tile, 10 + i) * TAU, PI * 0.5)
+			thing.position = Vector3(cos(i * 2.4) * 0.18 * mini(i, 1), ArtKit.size(slot).z * 0.5,
+					sin(i * 2.4) * 0.18 * mini(i, 1))
 		heap.add_child(thing)
 		if i == pile.ids.size() - 1 and pile.thrown_from != World.NO_CELL and World.tick - pile.thrown_tick < THROWN_SHOWN_TICKS:
 			_fly(thing, _tile_position(pile.thrown_from) - heap.position + Vector3.UP * 1.2, thing.position)
 	_room.add_child(heap)
 	_pile_nodes[pile] = heap
+
+
+## The plant a pile of [param ids] stands as: the first of Forage.PLANTS the
+## kit has when every one is Forage.HERBS, else "" (drawn as things).
+static func growing_slot(ids: PackedStringArray) -> String:
+	if ids.is_empty():
+		return ""
+	for id in ids:
+		if id != Forage.HERBS:
+			return ""
+	for slot in Forage.PLANTS:
+		if ArtKit.has(slot):
+			return slot
+	return ""
 
 
 ## A pile gone (World.pile_gone): its last things picked up.

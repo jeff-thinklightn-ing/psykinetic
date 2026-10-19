@@ -13633,3 +13633,63 @@ give the remedy its recipe (the healer's, from herbs 2) and the weaver
 his cloth_bolt (500), and terrain lay herbs for players to bank. The
 medicine man's gathering of herbs and the shepherd's wool follow.
 
+
+## 502. What grows wild: herbs as ground piles near the towns
+
+npc's sickness needs herbs for the healer's remedies, and Jeff's rule is
+that everything has to be gathered. The coordinator approved this on
+2026-10-18 and set it on in the real wilds: it's a seeded system like the
+herds, not placed content.
+
+**The server lays real things.** The client's scatter is seeded and drawn
+on the client only, so the server can't make anything out of it.
+- A new server class, Forage (sim/forage.gd), keeps what grows wild.
+  World keeps one (World.forage); Main makes it at boot, and the world
+  tick's first slice moves it on.
+- Once a game day, in each loaded outdoor zone whose area has a place the
+  town holds, it first withers, then lays:
+  - Withering: things that grew more than wither_days ago leave the ground
+    and end "withered".
+  - Laying: it lays per_day new ones, but only while fewer than most of the
+    grown ones lie in the area. Each is minted "grew" and laid with
+    World.put_on_ground, so it's an ordinary ground pile.
+- Each cell is drawn by area, item and day, and taken only if it is:
+  - grass (WorldMap's new per-area "grass" bytes)
+  - under the sky (WorldRichness.under_sky)
+  - dry, walkable floor with nothing lying on it and no fire
+  - within reach of a town-held place, and outside every such place's ring
+  - on ground nobody holds (Holdings.ground), so a camp's herbs are the
+    camp's
+- A town's ring is the larger of two distances:
+  - the rule's ring
+  - the furthest cell of any building within reach, plus clear cells
+  
+  In the wilds the houses reach about 22 cells from the store, so herbs
+  lie outside the houses, not between them.
+- The rules are levels/economy.json "forage", one entry per item:
+  {per_day 4, most 10, reach 48, ring 14, clear 4, wither_days 3}.
+  Economy owns them from here.
+- An item the catalog lacks lays nothing. Items' "herbs" lands on its own.
+
+**It keeps no state of its own.** What it laid is in each zone's ground,
+which the snapshot already saves. The item book keeps when each thing
+grew, from its first event. So a restart counts and withers them as
+before, and the cap holds across saves. A restart lays that day's herbs
+again, but never past most. A zone not loaded is left alone.
+
+**Taking.** Forage.take_near(area, cell, reach = 1, id = "herbs") takes
+the nearest one within reach off the ground and returns its uid, held by
+nobody yet; it returns 0 if there is none or the zone isn't loaded. It's
+for the medicine man's rounds (npc's side, 404): what he gathers on his
+way is the same herbs a player sees. A player picks herbs up as any pile
+and banks them at the store, where economy's delivery price (498) pays.
+
+**Drawing.** Client3D.growing_slot: a pile holding only herbs stands
+upright as the first of Forage.PLANTS the kit has (plant.herb, with
+plant.fern as the stand-in). It's about GROWING_WIDE (0.5 m) wide, turned
+by its cell, and keeps the pile's pale ring. An older client draws it as
+an ordinary pile.
+
+Protocol unchanged: piles already replicate. The new class_name is
+Forage. forage_test boots the game on the wilds, with the herbs item
+added for the test.

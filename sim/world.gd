@@ -463,6 +463,10 @@ var _counter_why := ""
 ## Server: the wildlife's herds (Herds, decision 367), moved on by the
 ## world tick's first slice; made by Main at boot. Null on a client.
 var herds: Herds = null
+## Server: what grows wild to be gathered (Forage, decision 502: herbs),
+## laid by the world tick's first slice; made by Main at boot. Null on a
+## client.
+var forage: Forage = null
 ## Raid groups on the world map (decision 328), server only; null on a client.
 var raid_groups: WorldRaids = null
 ## How rich in game each cell of the world is (decision 368), for Herds;
@@ -713,6 +717,9 @@ func world_tick(slice := -1) -> void:
 	if herds != null and slice <= 0:
 		herds.tick()
 		t = part("herds", t)
+	if forage != null and slice <= 0:
+		forage.tick()
+		t = part("forage", t)
 	var was := zone
 	var each_zone: Array[Zone] = []
 	each_zone.assign(zones.values())

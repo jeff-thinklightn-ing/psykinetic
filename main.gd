@@ -1843,6 +1843,8 @@ func _regenerate(level_name: String, config: Dictionary) -> bool:
 		World.richness.start()
 		if World.herds != null:
 			World.herds.richness = World.richness.richness
+	if World.forage != null:
+		World.forage.world_map = _world_map
 	return true
 
 
@@ -2170,6 +2172,8 @@ func _boot() -> void:
 			return cell
 		draw.seed = hash(cell)
 		return _free_cell_near(cell, reach, draw)
+	# Herbs and the like laid wild near the towns (decision 502).
+	World.forage = Forage.new(world_map, World.holdings, {}, World.steps_now)
 	World.keepers.erase(_herds_kept)
 	_herds_kept = World.herds
 	World.keepers.append(World.herds)

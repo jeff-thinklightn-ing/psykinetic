@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Herbs grow wild outside the town: a few a day in the wilds, standing like small ferns, for anyone to pick and sell at the town's store. Herbs left uncollected wither after three days (decision 502).
 - Tools: a heavy job too big to start also steps to the back of the resource gate's queue itself, so jobs waiting through an older copy of the gate get past it too (394 amended).
 
 ## v0.1.154

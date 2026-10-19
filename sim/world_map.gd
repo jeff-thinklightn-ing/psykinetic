@@ -11,7 +11,8 @@ extends RefCounted
 ## links (as Level reads them), neighbours (side -> area), warnings (the
 ## level's load warnings), floor (cell -> true), places (as Level reads
 ## them: key -> {key, cell, name, kind, radius, worth, holder}), buildings (as
-## Level reads them, with their use and town), and, for walking it
+## Level reads them, with their use and town), grass (a byte a cell, row by
+## row: 1 where its ground is grass; Forage, decision 502), and, for walking it
 ## (WorldRoutes), edges, heights and stairs as Level's terrain has them}.
 var areas: Dictionary[String, Dictionary] = {}
 ## Every way out of every area, in area order: {from, to, kind ("link" or
@@ -86,11 +87,18 @@ func _parse_area(area_name: String, layout: Image, height: Image, config: Dictio
 	var floor_cells: Dictionary[Vector2i, bool] = {}
 	for cell: Vector2i in level["terrain"]["floor"]:
 		floor_cells[cell] = true
+	var size := Vector2i((layout.get_width() + 1) / 2, (layout.get_height() + 1) / 2)
+	var grass := PackedByteArray()
+	grass.resize(size.x * size.y)
+	var kinds: Dictionary = level["terrain"]["kinds"]
+	for cell: Vector2i in kinds:
+		if kinds[cell] == "grass" and cell.x < size.x and cell.y < size.y:
+			grass[cell.y * size.x + cell.x] = 1
 	for cell: Vector2i in level["terrain"]["stairs"]:
 		floor_cells[cell] = true
 	areas[area_name] = {
 		"name": area_name, "display_name": str(level.get("display_name", "")),
-		"size": Vector2i((layout.get_width() + 1) / 2, (layout.get_height() + 1) / 2),
+		"size": size, "grass": grass,
 		"starts": level["starts"], "spawn_points": level["spawn_points"], "links": level["links"],
 		"neighbours": level["neighbours"], "warnings": level["warnings"], "floor": floor_cells,
 		"edges": level["terrain"]["edges"], "heights": level["terrain"]["heights"], "stairs": level["terrain"]["stairs"],
