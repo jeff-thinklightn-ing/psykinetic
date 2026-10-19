@@ -373,6 +373,9 @@ func tick() -> void:
 		_crop(town)
 		_crop_shown(town)
 		_farmer_comes(town)
+		_flock_turn(town)
+		_shepherd_comes(town)
+		_weaver_comes(town)
 		_woodcut(town)
 		_woodcutter_comes(town)
 		if production.building_in(town):
@@ -447,6 +450,12 @@ func choose(town: String) -> String:
 				wants.append(kind)
 	if residents(town).size() >= room(town) and kinds.has("inn"):
 		wants.append("inn")
+	# A pasture once a field is farmed, a loom once the store holds wool
+	# (decision 500): built first, their newcomer comes to it.
+	if kinds.has("pasture") and int(building(town, "pasture").get("level", 0)) < 1 and _farmed(town):
+		wants.append("pasture")
+	if kinds.has("loom") and int(building(town, "loom").get("level", 0)) < 1 			and production.stockpile.count(town, "wool") >= int(rules.get("flock", {}).get("weaver", {}).get("wool", 6)):
+		wants.append("loom")
 	var housing: Array = kinds.keys().filter(func(kind: String) -> bool:
 		return not str(kinds[kind].get("trade", "")).is_empty() and int(building(town, kind).get("level", 0)) >= 1)
 	housing.sort_custom(func(a: String, b: String) -> bool:
@@ -1001,6 +1010,123 @@ func _farmer_comes(town: String) -> void:
 		_seat(town)
 
 
+# --- Sheep and wool (decision 500) ---------------------------------------------------
+
+## [param town]'s flock ({} for none; Jeff: "sheep and wool yes"): {count
+## (a float: lambs come in parts), season (the last seen), sheared (this
+## season), worked (steps shearing)}. The count is the sheep there are, the
+## source for drawn sheep at the pasture.
+func flock(town: String) -> Dictionary:
+	return _towns.get(town, {}).get("flock", {}).duplicate()
+
+
+## The flock moved on to now: each spring lambs, count x flock.lambs x (1 -
+## count / room), room flock.per_level a level of a standing pasture (the
+## shepherd's own start with none); in spring and in autumn, once each, the
+## shepherd at the pasture works shear_steps and the flock's wool (count x
+## flock.wool) goes to the store, bought from him (Production.deliver_to).
+## A season passed by with nobody at the pasture is not sheared.
+func _flock_turn(town: String) -> void:
+	var record := _town(town)
+	if not record.has("flock"):
+		return
+	var rule: Dictionary = rules.get("flock", {})
+	var flock_now: Dictionary = record["flock"]
+	var at := now()
+	var since := maxi(at - int(flock_now.get("at", at)), 0)
+	flock_now["at"] = at
+	var season := Season.name_at(at)
+	if season != str(flock_now.get("season", "")):
+		if season == "spring" and str(flock_now.get("season", "")) != "":
+			var house := building(town, "pasture")
+			var levels := int(house.get("level", 0)) if house.get("state") in [STANDING, BUILDING] else 0
+			var room := float(rule.get("per_level", 12)) * levels if levels > 0 else float(rule.get("start", 6))
+			var count := float(flock_now["count"])
+			var lambs := maxf(count * float(rule.get("lambs", 0.5)) * (1.0 - count / maxf(room, 1.0)), 0.0)
+			flock_now["count"] = count + lambs
+			if floori(count + lambs) > floori(count):
+				var born := floori(count + lambs) - floori(count)
+				_note(town, "%s in the flock, %d sheep now" % ["a lamb" if born == 1 else "%d lambs" % born, floori(count + lambs)])
+		flock_now["season"] = season
+		flock_now["sheared"] = false
+		flock_now["worked"] = 0
+	if season not in ["spring", "autumn"] or bool(flock_now.get("sheared", false)) or not production.manned("%s:pasture" % town):
+		return
+	flock_now["worked"] = int(flock_now.get("worked", 0)) + since
+	if int(flock_now["worked"]) < int(rule.get("shear_steps", 2000)):
+		return
+	var wool := floori(float(flock_now["count"]) * float(rule.get("wool", 1)))
+	flock_now["sheared"] = true
+	flock_now["worked"] = 0
+	if wool > 0:
+		production.deliver_to(town, production.worker_at("%s:pasture" % town), "wool", wool, "shearing", "the %s shearing" % season)
+		_note(town, "the flock is sheared: %d wool" % wool)
+
+
+## Whether [param town]'s field stands and has its farmer.
+func _farmed(town: String) -> bool:
+	var field := building(town, "field")
+	return int(field.get("level", 0)) >= 1 and field.get("state") == STANDING 			and residents(town).any(func(who: String) -> bool: return "farmer" in production.worker(who).get("trades", []))
+
+
+## Whether [param town]'s [param kind] stands (at least level 1).
+func _stands(town: String, kind: String) -> bool:
+	var house := building(town, kind)
+	return int(house.get("level", 0)) >= 1 and house.get("state") == STANDING
+
+
+## A town whose pasture stands (built once its field is farmed: choose)
+## with no shepherd gets one, a newcomer with flock.start sheep of their own
+## (the town's flock from then), once it has stood flock.growth_days without
+## (as a field gets its farmer).
+func _shepherd_comes(town: String) -> void:
+	var rule: Dictionary = rules.get("flock", {})
+	var wanted: bool = not rule.is_empty() and _stands(town, "pasture")
+	if _comes(town, str(rule.get("trade", "shepherd")), wanted, float(rule.get("growth_days", 3)), rule.get("names", ["Wat"]), "shepherd"):
+		var record := _town(town)
+		if not record.has("flock"):
+			record["flock"] = {"count": float(rule.get("start", 6)), "season": Season.name_at(now()), "sheared": false, "worked": 0, "at": now()}
+			_note(town, "the shepherd brings a flock of %d" % int(rule.get("start", 6)))
+
+
+## A town whose loom stands (built once the store holds flock.weaver.wool
+## wool: choose) with no weaver gets one, a newcomer, once it has stood
+## flock.weaver.growth_days without; the weaver makes the bolt of cloth
+## from wool (items' 500).
+func _weaver_comes(town: String) -> void:
+	var rule: Dictionary = rules.get("flock", {}).get("weaver", {})
+	var wanted: bool = not rule.is_empty() and _stands(town, "loom")
+	_comes(town, str(rule.get("trade", "weaver")), wanted, float(rule.get("growth_days", 3)), rule.get("names", ["Joan"]), "weaver")
+
+
+## A newcomer of [param trade] to [param town] while [param wanted] and the
+## town has none, once it has been wanted [param days] days: named from
+## [param names] by the town and the count come, moved in by growth. True
+## the tick one comes.
+func _comes(town: String, trade: String, wanted: bool, days: float, names: Array, key: String) -> bool:
+	var record := _town(town)
+	if not wanted or residents(town).any(func(who: String) -> bool: return trade in production.worker(who).get("trades", [])):
+		record.erase("%s_wanted" % key)
+		return false
+	var waiting_since := int(record.get("%s_wanted" % key, -1))
+	if waiting_since < 0:
+		record["%s_wanted" % key] = now()
+		return false
+	if now() - waiting_since < int(days * maxi(DayNight.day_steps, 1)):
+		return false
+	var count := int(record.get("%ss_came" % key, 0)) + 1
+	record["%ss_came" % key] = count
+	record.erase("%s_wanted" % key)
+	var name := str(names[absi(hash("%s/%s/%d" % [town, key, count])) % names.size()]) if not names.is_empty() else trade.capitalize()
+	var id := "%s_%s_%d" % [key, town.replace("/", "_"), count]
+	if not production.add_worker(id, name, [trade], town, "growth"):
+		return false
+	record["residents"].append(id)
+	_note(town, "%s the %s comes to %s" % [name, trade, town])
+	_seat(town)
+	return true
+
+
 # --- Woodcutters (decision 497) --------------------------------------------------
 
 ## Each woodcutter of [param town] (rules' woodcutter.trade, a resident in
@@ -1483,6 +1609,14 @@ func from_dict(saved: Dictionary) -> void:
 		if entry.has("woodcutter_wanted"):
 			record["woodcutter_wanted"] = int(entry["woodcutter_wanted"])
 		record["woodcutters_came"] = maxi(int(entry.get("woodcutters_came", 0)), 0)
+		var flock_saved: Variant = entry.get("flock", {})
+		if flock_saved is Dictionary and not flock_saved.is_empty():
+			record["flock"] = {"count": maxf(float(flock_saved.get("count", 0.0)), 0.0), "season": str(flock_saved.get("season", "")),
+				"sheared": bool(flock_saved.get("sheared", false)), "worked": maxi(int(flock_saved.get("worked", 0)), 0), "at": int(flock_saved.get("at", 0))}
+		for key: String in ["shepherd", "weaver"]:
+			if entry.has("%s_wanted" % key):
+				record["%s_wanted" % key] = int(entry["%s_wanted" % key])
+			record["%ss_came" % key] = maxi(int(entry.get("%ss_came" % key, 0)), 0)
 		if entry.has("water_at"):
 			record["water"] = maxf(float(entry.get("water", 0.0)), 0.0)
 			record["water_at"] = int(entry["water_at"])

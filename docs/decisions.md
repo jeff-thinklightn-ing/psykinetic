@@ -15206,3 +15206,37 @@ Rejected: a mesh of its own per cell (the scatter's chunks and MultiMeshes
 already draw grass); hiding the clumps when trampled (the path should show
 as grass pressed down, not bare ground); a second MultiMesh for the flat
 ones (a cell would move between them on every step).
+## 500, economy's side: sheep, wool and the weaver
+
+Jeff (2026-10-18): "sheep and wool yes"; the coordinator's approval; the
+weaver's bolt of cloth (wool 2 into cloth 3) is "500, items' side".
+- The town builds a pasture (buildings.pasture, trade shepherd, wood 6)
+  once its field stands with its farmer (Towns.choose, after the inn), and
+  a loom (buildings.loom, trade weaver, wood 8) once its store holds
+  flock.weaver.wool (6) wool. A newcomer of the trade comes to each once
+  it has stood without one flock.growth_days (3), as a field gets its
+  farmer (Towns._comes): built first, so no shepherd or weaver waits idle
+  and borrowing (the first soak's shepherd, come before a pasture the
+  stalled inn kept back, ended 25 in debt).
+- The shepherd brings flock.start (6) sheep, the town's flock from then
+  (Towns.flock: count, a float, saved in the town's record). Each spring
+  lambs: count x flock.lambs x (1 - count / room), room flock.per_level
+  (12) a pasture level. In spring and in autumn, once each, the shepherd
+  at the pasture works shear_steps (2000) and the flock's wool, count x
+  flock.wool (2), goes to the store, bought from him (Production.deliver_to,
+  498: gathered and paid for). A season with nobody at the pasture is not
+  sheared.
+- The weaver makes the bolt of cloth from wool by always_want "resource"
+  (as the tanner's leather), banked as cloth 3, which the castle market
+  wants (1.5) and the town works up into bandages.
+- The flock count is the source for drawn sheep at the pasture (client
+  drawing later: no message carries it yet).
+- Not in this step: the inn costing cloth with leather the alternative
+  (building costs have no alternatives yet), sheep as food a raid takes,
+  wolves at the flock.
+Soak (30 days, 3 players, against 514's): the pasture stood on day 23.5,
+right after the inn (one build at a time, the inn waiting on leather), the
+shepherd came on 26.5 and sheared 12 wool that spring, the loom stood on
+26.6 and the weaver came on 29.6. Officials unpaid 201 (204), treasury
+end 5 (5). Protocol unchanged. farm_test.
+

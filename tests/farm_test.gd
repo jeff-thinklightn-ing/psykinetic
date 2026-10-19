@@ -34,6 +34,7 @@ func _ready() -> void:
 	_test_farmer_comes()
 	_test_look()
 	_test_woodcutter()
+	_test_flock()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -130,7 +131,7 @@ func _test_farmer_comes() -> void:
 	var farmers := towns.residents(TOWN).filter(func(id: String) -> bool: return "farmer" in towns.production.worker(id)["trades"])
 	_check(farmers.size() == 1 and towns.production.worker(farmers[0])["origin"] == "growth", "then a farmer comes (%s)" % [farmers])
 	_year(towns, 7)
-	_check(towns.residents(TOWN).size() == 1, "and only one")
+	_check(towns.residents(TOWN).filter(func(id: String) -> bool: return "farmer" in towns.production.worker(id)["trades"]).size() == 1, "and only one")
 
 
 ## The field's look through a year (decision 457), each change told once.
@@ -201,3 +202,42 @@ func _check(ok: bool, what: String) -> void:
 	print("%s  %s" % ["PASS" if ok else "FAIL", what])
 	if not ok:
 		_failures += 1
+
+
+## Sheep and wool (decision 500): a farmed field has the town build a
+## pasture, which brings a shepherd with a flock, sheared in spring and
+## autumn, lambs each spring; wool in the store has it build a loom, which
+## brings a weaver.
+func _test_flock() -> void:
+	print("
+== sheep and wool ==")
+	var rule: Dictionary = _rules["flock"]
+	var towns := _towns()
+	towns._town(TOWN)["xp"] = 1000
+	_check(towns.choose(TOWN) == "pasture", "a farmed field: the town would build a pasture (%s)" % towns.choose(TOWN))
+	_year(towns, 1)
+	_check(towns.flock(TOWN).is_empty(), "no pasture: no shepherd")
+	towns._town(TOWN)["buildings"]["pasture"] = {"kind": "pasture", "level": 1, "state": Towns.STANDING, "since": _now, "job": 0}
+	_year(towns, int(rule["growth_days"]) - 1)
+	_check(towns.flock(TOWN).is_empty(), "no shepherd before growth_days")
+	_year(towns, 2)
+	var shepherds := towns.residents(TOWN).filter(func(id: String) -> bool: return "shepherd" in towns.production.worker(id)["trades"])
+	_check(shepherds.size() == 1 and int(towns.flock(TOWN)["count"]) == int(rule["start"]), "the pasture brings a shepherd and his flock of %d (%s)" % [int(rule["start"]), towns.flock(TOWN)])
+	_year(towns, 1)
+	var shorn := int(rule["start"]) * int(rule["wool"])
+	_check(towns.production.stockpile.count(TOWN, "wool") == shorn, "sheared in spring, %d wool to the store" % shorn)
+	_check(towns.choose(TOWN) == "loom", "wool in the store: the town would build a loom (%s)" % towns.choose(TOWN))
+	towns._town(TOWN)["buildings"]["loom"] = {"kind": "loom", "level": 1, "state": Towns.STANDING, "since": _now, "job": 0}
+	_year(towns, int(rule["weaver"]["growth_days"]) + 1)
+	_check(towns.residents(TOWN).any(func(id: String) -> bool: return "weaver" in towns.production.worker(id)["trades"]), "the loom brings a weaver")
+	_year(towns, 2)  # Day 12, summer.
+	var shearings := func() -> int: return towns.log_of(TOWN).filter(func(line: Dictionary) -> bool: return str(line["what"]).begins_with("the flock is sheared")).size()
+	_check(shearings.call() == 1 and towns.production.stockpile.count(TOWN, "cloth") > 0, "not sheared in summer; the weaver weaves the wool (%d cloth)" % towns.production.stockpile.count(TOWN, "cloth"))
+	_year(towns, 8)  # Day 20, autumn.
+	_check(shearings.call() == 2, "sheared again in autumn")
+	_year(towns, 9)  # Day 29, spring again.
+	var lambs := int(rule["start"]) * float(rule["lambs"]) * (1.0 - float(rule["start"]) / float(rule["per_level"]))
+	_check(is_equal_approx(float(towns.flock(TOWN)["count"]), int(rule["start"]) + lambs), "lambs in spring: %.1f sheep" % float(towns.flock(TOWN)["count"]))
+	var saved := Towns.new(JSON.parse_string(JSON.stringify(towns.to_dict())), towns.production, _rules, func() -> int: return _now)
+	_check(is_equal_approx(float(saved.flock(TOWN)["count"]), float(towns.flock(TOWN)["count"])), "the flock saved and loaded")
+

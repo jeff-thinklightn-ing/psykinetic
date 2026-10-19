@@ -19,6 +19,9 @@
 	"crop": {"sow_steps": 3000, "harvest_steps": 3000, "harvest": 260, "roots": 30,
 		"growth": {"base": 0.7, "rain": 3.0, "least": 0.4, "most": 1.3}, "flatten": 0.5, "growth_days": 5,
 		"names": ["Tam", "Wynn", "Edda", "Rolf", "Hilde", "Bert"]},
+	"flock": {"trade": "shepherd", "start": 6, "per_level": 12, "lambs": 0.6, "wool": 2, "shear_steps": 2000, "growth_days": 3,
+		"names": ["Wat", "Morag", "Elin", "Gil", "Bryn", "Oda"],
+		"weaver": {"trade": "weaver", "wool": 6, "growth_days": 3, "names": ["Joan", "Lise", "Tobin", "Mabyn", "Cadoc", "Wenna"]}},
 	"roof": {"by": "carpenter", "wood_base": 1, "wood_cells": 8, "steps": 1200},
 	"stand_in": {"fletcher": "carpenter"},
 	"merchant": {"buy": 0.85, "sell": 1.15},
@@ -109,6 +112,8 @@
 		"field": {"trade": "farmer", "built_by": "carpenter", "xp": 15, "cost": {"wood": 6}, "steps": 3000, "max_level": 3},
 		"woodshed": {"trade": "woodcutter", "built_by": "carpenter", "xp": 10, "cost": {}, "steps": 1500, "max_level": 3},
 		"tannery": {"trade": "tanner", "built_by": "carpenter", "xp": 15, "cost": {"wood": 8}, "steps": 4000, "max_level": 2},
+		"pasture": {"trade": "shepherd", "built_by": "carpenter", "xp": 15, "cost": {"wood": 6}, "steps": 3000, "max_level": 3},
+		"loom": {"trade": "weaver", "built_by": "carpenter", "xp": 15, "cost": {"wood": 8}, "steps": 3000, "max_level": 2},
 		"walls": {"built_by": "carpenter", "xp": 25, "cost": {"wood": 20}, "steps": 9000, "max_level": 3}
 	}
 }
