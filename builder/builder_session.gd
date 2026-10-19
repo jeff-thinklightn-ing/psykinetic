@@ -331,7 +331,11 @@ static func system_prompt(prefabs_from := Prefab.DIR) -> String:
 			return str(entry.get("slot", entry.get("kind", ""))).trim_prefix("building.") if entry is Dictionary else ""))
 		if prefab_name.begins_with(Prefab.KIND_PREFIX) and Prefab.kind_names().has(prefab_name):
 			# A building kind (decision 488): walls round its blocks, its doors in front; said, not drawn.
-			prefabs.append("%s (%d x %d): a building, %s" % [prefab_name, piece.size.x, piece.size.y, ", ".join(kinds)])
+			# Its kind's words (levels/buildings.json, decision 511), so a longhouse is told from a cottage.
+			var words := PackedStringArray(buildings.map(func(entry: Variant) -> String:
+				var kind: Dictionary = Level.kinds().get(str(entry.get("kind", "")), {}) if entry is Dictionary else {}
+				return str(kind.get("words", "")) + (" (%s)" % entry.get("size", Level.KIND_SIZE) if not kind.is_empty() else "")))
+			prefabs.append("%s (%d x %d): a building, %s: %s" % [prefab_name, piece.size.x, piece.size.y, ", ".join(kinds), ", ".join(words)])
 			continue
 		prefabs.append("%s (%d x %d)%s:\n%s" % [prefab_name, piece.size.x, piece.size.y,
 			", a building: %s" % ", ".join(kinds) if not kinds.is_empty() else "",
@@ -869,7 +873,8 @@ func _set_building(given: Dictionary) -> Dictionary:
 		else:
 			entry[key] = value
 	working.apply_changes({"config": {"buildings": buildings}})
-	var what := "%s at %s" % [entry["slot"], entry.get("at")]
+	# A slot building names its slot, a composed one its kind (decision 511).
+	var what := "%s at %s" % [str(entry.get("slot", entry.get("kind", "building"))).trim_prefix("building."), entry.get("at")]
 	if use.is_empty() and town.is_empty():
 		return {"ok": true, "text": "the %s is scenery now" % what}
 	if town.is_empty():

@@ -26,6 +26,7 @@ func _ready() -> void:
 	await _test_monster_kinds()
 	await _test_loot()
 	await _test_stream()
+	await _test_kind_building()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -492,6 +493,29 @@ func _test_stream() -> void:
 	var bridges := (level["buildings"] as Array).filter(func(b: Dictionary) -> bool: return b["slot"] == Level.BRIDGE)
 	_check((level["terrain"]["streams"] as Array).size() == 2 and bridges.size() == 1 and bridges[0]["cell"] == Vector2i(13, 10),
 			"accepted: Level reads both streams and the one bridge, at (13, 10)")
+
+
+func _test_kind_building() -> void:
+	print("\n== a composed kind (511): said in its words, given a use ==")
+	var system := BuilderSession.system_prompt()
+	_check("building_longhouse_large (" in system and ": a building, longhouse: a longhouse (large)" in system
+			and ": a building, cottage: a stone cottage (small)" in system, "each kind's prefab is said in its words and size")
+	var doc := _doc()
+	var stub := StubClaude.new([
+		[{"name": "stamp", "input": {"prefab": "building_cottage_small", "at": [8, 8]}}],
+		"A cottage.",
+	])
+	var session := BuilderSession.new(doc, Rect2i(5, 5, 20, 15), "test_field", stub)
+	await session.ask("a cottage")
+	var entries: Array = (session.working.config.get("buildings", []) as Array).filter(func(entry: Dictionary) -> bool: return entry.get("kind") == "cottage")
+	_check(entries.size() == 1, "stamped: a cottage entry (%s)" % [session.working.config.get("buildings")])
+	if entries.is_empty():
+		return
+	var cell: Vector2i = Level.building_rect(entries[0]).position
+	var use: String = BuilderSession.building_uses()[0]
+	var answer := session.run_tool("set_building", {"at": [cell.x, cell.y], "use": use})
+	_check(answer.get("ok", false) and "the cottage at" in str(answer["text"]) and use in str(answer["text"]),
+			"set_building gives a composed building a use, named by its kind (%s)" % answer)
 
 
 func _check(ok: bool, label: String) -> void:

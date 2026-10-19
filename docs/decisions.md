@@ -14773,3 +14773,19 @@ than one level a cell (a stair's rule, and the views' ramps); rocks as
 boulders or void; the lip rule in Senses (geometry, so every caller's);
 the lip rule for light (lighting in the castle's levels would change for
 no gain); removing fall damage (tested, and used).
+## 511. Builder mode and buildings' composed kinds
+
+Buildings' 488/489 made buildings of kinds composed from blocks
+(levels/buildings.json), and builder could already stamp each kind and
+size as a building_<kind>_<size> prefab, walls and doors included
+(Prefab.kind_prefab). Two gaps remained, agreed with buildings:
+
+- set_building named the building by entry["slot"], which a kind entry
+  doesn't have, so giving a composed building a use failed. It now names
+  a slot building by its slot and a composed one by its kind.
+- The prompt said a kind's prefab only by its kind's key. It now adds
+  the kind's words and size from levels/buildings.json ("a building,
+  longhouse: a longhouse (large)"), so Claude picks the building asked
+  for. The seed stays defaulted (hash of its cell), as buildings advise.
+
+Protocol unchanged. builder_test _test_kind_building.
