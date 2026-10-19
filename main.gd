@@ -1798,6 +1798,7 @@ func reload_zone(zone_name: String) -> void:
 	if not Net.is_authority() or not World.zones.has(zone_name):
 		return
 	var was := World.enter_named(zone_name)
+	Regen.forget()  # An edited level.json may mark it, or no longer.
 	_load_level(zone_name)
 	_reloading = true
 	_start_level(false, false)

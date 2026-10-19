@@ -182,10 +182,12 @@ static var _registered: Dictionary[String, Dictionary] = {}
 ## Makes a level from images and a config, without files (tests).
 static func register(level_name: String, layout: Image, height: Image = null, config := {}) -> void:
 	_registered[level_name] = {"layout": layout, "height": height, "config": config}
+	Regen.forget()
 
 
 static func unregister(level_name: String) -> void:
 	_registered.erase(level_name)
+	Regen.forget()
 
 
 ## The authored files of the levels that regenerate (decision 465): name ->
@@ -198,6 +200,7 @@ static var _templates: Dictionary[String, Dictionary] = {}
 ## template: what each generation starts from.
 static func keep_template(level_name: String, made: Dictionary) -> void:
 	_templates[level_name] = {"layout": made["layout"], "height": made["height"], "config": made["config"]}
+	Regen.forget()
 
 
 ## Level [param level_name]'s template: the authored level a generation

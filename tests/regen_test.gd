@@ -187,6 +187,19 @@ func _test_marking() -> void:
 	var said: Array = level["warnings"].filter(func(text: String) -> bool: return text.contains("outside every anchor"))
 	_check(said.size() == 2 and str(said).contains("link at (13, 9)") and str(said).contains("spawn point out"),
 		"a link and a spawn point outside every anchor warn (%s)" % [level["warnings"]])
+	# The list is read once and kept (perf, 2026-10-19); a level registered
+	# or unregistered is seen on the next ask.
+	var listed := Regen.marked_levels()
+	Level.register("rg_marked_too", outside, null, {"regenerate": {"anchors": [{"rect": [1, 1, 5, 5]}]}})
+	var seen := Regen.marked_levels()
+	var its_block := Regen.config_of("rg_marked_too")
+	Level.unregister("rg_marked_too")
+	var expected := listed.duplicate()
+	expected.append("rg_marked_too")
+	expected.sort()
+	_check(listed.has("rg_halls") and not listed.has("rg_castle") and seen == expected and its_block.get("anchors", []).size() == 1
+		and Regen.marked_levels() == listed and Regen.config_of("rg_marked_too").is_empty(),
+		"the marked levels are kept between asks and read again after a register or unregister (%s, %s)" % [listed, seen])
 	_check(Regen.due({"generation": 0, "at_step": 0}, read, 0) and not Regen.due({"generation": 1, "at_step": 100}, read, 100 + _period - 1)
 		and Regen.due({"generation": 1, "at_step": 100}, read, 100 + _period) and not Regen.due({"generation": 0, "at_step": 50}, read, 60),
 		"due: never made, or every_days gone by since the last generation or try")

@@ -17,30 +17,54 @@ const LOST := "in the shifting halls"
 const GENERATORS := "res://sim/level_gen/"
 
 
+## The levels that regenerate and each one's block (config_of), read once
+## from the level folders and the registry (perf's reading, 2026-10-19:
+## reading them on every world tick cost the server milliseconds); null
+## until asked, and again after forget().
+static var _marked: Variant = null
+
+
 ## Whether level [param level_name] regenerates (its template says so).
 static func marked(level_name: String) -> bool:
-	return Level.regenerates(level_name)
+	return _marked_configs().has(level_name)
 
 
 ## Every level that regenerates, sorted.
 static func marked_levels() -> Array[String]:
 	var out: Array[String] = []
-	var names := Level.names()
-	for level_name in Level.registered_names():
-		if level_name not in names:
-			names.append(level_name)  # A test's, made in code.
-	names.sort()
-	for level_name in names:
-		if marked(level_name):
-			out.append(level_name)
+	out.assign(_marked_configs().keys())
 	return out
 
 
 ## Level [param level_name]'s "regenerate" block as Level.regenerate_from
 ## reads it from its template; {} for a level that does not regenerate.
 static func config_of(level_name: String) -> Dictionary:
-	var warnings: Array[String] = []
-	return Level.regenerate_from(Level.template(level_name)["config"], warnings)
+	return _marked_configs().get(level_name, {})
+
+
+## The levels and their blocks are read again on the next ask: a level
+## registered, unregistered or kept as a template (Level does this), or
+## reloaded from edited files (Main.reload_zone).
+static func forget() -> void:
+	_marked = null
+
+
+## Name -> block of every level that regenerates, in name order.
+static func _marked_configs() -> Dictionary:
+	if _marked is Dictionary:
+		return _marked
+	var found := {}
+	var names := Level.names()
+	for level_name in Level.registered_names():
+		if level_name not in names:
+			names.append(level_name)  # A test's, made in code.
+	names.sort()
+	for level_name in names:
+		if Level.regenerates(level_name):
+			var warnings: Array[String] = []
+			found[level_name] = Level.regenerate_from(Level.template_config(level_name), warnings)
+	_marked = found
+	return found
 
 
 ## The seed of [param area]'s generation [param generation], attempt
