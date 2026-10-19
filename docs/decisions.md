@@ -2658,6 +2658,25 @@ number, up from 4); `--max-players` sets another. Rejected: per cell instead of 
 thing on every step), recomputing every frame (decision 185 took the
 filters off the frame for a reason), and a ring per thing kind.
 
+Amended (measured again at 16+ players, 2026-10-18; perf's baseline).
+tools/net_bench.sh on its 256x256 dungeon (3072 entities, 1984 doors), the
+clients walking apart for 25 s each one of eight ways (NET_BENCH_WALK, new),
+one run each, what the server sent and its tick:
+
+| clients | interest | join minute | steady minute | steady tick avg |
+|---|---|---|---|---|
+| 16 | on | 53.0 / 43.5 KB/s | 40.4 / 42.0 KB/s | 5.5 / 7.1 ms |
+| 16 | off | 443.7 KB/s | 53.0 KB/s | 9.5 ms |
+| 24 | on | 79.7 KB/s | 55.7 KB/s | 7.7 ms |
+| 24 | off | 453.7 KB/s | 54.5 KB/s | 31.5 ms |
+
+Interest keeps doing its job at 24: the join's bytes a sixth to an
+eighth, about 2.3 KB/s a client steady, the tick a quarter of what it is
+without; no recompute over the log's threshold in any run. The 1.5 to
+1.9 s worst ticks are not joins or Interest: the "[net] slow:" lines put
+one on the first tick (hazards, ailments, before anyone joins) and one at
+tick 201 (hits, the first blows), on or off; handed to perf.
+
 ## 218. An idle monster walks straight when it can
 
 With many players spread out, most of the tick was idle monsters walking

@@ -9,6 +9,9 @@
 #   tools/net_bench.sh [clients=1] [size=256] [monsters=2]
 # NET_BENCH_SERVER_ARGS adds to the server's arguments (--no-interest: every
 # client sent everything, as before decision 217).
+# NET_BENCH_WALK=<seconds> sends client i walking for that long (--test-walk),
+# each of eight directions in turn, so they spread over the map's chunks
+# rather than all standing at the starts (Interest at 16+ players).
 set -u
 # A heavy job (decision 394): the whole run goes through the gate as
 # <checkout> bench (tools/heavy_job.py), waiting there if the machine has
@@ -51,8 +54,13 @@ ask() {
 	exec 3>&-
 }
 echo "before anyone joins: $(ask)"
+WAYS="w a s d wa wd sa sd"
 for i in $(seq 1 "$CLIENTS"); do
-	"$GODOT" --headless --path . --client --address=127.0.0.1 "--port=$PORT" --token=bench "--name=Bench$i" \
+	WALK=""
+	if [ -n "${NET_BENCH_WALK:-}" ]; then
+		WALK="--test-walk=$(echo $WAYS | cut -d' ' -f$(( (i - 1) % 8 + 1 ))):$NET_BENCH_WALK"
+	fi
+	"$GODOT" --headless --path . --client $WALK --address=127.0.0.1 "--port=$PORT" --token=bench "--name=Bench$i" \
 		"--player-id=be0c0000-0000-4000-8000-0000000000$(printf %02d "$i")" --test-exit-after=190 \
 		</dev/null >"$LOGS/client$i.log" 2>&1 &
 	sleep 0.5
