@@ -13589,6 +13589,19 @@ trait onto someone once in sixty, Snagfin never volunteers that he is a
 goblin though his prompt says so, and the soak tool now reads
 Townsfolk.tally instead of the store's windowed ledger.
 
+Amended 2026-10-19: the soak's players at the counter. The 30-day run of
+2026-10-19 refused 360 buys with "you must stand at the town's counter":
+the tool put its three players on the four cells beside the counter
+nearest the store first, two of them on one cell, and the third, finding
+it taken, on Main._nearest_free of it, often out of reach. Now the ring is
+the counter's eight neighbours that are walkable and in melee reach of it
+(World.can_melee, as Main._counter_near asks through World.reaches), free
+or holding one of the soak's own players; each player keeps the ring cell
+they already stand on, else takes the first untaken free one, else stands
+off at _nearest_free of the counter, one cell per player (tools/town_soak
+_ours_at). A one-day check: 0 refusals, every player buying at the 10:00
+hour. The earlier runs' bought and buy_failed counts read against this.
+
 ## 501. Sickness (npc's), items' side: the remedy
 
 Jeff (2026-10-18, through the coordinator) said yes to sickness: a sick

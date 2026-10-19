@@ -165,23 +165,38 @@ func _hourly() -> void:
 		target = inn.get_center()
 		at = "inn"
 	var beside: Array[Vector2i] = []
+	var counter: GridEntity = null
 	if hour in [10, 11, 15, 16]:
-		var counter := _counter()
+		counter = _counter()
 		if counter != null:
-			# The free walkable cells round the counter, nearest the store first.
-			for side: Vector2i in [Vector2i(0, 1), Vector2i(1, 0), Vector2i(0, -1), Vector2i(-1, 0)]:
+			# The walkable cells in reach of the counter (World.can_melee, as Main._counter_near
+			# asks through World.reaches), free or one of ours standing there already; each
+			# player gets a cell of their own, so three players never share one and fall
+			# back to a cell out of reach (the 30-day soak's 360 refused buys, 2026-10-19).
+			for side: Vector2i in [Vector2i(0, 1), Vector2i(1, 0), Vector2i(0, -1), Vector2i(-1, 0), Vector2i(1, 1), Vector2i(1, -1), Vector2i(-1, 1), Vector2i(-1, -1)]:
 				var cell := counter.tile + side
-				if World.is_walkable(cell) and World.is_free(cell):
+				if World.is_walkable(cell) and World.can_melee(cell, counter.tile) and (World.is_free(cell) or _ours_at(cell)):
 					beside.append(cell)
 			if not beside.is_empty():
 				at = "counter"
+	var taken: Array[Vector2i] = []
 	for i in _players.size():
 		var player: Player = _players[i]
 		if not is_instance_valid(player) or not player.spawned:
 			continue
-		var cell: Vector2i = beside[i % beside.size()] if at == "counter" else _main._nearest_free(target + Vector2i(i, 0))
-		if at == "counter" and not World.is_free(cell) and cell != player.tile:
-			cell = _main._nearest_free(cell)
+		var cell: Vector2i
+		if at == "counter":
+			cell = player.tile if beside.has(player.tile) and not taken.has(player.tile) else Vector2i(-99999, -99999)
+			if cell == Vector2i(-99999, -99999):
+				for spot: Vector2i in beside:
+					if not taken.has(spot) and (World.is_free(spot) or spot == player.tile):
+						cell = spot
+						break
+			if cell == Vector2i(-99999, -99999):
+				cell = _main._nearest_free(counter.tile)  # More players than cells in reach: the rest stand off.
+			taken.append(cell)
+		else:
+			cell = _main._nearest_free(target + Vector2i(i, 0))
 		if player.tile != cell:
 			World._relocate(player, cell)
 	if at == "counter":
@@ -199,6 +214,14 @@ func _hourly() -> void:
 	if hour == 0:
 		print("SOAK day %d: treasury %d, residents %d, bodies %d, inn %s" % [day, World.stockpile.count(TOWN, "gold"), World.towns.residents(TOWN).size(),
 			World.townsfolk().size(), "standing" if inn.size != Vector2i.ZERO else "none"])
+
+
+## Whether one of the soak's players stands on [param cell].
+func _ours_at(cell: Vector2i) -> bool:
+	for player: Player in _players:
+		if is_instance_valid(player) and player.spawned and player.tile == cell:
+			return true
+	return false
 
 
 ## The town's shop counter in this zone, or null.

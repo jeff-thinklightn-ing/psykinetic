@@ -15,6 +15,7 @@ notes (decision 324).
 - Builder mode can place every kind of monster and animal the game has: wolves, deer, boar and rabbits as well as goblins, and any kind added later. Claude is told what each kind is and how it behaves, so it puts animals in herds on open ground and goblins in camps.
 - Fixed: winter tufts no longer turn pure white like a field of flowers. Snow sits on their tips with straw below, in the wilds and in the forest, where less of it gets under the trees; the forest's crowns keep their green under a patchy dusting (467 amended).
 - Streams are heard before they are seen: running water from the nearest stretch of a stream, following you along its bank; wading through a ford splashes.
+- The living-world soak tool puts each of its players on a counter cell of their own, in reach of the shopkeeper (496 amended): the 30-day run's 360 refused buys were the tool's placement, not the shop's.
 - The medicine man gathers his herbs whether or not anyone is near his hut (502 amended): one a day, on his way when you are there, else at the hut in the afternoon.
 - Streams can be crossed at fords, wading slowly, or over bridges. The sample level has one; the bridge and the shallows are drawn once terrain's art lands (505).
 - Boars no longer walk and run backwards (Jeff: "boars walk/run backwards"): the boar's body had been fitted to its skeleton back to front, its snout on the skeleton's tail end, so it moved rump first. It is refitted facing forward, and the farm pig, made from the boar, is rebuilt from it.
