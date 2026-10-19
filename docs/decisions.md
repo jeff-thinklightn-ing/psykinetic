@@ -14170,3 +14170,65 @@ sides): the officials went unpaid 254 times on both. Giving builds the
 town; it doesn't pay its wages. What brings the makers' gold back to the
 treasury is phase 3's luxury goods and their tax, sold to the rich.
 
+
+## 506. The level editor's properties panel
+
+level.json had grown keys only a text editor reached (links' targets,
+starts, chests' contents, places, 504's markets, 505's streams and bridges,
+465's regenerate block). The editor's select tool now selects any of them
+and its panel shows and edits their fields (the coordinator's design).
+
+- EditorFields (editor/editor_fields.gd, new class_name): one table, KINDS,
+  per kind where it is found (config: the level's own keys; at: a list
+  matched by "at"; keyed: an object by key; spawn: spawn_points; indexed: a
+  list by index) and its fields, each {key ("a/b" inside an object),
+  label, type, min, max, choices, required, of}. The types are a closed
+  set: string, int, float, bool, enum, level, spawn, faction, item, items,
+  region, rect, cell, cells (shown, not written), order and action. The
+  panel (LevelEditor._fields_panel) builds a widget per field by its type
+  and knows no kind by name: a new key is a row.
+- Selecting: things_at(doc, cell), topmost first: a monster (its panel as
+  before), a crate, cart or chest, a link, a start, a spawn point, a place,
+  a market, a building, a stream, an anchor; a second click on the same
+  cell selects the next. Esc (nothing selected) shows the level's fields.
+- Writing: check() refuses a wrong type, a value out of range, an enum
+  value not offered, a level there is not, a spawn point that level has
+  not, a faction or item there is not, a rect off the map; the status says
+  why and nothing changes. A value that may be is written by write() as
+  one undo step: the whole level.json key it lives in replaced through
+  MapDoc.apply_changes ("config <key>", which undo already knew). Then
+  issues(): Level.parse of the doc and WorldMap's problems for this level
+  (the game's own checks); those naming the selected thing show in its
+  panel, red for what the game leaves out, and warn, not refuse (a link
+  with no way back yet is a fair state mid-edit).
+- Never offered: a key not in the table (no raw JSON), a cell thing's "at"
+  (repaint it), deleting a required key. The one "at" a field edits is a
+  market's (type cell), picked on the map, since nothing paints a market;
+  the level's panel has "add a market", a click putting one down
+  (add_market). An anchor's rect is picked by two corner clicks.
+- A spawn point's name is renamed by rename_spawn: the links in other
+  levels arriving at it (links_arriving, over the levels and the ones
+  registered) are named in a confirmation first; agreed, each of those
+  levels is opened as a MapDoc, its links changed and saved through it, so
+  its level.json is written the editor's way.
+- The editor draws each market (a diamond), each anchor (outlined) and the
+  selected thing ringed (a stream's course, an anchor's rect).
+- The every-key check: editor_test reads every config key sim/level.gd
+  reads and fails on one that is neither in the table nor in
+  EditorFields.NOT_OFFERED (legend, became, loot, clearings, roofs,
+  town_walls, item_style, monsters, centre, herds, dead_ground: painted,
+  laid by other tools, or not hand-edited).
+
+tests: editor_test's panel: a link's level and spawn set, a spawn the level
+has not and a level there is not refused, undone; a chest's item, a bogus
+one refused; a place's holder, a bogus faction refused; the spawn point and
+the anchor on one cell cycled; the spawn renamed, asking first, and the
+other level's link saved arriving at the new name; a market put down,
+named and moved; a stream reversed; the regenerate block's days set and 0
+refused; an anchor's rect picked; saved, read back. The every-key check.
+Its levels are in the test's scratch folder, never the shared overlay.
+
+Rejected: a raw JSON field (bypasses every check); a per-kind panel script
+(each new key a new script); moving painted things from the panel (the
+paint is the truth for them); refusing on the loader's warnings (many are
+fair mid-edit).

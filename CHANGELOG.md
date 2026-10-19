@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The level editor has a properties panel: click a link, chest, place, market, stream or the level itself to see and edit its settings, checked as you go (506).
 - Fixed: winter tufts no longer turn pure white like a field of flowers. Snow sits on their tips with straw below, in the wilds and in the forest, where less of it gets under the trees; the forest's crowns keep their green under a patchy dusting (467 amended).
 - The medicine man gathers his herbs whether or not anyone is near his hut (502 amended): one a day, on his way when you are there, else at the hut in the afternoon.
 - Streams can be crossed at fords, wading slowly, or over bridges. The sample level has one; the bridge and the shallows are drawn once terrain's art lands (505).

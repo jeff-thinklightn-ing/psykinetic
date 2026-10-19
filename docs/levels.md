@@ -618,6 +618,25 @@ write its levels.
   redoes it. Middle drag or the arrow keys pan, the wheel zooms.
 - The faint lines along the floor's outline are the outer walls the game
   builds by itself; you never need to draw them.
+- **The properties panel** (decision 506): with the select tool (`V`),
+  a click on a thing shows its fields in the panel, and a second click on
+  the same cell the next thing there: a link (its level, where it arrives,
+  one way, closed), a crate, cart or chest (its name, what is in it), a
+  start (its order), a spawn point (its name), a place (name, kind, holder,
+  radius, worth), a market (its name, and its cell, picked on the map), a
+  building (facing, use, town; a bridge's length and width), a stream (its
+  course; reverse it, take it out) or a regenerate anchor (its name, its
+  rect picked by two corners). With nothing selected (`Esc`) it shows the
+  level's own fields (name, outdoor, zone, region, border, north, light,
+  sets, canopy, neighbours, the regenerate block) and "add a market". A
+  value that cannot be (a level there is not, a spawn point it has not, a
+  faction or item there is not, out of range) is refused and the status
+  says why; what is written is one undo step, then the level goes through
+  the game's loader and the world map's checks, and what they say of the
+  thing shows in the panel (red for what the game would leave out).
+  Renaming a spawn point that other levels' links arrive at asks first,
+  naming them, and changes and saves them too. The table of kinds and
+  fields is `editor/editor_fields.gd`: a new `level.json` key is a row.
 - `Ctrl+R` shows the **canvas** panel: grow or shrink the map by 1 or 8
   cells on any side. Everything keeps its place on the ground, and
   `level.json`'s cells move with it (entities, routes, gather points,

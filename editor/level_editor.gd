@@ -143,6 +143,15 @@ var _buttons: Dictionary[String, Button] = {}
 var selected := NOWHERE
 var editing_route := false
 var setting_point := false
+## The select tool's other thing (EditorFields: {kind, id}; {} none, the
+## level's own fields shown), the cell its click cycled on and how far, what
+## the level's loader and the world map say of it now, and a field waiting
+## for a click ({thing, field, corner (a rect's first)}; {} none; decision 506).
+var thing := {}
+var _things_cell := NOWHERE
+var _things_index := 0
+var issues: Array[String] = []
+var picking := {}
 ## Each monster cell's name as the game will give it (for its own facing).
 var _names: Dictionary[Vector2i, String] = {}
 var _panel: VBoxContainer
@@ -794,8 +803,112 @@ func _select_click(button: MouseButton, at: Vector2i) -> void:
 		setting_point = false
 		_refresh_panel()
 		return
+	if not picking.is_empty() and button == MOUSE_BUTTON_LEFT:
+		_pick_cell(at)
+		return
 	if button == MOUSE_BUTTON_LEFT:
-		select(at)
+		var things := EditorFields.things_at(doc, at)
+		_things_index = (_things_index + 1) % things.size() if at == _things_cell and not things.is_empty() else 0
+		_things_cell = at
+		var chosen: Dictionary = things[_things_index] if not things.is_empty() else {}
+		thing = chosen if chosen.get("kind", "monster") != "monster" else {}
+		issues = EditorFields.issues(doc, map_name)
+		select(at if chosen.get("kind", "") == "monster" else NOWHERE)
+
+
+## The properties panel's thing [param chosen] ({} the level), shown.
+func select_thing(chosen: Dictionary) -> void:
+	thing = chosen
+	selected = NOWHERE
+	picking = {}
+	issues = EditorFields.issues(doc, map_name)
+	_refresh_panel()
+	queue_redraw()
+
+
+## [param field] of the selected thing (the level when none) set to
+## [param value] through EditorFields: written as one undo step, or refused
+## and said; what the loader says after is shown.
+func set_field(field: Dictionary, value: Variant) -> String:
+	var target := thing if not thing.is_empty() else {"kind": "level", "id": ""}
+	var why := EditorFields.write(doc, target, field, value)
+	report = why if not why.is_empty() else "%s: %s" % [field.get("label", field["key"]), value]
+	issues = EditorFields.issues(doc, map_name)
+	_refresh_panel()
+	queue_redraw()
+	return why
+
+
+## The selected thing's [param action] ("reverse", "delete", "up", "down").
+func act_on_thing(action: String) -> String:
+	var why := EditorFields.act(doc, thing, action)
+	report = why if not why.is_empty() else "%s %s" % [action, thing["kind"]]
+	if why.is_empty():
+		if action == "delete":
+			thing = {}
+		elif action in ["up", "down"]:
+			thing = {"kind": thing["kind"], "id": int(thing["id"]) + (-1 if action == "up" else 1)}
+	issues = EditorFields.issues(doc, map_name)
+	_refresh_panel()
+	queue_redraw()
+	return why
+
+
+## Spawn point [param old_name] renamed [param new_name]: the links in other
+## levels arriving at it are listed first and changed only once
+## [param agreed] (the panel asks; decision 506).
+func rename_spawn(old_name: String, new_name: String, agreed := false) -> String:
+	var arriving := EditorFields.links_arriving(map_name, old_name)
+	if not arriving.is_empty() and not agreed:
+		var levels: Array = arriving.map(func(each: Dictionary) -> String: return each["level"])
+		_confirm_rename(old_name, new_name, levels)
+		return "asked"
+	var others: Array = []
+	var root := folder.trim_suffix("/").get_base_dir() + "/"
+	for each: Dictionary in arriving:
+		if not others.any(func(other: MapDoc) -> bool: return other.folder == root + str(each["level"]) + "/"):
+			others.append(MapDoc.open(root + str(each["level"]) + "/"))
+	var why := EditorFields.rename_spawn(doc, map_name, old_name, new_name, others)
+	report = why if not why.is_empty() else "spawn point %s is %s now%s" % [old_name, new_name,
+		"" if others.is_empty() else ", and %d links in %s" % [arriving.size(), ", ".join(others.map(func(other: MapDoc) -> String: return other.folder))]]
+	if why.is_empty():
+		thing = {"kind": "spawn", "id": new_name}
+	issues = EditorFields.issues(doc, map_name)
+	_refresh_panel()
+	return why
+
+
+func _confirm_rename(old_name: String, new_name: String, levels: Array) -> void:
+	var dialog := ConfirmationDialog.new()
+	dialog.dialog_text = "Renaming %s to %s changes the links arriving at it in %s too, and saves them. Go ahead?" % [old_name, new_name, ", ".join(levels)]
+	dialog.confirmed.connect(func() -> void: rename_spawn(old_name, new_name, true))
+	dialog.close_requested.connect(dialog.queue_free)
+	add_child(dialog)
+	dialog.popup_centered()
+
+
+## A click while a field waits for one: a cell field gets the cell; a rect
+## field its first corner, then its second.
+func _pick_cell(at: Vector2i) -> void:
+	var field: Dictionary = picking.get("field", {})
+	if picking.get("new_market", false):
+		var key := EditorFields.add_market(doc, at)
+		picking = {}
+		select_thing({"kind": "market", "id": key})
+		report = "a market at %s: name it" % at
+		return
+	if field.get("type") == "rect" and not picking.has("corner"):
+		picking["corner"] = at
+		report = "and the other corner"
+		queue_redraw()
+		return
+	var value: Variant = at
+	if field.get("type") == "rect":
+		var a: Vector2i = picking["corner"]
+		value = Rect2i(a.min(at), (a - at).abs() + Vector2i.ONE)
+	thing = picking.get("thing", thing)
+	picking = {}
+	set_field(field, value)
 
 
 ## level.json's entry for the entity at [param at] ({} for none).
@@ -972,7 +1085,7 @@ func _refresh_panel() -> void:
 	for child in _panel.get_children():
 		_panel.remove_child(child)
 		child.queue_free()
-	_panel.get_parent().visible = selected != NOWHERE or brush in ["area", "stamp", "path", "height", "stairs"]
+	_panel.get_parent().visible = selected != NOWHERE or brush in ["area", "stamp", "path", "height", "stairs", "select"]
 	if brush == "area":
 		_area_panel()
 		return
@@ -990,6 +1103,7 @@ func _refresh_panel() -> void:
 		_path_panel()
 		return
 	if selected == NOWHERE:
+		_fields_panel()
 		return
 	var facing: Array = facing_of(selected)
 	var idle := idle_of(selected)
@@ -1052,6 +1166,40 @@ func _refresh_panel() -> void:
 			set_button.toggle_mode = true
 			set_button.button_pressed = setting_point
 	_panel_label("Esc lets go", 20)
+
+
+## What the properties panel adds to the map (decision 506): each market
+## a diamond, each anchor outlined, the selected thing ringed, a rect's
+## first picked corner.
+func _draw_fields() -> void:
+	var markets: Variant = config.get("markets", {})
+	for key: Variant in (markets as Dictionary).keys() if markets is Dictionary else []:
+		var at: Variant = Level._tile(markets[key].get("at") if markets[key] is Dictionary else null)
+		if at != null:
+			var c := (Vector2(at) + Vector2(0.5, 0.5)) * CELL
+			draw_colored_polygon(PackedVector2Array([c + Vector2(0, -CELL * 0.35), c + Vector2(CELL * 0.35, 0), c + Vector2(0, CELL * 0.35),
+				c + Vector2(-CELL * 0.35, 0)]), Color(0.95, 0.8, 0.3, 0.9))
+	var anchors: Variant = EditorFields._value(config, "regenerate/anchors", [])
+	for entry: Variant in anchors if anchors is Array else []:
+		var rect := EditorFields._rect(entry.get("rect") if entry is Dictionary else null)
+		if rect.size != Vector2i.ZERO:
+			draw_rect(Rect2(Vector2(rect.position) * CELL, Vector2(rect.size) * CELL), Color(0.4, 0.9, 1.0, 0.9), false, 4.0)
+	if not thing.is_empty():
+		var ring := Color(1, 1, 1, 0.95)
+		match thing["kind"]:
+			"stream":
+				var path: Variant = EditorFields.value_of(doc, thing, "path")
+				for i in range(1, (path as Array).size() if path is Array else 0):
+					draw_line((Vector2(Level._tile(path[i - 1])) + Vector2(0.5, 0.5)) * CELL, (Vector2(Level._tile(path[i])) + Vector2(0.5, 0.5)) * CELL, ring, 4.0)
+			"anchor":
+				var rect := EditorFields._rect(EditorFields.value_of(doc, thing, "rect"))
+				draw_rect(Rect2(Vector2(rect.position) * CELL, Vector2(rect.size) * CELL), ring, false, 6.0)
+			_:
+				var at: Variant = thing["id"] if thing["id"] is Vector2i else Level._tile(EditorFields.read(doc, thing).get("at"))
+				if at != null:
+					draw_rect(Rect2(Vector2(at) * CELL, Vector2.ONE * CELL).grow(3.0), ring, false, 4.0)
+	if picking.has("corner"):
+		draw_rect(Rect2(Vector2(picking["corner"]) * CELL, Vector2.ONE * CELL), Color(0.4, 0.9, 1.0, 0.6))
 
 
 ## The level's roofs (level.json "roofs"): each outlined, its ridge a line
@@ -1218,6 +1366,119 @@ func _stamp_panel() -> void:
 	_panel_label("R / right click turns it (%d degrees), click lays it" % (stamp_turns * 90), 22)
 
 
+## The selected thing's fields (the level's when none), from EditorFields'
+## table: a widget per field by its type; what the loader says of it.
+func _fields_panel() -> void:
+	var target := thing if not thing.is_empty() else {"kind": "level", "id": ""}
+	var spec: Dictionary = EditorFields.KINDS.get(target["kind"], {})
+	_panel_label("%s%s" % [spec.get("label", target["kind"]), "" if str(target["id"]).is_empty() else "  %s" % [target["id"]]], 30)
+	for issue in EditorFields.issues_of(doc, target, issues) if target["kind"] != "level" else issues:
+		var line := _panel_label(issue, 18)
+		line.add_theme_color_override("font_color", Color(1, 0.35, 0.3) if "left out" in issue else Color(1, 0.8, 0.4))
+		line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		line.custom_minimum_size.x = 420
+	for field: Dictionary in EditorFields.fields_of(doc, target):
+		_field_row(target, field)
+	if target["kind"] == "level":
+		_panel_button(_panel, "click a cell...  (a new market)" if picking.get("new_market", false) else "add a market", func() -> void:
+			picking = {} if picking.get("new_market", false) else {"new_market": true}
+			_refresh_panel())
+	_panel_label("click a thing; click again for the next on its cell; Esc the level", 18)
+
+
+func _field_row(target: Dictionary, field: Dictionary) -> void:
+	var row := HBoxContainer.new()
+	_panel.add_child(row)
+	_panel_label_in(row, str(field.get("label", field["key"])))
+	var value: Variant = EditorFields.value_of(doc, target, field["key"])
+	match field["type"]:
+		"string":
+			var edit := LineEdit.new()
+			edit.text = str(value) if value != null else ""
+			edit.custom_minimum_size.x = 220
+			var commit := func(text: String) -> void:
+				if target["kind"] == "spawn":
+					rename_spawn(str(target["id"]), text)
+				elif text != (str(value) if value != null else ""):
+					set_field(field, text)
+			edit.text_submitted.connect(commit)
+			edit.focus_exited.connect(func() -> void: commit.call(edit.text))
+			row.add_child(edit)
+		"int", "float":
+			var spin := SpinBox.new()
+			spin.min_value = float(field.get("min", -9999))
+			spin.max_value = float(field.get("max", 9999))
+			spin.step = 1.0 if field["type"] == "int" else 0.05
+			spin.value = float(value) if value != null else spin.min_value
+			spin.value_changed.connect(func(number: float) -> void:
+				set_field(field, int(number) if field["type"] == "int" else number))
+			row.add_child(spin)
+		"bool":
+			var box := CheckBox.new()
+			box.button_pressed = bool(value) if value != null else false
+			box.toggled.connect(func(on: bool) -> void: set_field(field, on))
+			row.add_child(box)
+		"enum", "level", "spawn", "faction", "region":
+			var options := OptionButton.new()
+			var offered := _offered(target, field)
+			var shown: Variant = value
+			if field["type"] == "enum" and str(field.get("choices", "")) == "facings":
+				shown = EditorFields.FACINGS.find_key(value) if value is Array else null
+			for each in offered:
+				options.add_item(str(each) if not str(each).is_empty() else "(none)")
+			options.select(maxi(offered.find(shown if shown != null else ""), 0))
+			options.item_selected.connect(func(index: int) -> void: set_field(field, offered[index]))
+			row.add_child(options)
+		"items":
+			var listed: Array = value if value is Array else []
+			for i in listed.size():
+				var without := listed.duplicate()
+				without.remove_at(i)
+				_panel_button(row, "%s  x" % listed[i], set_field.bind(field, without))
+			var add := LineEdit.new()
+			add.placeholder_text = "an item id"
+			add.custom_minimum_size.x = 160
+			add.text_submitted.connect(func(text: String) -> void: set_field(field, listed + [text]))
+			row.add_child(add)
+		"rect", "cell":
+			_panel_label_in(row, str(value))
+			var waiting: bool = picking.get("field", {}) == field
+			_panel_button(row, ("click two corners..." if field["type"] == "rect" else "click a cell...") if waiting else "pick on the map",
+				func() -> void:
+					picking = {} if waiting else {"thing": target, "field": field}
+					_refresh_panel())
+		"cells":
+			var cells: Array = value if value is Array else []
+			_panel_label_in(row, str(value) if not value is Array else "%d cells, %s to %s" % [cells.size(), cells.front(), cells.back()])
+		"order":
+			_panel_label_in(row, "#%d" % (int(value) + 1))
+			_panel_button(row, "earlier", act_on_thing.bind("up"))
+			_panel_button(row, "later", act_on_thing.bind("down"))
+		"action":
+			_panel_button(row, str(field.get("label", field["key"])), act_on_thing.bind(str(field["key"])))
+
+
+## What an enum-like field offers.
+func _offered(target: Dictionary, field: Dictionary) -> Array:
+	match field["type"]:
+		"enum":
+			return EditorFields.choices(field)
+		"level":
+			return [""] + Level.names()
+		"spawn":
+			return [""] + EditorFields.spawns_of(str(EditorFields.value_of(doc, target, str(field.get("of", "")))))
+		"faction":
+			return [Factions.NOBODY] + Factions.read().names()
+		"region":
+			var regions: Array = []
+			for key: String in Lore.entries():
+				if Lore.entries()[key].get("type") == "region":
+					regions.append(key)
+			regions.sort()
+			return regions
+	return []
+
+
 func _panel_label(text: String, size: int) -> Label:
 	var label := Label.new()
 	label.text = text
@@ -1333,11 +1594,13 @@ func _unhandled_input(event: InputEvent) -> void:
 		elif key.keycode in [KEY_Q, KEY_E] and selected != NOWHERE:
 			turn_selected(-1 if key.keycode == KEY_Q else 1)
 		elif key.keycode == KEY_ESCAPE and brush == "select":
-			if editing_route or setting_point:
+			if editing_route or setting_point or not picking.is_empty():
 				editing_route = false
 				setting_point = false
+				picking = {}
 				_refresh_panel()
 			else:
+				thing = {}
 				select(NOWHERE)
 		elif key.keycode >= KEY_0 and key.keycode <= KEY_9 and not key.ctrl_pressed:
 			var digit := (key.keycode - KEY_0 + 9) % 10  # 1 -> 0, ..., 0 -> 9
@@ -1461,6 +1724,7 @@ func _draw() -> void:
 		_draw_edge(key, WALL if map.edges[key] == "wall" else DOOR, 8.0, map.edges[key] == "door")
 	_draw_roofs()
 	_draw_monsters()
+	_draw_fields()
 	if area.size != Vector2i.ZERO:
 		var rect := Rect2(Vector2(area.position) * CELL, Vector2(area.size) * CELL)
 		draw_rect(rect, Color(AREA, 0.12))

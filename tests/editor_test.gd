@@ -28,6 +28,9 @@ func _ready() -> void:
 	await _test_heights()
 	_test_import_file()
 	_clear()
+	await _test_fields()
+	_clear()
+	_test_every_key()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -231,7 +234,8 @@ func _test_monsters() -> void:
 	_key(editor, KEY_Y, true)
 	_check(editor.entry_of(Vector2i(3, 4)).get("idle", {}).get("point") == [6, 6], "and Ctrl+Y again")
 	_key(editor, KEY_ESCAPE)
-	_check(editor.selected == Vector2i(-1, -1) and not editor._panel.get_parent().visible, "Esc lets go of it")
+	_check(editor.selected == Vector2i(-1, -1) and editor.thing.is_empty() and editor._panel.get_child(0).text.begins_with("The level"),
+			"Esc lets go of it: the panel shows the level's own fields (decision 506)")
 
 	_key(editor, KEY_S, true)
 	var saved: Variant = JSON.parse_string(FileAccess.get_file_as_string(FOLDER + "level.json"))
@@ -681,6 +685,144 @@ func _test_import_file() -> void:
 	var text := FileAccess.get_file_as_string(png + ".import")
 	_check('importer="image"' in text and 'type="Image"' in text and "texture" not in text, "with an Image one")
 	_check(not LevelMap.ensure_image_import(png, "res://levels/other/layout.png"), "and an Image one is left alone")
+
+
+func _test_fields() -> void:
+	print("\n== the properties panel (decision 506) ==")
+	var dir := ProjectSettings.globalize_path(FOLDER)
+	DirAccess.make_dir_recursive_absolute(dir)
+	var markers := {Vector2i(1, 1): "link", Vector2i(4, 4): "chest", Vector2i(2, 2): "start"}
+	for y in 4:
+		markers[Vector2i(8, y)] = "water"
+	var rows: Array[String] = []
+	for y in 23:
+		rows.append(".".repeat(27))
+	Level.image_from_rows(rows, markers).save_png(dir.path_join("layout.png"))
+	var json := FileAccess.open(dir.path_join("level.json"), FileAccess.WRITE)
+	json.store_string(JSON.stringify({"name": "Fields", "links": [{"at": [1, 1], "to_map": "test_room", "to_spawn": ""}],
+		"spawn_points": {"gate": [2, 2]}, "places": {"camp": {"at": [6, 6], "kind": "camp", "holder": "goblins", "worth": 3}},
+		"streams": [{"path": [[8, 0], [8, 1], [8, 2], [8, 3]]}],
+		"regenerate": {"generator": "maze", "every_days": 3, "anchors": [{"rect": [0, 0, 3, 3], "name": "gate"}]}}, "\t"))
+	json.close()
+	# Another level whose link arrives at the gate: renaming it changes that too.
+	var other_folder := FOLDER.trim_suffix("/").get_base_dir() + "/ef_other/"
+	var other_dir := ProjectSettings.globalize_path(other_folder)
+	DirAccess.make_dir_recursive_absolute(other_dir)
+	var other_image := Level.image_from_rows(rows, {Vector2i(3, 3): "link", Vector2i(1, 1): "start"})
+	other_image.save_png(other_dir.path_join("layout.png"))
+	var other_config := {"name": "Other", "links": [{"at": [3, 3], "to_map": "editor_test", "to_spawn": "gate"}]}
+	var other_json := FileAccess.open(other_dir.path_join("level.json"), FileAccess.WRITE)
+	other_json.store_string(JSON.stringify(other_config, "\t"))
+	other_json.close()
+	Level.register("ef_other", other_image, null, other_config)
+	var editor: LevelEditor = preload("res://editor/level_editor.tscn").instantiate()
+	editor.map_name = "editor_test"
+	editor.folder = FOLDER
+	add_child(editor)
+	await get_tree().process_frame
+	editor.pick("select")
+
+	editor._select_click(MOUSE_BUTTON_LEFT, Vector2i(1, 1))
+	_check(editor.thing == {"kind": "link", "id": Vector2i(1, 1)}, "a click on the link selects it (%s)" % [editor.thing])
+	var link_fields := EditorFields.fields_of(editor.doc, editor.thing)
+	var to_map: Dictionary = link_fields[0]
+	var to_spawn: Dictionary = link_fields[1]
+	var depth := editor._undo.size()
+	_check(editor.set_field(to_map, "castle") == "" and editor.doc.link_of(Vector2i(1, 1))["to_map"] == "castle" and editor._undo.size() == depth + 1,
+		"its level set to the castle, one undo step")
+	var why := editor.set_field(to_spawn, "nowhere")
+	_check(why.contains("no spawn point") and editor.doc.link_of(Vector2i(1, 1)).get("to_spawn") == "", "a spawn the castle has not is refused (%s)" % why)
+	_check(editor.set_field(to_spawn, "from_test_room") == "" and editor.doc.link_of(Vector2i(1, 1))["to_spawn"] == "from_test_room", "one it has is set")
+	_check(editor.set_field(to_map, "atlantis").contains("no level"), "a level there is not is refused")
+	editor.undo()
+	editor.undo()
+	_check(editor.doc.link_of(Vector2i(1, 1))["to_map"] == "test_room", "Ctrl+Z takes both back")
+
+	editor._select_click(MOUSE_BUTTON_LEFT, Vector2i(4, 4))
+	_check(editor.thing.get("kind") == "entity", "the chest")
+	var slots: Dictionary = EditorFields.fields_of(editor.doc, editor.thing)[1]
+	var item: String = Items.ids()[0]
+	_check(editor.set_field(slots, [item]) == "" and editor.entry_of(Vector2i(4, 4)).get("props", {}).get("slots") == [item], "an item put in it (%s)" % item)
+	_check(editor.set_field(slots, [item, "unobtainium"]).contains("no item"), "and no item that is none")
+
+	editor._select_click(MOUSE_BUTTON_LEFT, Vector2i(6, 6))
+	var holder: Dictionary = EditorFields.fields_of(editor.doc, editor.thing)[2]
+	_check(editor.thing == {"kind": "place", "id": "camp"} and editor.set_field(holder, Factions.NOBODY) == ""
+		and editor.config["places"]["camp"]["holder"] == "nobody", "the camp's holder set to nobody")
+	_check(editor.set_field(holder, "elves").contains("no faction"), "a faction there is not is refused")
+
+	editor._select_click(MOUSE_BUTTON_LEFT, Vector2i(2, 2))
+	var first: Dictionary = editor.thing
+	editor._select_click(MOUSE_BUTTON_LEFT, Vector2i(2, 2))
+	_check(first == {"kind": "spawn", "id": "gate"} and editor.thing == {"kind": "anchor", "id": 0},
+		"the spawn point; a second click on its cell, the anchor round it (%s, %s)" % [first, editor.thing])
+	_check(editor.rename_spawn("gate", "door") == "asked" and editor.config["spawn_points"].has("gate"),
+		"renaming it asks first: ef_other's link arrives there")
+	_check(editor.rename_spawn("gate", "door", true) == "" and editor.config["spawn_points"].has("door"), "agreed: it is the door now")
+	var saved_other: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(other_dir.path_join("level.json")))
+	_check(saved_other["links"][0]["to_spawn"] == "door", "and ef_other's link arrives at the door, saved (%s)" % [saved_other["links"]])
+
+	_key(editor, KEY_ESCAPE)
+	editor.picking = {"new_market": true}
+	editor._select_click(MOUSE_BUTTON_LEFT, Vector2i(5, 5))
+	_check(editor.thing == {"kind": "market", "id": "market"} and editor.config["markets"]["market"]["at"] == [5, 5], "a market put down with a click")
+	var market_fields := EditorFields.fields_of(editor.doc, editor.thing)
+	editor.set_field(market_fields[0], "the far market")
+	editor.picking = {"thing": editor.thing, "field": market_fields[1]}
+	editor._select_click(MOUSE_BUTTON_LEFT, Vector2i(6, 7))
+	_check(editor.config["markets"]["market"] == {"at": [6, 7], "name": "the far market"}, "named, and moved by picking its cell (%s)" % [editor.config["markets"]])
+
+	editor._select_click(MOUSE_BUTTON_LEFT, Vector2i(8, 1))
+	var picked: Dictionary = editor.thing
+	var reversed := editor.act_on_thing("reverse")
+	_check(picked == {"kind": "stream", "id": 0} and reversed == "" and Level._tile(editor.config["streams"][0]["path"][0]) == Vector2i(8, 3),
+		"the stream reversed: it rises at the bottom now (%s, %s, %s)" % [picked, reversed, editor.config.get("streams")])
+
+	_key(editor, KEY_ESCAPE)
+	var every: Dictionary = EditorFields.KINDS["level"]["fields"].filter(func(f: Dictionary) -> bool: return f["key"] == "regenerate/every_days")[0]
+	_check(editor.set_field(every, 5) == "" and editor.config["regenerate"]["every_days"] == 5 and editor.config["regenerate"]["generator"] == "maze",
+		"the level's regenerate every 5 days, the rest of the block kept")
+	_check(editor.set_field(every, 0).contains("1 to"), "0 days is refused")
+	editor._select_click(MOUSE_BUTTON_LEFT, Vector2i(1, 0))
+	_check(editor.thing == {"kind": "anchor", "id": 0}, "a click in the anchor selects it")
+	var rect_field: Dictionary = EditorFields.fields_of(editor.doc, editor.thing)[1]
+	editor.picking = {"thing": editor.thing, "field": rect_field}
+	editor._select_click(MOUSE_BUTTON_LEFT, Vector2i(4, 5))
+	editor._select_click(MOUSE_BUTTON_LEFT, Vector2i(1, 2))
+	_check(editor.config["regenerate"]["anchors"][0]["rect"] == [1, 2, 4, 4], "its rect picked by two corners (%s)" % [editor.config["regenerate"]["anchors"]])
+
+	_key(editor, KEY_S, true)
+	var level := Level.parse(Image.load_from_file(dir.path_join("layout.png")), null,
+			JSON.parse_string(FileAccess.get_file_as_string(FOLDER + "level.json")))
+	_check(level["markets"].has("market") and level["terrain"]["streams"].size() == 1, "saved, the game reads it (%s)" % [level["warnings"]])
+	editor.queue_free()
+	DirAccess.remove_absolute(other_dir.path_join("layout.png"))
+	DirAccess.remove_absolute(other_dir.path_join("level.json"))
+	DirAccess.remove_absolute(other_dir)
+	await get_tree().process_frame
+
+
+## Every key Level reads from level.json has a row in EditorFields, or is
+## one it says it does not offer: a new key with no row fails here.
+func _test_every_key() -> void:
+	print("\n== every level.json key has a row (decision 506) ==")
+	var source := FileAccess.get_file_as_string("res://sim/level.gd")
+	var found := RegEx.create_from_string("config(?:\\.get\\(|\\.has\\(|\\[)\"([a-z_]+)\"")
+	var covered: Array[String] = []
+	covered.append_array(EditorFields.NOT_OFFERED)
+	for kind: String in EditorFields.KINDS:
+		var spec: Dictionary = EditorFields.KINDS[kind]
+		if spec.has("list"):
+			covered.append(str(spec["list"]).split("/")[0])
+		for field: Dictionary in spec["fields"]:
+			if spec["where"] == "config":
+				covered.append(str(field["key"]).split("/")[0])
+	var missing: Array[String] = []
+	for match_ in found.search_all(source):
+		var key := match_.get_string(1)
+		if not key in covered and not key in missing:
+			missing.append(key)
+	_check(missing.is_empty(), "no key without a row (%s)" % [missing])
 
 
 func _key(editor: LevelEditor, keycode: Key, ctrl := false, shift := false, alt := false) -> void:
