@@ -205,6 +205,14 @@ const BRIDGE_LIFT := 0.04
 const BRIDGE_DECK := "bridge.wood.deck"
 const BRIDGE_RAIL := "bridge.wood.rail"
 const BRIDGE_END := "bridge.wood.end"
+## Rocks (decision 513, terrain's side): art-kit's rock.large over each 2x2
+## clump of rock cells, rock.small on every other one; each turned, sized
+## and sunk by its cell (sizes and sinks: these ranges).
+const ROCK_SMALL := "rock.small"
+const ROCK_LARGE := "rock.large"
+const ROCK_SMALL_SIZES := Vector2(0.9, 1.3)
+const ROCK_LARGE_SIZES := Vector2(0.9, 1.1)
+const ROCK_SINK := Vector2(0.05, 0.15)
 const WATER_SHADER := preload("res://client3d/water.gdshader")
 ## Drawn before the marks on it (hover, ripple, builder's ghost: 0) and the
 ## faded walls (188).
@@ -1060,6 +1068,9 @@ var _dry_water: Dictionary[Vector2i, bool] = {}
 var _bed_levels: Dictionary[Vector2i, int] = {}
 ## Fords (terrain "fords"): floor under a shallow sheet of the stream.
 var _fords: Dictionary[Vector2i, bool] = {}
+## Rocks (terrain "rocks", decision 513): no floor to the sim, but ground of
+## their footing here, under a rock, and never a tree.
+var _rocks: Dictionary[Vector2i, bool] = {}
 var _posts: Dictionary[Vector2i, Node3D] = {}
 ## Door edge key -> the doorway node (jambs, lintel, hinge). A double
 ## door's two edges share theirs (decision 403).
@@ -2738,6 +2749,12 @@ func _build_room() -> void:
 	_land = {}
 	for cell: Vector2i in _terrain["floor"] + _terrain.get("water", []):
 		_land[cell] = true
+	# Rocks (decision 513, terrain's side) are the land's too: ground under a
+	# rock, where the void's would be a tree.
+	_rocks.clear()
+	for cell: Vector2i in _terrain.get("rocks", []):
+		_rocks[cell] = true
+		_land[cell] = true
 	_glimpse_plans.clear()
 	if _outdoor:
 		_glimpse_plans = _plan_glimpses()
@@ -2764,6 +2781,7 @@ func _build_room() -> void:
 			_add_fire(cell)
 	_build_water()
 	_add_cliffs()
+	_add_rocks()
 	for cell: Vector2i in _terrain.get("torches", []):
 		_add_torch(cell)
 	for cell: Vector2i in _terrain.get("lanterns", []):
@@ -2824,6 +2842,8 @@ func _add_walls() -> void:
 			continue  # The forest's edge, not a wall (_add_forest).
 		if fences.has(key) and edges[key] == Terrain.Edge.WALL:
 			continue
+		if edges[key] == Terrain.Edge.WALL and _rock_edge(key):
+			continue  # A rock's own (decision 513): the rock is drawn, not a wall round it.
 		match edges[key]:
 			Terrain.Edge.WALL:
 				if BOX_WALLS:
@@ -3587,7 +3607,8 @@ func _scatter_plan(chunk: Vector2i) -> Dictionary[String, Array]:
 	var roof: Dictionary = _terrain.get("canopy", {})
 	for index: int in _scatter_chunks[chunk]:
 		var cell: Vector2i = _ground_cells[index]
-		if index >= _ground_floor_end and index < _ground_water_end or fire.has(cell) or _dry_water.has(cell) or _fords.has(cell):
+		if index >= _ground_floor_end and index < _ground_water_end or fire.has(cell) or _dry_water.has(cell) or _fords.has(cell) \
+				or _rocks.has(cell):
 			continue
 		# Grass under a grown forest's roof (its cover past SCATTER_ROOF) is
 		# its floor of needles, as the ground draws it: the forest's scatter.
@@ -4452,6 +4473,8 @@ func _build_ground(kinds: Dictionary) -> void:
 	for cell: Vector2i in _terrain["floor"]:
 		if not _bed_levels.has(cell):
 			land.append(cell)
+	# A rock's ground is its footing (kinds), under the rock (_add_rocks).
+	land.append_array(_rocks.keys())
 	var floor_size: int = land.size()
 	var dry: Array = []
 	var wet: Array = []
@@ -5014,6 +5037,84 @@ func _add_bridge(building: Dictionary) -> void:
 	_room.add_child(bridge)
 
 
+## Whether the edge [param key] has a rock on a side (Level walls a rock
+## round as it does the void; the view draws the rock instead).
+func _rock_edge(key: Vector3i) -> bool:
+	return Terrain.edge_cells(key).any(func(cell: Vector2i) -> bool: return _rocks.has(cell))
+
+
+## The rocks (terrain "rocks", decision 513, terrain's side): rock_plan's
+## large rocks over their clumps and small ones on the rest, each turned,
+## sized and sunk by its cell, one MultiMesh a slot, variant and mesh under
+## "Rocks", casting shadows.
+func _add_rocks() -> void:
+	if _rocks.is_empty():
+		return
+	var plan := rock_plan(_rocks)
+	var pieces: Dictionary[String, Array] = {}
+	for cell: Vector2i in plan["small"]:
+		var size := lerpf(ROCK_SMALL_SIZES.x, ROCK_SMALL_SIZES.y, _roll(cell, 131))
+		var sink := lerpf(ROCK_SINK.x, ROCK_SINK.y, _roll(cell, 132))
+		var basis := Basis(Vector3.UP, _roll(cell, 133) * TAU).scaled(Vector3.ONE * size)
+		pieces.get_or_add(ROCK_SMALL + "/1", []).append(Transform3D(basis, Vector3(cell.x, _height_in(cell, Vector2(cell)) - sink, cell.y)))
+	for cell: Vector2i in plan["large"]:
+		var size := lerpf(ROCK_LARGE_SIZES.x, ROCK_LARGE_SIZES.y, _roll(cell, 134))
+		var sink := lerpf(ROCK_SINK.x, ROCK_SINK.y, _roll(cell, 135))
+		var basis := Basis(Vector3.UP, _roll(cell, 136) * TAU).scaled(Vector3.ONE * size)
+		# On the lowest of its four cells, so no side stands in the air.
+		var low := INF
+		for step: Vector2i in [Vector2i.ZERO, Vector2i.RIGHT, Vector2i.DOWN, Vector2i.ONE]:
+			low = minf(low, _height_in(cell + step, Vector2(cell + step)))
+		var variant := 1 + posmod(hash(cell), maxi(ArtKit.variant_count(ROCK_LARGE), 1))
+		pieces.get_or_add("%s/%d" % [ROCK_LARGE, variant], []).append(Transform3D(basis, Vector3(cell.x + 0.5, low - sink, cell.y + 0.5)))
+	var rocks := Node3D.new()
+	rocks.name = "Rocks"
+	for key: String in pieces:
+		var slot := key.get_slice("/", 0)
+		var made := ArtKit.instance(slot, int(key.get_slice("/", 1)))
+		var meshes := made.find_children("*", "MeshInstance3D", true, false)
+		for m in meshes.size():
+			var drawn := meshes[m] as MeshInstance3D
+			var local := ArtKit._place_in(drawn, made)
+			var multimesh := MultiMesh.new()
+			multimesh.transform_format = MultiMesh.TRANSFORM_3D
+			multimesh.mesh = drawn.mesh
+			multimesh.instance_count = pieces[key].size()
+			for i in pieces[key].size():
+				multimesh.set_instance_transform(i, pieces[key][i] * local)
+			var many := MultiMeshInstance3D.new()
+			many.name = "%s_%s_%d" % [slot.get_slice(".", 1), key.get_slice("/", 1), m]
+			many.multimesh = multimesh
+			many.material_override = drawn.material_override
+			many.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+			rocks.add_child(many)
+		made.free()
+	_room.add_child(rocks)
+
+
+## Where [param rocks]' (cell -> true) rocks go: {large: the top-left cell
+## of each 2x2 clump, taken in reading order, no cell in two; small: every
+## rock cell left}.
+static func rock_plan(rocks: Dictionary) -> Dictionary:
+	var cells: Array = rocks.keys()
+	cells.sort_custom(func(a: Vector2i, b: Vector2i) -> bool: return a.y < b.y or a.y == b.y and a.x < b.x)
+	var used: Dictionary[Vector2i, bool] = {}
+	var large: Array[Vector2i] = []
+	var small: Array[Vector2i] = []
+	for cell: Vector2i in cells:
+		if used.has(cell):
+			continue
+		var clump: Array[Vector2i] = [cell, cell + Vector2i.RIGHT, cell + Vector2i.DOWN, cell + Vector2i.ONE]
+		if clump.all(func(at: Vector2i) -> bool: return rocks.has(at) and not used.has(at)):
+			large.append(cell)
+			for at in clump:
+				used[at] = true
+	for cell: Vector2i in cells:
+		if not used.has(cell):
+			small.append(cell)
+	return {"large": large, "small": small}
+
+
 ## A basis turning a piece's +Z toward [param direction] (a step on the grid).
 static func _turned_to(direction: Vector2i) -> Basis:
 	return Basis(Vector3.UP, atan2(float(direction.x), float(direction.y)))
@@ -5065,6 +5166,9 @@ func _add_cliffs() -> void:
 	for cell: Vector2i in _terrain["floor"]:
 		if not _bed_levels.has(cell):
 			floor_cells[cell] = true
+	# A rock on a lip stands on the raised ground: its face drawn as the
+	# ground's.
+	floor_cells.merge(_rocks)
 	var water: Dictionary[Vector2i, bool] = {}
 	for cell: Vector2i in _terrain.get("water", []):
 		water[cell] = true

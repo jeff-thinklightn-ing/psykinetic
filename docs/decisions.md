@@ -15304,3 +15304,38 @@ tools/town_soak --woodlot=30,0, taken by goblins at day 15
 treasury end 1 (the inn never stood, short of wood and leather).
 Protocol unchanged. production_test.
 
+
+## 513, terrain's side: rocks and slopes drawn
+
+513 left terrain the slope's ramp and the rocks from art-kit's slots.
+Client only (client3d.gd); the sim, the cells and the wire are 513's.
+
+- A rock cell (terrain "rocks") has no floor to the sim and was drawn as
+  the void is outdoors: a tree. It is land to the view now (Client3D._land,
+  _rocks, read in _build_room, which setup and rebuild both run): no tree
+  grows on it and the forest starts past it; the ground runs under it, of
+  its footing (kinds) at its height, with a cliff face where it stands on a
+  lip; no scatter on it. Level walls a rock round as it does the void (so it
+  stops a step and sight); the view draws no wall on an edge with a rock on
+  a side (_rock_edge), or a walled map showed each rock as a pillar of
+  wall, the rock hidden in it.
+- The rocks: Client3D.rock_plan takes each 2x2 clump of rock cells, in
+  reading order and no cell twice, for art-kit's rock.large (its variant by
+  the clump's cell, on the lowest of its four cells so no side stands in the
+  air) and rock.small for every rock cell left; each turned by its cell,
+  sized (ROCK_SMALL_SIZES 0.9-1.3, ROCK_LARGE_SIZES 0.9-1.1) and sunk
+  (ROCK_SINK 0.05-0.15 m). One MultiMesh a slot, variant and mesh under
+  "Rocks", casting shadows.
+- A slope is a stair to the sim (in terrain "stairs"), and the ground already
+  draws a stair as a ramp (_shape_ramps), of the ground's kind round it: so
+  nothing new; view_test checks a slope's ground rises a level up its high
+  side and nothing stair-like is drawn.
+
+tests/view_test (the sample's outcrop: no tree on a rock, its ground its
+footing at its height, no scatter on it, no wall drawn round it, each rock drawn with shadows,
+rock_plan's clumps; its slopes ramps).
+
+Rejected: rocks as scatter (they block, so a rock a cell, never off it, and
+they cast shadows, which the scatter doesn't); a rock as a node a cell (a
+MultiMesh a slot draws them all at once); the void's ground (the forest's
+floor) under a rock (a rock on a lip would stand on the forest's needles).

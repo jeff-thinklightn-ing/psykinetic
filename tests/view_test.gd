@@ -47,6 +47,7 @@ func _ready() -> void:
 	_test_water()
 	_test_streams()
 	_test_tall_grass()
+	_test_rocks()
 	await _test_wall_runs()
 	_test_cave_walls()
 	_test_scatter()
@@ -1499,6 +1500,69 @@ func _test_water() -> void:
 			"dry water: no surface, no sunk bed, drawn as the land; the map still has it as water")
 	_rig._dry_water.clear()
 	_rig.rebuild(terrain, castle["centre"])
+	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+
+
+## levels/sample's outcrop (decision 513, terrain's side): its rocks drawn
+## as rocks (a large one over a 2x2 clump, small ones on the rest), never a
+## tree, on ground of their footing and no scatter; its slopes ramps in the
+## ground, nothing stair-like on them.
+func _test_rocks() -> void:
+	print("\n== rocks and slopes: rocks for trees, ramps for slopes ==")
+	var sample := Level.load_level("sample")
+	var terrain: Dictionary = sample["terrain"]
+	var rocks: Array = terrain.get("rocks", [])
+	var slopes: Array = (terrain.get("slopes", {}) as Dictionary).keys()
+	_check(not rocks.is_empty() and not slopes.is_empty(), "the sample has rocks and slopes (%d, %d)" % [rocks.size(), slopes.size()])
+	if rocks.is_empty() or slopes.is_empty():
+		return
+	var plan := Client3D.rock_plan({Vector2i(0, 0): true, Vector2i(1, 0): true, Vector2i(0, 1): true, Vector2i(1, 1): true,
+			Vector2i(2, 0): true, Vector2i(2, 1): true, Vector2i(5, 5): true})
+	_check(plan["large"] == [Vector2i(0, 0)] and plan["small"] == [Vector2i(2, 0), Vector2i(2, 1), Vector2i(5, 5)],
+			"a large rock over a 2x2 clump, small ones on the rest, no cell twice (%s)" % [plan])
+	_rig.rebuild(terrain, sample["centre"])
+	_rig._scatter_all()
+	var kinds: Dictionary = terrain["kinds"]
+	var heights: Dictionary = terrain.get("heights", {})
+	var no_tree := rocks.all(func(cell: Vector2i) -> bool: return not _rig._trees.has(cell) and _rig._forest_distance.get(cell, 0) == 0)
+	var grounded := rocks.all(func(cell: Vector2i) -> bool:
+		var index: int = _rig._grounds.get(cell, -1)
+		return index >= 0 and index < _rig._ground_floor_end and _rig._ground_kinds[cell] == str(kinds.get(cell, "")) \
+				and _rig._corner_levels(cell)[0] == int(heights.get(cell, 0)))
+	_check(no_tree and grounded, "no tree on a rock; its ground its footing, at its height (trees %s, ground %s)" % [no_tree, grounded])
+	var on_rock := false
+	for chunk: Vector2i in _rig._scatter_chunks:
+		var placed := _rig._scatter_plan(chunk)
+		for kind: String in placed:
+			for item: Array in placed[kind]:
+				on_rock = on_rock or rocks.has(item[0])
+	_check(not on_rock, "no scatter on a rock")
+	var walled := 0
+	for key: Vector3i in _rig._walls:
+		walled += 1 if Terrain.edge_cells(key).any(func(cell: Vector2i) -> bool: return rocks.has(cell)) else 0
+	var rock_edges := 0
+	for key: Vector3i in terrain["edges"]:
+		rock_edges += 1 if terrain["edges"][key] == Terrain.Edge.WALL and Terrain.edge_cells(key).any(func(cell: Vector2i) -> bool: return rocks.has(cell)) else 0
+	_check(rock_edges > 0 and walled == 0, "no wall drawn round a rock, though the sim walls it (%d edges, %d drawn)" % [rock_edges, walled])
+	var drawn := _rig._room.get_node_or_null("Rocks") as Node3D
+	var counts := {"small": 0, "large": 0}
+	var shadowed := true
+	if drawn != null:
+		for many: MultiMeshInstance3D in drawn.find_children("*", "MultiMeshInstance3D", false, false):
+			# Named size_variant_mesh: a piece of several meshes counted once.
+			if String(many.name).get_slice("_", 2) == "0":
+				counts[String(many.name).get_slice("_", 0)] += many.multimesh.instance_count
+			shadowed = shadowed and many.cast_shadow == GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+	var wanted := Client3D.rock_plan(_rig._rocks)
+	_check(drawn != null and counts["small"] == wanted["small"].size() and counts["large"] == wanted["large"].size()
+			and counts["small"] + 4 * counts["large"] == rocks.size() and shadowed,
+			"each rock drawn, casting shadows (%s of %d cells)" % [counts, rocks.size()])
+	var stairs: Dictionary = terrain.get("stairs", {})
+	var ramps := slopes.all(func(cell: Vector2i) -> bool:
+		var levels := _rig._corner_levels(cell)
+		return stairs.has(cell) and Array(levels).max() == int(heights.get(cell, 0)) + 1 and Array(levels).min() == int(heights.get(cell, 0)))
+	_check(ramps and _rig._room.find_children("*tair*", "", true, false).is_empty(),
+			"a slope is a ramp in the ground, a level up its high side; nothing stair-like drawn")
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
 
