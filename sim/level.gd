@@ -95,7 +95,8 @@ const MARKERS: Array[String] = ["start", "crate", "boulder", "cart", "chest", "t
 const SIDES := {"north": Vector2i(0, -1), "east": Vector2i(1, 0), "south": Vector2i(0, 1), "west": Vector2i(-1, 0)}
 const OPPOSITE := {"north": "south", "east": "west", "south": "north", "west": "east"}
 ## What a place (level.json "places", Holdings) can be.
-const PLACE_KINDS: Array[String] = ["camp", "keep", "farm", "gate", "mine", "stockpile", "temple", "healers_hut", "other"]
+const PLACE_KINDS: Array[String] = ["camp", "keep", "farm", "gate", "mine", "stockpile", "temple", "healers_hut",
+	"woodlot", "hunting_ground", "quarry", "other"]
 ## The buildings that make a place of their own where they stand
 ## (building_places, decision 372): where the fallen come back.
 const BUILDING_PLACES := {"building.temple": "temple", "building.healers_hut": "healers_hut"}
@@ -891,8 +892,12 @@ static func neighbours_from(config: Dictionary, warnings: Array[String]) -> Dict
 
 ## level.json's "places", key -> {key, cell, name, kind (PLACE_KINDS), radius
 ## (cells, at least 1), worth (at least 0), holder (who holds it at the
-## start; "nobody" if not said)}: the places factions hold (Holdings). An
-## entry with no cell, or a kind there is not, is said in [param warnings].
+## start; "nobody" if not said), and town if it works for one (decision 517:
+## the key of the stockpile place whose town works it, as a building's
+## "town"; a woodlot its woodcutter's, a hunting ground its hunter's)}: the
+## places factions hold (Holdings). An entry with no cell, a kind there is
+## not, or a town that is no stockpile place here, is said in
+## [param warnings].
 static func places_from(config: Dictionary, warnings: Array[String]) -> Dictionary[String, Dictionary]:
 	var out: Dictionary[String, Dictionary] = {}
 	var listed: Variant = config.get("places", {})
@@ -927,6 +932,14 @@ static func places_from(config: Dictionary, warnings: Array[String]) -> Dictiona
 				out[str(key)]["holds"] = kept
 		elif holds != null:
 			warnings.append("the place %s's holds is not a list: left out" % [key])
+	for key: String in out:
+		var town := str(listed[key].get("town", ""))
+		if town.is_empty():
+			continue
+		if out.get(town, {}).get("kind") != "stockpile":
+			warnings.append("the place %s works for town \"%s\": no stockpile place of that key here; it works for none" % [key, town])
+			continue
+		out[key]["town"] = town
 	return out
 
 

@@ -37,6 +37,7 @@ func _ready() -> void:
 	_test_kinds()
 	_test_canopy()
 	_test_building_links()
+	_test_place_towns()
 	_test_regenerate_mark()
 	_test_town_walls()
 	_test_roofs()
@@ -594,6 +595,20 @@ func _test_kinds() -> void:
 	_check(World.edge_blocks(Vector2i(9, 5), Vector2i(0, 1)) and not World.edge_blocks(Vector2i(8, 7), Vector2i(-1, 0)),
 			"a wall where the wing meets the corner; none between the wing and the main block")
 	Level.unregister("test_kinds")
+
+
+## Work places and the town they work for (decision 517).
+func _test_place_towns() -> void:
+	print("
+== work places and their town ==")
+	var warnings: Array[String] = []
+	var places := Level.places_from({"places": {"square": {"at": [8, 5], "kind": "stockpile"},
+		"wood": {"at": [2, 2], "kind": "woodlot", "town": "square"}, "hunt": {"at": [3, 3], "kind": "hunting_ground", "town": "wood"},
+		"pit": {"at": [4, 4], "kind": "quarry"}}}, warnings)
+	_check(places["wood"]["kind"] == "woodlot" and places["wood"].get("town") == "square", "a woodlot working for the square's town")
+	_check(places["hunt"]["kind"] == "hunting_ground" and not places["hunt"].has("town")
+		and warnings.size() == 1 and "works for town \"wood\": no stockpile place" in warnings[0], "a town that is no stockpile: said, none (%s)" % [warnings])
+	_check(places["pit"]["kind"] == "quarry" and not places["pit"].has("town"), "a quarry, working for none")
 
 
 func _test_building_links() -> void:

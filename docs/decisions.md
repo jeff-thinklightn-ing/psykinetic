@@ -14970,3 +14970,28 @@ protocol unchanged.
 Also here: maps' "days" on a caravan (504 amended, 85bc318e) is a float
 of game days to go, so the wagon's words round it: "less than a day out"
 under three quarters, "a day out", "N days out".
+## 517. Work places and the town they work for
+
+From builder's places-and-holdings design (the coordinator approved it):
+economy is to make a trade work from its town's site of its kind (its
+step, after phase 3), and builder marks them, so a level has to be able to
+say which sites are a town's.
+
+- Level.PLACE_KINDS gains "woodlot" (the woodcutter's), "hunting_ground"
+  (the hunter's) and "quarry" (stone, or ore later). Farm and mine were
+  already there. Holdings is unchanged: a place of any kind is held as
+  before.
+- A place takes an optional "town": the key of the stockpile place whose
+  town works it, as a building's "town" is (decision 297). places_from
+  sets "town" on the parsed place when it names a stockpile place on the
+  same map, and otherwise says "the place ... works for town ...: no
+  stockpile place of that key here; it works for none", and the place
+  stands with no town.
+- The properties panel's place row gains "works for (a stockpile)" (one
+  EditorFields row, a string; the game's warning shows in the panel when
+  it names no stockpile).
+- No message carries it: places reach clients as holdings, unchanged.
+  Protocol unchanged.
+
+tests: level_test: a woodlot working for a stockpile place, its town set;
+one naming a place that is no stockpile, said and left with none.

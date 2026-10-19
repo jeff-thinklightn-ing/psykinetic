@@ -67,6 +67,8 @@ const KINDS := {
 		{"key": "holder", "label": "held by", "type": "faction"},
 		{"key": "radius", "label": "radius", "type": "int", "min": 1, "max": 64},
 		{"key": "worth", "label": "worth", "type": "int", "min": 0, "max": 100},
+		# The stockpile place whose town works it (decision 517).
+		{"key": "town", "label": "works for (a stockpile)", "type": "string"},
 	]},
 	"market": {"where": "keyed", "list": "markets", "label": "Market", "fields": [
 		{"key": "name", "label": "name", "type": "string", "required": true},
