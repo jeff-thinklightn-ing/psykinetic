@@ -13,6 +13,8 @@
 # 2. ssh: ~/psykinetic/server/deploy.sh --staged (server/stage.sh tries the
 #    build on UDP 7787 before the live server is touched), output streamed
 # 3. admin.sh version: what runs now
+# 4. whether the installed unit matches server/psykinetic.service; if not, the sudo
+#    line that installs it (deploy.sh cannot)
 # Exits non-zero if staging or the deploy fails; the running server is then
 # untouched (a failed stage) or restarted as it was.
 param([switch]$Now)
@@ -71,3 +73,17 @@ foreach ($attempt in 1..10) {
 }
 if ($after -notmatch 'protocol') { Fail "the server does not answer on its console after the deploy: $after" }
 Write-Output "box runs now: $after"
+
+# --- 4. the unit ---------------------------------------------------------------------
+# deploy.sh never installs the unit (its sudoers allow no cp to /etc), so a flag new in
+# server/psykinetic.service reaches the box only by hand (2026-10-18: a daemon-reload alone
+# reloaded the old unit). cmp -s compares without printing either file.
+$unit = (ssh @ssh 'cmp -s ~/psykinetic/server/psykinetic.service /etc/systemd/system/psykinetic.service && echo same || echo differs' 2>&1 | ForEach-Object { "$_" }) -join ' '
+if ($unit -match 'differs') {
+	Write-Output 'unit: the installed psykinetic.service differs from server/psykinetic.service; to install it (sudo, by hand):'
+	Write-Output '  sudo cp ~/psykinetic/server/psykinetic.service /etc/systemd/system/ && sudo systemctl daemon-reload && sudo systemctl restart psykinetic'
+} elseif ($unit -match 'same') {
+	Write-Output 'unit: installed, the same as server/psykinetic.service'
+} else {
+	Write-Output "unit: cannot compare ($unit)"
+}
