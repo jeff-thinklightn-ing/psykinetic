@@ -345,6 +345,9 @@ func _test_sim_reads() -> void:
 		"a caravan's words from the wire alone (the ids when the map has no names)")
 	_check(map.caravan_words(route, {"area": "b", "fraction": 0.9, "days": 2}) == "the wagon from a, bound for b, in b, 2 days out"
 		and map.caravan_words(route, {"area": "b", "days": 1}).ends_with(", a day out"), "with maps' days: N days out, a day out")
+	_check(map.caravan_words(route, {"area": "b", "days": 0.4}).ends_with(", less than a day out")
+		and map.caravan_words(route, {"area": "b", "days": 1.37}).ends_with(", a day out")
+		and map.caravan_words(route, {"area": "b", "days": 2.6}).ends_with(", 3 days out"), "maps' days are a float: rounded to whole days, under three quarters 'less than a day'")
 	_check(Main.hidden_words_due(World.TALL_GRASS_COVER, Senses.STILL_TICKS, false, 0.0, 9)
 		and not Main.hidden_words_due(0.0, Senses.STILL_TICKS, false, 0.0, 9)
 		and not Main.hidden_words_due(World.TALL_GRASS_COVER, Senses.STILL_TICKS - 1, false, 0.0, 9)
@@ -353,6 +356,20 @@ func _test_sim_reads() -> void:
 	_check(not Main.hidden_words_due(World.TALL_GRASS_COVER, 99, true, Senses.DARK - 0.1, 9)
 		and Main.hidden_words_due(World.TALL_GRASS_COVER, 99, true, 1.0, 9),
 		"a carried light gives them away in the dark alone, not by day (enemy-ai's reading)")
+	var sick: GridEntity = load(Main.RESIDENT).new()
+	sick.person = "Oda"
+	sick.trade = "cook"
+	sick.ailing = "a fever"
+	var panel: ConversePanel = _main.converse
+	panel.open(sick)
+	_check(panel._name.text == "Oda" and panel._trade.text == "cook, in bed with a fever", "the talk's title says who is in bed with what (515 amended, npc's ailing)")
+	if _main._local_player() != null:
+		_check(_main.context_hint_for(sick) == "LMB  talk   in bed with a fever", "and the hint over them says it too")
+	sick.ailing = ""
+	panel.open(sick)
+	_check(panel._trade.text == "cook", "well again: the trade alone")
+	panel.close()
+	sick.free()
 	_check(Main.pile_words(PackedStringArray(["herbs"])) == "herbs" and Main.pile_words(PackedStringArray(["herbs", "dagger", "rope"])) == "herbs and 2 more"
 		and Main.pile_words(PackedStringArray()) == "", "a pile's words: the first thing's short name, and how many more")
 

@@ -5689,7 +5689,9 @@ func context_hint_for(thing: Node) -> String:
 	if thing is Companion:
 		return "LMB  talk   E  her pack" if _is_own_companion(thing) else "LMB  talk"
 	if thing is Resident:
-		return "LMB  talk"  # Decision 454: Shift+LMB attacks, said in the controls list.
+		# Decision 454: Shift+LMB attacks, said in the controls list. 515 amended: in bed, their ailment (npc's Resident.ailing).
+		var ailing := str((thing as Resident).ailing)
+		return "LMB  talk   in bed with %s" % ailing if not ailing.is_empty() else "LMB  talk"
 	if thing is Monster and World.can_target(player, thing):
 		return "LMB  attack   RMB  draw, let go to shoot" if World.off_hand(player) == "draw" else "LMB  attack"
 	if thing is Player and thing != player:
@@ -8063,6 +8065,9 @@ func _test_converse(player: Player) -> bool:
 			nearest = entity
 	if nearest == null:
 		return false
+	if "sick" in Net.test_show:
+		nearest.ailing = "a fever"  # The sick read's shot (515 amended): the hint and the title say it.
+		_test_hint_thing = nearest
 	open_converse(nearest)
 	converse.add_line(_display_name(player), "(a test line) Any work for me?", false)
 	converse.add_line(converse._name.text, "(a test line) Bram's boy is held at the goblins' camp. Bring him home and the town will not forget it.", true)
@@ -8163,7 +8168,7 @@ func _run_test_show(player: Player) -> void:
 				options_panel.begin_rebind("open")
 				get_tree().create_timer(0.5).timeout.connect(func() -> void:
 					options_panel._scroll.scroll_vertical = 2400)
-			"converse":
+			"converse", "sick":
 				_test_converse_due = true  # Residents come with the town's sync: tried each tick.
 			"hint":
 				for entity in World.get_entities():

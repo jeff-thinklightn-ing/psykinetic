@@ -144,7 +144,9 @@ func open(body: GridEntity, label := "") -> void:
 	var person := str(body.get("person")) if body != null and body.get("person") != null else ""
 	var trade := str(body.get("trade")) if body != null and body.get("trade") != null else ""
 	_name.text = person if not person.is_empty() else label
-	_trade.text = trade.replace("_", " ")  # The trade's id, in words ("medicine man").
+	# The trade's id, in words ("medicine man"); in bed, their ailment after it (515 amended, npc's Resident.ailing).
+	var ailing := str(body.get("ailing")) if body != null and body.get("ailing") != null else ""
+	_trade.text = trade.replace("_", " ") + (", in bed with %s" % ailing if not ailing.is_empty() else "")
 	for child in _lines.get_children():
 		_lines.remove_child(child)
 		child.queue_free()

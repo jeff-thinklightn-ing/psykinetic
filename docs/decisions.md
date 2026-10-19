@@ -14956,3 +14956,17 @@ holds not placed before. Never in a real level: the sample has no camp
 and no store, so only resident_test's road level holds one (a
 carpenter's daughter of the test town). Server only; protocol unchanged;
 no new class_name.
+## 515 amended: the sick resident's read
+
+Npc's Resident.ailing (501 amended, 1a72b311): a replicated String, the
+ailment's name as townsfolk.json's "sick" kinds give it ("a fever", "a
+cough", "the shakes"), "" when well. The two reads 515 left waiting:
+the cursor hint over them, "LMB  talk   in bed with a fever", and the
+conversation panel's title caption, the trade with ", in bed with a
+fever" after it; nothing else. --test-show=sick opens the talk on the
+nearest resident with a fever for the shot. ui_test. Client only;
+protocol unchanged.
+
+Also here: maps' "days" on a caravan (504 amended, 85bc318e) is a float
+of game days to go, so the wagon's words round it: "less than a day out"
+under three quarters, "a day out", "N days out".

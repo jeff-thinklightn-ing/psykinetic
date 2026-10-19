@@ -300,8 +300,13 @@ func caravan_words(route: Dictionary, caravan: Dictionary) -> String:
 	if not where.is_empty():
 		words += ", in %s" % where
 	if caravan.has("days"):
-		var days := int(caravan["days"])
-		words += ", a day out" if days == 1 else ", %d days out" % days
+		# Maps' days_left (504 amended): game days still to go, a float.
+		var days := float(caravan["days"])
+		if days < 0.75:
+			words += ", less than a day out"
+		else:
+			var whole := roundi(days)
+			words += ", a day out" if whole == 1 else ", %d days out" % whole
 	return words
 
 
