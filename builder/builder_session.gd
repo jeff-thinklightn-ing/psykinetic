@@ -99,8 +99,6 @@ func _fresh_working() -> void:
 	working.map = doc.map.copy()
 	working.config = doc.config.duplicate(true)
 	working.had_heights = doc.had_heights
-	# Read, never changed here (decision 527): the ground's shape comes from the editor.
-	working.relief = doc.relief
 
 
 ## Asks for [param text] (the first request, or a follow-up), running
@@ -391,7 +389,7 @@ Levels join at their edges: walking off one edge arrives on the neighbour's oppo
 
 Places are what factions hold (the goblins, the town, or nobody): a camp, a keep, a farm, a gate, a mine. Each is a cell and a radius; the ground within the radius is its holder's, and no one else's group may walk through it. mark_place names one (its key, kind, cell, radius, who holds it at the start). Mark a place when you build one: a camp's place on its gather point (where its monsters gather), a farmstead's in its yard. A goblin camp can hold captives from the start (mark_place's holds), each taken from a town (the request lists them): someone of that town, or kin of one of its workers ("the smith's daughter"). In town their kin asks players to bring them home, and they go free when the camp falls, so a camp holding a captive is worth clearing. A town's work sites are places too: a woodlot (woods its woodcutter fells: put it at the forest's edge), a hunting ground (open land with game, its hunter's), a quarry (rock to cut stone from), a farm (fields), a mine. Mark one with the town it works for (mark_place's town: the key of the town's stockpile place), held by the town, not far from it, and with a way on foot from the store to it: a site the goblins hold, or that can't be reached, is worked by no one, and the tool's answer says so. %s Some prefabs bring their place with them. A building prefab is a roofed building players walk into: stamp it whole, door and all, rather than drawing its walls yourself. A building can serve a town: set_building gives one in the area a use (%s) and its town, the key of a stockpile place in this level (a place of kind stockpile, held by the town). A town has one building of each use. Stamping over a building drops its use: set it again. town_wall walls a town in: give the rectangle of cells it encloses (its buildings, its store, room to walk) and the wall stands on the edges just outside it, with gates (doors) where roads come in, one in the middle of each side if you name none. One wall per town; it looks as strong as the town has built it (a bank of rubble at first). roof puts a roof over a rectangle of floor of one height that no building covers: a room you walled yourself, or an open shelter (a market stall, a woodshed) on posts at its corners; give it a use and town and it serves the town as a building does.
 
-Ground has a height, 0 to 6 (the grid's Heights block, shown when any cell has one). A step of a level or more between two cells is a ledge: a wall to anyone walking, though a body pushed off it falls to the ground below, and higher ground sees over walls. Stairs join one level to the next: a stair climbs to the one cell beside it a level up. A slope is a stair that looks like a ramp of earth: use slopes outdoors (on hills, banks, outcrops) and stairs in and round buildings; hill and stairs make slopes when asked. Rock is bare rock standing out of the ground, walled round: no one walks on or through it. height raises, lowers or sets cells; hill makes a rounded hill of rings a level each, with stairs up the sides asked; stairs puts a stair or a flight onto a ledge or up from flat ground. Whatever stands on raised ground (things, starts, buildings) needs stairs to it, and a building stands on one height: when a change leaves something cut off or a stair climbing nowhere, the tool's answer says so: put it right. Some outdoor levels have their ground shaped in metres (the request says so): there the Heights block is in half metres (0-9, then a, b, c ...), a rise of more than 0.45 m between neighbours is a cliff no one walks, height, hill and stairs are refused (the ground is shaped in the editor), and a building needs ground flat within 0.05 m under it: stamp it where the ground is flat, or the tool refuses it.
+Ground has a height, 0 to 6 (the grid's Heights block, shown when any cell has one). A step of a level or more between two cells is a ledge: a wall to anyone walking, though a body pushed off it falls to the ground below, and higher ground sees over walls. Stairs join one level to the next: a stair climbs to the one cell beside it a level up. A slope is a stair that looks like a ramp of earth: use slopes outdoors (on hills, banks, outcrops) and stairs in and round buildings; hill and stairs make slopes when asked. Rock is bare rock standing out of the ground, walled round: no one walks on or through it. height raises, lowers or sets cells; hill makes a rounded hill of rings a level each, with stairs up the sides asked; stairs puts a stair or a flight onto a ledge or up from flat ground. Whatever stands on raised ground (things, starts, buildings) needs stairs to it, and a building stands on one height: when a change leaves something cut off or a stair climbing nowhere, the tool's answer says so: put it right. Some outdoor levels have their ground shaped in metres (the request says so): there the Heights block is in half metres (0-9, then a, b, c ...), a rise of more than 0.45 m between neighbours is a cliff no one walks, height, hill and stairs are refused (the ground is shaped in the editor), and a building needs ground flat within 0.05 m under it: stamp it where the ground is flat, or stamp it with pad to cut the ground flat under it (the only shaping you do: a house on a hillside sits on a cut pad).
 
 A town keeps what players bring home in its store: a place of kind stockpile that the town holds. Stamp town_store for one (an open yard with its depot, its shop counter and the store's place, all in one), once per town, near the middle of town on open ground reachable from the gate, its counter facing where players will stand. A depot is a chest placed with use depot: what is put in it is banked. A shop counter is a chest placed with use shop: players buy what the town's workers made and sell what it is short of. Either works only inside the town's store, and is never given items. When a change leaves the store wrong, the tool's answer says so: put it right.
 
@@ -604,7 +602,8 @@ const TOOLS := [
 			"required": ["at", "thing"]}},
 	{"name": "stamp", "description": "Stamps a prefab with its top-left at a cell, turned 0-3 quarter turns clockwise. Its void cells leave the map as it was.",
 		"input_schema": {"type": "object", "properties": {"prefab": {"type": "string"}, "at": _CELL,
-			"turns": {"type": "integer", "minimum": 0, "maximum": 3}},
+			"turns": {"type": "integer", "minimum": 0, "maximum": 3},
+			"pad": {"type": "boolean", "description": "on ground shaped in metres: cut the ground flat under each building it brings (and a cell round it) first"}},
 			"required": ["prefab", "at"]}},
 	{"name": "mark_place", "description": "Marks a place factions hold: a cell in the area and a radius of ground round it, held at the start by the goblins, the town or nobody. A key already used is moved or changed.",
 		"input_schema": {"type": "object", "properties": {
@@ -666,7 +665,7 @@ func run_tool(tool: String, input: Variant) -> Dictionary:
 	if not input is Dictionary:
 		return _no("the input is not an object")
 	var given: Dictionary = input
-	if tool in ["height", "hill", "stairs"] and working.relief != null:
+	if tool in ["height", "hill", "stairs"] and working.map.has_relief():
 		# Whole levels the relief would hide (decision 527).
 		return _no("this level's ground is shaped in metres: shape it in the editor")
 	match tool:
@@ -795,10 +794,13 @@ func run_tool(tool: String, input: Variant) -> Dictionary:
 				return _no("%s turned so is %d x %d: at %s it does not fit in the area" % [prefab_name, size.x, size.y, at])
 			var stamped := Prefab.stamp_changes(prefab, working.map, at, working.config)
 			var had: Array = working.config.get("buildings", []) if working.config.get("buildings") is Array else []
-			for entry: Variant in stamped.get("config", {}).get("buildings", []):
-				var uneven := "" if entry in had else pad_problem(entry)
+			var placed: Array = (stamped.get("config", {}).get("buildings", []) as Array).filter(func(entry: Variant) -> bool: return entry not in had)
+			if bool(given.get("pad", false)) and working.map.has_relief():
+				return _padded(stamped, placed, "stamped %s" % prefab_name)
+			for entry: Variant in placed:
+				var uneven := pad_problem(entry)
 				if not uneven.is_empty():
-					return _no(uneven)
+					return _no(uneven + " (stamp with pad to cut it flat)")
 			return _lay(stamped, "stamped %s" % prefab_name)
 		"mark_place":
 			return _mark_place(given)
@@ -950,14 +952,41 @@ static func building_uses() -> Array[String]:
 	return out
 
 
-## The level's relief (relief.png, maps' 525) as HeightTools reads it,
-## {field, size}, or {} with none (decision 527).
+## The level's relief (relief.png, maps' 525: LevelMap.relief) as
+## HeightTools reads it, {field, size}, or {} with none (decision 527).
 func relief() -> Dictionary:
-	if working.relief == null:
+	if not working.map.has_relief():
 		return {}
-	var warnings: Array[String] = []
-	var field := Relief.read(working.relief, working.map.size, warnings)
-	return {} if field.is_empty() else {"field": field, "size": working.map.size}
+	return {"field": working.map.relief_field(), "size": working.map.size}
+
+
+## [param stamped] laid with the ground under each of [param placed] (the
+## buildings it brings) cut flat first (Relief.pad, a cell's apron round
+## it; decision 527 amended): builder shapes ground only under a building
+## it places. Undone and refused if one still isn't flat (water under it).
+func _padded(stamped: Dictionary, placed: Array, done: String) -> Dictionary:
+	var ground := {}
+	for entry: Variant in placed:
+		var rect: Variant = Level.building_rect(entry)
+		if rect != null and str(entry.get("slot", "")) not in Level.SPANS_WATER:
+			ground.merge(Relief.pad(working.map, rect, 1)["relief"], true)
+	var before := relief()["field"] as PackedFloat32Array
+	var cutting := _kept({"relief": ground})
+	cutting.erase("outside")
+	working.apply_changes(cutting)
+	var cut := 0
+	for cell: Vector2i in ground:
+		if area.has_point(cell) and absf(Relief.at(before, working.map.size, cell) - working.map.relief_at(cell)) > Relief.EPSILON:
+			cut += 1
+	for entry: Variant in placed:
+		var uneven := pad_problem(entry)
+		if not uneven.is_empty():
+			working.undo()
+			return _no(uneven)
+	var laid := _lay(stamped, done)
+	if laid["ok"] and cut > 0:
+		laid["text"] += " (the ground cut flat under it: %d cells)" % cut
+	return laid
 
 
 ## Why the building [param entry] can't stand on this level's relief
@@ -1300,6 +1329,15 @@ func _lay(changes: Dictionary, done: String) -> Dictionary:
 		return _no(changes["reason"])
 	if changes.has("warnings"):
 		done += " (" + "; ".join(changes["warnings"]) + ")"
+	var kept := _kept(changes)
+	var outside: int = kept["outside"]
+	kept.erase("outside")
+	working.apply_changes(kept)
+	return {"ok": true, "text": "%s%s" % [done, " (%d cells or edges outside the area left out)" % outside if outside > 0 else ""]}
+
+
+## [param changes] kept to the area, with "outside" the count left out.
+func _kept(changes: Dictionary) -> Dictionary:
 	var kept := {}
 	var outside := 0
 	var cells: Dictionary = {}
@@ -1324,6 +1362,14 @@ func _lay(changes: Dictionary, done: String) -> Dictionary:
 		else:
 			outside += 1
 	kept["heights"] = heights
+	var ground: Dictionary = {}
+	for cell: Vector2i in changes.get("relief", {}):
+		if area.has_point(cell):
+			ground[cell] = changes["relief"][cell]
+		else:
+			outside += 1
+	if not ground.is_empty():
+		kept["relief"] = ground
 	for list in ["entries", "links"]:
 		kept[list] = (changes.get(list, []) as Array).filter(func(entry: Dictionary) -> bool:
 			return area.has_point(Level._tile(entry.get("at"))))
@@ -1331,8 +1377,8 @@ func _lay(changes: Dictionary, done: String) -> Dictionary:
 	if changes.has("config"):
 		# A stamped prefab's places and buildings (it fits in the area, so they do).
 		kept["config"] = changes["config"]
-	working.apply_changes(kept)
-	return {"ok": true, "text": "%s%s" % [done, " (%d cells or edges outside the area left out)" % outside if outside > 0 else ""]}
+	kept["outside"] = outside
+	return kept
 
 
 ## Each work site that names its town (decision 520) and can't serve it:
@@ -1434,6 +1480,7 @@ func proposal() -> Dictionary:
 	var cells: Dictionary[Vector2i, String] = {}
 	var edges: Dictionary[Vector3i, String] = {}
 	var heights: Dictionary[Vector2i, int] = {}
+	var ground: Dictionary[Vector2i, float] = {}
 	var covers: Array[Vector2i] = []
 	var entries: Array = []
 	var links: Array = []
@@ -1444,6 +1491,8 @@ func proposal() -> Dictionary:
 				cells[at] = working.map.cell(at)
 			if int(working.map.heights.get(at, 0)) != int(doc.map.heights.get(at, 0)):
 				heights[at] = int(working.map.heights.get(at, 0))
+			if working.map.has_relief() and absf(working.map.relief_at(at) - doc.map.relief_at(at)) > Relief.EPSILON:
+				ground[at] = working.map.relief_at(at)
 			var entry := working.entry_of(at)
 			var link := working.link_of(at)
 			if cells.has(at) or str(entry) != str(doc.entry_of(at)) or str(link) != str(doc.link_of(at)):
@@ -1457,6 +1506,8 @@ func proposal() -> Dictionary:
 				if working.map.edge(key) != doc.map.edge(key):
 					edges[key] = working.map.edge(key)
 	var out := {"cells": cells, "edges": edges, "heights": heights, "covers": covers, "entries": entries, "links": links}
+	if not ground.is_empty():
+		out["relief"] = ground
 	var config := {}
 	for key in CONFIG_KEYS:
 		if str(working.config.get(key)) != str(doc.config.get(key)):

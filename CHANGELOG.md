@@ -8,6 +8,7 @@ notes (decision 324).
 ## Unreleased
 
 - Signposts are rebuilt as a square post with two clean arrow boards.
+- Builder mode can cut a flat pad into a hillside for a building it stamps (stamp with pad), and only there (527 amended).
 - Bookshelves are rebuilt with shelves you can see and rows of books in leathers and muted colours.
 - The ground no longer looks like polygons (524): grass, dirt, stone and sand meet along soft, ragged edges that wander freely, and grass wears through the dirt in patches.
 - Beds are rebuilt in clean planks: a posted frame, a mattress and pillow, and a blue-grey wool blanket folded back.

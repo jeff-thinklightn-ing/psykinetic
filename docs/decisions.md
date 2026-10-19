@@ -15562,6 +15562,19 @@ level with no relief.png is unchanged (every level builder makes today).
   a pad are.
 
 Protocol unchanged. builder_test _test_relief.
+
+527 amended, on maps' part two (8ee7c046: relief in LevelMap, Relief.pad).
+BuilderSession.relief() reads working.map.relief_field(), and the working
+copy carries the relief with the map (no MapDoc.relief property use). The
+approved level_pad is stamp's "pad" option rather than a tool of its own:
+on a relief level a stamp with pad first cuts the ground flat under each
+building the prefab brings, plus a cell's apron (Relief.pad, one undo
+step), then stamps; refused and undone if a pad still isn't flat. So
+builder shapes ground only under a building it places, never as a free
+terrain tool, and never a building it didn't place. _lay keeps a change's
+"relief" to the area like its cells, and the proposal carries the
+working copy's relief where it differs, so accepting it writes
+relief.png. builder_test _test_relief.
 ## 524. The ground's kinds meet softly: no "polys"
 
 Jeff: "dirt having polys is not what i meant by elevation .. i meant hills

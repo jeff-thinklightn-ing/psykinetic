@@ -622,13 +622,22 @@ func _test_relief() -> void:
 			field[y * size.x + x] = 2.0 if x >= 25 else 0.3 if x >= 15 else 0.0
 	field[7 * size.x + 7] = 0.1
 	var doc := _doc()
-	doc.relief = Relief.image(field, size)
+	doc.map.relief = field
 	doc.config["places"] = {"store": {"at": [10, 20], "kind": "stockpile", "holder": "town"},
 		"woods": {"at": [18, 20], "kind": "woodlot", "holder": "town", "town": "store"},
 		"high": {"at": [30, 20], "kind": "hunting_ground", "holder": "town", "town": "store"}}
 	var session := BuilderSession.new(doc, Rect2i(0, 0, 40, 30), "test_field", StubClaude.new([]))
 	var bumpy: Dictionary = session.run_tool("stamp", {"prefab": "building_hut", "at": [6, 6]})
 	_check(not bumpy["ok"] and "is not flat: (7, 7) is +0.10 m off the rest" in str(bumpy["text"]), "a hut over a 0.1 m bump: refused, naming the cell (%s)" % bumpy["text"])
+	var cut: Dictionary = session.run_tool("stamp", {"prefab": "building_hut", "at": [6, 6], "pad": true})
+	_check(cut["ok"] and "the ground cut flat under it" in str(cut["text"]) and session.pad_problem(session.working.config["buildings"][0]).is_empty(),
+		"stamped with pad: the ground cut flat under it (%s)" % cut["text"])
+	_check(is_equal_approx(session.doc.map.relief_at(Vector2i(7, 7)), 0.1) and session.proposal().get("relief", {}).has(Vector2i(7, 7)),
+		"the cut is the working copy's, and in the proposal")
+	_check(not (session.proposal().get("relief", {}) as Dictionary).keys().any(func(cell: Vector2i) -> bool: return not Rect2i(4, 4, 10, 10).has_point(cell)),
+		"only under the hut and its apron")
+	session.working.undo()
+	session.working.undo()
 	var flat: Dictionary = session.run_tool("stamp", {"prefab": "building_hut", "at": [2, 12]})
 	_check(flat["ok"] and (session.working.config.get("buildings", []) as Array).size() == 1, "on flat ground: stamped (%s)" % flat["text"])
 	var sites := session.site_checks()
