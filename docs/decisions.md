@@ -13656,6 +13656,9 @@ laid down the slope's fall. A lean-to has its low eave only (its high
 side meets its wall). A round roof has none yet. Part of the composed
 look (cached with it), drawn only. view_test: the L-house thatched has
 its trims, the eaves' side out; shingle none.
+Thatched (the coordinator, on the review shot, under Jeff's apply-and-veto
+rule): cottage, hut, barn, longhouse, stable and house_leanto name
+"roof_set": "thatch"; every other kind keeps the shingle default.
 
 ## 495. Shader warm-ups: a material drawn once at load, not first at play
 
