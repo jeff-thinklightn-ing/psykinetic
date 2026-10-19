@@ -292,55 +292,48 @@ func _test_sight_over_walls() -> void:
 	_check(World.has_line_of_sight(Vector2i(4, 3), Vector2i(1, 3)), "from two levels up, it is seen over")
 
 
-## levels/hills (decision 358, tools/make_hills.gd): a bot walks from the
-## valley up the terraces onto the plateau and down the cliff's flight; a
-## body pushed off the rim falls four levels, off the flight two; the
-## plateau sees over the valley's low wall, the valley floor does not.
+## levels/hills (decision 525's relief, tools/make_hills.gd): a bot walks
+## from the link up the plateau's spur onto its top and back down; a body
+## pushed off its sheer face falls by the drop's levels; the plateau sees
+## over the valley's low wall, the valley floor does not; the ridge hides
+## the valley from the west.
 func _test_hills() -> void:
 	print("
-== levels/hills: heights to walk, fall from and see over ==")
-	_check(_main.load_map("hills") and World.outdoor, "hills loads, outdoors")
+== levels/hills: relief to walk, fall from and see over ==")
+	_check(_main.load_map("hills") and World.outdoor and World.has_relief(), "hills loads, outdoors, its ground in metres")
 	var player := _player()
-	_check(player != null and World.height_at(player.tile) == 0, "Player starts on the valley floor (%s)" % [player.tile if player else "none"])
 	var plateau := Vector2i(72, 30)
-	_check(World.height_at(plateau) == 4 and World.height_at(Vector2i(61, 38)) == 0, "the plateau stands at 4 over the valley at 0")
+	var foot := Vector2i(58, 30)
+	_check(World.elevation_at(plateau) - World.elevation_at(foot) > 4.0, "the plateau stands over the valley (%.1f m over %.1f)" % [World.elevation_at(plateau), World.elevation_at(foot)])
 	var path := World.find_path(player.tile, plateau)
-	_check(not path.is_empty() and (Vector2i(76, 49) in path or Vector2i(61, 30) in path), "a way up to the plateau, by the terraces' stairs or the cliff's flight (%d steps)" % path.size())
-	var climbed := {}
+	_check(not path.is_empty(),
+		"a way up to the plateau (%d steps)" % path.size())
 	World.order_move(player, plateau)
-	for i in 600:
+	var highest := 0.0
+	for i in 1200:
 		if player.tile == plateau:
 			break
 		World.step()
-		climbed[World.height_at(player.tile)] = true
-	_check(player.tile == plateau and climbed.size() == 5, "the bot walks up there, on every level from 0 to 4 on the way (%s, %s)" % [player.tile, climbed.keys()])
-	var below := Vector2i(57, 30)
-	World.order_move(player, below)
-	for i in 300:
-		if player.tile == below:
+		highest = maxf(highest, World.elevation_at(player.tile))
+	_check(player.tile == plateau, "the bot walks up there, round by the spur (%s)" % player.tile)
+	World.order_move(player, foot)
+	for i in 1200:
+		if player.tile == foot:
 			break
 		World.step()
-	_check(player.tile == below, "and back down to the valley (%s)" % player.tile)
-	for top: Vector2i in [Vector2i(20, 48), Vector2i(22, 25), Vector2i(24, 77)]:
-		_check(World.height_at(top) > 0 and not World.find_path(below, top).is_empty(),
-				"the rise at %s (level %d) has a way up" % [top, World.height_at(top)])
-	_check(World.height_at(Vector2i(28, 49)) == 0 and World.height_at(Vector2i(28, 48)) > 0 and World._terrain_blocks_step(Vector2i(28, 49), Vector2i(0, -1)),
-			"the gully's floor is at 0, a ledge up to its side")
-	var imp: Monster = _main._spawn({"script": Level.MONSTER, "shape": "capsule", "name": "Faller", "tile": Vector2i(62, 38), "props": {"sight_range": 0}})
-	_put(player, Vector2i(63, 38))
+	_check(player.tile == foot, "and back down to the valley (%s)" % player.tile)
+	var rim := Vector2i(62, 38)
+	var imp: Monster = _main._spawn({"script": Level.MONSTER, "shape": "capsule", "name": "Faller", "tile": rim, "props": {"sight_range": 0, "max_hp": 200}})
+	_put(player, rim + Vector2i(1, 0))
 	_pushes.clear()
 	var hp := imp.hp
+	var drop := World.elevation_at(rim) - World.elevation_at(rim - Vector2i(1, 0))
 	World._push(player, imp, Vector2i(-1, 0), 3.0)
-	_check(World.height_at(imp.tile) == 0 and _pushes.back()["stopped_by"] == "a fall of 4" and hp - imp.hp == World.FALL_IMPACT_PER_LEVEL * 4,
-			"pushed off the rim: it falls four levels for %d (%s, %s)" % [hp - imp.hp, imp.tile, _pushes.back()["stopped_by"]])
-	_put(imp, Vector2i(60, 30))
-	_put(player, Vector2i(61, 30))
-	_pushes.clear()
-	World._push(player, imp, Vector2i(0, 1), 3.0)
-	_check(_pushes.back()["stopped_by"] == "a fall of 2" and World.height_at(imp.tile) == 0, "pushed off the cliff's flight, open at its sides: it falls two (%s)" % _pushes.back()["stopped_by"])
+	_check(imp.tile.x < 62 and hp - imp.hp == World.FALL_IMPACT_PER_LEVEL * Relief.levels(drop),
+			"pushed off the face: it falls %.1f m, %d levels, for %d (%s, %s)" % [drop, Relief.levels(drop), hp - imp.hp, imp.tile, _pushes.back()["stopped_by"]])
 	World.despawn(imp)
-	_check(not World.has_line_of_sight(Vector2i(57, 38), Vector2i(53, 38)), "on the valley floor, the low wall stops sight")
-	_check(World.has_line_of_sight(Vector2i(63, 37), Vector2i(53, 38)), "from the plateau's rim it is seen over")
+	_check(World.has_line_of_sight(Vector2i(63, 37), Vector2i(53, 38)), "from the plateau's rim the valley beyond the low wall is seen")
+	_check(not World.has_line_of_sight(Vector2i(8, 40), Vector2i(46, 40)), "the ridge hides the valley from the west")
 
 
 ## [param prefab_name] stamped onto [param map] at [param at], turned

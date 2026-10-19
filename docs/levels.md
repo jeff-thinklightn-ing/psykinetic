@@ -153,7 +153,21 @@ its elevation rounded to levels, for what still reads levels.
 - The "terrain" message carries `relief.png` with the other files.
 
 The sample level has one: its whole levels lifted 0.2 m over its water,
-and a gentle rise of about 0.9 m east of the stream.
+and a gentle rise of about 0.9 m east of the stream. `levels/hills` is the
+showcase (`tools/make_hills.tscn`): a valley winding down the middle with
+its stream, a ford and a bridge, rolling hills and a ridge to the west, and
+a plateau 5 m up to the east whose west side is the map's one cliff, its
+south side a long spur that is the way up.
+
+**Laying relief.** `Relief.lay(map, rect, seed, options)` lays hills,
+valleys and ridges over an area of a `LevelMap`: a rolling noise (`base`,
+`amplitude`, `scale`), `ridges` and `valleys` along polylines, a `tilt`,
+`plateaus` raised with cliff `faces` (the other sides falling away as a
+spur), `keep_flat` pads, and `streams` found where the water runs (a
+priority flood, then the cells draining most), carved under their banks.
+Everything but the faces is limited to `Relief.LAY_SLOPE` (0.4 m) a step,
+so it is walked; the same seed lays the same ground. `Relief.pad(map,
+rect)` levels a footprint and a cell round it.
 
 ## Light, heat and north
 
@@ -724,6 +738,17 @@ write its levels.
   stair or slope the game would leave as floor (no cell one level up beside
   it) or that could climb more than one way is tinted red, and the height and
   stairs panels list it. The stairs tool lays stairs or slopes (its panel).
+- **The ground in metres** (decision 525): the height panel's "ground in
+  metres" gives the map relief (relief.png) from its heights, one undo
+  step; from then on the height tool is a brush in metres: LMB raises the
+  cells under it (by the strength at its middle, less to its edge), RMB
+  lowers, "smooth" pulls each toward the cells round it, "flatten" (or
+  Shift) sets the picked height, Alt+click picks one. The heights view
+  shades the ground by height, writes its metres when zoomed in, and draws
+  every step steeper than a walk (a cliff) red; the panel counts them. The
+  area panel's **relief** fill lays hills over the area (`Relief.lay`, its
+  streams added to level.json), and **pad** levels it for a building. A
+  resize carries the relief, a new side taking its neighbour's height.
 - **Area tools** (`editor/area_tools.gd`): with an area dragged out, its
   panel fills it, one undo step each, from the **seed** shown (`-` / `+`
   to change it; the same seed gives the same result):

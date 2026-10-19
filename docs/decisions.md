@@ -15594,3 +15594,70 @@ Rejected: a B-spline read (smoother, but a one-cell path of a kind vanishes);
 a finer kinds texture (four texels a cell: the level's data is a cell's kind,
 the warp gives the shape); dropping the strongest-kind band for a plain mix
 (kinds would mud into each other).
+Part two (the same number; protocol unchanged, f6a2296d1162): the
+generator, the editor's brush and levels/hills.
+
+- Relief.lay(map, rect, seed, options) over a LevelMap's walkable cells:
+  fbm roll (base, amplitude, scale), ridges and valleys along polylines
+  (smoothstep profiles), a tilt, plateaus raised with chosen cliff faces
+  (the rest falling away as a spur), keep_flat pads, then a slope limit of
+  LAY_SLOPE 0.4 m a step (under WALK_RISE, so centimetres keep it walked)
+  except across faces: an exact distance transform in raster passes (down
+  to within the slope of the fixed cells, then up where the ground falls
+  away too fast), not relaxation, which did not converge on a plateau's
+  spur in 200 passes. Streams: a priority flood fills the hollows for the
+  water's way, flow accumulation counts what drains through each cell, the
+  stream the strongest channel from the area's edge up to min_flow;
+  carved STREAM_DEPTH under its ground, never rising, its banks lifted to
+  SHORE_LIP over it and kept while the ground round them is limited again.
+  A laid area dipping under 0 m is lifted whole (relief.png holds nothing
+  under). Returns {relief, cells (water), streams}. Relief.pad(map, rect)
+  levels a footprint and a one-cell apron. Static, for the editor fill and
+  the level tools (and builder's, if asked for).
+- LevelMap.relief (PackedFloat32Array, empty for none), relief_field,
+  relief_at, set_relief (to the centimetre), read_relief, to_relief_image;
+  copy and transformed carry it (a grown side takes its neighbour's).
+  MapDoc keeps it in its map (no longer an Image of its own), set_relief,
+  apply_changes "relief" (cell -> metres), undo "relief x y"; a map's
+  first relief is one undo step holding its relief and heights ("relief
+  state"), its heights then cleared (relief.png is the ground).
+- The editor: the height panel's "ground in metres"; on a map with relief
+  the height tool is a brush in metres (raise with falloff, RMB lower,
+  smooth, flatten or Shift, Alt picks; strength 0.05-2 m), the heights view
+  shaded by height with cliffs drawn red (relief_cliffs, cached by the
+  field's hash), the area panel's "relief" fill (its streams added to
+  level.json) and "pad". Editor parses pass relief.png.
+- levels/hills remade by tools/make_hills.gd as a valley between rolling
+  hills and a ridge, the stream found by the water's way down (2 wide), a
+  ford (its banks set a walk over the water and the ground brought down to
+  them) and a bridge (its banks levelled), the plateau 5 m up east with one
+  sheer west face (40 edges, the map's only cliff) and rock along its rim,
+  its south side a spur up; the low wall, boulders and crates by the rim,
+  the knoll's crown of trees on the ridge; starts on a pad by the link.
+  height.png gone; the wilds untouched (its link was there).
+
+tests: relief_test: Relief.lay (the same for a seed, faces only where
+asked, a walkable spur, a pad, a stream running down under its banks),
+Relief.pad, levels/hills (no warnings, one cliff, 11.7 m of relief, its
+stream, ford and bridge, the plateau walked to from the link). editor_test:
+ground in metres (undone and redone at once), raise with falloff, lower,
+pick, flatten, smooth, cliffs, pad, the relief fill, saved and loaded to
+the centimetre, a resize.
+
+- Relief.corner_heights fixed (terrain's view_test, "no rock face where
+  the sim walks"): a corner is the mean of the cell's part of the ring of
+  four (it, its x neighbour, the one across, its y neighbour) joined by
+  steps that are no cliff, either way round. The two-step lookup missed a
+  path of three steps round the ring, so two walkable neighbours could
+  disagree on their shared corner (the sample at (12, 12)-(13, 13): 0.313
+  against 0.235) and the mesh drew a sliver face. A ring cut once is one
+  part (a ledge's face tapers to nothing there), cut twice it splits.
+- level_test's hills section rewritten for the new level (the walk up the
+  spur, the push off the face by its levels, sight over the low wall and
+  behind the ridge); view_test's hills faces check keeps "a face on every
+  ledge", not the four terraces' levels.
+
+Rejected: relaxation for the slope limit (slow to converge); a separate
+relief tool (the height tool is the one, in metres where the map has
+them); copying relief with the clipboard and prefabs (they carry whole
+levels; a paste stands on the ground already there).

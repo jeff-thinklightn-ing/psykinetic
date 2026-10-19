@@ -1742,8 +1742,9 @@ func _test_streams() -> void:
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
 
-## levels/hills (decision 358): every ledge between two of its cells is a
-## rock face, at every level from 1 to 4 (the plateau's cliff the tallest).
+## levels/hills (decision 358; relief since 525, drawn from its whole
+## levels until terrain's side reads metres): every ledge between two of
+## its cells is a rock face, at many levels.
 func _test_hills() -> void:
 	print("
 == hills: a rock face down every ledge, at every level ==")
@@ -1771,7 +1772,7 @@ func _test_hills() -> void:
 			drops[level - int(heights.get(next, 0))] = true
 			if not faces.has([cell, direction]):
 				missing.append([cell, direction])
-	_check(missing.is_empty() and tops.size() == 4 and drops.has(4),
+	_check(missing.is_empty() and tops.size() >= 4 and drops.size() > 1,
 			"a face on each of %d ledges, from tops at levels %s, drops of %s (missing: %s)" % [faces.size(), tops.keys(), drops.keys(), missing.slice(0, 5)])
 
 

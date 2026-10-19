@@ -20,6 +20,10 @@ var cells: Dictionary[Vector2i, String] = {}
 var edges: Dictionary[Vector3i, String] = {}
 ## height.png: cell -> level 1..Level.MAX_HEIGHT (0 is left out).
 var heights: Dictionary[Vector2i, int] = {}
+## relief.png (decision 525): the ground's elevation in metres, row by row
+## over [member size]; empty for a map that has none (its heights are its
+## ground).
+var relief := PackedFloat32Array()
 ## Meaning -> colour: the default legend with level.json's overrides.
 var colours: Dictionary[String, Color] = {}
 ## Pixels whose colour is not in the legend, found on load (they become
@@ -80,7 +84,53 @@ func copy() -> LevelMap:
 	out.cells = cells.duplicate()
 	out.edges = edges.duplicate()
 	out.heights = heights.duplicate()
+	out.relief = relief.duplicate()
 	return out
+
+
+## Whether the map has relief.png's elevations (decision 525).
+func has_relief() -> bool:
+	return relief.size() == size.x * size.y and not relief.is_empty()
+
+
+## The ground's elevation in metres: [member relief], or the heights' (a
+## level Relief.LEVEL_M) for a map with none.
+func relief_field() -> PackedFloat32Array:
+	return relief if has_relief() else Relief.derived(heights, size)
+
+
+## Cell [param at]'s elevation in metres.
+func relief_at(at: Vector2i) -> float:
+	return Relief.at(relief_field(), size, at)
+
+
+## Sets cell [param at]'s elevation to [param metres] (to the centimetre),
+## giving the map relief first if it has none; returns what it was.
+func set_relief(at: Vector2i, metres: float) -> float:
+	if not in_bounds(at):
+		return 0.0
+	if not has_relief():
+		relief = Relief.derived(heights, size)
+	var index := at.y * size.x + at.x
+	var old := relief[index]
+	relief[index] = clampf(snappedf(metres, 0.01), 0.0, Relief.MAX_M)
+	return old
+
+
+## Reads relief.png (one pixel a cell) into [member relief]; false, reading
+## nothing, if it is not [member size].
+func read_relief(image: Image) -> bool:
+	relief = PackedFloat32Array()
+	if image == null or image.get_size() != size:
+		return false
+	var ignored: Array[String] = []
+	relief = Relief.read(image, size, ignored)
+	return not relief.is_empty()
+
+
+## [member relief] as relief.png, or null for a map with none.
+func to_relief_image() -> Image:
+	return Relief.image(relief, size) if has_relief() else null
 
 
 ## Reads [param image] (height.png, the size of layout.png) into
@@ -123,6 +173,18 @@ func transformed(new_size: Vector2i, move: Callable) -> LevelMap:
 		var to: Variant = move.call(at)
 		if to != null and out.in_bounds(to):
 			out.heights[to] = heights[at]
+	if has_relief():
+		# What lands on no old cell (a grown side) takes its nearest's.
+		out.relief.resize(new_size.x * new_size.y)
+		var filled := PackedByteArray()
+		filled.resize(new_size.x * new_size.y)
+		for y in size.y:
+			for x in size.x:
+				var to: Variant = move.call(Vector2i(x, y))
+				if to != null and out.in_bounds(to):
+					out.relief[to.y * new_size.x + to.x] = relief[y * size.x + x]
+					filled[to.y * new_size.x + to.x] = 1
+		_fill_gaps(out.relief, filled, new_size)
 	for key: Vector3i in edges:
 		var ends := Terrain.edge_cells(key)
 		var a: Variant = move.call(ends[0])
@@ -133,6 +195,30 @@ func transformed(new_size: Vector2i, move: Callable) -> LevelMap:
 		if out.edge_in_bounds(moved):
 			out.edges[moved] = edges[key]
 	return out
+
+
+## The cells of [param field] not [param filled] given their nearest
+## filled neighbour's elevation, row then column.
+static func _fill_gaps(field: PackedFloat32Array, filled: PackedByteArray, size: Vector2i) -> void:
+	for pass_count in size.x + size.y:
+		var left := false
+		for y in size.y:
+			for x in size.x:
+				var i := y * size.x + x
+				if filled[i] == 1:
+					continue
+				left = true
+				for d: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+					var n := Vector2i(x, y) + d
+					if n.x >= 0 and n.y >= 0 and n.x < size.x and n.y < size.y and filled[n.y * size.x + n.x] == 1:
+						field[i] = field[n.y * size.x + n.x]
+						filled[i] = 2
+						break
+		for i in filled.size():
+			if filled[i] == 2:
+				filled[i] = 1
+		if not left:
+			return
 
 
 ## This map grown (or, negative, shrunk) by that many cells on each side.

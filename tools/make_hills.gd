@@ -1,29 +1,29 @@
 extends Node
-## Writes levels/hills, a showcase of the ground's heights (decision 358),
-## and its link from the wilds' west edge:
+## Writes levels/hills, a showcase of the ground's relief (decision 525;
+## before it, of whole levels: 358), and its link from the wilds' west edge:
 ##   Godot --headless --path . res://tools/make_hills.tscn
 ## (a scene, not a --script run: saving parses the level, which needs the
 ## autoloads).
 ##
-## 96 x 96 cells under the sky, its edge an uneven band of forest:
-## - a valley floor (level 0) down the middle, with a stream winding north
-##   to south (water, 2 wide), crossed by a ford (dirt) and a stone run
-##   (where a bridge piece goes once there is one: prop.bridge);
-## - to the west, rolling rises: a hill of 2 with a dry gully cut into it,
-##   a low rise of 1, and a knoll of 2 crowned with trees (void), each up
-##   by a stair flight;
-## - to the east, a plateau at 4 with a sheer cliff face over the valley,
-##   a flight of four stairs standing out from it (open both sides, a
-##   ledge to fall from), and the safe way up, terraces of 1, 2 and 3 to its
-##   south with a stair between each;
-## - a low stone wall on the valley floor below the cliff, which the
-##   plateau sees over;
-## - grass, dirt and stone (rock) ground, a few boulders and crates by the
-##   rim, starts on the valley floor by the link to the wilds (east edge).
-## No monsters, no buildings. The same seed makes the same map.
+## 96 x 96 cells under the sky, its edge an uneven band of forest, its
+## ground in metres (relief.png, laid by Relief.lay):
+## - a valley winding north to south down the middle, falling to the south,
+##   its stream (2 wide) found by the water's own way down, crossed by a
+##   ford and a bridge;
+## - to the west, rolling hills and a ridge running north to south, its
+##   highest knoll crowned with trees (void);
+## - to the east, a plateau 5 m over the valley, its west side a sheer
+##   cliff (the map's one), rock along its rim, its south side falling away
+##   as a long walkable spur: the way up;
+## - a low stone wall on the valley floor below the cliff, which the plateau
+##   sees over; a few boulders and crates by the rim to push off;
+## - grass and dirt, starts on a levelled pad by the link to the wilds (east
+##   edge).
+## No monsters, no buildings but the bridge. The same seed makes the same
+## map.
 
 const SIZE := Vector2i(96, 96)
-const SEED := 358
+const SEED := 525
 const FOLDER := "res://levels/hills/"
 const WILDS := "res://levels/wilds/"
 ## The wilds' end of the link (maps-80): the land's first cell on row 128,
@@ -32,19 +32,19 @@ const WILDS_LINK := Vector2i(14, 128)
 const WILDS_ARRIVAL := Vector2i(16, 128)
 ## The link's row on this map's east edge.
 const LINK_ROW := 70
-## The plateau: its west face (the cliff) at this column, north of row
-## FOOT - 1; terraces of 3, 2, 1 below it, TERRACE rows each.
+## The plateau: its cliff face at this column, north of row FOOT; how far
+## in from the face its top is rock; how high it stands.
 const CLIFF_X := 62
-const FOOT := 50
-const TERRACE := 4
-## How far in from the cliff the plateau's top is rock.
+const FOOT := 46
 const RIM := 4
-## The safe way up: the column of the terraces' stairs.
-const STAIR_X := 76
-## The cliff's flight: its row, standing out west of the face.
-const FLIGHT_ROW := 30
-## The stream's middle column, and its crossings' rows.
-const STREAM_X := 46
+const PLATEAU_HEIGHT := 5.0
+## The ground's middle height, and how it leans (metres a cell, north up).
+const BASE := 8.0
+const TILT := Vector2(0.0, -0.03)
+## The valley's line and the ridge's.
+const VALLEY: Array[Vector2i] = [Vector2i(46, 0), Vector2i(42, 30), Vector2i(50, 60), Vector2i(44, 95)]
+const RIDGE: Array[Vector2i] = [Vector2i(12, 10), Vector2i(24, 34), Vector2i(18, 62), Vector2i(26, 88)]
+## The rows the ford and the bridge cross the stream nearest to.
 const FORD_ROW := 38
 const BRIDGE_ROW := 78
 ## The low wall: its column (the edge east of it) and rows.
@@ -59,114 +59,145 @@ var entries: Array = []
 func _ready() -> void:
 	var edge := _noise(SEED, 0.05)
 	var dirt := _noise(SEED + 1, 0.07)
-	var wobble := _noise(SEED + 2, 0.12)
 	# The land: in from the border by 3 to 9 cells, unevenly; grass and dirt.
 	for y in SIZE.y:
 		for x in SIZE.x:
 			var inward := mini(mini(x, y), mini(SIZE.x - 1 - x, SIZE.y - 1 - y))
 			if inward > 3 + 6.0 * (edge.get_noise_2d(x, y) * 0.5 + 0.5):
 				map.set_cell(Vector2i(x, y), "dirt" if dirt.get_noise_2d(x, y) > 0.3 else "grass")
-	_plateau(wobble)
-	_lay(HeightTools.hill(map, Vector2i(20, 50), 11, 2, [Vector2i(0, -1)]))
-	_gully(Vector2i(31, 50), Vector2i(24, 50), 1)
-	_lay(HeightTools.hill(map, Vector2i(24, 77), 9, 1, [Vector2i(1, 0), Vector2i(0, -1)]))
-	_lay(HeightTools.hill(map, Vector2i(22, 22), 8, 2, [Vector2i(0, 1)]))
-	# The knoll's crown: trees.
-	for cell in _disc(Vector2i(22, 22), 2.2):
-		map.set_cell(cell, "void")
-		map.heights.erase(cell)
-	_stream()
+	var arrival := _link()
+	var laid := Relief.lay(map, Rect2i(Vector2i.ZERO, SIZE), SEED, {
+		"base": BASE, "amplitude": 1.6, "scale": 30.0, "tilt": TILT,
+		"ridges": [RIDGE], "ridge_height": 6.0, "ridge_width": 14.0,
+		"valleys": [VALLEY], "valley_depth": 3.0, "valley_width": 16.0,
+		"plateaus": [{"rect": Rect2i(CLIFF_X, 0, SIZE.x - CLIFF_X, FOOT), "height": PLATEAU_HEIGHT, "faces": ["west"]}],
+		"keep_flat": [Rect2i(arrival - Vector2i(2, 3), Vector2i(4, 7))],
+		"streams": 1, "width": 2, "keep_clear": {}})
+	map.relief = PackedFloat32Array()
+	map.relief.resize(SIZE.x * SIZE.y)
+	var filled := PackedByteArray()
+	filled.resize(SIZE.x * SIZE.y)
+	for at: Vector2i in laid["relief"]:
+		map.relief[at.y * SIZE.x + at.x] = laid["relief"][at]
+		filled[at.y * SIZE.x + at.x] = 1
+	# The forest round the land stands at its edge's height.
+	LevelMap._fill_gaps(map.relief, filled, SIZE)
+	for at: Vector2i in laid["cells"]:
+		map.set_cell(at, laid["cells"][at])
+	var stream: Array[Vector2i] = []
+	if not laid["streams"].is_empty():
+		stream = laid["streams"][0]
+		var path: Array = []
+		for cell in stream:
+			path.append([cell.x, cell.y])
+		config["streams"] = [{"path": path}]
+	_ford(laid["cells"])
+	_bridge(laid["cells"])
+	_rock()
+	_knoll()
 	_wall()
-	# Boulders and crates by the rim and the flight, to push off.
+	# Boulders and crates by the rim, to push off.
 	for at in [Vector2i(CLIFF_X + 1, 24), Vector2i(CLIFF_X + 2, 40)]:
 		map.set_cell(at, "boulder")
-	for at in [Vector2i(CLIFF_X + 1, 34), Vector2i(CLIFF_X + 1, 36), Vector2i(CLIFF_X - 3, FLIGHT_ROW + 3)]:
+	for at in [Vector2i(CLIFF_X + 1, 34), Vector2i(CLIFF_X + 1, 36)]:
 		map.set_cell(at, "crate")
-	_link()
-	var cells: Array[Vector2i] = []
-	cells.assign(map.cells.keys())
-	for warning in HeightTools.ledge_warnings(map, cells):
-		print("[hills] " + warning)
 	var doc := MapDoc.open(FOLDER, SIZE)
 	doc.map = map
 	doc.config = config
 	doc.config_dirty = true
-	doc.heights_dirty = true
+	doc.relief_dirty = true
+	doc.heights_dirty = false
+	doc.had_heights = false
 	doc.save()
 	print("[hills] " + doc.report)
+	for old in ["height.png", "height.png.import"]:
+		if FileAccess.file_exists(FOLDER + old):
+			DirAccess.remove_absolute(ProjectSettings.globalize_path(FOLDER + old))
+	_say_cliffs()
 	_link_wilds()
 	get_tree().quit()
 
 
-## The plateau at 4 east of CLIFF_X north of FOOT, the terraces of 3, 2 and 1
-## below it, rock (stone) but for the plateau's top in from its rim; the
-## cliff's flight and the terraces' stairs.
-func _plateau(wobble: FastNoiseLite) -> void:
-	var levels: Array[Array] = [[], [], [], []]
-	for y in range(0, FOOT + TERRACE * 3):
-		for x in range(CLIFF_X, SIZE.x):
+## The ford: the stream's cells on the row nearest FORD_ROW it crosses,
+## its banks set a walk over its water and the ground round them brought
+## down to them (Relief._limit), the stream's other banks kept.
+func _ford(water: Dictionary) -> void:
+	var across := _crossing(water, FORD_ROW)
+	if across.is_empty():
+		return
+	for at in across:
+		map.set_cell(at, "ford")
+	var surface := map.relief_at(across[0])
+	var heights := {}
+	var fixed := {}
+	var wet := {}
+	for at: Vector2i in map.cells:
+		if map.walkable(at) or map.cell(at) == "water":
+			heights[at] = map.relief_at(at)
+	for at: Vector2i in water:
+		fixed[at] = true
+		if map.cell(at) == "water":
+			wet[at] = true
+		for step: Vector2i in Relief.FOUR:
+			if heights.has(at + step) and not water.has(at + step) and absi(at.y - across[0].y) > 1:
+				fixed[at + step] = true
+	for bank: Vector2i in [across[0] - Vector2i(1, 0), across[across.size() - 1] + Vector2i(1, 0)]:
+		heights[bank] = surface + 0.3
+	var face := {}
+	for y in FOOT:
+		face[Terrain.edge_key(Vector2i(CLIFF_X - 1, y), Vector2i(1, 0))] = true
+	Relief._limit(heights, fixed, wet, Relief.LAY_SLOPE, face)
+	for at: Vector2i in heights:
+		map.set_relief(at, heights[at])
+
+
+## The bridge over the stream on the row nearest BRIDGE_ROW: its banks
+## levelled at the higher of them (a bridge's banks are of one height).
+func _bridge(water: Dictionary) -> void:
+	var across := _crossing(water, BRIDGE_ROW)
+	if across.is_empty():
+		return
+	var west := across[0]
+	var east := across[across.size() - 1]
+	var banks: Array[Vector2i] = [west - Vector2i(1, 0), east + Vector2i(1, 0)]
+	var top := maxf(map.relief_at(banks[0]), map.relief_at(banks[1]))
+	for bank in banks:
+		map.set_relief(bank, top)
+	config["buildings"] = [{"slot": "bridge", "at": [west.x, west.y], "facing": [1, 0], "length": across.size()}]
+
+
+## The water cells of the row nearest [param row] that the stream crosses
+## with water only, west to east.
+func _crossing(water: Dictionary, row: int) -> Array[Vector2i]:
+	for offset in range(0, 12):
+		for y in [row + offset, row - offset]:
+			var cells: Array[Vector2i] = []
+			for x in SIZE.x:
+				if water.has(Vector2i(x, y)) and map.cell(Vector2i(x, y)) == "water":
+					cells.append(Vector2i(x, y))
+			if cells.size() >= 1 and cells.size() <= 2 and cells[cells.size() - 1].x - cells[0].x == cells.size() - 1:
+				return cells
+	return []
+
+
+## Rock (stone) along the plateau's rim, in from its face.
+func _rock() -> void:
+	for y in FOOT:
+		for x in range(CLIFF_X, CLIFF_X + RIM):
 			var at := Vector2i(x, y)
-			if map.cell(at) == "void":
-				continue
-			# The terraces' fronts waver, but not by the stairs.
-			var shift := 0 if absi(x - STAIR_X) <= 2 else roundi(wobble.get_noise_2d(x, 0.0) * 1.4)
-			var level := 4 - clampi(floori(float(y - FOOT - shift) / TERRACE) + 1, 0, 4)
-			if level <= 0:
-				continue
-			levels[level - 1].append(at)
-			# Rock on the terraces and along the rim; the top keeps its grass.
-			if level < 4 or x < CLIFF_X + RIM:
+			if map.cell(at) in ["grass", "dirt"]:
 				map.set_cell(at, "stone")
-	for level in 4:
-		var cells: Array[Vector2i] = []
-		cells.assign(levels[level])
-		_lay(HeightTools.level(map, cells, level + 1))
-	# The safe way: a stair at the foot of each terrace's front, on the
-	# lower side.
-	for y in range(FOOT - 1, FOOT + TERRACE * 3 + 2):
-		var at := Vector2i(STAIR_X, y)
-		if map.heights.get(at, 0) == map.heights.get(at - Vector2i(0, 1), 0) - 1:
-			_lay(HeightTools.stair(map, at, Vector2i(0, -1)))
-	# The cliff's flight: four stairs west from the face, each a level up
-	# toward it, with the valley floor either side.
-	_lay(HeightTools.flight(map, Vector2i(CLIFF_X - 4, FLIGHT_ROW), Vector2i(CLIFF_X, FLIGHT_ROW)))
 
 
-## A dry gully: a dirt channel at level 0, 2 * [param half] + 1 wide, from
-## [param mouth] (on the valley floor) in to [param end].
-func _gully(mouth: Vector2i, end: Vector2i, half: int) -> void:
-	var way := (end - mouth).sign()
-	var at := mouth
-	var cells: Array[Vector2i] = []
-	while true:
-		for side in range(-half, half + 1):
-			var cell := at + Vector2i(way.y, way.x) * side
-			cells.append(cell)
-			map.set_cell(cell, "dirt")
-		if at == end:
-			break
-		at += way
-	_lay(HeightTools.level(map, cells, 0))
-
-
-## The stream: 2 wide, winding north to south through the valley, its
-## banks dirt; a ford of dirt across it at FORD_ROW, a stone run at
-## BRIDGE_ROW.
-func _stream() -> void:
-	for y in SIZE.y:
-		var middle := STREAM_X + roundi(sin(y / 9.0) * 4.0 + sin(y / 4.3) * 1.2)
-		for x in range(middle - 2, middle + 2):
-			var at := Vector2i(x, y)
-			if map.cell(at) == "void":
-				continue
-			map.heights.erase(at)
-			var bank := x == middle - 2 or x == middle + 1
-			if y in [FORD_ROW, FORD_ROW + 1]:
-				map.set_cell(at, "dirt")
-			elif y in [BRIDGE_ROW, BRIDGE_ROW + 1]:
-				map.set_cell(at, "stone")
-			else:
-				map.set_cell(at, "dirt" if bank else "water")
+## The ridge's highest knoll west of the valley, crowned with trees.
+func _knoll() -> void:
+	var top := Vector2i(-1, -1)
+	for at: Vector2i in map.cells:
+		if at.x < 36 and map.cell(at) in ["grass", "dirt"] and (top.x < 0 or map.relief_at(at) > map.relief_at(top)):
+			top = at
+	for cell in _disc(top, 2.2):
+		if map.cell(cell) in ["grass", "dirt"]:
+			map.set_cell(cell, "void")
 
 
 ## The low wall below the cliff: the edges east of WALL_X over WALL_ROWS.
@@ -175,9 +206,24 @@ func _wall() -> void:
 		map.set_edge(Vector3i(WALL_X, y, Terrain.EAST), "wall")
 
 
+## Says the cliff edges the relief has (the plateau's face is meant).
+func _say_cliffs() -> void:
+	var count := 0
+	var off_face := 0
+	for at: Vector2i in map.cells:
+		if not map.walkable(at):
+			continue
+		for step: Vector2i in [Vector2i(1, 0), Vector2i(0, 1)]:
+			if map.walkable(at + step) and Relief.cliff_between(map.relief_at(at), map.relief_at(at + step)):
+				count += 1
+				if not (step == Vector2i(1, 0) and at.x == CLIFF_X - 1 and at.y < FOOT):
+					off_face += 1
+	print("[hills] %d cliff edges, %d off the plateau's face" % [count, off_face])
+
+
 ## The link to the wilds on the east edge at LINK_ROW, its arrival two
-## cells in, the starts round that.
-func _link() -> void:
+## cells in, the starts round that; the arrival.
+func _link() -> Vector2i:
 	var link := Vector2i(SIZE.x - 1, LINK_ROW)
 	while map.cell(link) == "void":
 		link.x -= 1
@@ -196,12 +242,16 @@ func _link() -> void:
 	config["spawn_points"] = {"from_wilds": [arrival.x, arrival.y]}
 	config["links"] = [{"at": [link.x, link.y], "to_map": "wilds", "to_spawn": "from_hills"}]
 	config["entities"] = entries
+	return arrival
 
 
 ## The wilds' end: a link cell at WILDS_LINK and its "from_hills" arrival,
 ## left as they are if they are there already.
 func _link_wilds() -> void:
 	var doc := MapDoc.open(WILDS)
+	if str(doc.link_of(WILDS_LINK).get("to_map", "")) == "hills" and doc.config.get("spawn_points", {}).has("from_hills"):
+		print("[hills] wilds: its link is there already")
+		return
 	var changes := {"cells": {WILDS_LINK: "link"},
 		"links": [{"at": [WILDS_LINK.x, WILDS_LINK.y], "to_map": "hills", "to_spawn": "from_wilds"}]}
 	doc.apply_changes(changes)
@@ -212,23 +262,6 @@ func _link_wilds() -> void:
 	if doc.dirty:
 		doc.save()
 	print("[hills] wilds: " + doc.report)
-
-
-## Lays HeightTools' [param changes] on the map, saying any warnings.
-func _lay(changes: Dictionary) -> void:
-	for warning: String in changes.get("warnings", []):
-		print("[hills] " + warning)
-	if changes.has("reason"):
-		print("[hills] not made: " + str(changes["reason"]))
-	for at: Vector2i in changes["heights"]:
-		if changes["heights"][at] <= 0:
-			map.heights.erase(at)
-		else:
-			map.heights[at] = changes["heights"][at]
-	for at: Vector2i in changes["cells"]:
-		map.set_cell(at, changes["cells"][at])
-	for key: Vector3i in changes["edges"]:
-		map.set_edge(key, changes["edges"][key])
 
 
 func _disc(centre: Vector2i, radius: float) -> Array[Vector2i]:

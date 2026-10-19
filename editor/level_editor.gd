@@ -106,7 +106,10 @@ const HEIGHT_BRUSHES: Array[int] = [1, 3, 5, 9]
 const CLIFF := Color(0.05, 0.04, 0.03, 0.85)
 const CLIMB := Color(1.0, 0.95, 0.5, 0.95)
 ## What the area panel can fill an area with (AreaTools).
-const FILLS: Array[String] = ["pond", "grove", "scatter", "fence", "tall grass", "outcrop"]
+const FILLS: Array[String] = ["pond", "grove", "scatter", "fence", "tall grass", "outcrop", "relief"]
+## The relief brush's modes (decision 525): LMB raises (RMB lowers),
+## smooths toward the cells round, or flattens to the picked height.
+const RELIEF_MODES: Array[String] = ["raise", "smooth", "flatten"]
 const PATH_GROUNDS: Array[String] = ["dirt", "stone", "grass"]
 const EDGE_BRUSHES: Array[String] = ["wall", "door", "clear"]
 ## A thing's letter on its cell.
@@ -212,6 +215,15 @@ var _stairs_from := NOWHERE
 var _stairs_to := NOWHERE
 var show_heights := false
 var _height_set := false
+## The height tool on a map with relief (decision 525): its mode, how many
+## metres a raise moves a cell at the brush's middle, the height flatten
+## sets (Alt+click picks it).
+var relief_mode := "raise"
+var relief_strength := 0.25
+var relief_level := 0.0
+## relief_cliffs' last answer, and the hash of the relief it was for.
+var _cliffs: Array[Vector3i] = []
+var _cliffs_of := 0
 
 
 func _ready() -> void:
@@ -307,6 +319,11 @@ func target_at(grid: Vector2) -> Dictionary:
 ## set and pick).
 func begin_stroke(button: MouseButton, grid: Vector2, shift := false, alt := false) -> void:
 	var cell := Vector2i(floori(grid.x), floori(grid.y))
+	if brush == "height" and alt and map.has_relief():
+		if map.in_bounds(cell):
+			_set_tool("relief_level", snappedf(map.relief_at(cell), 0.01))
+			report = "picked %.2f m (cell %d, %d)" % [relief_level, cell.x, cell.y]
+		return
 	if brush == "height" and alt:
 		if map.in_bounds(cell):
 			_set_tool("height_level", maxi(1, int(map.heights.get(cell, 0))))
@@ -685,7 +702,24 @@ func fill_changes(fill: String) -> Dictionary:
 			return TallGrass.lay(map, area, tool_seed, {"keep_clear": _kept_cells()})
 		"outcrop":
 			return Outcrops.lay(map, area, tool_seed, {"keep_clear": _kept_cells()})
+		"relief":
+			return relief_changes(Relief.lay(map, area, tool_seed, {"keep_clear": _kept_cells()}))
 	return {}
+
+
+## Relief.lay's [param laid] as MapDoc changes: the elevations, the
+## streams' water, and level.json "streams" with them added.
+func relief_changes(laid: Dictionary) -> Dictionary:
+	var changes := {"relief": laid["relief"], "cells": laid["cells"]}
+	if not laid["streams"].is_empty():
+		var streams: Array = (config.get("streams") as Array).duplicate(true) if config.get("streams") is Array else []
+		for path: Array in laid["streams"]:
+			var cells: Array = []
+			for cell: Vector2i in path:
+				cells.append([cell.x, cell.y])
+			streams.append({"path": cells})
+		changes["config"] = {"streams": streams}
+	return changes
 
 
 ## Cells tall grass keeps clear of (decision 508): the spawn points and
@@ -822,6 +856,9 @@ func _apply_height(at: Vector2i, lower: bool) -> void:
 			fresh.append(cell)
 	if fresh.is_empty():
 		return
+	if map.has_relief():
+		_apply_relief(at, fresh, lower)
+		return
 	var changes := HeightTools.level(map, fresh, height_level) if _height_set else HeightTools.raise(map, fresh, -1 if lower else 1)
 	var heights: Dictionary = changes.get("heights", {})
 	for cell: Vector2i in heights:
@@ -830,6 +867,57 @@ func _apply_height(at: Vector2i, lower: bool) -> void:
 		if old != int(heights[cell]) and not _stroke.has(key):
 			_stroke[key] = old
 	queue_redraw()
+
+
+## The relief brush (decision 525) on [param fresh], the cells of the
+## brush at [param at] this stroke has not changed yet: raised by
+## relief_strength at the middle, less toward the brush's edge (lowered
+## with [param lower]), smoothed toward the mean of the cells round each,
+## or set to relief_level (flatten, or Shift), into the stroke's undo step.
+func _apply_relief(at: Vector2i, fresh: Array[Vector2i], lower: bool) -> void:
+	var reach := height_brush / 2.0 + 0.5
+	var mode := "flatten" if _height_set else relief_mode
+	var field := map.relief_field()
+	for cell in fresh:
+		var now := Relief.at(field, map.size, cell)
+		var to := now
+		match mode:
+			"raise":
+				var falloff := 1.0 - pow(Vector2(cell - at).length() / (reach + 0.5), 2.0)
+				to = now + relief_strength * maxf(0.2, falloff) * (-1.0 if lower else 1.0)
+			"smooth":
+				var sum := 0.0
+				var count := 0
+				for y in range(-1, 2):
+					for x in range(-1, 2):
+						var next := cell + Vector2i(x, y)
+						if map.in_bounds(next) and map.walkable(next):
+							sum += Relief.at(field, map.size, next)
+							count += 1
+				to = sum / maxi(1, count)
+			"flatten":
+				to = relief_level
+		var key := "relief %d %d" % [cell.x, cell.y]
+		var old := doc.set_relief(cell, to)
+		if not is_equal_approx(old, map.relief_at(cell)) and not _stroke.has(key):
+			_stroke[key] = old
+	queue_redraw()
+
+
+## Gives the map relief (decision 525), from its heights, as one undo step:
+## the height tool works in metres from then on.
+func start_relief() -> bool:
+	if map.has_relief():
+		return false
+	var changed := apply_changes({"relief": {Vector2i.ZERO: map.relief_at(Vector2i.ZERO)}})
+	report = "the ground is in metres now (relief.png); height.png goes"
+	_refresh_panel()
+	return changed
+
+
+## The area levelled for a building's pad, with a cell's apron (Relief.pad).
+func pad_area() -> void:
+	_area_heights(Relief.pad(map, area), "levelled for a pad")
 
 
 ## A stair from [param from] climbing toward [param to] (the drag's main
@@ -1210,7 +1298,7 @@ func kind_mode(at: Vector2i) -> String:
 ## Every monster cell's name, as the game will name it (Level.parse).
 func _name_cells() -> void:
 	_names.clear()
-	var level := Level.parse(map.to_image(), null, config)
+	var level := Level.parse(map.to_image(), null, config, map.to_relief_image())
 	for spec: Dictionary in level["entities"]:
 		if spec.get("script") == Level.MONSTER:
 			_names[spec["tile"]] = str(spec["name"])
@@ -1440,11 +1528,16 @@ func _area_panel() -> void:
 	_panel_button(heights_row, "lower", raise_area.bind(-1))
 	_panel_button(heights_row, "level", level_area)
 	_panel_button(heights_row, "hill", hill_area)
+	if map.has_relief():
+		_panel_button(heights_row, "pad", pad_area)
 	_height_level_row()
 
 
 ## The height tool's panel: its brush and the level Shift+click sets.
 func _height_panel() -> void:
+	if map.has_relief():
+		_relief_panel()
+		return
 	_panel_label("Height", 30)
 	_panel_label("LMB raise  RMB lower  Shift+LMB set  Alt+LMB pick", 22)
 	var row := HBoxContainer.new()
@@ -1459,10 +1552,66 @@ func _height_panel() -> void:
 	_climb_rows()
 
 
+## The height tool's panel on a map with relief (decision 525): its mode,
+## brush, strength and the picked height; the cliffs it has.
+func _relief_panel() -> void:
+	_panel_label("Relief (metres)", 30)
+	_panel_label("LMB %s  RMB lower  Shift+LMB flatten  Alt+LMB pick" % relief_mode, 22)
+	var modes := HBoxContainer.new()
+	_panel.add_child(modes)
+	for mode in RELIEF_MODES:
+		var button := _panel_button(modes, mode, _set_tool.bind("relief_mode", mode))
+		button.toggle_mode = true
+		button.button_pressed = mode == relief_mode
+	var row := HBoxContainer.new()
+	_panel.add_child(row)
+	_panel_label_in(row, "brush")
+	for size in HEIGHT_BRUSHES:
+		var button := _panel_button(row, "%dx%d" % [size, size], _set_tool.bind("height_brush", size))
+		button.toggle_mode = true
+		button.button_pressed = size == height_brush
+	var strength := HBoxContainer.new()
+	_panel.add_child(strength)
+	_panel_label_in(strength, "strength %.2f m" % relief_strength)
+	_panel_button(strength, "-", _set_tool.bind("relief_strength", maxf(0.05, snappedf(relief_strength - 0.05, 0.01))))
+	_panel_button(strength, "+", _set_tool.bind("relief_strength", minf(2.0, snappedf(relief_strength + 0.05, 0.01))))
+	var level := HBoxContainer.new()
+	_panel.add_child(level)
+	_panel_label_in(level, "flatten to %.2f m" % relief_level)
+	_panel_button(level, "-", _set_tool.bind("relief_level", maxf(0.0, snappedf(relief_level - 0.1, 0.01))))
+	_panel_button(level, "+", _set_tool.bind("relief_level", snappedf(relief_level + 0.1, 0.01)))
+	_panel_label("%d cliff edges (steeper than %.2f m a step)" % [relief_cliffs().size(), Relief.WALK_RISE], 18)
+	_climb_rows()
+
+
+## The edges of this map's relief steeper than a walk (Relief.cliff_between)
+## between two walkable cells: their keys.
+func relief_cliffs() -> Array[Vector3i]:
+	var out: Array[Vector3i] = []
+	if not map.has_relief():
+		return out
+	var field := map.relief
+	var key := hash(field)
+	if key == _cliffs_of:
+		return _cliffs
+	_cliffs_of = key
+	_cliffs = out
+	for at: Vector2i in map.cells:
+		if not map.walkable(at):
+			continue
+		for step: Vector2i in [Vector2i(1, 0), Vector2i(0, 1)]:
+			var next := at + step
+			if map.walkable(next) and Relief.cliff_between(Relief.at(field, map.size, at), Relief.at(field, map.size, next)):
+				out.append(Terrain.edge_key(at, step))
+	return out
+
+
 ## The picked level, to change by hand.
 func _height_level_row() -> void:
 	var row := HBoxContainer.new()
 	_panel.add_child(row)
+	if not map.has_relief():
+		_panel_button(row, "ground in metres", start_relief)
 	_panel_label_in(row, "level %d" % height_level)
 	_panel_button(row, "-", _set_tool.bind("height_level", maxi(1, height_level - 1)))
 	_panel_button(row, "+", _set_tool.bind("height_level", mini(Level.MAX_HEIGHT, height_level + 1)))
@@ -1917,6 +2066,9 @@ func _draw() -> void:
 func _draw_heights() -> void:
 	var font := ThemeDB.fallback_font
 	var numbers := _camera == null or _camera.zoom.x * CELL >= 26.0
+	if map.has_relief():
+		_draw_relief(font, numbers)
+		return
 	for at: Vector2i in map.cells:
 		var level := int(map.heights.get(at, 0))
 		var rect := Rect2(Vector2(at) * CELL, Vector2.ONE * CELL)
@@ -1949,6 +2101,29 @@ func _draw_heights() -> void:
 		var side := Vector2(climb).orthogonal() * CELL * 0.14
 		draw_colored_polygon(PackedVector2Array([tip + Vector2(climb) * CELL * 0.06, tip - Vector2(climb) * CELL * 0.16 + side,
 			tip - Vector2(climb) * CELL * 0.16 - side]), CLIMB)
+
+
+## The heights view on a map with relief (decision 525): each cell lighter
+## the higher it stands over the map's lowest, its metres when zoomed in,
+## and a cliff's edge drawn thick, red where it is between walkable cells.
+func _draw_relief(font: Font, numbers: bool) -> void:
+	var field := map.relief
+	var low := INF
+	var high := -INF
+	for value in field:
+		low = minf(low, value)
+		high = maxf(high, value)
+	var span := maxf(0.5, high - low)
+	for at: Vector2i in map.cells:
+		var here := Relief.at(field, map.size, at)
+		var rect := Rect2(Vector2(at) * CELL, Vector2.ONE * CELL)
+		draw_rect(rect, Color(1, 1, 1, 0.04 + 0.4 * (here - low) / span))
+		if numbers:
+			draw_string(font, rect.position + Vector2(CELL * 0.06, CELL * 0.3), "%.1f" % here, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(0, 0, 0, 0.75))
+	for key in relief_cliffs():
+		var a := Vector2(key.x + 1, key.y) if key.z == Terrain.EAST else Vector2(key.x, key.y + 1)
+		var b := a + (Vector2(0, 1) if key.z == Terrain.EAST else Vector2(1, 0))
+		draw_line(a * CELL, b * CELL, Color(1, 0.2, 0.1, 0.85), 4.0)
 
 
 ## The picked prefab, see-through, with its top-left at [param at].

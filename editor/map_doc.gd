@@ -28,10 +28,16 @@ var dirty := false
 var config_dirty := false
 var had_heights := false
 var heights_dirty := false
-## relief.png as loaded (decision 525; null if the level has none), and
-## whether it is to be written on save (a level first saved in the overlay).
-var relief: Image = null
+## Whether relief.png (decision 525: map.relief) has changes to write.
 var relief_dirty := false
+## relief.png as an image (null for none), read from and into map.relief
+## (builder's BuilderSession reads and copies it so).
+var relief: Image:
+	get:
+		return map.to_relief_image() if map != null else null
+	set(value):
+		if map != null:
+			map.read_relief(value)
 ## What the last load, save or resize said.
 var report := ""
 var undo_steps: Array[Dictionary] = []
@@ -59,7 +65,7 @@ static func open(level_folder: String, new_size := LevelMap.NEW_SIZE) -> MapDoc:
 		if doc.had_heights:
 			doc.map.read_heights(Image.load_from_file(ProjectSettings.globalize_path(heights_png)))
 		if FileAccess.file_exists(level_folder + "relief.png"):
-			doc.relief = Image.load_from_file(ProjectSettings.globalize_path(level_folder + "relief.png"))
+			doc.map.read_relief(Image.load_from_file(ProjectSettings.globalize_path(level_folder + "relief.png")))
 		doc.report = "loaded %s: %d x %d cells%s" % [png, doc.map.size.x, doc.map.size.y,
 			", %d pixels of colours not in the legend (void when saved)" % doc.map.unknown_pixels if doc.map.unknown_pixels > 0 else ""]
 	else:
@@ -84,11 +90,11 @@ static func from_level(level_name: String) -> MapDoc:
 	doc.had_heights = made["height"] != null
 	if doc.had_heights:
 		doc.map.read_heights(made["height"])
-	doc.relief = made.get("relief")
+	doc.map.read_relief(made.get("relief"))
 	if not Level.overlaid(level_name):
 		doc.config_dirty = true
 		doc.heights_dirty = doc.had_heights
-		doc.relief_dirty = doc.relief != null
+		doc.relief_dirty = doc.map.has_relief()
 	doc.report = "loaded %s: %d x %d cells" % [level_name, doc.map.size.x, doc.map.size.y]
 	return doc
 
@@ -122,16 +128,16 @@ func save() -> bool:
 		LevelMap.ensure_image_import(ProjectSettings.globalize_path(heights_png), heights_png)
 		had_heights = true
 		heights_dirty = false
-	if relief_dirty and relief != null:
+	if relief_dirty and map.has_relief():
 		var relief_png := folder + "relief.png"
-		error = relief.save_png(ProjectSettings.globalize_path(relief_png))
+		error = map.to_relief_image().save_png(ProjectSettings.globalize_path(relief_png))
 		if error != OK:
 			report = "could not save %s (%s)" % [relief_png, error_string(error)]
 			return false
 		LevelMap.ensure_image_import(ProjectSettings.globalize_path(relief_png), relief_png)
 		relief_dirty = false
 	dirty = false
-	var level := Level.parse(image, map.to_height_image() if had_heights else null, config, relief)
+	var level := Level.parse(image, map.to_height_image() if had_heights else null, config, map.to_relief_image())
 	var warnings: Array = level["warnings"]
 	report = "saved %s (%d x %d cells, %d floor, %d things)%s%s" % [png, map.size.x, map.size.y,
 		(level["terrain"]["floor"] as Array).size(), (level["entities"] as Array).size(),
@@ -142,7 +148,7 @@ func save() -> bool:
 
 ## The level as Level.parse reads it from what is here now (saved or not).
 func parsed() -> Dictionary:
-	return Level.parse(map.to_image(), map.to_height_image() if had_heights or not map.heights.is_empty() else null, config, relief)
+	return Level.parse(map.to_image(), map.to_height_image() if had_heights or not map.heights.is_empty() else null, config, map.to_relief_image())
 
 
 # --- Undo ----------------------------------------------------------------------------
@@ -184,6 +190,12 @@ func _swap(step: Dictionary) -> Dictionary:
 		elif key == "canvas":
 			back[key] = _canvas_state()
 			_set_canvas_state(step[key])
+		elif key == "relief state":
+			back[key] = _relief_state()
+			map.relief = step[key]["relief"]
+			map.heights = step[key]["heights"]
+			relief_dirty = true
+			heights_dirty = true
 		elif str(key).begins_with("config "):
 			var config_key := str(key).trim_prefix("config ")
 			back[key] = config.get(config_key)
@@ -194,6 +206,8 @@ func _swap(step: Dictionary) -> Dictionary:
 			match parts[0]:
 				"height":
 					back[key] = set_height(at, int(step[key]))
+				"relief":
+					back[key] = set_relief(at, float(step[key]))
 				"link":
 					back[key] = link_of(at).duplicate(true)
 					put_link(at, step[key])
@@ -244,6 +258,15 @@ func apply_changes(changes: Dictionary) -> bool:
 		var old := set_height(cell, heights[cell])
 		if old != heights[cell]:
 			step["height %d %d" % [cell.x, cell.y]] = old
+	var relief: Dictionary = changes.get("relief", {})
+	if not relief.is_empty() and not map.has_relief():
+		# The map's first relief: the whole state is the step (undone at once).
+		step["relief state"] = _relief_state()
+		_start_relief()
+	for cell: Vector2i in relief:
+		var old := set_relief(cell, float(relief[cell]))
+		if not is_equal_approx(old, snappedf(float(relief[cell]), 0.01)) and not step.has("relief state"):
+			step["relief %d %d" % [cell.x, cell.y]] = old
 	for entry: Dictionary in changes.get("entries", []):
 		var cell: Vector2i = Level._tile(entry.get("at"))
 		var key := "entry %d %d" % [cell.x, cell.y]
@@ -289,6 +312,34 @@ func set_height(at: Vector2i, level: int) -> int:
 		heights_dirty = true
 		dirty = true
 	return old
+
+
+## Sets cell [param at]'s elevation (decision 525) to [param metres];
+## returns what it was. A change means relief.png is written on save.
+func set_relief(at: Vector2i, metres: float) -> float:
+	if not map.has_relief():
+		_start_relief()
+	var old := map.set_relief(at, metres)
+	if not is_equal_approx(old, map.relief_at(at)):
+		relief_dirty = true
+		dirty = true
+	return old
+
+
+## The map's relief and heights, to put back (an undo step's).
+func _relief_state() -> Dictionary:
+	return {"relief": map.relief.duplicate(), "heights": map.heights.duplicate()}
+
+
+## Gives the map relief (decision 525) from its heights, which it then has
+## none of (height.png written black: relief.png is the ground).
+func _start_relief() -> void:
+	map.relief = Relief.derived(map.heights, map.size)
+	if not map.heights.is_empty():
+		map.heights.clear()
+		heights_dirty = true
+	relief_dirty = true
+	dirty = true
 
 
 ## level.json's entry for the entity at [param at] ({} for none).

@@ -446,10 +446,11 @@ static func issues(doc: MapDoc, level_name: String) -> Array[String]:
 	var layout := doc.map.to_image()
 	var height: Image = doc.map.to_height_image() if not doc.map.heights.is_empty() else null
 	var out: Array[String] = []
-	out.assign(Level.parse(layout, height, doc.config)["warnings"])
+	var relief := doc.map.to_relief_image()
+	out.assign(Level.parse(layout, height, doc.config, relief)["warnings"])
 	if level_name in Level.names():
 		var names: Array[String] = Level.names()
-		var sources := {level_name: {"layout": layout, "height": height, "config": doc.config}}
+		var sources := {level_name: {"layout": layout, "height": height, "config": doc.config, "relief": relief}}
 		for problem: String in WorldMap.build(names, sources).problems():
 			if problem.begins_with(level_name + ":") and not problem.trim_prefix(level_name + ": ") in out:
 				out.append(problem.trim_prefix(level_name + ": "))

@@ -100,7 +100,7 @@ func refresh() -> void:
 	var sources := {}
 	for area_name: String in docs:
 		var doc := docs[area_name]
-		sources[area_name] = {"layout": doc.map.to_image(), "config": doc.config,
+		sources[area_name] = {"layout": doc.map.to_image(), "config": doc.config, "relief": doc.map.to_relief_image(),
 			"height": doc.map.to_height_image() if doc.had_heights or not doc.map.heights.is_empty() else null}
 	world_map = WorldMap.build(Level.names(), sources)
 	holdings = Holdings.new(world_map)

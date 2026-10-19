@@ -48,6 +48,8 @@ func _ready() -> void:
 	_test_routes()
 	_test_message()
 	_test_sample()
+	_test_lay()
+	_test_hills()
 	_main.load_map(Level.DEFAULT_MAP)
 	Level.unregister("rl_hill")
 	print("")
@@ -114,6 +116,15 @@ func _test_rules() -> void:
 	var low := Relief.corner_heights(faced, Vector2i(2, 1), Vector2i(0, 0))
 	var high := Relief.corner_heights(faced, Vector2i(2, 1), Vector2i(1, 0))
 	_check(low[1] == 0.0 and low[3] == 0.0 and high[0] == 1.0 and high[2] == 1.0, "across a cliff each side keeps its own corners (%s, %s)" % [low, high])
+	# terrain's case on the sample: (1, 1) 0.59 over (0, 1) is a cliff, but
+	# round the ring by (1, 0) and (0, 0) all four are joined.
+	var ring := PackedFloat32Array([0.0, 0.35, 0.0, 0.59])
+	var a := Relief.corner_heights(ring, Vector2i(2, 2), Vector2i(1, 1))
+	var b := Relief.corner_heights(ring, Vector2i(2, 2), Vector2i(1, 0))
+	_check(is_equal_approx(a[0], b[2]) and is_equal_approx(a[0], (0.0 + 0.35 + 0.0 + 0.59) / 4.0),
+		"a ring cut once is one: walkably joined cells share their corner (%.3f, %.3f)" % [a[0], b[2]])
+	var split := Relief.corner_heights(PackedFloat32Array([0.0, 1.0, 1.0, 0.0]), Vector2i(2, 2), Vector2i(0, 0))
+	_check(split[3] == 0.0, "cut twice it splits (%.2f)" % split[3])
 	_check(Relief.flat(PackedFloat32Array([1.0, 1.04, 1.02, 0.99]), Vector2i(2, 2), [Vector2i(0, 0), Vector2i(1, 0), Vector2i(0, 1), Vector2i(1, 1)])
 		and not Relief.flat(PackedFloat32Array([1.0, 1.06]), Vector2i(2, 1), [Vector2i(0, 0), Vector2i(1, 0)]), "a pad is flat within %.2f m" % Relief.PAD_FLAT)
 	var cm := PackedFloat32Array([1.23, 300.5, 0.0, 655.35])
@@ -276,6 +287,124 @@ func _test_sample() -> void:
 					steep += 1
 	_check(steep == 0, "walked all over (%d cliffs)" % steep)
 	_check(terrain["stairs"].size() == 4, "its stairs and slopes as before (%s)" % [terrain["stairs"]])
+	_check(_corners_agree(terrain).is_empty(), "walkably joined cells agree on every corner they share (%s)" % [_corners_agree(terrain)])
+
+
+func _test_lay() -> void:
+	print("== Relief.lay ==")
+	var map := LevelMap.new(Vector2i(48, 40))
+	for y in 40:
+		for x in 48:
+			map.set_cell(Vector2i(x, y), "grass")
+	map.set_cell(Vector2i(5, 5), "void")
+	var options := {"base": 4.0, "ridges": [[Vector2i(6, 4), Vector2i(20, 30)]], "valleys": [[Vector2i(30, 0), Vector2i(26, 39)]],
+		"tilt": Vector2(0.0, -0.02), "plateaus": [{"rect": Rect2i(36, 4, 10, 10), "height": 3.0, "faces": ["west", "north"]}],
+		"keep_flat": [Rect2i(8, 30, 4, 3)], "streams": 1, "width": 2}
+	var laid := Relief.lay(map, Rect2i(0, 0, 48, 40), 3, options)
+	var again := Relief.lay(map, Rect2i(0, 0, 48, 40), 3, options)
+	_check(laid["relief"] == again["relief"] and laid["streams"] == again["streams"], "the same seed lays the same ground")
+	_check(laid["relief"] != Relief.lay(map, Rect2i(0, 0, 48, 40), 4, options)["relief"], "another seed, other ground")
+	_check(not laid["relief"].has(Vector2i(5, 5)), "void is left as it is")
+	for at: Vector2i in laid["relief"]:
+		map.set_relief(at, laid["relief"][at])
+	for at: Vector2i in laid["cells"]:
+		map.set_cell(at, laid["cells"][at])
+	var stray := 0
+	var face := 0
+	for at: Vector2i in map.cells:
+		for step: Vector2i in [Vector2i(1, 0), Vector2i(0, 1)]:
+			var next := at + step
+			if not map.walkable(at) or not map.walkable(next) or map.cell(at) == "water" or map.cell(next) == "water":
+				continue
+			if Relief.cliff_between(map.relief_at(at), map.relief_at(next)):
+				var on_face := (step == Vector2i(1, 0) and next.x == 36 and next.y >= 4 and next.y < 14) 						or (step == Vector2i(0, 1) and next.y == 4 and next.x >= 36)
+				if on_face:
+					face += 1
+				else:
+					stray += 1
+	_check(stray == 0 and face >= 15, "walked everywhere but the plateau's west and north faces (%d face edges, %d others)" % [face, stray])
+	var south := Relief.cliff_between(map.relief_at(Vector2i(40, 13)), map.relief_at(Vector2i(40, 14)))
+	_check(not south, "its south side falls away walkably (%.2f to %.2f)" % [map.relief_at(Vector2i(40, 13)), map.relief_at(Vector2i(40, 14))])
+	var pad: Array = []
+	for y in range(30, 33):
+		for x in range(8, 12):
+			pad.append(Vector2i(x, y))
+	_check(Relief.flat(map.relief, map.size, pad), "keep_flat is a pad")
+	_check(laid["streams"].size() == 1 and laid["streams"][0].size() >= 10, "a stream down the valley (%s cells)" % [laid["streams"].map(func(p: Array) -> int: return p.size())])
+	var path: Array = []
+	for cell: Vector2i in laid["streams"][0]:
+		path.append([cell.x, cell.y])
+	var level := Level.parse(map.to_image(), null, {"outdoor": true, "streams": [{"path": path}]}, map.to_relief_image())
+	_check(not level["warnings"].any(func(w: String) -> bool: return "stream" in w or "water" in w or "pond" in w),
+		"its water runs down, under banks a lip over it (%s)" % [level["warnings"]])
+	var padded := Relief.pad(map, Rect2i(20, 20, 3, 3))
+	var ring: Array = padded["relief"].keys()
+	_check(ring.size() == 25 and Relief.flat(PackedFloat32Array(padded["relief"].values()), Vector2i(25, 1),
+		range(25).map(func(i: int) -> Vector2i: return Vector2i(i, 0)), 0.0), "Relief.pad levels a footprint and its apron (%d cells)" % ring.size())
+
+
+func _test_hills() -> void:
+	print("== levels/hills ==")
+	var level := Level.load_level("hills")
+	var terrain: Dictionary = level["terrain"]
+	_check(terrain["relief_given"] and level["warnings"].is_empty(), "relief.png, nothing said (%s)" % [level["warnings"]])
+	var field: PackedFloat32Array = terrain["relief"]
+	var size: Vector2i = terrain["relief_size"]
+	var floor: Dictionary = {}
+	for cell: Vector2i in terrain["floor"]:
+		floor[cell] = true
+	var wet: Dictionary = {}
+	for cell: Vector2i in terrain["water"]:
+		wet[cell] = true
+	var off_face := 0
+	var face := 0
+	for cell: Vector2i in floor:
+		for step: Vector2i in [Vector2i(1, 0), Vector2i(0, 1)]:
+			if floor.has(cell + step) and Relief.cliff_between(Relief.at(field, size, cell), Relief.at(field, size, cell + step)):
+				if step == Vector2i(1, 0) and cell.x == 61 and cell.y < 46:
+					face += 1
+				else:
+					off_face += 1
+	_check(face >= 30 and off_face == 0, "one cliff, the plateau's west face (%d edges; %d elsewhere)" % [face, off_face])
+	var lowest := INF
+	var highest := -INF
+	for cell: Vector2i in floor:
+		lowest = minf(lowest, Relief.at(field, size, cell))
+		highest = maxf(highest, Relief.at(field, size, cell))
+	_check(_corners_agree(terrain).is_empty(), "walkably joined cells agree on every corner they share (%s)" % [_corners_agree(terrain)])
+	_check(highest - lowest > 8.0, "hills and valleys: %.1f m between the lowest and the highest" % (highest - lowest))
+	_check(terrain["streams"].size() == 1 and not terrain["fords"].is_empty() and level["buildings"].any(func(b: Dictionary) -> bool: return b["slot"] == "bridge"),
+		"its stream, a ford and a bridge")
+	var area := {"relief": field, "relief_size": size, "stairs": terrain["stairs"], "heights": {}, "edges": terrain["edges"], "floor": floor, "size": size}
+	var top := Vector2i(80, 20)
+	var steps := WorldRoutes._steps_between(area, level["spawn_points"]["from_wilds"], top)
+	_check(floor.has(top) and steps > 0.0, "the plateau's top is walked to from the link, round by its spur (%.0f steps)" % steps)
+	var foot := Vector2i(58, 20)
+	_check(floor.has(foot) and Relief.at(field, size, top) - Relief.at(field, size, foot) > 4.0, "it stands over the valley at its face")
+
+
+## The first few pairs of orthogonal neighbours of [param terrain]'s
+## relief, no cliff between them, whose shared corners differ (the view
+## would draw a face between them); [] if none.
+static func _corners_agree(terrain: Dictionary) -> Array:
+	var field: PackedFloat32Array = terrain["relief"]
+	var size: Vector2i = terrain["relief_size"]
+	var out := []
+	for y in size.y:
+		for x in size.x:
+			var cell := Vector2i(x, y)
+			var mine := Relief.corner_heights(field, size, cell)
+			for step: Vector2i in [Vector2i(1, 0), Vector2i(0, 1)]:
+				var next := cell + step
+				if not Relief.on_map(size, next) or Relief.cliff_between(Relief.at(field, size, cell), Relief.at(field, size, next)):
+					continue
+				var theirs := Relief.corner_heights(field, size, next)
+				# East: my (1, 0), (1, 1) are its (0, 0), (0, 1); south: my (0, 1), (1, 1) its (0, 0), (1, 0).
+				var pairs := [[1, 0], [3, 2]] if step.x == 1 else [[2, 0], [3, 1]]
+				for pair: Array in pairs:
+					if absf(mine[pair[0]] - theirs[pair[1]]) > 0.0001 and out.size() < 4:
+						out.append([cell, next, mine[pair[0]], theirs[pair[1]]])
+	return out
 
 
 func _player() -> Player:

@@ -1,0 +1,14 @@
+[remap]
+
+importer="image"
+type="Image"
+uid="uid://ghggl1s7v6jl"
+path="res://.godot/imported/relief.png-5eb768697bfb0b27985a0294d6acda24.image"
+
+[deps]
+
+source_file="res://levels/hills/relief.png"
+dest_files=["res://.godot/imported/relief.png-5eb768697bfb0b27985a0294d6acda24.image"]
+
+[params]
+

@@ -32,6 +32,8 @@ func _ready() -> void:
 	_clear()
 	await _test_clipboard()
 	_clear()
+	await _test_relief()
+	_clear()
 	_test_every_key()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -930,6 +932,87 @@ func _key(editor: LevelEditor, keycode: Key, ctrl := false, shift := false, alt 
 	event.shift_pressed = shift
 	event.alt_pressed = alt
 	editor._unhandled_input(event)
+
+
+func _test_relief() -> void:
+	print("
+== the ground in metres (decision 525) ==")
+	var dir := ProjectSettings.globalize_path(FOLDER)
+	DirAccess.make_dir_recursive_absolute(dir)
+	var markers := {Vector2i(1, 1): "start"}
+	for y in 14:
+		for x in 20:
+			if not markers.has(Vector2i(x, y)):
+				markers[Vector2i(x, y)] = "grass"
+	var rows: Array[String] = []
+	for y in 27:
+		rows.append(".".repeat(39))
+	Level.image_from_rows(rows, markers).save_png(dir.path_join("layout.png"))
+	var json := FileAccess.open(dir.path_join("level.json"), FileAccess.WRITE)
+	json.store_string(JSON.stringify({"name": "Relief", "outdoor": true}, "	"))
+	json.close()
+	var editor: LevelEditor = preload("res://editor/level_editor.tscn").instantiate()
+	editor.map_name = "editor_test"
+	editor.folder = FOLDER
+	add_child(editor)
+	await get_tree().process_frame
+	editor.doc.set_height(Vector2i(3, 3), 2)
+	editor.pick("height")
+	_check(not editor.map.has_relief() and editor.start_relief() and editor.map.has_relief()
+		and is_equal_approx(editor.map.relief_at(Vector2i(3, 3)), 1.0) and editor.map.heights.is_empty(),
+		"\"ground in metres\" gives the map relief from its heights, which go")
+	editor.doc.undo()
+	_check(not editor.map.has_relief() and editor.map.heights.get(Vector2i(3, 3)) == 2, "undone at once")
+	editor.doc.redo()
+	_check(editor.map.has_relief() and is_equal_approx(editor.map.relief_at(Vector2i(3, 3)), 1.0), "and redone")
+	editor.height_brush = 3
+	editor.relief_mode = "raise"
+	editor.relief_strength = 0.25
+	editor.begin_stroke(MOUSE_BUTTON_LEFT, Vector2(8.5, 6.5))
+	editor.end_stroke()
+	var middle := editor.map.relief_at(Vector2i(8, 6))
+	var side := editor.map.relief_at(Vector2i(9, 7))
+	_check(is_equal_approx(middle, 0.25) and side > 0.0 and side < middle and editor.map.relief_at(Vector2i(11, 6)) == 0.0,
+		"a raise lifts the brush's middle %.2f m, its edge less (%.2f, %.2f)" % [editor.relief_strength, middle, side])
+	editor.doc.undo()
+	_check(editor.map.relief_at(Vector2i(8, 6)) == 0.0 and editor.map.relief_at(Vector2i(9, 7)) == 0.0, "one undo step")
+	editor.begin_stroke(MOUSE_BUTTON_RIGHT, Vector2(8.5, 6.5))
+	editor.end_stroke()
+	_check(editor.map.relief_at(Vector2i(8, 6)) == 0.0, "lowering stops at 0 (relief.png holds none under)")
+	editor.begin_stroke(MOUSE_BUTTON_LEFT, Vector2(3.5, 3.5), false, true)
+	_check(is_equal_approx(editor.relief_level, 1.0), "Alt+click picks a height (%.2f)" % editor.relief_level)
+	editor.begin_stroke(MOUSE_BUTTON_LEFT, Vector2(12.5, 8.5), true)
+	editor.end_stroke()
+	_check(is_equal_approx(editor.map.relief_at(Vector2i(12, 8)), 1.0) and is_equal_approx(editor.map.relief_at(Vector2i(13, 9)), 1.0),
+		"Shift flattens to it")
+	editor.doc.set_relief(Vector2i(16, 4), 3.0)
+	editor.relief_mode = "smooth"
+	editor.height_brush = 1
+	editor.begin_stroke(MOUSE_BUTTON_LEFT, Vector2(16.5, 4.5))
+	editor.end_stroke()
+	_check(absf(editor.map.relief_at(Vector2i(16, 4)) - 3.0 / 9.0) < 0.01, "smooth: toward the mean round it (%.2f)" % editor.map.relief_at(Vector2i(16, 4)))
+	_check(editor.relief_cliffs().size() >= 4, "steps past a walk are the cliffs drawn (%d)" % editor.relief_cliffs().size())
+	editor.area = Rect2i(2, 9, 4, 3)
+	editor.pad_area()
+	var pad: Array = []
+	for y in range(9, 12):
+		for x in range(2, 6):
+			pad.append(Vector2i(x, y))
+	_check(Relief.flat(editor.map.relief, editor.map.size, pad, 0.0), "pad levels the area")
+	editor.area = Rect2i(0, 0, 20, 14)
+	var before := editor.map.relief.duplicate()
+	editor.fill_area("relief")
+	_check(editor.map.relief != before and not editor.doc.parsed()["warnings"].any(func(w: String) -> bool: return "stream" in w or "water" in w or "pond" in w),
+		"the relief fill lays hills, no water said (%s; %s)" % [editor.report, editor.doc.parsed()["warnings"]])
+	_check(editor.doc.save() and FileAccess.file_exists(dir.path_join("relief.png")), "saved: relief.png (%s)" % editor.doc.report)
+	var again := MapDoc.open(FOLDER)
+	_check(again.map.has_relief() and again.map.relief == editor.map.relief, "it loads again the same, to the centimetre")
+	var at := editor.map.relief_at(Vector2i(10, 7))
+	editor.resize(2, 0, 0, 0)
+	_check(editor.map.size == Vector2i(22, 14) and editor.map.relief_at(Vector2i(12, 7)) == at
+		and editor.map.relief_at(Vector2i(0, 7)) == editor.map.relief_at(Vector2i(2, 7)), "a resize carries it, a new side taking its neighbour's")
+	editor.queue_free()
+	await get_tree().process_frame
 
 
 func _clear() -> void:
