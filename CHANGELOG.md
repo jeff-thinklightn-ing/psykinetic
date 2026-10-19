@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Tools: heavy_job_test's step-aside check waits on the queue order and the log line (polled, up to 60 s) instead of fixed sleeps, which a loaded landing overran (release: art-kit's landing failed it twice at 22:39).
 - The level editor has a properties panel: click a link, chest, place, market, stream or the level itself to see and edit its settings, checked as you go (506).
 - Fixed: winter tufts no longer turn pure white like a field of flowers. Snow sits on their tips with straw below, in the wilds and in the forest, where less of it gets under the trees; the forest's crowns keep their green under a patchy dusting (467 amended).
 - Streams are heard before they are seen: running water from the nearest stretch of a stream, following you along its bank; wading through a ford splashes.

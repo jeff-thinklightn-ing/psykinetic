@@ -171,20 +171,31 @@ table["trellis_mesh"] = dict(gate.kinds()["trellis_mesh"], ram_gb=1e12)
 gate._write(gate._path("kinds.json"), table)
 real_poll, gate.POLL_SECONDS = gate.POLL_SECONDS, 0.1
 big = threading.Thread(target=lambda: gate.take("art", "trellis_mesh", os.getpid()), daemon=True)
+def wait_for(condition, seconds=60.0):
+    # Polled, not slept: under a loaded landing a fixed wait was overrun
+    # (release, art-kit's landing 2026-10-18).
+    until = time.time() + seconds
+    while not condition() and time.time() < until:
+        time.sleep(0.05)
+    return condition()
+def queue_order():
+    return [each["tree"] for each in gate._entries("queue")]
+def stepped_aside():
+    with open(gate._path("heavy_jobs.log")) as log:
+        return "\taside\tart\ttrellis_mesh\t" in log.read()
 big.start()
-time.sleep(0.5)
+wait_for(lambda: queue_order() == ["art"])
 gate._write(gate._path("queue", "%019d-old-1.json" % time.time_ns()), {"tree": "old", "kind": "suite", "pid": None,
     "waiter": os.getpid(), "queued": time.time()})
-time.sleep(1.0)
-order = [each["tree"] for each in gate._entries("queue")]
+wait_for(lambda: queue_order() == ["old", "art"] and stepped_aside())
+order = queue_order()
 check(order == ["old", "art"], "the job behind goes first in the queue's own order: %s" % order)
 for each in gate._entries("queue"):
     os.remove(gate._path("queue", each["file"]))
 big.join(5)
 gate.POLL_SECONDS = real_poll
 gate.total_ram_gb = real_total
-with open(gate._path("heavy_jobs.log")) as log:
-    check("\taside\tart\ttrellis_mesh\t" in log.read(), "the log says it stepped aside")
+check(stepped_aside(), "the log says it stepped aside")
 
 print("== a run inside the tree's own take ==")
 gate.take("lander", "suite", os.getpid())
