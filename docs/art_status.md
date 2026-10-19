@@ -133,7 +133,7 @@ Drawn as a grey box (a texture slot: terrain's procedural colour).
 | `prop.market_stall` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
 | `prop.palisade` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
 | `prop.sack` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
-| `prop.signpost` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
+| `prop.signpost` | 1 | art-kit, by hand | own | 2026-10-19 |
 | `prop.stairs` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
 | `prop.table` | 1 | art-kit, by hand | own | 2026-10-19 |
 | `prop.tent` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |

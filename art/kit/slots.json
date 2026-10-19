@@ -1623,7 +1623,7 @@
 			"kind": "cell",
 			"size": [0.8, 2, 0.2],
 			"budget": 300,
-			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/prop.signpost/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c4's two boards, squeezed to 0.8 x 2 x 0.2, 250 tris"},
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-19", "notes": "rebuilt by hand in big clean planes for Jeff's crispness note (2026-10-19, \"the graphics not crisp\"; the coordinator's ask; art-gen's c4 fit (a lumpy post, its arms blobs) read as mush at game zoom): a square post with a pointed cap, two arrow boards pointing along x, one each way on the front and the back at different heights and a little askew, a lighter face with a darker edge; 62 tris"},
 			"uses": "a signpost, its arms pointing along x"
 		},
 		"prop.banner": {
