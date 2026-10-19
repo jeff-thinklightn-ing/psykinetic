@@ -7,7 +7,16 @@ notes (decision 324).
 
 ## Unreleased
 
+## v0.1.155
+
+- Server and client both; the protocol is unchanged, so older builds still join.
+  New in it: sickness. Now and then a townsperson, or your companion resting in
+  town, takes to their bed; the healer or medicine man cures them, or a healing
+  remedy made from the herbs that now grow wild outside the town, which anyone can
+  pick and sell at the store. Fixed: the server no longer stalls for a second or
+  two whenever a player falls.
 - The server no longer stalls for a second or two when a player falls, while it works out the nearest temple or healer (503).
+- The healing remedy is a small green glass vial with a cork.
 - New items: a bunch of herbs (gathered in the wilds, sold to the store), from which the healer makes the healing remedy, and the weaver makes bolts of cloth from wool.
 - Sickness (decision 501, with economy's, items' and companions' sides): now and then a resident, or a companion resting in town, takes to their bed (more in winter, after hunger, when old) and is out of work but not out of need; their kin ask you to bring the medicine man (a word to him sends him, and his visit treats them) or to walk them to the healer's hut, and a remedy put in their hands treats them at once; treated, they are up next morning; untreated it runs five days, and one of the town's own who is old may die of it (never a rescued captive or Snagfin this step); the treatment pays whoever brought it, the cards remember, and a death is a memory for the lawspeaker.
 - A companion who fell sick while resting in town still goes with you when you come for her, and the party log says so; she knows she is sick when she talks, and is well again after the same five days. If she was sick while you were away, you hear it when you come back, from the party log and from her, along with who cured her (decision 501, companions' side).
@@ -28,7 +37,6 @@ notes (decision 324).
 - The thief's hand is stronger (461 amended, Jeff's "5 gold"): five gold from the richest purse above the line every day, not three on half the days.
 - A liar among the townsfolk lies only about himself (336 amended, the coordinator's ruling): never an invented deed of a named neighbour, until the lawspeaker can settle slander.
 - Townsfolk are paid for what they bring in: the woodcutter for wood, the hunter for game, the farmer for the harvest, and a hauler for each load carried to the store. Makers now buy their materials from the store, so their earnings flow back to the town. Players are paid for raw goods they bank at a town's store, at the same price. When the town's treasury runs dry it owes what it can't pay, and stops buying once it owes too much.
-- The healing remedy is a small green glass vial with a cork.
 - A healing remedy item: one dose, sold by the healer and the medicine man, to cure a sick resident.
 - The words soak (496 amended; 336 amended): tools/town_soak --ask asks every resident the usual things with the resident mind on the box's model over a tunnel; from its first five days the voice rule is now held by code (at most two sentences, never the speaker's name first), an embellishing voice never puts a deed, look or trait on a named person, and Snagfin's card no longer calls him a merchant who keeps it hidden.
 - The server's lawspeaker is switched on, ruling on what the towns talk of once a day (once the box's service file is reloaded).
