@@ -14520,3 +14520,15 @@ more hides, the leather the town owes him unpaid while the treasury is at
 its floor, the shortfall phase 3's luxury tax is for. Protocol unchanged.
 larder_test.
 
+## 509. Builder mode shows Claude the loot tables
+
+Builder's place tool already filled a chest with catalog-checked items,
+or gave a chest or monster a loot table by name (items' 330). But Claude
+was never told which tables there are, so it could only guess the names.
+
+- place's loot is an enum of Items.loot_tables() (BuilderSession.tools).
+- The prompt lists each table with the items it can give
+  (BuilderSession.loot_line: "supplies (ration, bandaging_kit, ...)"),
+  read from levels/loot.json. A new table needs nothing in builder.
+
+Protocol unchanged. builder_test _test_loot.

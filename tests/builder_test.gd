@@ -24,6 +24,7 @@ func _ready() -> void:
 	await _test_heights()
 	await _test_roof()
 	await _test_monster_kinds()
+	await _test_loot()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -430,6 +431,29 @@ func _test_monster_kinds() -> void:
 	_check(reread.cell(Vector2i(10, 10)) == "monster_wolf", "accepted: layout.png holds it, not void")
 	var wolves := (doc.parsed()["entities"] as Array).filter(func(spec: Dictionary) -> bool: return spec.get("kind") == "wolf")
 	_check(wolves.size() == 2 and wolves[0]["script"] == Level.ANIMAL, "the level spawns two wolves, as animals")
+
+
+func _test_loot() -> void:
+	print("\n== loot (509): the tables offered by name and said with their items ==")
+	var place: Dictionary = BuilderSession.tools().filter(func(tool: Dictionary) -> bool: return tool["name"] == "place")[0]
+	var tables: Array = place["input_schema"]["properties"]["loot"]["enum"]
+	_check(tables == Items.loot_tables().keys() and tables.has("supplies"), "place's loot is an enum of the tables (%s)" % [tables])
+	var line := BuilderSession.loot_line()
+	_check("supplies (" in line and "ration" in line.get_slice("supplies (", 1).get_slice(")", 0), "the prompt lists each table with its items (%s)" % line)
+	_check(line in BuilderSession.system_prompt(), "in the system prompt")
+	var doc := _doc()
+	var stub := StubClaude.new([
+		[{"name": "place", "input": {"at": [10, 10], "thing": "chest", "loot": "supplies"}},
+			{"name": "place", "input": {"at": [11, 10], "thing": "chest", "loot": "treasure"}},
+			{"name": "place", "input": {"at": [12, 10], "thing": "chest", "items": ["ration", "moonstone"]}}],
+		"A chest.",
+	])
+	var session := BuilderSession.new(doc, Rect2i(5, 5, 12, 10), "test_field", stub)
+	await session.ask("a chest of supplies")
+	var results: Array = stub.sent[1]["messages"][2]["content"]
+	_check(not results[0]["is_error"] and results[1]["is_error"] and "supplies" in str(results[1]["content"])
+			and results[2]["is_error"] and "moonstone" in str(results[2]["content"]),
+			"a table by name placed; a table or an item there is none of refused, saying what there is")
 
 
 func _check(ok: bool, label: String) -> void:

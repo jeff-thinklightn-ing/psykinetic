@@ -271,12 +271,27 @@ static func kind_line(kind: String) -> String:
 	return "- %s: %s (idles: %s)" % [kind, words, idle]
 
 
-## TOOLS with place()'s things as [param config]'s level offers them.
+## The loot tables (levels/loot.json, decision 509) and the items each can
+## give, for the prompt: "supplies (ration, bandaging_kit), ...".
+static func loot_line() -> String:
+	var tables := PackedStringArray()
+	for table: String in Items.loot_tables():
+		var items := PackedStringArray()
+		for row: Dictionary in Items.loot_tables()[table]:
+			if str(row["item"]) not in items:
+				items.append(str(row["item"]))
+		tables.append("%s (%s)" % [table, ", ".join(items)])
+	return ", ".join(tables) if not tables.is_empty() else "none"
+
+
+## TOOLS with place()'s things as [param config]'s level offers them, and
+## its loot tables (decision 509).
 static func tools(config := {}) -> Array:
 	var out := TOOLS.duplicate(true)
 	for tool: Dictionary in out:
 		if tool["name"] == "place":
 			tool["input_schema"]["properties"]["thing"]["enum"] = things(config).keys()
+			tool["input_schema"]["properties"]["loot"]["enum"] = Items.loot_tables().keys()
 	return out
 
 
@@ -332,7 +347,7 @@ The grid shows the area and a margin round it, one character a cell (the margin 
 %s
 Each row starts with its y; the first line says the x of the first column. Walls and doors are listed after the grid by the cell and its side.
 
-Monsters idle until someone comes: guard (stands, glances about), wander (strolls near its cell, a radius), patrol (walks a route of cells, round or back and forth), gather (stands or sits round a point, such as a fire: every monster gathering at one cell is one group), none. Without one, a monster idles as its kind does (said above). Wild animals are of no faction: goblins leave them be, and they keep to their herd (grazing as they stroll), so put two to six of a herd together on open ground, never in a camp. Chests hold item ids; the items there are: %s.
+Monsters idle until someone comes: guard (stands, glances about), wander (strolls near its cell, a radius), patrol (walks a route of cells, round or back and forth), gather (stands or sits round a point, such as a fire: every monster gathering at one cell is one group), none. Without one, a monster idles as its kind does (said above). Wild animals are of no faction: goblins leave them be, and they keep to their herd (grazing as they stroll), so put two to six of a herd together on open ground, never in a camp. Chests hold item ids; the items there are: %s. A loot table (place's loot, for a chest or a monster) is rolled as the level is built, the same every time; the tables and what each can give: %s.
 
 Levels join at their edges: walking off one edge arrives on the neighbour's opposite edge, at the same row (east, west) or column (north, south). When the area touches the map's edge with nothing beyond it, new_area makes a new level there (its own map; a first draft of grass, groves and forest round it, open where the way arrives) and carves a way out to the edge through the area. Use it when asked for somewhere new beyond the edge ("a new area east", "the woods past here"), not for changes inside the area.
 
@@ -343,7 +358,7 @@ Ground has a height, 0 to 6 (the grid's Heights block, shown when any cell has o
 A town keeps what players bring home in its store: a place of kind stockpile that the town holds. Stamp town_store for one (an open yard with its depot, its shop counter and the store's place, all in one), once per town, near the middle of town on open ground reachable from the gate, its counter facing where players will stand. A depot is a chest placed with use depot: what is put in it is banked. A shop counter is a chest placed with use shop: players buy what the town's workers made and sell what it is short of. Either works only inside the town's store, and is never given items. When a change leaves the store wrong, the tool's answer says so: put it right.
 
 Prefabs to stamp (their top-left at a cell, turned 0-3 quarter turns clockwise; their # is void and leaves the map as it was):
-%s""" % ["\n".join(monsters), ", ".join(legend), ", ".join(Items.ids()), ", ".join(building_uses()), "\n\n".join(prefabs) if not prefabs.is_empty() else "(none)"]
+%s""" % ["\n".join(monsters), ", ".join(legend), ", ".join(Items.ids()), loot_line(), ", ".join(building_uses()), "\n\n".join(prefabs) if not prefabs.is_empty() else "(none)"]
 
 
 ## What the first request starts with: the level, the area, what is in it.
