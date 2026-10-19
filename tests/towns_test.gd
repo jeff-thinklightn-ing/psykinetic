@@ -51,6 +51,7 @@ func _ready() -> void:
 	_test_companion_and_inn()
 	_test_damage_and_restart()
 	_test_world_tick()
+	_test_stalled_build()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -149,7 +150,8 @@ func _test_companion_and_inn() -> void:
 	_check(_work.job(int(meal["id"])).is_empty() and _stock.shop(TOWN).any(func(uid: int) -> bool: return _book.id_of(uid) == "meal"),
 		"back at 24000, she finishes it by 24500")
 	_towns.add_xp(TOWN, 100, "a test")
-	_check(_towns.choose(TOWN) == "inn", "with no one waiting and the town full, an inn (%s)" % _towns.choose(TOWN))
+	_check(int(_towns.building(TOWN, "inn").get("job", 0)) != 0 and _towns.choose(TOWN) != "inn",
+		"with no one waiting and the town full, an inn: ordered, and not chosen again while it is built (%s)" % [_towns.building(TOWN, "inn")])
 
 
 func _test_damage_and_restart() -> void:
@@ -194,3 +196,41 @@ func _check(ok: bool, label: String) -> void:
 	if not ok:
 		_failures += 1
 	print("  %s  %s" % ["PASS" if ok else "FAIL", label])
+
+
+## A build stalled on its materials (decision 522): after build_wait.days
+## the town orders the next one it can build, the stalled one kept at the
+## head and built first once its materials come.
+func _test_stalled_build() -> void:
+	print("
+== a stalled build ==")
+	var rules := RULES.duplicate(true)
+	rules["build_wait"] = {"days": 2, "most": 3}
+	_now = 0
+	var clock := func() -> int: return _now
+	_book = ItemBook.new(clock)
+	_stock = Stockpile.new({}, clock, _book)
+	_stock.deposit(TOWN, "wood", 40, "test")
+	_work = Production.new({}, _stock, null, clock, rules, func() -> Dictionary: return CATALOG)
+	_towns = Towns.new({}, _work, rules, clock)
+	_towns.note_rescue(TOWN, "dag", "Dag", "carpenter")
+	_towns.note_rescue(TOWN, "cora", "Cora", "cook")
+	_towns.add_xp(TOWN, 200, "a test")
+	_towns.unlock(TOWN, "inn")
+	var inn := int(_towns.building(TOWN, "inn")["job"])
+	_at(300)
+	_check(_work.job(inn).get("state") == "queued" and _towns.building(TOWN, "kitchen").is_empty(), "the inn waits on cloth; nothing else ordered yet")
+	var day := DayNight.day_steps
+	_at(2 * day - 300)
+	_check(_towns.building(TOWN, "kitchen").is_empty(), "not before build_wait.days")
+	_at(2 * day + 300)
+	var kitchen := int(_towns.building(TOWN, "kitchen").get("job", 0))
+	_check(kitchen != 0 and _work.job(inn).get("state") == "queued", "two days stalled: the kitchen ordered too, the inn still queued")
+	_at(2 * day + 600)
+	_check(_work.job(kitchen).get("state") == "working", "the carpenter builds the kitchen meanwhile (%s)" % [_work.job(kitchen)])
+	_check(int(_towns.shortfall(TOWN).get("job", 0)) == inn, "the inn stays at the head (what players give goes to it)")
+	_at(2 * day + 3600)
+	_stock.deposit(TOWN, "cloth", 5, "test")
+	_at(2 * day + 3900)
+	_check(_work.job(inn).get("state") == "working", "its cloth in: the inn is built next (%s)" % [_work.job(inn)])
+

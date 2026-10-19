@@ -15346,3 +15346,25 @@ Rejected: rocks as scatter (they block, so a rock a cell, never off it, and
 they cast shadows, which the scatter doesn't); a rock as a node a cell (a
 MultiMesh a slot draws them all at once); the void's ground (the forest's
 floor) under a rock (a rock on a lip would stand on the forest's needles).
+## 522. A build stalled on materials doesn't hold up the next
+
+The coordinator's approval, after 500's soak (the pasture waited till day
+23.5 behind an inn short of leather: one build at a time).
+- A build job remembers when it was ordered (Production.order_build "at";
+  one saved before this has none: long ago).
+- Production.builds_stalled(town): every build the town has in hand is
+  queued, its materials not in the store, ordered build_wait.days (2) ago
+  or more, and there are fewer than build_wait.most (3). Then Towns.tick
+  lets the town order its next build as if it had none (repairs, roofs,
+  choose), and choose skips a kind already being built.
+- The stalled one is kept at the head: the builder's bid takes the first
+  queued build whose materials are in the store, else the first; 499's
+  shortfall (what players give toward) is still the first queued build.
+Soak (30 days, 3 players, against 500's): the pasture stood on day 8.1
+(23.5), the shepherd came on 11.1 (26.5), the loom on 11.2 and the weaver
+on 14.2 (29.6). The inn didn't stand in 30 days (23.4): the treasury,
+at its floor, paid what the town owed the weaver (28 times) and the
+shepherd (16) as well as the tanner, who was paid 8 times (25) and made 5
+leather (13); the inn ended 2 leather short. Officials unpaid 198 (201),
+treasury end 1 (5). Protocol unchanged. towns_test.
+

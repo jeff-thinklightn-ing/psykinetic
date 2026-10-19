@@ -378,7 +378,9 @@ func tick() -> void:
 		_weaver_comes(town)
 		_woodcut(town)
 		_woodcutter_comes(town)
-		if production.building_in(town):
+		# One build at a time, unless the one in hand has stalled on its
+		# materials (decision 522).
+		if production.building_in(town) and not production.builds_stalled(town):
 			continue
 		if _repair(town):
 			continue
@@ -464,6 +466,8 @@ func choose(town: String) -> String:
 		return la < lb or la == lb and a < b)
 	wants.append_array(housing)
 	for kind in wants:
+		if int(building(town, kind).get("job", 0)) != 0:
+			continue  # Being built already (a stalled one, decision 522).
 		var level := int(building(town, kind).get("level", 0)) + 1
 		var top := int(kinds[kind].get("max_level", 3))
 		if level <= top and xp(town) >= int(kinds[kind].get("xp", 0)) * level:

@@ -574,6 +574,26 @@ func building_in(town: String) -> bool:
 	return _jobs.values().any(func(each: Dictionary) -> bool: return each["kind"] == "build" and each["town"] == town)
 
 
+## Whether every build [param town] has in hand is stalled (decision 522):
+## queued, its materials not in the store, ordered build_wait.days ago or
+## more (a build saved before 522 has no "at": long ago), and fewer than
+## build_wait.most of them; then the town may order
+## its next build, the stalled one kept at the head (499's shortfall, the
+## builder's first choice once its materials come).
+func builds_stalled(town: String) -> bool:
+	var rule: Dictionary = rules.get("build_wait", {})
+	var wait := int(float(rule.get("days", 0)) * maxi(DayNight.day_steps, 1))
+	if wait <= 0:
+		return false
+	var builds := _jobs.values().filter(func(each: Dictionary) -> bool: return each["kind"] == "build" and each["town"] == town)
+	if builds.is_empty() or builds.size() >= int(rule.get("most", 3)):
+		return false
+	for each: Dictionary in builds:
+		if each["state"] != "queued" or now() - int(each.get("at", 0)) < wait or _affords(town, {"from": each.get("cost", {})}, false):
+			return false
+	return true
+
+
 func worker(id: String) -> Dictionary:
 	return _workers.get(id, {}).duplicate(true)
 
@@ -1225,13 +1245,23 @@ func _choose(town: String, signals: Dictionary, cat: Dictionary) -> void:
 ## ({workshop, recipe, kind, want, job (an order's), rework, key}); {} for none.
 func _bid(shop: Dictionary, wants: Array[String], signals: Dictionary, cat: Dictionary) -> Dictionary:
 	var starved := 0 if int(shop["waited"]) >= int(rules.get("starve_after", 3)) else 1
+	# Orders first: the first one; of the town's builds, the first whose
+	# materials are in the store, else the first (decision 522: a stalled
+	# build kept at the head, the next one built meanwhile).
+	var first_build := 0
 	for id in jobs():
 		var each: Dictionary = _jobs[id]
 		var builds_here: bool = each["kind"] == "build" and each["workshop"] == "" and each["trade"] == shop["trade"] \
 				and each["town"] == shop["town"]
-		if each["state"] == "queued" and (each["workshop"] == shop["id"] or builds_here):
-			return {"workshop": shop["id"], "recipe": each["recipe"], "kind": each["kind"], "want": "order", "job": id,
-				"rework": int(each.get("rework", 0)), "key": [starved, 0, 0.0, -int(shop["waited"]), shop["id"]]}
+		if each["state"] != "queued" or not (each["workshop"] == shop["id"] or builds_here):
+			continue
+		if builds_here and not _affords(shop["town"], {"from": each.get("cost", {})}, false):
+			if first_build == 0:
+				first_build = id
+			continue
+		return _order_bid(shop, id, starved)
+	if first_build != 0:
+		return _order_bid(shop, first_build, starved)
 	var recipes: Array = cat.values().filter(func(entry: Dictionary) -> bool:
 		return _recipe_ok(entry) and entry["made"]["by"] == shop["trade"])
 	recipes.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
@@ -1317,6 +1347,13 @@ func _reworkable(town: String, id: String) -> int:
 		if book().id_of(uid) == id:
 			return uid
 	return 0
+
+
+## A bid for queued job [param id] at [param shop].
+func _order_bid(shop: Dictionary, id: int, starved: int) -> Dictionary:
+	var each: Dictionary = _jobs[id]
+	return {"workshop": shop["id"], "recipe": each["recipe"], "kind": each["kind"], "want": "order", "job": id,
+		"rework": int(each.get("rework", 0)), "key": [starved, 0, 0.0, -int(shop["waited"]), shop["id"]]}
 
 
 ## Whether [param town]'s stockpile has what [param made] needs: its
@@ -1469,6 +1506,7 @@ func order_build(town: String, building_id: String, trade: String, cost: Diction
 	_jobs[id]["ordered"] = true
 	_jobs[id]["cost"] = cost.duplicate()
 	_jobs[id]["steps"] = maxi(steps, 1)
+	_jobs[id]["at"] = now()
 	_town(town)
 	print("[production] %s orders %s built by a %s (%s, %d steps)" % [town, building_id, trade, cost, steps])
 	return id

@@ -92,6 +92,7 @@
 		"rich_every": 0.5
 	},
 	"level_speed": 0.25,
+	"build_wait": {"days": 2, "most": 3},
 	"xp": {"rescue": 10, "objective": 50},
 	"residents": {"base": 3, "per_inn": 3},
 	"raids": {

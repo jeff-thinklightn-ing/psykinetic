@@ -12,6 +12,9 @@ notes (decision 324).
 - Fixed: since v0.1.150 the kobold's dagger, and a player's dagger, spear, hammer, axe and pick swings and shield bash, stopped animating after the first swing; every swing animates again (390).
 - Rocks are drawn as rocks: mossy stones on the ground, a big boulder where four rock cells meet, where before they showed as trees or as pillars of wall. Slopes up an outcrop are smooth ramps of grass (513).
 - Builder mode tells Claude which trade works which work site (a town's woodcutter its woodlot, hunter its hunting ground, farmer its farm), read from the economy rules, and that the farther the site the longer each trip (520 amended, on 521).
+- A town no longer stands idle behind a building it can't get materials for (522): after two days it starts on the next building it can build, then goes back to the first once its materials come in.
+
+- Fixed: a monster with one strike clip erred on every swing after the first (390).
 - Tall grass is drawn: a patch of blades about a metre high with pale seed heads, swaying in the wind, and grass trampled flat shows as a pressed mat along the path until it stands again (508).
 - A town's woodcutter, hunter and farmer work from the town's woodlot, hunting ground and farm where a level has them (521), walking there and back. If goblins hold the site, or it is contested, it yields nothing and the town grows uneasy until it is retaken.
 - Sheep and wool (500): once a town's field is farmed it builds a pasture, and a shepherd comes with a flock. The flock is sheared in spring and autumn and has lambs each spring. When wool fills the store, the town builds a loom and a weaver comes to turn the wool into cloth.
