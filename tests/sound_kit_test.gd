@@ -184,7 +184,7 @@ func _test_takes() -> void:
 			"a Sonniss source is stored external, synced into art/audio/external/")
 	# A take listed but not synced (as on a machine without the sound library).
 	SoundKit.all_takes()["sfx.block_shield"] = [{"file": "sfx.block_shield.9.ogg", "from": "sonniss-gdc-2024", "sha256": "0"}]
-	SoundKit._files.clear()
+	SoundKit.forget_files()
 	_check(SoundKit.take_files("sfx.block_shield") == ["res://art/audio/external/sfx.block_shield/sfx.block_shield.9.ogg"], "it is looked for in art/audio/external/<slot>/")
 	_check(SoundKit.filled_by("sfx.block_shield") == "fill" and SoundKit.played_from("sfx.block_shield", false) == "sfx.block_shield",
 			"listed: filled, by the lists alone")
@@ -202,9 +202,11 @@ func _test_takes() -> void:
 	# Synced: a take that is there (a Kenney file, through its path from the slot's folder).
 	SoundKit.all_takes()["sfx.block_shield"] = [{"file": "../sfx/hit_1.ogg", "from": "kenney-impact", "sha256": "0"}]
 	SoundKit.source("kenney-impact")["path"] = "res://art/audio/"
-	SoundKit._files.clear()
+	SoundKit.forget_files()
 	_check(SoundKit.files("sfx.block_shield").size() == 1, "there: played (%s)" % [SoundKit.files("sfx.block_shield")])
+	_check(SoundKit._played_from.get("sfx.block_shield") == "sfx.block_shield", "what a slot plays from is resolved once, kept (perf: Music weighs by it)")
 	SoundKit.reload()
+	_check(SoundKit._played_from.is_empty(), "reload forgets it")
 	_check(SoundKit.takes("sfx.block_shield") == listed and SoundKit.source("kenney-impact")["path"] == "res://art/audio/sfx/", "reload reads the files again")
 
 
@@ -402,7 +404,7 @@ func _test_sfx_plays_slots() -> void:
 func _without_takes(slots: Array) -> void:
 	for slot: String in slots:
 		SoundKit.all_takes().erase(slot)
-	SoundKit._files.clear()
+	SoundKit.forget_files()
 
 
 func _test_credits() -> void:

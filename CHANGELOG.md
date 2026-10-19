@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- A small stutter four times a second is gone: the music no longer looks up its sound files on disk each time it weighs its layers.
 - Wine comes in a leather flask sealed with red wax, spice in a tied cloth pouch heaped with orange spice, and a silver ring has a small raised setting.
 ## v0.1.156
 

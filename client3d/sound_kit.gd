@@ -60,6 +60,10 @@ static var _takes: Dictionary = {}
 static var _takes_read := false
 ## Slot -> the files it plays (res:// paths), resolved once.
 static var _files: Dictionary[String, Array] = {}
+## Slot -> played_from(slot) on disk, resolved once: Music weighs its
+## layers by it four times a second (perf: uncached, ResourceLoader.exists
+## over every take name cost 2-4 ms a weigh).
+static var _played_from: Dictionary[String, String] = {}
 static var _placeholders: Dictionary[String, AudioStreamWAV] = {}
 
 
@@ -199,6 +203,15 @@ static func filled_by(slot: String) -> String:
 ## default) a slot whose takes are listed but not synced has none; by the
 ## lists alone (on_disk false: the status) it has them.
 static func played_from(slot: String, on_disk := true) -> String:
+	if on_disk and _played_from.has(slot):
+		return _played_from[slot]
+	var found := _resolve_played_from(slot, on_disk)
+	if on_disk:
+		_played_from[slot] = found
+	return found
+
+
+static func _resolve_played_from(slot: String, on_disk: bool) -> String:
 	var seen: Array[String] = []
 	var at := slot
 	while has(at) and at not in seen:
@@ -390,7 +403,13 @@ static func reload() -> void:
 	_manifest = {}
 	_takes = {}
 	_takes_read = false
+	forget_files()
+
+
+## Forget which files each slot plays (after its takes' lists change).
+static func forget_files() -> void:
 	_files.clear()
+	_played_from.clear()
 
 
 ## The blip a slot with no takes plays on [param bus_name] (null for a bed's
