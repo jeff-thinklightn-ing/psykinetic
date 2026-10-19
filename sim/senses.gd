@@ -5,8 +5,9 @@ extends RefCounted
 ##
 ## Sight (sees): within sight_range; in its cone (cone_cos of its facing),
 ## unless within NOTICE_ALWAYS; lit (the target glows, the map's light, or
-## a lantern carried near it, at least DARK); and in line of sight. The
-## cheap checks first, line of sight last.
+## a lantern carried near it, at least DARK); not hidden by cover
+## (hidden_by_cover); and in line of sight. The cheap checks first, line
+## of sight last.
 ##
 ## Hearing: World.noise pushes a noise to the agents within its radius as it
 ## happens (hear); nobody listens every tick. The last HEARD_MAX are kept.
@@ -60,6 +61,9 @@ const MEMORY_TICKS := 600
 ## this cosine of the wind's.
 const SCENT_TILES := 12
 const SCENT_ALIGN := 0.6
+## Cover (World.cover_at, tall grass; decision 508, enemy-ai's side): one
+## in it who has not stepped for so many ticks is not seen.
+const STILL_TICKS := 20
 
 var agent: GridEntity
 var sight_range := 7
@@ -97,23 +101,54 @@ func sees(entity: GridEntity, d := -1, in_cone := true, farther := 1.0) -> bool:
 			return false
 		if entity.emit_light <= 0.0 and not is_lit(at):
 			return false
+		if hidden_by_cover(entity, d, not in_cone):
+			return false
 	if not World.has_line_of_sight(from, at):
 		return false
 	_seen[entity.get_instance_id()] = {"at": at, "tick": World.tick}
 	return true
 
 
+## Whether cover hides [param entity], [param d] cells off (decision 508,
+## enemy-ai's side): it stands in cover (World.cover_at, standing tall
+## grass), is past NOTICE_ALWAYS, carries no light where it is dark without
+## one (a player's lantern, lit from the start, gives nothing away by day),
+## and is not the agent's keeper (a companion never loses her player in a
+## meadow); then still
+## (STILL_TICKS since its last step) it is hidden, and moving it is hidden
+## past sight_range x (1 - cover) unless [param held], the one the agent
+## already follows (a chase is shaken off by going still). Hidden past
+## NOTICE_ALWAYS only: glimpses still turns a wary one to look at a mover.
+func hidden_by_cover(entity: GridEntity, d: int, held := false) -> bool:
+	if d <= NOTICE_ALWAYS:
+		return false
+	var cover := World.cover_at(entity.tile)
+	if cover <= 0.0 or (agent is Companion and (agent as Companion).keeper == entity):
+		return false
+	if entity.emit_light > 0.0 and World.light_at(entity.tile, false) < DARK:
+		return false
+	if World.tick - entity.last_step_tick >= STILL_TICKS:
+		return true
+	return not held and d > sight_range * (1.0 - cover)
+
+
 ## Whether it glimpses [param entity], not seeing it (sees false): in
 ## range, in its cone and in line of sight, but lit only dimly (GLIMPSE or
-## more, under DARK) and carrying no light. [param d] as sees.
+## more, under DARK) and carrying no light; or moving in cover where cover
+## hides it (hidden_by_cover; decision 508). [param d] as sees.
 func glimpses(entity: GridEntity, d := -1) -> bool:
 	var at := entity.tile
 	if d < 0:
 		d = maxi(absi(at.x - agent.tile.x), absi(at.y - agent.tile.y))
-	if d <= NOTICE_ALWAYS or d > sight_range * World.weather_sight_at(agent.tile) or entity.emit_light > 0.0 or not _in_cone(at):
+	if d <= NOTICE_ALWAYS or d > sight_range * World.weather_sight_at(agent.tile) or not _in_cone(at):
 		return false
-	var light := _light(at, DARK)
-	return light >= GLIMPSE and light < DARK and World.has_line_of_sight(agent.tile, at)
+	var light := _light(at, DARK)  # A carried light counts: its bearer is seen, not glimpsed.
+	if light < GLIMPSE:
+		return false
+	# Moving in cover, hidden from sight: the grass stirs (decision 508).
+	var stirs := light >= DARK and World.cover_at(at) > 0.0 and World.tick - entity.last_step_tick < STILL_TICKS \
+			and hidden_by_cover(entity, d)
+	return (light < DARK or stirs) and World.has_line_of_sight(agent.tile, at)
 
 
 ## Whether it smells [param entity] [param d] cells off (Chebyshev; as

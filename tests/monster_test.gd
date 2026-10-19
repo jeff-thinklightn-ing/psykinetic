@@ -58,6 +58,7 @@ func _ready() -> void:
 	_test_plans_per_step()
 	_test_walk_round_held_ground()
 	_test_sight_cone()
+	_test_cover()
 	_test_sight_by_light()
 	_test_hearing()
 	_test_noise_reach()
@@ -871,6 +872,59 @@ func _build(rows: Array[String], extra := {}, edges := {}) -> Dictionary:
 			World.spawn(entity, spawn[1])
 			out[symbol].append(entity)
 	return out
+
+
+func _test_cover() -> void:
+	print("\n== tall grass hides one still in it; a mover is glimpsed far off, seen near or followed (decision 508) ==")
+	Monster.idling = false
+	var e := _build(["#############", "#...........#", "#...........#", "#.b.....P...#", "#...........#", "#...........#", "#############"],
+			{"b": {"facing": Vector2i(1, 0)}})
+	var brute: Monster = e["b"][0]
+	var player: GridEntity = e["P"][0]
+	brute.sight_range = 7
+	var grass: Array[Vector2i] = []
+	for x in range(6, 11):
+		for y in range(1, 6):
+			grass.append(Vector2i(x, y))
+	World._load_cover({"tall_grass": grass})
+	var d := World.distance(brute.tile, player.tile)
+	player.emit_light = 0.0  # No lantern (its own case below).
+	player.last_step_tick = World.tick - Senses.STILL_TICKS
+	World.step()
+	_check(World.cover_at(player.tile) > 0.0 and brute.target == null and not brute.senses.sees(player, d, false),
+			"still in the grass %d off, it is not seen, nor kept by one that had it" % d)
+	player.last_step_tick = World.tick
+	_check(not brute.senses.sees(player, d) and brute.senses.glimpses(player, d),
+			"moving in it far off: not seen, but glimpsed (the grass stirs)")
+	_check(brute.senses.sees(player, d, false), "but one already following it keeps it while it moves")
+	_move_to(player, Vector2i(6, 3))
+	player.last_step_tick = World.tick
+	_check(not brute.senses.sees(player, 4), "moving 4 off in 0.7 grass, sight 7: still past 7 x 0.3, not seen")
+	brute.sight_range = 14
+	_check(brute.senses.sees(player, 4), "within its sight x (1 - cover), seen")
+	brute.sight_range = 7
+	player.last_step_tick = World.tick - Senses.STILL_TICKS
+	_move_to(player, Vector2i(3, 3))
+	_check(brute.senses.sees(player, 1), "beside it, seen still or not")
+	_move_to(player, Vector2i(5, 3))
+	_check(brute.senses.sees(player, 3), "out of the grass, seen still")
+	_move_to(player, Vector2i(8, 3))
+	player.emit_light = Player.LANTERN
+	_check(World.light_at(player.tile, false) >= Senses.DARK and not brute.senses.sees(player, d),
+			"its lantern lit by day gives nothing away (in the dark it would: Senses.hidden_by_cover)")
+	player.last_step_tick = World.tick
+	_check(not brute.senses.sees(player, d) and brute.senses.glimpses(player, d), "moving, lantern and all, it is glimpsed")
+	player.last_step_tick = World.tick - Senses.STILL_TICKS
+	player.emit_light = 0.0
+	var companion := EntityFactory.build({"script": "res://sim/companion.gd", "shape": "capsule", "name": "Garrow",
+		"props": {"max_hp": 10}}) as Companion
+	_room.add_child(companion)
+	World.spawn(companion, Vector2i(3, 1))
+	companion.facing = Vector2i(1, 0)
+	_check(not companion.senses.sees(player), "a companion not hers does not see the still player in the grass")
+	companion.keeper = player
+	_check(companion.senses.sees(player), "her own player she sees in the grass, still or moving")
+	World._load_cover({})
 
 
 func _test_sight_cone() -> void:

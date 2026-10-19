@@ -14636,3 +14636,23 @@ out of the meal need and the store's resources:
 Art slots item.wine, item.spice and item.silver_ring, placeholders for
 art-kit; slots_items.json and the art status regenerated. items_test.
 Protocol unchanged; no new class_name.
+
+508, enemy-ai's side (perception in cover; agreed with maps, the
+coordinator approved): Senses reads World.cover_at; maps' data and the line
+of sight are unchanged (no thinning: a meadow is seen over).
+- Senses.hidden_by_cover: past NOTICE_ALWAYS, a body standing in cover is
+  hidden when still (STILL_TICKS, 2 s, since its last step,
+  GridEntity.last_step_tick), and moving when farther than sight_range x
+  (1 - cover) (a goblin's 7 in 0.7 grass: about 2 cells). Never from the
+  agent's keeper (a companion sees her player in a meadow), nor a body whose
+  carried light shows where it is dark without it (a player's lantern, lit
+  from the start, gives nothing away by day).
+- A held target (sees' in_cone false: the one a monster or an animal
+  already follows) is kept while it moves; it is shaken off by going still,
+  and the pursuer then searches its last-seen cell as ever.
+- glimpses: a mover hidden by cover is glimpsed (the grass stirs), so a
+  wary monster turns to look, with no target.
+- Smell (animals, by the wind) ignores cover.
+A companion on Heel keeps her player through grass both ways: Heel reads no
+Senses, and her Senses never hide her keeper. Server only, protocol
+unchanged. tests/monster_test (_test_cover).

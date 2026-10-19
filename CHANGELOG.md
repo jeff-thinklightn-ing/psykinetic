@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Tall grass hides you: stand still in it and monsters and animals pass you by; move and they may catch the grass stirring, and a monster already chasing you keeps after you until you go still. Your companion never loses you in it, and animals can still smell you on the wind.
 - New luxury goods: a flask of wine and a pouch of spice, brought in by caravan, and a silver ring the smith makes.
 - Wading into tall grass rustles; a trodden path through it is quiet.
 - Builder mode can lay streams: ask for "a stream through here with a ford" and Claude gives it a winding course, fords where paths cross it and bridges on level banks. It can also paint fords and tall grass.
