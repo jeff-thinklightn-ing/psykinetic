@@ -13931,6 +13931,20 @@ player could have picked. A delivery refused puts them back on the ground
 where he stands. Nothing on a client (World.forage is null). resident_test
 (skipped until items' "herbs" is in the catalog). Protocol unchanged; no
 new class_name.
+
+Amended 2026-10-19 (the coordinator, on the 30-day soak: he gathered nothing
+in a month, since a body stands only while a player is near, and in the
+wilds the hut is outside the walls; the roadmap's "world moves on" and
+Jeff's "everything has to be gathered and someone paid"): one gather a
+day per medicine man (townsfolk.json "healer" herbs_a_day 1), by his body
+on his way while a player is near, else around his hut's cell with the
+same reach once "gather_hour" (14) has come, bodiless, on the world tick;
+the same delivery and pay either way, and one day marker per man
+(Main._herbs_gathered) so a day's gather is never done twice. resident_test:
+the bodied take, the guard, the hut's take with no body standing, and the
+walk of a sick resident to the healer completing the kin's plea by the
+walker's name (501's third way, now covered).
+
 ## 504. Trade routes: caravans between a town and a market, raidable where they pass a camp
 
 Economy's phase 2 of the gold economy (Jeff: "trade with other town. think
@@ -14096,3 +14110,4 @@ bridge as a new cell kind (no length, no slot, no editor placing); one mesh
 per bridge length (art-kit: a repeated deck); fords in spate now
 (environment's Weather.water_at later, with routes replanning and a
 gameplay yes on being cut off by water).
+wool 2 at 2 for cloth 3 at 3).

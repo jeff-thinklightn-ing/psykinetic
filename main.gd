@@ -4442,40 +4442,84 @@ func _visits_due() -> void:
 const HERB_REACH := 6
 
 
-## Server, on the world tick: a medicine man whose body is up and about takes
-## the nearest herbs within HERB_REACH off the ground (terrain's
-## Forage.take_near, decision 502) and delivers them to the town's store as a
-## gatherer's raw (economy's Production.deliver_to, 498: bought at the
-## delivery price), where the healer's remedy recipe reads them (items'
-## 501). What a player sees lying there is what he gathers. Nothing
-## while he is at home, in bed or hiding; nothing on a client (World.forage
-## is null there).
+## Server, on the world tick: a medicine man gathers herbs (decision 502,
+## npc's side, amended): "herbs_a_day" (townsfolk.json "healer", 1) a day,
+## by his body on its way while a player is near (not at home, in bed or
+## hiding), else around his hut's cell once "gather_hour" has come; the
+## world moves on whether or not anyone stands there. Nothing on a client
+## (World.forage is null there).
+## A medicine man's gathers today: {worker id: {day, count}} (the guard: a day's
+## gather is never done twice, bodied or not).
+var _herbs_gathered: Dictionary = {}
+
+
 func _gather_herbs() -> void:
 	if World.forage == null or World.production == null or World.holdings == null:
 		return
+	var today := Townsfolk.day_of(World.steps)
+	var rule: Dictionary = Townsfolk.rules().get("healer", {})
+	var a_day := int(rule.get("herbs_a_day", 1))
+	# By his body, on his way, while a player is near: the visible gather.
 	for entity: GridEntity in World.townsfolk():
 		var body := entity as Resident
 		if body == null or body.trade != "medicine_man" or body.town.is_empty() or body.doing in [Resident.Doing.HOME, Resident.Doing.BED, Resident.Doing.HIDE]:
 			continue
-		var store := _town_store_of(body.zone)
-		if store.is_empty():
+		if _herbs_today(body.worker_id, today) >= a_day:
 			continue
-		var uid: int = World.forage.take_near(body.zone, body.tile, HERB_REACH)
-		if uid == 0:
+		if _take_herbs(body.worker_id, body.person, body.zone, body.tile, today):
+			print("[townsfolk] %s gathered herbs on his way at %s" % [body.person, body.tile])
+	# Without a body (nobody near his hut; the world moves on), at the hut once the hour has come.
+	if DayNight.hour(World.steps) < float(rule.get("gather_hour", 14)):
+		return
+	for id: String in World.production.worker_ids():
+		var who := World.production.worker(id)
+		if not "medicine_man" in who.get("trades", []) or bool(who.get("away", false)) or Townsfolk.is_sick(World.production, id):
 			continue
-		# Delivered as a gatherer's raw (economy's 498: the store buys it at the delivery price), the pile's instance ended as a banked resource's is.
-		var yields := World.items.yields_of(uid)
-		if yields.is_empty():
-			yields = {World.items.id_of(uid): 1}
-		var delivered := false
-		for what: String in yields:
-			if World.production.deliver_to(store, body.worker_id, what, int(yields[what]), body.person, "gathered by the medicine man"):
-				delivered = true
-		if delivered:
-			World.items.end(uid, "banked", "%s by %s" % [store, body.person], body.zone, body.tile)
-			print("[townsfolk] %s gathered %s at %s for %s" % [body.person, yields, body.tile, store])
-		else:
-			World.put_on_ground(uid, body.tile)  # Not taken: back on the ground where he stands.
+		if _herbs_today(id, today) >= a_day:
+			continue
+		var hut := World.holdings.place(str(who.get("town", "")))
+		var area := str(hut.get("area", ""))
+		if hut.is_empty() or not World.zones.has(area) or not hut.get("cell") is Vector2i:
+			continue
+		while _herbs_today(id, today) < a_day:
+			if not _take_herbs(id, str(who.get("name", id)), area, hut["cell"], today):
+				break
+			print("[townsfolk] %s gathered herbs around the hut" % who.get("name", id))
+
+
+## How many herbs [param id] has gathered on [param today].
+func _herbs_today(id: String, today: int) -> int:
+	var mark: Dictionary = _herbs_gathered.get(id, {})
+	return int(mark.get("count", 0)) if int(mark.get("day", -1)) == today else 0
+
+
+## The medicine man [param id] ([param name]) takes the nearest herbs within
+## HERB_REACH of [param cell] in [param area] (terrain's Forage.take_near) and
+## delivers them to the area's town store as a gatherer's raw (economy's
+## Production.deliver_to, 498: bought at the delivery price), the pile's
+## instance ended as a banked resource's is; a delivery refused puts them
+## back where they were. True when herbs were taken and delivered.
+func _take_herbs(id: String, name: String, area: String, cell: Vector2i, today: int) -> bool:
+	var store := _town_store_of(area)
+	if store.is_empty():
+		return false
+	var uid: int = World.forage.take_near(area, cell, HERB_REACH)
+	if uid == 0:
+		return false
+	var yields := World.items.yields_of(uid)
+	if yields.is_empty():
+		yields = {World.items.id_of(uid): 1}
+	var delivered := false
+	for what: String in yields:
+		if World.production.deliver_to(store, id, what, int(yields[what]), name, "gathered by the medicine man"):
+			delivered = true
+	if not delivered:
+		World.put_on_ground(uid, cell)
+		return false
+	World.items.end(uid, "banked", "%s by %s" % [store, name], area, cell)
+	var mark: Dictionary = _herbs_gathered.get(id, {})
+	_herbs_gathered[id] = {"day": today, "count": (int(mark.get("count", 0)) if int(mark.get("day", -1)) == today else 0) + 1}
+	return true
 
 
 ## The town's store in [param area] (the stockpile place the town holds), ""
