@@ -1677,6 +1677,34 @@
 			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/prop.bridge/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c3's 800 mesh scaled to 1.6 x 0.6 x 3, 744 tris"},
 			"uses": "a plank bridge over a stream or a drop, 3 m along z, walkable along its length"
 		},
+		"bridge.wood.deck": {
+			"category": "props",
+			"type": "mesh",
+			"kind": "cell",
+			"size": [1.0, 0.25, 1.04],
+			"base": -0.25,
+			"variants": 2,
+			"budget": 300,
+			"uses": "maps' bridges (decision 505: Level.BRIDGE, {slot \"bridge\", at, facing, length, width 1 or 2}, drawn by terrain): one 1 x 1 m plank deck segment, repeated along the bridge's facing (z) and twice side by side for width 2; its origin the cell's centre with the deck's top at y 0, the walking surface at the cell's floor height, its planks and stringers hanging below to -0.25 (\"base\"); 1.04 along z so neighbours overlap (and cover the joins when ramps come: each segment pitched about x by its cells' slope, capped near 0.3 m a cell); no railings (bridge.wood.rail)"
+		},
+		"bridge.wood.rail": {
+			"category": "props",
+			"type": "mesh",
+			"kind": "edge",
+			"size": [0.12, 0.8, 1.04],
+			"budget": 150,
+			"uses": "maps' bridges (decision 505: Level.BRIDGE, {slot \"bridge\", at, facing, length, width 1 or 2}, drawn by terrain): the railing along one outer long edge of a deck cell, never down the middle of a 2-wide bridge: an edge piece along z, its origin on the cell's edge at deck level, posts and a top rail to 0.8 m (stops walkers, not sight); pitched with its deck"
+		},
+		"bridge.wood.end": {
+			"category": "props",
+			"type": "mesh",
+			"kind": "cell",
+			"size": [1.1, 0.9, 0.6],
+			"base": -0.6,
+			"middle": [0, 0, 0.3],
+			"budget": 300,
+			"uses": "maps' bridges (decision 505: Level.BRIDGE, {slot \"bridge\", at, facing, length, width 1 or 2}, drawn by terrain): where the deck meets a bank, at each end: its origin the middle of the edge between the last deck cell and the bank, at deck level, the bank toward +z; a sill with a step down onto the bank, end posts finishing the rails (to 0.8 m and a little past the deck's sides), piles down to -0.6"
+		},
 		"prop.ladder": {
 			"category": "props",
 			"type": "mesh",
