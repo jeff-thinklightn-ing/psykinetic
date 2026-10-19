@@ -14884,3 +14884,34 @@ Rejected: a new height tool (357's is the one, and builder's HeightTools
 behind both); checking climbs by parsing the whole level each stroke (a
 big level's parse is slow; the rule is a few lines); saving the clipboard
 (that is a prefab); pasting part of a stream.
+
+## 450. The landing boots the exported server
+
+What only the exported server pack hits turned up first on the box: a
+resource the export filters leave out (art/audio, anything not listed for
+a dedicated server), a script that loads only in the editor, a class the
+binary-token scripts resolve differently. `tests/server_boot_test.sh` (and
+its `.ps1`) is now a part of `tests/land.sh` and `land.ps1`, run beside the
+suite, net_test and state_test under the landing's suite take of the gate:
+
+- `--export-pack "Linux Server"`, the box's own preset, into a temp
+  folder (about 10 s, 24 MB).
+- The pack booted by this Godot's Windows release template (from the
+  export_templates folder for its version), the same runtime as the box's
+  Linux one. Release templates refuse `--main-pack`, so the template is
+  copied beside the pack under its name (`server.exe`, `server.pck`, the
+  console wrapper `server.console.exe`). It runs `--headless --server` on
+  a fresh APPDATA with no snapshot, on ports of its own (17892 +
+  the checkout's offset), and quits after 45 s.
+- One headless client from the checkout joins once the server's
+  "listening" line is in, so a zone wakes and ticks scripts from the pack.
+  The test waits on log lines, not fixed times: beside the suite a client
+  took over 6 s to join.
+- It fails on a failed export or boot, a non-zero exit, no "listening" or
+  "joined as" line, or any `SCRIPT ERROR` / `ERROR:` line in the export's
+  or the server's log. A `push_error` put in `Main._ready` made it fail.
+
+It runs about 60 s, beside the suite (about 150 s), so a landing takes no
+longer. A Linux export can't run here, but
+the pack is the same file the box loads; what differs (the OS) the box's
+own boot after a deploy still covers. Tests only; protocol unchanged.

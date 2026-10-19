@@ -1,6 +1,6 @@
 # Everything a landing runs (decision 278): the suite (tests\run.ps1), the
-# network test and the state test, at the same time; one summary and one exit
-# code: 0 when all three pass. Their ports and folders are their own
+# network test, the state test and the exported server's boot (decision
+# 450), at the same time; one summary and one exit code: 0 when all pass. Their ports and folders are their own
 # (tests/suite_test checks), so they do not meet.
 #   tests\land.ps1
 # The suite takes the job count (tests\jobs.ps1) less the two the others use
@@ -27,12 +27,12 @@ $logs = Join-Path ([IO.Path]::GetTempPath()) ('psykinetic-land-' + [Guid]::NewGu
 New-Item -ItemType Directory -Force $logs | Out-Null
 
 $suiteJobs = [Math]::Max(2, (Get-TestJobs $root) - 2)
-Write-Output "landing tests: the suite ($suiteJobs at once), net_test and state_test together"
+Write-Output "landing tests: the suite ($suiteJobs at once), net_test, state_test and server_boot_test together"
 $started = Get-Date
 $gateTest = & python (Join-Path $root 'tests\heavy_job_test.py') 2>&1
 $gateOk = $LASTEXITCODE -eq 0
 Write-Output "$(if ($gateOk) { 'PASS' } else { 'FAIL' })  heavy_job_test"
-$parts = [ordered]@{ suite = 'run.ps1'; net_test = 'net_test.ps1'; state_test = 'state_test.ps1' }
+$parts = [ordered]@{ suite = 'run.ps1'; net_test = 'net_test.ps1'; state_test = 'state_test.ps1'; server_boot_test = 'server_boot_test.ps1' }
 $running = @{}
 $env:PSYKINETIC_TEST_JOBS = "$suiteJobs"  # Only the suite reads it.
 try {
@@ -85,7 +85,7 @@ Remove-Item $logs -Recurse -Force -ErrorAction SilentlyContinue
 $seconds = [int]((Get-Date) - $started).TotalSeconds
 Write-Output ''
 if ($failed.Count -eq 0) {
-	Write-Output "LANDING TESTS: PASS (suite, net_test, state_test; ${seconds}s)"
+	Write-Output "LANDING TESTS: PASS (suite, net_test, state_test, server_boot_test; ${seconds}s)"
 	exit 0
 }
 Write-Output "LANDING TESTS: FAIL ($($failed -join ', '); ${seconds}s)"

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Everything a landing runs (decision 278): the suite (tests/run.sh), the
-# network test and the state test, at the same time; one summary and one exit
-# code: 0 when all three pass. Their ports and folders are their own
+# network test, the state test and the exported server's boot (decision
+# 450), at the same time; one summary and one exit code: 0 when all pass. Their ports and folders are their own
 # (tests/suite_test checks), so they do not meet.
 #   tests/land.sh
 # The suite takes the job count (tests/jobs.sh) less the two the others use
@@ -28,7 +28,7 @@ jobs_at_once="$(test_jobs)"
 suite_jobs=$(( jobs_at_once - 2 ))
 [ "$suite_jobs" -lt 2 ] && suite_jobs=2
 started=$(date +%s)
-echo "landing tests: the suite ($suite_jobs at once), net_test and state_test together"
+echo "landing tests: the suite ($suite_jobs at once), net_test, state_test and server_boot_test together"
 
 part() {
 	name="$1"
@@ -43,11 +43,12 @@ part heavy_job_test python tests/heavy_job_test.py
 part suite env PSYKINETIC_TEST_JOBS="$suite_jobs" bash tests/run.sh &
 part net_test bash tests/net_test.sh &
 part state_test bash tests/state_test.sh &
+part server_boot_test bash tests/server_boot_test.sh &
 wait
 
 code=0
 failed=""
-for name in heavy_job_test suite net_test state_test; do
+for name in heavy_job_test suite net_test state_test server_boot_test; do
 	read -r status took <"$LOGS/$name.status"
 	if [ "$status" -ne 0 ]; then
 		code=1
@@ -74,7 +75,7 @@ if [ -n "$failed" ]; then
 fi
 echo
 if [ "$code" -eq 0 ]; then
-	echo "LANDING TESTS: PASS (suite, net_test, state_test, heavy_job_test; $(( $(date +%s) - started ))s)"
+	echo "LANDING TESTS: PASS (suite, net_test, state_test, server_boot_test, heavy_job_test; $(( $(date +%s) - started ))s)"
 else
 	echo "LANDING TESTS: FAIL ($failed; $(( $(date +%s) - started ))s)"
 fi
