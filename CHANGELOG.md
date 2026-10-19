@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The ground can now have real hills and valleys: an outdoor level's new relief.png gives each cell's height in centimetres. A gentle slope is walked (slower uphill, and wandering groups take the valleys), a steep one is a cliff to fall from, a ridge hides what lies behind it, buildings need level ground and water lies level under its banks. Levels without one play as before; the sample level has a gentle rise (525). Server and client: protocol 22.
 - Fire looks like fire (523): torches and burning ground have flickering flames with rising embers and a faint wisp of smoke, and their light flickers and warms the ground around them. By day outdoors a torch's light fades to a glint.
 - Chests, crates and barrels are rebuilt in clean planks: a chest with a rounded lid, iron straps and a brass clasp, a crate with a framed, braced side, and a barrel with staves and iron hoops.
 - A torch that stands on its own is a pole packed upright in a ring of stones, its pitch-wrapped head ready for the flame.

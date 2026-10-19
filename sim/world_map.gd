@@ -50,13 +50,13 @@ func _read(area_name: String, made: Dictionary) -> void:
 	if layout == null:
 		return
 	var config: Dictionary = made["config"]
-	var digest := _digest(layout, made["height"], config)
+	var digest := _digest(layout, made["height"], config, made.get("relief"))
 	var before: Dictionary = _read_before.get(area_name, {})
 	if before.get("digest", "") != digest:
 		before = {"digest": digest, "area": {}, "ways": []}
 		var ways_before := ways
 		ways = []
-		_parse_area(area_name, layout, made["height"], config)
+		_parse_area(area_name, layout, made["height"], config, made.get("relief"))
 		before["area"] = areas[area_name]
 		before["ways"] = ways
 		ways = ways_before
@@ -76,10 +76,10 @@ static func _set_of(cells: Array) -> Dictionary[Vector2i, bool]:
 
 ## What [param layout], [param height] and [param config] are, as a string:
 ## the same for the same level, another for any change to it.
-static func _digest(layout: Image, height: Image, config: Dictionary) -> String:
+static func _digest(layout: Image, height: Image, config: Dictionary, relief: Image = null) -> String:
 	var hashing := HashingContext.new()
 	hashing.start(HashingContext.HASH_MD5)
-	for image: Image in [layout, height]:
+	for image: Image in [layout, height, relief]:
 		if image == null:
 			hashing.update("none".to_utf8_buffer())
 			continue
@@ -89,8 +89,8 @@ static func _digest(layout: Image, height: Image, config: Dictionary) -> String:
 	return hashing.finish().hex_encode()
 
 
-func _parse_area(area_name: String, layout: Image, height: Image, config: Dictionary) -> void:
-	var level := Level.parse(layout, height, config)
+func _parse_area(area_name: String, layout: Image, height: Image, config: Dictionary, relief: Image = null) -> void:
+	var level := Level.parse(layout, height, config, relief)
 	var floor_cells: Dictionary[Vector2i, bool] = {}
 	for cell: Vector2i in level["terrain"]["floor"]:
 		floor_cells[cell] = true
@@ -109,6 +109,7 @@ func _parse_area(area_name: String, layout: Image, height: Image, config: Dictio
 		"starts": level["starts"], "spawn_points": level["spawn_points"], "links": level["links"],
 		"neighbours": level["neighbours"], "warnings": level["warnings"], "floor": floor_cells,
 		"edges": level["terrain"]["edges"], "heights": level["terrain"]["heights"], "stairs": level["terrain"]["stairs"],
+		"relief": level["terrain"]["relief"], "relief_size": level["terrain"]["relief_size"],
 		"places": level["places"], "buildings": level["buildings"], "markets": level["markets"],
 		# Fords (decision 505): floor, a step into one costing FORD_COST.
 		"fords": _set_of(level["terrain"].get("fords", [])),

@@ -390,6 +390,13 @@ var _fire: Dictionary[Vector2i, bool] = {}
 ## not a wall). See Level.
 var _height: Dictionary[Vector2i, int] = {}
 var _stairs: Dictionary[Vector2i, Vector2i] = {}
+## The ground's elevation in metres (decision 525), row by row over
+## _relief_size cells: relief.png's, or the whole levels' (Relief). Steps,
+## falls and pace read it; _relief_given (the level gave relief.png) has
+## sight read it in metres too.
+var _relief := PackedFloat32Array()
+var _relief_size := Vector2i.ZERO
+var _relief_given := false
 var _water: Dictionary[Vector2i, bool] = {}
 ## Fords (decision 505): shallow water walked through at FORD_TICK_SCALE;
 ## floor.
@@ -423,7 +430,7 @@ var outdoor := false
 var _through_bodies := false
 ## The eye height of the line of sight being walked (has_line_of_sight), -1
 ## when none: a wall lower than the eye does not stop it.
-var _eye := -1
+var _eye := -1.0
 ## Walls and doors are edges between cells, keyed as Terrain.edge_key says;
 ## open edges are absent. Blocking is a property of the edge you cross.
 var _edges: Dictionary[Vector3i, int] = {}
@@ -1168,6 +1175,9 @@ func enter(to: Zone) -> Zone:
 	from.fire = _fire
 	from.height = _height
 	from.stairs = _stairs
+	from.relief = _relief
+	from.relief_size = _relief_size
+	from.relief_given = _relief_given
 	from.water = _water
 	from.fords = _fords
 	from.cover = _cover
@@ -1189,6 +1199,9 @@ func enter(to: Zone) -> Zone:
 	_fire = to.fire
 	_height = to.height
 	_stairs = to.stairs
+	_relief = to.relief
+	_relief_size = to.relief_size
+	_relief_given = to.relief_given
 	_water = to.water
 	_fords = to.fords
 	_cover = to.cover
@@ -1303,6 +1316,9 @@ func reset() -> void:
 	_edges.clear()
 	_height.clear()
 	_stairs.clear()
+	_relief = PackedFloat32Array()
+	_relief_size = Vector2i.ZERO
+	_relief_given = false
 	_water.clear()
 	_fords.clear()
 	_cover = PackedFloat32Array()
@@ -1409,6 +1425,9 @@ func _set_terrain(terrain: Dictionary) -> void:
 	_edges.clear()
 	_height.clear()
 	_stairs.clear()
+	_relief = PackedFloat32Array()
+	_relief_size = Vector2i.ZERO
+	_relief_given = false
 	_water.clear()
 	_fords.clear()
 	_torches.clear()
@@ -1433,6 +1452,7 @@ func _set_terrain(terrain: Dictionary) -> void:
 	_load_cover(terrain)
 	for t: Vector2i in terrain["floor"]:
 		_floor[t] = true
+	_load_relief(terrain)
 	for t: Vector2i in terrain["fire"]:
 		_fire[t] = true
 	var edges: Dictionary = terrain["edges"]
@@ -3612,6 +3632,10 @@ func shot_line(from: Vector2i, toward: Vector2i, cells: int) -> Array[Vector2i]:
 		return out
 	var to := from + d * maxi(1, ceili(float(cells) / longest))
 	var top := height_at(from)
+	# Over relief (decision 525) the arrow flies from the eye toward the
+	# aim over [param toward], and ground above that line stops it.
+	var eye := elevation_at(from) + Relief.EYE_M
+	var drop_per_cell := (eye - elevation_at(toward) - Relief.AIM_M) / Vector2(from).distance_to(Vector2(toward))
 	var span: Vector2i = (to - from).abs()
 	var s := Vector2i(1 if from.x < to.x else -1, 1 if from.y < to.y else -1)
 	var err: int = span.x - span.y
@@ -3628,7 +3652,9 @@ func shot_line(from: Vector2i, toward: Vector2i, cells: int) -> Array[Vector2i]:
 		if _sight_crosses_edge(at, step):
 			break
 		at += step
-		if distance(from, at) > cells or height_at(at) > top or not (is_walkable(at) or is_water(at)):
+		var above := elevation_at(at) > eye - drop_per_cell * Vector2(from).distance_to(Vector2(at)) if _relief_given \
+				else height_at(at) > top
+		if distance(from, at) > cells or above or not (is_walkable(at) or is_water(at)):
 			break
 		out.append(at)
 	return out
@@ -4616,6 +4642,9 @@ func mirror_reset() -> void:
 	_edges.clear()
 	_height.clear()
 	_stairs.clear()
+	_relief = PackedFloat32Array()
+	_relief_size = Vector2i.ZERO
+	_relief_given = false
 	_water.clear()
 	_fords.clear()
 	tick = 0
@@ -5078,9 +5107,37 @@ func floor_cells() -> Array[Vector2i]:
 	return out
 
 
-## A cell's height in levels (0..6).
+## A cell's height in whole levels (0..6 from height.png; relief.png's
+## elevation rounded to levels, decision 525).
 func height_at(at: Vector2i) -> int:
 	return _height.get(at, 0)
+
+
+## A cell's elevation in metres (decision 525), 0 off the map.
+func elevation_at(at: Vector2i) -> float:
+	return Relief.at(_relief, _relief_size, at)
+
+
+## Whether this zone's level gave its ground in relief.png (decision 525).
+func has_relief() -> bool:
+	return _relief_given
+
+
+## The terrain's elevation field (Level's "relief"), or one derived from
+## its whole levels for a terrain that has none (Terrain.parse's, a test's).
+func _load_relief(terrain: Dictionary) -> void:
+	_relief_given = bool(terrain.get("relief_given", false))
+	if terrain.has("relief"):
+		_relief = terrain["relief"]
+		_relief_size = terrain["relief_size"]
+		return
+	var high := Vector2i.ZERO
+	for cell: Vector2i in _floor:
+		high = high.max(cell + Vector2i.ONE)
+	for cell: Vector2i in _height:
+		high = high.max(cell + Vector2i.ONE)
+	_relief_size = high
+	_relief = Relief.derived(_height, high)
 
 
 ## The way the stair on [param at] climbs, or ZERO for none.
@@ -5230,21 +5287,7 @@ func is_torch(at: Vector2i) -> bool:
 ## A diagonal across any change of height is a ledge (stairs are
 ## orthogonal), up or down as the destination is.
 func height_step(from: Vector2i, direction: Vector2i) -> int:
-	var to := from + direction
-	var rise := height_at(to) - height_at(from)
-	if direction.x != 0 and direction.y != 0:
-		var flat := rise == 0 and height_at(from + Vector2i(direction.x, 0)) == height_at(from) \
-				and height_at(from + Vector2i(0, direction.y)) == height_at(from)
-		if flat:
-			return 0
-		return -rise if rise != 0 else -1
-	if rise == 0:
-		return 0
-	if rise == 1 and stair_at(from) == direction:
-		return 0
-	if rise == -1 and stair_at(to) == -direction:
-		return 0
-	return -rise
+	return Relief.step(_relief, _relief_size, _stairs, from, direction)
 
 
 ## What is on the edge leaving [param from] in orthogonal [param direction];
@@ -5287,7 +5330,7 @@ func edge_blocks(from: Vector2i, direction: Vector2i, opens_doors := false) -> b
 ## being walked is above both cells it stands between (higher cells see
 ## over lower walls), or the wall is a field's fence (Fields.fences).
 func edge_blocks_sight(from: Vector2i, direction: Vector2i) -> bool:
-	if _eye >= 0 and _eye > maxi(height_at(from), height_at(from + direction)):
+	if _eye >= 0.0 and _eye - maxf(elevation_at(from), elevation_at(from + direction)) > Relief.WALK_RISE:
 		return false
 	match edge_kind(from, direction):
 		Terrain.Edge.WALL:
@@ -5391,6 +5434,8 @@ func distance(a: Vector2i, b: Vector2i) -> int:
 func step_ticks(entity: GridEntity, direction: Vector2i) -> float:
 	var ticks := entity.move_ticks * (DIAGONAL_TICK_SCALE if direction.x != 0 and direction.y != 0 else 1.0)
 	var to := entity.tile + direction
+	# Uphill is slower (Relief.pace, decision 525); a stair is not.
+	ticks *= Relief.pace(elevation_at(to) - elevation_at(entity.tile), direction.x != 0 and direction.y != 0)
 	if _fords.has(to):
 		return ticks * FORD_TICK_SCALE
 	return ticks * TALL_GRASS_TICK_SCALE if cover_at(to) > 0.0 else ticks
@@ -5543,9 +5588,9 @@ func blocks_sight(at: Vector2i) -> bool:
 ## tile between; the endpoints themselves never block. A diagonal step of
 ## the walk needs one of its two orthogonal routes open.
 func has_line_of_sight(from: Vector2i, to: Vector2i) -> bool:
-	_eye = height_at(from)
+	_eye = elevation_at(from)
 	var seen := _line_of_sight(from, to)
-	_eye = -1
+	_eye = -1.0
 	return seen
 
 
@@ -5630,6 +5675,8 @@ func _sight_edge(from: Vector2i, direction: Vector2i, eye: int) -> Variant:
 ## does (decision 513): from under a cliff its lip is seen, nothing behind
 ## it; from on top, everything below.
 func _line_of_sight(from: Vector2i, to: Vector2i) -> bool:
+	if _relief_given and not _through_bodies:
+		return _line_in_metres(from, to)
 	var top := maxi(height_at(from), height_at(to))
 	if not _through_bodies:
 		top = height_at(from)
@@ -5650,6 +5697,36 @@ func _line_of_sight(from: Vector2i, to: Vector2i) -> bool:
 			return false
 		at += step
 		if at != to and (blocks_sight(at) or height_at(at) > top):
+			return false
+	return true
+
+
+## Sight over a level's relief (decision 525): a line from Relief.EYE_M
+## over the viewer's ground to Relief.AIM_M over the seen cell's, stopped
+## by ground above it on the way (a ridge hides the valley behind it; from
+## under a cliff its lip is seen, not what stands back from it), and by
+## walls, doors and bodies as the walk above.
+func _line_in_metres(from: Vector2i, to: Vector2i) -> bool:
+	var eye := elevation_at(from) + Relief.EYE_M
+	var aim := elevation_at(to) + Relief.AIM_M
+	var length := Vector2(from).distance_to(Vector2(to))
+	var d: Vector2i = (to - from).abs()
+	var s := Vector2i(1 if from.x < to.x else -1, 1 if from.y < to.y else -1)
+	var err: int = d.x - d.y
+	var at: Vector2i = from
+	while at != to:
+		var e2: int = 2 * err
+		var step := Vector2i.ZERO
+		if e2 > -d.y:
+			err -= d.y
+			step.x = s.x
+		if e2 < d.x:
+			err += d.x
+			step.y = s.y
+		if _sight_crosses_edge(at, step):
+			return false
+		at += step
+		if at != to and (blocks_sight(at) or elevation_at(at) > lerpf(eye, aim, Vector2(from).distance_to(Vector2(at)) / length)):
 			return false
 	return true
 
@@ -5879,7 +5956,7 @@ func _path_step(from: Vector2i, way: int) -> int:
 func _fill_path_steps(from: Vector2i, base: int) -> void:
 	var x := from.x
 	var y := from.y
-	var level: int = _height.get(from, 0)
+	var level := elevation_at(from)
 	# The four edges round the cell, by way (DIRECTIONS 0..3: east, south,
 	# west, north), and whether each straight neighbour is floor at its height.
 	var sides := PackedInt32Array([
@@ -5893,11 +5970,9 @@ func _fill_path_steps(from: Vector2i, base: int) -> void:
 		var to := from + direction
 		var step := PATH_STEP_BLOCKED
 		if _floor.has(to):
-			var rise: int = _height.get(to, 0) - level
-			if rise == 0:
+			if not Relief.cliff_between(level, elevation_at(to)):
 				level_with[way] = 1
-			if sides[way] != Terrain.Edge.WALL and (rise == 0 or rise == 1 and _stairs.get(from, Vector2i.ZERO) == direction
-					or rise == -1 and _stairs.get(to, Vector2i.ZERO) == -direction):
+			if sides[way] != Terrain.Edge.WALL and height_step(from, direction) == 0:
 				step = PATH_STEP_DOOR if sides[way] == Terrain.Edge.DOOR else PATH_STEP_OPEN
 		_grid_steps[base + way] = step + 1
 	for way in range(4, 8):
@@ -5914,7 +5989,7 @@ func _fill_path_steps(from: Vector2i, base: int) -> void:
 				or beyond_x == Terrain.Edge.DOOR or beyond_y == Terrain.Edge.DOOR:
 			step = PATH_STEP_ASK
 		elif not _floor.has(from + direction) or level_with[way_x] == 0 or level_with[way_y] == 0 \
-				or _height.get(from + direction, 0) != level \
+				or height_step(from, direction) != 0 \
 				or sides[way_x] == Terrain.Edge.WALL or sides[way_y] == Terrain.Edge.WALL \
 				or beyond_x == Terrain.Edge.WALL or beyond_y == Terrain.Edge.WALL:
 			step = PATH_STEP_BLOCKED

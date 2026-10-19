@@ -287,8 +287,10 @@ static func terrain_message(level_name: String) -> Dictionary:
 	var made := Level.source(level_name)
 	var layout: Image = made["layout"]
 	var height: Image = made["height"]
+	var relief: Image = made.get("relief")
 	return {"name": level_name, "layout": layout.save_png_to_buffer() if layout != null else PackedByteArray(),
-		"height": height.save_png_to_buffer() if height != null else PackedByteArray(), "config": made["config"]}
+		"height": height.save_png_to_buffer() if height != null else PackedByteArray(), "config": made["config"],
+		"relief": relief.save_png_to_buffer() if relief != null else PackedByteArray()}
 
 
 ## A client: makes level [param data]["name"] from a "terrain" message
@@ -303,8 +305,14 @@ static func register_terrain(data: Dictionary) -> bool:
 		height = Image.new()
 		if height.load_png_from_buffer(height_bytes) != OK:
 			height = null
+	var relief: Image = null
+	var relief_bytes: PackedByteArray = data.get("relief", PackedByteArray())
+	if not relief_bytes.is_empty():
+		relief = Image.new()
+		if relief.load_png_from_buffer(relief_bytes) != OK:
+			relief = null
 	var config: Variant = data.get("config", {})
-	Level.register(str(data.get("name", "")), layout, height, config if config is Dictionary else {})
+	Level.register(str(data.get("name", "")), layout, height, config if config is Dictionary else {}, relief)
 	return true
 
 

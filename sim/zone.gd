@@ -16,6 +16,10 @@ var floor: Dictionary[Vector2i, bool] = {}
 var fire: Dictionary[Vector2i, bool] = {}
 var height: Dictionary[Vector2i, int] = {}
 var stairs: Dictionary[Vector2i, Vector2i] = {}
+## The ground's elevation in metres (World.elevation_at, decision 525).
+var relief := PackedFloat32Array()
+var relief_size := Vector2i.ZERO
+var relief_given := false
 var water: Dictionary[Vector2i, bool] = {}
 var fords: Dictionary[Vector2i, bool] = {}
 ## Each cell's cover in its rect (World.cover_at, decision 508).

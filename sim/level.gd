@@ -181,8 +181,8 @@ static var _registered: Dictionary[String, Dictionary] = {}
 
 
 ## Makes a level from images and a config, without files (tests).
-static func register(level_name: String, layout: Image, height: Image = null, config := {}) -> void:
-	_registered[level_name] = {"layout": layout, "height": height, "config": config}
+static func register(level_name: String, layout: Image, height: Image = null, config := {}, relief: Image = null) -> void:
+	_registered[level_name] = {"layout": layout, "height": height, "config": config, "relief": relief}
 	Regen.forget()
 
 
@@ -200,7 +200,7 @@ static var _templates: Dictionary[String, Dictionary] = {}
 ## Keeps [param made] ({layout, height, config}) as level [param level_name]'s
 ## template: what each generation starts from.
 static func keep_template(level_name: String, made: Dictionary) -> void:
-	_templates[level_name] = {"layout": made["layout"], "height": made["height"], "config": made["config"]}
+	_templates[level_name] = {"layout": made["layout"], "height": made["height"], "config": made["config"], "relief": made.get("relief")}
 	Regen.forget()
 
 
@@ -214,7 +214,8 @@ static func template(level_name: String) -> Dictionary:
 	if _registered.has(level_name):
 		return _registered[level_name]
 	var folder := DIR + level_name + "/"
-	return {"layout": _image(folder + "layout.png"), "height": _image(folder + "height.png"), "config": template_config(level_name)}
+	return {"layout": _image(folder + "layout.png"), "height": _image(folder + "height.png"), "config": template_config(level_name),
+		"relief": _image(folder + "relief.png")}
 
 
 ## The template's level.json alone (template, without its images read).
@@ -301,7 +302,8 @@ static func source(level_name: String) -> Dictionary:
 			config = parsed
 		else:
 			push_warning("[level] %slevel.json is not a JSON object" % folder)
-	return {"layout": _image(folder + "layout.png"), "height": _image(folder + "height.png"), "config": config}
+	return {"layout": _image(folder + "layout.png"), "height": _image(folder + "height.png"), "config": config,
+		"relief": _image(folder + "relief.png")}
 
 
 ## Reads level [param level_name] (see the class doc). {} with a warning
@@ -312,7 +314,7 @@ static func load_level(level_name: String) -> Dictionary:
 	if layout == null:
 		push_warning("[level] no level %s (%slayout.png)" % [level_name, folder_of(level_name)])
 		return {}
-	var level := parse(layout, made["height"], made["config"])
+	var level := parse(layout, made["height"], made["config"], made.get("relief"))
 	level["name"] = level_name
 	level["terrain"]["level"] = level_name
 	# A linked building's town by its id, as Towns and Holdings name it.
@@ -369,7 +371,7 @@ static func _rgb(colour: Color) -> int:
 
 ## The level in [param layout] (and [param height]) with [param config]:
 ## see the class doc for what comes back.
-static func parse(layout: Image, height: Image, config: Dictionary) -> Dictionary:
+static func parse(layout: Image, height: Image, config: Dictionary, relief: Image = null) -> Dictionary:
 	var by_colour := legend(config)
 	var warnings: Array[String] = []
 	var unknown: Dictionary[int, bool] = {}
@@ -548,6 +550,18 @@ static func parse(layout: Image, height: Image, config: Dictionary) -> Dictionar
 					var level := clampi(roundi(greys[(y * 2 * size.x + x * 2) * 4] / float(GREY_PER_LEVEL)), 0, MAX_HEIGHT)
 					if level > 0:
 						heights[Vector2i(x, y)] = level
+	# The ground's elevation in metres (decision 525): relief.png's where
+	# it is given, else the whole levels'.
+	var field := PackedFloat32Array()
+	if relief != null:
+		field = Relief.read(relief, cells, warnings)
+		if not field.is_empty():
+			if not heights.is_empty():
+				warnings.append("height.png and relief.png are both here: relief.png is the ground")
+			heights = Relief.whole_levels(field, cells)
+	var given := not field.is_empty()
+	if not given:
+		field = Relief.derived(heights, cells)
 	var stairs: Dictionary[Vector2i, Vector2i] = {}
 	var slopes: Dictionary[Vector2i, Vector2i] = {}
 	for cell in stair_cells:
@@ -555,7 +569,9 @@ static func parse(layout: Image, height: Image, config: Dictionary) -> Dictionar
 		for direction: Vector2i in [Vector2i(0, -1), Vector2i(1, 0), Vector2i(0, 1), Vector2i(-1, 0)]:
 			var next := cell + direction
 			var next_walks := walks[(next.y + 1) * across + next.x + 1] == 1
-			if next_walks and heights.get(next, 0) == heights.get(cell, 0) + 1 and not edges.has(Terrain.edge_key(cell, direction)):
+			var rise := Relief.at(field, cells, next) - Relief.at(field, cells, cell)
+			if next_walks and rise >= Relief.LEVEL_M * 0.5 and rise <= Relief.STAIR_RISE + Relief.EPSILON \
+					and not edges.has(Terrain.edge_key(cell, direction)):
 				up.append(direction)
 		var what := "slope" if cell in slope_cells else "stair"
 		if up.is_empty():
@@ -576,6 +592,7 @@ static func parse(layout: Image, height: Image, config: Dictionary) -> Dictionar
 			"floor": floor_tiles, "fire": fire, "edges": edges, "kinds": kinds, "water": water, "fords": fords,
 			"tall_grass": tall_grass, "slopes": slopes, "rocks": rocks,
 			"heights": heights, "stairs": stairs, "torches": torches, "lanterns": lanterns,
+			"relief": field, "relief_size": cells, "relief_given": given,
 			"ambient": clampf(float(config.get("ambient", DayNight.base_ambient(zone))), 0.0, 1.0),
 			"north": NORTHS.get(str(config.get("north", "up")), Vector2i(0, -1)),
 			"zone": zone,
@@ -604,6 +621,7 @@ static func parse(layout: Image, height: Image, config: Dictionary) -> Dictionar
 	_lay_bridges(level)
 	level["terrain"]["streams"] = streams_from(config, level["terrain"], warnings)
 	_check_fords(level["terrain"], warnings)
+	_check_water(level["terrain"], warnings)
 	level["building_cells"] = inside_cells(level["buildings"])
 	_clear_tall_grass(level, warnings)
 	building_places(level["buildings"], level["places"])
@@ -1108,9 +1126,9 @@ static func buildings_from(config: Dictionary, terrain: Dictionary, warnings: Ar
 				out.append(bridge)
 			continue
 		var under := wet if on_water else ground
-		var height: int = terrain["heights"].get(cells[0], 0)
-		var bad := cells.filter(func(cell: Vector2i) -> bool:
-			return not under.has(cell) or terrain["heights"].get(cell, 0) != height or taken.has(cell))
+		var bad := cells.filter(func(cell: Vector2i) -> bool: return not under.has(cell) or taken.has(cell))
+		if bad.is_empty():
+			bad = _uneven(terrain, cells)
 		if not bad.is_empty():
 			warnings.append("the %s at %s is not all on %s of one height (%s): left out" % [what, rect.position, "water" if on_water else "clear floor", bad[0]])
 			continue
@@ -1159,14 +1177,46 @@ static func _bridge(entry: Dictionary, rect: Rect2i, cells: Array[Vector2i], ter
 		if not ground.has(bank) or wet.has(bank) or bank in fords:
 			warnings.append("the bridge at %s does not end on a bank at %s: left out" % [rect.position, bank])
 			return {}
-		if terrain["heights"].get(bank, 0) != height:
-			warnings.append("the bridge at %s has banks of two heights (%s): left out (level banks only)" % [rect.position, bank])
-			return {}
+	var uneven := _uneven(terrain, banks)
+	if not uneven.is_empty():
+		warnings.append("the bridge at %s has banks of two heights (%s): left out (level banks only)" % [rect.position, uneven[0]])
+		return {}
 	for cell in cells:
 		taken[cell] = true
 	var blocks: Array[Rect2i] = [rect]
 	return {"slot": BRIDGE, "cell": rect.position, "facing": facing, "rect": rect, "blocks": blocks, "use": "", "town": "",
-		"height": height, "banks": [first, last]}
+		"height": height, "elevation": _elevation(terrain, banks[0]), "banks": [first, last]}
+
+
+## The cells of [param cells] off a pad (Relief.flat, decision 525): []
+## if they lie within Relief.PAD_FLAT of each other, else the one furthest
+## from the first. A terrain with no relief compares whole levels.
+static func _uneven(terrain: Dictionary, cells: Array) -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	if not terrain.has("relief"):
+		var height: int = terrain["heights"].get(cells[0], 0)
+		for cell: Vector2i in cells:
+			if terrain["heights"].get(cell, 0) != height:
+				out.append(cell)
+				break
+		return out
+	if Relief.flat(terrain["relief"], terrain["relief_size"], cells):
+		return out
+	var base := _elevation(terrain, cells[0])
+	var furthest: Vector2i = cells[0]
+	for cell: Vector2i in cells:
+		if absf(_elevation(terrain, cell) - base) > absf(_elevation(terrain, furthest) - base):
+			furthest = cell
+	out.append(furthest)
+	return out
+
+
+## [param terrain]'s elevation at [param cell] in metres (its relief, else
+## its whole levels).
+static func _elevation(terrain: Dictionary, cell: Vector2i) -> float:
+	if terrain.has("relief"):
+		return Relief.at(terrain["relief"], terrain["relief_size"], cell)
+	return int(terrain["heights"].get(cell, 0)) * Relief.LEVEL_M
 
 
 ## level.json's "streams" (decision 505): [{"path": [[x, y], ...]}], each a
@@ -1225,6 +1275,72 @@ static func _clear_tall_grass(level: Dictionary, warnings: Array[String]) -> voi
 
 ## A ford beside no water (nor another ford, nor under a bridge) is in no
 ## stream: said in [param warnings] (decision 505).
+## Water over relief (decision 525): its cells hold its surface, so a
+## stream steps only down along its path, a pond (water no stream runs
+## through) lies level within Relief.PAD_FLAT, and the ground beside any
+## water stands at least Relief.SHORE_LIP over it (the views' bank). What
+## is not so is said in [param warnings], once a body; nothing is changed.
+## A level with no relief.png's water is level by its whole levels.
+static func _check_water(terrain: Dictionary, warnings: Array[String]) -> void:
+	if not terrain.get("relief_given", false):
+		return
+	var field: PackedFloat32Array = terrain["relief"]
+	var size: Vector2i = terrain["relief_size"]
+	var bridged: Array = terrain.get("bridged", [])
+	var flowing: Dictionary[Vector2i, bool] = {}
+	for stream: Dictionary in terrain.get("streams", []):
+		var path: Array = stream["path"]
+		var last := INF
+		for cell: Vector2i in path:
+			flowing[cell] = true
+			if cell in bridged:
+				continue
+			var here := Relief.at(field, size, cell)
+			if here > last + Relief.EPSILON:
+				warnings.append("the stream from %s rises at %s (%.2f m after %.2f m): water runs down" % [path[0], cell, here, last])
+				break
+			last = here
+	var wet: Dictionary[Vector2i, bool] = {}
+	for cell: Vector2i in terrain.get("water", []):
+		wet[cell] = true
+	for cell: Vector2i in terrain.get("fords", []):
+		wet[cell] = true
+	var ground: Dictionary[Vector2i, bool] = {}
+	for cell: Vector2i in terrain["floor"]:
+		ground[cell] = true
+	var seen: Dictionary[Vector2i, bool] = {}
+	for start: Vector2i in wet:
+		if seen.has(start):
+			continue
+		var body: Array[Vector2i] = [start]
+		seen[start] = true
+		var i := 0
+		while i < body.size():
+			for direction: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+				var next := body[i] + direction
+				if wet.has(next) and not seen.has(next):
+					seen[next] = true
+					body.append(next)
+			i += 1
+		if not body.any(func(cell: Vector2i) -> bool: return flowing.has(cell)) and not Relief.flat(field, size, body):
+			warnings.append("the pond at %s is not level (within %.2f m): water lies level" % [start, Relief.PAD_FLAT])
+		var low_shore := _low_shore(field, size, body, wet, ground, bridged)
+		if not low_shore.is_empty():
+			warnings.append("the water at %s has its shore at %s less than %.1f m over it" % [low_shore[0], low_shore[1], Relief.SHORE_LIP])
+
+
+## The first water cell of [param body] with a dry floor neighbour (not a
+## bridge's) under Relief.SHORE_LIP over it, and that neighbour; [] if none.
+static func _low_shore(field: PackedFloat32Array, size: Vector2i, body: Array[Vector2i], wet: Dictionary, ground: Dictionary,
+		bridged: Array) -> Array[Vector2i]:
+	for cell in body:
+		for direction: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+			var shore := cell + direction
+			if ground.has(shore) and not wet.has(shore) and not shore in bridged 					and Relief.at(field, size, shore) < Relief.at(field, size, cell) + Relief.SHORE_LIP - Relief.EPSILON:
+				return [cell, shore]
+	return []
+
+
 static func _check_fords(terrain: Dictionary, warnings: Array[String]) -> void:
 	var wet := {}
 	for key in ["water", "fords", "bridged"]:
@@ -1265,6 +1381,8 @@ static func _lay_bridges(level: Dictionary) -> void:
 				terrain["kinds"][cell] = bank_kind
 				if int(building["height"]) > 0:
 					terrain["heights"][cell] = int(building["height"])
+				if terrain.has("relief") and Relief.on_map(terrain["relief_size"], cell):
+					terrain["relief"][cell.y * terrain["relief_size"].x + cell.x] = float(building["elevation"])
 				bridged.append(cell)
 				for side in sides:
 					if not rect.has_point(cell + side):
@@ -1395,8 +1513,9 @@ static func roofs_from(config: Dictionary, terrain: Dictionary, buildings: Array
 			continue
 		var cells := rect_cells(rect)
 		var height: int = terrain["heights"].get(cells[0], 0)
-		var bad := cells.filter(func(cell: Vector2i) -> bool:
-			return not ground.has(cell) or terrain["heights"].get(cell, 0) != height or taken.has(cell))
+		var bad := cells.filter(func(cell: Vector2i) -> bool: return not ground.has(cell) or taken.has(cell))
+		if bad.is_empty():
+			bad = _uneven(terrain, cells)
 		if not bad.is_empty():
 			warnings.append("the roof at %s is not all over clear floor of one height, clear of buildings and roofs (%s): left out" % [rect.position, bad[0]])
 			continue

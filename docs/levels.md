@@ -6,6 +6,7 @@ A level is a folder `levels/<name>/` (loaded by `sim/level.gd`):
 |---|---|
 | `layout.png` | the map, one colour per pixel from the legend below |
 | `height.png` | optional: how high each cell stands, in grey |
+| `relief.png` | optional, outdoors: the ground's elevation in metres, one pixel a cell (see Relief) |
 | `level.json` | its name, legend overrides, the entities' names and props, the start order, spawn points, level links |
 
 Every level is a zone on the server (docs/design.md, Zones): loaded on
@@ -105,6 +106,54 @@ No `height.png` means everything is at 0.
   faces down its sides, and draws stairs as four steps; walls and doors
   stand on the higher of their two cells. The 2D view draws higher cells
   lighter.
+
+## Relief
+
+Hills, valleys and ridges (decision 525). `relief.png` is one pixel a cell
+(the level's size in cells, not layout.png's), each the ground's elevation
+in centimetres as `R * 256 + G` (B unused; 0 to 655.35 m), written by
+`Relief.image` and read by `Relief.read`. Godot's PNG loader keeps 8 bits a
+channel, so the centimetres are split over two. Its `.import` is as Image,
+like height.png's. With no `relief.png` the elevation is derived from the
+whole levels, 0.5 m a level (`Relief.LEVEL_M`), and the level walks, falls
+and sees exactly as above. Given both, `relief.png` is the ground and the
+level says so; its whole levels (`World.height_at`, terrain `heights`) are
+its elevation rounded to levels, for what still reads levels.
+
+- **Walking is by slope.** An orthogonal step rising or falling up to
+  `Relief.WALK_RISE` (0.45 m) is walked; more is a cliff, as a ledge above.
+  A diagonal is walked when it (within 0.45 x sqrt 2) and both of its
+  orthogonal routes are. A stair or slope cell climbs up to
+  `Relief.STAIR_RISE` (0.5 m) its own way; it is found as above, a cell
+  0.25 to 0.5 m up. `Relief.cliff_between` and `Relief.step` are the rules,
+  for the sim, the routes and the views alike.
+- **Uphill is slower**: a step rising `r` takes `1 + 0.5 r / 0.45` as long
+  (`Relief.pace`; 1.5 at the steepest), and the world map's routes cost the
+  climb in their half steps, so they take valleys and saddles. Down is as
+  fast as the flat.
+- **A fall** off a cliff hurts `FALL_IMPACT_PER_LEVEL` for each 0.5 m of the
+  drop, rounded (one at least).
+- **Sight over relief** is a line from 1.5 m over the viewer's ground to 1 m
+  over the seen cell's, stopped by ground above it: a ridge hides the
+  valley behind it, and from under a cliff higher than the eye its lip is
+  seen, not what stands back from it. Walls are seen over by an eye more
+  than 0.45 m over both their cells. Light and heat keep the whole levels'
+  rule. A level with no `relief.png` sees as above.
+- **Buildings stand on pads**: a building's or roof's cells lie within
+  `Relief.PAD_FLAT` (0.05 m) of each other, or it is left out, said as
+  "not all on clear floor of one height". A bridge's banks likewise.
+- **Water holds its surface**: a water or ford cell's elevation is the
+  water's. A pond (water no stream runs through) lies level within 0.05
+  m; a stream steps only down along its path; dry ground beside water
+  stands at least `Relief.SHORE_LIP` (0.1 m) over it. What is not so is
+  said, and left as it is.
+- `Relief.corner_heights(field, size, cell)` gives a cell's four ground
+  corners (the mean of the cells joined to it walkably at each, per side
+  of a cliff): the views' ground follows it.
+- The "terrain" message carries `relief.png` with the other files.
+
+The sample level has one: its whole levels lifted 0.2 m over its water,
+and a gentle rise of about 0.9 m east of the stream.
 
 ## Light, heat and north
 

@@ -138,7 +138,8 @@ func _init(world_map: WorldMap, threaded := true, make_fields := true, obstacles
 	for area_name: String in _in_area:
 		var area: Dictionary = _areas[area_name]
 		_copies[area_name] = {"size": area["size"], "floor": area["floor"].duplicate(), "edges": area["edges"].duplicate(),
-			"heights": area["heights"].duplicate(), "stairs": area["stairs"].duplicate()}
+			"heights": area["heights"].duplicate(), "stairs": area["stairs"].duplicate(),
+			"relief": area.get("relief", PackedFloat32Array()), "relief_size": area.get("relief_size", area["size"])}
 	var job: Array[Dictionary] = []
 	for faction: String in _layers:
 		var layer := _layers[faction]
@@ -362,10 +363,10 @@ func distances_from(starts: Array[Dictionary]) -> Dictionary[String, PackedFloat
 				continue
 			for direction in STRAIGHTS:
 				if can_step(area, cell, direction):
-					_reach(area_name, cell + direction, cost + step_cost(area, cell + direction, 2), best, buckets)
+					_reach(area_name, cell + direction, cost + step_cost(area, cell + direction, 2) + climb_cost(area, cell, direction, 2), best, buckets)
 			for direction in DIAGONALS:
 				if can_step(area, cell, direction):
-					_reach(area_name, cell + direction, cost + step_cost(area, cell + direction, 3), best, buckets)
+					_reach(area_name, cell + direction, cost + step_cost(area, cell + direction, 3) + climb_cost(area, cell, direction, 3), best, buckets)
 			for lead: Array in leads.get(area_name, {}).get(cell, []):
 				_reach(lead[0], lead[1], cost + roundi(CROSSING * 2.0), best, buckets)
 		buckets[cost] = []
@@ -788,7 +789,7 @@ static func _steps_between(area: Dictionary, from: Vector2i, to: Vector2i, obsta
 			for pair: Array in [[STRAIGHTS, 2], [DIAGONALS, 3]]:
 				for direction: Vector2i in pair[0]:
 					var next := cell + direction
-					var next_cost: int = cost + step_cost(area, next, pair[1])
+					var next_cost: int = cost + step_cost(area, next, pair[1]) + climb_cost(area, cell, direction, pair[1])
 					if best.get(next, 1 << 30) <= next_cost or obstacles.has(next) or not can_step(area, cell, direction):
 						continue
 					best[next] = next_cost
@@ -815,8 +816,21 @@ static func step_cost(area: Dictionary, to: Vector2i, half_steps: int) -> int:
 	return half_steps * FORD_COST if area.get("fords", {}).has(to) else half_steps
 
 
+## The half steps a climb adds to a step of [param half_steps] from
+## [param from] by [param direction] (Relief.pace, decision 525: World's
+## uphill pace), so routes take the valley and the saddle.
+static func climb_cost(area: Dictionary, from: Vector2i, direction: Vector2i, half_steps: int) -> int:
+	var field: PackedFloat32Array = area.get("relief", PackedFloat32Array())
+	if field.is_empty():
+		return 0
+	var size: Vector2i = area["relief_size"]
+	var rise := Relief.at(field, size, from + direction) - Relief.at(field, size, from)
+	return roundi(half_steps * (Relief.pace(rise, direction.x != 0 and direction.y != 0) - 1.0))
+
+
 static func _relax(area: Dictionary, cell: Vector2i, direction: Vector2i, cost: int, best: Dictionary[Vector2i, int], buckets: Array[Array], obstacles: Dictionary) -> void:
 	var to := cell + direction
+	cost += climb_cost(area, cell, direction, cost - best[cell])
 	if area.get("fords", {}).has(to):
 		cost += (cost - best[cell]) * (FORD_COST - 1)
 	if best.get(to, 1 << 30) <= cost or obstacles.has(to) or not can_step(area, cell, direction):
@@ -849,8 +863,11 @@ static func _wall(area: Dictionary, from: Vector2i, direction: Vector2i) -> bool
 
 ## World.height_step on an area: 0 for a step that is level (or a stair).
 static func _height_step(area: Dictionary, from: Vector2i, direction: Vector2i) -> int:
-	var heights: Dictionary = area["heights"]
 	var stairs: Dictionary = area["stairs"]
+	var field: PackedFloat32Array = area.get("relief", PackedFloat32Array())
+	if not field.is_empty():
+		return Relief.step(field, area["relief_size"], stairs, from, direction)
+	var heights: Dictionary = area["heights"]
 	var here: int = heights.get(from, 0)
 	var to := from + direction
 	var rise: int = heights.get(to, 0) - here

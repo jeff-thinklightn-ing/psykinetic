@@ -28,6 +28,10 @@ var dirty := false
 var config_dirty := false
 var had_heights := false
 var heights_dirty := false
+## relief.png as loaded (decision 525; null if the level has none), and
+## whether it is to be written on save (a level first saved in the overlay).
+var relief: Image = null
+var relief_dirty := false
 ## What the last load, save or resize said.
 var report := ""
 var undo_steps: Array[Dictionary] = []
@@ -54,6 +58,8 @@ static func open(level_folder: String, new_size := LevelMap.NEW_SIZE) -> MapDoc:
 		doc.had_heights = FileAccess.file_exists(heights_png)
 		if doc.had_heights:
 			doc.map.read_heights(Image.load_from_file(ProjectSettings.globalize_path(heights_png)))
+		if FileAccess.file_exists(level_folder + "relief.png"):
+			doc.relief = Image.load_from_file(ProjectSettings.globalize_path(level_folder + "relief.png"))
 		doc.report = "loaded %s: %d x %d cells%s" % [png, doc.map.size.x, doc.map.size.y,
 			", %d pixels of colours not in the legend (void when saved)" % doc.map.unknown_pixels if doc.map.unknown_pixels > 0 else ""]
 	else:
@@ -78,9 +84,11 @@ static func from_level(level_name: String) -> MapDoc:
 	doc.had_heights = made["height"] != null
 	if doc.had_heights:
 		doc.map.read_heights(made["height"])
+	doc.relief = made.get("relief")
 	if not Level.overlaid(level_name):
 		doc.config_dirty = true
 		doc.heights_dirty = doc.had_heights
+		doc.relief_dirty = doc.relief != null
 	doc.report = "loaded %s: %d x %d cells" % [level_name, doc.map.size.x, doc.map.size.y]
 	return doc
 
@@ -114,8 +122,16 @@ func save() -> bool:
 		LevelMap.ensure_image_import(ProjectSettings.globalize_path(heights_png), heights_png)
 		had_heights = true
 		heights_dirty = false
+	if relief_dirty and relief != null:
+		var relief_png := folder + "relief.png"
+		error = relief.save_png(ProjectSettings.globalize_path(relief_png))
+		if error != OK:
+			report = "could not save %s (%s)" % [relief_png, error_string(error)]
+			return false
+		LevelMap.ensure_image_import(ProjectSettings.globalize_path(relief_png), relief_png)
+		relief_dirty = false
 	dirty = false
-	var level := Level.parse(image, map.to_height_image() if had_heights else null, config)
+	var level := Level.parse(image, map.to_height_image() if had_heights else null, config, relief)
 	var warnings: Array = level["warnings"]
 	report = "saved %s (%d x %d cells, %d floor, %d things)%s%s" % [png, map.size.x, map.size.y,
 		(level["terrain"]["floor"] as Array).size(), (level["entities"] as Array).size(),
@@ -126,7 +142,7 @@ func save() -> bool:
 
 ## The level as Level.parse reads it from what is here now (saved or not).
 func parsed() -> Dictionary:
-	return Level.parse(map.to_image(), map.to_height_image() if had_heights or not map.heights.is_empty() else null, config)
+	return Level.parse(map.to_image(), map.to_height_image() if had_heights or not map.heights.is_empty() else null, config, relief)
 
 
 # --- Undo ----------------------------------------------------------------------------

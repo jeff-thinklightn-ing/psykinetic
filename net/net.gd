@@ -208,7 +208,10 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## kinds: a ramp walked as a stair, a cell walled round) in the "terrain"
 ## message's files and the levels served (decision 513); the "world"
 ## message's trade caravans carry "days", the days still to go (504 amended).
-const PROTOCOL_REVISION := 21
+## 22: a level may carry relief.png, its ground's elevation in metres (in
+## the "terrain" message's files and the levels served), and steps are
+## walked by slope, uphill slower, sight over relief in metres (decision 525).
+const PROTOCOL_REVISION := 22
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]
 ## Every kind of message (message, message_to, broadcast, broadcast_to).

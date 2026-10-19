@@ -15462,3 +15462,74 @@ the shader's sparks cost nothing more); a prop.flame mesh slot (a flame is
 a shader, art-kit agreed); hanging prop.torch on the nearest wall (a torch
 marker is a free-standing cell; art-kit keeps the sconce for buildings'
 walls); flickering Fields' light or the floor's shade.
+## 525. Relief: hills, valleys and ridges as data
+
+Jeff: "dirt having polys is not what i meant by elevation .. i meant hills
+and valleys and ridges." Whole levels (356-358) and 513's cliffs read as
+terraces. The joint design with terrain, approved by the coordinator:
+terrain's polys fix first (524), this data half, then terrain's drawing
+("525, terrain's side"). This is the first of maps' two landings under
+this number: the data, the sim and the protocol. The generator
+(Relief.lay), the editor's height brush and levels/hills remade follow.
+
+- One elevation per cell centre, in metres (a cell is 1 m), so a cliff
+  lies on the edge between two cells where 513's are and each side keeps
+  its own corners. Outdoors a level may give it in relief.png: one pixel
+  a cell, centimetres as R * 256 + G. Godot 4.7's PNG loader cuts 16 bits
+  to 8 (checked: a 16-bit 256 read back as 1), so 16-bit grey would not
+  do. Terrain carries "relief" (a PackedFloat32Array row by row),
+  "relief_size" and "relief_given"; World holds it packed and swaps it
+  with the zone, as cover.
+- With no relief.png the field is derived from the whole levels at
+  Relief.LEVEL_M 0.5 m, and every rule below gives today's answer on it
+  exactly (indoors, the castle, the dungeon, every level made so far).
+  Given both files, relief.png wins, said. height_at() and terrain
+  "heights" stay, as the elevation rounded to levels, for buildings,
+  bridges, light and the views until terrain's side reads metres.
+- class_name Relief (sim/relief.gd), static so the sim, the routes, the
+  views and the tools share one of each rule: cliff_between (more than
+  WALK_RISE 0.45 m an orthogonal step, times sqrt 2 a diagonal),
+  step (World.height_step's answer: a stair or slope climbs up to
+  STAIR_RISE 0.5 m its own way; a diagonal needs both orthogonal routes),
+  levels (a drop in whole levels, one at least), pace, corner_heights,
+  flat, derived, whole_levels, read and image.
+- WALK_RISE sits under a level's 0.5 m so a whole level's step stays a
+  cliff. A stair is found as a cell 0.25 to 0.5 m up.
+- Pace: a step rising r takes 1 + UPHILL_PACE 0.5 x r / WALK_RISE as long
+  (World.step_ticks); a stair's 0.5 m is no slope and costs nothing more.
+  WorldRoutes adds the same in half steps (climb_cost) to its floods and
+  A*, and steps by Relief.step. World.find_path's own costs are unchanged.
+- Falls: FALL_IMPACT_PER_LEVEL for each level of Relief.levels(drop).
+- Sight, on a level with relief.png: a line from EYE_M 1.5 m over the
+  viewer's ground to AIM_M 1 m over the seen cell's, stopped by ground
+  above it (World._line_in_metres); shot_line likewise from the eye toward
+  the aim. A wall is seen over by an eye more than WALK_RISE over both its
+  cells (the old "higher than both", in metres). Light and heat keep the
+  whole levels' rule. Without relief.png sight is as 513 left it.
+- Pads: a building's and a roof's cells within PAD_FLAT 0.05 m of each
+  other (Level._uneven), else left out, said as before; a bridge's banks
+  likewise, its deck at the banks' elevation.
+- Water: a water or ford cell holds its surface. A pond lies level within
+  PAD_FLAT, a stream steps only down along its path, dry ground beside
+  water stands SHORE_LIP 0.1 m over it (terrain's bank); said, not changed.
+- The files: Level.parse, register, source and template take relief.png;
+  WorldMap's digest and areas; BuilderHost's "terrain" message and its
+  client side; MapDoc keeps and writes it (the editor's brush is the next
+  landing). PROTOCOL_REVISION 22.
+- levels/sample: relief.png in place of height.png, its whole levels
+  lifted 0.2 m over its water, a gentle rise of 0.9 m east of the stream;
+  its stairs, slopes and outcrop as before.
+- Cost at 256 x 256: 64k cells, 256 KB of floats a zone; relief.png about
+  100 KB on the wire, once a zone; a step check is array reads.
+
+tests: relief_test (new): the rules, relief.png read, stairs by metres,
+pads, water, a hill walked slower up and a cliff not, a fall's levels,
+sight over a ridge and a lip, routes' climb cost, the terrain message, the
+sample's rise. The rest of the suite, unchanged, is the derived levels'
+check.
+
+Rejected: corners as the data (no sharp cliff between two cells); 16-bit
+grey (the loader); relief added to whole levels (two meanings for one
+cell); the metre sight rule on levels with no relief.png (a 0.5 m step
+would stop blocking sight in the castle); the uphill cost in
+World.find_path (its tick costs and memo; routes are where it shows).
