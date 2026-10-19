@@ -714,6 +714,7 @@ static func _place(level: Dictionary, markers: Array[Dictionary], config: Dictio
 	var centre: Variant = _tile(config.get("centre"))
 	level["neighbours"] = neighbours_from(config, warnings)
 	level["places"] = places_from(config, warnings)
+	level["markets"] = markets_from(config, warnings)
 	level["became"] = became_from(config, warnings)
 	level["entities"] = entities
 	level["starts"] = starts
@@ -853,6 +854,26 @@ static func places_from(config: Dictionary, warnings: Array[String]) -> Dictiona
 			warnings.append("the place %s has a radius under 1: it is 1" % [key])
 		out[str(key)] = {"key": str(key), "cell": at, "name": str(entry.get("name", str(key).capitalize())), "kind": kind,
 			"radius": maxi(radius, 1), "worth": maxi(int(entry.get("worth", 1)), 0), "holder": str(entry.get("holder", "nobody"))}
+	return out
+
+
+## level.json's "markets", key -> {key, cell, name}: where trade routes end
+## that are no town's store (decision 504; "the castle market"), a cell a
+## caravan walks to, priced by economy. Its id is "market:<key>". An entry
+## with no cell is said in [param warnings].
+static func markets_from(config: Dictionary, warnings: Array[String]) -> Dictionary[String, Dictionary]:
+	var out: Dictionary[String, Dictionary] = {}
+	var listed: Variant = config.get("markets", {})
+	if not listed is Dictionary:
+		warnings.append("\"markets\" in level.json is not an object")
+		return out
+	for key: Variant in listed:
+		var entry: Variant = listed[key]
+		var at: Variant = _tile(entry.get("at") if entry is Dictionary else null)
+		if at == null:
+			warnings.append("the market %s has no \"at\" cell" % [key])
+			continue
+		out[str(key)] = {"key": str(key), "cell": at, "name": str(entry.get("name", "the %s market" % key))}
 	return out
 
 

@@ -7,6 +7,8 @@ notes (decision 324).
 
 ## Unreleased
 
+- Trade routes: the world map shows the way from the town to the castle market as a dashed line, with any caravan on it; the caravans themselves come with the town's trade (504).
+## v0.1.155
 - The medicine man gathers herbs on his way (502, npc's side): the nearest within six cells of him go to the town's store, bought as a gatherer's raw, for the healer's remedies.
 
 ## v0.1.155

@@ -40,6 +40,9 @@ var holdings: Dictionary = {}
 ## "known_places"; empty means everything is drawn as known).
 var known_areas: Dictionary = {}
 var known_places: Dictionary = {}
+## The trade routes through known areas (decision 504; Main's world_state
+## "trade"): [{id, from_area, to_area, areas, caravans: [{area, fraction}]}].
+var trade: Array = []
 ## ZOOMS' index: 1.5 at the start, so a box's words read at 1080p.
 var zoom_step := 3
 var pan := Vector2.ZERO
@@ -83,12 +86,49 @@ func set_world_state(state: Dictionary, here: Array[Dictionary]) -> void:
 	known_places.clear()
 	for id: Variant in state.get("known_places", []):
 		known_places[str(id)] = true
+	trade = (state.get("trade", []) as Array).duplicate(true) if state.get("trade") is Array else []
 	party.clear()
 	party.append_array(here)
 	for member: Variant in state.get("party", []):
 		if member is Dictionary:
 			party.append(member)
 	queue_redraw()
+
+
+## Each trade route a dashed brass way through the boxes of the areas it
+## crosses, beside their own ways (decision 504).
+func _draw_trade(scale: float) -> void:
+	for route: Dictionary in trade:
+		var line := trade_line(route, scale)
+		for i in range(1, line.size()):
+			draw_dashed_line(line[i - 1], line[i], UiTheme.color("brass"), LINE_WIDTH * 0.75 * scale, 14.0 * scale, true)
+
+
+## [param route]'s way on screen: its areas' box middles, set off a little
+## so it runs beside the ways between them; the areas not laid out left out.
+func trade_line(route: Dictionary, scale: float) -> PackedVector2Array:
+	var out := PackedVector2Array()
+	for area: Variant in route.get("areas", []):
+		var area_name := str(area)
+		if positions.has(area_name):
+			out.append((positions[area_name] + sizes[area_name] * 0.5 + Vector2(0.0, 18.0)) * scale + pan)
+	return out
+
+
+## The point [param fraction] of the way along [param line].
+static func point_along(line: PackedVector2Array, fraction: float) -> Vector2:
+	if line.size() == 1:
+		return line[0]
+	var total := 0.0
+	for i in range(1, line.size()):
+		total += line[i - 1].distance_to(line[i])
+	var left := clampf(fraction, 0.0, 1.0) * total
+	for i in range(1, line.size()):
+		var part := line[i - 1].distance_to(line[i])
+		if left <= part or i == line.size() - 1:
+			return line[i - 1].lerp(line[i], clampf(left / maxf(part, 0.001), 0.0, 1.0))
+		left -= part
+	return line[-1]
 
 
 ## The view put so [param area]'s box is in the middle of the screen.
@@ -254,6 +294,7 @@ func _draw() -> void:
 		draw_line(a, b, Color(UiTheme.color("edge"), 0.9 if edge else 0.6), LINE_WIDTH * scale, true)
 		if not edge:
 			draw_circle(b, 6.0 * scale, UiTheme.color("brass"))
+	_draw_trade(scale)
 	for area_name: String in positions:
 		var rect := Rect2(positions[area_name] * scale + pan, sizes[area_name] * scale)
 		var area: Dictionary = world.areas[area_name]
@@ -295,6 +336,12 @@ func _draw() -> void:
 		if not here.is_empty():
 			draw_string(serif, Vector2(rect.position.x + 18.0 * scale, rect.end.y - 12.0 * scale), ", ".join(here),
 				HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 36.0 * scale, int(caption * scale), UiTheme.color("friend"))
+	# The caravans over the boxes.
+	for route: Dictionary in trade:
+		var line := trade_line(route, scale)
+		for caravan: Variant in route.get("caravans", []):
+			if caravan is Dictionary and line.size() >= 1:
+				draw_circle(point_along(line, float(caravan.get("fraction", 0.0))), 7.0 * scale, UiTheme.color("brass_bright"))
 	# The title and how to leave.
 	draw_string(serif, Vector2(UiTheme.constant("margin"), UiTheme.constant("margin") + heading), "The known world",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, UiTheme.size("title"), UiTheme.color("text"))

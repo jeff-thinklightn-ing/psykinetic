@@ -13918,3 +13918,65 @@ player could have picked. A delivery refused puts them back on the ground
 where he stands. Nothing on a client (World.forage is null). resident_test
 (skipped until items' "herbs" is in the catalog). Protocol unchanged; no
 new class_name.
+## 504. Trade routes: caravans between a town and a market, raidable where they pass a camp
+
+Economy's phase 2 of the gold economy (Jeff: "trade with other town. think
+about establishing trade routes, also introduce luxury goods that traders
+seek, sell to the rich"; the roadmap: "traders carry goods along maps'
+routes between towns, routes on the world map and raidable"). Maps owns the
+route, the walking, the raid hook and the arrival; economy owns the goods,
+the prices, who goes and the trip home.
+
+- Ends: a town (its store's place id) or a market, `market:<key>` from a
+  level's new "markets" key (Level.markets_from, WorldMap.markets(); a
+  market off the floor is a WorldMap problem). levels/castle has one, "the
+  castle market" at (16, 9) in the keep (the coordinator's placement, one
+  entry to move). Today's route: wilds/store>market:castle; town to town
+  needs nothing more once there is a second town.
+- TradeRoutes (sim/trade_routes.gd, World.trade, server only): routes()
+  each town to each market and each pair of towns that can be walked,
+  {id "<from>><to>", legs, steps, areas, exposed}, over the world routes'
+  open layer (Main: the raid groups' routes, one set of distance fields):
+  the caravan is the town's, held ground no wall to it; a closed link
+  (463) is no way, as for every route, so the forest's way on exposes
+  nothing. Made when asked, again when a place changes hands and on
+  use_map (465's regeneration).
+- exposed: every sample_steps (4) along the way on ground nobody holds,
+  the nearest camp in raid_reach (30) cells whose side is hostile to the
+  town's. eta(route) is world ticks at steps_per_world_tick (10); risk(route)
+  the chance of at least one strike, from each exposed sample's world-tick
+  share of its camp's strike chance (strike_chance 0.15 at full worth, or
+  enemy-ai's `strike` Callable). Economy prices from both. Rules from
+  economy.json trade.routes, these by default.
+- send(route, {items, goods, members}, from_end) -> caravan id (either
+  end); position(id) {area, cell, fraction}, kept for visible traders
+  later; walks on the world tick; saved in the snapshot ("trade"); signals
+  caravan_left, caravan_arrived(at_end), caravan_raided(camp, taken),
+  caravan_lost(why: "taken", "no way").
+- A strike (each exposed sample passed this tick, each camp once) takes
+  food goods (economy's is_food Callable; "food" and "meat" unset) and the
+  people: each member through Towns.resident_taken, held at the camp
+  (captive_held), rescuable as raid captives are. Nothing else: items and
+  other goods stay (Jeff: raids take food and people only); no gold goes
+  on a caravan (economy settles at the market). A caravan with neither
+  takes nothing and walks on; one with nobody left is lost, its items
+  placed at the camp (ItemBook), its goods in caravan_lost for economy.
+- The world map: the "world" message's "trade", [{id, from_area, to_area,
+  areas, caravans: [{area, fraction}]}] for the routes through areas the
+  player knows (TradeRoutes.shown, WorldNews.trade), sent with the full
+  message and again whole when it changes; WorldMapPanel draws a dashed
+  brass way through the areas' boxes, a dot per caravan. No
+  PROTOCOL_REVISION (release): an older client ignores the key, and a newer
+  one with an older server draws no routes, today's map either way.
+
+tests/trade_routes_test (new): the route, its exposed stretch, eta and
+risk, gone with the camp; a caravan out and back; struck, its food and
+both members taken and held at the camp, lost with nobody left and its
+sword left there; struck with no food and nobody, nothing taken; no route
+with the way gone; lost when its way closes under it; a restart; shown on
+the world map and kept by the client. world_news_test's "trade";
+level_test's castle market.
+
+Rejected: visible caravans in awake zones now (economy: abstract for phase
+2); gold on caravans; a route as a level link; raids taking items; a
+passing event for tolls (later, its own step).

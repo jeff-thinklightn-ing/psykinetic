@@ -469,6 +469,9 @@ var herds: Herds = null
 var forage: Forage = null
 ## Raid groups on the world map (decision 328), server only; null on a client.
 var raid_groups: WorldRaids = null
+## Trade routes and their caravans (decision 504), server only; null on a
+## client.
+var trade: TradeRoutes = null
 ## How rich in game each cell of the world is (decision 368), for Herds;
 ## server only, null on a client.
 var richness: WorldRichness = null
@@ -713,6 +716,8 @@ func world_tick(slice := -1) -> void:
 		Offers.tick()  # Promises to them that lapse (decision 435).
 		if raid_groups != null:
 			raid_groups.world_tick()
+		if trade != null:
+			trade.world_tick()
 		t = part("towns, production, economy", t)
 	if herds != null and slice <= 0:
 		herds.tick()

@@ -371,6 +371,12 @@ func _test_forest() -> void:
 	var path := World.find_path(player.tile, east)
 	_check(not path.is_empty(), "a way from the way in to the way on (%d steps)" % path.size())
 	_check(_main.load_map("test_room"), "back to the test room")
+	var markets := WorldMap.build().markets()
+	_check(markets.get("market:castle", {}).get("cell") == Vector2i(16, 9) and markets["market:castle"]["area"] == "castle"
+		and markets["market:castle"]["name"] == "the castle market", "the castle market, in the keep (decision 504; %s)" % [markets])
+	var warnings: Array[String] = []
+	Level.markets_from({"markets": {"x": {"name": "no cell"}}}, warnings)
+	_check(warnings.size() == 1, "a market with no cell warns (%s)" % [warnings])
 
 
 func _test_buildings() -> void:

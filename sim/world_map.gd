@@ -102,7 +102,7 @@ func _parse_area(area_name: String, layout: Image, height: Image, config: Dictio
 		"starts": level["starts"], "spawn_points": level["spawn_points"], "links": level["links"],
 		"neighbours": level["neighbours"], "warnings": level["warnings"], "floor": floor_cells,
 		"edges": level["terrain"]["edges"], "heights": level["terrain"]["heights"], "stairs": level["terrain"]["stairs"],
-		"places": level["places"], "buildings": level["buildings"],
+		"places": level["places"], "buildings": level["buildings"], "markets": level["markets"],
 		# Its roofs (decision 383: damage_roof's index is into this) and
 		# its lore region (its weather), for what works on every level.
 		"roofs": level["roofs"], "region": level["terrain"]["region"],
@@ -329,6 +329,21 @@ func routes() -> WorldRoutes:
 	return _routes
 
 
+## The markets on every level (decision 504): "market:<key>" -> {id, area,
+## cell, name}. A key two levels use is the first level's, by name.
+func markets() -> Dictionary[String, Dictionary]:
+	var out: Dictionary[String, Dictionary] = {}
+	var names := areas.keys()
+	names.sort()
+	for area_name: String in names:
+		for key: String in areas[area_name].get("markets", {}):
+			var id := "market:" + key
+			if not out.has(id):
+				var market: Dictionary = areas[area_name]["markets"][key]
+				out[id] = {"id": id, "area": area_name, "cell": market["cell"], "name": market["name"]}
+	return out
+
+
 ## Whether [param area_name] is dead ground, where nothing lives (no game,
 ## no crops): its level.json says "dead_ground": true (decision 368).
 func is_dead(area_name: String) -> bool:
@@ -441,6 +456,10 @@ func _check_places(area_name: String, factions: Factions, out: Array[String]) ->
 		if not factions.has(place["holder"]):
 			out.append("%s: the place %s is held by %s, which is no faction (%s, or nobody)" % [
 				area_name, key, place["holder"], ", ".join(factions.names())])
+	for key: String in area.get("markets", {}):
+		var cell: Vector2i = area["markets"][key]["cell"]
+		if not floor_cells.has(cell):
+			out.append("%s: the market %s at %s is on no floor" % [area_name, key, cell])
 
 
 func _check_way(way: Dictionary, out: Array[String]) -> void:

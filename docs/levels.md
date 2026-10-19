@@ -202,6 +202,9 @@ All of it is optional.
   a closed canopy; `"clearings": [{"centre": [x, y], "radius": r}]` are kept
   open to the sky (radius 6 or more stays sunlit; environment hangs its
   light there). levels/forest is the first.
+- `markets` (decision 504): `{"castle": {"at": [x, y], "name": "the
+  castle market"}}`, where trade routes end that are no town's store; the
+  id is `market:<key>`, the cell must be floor. levels/castle has the one.
 - `links`: one per link marker, `to_map` the level to load and
   `to_spawn` the spawn point there ("" for its first start); `"one_way":
   true` for a link with no way back on purpose (a drop, a trapdoor), so the
@@ -503,6 +506,17 @@ is its size: bigger camps threaten more and send stronger groups. Raids are
 off until the console's `raids on` (or `--raids`); `raids` lists the groups,
 `raids send <camp> <town>` sends one now. Camps are content: none is in a
 real level until Jeff asks.
+
+### Trade routes
+
+Each town has a trade route to each market and to each other town that can
+be walked (decision 504, `TradeRoutes`): the world routes' open layer, a
+closed link no way. Economy sends caravans over them (its goods, the
+residents who go); they walk on the world tick and arrive, and where the
+way crosses ground nobody holds within `raid_reach` (30) cells of a camp
+hostile to the town, that camp may strike as it passes, taking food and
+people only. The world map draws each route through known areas as a
+dashed brass way, a dot for each caravan.
 
 ### Routes between areas
 

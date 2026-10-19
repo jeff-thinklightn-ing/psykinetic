@@ -8,9 +8,12 @@ extends RefCounted
 ## they are in, then only what changed:
 ##   {"full": bool, "holdings": {place_id: [faction, strength]},
 ##    "known": {"areas": [...], "places": [...]},
-##    "party": [{"name", "area", "kind": "player"|"companion"}]}
+##    "party": [{"name", "area", "kind": "player"|"companion"}],
+##    "trade": [{"id", "from_area", "to_area", "areas", "caravans": [{"area", "fraction"}]}]}
 ## Holdings go only to players who know the place (fog). Client side,
-## merge() folds each into Main.world_state.
+## merge() folds each into Main.world_state. "trade" (decision 504): the
+## trade routes through areas the player knows, and the caravans on them;
+## sent like the party, whole when it changes; a client before it ignores it.
 
 ## How near a place's cell a player comes to know it (Senses' sight range).
 const SIGHT := 7
@@ -25,10 +28,15 @@ var record_of: Callable
 ## () -> [{name, area, kind, peer}]: every player and companion and where
 ## they are (peer: the player's own, or a companion's keeper's).
 var members: Callable
+## (known areas) -> the trade routes to show (TradeRoutes.shown); none when
+## not set.
+var trade: Callable
 ## Peers sent their full message.
 var _full_sent: Dictionary[int, bool] = {}
 ## Peer -> the party list it was last sent.
 var _party_sent: Dictionary[int, Array] = {}
+## Peer -> the trade list it was last sent.
+var _trade_sent: Dictionary[int, Array] = {}
 
 
 func _init(with_holdings: Holdings) -> void:
@@ -79,20 +87,32 @@ func update() -> void:
 		if not now.has(peer):
 			_full_sent.erase(peer)
 			_party_sent.erase(peer)
+			_trade_sent.erase(peer)
 	var everyone: Array = members.call()
 	for peer: int in now:
 		var record := _record(peer)
 		if record == null:
 			continue
 		var party := party_for(peer, everyone)
+		var routes: Array = trade.call(record.known_areas) if trade.is_valid() else []
 		if not _full_sent.has(peer):
 			_full_sent[peer] = true
 			_party_sent[peer] = party
+			_trade_sent[peer] = routes
 			send.call(peer, {"full": true, "holdings": _holdings_of(record.known_places),
-				"known": {"areas": record.known_areas.duplicate(), "places": record.known_places.duplicate()}, "party": party})
-		elif _party_sent.get(peer, []) != party:
+				"known": {"areas": record.known_areas.duplicate(), "places": record.known_places.duplicate()}, "party": party,
+				"trade": routes})
+			continue
+		var changed := {}
+		if _party_sent.get(peer, []) != party:
 			_party_sent[peer] = party
-			send.call(peer, {"full": false, "party": party})
+			changed["party"] = party
+		if _trade_sent.get(peer, []) != routes:
+			_trade_sent[peer] = routes
+			changed["trade"] = routes
+		if not changed.is_empty():
+			changed["full"] = false
+			send.call(peer, changed)
 
 
 ## [param peer] is sent its full message again on the next update: what
@@ -147,8 +167,8 @@ func _record(peer: int) -> PlayerRecord:
 ## Client: [param data] (a "world" message) folded into [param state]
 ## ({holdings, known_areas, known_places, party}); a full one replaces it.
 static func merge(state: Dictionary, data: Dictionary) -> Dictionary:
-	var out := {"holdings": {}, "known_areas": [], "known_places": [], "party": []} if data.get("full", false) else state.duplicate(true)
-	for key in ["holdings", "known_areas", "known_places", "party"]:
+	var out := {"holdings": {}, "known_areas": [], "known_places": [], "party": [], "trade": []} if data.get("full", false) else state.duplicate(true)
+	for key in ["holdings", "known_areas", "known_places", "party", "trade"]:
 		if not out.has(key):
 			out[key] = {} if key == "holdings" else []
 	var held: Variant = data.get("holdings", {})
@@ -164,4 +184,6 @@ static func merge(state: Dictionary, data: Dictionary) -> Dictionary:
 			out[pair[1]].sort()
 	if data.get("party") is Array:
 		out["party"] = (data["party"] as Array).duplicate(true)
+	if data.get("trade") is Array:
+		out["trade"] = (data["trade"] as Array).duplicate(true)
 	return out

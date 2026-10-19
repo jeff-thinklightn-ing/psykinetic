@@ -1837,6 +1837,8 @@ func _regenerate(level_name: String, config: Dictionary) -> bool:
 	# herds pointed at it.
 	if World.raid_groups != null:
 		World.raid_groups.use_map(_world_map)
+	if World.trade != null:
+		World.trade.use_map(_world_map)
 	if World.richness != null:
 		World.richness.finish()
 		World.richness = WorldRichness.new(_world_map, World.holdings)
@@ -2061,6 +2063,13 @@ func _boot() -> void:
 	# from the herds (made below, so read when asked).
 	World.raid_groups.fed = func(camp_id: String) -> float: return World.herds.camp_fed(camp_id) if World.herds != null else 1.0
 	World.raid_groups.hook(World.raids)
+	# Trade routes (decision 504): caravans economy sends, walking the raid
+	# groups' routes (one set of distance fields), saved like them.
+	World.trade = TradeRoutes.new(world_map, World.holdings, World.towns, snapshot.get("trade", {}))
+	World.trade.clock = func() -> int: return World.steps
+	World.trade.get_routes = func() -> WorldRoutes: return World.raid_groups.routes
+	World.trade.is_food = func(kind: String) -> bool:
+		return World.economy.is_food(kind) if World.economy != null and World.economy.has_method("is_food") else kind in ["food", "meat"]
 	if Net.raids:
 		World.raid_groups.set_on(true)
 	# Game's richness (decision 368): the steps from the mines worked out on
@@ -3095,6 +3104,7 @@ func _save_state(wait := true) -> void:
 		"towns": World.towns.to_dict() if World.towns != null else {},
 		"roofs": World.roofs_damaged.keys(),
 		"raid_groups": World.raid_groups.to_dict() if World.raid_groups != null else {},
+		"trade": World.trade.to_dict() if World.trade != null else {},
 		"economy": World.economy.to_dict() if World.economy != null else {},
 		"herds": World.herds.to_dict() if World.herds != null else {},
 		"items": World.items.to_dict(),
@@ -3224,6 +3234,8 @@ func _exit_tree() -> void:
 	# Routes still being made on pool tasks would crash a server on its way out.
 	if World.raid_groups != null:
 		World.raid_groups.finish()
+	if World.trade != null:
+		World.trade.finish()
 	if World.richness != null:
 		World.richness.finish()
 	# The stdin thread runs this node's method: it must have stopped before
@@ -6244,6 +6256,7 @@ func _start_world_news() -> void:
 	_world_news.peers = func() -> Dictionary: return _peer_ids
 	_world_news.record_of = func(id: String) -> PlayerRecord: return _records.get(id)
 	_world_news.members = _party_members
+	_world_news.trade = func(areas: Array) -> Array: return World.trade.shown(areas) if World.trade != null else []
 
 
 ## Every player and companion in the game and where: WorldNews.members.

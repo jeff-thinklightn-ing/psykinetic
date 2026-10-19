@@ -84,6 +84,25 @@ func _ready() -> void:
 		"Ann goes to the wilds: her party is Bo in town now, Wren beside her left out (%s)" % [ann])
 	_check(bo.size() == 1 and bo[0]["party"].size() == 2, "and Bo's has Ann and Wren in the wilds (%s)" % [bo])
 
+	print("== trade (decision 504) ==")
+	var routes: Array = [{"id": "r", "from_area": "wn_town", "to_area": "wn_wild", "areas": ["wn_town", "wn_wild"], "caravans": []}]
+	var asked: Array = []
+	news.trade = func(areas: Array) -> Array:
+		asked.append(areas.duplicate())
+		return routes.duplicate(true)
+	_sent.clear()
+	news.update()
+	ann = _to(1)
+	_check(ann.size() == 1 and ann[0]["trade"] == routes and not ann[0].has("party") and asked.has(["wn_town", "wn_wild"]),
+		"the trade routes through what Ann knows, sent once they are there (%s)" % [ann])
+	_sent.clear()
+	news.update()
+	_check(_to(1).is_empty(), "not again while they are the same")
+	routes[0]["caravans"] = [{"area": "wn_town", "fraction": 0.2}]
+	news.update()
+	_check(_to(1).size() == 1 and _to(1)[0]["trade"][0]["caravans"].size() == 1, "a caravan on its way: sent again")
+	news.trade = Callable()
+
 	print("== kept ==")
 	var again := PlayerRecord.from_dict(JSON.parse_string(JSON.stringify(_records["ann"].to_dict())))
 	_check(again.known_areas == _strings(["wn_town", "wn_wild"]) and again.known_places == _strings(["wn_town/store", "wn_wild/camp"]),
