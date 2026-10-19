@@ -14359,3 +14359,30 @@ levels/monsters.json's (Monster.kinds), then the level's own
 - The ghost draws a kind with no default colour as a monster.
 
 Protocol unchanged. builder_test _test_monster_kinds.
+
+## 499, npc's side: the building fund at the official's counter
+
+Economy's 499 lets a town take gold toward its next build
+(Economy.contribution_wanted(town) -> {kind, gold}, Economy.contribute(town,
+player_id, amount) -> the gold given, Towns.shortfall(town) for what it
+lacks; the thanks and town xp in Main through their contributed signal).
+This is the offer (the coordinator's approval 2026-10-19; Jeff's rule for
+499: "any amount").
+- The town's official (the appointed one at the store, 404) offers it, a GIVE
+  kind first among his fresh offers, only while contribution_wanted gives
+  gold > 0. The words name the build and what it waits on: "The inn waits
+  on 6 wood and 24 gold; what you give goes to it."
+- Any amount, in two lines: when wanted is within "give_most" (residents.json
+  offers, 10) one line at wanted; else "Give 10 toward the inn" and "Give
+  the rest (24 gold)" at min(wanted, the player's gold) ("Give what you have"
+  when the purse is short, and no second line when it is not above the step).
+- Accepting pays through Economy.contribute (never more than wanted or than
+  the player has); the official's card learns "Jeff gave 10 gold toward the
+  inn", standing "gave" (2) from him, a notice to the player, no pay back.
+  No promise, so nothing lapses; the line stands again while gold is wanted
+  and goes when the build is paid up.
+- Rejected: giving goods (498's delivery pays for raws), a plea form (nobody
+  asks; the town takes what is offered), a roll of givers' names on the build.
+Main's ctx keys: contribution_wanted, shortfall, contribute, gold_of.
+offers_test. town_soak's --give=N is economy's. Protocol unchanged; no new
+class_name.

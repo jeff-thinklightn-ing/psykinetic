@@ -49,6 +49,7 @@ func _ready() -> void:
 	_test_quarrel()
 	_test_walk_home()
 	_test_sick_pleas()
+	_test_give()
 	_test_lapse()
 	_test_voice_words()
 	_test_scholar_and_merchant()
@@ -536,6 +537,52 @@ func _test_sick_pleas() -> void:
 	_check(_done.size() == 2 and _done[1][3] == 0 and str(_done[1][2]) == "Tam died of the sickness." and Townsfolk.card_of(_work, "o-mara")["asks"].is_empty(),
 		"a death closes the plea with the fact, no pay, no lapse: %s" % [_done[1]])
 	_check(Standing.score(Townsfolk.card_of(_work, "o-mara"), "p1") >= Standing.setting("healed"), "and Mara thinks no worse of Jeff for it")
+	Offers.ctx = _ctx
+
+
+var _wanted := {}
+var _purse := 0
+var _given: Array = []
+
+
+func _test_give() -> void:
+	print("\n== the building fund: the official offers gold toward the next build, any amount (decision 499, npc's side) ==")
+	_setup([["o-ald", "Alder", "smith"]])
+	_work.set_origin("o-ald", "appointed")
+	_wanted = {}
+	_purse = 60
+	_given = []
+	_ctx["contribution_wanted"] = func(_town: String) -> Dictionary: return _wanted.duplicate()
+	_ctx["shortfall"] = func(_town: String) -> Dictionary: return {"kind": "inn", "job": "inn", "steps": 0, "needs": {"wood": 6}} if not _wanted.is_empty() else {}
+	_ctx["contribute"] = func(town: String, player_id: String, amount: int) -> int:
+		var paid := mini(amount, mini(int(_wanted.get("gold", 0)), _purse))
+		_given.append([town, player_id, paid])
+		_wanted["gold"] = int(_wanted.get("gold", 0)) - paid
+		_purse -= paid
+		return paid
+	_ctx["gold_of"] = func(_player_id: String) -> int: return _purse
+	_check(_offers("o-ald").all(func(o: Dictionary) -> bool: return o["kind"] != Offers.GIVE), "nothing planned: no give line")
+	_wanted = {"kind": "inn", "gold": 24}
+	var mine := _offers("o-ald").filter(func(o: Dictionary) -> bool: return o["kind"] == Offers.GIVE)
+	_check(mine.size() == 2 and mine[0]["title"] == "Give 10 toward the inn" and mine[1]["title"] == "Give the rest (24 gold)" and mine[0]["cost"] == 10 and mine[1]["cost"] == 24,
+		"24 wanted, 60 in the purse: the step and the rest: %s" % [mine.map(func(o: Dictionary) -> String: return str(o["title"]))])
+	_check(mine.size() == 2 and str(mine[0]["words"]) == "The inn waits on 6 wood and 24 gold; what you give goes to it.", "the words say what it waits on: %s" % [mine[0]["words"] if not mine.is_empty() else ""])
+	_check(_offers("o-ald")[0]["kind"] == Offers.GIVE, "first at the official's counter")
+	var taken := Offers.accept("o-ald", "p1", "Jeff", mine[0]["id"] if not mine.is_empty() else "", 0, _ctx)
+	_check(taken["ok"] and _given == [[TOWN, "p1", 10]] and str(taken["line"]) == "Jeff gives 10 gold toward the inn.", "the step given through economy: %s" % [taken])
+	_check(str(Townsfolk.card_of(_work, "o-ald")["facts"].back()["text"]) == "Jeff gave 10 gold toward the inn." and Standing.score(Townsfolk.card_of(_work, "o-ald"), "p1") >= Standing.setting("gave"), "the official's card and his regard")
+	_check(_done.is_empty() or _done.back()[3] == 0, "(no pay for a gift)")
+	_purse = 9
+	mine = _offers("o-ald").filter(func(o: Dictionary) -> bool: return o["kind"] == Offers.GIVE)
+	_check(mine.size() == 1 and mine[0]["title"] == "Give 10 toward the inn", "14 still wanted but 9 in the purse: the step alone (economy takes what there is): %s" % [mine.map(func(o: Dictionary) -> String: return str(o["title"]))])
+	_purse = 60
+	mine = _offers("o-ald").filter(func(o: Dictionary) -> bool: return o["kind"] == Offers.GIVE)
+	taken = Offers.accept("o-ald", "p1", "Jeff", mine[1]["id"] if mine.size() > 1 else "", 0, _ctx)
+	_check(taken["ok"] and _given.back() == [TOWN, "p1", 14] and int(_wanted["gold"]) == 0, "the rest pays the inn up: %s" % [_given])
+	_check(_offers("o-ald").all(func(o: Dictionary) -> bool: return o["kind"] != Offers.GIVE), "paid up: the line is gone")
+	_wanted = {"kind": "inn", "gold": 7}
+	mine = _offers("o-ald").filter(func(o: Dictionary) -> bool: return o["kind"] == Offers.GIVE)
+	_check(mine.size() == 1 and mine[0]["title"] == "Give 7 toward the inn" and mine[0]["cost"] == 7, "within the step: one line at what is wanted")
 	Offers.ctx = _ctx
 
 

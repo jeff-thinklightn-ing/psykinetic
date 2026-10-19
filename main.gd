@@ -4241,6 +4241,11 @@ func _offers_context() -> Dictionary:
 			return out,
 		"say": func(town: String, song: Dictionary) -> void: _sung(town, song),
 		# Sickness (decision 501): the healer's hut of a town's zone and its medicine man, his visit, a companion's card, a death.
+		# The building fund (decision 499, npc's side): economy's next build, what it lacks, a gift, a purse.
+		"contribution_wanted": func(town: String) -> Dictionary: return World.economy.contribution_wanted(town) if World.economy != null and World.economy.has_method("contribution_wanted") else {},
+		"shortfall": func(town: String) -> Dictionary: return World.towns.shortfall(town) if World.towns != null and World.towns.has_method("shortfall") else {},
+		"contribute": func(town: String, player_id: String, amount: int) -> int: return int(World.economy.contribute(town, player_id, amount)) if World.economy != null and World.economy.has_method("contribute") else 0,
+		"gold_of": func(player_id: String) -> int: return int(World.gold_of(player_id)),
 		"healers_hut": func(town: String) -> String: return _healers_hut_of(town),
 		"healer_of": func(town: String) -> String:
 			var hut := _healers_hut_of(town)

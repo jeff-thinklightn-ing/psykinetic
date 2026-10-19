@@ -51,7 +51,7 @@ class_name Offers
 ## leaves out what needs it.
 
 const FILE := "res://levels/residents.json"
-const DEFAULTS := {"max": 3, "per_player": 3, "days": 7, "fetch": 6}
+const DEFAULTS := {"max": 3, "per_player": 3, "days": 7, "fetch": 6, "give_most": 10}
 const SHOP := "shop"
 const COMMISSION := "commission"
 const RUMOUR := "rumour"
@@ -64,6 +64,8 @@ const BUY := "buy"
 const TAKE := "take"
 const LEND := "lend"
 const CARRY := "carry"
+## A gift of gold toward the town's next build (decision 499, npc's side).
+const GIVE := "give"
 ## What the treasury pays when economy's rules have no line for a key yet
 ## (economy.json "commissions"; decisions 486 and 487).
 const DEFAULT_PAY := {"dispute": 5, "escort": 8, "healing": 6}
@@ -149,12 +151,71 @@ static func of(worker_id: String, player_id: String, given: Dictionary = ctx) ->
 		var rumour := _rumour_offer(worker_id, who, given)
 		if not rumour.is_empty():
 			fresh.append(rumour)
+		var gifts := _give_offers(worker_id, who, town, player_id, given)
+		for i in gifts.size():
+			fresh.insert(i, gifts[i])  # The town's building fund, first at the official's counter (decision 499, npc's side).
 	if open == 0:
 		var plea := _plea_offer(worker_id, who, card, town, given)
 		if not plea.is_empty():
 			fresh.append(plea)
 	out.append_array(fresh.slice(0, int(settings().get("max", 3))))
 	return out
+
+
+## The town's official (the appointed one, 404) at the store offers gold toward
+## the next build (decision 499, npc's side; Jeff: "any amount"): while
+## economy's contribution_wanted(town) says gold > 0, one GIVE line at wanted
+## when it is within "give_most" (residents.json offers, 10), else two: the
+## step and the rest at min(wanted, the player's gold). The words say what
+## the build waits on (Towns.shortfall). Nothing while nothing is planned.
+static func _give_offers(worker_id: String, who: Dictionary, town: String, player_id: String, given: Dictionary) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	if str(who.get("origin", "")) != "appointed" or town.is_empty():
+		return out
+	var wanted: Variant = _call(given, "contribution_wanted", [town])
+	if not wanted is Dictionary or int(wanted.get("gold", 0)) <= 0:
+		return out
+	var gold := int(wanted["gold"])
+	var kind := _build_words(str(wanted.get("kind", "")))
+	var lack: Variant = _call(given, "shortfall", [town])
+	var needs := _needs_words(lack.get("needs", {}) if lack is Dictionary else {})
+	var words := "%s waits on %s%d gold; what you give goes to it." % [kind.capitalize() if not kind.begins_with("the ") else "The " + kind.trim_prefix("the "), needs + " and " if not needs.is_empty() else "", gold]
+	var step := int(settings().get("give_most", 10))
+	if gold <= step:
+		out.append(_offer(worker_id, GIVE, "give:all", "Give %d toward %s" % [gold, kind], words, {"gold": gold, "kind": str(wanted.get("kind", ""))}, GIVE, gold))
+		return out
+	out.append(_offer(worker_id, GIVE, "give:step", "Give %d toward %s" % [step, kind], words, {"gold": step, "kind": str(wanted.get("kind", ""))}, GIVE, step))
+	var purse: Variant = _call(given, "gold_of", [player_id])
+	var rest := mini(gold, int(purse)) if purse is int or purse is float else gold
+	if rest > step:
+		out.append(_offer(worker_id, GIVE, "give:rest", "Give the rest (%d gold)" % rest if rest == gold else "Give what you have (%d gold)" % rest, words, {"gold": rest, "kind": str(wanted.get("kind", ""))}, GIVE, rest))
+	return out
+
+
+## "the inn" for a build kind ("inn", "healers_hut").
+static func _build_words(kind: String) -> String:
+	if kind.is_empty():
+		return "the next building"
+	return "the " + kind.replace("_", " ").replace("healers hut", "healer's hut")
+
+
+## "6 wood and 2 stone" from economy's needs ({item: count}, or a list, or words).
+static func _needs_words(needs: Variant) -> String:
+	var parts: Array[String] = []
+	if needs is Dictionary:
+		var keys: Array = needs.keys()
+		keys.sort()
+		for what: Variant in keys:
+			if int(needs[what]) > 0:
+				parts.append("%d %s" % [int(needs[what]), Items.name_of(str(what)) if Items.exists(str(what)) else str(what)])
+	elif needs is Array:
+		for what: Variant in needs:
+			parts.append(str(what))
+	elif needs is String and not str(needs).is_empty():
+		parts.append(str(needs))
+	if parts.size() <= 1:
+		return "".join(parts)
+	return ", ".join(parts.slice(0, parts.size() - 1)) + " and " + parts[parts.size() - 1]
 
 
 static func _offer(worker_id: String, kind: String, key: String, title: String, words: String, what: Dictionary, accept: String, cost := 0) -> Dictionary:
@@ -481,6 +542,17 @@ static func accept(worker_id: String, player_id: String, player_name: String, of
 				var delta := Standing.setting("loan_quarter") * quarters + (Standing.setting("loan_cleared") if cleared else 0)
 				_regard(production, worker_id, player_id, delta, "cleared their debt to the town" if cleared else "paid %d gold of their debt" % paid)
 				out["line"] = "%s gives %d gold toward %s's debt." % [player_name, paid, name]
+				out["ok"] = true
+		GIVE:
+			# Gold toward the next build (decision 499, npc's side): economy takes what it still wants and the player has.
+			var town := str(who.get("town", ""))
+			var given_gold := int(_call(given, "contribute", [town, player_id, maxi(int(offer["what"].get("gold", 0)), 0)]))
+			if given_gold > 0:
+				var kind := _build_words(str(offer["what"].get("kind", "")))
+				Townsfolk.learn(production, worker_id, "%s gave %d gold toward %s." % [player_name, given_gold, kind])
+				_regard(production, worker_id, player_id, Standing.setting("gave"), "gave %d gold toward %s" % [given_gold, kind])
+				_notice(player_id, town, "gave:" + str(offer["what"].get("kind", "")), "You gave %d gold toward %s." % [given_gold, kind], "", 1, given)
+				out["line"] = "%s gives %d gold toward %s." % [player_name, given_gold, kind]
 				out["ok"] = true
 		CARRY:
 			var quarrel: bool = offer["what"].has("law")  # A quarrel for the lawspeaker (486), else a word carried (435).
