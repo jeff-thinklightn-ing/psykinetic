@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Beds are rebuilt in clean planks: a posted frame, a mattress and pillow, and a blue-grey wool blanket folded back.
 - Dirt is soft, mottled earth instead of a patchwork of flat polygons.
 - Tables are rebuilt in clean planks: a planked top on cleats, square legs and stretchers.
 - The ground can now have real hills and valleys: an outdoor level's new relief.png gives each cell's height in centimetres. A gentle slope is walked (slower uphill, and wandering groups take the valleys), a steep one is a cliff to fall from, a ridge hides what lies behind it, buildings need level ground and water lies level under its banks. Levels without one play as before; the sample level has a gentle rise (525). Server and client: protocol 22.

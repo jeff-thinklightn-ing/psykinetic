@@ -1552,7 +1552,7 @@
 			"kind": "cell",
 			"size": [1, 0.6, 2],
 			"budget": 500,
-			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/prop.bed/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c1's 500 mesh stretched along z to 2.0, 450 tris"},
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-19", "notes": "rebuilt by hand in big clean planes for Jeff's crispness note (2026-10-19, \"the graphics not crisp\"; the coordinator's ask; art-gen's c1 fit (a crumpled heap of triangles) read as mush at game zoom): four square posts (the head pair taller) with caps, a planked headboard and footboard, side rails, a linen mattress and pillow, a blue-grey wool blanket (row 8's muted blues) folded back; 216 tris"},
 			"uses": "a bed, its head toward -z"
 		},
 		"prop.sack": {
