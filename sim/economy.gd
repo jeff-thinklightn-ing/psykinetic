@@ -93,6 +93,11 @@ var _bought: Dictionary = {}
 ## The day (now / day_steps) caravans were last thought of, and the
 ## market's buying last eased.
 var _trade_day := -1
+## Each import on the shelf's landed cost: uid -> gold (decision 514).
+var _landed: Dictionary = {}
+## A rich resident's want the shelf couldn't meet, a commission for the
+## next caravan (514 amended): town -> worker id.
+var _commissions: Dictionary = {}
 const LOG_SIZE := 50
 
 
@@ -312,7 +317,7 @@ func goods(town: String) -> Array[Dictionary]:
 	uids.sort()
 	for uid in uids:
 		var id := stockpile.book.id_of(uid)
-		out.append({"uid": uid, "id": id, "price": price(town, id, SELL, cat)})
+		out.append({"uid": uid, "id": id, "price": item_price(town, uid, cat)})
 	return out
 
 
@@ -337,14 +342,15 @@ func buy(player_id: String, town: String, uid: int) -> Dictionary:
 	if uid not in stockpile.shop(town):
 		return {"ok": false, "why": "that is no longer for sale"}
 	var id := stockpile.book.id_of(uid)
-	var cost := price(town, id)
+	var cost := item_price(town, uid)
 	if gold(player_id) < cost:
 		return {"ok": false, "price": cost, "why": "not enough gold (%d)" % cost}
 	var maker := stockpile.maker_of(town, uid)
 	if not stockpile.take_from_shop(town, uid, "sold:%s" % player_id):
 		return {"ok": false, "why": "that is no longer for sale"}
 	add_gold(player_id, -cost, "bought %s" % id)
-	_sale(town, maker, id, cost, "sale:%s" % player_id, "sold %s" % id)
+	_sale(town, maker, id, cost, "sale:%s" % player_id, "sold %s" % id, -1, int(_landed.get(uid, -1)))
+	_landed.erase(uid)
 	stockpile.book.note(uid, "bought", "by %s at %s for %d gold" % [player_id, town, cost])
 	production.note_sale(town, id, 1)
 	return {"ok": true, "price": cost, "id": id}
@@ -440,7 +446,9 @@ func raw_price(town: String, what: String) -> int:
 
 
 func _meet(id: String, need: String, rule: Dictionary, cat: Dictionary) -> void:
-	if rule.has("tags"):
+	if bool(rule.get("luxury", false)):
+		_indulge(id, cat)
+	elif rule.has("tags"):
 		_eat(id, rule, cat)
 	elif rule.has("building"):
 		_stay(id, need, rule)
@@ -551,11 +559,19 @@ func _hire(id: String, need: String, rule: Dictionary) -> void:
 ## wood paid for), the sale tax on the rest too, and the maker the rest,
 ## their labour. All of it to the treasury for no such worker. Who was
 ## paid: the maker's name or TREASURY.
-func _sale(town: String, maker: String, id: String, cost: int, by: String, why: String, base := -1) -> String:
+func _sale(town: String, maker: String, id: String, cost: int, by: String, why: String, base := -1, bought_for := -1) -> String:
 	var worker := production.worker(maker) if not maker.is_empty() else {}
 	if worker.is_empty():
 		stockpile.deposit(town, "gold", cost, by, why)
 		return TREASURY
+	# An import the merchant paid [param bought_for] for (decision 514): the
+	# tax on his margin only, the rest his.
+	if bought_for >= 0:
+		var cut := mini(Economy.taxed(maxi((base if base >= 0 else cost) - bought_for, 0), goods_class(id), rules)[0], cost)
+		if cut > 0:
+			stockpile.deposit(town, "gold", cut, "tax:sale", "%s: tax %d on the margin" % [why, cut])
+		production.pay(maker, cost - cut, why)
+		return str(worker["name"])
 	# Materials and tax on the price before a merchant's factor (decision
 	# 440, economy's side): the difference is the maker's alone.
 	var listed := base if base >= 0 else cost
@@ -1037,6 +1053,7 @@ func _send_caravan(town: String, way: Dictionary) -> bool:
 	var wages := _trip_wage(int(way["eta"])) * members.size()
 	if goods.is_empty() or float(fetch) <= wages + float(way["risk"]) * worth:
 		return false
+	var order := _luxury_order(town, market, int(way["eta"]))
 	for what: String in goods:
 		stockpile.take(town, what, int(goods[what]), "caravan to %s" % market)
 	for id in members:
@@ -1049,7 +1066,7 @@ func _send_caravan(town: String, way: Dictionary) -> bool:
 			production.set_away(id, false)
 		return false
 	_caravans[caravan] = {"town": town, "route": str(way["id"]), "market": market, "risk": float(way["risk"]), "eta": int(way["eta"]),
-		"members": members.duplicate(), "goods": goods.duplicate(), "home": false}
+		"members": members.duplicate(), "goods": goods.duplicate(), "home": false, "order": order}
 	print("[economy] %s sends a caravan to %s with %s (%s), to fetch about %d gold, step %d" % [town, market, goods,
 		", ".join(members.map(func(id: String) -> String: return str(production.worker(id).get("name", id)))), fetch, now()])
 	return true
@@ -1069,6 +1086,9 @@ func caravan_arrived(id: String, route_id: String, at_end: String, cargo: Dictio
 	var members: Array = cargo.get("members", [])
 	if bool(caravan["home"]):
 		for what: String in cargo.get("goods", {}):
+			if is_luxury(what):
+				_stock_import(town, what, int(cargo["goods"][what]), caravan)
+				continue
 			stockpile.deposit(town, what, int(cargo["goods"][what]), "caravan", "brought home from %s" % caravan["market"])
 		for who: String in members:
 			production.set_away(who, false)
@@ -1092,14 +1112,22 @@ func caravan_arrived(id: String, route_id: String, at_end: String, cargo: Dictio
 			wages += paid
 	var rest := proceeds - wages
 	var home := {}
+	var order: Dictionary = caravan.get("order", {})
+	if not order.is_empty():
+		home[str(order["id"])] = 1
+		rest -= int(order["cost"])
+		print("[economy] %s's caravan buys a %s at %s for %d gold, for %s, step %d" % [town, Items.name_of(str(order["id"])), market,
+			int(order["cost"]), order.get("name", TREASURY), now()])
 	var budget := floori(rest * float(rule.get("buy_share", 0.0)))
 	var sells: Array = rules.get("trade", {}).get("markets", {}).get(market, {}).get("sells", [])
 	var shortest := ""
 	for what: String in sells:
+		if is_luxury(what):
+			continue
 		var need := float(stockpile.count(town, what)) / maxf(float(rules.get("comfort", {}).get(what, 1)), 1.0)
 		if shortest.is_empty() or need < float(stockpile.count(town, shortest)) / maxf(float(rules.get("comfort", {}).get(shortest, 1)), 1.0):
 			shortest = what
-	if not shortest.is_empty() and budget > 0:
+	if not shortest.is_empty() and budget > 0 and rest > 0:
 		var unit := float(rules.get("value", {}).get(shortest, 1)) * float(rule.get("sell", 1.2))
 		var count := mini(floori(budget / maxf(unit, 0.01)), int(rule.get("load", 10)) * maxi(members.size(), 1))
 		if count > 0:
@@ -1107,6 +1135,10 @@ func caravan_arrived(id: String, route_id: String, at_end: String, cargo: Dictio
 			rest -= ceili(count * unit)
 	if rest > 0:
 		stockpile.deposit(town, "gold", rest, "trade:%s" % market, "sold %s at %s for %d (wages %d)" % [cargo.get("goods", {}), market, proceeds, wages])
+	elif rest < 0:
+		# The order cost more than the sale fetched: the rest from what the
+		# merchant paid in on the going (decision 514).
+		stockpile.take(town, "gold", mini(-rest, stockpile.count(town, "gold")), "trade:%s" % market)
 	print("[economy] %s's caravan sells %s at %s for %d gold: %d in wages, %d to the treasury, %s bought to bring home, step %d" % [town,
 		cargo.get("goods", {}), market, proceeds, wages, maxi(rest, 0), home, now()])
 	caravan_sold.emit(id, town, market, proceeds, wages)
@@ -1161,6 +1193,240 @@ func caravan_lost(id: String, _route_id: String, why: String) -> void:
 ## The town's caravans on the road: id -> {town, market, goods, members, home}.
 func caravans() -> Dictionary:
 	return _caravans.duplicate(true)
+
+
+# --- Luxuries (decision 514) ---------------------------------------------------------
+
+## Whether thing [param id] is a luxury (decision 514; Jeff: "luxury goods
+## that traders seek, sell to the rich"): tagged "luxury", taxed at
+## tax_class luxury.
+func is_luxury(id: String, cat := {}) -> bool:
+	if cat.is_empty():
+		cat = catalog.call()
+	return "luxury" in cat.get(id, {}).get("tags", [])
+
+
+## The luxuries in [param town]'s shop.
+func _luxuries(town: String) -> Array[int]:
+	var cat: Dictionary = catalog.call()
+	var out: Array[int] = []
+	for uid in stockpile.shop(town):
+		if is_luxury(stockpile.book.id_of(uid), cat):
+			out.append(uid)
+	return out
+
+
+## [param town]'s rich: residents whose purse stands above luxury.above.
+func rich(town: String) -> Array[String]:
+	var above := int(rules.get("luxury", {}).get("above", 60))
+	var out: Array[String] = []
+	for id in production.worker_ids(town):
+		if int(production.worker(id)["purse"]) > above:
+			out.append(id)
+	return out
+
+
+## [param town]'s merchant (a resident of trade luxury.trade, in town and
+## at work): "" for none.
+func _merchant(town: String) -> String:
+	var trade := str(rules.get("luxury", {}).get("trade", "merchant"))
+	for id in production.worker_ids(town):
+		var who := production.worker(id)
+		if trade in who["trades"] and not Production.off_work(who) and not production.outside(id):
+			return id
+	return ""
+
+
+## What one [param id] costs landed from a market [param eta] steps away:
+## value x caravan.sell, dearer by luxury.carry a day of the round trip.
+func landed_cost(id: String, eta: int) -> int:
+	var days := 2.0 * eta * World.WORLD_TICK_STEPS / maxf(float(DayNight.day_steps), 1.0)
+	var sell := float(rules.get("trade", {}).get("caravan", {}).get("sell", 1.2))
+	return ceili(value_of(id) * sell * (1.0 + float(rules.get("luxury", {}).get("carry", 0.0)) * days))
+
+
+## A going caravan's order (decision 514): one luxury the market sells, the
+## kind the shop has fewest of, while the town has a rich resident and its
+## shop under luxury.stock. The merchant pays its landed cost into the
+## treasury now (on a loan under the bank's cap if he must), the caravan
+## buys it out of the sale; with no merchant, or one who can't pay, the
+## treasury orders it above its floor. {} for none.
+func _luxury_order(town: String, market: String, eta: int) -> Dictionary:
+	var rule: Dictionary = rules.get("luxury", {})
+	if rule.is_empty() or rich(town).is_empty():
+		return {}
+	var shelf := _luxuries(town)
+	if shelf.size() >= int(rule.get("stock", 3)):
+		return {}
+	var cat: Dictionary = catalog.call()
+	var kinds: Array = rules.get("trade", {}).get("markets", {}).get(market, {}).get("sells", []).filter(func(what: Variant) -> bool:
+		return is_luxury(str(what), cat))
+	if kinds.is_empty():
+		return {}
+	var held := {}
+	for uid in shelf:
+		held[stockpile.book.id_of(uid)] = int(held.get(stockpile.book.id_of(uid), 0)) + 1
+	kinds.sort_custom(func(a: String, b: String) -> bool:
+		return int(held.get(a, 0)) < int(held.get(b, 0)) or int(held.get(a, 0)) == int(held.get(b, 0)) and a < b)
+	# Among the kinds the shelf has fewest of, a different one each day.
+	var fewest := kinds.filter(func(what: Variant) -> bool: return int(held.get(what, 0)) == int(held.get(kinds[0], 0)))
+	var id := str(fewest[int(now() / maxi(DayNight.day_steps, 1)) % fewest.size()])
+	var cost := landed_cost(id, eta)
+	var merchant := _merchant(town)
+	if not merchant.is_empty() and _afford(merchant, town, cost):
+		production.spend(merchant, cost, "a %s ordered from %s" % [Items.name_of(id), market])
+		stockpile.deposit(town, "gold", cost, "order:%s" % merchant, "%s ordered a %s from %s" % [production.worker(merchant)["name"], Items.name_of(id), market])
+		return {"id": id, "cost": cost, "merchant": merchant, "name": str(production.worker(merchant)["name"])}
+	# A commission (514 amended): the rich resident whose want found the
+	# shelf empty pays the landed cost up front, into the treasury as the
+	# order; the merchant fetches it with no gold of his own.
+	var buyer := str(_commissions.get(town, ""))
+	_commissions.erase(town)
+	var them := production.worker(buyer)
+	if not them.is_empty() and str(them["town"]) == town and int(them["purse"]) >= cost:
+		var asks := _folk_price(maxi(ceili(cost * float(rule.get("markup", 1.0))), value_of(id, cat)), buyer, merchant)
+		if int(them["purse"]) >= asks:
+			production.spend(buyer, cost, "a %s commissioned from %s" % [Items.name_of(id), market])
+			stockpile.deposit(town, "gold", cost, "commission:%s" % buyer, "%s commissioned a %s from %s" % [them["name"], Items.name_of(id), market])
+			print("[economy] %s commissions a %s from %s through %s, paying %d up front, step %d" % [them["name"], Items.name_of(id), market,
+				production.worker(merchant).get("name", TREASURY), cost, now()])
+			return {"id": id, "cost": cost, "merchant": merchant, "name": str(production.worker(merchant).get("name", TREASURY)), "for": buyer}
+	if stockpile.count(town, "gold") - cost < int(rules.get("gold_floor", 0)):
+		return {}
+	return {"id": id, "cost": cost, "merchant": "", "name": TREASURY}
+
+
+## [param count] of luxury [param id] home with [param caravan]: minted,
+## on the shelf as its orderer's (the merchant's, or the town's), each at
+## its landed cost (_landed) for the margin's tax.
+func _stock_import(town: String, id: String, count: int, caravan: Dictionary) -> void:
+	var order: Dictionary = caravan.get("order", {})
+	var merchant := str(order.get("merchant", "")) if str(order.get("id", "")) == id else ""
+	if not production.worker(merchant).is_empty() and str(production.worker(merchant)["town"]) != town:
+		merchant = ""
+	var cost := int(order.get("cost", landed_cost(id, int(caravan.get("eta", 0)))))
+	if str(order.get("id", "")) == id and not str(order.get("for", "")).is_empty() and count > 0:
+		_deliver_commission(town, id, cost, str(order["for"]), merchant, caravan)
+		count -= 1
+	for i in count:
+		var uid := stockpile.book.mint(id, "imported", "from %s" % caravan["market"])
+		stockpile.stock_shop(town, uid, "caravan from %s" % caravan["market"], merchant)
+		_landed[uid] = cost
+		print("[economy] %s puts a %s on the shelf at %s (landed %d, asks %d), step %d" % [production.worker(merchant).get("name", TREASURY),
+			Items.name_of(id), town, cost, item_price(town, uid), now()])
+
+
+## A commissioned [param id] home: its buyer [param buyer] pays the rest of
+## the merchant's price (landed x markup, at least its value, by their
+## factors) over the [param cost] they paid up front; the luxury tax on his
+## margin to the treasury, the rest his (all the treasury's with no
+## merchant). A buyer gone or short of the rest: it goes on the shelf,
+## what they paid the town's.
+func _deliver_commission(town: String, id: String, cost: int, buyer: String, merchant: String, caravan: Dictionary) -> void:
+	var uid := stockpile.book.mint(id, "imported", "from %s" % caravan["market"])
+	var them := production.worker(buyer)
+	var base := maxi(ceili(cost * float(rules.get("luxury", {}).get("markup", 1.0))), value_of(id))
+	var asks := _folk_price(base, buyer, merchant)
+	var rest := maxi(asks - cost, 0)
+	if them.is_empty() or str(them["town"]) != town or not production.spend(buyer, rest, "the rest for a %s" % Items.name_of(id)):
+		stockpile.stock_shop(town, uid, "caravan from %s" % caravan["market"], merchant)
+		_landed[uid] = cost
+		return
+	var before := stockpile.count(town, "gold")
+	var seller := TREASURY
+	if production.worker(merchant).is_empty():
+		if rest > 0:
+			stockpile.deposit(town, "gold", rest, "commission:%s" % buyer, "the rest for a %s" % Items.name_of(id))
+	else:
+		var cut := mini(Economy.taxed(maxi(base - cost, 0), goods_class(id), rules)[0], rest)
+		if cut > 0:
+			stockpile.deposit(town, "gold", cut, "tax:sale", "a %s for %s: tax %d on the margin" % [Items.name_of(id), them["name"], cut])
+		production.pay(merchant, rest - cut, "a %s for %s" % [Items.name_of(id), them["name"]])
+		seller = str(production.worker(merchant)["name"])
+	_owned(uid, buyer, id, asks, seller, merchant)
+	print("[economy] %s's commissioned %s is home: %d more to %s, %d of it tax to %s's treasury, step %d" % [them["name"], Items.name_of(id),
+		rest, seller, stockpile.count(town, "gold") - before if seller != TREASURY else rest, town, now()])
+
+
+## What [param town]'s shop asks for [param uid]: its price, and an import
+## never under its landed cost x luxury.markup, a luxury never under its
+## value (no want of the town's sets it: the rich pay it whole).
+func item_price(town: String, uid: int, cat := {}) -> int:
+	var id := stockpile.book.id_of(uid)
+	var asked := price(town, id, SELL, cat)
+	if is_luxury(id, cat):
+		asked = maxi(asked, value_of(id, cat))
+	if _landed.has(uid):
+		asked = maxi(asked, ceili(int(_landed[uid]) * float(rules.get("luxury", {}).get("markup", 1.0))))
+	return asked
+
+
+## A rich resident's daily want of a luxury (decision 514): above
+## luxury.above gold, with chance (purse - above) / luxury.span, they buy
+## the cheapest luxury on the shelf they can pay from their purse (never on
+## a loan), not one they made. Wine and spice are enjoyed; one tagged as
+## luxury.kept (the ring) is theirs to keep. The seller's sale pays the
+## luxury tax (tax_class luxury) into the treasury: on the merchant's
+## margin, on a made one's price.
+func _indulge(id: String, cat: Dictionary) -> void:
+	var rule: Dictionary = rules.get("luxury", {})
+	var who := production.worker(id)
+	var town := str(who["town"])
+	var purse := int(who["purse"])
+	var above := int(rule.get("above", 60))
+	if rule.is_empty() or purse <= above:
+		return
+	var chance := minf(float(purse - above) / maxf(float(rule.get("span", 100)), 1.0), 1.0)
+	if float(absi(hash([id, now(), "luxury"])) % 1000) / 1000.0 >= chance:
+		return
+	var best := 0
+	var best_cost := 0
+	var best_base := 0
+	for uid in _luxuries(town):
+		var maker := stockpile.maker_of(town, uid)
+		if maker == id:
+			continue
+		var base := item_price(town, uid, cat)
+		var cost := _folk_price(base, id, maker)
+		if cost <= purse and (best == 0 or cost < best_cost or cost == best_cost and uid < best):
+			best = uid
+			best_cost = cost
+			best_base = base
+	if best == 0:
+		if not _commissions.has(town):
+			_commissions[town] = id
+		return
+	var what := stockpile.book.id_of(best)
+	var thing := Items.name_of(what)
+	var maker := stockpile.maker_of(town, best)
+	var before := stockpile.count(town, "gold")
+	stockpile.take_from_shop(town, best, "folk:%s" % id)
+	production.spend(id, best_cost, "a %s" % thing)
+	var seller := _sale(town, maker, what, best_cost, "folk:%s" % id, "sold a %s to %s" % [thing, who["name"]], best_base, int(_landed.get(best, -1)))
+	_landed.erase(best)
+	_owned(best, id, what, best_cost, seller, maker)
+	print("[economy] %s buys a %s from %s for %d gold, %d of it tax to %s's treasury, step %d" % [who["name"], thing, seller, best_cost,
+		stockpile.count(town, "gold") - before if seller != TREASURY else 0, town, now()])
+
+
+## Luxury [param uid] ([param what]) is now resident [param id]'s, bought
+## for [param cost] from [param seller] (made or stocked by
+## [param maker]): kept if tagged luxury.kept, else enjoyed; the card's
+## trade both ways.
+func _owned(uid: int, id: String, what: String, cost: int, seller: String, maker: String) -> void:
+	var who := production.worker(id)
+	var town := str(who["town"])
+	var thing := Items.name_of(what)
+	var kept: Array = rules.get("luxury", {}).get("kept", [])
+	if catalog.call().get(what, {}).get("tags", []).any(func(tag: Variant) -> bool: return tag in kept):
+		stockpile.book.place(uid, "resident:%s" % id, id, str(who["name"]))
+		stockpile.book.note(uid, "bought", "by %s at %s for %d gold" % [who["name"], town, cost])
+	else:
+		stockpile.book.end(uid, "enjoyed", "by %s at %s" % [who["name"], town])
+	production.note_trade(id, "bought a %s" % thing, cost, seller)
+	if seller != TREASURY and not maker.is_empty():
+		production.note_trade(maker, "sold a %s" % thing, cost, who["name"])
+	stockpile.note(town, what, cost, "folk:%s" % id, "%s bought a %s from %s for %d gold" % [who["name"], thing, seller, cost])
 
 
 ## A maker's apprentice (decision 498 amended; Jeff: "makers have more
@@ -1302,7 +1568,8 @@ func pay_commission(player_id: String, town: String, gold_owed: int) -> int:
 func to_dict() -> Dictionary:
 	return {"purses": _purses.duplicate(), "log": _log.duplicate(true), "paid": _paid.duplicate(true), "hauled": _hauled.duplicate(),
 		"player_owed": _player_owed.duplicate(true), "apprentice_paid": _apprentice_paid.duplicate(), "funds": _funds.duplicate(true),
-		"caravans": _caravans.duplicate(true), "bought": _bought.duplicate(true), "trade_day": _trade_day}
+		"caravans": _caravans.duplicate(true), "bought": _bought.duplicate(true), "trade_day": _trade_day, "landed": _landed.duplicate(),
+		"commissions": _commissions.duplicate()}
 
 
 func from_dict(saved: Dictionary) -> void:
@@ -1326,6 +1593,14 @@ func from_dict(saved: Dictionary) -> void:
 				for what: Variant in bought[market]:
 					_bought[str(market)][str(what)] = maxf(float(bought[market][what]), 0.0)
 	_trade_day = int(saved.get("trade_day", -1))
+	var commissions: Variant = saved.get("commissions", {})
+	if commissions is Dictionary:
+		for town: Variant in commissions:
+			_commissions[str(town)] = str(commissions[town])
+	var landed: Variant = saved.get("landed", {})
+	if landed is Dictionary:
+		for uid: Variant in landed:
+			_landed[int(uid)] = int(landed[uid])
 	var funds: Variant = saved.get("funds", {})
 	if funds is Dictionary:
 		for town: Variant in funds:

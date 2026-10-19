@@ -43,6 +43,7 @@ func _ready() -> void:
 	_test_apprentice()
 	_test_contribute()
 	_test_caravan()
+	_test_luxury()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -692,6 +693,108 @@ func _test_caravan() -> void:
 	economy._trade_turn([TOWN])
 	var kept := maxi(int(_rules.get("comfort", {}).get("hide", 0)), int(rule["keep"])) + 2 * 3
 	_check(sent.size() == 4 and sent[3][1]["goods"] == {"hide": 20 - kept}, "the hides for the inn's leather kept: %d sent (%s)" % [20 - kept, sent[-1]])
+
+func _test_luxury() -> void:
+	print("\n== luxuries for the rich (514) ==")
+	_now = 0
+	var clock := func() -> int: return _now
+	var stock := Stockpile.new({}, clock, ItemBook.new(clock))
+	var work := Production.new({}, stock, null, clock, _rules)
+	var economy := Economy.new({}, stock, work, clock, _rules)
+	var cat: Dictionary = economy.catalog.call()
+	_check(economy.is_luxury("wine") and economy.is_luxury("silver_ring") and not economy.is_luxury("leather")
+		and Economy.goods_class("wine") == "luxury", "wine and the ring are luxuries, taxed as such")
+	var eta := 20
+	var way := {"id": "r1", "market": "market:castle", "eta": eta, "risk": 0.0}
+	economy.trade_routes = func(_town: String) -> Array: return [way]
+	var sent: Array = []
+	economy.send_caravan = func(route_id: String, cargo: Dictionary, from_end: String) -> String:
+		sent.append([route_id, cargo.duplicate(true), from_end])
+		return "c%d" % sent.size()
+	work.add_worker("h1", "Ash", ["hauler"], TOWN, "test", "steady")
+	work.add_worker("m1", "Snagfin", ["merchant"], TOWN, "test", "merchant")
+	work.add_worker("c1", "Pell", ["carpenter"], TOWN, "test", "steady")
+	work.add_worker("s1", "Odo", ["smith"], TOWN, "test", "steady")
+	work.add_worker("p1", "Nix", ["hauler"], TOWN, "test", "steady")
+	stock.deposit(TOWN, "food", 60)
+	stock.deposit(TOWN, "gold", 100)
+	work.pay("m1", 40, "test")
+	_now = DayNight.day_steps
+	economy._trade_turn([TOWN])
+	_check(sent.size() == 1 and economy.caravans()["c1"].get("order", {}).is_empty(), "nobody rich: nothing ordered")
+	economy.caravan_arrived("c1", "r1", "market:castle", sent[0][1])
+	economy.caravan_arrived("c2", "r1", TOWN, sent[1][1])
+	work.pay("c1", 300, "test")
+	work.pay("s1", 300, "test")
+	var cost := economy.landed_cost("spice", eta)
+	var treasury := stock.count(TOWN, "gold")
+	_now += DayNight.day_steps
+	economy._trade_turn([TOWN])
+	var order: Dictionary = economy.caravans()["c3"].get("order", {})
+	_check(order.get("id", "") == "spice" and int(order["cost"]) == cost and int(work.worker("m1")["purse"]) == 40 - cost
+		and stock.count(TOWN, "gold") == treasury + cost, "the rich in town: the merchant orders a spice for %d, paid into the treasury (%s)" % [cost, order])
+	economy.caravan_arrived("c3", "r1", "market:castle", sent[2][1])
+	_check(sent[3][1]["goods"].get("spice", 0) == 1, "the caravan brings it home (%s)" % [sent[3][1]])
+	economy.caravan_arrived("c4", "r1", TOWN, sent[3][1])
+	var shelf := stock.shop(TOWN)
+	_check(shelf.size() == 1 and stock.book.id_of(shelf[0]) == "spice" and stock.maker_of(TOWN, shelf[0]) == "m1"
+		and economy.item_price(TOWN, shelf[0]) >= ceili(cost * float(_rules["luxury"]["markup"])),
+		"on the merchant's shelf, asking at least its landed cost x markup (%d)" % economy.item_price(TOWN, shelf[0]))
+	var ring := stock.book.mint("silver_ring", "made", TOWN)
+	stock.stock_shop(TOWN, ring, "Odo", "s1")
+	# The smith never buys his own ring; he buys the spice, the cheaper one he didn't make.
+	var spice := shelf[0]
+	var asks := economy._folk_price(economy.item_price(TOWN, spice), "s1", "m1")
+	var merchant := int(work.worker("m1")["purse"])
+	treasury = stock.count(TOWN, "gold")
+	_now += 1
+	economy._indulge("s1", cat)
+	var tax: int = Economy.taxed(asks, "luxury", _rules)[0]
+	_check(spice not in stock.shop(TOWN) and ring in stock.shop(TOWN) and int(work.worker("s1")["purse"]) == 300 - asks,
+		"the smith buys the spice for %d, not his own ring" % asks)
+	var margin_tax := stock.count(TOWN, "gold") - treasury
+	_check(margin_tax > 0 and int(work.worker("m1")["purse"]) == merchant + asks - margin_tax and margin_tax < tax,
+		"the luxury tax on the merchant's margin only: %d to the treasury, %d his" % [margin_tax, asks - margin_tax])
+	_check(not stock.book.has(spice), "the spice is enjoyed, gone from the book")
+	_now += 1
+	economy._indulge("s1", cat)
+	_check(ring in stock.shop(TOWN), "the smith still won't buy his own ring")
+	work.pay("p1", 20, "test")
+	_now += 1
+	economy._indulge("p1", cat)
+	_check(ring in stock.shop(TOWN), "a purse of 20 buys no luxury")
+	treasury = stock.count(TOWN, "gold")
+	_now += 1
+	economy._indulge("c1", cat)
+	_check(ring not in stock.shop(TOWN) and stock.book.has(ring) and stock.count(TOWN, "gold") > treasury,
+		"the carpenter buys the ring and keeps it; its tax to the treasury (%d)" % (stock.count(TOWN, "gold") - treasury))
+	var saved := economy.to_dict()
+	_check(saved.has("landed"), "landed costs are saved")
+	# A commission (514 amended): the merchant broke, the shelf empty.
+	work.spend("m1", int(work.worker("m1")["purse"]), "test")
+	stock.take(TOWN, "gold", stock.count(TOWN, "gold") - int(_rules.get("gold_floor", 0)))
+	_check(economy._commissions.get(TOWN, "") == "s1", "the smith's want that found only his own ring is a commission")
+	economy._commissions.erase(TOWN)
+	_now += 1
+	economy._indulge("c1", cat)
+	var pell := int(work.worker("c1")["purse"])
+	treasury = stock.count(TOWN, "gold")
+	_now += DayNight.day_steps
+	economy._trade_turn([TOWN])
+	order = economy.caravans()["c5"].get("order", {})
+	cost = int(order.get("cost", 0))
+	_check(order.get("for", "") == "c1" and int(work.worker("c1")["purse"]) == pell - cost and stock.count(TOWN, "gold") == treasury + cost,
+		"the shelf empty and the merchant broke: Pell commissions a %s, paying %d up front (%s)" % [order.get("id", ""), cost, order])
+	economy.caravan_arrived("c5", "r1", "market:castle", sent[4][1])
+	merchant = int(work.worker("m1")["purse"])
+	pell = int(work.worker("c1")["purse"])
+	treasury = stock.count(TOWN, "gold")
+	economy.caravan_arrived("c6", "r1", TOWN, sent[5][1])
+	var rest := pell - int(work.worker("c1")["purse"])
+	var cut := stock.count(TOWN, "gold") - treasury
+	_check(stock.shop(TOWN).size() == 0 and rest > 0 and cut > 0 and int(work.worker("m1")["purse"]) == merchant + rest - cut,
+		"home, it's Pell's: %d more, %d to Snagfin and %d tax to the treasury" % [rest, rest - cut, cut])
+
 
 func _check(ok: bool, what: String) -> void:
 	print("%s  %s" % ["PASS" if ok else "FAIL", what])

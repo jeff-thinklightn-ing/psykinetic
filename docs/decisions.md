@@ -15110,3 +15110,65 @@ yield, and its prompt line comes with it.
   held by the town, near it and reachable from its store.
 
 Protocol unchanged. builder_test _test_work_sites.
+## 514. Luxury goods for the rich, and their tax
+
+Jeff (2026-10-18): "introduce luxury goods that traders seek, sell to the
+rich" and "taxes can be most higher on luxury goods which the rich prefer
+then wages are paid by town". Phase 3 of his gold economy, the
+coordinator's approval, amended once (the commission) after the first
+soak; the catalog is "514, items' side" (wine, spice, silver_ring, tagged
+"luxury").
+- A luxury is a thing tagged "luxury" (Economy.is_luxury); its sale pays
+  tax_class luxury (0.5) through the existing goods_class.
+- The rich: residents whose purse stands above luxury.above (60). A folk
+  need "luxury" each day (rich_every as often): with chance (purse -
+  above) / luxury.span (100) they buy the cheapest luxury on the shelf
+  they can pay from their purse (never on a loan), never one they made
+  (the smith doesn't buy his own ring). Wine and spice are enjoyed (the
+  book ends them); one tagged as luxury.kept (jewellery: the ring) is
+  theirs, placed "resident:<id>" in the book. The card's trade both ways
+  (note_trade: npc's facts and standing).
+- A luxury asks at least its value (no want of the town's discounts it),
+  an import at least its landed cost x luxury.markup (1.5)
+  (Economy.item_price, for players' shop too).
+- Imports: market:castle sells wine and spice. A going caravan, while the
+  town has a rich resident and fewer than luxury.stock (3) luxuries on the
+  shelf, orders one (the kind the shelf has fewest of, turn about by the
+  day) at its landed cost, value x caravan.sell x (1 + luxury.carry x the
+  round trip's days), dearer with distance. Paid for, in order: by the
+  merchant (a resident of trade luxury.trade, on a loan under the bank's
+  cap if he must), into the treasury now; else by a commission (amended,
+  below); else by the treasury above its floor. The caravan buys it out of
+  the sale (any shortfall from what was paid in on the going) and brings
+  it home; it is not food, so a raid leaves it.
+- On the shelf, an import is its orderer's (stock_shop maker), its landed
+  cost kept (Economy "landed", saved): a sale taxes the merchant's margin
+  over it at luxury 0.5 into the treasury, the rest his (Economy._sale's
+  bought_for). A made luxury (the smith's ring, made by "always_want":
+  "luxury", at most luxury.stock on the shelf, Production._serves) pays
+  luxury 0.5 on its price as a made thing does.
+- The commission (514 amended): the first soak moved nothing. The merchant
+  had no gold and 20 owed against the cap of 30, the treasury sat at its
+  floor, and the soak town has no ore for the ring, so no luxury was ever
+  stocked while the smith and carpenter held 290 gold idle. Now a rich
+  resident whose want finds nothing they can buy is the town's commission
+  (Economy "commissions", one a town, saved). The next caravan with no
+  merchant's order takes it: if they can pay the whole asking price, they
+  pay the landed cost up front into the treasury as the order, and on the
+  return the thing is theirs at once, paying the rest of the merchant's
+  price (landed x markup, at least its value, by both their factors), the
+  luxury tax on his margin to the treasury, the rest his. No new credit:
+  the gold that moves is the rich's own. A buyer gone or short of the
+  rest: it goes on the shelf, what they paid the town's.
+- [economy] lines for each order, commission, purchase at the market,
+  shelving, homecoming and sale, with the tax.
+Soak (30 days, 3 players) against a fresh baseline on the same main:
+12 commissions (Odo the smith 8, Pell the carpenter 3, Tam the farmer 1),
+180 gold paid up front (to the castle market through the caravan's sale),
+132 more on delivery: 48 luxury tax to the treasury, 84 to Snagfin, who
+paid off his 20 owed. Odo's purse 158 -> 81, Pell's 131 -> 52. Officials
+unpaid 204 (235); treasury end 5 (2); the tanner paid what the town owed
+him 28 times (7), and the inn stood on day 23.4 (not in 30 days). No
+ring was made: no ore reaches the soak town's smith, which waits for the
+work-site step. Protocol unchanged. larder_test.
+

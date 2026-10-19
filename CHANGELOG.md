@@ -8,6 +8,7 @@ notes (decision 324).
 ## Unreleased
 
 - Talking to the town's official about the building fund: the give lines read as "a gift" with a Give button and the gold in brass, and the foot says what you carry whenever a line would take gold; a long offer title wraps instead of running off the panel.
+- Luxuries for the rich (514): a well-off resident sometimes wants wine or spice from the castle market, or the smith's silver ring, and has the merchant fetch it by caravan. Luxuries are taxed at half the merchant's margin, and that tax helps the town pay its wages and the makers it owes. The rich keep a ring and enjoy the rest.
 - Streams run: their water drifts downstream, fords show shallow and clear with foam where the current crosses the stones, and bridges are drawn with wooden decks, rails and ends, the water running on underneath (505).
 - Builder mode can mark a town's work sites (a woodlot, a hunting ground, a quarry) and says when one is held by goblins or cut off from the town on foot.
 - Tools: the heavy-job gate estimates RAM and commit separately (394 amended). Windows charges a GPU job's memory on the card to commit without using RAM, and the gate had read that commit as RAM. A TRELLIS mesh job now wants 9 GB of free RAM plus the margin, not 28.9. It still needs about 29 GB of free commit plus the margin.
@@ -31,6 +32,7 @@ notes (decision 324).
 - Rocks and cliffs: a new slope cell joins two heights outdoors as a ramp, a new rock cell stands in the way and blocks sight, and from under a cliff you see only its edge, not who stands back from it. The level editor raises a rock outcrop with a slope and rocks on its lip; the sample level is taller, with one (513).
 - The world map's trade caravans carry how many days they have still to go (504).
 - Talking to a merchant: the thing for sale shows its price in brass, or in rust with what you carry when your purse is short; a line says it is bought at the town's counter, and until you stand there the button reads "Buy at the counter"; the foot says what you carry.
+
 - Tall grass hides you: stand still in it and monsters and animals pass you by; move and they may catch the grass stirring, and a monster already chasing you keeps after you until you go still. Your companion never loses you in it, and animals can still smell you on the wind.
 - New luxury goods: a flask of wine and a pouch of spice, brought in by caravan, and a silver ring the smith makes.
 - Builder mode knows the new building kinds by what they are (a longhouse, a stone cottage, a barn), and a composed building can be given a use in town, such as the inn.
@@ -531,7 +533,6 @@ notes (decision 324).
   you a little, like light rain.
 - Server console: `season <name>` and `season_days <n>` (also `--season`,
   `--season-days`).
-
 
 ## v0.1.148
 

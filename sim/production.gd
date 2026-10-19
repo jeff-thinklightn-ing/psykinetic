@@ -1193,6 +1193,10 @@ func _serves(town: String, entry: Dictionary, want: String, cat: Dictionary) -> 
 	if want != "goods" and want not in _tags_of(entry["id"], cat):
 		return false
 	var in_shop := stockpile.shop(town).filter(func(uid: int) -> bool: return book().id_of(uid) == entry["id"]).size()
+	# A luxury (the smith's ring, decision 514) only up to luxury.stock: the
+	# rich are few.
+	if "luxury" in _tags_of(entry["id"], cat):
+		return in_shop < int(rules.get("luxury", {}).get("stock", rules.get("shop_cap", 6)))
 	return in_shop < int(rules.get("shop_cap", 6))
 
 

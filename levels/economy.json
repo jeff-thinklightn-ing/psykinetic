@@ -11,7 +11,7 @@
 		"stock": ["bandage", "food", "weapon", "shield"],
 		"surplus": ["goods", "rework"]
 	},
-	"always_want": ["resource", "repair"],
+	"always_want": ["resource", "repair", "luxury"],
 	"hunter": {"trade": "hunter", "every": 3000},
 	"woodcutter": {"trade": "woodcutter", "every": 3000, "wood": 2, "per_level": 1, "growth_days": 2,
 		"names": ["Bran", "Alder", "Rowan", "Hazel", "Ash", "Birk"]},
@@ -40,7 +40,8 @@
 	"trade": {"buy_ratio": 0.5, "min_factor": 0.5, "max_factor": 2.0,
 		"caravan": {"load": 10, "keep": 5, "wage": 2, "risk_premium": 0.5, "saturation": 20, "recover": 2, "buy_share": 0.25, "sell": 1.2, "goes": []},
 		"markets": {"market:castle": {"wants": {"leather": 1.6, "cloth": 1.5, "meat": 1.2, "hide": 1.0, "food": 1.0, "wood": 0.8},
-			"sells": ["ore", "cloth", "wood", "food"]}}},
+			"sells": ["ore", "cloth", "wood", "food", "wine", "spice"]}}},
+	"luxury": {"above": 60, "span": 100, "stock": 3, "carry": 0.1, "markup": 1.5, "trade": "merchant", "kept": ["jewellery"]},
 	"rent": 1,
 	"rent_every": 54000,
 	"gold_floor": 5,
@@ -76,6 +77,7 @@
 	"folk": {
 		"needs": {
 			"meal": {"every": 54000, "tags": ["food"], "store": ["food", "meat"]},
+			"luxury": {"every": 54000, "luxury": true},
 			"bed": {"every": 54000, "building": "inn", "fee": 2, "what": "a bed at the inn"},
 			"mend": {"every": 108000, "trade": "carpenter", "fee": 3, "what": "mending at home"},
 			"tools": {"every": 108000, "trade": "smith", "fee": 4, "what": "work on their tools"}
