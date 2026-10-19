@@ -7,6 +7,8 @@ notes (decision 324).
 
 ## Unreleased
 
+- Standing still in tall grass with no light giving you away, the HUD says "hidden in the grass" (the one cue that the cover works); it goes the moment you step.
+- The world map's wagon can be hovered: its words say whose it is, where it is bound and where it is (and how many days out, when the server says); the hint over things on the ground names them ("F  pick up herbs").
 - The server no longer reads every level's level.json on each world tick to see which levels regenerate: the list is read once and again only when a level is registered, kept as a template or reloaded (perf's profile: about 4 ms a tick).
 - A small stutter four times a second is gone: the music no longer looks up its sound files on disk each time it weighs its layers.
 - Wine comes in a leather flask sealed with red wax, spice in a tied cloth pouch heaped with orange spice, and a silver ring has a small raised setting.

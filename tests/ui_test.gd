@@ -26,6 +26,7 @@ func _ready() -> void:
 	await _test_talk_panel()
 	_test_context_and_place()
 	_test_converse_panel()
+	_test_sim_reads()
 	_test_counter_panel()
 	_test_world_map()
 	_test_access()
@@ -334,6 +335,26 @@ func _test_converse_panel() -> void:
 	var fonts := UiTheme.credits()
 	_check(fonts["entries"].size() == 2 and UiTheme.credits in OptionsPanel.credit_providers(),
 		"the fonts' credit (Alegreya, Alegreya Sans, OFL) is one of the Credits' providers")
+
+
+func _test_sim_reads() -> void:
+	print("== the day's sim read in play (decision 515): the wagon's words, the pile's hint ==")
+	var map: WorldMapPanel = _main.world_map_panel
+	var route := {"id": "t", "from_area": "a", "to_area": "b", "areas": ["a", "b"], "caravans": [{"area": "a", "fraction": 0.5}]}
+	_check(map.caravan_words(route, route["caravans"][0]) == "the wagon from a, bound for b, in a",
+		"a caravan's words from the wire alone (the ids when the map has no names)")
+	_check(map.caravan_words(route, {"area": "b", "fraction": 0.9, "days": 2}) == "the wagon from a, bound for b, in b, 2 days out"
+		and map.caravan_words(route, {"area": "b", "days": 1}).ends_with(", a day out"), "with maps' days: N days out, a day out")
+	_check(Main.hidden_words_due(World.TALL_GRASS_COVER, Senses.STILL_TICKS, false, 0.0, 9)
+		and not Main.hidden_words_due(0.0, Senses.STILL_TICKS, false, 0.0, 9)
+		and not Main.hidden_words_due(World.TALL_GRASS_COVER, Senses.STILL_TICKS - 1, false, 0.0, 9)
+		and not Main.hidden_words_due(World.TALL_GRASS_COVER, Senses.STILL_TICKS, false, 0.0, Senses.NOTICE_ALWAYS),
+		"hidden in the grass: on cover, still Senses.STILL_TICKS, nobody adjacent")
+	_check(not Main.hidden_words_due(World.TALL_GRASS_COVER, 99, true, Senses.DARK - 0.1, 9)
+		and Main.hidden_words_due(World.TALL_GRASS_COVER, 99, true, 1.0, 9),
+		"a carried light gives them away in the dark alone, not by day (enemy-ai's reading)")
+	_check(Main.pile_words(PackedStringArray(["herbs"])) == "herbs" and Main.pile_words(PackedStringArray(["herbs", "dagger", "rope"])) == "herbs and 2 more"
+		and Main.pile_words(PackedStringArray()) == "", "a pile's words: the first thing's short name, and how many more")
 
 
 func _test_counter_panel() -> void:

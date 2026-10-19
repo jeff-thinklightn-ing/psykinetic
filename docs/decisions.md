@@ -14798,3 +14798,41 @@ size as a building_<kind>_<size> prefab, walls and doors included
   for. The seed stays defaulted (hash of its cell), as buildings advise.
 
 Protocol unchanged. builder_test _test_kind_building.
+
+## 515. The day's sim landings read in play
+
+Ui, the coordinator's list of 2026-10-19: what the sim landed that day,
+read in play without a number or a bar, client only. Each reads its
+owner's rule from the owner's code or the wire; none has a rule of its
+own.
+
+- Hidden (maps' 508, enemy-ai's Senses.hidden_by_cover): the HUD line's
+  state words gain "hidden in the grass" when the local player stands on
+  cover (World.cover_at > 0), has not changed cell for Senses.STILL_TICKS
+  (this view's own count from the replicated tile: last_step_tick is the
+  server's), no monster stands within Senses.NOTICE_ALWAYS (cover never
+  hides from the adjacent), and no carried light shows them (emit_light
+  with the cell darker than Senses.DARK without it; enemy-ai's reading,
+  so a lantern by day voids nothing). Main.hidden_words_due is the rule
+  on its inputs; the words go the tick they step. Moving in cover is
+  viewer-dependent, so the cue is for "still" alone.
+- The wagon (maps' 504): WorldMapPanel's caravan dot is a hover target
+  (CARAVAN_GRIP 14 units at zoom 1; caravan_at), drawn a little larger
+  under the cursor, with a caption beside it from what the wire has
+  (caravan_words): "the wagon from The Wilds, bound for The Castle, in
+  The Forest", and ", N days out" when maps sends "days" with the
+  caravan (its call; nothing shown without it). The --test-show=world
+  state adds a test wagon, hovered, when the map knows no route.
+- Herbs (502, items' 501 amended): the ground-pile hint names what lies
+  there, "F  pick up herbs" (Main.pile_words: the first thing's short
+  name in lower case, "and N more" for the rest); the pack shows a bunch
+  by its short name as it shows anything. --test-show=herbs lays a bunch
+  beside the player (the hint on it) and one in the hand.
+- Sick (npc's 501): a resident's "in bed" is not on the wire (Resident.
+  doing is the server's; the kind is on the card), so the hint and the
+  talk's title wait for npc's replicated word; an amendment here when it
+  lands.
+
+ui_test: the cue's rule on its inputs, the wagon's words with and without
+days, the pile's words. Shots in docs/ui/shots/sim. Protocol unchanged;
+no new class_name.

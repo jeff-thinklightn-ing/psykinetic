@@ -49,6 +49,10 @@ var pan := Vector2.ZERO
 var _dragging := false
 var _factions: Dictionary = {}
 var _hover := ""
+## The caravan dot under the cursor (decision 515): {route, caravan}, or {}.
+var _hover_caravan: Dictionary = {}
+## How near the cursor must come to a caravan's dot, in canvas units at zoom 1.
+const CARAVAN_GRIP := 14.0
 
 
 func _init() -> void:
@@ -262,6 +266,51 @@ func _gui_input(event: InputEvent) -> void:
 		if over != _hover:
 			_hover = over
 			queue_redraw()
+		var dot := caravan_at(motion.position)
+		if dot != _hover_caravan:
+			_hover_caravan = dot
+			queue_redraw()
+
+
+## The caravan whose dot is within CARAVAN_GRIP of [param at] (screen), as
+## {route, caravan}; {} for none (decision 515).
+func caravan_at(at: Vector2) -> Dictionary:
+	var scale := ZOOMS[zoom_step]
+	var best: Dictionary = {}
+	var best_away := CARAVAN_GRIP * scale
+	for route: Dictionary in trade:
+		var line := trade_line(route, scale)
+		if line.is_empty():
+			continue
+		for caravan: Variant in route.get("caravans", []):
+			if caravan is Dictionary:
+				var away := point_along(line, float(caravan.get("fraction", 0.0))).distance_to(at)
+				if away <= best_away:
+					best_away = away
+					best = {"route": route, "caravan": caravan}
+	return best
+
+
+## What hovering a caravan's dot says (decision 515), from what the wire
+## has: "the wagon from The Wilds, bound for The Castle, in The Forest",
+## and ", N days out" when maps sends "days" with the caravan.
+func caravan_words(route: Dictionary, caravan: Dictionary) -> String:
+	var words := "the wagon from %s, bound for %s" % [_area_words(str(route.get("from_area", ""))), _area_words(str(route.get("to_area", "")))]
+	var where := _area_words(str(caravan.get("area", "")))
+	if not where.is_empty():
+		words += ", in %s" % where
+	if caravan.has("days"):
+		var days := int(caravan["days"])
+		words += ", a day out" if days == 1 else ", %d days out" % days
+	return words
+
+
+## An area's display name, or its id when the map has none ("" for "").
+func _area_words(area_name: String) -> String:
+	if area_name.is_empty() or world == null:
+		return area_name
+	var area: Variant = world.areas.get(area_name)
+	return str(area.get("display_name", area_name)) if area is Dictionary else area_name
 
 
 ## The area whose box is under [param at] (screen), "" for none.
@@ -341,7 +390,26 @@ func _draw() -> void:
 		var line := trade_line(route, scale)
 		for caravan: Variant in route.get("caravans", []):
 			if caravan is Dictionary and line.size() >= 1:
-				draw_circle(point_along(line, float(caravan.get("fraction", 0.0))), 7.0 * scale, UiTheme.color("brass_bright"))
+				var hovered: bool = not _hover_caravan.is_empty() and _hover_caravan["route"] == route and _hover_caravan["caravan"] == caravan
+				draw_circle(point_along(line, float(caravan.get("fraction", 0.0))), (9.0 if hovered else 7.0) * scale, UiTheme.color("brass_bright"))
+	# The hovered caravan's words, in a box beside its dot (decision 515).
+	if not _hover_caravan.is_empty():
+		var route: Dictionary = _hover_caravan["route"]
+		var caravan: Dictionary = _hover_caravan["caravan"]
+		var line := trade_line(route, scale)
+		if not line.is_empty():
+			var dot := point_along(line, float(caravan.get("fraction", 0.0)))
+			var words := caravan_words(route, caravan)
+			var text_size := sans.get_string_size(words, HORIZONTAL_ALIGNMENT_LEFT, -1, int(caption * scale))
+			var pad := 10.0 * scale
+			var box := Rect2(dot + Vector2(14.0, -14.0) * scale - Vector2(0.0, text_size.y + pad * 2.0), text_size + Vector2(pad * 2.0, pad * 2.0))
+			if box.end.x > size.x:
+				box.position.x = dot.x - 14.0 * scale - box.size.x
+			if box.position.y < 0.0:
+				box.position.y = dot.y + 14.0 * scale
+			draw_rect(box, UiTheme.color("backing_deep"))
+			draw_rect(box, UiTheme.color("brass"), false, 1.0 * scale)
+			draw_string(sans, box.position + Vector2(pad, pad + text_size.y * 0.78), words, HORIZONTAL_ALIGNMENT_LEFT, -1, int(caption * scale), UiTheme.color("text"))
 	# The title and how to leave.
 	draw_string(serif, Vector2(UiTheme.constant("margin"), UiTheme.constant("margin") + heading), "The known world",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, UiTheme.size("title"), UiTheme.color("text"))

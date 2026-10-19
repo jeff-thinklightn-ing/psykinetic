@@ -418,6 +418,8 @@ var _place_words := ""
 var _counter_placed_from: Array = []
 ## --test-show=hint: the thing the hint is shown on, as if the cursor were on it.
 var _test_hint_thing: GridEntity
+## --test-show=herbs: the cell whose pile the hint is shown for (NONE: none).
+var _test_hint_cell := Vector2i(-100000, -100000)
 ## --test-show=counter: the pack panel, for the counter screen's sample.
 var _test_counter_shown: Node
 ## --test-show=converse: the panel wanted on the nearest resident, once there is one.
@@ -426,6 +428,11 @@ var _test_converse_due := false
 var _draw_shown := false
 ## The one-time line the first time a townsperson is near (Net.hinted_talk), and when it goes.
 var _talk_hint: Label
+## Where the local player last stood and since which tick, for the cover
+## cue (decision 515): stillness is this view's own count, since
+## last_step_tick is stamped on the server alone.
+var _still_tile := Vector2i(-100000, -100000)
+var _still_since := 0
 var _talk_hint_until := 0.0
 ## Talking with a town's person (ConversePanel; ui's step 4).
 var converse: ConversePanel
@@ -498,6 +505,8 @@ func _ready() -> void:
 		_builder_ui.name = "BuilderUI"
 		_builder_ui.main = self
 		add_child(_builder_ui)
+	if "hidden" in Net.test_show:
+		_register_test_meadow()  # --test-show=hidden: a meadow of tall grass and nobody in it (decision 515's shot).
 	_load_level(Net.map_name if not Net.map_name.is_empty() else Level.DEFAULT_MAP)
 	if Net.renderer == "3d" and Net.mode != Net.Mode.SERVER and DisplayServer.get_name() != "headless":
 		_show_3d()
@@ -836,12 +845,16 @@ func _process(delta: float) -> void:
 							_hint_words = context_hint_for(entity)
 							break
 				if _hint_words.is_empty() and player != null and not World.ground_at(tile).is_empty():
-					_hint_words = "%s  pick up" % Keys.name_of("pick_up")
+					_hint_words = "%s  pick up %s" % [Keys.name_of("pick_up"), pile_words(World.ground_at(tile))]
 		var words := _hint_words
 		if is_instance_valid(_test_hint_thing) and _client3d != null:
 			# --test-show=hint: the hint as the cursor on that thing would show it.
 			words = context_hint_for(_test_hint_thing)
 			at = _client3d.screen_of_tile(_test_hint_thing.tile)
+		elif _test_hint_cell != Vector2i(-100000, -100000) and _client3d != null and not World.ground_at(_test_hint_cell).is_empty():
+			# --test-show=herbs: the pile's hint, as the cursor on it would show it (decision 515).
+			words = "%s  pick up %s" % [Keys.name_of("pick_up"), pile_words(World.ground_at(_test_hint_cell))]
+			at = _client3d.screen_of_tile(_test_hint_cell)
 		_context_hint.visible = not words.is_empty()
 		if not words.is_empty():
 			if _context_hint.text != words:
@@ -5598,6 +5611,60 @@ func _swap_chat_channel() -> void:
 	_chat_box.caret_column = _chat_box.text.length()
 
 
+## --test-show=hidden: registers "ui_meadow", a grass field with a patch of
+## tall grass (tall_grass_test's shape) and no monster, and starts there,
+## so a shot can show the cover cue: --test-contest walks the player into
+## the patch (x 4 to 7, y 2 to 5) and the HUD says it once they stand.
+func _register_test_meadow() -> void:
+	var rows: Array[String] = []
+	for y in 2 * 8 - 1:
+		rows.append(".".repeat(2 * 12 - 1))
+	var markers := {Vector2i(1, 4): "start"}
+	var patch := Rect2i(4, 2, 4, 4)
+	for y in range(1, 7):
+		for x in range(2, 10):
+			markers[Vector2i(x, y)] = "tall_grass" if patch.has_point(Vector2i(x, y)) else "grass"
+	Level.register("ui_meadow", Level.image_from_rows(rows, markers), null, {"name": "The Meadow", "outdoor": true})
+	Net.map_name = "ui_meadow"
+
+
+## Whether the HUD says "hidden in the grass" (decision 515): enemy-ai's
+## rule read from Senses (508, hidden_by_cover), not copied. Standing on
+## cover (World.cover_at > 0), still for Senses.STILL_TICKS, no monster
+## within Senses.NOTICE_ALWAYS (cover never hides from the adjacent), and
+## no carried light where it would show (emit_light with the cell darker
+## than Senses.DARK without it; a lantern by day gives nothing away).
+func _hidden_in_cover(player: GridEntity, tick: int) -> bool:
+	if player.tile != _still_tile:
+		_still_tile = player.tile
+		_still_since = tick
+	var nearest := 1000000
+	for entity in World.get_entities():
+		if entity is Monster and entity.spawned:
+			nearest = mini(nearest, World.distance(player.tile, entity.tile))
+	return hidden_words_due(World.cover_at(player.tile), tick - _still_since, player.emit_light > 0.0,
+			World.light_at(player.tile, false), nearest)
+
+
+## The cover cue's rule on its inputs (decision 515; Senses' numbers):
+## [param cover] where they stand, [param still] ticks since their last
+## step, whether they carry a light and the cell's light without it, and
+## the nearest monster's distance.
+static func hidden_words_due(cover: float, still: int, carries_light: bool, light_without: float, nearest_monster: int) -> bool:
+	if cover <= 0.0 or still < Senses.STILL_TICKS or nearest_monster <= Senses.NOTICE_ALWAYS:
+		return false
+	return not (carries_light and light_without < Senses.DARK)
+
+
+## What a ground pile's hint calls what lies there (decision 515): the
+## first thing's short name in lower case, "and N more" for the rest.
+static func pile_words(ids: PackedStringArray) -> String:
+	if ids.is_empty():
+		return ""
+	var first := Items.short_of(ids[0]).to_lower()
+	return first if ids.size() == 1 else "%s and %d more" % [first, ids.size() - 1]
+
+
 ## What the keys do on [param thing] under the cursor (an entity or a
 ## door), for the context hint: "" for nothing to say. The owners' verbs
 ## (items' E and F, doors' E).
@@ -6783,6 +6850,8 @@ func _on_world_ticked(tick: int) -> void:
 			hp_text += "   shield raised"
 		elif player.raised == "draw":
 			hp_text += "   bow drawn"  # How far: the body, the ring and the creak (decision 475); F3 has the number.
+		if _hidden_in_cover(player, tick):
+			hp_text += "   hidden in the grass"  # Decision 515: the one cue that the cover works.
 	_hud_tick = tick
 	if converse != null and converse.visible and player != null:
 		converse.at_counter = shop_counter_in_reach(player)  # Decision 512: the buy's place, as the player moves.
@@ -7907,6 +7976,38 @@ func _run_test_show(player: Player) -> void:
 					func(slot: int) -> String: return ["Wren's dagger", "hammer"][slot])
 			"world":
 				open_world_map()
+				if world_map_panel != null and world_map_panel.trade.is_empty() and world_map_panel.world != null:
+					# A test wagon (decision 515) from this area to another the map knows, hovered.
+					var areas: Array = world_map_panel.positions.keys()
+					var own := world_map_panel.own_area
+					var other := ""
+					for area_name: String in areas:
+						if area_name != own:
+							other = area_name
+							break
+					if not other.is_empty():
+						var route := {"id": "test", "from_area": own, "to_area": other, "areas": [own, other],
+							"caravans": [{"area": own, "fraction": 0.4, "days": 2}]}
+						world_map_panel.trade = [route]
+						world_map_panel._hover_caravan = {"route": route, "caravan": route["caravans"][0]}
+						world_map_panel.queue_redraw()
+			"herbs":
+				# Herbs laid beside the player (the hint over them) and a bunch in the hand (the pack).
+				if Net.is_authority() and World.items != null:
+					var beside := player.tile + Vector2i(1, 0)
+					if not World.is_walkable(beside):
+						beside = player.tile + Vector2i(0, 1)
+					var uid := World.items.mint("herbs", "test", "the ground", World.zone.name, beside)
+					World.put_on_ground(uid, beside)
+					_test_hint_cell = beside
+					var held := World.items.mint("herbs", "test", _display_name(player), World.zone.name, player.tile)
+					var slots := player.slots.duplicate()
+					var uids := World.slot_uids(player)
+					if slots.size() > Items.RIGHT_HAND:
+						slots[Items.RIGHT_HAND] = "herbs"
+						uids[Items.RIGHT_HAND] = held
+						World.set_slots(player, slots, uids)
+				pack_panel.shown = true
 			"credits":
 				if not options_panel.visible:
 					options_panel.toggle()
