@@ -1534,7 +1534,7 @@
 			"kind": "cell",
 			"size": [1.6, 0.8, 0.9],
 			"budget": 400,
-			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/prop.table/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c1's 400 mesh stretched to 1.6, 400 tris"},
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-19", "notes": "rebuilt by hand in big clean planes for Jeff's crispness note (2026-10-19, \"the graphics not crisp\"; the coordinator's ask; art-gen's c1 fit had a top of crumpled triangles): four top planks along x on two cleats, an apron, four square legs, end and middle stretchers; 160 tris"},
 			"uses": "a table"
 		},
 		"prop.bench": {
