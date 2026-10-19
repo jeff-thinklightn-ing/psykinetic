@@ -3539,14 +3539,21 @@ func _join_companion(record: PlayerRecord, player: Player) -> void:
 			# Told where she is, so she does not read as lost.
 			var town := str(resident.get("zone", ""))
 			var town_name := str(Level.load_level(town).get("display_name", town)) if Level.exists(town) else town
+			var doing := "working" if not str(resident.get("trade", "")).is_empty() else "resting"
+			if record.companion.get("sick") is Dictionary and not record.companion["sick"].is_empty():
+				doing = "sick in %s bed" % {"her": "her", "him": "his", "them": "their"}.get(_companion_object(record), "her")  # Decision 501.
 			Net.broadcast_to([player.owner_peer], "party", {"from": "Server", "text": "%s is %s in %s. Go there to travel together again." % [
-				record.companion.get("name", "Your companion"), "working" if not str(resident.get("trade", "")).is_empty() else "resting", town_name]})
+				record.companion.get("name", "Your companion"), doing, town_name]})
 			return
 		_heard_from_worker(record)
 		if World.towns != null:
 			World.towns.note_companion_out(str(resident.get("place", "")), String(record.companion["name"]))
 		record.companion.erase("resident")
 		party_log.add("%s leaves her work in the town and goes with %s." % [record.companion["name"], record.name])
+		if record.companion.get("sick") is Dictionary and not record.companion["sick"].is_empty():
+			# Sick in her bed (decision 501): she goes all the same.
+			party_log.add("%s is sick with %s, and goes with %s all the same." % [record.companion["name"],
+				record.companion["sick"].get("kind", "a fever"), record.name])
 		# Her body in town goes; she comes as herself (decision 333 amended).
 		for body: GridEntity in World.townsfolk().duplicate():
 			if (body as Resident).player_id == record.player_id:
@@ -3566,6 +3573,7 @@ func _join_companion(record: PlayerRecord, player: Player) -> void:
 			existing.mind.warm()
 		print("[net] %s's companion %s was waiting at %s and follows again" % [
 			record.name, existing.name, existing.tile])
+		_tell_sickness(existing, record, true)
 		return
 	# A record from before companions existed, or one that never got one,
 	# has none: give it one now.
@@ -3633,6 +3641,60 @@ func _join_companion(record: PlayerRecord, player: Player) -> void:
 	_companions[record.player_id] = pet
 	print("[net] %s's companion %s is at %s%s" % [
 		record.name, pet.name, tile, " (new)" if is_new else ""])
+	_tell_sickness(pet, record, true)
+
+
+## Her object pronoun by her card ("her", "him", "them").
+func _companion_object(record: PlayerRecord) -> String:
+	var traits: Dictionary = record.companion.get("traits", {})
+	return {"she": "her", "he": "him", "they": "them"}.get(str(traits.get("pronoun", "she")), "her")
+
+
+## Server (decision 501, companions' side): [param pet]'s voice reads her
+## record's sickness while she has one; one that ended (her record's
+## "was_sick", left by npc's Townsfolk in town or _sickness_in_party) is told
+## once, to the party log, as a fact on her and to her exchange, then erased.
+## [param away]: it ran while her player was away from her.
+func _tell_sickness(pet: Companion, record: PlayerRecord, away: bool) -> void:
+	pet.sick_words = func() -> String:
+		var sick: Variant = record.companion.get("sick", {})
+		return Companion.sick_sentence(sick, Townsfolk.day_of(World.steps)) if sick is Dictionary else ""
+	var was: Variant = record.companion.get("was_sick")
+	if not was is Dictionary or was.is_empty():
+		return
+	var told := Companion.sickness_told(String(record.companion.get("name", pet.name)), record.name, _companion_object(record), was, away)
+	party_log.add(told["log"])
+	pet.note_fact(told["fact"])
+	pet._narrate(told["narrate"])
+	record.companion.erase("was_sick")
+
+
+## Her record's sickness ends (decision 501): "sick" goes, and "was_sick"
+## ({since, ended, cured_by, kind}) stays to be told once.
+func _end_companion_sickness(record: PlayerRecord) -> void:
+	var was: Dictionary = record.companion.get("sick", {})
+	record.companion["was_sick"] = {"since": was.get("since", 0), "ended": Townsfolk.day_of(World.steps),
+		"cured_by": was.get("cured_by", ""), "kind": was.get("kind", "a fever")}
+	record.companion.erase("sick")
+
+
+## Server, on the world tick (decision 501): a companion with her player
+## (not resting in town, where npc's Townsfolk keeps it) is well again once
+## her sickness is over (Companion.sickness_over, Townsfolk.sick_days); told
+## at once when she stands, else when she next joins.
+func _sickness_in_party() -> void:
+	var today := Townsfolk.day_of(World.steps)
+	for id: String in _records:
+		var record: PlayerRecord = _records[id]
+		var sick: Variant = record.companion.get("sick")
+		if not sick is Dictionary or sick.is_empty() or record.companion.has("resident"):
+			continue
+		if not Companion.sickness_over(sick, today, Townsfolk.sick_days()):
+			continue
+		_end_companion_sickness(record)
+		var pet: Companion = _companions.get(id)
+		if is_instance_valid(pet) and pet.spawned:
+			_tell_sickness(pet, record, false)
 
 
 ## Server: a raid group ([param by]) beat [param entity] down and took it
@@ -4139,8 +4201,9 @@ func _offers_context() -> Dictionary:
 			if sick.is_empty():
 				var was: Dictionary = record.companion.get("sick", {})
 				if was is Dictionary and not was.is_empty():
-					record.companion["was_sick"] = {"since": was.get("since", 0), "ended": Townsfolk.day_of(World.steps), "cured_by": was.get("cured_by", "")}
-				record.companion.erase("sick")
+					_end_companion_sickness(record)
+				else:
+					record.companion.erase("sick")
 			else:
 				record.companion["sick"] = sick.duplicate(true),
 		"died": func(town: String, id: String, why: String) -> bool:
@@ -6460,6 +6523,7 @@ func _on_world_ticked(tick: int) -> void:
 				print("[weather] %s broke roof %d of %s" % [broke["storm"], broke["index"], broke["level"]])
 			_seat_settled()  # A settled person whose town has since been founded (decision 471).
 			_visits_due()  # The medicine man's visits that have run their hours (decision 501).
+			_sickness_in_party()  # A sick companion with her player gets well (decision 501).
 		_respawn_due_players(tick)
 		_check_respawns(tick)
 		t = World.part("respawns", t)

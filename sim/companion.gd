@@ -346,6 +346,9 @@ var heard: Array = []
 ## (decision 444: Main's, Standing.fact on the COMPANION ladder: "You are
 ## close to Jeff: they carried you out of the raiders' camp."); none unset.
 var bond_words := Callable()
+## Her sickness in one sentence while she has one (decision 501: Main's,
+## from her record's "sick", Companion.sick_sentence); none unset.
+var sick_words := Callable()
 var talk: Array[String] = []
 var _talk_tick := -100000
 var _merging: Array[Dictionary] = []
@@ -877,6 +880,51 @@ func note_taken(who: String) -> void:
 ## just before she is taken off the map: a fact about her.
 func note_carried_off() -> void:
 	note_fact("%s was beaten down and carried off by raiders in %s." % [_name_of(self), _place_words()])
+
+
+# --- Sickness (decision 501, companions' side) ---------------------------------------
+# npc's Townsfolk keeps her record's "sick" while she rests in town; Main
+# ends it in the party (sickness_over) and tells "was_sick" once.
+
+## Her voice's sentence for her record's [param sick] on day [param today]:
+## "" when well.
+static func sick_sentence(sick: Dictionary, today: int) -> String:
+	if sick.is_empty():
+		return ""
+	var kind := str(sick.get("kind", "a fever"))
+	if int(sick.get("treated", -1)) >= 0:
+		return "You are sick with %s; %s saw to you, and it is breaking." % [kind, str(sick.get("cured_by", "someone"))]
+	var days := today - int(sick.get("since", today))
+	var since := "today" if days <= 0 else "yesterday" if days == 1 else "%d days ago" % days
+	return "You have been sick with %s since %s; it will pass." % [kind, since]
+
+
+## Whether [param sick] is over on day [param today] out of town: treated,
+## the morning after; untreated, after [param days] (Townsfolk.sick_days).
+## She never dies of it.
+static func sickness_over(sick: Dictionary, today: int, days: int) -> bool:
+	var treated := int(sick.get("treated", -1))
+	if treated >= 0:
+		return today > treated
+	return today - int(sick.get("since", today)) >= days
+
+
+## The words for a sickness that is over, [param was] (her record's
+## "was_sick": since, ended, cured_by, kind), told once: {"log" (the party log),
+## "fact" (on her), "narrate" (her exchange)}. [param away]: it was while
+## [param keeper] was away from her.
+static func sickness_told(her_name: String, keeper: String, object: String, was: Dictionary, away: bool) -> Dictionary:
+	var kind := str(was.get("kind", "a fever"))
+	var by := str(was.get("cured_by", ""))
+	var while_away := " while %s was away" % keeper if away else ""
+	var how := "%s saw to %s" % [by, object] if not by.is_empty() else "it ran its course"
+	var well: String = {"her": "she is", "him": "he is", "them": "they are"}.get(object, "she is")
+	return {
+		"log": "%s was sick with %s%s; %s, and %s well again." % [her_name, kind, while_away, how, well],
+		"fact": "%s was sick with %s%s; %s." % [her_name, kind, while_away, how],
+		"narrate": "You were sick with %s%s; %s. You are well again." % [kind, while_away,
+			"%s saw to you" % by if not by.is_empty() else "it ran its course"],
+	}
 
 
 ## A monster's kind ("imp", "brute"), from its level marker or, for one
@@ -1789,6 +1837,9 @@ func voice_messages(asked := false, heard := "") -> Array[Dictionary]:
 	var bond := str(bond_words.call()) if bond_words.is_valid() else ""
 	if not bond.is_empty():
 		met += " " + bond
+	var sick := str(sick_words.call()) if sick_words.is_valid() else ""
+	if not sick.is_empty():
+		met += " " + sick
 	var standing := standing_words()
 	if not standing.is_empty():
 		met += " " + standing

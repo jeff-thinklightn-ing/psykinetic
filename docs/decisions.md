@@ -13867,3 +13867,35 @@ Rejected: building the raids' routes at boot so the fields are always in
 (threads in every hosted test, and the fallback still has to be cheap);
 caching each place's distance field (a field per temple per faction for a
 lookup made at a death).
+
+## 501, companions' side (npc's sickness; the seam agreed with npc)
+
+A companion resting in town falls sick as the town's people do (npc's side
+above); this is her player's side of it.
+- Where it lives: her player's companion card, companion["sick"] {since,
+  kind, treated, cured_by}, written by npc's Townsfolk through Main while
+  she rests in town (442). When it ends there, Main's
+  _end_companion_sickness leaves companion["was_sick"] {since, ended,
+  cured_by, kind} (kind added here, so the telling can name it).
+- Taking her up: the party log says "<Name> is sick with <kind>, and goes
+  with <player> all the same."; she is never kept from her player. A
+  player in another zone is told she "is sick in her bed in <town>"
+  instead of "resting".
+- Her voice: while she is sick, one sentence beside her bond's
+  (Companion.sick_words, Main's: Companion.sick_sentence, "You have been
+  sick with a cough since 2 days ago; it will pass.", or, treated, "...;
+  Orm saw to you, and it is breaking.").
+- Told once: a "was_sick" is told when she next stands with her player
+  (Main._tell_sickness, on her spawn or rejoin): the party log ("<Name> was
+  sick with a fever while <player> was away; Orm saw to her, and she is
+  well again.", or "it ran its course"), a fact on her (294), and a
+  narration to her exchange, so her next line can speak to it; then
+  erased. Nothing reaches a player while they are away.
+- In the party: npc's Townsfolk never touches her record while she is
+  out of town, so Main._sickness_in_party (the world tick) ends it:
+  treated, the morning after; untreated, after Townsfolk.sick_days()
+  (Companion.sickness_over). Told at once if she stands, else on her next
+  join. She never dies of it, and it costs her nothing in the field this
+  step. A remedy in her hands in the party is not this step: her
+  sickness is cured by the town, or runs its course.
+companion_test _test_sickness. Protocol unchanged; no new class_name.

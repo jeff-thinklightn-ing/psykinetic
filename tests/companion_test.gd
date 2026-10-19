@@ -84,6 +84,7 @@ func _ready() -> void:
 	_test_card_things()
 	_test_record_loads()
 	_test_bond()
+	_test_sickness()
 	_test_out_of_reach()
 	_test_knows_level()
 	_test_wild()
@@ -1339,6 +1340,62 @@ func _test_bond() -> void:
 	record.companion.erase("standing")
 	record.companion.erase("bond_day")
 	record.companion.erase("struck_day")
+
+
+func _test_sickness() -> void:
+	print("
+== sick while she rests in town, told when her player comes for her; well again in the party (decision 501, companions' side) ==")
+	var pet := _companion()
+	var record: PlayerRecord = _main._records[Net.player_id]
+	var steps_were := World.steps
+	World.steps += DayNight.day_steps * 10  # Days enough behind her for the sickness's own days.
+	var today := Townsfolk.day_of(World.steps)
+	_check(Companion.sick_sentence({}, today).is_empty()
+		and Companion.sick_sentence({"since": today, "kind": "a fever", "treated": -1}, today) == "You have been sick with a fever since today; it will pass."
+		and "since yesterday" in Companion.sick_sentence({"since": today - 1, "kind": "a fever", "treated": -1}, today),
+		"her voice's sentence: none when well, the days since when sick")
+	record.companion["sick"] = {"since": today - 2, "kind": "a cough", "treated": -1, "cured_by": ""}
+	_main._tell_sickness(pet, record, true)
+	_check("You have been sick with a cough since 2 days ago; it will pass." in pet.voice_prompt("test"), "while sick, her voice knows it")
+	var log_size: int = _main.party_log.size()
+	_main._sickness_in_party()
+	_check(record.companion.has("sick") and _main.party_log.size() == log_size, "not yet run its course: still sick, nothing told")
+	record.companion["resident"] = {"place": "somewhere"}
+	record.companion["sick"]["since"] = today - Townsfolk.sick_days()
+	_main._sickness_in_party()
+	_check(record.companion.has("sick"), "resting in town: the town's (npc's Townsfolk), never ended here")
+	record.companion.erase("resident")
+	_main._sickness_in_party()
+	var lines: Array[String] = _main.party_log.last(_main.party_log.size() - log_size)
+	var her := String(record.companion["name"])
+	var well: String = {"her": "she is", "him": "he is", "them": "they are"}[_main._companion_object(record)]
+	var object: String = _main._companion_object(record)
+	_check(not record.companion.has("sick") and not record.companion.has("was_sick")
+		and ("%s was sick with a cough; it ran its course, and %s well again." % [her, well]) in lines,
+		"with her player, untreated, it runs Townsfolk.sick_days() and she is well, told at once (%s)" % [lines])
+	_check(not "You have been sick" in pet.voice_prompt("test") and pet.grown.facts.any(func(fact: Dictionary) -> bool: return str(fact.get("text", "")).begins_with("%s was sick with a cough" % her)),
+		"her voice no longer says she is sick; it is a fact about her now")
+	record.companion["sick"] = {"since": today - 1, "kind": "the shakes", "treated": today - 1, "cured_by": "Orm"}
+	log_size = _main.party_log.size()
+	_main._sickness_in_party()
+	lines = _main.party_log.last(_main.party_log.size() - log_size)
+	_check(not record.companion.has("sick") and ("%s was sick with the shakes; Orm saw to %s, and %s well again." % [her, object, well]) in lines,
+		"treated in town, taken out: well the morning after, and who cured her said (%s)" % [lines])
+	record.companion["sick"] = {"since": today, "kind": "a fever", "treated": -1, "cured_by": "Orm"}
+	_main._offers_context()["set_companion_sick"].call("companion:" + record.player_id, {})
+	_check(not record.companion.has("sick") and record.companion.get("was_sick", {}).get("kind", "") == "a fever"
+		and record.companion["was_sick"].get("cured_by", "") == "Orm", "ended in town (npc's set_companion_sick): was_sick keeps its kind and who cured her")
+	log_size = _main.party_log.size()
+	_main._tell_sickness(pet, record, true)
+	lines = _main.party_log.last(_main.party_log.size() - log_size)
+	_check(("%s was sick with a fever while %s was away; Orm saw to %s, and %s well again." % [her, record.name, object, well]) in lines
+		and not record.companion.has("was_sick"), "when her player comes for her it is told once, and forgotten (%s)" % [lines])
+	_check(("You were sick with a fever while %s was away; Orm saw to you. You are well again." % record.name) in pet.voice_prompt("test"),
+		"and her voice hears it as what just happened")
+	log_size = _main.party_log.size()
+	_main._tell_sickness(pet, record, true)
+	_check(_main.party_log.size() == log_size, "told once only")
+	World.steps = steps_were
 
 
 func _test_out_of_reach() -> void:
