@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Wine comes in a leather flask sealed with red wax, spice in a tied cloth pouch heaped with orange spice, and a silver ring has a small raised setting.
 ## v0.1.156
 
 - This version changes what goes over the network, so v0.1.155 and older can't join the server: update through the launcher first.
