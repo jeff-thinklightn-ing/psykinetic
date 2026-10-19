@@ -107,6 +107,7 @@ static func tick(production: Production, stockpile: Stockpile, economy: Economy 
 	if production == null or stockpile == null:
 		return
 	stray(production)  # Someone lost beyond the walls, and the lost come home (decision 487).
+	sicken(production)  # Someone takes to their bed, and the sick get up (decision 501).
 	var thief: Dictionary = rules().get("thief", {})
 	var every := int(thief.get("every", 0))
 	if every <= 0:
@@ -363,6 +364,198 @@ static func perform(production: Production, town: String, at_inn: Array, at: int
 	print("[bard] %s: %s%s" % [town, line, " " + second if not second.is_empty() else ""])
 	Offers._call(Offers.ctx, "say", [town, out])
 	return out
+
+
+# --- Sickness (decision 501) ----------------------------------------------------------
+
+## The card key of a sickness: {since (the day), kind (words), treated (the
+## day, or -1), cured_by (a name, or "")}. A resident's is on the townsfolk
+## card; a companion resting in town keeps hers on her player's companion
+## card, through Offers.ctx "companion_sick" (get) and "set_companion_sick"
+## (companions' side reads it, never writes it).
+const SICK := "sick"
+static var _sick_due := {}
+
+
+## The untreated length in days (townsfolk.json "sick".days; companions
+## read it for a sick companion taken out of town).
+static func sick_days() -> int:
+	return int(rules().get("sick", {}).get("days", 5))
+
+
+## [param id]'s sickness record, {} for well.
+static func sickness_of(production: Production, id: String) -> Dictionary:
+	if id.begins_with(COMPANION):
+		var hers: Variant = Offers._call(Offers.ctx, "companion_sick", [id])
+		return hers if hers is Dictionary else {}
+	var record: Variant = card_of(production, id).get(SICK)
+	return record if record is Dictionary else {}
+
+
+static func is_sick(production: Production, id: String) -> bool:
+	return production != null and not sickness_of(production, id).is_empty()
+
+
+static func _set_sickness(production: Production, id: String, record: Dictionary) -> void:
+	if id.begins_with(COMPANION):
+		Offers._call(Offers.ctx, "set_companion_sick", [id, record])
+		return
+	var card := card_of(production, id)
+	if card.is_empty():
+		return
+	if record.is_empty():
+		card.erase(SICK)
+	else:
+		card[SICK] = record
+	production.set_card(id, card)
+
+
+## Sickness on the world tick (decision 501): by town, once a day, first
+## every sickness runs on (treated, it ends this morning; untreated, it ends
+## after sick_days: the old of the town's own die by "death_old", the rest
+## are on their feet again), then one new case at most: each resident not
+## away and not sick (a resting companion too, 442) draws against "chance"
+## times the season's, the hungry's and the old's factors, by a seed of the
+## town and the day. The sick keep to their bed (Resident) and economy
+## counts them out of work but not out of need (Production.set_sick).
+static func sicken(production: Production) -> void:
+	if production == null:
+		return
+	var rule: Dictionary = rules().get("sick", {})
+	if float(rule.get("chance", 0.0)) <= 0.0:
+		return
+	var at := production.now()
+	var day := day_of(at)
+	var towns := {}
+	for id: String in production.worker_ids():
+		var town := str(production.worker(id).get("town", ""))
+		if not town.is_empty():
+			towns.get_or_add(town, []).append(id)
+	var names: Array = towns.keys()
+	names.sort()
+	for town: String in names:
+		if int(_sick_due.get(town, -1)) == day:
+			continue
+		_sick_due[town] = day
+		var ended := {}  # Up this morning, or dead: not rolled again today.
+		for id: String in towns[town]:
+			var record := sickness_of(production, id)
+			if record.is_empty():
+				continue
+			if int(record.get("treated", -1)) >= 0 and day > int(record["treated"]):
+				_sick_ends(production, town, id, record, true, at)
+				ended[id] = true
+			elif day - int(record.get("since", day)) >= sick_days():
+				_sick_ends(production, town, id, record, false, at)
+				ended[id] = true
+		var rng := RandomNumberGenerator.new()
+		rng.seed = hash("sick:%s:%d" % [town, day])
+		var winter := Season.name_at(at) == "winter"
+		var ids: Array = towns[town].duplicate()
+		ids.sort()
+		for id: String in ids:
+			var who := production.worker(id)
+			if who.is_empty() or ended.has(id) or bool(who.get("away", false)) or not sickness_of(production, id).is_empty():
+				continue
+			var p := float(rule.get("chance", 0.0))
+			if winter:
+				p *= float(rule.get("winter", 1.0))
+			if str(who.get("fed", "")) in ["hungry", "dole"]:
+				p *= float(rule.get("hungry", 1.0))
+			if _is_old(production, id):
+				p *= float(rule.get("old", 1.0))
+			if rng.randf() < p:
+				_falls_sick(production, town, id, day, rng)
+				break  # One new case a town a day.
+
+
+static func _is_old(production: Production, id: String) -> bool:
+	return str(card_of(production, id).get("look", {}).get("age", "")) == "old"
+
+
+static func _falls_sick(production: Production, town: String, id: String, day: int, rng: RandomNumberGenerator) -> void:
+	var kinds: Array = rules().get("sick", {}).get("kinds", ["a fever"])
+	var kind := str(kinds[rng.randi() % kinds.size()]) if not kinds.is_empty() else "a fever"
+	_set_sickness(production, id, {"since": day, "kind": kind, "treated": -1, "cured_by": ""})
+	if production.has_method("set_sick"):
+		production.set_sick(id, true)
+	var name := str(production.worker(id).get("name", id))
+	var card := card_of(production, id)
+	if not card.is_empty():
+		learn(production, id, "%s took to %s bed with %s." % [name, _their(card), kind])
+		for kin_id: Variant in card.get("kin", {}):
+			if not production.worker(str(kin_id)).is_empty():
+				learn(production, str(kin_id), "%s, %s %s, lies sick at home with %s." % [name, _their(card_of(production, str(kin_id))), Offers._relation(str(card["kin"][kin_id]), card), kind])
+	print("[townsfolk] %s: %s took to bed with %s, day %d" % [town, name, kind, day])
+
+
+## [param id] is treated (decision 501) by [param by_name] ([param how]: "the
+## medicine man", "the healer", "a remedy"): the sickness ends the next
+## morning; the cards remember; the pleas to see to them are met
+## (Offers.healed: the notice, the pay, the standing). False if not sick.
+static func treat(production: Production, id: String, by_name: String, how: String, player_id := "") -> bool:
+	var record := sickness_of(production, id)
+	if record.is_empty() or int(record.get("treated", -1)) >= 0:
+		return false
+	var day := day_of(production.now())
+	record["treated"] = day
+	record["cured_by"] = by_name
+	_set_sickness(production, id, record)
+	var name := str(production.worker(id).get("name", id))
+	var town := str(production.worker(id).get("town", ""))
+	if not card_of(production, id).is_empty():
+		var ailment := str(record.get("kind", "fever")).trim_prefix("a ").trim_prefix("the ")
+		if how == "the medicine man":
+			learn(production, id, "%s the medicine man saw to %s, and the %s broke that night." % [by_name, name, ailment])
+		else:
+			learn(production, id, "%s saw to %s with %s, and the %s broke that night." % [by_name, name, how, ailment])
+	print("[townsfolk] %s: %s treated by %s (%s), day %d" % [town, name, by_name, how, day])
+	Offers.healed(town, id, player_id, by_name, how)
+	return true
+
+
+## A sickness ends (decision 501): [param treated], on their feet; else, run
+## its course: one of the town's own who is old dies by "death_old" (never
+## a rescued captive, a settled arrival or a companion: the coordinator's
+## guard for this step), through economy's Towns.died (Offers.ctx "died");
+## the rest are on their feet, thinner. The kin's card and the pleas close.
+static func _sick_ends(production: Production, town: String, id: String, record: Dictionary, treated: bool, at: int) -> void:
+	var who := production.worker(id)
+	var name := str(who.get("name", id))
+	var kind := str(record.get("kind", "a fever"))
+	var origin := str(who.get("origin", ""))
+	var dies := false
+	if not treated and not id.begins_with(COMPANION) and _is_old(production, id) and not origin.begins_with("rescued:") and origin != "settled":
+		var rng := RandomNumberGenerator.new()
+		rng.seed = hash("death:%s:%d" % [id, day_of(at)])
+		dies = rng.randf() < float(rules().get("sick", {}).get("death_old", 0.0))
+	_set_sickness(production, id, {})
+	if production.has_method("set_sick"):
+		production.set_sick(id, false)
+	if dies:
+		for kin_id: Variant in card_of(production, id).get("kin", {}):
+			if not production.worker(str(kin_id)).is_empty():
+				learn(production, str(kin_id), "%s died of %s." % [name, kind])
+		var law := str(Offers._call(Offers.ctx, "lawspeaker_of", [town]))
+		var model := str(Offers._call(Offers.ctx, "model"))
+		if not law.is_empty() and law != "<null>" and not model.is_empty() and model != "off" and model != "<null>":
+			var log: Variant = Offers._call(Offers.ctx, "memory", [town])
+			if log is Array:
+				var entry := TownMemory.note(log, "%s died of %s in the %s" % [name, kind, Season.name_at(at)], law, "", at)
+				if not entry.is_empty() and str(entry.get("tier", "")) == TownMemory.BELIEF:
+					entry["tier"] = TownMemory.CANDIDATE
+				Offers._call(Offers.ctx, "set_memory", [town, log])
+		print("[townsfolk] %s: %s died of %s, day %d" % [town, name, kind, day_of(at)])
+		Offers.healed(town, id, "", "", "died")
+		Offers._call(Offers.ctx, "died", [town, id, kind])
+		return
+	if not card_of(production, id).is_empty():
+		if treated:
+			learn(production, id, "%s is on %s feet again." % [name, _their(card_of(production, id))])
+		else:
+			learn(production, id, "%s is on %s feet again after %s, thinner for it." % [name, _their(card_of(production, id)), kind])
+	if not treated:
+		Offers.healed(town, id, "", "", "recovered")
 
 
 ## The card key of someone lost beyond the walls (decision 487): {since,

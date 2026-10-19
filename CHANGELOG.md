@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Sickness (decision 501, with economy's, items' and companions' sides): now and then a resident, or a companion resting in town, takes to their bed (more in winter, after hunger, when old) and is out of work but not out of need; their kin ask you to bring the medicine man (a word to him sends him, and his visit treats them) or to walk them to the healer's hut, and a remedy put in their hands treats them at once; treated, they are up next morning; untreated it runs five days, and one of the town's own who is old may die of it (never a rescued captive or Snagfin this step); the treatment pays whoever brought it, the cards remember, and a death is a memory for the lawspeaker.
 - Herbs grow wild outside the town: a few a day in the wilds, standing like small ferns, for anyone to pick and sell at the town's store. Herbs left uncollected wither after three days (decision 502).
 - Tools: a heavy job too big to start also steps to the back of the resource gate's queue itself, so jobs waiting through an older copy of the gate get past it too (394 amended).
 

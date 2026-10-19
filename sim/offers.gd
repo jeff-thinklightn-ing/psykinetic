@@ -66,7 +66,7 @@ const LEND := "lend"
 const CARRY := "carry"
 ## What the treasury pays when economy's rules have no line for a key yet
 ## (economy.json "commissions"; decisions 486 and 487).
-const DEFAULT_PAY := {"dispute": 5, "escort": 8}
+const DEFAULT_PAY := {"dispute": 5, "escort": 8, "healing": 6}
 const RESCUE := "rescue"
 const CAMP := "camp"
 const FETCH := "fetch"
@@ -354,10 +354,29 @@ static func chronicle_of(worker_id: String, town: String, given: Dictionary = ct
 ## holds a grudge against.
 static func _plea_offer(worker_id: String, who: Dictionary, card: Dictionary, town: String, given: Dictionary) -> Dictionary:
 	var production: Production = given["production"]
-	# Kin lost beyond the walls (decision 487): walk them home. First, it is urgent.
+	# Kin sick in bed (decision 501): bring the medicine man, or take them to the healer. First of all.
 	var kin: Dictionary = card.get("kin", {})
 	var kin_ids: Array = kin.keys()
 	kin_ids.sort()
+	for kin_id: Variant in kin_ids:
+		if production.worker(str(kin_id)).is_empty() or not Townsfolk.is_sick(production, str(kin_id)):
+			continue
+		var sick := Townsfolk.sickness_of(production, str(kin_id))
+		if int(sick.get("treated", -1)) >= 0:
+			continue
+		var name := str(production.worker(str(kin_id)).get("name", kin_id))
+		var theirs := Townsfolk.card_of(production, str(kin_id))
+		var healer := str(_call(given, "healer_of", [town]))
+		if not healer.is_empty() and healer != "<null>":
+			return _offer(worker_id, PLEA, "heal:" + str(kin_id), "Bring the medicine man",
+				"My %s %s lies sick with %s; the medicine man is out at his hut. Fetch him to %s." % [_relation(str(kin[kin_id]), theirs), name, sick.get("kind", "a fever"), _them(theirs)],
+				{"sick": str(kin_id), "name": name, "healer": healer, "sub": "healing"}, TAKE)
+		var hut := str(_call(given, "healers_hut", [town]))
+		if not hut.is_empty() and hut != "<null>":
+			return _offer(worker_id, PLEA, "heal:" + str(kin_id), "Take %s to the healer" % name,
+				"My %s %s lies sick with %s. If you could walk %s to the healer's hut, the healer would see to %s." % [_relation(str(kin[kin_id]), theirs), name, sick.get("kind", "a fever"), _them(theirs), _them(theirs)],
+				{"sick": str(kin_id), "name": name, "hut": hut, "sub": "healing"}, TAKE)
+	# Kin lost beyond the walls (decision 487): walk them home.
 	for kin_id: Variant in kin_ids:
 		var theirs := Townsfolk.card_of(production, str(kin_id))
 		if theirs.is_empty() or not theirs.get(Townsfolk.STRAYED) is Dictionary or production.worker(str(kin_id)).is_empty():
@@ -775,6 +794,17 @@ static func spoke_to(player_id: String, worker_id: String, given: Dictionary = c
 		_regard(production, worker_id, player_id, Standing.setting("word"), "carried %s's word" % from_name)
 		_close(from_id, ask, "%s carried %s's word to %s: the matter between them is forgotten." % [by, from_name, to_name],
 			"%s carried %s's word to %s." % [by, from_name, to_name], "", 1, given, "word", "carried a word to %s" % to_name)
+	# A word to the medicine man (decision 501): with a plea to fetch him open,
+	# speaking to him sends him to the sick one's bed (Main puts the visit on
+	# his day; the visit treats them). Nothing handed in.
+	for pair: Array in _asks(production):
+		var ask: Dictionary = pair[1]
+		if str(ask.get("by", "")) != player_id or str(ask.get("what", {}).get("healer", "")) != worker_id:
+			continue
+		var sick_id := str(ask["what"].get("sick", ""))
+		if Townsfolk.is_sick(production, sick_id) and int(Townsfolk.sickness_of(production, sick_id).get("treated", -1)) < 0:
+			if _call(given, "send_healer", [worker_id, sick_id, player_id]) == true:
+				Townsfolk.learn(production, worker_id, "%s asked %s to see to %s." % [ask.get("by_name", "someone"), production.worker(worker_id).get("name", worker_id), production.worker(sick_id).get("name", sick_id)])
 	# A quarrel laid before the lawspeaker (decision 486): speaking to him with
 	# the plea open marks the pair's dispute as brought by this player, so his
 	# batch takes it first and his request names them; nothing is handed in.
@@ -842,6 +872,51 @@ static func ruled(town: String, entry: Dictionary, kind: String, memory: String,
 			"dispute", 1, given, "word", "spoke for them before the lawspeaker")
 		if kind == "reconcile":
 			_regard(production, other, str(ask.get("by", "")), 1, "brought the quarrel with %s to a reconciling" % mine_name)
+
+
+## The sick [param who_id] of [param town] was seen to (decision 501;
+## Townsfolk.treat) by [param player_id] ([param player_name], [param how]:
+## "the medicine man", "the healer", "a remedy"), or the sickness ended on
+## its own ("recovered") or in death ("died"), with no player: every plea
+## to see to them is met: the player who brought the cure gets the notice,
+## the treasury's "healing" pay and standing "healed" from the kin who
+## asked and from the sick one; a cure by another's hand or the medicine
+## man's own rounds closes a plea with the notice and no pay; recovered or
+## died, with the fact and no lapse against anyone (illness is nobody's
+## promise broken).
+static func healed(town: String, who_id: String, player_id: String, player_name: String, how: String, given: Dictionary = ctx) -> void:
+	var production: Production = given.get("production")
+	if production == null:
+		return
+	var who_name := str(production.worker(who_id).get("name", who_id))
+	var their := Townsfolk._their(Townsfolk.card_of(production, who_id))
+	var by_name := str(_call(given, "name_of", [player_id])) if not player_id.is_empty() else ""
+	if by_name.is_empty() or by_name == "<null>":
+		by_name = player_name
+	var paid_this := false
+	for pair: Array in _asks(production, town):
+		var ask: Dictionary = pair[1]
+		if str(ask.get("what", {}).get("sick", "")) != who_id:
+			continue
+		var kin_id: String = pair[0]
+		if how == "died":
+			_close(kin_id, ask, "%s died of the sickness before anyone saw to %s." % [who_name, _them(Townsfolk.card_of(production, who_id))],
+				"%s died of the sickness." % who_name, "", 1, given)
+		elif how == "recovered":
+			_close(kin_id, ask, "%s got over the sickness on %s own." % [who_name, their], "%s is on %s feet again on %s own." % [who_name, their, their], "", 1, given)
+		elif not player_id.is_empty() and str(ask.get("by", "")) == player_id:
+			paid_this = true
+			_close(kin_id, ask, "%s brought %s to %s, and %s mended." % [by_name, how, who_name, who_name],
+				"%s saw to %s with %s. %s remembers it." % [by_name, who_name, how, production.worker(kin_id).get("name", kin_id)],
+				"healing", 1, given, "healed", "saw to %s" % who_name)
+		else:
+			_close(kin_id, ask, "%s was seen to by %s." % [who_name, player_name if not player_name.is_empty() else how],
+				"%s was seen to by %s before %s could help." % [who_name, player_name if not player_name.is_empty() else how, ask.get("by_name", "you")], "", 1, given)
+	if player_id.is_empty() or how in ["died", "recovered"]:
+		return
+	_regard(production, who_id, player_id, Standing.setting("healed"), "saw to them when they were sick")
+	if not paid_this:
+		_notice(player_id, town, "healing:" + who_id, "%s saw to %s with %s." % [by_name, who_name, how], "healing", 1, given)
 
 
 ## The lost [param who_id] of [param town] is home (decision 487; Main on

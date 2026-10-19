@@ -13693,3 +13693,94 @@ an ordinary pile.
 Protocol unchanged: piles already replicate. The new class_name is
 Forage. forage_test boots the game on the wilds, with the herbs item
 added for the test.
+
+## 501. Sickness: to bed, the medicine man, the healer, a remedy
+
+Jeff (2026-10-19, through the coordinator): "yes" to sickness in the
+world, so a sick child to the medicine man can be an errand (the open
+item from 486/487). The coordinator's shape and approval of the same day,
+with one guard; economy's side ("501, economy's side": Production.set_sick
+and "sick" on the record, Towns.died with its "died" signal,
+commissions.healing 6), items' ("501, items' side": the "remedy" item, one
+dose, a whole thing, sold from stock by the healer and the medicine man),
+companions' ("501, companions' side", after this: the line on taking her
+up, her voice's narration, companion_test), lore's names as proposals. No
+plague and no contagion in this step.
+
+- Falling sick (Townsfolk.sicken, on the world tick, once a day by town,
+  seeded by the town and the day): every resident not away and not sick,
+  a companion resting there too (442), draws against townsfolk.json
+  "sick.chance" (0.01) times "winter" (3) in winter, "hungry" (3) after a
+  hungry or doled day, "old" (2) for the old; one new case a town a day.
+  The record {since, kind, treated, cured_by} is on the townsfolk card
+  ("sick"), or for a companion on her player's companion card
+  (companion["sick"], written here through Main and read by companions;
+  "was_sick" {since, ended, cured_by} left behind once, which companions
+  erase after their line). The kind is a word of "sick.kinds" (a fever, a
+  cough, the shakes), for the words only. Facts on theirs ("Ada took to her
+  bed with a fever.") and their kin's ("Ada, his sister, lies sick at home
+  with a fever."). Economy counts them out of work but not out of need
+  (set_sick: no job, wage, hunt or shop, not raided or counted for
+  defence; meals, the dole and rent as ever).
+- In bed (Resident.Doing.BED): the body keeps to its home all day, its
+  facts say what ails it, how long, and whether anyone has seen to it;
+  spoken to with a hut in reach, it lets that player walk it to the
+  healer (Doing.ESCORT, companions' Heel as 487).
+- Treatment, three ways, the treatment the event (435: nothing accepted,
+  nothing handed in). The kin's plea (first of all pleas): "Bring the
+  medicine man" when the town's zone has a healer's hut with its medicine
+  man (404), else "Take <name> to the healer" when it has the hut. A word
+  to the medicine man with the plea open (Offers.spoke_to) puts a visit on
+  his day (Main._send_healer: Resident.Doing.VISIT to the sick one's home
+  for "sick.visit_hours" (2); his body walks there with its routine when
+  one stands; the visit treats them when its hours run, watched or not:
+  Main._visits_due). Reaching the hut's ground at heel treats them (the
+  healer's). A "remedy" put into their hands (443's gift path) is used up
+  and treats them at once. Treated (Townsfolk.treat), the sickness breaks
+  that night and they are on their feet the next morning; untreated it
+  runs "sick.days" (5). Nobody is rolled again the morning they got up or
+  died. A remedy used up, or a gift banked (443), leaves a resident's
+  slot by the server's own act (Main._out_of_hands: World.set_slots and
+  the instance placed): nobody reaches a resident's slots by
+  World.reaches, so the gift's banking by take_item never moved it.
+- The end (Townsfolk._sick_ends): on their feet ("thinner for it" when
+  untreated); or, untreated, one of the town's own who is old dies with
+  "sick.death_old" (0.25): the coordinator's guard for this step, never a
+  named arrival with a player's story (origin "rescued:..." or "settled":
+  a rescued captive, Snagfin) and never a companion, so Jeff does not lose
+  a person he brought home to a dice roll before he has seen the system
+  work; lifted when he says. A death goes through economy's Towns.died
+  (the purse to the loan then the treasury, the house freed, the town's
+  log line), the kin's card learns it, and with rulings on it is a
+  candidate memory for the lawspeaker ("Ada died of a fever in the
+  winter"), so it may be set down (447), sung (490) and read (491).
+- Pay and memory (Offers.healed): every plea to see to them is met; the
+  player whose word, walk or remedy did it gets the notice, the treasury's
+  "healing" (6, economy's key; Offers.DEFAULT_PAY until it is there) and
+  standing "healed" (3) from the kin who asked and from the sick one;
+  another's hand closes a plea with the notice and no pay; recovered or
+  died, with the fact and no lapse against anyone (illness is nobody's
+  promise broken).
+- Lawspeaker off (the box today): everything above runs but the memory
+  candidate, which waits for him. Stated as the server's behaviour.
+- Companions' part: a resting companion rolls the same (her own seed,
+  only while she rests in town), keeps to her bed, is cured by anyone in
+  the same three ways, never dies of it; her player learns it on taking
+  her up and in her voice (companions' side); taken out of town sick, she
+  is well after Townsfolk.sick_days() (companions' side, in the party). A
+  remedy in her hands in the party is not this step.
+
+Numbers (npc's drafts, Jeff's to move): townsfolk.json "sick" {chance
+0.01, winter 3, hungry 3, old 2, days 5, death_old 0.25, visit_hours 2,
+kinds}; economy's commissions.healing 6; standing healed 3.
+townsfolk_test (one case a day, the cards, its course, the death of the
+old of the town's own and never a rescued one, treated it breaks that
+night, a resting companion's record on her player's card and no death);
+offers_test (the two pleas, the word to the medicine man, the treatment's
+pay and standing, a death closing a plea with no lapse); resident_test
+(in bed all day, the medicine man's visit by the clock, a remedy in hand).
+Protocol unchanged; no new class_name.
+
+Rejected: contagion and plague; sickness for players (372 stands); a
+companion dying of it; sickness as a stint word in residents.json (it is
+a state on the card, not a routine).

@@ -49,6 +49,7 @@ func _ready() -> void:
 	_test_strayed_body()
 	_test_what_is_true()
 	_test_two_sentences()
+	_test_sick_body()
 	_test_resident_voices()
 	_test_means_in_voice()
 	_test_hearsay()
@@ -544,6 +545,63 @@ func _test_two_sentences() -> void:
 	_check(Resident.two_sentences("I need a blade, and a shield, and more bandage.") == "I need a blade, and a shield, and more bandage.", "one sentence stands")
 	_check(Resident.two_sentences("Mags: The fog is thick.", "Mags") == "The fog is thick.", "a bare name lead is cut")
 	_check(Resident.two_sentences("Bandages: we have none.", "Mags") == "Bandages: we have none.", "another word before a colon stands when the name is known")
+
+
+## Sick (decision 501): the body keeps to its bed; the medicine man's visit
+## treats them; a remedy in hand treats them at once.
+func _test_sick_body() -> void:
+	print("\n== sick: in bed all day; the medicine man's visit; a remedy in hand (decision 501) ==")
+	var rules := Townsfolk.rules().duplicate(true)
+	rules["sick"] = {"chance": 0.0, "winter": 1, "hungry": 1, "old": 1, "days": 5, "death_old": 0.0, "visit_hours": 2, "kinds": ["a fever"]}
+	Townsfolk.use_rules(rules)
+	for i in 14:
+		World.production.set_away("rs-folk%02d" % i, true)
+	for id: String in ["rs-bram", "rs-snag", "rs-law", "rs-folk02", "rs-folk03", "rs-folk05"]:
+		World.production.set_away(id, true)
+	var hut: String = _main._healers_hut_of(STORE)
+	if not hut.is_empty():
+		World.production.set_away("medicine_man:" + hut, false)  # Back from 404's test.
+	World.production.set_away("rs-folk06", false)
+	Townsfolk._set_sickness(World.production, "rs-folk06", {"since": Townsfolk.day_of(World.steps), "kind": "a fever", "treated": -1, "cured_by": ""})
+	DayNight.set_hour(11.0)
+	_sync()
+	var sick := _body("rs-folk06")
+	_check(sick != null and sick.doing == Resident.Doing.BED and (sick.places.get("home", Rect2i()) as Rect2i).grow(1).has_point(sick.tile), "at eleven, when the well would call, the sick one is in bed at home (%s)" % [sick.doing if sick != null else -1])
+	_check(sick != null and sick.facts_now().any(func(f: String) -> bool: return f.begins_with("You are sick with a fever")), "their facts say so")
+	var player := _player()
+	var healer := str(Offers._call(Offers.ctx, "healer_of", [STORE]))
+	_check(not healer.is_empty() and healer != "<null>", "(the test town's hut has its medicine man: %s)" % healer)
+	if sick != null and player != null and not healer.is_empty() and healer != "<null>":
+		_check(_main._send_healer(healer, "rs-folk06", player.player_id), "a word sends the medicine man to the bedside")
+		_check(not _main._send_healer(healer, "rs-folk06", player.player_id), "(not twice while he is on a visit)")
+		World.steps += 2 * int(DayNight.day_steps / 24) + 1
+		_main._visits_due()
+		_check(int(Townsfolk.sickness_of(World.production, "rs-folk06").get("treated", -1)) >= 0 and str(Townsfolk.sickness_of(World.production, "rs-folk06").get("cured_by", "")) == str(World.production.worker(healer).get("name", "")),
+			"two hours later the visit has treated them, by his name")
+	# A remedy in hand treats at once.
+	World.production.set_away("rs-folk07", false)
+	Townsfolk._set_sickness(World.production, "rs-folk07", {"since": Townsfolk.day_of(World.steps), "kind": "a cough", "treated": -1, "cured_by": ""})
+	_sync()
+	var other := _body("rs-folk07")
+	if other != null and player != null and not Items.def("remedy").is_empty():
+		other.slots = ["remedy"]
+		other.slot_items = PackedInt32Array([0])
+		World.set_slots(other, ["remedy"], [])
+		var dose := World.slot_uid(other, 0)
+		_put(player, _main._nearest_free(other.tile + Vector2i(1, 0)))  # In reach, as a hand is.
+		_main._on_handed(player, other, "remedy", dose)
+		_check(int(Townsfolk.sickness_of(World.production, "rs-folk07").get("treated", -1)) >= 0, "a remedy put in their hands: the sickness breaks that night")
+		_check(other.slots[0] == "" and World.items.id_of(dose) == "remedy", "and the dose is used up (slots %s, dose %d, player at %s, they at %s)" % [other.slots, dose, player.tile, other.tile])
+	else:
+		_check(true, "(items' remedy is not here yet: the remedy case is skipped)")
+	Townsfolk._set_sickness(World.production, "rs-folk06", {})
+	Townsfolk._set_sickness(World.production, "rs-folk07", {})
+	World.production.set_away("rs-folk06", true)
+	World.production.set_away("rs-folk07", true)
+	if not hut.is_empty():
+		World.production.set_away("medicine_man:" + hut, true)
+	Townsfolk.use_rules({})
+	_sync()
 
 
 func _test_resident_voices() -> void:

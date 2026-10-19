@@ -17,14 +17,15 @@ extends GridEntity
 ## FAR_EVERY ticks and is walked there at once (World.walk), as monsters
 ## are by the world tick.
 
-enum Doing { WORK, HOME, SQUARE, HIDE, WELL, INN, TEMPLE, ROUNDS, STRAYED, ESCORT }
+enum Doing { WORK, HOME, SQUARE, HIDE, WELL, INN, TEMPLE, ROUNDS, STRAYED, ESCORT, BED, VISIT }
 ## Doing by the place word Townsfolk.whereabouts gives (decision 404).
 const DOING_AT := {"work": Doing.WORK, "home": Doing.HOME, "square": Doing.SQUARE, "well": Doing.WELL, "inn": Doing.INN, "temple": Doing.TEMPLE,
 	"rounds": Doing.ROUNDS}
 ## Where it is, in its voice's words (facts_now).
 const WHERE_WORDS := {Doing.WORK: "at your work", Doing.HOME: "at home", Doing.SQUARE: "in the square", Doing.HIDE: "hiding at home from raiders",
 	Doing.WELL: "at the well", Doing.INN: "at the inn", Doing.TEMPLE: "at the temple", Doing.ROUNDS: "on your rounds, at a neighbour's door",
-	Doing.STRAYED: "lost beyond the walls, far from the town", Doing.ESCORT: "being walked home, following at heel"}
+	Doing.STRAYED: "lost beyond the walls, far from the town", Doing.ESCORT: "being walked home, following at heel",
+	Doing.BED: "sick in your bed at home", Doing.VISIT: "at a sick neighbour's bedside, seeing to them"}
 const SIGHT_RANGE := 7
 ## It looks and listens for raiders every so many ticks.
 const LOOK_EVERY := 5
@@ -38,7 +39,8 @@ const FAR_EVERY := 20
 const STUCK_TRIES := 3
 const NO_CELL := Vector2i(-99999, -99999)
 const PLACE_OF := {Doing.WORK: "work", Doing.HOME: "home", Doing.SQUARE: "square", Doing.HIDE: "home",
-	Doing.WELL: "well", Doing.INN: "inn", Doing.TEMPLE: "temple", Doing.ROUNDS: "rounds", Doing.STRAYED: "strayed", Doing.ESCORT: "strayed"}
+	Doing.WELL: "well", Doing.INN: "inn", Doing.TEMPLE: "temple", Doing.ROUNDS: "rounds", Doing.STRAYED: "strayed", Doing.ESCORT: "strayed",
+	Doing.BED: "home", Doing.VISIT: "visit"}
 
 ## Production's worker id ("companion:<player id>" for a companion resting
 ## in town: decision 333 amended), the town (a stockpile place id) and its
@@ -73,6 +75,8 @@ var doing := Doing.SQUARE
 var strayed := false
 var escort_of := ""
 var escort_name := ""
+## The medicine man's visit (decision 501): {"rect": the sick one's home, "who": their id, "until": World.steps}; {} for none.
+var visit: Dictionary = {}
 ## Companions' Heel (decision 485), loaded by path so this script stands
 ## with or without it: without, the lost one waits where they are.
 const HEEL_SCRIPT := "res://sim/heel.gd"
@@ -171,6 +175,27 @@ func _sim_tick() -> void:
 	if strayed:
 		_tick_strayed()
 		return
+	if Townsfolk.is_sick(World.production, worker_id):
+		# Sick (decision 501): in bed, or walked to the healer by the player who spoke to them.
+		var leader := _escort_leader()
+		if leader != null:
+			doing = Doing.ESCORT
+			if _heel == null and ResourceLoader.exists(HEEL_SCRIPT):
+				_heel = load(HEEL_SCRIPT).new()
+			if _heel != null:
+				_heel.call("follow", self, leader)
+			return
+		escort_of = ""
+		if doing != Doing.BED or _goal == NO_CELL:
+			doing = Doing.BED
+			_pick_goal()
+		if not _far():
+			_step()
+		elif tile != _goal:
+			World.walk(self, _goal, FAR_EVERY)
+		return
+	if not visit.is_empty() and World.steps >= int(visit.get("until", 0)):
+		visit = {}
 	var far := _far()
 	if far and (World.tick + id) % FAR_EVERY != 0:
 		return
@@ -178,7 +203,7 @@ func _sim_tick() -> void:
 		_look()
 	if World.tick - hurt_tick <= 1:
 		_hide_until = World.tick + HIDE_TICKS
-	var now := Doing.HIDE if World.tick < _hide_until else doing_now(trade, type, worker_id)
+	var now := Doing.HIDE if World.tick < _hide_until else (Doing.VISIT if not visit.is_empty() else doing_now(trade, type, worker_id))
 	if now != doing or _goal == NO_CELL:
 		doing = now
 		_pick_goal()
@@ -259,6 +284,8 @@ func _pick_goal() -> void:
 	_route.clear()
 	_stuck = 0
 	var area: Rect2i = places.get(PLACE_OF[doing], places.get("square", Rect2i())) if doing != Doing.ROUNDS else _round_area()
+	if doing == Doing.VISIT and visit.get("rect") is Rect2i:
+		area = visit["rect"]
 	if area.size == Vector2i.ZERO:
 		_goal = tile
 		return
@@ -341,6 +368,17 @@ func facts_now() -> Array[String]:
 		sky = ", and " + Companion.WEATHER_WORDS[World.fields.weather["kind"]]
 	out.append("It is %s%s." % [hour, sky])
 	out.append("You are %s." % WHERE_WORDS.get(doing, "in the town"))
+	var sick := Townsfolk.sickness_of(World.production, worker_id)
+	if not sick.is_empty():
+		# Sick (decision 501): what ails it, how long, and whether anyone has seen to it.
+		var days := Townsfolk.day_of(World.steps) - int(sick.get("since", 0))
+		out.append("You are sick with %s and have kept to your bed %s." % [sick.get("kind", "a fever"), "since this morning" if days <= 0 else "for %d day%s" % [days, "" if days == 1 else "s"]])
+		if int(sick.get("treated", -1)) >= 0:
+			out.append("%s saw to you today, and you expect to be on your feet tomorrow." % sick.get("cured_by", "Someone"))
+		else:
+			out.append("Nobody has seen to you yet. You would be glad of the medicine man, or of being walked to the healer's hut, or of a remedy.")
+	if not visit.is_empty():
+		out.append("You are on your way to %s's bedside, to see to %s." % [visit.get("name", "a neighbour"), visit.get("name", "them")])
 	if strayed:
 		# Lost beyond the walls (decision 487): where home lies, and that it follows whoever speaks to it.
 		var square: Rect2i = places.get("square", Rect2i())

@@ -17,7 +17,7 @@ class_name Standing
 const FILE := "res://levels/residents.json"
 const DEFAULTS := {"trusted": 3, "wronged": -3, "top": 6, "most": 10, "heard_most": 2, "why_kept": 3, "decay_days": 10,
 	"met": 3, "rescue": 4, "lapsed": -2, "errand_lapsed": -1, "kin_home": 4, "loan_quarter": 1, "loan_cleared": 2,
-	"word": 2, "gift": 1, "gift_favourite": 2, "raid": 1, "heard": 1, "fetch": 1, "walked_home": 3, "song": 1}
+	"word": 2, "gift": 1, "gift_favourite": 2, "raid": 1, "heard": 1, "fetch": 1, "walked_home": 3, "song": 1, "healed": 3}
 ## A ladder: the word for each step, and the sentence frame for each word
 ## (the player's name goes in; the newest reason follows after a colon).
 const RESIDENT := {

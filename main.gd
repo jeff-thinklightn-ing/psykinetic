@@ -3807,6 +3807,14 @@ func _sync_residents() -> void:
 		var body := entity as Resident
 		if body.strayed and not body.escort_of.is_empty() and _at_towns_ground(body):
 			_came_home(body)
+		elif not body.escort_of.is_empty() and Townsfolk.is_sick(World.production, body.worker_id) and _at_healers_hut(body):
+			# Walked to the healer (decision 501): the healer sees to them.
+			var by := str(Offers._call(Offers.ctx, "name_of", [body.escort_of]))
+			if by.is_empty() or by == "<null>":
+				by = body.escort_name
+			Townsfolk.treat(World.production, body.worker_id, by, "the healer", body.escort_of)
+			body.escort_of = ""
+			body.escort_name = ""
 		if wanted.has(body.worker_id):
 			have[body.worker_id] = true
 			body.places = wanted[body.worker_id]["places"]
@@ -3969,6 +3977,9 @@ func _ask_resident(body: Resident, speaker: String, line: String, player: Player
 		Offers.spoke_to(player_id, body.worker_id)  # An errand to them is done by speaking (decision 435).
 		if body.strayed:
 			body.start_escort(player_id, speaker)  # Lost beyond the walls: a word, and they follow you home (decision 487).
+		elif Townsfolk.is_sick(World.production, body.worker_id) and int(Townsfolk.sickness_of(World.production, body.worker_id).get("treated", -1)) < 0 \
+				and not _healers_hut_of(body.town).is_empty():
+			body.start_escort(player_id, speaker)  # Sick: a word, and they let you walk them to the healer (decision 501).
 	body.asked_by = player_id
 	body.asked_by_name = speaker
 	if not player_id.is_empty() and World.production != null:
@@ -4109,6 +4120,31 @@ func _offers_context() -> Dictionary:
 					out.append(player.player_id)
 			return out,
 		"say": func(town: String, song: Dictionary) -> void: _sung(town, song),
+		# Sickness (decision 501): the healer's hut of a town's zone and its medicine man, his visit, a companion's card, a death.
+		"healers_hut": func(town: String) -> String: return _healers_hut_of(town),
+		"healer_of": func(town: String) -> String:
+			var hut := _healers_hut_of(town)
+			if hut.is_empty() or World.production == null:
+				return ""
+			var ids := World.production.worker_ids(hut).filter(func(id: String) -> bool: return not bool(World.production.worker(id).get("away", false)))
+			return str(ids[0]) if not ids.is_empty() else "",
+		"send_healer": func(healer_id: String, sick_id: String, player_id: String) -> bool: return _send_healer(healer_id, sick_id, player_id),
+		"companion_sick": func(id: String) -> Dictionary:
+			var record: PlayerRecord = _records.get(id.trim_prefix("companion:"))
+			return record.companion.get("sick", {}).duplicate(true) if record != null and record.companion.get("sick") is Dictionary else {},
+		"set_companion_sick": func(id: String, sick: Dictionary) -> void:
+			var record: PlayerRecord = _records.get(id.trim_prefix("companion:"))
+			if record == null:
+				return
+			if sick.is_empty():
+				var was: Dictionary = record.companion.get("sick", {})
+				if was is Dictionary and not was.is_empty():
+					record.companion["was_sick"] = {"since": was.get("since", 0), "ended": Townsfolk.day_of(World.steps), "cured_by": was.get("cured_by", "")}
+				record.companion.erase("sick")
+			else:
+				record.companion["sick"] = sick.duplicate(true),
+		"died": func(town: String, id: String, why: String) -> bool:
+			return bool(World.towns.died(town, id, why)) if World.towns != null and World.towns.has_method("died") else false,
 		"lore": func(_town: String) -> Array:
 			var facts := Lore.known_by(Lore.knower_for("townsfolk"), PackedStringArray(), "agreed")
 			facts.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return float(a.get("weight", 0)) > float(b.get("weight", 0)))
@@ -4156,13 +4192,37 @@ func _on_handed(by: GridEntity, to: GridEntity, item: String, uid: int) -> void:
 	if player == null or body == null or player.player_id.is_empty() or not body.player_id.is_empty() or World.production == null:
 		return
 	var slot := body.slots.find(item)
+	if item == "remedy" and slot >= 0 and Townsfolk.is_sick(World.production, body.worker_id) and int(Townsfolk.sickness_of(World.production, body.worker_id).get("treated", -1)) < 0:
+		# A remedy to the sick (decision 501): taken at once, used up, and the sickness breaks that night.
+		var dose := _out_of_hands(body, slot)
+		if dose != 0:
+			World.items.place(dose, "used")
+		Townsfolk.treat(World.production, body.worker_id, _display_name(player), "a remedy", player.player_id)
+		return
 	if slot >= 0 and World.stockpile != null and not body.town.is_empty():
-		var taken := World.take_item(body, body, slot)
+		var taken := _out_of_hands(body, slot)
 		if taken != 0:
 			World.stockpile.bank(body.town, taken, body.person, "a gift from %s" % _display_name(player), body.zone, body.tile, "banked", "player:" + player.player_id)
 	var line := Offers.gift(player.player_id, _display_name(player), body.worker_id, item)
 	if not line.is_empty():
 		party_log.add(line)
+
+
+## Server: what a resident holds in [param slot] leaves its hands (banked, or a
+## remedy used up: decisions 443 and 501); the instance uid, 0 for an empty
+## slot. Nobody reaches a resident's slots by World.reaches, so this clears
+## the slot outright, as the server's own act.
+func _out_of_hands(body: Resident, slot: int) -> int:
+	if slot < 0 or slot >= body.slots.size() or body.slots[slot].is_empty():
+		return 0
+	var uid := World.slot_uid(body, slot)
+	var kept := body.slots.duplicate()
+	var kept_uids := body.slot_items.duplicate()
+	kept[slot] = ""
+	kept_uids[slot] = 0
+	World.set_slots(body, kept, kept_uids)
+	World.items.place(uid, "")
+	return uid
 
 
 ## The lawspeaker's client (decision 448): the builder's ClaudeClient when
@@ -4241,6 +4301,66 @@ func _write_settled_card(id: String, entry: Dictionary) -> void:
 	if not str(entry.get("fact", "")).is_empty():
 		ResidentCard.add_fact(card, World.production.now(), str(entry["fact"]))
 	World.production.set_card(id, card)
+
+
+## The healer's hut place of [param town]'s zone (maps' 372), "" for none.
+func _healers_hut_of(town: String) -> String:
+	if World.holdings == null:
+		return ""
+	var area := str(World.holdings.place(town).get("area", ""))
+	for id: String in World.holdings.places_in(area):
+		if World.holdings.place(id).get("kind") == "healers_hut":
+			return id
+	return ""
+
+
+## Server: the medicine man [param healer_id] is asked, by [param player_id]'s
+## word, to see to [param sick_id] (decision 501): a visit goes on his day
+## (the sick one's home, "sick.visit_hours" from now; his body walks there
+## when one stands, Resident.Doing.VISIT), and when it ends the sick one is
+## treated by him whether or not anyone watched (_visits, on the world
+## tick). False when he is already on a visit or the sick one is unknown.
+var _visits: Dictionary = {}
+
+func _send_healer(healer_id: String, sick_id: String, player_id: String) -> bool:
+	if World.production == null or World.production.worker(healer_id).is_empty() or World.production.worker(sick_id).is_empty() or _visits.has(healer_id):
+		return false
+	var hours := int(Townsfolk.rules().get("sick", {}).get("visit_hours", 2))
+	var until := World.steps + hours * int(DayNight.day_steps / 24)
+	_visits[healer_id] = {"sick": sick_id, "until": until, "by": player_id}
+	var home := Rect2i()
+	for entity: GridEntity in World.townsfolk():
+		var body := entity as Resident
+		if body.worker_id == sick_id:
+			home = body.places.get("home", Rect2i())
+	for entity: GridEntity in World.townsfolk():
+		var body := entity as Resident
+		if body.worker_id == healer_id:
+			body.visit = {"rect": home, "who": sick_id, "name": str(World.production.worker(sick_id).get("name", sick_id)), "until": until}
+	print("[townsfolk] %s goes to see to %s" % [World.production.worker(healer_id).get("name", healer_id), World.production.worker(sick_id).get("name", sick_id)])
+	return true
+
+
+## Server, on the world tick: a medicine man's visit that has run its hours
+## treats the sick one (decision 501), by his name, for the player whose
+## word sent him.
+func _visits_due() -> void:
+	for healer_id: String in _visits.keys():
+		var visit: Dictionary = _visits[healer_id]
+		if World.steps < int(visit.get("until", 0)):
+			continue
+		_visits.erase(healer_id)
+		if World.production == null:
+			continue
+		var name := str(World.production.worker(healer_id).get("name", healer_id))
+		Townsfolk.treat(World.production, str(visit.get("sick", "")), name, "the medicine man", str(visit.get("by", "")))
+
+
+## Whether the sick [param body], walked to the healer, stands on the hut's
+## ground (decision 501).
+func _at_healers_hut(body: Resident) -> bool:
+	var hut := _healers_hut_of(body.town)
+	return not hut.is_empty() and World.holdings.covers(hut, body.tile)
 
 
 ## The standing inn of [param town] in this zone, as a rect; an empty one
@@ -4650,7 +4770,7 @@ func _spawn_resident(each: Dictionary) -> Resident:
 	var town: String = each["town"]
 	var places: Dictionary = each["places"]
 	var trade: String = each["trade"]
-	var doing := Resident.Doing.STRAYED if bool(each.get("strayed", false)) else Resident.doing_now(trade, str(each.get("type", "")), who)
+	var doing := Resident.Doing.STRAYED if bool(each.get("strayed", false)) else (Resident.Doing.BED if Townsfolk.is_sick(World.production, who) else Resident.doing_now(trade, str(each.get("type", "")), who))
 	# On his rounds (the lawspeaker, decision 459) "rounds" is a list of stops:
 	# he starts at the hour's stop (as Resident._round_stop has it), or the
 	# square with none.
@@ -6343,6 +6463,7 @@ func _on_world_ticked(tick: int) -> void:
 			for broke: Dictionary in Weather.break_roofs(_world_map.areas, World.steps):
 				print("[weather] %s broke roof %d of %s" % [broke["storm"], broke["index"], broke["level"]])
 			_seat_settled()  # A settled person whose town has since been founded (decision 471).
+			_visits_due()  # The medicine man's visits that have run their hours (decision 501).
 		_respawn_due_players(tick)
 		_check_respawns(tick)
 		t = World.part("respawns", t)

@@ -36,6 +36,7 @@ func _ready() -> void:
 	_test_fence_and_catch()
 	_test_strays()
 	_test_scoundrel()
+	_test_sickness()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	Offers.ctx = {}  # Static callables into this node would crash the quit.
@@ -378,6 +379,93 @@ func _test_scoundrel() -> void:
 	_check(str(Townsfolk.card_of(_work, "c-ald")["facts"].back()["text"]) == "Nix owes the town all it will lend and pays nothing back." and _memory2.is_empty(),
 		"with the lawspeaker off: the official knows, nothing before him")
 	Offers.ctx = {}
+
+
+var _died: Array = []
+var _her_sick := {}
+
+
+func _test_sickness() -> void:
+	print("\n== sickness: to bed, its course, the old of the town's own may die (never a rescued one), treated it breaks that night (decision 501) ==")
+	Townsfolk.use_rules({"type_weights": {}, "thief": {"every": 0}, "strays": {"every": 0},
+		"sick": {"chance": 1.0, "winter": 1, "hungry": 1, "old": 1, "days": 2, "death_old": 1.0, "visit_hours": 2, "kinds": ["a fever"]}})
+	_setup()
+	Townsfolk._sick_due.clear()
+	Production.type_of = Callable()
+	_work.add_worker("k-ada", "Ada", ["cook"], TOWN, "placeholder")
+	_work.add_worker("k-bram", "Bram", ["smith"], TOWN, "placeholder")
+	_work.add_worker("k-ren", "Ren", ["hauler"], TOWN, "rescued:p1")
+	Production.type_of = Townsfolk.roll_type
+	for id: String in ["k-ada", "k-bram", "k-ren"]:
+		var c := Townsfolk.card_of(_work, id)
+		c["kin"] = {}
+		c["grudge"] = []
+		_work.set_card(id, c)
+	var ada := Townsfolk.card_of(_work, "k-ada")
+	ada["kin"] = {"k-bram": "sister or brother"}
+	ada["look"]["age"] = "old"
+	ada["traits"]["pronoun"] = "she"
+	_work.set_card("k-ada", ada)
+	var ren := Townsfolk.card_of(_work, "k-ren")
+	ren["look"]["age"] = "old"
+	ren["traits"]["pronoun"] = "he"
+	_work.set_card("k-ren", ren)
+	var bram := Townsfolk.card_of(_work, "k-bram")
+	bram["traits"]["pronoun"] = "he"
+	_work.set_card("k-bram", bram)
+	_died = []
+	_her_sick = {}
+	var done: Array = []
+	Offers.ctx = {"production": _work, "pay": func() -> Dictionary: return {"healing": 6}, "pay_commission": func(_p: String, _t: String, g: int) -> int: return g,
+		"done": func(player_id: String, ask: Dictionary, line: String, paid: int) -> void: done.append([player_id, ask, line, paid]),
+		"died": func(town: String, id: String, why: String) -> bool:
+			_died.append([town, id, why])
+			_work.set_away(id, true)  # Economy's Towns.died takes them out of the town.
+			return true,
+		"lawspeaker_of": func(_t: String) -> String: return "", "model": func() -> String: return "off",
+		"companion_sick": func(_id: String) -> Dictionary: return _her_sick.duplicate(true),
+		"set_companion_sick": func(_id: String, record: Dictionary) -> void: _her_sick = record.duplicate(true)}
+	var day := DayNight.day_steps
+	_check(Townsfolk.sick_days() == 2, "the untreated length reads from the rule (%d)" % Townsfolk.sick_days())
+	Townsfolk.sicken(_work)
+	_check(Townsfolk.is_sick(_work, "k-ada") and not Townsfolk.is_sick(_work, "k-bram"), "one new case a town a day: Ada, the first by id (chance 1)")
+	_check(str(Townsfolk.card_of(_work, "k-ada")["facts"].back()["text"]) == "Ada took to her bed with a fever." and str(Townsfolk.card_of(_work, "k-bram")["facts"].back()["text"]).begins_with("Ada, his sister, lies sick at home"),
+		"her card and her brother's say so: %s" % [Townsfolk.card_of(_work, "k-bram")["facts"].back()["text"]])
+	if _work.has_method("set_sick"):
+		_check(_work.worker("k-ada").get("sick", false) == true, "economy counts her sick")
+	Townsfolk.sicken(_work)
+	_check(not Townsfolk.is_sick(_work, "k-bram"), "not twice the same day")
+	_now += day
+	Townsfolk.sicken(_work)
+	_check(Townsfolk.is_sick(_work, "k-ada") and Townsfolk.is_sick(_work, "k-bram"), "the next day Ada is still abed and Bram falls sick")
+	_now += day
+	Townsfolk.sicken(_work)
+	_check(not Townsfolk.is_sick(_work, "k-ada") and _died == [[TOWN, "k-ada", "a fever"]], "after two days untreated, Ada, old and the town's own, dies (death_old 1): %s" % [_died])
+	_check(str(Townsfolk.card_of(_work, "k-bram")["facts"].back()["text"]) == "Ada died of a fever.", "her brother's card")
+	_check(Townsfolk.treat(_work, "k-bram", "Jeff", "a remedy", "p1") and int(Townsfolk.sickness_of(_work, "k-bram")["treated"]) >= 0, "Bram is treated with a remedy")
+	_check(not Townsfolk.treat(_work, "k-bram", "Jeff", "a remedy", "p1"), "and not twice")
+	_now += day
+	Townsfolk.sicken(_work)
+	_check(not Townsfolk.is_sick(_work, "k-bram") and str(Townsfolk.card_of(_work, "k-bram")["facts"].back()["text"]) == "Bram is on his feet again." and _died.size() == 1,
+		"the next morning he is on his feet; nobody else died")
+	# The guard: Ren, old, rescued by a player, never dies of it this step.
+	Townsfolk._set_sickness(_work, "k-ren", {"since": Townsfolk.day_of(_now), "kind": "a fever", "treated": -1, "cured_by": ""})
+	_now += 3 * day
+	Townsfolk.sicken(_work)
+	_check(not Townsfolk.is_sick(_work, "k-ren") and _died.size() == 1 and str(Townsfolk.card_of(_work, "k-ren")["facts"].back()["text"]).contains("on his feet again after a fever, thinner"),
+		"a rescued captive, old, gets over it thinner: the death roll never touches a named arrival")
+	# A companion resting in town rolls too: her record goes to her player's card, never to a townsfolk card.
+	Production.type_of = Callable()
+	_work.add_worker("companion:p9", "Isolde", ["hauler"], TOWN, "companion:p9")
+	Production.type_of = Townsfolk.roll_type
+	_now += day
+	Townsfolk.sicken(_work)
+	_check(not _her_sick.is_empty() and _her_sick.get("kind") == "a fever" and Townsfolk.is_sick(_work, "companion:p9"), "Isolde, resting in town, falls sick and it is kept on her player's card: %s" % [_her_sick])
+	_now += 2 * day
+	Townsfolk.sicken(_work)
+	_check(_her_sick.is_empty() and _died.size() == 1, "she gets over it on her own; a companion never dies of it")
+	Offers.ctx = {}
+	Townsfolk._sick_due.clear()
 
 
 func _work_has(method: String) -> bool:

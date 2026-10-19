@@ -48,6 +48,7 @@ func _ready() -> void:
 	_test_errand()
 	_test_quarrel()
 	_test_walk_home()
+	_test_sick_pleas()
 	_test_lapse()
 	_test_voice_words()
 	_test_scholar_and_merchant()
@@ -485,6 +486,56 @@ func _test_chronicle() -> void:
 	_check(Standing.words(Townsfolk.card_of(_work, "o-odo"), "p1") != "" and Townsfolk.card_of(_work, "o-odo").get("standing", {}).has("p1"), "they have met")
 	Townsfolk.use_days({"default": {"stints": [{"from": 0, "to": 12, "at": "well"}, {"from": 12, "to": 24, "at": "well"}]}, "gossip": {"every": 0}})
 	_check(_offers("o-odo").all(func(o: Dictionary) -> bool: return o["kind"] != Offers.PAGE), "at the well, no chronicle: it is at the desk")
+	Offers.ctx = _ctx
+
+
+var _sent: Array = []
+var _healer := ""
+
+
+func _test_sick_pleas() -> void:
+	print("\n== kin sick in bed: bring the medicine man, or take them to the healer; the treatment pays (decision 501) ==")
+	_setup([["o-mara", "Mara", "smith"], ["o-tam", "Tam", "hauler"], ["o-doc", "Oren", "medicine_man"]])
+	var card := Townsfolk.card_of(_work, "o-mara")
+	card["kin"] = {"o-tam": "sibling"}
+	_work.set_card("o-mara", card)
+	_sent = []
+	_healer = "o-doc"
+	_ctx["healer_of"] = func(_town: String) -> String: return _healer
+	_ctx["healers_hut"] = func(_town: String) -> String: return "o/hut"
+	_ctx["send_healer"] = func(healer_id: String, sick_id: String, player_id: String) -> bool:
+		_sent.append([healer_id, sick_id, player_id])
+		return true
+	_ctx["companion_sick"] = func(_id: String) -> Dictionary: return {}
+	_ctx["set_companion_sick"] = func(_id: String, _r: Dictionary) -> void: pass
+	_check(_offers().is_empty(), "Tam well: nothing to ask")
+	Townsfolk._set_sickness(_work, "o-tam", {"since": 0, "kind": "a cough", "treated": -1, "cured_by": ""})
+	var mine := _offers()
+	_check(mine.size() == 1 and mine[0]["kind"] == Offers.PLEA and mine[0]["title"] == "Bring the medicine man" and mine[0]["what"]["sick"] == "o-tam" and mine[0]["what"]["healer"] == "o-doc"
+		and str(mine[0]["words"]).contains("lies sick with a cough"), "with a medicine man in the zone, Mara asks for him: %s" % [mine])
+	var taken := Offers.accept("o-mara", "p1", "Jeff", mine[0]["id"] if not mine.is_empty() else "", 0, _ctx)
+	_check(taken["ok"] and Townsfolk.card_of(_work, "o-mara")["asks"].size() == 1, "taken, interest only")
+	_check(Offers._promise(Townsfolk.card_of(_work, "o-mara")["asks"][0]) == "bring the medicine man", "(the promise in words)")
+	Offers.spoke_to("p1", "o-tam", _ctx)
+	_check(_sent.is_empty(), "a word to the sick one sends nobody")
+	Offers.spoke_to("p1", "o-doc", _ctx)
+	_check(_sent == [["o-doc", "o-tam", "p1"]] and str(Townsfolk.card_of(_work, "o-doc")["facts"].back()["text"]) == "Jeff asked Oren to see to Tam.", "a word to the medicine man sends him: %s" % [_sent])
+	Townsfolk.treat(_work, "o-tam", "Oren", "the medicine man", "p1")
+	_check(_done.size() == 1 and _done[0][0] == "p1" and _done[0][3] == 6 and str(_done[0][2]).begins_with("Jeff saw to Tam with the medicine man. Mara remembers it."),
+		"the visit treats Tam: the notice and the healing pay to the one whose word sent him: %s" % [_done])
+	_check(Standing.score(Townsfolk.card_of(_work, "o-mara"), "p1") >= Standing.setting("healed") and Standing.score(Townsfolk.card_of(_work, "o-tam"), "p1") >= Standing.setting("healed"),
+		"standing from the kin and from Tam")
+	_check(Townsfolk.card_of(_work, "o-mara")["asks"].is_empty() and _offers().is_empty(), "the plea is met; treated, no new plea")
+	# No medicine man: the walk to the healer's hut.
+	_healer = ""
+	Townsfolk._set_sickness(_work, "o-tam", {"since": 1, "kind": "the shakes", "treated": -1, "cured_by": ""})
+	mine = _offers()
+	_check(mine.size() == 1 and mine[0]["title"] == "Take Tam to the healer" and mine[0]["what"].get("hut") == "o/hut", "with no medicine man but a hut, walk him there: %s" % [mine.map(func(o: Dictionary) -> String: return str(o["title"]))])
+	Offers.accept("o-mara", "p1", "Jeff", mine[0]["id"], 0, _ctx)
+	Offers.healed(TOWN, "o-tam", "", "", "died", _ctx)
+	_check(_done.size() == 2 and _done[1][3] == 0 and str(_done[1][2]) == "Tam died of the sickness." and Townsfolk.card_of(_work, "o-mara")["asks"].is_empty(),
+		"a death closes the plea with the fact, no pay, no lapse: %s" % [_done[1]])
+	_check(Standing.score(Townsfolk.card_of(_work, "o-mara"), "p1") >= Standing.setting("healed"), "and Mara thinks no worse of Jeff for it")
 	Offers.ctx = _ctx
 
 
