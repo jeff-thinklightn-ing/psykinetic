@@ -64,6 +64,10 @@ var workshop_open := Callable()
 var workshop_level := Callable()
 ## (town, building id) -> void: a "build" job is done (Towns sets it).
 var on_built := Callable()
+## (town, building id, worker_id, fee) -> int: what players gave toward a
+## build pays its fee first, the rest kept by the town (Economy.settle_fund,
+## decision 499); the gold it paid. Unset, the treasury pays it all.
+var settle_fund := Callable()
 ## (job) -> void: a "return" job is done (decision 396; Main sets it): its
 ## who and who_kind brought back at its workshop by its worker ("by"), or,
 ## "fallback" true, given up on (nobody there for rules' return.give_up).
@@ -815,12 +819,23 @@ func _town_work_fee(each: Dictionary, worker_record: Dictionary) -> void:
 	if fee <= 0:
 		return
 	var town: String = each["town"]
-	var owed := maxi(int(int(each["needed"]) / maxf(float(town_work.get("per_steps", 600)), 1.0) * fee), 1)
-	var paid := mini(owed, stockpile.count(town, "gold") - int(rules.get("gold_floor", 0)))
+	var owed := town_work_fee(int(each["needed"]))
+	var given := int(settle_fund.call(town, str(each["recipe"]), str(worker_record["id"]), owed)) if settle_fund.is_valid() else 0
+	var paid := mini(owed - given, stockpile.count(town, "gold") - int(rules.get("gold_floor", 0)))
 	if paid > 0 and stockpile.take(town, "gold", paid, "town_work:%s" % worker_record["id"]):
 		worker_record["purse"] = int(worker_record["purse"]) + paid
-	print("[production] %s paid %d of %d gold by %s for %s, step %d" % [worker_record["name"], maxi(paid, 0), owed, town,
+	print("[production] %s paid %d of %d gold by %s for %s, step %d" % [worker_record["name"], maxi(paid, 0) + given, owed, town,
 		each["recipe"], now()])
+
+
+## The town's fee for [param steps] of its work (rules' town_work): 0 for
+## no fee, else at least 1.
+func town_work_fee(steps: int) -> int:
+	var town_work: Dictionary = rules.get("town_work", {})
+	var fee := int(town_work.get("fee", 0))
+	if fee <= 0:
+		return 0
+	return maxi(int(steps / maxf(float(town_work.get("per_steps", 600)), 1.0) * fee), 1)
 
 
 func _rent(at: int) -> void:

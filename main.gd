@@ -2153,6 +2153,11 @@ func _boot() -> void:
 		return World.towns.building(town, kind).get("state") == Towns.STANDING
 	World.economy.dole_changed.connect(_on_dole_changed)
 	World.economy.owed_paid.connect(func(player_id: String, gold: int) -> void: World.gold_changed.emit(player_id, gold))
+	# Players' contributions toward the next build (decision 499).
+	World.economy.shortfall = World.towns.shortfall
+	World.production.settle_fund = World.economy.settle_fund
+	World.economy.contributed.connect(func(town: String, player_id: String, kind: String, gold: int, xp: int) -> void:
+		World.towns.add_xp(town, xp, "%s gave %d gold toward the %s" % [player_id, gold, kind]))
 	# The fallen come back at a temple or a healer's hut (decision 396).
 	World.production.returned = _on_returned
 	if not World.production.work_done.is_connected(_on_counter_work_done):

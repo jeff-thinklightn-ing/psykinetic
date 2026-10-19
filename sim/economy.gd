@@ -29,6 +29,10 @@ signal dole_changed(town: String, count: int)
 ## A player was paid gold the town owed them for goods they banked
 ## (decision 498), off any request of theirs: World tells their client.
 signal owed_paid(player_id: String, gold: int)
+## Player [param player_id] gave [param gold] toward [param town]'s
+## [param kind] (decision 499): Main thanks them in town experience
+## ([param xp]).
+signal contributed(town: String, player_id: String, kind: String, gold: int, xp: int)
 
 const PATH := "res://levels/economy.json"
 const TREASURY := "the town"
@@ -47,6 +51,9 @@ var catalog := Callable()
 ## (town, building kind) -> bool: whether it stands (Towns', set by Main),
 ## for a need met at a building. None stands while unset.
 var building_stands := Callable()
+## (town) -> {kind, job, steps, needs}: what the town's next build lacks
+## (Towns.shortfall, set by Main; decision 499). {} while unset.
+var shortfall := Callable()
 ## Town -> how many it fed or let go hungry, as last told (dole_changed).
 var _dole := {}
 
@@ -65,6 +72,8 @@ var _cant_pay: Dictionary = {}
 var _player_owed: Dictionary = {}
 ## Maker id -> the step their apprentice's wage was last paid (498 amended).
 var _apprentice_paid: Dictionary = {}
+## Town -> building id -> gold players gave toward it, not yet spent (499).
+var _funds: Dictionary = {}
 const LOG_SIZE := 50
 
 
@@ -390,6 +399,7 @@ func tick() -> void:
 			production.set_need_due(id, need, at + maxi(int(every * (float(folk.get("rich_every", 1.0)) if rich else 1.0)), 1))
 	for player_id: String in _player_owed.keys():
 		_pay_player(player_id)
+	_drop_funds()
 	for town: String in _dole:
 		towns[town] = true
 	var keys: Array = towns.keys()
@@ -668,21 +678,30 @@ func deliver(town: String, id: String, what: String, count: int, why: String) ->
 	if not hauler.is_empty():
 		fee = mini(ceili(float(count) / maxi(int(haul.get("load", 5)), 1)) * int(haul.get("fee", 1)), price)
 		_hauled[hauler] = now()
-		_owe_or_pay(town, hauler, fee, "hauling %d %s" % [count, what])
-	_owe_or_pay(town, id, price - fee, "%d %s delivered" % [count, what])
+		_owe_or_pay(town, hauler, fee, "hauling %d %s" % [count, what], what)
+	_owe_or_pay(town, id, price - fee, "%d %s delivered" % [count, what], what)
 	return true
 
 
 ## [param amount] paid to worker [param id] from [param town]'s treasury
 ## above gold_floor, the rest owed them.
-func _owe_or_pay(town: String, id: String, amount: int, why: String) -> void:
+func _owe_or_pay(town: String, id: String, amount: int, why: String, what := "") -> void:
 	if amount <= 0:
 		return
-	var paid := mini(amount, maxi(stockpile.count(town, "gold") - int(rules.get("gold_floor", 0)), 0))
+	# A delivery the next build lacks: what players gave toward it pays first (499).
+	var given := 0
+	if not what.is_empty() and shortfall.is_valid():
+		var short: Dictionary = shortfall.call(town)
+		if short.get("needs", {}).has(what):
+			given = _from_fund(town, str(short["kind"]), amount)
+			if given > 0:
+				production.pay(id, given, "%s (given toward the %s)" % [why, short["kind"]])
+	var paid := mini(amount - given, maxi(stockpile.count(town, "gold") - int(rules.get("gold_floor", 0)), 0))
 	if paid > 0 and stockpile.take(town, "gold", paid, "paid:%s" % id):
 		production.pay(id, paid, why)
 	else:
 		paid = 0
+	paid += given
 	if paid < amount:
 		production.set_owed(id, int(production.worker(id).get("owed", 0)) + amount - paid)
 
@@ -697,6 +716,16 @@ func _pay_owed(id: String, town: String) -> void:
 	if paid > 0 and stockpile.take(town, "gold", paid, "owed:%s" % id):
 		production.pay(id, paid, "what the town owed")
 		production.set_owed(id, owed - paid)
+		owed -= paid
+	# The treasury at its floor: what players gave pays the town's debts (499).
+	for kind: String in _funds.get(town, {}).keys():
+		if owed <= 0:
+			break
+		var given := _from_fund(town, kind, owed)
+		if given > 0:
+			production.pay(id, given, "what the town owed (given toward the %s)" % kind)
+			owed -= given
+			production.set_owed(id, owed)
 
 
 ## The hauler of [param town] to carry the next load (in town, not away,
@@ -765,6 +794,104 @@ func _pay_player(player_id: String) -> void:
 ## What [param town] owes player [param player_id] for goods banked.
 func owed_to(player_id: String, town: String) -> int:
 	return int(_player_owed.get(player_id, {}).get(town, 0))
+
+
+# --- Players' contributions (decision 499) ------------------------------------------
+
+## What [param town]'s next build still needs in gold, for a player who
+## would give toward it (Jeff: "players bank goods for gold and if they want
+## they spend gold later to help the town with upgrades and defences"):
+## {kind, gold}: the materials the store lacks at what it pays for them
+## (raw_price x store.buy), what the town owes its gatherers and haulers,
+## and the builder's fee, less what was given already. {} for no build
+## waiting.
+func contribution_wanted(town: String) -> Dictionary:
+	var short: Dictionary = shortfall.call(town) if shortfall.is_valid() else {}
+	if short.is_empty():
+		return {}
+	var buy := float(rules.get("store", {}).get("buy", 1.0))
+	var gold := production.town_work_fee(int(short.get("steps", 0)))
+	for what: String in short["needs"]:
+		gold += ceili(raw_price(town, what) * buy * int(short["needs"][what]))
+	for id in production.worker_ids(town):
+		gold += int(production.worker(id).get("owed", 0))
+	gold -= fund(town, str(short["kind"]))
+	return {"kind": str(short["kind"]), "gold": maxi(gold, 0)}
+
+
+## Player [param player_id] gives up to [param amount] of their gold toward
+## [param town]'s next build (decision 499): never more than it still
+## needs (contribution_wanted) or they have. Kept in a fund for that build,
+## not the treasury: it pays first for deliveries of what the build lacks,
+## then what the town owes its workers, then the builder's fee when it
+## stands (settle_fund), the rest the town's; kept by the town if the plan
+## is dropped. Thanked in town experience, contribute.gold_per_xp gold a
+## point (contributed). The gold given (the caller tells the player).
+func contribute(town: String, player_id: String, amount: int) -> int:
+	var wanted := contribution_wanted(town)
+	var give := mini(mini(amount, int(wanted.get("gold", 0))), gold(player_id))
+	if give <= 0:
+		return 0
+	var kind := str(wanted["kind"])
+	add_gold(player_id, -give, "given toward the town's %s" % kind)
+	if not _funds.has(town):
+		_funds[town] = {}
+	_funds[town][kind] = fund(town, kind) + give
+	stockpile.note(town, "gold", 0, "given:%s" % player_id, "%s gave %d gold toward the %s" % [player_id, give, kind])
+	var xp := maxi(give / maxi(int(rules.get("contribute", {}).get("gold_per_xp", 2)), 1), 1)
+	contributed.emit(town, player_id, kind, give, xp)
+	return give
+
+
+## Gold given toward [param town]'s [param kind], not yet spent.
+func fund(town: String, kind: String) -> int:
+	return int(_funds.get(town, {}).get(kind, 0))
+
+
+## Up to [param amount] of [param town]'s fund for [param kind] taken to
+## pay with: what it took.
+func _from_fund(town: String, kind: String, amount: int) -> int:
+	var have := fund(town, kind)
+	var took := mini(have, maxi(amount, 0))
+	if took <= 0:
+		return 0
+	if have - took > 0:
+		_funds[town][kind] = have - took
+	else:
+		_funds[town].erase(kind)
+		if _funds[town].is_empty():
+			_funds.erase(town)
+	return took
+
+
+## [param kind] built in [param town] (Production's settle_fund): its fund
+## pays builder [param worker_id] up to [param fee], the rest goes to the
+## treasury ("kept by the town"). The gold paid to the builder.
+func settle_fund(town: String, kind: String, worker_id: String, fee: int) -> int:
+	var paid := _from_fund(town, kind, fee)
+	if paid > 0:
+		production.pay(worker_id, paid, "building the %s (given toward it)" % kind)
+	_keep_fund(town, kind, "built")
+	return paid
+
+
+## What is left of [param town]'s fund for [param kind] goes to its treasury.
+func _keep_fund(town: String, kind: String, why: String) -> void:
+	var rest := _from_fund(town, kind, fund(town, kind))
+	if rest > 0:
+		stockpile.deposit(town, "gold", rest, "given:%s" % kind, "what was given toward the %s, kept (%s)" % [kind, why])
+
+
+## A fund whose build is no longer planned (no build job of it in its town)
+## is the town's.
+func _drop_funds() -> void:
+	for town: String in _funds.keys():
+		for kind: String in _funds[town].keys():
+			var planned := production.jobs().any(func(id: int) -> bool:
+				var each := production.job(id)
+				return each["kind"] == "build" and each["town"] == town and each["recipe"] == kind)
+			if not planned:
+				_keep_fund(town, kind, "no longer planned")
 
 
 ## A maker's apprentice (decision 498 amended; Jeff: "makers have more
@@ -905,7 +1032,7 @@ func pay_commission(player_id: String, town: String, gold_owed: int) -> int:
 ## For the snapshot: {purses: {player id: gold}, log}.
 func to_dict() -> Dictionary:
 	return {"purses": _purses.duplicate(), "log": _log.duplicate(true), "paid": _paid.duplicate(true), "hauled": _hauled.duplicate(),
-		"player_owed": _player_owed.duplicate(true), "apprentice_paid": _apprentice_paid.duplicate()}
+		"player_owed": _player_owed.duplicate(true), "apprentice_paid": _apprentice_paid.duplicate(), "funds": _funds.duplicate(true)}
 
 
 func from_dict(saved: Dictionary) -> void:
@@ -916,6 +1043,15 @@ func from_dict(saved: Dictionary) -> void:
 				_paid[str(town)] = {}
 				for what: Variant in paid[town]:
 					_paid[str(town)][str(what)] = maxf(float(paid[town][what]), 0.0)
+	var funds: Variant = saved.get("funds", {})
+	if funds is Dictionary:
+		for town: Variant in funds:
+			if funds[town] is Dictionary:
+				for kind: Variant in funds[town]:
+					if int(funds[town][kind]) > 0:
+						if not _funds.has(str(town)):
+							_funds[str(town)] = {}
+						_funds[str(town)][str(kind)] = int(funds[town][kind])
 	var apprentice_paid: Variant = saved.get("apprentice_paid", {})
 	if apprentice_paid is Dictionary:
 		for id: Variant in apprentice_paid:

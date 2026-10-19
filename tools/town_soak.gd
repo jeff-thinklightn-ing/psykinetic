@@ -37,6 +37,10 @@ var _out := ""
 var _ask := false
 var _asks_made := 0
 var _asks_answered := 0
+## --give=N: at the counter each day, each player gives up to N gold toward
+## the town's next build (economy's 499, Economy.contribute), for the
+## contributions soak.
+var _give := 0
 const QUESTIONS := ["Who are you?", "What is new in the town?", "What do you need?", "What do you think of %s?", "Is it true that %s"]
 var _prev := {}  # Main's own context callbacks, put back before the quit.
 
@@ -57,6 +61,8 @@ func _run() -> void:
 			_out = arg.trim_prefix("--out=")
 		elif arg == "--ask":
 			_ask = true
+		elif arg.begins_with("--give="):
+			_give = maxi(int(arg.trim_prefix("--give=")), 0)
 	if _out.is_empty() or _out.begins_with("/var/lib/psykinetic") or _out.begins_with("user://"):
 		push_error("town_soak: --out=<a local folder> is needed, never the box's or user://")
 		get_tree().quit(2)
@@ -182,6 +188,12 @@ func _hourly() -> void:
 		_at_the_counter(day)
 		if hour == 10 and day % 3 == 0 and not _ask:
 			_speak(day)
+		if hour == 11 and _give > 0:
+			for player: Player in _players:
+				if is_instance_valid(player):
+					var given := World.economy.contribute(TOWN, player.player_id, _give)
+					if given > 0:
+						_count("given_gold", given)
 	if _ask and hour == 9:
 		await _ask_round(day)
 	if hour == 0:

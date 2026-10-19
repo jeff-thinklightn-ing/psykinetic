@@ -14111,3 +14111,48 @@ per bridge length (art-kit: a repeated deck); fords in spate now
 (environment's Weather.water_at later, with routes replanning and a
 gameplay yes on being cut off by water).
 wool 2 at 2 for cloth 3 at 3).
+## 499. Players give toward the town's next build
+
+Jeff (2026-10-18): "players bank goods for gold and if they want they
+spend gold later to help the town with upgrades and defences - they buy
+armor weapons and services to sink gold, players lose gold through
+spend". Phase 1b of his gold economy, the coordinator's approval; npc's
+player-facing "give" offer is "499, npc's side".
+- Towns.shortfall(town): the town's first build job still queued (its
+  materials not yet taken: a new building, a level, a repair; walls are
+  its defences) and what the store lacks for it: {kind, job, steps,
+  needs}. {} for none.
+- Economy.contribution_wanted(town) -> {kind, gold}: the lacking
+  materials at what the store pays for them (raw_price x store.buy), what
+  the town owes its gatherers and haulers, and the builder's fee
+  (Production.town_work_fee), less what was given already. A player can
+  never give more than that, or than they have.
+- Economy.contribute(town, player, amount) -> gold given: out of their
+  gold for good (spending, the only way a player loses gold), into a fund
+  for that build, not the treasury, so the treasury's floor doesn't hold
+  it back. The fund pays, in order: deliveries of what the build lacks
+  (Economy.deliver, before the treasury), what the town owes its workers
+  when the treasury is at its floor (_pay_owed), and the builder's fee
+  when it stands (Production.settle_fund -> Economy.settle_fund). The rest
+  is the town's, into the treasury: on the build, or when the plan is
+  dropped (no build job of it left, on Economy's tick). Never given back.
+- Thanks: contribute.gold_per_xp (2) gold a point of town experience
+  (contributed -> Main -> Towns.add_xp, "<player> gave N gold toward the
+  inn"), so a giving town unlocks its next building sooner.
+- The fund is saved (Economy "funds"). tools/town_soak --give=N has each
+  test player give up to N a day, for the measure.
+Protocol unchanged (npc's offer carries the amount). larder_test.
+
+Measured with npc's soak (496), 30 days, 3 players, --give=5 against the
+same run without it (apprentices and the leather fix on both sides). The
+players gave 129 gold in the month, all toward the inn while it waited
+on leather: it stood on day 25.0 against 28.2. The fund paid the
+deliveries and what the town owed, so its workers borrowed less: loans
+taken 14 and repaid 25, against 36 and 8 (the ledger's last 200 lines);
+the hunter ended owing 4 against 17, the cook 3 against 24. But the gold
+ends with the makers (the smith 151 against 88, the carpenter 119
+against 75), and the treasury stays at its floor (4 on day 29 on both
+sides): the officials went unpaid 254 times on both. Giving builds the
+town; it doesn't pay its wages. What brings the makers' gold back to the
+treasury is phase 3's luxury goods and their tax, sold to the rich.
+

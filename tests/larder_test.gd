@@ -41,6 +41,7 @@ func _ready() -> void:
 	_test_scoundrel_hooks()
 	_test_delivery()
 	_test_apprentice()
+	_test_contribute()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -556,6 +557,59 @@ func _test_apprentice() -> void:
 	economy._apprentice_turn("c1", TOWN)
 	_check(str(work.worker("c1")["apprentice"]).is_empty() and str(work.worker("h1")["master"]).is_empty(), "under %d: lets Ash go" % int(rule["below"]))
 
+
+## Players' contributions (decision 499): gold given toward the next build,
+## never more than it needs, kept in its fund; pays deliveries of what it
+## lacks, then the builder's fee, the rest the town's; thanked in xp.
+func _test_contribute() -> void:
+	print("
+== given toward the town ==")
+	_now = 0
+	var clock := func() -> int: return _now
+	var stock := Stockpile.new({}, clock, ItemBook.new(clock))
+	var work := Production.new({}, stock, null, clock, _rules)
+	var economy := Economy.new({}, stock, work, clock, _rules)
+	var towns := Towns.new({}, work, _rules, clock)
+	work.deliver = economy.deliver
+	economy.shortfall = towns.shortfall
+	work.settle_fund = economy.settle_fund
+	var thanked: Array = []
+	economy.contributed.connect(func(town: String, player_id: String, kind: String, gold: int, xp: int) -> void: thanked.append([kind, gold, xp]))
+	var floor_gold := int(_rules["gold_floor"])
+	stock.deposit(TOWN, "gold", floor_gold)
+	economy.add_gold("p1", 100)
+	_check(economy.contribution_wanted(TOWN).is_empty() and economy.contribute(TOWN, "p1", 10) == 0 and economy.gold("p1") == 100,
+		"nothing planned: nothing taken")
+	stock.deposit(TOWN, "wood", 4)
+	var job := work.order_build(TOWN, "inn", "carpenter", {"wood": 10}, 1200)
+	var wanted := economy.contribution_wanted(TOWN)
+	var expect := work.town_work_fee(1200) + ceili(economy.raw_price(TOWN, "wood") * float(_rules["store"]["buy"]) * 6)
+	_check(wanted.get("kind") == "inn" and int(wanted["gold"]) == expect, "the inn lacks 6 wood and its fee: %s gold wanted" % [wanted.get("gold")])
+	var given := economy.contribute(TOWN, "p1", 1000)
+	_check(given == expect and economy.gold("p1") == 100 - expect and economy.fund(TOWN, "inn") == expect and stock.count(TOWN, "gold") == floor_gold,
+		"gives %d, no more than wanted, into the inn's fund, not the treasury" % given)
+	_check(thanked.size() == 1 and thanked[0][2] == maxi(expect / int(_rules["contribute"]["gold_per_xp"]), 1), "thanked in town experience (%s)" % [thanked])
+	_check(economy.contribute(TOWN, "p1", 10) == 0, "nothing more wanted: nothing more taken")
+	work.add_worker("w1", "Bran", ["woodcutter"], TOWN, "test", "steady")
+	var price := roundi(economy.raw_price(TOWN, "wood") * float(_rules["store"]["buy"]) * 3)
+	var had := economy.fund(TOWN, "inn")
+	work.deliver_to(TOWN, "w1", "wood", 3, "w", "test")
+	_check(int(work.worker("w1")["purse"]) == price and int(work.worker("w1")["owed"]) == 0 and economy.fund(TOWN, "inn") == had - price
+		and stock.count(TOWN, "gold") == floor_gold, "the treasury at its floor: 3 wood paid from the fund (%d)" % price)
+	work.add_worker("c1", "Pell", ["carpenter"], TOWN, "test", "steady")
+	had = economy.fund(TOWN, "inn")
+	var fee := work.town_work_fee(1200)
+	_check(economy.settle_fund(TOWN, "inn", "c1", fee) == fee and int(work.worker("c1")["purse"]) == fee and economy.fund(TOWN, "inn") == 0
+		and stock.count(TOWN, "gold") == floor_gold + had - fee, "built: the carpenter's fee from it, the rest the town's")
+	work.cancel(job)
+	stock.take(TOWN, "wood", stock.count(TOWN, "wood"))
+	work.order_build(TOWN, "woodshed", "carpenter", {"wood": 5}, 600)
+	var shed := economy.contribute(TOWN, "p1", 5)
+	work.cancel(work.jobs().filter(func(id: int) -> bool: return work.job(id)["recipe"] == "woodshed")[0])
+	var treasury := stock.count(TOWN, "gold")
+	economy._drop_funds()
+	_check(shed == 5 and economy.fund(TOWN, "woodshed") == 0 and stock.count(TOWN, "gold") == treasury + 5 and economy.gold("p1") == 100 - expect - 5,
+		"the plan dropped: what was given is the town's, the player's gold not returned")
 
 func _check(ok: bool, what: String) -> void:
 	print("%s  %s" % ["PASS" if ok else "FAIL", what])

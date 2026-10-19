@@ -10,6 +10,8 @@ notes (decision 324).
 - The medicine man gathers his herbs whether or not anyone is near his hut (502 amended): one a day, on his way when you are there, else at the hut in the afternoon.
 - Streams can be crossed at fords, wading slowly, or over bridges. The sample level has one; the bridge and the shallows are drawn once terrain's art lands (505).
 - Boars no longer walk and run backwards (Jeff: "boars walk/run backwards"): the boar's body had been fitted to its skeleton back to front, its snout on the skeleton's tail end, so it moved rump first. It is refitted facing forward, and the farm pig, made from the boar, is rebuilt from it.
+- Players can give gold toward the town's next building or its walls (499): never more than it still needs, it pays the woodcutter and others for what the build lacks, then the carpenter, and the town thanks you in experience so it builds sooner. Gold given is spent for good.
+
 - Trade routes: the world map shows the way from the town to the castle market as a dashed line, with any caravan on it; the caravans themselves come with the town's trade (504).
 - The store pays 8 gold for a piece of leather, not 4: at 4 the tanner lost money on every piece he made from his two hides, ran out of credit and kept the inn from being built.
 - Makers take apprentices (498 amended): a smith, tanner or other maker who has stayed well off for three days takes a hauler on, works a quarter faster with them, and pays them two gold a day; when the maker's purse runs low, the apprentice is let go.
