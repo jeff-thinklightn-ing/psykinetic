@@ -413,9 +413,10 @@ func set_edge(key: Vector3i, kind: String) -> String:
 	return old
 
 
-## Whether a body could stand in [param at] (any meaning but void and water).
+## Whether a body could stand in [param at] (any meaning but void, water
+## and rock).
 func walkable(at: Vector2i) -> bool:
-	return cell(at) not in ["void", "water"]
+	return cell(at) not in ["void", "water", "rock"]
 
 
 ## The ground a marker cell will get when loaded (Level: the kind most of

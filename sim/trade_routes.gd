@@ -297,6 +297,19 @@ func position(id: String) -> Dictionary:
 	return {"area": here["area"], "cell": here["cell"], "fraction": clampf(walked / maxf(float(way["steps"]), 1.0), 0.0, 1.0)}
 
 
+## The days (game days, a float) until caravan [param id] reaches the end
+## it is bound for: the steps left at steps_per_world_tick a world tick (ui's
+## hover: "two days out"); -1 for none.
+func days_left(id: String) -> float:
+	if not caravans.has(id):
+		return -1.0
+	var way := _caravan_way(id)
+	if way.is_empty():
+		return -1.0
+	var left := maxf(float(way["steps"]) - float(caravans[id]["walked"]), 0.0)
+	return left / float(rules["steps_per_world_tick"]) * World.WORLD_TICK_STEPS / float(DayNight.day_steps)
+
+
 func _caravan_way(id: String) -> Dictionary:
 	if not _ways.has(id):
 		var caravan := caravans[id]
@@ -400,7 +413,7 @@ func shown(areas: Array = []) -> Array[Dictionary]:
 			var at := position(id)
 			if not at.is_empty():
 				var fraction: float = at["fraction"] if caravans[id]["from"] == way["from"] else 1.0 - float(at["fraction"])
-				on_it.append({"area": at["area"], "fraction": snappedf(fraction, 0.01)})
+				on_it.append({"area": at["area"], "fraction": snappedf(fraction, 0.01), "days": snappedf(days_left(id), 0.01)})
 		out.append({"id": way["id"], "from_area": way["areas"][0], "to_area": way["areas"][-1], "areas": way["areas"].duplicate(),
 			"caravans": on_it})
 	return out

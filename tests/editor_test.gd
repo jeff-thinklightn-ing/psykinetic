@@ -505,6 +505,17 @@ func _test_area_tools() -> void:
 	_check("tall_grass" in LevelEditor.PALETTE, "and in the palette to paint by hand")
 	_key(editor, KEY_Z, true)
 
+	# An outcrop (decision 513): raised, a slope up it, one undo step.
+	depth = editor._undo.size()
+	editor.fill_area("outcrop")
+	var slopes: Array = editor.map.cells.keys().filter(func(at: Vector2i) -> bool: return editor.map.cell(at) == "slope")
+	_check(editor.map.heights.values().has(2) and slopes.size() == 2 and editor._undo.size() == depth + 1,
+			"an outcrop: two levels up, a slope of two, one undo step (%s)" % [slopes])
+	_check(editor.doc.parsed()["terrain"]["slopes"].size() == 2, "the game reads its slope")
+	_check("slope" in LevelEditor.PALETTE and "rock" in LevelEditor.PALETTE, "slope and rock in the palette")
+	_key(editor, KEY_Z, true)
+	_check(not editor.map.heights.values().has(2), "Ctrl+Z: flat again")
+
 	editor.fence_gate = "south"
 	editor.fill_area("fence")
 	_check(editor.map.edge(Vector3i(1, 5, Terrain.EAST)) == "wall" and editor.map.edge(Vector3i(13, 5, Terrain.EAST)) == "wall"

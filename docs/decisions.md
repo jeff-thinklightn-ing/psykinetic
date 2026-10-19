@@ -14103,6 +14103,12 @@ what went per caravan id, not saved: after a restart the words say what
 the payload says. No new offer kind, no change to economy, maps or the
 bard; nothing on a client. townsfolk_test _test_road_news with a stub
 route. Protocol unchanged; no new class_name.
+Amended (ui, for the world map's hover: "two days out"): each caravan in
+the "world" message's "trade" carries "days", the game days still to go
+to the end it is bound for (TradeRoutes.days_left: the steps left at
+steps_per_world_tick a world tick, rounded to 0.01). A new field in an
+existing message: it rides PROTOCOL_REVISION 21 with 513.
+
 ## 498 amended: a maker's apprentice
 
 Jeff (2026-10-18): "makers have more expense - raw material and
@@ -14697,3 +14703,73 @@ where it is offered, client only:
 
 Haggling words wait for Jeff's answer (economy and npc). Protocol
 unchanged; no new class_name.
+## 513. Rocks and cliffs
+
+The last of the outdoors backlog: cliffs made of height, a way up them,
+rocks, and sight over an edge (the coordinator's design, agreed with
+terrain and enemy-ai).
+
+- Cliffs are no new data. A height step between orthogonal neighbours
+  already stops a step unless a stair joins a one-level rise
+  (World.height_step), a body pushed off a ledge already falls
+  (FALL_IMPACT_PER_LEVEL a level, kept: the coordinator), and Client3D
+  already draws a rock face on any step with no ramp. A list of cliff
+  edges would only drift from the heights (terrain).
+- "slope" (#c8b878): a stair to the sim, its rise found as a stair's (the
+  one orthogonal neighbour a level up; said as a slope when it has none
+  or several), so World, routes and the views' ramps take it unchanged:
+  it is in terrain "stairs", and in terrain "slopes" too, so terrain
+  draws a ramp of its ground (kinds: the ground round it) rather than
+  steps. A climb of two is two slopes in a row.
+- "rock" (#6e6a64): no floor, and walled round as void is (Level's walks),
+  so it stops a step, sight and routes as a wall does; listed in terrain
+  "rocks" with its footing in kinds, so terrain draws art-kit's rock.small
+  or rock.large over the ground rather than a tree (outdoors, void is a
+  tree). Not a boulder (an entity that moves) and not void. Not in the
+  canopy's trunks.
+- Sight over a lip: World._line_of_sight, for sight (not has_clear_line's
+  light and heat), takes ground higher than the viewer's own between the
+  ends to stop the line, where before only ground higher than both ends
+  did. From under a cliff its lip row is seen and nothing behind it; from
+  on top everything below. One compare in the walk as before. The same for
+  every caller (Senses, companions, the archer's clear shot: enemy-ai's
+  ask); shot_line already stops at ground higher than the shooter. Every
+  level with heights sees so now, the castle's included: intended.
+- Outcrops.lay(map, rect, seed, {levels 1-2, slope_side, rocks, keep_clear})
+  (new class_name, sim/outcrops.gd): an uneven blob in the area's ellipse
+  (a ring as wide as the slope is long left round it) raised levels over
+  the ground round it, a slope run out from the furthest raised cell of
+  its middle row or column on one side (the given side, else by the seed,
+  the others tried), the raised cells beside the run taken down so the
+  ramp's sides stand at its foot (terrain's ask: no half face), and rocks
+  on the lip (rocks 0.35 of it) clear of the slope's mouth. Only ground at
+  the base height is raised; markers, stairs, doors and kept cells, and
+  the cells beside them, stay down. Empty if no slope fits. AreaTools'
+  changes plus "heights", one undo step through MapDoc.apply_changes.
+- The editor: "slope" and "rock" in its palette (letters / and R), and
+  "outcrop" among its area fills (keeping clear of level.json's spawn
+  points, places and markets).
+- levels/sample made 8 rows taller (grass, the stream going on down x 12
+  to the map's edge) and an outcrop raised in the new ground (seed 5): two
+  levels, a slope up its east side, three rocks on its lip.
+- The wire: two new legend kinds in the level files: PROTOCOL_REVISION 21.
+
+Left to terrain: the slope's ramp in its ground with cliff rock on steep
+sides, rocks from art-kit's slots.
+
+tests: cliff_test (new): the slope (stairs and slopes, footing, said when
+it has nothing above), the rock (no floor, footing, walled, routes round,
+sight stopped), the cliff stopping a step either way, a push off falling
+two levels hurt as before and walking back up by the slope, sight from
+under (the lip, nothing behind) and from above (all), light past the lip,
+the archer's shot line from the top to below and none from below, a
+monster's way to the lip by the slope, Outcrops.lay (heights, a slope one
+a cell with its sides at its foot, rocks on the lip clear of the mouth,
+clear of a link, the same for the same seed, none in too small an area),
+the sample's outcrop. editor_test: the fill, the palette, undo.
+
+Rejected: a cliffs list (drifts from the heights); a slope rising more
+than one level a cell (a stair's rule, and the views' ramps); rocks as
+boulders or void; the lip rule in Senses (geometry, so every caller's);
+the lip rule for light (lighting in the castle's levels would change for
+no gain); removing fall damage (tested, and used).

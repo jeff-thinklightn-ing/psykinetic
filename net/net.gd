@@ -204,7 +204,11 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## 20: a level carries tall grass (the "tall_grass" legend kind, grass that
 ## hides, slows and is trampled), and the "grass" message tells a zone's
 ## trampled cells (decision 508).
-const PROTOCOL_REVISION := 20
+## 21: a level carries slopes and rocks (the "slope" and "rock" legend
+## kinds: a ramp walked as a stair, a cell walled round) in the "terrain"
+## message's files and the levels served (decision 513); the "world"
+## message's trade caravans carry "days", the days still to go (504 amended).
+const PROTOCOL_REVISION := 21
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]
 ## Every kind of message (message, message_to, broadcast, broadcast_to).

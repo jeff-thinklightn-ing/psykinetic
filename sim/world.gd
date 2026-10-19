@@ -5625,9 +5625,14 @@ func _sight_edge(from: Vector2i, direction: Vector2i, eye: int) -> Variant:
 	return true
 
 
-## The walk itself. Ground higher than both ends stops it too.
+## The walk itself. Ground higher than both ends stops it too, and for
+## sight (not light and heat: has_clear_line) ground higher than the eye
+## does (decision 513): from under a cliff its lip is seen, nothing behind
+## it; from on top, everything below.
 func _line_of_sight(from: Vector2i, to: Vector2i) -> bool:
 	var top := maxi(height_at(from), height_at(to))
+	if not _through_bodies:
+		top = height_at(from)
 	var d: Vector2i = (to - from).abs()
 	var s := Vector2i(1 if from.x < to.x else -1, 1 if from.y < to.y else -1)
 	var err: int = d.x - d.y

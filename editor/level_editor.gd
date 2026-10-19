@@ -87,7 +87,7 @@ const IDLE_CHOICES: Array[String] = ["", "guard", "wander", "patrol", "gather", 
 const PALETTE: Array[String] = [
 	"stone", "grass", "dirt", "water", "fire", "stair", "wall", "door", "clear", "void",
 	"start", "monster_imp", "monster_brute", "monster_sneak", "crate", "boulder", "cart", "chest", "torch", "lantern",
-	"link", "select", "area", "stamp", "path", "height", "stairs", "ford", "tall_grass",
+	"link", "select", "area", "stamp", "path", "height", "stairs", "ford", "tall_grass", "slope", "rock",
 ]
 ## Tools, not things to paint, and the key that picks each.
 const TOOLS := {"select": "V", "area": "A", "stamp": "P", "path": "T", "height": "H", "stairs": "S"}
@@ -96,12 +96,12 @@ const HEIGHT_BRUSHES: Array[int] = [1, 3, 5, 9]
 const CLIFF := Color(0.05, 0.04, 0.03, 0.85)
 const CLIMB := Color(1.0, 0.95, 0.5, 0.95)
 ## What the area panel can fill an area with (AreaTools).
-const FILLS: Array[String] = ["pond", "grove", "scatter", "fence", "tall grass"]
+const FILLS: Array[String] = ["pond", "grove", "scatter", "fence", "tall grass", "outcrop"]
 const PATH_GROUNDS: Array[String] = ["dirt", "stone", "grass"]
 const EDGE_BRUSHES: Array[String] = ["wall", "door", "clear"]
 ## A thing's letter on its cell.
 const LETTERS := {"start": "S", "crate": "C", "boulder": "O", "cart": "K", "chest": "H", "torch": "T",
-	"lantern": "L", "link": "→", "stair": "^", "monster_sneak": "N"}
+	"lantern": "L", "link": "→", "stair": "^", "monster_sneak": "N", "slope": "/", "rock": "R"}
 
 var map_name := ""
 ## Where layout.png lives (res://levels/<map>/; tests use user://).
@@ -567,6 +567,8 @@ func fill_changes(fill: String) -> Dictionary:
 			return AreaTools.fence(map, area, fence_gate)
 		"tall grass":
 			return TallGrass.lay(map, area, tool_seed, {"keep_clear": _kept_cells()})
+		"outcrop":
+			return Outcrops.lay(map, area, tool_seed, {"keep_clear": _kept_cells()})
 	return {}
 
 

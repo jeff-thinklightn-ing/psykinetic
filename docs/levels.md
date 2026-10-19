@@ -51,6 +51,8 @@ In the order of the swatches above:
 | `#2f6fd0` | water | cell | not walkable, but no wall: nothing is built along it, sight passes over, a pushed body stops at its edge unhurt |
 | `#6fa8e0` | ford | cell | shallow water, walked through: a step into it takes twice as long and costs routes twice (decision 505); its footing is the ground round it |
 | `#a8c850` | tall_grass | cell | grass grown tall (decision 508): grass ground that hides whoever stands in it (World.cover_at 0.7; how a look uses it is Senses'), a step into it takes 1.25 times as long, and a body of 40 kg or more walking through tramples flat the cells it leaves, for two days (a trail; where it stands still hides it) (no cover, no slowing); not under a building. The editor paints it, and fills an area with it ("tall grass": meadow patches and a band along the trees, clear of markers, spawn points and places; TallGrass.lay) |
+| `#c8b878` | slope | cell | a ramp of ground outdoors (decision 513): a stair to the sim (a one-level rise to its one orthogonal neighbour a level up; two in a row climb two), drawn as a ramp, not steps; its footing the ground round it |
+| `#6e6a64` | rock | cell | a rock (decision 513): no floor, walled round like void, so it stops a step and sight, but drawn as rock (art-kit's rock slots), not a tree; its footing the ground round it. A height step with no stair or slope is a cliff: a face of rock, no step up or down, a fall for a body pushed off; sight from under it sees its lip and nothing behind it. The editor's "outcrop" area fill raises one (Outcrops.lay) |
 | `#ff6a00` | fire | cell | walkable; burns any creature standing in it |
 | `#3c2a22` | wall | edge | a thin wall |
 | `#c88a3c` | door | edge | a door (wood, 20 hp) |

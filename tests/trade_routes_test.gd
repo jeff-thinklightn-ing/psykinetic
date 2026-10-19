@@ -216,6 +216,10 @@ func _test_shown() -> void:
 		and shown[0]["caravans"].size() == 1 and shown[0]["caravans"][0]["area"] == "tr_town",
 		"a player who knows the town is shown the route and the caravan on it (%s)" % [shown])
 	_check(_trade.shown(["elsewhere"]).is_empty(), "one who knows none of its areas is not")
+	var days := float(shown[0]["caravans"][0].get("days", -1.0))
+	var expected := (_trade.eta(ROUTE) - 1) * World.WORLD_TICK_STEPS / float(DayNight.day_steps)
+	_check(days > 0.0 and absf(days - expected) <= 0.01 + float(World.WORLD_TICK_STEPS) / DayNight.day_steps,
+		"with the days it has still to go (%.2f, about %.2f)" % [days, expected])
 	var state := WorldNews.merge({}, {"full": true, "trade": shown})
 	_check(state["trade"] == shown and WorldNews.merge(state, {"full": false, "party": []})["trade"] == shown,
 		"the client keeps it till it is sent again")

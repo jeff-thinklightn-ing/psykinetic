@@ -28,7 +28,11 @@ extends RefCounted
 ## no wall: nothing is built along it, and sight passes over it. Tall
 ## grass (decision 508) is grass ground that hides who stands in it
 ## (World.cover_at), slows a step and is trampled flat (terrain
-## "tall_grass"); a building over it takes it away.
+## "tall_grass"); a building over it takes it away. A slope (decision 513)
+## is a stair outdoors, drawn as a ramp of ground (in terrain "stairs", and
+## "slopes" for the look); a rock is no floor, walled round like void (it
+## stops a step and sight) but drawn as rock, not a tree (terrain "rocks").
+## A height step with neither a stair nor a slope is a cliff.
 ##
 ## load() reads a level into {name, terrain, entities, starts, spawn_points,
 ## links, neighbours, places, buildings, regenerate (decision 465), centre, size (in cells), warnings}; terrain is what World.load_terrain and the
@@ -65,6 +69,8 @@ const LEGEND := {
 	"water": "#2f6fd0",
 	"ford": "#6fa8e0",
 	"tall_grass": "#a8c850",
+	"slope": "#c8b878",
+	"rock": "#6e6a64",
 	"fire": "#ff6a00",
 	"wall": "#3c2a22",
 	"door": "#c88a3c",
@@ -386,6 +392,7 @@ static func parse(layout: Image, height: Image, config: Dictionary) -> Dictionar
 	var water_code: int = code_of.get("water", -2)
 	var ford_code: int = code_of.get("ford", -2)
 	var tall_code: int = code_of.get("tall_grass", -2)
+	var rock_code: int = code_of.get("rock", -2)
 	# The meaning of the pixel at (px, py), by code; the last colour looked
 	# up is kept, as neighbouring pixels are mostly the same colour.
 	var last_colour := -1
@@ -418,6 +425,8 @@ static func parse(layout: Image, height: Image, config: Dictionary) -> Dictionar
 	var water: Array[Vector2i] = []
 	var fords: Array[Vector2i] = []
 	var tall_grass: Array[Vector2i] = []
+	var rocks: Array[Vector2i] = []
+	var slope_cells: Array[Vector2i] = []
 	var kinds: Dictionary[Vector2i, String] = {}
 	var markers: Array[Dictionary] = []
 	var stair_cells: Array[Vector2i] = []
@@ -434,6 +443,11 @@ static func parse(layout: Image, height: Image, config: Dictionary) -> Dictionar
 			var cell := Vector2i(x, y)
 			if code == water_code:
 				water.append(cell)
+				continue
+			if code == rock_code:
+				# A rock (decision 513): no floor, its footing the ground round it.
+				rocks.append(cell)
+				kinds[cell] = _ground_around(cell, cell_codes, cells, names)
 				continue
 			floor_tiles.append(cell)
 			if code == ford_code:
@@ -457,6 +471,9 @@ static func parse(layout: Image, height: Image, config: Dictionary) -> Dictionar
 					fire.append(cell)
 				"stair":
 					stair_cells.append(cell)
+				"slope":
+					stair_cells.append(cell)
+					slope_cells.append(cell)
 				"torch":
 					torches.append(cell)
 				"lantern":
@@ -476,7 +493,7 @@ static func parse(layout: Image, height: Image, config: Dictionary) -> Dictionar
 			var code := cell_codes[y * cells.x + x]
 			if code == water_code:
 				wet[(y + 1) * across + x + 1] = 1
-			elif code != VOID:
+			elif code != VOID and code != rock_code:
 				walks[(y + 1) * across + x + 1] = 1
 	# Edges: from -1, as in Terrain, so the outline along the top and left is there.
 	var edges: Dictionary[Vector3i, int] = {}
@@ -528,6 +545,7 @@ static func parse(layout: Image, height: Image, config: Dictionary) -> Dictionar
 					if level > 0:
 						heights[Vector2i(x, y)] = level
 	var stairs: Dictionary[Vector2i, Vector2i] = {}
+	var slopes: Dictionary[Vector2i, Vector2i] = {}
 	for cell in stair_cells:
 		var up: Array[Vector2i] = []
 		for direction: Vector2i in [Vector2i(0, -1), Vector2i(1, 0), Vector2i(0, 1), Vector2i(-1, 0)]:
@@ -535,12 +553,15 @@ static func parse(layout: Image, height: Image, config: Dictionary) -> Dictionar
 			var next_walks := walks[(next.y + 1) * across + next.x + 1] == 1
 			if next_walks and heights.get(next, 0) == heights.get(cell, 0) + 1 and not edges.has(Terrain.edge_key(cell, direction)):
 				up.append(direction)
+		var what := "slope" if cell in slope_cells else "stair"
 		if up.is_empty():
-			warnings.append("the stair at %s has no cell one level up beside it: it is floor" % cell)
+			warnings.append("the %s at %s has no cell one level up beside it: it is floor" % [what, cell])
 			continue
 		if up.size() > 1:
-			warnings.append("the stair at %s could climb %s; it climbs %s" % [cell, up, up[0]])
+			warnings.append("the %s at %s could climb %s; it climbs %s" % [what, cell, up, up[0]])
 		stairs[cell] = up[0]
+		if what == "slope":
+			slopes[cell] = up[0]
 	for key: int in unknown:
 		warnings.append("colour #%06x is not in the legend: void" % key)
 	var zone := zone_of(config)
@@ -549,7 +570,7 @@ static func parse(layout: Image, height: Image, config: Dictionary) -> Dictionar
 	var level := {
 		"terrain": {
 			"floor": floor_tiles, "fire": fire, "edges": edges, "kinds": kinds, "water": water, "fords": fords,
-			"tall_grass": tall_grass,
+			"tall_grass": tall_grass, "slopes": slopes, "rocks": rocks,
 			"heights": heights, "stairs": stairs, "torches": torches, "lanterns": lanterns,
 			"ambient": clampf(float(config.get("ambient", DayNight.base_ambient(zone))), 0.0, 1.0),
 			"north": NORTHS.get(str(config.get("north", "up")), Vector2i(0, -1)),
