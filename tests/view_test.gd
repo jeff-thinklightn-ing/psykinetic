@@ -2438,6 +2438,11 @@ func _test_goblins_differ() -> void:
 			"each its own tempo, within %d%%" % roundi(Client3D.TEMPO_SPREAD * 100.0))
 	_rig._combat_at.erase(imps[0].get_instance_id())
 	var fidgets: Array[String] = []
+	# A fixed draw: its own rng is seeded by the session too, and 40 draws by weight
+	# sometimes put another clip ahead of looking about (art-kit's landing, 2026-10-19).
+	var steady := RandomNumberGenerator.new()
+	steady.seed = 1
+	a.set_meta("fidget_rng", steady)
 	for i in 40:
 		a.set_meta("fidget_at", 0)
 		a.set_meta("busy_until", 0)
