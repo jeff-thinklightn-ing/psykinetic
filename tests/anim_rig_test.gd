@@ -17,6 +17,7 @@ func _ready() -> void:
 	await _test_loop()
 	await _test_held_hands_over()
 	await _test_strike()
+	await _test_one_strike_clip()
 	await _test_upper()
 	await _test_upper_timed()
 	await _test_no_upper()
@@ -135,6 +136,40 @@ func _test_strike() -> void:
 	await _frames(2)
 	_check(is_equal_approx(rig.speed(), 1.0), "no contact named: halfway through the clip (x%.2f)" % rig.speed())
 	rig.get_parent().queue_free()
+
+
+## A body whose strikes for its weapon hold one clip (the kobold's dagger, a
+## player's spear or pick): every swing that clip, no error. Client3D._pick_clip
+## once left out the last clip and took a modulo of the none left (terrain,
+## on the sample level: "Modulo by zero" from the second swing on).
+func _test_one_strike_clip() -> void:
+	print("== one strike clip ==")
+	var rig := _goblin()
+	rig.loop("Idle")
+	var puppet := rig.get_parent() as Node3D
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 1
+	puppet.set_meta("rig", rig)
+	puppet.set_meta("rng", rng)
+	puppet.set_meta("moves", Client3D.HUMANOID_MOVES)
+	var client := Client3D.new()  # Never in the tree: _strike reads only the puppet.
+	var played: Array[String] = []
+	for i in 3:
+		rig.cancel_strike()
+		client._strike(puppet, null, "dagger")
+		await _frames(2)
+		played.append(rig.playing())
+	_check(played == ["Dagger_Stab", "Dagger_Stab", "Dagger_Stab"], "a dagger's one stab, swing after swing (%s)" % [played])
+	var bare: Array[String] = []
+	for i in 4:
+		rig.cancel_strike()
+		client._strike(puppet, null, "")
+		await _frames(2)
+		bare.append(rig.playing())
+	_check(range(1, bare.size()).all(func(i: int) -> bool: return bare[i] != bare[i - 1]),
+		"two clips: never the same twice running (%s)" % [bare])
+	client.free()
+	puppet.queue_free()
 
 
 func _test_upper() -> void:
