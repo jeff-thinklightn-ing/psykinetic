@@ -7,6 +7,15 @@ notes (decision 324).
 
 ## Unreleased
 
+## v0.1.154
+
+- Server and client both; the protocol is unchanged, so v0.1.153 still joins. Fixed:
+  cloud shadows drift smoothly instead of flickering. New in it: townsfolk paid for
+  what they bring in, a woodcutter so towns can build again, and a stronger thief;
+  the bard, the scholar's chronicle and the scoundrel's short measures; no two
+  goblins alike, and new looks for orcs and kobolds; horses, donkeys, dogs, cows
+  and pigs; people who fidget; stone chimneys and shuttered windows; and the
+  lawspeaker switched on for the box's towns, once its service is reloaded.
 - Tools: a heavy job too big to start even with nothing else running no longer holds up every job behind it at the resource gate; jobs that fit go past it, and one bigger than the machine's RAM is refused at once (394 amended).
 
 - The thief's hand is stronger (461 amended, Jeff's "5 gold"): five gold from the richest purse above the line every day, not three on half the days.
@@ -24,6 +33,7 @@ notes (decision 324).
 - Orcs have a new look, Jeff's pick: hulking, hunched and grey-blue, with an iron shoulder plate and a chain across the chest.
 - Snagfin, the wilds' goblin merchant, now looks like a goblin (bare-headed in town), not a person.
 - Some goblins go bare-headed with their hoods down, and their ears differ, big or small. Pointing at a goblin for the first time no longer stutters (decision 494).
+- In the forest the see-through around you now covers most of the screen and follows the zoom (settings.cfg see_through= sets how wide), and under the trees the ground is needles, with less grass and less snow (decision 467 amended).
 - Cloud shadows drift smoothly instead of flickering: the shadow's edge no longer jumps across the screen every few seconds in a wind (decision 309 amended).
 - The scoundrel (decision 492, on 393, with economy's and items' sides): a thing he makes that is measured by count or weight (a sack, a bolt, a bundle; never gear) may come out short, sold at the full price and telling on him only in the hand; he never pays back what he borrows on his own and rides his debt to the bank's cap, where the town's official learns it as a thing seen, his card knows what he owes, and with rulings on it is a dispute before the lawspeaker; with the lawspeaker off the talk passes and nothing is set down.
 - No two goblins look alike: each has its own build, a shade of the Blood Rot's green, its gear in its own colours, and some carry a scar, cheek stripes or a red hand (decision 494).
@@ -73,8 +83,6 @@ notes (decision 324).
 - A pick: a two-handed miner's tool the smith makes from ore and wood. Its swing is slow and heavy and drives back whoever it hits. Sword, dagger, spear, hammer and great axe are drawn wider, so their guards and heads show (decision 479).
 - A thing can be of dwarven or dark elven make, set by where it came from: a level, a chest, a monster or what it drops. Its note says "dwarven dagger" and its story "dwarven work" (decision 474).
 - A forest east of the wilds: a path through it between sunlit clearings, the way to the elven stronghold (closed for now).
-- The forest's trees: 700 tall pines grown by a simulation of a hundred years, close enough that their crowns make a roof, each one its own. Walking under them, the tree tops between you and the camera turn see-through around you over most of the screen, as near walls do, and follow you as you move; settings.cfg see_through= sets how wide (decision 467). Under the trees the ground is needles, with less grass and less snow.
-- A forest east of the wilds: a path through it between sunlit clearings, the way to the elven stronghold (closed for now). Its trees are still to come.
 - The forest's trees: 700 tall pines grown by a simulation of a hundred years, close enough that their crowns make a roof, each one its own. Walking under them, the tree tops between you and the camera turn see-through around you, as near walls do, and follow you as you move (decision 467).
 - An archer at rest now holds its arrows down at the hip instead of up at the chest.
 - The server no longer stalls for a moment at each dawn while it works out where the wild animals can live: it now does that a little at a time.
