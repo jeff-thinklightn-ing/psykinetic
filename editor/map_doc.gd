@@ -254,6 +254,9 @@ func set_config(key: String, value: Variant) -> void:
 		config.erase(key)
 	else:
 		config[key] = value.duplicate(true) if value is Dictionary or value is Array else value
+	if key == "legend":
+		# The map draws its cells in the legend's colours: a meaning new to it is saved, not voided.
+		map.colours = LevelMap.legend_colours(config)
 	config_dirty = true
 	dirty = true
 

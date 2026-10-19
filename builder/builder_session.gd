@@ -18,23 +18,40 @@ extends RefCounted
 ## prompt and the earlier turns are read from the cache.
 
 const MAX_TURNS := 16
-## A grid line per row of the area, a character per cell: CHARS.
+## A grid line per row of the area, a character per cell: CHARS, and one
+## for each other monster kind (chars, decision 507).
 const CHARS := {
 	"void": "#", "stone": "_", "grass": ".", "dirt": ",", "water": "~", "fire": "*", "stair": "^",
 	"start": "S", "monster_imp": "i", "monster_brute": "b", "monster_sneak": "s", "crate": "k",
 	"boulder": "o", "cart": "a", "chest": "h", "torch": "t", "lantern": "l", "link": ">",
 }
-## What place() can put down, by the names Claude uses.
+## The characters a monster kind not in CHARS takes, its own initial first
+## (lower case, then upper), else the first of these free.
+const SPARE_CHARS := "rdwgfjmnpquvxyzcekRDWGFJMNPQUVXYZCEKABHILOT"
+## What place() can put down besides monsters, by the names Claude uses
+## (monsters by their kind: things).
 const THINGS := {
-	"imp": "monster_imp", "brute": "monster_brute", "sneak": "monster_sneak", "crate": "crate",
-	"boulder": "boulder", "cart": "cart", "chest": "chest", "torch": "torch", "lantern": "lantern",
+	"crate": "crate", "boulder": "boulder", "cart": "cart", "chest": "chest", "torch": "torch", "lantern": "lantern",
+}
+## The goblins and their allies in lore's words (docs/lore/primer.md); any
+## other kind is said by its row in levels/monsters.json (label, role).
+const KIND_WORDS := {
+	"imp": "a Blood Rot goblin, small, darts in and out",
+	"brute": "an orc, ally of the Blood Rot, big and heavy",
+	"sneak": "a kobold, ally of the Blood Rot, quick, comes at its prey from the side",
+}
+## What a wild animal's role (levels/monsters.json) does, said to Claude.
+const ROLE_WORDS := {
+	"prey": "bolts from anyone it notices, never fights",
+	"game": "bolts, but charges when struck or cornered",
+	"predator": "hunts %s; players only at night or with its pack about",
 }
 const GROUNDS: Array[String] = ["stone", "grass", "dirt", "water", "fire", "void", "stair"]
 const SIDES := {"north": Vector2i(0, -1), "east": Vector2i(1, 0), "south": Vector2i(0, 1), "west": Vector2i(-1, 0)}
 ## Context shown round the area, in cells.
 const MARGIN := 3
 ## level.json keys a proposal may change as a whole (beyond entries and links).
-const CONFIG_KEYS: Array[String] = ["neighbours", "places", "buildings", "town_walls", "roofs"]
+const CONFIG_KEYS: Array[String] = ["neighbours", "places", "buildings", "town_walls", "roofs", "legend"]
 
 ## Asks Claude: send(body: Dictionary) -> Dictionary (a Messages API
 ## response, or {"error": "..."}), awaited (ClaudeClient, StubClaude).
@@ -156,7 +173,7 @@ func _body() -> Dictionary:
 		"max_tokens": 16000,
 		"output_config": {"effort": effort},
 		"system": [{"type": "text", "text": system_prompt(prefab_dir), "cache_control": {"type": "ephemeral"}}],
-		"tools": TOOLS,
+		"tools": tools(doc.config),
 		"messages": messages,
 		"cache_control": {"type": "ephemeral"},
 	}
@@ -189,12 +206,104 @@ static func _text_of(content: Array) -> String:
 
 # --- What Claude is told -----------------------------------------------------------------
 
+## The monster kinds place() offers (decision 507): levels/monsters.json's
+## (Monster.kinds), then [param config]'s own ("monsters"), so a new kind
+## needs nothing here.
+static func monster_kinds(config := {}) -> Array[String]:
+	var out: Array[String] = []
+	for kind: String in Monster.kinds():
+		out.append(kind)
+	if config.get("monsters") is Dictionary:
+		for kind: String in config["monsters"]:
+			if kind not in out:
+				out.append(kind)
+	return out
+
+
+## CHARS with a character for every monster kind (monster_kinds): its
+## initial if free (lower case, then upper), else the first free of SPARE_CHARS.
+static func chars(config := {}) -> Dictionary:
+	var out := CHARS.duplicate()
+	var used := {}
+	for meaning: String in out:
+		used[out[meaning]] = true
+	for kind in monster_kinds(config):
+		var meaning := "monster_" + kind
+		if out.has(meaning):
+			continue
+		var initial := kind.left(1)
+		for pick: String in [initial.to_lower(), initial.to_upper()] + Array(SPARE_CHARS.split("")):
+			if not used.has(pick):
+				out[meaning] = pick
+				used[pick] = true
+				break
+	return out
+
+
+## What place() can put down: each monster kind by its name, then THINGS.
+static func things(config := {}) -> Dictionary:
+	var out := {}
+	for kind in monster_kinds(config):
+		out[kind] = "monster_" + kind
+	out.merge(THINGS)
+	return out
+
+
+## [param kind] in a few words for the prompt: lore's (KIND_WORDS) or its
+## row's label and role, and how it idles when its entry does not say.
+static func kind_line(kind: String) -> String:
+	var row: Dictionary = Monster.kinds().get(kind, {})
+	var words := str(KIND_WORDS.get(kind, ""))
+	if words.is_empty() and row.is_empty():
+		words = "this level's own kind"
+	elif words.is_empty():
+		var label := str(row.get("label", "")).to_lower()
+		words = label if not label.is_empty() else kind
+		if Animal.is_wild(kind):
+			var role := str(row.get("role", ""))
+			var does := str(ROLE_WORDS.get(role, ""))
+			if role == "predator":
+				does = does % (", ".join(row.get("diet", [])) if not (row.get("diet", []) as Array).is_empty() else "what it can")
+			words += ", a wild animal" + (": " + does if not does.is_empty() else "")
+	var idle := "none"
+	if not row.is_empty():
+		idle = str(Monster.IDLE_MODES.find_key(row["idle"]))
+	return "- %s: %s (idles: %s)" % [kind, words, idle]
+
+
+## TOOLS with place()'s things as [param config]'s level offers them.
+static func tools(config := {}) -> Array:
+	var out := TOOLS.duplicate(true)
+	for tool: Dictionary in out:
+		if tool["name"] == "place":
+			tool["input_schema"]["properties"]["thing"]["enum"] = things(config).keys()
+	return out
+
+
+## A colour for [param meaning] in level.json's legend, none of [param taken]'s
+## (a kind with none in Level.LEGEND; its hue from its name, the same each time).
+static func kind_colour(meaning: String, taken: Array) -> Color:
+	var used := {}
+	for colour: Color in taken:
+		used[colour.to_html(false)] = true
+	var hue := float(absi(hash(meaning)) % 360) / 360.0
+	var colour := Color.from_hsv(hue, 0.5, 0.7)
+	while used.has(colour.to_html(false)):
+		hue = fmod(hue + 0.013, 1.0)
+		colour = Color.from_hsv(hue, 0.5, 0.7)
+	return colour
+
+
 ## The system prompt: what the map is, how it is drawn, what the tools do,
 ## the prefabs; the same for every request (cached).
 static func system_prompt(prefabs_from := Prefab.DIR) -> String:
 	var legend := PackedStringArray()
-	for meaning: String in CHARS:
-		legend.append("%s %s" % [CHARS[meaning], meaning.trim_prefix("monster_")])
+	var chars_now := chars()
+	for meaning: String in chars_now:
+		legend.append("%s %s" % [chars_now[meaning], meaning.trim_prefix("monster_")])
+	var monsters := PackedStringArray()
+	for kind in monster_kinds():
+		monsters.append(kind_line(kind))
 	var prefabs := PackedStringArray()
 	for prefab_name in Prefab.names(prefabs_from) + Prefab.kind_names():
 		var prefab := Prefab.load_prefab(prefab_name, prefabs_from)
@@ -216,13 +325,14 @@ static func system_prompt(prefabs_from := Prefab.DIR) -> String:
 
 Make places with something to do, not only scenery: a chest worth opening (and something guarding it), a camp to clear, a captive to free, a larder, a puzzle of crates and boulders. Monsters are few and matter: a camp is two to five, gathered round its fire. Leave ways in: what you make must be reachable on foot from the rest of the area.
 
-The map. Cells are x to the east, y to the south, (0, 0) the top-left of the level. A cell is ground (stone, grass, dirt), water (not walkable; nothing is built along it), fire (walkable, burns), a stair, void, or a thing standing on ground. Outdoors, void is forest: a void cell next to land is drawn as a tree, so scattered void cells are scattered trees and a block of void is a wood. Walls and doors stand on the edges between two cells; an edge between land and void is a wall of its own (outdoors, the forest's edge). Things: start (where players join), imp (small goblin), brute (big goblin), sneak (quick goblin), crate (pushable), boulder (heavy, pushable), cart, chest (4 slots of items), torch (light and a little heat), lantern (light), link (to another level; not yours to place).
+The map. Cells are x to the east, y to the south, (0, 0) the top-left of the level. A cell is ground (stone, grass, dirt), water (not walkable; nothing is built along it), fire (walkable, burns), a stair, void, or a thing standing on ground. Outdoors, void is forest: a void cell next to land is drawn as a tree, so scattered void cells are scattered trees and a block of void is a wood. Walls and doors stand on the edges between two cells; an edge between land and void is a wall of its own (outdoors, the forest's edge). Things: start (where players join), crate (pushable), boulder (heavy, pushable), cart, chest (4 slots of items), torch (light and a little heat), lantern (light), link (to another level; not yours to place), and monsters by their kind:
+%s
 
 The grid shows the area and a margin round it, one character a cell (the margin is shown for context; only the area may change):
 %s
 Each row starts with its y; the first line says the x of the first column. Walls and doors are listed after the grid by the cell and its side.
 
-Monsters idle until someone comes: guard (stands, glances about), wander (strolls near its cell, a radius), patrol (walks a route of cells, round or back and forth), gather (stands or sits round a point, such as a fire: every monster gathering at one cell is one group), none. Without one, imps wander, brutes guard and sneaks patrol. Chests hold item ids; the items there are: %s.
+Monsters idle until someone comes: guard (stands, glances about), wander (strolls near its cell, a radius), patrol (walks a route of cells, round or back and forth), gather (stands or sits round a point, such as a fire: every monster gathering at one cell is one group), none. Without one, a monster idles as its kind does (said above). Wild animals are of no faction: goblins leave them be, and they keep to their herd (grazing as they stroll), so put two to six of a herd together on open ground, never in a camp. Chests hold item ids; the items there are: %s.
 
 Levels join at their edges: walking off one edge arrives on the neighbour's opposite edge, at the same row (east, west) or column (north, south). When the area touches the map's edge with nothing beyond it, new_area makes a new level there (its own map; a first draft of grass, groves and forest round it, open where the way arrives) and carves a way out to the edge through the area. Use it when asked for somewhere new beyond the edge ("a new area east", "the woods past here"), not for changes inside the area.
 
@@ -233,7 +343,7 @@ Ground has a height, 0 to 6 (the grid's Heights block, shown when any cell has o
 A town keeps what players bring home in its store: a place of kind stockpile that the town holds. Stamp town_store for one (an open yard with its depot, its shop counter and the store's place, all in one), once per town, near the middle of town on open ground reachable from the gate, its counter facing where players will stand. A depot is a chest placed with use depot: what is put in it is banked. A shop counter is a chest placed with use shop: players buy what the town's workers made and sell what it is short of. Either works only inside the town's store, and is never given items. When a change leaves the store wrong, the tool's answer says so: put it right.
 
 Prefabs to stamp (their top-left at a cell, turned 0-3 quarter turns clockwise; their # is void and leaves the map as it was):
-%s""" % [", ".join(legend), ", ".join(Items.ids()), ", ".join(building_uses()), "\n\n".join(prefabs) if not prefabs.is_empty() else "(none)"]
+%s""" % ["\n".join(monsters), ", ".join(legend), ", ".join(Items.ids()), ", ".join(building_uses()), "\n\n".join(prefabs) if not prefabs.is_empty() else "(none)"]
 
 
 ## What the first request starts with: the level, the area, what is in it.
@@ -260,6 +370,13 @@ func _situation() -> String:
 			places.append("%s (%s at %s, radius %d, held by %s)" % [key, place["kind"], place["cell"], place["radius"], place["holder"]])
 	if not places.is_empty():
 		text += "\n\nPlaces here: " + ", ".join(places) + "."
+	var chars_here := chars(doc.config)
+	var own := PackedStringArray()
+	for kind in monster_kinds(doc.config):
+		if not Monster.kinds().has(kind):
+			own.append("%s (%s on the grid)" % [kind, chars_here["monster_" + kind]])
+	if not own.is_empty():
+		text += "\n\nThis level has monster kinds of its own: " + ", ".join(own) + "."
 	return text
 
 
@@ -285,10 +402,11 @@ static func grid(map: LevelMap, config: Dictionary, shown: Rect2i, inside: Rect2
 	var lines := PackedStringArray()
 	lines.append("x from %d%s" % [shown.position.x, "" if shown == inside else " (area: x %d-%d, y %d-%d)" % [
 		inside.position.x, inside.end.x - 1, inside.position.y, inside.end.y - 1]])
+	var chars_here := chars(config)
 	for y in range(shown.position.y, shown.end.y):
 		var row := ""
 		for x in range(shown.position.x, shown.end.x):
-			row += str(CHARS.get(map.cell(Vector2i(x, y)), "?"))
+			row += str(chars_here.get(map.cell(Vector2i(x, y)), "?"))
 		lines.append("%4d %s" % [y, row])
 	# Heights, when any cell shown has one: a digit a cell, the same rows.
 	var raised := false
@@ -399,7 +517,7 @@ const TOOLS := [
 	{"name": "place", "description": "Puts a thing on a cell (its ground stays), with its settings: a monster's facing and idling, a chest's items, a loot table for a chest or a monster, a name.",
 		"input_schema": {"type": "object", "properties": {
 			"at": _CELL,
-			"thing": {"type": "string", "enum": ["imp", "brute", "sneak", "crate", "boulder", "cart", "chest", "torch", "lantern"]},
+			"thing": {"type": "string", "enum": [], "description": "a monster by its kind, or a thing"},
 			"name": {"type": "string", "description": "optional, e.g. \"Gutrot\""},
 			"facing": {"type": "string", "enum": ["north", "north-east", "east", "south-east", "south", "south-west", "west", "north-west"]},
 			"idle": {"type": "object", "properties": {
@@ -836,13 +954,14 @@ func _roof(given: Dictionary) -> Dictionary:
 func _place(given: Dictionary) -> Dictionary:
 	var at: Variant = Level._tile(given.get("at"))
 	var thing := str(given.get("thing", ""))
-	if at == null or not THINGS.has(thing):
-		return _no("place needs at: [x, y] and a thing (%s)" % ", ".join(THINGS.keys()))
+	var offered := things(working.config)
+	if at == null or not offered.has(thing):
+		return _no("place needs at: [x, y] and a thing (%s)" % ", ".join(offered.keys()))
 	if not area.has_point(at):
 		return _no("%s is outside the area" % [at])
 	if working.map.cell(at) in ["void", "water"]:
 		return _no("%s is %s: paint ground there first" % [at, working.map.cell(at)])
-	var meaning: String = THINGS[thing]
+	var meaning: String = offered[thing]
 	var entry := {"at": [at.x, at.y]}
 	if given.has("name"):
 		entry["name"] = str(given["name"])
@@ -891,6 +1010,11 @@ func _place(given: Dictionary) -> Dictionary:
 	var changes := {"cells": {at: meaning}, "covers": [at]}
 	if entry.size() > 1:
 		changes["entries"] = [entry]
+	if not working.map.colours.has(meaning):
+		# A kind past Level.LEGEND: level.json's legend gives it a colour, so layout.png holds it.
+		var legend: Dictionary = (working.config["legend"] as Dictionary).duplicate() if working.config.get("legend") is Dictionary else {}
+		legend[meaning] = "#" + kind_colour(meaning, working.map.colours.values()).to_html(false)
+		changes["config"] = {"legend": legend}
 	return _lay(changes, "placed %s at %s" % [thing, at])
 
 

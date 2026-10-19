@@ -2226,7 +2226,9 @@ func show_builder(area: Rect2i, cells: Array = [], edges: Array = [], beyond := 
 	for each: Variant in cells:
 		var at := Vector2i(int(each[0]), int(each[1]))
 		var meaning := str(each[2])
-		var colour := BUILDER_VOID if meaning == "void" else Color(str(Level.LEGEND.get(meaning, "#ff00ff")))
+		# A monster kind past the default legend (507) is ghosted as a monster.
+		var fallback := str(Level.LEGEND["monster_imp"]) if meaning.begins_with("monster_") else "#ff00ff"
+		var colour := BUILDER_VOID if meaning == "void" else Color(str(Level.LEGEND.get(meaning, fallback)))
 		var half := 0.5 if meaning in Level.GROUNDS or meaning in ["void", "water", "fire", "stair"] else 0.3
 		if half == 0.5:
 			drawn[at] = true

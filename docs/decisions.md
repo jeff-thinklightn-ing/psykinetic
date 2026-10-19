@@ -14318,3 +14318,31 @@ ms/frame. After: the off-peak run's numbers follow in an amendment to this entry
   every frame.
 
 Behaviour unchanged (ui_test, items_test); client only; protocol unchanged.
+## 507. Builder mode places every monster kind, from data
+
+Builder mode's place tool offered only imp, brute and sneak, a list in its
+own code, so wildlife and any kind added since could not be placed by
+asking. Now the kinds come from data (BuilderSession.monster_kinds):
+levels/monsters.json's (Monster.kinds), then the level's own
+("monsters" in level.json). A new kind needs nothing in builder.
+
+- place's enum (BuilderSession.tools) and the grid's characters
+  (BuilderSession.chars) are built from them. The goblins keep i, b and s;
+  any other kind takes its initial (lower case, then upper), else the
+  first free of SPARE_CHARS.
+- The prompt says each kind in a few words and how it idles when its
+  entry doesn't say (its row's idle). The goblins are in lore's words
+  (primer: the imp a Blood Rot goblin, the brute an orc, the sneak a
+  kobold). Other kinds use their row's label, and for a wild animal its
+  role (prey bolts, game charges when struck, a predator hunts its
+  diet). A wild animal is placed in a herd on open ground, never in a
+  camp.
+- A kind with no colour in Level.LEGEND gets one in the level's
+  level.json "legend" when it is first placed (BuilderSession.kind_colour:
+  a hue from its name, none already used), so layout.png holds it.
+  "legend" joins CONFIG_KEYS. MapDoc.set_config("legend") redraws the
+  map's colours, so an accepted kind is saved as itself, not as void,
+  and undo takes the colour back with it.
+- The ghost draws a kind with no default colour as a monster.
+
+Protocol unchanged. builder_test _test_monster_kinds.

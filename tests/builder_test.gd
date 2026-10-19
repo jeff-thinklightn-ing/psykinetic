@@ -23,6 +23,7 @@ func _ready() -> void:
 	await _test_store_checks()
 	await _test_heights()
 	await _test_roof()
+	await _test_monster_kinds()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -387,6 +388,48 @@ func _test_new_area() -> void:
 	await session.ask("one more")
 	_check(session.proposal().get("new_area", {}).get("name") == "test_field_prefabs",
 			"a name of a folder under levels/ that is not a level (prefabs, lore) is not used: %s" % [session.proposal().get("new_area", {}).get("name")])
+
+
+func _test_monster_kinds() -> void:
+	print("\n== monster kinds from data (507): offered, said, drawn, placed with a legend colour ==")
+	var kinds := BuilderSession.monster_kinds()
+	_check(kinds.has("imp") and kinds.has("brute") and kinds.has("wolf") and kinds.has("rabbit"), "monsters.json's kinds are offered (%s)" % [kinds])
+	var own := BuilderSession.monster_kinds({"monsters": {"wraith": {"hp": 3}}})
+	_check(own.back() == "wraith" and BuilderSession.things({"monsters": {"wraith": {"hp": 3}}}).get("wraith") == "monster_wraith", "and a level's own kind")
+	var chars := BuilderSession.chars({"monsters": {"wraith": {"hp": 3}}})
+	var unique := {}
+	for meaning: String in chars:
+		unique[chars[meaning]] = true
+	_check(unique.size() == chars.size() and chars["monster_imp"] == "i" and chars["monster_rabbit"] == "r" and chars["monster_wolf"] == "W",
+			"a character each, none shared, the goblins' as they were (%s)" % [chars])
+	var place: Dictionary = BuilderSession.tools().filter(func(tool: Dictionary) -> bool: return tool["name"] == "place")[0]
+	var offered: Array = place["input_schema"]["properties"]["thing"]["enum"]
+	_check(offered.has("wolf") and offered.has("sneak") and offered.has("chest"), "place's enum has every kind and the things (%s)" % [offered])
+	var system := BuilderSession.system_prompt()
+	_check("- imp: a Blood Rot goblin" in system and "- brute: an orc" in system and "(idles: guard)" in system
+			and "- wolf: wolf, a wild animal: hunts rabbit, deer, stag" in system and "W wolf" in system,
+			"the prompt says each kind in lore's words or its row's, and how it idles")
+	var doc := _doc()
+	var stub := StubClaude.new([
+		[{"name": "place", "input": {"at": [10, 10], "thing": "wolf"}},
+			{"name": "place", "input": {"at": [11, 10], "thing": "wolf"}},
+			{"name": "place", "input": {"at": [12, 10], "thing": "dragon"}}],
+		"Two wolves.",
+	])
+	var session := BuilderSession.new(doc, Rect2i(5, 5, 12, 10), "test_field", stub)
+	await session.ask("a pair of wolves")
+	var results: Array = stub.sent[1]["messages"][2]["content"]
+	_check(not results[0]["is_error"] and not results[1]["is_error"] and results[2]["is_error"] and "wolf" in str(results[2]["content"]),
+			"wolves placed; a kind there is none of refused, naming the kinds")
+	var legend: Dictionary = session.proposal().get("config", {}).get("legend", {})
+	_check(legend.keys() == ["monster_wolf"] and Color(str(legend["monster_wolf"])) not in Array(Level.LEGEND.values()).map(func(hex: String) -> Color: return Color(hex)),
+			"the proposal gives the wolf a colour of its own in level.json's legend (%s)" % [legend])
+	_check(".WW" in BuilderSession.grid(session.working.map, session.working.config, session.area, session.area), "the grid draws them")
+	session.accept()
+	var reread := LevelMap.from_image(doc.map.to_image(), doc.config)
+	_check(reread.cell(Vector2i(10, 10)) == "monster_wolf", "accepted: layout.png holds it, not void")
+	var wolves := (doc.parsed()["entities"] as Array).filter(func(spec: Dictionary) -> bool: return spec.get("kind") == "wolf")
+	_check(wolves.size() == 2 and wolves[0]["script"] == Level.ANIMAL, "the level spawns two wolves, as animals")
 
 
 func _check(ok: bool, label: String) -> void:
