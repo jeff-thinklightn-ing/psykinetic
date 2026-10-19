@@ -2117,6 +2117,8 @@ func _boot() -> void:
 	World.trade.get_routes = func() -> WorldRoutes: return World.raid_groups.routes
 	World.trade.is_food = func(kind: String) -> bool:
 		return World.economy.is_food(kind) if World.economy != null and World.economy.has_method("is_food") else kind in ["food", "meat"]
+	# The road's news (decision 504, npc's side): what the wagons bring home, as card facts and the town's memory.
+	Townsfolk.watch_road(World.production, World.trade, World.economy)
 	if Net.raids:
 		World.raid_groups.set_on(true)
 	# Game's richness (decision 368): the steps from the mines worked out on
@@ -4282,6 +4284,9 @@ func _offers_context() -> Dictionary:
 		"shortfall": func(town: String) -> Dictionary: return World.towns.shortfall(town) if World.towns != null and World.towns.has_method("shortfall") else {},
 		"contribute": func(town: String, player_id: String, amount: int) -> int: return int(World.economy.contribute(town, player_id, amount)) if World.economy != null and World.economy.has_method("contribute") else 0,
 		"gold_of": func(player_id: String) -> int: return int(World.gold_of(player_id)),
+		# The road's news (decision 504, npc's side): a camp's holder, for the raiders' name; a good's value, for how the wagon sold.
+		"holder_of": func(place: String) -> String: return World.holdings.holder(place) if World.holdings != null else "",
+		"value_of": func(kind: String) -> int: return int(World.economy.rules.get("value", {}).get(kind, 0)) if World.economy != null else 0,
 		"healers_hut": func(town: String) -> String: return _healers_hut_of(town),
 		"healer_of": func(town: String) -> String:
 			var hut := _healers_hut_of(town)

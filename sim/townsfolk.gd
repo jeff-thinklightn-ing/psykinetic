@@ -1023,6 +1023,305 @@ static func watch(production: Production, towns: Towns) -> void:
 			if kept != null:
 				_rescued(kept, town, who_id, by))
 
+# --- The road's news (decision 504, npc's side) ------------------------------------
+
+## Caravan id -> {town, far, goods, members, home, sold, struck_by}: what a
+## town's wagon took out, for the words when it comes home. Not saved: after
+## a restart the words say what the payload says and no more.
+static var _wagons: Dictionary = {}
+static var _watching_road: Dictionary = {}
+
+
+## The road's news (decision 504, npc's side): maps' TradeRoutes [param trade]
+## tells what a town's wagon did (left, arrived, struck, lost) and its people,
+## their kin and the town's officials carry it as card facts (learn), spread
+## by gossip and the counter as every fact is; a raid or a lost wagon is a
+## candidate for the town's memory. Economy's [param economy] may tell the
+## sale (caravan_sold) for "sold well" in the traveller's words.
+static func watch_road(production: Production, trade: Object, economy: Object = null) -> void:
+	if production == null or trade == null or not trade.has_signal("caravan_left"):
+		return
+	var held: Variant = _watching_road.get(trade.get_instance_id())
+	if held is WeakRef and held.get_ref() == trade:
+		return
+	var weak: WeakRef = weakref(production)
+	var road: WeakRef = weakref(trade)
+	_watching_road[trade.get_instance_id()] = road
+	trade.caravan_left.connect(func(id: String, route_id: String, cargo: Dictionary) -> void:
+		var kept: Production = weak.get_ref()
+		if kept != null:
+			wagon_left(kept, road.get_ref(), id, route_id, cargo))
+	trade.caravan_arrived.connect(func(id: String, route_id: String, at_end: String, cargo: Dictionary) -> void:
+		var kept: Production = weak.get_ref()
+		if kept != null:
+			wagon_arrived(kept, road.get_ref(), id, route_id, at_end, cargo))
+	trade.caravan_raided.connect(func(id: String, route_id: String, camp_id: String, taken: Dictionary) -> void:
+		var kept: Production = weak.get_ref()
+		if kept != null:
+			wagon_raided(kept, road.get_ref(), id, route_id, camp_id, taken))
+	trade.caravan_lost.connect(func(id: String, route_id: String, why: String) -> void:
+		var kept: Production = weak.get_ref()
+		if kept != null:
+			wagon_lost(kept, road.get_ref(), id, route_id, why))
+	if economy != null and economy.has_signal("caravan_sold"):
+		economy.caravan_sold.connect(func(id: String, _town: String, _market: String, proceeds: int, wages: int) -> void:
+			wagon_sold(id, proceeds, wages))
+
+
+## A wagon set out: its people, their kin and the officials know where to
+## and for how long. Setting out from the far end is the way home (the same
+## people): the record moves to the new id, nobody in town to tell.
+static func wagon_left(production: Production, trade: Object, id: String, route_id: String, cargo: Dictionary) -> void:
+	var members: Array = cargo.get("members", [])
+	if members.is_empty():
+		return
+	for out_id: String in _wagons.keys():
+		var went: Dictionary = _wagons[out_id]
+		if not bool(went.get("home", false)) and members.all(func(who: Variant) -> bool: return str(who) in went["members"]):
+			went["home"] = true
+			went["back"] = cargo.get("goods", {}).duplicate()
+			_wagons.erase(out_id)
+			_wagons[id] = went
+			return
+	var town := str(production.worker(str(members[0])).get("town", ""))
+	if town.is_empty():
+		return
+	var far := _far_end(trade, route_id, town)
+	_wagons[id] = {"town": town, "far": far, "goods": cargo.get("goods", {}).duplicate(), "members": members.duplicate(), "all": members.duplicate(), "home": false}
+	var where := _end_words(far)
+	var days := _trip_words(trade, route_id)
+	var names := _names(production, members)
+	for who: Variant in members:
+		var name := str(production.worker(str(who)).get("name", who))
+		learn(production, str(who), "%s went with the wagon to %s, a trip of %s there and back." % [name, where, days])
+		for kin_id: Variant in card_of(production, str(who)).get("kin", {}):
+			if str(kin_id) in members or production.worker(str(kin_id)).is_empty():
+				continue
+			var theirs := card_of(production, str(kin_id))
+			learn(production, str(kin_id), "%s, %s %s, has gone to %s with the wagon, back in %s." % [name, _their(theirs),
+				Offers._relation(str(card_of(production, str(who)).get("kin", {}).get(kin_id, "")), card_of(production, str(who))), where, days])
+	for official: String in _officials(production, town):
+		if official in members:
+			continue
+		learn(production, official, "%s left with the wagon for %s, due back in %s." % [names, where, days])
+
+
+## A wagon arrived: at the far end nothing is said at home; home again, its
+## people tell what went and what came back (and how it sold, if economy
+## said), the town saw them come, and the town's memory may keep it.
+static func wagon_arrived(production: Production, _trade: Object, id: String, _route_id: String, at_end: String, cargo: Dictionary) -> void:
+	var members: Array = cargo.get("members", [])
+	var went: Dictionary = _wagons.get(id, {})
+	var town := str(went.get("town", ""))
+	if town.is_empty() and not members.is_empty():
+		town = str(production.worker(str(members[0])).get("town", ""))
+	if town.is_empty() or at_end != town:
+		return  # At the far end: the travellers are away, nobody at home hears yet.
+	_wagons.erase(id)
+	var where := _end_words(str(went.get("far", "")))
+	var took := _goods_words(went.get("goods", {}))
+	var back := _goods_words(cargo.get("goods", {}))
+	var load := ""
+	if not took.is_empty() and not back.is_empty():
+		load = "the wagon took %s, and brought back %s." % [took, back]
+	elif not took.is_empty():
+		load = "the wagon took %s, and came back empty." % took
+	elif not back.is_empty():
+		load = "the wagon brought back %s." % back
+	else:
+		load = "the wagon came back as it went."
+	var sold := _sold_words(went)
+	var names := _names(production, members)
+	for who: Variant in members:
+		var name := str(production.worker(str(who)).get("name", who))
+		learn(production, str(who), "%s came home from %s: %s%s" % [name, where, load, sold])
+	for other: String in production.worker_ids(town):
+		if other in members or other.begins_with(COMPANION) or bool(production.worker(other).get("away", false)):
+			continue
+		learn(production, other, "%s saw %s come home from %s with the wagon." % [production.worker(other).get("name", other), names, where])
+	if not members.is_empty():
+		_remember(town, "%s's wagon came home from %s%s" % [production.worker(str(members[0])).get("name", members[0]), where,
+			" with " + back if not back.is_empty() else ""], str(members[0]), false, production.now())
+
+
+## A camp struck a wagon: the taken are captives already (maps, through
+## Towns' 331 path, so the kin's commission stands at the counter); their
+## cards and the survivors' say so, and the town's memory holds it as a
+## candidate for the lawspeaker.
+static func wagon_raided(production: Production, trade: Object, id: String, route_id: String, camp_id: String, taken: Dictionary) -> void:
+	var went: Dictionary = _wagons.get(id, {})
+	var taken_ids: Array = taken.get("members", [])
+	var members: Array = went.get("members", taken_ids)
+	var town := str(went.get("town", ""))
+	if town.is_empty() and not members.is_empty():
+		town = str(production.worker(str(members[0])).get("town", ""))
+	if town.is_empty():
+		return
+	var far := str(went.get("far", _far_end(trade, route_id, town)))
+	var where := _end_words(far)
+	var holder: Variant = Offers._call(Offers.ctx, "holder_of", [camp_id])
+	var raiders := ResidentCard.faction_name(str(holder)) if holder is String and not str(holder).is_empty() else "raiders"
+	if not went.is_empty():
+		went["struck_by"] = raiders
+		for who: Variant in taken_ids:
+			went["members"].erase(who)
+	var left: Array = members.filter(func(who: Variant) -> bool: return not who in taken_ids)
+	for who: Variant in taken_ids:
+		learn(production, str(who), "%s was carried off from the wagon by %s on the road to %s." % [production.worker(str(who)).get("name", who), raiders, where])
+	var taken_names := _names(production, taken_ids)
+	for who: Variant in left:
+		var name := str(production.worker(str(who)).get("name", who))
+		if not taken_ids.is_empty():
+			learn(production, str(who), "%s saw %s carried off from the wagon by %s on the road to %s." % [name, taken_names, raiders, where])
+		if not taken.get("goods", {}).is_empty():
+			learn(production, str(who), "%s took the wagon's food on the road to %s." % [_upper_first(raiders), where])
+	var teller := str(left[0]) if not left.is_empty() else _lawspeaker(town)
+	if teller.is_empty() and not taken_ids.is_empty():
+		teller = str(taken_ids[0])
+	if not teller.is_empty():
+		var text := "%s struck the town's wagon on the road to %s" % [_upper_first(raiders), where]
+		if not taken_ids.is_empty():
+			text += " and carried off %s" % taken_names
+		_remember(town, text, teller, true, production.now())
+
+
+## A wagon lost: nobody left after a raid ("taken"), a candidate for the
+## memory by the lawspeaker; its way closed ("no way"), a word on the
+## officials' cards (economy brings its people straight home).
+static func wagon_lost(production: Production, trade: Object, id: String, route_id: String, why: String) -> void:
+	var went: Dictionary = _wagons.get(id, {})
+	_wagons.erase(id)
+	var town := str(went.get("town", ""))
+	if town.is_empty():
+		return  # Not a wagon this town saw leave (a restart): nothing to tell.
+	var where := _end_words(str(went.get("far", _far_end(trade, route_id, town))))
+	if why == "taken":
+		var teller := _lawspeaker(town)
+		var officials := _officials(production, town)
+		if teller.is_empty() and not officials.is_empty():
+			teller = officials[0]
+		var raiders := str(went.get("struck_by", "raiders"))
+		var gone := _names(production, went.get("all", []))
+		if not teller.is_empty():
+			_remember(town, "The wagon to %s was lost on the road to %s%s" % [where, raiders, ", and %s with it" % gone if not gone.is_empty() else ""], teller, true, production.now())
+	elif why == "no way":
+		for official: String in _officials(production, town):
+			learn(production, official, "The wagon to %s turned back: the road is closed." % where)
+
+
+## Economy's caravan_sold: how the wagon's load sold, for the words home.
+static func wagon_sold(id: String, proceeds: int, wages: int) -> void:
+	if _wagons.has(id):
+		_wagons[id]["sold"] = {"proceeds": proceeds, "wages": wages}
+
+
+## " It sold well." / " It sold poorly." against the goods' value (ctx
+## "value_of", economy's), "" with no sale told or no value known.
+static func _sold_words(went: Dictionary) -> String:
+	var sold: Dictionary = went.get("sold", {})
+	if sold.is_empty():
+		return ""
+	var value := 0
+	var goods: Dictionary = went.get("goods", {})
+	for kind: Variant in goods:
+		var each: Variant = Offers._call(Offers.ctx, "value_of", [str(kind)])
+		if each is int or each is float:
+			value += int(goods[kind]) * int(each)
+	if value <= 0:
+		return ""
+	var proceeds := int(sold.get("proceeds", 0))
+	if proceeds >= value:
+		return " It sold well."
+	if proceeds * 2 < value:
+		return " It sold poorly."
+	return " It sold fairly."
+
+
+## The town's memory takes [param text] from [param teller]: a belief, or a
+## candidate for the lawspeaker when [param candidate] (as a death is, 501).
+static func _remember(town: String, text: String, teller: String, candidate: bool, at: int) -> void:
+	var log: Variant = Offers._call(Offers.ctx, "memory", [town])
+	if not log is Array:
+		return
+	var entry := TownMemory.note(log, text, teller, "", at)
+	if candidate and not entry.is_empty() and str(entry.get("tier", "")) == TownMemory.BELIEF:
+		entry["tier"] = TownMemory.CANDIDATE
+	Offers._call(Offers.ctx, "set_memory", [town, log])
+
+
+## The route's end that is not [param town]: a market or the other town.
+static func _far_end(trade: Object, route_id: String, town: String) -> String:
+	if trade == null or not trade.has_method("route"):
+		return ""
+	var way: Variant = trade.route(route_id)
+	if not way is Dictionary or way.is_empty():
+		return ""
+	return str(way["to"]) if str(way.get("from", "")) == town else str(way.get("from", ""))
+
+
+## "the castle market" for "market:castle"; a town by its name (ctx
+## "town_name"); "the far end" for nothing known.
+static func _end_words(end: String) -> String:
+	if end.is_empty():
+		return "the far end"
+	if end.begins_with("market:"):
+		return "the %s market" % end.trim_prefix("market:").replace("_", " ")
+	var name: Variant = Offers._call(Offers.ctx, "town_name", [end])
+	return str(name) if name is String and not str(name).is_empty() else "the next town"
+
+
+## "about four days": the route's eta (world ticks) there and back, in days.
+static func _trip_words(trade: Object, route_id: String) -> String:
+	var ticks := -1
+	if trade != null and trade.has_method("eta"):
+		ticks = int(trade.eta(route_id))
+	if ticks < 0:
+		return "some days"
+	var days := maxi(ceili(float(ticks) * 2.0 * World.WORLD_TICK_STEPS / maxf(float(DayNight.day_steps), 1.0)), 1)
+	const WORDS := ["", "a day", "two days", "three days", "four days", "five days", "six days", "seven days", "eight days", "nine days", "ten days"]
+	return ("about " if days > 1 else "") + (WORDS[days] if days < WORDS.size() else "%d days" % days)
+
+
+## "10 leather and 4 hide": economy's goods by kind, as its ledger says them.
+static func _goods_words(goods: Dictionary) -> String:
+	var parts: Array[String] = []
+	var kinds: Array = goods.keys()
+	kinds.sort()
+	for kind: Variant in kinds:
+		if int(goods[kind]) > 0:
+			parts.append("%d %s" % [int(goods[kind]), str(kind).replace("_", " ")])
+	if parts.size() <= 1:
+		return "".join(parts)
+	return ", ".join(parts.slice(0, parts.size() - 1)) + " and " + parts[parts.size() - 1]
+
+
+## "Ren", "Ren and Oda", "Ren, Oda and Bram".
+static func _names(production: Production, ids: Array) -> String:
+	var names: Array[String] = []
+	for who: Variant in ids:
+		names.append(str(production.worker(str(who)).get("name", who)))
+	if names.size() <= 1:
+		return "".join(names)
+	return ", ".join(names.slice(0, names.size() - 1)) + " and " + names[names.size() - 1]
+
+
+## The town's officials: its appointed ones (404), at the counter.
+static func _officials(production: Production, town: String) -> Array[String]:
+	var out: Array[String] = []
+	for id: String in production.worker_ids(town):
+		if str(production.worker(id).get("origin", "")) == "appointed" and not bool(production.worker(id).get("away", false)):
+			out.append(id)
+	return out
+
+
+static func _lawspeaker(town: String) -> String:
+	var law: Variant = Offers._call(Offers.ctx, "lawspeaker_of", [town])
+	return str(law) if law is String else ""
+
+
+static func _upper_first(text: String) -> String:
+	return text.substr(0, 1).to_upper() + text.substr(1) if not text.is_empty() else text
+
 
 ## Gossip (decision 422): what a town's person believes or saw passes to a
 ## neighbour standing at the same meeting place. Every "gossip.every" steps

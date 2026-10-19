@@ -14060,6 +14060,39 @@ level_test's castle market.
 Rejected: visible caravans in awake zones now (economy: abstract for phase
 2); gold on caravans; a route as a level link; raids taking items; a
 passing event for tolls (later, its own step).
+
+npc's side, 2026-10-19: the road's news. Townsfolk.watch_road hooks the four
+signals (Main, after economy's own hooks, so the travellers are home in
+the record first) and economy's optional caravan_sold; everything said
+comes from the payloads and three lookups (the far end's name, a
+"market:<key>" end as "the <key> market" or ctx town_name; the trip in
+days from eta there and back; a camp's holder by ctx holder_of, named as
+lore names the faction, never a fixed word). Left: the travellers' cards
+("Ren went with the wagon to the castle market, a trip of about four days
+there and back."), their kin's ("Ren, his brother, has gone ... back in
+about four days.") and the officials' (origin "appointed"); nobody else,
+the rest by gossip (422) and the counter's rumour line. A wagon setting
+out from the far end with the same people is the way home: the record
+moves to the new id, nobody told. Arrived at the far end: nothing at
+home. Home: each traveller "came home from the castle market: the wagon
+took 10 leather and 4 hide, and brought back 6 cloth." plus " It sold
+well / fairly / poorly." against the goods' value (ctx value_of) when
+economy told the sale; everyone present "saw Ren come home ... with the
+wagon"; a town-memory belief of the homecoming, left to the ordinary
+rules. Struck: the taken are captives already (maps through Towns'
+resident_taken, 331's path, so the kin's rescue commission at the counter
+needs nothing new); the taken one's card, the survivors' ("saw Oda carried
+off from the wagon by the Blood Rot on the road to ...", "took the
+wagon's food"), and a forced candidate for the lawspeaker by the first
+survivor (else the lawspeaker, else the taken one), so the road's danger
+can become a memory and the bard's song. Lost "taken": a candidate by the
+lawspeaker ("The wagon to the castle market was lost on the road to the
+Blood Rot, and Ada with it"); "no way": a fact on the officials' cards
+only (economy brings its people straight home). Townsfolk._wagons holds
+what went per caravan id, not saved: after a restart the words say what
+the payload says. No new offer kind, no change to economy, maps or the
+bard; nothing on a client. townsfolk_test _test_road_news with a stub
+route. Protocol unchanged; no new class_name.
 ## 498 amended: a maker's apprentice
 
 Jeff (2026-10-18): "makers have more expense - raw material and

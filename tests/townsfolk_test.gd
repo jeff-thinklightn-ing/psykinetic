@@ -37,6 +37,7 @@ func _ready() -> void:
 	_test_strays()
 	_test_scoundrel()
 	_test_sickness()
+	_test_road_news()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	Offers.ctx = {}  # Static callables into this node would crash the quit.
@@ -471,6 +472,100 @@ func _test_sickness() -> void:
 func _work_has(method: String) -> bool:
 	return _work != null and _work.has_method(method) or Production.new({}, Stockpile.new({}, func() -> int: return 0, ItemBook.new(func() -> int: return 0)), null, func() -> int: return 0, {}, func() -> Dictionary: return {}).has_method(method)
 
+
+
+## Maps' TradeRoutes, as the road's news needs it: a route's ends and its eta.
+class RoadStub extends RefCounted:
+	var town := ""
+	func route(_id: String) -> Dictionary:
+		return {"from": town, "to": "market:castle"}
+	func eta(_id: String) -> int:
+		return 360  # x 300 steps x 2 ways / 54000 a day = 4 days.
+
+
+var _road_memory: Array = []
+
+## The road's news (decision 504, npc's side): what a wagon's people, their
+## kin and the officials say of it, the raid as a candidate memory.
+func _test_road_news() -> void:
+	print("\n== the road's news: a wagon out, struck, home and lost, as card facts and the town's memory (decision 504, npc's side) ==")
+	Townsfolk.use_rules({"type_weights": {}, "thief": {"every": 0}, "strays": {"every": 0}, "sick": {"chance": 0.0}})
+	_setup()
+	Townsfolk._wagons.clear()
+	Production.type_of = Callable()
+	_work.add_worker("w-ren", "Ren", ["hauler"], TOWN, "placeholder")
+	_work.add_worker("w-oda", "Oda", ["tanner"], TOWN, "placeholder")
+	_work.add_worker("w-bram", "Bram", ["smith"], TOWN, "placeholder")
+	_work.add_worker("w-ada", "Ada", ["cook"], TOWN, "placeholder")
+	_work.add_worker("w-law", "Ulf", ["lawspeaker"], TOWN, "appointed")
+	Production.type_of = Townsfolk.roll_type
+	for id: String in ["w-ren", "w-oda", "w-bram", "w-ada", "w-law"]:
+		var c := Townsfolk.card_of(_work, id)
+		c["kin"] = {}
+		c["grudge"] = []
+		c["traits"]["pronoun"] = "he"
+		_work.set_card(id, c)
+	var ren := Townsfolk.card_of(_work, "w-ren")
+	ren["kin"] = {"w-bram": "sister or brother"}
+	_work.set_card("w-ren", ren)
+	var bram := Townsfolk.card_of(_work, "w-bram")
+	bram["kin"] = {"w-ren": "sister or brother"}
+	_work.set_card("w-bram", bram)
+	_road_memory = []
+	Offers.ctx = {"production": _work, "memory": func(_t: String) -> Array: return _road_memory,
+		"set_memory": func(_t: String, log: Array) -> void: _road_memory = log,
+		"lawspeaker_of": func(_t: String) -> String: return "w-law", "model": func() -> String: return "off",
+		"holder_of": func(_place: String) -> String: return "blood_rot", "value_of": func(_kind: String) -> int: return 2,
+		"town_name": func(_t: String) -> String: return "Tf"}
+	var road := RoadStub.new()
+	road.town = TOWN
+	var raiders := ResidentCard.faction_name("blood_rot")
+	var last := func(id: String) -> String: return str(Townsfolk.card_of(_work, id).get("facts", [{}]).back().get("text", ""))
+	var count := func(id: String) -> int: return Townsfolk.card_of(_work, id).get("facts", []).size()
+	var ada_facts: int = count.call("w-ada")
+	for who: String in ["w-ren", "w-oda"]:
+		_work.set_away(who, true)  # Economy's: away on the road.
+	Townsfolk.wagon_left(_work, road, "c1", "r1", {"items": [], "goods": {"leather": 10, "hide": 4}, "members": ["w-ren", "w-oda"]})
+	_check(last.call("w-ren") == "Ren went with the wagon to the castle market, a trip of about four days there and back.", "the traveller's card: %s" % last.call("w-ren"))
+	_check(last.call("w-bram") == "Ren, his brother, has gone to the castle market with the wagon, back in about four days.", "his brother's: %s" % last.call("w-bram"))
+	_check(last.call("w-law") == "Ren and Oda left with the wagon for the castle market, due back in about four days.", "the official's: %s" % last.call("w-law"))
+	_check(count.call("w-ada") == ada_facts, "nobody else is told: the rest hear it by gossip")
+	Townsfolk.wagon_arrived(_work, road, "c1", "r1", "market:castle", {"items": [], "goods": {"leather": 10, "hide": 4}, "members": ["w-ren", "w-oda"]})
+	_check(count.call("w-ada") == ada_facts and last.call("w-ren").begins_with("Ren went"), "at the market nothing is said at home")
+	Townsfolk.wagon_sold("c1", 40, 8)  # Economy's optional signal: 40 for goods worth 28.
+	Townsfolk.wagon_raided(_work, road, "c1", "r1", "camp:x", {"goods": {"food": 3}, "members": ["w-oda"]})
+	_check(last.call("w-oda") == "Oda was carried off from the wagon by %s on the road to the castle market." % raiders, "the taken one's card: %s" % last.call("w-oda"))
+	var ren_facts: Array = Townsfolk.card_of(_work, "w-ren")["facts"].map(func(f: Dictionary) -> String: return str(f["text"]))
+	_check("Ren saw Oda carried off from the wagon by %s on the road to the castle market." % raiders in ren_facts and "%s took the wagon's food on the road to the castle market." % Townsfolk._upper_first(raiders) in ren_facts,
+		"the survivor saw it, and the food go: %s" % [ren_facts.slice(-2)])
+	var candidates: Array = _road_memory.filter(func(e: Dictionary) -> bool: return str(e.get("tier", "")) == TownMemory.CANDIDATE)
+	_check(candidates.size() == 1 and str(candidates[0]["text"]) == "%s struck the town's wagon on the road to the castle market and carried off Oda" % Townsfolk._upper_first(raiders) and str(candidates[0]["said_by"]) == "w-ren",
+		"the town's memory holds the raid as a candidate, by the survivor: %s" % [candidates.map(func(e: Dictionary) -> String: return str(e["text"]))])
+	# The way home: a new id from the market with the same people, then home.
+	Townsfolk.wagon_left(_work, road, "c2", "r1", {"items": [], "goods": {"cloth": 6}, "members": ["w-ren"]})
+	_check(not Townsfolk._wagons.has("c1") and Townsfolk._wagons.has("c2") and last.call("w-law").begins_with("Ren and Oda left"), "the way home moves the record to the new id, nothing said")
+	_work.set_away("w-ren", false)
+	Townsfolk.wagon_arrived(_work, road, "c2", "r1", TOWN, {"items": [], "goods": {"cloth": 6}, "members": ["w-ren"]})
+	var took := Townsfolk._goods_words({"leather": 10, "hide": 4})
+	var back := Townsfolk._goods_words({"cloth": 6})
+	_check(last.call("w-ren") == "Ren came home from the castle market: the wagon took %s, and brought back %s. It sold well." % [took, back], "home, what went and came back and how it sold: %s" % last.call("w-ren"))
+	_check(last.call("w-ada") == "Ada saw Ren come home from the castle market with the wagon." and last.call("w-bram") == "Bram saw Ren come home from the castle market with the wagon.", "the town saw him come: %s" % last.call("w-ada"))
+	_check(last.call("w-oda").begins_with("Oda was carried off"), "the captive hears nothing")
+	var beliefs: Array = _road_memory.filter(func(e: Dictionary) -> bool: return str(e.get("tier", "")) == TownMemory.BELIEF)
+	_check(beliefs.size() == 1 and str(beliefs[0]["text"]) == "Ren's wagon came home from the castle market with %s" % back, "a small memory of the homecoming, a belief: %s" % [beliefs.map(func(e: Dictionary) -> String: return str(e["text"]))])
+	# Lost: the road closed, a word on the officials' cards; taken, a candidate by the lawspeaker.
+	Townsfolk.wagon_left(_work, road, "c3", "r1", {"items": [], "goods": {}, "members": ["w-bram"]})
+	Townsfolk.wagon_lost(_work, road, "c3", "r1", "no way")
+	_check(last.call("w-law") == "The wagon to the castle market turned back: the road is closed." and last.call("w-ada").begins_with("Ada saw Ren"), "no way: the official's word, nobody else's: %s" % last.call("w-law"))
+	Townsfolk.wagon_left(_work, road, "c4", "r1", {"items": [], "goods": {"food": 5}, "members": ["w-ada"]})
+	Townsfolk.wagon_raided(_work, road, "c4", "r1", "camp:x", {"goods": {"food": 5}, "members": ["w-ada"]})
+	Townsfolk.wagon_lost(_work, road, "c4", "r1", "taken")
+	candidates = _road_memory.filter(func(e: Dictionary) -> bool: return str(e.get("tier", "")) == TownMemory.CANDIDATE)
+	_check(candidates.size() == 3 and str(candidates.back()["text"]) == "The wagon to the castle market was lost on the road to %s, and Ada with it" % raiders and str(candidates.back()["said_by"]) == "w-law",
+		"taken: the lawspeaker's candidate: %s" % [candidates.map(func(e: Dictionary) -> String: return str(e["text"]))])
+	_check(not Townsfolk._wagons.has("c4") and not Townsfolk._wagons.has("c3"), "the records are let go")
+	Townsfolk._wagons.clear()
+	Offers.ctx = {}
 
 func _check(ok: bool, what: String) -> void:
 	print("  %s  %s" % ["PASS" if ok else "FAIL", what])
