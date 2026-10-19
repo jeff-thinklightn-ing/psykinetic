@@ -6,7 +6,9 @@ shader_type spatial;
 // instance's custom data (Client3D._scatter_build): r how much of the
 // season's snow lies on it (less under a forest's roof; decision 467), g one
 // over its mesh's height, so snow lies on its tips whatever its size, b how
-// light its dried straw is (the roof's shade: the scatter takes no shadow).
+// light its dried straw is (the roof's shade: the scatter takes no shadow),
+// a 1 if it sinks into the snow: SNOW_SINK of its height under full cover,
+// more or less by where it stands (some gone, some a few straw tips).
 render_mode cull_disabled, shadows_disabled;
 
 global uniform vec4 wind;
@@ -17,6 +19,13 @@ varying float snow_cover;
 varying float straw_light;
 // How far full wind bends a tip one unit up (in the mesh's own units).
 uniform float bend = 0.35;
+// How much of a plant's height full snow buries, and how much that varies
+// from one to the next.
+const float SNOW_SINK = 0.7;
+const float SNOW_SINK_SPREAD = 0.35;
+// How white its tips go under full snow: faint, so the open reads as snow
+// with grass poking through.
+const float SNOW_TIPS = 0.35;
 
 vec3 to_linear(vec3 c) {
 	return mix(pow((c + vec3(0.055)) * (1.0 / 1.055), vec3(2.4)), c * (1.0 / 12.92), lessThan(c, vec3(0.04045)));
@@ -34,6 +43,9 @@ void vertex() {
 	vec3 way = inverse(mat3(MODEL_MATRIX)) * vec3(wind.x, 0.0, wind.y);
 	VERTEX += way * (bend * wind.z * gust * height * height);
 	VERTEX.y -= 0.3 * bend * wind.z * gust * height * height * height;
+	float drift = fract(sin(dot(floor(at * 3.0), vec2(12.9898, 78.233))) * 43758.5453);
+	float buried = season.z * snow_cover * INSTANCE_CUSTOM.a * (SNOW_SINK + (drift - 0.5) * 2.0 * SNOW_SINK_SPREAD);
+	VERTEX.y -= buried / max(INSTANCE_CUSTOM.g, 0.001);
 }
 
 void fragment() {
@@ -43,7 +55,7 @@ void fragment() {
 	float grey = dot(colour, vec3(0.3, 0.55, 0.15));
 	colour = mix(colour, vec3(0.62, 0.55, 0.34) * (0.6 + grey) * straw_light, (1.0 - season.x) * 0.6);
 	colour = mix(colour, vec3(0.78, 0.4, 0.12) * (0.6 + grey), season.y * 0.55);
-	colour = mix(colour, vec3(0.9, 0.93, 0.97), season.z * smoothstep(0.45, 0.95, up) * 0.8 * snow_cover);
+	colour = mix(colour, vec3(0.9, 0.93, 0.97), season.z * smoothstep(0.45, 0.95, up) * SNOW_TIPS * snow_cover);
 	ALBEDO = colour;
 	ROUGHNESS = 1.0;
 	SPECULAR = 0.5;

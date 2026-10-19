@@ -2014,10 +2014,11 @@ func _test_grown_trees() -> void:
 		if node is MultiMeshInstance3D and String(node.name).ends_with("_tuft"):
 			carried = (node as MultiMeshInstance3D).multimesh.use_custom_data
 			break
-	_check(carried and open_custom == Color(1.0, 2.0, 1.0, 0.0)
-			and forest_custom == Color(Client3D.SCATTER_ROOF_SNOW, 2.0, Client3D.SCATTER_ROOF_STRAW, 0.0)
+	_check(carried and open_custom == Color(1.0, 2.0, 1.0, 1.0)
+			and forest_custom == Color(Client3D.SCATTER_ROOF_SNOW, 2.0, Client3D.SCATTER_ROOF_STRAW, 1.0)
+			and Client3D.scatter_custom(false, 2.0, false).a == 0.0
 			and Client3D.SCATTER_ROOF_SNOW < 1.0 and Client3D.SCATTER_ROOF_STRAW < 1.0,
-			"a tuft's snow: full in the open, less under the roof with its straw shaded, its tips by its own height (%s, %s)" % [open_custom, forest_custom])
+			"a tuft's snow: full in the open, less under the roof with its straw shaded, its tips by its own height, sunk in it (not reeds) (%s, %s)" % [open_custom, forest_custom])
 	grown.set_focus(Vector3(5.0, 0.0, 5.0), Vector3(5.0, 0.0, 5.0))
 	grown.finish()
 	var near_one: Node3D = grown.chunks[chunk_of.call(Vector2i(5, 5))]["near"]

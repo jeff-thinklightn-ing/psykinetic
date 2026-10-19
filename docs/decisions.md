@@ -12023,6 +12023,13 @@ approval of the pad pass, 2026-10-18):
   snow_cover, snow_from, snow_to, snow_patch; 1, 0.3, 0.8, none for
   everything else), so under full cover the forest reads dark, its needles
   green-grey with a dusting, white only in the clearings.
+  Second pass (the coordinator, 2026-10-19: in the open a tuft at full
+  cover still read as a white rosette on white snow): under the snow a
+  plant is buried, not iced. Custom data a (1, but 0 for reeds, which
+  stand in water) sinks it SNOW_SINK (0.7) of its height times the cover,
+  more or less by SNOW_SINK_SPREAD (0.35) by where it stands, so some are
+  gone and some show a few straw tips; the tips' white is SNOW_TIPS (0.35),
+  faint (scatter.gdshader).
 Rejected: fading whole trees as the ring's are (hundreds of nodes to test
 a frame, and a whole 13 m tree gone for one crown in the way); a dithered
 hole over the player (the first cut: Jeff asked for transparency); every

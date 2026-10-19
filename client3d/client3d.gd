@@ -3494,7 +3494,7 @@ func _scatter_build(chunk: Vector2i, kind: String, items: Array) -> void:
 		multimesh.set_instance_transform(i, Transform3D(basis, Vector3(at.x, _height_in(cell, at) - fit[2], at.y)))
 		multimesh.set_instance_color(i, _scatter_tint(kind, cell, salt, items[i][3]))
 		if swaying:
-			multimesh.set_instance_custom_data(i, scatter_custom(items[i][3], over_tall))
+			multimesh.set_instance_custom_data(i, scatter_custom(items[i][3], over_tall, kind != "reeds"))
 	var drawn := MultiMeshInstance3D.new()
 	drawn.name = "Scatter_%d_%d_%s" % [chunk.x, chunk.y, kind]
 	drawn.multimesh = multimesh
@@ -3571,10 +3571,11 @@ func _forest_edge(cell: Vector2i) -> bool:
 
 
 ## A swaying item's custom data (scatter.gdshader): r how much snow lies on
-## it, g one over its mesh's height ([param over_tall]), b its straw's light;
-## less of both under the forest's roof.
-static func scatter_custom(forest: bool, over_tall: float) -> Color:
-	return Color(SCATTER_ROOF_SNOW if forest else 1.0, over_tall, SCATTER_ROOF_STRAW if forest else 1.0, 0.0)
+## it, g one over its mesh's height ([param over_tall]), b its straw's light,
+## a 1 if it sinks into the snow ([param buried]: not reeds, which stand in
+## the water); less snow and darker straw under the forest's roof.
+static func scatter_custom(forest: bool, over_tall: float, buried := true) -> Color:
+	return Color(SCATTER_ROOF_SNOW if forest else 1.0, over_tall, SCATTER_ROOF_STRAW if forest else 1.0, 1.0 if buried else 0.0)
 
 
 ## An item's colour: its kind's, varied, darker under the forest; a flower
