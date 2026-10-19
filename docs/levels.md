@@ -651,6 +651,18 @@ write its levels.
   tool (`P`) lists the prefabs: pick one and it follows the cursor as a
   see-through ghost, `R` (or a right click) turns it a quarter clockwise
   (`Shift+R` back), and a click lays it down, one undo step. See Prefabs below.
+- **Copy and paste** (decision 516): with an area dragged out, `Ctrl+C`
+  copies it (cells, edges, heights, entities, links, places, buildings,
+  roofs, spawn points, starts, markets, and the streams wholly in it) to the
+  editor's clipboard, and `Ctrl+X` copies it and clears it to void. `Ctrl+V`
+  picks the stamp tool holding the clipboard: `R` turns it, each click lays
+  it, one undo step each (a spawn point, place or market whose name is taken
+  becomes `_2`, `_3`...), until `Esc`. The clipboard lasts the editor
+  session; it is not saved.
+- **Climbs checked as you go** (decision 516): with the heights shown, a
+  stair or slope the game would leave as floor (no cell one level up beside
+  it) or that could climb more than one way is tinted red, and the height and
+  stairs panels list it. The stairs tool lays stairs or slopes (its panel).
 - **Area tools** (`editor/area_tools.gd`): with an area dragged out, its
   panel fills it, one undo step each, from the **seed** shown (`-` / `+`
   to change it; the same seed gives the same result):

@@ -17,6 +17,10 @@ extends RefCounted
 const DIR := "res://levels/prefabs/"
 ## level.json keys a prefab keeps.
 const KEEP: Array[String] = ["entities", "links", "legend", "monsters", "places", "buildings", "roofs"]
+## What the editor's clipboard keeps (decision 516): a prefab's, and the
+## names a saved prefab leaves out (stamp_changes renames a taken one).
+const CLIPBOARD_KEEP: Array[String] = ["entities", "links", "legend", "monsters", "places", "buildings", "roofs",
+	"spawn_points", "starts", "markets", "streams"]
 
 
 ## The building kinds as prefabs (decision 488): "building_<kind>_<size>",
@@ -77,13 +81,13 @@ static func kind_prefab(prefab_name: String) -> Dictionary:
 
 ## The area [param rect] of [param map] with its part of [param config], as
 ## a prefab {map, config}: what was at rect.position is at (0, 0).
-static func extract(map: LevelMap, config: Dictionary, rect: Rect2i) -> Dictionary:
+static func extract(map: LevelMap, config: Dictionary, rect: Rect2i, keys: Array[String] = KEEP) -> Dictionary:
 	var inside := func(at: Vector2i) -> Variant:
 		return at - rect.position if rect.has_point(at) else null
 	var piece := map.transformed(rect.size, inside)
 	var moved := LevelMap.moved_config(config, inside)
 	var kept := {}
-	for key in KEEP:
+	for key in keys:
 		if moved.has(key) and not (moved[key] is Array and (moved[key] as Array).is_empty()):
 			kept[key] = moved[key]
 	return {"map": piece, "config": kept}
@@ -142,17 +146,39 @@ static func stamp_changes(prefab: Dictionary, map: LevelMap, at: Vector2i, confi
 	var moved_config := LevelMap.moved_config(prefab["config"], shift)
 	var out := {"cells": cells, "edges": edges, "heights": heights, "covers": covers,
 		"entries": moved_config.get("entities", []), "links": moved_config.get("links", [])}
-	var places: Variant = moved_config.get("places", {})
-	if places is Dictionary and not places.is_empty():
-		var merged: Dictionary = (config.get("places", {}) as Dictionary).duplicate(true) if config.get("places") is Dictionary else {}
-		for key: String in places:
-			var free := key
-			var n := 2
-			while merged.has(free):
-				free = "%s_%d" % [key, n]
-				n += 1
-			merged[free] = places[key]
-		out["config"] = {"places": merged}
+	# Places, and a copy's spawn points and markets (decision 516): the
+	# map's with the prefab's added, a taken name _2, _3...
+	for named: String in ["places", "spawn_points", "markets"]:
+		var listed: Variant = moved_config.get(named, {})
+		if listed is Dictionary and not listed.is_empty():
+			var merged: Dictionary = (config.get(named, {}) as Dictionary).duplicate(true) if config.get(named) is Dictionary else {}
+			for key: String in listed:
+				var free := key
+				var n := 2
+				while merged.has(free):
+					free = "%s_%d" % [key, n]
+					n += 1
+				merged[free] = listed[key]
+			var named_changed: Dictionary = out.get("config", {})
+			named_changed[named] = merged
+			out["config"] = named_changed
+	# A copy's starts, added where the map has none, and its streams.
+	var starts: Variant = moved_config.get("starts", [])
+	if starts is Array and not starts.is_empty():
+		var all_starts: Array = (config.get("starts", []) as Array).duplicate(true) if config.get("starts") is Array else []
+		for start: Variant in starts:
+			if not all_starts.any(func(had: Variant) -> bool: return Level._tile(had) == Level._tile(start)):
+				all_starts.append(start)
+		var starts_changed: Dictionary = out.get("config", {})
+		starts_changed["starts"] = all_starts
+		out["config"] = starts_changed
+	var streams: Variant = moved_config.get("streams", [])
+	if streams is Array and not streams.is_empty():
+		var all_streams: Array = (config.get("streams", []) as Array).duplicate(true) if config.get("streams") is Array else []
+		all_streams.append_array(streams)
+		var streams_changed: Dictionary = out.get("config", {})
+		streams_changed["streams"] = all_streams
+		out["config"] = streams_changed
 	# Buildings: the map's, but for those whose footprint the prefab's cells
 	# land on, and the prefab's, moved.
 	var landed: Dictionary[Vector2i, bool] = {}

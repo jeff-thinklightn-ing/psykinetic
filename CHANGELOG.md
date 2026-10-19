@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The level editor copies, cuts and pastes an area (Ctrl+C, Ctrl+X, Ctrl+V) with everything on it, turning the paste with R, and flags a stair or slope that leads nowhere as you make it; its stairs tool lays slopes too (516).
 - Standing still in tall grass with no light giving you away, the HUD says "hidden in the grass" (the one cue that the cover works); it goes the moment you step.
 - The world map's wagon can be hovered: its words say whose it is, where it is bound and where it is (and how many days out, when the server says); the hint over things on the ground names them ("F  pick up herbs").
 - The server no longer reads every level's level.json on each world tick to see which levels regenerate: the list is read once and again only when a level is registered, kept as a template or reloaded (perf's profile: about 4 ms a tick).

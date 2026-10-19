@@ -52,6 +52,16 @@ extends Node2D
 ## tool (P) lists the prefabs; the picked one follows the cursor as a ghost,
 ## R turns it a quarter, and a click lays it down as one undo step.
 ##
+## Copy and paste (decision 516): with an area dragged out, Ctrl+C copies it
+## (cells, edges, heights, entities, links, places, buildings, roofs, spawn
+## points, starts, markets and the streams wholly in it) to the editor's
+## clipboard, Ctrl+X copies it and clears it to void; Ctrl+V picks the stamp
+## tool holding the clipboard, R turning it, each click laying it as one
+## undo step (a spawn point, place or market whose name is taken gets _2,
+## _3...), until Esc. The heights view tints red, and the height and stairs
+## panels list, each stair or slope the game would leave as floor or that
+## could climb more than one way, as it is made.
+##
 ## Area tools (AreaTools): with an area dragged out, the panel fills it
 ## with a pond (water and its shore), a grove (trees, a clearing if asked),
 ## a scatter (boulders, crates, trees) or a fence round it (a gate on a
@@ -164,6 +174,12 @@ var prefab_dir := Prefab.DIR
 ## The stamp tool's prefab ("" none), its turn, and it turned ({} none).
 var stamp_name := ""
 var stamp_turns := 0
+## The clipboard (decision 516): a prefab in memory ({} none), the stamp
+## tool's when stamp_name is CLIPBOARD.
+var clipboard := {}
+const CLIPBOARD := "(clipboard)"
+## What the stairs tool lays: "stair", or "slope" (decision 513's ramp).
+var stairs_kind := "stair"
 var _stamp: Dictionary = {}
 var _prefab_name: LineEdit
 ## The area tools' settings; the seed is shared.
@@ -393,6 +409,8 @@ func end_stroke() -> void:
 	_name_cells()
 	doc.push(_stroke)
 	_stroke = {}
+	if heights_shown():
+		_refresh_panel()  # The climbs' problems, as they are now.
 
 
 func _apply(target: Dictionary) -> void:
@@ -513,7 +531,7 @@ func pick_stamp(prefab_name: String) -> void:
 	stamp_name = prefab_name
 	_stamp = {}
 	if not prefab_name.is_empty():
-		var prefab := Prefab.load_prefab(prefab_name, prefab_dir)
+		var prefab := clipboard if prefab_name == CLIPBOARD else Prefab.load_prefab(prefab_name, prefab_dir)
 		if prefab.is_empty():
 			report = "no prefab %s" % prefab_name
 			stamp_name = ""
@@ -543,7 +561,105 @@ func stamp_at(at: Vector2i) -> void:
 	if _stamp.is_empty():
 		return
 	if apply_changes(Prefab.stamp_changes(_stamp, map, at, doc.config)):
-		report = "stamped %s at %d, %d" % [stamp_name, at.x, at.y]
+		report = "%s at %d, %d" % ["pasted" if stamp_name == CLIPBOARD else "stamped " + stamp_name, at.x, at.y]
+		issues = EditorFields.issues(doc, map_name)
+		_refresh_panel()
+
+
+## The area copied to the clipboard (decision 516), with the streams
+## wholly in it; what was copied, said.
+func copy_area() -> String:
+	if area.size == Vector2i.ZERO:
+		report = "no area: drag one out with the area tool (A)"
+		return report
+	var copied := doc.config.duplicate(true)
+	var whole: Array = []
+	for entry: Variant in copied.get("streams", []) if copied.get("streams") is Array else []:
+		var inside := entry is Dictionary
+		for point: Variant in entry.get("path", []) if entry is Dictionary else []:
+			var at: Variant = Level._tile(point)
+			inside = inside and at != null and area.has_point(at)
+		if inside:
+			whole.append(entry)
+	copied["streams"] = whole
+	clipboard = Prefab.extract(map, copied, area, Prefab.CLIPBOARD_KEEP)
+	report = "copied %d x %d cells, %d things" % [area.size.x, area.size.y, (clipboard["config"].get("entities", []) as Array).size()]
+	_refresh_panel()
+	return report
+
+
+## The area copied, then cleared to void (its cells, edges, heights and
+## what is on them), as one undo step.
+func cut_area() -> String:
+	if area.size == Vector2i.ZERO:
+		return copy_area()
+	copy_area()
+	var cells := {}
+	var heights := {}
+	var edges := {}
+	for cell in _area_cells():
+		cells[cell] = "void"
+		heights[cell] = 0
+		for step: Vector2i in [Vector2i(1, 0), Vector2i(0, 1), Vector2i(-1, 0), Vector2i(0, -1)]:
+			var key := Terrain.edge_key(cell, step)
+			if map.edge_in_bounds(key):
+				edges[key] = "clear"
+	var outside := func(at: Vector2i) -> Variant: return null if area.has_point(at) else at
+	var cleared := LevelMap.moved_config(doc.config, outside)
+	var config_changes := {}
+	for key in Prefab.CLIPBOARD_KEEP:
+		if key in ["entities", "links", "legend", "monsters"] or not doc.config.has(key):
+			continue
+		if str(cleared.get(key)) != str(doc.config[key]):
+			config_changes[key] = cleared.get(key)
+	apply_changes({"cells": cells, "edges": edges, "heights": heights, "config": config_changes})
+	report = "cut %d x %d cells" % [area.size.x, area.size.y]
+	issues = EditorFields.issues(doc, map_name)
+	_refresh_panel()
+	return report
+
+
+## The clipboard on the stamp tool, to lay with clicks (R turns it).
+func paste() -> void:
+	if clipboard.is_empty():
+		report = "nothing copied: drag out an area (A) and Ctrl+C"
+		_refresh_panel()
+		return
+	pick("stamp")
+	pick_stamp(CLIPBOARD)
+
+
+## Each stair or slope the game would leave as floor (no cell one level up
+## beside it) or that could climb more than one way, as Level reads it:
+## cell -> what Level would say (decision 516).
+func climb_problems() -> Dictionary[Vector2i, String]:
+	var out: Dictionary[Vector2i, String] = {}
+	for at: Vector2i in map.cells:
+		var meaning := map.cell(at)
+		if meaning not in ["stair", "slope"]:
+			continue
+		var up: Array[Vector2i] = []
+		for step: Vector2i in [Vector2i(0, -1), Vector2i(1, 0), Vector2i(0, 1), Vector2i(-1, 0)]:
+			if map.walkable(at + step) and int(map.heights.get(at + step, 0)) == int(map.heights.get(at, 0)) + 1 \
+					and map.edge(Terrain.edge_key(at, step)) == "clear":
+				up.append(step)
+		if up.is_empty():
+			out[at] = "the %s at %s has no cell one level up beside it: it is floor" % [meaning, at]
+		elif up.size() > 1:
+			out[at] = "the %s at %s could climb %s" % [meaning, at, up]
+	return out
+
+
+func _climb_rows() -> void:
+	var problems := climb_problems()
+	var shown := 0
+	for at: Vector2i in problems:
+		if shown == 8:
+			_panel_label("and %d more" % (problems.size() - shown), 18)
+			break
+		var line := _panel_label(problems[at], 18)
+		line.add_theme_color_override("font_color", Color(1, 0.35, 0.3))
+		shown += 1
 
 
 ## Makes [param changes] as one undo step (MapDoc.apply_changes).
@@ -726,13 +842,19 @@ func lay_stairs(from: Vector2i, to: Vector2i) -> bool:
 	var dir := along.sign()
 	var length := absi(along.x + along.y)
 	var changes := HeightTools.stair(map, from, dir) if length == 1 else HeightTools.flight(map, from, from + along)
+	if stairs_kind == "slope" and changes.get("cells") is Dictionary:
+		for cell: Vector2i in changes["cells"]:
+			if changes["cells"][cell] == "stair":
+				changes["cells"][cell] = "slope"
 	var reason := str(changes.get("reason", ""))
 	if not reason.is_empty():
 		report = "no stair from %d, %d: %s" % [from.x, from.y, reason]
 		return false
 	var changed := apply_changes(changes)
-	report = "%s from %d, %d climbing %s%s" % ["a stair" if length == 1 else "a flight of %d" % length, from.x, from.y,
+	var what := "a %s" % stairs_kind if length == 1 else ("a flight of %d" if stairs_kind == "stair" else "a slope of %d") % length
+	report = "%s from %d, %d climbing %s%s" % [what, from.x, from.y,
 		World.COMPASS[Monster.AROUND.find(dir)], "" if changed else ": nothing to change"]
+	_refresh_panel()
 	return changed
 
 
@@ -1113,6 +1235,13 @@ func _refresh_panel() -> void:
 	if brush == "stairs":
 		_panel_label("Stairs", 30)
 		_panel_label("press on the low cell, drag the way it climbs:\none cell a stair, more a flight (a level a cell)", 22)
+		var kinds := HBoxContainer.new()
+		_panel.add_child(kinds)
+		for kind: String in ["stair", "slope"]:
+			var button := _panel_button(kinds, kind + "s", _set_tool.bind("stairs_kind", kind))
+			button.toggle_mode = true
+			button.button_pressed = kind == stairs_kind
+		_climb_rows()
 		return
 	if brush == "stamp":
 		_stamp_panel()
@@ -1327,6 +1456,7 @@ func _height_panel() -> void:
 		button.button_pressed = size == height_brush
 	_panel_label_in(row, "[ ]")
 	_height_level_row()
+	_climb_rows()
 
 
 ## The picked level, to change by hand.
@@ -1375,6 +1505,8 @@ func _path_panel() -> void:
 func _stamp_panel() -> void:
 	_panel_label("Stamp a prefab", 30)
 	var names := Prefab.names(prefab_dir) + Prefab.kind_names()
+	if not clipboard.is_empty():
+		names.push_front(CLIPBOARD)
 	if names.is_empty():
 		_panel_label("none yet: save one with the area tool (A)", 22)
 	for each in names:
@@ -1582,6 +1714,14 @@ func _unhandled_input(event: InputEvent) -> void:
 			undo()
 		elif key.ctrl_pressed and key.keycode == KEY_R:
 			toggle_canvas()
+		elif key.ctrl_pressed and key.keycode == KEY_C:
+			copy_area()
+		elif key.ctrl_pressed and key.keycode == KEY_X:
+			cut_area()
+		elif key.ctrl_pressed and key.keycode == KEY_V:
+			paste()
+		elif key.keycode == KEY_ESCAPE and brush == "stamp" and not stamp_name.is_empty():
+			pick_stamp("")
 		elif key.keycode == KEY_V and not key.ctrl_pressed:
 			pick("select")
 		elif key.keycode == KEY_A and not key.ctrl_pressed:
@@ -1793,10 +1933,13 @@ func _draw_heights() -> void:
 				var a := Vector2(key.x + 1, key.y) if key.z == Terrain.EAST else Vector2(key.x, key.y + 1)
 				var b := a + (Vector2(0, 1) if key.z == Terrain.EAST else Vector2(1, 0))
 				draw_line(a * CELL, b * CELL, CLIFF, 2.0 + 2.0 * rise)
+	var problems := climb_problems()
 	for at: Vector2i in map.cells:
-		if map.cell(at) != "stair":
+		if map.cell(at) not in ["stair", "slope"]:
 			continue
 		var centre := (Vector2(at) + Vector2(0.5, 0.5)) * CELL
+		if problems.has(at):
+			draw_rect(Rect2(Vector2(at) * CELL, Vector2.ONE * CELL), Color(1, 0.15, 0.1, 0.45))
 		var climb := HeightTools.climbs(map, at)
 		if climb == Vector2i.ZERO:
 			draw_circle(centre, CELL * 0.2, Color(1, 0.2, 0.2, 0.9))

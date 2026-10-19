@@ -14836,3 +14836,51 @@ own.
 ui_test: the cue's rule on its inputs, the wagon's words with and without
 days, the pile's words. Shots in docs/ui/shots/sim. Protocol unchanged;
 no new class_name.
+
+## 516. The level editor's copy and paste, and its climbs checked live
+
+From the editor backlog (the coordinator): with 513's cliffs and slopes,
+raising ground by hand matters, and a prefab was the heavy way to move a
+few cells. Height painting itself was already there (decision 357: the
+height tool, the area's raise, lower, level and hill, the stairs tool, the
+heights view); this adds what it lacked, and a clipboard.
+
+- Climbs checked live: LevelEditor.climb_problems() reads each stair and
+  slope cell as Level.parse does (the orthogonal neighbours walkable, one
+  level up, no wall or door between): none is "the stair (slope) at ...
+  has no cell one level up beside it: it is floor", several "could climb".
+  It is cheap (the stair and slope cells only), so the heights view tints
+  those cells red each time it draws, and the height and stairs panels list
+  them (eight, then a count) after every stroke, stair laid or area height
+  change. Slopes draw their climb as stairs do (HeightTools.climbs takes a
+  slope); rocks keep their letter.
+- The stairs tool lays slopes as well as stairs (stairs_kind, its panel):
+  HeightTools' stair and flight changes with their cells made "slope".
+- Copy: Ctrl+C with an area dragged out puts Prefab.extract(map, config,
+  area, Prefab.CLIPBOARD_KEEP) in LevelEditor.clipboard: what a prefab keeps
+  (KEEP, unchanged, so saved prefabs are as they were) and the spawn points,
+  starts, markets and streams a saved prefab leaves out. Only the streams
+  wholly in the area go (a stream cut in two is no stream). In memory, for
+  the editor session: not across sessions or levels, not the OS clipboard.
+- Cut: Ctrl+X copies, then clears the area as one undo step: its cells to
+  void, heights to 0, edges to clear, and level.json's keys of the copy set
+  without what was in the area (LevelMap.moved_config dropping its cells),
+  its entries and links going with their cells.
+- Paste: Ctrl+V picks the stamp tool holding the clipboard (CLIPBOARD, at
+  the top of its list); R turns it, a click lays it, one undo step through
+  MapDoc.apply_changes, as many times as wanted, Esc letting go. After a
+  stamp the panel's issues (Level.parse, WorldMap's problems) are read
+  again. Prefab.stamp_changes merges what a copy brings: spawn points and
+  markets as places already were (a taken name _2, _3...), starts added
+  where the map has none on that cell, streams added.
+
+tests: editor_test: a slope with nothing above it flagged; the stairs
+tool's slope climbing; copy (spawn point, market, stream), paste turned
+(gate_2, m_2, the stream again, the chest's slots, the height), one undo
+step taken back, Esc; cut clearing the area, its spawn point and market,
+undone; KEEP without spawn points.
+
+Rejected: a new height tool (357's is the one, and builder's HeightTools
+behind both); checking climbs by parsing the whole level each stroke (a
+big level's parse is slow; the rule is a few lines); saving the clipboard
+(that is a prefab); pasting part of a stream.

@@ -30,6 +30,8 @@ func _ready() -> void:
 	_clear()
 	await _test_fields()
 	_clear()
+	await _test_clipboard()
+	_clear()
 	_test_every_key()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -707,6 +709,79 @@ func _test_import_file() -> void:
 	var text := FileAccess.get_file_as_string(png + ".import")
 	_check('importer="image"' in text and 'type="Image"' in text and "texture" not in text, "with an Image one")
 	_check(not LevelMap.ensure_image_import(png, "res://levels/other/layout.png"), "and an Image one is left alone")
+
+
+## Copy, cut and paste, and the live climb checks (decision 516).
+func _test_clipboard() -> void:
+	print("\n== copy, cut and paste; the climbs checked (decision 516) ==")
+	var dir := ProjectSettings.globalize_path(FOLDER)
+	DirAccess.make_dir_recursive_absolute(dir)
+	var markers := {Vector2i(3, 3): "chest", Vector2i(5, 3): "slope"}
+	for y in range(1, 4):
+		markers[Vector2i(6, y)] = "water"
+	var rows: Array[String] = []
+	for y in 27:
+		rows.append(".".repeat(41))
+	Level.image_from_rows(rows, markers).save_png(dir.path_join("layout.png"))
+	var item: String = Items.ids()[0]
+	var json := FileAccess.open(dir.path_join("level.json"), FileAccess.WRITE)
+	json.store_string(JSON.stringify({"name": "Clip", "spawn_points": {"gate": [2, 2]}, "markets": {"m": {"at": [4, 4], "name": "the market"}},
+		"entities": [{"at": [3, 3], "props": {"slots": [item]}}], "streams": [{"path": [[6, 1], [6, 2], [6, 3]]}]}, "\t"))
+	json.close()
+	var editor: LevelEditor = preload("res://editor/level_editor.tscn").instantiate()
+	editor.map_name = "editor_test"
+	editor.folder = FOLDER
+	add_child(editor)
+	await get_tree().process_frame
+	editor.doc.set_height(Vector2i(4, 2), 1)
+
+	var problems := editor.climb_problems()
+	_check(problems.size() == 1 and problems.has(Vector2i(5, 3)) and "no cell one level up" in problems[Vector2i(5, 3)],
+		"a slope with nothing above it is flagged at once (%s)" % [problems])
+	editor.pick("stairs")
+	editor.stairs_kind = "slope"
+	_check(editor.lay_stairs(Vector2i(8, 8), Vector2i(9, 8)) and editor.map.cell(Vector2i(8, 8)) == "slope" and editor.map.heights.get(Vector2i(9, 8)) == 1,
+		"the stairs tool lays a slope (%s)" % editor.report)
+	_check(not editor.climb_problems().has(Vector2i(8, 8)), "and it climbs")
+	editor.undo()
+
+	editor.pick("area")
+	editor.area = Rect2i(1, 1, 6, 4)
+	editor.copy_area()
+	_check(not editor.clipboard.is_empty() and editor.clipboard["config"].get("spawn_points", {}).has("gate")
+		and editor.clipboard["config"].get("markets", {}).has("m") and editor.clipboard["config"].get("streams", []).size() == 1,
+		"Ctrl+C: the area with its spawn point, market and stream (%s)" % editor.report)
+	var depth := editor._undo.size()
+	_key(editor, KEY_V, true)
+	_check(editor.brush == "stamp" and editor.stamp_name == LevelEditor.CLIPBOARD, "Ctrl+V: the stamp tool holds it")
+	editor.rotate_stamp(1)
+	editor.stamp_at(Vector2i(12, 6))
+	var pasted := Rect2i(12, 6, 4, 6)
+	var config: Dictionary = editor.doc.config
+	var gate_2: Variant = Level._tile(config["spawn_points"].get("gate_2"))
+	_check(config["spawn_points"].has("gate") and gate_2 != null and pasted.has_point(gate_2), "pasted turned: the spawn point as gate_2, in the paste (%s)" % [config["spawn_points"]])
+	_check(config["markets"].has("m_2") and config["streams"].size() == 2, "the market as m_2, the stream again (%s)" % [config["streams"]])
+	_check((config["entities"] as Array).filter(func(entry: Dictionary) -> bool: return entry.get("props", {}).get("slots") == [item]).size() == 2,
+		"the chest with its slots")
+	_check(pasted.has_point(Vector2i(12, 6) + Vector2i(3 - 1, 4 - 1 - 1)) and editor.map.heights.values().count(1) == 2, "and its height")
+	_check(editor._undo.size() == depth + 1, "one undo step")
+	editor.undo()
+	_check(not editor.doc.config["spawn_points"].has("gate_2") and editor.doc.config["streams"].size() == 1, "Ctrl+Z takes it back")
+	_key(editor, KEY_ESCAPE)
+	_check(editor.stamp_name.is_empty(), "Esc lets go of it")
+
+	editor.pick("area")
+	editor.area = Rect2i(1, 1, 6, 4)
+	_key(editor, KEY_X, true)
+	_check(editor.map.cell(Vector2i(3, 3)) == "void" and not editor.doc.config["spawn_points"].has("gate")
+		and not editor.doc.config["markets"].has("m") and editor.map.heights.get(Vector2i(4, 2), 0) == 0,
+		"Ctrl+X: the area cleared, its spawn point and market gone (%s)" % editor.report)
+	_check(not editor.clipboard.is_empty(), "and copied first")
+	editor.undo()
+	_check(editor.doc.config["spawn_points"].has("gate"), "undone")
+	_check(Prefab.KEEP.find("spawn_points") < 0, "a saved prefab still leaves spawn points out")
+	editor.queue_free()
+	await get_tree().process_frame
 
 
 func _test_fields() -> void:
