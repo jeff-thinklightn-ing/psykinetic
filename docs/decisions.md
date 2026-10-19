@@ -14439,7 +14439,7 @@ coordinator's design, agreed with enemy-ai).
 - Slowing: step_ticks takes TALL_GRASS_TICK_SCALE 1.25 into standing grass
   (a ford's 2.0 first). Routes take no cost for it (FORD_COST stays the
   only one): too small to reroute anyone.
-- Trampling: try_move's step onto standing grass by a body of TRAMPLE_MASS
+- Trampling: try_move's step off standing grass by a body of TRAMPLE_MASS
   40 or more (a player, a goblin, a deer; not a rabbit) flattens it for
   TRAMPLE_DAYS 2 (World.trampled: level -> {cell: the step it stands
   again}); flat, it has no cover and does not slow. The world tick stands
@@ -14532,3 +14532,9 @@ was never told which tables there are, so it could only guess the names.
   read from levels/loot.json. A new table needs nothing in builder.
 
 Protocol unchanged. builder_test _test_loot.
+
+Amended (enemy-ai, wiring Senses): the cell a body steps off is flattened,
+not the one it steps into. Trampling on the way in left every player
+standing on flat grass, cover 0, so only kobolds and rabbits could hide;
+now the walker leaves a trail behind (drawn, giving the way away) and the
+cell it stands in keeps hiding it until it moves on. Same data and wire.

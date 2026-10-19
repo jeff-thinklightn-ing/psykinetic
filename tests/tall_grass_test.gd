@@ -3,8 +3,9 @@ extends Node
 ## grass meadow: the "tall_grass" kind read as grass ground, floor, listed
 ## in the terrain; one under a building left out, said; World.cover_at
 ## TALL_GRASS_COVER on it and 0 elsewhere and off the map; a step into it
-## takes TALL_GRASS_TICK_SCALE; a body of TRAMPLE_MASS or more stepping in
-## flattens it (no cover, no slowing, grass_changed), a lighter one not; it
+## takes TALL_GRASS_TICK_SCALE; a body of TRAMPLE_MASS or more stepping on
+## flattens the cell it left (no cover, no slowing, grass_changed), the one
+## it stands in hiding it still, a lighter one flattens none; it
 ## stands again on the world tick after TRAMPLE_DAYS; the trampled set
 ## round-trips through the snapshot's form and a client's "grass" messages;
 ## TallGrass.lay grows meadow patches and a wood's edge on grass only, clear
@@ -90,17 +91,20 @@ func _test_trample() -> void:
 	World._relocate(player, Vector2i(3, 3))
 	player.next_move_tick = 0
 	_check(player.mass >= World.TRAMPLE_MASS and World.try_move(player, Vector2i(1, 0)) and player.tile == Vector2i(4, 3), "the player (%.0f) steps in" % player.mass)
-	_check(World.is_trampled(Vector2i(4, 3)) and World.cover_at(Vector2i(4, 3)) == 0.0 and World.is_tall_grass(Vector2i(4, 3)),
-		"it is trampled flat: no cover, still tall grass")
+	_check(not World.is_trampled(Vector2i(4, 3)) and World.cover_at(Vector2i(4, 3)) > 0.0 and told.is_empty(), "standing in it, it hides them")
+	player.next_move_tick = 0
+	_check(World.try_move(player, Vector2i(1, 0)) and player.tile == Vector2i(5, 3), "a step on")
+	_check(World.is_trampled(Vector2i(4, 3)) and World.cover_at(Vector2i(4, 3)) == 0.0 and World.is_tall_grass(Vector2i(4, 3))
+		and World.cover_at(Vector2i(5, 3)) > 0.0, "the cell left is trampled flat, a trail: no cover, still tall grass; the one stood in hides")
 	_check(told.size() == 1 and told[0][0] == "tg_meadow" and Array(told[0][1]) == [4, 3], "and grass_changed said so (%s)" % [told])
 	World._relocate(player, Vector2i(3, 3))
 	_check(is_equal_approx(World.step_ticks(player, Vector2i(1, 0)), player.move_ticks), "a step onto the flattened cell is not slowed")
 	var mass := player.mass
 	player.mass = World.TRAMPLE_MASS - 1.0
-	World._relocate(player, Vector2i(3, 4))
+	World._relocate(player, Vector2i(4, 4))
 	player.next_move_tick = 0
 	World.try_move(player, Vector2i(1, 0))
-	_check(player.tile == Vector2i(4, 4) and not World.is_trampled(Vector2i(4, 4)) and World.cover_at(Vector2i(4, 4)) > 0.0, "a lighter body goes through, the grass standing")
+	_check(player.tile == Vector2i(5, 4) and not World.is_trampled(Vector2i(4, 4)) and World.cover_at(Vector2i(4, 4)) > 0.0, "a lighter body goes through, the grass standing")
 	player.mass = mass
 	World.steps += int(World.TRAMPLE_DAYS * DayNight.day_steps) - 10
 	World.world_tick()

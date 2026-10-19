@@ -209,7 +209,7 @@ const DIAGONAL_TICK_SCALE := 1.5
 const FORD_TICK_SCALE := 2.0
 ## Tall grass (decision 508): the cover of a cell of it standing (0..1;
 ## Senses reads cover_at), a step into it so many times as long, and a body
-## of TRAMPLE_MASS or more stepping into it flattens it for TRAMPLE_DAYS
+## of TRAMPLE_MASS or more stepping off it flattens it for TRAMPLE_DAYS
 ## (no cover, no slowing), standing again on the world tick after.
 const TALL_GRASS_COVER := 0.7
 const TALL_GRASS_TICK_SCALE := 1.25
@@ -3976,7 +3976,7 @@ func try_move(entity: GridEntity, direction: Vector2i) -> bool:
 		return false
 	entity.next_move_tick = start + duration
 	entity.last_step_tick = tick  # (A braced spear stands still: braced.)
-	_trample(entity, entity.tile)
+	_trample(entity, entity.tile - direction)
 	if entity.raised == "draw":
 		entity.raised_tick = tick  # A step spoils the draw: it starts again.
 	entity._world_set_facing(direction)
@@ -5138,8 +5138,9 @@ func _trampled_of(level: String) -> Dictionary:
 	return trampled[level]
 
 
-## [param entity] stepped onto [param at]: standing tall grass under a body
-## of TRAMPLE_MASS or more is flattened for TRAMPLE_DAYS.
+## [param entity] stepped off [param at]: standing tall grass left by a
+## body of TRAMPLE_MASS or more is flattened for TRAMPLE_DAYS, a trail
+## behind it, while the cell it stands in keeps hiding it (508 amended).
 func _trample(entity: GridEntity, at: Vector2i) -> void:
 	if entity.mass < TRAMPLE_MASS or not is_tall_grass(at):
 		return
