@@ -524,6 +524,15 @@
 			"volume_db": 0.0,
 			"uses": "a body or thing falling into water; a body shoved into water, a thing thrown into it (Client3D._on_pushed, _pile_sounds)"
 		},
+		"sfx.grass_rustle": {
+			"category": "movement",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": null,
+			"range": 4,
+			"volume_db": -6.0,
+			"uses": "a step into standing tall grass, over the footstep; Client3D._step_sound, heard as far as the step"
+		},
 		"sfx.door_wood_open": {
 			"category": "doors",
 			"type": "oneshot",

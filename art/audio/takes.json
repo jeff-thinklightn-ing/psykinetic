@@ -1237,6 +1237,35 @@
 				"license": "CC0 1.0"
 			}
 		],
+		"sfx.grass_rustle": [
+			{
+				"file": "sfx.grass_rustle.ogg",
+				"from": "freesound",
+				"original": "freesound 396014: Rustling Grass 1.wav",
+				"sha256": "7cad72d7a777d84467eaba7f5cd4f447bd1917aae122d584d97619e4b731c78d",
+				"by": "morganpurkis",
+				"url": "https://freesound.org/people/morganpurkis/sounds/396014/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.grass_rustle.2.ogg",
+				"from": "freesound",
+				"original": "freesound 396013: Rustling Grass 2.wav",
+				"sha256": "33fc0324bd50b879bf990bd9134e0f3d443c568d7c99f37b88408fb8d6da8ea3",
+				"by": "morganpurkis",
+				"url": "https://freesound.org/people/morganpurkis/sounds/396013/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.grass_rustle.3.ogg",
+				"from": "freesound",
+				"original": "freesound 396016: Rustling Grass 4.wav",
+				"sha256": "1fe5e3efc7ff5bf3f0a80ad1672a8c204d9c8287f83c869538a48a920558cf68",
+				"by": "morganpurkis",
+				"url": "https://freesound.org/people/morganpurkis/sounds/396016/",
+				"license": "CC0 1.0"
+			}
+		],
 		"sfx.hit_blade_armor": [
 			{
 				"file": "sfx.hit_blade_armor.ogg",

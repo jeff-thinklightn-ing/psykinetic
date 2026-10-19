@@ -14573,3 +14573,26 @@ not the one it steps into. Trampling on the way in left every player
 standing on flat grass, cover 0, so only kobolds and rabbits could hide;
 now the walker leaves a trail behind (drawn, giving the way away) and the
 cell it stands in keeps hiding it until it moves on. Same data and wire.
+
+
+## 508, sound's side: a step into tall grass rustles
+
+Maps' tall grass, the coordinator's routing: a rustle as a step's variant,
+nothing new in Senses. sfx.grass_rustle (3 Freesound takes, CC0: 396013,
+396014, 396016; range 4) plays over the footstep, as far as the step is
+heard (Senses.step_radius), when Client3D._step_sound's creature steps into
+standing tall grass (World.cover_at > 0). Trampled grass is quiet, except
+for the step that flattened it: Client3D notes the cells World.grass_changed
+reports flat (_flattened, kept FLATTENED_MS 1000), and rustles(tile,
+flattened, now) counts them. A heavy body's step therefore rustles whether
+the server's "grass" news arrives before its step or after it (on a host,
+World._trample flattens the cell before the view sees the step).
+
+view_test: a step into tall grass plays the footstep then the rustle (a
+placeholder blip where the takes are absent); rustles() for trampled and
+just-trampled grass, and off it.
+
+Rejected: rustling on trampled grass too (maps: a flattened path is quiet,
+which is the point of a trodden line); a rustle in place of the grass
+footstep (the step's weight would be lost); a sim noise for it (the
+coordinator: nothing new in Senses).

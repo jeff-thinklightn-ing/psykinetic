@@ -1091,6 +1091,11 @@ const CHATTER_SECONDS := Vector2(8.0, 25.0)
 var _last_hp: Dictionary[int, int] = {}
 ## Entity instance id -> its tile as last seen, for footsteps.
 var _last_tile: Dictionary[int, Vector2i] = {}
+## Tall grass trampled just now (decision 508): cell -> when (ms), so the
+## step that flattens it still rustles, whether the "grass" news comes
+## before the step or after it.
+var _flattened: Dictionary[Vector2i, int] = {}
+const FLATTENED_MS := 1000
 ## Arrows in flight (_on_shot): {end: its last cell, arrive: msec, heard:
 ## whether a body's hit or guard was heard for it}; what stopped one that
 ## hit no body is heard as it arrives (_arrow_landed).
@@ -2759,6 +2764,8 @@ func _build_room() -> void:
 	# Every door's leaf set once; from then on those that change.
 	if not World.door_shown.is_connected(_on_door_shown):
 		World.door_shown.connect(_on_door_shown)
+	if not World.grass_changed.is_connected(_on_grass_changed):
+		World.grass_changed.connect(_on_grass_changed)
 	for door in World.get_doors():
 		_doors_due[door.key] = true
 	_show_piles()
@@ -6538,6 +6545,26 @@ func _step_sound(entity: GridEntity, puppet: Node3D) -> void:
 		var ground: String = "water" if wet else _ground_kinds.get(entity.tile, "stone")
 		var creature := str(entity.spawn_spec.get("kind", "")) if entity is Monster else ""
 		sfx.play(SoundKit.footstep(ground, entity.mass, creature), puppet.position, 1.0, 0.0, Senses.step_radius(entity))
+		if rustles(entity.tile, _flattened.get(entity.tile, -FLATTENED_MS), Time.get_ticks_msec()):
+			sfx.play("sfx.grass_rustle", puppet.position, 1.0, 0.0, Senses.step_radius(entity))
+
+
+## Whether a step into [param tile] rustles: standing tall grass (decision
+## 508), or tall grass flattened at [param flattened] (ms) within
+## FLATTENED_MS of [param now] (that step's own trampling).
+static func rustles(tile: Vector2i, flattened: int, now: int) -> bool:
+	return World.cover_at(tile) > 0.0 or World.is_tall_grass(tile) and now - flattened < FLATTENED_MS
+
+
+## Tall grass trampled ([param flat], flat [x, y, ...]) noted for
+## rustles(); a full "grass" message (both empty) notes nothing.
+func _on_grass_changed(_level: String, flat: PackedInt32Array, _stood: PackedInt32Array) -> void:
+	var now := Time.get_ticks_msec()
+	for i in range(0, flat.size() - 1, 2):
+		_flattened[Vector2i(flat[i], flat[i + 1])] = now
+	for cell: Vector2i in _flattened.keys():
+		if now - _flattened[cell] >= FLATTENED_MS:
+			_flattened.erase(cell)
 
 
 ## A blow landed: a thud on flesh for an attack (an impact makes its own

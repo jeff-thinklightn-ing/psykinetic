@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Wading into tall grass rustles; a trodden path through it is quiet.
 - Tall grass: a new cell kind that hides whoever stands in it, slows you a little and is trampled flat where people walk, growing back in two days. The level editor paints it and can fill an area with meadow patches and wood edges; the sample level has a patch (508).
 - A drawn bow no longer shows a percentage: the aim ring on the target closes in and turns brass as the draw completes, the body draws (pc-character) and the string creaks higher (sound); F3 keeps the number.
 - Builder mode knows the loot tables: asked for "a chest of supplies" or "an armoury", Claude picks the right table and knows what each can hold.

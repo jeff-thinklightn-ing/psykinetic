@@ -442,6 +442,18 @@ func _test_sounds_follow_events() -> void:
 			"sfx.door_wood_open" if door.open else "sfx.door_wood_close"], "a door: open or close, as it went")
 	_check(_heard(func() -> void: World._relocate(imp, imp.tile + Vector2i(0, 1)); _rig._process(0.0)).any(func(slot: String) -> bool: return slot.begins_with("sfx.footstep_stone_")),
 			"a creature's tile moves on: a footstep")
+	# Tall grass (decision 508): a step into it rustles over the footstep;
+	# none once trampled flat, but the trampling step itself does.
+	var grass_at := imp.tile + Vector2i(0, 1)
+	var had_grass: Array = _rig._terrain.get("tall_grass", [])
+	World._load_cover({"tall_grass": [grass_at]})
+	var into := _heard(func() -> void: World._relocate(imp, grass_at); _rig._process(0.0))
+	_check(into.size() == 2 and into[1] == "sfx.grass_rustle", "into tall grass: a rustle over the step (%s)" % [into])
+	_check(Client3D.rustles(grass_at, -Client3D.FLATTENED_MS, 0) == (World.cover_at(grass_at) > 0.0)
+			and Client3D.rustles(grass_at, 500, 600) and not Client3D.rustles(imp.tile + Vector2i(5, 5), 500, 600),
+			"trampled: only the step that flattened it rustles; none off the grass")
+	World._trampled_of(World.fields.level).erase(grass_at)
+	World._load_cover({"tall_grass": had_grass})
 	var pitch_light := _swing_pitch(imp)
 	var pitch_heavy := _swing_pitch(player)
 	_check(pitch_light > pitch_heavy, "an imp's swing is higher than a player's (%.2f, %.2f)" % [pitch_light, pitch_heavy])
