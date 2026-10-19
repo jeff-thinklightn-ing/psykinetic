@@ -79,6 +79,13 @@ var hunt := Callable()
 ## (town, site place) -> the kind caught: a hunter hunting at the town's
 ## hunting ground (decision 521); hunt's at the store without one.
 var hunt_at := Callable()
+## (town) -> {resource: count} the town's next build lacks (Towns.shortfall's
+## needs; 522 amended (2)): a maker working one of those works on the
+## town's account.
+var build_lacks := Callable()
+## (town, worker id, gold, why, resource): Economy.owe_or_pay, the town's
+## wage for work on its account, owed when the treasury is at its floor.
+var town_pays := Callable()
 ## Workers on the way to or at their trade's site: worker id -> the step
 ## they are back (decision 521).
 var _trips: Dictionary = {}
@@ -817,7 +824,15 @@ func _finish(each: Dictionary, cat: Dictionary) -> void:
 		# its own work to use (the mend, the buckler: decision 405 amended),
 		# bought from its maker (498); one the store won't take stays theirs.
 		for what: String in yields:
-			taken = deliver_to(each["town"], str(worker_record["id"]), what, int(yields[what]), worker_record["name"], "made at %s" % each["workshop"]) and taken
+			if bool(each.get("account", false)):
+				# Made on the town's account for its build: the town's, its
+				# maker paid a wage for the work (522 amended (2)).
+				taken = stockpile.deposit(each["town"], what, int(yields[what]), worker_record["name"], "made at %s for the town's build" % each["workshop"], str(worker_record["id"])) and taken
+			else:
+				taken = deliver_to(each["town"], str(worker_record["id"]), what, int(yields[what]), worker_record["name"], "made at %s" % each["workshop"]) and taken
+		if bool(each.get("account", false)) and town_pays.is_valid():
+			town_pays.call(each["town"], str(worker_record["id"]), int(rules.get("store", {}).get("account_wage", 0)),
+				"making %s for the town's build" % each["recipe"], yields.keys()[0] if not yields.is_empty() else "")
 		if taken:
 			book().end(uid, "banked", "%s by %s" % [each["town"], worker_record["name"]])
 	if not taken and uid != 0:
@@ -1356,6 +1371,18 @@ func _order_bid(shop: Dictionary, id: int, starved: int) -> Dictionary:
 		"rework": int(each.get("rework", 0)), "key": [starved, 0, 0.0, -int(shop["waited"]), shop["id"]]}
 
 
+## Whether [param recipe] yields a raw [param town]'s next build lacks
+## (522 amended (2)).
+func _for_build(town: String, recipe: String, cat: Dictionary) -> bool:
+	if not build_lacks.is_valid():
+		return false
+	var yields := Items.yield_of(recipe)
+	if yields.is_empty() or not cat.has(recipe):
+		return false
+	var lacking: Dictionary = build_lacks.call(town)
+	return yields.keys().any(func(what: Variant) -> bool: return lacking.has(str(what)))
+
+
 ## Whether [param town]'s stockpile has what [param made] needs: its
 ## "from", or for a rework one of its first resource.
 ## What [param town]'s store lacks for [param bid] ("wood 8 of 8, ore 1 of
@@ -1438,6 +1465,10 @@ func _start(bid: Dictionary, cat: Dictionary) -> bool:
 	# the town's account, like its own work: a cook at her loan cap still cooks.
 	var on_town: bool = cat.has(bid["recipe"]) and cat[bid["recipe"]].get("tags", []).any(func(tag: Variant) -> bool:
 		return str(tag) in rules.get("store", {}).get("town_account", []))
+	# So is a raw the town's next build lacks (522 amended (2): the
+	# tanner's leather while the inn waits on it), whatever its maker's purse.
+	var for_build: bool = bid["kind"] == "make" and _for_build(town, bid["recipe"], cat)
+	on_town = on_town or for_build
 	if buy_materials.is_valid() and bid["kind"] in ["make", "rework"] and not on_town:
 		var raws := {}
 		for what: String in needs:
@@ -1449,6 +1480,8 @@ func _start(bid: Dictionary, cat: Dictionary) -> bool:
 	_unpaid.erase(bid["workshop"])
 	var id: int = bid["job"] if int(bid["job"]) != 0 else _new_job(bid["kind"], bid["recipe"], shop)
 	var each: Dictionary = _jobs[id]
+	if for_build:
+		each["account"] = true
 	var reason := "job #%d" % id
 	for what: String in needs:
 		if what in Stockpile.RESOURCES:

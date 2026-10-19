@@ -57,6 +57,8 @@ func _run(days: int, thief: String, merchant: String, field: bool) -> void:
 	work.deliver = economy.deliver
 	work.buy_materials = economy.buy_materials
 	economy.shortfall = towns.shortfall
+	work.build_lacks = func(town: String) -> Dictionary: return towns.shortfall(town).get("needs", {})
+	work.town_pays = economy.owe_or_pay
 	work.settle_fund = economy.settle_fund
 	economy.building_stands = func(town: String, kind: String) -> bool:
 		var house := towns.building(town, kind)

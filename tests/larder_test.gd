@@ -45,6 +45,7 @@ func _ready() -> void:
 	_test_caravan()
 	_test_luxury()
 	_test_head_first()
+	_test_account()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -825,6 +826,50 @@ func _test_head_first() -> void:
 	economy.tick()
 	_check(int(work.worker("z1")["owed"]) == 0 and int(work.worker("a1")["owed"]) == weaver,
 		"gold comes in: the tanner, whose leather the inn lacks, is paid first; the weaver waits (%d, %d)" % [int(work.worker("z1")["owed"]), int(work.worker("a1")["owed"])])
+
+
+## While the next build lacks a raw, its maker makes it on the town's
+## account (522 amended (2)): materials from the store at no charge, the
+## raw the town's, a wage for the work; a broke tanner still makes the
+## inn's leather.
+func _test_account() -> void:
+	print("
+== made on the town's account for its build ==")
+	_now = 0
+	var clock := func() -> int: return _now
+	var stock := Stockpile.new({}, clock, ItemBook.new(clock))
+	var work := Production.new({}, stock, null, clock, _rules)
+	var economy := Economy.new({}, stock, work, clock, _rules)
+	var towns := Towns.new({}, work, _rules, clock)
+	work.deliver = economy.deliver
+	work.buy_materials = economy.buy_materials
+	work.build_lacks = func(town: String) -> Dictionary: return towns.shortfall(town).get("needs", {})
+	work.town_pays = economy.owe_or_pay
+	economy.shortfall = towns.shortfall
+	var floor_gold := int(_rules["gold_floor"])
+	stock.deposit(TOWN, "gold", floor_gold + 50)
+	stock.deposit(TOWN, "hide", 4)
+	work.add_worker("t1", "Hew", ["tanner"], TOWN, "test", "steady")
+	work.set_loan("t1", float(_rules["bank"]["cap"]))
+	work.add_workshop("%s:tannery" % TOWN, "tanner", TOWN)
+	work.assign("%s:tannery" % TOWN, "t1")
+	towns._town(TOWN)["buildings"]["tannery"] = {"kind": "tannery", "level": 1, "state": Towns.STANDING, "since": 0, "job": 0}
+	for i in 10:
+		_now += 300
+		work.tick()
+	_check(stock.count(TOWN, "leather") == 0, "no build waiting: a tanner at his loan cap makes nothing (he can't buy hides)")
+	work.order_build(TOWN, "inn", "carpenter", {"wood": 0, "leather": 5}, 1200)
+	var gold := stock.count(TOWN, "gold")
+	for i in 20:
+		_now += 300
+		work.tick()
+	var wage := int(_rules["store"]["account_wage"])
+	_check(stock.count(TOWN, "leather") == 2 and stock.count(TOWN, "hide") == 0, "the inn lacks leather: he makes it from the store's hides (%d leather)" % stock.count(TOWN, "leather"))
+	_check(int(work.worker("t1")["purse"]) == 2 * wage and stock.count(TOWN, "gold") == gold - 2 * wage,
+		"paid %d a piece for the work, by the treasury; nothing for the leather, the town's" % wage)
+	# The hooks hold economy and towns, which hold the production: let go, or they outlive the test.
+	work.build_lacks = Callable()
+	work.town_pays = Callable()
 
 
 func _check(ok: bool, what: String) -> void:

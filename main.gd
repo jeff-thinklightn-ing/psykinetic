@@ -2225,6 +2225,8 @@ func _boot() -> void:
 	World.economy.owed_paid.connect(func(player_id: String, gold: int) -> void: World.gold_changed.emit(player_id, gold))
 	# Players' contributions toward the next build (decision 499).
 	World.economy.shortfall = World.towns.shortfall
+	World.production.build_lacks = func(town: String) -> Dictionary: return World.towns.shortfall(town).get("needs", {})
+	World.production.town_pays = World.economy.owe_or_pay
 	# Caravans to market over maps' trade routes (decision 504, economy's side).
 	if World.trade != null:
 		World.economy.trade_routes = func(town: String) -> Array:

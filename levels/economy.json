@@ -50,7 +50,7 @@
 	"rent_every": 54000,
 	"gold_floor": 5,
 	"start_gold": 150, "start_food": 120,
-	"store": {"buy": 1.0, "sell": 1.1, "owed_cap": 30, "town_account": ["food"]},
+	"store": {"buy": 1.0, "sell": 1.1, "owed_cap": 30, "town_account": ["food"], "account_wage": 3},
 	"haul": {"trade": "hauler", "load": 5, "fee": 1},
 	"apprentice": {"from": "hauler", "above": 60, "days": 3, "below": 20, "wage": 2, "speed": 1.25},
 	"official": {"guard": {"wage": 4, "every": 18000}, "priest": {"wage": 4, "every": 18000},

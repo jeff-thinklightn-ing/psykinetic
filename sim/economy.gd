@@ -774,6 +774,13 @@ func _pay_owed(id: String, town: String) -> void:
 			production.set_owed(id, owed)
 
 
+## The town pays worker [param id] [param amount] for [param why] from its
+## treasury above its floor, the rest owed them (Production's work on the
+## town's account, 522 amended (2)); [param what] the resource it was for.
+func owe_or_pay(town: String, id: String, amount: int, why: String, what := "") -> void:
+	_owe_or_pay(town, id, amount, why, what)
+
+
 ## Before anyone else, the treasury pays those it owes for what each
 ## town's next build lacks (522 amended, the coordinator: the tanner while
 ## the inn waits on leather), so the build isn't held up by a debt the

@@ -12,6 +12,8 @@ notes (decision 324).
 - Bookshelves are rebuilt with shelves you can see and rows of books in leathers and muted colours.
 - The ground no longer looks like polygons (524): grass, dirt, stone and sand meet along soft, ragged edges that wander freely, and grass wears through the dirt in patches.
 - Beds are rebuilt in clean planks: a posted frame, a mattress and pillow, and a blue-grey wool blanket folded back.
+- While a building waits on something a town worker makes, such as the inn's leather, the worker makes it for the town from the store's materials and is paid a wage, even if he is too poor to buy the materials himself (522).
+
 - Dirt is soft, mottled earth instead of a patchwork of flat polygons.
 - Tables are rebuilt in clean planks: a planked top on cleats, square legs and stretchers.
 - Builder mode reads a level's relief: it refuses a building on ground that isn't flat (naming the cell off), counts a rise over 0.45 m as a cliff when it checks ways to work sites and things, shows the ground in half metres, and leaves shaping the ground to the editor (527).

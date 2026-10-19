@@ -15391,6 +15391,23 @@ left, 8192 right.
   same 128 MB and a little more fill. If a low preset comes it sets
   SUN_SHADOW_SIZE back to 4096.
 Client only, protocol unchanged.
+Amended (2), the coordinator's (A): while the town's next build lacks a
+raw (Towns.shortfall's needs), its maker makes it on the town's account,
+498's store.town_account mechanism (the cook's meals) for that build only:
+the materials from the store at no charge (Production._for_build, the
+job's "account"), the raw the town's (deposited, not bought), and the
+maker paid store.account_wage (3) for the job from the treasury above its
+floor, owed if not (Economy.owe_or_pay, so it is among the head build's
+debts paid first). Main and tools/town_balance wire Production.build_lacks
+and town_pays. Soak (30 days, 3 players, against a baseline on the same
+main): the inn stood on day 16.2 (not in 30 days), the tanner making 9
+pieces of leather for it; the tanner's loan 20 at the end (25); officials
+unpaid 200 (198), treasury end 5 (1). Still true, and not hidden by this:
+a maker whose trade doesn't pay his keep (the tanner's margin on leather,
+about 1.4 gold over two hides, against about 3 a day) is a finding for
+the luxury step (514) and the apprentices (498 amended); this only stops
+it holding up the town's building. larder_test _test_account.
+
 ## 522 amended: the head build's suppliers paid first
 
 The coordinator, on 522's soak (the inn 2 leather short as the treasury
