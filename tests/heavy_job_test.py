@@ -247,6 +247,40 @@ with open(gate._path("heavy_jobs.log")) as log:
     text = log.read()
 check("\tnested\tinner\tbench\tinside outer bench" in text, "the log says it ran inside the outer run")
 
+print("== a run's limit ==")
+check(gate.limit_seconds({"max_minutes": 90}) == 5400.0, "no runs recorded: the kind's max_minutes")
+check(gate.limit_seconds({"runs_s": [100.0, 120.0, 90.0]}) == gate.OVERRUN_FLOOR_SECONDS, "short runs: the floor")
+check(gate.limit_seconds({"runs_s": [1000.0, 1200.0, 900.0, 5000.0]}) == 3 * 1100.0, "3x the median of the runs")
+check(gate.limit_seconds({"runs_s": [100.0], "max_minutes": 90}, expect_minutes=600) == 36000.0, "--expect over all")
+check(gate.limit_seconds({}) is None, "a kind with neither: no limit")
+window = gate.HUNG_SECONDS
+check(gate.hung([(0.0, 0.0), (window, 1.0)], window, 0.0)[0], "1 s of CPU in the window: hung")
+check(not gate.hung([(0.0, 0.0), (window, 0.2 * window)], window, 0.0)[0], "a fifth of a core (npc's soak): not hung")
+check(not gate.hung([(0.0, 0.0), (window - 1, 0.0)], window - 1, 0.0)[0], "not before the window has run")
+
+print("== a run over its limit, hung, or busy ==")
+sleeper = [sys.executable, "-c", "import time; time.sleep(60)"]
+began = time.time()
+code = gate.run("slow", "bench", sleeper, expect_minutes=0.05)
+check(code == gate.STOPPED_CODE and time.time() - began < 30, "over its --expect: stopped, exit 5 (got %s after %.0f s)" % (
+    code, time.time() - began))
+check(not gate._entries("running"), "and nothing left held")
+real_window, gate.HUNG_SECONDS = gate.HUNG_SECONDS, 4.0
+began = time.time()
+code = gate.run("idle", "bench", sleeper)
+check(code == gate.STOPPED_CODE and time.time() - began < 30, "idle the whole window: stopped as hung, exit 5 (got %s after %.0f s)" % (
+    code, time.time() - began))
+code = gate.run("busy", "bench", [sys.executable, "-c", "import time\nend = time.time() + 8\nwhile time.time() < end: pass"])
+check(code == 0, "busy the whole window: left to finish (got %s)" % code)
+gate.HUNG_SECONDS = real_window
+runs = gate.kinds()["bench"].get("runs_s", [])
+check(runs and runs[-1] >= 7.0, "a clean run's time recorded for the kind's limit: %s" % runs)
+with open(gate._path("heavy_jobs.log")) as log:
+    text = log.read()
+check("\toverrun\tslow\tbench\t" in text and "\thung\tidle\tbench\t" in text, "the log says overrun and hung")
+busy = [line.split("\t")[1] for line in text.splitlines() if "\tbusy\tbench\t" in line]
+check("overrun" not in busy and "hung" not in busy, "and the busy one neither: %s" % busy)
+
 shutil.rmtree(STATE, ignore_errors=True)
 print("\nRESULT: %s" % ("PASS" if failed == 0 else "FAIL (%d failed)" % failed))
 sys.exit(1 if failed else 0)

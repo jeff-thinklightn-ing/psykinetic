@@ -38,12 +38,23 @@ under it (frame_budget.ps1 inside a gated bench script) neither queues nor
 releases, since the outer run holds the room and measures its whole tree;
 before this, such a run queued behind its own parent forever.
 
+A run has a time limit (limit_seconds): its --expect minutes, else
+OVERRUN_FACTOR times the median of its kind's last RUN_HISTORY clean runs
+(never under OVERRUN_FLOOR_SECONDS), else its kind's max_minutes. Past it,
+or using under HUNG_CPU of a core for HUNG_SECONDS (kinds off the GPU), its
+own wrapper stops it, logs "overrun" or "hung" and exits 5, not queued
+again: a bench stuck on a parse error, or crawling, held the one bench
+slot 10 h on 2026-10-17 and 7.6 h on 2026-10-18 with landings behind it.
+A soak meant to run for hours says so with --expect.
+
 State and log live outside the repo, in STATE_DIR (HEAVY_JOBS_DIR to put
 them elsewhere, as the test does): running/ and queue/ hold a file a job,
 kinds.json the estimates and caps (edit a kind's max_running there to
 tune it), heavy_jobs.log a line an event (`summary`).
 
-  heavy_job.py run <tree> <kind> -- <command...>   wait, run, release; the command's exit code
+  heavy_job.py run <tree> <kind> [--expect MIN] -- <command...>
+                                                   wait, run, release; the command's exit code (5: stopped,
+                                                   over its limit or hung; a long soak passes --expect MIN)
   heavy_job.py take <tree> <kind> [--pid N]        wait, then hold a place (scripts that cannot wrap);
                                                    N a Windows process id (Git Bash: $(cat /proc/$$/winpid))
   heavy_job.py release <tree> <kind>               give back what take held
@@ -87,14 +98,26 @@ TAKE_STALE_SECONDS = 30 * 60
 LONG_WAIT_SECONDS = 5 * 60
 ## The state's own lock, if its holder died holding it.
 LOCK_STALE_SECONDS = 30
-## The kinds and their first estimates (GB), before any is measured.
+## A run's limit: this many times its kind's median clean run, at least the
+## floor; how many runs the median reads.
+OVERRUN_FACTOR = 3.0
+OVERRUN_FLOOR_SECONDS = 30 * 60
+RUN_HISTORY = 9
+## A run off the GPU using under this share of one core over the last
+## HUNG_SECONDS (and running that long) is hung.
+HUNG_CPU = 0.03
+HUNG_SECONDS = 10 * 60
+## Exit code of a run its wrapper stopped as over its limit or hung.
+STOPPED_CODE = 5
+## The kinds and their first estimates (GB), before any is measured;
+## max_minutes: the limit before the kind has recorded runs.
 KINDS = {
     "trellis_mesh": {"ram_gb": 9.0, "gpu_gb": 12.0, "gpu": True},
     "comfy_batch": {"ram_gb": 6.0, "gpu_gb": 10.0, "gpu": True},
-    "suite": {"ram_gb": 6.5, "gpu_gb": 0.0, "gpu": False, "max_running": 1, "excludes": ["bench"]},  # tests/land.sh: 6.3 GB measured
-    "bench": {"ram_gb": 3.0, "gpu_gb": 0.0, "gpu": False, "max_running": 1, "excludes": ["suite"]},
-    "godot_import": {"ram_gb": 2.0, "gpu_gb": 0.0, "gpu": False},
-    "godot_export": {"ram_gb": 3.0, "gpu_gb": 0.0, "gpu": False},
+    "suite": {"ram_gb": 6.5, "gpu_gb": 0.0, "gpu": False, "max_running": 1, "excludes": ["bench"], "max_minutes": 90},  # tests/land.sh: 6.3 GB measured
+    "bench": {"ram_gb": 3.0, "gpu_gb": 0.0, "gpu": False, "max_running": 1, "excludes": ["suite"], "max_minutes": 90},
+    "godot_import": {"ram_gb": 2.0, "gpu_gb": 0.0, "gpu": False, "max_minutes": 90},
+    "godot_export": {"ram_gb": 3.0, "gpu_gb": 0.0, "gpu": False, "max_minutes": 90},
 }
 GB = 1024.0 ** 3
 
@@ -181,6 +204,35 @@ def should_stop(me, running, free_ram_gb):
     if free_ram_gb >= MARGIN_GB:
         return False
     return all(each["started"] <= me["started"] for each in running)
+
+
+def limit_seconds(row, expect_minutes=None):
+    """How long a run of [row]'s kind may hold the gate: [expect_minutes]
+    when given, else OVERRUN_FACTOR times the median of its recorded runs
+    ("runs_s"), never under the floor, else its max_minutes; None: no limit."""
+    if expect_minutes is not None:
+        return expect_minutes * 60.0
+    runs = sorted(row.get("runs_s", []))
+    if runs:
+        middle = len(runs) // 2
+        median = runs[middle] if len(runs) % 2 else (runs[middle - 1] + runs[middle]) / 2.0
+        return max(OVERRUN_FLOOR_SECONDS, OVERRUN_FACTOR * median)
+    if row.get("max_minutes") is not None:
+        return row["max_minutes"] * 60.0
+    return None
+
+
+def hung(samples, now, started):
+    """Whether a run is hung: running HUNG_SECONDS, and over the last
+    HUNG_SECONDS of [samples] ((time, cpu seconds), oldest first) its CPU
+    under HUNG_CPU of a core. Also the share, or None before it is known."""
+    if now - started < HUNG_SECONDS:
+        return False, None
+    then = [each for each in samples if each[0] <= now - HUNG_SECONDS]
+    if not then or samples[-1][1] is None or then[-1][1] is None:
+        return False, None
+    share = (samples[-1][1] - then[-1][1]) / max(1e-9, samples[-1][0] - then[-1][0])
+    return share < HUNG_CPU, share
 
 
 def updated_estimate(old_gb, peak_gb):
@@ -338,6 +390,23 @@ class Job:
                 ctypes.sizeof(limits), None):  # 9: JobObjectExtendedLimitInformation
             return 0.0
         return limits.peak_job / GB
+
+    def cpu_seconds(self):
+        """The CPU time (user and kernel) the job's processes have used, the
+        ended ones' too; None when not known."""
+        if self.handle is None:
+            return None
+
+        class Accounting(ctypes.Structure):
+            _fields_ = [("user", ctypes.c_longlong), ("kernel", ctypes.c_longlong),
+                ("period_user", ctypes.c_longlong), ("period_kernel", ctypes.c_longlong),
+                ("faults", ctypes.c_ulong), ("processes", ctypes.c_ulong), ("active", ctypes.c_ulong),
+                ("terminated", ctypes.c_ulong)]
+        accounting = Accounting()
+        if not ctypes.windll.kernel32.QueryInformationJobObject(ctypes.c_void_p(self.handle), 1, ctypes.byref(accounting),
+                ctypes.sizeof(accounting), None):  # 1: JobObjectBasicAccountingInformation
+            return None
+        return (accounting.user + accounting.kernel) / 1e7  # 100 ns units
 
     def stop(self):
         """Stops the child and everything it started."""
@@ -568,7 +637,7 @@ def _outer_run():
     return None
 
 
-def run(tree, kind, command):
+def run(tree, kind, command, expect_minutes=None):
     # A gated run inside another (frame_budget.ps1 under a bench script run
     # through the gate) would queue behind its own parent forever: the outer
     # run already holds the room and measures every process under it.
@@ -592,6 +661,8 @@ def run(tree, kind, command):
         peak, low, stopped, long_logged = 0.0, 0, False, False
         gpu_peak = 0.0
         row = kinds()[kind]
+        limit = limit_seconds(row, expect_minutes)
+        samples, ended = [(started, job.cpu_seconds())], None
         while child.poll() is None:
             time.sleep(WATCH_SECONDS)
             using = job.using_gb()
@@ -599,12 +670,28 @@ def run(tree, kind, command):
             if row["gpu"]:
                 _, used = gpu_gb()
                 gpu_peak = max(gpu_peak, used or 0.0)
+            now = time.time()
+            samples.append((now, job.cpu_seconds()))
+            while len(samples) > 2 and samples[1][0] <= now - HUNG_SECONDS:
+                samples.pop(0)  # Keeps one sample at or past the window's start.
+            idle, share = hung(samples, now, started)
             with StateLock():
                 entry = _read(_path("running", name))
                 if entry is not None:
                     entry["using_gb"] = using
+                    entry["limit_s"] = limit
+                    entry["cpu_share"] = share
                     _write(_path("running", name), entry)
                 running = _entries("running")
+            if limit is not None and now - started >= limit:
+                ended = ("overrun", "over its limit of %.0f min (%s)" % (limit / 60,
+                    "--expect" if expect_minutes is not None else "%g x its kind's median run, or its max_minutes" % OVERRUN_FACTOR))
+            elif idle and not row["gpu"]:
+                ended = ("hung", "hung: %.1f%% of a core the last %.0f min" % (share * 100, HUNG_SECONDS / 60))
+            if ended is not None:
+                job.stop()
+                child.wait()
+                break
             if not long_logged and time.time() - started >= LONG_HOLD_SECONDS:
                 long_logged = True
                 log("long", tree, kind, "still running after %.0f min" % (LONG_HOLD_SECONDS / 60))
@@ -641,15 +728,24 @@ def run(tree, kind, command):
                     entry["using_gb"] = 0.0
                     entry.pop("adopted_by", None)
                     _write(_path("running", name), entry)
-            if not stopped and peak > 0.0:
+            if not stopped and ended is None and (peak > 0.0 or code == 0):
                 table = _read(_path("kinds.json")) or {}
                 saved = dict(kinds()[kind])
-                saved["ram_gb"] = updated_estimate(saved["ram_gb"], peak)
-                if saved["gpu"] and gpu_peak > 0.0:
-                    saved["gpu_gb"] = updated_estimate(saved["gpu_gb"], gpu_peak)
-                saved["last_peak_gb"] = round(peak, 2)
+                if peak > 0.0:
+                    saved["ram_gb"] = updated_estimate(saved["ram_gb"], peak)
+                    if saved["gpu"] and gpu_peak > 0.0:
+                        saved["gpu_gb"] = updated_estimate(saved["gpu_gb"], gpu_peak)
+                    saved["last_peak_gb"] = round(peak, 2)
+                if code == 0 and expect_minutes is None:
+                    # Clean runs only, and no declared soak, set the limit.
+                    saved["runs_s"] = (saved.get("runs_s", []) + [round(duration, 1)])[-RUN_HISTORY:]
                 table[kind] = saved
                 _write(_path("kinds.json"), table)
+        if ended is not None:
+            log(ended[0], tree, kind, "stopped after %.0f min, %s; peak %.1f GB" % (duration / 60, ended[1], peak))
+            print("heavy_job: %s %s stopped after %.0f min, %s; if it is meant to run longer, pass --expect MIN "
+                "(heavy_job run %s %s --expect MIN -- ...)" % (tree, kind, duration / 60, ended[1], tree, kind), file=sys.stderr)
+            return STOPPED_CODE
         if not stopped:
             log("done", tree, kind, "exit %s, %.0f s, peak %.1f GB" % (code, duration, peak))
             return code
@@ -708,9 +804,17 @@ def status():
         "%.1f GB free" % free_gpu if free_gpu is not None else "unknown"))
     for entry in running:
         held = time.time() - entry["started"]
-        print("running %s %s, %.0f s, using %.1f of %.1f GB%s%s" % (entry["tree"], entry["kind"], held,
-            entry.get("using_gb", 0.0), entry["ram_gb"], "" if entry.get("watched") else " (taken)",
-            "  LONG: held %.0f min, is it stuck?" % (held / 60) if held >= LONG_HOLD_SECONDS else ""))
+        limit, share = entry.get("limit_s"), entry.get("cpu_share")
+        flag = ""
+        if limit is not None and held >= limit:
+            flag = "  OVERRUN"
+        elif share is not None and share < HUNG_CPU:
+            flag = "  HUNG? (cpu %.0f%% the last %.0f min)" % (share * 100, HUNG_SECONDS / 60)
+        elif held >= LONG_HOLD_SECONDS:
+            flag = "  LONG: held %.0f min, is it stuck?" % (held / 60)
+        print("running %s %s, %s, using %.1f of %.1f GB%s%s" % (entry["tree"], entry["kind"],
+            "held %.0f of %.0f min" % (held / 60, limit / 60) if limit is not None else "%.0f s" % held,
+            entry.get("using_gb", 0.0), entry["ram_gb"], "" if entry.get("watched") else " (taken)", flag))
     for place, entry in enumerate(queue, 1):
         print("queued %s %s, %.0f s (%s)" % (entry["tree"], entry["kind"], time.time() - entry["queued"], _ordinal(place)))
     if not running and not queue:
@@ -732,15 +836,21 @@ def summary(day):
         with open(_path("heavy_jobs.log")) as handle:
             for line in handle:
                 parts = line.rstrip("\n").split("\t")
-                if len(parts) == 5 and parts[0].startswith(day) and (parts[1] in ("stopped", "waiting", "long") or "waited" in parts[4]):
+                if len(parts) == 5 and parts[0].startswith(day) and (parts[1] in SUMMARY_EVENTS or "waited" in parts[4]):
                     lines.append(parts)
     except OSError:
         pass
     if not lines:
         print("%s: no heavy job waited or was stopped" % day)
     for when, event, tree, kind, detail in lines:
-        print("%s %s %s %s: %s" % (when[11:16], tree, kind, event if event in ("stopped", "waiting", "long") else "waited", detail))
+        print("%s %s %s %s: %s" % (when[11:16], tree, kind, event if event in SUMMARY_EVENTS else "waited", detail))
+    counts = ["%d %s" % (sum(1 for each in lines if each[1] == event), event) for event in ("overrun", "hung")]
+    print("%s: %s" % (day, ", ".join(counts)))
     return 0
+
+
+## The log's events the daily summary lists.
+SUMMARY_EVENTS = ("stopped", "waiting", "long", "overrun", "hung")
 
 
 def main(args):
@@ -753,9 +863,16 @@ def main(args):
         return 2
     if command == "run":
         if "--" not in args or args.index("--") == len(args) - 1:
-            print("heavy_job: run <tree> <kind> -- <command...>", file=sys.stderr)
+            print("heavy_job: run <tree> <kind> [--expect MIN] -- <command...>", file=sys.stderr)
             return 2
-        return run(args[1], args[2], args[args.index("--") + 1:])
+        options = args[3:args.index("--")]
+        expect = None
+        if options:
+            if options[0] != "--expect" or len(options) != 2:
+                print("heavy_job: run <tree> <kind> [--expect MIN] -- <command...>", file=sys.stderr)
+                return 2
+            expect = float(options[1])
+        return run(args[1], args[2], args[args.index("--") + 1:], expect)
     if command == "take":
         pid = int(args[args.index("--pid") + 1]) if "--pid" in args else None
         return take(args[1], args[2], pid)

@@ -8783,6 +8783,25 @@ job at the head steps to the back of the queue itself: waiters started
 from a tree's older heavy_job.py don't apply the pass rule, and one held
 five landings behind such a head for 107 minutes the same day.
 
+Amended a sixth time (2026-10-19, the coordinator and release): a run has
+a time limit, and its own wrapper stops it past it. npc's town_soak held
+the one bench slot 7.6 hours overnight (about a fifth of a core, crawling)
+with eight landings behind it; the "LONG" line was right and nobody read
+it. The limit is the run's `--expect MIN` when given (a soak meant to run
+for hours says so), else 3 times the median of its kind's last 9 clean runs
+(exit 0, not stopped, no --expect), never under 30 minutes, else the kind's
+max_minutes in kinds.json (90 for bench, suite, godot_import and
+godot_export; the GPU kinds none until they have runs). A second signal,
+for kinds off the GPU: a run whose job object's CPU time (every process in
+it, ended ones too) grew by under 3% of one core over the last 10 minutes
+is hung (a Godot sitting on a parse error). Either way the wrapper stops
+its job object, logs "overrun" or "hung", prints why and that --expect
+lifts it, and exits 5, not queued again. Only a job's own wrapper stops it,
+as before. `status` prints "held N of M min" with OVERRUN or HUNG?; the
+daily summary lists and counts them. Takes (nothing the gate can stop, and
+forgotten at 30 minutes) and nested runs (the outer run's limit holds) are
+unchanged.
+
 
 ## 395. UI sounds
 
