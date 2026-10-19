@@ -135,6 +135,9 @@ def face_forward(obj) -> None:
 	ahead.z = 0.0
 	turns = {(0, -1): 0.0, (1, 0): -90.0, (0, 1): 180.0, (-1, 0): 90.0}
 	axis = (round(ahead.x / ahead.length), 0) if abs(ahead.x) > abs(ahead.y) else (0, round(ahead.y / ahead.length))
+	# In Euler first: a glTF import's object turns by quaternion, and its rotation_euler alone
+	# would be ignored.
+	obj.rotation_mode = "XYZ"
 	obj.rotation_euler.z += math.radians(turns[axis])
 	print("toes pointed %s; turned %.0f degrees to face -y" % (axis, turns[axis]))
 	bpy.context.view_layer.update()

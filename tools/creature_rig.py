@@ -409,9 +409,12 @@ def main() -> None:
 	bpy.ops.wm.read_factory_settings(use_empty=True)
 	body = load_mesh(mesh_path)
 	if turn:
+		# On the mesh's own data: a glTF import's object turns by quaternion, so its
+		# rotation_euler (which this once set) was ignored and the mesh never turned.
 		import math
-		body.rotation_euler.z = math.radians(turn)
-		bpy.ops.object.transform_apply(rotation=True)
+		from mathutils import Matrix
+		body.data.transform(Matrix.Rotation(math.radians(turn), 4, "Z"))
+		body.data.update()
 	stand(body, height)
 	square(body, height)
 	if length:
