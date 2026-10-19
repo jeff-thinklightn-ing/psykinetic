@@ -1685,6 +1685,7 @@
 			"base": -0.25,
 			"variants": 2,
 			"budget": 300,
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-18", "notes": "planks of uneven width laid across on two stringers, a little tilted and gapped, one now and then darker; row 2's browns; variant 2 has a cross brace underneath; 84 and 96 tris"},
 			"uses": "maps' bridges (decision 505: Level.BRIDGE, {slot \"bridge\", at, facing, length, width 1 or 2}, drawn by terrain): one 1 x 1 m plank deck segment, repeated along the bridge's facing (z) and twice side by side for width 2; its origin the cell's centre with the deck's top at y 0, the walking surface at the cell's floor height, its planks and stringers hanging below to -0.25 (\"base\"); 1.04 along z so neighbours overlap (and cover the joins when ramps come: each segment pitched about x by its cells' slope, capped near 0.3 m a cell); no railings (bridge.wood.rail)"
 		},
 		"bridge.wood.rail": {
@@ -1693,17 +1694,19 @@
 			"kind": "edge",
 			"size": [0.12, 0.8, 1.04],
 			"budget": 150,
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-18", "notes": "one post at the segment's middle, a top rail at 0.8 and a mid rail, row 2's browns; 36 tris"},
 			"uses": "maps' bridges (decision 505: Level.BRIDGE, {slot \"bridge\", at, facing, length, width 1 or 2}, drawn by terrain): the railing along one outer long edge of a deck cell, never down the middle of a 2-wide bridge: an edge piece along z, its origin on the cell's edge at deck level, posts and a top rail to 0.8 m (stops walkers, not sight); pitched with its deck"
 		},
 		"bridge.wood.end": {
 			"category": "props",
 			"type": "mesh",
 			"kind": "cell",
-			"size": [1.1, 0.9, 0.6],
+			"size": [1.12, 1.5, 0.42],
 			"base": -0.6,
-			"middle": [0, 0, 0.3],
+			"middle": [0, 0, 0.21],
 			"budget": 300,
-			"uses": "maps' bridges (decision 505: Level.BRIDGE, {slot \"bridge\", at, facing, length, width 1 or 2}, drawn by terrain): where the deck meets a bank, at each end: its origin the middle of the edge between the last deck cell and the bank, at deck level, the bank toward +z; a sill with a step down onto the bank, end posts finishing the rails (to 0.8 m and a little past the deck's sides), piles down to -0.6"
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-18", "notes": "a sill beam, a flush threshold plank, two capped end posts and two piles; row 2's browns; 96 tris"},
+			"uses": "maps' bridges (decision 505: Level.BRIDGE, {slot \"bridge\", at, facing, length, width 1 or 2}, drawn by terrain): where the deck meets a bank, at each end: its origin the middle of the edge between the last deck cell and the bank, at deck level, the bank toward +z; a sill under the deck's end, a threshold plank flush onto the bank (banks are level, 505), end posts at the sides capping the rails to 0.9 m, piles down to -0.6"
 		},
 		"prop.ladder": {
 			"category": "props",
