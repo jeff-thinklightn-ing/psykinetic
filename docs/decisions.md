@@ -13619,6 +13619,16 @@ that is kept, never used up).
 - slots_items.json and the art status regenerated.
 npc's sickness itself follows under this number. Protocol unchanged; no
 new class_name.
+
+Amended 2026-10-19 (ui's ask, through the coordinator): Resident.ailing, a
+replicated String ("a fever", "a cough", "the shakes"; "" when well), set
+on the server's sim tick from the town's record and listed in Net's
+SUBCLASS_REPLICATED, so a client can say "Oda, in bed with a fever" in the
+cursor hint and the talk panel's title (ui's 515). A new property, not a
+changed meaning: protocol() reads the list, so its hash changes with no
+PROTOCOL_REVISION bump (release). resident_test.
+
+
 ## 498. Gathered, hauled and paid for: the store buys, makers pay for materials
 
 Jeff (2026-10-18, word for word): "gold economy - makers have more expense

@@ -569,6 +569,9 @@ func _test_sick_body() -> void:
 	var sick := _body("rs-folk06")
 	_check(sick != null and sick.doing == Resident.Doing.BED and (sick.places.get("home", Rect2i()) as Rect2i).grow(1).has_point(sick.tile), "at eleven, when the well would call, the sick one is in bed at home (%s)" % [sick.doing if sick != null else -1])
 	_check(sick != null and sick.facts_now().any(func(f: String) -> bool: return f.begins_with("You are sick with a fever")), "their facts say so")
+	_check(sick != null and sick.ailing == "a fever", "the body says what they lie abed with, for the client's hint (501 amended): %s" % [sick.ailing if sick != null else "-"])
+	var well := _body("medicine_man:" + hut) if not hut.is_empty() else null
+	_check(well == null or well.ailing == "", "a well body names nothing")
 	var player := _player()
 	var healer := str(Offers._call(Offers.ctx, "healer_of", [STORE]))
 	_check(not healer.is_empty() and healer != "<null>", "(the test town's hut has its medicine man: %s)" % healer)

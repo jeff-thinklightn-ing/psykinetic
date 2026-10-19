@@ -74,6 +74,11 @@ var doing := Doing.SQUARE
 ## spoke to them last), at heel (companions' Heel, decision 485).
 var strayed := false
 var escort_of := ""
+## What they lie abed with (decision 501 amended, ui's ask): the sickness's
+## kind ("a fever", "a cough"), "" when well. Replicated, so a client can
+## name it in the cursor hint and the talk panel's title; the server sets it
+## on its sim tick from the town's record (Townsfolk.sickness_of).
+var ailing := ""
 var escort_name := ""
 ## The medicine man's visit (decision 501): {"rect": the sick one's home, "who": their id, "until": World.steps}; {} for none.
 var visit: Dictionary = {}
@@ -141,6 +146,7 @@ const LORE_CHARS := 600
 func _init() -> void:
 	super()
 	max_hp = 10
+	replicate("ailing")
 	move_ticks = 3.0
 	senses = Senses.new(self, SIGHT_RANGE, -1.0)
 
@@ -177,6 +183,9 @@ func _sim_tick() -> void:
 		return
 	if Townsfolk.is_sick(World.production, worker_id):
 		# Sick (decision 501): in bed, or walked to the healer by the player who spoke to them.
+		var kind := str(Townsfolk.sickness_of(World.production, worker_id).get("kind", "a fever"))
+		if ailing != kind:
+			ailing = kind
 		var leader := _escort_leader()
 		if leader != null:
 			doing = Doing.ESCORT
@@ -194,6 +203,8 @@ func _sim_tick() -> void:
 		elif tile != _goal:
 			World.walk(self, _goal, FAR_EVERY)
 		return
+	if not ailing.is_empty():
+		ailing = ""  # Well again (501 amended).
 	if not visit.is_empty() and World.steps >= int(visit.get("until", 0)):
 		visit = {}
 	var far := _far()
