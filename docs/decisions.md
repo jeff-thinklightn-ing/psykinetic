@@ -8746,7 +8746,10 @@ held outside the gate, which nothing in the queue gives back: art-gen's
 mesh job wanted 28.9 + 8 GB with 32 GB free and nothing running, and held
 ten landings behind it. Once it is in reach it holds those behind it again,
 so it is not starved. A job whose estimate and margin pass the machine's
-physical RAM is refused at once (exit 4), never queued.
+physical RAM is refused at once (exit 4), never queued. And an out-of-reach
+job at the head steps to the back of the queue itself: waiters started
+from a tree's older heavy_job.py don't apply the pass rule, and one held
+five landings behind such a head for 107 minutes the same day.
 
 
 ## 395. UI sounds

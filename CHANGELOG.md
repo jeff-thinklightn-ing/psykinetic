@@ -7,6 +7,8 @@ notes (decision 324).
 
 ## Unreleased
 
+- Tools: a heavy job too big to start also steps to the back of the resource gate's queue itself, so jobs waiting through an older copy of the gate get past it too (394 amended).
+
 ## v0.1.154
 
 - Server and client both; the protocol is unchanged, so v0.1.153 still joins. Fixed:

@@ -162,6 +162,30 @@ except SystemExit as stop:
     check(stop.code == 4 and not gate._entries("queue"), "a job whose estimate and margin pass the machine's RAM is refused at once (exit 4), never queued")
 gate.total_ram_gb = real_total
 
+print("== a head out of reach steps to the back ==")
+# Waiters from a tree's older heavy_job.py don't go past it themselves.
+import threading
+gate.total_ram_gb = lambda: None
+table = gate._read(gate._path("kinds.json")) or {}
+table["trellis_mesh"] = dict(gate.kinds()["trellis_mesh"], ram_gb=1e12)
+gate._write(gate._path("kinds.json"), table)
+real_poll, gate.POLL_SECONDS = gate.POLL_SECONDS, 0.1
+big = threading.Thread(target=lambda: gate.take("art", "trellis_mesh", os.getpid()), daemon=True)
+big.start()
+time.sleep(0.5)
+gate._write(gate._path("queue", "%019d-old-1.json" % time.time_ns()), {"tree": "old", "kind": "suite", "pid": None,
+    "waiter": os.getpid(), "queued": time.time()})
+time.sleep(1.0)
+order = [each["tree"] for each in gate._entries("queue")]
+check(order == ["old", "art"], "the job behind goes first in the queue's own order: %s" % order)
+for each in gate._entries("queue"):
+    os.remove(gate._path("queue", each["file"]))
+big.join(5)
+gate.POLL_SECONDS = real_poll
+gate.total_ram_gb = real_total
+with open(gate._path("heavy_jobs.log")) as log:
+    check("\taside\tart\ttrellis_mesh\t" in log.read(), "the log says it stepped aside")
+
 print("== a run inside the tree's own take ==")
 gate.take("lander", "suite", os.getpid())
 gate.MAX_RUNNING = 0  # Were it to queue, it would never start.

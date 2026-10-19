@@ -501,6 +501,15 @@ def wait_turn(tree, kind, pid, watched):
             ok, why = decide(row, running, head, free_ram, free_gpu, free_commit)
             if not ok and head and out_of_reach(row, running, free_ram, free_commit):
                 why += "; out of reach even with no heavy job running (memory held outside the gate): jobs that fit go past it"
+                if place < len(queue):
+                    # Steps to the back itself: waiters started from an older
+                    # heavy_job.py (a tree not yet rebased) don't know the
+                    # rule above and would hold behind it (107 minutes,
+                    # 2026-10-18). Its turn comes again as the queue drains.
+                    aside = "%019d-%s-%s.json" % (time.time_ns(), tree, pid or os.getpid())
+                    os.replace(_path("queue", ticket), _path("queue", aside))
+                    ticket = aside
+                    log("aside", tree, kind, "out of reach; to the back of %d" % len(queue))
             if not head and queue and queue[0]["file"] != ticket:
                 first = queue[0]
                 first_row = dict(kinds().get(first["kind"], row), kind=first["kind"])
