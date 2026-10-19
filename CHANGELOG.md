@@ -12,10 +12,11 @@ notes (decision 324).
 - The server no longer reads every level's level.json on each world tick to see which levels regenerate: the list is read once and again only when a level is registered, kept as a template or reloaded (perf's profile: about 4 ms a tick).
 - A small stutter four times a second is gone: the music no longer looks up its sound files on disk each time it weighs its layers.
 - Wine comes in a leather flask sealed with red wax, spice in a tied cloth pouch heaped with orange spice, and a silver ring has a small raised setting.
+- Builder mode can make earth slopes instead of stairs (on hills, banks and ledges outdoors) and paint bare rock.
+
 ## v0.1.156
 
 - This version changes what goes over the network, so v0.1.155 and older can't join the server: update through the launcher first.
-- Builder mode can make earth slopes instead of stairs (on hills, banks and ledges outdoors) and paint bare rock.
 - Rocks and cliffs: a new slope cell joins two heights outdoors as a ramp, a new rock cell stands in the way and blocks sight, and from under a cliff you see only its edge, not who stands back from it. The level editor raises a rock outcrop with a slope and rocks on its lip; the sample level is taller, with one (513).
 - The world map's trade caravans carry how many days they have still to go (504).
 - Talking to a merchant: the thing for sale shows its price in brass, or in rust with what you carry when your purse is short; a line says it is bought at the town's counter, and until you stand there the button reads "Buy at the counter"; the foot says what you carry.
