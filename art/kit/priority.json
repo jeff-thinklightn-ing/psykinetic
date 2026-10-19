@@ -49,7 +49,7 @@
 				"item.sword", "item.dagger", "item.knife", "item.spear", "item.bow", "item.arrows", "item.arrows_flame", "item.arrows_barbed", "fx.arrow", "item.hammer", "item.giant_axe", "item.shield",
 				"item.meat", "item.hide", "item.antlers", "item.tusks",
 				"item.ration", "item.bandaging_kit", "item.food_sack", "item.ore_sack", "item.wood_bundle", "item.cloth_bolt",
-				"item.coin_purse", "item.nails", "item.axe_head", "item.pick", "item.remedy"
+				"item.coin_purse", "item.nails", "item.axe_head", "item.pick", "item.remedy", "item.herbs"
 			]
 		},
 		{
