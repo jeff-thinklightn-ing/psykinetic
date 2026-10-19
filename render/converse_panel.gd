@@ -25,8 +25,8 @@ const MAX_LINES := 8
 const THINKING_FOR := 15.0
 const ASKS := ["What do you sell?", "Any work for me?", "What's the news?"]
 ## What accepting an offer says on its button, by the offer's "accept".
-const ACCEPT_WORDS := {"buy": "Buy", "take": "Take it on", "lend": "Lend", "carry": "Carry it", "read": "Read it"}
-const KIND_WORDS := {"shop": "for sale", "commission": "work", "rumour": "rumour", "plea": "a plea", "page": "a page"}
+const ACCEPT_WORDS := {"buy": "Buy", "take": "Take it on", "lend": "Lend", "carry": "Carry it", "read": "Read it", "give": "Give"}
+const KIND_WORDS := {"shop": "for sale", "commission": "work", "rumour": "rumour", "plea": "a plea", "page": "a page", "give": "a gift"}
 
 ## The resident spoken with (null: closed).
 var resident: GridEntity
@@ -212,7 +212,8 @@ func show_offers(given: Array, owed: Array) -> void:
 			owing.append(str(each.get("title", each.get("words", ""))))
 	_owed.text = "You owe them: %s" % ", ".join(owing) if not owing.is_empty() else ""
 	_owed.visible = not owing.is_empty()
-	var selling := offers.any(func(each: Dictionary) -> bool: return str(each.get("accept", "")) == "buy")
+	# The purse shows with any row gold goes out on: a sale, a gift toward the town's build (npc's 499), a loan.
+	var selling := offers.any(func(each: Dictionary) -> bool: return int(each.get("cost", 0)) > 0)
 	_purse.text = "You carry %d gold" % gold if selling else ""
 	_purse.visible = selling
 
@@ -248,6 +249,7 @@ func _offer_row(offer: Dictionary) -> HBoxContainer:
 	var title := Label.new()
 	title.name = "Title"
 	title.text = str(offer.get("title", offer.get("words", "")))
+	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART  # A long title wraps in the column, never past the panel.
 	title.add_theme_font_override("font", UiTheme.font("serif"))
 	words.add_child(title)
 	var said := Label.new()

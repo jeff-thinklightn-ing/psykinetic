@@ -8071,14 +8071,29 @@ func _test_converse(player: Player) -> bool:
 	open_converse(nearest)
 	converse.add_line(_display_name(player), "(a test line) Any work for me?", false)
 	converse.add_line(converse._name.text, "(a test line) Bram's boy is held at the goblins' camp. Bring him home and the town will not forget it.", true)
-	converse.show_offers([
+	var purse := 1  # Decision 512: a purse too short for the loaf, in the shot.
+	var given: Array = [
 		{"id": "t1", "kind": "commission", "title": "Bring Bram home", "words": "He was carried off in the raid.", "accept": "take", "cost": 0},
 		{"id": "t2", "kind": "shop", "title": "A loaf, 2 gold", "words": "Baked this morning.", "accept": "buy", "cost": 2},
-		{"id": "t3", "kind": "rumour", "title": "What Tam said", "words": "At the well, Tam told me the mine is cursed.", "accept": "", "cost": 0}],
-		[{"id": "t0", "kind": "commission", "title": "Walk Tam home", "open": true}])
-	converse.gold = 1  # Decision 512: a purse too short for the loaf, in the shot.
+		{"id": "t3", "kind": "rumour", "title": "What Tam said", "words": "At the well, Tam told me the mine is cursed.", "accept": "", "cost": 0}]
+	if "give" in Net.test_show:
+		# npc's building fund (499): the official's two give lines, a purse of 20.
+		var waits := "The inn waits on 6 wood and 2 stone and 14 gold; what you give goes to it."
+		given = [
+			{"id": "g1", "kind": "give", "title": "Give 10 toward the inn", "words": waits, "accept": "give", "cost": 10},
+			{"id": "g2", "kind": "give", "title": "Give the rest (14 gold)", "words": waits, "accept": "give", "cost": 14}]
+		purse = 20
+	elif "news" in Net.test_show:
+		# npc's road news (504): the counter's rumour lines after a wagon's trip.
+		given = [
+			{"id": "n1", "kind": "rumour", "title": "What Ren said", "accept": "", "cost": 0,
+				"words": "Ren told me at the counter that she came home from the castle market: food and wood went, salt and cloth came back, and it sold well against what the goods were worth."},
+			{"id": "n2", "kind": "rumour", "title": "What Oda said", "accept": "", "cost": 0,
+				"words": "Oda told me that the goblins of the ridge camp struck the town's wagon on the road to the castle market, took its food, and carried Wat off with it."}]
+	converse.show_offers(given, [{"id": "t0", "kind": "commission", "title": "Walk Tam home", "open": true}])
+	converse.gold = purse
 	if shop_panel != null:
-		shop_panel.gold = 1  # The badge by the pack says the same purse.
+		shop_panel.gold = purse  # The badge by the pack says the same purse.
 	return true
 
 
@@ -8168,7 +8183,7 @@ func _run_test_show(player: Player) -> void:
 				options_panel.begin_rebind("open")
 				get_tree().create_timer(0.5).timeout.connect(func() -> void:
 					options_panel._scroll.scroll_vertical = 2400)
-			"converse", "sick":
+			"converse", "sick", "give", "news":
 				_test_converse_due = true  # Residents come with the town's sync: tried each tick.
 			"hint":
 				for entity in World.get_entities():

@@ -335,6 +335,13 @@ func _test_converse_panel() -> void:
 	var fonts := UiTheme.credits()
 	_check(fonts["entries"].size() == 2 and UiTheme.credits in OptionsPanel.credit_providers(),
 		"the fonts' credit (Alegreya, Alegreya Sans, OFL) is one of the Credits' providers")
+	# npc's give offer (499): the kind's word, the verb, the price in brass, the purse with it.
+	panel.gold = 5
+	panel.show_offers([{"id": "g", "kind": "give", "title": "Give 10 toward the inn", "words": "The inn waits on 14 gold.", "accept": "give", "cost": 10}], [])
+	var give_row: HBoxContainer = panel._offer_rows.get_child(0)
+	_check(panel.offers_shown() == ["Give 10 toward the inn [Give]"] and (give_row.get_node("Kind") as Label).text == "a gift"
+		and (give_row.get_node("Price") as Label).text == "10 gold" and panel._purse.visible and panel._purse.text == "You carry 5 gold",
+		"a gift toward the town's build: 'a gift', Give, the gold in brass, the purse shown (%s)" % [panel.offers_shown()])
 
 
 func _test_sim_reads() -> void:
