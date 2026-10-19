@@ -11990,6 +11990,20 @@ approval of the pad pass, 2026-10-18):
   With the see-through at 0.8, at zoom 1.1 (map_bench, 8 s): frame time
   median 1.4 to 1.7 ms, 99th 3.7 to 4.4 ms, standing, walking or turning,
   as at 0.45; every frame over 5 ms in the first 0.1 s (start-up).
+- Winter (amended; the coordinator, from the midwinter shots, 2026-10-18):
+  the swaying scatter's snow lies from each plant's own height (custom data
+  per instance: g one over its mesh's height, so the tips go white and the
+  straw shows below, where a tuft's tip had sat above the whole fade and
+  gone white to the ground), r how much: full in the open,
+  Client3D.SCATTER_ROOF_SNOW (0.12) under the roof (0.3 still read as
+  white flowers there: from above a tuft is mostly tips); b shades its
+  dried straw there (SCATTER_ROOF_STRAW, 0.5: the scatter takes no shadow). The wilds'
+  tufts too. The grown crowns hold GrownTrees.SNOW_COVER (0.5) of a lone
+  pine's snow, only on what faces up past SNOW_FROM (0.75), broken in
+  patches SNOW_PATCH (0.8 m) by world noise (season.gdshaderinc's
+  snow_cover, snow_from, snow_to, snow_patch; 1, 0.3, 0.8, none for
+  everything else), so under full cover the forest reads dark, its needles
+  green-grey with a dusting, white only in the clearings.
 Rejected: fading whole trees as the ring's are (hundreds of nodes to test
 a frame, and a whole 13 m tree gone for one crown in the way); a dithered
 hole over the player (the first cut: Jeff asked for transparency); every

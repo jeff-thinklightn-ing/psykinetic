@@ -1982,6 +1982,21 @@ func _test_grown_trees() -> void:
 					as_forest[item[0]] = as_forest.get(item[0], true) and bool(item[3])
 	_check(float(terrain["canopy"].get(roofed, 0.0)) > Client3D.SCATTER_ROOF and as_forest.get(roofed, false) and not as_forest.get(open_cell, true),
 			"grass under the roof takes the forest's scatter, as its floor turns to needles; open grass its own")
+	# The renderer keeps the custom data (headless it reads back as 0): its
+	# makings, and that the tufts carry it.
+	var forest_custom := Client3D.scatter_custom(true, 2.0)
+	var open_custom := Client3D.scatter_custom(false, 2.0)
+	var carried := false
+	for chunk_key: Vector2i in _rig._scatter_chunks:
+		_rig._scatter_build(chunk_key, "tuft", _rig._scatter_plan(chunk_key).get("tuft", []))
+	for node in _rig._room.get_children():
+		if node is MultiMeshInstance3D and String(node.name).ends_with("_tuft"):
+			carried = (node as MultiMeshInstance3D).multimesh.use_custom_data
+			break
+	_check(carried and open_custom == Color(1.0, 2.0, 1.0, 0.0)
+			and forest_custom == Color(Client3D.SCATTER_ROOF_SNOW, 2.0, Client3D.SCATTER_ROOF_STRAW, 0.0)
+			and Client3D.SCATTER_ROOF_SNOW < 1.0 and Client3D.SCATTER_ROOF_STRAW < 1.0,
+			"a tuft's snow: full in the open, less under the roof with its straw shaded, its tips by its own height (%s, %s)" % [open_custom, forest_custom])
 	grown.set_focus(Vector3(5.0, 0.0, 5.0), Vector3(5.0, 0.0, 5.0))
 	grown.finish()
 	var near_one: Node3D = grown.chunks[chunk_of.call(Vector2i(5, 5))]["near"]
@@ -1992,6 +2007,9 @@ func _test_grown_trees() -> void:
 	var drawn := near_one.get_node("Drawn") as MeshInstance3D
 	var twin := near_one.get_node("Shadow") as MeshInstance3D
 	var far_drawn := (grown.chunks[chunk_of.call(Vector2i(5, 5))]["far"] as Node3D).get_node("Drawn") as MeshInstance3D
+	var crown_look := far_drawn.material_override as ShaderMaterial
+	_check(crown_look != null and is_equal_approx(float(crown_look.get_shader_parameter("snow_cover")), GrownTrees.SNOW_COVER)
+			and float(crown_look.get_shader_parameter("snow_patch")) > 0.0, "the crowns hold half a pine's snow, in patches")
 	_check(drawn.cast_shadow == GeometryInstance3D.SHADOW_CASTING_SETTING_OFF and twin.cast_shadow == GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY
 			and twin.mesh == drawn.mesh, "drawn with no shadow of its own; a twin casts it, uncut")
 	var near_tris: int = drawn.mesh.surface_get_array_len(0) / 3

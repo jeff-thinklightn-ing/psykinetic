@@ -55,6 +55,12 @@ const HEAD_HIGH := 3.4
 ## chunk's middle is up to 6 m from its corner.
 const SEE_SOFT := 3.5
 const SEE_BEYOND := 17.0
+## Winter on the crowns (season.gdshaderinc's snow_cover, snow_from,
+## snow_patch): half a lone pine's snow, on what faces up past SNOW_FROM,
+## in patches SNOW_PATCH m a side.
+const SNOW_COVER := 0.5
+const SNOW_FROM := 0.75
+const SNOW_PATCH := 0.8
 
 ## Tests: a level's trees by its name, read before the file.
 static var registered: Dictionary[String, Dictionary] = {}
@@ -333,6 +339,12 @@ static func _season(shader: Shader, leaf: bool) -> ShaderMaterial:
 	made.set_shader_parameter("vertex_srgb", true)
 	made.set_shader_parameter("roughness", 0.9)
 	made.set_shader_parameter("leaf", leaf)
+	# Snow on the crowns in patches, the steepest tops only, their green
+	# showing as a lone pine's does.
+	made.set_shader_parameter("snow_cover", SNOW_COVER)
+	made.set_shader_parameter("snow_from", SNOW_FROM)
+	made.set_shader_parameter("snow_to", 0.97)
+	made.set_shader_parameter("snow_patch", SNOW_PATCH)
 	return made
 
 

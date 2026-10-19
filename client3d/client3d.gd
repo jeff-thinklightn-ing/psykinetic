@@ -751,6 +751,12 @@ const SCATTER_EDGE_ROOTS := 0.3
 ## A grass cell under a canopy this thick or more takes the forest's
 ## scatter (decision 467: ground.gdshader turns it to needles from 0.45).
 const SCATTER_ROOF := 0.6
+## How much of the season's snow lies on the forest's scatter under its roof
+## (the ground has a third: ground.gdshader).
+const SCATTER_ROOF_SNOW := 0.12
+## How light its dried straw is there, out of season: it takes no shadow, so
+## the roof's shade is put in.
+const SCATTER_ROOF_STRAW := 0.5
 const SCATTER_REEDS := 1.6
 const SCATTER_SIZES := {"tuft": Vector2(0.7, 1.3), "flower": Vector2(0.8, 1.1), "stone": Vector2(0.6, 1.6), "root": Vector2(0.8, 1.4),
 		"reeds": Vector2(0.8, 1.3)}
@@ -3469,9 +3475,14 @@ func _scatter_build(chunk: Vector2i, kind: String, items: Array) -> void:
 	var multimesh := MultiMesh.new()
 	multimesh.transform_format = MultiMesh.TRANSFORM_3D
 	multimesh.use_colors = true
+	# The swaying kinds' snow (scatter.gdshader): how much, their height, and
+	# their straw's shade.
+	var swaying := kind in SWAYING
+	multimesh.use_custom_data = swaying
 	multimesh.mesh = _scatter_mesh(kind)
 	multimesh.instance_count = items.size()
 	var fit := _scatter_fit(kind)
+	var over_tall := 1.0 / maxf(multimesh.mesh.get_aabb().end.y, 0.01)
 	for i in items.size():
 		var cell: Vector2i = items[i][0]
 		var at: Vector2 = items[i][1]
@@ -3482,6 +3493,8 @@ func _scatter_build(chunk: Vector2i, kind: String, items: Array) -> void:
 		var basis := Basis.from_euler(lean).scaled(Vector3.ONE * size)
 		multimesh.set_instance_transform(i, Transform3D(basis, Vector3(at.x, _height_in(cell, at) - fit[2], at.y)))
 		multimesh.set_instance_color(i, _scatter_tint(kind, cell, salt, items[i][3]))
+		if swaying:
+			multimesh.set_instance_custom_data(i, scatter_custom(items[i][3], over_tall))
 	var drawn := MultiMeshInstance3D.new()
 	drawn.name = "Scatter_%d_%d_%s" % [chunk.x, chunk.y, kind]
 	drawn.multimesh = multimesh
@@ -3555,6 +3568,13 @@ func _forest_edge(cell: Vector2i) -> bool:
 		if _forest_distance.get(cell + direction, 0) >= 1:
 			return true
 	return false
+
+
+## A swaying item's custom data (scatter.gdshader): r how much snow lies on
+## it, g one over its mesh's height ([param over_tall]), b its straw's light;
+## less of both under the forest's roof.
+static func scatter_custom(forest: bool, over_tall: float) -> Color:
+	return Color(SCATTER_ROOF_SNOW if forest else 1.0, over_tall, SCATTER_ROOF_STRAW if forest else 1.0, 0.0)
 
 
 ## An item's colour: its kind's, varied, darker under the forest; a flower

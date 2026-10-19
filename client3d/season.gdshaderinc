@@ -18,6 +18,14 @@ uniform float alpha = 1.0;
 // needles' floor, decision 423), world_tile metres a tile; off at 0.
 uniform sampler2D tile_texture : source_color, filter_linear_mipmap, repeat_enable;
 uniform float world_tile = 0.0;
+// How much of the season's snow lies on it, on what faces up from snow_from
+// to snow_to, in patches snow_patch metres a side (none at 0): a grown
+// forest's crowns hold less, in patches, their green showing (GrownTrees,
+// decision 467).
+uniform float snow_cover = 1.0;
+uniform float snow_from = 0.3;
+uniform float snow_to = 0.8;
+uniform float snow_patch = 0.0;
 varying float up;
 varying vec2 world_xz;
 #ifdef CUTAWAY
@@ -26,6 +34,17 @@ varying vec2 world_xz;
 // edge); SEE_THROUGH draws only that, faded toward alpha as a near wall is.
 #include "res://client3d/see_through.gdshaderinc"
 #endif
+
+float snow_noise(vec2 p) {
+	vec2 i = floor(p);
+	vec2 f = fract(p);
+	f = f * f * (3.0 - 2.0 * f);
+	float a = fract(sin(dot(i, vec2(12.9898, 78.233))) * 43758.5453);
+	float b = fract(sin(dot(i + vec2(1.0, 0.0), vec2(12.9898, 78.233))) * 43758.5453);
+	float c = fract(sin(dot(i + vec2(0.0, 1.0), vec2(12.9898, 78.233))) * 43758.5453);
+	float d = fract(sin(dot(i + vec2(1.0, 1.0), vec2(12.9898, 78.233))) * 43758.5453);
+	return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+}
 
 vec3 to_linear(vec3 c) {
 	return mix(pow((c + vec3(0.055)) * (1.0 / 1.055), vec3(2.4)), c * (1.0 / 12.92), lessThan(c, vec3(0.04045)));
@@ -73,7 +92,11 @@ void fragment() {
 		dried = mix(dried, turned * shade, season.y * 0.75);
 		colour = mix(colour, dried, foliage);
 	}
-	colour = mix(colour, vec3(0.9, 0.93, 0.97), season.z * smoothstep(0.3, 0.8, up) * 0.85);
+	float snow = season.z * smoothstep(snow_from, snow_to, up) * 0.85 * snow_cover;
+	if (snow_patch > 0.0) {
+		snow *= smoothstep(0.3, 0.6, snow_noise(world_xz / snow_patch));
+	}
+	colour = mix(colour, vec3(0.9, 0.93, 0.97), snow);
 	ALBEDO = colour;
 	ROUGHNESS = roughness;
 #ifdef NEAR
