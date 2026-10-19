@@ -15408,3 +15408,57 @@ can't buy hides (36 banked in the store over the run), his margin on a
 piece of leather (about 1.4 gold over two hides) less than his keep.
 larder_test. Protocol unchanged.
 
+## 523. Fire drawn: flames, embers, smoke, and a flickering light
+
+The castle's fixes asked for "fire that looks like fire (flicker, flames,
+warm light), not flat yellow squares": a torch was a stone post with an
+orange sphere, a fire cell a flat glowing patch, both under a steady light.
+The coordinator's design, agreed with environment (the light) and art-kit
+(the slots). Client only; the sim's fire (212) and light (123, 291, 304) are
+untouched.
+
+- Flames (new class_name, client3d/flames.gd) draws a flame: three crossed
+  quads (flame.gdshader, rewritten) whose shape is a tongue torn by noise
+  scrolling up, coloured on art-kit's row 7 from the bone core through
+  ffd27a, ffb861 and e8792e to b8322a at the tips, unshaded, leaning
+  downwind (309); a few embers rise out of it in the same shader and fade;
+  over it one faint smoke quad turned to the camera (smoke.gdshader, at most
+  0.15 of what is behind it), coming and going, gone by its top.
+  Flames.light(parent, at, size, seed) puts one anywhere; Flames.at_socket
+  lights a slot instance at its "flame" socket (art-kit's convention:
+  prop.torch, prop.torch_post, prop.campfire, prop.forge), sized by the slot
+  (Flames.SIZES: a hand for a torch, about a cell for a campfire), so
+  whoever places a campfire or a forge gets its fire. None is placed in a
+  level here.
+- A torch marker stands on art-kit's prop.torch_post (a hazel pole in a
+  ring of stones, its flame socket on its charred head) once the slot has
+  art, else on the stone post as before; the flame on its top either way,
+  the light over the flame. A fire cell keeps its ragged patch, with
+  FIRE_FLAMES 2-3 flames of 0.45-0.75 m on it at places by the cell. Lanterns
+  stay as they were: enclosed, steady.
+- The light: only fire's drawn OmniLights flicker (Client3D._fire_lights,
+  _flicker_fires), never World's light: Fields is the server's, and Senses
+  thresholds it (237), so a flicker there would make bodies blink between
+  seen and glimpsed. Flames.flicker: a slow sway (about 1.5 Hz) and a
+  smaller flutter (about 7 Hz) on each light's own phase, a torch's
+  TORCH_FLICKER 0.08 of its energy either way, an open fire's FIRE_FLICKER
+  0.14; on the view's clock (accumulated frame time, so a fixed-fps capture
+  flickers as play does); the energy only, never the light's place, so no
+  shadow crawls. By day, outdoors only, the light fades toward DAY_SHARE 0.3
+  by the look's daylight, less under the forest's canopy (477):
+  Flames.day_share; indoors and in dungeons it burns full at noon.
+- The warm pool on the ground: the floor's steady warmth near heat (304,
+  _cell_shades, worked out when the fields change) is left as it is; the
+  flicker reaches the pool through the light's energy alone (re-shading the
+  cells each frame would cost a great deal: environment).
+
+tests/view_test (the castle: a flame on each torch's top and two or three
+on each fire cell, each with its smoke; flames sized by slot at its socket;
+the flicker within its swing and the same for the same time; the day fade
+outdoors only; each drawn light flickering while World's light stays).
+
+Rejected: particles for embers and smoke (a node and a draw each per fire;
+the shader's sparks cost nothing more); a prop.flame mesh slot (a flame is
+a shader, art-kit agreed); hanging prop.torch on the nearest wall (a torch
+marker is a free-standing cell; art-kit keeps the sconce for buildings'
+walls); flickering Fields' light or the floor's shade.

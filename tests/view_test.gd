@@ -48,6 +48,7 @@ func _ready() -> void:
 	_test_streams()
 	_test_tall_grass()
 	_test_rocks()
+	_test_fire()
 	await _test_wall_runs()
 	_test_cave_walls()
 	_test_scatter()
@@ -1500,6 +1501,57 @@ func _test_water() -> void:
 			"dry water: no surface, no sunk bed, drawn as the land; the map still has it as water")
 	_rig._dry_water.clear()
 	_rig.rebuild(terrain, castle["centre"])
+	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+
+
+## Fire drawn (decision 523): the castle's torches and fire cells with their
+## flames (a torch's on its post or its slot's socket, two or three on a fire
+## cell, each with its smoke), flames sized by slot, the drawn lights
+## flickering within their swing and the same for the same time, faded by
+## day outdoors only, and World's light untouched by it.
+func _test_fire() -> void:
+	print("
+== fire: flames on torches and fire cells, the drawn light flickering, World's light steady ==")
+	var castle := Level.load_level("castle")
+	var terrain: Dictionary = castle["terrain"]
+	var torches: Array = terrain.get("torches", [])
+	var fire: Array = terrain.get("fire", [])
+	_check(not torches.is_empty() and not fire.is_empty(), "the castle has torches and fire (%d, %d)" % [torches.size(), fire.size()])
+	if torches.is_empty() or fire.is_empty():
+		return
+	_rig.rebuild(terrain, castle["centre"])
+	var lit := torches.all(func(cell: Vector2i) -> bool:
+		var post := _rig._room.get_node_or_null("Torch_%d_%d" % [cell.x, cell.y]) as Node3D
+		var flame := post.get_node_or_null("Flame") as Node3D if post != null else null
+		return flame != null and flame.get_node_or_null("Body") != null and flame.get_node_or_null("Smoke") != null 				and flame.position.y > 1.0)
+	var burning := fire.filter(func(cell: Vector2i) -> bool: return _rig._grounds.has(cell)).all(func(cell: Vector2i) -> bool:
+		var patch := _rig._room.get_node_or_null("Fire_%d_%d" % [cell.x, cell.y]) as Node3D
+		var flames := patch.find_children("Flame*", "Node3D", false, false).size() if patch != null else 0
+		return flames >= Client3D.FIRE_FLAMES.x and flames <= Client3D.FIRE_FLAMES.y)
+	_check(lit and burning, "a flame on each torch's top, two or three on each fire cell, each with its smoke")
+	_check(Flames.size_of("prop.campfire") > Flames.size_of("prop.forge") and Flames.size_of("prop.forge") > Flames.size_of("prop.torch")
+			and Flames.socket_of("prop.campfire") == Vector3(0.0, 0.2, 0.0) and Flames.socket_of("prop.barrel") == null,
+			"flames sized by slot, at its flame socket; none for a slot without one")
+	var swung := 0.0
+	var steady := true
+	for i in 300:
+		var share := Flames.flicker(i * 0.0333, 1.3, Flames.TORCH_FLICKER)
+		swung = maxf(swung, absf(share - 1.0))
+		steady = steady and Flames.flicker(i * 0.0333, 1.3, Flames.TORCH_FLICKER) == share
+	_check(swung > Flames.TORCH_FLICKER * 0.5 and swung <= Flames.TORCH_FLICKER + 0.0001 and steady,
+			"the drawn light flickers within its swing, the same for the same time (%.3f of %.2f)" % [swung, Flames.TORCH_FLICKER])
+	_check(is_equal_approx(Flames.day_share(1.0, true, 0.0), Flames.DAY_SHARE) and Flames.day_share(0.0, true, 0.0) == 1.0
+			and Flames.day_share(1.0, false, 0.0) == 1.0 and Flames.day_share(1.0, true, 1.0) == 1.0,
+			"by day outdoors faded to %.1f, full at night, indoors and under a full canopy" % Flames.DAY_SHARE)
+	var cell: Vector2i = torches[0]
+	var before := World.light_at(cell)
+	var energies: Array[float] = []
+	for i in 5:
+		_rig._flicker_fires(0.05)
+		energies.append((_rig._fire_lights[0][0] as OmniLight3D).light_energy)
+	_check(_rig._fire_lights.size() == torches.size() + fire.filter(func(c: Vector2i) -> bool: return _rig._grounds.has(c)).size()
+			and energies.max() != energies.min() and World.light_at(cell) == before,
+			"each fire's drawn light flickers; World's light stays as it was (%s)" % [energies])
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
 

@@ -335,10 +335,15 @@ const SHADOW_RECHECK := 0.5
 const PLAYER_LIGHT := Color(1.0, 0.93, 0.82)
 const FIRE := Color(1.0, 0.45, 0.1)
 const FIRE_SHADER := preload("res://client3d/fire.gdshader")
-const FLAME_SHADER := preload("res://client3d/flame.gdshader")
 const SCATTER_SHADER := preload("res://client3d/scatter.gdshader")
 ## How wide a cell's fire patch is drawn, in cells.
 const FIRE_SPREAD := 1.5
+## A fire cell's flames (decision 523): how many, and their heights (m).
+const FIRE_FLAMES := Vector2i(2, 3)
+const FIRE_FLAME_SIZES := Vector2(0.45, 0.75)
+## A torch marker's art (art-kit's standing torch; the stone post until it
+## has art).
+const TORCH_POST := "prop.torch_post"
 ## The floor where there is no light at all (Fields), as a share of its
 ## colour; the glow it takes on near heat, at most WARM_MOST of the way.
 const FLOOR_DARKEST := 0.3
@@ -1175,6 +1180,11 @@ var _hp_bar_shader: Shader
 var _terrain: Dictionary = {}
 var _sun: DirectionalLight3D
 var _outdoor := false
+## Fire's drawn lights (decision 523): [light, its energy, its phase, how far
+## it swings], flickered and faded by day each frame (_flicker_fires), on
+## the view's own clock (_fire_time, accumulated frame time).
+var _fire_lights: Array[Array] = []
+var _fire_time := 0.0
 ## Outdoors: the sky, and the step of the day (SKY_STEPS) it shows, -1 for
 ## none yet.
 var _sky_material: ProceduralSkyMaterial
@@ -1371,6 +1381,7 @@ func _process(delta: float) -> void:
 	_grow_scatter()
 	_drop_departed()
 	_update_mourning(delta)
+	_flicker_fires(delta)
 
 
 # --- Rig ---------------------------------------------------------------------
@@ -2782,6 +2793,7 @@ func _build_room() -> void:
 		_forest_distance = _measure_forest()
 	_shape_ramps()
 	_build_ground(kinds)
+	_fire_lights.clear()
 	for cell: Vector2i in fire:
 		if _grounds.has(cell):
 			_add_fire(cell)
@@ -5380,25 +5392,36 @@ func _add_lantern(cell: Vector2i) -> void:
 	_room.add_child(light)
 
 
-## A torch on a post, and its warm light.
+## A torch standing in its cell: art-kit's prop.torch_post, its flame at
+## the slot's socket (Flames, decision 523), or a stone post with the flame
+## on its top until the slot has art; and its warm light, over the flame,
+## flickering.
 func _add_torch(cell: Vector2i) -> void:
 	torch_cells.append(cell)
 	var at := _tile_position(cell)
-	var post := _box(Vector3(0.1, 1.1, 0.1), _stone_opaque)
+	var post: Node3D
+	var flame: Node3D
+	if ArtKit.has(TORCH_POST) and ArtKit.filled_by(TORCH_POST) != "placeholder":
+		post = ArtKit.instance(TORCH_POST)
+		post.rotation.y = _roll(cell, 141) * TAU
+		flame = Flames.at_socket(post, TORCH_POST, hash(cell))
+		if flame == null:  # Art with no flame socket: on its top.
+			flame = Flames.light(post, Vector3(0.0, ArtKit.size(TORCH_POST).y, 0.0), Flames.size_of(TORCH_POST), hash(cell))
+	else:
+		post = _box(Vector3(0.1, 1.1, 0.1), _stone_opaque)
+		flame = Flames.light(post, Vector3(0.0, 1.1, 0.0), Flames.size_of(TORCH_POST), hash(cell))
 	post.name = "Torch_%d_%d" % [cell.x, cell.y]
 	post.position = at
 	_room.add_child(post)
-	var flame := MeshInstance3D.new()
-	flame.mesh = _torch_flame()
-	flame.position = at + Vector3(0.0, 1.2, 0.0)
-	_room.add_child(flame)
 	var light := OmniLight3D.new()
 	light.light_color = TORCH
 	light.light_energy = 1.4
 	light.omni_range = 4.5
-	light.position = at + Vector3(0.0, 1.3, 0.0)
+	# Over the flame, wherever its post puts it.
+	light.position = post.transform * flame.position + Vector3(0.0, Flames.size_of(TORCH_POST) * 0.6, 0.0)
 	_room.add_child(light)
 	_cast_shadows(light)
+	_fire_lights.append([light, light.light_energy, _roll(cell, 142) * TAU, Flames.TORCH_FLICKER])
 
 
 ## The base of an edge's wall: the higher of the cells it stands between.
@@ -6342,23 +6365,6 @@ func _add_post(vertex: Vector2i) -> void:
 	_posts[vertex] = post
 
 
-## A torch's flame, one mesh for all: a glowing drop that leans with the
-## wind (flame.gdshader, decision 309).
-static var _flame_mesh: SphereMesh
-
-
-static func _torch_flame() -> SphereMesh:
-	if _flame_mesh == null:
-		_flame_mesh = SphereMesh.new()
-		_flame_mesh.radius = 0.09
-		_flame_mesh.height = 0.2
-		var material := ShaderMaterial.new()
-		material.shader = FLAME_SHADER
-		material.set_shader_parameter("flame", TORCH)
-		_flame_mesh.material = material
-	return _flame_mesh
-
-
 ## Fire on the ground: a ragged glowing patch (fire.gdshader) wider than
 ## its cell, so cells of fire side by side run together; one mesh for all.
 static var _fire_mesh: PlaneMesh
@@ -6380,12 +6386,35 @@ func _add_fire(cell: Vector2i) -> void:
 	quad.position = _tile_position(cell) + Vector3(0.0, ON_FLOOR, 0.0)
 	quad.rotation.y = _roll(cell, 6) * TAU
 	_room.add_child(quad)
+	# Its flames (decision 523), at places in the cell by the cell.
+	var flames := FIRE_FLAMES.x + floori(_roll(cell, 143) * (FIRE_FLAMES.y - FIRE_FLAMES.x + 1))
+	for n in flames:
+		var off := Vector2(_roll(cell, 144 + n * 3), _roll(cell, 145 + n * 3)) - Vector2(0.5, 0.5)
+		var size := lerpf(FIRE_FLAME_SIZES.x, FIRE_FLAME_SIZES.y, _roll(cell, 146 + n * 3))
+		var flame := Flames.light(quad, Vector3(off.x * 0.6, 0.0, off.y * 0.6), size, hash(Vector3i(cell.x, cell.y, n)))
+		flame.name = "Flame%d" % n
 	var light := OmniLight3D.new()
 	light.light_color = FIRE
 	light.light_energy = 1.5
 	light.omni_range = 2.5
 	light.position = _tile_position(cell) + Vector3(0.0, 0.5, 0.0)
 	_room.add_child(light)
+	_fire_lights.append([light, light.light_energy, _roll(cell, 147) * TAU, Flames.FIRE_FLICKER])
+
+
+## Fire's drawn lights each frame (decision 523): each flickers on its own
+## phase (Flames.flicker) and, outdoors, fades by day where the sky reaches
+## (Flames.day_share). World's light (Fields) is never touched: it stays
+## steady for Senses.
+func _flicker_fires(delta: float) -> void:
+	if _fire_lights.is_empty():
+		return
+	_fire_time += delta
+	var share := Flames.day_share(_look_daylight, _outdoor, World.fields.canopy_shade if World.fields != null else 0.0)
+	for fire: Array in _fire_lights:
+		var light := fire[0] as OmniLight3D
+		if is_instance_valid(light):
+			light.light_energy = float(fire[1]) * share * Flames.flicker(_fire_time, float(fire[2]), float(fire[3]))
 
 
 # --- Shadows -------------------------------------------------------------------

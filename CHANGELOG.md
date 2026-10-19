@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Fire looks like fire (523): torches and burning ground have flickering flames with rising embers and a faint wisp of smoke, and their light flickers and warms the ground around them. By day outdoors a torch's light fades to a glint.
 - Chests, crates and barrels are rebuilt in clean planks: a chest with a rounded lid, iron straps and a brass clasp, a crate with a framed, braced side, and a barrel with staves and iron hoops.
 - A torch that stands on its own is a pole packed upright in a ring of stones, its pitch-wrapped head ready for the flame.
 - Sharper sun shadows: a body's, a well's and a wall's shadows are clean shapes instead of speckled blobs (526).
