@@ -210,6 +210,35 @@
 				"sha256": "70de2e47ac4dc2ec69489ada3ed53617602d98200f94989e93d8df7102b169dd"
 			}
 		],
+		"amb.stream": [
+			{
+				"file": "amb.stream.ogg",
+				"from": "freesound",
+				"original": "freesound 231536: Creek 06 (loop) (from 0 s for 35 s)",
+				"sha256": "beb314b439e0d9972004473e7d7d82c544b014112a1f70f23a6e53e7293dd498",
+				"by": "VKProduktion",
+				"url": "https://freesound.org/people/VKProduktion/sounds/231536/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "amb.stream.2.ogg",
+				"from": "freesound",
+				"original": "freesound 415053: Brook 2.wav (from 0 s for 36 s)",
+				"sha256": "7742d493f9d45d79d47aa4dfed760ae7c279f75075de7346b0d55faa3522fd20",
+				"by": "straget",
+				"url": "https://freesound.org/people/straget/sounds/415053/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "amb.stream.3.ogg",
+				"from": "freesound",
+				"original": "freesound 446019: Gentle Stream Natural Stream Sound (from 2 s for 60 s)",
+				"sha256": "3355e834e61339d038213d718732dea4f03d5850e309522f75e5f46924612a44",
+				"by": "BurghRecords",
+				"url": "https://freesound.org/people/BurghRecords/sounds/446019/",
+				"license": "CC0 1.0"
+			}
+		],
 		"amb.torch_fire": [
 			{
 				"file": "amb.torch_fire.ogg",

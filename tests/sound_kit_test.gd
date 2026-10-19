@@ -263,6 +263,16 @@ func _test_ambience_weights() -> void:
 	_check(under["amb.owl"] == 0.0 and under["amb.bat"] == 0.0, "none under stone")
 	for slot: String in ["amb.owl", "amb.bat"]:
 		_check(SoundKit.has(slot) and SoundKit.positional(slot) and SoundKit.reach(slot) > 0, "%s is a call from somewhere" % slot)
+	# A stream heard from the nearest point of its course (decision 505).
+	var course: Array[Vector2i] = [Vector2i(0, 0), Vector2i(4, 0), Vector2i(5, 1), Vector2i(5, 6)]
+	var beside := Ambience.nearest_on(course, Vector2(2, 3))
+	_check(beside.at == 0 and is_equal_approx(beside.t, 0.5) and is_equal_approx(beside.distance, 3.0), "a stream: beside its middle, the point across from you (%s)" % beside)
+	var by_bend := Ambience.nearest_on(course, Vector2(8, 4))
+	_check(by_bend.at == 2 and is_equal_approx(by_bend.t, 0.6) and is_equal_approx(by_bend.distance, 3.0), "a stream round a bend: along its last reach (%s)" % by_bend)
+	var past := Ambience.nearest_on(course, Vector2(5, 10))
+	_check(past.at == 2 and is_equal_approx(past.t, 1.0) and is_equal_approx(past.distance, 4.0), "past its end: its end (%s)" % past)
+	_check(Ambience.nearest_on([Vector2i(3, 3)], Vector2(3, 7)).distance == 4.0 and Ambience.nearest_on([], Vector2.ZERO).is_empty(), "one cell; none")
+	_check(SoundKit.positional("amb.stream") and SoundKit.reach("amb.stream") >= 12, "a stream heard from %d cells" % SoundKit.reach("amb.stream"))
 	for bed: String in Ambience.BEDS:
 		_check(SoundKit.has(bed) and not SoundKit.positional(bed), "%s is a flat slot" % bed)
 

@@ -1321,6 +1321,15 @@
 			"range": 6,
 			"volume_db": -10.0,
 			"uses": "bats flitting at night by a forest's edges and clearings and by towers; Ambience.calls, overhead near the listener"
+		},
+		"amb.stream": {
+			"category": "ambience",
+			"type": "loop",
+			"bus": "ambience",
+			"noise": null,
+			"range": 16,
+			"volume_db": -8.0,
+			"uses": "running water: a stream heard from the nearest point of its course, before it is seen; Ambience, one per stream at the point of its course nearest the listener"
 		}
 	}
 }

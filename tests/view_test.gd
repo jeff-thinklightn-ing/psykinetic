@@ -158,6 +158,27 @@ func _test_ambience_runs() -> void:
 			playing.append(bed)
 	_check(playing.all(func(bed: String) -> bool: return _rig.ambience.targets[bed] >= Ambience.SILENT),
 			"only beds with weight play (%s)" % [playing])
+	# A stream (decision 505) heard from the point of its course across from
+	# the listener; none where its takes aren't (other checkouts).
+	var listener: Vector2i = _rig.sfx.listener
+	var had: Variant = _rig._terrain.get("streams")
+	var course: Array[Vector2i] = [listener + Vector2i(-3, 2), listener + Vector2i(3, 2)]
+	_rig._terrain["streams"] = [{"path": course}]
+	_rig.ambience._weigh()
+	var takes := not SoundKit.files("amb.stream").is_empty()
+	var held: Variant = _rig.ambience._streams.get(0)
+	_check(held == null if not takes else held is AudioStreamPlayer3D
+			and (held as AudioStreamPlayer3D).position.distance_to(_rig._tile_position(listener + Vector2i(0, 2))) < 0.01,
+			"a stream two cells off: its loop across from the listener (%s)" % ("held" if held != null else "no takes"))
+	_rig._terrain["streams"] = [{"path": [listener + Vector2i(60, 0), listener + Vector2i(60, 5)] as Array[Vector2i]}]
+	_rig.ambience._weigh()
+	_check(_rig.ambience._streams.is_empty() and (held == null or (held as Node).is_queued_for_deletion()),
+			"a stream out of reach: none held, the old one let go")
+	if had == null:
+		_rig._terrain.erase("streams")
+	else:
+		_rig._terrain["streams"] = had
+	_rig.ambience._weigh()
 
 
 func _test_options_panel() -> void:

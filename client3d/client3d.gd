@@ -6506,7 +6506,9 @@ func _step_sound(entity: GridEntity, puppet: Node3D) -> void:
 	var last: Vector2i = _last_tile.get(id, entity.tile)
 	_last_tile[id] = entity.tile
 	if entity.is_creature() and last != entity.tile and World.distance(last, entity.tile) == 1:
-		var ground: String = "water" if World.is_water(entity.tile) else _ground_kinds.get(entity.tile, "stone")
+		# A ford (decision 505) is waded, though it isn't deep water.
+		var wet := World.is_water(entity.tile) or World.is_ford(entity.tile)
+		var ground: String = "water" if wet else _ground_kinds.get(entity.tile, "stone")
 		var creature := str(entity.spawn_spec.get("kind", "")) if entity is Monster else ""
 		sfx.play(SoundKit.footstep(ground, entity.mass, creature), puppet.position, 1.0, 0.0, Senses.step_radius(entity))
 

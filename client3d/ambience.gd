@@ -29,6 +29,10 @@ extends Node
 ## listener, more often under a forest's roof, and bats (amb.bat) overhead
 ## by a canopy's edges and clearings and by a town wall's towers; both
 ## sparse, hushed by rain, at the rates calls() gives.
+## A stream (decision 505's terrain "streams") is a line, not a bed: its
+## loop (amb.stream) plays from the point of its course nearest the
+## listener (nearest_on), sliding along the water as they move, heard
+## before the trees let it be seen and muffled only by walls (Sfx.hearing).
 ## A bed with no takes plays nothing.
 
 ## Seconds a bed takes to ease most of the way to its new loudness.
@@ -77,6 +81,10 @@ var levels: Dictionary[String, float] = {}
 ## Every bed this much quieter (dB): Music's duck under a fight.
 var duck_db := 0.0
 var _torch: AudioStreamPlayer3D
+## Stream (its index in the terrain's "streams") -> its held loop, while
+## the listener is within its reach; and the streams they were made for.
+var _streams := {}
+var _stream_paths: Array = []
 var _since_weigh := INF
 
 
@@ -115,6 +123,7 @@ func _weigh() -> void:
 	targets.assign(weights(zone, under_sky, DayNight.daylight(steps), DayNight.hour(steps), weather, _town_nearness(cell),
 			canopy, drip))
 	_place_torch(cell)
+	_place_streams(cell)
 	var rates := calls(zone, DayNight.daylight(steps), weather, canopy, _tower_nearness(cell))
 	for slot: String in rates:
 		if randf() < rates[slot] * WEIGH_EVERY:
@@ -208,6 +217,56 @@ func _town_nearness(cell: Vector2i) -> float:
 		var dy := maxi(0, maxi(rect.position.y - cell.y, cell.y - rect.end.y + 1))
 		nearest = minf(nearest, maxf(dx, dy))
 	return clampf((TOWN_FAR - nearest) / (TOWN_FAR - TOWN_NEAR), 0.0, 1.0)
+
+
+## Each stream's loop at the point of its course nearest [param cell],
+## held while it is within the stream's reach (and a little over, so it
+## isn't made and freed at the edge).
+func _place_streams(cell: Vector2i) -> void:
+	var streams: Array = view._terrain.get("streams", [])
+	if not is_same(streams, _stream_paths):
+		for player: Variant in _streams.values():
+			if is_instance_valid(player):
+				player.queue_free()
+		_streams.clear()
+		_stream_paths = streams
+	var reach := float(SoundKit.reach("amb.stream"))
+	for i in streams.size():
+		var path: Array = (streams[i] as Dictionary).get("path", [])
+		var player: Variant = _streams.get(i)
+		if player != null and not is_instance_valid(player):
+			player = null
+		var near := nearest_on(path, Vector2(cell))
+		if near.is_empty() or float(near.distance) > reach + 2.0:
+			if player != null:
+				player.queue_free()
+			_streams.erase(i)
+			continue
+		var at := view._tile_position(path[near.at])
+		if int(near.at) + 1 < path.size():
+			at = at.lerp(view._tile_position(path[int(near.at) + 1]), float(near.t))
+		if player == null:
+			player = view.sfx.hold("amb.stream", at)
+			if player == null:
+				continue
+			_streams[i] = player
+		view.sfx.steer(player, at, 1.0, duck_db)
+
+
+## The point of [param path] (cells in order, each beside the one before)
+## nearest [param to], as the cells' line runs: {at: the index of the
+## segment's first cell, t: 0..1 along it, distance: in cells}; {} for
+## an empty path.
+static func nearest_on(path: Array, to: Vector2) -> Dictionary:
+	var best := {}
+	for i in maxi(1, path.size() - 1) if not path.is_empty() else 0:
+		var a := Vector2(path[i])
+		var along := Vector2(path[mini(i + 1, path.size() - 1)]) - a
+		var t := 0.0 if along.is_zero_approx() else clampf((to - a).dot(along) / along.length_squared(), 0.0, 1.0)
+		var distance := to.distance_to(a + along * t)
+		if best.is_empty() or distance < float(best.distance):
+			best = {"at": i, "t": t, "distance": distance}
+	return best
 
 
 ## The torch loop at the nearest torch heard from [param cell], else off.

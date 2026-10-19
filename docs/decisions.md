@@ -14232,3 +14232,32 @@ Rejected: a raw JSON field (bypasses every check); a per-kind panel script
 (each new key a new script); moving painted things from the panel (the
 paint is the truth for them); refusing on the loader's warnings (many are
 fair mid-edit).
+
+## 505, sound's side: a stream heard before it is seen, a ford waded
+
+Terrain asked (the coordinator: the sounds are sound's; a stream heard before
+it is seen, as the dark forest's rule has it). Two parts, client only.
+
+- Running water is a new positional loop, amb.stream (3 Freesound takes,
+  CC0: 231536, 415053, 446019), reach 16 cells. A stream is a line, not a
+  bed: Ambience holds one loop per stream (Sfx.hold), at the point of its
+  course nearest the listener (Ambience.nearest_on: the terrain's "streams"
+  paths, middle cells in flow order, projected onto their segments, so the
+  sound slides along the water as you walk). Each weigh (WEIGH_EVERY) steers
+  it there (Sfx.steer: heard as any sound is, muffled by walls, not by the
+  canopy; ducked with the beds). Held within reach + 2 cells, let go beyond
+  it; the loops are rebuilt when the terrain's streams change (a new zone).
+  The path is the stream's middle, its width (1 to 3) not recorded: a line
+  source loses at most 1.5 cells (terrain).
+- A ford (World.is_ford: floor, not water, since is_water is deep only) is
+  stepped on as water: Client3D._step_sound's footstep kind "water"
+  (sfx.footstep_water_small/medium/large by mass, as before for wading).
+
+Tests: sound_kit_test (nearest_on beside a stream, round a bend, past its
+end, one cell, none; the slot's reach); view_test (a stream two cells off
+held across from the listener, let go out of reach). Both pass with the
+external takes moved aside, where no loop is held.
+
+Rejected: a few fixed emitters along each stream (gaps or doubling as you
+walk; many players for a long stream); a bed weighed by distance to water
+(no direction); terrain calling the cues (the coordinator: sound's).
