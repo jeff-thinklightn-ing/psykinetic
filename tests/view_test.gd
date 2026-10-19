@@ -46,6 +46,7 @@ func _ready() -> void:
 	_test_hills()
 	_test_water()
 	_test_streams()
+	_test_tall_grass()
 	await _test_wall_runs()
 	_test_cave_walls()
 	_test_scatter()
@@ -1498,6 +1499,54 @@ func _test_water() -> void:
 			"dry water: no surface, no sunk bed, drawn as the land; the map still has it as water")
 	_rig._dry_water.clear()
 	_rig.rebuild(terrain, castle["centre"])
+	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+
+
+## levels/sample's tall grass (decision 508, terrain's side): its clumps,
+## tall, in place of the tufts, bending in the wind; each drawn clump known
+## by its cell; a cell trampled laid flat and stood again, and a full set
+## (both lists empty) read again whole.
+func _test_tall_grass() -> void:
+	print("\n== tall grass: clumps for tufts, laid flat when trampled ==")
+	var sample := Level.load_level("sample")
+	var terrain: Dictionary = sample["terrain"]
+	var grass: Array = terrain.get("tall_grass", [])
+	_check(not grass.is_empty(), "the sample has tall grass (%d cells)" % grass.size())
+	if grass.is_empty():
+		return
+	_rig.rebuild(terrain, sample["centre"])
+	_rig._scatter_all()
+	var clumps := 0
+	var tufts := 0
+	for chunk: Vector2i in _rig._scatter_chunks:
+		var plan := _rig._scatter_plan(chunk)
+		for item: Array in plan.get("tall", []):
+			clumps += 1 if grass.has(item[0]) else 0
+		for item: Array in plan.get("tuft", []):
+			tufts += 1 if grass.has(item[0]) else 0
+	_check(clumps >= grass.size() * 7 and tufts == 0, "clumps on its cells, about nine a cell, no tufts (%d on %d cells, %d tufts)" % [clumps, grass.size(), tufts])
+	var high := Client3D._scatter_mesh("tall").get_aabb().end.y
+	_check(high > 0.75 and high < 1.05 and "tall" in Client3D.SWAYING, "its blades about a metre and bending in the wind (%.2f m)" % high)
+	_check(grass.all(func(cell: Vector2i) -> bool: return _rig._tall_where.has(cell)), "each cell's clumps known, to redraw it alone")
+	_check(Client3D.tall_look(Color(0.5, 0.6, 0.3), true).a == 0.0 and Client3D.tall_look(Color(0.5, 0.6, 0.3), false).a == 1.0
+			and is_equal_approx(Client3D.tall_look(Color(0.5, 0.6, 0.3), true).g, 0.6), "trampled is its colour's alpha 0, standing 1, its colour kept")
+	var cell: Vector2i = grass[0]
+	# (Headless, a MultiMesh keeps no colours: the cells it drew flat.)
+	var alpha := func() -> float: return 0.0 if _rig._tall_flat.has(cell) else 1.0
+	var was: Dictionary = World._trampled_here.duplicate()
+	World._trampled_here[cell] = 1
+	_rig._on_grass_changed(World.fields.level, PackedInt32Array([cell.x, cell.y]), PackedInt32Array())
+	var flat: float = alpha.call()
+	World._trampled_here.erase(cell)
+	_rig._on_grass_changed(World.fields.level, PackedInt32Array(), PackedInt32Array([cell.x, cell.y]))
+	var stood: float = alpha.call()
+	World._trampled_here[cell] = 1
+	_rig._on_grass_changed(World.fields.level, PackedInt32Array(), PackedInt32Array())
+	var full: float = alpha.call()
+	World._trampled_here.clear()
+	World._trampled_here.merge(was)
+	_check(flat == 0.0 and stood == 1.0 and full == 0.0, "trampled laid flat, stood again, and a full set read again (%.0f, %.0f, %.0f)" % [flat, stood, full])
+	_rig._flattened.clear()
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
 

@@ -769,8 +769,11 @@ const SCATTER_ROOF_SNOW := 0.12
 ## the roof's shade is put in.
 const SCATTER_ROOF_STRAW := 0.5
 const SCATTER_REEDS := 1.6
+## Tall grass (decision 508, terrain's side): its clumps in place of the
+## grass's tufts, a few flowers among them.
+const SCATTER_TALL := {"tall": 9.0, "flower": 0.08}
 const SCATTER_SIZES := {"tuft": Vector2(0.7, 1.3), "flower": Vector2(0.8, 1.1), "stone": Vector2(0.6, 1.6), "root": Vector2(0.8, 1.4),
-		"reeds": Vector2(0.8, 1.3)}
+		"reeds": Vector2(0.8, 1.3), "tall": Vector2(0.9, 1.1)}
 ## Flowers: the palette's accents (row 7: flame, bone, banner red, magic
 ## violet), the few saturated things on the ground.
 const FLOWER_SWATCHES: Array[Vector2i] = [Vector2i(7, 0), Vector2i(7, 7), Vector2i(7, 3), Vector2i(7, 5)]
@@ -1199,6 +1202,13 @@ var _scatter_due: Array[Vector2i] = []
 var _scatter_aim := Vector2i(1 << 30, 0)
 ## Planned scatter still to make, a [chunk, kind, items] a frame.
 var _scatter_jobs: Array[Array] = []
+## Tall grass (decision 508, terrain's side): its cells, and where each
+## cell's clumps were drawn ([MultiMesh, index], ...), so a cell trampled
+## or standing again is redrawn without the rest of its chunk, and the
+## cells drawn flat now.
+var _tall: Dictionary[Vector2i, bool] = {}
+var _tall_where: Dictionary[Vector2i, Array] = {}
+var _tall_flat: Dictionary[Vector2i, bool] = {}
 var _mask_origin := Vector2i.ZERO
 var _mask_size := Vector2i.ONE
 ## The canopy over this map (decision 466; Fields.canopy_at, from the same
@@ -2498,6 +2508,11 @@ func rebuild(terrain: Dictionary, centre: Vector2i) -> void:
 	_scattered.clear()
 	_scatter_due.clear()
 	_scatter_jobs.clear()
+	_tall.clear()
+	for cell: Vector2i in terrain.get("tall_grass", []):
+		_tall[cell] = true
+	_tall_where.clear()
+	_tall_flat.clear()
 	_scatter_aim = Vector2i(1 << 30, 0)
 	_posts.clear()
 	_doorways.clear()
@@ -3545,9 +3560,16 @@ func _scatter_build(chunk: Vector2i, kind: String, items: Array) -> void:
 		var lean := Vector3((_roll(cell, 104 + salt) - 0.5) * 2.0 * tilt, _roll(cell, 105 + salt) * TAU, (_roll(cell, 106 + salt) - 0.5) * 2.0 * tilt)
 		var basis := Basis.from_euler(lean).scaled(Vector3.ONE * size)
 		multimesh.set_instance_transform(i, Transform3D(basis, Vector3(at.x, _height_in(cell, at) - fit[2], at.y)))
-		multimesh.set_instance_color(i, _scatter_tint(kind, cell, salt, items[i][3]))
+		var tint := _scatter_tint(kind, cell, salt, items[i][3])
+		multimesh.set_instance_color(i, tall_look(tint, World.is_trampled(cell)) if kind == "tall" else tint)
 		if swaying:
 			multimesh.set_instance_custom_data(i, scatter_custom(items[i][3], over_tall, kind != "reeds"))
+		if kind == "tall":
+			if not _tall_where.has(cell):
+				_tall_where[cell] = []
+			_tall_where[cell].append([multimesh, i])
+			if World.is_trampled(cell):
+				_tall_flat[cell] = true
 	var drawn := MultiMeshInstance3D.new()
 	drawn.name = "Scatter_%d_%d_%s" % [chunk.x, chunk.y, kind]
 	drawn.multimesh = multimesh
@@ -3572,7 +3594,7 @@ func _scatter_plan(chunk: Vector2i) -> Dictionary[String, Array]:
 		# its floor of needles, as the ground draws it: the forest's scatter.
 		var forest := index >= _ground_water_end 				or _ground_kinds[cell] == "grass" and float(roof.get(cell, 0.0)) > SCATTER_ROOF and not _floor_sets.has(cell)
 		var ground := "forest" if forest else _ground_kinds[cell]
-		var density: Dictionary = SCATTER_DENSITY.get(ground, {})
+		var density: Dictionary = SCATTER_TALL if _tall.has(cell) else SCATTER_DENSITY.get(ground, {})
 		# Roots where the land meets the forest; reeds by water.
 		if not forest and _forest_distance.has(cell) and _forest_edge(cell):
 			density = density.duplicate()
@@ -3642,13 +3664,35 @@ func _scatter_tint(kind: String, cell: Vector2i, salt: int, forest: bool) -> Col
 		colour = colour * Color(0.6, 0.72, 0.6)
 	elif kind == "tuft" and _ground_kinds.get(cell, "grass") != "grass":
 		colour = colour * Color(1.15, 1.05, 0.65)  # Dry, off the grass.
+	if kind == "tall":
+		colour = colour * Color(1.06, 1.02, 0.78)  # Riper than the lawn.
 	return Color(colour, 1.0)
+
+
+## A tall grass clump's colour, [param trampled] or standing: its alpha 0
+## lays it flat (scatter.gdshader's pressed mat), 1 stands it.
+static func tall_look(colour: Color, trampled: bool) -> Color:
+	return Color(colour, 0.0 if trampled else 1.0)
+
+
+## Each drawn clump of [param cells] laid flat or stood again, as World
+## has it trampled now.
+func _show_trampled(cells: Array) -> void:
+	for cell: Vector2i in cells:
+		var trampled := World.is_trampled(cell)
+		if trampled:
+			_tall_flat[cell] = true
+		else:
+			_tall_flat.erase(cell)
+		for drawn: Array in _tall_where.get(cell, []):
+			var multimesh: MultiMesh = drawn[0]
+			multimesh.set_instance_color(drawn[1], tall_look(multimesh.get_instance_color(drawn[1]), trampled))
 
 
 ## The scatter's materials: vertex colours times each instance's, rough,
 ## both sides of a blade drawn; the soft kinds (SWAYING) bend in the wind
 ## (scatter.gdshader, decision 309), stones and roots don't.
-const SWAYING: Array[String] = ["tuft", "flower", "reeds"]
+const SWAYING: Array[String] = ["tuft", "flower", "reeds", "tall"]
 static var _scatter_look: StandardMaterial3D
 static var _scatter_sway: ShaderMaterial
 
@@ -3748,6 +3792,24 @@ static func _make_scatter(kind: String) -> ArrayMesh:
 					var white := Color.WHITE
 					_scatter_triangle(surface, [at + Vector3(-r, 0, 0), at + Vector3(0, 0, -r), at + Vector3(r, 0, 0)], [white, white, white])
 					_scatter_triangle(surface, [at + Vector3(-r, 0, 0), at + Vector3(r, 0, 0), at + Vector3(0, 0, r)], [white, white, white])
+		"tall":
+			# A clump of ten long thin blades, each in two segments, near
+			# upright and bowing out a little toward the tip (decision 508,
+			# terrain's side).
+			var base := swatch(4, 4)
+			var middle := swatch(4, 3)
+			var top := swatch(3, 1)
+			for b in 10:
+				var turn := b * TAU / 10.0 + rng.randf_range(-0.35, 0.35)
+				var out := Vector3(cos(turn), 0.0, sin(turn))
+				var side := Vector3(-out.z, 0.0, out.x) * 0.02
+				var root := out * rng.randf_range(0.0, 0.06)
+				var tall := rng.randf_range(0.8, 1.0)
+				var knee := root + out * rng.randf_range(0.02, 0.05) + Vector3.UP * tall * 0.55
+				var tip := root + out * rng.randf_range(0.08, 0.16) + Vector3.UP * tall
+				_scatter_triangle(surface, [root - side, root + side, knee + side * 0.6], [base, base, middle])
+				_scatter_triangle(surface, [root - side, knee + side * 0.6, knee - side * 0.6], [base, middle, middle])
+				_scatter_triangle(surface, [knee - side * 0.6, knee + side * 0.6, tip], [middle, middle, top])
 		"reeds":
 			# Tall thin blades, a few with a brown head.
 			var stalk := swatch(4, 3)
@@ -6725,11 +6787,19 @@ static func rustles(tile: Vector2i, flattened: int, now: int) -> bool:
 
 
 ## Tall grass trampled ([param flat], flat [x, y, ...]) noted for
-## rustles(); a full "grass" message (both empty) notes nothing.
-func _on_grass_changed(_level: String, flat: PackedInt32Array, _stood: PackedInt32Array) -> void:
+## rustles(); a full "grass" message (both empty) notes nothing. Its clumps
+## are laid flat, and those [param stood] stood again.
+func _on_grass_changed(_level: String, flat: PackedInt32Array, stood: PackedInt32Array) -> void:
 	var now := Time.get_ticks_msec()
+	var changed: Array[Vector2i] = []
 	for i in range(0, flat.size() - 1, 2):
 		_flattened[Vector2i(flat[i], flat[i + 1])] = now
+		changed.append(Vector2i(flat[i], flat[i + 1]))
+	for i in range(0, stood.size() - 1, 2):
+		changed.append(Vector2i(stood[i], stood[i + 1]))
+	# The drawn tall grass (decision 508, terrain's side): the cells told,
+	# or after a full set (both empty) every clump, laid flat or stood.
+	_show_trampled(_tall_where.keys() if flat.is_empty() and stood.is_empty() else changed)
 	for cell: Vector2i in _flattened.keys():
 		if now - _flattened[cell] >= FLATTENED_MS:
 			_flattened.erase(cell)

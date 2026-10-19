@@ -15172,3 +15172,37 @@ him 28 times (7), and the inn stood on day 23.4 (not in 30 days). No
 ring was made: no ore reaches the soak town's smith, which waits for the
 work-site step. Protocol unchanged. larder_test.
 
+## 508, terrain's side: tall grass drawn, and the trodden path
+
+508 left the drawing to terrain: tall grass as a scatter that bends, and
+the trampled set. Client only (client3d.gd, scatter.gdshader); the sim and
+the wire are 508's.
+
+- A scatter kind "tall" (in SWAYING: scatter.gdshader bends it in the wind,
+  takes the season's straw, turn and snow as the tufts do). On a cell of
+  terrain "tall_grass" the grass's tufts give way to it: SCATTER_TALL, 9
+  clumps a cell and a few flowers. A clump is ten thin blades of two
+  segments each, 0.8 to 1 m tall, near upright and bowing out a little (made here; scatter.tall if art
+  ever fills it), scaled 0.9 to 1.1, a little riper than the lawn.
+- Trampled (World.is_trampled) is the clump's instance colour's alpha 0
+  (Client3D.tall_look); scatter.gdshader lays it down as a pressed mat
+  (MAT_HEIGHT 0.08 of its height, MAT_SPREAD 0.6 of it along the ground),
+  still in the wind, a little drier and
+  darker; blade by blade laid down one way, the cell's (a hash of it), as
+  feet pushed them, not a star round each root. Set when a chunk's scatter is made, and on World.grass_changed:
+  _tall_where keeps cell -> [MultiMesh, index] of its clumps, so the cells
+  told (flat, stood) are set alone; a full set (both lists empty) sets every
+  clump from World's set again. No animation: it lies down and stands up.
+- Who stands in it stays seen from above: a clump reaches about a person's
+  hip and its blades are thin (4 cm), so a body shows through and over it
+  (the review shots: an imp at its edge; the bench can't start the host in
+  it, so a player in it is still to see in game).
+
+tests/view_test (the sample's patch: clumps on its cells and no tufts, the
+blades' height, each cell's clumps known, trampled laid flat and stood
+again, a full set read again).
+
+Rejected: a mesh of its own per cell (the scatter's chunks and MultiMeshes
+already draw grass); hiding the clumps when trampled (the path should show
+as grass pressed down, not bare ground); a second MultiMesh for the flat
+ones (a cell would move between them on every step).

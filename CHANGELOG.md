@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Tall grass is drawn: tall clumps of blades about a metre high that sway in the wind, and grass trampled flat shows as a pressed mat along the path until it stands again (508).
 - Talking to the town's official about the building fund: the give lines read as "a gift" with a Give button and the gold in brass, and the foot says what you carry whenever a line would take gold; a long offer title wraps instead of running off the panel.
 - Luxuries for the rich (514): a well-off resident sometimes wants wine or spice from the castle market, or the smith's silver ring, and has the merchant fetch it by caravan. Luxuries are taxed at half the merchant's margin, and that tax helps the town pay its wages and the makers it owes. The rich keep a ring and enjoy the rest.
 - Streams run: their water drifts downstream, fords show shallow and clear with foam where the current crosses the stones, and bridges are drawn with wooden decks, rails and ends, the water running on underneath (505).

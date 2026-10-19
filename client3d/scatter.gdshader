@@ -8,7 +8,10 @@ shader_type spatial;
 // over its mesh's height, so snow lies on its tips whatever its size, b how
 // light its dried straw is (the roof's shade: the scatter takes no shadow),
 // a 1 if it sinks into the snow: SNOW_SINK of its height under full cover,
-// more or less by where it stands (some gone, some a few straw tips).
+// more or less by where it stands (some gone, some a few straw tips). Tall
+// grass trampled (decision 508, terrain's side: its instance colour's alpha
+// 0) is a pressed mat, its blades laid down flat one way (as feet pushed
+// them, by where it stands), still in the wind and drier.
 render_mode cull_disabled, shadows_disabled;
 
 global uniform vec4 wind;
@@ -17,6 +20,7 @@ global uniform vec4 season;
 varying float up;
 varying float snow_cover;
 varying float straw_light;
+varying float trodden;
 // How far full wind bends a tip one unit up (in the mesh's own units).
 uniform float bend = 0.35;
 // How much of a plant's height full snow buries, and how much that varies
@@ -26,6 +30,10 @@ const float SNOW_SINK_SPREAD = 0.35;
 // How white its tips go under full snow: faint, so the open reads as snow
 // with grass poking through.
 const float SNOW_TIPS = 0.35;
+// How high a trampled blade's tip still stands (of its height), and how
+// much of its height lies out along the ground.
+const float MAT_HEIGHT = 0.08;
+const float MAT_SPREAD = 0.6;
 
 vec3 to_linear(vec3 c) {
 	return mix(pow((c + vec3(0.055)) * (1.0 / 1.055), vec3(2.4)), c * (1.0 / 12.92), lessThan(c, vec3(0.04045)));
@@ -40,9 +48,15 @@ void vertex() {
 	up = clamp(height * INSTANCE_CUSTOM.g, 0.0, 1.0);
 	snow_cover = INSTANCE_CUSTOM.r;
 	straw_light = INSTANCE_CUSTOM.b;
+	trodden = 1.0 - step(0.5, COLOR.a);
+	float pushed = fract(sin(dot(floor(at), vec2(39.3468, 11.135))) * 43758.5453) * 6.2832;
+	vec3 laid = inverse(mat3(MODEL_MATRIX)) * vec3(cos(pushed), 0.0, sin(pushed));
+	VERTEX.xz += normalize(laid.xz) * height * MAT_SPREAD * trodden;
+	VERTEX.y = mix(VERTEX.y, VERTEX.y * MAT_HEIGHT, trodden);
 	vec3 way = inverse(mat3(MODEL_MATRIX)) * vec3(wind.x, 0.0, wind.y);
-	VERTEX += way * (bend * wind.z * gust * height * height);
-	VERTEX.y -= 0.3 * bend * wind.z * gust * height * height * height;
+	float sway = 1.0 - trodden;
+	VERTEX += way * (bend * wind.z * gust * height * height) * sway;
+	VERTEX.y -= 0.3 * bend * wind.z * gust * height * height * height * sway;
 	float drift = fract(sin(dot(floor(at * 3.0), vec2(12.9898, 78.233))) * 43758.5453);
 	float buried = season.z * snow_cover * INSTANCE_CUSTOM.a * (SNOW_SINK + (drift - 0.5) * 2.0 * SNOW_SINK_SPREAD);
 	VERTEX.y -= buried / max(INSTANCE_CUSTOM.g, 0.001);
@@ -53,7 +67,8 @@ void fragment() {
 	// snow lies on the tops.
 	vec3 colour = COLOR.rgb;
 	float grey = dot(colour, vec3(0.3, 0.55, 0.15));
-	colour = mix(colour, vec3(0.62, 0.55, 0.34) * (0.6 + grey) * straw_light, (1.0 - season.x) * 0.6);
+	colour = mix(colour, vec3(0.62, 0.55, 0.34) * (0.6 + grey) * straw_light, max((1.0 - season.x) * 0.6, trodden * 0.35));
+	colour *= 1.0 - trodden * 0.15;
 	colour = mix(colour, vec3(0.78, 0.4, 0.12) * (0.6 + grey), season.y * 0.55);
 	colour = mix(colour, vec3(0.9, 0.93, 0.97), season.z * smoothstep(0.45, 0.95, up) * SNOW_TIPS * snow_cover);
 	ALBEDO = colour;
