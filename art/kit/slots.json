@@ -357,7 +357,7 @@
 			"size": [0.87, 0.62, 1.12],
 			"base": -0.32,
 			"budget": 300,
-			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-18", "notes": "a lumpy rounded roll 0.5 across and 0.26 high over the ridge, its wings draping down both slopes at the thatch's rise (0.9), two hazel liggers along its flanks; straw in row 3's mid earth, darker on the flanks, a little weathered grey; 1.12 m so neighbours overlap, its ends ragged; 128 tris; a stand-in for an art-gen concept"},
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-18", "notes": "a lumpy rounded roll 0.5 across and 0.26 high over the ridge, its wings draping down both slopes at the thatch's rise (0.9), two hazel liggers along its flanks; the thatch's own straw and grey a shade under it (the coordinator; row 3's and row 5's, the flanks row 2's brown), lumps swollen and pinched unevenly along it (buildings' shot: the first read as a pale smooth band with grey pegs), the liggers and pegs hazel brown; 1.12 m so neighbours overlap, its ends ragged; 232 tris; a stand-in for an art-gen concept"},
 			"uses": "a thatch roof's ridge roll (the coordinator: a thick rounded ridge), laid a metre at a time along the ridge by BuildingComposer (buildings' composer, decision 489), following its sag and shift: an edge piece along z, its origin the middle of its underside on the ridge line, its wings down the slopes to y -0.32 (\"base\")"
 		},
 		"roof.thatch.eave": {
