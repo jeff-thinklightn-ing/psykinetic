@@ -28,6 +28,7 @@ func _ready() -> void:
 	await _test_stream()
 	await _test_kind_building()
 	await _test_slopes()
+	await _test_captives()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -542,6 +543,37 @@ func _test_slopes() -> void:
 	session.accept()
 	var warnings := (doc.parsed()["warnings"] as Array).filter(func(w: String) -> bool: return "slope" in w)
 	_check(warnings.is_empty(), "Level reads the slopes as made (%s)" % [warnings])
+
+
+func _test_captives() -> void:
+	print("\n== captives a camp holds (519, on npc's 518) ==")
+	var doc := _doc()
+	doc.config["places"] = {"store": {"at": [20, 20], "kind": "stockpile", "holder": "town"}}
+	var hold := {"town": "test_field/store", "resident": "the smith's daughter", "name": "Tam"}
+	var stub := StubClaude.new([
+		[{"name": "mark_place", "input": {"key": "camp", "kind": "camp", "at": [10, 10], "holder": "goblins", "holds": [hold]}},
+			{"name": "mark_place", "input": {"key": "camp2", "kind": "camp", "at": [12, 12], "holder": "goblins",
+				"holds": [{"town": "nowhere/store", "resident": "Bran"}]}},
+			{"name": "mark_place", "input": {"key": "farm", "kind": "farm", "at": [14, 12], "holder": "town", "holds": [hold]}}],
+		"A camp holding a captive.",
+	])
+	var session := BuilderSession.new(doc, Rect2i(5, 5, 20, 20), "test_field", stub)
+	await session.ask("a goblin camp holding the smith's daughter")
+	_check("Towns a camp may hold captives from: " in str(stub.sent[0]["messages"][0]["content"])
+			and "test_field/store" in str(stub.sent[0]["messages"][0]["content"]), "the request lists the towns")
+	var results: Array = stub.sent[1]["messages"][2]["content"]
+	_check(not results[0]["is_error"] and "holding 1 captives" in str(results[0]["content"]), "a camp holds one: %s" % results[0]["content"])
+	_check(results[1]["is_error"] and "no town nowhere/store" in str(results[1]["content"]) and "test_field/store" in str(results[1]["content"]),
+			"a town there is none of refused, naming the towns")
+	_check(results[2]["is_error"] and "camp only" in str(results[2]["content"]), "holds on a farm refused")
+	var places: Dictionary = session.proposal()["config"]["places"]
+	_check(places["camp"]["holds"] == [hold] and not places.has("camp2"), "the proposal's level.json has the hold as given")
+	_check(BuilderHost.camps_holding(session.working.config) == ["camp"], "the host knows which camps hold captives (to free a gone one's)")
+	session.accept()
+	var level_places: Dictionary = Level.places_from(doc.config, [] as Array[String])
+	var kept: Array = level_places["camp"].get("holds", [])
+	_check(kept.size() == 1 and kept[0]["town"] == hold["town"] and kept[0]["resident"] == hold["resident"] and kept[0]["name"] == "Tam",
+			"Level keeps the hold (%s)" % [kept])
 
 
 func _check(ok: bool, label: String) -> void:

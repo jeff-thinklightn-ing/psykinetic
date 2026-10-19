@@ -15014,3 +15014,27 @@ say which sites are a town's.
 
 tests: level_test: a woodlot working for a stockpile place, its town set;
 one naming a place that is no stockpile, said and left with none.
+
+## 519. Builder mode: camps holding captives
+
+npc's 518 let a level's camp hold captives from the start ("holds" on a
+camp place, placed by Main._place_captives through the raid path). Builder
+mode now writes them, as the coordinator approved:
+
+- mark_place takes holds [{town, resident, name?, trade?}] for a camp
+  only. Each town must be a stockpile place on the world map,
+  "<level>/<key>" (BuilderSession.town_ids, this level's as it is being
+  made). A town that doesn't exist is refused, naming the ones there are.
+  The request lists the towns. The prompt says a camp can hold someone of
+  a town or a worker's kin, their kin in town asks players to bring them
+  home, and they go free when the camp falls.
+- After an accept or undo, BuilderHost._save_and_reload calls
+  main._place_captives(world_map, gone) after its rebind and seed. gone
+  is the camps with holds that the change removed, by key
+  (BuilderHost.camps_holding, before against after), so their captives
+  come home. A camp moved under its key isn't gone (npc's note). The call
+  is cheap with no camps: it skips what is placed.
+- Builder relies on Main._place_captives's signature and meaning; npc
+  knows.
+
+Protocol unchanged. builder_test _test_captives.

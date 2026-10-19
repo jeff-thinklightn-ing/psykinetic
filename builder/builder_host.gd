@@ -236,6 +236,8 @@ func _undo(peer: int, player_id: String, zone_name: String) -> void:
 ## what the world map now finds wrong, if anything.
 func _save_and_reload(zone_name: String) -> bool:
 	var doc: MapDoc = docs[zone_name]
+	# The camps holding captives before the change (decision 519): one gone with it lets them go home.
+	var held_before := camps_holding(Level.source(zone_name).get("config", {}))
 	if not doc.save():
 		push_warning("[builder] " + doc.report)
 		return false
@@ -247,10 +249,33 @@ func _save_and_reload(zone_name: String) -> bool:
 	if World.towns != null:
 		# A building linked to its town with the change stands in it.
 		World.towns.seed_from(world_map)
+	if main != null and main.has_method("_place_captives"):
+		# Captives a camp holds from the start (npc's 518): the new placed, a gone camp's home.
+		var held_now := camps_holding(doc.config)
+		var gone: Array[String] = []
+		for key in held_before:
+			if key not in held_now:
+				gone.append("%s/%s" % [zone_name, key])
+		var placed: int = main._place_captives(world_map, gone)
+		if placed > 0 or not gone.is_empty():
+			print("[builder] after the change to %s: %d captives placed, %d camps gone" % [zone_name, placed, gone.size()])
 	var problems := world_map.problems()
 	for problem in problems:
 		push_warning("[builder] after the change to %s: %s" % [zone_name, problem])
 	return true
+
+
+## The keys of [param config]'s camps that hold captives (level.json
+## "places", kind camp, with holds).
+static func camps_holding(config: Dictionary) -> Array[String]:
+	var out: Array[String] = []
+	var places: Variant = config.get("places", {})
+	if places is Dictionary:
+		for key: Variant in places:
+			var place: Variant = places[key]
+			if place is Dictionary and str(place.get("kind", "")) == "camp" and place.get("holds") is Array and not (place["holds"] as Array).is_empty():
+				out.append(str(key))
+	return out
 
 
 ## The "terrain" message for level [param level_name]: its files as the
