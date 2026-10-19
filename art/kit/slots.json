@@ -1599,7 +1599,7 @@
 			"kind": "cell",
 			"size": [1.2, 2, 0.4],
 			"budget": 2400,
-			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/prop.bookshelf/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; c3, budget 600 -> 2400): its 2400 mesh fitted to 1.2 x 2 x 0.4, the books coloured from the concept onto cloth, leather and accent swatches; 1826 tris"},
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-19", "notes": "rebuilt by hand in big clean planes for Jeff's crispness note (2026-10-19, \"the graphics not crisp\"; the coordinator's ask; art-gen's c3 fit (a brown slab, no shelves or books to see) read as mush at game zoom): a carcass of two sides, a top, a plinth and a planked back, four shelves, each with a row of books of uneven width and height in leathers and a few muted cloth colours, a gap or a book lying flat here and there; 596 tris (budget 2400)"},
 			"uses": "a bookshelf against a wall, its back toward -z"
 		},
 		"prop.market_stall": {

@@ -117,7 +117,7 @@ Drawn as a grey box (a texture slot: terrain's procedural colour).
 | `prop.barrel` | 1 | art-kit, by hand | own | 2026-10-19 |
 | `prop.bed` | 1 | art-kit, by hand | own | 2026-10-19 |
 | `prop.bench` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
-| `prop.bookshelf` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
+| `prop.bookshelf` | 1 | art-kit, by hand | own | 2026-10-19 |
 | `prop.bridge` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
 | `prop.cage` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
 | `prop.campfire` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
