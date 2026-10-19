@@ -130,6 +130,19 @@ def reserved_gb(running):
     return sum(max(0.0, job["ram_gb"] - job.get("using_gb", 0.0)) for job in running)
 
 
+def commit_of(row):
+    """A kind's or job's commit estimate: commit_gb, else its RAM estimate.
+    They differ for a GPU job: what it puts on the card is charged to
+    Windows' commit too, with no RAM behind it (perf measured 6 GB moved to
+    the card: commit 8.1 -> 14.1 GB, working set unchanged)."""
+    return row.get("commit_gb", row["ram_gb"])
+
+
+def reserved_commit_gb(running):
+    """What running jobs are still owed of commit, as reserved_gb of RAM."""
+    return sum(max(0.0, commit_of(job) - job.get("using_commit_gb", job.get("using_gb", 0.0))) for job in running)
+
+
 def decide(job, running, head, free_ram_gb, free_gpu_gb, free_commit_gb=None):
     """Whether [job] may start now: (True, "") or (False, why). [job]: its
     kind's row, with "kind"; [running]: the jobs running ({kind, ram_gb,
@@ -151,9 +164,9 @@ def decide(job, running, head, free_ram_gb, free_gpu_gb, free_commit_gb=None):
     if room < job["ram_gb"] + MARGIN_GB:
         return False, "%.1f GB free (%.1f GB owed to running jobs), %.1f + %.0f GB wanted" % (
             free_ram_gb, reserved_gb(running), job["ram_gb"], MARGIN_GB)
-    if free_commit_gb is not None and free_commit_gb - reserved_gb(running) < job["ram_gb"] + COMMIT_MARGIN_GB:
+    if free_commit_gb is not None and free_commit_gb - reserved_commit_gb(running) < commit_of(job) + COMMIT_MARGIN_GB:
         return False, "commit: %.1f GB free (%.1f GB owed to running jobs), %.1f + %.0f GB wanted; a bigger pagefile raises it" % (
-            free_commit_gb, reserved_gb(running), job["ram_gb"], COMMIT_MARGIN_GB)
+            free_commit_gb, reserved_commit_gb(running), commit_of(job), COMMIT_MARGIN_GB)
     if job["gpu"] and free_gpu_gb is not None and free_gpu_gb < job["gpu_gb"]:
         return False, "%.1f GB GPU free, %.1f GB wanted" % (free_gpu_gb, job["gpu_gb"])
     return True, ""
@@ -176,7 +189,8 @@ def out_of_reach(job, running, free_ram_gb, free_commit_gb=None):
     back = sum(each.get("using_gb", 0.0) for each in running)
     if free_ram_gb + back < job["ram_gb"] + MARGIN_GB:
         return True
-    return free_commit_gb is not None and free_commit_gb + back < job["ram_gb"] + COMMIT_MARGIN_GB
+    back = sum(each.get("using_commit_gb", each.get("using_gb", 0.0)) for each in running)
+    return free_commit_gb is not None and free_commit_gb + back < commit_of(job) + COMMIT_MARGIN_GB
 
 
 def may_pass(job, ahead, running, free_ram_gb=None, free_commit_gb=None):
@@ -350,8 +364,15 @@ class Job:
 
     def using_gb(self):
         """The working set of the job's processes now."""
+        return self.memory()[0]
+
+    def memory(self):
+        """The job's live processes' (working set now, commit now, the sum of
+        their own peak working sets), GB. The peaks catch what a watch every
+        WATCH_SECONDS misses (a model's weights read on the CPU a moment
+        before they go to the card)."""
         if self.handle is None:
-            return 0.0
+            return 0.0, 0.0, 0.0
         kernel = ctypes.windll.kernel32
 
         class Counters(ctypes.Structure):
@@ -361,7 +382,7 @@ class Job:
                 ("quota_peak_nonpaged", ctypes.c_size_t), ("quota_nonpaged", ctypes.c_size_t),
                 ("pagefile", ctypes.c_size_t), ("peak_pagefile", ctypes.c_size_t)]
         kernel.OpenProcess.restype = ctypes.c_void_p
-        total = 0
+        total, commit, peaks = 0, 0, 0
         for pid in self._ids():
             process = kernel.OpenProcess(0x1000 | 0x0010, False, pid)  # QUERY_LIMITED | VM_READ
             if not process:
@@ -370,8 +391,10 @@ class Job:
             counters.cb = ctypes.sizeof(Counters)
             if kernel.K32GetProcessMemoryInfo(ctypes.c_void_p(process), ctypes.byref(counters), counters.cb):
                 total += counters.working_set
+                commit += counters.pagefile
+                peaks += counters.peak_working_set
             kernel.CloseHandle(ctypes.c_void_p(process))
-        return total / GB
+        return total / GB, commit / GB, peaks / GB
 
     def peak_gb(self):
         """The most memory the job's processes held at once (committed), as
@@ -490,10 +513,23 @@ def kinds():
     saved = _read(_path("kinds.json")) or {}
     table = {}
     for name, first in KINDS.items():
-        table[name] = dict(first, **saved.get(name, {}))
+        table[name] = _split(dict(first, **saved.get(name, {})), first["ram_gb"])
     for name, row in saved.items():
-        table.setdefault(name, row)
+        table.setdefault(name, _split(dict(row), 0.0))
     return table
+
+
+def _split(row, floor_gb):
+    """A row measured before RAM and commit were told apart (one ram_gb,
+    the larger of the two): that was its commit. A GPU kind's RAM is then
+    taken as that less its GPU estimate (what it put on the card), never
+    under [floor_gb] (its first estimate): trellis_mesh's 28.9 GB was about
+    5 GB of RAM and 23.6 on the card. The next run measures both."""
+    if "commit_gb" not in row:
+        row["commit_gb"] = row["ram_gb"]
+        if row.get("gpu"):
+            row["ram_gb"] = round(max(floor_gb, row["ram_gb"] - row.get("gpu_gb", 0.0)), 2)
+    return row
 
 
 def _entries(folder):
@@ -589,7 +625,8 @@ def wait_turn(tree, kind, pid, watched):
                 os.remove(_path("queue", ticket))
                 name = "%s-%s-%s.json" % (tree, kind, pid or os.getpid())
                 _write(_path("running", name), {"tree": tree, "kind": kind, "pid": pid, "queued": queued,
-                    "started": time.time(), "ram_gb": row["ram_gb"], "gpu": row["gpu"], "using_gb": 0.0, "watched": watched})
+                    "started": time.time(), "ram_gb": row["ram_gb"], "commit_gb": commit_of(row), "gpu": row["gpu"], "using_gb": 0.0,
+                    "using_commit_gb": 0.0, "watched": watched})
                 waited = time.time() - queued
                 log("start", tree, kind, "waited %.0f s" % waited if waited >= POLL_SECONDS else "")
                 if waited >= POLL_SECONDS:
@@ -659,14 +696,15 @@ def run(tree, kind, command, expect_minutes=None):
         child = subprocess.Popen(command, env=dict(os.environ, **{HELD_ENV: name}))
         job = Job(child)
         peak, low, stopped, long_logged = 0.0, 0, False, False
-        gpu_peak = 0.0
+        gpu_peak, commit_peak = 0.0, 0.0
         row = kinds()[kind]
         limit = limit_seconds(row, expect_minutes)
         samples, ended = [(started, job.cpu_seconds())], None
         while child.poll() is None:
             time.sleep(WATCH_SECONDS)
-            using = job.using_gb()
-            peak = max(peak, using, job.peak_gb())
+            using, committed, peaks = job.memory()
+            peak = max(peak, using, peaks)
+            commit_peak = max(commit_peak, committed, job.peak_gb())
             if row["gpu"]:
                 _, used = gpu_gb()
                 gpu_peak = max(gpu_peak, used or 0.0)
@@ -679,6 +717,7 @@ def run(tree, kind, command, expect_minutes=None):
                 entry = _read(_path("running", name))
                 if entry is not None:
                     entry["using_gb"] = using
+                    entry["using_commit_gb"] = committed
                     entry["limit_s"] = limit
                     entry["cpu_share"] = share
                     _write(_path("running", name), entry)
@@ -704,7 +743,7 @@ def run(tree, kind, command, expect_minutes=None):
                 child.wait()
                 stopped = True
                 break
-        peak = max(peak, job.peak_gb())
+        commit_peak = max(commit_peak, job.peak_gb())
         # What the command left running (a test's server or client whose
         # script was killed) would go on using the machine outside the gate.
         left = job.processes()
@@ -726,9 +765,10 @@ def run(tree, kind, command, expect_minutes=None):
                 entry = _read(_path("running", name))
                 if entry is not None:
                     entry["using_gb"] = 0.0
+                    entry["using_commit_gb"] = 0.0
                     entry.pop("adopted_by", None)
                     _write(_path("running", name), entry)
-            if not stopped and ended is None and (peak > 0.0 or code == 0):
+            if not stopped and ended is None and (peak > 0.0 or commit_peak > 0.0 or code == 0):
                 table = _read(_path("kinds.json")) or {}
                 saved = dict(kinds()[kind])
                 if peak > 0.0:
@@ -736,6 +776,9 @@ def run(tree, kind, command, expect_minutes=None):
                     if saved["gpu"] and gpu_peak > 0.0:
                         saved["gpu_gb"] = updated_estimate(saved["gpu_gb"], gpu_peak)
                     saved["last_peak_gb"] = round(peak, 2)
+                if commit_peak > 0.0:
+                    saved["commit_gb"] = updated_estimate(commit_of(saved), commit_peak)
+                    saved["last_commit_gb"] = round(commit_peak, 2)
                 if code == 0 and expect_minutes is None:
                     # Clean runs only, and no declared soak, set the limit.
                     saved["runs_s"] = (saved.get("runs_s", []) + [round(duration, 1)])[-RUN_HISTORY:]
@@ -747,7 +790,7 @@ def run(tree, kind, command, expect_minutes=None):
                 "(heavy_job run %s %s --expect MIN -- ...)" % (tree, kind, duration / 60, ended[1], tree, kind), file=sys.stderr)
             return STOPPED_CODE
         if not stopped:
-            log("done", tree, kind, "exit %s, %.0f s, peak %.1f GB" % (code, duration, peak))
+            log("done", tree, kind, "exit %s, %.0f s, peak %.1f GB, commit %.1f GB" % (code, duration, peak, commit_peak))
             return code
         restarts += 1
         log("stopped", tree, kind, "free RAM under %.0f GB after %.0f s (peak %.1f GB); restart %d of %d" % (
@@ -824,9 +867,11 @@ def status():
 
 def show_kinds():
     for name, row in sorted(kinds().items()):
-        print("%-14s %5.1f GB RAM%s%s%s" % (name, row["ram_gb"], ", GPU %.1f GB" % row["gpu_gb"] if row["gpu"] else "",
+        print("%-14s %5.1f GB RAM, %.1f GB commit%s%s%s%s" % (name, row["ram_gb"], commit_of(row),
+            ", GPU %.1f GB" % row["gpu_gb"] if row["gpu"] else "",
             ", at most %d at once" % row["max_running"] if row.get("max_running") is not None else "",
-            ", last peak %.1f GB" % row["last_peak_gb"] if "last_peak_gb" in row else ""))
+            ", last peak %.1f GB" % row["last_peak_gb"] if "last_peak_gb" in row else "",
+            " (commit %.1f)" % row["last_commit_gb"] if "last_commit_gb" in row else ""))
     return 0
 
 

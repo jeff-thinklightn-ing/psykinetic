@@ -281,6 +281,27 @@ check("\toverrun\tslow\tbench\t" in text and "\thung\tidle\tbench\t" in text, "t
 busy = [line.split("\t")[1] for line in text.splitlines() if "\tbusy\tbench\t" in line]
 check("overrun" not in busy and "hung" not in busy, "and the busy one neither: %s" % busy)
 
+print("== RAM and commit told apart ==")
+# What a GPU job puts on the card is charged to commit with no RAM behind it:
+# trellis_mesh's 28.9 GB, one figure, held it out of reach of 32 GB free.
+margins = gate.MARGIN_GB, gate.COMMIT_MARGIN_GB
+gate.MARGIN_GB, gate.COMMIT_MARGIN_GB = 8.0, 8.0
+mesh = {"kind": "trellis_mesh", "ram_gb": 9.0, "commit_gb": 28.9, "gpu_gb": 23.6, "gpu": True}
+check(gate.decide(mesh, [], True, 32.0, 30.0, 40.0) == (True, ""), "RAM checked on RAM, commit on commit: it starts")
+ok, why = gate.decide(mesh, [], True, 32.0, 30.0, 34.7)
+check(not ok and why.startswith("commit:"), "short of commit, it waits on commit: %s" % why)
+check(not gate.out_of_reach(mesh, [], 32.0, 40.0) and gate.out_of_reach(mesh, [], 32.0, 30.0), "out of reach by commit alone")
+holding = [{"kind": "trellis_mesh", "ram_gb": 9.0, "commit_gb": 28.9, "gpu": True, "using_gb": 5.0, "using_commit_gb": 27.0}]
+check(abs(gate.reserved_commit_gb(holding) - 1.9) < 1e-6 and gate.reserved_gb(holding) == 4.0, "owed: each by its own use")
+gate.MARGIN_GB, gate.COMMIT_MARGIN_GB = margins
+old = {"ram_gb": 28.86, "gpu_gb": 23.56, "gpu": True}
+check(gate._split(dict(old), 9.0) == dict(old, ram_gb=9.0, commit_gb=28.86), "an old GPU row: its figure is commit, RAM back to its first")
+check(gate._split({"ram_gb": 9.9, "gpu": False}, 6.5) == {"ram_gb": 9.9, "commit_gb": 9.9, "gpu": False}, "an old CPU row: both the same")
+code = gate.run("mem", "godot_import", [sys.executable, "-c", "x = bytearray(300 * 1024 * 1024); import time; time.sleep(3)"])
+row = gate.kinds()["godot_import"]
+check(code == 0 and row.get("last_peak_gb", 0) >= 0.25 and row.get("last_commit_gb", 0) >= 0.25,
+    "a run measures both: RAM %s, commit %s" % (row.get("last_peak_gb"), row.get("last_commit_gb")))
+
 shutil.rmtree(STATE, ignore_errors=True)
 print("\nRESULT: %s" % ("PASS" if failed == 0 else "FAIL (%d failed)" % failed))
 sys.exit(1 if failed else 0)

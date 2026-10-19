@@ -8802,6 +8802,25 @@ daily summary lists and counts them. Takes (nothing the gate can stop, and
 forgotten at 30 minutes) and nested runs (the outer run's limit holds) are
 unchanged.
 
+Amended a seventh time (2026-10-19, the coordinator): RAM and commit are
+estimated apart. A kind had one figure, the larger of its working set and
+its job object's peak commit, checked against free RAM and free commit
+both. For a GPU job those differ by what it puts on the card: Windows
+charges memory on the card to system commit with no RAM behind it (perf
+measured 6 GB moved from the CPU to the card: working set 6.6 GB, commit
+8.1 -> 14.1 GB, and after the CPU copy was freed 0.6 GB and 8.0 GB).
+trellis_mesh's 28.9 GB was its commit; its RAM is about 5 GB. Each run now
+records its RAM peak (the sampled working set and each process's own peak
+working set) as ram_gb and its commit peak as commit_gb; the RAM check
+reads ram_gb against free RAM, the commit check commit_gb against free
+commit, and a running job owes each less what it already uses of it. A row
+saved before this keeps its figure as commit_gb, and a GPU kind's RAM is
+taken as that less its GPU estimate, never under its first estimate, until
+its next run measures both. trellis_mesh then wants 9 + 8 GB of free RAM
+(it had wanted 28.9 + 8), and still 28.9 + 8 GB of free commit, which the
+machine's 99.7 GB commit limit leaves only when little else runs; a
+bigger pagefile raises it.
+
 
 ## 395. UI sounds
 
