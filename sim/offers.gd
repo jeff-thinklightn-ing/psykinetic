@@ -166,8 +166,10 @@ static func of(worker_id: String, player_id: String, given: Dictionary = ctx) ->
 ## the next build (decision 499, npc's side; Jeff: "any amount"): while
 ## economy's contribution_wanted(town) says gold > 0, one GIVE line at wanted
 ## when it is within "give_most" (residents.json offers, 10), else two: the
-## step and the rest at min(wanted, the player's gold). The words say what
-## the build waits on (Towns.shortfall). Nothing while nothing is planned.
+## step and the rest at min(wanted, the player's gold). The title names no
+## sum (the panel draws each row's gold beside it; ui, 499 amended) and the
+## first line's words say what the build waits on (Towns.shortfall), the
+## second's are empty. Nothing while nothing is planned.
 static func _give_offers(worker_id: String, who: Dictionary, town: String, player_id: String, given: Dictionary) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	if str(who.get("origin", "")) != "appointed" or town.is_empty():
@@ -182,13 +184,13 @@ static func _give_offers(worker_id: String, who: Dictionary, town: String, playe
 	var words := "%s waits on %s%d gold; what you give goes to it." % [kind.capitalize() if not kind.begins_with("the ") else "The " + kind.trim_prefix("the "), needs + " and " if not needs.is_empty() else "", gold]
 	var step := int(settings().get("give_most", 10))
 	if gold <= step:
-		out.append(_offer(worker_id, GIVE, "give:all", "Give %d toward %s" % [gold, kind], words, {"gold": gold, "kind": str(wanted.get("kind", ""))}, GIVE, gold))
+		out.append(_offer(worker_id, GIVE, "give:all", "Give toward %s" % kind, words, {"gold": gold, "kind": str(wanted.get("kind", ""))}, GIVE, gold))
 		return out
-	out.append(_offer(worker_id, GIVE, "give:step", "Give %d toward %s" % [step, kind], words, {"gold": step, "kind": str(wanted.get("kind", ""))}, GIVE, step))
+	out.append(_offer(worker_id, GIVE, "give:step", "Give toward %s" % kind, words, {"gold": step, "kind": str(wanted.get("kind", ""))}, GIVE, step))
 	var purse: Variant = _call(given, "gold_of", [player_id])
 	var rest := mini(gold, int(purse)) if purse is int or purse is float else gold
 	if rest > step:
-		out.append(_offer(worker_id, GIVE, "give:rest", "Give the rest (%d gold)" % rest if rest == gold else "Give what you have (%d gold)" % rest, words, {"gold": rest, "kind": str(wanted.get("kind", ""))}, GIVE, rest))
+		out.append(_offer(worker_id, GIVE, "give:rest", "Give the rest" if rest == gold else "Give what you have", "", {"gold": rest, "kind": str(wanted.get("kind", ""))}, GIVE, rest))
 	return out
 
 

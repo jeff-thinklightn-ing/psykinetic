@@ -9,6 +9,7 @@ notes (decision 324).
 
 - Streams run: their water drifts downstream, fords show shallow and clear with foam where the current crosses the stones, and bridges are drawn with wooden decks, rails and ends, the water running on underneath (505).
 - Tools: the heavy-job gate estimates RAM and commit separately (394 amended). Windows charges a GPU job's memory on the card to commit without using RAM, and the gate had read that commit as RAM. A TRELLIS mesh job now wants 9 GB of free RAM plus the margin, not 28.9. It still needs about 29 GB of free commit plus the margin.
+- The official's give lines read cleaner in the talk panel (499 amended): "Give toward the inn" and "Give the rest", the sum beside the row, and the inn's needs said once.
 - A townsperson in bed reads so: the hint over them says "in bed with a fever" and the talk's title line adds it after their trade.
 - Builder mode can make a goblin camp that holds a captive from a town, someone's daughter or brother. Their family in town asks you to bring them home, and they go free when the camp falls.
 - Tools: every landing now exports the server pack and boots it, with a client joining, failing on any error line (decision 450). Problems that only show in the exported server are caught before a deploy instead of on the box. It runs beside the suite, so landings take no longer.

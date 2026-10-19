@@ -564,7 +564,7 @@ func _test_give() -> void:
 	_check(_offers("o-ald").all(func(o: Dictionary) -> bool: return o["kind"] != Offers.GIVE), "nothing planned: no give line")
 	_wanted = {"kind": "inn", "gold": 24}
 	var mine := _offers("o-ald").filter(func(o: Dictionary) -> bool: return o["kind"] == Offers.GIVE)
-	_check(mine.size() == 2 and mine[0]["title"] == "Give 10 toward the inn" and mine[1]["title"] == "Give the rest (24 gold)" and mine[0]["cost"] == 10 and mine[1]["cost"] == 24,
+	_check(mine.size() == 2 and mine[0]["title"] == "Give toward the inn" and mine[1]["title"] == "Give the rest" and mine[0]["cost"] == 10 and mine[1]["cost"] == 24 and str(mine[1]["words"]).is_empty(),
 		"24 wanted, 60 in the purse: the step and the rest: %s" % [mine.map(func(o: Dictionary) -> String: return str(o["title"]))])
 	_check(mine.size() == 2 and str(mine[0]["words"]) == "The inn waits on 6 wood and 24 gold; what you give goes to it.", "the words say what it waits on: %s" % [mine[0]["words"] if not mine.is_empty() else ""])
 	_check(_offers("o-ald")[0]["kind"] == Offers.GIVE, "first at the official's counter")
@@ -574,7 +574,7 @@ func _test_give() -> void:
 	_check(_done.is_empty() or _done.back()[3] == 0, "(no pay for a gift)")
 	_purse = 9
 	mine = _offers("o-ald").filter(func(o: Dictionary) -> bool: return o["kind"] == Offers.GIVE)
-	_check(mine.size() == 1 and mine[0]["title"] == "Give 10 toward the inn", "14 still wanted but 9 in the purse: the step alone (economy takes what there is): %s" % [mine.map(func(o: Dictionary) -> String: return str(o["title"]))])
+	_check(mine.size() == 1 and mine[0]["title"] == "Give toward the inn" and mine[0]["cost"] == 10, "14 still wanted but 9 in the purse: the step alone (economy takes what there is): %s" % [mine.map(func(o: Dictionary) -> String: return str(o["title"]))])
 	_purse = 60
 	mine = _offers("o-ald").filter(func(o: Dictionary) -> bool: return o["kind"] == Offers.GIVE)
 	taken = Offers.accept("o-ald", "p1", "Jeff", mine[1]["id"] if mine.size() > 1 else "", 0, _ctx)
@@ -582,7 +582,7 @@ func _test_give() -> void:
 	_check(_offers("o-ald").all(func(o: Dictionary) -> bool: return o["kind"] != Offers.GIVE), "paid up: the line is gone")
 	_wanted = {"kind": "inn", "gold": 7}
 	mine = _offers("o-ald").filter(func(o: Dictionary) -> bool: return o["kind"] == Offers.GIVE)
-	_check(mine.size() == 1 and mine[0]["title"] == "Give 7 toward the inn" and mine[0]["cost"] == 7, "within the step: one line at what is wanted")
+	_check(mine.size() == 1 and mine[0]["title"] == "Give toward the inn" and mine[0]["cost"] == 7, "within the step: one line at what is wanted")
 	Offers.ctx = _ctx
 
 

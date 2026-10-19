@@ -14456,6 +14456,14 @@ Main's ctx keys: contribution_wanted, shortfall, contribute, gold_of.
 offers_test. town_soak's --give=N is economy's. Protocol unchanged; no new
 class_name.
 
+Amended 2026-10-19 (ui's read of the panel): the give lines' titles name no
+sum ("Give toward the inn", "Give the rest", "Give what you have"), since
+ConversePanel draws each priced row's gold beside it in brass and the
+number read twice; and only the first line carries "The inn waits on ...",
+the second's words are empty, so the sentence shows once. The ids, costs
+and the accept are as they were.
+
+
 ## 475. The bow's draw read in the world, not as a number
 
 Ui, from the coordinator's list (Jeff: performance first, then this): the
