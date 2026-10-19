@@ -92,7 +92,11 @@ which worktree owns each step, and the design rules not to break without asking 
   under `heavy_job run` doesn't call heavy_job itself: before perf's f2892ae a nested take
   queued behind its own parent for ever and, since suites and benches exclude each other,
   stalled every landing (ui's bench did, 10 hours, 2026-10-18); now the inner call passes
-  through (HEAVY_JOB_HELD), but the outer run is the one that gates and measures. If free
+  through (HEAVY_JOB_HELD), but the outer run is the one that gates and measures. Every gated
+  run has a time limit (`--expect MIN`, else about 3× the kind's recorded run, else 90 minutes):
+  past it, or idle under 3% of a core for 10 minutes, its own wrapper stops it (exit 5), so a
+  long soak passes `--expect`, and every Godot line under the gate carries `timeout` and
+  `</dev/null` (npc's soak with a parse error spun 7.6 hours overnight, 2026-10-19). If free
   memory falls under
   the margin while jobs run, the newest job's own wrapper stops it first and retries;
   nobody stops another session's job. The daily summary lists jobs that waited or were
