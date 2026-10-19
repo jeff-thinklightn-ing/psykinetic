@@ -14003,3 +14003,11 @@ of piling up; numbers are economy.json's apprentice rule, Jeff's to move.
   "master" on the worker record, Economy's last wage paid (all saved);
   Economy._apprentice_turn on its tick.
 Protocol unchanged. larder_test.
+
+Leather priced over its hides (2026-10-18, the apprentice soak): value
+leather 4 -> 8 in economy.json. A piece takes 2 hides (value 3, bought at
+x store.sell 1.1: 6.6), so at 4 the tanner lost about 3 gold on each and
+sat at his loan cap from day 7 to 17, unable to buy hides, and the inn
+(leather 5) waited; at 8 he keeps 1.4 for the work. larder_test checks
+it from the value table. Other made raws already pay (the weaver's bolt:
+wool 2 at 2 for cloth 3 at 3).

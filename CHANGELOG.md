@@ -8,6 +8,8 @@ notes (decision 324).
 ## Unreleased
 
 - Trade routes: the world map shows the way from the town to the castle market as a dashed line, with any caravan on it; the caravans themselves come with the town's trade (504).
+- The store pays 8 gold for a piece of leather, not 4: at 4 the tanner lost money on every piece he made from his two hides, ran out of credit and kept the inn from being built.
+- Makers take apprentices (498 amended): a smith, tanner or other maker who has stayed well off for three days takes a hauler on, works a quarter faster with them, and pays them two gold a day; when the maker's purse runs low, the apprentice is let go.
 ## v0.1.155
 - The medicine man gathers herbs on his way (502, npc's side): the nearest within six cells of him go to the town's store, bought as a gatherer's raw, for the healer's remedies.
 
@@ -25,7 +27,6 @@ notes (decision 324).
 - A companion who fell sick while resting in town still goes with you when you come for her, and the party log says so; she knows she is sick when she talks, and is well again after the same five days. If she was sick while you were away, you hear it when you come back, from the party log and from her, along with who cured her (decision 501, companions' side).
 - Herbs grow wild outside the town: a few a day in the wilds, standing like small ferns, for anyone to pick and sell at the town's store. Herbs left uncollected wither after three days (decision 502).
 - Tools: a heavy job too big to start also steps to the back of the resource gate's queue itself, so jobs waiting through an older copy of the gate get past it too (394 amended).
-- Makers take apprentices (498 amended): a smith, tanner or other maker who has stayed well off for three days takes a hauler on, works a quarter faster with them, and pays them two gold a day; when the maker's purse runs low, the apprentice is let go.
 
 ## v0.1.154
 

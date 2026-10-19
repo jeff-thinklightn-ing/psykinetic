@@ -493,6 +493,17 @@ func _test_delivery() -> void:
 	stock.deposit(TOWN, "gold", 100)
 	economy._pay_player("p1")
 	_check(economy.owed_to("p1", TOWN) == 0 and economy.gold("p1") == sale - now_paid and told == [["p1", sale - now_paid]], "the rest paid as gold comes in, and told")
+	# A bunch of herbs banked (items' herbs, 501 amended): a sale like any raw.
+	stock.deposit(TOWN, "gold", 100)
+	var herb_price := roundi(economy.raw_price(TOWN, "herbs") * float(_rules["store"]["buy"]))
+	_check(Items.yield_of("herbs") == {"herbs": 1} and herb_price >= 1 and economy.bank_sale(TOWN, "p1", Items.yield_of("herbs")) == herb_price,
+		"a bunch of herbs banked: %d gold" % herb_price)
+	# Leather pays for its hides and the work (2 hides a piece): the tanner
+	# no longer makes it at a loss (by the value table, as stocks move both).
+	var value: Dictionary = _rules["value"]
+	var hides := float(value["hide"]) * float(_rules["store"]["sell"]) * int(Items.def("leather")["made"]["from"]["hide"])
+	_check(float(value["leather"]) * float(_rules["store"]["buy"]) > hides,
+		"leather bought for more than its hides cost the tanner (%s > %s)" % [value["leather"], hides])
 
 
 ## Apprentices (decision 498 amended): a maker above apprentice.above for
