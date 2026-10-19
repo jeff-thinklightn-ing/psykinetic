@@ -19,7 +19,6 @@ notes (decision 324).
 - The building fund (499, npc's side): the town's official at the store takes gold toward the next build, any amount, in a step and the rest; the card remembers who gave.
 - The level editor has a properties panel: click a link, chest, place, market, stream or the level itself to see and edit its settings, checked as you go (506).
 - Builder mode can place every kind of monster and animal the game has: wolves, deer, boar and rabbits as well as goblins, and any kind added later. Claude is told what each kind is and how it behaves, so it puts animals in herds on open ground and goblins in camps.
-- Fixed: winter tufts no longer turn pure white like a field of flowers. Snow sits on their tips with straw below, in the wilds and in the forest, where less of it gets under the trees; the forest's crowns keep their green under a patchy dusting (467 amended).
 - Streams are heard before they are seen: running water from the nearest stretch of a stream, following you along its bank; wading through a ford splashes.
 - The living-world soak tool puts each of its players on a counter cell of their own, in reach of the shopkeeper (496 amended): the 30-day run's 360 refused buys were the tool's placement, not the shop's.
 - Towns send caravans to the castle market (504): a hauler takes the town's spare food, wood and hides down the road, is paid for the trip, and the sale goes to the town's treasury. They never sell what the town's next building needs, and a caravan carries no gold, so raiders take only its goods and people.
