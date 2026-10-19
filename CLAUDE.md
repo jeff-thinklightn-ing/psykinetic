@@ -29,7 +29,8 @@ which worktree owns each step, and the design rules not to break without asking 
 
 - Only `main` is released. In a worktree, rebase onto `origin/main` before each change,
   run `tests/land.sh` (or `land.ps1`: the suite's scenes at once, beside net_test and
-  state_test; decision 278), commit, and land it per change with `git push origin HEAD:main`. If the push is refused, `main`
+  state_test; decision 278; since 450 it also exports the server pack and boots it with one
+  client joining, about 60 s beside the suite), commit, and land it per change with `git push origin HEAD:main`. If the push is refused, `main`
   moved: rebase, retest, push again. A branch never collects unlanded work.
 - Take the landing lock for your final retest and push, so nobody lands between them, with
   the resource gate taken first (decision 394): `sh tools/heavy_job.sh take <tree> suite`
