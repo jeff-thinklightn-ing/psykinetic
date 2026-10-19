@@ -651,8 +651,11 @@ func _test_caravan() -> void:
 	var proceeds := economy._sale_of("market:castle", "leather", load, 0.0)
 	var wage := economy._trip_wage(eta)
 	var treasury := stock.count(TOWN, "gold")
+	var sold: Array = []
+	economy.caravan_sold.connect(func(id: String, town: String, market: String, gold: int, paid: int) -> void: sold.append([id, town, market, gold, paid]))
 	economy.caravan_arrived("c1", "r1", "market:castle", sent[0][1])
 	_check(int(work.worker("h1")["purse"]) == wage, "the hauler paid the trip's wage (%d)" % wage)
+	_check(sold == [["c1", TOWN, "market:castle", proceeds, wage]], "caravan_sold says what it fetched (%s)" % [sold])
 	_check(sent.size() == 2 and sent[1][2] == "market:castle" and sent[1][1]["members"] == ["h1"], "sets out home (%s)" % [sent[-1]])
 	var home: Dictionary = sent[1][1]["goods"]
 	var spent := 0

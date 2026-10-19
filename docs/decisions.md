@@ -14509,6 +14509,8 @@ caravans are 504 itself (TradeRoutes).
 - Raids take goods and members only (Jeff: raids take food and people):
   no gold travels, and a lost caravan's members come home unless taken.
 - Each going, sale, return, raid and loss prints an "[economy]" line.
+- Economy.caravan_sold(id, town, market, proceeds, wages) after each sale,
+  for npc's road news (whether the wagon sold well).
 - Saved: Economy "caravans", "bought", "trade_day".
 Soak (30 days, 3 players, against the apprentice soak): 21 caravans to
 market:castle, mostly food and wood, fetched 112 gold, 21 in wages and 86

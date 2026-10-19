@@ -33,6 +33,10 @@ signal owed_paid(player_id: String, gold: int)
 ## [param kind] (decision 499): Main thanks them in town experience
 ## ([param xp]).
 signal contributed(town: String, player_id: String, kind: String, gold: int, xp: int)
+## Caravan [param id] of [param town] sold its goods at [param market] for
+## [param proceeds], [param wages] of it to its members (decision 504,
+## for npc's road news: whether the wagon sold well).
+signal caravan_sold(id: String, town: String, market: String, proceeds: int, wages: int)
 
 const PATH := "res://levels/economy.json"
 const TREASURY := "the town"
@@ -1105,6 +1109,7 @@ func caravan_arrived(id: String, route_id: String, at_end: String, cargo: Dictio
 		stockpile.deposit(town, "gold", rest, "trade:%s" % market, "sold %s at %s for %d (wages %d)" % [cargo.get("goods", {}), market, proceeds, wages])
 	print("[economy] %s's caravan sells %s at %s for %d gold: %d in wages, %d to the treasury, %s bought to bring home, step %d" % [town,
 		cargo.get("goods", {}), market, proceeds, wages, maxi(rest, 0), home, now()])
+	caravan_sold.emit(id, town, market, proceeds, wages)
 	if members.is_empty():
 		return
 	var back := str(send_caravan.call(route_id, {"items": [], "goods": home, "members": members}, market)) if send_caravan.is_valid() else ""
