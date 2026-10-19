@@ -14654,8 +14654,9 @@ Art slots item.wine, item.spice and item.silver_ring, placeholders for
 art-kit; slots_items.json and the art status regenerated. items_test.
 Protocol unchanged; no new class_name.
 
-508, enemy-ai's side (perception in cover; agreed with maps, the
-coordinator approved): Senses reads World.cover_at; maps' data and the line
+## 508, enemy-ai's side: perception in cover
+
+Agreed with maps, the coordinator approved. Senses reads World.cover_at; maps' data and the line
 of sight are unchanged (no thinning: a meadow is seen over).
 - Senses.hidden_by_cover: past NOTICE_ALWAYS, a body standing in cover is
   hidden when still (STILL_TICKS, 2 s, since its last step,
