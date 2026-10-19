@@ -401,7 +401,18 @@ func _reach(area_name: String, cell: Vector2i, cost: int, best: Dictionary[Strin
 ## The cheapest route in [param layer], ignoring nothing; [] if none.
 func _route_in(layer: Layer, from_area: String, from_cell: Vector2i, to_area: String, to_cell: Vector2i) -> Array[Dictionary]:
 	var none: Array[Dictionary] = []
-	for area_name in _areas_from(from_area):
+	var reached := _areas_from(from_area)
+	if to_area not in reached:
+		return none  # No way there at all: nothing walked (decision 503).
+	if from_area == to_area and not _area_ready(layer, from_area):
+		# Until its fields are in, a walk inside one area is its walk there
+		# alone, not every portal's walked to as well (seconds on the wilds).
+		var steps := _steps_between(_areas[from_area], from_cell, to_cell, layer.obstacles.get(from_area, {}))
+		if steps < 0.0:
+			return none
+		var alone: Array[Dictionary] = [{"area": from_area, "from": from_cell, "to": to_cell, "steps": steps, "way": {}}]
+		return alone
+	for area_name in reached:
 		_join_area(layer, area_name)
 	var graph := layer.graph
 	var start := graph.get_available_point_id()
@@ -419,9 +430,9 @@ func _route_in(layer: Layer, from_area: String, from_cell: Vector2i, to_area: St
 	for id: int in lengths:
 		_join(layer, id, finish, lengths[id])
 	if from_area == to_area:
-		var direct := _flood(_areas[from_area], from_cell, {to_cell: true}, PackedFloat32Array(), layer.obstacles.get(from_area, {}))
-		if direct.has(to_cell):
-			_join(layer, start, finish, direct[to_cell])
+		var direct := _steps_between(_areas[from_area], from_cell, to_cell, layer.obstacles.get(from_area, {}))
+		if direct >= 0.0:
+			_join(layer, start, finish, direct)
 	var path := graph.get_id_path(start, finish)
 	var legs: Array[Dictionary] = []
 	var total := 0.0
@@ -580,13 +591,13 @@ func _to_portals(layer: Layer, area_name: String, cell: Vector2i) -> Dictionary[
 			if steps >= 0.0:
 				out[id] = steps
 		return out
-	var wanted := {}
+	# Not in yet: each portal walked to (A*), not the area flooded till it
+	# has them all (all of it, when one cannot be reached: decision 503).
+	var obstacles: Dictionary = layer.obstacles.get(area_name, {})
 	for id: int in ids:
-		wanted[_portals[id]["cell"]] = true
-	var lengths := _flood(_areas[area_name], cell, wanted, PackedFloat32Array(), layer.obstacles.get(area_name, {}))
-	for id: int in ids:
-		if lengths.has(_portals[id]["cell"]):
-			out[id] = lengths[_portals[id]["cell"]]
+		var steps := _steps_between(_areas[area_name], cell, _portals[id]["cell"], obstacles)
+		if steps >= 0.0:
+			out[id] = steps
 	return out
 
 
@@ -596,11 +607,23 @@ func _join_area(layer: Layer, area_name: String) -> void:
 	if layer.joined.has(area_name) or not _in_area.has(area_name):
 		return
 	var started := Time.get_ticks_usec()
-	for from_id: int in _in_area[area_name]:
-		var lengths := _to_portals(layer, area_name, _portals[from_id]["cell"])
-		for to_id: int in lengths:
-			if to_id != from_id:
-				_join(layer, from_id, to_id, lengths[to_id])
+	var ids: Array = _in_area[area_name]
+	if _area_ready(layer, area_name):
+		for from_id: int in ids:
+			var lengths := _to_portals(layer, area_name, _portals[from_id]["cell"])
+			for to_id: int in lengths:
+				if to_id != from_id:
+					_join(layer, from_id, to_id, lengths[to_id])
+	else:
+		# Its fields not in yet: each pair walked towards each other (A*),
+		# not the area flooded from every portal (decision 503).
+		var obstacles: Dictionary = layer.obstacles.get(area_name, {})
+		for i in ids.size():
+			for j in range(i + 1, ids.size()):
+				var steps := _steps_between(_areas[area_name], _portals[ids[i]]["cell"], _portals[ids[j]]["cell"], obstacles)
+				if steps >= 0.0:
+					_join(layer, ids[i], ids[j], steps)
+					_join(layer, ids[j], ids[i], steps)
 	layer.joined[area_name] = true
 	var ms := (Time.get_ticks_usec() - started) / 1000.0
 	if ms > 50.0:
@@ -730,6 +753,56 @@ static func _flood(area: Dictionary, from: Vector2i, wanted: Dictionary, field: 
 		buckets[cost] = []
 		cost += 1
 	return found
+
+
+## The steps of the shortest walk from [param from] to [param to] in
+## [param area] (as _flood walks), or -1 if it cannot get there: A* by
+## buckets, costs in half steps, aimed by the octile distance (never more
+## than the walk, so the walk found is a shortest), so it looks at the cells
+## towards [param to] and not the whole area round [param from] (a death's
+## way to the nearest temple: decision 503).
+static func _steps_between(area: Dictionary, from: Vector2i, to: Vector2i, obstacles: Dictionary = {}) -> float:
+	var floor_cells: Dictionary = area["floor"]
+	if not floor_cells.has(from) or obstacles.has(from) or not floor_cells.has(to) or obstacles.has(to):
+		return -1.0
+	var best: Dictionary[Vector2i, int] = {from: 0}
+	var buckets: Array[Array] = []
+	var guess := _octile(from, to)
+	while buckets.size() <= guess:
+		buckets.append([])
+	buckets[guess].append(from)
+	while guess < buckets.size():
+		var here: Array = buckets[guess]
+		var i := 0
+		while i < here.size():
+			var cell: Vector2i = here[i]
+			i += 1
+			var cost := best[cell]
+			if cost + _octile(cell, to) != guess:
+				continue  # Reached again more cheaply since it was put here.
+			if cell == to:
+				return cost / 2.0
+			for pair: Array in [[STRAIGHTS, 2], [DIAGONALS, 3]]:
+				for direction: Vector2i in pair[0]:
+					var next := cell + direction
+					var next_cost: int = cost + pair[1]
+					if best.get(next, 1 << 30) <= next_cost or obstacles.has(next) or not can_step(area, cell, direction):
+						continue
+					best[next] = next_cost
+					var f: int = next_cost + _octile(next, to)
+					while buckets.size() <= f:
+						buckets.append([])
+					buckets[f].append(next)
+		buckets[guess] = []
+		guess += 1
+	return -1.0
+
+
+## The octile distance in half steps (2 straight, 3 diagonal).
+static func _octile(a: Vector2i, b: Vector2i) -> int:
+	var dx := absi(a.x - b.x)
+	var dy := absi(a.y - b.y)
+	return 3 * mini(dx, dy) + 2 * absi(dx - dy)
 
 
 static func _relax(area: Dictionary, cell: Vector2i, direction: Vector2i, cost: int, best: Dictionary[Vector2i, int], buckets: Array[Array], obstacles: Dictionary) -> void:

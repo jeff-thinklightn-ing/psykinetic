@@ -177,8 +177,15 @@ func camps(faction := "") -> Array[Dictionary]:
 ## server, World.raid_groups.routes. With no routes, the nearest in the same
 ## area as the crow flies.
 func nearest(kinds: Array[String], area_name: String, cell: Vector2i, routes: WorldRoutes = null) -> String:
-	var best := ""
-	var best_steps := INF
+	var all := ranked(kinds, area_name, cell, routes)
+	return all[0] if not all.is_empty() else ""
+
+
+## The places of [param kinds] that can be reached from [param cell] of
+## [param area_name], nearest first, as [method nearest] measures: one
+## routing for a caller that takes the first that suits it (decision 503).
+func ranked(kinds: Array[String], area_name: String, cell: Vector2i, routes: WorldRoutes = null) -> Array[String]:
+	var found: Array[Array] = []
 	for id in all_places():
 		var place: Dictionary = _places[id]
 		if place["kind"] not in kinds:
@@ -193,10 +200,13 @@ func nearest(kinds: Array[String], area_name: String, cell: Vector2i, routes: Wo
 				steps += float(leg["steps"])
 		elif place["area"] == area_name:
 			steps = Vector2(place["cell"] - cell).length()
-		if steps < best_steps:
-			best = id
-			best_steps = steps
-	return best
+		found.append([steps, id])
+	found.sort_custom(func(a: Array, b: Array) -> bool: return a[0] < b[0] or (a[0] == b[0] and a[1] < b[1]))
+	var out: Array[String] = []
+	for each: Array in found:
+		if each[0] < INF:
+			out.append(each[1])
+	return out
 
 
 ## Whether place [param id]'s ground takes in [param cell] (its area's).

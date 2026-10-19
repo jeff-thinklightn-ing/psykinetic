@@ -13827,3 +13827,43 @@ Herbs is a store resource from economy's c3130ddc, so the recipe takes it
 from the store, not from herb things on a shelf. Herbs are measured; the
 remedy, one dose, still is not. slots_items.json and the art status
 regenerated. Protocol unchanged; no new class_name.
+
+## 503. A death's way to the nearest temple: A* inside an area, no walk where there is no way
+
+perf found a player's death stalling the server 1.5 to 2.8 s ("hits" in
+the tick's slow line, decision 469): Main._return_place asks
+Holdings.nearest for the nearest temple or healer's hut, three times (all
+kinds, then each), and each asks WorldRoutes.route for every such place.
+A route inside one area walked _flood from the fallen's cell, which stops
+only once it reaches its cell, so most of the wilds each time; before the
+distance fields are in (the raids' routes are made on the first death),
+every portal of every area was flooded to, and a portal it cannot reach
+floods the whole area; on netbench, with no links, the routes to the
+wilds' temple flooded the wilds though nothing could get there.
+
+Now:
+- WorldRoutes._steps_between: A* by buckets in half steps, aimed by the
+  octile distance (never more than the walk, so it finds a shortest one;
+  world_map_test checks it against the flood on every cell of a room and
+  on the wilds). The walk inside one area uses it.
+- A route to an area the from area cannot lead to returns none at once
+  (_areas_from), nothing walked.
+- Until an area's fields are in: a walk inside it is its own walk alone
+  (not every portal's as well); its portals are joined pairwise by A*;
+  the walks from the start and to the end to its portals are A* each.
+- Holdings.ranked: the reachable places of the kinds nearest first
+  (nearest is its first); Main._return_place takes the first that is
+  manned, routed once. That is the doc's "nearest manned return place";
+  before, a second temple manned behind an unmanned nearer one was missed.
+
+Measured on levels/ (the wilds' healer's hut and temple), one nearest
+call: from the middle of the wilds 653 ms with the fields in and 3785 ms
+before them, to 24 ms either way; across the wilds 420 to 18 ms; from the
+castle before the fields 719 ms to 411 (other areas' pairs still walked);
+a death made three such calls and now one ranked. On netbench (no links)
+the routes to the wilds walk nothing.
+
+Rejected: building the raids' routes at boot so the fields are always in
+(threads in every hosted test, and the fallback still has to be cheap);
+caching each place's distance field (a field per temple per faction for a
+lookup made at a death).

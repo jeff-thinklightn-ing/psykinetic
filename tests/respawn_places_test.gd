@@ -56,10 +56,19 @@ func _ready() -> void:
 	_check(holdings.nearest(temples, "rp_wild", Vector2i(36, 15), routes) == "rp_town/temple@11,11", "only temples asked: the town's, across the edge")
 	_check(holdings.nearest(temples, "rp_wild", Vector2i(36, 15)) == "", "without routes, only the same area: none")
 	_check(holdings.nearest(kinds, "rp_wild", Vector2i(36, 15)) == "rp_wild/healers_hut@31,9", "and the hut there")
+	var order := holdings.ranked(kinds, "rp_wild", Vector2i(36, 15), routes)
+	_check(order == _strings(["rp_wild/healers_hut@31,9", "rp_town/temple@11,11"]),
+		"ranked: every one that can be walked to, nearest first, for the first manned (decision 503; %s)" % [order])
 	routes = null
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
+
+
+func _strings(values: Array) -> Array[String]:
+	var out: Array[String] = []
+	out.assign(values)
+	return out
 
 
 func _check(ok: bool, label: String) -> void:

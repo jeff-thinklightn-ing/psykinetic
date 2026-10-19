@@ -6345,13 +6345,9 @@ func _return_place(cell: Vector2i) -> Dictionary:
 	var kinds: Array[String] = []
 	kinds.assign(World.production.rules.get("return", {}).get("places", {}).keys())
 	var routes: WorldRoutes = World.raid_groups.routes if World.raid_groups != null else null
-	var tries: Array = [kinds]
-	for kind in kinds:
-		var one: Array[String] = [kind]
-		tries.append(one)
-	for each: Array[String] in tries:
-		var id := World.holdings.nearest(each, World.zone.name, cell, routes)
-		var shop := _return_workshop(id) if not id.is_empty() else ""
+	# The nearest that is manned, of any kind, routed once (decision 503).
+	for id: String in World.holdings.ranked(kinds, World.zone.name, cell, routes):
+		var shop := _return_workshop(id)
 		if not shop.is_empty() and World.production.manned(shop):
 			return {"place": id, "workshop": shop}
 	return {}

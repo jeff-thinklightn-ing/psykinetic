@@ -466,6 +466,15 @@ func _test_routes() -> void:
 	var walking := WorldRoutes.new(world_map, false, false)
 	_check(not walking.is_ready() and walking.route("r_room", Vector2i(0, 0), "r_east", Vector2i(1, 1)).map(
 		func(leg: Dictionary) -> float: return leg["steps"]) == [10.5, 3.0, 1.0], "with no distance fields, a route walks the areas and finds the same legs")
+	var alone := walking.route("r_room", Vector2i(0, 0), "r_room", Vector2i(4, 0))
+	_check(alone.size() == 1 and alone[0]["steps"] == 10.5, "with no fields, a route inside one area is its own walk (decision 503; %s)" % [alone])
+	var room: Dictionary = world_map.areas["r_room"]
+	var flooded := walking.steps_from("r_room", Vector2i(0, 0), room["floor"].keys() as Array[Vector2i])
+	var differ: Array[Vector2i] = []
+	for cell: Vector2i in room["floor"]:
+		if WorldRoutes._steps_between(room, Vector2i(0, 0), cell) != flooded.get(cell, -1.0):
+			differ.append(cell)
+	_check(differ.is_empty(), "A* finds the flood's steps to every cell (%s)" % [differ])
 	var routes := world_map.routes()
 	routes.wait()
 	_check(routes.is_ready() and routes.build_ms.size() == 3, "the distance fields are made on a pool task, every area's (%s)" % [routes.build_ms])
@@ -586,6 +595,23 @@ func _test_level_routes() -> void:
 		print("    flooding %s (%d floor cells) from its start: %.0f ms" % [area_name, area["floor"].size(), (Time.get_ticks_usec() - flood) / 1000.0])
 	var room: Dictionary = world_map.areas["test_room"]
 	var wilds: Dictionary = world_map.areas["wilds"]
+	# A* against the flood, on the wilds: the same steps, far less walked.
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 503
+	var cells: Array = wilds["floor"].keys()
+	var from: Vector2i = wilds["starts"][0]
+	var targets: Array[Vector2i] = []
+	for i in 12:
+		targets.append(cells[rng.randi() % cells.size()])
+	var flood_started := Time.get_ticks_usec()
+	var by_flood := routes.steps_from("wilds", from, targets)
+	var flood_ms := (Time.get_ticks_usec() - flood_started) / 1000.0
+	var astar_started := Time.get_ticks_usec()
+	var same := true
+	for cell in targets:
+		same = same and WorldRoutes._steps_between(wilds, from, cell) == by_flood.get(cell, -1.0)
+	print("    the wilds, 12 cells: one flood %.0f ms, twelve A* %.0f ms" % [flood_ms, (Time.get_ticks_usec() - astar_started) / 1000.0])
+	_check(same, "on the wilds A* finds the flood's steps (decision 503)")
 	var query := Time.get_ticks_usec()
 	var legs := routes.route("test_room", room["starts"][0], "wilds", wilds["spawn_points"]["from_castle"])
 	print("    test_room to wilds: %.0f ms, %s" % [(Time.get_ticks_usec() - query) / 1000.0,
