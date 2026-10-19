@@ -14915,3 +14915,44 @@ It runs about 60 s, beside the suite (about 150 s), so a landing takes no
 longer. A Linux export can't run here, but
 the pack is the same file the box loads; what differs (the OS) the box's
 own boot after a deploy still covers. Tests only; protocol unchanged.
+
+## 518. A level-placed captive: a camp's holds, taken as a raid takes
+
+Builder's deferred ask: "a goblin camp holding a captive" placeable from
+level.json, where today a captive exists only when a raid takes someone.
+A place of kind camp may carry holds: [{town, resident, name, trade}]
+(Level.places_from keeps it, validated; docs/levels.md). On the server,
+after the towns are seeded and after a regeneration's rebind (465's path;
+builder may call it after an accepted change), Main._place_captives takes
+each hold of a camp a faction holds, once: the resident is a worker id of
+the town, a resident's name, or role words "a <trade>'s <son|daughter|
+brother|sister|father|mother|cousin>"; one not found is minted through
+Towns.move_in with origin "placed" (economy's: past the room check as
+"settled" is, since a placed captive leaves the roster the moment its camp
+takes them; the trade given or the hauler's, the name given or drawn from
+rescue.names), its kin the town's resident of that trade, first by id (any
+resident when the town has none, said in the log), the pair written into
+both cards as a founding does (ResidentCard.kin_facts, the "kin" ids). Then
+Towns.resident_taken(town, id, "placed:<camp>", holder) and captive_held,
+the path a raid uses, so the kin's rescue commission (331), the camp's
+fall (camp_taken, free_held, note_rescue), the carried-home and
+Townsfolk's "came home from" facts all run unchanged. The words invent no
+raid and no date (Townsfolk.placed_captive): the captive's card "Tilda was
+carried off by the Blood Rot; they hold her at their camp.", the kin's
+"Tilda, his daughter, was carried off by the Blood Rot before you came;
+...", the officials' "Tilda, Folk0's daughter, is held at the camp of the
+Blood Rot, taken before you came."; the faction as lore names the camp's
+holder, never a fixed word (ResidentCard.faction_name now reaches lore's
+entry through factions.json's lore_id and falls back to its display name,
+so "the Blood Rot" everywhere a card spoke of "the goblins" before).
+Idempotent: the snapshot's "placed_captives"
+(camp id -> the ids placed, in hold order) says what is placed; a world
+saved before it has none and places each hold once on its first boot; a
+minted id found already a worker is taken as placed. A camp gone from the
+levels (a regeneration dropped it) frees its placed held home through
+Towns.free_held, as a fallen camp does, and is forgotten; a fallen camp
+(nobody's) places nothing until a faction holds it again, and then only
+holds not placed before. Never in a real level: the sample has no camp
+and no store, so only resident_test's road level holds one (a
+carpenter's daughter of the test town). Server only; protocol unchanged;
+no new class_name.

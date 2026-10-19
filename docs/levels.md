@@ -244,6 +244,14 @@ All of it is optional.
   camp, keep, farm, gate, mine, stockpile (where the town banks what is
   brought home: see The stockpile) or other; `radius` defaults to 8
   cells, `worth` to 1, `holder` (who holds it at the start) to nobody.
+  A camp may hold captives from the start (decision 518): `"holds":
+  [{"town": "wilds/store", "resident": "a woodcutter's son", "name":
+  "Tam", "trade": "hauler"}]`; `resident` is a worker id, a resident's
+  name, or role words `a <trade>'s <son|daughter|brother|sister|father|
+  mother|cousin>` (the kin is the town's resident of that trade); `name`
+  and `trade` are for one minted. The server places each once, taken by
+  the camp as a raid takes, so the kin's plea and the rescue are the
+  ordinary ones. For the sample and tests, not a real level.
 - `buildings`: the buildings standing here, a list of `{"slot":
   "building.house", "at": [12, 4], "facing": [0, 1]}`. `slot` is one of
   `Level.BUILDINGS` (building.hut 3 x 3, building.house 4 x 6,

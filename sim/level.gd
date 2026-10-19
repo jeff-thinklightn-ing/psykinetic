@@ -914,6 +914,19 @@ static func places_from(config: Dictionary, warnings: Array[String]) -> Dictiona
 			warnings.append("the place %s has a radius under 1: it is 1" % [key])
 		out[str(key)] = {"key": str(key), "cell": at, "name": str(entry.get("name", str(key).capitalize())), "kind": kind,
 			"radius": maxi(radius, 1), "worth": maxi(int(entry.get("worth", 1)), 0), "holder": str(entry.get("holder", "nobody"))}
+		# A camp's captives from the start (decision 518, npc's): holds [{town, resident, name, trade}], kept when well-formed.
+		var holds: Variant = entry.get("holds")
+		if holds is Array:
+			var kept: Array[Dictionary] = []
+			for each: Variant in holds:
+				if each is Dictionary and not str(each.get("town", "")).is_empty() and not str(each.get("resident", "")).is_empty():
+					kept.append({"town": str(each["town"]), "resident": str(each["resident"]), "name": str(each.get("name", "")), "trade": str(each.get("trade", ""))})
+				else:
+					warnings.append("the place %s holds an entry with no town or resident: left out" % [key])
+			if not kept.is_empty():
+				out[str(key)]["holds"] = kept
+		elif holds != null:
+			warnings.append("the place %s's holds is not a list: left out" % [key])
 	return out
 
 

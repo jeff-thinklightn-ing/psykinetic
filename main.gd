@@ -192,6 +192,9 @@ var _world_map: WorldMap
 ## {generation (0 until its first), at_step (the world step of it)}; saved
 ## as the snapshot's "regen".
 var _regen: Dictionary = {}
+## A level-placed captive (decision 518): camp place id -> the worker ids it
+## holds from the level, placed once; saved ("placed_captives").
+var _placed_captives: Dictionary = {}
 ## A client: the generation of the regenerating level its player is in, as
 ## the "map" message said (0: a level that does not regenerate).
 var map_generation := 0
@@ -1887,6 +1890,7 @@ func _regenerate(level_name: String, config: Dictionary) -> bool:
 		var gone := World.holdings.rebind(_world_map)
 		if not gone.is_empty():
 			_forget_places(gone)
+		_place_captives(_world_map, gone)  # A new generation's camps hold their captives; a gone camp's come home (decision 518).
 	# The map's other holders (maps-2a's reading, 2026-10-18): the raid
 	# groups route over the new floor (their routes and legs dropped, each
 	# group going on from where it is); the game's richness is worked out
@@ -2068,6 +2072,8 @@ func _boot() -> void:
 	World.steps = snapshot.get("steps", 0)
 	# Each regenerating level's generation (decision 465), before any zone opens.
 	_regen = Regen.states_from(snapshot.get("regen", {}))
+	# A level-placed captive (decision 518): the camps whose holds are placed already, so each is placed once.
+	_placed_captives = snapshot.get("placed_captives", {}).duplicate(true) if snapshot.get("placed_captives") is Dictionary else {}
 	# The hour and the day's length go on as saved (DayNight), unless
 	# --hour or --day-minutes say otherwise.
 	DayNight.reset()
@@ -2116,6 +2122,7 @@ func _boot() -> void:
 	# The buildings the maps already have, for towns with no record of them.
 	World.towns.seed_from(world_map)
 	_world_map = world_map
+	_place_captives(world_map)  # The camps' level-placed captives (decision 518).
 	# Raid groups (decision 328): off until switched on (--raids, the console).
 	World.raid_groups = WorldRaids.new(world_map, World.holdings, World.towns, snapshot.get("raid_groups", {}))
 	World.raid_groups.clock = func() -> int: return World.steps
@@ -3194,6 +3201,7 @@ func _save_state(wait := true) -> void:
 		"trampled": World.trampled_to_dict(),
 		"raid_groups": World.raid_groups.to_dict() if World.raid_groups != null else {},
 		"trade": World.trade.to_dict() if World.trade != null else {},
+		"placed_captives": _placed_captives.duplicate(true),
 		"economy": World.economy.to_dict() if World.economy != null else {},
 		"herds": World.herds.to_dict() if World.herds != null else {},
 		"items": World.items.to_dict(),
@@ -6643,6 +6651,142 @@ func _temple_counters() -> void:
 				at = player
 				break
 		World.show_held(entity, at)
+
+
+
+# --- A level-placed captive (decision 518) ------------------------------------------
+
+## Words a hold may use for its resident: "a <trade>'s <word>".
+const HOLD_WORDS := "^an? (.+?)'s (son|daughter|brother|sister|father|mother|cousin)$"
+
+
+## Server: every camp place with level.json "holds" (decision 518; builder's
+## "a goblin camp holding a captive") that a faction holds takes its
+## captives, once: each hold's resident is found in the town (a worker id,
+## or a name among its residents) or minted into it (Towns.move_in, origin
+## "placed", the trade given or a hauler) with kin from the role words ("a
+## woodcutter's son": the town's woodcutter, first by id, any resident when
+## it has none), then taken by the camp through Towns.resident_taken and
+## captive_held, the path a raid uses, so the kin's plea (331), the camp's
+## fall, the carried-home and the memory run unchanged; Townsfolk says it
+## without a raid or a date. _placed_captives remembers what is placed; a
+## camp in [param gone] (a regeneration dropped it) frees its placed held
+## home (Towns.free_held, as a fallen camp does) and is forgotten. Called
+## after the towns are seeded and after a regeneration; builder may call
+## it after an accepted change. How many were placed.
+func _place_captives(world_map: WorldMap, gone: Array[String] = []) -> int:
+	if not Net.is_authority() or World.towns == null or World.holdings == null or World.production == null or world_map == null:
+		return 0
+	for camp_id: String in gone:
+		if _placed_captives.has(camp_id):
+			var freed := World.towns.free_held(camp_id)
+			print("[captive] %s is gone from the levels: %s come home" % [camp_id, ", ".join(freed) if not freed.is_empty() else "nobody held there"])
+			_placed_captives.erase(camp_id)
+	var placed := 0
+	var areas: Array = world_map.areas.keys()
+	areas.sort()
+	for area_name: String in areas:
+		var places: Dictionary = world_map.areas[area_name].get("places", {})
+		var keys: Array = places.keys()
+		keys.sort()
+		for key: String in keys:
+			var place: Dictionary = places[key]
+			if place.get("kind") != "camp" or not place.get("holds") is Array:
+				continue
+			var camp_id := "%s/%s" % [area_name, key]
+			var holder := World.holdings.holder(camp_id)
+			if holder.is_empty() or holder == Factions.NOBODY or holder == Stockpile.TOWN:
+				continue
+			var done: Dictionary = _placed_captives.get(camp_id, {})
+			var holds: Array = place["holds"]
+			for i in holds.size():
+				if done.has(str(i)):
+					continue  # Placed before (this boot or an earlier one).
+				var who := _place_captive(camp_id, holder, holds[i], i)
+				if who.is_empty():
+					continue  # Not yet (a town with nobody to be kin to, or none): the next pass tries again.
+				done[str(i)] = who
+				placed += 1
+			if not done.is_empty():
+				_placed_captives[camp_id] = done
+	return placed
+
+
+## One hold of camp [param camp_id] (held by [param holder]): the resident
+## found or minted, with kin, and taken. The worker id, "" if nothing could
+## be placed (no such town: said in the log).
+func _place_captive(camp_id: String, holder: String, hold: Dictionary, index: int) -> String:
+	var town := str(hold.get("town", ""))
+	var wanted := str(hold.get("resident", ""))
+	if town.is_empty() or wanted.is_empty() or World.holdings.place(town).is_empty():
+		print("[captive] %s holds %s of %s: no such town, nothing placed" % [camp_id, wanted, town])
+		return ""
+	var raiders := ResidentCard.faction_name(holder)
+	var who := ""
+	var kin_id := ""
+	var relation := ""
+	var role := RegEx.create_from_string(HOLD_WORDS).search(wanted.to_lower())
+	if role == null and not World.production.worker(wanted).is_empty() and str(World.production.worker(wanted).get("town", "")) == town:
+		who = wanted  # A worker id.
+	elif role == null:
+		for id: String in World.towns.residents(town):
+			if str(World.production.worker(id).get("name", "")).to_lower() == wanted.to_lower():
+				who = id  # A resident by name.
+				break
+	if who.is_empty() and World.towns.residents(town).is_empty():
+		return ""  # Nobody to be kin to yet (a town not peopled at this pass): waits for the next.
+	if who.is_empty():
+		var trade := str(hold.get("trade", ""))
+		if trade.is_empty():
+			trade = str(World.production.rules.get("haul", {}).get("trade", "hauler"))
+		var name := str(hold.get("name", ""))
+		if name.is_empty():
+			var names: Array = World.towns.rules.get("rescue", {}).get("names", ["Someone"])
+			name = str(names[absi(hash("%s/%d" % [camp_id, index])) % names.size()])
+		who = "placed_%s_%d" % [camp_id.replace("/", "_").replace(":", "_"), index]
+		if not World.production.worker(who).is_empty():
+			return who  # Minted on an earlier boot whose marker was lost: theirs already.
+		if not World.towns.move_in(town, who, name, trade, "placed"):
+			print("[captive] %s holds %s of %s: the town would not take them" % [camp_id, wanted, town])
+			return ""
+	var card := Townsfolk.card_of(World.production, who)
+	if role != null:
+		var word := role.get_string(2)
+		var of_trade := role.get_string(1).replace(" ", "_")
+		card["traits"]["pronoun"] = "she" if word in ["daughter", "sister", "mother"] else "he"
+		World.production.set_card(who, card)
+		var others: Array = World.towns.residents(town).filter(func(id: String) -> bool:
+			return id != who and not id.begins_with("companion:") and not str(World.production.worker(id).get("origin", "")).begins_with("companion:"))
+		others.sort()
+		var of_it: Array = others.filter(func(id: String) -> bool: return of_trade in World.production.worker(id).get("trades", []))
+		if of_it.is_empty() and not others.is_empty():
+			print("[captive] %s: %s has no %s; %s is kin to %s instead" % [camp_id, town, of_trade.replace("_", " "), who, others[0]])
+		kin_id = str(of_it[0]) if not of_it.is_empty() else (str(others[0]) if not others.is_empty() else "")
+		if not kin_id.is_empty():
+			var theirs := Townsfolk.card_of(World.production, kin_id)
+			var kind := "cousin" if word == "cousin" else ("sister or brother" if word in ["brother", "sister"] else "parent and child")
+			# kin_facts' first card is the child of a parent-and-child pair.
+			var both: Array[String] = ResidentCard.kin_facts(theirs, card, kind) if word in ["father", "mother"] else ResidentCard.kin_facts(card, theirs, kind)
+			var now := World.production.now()
+			if word in ["father", "mother"]:
+				ResidentCard.add_fact(theirs, now, both[0])
+				ResidentCard.add_fact(card, now, both[1])
+			else:
+				ResidentCard.add_fact(card, now, both[0])
+				ResidentCard.add_fact(theirs, now, both[1])
+			card.get_or_add("kin", {})[kin_id] = kind
+			theirs.get_or_add("kin", {})[who] = kind
+			World.production.set_card(kin_id, theirs)
+			World.production.set_card(who, card)
+			relation = word
+	if not World.towns.resident_taken(town, who, "placed:" + camp_id, holder):
+		print("[captive] %s could not take %s of %s" % [camp_id, who, town])
+		return ""
+	World.towns.captive_held(who, camp_id)
+	Townsfolk.placed_captive(World.production, town, who, kin_id, relation, raiders)
+	print("[captive] %s holds %s of %s from the start%s" % [camp_id, World.production.worker(who).get("name", who), town,
+		", %s of %s" % [relation, World.production.worker(kin_id).get("name", kin_id)] if not kin_id.is_empty() else ""])
+	return who
 
 
 # --- The fallen brought back (decision 396) -----------------------------------------

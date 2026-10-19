@@ -50,6 +50,7 @@ func _ready() -> void:
 	_test_what_is_true()
 	_test_two_sentences()
 	_test_sick_body()
+	_test_placed_captive()
 	_test_herbs()
 	_test_resident_voices()
 	_test_means_in_voice()
@@ -89,6 +90,10 @@ func _register_levels() -> void:
 		for y in 20:
 			rows.append("#".repeat(30) if y == 0 or y == 19 else "#" + ".".repeat(28) + "#")
 		var spec := {"name": level_name, "centre": [7, 4], "starts": [[2, 2]], "entities": []}
+		if level_name == ROAD:
+			# A goblin camp in the road level holding a carpenter's daughter of the town (decision 518).
+			spec["places"] = {"camp": {"at": [20, 10], "kind": "camp", "radius": 2, "holder": "goblins", "name": "the goblin camp",
+				"holds": [{"town": STORE, "resident": "a carpenter's daughter", "name": "Tilda"}]}}
 		if level_name == TOWN:
 			spec["places"] = {"store": {"at": [5, 3], "kind": "stockpile", "radius": 2, "holder": "town", "name": "the stockpile"}}
 			# A home for residents' bodies (decision 333): a hut linked to nothing.
@@ -1189,6 +1194,48 @@ func _test_bodies_only_near() -> void:
 	_put(player, Vector2i(2, 2))
 	_sync()
 
+
+
+## A level-placed captive (decision 518): the road level's camp holds a
+## carpenter's daughter of the town from the start.
+func _test_placed_captive() -> void:
+	print("\n== a level-placed captive: a camp's holds, found or minted with kin, taken as a raid takes (decision 518) ==")
+	var camp := ROAD + "/camp"
+	_check(not _main._placed_captives.has(camp), "at boot the town had nobody to be kin to: the hold waited")
+	_check(_main._place_captives(_main._world_map) == 1, "the next pass, the town peopled, places it")
+	var held: Array = World.towns.captives(STORE).filter(func(each: Dictionary) -> bool: return str(each.get("held_by", "")) == camp)
+	_check(held.size() == 1 and str(held[0].get("name", "")) == "Tilda" and str(held[0].get("by", "")) == "goblins", "the camp holds Tilda of the town: %s" % [held])
+	if held.is_empty():
+		return
+	var who := str(held[0]["id"])
+	var worker := World.production.worker(who)
+	_check(bool(worker.get("away", false)) and str(worker.get("origin", "")) == "placed" and who not in World.towns.residents(STORE), "minted into the town with origin placed, away, off the roster")
+	var card := Townsfolk.card_of(World.production, who)
+	var kin: Dictionary = card.get("kin", {})
+	_check(kin.has("rs-folk00") and str(kin["rs-folk00"]) == "parent and child" and str(card.get("traits", {}).get("pronoun", "")) == "she", "kin to the first carpenter by id, a daughter: %s" % [kin])
+	var father := Townsfolk.card_of(World.production, "rs-folk00")
+	var father_facts: Array = father.get("facts", []).map(func(f: Dictionary) -> String: return str(f["text"]))
+	var raiders := ResidentCard.faction_name("goblins")
+	_check("Tilda is Folk0's daughter." in father_facts and "Tilda, his daughter, was carried off by %s before you came; they hold her at their camp." % raiders in father_facts,
+		"his card: the kinship and the loss, no raid and no date: %s" % [father_facts.slice(-2)])
+	var her_facts: Array = card.get("facts", []).map(func(f: Dictionary) -> String: return str(f["text"]))
+	_check("Tilda was carried off by %s; they hold her at their camp." % raiders in her_facts, "her own card: %s" % [her_facts.back()])
+	World.production.set_away("rs-folk00", false)
+	var plea := Offers.of("rs-folk00", Net.player_id)
+	var rescue: Array = plea.filter(func(o: Dictionary) -> bool: return str(o.get("what", {}).get("captive", "")) == who)
+	_check(rescue.size() == 1 and str(rescue[0].get("title", "")) == "Bring Tilda home" and str(rescue[0].get("what", {}).get("held_by", "")) == camp and str(rescue[0].get("words", "")).contains(raiders),
+		"the kin's rescue commission at the counter, 331's, unchanged: %s" % [rescue.map(func(o: Dictionary) -> String: return str(o.get("words", "")))])
+	World.production.set_away("rs-folk00", true)
+	var before: int = World.towns.captives(STORE).size()
+	_check(_main._place_captives(_main._world_map) == 0 and World.towns.captives(STORE).size() == before, "placed once: a second pass places nothing")
+	_check(World.holdings.take(camp, Factions.NOBODY), "(the camp falls)")
+	_check(who in World.towns.residents(STORE) and not bool(World.production.worker(who).get("away", false)), "its fall brings her home, a resident again")
+	var home_facts: Array = Townsfolk.card_of(World.production, who).get("facts", []).map(func(f: Dictionary) -> String: return str(f["text"]))
+	_check(home_facts.back() == "Tilda came home from %s." % raiders, "and her card says so: %s" % [home_facts.back()])
+	_check(_main._place_captives(_main._world_map) == 0, "a fallen camp holds nobody: nothing placed again")
+	var gone: Array[String] = [camp]
+	_check(_main._place_captives(_main._world_map, gone) == 0 and not _main._placed_captives.has(camp), "a camp gone from the levels is forgotten")
+	_check(World.towns.died(STORE, who, "the test's end"), "(Tilda out of the town again, so the later tests see the roster they expect)")
 
 func _sync() -> void:
 	_main._sync_residents()

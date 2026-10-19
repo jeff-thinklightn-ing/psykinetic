@@ -256,9 +256,18 @@ static func grudge_fact(a: Dictionary, b: Dictionary, cause: String) -> String:
 	return "%s bears a grudge against %s %s." % [a.get("traits", {}).get("name", ""), b.get("traits", {}).get("name", ""), cause]
 
 
-## A faction as people name it, from lore's entry ("the goblins"), else
-## "the <id>" with underscores spaced.
+## A faction as people name it: lore's entry for it (by factions.json's
+## lore_id, "the Blood Rot"; decision 518), else factions.json's display name,
+## else "the <id>" with underscores spaced.
+static var _factions: Factions
+
 static func faction_name(faction: String) -> String:
-	var entry: Dictionary = Lore.entries().get(faction, {})
+	if _factions == null:
+		_factions = Factions.read()
+	var listed: Dictionary = _factions.all.get(faction, {})
+	var lore_id := str(listed.get("lore_id", faction))
+	var entry: Dictionary = Lore.entries().get(lore_id, Lore.entries().get(faction, {}))
 	var name := str(entry.get("name", ""))
+	if name.is_empty():
+		name = str(listed.get("name", ""))
 	return name if not name.is_empty() else "the " + faction.replace("_", " ")

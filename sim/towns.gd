@@ -298,12 +298,13 @@ func died(town: String, who_id: String, why: String) -> bool:
 ## [param town]'s residents are at its room (the growth rescued captives
 ## use, so the town's talk never crowds them out; not for [param origin]
 ## "settled", 471's Snagfin, who brings his own stall and is not the
-## town's growth) or [param who_id] is a worker already; else a resident of [param origin] working [param trade]
+## town's growth, nor "placed", a level's placed captive (npc's, decision
+## 518), counted out the moment its camp takes them) or [param who_id] is a worker already; else a resident of [param origin] working [param trade]
 ## (a [param type] like a thief's, 461, when given), seated, with no
 ## founding gold, no rescue xp and no rescued signal.
 func move_in(town: String, who_id: String, name: String, trade: String, origin := "remembered", type := "") -> bool:
 	var record := _town(town)
-	if who_id in record["residents"] or (origin != "settled" and record["residents"].size() >= room(town)):
+	if who_id in record["residents"] or (origin != "settled" and origin != "placed" and record["residents"].size() >= room(town)):
 		return false
 	if not production.add_worker(who_id, name, [trade], town, origin, type):
 		return false

@@ -1323,6 +1323,45 @@ static func _upper_first(text: String) -> String:
 	return text.substr(0, 1).to_upper() + text.substr(1) if not text.is_empty() else text
 
 
+## A level-placed captive (decision 518): [param who_id] of [param town] is
+## held by [param raiders] (lore's name for the camp's holder) from before
+## any player came; no raid, no date. The captive's card, the kin's
+## ([param kin_id], who is their [param relation]: "father", "sister") and
+## the officials' say so; the rest hear it by gossip.
+static func placed_captive(production: Production, town: String, who_id: String, kin_id: String, relation: String, raiders: String) -> void:
+	var who := production.worker(who_id)
+	if who.is_empty():
+		return
+	var name := str(who.get("name", who_id))
+	var card := card_of(production, who_id)
+	var their := _their(card) if not card.is_empty() else "them"
+	var him := "her" if str(card.get("traits", {}).get("pronoun", "")) == "she" else "him"
+	learn(production, who_id, "%s was carried off by %s; they hold %s at their camp." % [name, raiders, him])
+	var kin_name := ""
+	if not kin_id.is_empty() and not production.worker(kin_id).is_empty():
+		kin_name = str(production.worker(kin_id).get("name", kin_id))
+		var theirs := card_of(production, kin_id)
+		learn(production, kin_id, "%s, %s %s, was carried off by %s before you came; they hold %s at their camp." % [name, _their(theirs), relation, raiders, him])
+	for official: String in _officials(production, town):
+		if official == kin_id or official == who_id:
+			continue
+		learn(production, official, "%s%s is held at the camp of %s, taken before you came." % [name,
+			", %s's %s," % [kin_name, _kin_word(relation, their)] if not kin_name.is_empty() else "", raiders])
+
+
+## "son" for a relation word of the captive's side ("father" -> the kin is
+## their father, so the captive is the kin's son or daughter).
+static func _kin_word(relation: String, their: String) -> String:
+	match relation:
+		"father", "mother":
+			return "daughter" if their == "her" else "son"
+		"son", "daughter":
+			return "mother" if their == "her" else "father"
+		"brother", "sister":
+			return "sister" if their == "her" else "brother"
+	return "cousin"
+
+
 ## Gossip (decision 422): what a town's person believes or saw passes to a
 ## neighbour standing at the same meeting place. Every "gossip.every" steps
 ## (residents.json) per town, its residents (not away, not companions) are

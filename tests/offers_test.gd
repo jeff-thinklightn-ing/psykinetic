@@ -185,7 +185,7 @@ func _test_commission_kin() -> void:
 	_check(mine.size() == 1 and mine[0]["kind"] == Offers.COMMISSION and mine[0]["what"]["sub"] == Offers.RESCUE and mine[0]["what"]["captive"] == "o-bram"
 		and mine[0]["what"]["area"] == "wood", "Mara asks for her brother back: %s" % [mine])
 	_check(mine.size() == 1 and mine[0]["title"] == "Bring Bram home" and mine[0]["words"].begins_with("Bring my brother Bram home from the camp of ")
-		and mine[0]["words"].ends_with(" camp of the goblins at the Dark Wood."), "in words, with the camp's place: %s" % (mine[0]["words"] if not mine.is_empty() else ""))
+		and mine[0]["words"].ends_with(" camp of %s at the Dark Wood." % ResidentCard.faction_name("goblins")), "in words, with the camp's place: %s" % (mine[0]["words"] if not mine.is_empty() else ""))
 	_zone = "wood"
 	Offers.rescued(TOWN, "o-bram", _ctx)
 	_check(_paid == [["p1", TOWN, 10]] and _done.size() == 1 and _done[0][1]["kind"] == "notice" and _done[0][2] == "Bram is home; Mara's thanks. The town pays 10 gold.",
@@ -597,7 +597,7 @@ func _test_lapse() -> void:
 	_check(_done.is_empty(), "six days on, it stands")
 	_now = 8 * DayNight.day_steps
 	Offers.tick(_ctx)
-	_check(_done.size() == 1 and _done[0][2] == "Jeff's promise to Mara lapsed: to clear the camp of the goblins." and _done[0][3] == 0
+	_check(_done.size() == 1 and _done[0][2] == "Jeff's promise to Mara lapsed: to clear the camp of %s." % ResidentCard.faction_name("goblins") and _done[0][3] == 0
 		and Townsfolk.card_of(_work, "o-mara").get("asks", []).is_empty(), "eight days on, it lapses: %s" % [_done])
 	_check(str(Townsfolk.card_of(_work, "o-mara")["facts"].back()["text"]).begins_with("Jeff never kept the promise to Mara"), "told once, as a fact")
 
@@ -616,7 +616,7 @@ func _test_voice_words() -> void:
 	_camps = [{"id": CAMP, "area": "wood", "faction": "goblins"}]
 	Offers.accept("o-mara", "p1", "Jeff", "o-mara|commission|camp:" + CAMP, 0, _ctx)
 	words = Offers.voice_words("o-mara", "p1", "Jeff", _ctx)
-	_check(words.ends_with("Jeff promised to clear the camp of the goblins and has not yet."), "an open promise is a fact too: %s" % words)
+	_check(words.ends_with("Jeff promised to clear the camp of %s and has not yet." % ResidentCard.faction_name("goblins")), "an open promise is a fact too: %s" % words)
 
 
 func _check(ok: bool, what: String) -> void:
