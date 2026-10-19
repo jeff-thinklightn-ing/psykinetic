@@ -87,7 +87,7 @@ Base unit 8. Panel padding 24; between rows 12; between sections 24; a slot 132 
 
 | Where | What |
 |-------|------|
-| top left | the HUD line (the player's state; outlined text, no box), the controls list under it (H), the debug text (F3) |
+| top left | the HUD line (the player's state in words, never a number but HP for now; outlined text, no box), the controls list under it (H), the debug text (F3) |
 | top right | the compass, the place you stand in to its left; under it the corner map |
 | bottom right | the pack, with the open chest or companion above it; the gold over its corner; a shop to its left |
 | bottom left | the talk box: what was said, fading unless pinned (Tab), the chat box inside it |

@@ -422,6 +422,8 @@ var _test_hint_thing: GridEntity
 var _test_counter_shown: Node
 ## --test-show=converse: the panel wanted on the nearest resident, once there is one.
 var _test_converse_due := false
+## The aim ring and outline wear the draw's look (Client3D.draw_look): reset once it ends.
+var _draw_shown := false
 ## The one-time line the first time a townsperson is near (Net.hinted_talk), and when it goes.
 var _talk_hint: Label
 var _talk_hint_until := 0.0
@@ -770,10 +772,16 @@ func _process(delta: float) -> void:
 	var aim := World.shot_aim(player, tile) if player != null and player.raised == "draw" else {}
 	if _client3d != null and not aim.is_empty():
 		# A bow drawn: the body the shot would strike is outlined, else
-		# the cell where it would come down.
+		# the cell where it would come down; both tighten as the draw
+		# completes (decision 475), the one word of how far it is.
 		_client3d.target(aim["hit"])
 		_client3d.hover(aim["end"], aim["hit"] == null)
+		_client3d.draw_look(World.draw_of(player))
+		_draw_shown = true
 	elif _client3d != null:
+		if _draw_shown:
+			_draw_shown = false
+			_client3d.draw_look(-1.0)
 		var foe: GridEntity = under_mouse if player != null and under_mouse is Monster and World.can_target(player, under_mouse) else null
 		_client3d.target(foe)
 		_client3d.hover(tile, foe == null and World.is_walkable(tile))
@@ -6719,7 +6727,7 @@ func _on_world_ticked(tick: int) -> void:
 		if player.raised == "block":
 			hp_text += "   shield raised"
 		elif player.raised == "draw":
-			hp_text += "   bow drawn %d%%" % roundi(World.draw_of(player) * 100.0)
+			hp_text += "   bow drawn"  # How far: the body, the ring and the creak (decision 475); F3 has the number.
 	_hud_tick = tick
 	hud.text = hp_text
 	if player != null and _connect_joining and connect_screen != null:
@@ -7167,6 +7175,8 @@ func _debug_text() -> String:
 	var player := _local_player()
 	if player != null:
 		lines.append("stamina: %d / %d" % [player.stamina, player.max_stamina])
+		if player.raised == "draw":
+			lines.append("draw: %d%%" % roundi(World.draw_of(player) * 100.0))
 	if _client3d != null:
 		lines.append("yaw: %.1f deg   pitch: %.1f deg   zoom: %.2fx" % [_client3d.yaw, _client3d.pitch, _client3d.zoom])
 	else:

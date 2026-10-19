@@ -2302,6 +2302,30 @@ func hover(tile: Vector2i, show: bool) -> void:
 		_lay_on_ground(_hover, tile, ON_FLOOR)
 
 
+## A bow's draw read in the world (decision 475, ui's): the hover ring and
+## the outline tighten and brighten as [param fraction] (World.draw_of, 0 to
+## 1) completes: the ring half again as wide and dim at the start, the
+## cell's own size in brass_bright at a full draw; the outline's passes
+## nudged wider and paler at the start, their own width and brass at the
+## end. [param fraction] below 0: the plain look (no draw).
+func draw_look(fraction: float) -> void:
+	var drawing := fraction >= 0.0
+	var k := 1.0 if not drawing else 1.0 + 0.6 * (1.0 - clampf(fraction, 0.0, 1.0))
+	_hover.scale = Vector3(k, 1.0, k)
+	var ring_material := _hover.material_override as StandardMaterial3D
+	if ring_material != null:
+		var brass := UiTheme.color("brass_bright")
+		ring_material.albedo_color = HOVER if not drawing else HOVER.lerp(Color(brass, 0.9), clampf(fraction, 0.0, 1.0))
+	var pass_ := _outline
+	while pass_ != null:
+		var nudge: Vector2 = pass_.get_shader_parameter("nudge")
+		if nudge.length() > 0.0:
+			pass_.set_shader_parameter("nudge", nudge.normalized() * TARGET_PIXELS * k)
+		pass_.set_shader_parameter("colour", TARGET_OUTLINE if not drawing
+				else TARGET_OUTLINE.lerp(UiTheme.color("brass_bright"), clampf(fraction, 0.0, 1.0)))
+		pass_ = pass_.next_pass as ShaderMaterial
+
+
 ## Outlines [param entity] as the one the next click attacks, and nothing
 ## else (null: none).
 func target(entity: GridEntity) -> void:

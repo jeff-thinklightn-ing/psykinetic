@@ -14386,3 +14386,33 @@ This is the offer (the coordinator's approval 2026-10-19; Jeff's rule for
 Main's ctx keys: contribution_wanted, shortfall, contribute, gold_of.
 offers_test. town_soak's --give=N is economy's. Protocol unchanged; no new
 class_name.
+
+## 475. The bow's draw read in the world, not as a number
+
+Ui, from the coordinator's list (Jeff: performance first, then this): the
+HUD line said "bow drawn N%" from World.draw_of, a number against the
+no-bars rule (docs/ui_style.md). Items' bow (329, 375) and the arrows'
+bundle (456) are unchanged; this is how the draw is shown.
+
+- The HUD line says "bow drawn" alone while the bow is drawn; F3's debug
+  text carries "draw: N%" (perf's lines, one added).
+- Client3D.draw_look(fraction): the hover ring on the cell the shot would
+  reach is half again as wide and dim at the start of the draw and closes
+  to the cell's own size in brass_bright at a full draw; the struck body's
+  outline passes are nudged wider and paler at the start, their own width
+  and brass at the end; below 0 the plain look. Main calls it each frame
+  from the aim (World.shot_aim) while raised is "draw" and resets it once
+  when the draw ends. Every client computes the fraction (raised and
+  raised_tick are replicated), so a drawn bow reads the same on every
+  screen.
+- The rest of the draw is its owners': the body's pull (pc-character's 462,
+  amended on main as 3bd5098): Bow_Draw held at Client3D.bow_pull, the nock
+  before draw_min and then the pull following World.draw_of exactly, carried
+  between ticks by World.tick_alpha, so the arm draws back as the fraction
+  grows and full draw shows only when the shot is full; and the creak heard rising
+  (sound's side of 475, its own entry, on main as 856adaf): sfx.bow_creak loops from the archer
+  while raised is "draw", its pitch 0.85x to 1.25x and its level -18 to 0 dB
+  following World.draw_of, stopping at the shot or when the draw is let
+  down.
+
+Client only; protocol unchanged.

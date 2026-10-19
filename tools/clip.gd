@@ -37,7 +37,7 @@ extends Node
 ##     the bow in a chest; each caption names the verb.
 ##   items_controls: the right button as the off hand (decision 329): a
 ##     shield raised while held ("shield raised"), E opening a chest, a bow
-##     from it drawn ("bow drawn 50%") and let go at the imp.
+##     from it drawn ("bow drawn"; the ring and the body say how far) and let go at the imp.
 ##   items_loot: loot tables (decision 330): the level names "supplies"
 ##     for its chest and "armoury" for its brutes; the chest opened, stocked
 ##     from its table; the brute, carrying what its table gave, fought and

@@ -25,8 +25,8 @@ const MAX_LINES := 8
 const THINKING_FOR := 15.0
 const ASKS := ["What do you sell?", "Any work for me?", "What's the news?"]
 ## What accepting an offer says on its button, by the offer's "accept".
-const ACCEPT_WORDS := {"buy": "Buy", "take": "Take it on", "lend": "Lend", "carry": "Carry it"}
-const KIND_WORDS := {"shop": "for sale", "commission": "work", "rumour": "rumour", "plea": "a plea"}
+const ACCEPT_WORDS := {"buy": "Buy", "take": "Take it on", "lend": "Lend", "carry": "Carry it", "read": "Read it"}
+const KIND_WORDS := {"shop": "for sale", "commission": "work", "rumour": "rumour", "plea": "a plea", "page": "a page"}
 
 ## The resident spoken with (null: closed).
 var resident: GridEntity
