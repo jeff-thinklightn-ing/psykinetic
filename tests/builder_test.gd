@@ -25,6 +25,7 @@ func _ready() -> void:
 	await _test_roof()
 	await _test_monster_kinds()
 	await _test_loot()
+	await _test_stream()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -253,7 +254,7 @@ func _test_prompt() -> void:
 	_check(body["system"][0].has("cache_control") and body["model"] == "claude-opus-5-5" and body["output_config"]["effort"] == "medium",
 			"the request: the system prompt cached, Opus 5.5, effort medium")
 	_check((body["tools"] as Array).map(func(tool: Dictionary) -> String: return tool["name"])
-			== ["paint", "edges", "path", "pond", "grove", "scatter", "fence", "height", "hill", "stairs", "place", "stamp", "mark_place", "set_building", "town_wall", "roof", "look", "new_area"], "and the tools")
+			== ["paint", "edges", "stream", "path", "pond", "grove", "scatter", "fence", "height", "hill", "stairs", "place", "stamp", "mark_place", "set_building", "town_wall", "roof", "look", "new_area"], "and the tools")
 
 
 func _test_session() -> void:
@@ -454,6 +455,43 @@ func _test_loot() -> void:
 	_check(not results[0]["is_error"] and results[1]["is_error"] and "supplies" in str(results[1]["content"])
 			and results[2]["is_error"] and "moonstone" in str(results[2]["content"]),
 			"a table by name placed; a table or an item there is none of refused, saying what there is")
+
+
+func _test_stream() -> void:
+	print("\n== stream (510): water along its course, a ford, a bridge, its path in level.json ==")
+	var doc := _doc()
+	var stub := StubClaude.new([
+		[{"name": "stream", "input": {"points": [[5, 10], [16, 10]], "width": 2,
+				"fords": [[[8, 9], [8, 10], [8, 11], [8, 12]]], "bridges": [[[13, 8], [13, 9], [13, 10], [13, 11], [13, 12], [13, 13]]]}},
+			{"name": "height", "input": {"change": "raise", "cells": [[10, 8]]}},
+			{"name": "stream", "input": {"points": [[5, 6], [16, 6]], "width": 9,
+				"bridges": [[[10, 4], [10, 5], [10, 6], [10, 7], [10, 8]], [[5, 13], [6, 14]]]}},
+			{"name": "stream", "input": {"points": [[5, 6], [30, 6]]}},
+			{"name": "paint", "input": {"ground": "tall_grass", "cells": [[15, 13]]}}],
+		"A stream.",
+	])
+	var session := BuilderSession.new(doc, Rect2i(5, 5, 12, 10), "test_field", stub)
+	await session.ask("a stream with a ford and a bridge")
+	var results: Array = stub.sent[1]["messages"][2]["content"]
+	_check(not results[0]["is_error"] and "a stream, 2 wide, 12 cells from (5, 10) to (16, 10), 2 fords, 1 bridges" in str(results[0]["content"]),
+			"laid: %s" % results[0]["content"])
+	var map := session.working.map
+	_check(map.cell(Vector2i(6, 10)) == "water" and map.cell(Vector2i(6, 11)) == "water" and map.cell(Vector2i(8, 10)) == "ford"
+			and map.cell(Vector2i(8, 12)) == "grass", "two cells wide, the ford where its crossing meets it")
+	_check(not results[2]["is_error"] and "a stream, 3 wide" in str(results[2]["content"]) and "two heights" in str(results[2]["content"])
+			and "never runs over the stream" in str(results[2]["content"]),
+			"the width kept to 3; a bridge Level leaves out (banks of two heights) and one not straight are said, the stream kept (%s)" % results[2]["content"])
+	_check(results[3]["is_error"] and "outside the area" in str(results[3]["content"]), "a point outside the area: refused")
+	var proposal := session.proposal()
+	var streams: Array = proposal.get("config", {}).get("streams", [])
+	_check(streams.size() == 2 and (streams[0]["path"] as Array).size() == 12 and streams[0]["path"][0] == [5, 10], "both streams' paths in the proposal's level.json")
+	var grid := BuilderSession.grid(map, session.working.config, session.area, session.area)
+	_check("=" in grid and "\"" in grid, "the grid draws the ford and the tall grass")
+	session.accept()
+	var level := doc.parsed()
+	var bridges := (level["buildings"] as Array).filter(func(b: Dictionary) -> bool: return b["slot"] == Level.BRIDGE)
+	_check((level["terrain"]["streams"] as Array).size() == 2 and bridges.size() == 1 and bridges[0]["cell"] == Vector2i(13, 10),
+			"accepted: Level reads both streams and the one bridge, at (13, 10)")
 
 
 func _check(ok: bool, label: String) -> void:

@@ -56,7 +56,7 @@ static func lay(map: LevelMap, from: Vector2i, to: Vector2i, options := {}) -> D
 				map.set_cell(cell, "ford")
 	var bridges: Array[Dictionary] = []
 	for crossing: Array in options.get("bridges", []):
-		var bridge := _bridge_over(crossing, wet)
+		var bridge := bridge_over(crossing, wet)
 		if not bridge.is_empty():
 			bridges.append(bridge)
 	var out_path := []
@@ -95,7 +95,7 @@ static func widen(path: Array[Vector2i], width: int) -> Array[Vector2i]:
 ## The bridge where [param crossing] (a straight path of cells, along x or
 ## y) first runs over [param wet]: a building entry {slot, at, facing,
 ## length}, or {} if it never does or is not straight there.
-static func _bridge_over(crossing: Array, wet: Dictionary) -> Dictionary:
+static func bridge_over(crossing: Array, wet: Dictionary) -> Dictionary:
 	var run: Array[Vector2i] = []
 	for cell: Vector2i in crossing:
 		if wet.has(cell):

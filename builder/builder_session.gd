@@ -21,7 +21,7 @@ const MAX_TURNS := 16
 ## A grid line per row of the area, a character per cell: CHARS, and one
 ## for each other monster kind (chars, decision 507).
 const CHARS := {
-	"void": "#", "stone": "_", "grass": ".", "dirt": ",", "water": "~", "fire": "*", "stair": "^",
+	"void": "#", "stone": "_", "grass": ".", "dirt": ",", "water": "~", "fire": "*", "stair": "^", "ford": "=", "tall_grass": "\"",
 	"start": "S", "monster_imp": "i", "monster_brute": "b", "monster_sneak": "s", "crate": "k",
 	"boulder": "o", "cart": "a", "chest": "h", "torch": "t", "lantern": "l", "link": ">",
 }
@@ -46,12 +46,12 @@ const ROLE_WORDS := {
 	"game": "bolts, but charges when struck or cornered",
 	"predator": "hunts %s; players only at night or with its pack about",
 }
-const GROUNDS: Array[String] = ["stone", "grass", "dirt", "water", "fire", "void", "stair"]
+const GROUNDS: Array[String] = ["stone", "grass", "dirt", "tall_grass", "water", "ford", "fire", "void", "stair"]
 const SIDES := {"north": Vector2i(0, -1), "east": Vector2i(1, 0), "south": Vector2i(0, 1), "west": Vector2i(-1, 0)}
 ## Context shown round the area, in cells.
 const MARGIN := 3
 ## level.json keys a proposal may change as a whole (beyond entries and links).
-const CONFIG_KEYS: Array[String] = ["neighbours", "places", "buildings", "town_walls", "roofs", "legend"]
+const CONFIG_KEYS: Array[String] = ["neighbours", "places", "buildings", "town_walls", "roofs", "legend", "streams"]
 
 ## Asks Claude: send(body: Dictionary) -> Dictionary (a Messages API
 ## response, or {"error": "..."}), awaited (ClaudeClient, StubClaude).
@@ -340,7 +340,7 @@ static func system_prompt(prefabs_from := Prefab.DIR) -> String:
 
 Make places with something to do, not only scenery: a chest worth opening (and something guarding it), a camp to clear, a captive to free, a larder, a puzzle of crates and boulders. Monsters are few and matter: a camp is two to five, gathered round its fire. Leave ways in: what you make must be reachable on foot from the rest of the area.
 
-The map. Cells are x to the east, y to the south, (0, 0) the top-left of the level. A cell is ground (stone, grass, dirt), water (not walkable; nothing is built along it), fire (walkable, burns), a stair, void, or a thing standing on ground. Outdoors, void is forest: a void cell next to land is drawn as a tree, so scattered void cells are scattered trees and a block of void is a wood. Walls and doors stand on the edges between two cells; an edge between land and void is a wall of its own (outdoors, the forest's edge). Things: start (where players join), crate (pushable), boulder (heavy, pushable), cart, chest (4 slots of items), torch (light and a little heat), lantern (light), link (to another level; not yours to place), and monsters by their kind:
+The map. Cells are x to the east, y to the south, (0, 0) the top-left of the level. A cell is ground (stone, grass, dirt, or tall grass: hides who stands in it, slows a step, trampled flat), water (not walkable; nothing is built along it), a ford (shallow water, waded slowly), fire (walkable, burns), a stair, void, or a thing standing on ground. Outdoors, void is forest: a void cell next to land is drawn as a tree, so scattered void cells are scattered trees and a block of void is a wood. Walls and doors stand on the edges between two cells; an edge between land and void is a wall of its own (outdoors, the forest's edge). Things: start (where players join), crate (pushable), boulder (heavy, pushable), cart, chest (4 slots of items), torch (light and a little heat), lantern (light), link (to another level; not yours to place), and monsters by their kind:
 %s
 
 The grid shows the area and a margin round it, one character a cell (the margin is shown for context; only the area may change):
@@ -348,6 +348,8 @@ The grid shows the area and a margin round it, one character a cell (the margin 
 Each row starts with its y; the first line says the x of the first column. Walls and doors are listed after the grid by the cell and its side.
 
 Monsters idle until someone comes: guard (stands, glances about), wander (strolls near its cell, a radius), patrol (walks a route of cells, round or back and forth), gather (stands or sits round a point, such as a fire: every monster gathering at one cell is one group), none. Without one, a monster idles as its kind does (said above). Wild animals are of no faction: goblins leave them be, and they keep to their herd (grazing as they stroll), so put two to six of a herd together on open ground, never in a camp. Chests hold item ids; the items there are: %s. A loot table (place's loot, for a chest or a monster) is rolled as the level is built, the same every time; the tables and what each can give: %s.
+
+Running water is a stream: the stream tool lays its course, from where it rises to where it goes. Give it a ford or a bridge wherever a path meets it, or the far bank is cut off; a bridge needs level banks of floor at both ends.
 
 Levels join at their edges: walking off one edge arrives on the neighbour's opposite edge, at the same row (east, west) or column (north, south). When the area touches the map's edge with nothing beyond it, new_area makes a new level there (its own map; a first draft of grass, groves and forest round it, open where the way arrives) and carves a way out to the edge through the area. Use it when asked for somewhere new beyond the edge ("a new area east", "the woods past here"), not for changes inside the area.
 
@@ -477,9 +479,9 @@ const _RECT := {"type": "object", "description": "a rectangle of cells: its top-
 const _SEED := {"type": "integer", "description": "any number; another gives another shape"}
 
 const TOOLS := [
-	{"name": "paint", "description": "Sets cells to a ground (stone, grass, dirt), water, fire, a stair or void (forest outdoors). Give rectangles, single cells, or both. A thing on a painted cell is gone.",
+	{"name": "paint", "description": "Sets cells to a ground (stone, grass, dirt, tall grass), water, a ford, fire, a stair or void (forest outdoors). Give rectangles, single cells, or both. A thing on a painted cell is gone.",
 		"input_schema": {"type": "object", "properties": {
-			"ground": {"type": "string", "enum": ["stone", "grass", "dirt", "water", "fire", "void", "stair"]},
+			"ground": {"type": "string", "enum": ["stone", "grass", "dirt", "tall_grass", "water", "ford", "fire", "void", "stair"]},
 			"rects": {"type": "array", "items": _RECT},
 			"cells": {"type": "array", "items": _CELL}},
 			"required": ["ground"]}},
@@ -489,6 +491,13 @@ const TOOLS := [
 				"at": _CELL, "side": {"type": "string", "enum": ["north", "east", "south", "west"]},
 				"kind": {"type": "string", "enum": ["wall", "door", "clear"]}}, "required": ["at", "side", "kind"]}}},
 			"required": ["set"]}},
+	{"name": "stream", "description": "A stream of running water through the points in order, from where it rises to where it goes, 1 to 3 cells wide; a ford (shallow, waded slowly) where each ford crossing meets it, and a bridge where each bridge crossing (a straight row or column of cells from bank to bank) runs over it.",
+		"input_schema": {"type": "object", "properties": {
+			"points": {"type": "array", "items": _CELL, "minItems": 2},
+			"width": {"type": "integer", "minimum": 1, "maximum": 3},
+			"fords": {"type": "array", "items": {"type": "array", "items": _CELL}, "description": "crossings, each a list of cells across the stream"},
+			"bridges": {"type": "array", "items": {"type": "array", "items": _CELL}, "description": "crossings, each a straight list of cells from one bank to the other"}},
+			"required": ["points"]}},
 	{"name": "path", "description": "A winding path through the points in order, crossing anything (water and void too) and opening the walls it runs through.",
 		"input_schema": {"type": "object", "properties": {
 			"points": {"type": "array", "items": _CELL, "minItems": 2},
@@ -620,6 +629,8 @@ func run_tool(tool: String, input: Variant) -> Dictionary:
 					return _no("a cell is [x, y]")
 				cells[at] = ground
 			return _lay({"cells": cells}, "painted %d cells %s" % [cells.size(), ground])
+		"stream":
+			return _stream(given)
 		"edges":
 			var edges: Dictionary[Vector3i, String] = {}
 			for item: Variant in given.get("set", []):
@@ -964,6 +975,87 @@ func _roof(given: Dictionary) -> Dictionary:
 		return _no("; ".join(new))
 	return {"ok": true, "text": "a %s roof over x %d-%d, y %d-%d%s%s" % [roof_set, rect.position.x, rect.end.x - 1, rect.position.y, rect.end.y - 1,
 		" (replacing %d)" % gone if gone > 0 else "", "; " + "; ".join(new) if not new.is_empty() else ""]}
+
+
+## A stream as the editor lays one (lay_stream, maps' 505; decision 510):
+## water [param given] width wide along Streams.course through its points
+## (a ford already on the middle stays one), fords where a ford crossing
+## meets it, bridges (Streams.bridge_over) where a bridge crossing runs
+## over it, and the middle as a level.json "streams" path. Refused and
+## taken back if Level leaves the stream out; a bridge it leaves out is
+## said, the stream kept.
+func _stream(given: Dictionary) -> Dictionary:
+	var points: Array[Vector2i] = []
+	for point: Variant in given.get("points", []):
+		var at: Variant = Level._tile(point)
+		if at == null:
+			return _no("a point is [x, y]")
+		if not area.has_point(at):
+			return _no("%s is outside the area: a stream runs inside it" % [at])
+		points.append(at)
+	if points.size() < 2:
+		return _no("a stream needs two points or more: where it rises and where it goes")
+	var width := clampi(int(given.get("width", 2)), 1, 3)
+	var middle := Streams.course(points)
+	var cells: Dictionary[Vector2i, String] = {}
+	for cell in Streams.widen(middle, width):
+		if area.has_point(cell):
+			cells[cell] = "water"
+	for cell in middle:
+		if working.map.cell(cell) == "ford":
+			cells.erase(cell)
+	var wet: Dictionary = {}
+	for cell: Vector2i in cells:
+		wet[cell] = true
+	for cell in middle:
+		wet[cell] = true
+	var crossings := {"fords": [], "bridges": []}
+	for key: String in crossings:
+		for crossing: Variant in given.get(key, []):
+			var run: Array[Vector2i] = []
+			for value: Variant in (crossing if crossing is Array else []):
+				var at: Variant = Level._tile(value)
+				if at == null:
+					return _no("each of %s is a list of cells [x, y]" % key)
+				run.append(at)
+			crossings[key].append(run)
+	var fords := 0
+	for run: Array[Vector2i] in crossings["fords"]:
+		for cell in run:
+			if wet.has(cell):
+				cells[cell] = "ford"
+				fords += 1
+	var notes: Array[String] = []
+	var buildings: Array = (working.config["buildings"] as Array).duplicate(true) if working.config.get("buildings") is Array else []
+	var bridges := 0
+	for run: Array[Vector2i] in crossings["bridges"]:
+		var bridge := Streams.bridge_over(run, wet)
+		if bridge.is_empty():
+			notes.append("the bridge crossing from %s never runs over the stream in a straight line: no bridge" % [run[0] if not run.is_empty() else "nowhere"])
+			continue
+		buildings.append(bridge)
+		bridges += 1
+	var course := []
+	for cell in middle:
+		course.append([cell.x, cell.y])
+	var streams: Array = (working.config["streams"] as Array).duplicate(true) if working.config.get("streams") is Array else []
+	var index := streams.size()
+	streams.append({"path": course})
+	var config := {"streams": streams}
+	if bridges > 0:
+		config["buildings"] = buildings
+	var before: Array = working.parsed()["warnings"]
+	var laid := _lay({"cells": cells, "config": config}, "a stream, %d wide, %d cells from %s to %s%s%s" % [width, middle.size(), middle[0], middle[-1],
+		", %d fords" % fords if fords > 0 else "", ", %d bridges" % bridges if bridges > 0 else ""])
+	var new := (working.parsed()["warnings"] as Array).filter(func(warning: String) -> bool: return warning not in before)
+	var left_out := new.filter(func(warning: String) -> bool: return warning.begins_with("stream %d:" % index) or warning.begins_with("stream %d " % index))
+	if not left_out.is_empty():
+		working.undo()
+		return _no("; ".join(left_out))
+	notes.append_array(new)
+	if not notes.is_empty():
+		laid["text"] += "; " + "; ".join(notes)
+	return laid
 
 
 func _place(given: Dictionary) -> Dictionary:

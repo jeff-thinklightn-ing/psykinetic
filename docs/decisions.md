@@ -14596,3 +14596,25 @@ Rejected: rustling on trampled grass too (maps: a flattened path is quiet,
 which is the point of a trodden line); a rustle in place of the grass
 footstep (the step's weight would be lost); a sim noise for it (the
 coordinator: nothing new in Senses).
+## 510. Builder mode lays streams, with fords and bridges
+
+Maps' 505 gave levels streams (water with an ordered "streams" path),
+fords and bridges, and the editor a stream tool. Builder mode had none.
+Claude could paint water, but couldn't give it a course or a crossing.
+
+- A stream tool {points, width 1-3, fords, bridges} lays a stream as the
+  editor's lay_stream does (agreed with maps): water width wide along
+  Streams.course through the points, a ford already on the middle kept;
+  ford cells where a ford crossing meets the water; a bridge building
+  (Streams.bridge_over, made public here) where a bridge crossing runs
+  straight over it; the middle as a level.json "streams" path. The width
+  is clamped to 1-3. Points must be in the area.
+- If Level leaves the stream out, the tool refuses and takes it back
+  (MapDoc.undo on the working copy). If Level leaves a bridge out (banks
+  of two heights, not on floor), or a crossing never runs straight over
+  the water, the stream is kept and the answer says so, as in the editor.
+- "streams" joins CONFIG_KEYS. ford and tall_grass (maps' 508) are
+  paintable grounds, drawn "=" and '"' on the grid. The prompt says what
+  they are and that a path meeting a stream needs a ford or a bridge.
+
+Protocol unchanged. builder_test _test_stream.
