@@ -87,7 +87,7 @@ const IDLE_CHOICES: Array[String] = ["", "guard", "wander", "patrol", "gather", 
 const PALETTE: Array[String] = [
 	"stone", "grass", "dirt", "water", "fire", "stair", "wall", "door", "clear", "void",
 	"start", "monster_imp", "monster_brute", "monster_sneak", "crate", "boulder", "cart", "chest", "torch", "lantern",
-	"link", "select", "area", "stamp", "path", "height", "stairs", "ford",
+	"link", "select", "area", "stamp", "path", "height", "stairs", "ford", "tall_grass",
 ]
 ## Tools, not things to paint, and the key that picks each.
 const TOOLS := {"select": "V", "area": "A", "stamp": "P", "path": "T", "height": "H", "stairs": "S"}
@@ -96,7 +96,7 @@ const HEIGHT_BRUSHES: Array[int] = [1, 3, 5, 9]
 const CLIFF := Color(0.05, 0.04, 0.03, 0.85)
 const CLIMB := Color(1.0, 0.95, 0.5, 0.95)
 ## What the area panel can fill an area with (AreaTools).
-const FILLS: Array[String] = ["pond", "grove", "scatter", "fence"]
+const FILLS: Array[String] = ["pond", "grove", "scatter", "fence", "tall grass"]
 const PATH_GROUNDS: Array[String] = ["dirt", "stone", "grass"]
 const EDGE_BRUSHES: Array[String] = ["wall", "door", "clear"]
 ## A thing's letter on its cell.
@@ -565,7 +565,23 @@ func fill_changes(fill: String) -> Dictionary:
 			return AreaTools.scatter(map, area, tool_seed, scatter_things, scatter_density)
 		"fence":
 			return AreaTools.fence(map, area, fence_gate)
+		"tall grass":
+			return TallGrass.lay(map, area, tool_seed, {"keep_clear": _kept_cells()})
 	return {}
+
+
+## Cells tall grass keeps clear of (decision 508): the spawn points and
+## places of level.json (markers it sees on the map itself).
+func _kept_cells() -> Dictionary:
+	var kept := {}
+	for key: String in ["spawn_points", "places", "markets"]:
+		var listed: Variant = config.get(key, {})
+		for name: Variant in (listed as Dictionary).keys() if listed is Dictionary else []:
+			var entry: Variant = listed[name]
+			var at: Variant = Level._tile(entry.get("at") if entry is Dictionary else entry)
+			if at != null:
+				kept[at] = true
+	return kept
 
 
 ## Fills the area with [param fill], as one undo step.
@@ -1700,7 +1716,7 @@ func _draw() -> void:
 			if meaning == "void":
 				draw_rect(rect, VOID_CELL)
 				continue
-			var ground := meaning if meaning in Level.GROUNDS or meaning in ["water", "fire", "ford"] else map.ground_under(at)
+			var ground := meaning if meaning in Level.GROUNDS or meaning in ["water", "fire", "ford", "tall_grass"] else map.ground_under(at)
 			draw_rect(rect, map.colours.get(ground, VOID_CELL))
 			if ground != meaning:
 				draw_rect(rect.grow(-CELL * 0.18), map.colours.get(meaning, Color.MAGENTA))
@@ -1797,7 +1813,7 @@ func _draw_ghost(at: Vector2i) -> void:
 		var meaning: String = piece.cells[cell]
 		var rect := Rect2(Vector2(cell + at) * CELL, Vector2.ONE * CELL)
 		draw_rect(rect, Color(map.colours.get(meaning, Color.MAGENTA), 0.55))
-		if meaning not in Level.GROUNDS and meaning not in ["water", "fire", "ford"]:
+		if meaning not in Level.GROUNDS and meaning not in ["water", "fire", "ford", "tall_grass"]:
 			var letter: String = LETTERS.get(meaning, meaning.trim_prefix("monster_").left(1).to_upper())
 			draw_string(ThemeDB.fallback_font, rect.position + Vector2(0, CELL * 0.68), letter, HORIZONTAL_ALIGNMENT_CENTER, CELL, 26, Color(0, 0, 0, 0.7))
 	for key: Vector3i in piece.edges:

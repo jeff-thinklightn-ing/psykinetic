@@ -201,11 +201,14 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## 19: a level carries fords (the "ford" legend kind, walked as floor at
 ## half pace) and bridges (building slot "bridge", floor over water), in the
 ## "terrain" message's files and the levels served (decision 505).
-const PROTOCOL_REVISION := 19
+## 20: a level carries tall grass (the "tall_grass" legend kind, grass that
+## hides, slows and is trampled), and the "grass" message tells a zone's
+## trampled cells (decision 508).
+const PROTOCOL_REVISION := 20
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]
 ## Every kind of message (message, message_to, broadcast, broadcast_to).
-const MESSAGE_KINDS: Array[String] = ["builder", "chat", "counter", "death", "map", "offers", "party", "roofs", "shop", "sky", "speech", "terrain", "town", "world"]
+const MESSAGE_KINDS: Array[String] = ["builder", "chat", "counter", "death", "grass", "map", "offers", "party", "roofs", "shop", "sky", "speech", "terrain", "town", "world"]
 ## Properties entity subclasses add with replicate().
 const SUBCLASS_REPLICATED: Array[String] = ["ailments", "alert", "body", "buffs", "down_until", "emit_light", "hands", "keeper_peer", "mending", "move_ticks", "pose", "raised", "raised_tick", "slot_notes", "slots"]
 const SETTINGS_FILE := "settings.cfg"

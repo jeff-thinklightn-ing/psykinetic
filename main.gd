@@ -2095,6 +2095,10 @@ func _boot() -> void:
 		World.roofs_damaged[str(key)] = true
 	if not World.roof_changed.is_connected(_on_roof_changed):
 		World.roof_changed.connect(_on_roof_changed)
+	# The tall grass trampled flat and not yet standing again (decision 508).
+	World.trampled_from_dict(snapshot["trampled"] if snapshot.get("trampled") is Dictionary else {})
+	if not World.grass_changed.is_connected(_on_grass_changed):
+		World.grass_changed.connect(_on_grass_changed)
 	# The buildings the maps already have, for towns with no record of them.
 	World.towns.seed_from(world_map)
 	_world_map = world_map
@@ -2424,6 +2428,7 @@ func _show_zone_to(peer: int, zone_name: String, leaving: Array[GridEntity] = []
 	Net.message_to(peer, "sky", sky_message())
 	_send_towns(peer, zone_name)
 	Net.message_to(peer, "roofs", {"level": zone_name, "damaged": World.damaged_roofs(zone_name)})
+	Net.message_to(peer, "grass", {"level": zone_name, "full": true, "flat": World.trampled_cells(zone_name)})
 	World.update_visibility(peer, zone_name)
 
 
@@ -3157,6 +3162,7 @@ func _save_state(wait := true) -> void:
 		"production": World.production.to_dict() if World.production != null else {},
 		"towns": World.towns.to_dict() if World.towns != null else {},
 		"roofs": World.roofs_damaged.keys(),
+		"trampled": World.trampled_to_dict(),
 		"raid_groups": World.raid_groups.to_dict() if World.raid_groups != null else {},
 		"trade": World.trade.to_dict() if World.trade != null else {},
 		"economy": World.economy.to_dict() if World.economy != null else {},
@@ -3425,6 +3431,15 @@ func _on_town_building_changed(town: String, _kind: String) -> void:
 func _on_roof_changed(level: String) -> void:
 	Net.broadcast("roofs", {"level": level, "damaged": World.damaged_roofs(level)})
 	_show_towns()
+
+
+## Server: tall grass of [param level] was trampled or stood again
+## (World.grass_changed, decision 508): the players in its zone are told
+## ("grass" {level, flat, stood}: flat [x, y, ...]).
+func _on_grass_changed(level: String, flat: PackedInt32Array, stood: PackedInt32Array) -> void:
+	var peers := World.peers_in(level)
+	if not peers.is_empty():
+		Net.broadcast_to(peers, "grass", {"level": level, "flat": flat, "stood": stood})
 
 
 ## Server: how many residents [param town] feeds (or who go hungry)
@@ -5887,6 +5902,10 @@ func _on_message(kind: String, data: Dictionary) -> void:
 			World.open_roofs(town.get_slice("/", 0))
 			if _client3d != null:
 				_client3d.set_town(town, buildings)
+		return
+	if kind == "grass":
+		if not Net.is_authority() and not str(data.get("level", "")).is_empty():
+			World.grass_told(str(data["level"]), data)
 		return
 	if kind == "roofs":
 		var level := str(data.get("level", ""))

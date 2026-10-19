@@ -494,6 +494,17 @@ func _test_area_tools() -> void:
 			"none side by side")
 	_key(editor, KEY_Z, true)
 
+	# Tall grass (decision 508): the area's grass grown tall in patches, one
+	# undo step, saved as the legend's colour and read back as the kind.
+	depth = editor._undo.size()
+	editor.fill_area("tall grass")
+	var tall: Array = editor.map.cells.keys().filter(func(at: Vector2i) -> bool: return editor.map.cell(at) == "tall_grass")
+	_check(tall.size() > 10 and tall.all(func(at: Vector2i) -> bool: return rect.has_point(at)) and editor._undo.size() == depth + 1,
+			"tall grass: %d cells in the area, one undo step" % tall.size())
+	_check(LevelMap.from_image(editor.map.to_image()).cell(tall[0]) == "tall_grass", "painted in its colour, read back as tall grass")
+	_check("tall_grass" in LevelEditor.PALETTE, "and in the palette to paint by hand")
+	_key(editor, KEY_Z, true)
+
 	editor.fence_gate = "south"
 	editor.fill_area("fence")
 	_check(editor.map.edge(Vector3i(1, 5, Terrain.EAST)) == "wall" and editor.map.edge(Vector3i(13, 5, Terrain.EAST)) == "wall"

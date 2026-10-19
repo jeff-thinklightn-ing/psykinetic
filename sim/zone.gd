@@ -18,6 +18,9 @@ var height: Dictionary[Vector2i, int] = {}
 var stairs: Dictionary[Vector2i, Vector2i] = {}
 var water: Dictionary[Vector2i, bool] = {}
 var fords: Dictionary[Vector2i, bool] = {}
+## Each cell's cover in its rect (World.cover_at, decision 508).
+var cover := PackedFloat32Array()
+var cover_rect := Rect2i()
 var torches: Dictionary[Vector2i, bool] = {}
 var fields := Fields.new()
 var north := Vector2i(0, -1)

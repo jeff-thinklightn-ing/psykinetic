@@ -25,7 +25,10 @@ extends RefCounted
 ## wall), so a map may draw its outline in wall pixels or leave it out; a
 ## wall or door pixel on a cell position is void. (These are Terrain's
 ## ASCII rules, pixel for character.) Water is not walkable, but it is
-## no wall: nothing is built along it, and sight passes over it.
+## no wall: nothing is built along it, and sight passes over it. Tall
+## grass (decision 508) is grass ground that hides who stands in it
+## (World.cover_at), slows a step and is trampled flat (terrain
+## "tall_grass"); a building over it takes it away.
 ##
 ## load() reads a level into {name, terrain, entities, starts, spawn_points,
 ## links, neighbours, places, buildings, regenerate (decision 465), centre, size (in cells), warnings}; terrain is what World.load_terrain and the
@@ -61,6 +64,7 @@ const LEGEND := {
 	"dirt": "#8a6440",
 	"water": "#2f6fd0",
 	"ford": "#6fa8e0",
+	"tall_grass": "#a8c850",
 	"fire": "#ff6a00",
 	"wall": "#3c2a22",
 	"door": "#c88a3c",
@@ -381,6 +385,7 @@ static func parse(layout: Image, height: Image, config: Dictionary) -> Dictionar
 	var door: int = code_of.get("door", -2)
 	var water_code: int = code_of.get("water", -2)
 	var ford_code: int = code_of.get("ford", -2)
+	var tall_code: int = code_of.get("tall_grass", -2)
 	# The meaning of the pixel at (px, py), by code; the last colour looked
 	# up is kept, as neighbouring pixels are mostly the same colour.
 	var last_colour := -1
@@ -412,6 +417,7 @@ static func parse(layout: Image, height: Image, config: Dictionary) -> Dictionar
 	var fire: Array[Vector2i] = []
 	var water: Array[Vector2i] = []
 	var fords: Array[Vector2i] = []
+	var tall_grass: Array[Vector2i] = []
 	var kinds: Dictionary[Vector2i, String] = {}
 	var markers: Array[Dictionary] = []
 	var stair_cells: Array[Vector2i] = []
@@ -435,6 +441,11 @@ static func parse(layout: Image, height: Image, config: Dictionary) -> Dictionar
 				# its footing the ground round it.
 				fords.append(cell)
 				kinds[cell] = _ground_around(cell, cell_codes, cells, names)
+				continue
+			if code == tall_code:
+				# Grass ground grown tall (decision 508).
+				tall_grass.append(cell)
+				kinds[cell] = "grass"
 				continue
 			var meaning := names[code]
 			if ground[code]:
@@ -538,6 +549,7 @@ static func parse(layout: Image, height: Image, config: Dictionary) -> Dictionar
 	var level := {
 		"terrain": {
 			"floor": floor_tiles, "fire": fire, "edges": edges, "kinds": kinds, "water": water, "fords": fords,
+			"tall_grass": tall_grass,
 			"heights": heights, "stairs": stairs, "torches": torches, "lanterns": lanterns,
 			"ambient": clampf(float(config.get("ambient", DayNight.base_ambient(zone))), 0.0, 1.0),
 			"north": NORTHS.get(str(config.get("north", "up")), Vector2i(0, -1)),
@@ -568,6 +580,7 @@ static func parse(layout: Image, height: Image, config: Dictionary) -> Dictionar
 	level["terrain"]["streams"] = streams_from(config, level["terrain"], warnings)
 	_check_fords(level["terrain"], warnings)
 	level["building_cells"] = inside_cells(level["buildings"])
+	_clear_tall_grass(level, warnings)
 	building_places(level["buildings"], level["places"])
 	# The views draw them (roofs, inside floors) from the terrain they are given.
 	level["terrain"]["buildings"] = level["buildings"]
@@ -1146,6 +1159,18 @@ static func streams_from(config: Dictionary, terrain: Dictionary, warnings: Arra
 			continue
 		out.append({"path": path})
 	return out
+
+
+## Tall grass under a building (any footprint) is left out (decision 508).
+static func _clear_tall_grass(level: Dictionary, warnings: Array[String]) -> void:
+	var grass: Array = level["terrain"]["tall_grass"]
+	if grass.is_empty():
+		return
+	for building: Dictionary in level["buildings"]:
+		for cell in building_cells(building):
+			if cell in grass:
+				grass.erase(cell)
+				warnings.append("the tall grass at %s is under a building: left out" % [cell])
 
 
 ## A ford beside no water (nor another ford, nor under a bridge) is in no

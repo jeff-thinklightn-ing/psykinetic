@@ -14416,3 +14416,67 @@ bundle (456) are unchanged; this is how the draw is shown.
   down.
 
 Client only; protocol unchanged.
+## 508. Tall grass and cover
+
+The outdoors backlog and the hunting row asked for cover: "trees that block
+sight and slow you, tall grass that hides you". Trees already stop a line
+of sight (a trunk is a void cell). This adds the data and the sim for tall
+grass; enemy-ai's perception decides what a look makes of it (the
+coordinator's design, agreed with enemy-ai).
+
+- The kind: "tall_grass" in Level.LEGEND (#a8c850), a cell painted in
+  layout.png. It is floor on grass ground (kinds says "grass", so a view
+  that knows nothing of it draws grass) and is listed in terrain
+  "tall_grass". Under any building's footprint it is left out, said.
+- Cover: World.cover_at(cell) -> 0..1, TALL_GRASS_COVER 0.7 on standing
+  tall grass, 0 elsewhere, trampled or off the map. A PackedFloat32Array
+  over the bounds of the level's tall grass (Zone.cover, cover_rect), one
+  index and, on grass, one dictionary lookup for trampled: Senses calls it
+  per perceiver per candidate. Only a number: the rule (moving or still, by
+  GridEntity.last_step_tick; never in reach; never on a lit body; smell
+  ignores it) is Senses', so there are not two rules to drift apart. Grass
+  does not thin a line of sight: has_line_of_sight is unchanged.
+- Slowing: step_ticks takes TALL_GRASS_TICK_SCALE 1.25 into standing grass
+  (a ford's 2.0 first). Routes take no cost for it (FORD_COST stays the
+  only one): too small to reroute anyone.
+- Trampling: try_move's step onto standing grass by a body of TRAMPLE_MASS
+  40 or more (a player, a goblin, a deer; not a rabbit) flattens it for
+  TRAMPLE_DAYS 2 (World.trampled: level -> {cell: the step it stands
+  again}); flat, it has no cover and does not slow. The world tick stands
+  it again when its time comes (_regrow), in every level, loaded or not. A
+  body pushed in does not trample; only its own step.
+- Saved: the snapshot's "trampled", level -> [x, y, step, ...].
+- The wire: World.grass_changed(level, flat, stood) on the server is sent
+  to the players in that level ("grass" {level, flat, stood}, flat
+  [x, y, ...] each); a player coming into a zone is sent its whole set
+  ({level, full, flat}). A client keeps it in World.trampled (grass_told)
+  and emits grass_changed for terrain to redraw the trodden path. The
+  level's tall grass itself comes in its files, as fords do. A new message
+  kind and a new cell kind: PROTOCOL_REVISION 20.
+- Laying: TallGrass.lay(map, rect, seed, {meadow, edge, keep_clear}) (new
+  class_name, sim/tall_grass.gd) returns AreaTools-style changes: grass
+  cells over a noise threshold (meadow 0..1, 0.5) and, with a 0.8 chance,
+  those within edge (2) cells of a tree; grass only; never on or beside a
+  marker, a stair, a door or a kept cell. The editor has "tall_grass" in
+  its palette and "tall grass" among its area fills (keeping clear of
+  level.json's spawn points, places and markets), one undo step.
+- levels/sample has a patch (x 5, 7, 8 by rows 1 to 4), a trodden line of
+  plain grass down x 6. Nothing in the wilds or the forest until Jeff asks.
+
+Left to others: enemy-ai wires Senses.sees and glimpses; terrain draws tall
+grass as a scatter that bends, and the trampled set; sound a rustle on a
+step into standing grass (a step variant by cover_at; nothing new in
+Senses). Crouching is not in v1 (a player stance and an input, items' and
+ui's if it is wanted).
+
+tests: tall_grass_test (new): the kind, under a building left out, cover,
+the step's slowing, trampling by mass, standing again on the world tick,
+the snapshot's form through JSON, a client's full and changed messages,
+TallGrass.lay (grass only, clear of a link and a kept cell, a band by the
+trees, the same for the same seed), the sample's patch. editor_test: the
+area fill, the colour read back, the palette.
+
+Rejected: a concealed() rule beside Senses' (two rules drift); thinning the
+line of sight through grass (a hot path, and seeing over a meadow is the
+point); a route cost (too small to matter, and every route would change);
+trampled cells as level edits (they are play state: the snapshot's).

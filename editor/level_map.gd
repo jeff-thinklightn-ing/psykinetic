@@ -361,7 +361,7 @@ func to_image() -> Image:
 ## when they are all the same ground, water or fire; "" otherwise.
 static func _filler(around: Array) -> String:
 	var first: String = around[0]
-	if first not in Level.GROUNDS and first not in ["water", "fire", "ford"]:
+	if first not in Level.GROUNDS and first not in ["water", "fire", "ford", "tall_grass"]:
 		return ""
 	for each: String in around:
 		if each != first:

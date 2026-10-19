@@ -207,6 +207,14 @@ const CLOCK_LEAD_MAX := 2.5
 const DIAGONAL_TICK_SCALE := 1.5
 ## A step into a ford (decision 505) takes this many times as long: wading.
 const FORD_TICK_SCALE := 2.0
+## Tall grass (decision 508): the cover of a cell of it standing (0..1;
+## Senses reads cover_at), a step into it so many times as long, and a body
+## of TRAMPLE_MASS or more stepping into it flattens it for TRAMPLE_DAYS
+## (no cover, no slowing), standing again on the world tick after.
+const TALL_GRASS_COVER := 0.7
+const TALL_GRASS_TICK_SCALE := 1.25
+const TRAMPLE_MASS := 40.0
+const TRAMPLE_DAYS := 2.0
 ## WASD steps queued on the server for one player at most; more are
 ## dropped (the client never sends more than one ahead).
 const MAX_QUEUED_STEPS := 3
@@ -386,6 +394,20 @@ var _water: Dictionary[Vector2i, bool] = {}
 ## Fords (decision 505): shallow water walked through at FORD_TICK_SCALE;
 ## floor.
 var _fords: Dictionary[Vector2i, bool] = {}
+## Each cell's cover (decision 508), row by row over _cover_rect (0 off
+## it): TALL_GRASS_COVER on tall grass, 0 elsewhere; a trampled cell
+## (_trampled_here) has none while it is flat.
+var _cover := PackedFloat32Array()
+var _cover_rect := Rect2i()
+## Trampled tall grass (decision 508): level -> {cell: the world step it
+## stands again}. Saved in the snapshot; the server's, told to the clients
+## in its zone ("grass"). _trampled_here is this zone's level's.
+var trampled: Dictionary[String, Dictionary] = {}
+var _trampled_here: Dictionary = {}
+## Tall grass of [param level] was trampled ([param flat]) or stood again
+## ([param stood]), flat [x, y, ...]; on a client, also after a full
+## "grass" message (both empty): terrain redraws the trodden path.
+signal grass_changed(level: String, flat: PackedInt32Array, stood: PackedInt32Array)
 ## Torches on their posts (cells), for what a companion sees around her.
 var _torches: Dictionary[Vector2i, bool] = {}
 ## Heat and light per cell (Fields).
@@ -730,6 +752,8 @@ func world_tick(slice := -1) -> void:
 	if forage != null and slice <= 0:
 		forage.tick()
 		t = part("forage", t)
+	if slice <= 0:
+		_regrow()  # Trampled tall grass stands again (decision 508).
 	var was := zone
 	var each_zone: Array[Zone] = []
 	each_zone.assign(zones.values())
@@ -1146,6 +1170,8 @@ func enter(to: Zone) -> Zone:
 	from.stairs = _stairs
 	from.water = _water
 	from.fords = _fords
+	from.cover = _cover
+	from.cover_rect = _cover_rect
 	from.torches = _torches
 	from.fields = fields
 	from.north = north
@@ -1165,8 +1191,11 @@ func enter(to: Zone) -> Zone:
 	_stairs = to.stairs
 	_water = to.water
 	_fords = to.fords
+	_cover = to.cover
+	_cover_rect = to.cover_rect
 	_torches = to.torches
 	fields = to.fields
+	_trampled_here = _trampled_of(fields.level)
 	north = to.north
 	outdoor = to.outdoor
 	_edges = to.edges
@@ -1276,6 +1305,8 @@ func reset() -> void:
 	_stairs.clear()
 	_water.clear()
 	_fords.clear()
+	_cover = PackedFloat32Array()
+	_cover_rect = Rect2i()
 	_next_id = 1
 	zone.tier_origins = []
 	tick = 0
@@ -1399,6 +1430,7 @@ func _set_terrain(terrain: Dictionary) -> void:
 		_water[cell] = true
 	for cell: Vector2i in terrain.get("fords", []):
 		_fords[cell] = true
+	_load_cover(terrain)
 	for t: Vector2i in terrain["floor"]:
 		_floor[t] = true
 	for t: Vector2i in terrain["fire"]:
@@ -3944,6 +3976,7 @@ func try_move(entity: GridEntity, direction: Vector2i) -> bool:
 		return false
 	entity.next_move_tick = start + duration
 	entity.last_step_tick = tick  # (A braced spear stands still: braced.)
+	_trample(entity, entity.tile)
 	if entity.raised == "draw":
 		entity.raised_tick = tick  # A step spoils the draw: it starts again.
 	entity._world_set_facing(direction)
@@ -5059,6 +5092,127 @@ func is_water(at: Vector2i) -> bool:
 	return _water.has(at)
 
 
+## The cover of [param at] (decision 508), 0..1: how well it hides who
+## stands in it from a look at a distance (Senses decides what it does).
+## TALL_GRASS_COVER on standing tall grass, 0 trampled, open or off the map.
+## A lookup: no allocation.
+func cover_at(at: Vector2i) -> float:
+	if not _cover_rect.has_point(at):
+		return 0.0
+	var cover := _cover[(at.y - _cover_rect.position.y) * _cover_rect.size.x + at.x - _cover_rect.position.x]
+	return 0.0 if cover > 0.0 and _trampled_here.has(at) else cover
+
+
+## Whether [param at] is tall grass, standing or trampled (decision 508).
+func is_tall_grass(at: Vector2i) -> bool:
+	return _cover_rect.has_point(at) and _cover[(at.y - _cover_rect.position.y) * _cover_rect.size.x + at.x - _cover_rect.position.x] > 0.0
+
+
+## Whether [param at] is tall grass trampled flat now.
+func is_trampled(at: Vector2i) -> bool:
+	return _trampled_here.has(at)
+
+
+## The cover array over the bounds of the terrain's tall grass.
+func _load_cover(terrain: Dictionary) -> void:
+	_cover = PackedFloat32Array()
+	_cover_rect = Rect2i()
+	var grass: Array = terrain.get("tall_grass", [])
+	if grass.is_empty():
+		return
+	_cover_rect = Rect2i(grass[0], Vector2i.ONE)
+	for cell: Vector2i in grass:
+		_cover_rect = _cover_rect.expand(cell)
+	_cover_rect.size += Vector2i.ONE
+	_cover.resize(_cover_rect.size.x * _cover_rect.size.y)
+	for cell: Vector2i in grass:
+		_cover[(cell.y - _cover_rect.position.y) * _cover_rect.size.x + cell.x - _cover_rect.position.x] = TALL_GRASS_COVER
+	_trampled_here = _trampled_of(fields.level)
+
+
+## [param level]'s trampled cells, made if it has none (the dictionary
+## itself: _trampled_here is the same one).
+func _trampled_of(level: String) -> Dictionary:
+	if not trampled.has(level):
+		trampled[level] = {}
+	return trampled[level]
+
+
+## [param entity] stepped onto [param at]: standing tall grass under a body
+## of TRAMPLE_MASS or more is flattened for TRAMPLE_DAYS.
+func _trample(entity: GridEntity, at: Vector2i) -> void:
+	if entity.mass < TRAMPLE_MASS or not is_tall_grass(at):
+		return
+	var flat := not _trampled_here.has(at)
+	_trampled_here[at] = steps + int(TRAMPLE_DAYS * DayNight.day_steps)
+	if flat and Net.is_authority():
+		grass_changed.emit(fields.level, PackedInt32Array([at.x, at.y]), PackedInt32Array())
+
+
+## The world tick's: trampled grass whose time has come stands again, in
+## every level.
+func _regrow() -> void:
+	for level: String in trampled:
+		var cells: Dictionary = trampled[level]
+		var stood := PackedInt32Array()
+		for cell: Vector2i in cells.keys():
+			if int(cells[cell]) <= steps:
+				cells.erase(cell)
+				stood.append_array([cell.x, cell.y])
+		if not stood.is_empty():
+			grass_changed.emit(level, PackedInt32Array(), stood)
+
+
+## [param level]'s trampled cells, flat [x, y, ...] (the "grass" message).
+func trampled_cells(level: String) -> PackedInt32Array:
+	var out := PackedInt32Array()
+	for cell: Vector2i in trampled.get(level, {}):
+		out.append_array([cell.x, cell.y])
+	return out
+
+
+## The snapshot's: level -> [x, y, the step it stands again, ...].
+func trampled_to_dict() -> Dictionary:
+	var out := {}
+	for level: String in trampled:
+		var flat: Array = []
+		for cell: Vector2i in trampled[level]:
+			flat.append_array([cell.x, cell.y, int(trampled[level][cell])])
+		if not flat.is_empty():
+			out[level] = flat
+	return out
+
+
+func trampled_from_dict(data: Dictionary) -> void:
+	for level: String in trampled:
+		trampled[level].clear()
+	for level: Variant in data:
+		var flat: Variant = data[level]
+		if not flat is Array:
+			continue
+		var cells := _trampled_of(str(level))
+		for i in range(0, (flat as Array).size() - 2, 3):
+			cells[Vector2i(int(flat[i]), int(flat[i + 1]))] = int(flat[i + 2])
+	_trampled_here = _trampled_of(fields.level)
+
+
+## A client's: the "grass" message for [param level] ({level, full: its
+## whole trampled set in flat, or flat newly trampled and stood standing
+## again}); grass_changed for the view.
+func grass_told(level: String, data: Dictionary) -> void:
+	var cells := _trampled_of(level)
+	var flat: Variant = data.get("flat", PackedInt32Array())
+	var stood: Variant = data.get("stood", PackedInt32Array())
+	if bool(data.get("full", false)):
+		cells.clear()
+	for i in range(0, (flat as PackedInt32Array).size() - 1 if flat is PackedInt32Array else 0, 2):
+		cells[Vector2i(flat[i], flat[i + 1])] = 0
+	for i in range(0, (stood as PackedInt32Array).size() - 1 if stood is PackedInt32Array else 0, 2):
+		cells.erase(Vector2i(stood[i], stood[i + 1]))
+	grass_changed.emit(level, flat if flat is PackedInt32Array and not bool(data.get("full", false)) else PackedInt32Array(),
+		stood if stood is PackedInt32Array else PackedInt32Array())
+
+
 ## Whether [param at] is a ford (decision 505): floor, walked into at
 ## FORD_TICK_SCALE; not water (is_water is deep water only).
 func is_ford(at: Vector2i) -> bool:
@@ -5235,7 +5389,10 @@ func distance(a: Vector2i, b: Vector2i) -> int:
 ## may be fractional.
 func step_ticks(entity: GridEntity, direction: Vector2i) -> float:
 	var ticks := entity.move_ticks * (DIAGONAL_TICK_SCALE if direction.x != 0 and direction.y != 0 else 1.0)
-	return ticks * FORD_TICK_SCALE if _fords.has(entity.tile + direction) else ticks
+	var to := entity.tile + direction
+	if _fords.has(to):
+		return ticks * FORD_TICK_SCALE
+	return ticks * TALL_GRASS_TICK_SCALE if cover_at(to) > 0.0 else ticks
 
 
 func are_adjacent(a: Vector2i, b: Vector2i) -> bool:

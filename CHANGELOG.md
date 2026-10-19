@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Tall grass: a new cell kind that hides whoever stands in it, slows you a little and is trampled flat where people walk, growing back in two days. The level editor paints it and can fill an area with meadow patches and wood edges; the sample level has a patch (508).
 - A drawn bow no longer shows a percentage: the aim ring on the target closes in and turns brass as the draw completes, the body draws (pc-character) and the string creaks higher (sound); F3 keeps the number.
 - Fixed: winter tufts no longer turn pure white like a field of flowers. Snow buries them now, leaving a few straw tips poking through, in the wilds and in the forest, where less of it gets under the trees; the forest's crowns keep their green under a patchy dusting (467 amended).
 - The interface's panels no longer lay themselves out every frame: the pack refreshes only when its slots, notes or icons change, and the cursor hint, the compass place and the counter panel are worked out only when their inputs change (decision 476).
