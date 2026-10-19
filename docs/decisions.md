@@ -15087,3 +15087,26 @@ Rejected: the water drawn lower than its banks under a bridge (a stream one
 cell wide has no sunk bed to show it); a mesh a bridge (art-kit: a repeated
 deck); the flow worked out from the water's shape (the paths have it, and
 a pond has none).
+
+## 520. Builder mode: a town's work sites
+
+Maps' 517 gave places the kinds woodlot, hunting_ground and quarry, and a
+"town" (the stockpile place whose town works the site). Builder mode now
+writes them, as the coordinator approved, ahead of economy's rule that a
+trade works from its site. The data is valid today; that rule makes it
+yield, and its prompt line comes with it.
+
+- mark_place's kind enum is Level.PLACE_KINDS (BuilderSession.tools), so
+  a kind maps adds is offered with nothing in builder. It takes "town",
+  checked against a stockpile place in the level; a town that isn't one
+  is refused, naming the stores.
+- site_checks: each site naming its town says if it is held by someone
+  other than its town, or can't be reached on foot from the town's store
+  (HeightTools.reaches, a BFS over HeightTools.steps: walls, ledges,
+  water, forest). It runs before and after each tool like the height
+  checks; new lines come back as "Work sites now: ...", and the player's
+  summary gets "Work sites: ...".
+- The prompt says what each site is for, that it is marked with its town,
+  held by the town, near it and reachable from its store.
+
+Protocol unchanged. builder_test _test_work_sites.

@@ -128,6 +128,7 @@ func ask(text: String) -> Dictionary:
 				if block.get("type") == "tool_use":
 					var before := Stockpile.check(working.config)
 					var ground_before := height_checks()
+					var sites_before := site_checks()
 					var outcome := run_tool(str(block.get("name")), block.get("input", {}))
 					# What the change did to the town's store, said at once (decision 301).
 					var new := Stockpile.check(working.config).filter(func(warning: String) -> bool: return warning not in before)
@@ -139,6 +140,10 @@ The town's store now: " + "; ".join(new)
 					if not ground.is_empty():
 						outcome["text"] += "
 Heights now: " + "; ".join(ground)
+					# And to the work sites' ways to their towns (decision 520).
+					var sites := site_checks().filter(func(warning: String) -> bool: return warning not in sites_before)
+					if not sites.is_empty():
+						outcome["text"] += "\nWork sites now: " + "; ".join(sites)
 					results.append({"type": "tool_result", "tool_use_id": block.get("id"),
 						"content": outcome["text"], "is_error": not outcome["ok"]})
 			messages.append({"role": "user", "content": results})
@@ -161,6 +166,7 @@ Heights now: " + "; ".join(ground)
 	result["summary"] = summary
 	result["warnings"] = Stockpile.check(working.config)
 	result["height_warnings"] = height_checks()
+	result["site_warnings"] = site_checks()
 	result["cost"] = spent
 	busy = false
 	return result
@@ -292,6 +298,8 @@ static func tools(config := {}) -> Array:
 		if tool["name"] == "place":
 			tool["input_schema"]["properties"]["thing"]["enum"] = things(config).keys()
 			tool["input_schema"]["properties"]["loot"]["enum"] = Items.loot_tables().keys()
+		elif tool["name"] == "mark_place":
+			tool["input_schema"]["properties"]["kind"]["enum"] = Level.PLACE_KINDS.duplicate()
 	return out
 
 
@@ -357,7 +365,7 @@ Running water is a stream: the stream tool lays its course, from where it rises 
 
 Levels join at their edges: walking off one edge arrives on the neighbour's opposite edge, at the same row (east, west) or column (north, south). When the area touches the map's edge with nothing beyond it, new_area makes a new level there (its own map; a first draft of grass, groves and forest round it, open where the way arrives) and carves a way out to the edge through the area. Use it when asked for somewhere new beyond the edge ("a new area east", "the woods past here"), not for changes inside the area.
 
-Places are what factions hold (the goblins, the town, or nobody): a camp, a keep, a farm, a gate, a mine. Each is a cell and a radius; the ground within the radius is its holder's, and no one else's group may walk through it. mark_place names one (its key, kind, cell, radius, who holds it at the start). Mark a place when you build one: a camp's place on its gather point (where its monsters gather), a farmstead's in its yard. A goblin camp can hold captives from the start (mark_place's holds), each taken from a town (the request lists them): someone of that town, or kin of one of its workers ("the smith's daughter"). In town their kin asks players to bring them home, and they go free when the camp falls, so a camp holding a captive is worth clearing. Some prefabs bring their place with them. A building prefab is a roofed building players walk into: stamp it whole, door and all, rather than drawing its walls yourself. A building can serve a town: set_building gives one in the area a use (%s) and its town, the key of a stockpile place in this level (a place of kind stockpile, held by the town). A town has one building of each use. Stamping over a building drops its use: set it again. town_wall walls a town in: give the rectangle of cells it encloses (its buildings, its store, room to walk) and the wall stands on the edges just outside it, with gates (doors) where roads come in, one in the middle of each side if you name none. One wall per town; it looks as strong as the town has built it (a bank of rubble at first). roof puts a roof over a rectangle of floor of one height that no building covers: a room you walled yourself, or an open shelter (a market stall, a woodshed) on posts at its corners; give it a use and town and it serves the town as a building does.
+Places are what factions hold (the goblins, the town, or nobody): a camp, a keep, a farm, a gate, a mine. Each is a cell and a radius; the ground within the radius is its holder's, and no one else's group may walk through it. mark_place names one (its key, kind, cell, radius, who holds it at the start). Mark a place when you build one: a camp's place on its gather point (where its monsters gather), a farmstead's in its yard. A goblin camp can hold captives from the start (mark_place's holds), each taken from a town (the request lists them): someone of that town, or kin of one of its workers ("the smith's daughter"). In town their kin asks players to bring them home, and they go free when the camp falls, so a camp holding a captive is worth clearing. A town's work sites are places too: a woodlot (woods its woodcutter fells: put it at the forest's edge), a hunting ground (open land with game, its hunter's), a quarry (rock to cut stone from), a farm (fields), a mine. Mark one with the town it works for (mark_place's town: the key of the town's stockpile place), held by the town, not far from it, and with a way on foot from the store to it: a site the goblins hold, or that can't be reached, is worked by no one, and the tool's answer says so. Some prefabs bring their place with them. A building prefab is a roofed building players walk into: stamp it whole, door and all, rather than drawing its walls yourself. A building can serve a town: set_building gives one in the area a use (%s) and its town, the key of a stockpile place in this level (a place of kind stockpile, held by the town). A town has one building of each use. Stamping over a building drops its use: set it again. town_wall walls a town in: give the rectangle of cells it encloses (its buildings, its store, room to walk) and the wall stands on the edges just outside it, with gates (doors) where roads come in, one in the middle of each side if you name none. One wall per town; it looks as strong as the town has built it (a bank of rubble at first). roof puts a roof over a rectangle of floor of one height that no building covers: a room you walled yourself, or an open shelter (a market stall, a woodshed) on posts at its corners; give it a use and town and it serves the town as a building does.
 
 Ground has a height, 0 to 6 (the grid's Heights block, shown when any cell has one). A step of a level or more between two cells is a ledge: a wall to anyone walking, though a body pushed off it falls to the ground below, and higher ground sees over walls. Stairs join one level to the next: a stair climbs to the one cell beside it a level up. A slope is a stair that looks like a ramp of earth: use slopes outdoors (on hills, banks, outcrops) and stairs in and round buildings; hill and stairs make slopes when asked. Rock is bare rock standing out of the ground, walled round: no one walks on or through it. height raises, lowers or sets cells; hill makes a rounded hill of rings a level each, with stairs up the sides asked; stairs puts a stair or a flight onto a ledge or up from flat ground. Whatever stands on raised ground (things, starts, buildings) needs stairs to it, and a building stands on one height: when a change leaves something cut off or a stair climbing nowhere, the tool's answer says so: put it right.
 
@@ -570,7 +578,8 @@ const TOOLS := [
 	{"name": "mark_place", "description": "Marks a place factions hold: a cell in the area and a radius of ground round it, held at the start by the goblins, the town or nobody. A key already used is moved or changed.",
 		"input_schema": {"type": "object", "properties": {
 			"key": {"type": "string", "description": "lower case letters, digits and _, e.g. \"goblin_camp\""},
-			"kind": {"type": "string", "enum": ["camp", "keep", "farm", "gate", "mine", "stockpile", "other"]},
+			"kind": {"type": "string", "enum": [], "description": "what it is (Level.PLACE_KINDS)"},
+			"town": {"type": "string", "description": "a work site only (woodlot, hunting_ground, quarry, farm, mine): the key of the stockpile place here whose town works it"},
 			"at": _CELL,
 			"radius": {"type": "integer", "minimum": 1, "maximum": 32},
 			"holder": {"type": "string", "enum": ["goblins", "town", "nobody"]},
@@ -836,6 +845,14 @@ func _mark_place(given: Dictionary) -> Dictionary:
 	var place := {"at": [at.x, at.y], "kind": kind, "radius": clampi(int(given.get("radius", Level.PLACE_RADIUS)), 1, 32), "holder": holder}
 	if given.has("name"):
 		place["name"] = str(given["name"])
+	var town := str(given.get("town", "")).strip_edges()
+	if not town.is_empty():
+		# The town that works this site (maps' 517, decision 520): a stockpile place here.
+		var stockpiles := places.keys().filter(func(other: String) -> bool:
+			return other != key and places[other] is Dictionary and str(places[other].get("kind", "")) == "stockpile")
+		if town not in stockpiles:
+			return _no("town is the key of a stockpile place here (%s)" % (", ".join(stockpiles) if not stockpiles.is_empty() else "there is none: mark_place one, kind stockpile"))
+		place["town"] = town
 	if given.has("holds"):
 		# Captives held from the start (npc's 518, decision 519), each from a real town.
 		if kind != "camp" or not given["holds"] is Array:
@@ -858,7 +875,8 @@ func _mark_place(given: Dictionary) -> Dictionary:
 	places[key] = place
 	working.apply_changes({"config": {"places": places}})
 	return {"ok": true, "text": "%s the place %s: a %s at %s, radius %d, held by %s%s" % ["changed" if again else "marked", key, kind, at, place["radius"], holder,
-		", holding %d captives" % (place["holds"] as Array).size() if place.has("holds") else ""]}
+		", holding %d captives" % (place["holds"] as Array).size() if place.has("holds") else ""] \
+		+ (", worked by the town of %s" % town if place.has("town") else "")}
 
 
 ## The towns a camp may hold captives from (decision 519): every stockpile
@@ -1230,6 +1248,24 @@ func _lay(changes: Dictionary, done: String) -> Dictionary:
 		kept["config"] = changes["config"]
 	working.apply_changes(kept)
 	return {"ok": true, "text": "%s%s" % [done, " (%d cells or edges outside the area left out)" % outside if outside > 0 else ""]}
+
+
+## Each work site that names its town (decision 520) and can't serve it:
+## held by someone else, or cut off on foot from the town's store
+## (HeightTools.reaches: walls, ledges, water, forest).
+func site_checks() -> Array[String]:
+	var out: Array[String] = []
+	var places: Dictionary = Level.places_from(working.config, [] as Array[String])
+	for key: String in places:
+		var town := str(places[key].get("town", ""))
+		if town.is_empty() or not places.has(town):
+			continue
+		var site: Dictionary = places[key]
+		if site["holder"] != places[town]["holder"]:
+			out.append("the %s %s is held by %s, not by its town %s: its worker can't work it until the town holds it" % [site["kind"], key, site["holder"], town])
+		elif not HeightTools.reaches(working.map, places[town]["cell"], site["cell"]):
+			out.append("the %s %s at %s can't be reached on foot from its town's store %s at %s: open a way" % [site["kind"], key, site["cell"], town, places[town]["cell"]])
+	return out
 
 
 ## What is wrong with the area's heights on the working copy: a stair

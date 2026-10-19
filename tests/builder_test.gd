@@ -29,6 +29,7 @@ func _ready() -> void:
 	await _test_kind_building()
 	await _test_slopes()
 	await _test_captives()
+	await _test_work_sites()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -574,6 +575,37 @@ func _test_captives() -> void:
 	var kept: Array = level_places["camp"].get("holds", [])
 	_check(kept.size() == 1 and kept[0]["town"] == hold["town"] and kept[0]["resident"] == hold["resident"] and kept[0]["name"] == "Tam",
 			"Level keeps the hold (%s)" % [kept])
+
+
+func _test_work_sites() -> void:
+	print("\n== work sites (520, on maps' 517): a town's woodlot, checked held and reached ==")
+	var place: Dictionary = BuilderSession.tools().filter(func(tool: Dictionary) -> bool: return tool["name"] == "mark_place")[0]
+	var kinds: Array = place["input_schema"]["properties"]["kind"]["enum"]
+	_check(kinds.has("woodlot") and kinds.has("hunting_ground") and kinds.has("quarry") and kinds.has("camp"), "mark_place offers Level's kinds (%s)" % [kinds])
+	_check("A town's work sites are places too" in BuilderSession.system_prompt(), "the prompt says what a work site is for")
+	var doc := _doc()
+	doc.config["places"] = {"store": {"at": [20, 20], "kind": "stockpile", "holder": "town"}}
+	var walls := []
+	for side in ["north", "east", "south", "west"]:
+		walls.append({"at": [8, 8], "side": side, "kind": "wall"})
+	var stub := StubClaude.new([
+		[{"name": "mark_place", "input": {"key": "woods", "kind": "woodlot", "at": [8, 8], "holder": "town", "town": "store"}},
+			{"name": "mark_place", "input": {"key": "pit", "kind": "quarry", "at": [10, 8], "holder": "town", "town": "nowhere"}},
+			{"name": "mark_place", "input": {"key": "game", "kind": "hunting_ground", "at": [12, 8], "holder": "goblins", "town": "store"}},
+			{"name": "edges", "input": {"set": walls}}],
+		"A woodlot.",
+	])
+	var session := BuilderSession.new(doc, Rect2i(5, 5, 20, 20), "test_field", stub)
+	await session.ask("a woodlot for the town")
+	var results: Array = stub.sent[1]["messages"][2]["content"]
+	_check(not results[0]["is_error"] and "worked by the town of store" in str(results[0]["content"]) and not "Work sites now" in str(results[0]["content"]),
+			"a woodlot worked by its town, reached: %s" % results[0]["content"])
+	_check(results[1]["is_error"] and "store" in str(results[1]["content"]), "a town that is no stockpile place here: refused, naming the stores")
+	_check(not results[2]["is_error"] and "held by goblins, not by its town" in str(results[2]["content"]), "a site the goblins hold: said (%s)" % results[2]["content"])
+	_check("woodlot woods at (8, 8) can't be reached on foot" in str(results[3]["content"]), "walled off from its town: said (%s)" % results[3]["content"])
+	_check(session.proposal()["config"]["places"]["woods"].get("town") == "store", "the proposal's level.json has its town")
+	_check(HeightTools.reaches(doc.map, Vector2i(20, 20), Vector2i(8, 8)) and not HeightTools.reaches(session.working.map, Vector2i(20, 20), Vector2i(8, 8)),
+			"HeightTools.reaches: open ground reached, a walled cell not")
 
 
 func _check(ok: bool, label: String) -> void:

@@ -9,6 +9,7 @@ notes (decision 324).
 
 - Talking to the town's official about the building fund: the give lines read as "a gift" with a Give button and the gold in brass, and the foot says what you carry whenever a line would take gold; a long offer title wraps instead of running off the panel.
 - Streams run: their water drifts downstream, fords show shallow and clear with foam where the current crosses the stones, and bridges are drawn with wooden decks, rails and ends, the water running on underneath (505).
+- Builder mode can mark a town's work sites (a woodlot, a hunting ground, a quarry) and says when one is held by goblins or cut off from the town on foot.
 - Tools: the heavy-job gate estimates RAM and commit separately (394 amended). Windows charges a GPU job's memory on the card to commit without using RAM, and the gate had read that commit as RAM. A TRELLIS mesh job now wants 9 GB of free RAM plus the margin, not 28.9. It still needs about 29 GB of free commit plus the margin.
 - The official's give lines read cleaner in the talk panel (499 amended): "Give toward the inn" and "Give the rest", the sum beside the row, and the inn's needs said once.
 - A townsperson in bed reads so: the hint over them says "in bed with a fever" and the talk's title line adds it after their trade.

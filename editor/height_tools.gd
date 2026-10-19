@@ -216,6 +216,29 @@ static func steps(map: LevelMap, a: Vector2i, b: Vector2i) -> bool:
 	return rise == 0 or (rise == 1 and climbs(map, a) == b - a) or (rise == -1 and climbs(map, b) == a - b)
 
 
+## Whether a walker gets from [param from] to [param to] on [param map]
+## (steps: no wall, the same height or a stair between), looking through
+## at most [param limit] cells (decision 520: a work site and its town).
+static func reaches(map: LevelMap, from: Vector2i, to: Vector2i, limit := 70000) -> bool:
+	if from == to:
+		return true
+	var seen: Dictionary[Vector2i, bool] = {from: true}
+	var queue: Array[Vector2i] = [from]
+	var head := 0
+	while head < queue.size() and seen.size() < limit:
+		var at := queue[head]
+		head += 1
+		for side in FOUR:
+			var next := at + side
+			if seen.has(next) or not steps(map, at, next):
+				continue
+			if next == to:
+				return true
+			seen[next] = true
+			queue.append(next)
+	return false
+
+
 ## For each of [param cells] (things, starts, buildings) on [param map]:
 ## a line if it stands on a patch of ground that ledges cut off from bigger
 ## ground beyond them, with no stair to or from it (walls or forest closing
