@@ -8,6 +8,7 @@ notes (decision 324).
 ## Unreleased
 
 - Rocks are drawn as rocks: mossy stones on the ground, a big boulder where four rock cells meet, where before they showed as trees or as pillars of wall. Slopes up an outcrop are smooth ramps of grass (513).
+- Builder mode tells Claude which trade works which work site (a town's woodcutter its woodlot, hunter its hunting ground, farmer its farm), read from the economy rules, and that the farther the site the longer each trip (520 amended, on 521).
 - Fixed: a monster with one strike clip erred on every swing after the first (390).
 - Tall grass is drawn: a patch of blades about a metre high with pale seed heads, swaying in the wind, and grass trampled flat shows as a pressed mat along the path until it stands again (508).
 - A town's woodcutter, hunter and farmer work from the town's woodlot, hunting ground and farm where a level has them (521), walking there and back. If goblins hold the site, or it is contested, it yields nothing and the town grows uneasy until it is retaken.

@@ -583,6 +583,7 @@ func _test_work_sites() -> void:
 	var kinds: Array = place["input_schema"]["properties"]["kind"]["enum"]
 	_check(kinds.has("woodlot") and kinds.has("hunting_ground") and kinds.has("quarry") and kinds.has("camp"), "mark_place offers Level's kinds (%s)" % [kinds])
 	_check("A town's work sites are places too" in BuilderSession.system_prompt(), "the prompt says what a work site is for")
+	_check("worked by no one, and the tool's answer says so. A town's woodcutter works the first woodlot marked for it, its hunter" in BuilderSession.system_prompt(), "the prompt says which trade works which site, from economy.json (%s)" % BuilderSession.site_line())
 	var doc := _doc()
 	doc.config["places"] = {"store": {"at": [20, 20], "kind": "stockpile", "holder": "town"}}
 	var walls := []

@@ -15110,6 +15110,13 @@ yield, and its prompt line comes with it.
   held by the town, near it and reachable from its store.
 
 Protocol unchanged. builder_test _test_work_sites.
+
+520 amended, on economy's 521: the prompt says which trade works which
+site (BuilderSession.site_line, from economy.json sites.trades: the first
+site of its kind marked for a town), that the worker walks there and back
+from the store, and which site kinds no trade works yet. 521 checks no
+path at runtime, so site_checks' "can't be reached" stays the only guard.
+
 ## 514. Luxury goods for the rich, and their tax
 
 Jeff (2026-10-18): "introduce luxury goods that traders seek, sell to the
