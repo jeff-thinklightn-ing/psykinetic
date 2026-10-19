@@ -984,7 +984,7 @@
 			"kind": "cell",
 			"size": [0.8, 0.8, 0.8],
 			"budget": 300,
-			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/prop.crate/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c18's 300 mesh, 278 tris"},
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-19", "notes": "rebuilt by hand in big clean planes for Jeff's crispness note (2026-10-19, \"the graphics not crisp\"; the coordinator's ask; art-gen's c18 fit read as mush at game zoom): a frame of dark corner posts and rims, three planks a face over a dark core, a diagonal brace on each side; 168 tris"},
 			"uses": "a crate, pushable and stackable to stand on (the crate entity; drawn as a primitive puppet until decision 264 draws it through ArtKit)"
 		},
 		"prop.chest": {
@@ -993,7 +993,7 @@
 			"kind": "cell",
 			"size": [0.9, 0.6, 0.6],
 			"budget": 500,
-			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/prop.chest/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c10's 500 mesh stretched to 0.9 across, the lid above 0.4 m cut out as its part hinged at the back (0, 0.4, -0.3), 419 tris"},
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-19", "notes": "rebuilt by hand in big clean planes for Jeff's crispness note (2026-10-19, \"the graphics not crisp\"; the coordinator's ask; art-gen's c10 fit read as mush at game zoom): a planked body on a dark plinth with corner posts, a three-facet rounded lid hinged at the back (the lid part, its origin on the hinge at (0, 0.4, -0.3)), two iron straps over body and lid, a brass clasp and hasp; 310 tris"},
 			"uses": "a chest holding loot, its lid hinged at the back and lifted when opened (the chest entity; drawn as a primitive puppet until decision 264 draws it through ArtKit)",
 			"parts": [
 				{"name": "lid", "motion": "hinge", "axis": "x", "pivot": [0, 0.4, -0.3], "range": [0, -100], "size": [0.9, 0.2, 0.6]}
@@ -1454,7 +1454,7 @@
 			"kind": "cell",
 			"size": [0.7, 0.9, 0.7],
 			"budget": 400,
-			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/prop.barrel/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c4's 400 mesh, staves and hoops from the concept, 340 tris"},
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-19", "notes": "rebuilt by hand in big clean planes for Jeff's crispness note (2026-10-19, \"the graphics not crisp\"; the coordinator's ask; art-gen's c4 fit read as mush at game zoom): ten staves in two woods bulging to the middle, four iron hoops a hair proud, a planked head sunk in its chime; 332 tris"},
 			"uses": "a barrel (drawn as the barrel shape today)"
 		},
 		"prop.torch": {

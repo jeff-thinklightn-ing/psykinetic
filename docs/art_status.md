@@ -114,7 +114,7 @@ Drawn as a grey box (a texture slot: terrain's procedural colour).
 | `porch.timber_wide` | 1 | art-kit, by hand | own | 2026-10-18 |
 | `prop.anvil` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
 | `prop.banner` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
-| `prop.barrel` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
+| `prop.barrel` | 1 | art-kit, by hand | own | 2026-10-19 |
 | `prop.bed` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
 | `prop.bench` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
 | `prop.bookshelf` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
@@ -122,8 +122,8 @@ Drawn as a grey box (a texture slot: terrain's procedural colour).
 | `prop.cage` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
 | `prop.campfire` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
 | `prop.cart` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
-| `prop.chest` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
-| `prop.crate` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
+| `prop.chest` | 1 | art-kit, by hand | own | 2026-10-19 |
+| `prop.crate` | 1 | art-kit, by hand | own | 2026-10-19 |
 | `prop.fence` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
 | `prop.fence_post` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
 | `prop.forge` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
