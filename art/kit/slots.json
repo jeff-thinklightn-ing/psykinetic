@@ -1468,6 +1468,17 @@
 			"uses": "a wall sconce with its torch; the flame (a shader and a light) burns at its flame socket",
 			"sockets": {"flame": [0, 0.6, 0]}
 		},
+		"prop.torch_post": {
+			"category": "props",
+			"type": "mesh",
+			"kind": "cell",
+			"size": [0.3, 1.45, 0.3],
+			"budget": 400,
+			"materials": 1,
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-19", "notes": "a hazel pole worn dark where it is held, packed upright in a ring of stones, an iron collar under a pitch-wrapped head charred at its top; the flame socket on the head's top; 346 tris"},
+			"uses": "a level's torch standing free in its cell's middle (terrain's drawn fire; prop.torch is the wall sconce); the flame (terrain's shader and a light) burns at its flame socket",
+			"sockets": {"flame": [0, 1.45, 0]}
+		},
 		"prop.lantern": {
 			"category": "props",
 			"type": "mesh",

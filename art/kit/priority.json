@@ -20,7 +20,7 @@
 				"prop.palisade", "prop.fence", "prop.fence_post",
 				"prop.campfire", "prop.tent", "prop.market_stall", "prop.anvil", "prop.forge",
 				"prop.barrel", "prop.crate", "prop.sack", "prop.cart", "prop.signpost",
-				"prop.lantern", "prop.torch", "prop.banner", "prop.bench", "prop.table", "prop.bridge", "bridge.wood.deck", "bridge.wood.rail", "bridge.wood.end",
+				"prop.lantern", "prop.torch", "prop.torch_post", "prop.banner", "prop.bench", "prop.table", "prop.bridge", "bridge.wood.deck", "bridge.wood.rail", "bridge.wood.end",
 				"creature.boar", "creature.rabbit",
 				"material.wall.stone", "wall.stone.straight", "wall.stone.post", "wall.stone.end", "wall.stone.corner",
 				"wall.stone.t", "wall.stone.tower", "wall.stone.straight_ruined", "wall.stone.rubble",
