@@ -50,6 +50,7 @@ func _ready() -> void:
 	_test_what_is_true()
 	_test_two_sentences()
 	_test_sick_body()
+	_test_herbs()
 	_test_resident_voices()
 	_test_means_in_voice()
 	_test_hearsay()
@@ -601,6 +602,37 @@ func _test_sick_body() -> void:
 	if not hut.is_empty():
 		World.production.set_away("medicine_man:" + hut, true)
 	Townsfolk.use_rules({})
+	_sync()
+
+
+## The medicine man takes herbs on his way (decision 502, npc's side): the
+## nearest within HERB_REACH of his body go to his hut's store.
+func _test_herbs() -> void:
+	print("\n== the medicine man takes herbs on his way and banks them at his hut (decision 502, npc's side) ==")
+	var hut: String = _main._healers_hut_of(STORE)
+	if Items.def("herbs").is_empty() or World.forage == null or hut.is_empty():
+		_check(true, "(items' herbs, World.forage or the test hut is not here: skipped)")
+		return
+	for i in 14:
+		World.production.set_away("rs-folk%02d" % i, true)
+	for id: String in ["rs-bram", "rs-snag", "rs-law"]:
+		World.production.set_away(id, true)
+	World.production.set_away("medicine_man:" + hut, false)
+	DayNight.set_hour(12.0)
+	_sync()
+	var oren := _body("medicine_man:" + hut)
+	_check(oren != null and oren.doing == Resident.Doing.WORK, "(the medicine man at his work, the hut)")
+	if oren != null:
+		var uid := World.items.mint("herbs", "grew", "the test", oren.zone, oren.tile)
+		var laid := World.put_on_ground(uid, oren.tile + Vector2i(2, 0))
+		_check(laid != World.NO_CELL and World.ground_at(laid).has("herbs"), "(herbs laid near him at %s)" % [laid])
+		_main._gather_herbs()
+		_check(not World.ground_at(laid).has("herbs") and World.stockpile.count(STORE, "herbs") >= 1 and not World.items.has(uid), "on the world tick he takes them and the town's store buys them (%d herbs)" % World.stockpile.count(STORE, "herbs"))
+		var far := World.items.mint("herbs", "grew", "the test", oren.zone, oren.tile)
+		var away := World.put_on_ground(far, oren.tile + Vector2i(_main.HERB_REACH + 3, 0))
+		_main._gather_herbs()
+		_check(away == World.NO_CELL or World.ground_at(away).has("herbs"), "herbs beyond his reach stay where they grow")
+	World.production.set_away("medicine_man:" + hut, true)
 	_sync()
 
 

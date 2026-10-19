@@ -13899,3 +13899,22 @@ above); this is her player's side of it.
   step. A remedy in her hands in the party is not this step: her
   sickness is cured by the town, or runs its course.
 companion_test _test_sickness. Protocol unchanged; no new class_name.
+
+## 502, npc's side: the medicine man gathers herbs
+
+Terrain's 502 lays herbs as ground piles near the towns and gives
+Forage.take_near for the medicine man's rounds; this is that hook (404's
+medicine man, 501's sickness). On the world tick (Main._gather_herbs), a
+medicine man whose body is up and about (not at home, in bed or hiding)
+takes the nearest herbs within HERB_REACH (6) cells of where he stands off
+the ground and delivers them to the town's store of that area as a gatherer's
+raw (economy's Production.deliver_to, 498: the store buys them at the
+delivery price, herbs worth 1, and owes what it cannot pay; economy's
+word), the pile's instance ended as a banked resource's is; there the
+healer's remedy recipe (items' 501: herbs 2) reads them. Only
+while his body stands, so only while a player is near: what he gathers is
+what the player sees lying there, and the herbs he takes are the herbs a
+player could have picked. A delivery refused puts them back on the ground
+where he stands. Nothing on a client (World.forage is null). resident_test
+(skipped until items' "herbs" is in the catalog). Protocol unchanged; no
+new class_name.

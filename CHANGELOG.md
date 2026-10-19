@@ -7,8 +7,9 @@ notes (decision 324).
 
 ## Unreleased
 
-## v0.1.155
+- The medicine man gathers herbs on his way (502, npc's side): the nearest within six cells of him go to the town's store, bought as a gatherer's raw, for the healer's remedies.
 
+## v0.1.155
 - Server and client both; the protocol is unchanged, so older builds still join.
   New in it: sickness. Now and then a townsperson, or your companion resting in
   town, takes to their bed; the healer or medicine man cures them, or a healing

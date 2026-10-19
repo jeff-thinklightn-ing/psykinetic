@@ -4419,6 +4419,56 @@ func _visits_due() -> void:
 		Townsfolk.treat(World.production, str(visit.get("sick", "")), name, "the medicine man", str(visit.get("by", "")))
 
 
+## How far the medicine man reaches for herbs on his way (decision 502, npc's
+## side): cells from where his body stands, each world tick.
+const HERB_REACH := 6
+
+
+## Server, on the world tick: a medicine man whose body is up and about takes
+## the nearest herbs within HERB_REACH off the ground (terrain's
+## Forage.take_near, decision 502) and delivers them to the town's store as a
+## gatherer's raw (economy's Production.deliver_to, 498: bought at the
+## delivery price), where the healer's remedy recipe reads them (items'
+## 501). What a player sees lying there is what he gathers. Nothing
+## while he is at home, in bed or hiding; nothing on a client (World.forage
+## is null there).
+func _gather_herbs() -> void:
+	if World.forage == null or World.production == null or World.holdings == null:
+		return
+	for entity: GridEntity in World.townsfolk():
+		var body := entity as Resident
+		if body == null or body.trade != "medicine_man" or body.town.is_empty() or body.doing in [Resident.Doing.HOME, Resident.Doing.BED, Resident.Doing.HIDE]:
+			continue
+		var store := _town_store_of(body.zone)
+		if store.is_empty():
+			continue
+		var uid: int = World.forage.take_near(body.zone, body.tile, HERB_REACH)
+		if uid == 0:
+			continue
+		# Delivered as a gatherer's raw (economy's 498: the store buys it at the delivery price), the pile's instance ended as a banked resource's is.
+		var yields := World.items.yields_of(uid)
+		if yields.is_empty():
+			yields = {World.items.id_of(uid): 1}
+		var delivered := false
+		for what: String in yields:
+			if World.production.deliver_to(store, body.worker_id, what, int(yields[what]), body.person, "gathered by the medicine man"):
+				delivered = true
+		if delivered:
+			World.items.end(uid, "banked", "%s by %s" % [store, body.person], body.zone, body.tile)
+			print("[townsfolk] %s gathered %s at %s for %s" % [body.person, yields, body.tile, store])
+		else:
+			World.put_on_ground(uid, body.tile)  # Not taken: back on the ground where he stands.
+
+
+## The town's store in [param area] (the stockpile place the town holds), ""
+## for none.
+func _town_store_of(area: String) -> String:
+	for id: String in World.holdings.places_in(area):
+		if World.holdings.place(id).get("kind") == Stockpile.KIND and World.holdings.holder(id) == Stockpile.TOWN:
+			return id
+	return ""
+
+
 ## Whether the sick [param body], walked to the healer, stands on the hut's
 ## ground (decision 501).
 func _at_healers_hut(body: Resident) -> bool:
@@ -6524,6 +6574,7 @@ func _on_world_ticked(tick: int) -> void:
 			_seat_settled()  # A settled person whose town has since been founded (decision 471).
 			_visits_due()  # The medicine man's visits that have run their hours (decision 501).
 			_sickness_in_party()  # A sick companion with her player gets well (decision 501).
+			_gather_herbs()  # The medicine man takes herbs on his way (decision 502, npc's side).
 		_respawn_due_players(tick)
 		_check_respawns(tick)
 		t = World.part("respawns", t)
