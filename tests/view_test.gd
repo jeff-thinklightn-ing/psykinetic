@@ -1514,6 +1514,13 @@ func _test_tall_grass() -> void:
 	_check(not grass.is_empty(), "the sample has tall grass (%d cells)" % grass.size())
 	if grass.is_empty():
 		return
+	# The game's first build is setup's, not rebuild's: the ground's build
+	# reads the cells (e0d25913 read them in rebuild alone, and the game drew
+	# the lawn).
+	_rig.rebuild(terrain, sample["centre"])
+	_rig._tall.clear()
+	_rig._build_ground(terrain["kinds"])
+	_check(_rig._tall.size() == grass.size(), "the ground's build reads its cells, setup's first build too (%d)" % _rig._tall.size())
 	_rig.rebuild(terrain, sample["centre"])
 	_rig._scatter_all()
 	var clumps := 0
@@ -1526,8 +1533,14 @@ func _test_tall_grass() -> void:
 			tufts += 1 if grass.has(item[0]) else 0
 	_check(clumps >= grass.size() * 7 and tufts == 0, "clumps on its cells, about nine a cell, no tufts (%d on %d cells, %d tufts)" % [clumps, grass.size(), tufts])
 	var high := Client3D._scatter_mesh("tall").get_aabb().end.y
-	_check(high > 0.75 and high < 1.05 and "tall" in Client3D.SWAYING, "its blades about a metre and bending in the wind (%.2f m)" % high)
+	_check(high > 0.75 and high < 1.12 and "tall" in Client3D.SWAYING, "its blades about a metre and bending in the wind (%.2f m)" % high)
 	_check(grass.all(func(cell: Vector2i) -> bool: return _rig._tall_where.has(cell)), "each cell's clumps known, to redraw it alone")
+	var had_tall := _rig._tall.duplicate()
+	for x in 3:
+		for y in 3:
+			_rig._tall[Vector2i(100 + x, 100 + y)] = true
+	_check(_rig._tall_edge(Vector2i(100, 101)) and not _rig._tall_edge(Vector2i(101, 101)), "the patch's edge known (its clumps taller there)")
+	_rig._tall = had_tall
 	_check(Client3D.tall_look(Color(0.5, 0.6, 0.3), true).a == 0.0 and Client3D.tall_look(Color(0.5, 0.6, 0.3), false).a == 1.0
 			and is_equal_approx(Client3D.tall_look(Color(0.5, 0.6, 0.3), true).g, 0.6), "trampled is its colour's alpha 0, standing 1, its colour kept")
 	var cell: Vector2i = grass[0]

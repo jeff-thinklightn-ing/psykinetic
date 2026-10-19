@@ -770,8 +770,10 @@ const SCATTER_ROOF_SNOW := 0.12
 const SCATTER_ROOF_STRAW := 0.5
 const SCATTER_REEDS := 1.6
 ## Tall grass (decision 508, terrain's side): its clumps in place of the
-## grass's tufts, a few flowers among them.
+## grass's tufts, a few flowers among them; at the patch's edge, where the
+## camera sees them side-on, a little taller.
 const SCATTER_TALL := {"tall": 9.0, "flower": 0.08}
+const TALL_EDGE_SCALE := 1.2
 const SCATTER_SIZES := {"tuft": Vector2(0.7, 1.3), "flower": Vector2(0.8, 1.1), "stone": Vector2(0.6, 1.6), "root": Vector2(0.8, 1.4),
 		"reeds": Vector2(0.8, 1.3), "tall": Vector2(0.9, 1.1)}
 ## Flowers: the palette's accents (row 7: flame, bone, banner red, magic
@@ -2508,11 +2510,6 @@ func rebuild(terrain: Dictionary, centre: Vector2i) -> void:
 	_scattered.clear()
 	_scatter_due.clear()
 	_scatter_jobs.clear()
-	_tall.clear()
-	for cell: Vector2i in terrain.get("tall_grass", []):
-		_tall[cell] = true
-	_tall_where.clear()
-	_tall_flat.clear()
 	_scatter_aim = Vector2i(1 << 30, 0)
 	_posts.clear()
 	_doorways.clear()
@@ -3556,6 +3553,8 @@ func _scatter_build(chunk: Vector2i, kind: String, items: Array) -> void:
 		var at: Vector2 = items[i][1]
 		var salt: int = items[i][2]
 		var size := lerpf(fit[0].x, fit[0].y, _roll(cell, 103 + salt))
+		if kind == "tall" and _tall_edge(cell):
+			size *= TALL_EDGE_SCALE
 		var tilt: float = fit[1]
 		var lean := Vector3((_roll(cell, 104 + salt) - 0.5) * 2.0 * tilt, _roll(cell, 105 + salt) * TAU, (_roll(cell, 106 + salt) - 0.5) * 2.0 * tilt)
 		var basis := Basis.from_euler(lean).scaled(Vector3.ONE * size)
@@ -3641,6 +3640,15 @@ func _by_water(cell: Vector2i) -> bool:
 func _forest_edge(cell: Vector2i) -> bool:
 	for direction: Vector2i in World.DIRECTIONS:
 		if _forest_distance.get(cell + direction, 0) >= 1:
+			return true
+	return false
+
+
+## Whether tall grass [param cell] is on its patch's edge (a side not tall
+## grass).
+func _tall_edge(cell: Vector2i) -> bool:
+	for direction: Vector2i in [Vector2i.RIGHT, Vector2i.LEFT, Vector2i.DOWN, Vector2i.UP]:
+		if not _tall.has(cell + direction):
 			return true
 	return false
 
@@ -3794,15 +3802,17 @@ static func _make_scatter(kind: String) -> ArrayMesh:
 					_scatter_triangle(surface, [at + Vector3(-r, 0, 0), at + Vector3(r, 0, 0), at + Vector3(0, 0, r)], [white, white, white])
 		"tall":
 			# A clump of ten long thin blades, each in two segments, near
-			# upright and bowing out a little toward the tip (decision 508,
-			# terrain's side).
+			# upright and bowing out a little toward the tip, pale toward it,
+			# every other one under a seed head (decision 508, terrain's
+			# side): a yellowing meadow against the lawn.
 			var base := swatch(4, 4)
 			var middle := swatch(4, 3)
-			var top := swatch(3, 1)
+			var seed := swatch(7, 7)
+			var top := swatch(3, 1).lerp(seed, 0.6)
 			for b in 10:
 				var turn := b * TAU / 10.0 + rng.randf_range(-0.35, 0.35)
 				var out := Vector3(cos(turn), 0.0, sin(turn))
-				var side := Vector3(-out.z, 0.0, out.x) * 0.02
+				var side := Vector3(-out.z, 0.0, out.x) * 0.025
 				var root := out * rng.randf_range(0.0, 0.06)
 				var tall := rng.randf_range(0.8, 1.0)
 				var knee := root + out * rng.randf_range(0.02, 0.05) + Vector3.UP * tall * 0.55
@@ -3810,6 +3820,11 @@ static func _make_scatter(kind: String) -> ArrayMesh:
 				_scatter_triangle(surface, [root - side, root + side, knee + side * 0.6], [base, base, middle])
 				_scatter_triangle(surface, [root - side, knee + side * 0.6, knee - side * 0.6], [base, middle, middle])
 				_scatter_triangle(surface, [knee - side * 0.6, knee + side * 0.6, tip], [middle, middle, top])
+				if b % 2 == 0:
+					var head := tip.lerp(knee, 0.18)
+					var crest := tip + (tip - knee).normalized() * 0.06
+					_scatter_triangle(surface, [head - side * 1.6, head + side * 1.6, crest], [seed, seed, seed])
+					_scatter_triangle(surface, [head - side * 1.6, crest, head + side * 1.6], [seed, seed, seed])
 		"reeds":
 			# Tall thin blades, a few with a brown head.
 			var stalk := swatch(4, 3)
@@ -4426,6 +4441,13 @@ func _build_ground(kinds: Dictionary) -> void:
 	# the water; floor_count is where the land ends. A bridge's cells are
 	# floor to the sim but water here, at the stream's bed (_bed_levels).
 	_measure_streams()
+	# Tall grass's cells, read here so setup's first build has them as a
+	# rebuild's does (decision 508, terrain's side); its clumps are drawn anew.
+	_tall.clear()
+	for cell: Vector2i in _terrain.get("tall_grass", []):
+		_tall[cell] = true
+	_tall_where.clear()
+	_tall_flat.clear()
 	var land: Array = []
 	for cell: Vector2i in _terrain["floor"]:
 		if not _bed_levels.has(cell):
@@ -7627,7 +7649,8 @@ static func _vary(entity: GridEntity, puppet: Node3D, model: Dictionary) -> void
 	puppet.set_meta("fidget_at", Time.get_ticks_msec() + int(fidget_rng.randf_range(2.0, FIDGET_SECONDS_MAX) * 1000.0))
 
 
-## One of [param clips], at random, not [param puppet]'s last of them.
+## One of [param clips], at random, not [param puppet]'s last of them (the
+## one there is, when there is one: decision 390's).
 static func _pick_clip(puppet: Node3D, clips: Array[String]) -> String:
 	var rng: RandomNumberGenerator = puppet.get_meta("rng") if puppet.has_meta("rng") else null
 	if rng == null:
@@ -7635,6 +7658,8 @@ static func _pick_clip(puppet: Node3D, clips: Array[String]) -> String:
 	var key := "last_" + clips[0]
 	var last := str(puppet.get_meta(key, ""))
 	var choices := clips.filter(func(clip: String) -> bool: return clip != last)
+	if choices.is_empty():
+		choices = clips
 	var clip: String = choices[rng.randi() % choices.size()]
 	puppet.set_meta(key, clip)
 	return clip

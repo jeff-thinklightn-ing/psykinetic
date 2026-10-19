@@ -15194,9 +15194,7 @@ the wire are 508's.
   told (flat, stood) are set alone; a full set (both lists empty) sets every
   clump from World's set again. No animation: it lies down and stands up.
 - Who stands in it stays seen from above: a clump reaches about a person's
-  hip and its blades are thin (4 cm), so a body shows through and over it
-  (the review shots: an imp at its edge; the bench can't start the host in
-  it, so a player in it is still to see in game).
+  hip and its blades are thin, so a body shows through and over it.
 
 tests/view_test (the sample's patch: clumps on its cells and no tufts, the
 blades' height, each cell's clumps known, trampled laid flat and stood
@@ -15240,3 +15238,27 @@ shepherd came on 26.5 and sheared 12 wool that spring, the loom stood on
 26.6 and the weaver came on 29.6. Officials unpaid 201 (204), treasury
 end 5 (5). Protocol unchanged. farm_test.
 
+
+Amended (the coordinator's second pass, after the game's own shot): the
+patch read as the lawn's tufts from the game's camera.
+
+- The cells were read in Client3D.rebuild alone, and the game's first build
+  is setup's: the game drew no tall grass at all (the bench rebuilds, so its
+  shots had it). They are read in _build_ground, which both run; view_test
+  checks the ground's build has them.
+- To read as another ground at a glance: blades a little wider (2.5 cm each side),
+  their tips paler toward the palette's bone and every other blade under a
+  seed head (a yellowing meadow against the lawn), and the clumps on the
+  patch's edge (a side not tall grass, _tall_edge) TALL_EDGE_SCALE 1.2
+  taller, where the camera sees them side-on. Twice the clumps (18 a cell)
+  was shot beside 9 once they drew in the game (C:\dev\review\tallgrass,
+  meadow-9 and meadow-18): 18 buried the ground and the player's legs; 9,
+  with the seed heads, reads as tall grass and stays.
+- A player standing in it shows whole (the game's meadow shot,
+  --test-show=hidden, walked in with --test-move): nothing skips their cell.
+- Not tall grass's, but found by its shots and landed with it (the
+  coordinator's word): decision 390's Client3D._pick_clip left out the
+  puppet's last clip and took a random one of the rest, none when a
+  monster's strikes for its weapon list one clip, so every swing after its
+  first erred (a modulo by zero). With none left it picks among them all.
+  pc-character adds the test on 390's side.
