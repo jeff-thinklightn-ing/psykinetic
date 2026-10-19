@@ -13646,6 +13646,16 @@ A wall's corner post stands as tall as the tallest wall at it, squeezed
 under a storey where every wall there is lower (a lean-to's, a wing's):
 at a storey's height its cap poked through the low roof (the review
 shot's "salmon cubes"). view_test: no post taller than its walls.
+Amended (thatch trims; art-kit's roof.thatch.ridge and roof.thatch.eave,
+d6c92ae5): a thatch roof's slopes are dressed in art-kit's pieces
+(BuildingComposer._trims), one a metre along the roof's length (they are
+1.1 m long, so neighbours overlap), on the top of the thatch: the ridge
+roll along a gable's ridge, each piece pitched to the ridge's sag, and
+the eave fringe along each low eave, turned so its tufts hang outward and
+laid down the slope's fall. A lean-to has its low eave only (its high
+side meets its wall). A round roof has none yet. Part of the composed
+look (cached with it), drawn only. view_test: the L-house thatched has
+its trims, the eaves' side out; shingle none.
 
 ## 495. Shader warm-ups: a material drawn once at load, not first at play
 

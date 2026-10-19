@@ -195,7 +195,7 @@ static func _build(building: Dictionary, roof_set: String) -> Node3D:
 			roof.add_child(_cone(Vector2(rect.size), eaves, rng, material))
 		else:
 			for index in blocks.size():
-				var piece := _block_roof(building, index, material, gable, _profile(roof_set))
+				var piece := _block_roof(building, index, material, gable, _profile(roof_set), roof_set == "thatch")
 				piece.name = "Roof_%d" % index
 				roof.add_child(piece)
 	var odds := float(CHIMNEYS.get(str(building["kind"]), 0.0)) * (0.6 if ruined else 1.0)
@@ -301,7 +301,8 @@ static func cruck_of(building: Dictionary, far: bool) -> Node3D:
 
 ## Block [param index]'s roof by its role, placed in the building's frame
 ## (its box's top-left cell's middle at the origin), from its own stream.
-static func _block_roof(building: Dictionary, index: int, material: Material, gable: Material, profile: Dictionary) -> Node3D:
+static func _block_roof(building: Dictionary, index: int, material: Material, gable: Material, profile: Dictionary,
+		trim := false) -> Node3D:
 	var blocks: Array = building["blocks"]
 	var block: Rect2i = blocks[index]
 	var rect: Rect2i = building["rect"]
@@ -323,14 +324,14 @@ static func _block_roof(building: Dictionary, index: int, material: Material, ga
 		var along := float(block.size.y if leans.x != 0 else block.size.x)
 		var low := at
 		var rise := maxf(eaves - LEAN_TUCK - low, 0.3)
-		holder.add_child(_slopes(across, along, rise, reach, rng.randf_range(SAG.x, SAG.y) * along, true, thick, material, gable))
+		holder.add_child(_slopes(across, along, rise, reach, rng.randf_range(SAG.x, SAG.y) * along, true, thick, material, gable, trim))
 		holder.position = Vector3(middle.x, low, middle.y)
 		holder.rotation.y = {Vector2i(1, 0): 0.0, Vector2i(-1, 0): PI, Vector2i(0, 1): -PI * 0.5, Vector2i(0, -1): PI * 0.5}[leans]
 	else:
 		var along_x := block.size.x > block.size.y
 		var span := Vector2(block.size.y, block.size.x) if along_x else Vector2(block.size)
 		var rise := span.x * 0.5 * rng.randf_range(RISE.x, RISE.y)
-		holder.add_child(_slopes(span.x, span.y, rise, reach, rng.randf_range(SAG.x, SAG.y) * span.y, false, thick, material, gable))
+		holder.add_child(_slopes(span.x, span.y, rise, reach, rng.randf_range(SAG.x, SAG.y) * span.y, false, thick, material, gable, trim))
 		holder.position = Vector3(middle.x, at, middle.y)
 		holder.rotation.y = PI * 0.5 if along_x else 0.0
 	holder.position += Vector3(rng.randf_range(-SHIFT, SHIFT), 0.0, rng.randf_range(-SHIFT, SHIFT))
@@ -363,9 +364,10 @@ static func _leans_on(block: Rect2i, blocks: Array) -> Vector2i:
 ## low eave at -x to its high side at +x; reaching [param reach] past the
 ## walls each way, the ridge sagging [param sag] in the middle of its
 ## length (the eaves do not), a top [param thick] above its underside; and its
-## ends closed down to the eaves in [param gable].
+## ends closed down to the eaves in [param gable]. A thatch roof's
+## ([param trim]) ridge and eaves dressed in art-kit's rolls (_trims).
 static func _slopes(across: float, along: float, rise: float, reach: float, sag: float, mono: bool, thick: float,
-		material: Material, gable: Material) -> Node3D:
+		material: Material, gable: Material, trim := false) -> Node3D:
 	var half := across * 0.5
 	var length := along + reach * 2.0
 	var height := func(x: float, z: float) -> float:
@@ -410,6 +412,41 @@ static func _slopes(across: float, along: float, rise: float, reach: float, sag:
 	gables.mesh = ends.commit()
 	gables.material_override = gable
 	out.add_child(gables)
+	if trim:
+		out.add_child(_trims(height, half + reach, length, rise / across if mono else rise / half, mono, thick))
+	return out
+
+
+## A thatch roof's trims (489 amended, art-kit's pieces): roof.thatch.ridge
+## along a gable's ridge and roof.thatch.eave along each low eave (a
+## lean-to's high side meets its wall and has none), one a metre over
+## [param length], on the top of the thatch ([param thick] above
+## [param height]'s underside), the ridge's pieces pitched to its sag, the
+## eaves' turned outward and laid down the slope ([param pitch] its fall a
+## metre). Slots art-kit has not got are left out.
+static func _trims(height: Callable, edge: float, length: float, pitch: float, mono: bool, thick: float) -> Node3D:
+	var out := Node3D.new()
+	out.name = "Trim"
+	var count := maxi(ceili(length), 1)
+	var step := length / count
+	var sides: Array[float] = [-1.0]
+	if not mono:
+		sides.append(1.0)
+	for k in count:
+		var z := -length * 0.5 + step * (k + 0.5)
+		if not mono and ArtKit.has("roof.thatch.ridge"):
+			var ridge := ArtKit.instance("roof.thatch.ridge")
+			var fall := (float(height.call(0.0, z + 0.05)) - float(height.call(0.0, z - 0.05))) / 0.1
+			ridge.position = Vector3(0.0, float(height.call(0.0, z)) + thick, z)
+			ridge.rotation.x = -atan(fall)
+			out.add_child(ridge)
+		if ArtKit.has("roof.thatch.eave"):
+			for side in sides:
+				var eave := ArtKit.instance("roof.thatch.eave")
+				eave.position = Vector3(side * edge, float(height.call(side * edge, z)) + thick, z)
+				# Its +x out past the eave, its -x up the slope under the thatch.
+				eave.rotation = Vector3(0.0, 0.0 if side > 0.0 else PI, -atan(pitch))
+				out.add_child(eave)
 	return out
 
 

@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Building kinds' roofs default to shingle; a kind may name thatch, now dressed in a ridge roll and ragged eaves. Corner posts no longer poke through a lean-to's roof.
 - Fixed: the server could crash when someone who had eaten, or was being bandaged or brought back, died or left for another place (572 amended).
 ## v0.1.164
 

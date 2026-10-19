@@ -1291,6 +1291,22 @@ func _test_composer() -> void:
 	var slopes := func(node: Node3D) -> Mesh: return (node.find_child("Slopes", true, false) as MeshInstance3D).mesh
 	_check(one != two and slopes.call(one) == slopes.call(two) and BuildingComposer._made.size() == 1,
 			"one look built once: two copies, one mesh between them")
+	# Thatch's trims: art-kit's ridge roll and eave fringe, a metre apiece,
+	# each eave's fringe out past its slope's low edge; shingle has none.
+	var thatch := BuildingComposer.compose(buildings[0], "thatch")
+	var trims := thatch.find_children("Trim", "", true, false)
+	var fringe_out := true
+	for trim: Node3D in trims:
+		for piece: Node3D in trim.get_children():
+			var local := piece.position
+			if absf(local.x) > 0.5:
+				fringe_out = fringe_out and piece.transform.basis.x.x * signf(local.x) > 0.5
+	var pieces := 0
+	for trim: Node in trims:
+		pieces += trim.get_child_count()
+	_check(one.find_child("Trim", true, false) == null and (not ArtKit.has("roof.thatch.eave") or (pieces > 10 and fringe_out)),
+			"thatch roofs trimmed in art-kit's ridge and eave rolls, the eaves' side out (%d); shingle none" % pieces)
+	thatch.free()
 	one.free()
 	two.free()
 	_rig.rebuild(level["terrain"], Vector2i(4, 11))
