@@ -27,6 +27,7 @@ func _ready() -> void:
 	_test_context_and_place()
 	_test_converse_panel()
 	_test_sim_reads()
+	_test_minimap_turn()
 	_test_counter_panel()
 	_test_world_map()
 	_test_access()
@@ -377,6 +378,34 @@ func _test_sim_reads() -> void:
 	sick.free()
 	_check(Main.pile_words(PackedStringArray(["herbs"])) == "herbs" and Main.pile_words(PackedStringArray(["herbs", "dagger", "rope"])) == "herbs and 2 more"
 		and Main.pile_words(PackedStringArray()) == "", "a pile's words: the first thing's short name, and how many more")
+
+
+func _test_minimap_turn() -> void:
+	print("== the minimap turns with the view, the arrow is the body's facing (decision 535) ==")
+	var map: Minimap = _main.minimap
+	var north := Vector2(World.north)
+	map.north_on_screen = Vector2.UP
+	var shown := map.view(Vector2(map.cells) / 2.0)
+	var middle := Minimap.to_screen((shown["centre"] as Vector2) - Vector2(0.5, 0.5), shown)
+	var ahead := Minimap.to_screen((shown["centre"] as Vector2) - Vector2(0.5, 0.5) + north * 3.0, shown)
+	_check(is_zero_approx(float(shown["angle"])) and (ahead - middle).normalized().is_equal_approx(Vector2.UP) == (north == Vector2.UP),
+		"north up: no turn, a cell to the north draws above the middle (%s)" % [(ahead - middle).normalized()])
+	var ok := true
+	for screen_north: Vector2 in [Vector2.UP, Vector2.RIGHT, Vector2.DOWN, Vector2.LEFT]:
+		map.north_on_screen = screen_north
+		shown = map.view(Vector2(map.cells) / 2.0)
+		middle = Minimap.to_screen((shown["centre"] as Vector2) - Vector2(0.5, 0.5), shown)
+		ahead = Minimap.to_screen((shown["centre"] as Vector2) - Vector2(0.5, 0.5) + north * 3.0, shown)
+		ok = ok and (ahead - middle).normalized().is_equal_approx(screen_north) and Minimap.on_screen(north, shown).is_equal_approx(screen_north)
+	_check(ok, "at four turns a cell to the north draws where the view puts north, and a body facing north points the same way")
+	map.north_on_screen = Vector2.UP
+	var player: GridEntity = _main._local_player()
+	if player != null:
+		var you: Dictionary = {}
+		for mark: Dictionary in _main._minimap_marks():
+			if mark["kind"] == "you":
+				you = mark
+		_check(not you.is_empty() and you["facing"] == Vector2(player.facing), "the you mark's facing is the body's replicated facing, not the camera's")
 
 
 func _test_counter_panel() -> void:

@@ -16266,3 +16266,37 @@ route through it and no group walks the temple's back way (maps' OK). The
 server alone refuses; nothing new reaches the client, so the protocol is
 unchanged. level_test (a sealed link, the console, the record), world_map_test
 (the way closed, no route). Server only; no new class_name.
+
+## 535. The minimap turns with the view; the arrow is the body's facing
+
+Jeff, from his play tests (2026-10-19, through the coordinator): "the
+minimap should probably rotate with compass and map, because it gets
+confusing, and the player arrow doesn't seem consistent with what
+direction one is facing." Ui's, maps glanced (482 is the minimap's
+redraw).
+
+- Minimap.north_on_screen, set by Main each frame from Main.screen_north,
+  the same screen direction of the level's north HudCompass turns its
+  ring by (427); the map turns by Vector2(World.north).angle_to(it)
+  (Minimap.turn), so up on the minimap and on the big map is up on the
+  screen. The zone's picture is drawn as the box's rectangle intersected
+  with the turned zone (Geometry2D.intersect_polygons), each vertex
+  mapped back to its cell for the texture (draw_polygon), so the corner
+  map is a window on the turned map and the big map shows the whole
+  turned zone, its box the turned bounds within the screen's fraction.
+  Minimap.to_screen turns every mark about the box's middle; with no
+  turn, nothing differs from before (minimap_test's numbers hold).
+- Redraws: the setter queues one draw when the direction changes
+  (turning the camera draws as it turns); standing still with the camera
+  still, nothing draws, as 482 has it (the marks' hash).
+- The arrow: Main's "you" mark carries the body's replicated facing
+  (GridEntity.facing, a grid direction) in place of the camera's look
+  (view_forward, gone), and the map draws it turned as the map is
+  (Minimap.on_screen), so the arrow points where the body's front points
+  on screen at every yaw. The inconsistency Jeff saw was the arrow
+  showing the camera, not the body.
+
+ui_test: four turns (a cell to the north draws where the view puts
+north, a body facing north points the same way), the you mark's facing.
+Shots at two yaws with the body facing the same way. Client only;
+protocol unchanged; no new class_name.

@@ -53,7 +53,18 @@ var ways_out: Array[Dictionary] = []
 ## {cell, name, kind}: the level's places.
 var places: Array[Dictionary] = []
 ## Main's: () -> Array of {cell: Vector2, kind: "you"|"companion"|"player"|"door", colour, facing: Vector2}.
+## The "you" mark's facing is the body's own (its replicated facing, a grid direction, decision 535).
 var marks: Callable = func() -> Array: return []
+## The screen direction of the level's north, set by Main from the view
+## (the same turn HudCompass makes, Main.screen_north): the map turns so
+## that up on it is up on the screen (decision 535, Jeff: "the minimap
+## should probably rotate with compass and map"). A change queues one
+## draw; standing still, nothing draws (482).
+var north_on_screen := Vector2.UP:
+	set(value):
+		if value.length() > 0.001 and not value.normalized().is_equal_approx(north_on_screen):
+			north_on_screen = value.normalized()
+			queue_redraw()
 
 ## How often it has drawn, and the microseconds drawing took (map_bench).
 var draws := 0
@@ -196,16 +207,35 @@ func view(centre: Vector2) -> Dictionary:
 		box = Vector2(side, side).min(area * scale)
 	var seen := (box / scale).min(area)
 	var start := (centre - seen / 2.0).clamp(Vector2.ZERO, area - seen)
+	var angle := turn()
 	var dest_size := seen * scale
-	var dest_pos := (screen - dest_size) / 2.0 if big 		else Vector2(screen.x - dest_size.x - CORNER_MARGIN * ui_scale(), CORNER_TOP * ui_scale())
-	return {"dest": Rect2(dest_pos, dest_size), "source": Rect2(start, seen), "scale": scale}
+	if big and not is_zero_approx(angle):
+		# The box holds the part shown however it is turned (its turned bounds).
+		dest_size = Vector2(absf(dest_size.x * cos(angle)) + absf(dest_size.y * sin(angle)),
+				absf(dest_size.x * sin(angle)) + absf(dest_size.y * cos(angle))).min(screen * BIG_FRACTION)
+	var dest_pos := (screen - dest_size) / 2.0 if big else Vector2(screen.x - dest_size.x - CORNER_MARGIN * ui_scale(), CORNER_TOP * ui_scale())
+	return {"dest": Rect2(dest_pos, dest_size), "source": Rect2(start, seen), "scale": scale,
+		"angle": angle, "centre": start + seen / 2.0}
 
 
-## Where [param cell] (its middle) falls on screen in [param shown] (view()).
+## How far the map is turned on screen (radians, clockwise positive):
+## from the level's north as the map holds it (World.north, a grid
+## direction) to where the view puts it (north_on_screen).
+func turn() -> float:
+	return Vector2(World.north).angle_to(north_on_screen)
+
+
+## Where [param cell] (its middle) falls on screen in [param shown] (view()):
+## turned about the box's middle by the view's turn (535).
 static func to_screen(cell: Vector2, shown: Dictionary) -> Vector2:
-	var source: Rect2 = shown["source"]
 	var dest: Rect2 = shown["dest"]
-	return dest.position + (cell + Vector2(0.5, 0.5) - source.position) * float(shown["scale"])
+	var centre: Vector2 = shown.get("centre", (shown["source"] as Rect2).get_center())
+	return dest.get_center() + ((cell + Vector2(0.5, 0.5) - centre) * float(shown["scale"])).rotated(float(shown.get("angle", 0.0)))
+
+
+## The screen direction a grid direction [param facing] points in [param shown] (the arrow's, 535).
+static func on_screen(facing: Vector2, shown: Dictionary) -> Vector2:
+	return facing.normalized().rotated(float(shown.get("angle", 0.0)))
 
 
 func _draw() -> void:
@@ -223,7 +253,21 @@ func _draw() -> void:
 	var scale: float = shown["scale"]
 	var ui := ui_scale()
 	draw_rect(dest.grow(3.0 * ui), FRAME)
-	draw_texture_rect_region(texture, dest, shown["source"], Color.WHITE, false, false)
+	# The zone's picture, turned about the box's middle and cut to the box
+	# (535): the box's corners and the turned zone's, intersected, each
+	# vertex mapped back to its cell for the texture.
+	var angle: float = shown["angle"]
+	var centre_cell: Vector2 = shown["centre"]
+	var middle := dest.get_center()
+	var zone_poly := PackedVector2Array()
+	for corner: Vector2 in [Vector2.ZERO, Vector2(cells.x, 0), Vector2(cells), Vector2(0, cells.y)]:
+		zone_poly.append(middle + ((corner - centre_cell) * scale).rotated(angle))
+	var box_poly := PackedVector2Array([dest.position, Vector2(dest.end.x, dest.position.y), dest.end, Vector2(dest.position.x, dest.end.y)])
+	for poly: PackedVector2Array in Geometry2D.intersect_polygons(box_poly, zone_poly):
+		var uvs := PackedVector2Array()
+		for p: Vector2 in poly:
+			uvs.append((centre_cell + ((p - middle) / scale).rotated(-angle)) / Vector2(cells))
+		draw_polygon(poly, PackedColorArray([Color.WHITE]), uvs, texture)
 	var font := UiTheme.font("serif")
 	var label_size := int(LABEL_SIZE * ui)
 	var dot := maxf(2.0 * ui, scale * 0.6)
@@ -253,7 +297,8 @@ func _draw() -> void:
 			"player", "companion":
 				_mark(at, dest, func(p: Vector2) -> void: draw_circle(p, dot if mark["kind"] == "player" else dot * 0.7, colour))
 			"you":
-				var facing: Vector2 = mark.get("facing", Vector2(0, -1))
+				# The body's facing, turned as the map is (535): the arrow points where the body's front points on screen.
+				var facing := on_screen(mark.get("facing", Vector2(0, -1)), shown)
 				var size := maxf(8.0 * ui, dot * 2.5)
 				var tip := at + facing.normalized() * size
 				var side := facing.orthogonal().normalized() * size * 0.6

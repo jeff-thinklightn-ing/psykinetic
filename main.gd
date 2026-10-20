@@ -813,6 +813,8 @@ func _process(delta: float) -> void:
 	var hud_began := Time.get_ticks_usec()
 	if compass != null:
 		compass.north_on_screen = screen_north()
+		if minimap != null:
+			minimap.north_on_screen = compass.north_on_screen  # The map turns as the compass does (535).
 		var standing := player.tile if player != null else NONE
 		if standing != _place_tile or _hud_tick != _place_tick:
 			_place_tile = standing
@@ -7682,7 +7684,7 @@ func _minimap_marks() -> Array:
 			continue
 		if entity is Player:
 			if entity == me:
-				out.append({"cell": Vector2(entity.tile), "kind": "you", "facing": view_forward()})
+				out.append({"cell": Vector2(entity.tile), "kind": "you", "facing": Vector2(entity.facing)})  # The body's own facing (535).
 			else:
 				out.append({"cell": Vector2(entity.tile), "kind": "player", "colour": entity.tint})
 		elif entity is Companion and entity.keeper_peer == Net.local_id:
