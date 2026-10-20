@@ -337,6 +337,28 @@ func _test_lay() -> void:
 	var level := Level.parse(map.to_image(), null, {"outdoor": true, "streams": [{"path": path}]}, map.to_relief_image())
 	_check(not level["warnings"].any(func(w: String) -> bool: return "stream" in w or "water" in w or "pond" in w),
 		"its water runs down, under banks a lip over it (%s)" % [level["warnings"]])
+	var painted := Relief.lay(map, Rect2i(0, 0, 48, 40), 3, options.merged({"kinds": true}))
+	var cells: Dictionary = painted["cells"]
+	var steep := 0
+	var steep_rock := 0
+	var bank_dirt := true
+	for at: Vector2i in painted["relief"]:
+		if cells.get(at, "") == "water" or not cells.has(at):
+			continue
+		var step := 0.0
+		var by_water := false
+		for d: Vector2i in Relief.FOUR:
+			if cells.get(at + d, "") == "water":
+				by_water = true
+			elif painted["relief"].has(at + d):
+				step = maxf(step, absf(float(painted["relief"][at + d]) - float(painted["relief"][at])))
+		if step >= Relief.ROCK_STEP + Relief.KIND_WANDER:
+			steep += 1
+			steep_rock += 1 if cells[at] == "stone" else 0
+		if by_water and step < Relief.ROCK_STEP - Relief.KIND_WANDER and cells[at] != "dirt":
+			bank_dirt = false
+	_check(steep > 0 and steep_rock == steep, "kinds: rock on every steep cell (%d of %d)" % [steep_rock, steep])
+	_check(bank_dirt and cells.values().has("grass") and cells.values().has("dirt"), "dirt banks by the water, grass and bare dirt elsewhere")
 	var padded := Relief.pad(map, Rect2i(20, 20, 3, 3))
 	var ring: Array = padded["relief"].keys()
 	_check(ring.size() == 25 and Relief.flat(PackedFloat32Array(padded["relief"].values()), Vector2i(25, 1),
@@ -373,6 +395,11 @@ func _test_hills() -> void:
 		highest = maxf(highest, Relief.at(field, size, cell))
 	_check(_corners_agree(terrain).is_empty(), "walkably joined cells agree on every corner they share (%s)" % [_corners_agree(terrain)])
 	_check(highest - lowest > 8.0, "hills and valleys: %.1f m between the lowest and the highest" % (highest - lowest))
+	var kinds := {}
+	for cell: Vector2i in terrain["kinds"]:
+		kinds[terrain["kinds"][cell]] = int(kinds.get(terrain["kinds"][cell], 0)) + 1
+	_check(kinds.get("stone", 0) > 500 and kinds.get("grass", 0) > 1000 and kinds.get("dirt", 0) > 200, "its ground by slope: rock, grass and bare dirt (%s)" % [kinds])
+	_check(terrain["streams"][0]["path"].size() > 60, "the stream runs the valley's length (%d cells)" % terrain["streams"][0]["path"].size())
 	_check(terrain["streams"].size() == 1 and not terrain["fords"].is_empty() and level["buildings"].any(func(b: Dictionary) -> bool: return b["slot"] == "bridge"),
 		"its stream, a ford and a bridge")
 	var area := {"relief": field, "relief_size": size, "stairs": terrain["stairs"], "heights": {}, "edges": terrain["edges"], "floor": floor, "size": size}

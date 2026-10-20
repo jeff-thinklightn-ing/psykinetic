@@ -214,6 +214,14 @@ const LAY_SLOPE := 0.4
 const STREAM_DEPTH := 0.4
 const FOUR: Array[Vector2i] = [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]
 const SIDES := {"north": Vector2i(0, -1), "east": Vector2i(1, 0), "south": Vector2i(0, 1), "west": Vector2i(-1, 0)}
+## Relief.lay's "kinds": the ground it paints, and by what (metres a step,
+## a crest's height over the cells round it).
+const GROUND_KINDS: Array[String] = ["grass", "dirt", "stone"]
+const ROCK_STEP := 0.34
+const DIRT_STEP := 0.24
+const CREST := 0.3
+const CREST_REACH := 3
+const KIND_WANDER := 0.04
 
 
 ## Hills, valleys and ridges laid over [param rect] of [param map] (a
@@ -222,27 +230,32 @@ const SIDES := {"north": Vector2i(0, -1), "east": Vector2i(1, 0), "south": Vecto
 ## - base (metres; the area's mean if not given): the ground's middle;
 ## - amplitude (4): how far the roll goes either way of it;
 ## - scale (36): the roll's width in cells;
+## - octaves (3): the roll's detail (fewer, smoother);
 ## - ridges: [[Vector2i, ...], ...], polylines a ridge runs along, ridge_height
 ##   (amplitude * 1.5) over the roll at its crest, ridge_width (10 cells) out;
-## - valleys: [[Vector2i, ...], ...], polylines a valley runs along,
-##   valley_depth (amplitude) under the roll at its floor, valley_width (12)
-##   out (a stream finds it);
+##   an entry may be {line, height, width} of its own (a knoll: one point);
+## - valleys: [[Vector2i, ...], ...], polylines a valley runs along, its
+##   floor valley_depth (amplitude) under base and valley_floor (0) cells
+##   out either side, falling valley_fall (0) metres from the line's first
+##   point to its last, the ground eased down to it valley_width (12) out
+##   (a stream finds it, all along);
 ## - tilt (Vector2, metres a cell): the whole area leaning, so water runs
 ##   one way;
-## - plateaus: [{rect: Rect2i, height, faces}], raised that many metres over
-##   the ground round them, their faces ("north", "east", "south", "west";
-##   all if not given) cliffs left steep, their other sides falling away
-##   walkably (a spur down);
+## - plateaus: [{rect: Rect2i, height, faces, spur}], raised that many
+##   metres over the ground round them, their faces ("north", "east",
+##   "south", "west"; all if not given) cliffs left steep, their other sides
+##   falling away walkably, no steeper than spur (LAY_SLOPE) metres a cell;
 ## - keep_flat: [Rect2i], pads levelled with a one-cell apron (pad);
 ## - streams (1): how many streams run down the valleys to the area's edge,
 ##   each width (1 or 2) cells wide; min_flow (area / 60): the fewest cells
 ##   that drain into a stream's source;
-## - keep_clear (cell -> anything): cells left as they are.
+## - keep_clear (cell -> anything): cells left as they are;
+## - kinds (false): the ground's kinds set by slope and height too (_kinds).
 ## Everything else is slope-limited to LAY_SLOPE a step, so walked. Only
 ## the map's walkable cells are changed (what stands on them goes up and
 ## down with them; void, water and keep_clear left). The same seed
 ## lays the same ground. Returns {relief: cell -> metres, cells: cell ->
-## "water" (the streams), streams: [[Vector2i, ...]] (each from its source to
+## "water" (the streams; with kinds, the ground's meanings too), streams: [[Vector2i, ...]] (each from its source to
 ## its mouth, for level.json "streams")}.
 static func lay(map: LevelMap, rect: Rect2i, lay_seed: int, options := {}) -> Dictionary:
 	var area := rect.intersection(Rect2i(Vector2i.ZERO, map.size))
@@ -266,7 +279,7 @@ static func lay(map: LevelMap, rect: Rect2i, lay_seed: int, options := {}) -> Di
 	roll.seed = lay_seed
 	roll.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
 	roll.fractal_type = FastNoiseLite.FRACTAL_FBM
-	roll.fractal_octaves = 3
+	roll.fractal_octaves = clampi(int(options.get("octaves", 3)), 1, 6)
 	roll.frequency = 1.0 / maxf(4.0, float(options.get("scale", 36.0)))
 	var ridges: Array = options.get("ridges", [])
 	var ridge_height := float(options.get("ridge_height", amplitude * 1.5))
@@ -274,22 +287,31 @@ static func lay(map: LevelMap, rect: Rect2i, lay_seed: int, options := {}) -> Di
 	var valleys: Array = options.get("valleys", [])
 	var valley_depth := float(options.get("valley_depth", amplitude))
 	var valley_width := maxf(2.0, float(options.get("valley_width", 12.0)))
+	var valley_floor := clampf(float(options.get("valley_floor", 0.0)), 0.0, valley_width - 1.0)
+	var valley_fall := float(options.get("valley_fall", 0.0))
 	var tilt: Vector2 = options.get("tilt", Vector2.ZERO)
 	var middle := Vector2(area.get_center())
 	var heights := {}
 	for at: Vector2i in ground:
 		var height := base + amplitude * roll.get_noise_2d(at.x, at.y) + tilt.dot(Vector2(at) - middle)
 		var crest := 0.0
-		for line: Array in ridges:
+		for ridge: Variant in ridges:
+			var line: Array = ridge["line"] if ridge is Dictionary else ridge
+			var high := float(ridge.get("height", ridge_height)) if ridge is Dictionary else ridge_height
+			var wide := float(ridge.get("width", ridge_width)) if ridge is Dictionary else ridge_width
 			var near := _distance_to_line(at, line)
-			if near < ridge_width:
-				crest = maxf(crest, ridge_height * (1.0 - smoothstep(0.0, ridge_width, near)))
-		var trough := 0.0
+			if near < wide:
+				crest = maxf(crest, high * (1.0 - smoothstep(0.0, wide, near)))
+		height += crest
+		# A valley: its floor (valley_floor cells out from its line) falling
+		# valley_fall metres from its first point to its last under the
+		# ground's middle, the ground eased down to it across valley_width.
 		for line: Array in valleys:
-			var near := _distance_to_line(at, line)
-			if near < valley_width:
-				trough = maxf(trough, valley_depth * (1.0 - smoothstep(0.0, valley_width, near)))
-		heights[at] = height + crest - trough
+			var where := _along_line(at, line)
+			if where.x < valley_width:
+				var floor_at := base - valley_depth + valley_fall * (0.5 - where.y)
+				height = lerpf(height, floor_at, 1.0 - smoothstep(valley_floor, valley_width, where.x))
+		heights[at] = height
 	# Plateaus: raised over what is round them, fixed, their sides left steep.
 	var fixed: Dictionary[Vector2i, bool] = {}
 	var cliff_side: Dictionary[Vector2i, bool] = {}
@@ -301,6 +323,16 @@ static func lay(map: LevelMap, rect: Rect2i, lay_seed: int, options := {}) -> Di
 			continue
 		var level := _mean_of(heights, cells) + float(plateau.get("height", 3.0))
 		var sides: Array = plateau.get("faces", SIDES.keys())
+		# Its other sides fall away no steeper than "spur" metres a cell.
+		var spur := float(plateau.get("spur", LAY_SLOPE))
+		for at: Vector2i in ground:
+			if top.has_point(at):
+				continue
+			var nearest := Vector2i(clampi(at.x, top.position.x, top.end.x - 1), clampi(at.y, top.position.y, top.end.y - 1))
+			var off := at - nearest
+			var faced := (off.x < 0 and "west" in sides) or (off.x > 0 and "east" in sides) 					or (off.y < 0 and "north" in sides) or (off.y > 0 and "south" in sides)
+			if not faced:
+				heights[at] = maxf(float(heights[at]), level - spur * Vector2(off).length())
 		for at: Vector2i in cells:
 			heights[at] = level
 			fixed[at] = true
@@ -321,8 +353,14 @@ static func lay(map: LevelMap, rect: Rect2i, lay_seed: int, options := {}) -> Di
 	var flow := _flow(heights, area)
 	var taken: Dictionary[Vector2i, bool] = {}
 	var min_flow := int(options.get("min_flow", maxi(8, ground.size() / 60)))
+	# A stream keeps to a valley's floor where it can.
+	var floors: Dictionary[Vector2i, bool] = {}
+	for at: Vector2i in heights:
+		for line: Array in valleys:
+			if _along_line(at, line).x <= valley_floor + 1.0:
+				floors[at] = true
 	for i in int(options.get("streams", 1)):
-		var path := _stream_path(flow, heights, area, min_flow, taken)
+		var path := _stream_path(flow, heights, area, min_flow, taken, floors)
 		if path.size() < 4:
 			break
 		var wide := clampi(int(options.get("width", 1)), 1, 2)
@@ -343,7 +381,51 @@ static func lay(map: LevelMap, rect: Rect2i, lay_seed: int, options := {}) -> Di
 		lowest = minf(lowest, heights[at])
 	for at: Vector2i in heights:
 		out["relief"][at] = snappedf(heights[at] - lowest, 0.01)
+	if options.get("kinds", false):
+		_kinds(map, heights, out["cells"], lay_seed)
 	return out
+
+
+## The ground's kinds by its slope and height (Relief.lay's "kinds",
+## decision 525 amended), into [param cells] for the cells of
+## [param heights] that are ground (stone, grass or dirt) and not water: by
+## the biggest step to an orthogonal neighbour, stone from ROCK_STEP up,
+## bare dirt from DIRT_STEP up or on a crest (CREST over the mean of the
+## cells within CREST_REACH), grass in the hollows and on gentle ground; a
+## cell beside the water its dirt bank. The thresholds wander a little
+## (KIND_WANDER, by the seed) so the bands are no contour lines.
+static func _kinds(map: LevelMap, heights: Dictionary, cells: Dictionary, lay_seed: int) -> void:
+	var wander := FastNoiseLite.new()
+	wander.seed = lay_seed + 1
+	wander.frequency = 0.15
+	wander.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+	for at: Vector2i in heights:
+		if cells.has(at) or map.cell(at) not in GROUND_KINDS:
+			continue
+		var here: float = heights[at]
+		var step := 0.0
+		var bank := false
+		for direction in FOUR:
+			var next := at + direction
+			if cells.get(next, "") == "water":
+				bank = true
+			elif heights.has(next):
+				step = maxf(step, absf(float(heights[next]) - here))
+		var sum := 0.0
+		var count := 0
+		for y in range(-CREST_REACH, CREST_REACH + 1):
+			for x in range(-CREST_REACH, CREST_REACH + 1):
+				var near := at + Vector2i(x, y)
+				if heights.has(near) and not cells.get(near, "") == "water":
+					sum += float(heights[near])
+					count += 1
+		var shift := KIND_WANDER * wander.get_noise_2d(at.x, at.y)
+		if step >= ROCK_STEP + shift:
+			cells[at] = "stone"
+		elif bank or step >= DIRT_STEP + shift or here - sum / maxi(1, count) >= CREST + shift:
+			cells[at] = "dirt"
+		else:
+			cells[at] = "grass"
 
 
 ## Cells [param rect] of [param map] levelled at their mean, and the ring
@@ -379,6 +461,31 @@ static func _mean_of(heights: Dictionary, cells: Array) -> float:
 	for at: Vector2i in cells:
 		sum += float(heights[at])
 	return sum / maxi(1, cells.size())
+
+
+## How far [param at] is from the polyline [param line] (cells), and how
+## far along it the nearest point lies (0 at its first point, 1 at its
+## last), as (distance, along).
+static func _along_line(at: Vector2i, line: Array) -> Vector2:
+	var point := Vector2(at)
+	if line.size() == 1:
+		return Vector2(point.distance_to(Vector2(line[0])), 0.0)
+	var total := 0.0
+	for i in range(1, line.size()):
+		total += Vector2(line[i]).distance_to(Vector2(line[i - 1]))
+	var best := INF
+	var along := 0.0
+	var walked := 0.0
+	for i in range(1, line.size()):
+		var a := Vector2(line[i - 1])
+		var b := Vector2(line[i])
+		var nearest := Geometry2D.get_closest_point_to_segment(point, a, b)
+		var near := point.distance_to(nearest)
+		if near < best:
+			best = near
+			along = (walked + a.distance_to(nearest)) / maxf(total, 0.001)
+		walked += a.distance_to(b)
+	return Vector2(best, along)
 
 
 ## How far [param at] is from the polyline [param line] (cells).
@@ -525,8 +632,9 @@ static func _flow(heights: Dictionary, area: Rect2i) -> Dictionary:
 
 ## The stream draining most of [param flow] not yet [param taken]: from its
 ## source (the last cell up it with min_flow draining through) to its mouth
-## at the area's edge.
-static func _stream_path(flow: Dictionary, heights: Dictionary, area: Rect2i, min_flow: int, taken: Dictionary) -> Array[Vector2i]:
+## at the area's edge, keeping to [param floors] (a valley's) where a
+## branch up does.
+static func _stream_path(flow: Dictionary, heights: Dictionary, area: Rect2i, min_flow: int, taken: Dictionary, floors: Dictionary = {}) -> Array[Vector2i]:
 	var down: Dictionary = flow["down"]
 	var count: Dictionary = flow["count"]
 	var mouth := Vector2i(-1, -1)
@@ -544,7 +652,11 @@ static func _stream_path(flow: Dictionary, heights: Dictionary, area: Rect2i, mi
 		path.append(at)
 		var best := Vector2i(-1, -1)
 		for up: Vector2i in ups.get(at, []):
-			if not taken.has(up) and int(count[up]) >= min_flow and (best.x < 0 or int(count[up]) > int(count[best])):
+			if taken.has(up) or int(count[up]) < min_flow:
+				continue
+			# A valley's floor first, then the most water.
+			var better := best.x < 0 or floors.has(up) and not floors.has(best) 					or floors.has(up) == floors.has(best) and int(count[up]) > int(count[best])
+			if better:
 				best = up
 		if best.x < 0:
 			break

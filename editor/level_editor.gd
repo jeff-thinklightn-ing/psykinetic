@@ -703,7 +703,7 @@ func fill_changes(fill: String) -> Dictionary:
 		"outcrop":
 			return Outcrops.lay(map, area, tool_seed, {"keep_clear": _kept_cells()})
 		"relief":
-			return relief_changes(Relief.lay(map, area, tool_seed, {"keep_clear": _kept_cells()}))
+			return relief_changes(Relief.lay(map, area, tool_seed, {"keep_clear": _kept_cells(), "kinds": true}))
 	return {}
 
 

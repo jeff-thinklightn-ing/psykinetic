@@ -15889,3 +15889,38 @@ PersonLook's people) and 494 (the goblin's shader and per-instance variation).
   few back faces show through at the shoulders in the jog and the axe swing; the chest scar
   sits mostly under its hunched arms. The generator's revision (478 amended, cd20dd73) is the
   fallback: its orc.glb and orc.blend from that commit, "parts" in place of "paint".
+Amended (Jeff after the review: "that's not working", the valley read flat
+from the game's camera; the coordinator's numbers): the remade hills had a
+roll of 1.6 m over 30 cells (many small bumps cancelling out), a 6 m ridge
+14 cells out and a valley 3 m deep, 11.7 m from lowest to highest; from the
+isometric camera a lumpy plain.
+
+- Relief.lay: "octaves"; a ridge entry {line, height, width} (a knoll);
+  a valley's floor (valley_floor cells out) easing the ground to a level
+  falling valley_fall along its line (the roll's noise had split the valley
+  into two drainages, the stream only in half), and streams keeping to a
+  valley's floor going up; a plateau's "spur" (its other sides falling no
+  steeper than that); "kinds": the ground painted by slope and height
+  (Relief._kinds: stone from ROCK_STEP 0.34 m a step, dirt from DIRT_STEP
+  0.24 or a crest CREST 0.3 m over the cells within 3 or beside water,
+  grass else, the thresholds wandering KIND_WANDER 0.04 by the seed). The
+  editor's relief fill paints so.
+- levels/hills: a roll of 2 m over 70 cells in 2 octaves, the ridge 6.5 m
+  34 cells out (moved west), a knoll 6 m 20 out across the stream, the
+  valley floor 3.5 m under base and 3 cells either side falling 5 m north
+  to south 30 out, the plateau 6 m (its spur 0.25 m a cell); the stream
+  (99 cells) runs the valley's length; the ford where the stream runs
+  straight and level (its banks a walk over it and a lip over the water
+  beside them); the bridge the crossing nearest row 78 at least 7 rows
+  from the ford. 2.3 to 15.4 m west of the plateau, the stream from 1.9,
+  the plateau 14.3; one cliff, its face. Ground: 3241 stone, 896 dirt, 2598
+  grass. The approved 9 m ridge and 6 m valley were cut back: on a map 96
+  wide with the plateau a third of it they put every flank at the slope's
+  cap (74% rock); as laid, the flanks still sit at the cap (rock), the
+  crests, tops and the valley grass. Raising the thresholds hardly moves
+  it (the steps cluster at the cap): less rock is gentler ground.
+- make_hills passed the ford and bridge only the water (with kinds, lay's
+  cells hold the ground too).
+
+tests: relief_test: kinds (rock on every steep cell, dirt banks, grass
+and dirt), the hills' ground by slope, the stream its valley's length.
