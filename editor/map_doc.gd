@@ -30,14 +30,6 @@ var had_heights := false
 var heights_dirty := false
 ## Whether relief.png (decision 525: map.relief) has changes to write.
 var relief_dirty := false
-## relief.png as an image (null for none), read from and into map.relief
-## (builder's BuilderSession reads and copies it so).
-var relief: Image:
-	get:
-		return map.to_relief_image() if map != null else null
-	set(value):
-		if map != null:
-			map.read_relief(value)
 ## What the last load, save or resize said.
 var report := ""
 var undo_steps: Array[Dictionary] = []

@@ -564,8 +564,9 @@ func _test_territory_routes() -> void:
 	_check(cut.size() == 1 and cut[0].get("meets") == "t_mid/ford" and holdings.ground("t_mid", cut[0]["to"]) == "nobody",
 		"the goblins take the ford, wall to wall: at once the town's way across meets it, before its fields are made again (%s)" % [cut])
 	routes.wait()
-	_check(routes.is_ready("town") and str(routes.route("t_mid", Vector2i(0, 4), "t_mid", Vector2i(20, 4), "town")) == str(cut),
-		"its fields made again on the pool: the same answer")
+	var again := routes.route("t_mid", Vector2i(0, 4), "t_mid", Vector2i(20, 4), "town")
+	_check(routes.is_ready("town") and str(again) == str(cut),
+		"its fields made again on the pool: the same answer (ready %s, %s)" % [routes.is_ready("town"), again])
 	_check(routes.route("t_mid", Vector2i(0, 4), "t_mid", Vector2i(20, 4), "goblins")[0]["steps"] == 20.0, "the goblins' own ground stays open to them")
 	_check(routes.route("t_mid", Vector2i(0, 4), "t_mid", Vector2i(20, 4)).size() == 1, "a route with no faction ignores held ground")
 	routes.blocked = func(way: Dictionary, faction: String) -> bool: return faction == "goblins" and way["kind"] == "edge"
