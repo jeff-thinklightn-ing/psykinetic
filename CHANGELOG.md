@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The server console can move a player: `move <player> <x> <y> [zone]` puts them at the nearest walkable spot, their companion with them (531).
 - Landing tests: a test that dies as it starts, before running any of its own code, is noted and retried once, and the suite starts its tests a moment apart (530); tools only.
 - The orc brute is now drawn from Jeff's chosen concept (Jeff: "the trellis retarget is what's close, not the blue blob monster"): art-gen's model of it with its own painted skin, each orc a little different in build and skin, some with a chest scar, arm stripes or a red handprint (529).
 - Hills are drawn (525): the ground follows its heights in smooth slopes, with rock faces only where it is too steep to walk; streams step down their valleys, things stand on the slope, and the camera tilts up to see you over a ridge.

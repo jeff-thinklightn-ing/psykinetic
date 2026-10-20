@@ -2472,6 +2472,76 @@ func _show_zone_to(peer: int, zone_name: String, leaving: Array[GridEntity] = []
 	World.update_visibility(peer, zone_name)
 
 
+## The console's "move <player> <x> <y> [zone]" (decision 531; Jeff:
+## "teleport me to the trader"): the connected player of that name (as
+## "players" lists them: the game's Player3 or the name they joined with,
+## exactly) put at the nearest walkable cell to (x, y) in that zone, else
+## their own, as travel takes anyone (their companion at heel brought
+## along; a returning player's free-cell and spawn-safety placement, 465;
+## the client sent the zone afresh) and told where they are. Refused, with
+## nothing moved, for no such player online, a name two players share (how
+## many, not who), no such zone, a cell off the map, or none walkable within
+## MOVE_REACH of it. No id is printed (the journal is grepped).
+const MOVE_REACH := 8
+func _move_command(words: PackedStringArray) -> String:
+	if words.size() < 4 or not words[2].is_valid_int() or not words[3].is_valid_int():
+		return "move <player> <x> <y> [zone]: the player by name as \"players\" lists them"
+	var wanted := words[1]
+	var peers: Array[int] = []
+	for peer: int in _players:
+		var player: Player = _players[peer]
+		if not is_instance_valid(player) or not player.spawned:
+			continue
+		var record: PlayerRecord = _records.get(_peer_ids.get(peer, ""))
+		if player.name == wanted or record != null and record.name == wanted:
+			peers.append(peer)
+	if peers.is_empty():
+		return "move: no player %s online" % wanted
+	if peers.size() > 1:
+		return "move: %d players online are called %s; not moved" % [peers.size(), wanted]
+	var peer := peers[0]
+	var mover: Player = _players[peer]
+	var zone_name := words[4] if words.size() > 4 else mover.zone
+	if not Level.exists(zone_name):
+		return "move: no zone %s" % zone_name
+	var target := Vector2i(int(words[2]), int(words[3]))
+	var parsed := Level.load_level(zone_name)
+	var size: Vector2i = parsed.get("size", Vector2i.ZERO)
+	if not Rect2i(Vector2i.ZERO, size).has_point(target):
+		return "move: %s is off %s's map (%d x %d)" % [target, zone_name, size.x, size.y]
+	var cell := _walkable_near(parsed, target)
+	if cell == World.NO_CELL:
+		return "move: nothing walkable within %d of %s in %s; not moved" % [MOVE_REACH, target, zone_name]
+	var who := mover.name
+	if not travel(peer, zone_name, "", {}, cell):
+		return "move: %s could not go to %s" % [who, zone_name]
+	var moved: Player = _players.get(peer)
+	var landed: Vector2i = moved.tile if is_instance_valid(moved) else cell
+	var place := str(Level.load_level(zone_name).get("display_name", zone_name))
+	Net.broadcast_to([peer], "party", {"from": "Server", "text": "You find yourself in %s." % (place if not place.is_empty() else zone_name)})
+	print("[admin] moved %s to %s in %s" % [who, landed, zone_name])
+	return "moved %s to %s in %s%s" % [who, landed, zone_name, "" if landed == target else " (nearest walkable to %s)" % target]
+
+
+## The floor cell of level [param parsed] nearest [param target] (itself if
+## it is floor) within MOVE_REACH, ring by ring; World.NO_CELL if none.
+static func _walkable_near(parsed: Dictionary, target: Vector2i) -> Vector2i:
+	var floor_cells: Dictionary[Vector2i, bool] = {}
+	for cell: Vector2i in parsed.get("terrain", {}).get("floor", []):
+		floor_cells[cell] = true
+	var best := World.NO_CELL
+	for reach in MOVE_REACH + 1:
+		for y in range(-reach, reach + 1):
+			for x in range(-reach, reach + 1):
+				var cell := target + Vector2i(x, y)
+				if maxi(absi(x), absi(y)) == reach and floor_cells.has(cell) \
+						and (best == World.NO_CELL or Vector2(cell - target).length() < Vector2(best - target).length()):
+					best = cell
+		if best != World.NO_CELL:
+			return best
+	return best
+
+
 ## Server: [param peer]'s player (and their companion) go to zone
 ## [param to_map], at its spawn point [param to_spawn] ("" for its first
 ## start), or, across an edge, at the cell matching [param edge] ({side,
@@ -7837,6 +7907,8 @@ func admin_command(line: String) -> String:
 					player.name, record.name if record != null else "?", id.left(8), peer, player.zone,
 					player.tile, player.hp, player.max_hp])
 			return "%d connected\n%s" % [lines.size(), "\n".join(lines)] if not lines.is_empty() else "0 connected"
+		"move":
+			return _move_command(words)
 		"save":
 			if Net.state_path == "":
 				return "no --state file to save to"

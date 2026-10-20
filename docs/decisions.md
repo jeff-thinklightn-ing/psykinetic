@@ -15924,3 +15924,26 @@ isometric camera a lumpy plain.
 
 tests: relief_test: kinds (rock on every steep cell, dirt banks, grass
 and dirt), the hills' ground by slope, the stream its valley's length.
+
+## 531. The console's "move": a player put where the operator says
+
+Jeff: "teleport me to the trader" (the coordinator's ask; release's terms).
+
+- Main.admin_command "move <player> <x> <y> [zone]" (server/admin.sh's
+  usage): the connected player whose joined name (as "players" lists it)
+  or player node name is exactly that, put by Main.travel at the nearest
+  floor cell to (x, y) within MOVE_REACH 8 (ring by ring) in the zone
+  named, else their own: the same placement a link or a returning player
+  gets (the nearest free cell, spawn safety, 465's), their companion
+  brought along, the client sent the zone afresh, and the player told
+  "You find yourself in <the level's name>."
+- Refused, with nothing moved and no record touched, for: no such player
+  online; a name two or more players share ("N players online are called
+  X", not who); no such zone; a cell off its map; no floor within 8 of it;
+  words that are not numbers. Every check is made before travel.
+- No player id in any reply or log line (the journal is grepped).
+- Server only; protocol unchanged.
+
+tests: level_test _test_admin_move: moved into another zone and within
+their own, each refusal with nothing moved, no id in a reply, the nearest
+floor search.

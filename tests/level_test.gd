@@ -31,6 +31,7 @@ func _ready() -> void:
 	_test_falls()
 	_test_sight_over_walls()
 	_test_hills()
+	_test_admin_move()
 	_test_forest()
 	_test_buildings()
 	_test_field()
@@ -334,6 +335,38 @@ func _test_hills() -> void:
 	World.despawn(imp)
 	_check(World.has_line_of_sight(Vector2i(63, 37), Vector2i(53, 38)), "from the plateau's rim the valley beyond the low wall is seen")
 	_check(not World.has_line_of_sight(Vector2i(8, 40), Vector2i(46, 40)), "the ridge hides the valley from the west")
+
+
+## The console's "move" (decision 531): the player by name to the nearest
+## walkable cell in a zone (by travel, which brings a companion along: the
+## link tests'); refused with
+## nothing moved for no such player, zone, a cell off the map or with no
+## floor near it; no id in any reply.
+func _test_admin_move() -> void:
+	print("== admin: move a player ==")
+	_main.load_map("test_room")
+	var player := _player()
+	var record: PlayerRecord = _main._records.get(_main._peer_ids.get(player.owner_peer, ""))
+	# The name they joined with: the node's own (Player1) may change as it
+	# is spawned again in another zone.
+	var who := record.name
+	var reply: String = _main.admin_command("move %s 13 15 sample" % who)
+	var moved := _player()
+	_check(moved != null and moved.zone == "sample" and World.distance(moved.tile, Vector2i(13, 15)) <= 1 and reply.begins_with("moved %s" % who),
+		"move %s 13 15 sample: there (%s; %s)" % [who, moved.tile if moved else "none", reply])
+	reply = _main.admin_command("move %s 2 6" % who)
+	_check(_player().zone == "sample" and World.distance(_player().tile, Vector2i(2, 6)) <= 1, "no zone: within their own (%s)" % reply)
+	var at := _player().tile
+	var refusals := {"move Nobody 3 3": "no player Nobody online", "move %s 3 3 no_such_zone" % who: "no zone no_such_zone",
+		"move %s 900 3" % who: "off sample's map", "move %s x 3" % who: "move <player> <x> <y>"}
+	for line: String in refusals:
+		reply = _main.admin_command(line)
+		_check(refusals[line] in reply and _player().tile == at and _player().zone == "sample", "%s: refused, not moved (%s)" % [line, reply])
+	_check(record == null or not record.player_id in reply, "no id in the reply")
+	var far := {"terrain": {"floor": [Vector2i(20, 20)]}}
+	_check(_main._walkable_near(far, Vector2i(0, 0)) == World.NO_CELL and _main._walkable_near(far, Vector2i(14, 15)) == Vector2i(20, 20),
+		"nothing walkable within %d: none (refused); within it, the nearest floor" % _main.MOVE_REACH)
+	_main.load_map("test_room")
 
 
 ## [param prefab_name] stamped onto [param map] at [param at], turned
