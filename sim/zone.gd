@@ -26,6 +26,9 @@ var fords: Dictionary[Vector2i, bool] = {}
 var cover := PackedFloat32Array()
 var cover_rect := Rect2i()
 var torches: Dictionary[Vector2i, bool] = {}
+## How many times its terrain has been loaded (a reload, a generation): what
+## reads its level.json once knows when to read it again (Monster's graves).
+var terrain_loads := 0
 var fields := Fields.new()
 var north := Vector2i(0, -1)
 var outdoor := false

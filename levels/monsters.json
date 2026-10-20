@@ -31,6 +31,43 @@
 		"wields": {"right": "dagger"},
 		"drops": [{"item": "pick", "count": [1, 1], "chance": 0.2}]
 	},
+	"skeleton": {
+		"label": "Skeleton",
+		"body": {"mass": 30.0, "move_ticks": 4.0, "max_hp": 6},
+		"tactic": "plain",
+		"idle": "homeward",
+		"opens_doors": true,
+		"door_force": 1,
+		"leash": 12,
+		"strength": 1,
+		"temperament": {"bold": 1, "cautious": 0, "cowardly": 0},
+		"fearless": true
+	},
+	"skeleton_guard": {
+		"label": "Barrow guard",
+		"body": {"mass": 45.0, "move_ticks": 4.0, "max_hp": 10, "attack_damage": 2},
+		"tactic": "plain",
+		"idle": "guard",
+		"opens_doors": true,
+		"door_force": 1,
+		"leash": 12,
+		"strength": 2,
+		"temperament": {"bold": 1, "cautious": 0, "cowardly": 0},
+		"fearless": true,
+		"keeps_room": true
+	},
+	"robber": {
+		"label": "Grave robber",
+		"body": {"mass": 70.0, "move_ticks": 3.5, "max_hp": 10},
+		"tactic": "flank",
+		"idle": "wander",
+		"opens_doors": true,
+		"door_force": 1,
+		"leash": 20,
+		"strength": 1,
+		"temperament": {"bold": 0, "cautious": 2, "cowardly": 1},
+		"wields": {"right": "dagger"}
+	},
 	"rabbit": {
 		"side": "wild", "role": "prey", "herd": "rabbit", "label": "Wild rabbit", "art": "creature.rabbit",
 		"body": {"mass": 3.0, "max_hp": 3, "move_ticks": 2.5, "attack_damage": 0, "sight_range": 7},

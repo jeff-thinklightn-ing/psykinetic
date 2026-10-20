@@ -174,9 +174,17 @@ const PICK_UP_EVERY := 10
 ## no kind, as monsters were).
 ## MARCH (a raider, Raids): along its route once, to the last waypoint, and
 ## stands there.
-enum Idle { NONE, GUARD, WANDER, PATROL, GATHER, MARCH }
+## HOMEWARD (the barrow's dead, decision 547): up to its grave, a niche of
+## a shallower band from its level's "graves", and there it lies down still
+## (laid) till the curse renews (rise).
+enum Idle { NONE, GUARD, WANDER, PATROL, GATHER, MARCH, HOMEWARD }
 const IDLE_MODES := {"none": Idle.NONE, "guard": Idle.GUARD, "wander": Idle.WANDER, "patrol": Idle.PATROL,
-	"gather": Idle.GATHER, "march": Idle.MARCH}
+	"gather": Idle.GATHER, "march": Idle.MARCH, "homeward": Idle.HOMEWARD}
+## HOMEWARD: how far it searches for its way (a barrow's breadth), and how
+## long it lies down at a time (renewed before it would get up).
+const HOMEWARD_SEARCH_TILES := 2000
+const LAID_HOLD_TICKS := 6000
+const LAID_RENEW_TICKS := 600
 ## Idling it walks this much slower than it chases (its step time times this).
 const IDLE_PACE := 1.6
 ## GUARD: a glance aside every so often (ticks), up to GLANCE_STEPS_MAX
@@ -287,6 +295,18 @@ var raid_strength := 0.0
 ## The factions its kind's fights on sight (Factions.on_sight, decision
 ## 545): their monsters, and "town" the residents' bodies. Most kinds none.
 var foes: Array[String] = []
+## HOMEWARD (decision 547): the grave it walks to (NO_TILE till chosen) and
+## whether it lies there still, both kept in its saved props; whom it fights
+## on the way: one in its way, or one that struck it.
+var grave := NO_TILE
+var laid := false
+var _provoked: GridEntity
+## Its kind's: it never flees (the dead); it keeps to the room it stands in
+## (the anchor of its level round its home: the altar's guards), sees and
+## fights nobody outside it, and goes after no noise.
+var fearless := false
+var keeps_room := false
+var _room := Rect2i()
 var _alert_until := 0
 var _lead := NO_TILE
 var _looks := 0
@@ -422,6 +442,10 @@ func _ready() -> void:
 		opens_doors = bool(opens) if opens != null else bool(row.get("opens_doors", true))
 		door_force = int(row.get("door_force", 1))
 		picks_up = bool(row.get("picks_up", false))
+		fearless = bool(row.get("fearless", false))
+		keeps_room = bool(row.get("keeps_room", false))
+		if keeps_room:
+			_room = room_of(home)
 		leash = roundi(int(row.get("leash", LEASH)) * (BOLD_LEASH if temper == Temper.BOLD else 1.0))
 		senses = Senses.new(self, sight_range, Senses.CONE_COS if _wary else -1.0)
 
@@ -471,6 +495,9 @@ func _temper() -> void:
 func _sim_tick() -> void:
 	if not _bundle_rolled:
 		_wear_bundle()
+	if laid:
+		_lie_still()  # Struck or not, it stays down (decision 547).
+		return
 	if not noticing:
 		_unnoticing()
 		return
@@ -872,6 +899,8 @@ func _target_beset(need := 1) -> bool:
 ## looks for their monsters and the residents too. Entities still in their
 ## spawn grace are passed over.
 func _nearest_visible_target() -> GridEntity:
+	if idle == Idle.HOMEWARD:
+		return _in_the_way()
 	var marks := _marks(World.kind_of(self))
 	var bane: Array[GridEntity] = marks["bane"]
 	# Nobody near enough to be seen: its tier's measure (a few ticks old,
@@ -896,6 +925,8 @@ func _nearest_visible_target() -> GridEntity:
 		var times := farther if entity in bane else 1.0
 		if d > sight_range * times or entity.protected:
 			continue  # Too far, or in its spawn grace.
+		if keeps_room and not _room.has_point(at):
+			continue  # Outside the room it keeps.
 		if entity is Player or (entity is Companion and entity.keeper != null):
 			if not _given_up.is_empty() and _letting_be(entity):
 				continue
@@ -933,7 +964,8 @@ func _nearest_visible_target() -> GridEntity:
 				others.append(entity)
 		for entity in others:
 			var d := World.distance(tile, entity.tile)
-			if d <= sight_range and d < nearest_distance and not entity.protected and senses.sees(entity, d, entity != target):
+			if d <= sight_range and d < nearest_distance and not entity.protected \
+					and (not keeps_room or _room.has_point(entity.tile)) and senses.sees(entity, d, entity != target):
 				if entity == target:
 					kept = d
 				nearest = entity
@@ -974,8 +1006,8 @@ func _listen() -> Dictionary:
 ## gives up.
 func _alert_tick() -> void:
 	var noise := _listen()
-	if not _wary:
-		_idle_tick()
+	if not _wary or idle == Idle.HOMEWARD or keeps_room:
+		_idle_tick()  # The dead on their way home, a room's guard: no going to look.
 		return
 	if not noise.is_empty():
 		_heard(noise)
@@ -1031,7 +1063,7 @@ func _heard(noise: Dictionary) -> void:
 ## on HUNT_ON_TILES the way it was going. False (no hunt) for a monster of
 ## no kind, one gone, or one it has given up on.
 func _hunt(lost: GridEntity) -> bool:
-	if not _wary or lost == null or not is_instance_valid(lost) or not lost.spawned \
+	if not _wary or idle == Idle.HOMEWARD or keeps_room or lost == null or not is_instance_valid(lost) or not lost.spawned \
 			or _given_up.has(lost.get_instance_id()):
 		return false
 	_quarry = lost
@@ -1316,7 +1348,8 @@ static func read_kinds(path: String) -> Dictionary:
 			"drops": (row.get("drops", []) as Array).duplicate(true) if row.get("drops") is Array else [],
 			"wields": (row["wields"] as Dictionary).duplicate() if row.get("wields") is Dictionary else {},
 			"picks_up": bool(row.get("picks_up", false)), "art": str(row.get("art", "")),
-			"label": str(row.get("label", ""))}
+			"label": str(row.get("label", "")), "fearless": bool(row.get("fearless", false)),
+			"keeps_room": bool(row.get("keeps_room", false))}
 	return out
 
 
@@ -1426,6 +1459,8 @@ static func _marks(kind: String) -> Dictionary:
 ## for the cautious at a dread holder, or a coward alone against two or more
 ## near, a dread holder counted as two).
 func _should_flee() -> bool:
+	if fearless:
+		return false
 	var dreaded := _dreads_target()
 	var below := float(FLEE_BELOW[temper])
 	if dreaded and temper == Temper.CAUTIOUS:
@@ -1591,12 +1626,16 @@ func _idle_tick() -> void:
 			_gather()
 		Idle.MARCH:
 			_march()
+		Idle.HOMEWARD:
+			_homeward()
 
 
 ## Where it goes back to after a fight: home, or (PATROL) the nearest
 ## waypoint of its route, or (GATHER) its place at the point.
 func _back_to() -> Vector2i:
 	match idle:
+		Idle.HOMEWARD:
+			return grave if grave != NO_TILE else home
 		Idle.PATROL:
 			_ensure_route()
 			if route.is_empty():
@@ -1631,6 +1670,211 @@ func _march() -> void:
 		if _route_index < last and World.distance(tile, to) <= MARCH_NEAR * 2:
 			_route_index += 1  # Crowded round it: on to the next.
 		_idle_until = World.tick + MARCH_RETRY_TICKS
+
+
+## HOMEWARD: on toward its grave (chosen the first time), down when there.
+## A step it cannot take: whoever stands in its way on a cell nearer home
+## it fights (_blocker); one of its own side it waits behind.
+func _homeward() -> void:
+	if World.tick < _idle_until or not _settle_grave():
+		return
+	if tile == grave:
+		lay_down()
+		return
+	if _idle_step(grave, HOMEWARD_SEARCH_TILES):
+		return
+	_provoked = _blocker()
+	_idle_until = World.tick + MARCH_RETRY_TICKS
+
+
+## Whether it has a grave, choosing one the first time (choose_grave, kept
+## in its props); with none in its level it wanders where it stands.
+func _settle_grave() -> bool:
+	if grave != NO_TILE:
+		return true
+	grave = choose_grave()
+	if grave == NO_TILE:
+		idle = Idle.WANDER
+		return false
+	_keep_prop("grave", grave)
+	return true
+
+
+## A grave for it (decision 547): one of its level's "graves" ([x, y, band]
+## each, band 0 shallowest) in a band shallower than the grave nearest where
+## it stands (the old dead walk up, home), else one no deeper, else any;
+## none another of the zone's monsters has; of those, one by its name.
+## NO_TILE when there are none.
+func choose_grave() -> Vector2i:
+	var graves := zone_graves()
+	if graves.is_empty():
+		return NO_TILE
+	var taken: Dictionary[Vector2i, bool] = {}
+	for other in World.monsters():
+		if other != self and other is Monster and (other as Monster).grave != NO_TILE:
+			taken[(other as Monster).grave] = true
+	var mine := 0
+	var nearest := -1
+	for each: Vector3i in graves:
+		var d := World.distance(tile, Vector2i(each.x, each.y))
+		if nearest < 0 or d < nearest:
+			nearest = d
+			mine = each.z
+	var shallower: Array[Vector2i] = []
+	var no_deeper: Array[Vector2i] = []
+	var free: Array[Vector2i] = []
+	for each: Vector3i in graves:
+		var at := Vector2i(each.x, each.y)
+		if taken.has(at):
+			continue
+		free.append(at)
+		if each.z <= mine:
+			no_deeper.append(at)
+		if each.z < mine:
+			shallower.append(at)
+	var pick := shallower if not shallower.is_empty() else (no_deeper if not no_deeper.is_empty() else free)
+	if pick.is_empty():
+		return NO_TILE
+	return pick[absi(hash(String(name) + "/grave")) % pick.size()]
+
+
+## Whoever stands in its way home: beside it, on a cell nearer its grave, one
+## it may fight (_may_fight); null for none.
+func _blocker() -> GridEntity:
+	var here := World.distance(tile, grave)
+	for direction in AROUND:
+		var other := World.get_entity_at(tile + direction)
+		if other != null and other != self and World.distance(tile + direction, grave) < here and _may_fight(other):
+			return other
+	return null
+
+
+## Whether it fights [param other] when it is in its way or strikes it: a
+## player, a kept companion, a resident when its side fights the town, a
+## monster of its foes. Never one of its own side.
+func _may_fight(other: GridEntity) -> bool:
+	if other is Player or (other is Companion and (other as Companion).keeper != null):
+		return true
+	if other is Resident:
+		return "town" in foes
+	return other is Monster and not other is Animal and _factions().of_kind(World.kind_of(other)) in foes
+
+
+## HOMEWARD's target: the one in its way (_blocker) or that struck it, while
+## it is in sight; else nobody, and it walks on.
+func _in_the_way() -> GridEntity:
+	var struck := _struck_by()
+	if struck != null and _may_fight(struck):
+		_provoked = struck
+	if _provoked != null:
+		if not is_instance_valid(_provoked) or not _provoked.spawned or _provoked.hp <= 0:
+			_provoked = null
+		else:
+			var d := World.distance(tile, _provoked.tile)
+			if d > sight_range or not senses.sees(_provoked, d, false):
+				_provoked = null
+	return _provoked
+
+
+## Whoever struck it just now (a fight noise on its own tile from someone),
+## else null.
+func _struck_by() -> GridEntity:
+	if World.tick - hurt_tick > 1:
+		return null
+	for i in range(senses.heard.size() - 1, -1, -1):
+		var noise: Dictionary = senses.heard[i]
+		if int(noise["tick"]) < hurt_tick:
+			break
+		var source: Variant = noise["source"]
+		if noise["kind"] == &"fight" and noise["at"] == tile and is_instance_valid(source) and source != self:
+			return source
+	return null
+
+
+## Down at its grave, or stilled (the draugr laid to rest, step 3): it lies
+## still (down_until, which the views draw) till rise, kept in its props so
+## a restart finds it lying.
+func lay_down() -> void:
+	laid = true
+	target = null
+	_provoked = null
+	alert = Alert.IDLE
+	_drop_windup()
+	_keep_prop("laid", true)
+	_lie_still()
+
+
+## Up again when the curse renews: one that lay at its grave keeps it
+## (GUARD there); one stilled on its way walks on.
+func rise() -> void:
+	if not laid:
+		return
+	laid = false
+	down_until = World.tick
+	_keep_prop("laid", false)
+	if idle == Idle.HOMEWARD and grave != NO_TILE and tile == grave:
+		idle = Idle.GUARD
+		home = grave
+
+
+func _lie_still() -> void:
+	if down_until - World.tick < LAID_RENEW_TICKS:
+		down_until = World.tick + LAID_HOLD_TICKS
+
+
+## [param key] set to [param value] in its spawn spec's props, which a save
+## keeps (Snapshot): the spec copied first, never the level's own.
+func _keep_prop(key: String, value: Variant) -> void:
+	spawn_spec = spawn_spec.duplicate()
+	var props: Variant = spawn_spec.get("props", {})
+	var kept: Dictionary = (props as Dictionary).duplicate() if props is Dictionary else {}
+	kept[key] = value
+	spawn_spec["props"] = kept
+
+
+## The graves of the zone's level (its level.json "graves", [x, y, band]
+## each, as Regen writes them for the barrow), read once a zone.
+static func zone_graves() -> Array[Vector3i]:
+	var config := _zone_config()
+	var out: Array[Vector3i] = []
+	var listed: Variant = config.get("graves", [])
+	if listed is Array:
+		for each: Variant in listed:
+			if each is Array and each.size() >= 2:
+				out.append(Vector3i(int(each[0]), int(each[1]), int(each[2]) if each.size() > 2 else 0))
+	return out
+
+
+## The room round [param cell]: the anchor of the zone's level (its
+## "regenerate" block's) it lies in; an empty Rect2i in none.
+static func room_of(cell: Vector2i) -> Rect2i:
+	var block: Variant = _zone_config().get("regenerate", {})
+	var anchors: Variant = block.get("anchors", []) if block is Dictionary else []
+	if anchors is Array:
+		for anchor: Variant in anchors:
+			var rect: Variant = anchor.get("rect") if anchor is Dictionary else null
+			if rect is Array and rect.size() == 4:
+				var room := Rect2i(int(rect[0]), int(rect[1]), int(rect[2]), int(rect[3]))
+				if room.has_point(cell):
+					return room
+	return Rect2i()
+
+
+## The zone's level.json, read once each time its terrain is loaded (a
+## reload or a generation reads it again).
+static func _zone_config() -> Dictionary:
+	var zone := World.zone
+	if zone == null or zone.name.is_empty() or not Level.exists(zone.name):
+		return {}
+	var key := "%d/%s/%d" % [zone.get_instance_id(), zone.name, zone.terrain_loads]
+	if not _zone_configs.has(key):
+		if _zone_configs.size() >= 32:
+			_zone_configs.clear()  # Zones and their reloads come and go: never many kept.
+		_zone_configs[key] = Level.source(zone.name)["config"]
+	return _zone_configs[key]
+
+
+static var _zone_configs: Dictionary[String, Dictionary] = {}
 
 
 ## Whether it has marched to its route's end (or as near as its fellows let
@@ -1870,6 +2114,16 @@ func _world_tick(seconds: float) -> void:
 	_drop_windup()
 	_glancing = false
 	_calm()
+	if laid:
+		return
+	if idle == Idle.HOMEWARD:
+		# Far from everyone: on home by a real way, as far as it would have
+		# gone, and down if it got there.
+		move_ticks = _pace * IDLE_PACE
+		_returning = false
+		if _settle_grave() and World.walk(self, grave, seconds * World.TICK_RATE) and tile == grave:
+			lay_down()
+		return
 	if idle == Idle.MARCH and not route.is_empty():
 		# Marching far from everyone: on by a real way toward its route's end,
 		# as far as it would have gone.

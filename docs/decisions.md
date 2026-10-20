@@ -16682,3 +16682,51 @@ their companion's return token, both bound to the player.
   slots item.barrow_half and item.return_token for art-kit.
 items_test. Protocol unchanged (bound is server-side; the note is display
 text); no new class_name.
+## 547. The barrow's dead and its robbers (the crypt's monsters, step 2)
+
+The coordinator's rulings on Jeff's crypt.md: each skeleton has a grave, a
+niche of the layer it was taken from, and walks up to it; there it lies
+down and goes still, a body still, till the curse renews; "in the way
+means in the way": it fights what blocks its path, or strikes it, and
+lets one beside its way be; the altar's guards fight on sight within the
+altar room and never leave it; the robbers are human outlaws who fight and
+flee when beaten. Three kinds in levels/monsters.json, their sides in
+factions.json (545): "dead" skeleton and skeleton_guard, "robbers" robber.
+
+- skeleton: idle "homeward" (Monster.Idle.HOMEWARD). Its grave (choose_grave,
+  the first time it idles) is one of its level.json's "graves" ([x, y,
+  band], band 0 shallowest; dungeon's Regen writes them for the barrow)
+  in a band shallower than the grave nearest where it stands, else one no
+  deeper, else any, never one another monster of the zone has; of those
+  one by its name. It walks there (HOMEWARD_SEARCH_TILES, a barrow's
+  breadth; the world tick walks it far from everyone too) and lies down
+  (lay_down): laid, and GridEntity.down_until held ahead (LAID_HOLD_TICKS,
+  renewed), which the views already draw as lying (343), so nothing new
+  goes to clients. Struck, it stays down. rise() (the draugr's step 3) gets
+  it up; one that lay at its grave then guards it. Its grave and laid are
+  kept in its spawn spec's props (copied first, never the level's), so a
+  save finds it lying; one killed comes back at its marker and walks again.
+  A level with no graves: it wanders.
+- In the way (_in_the_way, its only targeting): a step it cannot take, it
+  fights whoever stands beside it on a cell nearer its grave (_blocker)
+  that it may fight (a player, a kept companion, a resident as its side
+  fights the town, a monster of its foes; never one of its own side, it
+  waits behind); and whoever strikes it (_struck_by, moved up from
+  Animal). It keeps them while it sees them; then it walks on, hunting
+  nobody and going after no noise.
+- skeleton_guard: GUARD, "keeps_room": its room is the level's anchor
+  (the "regenerate" block's) round its post (room_of); it sees nobody
+  outside it, so one leaving is let go, and hunts and follows noises not
+  at all. dungeon paints two or three into the altar anchor.
+- "fearless" (both dead kinds): never flees (_should_flee).
+- robber: flank, wanders, cautious or cowardly (it flees when beaten),
+  a dagger. Going for the altar's gold is economy's, later.
+- The level.json is read once each terrain load (Monster._zone_config;
+  Zone.terrain_loads counts them, since a reload or a generation keeps the
+  zone).
+Legend colours: none in Level.LEGEND. The barrow's level.json "legend"
+carries monster_skeleton, monster_skeleton_guard and monster_robber, read
+by every client through Level.legend's overrides, so no protocol bump
+(release's check); a client before these kinds draws them as the stand-in
+shape any monster without a model is. Server only; protocol unchanged; no
+new class_name. monster_test (_test_homeward, _test_room_guard).

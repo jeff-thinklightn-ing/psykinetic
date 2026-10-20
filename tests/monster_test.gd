@@ -16,9 +16,13 @@ const SPECS := {
 	"o": {"script": "res://sim/animal.gd", "shape": "capsule", "kind": "boar"},
 	"w": {"script": "res://sim/animal.gd", "shape": "capsule", "kind": "wolf"},
 	"a": {"script": "res://sim/monster.gd", "shape": "capsule", "kind": "imp"},
+	"k": {"script": "res://sim/monster.gd", "shape": "capsule", "kind": "skeleton"},
+	"g": {"script": "res://sim/monster.gd", "shape": "capsule", "kind": "skeleton_guard"},
+	"x": {"script": "res://sim/monster.gd", "shape": "capsule", "kind": "robber"},
 }
 const NAMES := {"P": "Player", "m": "Monster", "i": "Imp", "b": "Brute", "s": "Sneak", "c": "Crate",
-	"r": "Rabbit", "d": "Doe", "D": "Stag", "o": "Boar", "w": "Wolf", "a": "Archer"}
+	"r": "Rabbit", "d": "Doe", "D": "Stag", "o": "Boar", "w": "Wolf", "a": "Archer", "k": "Skeleton", "g": "Guard",
+	"x": "Robber"}
 
 var _failures := 0
 var _room: Node2D
@@ -90,6 +94,8 @@ func _ready() -> void:
 	_test_lead_occupied()
 	_test_raid_townsfolk()
 	_test_sides_on_sight()
+	_test_homeward()
+	_test_room_guard()
 	_test_charging()
 	_test_archer()
 	_test_worn_bundles()
@@ -821,7 +827,9 @@ func _test_walk_round_held_ground() -> void:
 ## [param edges]: walls ("#") and doors ("+", each with its Door) at
 ## positions of the expanded rows (Terrain.expand: the edge east of cell
 ## (x, y) is at (2x + 1, 2y)).
-func _build(rows: Array[String], extra := {}, edges := {}) -> Dictionary:
+## [param zone_name]: the zone named so before anything spawns (a level
+## registered under it gives its level.json: graves, anchors).
+func _build(rows: Array[String], extra := {}, edges := {}, zone_name := "") -> Dictionary:
 	World.reset()
 	if _room != null:
 		_room.free()
@@ -847,6 +855,8 @@ func _build(rows: Array[String], extra := {}, edges := {}) -> Dictionary:
 			row += " "
 		expanded[at.y] = row.substr(0, at.x) + str(edges[at]) + row.substr(at.x + 1)
 	World.load_terrain(Terrain.parse(expanded))
+	if zone_name != "":
+		World.zone.name = zone_name
 	for at: Vector2i in edges:
 		if edges[at] == "+":
 			var key := Vector3i((at.x - 1) / 2, at.y / 2, Terrain.EAST) if at.x % 2 == 1 \
@@ -2072,6 +2082,114 @@ func _test_sides_on_sight() -> void:
 	_check(e["i"][0].foes.is_empty() and e["i"][0].target == null and e["s"][0].target == null,
 		"an imp and a sneak (the Blood Rot's, levels/factions.json) let each other be")
 	World.holdings = was_holdings
+	Monster.idling = true
+
+
+func _test_homeward() -> void:
+	print("
+== the barrow's dead walk home to a shallower grave and lie down there; they fight only who is in the way, or strikes them (decision 547) ==")
+	Monster.idling = true
+	var rows: Array[String] = ["###############", "#.............#", "#.k...........#", "#.............#", "###############"]
+	Level.register("mt_barrow", Level.image_from_rows(rows), null, {"graves": [[3, 3, 2], [12, 1, 0], [12, 3, 1]]})
+	var e := _build(rows, {}, {}, "mt_barrow")
+	var walker: Monster = e["k"][0]
+	_check(walker.idle == Monster.Idle.HOMEWARD and walker.fearless and not walker._should_flee(), "a skeleton walks home and never flees")
+	walker.hp = 1
+	_check(not walker._should_flee(), "not even at 1 hp")
+	walker.hp = walker.max_hp
+	for i in 400:
+		World.step()
+		if walker.laid:
+			break
+	_check(walker.grave in [Vector2i(12, 1), Vector2i(12, 3)], "its grave is a shallower one than the deep niche beside it (%s)" % [walker.grave])
+	_check(walker.laid and walker.tile == walker.grave and World.is_down(walker), "home, it lies down (%s at %s)" % [walker.tile, walker.grave])
+	var props: Dictionary = walker.spawn_spec["props"]
+	_check(props.get("laid") == true and props.get("grave") == walker.grave, "a save keeps it lying at its grave (%s)" % [props])
+	World.damage(walker, 1, null)
+	for i in 5:
+		World.step()
+	_check(walker.laid and walker.tile == walker.grave, "struck, it stays down")
+	walker.down_until = World.tick + 10
+	World.step()
+	_check(World.is_down(walker) and walker.down_until - World.tick > Monster.LAID_RENEW_TICKS, "and never gets up of itself")
+	walker.rise()
+	_check(not walker.laid and walker.idle == Monster.Idle.GUARD and walker.home == walker.grave, "risen, it guards its grave")
+
+	rows = ["###########", "#k.....P..#", "###########"]
+	Level.register("mt_barrow", Level.image_from_rows(rows), null, {"graves": [[9, 1, 0]]})
+	e = _build(rows, {}, {}, "mt_barrow")
+	walker = e["k"][0]
+	var player: GridEntity = e["P"][0]
+	walker.sight_range = 7
+	walker.senses.cone_cos = -1.0
+	var met := false
+	for i in 200:
+		World.step()
+		if walker.target == player:
+			met = true
+			break
+	_check(met and World.distance(walker.tile, player.tile) == 1, "one standing in its way it fights (%s)" % [walker.tile])
+
+	rows = ["#############", "#.....P.....#", "#k..........#", "#...........#", "#############"]
+	Level.register("mt_barrow", Level.image_from_rows(rows), null, {"graves": [[11, 2, 0]]})
+	e = _build(rows, {}, {}, "mt_barrow")
+	walker = e["k"][0]
+	player = e["P"][0]
+	walker.sight_range = 7
+	walker.senses.cone_cos = -1.0
+	var bothered := false
+	for i in 300:
+		World.step()
+		bothered = bothered or walker.target != null
+		if walker.laid:
+			break
+	_check(walker.laid and not bothered, "one standing beside its way it passes by, and lies down at home (laid %s, bothered %s, at %s, grave %s)" % [walker.laid, bothered, walker.tile, walker.grave])
+	walker.rise()
+	walker.idle = Monster.Idle.HOMEWARD
+	walker.grave = Vector2i(1, 2)
+	World.damage(walker, 1, player)
+	World.step()
+	_check(walker.target == player, "struck, it fights back (%s)" % [walker.target])
+
+	Monster._read_factions = null
+	e = _build(["########", "#k.k.xP#", "########"])
+	_check(not e["k"][0]._may_fight(e["k"][1]) and e["k"][0]._may_fight(e["x"][0]) and e["k"][0]._may_fight(e["P"][0]),
+		"a fellow of its side in its way it waits behind; a robber it fights, as a player")
+	rows = ["###############", "#k............#", "###############"]
+	Level.register("mt_barrow", Level.image_from_rows(rows), null, {"graves": [[13, 1, 0]]})
+	e = _build(rows, {}, {}, "mt_barrow")
+	walker = e["k"][0]
+	walker._world_tick(60.0)
+	_check(walker.laid and walker.tile == Vector2i(13, 1), "far from everyone, it walks home all the same and lies down (%s)" % [walker.tile])
+	Level.unregister("mt_barrow")
+
+
+func _test_room_guard() -> void:
+	print("
+== the altar's guards see and fight only who is in their room, and never leave it (decision 547) ==")
+	Monster.idling = true
+	var rows: Array[String] = ["############", "#..........#", "#.g........#", "#..........#", "############"]
+	Level.register("mt_altar", Level.image_from_rows(rows), null, {"regenerate": {"anchors": [{"rect": [1, 1, 4, 3], "name": "altar"}]}})
+	var e := _build(rows, {}, {}, "mt_altar")
+	var guard: Monster = e["g"][0]
+	var player := EntityFactory.build(SPECS["P"].merged({"name": "Player1"})) as GridEntity
+	_room.add_child(player)
+	World.spawn(player, Vector2i(7, 2))
+	_bold(guard)
+	_check(guard.keeps_room and guard._room == Rect2i(1, 1, 4, 3), "its room is the anchor round its post (%s)" % [guard._room])
+	World.step()
+	World.step()
+	_check(guard.target == null, "one outside the room it lets be")
+	_move_to(player, Vector2i(4, 2))
+	World.step()
+	_check(guard.target == player, "one inside it, it goes for")
+	_move_to(player, Vector2i(9, 2))
+	var left := false
+	for i in 60:
+		World.step()
+		left = left or not guard._room.has_point(guard.tile)
+	_check(guard.target == null and not left, "gone out of the room, it is let go, and the guard never left the room")
+	Level.unregister("mt_altar")
 	Monster.idling = true
 
 

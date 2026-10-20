@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The barrow's dead and its robbers: skeletons walk up through the barrow to the graves they were taken from and lie down there, fighting only whoever stands in their way or strikes them; the altar's guards fight anyone in the altar room but never leave it; grave robbers fight the dead and flee when beaten. They take their places in the Barrow with dungeon's next change.
 - Landing tests also retry a test that crashes as it starts, before running any of its own code, and the daily summary groups such crashes by where they happened (530 amended); tools only.
 - Things can be bound to one player for life: the halves of a cut coin a beaten draugr leaves, which stay theirs even when lost or stolen.
 - Fixed: a companion's sickness, and news of one she had while you were away, was forgotten when the server restarted (decision 501).

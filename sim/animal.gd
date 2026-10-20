@@ -186,21 +186,6 @@ func _noise_threat() -> void:
 		return
 
 
-## Whoever struck it just now (a fight noise on its own tile from someone),
-## else null.
-func _struck_by() -> GridEntity:
-	if World.tick - hurt_tick > 1:
-		return null
-	for i in range(senses.heard.size() - 1, -1, -1):
-		var noise: Dictionary = senses.heard[i]
-		if int(noise["tick"]) < hurt_tick:
-			break
-		var source: Variant = noise["source"]
-		if noise["kind"] == &"fight" and noise["at"] == tile and is_instance_valid(source) and source != self:
-			return source
-	return null
-
-
 ## Whether it has nowhere to run from [param threat] (Monster's flee goal
 ## finds no tile away).
 func _cornered(threat: Vector2i) -> bool:

@@ -29,7 +29,7 @@
 	"dead": {
 		"name": "the barrow's dead",
 		"colour": "#b8b49c",
-		"monsters": [],
+		"monsters": ["skeleton", "skeleton_guard"],
 		"hostile_to": ["robbers", "town"],
 		"on_sight": ["robbers", "town"],
 		"holds": false
@@ -37,7 +37,7 @@
 	"robbers": {
 		"name": "the mound-breakers",
 		"colour": "#7a5a3a",
-		"monsters": [],
+		"monsters": ["robber"],
 		"hostile_to": ["dead", "town"],
 		"on_sight": ["dead", "town"],
 		"holds": false

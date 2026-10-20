@@ -1418,6 +1418,7 @@ func load_terrain(terrain: Dictionary) -> void:
 
 
 func _set_terrain(terrain: Dictionary) -> void:
+	zone.terrain_loads += 1
 	_grid_rect = Rect2i()
 	_grid_steps = PackedByteArray()
 	_floor.clear()
