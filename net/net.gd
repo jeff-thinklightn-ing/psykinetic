@@ -214,13 +214,15 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## walked by slope, uphill slower, sight over relief in metres (decision 525).
 ## 23: the "offers" message carries "standing" {id, title}, the offer standing
 ## for that player, absent if none (decision 536).
-const PROTOCOL_REVISION := 23
+## 24: a blessed body at 0 HP is downed until downed_until, not gone; a
+## channeler carries channel_of and channel_until (decision 544).
+const PROTOCOL_REVISION := 24
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]
 ## Every kind of message (message, message_to, broadcast, broadcast_to).
 const MESSAGE_KINDS: Array[String] = ["builder", "chat", "counter", "death", "grass", "map", "offers", "party", "roofs", "shop", "sky", "speech", "terrain", "town", "world"]
 ## Properties entity subclasses add with replicate().
-const SUBCLASS_REPLICATED: Array[String] = ["ailing", "ailments", "alert", "body", "buffs", "down_until", "emit_light", "hands", "keeper_peer", "mending", "move_ticks", "pose", "raised", "raised_tick", "slot_notes", "slots"]
+const SUBCLASS_REPLICATED: Array[String] = ["ailing", "ailments", "alert", "body", "buffs", "channel_of", "channel_until", "down_until", "downed_until", "emit_light", "hands", "keeper_peer", "mending", "move_ticks", "pose", "raised", "raised_tick", "slot_notes", "slots"]
 const SETTINGS_FILE := "settings.cfg"
 ## First launch: half the 3840x2160 base, windowed.
 const DEFAULT_WINDOW_SIZE := Vector2i(1920, 1080)

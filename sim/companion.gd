@@ -28,10 +28,10 @@ extends GridEntity
 ## her player said in the last ECHO_TICKS, or her own last SAID_REMEMBERED, are
 ## dropped.
 
-enum Intent { FOLLOW, HOLD, ATTACK, SHOVE, RETREAT, IDLE, YIELD, ERRAND }
+enum Intent { FOLLOW, HOLD, ATTACK, SHOVE, RETREAT, IDLE, YIELD, ERRAND, REVIVE }
 enum Stance { STAY_CLOSE, HOLD, PRESS, GUARD, PULL_BACK }
 
-const INTENT_NAMES: Array[String] = ["FOLLOW", "HOLD", "ATTACK", "SHOVE", "RETREAT", "IDLE", "YIELD", "ERRAND"]
+const INTENT_NAMES: Array[String] = ["FOLLOW", "HOLD", "ATTACK", "SHOVE", "RETREAT", "IDLE", "YIELD", "ERRAND", "REVIVE"]
 const STANCE_NAMES: Array[String] = ["STAY_CLOSE", "HOLD", "PRESS", "GUARD", "PULL_BACK"]
 const DEFAULT_STANCE := Stance.GUARD
 ## A bump this soon after the last one is the same bump (a held key).
@@ -349,6 +349,11 @@ var bond_words := Callable()
 ## Her sickness in one sentence while she has one (decision 501: Main's,
 ## from her record's "sick", Companion.sick_sentence); none unset.
 var sick_words := Callable()
+## The draugr's blessing (decision 544), Main's: whether she can bring her
+## downed player back now (her mark, her token, her player's count), () ->
+## bool; and the channel begun, (her, body) -> bool.
+var can_revive := Callable()
+var revive := Callable()
 var talk: Array[String] = []
 var _talk_tick := -100000
 var _merging: Array[Dictionary] = []
@@ -525,6 +530,9 @@ func _init() -> void:
 	replicate("buffs")
 	replicate("ailments")
 	replicate("down_until")
+	replicate("downed_until")  # Decision 544: downed, and bringing back the downed.
+	replicate("channel_of")
+	replicate("channel_until")
 	# Her player's peer changes when they rejoin and she was waiting.
 	replicate("keeper_peer")
 	replicate("body")
@@ -880,6 +888,23 @@ func note_taken(who: String) -> void:
 ## just before she is taken off the map: a fact about her.
 func note_carried_off() -> void:
 	note_fact("%s was beaten down and carried off by raiders in %s." % [_name_of(self), _place_words()])
+
+
+## Downed (decision 544): her player ([param theirs]), else she herself.
+## Her player: told, and her voice asked, as at a death.
+func note_downed(theirs: bool) -> void:
+	if theirs:
+		_narrate("%s is down. You may bring them back where they lie." % keeper_name())
+		_ask_voice("%s is down." % keeper_name(), "", true)
+	else:
+		_narrate("You are down, and lie where you fell.")
+
+
+## [param by] brought [param body] back where they fell (decision 544).
+func note_brought_back(by: String, body: String) -> void:
+	var me := _name_of(self)
+	_narrate("%s brought %s back where %s lay." % ["You" if by == me else by, "you" if body == me else body, "you" if body == me else "they"])
+	note_fact("%s brought %s back where they fell in %s." % [by, body, _place_words()])
 
 
 # --- Sickness (decision 501, companions' side) ---------------------------------------
@@ -2868,6 +2893,8 @@ func _set_stance(wanted: int, serial: int, source: String) -> void:
 ## Says [param line] (over her, to everyone) unless the rate limit holds it
 ## back; [param always] for an answer to her player and her own notices.
 func _say(line: String, always: bool) -> bool:
+	if World.is_downed(self):
+		return false  # Downed (decision 544): no word.
 	if not always and World.tick - _last_speech_tick < SPEECH_INTERVAL_TICKS:
 		return false
 	_last_speech_tick = World.tick
@@ -3140,6 +3167,24 @@ func _act() -> void:
 		return
 	intent_target = null
 	_door_hold = NONE
+	if _reviving():
+		# Her player downed (decision 544): a foe at her fought off, then to them.
+		_fight_or(foe, Intent.REVIVE)
+	else:
+		_choose(foe, low)
+	if current_intent != before or intent_target != before_target:
+		print("[mind] %s: %s%s (%s)" % [name, intent_name(),
+			" " + String(intent_target.name) if intent_target != null else "", stance_name()])
+
+
+## Whether she can bring her downed player back (decision 544): they lie
+## downed and Main's can_revive says she may.
+func _reviving() -> bool:
+	return _alive(keeper) and World.is_downed(keeper) and can_revive.is_valid() and bool(can_revive.call())
+
+
+## Her intent, her player up: the reflex, an errand, a door, her stance.
+func _choose(foe: GridEntity, low: bool) -> void:
 	# Bandaging herself, low, with nothing at her: she keeps at it.
 	var mending_self: bool = str(errand.get("verb", "")) == "bandage" and errand.get("patient") == self and foe == null
 	if low and not mending_self:
@@ -3162,9 +3207,6 @@ func _act() -> void:
 				_fight_or(foe if foe != null else _guard_target(), Intent.FOLLOW)
 			Stance.PRESS:
 				_fight_or(foe if foe != null else _nearest_hostile(SIGHT_RANGE), Intent.FOLLOW)
-	if current_intent != before or intent_target != before_target:
-		print("[mind] %s: %s%s (%s)" % [name, intent_name(),
-			" " + String(intent_target.name) if intent_target != null else "", stance_name()])
 
 
 ## A door to hold (_door_to_hold), asked or, guarding or pressing, of her
@@ -3257,8 +3299,31 @@ func _execute() -> void:
 				_step_toward(_yield_tile, false)
 		Intent.ERRAND:
 			_errand_step()
+		Intent.REVIVE:
+			_revive_step()
 		Intent.IDLE, Intent.SHOVE:
 			pass
+
+
+## REVIVE (decision 544): to a cell beside her downed player, then the
+## channel (Main's revive); kneeling, she holds still till it is done or
+## broken, and begins again.
+func _revive_step() -> void:
+	if World.channeler_of(keeper) == self:
+		return
+	if World.can_melee(tile, keeper.tile):
+		if revive.is_valid():
+			revive.call(self, keeper)
+		return
+	var best := NONE
+	for dy in range(-1, 2):
+		for dx in range(-1, 2):
+			var at := keeper.tile + Vector2i(dx, dy)
+			if at != keeper.tile and World.is_walkable(at) and World.is_free(at) and World.can_melee(at, keeper.tile) \
+					and (best == NONE or World.distance(tile, at) < World.distance(tile, best)):
+				best = at
+	if best != NONE:
+		_step_toward(best, false)
 
 
 ## RETREAT: to the nearest cell with no hostile next to it, near her player

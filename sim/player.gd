@@ -53,6 +53,9 @@ func _init() -> void:
 	replicate("raised")
 	replicate("raised_tick")
 	replicate("down_until")
+	replicate("downed_until")  # Decision 544: downed, and bringing back the downed.
+	replicate("channel_of")
+	replicate("channel_until")
 	# Its lantern lit or covered (L): what the views draw and monsters see by.
 	replicate("emit_light")
 	replicate("body")

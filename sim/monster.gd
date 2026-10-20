@@ -923,8 +923,8 @@ func _nearest_visible_target() -> GridEntity:
 		var at := entity.tile
 		var d := maxi(absi(at.x - tile.x), absi(at.y - tile.y))
 		var times := farther if entity in bane else 1.0
-		if d > sight_range * times or entity.protected:
-			continue  # Too far, or in its spawn grace.
+		if d > sight_range * times or entity.protected or World.is_downed(entity):
+			continue  # Too far, in its spawn grace, or downed (no finishing blows: decision 544).
 		if keeps_room and not _room.has_point(at):
 			continue  # Outside the room it keeps.
 		if entity is Player or (entity is Companion and entity.keeper != null):

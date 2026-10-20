@@ -115,6 +115,14 @@ var wind_up := {}
 ## it cannot act and is easily pushed. A creature's replicates, for the
 ## views.
 var down_until := 0
+## Downed until this tick (World.lay_downed, decision 544): a blessed body
+## beaten to 0 hp lies at 1, brought back by a channel or dead after. And a
+## channeler's: the name of the body it is bringing back ("" none) and the
+## tick it will be done. A player's and a companion's replicate, for the
+## views.
+var downed_until := 0
+var channel_of := ""
+var channel_until := 0
 ## Server: the tick it last took a step (World.try_move): a spear is braced
 ## standing still (World.braced, decision 344).
 var last_step_tick := -100000

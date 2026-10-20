@@ -55,6 +55,9 @@ var seen_generation: Dictionary = {}
 ## (level.json link "sealed": the mark it opens for): "draugr" once the
 ## draugr is beaten (enemy-ai's call to Main.mark_player).
 var marks: Array[String] = []
+## The draugr's blessing (decision 544): {uses, of, difficulty, day}, the
+## count of returns in the field this player's device has left; {} unblessed.
+var barrow: Dictionary = {}
 
 
 ## Copies the live state off the player's entity.
@@ -92,6 +95,7 @@ func to_dict() -> Dictionary:
 		"known_places": known_places.duplicate(),
 		"seen_generation": seen_generation.duplicate(),
 		"marks": marks.duplicate(),
+		"barrow": barrow.duplicate(),
 	}
 
 
@@ -122,6 +126,9 @@ static func from_dict(entry: Variant) -> PlayerRecord:
 	record.known_areas = _strings(entry.get("known_areas", []))
 	record.known_places = _strings(entry.get("known_places", []))
 	record.marks = _strings(entry.get("marks", []))
+	var barrow: Variant = entry.get("barrow", {})
+	if barrow is Dictionary and not barrow.is_empty():
+		record.barrow = _numbers(barrow)
 	var seen: Variant = entry.get("seen_generation", {})
 	if seen is Dictionary:
 		for area: Variant in seen:
@@ -189,6 +196,10 @@ static func from_dict(entry: Variant) -> PlayerRecord:
 			if pet.get(key) is float or pet.get(key) is int:
 				record.companion[key] = int(pet[key])
 		# Her sickness (decision 501, npc's Townsfolk) and one ended, still to be told.
+		# Her marks (decision 544: "draugr", the draugr's blessing), as a player's.
+		var her_marks := _strings(pet.get("marks", []))
+		if not her_marks.is_empty():
+			record.companion["marks"] = Array(her_marks)
 		for key: String in ["sick", "was_sick"]:
 			var sick: Variant = pet.get(key)
 			if sick is Dictionary and not sick.is_empty():

@@ -16730,3 +16730,77 @@ by every client through Level.legend's overrides, so no protocol bump
 (release's check); a client before these kinds draws them as the stand-in
 shape any monster without a model is. Server only; protocol unchanged; no
 new class_name. monster_test (_test_homeward, _test_room_guard).
+
+## 544. The draugr's blessing: downed, not gone, and brought back where they fell
+
+Jeff's crypt page (docs/lore/crypt.md, 2026-10-19): beating the draugr
+blesses you, and a companion who goes down with you and finishes it;
+"a blessed player can be brought back in the field"; the draugr gives a
+two-part device, the player's item and the companion's return token,
+with 5, 10 or 15 uses by the difficulty, "the uses are the blessed
+player's own count", spent on anyone blessed, oneself included; a fallen
+companion is brought back by the player "standing still and not hit for
+a few seconds ... Being hit breaks it"; the unblessed start again in town.
+The coordinator approved companions' design; dungeon's barrow (540, 542),
+items' halves ("544, items' side"), economy's offering (546) and
+enemy-ai's draugr are beside it.
+
+- The blessing: Main.bless(player_ids, difficulty), enemy-ai's call when
+  the draugr is beaten, for the players in his lair. Each is marked
+  "draugr" (540's mark_player, the mark the sealed shortcut reads) and
+  given PlayerRecord.barrow {uses, of, difficulty, day}, the count by the
+  field rules' uses (a harder win's count replaces a smaller one; a
+  spent count is renewed as Jeff decides), and the device's half (items'
+  World.mint_bound, bound to "player:<id>", into a free pack slot or on
+  the ground). Their companion, if she stands alive in the same zone, is
+  blessed too: "draugr" in record.companion["marks"] (saved; economy's
+  offering reads it), the return token bound to her player, and the fact
+  "<Name> went down into the barrow with <player> and laid the draugr to
+  rest." A companion who was not there is not blessed, whatever her
+  player is. Her mark gates nothing at the seal: she crosses with her
+  player, as on any link (540).
+- Downed, not gone: World.downed, a hook beside 314's spared (asked after
+  it), set to Main._downed: a blessed body (a player marked "draugr", a
+  companion with it in her marks) whose player's count has uses left,
+  beaten to 0 HP, is not killed but laid downed (World.lay_downed): 1 HP,
+  downed_until the field rules' window on, lying (down_until, 343's pose)
+  and stunned as long, so no moves, attacks or words (chat and her voice
+  are dropped). No blow lands on the downed (World.damage) and no monster
+  picks them (Monster._nearest_visible_target: no finishing blows, the
+  coordinator's draft). When the window runs out with nobody bringing
+  them back, they die as ever (cause &"bled"): 396's return, or the town
+  for the unblessed. The unblessed, and the blessed with no uses left,
+  die as ever. A player who leaves while downed has fallen: brought back
+  as ever.
+- The channel: World.try_channel(by, body, ticks): beside the body (can
+  melee), holding still; done unless meanwhile the channeler moves,
+  exerts itself, is hit or is downed, or the body gets up or dies
+  (World._tend_downed, World.channel_changed started / broken / done).
+  Who may is Main._start_channel's: a blessed channeler carrying its
+  half bound to its player (the player's barrow_half, a companion's
+  return_token), with uses left on that player's count. Done: one use off
+  the channeler's player's count, the body up at the field rules' hp of
+  its most (World.raise_downed), and "<X> brought <Y> back (<n> uses
+  left)." in the party log; companions there hear it and it is a fact of
+  theirs. A player begins it by holding E on the downed (the bandage
+  command, on a downed body: no new command). Anyone blessed may bring
+  back anyone downed.
+- Her part, Intent.REVIVE: her own player downed and she able
+  (Main._can_revive: blessed, her token on her, uses left), she fights off
+  a foe at her, then goes to a cell beside them and channels (Main's
+  revive), holding still till it is done or broken, and begins again. Her
+  voice is told and asked when they go down. This step she brings back
+  only her own player.
+- Rules: economy.json "return" "field" {window_s 30, channel_s 4, hp
+  0.5, uses {easy 5, normal 10, hard 15}}, Jeff's numbers to move.
+- Wire: downed_until, channel_of (the body's name) and channel_until
+  replicate on players and companions (SUBCLASS_REPLICATED), and a body
+  at 0 HP may now be downed rather than gone: PROTOCOL_REVISION 24. The
+  views draw the downed lying (343's down_until); a countdown and the
+  channel's ring are the HUD's to come.
+
+Open for Jeff: the word ("barrow-blessed" or "hallowed"; "blessed" is
+424's), renewing a spent count (gold, the draugr again, or both), the
+blessing for life (drafted yes, only the uses run out), finishing blows
+on the downed (drafted no).
+companion_test _test_field_return. New class_name: none.

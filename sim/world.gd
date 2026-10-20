@@ -32,6 +32,14 @@ signal entity_died(entity: GridEntity, cause: StringName)
 ## raid group's id), not killed. Whoever keeps it (Main, a companion's
 ## record) takes it off the map.
 signal entity_taken(entity: GridEntity, by: String)
+## Beaten down and downed (downed, decision 544): a blessed body left at 1
+## hp, lying for [param ticks] in which a blessed hand may bring it back
+## (try_channel); then it dies as ever (cause &"bled").
+signal entity_downed(entity: GridEntity, source: GridEntity, ticks: int)
+## A channel (try_channel, decision 544): [param by] began bringing back the
+## downed [param body] (&"started"), did (&"done"), or was broken off
+## (&"broken"). Server only.
+signal channel_changed(by: GridEntity, body: GridEntity, state: StringName)
 ## [param each] fell asleep: nobody is in it now (World.step).
 signal zone_slept(each: Zone)
 ## A door opened, closed, was damaged or broke; [param by] did it.
@@ -373,6 +381,11 @@ var quiver_check: Callable = func(entity: GridEntity) -> bool: return World.bund
 ## source, cause) -> who takes it ("" to kill as ever): set by Raids, so a
 ## raider takes a companion captive (decision 314). Unset, nobody is.
 var spared: Callable
+## Whether a blow that would kill leaves its target downed instead (target,
+## source, cause) -> the ticks it lies downed (0 to die as ever): set by
+## Main for the draugr's blessed (decision 544). Asked after spared. Unset,
+## nobody is.
+var downed: Callable
 ## Puts an entity of a spec ({kind, name, tile, props, idle...}) into the
 ## zone World is in, as a level's are (Main's _spawn); null if it cannot.
 ## Unset (a test that builds its own), nothing is spawned.
@@ -524,6 +537,10 @@ var _unclaimed: Array[int] = []
 ## Server: bandaging under way, bandager -> {patient, until, from, tile,
 ## exerted}; and the mending, patient -> {left, next, from} (_tend_wounds).
 var _bandaging: Dictionary[GridEntity, Dictionary] = {}
+## Server: the downed (decision 544), lying till their downed_until; and
+## channels under way, channeler -> {body, until, from, tile, exerted}.
+var _downed: Dictionary[GridEntity, bool] = {}
+var _channels: Dictionary[GridEntity, Dictionary] = {}
 ## Server: whoever has a buff on (GridEntity.buffs), so only they are
 ## looked at for fading.
 var _buffed: Dictionary[GridEntity, bool] = {}
@@ -891,6 +908,7 @@ func _step_zone() -> void:
 	_regen_stamina()
 	# 5. Bandaging and mending; buffs wearing off.
 	_tend_wounds()
+	_tend_downed()
 	_fade_buffs()
 	t = part("stamina, wounds, buffs", t)
 	var timed := _parts_total()
@@ -4252,6 +4270,8 @@ func damage(target: GridEntity, amount: int, source: GridEntity = null,
 		return
 	if not target.spawned or amount <= 0 or not target.is_breakable():
 		return
+	if is_downed(target) and cause != &"bled":
+		return  # Downed (decision 544): no blow lands on the fallen.
 	var lost := mini(amount, target.hp)
 	target.hp -= lost
 	target.hurt_tick = tick
@@ -4269,6 +4289,12 @@ func damage(target: GridEntity, amount: int, source: GridEntity = null,
 		if by != "":
 			target.hp = 1
 			entity_taken.emit(target, by)
+			return
+	if target.hp == 0 and downed.is_valid() and cause != &"bled":
+		var ticks := int(downed.call(target, source, cause))
+		if ticks > 0:
+			lay_downed(target, ticks)
+			entity_downed.emit(target, source, ticks)
 			return
 	if target.hp == 0:
 		if not target.is_creature():
@@ -5566,6 +5592,110 @@ func _meets_brace(mover: GridEntity, cell: Vector2i, direction: Vector2i) -> boo
 			braced_against.emit(holder, mover)
 			return true
 	return false
+
+
+## Whether [param entity] lies downed (decision 544): at 1 hp, not acting,
+## no blow landing, no foe minding it, till downed_until.
+func is_downed(entity: GridEntity) -> bool:
+	return is_instance_valid(entity) and tick < entity.downed_until
+
+
+## Lays [param target] downed for [param ticks] (decision 544): 1 hp, lying
+## (down_until, as knocked down) and stunned as long, whatever it was doing
+## dropped. Server only.
+func lay_downed(target: GridEntity, ticks: int) -> void:
+	if not Net.is_authority() or ticks <= 0 or not _alive(target):
+		return
+	target.hp = maxi(target.hp, 1)
+	target.downed_until = tick + ticks
+	target.down_until = maxi(target.down_until, target.downed_until)
+	target.raised = ""
+	_stun_for(target, ticks)
+	_bandaging.erase(target)
+	if _channels.has(target):
+		_end_channel(target, &"broken")
+	_downed[target] = true
+	_log("downed: %s lies downed for %d ticks" % [target.name, ticks])
+
+
+## [param body], downed, gets up at [param hp] (a channel done, decision
+## 544). Server only.
+func raise_downed(body: GridEntity, hp: int) -> void:
+	if not Net.is_authority() or not _alive(body) or not is_downed(body):
+		return
+	body.downed_until = 0
+	body.down_until = tick
+	body.stunned_until_tick = tick
+	_downed.erase(body)
+	heal(body, clampi(hp, 1, body.max_hp) - body.hp)
+	_log("downed: %s gets up at %d hp" % [body.name, body.hp])
+
+
+## [param by] begins to bring back the downed [param body] (decision 544):
+## beside it, holding still, for [param ticks]; done unless meanwhile
+## [param by] moves, exerts itself or is hit, or [param body] gets up or
+## dies (_tend_downed). Who may is Main's (the blessing, the half, the
+## count). False if it cannot start.
+func try_channel(by: GridEntity, body: GridEntity, ticks: int) -> bool:
+	if not Net.is_authority() or ticks <= 0 or not _alive(by) or not _alive(body) or by == body:
+		return false
+	if is_downed(by) or is_stunned(by) or not is_downed(body) or body.zone != by.zone or not can_melee(by.tile, body.tile):
+		return false
+	if _channels.has(by) or _channels.values().any(func(job: Dictionary) -> bool: return job["body"] == body):
+		return false
+	_channels[by] = {"body": body, "until": tick + ticks, "from": tick, "tile": by.tile, "exerted": by.last_exertion_tick()}
+	by.channel_of = String(body.name)
+	by.channel_until = tick + ticks
+	_log("channel: %s begins to bring back %s" % [by.name, body.name])
+	channel_changed.emit(by, body, &"started")
+	return true
+
+
+## Who [param body] is being brought back by (decision 544); null if nobody.
+func channeler_of(body: GridEntity) -> GridEntity:
+	for by: GridEntity in _channels:
+		if _channels[by]["body"] == body:
+			return by
+	return null
+
+
+func _end_channel(by: GridEntity, state: StringName) -> void:
+	var job: Dictionary = _channels.get(by, {})
+	_channels.erase(by)
+	if is_instance_valid(by):
+		by.channel_of = ""
+		by.channel_until = 0
+	if not job.is_empty():
+		_log("channel: %s's return of %s %s" % [by.name if is_instance_valid(by) else "?", job["body"].name if is_instance_valid(job["body"]) else "?", state])
+		channel_changed.emit(by, job["body"], state)
+
+
+## Each tick (decision 544): channels go on, are broken off or are done;
+## a downed body whose time ran out dies as ever (cause &"bled").
+func _tend_downed() -> void:
+	for by: GridEntity in _channels.keys():
+		var job: Dictionary = _channels[by]
+		var body: GridEntity = job["body"]
+		if _alive(by) and by.zone != zone.name:
+			continue  # Another zone's: its own step tends it.
+		var broken := not _alive(by) or not _alive(body) or not is_downed(body) or is_downed(by)
+		if not broken:
+			broken = by.tile != job["tile"] or by.last_exertion_tick() != job["exerted"] \
+					or by.hurt_tick >= int(job["from"]) or not can_melee(by.tile, body.tile)
+		if broken:
+			_end_channel(by, &"broken")
+		elif tick >= int(job["until"]):
+			_end_channel(by, &"done")
+	for body: GridEntity in _downed.keys():
+		if not _alive(body):
+			_downed.erase(body)
+		elif body.zone == zone.name and not is_downed(body) and body.downed_until > 0:
+			_downed.erase(body)
+			body.downed_until = 0
+			if channeler_of(body) != null:
+				_end_channel(channeler_of(body), &"broken")
+			_log("downed: %s's time ran out" % body.name)
+			damage(body, body.hp, null, &"bled")
 
 
 ## Whether [param entity] lies knocked down (knock_down; decision 343).

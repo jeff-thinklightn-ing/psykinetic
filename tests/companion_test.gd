@@ -85,6 +85,7 @@ func _ready() -> void:
 	_test_record_loads()
 	_test_bond()
 	_test_sickness()
+	_test_field_return()
 	_test_out_of_reach()
 	_test_knows_level()
 	_test_wild()
@@ -1401,6 +1402,79 @@ func _test_sickness() -> void:
 	_main._tell_sickness(pet, record, true)
 	_check(_main.party_log.size() == log_size, "told once only")
 	World.steps = steps_were
+
+
+func _test_field_return() -> void:
+	print("
+== the draugr's blessing: downed, not gone, and brought back where they fell (decision 544) ==")
+	_kill_monsters()
+	var owner := _player()
+	var pet := _companion()
+	_settle(pet)
+	var record: PlayerRecord = _main._records[Net.player_id]
+	var id := record.player_id
+	var whose := "player:" + id
+	_check(_main._downed(owner, null, &"attack") == 0 and _main._downed(pet, null, &"attack") == 0, "unblessed: nobody goes down, they fall as ever")
+	_put(pet, owner.tile + Vector2i(1, 0))
+	_check(_main.bless([id], "easy") == 1 and "draugr" in record.marks and int(record.barrow.get("uses", 0)) == 5,
+		"the draugr beaten on easy: the player marked, 5 uses (%s)" % [record.barrow])
+	_check(World.carries_bound(owner, "barrow_half", whose) and World.carries_bound(pet, "return_token", whose)
+		and "draugr" in record.companion.get("marks", []), "the half to them, the token and the mark to her, beside them")
+	_check(pet.grown.facts.any(func(fact: Dictionary) -> bool: return "laid the draugr to rest" in str(fact.get("text", ""))), "and it is a fact of hers")
+	_main.bless([id], "easy")
+	_check(owner.slots.count("barrow_half") + owner.slots.count("return_token") == 1 and pet.slots.count("return_token") == 1,
+		"blessed again: no second half or token")
+	var saved := PlayerRecord.from_dict(JSON.parse_string(JSON.stringify(record.to_dict())))
+	_check(saved.barrow == record.barrow and "draugr" in saved.companion.get("marks", []), "the count and her mark are kept through a save and a load")
+	# Her player downed: she brings them back.
+	var imp := _spawn_imp(_free_tile_between(pet, 3, 4))
+	World.damage(owner, owner.hp, imp, &"attack")
+	_check(owner.spawned and owner.hp == 1 and World.is_downed(owner) and World.is_down(owner), "blessed, beaten to 0: downed at 1 hp, lying (%d)" % owner.hp)
+	World.damage(owner, 5, imp, &"attack")
+	_check(owner.hp == 1 and not imp._nearest_visible_target() == owner, "no blow lands on the downed, and no foe minds them")
+	_step_until(func() -> bool: return not World.is_downed(owner), 120)
+	_check(not World.is_downed(owner) and owner.spawned and owner.hp == roundi(owner.max_hp * 0.5) and int(record.barrow["uses"]) == 4,
+		"she goes to them and brings them back: half their hp, one use spent (%d hp, %s)" % [owner.hp, record.barrow])
+	# She downed: her player brings her back by holding E on her.
+	World.despawn(imp)
+	_settle(pet)
+	_put(pet, owner.tile + Vector2i(1, 0))
+	World.damage(pet, pet.hp, null, &"attack")
+	_check(pet.spawned and World.is_downed(pet), "she, blessed, is downed too")
+	_main._on_command(owner, "bandage", {"target": str(pet.get_path())})
+	_check(World.channeler_of(pet) == owner and owner.channel_of == String(pet.name), "held E on her: the channel begins")
+	World.try_move(owner, Vector2i(0, 1))
+	World.step()
+	_check(World.channeler_of(pet) == null and owner.channel_of.is_empty(), "a step breaks it")
+	_put(owner, pet.tile + Vector2i(-1, 0))
+	_main._on_command(owner, "bandage", {"target": str(pet.get_path())})
+	_step_until(func() -> bool: return not World.is_downed(pet), 80)
+	_check(not World.is_downed(pet) and int(record.barrow["uses"]) == 3, "held still: she is back, another use spent (%s)" % [record.barrow])
+	# Out of uses: down no more.
+	record.barrow["uses"] = 0
+	_check(_main._downed(owner, null, &"attack") == 0 and _main._downed(pet, null, &"attack") == 0, "the count spent: they fall as ever")
+	# The window runs out: the fall as ever.
+	record.barrow["uses"] = 2
+	World.damage(owner, owner.hp, null, &"attack")
+	owner.downed_until = World.tick + 1
+	pet.can_revive = func() -> bool: return false
+	_step_until(func() -> bool: return not owner.spawned, 10)
+	_check(not owner.spawned, "nobody brings them back in time: they die as ever")
+	_step_until(func() -> bool: return _player() != null, 60)
+	_main._join_companion(record, _player())
+	pet.can_revive = func() -> bool: return _main._can_revive(pet, record)
+	# Leave things as they were.
+	record.marks.erase("draugr")
+	record.barrow = {}
+	record.companion.erase("marks")
+	for entity: GridEntity in [_player(), pet]:
+		var kept := entity.slots.duplicate()
+		var kept_uids := World.slot_uids(entity)
+		for slot in kept.size():
+			if kept[slot] in ["barrow_half", "return_token"]:
+				kept[slot] = ""
+				kept_uids[slot] = 0
+		World.set_slots(entity, kept, kept_uids)
 
 
 func _test_out_of_reach() -> void:

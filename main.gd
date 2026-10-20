@@ -726,6 +726,10 @@ func _go_online() -> void:
 		World.entity_bumped.connect(_on_bumped)
 		World.entity_died.connect(_on_entity_died)
 		World.entity_taken.connect(_on_entity_taken)
+		# The draugr's blessed, downed and brought back (decision 544).
+		World.downed = _downed
+		World.entity_downed.connect(_on_downed)
+		World.channel_changed.connect(_on_channel)
 		World.command_received.connect(_on_command)
 		World.slots_changed.connect(_on_slots_changed)
 		World.ground_changed.connect(_on_ground_changed)
@@ -3936,6 +3940,9 @@ func _join_companion(record: PlayerRecord, player: Player) -> void:
 	World.set_slots(pet, record.companion.get("slots", []), record.companion.get("items", []))
 	pet.party_log = party_log
 	pet.home = record.companion.get("home", {})
+	# The draugr's blessing (decision 544): she brings her downed player back.
+	pet.can_revive = func() -> bool: return _can_revive(pet, record)
+	pet.revive = func(by: GridEntity, body: GridEntity) -> bool: return _start_channel(by, body)
 	pet.mind = _make_mind()
 	if _claude_voices.has(record.player_id):
 		pet.mind = ClaudeMind.new(pet.mind, _claude_voices[record.player_id], self)
@@ -3948,6 +3955,174 @@ func _join_companion(record: PlayerRecord, player: Player) -> void:
 	print("[net] %s's companion %s is at %s%s" % [
 		record.name, pet.name, tile, " (new)" if is_new else ""])
 	_tell_sickness(pet, record, true)
+
+
+# --- The draugr's blessing (decision 544) -------------------------------------
+
+## The mark the draugr's blessed carry (540's, on a player's record; on a
+## companion's, record.companion["marks"]).
+const BLESSED := "draugr"
+## The device's two halves (items' kinds, 544's items' side).
+const HALF := "barrow_half"
+const TOKEN := "return_token"
+
+
+## The rules of the field return: economy.json "return" "field".
+func _field_rules() -> Dictionary:
+	var rules: Variant = Production.read_rules().get("return", {}).get("field", {})
+	return rules if rules is Dictionary else {}
+
+
+## Server: the draugr beaten (enemy-ai's call, decision 544): each player of
+## [param player_ids] is blessed, marked BLESSED with a count of uses by
+## [param difficulty] (field rules' uses: easy, normal, hard) and given the
+## device's half; their companion, standing alive in the same zone and not
+## downed, is blessed too, given the token and the fact. A harder win's count
+## replaces a smaller one. How many players were blessed.
+func bless(player_ids: Array, difficulty: String) -> int:
+	var uses := int(_field_rules().get("uses", {}).get(difficulty, 0))
+	if uses <= 0:
+		return 0
+	var blessed := 0
+	for each: Variant in player_ids:
+		var id := str(each)
+		var record: PlayerRecord = _records.get(id)
+		var player: Player = _players.get(_peer_of(id))
+		if record == null or not is_instance_valid(player) or not player.spawned:
+			continue
+		mark_player(id, BLESSED)
+		var barrow: Dictionary = record.barrow
+		if int(barrow.get("of", 0)) <= uses:
+			record.barrow = {"uses": uses, "of": uses, "difficulty": difficulty, "day": Townsfolk.day_of(World.steps)}
+		var whose := _owner_key(id)
+		if not World.carries_bound(player, HALF, whose):
+			_give_bound(player, HALF, whose)
+		blessed += 1
+		party_log.add("The draugr blesses %s: they may be brought back where they fall (%d uses)." % [record.name, int(record.barrow["uses"])])
+		var pet: Companion = _companions.get(id)
+		if is_instance_valid(pet) and pet.spawned and pet.zone == player.zone and not World.is_downed(pet):
+			var marks: Array = record.companion.get("marks", [])
+			if not BLESSED in marks:
+				marks.append(BLESSED)
+				marks.sort()
+				record.companion["marks"] = marks
+			if not World.carries_bound(pet, TOKEN, whose):
+				_give_bound(pet, TOKEN, whose)
+			pet.note_fact("%s went down into the barrow with %s and laid the draugr to rest." % [pet.name, record.name])
+			party_log.add("The draugr blesses %s too." % pet.name)
+	return blessed
+
+
+## [param id] minted bound to [param whose] into [param entity]'s first free
+## pack slot, or on the ground at its feet.
+func _give_bound(entity: GridEntity, id: String, whose: String) -> void:
+	var uid := World.mint_bound(id, whose, entity, entity.zone, entity.tile)
+	if uid == 0:
+		return
+	for slot in mini(entity.slots.size(), Items.PACK):
+		if entity.slots[slot].is_empty():
+			var kept := entity.slots.duplicate()
+			var kept_uids := World.slot_uids(entity)
+			kept[slot] = id
+			kept_uids[slot] = uid
+			World.set_slots(entity, kept, kept_uids)
+			return
+	World.put_on_ground(uid, entity.tile)
+
+
+## The record whose count [param entity]'s return spends, and whose device
+## it carries: a player's own, a companion's her player's; null for others.
+func _blessing_record(entity: GridEntity) -> PlayerRecord:
+	if entity is Player:
+		return _records.get(_peer_ids.get(entity.owner_peer, ""))
+	if entity is Companion:
+		return _records.get((entity as Companion).keeper_id)
+	return null
+
+
+## Whether [param entity] carries the draugr's blessing (decision 544): a
+## player marked BLESSED, a companion with BLESSED in her marks.
+func _blessed(entity: GridEntity) -> bool:
+	var record := _blessing_record(entity)
+	if record == null:
+		return false
+	if entity is Player:
+		return BLESSED in record.marks
+	return BLESSED in record.companion.get("marks", [])
+
+
+## Whose the device's halves are (World.holder_key of the player): both
+## halves name the player, the token "hers for that player" (544's items' side).
+static func _owner_key(player_id: String) -> String:
+	return "player:" + player_id
+
+
+## Her can_revive: blessed, her token on her, uses left on her player's count.
+func _can_revive(pet: Companion, record: PlayerRecord) -> bool:
+	return _blessed(pet) and _uses_left(record) > 0 and World.carries_bound(pet, TOKEN, _owner_key(record.player_id))
+
+
+## Uses left on [param record]'s count.
+static func _uses_left(record: PlayerRecord) -> int:
+	return int(record.barrow.get("uses", 0)) if record != null else 0
+
+
+## World.downed (decision 544): a blessed body whose player has uses left
+## lies downed for the field rules' window; anyone else dies as ever.
+func _downed(target: GridEntity, _source: GridEntity, _cause: StringName) -> int:
+	if not (target is Player or target is Companion) or not _blessed(target) or _uses_left(_blessing_record(target)) <= 0:
+		return 0
+	if target is Player and not _players.has(target.owner_peer):
+		return 0
+	return roundi(float(_field_rules().get("window_s", 30)) * World.TICK_RATE)
+
+
+## World.entity_downed: said to the party, and to the fallen.
+func _on_downed(entity: GridEntity, _source: GridEntity, ticks: int) -> void:
+	var seconds := ceili(float(ticks) / World.TICK_RATE)
+	party_log.add("%s is down. A blessed hand beside them can bring them back within %d seconds." % [_display_name(entity), seconds])
+	if entity is Player:
+		Net.broadcast_to([entity.owner_peer], "party", {"from": "Server", "text": "You are down. A blessed hand beside you can bring you back within %d seconds; else you are brought back as ever." % seconds})
+	for pet: Companion in _companions.values():
+		if is_instance_valid(pet) and pet.spawned and (pet.keeper == entity or pet == entity):
+			pet.note_downed(entity == pet.keeper)
+
+
+## Server: [param by] begins to bring back the downed [param body] (held E
+## on it, or her REVIVE): [param by] blessed, carrying its half bound to
+## its player, with uses left on that count. False if it cannot.
+func _start_channel(by: GridEntity, body: GridEntity) -> bool:
+	if not World.is_downed(body) or not _blessed(by):
+		return false
+	var record := _blessing_record(by)
+	if _uses_left(record) <= 0:
+		if by is Player:
+			Net.broadcast_to([by.owner_peer], "party", {"from": "Server", "text": "Your token is spent: you cannot bring anyone back."})
+		return false
+	if not World.carries_bound(by, TOKEN if by is Companion else HALF, _owner_key(record.player_id)):
+		return false
+	return World.try_channel(by, body, roundi(float(_field_rules().get("channel_s", 4)) * World.TICK_RATE))
+
+
+## World.channel_changed (decision 544): a return done spends one use of
+## the channeler's player's count and stands the body up; one broken is said.
+func _on_channel(by: GridEntity, body: GridEntity, state: StringName) -> void:
+	if not is_instance_valid(body):
+		return
+	if state == &"started":
+		party_log.add("%s kneels beside %s." % [_display_name(by), _display_name(body)])
+	elif state == &"broken":
+		party_log.add("%s's return of %s is broken." % [_display_name(by) if is_instance_valid(by) else "Someone", _display_name(body)])
+	elif state == &"done":
+		var record := _blessing_record(by)
+		if record == null or _uses_left(record) <= 0:
+			return
+		record.barrow["uses"] = _uses_left(record) - 1
+		World.raise_downed(body, roundi(body.max_hp * float(_field_rules().get("hp", 0.5))))
+		party_log.add("%s brought %s back (%d uses left)." % [_display_name(by), _display_name(body), _uses_left(record)])
+		for pet: Companion in _companions.values():
+			if is_instance_valid(pet) and pet.spawned and (pet == by or pet == body or pet.keeper == body):
+				pet.note_brought_back(_display_name(by), _display_name(body))
 
 
 ## Her object pronoun by her card ("her", "him", "them").
@@ -5617,7 +5792,9 @@ func _on_command(entity: GridEntity, command_name: String, args: Dictionary) -> 
 		_party_said(entity, str(args.get("text", "")))
 	elif command_name == "bandage" and entity is Player:
 		var patient := get_node_or_null(NodePath(str(args.get("target", "")))) as GridEntity
-		if patient != null:
+		if patient != null and World.is_downed(patient):
+			_start_channel(entity, patient)  # Held E on the downed: the return (decision 544).
+		elif patient != null:
 			World.try_bandage(entity, patient)
 	elif command_name == "use" and entity is Player:
 		World.try_use(entity, int(args.get("slot", -1)))
@@ -6093,6 +6270,8 @@ func _on_bumped(mover: GridEntity, occupant: GridEntity, direction: Vector2i) ->
 ## capitals is a shout, heard farther by monsters (Senses.speech_radius).
 func _player_said(player: Player, text: String, phrase := 0) -> void:
 	var line := text.strip_edges().left(CHAT_MAX_CHARS)
+	if World.is_downed(player):
+		return  # Downed (decision 544): no word.
 	var whisper := line.begins_with(WHISPER_PREFIX.strip_edges()) and (line.length() == 2 or line[2] == " ")
 	if whisper:
 		line = line.substr(2).strip_edges()
@@ -6617,6 +6796,10 @@ func _leave(peer: int, player: Player, id: String) -> void:
 	if is_instance_valid(player) and player.spawned:
 		if record != null:
 			record.remember(player)
+			if World.is_downed(player):
+				# Gone while downed (decision 544): fallen, brought back as ever.
+				record.hp = 0
+				_start_return(id, "player", player.tile)
 		World.despawn(player)
 	elif record != null:
 		record.last_seen = int(Time.get_unix_time_from_system())
