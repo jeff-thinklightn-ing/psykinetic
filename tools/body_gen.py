@@ -64,11 +64,17 @@ def per(human, orc=None, kobold=None):
 ## across; spine; neck: to the head; hands: the fingers; feet: heel to toe). The feet are
 ## then put back on the ground.
 PROPORTIONS = {
-	"orc": {"legs": 0.84, "arms": 1.16, "shoulders": 1.7, "hips": 1.2, "spine": 1.0, "neck": 0.3,
+	"orc": {"legs": 0.84, "arms": 1.16, "shoulders": 1.7, "hips": 1.2, "spine": 1.0, "neck": 0.9,
 		"hands": 1.5, "feet": 1.3},
 	"kobold": {"legs": 0.66, "arms": 1.0, "shoulders": 1.05, "hips": 0.92, "spine": 0.84, "neck": 0.55,
 		"hands": 1.55, "feet": 1.6},
 }
+## Each lofted part's density by people (Part.densify): its rings' points and the rings between
+## stations each this many times over (the orc's revision, 478 amended: rounder at about 10k
+## triangles of its 12k budget; the humans and the kobold as built). A ring of fewer than
+## DENSE_MIN points is left (the face's little boxes, the chain's links).
+DENSITY_OF = (2, 1)
+DENSE_MIN = 5
 ## The torso's rings (torso_rings' ten) widened or narrowed by people: across, front to back.
 TORSO_WIDTH = {
 	"orc": [1.2, 1.18, 1.18, 1.3, 1.5, 1.85, 2.05, 2.05, 2.3, 1.8],
@@ -336,23 +342,61 @@ class Part:
 		# Rings shared with another bone at a weight ({ring index: (bone, weight)}): the top of
 		# a sleeve half on the clavicle, so it turns only part way as the arm comes down.
 		self.mixes = {}
+		# Its last ring joined back to its first, no caps: a loop (a chain's link).
+		self.closed = False
+		# Left as built by densify (a small part: a finger, a toe, a rivet).
+		self.sparse = False
 
 	def add(self, points: list) -> "Part":
 		self.rings.append(points)
 		return self
 
+	def densify(self, d: int) -> None:
+		"""Each ring [d] times its points round a smooth closed curve, and [d] - 1 rings put
+		between each two along a smooth path (Catmull-Rom both ways): rounder sections, more
+		segments, the part's shape kept. Rings of fewer than DENSE_MIN points are left."""
+		if d <= 1 or self.closed or self.sparse or len(self.rings[0]) < DENSE_MIN:
+			return
+
+		def cr(p0, p1, p2, p3, t):
+			t2, t3 = t * t, t * t * t
+			return 0.5 * ((2.0 * p1) + (-p0 + p2) * t + (2.0 * p0 - 5.0 * p1 + 4.0 * p2 - p3) * t2
+				+ (-p0 + 3.0 * p1 - 3.0 * p2 + p3) * t3)
+
+		rings = []
+		for r in self.rings:
+			n = len(r)
+			out = []
+			for i in range(n):
+				for s in range(d):
+					out.append(r[i].copy() if s == 0 else cr(r[i - 1], r[i], r[(i + 1) % n], r[(i + 2) % n], s / d))
+			rings.append(out)
+		m = len(rings)
+		along = []
+		for k in range(m):
+			along.append(rings[k])
+			if k == m - 1:
+				break
+			a, b = rings[max(0, k - 1)], rings[min(m - 1, k + 2)]
+			for s in range(1, d):
+				along.append([cr(a[i], rings[k][i], rings[k + 1][i], b[i], s / d) for i in range(len(rings[k]))])
+		self.rings = along
+		self.pins = {k * d: bone for k, bone in self.pins.items()}
+		self.mixes = {k * d: mix for k, mix in self.mixes.items()}
+
 	def mesh(self, J: dict, cap_start: bool = True, cap_end: bool = True):
+		self.densify(per(1, *DENSITY_OF))
 		verts, faces = [], []
 		n = len(self.rings[0])
 		for r in self.rings:
 			verts.extend(r)
-		for k in range(len(self.rings) - 1):
+		for k in range(len(self.rings) - (0 if self.closed else 1)):
+			nxt = (k + 1) % len(self.rings)
 			for i in range(n):
-				a, b = k * n + i, k * n + (i + 1) % n
-				faces.append((a, b, b + n, a + n))
-		if cap_start:
+				faces.append((k * n + i, k * n + (i + 1) % n, nxt * n + (i + 1) % n, nxt * n + i))
+		if cap_start and not self.closed:
 			faces.append(tuple(reversed(range(n))))
-		if cap_end:
+		if cap_end and not self.closed:
 			last = (len(self.rings) - 1) * n
 			faces.append(tuple(range(last, last + n)))
 		mesh = bpy.data.meshes.new(self.name)
@@ -503,6 +547,12 @@ def sleeve(J: dict, side: str) -> Part:
 	down = Vector((0.0, 0.0, -0.018))
 	stations = [(inner + down, 0.052, 0.075), (sh + along * 0.03 + down, 0.060, 0.074), (sh.lerp(el, 0.45), 0.058, 0.058),
 		(el, 0.048, 0.050), (el.lerp(wr, 0.5), 0.046, 0.044), (wr - along * 0.01, 0.040, 0.036)]
+	if PEOPLE == "orc":
+		# The revision (478 amended): a capped deltoid, the biceps, an elbow, a heavy forearm
+		# swelling below it, the wrist thick.
+		stations = [(inner + down, 0.052, 0.075), (sh + along * 0.03 + down, 0.066, 0.080), (sh.lerp(el, 0.3), 0.060, 0.062),
+			(sh.lerp(el, 0.6), 0.062, 0.060), (el, 0.046, 0.048), (el.lerp(wr, 0.3), 0.058, 0.054),
+			(el.lerp(wr, 0.65), 0.050, 0.046), (wr - along * 0.01, 0.040, 0.036)]
 	k = pick(1.0, 0.86) * m("arms") * per(1.0, 2.4, 1.45)  # The woman's arms slighter, an orc's massive.
 	for c, rv, ru in stations:
 		# u forward, v up: the arm's front-to-back depth and its height.
@@ -528,8 +578,8 @@ def leg(J: dict, side: str) -> Part:
 	# The woman's legs: the thigh's top as full (her hips), slighter below.
 	scale = pick([1.0] * 7, [1.04, 1.0, 0.95, 0.9, 0.9, 0.88, 0.88])
 	for k, (c, ru, rv, dx) in enumerate(stations):
-		back = {1: 0.018, 4: 0.012}.get(k, 0.0)  # The seat; the calf.
-		f = scale[k] * m("legs") * (m("thighs") if k < 2 else 1.0) * per(1.0, 1.85 if k < 3 else 1.7, 1.45 if k < 3 else 1.4)
+		back = per({1: 0.018, 4: 0.012}, {1: 0.03, 4: 0.05, 5: 0.02}, {1: 0.018, 4: 0.012}).get(k, 0.0)  # The seat; the calf.
+		f = scale[k] * m("legs") * (m("thighs") if k < 2 else 1.0) * per(1.0, [1.9, 1.9, 1.85, 1.55, 1.75, 1.45, 1.32][k], 1.45 if k < 3 else 1.4)
 		# (2) A kobold's leg digitigrade on the same bones: the knee a little forward, the hock
 		# (three quarters down the calf) well back, the shin slanting down and forward from it.
 		bend = per(0.0, 0.0, [0.0, 0.0, -0.01, -0.045, -0.01, 0.075, 0.03][k])
@@ -558,6 +608,34 @@ def boot(J: dict, side: str) -> Part:
 	return p
 
 
+def orc_foot(J: dict, side: str) -> list:
+	"""An orc's bare foot (the revision, 478 amended: "the calves and feet shaped"): out of
+	the ankle, a rounded heel behind it, the instep high, broad across the ball; five toes,
+	the big one inside, on the ball's bone."""
+	p = Part("Foot_" + side, "Skin")
+	p.bones = ["calf_" + side, "foot_" + side, "ball_" + side]
+	ankle, ball, toe = J["foot_" + side], J["ball_" + side], J["ball_" + side + ".tail"]
+	x = ankle.x
+	k = 1.3
+	# Its top tucked inside the leg's end (leg()'s last ring, 0.04 over the ankle), so no cuff.
+	for c, r in [(ankle + Vector((0, 0, 0.08)), 0.042), (ankle + Vector((0, 0, 0.04)), 0.046), (ankle + Vector((0, 0.004, 0.0)), 0.05)]:
+		p.add(ring(c, X, FRONT, r * k, r * 1.04 * k, 8, 0.25))
+	for y, w, h in [(ankle.y + 0.085, 0.040, 0.075), (ankle.y + 0.055, 0.050, 0.100), (ankle.y - 0.02, 0.054, 0.105),
+			(ball.y + 0.06, 0.060, 0.072), (ball.y + 0.01, 0.066, 0.050), (ball.y - 0.025, 0.062, 0.038)]:
+		p.add(ring(Vector((x, y, h * 0.5 + 0.004)), X, Z, w * k, h * 0.5, 8, 0.45))
+	out = [p]
+	inner = -1.0 if x > 0 else 1.0  # Toward the body's middle.
+	for dx, r, length in [(0.044, 0.019, 0.056), (0.017, 0.014, 0.050), (-0.004, 0.0135, 0.045), (-0.024, 0.0125, 0.040),
+			(-0.043, 0.0115, 0.034)]:
+		t = Part("Toe", "Skin", rigid="ball_" + side)
+		t.sparse = True
+		base = Vector((x + dx * inner * k, ball.y - 0.015, r * k + 0.004))
+		for f, kk, dz in [(0.0, 1.0, 0.0), (0.6, 0.95, -0.002), (1.0, 0.7, -0.006)]:
+			t.add(ring(base + Vector((0, -length * k * f, dz)), X, Z, r * k * kk, r * k * kk * 0.85, 6, 0.3))
+		out.append(t)
+	return out
+
+
 def kobold_foot(J: dict, side: str) -> list:
 	"""A kobold's foot, as the leg's digitigrade bend goes on: from the hock-high ankle down
 	and forward along its long sole to the toes, the heel off the ground; four claws."""
@@ -583,10 +661,40 @@ def hand(J: dict, side: str) -> Part:
 	wr = J["hand_" + side]
 	k = pick(1.0, 0.88) * m("hands") * per(1.0, 1.75, 1.6)  # The woman's hands narrower and thinner.
 	reach = per(1.0, *PROPORTIONS_OF("hands"))  # As long as the skeleton's fingers.
-	for dx, w, h in [(-0.015, 0.036, 0.028), (0.02, 0.050, 0.027), (0.065, 0.053, 0.023), (0.105, 0.048, 0.018),
-			(0.135, 0.034, 0.013)]:
+	stations = [(-0.015, 0.036, 0.028), (0.02, 0.050, 0.027), (0.065, 0.053, 0.023), (0.105, 0.048, 0.018),
+		(0.135, 0.034, 0.013)]
+	if PEOPLE == "orc":
+		# The palm to the knuckles only, its fingers their own (fingers()).
+		stations = [(-0.015, 0.034, 0.026), (0.02, 0.044, 0.026), (0.065, 0.047, 0.024), (0.105, 0.045, 0.020)]
+	for dx, w, h in stations:
 		p.add(ring(wr + Vector((dx * reach * sign, 0, -0.005)), FRONT, Z, w * k, h * k, 8, 0.6))
 	return p
+
+
+def fingers(J: dict, side: str) -> list:
+	"""An orc's four fingers and its thumb (the revision, 478 amended: "hands with fingers"):
+	each a thick tapering loft along its own bones from inside the palm, weighted to them,
+	so the clips' fists close them."""
+	out = []
+	for name, r in [("index", 0.019), ("middle", 0.020), ("ring", 0.019), ("pinky", 0.016), ("thumb", 0.022)]:
+		p = Part("Finger_" + side, "Skin")
+		p.sparse = True
+		bones = [name + "_0%d_" % i + side for i in (1, 2, 3)]
+		p.bones = ["hand_" + side] + bones
+		leaf = J[name + "_04_leaf_" + side]
+		points = [J[b] for b in bones] + [leaf]
+		# From back in the palm (the thumb's root inside the hand's heel).
+		start = points[0] + (points[0] - points[1]).normalized() * (0.012 if name == "thumb" else 0.025)
+		path = [start] + points
+		along = (leaf - points[0]).normalized()
+		u = along.cross(Z).normalized() if abs(along.z) < 0.9 else X
+		v = u.cross(along).normalized()
+		for i, c in enumerate(path):
+			k = [1.05, 1.0, 0.94, 0.86, 0.72][i]
+			p.add(ring(c + Vector((0, 0, -0.004)), u, v, r * k, r * k * 0.85, 6, 0.3))
+		p.pins = {0: "hand_" + side}
+		out.append(p)
+	return out
 
 
 def thumb(J: dict, side: str) -> Part:
@@ -609,8 +717,14 @@ def neck(J: dict) -> Part:
 	p.bones = ["spine_03", "neck_01", "Head"]
 	n, h = J["neck_01"], J["Head"]
 	k = pick(1.0, 0.86) * m("neck") * per(1.0, 1.55, 0.8)  # The woman's neck slimmer, an orc's a bull's.
-	for c, r, fwd in [(n + Vector((0, 0, -0.01)), 0.066, 0.0), (n.lerp(h, 0.5), 0.060, 0.008),
-			(h + Vector((0, 0.005, 0.03)), 0.060, 0.014)]:
+	stations = [(n + Vector((0, 0, -0.01)), 0.066, 0.0), (n.lerp(h, 0.5), 0.060, 0.008),
+		(h + Vector((0, 0.005, 0.03)), 0.060, 0.014)]
+	if PEOPLE == "orc":
+		# The revision (478 amended): a neck to be seen, broad at its foot where the
+		# trapezius slopes into the shoulders, thick up into the jaw.
+		stations = [(n + Vector((0, 0.01, -0.04)), 0.085, 0.0), (n + Vector((0, 0.005, -0.005)), 0.068, 0.0),
+			(n.lerp(h, 0.5), 0.058, 0.006), (h + Vector((0, 0.005, 0.03)), 0.060, 0.014)]
+	for c, r, fwd in stations:
 		p.add(ring(c + Vector((0, 0.008, 0)) + FRONT * fwd, X, FRONT, r * k, r * 1.05 * k, 8))
 	return p
 
@@ -633,6 +747,8 @@ HEAD_Z = (0.010, 0.040, 0.070, 0.102, 0.132, 0.158, 0.192, 0.222, 0.243)
 
 def head_rings(J: dict) -> list:
 	"""The head's rings of 12, jaw to crown (HEAD_Z), the face shaped (see head)."""
+	if PEOPLE == "orc":
+		return orc_head_rings(J)
 	rings = []
 	base = J["Head"] + Vector((0, 0.0, -0.015))
 	# (height above the head bone, half-width, half-depth, y centre, front push)
@@ -651,7 +767,7 @@ def head_rings(J: dict) -> list:
 	kw, kd, kp = pick((1.0, 1.0, 1.0), (0.95, 0.97, 0.75))
 	# An orc's lower face broad (the jaw, the chin, the mouth) and its brow a ridge; a
 	# kobold's head narrow, its mouth and nose drawn out into a snout (SNOUT).
-	jaw_wide = per({}, {0.010: 1.25, 0.040: 1.48, 0.070: 1.32, 0.102: 1.12}, {0.010: 0.8, 0.040: 0.72, 0.070: 0.7, 0.102: 0.72})
+	jaw_wide = per({}, {}, {0.010: 0.8, 0.040: 0.72, 0.070: 0.7, 0.102: 0.72})
 	for z, w, d, yc, push in stations:
 		w, d, push = w * kw * jaw_wide.get(z, per(1.0, 1.04, 0.86)), d * kd, push * kp
 		if z < 0.08:
@@ -679,9 +795,6 @@ def head_rings(J: dict) -> list:
 			jaw = per(pick(0.006, -0.004), 0.016, 0.0)
 			pts[1] = pts[1] + X * jaw
 			pts[5] = pts[5] - X * jaw
-		if PEOPLE == "orc" and abs(z - 0.158) < 0.01:
-			for i in (2, 3, 4):
-				pts[i] = pts[i] + FRONT * 0.022  # The brow's ridge.
 		if PEOPLE == "kobold":
 			out = SNOUT.get(z, 0.0)
 			if abs(z - 0.070) < 0.01:
@@ -693,6 +806,57 @@ def head_rings(J: dict) -> list:
 			pts[4] = pts[4] + FRONT * out * 0.85
 			pts[1] = pts[1] + FRONT * out * 0.4
 			pts[5] = pts[5] + FRONT * out * 0.4
+		rings.append(pts)
+	return rings
+
+
+## An orc's head (the revision, 478 amended: "the head bigger with a jaw and brow"), off
+## Jeff's p2 front and side: (height above the head bone less 0.015, half-width, the face's
+## front, the back of the head, squareness), under the jaw to the top. The jaw as wide as the
+## skull and thrust forward past it, the lower lip out, the nose's line back, the eyes deep
+## under a ridge of brow, the forehead sloping back to a low crown.
+ORC_HEAD = [
+	(-0.008, 0.074, -0.070, 0.026, 0.3),  # Under the jaw, at the neck.
+	(0.030, 0.098, -0.108, 0.050, 0.45),  # The jaw and the chin.
+	(0.056, 0.104, -0.122, 0.064, 0.45),  # The lower lip, the tusks' roots.
+	(0.080, 0.098, -0.104, 0.072, 0.4),   # The upper lip.
+	(0.104, 0.094, -0.100, 0.078, 0.4),   # Under the nose, the cheeks.
+	(0.124, 0.092, -0.094, 0.082, 0.4),   # The eyes.
+	(0.146, 0.090, -0.102, 0.082, 0.4),   # The brow's ridge.
+	(0.170, 0.084, -0.086, 0.080, 0.4),   # The forehead, sloping back.
+	(0.196, 0.068, -0.054, 0.068, 0.3),   # The crown.
+	(0.214, 0.036, -0.012, 0.036, 0.2),   # The top.
+]
+
+
+def orc_head_rings(J: dict) -> list:
+	"""The orc's head rings of 12 (ORC_HEAD), by MORPH's face keys: the jaw wider, the brow
+	heavier, the cheeks fuller, the eyes deeper."""
+	base = J["Head"] + Vector((0, 0.0, -0.015))
+	rings = []
+	for z, w, front, back, sq in ORC_HEAD:
+		if z < 0.06:
+			w *= m("jaw")
+		if abs(z - 0.104) < 0.01:
+			w *= 1.0 + 0.5 * (m("cheeks") - 1.0)
+		if abs(z - 0.146) < 0.01:
+			front -= 0.01 * (m("brow") - 1.0)
+		d = (back - front) * 0.5
+		pts = ring(base + Vector((0, (front + back) * 0.5, z)), X, FRONT, w, d, 12, sq)
+		if abs(z - 0.124) < 0.01:
+			# The sockets: the eyes' columns back under the brow.
+			for i in (2, 4):
+				pts[i] = pts[i] - FRONT * (0.012 + 0.006 * (m("eyes") - 1.0))
+		if abs(z - 0.146) < 0.01:
+			# The ridge across, not only at the middle.
+			for i in (2, 4):
+				pts[i] = pts[i] + FRONT * 0.007
+		if 0.02 < z < 0.07:
+			# The jaw's corners out under the cheeks, a heavy square chin.
+			pts[1] = pts[1] + X * 0.01 + FRONT * 0.012
+			pts[5] = pts[5] - X * 0.01 + FRONT * 0.012
+			pts[2] = pts[2] + FRONT * 0.01
+			pts[4] = pts[4] + FRONT * 0.01
 		rings.append(pts)
 	return rings
 
@@ -729,20 +893,40 @@ def face(J: dict) -> list:
 		return parts + kobold_face(J)
 	nose = Part("Nose", "Skin", rigid="Head")
 	top, tip = at(0, -0.100 - 0.008 * m("brow"), 0.150), at(0, per(pick(-0.128, -0.124), -0.118) - 0.014 * m("nose"), 0.098 - 0.008 * m("nose"))
-	for t, w in [(0.0, 0.010), (0.7, per(pick(0.016, 0.013), 0.024)), (1.0, per(pick(0.012, 0.010), 0.02))]:
+	if PEOPLE == "orc":
+		# Broad and flat, its tip just out from the upper lip's line.
+		top, tip = at(0, -0.090, 0.140), at(0, -0.124 - 0.01 * m("nose"), 0.096)
+	for t, w in [(0.0, 0.010), (0.7, per(pick(0.016, 0.013), 0.034)), (1.0, per(pick(0.012, 0.010), 0.03))]:
 		c = top.lerp(tip, t)
 		nose.add([c + Vector((-w, 0.012, 0)), c + Vector((0, -0.004, 0)), c + Vector((w, 0.012, 0))])
 	parts.append(nose)
 	for side in (1.0, -1.0):
+		if PEOPLE == "orc":
+			# Small eyes deep in their sockets under the ridge; no brows (the ridge is them).
+			parts.append(box("Eye", "Belt", at(0.034 * side, -0.090, 0.124), Vector((0.016, 0.006, 0.008)), rigid="Head"))
+			parts.append(box("Ear", "Skin", at(0.090 * side, 0.036, 0.132), Vector((0.012, 0.055, 0.03)), 0.35, rigid="Head"))
+			parts.append(tusk(at(0.046 * side, -0.118, 0.040), side))
+			continue
 		parts.append(box("Brow", "Hair", at(0.030 * side, -0.100 - 0.010 * m("brow"), 0.150), Vector((0.032, 0.012, pick(0.008, 0.005))), rigid="Head"))
 		parts.append(box("Eye", "Belt", at(0.030 * side, -0.090 + 0.008 * m("eyes"), 0.130), Vector((0.016, 0.006, 0.008)), rigid="Head"))
-		if PEOPLE == "orc":
-			# Small ears swept back to a point; two tusks up from the lower jaw.
-			parts.append(box("Ear", "Skin", at(0.088 * side, 0.030, 0.128), Vector((0.012, 0.060, 0.026)), 0.45, rigid="Head"))
-			parts.append(spike("Tusk", "Bone", at(0.048 * side, -0.104, 0.040), at(0.062 * side, -0.122, 0.112), 0.018))
-		else:
-			parts.append(box("Ear", "Skin", at(0.080 * side, 0.004, 0.120), Vector((0.012, 0.030, pick(0.045, 0.040))), 0.8, rigid="Head"))
+		parts.append(box("Ear", "Skin", at(0.080 * side, 0.004, 0.120), Vector((0.012, 0.030, pick(0.045, 0.040))), 0.8, rigid="Head"))
 	return parts
+
+
+def tusk(base: Vector, side: float) -> Part:
+	"""An orc's tusk (the revision, 478 amended: "modelled, not pegs"): thick at the lower
+	jaw, curving up past the upper lip, out and a little back, to a blunt point."""
+	p = Part("Tusk", "Bone", rigid="Head")
+	path = [(Vector((0, 0, 0)), 1.0), (Vector((0.004, -0.010, 0.026)), 0.92), (Vector((0.011, -0.012, 0.052)), 0.78),
+		(Vector((0.020, -0.006, 0.074)), 0.55), (Vector((0.028, 0.006, 0.090)), 0.18)]
+	for i, (d, k) in enumerate(path):
+		c = base + Vector((d.x * side, d.y, d.z))
+		nxt = path[min(i + 1, len(path) - 1)][0] - path[max(i - 1, 0)][0]
+		along = Vector((nxt.x * side, nxt.y, nxt.z)).normalized()
+		u = along.cross(X).normalized()
+		v = along.cross(u).normalized()
+		p.add(ring(c, u, v, 0.019 * k, 0.016 * k, 6, 0.2))
+	return p
 
 
 def spike(name: str, region: str, base: Vector, tip: Vector, r: float, bone: str = "Head") -> Part:
@@ -834,6 +1018,40 @@ def kilt(J: dict, drop: float = 0.5, name: str = "Kilt", wide: float = 1.0) -> P
 	return p
 
 
+def loincloth(J: dict) -> list:
+	"""An orc's loincloth (the revision, 478 amended: "hanging, not flaring"): a short wrap
+	under the belt, close round the hips, and a flap front and back hanging straight down
+	from it to above the knees, a little narrower at the hem, the hem ragged."""
+	rings = torso_rings(J)
+	wrap = Part("Loincloth", "Tunic")
+	wrap.bones = ["pelvis", "spine_01", "thigh_l", "thigh_r"]
+	for r, k, dz in [(rings[0], 1.1, -0.03), (rings[0], 1.06, 0.0), (rings[1], 1.05, 0.0), (rings[2], 1.04, 0.0), (rings[3], 1.03, 0.0)]:
+		wrap.add([Vector((q.x * k, q.y * k, q.z + dz)) for q in r])
+	out = [wrap]
+	top = J["spine_01"].z - 0.03
+	hem = J["calf_l"].z + 0.07
+	front = min(q.y for q in rings[0]) * 1.18
+	back = max(q.y for q in rings[0]) * 1.1
+	for name, y, w, drop, sign in [("Flap_Front", front, 0.17, 0.0, -1.0), ("Flap_Back", back, 0.19, 0.06, 1.0)]:
+		p = Part(name, "Tunic")
+		p.bones = ["pelvis", "thigh_l", "thigh_r"]
+		p.pins = {0: "pelvis", 1: "pelvis"}
+		low = hem + drop
+		xs = (-1.0, -0.5, 0.0, 0.5, 1.0)
+		for f in (0.0, 0.2, 0.5, 0.8, 1.0):
+			z = top + (low - top) * f
+			width = w * (1.0 - 0.12 * f)
+			# The hem ragged: its points at their own lengths.
+			rag = [0.0, -0.05, -0.015, -0.06, -0.01] if f == 1.0 else [0.0] * 5
+			# Hung off the belly at its top, then straight down, clear of the thighs.
+			yy = y + sign * 0.02
+			fronts = [Vector((x * width, yy, z + d)) for x, d in zip(xs, rag)]
+			backs = [Vector((x * width, yy - sign * 0.014, z + d)) for x, d in zip(xs, rag)]
+			p.add(fronts + list(reversed(backs)))
+		out.append(p)
+	return out
+
+
 def harness(J: dict) -> list:
 	"""An orc's harness: a leather strap from its right hip up across its chest to its left
 	shoulder, and on across its back down to the hip again (the torso's rings, followed)."""
@@ -846,6 +1064,9 @@ def harness(J: dict) -> list:
 
 	out = []
 	for name, start, end in [("Chain_Front", 4.6, 1.5), ("Chain_Back", 7.4, 10.5)]:
+		if PEOPLE == "orc":
+			out += chain(rings, at, start, end)
+			continue
 		# Jeff's p2 (478 restyled): a heavy iron chain where the strap was, its links in
 		# alternate bands of the iron and the belt's dark.
 		for k in range(3, 8):
@@ -859,19 +1080,98 @@ def harness(J: dict) -> list:
 	return out
 
 
+## A chain's links (the revision, 478 amended: "the chain as links"): this many a strand
+## (spaced evenly along it, the same count in every shape key's build), each this long and
+## wide outside, its iron this thick, riding this far off the skin.
+LINKS = 11
+LINK_LENGTH = 0.092
+LINK_WIDTH = 0.058
+LINK_IRON = 0.015
+LINK_OFF = 0.026
+
+
+def chain(rings: list, at, start: float, end: float) -> list:
+	"""The orc's chain from [start] to [end] round the torso's rings 3 to 8 (harness's
+	path): a strap of the belt's leather under it, and links along it, each turned a quarter
+	from the last, lying on the skin and following its weights."""
+	axis = Vector((0, 0, 0))
+	path = []
+	for kk in range(3, 9):
+		f = start + (end - start) * (kk - 3) / 5.0
+		path.append(at(rings[kk], f))
+	strap = Part("Strap", "Belt", follow=True)
+	for kk in range(3, 9):
+		f = start + (end - start) * (kk - 3) / 5.0
+		strap.add(slab([at(rings[kk], f - 0.22), at(rings[kk], f + 0.22)], axis, 0.008, 0.002))
+	out = [strap]
+	# Even steps along the polyline.
+	lengths = [0.0]
+	for a, b in zip(path, path[1:]):
+		lengths.append(lengths[-1] + (b - a).length)
+	total, i = lengths[-1], 0
+	step = total / LINKS
+	for n in range(LINKS):
+		t = step * (n + 0.5)
+		while lengths[i + 1] < t:
+			i += 1
+		a, b = path[i], path[i + 1]
+		c = a.lerp(b, (t - lengths[i]) / (lengths[i + 1] - lengths[i]))
+		tangent = (b - a).normalized()
+		normal = outward(c, axis)
+		normal = (normal - tangent * normal.dot(tangent)).normalized()
+		c = c + normal * LINK_OFF
+		side = tangent.cross(normal).normalized()
+		# Alternate links lie flat on the skin and stand up from it.
+		across = side if len(out) % 2 else normal
+		plane = tangent.cross(across).normalized()
+		p = Part("Link", "Iron", follow=True)
+		p.closed = True
+		ra, rb = (LINK_LENGTH - LINK_IRON) * 0.5, (LINK_WIDTH - LINK_IRON) * 0.5
+		for s in range(8):
+			ang = 2.0 * math.pi * s / 8
+			centre = c + tangent * math.cos(ang) * ra + across * math.sin(ang) * rb
+			radial = (tangent * math.cos(ang) * rb + across * math.sin(ang) * ra).normalized()
+			p.add(ring(centre, radial, plane, LINK_IRON * 0.5, LINK_IRON * 0.5, 4, 0.0, phase=0.5))
+		out.append(p)
+	return out
+
+
 def shoulder_plate(J: dict) -> list:
-	"""An orc's iron shoulder plate (Jeff's p2): curved over its left shoulder, rigid on the
-	upper arm's root, its rim flaring out over the arm."""
-	p = Part("Plate", "Iron", rigid="clavicle_l")
+	"""An orc's iron shoulder plate (Jeff's p2; the revision, 478 amended: "an edged plate
+	with rivets"): a domed cap over its left shoulder and two lames stepping down and out
+	over the arm, each a band of iron with a thick turned edge and a row of rivets, rigid on
+	the clavicle."""
 	sh = J["upperarm_l"]
-	for z, w, d, out in [(0.16, 0.16, 0.17, 0.02), (0.10, 0.20, 0.20, 0.05), (0.03, 0.21, 0.21, 0.08), (-0.06, 0.20, 0.19, 0.11)]:
-		c = sh + Vector((out, 0.0, z))
-		p.add(ring(c, X, FRONT, w * 0.75, d * 0.75, 10, 0.45))
-	rim = Part("Plate_Rim", "Belt", rigid="clavicle_l")
-	for z, w in [(-0.08, 0.215), (-0.11, 0.205)]:
-		rim.add(ring(sh + Vector((0.11, 0.0, z)), X, FRONT, w * 0.75, w * 0.72, 10, 0.45))
+	out = []
+	# (top, bottom, half-width, half-depth, out along x at the bottom)
+	for i, (top, bottom, w, d, dx) in enumerate([(0.12, 0.02, 0.155, 0.160, 0.05), (0.05, -0.04, 0.165, 0.168, 0.085),
+			(-0.01, -0.10, 0.170, 0.170, 0.12)]):
+		p = Part("Plate_%d" % i, "Iron", rigid="clavicle_l")
+		if i == 0:
+			# The dome over the shoulder's top, rounding down into the cap's side.
+			for dz, k in ((0.07, 0.3), (0.055, 0.62), (0.03, 0.82)):
+				p.add(ring(sh + Vector((0.01, 0.0, top + dz)), X, FRONT, w * k, d * k, 10, 0.45))
+		for f in (0.0, 0.5, 1.0):
+			z = top + (bottom - top) * f
+			k = 0.86 + 0.14 * f
+			p.add(ring(sh + Vector((dx * (0.4 + 0.6 * f), 0.0, z)), X, FRONT, w * k, d * k, 10, 0.5))
+		out.append(p)
+		# The turned edge: a thick roll round the bottom.
+		c = sh + Vector((dx, 0.0, bottom))
+		edge = Part("Plate_Edge", "Iron", rigid="clavicle_l")
+		for dz, k in ((0.012, 1.0), (0.0, 1.06), (-0.012, 1.0)):
+			edge.add(ring(c + Vector((0, 0, dz)), X, FRONT, w * k, d * k, 10, 0.5))
+		out.append(edge)
+		# Rivets: a row a little above the edge, round the outside of the shoulder.
+		for a in (-1.0, -0.5, 0.0, 0.5, 1.0):
+			ang = a * 1.2
+			n = Vector((math.cos(ang), -math.sin(ang) * 0.95, 0.0)).normalized()
+			at = c + Vector((n.x * w * 1.04, n.y * d * 1.04, 0.03))
+			rivet = spike("Rivet", "Belt", at - n * 0.004, at + n * 0.012, 0.011, "clavicle_l")
+			rivet.sparse = True
+			out.append(rivet)
 	buckle = box("Buckle", "Iron", J["spine_01"] + Vector((0.0, -0.21, 0.0)), Vector((0.11, 0.03, 0.09)), rigid="spine_01")
-	return [p, rim, buckle]
+	return out + [buckle]
 
 
 def collar(J: dict) -> Part:
@@ -1204,16 +1504,17 @@ def assemble(J: dict, which: str = "Body"):
 	Head bone, or as near) grows by MORPH's "head" about the Head bone."""
 	if which == "Body":
 		parts = [torso(J), belt(J), neck(J), head(J)] + per([collar(J)], [], []) + face(J)
-		parts += per([], [kilt(J, 0.62, "Loincloth", 1.12)] + harness(J) + shoulder_plate(J), [tail(J), kilt(J, 0.4, "Loincloth", 1.22)] + ruff(J))
+		parts += per([], loincloth(J) + harness(J) + shoulder_plate(J), [tail(J), kilt(J, 0.4, "Loincloth", 1.22)] + ruff(J))
 		for side in ("l", "r"):
-			parts += [sleeve(J, side), leg(J, side), hand(J, side), thumb(J, side)]
-			parts += kobold_foot(J, side) if PEOPLE == "kobold" else [boot(J, side)]
+			parts += [sleeve(J, side), leg(J, side), hand(J, side)]
+			parts += fingers(J, side) if PEOPLE == "orc" else [thumb(J, side)]
+			parts += kobold_foot(J, side) if PEOPLE == "kobold" else orc_foot(J, side) if PEOPLE == "orc" else [boot(J, side)]
 			if PEOPLE == "kobold":
 				parts += claws(J, side)
 	else:
 		parts = WEARABLES[which](J)
 	# A kobold's head large for its body.
-	grow = m("head") * per(1.0, 1.2, 1.55)
+	grow = m("head") * per(1.0, 1.62, 1.55)
 	for p in parts:
 		if (p.rigid == "Head" or "Head" in p.bones) and grow != 1.0:
 			p.rings = [[J["Head"] + (q - J["Head"]) * grow for q in r] for r in p.rings]

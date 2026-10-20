@@ -12527,6 +12527,26 @@ the iron a new palette region, "Iron" (body_build, the metal row). Its slot art-
 1.95 x 0.73 in T-pose). The coordinator: the generator is at its limit for monsters; the next
 step is a trial of meshing the picked concepts (TRELLIS) and retargeting them onto these rigs,
 for Jeff to choose the route.
+
+Amended (Jeff on the brute in game: "still pretty clunky, it's going to need a revision or a
+hand redo by me in blender"; the coordinator: revise it meanwhile, the hunch left to the
+posture layer): the orc revised toward p2 while Jeff's hand redo is under way (his kit,
+C:\dev\review\orc_hand\). Its own head (ORC_HEAD, orc_head_rings): the jaw as wide as the
+skull and thrust out past it, the lower lip forward, deep sockets under a ridge of brow, the
+forehead sloping back to a low crown, the head larger (by 1.62 about the head bone); a broad
+flat nose, small eyes, no brows; tusks lofted from the lower jaw, curving up past the lip, out
+and back (tusk). A neck to be seen (PROPORTIONS neck 0.9), broad at its foot. Four fingers and
+a thumb lofted along their own bones (fingers), so the clips' fists close them, the palm to the
+knuckles only. The plate a domed cap and two lames, each with a turned edge and five rivets;
+the chain eleven links a strand, each a closed loop (Part.closed) turned a quarter from the
+last, over a leather strap. The loincloth a short wrap and a flap front and back hanging
+straight down to above the knees, their hems ragged (loincloth), not the flared kilt. A
+deltoid, biceps, heavy forearms; calves swelling behind, narrower ankles; bare feet with a
+heel, a high instep and five toes (orc_foot). Every part densified twice (Part.densify:
+Catmull-Rom round each ring and between rings; fingers, toes, rivets and links left as
+built): 11,292 triangles of the 12,000 budget. The humans and the kobold build byte for byte as
+before (DENSITY_OF's kobold 1, every change the orc's own). Its arm span in T-pose is 2.85 m,
+within the slot's 15%.
 ## 481. A kobold fights with a dagger and drops a pick 1 time in 5
 
 The coordinator, on the kobold's look (pc-character's 478) and items' pick
