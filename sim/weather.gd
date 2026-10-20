@@ -37,7 +37,7 @@ const FILE := "res://levels/climates.json"
 ## Each kind as how much cloud, rain, fog and wind it brings, 0..1.
 const KINDS := {
 	"clear": {"cloud": 0.0, "rain": 0.0, "fog": 0.0, "wind": 0.1},
-	"overcast": {"cloud": 0.8, "rain": 0.0, "fog": 0.1, "wind": 0.2},
+	"overcast": {"cloud": 0.8, "rain": 0.0, "fog": 0.0, "wind": 0.2},
 	"rain": {"cloud": 0.9, "rain": 0.7, "fog": 0.15, "wind": 0.3},
 	"fog": {"cloud": 0.5, "rain": 0.0, "fog": 0.9, "wind": 0.0},
 	"wind": {"cloud": 0.3, "rain": 0.0, "fog": 0.0, "wind": 0.9},

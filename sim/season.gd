@@ -17,7 +17,9 @@ extends RefCounted
 ## (Weather.sight_factor).
 
 const NAMES: Array[String] = ["spring", "summer", "autumn", "winter"]
-const DEFAULT_SEASON_DAYS := 7
+## Days a season lasts unless the world says (14, so a play session stays in
+## one season; 7 until decision 533).
+const DEFAULT_SEASON_DAYS := 14
 ## The sun's swing either side of the equinoxes' path, degrees: noon at
 ## 60° in midsummer, 30° in midwinter (DayNight.LATITUDE puts the
 ## equinoxes' noon at 45°).

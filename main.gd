@@ -2104,6 +2104,10 @@ func _boot() -> void:
 		Season.set_season(Net.start_season)
 	if Net.start_weather != "":
 		Weather.set_override("all", Net.start_weather, 600.0, true)
+	elif not snapshot.get("ok", false):
+		# A new world opens under a clear sky for its first spell (decision
+		# 533), whatever its first spell's hash says.
+		Weather.set_override("all", "clear", Weather.spell_steps(Level.DEFAULT_REGION) / float(World.TICK_RATE) / 60.0, true)
 	# Who holds which place: as the levels start them, then as the snapshot
 	# left them, on the world's clock.
 	var world_map := WorldMap.build()

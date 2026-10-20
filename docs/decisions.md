@@ -16317,3 +16317,38 @@ brings levels/barrow and takes "closed" off these two entries:
   the world map's groups); spawn point "from_barrow_shortcut" at (217, 192).
 - Nothing else of the wilds changed (layout.png's two link pixels, the
   level.json entries).
+## 533. The climate and the year retuned: clearer town lands, longer seasons
+
+Jeff's tone package ("tone 8 approved, good improvement"; decision 534 is
+its client half, and has the stills). Here are the server's parts:
+
+- town_lands' weights (levels/climates.json) are clear 6.5, overcast 1,
+  rain 2, fog 0.5, wind 1.5 and storm 0.5. They were 4, 3, 2, 1, 1.5 and
+  0.5. Heavy cloud (cloud >= 0.8) falls from 46% of spells to 29%, and the
+  clear noon look shows about 21% of the time instead of 14%.
+  - Rain and storms keep their share. Weather.rain_between stays about
+    0.158 days of full rain a day, and storms_between about 0.16 storms a
+    day, over 20,000 hashed spells. So economy's wells, crops and roofs see
+    the same weather on average.
+  - Which spells rain moves, since the hash now rolls against new totals.
+  - economy-22 chose this over Jeff's first suggestion (clear 55 ...),
+    which would have cut rain to 0.091.
+  - The default climate (regions with none) keeps its weights.
+- Overcast brings no fog: Weather.KINDS overcast fog is 0 (it was 0.1).
+  Sight under overcast is now 1.0 of its range, against 0.945 before.
+- A new world opens clear. With no snapshot (Snapshot.load's ok false) and
+  no --weather, Main sets a clear override over every region for one
+  spell, as `weather clear` would, starting already in. town_lands' spell 0
+  used to hash to rain, so every fresh local game opened in rain. A world
+  loaded from a snapshot is untouched.
+- Season.DEFAULT_SEASON_DAYS is 14 (it was 7), so a season lasts 21 real
+  hours at a 90-minute day and a year 84 hours. A play session now stays
+  in one season instead of crossing two.
+  - A snapshot keeps its own season_days. The box goes over with
+    `server/admin.sh season_days 14` after the deploy that carries this;
+    the console's season_days keeps the year's place (Season.rebase).
+  - economy's half, landed first (af9abdca): Towns.season_scale()
+    multiplies the season-bound yields by season_days / 7, so a day's food
+    and wool stay the same.
+Protocol unchanged (b7a6a4094974 before and after; season_days already
+travels in the sky message). season_test, weather_test, farm_test.
