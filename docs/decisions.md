@@ -16167,3 +16167,47 @@ the coordinator's gentler variant, terrain's ask for the rim):
   top). 2.3 to 15.9 m west of the plateau, the stream 92 cells, one cliff;
   5745 grass, 986 dirt, no stone. Real rock is the cliff's drawn face
   until art-kit has a natural-rock ground (the coordinator asks later).
+
+## 534. The outdoor look retuned: less grey, less haze, shorter shadows
+
+Jeff, 2026-10-19: "somehow over the course of the last week, the graphic
+tone has become much more muted ... the colors are dull, the graphics not
+crisp". A clear midsummer noon was still the old look exactly (SKY_KEYS'
+top key is the DAY_* light), but it showed about 15% of the time: heavy
+cloud (cloud >= 0.8) 46% of town_lands' spells, the sun under the noon
+key's 22° two thirds of each day, and autumn's straw and winter's pale half
+the year. The stills (C:\dev\review\tone\env_*.png, the same wilds plaza,
+saturation / brightness / luminance spread): clear midsummer noon 71 / 145
+/ 29.2, the box's own state (a wind spell, early spring, 08:44) 45 / 122 /
+24.0, overcast midsummer noon 43 / 123 / 23.1. Jeff approved the package
+("tone 8 approved, good improvement"); this is its client half, the climate
+half is decision 533. Amends 292, 309 and 362's looks; each value below was
+the one before.
+
+- Under cloud (weathered_look): the ambient and the sun's colour greyed
+  0.25 x cloud (0.5), and CLOUD_SUN 0.5 (0.75), so overcast keeps 0.6 of
+  the sun (0.4) and a storm half (a quarter). A grey sky lights a coloured
+  ground.
+- Autumn and winter at half strength: Season.LOOK autumn green 0.775 and
+  turn 0.5 (0.55, 1.0), winter green 0.625 and turn 0.15 (0.25, 0.3);
+  seasoned_look's winter tints 0.175 to the light and 0.15 to the sky,
+  horizon and ambient (0.35, 0.3), WINTER_SUN 0.1 (0.2). Snow is as it was.
+- The haze while the sun is up is never thicker than midday's: SKY_KEYS'
+  6° key's fog_density 0.0008 (0.0018); twilight's and night's stay.
+- The noon look from 12° up (22°): it holds about 40% of an equinox day
+  rather than 32%, the gold of dawn and dusk kept but shorter.
+- The cloud shadows' patches at most CLOUD_DARK 0.3 (0.55): soft shade,
+  not grey bands.
+- The sun's shadows (Jeff in play: "one building had a shadow about 30-40
+  tiles long"): cast from at least SHADOW_LOW 20° (14°, about 4 times the
+  caster's height), so none is longer than about 2.75 times what casts it;
+  the drawn sun (sky, light shafts) keeps its true place. They fade out
+  over SHADOW_FADE 5° either side of MOON_BELOW, where the light swaps to
+  the moon, so the swap has no shadow to jump. 07:00 in spring (sun
+  about 10° up) before and after: docs/shots/environment/shadow_0700.jpg;
+  a tall wall still lays a band of shade across a plaza (2.75 times its
+  height), shorter than before; a higher SHADOW_LOW shortens it further.
+Retuned, the same stills: clear noon unchanged, overcast noon 64 / 123 /
+27.2, the box's state 47 / 130 / 25.9 (what is left there is the low sun's
+own light, kept as designed). Client only (Season.LOOK is read only by the
+view), protocol unchanged. day_night_test, season_test, weather_test.

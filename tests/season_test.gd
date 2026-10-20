@@ -100,7 +100,7 @@ func _test_blend() -> void:
 	_check(is_equal_approx(near["spring"], 1.0), "a day before it, spring alone")
 	var autumn := Season.at("town_lands", _steps_at(0.625))
 	var summer := Season.at("town_lands", _steps_at(0.375))
-	_check(autumn["turn"] > 0.9 and summer["turn"] == 0.0 and summer["green"] > autumn["green"], "autumn turns the land, summer is green")
+	_check(autumn["turn"] > 0.9 * Season.LOOK["autumn"]["turn"] and summer["turn"] == 0.0 and summer["green"] > autumn["green"], "autumn turns the land, summer is green")
 
 
 func _test_snow() -> void:

@@ -48,11 +48,11 @@ const RAIN_LAYER := 1 << 19
 const FOG_LAYERS: Array[float] = [0.35, 1.0, 1.9]
 const FOG_SIZE := 72.0
 ## The clouds' shadow: the noise's period (m), the periods its decal spans
-## (odd, so the view stays a period from its edge), how dark at most, and
-## how fast it drifts at full wind (m/s).
+## (odd, so the view stays a period from its edge), how dark at most (0.55
+## until decision 534), and how fast it drifts at full wind (m/s).
 const CLOUD_PERIOD := 36.0
 const CLOUD_TILES := 3
-const CLOUD_DARK := 0.55
+const CLOUD_DARK := 0.3
 const CLOUD_DRIFT := 3.0
 ## What drifts fog and clouds even in still air (m/s).
 const CALM_DRIFT := 0.4

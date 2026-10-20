@@ -23,12 +23,13 @@ const DEFAULT_SEASON_DAYS := 7
 ## equinoxes' noon at 45°).
 const DECLINATION := 15.0
 ## Each season's land: green (foliage 0..1) and turn (autumn colour 0..1),
-## blended across the boundaries.
+## blended across the boundaries; autumn's and winter's half what they were
+## (decision 534).
 const LOOK := {
 	"spring": {"green": 0.85, "turn": 0.0},
 	"summer": {"green": 1.0, "turn": 0.0},
-	"autumn": {"green": 0.55, "turn": 1.0},
-	"winter": {"green": 0.25, "turn": 0.3},
+	"autumn": {"green": 0.775, "turn": 0.5},
+	"winter": {"green": 0.625, "turn": 0.15},
 }
 ## The cold (0..1) over which precipitation turns to snow, and over which
 ## snow comes to lie and cover the ground.

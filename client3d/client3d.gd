@@ -391,8 +391,10 @@ const DAY_AMBIENT_ENERGY := 0.6
 ## Outdoors the sky follows the world clock (DayNight, decision 292): these
 ## keys, by the sun's height in degrees, each the sky's top and horizon,
 ## the ambient light, the sun's (or under the horizon the moon's) light
-## and the haze, are blended between; midday is the DAY_* look above.
-## Warm gold at dawn and dusk, cool blue under the moon.
+## and the haze, are blended between; midday is the DAY_* look above,
+## from 12° up (it was 22°, decision 534), and the haze while the sun is up
+## no thicker than midday's. Warm gold at dawn and dusk, cool blue under
+## the moon.
 const SKY_KEYS := [
 	[-14.0, {"top": Color("0b1322"), "horizon": Color("1d2b45"), "ambient": Color(0.42, 0.5, 0.8), "ambient_energy": 0.24,
 		"light": Color(0.62, 0.72, 1.0), "energy": 0.26, "fog": Color("1d2b45"), "fog_density": 0.003}],
@@ -401,22 +403,24 @@ const SKY_KEYS := [
 	[-1.0, {"top": Color("3a4a72"), "horizon": Color("c7794a"), "ambient": Color(0.85, 0.7, 0.62), "ambient_energy": 0.36,
 		"light": Color(1.0, 0.55, 0.3), "energy": 0.0, "fog": Color("b0765a"), "fog_density": 0.0025}],
 	[6.0, {"top": Color("6283b8"), "horizon": Color("e3a96f"), "ambient": Color(1.0, 0.9, 0.78), "ambient_energy": 0.48,
-		"light": Color(1.0, 0.72, 0.42), "energy": 0.8, "fog": Color("d9a77c"), "fog_density": 0.0018}],
-	[22.0, {"top": SKY_TOP, "horizon": SKY_HORIZON, "ambient": DAY_AMBIENT, "ambient_energy": DAY_AMBIENT_ENERGY,
+		"light": Color(1.0, 0.72, 0.42), "energy": 0.8, "fog": Color("d9a77c"), "fog_density": 0.0008}],
+	[12.0, {"top": SKY_TOP, "horizon": SKY_HORIZON, "ambient": DAY_AMBIENT, "ambient_energy": DAY_AMBIENT_ENERGY,
 		"light": DAY_SUN, "energy": DAY_SUN_ENERGY, "fog": SKY_HORIZON, "fog_density": 0.0008}],
 ]
 ## Under the weather (decision 309): how much of the sun's light full cloud
 ## takes (the ambient stays, so a storm's noon is grey, not dark); the haze
 ## full fog and full rain add (Environment fog density, per unit: the
 ## camera is CAMERA_DISTANCE off); full fog's layer along the ground, up
-## to FOG_HEIGHT.
-const CLOUD_SUN := 0.75
+## to FOG_HEIGHT. Eased in decision 534 (Jeff's "muted"): a grey sky
+## still lights a coloured ground.
+const CLOUD_SUN := 0.5
 ## The seasons' light (decision 362): winter's cool, pale tint, the sun
-## weaker by WINTER_SUN; summer's warmer; snow cover's lift to the ambient.
+## weaker by WINTER_SUN; summer's warmer; snow cover's lift to the ambient
+## (winter's half as strong since decision 534).
 const WINTER_LIGHT := Color(0.86, 0.92, 1.0)
 const WINTER_SKY := Color("9fb3c8")
 const SUMMER_LIGHT := Color(1.0, 0.93, 0.8)
-const WINTER_SUN := 0.2
+const WINTER_SUN := 0.1
 const SNOW_AMBIENT := 0.35
 ## Under a forest's canopy (decision 477): the ambient's share full cover
 ## at the sim's full shade (DayNight.CANOPY_SHADE) takes, the green it is
@@ -433,9 +437,12 @@ const FOG_HEIGHT := 2.5
 const FOG_HEIGHT_DENSITY := 0.22
 ## Under this height (degrees) the light is the moon's, opposite the sun.
 const MOON_BELOW := -1.0
-## Shadows are cast from at least this high (degrees): a low sun's
-## shadows, tens of metres long, would crawl and flicker.
-const SHADOW_LOW := 14.0
+## Shadows are cast from at least this high (degrees), so none is longer
+## than about three times what casts it (14° let a house's run 30-40 cells;
+## Jeff, decision 534); and they fade out over SHADOW_FADE either side of
+## MOON_BELOW, where the light swaps to the moon.
+const SHADOW_LOW := 20.0
+const SHADOW_FADE := 5.0
 ## Away from the sky, each kind of place's ambient light, [colour, energy]
 ## (decision 304), spread as the sim's light is: a room is dim but all of
 ## it shows, warm-grey; a cave is moonlight, shapes without colour; a
@@ -1546,6 +1553,7 @@ func _update_sky(delta: float) -> void:
 		if elevation < MOON_BELOW:
 			toward = -toward
 		toward.y = maxf(toward.y, sin(deg_to_rad(SHADOW_LOW)))
+		_sun.shadow_opacity = smoothstep(0.0, SHADOW_FADE, absf(elevation - MOON_BELOW))
 		_sun.basis = Basis.looking_at(-_level_direction(toward.normalized()), Vector3.UP)
 	var look := canopied_look(weathered_look(seasoned_look(_look, season), _weather_view.weather),
 			_canopy_cover * World.fields.canopy_shade / DayNight.CANOPY_SHADE)
@@ -1578,11 +1586,11 @@ static func seasoned_look(look: Dictionary, season: Dictionary) -> Dictionary:
 	var summer := float(season.get("summer", 0.0))
 	var snow := float(season.get("snow", 0.0))
 	var out := look.duplicate()
-	out["light"] = (look["light"] as Color).lerp(WINTER_LIGHT, 0.35 * winter).lerp(SUMMER_LIGHT, 0.25 * summer)
+	out["light"] = (look["light"] as Color).lerp(WINTER_LIGHT, 0.175 * winter).lerp(SUMMER_LIGHT, 0.25 * summer)
 	out["energy"] = float(look["energy"]) * (1.0 - WINTER_SUN * winter)
-	out["top"] = (look["top"] as Color).lerp(WINTER_SKY, 0.3 * winter)
-	out["horizon"] = (look["horizon"] as Color).lerp(WINTER_SKY.lightened(0.3), 0.3 * winter)
-	out["ambient"] = (look["ambient"] as Color).lerp(WINTER_LIGHT, 0.3 * winter)
+	out["top"] = (look["top"] as Color).lerp(WINTER_SKY, 0.15 * winter)
+	out["horizon"] = (look["horizon"] as Color).lerp(WINTER_SKY.lightened(0.3), 0.15 * winter)
+	out["ambient"] = (look["ambient"] as Color).lerp(WINTER_LIGHT, 0.15 * winter)
 	out["ambient_energy"] = float(look["ambient_energy"]) * (1.0 + SNOW_AMBIENT * snow)
 	return out
 
@@ -1600,8 +1608,8 @@ static func weathered_look(look: Dictionary, weather: Dictionary) -> Dictionary:
 		return colour.lerp(Color(value, value, value * 1.04), amount)
 	out["top"] = grey.call(look["top"], 0.75 * cloud)
 	out["horizon"] = grey.call(look["horizon"], 0.6 * cloud)
-	out["ambient"] = grey.call(look["ambient"], 0.5 * cloud)
-	out["light"] = grey.call(look["light"], 0.5 * cloud)
+	out["ambient"] = grey.call(look["ambient"], 0.25 * cloud)
+	out["light"] = grey.call(look["light"], 0.25 * cloud)
 	out["energy"] = float(look["energy"]) * (1.0 - CLOUD_SUN * cloud)
 	out["fog"] = grey.call(look["fog"], maxf(0.6 * cloud, 0.8 * fog))
 	out["fog_density"] = float(look["fog_density"]) + FOG_DENSITY * fog + RAIN_FOG_DENSITY * rain

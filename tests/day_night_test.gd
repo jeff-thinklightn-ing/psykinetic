@@ -178,6 +178,11 @@ func _test_sky_look() -> void:
 	_check(dawn["light"].r > dawn["light"].b and dawn["energy"] > 0.0, "dawn: warm gold")
 	var at_swap := Client3D.sky_look(Client3D.MOON_BELOW)
 	_check(at_swap["energy"] < 0.05, "where the sun hands over to the moon, the light is out, so the swap does not show")
+	# Decision 534: no shadow longer than about three times its caster, and
+	# none at the swap.
+	_check(1.0 / tan(deg_to_rad(Client3D.SHADOW_LOW)) <= 3.0, "a shadow is at most about three times what casts it")
+	_check(Client3D.sky_look(12.0)["light"] == Client3D.DAY_SUN and Client3D.sky_look(6.0)["fog_density"] <= noon["fog_density"],
+			"the day look from 12° up, and no thicker haze while the sun is up")
 
 
 func _check(ok: bool, label: String) -> void:

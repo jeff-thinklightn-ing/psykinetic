@@ -162,7 +162,7 @@ func _test_view() -> void:
 	_check(clear["top"] == noon["top"] and is_equal_approx(clear["energy"], noon["energy"]) and is_equal_approx(clear["fog_density"], noon["fog_density"]),
 			"clear weather leaves the sky as the hour has it")
 	var storm := Client3D.weathered_look(noon, Weather.KINDS["storm"])
-	_check(storm["energy"] < noon["energy"] * 0.5 and storm["ambient_energy"] == noon["ambient_energy"],
+	_check(is_equal_approx(storm["energy"], noon["energy"] * (1.0 - Client3D.CLOUD_SUN)) and storm["energy"] < noon["energy"] and storm["ambient_energy"] == noon["ambient_energy"],
 			"a storm takes the sun's light, not the ambient (%.2f of %.2f)" % [storm["energy"], noon["energy"]])
 	_check(storm["top"].s < noon["top"].s * 0.6, "and greys the sky")
 	var fog := Client3D.weathered_look(noon, Weather.KINDS["fog"])
