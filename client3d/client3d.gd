@@ -552,16 +552,21 @@ const ORC_SOCKETS := {"hand": 1.47, "hip": 0.24, "back": 0.19, "chest": 0.06}
 const KOBOLD_SOCKETS := {"hand": 0.92, "hip": 0.12, "back": 0.1, "chest": 0.03}
 ## Their gaits' paces, by tools/gait_pace.gd (the kobold's short legs
 ## scurry: it jogs at 1.8 tiles a second where a man jogs at 3.6).
-const ORC_GAITS: Array[Array] = [[CLIP_WALK, 1.05], ["Jog_Short", 4.10], ["Sprint_Short", 6.30]]
+## The orc's since its TRELLIS body (decision 529): its jog measured (3.35, its legs bent
+## as its concept stands), its walk and sprint as the generator's were to its jog (0.82 of them).
+const ORC_GAITS: Array[Array] = [[CLIP_WALK, 0.86], ["Jog_Short", 3.35], ["Sprint_Short", 5.15]]
 const KOBOLD_GAITS: Array[Array] = [[CLIP_WALK, 0.46], ["Jog_Short", 1.82], ["Sprint_Short", 2.75]]
 ## The imp is the Blood Rot goblin; the brute an orc and the sneak a kobold,
 ## allied peoples (decision 416), each body_gen's (decision 478) and drawn as a
-## person is ("parts", a PersonLook of its "people").
+## person is ("parts", a PersonLook of its "people"), or art-gen's mesh in its
+## own paint (decision 529: "paint", its material, the goblin's shader; its
+## PersonLook only its stature, its mesh hunched as its concept stands).
 const MODELS := {
 	"imp": {"scene": "res://art/models/characters/goblin.glb", "clips": "res://art/models/animations/goblin.res", "height": 1.2,
 		"faces": PI * 0.5, "moves": HUMANOID_MOVES, "sockets": GOBLIN_SOCKETS, "goblin": true},
 	"brute": {"scene": "res://art/models/characters/orc.glb", "clips": "res://art/models/animations/goblin.res", "height": 1.95,
-		"faces": PI * 0.5, "by_mass": false, "gaits": ORC_GAITS, "backpedal": 5.26, "parts": true, "people": "orc",
+		"faces": PI * 0.5, "by_mass": false, "gaits": ORC_GAITS, "backpedal": 4.30, "people": "orc",
+		"paint": "res://art/models/characters/orc_body.tres",
 		"fidgets": ORC_FIDGETS, "moves": HUMANOID_MOVES, "sockets": ORC_SOCKETS},
 	"sneak": {"scene": "res://art/models/characters/kobold.glb", "clips": "res://art/models/animations/goblin.res", "height": 1.0,
 		"faces": PI * 0.5, "by_mass": false, "gaits": KOBOLD_GAITS, "backpedal": 2.34, "parts": true, "people": "kobold",
@@ -706,6 +711,14 @@ const GOBLIN_UNMARKED := 0.55
 ## from small to big (goblin.glb's Ears_Small and Ears_Big, tools/goblin_hood.py),
 ## a word past GOBLIN_EARS_SAID either way (decision 494 amended).
 const GOBLIN_HOOD_UP := 0.7
+## A painted ally's variation (painted_look; decision 529): a little broader or
+## slighter, its skin's hue barely turned (an orc stays grey-blue, a kobold
+## red to purple), its colour and lightness more, marked or not.
+const PAINTED_WIDTH := Vector2(0.94, 1.06)
+const PAINTED_SKIN_HUE := Vector2(-0.025, 0.025)
+const PAINTED_SKIN_SAT := Vector2(0.8, 1.3)
+const PAINTED_SKIN_VALUE := Vector2(0.85, 1.12)
+const PAINTED_UNMARKED := 0.55
 const GOBLIN_EARS_SAID := 0.6
 const HUMAN_PARTS := ["skin", "hair", "tunic", "trousers"]
 ## A PersonLook's posture: its pose in the clips (rest plus the bend,
@@ -2588,7 +2601,7 @@ func _marking_copy(material: Material) -> Material:
 			copy.stencil_flags = BaseMaterial3D.STENCIL_FLAG_WRITE
 			copy.stencil_compare = BaseMaterial3D.STENCIL_COMPARE_ALWAYS
 			copy.stencil_reference = OUTLINE_STENCIL
-		elif copy is ShaderMaterial and material == GOBLIN_MATERIAL:
+		elif copy is ShaderMaterial and (material as ShaderMaterial).shader == GOBLIN_MATERIAL.shader:
 			(copy as ShaderMaterial).shader = GOBLIN_MARKING_SHADER
 		_marking[material] = copy
 	return _marking[material]
@@ -3556,7 +3569,7 @@ static func _warm_art() -> void:
 ## cast below the ground). Godot (Forward+ on d3d12, 4.4 and on) also
 ## compiles pipelines in the background with its ubershaders, and keeps a
 ## shader cache in user data: check those before adding a warm-up.
-static var warm_ups: Array[Callable] = [Callable(GrownTrees, "warm"), Callable(Client3D, "warm_goblin")]
+static var warm_ups: Array[Callable] = [Callable(GrownTrees, "warm"), Callable(Client3D, "warm_goblin"), Callable(Client3D, "warm_painted")]
 static var _warmed_ups: Dictionary[String, bool] = {}
 const WARM_FRAMES := 2
 const WARM_DEPTH := 6.0
@@ -7576,6 +7589,17 @@ func _make_model(model: Dictionary, puppet: Node3D) -> Node3D:
 		_dress(scene, tunic)
 		if puppet.has_meta("look"):
 			(puppet.get_meta("look") as PersonLook).apply(scene, tunic)
+	if model.has("paint"):
+		# Its own paint (decision 529): its people's material, its variation as the goblin's is.
+		var look := painted_look(str(puppet.get_meta("entity_name", "")))
+		puppet.set_meta("painted_look", look)
+		scene.scale = Vector3(scene.scale.x * float(look["width"]), scene.scale.y, scene.scale.z * float(look["width"]))
+		var paint := load(str(model["paint"])) as Material
+		for mesh: MeshInstance3D in scene.find_children("*", "MeshInstance3D", true, false):
+			mesh.material_override = paint
+			mesh.set_instance_shader_parameter("skin", look["skin"])
+			mesh.set_instance_shader_parameter("gear", Color(1.0, 1.0, 1.0, 0.0))
+			mesh.set_instance_shader_parameter("mark", look["mark"])
 	if model.get("goblin", false):
 		# Its own goblin (decision 494): the shared material, its variation as instance parameters.
 		var look := goblin_look(str(puppet.get_meta("entity_name", "")))
@@ -7607,7 +7631,8 @@ func _make_model(model: Dictionary, puppet: Node3D) -> Node3D:
 	rig.loop(CLIP_IDLE)
 	if model.has("sockets"):
 		_attach_sockets(scene, model["sockets"], float(puppet.get_meta("model_scale", 1.0)), puppet)
-	if puppet.has_meta("look"):
+	if puppet.has_meta("look") and not model.has("paint"):
+		# (A painted ally's mesh stands in its concept's stance already: no second hunch.)
 		var posture := str(POSTURES.get((puppet.get_meta("look") as PersonLook).posture, ""))
 		if posture != "" and rig.has(posture):
 			rig.posture((load(model["clips"]) as AnimationLibrary).get_animation(posture), 1.0)
@@ -7864,6 +7889,58 @@ static func warm_goblin() -> Node3D:
 	return piece
 
 
+## The painted allies for the warm-up (warm_ups; decision 529): each MODELS
+## "paint" in its material and its hover outline's stencil twin, skinned, as
+## warm_goblin does the goblin's.
+static func warm_painted() -> Node3D:
+	var piece := Node3D.new()
+	for kind: String in MODELS:
+		if not MODELS[kind].has("paint"):
+			continue
+		var paint := load(str(MODELS[kind]["paint"])) as ShaderMaterial
+		var twin := paint.duplicate() as ShaderMaterial
+		twin.shader = GOBLIN_MARKING_SHADER
+		for material: Material in [paint, twin]:
+			var scene := (load(MODELS[kind]["scene"]) as PackedScene).instantiate() as Node3D
+			for mesh: MeshInstance3D in scene.find_children("*", "MeshInstance3D", true, false):
+				mesh.material_override = material
+			piece.add_child(scene)
+	return piece
+
+
+## A painted ally's look by its name (decision 529), the same on every peer
+## (goblin_look's hash): {width, skin (hue shift, saturation, value: within
+## PAINTED_SKIN_*), mark (one of GOBLIN_MARKS, one-hot, or none:
+## PAINTED_UNMARKED of the time; body_marks.py's chest scar, arm stripes and
+## red hand), words}.
+static func painted_look(ally_name: String) -> Dictionary:
+	var h := 2166136261
+	for byte in ally_name.to_utf8_buffer():
+		h = ((h ^ byte) * 16777619) & 0xffffffff
+	var rng := RandomNumberGenerator.new()
+	rng.seed = h
+	var width := rng.randf_range(PAINTED_WIDTH.x, PAINTED_WIDTH.y)
+	var skin := Vector3(rng.randf_range(PAINTED_SKIN_HUE.x, PAINTED_SKIN_HUE.y), rng.randf_range(PAINTED_SKIN_SAT.x, PAINTED_SKIN_SAT.y),
+		rng.randf_range(PAINTED_SKIN_VALUE.x, PAINTED_SKIN_VALUE.y))
+	var marked := rng.randf() >= PAINTED_UNMARKED
+	var mark_index := rng.randi() % GOBLIN_MARKS.size()
+	var mark := Vector3.ZERO
+	if marked:
+		mark[mark_index] = 1.0
+	var words: Array[String] = []
+	if width < 0.97:
+		words.append("build=lean")
+	elif width > 1.03:
+		words.append("build=stocky")
+	if skin.z < 0.92:
+		words.append("skin=dark")
+	elif skin.z > 1.06:
+		words.append("skin=pale")
+	if marked:
+		words.append("mark=" + GOBLIN_MARKS[mark_index])
+	return {"width": width, "skin": skin, "mark": mark, "words": " ".join(words)}
+
+
 ## A goblin's look by its name (decision 494), the same on every peer (a
 ## hash of the name's bytes, not the engine's String.hash): {width, skin
 ## (Vector3: hue shift, saturation, value), gear (Color, its amount in .a),
@@ -7926,8 +8003,9 @@ static func _vary(entity: GridEntity, puppet: Node3D, model: Dictionary) -> void
 	if model.get("by_mass", true):
 		size = clampf(pow(entity.mass / MODEL_MASS, 1.0 / 3.0), MODEL_SCALE_MIN, MODEL_SCALE_MAX)
 	size *= 1.0 + rng.randf_range(-MODEL_SCALE_SPREAD, MODEL_SCALE_SPREAD)
-	if model.get("parts", false):
-		# A person: their look's stature (its pace with it: longer legs, longer strides).
+	if model.get("parts", false) or model.has("people"):
+		# A person: their look's stature (its pace with it: longer legs, longer strides); a
+		# painted ally its stature only (decision 529).
 		var look := look_for(entity)
 		puppet.set_meta("look", look)
 		size = look.scale

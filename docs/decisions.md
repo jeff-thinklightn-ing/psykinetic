@@ -15853,3 +15853,39 @@ notes; a "[net]" line then exit 1: not retried).
 
 Rejected: retrying any failed scene (it would hide flaky tests); fewer
 scenes at once (slower landings for a failure that is rare).
+## 529. The Blood Rot's allies on the mesh route: art-gen's meshes in their own paint
+
+Jeff on the route sheets (orc_routes.png, kobold_routes.png): "the trellis retarget is what's
+close, not the blue blob monster". The orc (then the kobold, 529 amended) stops being
+body_gen's (478) and becomes art-gen's TRELLIS mesh of his pick, made by the goblin's recipe
+and drawn as the goblin is (494). Builds on 478 (the allies' rigs, clips, sockets, fidgets and
+PersonLook's people) and 494 (the goblin's shader and per-instance variation).
+
+- The body: art-gen's mesh (the orc's p2, redo v7 c12, art-kit's hand fix
+  creature.orc_p2_front_10k_paint_fixed.glb) fitted arms down to the UAL skeleton by
+  tools/creature_fit.py: joints read off the mesh (a JSON, the right mirrored from the left),
+  the arms posed down, weights by distance within each limb (heat failed on these meshes), faces
+  bridging an arm to a leg cut, then posed back to the T-pose rest. tools/creature_finish.py
+  names its mesh "Body" and its one material for its people ("orc"), saves its paint beside it
+  (art/models/characters/orc_paint.png, 1024) and leaves it out of the .glb, the .blend its
+  source. 5,608 triangles of the slot's 12,000.
+- Its paint: orc_body.tres, the goblin's shader (goblin.gdshaderinc) over orc_paint.png. Which
+  texels are skin is now the material's (skin_turn, skin_band, skin_sat; the goblin's greens the
+  defaults, so the goblin is drawn as before): the orc's grey-blues, hue 0.46..0.70. Its
+  variation as the goblin's, by name (Client3D.painted_look, goblin_look's hash): a little
+  broader or slighter (PAINTED_WIDTH), its skin's hue barely turned, its colour and lightness
+  more (PAINTED_SKIN_*), and one of three marks or none (PAINTED_UNMARKED): tools/body_marks.py
+  draws them into orc_marks.png from where they lie on the body (a scar across the chest, three
+  bands round each upper arm, a red hand over the heart), since a TRELLIS mesh's UV islands
+  are scattered; its gear untinted (the paint's own leather and iron).
+- MODELS' "brute": "paint" in place of "parts". Its PersonLook stays for its stature only: no
+  part tints, and no posture (its mesh stands hunched as its concept does; a second hunch over
+  it bent it double). Its gaits from its jog measured (gait_pace.gd: 3.35), the rest as the
+  generator's were to its jog. The hover outline's twin takes any material on the goblin's
+  shader; warm_painted warms each painted model and its twin (495's warm_ups).
+- art/kit's creature.orc: 3.45 x 1.95 x 1.04 m in T-pose (its long arms), body_material
+  "orc"; art_kit_test checks "orc" accepted on it; art_style.md names the creatures' own.
+- Known: its knees stand a little bent as TRELLIS made them, so its idle reads as a crouch; a
+  few back faces show through at the shoulders in the jog and the axe swing; the chest scar
+  sits mostly under its hunched arms. The generator's revision (478 amended, cd20dd73) is the
+  fallback: its orc.glb and orc.blend from that commit, "parts" in place of "paint".

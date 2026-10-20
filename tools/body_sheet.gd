@@ -15,7 +15,9 @@ extends SceneTree
 ## (the whole model's, a stature), and a built body's part colours by name (skin, hair,
 ## tunic, trousers; hex without "#"), and "parts", the generator's parts it wears joined by
 ## "," (tools/body_gen.py's WEARABLES; the rest hidden, "parts=" for none), e.g.
-## heavy=0.6+old=1+scale=0.94+hair=b0b0b0+parts=Hair_Cropped,Beard_Full;
+## heavy=0.6+old=1+scale=0.94+hair=b0b0b0+parts=Hair_Cropped,Beard_Full; "paint" a painted
+## body's material (decision 529, a res:// path) and "mark" one of its marks
+## (0 scar, 1 stripes, 2 hand), e.g. paint=res://art/models/characters/orc_body.tres+mark=2;
 ## <t> is how far through the clip (0..1, default 0.3); <pixels> a cell's
 ## width (default PIXELS); <cell> the metres between models (default CELL; 0.5 for a rabbit). "rest" is the rest pose. Clips default to: rest Idle Walk@0.25 Jog_Fwd@0.25 Sprint@0.3
 ## Sword_Attack@0.45 Hit_Chest@0.3 Death01@1.
@@ -149,6 +151,21 @@ func _look(model: Node3D, look: String) -> void:
 		var field := pair.split("=")
 		if field[0] == "scale":
 			model.scale = Vector3.ONE * float(field[1])
+			continue
+		if field[0] == "paint":
+			# A painted body's material (decision 529: e.g. orc_body.tres), unvaried.
+			for mesh: MeshInstance3D in model.find_children("*", "MeshInstance3D", true, false):
+				mesh.material_override = load(field[1]) as Material
+				mesh.set_instance_shader_parameter("skin", Vector3(0.0, 1.0, 1.0))
+				mesh.set_instance_shader_parameter("gear", Color(1.0, 1.0, 1.0, 0.0))
+				mesh.set_instance_shader_parameter("mark", Vector3.ZERO)
+			continue
+		if field[0] == "mark":
+			# Its mark (0 the scar, 1 the stripes, 2 the hand; after "paint").
+			var mark := Vector3.ZERO
+			mark[int(field[1])] = 1.0
+			for mesh: MeshInstance3D in model.find_children("*", "MeshInstance3D", true, false):
+				mesh.set_instance_shader_parameter("mark", mark)
 			continue
 		if field[0] == "parts":
 			var worn := field[1].split(",", false)

@@ -8,6 +8,7 @@ notes (decision 324).
 ## Unreleased
 
 - Landing tests: a test that dies as it starts, before running any of its own code, is noted and retried once, and the suite starts its tests a moment apart (530); tools only.
+- The orc brute is now drawn from Jeff's chosen concept (Jeff: "the trellis retarget is what's close, not the blue blob monster"): art-gen's model of it with its own painted skin, each orc a little different in build and skin, some with a chest scar, arm stripes or a red handprint (529).
 - Hills are drawn (525): the ground follows its heights in smooth slopes, with rock faces only where it is too steep to walk; streams step down their valleys, things stand on the slope, and the camera tilts up to see you over a ridge.
 - The orc brute is reworked (Jeff: "the brute in game model is still pretty clunky"), while Jeff's own Blender redo is under way: a bigger head with a heavy jaw and brow, tusks curving up from the jaw, a neck, hands with fingers, an iron shoulder plate with edges and rivets, a chain of real links, a loincloth that hangs, shaped calves and bare feet with toes.
 - The smith's forge is rebuilt as a hearth of coursed stone with a glowing coal bed under a sooty hood and chimney.

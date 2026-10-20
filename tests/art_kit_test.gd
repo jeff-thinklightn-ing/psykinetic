@@ -508,16 +508,17 @@ func _test_creature_rig() -> void:
 	var missing := ArtCheck._check_rig({"clips": (ArtKit.spec("creature.orc")["clips"] as Array)}, body)
 	_check(shared.is_empty() and missing.any(func(line: String) -> bool: return line.begins_with("error: no \"idle\" clip")),
 			"the orc's clips found in its clip_library (goblin.res), not in its .glb: %s" % [shared])
-	# A body in the game's own "human" material: accepted where the slot names it, a warning elsewhere.
+	# A body in a material of the game's own (the orc's "orc", decision 529): accepted where the
+	# slot names it, a warning elsewhere.
 	var dressed := MeshInstance3D.new()
 	dressed.mesh = BoxMesh.new()
-	var human := StandardMaterial3D.new()
-	human.resource_name = "human"
-	dressed.mesh.surface_set_material(0, human)
+	var own := StandardMaterial3D.new()
+	own.resource_name = "orc"
+	dressed.mesh.surface_set_material(0, own)
 	body.add_child(dressed)
 	var warned := func(slot: String) -> bool:
-		return ArtCheck.check_node(slot, body).any(func(line: String) -> bool: return "\"human\"" in line and line.begins_with("warning: material"))
-	_check(not warned.call("creature.orc") and warned.call("creature.wolf"), "the orc's body_material \"human\" accepted; a wolf in it warned")
+		return ArtCheck.check_node(slot, body).any(func(line: String) -> bool: return "\"orc\"" in line and line.begins_with("warning: material"))
+	_check(not warned.call("creature.orc") and warned.call("creature.wolf"), "the orc's body_material \"orc\" accepted; a wolf in it warned")
 	body.free()
 	grey.free()
 

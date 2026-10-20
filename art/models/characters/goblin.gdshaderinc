@@ -4,6 +4,13 @@
 uniform sampler2D paint : source_color, filter_linear_mipmap, repeat_disable;
 uniform sampler2D shine : hint_default_white, filter_linear_mipmap, repeat_disable;
 uniform sampler2D marks : hint_default_black, filter_linear_mipmap, repeat_disable;
+// Which of the paint's texels are skin (decision 529: the orc's and the kobold's through the
+// same drawing): its hue turned by skin_turn, then in skin_band (rising from .x to .y, falling
+// from .z to .w), with some colour in it (saturation rising from skin_sat.x to .y). The
+// defaults are the goblin's greens.
+uniform float skin_turn = 0.0;
+uniform vec4 skin_band = vec4(0.15, 0.20, 0.42, 0.48);
+uniform vec2 skin_sat = vec2(0.12, 0.2);
 
 instance uniform vec3 skin = vec3(0.0, 1.0, 1.0);
 instance uniform vec4 gear = vec4(1.0, 1.0, 1.0, 0.0);
@@ -29,8 +36,11 @@ vec3 hsv2rgb(vec3 c) {
 void fragment() {
 	vec3 c = texture(paint, UV).rgb;
 	vec3 hsv = rgb2hsv(c);
-	// Its skin: the green texels (hue about 0.17 to 0.45, some colour in them).
-	float green = smoothstep(0.15, 0.20, hsv.x) * (1.0 - smoothstep(0.42, 0.48, hsv.x)) * smoothstep(0.12, 0.2, hsv.y);
+	// Its skin: the goblin's green texels (hue about 0.17 to 0.45, some colour in them), or the
+	// body's own band.
+	float hue = fract(hsv.x + skin_turn);
+	float green = smoothstep(skin_band.x, skin_band.y, hue) * (1.0 - smoothstep(skin_band.z, skin_band.w, hue))
+			* smoothstep(skin_sat.x, skin_sat.y, hsv.y);
 	vec3 shifted = hsv2rgb(vec3(fract(hsv.x + skin.x), clamp(hsv.y * skin.y, 0.0, 1.0), clamp(hsv.z * skin.z, 0.0, 1.0)));
 	vec3 out_c = mix(c, shifted, green);
 	// Its gear: the rest but the eyes' bright yellow and the near-black, tinted keeping its shading.
