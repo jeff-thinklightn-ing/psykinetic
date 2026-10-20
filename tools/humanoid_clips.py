@@ -152,7 +152,12 @@ SIDE_ON = [("spine_01", TURN, -18.0), ("spine_02", TURN, -22.0), ("spine_03", TU
 	("neck_01", TURN, 30.0), ("Head", TURN, 28.0)]
 # The bow hand rolled thumb up about the arm (ROLL), so the bow held in it stands upright.
 ROLL = [("hand_l", AHEAD, -90.0)]
-BOW_LOW = [("upperarm_l", LIFT, -55.0), ("upperarm_l", TURN, -10.0), ("lowerarm_l", LIFT, 30.0), ("hand_l", LIFT, -45.0),
+# BOW_LOW (462 amended; Jeff: "arm and bow clipping body"): the arm hanging a little out and
+# forward, the grip at the left side (0.25 m ahead, 0.84 up on the man), the hand turned so the bow
+# (its length out of the thumb's side) stands upright, its top a little forward and out, clear of the
+# shoulder and the leg. It hung behind the body, the bow up through the back.
+BOW_LOW_HAND = [("hand_l", Vector((-0.573, 0.740, 0.352)), 48.0)]
+BOW_LOW = [("upperarm_l", Vector((0.3, -0.12, -1.0)), AIM), ("lowerarm_l", Vector((0.15, -0.5, -0.85)), AIM)] + BOW_LOW_HAND + [
 	# The bundle's arm hanging at its side, the hand by the hip (it was lifted, the bundle at the
 	# chest; the coordinator on the bow check).
 	("upperarm_r", Vector((-0.18, 0.02, -1.0)), AIM), ("lowerarm_r", Vector((-0.08, -0.3, -1.0)), AIM)]
@@ -218,10 +223,16 @@ CLIPS["Bow_Hold_Loop"] = {"loop": True, "keys": [
 ]}
 CLIPS["Bow_Loose"] = {"keys": [
 	(0.0, P("Idle_Loop", 0.0, DRAWN)),
-	(0.08, P("Idle_Loop", 0.1, DRAWN[:5] + [("upperarm_l", Vector((0.0, -1.0, 0.0)), AIM), ("lowerarm_l", Vector((0.0, -1.0, 0.0)), AIM),
-		("upperarm_r", Vector((-0.55, 0.85, 0.1)), AIM), ("lowerarm_r", Vector((-0.2, 0.3, 0.1)), AIM)] + ROLL)),
-	(0.45, P("Idle_Loop", 0.45, NOCK)),
-	(0.9, P("Idle_Loop", 0.9, BOW_LOW)),
+	# The release (Jeff: "firing animation is awkward"): the string hand slides back past the jaw,
+	# its forearm turning out a little (a turn of the forearm, not a swing through the front), the
+	# bow arm dropping a touch with the string's kick; held a moment; then the hand back to the
+	# nock and the bow down.
+	(0.08, P("Idle_Loop", 0.08, SIDE_ON + [("upperarm_l", Vector((0.0, -1.0, -0.04)), AIM), ("lowerarm_l", Vector((0.0, -1.0, -0.06)), AIM),
+		("upperarm_r", Vector((-0.45, 0.85, 0.1)), AIM), ("lowerarm_r", Vector((-0.4, -0.85, 0.15)), AIM)] + ROLL)),
+	(0.3, P("Idle_Loop", 0.3, SIDE_ON + [("upperarm_l", Vector((0.0, -1.0, -0.06)), AIM), ("lowerarm_l", Vector((0.0, -1.0, -0.08)), AIM),
+		("upperarm_r", Vector((-0.45, 0.85, 0.05)), AIM), ("lowerarm_r", Vector((-0.4, -0.85, 0.1)), AIM)] + ROLL)),
+	(0.6, P("Idle_Loop", 0.6, NOCK)),
+	(1.0, P("Idle_Loop", 1.0, BOW_LOW)),
 ]}
 
 

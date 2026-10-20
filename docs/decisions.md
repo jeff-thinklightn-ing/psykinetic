@@ -11751,6 +11751,28 @@ the draw from the nock with the bundle put away, its speed for a 2 s draw, an ar
 the string, the hold, the loose, a cancelled draw, the shield's guard. Rejected: the
 draw as a whole-body strike (the legs would stop); one clip played at a fixed speed
 (full draw would not come when the sim's does).
+
+Amended (Jeff on v0.1.158: "tested archery, it's clean but bow holding and firing animation
+is awkward"; "arm and bow clipping body is probably one of the more obvious things to fix"):
+the held pose, the nock and the release reworked in tools/humanoid_clips.py, Bow_Idle,
+Bow_Draw, Bow_Hold and Bow_Loose extracted into goblin.res again (only those four: no other
+clip, nor any monster's, changes). Held (BOW_LOW): Bow_Idle's left arm had swung back, the grip
+0.33 m behind the body, the bow (its length out of the thumb's side) up behind the shoulder
+through the back; now the arm hangs a little out and forward, the grip at the left side (0.25 m
+ahead, 0.84 up on the man) and the hand turned (BOW_LOW_HAND) so the bow stands upright, its top a
+little forward and out, clear of the shoulder and the leg. The nock, from that pose, has the bow
+upright, not flat across the body. The release (Bow_Loose) had its string hand swing through the
+front to the bow (the forearm turned some 150 degrees in one key, the blend going the short way
+round): now the hand slides back past the jaw, the forearm turning out a little, the bow arm
+dipping with the kick, held a moment, then the nock and the bow down. anim_rig_test
+_test_bow_clear: on five builds (the man as built, heavy, broad, lean; the woman), the bow and
+the arrows socketed as Client3D does, walking and standing in the held pose, at the nock, at full
+draw and at the release, no vertex of the bow nor of the left forearm inside the trunk (each
+against the nearest trunk vertex's normal, the body skinned on the CPU with its shape keys: a
+headless run registers no skin to bake); the old clips fail it (the man's bow 28 vertices into
+his back standing). Not changed, asked of Jeff: the body turned to the target before the release
+(the puppet's facing, an aim layer if the shot goes off-axis) and the pull's pace (the sim's draw
+ticks, items').
 ## 460. Moving in: a person the town remembers arrives, with room and the lawspeaker's word
 
 Phase 4 of Jeff's lawspeaker proposal (docs/lore/lawspeaker.md, Jeff: "when
