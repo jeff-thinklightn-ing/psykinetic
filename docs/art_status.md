@@ -65,8 +65,8 @@ Drawn as a grey box (a texture slot: terrain's procedural colour).
 | `door.trapdoor` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
 | `floor.castle` | 1 | art-gen | own | 2026-10-18 |
 | `floor.cave` | 1 | art-gen | own | 2026-10-18 |
-| `floor.stone` | 1 | art-gen | own | 2026-10-18 |
-| `floor.wood` | 1 | art-gen | own | 2026-10-18 |
+| `floor.stone` | 1 | art-gen, re-graded by art-kit | own | 2026-10-19 |
+| `floor.wood` | 1 | art-gen, re-graded by art-kit | own | 2026-10-19 |
 | `frame.cruck` | 1 | art-kit, by hand | own | 2026-10-18 |
 | `fx.arrow` | 3 | art-kit | own | 2026-10-17 |
 | `ground.dirt` | 1 | art-kit, procedural | own | 2026-10-19 |
@@ -103,10 +103,10 @@ Drawn as a grey box (a texture slot: terrain's procedural colour).
 | `item.wood_bundle` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
 | `material.rock` | 1 | art-gen | own | 2026-10-18 |
 | `material.roof.shingle` | 1 | art-gen, procedural (no model) | own | 2026-10-17 |
-| `material.roof.thatch` | 1 | art-kit, procedural | own | 2026-10-18 |
+| `material.roof.thatch` | 1 | art-kit, procedural, re-graded by art-kit | own | 2026-10-19 |
 | `material.wall.castle` | 1 | art-gen, re-graded by art-kit | own | 2026-10-19 |
 | `material.wall.cave` | 1 | art-gen | own | 2026-10-18 |
-| `material.wall.stone` | 1 | art-gen | own | 2026-10-18 |
+| `material.wall.stone` | 1 | art-gen, re-graded by art-kit | own | 2026-10-19 |
 | `material.wall.wood` | 1 | art-gen | own | 2026-10-18 |
 | `plant.bush` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
 | `plant.fern` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |

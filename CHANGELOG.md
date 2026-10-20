@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Brighter, cleaner stone and warmer wood (Jeff: "tone 8 approved, good improvement"; the castle walls' grade carried on): stone walls lighter and truly grey, stone floors no longer blue-grey, wood floors and thatch warmer; client art only.
 - The minimap and the big map turn with the view, so up on the map is up on the screen, as the compass already turns; the arrow on them points the way your body faces.
 - A level link can be sealed: it opens only for a player who carries its mark (the draugr's, once he is beaten; a thing enemy-ai gives), else "The way is sealed."; a companion crosses with her marked player; the world map and routes treat it as closed, so no raiding group walks it. The console's `mark <player> <mark>` (or `-<mark>`) puts a mark on or takes it off. For the barrow's shortcut from the temple (Jeff's crypt page).
 - Landing tests leave no Python cache folder behind (539 amended); tools only.

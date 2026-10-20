@@ -340,7 +340,7 @@
 			"type": "texture",
 			"tile_m": 4.0,
 			"pixels": 1024,
-			"source": {"by": "art-kit, procedural", "tool": "numpy, Pillow", "license": "own", "date": "2026-10-18", "notes": "reworked after the coordinator's look at buildings' kinds shots (the first read as a bright, pale woven mat lighting the whole view): old straw, darker and greyer (row 3's earths drawn toward row 1's grey), weathered in broad blotches, a trace of moss; twelve courses of uneven depth that bulge and sag, their lips ragged and soft-shadowed; low-contrast strands; 1024 px over 4 m so its repeat is wider than a cottage; seamless; Jeff's accepted hand thatch (building.hut) the reference; a stand-in for an art-gen concept"},
+			"source": {"by": "art-kit, procedural, re-graded by art-kit", "tool": "numpy, Pillow", "license": "own", "date": "2026-10-19", "notes": "reworked after the coordinator's look at buildings' kinds shots (the first read as a bright, pale woven mat lighting the whole view): old straw, darker and greyer (row 3's earths drawn toward row 1's grey), weathered in broad blotches, a trace of moss; twelve courses of uneven depth that bulge and sag, their lips ragged and soft-shadowed; low-contrast strands; 1024 px over 4 m so its repeat is wider than a cottage; seamless; Jeff's accepted hand thatch (building.hut) the reference; a stand-in for an art-gen concept; re-graded (Jeff, 2026-10-19: \"tone 8 approved, good improvement\"; the coordinator's (2), the castle's grade on the other tiles): per channel in linear light toward row 2's roof wood, the capsule days' roof at the castle's lit level, never darker than before, a soft shoulder; mean #827254 (hue 39, sat 0.35, value 0.51) to #8d6e4f (hue 30, sat 0.44, value 0.55)"},
 			"uses": "the thatch of roof.thatch.profile's slopes (buildings' composer, decision 489; Jeff, 2026-10-18: building variety): u is metres along the ridge, v metres down the slope"
 		},
 		"roof.thatch.profile": {
@@ -443,7 +443,7 @@
 		"floor.wood": {
 			"category": "floors",
 			"type": "texture",
-			"source": {"by": "art-gen", "tool": "Qwen-Image-2512, art-gen's seamless.py", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/floor.wood/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c2 (the _top concept) made seamless by art-gen (min-error cut; the cross-board rows break where the seam passes)"},
+			"source": {"by": "art-gen, re-graded by art-kit", "tool": "Qwen-Image-2512, art-gen's seamless.py, numpy", "license": "own", "date": "2026-10-19", "notes": "N:/assets/candidates/floor.wood/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c2 (the _top concept) made seamless by art-gen (min-error cut; the cross-board rows break where the seam passes); re-graded (Jeff, 2026-10-19: \"tone 8 approved, good improvement\"; the coordinator's (2), the castle's grade on the other tiles): per channel in linear light toward row 2's wood, the capsule days' wood floor at the castle's lit level, never darker than before, a soft shoulder; mean #8a7858 (hue 38, sat 0.36, value 0.54) to #96744f (hue 31, sat 0.47, value 0.59)"},
 			"tile_m": 4.0,
 			"pixels": 512,
 			"uses": "terrain's ground shader on the floor of a home place (floor set \"wood\"): planks"
@@ -560,7 +560,7 @@
 		"material.wall.stone": {
 			"category": "materials",
 			"type": "texture",
-			"source": {"by": "art-gen", "tool": "Qwen-Image-2512, art-gen's seamless.py", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/material.wall.stone/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c3 made seamless by art-gen"},
+			"source": {"by": "art-gen, re-graded by art-kit", "tool": "Qwen-Image-2512, art-gen's seamless.py, numpy", "license": "own", "date": "2026-10-19", "notes": "N:/assets/candidates/material.wall.stone/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c3 made seamless by art-gen; re-graded (Jeff, 2026-10-19: \"tone 8 approved, good improvement\"; the coordinator's (2), the castle's grade on the other tiles): per channel in linear light toward row 1's grey stone, the capsule days' stone wall at the castle's lit level, never darker than before, a soft shoulder; mean #535752 (hue 105, sat 0.06, value 0.34) to #686761 (hue 50, sat 0.07, value 0.41)"},
 			"tile_m": 2.0,
 			"pixels": 512,
 			"uses": "the dressed stone of swept wall.stone runs (wall.stone.profile): u is metres along the run, v metres up"
@@ -568,7 +568,7 @@
 		"floor.stone": {
 			"category": "floors",
 			"type": "texture",
-			"source": {"by": "art-gen", "tool": "Qwen-Image-2512, art-gen's seamless.py", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/floor.stone/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c10 (_top) made seamless by art-gen"},
+			"source": {"by": "art-gen, re-graded by art-kit", "tool": "Qwen-Image-2512, art-gen's seamless.py, numpy", "license": "own", "date": "2026-10-19", "notes": "N:/assets/candidates/floor.stone/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c10 (_top) made seamless by art-gen; re-graded (Jeff, 2026-10-19: \"tone 8 approved, good improvement\"; the coordinator's (2), the castle's grade on the other tiles): per channel in linear light toward row 1's grey stone, the capsule days' stone floor at the castle's lit level, never darker than before, a soft shoulder; mean #475052 (hue 194, sat 0.13, value 0.32) to #696762 (hue 45, sat 0.07, value 0.41)"},
 			"tile_m": 4.0,
 			"pixels": 512,
 			"uses": "terrain's ground shader on the floor of a dungeon or crypt place (floor set \"stone\"): flagstones"
