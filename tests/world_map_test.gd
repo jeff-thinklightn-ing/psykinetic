@@ -245,9 +245,9 @@ func _test_places() -> void:
 	print("places")
 	_register_place_maps()
 	var factions := Factions.read()
-	_check(factions.names() == _strings(["goblins", "kobolds", "orcs", "town"]) and factions.of_kind("brute") == "orcs"
+	_check(factions.names() == _strings(["dead", "goblins", "kobolds", "orcs", "robbers", "town"]) and factions.of_kind("brute") == "orcs"
 		and factions.side("orcs") == "goblins" and factions.of_kind("wolf") == "nobody",
-		"levels/factions.json: the Blood Rot (goblins), its allies the orcs and kobolds, and the town; brutes act for the orcs, on the Blood Rot's side (decision 416; %s)" % [factions.names()])
+		"levels/factions.json: the Blood Rot (goblins), its allies the orcs and kobolds, the town, and the barrow's dead and robbers (545); brutes act for the orcs, on the Blood Rot's side (decision 416; %s)" % [factions.names()])
 	_check(factions.hostile("goblins", "town") and not factions.hostile("town", "town") and factions.has("nobody") and not factions.has("elves"),
 		"goblins and town are hostile; nobody can hold, elves cannot")
 	var names: Array[String] = ["h_land", "h_bad"]

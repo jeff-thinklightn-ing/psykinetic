@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Monsters can now be at war with each other: factions name who they fight on sight. The barrow's dead and its grave robbers (coming next) will go for each other and for any townsfolk who wander below; the goblins, orcs and kobolds keep the peace among themselves as before.
 - Art slots for the Barrow (542): the mound with its stone-framed door at the entrance, and what lies in a burial niche (a bier with remains, three kinds by how deep), drawn as plain shapes until their art comes; client art only.
 - F12 takes a screenshot (rebindable in the Options): saved under user://screenshots, or the folder settings.cfg screenshot_dir= names (a share, say), with the path said in the talk log and the folder shown the first time; a folder that can't be written falls back to the game's own and says so.
 - The minimap turns with the view, so up on it is up on the screen, as the compass already turns (the big map stays north-up, where the land is read as laid out); the arrow on them points the way your body faces.

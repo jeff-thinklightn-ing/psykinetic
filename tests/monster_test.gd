@@ -89,6 +89,7 @@ func _ready() -> void:
 	_test_wolf_den()
 	_test_lead_occupied()
 	_test_raid_townsfolk()
+	_test_sides_on_sight()
 	_test_charging()
 	_test_archer()
 	_test_worn_bundles()
@@ -2019,6 +2020,66 @@ func _test_raid_townsfolk() -> void:
 	World.spawn_spec = Callable()
 	raids.clear()
 	Monster.idling = true
+
+
+func _test_sides_on_sight() -> void:
+	print("
+== sides (decision 545): the barrow's dead and robbers fight each other and the residents on sight; others let them be ==")
+	Monster.idling = false
+	var was_holdings := World.holdings
+	World.holdings = null
+	var folder: String = preload("res://tests/test_ports.gd").scratch("monster_test/")
+	DirAccess.make_dir_recursive_absolute(folder)
+	var path := folder + "factions.json"
+	var file := FileAccess.open(path, FileAccess.WRITE)
+	file.store_string(JSON.stringify({"dead": {"monsters": ["imp"], "hostile_to": ["robbers", "town"], "on_sight": ["robbers", "town"], "holds": false},
+		"robbers": {"monsters": ["sneak"], "hostile_to": ["dead", "town"], "on_sight": ["dead", "town"], "holds": false},
+		"town": {"monsters": []}}))
+	file.close()
+	var sides := Factions.read(path)
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
+	Monster._read_factions = sides
+	var e := _build(["#############", "#...........#", "#.i.......s.#", "#...........#", "#############"])
+	var dead: Monster = e["i"][0]
+	var robber: Monster = e["s"][0]
+	_check(dead.foes == _strings(["robbers", "town"]) and robber.foes == _strings(["dead", "town"]), "each kind's foes, from its faction")
+	_bold(dead)
+	_bold(robber)
+	World.step()
+	_check(dead.target == robber and robber.target == dead, "they go for each other (%s, %s)" % [dead.target, robber.target])
+	var hurt := false
+	for i in 200:
+		World.step()
+		if robber.hp < robber.max_hp or dead.hp < dead.max_hp:
+			hurt = true
+			break
+	_check(hurt, "and come to blows")
+	e = _build(["#############", "#...........#", "#.i.........#", "#...........#", "#############"])
+	dead = e["i"][0]
+	_bold(dead)
+	var pip := EntityFactory.build({"script": "res://sim/resident.gd", "shape": "capsule", "name": "Pip"}) as Resident
+	pip.worker_id = "w-pip"
+	_room.add_child(pip)
+	World.spawn(pip, Vector2i(7, 2))
+	World.step()
+	_check(dead.target == pip, "the dead go for a resident walking the barrow (%s)" % [dead.target])
+	Monster._read_factions = null
+	e = _build(["#############", "#...........#", "#.i.......s.#", "#...........#", "#############"])
+	_bold(e["i"][0])
+	_bold(e["s"][0])
+	World.step()
+	World.step()
+	_check(e["i"][0].foes.is_empty() and e["i"][0].target == null and e["s"][0].target == null,
+		"an imp and a sneak (the Blood Rot's, levels/factions.json) let each other be")
+	World.holdings = was_holdings
+	Monster.idling = true
+
+
+func _strings(values: Array) -> Array[String]:
+	var out: Array[String] = []
+	for value: Variant in values:
+		out.append(str(value))
+	return out
 
 
 func _test_charging() -> void:

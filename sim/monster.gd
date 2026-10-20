@@ -284,6 +284,9 @@ var _wary := false
 ## the group's strength.
 var raid := ""
 var raid_strength := 0.0
+## The factions its kind's fights on sight (Factions.on_sight, decision
+## 545): their monsters, and "town" the residents' bodies. Most kinds none.
+var foes: Array[String] = []
 var _alert_until := 0
 var _lead := NO_TILE
 var _looks := 0
@@ -461,6 +464,8 @@ func _temper() -> void:
 	boldness = _rng.randf()
 	pause_chance = _rng.randf_range(0.0, PAUSE_CHANCE_MAX)
 	_settle_temper(kind)
+	var factions := _factions()
+	foes = factions.on_sight(factions.of_kind(kind))
 
 
 func _sim_tick() -> void:
@@ -863,7 +868,9 @@ func _target_beset(need := 1) -> bool:
 ## (Senses.sees); the one it has kept unless another is RETARGET_TILES
 ## nearer. One bearing its kind's bane it sees bane_notice times farther;
 ## one bearing a grudge against its kind it goes for first (417; decision
-## 420). Entities still in their spawn grace are passed over.
+## 420). A kind whose faction fights others on sight (foes, decision 545)
+## looks for their monsters and the residents too. Entities still in their
+## spawn grace are passed over.
 func _nearest_visible_target() -> GridEntity:
 	var marks := _marks(World.kind_of(self))
 	var bane: Array[GridEntity] = marks["bane"]
@@ -872,7 +879,7 @@ func _nearest_visible_target() -> GridEntity:
 	# could close meanwhile. Most looks end here.
 	if target == null and raid == "" and nearest_sought > sight_range + LOOK_MARGIN_TILES \
 			and tier_comings == World.zone.comings and World.tick - tier_tick < World.TIER_EVERY_TICKS \
-			and bane.is_empty():
+			and bane.is_empty() and foes.is_empty():
 		return null
 	var grudge: Array[GridEntity] = marks["grudge"]
 	var farther := float(Items.growth()["bane_notice"]) if not bane.is_empty() else 1.0
@@ -910,6 +917,23 @@ func _nearest_visible_target() -> GridEntity:
 		for entity in World.townsfolk():
 			var d := World.distance(tile, entity.tile)
 			if d <= sight_range and d < nearest_distance and senses.sees(entity, d, entity != target):
+				if entity == target:
+					kept = d
+				nearest = entity
+				nearest_distance = d
+	if not foes.is_empty():
+		# Its side's enemies on sight (decision 545): the barrow's dead and
+		# robbers at each other, and both at the residents (Pip).
+		var factions := _factions()
+		var others: Array[GridEntity] = []
+		if raid == "" and "town" in foes:
+			others.append_array(World.townsfolk())  # A raider has already looked (above).
+		for entity in World.monsters():
+			if entity != self and not entity is Animal and factions.of_kind(World.kind_of(entity)) in foes:
+				others.append(entity)
+		for entity in others:
+			var d := World.distance(tile, entity.tile)
+			if d <= sight_range and d < nearest_distance and not entity.protected and senses.sees(entity, d, entity != target):
 				if entity == target:
 					kept = d
 				nearest = entity
@@ -1494,6 +1518,19 @@ func _call_for_help() -> void:
 
 ## Whether [param other] is of its side (Factions.of_kind, allies one side,
 ## decision 416; with no factions, every monster of a kind is).
+## The world's factions (Holdings'), or levels/factions.json read once where
+## there are no holdings (a test, a tool).
+static func _factions() -> Factions:
+	if World.holdings != null:
+		return World.holdings.factions
+	if _read_factions == null:
+		_read_factions = Factions.read()
+	return _read_factions
+
+
+static var _read_factions: Factions
+
+
 func _same_side(other: GridEntity) -> bool:
 	if not other is Monster or not (other as Monster)._wary or other is Animal:
 		return false  # An animal is of no side but its herd's (Animal).

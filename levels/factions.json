@@ -25,5 +25,21 @@
 		"colour": "#d9b24a",
 		"monsters": [],
 		"hostile_to": ["goblins"]
+	},
+	"dead": {
+		"name": "the barrow's dead",
+		"colour": "#b8b49c",
+		"monsters": [],
+		"hostile_to": ["robbers", "town"],
+		"on_sight": ["robbers", "town"],
+		"holds": false
+	},
+	"robbers": {
+		"name": "the mound-breakers",
+		"colour": "#7a5a3a",
+		"monsters": [],
+		"hostile_to": ["dead", "town"],
+		"on_sight": ["dead", "town"],
+		"holds": false
 	}
 }

@@ -244,7 +244,8 @@ func blocked_cells(area_name: String, faction: String) -> Dictionary[Vector2i, S
 ## 416: route with Factions.side).
 func obstacles(world_map: WorldMap) -> Dictionary:
 	var out := {}
-	for faction in factions.names().filter(func(id: String) -> bool: return factions.side(id) == id):
+	# A side that holds no places (the barrow's dead, decision 545) gets no layer.
+	for faction in factions.names().filter(func(id: String) -> bool: return factions.side(id) == id and factions.holds(id)):
 		var areas := {}
 		for area_name: String in world_map.areas:
 			areas[area_name] = blocked_cells(area_name, faction)

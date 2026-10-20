@@ -16520,3 +16520,39 @@ Not yet measured in a soak: the soak's players don't fall. larder_test
 _test_offering (Economy and the priest's wage); Main's path is wired, not
 scene-tested.
 
+
+## 545. Monster sides: factions fight on sight (the crypt's monsters, step 1)
+
+Jeff's barrow (docs/lore/crypt.md): grave robbers after the altar's gold,
+skeletons that guard it, "both hostile to Pip"; the coordinator approved
+enemy-ai's crypt design in three steps (sides; skeletons and robbers; the
+draugr), this the first. Until now a monster went only for players and
+kept companions (a raider for the residents too, 333), and never for
+another monster.
+
+- Hostility has one home, levels/factions.json, which raids (328) and
+  Holdings already read; nothing new in monsters.json (release asked that
+  a camp's faction and a monster's side never disagree). A faction may
+  name "on_sight": the factions its monsters fight on sight, their
+  monsters and, for "town", the residents' bodies (World.townsfolk). Only
+  factions it is hostile to may be named (Factions.read drops the rest
+  with a warning); an ally takes on its lead's (Factions.on_sight).
+- Two new factions: "dead" (the barrow's dead) and "robbers" (the
+  mound-breakers), each on sight of the other and the town, each with
+  "holds": false: they hold no places, so Holdings.obstacles makes them
+  no route layer (Factions.holds; a layer is a distance field per area,
+  not worth making for a side that never travels the world map). Their
+  kinds come with step 2; until then they have no monsters.
+- Monster.foes, settled with its temper from its kind's faction; a kind
+  with foes also looks through World.monsters() (not animals) and, unless
+  it raids (which already does), the residents, nearest first beside the
+  players, and skips the tier's early return (only the barrow's kinds pay
+  for it). The Blood Rot and its allies name no on_sight: imps, brutes and
+  sneaks let each other and the residents be as before.
+- Monster._factions: the world's (Holdings') factions, or factions.json
+  read once without holdings (tests, tools).
+No client sees a side: server only, protocol unchanged, no new
+class_name. factions_test (on_sight, holds, no layer, a bad on_sight
+dropped), monster_test (_test_sides_on_sight: two sides at blows, the dead
+at a resident, the Blood Rot's kinds still at peace), world_map_test (the
+faction list).

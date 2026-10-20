@@ -33,16 +33,32 @@ func _ready() -> void:
 	_check(factions.same_side(Factions.NOBODY, Factions.NOBODY) and not factions.same_side(Factions.NOBODY, "orcs"),
 		"nobody is its own, no faction's")
 
+	print("== on sight (decision 545) ==")
+	_check(factions.on_sight("dead") == _strings(["robbers", "town"]) and factions.on_sight("robbers") == _strings(["dead", "town"]),
+		"the barrow's dead and its robbers fight each other and the town's folk on sight")
+	_check(factions.on_sight("goblins").is_empty() and factions.on_sight("orcs").is_empty() and factions.on_sight(Factions.NOBODY).is_empty(),
+		"the Blood Rot and its allies fight no monster or resident on sight (a raider looks for residents itself)")
+	_check(not factions.holds("dead") and not factions.holds("robbers") and factions.holds("goblins") and factions.holds("town")
+		and not factions.holds(Factions.NOBODY), "the dead and the robbers hold no places")
+	var map_rows: Array[String] = [".".repeat(9)]
+	Level.register("fa_sight", Level.image_from_rows(map_rows), null, {"outdoor": true})
+	var sight_names: Array[String] = ["fa_sight"]
+	var layers := Holdings.new(WorldMap.build(sight_names), factions, {}).obstacles(WorldMap.build(sight_names))
+	_check(layers.keys().has("goblins") and layers.keys().has("town") and not layers.keys().has("dead") and not layers.keys().has("robbers"),
+		"no route layer for a side that holds nothing (%s)" % [layers.keys()])
+
 	var folder: String = preload("res://tests/test_ports.gd").scratch("factions_test/")
 	DirAccess.make_dir_recursive_absolute(folder)
 	var path := folder + "bad.json"
 	var file := FileAccess.open(path, FileAccess.WRITE)
-	file.store_string(JSON.stringify({"a": {"allied_to": "b"}, "b": {"allied_to": "a"}, "c": {"allied_to": "nowhere"}}))
+	file.store_string(JSON.stringify({"a": {"allied_to": "b"}, "b": {"allied_to": "a"}, "c": {"allied_to": "nowhere"},
+		"d": {"hostile_to": ["c"], "on_sight": ["c", "a", "nowhere"]}}))
 	file.close()
 	var bad := Factions.read(path)
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
 	_check(bad.side("c") == "c" and bad.side("a") == "a" and bad.side("b") == "a",
 		"an allied_to naming no faction, or one that is an ally itself, is dropped: no chains (a %s, b %s, c %s)" % [bad.side("a"), bad.side("b"), bad.side("c")])
+	_check(bad.on_sight("d") == _strings(["c"]), "on_sight keeps only factions it is hostile to (d: %s)" % [bad.on_sight("d")])
 
 	print("== held ground ==")
 	var rows: Array[String] = []

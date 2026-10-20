@@ -9,6 +9,10 @@ extends RefCounted
 ## and takes on the lead's enemies.
 ## "nobody" is no faction: it holds what nobody holds, and blocks no one;
 ## "contested" is ground two factions claim (Holdings.ground).
+## A faction may also name the factions its monsters fight on sight
+## (on_sight, only ones it is hostile to; "town" is the residents' bodies),
+## and say it holds no places ("holds": false: no route layer, decision
+## 545), as the barrow's dead and its robbers do.
 
 const PATH := "res://levels/factions.json"
 const NOBODY := "nobody"
@@ -17,7 +21,8 @@ const NOBODY_COLOUR := Color(0.5, 0.5, 0.52)
 const CONTESTED_COLOUR := Color(0.85, 0.3, 0.3)
 
 ## Faction id -> {name, colour (Color), monsters (Array[String]),
-## hostile_to (Array[String]), allied_to ("" for none), lore_id}.
+## hostile_to (Array[String]), allied_to ("" for none), lore_id,
+## on_sight (Array[String]), holds (bool)}.
 var all: Dictionary[String, Dictionary] = {}
 
 
@@ -39,14 +44,27 @@ static func read(path := PATH) -> Factions:
 		var hostile: Array[String] = []
 		for other: Variant in entry.get("hostile_to", []):
 			hostile.append(str(other))
+		var on_sight: Array[String] = []
+		for other: Variant in entry.get("on_sight", []):
+			on_sight.append(str(other))
 		out.all[id] = {"name": str(entry.get("name", id)), "colour": Color.from_string(str(entry.get("colour", "")), NOBODY_COLOUR),
 			"monsters": monsters, "hostile_to": hostile, "allied_to": str(entry.get("allied_to", "")),
-			"lore_id": str(entry.get("lore_id", id))}
+			"lore_id": str(entry.get("lore_id", id)), "on_sight": on_sight, "holds": bool(entry.get("holds", true))}
 	for id: String in out.all:
 		var lead: String = out.all[id]["allied_to"]
 		if lead != "" and (not out.all.has(lead) or lead == id or out.all[lead]["allied_to"] != ""):
 			push_warning("[factions] %s: %s's allied_to %s is not a faction leading a side: none" % [path, id, lead])
 			out.all[id]["allied_to"] = ""
+	# One place says who is whose enemy: a faction fights on sight only
+	# those it is hostile to.
+	for id: String in out.all:
+		var kept: Array[String] = []
+		for other: String in out.all[id]["on_sight"]:
+			if out.all.has(other) and out.hostile(id, other):
+				kept.append(other)
+			else:
+				push_warning("[factions] %s: %s's on_sight %s is no faction it is hostile to: left out" % [path, id, other])
+		out.all[id]["on_sight"] = kept
 	return out
 
 
@@ -121,3 +139,23 @@ func allies_of(id: String) -> Array[String]:
 ## factions.json gives none).
 func lore_id(id: String) -> String:
 	return str(all[id]["lore_id"]) if all.has(id) else id
+
+
+## The factions [param id]'s monsters fight on sight: its own on_sight and
+## its lead's (an ally takes on its lead's enemies), sorted; none for
+## "nobody".
+func on_sight(id: String) -> Array[String]:
+	var out: Array[String] = []
+	for each: String in [id, side(id)]:
+		if all.has(each):
+			for other: String in all[each]["on_sight"]:
+				if not out.has(other):
+					out.append(other)
+	out.sort()
+	return out
+
+
+## Whether [param id] holds places (and so routes the world map's ways
+## round others' ground, Holdings.obstacles); "holds": false says not.
+func holds(id: String) -> bool:
+	return all.has(id) and bool(all[id]["holds"])
