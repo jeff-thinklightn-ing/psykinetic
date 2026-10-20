@@ -14015,6 +14015,12 @@ above); this is her player's side of it.
   sickness is cured by the town, or runs its course.
 companion_test _test_sickness. Protocol unchanged; no new class_name.
 
+Amended (2026-10-19): PlayerRecord.from_dict kept neither "sick" nor
+"was_sick" (it rebuilds the companion's keys one by one), so a server
+restart forgot a companion's sickness and its telling. Both are read back
+now, JSON's floats made ints again. companion_test: kept through a save
+and a load.
+
 ## 502, npc's side: the medicine man gathers herbs
 
 Terrain's 502 lays herbs as ground piles near the towns and gives

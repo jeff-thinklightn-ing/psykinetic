@@ -188,7 +188,21 @@ static func from_dict(entry: Variant) -> PlayerRecord:
 		for key: String in ["bond_day", "struck_day"]:
 			if pet.get(key) is float or pet.get(key) is int:
 				record.companion[key] = int(pet[key])
+		# Her sickness (decision 501, npc's Townsfolk) and one ended, still to be told.
+		for key: String in ["sick", "was_sick"]:
+			var sick: Variant = pet.get(key)
+			if sick is Dictionary and not sick.is_empty():
+				record.companion[key] = _numbers(sick)
 	return record
+
+
+## [param entry] with JSON's floats made ints again (days, ticks), the rest kept.
+static func _numbers(entry: Dictionary) -> Dictionary:
+	var kept := {}
+	for key: Variant in entry:
+		var value: Variant = entry[key]
+		kept[str(key)] = int(value) if value is float else value
+	return kept
 
 
 ## [param value] as ItemBook uids (0 for none), or none.

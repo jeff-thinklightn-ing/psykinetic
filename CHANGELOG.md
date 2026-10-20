@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Fixed: a companion's sickness, and news of one she had while you were away, was forgotten when the server restarted (decision 501).
 - Fixed: the rubber banding walking with WASD near the town chests (543). A held walk no longer gets stuck a few steps ahead of the server and pulled back every second or two; after a hold-up it catches up smoothly instead.
 - Monsters can now be at war with each other: factions name who they fight on sight. The barrow's dead and its grave robbers (coming next) will go for each other and for any townsfolk who wander below; the goblins, orcs and kobolds keep the peace among themselves as before.
 - Art slots for the Barrow (542): the mound with its stone-framed door at the entrance, and what lies in a burial niche (a bier with remains, three kinds by how deep), drawn as plain shapes until their art comes; client art only.
@@ -14,7 +15,6 @@ notes (decision 324).
 - The minimap turns with the view, so up on it is up on the screen, as the compass already turns (the big map stays north-up, where the land is read as laid out); the arrow on them points the way your body faces.
 - Clearer skies in the town lands: overcast and fog come about half as often, while rain and storms come as often as before. A new world opens under a clear sky, and each season lasts twice as long, so a play session stays in one season (533). The server needs `server/admin.sh season_days 14` once after the deploy.
 - Being brought back at the temple now costs an offering of 8 gold, or what you have if less, and you are brought back either way. Your companion's offering comes out of your gold. Those the draugr has blessed come back free. The offerings pay the priest first (546).
-
 - The Barrow: a mound a little outside the town with a crypt below it, the starter dungeon of Jeff's crypt page. Its tombs lay themselves out afresh every three days; the entrance, the altar room with its hidden passage, the draugr's lair and the sealed shortcut to the temple stay. A brute stands in for the draugr until he is made; the mound's door and the temple's end of the shortcut come with the wilds' side of it. Levels shift only on a server started with `--regenerate` (or the console's `regenerate on`), the castle's halls included when they come; the service file carries the flag.
 - Fixed: walking onto tall grass, a ford or a slope could be shown at the wrong pace for the steps after the first, so the game pulled you back a little (rubber banding); others' walks were drawn at the wrong pace there too.
 - The kobold sneak is cleaned up the way Jeff cleaned the orc: one solid body, its painted skin carried over (529 amended); Jeff's to veto.

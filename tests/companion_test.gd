@@ -1357,6 +1357,11 @@ func _test_sickness() -> void:
 	record.companion["sick"] = {"since": today - 2, "kind": "a cough", "treated": -1, "cured_by": ""}
 	_main._tell_sickness(pet, record, true)
 	_check("You have been sick with a cough since 2 days ago; it will pass." in pet.voice_prompt("test"), "while sick, her voice knows it")
+	record.companion["was_sick"] = {"since": today - 9, "ended": today - 8, "cured_by": "", "kind": "a fever"}
+	var saved := PlayerRecord.from_dict(JSON.parse_string(JSON.stringify(record.to_dict())))
+	_check(saved.companion.get("sick", {}) == record.companion["sick"] and saved.companion.get("was_sick", {}) == record.companion["was_sick"],
+		"her sickness, and one still to be told, are kept through a save and a load (%s)" % [saved.companion.get("sick", {})])
+	record.companion.erase("was_sick")
 	var log_size: int = _main.party_log.size()
 	_main._sickness_in_party()
 	_check(record.companion.has("sick") and _main.party_log.size() == log_size, "not yet run its course: still sick, nothing told")
