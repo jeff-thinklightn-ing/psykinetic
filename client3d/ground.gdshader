@@ -229,6 +229,27 @@ const float KIND_WOBBLE = 0.35;
 const float KIND_EDGE = 0.25;
 const float GRASS_WEAR = 0.7;
 
+// The grass and the dirt lifted toward the capsule days' greens (decision
+// 532, Jeff: "tone 8 approved, good improvement"): the grass turned
+// GRASS_HUE degrees toward green and its saturation and value raised, the
+// dirt's a little; worked out in linear light, about the grey axis.
+const float GRASS_HUE = 20.0;
+const float GRASS_SAT = 1.45;
+const float GRASS_VAL = 1.22;
+const float DIRT_SAT = 1.15;
+const float DIRT_VAL = 1.1;
+
+vec3 hue_turn(vec3 c, float degrees) {
+	float a = radians(degrees);
+	vec3 k = vec3(0.57735);
+	return c * cos(a) + cross(k, c) * sin(a) + k * dot(k, c) * (1.0 - cos(a));
+}
+
+vec3 lift(vec3 c, float sat, float val) {
+	float grey = dot(c, vec3(0.2126, 0.7152, 0.0722));
+	return clamp(mix(vec3(grey), c, sat) * val, 0.0, 1.0);
+}
+
 void fragment() {
 	vec2 at = world.xz;
 	// Where the kinds are read: pushed about at two scales, a slow drift of
@@ -259,11 +280,11 @@ void fragment() {
 		float grey = clamp(dot(here, vec3(0.3, 0.55, 0.15)) * 3.0, 0.6, 1.3);
 		here = mix(here, vec3(0.3, 0.25, 0.1) * grey, (1.0 - season.x) * 0.5);
 		here = mix(here, vec3(0.34, 0.17, 0.04) * grey, season.y * 0.3 * smoothstep(0.35, 0.7, noise(at * 0.5 + 60.0)));
-		colour += here * weights.r;
+		colour += lift(max(hue_turn(here, GRASS_HUE), vec3(0.0)), GRASS_SAT, GRASS_VAL) * weights.r;
 	}
 	if (weights.g > 0.0) {
-		colour += (dirt_own ? tiled(dirt_tex, at, kind_tiles.g, dx, dy, 7.0)
-				: dirt * (0.85 + 0.3 * fbm(at * 0.6 + 7.0)) * (0.9 + 0.2 * noise(at * 9.0))) * weights.g;
+		colour += lift(dirt_own ? tiled(dirt_tex, at, kind_tiles.g, dx, dy, 7.0)
+				: dirt * (0.85 + 0.3 * fbm(at * 0.6 + 7.0)) * (0.9 + 0.2 * noise(at * 9.0)), DIRT_SAT, DIRT_VAL) * weights.g;
 	}
 	if (weights.b > 0.0 && stone_own) {
 		colour += tiled(stone_tex, at, kind_tiles.b, dx, dy, 13.0) * weights.b;

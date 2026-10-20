@@ -15947,3 +15947,31 @@ Jeff: "teleport me to the trader" (the coordinator's ask; release's terms).
 tests: level_test _test_admin_move: moved into another zone and within
 their own, each refusal with nothing moved, no id in a reply, the nearest
 floor search.
+
+## 532. The ground's greens lifted toward the capsule days
+
+Jeff, 2026-10-19: "somehow over the course of the last week, the graphic
+tone has become much more muted ... the colors are dull" (the tone pairs in
+C:\dev\review\tone: the capsule-day builds' flat palette greens against
+today's grey-olive grass texture). Tried in a throwaway checkout and shot
+beside the old builds; then Jeff: "tone 8 approved, good improvement"
+(castle-8-final, wilds-8-final: this with art-kit's warm wall tile and
+stone row, 532, art-kit's side). Client only (ground.gdshader,
+scatter.gdshader).
+
+- The grass (its own texture or its procedural look) turned GRASS_HUE 20
+  degrees toward green (a rotation about the grey axis in linear light),
+  then its saturation (about Rec.709 luma) times GRASS_SAT 1.45 and its value
+  times GRASS_VAL 1.22: two thirds of the way from today's grass (hue 88,
+  saturation 0.37, value 0.57 at noon) to the capsule days' (122, 0.62,
+  0.76), its texture still showing.
+- The dirt only a little: DIRT_SAT 1.15, DIRT_VAL 1.1 (a full lift turned it
+  orange).
+- The scatter (tufts, flowers, reeds, tall grass) as the grass, in
+  scatter.gdshader, so it sits in the lawn it stands on.
+- Stone, sand, needles and the floors are untouched; the season, wet, light
+  and heat go over the lifted colour as before.
+
+Rejected: saturation and value alone (the grass went lime: its texture is
+yellow-green at heart); the same lift on the dirt (an orange overshoot); a
+grade over the whole frame (it would tint the walls, people and sky too).

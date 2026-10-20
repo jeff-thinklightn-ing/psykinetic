@@ -39,8 +39,27 @@ vec3 to_linear(vec3 c) {
 	return mix(pow((c + vec3(0.055)) * (1.0 / 1.055), vec3(2.4)), c * (1.0 / 12.92), lessThan(c, vec3(0.04045)));
 }
 
+// The scatter lifted as the ground's grass (decision 532, Jeff: "tone 8
+// approved, good improvement"): turned GRASS_HUE degrees toward green, its
+// saturation and value raised, in linear light about the grey axis.
+const float GRASS_HUE = 20.0;
+const float GRASS_SAT = 1.45;
+const float GRASS_VAL = 1.22;
+
+vec3 hue_turn(vec3 c, float degrees) {
+	float a = radians(degrees);
+	vec3 k = vec3(0.57735);
+	return c * cos(a) + cross(k, c) * sin(a) + k * dot(k, c) * (1.0 - cos(a));
+}
+
+vec3 lift(vec3 c, float sat, float val) {
+	float grey = dot(c, vec3(0.2126, 0.7152, 0.0722));
+	return clamp(mix(vec3(grey), c, sat) * val, 0.0, 1.0);
+}
+
 void vertex() {
 	COLOR.rgb = to_linear(COLOR.rgb);
+	COLOR.rgb = lift(max(hue_turn(COLOR.rgb, GRASS_HUE), vec3(0.0)), GRASS_SAT, GRASS_VAL);
 	vec2 at = MODEL_MATRIX[3].xz;
 	float phase = dot(at, wind.xy) * 0.6 - TIME * (1.2 + 2.0 * wind.z);
 	float gust = 0.65 + 0.35 * sin(phase) + 0.12 * sin(TIME * 3.1 + at.x * 1.7 + at.y * 2.3);
