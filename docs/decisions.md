@@ -15988,3 +15988,38 @@ creature.kobold 1.11 x 0.96 x 0.85 m, body_material "kobold", no "middle" (0.41 
 its feet to 0.44 behind), its grey boxes re-measured. 2,327 triangles. view_test checks both
 in their paint. Known: its scar and hand are faint at its size; a dark patch shows at the
 thighs in the jog. The generator kobold (478) is the fallback, from 11a3f6af's parent.
+
+## 536. Talk with no panel: offers spoken and taken by a word
+
+Jeff, from play (2026-10-19): "the questions at the bottom don't seem natural
+when every npc is the same... I'd rather not have the ui at all". ui's side
+takes the conversation panel away (E or a click addresses the say line, a
+HUD hint while an offer stands); this is npc's: an offer is heard, and
+taken, in words. A line said to a resident (336) that asks for wares, work
+or news, by word lists in levels/residents.json offers "asks" (Jeff's to
+tune; the defaults in Offers.ASKS), is answered without the mind:
+Offers.to_speak picks the first fresh offer of the kinds that ask names
+(wares: the shop line; work: a commission, a plea, the building fund, the
+scholar's page; news: the rumour, the page) and Main speaks its "words" as
+the body's speech and the party log's line, exactly as written, noted
+"[offer]" in the transcript and "offer" in mind.log; asked again, the next
+of that kind, round and round; nothing is volunteered. What was spoken
+stands for that player (Main._standing, one per player, memory only) until
+taken, refused, replaced by another ask, a day old, or the body out of
+hearing. A yes word, an amount said ("give 25", "lend 5", a bare number),
+or the name of the thing or person (Offers.named: the shop item, the
+captive or kin, "the rest" / "what I have" for the fund's second line,
+"debt", "page") takes the offer named, else the one standing, through the
+same Offers.accept and Main._accept_offer as the panel did; a yes to a debt
+pays what is owed or all they have, a yes to the fund its step, "the rest"
+the whole lack; the GIVE accept now takes a said amount; over the purse or
+the cap it is refused in words ("You have but 9 gold.", "The inn wants but
+24 gold more.", "I owe but 14."), nothing taken. A no clears what stands
+with nothing said back. Any other line is the mind's, as before, and the
+mind still carries the offers as facts. The "offers" message gains
+"standing": {id, title} when one stands (absent otherwise), for ui's hint:
+PROTOCOL_REVISION 23 (release: an added key in an existing message bumps,
+as 17 and 21 did). The "offer" command verb and the message's list stay, so
+a client may still accept by id. offers_test (the rules, pure) and
+resident_test (a kin's plea asked for, spoken, standing, taken by a yes;
+the mind for the rest). Server and wire; no new class_name.

@@ -50,6 +50,7 @@ func _ready() -> void:
 	_test_walk_home()
 	_test_sick_pleas()
 	_test_give()
+	_test_asks()
 	_test_lapse()
 	_test_voice_words()
 	_test_scholar_and_merchant()
@@ -618,6 +619,36 @@ func _test_voice_words() -> void:
 	words = Offers.voice_words("o-mara", "p1", "Jeff", _ctx)
 	_check(words.ends_with("Jeff promised to clear the camp of %s and has not yet." % ResidentCard.faction_name("goblins")), "an open promise is a fact too: %s" % words)
 
+
+
+## Talk with no panel (decision 536): what a line asks, the offer it speaks,
+## the one it names, the amount it says, and what is refused.
+func _test_asks() -> void:
+	print("\n== talk with no panel: asks by word, the offer spoken, named, an amount said (decision 536) ==")
+	Offers.use_settings({})
+	_check(Offers.ask_kind("What do you sell?") == "wares" and Offers.ask_kind("Any work for me?") == "work" and Offers.ask_kind("What's the news?") == "news",
+		"the three asks, by their words")
+	_check(Offers.ask_kind("Yes.") == "yes" and Offers.ask_kind("I'll take it") == "yes" and Offers.ask_kind("No, not now.") == "no" and Offers.ask_kind("Yesterday I saw the smith") == "" and Offers.ask_kind("Is the kitchen busy?") == "",
+		"a yes or a no is a short line beginning so; a word inside another is not; a line of its own is nobody's ask")
+	_check(Offers.amount_said("Give 25") == 25 and Offers.amount_said("I'll lend 5 gold") == 5 and Offers.amount_said("12") == 12 and Offers.amount_said("Give the rest") == 0,
+		"an amount said: after give, lend, pay, or a bare number")
+	# The official's building fund (the give test's town): work speaks the step, then the rest, round and round.
+	_wanted = {"kind": "inn", "gold": 24}
+	_purse = 60
+	var first := Offers.to_speak("o-ald", "p1", "work")
+	var second := Offers.to_speak("o-ald", "p1", "work", str(first.get("id", "")))
+	var third := Offers.to_speak("o-ald", "p1", "work", str(second.get("id", "")))
+	_check(str(first.get("id", "")).ends_with("give:step") and str(second.get("id", "")).ends_with("give:rest") and third.get("id") == first.get("id"),
+		"asked for work: the step, asked again the rest, then the step again: %s" % [[first.get("title"), second.get("title"), third.get("title")]])
+	_check(Offers.to_speak("o-ald", "p1", "wares").is_empty() and Offers.to_speak("o-ald", "p1", "news").is_empty(), "no wares and no news from the official: the mind answers those")
+	_check(str(Offers.named("o-ald", "p1", "The rest, then.").get("id", "")).ends_with("give:rest") and Offers.named("o-ald", "p1", "Yes").is_empty(), "'the rest' names the second line; a yes names nothing (the standing one takes it)")
+	_check(Offers.amount_refusal(first, 30, 60) == "The inn wants but 24 gold more." and Offers.amount_refusal(first, 70, 60) == "You have but 60 gold." and Offers.amount_refusal(first, 20, 60).is_empty(),
+		"an amount over the lack or the purse is refused in words; within both, taken")
+	var took := Offers.accept("o-ald", "p1", "Jeff", str(first["id"]), 15)
+	_check(bool(took.get("ok", false)) and _given.back() == [TOWN, "p1", 15], "'give 15' to the step line gives 15, not the step: %s" % [_given.back()])
+	Offers.use_settings({"asks": {"wares": ["what have you"], "work": [], "news": [], "yes": ["ja"], "no": [], "amount": []}})
+	_check(Offers.ask_kind("Any work for me?") == "" and Offers.ask_kind("Ja") == "yes" and Offers.ask_kind("what have you?") == "wares", "the lists are residents.json's to tune")
+	Offers.use_settings({})
 
 func _check(ok: bool, what: String) -> void:
 	print("  %s  %s" % ["PASS" if ok else "FAIL", what])

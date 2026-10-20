@@ -51,7 +51,17 @@ class_name Offers
 ## leaves out what needs it.
 
 const FILE := "res://levels/residents.json"
-const DEFAULTS := {"max": 3, "per_player": 3, "days": 7, "fetch": 6, "give_most": 10}
+## The words a line to a resident may be (decision 536: talk with no panel):
+## an ask for wares, work or news, a yes, a no, or an amount said ("give 25").
+## residents.json offers "asks" replaces any list, so Jeff can tune them.
+const ASKS := {
+	"wares": ["sell", "buy", "wares", "for sale", "have you got", "what do you have", "what have you"],
+	"work": ["work", "job", "errand", "need", "help you", "anything i can do", "can i do"],
+	"news": ["news", "what's new", "anything new", "heard", "going on", "tell me"],
+	"yes": ["yes", "aye", "all right", "alright", "i will", "i'll take it", "i'll do it", "i'll bring", "done", "deal", "take it", "agreed", "very well", "gladly"],
+	"no": ["no", "nay", "not now", "no thanks", "never mind", "not today"],
+	"amount": ["give", "lend", "pay", "here is", "here's", "take"]}
+const DEFAULTS := {"max": 3, "per_player": 3, "days": 7, "fetch": 6, "give_most": 10, "asks": ASKS}
 const SHOP := "shop"
 const COMMISSION := "commission"
 const RUMOUR := "rumour"
@@ -184,13 +194,13 @@ static func _give_offers(worker_id: String, who: Dictionary, town: String, playe
 	var words := "%s waits on %s%d gold; what you give goes to it." % [kind.capitalize() if not kind.begins_with("the ") else "The " + kind.trim_prefix("the "), needs + " and " if not needs.is_empty() else "", gold]
 	var step := int(settings().get("give_most", 10))
 	if gold <= step:
-		out.append(_offer(worker_id, GIVE, "give:all", "Give toward %s" % kind, words, {"gold": gold, "kind": str(wanted.get("kind", ""))}, GIVE, gold))
+		out.append(_offer(worker_id, GIVE, "give:all", "Give toward %s" % kind, words, {"gold": gold, "kind": str(wanted.get("kind", "")), "town": town}, GIVE, gold))
 		return out
-	out.append(_offer(worker_id, GIVE, "give:step", "Give toward %s" % kind, words, {"gold": step, "kind": str(wanted.get("kind", ""))}, GIVE, step))
+	out.append(_offer(worker_id, GIVE, "give:step", "Give toward %s" % kind, words, {"gold": step, "kind": str(wanted.get("kind", "")), "town": town}, GIVE, step))
 	var purse: Variant = _call(given, "gold_of", [player_id])
 	var rest := mini(gold, int(purse)) if purse is int or purse is float else gold
 	if rest > step:
-		out.append(_offer(worker_id, GIVE, "give:rest", "Give the rest" if rest == gold else "Give what you have", "", {"gold": rest, "kind": str(wanted.get("kind", ""))}, GIVE, rest))
+		out.append(_offer(worker_id, GIVE, "give:rest", "Give the rest" if rest == gold else "Give what you have", "", {"gold": rest, "kind": str(wanted.get("kind", "")), "town": town}, GIVE, rest))
 	return out
 
 
@@ -548,7 +558,8 @@ static func accept(worker_id: String, player_id: String, player_name: String, of
 		GIVE:
 			# Gold toward the next build (decision 499, npc's side): economy takes what it still wants and the player has.
 			var town := str(who.get("town", ""))
-			var given_gold := int(_call(given, "contribute", [town, player_id, maxi(int(offer["what"].get("gold", 0)), 0)]))
+			var asked_gold := gold if gold > 0 else int(offer["what"].get("gold", 0))  # A number said takes that much (decision 536).
+			var given_gold := int(_call(given, "contribute", [town, player_id, maxi(asked_gold, 0)]))
 			if given_gold > 0:
 				var kind := _build_words(str(offer["what"].get("kind", "")))
 				Townsfolk.learn(production, worker_id, "%s gave %d gold toward %s." % [player_name, given_gold, kind])
@@ -1065,6 +1076,156 @@ static func watch(towns: Towns, holdings: Holdings, stockpile: Stockpile) -> voi
 		_watching[stockpile.get_instance_id()] = weakref(stockpile)
 		stockpile.connect("deposited", func(place: String, by: String, by_id: String, what: String, count: int) -> void:
 			deposited(place, by, by_id, what, count))
+
+
+
+# --- Talk with no panel (decision 536) ------------------------------------------------
+
+## What [param line], said to a resident, asks for: "wares", "work", "news",
+## "yes", "no" (a short line beginning with such a word), or "" for a line of
+## its own, which the mind answers. By the "asks" word lists.
+static func ask_kind(line: String) -> String:
+	var said := _plain(line)
+	if said.is_empty():
+		return ""
+	var asks: Dictionary = settings().get("asks", ASKS)
+	var words := said.split(" ", false)
+	if words.size() <= 4:
+		for kind: String in ["yes", "no"]:
+			for word: Variant in asks.get(kind, []):
+				if said == str(word) or said.begins_with(str(word) + " "):
+					return kind
+	for kind: String in ["wares", "work", "news"]:
+		for word: Variant in asks.get(kind, []):
+			if _has_word(said, str(word)):
+				return kind
+	return ""
+
+
+## The amount [param line] says ("give 25", "lend 5", "here is 10", or a bare
+## number), 0 for none.
+static func amount_said(line: String) -> int:
+	var said := _plain(line)
+	if said.is_valid_int():
+		return maxi(int(said), 0)
+	var asks: Dictionary = settings().get("asks", ASKS)
+	for word: Variant in asks.get("amount", []):
+		var found := RegEx.create_from_string("(?:^|[^a-z])%s (\\d+)" % _escape(str(word))).search(said)
+		if found != null:
+			return maxi(int(found.get_string(1)), 0)
+	return 0
+
+
+## The offer [param worker_id] speaks to [param player_id] for [param ask]
+## ("wares": the shop line; "work": a commission, a plea, the building fund,
+## the scholar's page; "news": the rumour, the page): the first fresh one of
+## those kinds, or the one after [param after_id] when that is among them
+## (asked again, the next, round and round). {} for none.
+static func to_speak(worker_id: String, player_id: String, ask: String, after_id := "", given: Dictionary = ctx) -> Dictionary:
+	var kinds: Array[String] = []
+	match ask:
+		"wares":
+			kinds = [SHOP]
+		"work":
+			kinds = [COMMISSION, PLEA, GIVE, PAGE]
+		"news":
+			kinds = [RUMOUR, PAGE]
+	if kinds.is_empty():
+		return {}
+	var fresh: Array[Dictionary] = []
+	for offer: Dictionary in of(worker_id, player_id, given):
+		if not bool(offer.get("open", false)) and str(offer.get("kind", "")) in kinds:
+			fresh.append(offer)
+	if fresh.is_empty():
+		return {}
+	for i in fresh.size():
+		if str(fresh[i].get("id", "")) == after_id:
+			return fresh[(i + 1) % fresh.size()]
+	return fresh[0]
+
+
+## The fresh offer of [param worker_id] that [param line] names: the shop
+## thing's name, the person of a commission or plea, "the rest" / "what I
+## have" for the building fund's second line, "debt" or "loan", "page" or
+## "chronicle". The first that matches; {} for none.
+static func named(worker_id: String, player_id: String, line: String, given: Dictionary = ctx) -> Dictionary:
+	var said := _plain(line)
+	if said.is_empty():
+		return {}
+	for offer: Dictionary in of(worker_id, player_id, given):
+		if bool(offer.get("open", false)):
+			continue
+		for name: String in names_of(offer):
+			if _has_word(said, name):
+				return offer
+	return {}
+
+
+## The words that name [param offer] when said back, lower-cased.
+static func names_of(offer: Dictionary) -> Array[String]:
+	var out: Array[String] = []
+	var what: Dictionary = offer.get("what", {})
+	var key := str(offer.get("id", "")).get_slice(SEP, 2)
+	match str(offer.get("kind", "")):
+		SHOP:
+			var id := str(what.get("id", ""))
+			if not id.is_empty():
+				out.append(id.replace("_", " ").to_lower())
+				if Items.exists(id):
+					out.append(Items.name_of(id).to_lower())
+		COMMISSION, PLEA:
+			if not str(what.get("name", "")).is_empty():
+				out.append(str(what["name"]).to_lower())
+			if what.has("loan"):
+				out.append_array(["debt", "loan"])
+		GIVE:
+			if key == "give:rest":
+				out.append_array(["the rest", "what i have", "the whole", "all of it"])
+		PAGE:
+			out.append_array(["page", "chronicle", "book"])
+	return out
+
+
+## Why [param amount] gold cannot go to [param offer] from a purse of
+## [param purse]: over the purse ("You have but 9 gold."), over what the
+## fund still wants (ctx contribution_wanted) or the debt owed; "" when it
+## can.
+static func amount_refusal(offer: Dictionary, amount: int, purse: int, given: Dictionary = ctx) -> String:
+	if amount <= 0:
+		return ""
+	if amount > purse:
+		return "You have but %d gold." % purse
+	var what: Dictionary = offer.get("what", {})
+	match str(offer.get("kind", "")):
+		GIVE:
+			var wanted: Variant = _call(given, "contribution_wanted", [str(what.get("town", ""))])
+			var cap := int(wanted.get("gold", 0)) if wanted is Dictionary else int(what.get("gold", 0))
+			if amount > cap:
+				return "%s wants but %d gold more." % [_upper_first(_build_words(str(what.get("kind", "")))), cap]
+		PLEA:
+			if what.has("loan") and amount > int(what["loan"]):
+				return "I owe but %d." % int(what["loan"])
+	return ""
+
+
+## [param line] lower-cased, its punctuation gone, one space between words.
+static func _plain(line: String) -> String:
+	var said := line.to_lower().strip_edges()
+	said = RegEx.create_from_string("[^a-z0-9' ]+").sub(said, " ", true)
+	return RegEx.create_from_string(" +").sub(said, " ", true).strip_edges()
+
+
+static func _has_word(said: String, word: String) -> bool:
+	if word.is_empty():
+		return false
+	return RegEx.create_from_string("(?:^|[^a-z0-9])%s(?:$|[^a-z0-9])" % _escape(word)).search(said) != null
+
+
+static func _escape(word: String) -> String:
+	var out := ""
+	for ch: String in word:
+		out += ("\\" + ch) if ch in ".^$*+?()[]{}|\\" else ch
+	return out
 
 
 # --- The voice --------------------------------------------------------------------------

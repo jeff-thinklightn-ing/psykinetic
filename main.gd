@@ -203,6 +203,11 @@ var map_generation := 0
 ## resident; the ask out, by serial.
 var _resident_mind: CompanionMind
 var _resident_asks: Array[Dictionary] = []
+## Talk with no panel (decision 536): the offer standing for each player,
+## player id -> {worker, id, title, at, zone}: what a resident last spoke to
+## them, taken by a yes, a name or an amount said back; one per player, not
+## saved (a restart forgets it as it forgets a conversation).
+var _standing: Dictionary = {}
 var _resident_out: Dictionary[int, Dictionary] = {}
 ## Server only: claims asks waiting (decision 378), each {body, worker,
 ## person, from, line, at}, one per resident; those out, by serial; when
@@ -4259,8 +4264,11 @@ func _ask_resident(body: Resident, speaker: String, line: String, player: Player
 func _send_offers(body: Resident, player_id: String, peer: int) -> void:
 	if body == null or not is_instance_valid(body) or player_id.is_empty() or peer < 0 or not body.player_id.is_empty():
 		return
-	Net.message_to(peer, "offers", {"entity": String(body.get_path()), "speaker": body.person,
-		"offers": Offers.of(body.worker_id, player_id)})
+	var data := {"entity": String(body.get_path()), "speaker": body.person, "offers": Offers.of(body.worker_id, player_id)}
+	var standing := _standing_for(player_id, body.worker_id)
+	if not standing.is_empty():
+		data["standing"] = {"id": standing["id"], "title": standing["title"]}  # PROTOCOL_REVISION 23 (decision 536).
+	Net.message_to(peer, "offers", data)
 
 
 ## Server: [param player] accepts offer [param offer_id] (of the resident
@@ -4277,6 +4285,7 @@ func _accept_offer(player: Player, offer_id: String, gold: int) -> void:
 	if body == null or World.distance(body.tile, player.tile) > HEARING_RANGE:
 		return
 	var result := Offers.accept(worker_id, player.player_id, _display_name(player), offer_id, gold)
+	_standing.erase(player.player_id)  # Taken, or tried: nothing stands (decision 536).
 	if result.get("read") is Array and not result["read"].is_empty():
 		_read_page(player, body, result["read"])  # The scholar's chronicle (decision 491).
 	elif int(result.get("buy", 0)) > 0:
@@ -6012,7 +6021,8 @@ func _player_said(player: Player, text: String, phrase := 0) -> void:
 	Net.broadcast_to(hearers(player.tile, earshot), "chat", {"entity": String(player.get_path()), "from": _display_name(player),
 		"to": to, "text": line})
 	if resident != null:
-		_ask_resident(resident, _display_name(player), line, player)
+		if not _offer_said(resident, player, line):  # An ask for wares, work or news, or a word taking the offer standing (decision 536).
+			_ask_resident(resident, _display_name(player), line, player)
 		if hears:
 			pet.overheard(_display_name(player), line, false)
 	elif to != "":
@@ -6728,6 +6738,101 @@ func _temple_counters() -> void:
 				break
 		World.show_held(entity, at)
 
+
+
+
+# --- Talk with no panel (decision 536) ------------------------------------------------
+
+## Server: [param line], said by [param player] to [param body], handled
+## without the mind when it is an ask or an answer: an ask for wares, work
+## or news speaks the matching offer's words back, exactly, and keeps it as
+## the offer standing for the player (asked again, the next); a yes word, an
+## amount, or the name of a thing or person takes the offer named, else the
+## one standing, through the accept path (an amount over the purse or the
+## cap is refused in words); a no clears what stands, nothing said back.
+## True when handled; false for a line of the player's own, the mind's.
+func _offer_said(body: Resident, player: Player, line: String) -> bool:
+	if World.production == null or body == null or player == null or body.worker_id.is_empty():
+		return false
+	var player_id := player.player_id
+	var ask := Offers.ask_kind(line)
+	var amount := Offers.amount_said(line)
+	var standing := _standing_for(player_id, body.worker_id)
+	if ask in ["wares", "work", "news"]:
+		var offer := Offers.to_speak(body.worker_id, player_id, ask, str(standing.get("id", "")))
+		if offer.is_empty():
+			return false  # Nothing of that kind: the mind answers as it would.
+		Transcript.record(body.person, _display_name(player), line)
+		_speak_offer(body, player, offer)
+		return true
+	var target := Offers.named(body.worker_id, player_id, line)
+	if target.is_empty() and (ask == "yes" or amount > 0) and not standing.is_empty():
+		for offer: Dictionary in Offers.of(body.worker_id, player_id):
+			if str(offer.get("id", "")) == str(standing["id"]) and not bool(offer.get("open", false)):
+				target = offer
+	if ask == "no" and not standing.is_empty():
+		_standing.erase(player_id)
+		Transcript.record(body.person, _display_name(player), line)
+		_send_offers(body, player_id, player.owner_peer)
+		return true
+	if target.is_empty():
+		return false
+	Transcript.record(body.person, _display_name(player), line)
+	var gold := amount
+	if gold <= 0 and str(target.get("accept", "")) == Offers.LEND:
+		gold = mini(int(target.get("cost", 0)), World.gold_of(player_id))  # A yes to a debt: what is owed, or all they have.
+	var refusal := Offers.amount_refusal(target, amount, World.gold_of(player_id))
+	if not refusal.is_empty():
+		_say_plain(body, refusal)
+		return true
+	_accept_offer(player, str(target["id"]), gold)
+	return true
+
+
+## [param body] speaks [param offer]'s words to [param player], exactly, as
+## its speech and the party log's line, and it stands for them.
+func _speak_offer(body: Resident, player: Player, offer: Dictionary) -> void:
+	var words := str(offer.get("words", ""))
+	if words.is_empty():
+		words = str(offer.get("title", ""))
+	_standing[player.player_id] = {"worker": body.worker_id, "id": str(offer.get("id", "")), "title": str(offer.get("title", "")),
+		"at": World.steps, "zone": body.zone}
+	MindLog.record({"kind": "offer", "companion": body.person, "mind": "resident", "say": words, "outcome": "spoken"})
+	_say_plain(body, words, "[offer] ")
+	_send_offers(body, player.player_id, player.owner_peer)
+
+
+## [param body] says [param words] with no mind asked: the transcript (with
+## [param note]), the party log, those near, the speech bubble.
+func _say_plain(body: Resident, words: String, note := "") -> void:
+	Transcript.record(body.person, body.person, note + words)
+	party_log.add("%s said: \"%s\"" % [body.person, words])
+	_heard_near(body, body.person, words)
+	Net.broadcast_to(hearers(body.tile), "speech", {"entity": String(body.get_path()), "speaker": body.person, "text": words})
+
+
+## The offer standing for [param player_id] with [param worker_id], {} for
+## none: one spoken within a day whose body is still within hearing in this
+## zone; else it is let go.
+func _standing_for(player_id: String, worker_id: String) -> Dictionary:
+	var standing: Dictionary = _standing.get(player_id, {})
+	if standing.is_empty():
+		return {}
+	if str(standing.get("worker", "")) != worker_id:
+		return {}
+	var player: Player = null
+	for each: Player in _players.values():
+		if is_instance_valid(each) and each.player_id == player_id:
+			player = each
+	var body: Resident = null
+	for entity: GridEntity in World.townsfolk():
+		if entity is Resident and (entity as Resident).worker_id == worker_id:
+			body = entity
+	if World.steps - int(standing.get("at", 0)) > maxi(DayNight.day_steps, 1) or body == null or player == null \
+			or body.zone != player.zone or World.distance(body.tile, player.tile) > HEARING_RANGE:
+		_standing.erase(player_id)
+		return {}
+	return standing
 
 
 # --- A level-placed captive (decision 518) ------------------------------------------

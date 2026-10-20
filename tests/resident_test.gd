@@ -51,6 +51,7 @@ func _ready() -> void:
 	_test_two_sentences()
 	_test_sick_body()
 	_test_placed_captive()
+	_test_offer_words()
 	_test_herbs()
 	_test_resident_voices()
 	_test_means_in_voice()
@@ -1236,6 +1237,70 @@ func _test_placed_captive() -> void:
 	var gone: Array[String] = [camp]
 	_check(_main._place_captives(_main._world_map, gone) == 0 and not _main._placed_captives.has(camp), "a camp gone from the levels is forgotten")
 	_check(World.towns.died(STORE, who, "the test's end"), "(Tilda out of the town again, so the later tests see the roster they expect)")
+
+
+## Talk with no panel (decision 536): a kin's plea spoken back word for
+## word when asked for work, standing, taken by a yes; the mind for the rest.
+func _test_offer_words() -> void:
+	print("\n== talk with no panel: asked for work, the plea is spoken as it is written and a yes takes it (decision 536) ==")
+	var rules := Townsfolk.rules().duplicate(true)
+	rules["sick"] = {"chance": 0.0, "winter": 1, "hungry": 1, "old": 1, "days": 5, "death_old": 0.0, "visit_hours": 2, "kinds": ["a cough"]}
+	Townsfolk.use_rules(rules)
+	for i in 14:
+		World.production.set_away("rs-folk%02d" % i, true)
+	for id: String in ["rs-bram", "rs-snag", "rs-law"]:
+		World.production.set_away(id, true)
+	var hut: String = _main._healers_hut_of(STORE)
+	if not hut.is_empty():
+		World.production.set_away("medicine_man:" + hut, true)  # Away: the plea is to walk the sick one to the hut.
+	World.production.set_away("rs-folk11", false)
+	var kin := Townsfolk.card_of(World.production, "rs-folk11")
+	kin["kin"] = {"rs-folk10": "sister or brother"}
+	kin["asks"] = []
+	World.production.set_card("rs-folk11", kin)
+	var sick := Townsfolk.card_of(World.production, "rs-folk10")
+	sick["kin"] = {"rs-folk11": "sister or brother"}
+	World.production.set_card("rs-folk10", sick)
+	Townsfolk._set_sickness(World.production, "rs-folk10", {"since": Townsfolk.day_of(World.steps), "kind": "a cough", "treated": -1, "cured_by": ""})
+	DayNight.set_hour(11.0)
+	_sync()
+	var body := _body("rs-folk11")
+	var player := _player()
+	var plea: Array = Offers.of("rs-folk11", Net.player_id).filter(func(o: Dictionary) -> bool: return str(o.get("kind", "")) == Offers.PLEA and not bool(o.get("open", false)))
+	_check(body != null and player != null and not hut.is_empty() and plea.size() == 1, "(Folk11 stands in the town with a plea for Folk10: %s)" % [plea.map(func(o: Dictionary) -> String: return str(o.get("title", "")))])
+	if body == null or player == null or hut.is_empty() or plea.is_empty():
+		return
+	_put(player, _main._nearest_free(body.tile + Vector2i(1, 0)))
+	var mind := VoiceMind.new()
+	_main._resident_mind = mind
+	_main._chat_tick.clear()
+	_main._player_said(player, "Any work for me?")
+	World.step()
+	var standing: Dictionary = _main._standing.get(Net.player_id, {})
+	_check(mind.asks.is_empty() and str(standing.get("id", "")) == str(plea[0]["id"]) and str(standing.get("title", "")) == str(plea[0]["title"]),
+		"asked for work: no mind asked, the plea spoken stands: %s" % [standing.get("title", "")])
+	_main._chat_tick.clear()
+	_main._player_said(player, "Is the kitchen busy?")
+	World.step()
+	_check(mind.asks.size() == 1 and _main._standing.has(Net.player_id), "a line of the player's own goes to the mind; the plea still stands")
+	_main._chat_tick.clear()
+	_main._player_said(player, "Yes, I'll take it.")
+	World.step()
+	var open: Array = Offers.of("rs-folk11", Net.player_id).filter(func(o: Dictionary) -> bool: return bool(o.get("open", false)) and str(o.get("id", "")) == str(plea[0]["id"]))
+	_check(mind.asks.size() == 1 and open.size() == 1 and not _main._standing.has(Net.player_id), "a yes takes it through the accept path: the plea is theirs, open, and nothing stands")
+	_main._chat_tick.clear()
+	_main._player_said(player, "Yes")
+	World.step()
+	_check(mind.asks.size() == 2, "a yes with nothing standing is a line like any other: the mind's")
+	_main._chat_tick.clear()
+	_main._player_said(player, "What's the news?")
+	World.step()
+	_check(mind.asks.size() == 3 or _main._standing.has(Net.player_id), "news: a rumour spoken if they hold one, else the mind")
+	_main._standing.clear()
+	_main._resident_mind = null
+	World.production.set_away("rs-folk11", true)
+	Townsfolk._set_sickness(World.production, "rs-folk10", {})
+	_sync()
 
 func _sync() -> void:
 	_main._sync_residents()
