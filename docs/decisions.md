@@ -15738,3 +15738,63 @@ floor and the makers' price draw on the same treasury first, and C's
 0.3 doesn't yet bring in enough to cover both. Protocol unchanged.
 larder_test _test_livings.
 
+## 525, terrain's side: the ground drawn from the relief
+
+525 gave the ground a height in metres a cell (terrain "relief",
+Relief.corner_heights, Relief.cliff_between); this draws it. Client only
+(client3d.gd, border.gd); the castle and every level with no relief.png
+draw exactly as before (their field is their whole levels, derived).
+
+- One path, metres everywhere: Client3D._elevation(cell) (Relief.at, else
+  the whole level) and _corner_heights(cell), the corners as drawn, kept per
+  ground cell in _corners by _build_ground: Relief.corner_heights (each the
+  mean of the cells joined to it walkably, per side of a cliff), a stair's
+  ramp's (_ramp_heights: its high side up to the cell it climbs to) or a
+  stream bed's under a bridge (_bed_levels, now metres). _height(cell)
+  stays for whole-level logic only.
+- The mesh: a vertex per corner and height (to the millimetre), so walkable
+  neighbours share theirs and each side of a cliff has its own; normals the
+  faces' about each vertex (the field's gradient there). No subdivision:
+  one vertex a corner reads smooth at the game's camera on the sample's
+  rise; 2x2 a cell stays the remedy if a remade hill shows facets.
+- A point's height (_height_in) is the triangle the mesh draws there, not
+  bilinear, so puppets, scatter, trees, rocks and props stand on what is
+  drawn; _tile_position (a cell's middle) too. Marks (hover, ripple) tilt
+  with the ground by its corners, not only on a stair.
+- Cliffs: a face wherever two neighbours' corners part (Relief's rule
+  decides where they part); a pond's shore stands over its water (525's
+  lip), so its lip is a low face down to the bed. Water, where the level
+  gives its relief: the surface follows its cells, each corner the mean of
+  the water cells' surfaces round it (_water_corner), so a pond is flat and
+  a stream slopes down its valley (flat steps each a body overlapped as a
+  staircase of see-through sheets); the bed under it (water and fords,
+  _wet) each corner the lower of its own and the surface's, sunk
+  WATER_BED_DEPTH (a ford FORD_DEPTH 0.06), a bank's face going down to it.
+  A level with no relief.png keeps its water as before.
+- Buildings, bridges, wall bases, posts and towers stand at their cells'
+  elevation (pads are flat by 525's parse); the forest's border and grown
+  trees take the ground in metres (_elevations, rise 1.0; border.gd reads
+  it as a float).
+- Picking: the cursor's ray walked down from where it comes level with the
+  highest ground (PICK_STEP 0.2 m across), then halved in to the ground as
+  drawn, slopes included.
+- The camera: its target follows the player's puppet, on the ground. Where
+  the ground between it and the player stands over the line to them (a
+  ridge: RIDGE_REACH 14 m back along the camera's way, kept RIDGE_CLEAR 0.3
+  under the line to RIDGE_AIM 1 m over their feet), its pitch rises to
+  clear it (ridge_pitch, eased at RIDGE_EASE 40 degrees a second), and
+  settles back. None on a level with no relief.
+
+tests/view_test (the sample: corners as the sim's, a thing on a slope on
+the drawn triangle, each body of water level, the camera over a ridge and
+not on the flat; on hills a stream's surface sloping down its valley, each
+corner its water's mean, its bed under it; the castle drawn as its whole
+levels; the stair, ledge and
+rock checks in metres, no face where the sim walks but a shore's lip; on
+levels/hills a face down each of its cliff steps, the plateau's west face,
+and none on the thousands of steps down its slopes).
+
+Rejected: bilinear heights (a puppet would float or sink up to a few
+centimetres off the drawn triangles); a vertex a cell's middle (twice the
+vertices for no gain at this camera); fading the ground that hides the
+player (ground is not a wall; lifting the camera shows the slope).

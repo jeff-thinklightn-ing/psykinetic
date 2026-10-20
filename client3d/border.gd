@@ -55,8 +55,8 @@ var _leaf := true
 
 ## Lays the far floor now and starts the canopy past [param land] (its
 ## cells, never changed after this: the view makes a new one each build),
-## [param heights] (the land's, a level a cell; copied), each level
-## [param rise] metres; the forest floor's colour and depth; whether the
+## [param heights] (the land's ground, copied: a level a cell, or metres with
+## [param rise] 1.0, decision 525), each unit [param rise] metres; the forest floor's colour and depth; whether the
 ## band is [param stands] of pines (PineStands), whose canopy's colours,
 ## the palette's foliage, the canopy takes.
 func build(land: Dictionary[Vector2i, bool], heights: Dictionary, rise: float, floor_colour: Color, floor_depth: float, threaded := true, stands := false) -> void:
@@ -134,7 +134,7 @@ func _work(land: Dictionary[Vector2i, bool], heights: Dictionary, rise: float, c
 		for way in ways:
 			if not land.has(cell + way):
 				distance[cell] = 0
-				base[cell] = int(heights.get(cell, 0)) * rise
+				base[cell] = float(heights.get(cell, 0)) * rise
 				frontier.append(cell)
 				break
 	var head := 0

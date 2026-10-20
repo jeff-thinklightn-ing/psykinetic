@@ -193,6 +193,8 @@ const WATER_FOAM := Vector2i(8, 0)
 const WATER_LIFT := 0.01
 ## (Above FOREST_FLOOR_DEPTH, or the forest floor under the map hides it.)
 const WATER_BED_DEPTH := 0.15
+## On a relief (decision 525), how far a ford's bed lies under its surface.
+const FORD_DEPTH := 0.06
 const WATER_BED_KIND := "dirt"
 ## A stream's flow (decision 505, terrain's side) reaches this many cells out
 ## from its path, across its width (Streams.lay's are 1 to 3 wide).
@@ -274,6 +276,16 @@ void fragment() {
 }
 """
 const CAMERA_PITCH := 50.0
+## Over hills (decision 525): how far back toward the camera the ground is
+## looked at, how far under the line to the player (aimed RIDGE_AIM over
+## their feet) it must stay, and how fast (degrees a second) the pitch
+## follows.
+const RIDGE_REACH := 14.0
+const RIDGE_CLEAR := 0.3
+const RIDGE_AIM := 1.0
+const RIDGE_EASE := 40.0
+## Picking on the drawn ground: how far apart (m, across) the ray is tried.
+const PICK_STEP := 0.2
 const CAMERA_DISTANCE := 40.0
 ## Orthographic height in units: a 1.5-unit character, foreshortened by
 ## cos(CAMERA_PITCH), is about a twelfth of it.
@@ -1074,8 +1086,8 @@ var _building_dry: Array[Vector2i] = []
 ## them. The sim still has them as water. Filled the same way.
 var _dry_water: Dictionary[Vector2i, bool] = {}
 ## The water under a bridge (terrain "bridged", decision 505): its bed's
-## level, the stream's, not the deck's (_measure_streams).
-var _bed_levels: Dictionary[Vector2i, int] = {}
+## elevation (m), the stream's, not the deck's (_measure_streams).
+var _bed_levels: Dictionary[Vector2i, float] = {}
 ## Fords (terrain "fords"): floor under a shallow sheet of the stream.
 var _fords: Dictionary[Vector2i, bool] = {}
 ## Rocks (terrain "rocks", decision 513): no floor to the sim, but ground of
@@ -1205,9 +1217,31 @@ var _ground_shader_material: ShaderMaterial
 var _sky_floor := 0.0
 ## Floor and water cells: the land the forest stands around.
 var _land: Dictionary[Vector2i, bool] = {}
-## Corner levels where they are not a cell's height: stairs' ramps and the
-## cells round them (_shape_ramps).
-var _ramp_levels: Dictionary[Vector2i, PackedInt32Array] = {}
+## The ground's elevation (decision 525): terrain "relief", metres a cell
+## row by row over _relief_size cells; empty for a terrain with none (a
+## glimpse's, a test's), whose cells stand at their whole levels.
+var _relief := PackedFloat32Array()
+var _relief_size := Vector2i.ZERO
+## Whether the level gave its relief (relief.png): then its water's surface
+## follows its cells (a stream's slopes down its path) and its bed sinks
+## under it; a level with none keeps its water as before.
+var _relief_given := false
+## Water and fords as the ground draws them (wet: their ground is a bed under
+## the surface).
+var _wet: Dictionary[Vector2i, bool] = {}
+## The drawn ground's highest and lowest corner (m), for picking.
+var _ground_top := 0.0
+var _ground_bottom := 0.0
+## Each ground cell's four corners (metres, GROUND_CORNERS order) as the
+## mesh draws them (_build_ground): Relief.corner_heights, a ramp's or a
+## stream bed's where those apply. _height_in reads them.
+var _corners: Dictionary[Vector2i, PackedFloat32Array] = {}
+## Corners where a stair's ramp sets them: the stair's high side up to the
+## cell it climbs to, and the cells round it (_shape_ramps).
+var _ramp_heights: Dictionary[Vector2i, PackedFloat32Array] = {}
+## The camera's pitch while a ridge would hide the player (_ridge_lift),
+## eased; 0 when none.
+var _ridge_pitch := 0.0
 ## Where the map's water is, a texel a cell (_build_ground), for the ground's
 ## wet shore and the water's own; its first cell and size; the bodies drawn.
 var _water_mask: ImageTexture
@@ -1634,7 +1668,7 @@ func _build_camera() -> void:
 ## +x +z side (grid +x toward the viewer down-right, +y down-left, as in
 ## the 2D view), turned about the vertical by the yaw.
 func _camera_offset() -> Vector3:
-	var tilt := deg_to_rad(pitch)
+	var tilt := deg_to_rad(maxf(pitch, _ridge_pitch))
 	var horizontal := CAMERA_DISTANCE * cos(tilt)
 	var offset := Vector3(horizontal / sqrt(2.0), CAMERA_DISTANCE * sin(tilt), horizontal / sqrt(2.0))
 	return offset.rotated(Vector3.UP, deg_to_rad(yaw))
@@ -1675,7 +1709,26 @@ func _follow(delta: float) -> void:
 	sfx.listener = player.tile  # Sounds are heard from here, as a monster there would.
 	_lead = Main.camera_lean(_lead, get_viewport(), yaw, delta)
 	_camera_target = _camera_ease.follow(puppet.position, delta) + Vector3(_lead.x, 0.0, _lead.y) + pan
+	_ridge_pitch = move_toward(_ridge_pitch, ridge_pitch(puppet.position), RIDGE_EASE * delta)
 	_place_camera()
+
+
+## The pitch (degrees) the camera needs to see over the ground between it and
+## [param at] (decision 525): the ground along the camera's way back,
+## RIDGE_REACH metres of it, kept RIDGE_CLEAR under the line to a body's
+## middle there; 0 where nothing rises (a level with no hills: always).
+func ridge_pitch(at: Vector3) -> float:
+	if _relief.is_empty():
+		return 0.0
+	var back := Vector2(1.0, 1.0).normalized().rotated(-deg_to_rad(yaw))
+	var need := 0.0
+	var aim := at.y + RIDGE_AIM
+	var d := 1.0
+	while d <= RIDGE_REACH:
+		var ground := _ground_height(Vector2(at.x, at.z) + back * d)
+		need = maxf(need, rad_to_deg(atan2(ground + RIDGE_CLEAR - aim, d)))
+		d += 0.5
+	return clampf(need, 0.0, PITCH_MAX)
 
 
 func _local_player() -> Player:
@@ -1989,15 +2042,30 @@ func mouse_grid() -> Vector2:
 	var ray := _mouse_ray()
 	if absf(ray[1].y) < 0.0001:
 		return Vector2(NAN, NAN)
-	# From the highest level down: the first ground the ray meets at its own
-	# height; the ground plane if none.
-	for level in range(Level.MAX_HEIGHT, 0, -1):
-		var t := (level * LEVEL_RISE - ray[0].y) / ray[1].y
-		if t < 0.0:
-			continue
-		var at := ray[0] + ray[1] * t
-		if _height(Vector2i(roundi(at.x), roundi(at.z))) == level:
-			return Vector2(at.x, at.z)
+	# Down the ray from where it comes as low as the highest ground to where
+	# it passes the lowest, in short steps: the first point under the ground
+	# (as drawn, slopes and ramps too), then halved in to it; the ground
+	# plane if none.
+	if ray[1].y < 0.0 and not _corners.is_empty():
+		var start := maxf((_ground_top - ray[0].y) / ray[1].y, 0.0)
+		var end := (_ground_bottom - 0.01 - ray[0].y) / ray[1].y
+		var step := PICK_STEP / maxf(Vector2(ray[1].x, ray[1].z).length(), 0.05)
+		var before := start
+		var t := start
+		while t <= end:
+			var at: Vector3 = ray[0] + ray[1] * t
+			if at.y <= _ground_height(Vector2(at.x, at.z)):
+				for i in 6:
+					var middle := (before + t) * 0.5
+					var mid: Vector3 = ray[0] + ray[1] * middle
+					if mid.y <= _ground_height(Vector2(mid.x, mid.z)):
+						t = middle
+					else:
+						before = middle
+				var hit: Vector3 = ray[0] + ray[1] * t
+				return Vector2(hit.x, hit.z)
+			before = t
+			t += step
 	var t := -ray[0].y / ray[1].y
 	if t < 0.0:
 		return Vector2(NAN, NAN)
@@ -2011,25 +2079,92 @@ func _ground_height(grid: Vector2) -> float:
 	return _height_in(Vector2i(roundi(grid.x), roundi(grid.y)), grid)
 
 
-## How high [param cell]'s ground is at [param point] (on it or its edge):
-## flat at its height, or a stair's ramp, a level up across the cell.
+## How high [param cell]'s ground is at [param point] (on it or its edge),
+## on the triangle the mesh draws there (its corners: _corner_heights): a
+## slope's, a ramp's, or flat. Every puppet every frame: a lookup and a
+## few sums.
 func _height_in(cell: Vector2i, point: Vector2) -> float:
-	if not _ramp_levels.has(cell):
-		return _height(cell) * LEVEL_RISE  # Flat: nearly every cell, every puppet every frame.
-	var levels: PackedInt32Array = _ramp_levels[cell]
+	var h := _corner_heights(cell)
 	var at := (point - Vector2(cell) + Vector2(0.5, 0.5)).clamp(Vector2.ZERO, Vector2.ONE)
-	var top := lerpf(levels[0], levels[1], at.x)
-	var bottom := lerpf(levels[2], levels[3], at.x)
-	return lerpf(top, bottom, at.y) * LEVEL_RISE
+	# The quad's two triangles: (0, 1, 2) where x + y <= 1, (1, 3, 2) past it.
+	if at.x + at.y <= 1.0:
+		return h[0] + (h[1] - h[0]) * at.x + (h[2] - h[0]) * at.y
+	return h[3] + (h[2] - h[3]) * (1.0 - at.x) + (h[1] - h[3]) * (1.0 - at.y)
 
 
-## The levels of [param cell]'s corners (GROUND_CORNERS): its height, or
-## as _shape_ramps left them round a stair.
-func _corner_levels(cell: Vector2i) -> PackedInt32Array:
-	if _ramp_levels.has(cell):
-		return _ramp_levels[cell]
-	var height := _height(cell)
-	return PackedInt32Array([height, height, height, height])
+## [param cell]'s ground in metres at its middle (decision 525): its
+## elevation in the relief, else its whole level.
+func _elevation(cell: Vector2i) -> float:
+	if _relief.is_empty() or not Relief.on_map(_relief_size, cell):
+		return _height(cell) * LEVEL_RISE
+	return Relief.at(_relief, _relief_size, cell)
+
+
+## [param cell]'s ground corners (metres, GROUND_CORNERS order), as drawn.
+func _corner_heights(cell: Vector2i) -> PackedFloat32Array:
+	if _corners.has(cell):
+		return _corners[cell]
+	return _ground_corners(cell)
+
+
+## [param cell]'s corners worked out: a stream bed's under a bridge, a
+## ramp's, else the relief's (Relief.corner_heights: each the mean of the
+## cells joined to it walkably, per side of a cliff), else its whole level
+## flat.
+func _ground_corners(cell: Vector2i) -> PackedFloat32Array:
+	if _relief_given and (_wet.has(cell) or _bed_levels.has(cell)):
+		# A bed under the water's surface (decision 525): each corner below
+		# the surface there, a ford's just under, a stream's or pond's deeper.
+		var own := Relief.corner_heights(_relief, _relief_size, cell) if not _bed_levels.has(cell) \
+				else PackedFloat32Array([_bed_levels[cell], _bed_levels[cell], _bed_levels[cell], _bed_levels[cell]])
+		var depth := FORD_DEPTH if _fords.has(cell) else WATER_BED_DEPTH
+		for c in 4:
+			own[c] = minf(own[c], _water_corner(cell + GROUND_CORNERS[c])) - depth
+		return own
+	if _bed_levels.has(cell):
+		var bed := _bed_levels[cell]
+		return PackedFloat32Array([bed, bed, bed, bed])
+	if _ramp_heights.has(cell):
+		return _ramp_heights[cell]
+	if _relief.is_empty() or not Relief.on_map(_relief_size, cell):
+		var flat := _height(cell) * LEVEL_RISE
+		return PackedFloat32Array([flat, flat, flat, flat])
+	return Relief.corner_heights(_relief, _relief_size, cell)
+
+
+## The ground's elevation (m) at each cell the forest's border and grown
+## trees stand round (decision 525): the land and the wooded cells.
+func _elevations() -> Dictionary:
+	var out := {}
+	for cell: Vector2i in _wooded:
+		out[cell] = _elevation(cell)
+	for cell: Vector2i in _terrain.get("heights", {}):
+		out[cell] = _elevation(cell)
+	return out
+
+
+## The water's surface at the ground's corner [param vertex] (decision 525):
+## the mean of the surfaces of the water cells round it (a bridge's water at
+## its bed), so a pond's is flat and a stream's slopes down its path.
+func _water_corner(vertex: Vector2i) -> float:
+	var sum := 0.0
+	var count := 0
+	for cell: Vector2i in [vertex - Vector2i.ONE, vertex - Vector2i(0, 1), vertex - Vector2i(1, 0), vertex]:
+		if _wet.has(cell) or _bed_levels.has(cell):
+			sum += _bed_levels.get(cell, _elevation(cell))
+			count += 1
+	return sum / count if count > 0 else INF
+
+
+## The terrain's relief (decision 525) for this build: its field, or none.
+func _read_field() -> void:
+	_relief = _terrain.get("relief", PackedFloat32Array())
+	_relief_size = _terrain.get("relief_size", Vector2i.ZERO)
+	_relief_given = bool(_terrain.get("relief_given", false))
+	if _relief.size() != _relief_size.x * _relief_size.y:
+		_relief = PackedFloat32Array()
+		_relief_size = Vector2i.ZERO
+		_relief_given = false
 
 
 ## The corners a stair raises: its two on its high side a level up (a ramp
@@ -2038,34 +2173,38 @@ func _corner_levels(cell: Vector2i) -> PackedInt32Array:
 ## the ground slopes off the ramp's side, all of it one vertex, where a step
 ## up beside the ramp would show a ledge the sim does not have.
 func _shape_ramps() -> void:
-	_ramp_levels.clear()
+	_ramp_heights.clear()
 	var stairs: Dictionary = _terrain.get("stairs", {})
 	var around: Array[Vector2i] = [-Vector2i.ONE, Vector2i(0, -1), Vector2i(-1, 0), Vector2i.ZERO]
 	for stair: Vector2i in stairs:
 		var up: Vector2i = stairs[stair]
-		var height := _height(stair)
+		var height := _elevation(stair)
+		# The ramp's top: the cell it climbs to (a level up where there is no
+		# relief, up to Relief.STAIR_RISE where there is).
+		var top := _elevation(stair + up)
+		if top <= height + Relief.EPSILON:
+			top = height + LEVEL_RISE
 		for c in 4:
 			if (Vector2(GROUND_CORNERS[c]) - Vector2(0.5, 0.5)).dot(Vector2(up)) <= 0.0:
 				continue
 			var corner := stair + GROUND_CORNERS[c]
 			for a in 4:
 				var cell := corner + around[a]
-				if cell != stair and (not _land.has(cell) or stairs.has(cell) or _height(cell) != height):
+				if cell != stair and (not _land.has(cell) or stairs.has(cell) or absf(_elevation(cell) - height) > Relief.EPSILON):
 					continue
-				var levels: PackedInt32Array = _ramp_levels.get(cell, PackedInt32Array([height, height, height, height]))
+				var heights: PackedFloat32Array = _ramp_heights.get(cell, _ground_corners(cell)).duplicate()
 				# The corner is this cell's corner 3 - a.
-				levels[3 - a] = height + 1
-				_ramp_levels[cell] = levels
+				heights[3 - a] = top
+				_ramp_heights[cell] = heights
 
 
 ## Lies a flat mark (hover, ripple) on [param cell]'s ground, [param lift]
 ## above it: at the ramp's middle on a stair, tilted with it.
 func _lay_on_ground(mark: Node3D, cell: Vector2i, lift: float) -> void:
-	var up := _stair(cell)
-	var tilt := Quaternion.IDENTITY
-	if up != Vector2i.ZERO:
-		var normal := Vector3(-up.x * LEVEL_RISE, 1.0, -up.y * LEVEL_RISE).normalized()
-		tilt = Quaternion(Vector3.UP, normal)
+	# Tilted with the ground there (a ramp's, a slope's), by its corners.
+	var h := _corner_heights(cell)
+	var normal := Vector3(-((h[1] - h[0]) + (h[3] - h[2])) * 0.5, 1.0, -((h[2] - h[0]) + (h[3] - h[1])) * 0.5).normalized()
+	var tilt := Quaternion(Vector3.UP, normal) if normal.y < 0.9999 else Quaternion.IDENTITY
 	mark.quaternion = tilt
 	mark.position = Vector3(cell.x, _height_in(cell, Vector2(cell)), cell.y) + tilt * Vector3(0.0, lift, 0.0)
 
@@ -2270,7 +2409,7 @@ func show_builder(area: Rect2i, cells: Array = [], edges: Array = [], beyond := 
 	_builder_marks = Node3D.new()
 	add_child(_builder_marks)
 	var frame := _make_flat(_frame_mesh(area, 0.08), BUILDER_AREA)
-	frame.position.y = ON_FLOOR * 3.0 + _height(area.position) * LEVEL_RISE
+	frame.position.y = ON_FLOOR * 3.0 + _elevation(area.position)
 	_builder_marks.add_child(frame)
 	if beyond.size != Vector2i.ZERO:
 		var far := _make_flat(_frame_mesh(beyond, 0.25), BUILDER_BEYOND)
@@ -2279,7 +2418,7 @@ func show_builder(area: Rect2i, cells: Array = [], edges: Array = [], beyond := 
 	for each: Variant in roofs:
 		var rect := Rect2i(int(each[0]), int(each[1]), int(each[2]), int(each[3]))
 		var outline := _make_flat(_frame_mesh(rect, 0.12), BUILDER_ROOF)
-		outline.position.y = _height(rect.position) * LEVEL_RISE + 0.75
+		outline.position.y = _elevation(rect.position) + 0.75
 		_builder_marks.add_child(outline)
 	# Cells, one mesh a colour; a thing as a smaller square on its cell.
 	var raised := {}
@@ -2511,9 +2650,9 @@ func ripple(tile: Vector2i) -> void:
 
 # --- Room ----------------------------------------------------------------------
 
-## A cell's centre on its ground, at its height.
+## A cell's centre on its ground, at its height (on a slope, as drawn).
 func _tile_position(tile: Vector2i) -> Vector3:
-	return Vector3(tile.x, _height(tile) * LEVEL_RISE, tile.y)
+	return Vector3(tile.x, _height_in(tile, Vector2(tile)), tile.y)
 
 
 ## This view's terrain, not the World's: the room is built before the World
@@ -2791,6 +2930,10 @@ func _build_room() -> void:
 	_forest_distance.clear()
 	if _outdoor:
 		_forest_distance = _measure_forest()
+	_read_field()
+	_bed_levels.clear()
+	_corners.clear()
+	_wet.clear()
 	_shape_ramps()
 	_build_ground(kinds)
 	_fire_lights.clear()
@@ -2817,12 +2960,12 @@ func _build_room() -> void:
 			_grown = GrownTrees.new()
 			_grown.name = "GrownTrees"
 			_room.add_child(_grown)
-			_grown.build(grown, _land, ground, _terrain.get("heights", {}), LEVEL_RISE, str(_terrain["canopy_kind"]) == "broadleaf")
+			_grown.build(grown, _land, ground, _elevations(), 1.0, str(_terrain["canopy_kind"]) == "broadleaf")
 		if str(_terrain.get("border", "forest")) != "none":
 			_border = TerrainBorder.new()
 			_border.name = "Border"
 			_room.add_child(_border)
-			_border.build(_wooded, _terrain.get("heights", {}), LEVEL_RISE, _forest_floor_colour(), FOREST_FLOOR_DEPTH, true, PineStands.drawn())
+			_border.build(_wooded, _elevations(), 1.0, _forest_floor_colour(), FOREST_FLOOR_DEPTH, true, PineStands.drawn())
 		for plan: Dictionary in _glimpse_plans:
 			_add_glimpse(plan)
 	_add_buildings()
@@ -2904,7 +3047,7 @@ func _add_buildings() -> void:
 		for part: Node3D in damaged:
 			part.visible = false
 		var middle := Vector2(rect.position) + Vector2(rect.size - Vector2i.ONE) * 0.5
-		node.position = Vector3(middle.x, _height(rect.position) * LEVEL_RISE, middle.y)
+		node.position = Vector3(middle.x, _elevation(rect.position), middle.y)
 		node.rotation.y = atan2(float(facing.x), float(facing.y))
 		_room.add_child(node)
 		var index := _buildings.size()
@@ -2920,7 +3063,7 @@ func _add_buildings() -> void:
 		var keep_dry := GPUParticlesCollisionBox3D.new()
 		var eaves := float(ArtKit.spec(slot).get("wall_height", WALL_HEIGHT))
 		keep_dry.size = Vector3(rect.size.x, eaves, rect.size.y)
-		keep_dry.position = Vector3(middle.x, _height(rect.position) * LEVEL_RISE + eaves * 0.5, middle.y)
+		keep_dry.position = Vector3(middle.x, _elevation(rect.position) + eaves * 0.5, middle.y)
 		_room.add_child(keep_dry)
 		for cell in Level.rect_cells(rect):
 			_building_at[cell] = index
@@ -2935,7 +3078,7 @@ func _add_buildings() -> void:
 func _add_kind(building: Dictionary) -> void:
 	var rect: Rect2i = building["rect"]
 	var cells := Level.building_cells(building)
-	var base := _height(rect.position) * LEVEL_RISE
+	var base := _elevation(rect.position)
 	var eaves := float(building["eaves"])
 	var roof_set := KIND_ROOF if ArtKit.has("material.roof." + KIND_ROOF) else Level.ROOF_SETS[0]
 	var node := BuildingComposer.compose(building, roof_set)
@@ -2974,7 +3117,7 @@ func _add_roofs() -> void:
 		var holder := Node3D.new()
 		holder.name = "Roof_%d_%d" % [rect.position.x, rect.position.y]
 		var middle := Vector2(rect.position) + Vector2(rect.size - Vector2i.ONE) * 0.5
-		holder.position = Vector3(middle.x, _height(rect.position) * LEVEL_RISE, middle.y)
+		holder.position = Vector3(middle.x, _elevation(rect.position), middle.y)
 		var along_x := str(given.get("ridge", "z")) == "x"
 		# Built along z; a ridge along x is the same turned a quarter.
 		holder.rotation.y = PI * 0.5 if along_x else 0.0
@@ -3374,7 +3517,7 @@ func _show_town_wall(ring: Dictionary) -> void:
 				break
 			var tower := ArtKit.instance(slot)
 			tower.name = "Tower_%d_%d" % [vertex.x, vertex.y]
-			tower.position = Vector3(vertex.x - 0.5, _height(vertex) * LEVEL_RISE, vertex.y - 0.5)
+			tower.position = Vector3(vertex.x - 0.5, _elevation(vertex), vertex.y - 0.5)
 			_room.add_child(tower)
 			towers[vertex] = tower
 	for tower: Node3D in towers.values():
@@ -4480,6 +4623,13 @@ func _build_ground(kinds: Dictionary) -> void:
 	# the water; floor_count is where the land ends. A bridge's cells are
 	# floor to the sim but water here, at the stream's bed (_bed_levels).
 	_measure_streams()
+	_wet.clear()
+	for cell: Vector2i in _terrain.get("water", []):
+		if not _dry_water.has(cell):
+			_wet[cell] = true
+	_wet.merge(_fords)
+	_ground_top = -INF
+	_ground_bottom = INF
 	# Tall grass's cells, read here so setup's first build has them as a
 	# rebuild's does (decision 508, terrain's side); its clumps are drawn anew.
 	_tall.clear()
@@ -4539,8 +4689,8 @@ func _build_ground(kinds: Dictionary) -> void:
 	var at := PackedInt32Array()
 	at.resize(across * down)
 	at.fill(-1)
-	var levels := PackedInt32Array()
-	levels.resize(cells.size() * 4)
+	var heights := PackedFloat32Array()
+	heights.resize(cells.size() * 4)
 	var kind_bytes := PackedByteArray()
 	kind_bytes.resize(across * down * 4)
 	# The water mask: r water (a ford's and a bridge's too), g the forest's
@@ -4557,11 +4707,12 @@ func _build_ground(kinds: Dictionary) -> void:
 			kind = "stone"
 		_grounds[cell] = i
 		_ground_kinds[cell] = kind
-		var corner_levels := _corner_levels(cell)
-		if _bed_levels.has(cell):
-			corner_levels = PackedInt32Array([_bed_levels[cell], _bed_levels[cell], _bed_levels[cell], _bed_levels[cell]])
+		var corner_heights := _ground_corners(cell)
+		_corners[cell] = corner_heights
 		for c in 4:
-			levels[i * 4 + c] = clampi(corner_levels[c], 0, MAX_GROUND_HEIGHT + 1)
+			heights[i * 4 + c] = corner_heights[c]
+		_ground_top = maxf(_ground_top, maxf(maxf(corner_heights[0], corner_heights[1]), maxf(corner_heights[2], corner_heights[3])))
+		_ground_bottom = minf(_ground_bottom, minf(minf(corner_heights[0], corner_heights[1]), minf(corner_heights[2], corner_heights[3])))
 		var place := (cell.y - origin.y) * across + cell.x - origin.x
 		at[place] = i
 		kind_bytes[place * 4 + GROUND_CHANNELS[kind]] = 255
@@ -4605,16 +4756,14 @@ func _build_ground(kinds: Dictionary) -> void:
 	# The cells round a corner, and which of their corners it is.
 	var around: Array[Vector2i] = [-Vector2i.ONE, Vector2i(0, -1), Vector2i(-1, 0), Vector2i.ZERO]
 	var ends := PackedInt32Array([0, 0, 0, 0])
-	# A chunk's vertex for each corner and level, or -1.
-	var level_count := MAX_GROUND_HEIGHT + 2
-	var local := PackedInt32Array()
-	local.resize((FLOOR_CHUNK + 1) * (FLOOR_CHUNK + 1) * level_count)
+	# A chunk's vertex for each corner and height (mm): one a side of a cliff.
+	var local: Dictionary[Vector3i, int] = {}
 	for chunk: Vector2i in chunks:
 		var chunk_index := _ground_meshes.size()
 		var base := chunk * FLOOR_CHUNK
 		var byte_start := _ground_bytes.size()
 		_chunk_byte_start.append(byte_start)
-		local.fill(-1)
+		local.clear()
 		var positions := PackedVector3Array()
 		var indices := PackedInt32Array()
 		# Each corner's relief, a byte each: at the foot of a drop (shaded),
@@ -4625,9 +4774,9 @@ func _build_ground(kinds: Dictionary) -> void:
 			var cell: Vector2i = cells[i]
 			for c in 4:
 				var corner := cell + GROUND_CORNERS[c]
-				var level := levels[i * 4 + c]
-				var key := ((corner.x - base.x) * (FLOOR_CHUNK + 1) + corner.y - base.y) * level_count + level
-				var vertex := local[key]
+				var level := heights[i * 4 + c]
+				var key := Vector3i(corner.x, corner.y, roundi(level * 1000.0))
+				var vertex: int = local.get(key, -1)
 				if vertex < 0:
 					vertex = positions.size()
 					local[key] = vertex
@@ -4636,7 +4785,7 @@ func _build_ground(kinds: Dictionary) -> void:
 						var next := corner + around[a]
 						var other := at[(next.y - origin.y) * across + next.x - origin.x]
 						sunk = sunk and other >= floor_count and other < water_end
-					positions.append(Vector3(corner.x - 0.5, level * LEVEL_RISE - (WATER_BED_DEPTH if sunk else 0.0), corner.y - 0.5))
+					positions.append(Vector3(corner.x - 0.5, level - (WATER_BED_DEPTH if sunk else 0.0), corner.y - 0.5))
 					var global := _vertex_chunk.size()
 					_vertex_chunk.append(chunk_index)
 					_vertex_byte.append(byte_start + vertex * _ground_stride + _ground_custom)
@@ -4646,10 +4795,10 @@ func _build_ground(kinds: Dictionary) -> void:
 						var next := corner + around[a]
 						var other := at[(next.y - origin.y) * across + next.x - origin.x]
 						# This corner is the other cell's corner 3 - a.
-						var theirs := levels[other * 4 + 3 - a] if other >= 0 else 0
-						foot = foot or theirs > level
-						top = top or theirs < level
-						if other >= 0 and theirs != level:
+						var theirs := heights[other * 4 + 3 - a] if other >= 0 else 0.0
+						foot = foot or theirs > level + Relief.EPSILON
+						top = top or theirs < level - Relief.EPSILON
+						if other >= 0 and absf(theirs - level) > Relief.EPSILON:
 							other = -1
 						_vertex_cells.append(other)
 						if other >= 0:
@@ -4883,13 +5032,13 @@ func _build_water() -> void:
 		if seen.has(start):
 			continue
 		seen[start] = true
+		var level: float = _bed_levels.get(start, _elevation(start))
 		var body: Array[Vector2i] = [start]
-		var level := 0
 		var head := 0
 		while head < body.size():
 			var cell := body[head]
 			head += 1
-			level = maxi(level, _bed_levels.get(cell, _height(cell)))
+			level = maxf(level, _bed_levels.get(cell, _elevation(cell)))
 			for side in sides:
 				var next := cell + side
 				if water.has(next) and not seen.has(next):
@@ -4903,7 +5052,7 @@ func _build_water() -> void:
 			for y in range(-1, 2):
 				for x in range(-1, 2):
 					var near := cell + Vector2i(x, y)
-					if covered.has(near) or water.has(near) or not _grounds.has(near) or _height(near) != level:
+					if covered.has(near) or water.has(near) or not _grounds.has(near) or absf(_elevation(near) - level) > Relief.EPSILON:
 						continue
 					var walled := false
 					for step: Vector2i in [Vector2i(x, 0), Vector2i(0, y)]:
@@ -4912,13 +5061,16 @@ func _build_water() -> void:
 									or _edge_kind(near, -step) == Terrain.Edge.WALL
 					if not walled:
 						covered[near] = true
-		var top := level * LEVEL_RISE + WATER_LIFT
+		var top := level + WATER_LIFT
 		var positions := PackedVector3Array()
 		var indices := PackedInt32Array()
 		for cell: Vector2i in covered:
 			var first := positions.size()
 			for corner in GROUND_CORNERS:
-				positions.append(Vector3(cell.x + corner.x - 0.5, top, cell.y + corner.y - 0.5))
+				# On a relief the surface follows the water's cells (a stream
+				# slopes down its path, decision 525); else the body's level.
+				var y := _water_corner(cell + corner) + WATER_LIFT if _relief_given else top
+				positions.append(Vector3(cell.x + corner.x - 0.5, y, cell.y + corner.y - 0.5))
 			indices.append_array([first, first + 1, first + 2, first + 1, first + 3, first + 2])
 		var normals := PackedVector3Array()
 		normals.resize(positions.size())
@@ -4946,7 +5098,6 @@ func _measure_streams() -> void:
 	_fords.clear()
 	for cell: Vector2i in _terrain.get("fords", []):
 		_fords[cell] = true
-	_bed_levels.clear()
 	var bridged: Dictionary[Vector2i, bool] = {}
 	for cell: Vector2i in _terrain.get("bridged", []):
 		bridged[cell] = true
@@ -4959,14 +5110,14 @@ func _measure_streams() -> void:
 		if not str(building.get("slot", "")) in Level.SPANS_WATER or not building.has("rect"):
 			continue
 		var rect: Rect2i = building["rect"]
-		var level := MAX_GROUND_HEIGHT + 1
+		var level := INF
 		for y in range(rect.position.y - 1, rect.end.y + 1):
 			for x in range(rect.position.x - 1, rect.end.x + 1):
 				if wet.has(Vector2i(x, y)):
-					level = mini(level, _height(Vector2i(x, y)))
+					level = minf(level, _elevation(Vector2i(x, y)))
 		for cell in Level.rect_cells(rect):
 			if bridged.has(cell):
-				_bed_levels[cell] = level if level <= MAX_GROUND_HEIGHT else _height(cell)
+				_bed_levels[cell] = level if level < INF else _elevation(cell)
 
 
 ## The way [param streams] (terrain "streams": {path}, source to mouth) run
@@ -5018,7 +5169,7 @@ func _add_bridge(building: Dictionary) -> void:
 	var facing: Vector2i = building["facing"]
 	var along := Vector2i(absi(facing.x), absi(facing.y))
 	var across := Vector2i(along.y, along.x)
-	var top := _height(rect.position) * LEVEL_RISE + BRIDGE_LIFT
+	var top := _elevation(rect.position) + BRIDGE_LIFT
 	var pieces: Dictionary[String, Array] = {}
 	for cell in Level.rect_cells(rect):
 		var deck := "%s/%d" % [BRIDGE_DECK, 1 + posmod(hash(cell), maxi(ArtKit.variant_count(BRIDGE_DECK), 1))]
@@ -5201,22 +5352,24 @@ func _add_cliffs() -> void:
 	var faces: Dictionary[Vector2i, Array] = {}
 	_cliff_edges.clear()
 	for cell: Vector2i in floor_cells:
-		var own := _corner_levels(cell)
-		if own[0] == 0 and own[1] == 0 and own[2] == 0 and own[3] == 0:
+		var own := _corner_heights(cell)
+		if maxf(maxf(own[0], own[1]), maxf(own[2], own[3])) <= _ground_bottom + Relief.EPSILON:
 			continue
 		for direction: Vector2i in sides:
 			var next := cell + direction
-			var theirs := PackedInt32Array([0, 0, 0, 0])
+			var theirs := PackedFloat32Array([0.0, 0.0, 0.0, 0.0])
 			if floor_cells.has(next):
-				theirs = _corner_levels(next)
+				theirs = _corner_heights(next)
+			elif water.has(next) and _relief_given:
+				theirs = _corner_heights(next)  # Down to the bed (decision 525).
 			elif water.has(next):
-				var level: int = _bed_levels.get(next, _height(next))
-				theirs = PackedInt32Array([level, level, level, level])
+				var level: float = _bed_levels.get(next, _elevation(next))
+				theirs = PackedFloat32Array([level, level, level, level])
 			var mine: Array = sides[direction][0]
 			var their: Array = sides[direction][1]
 			var top := Vector2(own[mine[0]], own[mine[1]])
-			var bottom := Vector2(mini(own[mine[0]], theirs[their[0]]), mini(own[mine[1]], theirs[their[1]]))
-			if top == bottom:
+			var bottom := Vector2(minf(own[mine[0]], theirs[their[0]]), minf(own[mine[1]], theirs[their[1]]))
+			if (top - bottom).length() <= Relief.EPSILON:
 				continue
 			_cliff_edges.append([cell, direction])
 			var chunk := Vector2i(floori(cell.x / float(FLOOR_CHUNK)), floori(cell.y / float(FLOOR_CHUNK)))
@@ -5224,7 +5377,7 @@ func _add_cliffs() -> void:
 				faces[chunk] = [PackedVector3Array(), PackedVector3Array(), PackedColorArray()]
 			var from := Vector2(cell + GROUND_CORNERS[mine[0]]) - Vector2(0.5, 0.5)
 			var to := Vector2(cell + GROUND_CORNERS[mine[1]]) - Vector2(0.5, 0.5)
-			_cliff_strip(faces[chunk], from, to, top * LEVEL_RISE, bottom * LEVEL_RISE, Vector3(direction.x, 0.0, direction.y))
+			_cliff_strip(faces[chunk], from, to, top, bottom, Vector3(direction.x, 0.0, direction.y))
 	var material := StandardMaterial3D.new()
 	material.vertex_color_use_as_albedo = true
 	material.roughness = 1.0
@@ -5427,7 +5580,7 @@ func _add_torch(cell: Vector2i) -> void:
 ## The base of an edge's wall: the higher of the cells it stands between.
 func _edge_base(key: Vector3i) -> float:
 	var cells := Terrain.edge_cells(key)
-	return maxi(_height(cells[0]), _height(cells[1])) * LEVEL_RISE
+	return maxf(_elevation(cells[0]), _elevation(cells[1]))
 
 
 func _add_wall(key: Vector3i) -> void:
@@ -6357,10 +6510,10 @@ func _add_post(vertex: Vector2i) -> void:
 		post = ArtKit.instance(slot)
 		post.scale.y = stretch
 	post.name = "Post_%d_%d" % [vertex.x, vertex.y]
-	var base := 0
+	var base := 0.0
 	for corner: Vector2i in [vertex, vertex - Vector2i(1, 0), vertex - Vector2i(0, 1), vertex - Vector2i(1, 1)]:
-		base = maxi(base, _height(corner))
-	post.position = Vector3(vertex.x - 0.5, base * LEVEL_RISE, vertex.y - 0.5)
+		base = maxf(base, _elevation(corner))
+	post.position = Vector3(vertex.x - 0.5, base, vertex.y - 0.5)
 	_room.add_child(post)
 	_posts[vertex] = post
 

@@ -48,6 +48,7 @@ func _ready() -> void:
 	_test_streams()
 	_test_tall_grass()
 	_test_rocks()
+	_test_relief()
 	_test_fire()
 	await _test_wall_runs()
 	_test_cave_walls()
@@ -1555,6 +1556,93 @@ func _test_fire() -> void:
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
 
+## The ground drawn from the relief (decision 525, terrain's side): levels/
+## sample's corners are Relief.corner_heights' (the sim's own derivation),
+## a point's height the triangle drawn there, each water body flat, the
+## camera lifted over a ridge and not on the flat; the castle (no relief.png)
+## drawn exactly as its whole levels.
+func _test_relief() -> void:
+	print("\n== relief: the ground drawn from the field, water level, the camera over a ridge ==")
+	var sample := Level.load_level("sample")
+	var terrain: Dictionary = sample["terrain"]
+	_check(terrain.get("relief_given", false), "the sample gives its ground in relief.png")
+	_rig.rebuild(terrain, sample["centre"])
+	var field: PackedFloat32Array = terrain["relief"]
+	var size: Vector2i = terrain["relief_size"]
+	var differ := []
+	for cell: Vector2i in _rig._corners:
+		if _rig._bed_levels.has(cell) or _rig._ramp_heights.has(cell) or _rig._wet.has(cell) or not Relief.on_map(size, cell):
+			continue
+		if _rig._corners[cell] != Relief.corner_heights(field, size, cell):
+			differ.append(cell)
+	_check(not _rig._corners.is_empty() and differ.is_empty(),
+			"each cell's corners are the sim's (Relief.corner_heights), off a ramp or under water (%d differ: %s)" % [differ.size(), differ.slice(0, 4)])
+	# A point's height: the triangle drawn there, its corners exactly at
+	# the corners; a sloped cell's middle between its lowest and highest.
+	var sloped := Vector2i(13, 14)
+	var h := _rig._corner_heights(sloped)
+	var corners_met := true
+	for c in 4:
+		var at := Vector2(sloped) - Vector2(0.5, 0.5) + Vector2(Client3D.GROUND_CORNERS[c])
+		corners_met = corners_met and absf(_rig._height_in(sloped, at) - h[c]) < 0.0001
+	var middle := _rig._tile_position(sloped).y
+	_check(corners_met and Array(h).max() - Array(h).min() > 0.1 and middle > Array(h).min() and middle < Array(h).max(),
+			"on a slope a thing stands on the ground drawn there (%s, middle %.2f)" % [h, middle])
+	var level := true
+	for body: MeshInstance3D in _rig._water_bodies:
+		var ys: Dictionary = {}
+		for point: Vector3 in (body.mesh as ArrayMesh).surface_get_arrays(0)[Mesh.ARRAY_VERTEX]:
+			ys[snappedf(point.y, 0.001)] = true
+		level = level and ys.size() == 1
+	_check(not _rig._water_bodies.is_empty() and level, "the sample's water (one surface) lies level (%d bodies)" % _rig._water_bodies.size())
+	# On hills the stream steps down its valley: its surface slopes with it,
+	# each corner its water cells' mean, and its bed lies under it.
+	var hills := Level.load_level("hills")
+	_rig.rebuild(hills["terrain"], hills["centre"])
+	var off_surface := 0
+	var heights_seen: Dictionary = {}
+	for body: MeshInstance3D in _rig._water_bodies:
+		for point: Vector3 in (body.mesh as ArrayMesh).surface_get_arrays(0)[Mesh.ARRAY_VERTEX]:
+			var vertex := Vector2i(roundi(point.x + 0.5), roundi(point.z + 0.5))
+			off_surface += 0 if absf(point.y - _rig._water_corner(vertex) - Client3D.WATER_LIFT) < 0.001 else 1
+			heights_seen[snappedf(point.y, 0.01)] = true
+	var dry_bed := []
+	for cell: Vector2i in _rig._wet:
+		var bed := _rig._corner_heights(cell)
+		for c in 4:
+			if bed[c] >= _rig._water_corner(cell + Client3D.GROUND_CORNERS[c]):
+				dry_bed.append(cell)
+				break
+	_check(off_surface == 0 and heights_seen.size() > 3 and dry_bed.is_empty(),
+			"a stream's surface slopes down its valley, each corner its water's mean, its bed under it (%d heights; off: %d; beds above: %s)" % [heights_seen.size(), off_surface, dry_bed.slice(0, 4)])
+	# The camera over a ridge: ground standing 6 m between the player and the
+	# camera lifts its pitch past the usual; none on the flat.
+	var at := Vector3(sloped.x, _rig._ground_height(Vector2(sloped)), sloped.y)
+	var flat := _rig.ridge_pitch(Vector3(4.0, _rig._ground_height(Vector2(4.0, 4.0)), 4.0))
+	var back := Vector2(1.0, 1.0).normalized().rotated(-deg_to_rad(_rig.yaw))
+	var had := _rig._corners.duplicate()
+	for d in range(3, 7):
+		var cell := Vector2i((Vector2(at.x, at.z) + back * d).round())
+		_rig._corners[cell] = PackedFloat32Array([at.y + 6.0, at.y + 6.0, at.y + 6.0, at.y + 6.0])
+	var lifted := _rig.ridge_pitch(at)
+	_rig._corners = had
+	_check(lifted > Client3D.CAMERA_PITCH and flat < Client3D.CAMERA_PITCH,
+			"the camera lifts over a ridge between it and the player (%.0f degrees), not on the flat (%.0f)" % [lifted, flat])
+	# The castle: no relief.png, its ground exactly its whole levels.
+	var castle := Level.load_level("castle")
+	_rig.rebuild(castle["terrain"], castle["centre"])
+	var off := []
+	for cell: Vector2i in _rig._corners:
+		if _rig._ramp_heights.has(cell) or _rig._bed_levels.has(cell):
+			continue
+		var whole := _rig._height(cell) * Client3D.LEVEL_RISE
+		if _rig._corners[cell] != PackedFloat32Array([whole, whole, whole, whole]):
+			off.append(cell)
+	_check(not castle["terrain"].get("relief_given", false) and off.is_empty(),
+			"the castle (no relief.png) drawn exactly as its whole levels (%d cells off: %s)" % [off.size(), off.slice(0, 4)])
+	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+
+
 ## levels/sample's outcrop (decision 513, terrain's side): its rocks drawn
 ## as rocks (a large one over a 2x2 clump, small ones on the rest), never a
 ## tree, on ground of their footing and no scatter; its slopes ramps in the
@@ -1580,7 +1668,7 @@ func _test_rocks() -> void:
 	var grounded := rocks.all(func(cell: Vector2i) -> bool:
 		var index: int = _rig._grounds.get(cell, -1)
 		return index >= 0 and index < _rig._ground_floor_end and _rig._ground_kinds[cell] == str(kinds.get(cell, "")) \
-				and _rig._corner_levels(cell)[0] == int(heights.get(cell, 0)))
+				and absf(Array(_rig._corner_heights(cell)).reduce(func(a: float, b: float) -> float: return a + b, 0.0) / 4.0 - _rig._elevation(cell)) < 0.3)
 	_check(no_tree and grounded, "no tree on a rock; its ground its footing, at its height (trees %s, ground %s)" % [no_tree, grounded])
 	var on_rock := false
 	for chunk: Vector2i in _rig._scatter_chunks:
@@ -1611,8 +1699,9 @@ func _test_rocks() -> void:
 			"each rock drawn, casting shadows (%s of %d cells)" % [counts, rocks.size()])
 	var stairs: Dictionary = terrain.get("stairs", {})
 	var ramps := slopes.all(func(cell: Vector2i) -> bool:
-		var levels := _rig._corner_levels(cell)
-		return stairs.has(cell) and Array(levels).max() == int(heights.get(cell, 0)) + 1 and Array(levels).min() == int(heights.get(cell, 0)))
+		var corners := Array(_rig._corner_heights(cell))
+		var top := maxf(_rig._elevation(cell + stairs.get(cell, Vector2i.ZERO)), _rig._elevation(cell) + 0.3)
+		return stairs.has(cell) and absf(corners.max() - top) < 0.25 and corners.max() - corners.min() >= 0.3)
 	_check(ramps and _rig._room.find_children("*tair*", "", true, false).is_empty(),
 			"a slope is a ramp in the ground, a level up its high side; nothing stair-like drawn")
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
@@ -1747,33 +1836,42 @@ func _test_streams() -> void:
 ## its cells is a rock face, at many levels.
 func _test_hills() -> void:
 	print("
-== hills: a rock face down every ledge, at every level ==")
+== hills: a rock face down every cliff, smooth slopes everywhere else ==")
 	var hills := Level.load_level("hills")
 	var terrain: Dictionary = hills["terrain"]
 	_rig.rebuild(terrain, hills["centre"])
 	var faces: Dictionary = {}
 	for edge: Array in _rig._cliff_edges:
 		faces[edge] = true
-	var heights: Dictionary = terrain["heights"]
 	var stairs: Dictionary = terrain["stairs"]
 	var floor_cells: Dictionary = {}
 	for cell: Vector2i in terrain["floor"]:
 		floor_cells[cell] = true
+	# A ledge is where the sim's rule says a step is a cliff (decision 525):
+	# each has its face; a walkable step down (a slope) has none.
 	var missing := []
-	var tops: Dictionary = {}
-	var drops: Dictionary = {}
+	var on_slopes := []
+	var ledges := 0
+	var slopes := 0
+	# A ford's or the water's bank is a lip down to its bed: not a slope's.
+	var wet: Array = terrain.get("water", []) + terrain.get("fords", []) + terrain.get("bridged", [])
 	for cell: Vector2i in floor_cells:
-		var level: int = heights.get(cell, 0)
+		var here := _rig._elevation(cell)
 		for direction: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
 			var next := cell + direction
-			if not floor_cells.has(next) or heights.get(next, 0) >= level or stairs.get(next) == -direction:
+			if not floor_cells.has(next) or _rig._elevation(next) >= here - Relief.EPSILON or stairs.get(next) == -direction 					or wet.has(cell) or wet.has(next):
 				continue
-			tops[level] = true
-			drops[level - int(heights.get(next, 0))] = true
-			if not faces.has([cell, direction]):
-				missing.append([cell, direction])
-	_check(missing.is_empty() and tops.size() >= 4 and drops.size() > 1,
-			"a face on each of %d ledges, from tops at levels %s, drops of %s (missing: %s)" % [faces.size(), tops.keys(), drops.keys(), missing.slice(0, 5)])
+			if Relief.cliff_between(here, _rig._elevation(next)):
+				ledges += 1
+				if not faces.has([cell, direction]):
+					missing.append([cell, direction])
+			else:
+				slopes += 1
+				if faces.has([cell, direction]):
+					on_slopes.append([cell, direction])
+	_check(ledges > 0 and missing.is_empty(), "a face down each of the %d cliff steps (missing: %s)" % [ledges, missing.slice(0, 5)])
+	_check(slopes > ledges * 4 and on_slopes.is_empty(),
+			"and none on the %d steps down a walkable slope: hills, not terraces (faces there: %s)" % [slopes, on_slopes.slice(0, 5)])
 
 
 func _test_heights() -> void:
@@ -1787,12 +1885,16 @@ func _test_heights() -> void:
 	_rig.rebuild(terrain, sample["centre"])
 	var stair: Vector2i = stairs.keys()[0]
 	var up: Vector2i = stairs[stair]
-	var low: int = terrain["heights"].get(stair, 0)
-	var rise := Client3D.LEVEL_RISE
-	_check(is_equal_approx(_rig._ground_height(Vector2(stair)), (low + 0.5) * rise)
-			and is_equal_approx(_rig._ground_height(Vector2(stair) - Vector2(up) * 0.49), (low + 0.01) * rise)
-			and is_equal_approx(_rig._ground_height(Vector2(stair) + Vector2(up) * 0.49), (low + 0.99) * rise),
-			"a puppet on a stair stands on its ramp: half up at its middle, nearly a level up at its top edge")
+	# In metres (decision 525): the stair's ground and the cell it climbs to.
+	var low := _rig._elevation(stair)
+	var high := _rig._elevation(stair + up)
+	if high <= low + Relief.EPSILON:
+		high = low + Client3D.LEVEL_RISE
+	var middle := _rig._ground_height(Vector2(stair))
+	_check(middle > low + 0.1 and middle < high - 0.1
+			and absf(_rig._ground_height(Vector2(stair) - Vector2(up) * 0.49) - low) < 0.15
+			and absf(_rig._ground_height(Vector2(stair) + Vector2(up) * 0.49) - high) < 0.06,
+			"a puppet on a stair stands on its ramp: part way up at its middle, at the cell above at its top edge (%.2f between %.2f and %.2f)" % [middle, low, high])
 	# The ramp's high corners are the upper cell's: one vertex shared.
 	var shared := false
 	var stair_index: int = _rig._grounds[stair]
@@ -1812,9 +1914,13 @@ func _test_heights() -> void:
 		var to := from + direction
 		if not _rig._grounds.has(to) or terrain["edges"].get(Terrain.edge_key(from, direction), Terrain.Edge.OPEN) == Terrain.Edge.WALL:
 			continue
-		var level: int = heights.get(from, 0)
-		var other: int = heights.get(to, 0)
-		if level == other or stairs.get(from) == direction or stairs.get(to) == -direction:
+		# A shore's lip over the water is a face (decision 525: shores stand
+		# over the surface); the water is not walked.
+		var wet: Array = terrain.get("water", []) + terrain.get("fords", []) + terrain.get("bridged", [])
+		if wet.has(from) or wet.has(to):
+			continue
+		# Walked: no cliff between them by the sim's own rule (decision 525).
+		if not Relief.cliff_between(_rig._elevation(from), _rig._elevation(to)) or stairs.get(from) == direction or stairs.get(to) == -direction:
 			walked.append(edge)
 	_check(not _rig._cliff_edges.is_empty() and walked.is_empty(),
 			"a rock face only on a ledge, none where the sim walks (%d faces; on walked edges: %s)" % [_rig._cliff_edges.size(), walked])
@@ -1824,7 +1930,7 @@ func _test_heights() -> void:
 	var sides := 0
 	for side: Vector2i in [Vector2i(up.y, up.x), -Vector2i(up.y, up.x)]:
 		var beside := stair + side
-		if not _rig._grounds.has(beside) or heights.get(beside, 0) != low:
+		if not _rig._grounds.has(beside) or absf(_rig._elevation(beside) - low) > Relief.EPSILON:
 			continue
 		sides += 1
 		var wanted := [stair_index, upper_index, _rig._grounds[beside]]
@@ -1839,9 +1945,9 @@ func _test_heights() -> void:
 			and _rig._room.find_children("Cliff_*", "", false, false).is_empty(),
 			"ledges are rock faces, a mesh a chunk; no stone boxes, no steps")
 	_rig.hover(stair, true)
-	var slope := Vector3(-up.x * rise, 1.0, -up.y * rise).normalized()
-	_check(absf(_rig._hover.position.y - (low + 0.5) * rise) < 0.05 and _rig._hover.basis.y.dot(slope) > 0.999,
-			"the hover outline lies on the ramp, tilted with it")
+	_check(absf(_rig._hover.position.y - _rig._ground_height(Vector2(stair))) < 0.05 and _rig._hover.basis.y.y < 0.995
+			and _rig._hover.basis.y.dot(Vector3(up.x, 0.0, up.y)) < 0.0,
+			"the hover outline lies on the ramp, tilted with it (leaning back from its top)")
 	_rig.hover(stair, false)
 	_rig.show_builder(Rect2i(stair - Vector2i.ONE, Vector2i(3, 3)), [[stair.x, stair.y, "grass"]])
 	var lowest := INF
@@ -1852,7 +1958,7 @@ func _test_heights() -> void:
 			for point: Vector3 in (mesh as ArrayMesh).surface_get_arrays(0)[Mesh.ARRAY_VERTEX]:
 				lowest = minf(lowest, point.y)
 				highest = maxf(highest, point.y)
-	_check(highest - lowest > rise * 0.9, "a builder ghost on the stair runs up its ramp (%.2f to %.2f)" % [lowest, highest])
+	_check(highest - lowest > (high - low) * 0.9, "a builder ghost on the stair runs up its ramp (%.2f to %.2f)" % [lowest, highest])
 	# A height the proposal changes: flat at the new height, lighter the higher (decision 356).
 	var beside := stair
 	_rig.show_builder(Rect2i(stair - Vector2i.ONE, Vector2i(3, 3)), [], [], Rect2i(), [[beside.x, beside.y, 5]])
@@ -1864,7 +1970,7 @@ func _test_heights() -> void:
 			for point: Vector3 in (mesh as ArrayMesh).surface_get_arrays(0)[Mesh.ARRAY_VERTEX]:
 				tops.append(point.y)
 			colours.append(((node as MeshInstance3D).material_override as StandardMaterial3D).albedo_color)
-	_check(not tops.is_empty() and tops.all(func(y: float) -> bool: return absf(y - 5 * rise - Client3D.ON_FLOOR * 2.0) < 0.01)
+	_check(not tops.is_empty() and tops.all(func(y: float) -> bool: return absf(y - 5 * Client3D.LEVEL_RISE - Client3D.ON_FLOOR * 2.0) < 0.01)
 			and colours.size() == 1 and colours[0].v > Client3D.BUILDER_LOW.v,
 			"a cell raised to 5 in the ghost: flat at 5, lighter than the ground's tint (%s)" % [colours])
 	_rig.clear_builder()

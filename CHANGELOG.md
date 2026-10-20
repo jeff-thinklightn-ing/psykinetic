@@ -7,6 +7,9 @@ notes (decision 324).
 
 ## Unreleased
 
+- Hills are drawn (525): the ground follows its heights in smooth slopes, with rock faces only where it is too steep to walk; streams step down their valleys, things stand on the slope, and the camera tilts up to see you over a ridge.
+- The smith's forge is rebuilt as a hearth of coursed stone with a glowing coal bed under a sooty hood and chimney.
+- Town workers can make a living (528): the store never pays a tanner or weaver less than their materials cost plus a fee for the work. Shepherds, haulers, tanners, weavers and cooks get a small daily wage from the town when trade is slow. Mending and tool work by the town's rich is taxed more to help pay for it.
 ## v0.1.158
 
 - This version changes what goes over the network, so v0.1.157 and older can't join the server: update through the launcher first.
