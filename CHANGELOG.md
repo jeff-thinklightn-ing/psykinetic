@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The town well is made by hand (Jeff: "we owe the town well a hand made pass - its auto slop"): a ring of coursed stone with a flat coping and water inside, two posts and a crossbeam, a windlass with its crank, a rope and a bucket, and a small pitched roof, in big clean shapes; client art only.
 - The conversation panel no longer offers canned questions at the bottom (Jeff: they read the same from everyone); you talk by typing in the say line, as before, and the panel keeps the exchange, their offers and what you owe them.
 - Landing tests check the CHANGELOG first (539): a released section must read as its tag has it, and no bullet may stand both under Unreleased and in a release; tools only.
 - The grass is green again (532): fresher and brighter, nearer the early builds' greens with its texture still showing, the dirt a warmer brown and the tufts and flowers matching the lawn.

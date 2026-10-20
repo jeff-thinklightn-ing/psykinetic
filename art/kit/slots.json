@@ -1281,7 +1281,7 @@
 			"footprint": [1, 1],
 			"size": [1.4, 2.4, 1.4],
 			"budget": 800,
-			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/building.well/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c3's 800 mesh scaled x/z 0.65 to the 1.4 box, the roof above 1.8 m cut out as its part (pivot 0, 1.8, 0), stone rim, timber posts and roof, 646 tris"},
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-19", "notes": "rebuilt by hand in big clean planes (Jeff, 2026-10-19: \"we owe the town well a hand made pass - its auto slop\"; art-gen's c3 fit was lumpy stone and splintered timbers): a ring of grey stone in three staggered courses, each block a little proud or sunk, a flat coping, dark water down the shaft; two posts set in the ring, a crossbeam, a windlass with rope on its drum and a crank on +x, the rope down to a hanging bucket with water in it; the little pitched roof, two planked slopes in three stepped courses with a ridge board and gable boards, its part \"roof\" (origin at (0, 1.8, 0)); 752 tris"},
 			"uses": "a well, 1 x 1 cell, a whole piece standing in the open: its rim and posts the body, its little roof a part (no floor; nothing to walk into)",
 			"grey": [
 				{"at": [0, 0.4, 0], "size": [1.2, 0.8, 1.2]},

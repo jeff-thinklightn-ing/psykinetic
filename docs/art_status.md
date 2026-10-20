@@ -44,7 +44,7 @@ Drawn as a grey box (a texture slot: terrain's procedural colour).
 | `building.house` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
 | `building.hut` | 1 | art-kit, by hand | own | 2026-10-18 |
 | `building.shed` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
-| `building.well` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
+| `building.well` | 1 | art-kit, by hand | own | 2026-10-19 |
 | `chimney.stone` | 1 | art-kit, by hand | own | 2026-10-18 |
 | `creature.boar` | 1 | art-gen (mesh), pc-character (rig fit); rig and clips Quaternius | own (mesh); CC0 1.0 (the Quaternius Pig's rig and clips, docs/licenses/quaternius-cc0_2026-10-15.txt) | 2026-10-15 |
 | `creature.cow` | 2 | Quaternius (mesh, rig and clips), pc-character (fitted to the slot, recoloured onto the palette) | CC0 1.0 (Quaternius, Ultimate Animated Animal Pack: Cow; variant 2 Bull, docs/licenses/quaternius-cc0_2026-10-15.txt) | 2026-10-18 |
