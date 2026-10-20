@@ -93,6 +93,13 @@ var _bought: Dictionary = {}
 ## The day (now / day_steps) caravans were last thought of, and the
 ## market's buying last eased.
 var _trade_day := -1
+## The temple's alms by town (decision 546): the offerings for being
+## brought back, paying the priest's wage first, the rest the altar's.
+var _alms: Dictionary = {}
+## The gold laid below at the barrow's altar by town (546), and the day it
+## last went down (-1: never).
+var _below: Dictionary = {}
+var _down_day: Dictionary = {}
 ## The day of the last wage floor turn (decision 528), -1 before the first.
 var _floor_day := -1
 ## What each worker the town owes is owed for: worker id -> [resource]
@@ -849,6 +856,96 @@ func _floor_turn() -> void:
 		var now_owed := int(production.worker(id).get("owed", 0)) - owed
 		print("[economy] %s the %s earned %d: the wage floor's %d more, %d paid and %d owed, step %d" % [who["name"], trade, earned, short,
 			short - now_owed, now_owed, now()])
+
+
+# --- The temple's offering and the gold below (decision 546) -------------------------
+
+## Player [param player_id] makes the offering for being brought back at
+## [param town]'s temple (Jeff's crypt.md: "a gold offering, until
+## blessed"): return.offering, or what they hold if less (they are brought
+## back anyway), into the town's alms; nothing when [param waived] (the
+## fallen carries return.waived_by, the draugr's mark). A companion's is
+## her player's to pay. Spending, the only way a player loses gold. The
+## gold paid.
+func temple_offering(town: String, player_id: String, waived: bool, for_name := "") -> int:
+	if waived or town.is_empty() or player_id.is_empty():
+		return 0
+	var paid := mini(int(rules.get("return", {}).get("offering", 0)), gold(player_id))
+	if paid <= 0:
+		return 0
+	add_gold(player_id, -paid, "an offering at the temple%s" % (" for " + for_name if not for_name.is_empty() else ""))
+	_alms[town] = int(_alms.get(town, 0)) + paid
+	stockpile.note(town, "gold", paid, "alms:%s" % player_id, "alms at the temple, %d" % paid)
+	return paid
+
+
+## [param town]'s alms held at the temple.
+func alms(town: String) -> int:
+	return int(_alms.get(town, 0))
+
+
+## Production.wage_from: the priest's wage paid from [param town]'s alms
+## first (decision 546), as far as they go; other officials' never. The
+## part paid.
+func wage_from_alms(town: String, _id: String, trade: String, wage: int) -> int:
+	if trade != str(rules.get("return", {}).get("places", {}).get("temple", {}).get("trade", "priest")):
+		return 0
+	var paid := mini(wage, alms(town))
+	_alms[town] = alms(town) - paid
+	return paid
+
+
+## The priest's wage for a day, kept back in the alms for him.
+func _priest_day(town: String) -> int:
+	var trade := str(rules.get("return", {}).get("places", {}).get("temple", {}).get("trade", "priest"))
+	var rule: Dictionary = rules.get("official", {}).get(trade, {})
+	if rule.is_empty() or not production.worker_ids(town).any(func(id: String) -> bool: return trade in production.worker(id)["trades"]):
+		return 0
+	return ceili(float(rule.get("wage", 0)) * DayNight.day_steps / maxf(float(rule.get("every", 54000)), 1.0))
+
+
+## The altar's gold of [param town]: its alms above a day of the priest's
+## wage, waiting to go down (npc's runner, 546).
+func altar_gold(town: String) -> int:
+	return maxi(alms(town) - _priest_day(town), 0)
+
+
+## Takes the altar's gold of [param town] for a run down: the gold taken.
+func take_altar(town: String) -> int:
+	var taken := altar_gold(town)
+	_alms[town] = alms(town) - taken
+	return taken
+
+
+## [param amount] laid at [param town]'s barrow altar (a run, or a player
+## keeping Aldous's promise): the gold below, the day it went down.
+func altar_down(town: String, amount: int) -> void:
+	if amount <= 0:
+		return
+	_below[town] = below_gold(town) + amount
+	_down_day[town] = now() / maxi(DayNight.day_steps, 1)
+	print("[economy] %d gold laid at %s's altar below, %d there now, step %d" % [amount, town, below_gold(town), now()])
+
+
+## The gold at [param town]'s barrow altar.
+func below_gold(town: String) -> int:
+	return int(_below.get(town, 0))
+
+
+## The day gold last went down to [param town]'s altar, -1 for never
+## (the creep reads it: enemy-ai's).
+func last_down_day(town: String) -> int:
+	return int(_down_day.get(town, -1))
+
+
+## Robbers or a player lift [param amount] from [param town]'s altar: what
+## was there to take.
+func lift_below(town: String, amount: int) -> int:
+	var taken := clampi(amount, 0, below_gold(town))
+	_below[town] = below_gold(town) - taken
+	if taken > 0:
+		print("[economy] %d gold lifted from %s's altar below, %d left, step %d" % [taken, town, below_gold(town), now()])
+	return taken
 
 
 ## Whether worker [param id] holds an official job the town pays
@@ -1689,7 +1786,7 @@ func pay_commission(player_id: String, town: String, gold_owed: int) -> int:
 func to_dict() -> Dictionary:
 	return {"purses": _purses.duplicate(), "log": _log.duplicate(true), "paid": _paid.duplicate(true), "hauled": _hauled.duplicate(),
 		"player_owed": _player_owed.duplicate(true), "apprentice_paid": _apprentice_paid.duplicate(), "funds": _funds.duplicate(true),
-		"caravans": _caravans.duplicate(true), "bought": _bought.duplicate(true), "trade_day": _trade_day, "floor_day": _floor_day, "landed": _landed.duplicate(), "owed_what": _owed_what.duplicate(true),
+		"caravans": _caravans.duplicate(true), "bought": _bought.duplicate(true), "trade_day": _trade_day, "floor_day": _floor_day, "alms": _alms.duplicate(), "below": _below.duplicate(), "down_day": _down_day.duplicate(), "landed": _landed.duplicate(), "owed_what": _owed_what.duplicate(true),
 		"commissions": _commissions.duplicate()}
 
 
@@ -1715,6 +1812,12 @@ func from_dict(saved: Dictionary) -> void:
 					_bought[str(market)][str(what)] = maxf(float(bought[market][what]), 0.0)
 	_trade_day = int(saved.get("trade_day", -1))
 	_floor_day = int(saved.get("floor_day", -1))
+	for key: String in ["alms", "below", "down_day"]:
+		var each: Variant = saved.get(key, {})
+		if each is Dictionary:
+			var into: Dictionary = {"alms": _alms, "below": _below, "down_day": _down_day}[key]
+			for town: Variant in each:
+				into[str(town)] = int(each[town])
 	var owed_what: Variant = saved.get("owed_what", {})
 	if owed_what is Dictionary:
 		for id: Variant in owed_what:

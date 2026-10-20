@@ -79,6 +79,10 @@ var hunt := Callable()
 ## (town, site place) -> the kind caught: a hunter hunting at the town's
 ## hunting ground (decision 521); hunt's at the store without one.
 var hunt_at := Callable()
+## (town, worker id, trade, wage) -> the part of an official's wage paid
+## from elsewhere (Economy.wage_from_alms: the temple's alms pay the
+## priest first, decision 546); the treasury pays the rest.
+var wage_from := Callable()
 ## What each worker has earned by their work since Economy's last wage
 ## floor turn (decision 528): worker id -> gold; loans, founding gold,
 ## theft and the floor itself not counted, the town's debts to them
@@ -1005,6 +1009,14 @@ func _official_wages(at: int) -> void:
 		var town: String = worker_record["town"]
 		if wage <= 0:
 			continue
+		# The alms first, for the priest (decision 546).
+		var from_alms := clampi(int(wage_from.call(town, id, trade, wage)), 0, wage) if wage_from.is_valid() else 0
+		if from_alms > 0:
+			worker_record["purse"] = int(worker_record["purse"]) + from_alms
+			print("[production] %s the %s is paid %d gold from the alms, step %d" % [worker_record["name"], trade, from_alms, at])
+			wage -= from_alms
+			if wage <= 0:
+				continue
 		if stockpile.count(town, "gold") - wage < floor_gold or not stockpile.take(town, "gold", wage, "wage:%s" % id):
 			# Owed, as the wage floor is, and paid first when the treasury
 			# can (528 amended: "the town pays official jobs").

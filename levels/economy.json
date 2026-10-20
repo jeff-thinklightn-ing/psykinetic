@@ -59,7 +59,7 @@
 	"town_work": {"fee": 1, "per_steps": 600},
 	"contribute": {"gold_per_xp": 2},
 	"return": {
-		"steps": 600, "fee": 0, "give_up": 6000,
+		"steps": 600, "fee": 0, "give_up": 6000, "offering": 8, "waived_by": "draugr",
 		"places": {
 			"temple": {"trade": "priest", "names": ["Aldous", "Brother Cuth", "Osric", "Wendel"]},
 			"healers_hut": {"trade": "medicine_man", "outside": true, "names": ["Ned", "Old Tam", "Hob", "Gile"]}

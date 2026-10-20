@@ -47,6 +47,7 @@ func _ready() -> void:
 	_test_head_first()
 	_test_account()
 	_test_livings()
+	_test_offering()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -935,6 +936,45 @@ func _test_livings() -> void:
 	economy._pay_head_first()
 	_check(int(work.worker("s1")["owed"]) == shepherd, "gold comes in: the guard's debt paid before the shepherd's")
 	_check(int(work.worker("g1")["owed"]) == 0 and int(work.worker("g1")["purse"]) == wage, "the guard paid what he was owed, first")
+
+
+## The temple's offering (decision 546): a player brought back pays it
+## into the alms, waived by the draugr's mark; the alms pay the priest's
+## wage first, the rest is the altar's gold, taken down and laid below.
+func _test_offering() -> void:
+	print("
+== the temple's offering ==")
+	_now = 0
+	var clock := func() -> int: return _now
+	var stock := Stockpile.new({}, clock, ItemBook.new(clock))
+	var work := Production.new({}, stock, null, clock, _rules)
+	var economy := Economy.new({}, stock, work, clock, _rules)
+	work.wage_from = economy.wage_from_alms
+	var offering := int(_rules["return"]["offering"])
+	economy.add_gold("p1", 20)
+	economy.add_gold("p2", 3)
+	_check(economy.temple_offering(TOWN, "p1", false) == offering and economy.gold("p1") == 20 - offering and economy.alms(TOWN) == offering,
+		"brought back at the temple: %d gold into the alms" % offering)
+	_check(economy.temple_offering(TOWN, "p2", false) == 3 and economy.gold("p2") == 0, "one holding less pays what they hold")
+	_check(economy.temple_offering(TOWN, "p1", true) == 0 and economy.gold("p1") == 20 - offering, "the draugr's mark: no offering")
+	work.add_worker("pr", "Aldous", ["priest"], TOWN, "test", "steady")
+	var wage := int(_rules["official"]["priest"]["wage"])
+	var alms := economy.alms(TOWN)
+	_check(economy.altar_gold(TOWN) == alms - wage, "the altar's gold: the alms less a day of the priest's wage (%d)" % economy.altar_gold(TOWN))
+	var treasury := stock.count(TOWN, "gold")
+	work._official_wages(_now)
+	work._official_wages(_now + int(_rules["official"]["priest"]["every"]))
+	_check(int(work.worker("pr")["purse"]) == wage and stock.count(TOWN, "gold") == treasury and economy.alms(TOWN) == alms - wage,
+		"the priest paid from the alms, not the treasury")
+	var taken := economy.take_altar(TOWN)
+	_check(taken == alms - 2 * wage and economy.alms(TOWN) == wage and economy.last_down_day(TOWN) == -1,
+		"a run takes the altar's gold (%d), a day of the priest's wage kept back" % taken)
+	_now = 3 * DayNight.day_steps
+	economy.altar_down(TOWN, taken)
+	_check(economy.below_gold(TOWN) == taken and economy.last_down_day(TOWN) == 3, "laid at the altar below on day 3")
+	_check(economy.lift_below(TOWN, 100) == taken and economy.below_gold(TOWN) == 0, "robbers lift what is there, no more")
+	var saved := Economy.new(economy.to_dict(), stock, work, clock, _rules)
+	_check(saved.last_down_day(TOWN) == 3, "saved and loaded")
 
 
 func _check(ok: bool, what: String) -> void:

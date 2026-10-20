@@ -2303,6 +2303,7 @@ func _boot() -> void:
 	# Gathered and made raws bought by the store, materials by the makers (decision 498).
 	World.production.deliver = World.economy.deliver
 	World.production.buy_materials = World.economy.buy_materials
+	World.production.wage_from = World.economy.wage_from_alms
 	World.production.hunt_at = func(_town: String, site: Dictionary) -> String:
 		return World.herds.hunt_one(str(site["area"]), site["cell"]) if World.herds != null else ""
 	World.production.hunt = func(town: String) -> String:
@@ -7166,6 +7167,8 @@ func _on_returned(job: Dictionary) -> void:
 			else "a holy place"
 	var by := str(job.get("by", ""))
 	var was := World.zone
+	# The temple's offering (decision 546): its town's, from the job's workshop ("<town>:temple").
+	var temple_town := str(job.get("workshop", "")).get_slice(":", 0) if place.get("kind") == "temple" and cell != World.NO_CELL else ""
 	match str(job.get("who_kind", "")):
 		"player":
 			var record: PlayerRecord = _records.get(who)
@@ -7175,6 +7178,7 @@ func _on_returned(job: Dictionary) -> void:
 			if _players.has(peer):
 				return  # Back already (a rejoin).
 			record.hp = 0  # Full stats.
+			var offered := World.economy.temple_offering(temple_town, who, _offering_waived(record.marks), "") if World.economy != null else 0
 			if peer == 0:
 				# Not playing now: they come in there next time.
 				if cell != World.NO_CELL:
@@ -7189,7 +7193,8 @@ func _on_returned(job: Dictionary) -> void:
 				_join_player(peer, who, record.name, true, cell)
 			else:
 				travel(peer, area, "", {}, cell)
-			Net.broadcast_to([peer], "party", {"from": by, "text": "%s is brought back at %s by %s." % [record.name, where, by]})
+			Net.broadcast_to([peer], "party", {"from": by, "text": "%s is brought back at %s by %s%s." % [record.name, where, by,
+				", for an offering of %d gold" % offered if offered > 0 else ""]})
 		"companion":
 			var record: PlayerRecord = _records.get(who)
 			if record == null or record.companion.is_empty():
@@ -7199,6 +7204,9 @@ func _on_returned(job: Dictionary) -> void:
 			var with_them := is_instance_valid(player) and player.spawned
 			record.companion["alive"] = true
 			record.companion["hp"] = 0  # Full stats.
+			# Her player makes her offering, waived by her own mark (544).
+			var offered := World.economy.temple_offering(temple_town, who, _offering_waived(record.companion.get("marks", [])),
+				str(record.companion.get("name", ""))) if World.economy != null else 0
 			record.companion["tile"] = [cell.x, cell.y] if with_them and player.zone == area and cell != World.NO_CELL else null
 			if cell != World.NO_CELL:
 				# Her card takes it (293 amended): the one who brought her back.
@@ -7209,14 +7217,22 @@ func _on_returned(job: Dictionary) -> void:
 				World.enter_named(player.zone)
 				_join_companion(record, player)
 				if cell != World.NO_CELL:
-					Net.broadcast_to([peer], "party", {"from": by, "text": "%s is brought back at %s by %s." % [
-						record.companion.get("name", "Your companion"), where, by]})
+					Net.broadcast_to([peer], "party", {"from": by, "text": "%s is brought back at %s by %s%s." % [
+						record.companion.get("name", "Your companion"), where, by, ", for an offering of %d gold" % offered if offered > 0 else ""]})
 		"resident":
 			if World.production.worker(who).is_empty():
 				return
 			World.production.set_away(who, false)
 			print("[return] %s is back%s" % [World.production.worker(who)["name"], "" if cell == World.NO_CELL else " at %s by %s" % [where, by]])
 	World.enter(was)
+
+
+## Whether the temple's offering is waived for one carrying [param marks]
+## (a player's record.marks, a companion's own "marks": return.waived_by,
+## the draugr's mark, decisions 540 and 544).
+func _offering_waived(marks: Variant) -> bool:
+	var mark := str(World.production.rules.get("return", {}).get("waived_by", "draugr")) if World.production != null else "draugr"
+	return marks is Array and mark in (marks as Array)
 
 
 func _respawn_due_players(tick: int) -> void:

@@ -16481,3 +16481,42 @@ Solidify 0.008, at its 0.96 m; QuadriFlow fails on it, so collapsed to 6,000 tri
 then fitted as before: 5,975 triangles, its paint baked back. The fit still cuts the faces
 where the remesh fused its hands to its thighs (25), which leaves small openings there, and
 the dark patch at its thighs in the jog stays (it is in its paint).
+
+## 546. The temple's offering, the alms and the gold below
+
+Jeff's crypt.md (2026-10-19): "Brought back at the temple: a gold
+offering, until blessed; free after", "the offering is all the gold
+people pay Aldous to be brought back", the alms "the gold that goes
+down". Designed with npc (its runner, Aldous's secrets and quests are
+"546, npc's side"), with dungeon's barrow (542) and its draugr mark (540)
+and companions' own mark (544); the coordinator's approval. On 396 (the
+fallen brought back) and 528 amended (the officials' wage).
+- The offering: brought back at a temple (not the healer's hut, free
+  until Jeff says), a player pays return.offering (8), or what they hold
+  if less, and is brought back anyway (Economy.temple_offering, from
+  Main._on_returned); a companion's is her player's to pay. Waived when
+  the fallen carries return.waived_by ("draugr"): a player's
+  PlayerRecord.marks (540), a companion's own record.companion "marks"
+  (544), not her player's (Main._offering_waived). Residents never pay.
+  Spending, the only way a player loses gold. The party line says it: "X
+  is brought back at the temple by Aldous, for an offering of 8 gold" (an
+  existing message's text: protocol unchanged).
+- The alms (Economy "alms", saved, per town): the offerings, which the
+  ledger calls alms, never the dead, so the secret holds. The priest's
+  wage is paid from them first (Production.wage_from ->
+  Economy.wage_from_alms), the treasury only for the rest. The altar's
+  gold is the alms above a day of the priest's wage (altar_gold).
+- The gold below, as numbers (the barrow sleeps): take_altar(town) for a
+  run, altar_down(town, n) for what a run or a player lays at the altar,
+  below_gold(town), last_down_day(town) (the creep reads it: enemy-ai's),
+  lift_below(town, n) for robbers or players (dungeon or items, showing
+  below_gold as a pile in the Altar chest). Saved ("below", "down_day").
+- The "cheated" standing key Jeff asked about is born on npc's side here:
+  a player who keeps the offering Aldous gave them to take down.
+- Open for Jeff: the amount (8); whether the healer's hut charges;
+  whether the alms pay the priest first (built) or all go down (the
+  lore as written).
+Not yet measured in a soak: the soak's players don't fall. larder_test
+_test_offering (Economy and the priest's wage); Main's path is wired, not
+scene-tested.
+
