@@ -7,27 +7,28 @@ notes (decision 324).
 
 ## Unreleased
 
-- The smith's forge is rebuilt as a hearth of coursed stone with a glowing coal bed under a sooty hood and chimney.
-- Town workers can make a living (528): the store never pays a tanner or weaver less than their materials cost plus a fee for the work. Shepherds, haulers, tanners, weavers and cooks get a small daily wage from the town when trade is slow. Mending and tool work by the town's rich is taxed more to help pay for it.
+## v0.1.158
 
-- Signposts are rebuilt as a square post with two clean arrow boards.
-- Builder mode can cut a flat pad into a hillside for a building it stamps (stamp with pad), and only there (527 amended).
-- Bookshelves are rebuilt with shelves you can see and rows of books in leathers and muted colours.
-- The ground no longer looks like polygons (524): grass, dirt, stone and sand meet along soft, ragged edges that wander freely, and grass wears through the dirt in patches.
-- Beds are rebuilt in clean planks: a posted frame, a mattress and pillow, and a blue-grey wool blanket folded back.
-- While a building waits on something a town worker makes, such as the inn's leather, the worker makes it for the town from the store's materials and is paid a wage, even if he is too poor to buy the materials himself (522).
-
-- Dirt is soft, mottled earth instead of a patchwork of flat polygons.
-- Tables are rebuilt in clean planks: a planked top on cleats, square legs and stretchers.
-- Builder mode reads a level's relief: it refuses a building on ground that isn't flat (naming the cell off), counts a rise over 0.45 m as a cliff when it checks ways to work sites and things, shows the ground in half metres, and leaves shaping the ground to the editor (527).
+- This version changes what goes over the network, so v0.1.157 and older can't join the server: update through the launcher first.
 - The ground can now have real hills and valleys: an outdoor level's new relief.png gives each cell's height in centimetres. A gentle slope is walked (slower uphill, and wandering groups take the valleys), a steep one is a cliff to fall from, a ridge hides what lies behind it, buildings need level ground and water lies level under its banks. Levels without one play as before; the sample level has a gentle rise (525). Server and client: protocol 22.
 - The Hills level is remade as a real landscape: a valley with its stream, a ford and a bridge winding between rolling hills and a ridge, and a plateau with one sheer cliff and a long slope up its far side. The level editor paints the ground in metres with a raise, lower, smooth and flatten brush, lays hills, valleys and streams over an area, and levels a pad for a building (525).
+- Builder mode reads a level's relief: it refuses a building on ground that isn't flat (naming the cell off), counts a rise over 0.45 m as a cliff when it checks ways to work sites and things, shows the ground in half metres, and leaves shaping the ground to the editor (527).
+- Builder mode can cut a flat pad into a hillside for a building it stamps (stamp with pad), and only there (527 amended).
+- The ground no longer looks like polygons (524): grass, dirt, stone and sand meet along soft, ragged edges that wander freely, and grass wears through the dirt in patches.
+- Dirt is soft, mottled earth instead of a patchwork of flat polygons.
 - Fire looks like fire (523): torches and burning ground have flickering flames with rising embers and a faint wisp of smoke, and their light flickers and warms the ground around them. By day outdoors a torch's light fades to a glint.
-- Chests, crates and barrels are rebuilt in clean planks: a chest with a rounded lid, iron straps and a brass clasp, a crate with a framed, braced side, and a barrel with staves and iron hoops.
-- A torch that stands on its own is a pole packed upright in a ring of stones, its pitch-wrapped head ready for the flame.
 - Sharper sun shadows: a body's, a well's and a wall's shadows are clean shapes instead of speckled blobs (526).
+- Town workers can make a living (528): the store never pays a tanner or weaver less than their materials cost plus a fee for the work. Shepherds, haulers, tanners, weavers and cooks get a small daily wage from the town when trade is slow. Mending and tool work by the town's rich is taxed more to help pay for it.
+- While a building waits on something a town worker makes, such as the inn's leather, the worker makes it for the town from the store's materials and is paid a wage, even if they are too poor to buy the materials himself (522).
 - When gold comes in, a town now first pays what it owes whoever supplies the building it is waiting on, such as the tanner while the inn waits on leather (522).
 - A town no longer stands idle behind a building it can't get materials for (522): after two days it starts on the next building it can build, then goes back to the first once its materials come in.
+- The smith's forge is rebuilt as a hearth of coursed stone with a glowing coal bed under a sooty hood and chimney.
+- Signposts are rebuilt as a square post with two clean arrow boards.
+- Bookshelves are rebuilt with shelves you can see and rows of books in leathers and muted colours.
+- Beds are rebuilt in clean planks: a posted frame, a mattress and pillow, and a blue-grey wool blanket folded back.
+- Tables are rebuilt in clean planks: a planked top on cleats, square legs and stretchers.
+- Chests, crates and barrels are rebuilt in clean planks: a chest with a rounded lid, iron straps and a brass clasp, a crate with a framed, braced side, and a barrel with staves and iron hoops.
+- A torch that stands on its own is a pole packed upright in a ring of stones, its pitch-wrapped head ready for the flame.
 
 ## v0.1.157
 
