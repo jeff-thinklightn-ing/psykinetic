@@ -16383,3 +16383,20 @@ leaving its east wall through a door to the lair, the lair, the
 shortcut's nook with its sealed link, 540), for Jeff's sheets
 (--sample=barrow). labyrinth_test. No protocol change, no new class_name;
 no real level marked (542).
+
+Amended (Jeff: "even the rebuilt orc and kobold need a lot of tlc. I worked in blender for a
+couple hours on clean up"): the orc is now Jeff's cleaned mesh. The hand-redo kit gave him
+triangle soup: creature_finish.py saved the .blend from the .glb as imported, and glTF's
+export splits every vertex at each UV seam and flat normal, so the kit's Orc_work was 5,553
+loose triangles (16,697 vertices for 5,608 faces). His two hours were the weld and the remesh
+this pipeline should have done: merged (2,951 vertices, 23 open edges and 72 loose shells
+left), Solidify 0.02 inward (the single-sided sheets that showed through at the back and
+shoulders given thickness) and a voxel Remesh at 0.023 m removing what was disconnected (one
+closed surface); no vertex moved more than 5 mm. His stack evaluated at rest (75,160
+triangles, no UVs) is made a game body by build steps of pc-character's: its 12 stray shells
+dropped, collapsed to 10,000 triangles (QuadriFlow fails on it), unwrapped (Smart UV), the
+kit's paint baked across (Cycles, its colour only, from the kit's mesh in the same pose) and
+the kit's weights carried over (nearest face, on the same Armature). From here every body goes
+through tools/creature_clean.py (weld, loose shells dropped, Solidify, voxel remesh, its bits
+dropped and stairs smoothed, QuadriFlow to clean quads, Smart UV, the paint baked back: about
+4 s a body) before its rig and before any kit, and a kit's work mesh is the cleaned one.
