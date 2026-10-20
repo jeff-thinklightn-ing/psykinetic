@@ -17,6 +17,9 @@ set -u
 cd "$(dirname "$0")/.."
 tree="$(basename "$(pwd)")"
 if [ -z "${HEAVY_JOB_INSIDE:-}" ]; then
+	# The CHANGELOG first, no Godot, before any wait at the gate (decision
+	# 539): released sections as tagged, no bullet both unreleased and released.
+	python tools/changelog_check.py || { echo "LANDING TESTS: FAIL (CHANGELOG.md, decision 539: fix it as above)"; exit 1; }
 	echo "landing tests: through the heavy-job gate as $tree suite (decision 394)"
 	HEAVY_JOB_INSIDE=1 exec python tools/heavy_job.py run "$tree" suite -- bash tests/land.sh
 fi
@@ -40,6 +43,7 @@ part() {
 	echo "$([ "$code" -eq 0 ] && echo PASS || echo FAIL)  $name ${took}s"
 }
 part heavy_job_test python tests/heavy_job_test.py
+part changelog_check_test python tests/changelog_check_test.py
 # Started a little apart, as the suite starts its scenes (decision 530: Godots
 # launched in the same instant died at launch).
 part suite env PSYKINETIC_TEST_JOBS="$suite_jobs" bash tests/run.sh &
@@ -53,7 +57,7 @@ wait
 
 code=0
 failed=""
-for name in heavy_job_test suite net_test state_test server_boot_test; do
+for name in heavy_job_test changelog_check_test suite net_test state_test server_boot_test; do
 	read -r status took <"$LOGS/$name.status"
 	if [ "$status" -ne 0 ]; then
 		code=1
@@ -80,7 +84,7 @@ if [ -n "$failed" ]; then
 fi
 echo
 if [ "$code" -eq 0 ]; then
-	echo "LANDING TESTS: PASS (suite, net_test, state_test, server_boot_test, heavy_job_test; $(( $(date +%s) - started ))s)"
+	echo "LANDING TESTS: PASS (suite, net_test, state_test, server_boot_test, heavy_job_test, changelog_check_test; $(( $(date +%s) - started ))s)"
 else
 	echo "LANDING TESTS: FAIL ($failed; $(( $(date +%s) - started ))s)"
 fi

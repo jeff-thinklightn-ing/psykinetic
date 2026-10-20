@@ -13,6 +13,13 @@ $root = Split-Path $PSScriptRoot -Parent
 $tree = Split-Path $root -Leaf
 $gate = Join-Path $root 'tools\heavy_job.py'
 if (-not $env:HEAVY_JOB_INSIDE) {
+	# The CHANGELOG first, no Godot, before any wait at the gate (decision
+	# 539): released sections as tagged, no bullet both unreleased and released.
+	& python (Join-Path $root 'tools\changelog_check.py')
+	if ($LASTEXITCODE -ne 0) {
+		Write-Output "LANDING TESTS: FAIL (CHANGELOG.md, decision 539: fix it as above)"
+		exit 1
+	}
 	Write-Output "landing tests: through the heavy-job gate as $tree suite (decision 394)"
 	$env:HEAVY_JOB_INSIDE = '1'
 	try {
@@ -32,6 +39,9 @@ $started = Get-Date
 $gateTest = & python (Join-Path $root 'tests\heavy_job_test.py') 2>&1
 $gateOk = $LASTEXITCODE -eq 0
 Write-Output "$(if ($gateOk) { 'PASS' } else { 'FAIL' })  heavy_job_test"
+$changelogTest = & python (Join-Path $root 'tests\changelog_check_test.py') 2>&1
+$changelogOk = $LASTEXITCODE -eq 0
+Write-Output "$(if ($changelogOk) { 'PASS' } else { 'FAIL' })  changelog_check_test"
 $parts = [ordered]@{ suite = 'run.ps1'; net_test = 'net_test.ps1'; state_test = 'state_test.ps1'; server_boot_test = 'server_boot_test.ps1' }
 $running = @{}
 $env:PSYKINETIC_TEST_JOBS = "$suiteJobs"  # Only the suite reads it.
@@ -51,6 +61,10 @@ $failed = @()
 if (-not $gateOk) {
 	$failed += 'heavy_job_test'
 	$gateTest | Write-Output
+}
+if (-not $changelogOk) {
+	$failed += 'changelog_check_test'
+	$changelogTest | Write-Output
 }
 $done = @{}
 while ($done.Count -lt $parts.Count) {
@@ -86,7 +100,7 @@ Remove-Item $logs -Recurse -Force -ErrorAction SilentlyContinue
 $seconds = [int]((Get-Date) - $started).TotalSeconds
 Write-Output ''
 if ($failed.Count -eq 0) {
-	Write-Output "LANDING TESTS: PASS (suite, net_test, state_test, server_boot_test; ${seconds}s)"
+	Write-Output "LANDING TESTS: PASS (suite, net_test, state_test, server_boot_test, heavy_job_test, changelog_check_test; ${seconds}s)"
 	exit 0
 }
 Write-Output "LANDING TESTS: FAIL ($($failed -join ', '); ${seconds}s)"

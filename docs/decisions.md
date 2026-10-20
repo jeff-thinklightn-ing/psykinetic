@@ -16035,3 +16035,35 @@ flock.wool: 1 at 7 days, 2 at 14, the same a day either way, landed
 before 533 so the box never runs the longer seasons without it.
 farm_test _test_season_scale. Protocol unchanged.
 
+## 539. A landing checks the CHANGELOG before its tests
+
+On 2026-10-19 four bullets went in the wrong place. Economy's 522 and maps'
+amended 525 went into released sections (v0.1.157's, v0.1.158's), and
+terrain's forge and 528 bullets were left under Unreleased beside their
+released copies. A rebase keeps a bullet beside the heading it was next to,
+and a release cut moves that heading. Each slip ships wrong release notes or
+none.
+
+- tools/changelog_check.py, run first by tests/land.sh and land.ps1: no
+  Godot, before any wait at the gate. A failure names the bullet and what to
+  do ("move it under ## Unreleased"; "drop it: vX.Y.Z already carries it";
+  "make it as tagged"), and the landing fails.
+- The newest "## vX.Y.Z" section must read exactly as the same section in
+  tag vX.Y.Z's CHANGELOG.md, blank lines included (line ends as the
+  repository keeps them). At a cut the newest heading is not tagged yet
+  (the suite runs before release_client tags it): then the section below is
+  checked against its own tag.
+- No bullet line under ## Unreleased may also stand in a released section.
+- Tags are fetched first (git fetch -q --tags). A tag that cannot be had is
+  a warning, not a failure.
+
+tests/changelog_check_test (in the landing, beside heavy_job_test): today's
+shapes (a bullet put in the newest section; one amended there; a stray blank
+line; the forge and an older bullet under Unreleased twice; a cut, clean and
+with a slip below; no tags; unreadable tags). Replayed over the day's 83
+CHANGELOG commits on main it names every slip above, at the commits that made
+them, and passes main as it is now.
+
+Rejected: checking every released section against its tag (each tag holds only
+the sections up to its own; older ones are kept by the newest's check at
+their time); a pre-commit hook (hooks are per clone and nobody's is set).
