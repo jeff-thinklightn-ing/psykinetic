@@ -16300,3 +16300,20 @@ ui_test: four turns (a cell to the north draws where the view puts
 north, a body facing north points the same way), the you mark's facing.
 Shots at two yaws with the body facing the same way. Client only;
 protocol unchanged; no new class_name.
+
+## 542, maps' side: the barrow's two ways in from the wilds
+
+For dungeon's barrow (542; the coordinator approved its design and the
+mound's place), in levels/wilds, both closed (463) until dungeon's 542
+brings levels/barrow and takes "closed" off these two entries:
+
+- The mound's door: a link at (236, 186), on the grass north-east of the
+  temple toward the forest, to barrow "from_wilds"; spawn point
+  "from_barrow" at (236, 187), just south of it. A plain link for now (a
+  building.mound slot when art has one).
+- The shortcut's temple end: a link at (217, 193), right behind the
+  temple (its back wall at y 194), to barrow "from_temple", "sealed":
+  "draugr" (dungeon's 540: walked only by a player marked so, and closed to
+  the world map's groups); spawn point "from_barrow_shortcut" at (217, 192).
+- Nothing else of the wilds changed (layout.png's two link pixels, the
+  level.json entries).

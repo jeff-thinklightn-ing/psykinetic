@@ -35,6 +35,14 @@
 		"from_forest": [
 			237,
 			128
+		],
+		"from_barrow": [
+			236,
+			187
+		],
+		"from_barrow_shortcut": [
+			217,
+			192
 		]
 	},
 	"links": [
@@ -61,6 +69,25 @@
 			],
 			"to_map": "forest",
 			"to_spawn": "from_wilds"
+		},
+		{
+			"at": [
+				236,
+				186
+			],
+			"to_map": "barrow",
+			"to_spawn": "from_wilds",
+			"closed": true
+		},
+		{
+			"at": [
+				217,
+				193
+			],
+			"to_map": "barrow",
+			"to_spawn": "from_temple",
+			"sealed": "draugr",
+			"closed": true
 		}
 	],
 	"entities": [
