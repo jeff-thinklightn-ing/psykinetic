@@ -12,6 +12,10 @@
 		}
 	},
 	"overrides": {
+		"item.barrow_half": {"origin": "centre",
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-20", "notes": "the barrow coin cut in two (decision 544, items' slot; the companions' blessing): one coin of plundered grave gold 0.035 m across, 4 mm thick, cut along a jagged line on its diagonal so each half fills the 0.03 x 0.03 box; the player's half (the side x + y > 0), built from the same cut as item.return_token so the two edges match; a raised rim on both faces, a stamped boss on the front, the fresh cut brighter than the worn gold; 106 tris"}},
+		"item.return_token": {"origin": "centre",
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-20", "notes": "the barrow coin cut in two (decision 544, items' slot; the companions' blessing): one coin of plundered grave gold 0.035 m across, 4 mm thick, cut along a jagged line on its diagonal so each half fills the 0.03 x 0.03 box; the companion's half (the side x + y < 0), built from the same cut as item.barrow_half so the two edges match; a raised rim on both faces, a stamped boss on the front, the fresh cut brighter than the worn gold, this half a shade darker; 106 tris"}},
 		"item.bow": {"origin": "centre",
 			"source": {"by": "art-kit, by hand from art-gen's c2", "tool": "blender", "license": "own", "date": "2026-10-17",
 				"notes": "N:/assets/candidates/item.bow/notes.md (Jeff: \"c2 bow\"): c2's 500 mesh came out as 171 crumbs, so rebuilt by hand from its concept: the limb's centre line traced off it, a rectangular limb tapering to squared tips that kick back, the grip a dark leather wrap between two bands; 196 tris"},
