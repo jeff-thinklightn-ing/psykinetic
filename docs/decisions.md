@@ -15975,3 +15975,16 @@ scatter.gdshader).
 Rejected: saturation and value alone (the grass went lime: its texture is
 yellow-green at heart); the same lift on the dirt (an orange overshoot); a
 grade over the whole frame (it would tint the walls, people and sky too).
+
+Amended (Jeff, earlier: the mesh route "lands the TRELLIS retargets"; the kobold under the veto
+rule, his in game or off kobold_529_beside_concept.png): the kobold the same way. Art-gen's
+mesh of his p1 (redo v7 c11, art-kit's hand fix without its loose shards) fitted by
+creature_fit.py (its tail rigid on the pelvis), finished by creature_finish.py, drawn in
+kobold_body.tres over kobold_paint.png; its skin the red to purple texels (skin_turn 0.2, then
+hue 0.02..0.27); its marks by body_marks.py (kobold_marks.png). MODELS' "sneak" "paint" in
+place of "parts", no posture (its mesh slouches as its concept does), its gaits measured
+(walk 0.39, jog 1.63, sprint 2.44; its backpedal as the generator's was to its jog).
+creature.kobold 1.11 x 0.96 x 0.85 m, body_material "kobold", no "middle" (0.41 m in front of
+its feet to 0.44 behind), its grey boxes re-measured. 2,327 triangles. view_test checks both
+in their paint. Known: its scar and hand are faint at its size; a dark patch shows at the
+thighs in the jog. The generator kobold (478) is the fallback, from 11a3f6af's parent.

@@ -52,7 +52,7 @@ Drawn as a grey box (a texture slot: terrain's procedural colour).
 | `creature.dog` | 2 | Quaternius (mesh, rig and clips), pc-character (fitted to the slot, recoloured onto the palette) | CC0 1.0 (Quaternius, Ultimate Animated Animal Pack: Husky; variant 2 ShibaInu, docs/licenses/quaternius-cc0_2026-10-15.txt) | 2026-10-18 |
 | `creature.donkey` | 1 | Quaternius (mesh, rig and clips), pc-character (fitted to the slot, recoloured onto the palette) | CC0 1.0 (Quaternius, Ultimate Animated Animal Pack: Donkey, docs/licenses/quaternius-cc0_2026-10-15.txt) | 2026-10-18 |
 | `creature.horse` | 2 | Quaternius (mesh, rig and clips), pc-character (fitted to the slot, recoloured onto the palette) | CC0 1.0 (Quaternius, Ultimate Animated Animal Pack: Horse; variant 2 Horse_White, docs/licenses/quaternius-cc0_2026-10-15.txt) | 2026-10-18 |
-| `creature.kobold` | 1 | pc-character (tools/body_gen.py, body_build.py --parts) | own | 2026-10-18 |
+| `creature.kobold` | 1 | art-gen (mesh and paint), pc-character (rig fit) | own (mesh and paint); CC0 1.0 (the UAL skeleton and clips, Quaternius) | 2026-10-19 |
 | `creature.orc` | 1 | art-gen (mesh and paint), pc-character (rig fit) | own (mesh and paint); CC0 1.0 (the UAL skeleton and clips, Quaternius) | 2026-10-19 |
 | `creature.pig` | 1 | art-gen (the boar's mesh), pc-character (rig fit; made a farm pig by tools/pig_from_boar.py) | own (mesh); CC0 1.0 (the Quaternius Pig's rig and clips, docs/licenses/quaternius-cc0_2026-10-15.txt) | 2026-10-18 |
 | `creature.rabbit` | 1 | art-gen (mesh), pc-character (rig and clips) | own | 2026-10-17 |

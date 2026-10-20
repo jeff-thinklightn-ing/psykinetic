@@ -2685,19 +2685,20 @@ func _test_allies() -> void:
 		heights.append(snappedf(top, 0.01))
 	_check(absf(heights[0] - 1.95) < 0.15 and absf(heights[1] - 1.0) < 0.1,
 			"an orc stands about 1.95 m, a kobold about 1 m (%s)" % [heights])
-	# The orc in its own paint (decision 529): art-gen's mesh in orc_body.tres, each its own
-	# by its name (painted_look), with no second hunch over its mesh's.
+	# The orc and the kobold in their own paint (decision 529): art-gen's meshes in
+	# <people>_body.tres, each its own by its name (painted_look), with no second hunch over
+	# its mesh's.
 	var painted := []
-	for orc: Monster in orcs:
+	for orc: Monster in orcs + [kobold]:
 		var puppet: Node3D = _rig._puppets[orc.get_instance_id()]
 		var body := (puppet.get_node("Body/Model") as Node3D).find_child("Body", true, false) as MeshInstance3D
 		var look: Dictionary = puppet.get_meta("painted_look", {})
 		painted.append(look)
-		_check(body != null and body.material_override == load(str(Client3D.MODELS["brute"]["paint"]))
+		_check(body != null and body.material_override == load(str(Client3D.MODELS[str(orc.spawn_spec["kind"])]["paint"]))
 				and look == Client3D.painted_look(String(orc.name))
 				and body.get_instance_shader_parameter("skin") == look["skin"] and body.get_instance_shader_parameter("mark") == look["mark"]
 				and (puppet.get_meta("rig") as AnimRig)._posture == null,
-				"an orc in its own paint, its look its name's (%s), no posture over its stance" % str(look.get("words", "")))
+				"a %s in its own paint, its look its name's (%s), no posture over its stance" % [orc.spawn_spec["kind"], str(look.get("words", ""))])
 	_check(painted[0] != painted[1], "two orcs differ")
 	# Their fidgets (Jeff: "the idle need variability"): their own, never the same twice
 	# running, timed by a generator of this run's (the name and _session_seed).

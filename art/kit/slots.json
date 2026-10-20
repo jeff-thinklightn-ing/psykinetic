@@ -2054,15 +2054,14 @@
 			"category": "creatures",
 			"type": "mesh",
 			"kind": "creature",
-			"size": [1.26, 1.0, 1.1],
-			"middle": [0, 0, -0.3],
+			"size": [1.11, 0.96, 0.85],
 			"tolerance": 0.15,
 			"clip_library": "res://art/models/animations/goblin.res",
 			"model": "res://art/models/characters/kobold.glb",
-			"body_material": "human",
-			"source": {"by": "pc-character (tools/body_gen.py, body_build.py --parts)", "tool": "blender", "license": "own", "date": "2026-10-18", "notes": "generated on the UAL skeleton, skinned, on the palette; clips the shared humanoid library (clip_library) through the UAL bone map (decision 416)"},
+			"body_material": "kobold",
+			"source": {"by": "art-gen (mesh and paint), pc-character (rig fit)", "tool": "Qwen-Image-2512, TRELLIS.2, blender (pc-character's tools/creature_fit.py, creature_finish.py)", "license": "own (mesh and paint); CC0 1.0 (the UAL skeleton and clips, Quaternius)", "date": "2026-10-19", "notes": "N:/assets/candidates/creature.kobold/notes.md (Jeff's pick p1, redo v7 c11; meshed by the goblin's recipe, art-kit's hand fix creature.kobold_p1_tq_10k_paint_fixed.glb, its loose shards gone); fitted arms down to the UAL skeleton by joints read off the mesh (creature_fit.py, distance weights, its tail rigid on the pelvis), posed to its T-pose rest; its paint art/models/characters/kobold_paint.png, drawn in kobold_body.tres (decision 529 amended)"},
 			"budget": 12000,
-			"uses": "the kobold, the sneak's body (decision 416; Jeff's pick p1 of art-gen's redo v7, a sleek scaly climber): a long, thick whip tail, rigid on the pelvis, curling up at its tip (pc-character's v3), 0.252 m in front of the feet to 0.847 behind with it (pc-character's measure), so its box's middle sits 0.3 m behind its origin (\"middle\"): a rigged body (one Skeleton3D) on the UAL skeleton, made by pc-character's body_gen, skinned, in the game's \"human\" material (body_material; tinted light red, purple limbs and tail, a dark purple crest), its clips the shared humanoid library's (clip_library: goblin.res, played through art/models/bonemaps/ual.tres; none baked into the .glb) by the names listed (any one of a clip's names, after any prefix); front +z, origin between its feet, standing at rest in T-pose (the UAL's and the human bodies' rest), so x is its arm span; budget 12,000 (Jeff, 2026-10-18: \"kobold and orc poly counts are way too low\"; built at about 10,000)",
+			"uses": "the kobold, the sneak's body (decision 416; Jeff's pick p1 of art-gen's redo v7, a sleek scaly climber, light red to purple, its tail long): art-gen's TRELLIS mesh (decision 529 amended; Jeff's veto in game or off the sheet) rigged on the UAL skeleton (one Skeleton3D) by pc-character's creature_fit.py, its tail rigid on the pelvis, in its own paint: its one material \"kobold\" is drawn in Client3D's kobold_body.tres (the goblin's shader, 494), not the palette; its clips the shared humanoid library's (clip_library: goblin.res, played through art/models/bonemaps/ual.tres; none baked into the .glb) by the names listed (any one of a clip's names, after any prefix); front +z, origin between its feet, standing at rest in T-pose, so x is its arm span, hunched as its concept stands (0.41 m in front of the feet to 0.44 behind, pc-character's measure); 2,327 triangles of the budget's 12,000",
 			"clips": [
 				{"name": "idle", "names": ["idle", "idle_loop"], "required": true},
 				{"name": "walk", "names": ["walk", "walk_loop"], "required": true},
@@ -2072,11 +2071,11 @@
 				{"name": "death", "names": ["death01", "death02", "death"], "required": true}
 			],
 			"grey": [
-				{"at": [0, 0.76, 0], "size": [1.26, 0.08, 0.08]},
-				{"at": [0, 0.22, 0], "size": [0.3, 0.44, 0.25]},
-				{"at": [0, 0.62, 0], "size": [0.45, 0.4, 0.35]},
-				{"at": [0, 0.9, 0.132], "size": [0.22, 0.2, 0.24]},
-				{"at": [0, 0.35, -0.4985], "size": [0.1, 0.1, 0.697]}
+				{"at": [0, 0.65, 0.09], "size": [1.11, 0.1, 0.19]},
+				{"at": [0, 0.21, 0], "size": [0.4, 0.42, 0.3]},
+				{"at": [0, 0.6, 0], "size": [0.54, 0.33, 0.5]},
+				{"at": [0, 0.86, 0.2], "size": [0.27, 0.2, 0.42]},
+				{"at": [0, 0.28, -0.3], "size": [0.12, 0.12, 0.28]}
 			]
 		},
 		"ground.grass": {

@@ -555,7 +555,8 @@ const KOBOLD_SOCKETS := {"hand": 0.92, "hip": 0.12, "back": 0.1, "chest": 0.03}
 ## The orc's since its TRELLIS body (decision 529): its jog measured (3.35, its legs bent
 ## as its concept stands), its walk and sprint as the generator's were to its jog (0.82 of them).
 const ORC_GAITS: Array[Array] = [[CLIP_WALK, 0.86], ["Jog_Short", 3.35], ["Sprint_Short", 5.15]]
-const KOBOLD_GAITS: Array[Array] = [[CLIP_WALK, 0.46], ["Jog_Short", 1.82], ["Sprint_Short", 2.75]]
+## The kobold's since its TRELLIS body (529 amended), each measured.
+const KOBOLD_GAITS: Array[Array] = [[CLIP_WALK, 0.39], ["Jog_Short", 1.63], ["Sprint_Short", 2.44]]
 ## The imp is the Blood Rot goblin; the brute an orc and the sneak a kobold,
 ## allied peoples (decision 416), each body_gen's (decision 478) and drawn as a
 ## person is ("parts", a PersonLook of its "people"), or art-gen's mesh in its
@@ -569,7 +570,8 @@ const MODELS := {
 		"paint": "res://art/models/characters/orc_body.tres",
 		"fidgets": ORC_FIDGETS, "moves": HUMANOID_MOVES, "sockets": ORC_SOCKETS},
 	"sneak": {"scene": "res://art/models/characters/kobold.glb", "clips": "res://art/models/animations/goblin.res", "height": 1.0,
-		"faces": PI * 0.5, "by_mass": false, "gaits": KOBOLD_GAITS, "backpedal": 2.34, "parts": true, "people": "kobold",
+		"faces": PI * 0.5, "by_mass": false, "gaits": KOBOLD_GAITS, "backpedal": 2.10, "people": "kobold",
+		"paint": "res://art/models/characters/kobold_body.tres",
 		"fidgets": KOBOLD_FIDGETS, "moves": HUMANOID_MOVES, "sockets": KOBOLD_SOCKETS},
 }
 ## Each modelled monster is its own (_vary, seeded by its name, so every
