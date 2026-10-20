@@ -16556,3 +16556,57 @@ class_name. factions_test (on_sight, holds, no layer, a bad on_sight
 dropped), monster_test (_test_sides_on_sight: two sides at blows, the dead
 at a resident, the Blood Rot's kinds still at peace), world_map_test (the
 faction list).
+
+## 543. A WASD walk keeps to the server's queue
+
+Jeff, playing v0.1.158: "some rubber banding around movement near the town
+chests". The client shows each WASD step as it sends it, and the server
+walks the queue of steps sent on its own clock (42). Once the server fell
+behind on a held walk (a step it took late, a hauler in the way, a wrongly
+paced step: 3a3f5335 fixed the pace), it never caught up. Logged on both
+sides, every step had the same pace (3.75 ticks) but the server's queue held
+2 the whole walk. Each step went past its deadline (18's blend, 24's rule),
+was corrected, and dropped the shown steps the server still had queued; each
+of those came back as "the server moved it elsewhere". Measured in the wilds
+town by the chests: 39 to 73 corrections a minute. MovePrediction (client
+only, protocol unchanged):
+
+- The server's queue as the client has it: the WASD steps sent and not yet
+  seen taken (_sent, followed from _server_at). A correction shows them again
+  from the server's tile, as the server will walk them. A refused step, which
+  empties the server's queue (GridEntity._on_move_refused), forgets them, and
+  so does a move order (World.order_move).
+- A step past its deadline that the server simply has not taken yet (the
+  oldest unconfirmed, the walker still on its start) is waited for, at most
+  CATCH_UP_WAIT_STEPS (2) of its length, before it counts as a misprediction
+  as before.
+- A new step starts no earlier than the server's last confirmed step's end
+  (_server_done) plus the shown steps after it, less one step. More than a
+  step behind that, the step's deadline runs from when the server will take
+  it, and it is drawn up to CATCH_UP_STRETCH (half) of its length longer, so
+  the gap closes. With the server keeping up, that limit is a step or more in
+  the past and nothing changes: no new pause on a clean link.
+
+Bounds: a step is never drawn more than 1.5 times its length, and a late one
+is waited for at most two steps' length past its deadline. A 300 ms round
+trip with the server keeping up gives no corrections and no slower step
+(tests/prediction_test).
+
+Measured: the chest walk (tools-style repro: a local wilds server, a WASD
+client starting by the chests, keys held 0.5 to 2 s each, through
+net_proxy), corrections a minute, before (main with 3a3f5335) and after,
+two passes each:
+  clean link (rtt 22 ms): 73, 54 -> 2, 1 (back steps 149, 122 -> 11, 15)
+  wan (60 +-20 ms each way, 1% loss): 57, 16 -> 12, 3 (back 103, 37 -> 38, 22)
+What is left on wan: the client's first step at join (before the server takes
+steps), real refusals, and the link's losses.
+
+tests/prediction_test: MovePrediction against a scripted server, one-way
+trips each way and the server's tick clock: keeping up (40 ms), no
+corrections and no step stretched; the first step 5 ticks late, none (main:
+2, and still 2.67 ticks behind at the end), caught up to within a step; 12
+ticks late, past the wait, corrected once and no more; a 300 ms round trip,
+none corrected or slowed.
+
+Rejected: pausing a held walk until the server confirms (a stutter on every
+slow link); sending the held direction instead of steps (42's reasons stand).

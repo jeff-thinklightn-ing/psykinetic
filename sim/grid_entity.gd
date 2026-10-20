@@ -956,6 +956,7 @@ func _on_move_refused(refused: Vector2i, epoch: int) -> void:
 	# that the server gave up (World.ORDER_DROPPED): the server has dropped
 	# the order (Player._sim_tick, _pursue_action), so there is nothing left
 	# to predict.
+	_prediction.server_dropped_queue()  # A refused WASD step empties it (decision 543).
 	if refused == _prediction.target() or epoch == World.ORDER_DROPPED:
 		_prediction.give_up()
 	_prediction.rebase(tile, RECONCILE_BLEND_TICKS)

@@ -43,6 +43,14 @@ extends RefCounted
 ## How long past its expected confirmation (start + round trip) a shown step
 ## may stay unconfirmed before it counts as a misprediction.
 const RECONCILE_GRACE_TICKS := 4.0
+## A WASD step shown while the server is behind (decision 543) is drawn this
+## much longer at most, of its own length, so a backlog drains a little each
+## step instead of lasting the whole held walk.
+const CATCH_UP_STRETCH := 0.5
+## How long past its deadline a WASD step the server has not taken yet (it
+## still has the walker on the step's own start) is waited for, in steps of
+## its length, before it counts as a misprediction after all (decision 543).
+const CATCH_UP_WAIT_STEPS := 2.0
 ## Ticks a step toward a target that came within reach is eased back over.
 const REACH_SETTLE_TICKS := 1.5
 
@@ -85,6 +93,16 @@ var _following: WeakRef = null
 ## The walk was planned again (a step taken, a shorter way open) and is to
 ## be sent to the server (take_route_changed).
 var _route_changed := false
+## When the server will have done the last step it confirmed, on the clock,
+## as the client shows walks (a round trip ahead of the server's own time):
+## where a WASD step may start with the server keeping up (decision 543).
+var _server_done := -INF
+## WASD steps sent that the server has not been seen to take, in order: its
+## queue as this client has it (decision 543). A correction shows them again
+## from the server's tile, for the server walks them still.
+var _sent: Array[Vector2i] = []
+## The server's tile as last heard, where _sent's steps go on from.
+var _server_at := Vector2i.ZERO
 
 
 func _init(entity: GridEntity) -> void:
@@ -106,6 +124,7 @@ func is_active() -> bool:
 ## later and elsewhere (most of the corrections on the castle were that).
 func order(target: Vector2i, into_goal := true) -> Array[Vector2i]:
 	_following = null
+	_sent.clear()  # The server's queue goes with a move order (World.order_move).
 	_has_target = true
 	_target = target
 	_into_goal = into_goal
@@ -186,10 +205,28 @@ func step(direction: Vector2i) -> bool:
 	next.to_grid = Vector2(next.to)
 	next.start = start
 	next.duration = World.step_ticks(_entity, direction, at)
-	next.deadline = start + Net.rtt_ticks() + RECONCILE_GRACE_TICKS
+	# The server walks the queue of steps sent on its own clock: if it fell
+	# behind (a step it took late, a hauler in the way) a held walk would stay
+	# that far ahead of it, past every step's deadline, corrected over and over
+	# (decision 543; the wilds town's chests). Where the server should be by
+	# now: done with its last confirmed step and the shown ones after it.
+	# More than one step behind that, this step waits on it: confirmed later
+	# (the deadline from when the server will take it) and drawn a little
+	# longer (CATCH_UP_STRETCH), so the gap closes. Keeping up, this is a step
+	# or more in the past and nothing changes.
+	var server_takes := _server_done
+	for shown in _steps:
+		if not shown.confirmed:
+			server_takes += shown.duration
+	var behind := server_takes - start - next.duration
+	next.duration += clampf(behind, 0.0, next.duration * CATCH_UP_STRETCH)
+	next.deadline = maxf(start, server_takes) + Net.rtt_ticks() + RECONCILE_GRACE_TICKS
 	# Sent as it starts: never re-planned (see advance).
 	next.started = true
 	_steps.append(next)
+	if _sent.is_empty():
+		_server_at = _entity.tile
+	_sent.append(direction)
 	return true
 
 
@@ -235,6 +272,7 @@ func give_up() -> void:
 ## wherever it is now, then carry on toward the target from that tile.
 func rebase(server_tile: Vector2i, blend_ticks: float) -> void:
 	var from_grid := Iso.local_to_grid(position() if is_active() else _entity.position)
+	_taken(server_tile)
 	_steps.clear()
 	var blend := Step.new()
 	blend.from = server_tile
@@ -249,6 +287,25 @@ func rebase(server_tile: Vector2i, blend_ticks: float) -> void:
 	_steps.append(blend)
 	if _has_target:
 		_append_path(server_tile, _clock + blend.duration)
+		return
+	# WASD steps the server still has queued: shown again, from its tile on,
+	# as it will walk them (decision 543), not dropped to come back as more
+	# surprises one by one.
+	var at := server_tile
+	var start := _clock + blend.duration
+	for direction in _sent:
+		var again := Step.new()
+		again.from = at
+		again.to = at + direction
+		again.from_grid = Vector2(at)
+		again.to_grid = Vector2(again.to)
+		again.start = start
+		again.duration = World.step_ticks(_entity, direction, at)
+		again.deadline = start + Net.rtt_ticks() + RECONCILE_GRACE_TICKS
+		again.started = true
+		_steps.append(again)
+		at = again.to
+		start += again.duration
 
 
 ## Advances the clock. Returns true if a shown step has gone unconfirmed past
@@ -295,12 +352,51 @@ func advance(delta: float) -> bool:
 			continue
 		all_confirmed = false
 		if step.started and _clock > step.deadline:
+			if _server_behind(step):
+				break  # The ones after it wait on it too.
 			return true
 	var last: Step = _steps.back()
 	if all_confirmed and _clock >= last.start + last.duration:
 		_ended_at = last.start + last.duration
 		_steps.clear()
 	return false
+
+
+## A WASD step past its deadline that the server has simply not taken yet:
+## the oldest unconfirmed, the server still has the walker on its start
+## (behind on the queue of steps sent, not somewhere else), and not
+## CATCH_UP_WAIT_STEPS of its length overdue (decision 543). Correcting it
+## would drop steps the server is still to walk, each then a surprise.
+func _server_behind(step: Step) -> bool:
+	if _has_target or _entity.tile != step.from:
+		return false
+	for shown in _steps:
+		if not shown.confirmed:
+			return shown == step and _clock - step.deadline < step.duration * CATCH_UP_WAIT_STEPS
+	return false
+
+
+## The server refused a WASD step and emptied its queue (Player's
+## _take_queued_step): none of the steps sent is coming.
+func server_dropped_queue() -> void:
+	_sent.clear()
+
+
+## The server is on [param server_tile]: the sent steps that took it there,
+## followed from where it was, are taken; the rest it has still to walk. On
+## a tile they do not lead to (a push, a step refused), none are known.
+func _taken(server_tile: Vector2i) -> void:
+	if server_tile == _server_at:
+		return
+	var at := _server_at
+	for i in _sent.size():
+		at += _sent[i]
+		if at == server_tile:
+			_sent = _sent.slice(i + 1)
+			_server_at = server_tile
+			return
+	_sent.clear()
+	_server_at = server_tile
 
 
 ## The server's tile for the entity just changed to [param server_tile].
@@ -313,6 +409,10 @@ func reconcile(server_tile: Vector2i) -> bool:
 			if _steps[k].to == server_tile:
 				for confirmed in range(i, k + 1):
 					_steps[confirmed].confirmed = true
+				# The server started it a one-way trip ago; shown a round trip
+				# ahead, it is done a step's length after that (543).
+				_server_done = maxf(_server_done, _clock - Net.rtt_ticks() + _steps[k].duration)
+				_taken(server_tile)
 				return true
 		return false
 	# Everything is confirmed already; the same tile again is no surprise.
