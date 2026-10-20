@@ -16439,3 +16439,38 @@ stays a second guard: even switched on, a test run on the shared
 overlay writes nothing (Regen.may_write). level_test (the level, the
 mark, a generation, the switch and the console). layout.png is imported as an
 Image (its .import committed). Protocol unchanged, no new class_name.
+## 538. A screenshot key, for Jeff's feedback
+
+Jeff (2026-10-19, through the coordinator): "also a folder for screenshot
+feedback, I don't know how to upload screenshots here." Ui's, client
+only.
+
+- Keys action "screenshot", F12 by default, rebindable in the Options and
+  named in the controls list with its folder. Main.take_screenshot saves
+  the viewport as PNG in Main.screenshot_folder(): settings.cfg
+  screenshot_dir= when it exists or can be made (Jeff's NAS folder, shared
+  by his machines), else the game's own user://screenshots; a folder that
+  will not take the file (the share away) falls back to the game's own
+  and the talk log says so, never silently (release's ask). The file is
+  Main.screenshot_name: <zone>_<x>-<y>_<hour>h_<yyyymmdd-hhmmss>.png, the
+  zone's id, the player's cell, the game hour and the clock, no name or
+  id of anyone (release's ask). The talk log gets "Screenshot saved:
+  <path>"; the first time, a line at the top says the folder and how to
+  change it (hinted_shot=on, as the talk hint 453). The hint label is
+  shared (_show_top_hint).
+- Tests never write the shared user://screenshots: ui_test points
+  screenshot_dir at test_ports' scratch, and the game's own folder is
+  made only when a shot is saved there (release's ask).
+- --test-show=shot takes one a moment in, for the shot of the log line
+  and the hint.
+
+Protocol unchanged; no new class_name.
+
+## 535 amended: the big map stays north-up
+
+Maps' glance at 535: the big map is where the land is read as the level
+is laid out ("north of the square" in residents' and quests' words, the
+edges and links named by side, the editor's view), so it stays north-up;
+the corner map alone turns with the view (Minimap.turn is 0 while big),
+which is the play-feel Jeff asked for. The arrow carries the body's facing
+on both. A direction change queues no draw while the big map is open.

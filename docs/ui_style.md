@@ -148,6 +148,9 @@ and the inconsistencies the theme settles:
   ground.
 - **Builder mode** (B, `builder/builder_ui.gd`): 28-unit outlined light-blue status text,
   the engine's default LineEdit, both top-middle; the box's placeholder is a sentence.
+  Since 537: an Outlined coordinates line under them ("212, 207      you 210, 205") and
+  light-blue Label3D codes over each building ("H3 house"), the tool's own colour, outside
+  the colour sets; the cursor hint names a building when nothing else claims the cursor.
 - **Debug text** (F3): default 48-unit white text, no outline.
 - **First-run screen** (then `net/setup_screen.gd`, now `render/connect_screen.gd`, ConnectScreen): a dark backdrop, the engine's default
   Label, LineEdit and Button; a 66-unit title; the panel has no visible box. Connection

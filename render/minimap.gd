@@ -59,12 +59,14 @@ var marks: Callable = func() -> Array: return []
 ## (the same turn HudCompass makes, Main.screen_north): the map turns so
 ## that up on it is up on the screen (decision 535, Jeff: "the minimap
 ## should probably rotate with compass and map"). A change queues one
-## draw; standing still, nothing draws (482).
+## draw (none while the big map is open: it stays north-up, 535 amended);
+## standing still, nothing draws (482).
 var north_on_screen := Vector2.UP:
 	set(value):
 		if value.length() > 0.001 and not value.normalized().is_equal_approx(north_on_screen):
 			north_on_screen = value.normalized()
-			queue_redraw()
+			if not big:
+				queue_redraw()
 
 ## How often it has drawn, and the microseconds drawing took (map_bench).
 var draws := 0
@@ -220,9 +222,12 @@ func view(centre: Vector2) -> Dictionary:
 
 ## How far the map is turned on screen (radians, clockwise positive):
 ## from the level's north as the map holds it (World.north, a grid
-## direction) to where the view puts it (north_on_screen).
+## direction) to where the view puts it (north_on_screen). The corner map
+## alone: the big map stays north-up (535 amended, maps: the land is read
+## there as the level is laid out, "north of the square", the sides'
+## links, the editor's view).
 func turn() -> float:
-	return Vector2(World.north).angle_to(north_on_screen)
+	return 0.0 if big else Vector2(World.north).angle_to(north_on_screen)
 
 
 ## Where [param cell] (its middle) falls on screen in [param shown] (view()):

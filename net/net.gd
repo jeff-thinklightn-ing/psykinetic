@@ -416,6 +416,12 @@ var text_scale := 1.0
 var colours := "normal"
 ## The first-time talk hint was shown (hinted_talk=on).
 var hinted_talk := false
+## settings.cfg screenshot_dir=: where F12's screenshots go (decision 538; Jeff's
+## NAS folder), "" for the game's own user://screenshots. Kept as any
+## unknown key is.
+var screenshot_dir := ""
+## The first screenshot's hint (the folder) has been shown (hinted_shot=on).
+var hinted_shot := false
 ## How far round the player a grown forest's crowns are seen through
 ## (GrownTrees, decision 467; Jeff: "larger circle, probably even most of
 ## visible screen"): a share of the view's half-height, to the middle of its
@@ -795,6 +801,8 @@ func _apply_access_settings() -> void:
 		if UiTheme.COLOUR_SETS.has(set):
 			colours = set
 		hinted_talk = str(settings.get("hinted_talk", "off")) == "on"
+		screenshot_dir = str(settings.get("screenshot_dir", "")).strip_edges()
+		hinted_shot = str(settings.get("hinted_shot", "off")) == "on"
 		Keys.read(settings)  # key_<action>= (decision 453).
 	set_ui_scale(ui_scale, false)
 	set_text_scale(text_scale, false)
@@ -824,6 +832,13 @@ func set_text_scale(value: float, save := true) -> void:
 ## The one-time talk hint shown (Main), remembered.
 func set_hinted_talk(value: bool) -> void:
 	hinted_talk = value
+	save_view_settings()
+
+
+## The first screenshot's hint shown (decision 538), kept in settings.cfg.
+func set_hinted_shot(value: bool) -> void:
+	hinted_shot = value
+	_settings_kept["hinted_shot"] = "on" if value else "off"
 	save_view_settings()
 
 

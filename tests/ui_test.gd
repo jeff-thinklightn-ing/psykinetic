@@ -28,6 +28,7 @@ func _ready() -> void:
 	_test_converse_panel()
 	_test_sim_reads()
 	_test_minimap_turn()
+	_test_screenshot_key()
 	_test_counter_panel()
 	_test_world_map()
 	_test_access()
@@ -398,6 +399,10 @@ func _test_minimap_turn() -> void:
 		ahead = Minimap.to_screen((shown["centre"] as Vector2) - Vector2(0.5, 0.5) + north * 3.0, shown)
 		ok = ok and (ahead - middle).normalized().is_equal_approx(screen_north) and Minimap.on_screen(north, shown).is_equal_approx(screen_north)
 	_check(ok, "at four turns a cell to the north draws where the view puts north, and a body facing north points the same way")
+	map.north_on_screen = Vector2.RIGHT
+	map.big = true
+	_check(is_zero_approx(map.turn()) and is_zero_approx(float(map.view(Vector2(map.cells) / 2.0)["angle"])), "the big map stays north-up (535 amended, maps)")
+	map.big = false
 	map.north_on_screen = Vector2.UP
 	var player: GridEntity = _main._local_player()
 	if player != null:
@@ -406,6 +411,29 @@ func _test_minimap_turn() -> void:
 			if mark["kind"] == "you":
 				you = mark
 		_check(not you.is_empty() and you["facing"] == Vector2(player.facing), "the you mark's facing is the body's replicated facing, not the camera's")
+
+
+func _test_screenshot_key() -> void:
+	print("== the screenshot key (decision 538): the folder, its fallback, the file's name ==")
+	var ports := preload("res://tests/test_ports.gd")
+	var own := ports.scratch("screenshots")  # Never the shared user://screenshots (release's rule).
+	Net.screenshot_dir = own
+	_check(Main.screenshot_folder() == [own, ""] and DirAccess.dir_exists_absolute(own), "screenshot_dir= is used, made if missing")
+	var blocked := ports.scratch("shots_block")
+	var file := FileAccess.open(blocked, FileAccess.WRITE)
+	if file != null:
+		file.store_string("a file where a folder is wanted")
+		file.close()
+	Net.screenshot_dir = blocked.path_join("inside")
+	var fallen: Array = Main.screenshot_folder()
+	_check(fallen[0] == Main.DEFAULT_SCREENSHOT_DIR and str(fallen[1]).contains("can't be written"),
+		"a folder that can't be made falls back to the game's own and says so (%s)" % [fallen[1]])
+	Net.screenshot_dir = ""
+	_check(Main.screenshot_folder() == [Main.DEFAULT_SCREENSHOT_DIR, ""], "no setting: the game's own folder")
+	_check(Main.screenshot_name("wilds", Vector2i(217, 195), 14.6, "20261019-113005") == "wilds_217-195_14h_20261019-113005.png",
+		"the name: zone, cell, hour, clock; nobody's name or id")
+	_check(Keys.DEFAULTS["screenshot"] == KEY_F12 and Keys.WORDS.has("screenshot"), "F12 by default, in the Options' key rows")
+	Net.screenshot_dir = ""  # The save itself is a windowed run's (--test-show=shot); headless has no picture to take.
 
 
 func _test_counter_panel() -> void:
@@ -525,7 +553,7 @@ func _test_keys() -> void:
 	var today := {"open": KEY_E, "pack": KEY_I, "pick_up": KEY_F, "drop": KEY_G, "throw": KEY_T, "talk": KEY_ENTER,
 		"talk_log": KEY_TAB, "map": KEY_M, "lantern": KEY_L, "reset": KEY_R, "options": KEY_O, "hints": KEY_H,
 		"debug": KEY_F3, "fullscreen": KEY_F11, "builder": KEY_B, "phrase_1": KEY_1, "phrase_2": KEY_2,
-		"phrase_3": KEY_3, "phrase_4": KEY_4, "attack_friend": KEY_SHIFT}
+		"phrase_3": KEY_3, "phrase_4": KEY_4, "attack_friend": KEY_SHIFT, "screenshot": KEY_F12}
 	var same := Keys.DEFAULTS.size() == today.size()
 	for action: String in today:
 		same = same and int(Keys.DEFAULTS.get(action, -1)) == int(today[action])

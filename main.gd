@@ -436,6 +436,10 @@ var _test_converse_due := false
 var _draw_shown := false
 ## The one-time line the first time a townsperson is near (Net.hinted_talk), and when it goes.
 var _talk_hint: Label
+## Where F12's screenshots go unless settings.cfg says (decision 538).
+const DEFAULT_SCREENSHOT_DIR := "user://screenshots"
+## The last screenshot saved (F12), "" for none or a failure.
+var last_screenshot := ""
 ## Where the local player last stood and since which tick, for the cover
 ## cue (decision 515): stillness is this view's own count, since
 ## last_step_tick is stamped on the server alone.
@@ -914,6 +918,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if Keys.pressed(event, "fullscreen"):
 		Net.toggle_fullscreen()
+		return
+	if Keys.pressed(event, "screenshot"):
+		take_screenshot()
 		return
 	if Keys.pressed(event, "hints"):
 		toggle_hints()
@@ -7325,7 +7332,8 @@ func hint_lines() -> Array[String]:
 		"%s hold\tbandage an ally beside you, else yourself (a kit, out of combat)" % Keys.name_of("open"),
 		"RMB in pack\tuse it (eat, open a purse, bandage)",
 		"%s\ttalk (/w whisper)" % Keys.name_of("talk"), "%s\ttalk log" % Keys.name_of("talk_log"), "%s\tmap" % Keys.name_of("map"), "%s\tlantern" % Keys.name_of("lantern"),
-		"%s\treset the room" % Keys.name_of("reset"), "%s\toptions" % Keys.name_of("options"), "%s\tdebug" % Keys.name_of("debug"), "%s\tfullscreen" % Keys.name_of("fullscreen"), "%s\thide these" % Keys.name_of("hints")])
+		"%s\treset the room" % Keys.name_of("reset"), "%s\toptions" % Keys.name_of("options"), "%s\tdebug" % Keys.name_of("debug"), "%s\tfullscreen" % Keys.name_of("fullscreen"),
+		"%s\tscreenshot, saved under %s" % [Keys.name_of("screenshot"), ProjectSettings.globalize_path(str(screenshot_folder()[0]))], "%s\thide these" % Keys.name_of("hints")])
 	if Net.mode == Net.Mode.HOST:
 		lines.append("%s\tbuilder mode" % Keys.name_of("builder"))
 	return lines
@@ -8335,20 +8343,96 @@ func _first_talk_hint(player: Player) -> void:
 		return
 	for entity in World.townsfolk():
 		if entity is Resident and World.distance(entity.tile, player.tile) <= RESIDENT_EARSHOT + 2:
-			if _talk_hint == null:
-				_talk_hint = Label.new()
-				_talk_hint.theme_type_variation = &"Hud"
-				_talk_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-				_talk_hint.set_anchors_preset(Control.PRESET_CENTER_TOP)
-				_talk_hint.grow_horizontal = Control.GROW_DIRECTION_BOTH
-				_talk_hint.offset_top = 120
-				_talk_hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
-				$HUD.add_child(_talk_hint)
-			_talk_hint.text = "Click a townsperson to talk, or press %s" % Keys.name_of("open")
-			_talk_hint.visible = true
-			_talk_hint_until = Time.get_ticks_msec() / 1000.0 + 8.0
+			_show_top_hint("Click a townsperson to talk, or press %s" % Keys.name_of("open"))
 			Net.set_hinted_talk(true)
 			return
+
+
+## One line at the top of the screen for a few seconds (the first-time
+## hints: talking, 453; the screenshot folder, 538).
+func _show_top_hint(text: String) -> void:
+	if _talk_hint == null:
+		_talk_hint = Label.new()
+		_talk_hint.theme_type_variation = &"Hud"
+		_talk_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_talk_hint.set_anchors_preset(Control.PRESET_CENTER_TOP)
+		_talk_hint.grow_horizontal = Control.GROW_DIRECTION_BOTH
+		_talk_hint.offset_top = 120
+		_talk_hint.offset_left = -1100  # A box in the middle, clear of the compass and its place name; long lines wrap.
+		_talk_hint.offset_right = 1100
+		_talk_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		_talk_hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		$HUD.add_child(_talk_hint)
+	_talk_hint.text = text
+	_talk_hint.visible = true
+	_talk_hint_until = Time.get_ticks_msec() / 1000.0 + 8.0
+
+
+## Where screenshots go (decision 538) and a note when it is not the folder
+## asked for: settings.cfg screenshot_dir= when it exists or can be made,
+## else the game's own DEFAULT_SCREENSHOT_DIR with why (the NAS away). The
+## game's own folder is made only when a screenshot is saved there.
+static func screenshot_folder() -> Array:
+	var wanted := Net.screenshot_dir
+	if wanted.is_empty():
+		return [DEFAULT_SCREENSHOT_DIR, ""]
+	if DirAccess.dir_exists_absolute(wanted) or (_folder_makeable(wanted) and DirAccess.make_dir_recursive_absolute(wanted) == OK):
+		return [wanted, ""]
+	return [DEFAULT_SCREENSHOT_DIR, " (%s can't be written, so the game's own folder)" % wanted]
+
+
+## Whether [param path] could be made as a folder: some ancestor of it is
+## a folder, and no ancestor is a file. Asked before the engine's maker,
+## which prints an error for a folder it cannot make (a share away, a file
+## in the way), and an error line fails a test.
+static func _folder_makeable(path: String) -> bool:
+	var at := path
+	while not at.is_empty() and not DirAccess.dir_exists_absolute(at):
+		if FileAccess.file_exists(at):
+			return false
+		var up := at.get_base_dir()
+		if up == at or up.is_empty():
+			return false
+		at = up
+	return not at.is_empty()
+
+
+## A screenshot's file name (538): the zone, the player's cell, the game
+## hour and the clock; nothing of who took it.
+static func screenshot_name(zone_name: String, cell: Vector2i, hour: float, stamp: String) -> String:
+	return "%s_%d-%d_%02dh_%s.png" % [zone_name, cell.x, cell.y, int(hour), stamp]
+
+
+## F12 (decision 538, Jeff: "a folder for screenshot feedback"): the
+## viewport saved as PNG in screenshot_folder(), said in the talk log with
+## the path; the first time, the folder in a line at the top. A folder
+## that will not take the file falls back to the game's own and says so.
+func take_screenshot() -> void:
+	var player := _local_player()
+	var zone_name := World.zone.name if World.zone != null else map_name
+	var cell := player.tile if player != null else Vector2i.ZERO
+	var stamp := Time.get_datetime_string_from_system(false, false).replace("-", "").replace(":", "").replace("T", "-")
+	var file := screenshot_name(zone_name, cell, DayNight.hour(DayNight.now()), stamp)
+	var where := screenshot_folder()
+	var image := get_viewport().get_texture().get_image()
+	var usable := image != null and not image.is_empty()
+	var path := str(where[0]).path_join(file)
+	if where[0] == DEFAULT_SCREENSHOT_DIR:
+		DirAccess.make_dir_recursive_absolute(DEFAULT_SCREENSHOT_DIR)
+	var error := image.save_png(path) if usable else ERR_UNAVAILABLE
+	if error != OK and usable and where[0] != DEFAULT_SCREENSHOT_DIR:
+		where = [DEFAULT_SCREENSHOT_DIR, " (%s can't be written, so the game's own folder)" % where[0]]
+		DirAccess.make_dir_recursive_absolute(DEFAULT_SCREENSHOT_DIR)
+		path = DEFAULT_SCREENSHOT_DIR.path_join(file)
+		error = image.save_png(path)
+	last_screenshot = path if error == OK else ""
+	var shown := ProjectSettings.globalize_path(path)
+	if talk != null:
+		talk.add_line("Game", "Screenshot saved: %s%s" % [shown, where[1]] if error == OK
+				else "Screenshot not saved: %s (%s)" % [shown, error_string(error)], true, true)
+	if error == OK and not Net.hinted_shot:
+		_show_top_hint("Screenshots go to %s. Set screenshot_dir= in settings.cfg to send them elsewhere." % ProjectSettings.globalize_path(str(where[0])))
+		Net.set_hinted_shot(true)
 
 
 ## --test-show=converse: the panel on the nearest town's person, with sample
@@ -8434,6 +8518,8 @@ func _run_test_show(player: Player) -> void:
 					"working": [{"uid": 3, "id": "bow", "effect": "bless", "left": 900, "left_seconds": 90}],
 					"waiting": [{"uid": 4, "id": "shield", "effect": "bless"}]},
 					func(slot: int) -> String: return ["Wren's dagger", "hammer"][slot])
+			"shot":
+				get_tree().create_timer(3.0).timeout.connect(take_screenshot)  # The log line and the first-time hint, in the shot.
 			"world":
 				open_world_map()
 				if world_map_panel != null and world_map_panel.trade.is_empty() and world_map_panel.world != null:
