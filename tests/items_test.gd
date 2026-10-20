@@ -59,6 +59,7 @@ func _ready() -> void:
 	_test_bane()
 	_test_style()
 	_test_short()
+	_test_bound()
 	_test_story()
 	_test_bless()
 	_test_reforge()
@@ -1245,6 +1246,33 @@ func _test_short() -> void:
 	_check(back.yields_of(sack) == {"food": 3} and back.short_of(sword) == 1.0, "saved and read back")
 	for uid in [sword, sack, arrows, hide]:
 		World.items.end(uid, "gone")
+
+
+func _test_bound() -> void:
+	print("
+== bound for life: the draugr's halves (decision 544) ==")
+	var host := _player(Net.local_id)
+	var owner := World.holder_key(host)
+	var had_slots := host.slots.duplicate()
+	var had_uids := host.slot_items.duplicate()
+	var half := World.mint_bound("barrow_half", owner, host)
+	_check(World.items.bound_to(half) == owner and World.items.history(half)["events"].back()["kind"] == "bound",
+			"minted bound to its player, noted (%s)" % World.items.bound_to(half))
+	World.items.bind(half, "player:someone else")
+	_check(World.items.bound_to(half) == owner and World.items.character_of(half).is_empty(), "bound once, for life; no character")
+	_check(not World.carries_bound(host, "barrow_half", owner), "not carried until it is put in a slot")
+	var slot := host.slots.find("")
+	_check(slot >= 0 and World.put_item(host, host, slot, half), "put in a free slot")
+	_check(World.carries_bound(host, "barrow_half", owner) and not World.carries_bound(host, "barrow_half", "player:someone else")
+			and not World.carries_bound(host, "return_token", owner), "carried: its own player's, of its own kind only")
+	_check("bound" in World.item_note(half), "its note says so (%s)" % World.item_note(half))
+	World.items.place(half, "zone/stranger", "zone/stranger", "a stranger")
+	_check(World.items.bound_to(half) == owner, "taken by another, still bound to its player")
+	_check(ItemBook.from_dict(World.items.to_dict()).bound_to(half) == owner, "saved and read back")
+	_check(Items.def("barrow_half")["verb"].is_empty() and not Items.has_tag("barrow_half", "tool") and Items.def("return_token")["made"].is_empty(),
+			"no verb, not a tool, not made: never named (365), never sold or made")
+	World.set_slots(host, had_slots, had_uids)
+	World.items.end(half, "gone")
 
 
 func _test_bane() -> void:

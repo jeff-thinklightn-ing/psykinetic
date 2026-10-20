@@ -2066,6 +2066,27 @@ func slot_uids(entity: GridEntity) -> PackedInt32Array:
 	return entity.slot_items.duplicate()
 
 
+## A new [param id] bound for life to [param owner] (a holder_key; decision
+## 544), minted for [param entity] (who it is made for, the companion's
+## token's bearer or the player) at [param at_zone] [param tile]. Its uid,
+## not yet in any slot: put_item places it.
+func mint_bound(id: String, owner: String, entity: GridEntity, at_zone := "", tile := Vector2i(-1, -1)) -> int:
+	var uid := items.mint(id, "bound", _label_of(entity) if is_instance_valid(entity) else "", at_zone, tile)
+	items.bind(uid, owner, at_zone, tile)
+	return uid
+
+
+## Whether [param entity] carries, in any slot, an [param id] bound to
+## [param owner] (decision 544): a half bound to anyone else does nothing.
+func carries_bound(entity: GridEntity, id: String, owner: String) -> bool:
+	if not is_instance_valid(entity) or owner.is_empty():
+		return false
+	for slot in entity.slots.size():
+		if entity.slots[slot] == id and items.bound_to(slot_uid(entity, slot)) == owner:
+			return true
+	return false
+
+
 ## Where [param entity]'s things are, in an item's history: "player:<id>",
 ## "companion:<keeper id>:<name>", or "<zone>/<name>".
 func holder_key(entity: GridEntity) -> String:
@@ -2243,6 +2264,8 @@ func item_note(uid: int) -> String:
 		more.append("%d of %d" % [items.condition_of(uid), Items.condition_max(items.id_of(uid))])
 	if items.short_of(uid) < 1.0:
 		more.append("short measure")  # Decision 493.
+	if not items.bound_to(uid).is_empty():
+		more.append("bound")  # Decision 544.
 	if not items.bane_of(uid).is_empty():
 		more.append("%s-bane" % items.bane_of(uid))  # Decision 417.
 	if not items.grudge_of(uid).is_empty():

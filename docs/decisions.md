@@ -16616,3 +16616,25 @@ none corrected or slowed.
 
 Rejected: pausing a held walk until the server confirms (a stutter on every
 slow link); sending the held direction instead of steps (42's reasons stand).
+## 544, items' side: the draugr's halves, bound for life
+
+companions' barrow blessing (544, the coordinator's approval): a beaten
+draugr's device is a coin of the plundered grave gold cut in two (lore's
+proposal; an oath-ring was the other), one half the player's, the other
+their companion's return token, both bound to the player.
+- ItemBook.bind(uid, owner) and bound_to(uid): bound for life to a carrier
+  key (World.holder_key, "player:<id>"), saved, noted "bound" (a kept
+  event). Not 424's blessing: given, dropped or stolen it stays bound and
+  works for nobody else (companions: a dropped half is picked up again,
+  never crumbles); it gives no character (472) and is bound once.
+- World.mint_bound(id, owner, entity, zone, tile) mints one bound (made
+  "bound" for the entity it is made for), not yet in a slot (put_item
+  places it); World.carries_bound(entity, id, owner) says whether any of
+  its slots holds that id bound to that owner. Its note says "bound".
+- items.json "barrow_half" ("half a cut coin") and "return_token" ("the
+  coin's other half"): held, tag token, no verb and not tool or armour (so
+  365's naming never takes them), no value, yield or made (never sold or
+  made). No count: the uses are on the player's record (companions'). Art
+  slots item.barrow_half and item.return_token for art-kit.
+items_test. Protocol unchanged (bound is server-side; the note is display
+text); no new class_name.

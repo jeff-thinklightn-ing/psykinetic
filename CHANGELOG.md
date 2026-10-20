@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Things can be bound to one player for life: the halves of a cut coin a beaten draugr leaves, which stay theirs even when lost or stolen.
 - Fixed: a companion's sickness, and news of one she had while you were away, was forgotten when the server restarted (decision 501).
 - Fixed: the rubber banding walking with WASD near the town chests (543). A held walk no longer gets stuck a few steps ahead of the server and pulled back every second or two; after a hold-up it catches up smoothly instead.
 - Monsters can now be at war with each other: factions name who they fight on sight. The barrow's dead and its grave robbers (coming next) will go for each other and for any townsfolk who wander below; the goblins, orcs and kobolds keep the peace among themselves as before.

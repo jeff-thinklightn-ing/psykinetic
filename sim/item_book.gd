@@ -37,7 +37,7 @@ extends RefCounted
 const MAX_CARRIERS := 8
 const MAX_EVENTS := 5
 ## Events that stay past MAX_EVENTS, as events[0] does.
-const KEPT_EVENTS: Array[String] = ["named", "reforged", "kept", "back", "bane", "grudge", "avenged", "blessed", "unblessed", "character", "gave way", "short"]
+const KEPT_EVENTS: Array[String] = ["named", "reforged", "kept", "back", "bane", "grudge", "avenged", "blessed", "unblessed", "character", "gave way", "short", "bound"]
 
 ## Gives World.steps (the clock history is kept in).
 var clock: Callable = func() -> int: return 0
@@ -398,6 +398,23 @@ func bless(uid: int, owner: String, zone := "", tile := Vector2i(-1, -1)) -> voi
 	give_character(uid, "blessed", zone, tile)  # Decision 472.
 
 
+## Who [param uid] is bound to (a carrier key; decision 544); "" when it is
+## not bound.
+func bound_to(uid: int) -> String:
+	return str(_book[uid].get("bound", "")) if _book.has(uid) else ""
+
+
+## [param uid] bound to [param owner] for life (a carrier key; decision
+## 544: the draugr's device). Not 424's blessing: given, dropped or stolen
+## it stays bound and works for nobody else, and it gives no character.
+## Noted "bound". Nothing if it is bound already.
+func bind(uid: int, owner: String, zone := "", tile := Vector2i(-1, -1)) -> void:
+	if not _book.has(uid) or owner.is_empty() or not bound_to(uid).is_empty():
+		return
+	_book[uid]["bound"] = owner
+	note(uid, "bound", owner, zone, tile)
+
+
 ## [param uid] given by its blessed owner to [param owner]: the blessing
 ## goes with the gift (decision 424).
 func pass_blessing(uid: int, owner: String) -> void:
@@ -544,6 +561,8 @@ static func from_dict(data: Variant, steps: Callable = Callable()) -> ItemBook:
 				items._book[int(key)]["style"] = str(entry["style"])
 			if entry.get("blessed") is Dictionary and entry["blessed"].get("for") is String:
 				items._book[int(key)]["blessed"] = {"for": entry["blessed"]["for"], "step": int(entry["blessed"].get("step", 0))}
+			if entry.get("bound") is String and not entry["bound"].is_empty():
+				items._book[int(key)]["bound"] = entry["bound"]
 			if entry.get("bane") is String and not entry["bane"].is_empty():
 				items._book[int(key)]["bane"] = entry["bane"]
 			if entry.get("grudge") is Dictionary and entry["grudge"].get("kind") is String:

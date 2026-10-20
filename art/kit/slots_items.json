@@ -115,6 +115,25 @@
 			"type": "mesh",
 			"uses": "bandaging kit (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
 		},
+		"item.barrow_half": {
+			"budget": 500,
+			"category": "items",
+			"kind": "held",
+			"size": [
+				0.03,
+				0.03,
+				0.004
+			],
+			"sockets": {
+				"grip": [
+					0,
+					0,
+					0
+				]
+			},
+			"type": "mesh",
+			"uses": "half a cut coin (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
+		},
 		"item.bow": {
 			"budget": 500,
 			"category": "items",
@@ -467,6 +486,25 @@
 			},
 			"type": "mesh",
 			"uses": "healing remedy (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
+		},
+		"item.return_token": {
+			"budget": 500,
+			"category": "items",
+			"kind": "held",
+			"size": [
+				0.03,
+				0.03,
+				0.004
+			],
+			"sockets": {
+				"grip": [
+					0,
+					0,
+					0
+				]
+			},
+			"type": "mesh",
+			"uses": "the coin's other half (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
 		},
 		"item.roast": {
 			"budget": 500,
