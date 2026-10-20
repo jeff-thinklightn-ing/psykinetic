@@ -439,7 +439,15 @@ corridors straight with one bend and two cells wide between halls and
 anchors, a door where a corridor meets a room, torches along the ways and
 inside the doors, alcoves off the rooms) or `"old"` (the older labyrinths
 below: caverns grown from a seed cell, crooked ways, blind ways wandering
-into the rock, no doors and no torches, so lanterns matter). Its own keys:
+into the rock, no doors and no torches, so lanterns matter) or `"barrow"`
+(decision 541, Jeff's crypt page: tombs layered, oldest deepest; what each
+room is goes by its depth, the distance from the `"entrance"` anchor, the
+first unless named, as a share of the map's farthest reach: the shallow
+third the town's square tombs with doors, torches and burial niches, an
+alcove cell off the walls; the middle third narrow passage graves with
+crooked ways and niches, no doors; the deepest the old caverns; chests in
+the deepest niches first, monsters deepest first unless `"near": {kind:
+anchor}` sends a kind to an anchor, the robbers to the altar). Its own keys:
 `"rooms": {"count": [lo, hi], "size": [[w, h], [w, h]]}` (least and most),
 `"loops"` (extra ways as a share of the rooms and anchors, 0.2), `"chests"`
 and `"crates"` (counts; chests on the blind ways' ends and room corners
@@ -448,7 +456,7 @@ anchors and rooms are joined by a minimum spanning tree over their centres
 plus the loops. Any key of the block beyond the four Level reads is the
 generator's own and passed as written. `tools/plan_sheet.tscn` draws a
 generation large, the anchors outlined (`--level=<name>` or
-`--sample=dwarven|old`, `--generation=n`, `--out=<png>`).
+`--sample=dwarven|old|barrow`, `--generation=n`, `--out=<png>`).
 
 When it shifts: on the slow world tick (every `World.WORLD_TICK_STEPS`), a
 level whose `every_days` have gone by since its last generation is laid

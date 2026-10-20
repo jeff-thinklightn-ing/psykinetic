@@ -5,16 +5,26 @@ extends Node
 ## chests brown, crates tan, monsters reds, links magenta, starts cyan),
 ## each anchor outlined in blue. Headless:
 ##   godot --headless --path <repo> --scene res://tools/plan_sheet.tscn -- --level=<name> --generation=<n> --out=<png> [--scale=8]
-##   godot --headless --path <repo> --scene res://tools/plan_sheet.tscn -- --sample=dwarven|old --generation=<n> --out=<png>
+##   godot --headless --path <repo> --scene res://tools/plan_sheet.tscn -- --sample=dwarven|old|barrow --generation=<n> --out=<png>
 ## --level names a level under levels/ (or the overlay) marked "regenerate";
 ## --sample draws the built-in sample halls (sample_halls) in that style,
 ## a 48 x 40 floor with a gatehouse, two halls and a deepest chamber for
-## anchors. Writes nothing but --out; the level is read, never written.
+## anchors, or the sample barrow (sample_barrow, decision 541). Writes
+## nothing but --out; the level is read, never written.
 
 const SIZE := Vector2i(48, 40)
 const ANCHORS := [{"rect": [2, 2, 6, 5], "name": "gatehouse"}, {"rect": [4, 18, 7, 5], "name": "west hall"},
 	{"rect": [37, 14, 7, 5], "name": "east hall"}, {"rect": [40, 33, 6, 5], "name": "deepest chamber"}]
 const OUTLINE := Color(0.25, 0.6, 1.0)
+## The sample barrow (decision 541): its size and anchors, each with the
+## sides it is walled on (the rest open to the tombs).
+const BARROW_SIZE := Vector2i(44, 36)
+const BARROW_ANCHORS := [
+	{"rect": [19, 1, 6, 4], "name": "entrance", "walled": ["north", "east", "west"]},
+	{"rect": [16, 15, 8, 6], "name": "altar", "walled": ["east", "south"]},
+	{"rect": [24, 17, 7, 1], "name": "passage", "walled": ["north", "south"]},
+	{"rect": [31, 14, 7, 7], "name": "lair", "walled": ["north", "east"]},
+	{"rect": [38, 16, 2, 3], "name": "shortcut", "walled": ["north", "east", "south"]}]
 
 
 func _ready() -> void:
@@ -92,8 +102,10 @@ static func write_sheet(level_name: String, generation: int, out: String, scale 
 
 ## The sample halls in [param style] ("dwarven" or "old"): {layout, config},
 ## SIZE cells, its four anchors bare floor, a link and spawn point in the
-## gatehouse and in the deepest chamber.
+## gatehouse and in the deepest chamber. "barrow" gives sample_barrow.
 static func sample_halls(style: String) -> Dictionary:
+	if style == "barrow":
+		return sample_barrow()
 	var rects: Array[Rect2i] = []
 	for anchor: Dictionary in ANCHORS:
 		rects.append(Level.town_wall_rect(anchor))
@@ -115,4 +127,57 @@ static func sample_halls(style: String) -> Dictionary:
 		"regenerate": {"generator": "labyrinth", "style": style, "every_days": 3, "anchors": ANCHORS,
 			"rooms": {"count": [8, 12], "size": [[3, 3], [7, 6]]}, "loops": 0.2,
 			"monsters": {"imp": 6, "brute": 2, "sneak": 2}, "chests": 3, "crates": 4}}
+	return {"layout": layout, "config": config}
+
+
+## The sample barrow (decision 541, the shape of the real one): {layout,
+## config}, BARROW_SIZE cells, five anchors: the entrance vestibule under
+## the mound's door at the top (the link up, the spawn point and a start),
+## the altar room with the altar (a chest) and the hidden passage leaving
+## its east wall through a door to the lair, the lair with the draugr's
+## stand-in (a brute) and the spawn point from the temple, and the
+## shortcut's nook off the lair's east side with its sealed link. Each
+## anchor is walled but for the side the tombs come in by.
+static func sample_barrow() -> Dictionary:
+	var rows: Array[PackedStringArray] = []
+	for py in BARROW_SIZE.y * 2 - 1:
+		var row := PackedStringArray()
+		row.resize(BARROW_SIZE.x * 2 - 1)
+		row.fill(" ")
+		rows.append(row)
+	for anchor: Dictionary in BARROW_ANCHORS:
+		var rect: Rect2i = Level.town_wall_rect(anchor)
+		for cell in Level.rect_cells(rect):
+			rows[cell.y * 2][cell.x * 2] = "."
+		for side: String in anchor.get("walled", []):
+			for cell in Level.rect_cells(rect):
+				match side:
+					"north":
+						if cell.y == rect.position.y and cell.y > 0:
+							rows[cell.y * 2 - 1][cell.x * 2] = "#"
+					"south":
+						if cell.y == rect.end.y - 1:
+							rows[cell.y * 2 + 1][cell.x * 2] = "#"
+					"west":
+						if cell.x == rect.position.x:
+							rows[cell.y * 2][cell.x * 2 - 1] = "#"
+					"east":
+						if cell.x == rect.end.x - 1:
+							rows[cell.y * 2][cell.x * 2 + 1] = "#"
+	rows[17 * 2][23 * 2 + 1] = "+"  # The hidden passage's door, behind the altar.
+	for y in range(16, 19):
+		rows[y * 2][37 * 2 + 1] = " "  # The lair's east wall opens on the shortcut's nook.
+	var lines: Array[String] = []
+	for row in rows:
+		lines.append("".join(row))
+	var layout := Level.image_from_rows(lines, {Vector2i(22, 1): "link", Vector2i(21, 2): "start", Vector2i(19, 17): "chest",
+		Vector2i(34, 17): "monster_brute", Vector2i(39, 17): "link"})
+	var config := {"name": "Sample barrow", "walls": "stone", "floors": "stone", "starts": [[21, 2]],
+		"spawn_points": {"from_wilds": [22, 2], "from_temple": [38, 17]},
+		"links": [{"at": [22, 1], "to_map": "wilds", "to_spawn": "from_barrow"},
+			{"at": [39, 17], "to_map": "wilds", "to_spawn": "from_barrow_shortcut", "sealed": "draugr"}],
+		"entities": [{"at": [19, 17], "name": "Altar", "props": {"slots": ["", "", "", ""]}}, {"at": [34, 17], "name": "Draugr"}],
+		"regenerate": {"generator": "labyrinth", "style": "barrow", "every_days": 3, "anchors": BARROW_ANCHORS, "entrance": "entrance",
+			"rooms": {"count": [9, 12], "size": [[3, 3], [6, 5]]}, "loops": 0.15,
+			"monsters": {"imp": 6, "sneak": 3}, "near": {"sneak": "altar"}, "chests": 4}}
 	return {"layout": layout, "config": config}

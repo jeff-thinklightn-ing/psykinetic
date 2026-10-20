@@ -16,12 +16,13 @@ var _failures := 0
 func _ready() -> void:
 	World.set_process(false)
 	Net.port = preload("res://tests/test_ports.gd").of(17861)
-	for style in ["dwarven", "old"]:
+	for style in ["dwarven", "old", "barrow"]:
 		var sample := Sheet.sample_halls(style)
 		Level.register("lab_" + style, sample["layout"], null, sample["config"])
 	_test_block()
 	_test_style("dwarven")
 	_test_style("old")
+	_test_barrow()
 	_test_sheet()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -83,6 +84,7 @@ func _test_style(style: String) -> void:
 	_check(outside_floor > 150, "rooms and ways fill the rock between (%d cells)" % outside_floor)
 	_check(blocks >= 6, "rooms, not only corridors: %d cells start a 3 x 3 block of floor" % blocks)
 	_check(Regen.connected(a, anchors) and Regen.connected(b, anchors), "every anchor reaches every other in both")
+	_check(_cut_off(a, Vector2i(4, 4)).is_empty() and _cut_off(b, Vector2i(4, 4)).is_empty(), "no room is cut off from the gatehouse")
 	var again := Regen.generate(name, 1)
 	_check(again["seed"] == first["seed"] and again["layout"].get_data() == first["layout"].get_data(), "the same seed gives the same map (seed %d)" % first["seed"])
 	var level := Level.parse(first["layout"], null, config)
@@ -119,6 +121,89 @@ func _test_style(style: String) -> void:
 		"no warnings; the links and spawn points in the anchors kept (%s)" % [level["warnings"]])
 
 
+func _test_barrow() -> void:
+	print("\n== the barrow style (decision 541): tombs by depth ==")
+	var first := Regen.generate("lab_barrow", 1)
+	var second := Regen.generate("lab_barrow", 2)
+	_check(not first.is_empty() and not second.is_empty(), "generations 1 and 2 are made (%d and %d tries)" % [first.get("tries", 0), second.get("tries", 0)])
+	if first.is_empty() or second.is_empty():
+		return
+	var config: Dictionary = first["config"]
+	var anchors: Array = first["anchors"]
+	var template := LevelMap.from_image(Level.template("lab_barrow")["layout"], config)
+	var a := LevelMap.from_image(first["layout"], config)
+	var b := LevelMap.from_image(second["layout"], config)
+	var inside_same := true
+	var outside_differ := 0
+	var floor_cells: Array[Vector2i] = []
+	for y in Sheet.BARROW_SIZE.y:
+		for x in Sheet.BARROW_SIZE.x:
+			var cell := Vector2i(x, y)
+			if Level.in_anchors(anchors, cell):
+				if a.cell(cell) != template.cell(cell) or b.cell(cell) != template.cell(cell):
+					inside_same = false
+				for side in [Terrain.EAST, Terrain.SOUTH]:
+					var key := Vector3i(x, y, side)
+					if a.edge(key) != template.edge(key) or b.edge(key) != template.edge(key):
+						inside_same = false
+				continue
+			if a.cell(cell) != b.cell(cell):
+				outside_differ += 1
+			if a.walkable(cell):
+				floor_cells.append(cell)
+	_check(inside_same, "inside the five anchors both generations are the template: the passage's door, the altar, the sealed link")
+	_check(outside_differ > 50 and floor_cells.size() > 120, "the tombs between differ (%d cells) and fill the rock (%d floor cells)" % [outside_differ, floor_cells.size()])
+	_check(Regen.connected(a, anchors) and Regen.connected(b, anchors), "every anchor reaches every other in both")
+	_check(_cut_off(a, Vector2i(22, 2)).is_empty() and _cut_off(b, Vector2i(22, 2)).is_empty(),
+		"no tomb is cut off from the entrance: a way round the walled anchors (%s)" % [_cut_off(a, Vector2i(22, 2)).slice(0, 6)])
+	# Depth from the entrance anchor's centre, (22, 3); the map's farthest
+	# reach from it is 54 cells, so the shallow band ends under 18.36: a
+	# cell 19 or more away lies below it.
+	var entrance := Vector2i(22, 3)
+	var depth := func(cell: Vector2i) -> int: return absi(cell.x - entrance.x) + absi(cell.y - entrance.y)
+	var level := Level.parse(first["layout"], null, config)
+	var doors := 0
+	var deep_doors := 0
+	for key: Vector3i in level["terrain"]["edges"]:
+		if level["terrain"]["edges"][key] == Terrain.Edge.DOOR:
+			doors += 1
+			var sides := Terrain.edge_cells(key)
+			if not Level.in_anchors(anchors, sides[0]) and not Level.in_anchors(anchors, sides[1]) and depth.call(sides[0]) >= 19:
+				deep_doors += 1
+	var torches: Array = level["terrain"]["torches"]
+	var deep_torches: int = torches.filter(func(cell: Vector2i) -> bool: return depth.call(cell) >= 19).size()
+	_check(doors >= 2 and deep_doors == 0, "doors on the town's tombs alone, the shallow band (%d doors, %d below it)" % [doors, deep_doors])
+	_check(torches.size() >= 2 and deep_torches == 0, "torches in the shallow band alone (%d, %d below it)" % [torches.size(), deep_torches])
+	var mean_floor := 0.0
+	for cell in floor_cells:
+		mean_floor += depth.call(cell)
+	mean_floor /= floor_cells.size()
+	var kinds := {}
+	var sums := {}
+	var altar := Vector2i(20, 18)
+	var sneak_to_altar := 0.0
+	var imp_to_altar := 0.0
+	for spec: Dictionary in level["entities"]:
+		var kind := str(spec.get("kind", spec["name"].rstrip("0123456789").to_lower()))
+		kinds[kind] = int(kinds.get(kind, 0)) + 1
+		sums[kind] = float(sums.get(kind, 0.0)) + depth.call(spec["tile"])
+		var to_altar: int = absi(spec["tile"].x - altar.x) + absi(spec["tile"].y - altar.y)
+		if kind == "sneak":
+			sneak_to_altar += to_altar
+		elif kind == "imp":
+			imp_to_altar += to_altar
+	_check(kinds.get("imp", 0) == 6 and kinds.get("sneak", 0) == 3 and kinds.get("chest", 0) == 4 and kinds.get("altar", 0) == 1 and kinds.get("brute", 0) == 1,
+		"six imps, three sneaks and four chests laid; the altar and the draugr's stand-in, a brute, kept (%s)" % [kinds])
+	if kinds.get("imp", 0) == 6 and kinds.get("sneak", 0) == 3 and kinds.get("chest", 0) == 4:
+		_check(sums["chest"] / 4.0 > mean_floor and sums["imp"] / 6.0 > mean_floor,
+			"the grave goods and the imps lie deeper than the floor's mean depth (%.1f, %.1f over %.1f)" % [sums["chest"] / 4.0, sums["imp"] / 6.0, mean_floor])
+		_check(sneak_to_altar / 3.0 < imp_to_altar / 6.0, "the sneaks, sent near the altar, stand closer to it than the imps (%.1f against %.1f)" % [sneak_to_altar / 3.0, imp_to_altar / 6.0])
+	_check(level["warnings"].is_empty() and level["links"].size() == 2 and level["links"][1]["sealed"] == "draugr" and level["spawn_points"].size() == 2,
+		"no warnings; both links kept, the shortcut's sealed, and the spawn points (%s)" % [level["warnings"]])
+	var again := Regen.generate("lab_barrow", 1)
+	_check(again["layout"].get_data() == first["layout"].get_data(), "the same seed gives the same barrow")
+
+
 func _test_sheet() -> void:
 	print("\n== the plan sheet ==")
 	var out: String = preload("res://tests/test_ports.gd").scratch_path("labyrinth_sheet.png")
@@ -132,6 +217,28 @@ func _test_sheet() -> void:
 	_check(grey != null and grey.is_equal_approx(Color("#9a9a9a")), "the gatehouse's floor at (4, 3) is stone grey on it (%s)" % [grey.to_html(false) if grey else null])
 	_check(Sheet.write_sheet("lab_old", 1, "", 4) == 2 and Sheet.write_sheet("castle", 1, out, 4) == 2, "no out, or a level that does not regenerate: refused")
 	DirAccess.remove_absolute(out)
+
+
+## The walkable cells of [param map] no walk from [param start] reaches
+## (through open and door edges).
+func _cut_off(map: LevelMap, start: Vector2i) -> Array[Vector2i]:
+	var seen: Dictionary[Vector2i, bool] = {start: true}
+	var queue: Array[Vector2i] = [start]
+	while not queue.is_empty():
+		var here: Vector2i = queue.pop_front()
+		for direction: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+			var next := here + direction
+			if seen.has(next) or not map.in_bounds(next) or not map.walkable(next) or map.edge(Terrain.edge_key(here, direction)) == "wall":
+				continue
+			seen[next] = true
+			queue.append(next)
+	var out: Array[Vector2i] = []
+	for y in map.size.y:
+		for x in map.size.x:
+			var cell := Vector2i(x, y)
+			if map.walkable(cell) and not seen.has(cell):
+				out.append(cell)
+	return out
 
 
 func _check(ok: bool, label: String) -> void:

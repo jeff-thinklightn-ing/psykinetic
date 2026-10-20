@@ -7,6 +7,8 @@ notes (decision 324).
 
 ## Unreleased
 
+- A third way for a shifting level to lay itself out, for the barrow (Jeff's crypt page): tombs by depth, the town's square tombs with doors, torches and burial niches near the entrance, narrow passage graves with crooked ways below them, the old caverns deepest; grave goods in the deepest niches first, the dead deepest first, the robbers near the altar. The plan sheet draws a sample barrow (`--sample=barrow`).
+
 ## v0.1.159
 
 - This version changes what goes over the network, so v0.1.158 and older can't join the server: update through the launcher first.

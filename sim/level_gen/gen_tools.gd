@@ -85,7 +85,10 @@ static func join_up(map: LevelMap, anchors: Array, carved: Dictionary[Vector2i, 
 					best = d
 					best_a = cell_a
 					best_b = cell_b
-		for at in l_path(best_a, best_b, true):
+		var path := l_path(best_a, best_b, true)
+		if path.any(func(at: Vector2i) -> bool: return Level.in_anchors(anchors, at) and at != best_a and at != best_b):
+			path = path_around(map, anchors, best_a, best_b)  # Round a walled anchor in the way.
+		for at in path:
 			if rock(map, anchors, at):
 				carve(map, at, carved)
 
@@ -102,6 +105,50 @@ static func l_path(from: Vector2i, to: Vector2i, horizontal_first: bool) -> Arra
 			at[axis] += signi(to[axis] - at[axis])
 			out.append(at)
 	return out
+
+
+## A way from [param from] to [param to] through the rock and what is
+## carved, round the anchors (A*, Manhattan steps; neither end counts as
+## in one): a walled anchor would cut a straight way (decision 541). With
+## [param rng] each step costs 1 to 2 by a draw, so the way wanders. Both
+## ends included; [from] alone when there is none.
+static func path_around(map: LevelMap, anchors: Array, from: Vector2i, to: Vector2i, rng: RandomNumberGenerator = null) -> Array[Vector2i]:
+	var open: Array[Vector2i] = [from]
+	var came: Dictionary[Vector2i, Vector2i] = {}
+	var cost: Dictionary[Vector2i, float] = {from: 0.0}
+	var closed: Dictionary[Vector2i, bool] = {}
+	while not open.is_empty():
+		var best := 0
+		var best_f := cost[open[0]] + distance(open[0], to)
+		for i in range(1, open.size()):
+			var f := cost[open[i]] + distance(open[i], to)
+			if f < best_f:
+				best_f = f
+				best = i
+		var at: Vector2i = open[best]
+		open.remove_at(best)
+		if at == to:
+			var path: Array[Vector2i] = [to]
+			while path[-1] != from:
+				path.append(came[path[-1]])
+			path.reverse()
+			return path
+		closed[at] = true
+		for direction in DIRECTIONS:
+			var next := at + direction
+			if closed.has(next) or not map.in_bounds(next):
+				continue
+			if next != to and Level.in_anchors(anchors, next):
+				continue
+			var step := 1.0 if rng == null else 1.0 + rng.randf()
+			var through := cost[at] + step
+			if cost.has(next) and through >= cost[next]:
+				continue
+			cost[next] = through
+			came[next] = at
+			if next not in open:
+				open.append(next)
+	return [from]
 
 
 ## [param cells] in a random order, by [param rng] (Fisher-Yates), in place.

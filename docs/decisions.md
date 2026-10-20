@@ -16352,3 +16352,34 @@ its client half, and has the stills). Here are the server's parts:
     and wool stay the same.
 Protocol unchanged (b7a6a4094974 before and after; season_days already
 travels in the sky message). season_test, weather_test, farm_test.
+## 541. The labyrinth's barrow style: tombs by depth
+
+Jeff's barrow (docs/lore/crypt.md): "the town's own tombs near the top,
+the old dead shoved down below them, oldest deepest. Going down goes back
+in time." A third "style" of the labyrinth generator (470), "barrow": the
+depth of a room is its distance from the "entrance" anchor (the first
+unless the block names one) as a share of the map's farthest reach from
+it, in three bands (BANDS, a third each). Shallow, the town's tombs:
+square chambers, a door where a way comes in, torches inside the doors and
+along the ways, up to NICHES burial niches (an alcove cell) off the walls.
+Middle, the old dead: passage graves, narrow and long, crooked ways in, no
+doors or torches, niches along them. Deep, the oldest: the old style's
+caverns, crooked and blind ways, nothing lit. A way to or from anything
+below the shallow band is crooked; the great halls and wide ways are the
+dwarven style's alone. Chests go in the deepest niches first, then the
+deepest corners; monsters deepest first, unless "near": {kind: anchor}
+sends a kind to an anchor (the robbers to the altar), laid nearest it
+first. Two things the walled anchors taught: a straight or crooked way
+that would cross an anchor goes round it instead (gen_tools.path_around,
+A* over the rock and what is carved; join_up the same), since a walled
+anchor cut the halls' old straight ways; and an anchor with no way out
+into the rock (the hidden passage, the shortcut's nook, walled but for
+another anchor) is no node of the spanning tree, joined through its
+neighbour. labyrinth_test checks no room of any style is cut off from the
+entrance. A niche is a plain alcove cell for now; art's tomb slot gives it a
+marker later. tools/plan_sheet's sample_barrow is the real level's shape
+(44 x 36; the entrance vestibule, the altar room with the hidden passage
+leaving its east wall through a door to the lair, the lair, the
+shortcut's nook with its sealed link, 540), for Jeff's sheets
+(--sample=barrow). labyrinth_test. No protocol change, no new class_name;
+no real level marked (542).
