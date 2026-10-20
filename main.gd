@@ -5680,7 +5680,6 @@ func _build_talk() -> void:
 	if has_signal("world_changed"):
 		connect("world_changed", _refresh_world_map)
 	converse = ConversePanel.new()
-	converse.ask_pressed.connect(func(line: String) -> void: _send_chat(line))
 	converse.offer_accepted.connect(_accept_offer_from_panel)
 	converse.close_pressed.connect(func() -> void: converse.close())
 	$HUD.add_child(converse)
@@ -8260,9 +8259,9 @@ func _test_converse(player: Player) -> bool:
 	if "give" in Net.test_show:
 		# npc's building fund (499): the official's two give lines, a purse of 20.
 		var waits := "The inn waits on 6 wood and 2 stone and 14 gold; what you give goes to it."
-		given = [
-			{"id": "g1", "kind": "give", "title": "Give 10 toward the inn", "words": waits, "accept": "give", "cost": 10},
-			{"id": "g2", "kind": "give", "title": "Give the rest (14 gold)", "words": waits, "accept": "give", "cost": 14}]
+		given = [  # Titles as npc's 74775fa8 words them: no sum, the brass beside says it; the second line's words empty.
+			{"id": "g1", "kind": "give", "title": "Give toward the inn", "words": waits, "accept": "give", "cost": 10},
+			{"id": "g2", "kind": "give", "title": "Give the rest", "words": "", "accept": "give", "cost": 14}]
 		purse = 20
 	elif "news" in Net.test_show:
 		# npc's road news (504): the counter's rumour lines after a wagon's trip.

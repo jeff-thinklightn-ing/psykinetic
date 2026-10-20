@@ -5,14 +5,14 @@ extends PanelContainer
 ## name and trade; never the hidden type), "thinking" while their answer
 ## is out, the exchange with them alone, their offers (npc's "offers"
 ## message: shop, commission, rumour, plea, each with words, a cost and
-## what accepting does), what the player owes them (open commissions), and
-## quick asks that send ordinary chat lines their voice answers. Main
-## opens it (E on a resident, or a line said to one in earshot), feeds it
-## lines and offers, and sends what the buttons ask. The look is the
-## shared theme's (UiTheme, docs/ui_style.md).
+## what accepting does) and what the player owes them (open commissions).
+## Talk itself is what the player types in the say line (decision 336);
+## the quick-ask buttons went with Jeff's play test (436 amended: "the
+## questions at the bottom don't seem natural when every npc is the
+## same"). Main opens it (E on a resident, or a line said to one in
+## earshot) and feeds it lines and offers. The look is the shared theme's
+## (UiTheme, docs/ui_style.md).
 
-## A quick ask: the chat line to send.
-signal ask_pressed(line: String)
 ## An offer accepted: its id, and the gold for a loan (0 otherwise).
 signal offer_accepted(id: String, gold: int)
 ## Close pressed (Esc closes it too, Main).
@@ -23,7 +23,6 @@ const MAX_LINES := 8
 ## How long "thinking" shows after a line is sent, at most (the resident
 ## mind's own wait, decision 336).
 const THINKING_FOR := 15.0
-const ASKS := ["What do you sell?", "Any work for me?", "What's the news?"]
 ## What accepting an offer says on its button, by the offer's "accept".
 const ACCEPT_WORDS := {"buy": "Buy", "take": "Take it on", "lend": "Lend", "carry": "Carry it", "read": "Read it", "give": "Give"}
 const KIND_WORDS := {"shop": "for sale", "commission": "work", "rumour": "rumour", "plea": "a plea", "page": "a page", "give": "a gift"}
@@ -64,7 +63,8 @@ var _owed: Label
 var _purse: Label
 ## What show_offers was last given as owed, for _show_trade.
 var _owed_given: Array = []
-var _asks: HBoxContainer
+## The foot: Close alone (the quick asks went, 436 amended).
+var _foot: HBoxContainer
 var _thinking_since := 0.0
 var _since := 0.0
 
@@ -117,23 +117,15 @@ func _ready() -> void:
 	_purse.theme_type_variation = &"Caption"
 	_purse.visible = false
 	column.add_child(_purse)
-	_asks = HBoxContainer.new()
-	_asks.add_theme_constant_override("separation", UiTheme.constant("unit"))
-	for ask: String in ASKS:
-		var button := Button.new()
-		button.text = ask
-		button.focus_mode = Control.FOCUS_NONE
-		button.pressed.connect(func() -> void:
-			ask_pressed.emit(ask)
-			set_thinking(true))
-		_asks.add_child(button)
+	_foot = HBoxContainer.new()
+	_foot.add_theme_constant_override("separation", UiTheme.constant("unit"))
 	var close := Button.new()
 	close.text = "Close"
 	close.focus_mode = Control.FOCUS_NONE
 	close.size_flags_horizontal = Control.SIZE_SHRINK_END | Control.SIZE_EXPAND
 	close.pressed.connect(func() -> void: close_pressed.emit())
-	_asks.add_child(close)
-	column.add_child(_asks)
+	_foot.add_child(close)
+	column.add_child(_foot)
 
 
 ## Opened on [param body]: its name and trade from it (Resident.person,

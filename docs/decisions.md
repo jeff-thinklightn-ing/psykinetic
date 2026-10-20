@@ -16067,3 +16067,15 @@ them, and passes main as it is now.
 Rejected: checking every released section against its tag (each tag holds only
 the sections up to its own; older ones are kept by the newest's check at
 their time); a pre-commit hook (hooks are per clone and nobody's is set).
+## 436 amended: the quick asks go
+
+Jeff, from his play tests (2026-10-19, through the coordinator): "the npc
+interaction ui, the questions at the bottom don't seem natural when every
+npc is the same... I'd rather not have the ui at all." The first step,
+small: ConversePanel's row of quick asks ("What do you sell?", "Any work
+for me?", "What's the news?") and its ask_pressed signal are gone; the
+foot is Close alone. Talk is what the player types in the say line, as
+336 meant. The exchange, the offers and what the player owes stay as
+they were. The second step, a conversation with no panel at all, is a
+design to the coordinator with npc before anything lands. ui_test.
+Client only; protocol unchanged.

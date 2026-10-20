@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The conversation panel no longer offers canned questions at the bottom (Jeff: they read the same from everyone); you talk by typing in the say line, as before, and the panel keeps the exchange, their offers and what you owe them.
 - Landing tests check the CHANGELOG first (539): a released section must read as its tag has it, and no bullet may stand both under Unreleased and in a release; tools only.
 - The grass is green again (532): fresher and brighter, nearer the early builds' greens with its texture still showing, the dirt a warmer brown and the tufts and flowers matching the lawn.
 - Talk with no panel (536): ask a townsperson what they sell, whether they have work, or what the news is, and they answer in their own words with what they have; say "yes", name the thing or the person, or say an amount ("give 25") to take it. Nothing is pushed at you. The wire changes (an offer that stands is sent to the interface): the client and server go together.

@@ -325,10 +325,8 @@ func _test_converse_panel() -> void:
 	_check(got == ["a", 0], "Take it on: the offer's id (%s)" % [got])
 	(panel._offer_rows.get_child(3).get_node("Accept") as Button).pressed.emit()
 	_check(got == ["d", 10], "Lend: the id and the gold asked, up to the loan (%s)" % [got])
-	var asked := [""]
-	panel.ask_pressed.connect(func(line: String) -> void: asked[0] = line)
-	(panel._asks.get_child(2) as Button).pressed.emit()
-	_check(asked[0] == "What's the news?" and panel.thinking, "a quick ask: its line sent, thinking")
+	_check(panel._foot.get_child_count() == 1 and (panel._foot.get_child(0) as Button).text == "Close",
+		"no quick-ask buttons: the foot is Close alone (436 amended, Jeff's play test; talk is the say line)")
 	_main.escape()
 	_check(not panel.visible, "Esc closes it")
 	_check(Main.server_status_words({"ok": false, "why": "no answer"}) == "status unknown", "no answer is status unknown")
