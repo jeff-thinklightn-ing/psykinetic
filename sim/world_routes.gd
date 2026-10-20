@@ -154,8 +154,12 @@ func _init(world_map: WorldMap, threaded := true, make_fields := true, obstacles
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_PREDELETE:
 		_stopping = true
+		# Freed by the last task's own hold (_make_held): not waited on by
+		# itself.
+		var mine := WorkerThreadPool.get_caller_task_id()
 		for task in _tasks:
-			WorkerThreadPool.wait_for_task_completion(task)
+			if task != mine:
+				WorkerThreadPool.wait_for_task_completion(task)
 
 
 ## The factions with a layer of their own.
@@ -217,7 +221,10 @@ func _start(job: Array[Dictionary]) -> void:
 		return
 	_reap()
 	if _threaded:
-		_tasks.append(WorkerThreadPool.add_task(_make.bind(job), false, "world routes: distance fields"))
+		# Held weakly: a task still queued at exit must not keep these routes
+		# alive past the pool (freed with it, their wait on it crashed the
+		# exit: raid_groups_test's 139 after PASS).
+		_tasks.append(WorkerThreadPool.add_task(WorldRoutes._make_held.bind(weakref(self), job), false, "world routes: distance fields"))
 	else:
 		_make(job)
 
@@ -228,6 +235,14 @@ func _reap() -> void:
 		if WorkerThreadPool.is_task_completed(task):
 			WorkerThreadPool.wait_for_task_completion(task)
 			_tasks.erase(task)
+
+
+## A pool task's: _make on the routes [param held] still refers to, if
+## any (they may be gone, or going: nothing to make then).
+static func _make_held(held: WeakRef, job: Array[Dictionary]) -> void:
+	var routes: WorldRoutes = held.get_ref()
+	if routes != null and not routes._stopping:
+		routes._make(job)
 
 
 ## A task: a distance field per portal, area by area, from the copies in
