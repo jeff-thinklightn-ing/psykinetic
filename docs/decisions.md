@@ -16211,3 +16211,30 @@ Retuned, the same stills: clear noon unchanged, overcast noon 64 / 123 /
 27.2, the box's state 47 / 130 / 25.9 (what is left there is the low sun's
 own light, kept as designed). Client only (Season.LOOK is read only by the
 view), protocol unchanged. day_night_test, season_test, weather_test.
+
+## 532, art-kit's side: the castle's walls warm sandstone again
+
+532 lifted the ground's greens; this is its other half in castle-8-final (Jeff,
+2026-10-19: "tone 8 approved, good improvement"). Art only (art/kit), no code.
+
+- material.wall.castle, art-gen's grey brick (mean #626560: hue 102,
+  saturation 0.05, value 0.40), re-graded toward the v0.1.100 sandstone the
+  castle had in the capsule days: each channel scaled in linear light (R 2.73,
+  G 1.69, B 1.10, found so the tile's mean shows in game the colour the old
+  build showed at the same spot), with a soft shoulder above 0.8 so the
+  lightest bricks roll off rather than clip; its mean now #9c8165 (hue 31,
+  saturation 0.35, value 0.61), the courses and joints keeping their
+  contrast.
+- The 23 wall.castle.* pieces (posts, ends, corners, crosses, tees, their low
+  and tall kinds, the straight caps, ruins, rubble, tower and window) had
+  every face on row 1's grey stone, so they stood out grey against the warm
+  walls (terrain's castle-5-warm). Every face moved to the same column of row 3
+  (earth, sand to dark soil), whose tans sit on the re-graded bricks; the
+  palette itself is unchanged. Row 1 stays the grey stone of rocks, the well
+  and every other piece.
+
+Rejected: a new warm stone row (a tenth row changes the atlas's height, and
+every piece's UVs were made for nine, so all of them would come out a row
+off); row 0, the old "stone, warm" (the animals' hides and wall.stone's pieces
+sit on it, and its swatches are pinker than the re-graded bricks); repainting
+row 1 warmer (palette lift (b), held: the rocks would turn warm too).

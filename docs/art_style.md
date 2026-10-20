@@ -45,7 +45,7 @@ keep the rows.
 | 0 | stone, warm (today's walls) | `#f2c9a6` `#ebb48e` `#d49c78` `#b8845f` `#9a6c4c` `#7c573d` `#5f4330` `#433024` |
 | 1 | stone, grey | `#c9c7c0` `#b0aea6` `#97958d` `#8f8f8a` `#77766f` `#6b6660` `#545049` `#3b3834` |
 | 2 | wood | `#b8946a` `#9e7c55` `#8a6a48` `#796145` `#6a523a` `#5e4c41` `#4a3a2c` `#3b2e24` |
-| 3 | earth (sand to dark soil) | `#d8c89a` `#c7b380` `#a88e5e` `#8c7148` `#755c38` `#5f4a2e` `#4a3a25` `#2c2418` |
+| 3 | earth (sand to dark soil); the castle's sandstone (its posts and caps, beside `material.wall.castle`; decision 532) | `#d8c89a` `#c7b380` `#a88e5e` `#8c7148` `#755c38` `#5f4a2e` `#4a3a25` `#2c2418` |
 | 4 | foliage, moss | `#a8bf6a` `#8fa857` `#7a8f4a` `#5d7742` `#4f6a35` `#36a340` `#2f5a2a` `#2c4224` |
 | 5 | cloth, leather | `#c2b8a0` `#9c8f74` `#7a6e58` `#4c4a3b` `#6b4a35` `#55392a` `#3d2a1f` `#29231b` |
 | 6 | metal (iron, then bronze) | `#c7c9cc` `#a3a6ab` `#7d8086` `#55575c` `#3e4044` `#c79a55` `#a37d40` `#8a6a3a` |

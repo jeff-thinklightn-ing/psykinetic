@@ -71,7 +71,7 @@
 		"material.wall.castle": {
 			"category": "materials",
 			"type": "texture",
-			"source": {"by": "art-gen", "tool": "Qwen-Image-2512, art-gen's seamless.py", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/material.wall.castle/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c6 made seamless by art-gen"},
+			"source": {"by": "art-gen, re-graded by art-kit", "tool": "Qwen-Image-2512, art-gen's seamless.py, numpy", "license": "own", "date": "2026-10-19", "notes": "N:/assets/candidates/material.wall.castle/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c6 made seamless by art-gen; re-graded warm (decision 532, Jeff, 2026-10-19: \"tone 8 approved, good improvement\"): per channel in linear light toward the v0.1.100 sandstone (R x2.73, G x1.69, B x1.10, a soft shoulder), the brick mean #626560 to #9c8165"},
 			"tile_m": 2.0,
 			"pixels": 512,
 			"uses": "the stone of swept wall.castle runs (wall.castle.profile): u is metres along the run, v metres up"
@@ -90,7 +90,7 @@
 			"kind": "edge",
 			"size": [0.5, 3, 1],
 			"budget": 300,
-			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/wall.castle.straight/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c2's 300 mesh, a 1 m cut from its long slab, depth 1.35 to 0.5, 113 tris (in place of the Kenney fill)"},
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-19", "notes": "N:/assets/candidates/wall.castle.straight/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c2's 300 mesh, a 1 m cut from its long slab, depth 1.35 to 0.5, 113 tris (in place of the Kenney fill); re-coloured (decision 532, Jeff, 2026-10-19: \"tone 8 approved, good improvement\"): every face moved from row 1's grey stone to the same column of row 3, the sandstone of the re-graded wall tile, so posts, caps and coping match the walls; rocks keep row 1"},
 			"uses": "a wall on a cell edge (Client3D._add_wall); one per edge of a run until terrain sweeps wall.castle.profile along runs",
 			"sockets": {"end_a": [0, 0, -0.5], "end_b": [0, 0, 0.5]},
 			"fill": {"from": "kenney-castle", "piece": "wall-narrow", "offset": [0.25, 0, 0], "scale": [1, 2.290076, 1]}
@@ -101,7 +101,7 @@
 			"kind": "edge",
 			"size": [0.5, 1, 1],
 			"budget": 600,
-			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/wall.castle.straight_low/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; c4, budget 300 -> 600, tiles a metre at a time): a 1 m section cut from its 1200 mesh, decimated to 572"},
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-19", "notes": "N:/assets/candidates/wall.castle.straight_low/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; c4, budget 300 -> 600, tiles a metre at a time): a 1 m section cut from its 1200 mesh, decimated to 572; re-coloured (decision 532, Jeff, 2026-10-19: \"tone 8 approved, good improvement\"): every face moved from row 1's grey stone to the same column of row 3, the sandstone of the re-graded wall tile, so posts, caps and coping match the walls; rocks keep row 1"},
 			"uses": "a 1 m wall section low (1 m) on a cell edge; tiles along z, its ends the wall.castle.profile section",
 			"sockets": {"end_a": [0, 0, -0.5], "end_b": [0, 0, 0.5]}
 		},
@@ -111,7 +111,7 @@
 			"kind": "edge",
 			"size": [0.5, 4.5, 1],
 			"budget": 300,
-			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/wall.castle.straight_tall/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; c1 slab trimmed to 1 m, budget 300): its 1200 mesh cut to 1 m, depth to 0.5, decimated to 286"},
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-19", "notes": "N:/assets/candidates/wall.castle.straight_tall/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; c1 slab trimmed to 1 m, budget 300): its 1200 mesh cut to 1 m, depth to 0.5, decimated to 286; re-coloured (decision 532, Jeff, 2026-10-19: \"tone 8 approved, good improvement\"): every face moved from row 1's grey stone to the same column of row 3, the sandstone of the re-graded wall tile, so posts, caps and coping match the walls; rocks keep row 1"},
 			"uses": "a 1 m wall section tall (4.5 m) on a cell edge; tiles along z, its ends the wall.castle.profile section",
 			"sockets": {"end_a": [0, 0, -0.5], "end_b": [0, 0, 0.5]}
 		},
@@ -121,7 +121,7 @@
 			"kind": "vertex",
 			"size": [0.6, 3.1, 0.6],
 			"budget": 800,
-			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/wall.castle.post/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; post c2 as the one mesh for the 3 m castle set, slimmed to 0.5 x 3 x 0.5, the end 0.6 x 3.1; budget 200 -> 800, one per joint): 690 tris, grey stone on row 1"},
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-19", "notes": "N:/assets/candidates/wall.castle.post/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; post c2 as the one mesh for the 3 m castle set, slimmed to 0.5 x 3 x 0.5, the end 0.6 x 3.1; budget 200 -> 800, one per joint): 690 tris, grey stone on row 1; re-coloured (decision 532, Jeff, 2026-10-19: \"tone 8 approved, good improvement\"): every face moved from row 1's grey stone to the same column of row 3, the sandstone of the re-graded wall tile, so posts, caps and coping match the walls; rocks keep row 1"},
 			"uses": "a run's free end, capping the wall.castle.profile section, a little proud of it"
 		},
 		"wall.castle.end_low": {
@@ -130,7 +130,7 @@
 			"kind": "vertex",
 			"size": [0.6, 1.1, 0.6],
 			"budget": 200,
-			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/wall.castle.end_low/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c2's 200 mesh scaled to 0.6, 198 tris"},
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-19", "notes": "N:/assets/candidates/wall.castle.end_low/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c2's 200 mesh scaled to 0.6, 198 tris; re-coloured (decision 532, Jeff, 2026-10-19: \"tone 8 approved, good improvement\"): every face moved from row 1's grey stone to the same column of row 3, the sandstone of the re-graded wall tile, so posts, caps and coping match the walls; rocks keep row 1"},
 			"uses": "a run's free end low (1 m), capping the wall.castle.profile section, a little proud of it"
 		},
 		"wall.castle.end_tall": {
@@ -139,7 +139,7 @@
 			"kind": "vertex",
 			"size": [0.6, 4.6, 0.6],
 			"budget": 800,
-			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/wall.castle.corner_tall/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; corner_tall c2 as the one post mesh for post/end/corner/t/cross_tall, slimmed to 0.5 x 4.5, the end 0.6 x 4.6, crenellated top kept; budget 200 -> 800): 699 tris"},
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-19", "notes": "N:/assets/candidates/wall.castle.corner_tall/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; corner_tall c2 as the one post mesh for post/end/corner/t/cross_tall, slimmed to 0.5 x 4.5, the end 0.6 x 4.6, crenellated top kept; budget 200 -> 800): 699 tris; re-coloured (decision 532, Jeff, 2026-10-19: \"tone 8 approved, good improvement\"): every face moved from row 1's grey stone to the same column of row 3, the sandstone of the re-graded wall tile, so posts, caps and coping match the walls; rocks keep row 1"},
 			"uses": "a run's free end tall (4.5 m), capping the wall.castle.profile section, a little proud of it"
 		},
 		"wall.castle.corner": {
@@ -148,7 +148,7 @@
 			"kind": "vertex",
 			"size": [0.5, 3, 0.5],
 			"budget": 800,
-			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/wall.castle.post/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; post c2 as the one mesh for the 3 m castle set, slimmed to 0.5 x 3 x 0.5, the end 0.6 x 3.1; budget 200 -> 800, one per joint): 690 tris, grey stone on row 1"},
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-19", "notes": "N:/assets/candidates/wall.castle.post/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; post c2 as the one mesh for the 3 m castle set, slimmed to 0.5 x 3 x 0.5, the end 0.6 x 3.1; budget 200 -> 800, one per joint): 690 tris, grey stone on row 1; re-coloured (decision 532, Jeff, 2026-10-19: \"tone 8 approved, good improvement\"): every face moved from row 1's grey stone to the same column of row 3, the sandstone of the re-graded wall tile, so posts, caps and coping match the walls; rocks keep row 1"},
 			"uses": "an L joint where two runs meet at a corner, the runs' ends meeting in it along -z and +x"
 		},
 		"wall.castle.corner_low": {
@@ -157,7 +157,7 @@
 			"kind": "vertex",
 			"size": [0.5, 1, 0.5],
 			"budget": 200,
-			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/wall.castle.corner_low/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): wall.castle.corner_low's c1 200 mesh as the one mesh for post/corner/t/cross_low (art-gen: t_low's own c1 is 111 parts), 188 tris"},
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-19", "notes": "N:/assets/candidates/wall.castle.corner_low/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): wall.castle.corner_low's c1 200 mesh as the one mesh for post/corner/t/cross_low (art-gen: t_low's own c1 is 111 parts), 188 tris; re-coloured (decision 532, Jeff, 2026-10-19: \"tone 8 approved, good improvement\"): every face moved from row 1's grey stone to the same column of row 3, the sandstone of the re-graded wall tile, so posts, caps and coping match the walls; rocks keep row 1"},
 			"uses": "an L joint low (1 m) where two runs meet at a corner, the runs' ends meeting in it along -z and +x"
 		},
 		"wall.castle.corner_tall": {
@@ -166,7 +166,7 @@
 			"kind": "vertex",
 			"size": [0.5, 4.5, 0.5],
 			"budget": 800,
-			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/wall.castle.corner_tall/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; corner_tall c2 as the one post mesh for post/end/corner/t/cross_tall, slimmed to 0.5 x 4.5, the end 0.6 x 4.6, crenellated top kept; budget 200 -> 800): 699 tris"},
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-19", "notes": "N:/assets/candidates/wall.castle.corner_tall/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; corner_tall c2 as the one post mesh for post/end/corner/t/cross_tall, slimmed to 0.5 x 4.5, the end 0.6 x 4.6, crenellated top kept; budget 200 -> 800): 699 tris; re-coloured (decision 532, Jeff, 2026-10-19: \"tone 8 approved, good improvement\"): every face moved from row 1's grey stone to the same column of row 3, the sandstone of the re-graded wall tile, so posts, caps and coping match the walls; rocks keep row 1"},
 			"uses": "an L joint tall (4.5 m) where two runs meet at a corner, the runs' ends meeting in it along -z and +x"
 		},
 		"wall.castle.t": {
@@ -175,7 +175,7 @@
 			"kind": "vertex",
 			"size": [0.5, 3, 0.5],
 			"budget": 800,
-			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/wall.castle.post/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; post c2 as the one mesh for the 3 m castle set, slimmed to 0.5 x 3 x 0.5, the end 0.6 x 3.1; budget 200 -> 800, one per joint): 690 tris, grey stone on row 1"},
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-19", "notes": "N:/assets/candidates/wall.castle.post/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; post c2 as the one mesh for the 3 m castle set, slimmed to 0.5 x 3 x 0.5, the end 0.6 x 3.1; budget 200 -> 800, one per joint): 690 tris, grey stone on row 1; re-coloured (decision 532, Jeff, 2026-10-19: \"tone 8 approved, good improvement\"): every face moved from row 1's grey stone to the same column of row 3, the sandstone of the re-graded wall tile, so posts, caps and coping match the walls; rocks keep row 1"},
 			"uses": "a T joint, a run along z met by one along +x"
 		},
 		"wall.castle.t_low": {
@@ -184,7 +184,7 @@
 			"kind": "vertex",
 			"size": [0.5, 1, 0.5],
 			"budget": 200,
-			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/wall.castle.corner_low/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): wall.castle.corner_low's c1 200 mesh as the one mesh for post/corner/t/cross_low (art-gen: t_low's own c1 is 111 parts), 188 tris"},
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-19", "notes": "N:/assets/candidates/wall.castle.corner_low/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): wall.castle.corner_low's c1 200 mesh as the one mesh for post/corner/t/cross_low (art-gen: t_low's own c1 is 111 parts), 188 tris; re-coloured (decision 532, Jeff, 2026-10-19: \"tone 8 approved, good improvement\"): every face moved from row 1's grey stone to the same column of row 3, the sandstone of the re-graded wall tile, so posts, caps and coping match the walls; rocks keep row 1"},
 			"uses": "a T joint low (1 m), a run along z met by one along +x"
 		},
 		"wall.castle.t_tall": {
@@ -193,7 +193,7 @@
 			"kind": "vertex",
 			"size": [0.5, 4.5, 0.5],
 			"budget": 800,
-			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/wall.castle.corner_tall/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; corner_tall c2 as the one post mesh for post/end/corner/t/cross_tall, slimmed to 0.5 x 4.5, the end 0.6 x 4.6, crenellated top kept; budget 200 -> 800): 699 tris"},
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-19", "notes": "N:/assets/candidates/wall.castle.corner_tall/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; corner_tall c2 as the one post mesh for post/end/corner/t/cross_tall, slimmed to 0.5 x 4.5, the end 0.6 x 4.6, crenellated top kept; budget 200 -> 800): 699 tris; re-coloured (decision 532, Jeff, 2026-10-19: \"tone 8 approved, good improvement\"): every face moved from row 1's grey stone to the same column of row 3, the sandstone of the re-graded wall tile, so posts, caps and coping match the walls; rocks keep row 1"},
 			"uses": "a T joint tall (4.5 m), a run along z met by one along +x"
 		},
 		"wall.castle.cross": {
@@ -202,7 +202,7 @@
 			"kind": "vertex",
 			"size": [0.5, 3, 0.5],
 			"budget": 800,
-			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/wall.castle.post/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; post c2 as the one mesh for the 3 m castle set, slimmed to 0.5 x 3 x 0.5, the end 0.6 x 3.1; budget 200 -> 800, one per joint): 690 tris, grey stone on row 1"},
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-19", "notes": "N:/assets/candidates/wall.castle.post/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; post c2 as the one mesh for the 3 m castle set, slimmed to 0.5 x 3 x 0.5, the end 0.6 x 3.1; budget 200 -> 800, one per joint): 690 tris, grey stone on row 1; re-coloured (decision 532, Jeff, 2026-10-19: \"tone 8 approved, good improvement\"): every face moved from row 1's grey stone to the same column of row 3, the sandstone of the re-graded wall tile, so posts, caps and coping match the walls; rocks keep row 1"},
 			"uses": "a + joint, runs along z and x crossing"
 		},
 		"wall.castle.cross_low": {
@@ -211,7 +211,7 @@
 			"kind": "vertex",
 			"size": [0.5, 1, 0.5],
 			"budget": 200,
-			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/wall.castle.corner_low/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): wall.castle.corner_low's c1 200 mesh as the one mesh for post/corner/t/cross_low (art-gen: t_low's own c1 is 111 parts), 188 tris"},
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-19", "notes": "N:/assets/candidates/wall.castle.corner_low/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): wall.castle.corner_low's c1 200 mesh as the one mesh for post/corner/t/cross_low (art-gen: t_low's own c1 is 111 parts), 188 tris; re-coloured (decision 532, Jeff, 2026-10-19: \"tone 8 approved, good improvement\"): every face moved from row 1's grey stone to the same column of row 3, the sandstone of the re-graded wall tile, so posts, caps and coping match the walls; rocks keep row 1"},
 			"uses": "a + joint low (1 m), runs along z and x crossing"
 		},
 		"wall.castle.cross_tall": {
@@ -220,7 +220,7 @@
 			"kind": "vertex",
 			"size": [0.5, 4.5, 0.5],
 			"budget": 800,
-			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/wall.castle.corner_tall/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; corner_tall c2 as the one post mesh for post/end/corner/t/cross_tall, slimmed to 0.5 x 4.5, the end 0.6 x 4.6, crenellated top kept; budget 200 -> 800): 699 tris"},
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-19", "notes": "N:/assets/candidates/wall.castle.corner_tall/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; corner_tall c2 as the one post mesh for post/end/corner/t/cross_tall, slimmed to 0.5 x 4.5, the end 0.6 x 4.6, crenellated top kept; budget 200 -> 800): 699 tris; re-coloured (decision 532, Jeff, 2026-10-19: \"tone 8 approved, good improvement\"): every face moved from row 1's grey stone to the same column of row 3, the sandstone of the re-graded wall tile, so posts, caps and coping match the walls; rocks keep row 1"},
 			"uses": "a + joint tall (4.5 m), runs along z and x crossing"
 		},
 		"wall.castle.post": {
@@ -229,7 +229,7 @@
 			"kind": "vertex",
 			"size": [0.5, 3, 0.5],
 			"budget": 800,
-			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/wall.castle.post/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; post c2 as the one mesh for the 3 m castle set, slimmed to 0.5 x 3 x 0.5, the end 0.6 x 3.1; budget 200 -> 800, one per joint): 690 tris, grey stone on row 1"},
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-19", "notes": "N:/assets/candidates/wall.castle.post/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; post c2 as the one mesh for the 3 m castle set, slimmed to 0.5 x 3 x 0.5, the end 0.6 x 3.1; budget 200 -> 800, one per joint): 690 tris, grey stone on row 1; re-coloured (decision 532, Jeff, 2026-10-19: \"tone 8 approved, good improvement\"): every face moved from row 1's grey stone to the same column of row 3, the sandstone of the re-graded wall tile, so posts, caps and coping match the walls; rocks keep row 1"},
 			"uses": "where walls meet at an angle or a wall ends (Client3D._add_post)",
 			"fill": {"from": "kenney-castle", "piece": "wall-narrow-corner", "scale": [1, 2.290076, 1]}
 		},
@@ -239,7 +239,7 @@
 			"kind": "vertex",
 			"size": [0.5, 1, 0.5],
 			"budget": 200,
-			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/wall.castle.corner_low/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): wall.castle.corner_low's c1 200 mesh as the one mesh for post/corner/t/cross_low (art-gen: t_low's own c1 is 111 parts), 188 tris"},
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-19", "notes": "N:/assets/candidates/wall.castle.corner_low/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): wall.castle.corner_low's c1 200 mesh as the one mesh for post/corner/t/cross_low (art-gen: t_low's own c1 is 111 parts), 188 tris; re-coloured (decision 532, Jeff, 2026-10-19: \"tone 8 approved, good improvement\"): every face moved from row 1's grey stone to the same column of row 3, the sandstone of the re-graded wall tile, so posts, caps and coping match the walls; rocks keep row 1"},
 			"uses": "a free-standing pillar low (1 m) at a cell corner"
 		},
 		"wall.castle.post_tall": {
@@ -248,7 +248,7 @@
 			"kind": "vertex",
 			"size": [0.5, 4.5, 0.5],
 			"budget": 800,
-			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/wall.castle.corner_tall/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; corner_tall c2 as the one post mesh for post/end/corner/t/cross_tall, slimmed to 0.5 x 4.5, the end 0.6 x 4.6, crenellated top kept; budget 200 -> 800): 699 tris"},
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-19", "notes": "N:/assets/candidates/wall.castle.corner_tall/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; corner_tall c2 as the one post mesh for post/end/corner/t/cross_tall, slimmed to 0.5 x 4.5, the end 0.6 x 4.6, crenellated top kept; budget 200 -> 800): 699 tris; re-coloured (decision 532, Jeff, 2026-10-19: \"tone 8 approved, good improvement\"): every face moved from row 1's grey stone to the same column of row 3, the sandstone of the re-graded wall tile, so posts, caps and coping match the walls; rocks keep row 1"},
 			"uses": "a free-standing pillar tall (4.5 m) at a cell corner"
 		},
 		"wall.castle.window": {
@@ -257,7 +257,7 @@
 			"kind": "edge",
 			"size": [0.5, 3, 1],
 			"budget": 400,
-			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/wall.castle.window/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; c3, depth squeezed to the wall): its 400 mesh, the slit on the +-x faces, 349 tris"},
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-19", "notes": "N:/assets/candidates/wall.castle.window/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; c3, depth squeezed to the wall): its 400 mesh, the slit on the +-x faces, 349 tris; re-coloured (decision 532, Jeff, 2026-10-19: \"tone 8 approved, good improvement\"): every face moved from row 1's grey stone to the same column of row 3, the sandstone of the re-graded wall tile, so posts, caps and coping match the walls; rocks keep row 1"},
 			"uses": "a 1 m wall section with an opening to see through; it still blocks movement; an arrow slit",
 			"grey": [
 				{"at": [0, 0.6, 0], "size": [0.5, 1.2, 1]},
@@ -272,7 +272,7 @@
 			"kind": "edge",
 			"size": [0.5, 2.2, 1],
 			"budget": 400,
-			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/wall.castle.straight_ruined/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; c8 trimmed to 1 m): its 1600 mesh cut to 1 m and decimated to 378"},
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-19", "notes": "N:/assets/candidates/wall.castle.straight_ruined/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; c8 trimmed to 1 m): its 1600 mesh cut to 1 m and decimated to 378; re-coloured (decision 532, Jeff, 2026-10-19: \"tone 8 approved, good improvement\"): every face moved from row 1's grey stone to the same column of row 3, the sandstone of the re-graded wall tile, so posts, caps and coping match the walls; rocks keep row 1"},
 			"uses": "a 1 m wall section with a broken top, for ruins and broken runs",
 			"grey": [
 				{"at": [0, 0.9, 0], "size": [0.5, 1.8, 1]},
@@ -285,7 +285,7 @@
 			"kind": "vertex",
 			"size": [0.6, 1.8, 0.6],
 			"budget": 300,
-			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/wall.castle.end_ruined/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c1's 300 mesh squeezed to 0.6, 289 tris"},
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-19", "notes": "N:/assets/candidates/wall.castle.end_ruined/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c1's 300 mesh squeezed to 0.6, 289 tris; re-coloured (decision 532, Jeff, 2026-10-19: \"tone 8 approved, good improvement\"): every face moved from row 1's grey stone to the same column of row 3, the sandstone of the re-graded wall tile, so posts, caps and coping match the walls; rocks keep row 1"},
 			"uses": "a run's broken free end: rubble and a jagged stub"
 		},
 		"wall.castle.rubble": {
@@ -294,7 +294,7 @@
 			"kind": "edge",
 			"size": [0.8, 0.7, 1],
 			"budget": 400,
-			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/wall.castle.rubble/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c4's 400 mesh, 319 tris"},
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-19", "notes": "N:/assets/candidates/wall.castle.rubble/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c4's 400 mesh, 319 tris; re-coloured (decision 532, Jeff, 2026-10-19: \"tone 8 approved, good improvement\"): every face moved from row 1's grey stone to the same column of row 3, the sandstone of the re-graded wall tile, so posts, caps and coping match the walls; rocks keep row 1"},
 			"uses": "the blocked gap in a broken wall run: fills a whole 1 m edge, at least 0.6 m tall, so a gap never reads as a way through"
 		},
 		"wall.wood.profile": {
@@ -816,7 +816,7 @@
 			"kind": "vertex",
 			"size": [1.6, 6, 1.6],
 			"budget": 3200,
-			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/wall.castle.tower/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; c7, budget 800 -> 3200): its 3200 mesh fitted to 1.6 x 6, 3045 tris, grey stone on row 1"},
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-19", "notes": "N:/assets/candidates/wall.castle.tower/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; c7, budget 800 -> 3200): its 3200 mesh fitted to 1.6 x 6, 3045 tris, grey stone on row 1; re-coloured (decision 532, Jeff, 2026-10-19: \"tone 8 approved, good improvement\"): every face moved from row 1's grey stone to the same column of row 3, the sandstone of the re-graded wall tile, so posts, caps and coping match the walls; rocks keep row 1"},
 			"uses": "a castle tower at a vertex where two runs meet or beside a gate (a town's walls, level 3), taller than the wall; origin at its base, centred on the vertex, as a post; its socket top at the platform",
 			"sockets": {"top": [0, 5, 0]}
 		},

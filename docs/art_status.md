@@ -104,7 +104,7 @@ Drawn as a grey box (a texture slot: terrain's procedural colour).
 | `material.rock` | 1 | art-gen | own | 2026-10-18 |
 | `material.roof.shingle` | 1 | art-gen, procedural (no model) | own | 2026-10-17 |
 | `material.roof.thatch` | 1 | art-kit, procedural | own | 2026-10-18 |
-| `material.wall.castle` | 1 | art-gen | own | 2026-10-18 |
+| `material.wall.castle` | 1 | art-gen, re-graded by art-kit | own | 2026-10-19 |
 | `material.wall.cave` | 1 | art-gen | own | 2026-10-18 |
 | `material.wall.stone` | 1 | art-gen | own | 2026-10-18 |
 | `material.wall.wood` | 1 | art-gen | own | 2026-10-18 |
@@ -159,29 +159,29 @@ Drawn as a grey box (a texture slot: terrain's procedural colour).
 | `tree.pine_stand` | 4 | art-kit, from tree.pine's art-gen variants | own | 2026-10-17 |
 | `tree.small` | 3 | art-gen, fitted by art-kit (variant 1); art-kit by hand (2, 3) | own | 2026-10-18 |
 | `tree.stump` | 2 | art-gen, cleaned up by art-kit | own | 2026-10-15 |
-| `wall.castle.corner` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
-| `wall.castle.corner_low` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
-| `wall.castle.corner_tall` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
-| `wall.castle.cross` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
-| `wall.castle.cross_low` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
-| `wall.castle.cross_tall` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
-| `wall.castle.end` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
-| `wall.castle.end_low` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
-| `wall.castle.end_ruined` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
-| `wall.castle.end_tall` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
-| `wall.castle.post` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
-| `wall.castle.post_low` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
-| `wall.castle.post_tall` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
-| `wall.castle.rubble` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
-| `wall.castle.straight` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
-| `wall.castle.straight_low` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
-| `wall.castle.straight_ruined` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
-| `wall.castle.straight_tall` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
-| `wall.castle.t` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
-| `wall.castle.t_low` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
-| `wall.castle.t_tall` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
-| `wall.castle.tower` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
-| `wall.castle.window` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
+| `wall.castle.corner` | 1 | art-gen, fitted by art-kit | own | 2026-10-19 |
+| `wall.castle.corner_low` | 1 | art-gen, fitted by art-kit | own | 2026-10-19 |
+| `wall.castle.corner_tall` | 1 | art-gen, fitted by art-kit | own | 2026-10-19 |
+| `wall.castle.cross` | 1 | art-gen, fitted by art-kit | own | 2026-10-19 |
+| `wall.castle.cross_low` | 1 | art-gen, fitted by art-kit | own | 2026-10-19 |
+| `wall.castle.cross_tall` | 1 | art-gen, fitted by art-kit | own | 2026-10-19 |
+| `wall.castle.end` | 1 | art-gen, fitted by art-kit | own | 2026-10-19 |
+| `wall.castle.end_low` | 1 | art-gen, fitted by art-kit | own | 2026-10-19 |
+| `wall.castle.end_ruined` | 1 | art-gen, fitted by art-kit | own | 2026-10-19 |
+| `wall.castle.end_tall` | 1 | art-gen, fitted by art-kit | own | 2026-10-19 |
+| `wall.castle.post` | 1 | art-gen, fitted by art-kit | own | 2026-10-19 |
+| `wall.castle.post_low` | 1 | art-gen, fitted by art-kit | own | 2026-10-19 |
+| `wall.castle.post_tall` | 1 | art-gen, fitted by art-kit | own | 2026-10-19 |
+| `wall.castle.rubble` | 1 | art-gen, fitted by art-kit | own | 2026-10-19 |
+| `wall.castle.straight` | 1 | art-gen, fitted by art-kit | own | 2026-10-19 |
+| `wall.castle.straight_low` | 1 | art-gen, fitted by art-kit | own | 2026-10-19 |
+| `wall.castle.straight_ruined` | 1 | art-gen, fitted by art-kit | own | 2026-10-19 |
+| `wall.castle.straight_tall` | 1 | art-gen, fitted by art-kit | own | 2026-10-19 |
+| `wall.castle.t` | 1 | art-gen, fitted by art-kit | own | 2026-10-19 |
+| `wall.castle.t_low` | 1 | art-gen, fitted by art-kit | own | 2026-10-19 |
+| `wall.castle.t_tall` | 1 | art-gen, fitted by art-kit | own | 2026-10-19 |
+| `wall.castle.tower` | 1 | art-gen, fitted by art-kit | own | 2026-10-19 |
+| `wall.castle.window` | 1 | art-gen, fitted by art-kit | own | 2026-10-19 |
 | `wall.cave.end` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
 | `wall.cave.pillar` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
 | `wall.cave.rubble` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
