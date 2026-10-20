@@ -1003,8 +1003,17 @@ func _official_wages(at: int) -> void:
 		worker_record["wage_due"] = at + every
 		var wage := int(official[trade].get("wage", 0))
 		var town: String = worker_record["town"]
-		if wage <= 0 or stockpile.count(town, "gold") - wage < floor_gold 				or not stockpile.take(town, "gold", wage, "wage:%s" % id):
-			print("[production] %s the %s goes unpaid: %s's treasury is at its floor, step %d" % [worker_record["name"], trade, town, at])
+		if wage <= 0:
+			continue
+		if stockpile.count(town, "gold") - wage < floor_gold or not stockpile.take(town, "gold", wage, "wage:%s" % id):
+			# Owed, as the wage floor is, and paid first when the treasury
+			# can (528 amended: "the town pays official jobs").
+			# Never past store.owed_cap, as a delivery's debt: what the town
+			# keeps back for its officials can't grow without end.
+			var cap := int(rules.get("store", {}).get("owed_cap", 30))
+			worker_record["owed"] = mini(int(worker_record.get("owed", 0)) + wage, maxi(cap, int(worker_record.get("owed", 0))))
+			print("[production] %s the %s goes unpaid: %s's treasury is at its floor; owed %d, step %d" % [worker_record["name"], trade, town,
+				int(worker_record["owed"]), at])
 			continue
 		worker_record["purse"] = int(worker_record["purse"]) + wage
 		print("[production] %s the %s is paid %d gold by %s, step %d" % [worker_record["name"], trade, wage, town, at])

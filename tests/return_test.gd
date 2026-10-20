@@ -96,8 +96,8 @@ func _test_job() -> void:
 
 func _test_officials() -> void:
 	print("\n== the priest, the medicine man ==")
-	_check(int(_rules["official"]["priest"]["wage"]) == 4 and int(_rules["official"]["priest"]["every"]) == 18000,
-		"the priest is an official: 4 every 18000 steps")
+	_check(int(_rules["official"]["priest"]["wage"]) == 4 and int(_rules["official"]["priest"]["every"]) == 54000,
+		"the priest is an official: 4 a day (528 amended)")
 	_check(_rules["buildings"]["temple"]["trade"] == "priest", "the temple is the priest's building")
 	var stock := Stockpile.new({}, func() -> int: return _now)
 	var work := Production.new({}, stock, null, func() -> int: return _now, _rules, func() -> Dictionary: return {})

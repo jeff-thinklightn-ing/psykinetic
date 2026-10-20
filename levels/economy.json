@@ -54,8 +54,8 @@
 	"wage_floor": {"gold": 3, "trades": {"shepherd": "wool", "hauler": "", "tanner": "leather", "weaver": "cloth", "cook": "food"}},
 	"haul": {"trade": "hauler", "load": 5, "fee": 1},
 	"apprentice": {"from": "hauler", "above": 60, "days": 3, "below": 20, "wage": 2, "speed": 1.25},
-	"official": {"guard": {"wage": 4, "every": 18000}, "priest": {"wage": 4, "every": 18000},
-		"lawspeaker": {"wage": 4, "every": 18000, "from": 6, "names": ["Ulf", "Sigrid", "Halvard", "Ingrid", "Torvald", "Asa"]}},
+	"official": {"guard": {"wage": 4, "every": 54000}, "priest": {"wage": 4, "every": 54000},
+		"lawspeaker": {"wage": 4, "every": 54000, "from": 6, "names": ["Ulf", "Sigrid", "Halvard", "Ingrid", "Torvald", "Asa"]}},
 	"town_work": {"fee": 1, "per_steps": 600},
 	"contribute": {"gold_per_xp": 2},
 	"return": {

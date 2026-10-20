@@ -16117,3 +16117,37 @@ approved.
 
 builder_test _test_codes; editor_test's every-key list (building_codes
 not offered).
+## 528 amended: the officials paid first, at a living
+
+The coordinator, after 528's soak (officials unpaid 229, the floor and
+the makers' price drawing on the treasury first); Jeff: "the town pays
+official jobs", "wages are paid by town". The coordinator flags the wage
+to Jeff as his to move.
+- An official's wage the treasury can't pay is owed (Production
+  _official_wages: worker "owed", never past store.owed_cap), not lost,
+  and each tick what the town owes its officials is paid before anyone
+  else's debts (Economy._pay_head_first, then the head build's
+  suppliers, then the rest in turn). Economy.is_official.
+- The officials' wage is 4 a day (official.<trade>.every 54000), not 4
+  every 18000 (12 a day).
+Three soaks (30 days, 3 players, on the same main) give the reasoning:
+1. A day of the officials' wages and what is owed them held back above
+   the floor ahead of everything (deliveries, the floor, other debts):
+   the town froze. Nothing was built after day 2.4, no inn, the wage
+   floor paid 0 of 280, the farmer's deliveries owed.
+2. Owed officials paid first among debts, nothing held back, at 12 a
+   day: still starved. The farmer's income 2.6 a day (13.4), no inn, the
+   floor paid 39 of 319. The officials' 36 a day between three was more
+   than the treasury takes in and four times an official's keep (2.5 to
+   4 a day): "goes unpaid" had been hiding a wrong number, not a
+   shortfall.
+3. As 2 at 4 a day: the officials were due 324 and paid all of it (76
+   on the day, 248 owed and paid later); the inn on day 16.2, treasury
+   end 5, the floor 252 due, 133 paid, 119 owed.
+The standing fact: with today's inflows (rent, taxes, caravans, the
+luxury tax and C's tax on the rich's services) the treasury can't pay
+the wage floor, the officials and the makers' price all at once; the
+floor runs about half owed. The next gold has to come from trade's
+volume or from the rich, not from the poor. larder_test, return_test.
+Protocol unchanged.
+

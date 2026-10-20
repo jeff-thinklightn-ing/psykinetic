@@ -851,11 +851,23 @@ func _floor_turn() -> void:
 			short - now_owed, now_owed, now()])
 
 
+## Whether worker [param id] holds an official job the town pays
+## (economy.json "official": the guard, the priest, the lawspeaker).
+func is_official(id: String) -> bool:
+	var official: Dictionary = rules.get("official", {})
+	return production.worker(id).get("trades", []).any(func(trade: String) -> bool: return official.has(trade))
+
+
 ## Before anyone else, the treasury pays those it owes for what each
 ## town's next build lacks (522 amended, the coordinator: the tanner while
 ## the inn waits on leather), so the build isn't held up by a debt the
 ## town pays to others first. The rest are paid as before, in turn.
 func _pay_head_first() -> void:
+	# The town's officials before anyone (528 amended: "the town pays
+	# official jobs"): what it owes them, from its treasury above its floor.
+	for id in production.worker_ids():
+		if is_official(id) and int(production.worker(id).get("owed", 0)) > 0:
+			_pay_owed(id, str(production.worker(id)["town"]))
 	if not shortfall.is_valid():
 		return
 	var ids: Array = _owed_what.keys()

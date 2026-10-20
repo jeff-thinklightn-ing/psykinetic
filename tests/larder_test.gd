@@ -922,6 +922,19 @@ func _test_livings() -> void:
 	economy._pay(TOWN, "c1", 10, "trade", "test")
 	var rich := stock.count(TOWN, "gold") - gold
 	_check(poor == 1 and rich == 3, "a service fee taxed 0.1 for a purse under luxury.above, 0.3 above it (%d, %d)" % [poor, rich])
+	# The officials first (528 amended): a wage the treasury can't pay is owed, and paid before anyone's.
+	stock.take(TOWN, "gold", stock.count(TOWN, "gold") - floor_gold)
+	work.add_worker("g1", "Gar", ["guard"], TOWN, "test", "steady")
+	var wage := int(_rules["official"]["guard"]["wage"])
+	var every := int(_rules["official"]["guard"]["every"])
+	work._official_wages(_now)
+	work._official_wages(_now + every)
+	_check(int(work.worker("g1")["owed"]) == wage, "the guard's wage at the floor: owed him (%d), not lost" % int(work.worker("g1")["owed"]))
+	stock.deposit(TOWN, "gold", wage)
+	var shepherd := int(work.worker("s1")["owed"])
+	economy._pay_head_first()
+	_check(int(work.worker("s1")["owed"]) == shepherd, "gold comes in: the guard's debt paid before the shepherd's")
+	_check(int(work.worker("g1")["owed"]) == 0 and int(work.worker("g1")["purse"]) == wage, "the guard paid what he was owed, first")
 
 
 func _check(ok: bool, what: String) -> void:
