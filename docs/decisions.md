@@ -16474,3 +16474,10 @@ edges and links named by side, the editor's view), so it stays north-up;
 the corner map alone turns with the view (Minimap.turn is 0 while big),
 which is the play-feel Jeff asked for. The arrow carries the body's facing
 on both. A direction change queues no draw while the big map is open.
+
+Amended (the coordinator: every body through creature_clean before its rig): the kobold
+cleaned the same way: art-kit's shard-free mesh through tools/creature_clean.py (voxel 0.006,
+Solidify 0.008, at its 0.96 m; QuadriFlow fails on it, so collapsed to 6,000 triangles; 2 s),
+then fitted as before: 5,975 triangles, its paint baked back. The fit still cuts the faces
+where the remesh fused its hands to its thighs (25), which leaves small openings there, and
+the dark patch at its thighs in the jog stays (it is in its paint).
