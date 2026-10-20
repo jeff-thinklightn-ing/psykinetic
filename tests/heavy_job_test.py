@@ -316,6 +316,16 @@ shown = io.StringIO()
 with contextlib.redirect_stdout(shown):
     gate.summary(datetime.date.today().isoformat())
 check("launch: items_test" in shown.getvalue() and "1 launch" in shown.getvalue(), "the summary lists and counts it")
+# 530 amended: a crash at launch carries its top frame and backtrace, and the
+# summary groups crashes by top frame, the backtrace left in the log.
+for scene in ("anim_rig_test", "view_test"):
+    gate.main(["note", "suite", "launch", scene, "exit 139 at launch; crashed (Program crashed with signal 11) at main+40d4d61;",
+        "backtrace: main+40d4d61 main+61555f"])
+shown = io.StringIO()
+with contextlib.redirect_stdout(shown):
+    gate.summary(datetime.date.today().isoformat())
+check("launch crashes by top frame: main+40d4d61 2" in shown.getvalue() and "3 launch" in shown.getvalue()
+    and "backtrace:" not in shown.getvalue(), "crashes grouped by top frame, the backtrace kept to the log: %s" % shown.getvalue().splitlines()[-1])
 
 shutil.rmtree(STATE, ignore_errors=True)
 print("\nRESULT: %s" % ("PASS" if failed == 0 else "FAIL (%d failed)" % failed))

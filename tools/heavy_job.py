@@ -71,6 +71,7 @@ import ctypes
 import datetime
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -890,9 +891,21 @@ def summary(day):
     if not lines:
         print("%s: no heavy job waited or was stopped" % day)
     for when, event, tree, kind, detail in lines:
+        if event == "launch":
+            detail = detail.split("; backtrace:")[0]  # The whole one stays in the log.
         print("%s %s %s %s: %s" % (when[11:16], tree, kind, event if event in SUMMARY_EVENTS else "waited", detail))
     counts = ["%d %s" % (sum(1 for each in lines if each[1] == event), event) for event in ("overrun", "hung", "launch")]
     print("%s: %s" % (day, ", ".join(counts)))
+    # Launch crashes by their top frame (530 amended): the same frame again
+    # and again is an engine or asset bug to chase, not the machine.
+    crashes = {}
+    for each in lines:
+        found = re.search(r"; crashed \([^)]*\) at ([^\s;]+)", each[4]) if each[1] == "launch" else None
+        if found:
+            crashes[found.group(1)] = crashes.get(found.group(1), 0) + 1
+    if crashes:
+        print("%s: launch crashes by top frame: %s" % (day, ", ".join("%s %d" % (frame, count)
+            for frame, count in sorted(crashes.items(), key=lambda item: -item[1]))))
     return 0
 
 

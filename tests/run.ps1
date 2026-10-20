@@ -66,22 +66,38 @@ function Get-Verdict($scene, $process, $killed, $took) {
 	if ($why -eq '') { "PASS  $(Get-Name $scene) ${took}s" } else { "FAIL  $(Get-Name $scene) ${took}s: $why" }
 }
 
-# Whether a scene died at launch (decision 530): a non-zero exit within 5 s
-# with nothing after Godot's banner in its output (no line of the game's own,
-# no RESULT). A scene that ran any of its own code is never retried.
-function Test-LaunchFailed($scene, $process, $killed, $took) {
-	if ($killed -or $process.ExitCode -eq 0 -or $took -gt 5) { return $false }
+# What a scene that died at launch may show (decision 530): Godot's banner,
+# blank lines and, since 530 amended, the engine's crash-handler block. Any
+# other line is the game's own (tests/run.sh's LAUNCH_ONLY).
+$launchOnly = '^Godot Engine v|^\s*$|^=+$|^CrashHandlerException:|^Engine version:|^Dumping the backtrace|^Load address:|^\[[0-9]+\] |^-- END OF .*BACKTRACE --$'
+
+function Get-SceneOutput($scene) {
 	$log = Join-Path $logs "$(Get-Name $scene).log"
-	$output = @(Get-Content "$log.out" -ErrorAction SilentlyContinue) + @(Get-Content "$log.err" -ErrorAction SilentlyContinue)
-	return -not ($output | Where-Object { "$_" -notmatch '^Godot Engine v' -and "$_".Trim() -ne '' })
+	@(Get-Content "$log.out" -ErrorAction SilentlyContinue) + @(Get-Content "$log.err" -ErrorAction SilentlyContinue) | ForEach-Object { "$_" }
+}
+
+# Whether a scene died at launch (decision 530): a non-zero exit within 10 s
+# with nothing but $launchOnly's lines in its output (no line of the game's
+# own, no RESULT). A scene that ran any of its own code is never retried.
+function Test-LaunchFailed($scene, $process, $killed, $took) {
+	if ($killed -or $process.ExitCode -eq 0 -or $took -gt 10) { return $false }
+	return -not (Get-SceneOutput $scene | Where-Object { $_ -notmatch $launchOnly })
 }
 
 # A launch failure's diagnosis, logged in the gate's log too (heavy_job
-# summary counts them): the exit code, where Godot resolves, free RAM and commit.
+# summary counts them): the exit code, where Godot resolves, free RAM and
+# commit; a crash's top frame and whole backtrace (summary groups by top frame).
 function Get-LaunchNote($scene, $process) {
 	$detail = "$(Get-Name $scene) exit $($process.ExitCode) at launch; godot: $(if (Test-Path $godot) { $godot } else { "$godot not found" })"
-	$noted = & python (Join-Path $root 'tools/heavy_job.py') note (Split-Path $root -Leaf) launch $detail 2>$null
-	if ($LASTEXITCODE -eq 0 -and $noted) { "$noted" } else { $detail }
+	$output = Get-SceneOutput $scene
+	$crash = $output | Where-Object { $_ -match '^CrashHandlerException: ' } | Select-Object -First 1
+	if ($crash) {
+		$frames = @($output | Where-Object { $_ -match '^\[[0-9]+\] ' } | ForEach-Object { $_ -replace '^\[[0-9]+\] [0-9a-fx]+ \(([^)]*)\).*', '$1' })
+		$detail += "; crashed ($($crash -replace '^CrashHandlerException: ', '')) at $($frames[0]); backtrace: $($frames -join ' ')"
+	}
+	$noted = & python -B (Join-Path $root 'tools/heavy_job.py') note (Split-Path $root -Leaf) launch $detail 2>$null
+	$note = if ($LASTEXITCODE -eq 0 -and $noted) { "$noted" } else { $detail }
+	$note -replace '; backtrace:.*$', ''  # The whole one is in the gate's log.
 }
 
 # Stops a scene's process and the game it runs under it (the console build's child).

@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Landing tests also retry a test that crashes as it starts, before running any of its own code, and the daily summary groups such crashes by where they happened (530 amended); tools only.
 - Things can be bound to one player for life: the halves of a cut coin a beaten draugr leaves, which stay theirs even when lost or stolen.
 - Fixed: a companion's sickness, and news of one she had while you were away, was forgotten when the server restarted (decision 501).
 - Fixed: the rubber banding walking with WASD near the town chests (543). A held walk no longer gets stuck a few steps ahead of the server and pulled back every second or two; after a hold-up it catches up smoothly instead.

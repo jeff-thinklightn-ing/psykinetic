@@ -64,13 +64,15 @@ run_scene() {
 		# Died at launch, before any of its own code ran (decision 530: exit 127
 		# with an empty log, exit 1 after the banner, in a suite's first burst):
 		# noted with what the machine had, then run once more.
-		retried="$(launch_note "$name" "$status")"
+		retried="$(launch_note "$name" "$status" "$log")"
+		retried="${retried%%; backtrace:*}"  # The whole one is in the gate's log.
 		sleep 2
 		again=$(date +%s)
 		timeout --kill-after=10 "$TIMEOUT" "$GODOT" --headless --path . --scene "$scene" -- "--run-marker=$marker" </dev/null >"$log" 2>&1
 		status=$?
 		if launch_failed "$status" "$again" "$log"; then
-			retried="$retried; the retry too: $(launch_note "$name" "$status")"
+			again_note="$(launch_note "$name" "$status" "$log")"
+			retried="$retried; the retry too: ${again_note%%; backtrace:*}"
 		fi
 	fi
 	if { [ "$status" -eq 124 ] || [ "$status" -eq 137 ]; } && command -v powershell.exe >/dev/null 2>&1; then
@@ -97,20 +99,33 @@ run_scene() {
 	echo "$took $scene" >"$log.took"
 }
 
+# What a scene that died at launch may show (decision 530): Godot's banner,
+# blank lines and, since 530 amended (anim_rig_test, signal 11 at 5 s), the
+# engine's crash-handler block. Any other line is the game's own.
+LAUNCH_ONLY='^Godot Engine v|^[[:space:]]*$|^=+$|^CrashHandlerException:|^Engine version:|^Dumping the backtrace|^Load address:|^\[[0-9]+\] |^-- END OF .*BACKTRACE --$'
+
 # Whether a scene died at launch (decision 530): exit [param 1] non-zero
-# within 5 s of [param 2], and its log [param 3] holding nothing after
-# Godot's banner (no line of the game's own, no RESULT). A scene that ran any
-# of its own code is never retried.
+# within 10 s of [param 2] (5 until 530 amended: a crash dump took 5 s, an
+# instant exit read 6 under load), and its log [param 3] holding nothing but
+# LAUNCH_ONLY's lines (no line of the game's own, no RESULT). A scene that
+# ran any of its own code is never retried.
 launch_failed() {
-	[ "$1" -ne 0 ] && [ $(( $(date +%s) - $2 )) -le 5 ] 		&& ! grep -v -q -E '^Godot Engine v|^[[:space:]]*$' "$3"
+	[ "$1" -ne 0 ] && [ $(( $(date +%s) - $2 )) -le 10 ] \
+		&& ! grep -v -q -E "$LAUNCH_ONLY" "$3"
 }
 
 # A launch failure's diagnosis for its .result, logged in the gate's log too
 # (heavy_job summary counts them): exit [param 2], the command, where its
-# programs resolve, the machine's free RAM and commit.
+# programs resolve, the machine's free RAM and commit; a crash's top frame
+# and its whole backtrace from log [param 3] (heavy_job summary groups
+# crashes by top frame: the same one again is an engine or asset bug).
 launch_note() {
 	detail="$1 exit $2 at launch; timeout: $(command -v timeout || echo none), godot: $(command -v "$GODOT" || echo "$GODOT not found")"
-	python tools/heavy_job.py note "$(basename "$(pwd)")" launch "$detail" 2>/dev/null || echo "$detail"
+	if grep -q '^CrashHandlerException:' "$3"; then
+		frames="$(grep -E '^\[[0-9]+\] ' "$3" | sed -E 's/^\[[0-9]+\] [0-9a-fx]+ \(([^)]*)\).*/\1/' | tr '\n' ' ')"
+		detail="$detail; crashed ($(grep -m 1 '^CrashHandlerException:' "$3" | sed 's/^CrashHandlerException: //')) at ${frames%% *}; backtrace: ${frames% }"
+	fi
+	python -B tools/heavy_job.py note "$(basename "$(pwd)")" launch "$detail" 2>/dev/null || echo "$detail"
 }
 
 started=$(date +%s)

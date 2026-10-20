@@ -15881,6 +15881,28 @@ notes; a "[net]" line then exit 1: not retried).
 
 Rejected: retrying any failed scene (it would hide flaky tests); fewer
 scenes at once (slower landings for a failure that is rare).
+
+Amended (release's go, 2026-10-20): perf's 543 landing lost anim_rig_test
+to a segfault at launch (exit 139 at 5 s: the banner, then the engine's
+crash-handler block, no line of the game's; it passes alone 3 of 3). That
+block now counts as nothing of the scene's own (run.sh's LAUNCH_ONLY, run.ps1's
+$launchOnly: the banner, blank lines, the "====" rules, CrashHandlerException,
+Engine version, Dumping the backtrace, Load address, the "[n]" frames, "-- END
+OF ... BACKTRACE --"), so it gets the one retry. A crash that is
+deterministic on load still fails twice, and one after any line of the game's
+own, or after RESULT, is never retried.
+- The launch note carries the crash, its top frame and the whole backtrace
+  (frame symbols, "main+40d4d61 ...") to the gate's log; the verdict line shows
+  it up to the top frame. heavy_job summary groups launch crashes by top
+  frame ("launch crashes by top frame: main+40d4d61 2"): the same frame again
+  and again is an engine or asset bug to chase.
+- The window is 10 s, was 5: the segfault's own dump took 5 s, and under the
+  day's load a fake Godot exiting 127 at once was read at 6 s, missing its
+  retry in 2 of 4 runs at 5 s, none of 3 at 10 s. The content is the guard.
+Checked against fake Godots in both runners (a crash block once then a pass:
+retried, passes; a game line then the crash: not retried); heavy_job_test
+(two crashes with one top frame grouped, the backtrace kept out of the
+summary).
 ## 529. The Blood Rot's allies on the mesh route: art-gen's meshes in their own paint
 
 Jeff on the route sheets (orc_routes.png, kobold_routes.png): "the trellis retarget is what's
