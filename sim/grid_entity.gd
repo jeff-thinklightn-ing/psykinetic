@@ -818,7 +818,7 @@ func _mirror_tile_changed(old: Vector2i) -> void:
 	if steps == 1 and previous_end > start - 1.0 and previous_end < start + 1.0:
 		start = previous_end
 	_slides.append({"from": old, "to": tile, "tick": start,
-		"duration": World.step_ticks(self, delta) if steps == 1 else float(clampi(steps, 1, 3))})
+		"duration": World.step_ticks(self, delta, old) if steps == 1 else float(clampi(steps, 1, 3))})
 
 
 ## True while this client is showing its own walk ahead of the server.

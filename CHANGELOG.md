@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Fixed: walking onto tall grass, a ford or a slope could be shown at the wrong pace for the steps after the first, so the game pulled you back a little (rubber banding); others' walks were drawn at the wrong pace there too.
 - A third way for a shifting level to lay itself out, for the barrow (Jeff's crypt page): tombs by depth, the town's square tombs with doors, torches and burial niches near the entrance, narrow passage graves with crooked ways below them, the old caverns deepest; grave goods in the deepest niches first, the dead deepest first, the robbers near the altar. The plan sheet draws a sample barrow (`--sample=barrow`).
 - The orc brute is Jeff's own clean-up of it (Jeff: "I worked in blender for a couple hours on clean up"): one solid body with no holes or see-through faces at its back and shoulders, its painted skin carried over (529 amended).
 

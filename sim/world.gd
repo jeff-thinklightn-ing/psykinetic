@@ -1029,7 +1029,7 @@ func walk(entity: GridEntity, to: Vector2i, ticks: float) -> bool:
 	var spent := 0.0
 	for next in path:
 		var direction := next - at
-		var cost := step_ticks(entity, direction)
+		var cost := step_ticks(entity, direction, at)
 		if spent + cost > ticks:
 			break
 		spent += cost
@@ -5430,12 +5430,19 @@ func distance(a: Vector2i, b: Vector2i) -> int:
 
 
 ## Ticks one walking step in [param direction] takes for [param entity];
-## may be fractional.
-func step_ticks(entity: GridEntity, direction: Vector2i) -> float:
+## may be fractional. The step is from [param from], the entity's tile if
+## not given: a walk planned ahead (a client's prediction, an offscreen
+## walk) or a step already taken (a slide drawn after the tile moved) passes
+## the step's own start, or its slope, ford and grass are another cell's and
+## the client's pace drifts from the server's (perf, 2026-10-19, looking
+## into rubber banding by the wilds town's chests, on grass and slopes).
+func step_ticks(entity: GridEntity, direction: Vector2i, from := NO_CELL) -> float:
 	var ticks := entity.move_ticks * (DIAGONAL_TICK_SCALE if direction.x != 0 and direction.y != 0 else 1.0)
-	var to := entity.tile + direction
+	if from == NO_CELL:
+		from = entity.tile
+	var to := from + direction
 	# Uphill is slower (Relief.pace, decision 525); a stair is not.
-	ticks *= Relief.pace(elevation_at(to) - elevation_at(entity.tile), direction.x != 0 and direction.y != 0)
+	ticks *= Relief.pace(elevation_at(to) - elevation_at(from), direction.x != 0 and direction.y != 0)
 	if _fords.has(to):
 		return ticks * FORD_TICK_SCALE
 	return ticks * TALL_GRASS_TICK_SCALE if cover_at(to) > 0.0 else ticks

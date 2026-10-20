@@ -185,7 +185,7 @@ func step(direction: Vector2i) -> bool:
 	next.from_grid = from_grid
 	next.to_grid = Vector2(next.to)
 	next.start = start
-	next.duration = World.step_ticks(_entity, direction)
+	next.duration = World.step_ticks(_entity, direction, at)
 	next.deadline = start + Net.rtt_ticks() + RECONCILE_GRACE_TICKS
 	# Sent as it starts: never re-planned (see advance).
 	next.started = true
@@ -374,7 +374,7 @@ func _append_path(at: Vector2i, start: float, drawn := Vector2.INF) -> void:
 		drawn = Vector2.INF
 		step.to_grid = Vector2(next)
 		step.start = start
-		step.duration = World.step_ticks(_entity, next - at)
+		step.duration = World.step_ticks(_entity, next - at, at)
 		step.deadline = start + latency + RECONCILE_GRACE_TICKS
 		_steps.append(step)
 		start += step.duration
