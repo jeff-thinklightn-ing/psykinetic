@@ -40,9 +40,14 @@ part() {
 	echo "$([ "$code" -eq 0 ] && echo PASS || echo FAIL)  $name ${took}s"
 }
 part heavy_job_test python tests/heavy_job_test.py
+# Started a little apart, as the suite starts its scenes (decision 530: Godots
+# launched in the same instant died at launch).
 part suite env PSYKINETIC_TEST_JOBS="$suite_jobs" bash tests/run.sh &
+sleep 0.3
 part net_test bash tests/net_test.sh &
+sleep 0.3
 part state_test bash tests/state_test.sh &
+sleep 0.3
 part server_boot_test bash tests/server_boot_test.sh &
 wait
 

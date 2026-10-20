@@ -59,6 +59,20 @@ run_scene() {
 	marker="psykinetic-run-$$-$name"
 	timeout --kill-after=10 "$TIMEOUT" "$GODOT" --headless --path . --scene "$scene" -- "--run-marker=$marker" </dev/null >"$log" 2>&1
 	status=$?
+	retried=""
+	if launch_failed "$status" "$started" "$log"; then
+		# Died at launch, before any of its own code ran (decision 530: exit 127
+		# with an empty log, exit 1 after the banner, in a suite's first burst):
+		# noted with what the machine had, then run once more.
+		retried="$(launch_note "$name" "$status")"
+		sleep 2
+		again=$(date +%s)
+		timeout --kill-after=10 "$TIMEOUT" "$GODOT" --headless --path . --scene "$scene" -- "--run-marker=$marker" </dev/null >"$log" 2>&1
+		status=$?
+		if launch_failed "$status" "$again" "$log"; then
+			retried="$retried; the retry too: $(launch_note "$name" "$status")"
+		fi
+	fi
 	if { [ "$status" -eq 124 ] || [ "$status" -eq 137 ]; } && command -v powershell.exe >/dev/null 2>&1; then
 		# On Windows the console build runs the game as a child, which outlives
 		# the wrapper timeout kills: stop it too, found by this run's marker.
@@ -74,12 +88,29 @@ run_scene() {
 	elif [ "$status" -ne 0 ]; then
 		why="$(grep -m 1 '^RESULT:' "$log" || echo "exit $status")"
 	fi
+	[ -n "$retried" ] && retried=" (retried after a launch failure: $retried)"
 	if [ -z "$why" ]; then
-		echo "PASS  $name ${took}s" >"$log.result"
+		echo "PASS  $name ${took}s$retried" >"$log.result"
 	else
-		echo "FAIL  $name ${took}s: $why" >"$log.result"
+		echo "FAIL  $name ${took}s: $why$retried" >"$log.result"
 	fi
 	echo "$took $scene" >"$log.took"
+}
+
+# Whether a scene died at launch (decision 530): exit [param 1] non-zero
+# within 5 s of [param 2], and its log [param 3] holding nothing after
+# Godot's banner (no line of the game's own, no RESULT). A scene that ran any
+# of its own code is never retried.
+launch_failed() {
+	[ "$1" -ne 0 ] && [ $(( $(date +%s) - $2 )) -le 5 ] 		&& ! grep -v -q -E '^Godot Engine v|^[[:space:]]*$' "$3"
+}
+
+# A launch failure's diagnosis for its .result, logged in the gate's log too
+# (heavy_job summary counts them): exit [param 2], the command, where its
+# programs resolve, the machine's free RAM and commit.
+launch_note() {
+	detail="$1 exit $2 at launch; timeout: $(command -v timeout || echo none), godot: $(command -v "$GODOT" || echo "$GODOT not found")"
+	python tools/heavy_job.py note "$(basename "$(pwd)")" launch "$detail" 2>/dev/null || echo "$detail"
 }
 
 started=$(date +%s)
@@ -101,6 +132,9 @@ else
 		fi
 		( run_scene "$scene"; cat "$LOGS/$name.log.result" ) &
 		running=$((running + 1))
+		# Not all in the same instant (decision 530): two scenes died at launch
+		# in a suite's first burst of nine Godots.
+		sleep 0.2
 	done
 	wait
 fi
@@ -126,10 +160,14 @@ if [ "$SERIAL" -eq 0 ]; then
 fi
 echo
 count=$(echo "$scenes" | wc -w | tr -d ' ')
+retries=$(cat "$LOGS"/*.result 2>/dev/null | grep -c "retried after a launch failure")
+again=""
+[ "$retries" -gt 0 ] && again="; $retries retried after a launch failure"
 if [ "$code" -eq 0 ]; then
-	echo "SUITE: PASS ($count scenes, $jobs_at_once at once, $(( $(date +%s) - started ))s)"
+	echo "SUITE: PASS ($count scenes, $jobs_at_once at once, $(( $(date +%s) - started ))s$again)"
+	cat "$LOGS"/*.result 2>/dev/null | grep "retried after a launch failure"
 else
-	echo "SUITE: FAIL ($(echo "$failed" | wc -w | tr -d ' ') of $count failed:$failed; $(( $(date +%s) - started ))s)"
+	echo "SUITE: FAIL ($(echo "$failed" | wc -w | tr -d ' ') of $count failed:$failed; $(( $(date +%s) - started ))s$again)"
 	for name in $failed; do cat "$LOGS/$name.log.result"; done
 fi
 exit $code

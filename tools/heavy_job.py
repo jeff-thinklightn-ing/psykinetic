@@ -62,6 +62,8 @@ tune it), heavy_jobs.log a line an event (`summary`).
   heavy_job.py status                              running, queued, free memory
   heavy_job.py kinds                               the kinds and their estimates
   heavy_job.py summary [YYYY-MM-DD]                what waited or was stopped that day (today)
+  heavy_job.py note <tree> launch <detail...>      log a test scene that died at launch (decision 530),
+                                                   with free RAM and commit; prints the line's detail
 
 Standard library only (ctypes for Windows), so any Python can run it by path.
 """
@@ -889,13 +891,26 @@ def summary(day):
         print("%s: no heavy job waited or was stopped" % day)
     for when, event, tree, kind, detail in lines:
         print("%s %s %s %s: %s" % (when[11:16], tree, kind, event if event in SUMMARY_EVENTS else "waited", detail))
-    counts = ["%d %s" % (sum(1 for each in lines if each[1] == event), event) for event in ("overrun", "hung")]
+    counts = ["%d %s" % (sum(1 for each in lines if each[1] == event), event) for event in ("overrun", "hung", "launch")]
     print("%s: %s" % (day, ", ".join(counts)))
     return 0
 
 
 ## The log's events the daily summary lists.
-SUMMARY_EVENTS = ("stopped", "waiting", "long", "overrun", "hung")
+SUMMARY_EVENTS = ("stopped", "waiting", "long", "overrun", "hung", "launch")
+## What a script outside the gate may log with `note` (decision 530: a test
+## scene that died at launch, before any of its own code ran).
+NOTE_EVENTS = ("launch",)
+
+
+def note(tree, event, detail):
+    """Logs [param event] for [param tree] with the machine's free RAM and
+    commit added, and prints that line's detail (for the caller's own log)."""
+    ram, commit = _memory()
+    detail = "%s; free RAM %.1f GB, commit %s" % (detail, ram, "%.1f GB" % commit if commit is not None else "unknown")
+    log(event, tree, "suite", detail)
+    print(detail)
+    return 0
 
 
 def main(args):
@@ -931,7 +946,12 @@ def main(args):
         return show_kinds()
     if command == "summary":
         return summary(args[1] if len(args) > 1 else datetime.date.today().isoformat())
-    print("heavy_job: no command %s (run, take, release, status, kinds, summary)" % command, file=sys.stderr)
+    if command == "note":
+        if len(args) < 4 or args[2] not in NOTE_EVENTS:
+            print("heavy_job: note <tree> <event> <detail...>, an event of: %s" % ", ".join(NOTE_EVENTS), file=sys.stderr)
+            return 2
+        return note(args[1], args[2], " ".join(args[3:]))
+    print("heavy_job: no command %s (run, take, release, status, kinds, summary, note)" % command, file=sys.stderr)
     return 2
 
 

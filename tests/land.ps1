@@ -42,6 +42,7 @@ try {
 			-RedirectStandardOutput (Join-Path $logs "$name.out") -RedirectStandardError (Join-Path $logs "$name.err")
 		$null = $process.Handle  # Without it Windows PowerShell may lose the exit code.
 		$running[$name] = @{ Process = $process; Started = Get-Date }
+		Start-Sleep -Milliseconds 300  # A little apart (decision 530), as the suite starts its scenes.
 	}
 } finally {
 	Remove-Item Env:PSYKINETIC_TEST_JOBS -ErrorAction SilentlyContinue

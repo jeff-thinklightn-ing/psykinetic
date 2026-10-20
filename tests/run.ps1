@@ -66,6 +66,24 @@ function Get-Verdict($scene, $process, $killed, $took) {
 	if ($why -eq '') { "PASS  $(Get-Name $scene) ${took}s" } else { "FAIL  $(Get-Name $scene) ${took}s: $why" }
 }
 
+# Whether a scene died at launch (decision 530): a non-zero exit within 5 s
+# with nothing after Godot's banner in its output (no line of the game's own,
+# no RESULT). A scene that ran any of its own code is never retried.
+function Test-LaunchFailed($scene, $process, $killed, $took) {
+	if ($killed -or $process.ExitCode -eq 0 -or $took -gt 5) { return $false }
+	$log = Join-Path $logs "$(Get-Name $scene).log"
+	$output = @(Get-Content "$log.out" -ErrorAction SilentlyContinue) + @(Get-Content "$log.err" -ErrorAction SilentlyContinue)
+	return -not ($output | Where-Object { "$_" -notmatch '^Godot Engine v' -and "$_".Trim() -ne '' })
+}
+
+# A launch failure's diagnosis, logged in the gate's log too (heavy_job
+# summary counts them): the exit code, where Godot resolves, free RAM and commit.
+function Get-LaunchNote($scene, $process) {
+	$detail = "$(Get-Name $scene) exit $($process.ExitCode) at launch; godot: $(if (Test-Path $godot) { $godot } else { "$godot not found" })"
+	$noted = & python (Join-Path $root 'tools/heavy_job.py') note (Split-Path $root -Leaf) launch $detail 2>$null
+	if ($LASTEXITCODE -eq 0 -and $noted) { "$noted" } else { $detail }
+}
+
 # Stops a scene's process and the game it runs under it (the console build's child).
 function Stop-Scene($process) {
 	Get-CimInstance Win32_Process -Filter "ParentProcessId = $($process.Id)" -ErrorAction SilentlyContinue |
@@ -82,6 +100,7 @@ $times = @()
 $queue = New-Object Collections.Queue
 $scenes | ForEach-Object { $queue.Enqueue($_) }
 $running = @{}
+$retried = @{}
 $code = 1
 Push-Location $root
 try {
@@ -93,6 +112,9 @@ try {
 				-RedirectStandardOutput "$log.out" -RedirectStandardError "$log.err" -NoNewWindow -PassThru
 			$null = $process.Handle  # Without it Windows PowerShell may lose the exit code.
 			$running[$scene] = @{ Process = $process; Started = Get-Date }
+			# Not all in the same instant (decision 530): two scenes died at launch
+			# in a suite's first burst of nine Godots.
+			Start-Sleep -Milliseconds 200
 		}
 		Start-Sleep -Milliseconds 200
 		foreach ($scene in @($running.Keys)) {
@@ -105,7 +127,20 @@ try {
 				$killed = $true
 			}
 			$entry.Process.WaitForExit()
+			if (Test-LaunchFailed $scene $entry.Process $killed $took) {
+				$note = Get-LaunchNote $scene $entry.Process
+				if (-not $retried.ContainsKey($scene)) {
+					# Noted with what the machine had, then run once more.
+					$retried[$scene] = $note
+					$running.Remove($scene)
+					Start-Sleep -Seconds 2
+					$queue.Enqueue($scene)
+					continue
+				}
+				$retried[$scene] = "$($retried[$scene]); the retry too: $note"
+			}
 			$verdict = Get-Verdict $scene $entry.Process $killed $took
+			if ($retried.ContainsKey($scene)) { $verdict += " (retried after a launch failure: $($retried[$scene]))" }
 			$verdicts[$scene] = $verdict
 			$times += "$took $scene"
 			$running.Remove($scene)
@@ -128,12 +163,14 @@ try {
 		}
 	}
 	$seconds = [int]((Get-Date) - $started).TotalSeconds
+	$again = if ($retried.Count -gt 0) { "; $($retried.Count) retried after a launch failure" } else { '' }
 	Write-Output ''
 	if ($failed.Count -eq 0) {
-		Write-Output "SUITE: PASS ($($scenes.Count) scenes, $jobs at once, ${seconds}s)"
+		Write-Output "SUITE: PASS ($($scenes.Count) scenes, $jobs at once, ${seconds}s$again)"
+		$scenes | Where-Object { $retried.ContainsKey($_) } | ForEach-Object { $verdicts[$_] } | Write-Output
 		$code = 0
 	} else {
-		Write-Output "SUITE: FAIL ($($failed.Count) of $($scenes.Count) failed: $(($failed | ForEach-Object { Get-Name $_ }) -join ' '); ${seconds}s)"
+		Write-Output "SUITE: FAIL ($($failed.Count) of $($scenes.Count) failed: $(($failed | ForEach-Object { Get-Name $_ }) -join ' '); ${seconds}s$again)"
 		$failed | ForEach-Object { $verdicts[$_] } | Write-Output
 	}
 } finally {

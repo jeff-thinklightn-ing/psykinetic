@@ -5,6 +5,9 @@ release through a state folder of its own (HEAVY_JOBS_DIR), never the real
 one.
   python tests/heavy_job_test.py
 """
+import contextlib
+import datetime
+import io
 import os
 import shutil
 import sys
@@ -301,6 +304,18 @@ code = gate.run("mem", "godot_import", [sys.executable, "-c", "x = bytearray(300
 row = gate.kinds()["godot_import"]
 check(code == 0 and row.get("last_peak_gb", 0) >= 0.25 and row.get("last_commit_gb", 0) >= 0.25,
     "a run measures both: RAM %s, commit %s" % (row.get("last_peak_gb"), row.get("last_commit_gb")))
+
+print("== a scene that died at launch ==")
+# Decision 530: tests/run.sh notes each in the gate's log, and the summary counts them.
+check(gate.main(["note", "suite", "stopped", "x"]) == 2, "note takes only its own events")
+check(gate.main(["note", "suite", "launch", "items_test", "exit", "127", "at", "launch"]) == 0, "a launch failure noted")
+with open(os.path.join(STATE, "heavy_jobs.log")) as handle:
+    noted = [line for line in handle if "\tlaunch\tsuite\tsuite\t" in line]
+check(len(noted) == 1 and "items_test exit 127 at launch; free RAM" in noted[0], "logged with free RAM and commit: %s" % noted)
+shown = io.StringIO()
+with contextlib.redirect_stdout(shown):
+    gate.summary(datetime.date.today().isoformat())
+check("launch: items_test" in shown.getvalue() and "1 launch" in shown.getvalue(), "the summary lists and counts it")
 
 shutil.rmtree(STATE, ignore_errors=True)
 print("\nRESULT: %s" % ("PASS" if failed == 0 else "FAIL (%d failed)" % failed))

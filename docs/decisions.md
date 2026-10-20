@@ -15818,3 +15818,38 @@ Rejected: bilinear heights (a puppet would float or sink up to a few
 centimetres off the drawn triangles); a vertex a cell's middle (twice the
 vertices for no gain at this camera); fading the ground that hides the
 player (ground is not a wall; lifting the camera shows the slope).
+
+## 530. A test scene that dies at launch is retried once, and the suite starts its scenes apart
+
+Two landings on 2026-10-19 failed on a scene that never ran: builder's
+companion_test exited 1 at 3 s after Godot's banner, and maps' items_test
+exited 127 at 1 s with an empty log. Both passed alone and on the retry.
+Both died in a suite's first burst, about nine Godots (six scenes, net_test,
+state_test, the server export) started in the same instant, with memory to
+spare (the gate saw 7.6 and 10.0 GB of commit used, about 30 GB free). Nothing
+in the game or the runner exits 127, and a failed exec under timeout would
+have written its error into the log: Windows failing to start the process,
+handed back as a bare code, fits.
+
+- The suite (tests/run.sh, run.ps1) starts its scenes 0.2 s apart, and
+  land.sh / land.ps1 its parts 0.3 s apart.
+- A launch failure: a scene exiting non-zero within 5 s whose output holds
+  nothing after Godot's banner (no line of the game's own, no RESULT). One
+  that ran any of its own code is never retried.
+- One is noted (`heavy_job.py note <tree> launch <detail>`: the gate's log,
+  with the exit code, where timeout and Godot resolve, and the machine's free
+  RAM and commit; `heavy_job summary` lists and counts them) and run once
+  more after 2 s. A retry that dies at launch too fails the scene, both
+  diagnoses in its verdict.
+- The scene's verdict line says "retried after a launch failure: ...", and the
+  SUITE line counts them, passed or not, so the rate stays visible.
+- net_test, state_test and the server boot are not retried (they run outside
+  the suite's runner).
+
+tests/heavy_job_test (note takes only its events, logs free memory, the
+summary counts it); run.sh and run.ps1 checked against a fake Godot (127
+once then a pass: retried, passes; banner-only twice: fails with both
+notes; a "[net]" line then exit 1: not retried).
+
+Rejected: retrying any failed scene (it would hide flaky tests); fewer
+scenes at once (slower landings for a failure that is rare).
