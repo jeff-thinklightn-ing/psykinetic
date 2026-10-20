@@ -39,7 +39,8 @@
 				"wall.stone.straight_tall", "wall.stone.post_tall", "wall.stone.end_tall", "wall.stone.corner_tall", "wall.stone.t_tall", "wall.stone.cross_tall",
 				"wall.stone.straight_low", "wall.stone.post_low", "wall.stone.end_low",
 				"door.portcullis", "door.double", "door.trapdoor",
-				"prop.chest", "prop.cage", "prop.stairs", "prop.ladder", "prop.bed", "prop.bookshelf", "prop.grave"
+				"prop.chest", "prop.cage", "prop.stairs", "prop.ladder", "prop.bed", "prop.bookshelf", "prop.grave",
+				"building.mound", "prop.burial_niche"
 			]
 		},
 		{
