@@ -786,7 +786,8 @@ static func _place(level: Dictionary, markers: Array[Dictionary], config: Dictio
 				warnings.append("a level link in level.json is not on a link marker (%s)" % [entry])
 				continue
 			links.append({"tile": at, "to_map": str(entry.get("to_map", "")), "to_spawn": str(entry.get("to_spawn", "")),
-					"one_way": bool(entry.get("one_way", false)), "closed": bool(entry.get("closed", false))})
+					"one_way": bool(entry.get("one_way", false)), "closed": bool(entry.get("closed", false)),
+					"sealed": str(entry.get("sealed", ""))})
 	for at in link_tiles:
 		if links.all(func(link: Dictionary) -> bool: return link["tile"] != at):
 			warnings.append("the link marker at %s goes nowhere (no entry in level.json \"links\")" % at)

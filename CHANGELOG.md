@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- A level link can be sealed: it opens only for a player who carries its mark (the draugr's, once he is beaten; a thing enemy-ai gives), else "The way is sealed."; a companion crosses with her marked player; the world map and routes treat it as closed, so no raiding group walks it. The console's `mark <player> <mark>` (or `-<mark>`) puts a mark on or takes it off. For the barrow's shortcut from the temple (Jeff's crypt page).
 - Landing tests leave no Python cache folder behind (539 amended); tools only.
 - The castle's walls are warm sandstone again, as in the early builds (532; "tone 8 approved, good improvement"): the brick tile re-graded from grey, and the wall posts, caps and towers moved onto a matching sandstone so they no longer stand out grey; rocks stay grey; client art only.
 - The town well is made by hand (Jeff: "we owe the town well a hand made pass - its auto slop"): a ring of coursed stone with a flat coping and water inside, two posts and a crossbeam, a windlass with its crank, a rope and a bucket, and a small pitched roof, in big clean shapes; client art only.

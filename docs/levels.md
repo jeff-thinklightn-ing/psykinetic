@@ -306,7 +306,12 @@ All of it is optional.
   world map's check does not flag it; `"closed": true` for a way shown but
   not travelled yet (decision 463): stepping on it says "The way on is
   closed." and goes nowhere, no route passes through it, and its `to_map`
-  may be a level still to come.
+  may be a level still to come; `"sealed": "<mark>"` for a way open to the
+  marked alone (decision 540): a player steps through only when their
+  record holds that mark (`PlayerRecord.marks`; `Main.mark_player`, the
+  console's `mark <player> <mark>` or `-<mark>`), else "The way is sealed."
+  once a stand; their companion goes with them; to the world map and routes
+  it is closed. The barrow's shortcut from the temple is sealed `draugr`.
 - `walls` and `floors`: the wall and floor sets the map is drawn in
   (art-kit's `wall.<set>.*` and `floor.<set>`: castle, wood, stone, cave;
   castle if not given or not a set). The floor set is drawn on the map's

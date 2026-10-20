@@ -2553,6 +2553,68 @@ func _move_command(words: PackedStringArray) -> String:
 	return "moved %s to %s in %s%s" % [who, landed, zone_name, "" if landed == target else " (nearest walkable to %s)" % target]
 
 
+## Whether [param link] (a level's, Level.parse) lets [param peer]'s player
+## through (decision 540): a link not sealed does; a sealed one only when
+## their record holds its mark. Their companion goes with them, as always.
+func sealed_open(link: Dictionary, peer: int) -> bool:
+	var mark := str(link.get("sealed", ""))
+	if mark.is_empty():
+		return true
+	var record: PlayerRecord = _records.get(_peer_ids.get(peer, ""))
+	return record != null and mark in record.marks
+
+
+## Server: mark [param mark] put on player [param id]'s record (decision
+## 540; enemy-ai's call when the draugr is beaten), or taken off with
+## [param on] false. False for no such record or no change.
+func mark_player(id: String, mark: String, on := true) -> bool:
+	var record: PlayerRecord = _records.get(id)
+	if record == null or mark.is_empty() or not mark.is_valid_identifier():
+		return false
+	if on == (mark in record.marks):
+		return false
+	if on:
+		record.marks.append(mark)
+		record.marks.sort()
+	else:
+		record.marks.erase(mark)
+	for peer: int in _peer_ids:
+		if _peer_ids[peer] == id:
+			_told_closed.erase(peer)  # A sealed way they stand on is tried again.
+	return true
+
+
+## The console's "mark <player> <mark>" and "mark <player> -<mark>"
+## (decision 540): the mark put on, or taken off, the record of the player
+## of that exact name online, as "move" finds them (531).
+func _mark_command(words: PackedStringArray) -> String:
+	if words.size() != 3:
+		return "mark <player> <mark> | mark <player> -<mark>: the player by name as \"players\" lists them; a mark is one word"
+	var wanted := words[1]
+	var ids: Array[String] = []
+	for peer: int in _players:
+		var player: Player = _players[peer]
+		if not is_instance_valid(player) or not player.spawned:
+			continue
+		var id: String = _peer_ids.get(peer, "")
+		var record: PlayerRecord = _records.get(id)
+		if (player.name == wanted or record != null and record.name == wanted) and id not in ids:
+			ids.append(id)
+	if ids.is_empty():
+		return "mark: no player %s online" % wanted
+	if ids.size() > 1:
+		return "mark: %d players online are called %s; not marked" % [ids.size(), wanted]
+	var on := not words[2].begins_with("-")
+	var mark := words[2].trim_prefix("-")
+	if not mark.is_valid_identifier():
+		return "mark: a mark is one word of letters, digits and underscores (%s)" % mark
+	var record: PlayerRecord = _records[ids[0]]
+	if not mark_player(ids[0], mark, on):
+		return "%s %s %s already" % [wanted, "carries" if on else "lacks", mark]
+	print("[admin] %s %s %s" % [wanted, "marked" if on else "unmarked", mark])
+	return "%s %s %s; marks: %s" % [wanted, "marked" if on else "unmarked", mark, ", ".join(record.marks) if not record.marks.is_empty() else "none"]
+
+
 ## The floor cell of level [param parsed] nearest [param target] (itself if
 ## it is floor) within MOVE_REACH, ring by ring; World.NO_CELL if none.
 static func _walkable_near(parsed: Dictionary, target: Vector2i) -> Vector2i:
@@ -2644,6 +2706,12 @@ func _on_entity_moved(entity: GridEntity, _from: Vector2i, to: Vector2i) -> void
 			if _told_closed.get(entity.owner_peer) != to:
 				_told_closed[entity.owner_peer] = to
 				party_log.add("The way on is closed.")
+			return
+		if link["tile"] == to and not sealed_open(link, entity.owner_peer):
+			# Sealed (decision 540): open to the marked alone, said once a stand.
+			if _told_closed.get(entity.owner_peer) != to:
+				_told_closed[entity.owner_peer] = to
+				party_log.add("The way is sealed.")
 			return
 		if link["tile"] == to:
 			_told_closed.erase(entity.owner_peer)
@@ -8038,6 +8106,8 @@ func admin_command(line: String) -> String:
 			return "%d connected\n%s" % [lines.size(), "\n".join(lines)] if not lines.is_empty() else "0 connected"
 		"move":
 			return _move_command(words)
+		"mark":
+			return _mark_command(words)
 		"save":
 			if Net.state_path == "":
 				return "no --state file to save to"
@@ -8119,7 +8189,7 @@ func admin_command(line: String) -> String:
 					peers.append("%s rtt %d ms" % [_players[peer].name, roundi(link.get_statistic(ENetPacketPeer.PEER_ROUND_TRIP_TIME))])
 			return "%s\n%s" % [Net.stats.server_text(), ", ".join(peers) if not peers.is_empty() else "no peers"]
 		"help":
-			return "reset | respawn | players | net | version | restart|stop [<seconds>] [<why>] | restart cancel | reload <zone>|all | raids [on|off|send <camp> <town>] | companions | zones | zone reset <name> | zone move <player> <zone> | " \
+			return "reset | respawn | players | net | version | restart|stop [<seconds>] [<why>] | restart cancel | reload <zone>|all | raids [on|off|send <camp> <town>] | companions | zones | zone reset <name> | zone move <player> <zone> | mark <player> <mark>|-<mark> | " \
 				+ "mind scripted|ollama | mind log on|off | mind last <name> | perception list|grid|both | " \
 				+ "transcript <name> [<date>] | companion facts <player> | companion forget <player> <id> | save | builder | builder export | builder drop <name> | hour [<h>] | day_minutes [<m>] | season [<name>] | season_days [<n>] | weather [<kind>|auto|reload] [<minutes>] [<region>|all]"
 	return "unknown command %s (try help)" % words[0]

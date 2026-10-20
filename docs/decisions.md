@@ -16243,3 +16243,26 @@ every piece's UVs were made for nine, so all of them would come out a row
 off); row 0, the old "stone, warm" (the animals' hides and wall.stone's pieces
 sit on it, and its swatches are pinker than the re-graded bricks); repainting
 row 1 warmer (palette lift (b), held: the rocks would turn warm too).
+## 540. A link can be sealed: open to the marked alone
+
+Jeff's barrow (docs/lore/crypt.md): a shortcut from the temple to the
+draugr's lair that "opens only for those who carry the draugr's blessing,
+so it is per player, never open for everyone". A level.json link gains
+`"sealed": "<mark>"` (Level.parse keeps it beside `closed`, "" when not).
+A player stepping on a sealed link goes through only when their record
+holds the mark (PlayerRecord.marks, sorted words, saved as "marks";
+Main.sealed_open); else they stay and are told "The way is sealed." once a
+stand, as a closed link says "The way on is closed." (463). Their
+companion goes with them as on any link, so a marked player brings one
+through; nobody carries an unmarked player, since each steps on the link
+alone (Jeff: "every player must play the barrow and defeat the draugr at
+least once"). The mark goes on with Main.mark_player(id, mark, on), for
+enemy-ai's draugr to call when he is beaten (the mark is "draugr" in code;
+the word players see is Jeff's, "blessed" being 424's), and the console's
+"mark <player> <mark>" or "mark <player> -<mark>" (the player of that exact
+name online, as "move" finds them, 531; no ids printed). To the world map
+a sealed link's way is closed (WorldMap.build), so WorldRoutes lays no
+route through it and no group walks the temple's back way (maps' OK). The
+server alone refuses; nothing new reaches the client, so the protocol is
+unchanged. level_test (a sealed link, the console, the record), world_map_test
+(the way closed, no route). Server only; no new class_name.

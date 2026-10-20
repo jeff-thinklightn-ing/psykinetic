@@ -51,6 +51,10 @@ var known_places: Array[String] = []
 ## 465), area -> n: coming back to a newer one is told "The ways have
 ## shifted since you were last here."
 var seen_generation: Dictionary = {}
+## The marks on them (decision 540), sorted words a sealed link reads
+## (level.json link "sealed": the mark it opens for): "draugr" once the
+## draugr is beaten (enemy-ai's call to Main.mark_player).
+var marks: Array[String] = []
 
 
 ## Copies the live state off the player's entity.
@@ -87,6 +91,7 @@ func to_dict() -> Dictionary:
 		"known_areas": known_areas.duplicate(),
 		"known_places": known_places.duplicate(),
 		"seen_generation": seen_generation.duplicate(),
+		"marks": marks.duplicate(),
 	}
 
 
@@ -116,6 +121,7 @@ static func from_dict(entry: Variant) -> PlayerRecord:
 	record.slot_items = _uids(entry.get("items", []))
 	record.known_areas = _strings(entry.get("known_areas", []))
 	record.known_places = _strings(entry.get("known_places", []))
+	record.marks = _strings(entry.get("marks", []))
 	var seen: Variant = entry.get("seen_generation", {})
 	if seen is Dictionary:
 		for area: Variant in seen:

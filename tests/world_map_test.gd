@@ -479,6 +479,15 @@ func _test_routes() -> void:
 	routes.wait()
 	_check(routes.is_ready() and routes.build_ms.size() == 3, "the distance fields are made on a pool task, every area's (%s)" % [routes.build_ms])
 	_check(routes.gaps.is_empty(), "every way has its portals (%s)" % [routes.gaps])
+	# A sealed link (decision 540) is a closed way: no route goes through it.
+	Level.register("r_sealed", _strip(2, [Vector2i(1, 0)]), null,
+		{"links": [{"at": [1, 0], "to_map": "r_field", "to_spawn": "gate", "sealed": "draugr"}]})
+	var sealed_map := WorldMap.build(["r_sealed", "r_field", "r_east"] as Array[String])
+	var sealed_ways := sealed_map.ways_from("r_sealed")
+	var sealed_routes := sealed_map.routes()
+	sealed_routes.wait()
+	_check(sealed_ways.size() == 1 and sealed_ways[0]["closed"] and sealed_routes.route("r_sealed", Vector2i(0, 0), "r_field", Vector2i(0, 1)).is_empty(),
+		"a sealed link's way is closed and no route goes through it (%s)" % [sealed_ways])
 	var around := routes.steps_from("r_room", Vector2i(0, 0), [Vector2i(4, 0)] as Array[Vector2i])
 	_check(around.get(Vector2i(4, 0), -1.0) == 10.5, "the walk round the wall is 10.5 steps, not the 4 of a straight line (%s)" % [around])
 	var same := routes.route("r_room", Vector2i(0, 0), "r_room", Vector2i(4, 0))

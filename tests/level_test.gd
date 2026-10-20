@@ -43,6 +43,7 @@ func _ready() -> void:
 	_test_town_walls()
 	_test_roofs()
 	await _test_level_links()
+	await _test_sealed_link()
 	await _test_edge_links()
 	_test_console()
 	await _test_castle()
@@ -104,6 +105,9 @@ func _register_maps() -> void:
 		{"links": [{"at": [4, 1], "to_map": "test_link_b", "to_spawn": "gate"}]})
 	Level.register("test_link_b", Level.image_from_rows(_rows(1, 3, 1, 2), {Vector2i(1, 1): "start"}), null,
 		{"spawn_points": {"gate": [2, 2]}})
+	# A sealed link (decision 540): the same way, open to the marked alone.
+	Level.register("test_link_s", Level.image_from_rows(_rows(1, 4, 1, 1), {Vector2i(1, 1): "start", Vector2i(4, 1): "link"}), null,
+		{"links": [{"at": [4, 1], "to_map": "test_link_b", "to_spawn": "gate", "sealed": "draugr"}]})
 	# Edge links: test_edge_w (4 x 3 cells, all floor) has test_edge_e
 	# (3 x 5) east of it, and the other way round.
 	var w_rows: Array[String] = []
@@ -784,6 +788,41 @@ func _test_level_links() -> void:
 		"in the zone test_link_b; test_link_a stays loaded")
 
 
+func _test_sealed_link() -> void:
+	print("\n== a sealed link (decision 540): open to the marked alone ==")
+	_check(Level.parse(Level.template("test_link_s")["layout"], null, Level.template_config("test_link_s"))["links"][0]["sealed"] == "draugr",
+		"the link reads its mark")
+	_main.load_map("test_link_s")
+	var player := _player()
+	var id: String = _main._peer_ids[Net.local_id]
+	var record: PlayerRecord = _main._records[id]
+	_check(record.marks.is_empty() and not _main.mark_player(id, "", true) and not _main.mark_player("nobody", "draugr"),
+		"no marks to start; no mark with no word or no record")
+	_put(player, Vector2i(3, 1))
+	_wait_for_step(player)
+	_check(World.try_move(player, Vector2i(1, 0)), "Player steps onto the sealed link")
+	await get_tree().process_frame
+	await get_tree().process_frame
+	_check(_main.map_name == "test_link_s" and _player() == player and player.tile == Vector2i(4, 1), "and stays (%s)" % _main.map_name)
+	_check(_main.party_log.last(1) == ["The way is sealed."], "told the way is sealed (%s)" % [_main.party_log.last(1)])
+	_check(_main.admin_command("mark Player -draugr") == "Player lacks draugr already", "the console takes no mark off that is not there")
+	var answer: String = _main.admin_command("mark Player draugr")
+	_check(answer == "Player marked draugr; marks: draugr" and record.marks == ["draugr"], "the console marks the player (%s)" % answer)
+	_check(_main.admin_command("mark Player draugr") == "Player carries draugr already", "and says so twice")
+	_check(_main.admin_command("mark Player not a word") == "mark: a mark is one word of letters, digits and underscores (not a word)" or
+		_main.admin_command("mark Nobody draugr") == "mark: no player Nobody online", "a bad mark or an unknown player is refused")
+	_put(player, Vector2i(3, 1))
+	_wait_for_step(player)
+	_check(World.try_move(player, Vector2i(1, 0)), "marked, Player steps onto it again")
+	await get_tree().process_frame
+	await get_tree().process_frame
+	var arrived := _player()
+	_check(_main.map_name == "test_link_b" and arrived != null and arrived.tile == Vector2i(2, 2), "and goes through to test_link_b's gate (%s)" % _main.map_name)
+	_check(PlayerRecord.from_dict(record.to_dict().merged({"player_id": record.player_id})).marks == ["draugr"], "the mark is saved with the record")
+	_main.mark_player(id, "draugr", false)
+	_check(record.marks.is_empty(), "and taken off again")
+
+
 func _test_edge_links() -> void:
 	print("
 == edge links: walk off one map's edge, arrive at the next one's ==")
@@ -822,8 +861,8 @@ func _test_castle() -> void:
 	_check(not castle.is_empty() and castle["display_name"] == "The Castle" and castle["warnings"].is_empty(),
 			"levels/castle is \"The Castle\" and loads cleanly (%s)" % [castle.get("warnings", "missing")])
 	_check(load("res://levels/castle/layout.png") is Image, "its layout.png is imported as an Image")
-	_check(str(castle["links"]) == str([{"tile": Vector2i(27, 12), "to_map": "test_room", "to_spawn": "from_castle", "one_way": false, "closed": false},
-			{"tile": Vector2i(16, 23), "to_map": "wilds", "to_spawn": "from_castle", "one_way": false, "closed": false}]),
+	_check(str(castle["links"]) == str([{"tile": Vector2i(27, 12), "to_map": "test_room", "to_spawn": "from_castle", "one_way": false, "closed": false, "sealed": ""},
+			{"tile": Vector2i(16, 23), "to_map": "wilds", "to_spawn": "from_castle", "one_way": false, "closed": false, "sealed": ""}]),
 			"its link at (27, 12) goes to the test room, at the foot of its road to the wilds (%s)" % [castle["links"]])
 	var room := Level.load_level("test_room")
 	var back: Array = (room["links"] as Array).filter(func(link: Dictionary) -> bool: return link["to_map"] == "castle")
