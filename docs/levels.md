@@ -458,6 +458,25 @@ generator's own and passed as written. `tools/plan_sheet.tscn` draws a
 generation large, the anchors outlined (`--level=<name>` or
 `--sample=dwarven|old|barrow`, `--generation=n`, `--out=<png>`).
 
+The first real level that regenerates is `levels/barrow`, "The Barrow"
+(decision 542, Jeff's crypt page: the starter dungeon, a mound a little
+outside the town): 44 x 36, the barrow style every 3 days, five anchors
+kept through every generation: the entrance vestibule under the mound's
+door (the link up to the wilds' "from_barrow", the spawn point
+"from_wilds"), the altar room with the altar and the hidden passage leaving
+its east wall through a door, the passage, the draugr's lair (a brute
+stands in for him until enemy-ai's draugr; the spawn point "from_temple"),
+and the shortcut's nook with the link to the wilds' "from_barrow_shortcut",
+sealed `draugr` (540). The wilds hold the other ends (maps' side of 542).
+Levels regenerate only on a server started with `--regenerate` (as raid
+groups with `--raids`, decision 328) or after the console's `regenerate on`
+(`regenerate` alone lists the marked levels and their generations); the
+box's service runs with it. Off, and in any test run (tests/run.sh passes
+`--run-marker`) on the shared overlay, nothing is laid (`Regen.may_write`):
+the barrow stays its template, its anchors in the rock. A test that wants
+generations switches `Net.regenerate` on and points `Level.overlay_dir` at
+its own scratch folder, as regen_test does.
+
 When it shifts: on the slow world tick (every `World.WORLD_TICK_STEPS`), a
 level whose `every_days` have gone by since its last generation is laid
 again, only while its zone is asleep (nobody in it, nobody dead there

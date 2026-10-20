@@ -28,6 +28,7 @@ var _period := 0
 func _ready() -> void:
 	World.set_process(false)
 	Net.port = preload("res://tests/test_ports.gd").of(17860)
+	Net.regenerate = true  # As --regenerate: generations are laid, in this test's own overlay (below).
 	Net.companions = true
 	Net.map_name = "rg_castle"
 	Net.state_path = preload("res://tests/test_ports.gd").scratch_path("regen_test_world.json")
@@ -361,7 +362,7 @@ func _test_castle_never_marked() -> void:
 	for level_name in Level.names():
 		if not level_name.begins_with("rg_") and Regen.marked(level_name):
 			marked.append(level_name)
-	_check(marked.is_empty(), "nor is any level under levels/ (%s)" % [marked])
+	_check(marked == ["barrow"], "under levels/ the barrow alone is, Jeff's starter dungeon (542) (%s)" % [marked])
 
 
 # --- Helpers ----------------------------------------------------------------------

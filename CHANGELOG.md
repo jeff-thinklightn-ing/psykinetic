@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The Barrow: a mound a little outside the town with a crypt below it, the starter dungeon of Jeff's crypt page. Its tombs lay themselves out afresh every three days; the entrance, the altar room with its hidden passage, the draugr's lair and the sealed shortcut to the temple stay. A brute stands in for the draugr until he is made; the mound's door and the temple's end of the shortcut come with the wilds' side of it. Levels shift only on a server started with `--regenerate` (or the console's `regenerate on`), the castle's halls included when they come; the service file carries the flag.
 - Fixed: walking onto tall grass, a ford or a slope could be shown at the wrong pace for the steps after the first, so the game pulled you back a little (rubber banding); others' walks were drawn at the wrong pace there too.
 - A third way for a shifting level to lay itself out, for the barrow (Jeff's crypt page): tombs by depth, the town's square tombs with doors, torches and burial niches near the entrance, narrow passage graves with crooked ways below them, the old caverns deepest; grave goods in the deepest niches first, the dead deepest first, the robbers near the altar. The plan sheet draws a sample barrow (`--sample=barrow`).
 - The orc brute is Jeff's own clean-up of it (Jeff: "I worked in blender for a couple hours on clean up"): one solid body with no holes or see-through faces at its back and shoulders, its painted skin carried over (529 amended).

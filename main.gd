@@ -1864,7 +1864,7 @@ func _regenerate_due() -> void:
 ## time has come (Regen.due) and nobody is in it (its zone not open, or
 ## asleep). True if it was.
 func _regenerate_if_due(level_name: String) -> bool:
-	if not Net.is_authority() or not Regen.marked(level_name):
+	if not Net.is_authority() or not Regen.marked(level_name) or not Regen.may_write():
 		return false
 	var config := Regen.config_of(level_name)
 	var state: Dictionary = _regen.get(level_name, {"generation": 0, "at_step": 0})
@@ -7940,6 +7940,19 @@ func _count_down_restart() -> void:
 
 ## Server: the console's raids (decision 328): on, off, the groups out, or
 ## one sent at once from a camp at a town.
+## The console's "regenerate [on|off]" (decision 542): whether the shifting
+## levels are laid again on this server (Net.regenerate; --regenerate sets
+## it from the start), and which levels are marked, each with its generation.
+func _regenerate_command(words: PackedStringArray) -> String:
+	if words.size() >= 2 and words[1] in ["on", "off"]:
+		Net.regenerate = words[1] == "on"
+		return "regenerate %s: %s" % [words[1], "the shifting levels are laid again when due" if Net.regenerate else "the shifting levels stay as they are"]
+	var lines: Array[String] = ["regenerate %s" % ("on" if Net.regenerate else "off")]
+	for level_name in Regen.marked_levels():
+		lines.append("%s: generation %d, every %d days" % [level_name, generation_of(level_name), int(Regen.config_of(level_name).get("every_days", 0))])
+	return "\n".join(lines)
+
+
 func _raids_command(words: PackedStringArray) -> String:
 	var groups := World.raid_groups
 	if groups == null:
@@ -8184,6 +8197,8 @@ func admin_command(line: String) -> String:
 			return _restart_command(words)
 		"raids":
 			return _raids_command(words)
+		"regenerate":
+			return _regenerate_command(words)
 		"reload":
 			return _reload_command(words)
 		"net":
@@ -8195,7 +8210,7 @@ func admin_command(line: String) -> String:
 					peers.append("%s rtt %d ms" % [_players[peer].name, roundi(link.get_statistic(ENetPacketPeer.PEER_ROUND_TRIP_TIME))])
 			return "%s\n%s" % [Net.stats.server_text(), ", ".join(peers) if not peers.is_empty() else "no peers"]
 		"help":
-			return "reset | respawn | players | net | version | restart|stop [<seconds>] [<why>] | restart cancel | reload <zone>|all | raids [on|off|send <camp> <town>] | companions | zones | zone reset <name> | zone move <player> <zone> | mark <player> <mark>|-<mark> | " \
+			return "reset | respawn | players | net | version | restart|stop [<seconds>] [<why>] | restart cancel | reload <zone>|all | raids [on|off|send <camp> <town>] | regenerate [on|off] | companions | zones | zone reset <name> | zone move <player> <zone> | mark <player> <mark>|-<mark> | " \
 				+ "mind scripted|ollama | mind log on|off | mind last <name> | perception list|grid|both | " \
 				+ "transcript <name> [<date>] | companion facts <player> | companion forget <player> <id> | save | builder | builder export | builder drop <name> | hour [<h>] | day_minutes [<m>] | season [<name>] | season_days [<n>] | weather [<kind>|auto|reload] [<minutes>] [<region>|all]"
 	return "unknown command %s (try help)" % words[0]

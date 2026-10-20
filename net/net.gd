@@ -111,6 +111,7 @@ extends Node
 ##                                credits (the Options with its Credits list open), counter (the counter screen, sample work),
 ##                                world (the world map), controls (the Options scrolled to its key rows, one waiting for a key)
 ##   --raids                      raid groups on from the start (decision 328; else the console's raids on)
+##   --regenerate                 the shifting levels laid again on this server (decision 542; else the console's regenerate on)
 ##   --test-hover=<x>,<y>         keep the cursor over that cell (for screenshots)
 ##   --test-click=<seconds>       after this long, left-click where the cursor is
 ##   --test-fullscreen=<seconds>  after this long, toggle fullscreen as F11 does
@@ -472,6 +473,10 @@ var show_menu := false
 var test_show: PackedStringArray = []
 ## --raids: raid groups on from the start (World.raid_groups; the console can too).
 var raids := false
+## --regenerate: the shifting levels regenerate on this server (Regen, decision
+## 542; the console can too). Off, a marked level stays as it is: tests, and
+## any server not asked, never write a generation.
+var regenerate := false
 var test_wait_players := 0
 ## --test-herds=<n>: n mixed herds (deer, rabbits, boar, wolves) put in each
 ## outdoor zone the server builds, for benches with wildlife before economy's
@@ -1576,6 +1581,8 @@ func _parse_args() -> void:
 				test_ui_cost = true
 			"--raids":
 				raids = true
+			"--regenerate":
+				regenerate = true
 			"--test-smooth":
 				test_smooth = true
 			"--world-map":

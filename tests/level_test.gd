@@ -44,6 +44,7 @@ func _ready() -> void:
 	_test_roofs()
 	await _test_level_links()
 	await _test_sealed_link()
+	_test_barrow_level()
 	await _test_edge_links()
 	_test_console()
 	await _test_castle()
@@ -821,6 +822,30 @@ func _test_sealed_link() -> void:
 	_check(PlayerRecord.from_dict(record.to_dict().merged({"player_id": record.player_id})).marks == ["draugr"], "the mark is saved with the record")
 	_main.mark_player(id, "draugr", false)
 	_check(record.marks.is_empty(), "and taken off again")
+
+
+func _test_barrow_level() -> void:
+	print("
+== levels/barrow (decision 542): the real barrow, marked to regenerate; a test run never writes it ==")
+	var barrow := Level.load_level("barrow")
+	_check(barrow["display_name"] == "The Barrow" and barrow["size"] == Vector2i(44, 36) and barrow["warnings"].is_empty(),
+		"The Barrow, 44 x 36, parses with no warning (%s)" % [barrow["warnings"]])
+	_check(Regen.marked("barrow") and Regen.config_of("barrow")["anchors"].size() == 5 and Regen.config_of("barrow")["style"] == "barrow",
+		"marked to regenerate in the barrow style, five anchors")
+	_check(barrow["links"].size() == 2 and barrow["links"][1]["sealed"] == "draugr" and barrow["links"][1]["to_spawn"] == "from_barrow_shortcut"
+		and barrow["spawn_points"].has("from_wilds") and barrow["spawn_points"].has("from_temple"),
+		"the way up and the sealed shortcut, with the spawn points the wilds come in by")
+	var made := Regen.generate("barrow", 1)
+	_check(not made.is_empty() and Regen.connected(LevelMap.from_image(made["layout"], made["config"]), made["anchors"]),
+		"a generation is laid and joins every anchor (%d tries)" % made.get("tries", 0))
+	_check(not Net.regenerate and not Regen.may_write() and not _main._regenerate_if_due("barrow") and not Level.overlaid("barrow"),
+		"off unless the server runs --regenerate: nothing is laid, the barrow stays its template")
+	_check(_main.admin_command("regenerate on") == "regenerate on: the shifting levels are laid again when due" and Net.regenerate, "the console switches it on")
+	_check(Regen.in_test_run() and not Regen.may_write() and not _main._regenerate_if_due("barrow") and not Level.overlaid("barrow"),
+		"and even on, a test run on the shared overlay writes nothing there")
+	var listed: String = _main.admin_command("regenerate")
+	_check(listed.begins_with("regenerate on") and "barrow: generation 0, every 3 days" in listed, "the console lists the marked levels (%s)" % listed.replace("\n", "; "))
+	_check(_main.admin_command("regenerate off").begins_with("regenerate off") and not Net.regenerate, "and switches it off")
 
 
 func _test_edge_links() -> void:

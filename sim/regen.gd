@@ -42,6 +42,26 @@ static func config_of(level_name: String) -> Dictionary:
 	return _marked_configs().get(level_name, {})
 
 
+## Whether this is a test run (tests/run.sh passes --run-marker to every
+## scene): with the shared overlay (Level.OVERLAY) a test never writes a
+## generation there (decision 542; CLAUDE.md: tests never write levels to
+## user://). A test that wants generations points Level.overlay_dir at its
+## own scratch folder, as regen_test does.
+static func in_test_run() -> bool:
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--run-marker="):
+			return true
+	return false
+
+
+## Whether a generation may be laid now: the server was started with
+## --regenerate or the console switched it on (Net.regenerate, as raid
+## groups with --raids, 328), and this is no test run on the shared
+## overlay. Off, a marked level stays as it is.
+static func may_write() -> bool:
+	return Net.regenerate and (not in_test_run() or Level.overlay_dir != Level.OVERLAY)
+
+
 ## The levels and their blocks are read again on the next ask: a level
 ## registered, unregistered or kept as a template (Level does this), or
 ## reloaded from edited files (Main.reload_zone).

@@ -1,0 +1,143 @@
+{
+	"name": "The Barrow",
+	"outdoor": false,
+	"walls": "stone",
+	"floors": "stone",
+	"starts": [
+		[
+			21,
+			2
+		]
+	],
+	"spawn_points": {
+		"from_wilds": [
+			22,
+			2
+		],
+		"from_temple": [
+			38,
+			17
+		]
+	},
+	"links": [
+		{
+			"at": [
+				22,
+				1
+			],
+			"to_map": "wilds",
+			"to_spawn": "from_barrow"
+		},
+		{
+			"at": [
+				39,
+				17
+			],
+			"to_map": "wilds",
+			"to_spawn": "from_barrow_shortcut",
+			"sealed": "draugr"
+		}
+	],
+	"entities": [
+		{
+			"at": [
+				19,
+				17
+			],
+			"name": "Altar",
+			"props": {
+				"slots": [
+					"",
+					"",
+					"",
+					""
+				]
+			}
+		},
+		{
+			"at": [
+				34,
+				17
+			],
+			"name": "Draugr"
+		}
+	],
+	"regenerate": {
+		"generator": "labyrinth",
+		"style": "barrow",
+		"every_days": 3,
+		"entrance": "entrance",
+		"anchors": [
+			{
+				"rect": [
+					19,
+					1,
+					6,
+					4
+				],
+				"name": "entrance"
+			},
+			{
+				"rect": [
+					16,
+					15,
+					8,
+					6
+				],
+				"name": "altar"
+			},
+			{
+				"rect": [
+					24,
+					17,
+					7,
+					1
+				],
+				"name": "passage"
+			},
+			{
+				"rect": [
+					31,
+					14,
+					7,
+					7
+				],
+				"name": "lair"
+			},
+			{
+				"rect": [
+					38,
+					16,
+					2,
+					3
+				],
+				"name": "shortcut"
+			}
+		],
+		"rooms": {
+			"count": [
+				9,
+				12
+			],
+			"size": [
+				[
+					3,
+					3
+				],
+				[
+					6,
+					5
+				]
+			]
+		},
+		"loops": 0.15,
+		"monsters": {
+			"imp": 6,
+			"sneak": 3
+		},
+		"near": {
+			"sneak": "altar"
+		},
+		"chests": 4
+	}
+}

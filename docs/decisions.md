@@ -16400,3 +16400,42 @@ the kit's weights carried over (nearest face, on the same Armature). From here e
 through tools/creature_clean.py (weld, loose shells dropped, Solidify, voxel remesh, its bits
 dropped and stairs smoothed, QuadriFlow to clean quads, Smart UV, the paint baked back: about
 4 s a body) before its rig and before any kit, and a kit's work mesh is the cleaned one.
+## 542. The Barrow: the first real level that regenerates
+
+Jeff asked for it (docs/lore/crypt.md, 2026-10-19: "the barrow is the
+starter dungeon", "a crypt-like structure below the town", "delve-again
+layout; a small boss room at the end"), so levels/barrow is content on
+Jeff's word, the one exception to infrastructure first. "The Barrow", 44
+x 36, indoor, stone, marked "regenerate" in the labyrinth's barrow style
+(541) every 3 days, its template the plan sheet's sample barrow (the
+shape the coordinator approved from dungeon's design): five anchors, the
+entrance vestibule under the mound's door with the link up to the wilds
+("from_barrow") and the spawn point "from_wilds", the altar room with the
+altar (a chest named Altar, economy's offering later) and the hidden
+passage leaving its east wall through a door, the passage itself, the
+draugr's lair (an entity named Draugr on a brute marker stands in until
+enemy-ai's draugr) with the spawn point "from_temple", and the shortcut's
+nook with the link to the wilds ("from_barrow_shortcut") sealed "draugr"
+(540). Six imps and three sneaks (the sneaks near the altar, the robbers
+to come) and four chests stand in for enemy-ai's skeletons and robbers
+and items' grave goods. The wilds' side, the mound's link at (236, 186)
+and the temple's sealed end at (217, 193) with their spawn points, is
+maps' ("542, maps' side"), landed closed first so no way dangles, and
+opened with this level. Levels regenerate only on a server
+started with --regenerate (Net.regenerate, as raid groups with --raids,
+328) or after the console's "regenerate on" ("regenerate" alone lists
+the marked levels); server/psykinetic.service carries it beside
+--status-port and --lawspeaker, so Jeff's one cp turns all three on. On
+the box nothing changes until then: no real level was marked before
+this one. From here every marked level needs the flag, the halls'
+labyrinths (465, 470) included when they come. Off, a
+marked level stays as it is, so no test and no server not asked ever
+lays a generation: the first try guarded on tests/run.sh's --run-marker
+alone, and net_test's and state_test's servers, started without it,
+wrote the barrow into the shared overlay (CLAUDE.md: never), while a
+hosted test with its own overlay regenerated on the slow tick and its
+rebind dropped a place it had put in by hand (return_test). The marker
+stays a second guard: even switched on, a test run on the shared
+overlay writes nothing (Regen.may_write). level_test (the level, the
+mark, a generation, the switch and the console). layout.png is imported as an
+Image (its .import committed). Protocol unchanged, no new class_name.
