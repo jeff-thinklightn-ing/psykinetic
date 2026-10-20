@@ -54,7 +54,7 @@ which worktree owns each step, and the design rules not to break without asking 
   and unfreezes. Between releases `main` runs ahead of the box; that's expected. Say in
   your landing message if your change alters the wire format, so it isn't left unreleased.
   After a rebase, check your bullet still sits under `## Unreleased`, above the first
-  `## v` heading: a cut moves the heading, and git keeps a bullet beside the old top one.
+  `## v` heading: a cut moves the heading, and git keeps a bullet beside the old top one; since 539, land.sh fails on a bullet in a shipped section or in two places, naming it.
 - Every architectural choice gets its own numbered entry at the bottom of
   `docs/decisions.md`, in the same commit as the code. With several worktree sessions
   running, ask the release session for the number before
