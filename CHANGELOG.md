@@ -7,32 +7,30 @@ notes (decision 324).
 
 ## Unreleased
 
-- Brighter, cleaner stone and warmer wood (Jeff: "tone 8 approved, good improvement"; the castle walls' grade carried on): stone walls lighter and truly grey, stone floors no longer blue-grey, wood floors and thatch warmer; client art only.
-- The minimap and the big map turn with the view, so up on the map is up on the screen, as the compass already turns; the arrow on them points the way your body faces.
-- A level link can be sealed: it opens only for a player who carries its mark (the draugr's, once he is beaten; a thing enemy-ai gives), else "The way is sealed."; a companion crosses with her marked player; the world map and routes treat it as closed, so no raiding group walks it. The console's `mark <player> <mark>` (or `-<mark>`) puts a mark on or takes it off. For the barrow's shortcut from the temple (Jeff's crypt page).
-- Landing tests leave no Python cache folder behind (539 amended); tools only.
-- The castle's walls are warm sandstone again, as in the early builds (532; "tone 8 approved, good improvement"): the brick tile re-graded from grey, and the wall posts, caps and towers moved onto a matching sandstone so they no longer stand out grey; rocks stay grey; client art only.
-- Clearer skies in the town lands: overcast and fog come about half as often, while rain and storms come as often as before. A new world opens under a clear sky, and each season lasts twice as long, so a play session stays in one season (533). The server needs `server/admin.sh season_days 14` once after the deploy.
+## v0.1.159
 
-- The town well is made by hand (Jeff: "we owe the town well a hand made pass - its auto slop"): a ring of coursed stone with a flat coping and water inside, two posts and a crossbeam, a windlass with its crank, a rope and a bucket, and a small pitched roof, in big clean shapes; client art only.
-- The conversation panel no longer offers canned questions at the bottom (Jeff: they read the same from everyone); you talk by typing in the say line, as before, and the panel keeps the exchange, their offers and what you owe them.
-- Landing tests check the CHANGELOG first (539): a released section must read as its tag has it, and no bullet may stand both under Unreleased and in a release; tools only.
-- The town's guard, priest and lawspeaker are paid 4 gold a day, and the town owes them any wage it can't pay and pays them back first when gold comes in (528). They used to go unpaid most days.
-
+- This version changes what goes over the network, so v0.1.158 and older can't join the server: update through the launcher first.
+- The outdoors is brighter and more colourful: a cloudy sky still lights the ground in colour, autumn and winter are half as faded, the morning haze is gone, the midday light lasts longer, cloud shadows are softer, and no shadow stretches across the map at dawn or dusk (534).
 - The grass is green again (532): fresher and brighter, nearer the early builds' greens with its texture still showing, the dirt a warmer brown and the tufts and flowers matching the lawn.
-- Talk with no panel (536): ask a townsperson what they sell, whether they have work, or what the news is, and they answer in their own words with what they have; say "yes", name the thing or the person, or say an amount ("give 25") to take it. Nothing is pushed at you. The wire changes (an offer that stands is sent to the interface): the client and server go together.
+- The castle's walls are warm sandstone again, as in the early builds (532; "tone 8 approved, good improvement"): the brick tile re-graded from grey, and the wall posts, caps and towers moved onto a matching sandstone so they no longer stand out grey; rocks stay grey; client art only.
+- Brighter, cleaner stone and warmer wood (Jeff: "tone 8 approved, good improvement"; the castle walls' grade carried on): stone walls lighter and truly grey, stone floors no longer blue-grey, wood floors and thatch warmer; client art only.
+- Clearer skies in the town lands: overcast and fog come about half as often, while rain and storms come as often as before. A new world opens under a clear sky, and each season lasts twice as long, so a play session stays in one season (533).
+- Hills are drawn (525): the ground follows its heights in smooth slopes, with rock faces only where it is too steep to walk; streams step down their valleys, things stand on the slope, and the camera tilts up to see you over a ridge.
+- The Hills level is remade again, bigger: a valley you look down into with its stream running its length, a ridge and a knoll either side, flanks mostly gentle with steeper bands, and the ground painted by its slope (bare earth on the steep bands, crests and banks, grass elsewhere; no paving on the hillsides); the editor's relief fill paints the ground the same way (525).
+- The orc brute is now drawn from Jeff's chosen concept (Jeff: "the trellis retarget is what's close, not the blue blob monster"): art-gen's model of it with its own painted skin, each orc a little different in build and skin, some with a chest scar, arm stripes or a red handprint (529).
+- The kobold sneak is now drawn from Jeff's chosen concept too, art-gen's model of it in its own red-to-purple painted skin, each a little different and some marked (529 amended); Jeff's to veto.
+- The minimap and the big map turn with the view, so up on the map is up on the screen, as the compass already turns; the arrow on them points the way your body faces.
+- Talk with no panel (536): ask a townsperson what they sell, whether they have work, or what the news is, and they answer in their own words with what they have; say "yes", name the thing or the person, or say an amount ("give 25") to take it. Nothing is pushed at you.
+- The conversation panel no longer offers canned questions at the bottom (Jeff: they read the same from everyone); you talk by typing in the say line, as before, and the panel keeps the exchange, their offers and what you owe them.
+- The town's guard, priest and lawspeaker are paid 4 gold a day, and the town owes them any wage it can't pay and pays them back first when gold comes in (528). They used to go unpaid most days.
 - Harvests, winter roots and shearing grow with the length of a season, so a town gathers as much food and wool a day when the seasons are longer (533).
-
+- The town well is made by hand (Jeff: "we owe the town well a hand made pass - its auto slop"): a ring of coursed stone with a flat coping and water inside, two posts and a crossbeam, a windlass with its crank, a rope and a bucket, and a small pitched roof, in big clean shapes; client art only.
 - Builder mode marks the map: the HUD shows the cell under the cursor and your own, every building carries a code (H3, S1) floating over it, a click on one names it in the party log, the cursor hint names a building by its code at any time, and builder requests and the admin move command take codes (537).
 - The server console can move a player: `move <player> <x> <y> [zone]` puts them at the nearest walkable spot, their companion with them (531).
-- The kobold sneak is now drawn from Jeff's chosen concept too, art-gen's model of it in its own red-to-purple painted skin, each a little different and some marked (529 amended); Jeff's to veto.
-- The outdoors is brighter and more colourful: a cloudy sky still lights the ground in colour, autumn and winter are half as faded, the morning haze is gone, the midday light lasts longer, cloud shadows are softer, and no shadow stretches across the map at dawn or dusk (534).
-
+- A level link can be sealed: it opens only for a player who carries its mark (the draugr's, once he is beaten; a thing enemy-ai gives), else "The way is sealed."; a companion crosses with her marked player; the world map and routes treat it as closed, so no raiding group walks it. The console's `mark <player> <mark>` (or `-<mark>`) puts a mark on or takes it off. For the barrow's shortcut from the temple (Jeff's crypt page).
 - Landing tests: a test that dies as it starts, before running any of its own code, is noted and retried once, and the suite starts its tests a moment apart (530); tools only.
-- The orc brute is now drawn from Jeff's chosen concept (Jeff: "the trellis retarget is what's close, not the blue blob monster"): art-gen's model of it with its own painted skin, each orc a little different in build and skin, some with a chest scar, arm stripes or a red handprint (529).
-- Hills are drawn (525): the ground follows its heights in smooth slopes, with rock faces only where it is too steep to walk; streams step down their valleys, things stand on the slope, and the camera tilts up to see you over a ridge.
-- The orc brute is reworked (Jeff: "the brute in game model is still pretty clunky"), while Jeff's own Blender redo is under way: a bigger head with a heavy jaw and brow, tusks curving up from the jaw, a neck, hands with fingers, an iron shoulder plate with edges and rivets, a chain of real links, a loincloth that hangs, shaped calves and bare feet with toes.
-- The Hills level is remade again, bigger: a valley you look down into with its stream running its length, a ridge and a knoll either side, flanks mostly gentle with steeper bands, and the ground painted by its slope (bare earth on the steep bands, crests and banks, grass elsewhere; no paving on the hillsides); the editor's relief fill paints the ground the same way (525).
+- Landing tests check the CHANGELOG first (539): a released section must read as its tag has it, and no bullet may stand both under Unreleased and in a release; tools only.
+- Landing tests leave no Python cache folder behind (539 amended); tools only.
 
 ## v0.1.158
 
