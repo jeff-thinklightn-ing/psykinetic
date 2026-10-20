@@ -46,6 +46,7 @@ func _ready() -> void:
 	_test_luxury()
 	_test_head_first()
 	_test_account()
+	_test_livings()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -870,6 +871,57 @@ func _test_account() -> void:
 	# The hooks hold economy and towns, which hold the production: let go, or they outlive the test.
 	work.build_lacks = Callable()
 	work.town_pays = Callable()
+
+
+## A living for the trades that need one (decision 528): the store never
+## buys a maker's raw for less than its inputs and a margin; the wage
+## floor tops a day up; a service earned by the rich is taxed higher.
+func _test_livings() -> void:
+	print("
+== livings ==")
+	_now = 0
+	var clock := func() -> int: return _now
+	var stock := Stockpile.new({}, clock, ItemBook.new(clock))
+	var work := Production.new({}, stock, null, clock, _rules)
+	var economy := Economy.new({}, stock, work, clock, _rules)
+	var floor_gold := int(_rules["gold_floor"])
+	stock.deposit(TOWN, "gold", floor_gold + 200)
+	stock.deposit(TOWN, "leather", 40)  # Plenty: the want's price is low.
+	work.add_worker("t1", "Hew", ["tanner"], TOWN, "test", "steady")
+	work.add_worker("h1", "Hob", ["hunter"], TOWN, "test", "steady")
+	var sell := float(_rules["store"]["sell"])
+	var hides := float(economy.raw_price(TOWN, "hide")) * sell * 2 + int(_rules["store"]["make_margin"])
+	_check(is_equal_approx(economy.maker_floor(TOWN, "t1", "leather"), hides) and economy.maker_floor(TOWN, "h1", "hide") == 0.0,
+		"the tanner's leather: no less than two hides at the store and the margin (%.1f); the hunter's hide: no floor" % hides)
+	var purse := int(work.worker("t1")["purse"])
+	economy.deliver(TOWN, "t1", "leather", 1, "test")
+	_check(int(work.worker("t1")["purse"]) - purse >= floori(hides) and economy.raw_price(TOWN, "leather") < hides,
+		"a full store wants little leather, but he is paid %d, not %d" % [int(work.worker("t1")["purse"]) - purse, economy.raw_price(TOWN, "leather")])
+	# B: the wage floor.
+	work.add_worker("s1", "Bryn", ["shepherd"], TOWN, "test", "steady")
+	work.take_earned("t1")
+	economy._floor_turn()
+	work.note_earned("s1", 1)
+	_now += DayNight.day_steps
+	purse = int(work.worker("s1")["purse"])
+	economy._floor_turn()
+	var floor_day := int(_rules["wage_floor"]["gold"])
+	_check(int(work.worker("s1")["purse"]) - purse == floor_day - 1, "a shepherd who earned 1 in a day: the town pays him %d more" % (floor_day - 1))
+	_check(int(work.worker("h1")["purse"]) == 0, "the hunter's trade has no floor")
+	stock.take(TOWN, "gold", stock.count(TOWN, "gold") - floor_gold)
+	_now += DayNight.day_steps
+	economy._floor_turn()
+	_check(int(work.worker("s1")["owed"]) == floor_day, "the treasury at its floor: the day's floor owed him (%d)" % int(work.worker("s1")["owed"]))
+	# C: the service tax by the earner's purse.
+	work.add_worker("c1", "Pell", ["carpenter"], TOWN, "test", "steady")
+	var gold := stock.count(TOWN, "gold")
+	economy._pay(TOWN, "c1", 10, "trade", "test")
+	var poor := stock.count(TOWN, "gold") - gold
+	work.pay("c1", 100, "test")
+	gold = stock.count(TOWN, "gold")
+	economy._pay(TOWN, "c1", 10, "trade", "test")
+	var rich := stock.count(TOWN, "gold") - gold
+	_check(poor == 1 and rich == 3, "a service fee taxed 0.1 for a purse under luxury.above, 0.3 above it (%d, %d)" % [poor, rich])
 
 
 func _check(ok: bool, what: String) -> void:

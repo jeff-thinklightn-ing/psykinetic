@@ -15691,3 +15691,50 @@ Rejected: relaxation for the slope limit (slow to converge); a separate
 relief tool (the height tool is the one, in metres where the map has
 them); copying relief with the clipboard and prefabs (they carry whole
 levels; a paste stands on the ground already there).
+
+## 528. A living for the trades the town needs
+
+The coordinator's livings audit (each trade's income and keep a day in a
+30-day soak): the smith, carpenter, farmer and woodcutter clear their
+keep; the tanner was paid less for leather than his hides cost, the
+weaver's cloth covered only her wool, the shepherd and the haulers earn by
+the load at value 1-2, and the officials were never paid (the treasury
+always at its floor) while the smith and carpenter took about 34 gold a
+day of mending and tools fees taxed at 0.1. Jeff's rules: "makers have
+more expense", "everything has to be gathered and someone paid to do it",
+"taxes can be most higher on luxury goods which the rich prefer then wages
+are paid by town". Built on 498 (the store buys, makers pay for
+materials); the coordinator approved A, B and C as one design, C flagged
+to Jeff as the coordinator's to veto.
+- A. A maker's price: the store pays a worker for a raw they made from
+  raws (leather from hides, the bolt's cloth from wool: a catalog item
+  made by their trade that yields it) no less than its inputs at the
+  store's own sell price (as buy_materials asks them) plus
+  store.make_margin (3) for the job, over the job's yield
+  (Economy.maker_floor). raw_price's want discount works only above that
+  floor; a gatherer's raw and a player's banking have none.
+- B. A wage floor: once a day (Economy._floor_turn, "floor_day" saved)
+  each resident of a trade in wage_floor.trades (shepherd, hauler, tanner,
+  weaver, cook) whose work earned less than wage_floor.gold (3) a day since
+  the last turn is paid the rest by the town, from the treasury above its
+  floor or owed (as the head build's supplier first when the trade's good,
+  wage_floor.trades' value, is what it lacks). Earned: Production.pay's
+  gold less loans, founding gold, theft, fencing and the floor itself,
+  and what the town comes to owe them when it is owed
+  (Production.note_earned/take_earned, "earned" saved).
+- C. The service tax by the earner's purse: a service fee (tools, mending:
+  Economy._pay's "trade") earned while the payee's purse is above
+  luxury.above (60) pays tax.trade_rich (0.3), below it tax.trade (0.1)
+  as before, so the rich carry the town's wages and a struggling maker's
+  fees aren't taxed harder.
+- "[economy] <name> the <trade> earned N: the wage floor's M more, P paid
+  and O owed" a top-up.
+Soak (30 days, 3 players, against 522 amended (2)'s on the same main):
+the weaver and the cook now clear their keep (loans at day 30: weaver 8
+(28), cook 1 (24)); shepherd 16 (27), tanner 15 (20), hauler Bea 8 (25);
+the inn on day 16.2 (16.2), treasury end 5 (5). The floor came to 258
+gold over the run: 126 paid, 132 owed. Officials unpaid 229 (200): the
+floor and the makers' price draw on the same treasury first, and C's
+0.3 doesn't yet bring in enough to cover both. Protocol unchanged.
+larder_test _test_livings.
+

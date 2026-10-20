@@ -79,6 +79,12 @@ var hunt := Callable()
 ## (town, site place) -> the kind caught: a hunter hunting at the town's
 ## hunting ground (decision 521); hunt's at the store without one.
 var hunt_at := Callable()
+## What each worker has earned by their work since Economy's last wage
+## floor turn (decision 528): worker id -> gold; loans, founding gold,
+## theft and the floor itself not counted, the town's debts to them
+## counted when owed (note_earned), not again when paid.
+var _earned: Dictionary = {}
+const NOT_EARNED: Array[String] = ["a loan from the town", "what the town owed", "the town's founding gold", "lifted", "the town's wage floor"]
 ## (town) -> {resource: count} the town's next build lacks (Towns.shortfall's
 ## needs; 522 amended (2)): a maker working one of those works on the
 ## town's account.
@@ -677,7 +683,24 @@ func pay(worker_id: String, amount: int, why := "") -> void:
 	if not _workers.has(worker_id) or amount <= 0:
 		return
 	_workers[worker_id]["purse"] = int(_workers[worker_id]["purse"]) + amount
+	if not NOT_EARNED.any(func(not_earned: String) -> bool: return why.begins_with(not_earned)) and not why.begins_with("fenced"):
+		_earned[worker_id] = int(_earned.get(worker_id, 0)) + amount
 	print("[production] %s paid %d gold (%s), step %d" % [_workers[worker_id]["name"], amount, why, now()])
+
+
+## [param amount] the town now owes worker [param worker_id] for their
+## work, counted as earned (decision 528).
+func note_earned(worker_id: String, amount: int) -> void:
+	if _workers.has(worker_id) and amount > 0:
+		_earned[worker_id] = int(_earned.get(worker_id, 0)) + amount
+
+
+## What worker [param worker_id] earned since the last call, and the count
+## starts again (decision 528).
+func take_earned(worker_id: String) -> int:
+	var earned := int(_earned.get(worker_id, 0))
+	_earned.erase(worker_id)
+	return earned
 
 
 ## Thief [param thief_id] lifts up to [param gold] from worker
@@ -1575,7 +1598,7 @@ func to_dict() -> Dictionary:
 		var window := int(rules.get("window", 6000))
 		state["sales"] = state["sales"].filter(func(sale: Dictionary) -> bool: return int(sale["step"]) >= now() - window)
 		towns[town] = state
-	return {"trips": _trips.duplicate(), "workers": _workers.duplicate(true), "workshops": _workshops.duplicate(true), "jobs": saved_jobs,
+	return {"earned": _earned.duplicate(), "trips": _trips.duplicate(), "workers": _workers.duplicate(true), "workshops": _workshops.duplicate(true), "jobs": saved_jobs,
 		"next_job": _next_job, "towns": towns}
 
 
@@ -1649,6 +1672,10 @@ func from_dict(saved: Dictionary) -> void:
 						state["sales"].append({"step": int(sale.get("step", 0)), "what": str(sale.get("what", "")),
 							"count": int(sale.get("count", 0))})
 	_next_job = maxi(int(saved.get("next_job", 1)), 1)
+	var earned: Variant = saved.get("earned", {})
+	if earned is Dictionary:
+		for id: Variant in earned:
+			_earned[str(id)] = int(earned[id])
 	var trips: Variant = saved.get("trips", {})
 	if trips is Dictionary:
 		for id: Variant in trips:

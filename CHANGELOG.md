@@ -8,6 +8,8 @@ notes (decision 324).
 ## Unreleased
 
 - The smith's forge is rebuilt as a hearth of coursed stone with a glowing coal bed under a sooty hood and chimney.
+- Town workers can make a living (528): the store never pays a tanner or weaver less than their materials cost plus a fee for the work. Shepherds, haulers, tanners, weavers and cooks get a small daily wage from the town when trade is slow. Mending and tool work by the town's rich is taxed more to help pay for it.
+
 - Signposts are rebuilt as a square post with two clean arrow boards.
 - Builder mode can cut a flat pad into a hillside for a building it stamps (stamp with pad), and only there (527 amended).
 - Bookshelves are rebuilt with shelves you can see and rows of books in leathers and muted colours.
