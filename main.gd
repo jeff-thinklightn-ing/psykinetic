@@ -2277,6 +2277,7 @@ func _boot() -> void:
 	_seat_healers()
 	# Raiders come into a played zone as its level's monsters do.
 	World.spawn_spec = _spawn
+	World.bless = bless  # The draugr beaten (decision 548).
 	# The wildlife's herds (decision 367): counts on the world tick, bodies
 	# near someone through the far tier's keepers.
 	World.herds = Herds.new(snapshot.get("herds", {}), Herds.areas_of(world_map), {}, World.steps_now, World.holdings)

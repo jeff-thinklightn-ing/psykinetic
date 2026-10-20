@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The draugr waits in the barrow's lair. He speaks first: give him gold and he offers a pact, a fight whose difficulty your gold sets (one, two or three measures of the offering). Beat him and he yields and blesses everyone standing in his lair; then he rests for three days and the barrow's dead lie still, until he rises again. Lose, or leave his lair, and he keeps the gold. Clients must update (protocol revision 25).
 - The draugr's blessing (decision 544): beat the draugr and you are blessed, and so is your companion if she was there with you. A blessed player or companion beaten to nothing lies downed for 30 seconds instead of falling; hold E beside them, still and unhit, for 4 seconds to bring them back at half health, one use of your count (5, 10 or 15 by the draugr's difficulty) each time. Your companion does it for you on her own. Nobody in time, or no uses left, and the fall is as before. Foes leave the downed alone.
 - The barrow coin's two halves have their art (544): a gold coin cut along one jagged line, so the player's half and the companion's fit together; client art only.
 - The barrow's dead and its robbers: skeletons walk up through the barrow to the graves they were taken from and lie down there, fighting only whoever stands in their way or strikes them; the altar's guards fight anyone in the altar room but never leave it; grave robbers fight the dead and flee when beaten. They take their places in the Barrow with dungeon's next change.

@@ -29,7 +29,7 @@
 	"dead": {
 		"name": "the barrow's dead",
 		"colour": "#b8b49c",
-		"monsters": ["skeleton", "skeleton_guard"],
+		"monsters": ["skeleton", "skeleton_guard", "draugr"],
 		"hostile_to": ["robbers", "town"],
 		"on_sight": ["robbers", "town"],
 		"holds": false

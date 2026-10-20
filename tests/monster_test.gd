@@ -19,10 +19,11 @@ const SPECS := {
 	"k": {"script": "res://sim/monster.gd", "shape": "capsule", "kind": "skeleton"},
 	"g": {"script": "res://sim/monster.gd", "shape": "capsule", "kind": "skeleton_guard"},
 	"x": {"script": "res://sim/monster.gd", "shape": "capsule", "kind": "robber"},
+	"u": {"script": "res://sim/draugr.gd", "shape": "capsule", "kind": "draugr"},
 }
 const NAMES := {"P": "Player", "m": "Monster", "i": "Imp", "b": "Brute", "s": "Sneak", "c": "Crate",
 	"r": "Rabbit", "d": "Doe", "D": "Stag", "o": "Boar", "w": "Wolf", "a": "Archer", "k": "Skeleton", "g": "Guard",
-	"x": "Robber"}
+	"x": "Robber", "u": "Draugr"}
 
 var _failures := 0
 var _room: Node2D
@@ -96,6 +97,7 @@ func _ready() -> void:
 	_test_sides_on_sight()
 	_test_homeward()
 	_test_room_guard()
+	_test_draugr()
 	_test_charging()
 	_test_archer()
 	_test_worn_bundles()
@@ -2191,6 +2193,89 @@ func _test_room_guard() -> void:
 	_check(guard.target == null and not left, "gone out of the room, it is let go, and the guard never left the room")
 	Level.unregister("mt_altar")
 	Monster.idling = true
+
+
+func _test_draugr() -> void:
+	print("
+== the draugr: talks first, a pact for gold at a difficulty, yields at 1 hp, rests and stills the dead, rises again (decision 548) ==")
+	Monster.idling = true
+	var rows: Array[String] = ["#############", "#...........#", "#.....u.....#", "#...........#", "#..........k#", "#############"]
+	Level.register("mt_lair", Level.image_from_rows(rows), null, {"regenerate": {"anchors": [{"rect": [1, 1, 8, 4], "name": "lair"}]}})
+	var e := _build(rows, {}, {}, "mt_lair")
+	var draugr := e["u"][0] as Draugr
+	var skeleton: Monster = e["k"][0]
+	_check(draugr != null and Level._spec_for("monster_draugr", Level.MONSTER_TYPES)["script"] == "res://sim/draugr.gd",
+		"a draugr marker spawns a Draugr (his kind's script)")
+	var player := EntityFactory.build(SPECS["P"].merged({"name": "Player1"})) as Player
+	player.player_id = "p1"
+	_room.add_child(player)
+	World.spawn(player, Vector2i(11, 2))
+	draugr.sight_range = 8
+	draugr.senses.cone_cos = -1.0
+	var was_economy := World.economy
+	World.economy = Economy.new({"purses": {"p1": 50}})
+	var spawned: Array[GridEntity] = []
+	World.spawn_spec = func(spec: Dictionary) -> GridEntity:
+		var risen := EntityFactory.build(spec)
+		_room.add_child(risen)
+		World.spawn(risen, spec["tile"])
+		spawned.append(risen)
+		return risen
+	var spoken: Array = []
+	draugr.offer_spoken.connect(func(id: String, offer: Dictionary) -> void: spoken.append([id, offer]))
+	var offers := draugr.offers_for("p1")
+	_check(draugr.talks and offers.size() == 1 and offers[0]["kind"] == "deal" and offers[0]["cost"] == Draugr.offering()
+		and offers[0]["what"]["most"] == Draugr.offering() * 3, "he talks, and offers a pact for the offering (%s)" % [offers])
+	World.step()
+	_check(spoken.is_empty(), "outside his lair he says nothing")
+	_move_to(player, Vector2i(7, 2))
+	for i in 10:
+		World.step()
+	_check(spoken.size() == 1 and spoken[0][0] == "p1", "come into his lair, he speaks first, once (%s)" % [spoken.size()])
+	_check(draugr.target == null and player.hp == player.max_hp, "seated, he fights nobody unasked")
+	var refused := draugr.accept_offer(player, offers[0], Draugr.offering() - 1)
+	_check(not refused["ok"] and str(refused["say"]).begins_with("Not for so little") and World.gold_of("p1") == 50, "under the offering he refuses, and takes nothing")
+	var taken := draugr.accept_offer(player, offers[0], Draugr.offering() * 2)
+	_check(taken["ok"] and draugr.state == Draugr.State.PACT and draugr.difficulty == "normal" and World.gold_of("p1") == 50 - Draugr.offering() * 2,
+		"two measures: a pact at normal, his gold (%s, %s)" % [taken, World.gold_of("p1")])
+	_check(draugr.max_hp == roundi(30 * 1.5) and draugr.hp == draugr.max_hp and spawned.size() == 2 and draugr.offers_for("p1").is_empty(),
+		"he grows to it, raises two of the dead, and offers nothing while it is on (%d hp, %d risen)" % [draugr.max_hp, spawned.size()])
+	var fought := false
+	for i in 20:
+		World.step()
+		if draugr.target == player:
+			fought = true
+			break
+	_check(fought, "he fights his challenger")
+	World.damage(draugr, 999, player)
+	_check(draugr.spawned and draugr.hp == draugr.max_hp and draugr.max_hp == 30 and draugr.blessed_last == ["p1"],
+		"beaten, he yields, never dies: the players in his lair are blessed (%s)" % [draugr.blessed_last])
+	_check(draugr.state == Draugr.State.AT_REST and draugr.rests_until == World.steps + Draugr.RISE_DAYS * DayNight.day_steps
+		and draugr.spawn_spec["props"].get("rests_until") == draugr.rests_until and World.is_down(draugr),
+		"and lies at rest three days, kept in his props")
+	_check(spawned.all(func(r: GridEntity) -> bool: return not r.spawned) and skeleton.laid, "his risen gone, the barrow's dead lie still")
+	var resting_till := draugr.rests_until
+	draugr.accept_offer(player, draugr.offers_for("p1")[0], Draugr.offering())
+	_check(draugr.state == Draugr.State.PACT and not World.is_down(draugr) and draugr.rests_until == resting_till,
+		"another pact raises him from his rest, which runs on")
+	_move_to(player, Vector2i(11, 2))
+	World.step()
+	_check(draugr.state == Draugr.State.AT_REST and draugr.hp == 30, "the challenger gone from his lair, the pact is lost: he rests on, healed")
+	World.steps = draugr.rests_until
+	World.step()
+	_check(draugr.state == Draugr.State.SEATED and not skeleton.laid and draugr.rests_until == -1, "rested, he rises, and the dead stir")
+	draugr.blessed_last = []
+	_move_to(player, Vector2i(7, 2))
+	World.damage(draugr, 2, player)
+	World.step()
+	_check(draugr.target == player, "struck unasked, he fights back")
+	World.damage(draugr, 999, player)
+	_check(draugr.blessed_last.is_empty() and draugr.state == Draugr.State.SEATED and draugr.hp == 30,
+		"beaten without a pact, he yields, but blesses nobody")
+	_check(Draugr.difficulty_for(Draugr.offering() * 7) == "hard" and Draugr.difficulty_for(Draugr.offering()) == "easy", "three measures or more, hard")
+	World.economy = was_economy
+	World.spawn_spec = Callable()
+	Level.unregister("mt_lair")
 
 
 func _strings(values: Array) -> Array[String]:

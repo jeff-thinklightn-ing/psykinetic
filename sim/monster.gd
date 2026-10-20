@@ -306,6 +306,9 @@ var _provoked: GridEntity
 ## fights nobody outside it, and goes after no noise.
 var fearless := false
 var keeps_room := false
+## Whether players can talk to it (npc's offer contract, decision 548: the
+## draugr): Main's speaker lookup takes it in.
+var talks := false
 var _room := Rect2i()
 var _alert_until := 0
 var _lead := NO_TILE
@@ -1349,7 +1352,7 @@ static func read_kinds(path: String) -> Dictionary:
 			"wields": (row["wields"] as Dictionary).duplicate() if row.get("wields") is Dictionary else {},
 			"picks_up": bool(row.get("picks_up", false)), "art": str(row.get("art", "")),
 			"label": str(row.get("label", "")), "fearless": bool(row.get("fearless", false)),
-			"keeps_room": bool(row.get("keeps_room", false))}
+			"keeps_room": bool(row.get("keeps_room", false)), "script": str(row.get("script", ""))}
 	return out
 
 

@@ -1870,6 +1870,9 @@ static func _spec_for(marker: String, monster_types: Dictionary) -> Dictionary:
 		for key: String in type_props:
 			props[key] = _prop(key, type_props[key])
 	var spec := {"script": ANIMAL if Animal.is_wild(type) else MONSTER, "shape": "capsule", "props": props, "kind": type}
+	var own_script := str(Monster.kinds().get(type, {}).get("script", ""))
+	if not own_script.is_empty():
+		spec["script"] = own_script  # A kind of its own class (the draugr, decision 548).
 	# Its kind's name over it ("Wild doe"; 397 amended), not its spawn name.
 	var label := str(Monster.kinds().get(type, {}).get("label", ""))
 	if not label.is_empty():

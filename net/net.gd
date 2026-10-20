@@ -216,7 +216,10 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## for that player, absent if none (decision 536).
 ## 24: a blessed body at 0 HP is downed until downed_until, not gone; a
 ## channeler carries channel_of and channel_until (decision 544).
-const PROTOCOL_REVISION := 24
+## 25: a draugr spawns from sim/draugr.gd (Draugr), and the "offers"
+## message's "standing" may name a monster that talks, not only a resident
+## (decision 548, and npc's side of it).
+const PROTOCOL_REVISION := 25
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]
 ## Every kind of message (message, message_to, broadcast, broadcast_to).

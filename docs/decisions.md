@@ -16804,3 +16804,52 @@ Open for Jeff: the word ("barrow-blessed" or "hallowed"; "blessed" is
 blessing for life (drafted yes, only the uses run out), finishing blows
 on the downed (drafted no).
 companion_test _test_field_return. New class_name: none.
+
+## 548. The draugr (the crypt's monsters, step 3)
+
+Jeff's crypt.md: "give gold to the draugr and he offers a deal: beat him,
+and you can be brought back without the offering"; the coordinator's
+rulings: a fight by pact at a difficulty that sets the token's uses (5,
+10, 15), per challenger, he rises again in time (three game days, a rules
+number), and laying him to rest stills the skeletons. A new class_name,
+Draugr (sim/draugr.gd, extends Monster), the kind "draugr" (the dead's
+side, 545), whose row names its script: a kind's "script" in
+levels/monsters.json is what Level._spec_for spawns it from.
+
+- Seated (awake): he fights nobody unless struck (then he fights back and
+  yields as ever, but blesses nobody: a fight without the pact winning
+  nothing is the draft, Jeff's to decide). He talks first (npc's offer
+  contract): Monster.talks, and a player coming within HEARING_TILES in
+  his lair is spoken to once a visit (offer_spoken); offers_for gives the
+  one deal, {kind "deal", cost the offering (economy.json
+  return.offering, 8), most three measures}; accept_offer refuses under
+  the offering or past the purse, else takes the gold (World.add_gold, a
+  spending, "the draugr's pact") and starts the pact.
+- The pact: the gold's measures of the offering (1, 2, 3 or more) set the
+  difficulty, easy, normal or hard (Main.bless's names); his hp and blows
+  times 1, 1.5 or 2, and 0, 2 or 4 skeletons raised round him in his lair
+  (World.spawn_spec), guarding. He fights the challenger and their
+  companion while they are in his lair (the anchor round him, keeps_room,
+  547). Lost when the challenger falls or leaves the lair: he heals, his
+  raised dead go, he keeps the gold. Nothing stands while it is on
+  (offer_withdrawn to everyone).
+- Beaten: at 1 hp he yields (Draugr._world_damaged sets 1 back, so World
+  never kills him) and World.bless (Main.bless, 544) is called with the
+  players standing in his lair and the difficulty: their mark, uses,
+  halves and companions are 544's. Then he rests RISE_DAYS game days
+  (rests_until in World.steps, kept in his props so a restart finds him
+  resting), lying (down_until, as the dead lie, 547), and every one of
+  the dead in his zone lies still (lay_down), any that stir again
+  (respawns) every STILL_EVERY_TICKS. Per challenger: a new pact raises
+  him from his rest, which runs on; struck resting, he stays down.
+  Rested (the world tick too), he sits up and the dead rise (Monster.rise).
+- A pact does not survive a restart or a far world tick (forfeit, the gold
+  kept).
+- World.bless is the hook (as World.downed, 544), set by Main; unset in a
+  test, Draugr.blessed_last says who would have been blessed.
+Protocol: PROTOCOL_REVISION 25 (release's; one bump with npc's side of
+the talk): a draugr spawns from a script an older client lacks, and the
+"offers" message's "standing" may name a monster that talks. No new
+replicated property. dungeon's barrow swaps its stand-in for a
+monster_draugr marker in its level.json legend. monster_test
+(_test_draugr); level_test, protocol_test, builder_test unchanged.

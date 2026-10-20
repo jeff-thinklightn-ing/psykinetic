@@ -386,6 +386,9 @@ var spared: Callable
 ## Main for the draugr's blessed (decision 544). Asked after spared. Unset,
 ## nobody is.
 var downed: Callable
+## The draugr beaten in a pact (decision 548): (player ids, difficulty) ->
+## how many blessed; Main's bless (544). Unset, nobody is blessed.
+var bless: Callable
 ## Puts an entity of a spec ({kind, name, tile, props, idle...}) into the
 ## zone World is in, as a level's are (Main's _spawn); null if it cannot.
 ## Unset (a test that builds its own), nothing is spawned.

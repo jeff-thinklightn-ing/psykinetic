@@ -102,5 +102,19 @@
 		"strength": 1,
 		"temperament": {"bold": 0, "cautious": 2, "cowardly": 1},
 		"wields": {"right": "dagger"}
+	},
+	"draugr": {
+		"label": "Draugr",
+		"script": "res://sim/draugr.gd",
+		"body": {"mass": 120.0, "move_ticks": 4.5, "max_hp": 30, "attack_ticks": 14, "attack_damage": 3},
+		"tactic": "heavy",
+		"idle": "guard",
+		"opens_doors": false,
+		"door_force": 3,
+		"leash": 8,
+		"strength": 0,
+		"temperament": {"bold": 1, "cautious": 0, "cowardly": 0},
+		"fearless": true,
+		"keeps_room": true
 	}
 }
