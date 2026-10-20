@@ -35,6 +35,7 @@ func _ready() -> void:
 	_test_look()
 	_test_woodcutter()
 	_test_flock()
+	_test_season_scale()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -241,3 +242,16 @@ func _test_flock() -> void:
 	var saved := Towns.new(JSON.parse_string(JSON.stringify(towns.to_dict())), towns.production, _rules, func() -> int: return _now)
 	_check(is_equal_approx(float(saved.flock(TOWN)["count"]), float(towns.flock(TOWN)["count"])), "the flock saved and loaded")
 
+
+## Longer seasons (decision 533): a 14-day season's harvest is twice a
+## 7-day one's, so the food a day stays the same.
+func _test_season_scale() -> void:
+	print("
+== the season's length ==")
+	_rain = 0.11
+	_storm = false
+	var short := _year(_towns())
+	Season.season_days = 14
+	var long := _year(_towns(), 56)
+	Season.season_days = 7
+	_check(absi(long - 2 * short) <= 4, "a 14-day year (56 days) brings in twice a 7-day one's food (%d, %d): the same a day" % [long, short])

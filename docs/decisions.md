@@ -16023,3 +16023,15 @@ as 17 and 21 did). The "offer" command verb and the message's list stay, so
 a client may still accept by id. offers_test (the rules, pure) and
 resident_test (a kin's plea asked for, spoken, standing, taken by a yes;
 the mind for the rest). Server and wire; no new class_name.
+## 533, economy's side: yields kept a day as the seasons lengthen
+
+Environment's 533 (Jeff's tone package) makes a season 14 days, not 7. A
+crop's growth is per season, a harvest, the winter's roots and a
+shearing once a season, so at 14 days a day's food and wool would halve.
+Rather than doubling economy.json's numbers in step with the box's
+console, Towns.season_scale() (Season.season_days over the 7 the rules
+are set for, SEASON_DAYS_RULED) scales crop.harvest, crop.roots and
+flock.wool: 1 at 7 days, 2 at 14, the same a day either way, landed
+before 533 so the box never runs the longer seasons without it.
+farm_test _test_season_scale. Protocol unchanged.
+

@@ -871,6 +871,17 @@ func _draw_trade(town: String, draw: RandomNumberGenerator) -> String:
 
 # --- Farms (decision 449) -------------------------------------------------------------
 
+## The season length economy.json's season-bound yields are set for (533).
+const SEASON_DAYS_RULED := 7.0
+
+## What a season's yields are scaled by (decision 533, environment's
+## longer seasons): the season's days over the 7 economy.json's crop.harvest,
+## crop.roots and flock.wool are set for, so a day's food and wool stay
+## the same whatever the season's length (7 days: 1; 14: 2).
+static func season_scale() -> float:
+	return float(maxi(Season.season_days, 1)) / SEASON_DAYS_RULED
+
+
 ## [param town]'s crop this year ({} with no field): {stage ("" | "sown" |
 ## "harvested" | "rotted"), growth, worked (steps sowing or harvesting),
 ## season (the last seen), roots (dug this winter), at}.
@@ -947,14 +958,14 @@ func _crop(town: String) -> void:
 			if crop_now["stage"] == "sown" and farming:
 				crop_now["worked"] = int(crop_now["worked"]) + since
 				if int(crop_now["worked"]) >= int(rule.get("harvest_steps", 3000)):
-					var food := roundi(float(rule.get("harvest", 150)) * level * float(crop_now["growth"]))
+					var food := roundi(float(rule.get("harvest", 150)) * season_scale() * level * float(crop_now["growth"]))
 					production.deliver_to(town, production.worker_at("%s:field" % town), "food", food, "harvest", "the harvest")
 					crop_now["stage"] = "harvested"
 					crop_now["worked"] = 0
 					_note(town, "the harvest is in: %d food" % food)
 		"winter":
 			if not bool(crop_now["roots"]) and farming:
-				var roots := int(rule.get("roots", 20)) * level
+				var roots := roundi(float(rule.get("roots", 20)) * season_scale()) * level
 				production.deliver_to(town, production.worker_at("%s:field" % town), "food", roots, "roots", "roots dug in winter")
 				crop_now["roots"] = true
 				_note(town, "roots dug: %d food" % roots)
@@ -1060,7 +1071,7 @@ func _flock_turn(town: String) -> void:
 	flock_now["worked"] = int(flock_now.get("worked", 0)) + since
 	if int(flock_now["worked"]) < int(rule.get("shear_steps", 2000)):
 		return
-	var wool := floori(float(flock_now["count"]) * float(rule.get("wool", 1)))
+	var wool := floori(float(flock_now["count"]) * float(rule.get("wool", 1)) * season_scale())
 	flock_now["sheared"] = true
 	flock_now["worked"] = 0
 	if wool > 0:
