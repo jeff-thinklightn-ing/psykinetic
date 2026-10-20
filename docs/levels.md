@@ -155,14 +155,15 @@ its elevation rounded to levels, for what still reads levels.
 The sample level has one: its whole levels lifted 0.2 m over its water,
 and a gentle rise of about 0.9 m east of the stream. `levels/hills` is the
 showcase (`tools/make_hills.tscn`): a valley winding down the middle, its
-floor falling 5 m north to south and its stream running the whole of it
-with a ford and a bridge, a ridge 6.5 m over hills rolling 2 m either way
-to the west (its flanks as steep as a walk), a knoll across the stream, and
-a plateau 6 m up to the east whose west side is the map's one cliff, its
-south side a spur falling 0.25 m a cell that is the way up; about 13 m from
-the stream to the ridge's crest. Its ground is painted by slope: rock on
-the steep flanks, bare dirt on steeper ground, the crests and the banks,
-grass in the valley and on the tops.
+floor falling 5 m north to south and its stream running down it with a
+ford and a bridge, a ridge 7 m over hills rolling 2 m either way to the
+west, a knoll across the stream, and a plateau 6 m up to the east whose
+west side is the map's one cliff, its south side a spur falling 0.25 m a
+cell that is the way up; 2.3 to 15.9 m west of the plateau. Its flanks
+are mostly 0.3 m a step, the full walkable 0.4 in bands; its ground is
+painted by slope with no stone (the stone ground draws as paving): bare
+dirt on the steep bands, the crests, the banks and the plateau's rim,
+grass elsewhere.
 
 **Laying relief.** `Relief.lay(map, rect, seed, options)` lays hills,
 valleys and ridges over an area of a `LevelMap`: a rolling noise (`base`,
@@ -176,8 +177,10 @@ length; a ridge entry may be `{line, height, width}` (a knoll: one point).
 With `kinds` it paints the ground by slope too: stone where a step to a
 neighbour is 0.34 m or more, bare dirt from 0.24 m, on a crest (0.3 m over
 the cells within 3) and beside water, grass elsewhere, the thresholds
-wandering ±0.04 m so the bands are no contour lines. The editor's relief
-fill paints so.
+wandering ±0.04 m so the bands are no contour lines (`rock_step` and
+`dirt_step` set them). `slope` caps a step lower than 0.4 m, with
+`steep_bands` (a share of the ground, in noise bands) still at 0.4: gentler
+flanks with steep bands through them. The editor's relief fill paints so.
 Everything but the faces is limited to `Relief.LAY_SLOPE` (0.4 m) a step,
 so it is walked; the same seed lays the same ground. `Relief.pad(map,
 rect)` levels a footprint and a cell round it.

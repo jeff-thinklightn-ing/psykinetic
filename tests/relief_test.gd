@@ -398,7 +398,8 @@ func _test_hills() -> void:
 	var kinds := {}
 	for cell: Vector2i in terrain["kinds"]:
 		kinds[terrain["kinds"][cell]] = int(kinds.get(terrain["kinds"][cell], 0)) + 1
-	_check(kinds.get("stone", 0) > 500 and kinds.get("grass", 0) > 1000 and kinds.get("dirt", 0) > 200, "its ground by slope: rock, grass and bare dirt (%s)" % [kinds])
+	_check(kinds.get("stone", 0) == 0 and kinds.get("grass", 0) > 3000 and kinds.get("dirt", 0) > 500,
+		"its ground by slope: grass, bare dirt on the steep bands, crests and banks, no stone (paving) on its slopes (%s)" % [kinds])
 	_check(terrain["streams"][0]["path"].size() > 60, "the stream runs the valley's length (%d cells)" % terrain["streams"][0]["path"].size())
 	_check(terrain["streams"].size() == 1 and not terrain["fords"].is_empty() and level["buildings"].any(func(b: Dictionary) -> bool: return b["slot"] == "bridge"),
 		"its stream, a ford and a bridge")

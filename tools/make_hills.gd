@@ -7,21 +7,23 @@ extends Node
 ##
 ## 96 x 96 cells under the sky, its edge an uneven band of forest, its
 ## ground in metres (relief.png, laid by Relief.lay):
-## - a valley 6 m deep winding north to south down the middle, falling to
+## - a valley winding north to south down the middle, its floor falling to
 ##   the south, its stream (2 wide) found by the water's own way down,
 ##   crossed by a ford and a bridge;
-## - to the west, hills rolling 3.5 m either way over 70 cells and a ridge
-##   9 m over them, 22 cells out, running north to south, its highest knoll
-##   crowned with trees (void): from its crest you look down 14 m and more
-##   into the valley;
-## - across the stream, a knoll 7 m high, so the valley has a shape from
+## - to the west, hills rolling 2 m either way over 70 cells and a ridge
+##   7 m over them, 40 cells out, running north to south, its highest knoll
+##   crowned with trees (void): from its crest you look down into the
+##   valley;
+## - across the stream, a knoll 6 m high, so the valley has a shape from
 ##   both sides;
 ## - to the east, a plateau 6 m up, its west side a sheer cliff (the map's
-##   one), rock along its rim, its south side falling away as a long
+##   one), bare dirt along its rim, its south side falling away as a long
 ##   walkable spur: the way up;
-## - the ground's kinds by its slope (Relief.lay "kinds", 525 amended):
-##   rock on the steep, bare dirt on steeper ground and the crests, grass in
-##   the hollows, dirt banks by the stream;
+## - flanks mostly 0.3 m a step, the full walkable 0.4 in bands, and the
+##   ground's kinds by its slope (Relief.lay "kinds", 525 amended): bare
+##   dirt on the steep bands, the crests and the banks, grass elsewhere, no
+##   stone on the slopes (the stone ground draws as paving; the cliff's
+##   face is the rock);
 ## - a low stone wall on the valley floor below the cliff, which the plateau
 ##   sees over; a few boulders and crates by the rim to push off;
 ## - starts on a levelled pad by the link to the wilds (east edge).
@@ -77,7 +79,7 @@ func _ready() -> void:
 	var arrival := _link()
 	var laid := Relief.lay(map, Rect2i(Vector2i.ZERO, SIZE), SEED, {
 		"base": BASE, "amplitude": 2.0, "scale": 70.0, "octaves": 2, "tilt": TILT,
-		"ridges": [RIDGE, {"line": [KNOLL], "height": 6.0, "width": 20.0}], "ridge_height": 6.5, "ridge_width": 34.0,
+		"ridges": [RIDGE, {"line": [KNOLL], "height": 6.0, "width": 20.0}], "ridge_height": 7.0, "ridge_width": 40.0, "slope": 0.3, "steep_bands": 0.3, "rock_step": Relief.MAX_M, "dirt_step": 0.33,
 		"valleys": [VALLEY], "valley_depth": 3.5, "valley_floor": 3.0, "valley_fall": 5.0, "valley_width": 30.0, "kinds": true, "min_flow": 30,
 		"plateaus": [{"rect": Rect2i(CLIFF_X, 0, SIZE.x - CLIFF_X, FOOT), "height": PLATEAU_HEIGHT, "faces": ["west"], "spur": 0.25}],
 		"keep_flat": [Rect2i(arrival - Vector2i(2, 3), Vector2i(4, 7))],
@@ -211,13 +213,14 @@ func _straight(water: Dictionary, cells: Array[Vector2i]) -> bool:
 	return true
 
 
-## Rock (stone) along the plateau's rim, in from its face.
+## Bare dirt along the plateau's rim, in from its face (stone ground drew
+## as paving on a cliff top: the face's own rock is the rock).
 func _rock() -> void:
 	for y in FOOT:
 		for x in range(CLIFF_X, CLIFF_X + RIM):
 			var at := Vector2i(x, y)
-			if map.cell(at) in ["grass", "dirt"]:
-				map.set_cell(at, "stone")
+			if map.cell(at) == "grass":
+				map.set_cell(at, "dirt")
 
 
 ## The ridge's highest knoll west of the valley, crowned with trees.

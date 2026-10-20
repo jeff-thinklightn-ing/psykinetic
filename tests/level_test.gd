@@ -334,7 +334,20 @@ func _test_hills() -> void:
 			"pushed off the face: it falls %.1f m, %d levels, for %d (%s, %s)" % [drop, Relief.levels(drop), hp - imp.hp, imp.tile, _pushes.back()["stopped_by"]])
 	World.despawn(imp)
 	_check(World.has_line_of_sight(Vector2i(63, 37), Vector2i(53, 38)), "from the plateau's rim the valley beyond the low wall is seen")
-	_check(not World.has_line_of_sight(Vector2i(8, 40), Vector2i(46, 40)), "the ridge hides the valley from the west")
+	# Where the ridge bends east (rows 30-38, 84-90) there is ground behind
+	# its crest: some of it hidden from the valley floor.
+	var hidden := []
+	for row in range(30, 39) + range(84, 91):
+		var crest := Vector2i(-1, row)
+		for x in range(0, 36):
+			var cell := Vector2i(x, row)
+			if World.is_walkable(cell) and (crest.x < 0 or World.elevation_at(cell) > World.elevation_at(crest)):
+				crest = cell
+		for x in range(0, crest.x - 1):
+			var behind := Vector2i(x, row)
+			if World.is_walkable(behind) and not World.has_line_of_sight(Vector2i(46, row), behind):
+				hidden.append(behind)
+	_check(hidden.size() >= 1, "the ridge hides ground behind its crest from the valley floor (%d cells)" % hidden.size())
 
 
 ## The console's "move" (decision 531): the player by name to the nearest

@@ -348,17 +348,34 @@ static func lay(map: LevelMap, rect: Rect2i, lay_seed: int, options := {}) -> Di
 		for at: Vector2i in cells:
 			heights[at] = level
 			fixed[at] = true
-	_limit(heights, fixed, cliff_side, LAY_SLOPE, faces)
+	# A valley's floor is held as laid (the flanks give way to it, so it
+	# keeps its fall), and a stream keeps to it where it can.
+	var floors: Dictionary[Vector2i, bool] = {}
+	if valley_floor > 0.0:
+		for at: Vector2i in heights:
+			for line: Array in valleys:
+				if _along_line(at, line).x <= valley_floor + 1.0:
+					floors[at] = true
+					fixed[at] = true
+	# The slope's cap: "slope" a step, but LAY_SLOPE in bands ("steep_bands",
+	# the share of the ground in them) where rock shows.
+	var cap := clampf(float(options.get("slope", LAY_SLOPE)), 0.05, LAY_SLOPE)
+	var steeper := {}
+	var bands := clampf(float(options.get("steep_bands", 0.0)), 0.0, 1.0)
+	if bands > 0.0 and cap < LAY_SLOPE:
+		var band := FastNoiseLite.new()
+		band.seed = lay_seed + 2
+		band.frequency = 0.08
+		band.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+		for at: Vector2i in heights:
+			# The noise's top share: about -1..1, so above 1 - 2 * share.
+			if band.get_noise_2d(at.x, at.y) > 1.0 - 2.0 * bands:
+				steeper[at] = LAY_SLOPE
+	_limit(heights, fixed, cliff_side, cap, faces, steeper)
 	# Streams down the valleys: water follows the lowest way out of the area.
 	var flow := _flow(heights, area)
 	var taken: Dictionary[Vector2i, bool] = {}
 	var min_flow := int(options.get("min_flow", maxi(8, ground.size() / 60)))
-	# A stream keeps to a valley's floor where it can.
-	var floors: Dictionary[Vector2i, bool] = {}
-	for at: Vector2i in heights:
-		for line: Array in valleys:
-			if _along_line(at, line).x <= valley_floor + 1.0:
-				floors[at] = true
 	for i in int(options.get("streams", 1)):
 		var path := _stream_path(flow, heights, area, min_flow, taken, floors)
 		if path.size() < 4:
@@ -374,7 +391,7 @@ static func lay(map: LevelMap, rect: Rect2i, lay_seed: int, options := {}) -> Di
 			for direction in FOUR:
 				if heights.has(at + direction):
 					fixed[at + direction] = true
-		_limit(heights, fixed, cliff_side, LAY_SLOPE, faces)
+		_limit(heights, fixed, cliff_side, cap, faces, steeper)
 	# relief.png holds nothing under 0 m: the whole of it lifted if it dips.
 	var lowest := 0.0
 	for at: Vector2i in heights:
@@ -382,7 +399,7 @@ static func lay(map: LevelMap, rect: Rect2i, lay_seed: int, options := {}) -> Di
 	for at: Vector2i in heights:
 		out["relief"][at] = snappedf(heights[at] - lowest, 0.01)
 	if options.get("kinds", false):
-		_kinds(map, heights, out["cells"], lay_seed)
+		_kinds(map, heights, out["cells"], lay_seed, float(options.get("rock_step", ROCK_STEP)), float(options.get("dirt_step", DIRT_STEP)))
 	return out
 
 
@@ -394,7 +411,7 @@ static func lay(map: LevelMap, rect: Rect2i, lay_seed: int, options := {}) -> Di
 ## cells within CREST_REACH), grass in the hollows and on gentle ground; a
 ## cell beside the water its dirt bank. The thresholds wander a little
 ## (KIND_WANDER, by the seed) so the bands are no contour lines.
-static func _kinds(map: LevelMap, heights: Dictionary, cells: Dictionary, lay_seed: int) -> void:
+static func _kinds(map: LevelMap, heights: Dictionary, cells: Dictionary, lay_seed: int, rock_step := ROCK_STEP, dirt_step := DIRT_STEP) -> void:
 	var wander := FastNoiseLite.new()
 	wander.seed = lay_seed + 1
 	wander.frequency = 0.15
@@ -420,9 +437,9 @@ static func _kinds(map: LevelMap, heights: Dictionary, cells: Dictionary, lay_se
 					sum += float(heights[near])
 					count += 1
 		var shift := KIND_WANDER * wander.get_noise_2d(at.x, at.y)
-		if step >= ROCK_STEP + shift:
+		if step >= rock_step + shift:
 			cells[at] = "stone"
-		elif bank or step >= DIRT_STEP + shift or here - sum / maxi(1, count) >= CREST + shift:
+		elif bank or step >= dirt_step + shift or here - sum / maxi(1, count) >= CREST + shift:
 			cells[at] = "dirt"
 		else:
 			cells[at] = "grass"
@@ -510,7 +527,7 @@ static func _distance_to_line(at: Vector2i, line: Array) -> float:
 ## of them, then raised wherever it falls away faster than slope from a
 ## neighbour (raster passes each way, again until nothing moves: a
 ## distance transform, so a peak broadens rather than a hollow digging in).
-static func _limit(heights: Dictionary, fixed: Dictionary, cliff_side: Dictionary, slope: float, faces: Dictionary = {}) -> void:
+static func _limit(heights: Dictionary, fixed: Dictionary, cliff_side: Dictionary, slope: float, faces: Dictionary = {}, steeper: Dictionary = {}) -> void:
 	if heights.is_empty():
 		return
 	var low := Vector2i(1 << 30, 1 << 30)
@@ -542,12 +559,18 @@ static func _limit(heights: Dictionary, fixed: Dictionary, cliff_side: Dictionar
 	bound.resize(h.size())
 	for i in h.size():
 		bound[i] = h[i] if kind[i] & 3 == 2 else INF
-	_sweep(bound, kind, open, size, slope, false)
+	var caps := PackedFloat32Array()
+	caps.resize(h.size())
+	caps.fill(slope)
+	for at: Vector2i in steeper:
+		if heights.has(at):
+			caps[(at.y - low.y) * size.x + at.x - low.x] = float(steeper[at])
+	_sweep(bound, kind, open, size, caps, false)
 	for i in h.size():
 		if kind[i] & 3 == 1:
 			h[i] = minf(h[i], bound[i])
 	# Then up wherever the ground falls away too fast.
-	_sweep(h, kind, open, size, slope, true)
+	_sweep(h, kind, open, size, caps, true)
 	for at: Vector2i in heights:
 		heights[at] = h[(at.y - low.y) * size.x + at.x - low.x]
 
@@ -555,7 +578,7 @@ static func _limit(heights: Dictionary, fixed: Dictionary, cliff_side: Dictionar
 ## Raster passes over [param h] ([param size]) until nothing moves: each
 ## free cell (kind 1) raised to its open neighbours' less [param slope]
 ## ([param up]), or brought down to theirs plus it (not [param up]).
-static func _sweep(h: PackedFloat32Array, kind: PackedByteArray, open: PackedByteArray, size: Vector2i, slope: float, up: bool) -> void:
+static func _sweep(h: PackedFloat32Array, kind: PackedByteArray, open: PackedByteArray, size: Vector2i, caps: PackedFloat32Array, up: bool) -> void:
 	for round_count in 64:
 		var moved := false
 		for backward in [false, true]:
@@ -567,6 +590,7 @@ static func _sweep(h: PackedFloat32Array, kind: PackedByteArray, open: PackedByt
 					if kind[i] & 3 != 1:
 						continue
 					var best := h[i]
+					var slope := caps[i]
 					# West and north neighbours forward; east and south back.
 					if backward:
 						if x + 1 < size.x and open[i] & 1:

@@ -16151,3 +16151,19 @@ floor runs about half owed. The next gold has to come from trade's
 volume or from the rich, not from the poor. larder_test, return_test.
 Protocol unchanged.
 
+
+Amended again (terrain's shot of 286cf0c5: the 3241 "stone" flank cells
+drew the stone ground's flagstone tile, a valley side like a paved square;
+the coordinator's gentler variant, terrain's ask for the rim):
+
+- Relief.lay: "slope" caps a step below LAY_SLOPE, "steep_bands" (a share
+  of the ground in noise bands) keeping LAY_SLOPE there (_limit takes a
+  cap per cell); "rock_step" and "dirt_step" set _kinds' thresholds; a
+  valley's floor is held fixed while the ground is limited (a lower cap had
+  lifted it near the ridge and broken its fall, the stream 19 cells).
+- levels/hills: slope 0.3 with steep_bands 0.3, the ridge 7 m 40 cells
+  out, rock_step above any step (no stone ground on its slopes), dirt from
+  0.33 m, the plateau's rim dirt (stone there read as paving on the cliff
+  top). 2.3 to 15.9 m west of the plateau, the stream 92 cells, one cliff;
+  5745 grass, 986 dirt, no stone. Real rock is the cliff's drawn face
+  until art-kit has a natural-rock ground (the coordinator asks later).
