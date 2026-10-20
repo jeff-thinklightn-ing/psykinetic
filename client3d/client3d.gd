@@ -2397,6 +2397,11 @@ func _make_flat(mesh: Mesh, color: Color) -> MeshInstance3D:
 # --- Builder mode: the area picked, the proposal as a ghost ------------------------------
 
 const BUILDER_AREA := Color(0.45, 0.8, 1.0, 0.9)
+## A building's code label: the area frame's blue, a little paler, this
+## high over its ground and this many times a name's size.
+const BUILDING_CODE := Color(0.75, 0.92, 1.0)
+const CODE_HEIGHT := 4.5
+const CODE_SCALE := 2.5
 ## A new level's outline, beyond the map's edge.
 const BUILDER_BEYOND := Color(1.0, 0.7, 0.3, 0.9)
 const BUILDER_GHOST_ALPHA := 0.6
@@ -2409,6 +2414,10 @@ const BUILDER_HIGH := Color(0.97, 0.95, 0.88)
 ## A roof the proposal adds: its rect outlined, raised to about the eaves.
 const BUILDER_ROOF := Color(0.85, 0.35, 0.25, 0.9)
 var _builder_marks: Node3D
+## Builder mode's building codes over the buildings (decision 537), and
+## whether they are on (kept over a rebuilt level).
+var _code_labels: Node3D
+var _codes_on := false
 
 
 ## Builder mode's marks: [param area]'s outline (size zero: none) and, over
@@ -2505,6 +2514,27 @@ static func _frame_mesh(rect: Rect2i, line: float) -> ArrayMesh:
 		PackedVector2Array([Vector2(b.x - line, a.y), Vector2(b.x, a.y), b, Vector2(b.x - line, b.y)]),
 	]
 	return _flat_mesh(quads)
+
+
+## Each building's code (Level.building_codes: "H3 house") floating over
+## its middle while [param on] (builder mode, decision 537).
+func show_building_codes(on: bool) -> void:
+	_codes_on = on
+	if _code_labels != null:
+		_code_labels.queue_free()
+		_code_labels = null
+	if not on:
+		return
+	_code_labels = Node3D.new()
+	_code_labels.name = "BuildingCodes"
+	add_child(_code_labels)
+	for building: Dictionary in _terrain.get("buildings", []):
+		var rect: Rect2i = building["rect"]
+		var middle := Vector2(rect.position) + Vector2(rect.size - Vector2i.ONE) * 0.5
+		var label := _label("Code_%s" % building.get("code", ""), BuilderUI.building_words(building), BUILDING_CODE, 0.0)
+		label.pixel_size = LABEL_SIZE * CODE_SCALE
+		label.position = Vector3(middle.x, _elevation(rect.position) + CODE_HEIGHT, middle.y)
+		_code_labels.add_child(label)
 
 
 func clear_builder() -> void:
@@ -3044,6 +3074,8 @@ func _add_walls() -> void:
 ## ground; the slot's "roof" part is what hides while the local player is
 ## inside (_update_roofs). The walls are the map's own wall runs.
 func _add_buildings() -> void:
+	if _codes_on:
+		show_building_codes.call_deferred(true)
 	for building: Dictionary in _terrain.get("buildings", []):
 		if building.has("kind"):
 			_add_kind(building)

@@ -854,6 +854,11 @@ func _process(delta: float) -> void:
 							break
 				if _hint_words.is_empty() and player != null and not World.ground_at(tile).is_empty():
 					_hint_words = "%s  pick up %s" % [Keys.name_of("pick_up"), pile_words(World.ground_at(tile))]
+				if _hint_words.is_empty() and tile != NONE:
+					# The building under the cursor by its code (decision 537): "H3 house".
+					var building := BuilderUI.building_at(level.get("buildings", []), tile)
+					if not building.is_empty():
+						_hint_words = BuilderUI.building_words(building)
 		var words := _hint_words
 		if is_instance_valid(_test_hint_thing) and _client3d != null:
 			# --test-show=hint: the hint as the cursor on that thing would show it.
@@ -2488,9 +2493,22 @@ func _show_zone_to(peer: int, zone_name: String, leaving: Array[GridEntity] = []
 ## many, not who), no such zone, a cell off the map, or none walkable within
 ## MOVE_REACH of it. No id is printed (the journal is grepped).
 const MOVE_REACH := 8
+
+
+## The cell just outside [param building]'s front (its facing side), in
+## the middle: where a move to its code lands (decision 537).
+static func front_of(building: Dictionary) -> Vector2i:
+	var rect: Rect2i = building["rect"]
+	var facing: Vector2i = building.get("facing", Vector2i(0, 1))
+	var at := rect.position + (rect.size - Vector2i.ONE) / 2
+	while rect.has_point(at):
+		at += facing if facing != Vector2i.ZERO else Vector2i(0, 1)
+	return at
 func _move_command(words: PackedStringArray) -> String:
-	if words.size() < 4 or not words[2].is_valid_int() or not words[3].is_valid_int():
-		return "move <player> <x> <y> [zone]: the player by name as \"players\" lists them"
+	# Or to a building by its code (decision 537): move <player> H3 [zone].
+	var by_code := words.size() >= 3 and not words[2].is_valid_int() and words[2].substr(1).is_valid_int()
+	if not by_code and (words.size() < 4 or not words[2].is_valid_int() or not words[3].is_valid_int()):
+		return "move <player> <x> <y> [zone], or move <player> <building code> [zone]: the player by name as \"players\" lists them"
 	var wanted := words[1]
 	var peers: Array[int] = []
 	for peer: int in _players:
@@ -2506,11 +2524,18 @@ func _move_command(words: PackedStringArray) -> String:
 		return "move: %d players online are called %s; not moved" % [peers.size(), wanted]
 	var peer := peers[0]
 	var mover: Player = _players[peer]
-	var zone_name := words[4] if words.size() > 4 else mover.zone
+	var zone_name := (words[3] if words.size() > 3 else mover.zone) if by_code else (words[4] if words.size() > 4 else mover.zone)
 	if not Level.exists(zone_name):
 		return "move: no zone %s" % zone_name
-	var target := Vector2i(int(words[2]), int(words[3]))
 	var parsed := Level.load_level(zone_name)
+	var target := Vector2i(int(words[2]), int(words[3])) if not by_code else World.NO_CELL
+	if by_code:
+		var code := words[2].to_upper()
+		for building: Dictionary in parsed.get("buildings", []):
+			if str(building.get("code", "")) == code:
+				target = front_of(building)
+		if target == World.NO_CELL:
+			return "move: no building %s in %s" % [code, zone_name]
 	var size: Vector2i = parsed.get("size", Vector2i.ZERO)
 	if not Rect2i(Vector2i.ZERO, size).has_point(target):
 		return "move: %s is off %s's map (%d x %d)" % [target, zone_name, size.x, size.y]

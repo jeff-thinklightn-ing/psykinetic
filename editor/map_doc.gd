@@ -103,6 +103,9 @@ func save() -> bool:
 		report = "could not save %s (%s)" % [png, error_string(error)]
 		return false
 	var imported := LevelMap.ensure_image_import(ProjectSettings.globalize_path(png), png)
+	# Each building's code written in, so it stays its own (decision 537).
+	if Level.fill_codes(config):
+		config_dirty = true
 	if config_dirty:
 		var json := FileAccess.open(ProjectSettings.globalize_path(folder + "level.json"), FileAccess.WRITE)
 		if json == null:

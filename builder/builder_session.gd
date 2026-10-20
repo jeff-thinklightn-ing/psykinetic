@@ -54,7 +54,7 @@ const SIDES := {"north": Vector2i(0, -1), "east": Vector2i(1, 0), "south": Vecto
 ## Context shown round the area, in cells.
 const MARGIN := 3
 ## level.json keys a proposal may change as a whole (beyond entries and links).
-const CONFIG_KEYS: Array[String] = ["neighbours", "places", "buildings", "town_walls", "roofs", "legend", "streams"]
+const CONFIG_KEYS: Array[String] = ["neighbours", "places", "buildings", "building_codes", "town_walls", "roofs", "legend", "streams"]
 
 ## Asks Claude: send(body: Dictionary) -> Dictionary (a Messages API
 ## response, or {"error": "..."}), awaited (ClaudeClient, StubClaude).
@@ -86,6 +86,8 @@ var created := ""
 
 func _init(level_doc: MapDoc, selected: Rect2i, level_name: String, claude: Object) -> void:
 	doc = level_doc
+	# The codes the level's buildings go by (decision 537), as Level.parse derives them.
+	Level.fill_codes(doc.config)
 	area = selected.intersection(Rect2i(Vector2i.ZERO, level_doc.map.size))
 	map_name = level_name
 	client = claude
@@ -423,6 +425,12 @@ func _situation() -> String:
 		text += "\n\nPlaces here: " + ", ".join(places) + "."
 	if not relief().is_empty():
 		text += "\n\nThis level's ground is shaped in metres: the Heights block is in half metres."
+	var coded := PackedStringArray()
+	for entry: Variant in doc.config.get("buildings", []) if doc.config.get("buildings") is Array else []:
+		if entry is Dictionary and entry.has("code"):
+			coded.append("%s %s at %s" % [entry["code"], building_name(entry), Level._tile(entry.get("at"))])
+	if not coded.is_empty():
+		text += "\n\nBuildings in this level, by code (the player may name one so; it is the same entry's \"code\" in the settings): " + ", ".join(coded) + "."
 	var towns := town_ids()
 	if not towns.is_empty():
 		text += "\n\nTowns a camp may hold captives from: " + ", ".join(towns) + "."
@@ -625,9 +633,9 @@ const TOOLS := [
 	{"name": "set_building", "description": "Gives a building in the area its use and the town it serves, or makes it scenery again (no use, no town).",
 		"input_schema": {"type": "object", "properties": {
 			"at": _CELL,
+			"code": {"type": "string", "description": "the building's code (\"H3\"), instead of at"},
 			"use": {"type": "string", "description": "what the town does there (the uses are in the system prompt); empty for none"},
-			"town": {"type": "string", "description": "the key of a stockpile place in this level; empty for none"}},
-			"required": ["at"]}},
+			"town": {"type": "string", "description": "the key of a stockpile place in this level; empty for none"}}}},
 	{"name": "town_wall", "description": "Walls a town in: a wall on the edges just outside a rectangle of cells, gates (doors) in it, recorded as that town's wall (a town walled again gets the new one). Leaves the cells as they are.",
 		"input_schema": {"type": "object", "properties": {
 			"town": {"type": "string", "description": "the key of the town's stockpile place in this level"},
@@ -662,6 +670,13 @@ const FACINGS := {"north": Vector2i(0, -1), "north-east": Vector2i(1, -1), "east
 
 ## Runs tool [param tool] with [param input] on the working copy: {ok, text}.
 func run_tool(tool: String, input: Variant) -> Dictionary:
+	var out := _run_tool(tool, input)
+	# A building it made gets its code now, for the next tool and the answer (decision 537).
+	Level.fill_codes(working.config)
+	return out
+
+
+func _run_tool(tool: String, input: Variant) -> Dictionary:
 	if not input is Dictionary:
 		return _no("the input is not an object")
 	var given: Dictionary = input
@@ -941,6 +956,14 @@ func town_ids() -> Array[String]:
 	return out
 
 
+## A building entry's name in words (decision 537): its kind, else its
+## slot's ("house", "healers hut").
+static func building_name(entry: Variant) -> String:
+	if not entry is Dictionary:
+		return "building"
+	return str(entry.get("kind", str(entry.get("slot", "building")).trim_prefix("building."))).replace("_", " ")
+
+
 ## The uses a map building may have: the economy rules' buildings (the
 ## town wall is a record of its own, not a building's use).
 static func building_uses() -> Array[String]:
@@ -1023,8 +1046,14 @@ func pad_problem(entry: Variant) -> String:
 
 func _set_building(given: Dictionary) -> Dictionary:
 	var at: Variant = Level._tile(given.get("at"))
+	var code := str(given.get("code", "")).strip_edges().to_upper()
+	if not code.is_empty():
+		var named: Array = (working.config.get("buildings", []) as Array).filter(func(entry: Variant) -> bool: return entry is Dictionary and str(entry.get("code", "")) == code)
+		if named.is_empty():
+			return _no("no building here is %s (the request lists the level's buildings)" % code)
+		at = Level._tile(named[0].get("at"))
 	if at == null:
-		return _no("set_building needs at: [x, y], a cell of the building")
+		return _no("set_building needs at: [x, y], a cell of the building, or its code")
 	if not area.has_point(at):
 		return _no("%s is outside the area" % [at])
 	var buildings: Array = (working.config["buildings"] as Array).duplicate(true) if working.config.get("buildings") is Array else []

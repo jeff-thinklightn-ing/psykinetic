@@ -16079,3 +16079,41 @@ foot is Close alone. Talk is what the player types in the say line, as
 they were. The second step, a conversation with no panel at all, is a
 design to the coordinator with npc before anything lands. ui_test.
 Client only; protocol unchanged.
+## 537. Building codes and cell coordinates in builder mode
+
+Jeff (via the coordinator): "in build mode it could mark coordinates and
+name buildings with a code?" Small, client-side, as the coordinator
+approved.
+
+- A building's code is its kind's or slot's first letter, upper case,
+  and a number: H3 (a house or hut), S1 (a shed), B2 (a bridge).
+  Level.building_codes derives them in level.json order: an entry's own
+  "code", else the next number past the highest that letter has had.
+  Level.fill_codes writes them into the entries, and keeps level.json's
+  "building_codes" (letter -> the last number given) at each letter's
+  highest. MapDoc.save and builder mode (each tool, and a session's
+  level) call it.
+- Stable under edits: adding a building gives it the next number;
+  removing one leaves every other code as it was, and its code is never
+  given again once written (the counter keeps it). A copy repeating a
+  code (a paste) gets its own. A stamped prefab's buildings drop the
+  prefab's codes and are given the level's next ones.
+- Level.parse gives each building its "code", so the client and the
+  server work them out from the same level.json. Nothing new travels:
+  protocol unchanged.
+- On the client, while B is on: the HUD shows the cell under the cursor
+  and the player's own ("212, 207      you 210, 205"); each building
+  carries its code and name floating over it (Client3D.show_building_codes,
+  kept over a rebuilt level); a click on one says in the party log "H3
+  house at 212, 207, facing south, use: inn". At any time the cursor hint
+  over a building is its code and name (after the things' hints).
+- Builder requests: the request lists the level's buildings by code, the
+  grid's settings show each entry's "code", and set_building takes a code
+  in place of a cell, so "make H3 the inn" works. Other tools still take
+  cells, read from the listing.
+- The admin console's move takes a code: "move <player> H3 [zone]" lands
+  at the cell outside the middle of its front (main.front_of), the
+  nearest walkable as before.
+
+builder_test _test_codes; editor_test's every-key list (building_codes
+not offered).

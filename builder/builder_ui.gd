@@ -17,6 +17,10 @@ var state := "idle"
 var _drag_from := Vector2i(-1, -1)
 var _box: LineEdit
 var _status: Label
+## The cursor's cell and the player's, while on (decision 537).
+var _coords: Label
+var _coords_at := Vector2i(-2, -2)
+var _coords_me := Vector2i(-2, -2)
 var _proposal := {}
 ## --test-builder with a request starting "+": accept the proposal when it comes.
 var _test_accept := false
@@ -35,6 +39,18 @@ func _ready() -> void:
 	_status.theme_type_variation = &"Outlined"
 	_status.visible = false
 	main.get_node("HUD").add_child(_status)
+	_coords = Label.new()
+	_coords.name = "BuilderCoords"
+	_coords.anchor_left = 0.5
+	_coords.anchor_right = 0.5
+	_coords.offset_left = -400
+	_coords.offset_right = 400
+	_coords.offset_top = 40
+	_coords.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_coords.theme_type_variation = &"Outlined"
+	_coords.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_coords.visible = false
+	main.get_node("HUD").add_child(_coords)
 	_box = LineEdit.new()
 	_box.name = "BuilderBox"
 	_box.max_length = BuilderHost.MAX_TEXT
@@ -52,6 +68,61 @@ func _ready() -> void:
 			escape()
 			main.get_viewport().set_input_as_handled())
 	main.get_node("HUD").add_child(_box)
+
+
+func _process(_delta: float) -> void:
+	if not active or _coords == null:
+		return
+	var at: Vector2i = main._mouse_tile()
+	var me: Player = main._local_player()
+	var standing: Vector2i = me.tile if me != null else main.NONE
+	if at == _coords_at and standing == _coords_me:
+		return
+	_coords_at = at
+	_coords_me = standing
+	_coords.text = coords_text(at, standing, main.NONE)
+
+
+## The coordinates line (decision 537): "212, 207      you 210, 205".
+static func coords_text(at: Vector2i, standing: Vector2i, none: Vector2i) -> String:
+	var parts := PackedStringArray()
+	if at != none:
+		parts.append("%d, %d" % [at.x, at.y])
+	if standing != none:
+		parts.append("you %d, %d" % [standing.x, standing.y])
+	return "      ".join(parts)
+
+
+## The building of [param buildings] (Level.parse's) whose footprint holds
+## [param tile], or {} (decision 537).
+static func building_at(buildings: Array, tile: Vector2i) -> Dictionary:
+	for building: Dictionary in buildings:
+		var blocks: Array = building.get("blocks", [])
+		if (blocks if not blocks.is_empty() else [building["rect"]]).any(func(rect: Rect2i) -> bool: return rect.has_point(tile)):
+			return building
+	return {}
+
+
+## A building's code and name, the cursor hint's and the label's: "H3 house".
+static func building_words(building: Dictionary) -> String:
+	var name := str(building.get("kind", ""))
+	if name.is_empty():
+		name = str(building.get("slot", "building")).trim_prefix("building.")
+	return ("%s %s" % [building.get("code", ""), name.replace("_", " ")]).strip_edges()
+
+
+## The party log's line for a building clicked in builder mode:
+## "H3 house at 212, 207, facing south, use: inn".
+static func building_line(building: Dictionary) -> String:
+	var at: Vector2i = building.get("cell", Vector2i.ZERO)
+	var facing: Vector2i = building.get("facing", Vector2i(0, 1))
+	var side: String = {Vector2i(0, -1): "north", Vector2i(1, 0): "east", Vector2i(0, 1): "south", Vector2i(-1, 0): "west"}.get(facing, str(facing))
+	var line := "%s at %d, %d, facing %s" % [building_words(building), at.x, at.y, side]
+	if not str(building.get("use", "")).is_empty():
+		line += ", use: %s" % building["use"]
+	if not str(building.get("town", "")).is_empty():
+		line += ", town: %s" % building["town"]
+	return line
 
 
 func is_typing() -> bool:
@@ -83,6 +154,10 @@ func handle_input(event: InputEvent) -> bool:
 	var button := event as InputEventMouseButton
 	if button != null and button.button_index == MOUSE_BUTTON_LEFT:
 		var at: Vector2i = main._mouse_tile()
+		if button.pressed and at != main.NONE:
+			var clicked := building_at(main.level.get("buildings", []), at)
+			if not clicked.is_empty():
+				main.talk.add_line("Builder", building_line(clicked), true, true)
 		if button.pressed and at != main.NONE and state in ["idle", "asking", "proposal"]:
 			if state == "proposal":
 				_send({"op": "discard"})
@@ -105,6 +180,10 @@ func handle_input(event: InputEvent) -> bool:
 
 func toggle() -> void:
 	active = not active
+	_coords.visible = active
+	_coords_at = Vector2i(-2, -2)
+	if main._client3d != null:
+		main._client3d.show_building_codes(active)
 	if active:
 		_say("Builder mode: drag out an area, then say what to make there.   B leaves.")
 	else:

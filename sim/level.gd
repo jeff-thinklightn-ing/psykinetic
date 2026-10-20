@@ -1103,6 +1103,8 @@ static func buildings_from(config: Dictionary, terrain: Dictionary, warnings: Ar
 	if not listed is Array:
 		warnings.append("\"buildings\" in level.json is not a list")
 		return out
+	var codes := building_codes(listed, config.get("building_codes", {}))
+	var index := -1
 	var ground: Dictionary[Vector2i, bool] = {}
 	for cell: Vector2i in terrain["floor"]:
 		ground[cell] = true
@@ -1112,6 +1114,7 @@ static func buildings_from(config: Dictionary, terrain: Dictionary, warnings: Ar
 	var taken: Dictionary[Vector2i, bool] = {}
 	var linked := {}
 	for entry: Variant in listed:
+		index += 1
 		var rect: Variant = building_rect(entry)
 		if rect == null:
 			warnings.append("the building %s has no \"at\" cell, or no slot of %s or kind of %s" % [entry, ", ".join(BUILDINGS.keys()), ", ".join(kinds().keys())])
@@ -1141,7 +1144,7 @@ static func buildings_from(config: Dictionary, terrain: Dictionary, warnings: Ar
 		if not open.is_empty():
 			warnings.append("the %s at %s has %d open edges on its outline (%s)" % [what, rect.position, open.size(), open[0]])
 		var building := {"slot": str(entry.get("slot", "")), "cell": rect.position, "facing": building_facing(entry), "rect": rect,
-			"blocks": blocks, "use": "", "town": ""}
+			"blocks": blocks, "use": "", "town": "", "code": codes[index]}
 		if entry.has("kind"):
 			_kind_of(building, entry)
 		_link(building, entry, config, linked, warnings)
@@ -1570,6 +1573,72 @@ static func building_facing(entry: Dictionary) -> Vector2i:
 ## A level.json building entry's footprint (null if it has no "at", or no
 ## slot in BUILDINGS nor a kind and size in kinds()): a kind's the box
 ## round its blocks (building_blocks).
+## A building's code letter (decision 537): its kind's first letter, or
+## its slot's (building.house: H), upper case; X for neither.
+static func code_letter(entry: Variant) -> String:
+	if not entry is Dictionary:
+		return "X"
+	var name := str(entry.get("kind", "")) if entry.has("kind") else str(entry.get("slot", "")).trim_prefix("building.")
+	return name.left(1).to_upper() if not name.is_empty() else "X"
+
+
+## Each of [param entries]' codes, in order (decision 537): its own
+## "code" (written in by fill_codes), else its letter and the next number
+## past the highest that letter has had: [param given] (level.json's
+## "building_codes", letter -> the last number given) or any code present.
+## So a building keeps its code when another is added or taken away, and
+## a taken one's code is never given again once written. A code a second
+## entry repeats (a pasted copy) is given afresh.
+static func building_codes(entries: Variant, given: Variant) -> Array[String]:
+	var out: Array[String] = []
+	if not entries is Array:
+		return out
+	var last := {}
+	if given is Dictionary:
+		for letter: Variant in given:
+			last[str(letter)] = int(given[letter])
+	for entry: Variant in entries:
+		if entry is Dictionary and entry.has("code"):
+			var code := str(entry["code"])
+			last[code.left(1)] = maxi(int(last.get(code.left(1), 0)), code.substr(1).to_int())
+	var seen := {}
+	for entry: Variant in entries:
+		var code := str(entry.get("code", "")) if entry is Dictionary else ""
+		if code.is_empty() or seen.has(code):
+			var letter := code_letter(entry)
+			last[letter] = int(last.get(letter, 0)) + 1
+			code = "%s%d" % [letter, last[letter]]
+		seen[code] = true
+		out.append(code)
+	return out
+
+
+## Writes building_codes into [param config]'s buildings that lack one
+## (or repeat one) and keeps "building_codes" at each letter's highest, so
+## a deleted building's code is not given again (decision 537; MapDoc.save
+## and builder mode). Whether it changed anything.
+static func fill_codes(config: Dictionary) -> bool:
+	if not config.get("buildings") is Array or (config["buildings"] as Array).is_empty():
+		return false
+	var entries: Array = config["buildings"]
+	var codes := building_codes(entries, config.get("building_codes", {}))
+	var changed := false
+	var given: Dictionary = (config.get("building_codes", {}) as Dictionary).duplicate() if config.get("building_codes") is Dictionary else {}
+	for i in entries.size():
+		if not entries[i] is Dictionary:
+			continue
+		if str(entries[i].get("code", "")) != codes[i]:
+			entries[i]["code"] = codes[i]
+			changed = true
+		var letter := codes[i].left(1)
+		if int(given.get(letter, 0)) < codes[i].substr(1).to_int():
+			given[letter] = codes[i].substr(1).to_int()
+			changed = true
+	if changed:
+		config["building_codes"] = given
+	return changed
+
+
 static func building_rect(entry: Variant) -> Variant:
 	if not entry is Dictionary:
 		return null

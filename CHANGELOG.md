@@ -14,6 +14,7 @@ notes (decision 324).
 - Talk with no panel (536): ask a townsperson what they sell, whether they have work, or what the news is, and they answer in their own words with what they have; say "yes", name the thing or the person, or say an amount ("give 25") to take it. Nothing is pushed at you. The wire changes (an offer that stands is sent to the interface): the client and server go together.
 - Harvests, winter roots and shearing grow with the length of a season, so a town gathers as much food and wool a day when the seasons are longer (533).
 
+- Builder mode marks the map: the HUD shows the cell under the cursor and your own, every building carries a code (H3, S1) floating over it, a click on one names it in the party log, the cursor hint names a building by its code at any time, and builder requests and the admin move command take codes (537).
 - The server console can move a player: `move <player> <x> <y> [zone]` puts them at the nearest walkable spot, their companion with them (531).
 - The kobold sneak is now drawn from Jeff's chosen concept too, art-gen's model of it in its own red-to-purple painted skin, each a little different and some marked (529 amended); Jeff's to veto.
 - Landing tests: a test that dies as it starts, before running any of its own code, is noted and retried once, and the suite starts its tests a moment apart (530); tools only.

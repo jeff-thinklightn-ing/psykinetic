@@ -188,6 +188,10 @@ static func stamp_changes(prefab: Dictionary, map: LevelMap, at: Vector2i, confi
 	var buildings := had.filter(func(entry: Variant) -> bool:
 		var rect: Variant = Level.building_rect(entry)
 		return rect == null or Level._union(Level.building_blocks(entry)).all(func(cell: Vector2i) -> bool: return not landed.has(cell)))
+	for entry: Variant in moved_config.get("buildings", []):
+		# A stamped building is a new one: fill_codes gives it its own (decision 537).
+		if entry is Dictionary:
+			entry.erase("code")
 	buildings.append_array(moved_config.get("buildings", []))
 	if buildings.size() != had.size() or not moved_config.get("buildings", []).is_empty():
 		var changed: Dictionary = out.get("config", {})

@@ -31,6 +31,7 @@ func _ready() -> void:
 	await _test_captives()
 	await _test_work_sites()
 	_test_relief()
+	_test_codes()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -86,7 +87,7 @@ func _test_stamp_building() -> void:
 	session.accept()
 	var buildings: Array = doc.config.get("buildings", [])
 	_check(buildings.size() == 3 and buildings[0]["at"] == [20, 20], "accepted: the map's shed kept, and two more (%s)" % [buildings])
-	_check(buildings.size() == 3 and buildings[1] == {"slot": "building.hut", "at": [7, 7], "facing": [-1, 0]},
+	_check(buildings.size() == 3 and buildings[1] == {"slot": "building.hut", "at": [7, 7], "facing": [-1, 0], "code": "H1"},
 			"the hut turned a quarter: its front west (%s)" % [buildings[1] if buildings.size() > 1 else null])
 	var level := Level.parse(doc.map.to_image(), null, doc.config)
 	_check(level["buildings"].size() == 3 and doc.undo_steps.size() == 1, "all three stand in the level, one undo step (%s)" % [level["warnings"]])
@@ -608,6 +609,42 @@ func _test_work_sites() -> void:
 	_check(session.proposal()["config"]["places"]["woods"].get("town") == "store", "the proposal's level.json has its town")
 	_check(HeightTools.reaches(doc.map, Vector2i(20, 20), Vector2i(8, 8)) and not HeightTools.reaches(session.working.map, Vector2i(20, 20), Vector2i(8, 8)),
 			"HeightTools.reaches: open ground reached, a walled cell not")
+
+
+func _test_codes() -> void:
+	print("\n== building codes (537): stable from level.json, never given again ==")
+	var entries := [{"slot": "building.hut", "at": [1, 1]}, {"kind": "house", "at": [8, 1]}, {"slot": "building.shed", "at": [14, 1]}]
+	_check(Array(Level.building_codes(entries, {})) == ["H1", "H2", "S1"], "derived in order, a letter each: %s" % [Level.building_codes(entries, {})])
+	var config := {"buildings": entries.duplicate(true)}
+	_check(Level.fill_codes(config) and config["buildings"][1]["code"] == "H2" and config["building_codes"] == {"H": 2, "S": 1}, "fill_codes writes them in, and the counter")
+	config["buildings"].remove_at(0)
+	config["buildings"].append({"slot": "building.house", "at": [20, 1]})
+	Level.fill_codes(config)
+	_check(config["buildings"][0]["code"] == "H2" and config["buildings"][2]["code"] == "H3", "one taken away, one added: the others keep theirs, H1 is not given again (%s)" % [config["buildings"]])
+	config["buildings"].append(config["buildings"][0].duplicate())
+	Level.fill_codes(config)
+	_check(config["buildings"][3]["code"] == "H4", "a copy repeating H2 gets its own")
+	_check(not Level.fill_codes(config), "nothing to fill: unchanged")
+	var doc := _doc()
+	doc.config["places"] = {"store": {"at": [20, 20], "kind": "stockpile", "holder": "town"}}
+	var session := BuilderSession.new(doc, Rect2i(0, 0, 40, 30), "test_field", StubClaude.new([]))
+	session.run_tool("stamp", {"prefab": "building_hut", "at": [6, 6]})
+	session.run_tool("stamp", {"prefab": "building_hut", "at": [12, 6]})
+	var codes: Array = session.working.config["buildings"].map(func(entry: Dictionary) -> String: return str(entry.get("code", "")))
+	_check(codes == ["H1", "H2"], "two huts stamped from one prefab: H1, H2 (%s)" % [codes])
+	var set: Dictionary = session.run_tool("set_building", {"code": "h2", "use": "inn", "town": "store"})
+	_check(set["ok"] and session.working.config["buildings"][1].get("use") == "inn", "set_building by code (%s)" % set["text"])
+	_check(not session.run_tool("set_building", {"code": "Q9"})["ok"], "a code no building has: refused")
+	session.accept()
+	_check("Buildings in this level, by code" in session._situation() and "H2 hut at (13, 7)" in session._situation(), "the request lists the codes")
+	var parsed := doc.parsed()
+	var hut: Dictionary = parsed["buildings"][1]
+	_check(hut["code"] == "H2" and BuilderUI.building_words(hut) == "H2 hut", "Level.parse gives each building its code: %s" % BuilderUI.building_words(hut))
+	_check(BuilderUI.building_line(hut) == "H2 hut at 13, 7, facing south, use: inn, town: store", "the party log line: %s" % BuilderUI.building_line(hut))
+	_check(BuilderUI.building_at(parsed["buildings"], Vector2i(13, 7)) == hut and BuilderUI.building_at(parsed["buildings"], Vector2i(30, 20)).is_empty(), "the building under a cell")
+	_check(BuilderUI.coords_text(Vector2i(212, 207), Vector2i(210, 205), Vector2i(-1, -1)) == "212, 207      you 210, 205", "the coordinates line")
+	var front: Vector2i = preload("res://main.gd").front_of(hut)
+	_check(not (hut["rect"] as Rect2i).has_point(front) and front.y == (hut["rect"] as Rect2i).end.y, "a move to H2 lands at its front: %s" % front)
 
 
 func _test_relief() -> void:
