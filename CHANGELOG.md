@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Landing tests leave no Python cache folder behind (539 amended); tools only.
 - The castle's walls are warm sandstone again, as in the early builds (532; "tone 8 approved, good improvement"): the brick tile re-graded from grey, and the wall posts, caps and towers moved onto a matching sandstone so they no longer stand out grey; rocks stay grey; client art only.
 - The town well is made by hand (Jeff: "we owe the town well a hand made pass - its auto slop"): a ring of coursed stone with a flat coping and water inside, two posts and a crossbeam, a windlass with its crank, a rope and a bucket, and a small pitched roof, in big clean shapes; client art only.
 - The conversation panel no longer offers canned questions at the bottom (Jeff: they read the same from everyone); you talk by typing in the say line, as before, and the panel keeps the exchange, their offers and what you owe them.

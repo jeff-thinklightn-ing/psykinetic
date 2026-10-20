@@ -19,7 +19,7 @@ tree="$(basename "$(pwd)")"
 if [ -z "${HEAVY_JOB_INSIDE:-}" ]; then
 	# The CHANGELOG first, no Godot, before any wait at the gate (decision
 	# 539): released sections as tagged, no bullet both unreleased and released.
-	python tools/changelog_check.py || { echo "LANDING TESTS: FAIL (CHANGELOG.md, decision 539: fix it as above)"; exit 1; }
+	python -B tools/changelog_check.py || { echo "LANDING TESTS: FAIL (CHANGELOG.md, decision 539: fix it as above)"; exit 1; }
 	echo "landing tests: through the heavy-job gate as $tree suite (decision 394)"
 	HEAVY_JOB_INSIDE=1 exec python tools/heavy_job.py run "$tree" suite -- bash tests/land.sh
 fi
@@ -42,8 +42,8 @@ part() {
 	read -r code took <"$LOGS/$name.status"
 	echo "$([ "$code" -eq 0 ] && echo PASS || echo FAIL)  $name ${took}s"
 }
-part heavy_job_test python tests/heavy_job_test.py
-part changelog_check_test python tests/changelog_check_test.py
+part heavy_job_test python -B tests/heavy_job_test.py
+part changelog_check_test python -B tests/changelog_check_test.py
 # Started a little apart, as the suite starts its scenes (decision 530: Godots
 # launched in the same instant died at launch).
 part suite env PSYKINETIC_TEST_JOBS="$suite_jobs" bash tests/run.sh &

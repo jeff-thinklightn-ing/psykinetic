@@ -16067,6 +16067,11 @@ them, and passes main as it is now.
 Rejected: checking every released section against its tag (each tag holds only
 the sections up to its own; older ones are kept by the newest's check at
 their time); a pre-commit hook (hooks are per clone and nobody's is set).
+
+Amended (economy's clean-tree check, by release): a test importing a module
+from tools/ left an untracked tools/__pycache__/. The landing runs its Python
+with -B (no bytecode written), and .gitignore ignores __pycache__/.
+
 ## 436 amended: the quick asks go
 
 Jeff, from his play tests (2026-10-19, through the coordinator): "the npc

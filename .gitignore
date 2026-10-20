@@ -20,3 +20,5 @@ art/audio/kenney_impact-sounds/
 # Sound takes from sources whose licence forbids sharing them (Sonniss): kept in the
 # sound library outside the repo, copied here by tools/sound_sync.ps1 (decision 268).
 art/audio/external/
+# Python's bytecode caches (a test importing tools/*.py; decision 539 amended).
+__pycache__/

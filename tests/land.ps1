@@ -15,7 +15,7 @@ $gate = Join-Path $root 'tools\heavy_job.py'
 if (-not $env:HEAVY_JOB_INSIDE) {
 	# The CHANGELOG first, no Godot, before any wait at the gate (decision
 	# 539): released sections as tagged, no bullet both unreleased and released.
-	& python (Join-Path $root 'tools\changelog_check.py')
+	& python -B (Join-Path $root 'tools\changelog_check.py')
 	if ($LASTEXITCODE -ne 0) {
 		Write-Output "LANDING TESTS: FAIL (CHANGELOG.md, decision 539: fix it as above)"
 		exit 1
@@ -36,10 +36,10 @@ New-Item -ItemType Directory -Force $logs | Out-Null
 $suiteJobs = [Math]::Max(2, (Get-TestJobs $root) - 2)
 Write-Output "landing tests: the suite ($suiteJobs at once), net_test, state_test and server_boot_test together"
 $started = Get-Date
-$gateTest = & python (Join-Path $root 'tests\heavy_job_test.py') 2>&1
+$gateTest = & python -B (Join-Path $root 'tests\heavy_job_test.py') 2>&1
 $gateOk = $LASTEXITCODE -eq 0
 Write-Output "$(if ($gateOk) { 'PASS' } else { 'FAIL' })  heavy_job_test"
-$changelogTest = & python (Join-Path $root 'tests\changelog_check_test.py') 2>&1
+$changelogTest = & python -B (Join-Path $root 'tests\changelog_check_test.py') 2>&1
 $changelogOk = $LASTEXITCODE -eq 0
 Write-Output "$(if ($changelogOk) { 'PASS' } else { 'FAIL' })  changelog_check_test"
 $parts = [ordered]@{ suite = 'run.ps1'; net_test = 'net_test.ps1'; state_test = 'state_test.ps1'; server_boot_test = 'server_boot_test.ps1' }
