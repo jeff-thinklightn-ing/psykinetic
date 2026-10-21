@@ -1573,10 +1573,15 @@ func _test_relief() -> void:
 	for cell: Vector2i in _rig._corners:
 		if _rig._bed_levels.has(cell) or _rig._ramp_heights.has(cell) or _rig._wet.has(cell) or not Relief.on_map(size, cell):
 			continue
+		var bank := false
+		for corner: Vector2i in Client3D.GROUND_CORNERS:
+			bank = bank or _rig._water_corner(cell + corner) < INF
+		if bank:
+			continue  # A bank comes down to the water's edge (decision 525).
 		if _rig._corners[cell] != Relief.corner_heights(field, size, cell):
 			differ.append(cell)
 	_check(not _rig._corners.is_empty() and differ.is_empty(),
-			"each cell's corners are the sim's (Relief.corner_heights), off a ramp or under water (%d differ: %s)" % [differ.size(), differ.slice(0, 4)])
+			"each cell's corners are the sim's (Relief.corner_heights), off a ramp, a bank or the water (%d differ: %s)" % [differ.size(), differ.slice(0, 4)])
 	# A point's height: the triangle drawn there, its corners exactly at
 	# the corners; a sloped cell's middle between its lowest and highest.
 	var sloped := Vector2i(13, 14)
@@ -1615,6 +1620,50 @@ func _test_relief() -> void:
 				break
 	_check(off_surface == 0 and heights_seen.size() > 3 and dry_bed.is_empty(),
 			"a stream's surface slopes down its valley, each corner its water's mean, its bed under it (%d heights; off: %d; beds above: %s)" % [heights_seen.size(), off_surface, dry_bed.slice(0, 4)])
+	# Its banks: within a walk of the water a grassy slope into it, no face;
+	# a face only where the land stands a cliff over it.
+	var faces: Dictionary = {}
+	for edge: Array in _rig._cliff_edges:
+		faces[edge] = true
+	var low_faced := []
+	var low_banks := 0
+	for cell: Vector2i in _rig._corners:
+		if _rig._wet.has(cell) or _rig._bed_levels.has(cell):
+			continue
+		for direction: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+			var next := cell + direction
+			if _rig._wet.has(next) and not _rig._fords.has(next) and _rig._elevation(cell) - _rig._elevation(next) <= Relief.WALK_RISE:
+				low_banks += 1
+				if faces.has([cell, direction]):
+					low_faced.append([cell, direction])
+	# The hills read: slopes lit against the sun, the valley floor darkened,
+	# the crests lit (decision 525 amended, terrain's side).
+	var lowest := Vector2i(-1, -1)
+	var highest := Vector2i(-1, -1)
+	for cell: Vector2i in _rig._corners:
+		if _rig._wet.has(cell) or not Relief.on_map(_rig._relief_size, cell):
+			continue
+		if lowest.x < 0 or _rig._elevation(cell) < _rig._elevation(lowest):
+			lowest = cell
+		if highest.x < 0 or _rig._elevation(cell) > _rig._elevation(highest):
+			highest = cell
+	var shaded: float = _rig._ground_look.get_shader_parameter("slope_shade") if _rig._ground_look != null else 0.0
+	_check(is_equal_approx(shaded, Client3D.SLOPE_SHADE) and _rig._concavity(lowest + Vector2i.ONE, _rig._elevation(lowest)) > 0.0
+			and _rig._crest(highest, _rig._elevation(highest)) > 0.0,
+			"hills read: slopes lit by the relief light (%.1f), the valley floor darkened, the crest lit" % shaded)
+	# The relief light: from the screen's upper left whatever the hour,
+	# turning with the camera (a north-south ridge's flanks part at noon).
+	_rig._place_camera()
+	var light := Client3D.hillshade_light(_rig.yaw)
+	var screen_up := Vector3(_rig._camera_target - _rig._camera.global_position) * Vector3(1, 0, 1)
+	var screen_left := -_rig._camera.global_transform.basis.x
+	var turned := Client3D.hillshade_light(_rig.yaw + 90.0)
+	_check(light.y > 0.5 and light.dot(screen_up.normalized()) > 0.3 and light.dot(screen_left) > 0.3
+			and is_equal_approx(turned.y, light.y) and turned.dot(light) < 0.7
+			and _rig._ground_look.get_shader_parameter("relief_light").is_equal_approx(light),
+			"the relief light from the screen's upper left, turning with the camera (%s; up %s, left %s)" % [light, screen_up.normalized(), screen_left])
+	_check(low_banks > 10 and low_faced.is_empty(),
+			"a low bank slopes into the water as grass, no rock face (%d banks; faced: %s)" % [low_banks, low_faced.slice(0, 4)])
 	# The camera over a ridge: ground standing 6 m between the player and the
 	# camera lifts its pitch past the usual; none on the flat.
 	var at := Vector3(sloped.x, _rig._ground_height(Vector2(sloped)), sloped.y)
@@ -1638,7 +1687,8 @@ func _test_relief() -> void:
 		var whole := _rig._height(cell) * Client3D.LEVEL_RISE
 		if _rig._corners[cell] != PackedFloat32Array([whole, whole, whole, whole]):
 			off.append(cell)
-	_check(not castle["terrain"].get("relief_given", false) and off.is_empty(),
+	var castle_shade: float = _rig._ground_look.get_shader_parameter("slope_shade")
+	_check(not castle["terrain"].get("relief_given", false) and off.is_empty() and castle_shade == 0.0,
 			"the castle (no relief.png) drawn exactly as its whole levels (%d cells off: %s)" % [off.size(), off.slice(0, 4)])
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 

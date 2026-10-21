@@ -17003,3 +17003,41 @@ the window gives.
 
 ui_test: the words and the course. Protocol unchanged; no new
 class_name.
+Amended (525 amended, terrain's side; Jeff on the first shots: "that's not
+working": the valley read flat from the game's camera). With maps' remake
+of hills (real amplitude, ground kinds laid by slope), the ground now shows
+its relief:
+
+- Slopes lit by a relief light, as a relief map's hillshade: ground.gdshader's
+  slope_shade (SLOPE_SHADE 3.0 where the level gives relief, 0 elsewhere, so
+  the castle is as before; a constant to tune from the shots) lightens a
+  slope facing the light and darkens one facing away, between SLOPE_DARKEST
+  0.5 and SLOPE_LIGHTEST 1.35 of the flat's light. The light is fixed, from
+  the screen's upper left HILLSHADE_HIGH 40 degrees up, turning with the
+  camera's yaw (Client3D.hillshade_light, set on the ground's material as
+  the camera turns), whatever the hour; the sun lights everything over it
+  as before. Not the sun: a north-south ridge's flanks face east and west,
+  and the noon sun, due south, lights both alike, so by the sun alone the
+  remade valley read flat at noon (the first try of this amendment did so).
+  Tuned on the gentle hills' 0.3 m-a-cell flanks (about 17 degrees): at 1.4
+  a flank moved its light by a quarter and still read flat.
+- The camera's lift over a ridge stops at RIDGE_PITCH_MAX 70 degrees: at the
+  foot of the plateau's face it rose to PITCH_MAX 85, all but top-down, the
+  face gone and the player a label.
+- Valley floors darker, crests lit: each corner's bend against the ground
+  CONCAVITY_REACH 2 cells round it (_bend, in CONCAVITY_FULL 1.5 m) goes in
+  the corner's foot and top bytes the ledges already shade by (a hollow up
+  to CONCAVITY_MOST 0.5 of a ledge's foot, a crest up to CREST_MOST 1.0 of
+  a ledge top's lift).
+- Low banks are grassy slopes: a corner the water touches comes down to the
+  water's edge (_shore_bed: SHORE_SINK 0.02 under the surface, a ford's
+  FORD_DEPTH) wherever the lowest land there stands within Relief.WALK_RISE
+  of the highest water (_land_low, _water_top): one vertex for land and
+  water, no rock face; decided by the corner so every cell meeting there
+  agrees. Faces stay for true cliffs. The water's bed is _shore_bed at
+  every corner, the mesh sinking those with water all round as before.
+- The camera's pitch (CAMERA_PITCH 50) is unchanged; a shot 10 degrees lower
+  was taken for Jeff to judge (no change to the game).
+- Known limit: a player at the foot of a tall face, the camera on its top
+  side, is hidden behind its edge whatever the pitch; seeing them needs a
+  design of its own (fade the near edge as walls fade, or turn the camera).

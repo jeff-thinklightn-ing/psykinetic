@@ -193,8 +193,24 @@ const WATER_FOAM := Vector2i(8, 0)
 const WATER_LIFT := 0.01
 ## (Above FOREST_FLOOR_DEPTH, or the forest floor under the map hides it.)
 const WATER_BED_DEPTH := 0.15
-## On a relief (decision 525), how far a ford's bed lies under its surface.
+## On a relief (decision 525), how far a ford's bed lies under its surface,
+## and the water's edge under its surface where a bank meets it (a bank
+## within Relief.WALK_RISE of the water slopes into it as grass, no face).
 const FORD_DEPTH := 0.06
+const SHORE_SINK := 0.02
+## Hills read (decision 525 amended, terrain's side): how strongly a slope
+## is lit by the relief light (ground.gdshader's slope_shade; tuned from the
+## shots), how high that light stands (degrees), and the valley floors'
+## darkening: a corner CONCAVITY_FULL metres under the ground round it
+## (CONCAVITY_REACH cells away) takes CONCAVITY_MOST of the foot's shade.
+const SLOPE_SHADE := 3.0
+const HILLSHADE_HIGH := 40.0
+const CONCAVITY_FULL := 1.5
+const CONCAVITY_REACH := 2
+const CONCAVITY_MOST := 0.5
+## A crest: a corner standing over the ground round it catches the light,
+## CREST_MOST of the ledge top's lift at CONCAVITY_FULL metres over.
+const CREST_MOST := 1.0
 const WATER_BED_KIND := "dirt"
 ## A stream's flow (decision 505, terrain's side) reaches this many cells out
 ## from its path, across its width (Streams.lay's are 1 to 3 wide).
@@ -284,6 +300,10 @@ const RIDGE_REACH := 14.0
 const RIDGE_CLEAR := 0.3
 const RIDGE_AIM := 1.0
 const RIDGE_EASE := 40.0
+## The most the camera lifts over a ridge (degrees): past it the view is near
+## top-down and loses the slope and the player (better a ridge's edge in
+## the way than no view of the hill at all).
+const RIDGE_PITCH_MAX := 70.0
 ## Picking on the drawn ground: how far apart (m, across) the ray is tried.
 const PICK_STEP := 0.2
 const CAMERA_DISTANCE := 40.0
@@ -1255,6 +1275,10 @@ var _relief_given := false
 var _wet: Dictionary[Vector2i, bool] = {}
 ## The drawn ground's highest and lowest corner (m), for picking.
 var _ground_top := 0.0
+## The ground's material, told the relief light's way as the camera turns
+## (slope_shade), and the yaw it was last told for.
+var _ground_look: ShaderMaterial
+var _hillshade_yaw := NAN
 var _ground_bottom := 0.0
 ## Each ground cell's four corners (metres, GROUND_CORNERS order) as the
 ## mesh draws them (_build_ground): Relief.corner_heights, a ramp's or a
@@ -1713,6 +1737,7 @@ func screen_direction(offset: Vector2) -> Vector2:
 
 
 func _place_camera() -> void:
+	_aim_hillshade()
 	_camera.position = _camera_target + _camera_offset()
 	_camera.look_at(_camera_target, Vector3.UP)
 	if _listener != null:
@@ -1741,6 +1766,29 @@ func _follow(delta: float) -> void:
 	_place_camera()
 
 
+## The ground's relief light set for the camera's yaw, when it turned.
+func _aim_hillshade() -> void:
+	if _ground_look == null or is_equal_approx(_hillshade_yaw, yaw):
+		return
+	_hillshade_yaw = yaw
+	_ground_look.set_shader_parameter("relief_light", hillshade_light(yaw))
+
+
+## The relief light (decision 525 amended, terrain's side), toward it: from
+## the screen's upper left, HILLSHADE_HIGH degrees up, turned with the
+## camera's [param yaw_degrees]. A fixed light, not the sun: a north-south
+## ridge's flanks face east and west, and the noon sun, due south, lights
+## both alike, so by the sun alone a valley reads flat at noon.
+static func hillshade_light(yaw_degrees: float) -> Vector3:
+	# The camera sits toward +x +z of its aim (turned by the yaw): the
+	# screen's up is away from it, its left a quarter turn from that.
+	var up := -Vector3(1.0, 0.0, 1.0).normalized().rotated(Vector3.UP, deg_to_rad(yaw_degrees))
+	var left := up.rotated(Vector3.UP, PI * 0.5)
+	var across := (up + left).normalized()
+	var high := deg_to_rad(HILLSHADE_HIGH)
+	return (across * cos(high) + Vector3.UP * sin(high)).normalized()
+
+
 ## The pitch (degrees) the camera needs to see over the ground between it and
 ## [param at] (decision 525): the ground along the camera's way back,
 ## RIDGE_REACH metres of it, kept RIDGE_CLEAR under the line to a body's
@@ -1756,7 +1804,7 @@ func ridge_pitch(at: Vector3) -> float:
 		var ground := _ground_height(Vector2(at.x, at.z) + back * d)
 		need = maxf(need, rad_to_deg(atan2(ground + RIDGE_CLEAR - aim, d)))
 		d += 0.5
-	return clampf(need, 0.0, PITCH_MAX)
+	return clampf(need, 0.0, RIDGE_PITCH_MAX)
 
 
 func _local_player() -> Player:
@@ -2141,13 +2189,24 @@ func _corner_heights(cell: Vector2i) -> PackedFloat32Array:
 ## flat.
 func _ground_corners(cell: Vector2i) -> PackedFloat32Array:
 	if _relief_given and (_wet.has(cell) or _bed_levels.has(cell)):
-		# A bed under the water's surface (decision 525): each corner below
-		# the surface there, a ford's just under, a stream's or pond's deeper.
-		var own := Relief.corner_heights(_relief, _relief_size, cell) if not _bed_levels.has(cell) \
-				else PackedFloat32Array([_bed_levels[cell], _bed_levels[cell], _bed_levels[cell], _bed_levels[cell]])
-		var depth := FORD_DEPTH if _fords.has(cell) else WATER_BED_DEPTH
+		# Under the water's surface (decision 525): each corner the water's
+		# bed there (_shore_bed); the mesh sinks those with water all round.
+		var own := PackedFloat32Array([0.0, 0.0, 0.0, 0.0])
 		for c in 4:
-			own[c] = minf(own[c], _water_corner(cell + GROUND_CORNERS[c])) - depth
+			own[c] = _shore_bed(cell + GROUND_CORNERS[c])
+		return own
+	if _relief_given and _relief_size != Vector2i.ZERO and Relief.on_map(_relief_size, cell) and not _ramp_heights.has(cell):
+		# A bank: a corner the water touches comes down to the water's edge
+		# (one vertex with it: a grassy slope into the brook, no face) where
+		# the lowest land there stands within a walk of the highest water, as
+		# the sim's step to it is: decided by the corner, so every land cell
+		# meeting there agrees; a true cliff keeps its face.
+		var own := Relief.corner_heights(_relief, _relief_size, cell)
+		for c in 4:
+			var vertex := cell + GROUND_CORNERS[c]
+			var top := _water_top(vertex)
+			if top > -INF and _land_low(vertex) - top <= Relief.WALK_RISE:
+				own[c] = _shore_bed(vertex)
 		return own
 	if _bed_levels.has(cell):
 		var bed := _bed_levels[cell]
@@ -2182,6 +2241,65 @@ func _water_corner(vertex: Vector2i) -> float:
 			sum += _bed_levels.get(cell, _elevation(cell))
 			count += 1
 	return sum / count if count > 0 else INF
+
+
+## The lowest land (not water) at corner [param vertex] (INF for none).
+func _land_low(vertex: Vector2i) -> float:
+	var low := INF
+	for cell: Vector2i in [vertex - Vector2i.ONE, vertex - Vector2i(0, 1), vertex - Vector2i(1, 0), vertex]:
+		if not _wet.has(cell) and not _bed_levels.has(cell) and Relief.on_map(_relief_size, cell):
+			low = minf(low, _elevation(cell))
+	return low
+
+
+## The highest water surface at corner [param vertex] (-INF for none).
+func _water_top(vertex: Vector2i) -> float:
+	var top := -INF
+	for cell: Vector2i in [vertex - Vector2i.ONE, vertex - Vector2i(0, 1), vertex - Vector2i(1, 0), vertex]:
+		if _wet.has(cell) or _bed_levels.has(cell):
+			top = maxf(top, _bed_levels.get(cell, _elevation(cell)))
+	return top
+
+
+## The ground's height under the water at corner [param vertex] (decision
+## 525): just under the surface (SHORE_SINK), a ford's FORD_DEPTH under.
+func _shore_bed(vertex: Vector2i) -> float:
+	var ford := false
+	for cell: Vector2i in [vertex - Vector2i.ONE, vertex - Vector2i(0, 1), vertex - Vector2i(1, 0), vertex]:
+		ford = ford or _fords.has(cell)
+	return _water_corner(vertex) - (FORD_DEPTH if ford else SHORE_SINK)
+
+
+## How much of a valley floor corner [param vertex] is at [param height]
+## (0..CONCAVITY_MOST): the ground round it, CONCAVITY_REACH cells away,
+## standing over it, CONCAVITY_FULL metres for the most (decision 525).
+func _concavity(vertex: Vector2i, height: float) -> float:
+	return maxf(_bend(vertex, height), 0.0) * CONCAVITY_MOST
+
+
+## How much of a crest corner [param vertex] is at [param height] (0..
+## CREST_MOST): it standing over the ground round it.
+func _crest(vertex: Vector2i, height: float) -> float:
+	return maxf(-_bend(vertex, height), 0.0) * CREST_MOST
+
+
+## The ground round corner [param vertex] (CONCAVITY_REACH cells away) over
+## [param height], in CONCAVITY_FULLs, -1..1: a hollow's positive, a crest's
+## negative; 0 on a level with no relief.
+func _bend(vertex: Vector2i, height: float) -> float:
+	if not _relief_given:
+		return 0.0
+	var sum := 0.0
+	var count := 0
+	for offset: Vector2i in [Vector2i(-1, -1), Vector2i(1, -1), Vector2i(-1, 1), Vector2i(1, 1),
+			Vector2i(0, -1), Vector2i(0, 1), Vector2i(-1, 0), Vector2i(1, 0)]:
+		var cell := vertex + offset * CONCAVITY_REACH - Vector2i(0 if offset.x < 0 else 1, 0 if offset.y < 0 else 1)
+		if Relief.on_map(_relief_size, cell):
+			sum += Relief.at(_relief, _relief_size, cell)
+			count += 1
+	if count == 0:
+		return 0.0
+	return clampf((sum / count - height) / CONCAVITY_FULL, -1.0, 1.0)
 
 
 ## The terrain's relief (decision 525) for this build: its field, or none.
@@ -4820,6 +4938,11 @@ func _build_ground(kinds: Dictionary) -> void:
 	canopy_texture = canopy_mask(_terrain.get("canopy", {}), origin, _mask_size)
 	canopy_origin = origin
 	var material := _ground_material(kind_bytes, across, down, origin)
+	# Hills read (decision 525, terrain's side): slopes lit against the sun.
+	material.set_shader_parameter("slope_shade", SLOPE_SHADE if _relief_given else 0.0)
+	_ground_look = material
+	_hillshade_yaw = NAN
+	_aim_hillshade()
 	material.set_shader_parameter("canopy", canopy_texture)
 	_build_shafts()
 	# Each (cell, vertex) the cell's shade reaches, gathered by cell after.
@@ -4876,8 +4999,8 @@ func _build_ground(kinds: Dictionary) -> void:
 						if other >= 0:
 							pair_cell.append(other)
 							pair_vertex.append(global)
-					feet.append(255 if foot else 0)
-					tops.append(255 if top else 0)
+					feet.append(255 if foot else roundi(_concavity(corner, level) * 255.0))
+					tops.append(255 if top else roundi(_crest(corner, level) * 255.0))
 				ends[c] = vertex
 			indices.append_array([ends[0], ends[1], ends[2], ends[1], ends[3], ends[2]])
 		var custom := PackedByteArray()

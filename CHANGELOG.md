@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Hills read at a glance (525 amended): slopes are lit from one side, like a relief map, so a ridge and its valley show at any hour; valley floors are darker, crests catch the light, and a brook's low banks are grass running into the water.
 - Downed by the draugr's blessing, the HUD counts down "You are down: n s"; whoever brings you back has a brass ring closing in on you and "bringing <name> back: n s" on their own line.
 - Talking to townsfolk has no panel any more (Jeff: "I'd rather not have the ui at all"): click them or press E and type; they answer in the world and the talk log, an offer is spoken as a line, and while one stands the HUD says `say "yes" to take it` (Y says it for you); what you have promised them is a line in your pack.
 - Pip, the priest's apprentice, carries the temple's alms down to the barrow's altar each morning (546, npc's side, part 2), whether or not anyone is about; once the secret is out a run can go wrong, and he is lost below until someone finds him in a niche in the wall. The town notices when he is gone.

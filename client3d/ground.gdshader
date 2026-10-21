@@ -85,6 +85,16 @@ global uniform vec4 season;
 varying float up;
 varying vec2 shade;
 varying vec2 relief;
+varying vec3 slope_normal;
+// Hills (decision 525 amended, terrain's side): a relief light, as a relief
+// map's hillshade, from the screen's upper left (Client3D.hillshade_light,
+// turned with the camera's yaw, whatever the hour), and how strongly a
+// slope is lit by it (0 where a level has no relief: the castle as before);
+// a slope's light held between these shares of the flat's.
+uniform vec3 relief_light = vec3(-0.5, 0.7, -0.5);
+uniform float slope_shade = 0.0;
+const float SLOPE_DARKEST = 0.5;
+const float SLOPE_LIGHTEST = 1.35;
 
 // Smooth noise 0..1 with about one feature per unit of p, read from
 // noise_tex (FastNoiseLite, made at run time, 64 features across before it
@@ -220,6 +230,7 @@ void vertex() {
 	up = normalize((MODEL_MATRIX * vec4(NORMAL, 0.0)).xyz).y;
 	shade = CUSTOM0.rg;
 	relief = CUSTOM0.ba;
+	slope_normal = normalize((MODEL_MATRIX * vec4(NORMAL, 0.0)).xyz);
 }
 
 // How far the kinds are pushed (cells), at the slow scale and the quick;
@@ -307,6 +318,13 @@ void fragment() {
 	}
 
 	colour *= mix(1.0, 0.5, relief.x) * (1.0 + 0.14 * relief.y);
+	// A slope facing the relief light lighter, one facing away plainly
+	// darker, the flat as it was: hills read at a glance at any hour (the
+	// sun lights everything as before, over this).
+	if (slope_shade > 0.0) {
+		float facing = dot(slope_normal, relief_light) - relief_light.y;
+		colour *= clamp(1.0 + slope_shade * facing, SLOPE_DARKEST, SLOPE_LIGHTEST);
+	}
 	float wet = smoothstep(0.25, 0.6, texture(water, (at - kinds_origin + 0.5) / kinds_size).r);
 	colour = mix(colour, colour * vec3(0.5, 0.58, 0.62), wet);
 	float forest = smoothstep(0.35, 0.65, texture(water, uv).g + (noise(at * 1.9 + 40.0) - 0.5) * 0.35);
