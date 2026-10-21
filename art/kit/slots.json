@@ -2091,14 +2091,15 @@
 			"category": "creatures",
 			"type": "mesh",
 			"kind": "creature",
-			"size": [1.11, 0.96, 0.85],
+			"size": [1.12, 0.99, 0.82],
 			"tolerance": 0.15,
 			"clip_library": "res://art/models/animations/goblin.res",
 			"model": "res://art/models/characters/kobold.glb",
 			"body_material": "kobold",
-			"source": {"by": "art-gen (mesh and paint), pc-character (rig fit)", "tool": "Qwen-Image-2512, TRELLIS.2, blender (pc-character's tools/creature_fit.py, creature_finish.py)", "license": "own (mesh and paint); CC0 1.0 (the UAL skeleton and clips, Quaternius)", "date": "2026-10-19", "notes": "N:/assets/candidates/creature.kobold/notes.md (Jeff's pick p1, redo v7 c11; meshed by the goblin's recipe, art-kit's hand fix creature.kobold_p1_tq_10k_paint_fixed.glb, its loose shards gone; cleaned by tools/creature_clean.py, 529 amended); fitted arms down to the UAL skeleton by joints read off the mesh (creature_fit.py, distance weights, its tail rigid on the pelvis), posed to its T-pose rest; its paint art/models/characters/kobold_paint.png, drawn in kobold_body.tres (decision 529 amended)"},
+			"source": {"by": "art-kit (mesh and paint, by hand), pc-character (rig)", "tool": "blender (art-kit's build; pc-character's tools/creature_crouch_rig.py, paint_bake.py, creature_finish.py, body_marks.py)", "license": "own (mesh and paint); CC0 1.0 (the UAL skeleton and clips, Quaternius)", "date": "2026-10-21", "notes": "Jeff's pick of art-kit's hand-built kobold over the TRELLIS retarget (\"hand built orc and kobold approved\"): C:/dev/review/orc_kobold/kobold_by_hand.blend with the rib and crouch passes (a digitigrade rest, knee, hock and ball empties); the leg bones moved to the empties, its Body weighted from the retarget's fit above the legs (nearest face) and by distance to their own bones below (creature_crouch_rig.py), the loincloth on the pelvis and thighs, its pick left out (the game sockets its dagger); its swatch paint baked onto new UVs (paint_bake.py) so the marks have room; its belt on art-kit's palette; its skin art/models/characters/kobold_paint.png, drawn in kobold_body.tres (decision 529 amended). The retarget kept off the repo as the fallback (C:/dev/review/orc_kobold/fallback/, and git history)"},
 			"budget": 12000,
-			"uses": "the kobold, the sneak's body (decision 416; Jeff's pick p1 of art-gen's redo v7, a sleek scaly climber, light red to purple, its tail long): art-gen's TRELLIS mesh (decision 529 amended; Jeff's veto in game or off the sheet) rigged on the UAL skeleton (one Skeleton3D) by pc-character's creature_fit.py, its tail rigid on the pelvis, in its own paint: its one material \"kobold\" is drawn in Client3D's kobold_body.tres (the goblin's shader, 494), not the palette; its clips the shared humanoid library's (clip_library: goblin.res, played through art/models/bonemaps/ual.tres; none baked into the .glb) by the names listed (any one of a clip's names, after any prefix); front +z, origin between its feet, standing at rest in T-pose, so x is its arm span, hunched as its concept stands (0.40 m in front of the feet to 0.44 behind, pc-character's measure); cleaned by tools/creature_clean.py (welded, thickened, voxel remeshed, its paint baked back) to 5,975 triangles of the budget's 12,000",
+			"materials": 2,
+			"uses": "the kobold, the sneak's body (decision 416; Jeff's pick p1 of art-gen's redo v7, a sleek scaly climber, light red to purple, its tail long): art-kit's hand-built kobold (Jeff: \"hand built orc and kobold approved\"; decision 529 amended) rigged on the UAL skeleton (one Skeleton3D) by pc-character, its leg bones moved to its crouched digitigrade legs, in its own paint: its skin's material \"kobold\" is drawn in Client3D's kobold_body.tres (the goblin's shader, 494), its belt on the shared palette (materials: 2); its clips the shared humanoid library's (clip_library: goblin.res, played through art/models/bonemaps/ual.tres; none baked into the .glb), played relative to its crouched rest, by the names listed (any one of a clip's names, after any prefix); front +z, origin between its feet, standing at rest in T-pose, so x is its arm span, crouched and hunched as its concept stands (0.39 m in front of the feet to 0.44 behind, pc-character's measure); 2,700 triangles of the budget's 12,000",
 			"clips": [
 				{"name": "idle", "names": ["idle", "idle_loop"], "required": true},
 				{"name": "walk", "names": ["walk", "walk_loop"], "required": true},
@@ -2108,11 +2109,11 @@
 				{"name": "death", "names": ["death01", "death02", "death"], "required": true}
 			],
 			"grey": [
-				{"at": [0, 0.65, 0.09], "size": [1.11, 0.1, 0.19]},
+				{"at": [0, 0.65, 0.09], "size": [1.12, 0.1, 0.19]},
 				{"at": [0, 0.21, 0], "size": [0.4, 0.42, 0.3]},
 				{"at": [0, 0.6, 0], "size": [0.54, 0.33, 0.5]},
-				{"at": [0, 0.86, 0.2], "size": [0.27, 0.2, 0.42]},
-				{"at": [0, 0.28, -0.3], "size": [0.12, 0.12, 0.28]}
+				{"at": [0, 0.87, 0.18], "size": [0.3, 0.24, 0.42]},
+				{"at": [0, 0.3, -0.36], "size": [0.1, 0.27, 0.17]}
 			]
 		},
 		"ground.grass": {

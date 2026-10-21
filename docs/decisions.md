@@ -16734,6 +16734,21 @@ and leaves the lips' pink and the tusks' ivory. warm_painted holds its materials
 the headless renderer's "material is null". The kobold follows when its crouched rest (art-kit's
 next pass) is fitted.
 
+Amended (529; the kobold, the same approval): the kobold is art-kit's hand-built body
+(C:/dev/review/orc_kobold/kobold_by_hand.blend, its rib and crouch passes), not the TRELLIS
+retarget, kept beside the orc's as the fallback. Its rest is crouched and digitigrade (knee forward,
+hock high behind, the long foot down to the ball), so the mesh bends and the bones follow it: art-kit
+marks the knees, hocks and balls with empties, and tools/creature_crouch_rig.py moves the thigh's
+tail, the calf, foot and ball bones onto them, weights the Body from the retarget's fit above the
+legs (nearest face) and the legs afresh by distance to their own two nearest bones (the pelvis sharing
+it at the hip, the tail's root left to the transfer), and joins the loincloth on the pelvis and
+thighs. The import's rest fixer plays the shared clips relative to that rest, so the crouch holds
+through idle, walk, run, attack, hit and death. Its pick is left out (the game sockets the dagger).
+Its swatch paint is baked by paint_bake.py and its belt is on the palette as the orc's is: the slot
+allows two materials, 1.12 by 0.99 by 0.82 m, 2,700 triangles. kobold_body.tres is unchanged: its
+skin band (0.2, 0.02 to 0.27) takes the red skin and leaves the purple stripes and the belly.
+tools/creature_byhand_rig.py is the orc's rig script, kept beside it.
+
 ## 546. The temple's offering, the alms and the gold below
 
 Jeff's crypt.md (2026-10-19): "Brought back at the temple: a gold

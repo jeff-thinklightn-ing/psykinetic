@@ -6,6 +6,8 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+
+- The kobolds are art-kit's hand-built kobold now (Jeff's pick over the generated one, 529): red with purple stripes and ribs, crouched low on bent-back legs that stay crouched as it walks, runs and fights, each kobold still its own build, skin and mark.
 - The walk reads its keys from the Options: bind forward, back, left and right to arrows, ZQSD or whatever you like under Controls, and the walk (and the click scheme's view tilt and turn) follows; the controls list names the keys you chose; nothing changes for anyone who keeps W, A, S, D (453 amended).
 
 - A companion refuses a road that isn't safe (551 phase 2): asked to lead somewhere, she weighs what she lived through and heard on the way against her nerve (her temperament, her bond with you, and how many friends walk with you), says why she won't go, and offers to go as far as the last place short of the danger ("lead on" takes her up on it); she won't be talked round the same day, and stops partway if the road ahead turns bad. Server only.
