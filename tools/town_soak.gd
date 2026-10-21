@@ -47,6 +47,10 @@ var _give := 0
 var _woodlot := Vector2i(-99999, -99999)
 var _woodlot_taken := -1
 const WOODLOT := "wilds/soak_woodlot"
+## --retrain=NAME:TRADE:DAY: the resident named NAME turns to TRADE at the
+## start of that day (npc's Production.retrain, as Pip turns acolyte),
+## leaving their bench for economy's 552 newcomer.
+var _retrain := {}
 const QUESTIONS := ["Who are you?", "What is new in the town?", "What do you need?", "What do you think of %s?", "Is it true that %s"]
 var _prev := {}  # Main's own context callbacks, put back before the quit.
 
@@ -72,6 +76,10 @@ func _run() -> void:
 		elif arg.begins_with("--woodlot="):
 			var parts := arg.trim_prefix("--woodlot=").split(",")
 			_woodlot = Vector2i(int(parts[0]), int(parts[1]) if parts.size() > 1 else 0)
+		elif arg.begins_with("--retrain="):
+			var parts := arg.trim_prefix("--retrain=").split(":")
+			if parts.size() == 3:
+				_retrain = {"name": parts[0], "trade": parts[1], "day": int(parts[2])}
 		elif arg.begins_with("--woodlot-taken="):
 			_woodlot_taken = int(arg.trim_prefix("--woodlot-taken="))
 	if _out.is_empty() or _out.begins_with("/var/lib/psykinetic") or _out.begins_with("user://"):
@@ -234,6 +242,12 @@ func _hourly() -> void:
 	if hour == 0 and day == _woodlot_taken and World.holdings.place(WOODLOT).size() > 0:
 		World.holdings.take(WOODLOT, "goblins")
 		print("SOAK day %d: goblins take the woodlot" % day)
+	if hour == 0 and not _retrain.is_empty() and day == int(_retrain["day"]):
+		for who in World.towns.residents(TOWN):
+			if str(World.production.worker(who).get("name", "")) == _retrain["name"]:
+				var was: Array = World.production.worker(who)["trades"]
+				World.production.retrain(who, _retrain["trade"])
+				print("SOAK day %d: %s the %s turns %s" % [day, _retrain["name"], ", ".join(was), _retrain["trade"]])
 	if hour == 0:
 		print("SOAK day %d: treasury %d, residents %d, bodies %d, inn %s" % [day, World.stockpile.count(TOWN, "gold"), World.towns.residents(TOWN).size(),
 			World.townsfolk().size(), "standing" if inn.size != Vector2i.ZERO else "none"])
