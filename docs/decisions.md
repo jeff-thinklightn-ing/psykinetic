@@ -18358,3 +18358,79 @@ Towns.died remembers the last DEAD_NAMES (40) names in the town's
   was lost; and "warned" reads "ignored your warning and took you there",
   since "took you where you said..." turned into "her said" for the
   player's and the town's reading. companion_test checks the first.
+## 553. The water's edge unsquared
+
+Jeff: the world reads as squares. The coordinator approved terrain's
+unsquaring design (2026-10-21), the water's edge first: start at 0.35 of a
+cell and show it; the well's water stays its own art.
+
+**The shore field** (Client3D.shore_image): an L8 image over the ground's
+mask, SHORE_RES 4 texels a cell, 1 in the water, 0 on land, the water's
+edge where it is a half.
+- The wet cells (water, fords, a bridge's bed) at a texel a cell are
+  scaled up bilinearly, a box a cell wide over them. A straight run of
+  cells keeps its edge, a corner rounds, and a lone cell is near a disc.
+- A stream's one-wide cells (both sides dry) are left out of that and drawn
+  along its path instead: a Catmull-Rom through their middles, wandering
+  STREAM_WIND 0.2 either side by a noise along it, STREAM_HALF 0.42 wide
+  each side. It winds within them.
+- The bound: a texel further than SHORE_BOUND 0.35 (box distance) from a
+  cell of the other kind is its own cell's, water (at least 0.55) or land
+  (at most 0.45). The edge never strays further from its cells', so what
+  the sim calls water or land is what is drawn there, give or take a third
+  of a cell.
+- Client3D.shore_at reads it on the CPU (bilinear).
+
+**The shaders read it.**
+- water.gdshader: the shore line, foam and the water's inside come from
+  the field, warped SHORE_WARP 0.1 of a cell by its noise (SHORE_WANDER
+  dropped). The depth toward the middle is still the box distance from the
+  land.
+- ground.gdshaderinc: the wet bank is a smoothstep of the field (0.3 to
+  0.55) instead of the mask's water byte.
+
+**The bank drawn finer, on relief only.** On a level that gives its relief,
+a shore cell is drawn as SHORE_RES x SHORE_RES quads (Client3D._shore_band,
+_shore_cell). A shore cell is ground or water, not a building's floor, a
+rock's or a ramp's, with water and land in the 3 x 3 round it and no cliff
+on its sides. A point's height eases from the ground as the cells draw it
+to the bed (under the water's mean, _water_corner, by SHORE_SINK). It
+follows smoothstep(0.3, 0.5) of the field, so the bank is under the water by
+the field's edge (its half, not the cell's), where the foam is drawn. The dry side is the drawn ground, not
+the land's own height: 525 already brings a bank down to the water across
+its cell, and lifting it back to the land's height made a dark wall along
+the hills' stream in the first A/B. A corner touching a
+cell drawn whole keeps that cell's height (only the shore cells' own, as a
+cell across the corner may stand a cliff over them), so there is no gap.
+Vertex keys are in SHORE_RES units for every cell; _height_in reads a shore
+cell's finer triangles. A level without relief keeps its ground mesh: its
+water lies over the ground, and the shader alone draws the curve.
+
+**The water over the bank, on relief.** _build_water's surface covered a
+body's cells and the land beside them at its level. On a relief the bank
+stands higher than the stream, so the surface stopped at the cells' edge,
+and the field's edge and foam on the land side went undrawn: the first A/B
+of the hills lost their foam line. On a relief the surface now covers the
+unwalled land beside a body at any height, at the water's height there (a
+bank's corner with no water round it takes the mean of its cell's that
+have). Where the bank stands over the water it hides it; where the finer
+bank dips under the field's edge, the water shows.
+
+**Normals across the band.** The ground's normals are the sum of the faces
+round each corner, weighted by area. A shore cell's finer triangle counts
+SHORE_RES squared times its area, as the whole cell's would. Otherwise a
+corner shared with a cell drawn whole took its slope from the big triangles
+alone, and the bank's lean stopped at the band, leaving a light seam with a
+straight edge in the second A/B.
+
+What stays square: the cells the sim walks, builds and floods by; a
+building's floor; the well's water (its own art); the forest's ring.
+
+tests/view_test _test_shore: a lone cell wet in its middle and dry at its
+corners; a pond's side keeps its edge, its corner rounded; on the wilds
+and the hills every texel past SHORE_BOUND from the other kind is its
+cell's; the wilds (no relief) drawn whole; the hills' finer cells only in
+the band, each point in the mesh at its _height_in, the ground beside
+meeting it. _test_relief's stream bed check now applies only where the
+field says water. Shots and A/B in C:\dev\review\water (ab-*.png). Client only,
+protocol unchanged, no new class_name.

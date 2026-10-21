@@ -1,10 +1,12 @@
 shader_type spatial;
 // Water, a mesh a body (Client3D._build_water), over its cells and the land
-// round them. Where it shows: the distance to the edge of the water's cells
-// (the mask, a texel a cell, 1 for water; worked out from the 9 cells round
-// the point), the shore where it equals a noise of at most SHORE_WANDER: it
-// never strays further than that from the cells' true edge, whatever their
-// shape, so a cell that is land never looks drowned nor a water cell dry.
+// round them. Where it shows: the shore field (decision 553,
+// Client3D.shore_image: rounded corners, round ponds, streams winding within
+// their cells) over a half, read SHORE_WARP aside by a noise; the field and
+// the warp keep it within Client3D.SHORE_BOUND of the cells' true edge, so a
+// cell that is land never looks drowned nor a water cell dry. How deep: the
+// distance into the water's cells (the mask, a texel a cell, 1 for water;
+// worked out from the 9 cells round the point).
 // Foam on the land side of the shore; deeper and less clear toward the
 // middle; ripples that drift. A stream's (decision 505, terrain's side) run
 // down its flow (Client3D.flow_mask), two phases of the flow cross-faded so
@@ -24,6 +26,8 @@ uniform vec3 foam : source_color = vec3(0.85, 0.92, 0.95);
 // half the way the water runs.
 uniform sampler2D flow : filter_linear, repeat_disable;
 uniform bool flowing = false;
+// The shore field, Client3D.SHORE_RES texels a cell over the mask's cells.
+uniform sampler2D shore : hint_default_black, filter_linear, repeat_disable;
 
 varying vec3 world;
 
@@ -32,7 +36,8 @@ float noise(vec2 p) {
 	return texture(noise_tex, mat2(vec2(0.913, 0.408), vec2(-0.408, 0.913)) * p / 64.0).r;
 }
 
-const float SHORE_WANDER = 0.2;
+// Client3D.SHORE_WARP: how far aside (cells) the shore field is read.
+const float SHORE_WARP = 0.1;
 const float FOAM = 0.1;
 // How fast a stream runs (m/s), and how long each phase of its flow lasts
 // (s) before it fades out and starts again.
@@ -80,14 +85,15 @@ void vertex() {
 
 void fragment() {
 	vec2 at = world.xz;
-	// The shore: where the distance into the water is the wander here.
-	float wander = clamp((noise(at * 0.9) - 0.5) * 1.6 + (noise(at * 3.1 + 5.0) - 0.5) * 0.4, -1.0, 1.0) * SHORE_WANDER;
-	float into = into_water(at) - wander;
+	// The shore: the field's half, read a little aside; about a cell from
+	// dry to wet, so a half less it is about how far into the water.
+	vec2 aside = vec2(noise(at * 0.9) - 0.5, noise(at * 0.9 + 17.0) - 0.5) * 2.0 * SHORE_WARP;
+	float into = texture(shore, (at + aside - mask_origin + 0.5) / mask_size).r - 0.5;
 	if (into < -FOAM) {
 		discard;
 	}
 	float inside = smoothstep(-0.02, 0.03, into);
-	float depth = smoothstep(0.15, 1.2, into);
+	float depth = smoothstep(0.15, 1.2, into_water(at));
 	float t = TIME * 0.12;
 	// Down a stream the surface drifts with the water, in two phases: each
 	// carried FLOW_SPEED along and faded out as the other comes in.

@@ -47,6 +47,9 @@ uniform sampler2D noise_tex : filter_linear_mipmap, repeat_enable;
 // Where the water is, a texel a cell like kinds (Client3D._build_ground):
 // the bed and the shore beside it darker, wet.
 uniform sampler2D water : hint_default_black, filter_linear, repeat_disable;
+// The shore field (decision 553, Client3D.shore_image): over the same cells,
+// Client3D.SHORE_RES texels a cell, the water's edge where it is a half.
+uniform sampler2D shore : hint_default_black, filter_linear, repeat_disable;
 // Outdoors, the forest's floor (the mask's g): the land runs into it along
 // a ragged line.
 uniform vec3 forest_floor : source_color = vec3(0.17, 0.26, 0.14);
@@ -338,7 +341,7 @@ void fragment() {
 		float facing = dot(slope_normal, relief_light) - relief_light.y;
 		colour *= clamp(1.0 + slope_shade * facing, SLOPE_DARKEST, SLOPE_LIGHTEST);
 	}
-	float wet = smoothstep(0.25, 0.6, texture(water, (at - kinds_origin + 0.5) / kinds_size).r);
+	float wet = smoothstep(0.3, 0.55, texture(shore, (at - kinds_origin + 0.5) / kinds_size).r);
 	colour = mix(colour, colour * vec3(0.5, 0.58, 0.62), wet);
 	float forest = smoothstep(0.35, 0.65, texture(water, uv).g + (noise(at * 1.9 + 40.0) - 0.5) * 0.35);
 	// Under a grown forest's roof (decisions 466, 467) the grass is needles

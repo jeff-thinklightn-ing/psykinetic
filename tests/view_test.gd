@@ -44,6 +44,7 @@ func _ready() -> void:
 	_test_seasons()
 	_test_heights()
 	_test_hills()
+	_test_shore()
 	_test_water()
 	_test_streams()
 	_test_tall_grass()
@@ -1651,7 +1652,9 @@ func _test_relief() -> void:
 		level = level and ys.size() == 1
 	_check(not _rig._water_bodies.is_empty() and level, "the sample's water (one surface) lies level (%d bodies)" % _rig._water_bodies.size())
 	# On hills the stream steps down its valley: its surface slopes with it,
-	# each corner its water cells' mean, and its bed lies under it.
+	# each corner its water cells' mean, and its bed lies under it where the
+	# shore field has it in the water (decision 553: a winding stream leaves
+	# a water cell's corner dry bank).
 	var hills := Level.load_level("hills")
 	_rig.rebuild(hills["terrain"], hills["centre"])
 	var off_surface := 0
@@ -1659,13 +1662,17 @@ func _test_relief() -> void:
 	for body: MeshInstance3D in _rig._water_bodies:
 		for point: Vector3 in (body.mesh as ArrayMesh).surface_get_arrays(0)[Mesh.ARRAY_VERTEX]:
 			var vertex := Vector2i(roundi(point.x + 0.5), roundi(point.z + 0.5))
+			# A bank's corner with no water round it (decision 553) is its cell's.
+			if _rig._water_corner(vertex) == INF:
+				continue
 			off_surface += 0 if absf(point.y - _rig._water_corner(vertex) - Client3D.WATER_LIFT) < 0.001 else 1
 			heights_seen[snappedf(point.y, 0.01)] = true
 	var dry_bed := []
 	for cell: Vector2i in _rig._wet:
 		var bed := _rig._corner_heights(cell)
 		for c in 4:
-			if bed[c] >= _rig._water_corner(cell + Client3D.GROUND_CORNERS[c]):
+			var corner := cell + Client3D.GROUND_CORNERS[c]
+			if _rig.shore_at(Vector2(corner) - Vector2(0.5, 0.5)) > 0.6 and bed[c] >= _rig._water_corner(corner):
 				dry_bed.append(cell)
 				break
 	_check(off_surface == 0 and heights_seen.size() > 3 and dry_bed.is_empty(),
@@ -1966,6 +1973,133 @@ func _test_streams() -> void:
 	var width := rect.size.y if facing.x != 0 else rect.size.x
 	_check(bridge != null and counts["deck"] == length * width and counts["rail"] == 2 * length and counts["end"] == 2 * width,
 			"the bridge: a deck a cell, a rail along each long side, an end at each end (%s)" % [counts])
+	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+
+
+## The water's edge unsquared (decision 553): the shore field rounds a
+## pond's corners (a lone cell a disc) yet keeps to its cells, the hills'
+## shore cells drawn finer and meeting the ground round them, a level
+## without relief drawn whole.
+func _test_shore() -> void:
+	print("\n== shore: the water's edge rounded, within SHORE_BOUND of its cells; the bank drawn finer on relief ==")
+	# A lone cell is a disc: wet in its middle, dry at its corners; a 3 x 3
+	# pond's straight sides keep their edge, its corners rounded.
+	var lone: Dictionary[Vector2i, bool] = {Vector2i(3, 3): true}
+	var field := Client3D.shore_image([], lone, Vector2i.ZERO, Vector2i(7, 7))
+	var at := func(image: Image, point: Vector2) -> float:
+		var texel := ((point + Vector2(0.5, 0.5)) * Client3D.SHORE_RES - Vector2(0.5, 0.5)).round()
+		return image.get_pixelv(Vector2i(texel)).r
+	var corners_dry := true
+	for corner: Vector2 in [Vector2(-0.45, -0.45), Vector2(0.45, -0.45), Vector2(-0.45, 0.45), Vector2(0.45, 0.45)]:
+		corners_dry = corners_dry and at.call(field, Vector2(3, 3) + corner) < 0.5
+	_check(at.call(field, Vector2(3, 3)) > 0.5 and corners_dry, "a lone water cell is a disc: wet in its middle, dry at its corners")
+	var pond: Dictionary[Vector2i, bool] = {}
+	for y in range(2, 5):
+		for x in range(2, 5):
+			pond[Vector2i(x, y)] = true
+	field = Client3D.shore_image([], pond, Vector2i.ZERO, Vector2i(7, 7))
+	_check(at.call(field, Vector2(3, 1.75)) > 0.5 and at.call(field, Vector2(3, 1.25)) < 0.5 and at.call(field, Vector2(1.6, 1.6)) < 0.5,
+			"a pond's side keeps its edge, its corner rounded (side %.2f, out %.2f, corner %.2f)"
+			% [at.call(field, Vector2(3, 1.75)), at.call(field, Vector2(3, 1.25)), at.call(field, Vector2(1.6, 1.6))])
+	for name: String in ["wilds", "hills"]:
+		var level := Level.load_level(name)
+		_rig.rebuild(level["terrain"], level["centre"])
+		var wet: Dictionary = {}
+		for cell: Vector2i in _rig._wet:
+			wet[cell] = true
+		wet.merge(_rig._fords)
+		for cell: Vector2i in _rig._bed_levels:
+			wet[cell] = true  # A bridge's: the water runs on under it.
+		# Each texel within the wet cells round it and the land: further
+		# than SHORE_BOUND (box distance) from the other, it is the cell's.
+		var astray := []
+		var checked := 0
+		var seen: Dictionary[Vector2i, bool] = {}
+		for cell: Vector2i in wet:
+			for y in range(-1, 2):
+				for x in range(-1, 2):
+					var here := cell + Vector2i(x, y)
+					if not _rig._grounds.has(here) or seen.has(here):
+						continue
+					seen[here] = true
+					var water := wet.has(here)
+					for v in Client3D.SHORE_RES:
+						for u in Client3D.SHORE_RES:
+							var point := Vector2(here) + (Vector2(u, v) + Vector2(0.5, 0.5)) / Client3D.SHORE_RES - Vector2(0.5, 0.5)
+							var far := INF
+							for dy in range(-1, 2):
+								for dx in range(-1, 2):
+									var near := here + Vector2i(dx, dy)
+									if wet.has(near) != water and _rig._grounds.has(near):
+										var gap := (point - Vector2(near)).abs() - Vector2(0.5, 0.5)
+										far = minf(far, maxf(maxf(gap.x, gap.y), 0.0))
+							if far <= Client3D.SHORE_BOUND:
+								continue
+							checked += 1
+							if (_rig.shore_at(point) > 0.5) != water:
+								astray.append([name, here, point])
+		_check(checked > 0 and astray.is_empty(),
+				"%s: the water's edge within %.2f of its cells' (%d points; astray: %s)" % [name, Client3D.SHORE_BOUND, checked, astray.slice(0, 4)])
+		if not bool(level["terrain"].get("relief_given", false)):
+			_check(not wet.is_empty() and _rig._shore_heights.is_empty(), "%s (no relief): its ground drawn whole, its water's edge the shaders'" % name)
+			continue
+		# Drawn finer only in the band: water and land in its 3 x 3.
+		var outside := []
+		for cell: Vector2i in _rig._shore_heights:
+			var water := false
+			var land := false
+			for y in range(-1, 2):
+				for x in range(-1, 2):
+					var near := cell + Vector2i(x, y)
+					if _rig._grounds.has(near):
+						water = water or wet.has(near) or _rig._bed_levels.has(near)
+						land = land or not (wet.has(near) or _rig._bed_levels.has(near))
+			if not (water and land):
+				outside.append(cell)
+		_check(not _rig._shore_heights.is_empty() and outside.is_empty(),
+				"%s: %d shore cells drawn finer, each by water and land (outside: %s)" % [name, _rig._shore_heights.size(), outside.slice(0, 4)])
+		# Each finer point in the mesh, _height_in its height; on its edge the
+		# cell beside it meets it there (no gap).
+		var drawn: Dictionary = {}
+		for mesh: ArrayMesh in _rig._ground_meshes:
+			for point: Vector3 in mesh.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]:
+				drawn[Vector3i(roundi(point.x * Client3D.SHORE_RES), roundi(point.z * Client3D.SHORE_RES), roundi(point.y * 1000.0))] = true
+		var row := Client3D.SHORE_RES + 1
+		var unmet := []
+		var gaps := []
+		for cell: Vector2i in _rig._shore_heights:
+			var fine: PackedFloat32Array = _rig._shore_heights[cell]
+			for y in row:
+				for x in row:
+					var point := Vector2(cell) - Vector2(0.5, 0.5) + Vector2(x, y) / Client3D.SHORE_RES
+					var height := fine[y * row + x]
+					var key := Vector3i(roundi(point.x * Client3D.SHORE_RES), roundi(point.y * Client3D.SHORE_RES), roundi(height * 1000.0))
+					if not drawn.has(key) or absf(_rig._height_in(cell, point) - height) > 0.0001:
+						unmet.append([cell, x, y])
+					if x != 0 and y != 0 and x != Client3D.SHORE_RES and y != Client3D.SHORE_RES:
+						continue
+					var side := Vector2i(-1 if x == 0 else 1 if x == Client3D.SHORE_RES else 0, -1 if y == 0 else 1 if y == Client3D.SHORE_RES else 0)
+					for next: Vector2i in [cell + Vector2i(side.x, 0), cell + Vector2i(0, side.y)]:
+						if next == cell or not _rig._corners.has(next):
+							continue
+						# As the cell beside draws it: a whole cell's corners with
+						# water all round sunk WATER_BED_DEPTH (a finer cell's
+						# heights have it already). A cliff splits them on
+						# purpose: a face drawn there.
+						var sink := PackedFloat32Array()
+						for c in 4:
+							var sunk := true
+							for a in 4:
+								var round_it: Vector2i = next + Client3D.GROUND_CORNERS[c] + Client3D.SHORE_AROUND[a]
+								var index: int = _rig._grounds.get(round_it, -1)
+								sunk = sunk and index >= _rig._ground_floor_end and index < _rig._ground_water_end
+							sink.append(Client3D.WATER_BED_DEPTH if sunk and not _rig._shore_heights.has(next) else 0.0)
+						var f := (point - Vector2(next) + Vector2(0.5, 0.5)).clamp(Vector2.ZERO, Vector2.ONE)
+						var theirs := _rig._height_in(next, point) - lerpf(lerpf(sink[0], sink[1], f.x), lerpf(sink[2], sink[3], f.x), f.y)
+						if absf(theirs - height) > 0.0001 and not Relief.cliff_between(theirs, height):
+							gaps.append([cell, next, x, y])
+		_check(unmet.is_empty() and gaps.is_empty(),
+				"%s: each finer point drawn at its _height_in, the ground beside meeting it (unmet: %s; gaps: %s)" % [name, unmet.slice(0, 3), gaps.slice(0, 3)])
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
 

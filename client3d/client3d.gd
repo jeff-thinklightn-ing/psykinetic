@@ -215,6 +215,16 @@ const WATER_BED_KIND := "dirt"
 ## A stream's flow (decision 505, terrain's side) reaches this many cells out
 ## from its path, across its width (Streams.lay's are 1 to 3 wide).
 const STREAM_REACH := 2
+## The water's edge unsquared (decision 553): the shore field (shore_image)
+## has SHORE_RES texels a cell; a one-wide stream winds within its cells up
+## to STREAM_WIND either side of their middles, STREAM_HALF wide each side
+## of its line; the water's edge never strays further than SHORE_BOUND from
+## the cells' true edge (the shader's warp, SHORE_WARP, inside it).
+const SHORE_RES := 4
+const STREAM_WIND := 0.2
+const STREAM_HALF := 0.42
+const SHORE_BOUND := 0.35
+const SHORE_WARP := 0.1
 ## A bridge's pieces stand this far over the banks' height, so the water
 ## drawn under (WATER_LIFT up) never shows through the deck.
 const BRIDGE_LIFT := 0.04
@@ -1321,6 +1331,14 @@ var _water_mask: ImageTexture
 ## The streams' flow, a texel a cell as the water mask (flow_mask); null
 ## with no streams.
 var _flow_mask: ImageTexture
+## The shore field (decision 553, shore_image): SHORE_RES texels a cell
+## over the water mask's cells, the water's edge where it is a half; its
+## image too, for what stands on the ground (shore_at).
+var _shore_mask: ImageTexture
+var _shore_image: Image
+## The shore's cells drawn finer (decision 553, _shore_band): each one's
+## heights, (SHORE_RES + 1) squared row by row.
+var _shore_heights: Dictionary[Vector2i, PackedFloat32Array] = {}
 ## How far each void cell outdoors is from the land, out to FOREST_REACH
 ## (_measure_forest); the ground's cells in index order, and where its
 ## forest ones (after floor and water) begin.
@@ -2242,8 +2260,20 @@ func _ground_height(grid: Vector2) -> float:
 ## slope's, a ramp's, or flat. Every puppet every frame: a lookup and a
 ## few sums.
 func _height_in(cell: Vector2i, point: Vector2) -> float:
-	var h := _corner_heights(cell)
 	var at := (point - Vector2(cell) + Vector2(0.5, 0.5)).clamp(Vector2.ZERO, Vector2.ONE)
+	if _shore_heights.has(cell):
+		# A shore cell's finer quad (decision 553), its triangles as a cell's.
+		var fine: PackedFloat32Array = _shore_heights[cell]
+		var x := mini(floori(at.x * SHORE_RES), SHORE_RES - 1)
+		var y := mini(floori(at.y * SHORE_RES), SHORE_RES - 1)
+		var row := SHORE_RES + 1
+		var q := y * row + x
+		at = at * SHORE_RES - Vector2(x, y)
+		if at.x + at.y <= 1.0:
+			return fine[q] + (fine[q + 1] - fine[q]) * at.x + (fine[q + row] - fine[q]) * at.y
+		return fine[q + row + 1] + (fine[q + row] - fine[q + row + 1]) * (1.0 - at.x) \
+				+ (fine[q + 1] - fine[q + row + 1]) * (1.0 - at.y)
+	var h := _corner_heights(cell)
 	# The quad's two triangles: (0, 1, 2) where x + y <= 1, (1, 3, 2) past it.
 	if at.x + at.y <= 1.0:
 		return h[0] + (h[1] - h[0]) * at.x + (h[2] - h[0]) * at.y
@@ -5019,6 +5049,8 @@ func _build_ground(kinds: Dictionary) -> void:
 		wet_cells[cell] = true
 	wet_cells.merge(_fords)
 	_flow_mask = flow_mask(_terrain.get("streams", []), wet_cells, origin, Vector2i(across, down))
+	_shore_image = shore_image(_terrain.get("streams", []), wet_cells, origin, Vector2i(across, down))
+	_shore_mask = ImageTexture.create_from_image(_shore_image)
 	_floor_mask = ImageTexture.create_from_image(Image.create_from_data(across, down, false, Image.FORMAT_R8, _floor_bytes))
 	_mask_origin = origin
 	_mask_size = Vector2i(across, down)
@@ -5038,7 +5070,10 @@ func _build_ground(kinds: Dictionary) -> void:
 	# The cells round a corner, and which of their corners it is.
 	var around: Array[Vector2i] = [-Vector2i.ONE, Vector2i(0, -1), Vector2i(-1, 0), Vector2i.ZERO]
 	var ends := PackedInt32Array([0, 0, 0, 0])
-	# A chunk's vertex for each corner and height (mm): one a side of a cliff.
+	# The shore's cells drawn finer, SHORE_RES a side (decision 553).
+	_shore_heights = _shore_band(cells, floor_count, water_end)
+	# A chunk's vertex for each corner (or a shore cell's finer point, in
+	# SHORE_RES units) and height (mm): one a side of a cliff.
 	var local: Dictionary[Vector3i, int] = {}
 	for chunk: Vector2i in chunks:
 		var chunk_index := _ground_meshes.size()
@@ -5052,12 +5087,19 @@ func _build_ground(kinds: Dictionary) -> void:
 		# at its top (lit a little).
 		var feet := PackedByteArray()
 		var tops := PackedByteArray()
+		# The shore cells' finer triangles, as spans of indices [from, to).
+		var finer := PackedInt32Array()
 		for i in chunks[chunk]:
 			var cell: Vector2i = cells[i]
+			if _shore_heights.has(cell):
+				finer.append(indices.size())
+				_shore_cell(cell, positions, indices, feet, tops, local, chunk_index, byte_start, pair_cell, pair_vertex)
+				finer.append(indices.size())
+				continue
 			for c in 4:
 				var corner := cell + GROUND_CORNERS[c]
 				var level := heights[i * 4 + c]
-				var key := Vector3i(corner.x, corner.y, roundi(level * 1000.0))
+				var key := Vector3i(corner.x * SHORE_RES, corner.y * SHORE_RES, roundi(level * 1000.0))
 				var vertex: int = local.get(key, -1)
 				if vertex < 0:
 					vertex = positions.size()
@@ -5103,12 +5145,19 @@ func _build_ground(kinds: Dictionary) -> void:
 			_ground_bytes[byte + 2] = feet[v]
 			_ground_bytes[byte + 3] = tops[v]
 		# Up, but tilted on and beside a ramp: each corner the sum of the
-		# faces round it.
+		# faces round it. A shore cell's finer triangle counts as the whole
+		# cell's it stands for (SHORE_RES squared its area), so a corner it
+		# shares with a cell drawn whole leans as much its way as before
+		# (else the bank's slope stops at the band, a light seam).
 		var normals := PackedVector3Array()
 		normals.resize(positions.size())
 		normals.fill(Vector3.ZERO)
+		var span := 0
 		for t in range(0, indices.size(), 3):
-			var face := (positions[indices[t + 2]] - positions[indices[t]]).cross(positions[indices[t + 1]] - positions[indices[t]])
+			while span < finer.size() and t >= finer[span + 1]:
+				span += 2
+			var weight := float(SHORE_RES * SHORE_RES) if span < finer.size() and t >= finer[span] else 1.0
+			var face := (positions[indices[t + 2]] - positions[indices[t]]).cross(positions[indices[t + 1]] - positions[indices[t]]) * weight
 			for k in 3:
 				normals[indices[t + k]] += face
 		for v in normals.size():
@@ -5149,6 +5198,196 @@ func _build_ground(kinds: Dictionary) -> void:
 		filled[cell] += 1
 
 
+## The shore's cells drawn finer (decision 553), by cell: each one's
+## heights ((SHORE_RES + 1) squared, row by row); none on a level with no
+## relief, whose water lies over its ground and shows its edge by the shore
+## field alone (the flat ground drawn as before). A shore cell is a ground
+## cell of land or water (not the forest's ring, a building's floor, a
+## rock's or a ramp's) with both water and land in the 3 x 3 round it and no
+## cliff on any side (its corners and its neighbour's differ). A point's
+## height eases from the dry ground to the bed by the shore field there
+## (shore_at, 0.3 to 0.5), each a mix of its cell's corners' (_shore_corner),
+## so two cells meet on their edge and the water meets the ground on the
+## field's half. Its corners' heights become the cell's in _corners.
+func _shore_band(cells: Array, floor_count: int, water_end: int) -> Dictionary[Vector2i, PackedFloat32Array]:
+	var band: Dictionary[Vector2i, PackedFloat32Array] = {}
+	if _shore_image == null or _glimpse or not _relief_given:
+		return band
+	var sides: Array[Vector2i] = [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]
+	var picked: Dictionary[Vector2i, bool] = {}
+	for i in water_end:
+		var cell: Vector2i = cells[i]
+		if _rocks.has(cell) or _ramp_heights.has(cell) or _floor_bytes_at(cell) != 0:
+			continue
+		var water := false
+		var land := false
+		for y in range(-1, 2):
+			for x in range(-1, 2):
+				var near := cell + Vector2i(x, y)
+				var index: int = _grounds.get(near, -1)
+				if index < 0 or index >= water_end:
+					continue
+				if _wet.has(near) or _bed_levels.has(near):
+					water = true
+				else:
+					land = true
+		if not (water and land):
+			continue
+		var own: PackedFloat32Array = _corners[cell]
+		var cliff := false
+		for side in sides:
+			var next := cell + side
+			if not _corners.has(next):
+				continue
+			var theirs: PackedFloat32Array = _corners[next]
+			for c in 4:
+				var k := GROUND_CORNERS.find(cell + GROUND_CORNERS[c] - next)
+				if k >= 0 and absf(theirs[k] - own[c]) > Relief.EPSILON:
+					cliff = true
+		if not cliff:
+			picked[cell] = true
+	var corners: Dictionary[Vector2i, Vector2] = {}
+	for cell: Vector2i in picked:
+		for c in 4:
+			var corner := cell + GROUND_CORNERS[c]
+			if not corners.has(corner):
+				corners[corner] = _shore_corner(corner, picked, floor_count, water_end)
+	var row := SHORE_RES + 1
+	for cell: Vector2i in picked:
+		var ends: Array[Vector2] = []
+		for c in 4:
+			ends.append(corners[cell + GROUND_CORNERS[c]])
+		var fine := PackedFloat32Array()
+		fine.resize(row * row)
+		for y in row:
+			for x in row:
+				var u := x / float(SHORE_RES)
+				var v := y / float(SHORE_RES)
+				var mixed := ends[0].lerp(ends[1], u).lerp(ends[2].lerp(ends[3], u), v)
+				var m := shore_at(Vector2(cell) + Vector2(u - 0.5, v - 0.5))
+				fine[y * row + x] = lerpf(mixed.y, mixed.x, smoothstep(0.3, 0.5, m))
+		band[cell] = fine
+	for cell: Vector2i in band:
+		var fine: PackedFloat32Array = band[cell]
+		_corners[cell] = PackedFloat32Array([fine[0], fine[SHORE_RES], fine[SHORE_RES * row], fine[row * row - 1]])
+	return band
+
+
+## Whether [param cell] has a building's floor set (the floors mask), 0
+## for the ground's own.
+func _floor_bytes_at(cell: Vector2i) -> int:
+	var at := cell - _mask_origin
+	if at.x < 0 or at.y < 0 or at.x >= _mask_size.x or at.y >= _mask_size.y:
+		return 0
+	return _floor_bytes[at.y * _mask_size.x + at.x]
+
+
+## A shore corner's heights (decision 553): x its bed's (the ground as the
+## cells draw it, under the water's edge where water and land meet at
+## it), y the dry ground's (the ground as the cells draw it: the bank
+## already comes down to the water, decision 525, so the field shapes only
+## its last dip under the edge, not a wall). Both the picked cells' own
+## where a cell round it is drawn whole (not in [param picked]), so the
+## finer cells meet it with no gap.
+func _shore_corner(corner: Vector2i, picked: Dictionary, floor_count: int, water_end: int) -> Vector2:
+	var drawn := 0.0
+	var count := 0
+	var pinned := false
+	var all_water := true
+	var land := false
+	var water := false
+	for a in 4:
+		var cell := corner + SHORE_AROUND[a]
+		var index: int = _grounds.get(cell, -1)
+		if index < 0:
+			all_water = false
+			continue
+		pinned = pinned or not picked.has(cell)
+		# This corner is the cell's corner 3 - a, as the cell draws it: the
+		# picked cells' only, which meet their sides with no cliff (a cell
+		# across the corner may stand a cliff over them).
+		if picked.has(cell):
+			drawn += _corners[cell][3 - a]
+			count += 1
+		all_water = all_water and index >= floor_count and index < water_end
+		if index >= water_end:
+			continue
+		if _wet.has(cell) or _bed_levels.has(cell):
+			water = true
+		else:
+			land = true
+	var bed := drawn / maxi(count, 1) - (WATER_BED_DEPTH if all_water else 0.0)
+	if pinned or not water or not land:
+		return Vector2(bed, bed)
+	return Vector2(minf(bed, _water_corner(corner) - SHORE_SINK), bed)
+
+
+## The cells round a corner, the corner being each one's corner 3 - a.
+const SHORE_AROUND: Array[Vector2i] = [Vector2i(-1, -1), Vector2i(0, -1), Vector2i(-1, 0), Vector2i(0, 0)]
+
+
+## A shore cell's finer quads into a chunk's arrays (decision 553): its
+## (SHORE_RES + 1) squared points, each shared with the cell beside it on an
+## edge or corner (keyed in SHORE_RES units, as the whole cells' corners);
+## each lit by the cells it touches that draw it at its height
+## (_vertex_cells), its relief bytes mixed from its cell's corners'.
+func _shore_cell(cell: Vector2i, positions: PackedVector3Array, indices: PackedInt32Array,
+		feet: PackedByteArray, tops: PackedByteArray, local: Dictionary, chunk_index: int, byte_start: int,
+		pair_cell: PackedInt32Array, pair_vertex: PackedInt32Array) -> void:
+	var fine: PackedFloat32Array = _shore_heights[cell]
+	var row := SHORE_RES + 1
+	var corner_feet := PackedFloat32Array()
+	var corner_tops := PackedFloat32Array()
+	for c in 4:
+		var corner := cell + GROUND_CORNERS[c]
+		var level := fine[[0, SHORE_RES, SHORE_RES * row, row * row - 1][c]]
+		corner_feet.append(_concavity(corner, level))
+		corner_tops.append(_crest(corner, level))
+	var made := PackedInt32Array()
+	made.resize(row * row)
+	for y in row:
+		for x in row:
+			var level := fine[y * row + x]
+			var key := Vector3i(cell.x * SHORE_RES + x, cell.y * SHORE_RES + y, roundi(level * 1000.0))
+			var vertex: int = local.get(key, -1)
+			if vertex < 0:
+				vertex = positions.size()
+				local[key] = vertex
+				var point := Vector2(cell.x - 0.5 + x / float(SHORE_RES), cell.y - 0.5 + y / float(SHORE_RES))
+				positions.append(Vector3(point.x, level, point.y))
+				var global := _vertex_chunk.size()
+				_vertex_chunk.append(chunk_index)
+				_vertex_byte.append(byte_start + vertex * _ground_stride + _ground_custom)
+				# The cells it touches: on a corner the four round it, on an
+				# edge the two, else its own; each lights it where it draws
+				# it at this height.
+				var touched: Array[Vector2i] = []
+				for dy: int in ([0, -1] if y == 0 else [0, 1] if y == SHORE_RES else [0]):
+					for dx: int in ([0, -1] if x == 0 else [0, 1] if x == SHORE_RES else [0]):
+						touched.append(cell + Vector2i(dx, dy))
+				for k in 4:
+					var other: int = -1
+					if k < touched.size():
+						var near := touched[k]
+						other = _grounds.get(near, -1)
+						if other >= 0 and (_shore_heights.has(near) or _corners.has(near)) \
+								and absf(_height_in(near, point) - level) > Relief.EPSILON:
+							other = -1
+					_vertex_cells.append(other)
+					if other >= 0:
+						pair_cell.append(other)
+						pair_vertex.append(global)
+				var u := x / float(SHORE_RES)
+				var v := y / float(SHORE_RES)
+				feet.append(roundi(lerpf(lerpf(corner_feet[0], corner_feet[1], u), lerpf(corner_feet[2], corner_feet[3], u), v) * 255.0))
+				tops.append(roundi(lerpf(lerpf(corner_tops[0], corner_tops[1], u), lerpf(corner_tops[2], corner_tops[3], u), v) * 255.0))
+			made[y * row + x] = vertex
+	for y in SHORE_RES:
+		for x in SHORE_RES:
+			var q := y * row + x
+			indices.append_array([made[q], made[q + 1], made[q + row], made[q + 1], made[q + row + 1], made[q + row]])
+
+
 ## What a water cell's bed is: the ground of the land beside it, so its bank
 ## runs on under the water; out of sight of land, WATER_BED_KIND.
 ## ([param floor_count]: the indices below it are floor, already placed.)
@@ -5186,6 +5425,7 @@ func _ground_material(bytes: PackedByteArray, across: int, down: int, origin: Ve
 	material.set_shader_parameter("warm", WARM)
 	material.set_shader_parameter("noise_tex", _ground_noise())
 	material.set_shader_parameter("water", _water_mask)
+	material.set_shader_parameter("shore", _shore_mask)
 	# Past pine stands the forest's edge runs into their needles (423), as
 	# dark as the floor beyond looks in the canopy's shade (the edge is in
 	# the sun).
@@ -5331,14 +5571,17 @@ func _build_water() -> void:
 					seen[next] = true
 					body.append(next)
 		# Its cells, and the land beside them at its level that no wall
-		# parts from them: water never shows past a wall.
+		# parts from them: water never shows past a wall. On a relief the
+		# land beside it at any height (decision 553): its bank dips under
+		# the water where the shore field rounds into it, and stands over
+		# the water elsewhere, hiding it.
 		var covered: Dictionary[Vector2i, bool] = {}
 		for cell in body:
 			covered[cell] = true
 			for y in range(-1, 2):
 				for x in range(-1, 2):
 					var near := cell + Vector2i(x, y)
-					if covered.has(near) or water.has(near) or not _grounds.has(near) or absf(_elevation(near) - level) > Relief.EPSILON:
+					if covered.has(near) or water.has(near) or not _grounds.has(near) 							or (not _relief_given and absf(_elevation(near) - level) > Relief.EPSILON):
 						continue
 					var walled := false
 					for step: Vector2i in [Vector2i(x, 0), Vector2i(0, y)]:
@@ -5352,11 +5595,26 @@ func _build_water() -> void:
 		var indices := PackedInt32Array()
 		for cell: Vector2i in covered:
 			var first := positions.size()
-			for corner in GROUND_CORNERS:
-				# On a relief the surface follows the water's cells (a stream
-				# slopes down its path, decision 525); else the body's level.
-				var y := _water_corner(cell + corner) + WATER_LIFT if _relief_given else top
-				positions.append(Vector3(cell.x + corner.x - 0.5, y, cell.y + corner.y - 0.5))
+			# On a relief the surface follows the water's cells (a stream
+			# slopes down its path, decision 525); else the body's level. A
+			# bank's corner with no water round it takes the mean of its
+			# cell's that have.
+			var ys := PackedFloat32Array([top, top, top, top])
+			if _relief_given:
+				var sum := 0.0
+				var count := 0
+				for c in 4:
+					ys[c] = _water_corner(cell + GROUND_CORNERS[c])
+					if ys[c] < INF:
+						sum += ys[c]
+						count += 1
+				for c in 4:
+					if ys[c] == INF:
+						ys[c] = sum / count if count > 0 else level
+					ys[c] += WATER_LIFT
+			for c in 4:
+				var corner := GROUND_CORNERS[c]
+				positions.append(Vector3(cell.x + corner.x - 0.5, ys[c], cell.y + corner.y - 0.5))
 			indices.append_array([first, first + 1, first + 2, first + 1, first + 3, first + 2])
 		var normals := PackedVector3Array()
 		normals.resize(positions.size())
@@ -5443,6 +5701,113 @@ static func flow_mask(streams: Array, wet: Dictionary, origin: Vector2i, size: V
 			bytes[(at.y * size.x + at.x) * 2] = clampi(roundi(128.0 + 127.0 * ways[cell].x), 0, 255)
 			bytes[(at.y * size.x + at.x) * 2 + 1] = clampi(roundi(128.0 + 127.0 * ways[cell].y), 0, 255)
 	return ImageTexture.create_from_image(Image.create_from_data(size.x, size.y, false, Image.FORMAT_RG8, bytes))
+
+
+## The shore field (decision 553): an L8 image of [param size] cells from
+## cell [param origin], SHORE_RES texels a cell (a texel's middle at cell
+## origin + (texel + 0.5) / SHORE_RES - 0.5), 255 in the water, 0 on land, the
+## water's edge where it is a half. The [param wet] cells, a texel a cell,
+## scaled up bilinearly (a box a cell wide over them), so a straight run of
+## cells keeps its edge, a corner rounds and a lone cell is near a disc, the
+## edge no further than 0.29 of a cell off its cells' (SHORE_BOUND); but a stream's one-wide cells (its two
+## sides dry) left out of that and drawn along its path instead, a
+## Catmull-Rom through their middles wandering STREAM_WIND either side
+## (a noise along it), STREAM_HALF wide each side: it winds within them.
+static func shore_image(streams: Array, wet: Dictionary, origin: Vector2i, size: Vector2i) -> Image:
+	var narrow: Dictionary[Vector2i, bool] = {}
+	for stream: Dictionary in streams:
+		var path: Array = stream.get("path", [])
+		for i in path.size():
+			var way: Vector2i = (path[mini(i + 1, path.size() - 1)] - path[maxi(i - 1, 0)]).sign()
+			var side := Vector2i(-way.y, way.x)
+			if way != Vector2i.ZERO and not wet.has(path[i] + side) and not wet.has(path[i] - side):
+				narrow[path[i]] = true
+	var cells := PackedByteArray()
+	cells.resize(size.x * size.y)
+	for cell: Vector2i in wet:
+		var at := cell - origin
+		if not narrow.has(cell) and at.x >= 0 and at.y >= 0 and at.x < size.x and at.y < size.y:
+			cells[at.y * size.x + at.x] = 255
+	var image := Image.create_from_data(size.x, size.y, false, Image.FORMAT_L8, cells)
+	var across := size.x * SHORE_RES
+	var down := size.y * SHORE_RES
+	image.resize(across, down, Image.INTERPOLATE_BILINEAR)
+	var bytes := image.get_data()
+	var wander := FastNoiseLite.new()
+	wander.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+	wander.seed = 553
+	wander.frequency = 0.15
+	wander.fractal_type = FastNoiseLite.FRACTAL_NONE
+	var reach := ceili(STREAM_HALF * SHORE_RES) + 1
+	for stream: Dictionary in streams:
+		var path: Array = stream.get("path", [])
+		var along := 0.0
+		for i in path.size() - 1:
+			var a := Vector2(path[maxi(i - 1, 0)])
+			var b := Vector2(path[i])
+			var c := Vector2(path[i + 1])
+			var d := Vector2(path[mini(i + 2, path.size() - 1)])
+			for k in SHORE_RES * 2:
+				var t := k / float(SHORE_RES * 2)
+				var point := 0.5 * (2.0 * b + (c - a) * t + (2.0 * a - 5.0 * b + 4.0 * c - d) * t * t
+						+ (3.0 * b - a - 3.0 * c + d) * t * t * t)
+				var tangent := (0.5 * ((c - a) + 2.0 * (2.0 * a - 5.0 * b + 4.0 * c - d) * t
+						+ 3.0 * (3.0 * b - a - 3.0 * c + d) * t * t)).normalized()
+				point += Vector2(-tangent.y, tangent.x) * wander.get_noise_1d(along) * STREAM_WIND
+				along += b.distance_to(c) / (SHORE_RES * 2)
+				# The texels round it, in texel units.
+				var middle := (point - Vector2(origin) + Vector2(0.5, 0.5)) * SHORE_RES - Vector2(0.5, 0.5)
+				for y in range(floori(middle.y) - reach, floori(middle.y) + reach + 2):
+					for x in range(floori(middle.x) - reach, floori(middle.x) + reach + 2):
+						if x < 0 or y < 0 or x >= across or y >= down:
+							continue
+						var off := Vector2(x, y).distance_to(middle) / SHORE_RES
+						var cover := roundi(clampf((STREAM_HALF - off) * SHORE_RES + 0.5, 0.0, 1.0) * 255.0)
+						if cover > bytes[y * across + x]:
+							bytes[y * across + x] = cover
+	# The bound: a texel further than SHORE_BOUND from a cell of the other
+	# kind (box distance) is its own cell's, water or land, wherever a
+	# stream's winding or its meeting the water left it.
+	var near_water: Dictionary[Vector2i, bool] = {}
+	for cell: Vector2i in wet:
+		for y in range(-1, 2):
+			for x in range(-1, 2):
+				near_water[cell + Vector2i(x, y)] = true
+	for cell: Vector2i in near_water:
+		var at := cell - origin
+		if at.x < 0 or at.y < 0 or at.x >= size.x or at.y >= size.y:
+			continue
+		var water := wet.has(cell)
+		for v in SHORE_RES:
+			for u in SHORE_RES:
+				var point := (Vector2(u, v) + Vector2(0.5, 0.5)) / SHORE_RES - Vector2(0.5, 0.5)
+				var far := INF
+				for y in range(-1, 2):
+					for x in range(-1, 2):
+						if wet.has(cell + Vector2i(x, y)) != water:
+							var gap := (point - Vector2(x, y)).abs() - Vector2(0.5, 0.5)
+							far = minf(far, maxf(maxf(gap.x, gap.y), 0.0))
+				if far <= SHORE_BOUND:
+					continue
+				var texel := (at.y * SHORE_RES + v) * across + at.x * SHORE_RES + u
+				bytes[texel] = maxi(bytes[texel], 141) if water else mini(bytes[texel], 114)
+	return Image.create_from_data(across, down, false, Image.FORMAT_L8, bytes)
+
+
+## The shore field (shore_image) at [param point] (cells), 0 on land to 1 in
+## the water, the edge at a half; 0 off it.
+func shore_at(point: Vector2) -> float:
+	if _shore_image == null:
+		return 0.0
+	var texel := (point - Vector2(_mask_origin) + Vector2(0.5, 0.5)) * SHORE_RES - Vector2(0.5, 0.5)
+	var low := Vector2i(floori(texel.x), floori(texel.y))
+	var f := texel - Vector2(low)
+	var size := _shore_image.get_size()
+	var v := PackedFloat32Array([0.0, 0.0, 0.0, 0.0])
+	for k in 4:
+		var at := (low + Vector2i(k & 1, k >> 1)).clamp(Vector2i.ZERO, size - Vector2i.ONE)
+		v[k] = _shore_image.get_pixelv(at).r
+	return lerpf(lerpf(v[0], v[1], f.x), lerpf(v[2], v[3], f.x), f.y)
 
 
 ## A bridge (decision 505, terrain's side): art-kit's BRIDGE_DECK on each
@@ -5646,6 +6011,7 @@ func _water_material() -> ShaderMaterial:
 	material.set_shader_parameter("foam", swatch(WATER_FOAM.x, WATER_FOAM.y))
 	material.set_shader_parameter("flow", _flow_mask)
 	material.set_shader_parameter("flowing", _flow_mask != null)
+	material.set_shader_parameter("shore", _shore_mask)
 	return material
 
 
