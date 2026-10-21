@@ -136,6 +136,13 @@ func _test_records_come_back_as_they_were() -> void:
 	World._relocate(player, Vector2i(60, 3))
 	for i in Main.RETIRE_EVERY_TICKS + 1:
 		World.step()
+	# One queued for _recall_due on the last of those (a recall tick falling
+	# on it, by the tick count the sections before left) is made on the next:
+	# a few more, while any is left, never more than another round.
+	for i in Main.RETIRE_EVERY_TICKS:
+		if World.record_list().is_empty():
+			break
+		World.step()
 	var imp := _named("Imp1")
 	var armed := _named("Imp2")
 	_check(_monsters() == 3 and World.record_list().is_empty(), "all three back (%d nodes, %d records)" % [_monsters(), World.record_list().size()])
