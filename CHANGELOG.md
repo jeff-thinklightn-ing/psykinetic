@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Screenshots taken on a joined client are named with the area again ("wilds_209-201_..."), and the big map marks your own area and lists your party under it when you joined a server, not only when hosting (538 amended).
 - Trade wagons and raiding parties walk up hills, stairs and fords on their way instead of waiting at the foot of the first climb and then jumping to the end of that stretch; and the routes can now give a companion her way leg by leg, or a way round a camp she knows, for leading her player (551, maps' side).
 - The Barrow's burial niches are drawn (542): each alcove holds its bier and remains, plundered near the top, old bones and grave goods deeper, the oldest wrapped burials at the bottom.
 - The Barrow fills in: its generated plan lists every grave between the tombs with how deep it lies, so enemy-ai's walking skeletons can each be given one to go home to (Jeff's crypt page: "the dead are only trying to go back to their graves"), and the wall niches with their facing for the burial-niche art; skeletons and robbers replace the imps and sneaks, three skeleton guards stand in the altar room and the draugr in his lair; a niche off the altar room where a lost Pip may be found, and the runner's pack in the lair.

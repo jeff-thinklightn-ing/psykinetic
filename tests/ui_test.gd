@@ -390,6 +390,16 @@ func _test_screenshot_key() -> void:
 	_check(Main.screenshot_name("wilds", Vector2i(217, 195), 14.6, "20261019-113005") == "wilds_217-195_14h_20261019-113005.png",
 		"the name: zone, cell, hour, clock; nobody's name or id")
 	_check(Keys.DEFAULTS["screenshot"] == KEY_F12 and Keys.WORDS.has("screenshot"), "F12 by default, in the Options' key rows")
+	# 538 amended: a joined client's World.zone is unnamed; the name is its loaded map's.
+	var was_zone: String = World.zone.name
+	var was_map: String = _main.map_name
+	World.zone.name = ""
+	_main.map_name = "wilds"
+	_check(_main.zone_name_here() == "wilds", "a joined client (World's zone unnamed) names its loaded map in the file")
+	World.zone.name = "castle"
+	_check(_main.zone_name_here() == "castle", "a host names World's zone")
+	World.zone.name = was_zone
+	_main.map_name = was_map
 	Net.screenshot_dir = ""  # The save itself is a windowed run's (--test-show=shot); headless has no picture to take.
 
 

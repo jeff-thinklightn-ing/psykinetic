@@ -16599,6 +16599,15 @@ only.
 
 Protocol unchanged; no new class_name.
 
+Amended (2026-10-20; Jeff's first shots from the laptop reached the NAS
+named "_209-201_16h_20261020-213655.png", the zone blank): the name read
+World.zone.name, which a joined client never sets (its World.zone is a
+bare Zone; the map it loaded is Main.map_name, set in _client_zone). The
+read is Main.zone_name_here(): World's zone where it has a name (a host,
+the server), else map_name. The big map's own_area read the same way and
+so a joined client's own area was never marked nor its party listed under
+it (445, 515): it takes the same read. ui_test covers the two reads.
+
 ## 535 amended: the big map stays north-up
 
 Maps' glance at 535: the big map is where the land is read as the level

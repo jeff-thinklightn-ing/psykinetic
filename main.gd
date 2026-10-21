@@ -1691,6 +1691,17 @@ static func camera_lean(lean: Vector2, viewport: Viewport, yaw_degrees: float, d
 	return lean.lerp(wanted, 1.0 - exp(-delta / CAMERA_LEAN_EASE))
 
 
+## The id of the zone this view is in: World's zone where World names it (a
+## host, the server), else this peer's loaded map (a joined client's
+## World.zone is a bare Zone with no name; its map is map_name, set as the
+## zone's level loads in _client_zone). 538 amended: Jeff's screenshots from
+## the laptop were named "_209-201_16h_...", the zone blank.
+func zone_name_here() -> String:
+	if World.zone != null and not World.zone.name.is_empty():
+		return World.zone.name
+	return map_name
+
+
 ## The player this peer's input controls, or null (dedicated server, dead,
 ## or not spawned yet).
 func _local_player() -> Player:
@@ -7967,7 +7978,7 @@ func _refresh_world_map() -> void:
 	if world_map_panel == null:
 		return
 	var player := _local_player()
-	world_map_panel.own_area = World.zone.name if World.zone != null else map_name
+	world_map_panel.own_area = zone_name_here()  # 538 amended: the same read, so a joined client's own area is marked.
 	world_map_panel.own_cell = player.tile if player != null else Vector2i(-1, -1)
 	var here: Array[Dictionary] = []
 	for entity in World.get_entities():
@@ -9010,7 +9021,7 @@ static func screenshot_name(zone_name: String, cell: Vector2i, hour: float, stam
 ## that will not take the file falls back to the game's own and says so.
 func take_screenshot() -> void:
 	var player := _local_player()
-	var zone_name := World.zone.name if World.zone != null else map_name
+	var zone_name := zone_name_here()  # 538 amended: a joined client's World.zone has no name.
 	var cell := player.tile if player != null else Vector2i.ZERO
 	var stamp := Time.get_datetime_string_from_system(false, false).replace("-", "").replace(":", "").replace("T", "-")
 	var file := screenshot_name(zone_name, cell, DayNight.hour(DayNight.now()), stamp)
