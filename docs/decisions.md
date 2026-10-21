@@ -17846,8 +17846,8 @@ places, areas} says what she knows the way to; the "guide" command
   The foot line names the ask when she knows any way.
 - --test-show=led and guide_map stand a sample for the shots (the guide
   itself is companions'; a fresh world's companion knows no road yet):
-  docs/ui/shots/sim/led.jpg and bigmap_guide.jpg, taken once the shot runs
-  are allowed again after the 2026-10-21 restart (short landings only till then).
+  docs/ui/shots/sim/led.jpg and bigmap_guide.jpg (taken on wilds in release's
+  shot slot after npc's 551 phase 2, a docs-only landing after the code's).
 
 ui_test: knows_way, the words, place_words, the ask box's open, confirm,
 refusal and close. Client only; protocol unchanged on this side; no new
