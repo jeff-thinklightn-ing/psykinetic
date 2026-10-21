@@ -5899,6 +5899,7 @@ func _heard_from_worker(record: PlayerRecord) -> void:
 	if World.production == null or World.production.worker(who).is_empty():
 		return
 	record.companion["heard"] = World.production.worker(who).get("heard", []).duplicate(true)
+	World.production.set_mood(who, "", "")  # Out with her player again: no mood for the town (555).
 
 
 ## A resident's answer ([param out]: the ask waited for): said from its
