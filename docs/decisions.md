@@ -16974,3 +16974,32 @@ standing offer per player and resident, taken by "yes", "I'll take it",
 
 ui_test: no panel, the standing words, an offers message's effect and its
 absence, Y's default. Client only; the protocol change is npc's.
+
+## 544, ui's side: downed and brought back, read on the HUD
+
+Companions' 544 replicates downed_until, channel_of (the body's node
+name) and channel_until on players and companions (PROTOCOL_REVISION 24);
+this is how they read, client only, no number or bar beyond the seconds
+the window gives.
+
+- The local player downed (World.is_downed): the HUD's state line adds
+  "You are down: n s" (Main.downed_words), the seconds to downed_until,
+  counted on the world tick; the body already lies (343's pose).
+- The local player channeling (channel_of set, before channel_until):
+  "bringing <name> back: n s" (Main.channel_words), the name the client
+  shows for that body (_display_name), never an id.
+- The ring: Client3D.channel_ring, a brass_bright flat ring on the cell
+  of the body being brought back by the first channeler in view, half
+  again as wide when first seen and the cell's own size as the channel
+  completes (475's language for a thing that completes); Main shows it
+  each frame (_show_channel_ring) from the replicated pair, the course
+  running from the tick this view first saw that channel to its end
+  (Main.channel_fraction), since the start is not on the wire. 2D draws
+  no ring, as it draws no hover ring.
+- --test-show=downed lays the local player downed for the shot;
+  --test-show=channel lays the companion downed and has the player
+  channel her (World.try_channel on the host, past Main's blessing gate,
+  for the shot alone).
+
+ui_test: the words and the course. Protocol unchanged; no new
+class_name.

@@ -455,6 +455,10 @@ var _still_tile := Vector2i(-100000, -100000)
 var _still_since := 0
 var _talk_hint_until := 0.0
 ## Talking with a town's person (536, ui's side: no panel; the say line, their speech, the HUD).
+## Channels this view has seen (544, ui's side): channeler instance id ->
+## [the tick first seen, its channel_until], so the ring's course runs from
+## when it was first seen to its end.
+var _channel_seen: Dictionary = {}
 ## The offer that stands with a resident for this player (npc's 536: the
 ## "offers" message's "standing" title, "" for none): said on the HUD
 ## line, taken by "yes" (Y, or typed).
@@ -827,6 +831,7 @@ func _process(delta: float) -> void:
 		cursor.polygon = PackedVector2Array([Iso.project(Vector2(-0.5, 0.5)), Iso.project(Vector2(-0.5, -0.5)),
 				Iso.project(Vector2(0.5, -0.5)), Iso.project(Vector2(0.5, 0.5))])
 	_retarget_held()
+	_show_channel_ring()
 	_update_pack()
 	_update_talk()
 	var hud_began := Time.get_ticks_usec()
@@ -6215,6 +6220,57 @@ static func standing_words(title: String) -> String:
 	return 'say "yes" to take it: %s' % title if not title.is_empty() else ""
 
 
+## The HUD's words while the local player lies downed (544, ui's side): the
+## seconds left before they are gone for good, unless brought back.
+static func downed_words(seconds: int) -> String:
+	return "You are down: %d s" % maxi(seconds, 0)
+
+
+## The HUD's words while the local player brings [param name] back (544).
+static func channel_words(name: String, seconds: int) -> String:
+	return "bringing %s back: %d s" % [name, maxi(seconds, 0)]
+
+
+## How far a channel has run (0 to 1): from [param seen], the tick this view
+## first saw it, to [param until], at [param tick].
+static func channel_fraction(seen: int, until: int, tick: int) -> float:
+	return 1.0 if until <= seen else clampf(float(tick - seen) / float(until - seen), 0.0, 1.0)
+
+
+## The spawned entity whose node name is [param name] (a replicated
+## channel_of names a body so), or null.
+func _entity_named(name: String) -> GridEntity:
+	for entity in World.get_entities():
+		if entity.spawned and String(entity.name) == name:
+			return entity
+	return null
+
+
+## The channel's ring on the body being brought back (544, ui's side): the
+## first channeler in view (channel_of and channel_until are replicated),
+## the ring on its body, closing in as the channel runs; none, hidden.
+func _show_channel_ring() -> void:
+	if _client3d == null:
+		return
+	var tick := World.tick
+	for entity in World.get_entities():
+		if not entity.spawned or entity.channel_of.is_empty() or tick >= entity.channel_until:
+			continue
+		var body := _entity_named(entity.channel_of)
+		if body == null:
+			continue
+		var id := entity.get_instance_id()
+		var seen: Array = _channel_seen.get(id, [])
+		if seen.is_empty() or int(seen[1]) != entity.channel_until:
+			seen = [tick, entity.channel_until]
+			_channel_seen[id] = seen
+		_client3d.channel_ring(body.tile, channel_fraction(int(seen[0]), int(seen[1]), tick))
+		return
+	_client3d.channel_ring(Vector2i.ZERO, 0.0, false)
+	if not _channel_seen.is_empty():
+		_channel_seen.clear()
+
+
 ## The latest blow (_narrate_damage): who was struck and by whom, so a
 ## death right after it knows its killer (decision 332).
 var _blow_target: GridEntity = null
@@ -7824,6 +7880,12 @@ func _on_world_ticked(tick: int) -> void:
 			hp_text += "   hidden in the grass"  # Decision 515: the one cue that the cover works.
 		if not standing_title.is_empty():
 			hp_text += "   " + standing_words(standing_title)  # 536: an offer stands; "yes" (Y) takes it.
+		if World.is_downed(player):
+			hp_text += "   " + downed_words(ceili((player.downed_until - tick) * World.TICK_DT))  # 544, ui's side.
+		elif not player.channel_of.is_empty() and tick < player.channel_until:
+			var body := _entity_named(player.channel_of)
+			hp_text += "   " + channel_words(_display_name(body) if body != null else player.channel_of,
+					ceili((player.channel_until - tick) * World.TICK_DT))
 	_hud_tick = tick
 	hud.text = hp_text
 	if player != null and _connect_joining and connect_screen != null:
@@ -7845,6 +7907,7 @@ func _on_world_ticked(tick: int) -> void:
 	_run_test_chest(player)
 	_run_test_show(player)
 	_run_test_offer(player)
+	_run_test_channel(player)
 	if world_map_panel != null and world_map_panel.visible:
 		_refresh_world_map()
 	_first_talk_hint(player)
@@ -8985,6 +9048,27 @@ var _test_offer_asked := false
 var _test_offer_said_yes := false
 const TEST_OFFER_ASK := 5.0
 const TEST_OFFER_YES := 11.0
+## How long (seconds from the start) the offer state waits for the merchant before taking whoever is nearest.
+const TEST_OFFER_MERCHANT_WAIT := 75.0  # He is seated on the first world tick, about a minute in.
+## --test-show=channel: the companion laid downed, to be brought back once the player stands beside her.
+var _test_channel_body: GridEntity
+
+
+## --test-show=channel, each tick (544, ui's side): a step to a cell beside
+## the downed companion (a channel needs a neighbouring cell, not a
+## corner), then the channel, once.
+func _run_test_channel(player: Player) -> void:
+	if not is_instance_valid(_test_channel_body) or not Net.is_authority() or not World.is_downed(_test_channel_body):
+		return
+	var body := _test_channel_body
+	if World.can_melee(player.tile, body.tile):
+		if player.channel_of.is_empty():
+			World.try_channel(player, body, 8 * World.TICK_RATE)
+		return
+	for step: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+		if World.is_walkable(body.tile + step) and World.is_free(body.tile + step):
+			World.command_move(player, body.tile + step)
+			break
 
 
 func _run_test_offer(player: Player) -> void:
@@ -8992,13 +9076,18 @@ func _run_test_offer(player: Player) -> void:
 		return
 	if _test_offer_body == null:
 		var nearest: GridEntity = null
+		var merchant: GridEntity = null
 		for entity in World.get_entities():
+			if entity is Resident and ("Snagfin" in str(entity.get("person")) or "Snagfin" in str(entity.get("label"))):
+				merchant = entity  # The merchant: a shop offer whenever the counter holds a good (npc's 536).
 			if entity is Resident and (nearest == null
 					or World.distance(player.tile, entity.tile) < World.distance(player.tile, nearest.tile)):
 				nearest = entity
 		if nearest == null:
 			return
-		_test_offer_body = nearest
+		if merchant == null and Time.get_ticks_msec() / 1000.0 < TEST_OFFER_MERCHANT_WAIT:
+			return  # He is seated on a world tick after the town's people come: a moment's wait.
+		_test_offer_body = merchant if merchant != null else nearest
 		if "sick" in Net.test_show:
 			nearest.ailing = "a fever"  # The sick read's shot (515 amended): the hint says it.
 			_test_hint_thing = nearest
@@ -9018,7 +9107,9 @@ func _run_test_offer(player: Player) -> void:
 			return
 		_test_offer_asked = true
 		_test_offer_since = now
-		_send_chat("any work for me?")  # In earshot: addressed by nearness, as a player's line is.
+		if talk != null and not talk.pinned:
+			talk.toggle_pin()  # The exchange stays up for the shot.
+		_send_chat("what do you sell?" if "Snagfin" in str(body.get("person")) else "any work for me?")  # In earshot: addressed by nearness.
 	elif now - _test_offer_since >= 1.5 and standing_title.is_empty() and not _test_offer_said_yes:
 		standing_title = "(a test offer) Bring Bram home"  # Nothing stood with them: a sample, so the shot shows the HUD's line.
 	elif now - _test_offer_since >= TEST_OFFER_YES - TEST_OFFER_ASK and not _test_offer_said_yes:
@@ -9116,6 +9207,15 @@ func _run_test_show(player: Player) -> void:
 					options_panel._scroll.scroll_vertical = 2400)
 			"offer", "sick":
 				_test_offer_due = true  # Residents come with the town's sync: tried each tick.
+			"downed":
+				if Net.is_authority():
+					World.lay_downed(player, 30 * World.TICK_RATE)  # 544, ui's side: the countdown on the HUD.
+			"channel":
+				if Net.is_authority():
+					var pet := _own_companion()
+					if pet != null:
+						World.lay_downed(pet, 30 * World.TICK_RATE)
+						_test_channel_body = pet  # Then, each tick: step to a cell beside her and channel (the ring, the HUD's line).
 			"hint":
 				for entity in World.get_entities():
 					if entity is Cargo or entity is Chest:

@@ -1128,6 +1128,8 @@ var _door_states: Dictionary[Vector3i, Array] = {}
 ## Entity instance id -> its puppet.
 var _puppets: Dictionary[int, Node3D] = {}
 var _hover: MeshInstance3D
+## The channel's ring (544, ui's side), one, on the body being brought back.
+var _channel_ring: MeshInstance3D
 ## The outline's passes (the first; each the next's next_pass), the
 ## outlined puppet (null: none), and each body material's copy that marks
 ## the stencil, by the material.
@@ -1375,6 +1377,9 @@ func setup(terrain: Dictionary, centre := Vector2i.ZERO) -> void:
 	_hover = _make_flat(_make_square_outline(HOVER_HALF, HOVER_LINE), HOVER)
 	_hover.visible = false
 	add_child(_hover)
+	_channel_ring = _make_flat(_make_square_outline(HOVER_HALF, HOVER_LINE), Color(UiTheme.color("brass_bright"), 0.9))
+	_channel_ring.visible = false
+	add_child(_channel_ring)
 	var outline_shader := Shader.new()
 	outline_shader.code = OUTLINE_SHADER
 	var after: ShaderMaterial = null
@@ -2556,6 +2561,18 @@ func hover(tile: Vector2i, show: bool) -> void:
 	_hover.visible = show
 	if show:
 		_lay_on_ground(_hover, tile, ON_FLOOR)
+
+
+## The channel's ring (544, ui's side): on [param tile], under the body
+## being brought back, brass_bright, half again as wide at the start and
+## the cell's own size as [param fraction] (0 to 1) completes, the draw's
+## language (475); [param show] false hides it.
+func channel_ring(tile: Vector2i, fraction: float, show := true) -> void:
+	_channel_ring.visible = show
+	if show:
+		var k := 1.0 + 0.5 * (1.0 - clampf(fraction, 0.0, 1.0))
+		_channel_ring.scale = Vector3(k, 1.0, k)
+		_lay_on_ground(_channel_ring, tile, ON_FLOOR)
 
 
 ## A bow's draw read in the world (decision 475, ui's): the hover ring and

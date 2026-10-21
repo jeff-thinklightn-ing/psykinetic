@@ -28,6 +28,7 @@ func _ready() -> void:
 	_test_talk_no_panel()
 	_test_sim_reads()
 	_test_minimap_turn()
+	_test_revive_reads()
 	_test_screenshot_key()
 	_test_counter_panel()
 	_test_world_map()
@@ -390,6 +391,15 @@ func _test_screenshot_key() -> void:
 		"the name: zone, cell, hour, clock; nobody's name or id")
 	_check(Keys.DEFAULTS["screenshot"] == KEY_F12 and Keys.WORDS.has("screenshot"), "F12 by default, in the Options' key rows")
 	Net.screenshot_dir = ""  # The save itself is a windowed run's (--test-show=shot); headless has no picture to take.
+
+
+func _test_revive_reads() -> void:
+	print("== downed and brought back, read on the HUD (544, ui's side) ==")
+	_check(Main.downed_words(12) == "You are down: 12 s" and Main.downed_words(-3) == "You are down: 0 s", "the countdown's words")
+	_check(Main.channel_words("Wren", 3) == "bringing Wren back: 3 s", "the channeler's words, with the name the client shows")
+	_check(is_zero_approx(Main.channel_fraction(100, 140, 100)) and is_equal_approx(Main.channel_fraction(100, 140, 120), 0.5)
+		and is_equal_approx(Main.channel_fraction(100, 140, 150), 1.0) and is_equal_approx(Main.channel_fraction(100, 100, 100), 1.0),
+		"the ring's course: from first seen to the end, clamped")
 
 
 func _test_counter_panel() -> void:
