@@ -17272,3 +17272,58 @@ differently (a niche stays floor).
 
 tests/view_test (niches_from's checks; a generated barrow's niches in its
 terrain on floor, each drawn once in its variant with the lid).
+
+## 551, maps' side. A guide's routes: a leg's cells, a route round a camp, and the leg walk on slopes
+
+Companions' guide (551: a companion who knows a place leads her player
+there on the world's real ways) needs three things of WorldRoutes and
+Main; the coordinator routed them to maps, signatures agreed with
+companions.
+
+**WorldRoutes.leg_cells(leg, faction := OPEN) -> Array[Vector2i].** The
+cells of one leg of route() or route_round(), its "from" to its "to" both
+in, each a step can_step allows from the one before, along a shortest
+walk: the leg's own "cells" if it carries them, else _walk_cells (down the
+distance fields, or a field walked then where they are not in). A leg
+from a cell to itself is that cell. She keeps them and steps along them.
+
+**WorldRoutes.route_round(from_area, from_cell, to_area, to_cell, avoid,
+faction := OPEN) -> Array[Dictionary].** route()'s legs, each leg in an
+area of avoid (area name -> {cell: true}: a camp she knows) walked again
+by A* round those cells and the faction's held ground, there and then: no
+distance fields made for a one-off. Such a leg carries "cells" (leg_cells
+and along() follow them) and its own "steps". The crossings stay route()'s:
+it never takes another way to keep clear, which would need fields per
+avoided set. A leg's own start and end are never avoided (a portal inside
+the camp is passed through). [] if a leg cannot get round, and the guide
+falls back to route() (she goes through, or refuses). _steps_between's
+A* is now _a_star, which also notes where each cell was reached from.
+
+**Main.travel and a led pair.** travel(peer, ...) already takes a player
+and companion together (her tile null: beside him on arrival). Companions
+take the crossing in their Guide: standing at the leg's exit or beside it,
+her player within 3 cells in her zone, Main calls travel with the way's own
+data, deferred as the player's own path is (a link: to and to_spawn; an
+edge: {side, cell: exit + the side's step}), and sealed_open is asked for
+her player again. She never stands on a link cell, so she never blocks his
+step, and he still goes through by the usual path if he steps on it.
+Nothing in travel changes; maps' OK.
+
+**A fix to the existing route walk (206's layers, the leg walk).** _step_down
+matched a step down a distance field by a flat 1 or 1.5, but _flood pays a
+climb (Relief.pace, decision 525) and a ford (505) into its steps, so on a
+slope, a stair or a ford no neighbour matched and the walk stopped there:
+_walk_cells (held ground's cut, 206) ended a leg early, and along() left a
+group standing at the foot of the first climb until its leg was done
+(TradeRoutes' wagons, 504; raid groups). Now every walk pays one cost,
+_step_halves (climb added, the whole FORD_COST times into a ford: _relax's
+rule; _steps_between had paid the ford on the flat part only), and
+_step_down matches the step the field was walked by, from the next cell to
+this one. Wagons and raiders now move along a leg over hills and stairs
+instead of waiting at the foot and arriving at its end.
+
+tests/world_map_test: the r_room legs' cells (round the wall, 10.5 steps);
+a leg's cells up and down a slope at the leg's steps (the downhill walk
+stopped at its first cell before the fix); route_round round a camp
+(longer, no camp cell, along follows it), [] against a wall edge to edge,
+unchanged by a camp in another area.

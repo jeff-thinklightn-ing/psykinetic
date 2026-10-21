@@ -27,6 +27,7 @@ func _ready() -> void:
 	_test_routes()
 	_test_level_routes()
 	_test_territory_routes()
+	_test_guide_routes()
 	_test_closed()
 	await _test_view()
 
@@ -523,6 +524,71 @@ func _test_along(routes: WorldRoutes) -> void:
 	_check(at.call(13.0)["cell"] == Vector2i(2, 1), "1.5 steps into r_field: down the east edge's field, at (2, 1) (%s)" % [at.call(13.0)])
 	_check(at.call(16.5) == {"area": "r_east", "cell": Vector2i(1, 1), "leg": 2, "done": true}, "after every step and crossing (16.5): there, done")
 	_check(at.call(99.0)["done"] and routes.along([] as Array[Dictionary], 3.0).is_empty(), "further is still there; no route is nowhere")
+	var first := routes.leg_cells(legs[0])
+	_check(_is_walk(routes, "r_room", first, Vector2i(0, 0), Vector2i(4, 0), 10.5),
+		"the first leg's cells: (0, 0) round the wall to the link, real steps, 10.5 of them (decision 551; %s)" % [first])
+	_check(_is_walk(routes, "r_field", routes.leg_cells(legs[1]), Vector2i(0, 1), Vector2i(3, 1), 3.0), "the second's, gate to east edge")
+
+
+## Whether [param cells] walk [param area_name] from [param from] to
+## [param to], each a step can_step allows, costing [param steps] in all.
+func _is_walk(routes: WorldRoutes, area_name: String, cells: Array[Vector2i], from: Vector2i, to: Vector2i, steps: float) -> bool:
+	if cells.is_empty() or cells[0] != from or cells[-1] != to:
+		return false
+	var area: Dictionary = routes._areas[area_name]
+	var halves := 0
+	for i in range(1, cells.size()):
+		var direction := cells[i] - cells[i - 1]
+		if maxi(absi(direction.x), absi(direction.y)) != 1 or not WorldRoutes.can_step(area, cells[i - 1], direction):
+			return false
+		halves += WorldRoutes._step_halves(area, cells[i - 1], direction, 3 if direction.x != 0 and direction.y != 0 else 2)
+	return absf(halves / 2.0 - steps) < 0.001
+
+
+## A guide's routes (decision 551): a leg's cells up and down a slope (the
+## walk down a field once stopped at the first climb), and route_round
+## going round a camp, or [] when there is no way round.
+func _test_guide_routes() -> void:
+	print("guide routes")
+	var size := Vector2i(9, 3)
+	var field := PackedFloat32Array()
+	for y in size.y:
+		for x in size.x:
+			field.append(x * 0.3)
+	Level.register("g_hill", _block(size.x, size.y), null, {}, Relief.image(field, size))
+	var hill := WorldRoutes.new(WorldMap.build(["g_hill"] as Array[String]), false, false)
+	for ends: Array in [[Vector2i(0, 1), Vector2i(8, 1)], [Vector2i(8, 1), Vector2i(0, 1)]]:
+		var legs := hill.route("g_hill", ends[0], "g_hill", ends[1])
+		var cells := hill.leg_cells(legs[0]) if legs.size() == 1 else [] as Array[Vector2i]
+		_check(legs.size() == 1 and legs[0]["steps"] > 8.0 if ends[0].x == 0 else true, "uphill costs more than the flat (%s)" % [legs])
+		_check(legs.size() == 1 and _is_walk(hill, "g_hill", cells, ends[0], ends[1], legs[0]["steps"]),
+			"a leg's cells climb the whole slope, %s to %s, at the leg's steps (%s)" % [ends[0], ends[1], cells])
+	Level.register("g_open", _block(11, 5), null, {})
+	var open := WorldRoutes.new(WorldMap.build(["g_open"] as Array[String]), false, false)
+	var camp := {}
+	for y in range(1, 4):
+		for x in range(4, 7):
+			camp[Vector2i(x, y)] = true
+	var plain := open.route("g_open", Vector2i(0, 2), "g_open", Vector2i(10, 2))
+	var round_legs := open.route_round("g_open", Vector2i(0, 2), "g_open", Vector2i(10, 2), {"g_open": camp})
+	var walked: Array[Vector2i] = open.leg_cells(round_legs[0]) if round_legs.size() == 1 else [] as Array[Vector2i]
+	_check(round_legs.size() == 1 and _is_walk(open, "g_open", walked, Vector2i(0, 2), Vector2i(10, 2), round_legs[0]["steps"])
+		and not walked.any(func(cell: Vector2i) -> bool: return camp.has(cell)) and round_legs[0]["steps"] > plain[0]["steps"],
+		"route_round goes round the camp, a longer walk than straight through (%s)" % [walked])
+	if round_legs.size() == 1:
+		var at_start: Dictionary = open.along(round_legs, 0.0)
+		var midway: Dictionary = open.along(round_legs, round_legs[0]["steps"] / 2.0)
+		var at_end: Dictionary = open.along(round_legs, round_legs[0]["steps"])
+		_check(at_start["cell"] == Vector2i(0, 2) and walked.has(midway["cell"]) and midway["cell"] != Vector2i(0, 2)
+			and at_end["cell"] == Vector2i(10, 2) and at_end["done"], "along follows the walk round (%s)" % [midway])
+	var wall := {}
+	for y in 5:
+		wall[Vector2i(5, y)] = true
+	_check(open.route_round("g_open", Vector2i(0, 2), "g_open", Vector2i(10, 2), {"g_open": wall}).is_empty(),
+		"no way round a camp from edge to edge: []")
+	_check(open.route_round("g_open", Vector2i(0, 2), "g_open", Vector2i(10, 2), {"elsewhere": wall}).map(
+		func(leg: Dictionary) -> float: return leg["steps"]) == plain.map(func(leg: Dictionary) -> float: return leg["steps"]),
+		"a camp in another area changes nothing")
 
 
 ## t_mid (21 x 9 cells of floor) has a goblin camp at (10, 4), radius 2, a

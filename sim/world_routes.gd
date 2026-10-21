@@ -339,6 +339,53 @@ func along(legs: Array[Dictionary], cells: float, faction := OPEN) -> Dictionary
 	return {"area": last["area"], "cell": last["to"], "leg": legs.size() - 1, "done": true}
 
 
+## The cells of [param leg] (one of route()'s or route_round()'s, asked
+## for [param faction]) from its "from" to its "to", both in, each one real
+## step (can_step) from the one before, along a shortest walk: its own
+## "cells" if it carries them, else as the distance fields have it (a walk
+## made now where they are not in). For a guide walking her player there
+## (decision 551).
+func leg_cells(leg: Dictionary, faction := OPEN) -> Array[Vector2i]:
+	if leg.has("cells"):
+		var own: Array[Vector2i] = leg["cells"]
+		return own.duplicate()
+	return _walk_cells(_layers.get(faction, _layers[OPEN]), leg)
+
+
+## route() for [param faction], each leg in an area of [param avoid] (area
+## name -> {cell: true}: a camp a guide knows, decision 551) walked again
+## round those cells as well as the faction's held ground, by A* there and
+## then (no distance fields made); such a leg carries "cells" (its walk,
+## leg_cells and along() follow it) and its own "steps". The crossings are
+## route()'s: it never takes another way to keep clear. A leg's own start
+## and end are never avoided (a portal inside the camp is passed through).
+## [] if route() has no route or a leg cannot get round.
+func route_round(from_area: String, from_cell: Vector2i, to_area: String, to_cell: Vector2i, avoid: Dictionary, faction := OPEN) -> Array[Dictionary]:
+	var none: Array[Dictionary] = []
+	var legs := route(from_area, from_cell, to_area, to_cell, faction)
+	var layer: Layer = _layers.get(faction, _layers[OPEN])
+	for leg in legs:
+		var area_name: String = leg["area"]
+		var extra: Dictionary = avoid.get(area_name, {})
+		if extra.is_empty():
+			continue
+		var obstacles: Dictionary = layer.obstacles.get(area_name, {}).duplicate()
+		obstacles.merge(extra)
+		obstacles.erase(leg["from"])
+		obstacles.erase(leg["to"])
+		var came: Dictionary[Vector2i, Vector2i] = {}
+		var halves := _a_star(_areas[area_name], leg["from"], leg["to"], obstacles, came)
+		if halves < 0:
+			return none
+		var cells: Array[Vector2i] = [leg["to"]]
+		while cells[-1] != leg["from"]:
+			cells.append(came[cells[-1]])
+		cells.reverse()
+		leg["cells"] = cells
+		leg["steps"] = halves / 2.0
+	return legs
+
+
 ## The length in steps of the shortest walk from [param from] to each of
 ## [param targets] in [param area_name] (the ones it can reach), walking as
 ## World does: floor only, no wall edge (doors open), no corner cut past a
@@ -530,6 +577,9 @@ func _walk_cells(layer: Layer, leg: Dictionary) -> Array[Vector2i]:
 	var area: Dictionary = _areas[area_name]
 	var from: Vector2i = leg["from"]
 	var to: Vector2i = leg["to"]
+	if from == to:
+		var here: Array[Vector2i] = [from]
+		return here
 	var exit := _field(layer, _portal_id(area_name, to))
 	if _at(exit, area_name, from) >= 0.0:
 		return _down(area, exit, from)
@@ -689,6 +739,16 @@ func _cell_along(layer: Layer, leg: Dictionary, covered: float) -> Vector2i:
 	var area: Dictionary = _areas[area_name]
 	var from: Vector2i = leg["from"]
 	var to: Vector2i = leg["to"]
+	if leg.has("cells"):
+		# Walked for it (route_round): along its cells until covered is spent.
+		var cells: Array[Vector2i] = leg["cells"]
+		var spent := 0.0
+		for i in range(1, cells.size()):
+			var direction := cells[i] - cells[i - 1]
+			spent += _step_halves(area, cells[i - 1], direction, 3 if direction.x != 0 and direction.y != 0 else 2) / 2.0
+			if spent > covered + 0.001:
+				return cells[i - 1]
+		return cells[-1]
 	var exit := _field(layer, _portal_id(area_name, to))
 	if _at(exit, area_name, from) >= 0.0:
 		# Towards the exit: down its field until covered steps are spent.
@@ -715,7 +775,10 @@ func _descend(area: Dictionary, field: PackedFloat32Array, cell: Vector2i, down_
 
 
 ## The cell one real step from [param cell] down [param field] (one step
-## nearer its 0), or null at the bottom.
+## nearer its 0), or null at the bottom. The field was walked out from its
+## 0, so the step matched is the one from that cell to [param cell], at
+## its climb and ford cost as _flood paid it (decision 551: matching a
+## flat 1 or 1.5 stopped a walk at the first climb or ford).
 func _step_down(area: Dictionary, field: PackedFloat32Array, cell: Vector2i) -> Variant:
 	var size: Vector2i = area["size"]
 	var value := field[cell.y * size.x + cell.x]
@@ -725,9 +788,11 @@ func _step_down(area: Dictionary, field: PackedFloat32Array, cell: Vector2i) -> 
 		var next := cell + direction
 		if not Rect2i(Vector2i.ZERO, size).has_point(next):
 			continue
-		var step := DIAGONAL if direction.x != 0 and direction.y != 0 else 1.0
 		var there := field[next.y * size.x + next.x]
-		if there >= 0.0 and absf(there + step - value) < 0.001 and can_step(area, cell, direction):
+		if there < 0.0 or not can_step(area, next, -direction):
+			continue
+		var step := _step_halves(area, next, -direction, 3 if direction.x != 0 and direction.y != 0 else 2) / 2.0
+		if absf(there + step - value) < 0.001:
 			return next
 	return null
 
@@ -787,9 +852,17 @@ static func _flood(area: Dictionary, from: Vector2i, wanted: Dictionary, field: 
 ## towards [param to] and not the whole area round [param from] (a death's
 ## way to the nearest temple: decision 503).
 static func _steps_between(area: Dictionary, from: Vector2i, to: Vector2i, obstacles: Dictionary = {}) -> float:
+	var came: Dictionary[Vector2i, Vector2i] = {}
+	var halves := _a_star(area, from, to, obstacles, came)
+	return halves / 2.0 if halves >= 0 else -1.0
+
+
+## _steps_between's walk in half steps (-1 if none), each cell reached
+## noted in [param came] with the cell it was reached from.
+static func _a_star(area: Dictionary, from: Vector2i, to: Vector2i, obstacles: Dictionary, came: Dictionary[Vector2i, Vector2i]) -> int:
 	var floor_cells: Dictionary = area["floor"]
 	if not floor_cells.has(from) or obstacles.has(from) or not floor_cells.has(to) or obstacles.has(to):
-		return -1.0
+		return -1
 	var best: Dictionary[Vector2i, int] = {from: 0}
 	var buckets: Array[Array] = []
 	var guess := _octile(from, to)
@@ -806,21 +879,22 @@ static func _steps_between(area: Dictionary, from: Vector2i, to: Vector2i, obsta
 			if cost + _octile(cell, to) != guess:
 				continue  # Reached again more cheaply since it was put here.
 			if cell == to:
-				return cost / 2.0
+				return cost
 			for pair: Array in [[STRAIGHTS, 2], [DIAGONALS, 3]]:
 				for direction: Vector2i in pair[0]:
 					var next := cell + direction
-					var next_cost: int = cost + step_cost(area, next, pair[1]) + climb_cost(area, cell, direction, pair[1])
+					var next_cost: int = cost + _step_halves(area, cell, direction, pair[1])
 					if best.get(next, 1 << 30) <= next_cost or obstacles.has(next) or not can_step(area, cell, direction):
 						continue
 					best[next] = next_cost
+					came[next] = cell
 					var f: int = next_cost + _octile(next, to)
 					while buckets.size() <= f:
 						buckets.append([])
 					buckets[f].append(next)
 		buckets[guess] = []
 		guess += 1
-	return -1.0
+	return -1
 
 
 ## The octile distance in half steps (2 straight, 3 diagonal).
@@ -849,11 +923,18 @@ static func climb_cost(area: Dictionary, from: Vector2i, direction: Vector2i, ha
 	return roundi(half_steps * (Relief.pace(rise, direction.x != 0 and direction.y != 0) - 1.0))
 
 
+## What a step from [param from] by [param direction] costs, in half
+## steps, [param half_steps] on the flat (2 straight, 3 diagonal): its
+## climb added, the whole FORD_COST times into a ford. Every walk here
+## pays this, so a field's steps and a walk down it agree.
+static func _step_halves(area: Dictionary, from: Vector2i, direction: Vector2i, half_steps: int) -> int:
+	var cost := half_steps + climb_cost(area, from, direction, half_steps)
+	return cost * FORD_COST if area.get("fords", {}).has(from + direction) else cost
+
+
 static func _relax(area: Dictionary, cell: Vector2i, direction: Vector2i, cost: int, best: Dictionary[Vector2i, int], buckets: Array[Array], obstacles: Dictionary) -> void:
 	var to := cell + direction
-	cost += climb_cost(area, cell, direction, cost - best[cell])
-	if area.get("fords", {}).has(to):
-		cost += (cost - best[cell]) * (FORD_COST - 1)
+	cost = best[cell] + _step_halves(area, cell, direction, cost - best[cell])
 	if best.get(to, 1 << 30) <= cost or obstacles.has(to) or not can_step(area, cell, direction):
 		return
 	best[to] = cost
