@@ -18434,3 +18434,56 @@ the band, each point in the mesh at its _height_in, the ground beside
 meeting it. _test_relief's stream bed check now applies only where the
 field says water. Shots and A/B in C:\dev\review\water (ab-*.png). Client only,
 protocol unchanged, no new class_name.
+## 556. Ledges along a curve
+
+Step 3 of terrain's unsquaring design, after 553's water's edge (Jeff:
+"square rivers, square ledges"). The coordinator approved it, with the
+escarpment hills and the sample's ledge by its stairs as the checks and
+the castle as the level without relief.
+
+**The rim.** A ledge's rim ran along the cells' edges, in straight runs
+and right angles. Now each land cell under a cliff gets a cap: the higher
+ground carried out over it to a curve, with a face down from that curve.
+- A cell is under a cliff when a neighbour, side or corner, stands over
+  it: the neighbour's drawn corners are over this cell's where they meet,
+  and none is under.
+- The cap is where the distance to those higher cells is under the rim's
+  reach. The reach runs RIM_LEAST 0.12 to RIM_MOST 0.32 of a cell by a
+  noise (seed 556), so it never passes SHORE_BOUND 0.35. It eases to
+  nothing within RIM_TAPER 0.6 of a pinned corner: one where a cell round
+  it is not rim ground (a ramp, water, a building's floor, a rock, the
+  shore's finer cells, the map's edge), or where three heights meet.
+- Client3D._rim_band finds the caps; _rim_cap traces each with marching
+  squares on RIM_RES 8 samples a side.
+- A cell's middle is half a cell from its edges, so it is never under a
+  cap: puppets at the foot of a face stand clear of it. A ramp's sides
+  stay on the cells' edges.
+- The rim only stands out from the higher cells, never cuts into them, so
+  the ground's mesh is not cut. The cap's triangles are added to the
+  ground chunk at the higher cell's heights, lit by that cell
+  (_vertex_cells), so night and torches light them as the ground beside.
+- _add_cliffs lays the faces down the curve (_cliff_strip, one column a
+  segment) with cliff.gdshader, so 513 amended's night darkening and
+  549's cut-out apply as before. A cell edge whose cap covers it whole
+  (its first samples in all on the cap, past CLIFF_JITTER) no longer
+  draws its straight face. _cliff_edges still lists every cliff edge.
+- Where a puppet stands is still the cell's ground (_ground_height).
+  Client3D._drawn_height takes the caps in (_rim_top), and
+  hidden_by_ground (549) reads it, so a player at a curved face's foot is
+  hidden as at a straight one.
+- Scatter skips a point under a cap.
+- A level without relief (the castle) keeps its straight faces.
+
+**Cost**, map_bench A/B, 10 s at noon, alternated, two passes each:
+- frame time unchanged: hills 1.20 ms, the sample 1.57, the castle 3.07;
+- rebuild: the hills about 810 ms to about 960 (824 and 797 before, 971
+  and 944 after), the sample 31 to 54, the castle unchanged.
+- _add_cliffs takes about 400 ms of the hills' rebuild apart from 556,
+  worth a look of its own.
+
+tests/view_test _test_ledges: on the hills and the sample, caps found; no
+cap over a cell's middle; every cap sample within SHORE_BOUND of a cell
+over it; faces within their cells; capped cells side by side meet on
+their edge; the drawn height takes a cap in and a puppet's doesn't; the
+castle and the wilds without caps. Shots and A/B in C:\dev\review\ledges
+(ab-*.png). Client only, protocol unchanged, no new class_name.

@@ -45,6 +45,7 @@ func _ready() -> void:
 	_test_heights()
 	_test_hills()
 	_test_shore()
+	_test_ledges()
 	_test_water()
 	_test_streams()
 	_test_tall_grass()
@@ -2100,6 +2101,77 @@ func _test_shore() -> void:
 							gaps.append([cell, next, x, y])
 		_check(unmet.is_empty() and gaps.is_empty(),
 				"%s: each finer point drawn at its _height_in, the ground beside meeting it (unmet: %s; gaps: %s)" % [name, unmet.slice(0, 3), gaps.slice(0, 3)])
+	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+
+
+## The ledges' rims along a curve (decision 556): on relief a cap carries
+## the higher ground out over the cell under it to a curve within
+## SHORE_BOUND, never over a cell's middle, the faces down from it; the
+## caps of two cells meet on their edge; a level without relief keeps its
+## straight faces.
+func _test_ledges() -> void:
+	print("\n== ledges: rims along a curve on relief, within SHORE_BOUND, never over a cell's middle ==")
+	var row := Client3D.RIM_RES + 1
+	for name: String in ["hills", "sample", "castle", "wilds"]:
+		var level := Level.load_level(name)
+		_rig.rebuild(level["terrain"], level["centre"])
+		if not bool(level["terrain"].get("relief_given", false)):
+			_check(_rig._rim_caps.is_empty(),
+					"%s (no relief): no caps, its faces on the cells' edges (%d faces)" % [name, _rig._cliff_edges.size()])
+			continue
+		var middles := []
+		var astray := []
+		var faces := 0
+		var stray_faces := []
+		var samples := 0
+		for cell: Vector2i in _rig._rim_caps:
+			var cap: Dictionary = _rig._rim_caps[cell]
+			var tops: PackedFloat32Array = cap["tops"]
+			var over: Array[Vector2i] = cap["over"]
+			if tops[(row / 2) * row + row / 2] > -INF:
+				middles.append(cell)
+			for k in row * row:
+				if tops[k] == -INF:
+					continue
+				samples += 1
+				var point := Vector2(cell) + Vector2(k % row, k / row) / Client3D.RIM_RES - Vector2(0.5, 0.5)
+				if float(Client3D._rim_nearest(point, over)[1]) > Client3D.SHORE_BOUND:
+					astray.append([cell, point])
+			for segment: Array in cap["segments"]:
+				faces += 1
+				for end: Vector2 in [segment[0], segment[1]]:
+					var off := (end - Vector2(cell)).abs()
+					if off.x > 0.5001 or off.y > 0.5001:
+						stray_faces.append([cell, end])
+		_check(not _rig._rim_caps.is_empty() and samples > 0 and middles.is_empty() and astray.is_empty(),
+				"%s: %d cells capped (%d samples), none over a cell's middle (%s), all within %.2f of the cells over them (astray: %s)"
+				% [name, _rig._rim_caps.size(), samples, middles.slice(0, 3), Client3D.SHORE_BOUND, astray.slice(0, 3)])
+		_check(faces > 0 and stray_faces.is_empty(), "%s: %d faces down the rims' curves, each within its cell (stray: %s)" % [name, faces, stray_faces.slice(0, 3)])
+		# Two capped cells side by side meet on their edge: the same cap there.
+		var unmet := []
+		for cell: Vector2i in _rig._rim_caps:
+			for side: Vector2i in [Vector2i(1, 0), Vector2i(0, 1)]:
+				var next := cell + side
+				if not _rig._rim_caps.has(next):
+					continue
+				var mine: PackedFloat32Array = _rig._rim_caps[cell]["tops"]
+				var theirs: PackedFloat32Array = _rig._rim_caps[next]["tops"]
+				for t in row:
+					var a := (t * row + Client3D.RIM_RES) if side.x == 1 else (Client3D.RIM_RES * row + t)
+					var b := (t * row) if side.x == 1 else t
+					if (mine[a] == -INF) != (theirs[b] == -INF) or (mine[a] > -INF and absf(mine[a] - theirs[b]) > 0.001):
+						unmet.append([cell, next, t])
+						break
+		_check(unmet.is_empty(), "%s: capped cells side by side meet on their edge (unmet: %s)" % [name, unmet.slice(0, 4)])
+		# What the camera sees takes the caps in; where a puppet stands doesn't.
+		var shown := false
+		for cell: Vector2i in _rig._rim_caps:
+			var tops: PackedFloat32Array = _rig._rim_caps[cell]["tops"]
+			for k in row * row:
+				if tops[k] > -INF and not shown:
+					var point := Vector2(cell) + Vector2(k % row, k / row) / Client3D.RIM_RES - Vector2(0.5, 0.5)
+					shown = absf(_rig._drawn_height(point) - tops[k]) < 0.001 and _rig._ground_height(point) < tops[k] - 0.1
+		_check(shown, "%s: the drawn height takes a cap in, a puppet's doesn't" % name)
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
 

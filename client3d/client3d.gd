@@ -225,6 +225,13 @@ const STREAM_WIND := 0.2
 const STREAM_HALF := 0.42
 const SHORE_BOUND := 0.35
 const SHORE_WARP := 0.1
+## The ledges' rims (decision 556, _rim_band): sampled RIM_RES a side; each
+## stands out RIM_LEAST to RIM_MOST of a cell from the higher cells (never
+## past SHORE_BOUND), easing to none within RIM_TAPER of a pinned corner.
+const RIM_RES := 8
+const RIM_LEAST := 0.12
+const RIM_MOST := 0.32
+const RIM_TAPER := 0.6
 ## A bridge's pieces stand this far over the banks' height, so the water
 ## drawn under (WATER_LIFT up) never shows through the deck.
 const BRIDGE_LIFT := 0.04
@@ -1339,6 +1346,11 @@ var _shore_image: Image
 ## The shore's cells drawn finer (decision 553, _shore_band): each one's
 ## heights, (SHORE_RES + 1) squared row by row.
 var _shore_heights: Dictionary[Vector2i, PackedFloat32Array] = {}
+## The ledges' caps by the cell under them (decision 556, _rim_band), the
+## corners the rims keep to, and the noise along them.
+var _rim_caps: Dictionary[Vector2i, Dictionary] = {}
+var _rim_pins: Dictionary[Vector2i, bool] = {}
+var _rim_noise: FastNoiseLite
 ## How far each void cell outdoors is from the land, out to FOREST_REACH
 ## (_measure_forest); the ground's cells in index order, and where its
 ## forest ones (after floor and water) begin.
@@ -1860,7 +1872,7 @@ func hidden_by_ground(at: Vector3, pitch_degrees: float) -> bool:
 	var aim := at.y + RIDGE_AIM
 	var d := 0.75
 	while d <= RIDGE_REACH:
-		if _ground_height(Vector2(at.x, at.z) + back * d) > aim + d * rise:
+		if _drawn_height(Vector2(at.x, at.z) + back * d) > aim + d * rise:
 			return true
 		d += 0.25
 	return false
@@ -2253,6 +2265,23 @@ func mouse_grid() -> Vector2:
 ## height, or on a stair, the ramp's.
 func _ground_height(grid: Vector2) -> float:
 	return _height_in(Vector2i(roundi(grid.x), roundi(grid.y)), grid)
+
+
+## How high the ground is drawn at [param grid], a ledge's cap over it
+## (decision 556) taken in: what the camera sees, not where a puppet stands.
+func _drawn_height(grid: Vector2) -> float:
+	return maxf(_ground_height(grid), _rim_top(grid))
+
+
+## A ledge's cap's height over [param grid] (decision 556, its nearest
+## sample), -INF where no cap is.
+func _rim_top(grid: Vector2) -> float:
+	var cell := Vector2i(roundi(grid.x), roundi(grid.y))
+	if not _rim_caps.has(cell):
+		return -INF
+	var at := ((grid - Vector2(cell) + Vector2(0.5, 0.5)) * RIM_RES).round()
+	var tops: PackedFloat32Array = _rim_caps[cell]["tops"]
+	return tops[clampi(int(at.y), 0, RIM_RES) * (RIM_RES + 1) + clampi(int(at.x), 0, RIM_RES)]
 
 
 ## How high [param cell]'s ground is at [param point] (on it or its edge),
@@ -4096,6 +4125,8 @@ func _scatter_plan(chunk: Vector2i) -> Dictionary[String, Array]:
 			var count := floori(density[kind] + _roll(cell, 100 + salt))
 			for n in count:
 				var at := Vector2(cell) + Vector2(_roll(cell, 101 + salt + n * 7), _roll(cell, 102 + salt + n * 7)) - Vector2(0.5, 0.5)
+				if _rim_top(at) > -INF:
+					continue  # Under a ledge's cap (decision 556).
 				if not placed.has(kind):
 					placed[kind] = []
 				placed[kind].append([cell, at, n + salt, forest])
@@ -5072,6 +5103,8 @@ func _build_ground(kinds: Dictionary) -> void:
 	var ends := PackedInt32Array([0, 0, 0, 0])
 	# The shore's cells drawn finer, SHORE_RES a side (decision 553).
 	_shore_heights = _shore_band(cells, floor_count, water_end)
+	# The ledges' rims carried out over the cells under them (decision 556).
+	_rim_caps = _rim_band(cells, floor_count)
 	# A chunk's vertex for each corner (or a shore cell's finer point, in
 	# SHORE_RES units) and height (mm): one a side of a cliff.
 	var local: Dictionary[Vector3i, int] = {}
@@ -5132,6 +5165,10 @@ func _build_ground(kinds: Dictionary) -> void:
 					tops.append(255 if top else roundi(_crest(corner, level) * 255.0))
 				ends[c] = vertex
 			indices.append_array([ends[0], ends[1], ends[2], ends[1], ends[3], ends[2]])
+		# The ledges' caps (decision 556), over the cells under them.
+		for i in chunks[chunk]:
+			if _rim_caps.has(cells[i]):
+				_rim_cap_into(_rim_caps[cells[i]], positions, indices, feet, tops, chunk_index, byte_start, pair_cell, pair_vertex)
 		var custom := PackedByteArray()
 		custom.resize(positions.size() * 4)
 		_ground_bytes.resize(byte_start + positions.size() * _ground_stride)
@@ -5320,6 +5357,248 @@ func _shore_corner(corner: Vector2i, picked: Dictionary, floor_count: int, water
 	if pinned or not water or not land:
 		return Vector2(bed, bed)
 	return Vector2(minf(bed, _water_corner(corner) - SHORE_SINK), bed)
+
+
+## The ledges' rims along a curve (decision 556): each land cell under a
+## cliff (a neighbour, side or corner, standing over it: its drawn corners
+## over this one's where they meet, none under) gets a cap, the higher
+## ground carried out over it to a curve, and a face down from that curve
+## (_add_cliffs). The cap is where the distance to the higher cells is
+## under _rim_reach (RIM_LEAST to RIM_MOST by a noise, none by a pinned
+## corner), found on RIM_RES samples a side by marching squares, so a
+## cell's middle, half a cell from its edges, is never under one. Each cap:
+## "points" (its triangles' points), "heights" and "uppers" (each point's
+## height, and the ground index of the cell over it that lights it),
+## "segments" (the faces: [from, to, top, bottom, out]), "tops" (each
+## sample's cap height, -INF off the cap), "over" (the cells over it) and
+## "covers" (the sides toward them it covers whole, their faces undrawn).
+func _rim_band(cells: Array, floor_count: int) -> Dictionary[Vector2i, Dictionary]:
+	var band: Dictionary[Vector2i, Dictionary] = {}
+	_rim_pins.clear()
+	if not _relief_given or _glimpse:
+		return band
+	for i in floor_count:
+		var cell: Vector2i = cells[i]
+		if not _rim_ground(cell, floor_count):
+			continue
+		var own := _corner_heights(cell)
+		var uppers: Array[Vector2i] = []
+		for y in range(-1, 2):
+			for x in range(-1, 2):
+				var near := cell + Vector2i(x, y)
+				if near == cell or not _rim_ground(near, floor_count):
+					continue
+				var theirs := _corner_heights(near)
+				var over := false
+				var under := false
+				for c in 4:
+					var k := GROUND_CORNERS.find(cell + GROUND_CORNERS[c] - near)
+					if k >= 0:
+						over = over or theirs[k] > own[c] + Relief.EPSILON
+						under = under or theirs[k] < own[c] - Relief.EPSILON
+				if over and not under:
+					uppers.append(near)
+		if uppers.is_empty():
+			continue
+		var cap := _rim_cap(cell, uppers)
+		if not cap.is_empty():
+			band[cell] = cap
+	return band
+
+
+## Whether [param cell] is ground a rim may run over: land of the level's
+## floor, not water, a ramp, a rock, a building's floor or the shore's
+## finer cells.
+func _rim_ground(cell: Vector2i, floor_count: int) -> bool:
+	var index: int = _grounds.get(cell, -1)
+	return index >= 0 and index < floor_count and not _wet.has(cell) and not _bed_levels.has(cell) \
+			and not _ramp_heights.has(cell) and not _rocks.has(cell) and not _shore_heights.has(cell) \
+			and _floor_bytes_at(cell) == 0
+
+
+## Whether the rim keeps to the cells at ground corner [param corner]: a
+## cell round it is no rim ground (a ramp's side, the water, a building,
+## the map's edge), or three heights meet there.
+func _rim_pinned(corner: Vector2i) -> bool:
+	if _rim_pins.has(corner):
+		return _rim_pins[corner]
+	var pinned := false
+	var heights: Array[float] = []
+	for a in 4:
+		var cell := corner + SHORE_AROUND[a]
+		if not _rim_ground(cell, _ground_floor_end):
+			pinned = true
+			break
+		var level := _corner_heights(cell)[3 - a]
+		if not heights.any(func(h: float) -> bool: return absf(h - level) <= Relief.EPSILON):
+			heights.append(level)
+	pinned = pinned or heights.size() > 2
+	_rim_pins[corner] = pinned
+	return pinned
+
+
+## The pinned corners (_rim_pinned) within RIM_TAPER of [param cell], as
+## points.
+func _rim_pins_near(cell: Vector2i) -> PackedVector2Array:
+	var pins := PackedVector2Array()
+	for y in range(cell.y - 1, cell.y + 3):
+		for x in range(cell.x - 1, cell.x + 3):
+			if _rim_pinned(Vector2i(x, y)):
+				pins.append(Vector2(x, y) - Vector2(0.5, 0.5))
+	return pins
+
+
+## How far the rim stands out from the higher cells at [param point]:
+## RIM_LEAST to RIM_MOST by a noise along it, easing to none within
+## RIM_TAPER of a pinned corner (of [param pins]).
+func _rim_reach(point: Vector2, pins: PackedVector2Array) -> float:
+	var nearest := RIM_TAPER
+	for pin in pins:
+		nearest = minf(nearest, point.distance_to(pin))
+	if _rim_noise == null:
+		_rim_noise = FastNoiseLite.new()
+		_rim_noise.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+		_rim_noise.seed = 556
+		_rim_noise.frequency = 0.4
+		_rim_noise.fractal_type = FastNoiseLite.FRACTAL_NONE
+	var reach := lerpf(RIM_LEAST, RIM_MOST, _rim_noise.get_noise_2dv(point) * 0.5 + 0.5)
+	return reach * smoothstep(0.0, RIM_TAPER, nearest)
+
+
+## Of [param uppers], the cell nearest [param point], and how far it is.
+static func _rim_nearest(point: Vector2, uppers: Array[Vector2i]) -> Array:
+	var best := uppers[0]
+	var gap := INF
+	for upper in uppers:
+		var off := ((point - Vector2(upper)).abs() - Vector2(0.5, 0.5)).max(Vector2.ZERO)
+		if off.length() < gap:
+			gap = off.length()
+			best = upper
+	return [best, gap]
+
+
+## Under 0 on [param cell]'s cap: the distance to the nearest of
+## [param uppers] less the rim's reach there.
+func _rim_field(point: Vector2, uppers: Array[Vector2i], pins: PackedVector2Array) -> float:
+	return float(_rim_nearest(point, uppers)[1]) - _rim_reach(point, pins)
+
+
+## [param cell]'s cap under [param uppers] (see _rim_band), or none.
+func _rim_cap(cell: Vector2i, uppers: Array[Vector2i]) -> Dictionary:
+	var row := RIM_RES + 1
+	var pins := _rim_pins_near(cell)
+	var field := PackedFloat32Array()
+	field.resize(row * row)
+	var on := false
+	for y in row:
+		for x in row:
+			field[y * row + x] = _rim_field(Vector2(cell) + Vector2(x, y) / RIM_RES - Vector2(0.5, 0.5), uppers, pins)
+			on = on or field[y * row + x] < 0.0
+	if not on:
+		return {}
+	# The sides it covers whole: its samples a step in from a side under a
+	# cell over it all on the cap, past where the face on the cells' edge
+	# is pushed (CLIFF_JITTER): that face goes undrawn.
+	var covers: Array[Vector2i] = []
+	for side: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+		if not uppers.has(cell + side):
+			continue
+		var whole := true
+		for t in row:
+			var x := t if side.x == 0 else (RIM_RES - 1 if side.x > 0 else 1)
+			var y := t if side.y == 0 else (RIM_RES - 1 if side.y > 0 else 1)
+			whole = whole and field[y * row + x] < 0.0
+		if whole:
+			covers.append(side)
+	var points := PackedVector2Array()
+	var heights := PackedFloat32Array()
+	var lit := PackedInt32Array()
+	var segments := []
+	var tops := PackedFloat32Array()
+	tops.resize(row * row)
+	# Each point's cell over it and height there, worked out once: a point
+	# is shared by the squares round it.
+	var known: Dictionary[Vector2, Vector2] = {}
+	var over_at := func(point: Vector2) -> Vector2:
+		if not known.has(point):
+			var upper: Vector2i = _rim_nearest(point, uppers)[0]
+			known[point] = Vector2(_height_in(upper, point), _grounds[upper])
+		return known[point]
+	var top_at := func(point: Vector2) -> float:
+		return over_at.call(point).x
+	for k in row * row:
+		var point := Vector2(cell) + Vector2(k % row, k / row) / RIM_RES - Vector2(0.5, 0.5)
+		tops[k] = top_at.call(point) if field[k] < 0.0 else -INF
+	var ring: Array[Vector2i] = [Vector2i(0, 0), Vector2i(1, 0), Vector2i(1, 1), Vector2i(0, 1)]
+	for y in RIM_RES:
+		for x in RIM_RES:
+			# Marching squares: the square's corners on the cap, and where its
+			# sides cross the rim, in order round it.
+			var shape := PackedVector2Array()
+			var crossings := PackedVector2Array()
+			for i in 4:
+				var a := Vector2i(x, y) + ring[i]
+				var b := Vector2i(x, y) + ring[(i + 1) % 4]
+				var fa := field[a.y * row + a.x]
+				var fb := field[b.y * row + b.x]
+				var pa := Vector2(cell) + Vector2(a) / RIM_RES - Vector2(0.5, 0.5)
+				var pb := Vector2(cell) + Vector2(b) / RIM_RES - Vector2(0.5, 0.5)
+				if fa < 0.0:
+					shape.append(pa)
+				if (fa < 0.0) != (fb < 0.0):
+					var crossing := pa.lerp(pb, fa / (fa - fb))
+					shape.append(crossing)
+					crossings.append(crossing)
+			for t in range(1, shape.size() - 1):
+				var triangle := [shape[0], shape[t], shape[t + 1]]
+				# Wound as the ground's, up: (p2 - p0) x (p1 - p0) points up.
+				var up := Vector3(triangle[2].x - triangle[0].x, 0.0, triangle[2].y - triangle[0].y).cross(
+						Vector3(triangle[1].x - triangle[0].x, 0.0, triangle[1].y - triangle[0].y))
+				if up.y < 0.0:
+					triangle = [triangle[0], triangle[2], triangle[1]]
+				for point: Vector2 in triangle:
+					var over: Vector2 = over_at.call(point)
+					points.append(point)
+					heights.append(over.x)
+					lit.append(int(over.y))
+			for s in range(0, crossings.size() - 1, 2):
+				var from := crossings[s]
+				var to := crossings[s + 1]
+				var top := Vector2(top_at.call(from), top_at.call(to))
+				var bottom := Vector2(_height_in(cell, from), _height_in(cell, to))
+				if (top - bottom).length() <= Relief.EPSILON or from.distance_to(to) < 0.001:
+					continue
+				# Facing away from the cells over it, where the field rises.
+				var along := (to - from).normalized()
+				var out := Vector2(-along.y, along.x)
+				var middle := (from + to) * 0.5
+				if _rim_field(middle + out * 0.02, uppers, pins) < _rim_field(middle - out * 0.02, uppers, pins):
+					out = -out
+				segments.append([from, to, top, bottom, Vector3(out.x, 0.0, out.y)])
+	return {"points": points, "heights": heights, "uppers": lit, "segments": segments, "tops": tops, "over": uppers, "covers": covers}
+
+
+## [param cap]'s triangles into a chunk's arrays (decision 556): points of
+## their own, each lit by the cell over it.
+func _rim_cap_into(cap: Dictionary, positions: PackedVector3Array, indices: PackedInt32Array,
+		feet: PackedByteArray, tops: PackedByteArray, chunk_index: int, byte_start: int,
+		pair_cell: PackedInt32Array, pair_vertex: PackedInt32Array) -> void:
+	var points: PackedVector2Array = cap["points"]
+	var heights: PackedFloat32Array = cap["heights"]
+	var lit: PackedInt32Array = cap["uppers"]
+	for k in points.size():
+		var vertex := positions.size()
+		positions.append(Vector3(points[k].x, heights[k], points[k].y))
+		var global := _vertex_chunk.size()
+		_vertex_chunk.append(chunk_index)
+		_vertex_byte.append(byte_start + vertex * _ground_stride + _ground_custom)
+		_vertex_cells.append_array([lit[k], -1, -1, -1])
+		pair_cell.append(lit[k])
+		pair_vertex.append(global)
+		feet.append(0)
+		var corner := Vector2i(roundi(points[k].x + 0.5), roundi(points[k].y + 0.5))
+		tops.append(roundi(_crest(corner, heights[k]) * 255.0))
+		indices.append(vertex)
 
 
 ## The cells round a corner, the corner being each one's corner 3 - a.
@@ -6063,12 +6342,23 @@ func _add_cliffs() -> void:
 			if (top - bottom).length() <= Relief.EPSILON:
 				continue
 			_cliff_edges.append([cell, direction])
+			# Behind a ledge's face along its rim's curve (decision 556).
+			if _rim_caps.has(next) and (_rim_caps[next]["covers"] as Array).has(-direction):
+				continue
 			var chunk := Vector2i(floori(cell.x / float(FLOOR_CHUNK)), floori(cell.y / float(FLOOR_CHUNK)))
 			if not faces.has(chunk):
 				faces[chunk] = [PackedVector3Array(), PackedVector3Array(), PackedColorArray()]
 			var from := Vector2(cell + GROUND_CORNERS[mine[0]]) - Vector2(0.5, 0.5)
 			var to := Vector2(cell + GROUND_CORNERS[mine[1]]) - Vector2(0.5, 0.5)
 			_cliff_strip(faces[chunk], from, to, top, bottom, Vector3(direction.x, 0.0, direction.y))
+	# The ledges' faces down from their rims' curves (decision 556), in
+	# front of the faces on the cells' edges, which the caps cover.
+	for cell: Vector2i in _rim_caps:
+		var chunk := Vector2i(floori(cell.x / float(FLOOR_CHUNK)), floori(cell.y / float(FLOOR_CHUNK)))
+		if not faces.has(chunk):
+			faces[chunk] = [PackedVector3Array(), PackedVector3Array(), PackedColorArray()]
+		for segment: Array in _rim_caps[cell]["segments"]:
+			_cliff_strip(faces[chunk], segment[0], segment[1], segment[2], segment[3], segment[4], 1)
 	# Their vertex colours, rough, both sides, under the sky's light as the
 	# ground (513 amended); seen through where they hide the player
 	# (cliff.gdshader, decision 549).
@@ -6093,16 +6383,17 @@ func _add_cliffs() -> void:
 
 ## One cliff face into [param into] ([positions, normals, colours]): along
 ## the edge [param from] to [param to], from [param top] (heights at each
-## end) down to [param bottom], facing [param out].
-func _cliff_strip(into: Array, from: Vector2, to: Vector2, top: Vector2, bottom: Vector2, out: Vector3) -> void:
+## end) down to [param bottom], facing [param out], [param across] columns.
+func _cliff_strip(into: Array, from: Vector2, to: Vector2, top: Vector2, bottom: Vector2, out: Vector3,
+		across := CLIFF_ACROSS) -> void:
 	var drop := maxf(top.x - bottom.x, top.y - bottom.y)
 	var rows := maxi(1, ceili(drop / CLIFF_ROW))
 	var points: Array[PackedVector3Array] = []
 	for j in rows + 1:
 		var row := PackedVector3Array()
 		var v := j / float(rows)
-		for i in CLIFF_ACROSS + 1:
-			var u := i / float(CLIFF_ACROSS)
+		for i in across + 1:
+			var u := i / float(across)
 			var at := from.lerp(to, u)
 			var low := lerpf(bottom.x, bottom.y, u)
 			var high := lerpf(top.x, top.y, u)
@@ -6115,8 +6406,9 @@ func _cliff_strip(into: Array, from: Vector2, to: Vector2, top: Vector2, bottom:
 	var positions: PackedVector3Array = into[0]
 	var normals: PackedVector3Array = into[1]
 	var colours: PackedColorArray = into[2]
+	var rock := swatch(CLIFF_ROCK.x, CLIFF_ROCK.y)
 	for j in rows:
-		for i in CLIFF_ACROSS:
+		for i in across:
 			var a := points[j][i]
 			var b := points[j][i + 1]
 			var c := points[j + 1][i]
@@ -6135,7 +6427,7 @@ func _cliff_strip(into: Array, from: Vector2, to: Vector2, top: Vector2, bottom:
 				var shade := lerpf(0.8, 1.15, _roll(Vector2i(roundi(middle.x * 16.0), roundi(middle.z * 16.0)), roundi(middle.y * 16.0)))
 				# Darker toward the foot.
 				shade *= lerpf(0.72, 1.0, clampf(inverse_lerp(minf(bottom.x, bottom.y), maxf(top.x, top.y), middle.y), 0.0, 1.0))
-				var colour := Color(swatch(CLIFF_ROCK.x, CLIFF_ROCK.y) * shade, 1.0)
+				var colour := Color(rock * shade, 1.0)
 				positions.append_array([p0, p1, p2])
 				normals.append_array([normal, normal, normal])
 				colours.append_array([colour, colour, colour])
