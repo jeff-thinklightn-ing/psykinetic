@@ -186,6 +186,12 @@ func set_obstacles(faction: String, area_name: String, cells: Dictionary) -> voi
 	_start([_job(layer, area_name)])
 
 
+## Whether these routes make distance fields at all (some are made
+## without: their walks are always the way they are).
+func makes_fields() -> bool:
+	return _make_fields
+
+
 ## Whether every layer's distance fields are in for every area (only
 ## [param faction]'s layer, if given): from then on no route walks an area
 ## to find a way through it.

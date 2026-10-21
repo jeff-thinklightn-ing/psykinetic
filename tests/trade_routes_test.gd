@@ -37,6 +37,7 @@ func _ready() -> void:
 	_test_closed_way()
 	_test_saved()
 	_test_shown()
+	_test_before_fields()
 	_trade.finish()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -77,6 +78,35 @@ func _fresh(saved: Dictionary) -> void:
 	_events.clear()
 	for pair: Array in [["caravan_left", "left"], ["caravan_arrived", "arrived"], ["caravan_raided", "raided"], ["caravan_lost", "lost"]]:
 		_trade.connect(pair[0], _note.bind(pair[1]))
+
+
+## 504 amended: before the routes' distance fields are in, no route is
+## made (and none cached empty), a caravan on its way keeps still rather
+## than being lost, and its days are not told; once in, all as before.
+func _test_before_fields() -> void:
+	print("== before the routes' fields are in ==")
+	_fresh({})
+	_holdings.take(CAMP, Factions.NOBODY)
+	var id := _trade.send(ROUTE, {"items": [], "goods": {"cloth": 1}, "members": []}, TOWN)
+	_fresh({"caravans": {}})
+	var fields := {"in": false}  # A lambda holds a copy of a local, not the local.
+	_trade.fields_in = func() -> bool: return fields["in"]
+	_check(_trade.routes().is_empty() and _trade.route(ROUTE).is_empty() and _trade.eta(ROUTE) == -1, "no route yet, nothing walked")
+	_trade.fields_in = Callable()
+	var sent := _trade.send(ROUTE, {"items": [], "goods": {"cloth": 1}, "members": []}, TOWN)
+	_trade.fields_in = func() -> bool: return fields["in"]
+	_trade._dirty()
+	_tick(3)
+	_check(_trade.caravans.has(sent) and float(_trade.caravans[sent]["walked"]) == 0.0 and not "lost" in _kinds() and _trade.days_left(sent) == -1.0,
+		"a caravan on its way keeps still, not lost (%s)" % [_kinds()])
+	_check(_trade.routes().is_empty(), "the route made before is let go with the rest, and not made again yet")
+	fields["in"] = true
+	_check(_trade.routes().size() == 1, "in: the route is made")
+	_tick()
+	_check(_trade.caravans.has(sent) and float(_trade.caravans[sent]["walked"]) > 0.0 and _trade.days_left(sent) > 0.0,
+		"and the caravan walks on (%s, %s)" % [_trade.caravans.get(sent, {}).get("walked"), _kinds()])
+	_trade.fields_in = Callable()
+	_holdings.take(CAMP, "goblins")
 
 
 func _note(a: Variant, b: Variant, c: Variant = null, d: Variant = null, what := "") -> void:
@@ -167,6 +197,7 @@ func _test_lost() -> void:
 	var names: Array[String] = ["tr_town", "tr_mid", "tr_far"]
 	var map := WorldMap.build(names)
 	_trade.use_map(map)
+	_trade.routes_now().wait()
 	_check(_trade.routes().is_empty(), "no way to the market: no route")
 	_register(true)
 	_trade.use_map(WorldMap.build(names))
@@ -181,6 +212,7 @@ func _test_closed_way() -> void:
 	_register(false)
 	var names: Array[String] = ["tr_town", "tr_mid", "tr_far"]
 	_trade.use_map(WorldMap.build(names))
+	_trade.routes_now().wait()  # Till they are in, it keeps still (504 amended).
 	_tick()
 	_check(not _trade.caravans.has(id) and _events[-1][0] == "lost" and _events[-1][3] == "no way", "lost: no way on (%s)" % [_events.back()])
 	_register(true)

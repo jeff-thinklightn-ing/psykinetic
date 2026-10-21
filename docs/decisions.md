@@ -14176,6 +14176,22 @@ to the end it is bound for (TradeRoutes.days_left: the steps left at
 steps_per_world_tick a world tick, rounded to 0.01). A new field in an
 existing message: it rides PROTOCOL_REVISION 21 with 513.
 
+Amended (perf's first-tick stall, the coordinator): the server's first
+world tick asked TradeRoutes.routes() (Main._tell_world, WorldNews) before
+WorldRoutes' background distance fields were in, so each walk across an
+area fell back to 503's pairwise A*: 2.3 s over the wilds, 2-6 s in all
+under load, once a boot, and clients joining then failed to connect.
+Chosen: TradeRoutes waits for them (routes_in: the faction-less layer
+ready, or routes that make no fields), not a warm at boot: the fields are
+already being made in the background from the boot, and a warm would only
+move the same walk to before the server listens. Until they are in no
+route is made (and none cached empty), route() answers {} (eta -1, no
+caravan sent that tick), and a caravan on its way keeps still a world
+tick rather than being lost for want of a way not made yet. WorldRoutes
+gains makes_fields(). perf's repro (a server booting with a client
+joining): no fallback walk, no slow tick, the client in. trade_routes_test
+_test_before_fields; the map-change tests wait for the new routes.
+
 ## 498 amended: a maker's apprentice
 
 Jeff (2026-10-18): "makers have more expense - raw material and

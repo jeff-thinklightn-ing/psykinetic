@@ -92,6 +92,20 @@ static func _read_rules() -> Dictionary:
 	return routes_rules if routes_rules is Dictionary else {}
 
 
+## Whether the routes are in to walk by (504 amended; perf's first-tick
+## stall): their faction-less layer's distance fields made. Before that a
+## walk across an area falls back to A* (503), 2-6 s over the wilds on a
+## server's first world tick, so nothing here walks: no route yet (made
+## when they are in, not cached empty), and caravans keep still a tick.
+## Tests may set [member fields_in] instead.
+var fields_in := Callable()
+func routes_in() -> bool:
+	if fields_in.is_valid():
+		return bool(fields_in.call())
+	var routes := routes_now()
+	return routes == null or not routes.makes_fields() or routes.is_ready(WorldRoutes.OPEN)
+
+
 func routes_now() -> WorldRoutes:
 	if get_routes.is_valid():
 		return get_routes.call()
@@ -158,7 +172,7 @@ func route(route_id: String) -> Dictionary:
 
 
 func _make_routes() -> void:
-	if _routes_made:
+	if _routes_made or not routes_in():
 		return
 	_routes_made = true
 	var town_ids: Array = towns.to_dict().keys() if towns != null else []
@@ -311,6 +325,8 @@ func days_left(id: String) -> float:
 
 
 func _caravan_way(id: String) -> Dictionary:
+	if not _ways.has(id) and not routes_in():
+		return {}
 	if not _ways.has(id):
 		var caravan := caravans[id]
 		_ways[id] = _way(caravan["from"], caravan["to"])
@@ -319,6 +335,8 @@ func _caravan_way(id: String) -> Dictionary:
 
 ## Every caravan's step, its raids, its arrival.
 func world_tick() -> void:
+	if not routes_in():
+		return  # Not lost for want of a way not made yet: a tick's wait.
 	for id: String in caravans.keys():
 		if caravans.has(id):
 			_move(id)

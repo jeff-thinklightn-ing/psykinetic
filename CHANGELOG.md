@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Joining a server in its first seconds after a restart no longer fails: the trade roads wait for the world's routes instead of working them out the slow way on the first tick (504).
 - Fixed an error printed when a level was built, from the orc and kobold's painted bodies (529 amended).
 
 ## v0.1.160
