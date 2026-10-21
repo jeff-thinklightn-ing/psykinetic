@@ -24,7 +24,11 @@ const BARROW_ANCHORS := [
 	{"rect": [16, 15, 8, 6], "name": "altar", "walled": ["east", "south"]},
 	{"rect": [24, 17, 7, 1], "name": "passage", "walled": ["north", "south"]},
 	{"rect": [31, 14, 7, 7], "name": "lair", "walled": ["north", "east"]},
-	{"rect": [38, 16, 2, 3], "name": "shortcut", "walled": ["north", "east", "south"]}]
+	{"rect": [38, 16, 2, 3], "name": "shortcut", "walled": ["north", "east", "south"]},
+	{"rect": [12, 16, 2, 2], "name": "niche", "walled": ["north", "west", "south"]}]
+## The barrow's legend: enemy-ai's kinds (547, 548), the barrow's own level.json
+## colours, never Level.LEGEND's.
+const BARROW_LEGEND := {"monster_skeleton": "#d8d0b0", "monster_skeleton_guard": "#988c64", "monster_robber": "#8a5a2a", "monster_draugr": "#5a4636"}
 
 
 func _ready() -> void:
@@ -136,8 +140,9 @@ static func sample_halls(style: String) -> Dictionary:
 ## the altar room with the altar (a chest) and the hidden passage leaving
 ## its east wall through a door to the lair, the lair with the draugr's
 ## stand-in (a brute) and the spawn point from the temple, and the
-## shortcut's nook off the lair's east side with its sealed link. Each
-## anchor is walled but for the side the tombs come in by.
+## shortcut's nook off the lair's east side with its sealed link, and Pip's
+## niche off the altar room's west side (npc's, 542 amended). Each anchor is
+## walled but for the side the tombs come in by.
 static func sample_barrow() -> Dictionary:
 	var rows: Array[PackedStringArray] = []
 	for py in BARROW_SIZE.y * 2 - 1:
@@ -171,13 +176,16 @@ static func sample_barrow() -> Dictionary:
 	for row in rows:
 		lines.append("".join(row))
 	var layout := Level.image_from_rows(lines, {Vector2i(22, 1): "link", Vector2i(21, 2): "start", Vector2i(19, 17): "chest",
-		Vector2i(34, 17): "monster_brute", Vector2i(39, 17): "link"})
-	var config := {"name": "Sample barrow", "walls": "stone", "floors": "stone", "starts": [[21, 2]],
+		Vector2i(17, 15): "monster_skeleton_guard", Vector2i(22, 15): "monster_skeleton_guard", Vector2i(17, 20): "monster_skeleton_guard",
+		Vector2i(34, 17): "monster_draugr", Vector2i(31, 20): "chest", Vector2i(39, 17): "link"}, {"legend": BARROW_LEGEND})
+	var config := {"name": "Sample barrow", "walls": "stone", "floors": "stone", "starts": [[21, 2]], "legend": BARROW_LEGEND,
 		"spawn_points": {"from_wilds": [22, 2], "from_temple": [38, 17]},
 		"links": [{"at": [22, 1], "to_map": "wilds", "to_spawn": "from_barrow"},
 			{"at": [39, 17], "to_map": "wilds", "to_spawn": "from_barrow_shortcut", "sealed": "draugr"}],
-		"entities": [{"at": [19, 17], "name": "Altar", "props": {"slots": ["", "", "", ""]}}, {"at": [34, 17], "name": "Draugr"}],
+		"places": {"niche": {"at": [12, 16], "kind": "other", "radius": 1, "name": "a niche in the wall"}},
+		"entities": [{"at": [19, 17], "name": "Altar", "props": {"slots": ["", "", "", ""]}}, {"at": [34, 17], "name": "Draugr"},
+			{"at": [31, 20], "name": "Runner's pack", "props": {"slots": ["", "", "", ""]}}],
 		"regenerate": {"generator": "labyrinth", "style": "barrow", "every_days": 3, "anchors": BARROW_ANCHORS, "entrance": "entrance",
 			"rooms": {"count": [9, 12], "size": [[3, 3], [6, 5]]}, "loops": 0.15,
-			"monsters": {"imp": 6, "sneak": 3}, "near": {"sneak": "altar"}, "chests": 4}}
+			"monsters": {"skeleton": 6, "robber": 3}, "near": {"robber": "altar"}, "chests": 4}}
 	return {"layout": layout, "config": config}

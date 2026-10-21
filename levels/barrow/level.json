@@ -60,6 +60,21 @@
 				17
 			],
 			"name": "Draugr"
+		},
+		{
+			"at": [
+				31,
+				20
+			],
+			"name": "Runner's pack",
+			"props": {
+				"slots": [
+					"",
+					"",
+					"",
+					""
+				]
+			}
 		}
 	],
 	"regenerate": {
@@ -112,6 +127,15 @@
 					3
 				],
 				"name": "shortcut"
+			},
+			{
+				"rect": [
+					12,
+					16,
+					2,
+					2
+				],
+				"name": "niche"
 			}
 		],
 		"rooms": {
@@ -132,12 +156,29 @@
 		},
 		"loops": 0.15,
 		"monsters": {
-			"imp": 6,
-			"sneak": 3
+			"skeleton": 6,
+			"robber": 3
 		},
 		"near": {
-			"sneak": "altar"
+			"robber": "altar"
 		},
 		"chests": 4
+	},
+	"legend": {
+		"monster_skeleton": "#d8d0b0",
+		"monster_skeleton_guard": "#988c64",
+		"monster_robber": "#8a5a2a",
+		"monster_draugr": "#5a4636"
+	},
+	"places": {
+		"niche": {
+			"at": [
+				12,
+				16
+			],
+			"kind": "other",
+			"radius": 1,
+			"name": "a niche in the wall"
+		}
 	}
 }

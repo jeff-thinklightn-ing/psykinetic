@@ -50,9 +50,7 @@ const HALLS := 2
 const TORCH_EVERY := 8
 ## How far a crooked way leans toward where it goes.
 const LEAN := 0.65
-## Barrow: the depth (a share of the farthest reach) where the shallow
-## band ends and where the middle one does.
-const BANDS: Array[float] = [0.34, 0.67]
+## Barrow: the depth bands are Regen.BANDS, shared with the graves it writes.
 ## Barrow: niches off a shallow or middle room, at most.
 const NICHES := 3
 
@@ -116,7 +114,7 @@ static func _depth_of(depth: Dictionary, point: Vector2i) -> float:
 ## The band [param point] lies in: 0 shallow, 1 middle, 2 deep.
 static func _band_of(depth: Dictionary, point: Vector2i) -> int:
 	var d := _depth_of(depth, point)
-	return 0 if d < BANDS[0] else (1 if d < BANDS[1] else 2)
+	return 0 if d < Regen.BANDS[0] else (1 if d < Regen.BANDS[1] else 2)
 
 
 ## [param cells] deepest first (ties by cell), a set order to draw from.

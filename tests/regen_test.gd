@@ -155,6 +155,11 @@ func _test_generator() -> void:
 	var again := Regen.generate("rg_halls", 1)
 	_check(again["seed"] == first["seed"] and again["layout"].get_data() == first["layout"].get_data(),
 		"the same seed gives the same map (seed %d)" % first["seed"])
+	var graves: Array = first["config"].get("graves", [])
+	var well_formed := func(grave: Variant) -> bool:
+		return grave is Array and grave.size() == 3 and int(grave[2]) in [0, 1, 2] and not Level.in_anchors(first["anchors"], Vector2i(int(grave[0]), int(grave[1])))
+	_check(graves.size() > 4 and graves.all(well_formed),
+		"the maze's dead ends are its graves, [x, y, band], none in an anchor (%d)" % graves.size())
 	_check(first["seed"] != second["seed"], "another generation, another seed")
 	var level := Level.parse(first["layout"], null, config)
 	var imps: Array = level["entities"].filter(func(spec: Dictionary) -> bool: return spec.get("kind", "") == "imp" or str(spec["name"]).begins_with("Imp"))

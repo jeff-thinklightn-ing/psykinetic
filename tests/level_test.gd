@@ -864,8 +864,14 @@ func _test_barrow_level() -> void:
 	var barrow := Level.load_level("barrow")
 	_check(barrow["display_name"] == "The Barrow" and barrow["size"] == Vector2i(44, 36) and barrow["warnings"].is_empty(),
 		"The Barrow, 44 x 36, parses with no warning (%s)" % [barrow["warnings"]])
-	_check(Regen.marked("barrow") and Regen.config_of("barrow")["anchors"].size() == 5 and Regen.config_of("barrow")["style"] == "barrow",
-		"marked to regenerate in the barrow style, five anchors")
+	_check(Regen.marked("barrow") and Regen.config_of("barrow")["anchors"].size() == 6 and Regen.config_of("barrow")["style"] == "barrow",
+		"marked to regenerate in the barrow style, six anchors")
+	var kinds := {}
+	for spec: Dictionary in barrow["entities"]:
+		var kind := str(spec.get("kind", spec["name"].rstrip("0123456789").to_lower()))
+		kinds[kind] = int(kinds.get(kind, 0)) + 1
+	_check(kinds.get("skeleton_guard", 0) == 3 and kinds.get("draugr", 0) == 1 and kinds.get("altar", 0) == 1 and kinds.get("runner's pack", 0) == 1 and barrow["places"].has("niche"),
+		"three skeleton guards in the altar room, the draugr in his lair, the altar and the runner's pack, Pip's niche (%s)" % [kinds])
 	_check(barrow["links"].size() == 2 and barrow["links"][1]["sealed"] == "draugr" and barrow["links"][1]["to_spawn"] == "from_barrow_shortcut"
 		and barrow["spawn_points"].has("from_wilds") and barrow["spawn_points"].has("from_temple"),
 		"the way up and the sealed shortcut, with the spawn points the wilds come in by")

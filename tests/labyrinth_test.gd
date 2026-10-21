@@ -37,6 +37,7 @@ func _test_block() -> void:
 		and read["loops"] == 0.2 and read["chests"] == 3 and read["crates"] == 4 and read["monsters"] == {"imp": 6, "brute": 2, "sneak": 2}
 		and warnings.is_empty(), "style, rooms, loops, chests and crates come through beside the rest (%s)" % [read.keys()])
 	_check(Regen.marked("lab_dwarven") and Regen.config_of("lab_dwarven")["anchors"].size() == 4, "the sample halls regenerate, four anchors")
+	_check(Regen.config_of("lab_barrow")["anchors"].size() == 6 and Regen.config_of("lab_barrow")["near"] == {"robber": "altar"}, "the sample barrow regenerates, six anchors, the robbers near the altar")
 
 
 func _test_style(style: String) -> void:
@@ -151,7 +152,7 @@ func _test_barrow() -> void:
 				outside_differ += 1
 			if a.walkable(cell):
 				floor_cells.append(cell)
-	_check(inside_same, "inside the five anchors both generations are the template: the passage's door, the altar, the sealed link")
+	_check(inside_same, "inside the six anchors both generations are the template: the passage's door, the altar, the guards, the draugr, the sealed link, Pip's niche")
 	_check(outside_differ > 50 and floor_cells.size() > 120, "the tombs between differ (%d cells) and fill the rock (%d floor cells)" % [outside_differ, floor_cells.size()])
 	_check(Regen.connected(a, anchors) and Regen.connected(b, anchors), "every anchor reaches every other in both")
 	_check(_cut_off(a, Vector2i(22, 2)).is_empty() and _cut_off(b, Vector2i(22, 2)).is_empty(),
@@ -181,27 +182,58 @@ func _test_barrow() -> void:
 	var kinds := {}
 	var sums := {}
 	var altar := Vector2i(20, 18)
-	var sneak_to_altar := 0.0
-	var imp_to_altar := 0.0
+	var robber_to_altar := 0.0
+	var skeleton_to_altar := 0.0
 	for spec: Dictionary in level["entities"]:
 		var kind := str(spec.get("kind", spec["name"].rstrip("0123456789").to_lower()))
 		kinds[kind] = int(kinds.get(kind, 0)) + 1
 		sums[kind] = float(sums.get(kind, 0.0)) + depth.call(spec["tile"])
 		var to_altar: int = absi(spec["tile"].x - altar.x) + absi(spec["tile"].y - altar.y)
-		if kind == "sneak":
-			sneak_to_altar += to_altar
-		elif kind == "imp":
-			imp_to_altar += to_altar
-	_check(kinds.get("imp", 0) == 6 and kinds.get("sneak", 0) == 3 and kinds.get("chest", 0) == 4 and kinds.get("altar", 0) == 1 and kinds.get("brute", 0) == 1,
-		"six imps, three sneaks and four chests laid; the altar and the draugr's stand-in, a brute, kept (%s)" % [kinds])
-	if kinds.get("imp", 0) == 6 and kinds.get("sneak", 0) == 3 and kinds.get("chest", 0) == 4:
-		_check(sums["chest"] / 4.0 > mean_floor and sums["imp"] / 6.0 > mean_floor,
-			"the grave goods and the imps lie deeper than the floor's mean depth (%.1f, %.1f over %.1f)" % [sums["chest"] / 4.0, sums["imp"] / 6.0, mean_floor])
-		_check(sneak_to_altar / 3.0 < imp_to_altar / 6.0, "the sneaks, sent near the altar, stand closer to it than the imps (%.1f against %.1f)" % [sneak_to_altar / 3.0, imp_to_altar / 6.0])
-	_check(level["warnings"].is_empty() and level["links"].size() == 2 and level["links"][1]["sealed"] == "draugr" and level["spawn_points"].size() == 2,
-		"no warnings; both links kept, the shortcut's sealed, and the spawn points (%s)" % [level["warnings"]])
+		if kind == "robber":
+			robber_to_altar += to_altar
+		elif kind == "skeleton":
+			skeleton_to_altar += to_altar
+	_check(kinds.get("skeleton", 0) == 6 and kinds.get("robber", 0) == 3 and kinds.get("chest", 0) == 4 and kinds.get("altar", 0) == 1
+		and kinds.get("skeleton_guard", 0) == 3 and kinds.get("draugr", 0) == 1 and kinds.get("runner's pack", 0) == 1,
+		"six skeletons, three robbers and four chests laid; the altar, three guards, the draugr and the runner's pack kept (%s)" % [kinds])
+	if kinds.get("skeleton", 0) == 6 and kinds.get("robber", 0) == 3 and kinds.get("chest", 0) == 4:
+		_check(sums["chest"] / 4.0 > mean_floor and sums["skeleton"] / 6.0 > mean_floor,
+			"the grave goods and the skeletons lie deeper than the floor's mean depth (%.1f, %.1f over %.1f)" % [sums["chest"] / 4.0, sums["skeleton"] / 6.0, mean_floor])
+		_check(robber_to_altar / 3.0 < skeleton_to_altar / 6.0, "the robbers, sent near the altar, stand closer to it than the skeletons (%.1f against %.1f)" % [robber_to_altar / 3.0, skeleton_to_altar / 6.0])
+	_check(level["warnings"].is_empty() and level["links"].size() == 2 and level["links"][1]["sealed"] == "draugr" and level["spawn_points"].size() == 2
+		and level["places"].has("niche"), "no warnings; both links kept, the shortcut's sealed, the spawn points and Pip's niche place (%s)" % [level["warnings"]])
 	var again := Regen.generate("lab_barrow", 1)
 	_check(again["layout"].get_data() == first["layout"].get_data(), "the same seed gives the same barrow")
+	# The graves (542 amended): every dead end outside the anchors, bar the
+	# chests, with its band.
+	var graves: Array = config.get("graves", [])
+	var dead_ends := 0
+	var chests_in := 0
+	var bands_ok := true
+	for cell in floor_cells:
+		var open := 0
+		for direction: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+			if a.walkable(cell + direction) and a.edge(Terrain.edge_key(cell, direction)) != "wall":
+				open += 1
+		if open == 1 and a.cell(cell) != "chest":
+			dead_ends += 1
+	for grave: Array in graves:
+		var cell := Vector2i(int(grave[0]), int(grave[1]))
+		if a.cell(cell) == "chest" or Level.in_anchors(anchors, cell):
+			chests_in += 1
+		var band_wanted := 0 if depth.call(cell) < 19 else (1 if depth.call(cell) < 37 else 2)
+		if int(grave[2]) != band_wanted:
+			bands_ok = false
+	_check(graves.size() >= 6 and graves.size() == dead_ends and chests_in == 0 and bands_ok,
+		"the generated config lists every dead end outside the anchors as a grave with its band, none on a chest (%d graves, %d dead ends)" % [graves.size(), dead_ends])
+	var niches: Array = config.get("niches", [])
+	var niches_ok := not niches.is_empty()
+	for niche: Array in niches:
+		var cell := Vector2i(int(niche[0]), int(niche[1]))
+		var mouth := Vector2i(int(niche[2]), int(niche[3]))
+		if not a.walkable(cell + mouth) or a.walkable(cell - mouth) or int(niche[4]) < 1 or int(niche[4]) > 3:
+			niches_ok = false
+	_check(niches_ok and niches.size() <= graves.size(), "the wall niches among them carry the way out of the wall and a variant 1 to 3 (%d)" % niches.size())
 
 
 func _test_sheet() -> void:

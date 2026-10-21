@@ -16547,6 +16547,31 @@ stays a second guard: even switched on, a test run on the shared
 overlay writes nothing (Regen.may_write). level_test (the level, the
 mark, a generation, the switch and the console). layout.png is imported as an
 Image (its .import committed). Protocol unchanged, no new class_name.
+
+Amended (2026-10-20; enemy-ai's crypt design, 547 and 548, economy and
+npc's, art-kit's slots, each the coordinator's approval): the generated
+level.json carries "graves": [[x, y, band], ...] (Regen.graves_of), one
+per dead-end floor cell outside the anchors, the tomb niches and the
+blind ways' ends alike, none with a chest on it, the band 0, 1 or 2 by
+the cell's depth from the "entrance" anchor over the map's farthest
+reach (Regen.BANDS, the barrow style's bands moved there), so each
+walking skeleton is given a grave of its own in a shallower band and
+lies down there; and "niches": [[x, y, dx, dy, variant], ...]
+(Regen.niches_of), the wall niches among the graves, open on one side
+alone, with the way out of the wall into the room and a variant 1 to 3
+by band (plundered, bones with goods, old wrapped), for the client to
+stand art-kit's prop.burial_niche in (no legend colour: a niche is
+floor to the sim). The template takes enemy-ai's kinds by the level's
+own "legend" (never Level.LEGEND's, so no protocol change): the
+stand-ins swapped, six skeletons and three robbers near the altar in
+the block, three skeleton_guard markers in the altar anchor, the
+Draugr entity on a monster_draugr marker. npc's two kept spots: Pip's
+niche, a 2 x 2 anchor off the altar room's west side with the place
+barrow/niche (kind other), where his lost body stands, and a chest
+named Runner's pack at (31, 20) in the lair anchor. The mound's
+building (art-kit's building.mound, 5 x 5, its door on the link) is
+maps' wilds edit. labyrinth_test, regen_test and level_test check the
+graves, the niches, the kinds and the anchors.
 ## 538. A screenshot key, for Jeff's feedback
 
 Jeff (2026-10-19, through the coordinator): "also a folder for screenshot

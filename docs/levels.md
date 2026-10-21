@@ -483,6 +483,20 @@ the barrow stays its template, its anchors in the rock. A test that wants
 generations switches `Net.regenerate` on and points `Level.overlay_dir` at
 its own scratch folder, as regen_test does.
 
+A generated level.json also carries (decision 542 amended) `"graves":
+[[x, y, band], ...]`, one per dead-end floor cell outside the anchors (the
+tomb niches and the blind ways' ends), none with a chest on it, the band 0,
+1 or 2 by its depth from the `"entrance"` anchor (`Regen.BANDS`, the barrow
+style's own bands), so enemy-ai's walking skeletons are each given a grave
+in a shallower band to go home to; and `"niches": [[x, y, dx, dy,
+variant], ...]`, the wall niches among the graves (open on one side alone)
+with the way out of the wall into the room and a variant 1 to 3 by band, for
+art-kit's `prop.burial_niche` to stand in them. The barrow's template holds
+enemy-ai's kinds by the level's own `"legend"` colours (skeleton, robber,
+three skeleton guards in the altar room, the draugr in his lair), Pip's niche
+(a 2 x 2 anchor off the altar room with the place `barrow/niche`) and the
+runner's pack (a chest in the lair's corner), npc's.
+
 When it shifts: on the slow world tick (every `World.WORLD_TICK_STEPS`), a
 level whose `every_days` have gone by since its last generation is laid
 again, only while its zone is asleep (nobody in it, nobody dead there

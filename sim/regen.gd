@@ -15,6 +15,11 @@ const TRIES := 8
 ## How a thing lost outside the anchors is ended in the ItemBook.
 const LOST := "in the shifting halls"
 const GENERATORS := "res://sim/level_gen/"
+## The depth bands of a generated level (a share of the farthest reach from
+## the "entrance" anchor): where the shallow band ends and where the middle
+## one does. The labyrinth's barrow style lays its tombs by them (541) and
+## graves_of names each grave's band by them (542 amended).
+const BANDS: Array[float] = [0.34, 0.67]
 
 
 ## The levels that regenerate and each one's block (config_of), read once
@@ -151,10 +156,79 @@ static func generate(level_name: String, generation: int) -> Dictionary:
 		if not connected(map, anchors):
 			continue
 		var height: Image = map.to_height_image() if made["height"] != null or not map.heights.is_empty() else null
-		return {"layout": map.to_image(), "height": height, "config": generated_config(made["config"], anchors, generation),
-			"seed": seed, "tries": attempt + 1, "anchors": anchors}
+		var generated := generated_config(made["config"], anchors, generation)
+		generated["graves"] = graves_of(map, config)
+		generated["niches"] = niches_of(map, config, generated["graves"])
+		return {"layout": map.to_image(), "height": height, "config": generated, "seed": seed, "tries": attempt + 1, "anchors": anchors}
 	push_warning("[regen] %s: no map of %d tries joined every anchor; the last one stands" % [level_name, TRIES])
 	return {}
+
+
+## The graves of a generated [param map] (542 amended, enemy-ai's crypt
+## design: a walking skeleton is given a grave of its own in a shallower
+## band): [[x, y, band], ...], one per dead-end floor cell outside the
+## anchors (one walkable neighbour: the tomb niches and the blind ways'
+## ends alike), none with a chest on it, in cell order; the band 0, 1 or 2
+## by the cell's distance from the "entrance" anchor's centre (the first
+## anchor unless [param config] names one) over the farthest the map
+## reaches from it (BANDS). Written into the generated level.json as
+## "graves".
+static func graves_of(map: LevelMap, config: Dictionary) -> Array:
+	var out: Array = []
+	var anchors: Array = config.get("anchors", [])
+	if anchors.is_empty():
+		return out
+	var entrance: Dictionary = anchors[0]
+	for anchor: Dictionary in anchors:
+		if str(anchor.get("name", "")) == str(config.get("entrance", "")):
+			entrance = anchor
+	var rect: Rect2i = entrance["rect"]
+	var centre := rect.position + rect.size / 2
+	var far := 1
+	for corner: Vector2i in [Vector2i.ZERO, Vector2i(map.size.x - 1, 0), Vector2i(0, map.size.y - 1), map.size - Vector2i.ONE]:
+		far = maxi(far, absi(centre.x - corner.x) + absi(centre.y - corner.y))
+	for y in map.size.y:
+		for x in map.size.x:
+			var cell := Vector2i(x, y)
+			if not map.walkable(cell) or map.cell(cell) == "chest" or Level.in_anchors(anchors, cell):
+				continue
+			var open := 0
+			for direction: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+				var next := cell + direction
+				if map.in_bounds(next) and map.walkable(next) and map.edge(Terrain.edge_key(cell, direction)) != "wall":
+					open += 1
+			if open != 1:
+				continue
+			var depth := clampf(float(absi(centre.x - x) + absi(centre.y - y)) / float(far), 0.0, 1.0)
+			out.append([x, y, 0 if depth < BANDS[0] else (1 if depth < BANDS[1] else 2)])
+	return out
+
+
+## The burial niches of a generated [param map] for art-kit's prop.burial_niche
+## (542 amended): of the [param graves], those that are a wall niche, an
+## alcove open on one side alone (a blind way's end turns a corner and is
+## none), as [[x, y, dx, dy, variant], ...]: (dx, dy) the way out of the
+## wall into the room, the variant 1 to 3 by the band (the town's
+## plundered tombs, the old bones with their goods, the oldest wrapped).
+## Written into the generated level.json as "niches"; the client places
+## the slot by it.
+static func niches_of(map: LevelMap, _config: Dictionary, graves: Array) -> Array:
+	var out: Array = []
+	for grave: Array in graves:
+		var cell := Vector2i(int(grave[0]), int(grave[1]))
+		var mouth := Vector2i.ZERO
+		var open := 0
+		for direction: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+			var next := cell + direction
+			if map.in_bounds(next) and map.walkable(next) and map.edge(Terrain.edge_key(cell, direction)) != "wall":
+				open += 1
+				mouth = direction
+		if open != 1:
+			continue
+		# The mouth leads straight on into the room, not round a corner: the
+		# cell beyond it is floor too, or the mouth cell has floor beside it.
+		out.append([cell.x, cell.y, mouth.x, mouth.y, int(grave[2]) + 1])
+	return out
 
 
 ## Whether every anchor's floor reaches every other's on [param map], on
