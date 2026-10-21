@@ -1639,6 +1639,7 @@ func _test_hails() -> void:
 	Resident.hail_undone(World.production, "rs-mara", pid, str(undone["hails"]["said"].back()))
 	undone = Townsfolk.card_of(World.production, "rs-mara")
 	_check(not Resident.hailed_today(undone, pid, today) and undone["hails"]["said"].size() == said_before - 1, "a hail not said gives back the day's mark and its text")
+	_check(Resident.hail_cue("rs-mara", STORE, pid, "Bo", World.production, now, "", Offers.ctx, [], false).is_empty(), "greetings capped for the day: nothing, when a greeting was all there was")
 	Resident.hail_done(World.production, "rs-mara", pid, {"kind": "greeting", "text": "Jeff is a stranger to you; you greet them as the town does a newcomer."}, today, sky)
 	Townsfolk._remember(STORE, "Odo saw the wagon come home", "rs-mara", true, now)
 	_check(Resident.hail_cue("rs-mara", STORE, pid, "Jeff", World.production, now, "").is_empty(), "their own event line is not news to them")
@@ -1718,6 +1719,26 @@ func _test_hails() -> void:
 	trigger = str(_main._resident_asks[0]["ask"].get("trigger", "")) if not _main._resident_asks.is_empty() else ""
 	_check(_main._resident_asks.size() == 1 and trigger.begins_with("hail: ruling"), "free again: the next thing she has to say, the ruling (%s)" % trigger)
 	_main._resident_asks.clear()
+	# The greeting cap (the coordinator, after the soak): three a player a day from the whole town.
+	var capped := Townsfolk.card_of(World.production, "rs-mara")
+	capped["hails"]["to"].erase(pid)
+	capped["hails"]["said"].append("I heard the lawspeaker rule today that a wagon was struck on the road to the market, because two saw it.")
+	World.production.set_card("rs-mara", capped)
+	_main._hail_tried.clear()
+	_main._hail_heard.clear()
+	_main._hail_at.clear()
+	_main._hail_greetings[pid] = {"day": today, "n": 3}
+	_main._hails_tick()
+	_check(_main._resident_asks.is_empty(), "three greeted this player today: a fourth resident with only a greeting says nothing")
+	_main._hail_greetings[pid] = {"day": today - 1, "n": 3}
+	_main._hail_tried.clear()
+	_main._hail_at.clear()
+	_main._hails_tick()
+	trigger = str(_main._resident_asks[0]["ask"].get("trigger", "")) if not _main._resident_asks.is_empty() else ""
+	_check(_main._resident_asks.size() == 1 and trigger.begins_with("hail: greeting") and _main._hail_greetings[pid] == {"day": today, "n": 1},
+		"a new day: greeted, and counted (%s)" % trigger)
+	_main._resident_asks.clear()
+	_main._hail_greetings.clear()
 	Net.message_received.disconnect(heard)
 	_main._resident_mind = null
 	_main._hail_at.clear()

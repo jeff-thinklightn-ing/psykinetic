@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Townsfolk speak first: greeted, not mobbed (554 amended): on your first day three residents greet you, not every one you pass; the rest keep their greetings and say something else if they have it. Server only.
 - Townsfolk speak first, tuned again (554 amended): a clear sky is nothing to remark on, and a greeting lost to a slow answer is tried again later in the day. Server only.
 ## v0.1.162
 

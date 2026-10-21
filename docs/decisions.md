@@ -18109,7 +18109,13 @@ the sky is a cue only with weather in it or snow on the ground
 the cue that drew the narrating lines ("your bones remember"). And from
 the day after: a hail the mind did not answer (timed out, "not said")
 gives its marks back (Resident.hail_undone and Main._hail_heard), so the
-town's one news line of a day is not lost to one slow answer. What the day
+town's one news line of a day is not lost to one slow answer. And the
+coordinator's ruling on the soak's page (Jeff's to move): twelve
+greetings on a first day is a chorus, so greetings by standing are
+capped at hail.greetings_a_day (3) a player a day from the whole town,
+the first three residents met (Main._hail_greetings; hail_cue's
+greeting_ok), the other cues under their own limits as before: a
+newcomer is greeted, not mobbed. What the day
 also showed, left as it is and told to the coordinator: the news, the
 ruling and the plea come back as her own echo of the cue, flat but true;
 the greeting and the sky are paraphrased, and the sky's lines are the

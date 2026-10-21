@@ -229,6 +229,7 @@ var _blow_at: Dictionary = {}
 var _mind_last_ticks := 0
 var _hail_tried: Dictionary = {}
 var _hail_heard: Dictionary = {}  # player id -> {cue text: day}: no two residents tell one player the same thing in a day
+var _hail_greetings: Dictionary = {}  # player id -> {day, n}: greetings by standing a player heard today, capped at hail.greetings_a_day
 ## Talk with no panel (decision 536): the offer standing for each player,
 ## player id -> {worker, id, title, at, zone}: what a resident last spoke to
 ## them, taken by a yes, a name or an amount said back; one per player, not
@@ -5934,6 +5935,8 @@ func _resident_answered(out: Dictionary, answer: Dictionary, error: String) -> v
 			Resident.hail_undone(World.production, body.worker_id, player_id, cue_text)
 			if _hail_heard.has(player_id):
 				_hail_heard[player_id].erase(cue_text)
+			if str(ask.get("hail", "")) == "greeting" and _hail_greetings.has(player_id):
+				_hail_greetings[player_id]["n"] = maxi(int(_hail_greetings[player_id].get("n", 1)) - 1, 0)
 		return
 	Transcript.record(body.person, body.person, line)
 	if not aside.is_empty():
@@ -8083,10 +8086,17 @@ func _hails_tick() -> void:
 			for text: Variant in heard.keys():
 				if int(heard[text]) != day:
 					heard.erase(text)
-			var cue := Resident.hail_cue(body.worker_id, body.town, player.player_id, _display_name(player), World.production, now, sky, Offers.ctx, heard.keys())
+			var greeted: Dictionary = _hail_greetings.get_or_add(player.player_id, {"day": day, "n": 0})
+			if int(greeted.get("day", -1)) != day:
+				greeted["day"] = day
+				greeted["n"] = 0
+			var greeting_ok := int(greeted["n"]) < int(rules.get("greetings_a_day", 3))
+			var cue := Resident.hail_cue(body.worker_id, body.town, player.player_id, _display_name(player), World.production, now, sky, Offers.ctx, heard.keys(), greeting_ok)
 			if cue.is_empty():
 				_hail_tried[tried] = World.tick
 				continue
+			if str(cue.get("kind", "")) == "greeting":
+				greeted["n"] = int(greeted["n"]) + 1
 			heard[str(cue.get("text", ""))] = day
 			Resident.hail_done(World.production, body.worker_id, player.player_id, cue, day, sky)
 			_write_resident_card(body)

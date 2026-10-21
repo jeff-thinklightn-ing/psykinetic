@@ -544,9 +544,12 @@ static func hailed_today(card: Dictionary, player_id: String, day: int) -> bool:
 ## DayNight.describe's sentence) when it has changed since they last spoke
 ## of it, a greeting by standing. A cue said to anyone before (the card's
 ## said) is skipped, and a shared one (SHARED_CUES) this player heard today
-## from anyone ([param heard], Main's). {kind, text}, {} for nothing to say.
+## from anyone ([param heard], Main's); no greeting when [param greeting_ok]
+## is false (Main's cap of hail.greetings_a_day a player a day from the
+## whole town, the coordinator's: a newcomer is greeted, not mobbed).
+## {kind, text}, {} for nothing to say.
 static func hail_cue(worker_id: String, town: String, player_id: String, player_name: String, production: Production, now: int, sky: String,
-		given: Dictionary = Offers.ctx, heard: Array = []) -> Dictionary:
+		given: Dictionary = Offers.ctx, heard: Array = [], greeting_ok := true) -> Dictionary:
 	var card := Townsfolk.card_of(production, worker_id)
 	if card.is_empty():
 		return {}
@@ -582,7 +585,7 @@ static func hail_cue(worker_id: String, town: String, player_id: String, player_
 	if not sky.is_empty() and str(hails.get("sky", "")) != sky:
 		cues.append({"kind": "sky", "text": _sentence(sky)})
 	var word := Standing.words(card, player_id)
-	if HAIL_GREETINGS.has(word):
+	if greeting_ok and HAIL_GREETINGS.has(word):
 		cues.append({"kind": "greeting", "text": HAIL_GREETINGS[word] % player_name})
 	for cue: Dictionary in cues:
 		if said.has(cue["text"]):
