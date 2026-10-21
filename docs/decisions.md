@@ -18184,3 +18184,31 @@ part 1, what each step changes. Part 2 (555 amended) adds the new events.
   leading nowhere, a monster not after them left be, a load refused, food
   and a gift taken, fond as before, devoted closer. Server and wire, no new
   class_name.
+
+## 555 amended: what her player does moves her bond
+
+Part 2 of 555: the new deeds beside 444's (rescued +4, gift +1, fed +1,
+bandaged +1, day +1 up to close, stood_by +1, kept_from -1, struck -1).
+Each is a Standing.bump naming what her player did, in companion_traits
+"bond" (drafts for Jeff):
+- blessed +2: the draugr laid to rest together (Main.bless, her blessed
+  beside her player): "laid the draugr to rest with you".
+- cleared +1: a place taken from a side hostile to the town by one that is
+  not (Holdings.place_taken), with her and her player in its area: "cleared
+  <the place> with you". Jeff: "areas affect loyalty".
+- left_alone -1: she goes down (World.entity_downed) or dies with her
+  player out of her hearing, or gone: "left you to fall alone". Downed
+  and then bled out with them still away counts once.
+- let_bleed -2: downed, she bleeds out (cause &"bled") with her player
+  within hearing, blessed with uses left: "let you bleed out".
+- grave -1: grave goods put on her by her player (World.item_given) while
+  her superstition is grave_superstition or more and she is short of
+  devoted: "made you carry grave goods". Below close she refuses them
+  (555's turns_down), so this is the close companion's cost. It is no gift.
+- warned -1: her player takes her into the area she refused that day as
+  unsafe (551 phase 2's refusal keeps the worst danger's area), once a
+  refusal: "took you where you said it wasn't safe".
+- Unpaid days wait: the game has no companion pay (economy and Jeff).
+- companion_test _test_loyalty: left alone, let bleed, warned once and
+  wary after it; cleared, and not by the Blood Rot (where the test room has
+  a place). Server only, no protocol change beyond 555's, no new class_name.

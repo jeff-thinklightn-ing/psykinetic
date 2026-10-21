@@ -1786,6 +1786,37 @@ func _test_loyalty() -> void:
 	_check(pet.bond_step == "devoted" and pet.heel.start == 2, "devoted: she keeps closer (%d)" % pet.heel.start)
 	World.set_slots(pet, [])
 	World.set_slots(owner, [])
+	# What her player did moves it (555 amended); each names the deed.
+	record.companion["standing"] = {Net.player_id: {"score": 0, "why": [], "since": World.steps}}
+	var score := func() -> int: return Standing.score(record.companion, Net.player_id)
+	var newest := func() -> String: return Main.mood_why_of(record.companion, Net.player_id, "you")
+	var near_tile := owner.tile
+	var away := _far_cell(pet.tile, Companion.HEARING_RANGE + 1, Companion.HEARING_RANGE + 6)
+	if away != Vector2i(-1, -1):
+		_put(owner, away)
+		_main._bond_fell(pet, &"attack")
+		_check(score.call() == -1 and newest.call() == "you left her to fall alone", "fell with her player out of hearing: left alone (%d, %s)" % [score.call(), newest.call()])
+		_put(owner, near_tile)
+	else:
+		_check(false, "a cell out of her hearing to stand her player in")
+	var barrow := record.barrow
+	record.barrow = {"uses": 2, "of": 2, "difficulty": "normal", "day": 0}
+	_main._bond_fell(pet, &"bled")
+	_check(score.call() == -3 and newest.call() == "you let her bleed out", "bled out with her blessed player near: let bleed (%d)" % score.call())
+	record.barrow = barrow
+	_main._guide_refused[Net.player_id] = {"test/x": {"day": Townsfolk.day_of(World.steps), "reason": "", "as_far": {}, "area": String(World.zone.name)}}
+	_main._bond_warned(pet)
+	_main._bond_warned(pet)
+	_check(score.call() == -4 and pet.bond_step == "wary", "taken where she said it wasn't safe: once a refusal, and wary now (%d, %s)" % [score.call(), pet.bond_step])
+	_main._guide_refused.clear()
+	var camp := ""
+	for id in World.holdings.places_in(String(World.zone.name)):
+		camp = id
+	if not camp.is_empty():
+		_main._bond_cleared(camp, "goblins", Factions.NOBODY)
+		_check(score.call() == -3 and "cleared" in newest.call(), "a camp cleared with her here (%s)" % newest.call())
+		_main._bond_cleared(camp, Factions.NOBODY, "goblins")
+		_check(score.call() == -3, "taken by the Blood Rot: no credit")
 	record.companion["standing"] = kept_standing
 	_main._set_mood(record)
 

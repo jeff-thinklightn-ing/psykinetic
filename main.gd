@@ -769,6 +769,9 @@ func _go_online() -> void:
 		World.entity_taken.connect(_roads_taken)
 		World.entity_died.connect(_roads_fell)
 		World.entity_damaged.connect(_roads_struck)
+		# What her player did that moves her bond (555 amended).
+		World.entity_downed.connect(_bond_left_down)
+		World.entity_died.connect(_bond_fell)
 		road_heard = _road_heard  # The road's news she hears (551 phase 2).
 		World.entity_damaged.connect(_hail_struck)  # A blow given (decision 554).
 		World.channel_changed.connect(_on_channel)
@@ -4009,6 +4012,7 @@ func _join_companion(record: PlayerRecord, player: Player) -> void:
 	pet.can_revive = func() -> bool: return _can_revive(pet, record)
 	pet.revive = func(by: GridEntity, body: GridEntity) -> bool: return _start_channel(by, body)
 	_wire_guide(pet, record, player)  # Her guiding (decision 551).
+	_bond_warned(pet)  # Taken where she said it wasn't safe (555 amended).
 	pet.mind = _make_mind()
 	if _claude_voices.has(record.player_id):
 		pet.mind = ClaudeMind.new(pet.mind, _claude_voices[record.player_id], self)
@@ -4262,7 +4266,8 @@ func _guide_refuse(pet: Companion, player: Player, to: Dictionary, no: Dictionar
 	for key: String in refused.keys():
 		if int(refused[key].get("day", -1)) != day:
 			refused.erase(key)
-	refused[str(to["key"])] = {"day": day, "reason": no["reason"], "as_far": no["as_far"]}
+	refused[str(to["key"])] = {"day": day, "reason": no["reason"], "as_far": no["as_far"],
+		"area": str((no.get("worst", {}) as Dictionary).get("area", ""))}
 	_guide_refused[pet.keeper_id] = refused
 	if (no["as_far"] as Dictionary).is_empty():
 		_guide_offers.erase(pet.keeper_id)
@@ -4408,6 +4413,7 @@ func bless(player_ids: Array, difficulty: String) -> int:
 			if not World.carries_bound(pet, TOKEN, whose):
 				_give_bound(pet, TOKEN, whose)
 			pet.note_fact("%s went down into the barrow with %s and laid the draugr to rest." % [pet.name, record.name])
+			_bond(record, "blessed", "laid the draugr to rest with you")  # 555 amended.
 			party_log.add("The draugr blesses %s too." % pet.name)
 	return blessed
 
@@ -7063,6 +7069,13 @@ func _card_given(from: GridEntity, to: GridEntity, uid: int) -> void:
 		for pet: Companion in _companions.values():
 			if is_instance_valid(pet) and from == pet.keeper and to == pet:
 				_bond(_record_of(pet), "fed", "shared food with you")
+	if _grave_goods(uid):
+		# Grave goods put on her, superstitious and short of devoted: she
+		# carries them (turns_down let her, close), and it costs her (555 amended).
+		for pet: Companion in _companions.values():
+			if is_instance_valid(pet) and from == pet.keeper and to == pet and not pet.bond_at_least("devoted") \
+					and pet.superstition >= int(Companion.loyalty().get("grave_superstition", 6)):
+				_bond(_record_of(pet), "grave", "made you carry grave goods")
 	if named.is_empty() and (not Items.is_gear(id) or not str(Items.def(id).get("use", "")).is_empty()):
 		return  # A bandage or a meal handed over (used up) is no event of the card.
 	var thing := named if not named.is_empty() else Companion._a(Items.name_of(id).to_lower())
@@ -7071,7 +7084,8 @@ func _card_given(from: GridEntity, to: GridEntity, uid: int) -> void:
 			continue
 		if from == pet.keeper and to == pet:
 			pet.note_fact("%s gave %s %s." % [pet.keeper_name(), pet.name, thing])
-			_bond(_record_of(pet), "gift", "gave you %s" % thing)
+			if not _grave_goods(uid):
+				_bond(_record_of(pet), "gift", "gave you %s" % thing)
 		elif from == pet and to == pet.keeper:
 			var hers := str(World.items.name_of(uid).get("who", "")) == World.holder_key(pet)
 			pet.note_fact("%s gave %s %s%s." % [pet.name, pet.keeper_name(), thing, ", the thing named for her" if hers else ""])
@@ -7553,6 +7567,67 @@ func _camp_lets_back(spec: Dictionary) -> bool:
 func _on_place_taken(id: String, from: String, to: String) -> void:
 	if World.towns != null and World.holdings.place(id).get("kind") == "camp":
 		World.towns.camp_taken(id, from, to)
+	_bond_cleared(id, from, to)
+
+
+## A place taken from a side hostile to the town by one that is not (555
+## amended, Jeff: "areas affect loyalty"): each companion out with her
+## player in its area cleared it with them.
+func _bond_cleared(id: String, from: String, to: String) -> void:
+	var factions := World.holdings.factions if World.holdings != null else null
+	if factions == null or not factions.hostile(from, "town") or factions.hostile(to, "town"):
+		return
+	var place := World.holdings.place(id)
+	for pet: Companion in _companions.values():
+		if is_instance_valid(pet) and pet.spawned and pet.zone == str(place.get("area", "")) and is_instance_valid(pet.keeper) \
+				and pet.keeper.zone == pet.zone:
+			_bond(_record_of(pet), "cleared", "cleared %s with you" % str(place.get("name", "the camp")))
+
+
+## She went down, or died (555 amended): with her player nowhere near
+## (out of hearing, or gone), left to fall alone; bled out downed while
+## her player, blessed with uses left, stood within hearing, let bleed.
+func _bond_left_down(entity: GridEntity, _source: GridEntity, _ticks: int) -> void:
+	if entity is Companion and not _near_keeper(entity as Companion):
+		_bond(_record_of(entity), "left_alone", "left you to fall alone")
+
+
+func _bond_fell(entity: GridEntity, cause: StringName) -> void:
+	var pet := entity as Companion
+	if pet == null:
+		return
+	var record := _record_of(pet)
+	if record == null:
+		return
+	if cause == &"bled":
+		if _near_keeper(pet) and int(record.barrow.get("uses", 0)) > 0:
+			_bond(record, "let_bleed", "let you bleed out")
+	elif not _near_keeper(pet):
+		_bond(record, "left_alone", "left you to fall alone")
+
+
+## Whether [param uid] is grave goods (555, items' side: World.items.is_grave;
+## false before it).
+func _grave_goods(uid: int) -> bool:
+	return World.items != null and World.items.has_method("is_grave") and bool(World.items.call("is_grave", uid))
+
+
+## Whether [param pet]'s player stands within her hearing.
+func _near_keeper(pet: Companion) -> bool:
+	return is_instance_valid(pet.keeper) and pet.keeper.spawned and pet.keeper.zone == pet.zone \
+		and World.distance(pet.keeper.tile, pet.tile) <= HEARING_RANGE
+
+
+## Her player took her into an area she refused as unsafe that day (555
+## amended; 551 phase 2's refusals): once a refusal.
+func _bond_warned(pet: Companion) -> void:
+	var refused: Dictionary = _guide_refused.get(pet.keeper_id, {})
+	var day := Townsfolk.day_of(World.steps)
+	for key: String in refused:
+		var entry: Dictionary = refused[key]
+		if int(entry.get("day", -1)) == day and str(entry.get("area", "")) == pet.zone and not entry.get("walked", false):
+			entry["walked"] = true
+			_bond(_record_of(pet), "warned", "took you where you said it wasn't safe")
 
 
 ## Each temple counter in the zone shows what is held for the first player
