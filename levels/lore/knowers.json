@@ -116,6 +116,20 @@
 			"tags": [
 				"materials"
 			]
+		},
+		{
+			"id": "acolyte",
+			"status": "agreed",
+			"source": "npc (546, part 3)",
+			"where": ["town_lands", "blood_rot_lands"],
+			"tags": []
+		},
+		{
+			"id": "draugr",
+			"status": "agreed",
+			"source": "npc (546, part 3)",
+			"where": [],
+			"tags": []
 		}
 	]
 }

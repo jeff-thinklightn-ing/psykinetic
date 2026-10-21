@@ -64,6 +64,10 @@ const ASKS := {
 const DEFAULTS := {"max": 3, "per_player": 3, "days": 7, "fetch": 6, "give_most": 10, "asks": ASKS}
 const SHOP := "shop"
 const COMMISSION := "commission"
+## The priest's crypt commissions (decision 546, npc's side, part 3): sub OFFERING (carry
+## the temple's offering down to the altar) and RUNNER (find what became of Pip).
+const OFFERING := "offering"
+const RUNNER := "runner"
 const RUMOUR := "rumour"
 const PLEA := "plea"
 ## A page read to the player (decision 491: the scholar's chronicle); its
@@ -149,6 +153,8 @@ static func of(worker_id: String, player_id: String, given: Dictionary = ctx) ->
 	var fresh: Array[Dictionary] = []
 	if regard != "wronged":
 		var shop := _shop_offer(worker_id, who, town, given)
+		for crypt: Dictionary in _crypt_offers(worker_id, who, town, player_id, open, given):
+			fresh.append(crypt)  # Aldous's, to one who knows the secret (546, npc's side, part 3).
 		var job := {}
 		if card.get("asks", []).size() < (2 if trusted else 1) and open < (2 if trusted else 1):
 			job = _commission_offer(worker_id, who, card, town, given)
@@ -276,7 +282,65 @@ static func _shop_offer(worker_id: String, who: Dictionary, town: String, given:
 
 ## One commission, the first true: kin held captive, a raiders' camp, a
 ## thing the town is short of.
+## The priest's crypt commissions (decision 546, npc's side, part 3), to a
+## player Aldous has told the secret (ctx "crypt_asks" (town, player_id) ->
+## {offering: the gold at the altar, 0 for none or an untold player; runner:
+## the lost runner's name, "" for none}): "Take the offering down" while
+## gold waits at the altar, "Find the runner" while Pip is lost below; each
+## once (not while the player's own ask of it stands).
+static func _crypt_offers(worker_id: String, who: Dictionary, town: String, player_id: String, open: int, given: Dictionary) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	if "priest" not in who.get("trades", []):
+		return out
+	var asks: Variant = _call(given, "crypt_asks", [town, player_id])
+	if not asks is Dictionary:
+		return out
+	var production: Production = given["production"]
+	var standing: Array = Townsfolk.card_of(production, worker_id).get("asks", []).filter(func(ask: Dictionary) -> bool: return str(ask.get("by", "")) == player_id)
+	var has := func(sub: String) -> bool: return standing.any(func(ask: Dictionary) -> bool: return str(ask.get("sub", "")) == sub)
+	var gold := int(asks.get("offering", 0))
+	if gold > 0 and not has.call(OFFERING):
+		out.append(_offer(worker_id, COMMISSION, OFFERING + ":" + town, "Take the offering down",
+			"Carry the temple's offering, %d gold, down to the altar in the barrow and lay it there. Tell no one." % gold,
+			{"sub": OFFERING, "gold": gold, "town": town}, TAKE))
+	var runner := str(asks.get("runner", ""))
+	if not runner.is_empty() and not has.call(RUNNER):
+		out.append(_offer(worker_id, COMMISSION, RUNNER + ":" + town, "Find the runner",
+			"%s went down with the offering and has not come back. Find what became of him." % runner,
+			{"sub": RUNNER, "name": runner, "town": town}, TAKE))
+	return out
+
+
+## A crypt commission met (Main, on reach: the Altar laid, the Runner's pack
+## found): closed with its fact, its standing key and, for the offering, the
+## gold down (ctx "altar_down"). False if [param player_id] holds no such ask
+## of [param town]'s priest.
+static func crypt_done(town: String, player_id: String, sub: String, given: Dictionary = ctx) -> bool:
+	var production: Production = given.get("production")
+	if production == null:
+		return false
+	for pair: Array in _asks(production):
+		var ask: Dictionary = pair[1]
+		if str(ask.get("by", "")) != player_id or str(ask.get("sub", "")) != sub or str(ask.get("town", "")) != town:
+			continue
+		var by := str(ask.get("by_name", "someone"))
+		var name := str(production.worker(pair[0]).get("name", pair[0]))
+		if sub == OFFERING:
+			var gold := int(ask.get("what", {}).get("gold", 0))
+			_call(given, "altar_down", [town, gold])
+			_close(pair[0], ask, "%s carried the temple's offering down and laid it at the altar." % by,
+				"%s laid the offering at the altar, as promised to %s." % [by, name], "", 1, given, OFFERING, "carried the offering down")
+		else:
+			var runner := str(ask.get("what", {}).get("name", "Pip"))
+			_close(pair[0], ask, "%s found %s's pack in the barrow's lair: he was lost below, past the altar." % [by, runner],
+				"%s found %s's pack in the lair below the altar, and told %s." % [by, runner, name], "", 1, given, RUNNER, "found the runner's pack")
+			Townsfolk._remember(town, "%s's pack was found in the barrow's lair, below the altar" % runner, pair[0], false, production.now())
+		return true
+	return false
+
+
 static func _commission_offer(worker_id: String, who: Dictionary, card: Dictionary, town: String, given: Dictionary) -> Dictionary:
+
 	var production: Production = given["production"]
 	var kin: Dictionary = card.get("kin", {})
 	var captives: Variant = _call(given, "captives", [town])
@@ -539,10 +603,21 @@ static func accept(worker_id: String, player_id: String, player_name: String, of
 			var ask := {"id": offer_id, "kind": COMMISSION, "sub": str(offer["what"].get("sub", "")), "by": player_id, "by_name": player_name,
 				"step": now, "town": str(who.get("town", "")), "worker": worker_id, "title": offer["title"], "words": offer["words"],
 				"what": offer["what"].duplicate(true)}
+			if ask["sub"] == OFFERING:
+				# The temple's gold into their purse, to carry down (546, npc's side, part 3; economy's take_altar).
+				var took: Variant = _call(given, "take_altar", [str(who.get("town", ""))])
+				var carried := int(took) if took is int or took is float else int(offer["what"].get("gold", 0))
+				if carried <= 0:
+					out["line"] = "There is nothing at the altar to carry."
+					return out
+				ask["what"]["gold"] = carried
+				_call(given, "give_gold", [player_id, carried, "the temple's offering, to carry down"])
 			_add_ask(production, worker_id, ask)
 			_call(given, "asked", [player_id, ask])
 			Townsfolk.learn(production, worker_id, "%s promised %s: %s" % [player_name, name, _promise(ask)])
 			out["line"] = "%s takes %s's commission: %s." % [player_name, name, _promise(ask)]
+			if ask["sub"] == OFFERING:
+				out["line"] = "%s takes the temple's offering, %d gold, to carry down to the altar." % [player_name, int(ask["what"]["gold"])]
 			out["ok"] = true
 		LEND:
 			var owed := maxi(int(offer["what"].get("loan", 0)), 1)
@@ -597,6 +672,10 @@ static func _promise(ask: Dictionary) -> String:
 			return "to walk %s home" % what.get("name", "")
 		"quarrel":
 			return "to lay the quarrel with %s before the lawspeaker" % what.get("name", "")
+		OFFERING:
+			return "to carry the temple's offering, %d gold, down to the altar" % int(what.get("gold", 0))
+		RUNNER:
+			return "to find what became of %s" % what.get("name", "Pip")
 	return str(ask.get("title", "")).to_lower()
 
 
@@ -1057,6 +1136,11 @@ static func tick(given: Dictionary = ctx) -> void:
 			continue
 		var by := str(ask.get("by_name", "someone"))
 		var name := str(production.worker(pair[0]).get("name", pair[0]))
+		if str(ask.get("sub", "")) == OFFERING:
+			# The temple's gold kept (546, npc's side, part 3): the "cheated" standing key, Jeff's list.
+			_close(pair[0], ask, "%s took the temple's offering to carry down and kept it: %d gold." % [by, int(ask.get("what", {}).get("gold", 0))],
+				"%s kept the temple's offering; %s knows it." % [by, name], "", 1, given, "cheated", "kept the temple's offering")
+			continue
 		_close(pair[0], ask, "%s never kept the promise %s: %s." % [by, "to " + name, _promise(ask)], "%s's promise to %s lapsed: %s." % [by, name, _promise(ask)], "", 1, given,
 			"errand_lapsed" if str(ask.get("kind", "")) == ERRAND else "lapsed", "let a promise lapse, %s" % _promise(ask))
 

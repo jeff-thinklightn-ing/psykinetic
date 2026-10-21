@@ -17124,6 +17124,49 @@ this lands on it: the retrade is that rule's trigger. On the box nothing is
 rewritten at the deploy: at the first runner hour after it the saved
 carpenter becomes the acolyte and the runs begin. resident_test
 _test_alms_run seats a carpenter Pip at a bench first.
+
+Part 3 (2026-10-20): Aldous's secrets, and his two commissions. Lore's
+rows from crypt.md's "Who knows what", the [Jeff] rows alone (the
+coordinator: lore-eb is held on a prompt only Jeff can answer; the
+[proposal] rows, the two true rumours and "Pip hasn't been seen" as
+common, are lore's to add when it lands): entry "crypt" in
+levels/lore/history.json with crypt.keep_away (common, town_lands),
+crypt.founders (secret: priest), crypt.alms_down (secret: priest,
+acolyte), crypt.draugr_bargains (secret: draugr; Pip once rescued has it
+as part 2's lived fact on his card), crypt.pip_carries (secret: priest,
+acolyte, pip); knowers "acolyte" (the resident Pip, by his trade) and
+"draugr" added to knowers.json. Lore.known_by now says "secret" on a
+fact (lore's file, one key). A secret is told past the standing tier:
+Resident.world_facts gives a secret to the voice only when the one
+speaking (asked_by) is trusted (Standing.score at or over "trusted"),
+never to a stranger or in a line said to nobody; every secret, not the
+crypt's alone (the only other agreed one is star_fall.age, "learned"'s).
+Each secret given is reported (ctx "secret_told"); Main._secret_told
+marks a crypt secret's hearer in _crypt_told, which part 2 reads (Pip's
+runs may go wrong from then) and the commissions need. The commissions,
+Aldous's at the temple (Offers._crypt_offers, in the list before the
+shop, to a told player only, through ctx "crypt_asks" -> {offering,
+runner} from Main._crypt_asks): "Take the offering down" while gold
+waits at the altar and no run is out: taken, the altar's gold goes into
+the purse (economy's take_altar, add_gold) with the promise; met when
+the player stands within reach of the barrow's Altar chest
+(Main._crypt_asks_tick on the world tick, World.reaches; Offers.crypt_done:
+economy's altar_down, the fact, standing "offering" +3); kept past the
+offers' days, the lapse is a cheat: fact "took the temple's offering to
+carry down and kept it", standing "cheated" -4 (Jeff's list's key, born
+here, in residents.json "standing"), nothing goes down. "Find the
+runner" while Pip is lost below (part 2's run "lost"): met within reach
+of the chest named in townsfolk.json runner.pack ("Runner's pack", in
+the lair; dungeon's 542 amended: the server is never told a chest is
+opened, reach is the signal, as the niche's): Aldous's fact and the
+town's memory say where the pack lay, standing "runner" +3; Pip himself
+comes home only by the niche, as before. A commission is offered once
+per player while their own ask of it stands; no pay from the treasury
+for either. Not built: the draugr's own telling of its secret (its lines
+are enemy-ai's 548), and "Pip hasn't been seen" as a lore entry (lore's
+row; part 2's gossip fact carries it meanwhile). offers_test
+_test_crypt_commissions; resident_test _test_crypt_secrets. Server only,
+protocol unchanged, no new class_name.
 ## 536, ui's side: talk with no panel
 
 Jeff, from his play tests (2026-10-19): "the npc interaction ui, the

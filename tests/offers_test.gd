@@ -52,6 +52,7 @@ func _ready() -> void:
 	_test_give()
 	_test_asks()
 	_test_lapse()
+	_test_crypt_commissions()
 	_test_voice_words()
 	_test_scholar_and_merchant()
 	_test_chronicle()
@@ -603,7 +604,65 @@ func _test_lapse() -> void:
 	_check(str(Townsfolk.card_of(_work, "o-mara")["facts"].back()["text"]).begins_with("Jeff never kept the promise to Mara"), "told once, as a fact")
 
 
+## The priest's crypt commissions (decision 546, npc's side, part 3): to one
+## told the secret, the offering carried down (gold to the purse, laid at
+## the altar: down, standing) or kept (lapsed: "cheated"), and the runner's
+## fate found.
+func _test_crypt_commissions() -> void:
+	print("\n== the crypt's commissions: take the offering down, find the runner; a kept offering is a cheat (decision 546, npc's side, part 3) ==")
+	_setup([["o-aldous", "Aldous", "priest"]])
+	var pot := [12]
+	var lost := [""]
+	var told := ["p1"]
+	var downs: Array = []
+	var given: Array = []
+	_ctx["crypt_asks"] = func(_town: String, player_id: String) -> Dictionary: return {"offering": pot[0], "runner": lost[0]} if player_id in told else {}
+	_ctx["take_altar"] = func(_town: String) -> int:
+		var gold: int = pot[0]
+		pot[0] = 0
+		return gold
+	_ctx["altar_down"] = func(_town: String, gold: int) -> void: downs.append(gold)
+	_ctx["give_gold"] = func(player_id: String, gold: int, _why: String) -> void: given.append([player_id, gold])
+	Offers.ctx = _ctx
+	var titles := func(player: String) -> Array: return _offers("o-aldous", player).map(func(o: Dictionary) -> String: return str(o["title"]))
+	_check("Take the offering down" in titles.call("p1") and not "Find the runner" in titles.call("p1"), "gold at the altar: the offering to one told the secret, no runner lost: %s" % [titles.call("p1")])
+	_check(not "Take the offering down" in titles.call("p2"), "nothing to one not told")
+	var offer: Dictionary = _offers("o-aldous", "p1").filter(func(o: Dictionary) -> bool: return str(o["title"]) == "Take the offering down")[0]
+	_check(str(offer["words"]) == "Carry the temple's offering, 12 gold, down to the altar in the barrow and lay it there. Tell no one." and str(offer["kind"]) == Offers.COMMISSION, "its words: %s" % offer["words"])
+	var taken := Offers.accept("o-aldous", "p1", "Jeff", offer["id"], 0, _ctx)
+	_check(bool(taken["ok"]) and given == [["p1", 12]] and pot[0] == 0 and str(taken["line"]) == "Jeff takes the temple's offering, 12 gold, to carry down to the altar.", "taken: the altar's gold into the purse: %s" % taken["line"])
+	var standing: Array = _offers("o-aldous", "p1").filter(func(o: Dictionary) -> bool: return str(o["title"]) == "Take the offering down")
+	_check(standing.size() == 1 and bool(standing[0].get("open", false)), "it stands as an open ask, not offered again: %s" % [standing.map(func(o: Dictionary) -> bool: return bool(o.get("open", false)))])
+	_check(str(Townsfolk.card_of(_work, "o-aldous")["facts"].back()["text"]) == "Jeff promised Aldous: to carry the temple's offering, 12 gold, down to the altar", "the promise on his card: %s" % Townsfolk.card_of(_work, "o-aldous")["facts"].back()["text"])
+	_check(not Offers.crypt_done(TOWN, "p1", Offers.RUNNER, _ctx) and not Offers.crypt_done(TOWN, "p2", Offers.OFFERING, _ctx), "nothing met for another ask or another player")
+	_check(Offers.crypt_done(TOWN, "p1", Offers.OFFERING, _ctx) and downs == [12] and _done.size() == 1 and str(_done[0][2]) == "Jeff laid the offering at the altar, as promised to Aldous." and int(_done[0][3]) == 0,
+		"laid at the altar: the gold goes down, the ask is met, no pay: %s" % [_done])
+	_check(Standing.score(Townsfolk.card_of(_work, "o-aldous"), "p1") == Standing.setting("offering") and Townsfolk.card_of(_work, "o-aldous").get("asks", []).is_empty(), "Aldous thinks the more of them: %d" % Standing.score(Townsfolk.card_of(_work, "o-aldous"), "p1"))
+	# The runner lost: the second commission; the pack found.
+	lost[0] = "Pip"
+	_check("Find the runner" in titles.call("p1") and not "Take the offering down" in titles.call("p1"), "Pip lost, the altar bare: find the runner: %s" % [titles.call("p1")])
+	offer = _offers("o-aldous", "p1").filter(func(o: Dictionary) -> bool: return str(o["title"]) == "Find the runner")[0]
+	taken = Offers.accept("o-aldous", "p1", "Jeff", offer["id"], 0, _ctx)
+	_check(bool(taken["ok"]) and str(taken["line"]) == "Jeff takes Aldous's commission: to find what became of Pip.", "taken: %s" % taken["line"])
+	_check(Offers.crypt_done(TOWN, "p1", Offers.RUNNER, _ctx) and _done.size() == 2 and str(_done[1][2]) == "Jeff found Pip's pack in the lair below the altar, and told Aldous."
+		and str(Townsfolk.card_of(_work, "o-aldous")["facts"].back()["text"]) == "Jeff found Pip's pack in the barrow's lair: he was lost below, past the altar.", "the pack found: met, and Aldous learns the fate: %s" % [_done[1][2]])
+	# The offering kept: after the days it lapses as a cheat.
+	lost[0] = ""
+	pot[0] = 8
+	offer = _offers("o-aldous", "p1").filter(func(o: Dictionary) -> bool: return str(o["title"]) == "Take the offering down")[0]
+	Offers.accept("o-aldous", "p1", "Jeff", offer["id"], 0, _ctx)
+	var before := Standing.score(Townsfolk.card_of(_work, "o-aldous"), "p1")
+	_now = 8 * DayNight.day_steps
+	Offers.tick(_ctx)
+	_check(_done.size() == 3 and str(_done[2][2]) == "Jeff kept the temple's offering; Aldous knows it." and downs == [12]
+		and str(Townsfolk.card_of(_work, "o-aldous")["facts"].back()["text"]) == "Jeff took the temple's offering to carry down and kept it: 8 gold.", "kept: the lapse is a cheat, nothing went down: %s" % [_done[2][2]])
+	_check(Standing.score(Townsfolk.card_of(_work, "o-aldous"), "p1") == before + Standing.setting("cheated") and Standing.setting("cheated") < 0, "the cheated key, Jeff's list: %d -> %d" % [before, Standing.score(Townsfolk.card_of(_work, "o-aldous"), "p1")])
+	pot[0] = 0
+	_check(not "Take the offering down" in titles.call("p1"), "a bare altar: nothing to carry")
+
+
 func _test_voice_words() -> void:
+
 	print("\n== the voice is told the offers as facts ==")
 	_setup([["o-mara", "Mara", "smith"], ["o-bram", "Bram", "hauler"]])
 	_goods = [{"uid": 9, "id": "knife", "price": 12}]

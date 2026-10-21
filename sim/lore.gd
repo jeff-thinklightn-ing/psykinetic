@@ -129,7 +129,7 @@ static func known_by(knower: String, about := PackedStringArray(), least := "agr
 					knows = knower in fact.get("knowers", [])
 			if knows and (about.is_empty() or _about(fact, entry, about)):
 				out.append({"id": fact.get("id", ""), "text": fact.get("text", ""),
-						"hearsay": known == "rumour", "memory": known == "lived",
+						"hearsay": known == "rumour", "memory": known == "lived", "secret": known == "secret",
 						"where": fact.get("where", []).duplicate(), "weight": float(fact.get("weight", DEFAULT_WEIGHT))})
 	return out
 

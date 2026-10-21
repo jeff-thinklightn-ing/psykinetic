@@ -4955,6 +4955,12 @@ func _offers_context() -> Dictionary:
 		# One Pip (the coordinator's ruling with npc): the companion of that name, if a player has her.
 		"companion_named": func(wanted: String) -> Dictionary: return companion_named(wanted),
 		"road_news": func(town: String, news: Dictionary) -> void: _road_news(town, news),
+		# The crypt's people (decision 546, npc's side, part 3): Aldous's secret told, and his two commissions.
+		"secret_told": func(player_id: String, fact_id: String) -> void: _secret_told(player_id, fact_id),
+		"crypt_asks": func(town: String, player_id: String) -> Dictionary: return _crypt_asks(town, player_id),
+		"take_altar": func(town: String) -> int: return World.economy.take_altar(town) if World.economy != null and World.economy.has_method("take_altar") else 0,
+		"altar_down": func(town: String, gold: int) -> void: _altar_down(town, gold),
+		"give_gold": func(player_id: String, gold: int, why: String) -> void: _give_gold(player_id, gold, why),
 		"companion_sick": func(id: String) -> Dictionary:
 			var record: PlayerRecord = _records.get(id.trim_prefix("companion:"))
 			return record.companion.get("sick", {}).duplicate(true) if record != null and record.companion.get("sick") is Dictionary else {},
@@ -7680,7 +7686,78 @@ func _runner_here(who: String, name: String) -> bool:
 ## the barrow's niche place; the priest's card says he has not been seen
 ## (gossip carries it). Found: the gold goes down, he comes home, his card
 ## keeps the lived fact, the finder is told.
+## A resident told [param player_id] a secret (Resident.world_facts, ctx
+## "secret_told"): one of the crypt's marks them as knowing (Main._crypt_told:
+## Pip's runs may go wrong from then, and Aldous's commissions open to them).
+func _altar_down(town: String, gold: int) -> void:
+	if World.economy != null and World.economy.has_method("altar_down"):
+		World.economy.altar_down(town, gold)
+
+
+func _give_gold(player_id: String, gold: int, why: String) -> void:
+	if World.economy != null and gold > 0:
+		World.economy.add_gold(player_id, gold, why)
+
+
+func _secret_told(player_id: String, fact_id: String) -> void:
+	if fact_id.begins_with("crypt.") and not player_id.is_empty() and not _crypt_told.get(player_id, false):
+		_crypt_told[player_id] = true
+		print("[crypt] %s has been told %s" % [player_id, fact_id])
+
+
+## What Aldous may ask of [param player_id] now (Offers._crypt_offers, ctx
+## "crypt_asks"): the offering's gold while gold waits at the altar and Pip
+## is not carrying it; the lost runner's name while he is lost below; both
+## only to one told the secret.
+func _crypt_asks(town: String, player_id: String) -> Dictionary:
+	if not _crypt_told.get(player_id, false):
+		return {}
+	var run: Dictionary = _alms_runs.get(town, {})
+	var gold := 0
+	if run.is_empty() and World.economy != null and World.economy.has_method("altar_gold"):
+		gold = int(World.economy.altar_gold(town))
+	var runner := ""
+	if bool(run.get("lost", false)):
+		runner = str(World.production.worker(str(run.get("who", ""))).get("name", "Pip")) if World.production != null else "Pip"
+	return {"offering": gold, "runner": runner}
+
+
+## Server, on the world tick: a player with a crypt commission standing
+## within reach of the barrow's Altar (the offering laid) or of the Runner's
+## pack (the runner's fate found) has met it (Offers.crypt_done).
+func _crypt_asks_tick() -> void:
+	if World.production == null:
+		return
+	var rule := _runner_rule()
+	var barrow := str(rule.get("barrow", "barrow"))
+	for peer: int in _players:
+		var player: Player = _players[peer]
+		if player == null or not is_instance_valid(player) or not player.spawned or player.zone != barrow:
+			continue
+		for pair: Array in Offers._asks(World.production):
+			var ask: Dictionary = pair[1]
+			if str(ask.get("by", "")) != player.player_id:
+				continue
+			var sub := str(ask.get("sub", ""))
+			if sub != Offers.OFFERING and sub != Offers.RUNNER:
+				continue
+			var chest := _chest_named(barrow, "Altar" if sub == Offers.OFFERING else str(rule.get("pack", "Runner's pack")))
+			if chest != null and World.reaches(player, chest):
+				Offers.crypt_done(str(ask.get("town", "")), player.player_id, sub)
+
+
+## The chest called [param chest_name] in zone [param zone_name], null for none
+## (the level.json entry's name is the entity's; dungeon's 542).
+func _chest_named(zone_name: String, chest_name: String) -> Chest:
+	var found: Array = World.zones[zone_name].entities if World.zones.has(zone_name) else World.get_entities()
+	for entity: Variant in found:
+		if entity is Chest and entity.spawned and entity.zone == zone_name and String(entity.name) == chest_name:
+			return entity as Chest
+	return null
+
+
 func _alms_runs_tick() -> void:
+
 	if not Net.is_authority() or World.economy == null or World.production == null or not World.economy.has_method("altar_gold"):
 		return
 	var rule := _runner_rule()
@@ -8102,6 +8179,7 @@ func _on_world_ticked(tick: int) -> void:
 			_sickness_in_party()  # A sick companion with her player gets well (decision 501).
 			_gather_herbs()  # The medicine man takes herbs on his way (decision 502, npc's side).
 			_alms_runs_tick()  # Pip's run with the alms (decision 546, npc's side).
+			_crypt_asks_tick()  # Aldous's commissions met at the altar or the pack (part 3).
 		_respawn_due_players(tick)
 		_check_respawns(tick)
 		t = World.part("respawns", t)

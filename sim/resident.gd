@@ -756,12 +756,24 @@ func world_facts() -> Array[String]:
 		return out
 	var facts := Lore.known_by(Lore.knower_for(trade), PackedStringArray(), "agreed", hidden_type())
 	var superstitious := leaning("superstition") >= HIGH
+	# A secret (decision 546, npc's side, part 3) is told past the standing tier: to a player it trusts, and
+	# to nobody else; Main hears which (ctx "secret_told", for Aldous's crypt secrets).
+	var trusted := false
+	if not asked_by.is_empty() and World.production != null:
+		var own := Townsfolk.card_of(World.production, worker_id)
+		trusted = not own.is_empty() and Standing.score(own, asked_by) >= Standing.setting("trusted")
 	facts.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		if trusted and bool(a.get("secret", false)) != bool(b.get("secret", false)):
+			return bool(a.get("secret", false))  # A secret is the rarest thing it can say: first, within the budget.
 		if superstitious and bool(a.get("hearsay", false)) != bool(b.get("hearsay", false)):
 			return bool(a.get("hearsay", false))
 		return float(a["weight"]) > float(b["weight"]))
 	var length := 0
 	for fact in facts:
+		if bool(fact.get("secret", false)):
+			if not trusted:
+				continue
+			Offers._call(Offers.ctx, "secret_told", [asked_by, str(fact.get("id", ""))])
 		var text := str(fact["text"]).strip_edges()
 		if bool(fact.get("hearsay", false)):
 			text = "It is said that %s" % Hearsay._lower_first(text)

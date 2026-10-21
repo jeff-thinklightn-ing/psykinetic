@@ -52,6 +52,7 @@ func _ready() -> void:
 	_test_sick_body()
 	_test_placed_captive()
 	_test_aloud()
+	_test_crypt_secrets()
 	_test_offer_words()
 	_test_monster_talk()
 	_test_alms_run()
@@ -1244,7 +1245,49 @@ func _test_placed_captive() -> void:
 	_check(World.towns.died(STORE, who, "the test's end"), "(Tilda out of the town again, so the later tests see the roster they expect)")
 
 
+## Aldous's secrets (decision 546, npc's side, part 3): lore's crypt rows,
+## told to a player he trusts and to nobody else; Main marks who was told.
+func _test_crypt_secrets() -> void:
+	print("\n== the crypt's secrets: Aldous knows the founding and the alms, tells one he trusts, and Main marks them told (decision 546, npc's side, part 3) ==")
+	Lore.reload()
+	var ids := func(knower: String) -> Array: return Lore.known_by(knower).map(func(f: Dictionary) -> String: return str(f["id"]))
+	_check("crypt.founders" in ids.call("priest") and "crypt.alms_down" in ids.call("priest") and "crypt.pip_carries" in ids.call("priest") and not "crypt.draugr_bargains" in ids.call("priest"),
+		"the priest knows the founding, the alms and Pip's errand, not the draugr's bargain: %s" % [ids.call("priest").filter(func(id: String) -> bool: return id.begins_with("crypt."))])
+	_check("crypt.alms_down" in ids.call("acolyte") and "crypt.pip_carries" in ids.call("acolyte") and not "crypt.founders" in ids.call("acolyte") and "crypt.pip_carries" in ids.call("pip") and "crypt.draugr_bargains" in ids.call("draugr"),
+		"the acolyte, Pip and the draugr know their rows")
+	_check("crypt.keep_away" in ids.call("townsfolk") and not "crypt.founders" in ids.call("townsfolk") and Lore.known_by("priest").filter(func(f: Dictionary) -> bool: return str(f["id"]) == "crypt.founders")[0]["secret"] == true,
+		"the town keeps away and knows no more; a secret is marked so")
+	var priest := "priest:" + STORE
+	if World.production.worker(priest).is_empty():
+		World.production.add_worker(priest, "Aldous", ["priest"], STORE, "appointed")
+	var told: Array = []
+	Offers.ctx["secret_told"] = func(player_id: String, fact_id: String) -> void: told.append([player_id, fact_id])
+	var voice := Resident.new()
+	voice.worker_id = priest
+	voice.person = "Aldous"
+	voice.trade = "priest"
+	voice.town = STORE
+	voice.asked_by = "p-stranger"
+	var founders := "The town's founders plundered the barrow for its gold and pushed the old dead deeper."
+	_check(not founders in voice.world_facts() and told.is_empty(), "a stranger is told no secret")
+	var card := Townsfolk.card_of(World.production, priest)
+	Standing.bump(card, "p-friend", Standing.setting("trusted"), "brought the sick home", World.production.now())
+	World.production.set_card(priest, card)
+	voice.asked_by = "p-friend"
+	var facts := voice.world_facts()
+	_check(founders in facts and told.any(func(t: Array) -> bool: return t[0] == "p-friend" and t[1] == "crypt.founders"), "one he trusts is told, and Main hears which: %s / %s" % [told, facts])
+	voice.asked_by = ""
+	_check(not founders in voice.world_facts(), "spoken to by nobody in particular: no secret")
+	Offers.ctx.erase("secret_told")
+	voice.free()
+	_main._secret_told("p-friend", "crypt.founders")
+	_main._secret_told("p-other", "star_fall.age")
+	_check(bool(_main._crypt_told.get("p-friend", false)) and not _main._crypt_told.has("p-other"), "Main marks the crypt's secrets told, no other")
+	_main._crypt_told.clear()
+
+
 ## The words said and one clause of how (336 amended; Jeff's play on
+
 ## v0.1.160): the model's stage direction round the words never reaches a
 ## bubble; it becomes a third-person aside, or nothing.
 func _test_aloud() -> void:
