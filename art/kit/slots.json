@@ -2063,14 +2063,15 @@
 			"category": "creatures",
 			"type": "mesh",
 			"kind": "creature",
-			"size": [3.45, 1.95, 1.04],
+			"size": [3.53, 1.9, 1.2],
 			"tolerance": 0.15,
 			"clip_library": "res://art/models/animations/goblin.res",
 			"model": "res://art/models/characters/orc.glb",
 			"body_material": "orc",
-			"source": {"by": "art-gen (mesh and paint), Jeff (clean-up), pc-character (rig fit)", "tool": "Qwen-Image-2512, TRELLIS.2, blender (pc-character's tools/creature_fit.py, creature_finish.py)", "license": "own (mesh and paint); CC0 1.0 (the UAL skeleton and clips, Quaternius)", "date": "2026-10-19", "notes": "N:/assets/candidates/creature.orc/notes.md (Jeff's pick p2, redo v7 c12; meshed by the goblin's recipe, art-kit's hand fix creature.orc_p2_front_10k_paint_fixed.glb); fitted arms down to the UAL skeleton by joints read off the mesh (creature_fit.py, distance weights), posed to its T-pose rest; Jeff's clean-up in Blender (N:/psykinetic-art/orc_hand/orc_kit2.blend: welded, Solidify 0.02, voxel Remesh 0.023), collapsed to 10,000 triangles, the paint baked onto new UVs and the weights carried from the fit; its paint art/models/characters/orc_paint.png, drawn in orc_body.tres (decision 529 amended)"},
+			"source": {"by": "art-kit (mesh and paint, by hand), pc-character (rig)", "tool": "blender (art-kit's build; pc-character's tools/paint_bake.py, creature_finish.py, body_marks.py)", "license": "own (mesh and paint); CC0 1.0 (the UAL skeleton and clips, Quaternius)", "date": "2026-10-20", "notes": "Jeff's pick of art-kit's hand-built orc over the TRELLIS retarget (\"hand built orc and kobold approved\"): C:/dev/review/orc_hand/orc_by_hand.blend with the plate, brow and face passes; its Body weighted from the retarget's fit on the same armature (nearest face), the plate, chain and loincloth joined rigid on their bones (the loincloth's flaps on the thighs); its swatch paint baked onto new UVs (paint_bake.py) so the marks have room; the plate and chain on art-kit's palette; its skin art/models/characters/orc_paint.png, drawn in orc_body.tres (decision 529 amended). The retarget kept off the repo as the fallback (C:/dev/review/orc_kobold/fallback/, and git history)"},
 			"budget": 12000,
-			"uses": "the orc, the brute's body (decision 416; Jeff's pick p2 of art-gen's redo v7, a hulking hunched brute, grey-blue, an iron plate on its left shoulder and a chain; Jeff on the route sheet: \"the trellis retarget is what's close\"): art-gen's TRELLIS mesh (decision 529) rigged on the UAL skeleton (one Skeleton3D) by pc-character's creature_fit.py, in its own paint: its one material \"orc\" is drawn in Client3D's orc_body.tres (the goblin's shader, 494), not the palette; its clips the shared humanoid library's (clip_library: goblin.res, played through art/models/bonemaps/ual.tres; none baked into the .glb) by the names listed (any one of a clip's names, after any prefix); front +z, origin between its feet, standing at rest in T-pose, so x is its arm span (its long arms: 3.45 m), its knees a little bent and its back hunched as the concept stands (0.51 m in front of the feet to 0.51 behind, pc-character's measure); Jeff's clean-up of it (welded, thickened, voxel remeshed: 529 amended), collapsed to 10,000 triangles of the budget's 12,000, its paint baked across",
+			"materials": 2,
+			"uses": "the orc, the brute's body (decision 416; Jeff's pick p2 of art-gen's redo v7, a hulking hunched brute, grey-blue, an iron plate on its left shoulder and a chain): art-kit's hand-built orc (Jeff: \"hand built orc and kobold approved\"; decision 529 amended) rigged on the UAL skeleton (one Skeleton3D) by pc-character, in its own paint: its skin's material \"orc\" is drawn in Client3D's orc_body.tres (the goblin's shader, 494), its plate, chain and belt on the shared palette (materials: 2); its clips the shared humanoid library's (clip_library: goblin.res, played through art/models/bonemaps/ual.tres; none baked into the .glb) by the names listed (any one of a clip's names, after any prefix); front +z, origin between its feet, standing at rest in T-pose, so x is its arm span (its long arms: 3.53 m), its knees a little bent and its back hunched as the concept stands; 4,906 triangles of the budget's 12,000",
 			"clips": [
 				{"name": "idle", "names": ["idle", "idle_loop"], "required": true},
 				{"name": "walk", "names": ["walk", "walk_loop"], "required": true},
@@ -2080,10 +2081,10 @@
 				{"name": "death", "names": ["death01", "death02", "death"], "required": true}
 			],
 			"grey": [
-				{"at": [0, 1.39, -0.1], "size": [3.45, 0.3, 0.3]},
+				{"at": [0, 1.39, -0.1], "size": [3.53, 0.3, 0.3]},
 				{"at": [0, 0.44, 0], "size": [0.9, 0.88, 0.6]},
 				{"at": [0, 1.22, 0], "size": [1.1, 0.68, 1.0]},
-				{"at": [0, 1.76, 0.25], "size": [0.36, 0.34, 0.4]}
+				{"at": [0, 1.72, 0.45], "size": [0.36, 0.34, 0.4]}
 			]
 		},
 		"creature.kobold": {

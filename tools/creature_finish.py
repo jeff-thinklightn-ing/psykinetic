@@ -1,12 +1,16 @@
-# A creature_fit.py body made a model of the game's own (decision 529): its mesh named
-# "Body", its one material named for its people (Client3D draws it in that people's
+# A creature_fit.py body (or a hand-made one, rigged) made a model of the game's own (decision 529):
+# its mesh named "Body", its skin's material named for its people (Client3D draws it in that people's
 # <name>_body.tres, the goblin's shader over its paint), its paint saved beside it as
-# <name>_paint.png and left out of the .glb, the .blend saved beside the .glb as its source.
+# <name>_paint.png and left out of the .glb, the .blend saved beside the .glb as its source. Parts on
+# art-kit's palette (a material named "palette": a hand-made body's plate, chain, belt) keep it.
 #   blender -b -P tools/creature_finish.py -- <fitted .glb> <out .glb> <name>
 import os
 import sys
 
 import bpy
+
+## Art-kit's shared material (ArtKit.PALETTE_NAME), kept on a part that has it.
+PALETTE = "palette"
 
 
 def main() -> None:
@@ -27,7 +31,10 @@ def main() -> None:
 	body = meshes[0]
 	body.name = "Body"
 	body.data.name = name
-	images = [n.image for m in body.data.materials if m and m.use_nodes for n in m.node_tree.nodes if n.type == "TEX_IMAGE" and n.image]
+	skins = [m for m in body.data.materials if m and m.name.split(".")[0] != PALETTE]
+	if len(skins) != 1:
+		raise SystemExit("%d skin materials: one wanted" % len(skins))
+	images = [n.image for m in skins if m.use_nodes for n in m.node_tree.nodes if n.type == "TEX_IMAGE" and n.image]
 	if not images:
 		raise SystemExit("no paint on %s" % src)
 	paint = images[0]
@@ -36,10 +43,11 @@ def main() -> None:
 	paint.file_format = "PNG"
 	paint.save()
 	paint_size = tuple(paint.size)
-	# One material, named for the body's own in the game, with no image (the game's has it).
+	# The skin's material named for the body's own in the game, with no image (the game's has it).
+	slot = body.data.materials.find(skins[0].name)
+	skins[0].name = "%s (painted)" % name  # (Its name for the new one.)
 	material = bpy.data.materials.new(name)
-	body.data.materials.clear()
-	body.data.materials.append(material)
+	body.data.materials[slot] = material
 	for image in list(bpy.data.images):
 		bpy.data.images.remove(image)
 	for action in list(bpy.data.actions):

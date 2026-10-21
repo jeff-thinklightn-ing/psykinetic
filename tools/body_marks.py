@@ -44,7 +44,10 @@ def main() -> None:
 	body = max((o for o in bpy.data.objects if o.type == "MESH" and o.data.uv_layers), key=lambda o: len(o.data.polygons))
 	bone = lambda n: arm.matrix_world @ arm.data.bones[n].head_local
 	tail = lambda n: arm.matrix_world @ arm.data.bones[n].tail_local
-	pts = [body.matrix_world @ v.co for v in body.data.vertices]
+	# The skin's own faces only (a hand-made body's parts on art-kit's palette take no marks).
+	skin = {i for i, m in enumerate(body.data.materials) if m is None or m.name.split(".")[0] != "palette"}
+	on_skin = {v for poly in body.data.polygons if poly.material_index in skin for v in poly.vertices}
+	pts = [body.matrix_world @ body.data.vertices[i].co for i in sorted(on_skin)]
 	height = max(p.z for p in pts) - min(p.z for p in pts)
 	k = height / ORC_HEIGHT
 	# The chest's middle: a little over spine_02 (spine_03 sits up under a hunched body's jaw).
@@ -89,6 +92,8 @@ def main() -> None:
 	normal_m = world.to_3x3().inverted().transposed()
 	drawn = [0, 0, 0]
 	for tri in mesh.loop_triangles:
+		if tri.material_index not in skin:
+			continue
 		p3 = [world @ mesh.vertices[v].co for v in tri.vertices]
 		centre = (p3[0] + p3[1] + p3[2]) / 3.0
 		# Only near the chest and the upper arms.

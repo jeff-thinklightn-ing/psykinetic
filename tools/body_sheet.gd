@@ -153,9 +153,14 @@ func _look(model: Node3D, look: String) -> void:
 			model.scale = Vector3.ONE * float(field[1])
 			continue
 		if field[0] == "paint":
-			# A painted body's material (decision 529: e.g. orc_body.tres), unvaried.
+			# A painted body's material (decision 529: e.g. orc_body.tres), unvaried, on its skin as
+			# the game draws it (parts on art-kit's palette in the palette).
 			for mesh: MeshInstance3D in model.find_children("*", "MeshInstance3D", true, false):
-				mesh.material_override = load(field[1]) as Material
+				# (Client3D._paint_skin's way: this script runs without the game's autoloads.)
+				for surface in mesh.mesh.get_surface_count():
+					var own := mesh.mesh.surface_get_material(surface)
+					var palette := own != null and own.resource_name == "palette"
+					mesh.set_surface_override_material(surface, load("res://art/kit/palette.tres") if palette else load(field[1]) as Material)
 				mesh.set_instance_shader_parameter("skin", Vector3(0.0, 1.0, 1.0))
 				mesh.set_instance_shader_parameter("gear", Color(1.0, 1.0, 1.0, 0.0))
 				mesh.set_instance_shader_parameter("mark", Vector3.ZERO)

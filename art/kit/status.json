@@ -1986,7 +1986,7 @@
 			"type": "mesh",
 			"kind": "creature",
 			"category": "creatures",
-			"size": "3.45 x 1.95 x 1.04",
+			"size": "3.53 x 1.9 x 1.2",
 			"budget": 12000,
 			"for": "pc-character: body_gen on the UAL skeleton, skinned, UAL clips (decision 416)"
 		},

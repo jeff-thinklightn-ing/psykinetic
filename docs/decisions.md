@@ -16690,6 +16690,26 @@ then fitted as before: 5,975 triangles, its paint baked back. The fit still cuts
 where the remesh fused its hands to its thighs (25), which leaves small openings there, and
 the dark patch at its thighs in the jog stays (it is in its paint).
 
+Amended (529; Jeff: "hand built orc and kobold approved"): the orc is art-kit's hand-built body
+(C:/dev/review/orc_hand/orc_by_hand.blend, its plate, brow and face passes), not the TRELLIS
+retarget, which stays off the repo as the fallback (C:/dev/review/orc_kobold/fallback/, and git
+history). Rigged as the trial was: its Body weighted from the retarget's fit on the same armature
+(nearest face), the plate, chain and loincloth joined rigid on their bones, the loincloth's flaps
+below the hips on the thighs. Art-kit paints in flat swatches (each face's UVs on one texel of a
+128 by 16 strip), where body_marks.py has no room to draw, so tools/paint_bake.py welds the skin's
+faces, unwraps them afresh (Smart UV Project) and bakes the swatches into a 512 paint on the new
+UVs; the marks then draw (2,156 texels: the scar, the stripes, the hand). The plate, chain and belt
+stay on art-kit's palette: creature_finish.py keeps a "palette" material beside the skin's (the one
+other material named for the people), body_marks.py draws on the skin's faces only, and Client3D
+paints the skin's surfaces alone (_paint_skin: each surface not on the palette in the people's
+paint, the palette's in ArtKit.PALETTE), in the game, in warm_painted and in body_sheet.gd. The
+slot allows the two materials ("materials": 2), 3.53 by 1.90 by 1.20 m, 4,906 triangles.
+orc_body.tres is unchanged: its skin band (hue 0.46 to 0.70) takes the blue-grey skin (0.59 to 0.62)
+and leaves the lips' pink and the tusks' ivory. warm_painted holds its materials on the piece (meta
+"materials"): a twin held only by surface overrides was freed before the meshes as the piece was,
+the headless renderer's "material is null". The kobold follows when its crouched rest (art-kit's
+next pass) is fitted.
+
 ## 546. The temple's offering, the alms and the gold below
 
 Jeff's crypt.md (2026-10-19): "Brought back at the temple: a gold

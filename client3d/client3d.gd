@@ -7894,7 +7894,7 @@ func _make_model(model: Dictionary, puppet: Node3D) -> Node3D:
 		# (Its own material where this build lacks the paint: no error, as warm_painted.)
 		var paint := load(str(model["paint"])) as Material if ResourceLoader.exists(str(model["paint"])) else null
 		for mesh: MeshInstance3D in scene.find_children("*", "MeshInstance3D", true, false):
-			mesh.material_override = paint
+			_paint_skin(mesh, paint)
 			mesh.set_instance_shader_parameter("skin", look["skin"])
 			mesh.set_instance_shader_parameter("gear", Color(1.0, 1.0, 1.0, 0.0))
 			mesh.set_instance_shader_parameter("mark", look["mark"])
@@ -8194,6 +8194,10 @@ static func warm_goblin() -> Node3D:
 ## 11a3f6af: "Cannot call method 'duplicate' on a null value") is passed over, not warmed.
 static func warm_painted(models: Dictionary = MODELS) -> Node3D:
 	var piece := Node3D.new()
+	# The materials held by the piece itself till its children are gone (a twin held by its
+	# surfaces alone was freed before them as the piece was: the renderer's "material is null").
+	var held: Array[Material] = []
+	piece.set_meta("materials", held)
 	for kind: String in models:
 		if not models[kind].has("paint"):
 			continue
@@ -8207,12 +8211,24 @@ static func warm_painted(models: Dictionary = MODELS) -> Node3D:
 			continue
 		var twin := paint.duplicate() as ShaderMaterial
 		twin.shader = GOBLIN_MARKING_SHADER
+		held.append_array([paint, twin])
 		for material: Material in [paint, twin]:
 			var scene := made.instantiate() as Node3D
 			for mesh: MeshInstance3D in scene.find_children("*", "MeshInstance3D", true, false):
-				mesh.material_override = material
+				_paint_skin(mesh, material)
 			piece.add_child(scene)
 	return piece
+
+
+## [param mesh]'s skin in [param paint]: every surface but those on art-kit's palette (a
+## hand-made body's plate, chain and belt), which are drawn in the palette (decision 529 amended).
+static func _paint_skin(mesh: MeshInstance3D, paint: Material) -> void:
+	if paint == null:
+		return  # Its own material where this build lacks the paint.
+	for surface in mesh.mesh.get_surface_count():
+		var own := mesh.mesh.surface_get_material(surface)
+		var palette := own != null and own.resource_name == ArtKit.PALETTE_NAME
+		mesh.set_surface_override_material(surface, load(ArtKit.PALETTE) if palette else paint)
 
 
 ## A painted ally's look by its name (decision 529), the same on every peer
