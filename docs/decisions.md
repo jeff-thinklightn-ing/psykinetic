@@ -15919,6 +15919,16 @@ Checked against fake Godots in both runners (a crash block once then a pass:
 retried, passes; a game line then the crash: not retried); heavy_job_test
 (two crashes with one top frame grouped, the backtrace kept out of the
 summary).
+
+Amended (2) (release, 2026-10-20; ui's net_test at 22:04 lost an instance to
+a segfault, which only bash's "Segmentation fault" line showed): net_test.sh's
+quit() keeps each instance's exit code, and one that died on a signal (128 or
+more) is noted in the gate's log as a launch event, its role (server, server2,
+client4, ...) and, from its log, the crash, top frame and whole backtrace in
+run.sh's form, so heavy_job summary groups net_test's crashes by top frame
+with the suite's. Observability only: nothing in net_test is retried. Checked
+with a process killed by SIGSEGV over a crash block (noted, grouped) beside a
+clean exit (not noted).
 ## 529. The Blood Rot's allies on the mesh route: art-gen's meshes in their own paint
 
 Jeff on the route sheets (orc_routes.png, kobold_routes.png): "the trellis retarget is what's

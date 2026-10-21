@@ -53,10 +53,29 @@ client() {
 	CLIENTS="$CLIENTS $1"
 	start "$@" --test-exit-after=240
 }
-# Tells one instance to report and quit, and waits until it has.
+# Tells one instance to report and quit, and waits until it has. One that
+# died on a signal (exit 128 or more: a segfault is 139) is noted in the
+# gate's log with its role and crash block (crash_note).
 quit() {
 	touch "$LOGS/$1.done" "$LOGS/$1.done.quit"
-	eval "wait \$pid_$1"
+	code=0
+	eval "wait \$pid_$1" || code=$?
+	[ "$code" -ge 128 ] && crash_note "$1" "$code"
+	return 0
+}
+# An instance <name> that died on a signal, exit <code> (decision 530
+# amended (2), observability only: nothing is retried): its role, and from
+# its log the crash, top frame and whole backtrace, as tests/run.sh notes a
+# scene's, so heavy_job summary groups net_test's crashes by top frame with
+# the suite's.
+crash_note() {
+	detail="net_test $1 exit $2, killed by a signal"
+	if cat "$LOGS/$1.log" "$LOGS/$1.err" 2>/dev/null | grep -q '^CrashHandlerException:'; then
+		frames="$(cat "$LOGS/$1.log" "$LOGS/$1.err" | grep -E '^\[[0-9]+\] ' | sed -E 's/^\[[0-9]+\] [0-9a-fx]+ \(([^)]*)\).*/\1/' | tr '\n' ' ')"
+		detail="$detail; crashed ($(cat "$LOGS/$1.log" "$LOGS/$1.err" | grep -m 1 '^CrashHandlerException:' | sed 's/^CrashHandlerException: //')) at ${frames%% *}; backtrace: ${frames% }"
+	fi
+	noted="$(python -B tools/heavy_job.py note "$(basename "$(pwd)")" launch "$detail" 2>/dev/null || echo "$detail")"
+	echo "  (crashed: ${noted%%; backtrace:*})"
 }
 # The end of a phase: the clients report, and once all have (each one's last
 # view still has the others) they quit; then the server.
