@@ -949,7 +949,8 @@ func _test_companion_hearsay() -> void:
 	_check(leanings.size() == 2 and leanings.values().all(func(v: Variant) -> bool: return int(v) >= 1 and int(v) <= 10)
 		and leanings == CompanionCard.roll("lean-test")["leanings"] and rolled["fear"] == CompanionCard.roll("lean-test")["fear"],
 		"her intellect and superstition are rolled with her card, the same every time, the rest as it was (%s)" % [leanings])
-	_check(CompanionCard.leaning({"name": "Pip"}, "old", "intellect") == 4 and CompanionCard.leaning({"name": "Pip"}, "old", "superstition") == 8
+	_check(CompanionCard.leaning({"name": "Pip"}, "old", "intellect") == 4 and CompanionCard.leaning({"name": "Pip"}, "old", "superstition") == 2
+		and CompanionCard.leaning({"name": "Pip", "leanings": {"intellect": 4, "superstition": 8}}, "old", "superstition") == 2
 		and CompanionCard.leaning({"name": "Nix"}, "old", "intellect") == 8, "Pip, Wren and Nix have theirs fixed")
 	_check(CompanionCard.leaning({"name": "Ysolt"}, "old", "intellect") == CompanionCard.leaning({"name": "Ysolt"}, "old", "intellect")
 		and "Leanings" not in CompanionCard.facts(rolled, "Jeff"), "a card from before has them from her seed; her card is written without them")

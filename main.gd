@@ -4128,6 +4128,22 @@ func _on_channel(by: GridEntity, body: GridEntity, state: StringName) -> void:
 				pet.note_brought_back(_display_name(by), _display_name(body))
 
 
+## Server: the companion called [param wanted] (a name is never rolled
+## twice: _give_traits), if a player's record has her alive: {player_id,
+## where: "party" (with her player or waiting in the world), "resting" (in
+## a town, "companion:<player_id>" there), "taken" (held by raiders)}; {}
+## if none. npc's resident of the same name (Pip) stands down while she is
+## (no body, no alms run), so there is one of him.
+func companion_named(wanted: String) -> Dictionary:
+	for id: String in _records:
+		var pet: Dictionary = _records[id].companion
+		if str(pet.get("name", "")) != wanted or not bool(pet.get("alive", true)):
+			continue
+		var where := "taken" if pet.has("taken") else "resting" if pet.has("resident") else "party"
+		return {"player_id": id, "where": where}
+	return {}
+
+
 ## Her object pronoun by her card ("her", "him", "them").
 func _companion_object(record: PlayerRecord) -> String:
 	var traits: Dictionary = record.companion.get("traits", {})
@@ -4687,6 +4703,8 @@ func _offers_context() -> Dictionary:
 			var ids := World.production.worker_ids(hut).filter(func(id: String) -> bool: return not bool(World.production.worker(id).get("away", false)))
 			return str(ids[0]) if not ids.is_empty() else "",
 		"send_healer": func(healer_id: String, sick_id: String, player_id: String) -> bool: return _send_healer(healer_id, sick_id, player_id),
+		# One Pip (the coordinator's ruling with npc): the companion of that name, if a player has her.
+		"companion_named": func(wanted: String) -> Dictionary: return companion_named(wanted),
 		"companion_sick": func(id: String) -> Dictionary:
 			var record: PlayerRecord = _records.get(id.trim_prefix("companion:"))
 			return record.companion.get("sick", {}).duplicate(true) if record != null and record.companion.get("sick") is Dictionary else {},

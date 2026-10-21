@@ -16888,3 +16888,26 @@ resident_test. Parts to come: Pip's bodiless alms run on the world tick
 Aldous's secret, the gossip and the lived fact; Aldous's secrets as lore's
 entries with knowers; "Take the offering down" (a kept offering births the
 "cheated" standing key from Jeff's list) and "Find the runner".
+## 442 amended: one Pip
+
+The coordinator's ruling with npc (2026-10-20, Jeff's crypt.md): Pip is a
+settled resident of Held, Aldous's apprentice running the alms (npc's
+side), and the companion Pip of companion_traits.json is the same person
+when a player takes him along. So:
+- His superstition is low, fixed (crypt.md: "not superstitious enough to
+  keep away from the crypt"): the legacy table's Pip leanings {intellect
+  4, superstition 2} (the 8 there was companions' own draft, the other way
+  round). CompanionCard.leaning reads a legacy name's fixed leanings
+  before her saved traits, so a record that saved the old 8 reads 2, and
+  npc's resident card reads the same values by name (leaning,
+  legacy_look).
+- Main.companion_named(name) -> {player_id, where: "party" | "resting" |
+  "taken"}, {} if no player's record has a living companion of that name
+  (Offers ctx "companion_named"): npc's resident Pip stands down (no
+  body, no alms run) while a player's Pip is alive and not taken, so he
+  is never two bodies; resting in Held, his companion body is the Pip the
+  town sees. Names stay one each: _give_traits never rolls a taken name,
+  and a legacy name is never rolled.
+The recruit path, resident to companion, is companions' to design later.
+companion_test _test_companion_named; resident_test's Pip leanings.
+Protocol unchanged; no new class_name.

@@ -86,6 +86,7 @@ func _ready() -> void:
 	_test_bond()
 	_test_sickness()
 	_test_field_return()
+	_test_companion_named()
 	_test_out_of_reach()
 	_test_knows_level()
 	_test_wild()
@@ -1475,6 +1476,23 @@ func _test_field_return() -> void:
 				kept[slot] = ""
 				kept_uids[slot] = 0
 		World.set_slots(entity, kept, kept_uids)
+
+
+func _test_companion_named() -> void:
+	print("
+== one of each name: where a player's companion of a name is, for npc's resident of the same name (442 amended) ==")
+	var record: PlayerRecord = _main._records[Net.player_id]
+	var her := String(record.companion["name"])
+	_check(_main.companion_named(her) == {"player_id": record.player_id, "where": "party"} and _main.companion_named("Nobody_at_all").is_empty(),
+		"with her player: party; a name nobody has: none")
+	record.companion["resident"] = {"place": "t/store", "zone": "t", "trade": ""}
+	_check(str(_main.companion_named(her).get("where", "")) == "resting", "resting in a town: resting")
+	record.companion.erase("resident")
+	record.companion["alive"] = false
+	_check(_main.companion_named(her).is_empty(), "fallen: none")
+	record.companion["alive"] = true
+	_check(CompanionCard.leaning({"name": "Pip", "leanings": {"intellect": 4, "superstition": 8}}, "old", "superstition") == 2,
+		"Pip's low superstition is fixed, whatever a record saved (crypt.md)")
 
 
 func _test_out_of_reach() -> void:

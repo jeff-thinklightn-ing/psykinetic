@@ -93,19 +93,20 @@ static func roll_leanings(player_id: String, traits: Dictionary) -> Dictionary:
 	return out
 
 
-## Her leaning [param key] ("intellect", "superstition"): her traits'
-## "leanings", else a legacy one's fixed, else rolled 1..10 by [param seed]
-## (her player's id), the same every time, so a card from before has them
-## with nothing saved.
+## Her leaning [param key] ("intellect", "superstition"): a legacy one's
+## fixed (they win over what was saved: one Pip, the resident and the
+## companion alike), else her traits' "leanings", else rolled 1..10 by
+## [param seed] (her player's id), the same every time, so a card from
+## before has them with nothing saved.
 static func leaning(traits: Dictionary, seed: String, key: String) -> int:
-	var own: Variant = traits.get("leanings", {}).get(key) if traits.get("leanings") is Dictionary else null
-	if own is int or own is float:
-		return clampi(int(own), 1, 10)
 	var name := str(traits.get("name", ""))
 	if is_legacy(name):
 		var fixed: Variant = tables()["legacy"][name].get("leanings", {})
 		if fixed is Dictionary and (fixed.get(key) is int or fixed.get(key) is float):
 			return clampi(int(fixed[key]), 1, 10)
+	var own: Variant = traits.get("leanings", {}).get(key) if traits.get("leanings") is Dictionary else null
+	if own is int or own is float:
+		return clampi(int(own), 1, 10)
 	return 1 + absi(hash("%s:%s" % [key, seed])) % 10
 
 
