@@ -300,8 +300,8 @@ static func label_of(person_name: String, of_trade: String) -> String:
 ## What one of [param of_trade] is doing at [param hour] (0..24), by its
 ## routine (decision 404, Townsfolk.whereabouts: the season, its hidden
 ## type, its own clock and the temple day by [param worker_id]).
-static func doing_at(of_trade: String, hour: float, season := "", type := "", worker_id := "", day := -1) -> Doing:
-	return DOING_AT.get(Townsfolk.whereabouts(of_trade, hour, season, type, worker_id, day), Doing.SQUARE)
+static func doing_at(of_trade: String, hour: float, season := "", type := "", worker_id := "", day := -1, mood := "") -> Doing:
+	return DOING_AT.get(Townsfolk.whereabouts(of_trade, hour, season, type, worker_id, day, mood), Doing.SQUARE)
 
 
 ## What one of [param of_trade] (hidden [param type], [param worker_id]) is
@@ -309,7 +309,8 @@ static func doing_at(of_trade: String, hour: float, season := "", type := "", wo
 ## body spawned as a player walks up starts at the right stint.
 static func doing_now(of_trade: String, type := "", worker_id := "") -> Doing:
 	var now := DayNight.now()
-	return doing_at(of_trade, DayNight.hour(now), Season.name_at(World.steps), type, worker_id, Townsfolk.day_of(now))
+	return doing_at(of_trade, DayNight.hour(now), Season.name_at(World.steps), type, worker_id, Townsfolk.day_of(now),
+		Townsfolk.mood_of(World.production, worker_id))  # A resting companion kept apart sits alone (555, npc's side).
 
 
 func _sim_tick() -> void:

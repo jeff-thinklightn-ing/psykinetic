@@ -40,5 +40,9 @@
 			"news": ["news", "what's new", "anything new", "heard", "going on", "tell me"],
 			"yes": ["yes", "aye", "all right", "alright", "i will", "i'll take it", "i'll do it", "i'll bring", "done", "deal", "take it", "agreed", "very well", "gladly"],
 			"no": ["no", "nay", "not now", "no thanks", "never mind", "not today"],
-			"amount": ["give", "lend", "pay", "here is", "here's", "take"]}}
+			"amount": ["give", "lend", "pay", "here is", "here's", "take"]}},
+	"mood": {
+		"_note": "A companion resting in town shows her mood toward her player (decision 555, npc's side; companions write mood and mood_why on her worker record). apart_at: where she sits alone instead of her trade while the mood is apart (a whereabouts place: well, inn, square, temple). Sullen or apart, the town's gossip notes once a day that she is unhappy with her player, companions' reason verbatim.",
+		"apart_at": "temple"
+	}
 }

@@ -38,6 +38,7 @@ func _ready() -> void:
 	_test_scoundrel()
 	_test_sickness()
 	_test_road_news()
+	_test_mood_in_town()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	Offers.ctx = {}  # Static callables into this node would crash the quit.
@@ -584,3 +585,57 @@ func _check(ok: bool, what: String) -> void:
 	print("  %s  %s" % ["PASS" if ok else "FAIL", what])
 	if not ok:
 		_failures += 1
+
+
+func _test_mood_in_town() -> void:
+	print("\n== a companion resting in town shows her mood: apart, she sits alone; sullen or apart, the town says why (decision 555, npc's side) ==")
+	_thief_town()
+	Townsfolk.use_days({"default": {"stints": [{"from": 0, "to": 12, "at": "work"}, {"from": 12, "to": 24, "at": "work"}]}, "offset_hours": 0,
+		"gossip": {"every": 1, "places": ["well", "inn", "square", "temple"]}, "mood": {"apart_at": "temple"}})
+	Townsfolk._gossip_due.clear()
+	Townsfolk._mood_told.clear()
+	Offers.ctx["name_of"] = func(id: String) -> String: return "Jeff" if id == "p-jeff" else ""
+	_work.add_worker("companion:Wren", "Wren", ["cook"], TOWN, "companion:Wren")
+	_work.set_origin("companion:Wren", "companion:p-jeff")
+	_work.set_away("companion:Wren", false)
+	_check(Townsfolk.mood_of(_work, "companion:Wren") == "" and Townsfolk.whereabouts("cook", 10.0, "", "", "companion:Wren", 0, "") == "work",
+		"no mood written: she is at her trade like anyone")
+	_work.set_mood("companion:Wren", "apart", "they struck her")
+	_check(_work.worker("companion:Wren")["mood"] == "apart" and _work.worker("companion:Wren")["mood_why"] == "they struck her"
+		and Townsfolk.mood_of(_work, "companion:Wren") == "apart", "Production.set_mood keeps the mood and the why on her worker record")
+	_check(Townsfolk.whereabouts("cook", 10.0, "", "", "companion:Wren", 0, "apart") == "temple"
+		and Resident.doing_at("cook", 10.0, "", "", "companion:Wren", 0, "apart") == Resident.Doing.TEMPLE, "apart: she sits alone at the temple instead of her trade")
+	_check(Townsfolk.whereabouts("cook", 10.0, "", "", "companion:Wren", 0, "sullen") == "work", "sullen: still at her trade")
+	_check(Townsfolk.mood_of(_work, "t-odo") == "" and Townsfolk.whereabouts("smith", 10.0, "", "", "t-odo", 0, Townsfolk.mood_of(_work, "t-odo")) == "work", "a resident has no mood")
+	var texts := func() -> Array: return _memory.map(func(e: Dictionary) -> String: return str(e.get("text", "")))
+	Townsfolk.gossip(_work)  # Arms the beat.
+	_now += 10
+	Townsfolk.gossip(_work)
+	var said: Array = texts.call()
+	_check(said.has("Wren is unhappy with Jeff: they struck her"), "the gossip beat: the town notes that she is unhappy with Jeff, companions' reason verbatim (%s)" % [said])
+	var entry: Dictionary = _memory[said.find("Wren is unhappy with Jeff: they struck her")] if said.has("Wren is unhappy with Jeff: they struck her") else {}
+	_check(entry.get("tier") == TownMemory.CANDIDATE and entry.get("said_by") == "companion:Wren", "as a candidate belief of the town, said by her")
+	_work.set_mood("companion:Wren", "apart", "they left her behind")
+	_now += 10
+	Townsfolk.gossip(_work)
+	_check(not texts.call().has("Wren is unhappy with Jeff: they left her behind"), "a new reason the same day: not again today")
+	_now += maxi(DayNight.day_steps, 1)
+	Townsfolk.gossip(_work)
+	_check(texts.call().has("Wren is unhappy with Jeff: they left her behind"), "the next day: the newest reason")
+	_work.set_mood("companion:Wren", "sullen", "they kept her from a fight")
+	_now += maxi(DayNight.day_steps, 1)
+	Townsfolk.gossip(_work)
+	_check(texts.call().has("Wren is unhappy with Jeff: they kept her from a fight"), "sullen says it too")
+	_work.set_mood("companion:Wren", "fond", "")
+	_now += maxi(DayNight.day_steps, 1)
+	var before: int = _memory.size()
+	Townsfolk.gossip(_work)
+	_check(_memory.size() == before, "fond again: nothing more is said")
+	_work.set_mood("companion:Wren", "apart", "they struck her")
+	Offers.ctx["name_of"] = func(_id: String) -> String: return ""
+	_now += maxi(DayNight.day_steps, 1)
+	before = _memory.size()
+	Townsfolk.gossip(_work)
+	_check(_memory.size() == before, "a player the town has no name for: no line, never an id")
+	Offers.ctx.erase("name_of")
+	Townsfolk._mood_told.clear()

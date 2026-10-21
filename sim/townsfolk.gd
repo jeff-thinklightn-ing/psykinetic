@@ -1453,6 +1453,7 @@ static func gossip(production: Production) -> void:
 			var changed := not TownMemory.candidates(log, at).is_empty()  # Beliefs that spread and hold: candidates (phase 1).
 			changed = _arrive(production, town, log, at) or changed  # Remembered people moving in (phase 4).
 			changed = note_disputes(production, town, log, at) or changed  # Quarrels for the lawspeaker (decision 486).
+			changed = _mood_news(production, town, log, towns[town], at) or changed  # A resting companion sullen or apart (555, npc's side).
 			if changed:
 				Offers._call(Offers.ctx, "set_memory", [town, log])
 		for id: String in towns[town]:
@@ -1465,7 +1466,7 @@ static func gossip(production: Production) -> void:
 		var groups := {}  # place -> [worker ids]
 		for id: String in towns[town]:
 			var where := whereabouts(_trade_of(production, id), hour, Season.name_at(at),
-				str(production.worker(id).get("type", "")), id, day_of(at))
+				str(production.worker(id).get("type", "")), id, day_of(at), mood_of(production, id))
 			if where in places:
 				groups.get_or_add(where, []).append(id)
 		var keys: Array = groups.keys()
@@ -1474,6 +1475,51 @@ static func gossip(production: Production) -> void:
 			if groups[place].size() >= 2:
 				_pass(production, town, place, groups[place], at)
 		perform(production, town, groups.get("inn", []), at)  # The bard's piece (decision 490).
+
+
+## A resting companion's mood in town (decision 555, npc's side): the
+## worker record's "mood" (companions' word, written with Production.set_mood)
+## for a companion worker, "" for anyone else or no production.
+const MOOD_APART := "apart"
+const MOOD_SULLEN := "sullen"
+static var _mood_told := {}  # companion worker id -> the day the town last spoke of her mood
+
+
+static func mood_of(production: Production, worker_id: String) -> String:
+	if production == null or not worker_id.begins_with(COMPANION):
+		return ""
+	return str(production.worker(worker_id).get("mood", ""))
+
+
+## The town speaks of a resting companion sullen or apart (decision 555,
+## npc's side): once a day for each, "<name> is unhappy with <player>:
+## <why>", the player named as the town knows them (Offers.ctx "name_of",
+## the plea's word; no name, no line) and the why companions' own words,
+## noted in [param log] as a candidate belief of the town, the lawspeaker's
+## to rule on like any other. Whether the log changed.
+static func _mood_news(production: Production, town: String, log: Array, ids: Array, at: int) -> bool:
+	var changed := false
+	var today := day_of(at)
+	for id: String in ids:
+		if not id.begins_with(COMPANION):
+			continue
+		var who := production.worker(id)
+		var mood := str(who.get("mood", ""))
+		var why := str(who.get("mood_why", "")).strip_edges()
+		if mood not in [MOOD_SULLEN, MOOD_APART] or why.is_empty() or int(_mood_told.get(id, -1)) == today:
+			continue
+		var player_id := str(who.get("origin", "")).trim_prefix(COMPANION)
+		var player_name := str(Offers._call(Offers.ctx, "name_of", [player_id])) if not player_id.is_empty() else ""
+		if player_name.is_empty() or player_name == "<null>":
+			continue
+		var entry := TownMemory.note(log, "%s is unhappy with %s: %s" % [str(who.get("name", id)), player_name, why.trim_suffix(".")], id, "", at)
+		_mood_told[id] = today
+		if entry.is_empty():
+			continue
+		if str(entry.get("tier", "")) == TownMemory.BELIEF:
+			entry["tier"] = TownMemory.CANDIDATE
+		changed = true
+	return changed
 
 
 ## Remembered people moving in (decision 460): each entry of [param log]
@@ -1839,9 +1885,11 @@ static func use_days(given: Dictionary) -> void:
 ## listed), their edges moved by [param season]; else the square. The hour
 ## is read on the resident's own clock, ahead of or behind the town's by
 ## their offset (offset_hours at most, by the id).
-static func whereabouts(trade: String, hour: float, season := "", type := "", worker_id := "", day := -1) -> String:
+static func whereabouts(trade: String, hour: float, season := "", type := "", worker_id := "", day := -1, mood := "") -> String:
 	var table := days()
 	var at := fposmod(hour - offset_of(worker_id), 24.0)
+	if mood == MOOD_APART:
+		return str(table.get("mood", {}).get("apart_at", "temple"))  # Kept apart from her player, she sits alone (555, npc's side).
 	var temple: Dictionary = table.get("temple", {})
 	var every := int(temple.get("every_days", 0))
 	if day >= 0 and every > 0 and (day + absi(hash("temple:" + worker_id))) % every == 0 \

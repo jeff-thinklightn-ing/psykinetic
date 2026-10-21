@@ -241,6 +241,17 @@ func set_heard(worker_id: String, heard: Array) -> void:
 		_workers[worker_id]["heard"] = heard.duplicate(true)
 
 
+## Worker [param worker_id]'s mood toward their player (companions' 555:
+## "devoted", "close", "fond", "cooling", "wary", "sullen", "apart") and
+## [param why], the newest reason in the third person ("they struck her"),
+## as companions' side writes them for a companion resting in town; "" for
+## none. Nothing for an unknown id.
+func set_mood(worker_id: String, mood: String, why := "") -> void:
+	if _workers.has(worker_id):
+		_workers[worker_id]["mood"] = mood
+		_workers[worker_id]["mood_why"] = why
+
+
 ## Worker [param worker_id]'s [param quality] of MIND, 1..10: a companion
 ## resting in town brings hers from her card (decision 442); nothing for an
 ## unknown id.

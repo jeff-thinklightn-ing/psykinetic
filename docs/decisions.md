@@ -18101,3 +18101,30 @@ later hand.
   place's label); false and "" for an unknown uid. The note says "grave
   goods", the story "taken from the grave".
 items_test. Protocol unchanged; no new class_name.
+## 555, npc's side. Her mood shows in town
+
+Companions' 555 (loyalty): Main writes record.companion["mood"], her
+bond step word, one of devoted, close, fond, cooling, wary, sullen,
+apart, and while she rests in town copies "mood" and "mood_why" (the
+newest Standing why, ready-made in the third person: "they struck her")
+onto her worker record "companion:<her name>" with Production.set_mood
+(added here, beside set_heard and set_mind of 442). The coordinator
+approved npc's half 2026-10-21, with one care: the gossip names the
+player as the town knows them and the why is companions' text verbatim.
+
+- Apart: Townsfolk.whereabouts takes her mood (Townsfolk.mood_of, the
+  worker record's word; "" for a resident) and at "apart" seats her at
+  residents.json mood.apart_at (the temple) whatever the hour, instead of
+  her trade: Resident.doing_now passes it, so her body moves there on
+  its next look and stays while the mood lasts. The gossip's grouping by
+  place sees her there too.
+- Sullen or apart: Townsfolk._mood_news, on the gossip beat with the
+  arrivals and the disputes, notes "<name> is unhappy with <player>:
+  <why>" in the town's memory as a candidate belief, said by her, once a
+  day for each companion (_mood_told), the player named by Offers.ctx
+  "name_of" (the plea's word; no name, no line, never an id). The
+  lawspeaker may rule on it like any belief; a mood back at fond or
+  better simply adds no more.
+- Rules: residents.json "mood" {apart_at}. townsfolk_test
+  _test_mood_in_town. Server only, nothing on the wire, no new
+  class_name, no new content in levels. Leaving itself waits on Jeff.
