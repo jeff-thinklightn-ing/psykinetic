@@ -51,6 +51,7 @@ func _ready() -> void:
 	_test_two_sentences()
 	_test_sick_body()
 	_test_placed_captive()
+	_test_aloud()
 	_test_offer_words()
 	_test_monster_talk()
 	_test_alms_run()
@@ -1241,6 +1242,32 @@ func _test_placed_captive() -> void:
 	var gone: Array[String] = [camp]
 	_check(_main._place_captives(_main._world_map, gone) == 0 and not _main._placed_captives.has(camp), "a camp gone from the levels is forgotten")
 	_check(World.towns.died(STORE, who, "the test's end"), "(Tilda out of the town again, so the later tests see the roster they expect)")
+
+
+## The words said and one clause of how (336 amended; Jeff's play on
+## v0.1.160): the model's stage direction round the words never reaches a
+## bubble; it becomes a third-person aside, or nothing.
+func _test_aloud() -> void:
+	print("\n== the voice: the words said in the bubble, the model's narration turned to one third-person clause beside them, or dropped (336 amended) ==")
+	var cases := [
+		["You nod, your voice steady despite the rain. \"Jeff, I've been meaning to thank you for the food you brought last time. It was kind of you.\"", "Aldous",
+			"Jeff, I've been meaning to thank you for the food you brought last time. It was kind of you.", "his voice steady despite the rain", "Aldous's line from the box: the quoted words, both sentences; the voice clause over a bare nod"],
+		["You look up from your workbench, your voice low and careful. \"I owe the town 29 gold.\"", "Snagfin",
+			"I owe the town 29 gold.", "looking up from his workbench, low and careful", "Snagfin's line from the box: a gesture with its place joins the voice within eight words"],
+		["You look up from the long bench by the door, your voice low. \"Aye.\"", "Snagfin", "Aye.", "his voice low", "over eight words joined: the voice clause alone"],
+		["You've got a better trade than me, at least. What's the town needing most?", "Pip", "You've got a better trade than me, at least. What's the town needing most?", "", "real speech beginning with You is kept whole, no aside"],
+		["You look tired, friend. Sit a while.", "Bea", "You look tired, friend. Sit a while.", "", "\"You look tired\" is speech, not a look up from the bench"],
+		["*nods* Aye, the well is low.", "Bea", "Aye, the well is low.", "nodding", "an asterisked action becomes the aside"],
+		["(sighs) It is what it is. You shrug. We manage.", "Bea", "It is what it is. We manage.", "sighing", "a bracketed action first, a shrug mid-line out of the speech, the rest joined"],
+		["You nod and say nothing more.", "Bea", "", "nodding", "narration alone leaves no words: not said"],
+		["“Aye, the smith owes me.” You turn back to the fire.", "Bea", "Aye, the smith owes me.", "turning back to the fire", "curly quotes count; a gesture after the quote"],
+		["Bea says: \"You turn to go. Stay, the night is cold.\"", "Bea", "Stay, the night is cold.", "", "the own-name lead cut first; a turn to go is movement, no aside"],
+		["You smile. \"Come in.\" Aldous's voice is warm.", "Aldous", "Come in.", "his voice is warm", "the speaker's name turned to the pronoun, never in the aside"],
+		["I know little of him. He came by the east road. Ask the lawspeaker.", "Bea", "I know little of him. He came by the east road.", "", "two sentences still, after the filter"],
+	]
+	for each: Array in cases:
+		var got := Resident.spoken(str(each[0]), str(each[1]), "his")
+		_check(str(got["say"]) == str(each[2]) and str(got["aside"]) == str(each[3]), "%s: \"%s\" + \"%s\"" % [each[4], got["say"], got["aside"]])
 
 
 ## Talk with no panel (decision 536): a kin's plea spoken back word for

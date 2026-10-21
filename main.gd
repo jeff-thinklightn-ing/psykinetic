@@ -5454,18 +5454,24 @@ func _heard_from_worker(record: PlayerRecord) -> void:
 func _resident_answered(out: Dictionary, answer: Dictionary, error: String) -> void:
 	var ask: Dictionary = out["ask"]
 	var body := instance_from_id(int(out["body"])) as Resident
-	var line := Resident.two_sentences(Companion.trim_line(str(answer.get("say", "")).strip_edges()), body.person if body != null else "")  # The voice rule, by code too (336 amended).
+	# The voice rule, by code too (336 amended): the words said, and one clause of how, apart.
+	var pronoun := str(Townsfolk.card_of(World.production, body.worker_id).get("traits", {}).get("pronoun", "")) if body != null else ""
+	var spoken := Resident.spoken(Companion.trim_line(str(answer.get("say", "")).strip_edges()), body.person if body != null else "", {"she": "her", "he": "his"}.get(pronoun, "their"))
+	var line := str(spoken["say"])
+	var aside := str(spoken["aside"])
 	var said := body != null and is_instance_valid(body) and body.spawned and not line.is_empty() and line != "..."
 	MindLog.record({"kind": "voice", "companion": str(ask.get("speaker", "")), "mind": "resident", "trigger": ask.get("trigger", ""),
-		"prompt": "%s\n\n%s" % [ask.get("system", ""), ask.get("user", "")], "say": line, "error": error,
+		"prompt": "%s\n\n%s" % [ask.get("system", ""), ask.get("user", "")], "say": line, "aside": aside, "error": error,
 		"outcome": "said" if said else "not said"})
 	if not said:
 		return
 	Transcript.record(body.person, body.person, line)
-	party_log.add("%s said: \"%s\"" % [body.person, line])
+	if not aside.is_empty():
+		Transcript.record(body.person, body.person, "[aside] " + aside)
+	party_log.add("%s said: \"%s\"%s" % [body.person, line, (" (%s)" % aside) if not aside.is_empty() else ""])
 	_heard_near(body, body.person, line)
 	_own_tale(body, line, str(ask.get("speaker", "")))
-	Net.broadcast_to(hearers(body.tile), "speech", {"entity": String(body.get_path()), "speaker": body.person, "text": line})
+	Net.broadcast_to(hearers(body.tile), "speech", {"entity": String(body.get_path()), "speaker": body.person, "text": line, "aside": aside})
 	_send_offers(body, str(out.get("player", "")), int(out.get("peer", -1)))
 
 

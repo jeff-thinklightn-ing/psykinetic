@@ -17379,3 +17379,60 @@ only carpenter left would stop building. Approved by the coordinator.
   this, so Held is never left without a carpenter for more than the wait.
 farm_test _test_maker_comes. Not soak-measured.
 
+
+## 336 amended. The words said, and one clause of how
+
+Jeff, from his play on v0.1.160 (2026-10-20): "town npc verbalize their
+thoughts." On the box (grepped mind.log lines) nothing a resident says
+is unprompted: the voice asks fire only on a player's line (336), the
+bard's song in earshot (490) and an offer when asked (536). What he saw
+is the shape of the answers: the model wraps the resident's words in
+stage direction and inner state, second person, and the whole of it went
+to the bubble, the transcript, the party log and the gossip of those in
+earshot. Aldous: "You nod, your voice steady despite the rain. \"Jeff,
+I've been meaning to thank you for the food you brought last time.\"";
+Snagfin: "You look up from your workbench, your voice low and careful.
+\"I owe the town 29 gold.\"". Worse, the two-sentence cut then kept the
+narration as sentence one and cut the words themselves. The prompt already
+forbade it ("never describe what you do"); the model ignores it. Then
+Jeff, on the fix: "might be interesting if there's some sort of narration
+quality, such as 'Jeff, I've been meaning...' his voice steady despite the
+rain." So the narration is turned, not dropped.
+
+The rule, by code, on the one path Main holds every answer to
+(Resident.spoken, new; two_sentences keeps its contract over it):
+asterisked and bracketed actions come out of the line; when the answer
+holds quoted speech, the quoted words are the speech and the rest
+narration; else each sentence of second-person narration is (one
+beginning "You" and a gesture verb: nod, shrug, sigh, smile, glance,
+lean, pause, turn, look up / down / over / around / away, set down...; or
+naming your voice, eyes, hands, face, gaze, brow, jaw, shoulders). The
+speech is cut to two sentences as before (Resident.sentences keeps an
+unfinished tail); an answer left empty is "not said". The narration
+becomes one clause of how it was said (Resident.aside_of): third person
+in the resident's pronoun ("your" to his / her / their, the name's
+possessive to the pronoun's, a clause still naming the speaker dropped:
+ui's row heads with the name), lowercase, no end mark; a clause naming
+the voice is preferred ("his voice steady despite the rain"); else a
+gesture turned to its participle ("looking up from his workbench",
+"nodding", a tail after "and" cut); a gesture with something after its
+verb joins the voice clause's words when the two stay within eight words
+("looking up from his workbench, low and careful"), a bare gesture gives
+way to the voice, and over eight the voice alone ("his voice low"). A
+clause of walking, giving, taking, sitting, standing, or of thought, plan
+or wish (NOT_DONE) is never an aside: the sim did not do it. "You look
+tired" and "You've got a better trade than me" are speech and stay.
+
+Where each goes: the bubble carries the speech alone; the "speech"
+message gains "aside" (String, "" when none; PROTOCOL_REVISION 27),
+which ui's talk log shows after the speech on the same row, after a
+spaced dash, dim, in the sans (ui's side, landed beside this); the
+transcript keeps both, the aside marked "[aside]"; the server's party log
+the aside in brackets; gossip (_heard_near) and a resident's own tale hear
+the words alone. The prompt gains one line against narration, asterisks
+and quotation marks, so the model has less to turn. The cost: a true line
+naming "your voice" becomes an aside; rare. Unprompted greetings or
+gossip in earshot stay a design of their own. resident_test _test_aloud:
+the two lines from the box and ten shapes round them (the join, the
+over-eight fall-back, the name, the movement that is no aside). Server
+only beyond the key; the bump rides v0.1.161.

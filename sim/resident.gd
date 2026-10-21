@@ -102,16 +102,153 @@ var _listened := -1
 ## and one began "Bea says:"): two_sentences, with the speaker's [param name]
 ## so only their own name is cut from the front.
 static func two_sentences(line: String, name := "") -> String:
+	return str(spoken(line, name)["say"])
+
+
+## The gesture verbs a resident's narration may turn on, each with its
+## participle (336 amended): nothing that moves, gives or takes.
+const GESTURES := {"nod": "nodding", "shrug": "shrugging", "sigh": "sighing", "smile": "smiling", "grin": "grinning", "frown": "frowning",
+	"glance": "glancing", "lean": "leaning", "pause": "pausing", "turn": "turning", "straighten": "straightening", "wipe": "wiping",
+	"scratch": "scratching", "rub": "rubbing", "chuckle": "chuckling", "laugh": "laughing", "exhale": "exhaling", "blink": "blinking",
+	"squint": "squinting", "gesture": "gesturing", "fold": "folding", "tilt": "tilting", "shake": "shaking", "raise": "raising",
+	"lower": "lowering", "wave": "waving", "clear": "clearing", "set": "setting", "look": "looking", "lift": "lifting", "snort": "snorting",
+	"cough": "coughing", "wince": "wincing", "shift": "shifting", "stare": "staring", "spit": "spitting", "nudge": "nudging", "purse": "pursing"}
+## A sentence of second-person narration: "You" and a gesture verb, or one
+## naming your voice, eyes, hands or face.
+const NARRATION := "^[Yy]ou (nods?|shrugs?|sighs?|smiles?|grins?|frowns?|glances?|leans?|pauses?|turns?|straightens?|wipes?|scratch(es)?|rubs?|chuckles?|laughs?|exhales?|blinks?|squints?|gestures?|folds?|tilts?|shakes?|raises?|lowers?|waves?|clears?|sets? down|lifts?|snorts?|coughs?|winces?|shifts?|stares?|spits?|purses?|looks? (up|down|over|around|away|out|back|aside))\\b|\\byour (voice|eyes|hands?|face|gaze|brow|jaw|shoulders)\\b"
+## An action the sim did not do, a thought or a plan: never an aside.
+const NOT_DONE := "\\b(walk|go|goe|give|take|hand|step|leave|sit|stand|pick|put|pour|open|close|fetch|come|run|move|cross|carry|bring|follow|lead|think|wonder|decide|remember|consider|plan|hope|wish)(s|es|ing)?\\b"
+
+
+## What the model gave back, held to the rule (decision 336, amended from
+## Jeff's play on v0.1.160: "town npc verbalize their thoughts", then "might
+## be interesting if there's some sort of narration quality"): {say, aside}.
+## The model wrapped the words in stage direction ("You nod, your voice
+## steady despite the rain. "Jeff, I've been meaning to thank you..."") and
+## the whole of it reached the bubble, cut to two sentences with the words
+## themselves the ones cut. Now: asterisked and bracketed actions come out;
+## when the answer holds quoted speech, the quoted words are the speech and
+## the rest narration; else each sentence of second-person narration
+## (NARRATION) is; the speech is cut to two sentences as before, "" when
+## none (not said). The narration becomes one clause of how it was said, in
+## the third person with [param possessive] ("his", "her", "their"), no
+## end mark, never the speaker's [param name]: a clause naming the voice is
+## preferred ("his voice steady despite the rain"); else a gesture turned to
+## its participle ("looking up from his workbench", "nodding"); a gesture
+## with something after its verb joins a voice clause's words when the two
+## stay within eight words ("looking up from his workbench, low and
+## careful"); a bare gesture gives way to the voice. A clause of walking,
+## giving, taking, or of thought or plan (NOT_DONE) is never an aside.
+static func spoken(line: String, name := "", possessive := "their") -> Dictionary:
 	var said := line.strip_edges()
 	var lead_word := name if not name.is_empty() else "[A-Z][\\w'-]*"
 	var own := RegEx.create_from_string("^\\s*" + lead_word + "(\\s+says)?\\s*:\\s*\"?")
 	var lead := own.search(said)
 	if lead != null:
 		said = said.substr(lead.get_end()).strip_edges().trim_suffix("\"")
-	var parts: Array = RegEx.create_from_string("[^.!?]+[.!?]+[\"']?\\s*").search_all(said).map(func(m: RegExMatch) -> String: return m.get_string())
+	var narration: Array[String] = []
+	var marked := RegEx.create_from_string("\\*([^*]*)\\*|\\(([^)]*)\\)|\\[([^\\]]*)\\]")
+	for m: RegExMatch in marked.search_all(said):
+		var inner := (m.get_string(1) + m.get_string(2) + m.get_string(3)).strip_edges()
+		if not inner.is_empty():
+			narration.append(inner)
+	said = marked.sub(said, " ", true).strip_edges()
+	var quotes := RegEx.create_from_string("[\"“]([^\"”]*[A-Za-z][^\"”]*)[\"”]")
+	var quoted: Array = quotes.search_all(said).map(func(m: RegExMatch) -> String: return m.get_string(1).strip_edges())
+	var say := ""
+	if not quoted.is_empty():
+		say = " ".join(quoted)
+		for part: String in sentences(quotes.sub(said, " ", true)):
+			narration.append(part)
+	else:
+		var told := RegEx.create_from_string(NARRATION)
+		var kept: Array[String] = []
+		for part: String in sentences(said):
+			if told.search(part.strip_edges()) != null:
+				narration.append(part)
+			else:
+				kept.append(part)
+		say = "".join(kept)
+	var parts := sentences(say.strip_edges())
 	if parts.size() > 2:
-		said = ("".join(parts.slice(0, 2))).strip_edges()
-	return said
+		say = "".join(parts.slice(0, 2))
+	return {"say": say.strip_edges(), "aside": aside_of(narration, name, possessive)}
+
+
+## One clause of how it was said, from the model's [param narration]
+## (spoken): "" for none that fits.
+static func aside_of(narration: Array[String], name: String, possessive: String) -> String:
+	var not_done := RegEx.create_from_string(NOT_DONE)
+	var voiced := RegEx.create_from_string("^(his|her|their) voice\\b")
+	var clause_ends := RegEx.create_from_string(",|;")
+	var named := RegEx.create_from_string("\\b" + name + "\\b") if not name.is_empty() else null
+	var voice := ""
+	var gesture := ""
+	var bare := true
+	for part: String in narration:
+		for clause: String in clause_ends.sub(part, "|", true).split("|", false):
+			var words := _third_person(clause, name, possessive)
+			if words.is_empty() or not_done.search(words) != null or (named != null and named.search(words) != null):
+				continue
+			if voice.is_empty() and voiced.search(words) != null:
+				voice = words
+			elif gesture.is_empty():
+				var turned := _participle(words)
+				if not turned.is_empty():
+					gesture = turned
+					bare = turned.find(" ") < 0
+	if voice.is_empty():
+		return gesture
+	if gesture.is_empty() or bare:
+		return voice
+	var joined := gesture + ", " + voiced.sub(voice, "").strip_edges()
+	return joined if joined.split(" ").size() <= 8 else voice
+
+
+## [param clause] in the third person: "your" and "yourself" to the
+## resident's, the name's possessive to the pronoun's, no end mark, no
+## capital.
+static func _third_person(clause: String, name: String, possessive: String) -> String:
+	var words := clause.strip_edges().rstrip(".!?… ").strip_edges()
+	if words.is_empty():
+		return ""
+	var reflexive: String = {"his": "himself", "her": "herself"}.get(possessive, "themselves")
+	words = RegEx.create_from_string("\\byourself\\b").sub(words, reflexive, true)
+	words = RegEx.create_from_string("\\b[Yy]our\\b").sub(words, possessive, true)
+	if not name.is_empty():
+		words = RegEx.create_from_string("\\b" + name + "'s\\b").sub(words, possessive, true)
+	return words.left(1).to_lower() + words.substr(1)
+
+
+## [param words] as a participle clause when they begin with a gesture verb
+## ("you look up from his workbench" -> "looking up from his workbench",
+## "nods" -> "nodding"); "" otherwise.
+static func _participle(words: String) -> String:
+	var m := RegEx.create_from_string("^(?:you )?([a-z]+)(.*)$").search(words)
+	if m == null:
+		return ""
+	var verb := m.get_string(1)
+	var rest := m.get_string(2)
+	var more := rest.find(" and ")  # "nod and say nothing more": the gesture alone.
+	if more >= 0:
+		rest = rest.left(more)
+	for form: String in [verb, verb.trim_suffix("s"), verb.trim_suffix("es")]:
+		if GESTURES.has(form):
+			return (GESTURES[form] + rest).strip_edges()
+	return ""
+
+
+## [param text] cut into sentences, each with its end mark and the space
+## after; an unfinished tail is a sentence too.
+static func sentences(text: String) -> Array[String]:
+	var out: Array[String] = []
+	var at := 0
+	for m: RegExMatch in RegEx.create_from_string("[^.!?]+[.!?]+[\"'”]?\\s*").search_all(text):
+		out.append(m.get_string())
+		at = m.get_end()
+	if at < text.length() and not text.substr(at).strip_edges().is_empty():
+		out.append(text.substr(at))
+	return out
 
 
 const VOICE := """You are %s, who lives in %s and works there%s. You are no adventurer: you live and work in the town. Someone has just spoken to you.
@@ -122,7 +259,7 @@ Who you are:
 What is true now:
 %s
 
-Say what you would say out loud right now, as yourself, in one or two short sentences, to %s, speaking to them as "you". Your words are only what you say aloud: never describe what you do, and never begin with your own name or "says". Asked about someone nothing above speaks of, say plainly that you know little of them: never invent what another said of them. %s"""
+Say what you would say out loud right now, as yourself, in one or two short sentences, to %s, speaking to them as "you". Your words are only what you say aloud: never describe what you do, and never begin with your own name or "says". Never narrate yourself: no "You nod", nothing of your face, hands or voice, no asterisks, and no quotation marks round your words, which are the whole of your answer. Asked about someone nothing above speaks of, say plainly that you know little of them: never invent what another said of them. %s"""
 ## What its voice may say of the world (decision 378): an official's what
 ## it knows alone; others' what they know and have heard, as heard; then by
 ## its role's creativity and integrity (Lore.profile, 1..10: HIGH or more,

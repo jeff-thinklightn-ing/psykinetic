@@ -222,7 +222,9 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## 26: a building kind may be SOLID (building.mound): its footprint is no
 ## floor but its door, carried as terrain "solid" in the "terrain"
 ## message's files and the levels served (decision 550).
-const PROTOCOL_REVISION := 26
+## 27: the "speech" message carries "aside", one clause of how a resident
+## said the words, "" when none (336 amended).
+const PROTOCOL_REVISION := 27
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]
 ## Every kind of message (message, message_to, broadcast, broadcast_to).
