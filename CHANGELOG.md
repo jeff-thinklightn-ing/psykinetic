@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The talk log shows how a townsperson said a line, dim after their words ("— his voice steady despite the rain"); the bubble over their head stays the words alone (336 amended, ui's side).
 - When a town loses its last carpenter, smith or other maker, a newcomer of that trade now moves in after three days and takes the empty bench, so the town keeps building (552).
 - Screenshots taken on a joined client are named with the area again ("wilds_209-201_..."), and the big map marks your own area and lists your party under it when you joined a server, not only when hosting (538 amended).
 - Townsfolk speak their words and no more: the stage direction the model wrapped round a resident's answer ("You nod, your voice steady despite the rain. ...") leaves the speech bubble, which carries the words alone, whole; one clause of how it was said follows the line in the talk log, dim ("his voice steady despite the rain"), and the town's gossip hears only the words (336 amended, from Jeff's play on v0.1.160; PROTOCOL_REVISION 27, the "speech" message's "aside").

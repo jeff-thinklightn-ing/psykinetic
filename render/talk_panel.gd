@@ -28,6 +28,11 @@ const LIST_HEIGHT := 520.0
 static var SPEAKER: Color = UiTheme.color("brass_bright")
 static var CHAT: Color = UiTheme.color("aloud")
 static var PARTY: Color = UiTheme.color("party")
+## A resident's aside (npc's 336 amended, ui's side): how the line was said,
+## dim after the speech.
+static var ASIDE: Color = UiTheme.color("text_dim")
+## What sets an aside off from the speech on its row.
+const ASIDE_DASH := " — "
 
 ## Tab: kept shown, and scrollable.
 var pinned := false
@@ -105,10 +110,13 @@ func channel_shown() -> String:
 
 
 ## [param party]: a party chat line (Main), shown apart from what is said
-## around the player.
-func add_line(speaker: String, text: String, is_chat := false, party := false) -> void:
+## around the player. [param aside]: a resident's one clause of how the line
+## was said (npc's 336 amended; "his voice steady despite the rain"), shown
+## after the speech on the same row, dim, in the sans, set off by a spaced
+## dash, no quotes; "" shows nothing (players and companions carry none).
+func add_line(speaker: String, text: String, is_chat := false, party := false, aside := "") -> void:
 	var at := Time.get_time_string_from_system().substr(0, 8)
-	lines.append([at, speaker, text, is_chat])
+	lines.append([at, speaker, text, is_chat, aside])
 	if lines.size() > MAX_LINES:
 		lines.pop_front()
 	var label := RichTextLabel.new()
@@ -132,6 +140,12 @@ func add_line(speaker: String, text: String, is_chat := false, party := false) -
 	label.push_color(said)
 	label.add_text(text)
 	label.pop()
+	if not aside.is_empty():
+		label.push_font(UiTheme.font("sans"))
+		label.push_color(ASIDE)
+		label.add_text(ASIDE_DASH + aside)
+		label.pop()
+		label.pop()
 	_list.add_child(label)
 	while _list.get_child_count() > MAX_LINES:
 		var oldest := _list.get_child(0)

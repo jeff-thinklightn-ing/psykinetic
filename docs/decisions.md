@@ -6543,6 +6543,18 @@ Monsters shoot through the same calls (try_stance "draw", try_loose).
 Protocol: the new RPC changes the fingerprint; no revision bump (no
 existing RPC or value changes; &"shot" is a new cause old views treat as a
 blow).
+Amended, ui's side (2026-10-20; npc's 336 amended gives the "speech"
+message an "aside", one clause of how the line was said, third person,
+lowercase, no end mark; Jeff: "might be interesting if there's some sort
+of narration quality"): in the talk log the aside follows the speech on
+the same row, set off by a spaced dash, in text_dim and the sans, no
+quotes ("Aldous: I've been meaning to thank you. — his voice steady
+despite the rain"); the bubble shows the words alone, as before. Only
+residents send one; an absent or empty key shows nothing, and
+TalkPanel.add_line's aside defaults to "", so this lands in either order
+with npc's. ui_test; --test-show=talk carries a sample for the shot
+(docs/ui/shots/sim/talk_aside.jpg). Client only; the protocol bump is npc's.
+
 ## 337. Network smoothness, measured; the camera eases over jumps
 
 Roadmap step 2 (Jeff: "no rubber-banding in a castle fight ... report

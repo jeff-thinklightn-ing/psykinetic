@@ -6536,7 +6536,7 @@ func _on_message(kind: String, data: Dictionary) -> void:
 		var entity := get_node_or_null(NodePath(str(data.get("entity", "")))) as GridEntity
 		var speaker := str(data.get("speaker", entity.name if entity != null else "?"))
 		print("[speech] %s: %s" % [speaker, data.get("text", "")])
-		talk.add_line(speaker, str(data.get("text", "")))
+		talk.add_line(speaker, str(data.get("text", "")), false, false, str(data.get("aside", "")))  # The aside dim after it (336 amended); the bubble the words alone.
 		if entity != null:
 			bubbles.show_line(entity.get_instance_id(), str(data.get("text", "")))
 	if kind == "offers":
@@ -9152,6 +9152,7 @@ func _run_test_show(player: Player) -> void:
 				pack_panel.shown = true
 			"talk":
 				talk.add_line("Wren", "(a test line) The door's barred from the other side.")
+				talk.add_line("Aldous", "(a test line) I've been meaning to thank you for the food you brought.", false, false, "his voice steady despite the rain")  # 336 amended: the aside.
 				talk.add_line(player.label, "(a test line) hold here", true)
 				talk.add_line(player.label, "(a test line) anyone near the well?", true, true)
 				if not talk.pinned:

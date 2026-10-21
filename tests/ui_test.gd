@@ -237,6 +237,15 @@ func _test_talk_panel() -> void:
 	_check(not talk.visible and not talk.pinned, "hidden and unpinned at the start")
 	talk.add_line("Wren", "The door's barred.")
 	_check(talk.visible and talk.keeps_showing(), "a line shows it")
+	# npc's 336 amended, ui's side: a resident's aside after the speech, dim; none for an empty key.
+	talk.add_line("Aldous", "I've been meaning to thank you.", false, false, "his voice steady despite the rain")
+	var row: RichTextLabel = talk._list.get_child(talk._list.get_child_count() - 1)
+	_check(row.get_parsed_text() == "Aldous: I've been meaning to thank you." + TalkPanel.ASIDE_DASH + "his voice steady despite the rain"
+		and talk.lines.back()[4] == "his voice steady despite the rain", "the aside follows the speech on its row, set off by a spaced dash")
+	_check(TalkPanel.ASIDE == UiTheme.color("text_dim"), "dim")
+	talk.add_line("Wren", "Nothing to say.")
+	row = talk._list.get_child(talk._list.get_child_count() - 1)
+	_check(row.get_parsed_text() == "Wren: Nothing to say." and talk.lines.back()[4] == "", "no aside, nothing after the speech")
 	talk._shown_until = 0.0
 	await get_tree().process_frame
 	_check(not talk.visible, "and it goes once the line is old (the mouse away, nothing typed)")
