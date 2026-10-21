@@ -609,7 +609,10 @@ func _test_territory_routes() -> void:
 	var world_map := WorldMap.build(names)
 	var holdings := Holdings.new(world_map)
 	var routes := holdings.make_routes(world_map)
+	var unready := WorldRoutes.new(world_map, false, false).route("t_mid", Vector2i(0, 4), "t_mid", Vector2i(20, 4))
 	routes.wait()
+	_check(str(unready) == str(routes.route("t_mid", Vector2i(0, 4), "t_mid", Vector2i(20, 4))),
+		"a route reads the same with its fields in or not (%s)" % [unready])
 	_check(routes.factions() == _strings(["goblins", "town"]) and routes.is_ready(), "a layer per side (the allies route on the Blood Rot's, decision 416), every field in (%s)" % [routes.build_ms])
 	var town := routes.route("t_mid", Vector2i(0, 4), "t_mid", Vector2i(20, 4), "town")
 	var goblins := routes.route("t_mid", Vector2i(0, 4), "t_mid", Vector2i(20, 4), "goblins")

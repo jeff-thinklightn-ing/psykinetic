@@ -482,7 +482,9 @@ func _route_in(layer: Layer, from_area: String, from_cell: Vector2i, to_area: St
 		var steps := _steps_between(_areas[from_area], from_cell, to_cell, layer.obstacles.get(from_area, {}))
 		if steps < 0.0:
 			return none
-		var alone: Array[Dictionary] = [{"area": from_area, "from": from_cell, "to": to_cell, "steps": steps, "way": {}}]
+		# Its keys in the graph's legs' order, so the route reads the same
+		# whether the fields were in or not.
+		var alone: Array[Dictionary] = [{"area": from_area, "from": from_cell, "steps": steps, "to": to_cell, "way": {}}]
 		return alone
 	for area_name in reached:
 		_join_area(layer, area_name)
