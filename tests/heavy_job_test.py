@@ -20,6 +20,9 @@ os.environ["HEAVY_JOBS_DIR"] = STATE
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "tools"))
 import heavy_job as gate  # noqa: E402
 
+real_boot_time = gate.boot_time
+gate.boot_time = lambda: 0.0  # Entries made up as hours old stay after this machine's boot.
+
 failed = 0
 
 
@@ -134,6 +137,59 @@ with gate.StateLock():
     gate._write(gate._path("running", "forgot-suite-1.json"), dict(old_take, adopted_by=os.getpid()))
     check(len(gate._entries("running")) == 1, "a take that old is kept while a run inside it lives (a slow landing)")
     os.remove(gate._path("running", "forgot-suite-1.json"))
+
+print("== an id reused, an entry from before a reboot (394 amended (8)) ==")
+me = gate.started_at(os.getpid())
+fresh = {"tree": "mine", "kind": "suite", "pid": os.getpid(), "pid_since": me, "queued": time.time(), "started": time.time(),
+    "ram_gb": 6.0, "gpu": False, "watched": True}
+with gate.StateLock():
+    gate._write(gate._path("running", "mine-suite-1.json"), fresh)
+    check(len(gate._entries("running")) == 1, "a live id with its own start time is kept")
+    if me is not None:
+        gate._write(gate._path("running", "mine-suite-1.json"), dict(fresh, pid_since=me - 1))
+        check(not gate._entries("running"), "the same id with another start time (reused by a new process) is dropped")
+        gate._write(gate._path("queue", "mine-suite-1.json"), dict(fresh, waiter=os.getpid(), waiter_since=me + 1))
+        check(not gate._entries("queue"), "and a queued entry whose waiter's id was reused")
+    gate._write(gate._path("running", "mine-suite-1.json"), {k: v for k, v in fresh.items() if k != "pid_since"})
+    check(len(gate._entries("running")) == 1, "an entry with no start time (an older heavy_job.py) by its id alone")
+    gate.boot_time = lambda: fresh["queued"] + 1  # The machine started after it was queued.
+    check(not gate._entries("running"), "an entry queued before the machine started is dropped")
+    gate.boot_time = lambda: 0.0
+    for folder in ("running", "queue"):
+        for name in os.listdir(gate._path(folder)):
+            os.remove(gate._path(folder, name))
+if os.name == "nt":
+    booted = real_boot_time()
+    check(0 < time.time() - booted < 365 * 86400, "the machine's start read (%.1f h ago)" % ((time.time() - booted) / 3600))
+
+print("== a soak (394 amended (8)) ==")
+table = gate.kinds()
+soak_row = dict(table["soak"], kind="soak")
+suite_running = dict(running(6, 6), kind="suite")
+check(gate.decide(soak_row, [suite_running], True, 60.0, None)[0], "a soak starts beside a suite")
+check(gate.decide(dict(table["suite"], kind="suite"), [dict(running(2, 2), kind="soak")], True, 60.0, None)[0],
+    "and a suite beside a soak")
+ok, why = gate.decide(soak_row, [dict(running(1, 1), kind="bench")], True, 60.0, None)
+check(not ok and "never beside" in why, "never beside a bench (%s)" % why)
+ok, why = gate.decide(dict(table["bench"], kind="bench"), [dict(running(2, 2), kind="soak")], True, 60.0, None)
+check(not ok and "never beside" in why, "nor a bench beside a soak (%s)" % why)
+ok, why = gate.decide(soak_row, [dict(running(2, 2), kind="soak")], True, 60.0, None)
+check(not ok and "at most 1" in why, "one soak at a time (%s)" % why)
+check(gate.may_pass(soak_row, [dict(table["suite"], kind="suite")], [suite_running]),
+    "a soak goes past a suite waiting for the suite running")
+check(gate.limit_seconds(dict(table["soak"], runs_s=[60.0, 60.0, 60.0])) == 180 * 60.0,
+    "its limit is 180 minutes, whatever its runs took")
+check(gate.limit_seconds(table["soak"], expect_minutes=600) == 36000.0, "--expect over that")
+with gate.StateLock():
+    gate._write(gate._path("kinds.json"), {"bench": {"ram_gb": 1.2, "gpu_gb": 0.0, "gpu": False, "excludes": ["suite"]}})
+check("soak" in gate.kinds()["bench"]["excludes"], "a kinds.json from before the soak still keeps a bench from one")
+os.remove(gate._path("kinds.json"))
+if os.name == "nt":
+    probe = "import ctypes; k = ctypes.windll.kernel32; k.GetCurrentProcess.restype = ctypes.c_void_p; " \
+        "raise SystemExit(0 if k.GetPriorityClass(ctypes.c_void_p(k.GetCurrentProcess())) == 0x4000 else 1)"
+    check(gate.run("test", "soak", [sys.executable, "-c", probe]) == 0, "a soak runs below normal priority")
+    check(gate.run("test", "suite", [sys.executable, "-c", probe]) == 1, "a suite does not")
+
 code = gate.run("test", "suite", [sys.executable, "-c", "import time; time.sleep(1)"])
 check(code == 0 and "last_peak_gb" in gate.kinds()["suite"], "run: the command's exit code, the kind's peak recorded")
 with open(gate._path("heavy_jobs.log")) as log:

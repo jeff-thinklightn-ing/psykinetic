@@ -17,7 +17,15 @@ art-gen, which lets it start only when there is room:
     each; bench 1, as the bench lock);
   * none of the kinds it excludes running: a bench and a suite never run
     together (a bench's timings beside a suite are the suite's, not the
-    build's: one build measured 20 to 42 ms a frame by what ran beside it).
+    build's: one build measured 20 to 42 ms a frame by what ran beside it),
+    nor a bench and a soak; a soak (sim steps counted, no timings: town_soak,
+    town_balance) runs beside a suite, below normal priority, one at a time
+    (394 amended (8): economy's 150-minute soak as a bench held five
+    landings and a cut).
+
+An entry names its processes by id and start time (pid_since, waiter_since,
+adopted_since): one whose id now belongs to another process, or queued
+before the machine last started, is stale and dropped (394 amended (8)).
 
 Otherwise it waits in a queue, first come first served: only the job at
 its head may start, so a big job is not starved by small ones; except that
@@ -45,7 +53,8 @@ or using under HUNG_CPU of a core for HUNG_SECONDS (kinds off the GPU), its
 own wrapper stops it, logs "overrun" or "hung" and exits 5, not queued
 again: a bench stuck on a parse error, or crawling, held the one bench
 slot 10 h on 2026-10-17 and 7.6 h on 2026-10-18 with landings behind it.
-A soak meant to run for hours says so with --expect.
+A soak meant to run for hours says so with --expect; the soak kind's limit
+is its max_minutes (180) whatever its runs took (fixed_limit).
 
 State and log live outside the repo, in STATE_DIR (HEAVY_JOBS_DIR to put
 them elsewhere, as the test does): running/ and queue/ hold a file a job,
@@ -118,9 +127,15 @@ KINDS = {
     "trellis_mesh": {"ram_gb": 9.0, "gpu_gb": 12.0, "gpu": True},
     "comfy_batch": {"ram_gb": 6.0, "gpu_gb": 10.0, "gpu": True},
     "suite": {"ram_gb": 6.5, "gpu_gb": 0.0, "gpu": False, "max_running": 1, "excludes": ["bench"], "max_minutes": 90},  # tests/land.sh: 6.3 GB measured
-    "bench": {"ram_gb": 3.0, "gpu_gb": 0.0, "gpu": False, "max_running": 1, "excludes": ["suite"], "max_minutes": 90},
+    "bench": {"ram_gb": 3.0, "gpu_gb": 0.0, "gpu": False, "max_running": 1, "excludes": ["suite", "soak"], "max_minutes": 90},
     "godot_import": {"ram_gb": 2.0, "gpu_gb": 0.0, "gpu": False, "max_minutes": 90},
     "godot_export": {"ram_gb": 3.0, "gpu_gb": 0.0, "gpu": False, "max_minutes": 90},
+    # A soak (394 amended an eighth time) counts sim steps, not time: it
+    # runs beside a suite, at below-normal priority so the suite's scenes
+    # come first, never beside a bench (whose timings it would skew); its
+    # limit is max_minutes, not its median run, since --days sets its length.
+    "soak": {"ram_gb": 2.5, "gpu_gb": 0.0, "gpu": False, "max_running": 1, "excludes": ["bench"], "max_minutes": 180,
+        "fixed_limit": True, "below_normal": True},
 }
 GB = 1024.0 ** 3
 
@@ -229,6 +244,8 @@ def limit_seconds(row, expect_minutes=None):
     ("runs_s"), never under the floor, else its max_minutes; None: no limit."""
     if expect_minutes is not None:
         return expect_minutes * 60.0
+    if row.get("fixed_limit") and row.get("max_minutes") is not None:
+        return row["max_minutes"] * 60.0  # A soak: its length is its own --days.
     runs = sorted(row.get("runs_s", []))
     if runs:
         middle = len(runs) // 2
@@ -313,23 +330,55 @@ def gpu_gb():
         return None, None
 
 
-def alive(pid):
+def alive(pid, since=None):
+    """Whether process [pid] runs, and, given [since] (its started_at when
+    the entry was written), is still that process: an id Windows has given
+    to another since (after a reboot, or a long day) is not (394 amended
+    (8))."""
     if not pid:
         return False
     if os.name == "nt":
         kernel = ctypes.windll.kernel32
+        kernel.OpenProcess.restype = ctypes.c_void_p
         handle = kernel.OpenProcess(0x1000, False, int(pid))  # PROCESS_QUERY_LIMITED_INFORMATION
         if not handle:
             return False
         code = ctypes.c_ulong()
-        kernel.GetExitCodeProcess(handle, ctypes.byref(code))
-        kernel.CloseHandle(handle)
-        return code.value == 259  # STILL_ACTIVE
-    try:
-        os.kill(int(pid), 0)
-        return True
-    except OSError:
-        return False
+        kernel.GetExitCodeProcess(ctypes.c_void_p(handle), ctypes.byref(code))
+        kernel.CloseHandle(ctypes.c_void_p(handle))
+        if code.value != 259:  # STILL_ACTIVE
+            return False
+    else:
+        try:
+            os.kill(int(pid), 0)
+        except OSError:
+            return False
+    return since is None or started_at(pid) in (None, since)
+
+
+def started_at(pid):
+    """When process [pid] was created, as Windows counts it (100 ns since
+    1601), or None (not Windows, or not to be read)."""
+    if not pid or os.name != "nt":
+        return None
+    kernel = ctypes.windll.kernel32
+    kernel.OpenProcess.restype = ctypes.c_void_p
+    handle = kernel.OpenProcess(0x1000, False, int(pid))
+    if not handle:
+        return None
+    times = [ctypes.c_ulonglong() for _ in range(4)]
+    ok = kernel.GetProcessTimes(ctypes.c_void_p(handle), *[ctypes.byref(each) for each in times])
+    kernel.CloseHandle(ctypes.c_void_p(handle))
+    return times[0].value if ok else None
+
+
+def boot_time():
+    """When this machine last started (time.time() seconds), or 0.0 where
+    not known: an entry queued before it is from before a reboot."""
+    if os.name != "nt":
+        return 0.0
+    ctypes.windll.kernel32.GetTickCount64.restype = ctypes.c_ulonglong
+    return time.time() - ctypes.windll.kernel32.GetTickCount64() / 1000.0
 
 
 class Job:
@@ -516,7 +565,13 @@ def kinds():
     saved = _read(_path("kinds.json")) or {}
     table = {}
     for name, first in KINDS.items():
-        table[name] = _split(dict(first, **saved.get(name, {})), first["ram_gb"])
+        row = dict(first, **saved.get(name, {}))
+        # Exclusions the code adds (a bench never beside a soak) hold over a
+        # kinds.json written before them.
+        row["excludes"] = sorted(set(first.get("excludes", [])) | set(saved.get(name, {}).get("excludes", [])))
+        if not row["excludes"]:
+            del row["excludes"]
+        table[name] = _split(row, first["ram_gb"])
     for name, row in saved.items():
         table.setdefault(name, _split(dict(row), 0.0))
     return table
@@ -540,6 +595,7 @@ def _entries(folder):
     (their process gone, or a running take past TAKE_STALE_SECONDS)
     removed."""
     out = []
+    booted = boot_time()
     for name in sorted(os.listdir(_path(folder))):
         if not name.endswith(".json"):
             continue
@@ -547,10 +603,13 @@ def _entries(folder):
         if entry is None:
             continue
         pid = entry.get("pid")
-        stale = bool(pid) and not alive(pid)
+        # Each id with its process's start time, where the entry has one: an
+        # id reused by another process is not its holder (394 amended (8)).
+        stale = bool(pid) and not alive(pid, entry.get("pid_since"))
+        stale = stale or entry.get("queued", booted) < booted  # From before a reboot.
         if folder == "queue" and entry.get("waiter"):
-            stale = stale or not alive(entry["waiter"])
-        if folder == "running" and not entry.get("watched") and not alive(entry.get("adopted_by")):
+            stale = stale or not alive(entry["waiter"], entry.get("waiter_since"))
+        if folder == "running" and not entry.get("watched") and not alive(entry.get("adopted_by"), entry.get("adopted_since")):
             stale = stale or time.time() - entry.get("started", entry["queued"]) > TAKE_STALE_SECONDS
         if stale:
             os.remove(_path(folder, name))
@@ -585,7 +644,8 @@ def wait_turn(tree, kind, pid, watched):
     with StateLock():
         # "waiter": this wrapper, which waits for the turn; a take's pid (its
         # holder) may be none, and a queue file whose waiter died is dropped.
-        _write(_path("queue", ticket), {"tree": tree, "kind": kind, "pid": pid, "waiter": os.getpid(), "queued": queued})
+        _write(_path("queue", ticket), {"tree": tree, "kind": kind, "pid": pid, "pid_since": started_at(pid),
+            "waiter": os.getpid(), "waiter_since": started_at(os.getpid()), "queued": queued})
     said = 0.0
     long_logged = False
     while True:
@@ -627,7 +687,7 @@ def wait_turn(tree, kind, pid, watched):
             if ok:
                 os.remove(_path("queue", ticket))
                 name = "%s-%s-%s.json" % (tree, kind, pid or os.getpid())
-                _write(_path("running", name), {"tree": tree, "kind": kind, "pid": pid, "queued": queued,
+                _write(_path("running", name), {"tree": tree, "kind": kind, "pid": pid, "pid_since": started_at(pid), "queued": queued,
                     "started": time.time(), "ram_gb": row["ram_gb"], "commit_gb": commit_of(row), "gpu": row["gpu"], "using_gb": 0.0,
                     "using_commit_gb": 0.0, "watched": watched})
                 waited = time.time() - queued
@@ -658,6 +718,7 @@ def _adopt_take(tree, kind):
             if entry["tree"] == tree and entry["kind"] == kind and not entry.get("watched"):
                 name = entry.pop("file")
                 entry["adopted_by"] = os.getpid()
+                entry["adopted_since"] = started_at(os.getpid())
                 _write(_path("running", name), entry)
                 return name
     return None
@@ -696,11 +757,14 @@ def run(tree, kind, command, expect_minutes=None):
         else:
             name = wait_turn(tree, kind, os.getpid(), True)
         started = time.time()
-        child = subprocess.Popen(command, env=dict(os.environ, **{HELD_ENV: name}))
+        row = kinds()[kind]
+        # A soak below normal priority, and what it starts with it (Windows
+        # gives a below-normal process's children its class).
+        flags = getattr(subprocess, "BELOW_NORMAL_PRIORITY_CLASS", 0) if row.get("below_normal") else 0
+        child = subprocess.Popen(command, env=dict(os.environ, **{HELD_ENV: name}), creationflags=flags)
         job = Job(child)
         peak, low, stopped, long_logged = 0.0, 0, False, False
         gpu_peak, commit_peak = 0.0, 0.0
-        row = kinds()[kind]
         limit = limit_seconds(row, expect_minutes)
         samples, ended = [(started, job.cpu_seconds())], None
         while child.poll() is None:
@@ -727,7 +791,8 @@ def run(tree, kind, command, expect_minutes=None):
                 running = _entries("running")
             if limit is not None and now - started >= limit:
                 ended = ("overrun", "over its limit of %.0f min (%s)" % (limit / 60,
-                    "--expect" if expect_minutes is not None else "%g x its kind's median run, or its max_minutes" % OVERRUN_FACTOR))
+                    "--expect" if expect_minutes is not None else "its kind's max_minutes" if row.get("fixed_limit")
+                    else "%g x its kind's median run, or its max_minutes" % OVERRUN_FACTOR))
             elif idle and not row["gpu"]:
                 ended = ("hung", "hung: %.1f%% of a core the last %.0f min" % (share * 100, HUNG_SECONDS / 60))
             if ended is not None:

@@ -8833,6 +8833,30 @@ its next run measures both. trellis_mesh then wants 9 + 8 GB of free RAM
 machine's 99.7 GB commit limit leaves only when little else runs; a
 bigger pagefile raises it.
 
+Amended an eighth time (2026-10-21, the coordinator): two changes.
+- An entry names each process (the job, the queue's waiter, the run that
+  adopts a take) by its id and its start time (pid_since, waiter_since,
+  adopted_since, from GetProcessTimes). An id now held by another process is
+  not alive. An entry queued before the machine last started is stale
+  whatever it holds. Before this, a reboot or a long day could hand a dead
+  entry's id to a new process, and a dead queue head would then hold every
+  take with no limit. An entry from an older heavy_job.py, with no start
+  time, is checked by its id alone, as before.
+- A "soak" kind for runs that count sim steps, not time (town_soak,
+  town_balance, npc's long runs). economy's 150-minute soak ran as a bench,
+  which excludes suites, and held five landings and a cut.
+  - A soak runs beside a suite, one at a time, and never beside a bench in
+    either direction: a soak keeps a core busy, which skews a bench's timings.
+    kinds.json's saved exclusions are merged with the code's, so an older
+    file still keeps a bench from a soak.
+  - The gate starts it below normal priority, and what it starts inherits
+    that, so the suite's scenes come first.
+  - Its limit is its max_minutes, 180, not three times its median run,
+    since its --days sets its length. --expect still overrides it.
+  - Its RAM estimate starts at 2.5 GB.
+heavy_job_test covers the reused id, the reused waiter, the entry from
+before a boot, the soak's exclusions, its limit and its priority.
+
 
 ## 395. UI sounds
 

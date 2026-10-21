@@ -10,7 +10,7 @@ extends Node
 ## coordinator's balance runs (decisions 354, 449, 461): no state written,
 ## nothing in the shared user:// (Level.overlay_dir a private folder).
 ##   godot --headless --path <repo> res://tools/town_balance.tscn -- --days=90 [--thief=hand_1] [--merchant=hand_2] [--no-field]
-## Run it through the gate, its output to a file: sh tools/heavy_job.sh run <tree> bench -- "$GODOT_PATH" --headless --path . res://tools/town_balance.tscn -- --days=90 > balance.txt
+## Run it through the gate, its output to a file: sh tools/heavy_job.sh run <tree> soak -- "$GODOT_PATH" --headless --path . res://tools/town_balance.tscn -- --days=90 > balance.txt
 
 const TOWN := "wilds/store"
 const DAY := 54000

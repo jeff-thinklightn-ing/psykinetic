@@ -7,7 +7,7 @@ extends Node
 ## "SOAK ..." lines (counts, the ledger's moves, every resident's stints
 ## seen and standing with each player) for npc to read beside the stdout
 ## log, the transcripts and the mind log it writes under --out. Local only:
-## a scratch world, never the box's. Headless, through the bench gate:
+## a scratch world, never the box's. Headless, through the gate as a soak (394 amended (8)):
 ##   godot --headless --path <repo> --scene res://tools/town_soak.tscn -- --days=30 --players=3 --out=<folder>
 
 const TOWN := "wilds/store"
