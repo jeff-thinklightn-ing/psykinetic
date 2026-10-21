@@ -17041,3 +17041,10 @@ its relief:
 - Known limit: a player at the foot of a tall face, the camera on its top
   side, is hidden behind its edge whatever the pitch; seeing them needs a
   design of its own (fade the near edge as walls fade, or turn the camera).
+
+Amended (terrain, a bench on main: "Cannot call method 'duplicate' on a null value" in
+warm_painted when a level was built): warm_painted(models = MODELS) passes over a model whose
+paint or scene this build cannot load (ResourceLoader.exists, then a null check) instead of
+duplicating a null; _make_model leaves a model in its own material the same way.
+anim_rig_test _test_warm_painted: each painted model warmed twice, a missing paint passed over
+with no error.

@@ -19,6 +19,7 @@ func _ready() -> void:
 	await _test_strike()
 	await _test_one_strike_clip()
 	await _test_bow_clear()
+	_test_warm_painted()
 	await _test_upper()
 	await _test_upper_timed()
 	await _test_no_upper()
@@ -291,6 +292,22 @@ static func _inside(points: PackedVector3Array, surface: PackedVector3Array, nor
 		if at >= 0 and best < 0.0225 and (p - surface[at]).dot(normals[at]) < -0.004:
 			n += 1
 	return n
+
+
+## The painted allies' warm-up (decision 529): each MODELS "paint" warmed in its material and its
+## outline twin; a model whose paint this build lacks (a pck without the art) passed over, with
+## no error (terrain's bench: a null duplicated).
+func _test_warm_painted() -> void:
+	print("== the painted allies warmed, a missing paint passed over ==")
+	var painted := Client3D.MODELS.keys().filter(func(kind: String) -> bool: return Client3D.MODELS[kind].has("paint"))
+	var piece := Client3D.warm_painted()
+	_check(piece.get_child_count() == 2 * painted.size(), "each painted model twice, its paint and its twin (%d of %d)" % [piece.get_child_count(), 2 * painted.size()])
+	piece.free()
+	var models := {"brute": Client3D.MODELS["brute"],
+		"lost": {"scene": Client3D.MODELS["brute"]["scene"], "paint": "res://art/models/characters/no_such_body.tres"}}
+	piece = Client3D.warm_painted(models)
+	_check(piece.get_child_count() == 2, "a model without its paint passed over (%d warmed)" % piece.get_child_count())
+	piece.free()
 
 func _test_upper() -> void:
 	print("== the upper layer ==")

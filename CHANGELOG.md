@@ -7,6 +7,8 @@ notes (decision 324).
 
 ## Unreleased
 
+- Fixed an error printed when a level was built, from the orc and kobold's painted bodies (529 amended).
+
 ## v0.1.160
 
 - This version changes what goes over the network, so v0.1.159 and older can't join the server: update through the launcher first.

@@ -7776,7 +7776,8 @@ func _make_model(model: Dictionary, puppet: Node3D) -> Node3D:
 		var look := painted_look(str(puppet.get_meta("entity_name", "")))
 		puppet.set_meta("painted_look", look)
 		scene.scale = Vector3(scene.scale.x * float(look["width"]), scene.scale.y, scene.scale.z * float(look["width"]))
-		var paint := load(str(model["paint"])) as Material
+		# (Its own material where this build lacks the paint: no error, as warm_painted.)
+		var paint := load(str(model["paint"])) as Material if ResourceLoader.exists(str(model["paint"])) else null
 		for mesh: MeshInstance3D in scene.find_children("*", "MeshInstance3D", true, false):
 			mesh.material_override = paint
 			mesh.set_instance_shader_parameter("skin", look["skin"])
@@ -8074,16 +8075,25 @@ static func warm_goblin() -> Node3D:
 ## The painted allies for the warm-up (warm_ups; decision 529): each MODELS
 ## "paint" in its material and its hover outline's stencil twin, skinned, as
 ## warm_goblin does the goblin's.
-static func warm_painted() -> Node3D:
+## A model whose paint or scene this build lacks (a pck without the art, terrain's bench on
+## 11a3f6af: "Cannot call method 'duplicate' on a null value") is passed over, not warmed.
+static func warm_painted(models: Dictionary = MODELS) -> Node3D:
 	var piece := Node3D.new()
-	for kind: String in MODELS:
-		if not MODELS[kind].has("paint"):
+	for kind: String in models:
+		if not models[kind].has("paint"):
 			continue
-		var paint := load(str(MODELS[kind]["paint"])) as ShaderMaterial
+		var paint_path := str(models[kind]["paint"])
+		var scene_path := str(models[kind]["scene"])
+		if not ResourceLoader.exists(paint_path) or not ResourceLoader.exists(scene_path):
+			continue
+		var paint := load(paint_path) as ShaderMaterial
+		var made := load(scene_path) as PackedScene
+		if paint == null or made == null:
+			continue
 		var twin := paint.duplicate() as ShaderMaterial
 		twin.shader = GOBLIN_MARKING_SHADER
 		for material: Material in [paint, twin]:
-			var scene := (load(MODELS[kind]["scene"]) as PackedScene).instantiate() as Node3D
+			var scene := made.instantiate() as Node3D
 			for mesh: MeshInstance3D in scene.find_children("*", "MeshInstance3D", true, false):
 				mesh.material_override = material
 			piece.add_child(scene)
