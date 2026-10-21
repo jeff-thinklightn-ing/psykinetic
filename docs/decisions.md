@@ -15969,6 +15969,20 @@ run.sh's form, so heavy_job summary groups net_test's crashes by top frame
 with the suite's. Observability only: nothing in net_test is retried. Checked
 with a process killed by SIGSEGV over a crash block (noted, grouped) beside a
 clean exit (not noted).
+
+Amended (3) (release, 2026-10-20; enemy-ai's landing of 04ec1579 failed
+net_test once at "phase 3: Gus crossed to (5, 12)", and Gus's log held only
+the banner: he never loaded the room or joined, so the server gave up waiting
+for two players and Fay crossed alone; no signal, so nothing was noted): an
+instance that exits under 128 with nothing in its log or err but the banner
+and blank lines is noted too, as a launch event "net_test <role> never got
+past the banner by quit (exit N, S s after launch)". It is checked after the
+instance has exited, not when quit() starts, so one merely slow to start when
+an early failure brings quit() on is not counted: main.gd arms both test exits
+(--test-exit-on, --test-exit-after) only once the level is loaded and printed.
+Observability only, nothing retried; net_test.sh only, as amended (2).
+Checked with fake instances under a stub gate: banner-only exit 0 and exit 1
+noted, a slow start that printed, and a banner with an ERROR on stderr, not.
 ## 529. The Blood Rot's allies on the mesh route: art-gen's meshes in their own paint
 
 Jeff on the route sheets (orc_routes.png, kobold_routes.png): "the trellis retarget is what's

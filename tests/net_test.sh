@@ -40,7 +40,7 @@ start() {
 	shift
 	"$GODOT" --headless --path . "$@" "--port=$P" "--test-exit-on=$LOGS/$name.done" \
 		</dev/null >"$LOGS/$name.log" 2>"$LOGS/$name.err" &
-	eval "pid_$name=$!"
+	eval "pid_$name=$! started_$name=$SECONDS"
 }
 # The phase's server, which quits last. Its world is test_room, not the
 # world's start zone (levels/world_map.json, decision 300).
@@ -55,13 +55,30 @@ client() {
 }
 # Tells one instance to report and quit, and waits until it has. One that
 # died on a signal (exit 128 or more: a segfault is 139) is noted in the
-# gate's log with its role and crash block (crash_note).
+# gate's log with its role and crash block (crash_note); one that never got
+# past the banner, too (banner_note).
 quit() {
 	touch "$LOGS/$1.done" "$LOGS/$1.done.quit"
 	code=0
 	eval "wait \$pid_$1" || code=$?
-	[ "$code" -ge 128 ] && crash_note "$1" "$code"
+	if [ "$code" -ge 128 ]; then
+		crash_note "$1" "$code"
+	elif ! cat "$LOGS/$1.log" "$LOGS/$1.err" 2>/dev/null | grep -v -q -E '^Godot Engine v|^[[:space:]]*$'; then
+		banner_note "$1" "$code"
+	fi
 	return 0
+}
+# An instance <name> that exited, <code>, with nothing in its log but the
+# banner (decision 530 amended (3), observability only: nothing is retried;
+# enemy-ai's net_test of 2026-10-20 lost Gus so in phase 3). Checked once it
+# has exited, so one merely slow to start when quit() came early is not
+# taken for it: main.gd arms both test exits only after the level is loaded
+# and printed, so any instance that quits through them has written more.
+banner_note() {
+	eval "lived=\$((SECONDS - started_$1))"
+	detail="net_test $1 never got past the banner by quit (exit $2, ${lived} s after launch)"
+	noted="$(python -B tools/heavy_job.py note "$(basename "$(pwd)")" launch "$detail" 2>/dev/null || echo "$detail")"
+	echo "  ($noted)"
 }
 # An instance <name> that died on a signal, exit <code> (decision 530
 # amended (2), observability only: nothing is retried): its role, and from
