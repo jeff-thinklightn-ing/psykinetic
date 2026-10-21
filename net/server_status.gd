@@ -66,8 +66,8 @@ class Responder:
 	## () -> {version, protocol, players, accepting}.
 	var info: Callable
 
-	func listen(port: int) -> Error:
-		return _udp.bind(port)
+	func listen(port: int, bind_address := "*") -> Error:
+		return _udp.bind(port, bind_address)
 
 	func is_listening() -> bool:
 		return _udp.is_bound()

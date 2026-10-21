@@ -5,6 +5,9 @@ extends Node
 ##   --server                     dedicated: runs the sim, no local player, fine with --headless
 ##   --client --address=<ip>      connects to a server; runs no sim
 ##   --port=<n>                   default 7777
+##   --bind=<ip>                  server/host: listen on this address only (game and status ports;
+##                                default every address); tests' servers take 127.0.0.1, which
+##                                Windows' firewall doesn't ask about
 ##   --token=<string>             server: required; a peer must send it (Net.authenticate)
 ##                                within 5 s or it is disconnected. host: optional; without
 ##                                it anyone may join (local play). client: sent on connect
@@ -256,6 +259,8 @@ var version := UNKNOWN_VERSION
 var mode := Mode.HOST
 var address := "127.0.0.1"
 var port := DEFAULT_PORT
+## The address a server or host listens on (--bind), or "" for every one.
+var bind_address := ""
 ## Snapshot file for the authority, or "" for none.
 var state_path := ""
 ## Localhost TCP port for console commands, or 0 for none.
@@ -1464,7 +1469,7 @@ func _listen_status() -> void:
 	_status_responder.info = func() -> Dictionary:
 		return {"version": claimed_version(), "protocol": protocol(), "players": _authenticated.size(),
 			"accepting": _authenticated.size() < max_players}
-	var error := _status_responder.listen(at)
+	var error := _status_responder.listen(at, bind_address if bind_address != "" else "*")
 	if error != OK:
 		print("[net] status port %d unavailable (%s): no status answers" % [at, error_string(error)])
 		_status_responder = null
@@ -1514,6 +1519,8 @@ func start() -> void:
 		# link (two clients leaving in one poll: the second, already without
 		# channels, was told about the first).
 		(multiplayer as SceneMultiplayer).server_relay = false
+		if bind_address != "":
+			peer.set_bind_ip(bind_address)
 		var error := peer.create_server(port, maxi(MAX_CLIENTS, max_players * 2))
 		if error != OK:
 			if mode == Mode.SERVER:
@@ -1621,7 +1628,7 @@ func _parse_args() -> void:
 				builder_stub = true
 			"--lawspeaker-players":
 				lawspeaker_players = true
-			"--address", "--port", "--state", "--admin-port", "--max-players", "--token", "--settings", "--player-id", "--name", "--renderer", "--controls", \
+			"--address", "--port", "--bind", "--state", "--admin-port", "--max-players", "--token", "--settings", "--player-id", "--name", "--renderer", "--controls", \
 					"--llm-url", "--llm-model", "--voice-url", "--voice-model", "--perception", "--mind-log", "--map", "--day-minutes", "--hour", "--weather", "--season", "--season-days", "--edit", "--edit-size", "--transcripts", \
 					"--builders", "--builder-model", "--builder-effort", "--builder-max-cost", "--lawspeaker", "--proposed", \
 					"--test-move", "--test-contest", "--test-reset", "--test-builder", "--test-exit-after", "--test-exit-on", "--test-wait-players", "--test-herds", "--test-hold", "--test-version", "--test-protocol", \
@@ -1641,6 +1648,8 @@ func _set_option(key: String, value: String) -> void:
 		"--port":
 			if value.is_valid_int():
 				port = value.to_int()
+		"--bind":
+			bind_address = value
 		"--state":
 			state_path = value
 		"--token":

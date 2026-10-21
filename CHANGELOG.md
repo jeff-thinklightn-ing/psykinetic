@@ -15,6 +15,7 @@ notes (decision 324).
 - Ponds, streams and fords lose their square edges: the water's edge rounds its corners (a one-tile pond is round), narrow streams wind within their banks, and on the hills the bank slopes down to it in finer steps (553).
 - Greetings tuned (554 amended): on your first day three residents greet you, not every one you pass, and the rest say something else if they have it; a clear sky is nothing to remark on, and a greeting lost to a slow answer is tried again later in the day. Server only; the clear-sky and slow-answer fixes have been on the server since the morning of v0.1.162.
 - The hills load faster: their cliff faces are built in about 140 ms less (the 3D rebuild about 980 to 840 ms), with the same faces as before.
+- Developer tools: the landing's server check no longer sets off a Windows firewall prompt on each landing (450 amended). Its test server listens on this machine only (a new --bind option for servers) and runs from one fixed folder.
 ## v0.1.162
 
 - This version changes what goes over the network, so v0.1.161 and older can't join the server: update through the launcher first.

@@ -15074,6 +15074,26 @@ longer. A Linux export can't run here, but
 the pack is the same file the box loads; what differs (the OS) the box's
 own boot after a deploy still covers. Tests only; protocol unchanged.
 
+Amended (2026-10-21, the coordinator's ask through release): Windows' firewall
+asks once per program path when a program listens on every address. The
+boot copied `server.exe` into a fresh temp folder on each landing, so Jeff
+had about twenty prompts in one evening, and 62 rules for temp-folder copies
+had built up. Two changes, either of which is enough:
+
+- `--bind=<ip>` (Net): a server or host listens on that address only, for
+  its game port and its status port; without it, every address as before
+  (the box's unit is unchanged). The boot runs with `--bind=127.0.0.1`. A
+  loopback-only listener isn't asked about, and the test talks only over
+  loopback anyway. The test now checks, with `netstat` while the server
+  runs, that its UDP port is on 127.0.0.1 and not on every address.
+- The template and pack are copied to one path per checkout,
+  `build/server_boot/` (gitignored), not the temp folder. The logs, APPDATA
+  and snapshot stay in the temp folder. Should something ever listen widely
+  again, there is one rule a checkout, not one a landing.
+
+Two runs added no firewall rule (62 temp-path rules before and after, none
+for `build\server_boot`). Protocol unchanged.
+
 ## 518. A level-placed captive: a camp's holds, taken as a raid takes
 
 Builder's deferred ask: "a goblin camp holding a captive" placeable from
