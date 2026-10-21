@@ -1634,6 +1634,12 @@ func _test_hails() -> void:
 		"but not one this player heard today from someone else")
 	_check(Resident.hail_cue("rs-mara", STORE, pid, "Bo", World.production, now, "", Offers.ctx, ["Bo is a stranger to you; you greet them as the town does a newcomer."]).get("kind") == "greeting",
 		"a greeting is each resident's own: another's does not silence it")
+	var undone := Townsfolk.card_of(World.production, "rs-mara")
+	var said_before: int = undone["hails"]["said"].size()
+	Resident.hail_undone(World.production, "rs-mara", pid, str(undone["hails"]["said"].back()))
+	undone = Townsfolk.card_of(World.production, "rs-mara")
+	_check(not Resident.hailed_today(undone, pid, today) and undone["hails"]["said"].size() == said_before - 1, "a hail not said gives back the day's mark and its text")
+	Resident.hail_done(World.production, "rs-mara", pid, {"kind": "greeting", "text": "Jeff is a stranger to you; you greet them as the town does a newcomer."}, today, sky)
 	Townsfolk._remember(STORE, "Odo saw the wagon come home", "rs-mara", true, now)
 	_check(Resident.hail_cue("rs-mara", STORE, pid, "Jeff", World.production, now, "").is_empty(), "their own event line is not news to them")
 	log = Offers._call(Offers.ctx, "memory", [STORE])

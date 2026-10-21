@@ -5927,6 +5927,13 @@ func _resident_answered(out: Dictionary, answer: Dictionary, error: String) -> v
 		"prompt": "%s\n\n%s" % [ask.get("system", ""), ask.get("user", "")], "say": line, "aside": aside, "error": error,
 		"outcome": "said" if said else "not said"})
 	if not said:
+		if not str(ask.get("hail", "")).is_empty() and body != null and is_instance_valid(body) and World.production != null:
+			# A hail the mind did not answer (554 amended): its marks go back, so the thing can be said later today.
+			var player_id := str(out.get("player", ""))
+			var cue_text := str(ask.get("cue", ""))
+			Resident.hail_undone(World.production, body.worker_id, player_id, cue_text)
+			if _hail_heard.has(player_id):
+				_hail_heard[player_id].erase(cue_text)
 		return
 	Transcript.record(body.person, body.person, line)
 	if not aside.is_empty():
@@ -8052,7 +8059,8 @@ func _hails_tick() -> void:
 	if World.fields != null:
 		# The sky is worth a word when there is weather in it or snow on the ground; a clear sky is not (554 amended: it drew the invented lines).
 		var now_words := DayNight.describe(World.fields.region, DayNight.now())
-		if not str(now_words.get("weather", "")).is_empty() or not str(now_words.get("ground", "")).is_empty():
+		var kind := str(Weather.at(World.fields.region, DayNight.now()).get("kind", "clear"))
+		if (kind != "clear" and not str(now_words.get("weather", "")).is_empty()) or not str(now_words.get("ground", "")).is_empty():
 			sky = str(now_words.get("sentence", ""))
 	for entity in World.townsfolk():
 		var body := entity as Resident

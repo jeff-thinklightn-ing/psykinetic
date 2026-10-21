@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Townsfolk speak first, tuned again (554 amended): a clear sky is nothing to remark on, and a greeting lost to a slow answer is tried again later in the day. Server only.
 ## v0.1.162
 
 - This version changes what goes over the network, so v0.1.161 and older can't join the server: update through the launcher first.

@@ -512,7 +512,7 @@ func hail_ask(speaker: String, cue: Dictionary, serial: int) -> Dictionary:
 	var user := HAIL_USER % [speaker, str(cue.get("text", ""))]
 	return {"kind": "voice", "serial": serial, "trigger": "hail: %s, %s to %s." % [str(cue.get("kind", "")), person, speaker], "speaker": person,
 		"system": system, "user": user, "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
-		"spoken_to": false, "asked": false, "heard": "", "hail": str(cue.get("kind", ""))}
+		"spoken_to": false, "asked": false, "heard": "", "hail": str(cue.get("kind", "")), "cue": str(cue.get("text", ""))}
 
 
 ## Their hails on [param card]: {to: {player id: day of the last}, said:
@@ -610,6 +610,19 @@ static func _lead(text: String) -> String:
 static func _sentence(text: String) -> String:
 	var clean := text.strip_edges()
 	return clean if clean.is_empty() or clean.ends_with(".") or clean.ends_with("!") or clean.ends_with("?") else clean + "."
+
+
+## A hail of [param worker_id] to [param player_id] that was not said (the
+## mind slow or down): the day's mark and the cue's text go back off the
+## card, so it can be tried again later today.
+static func hail_undone(production: Production, worker_id: String, player_id: String, cue_text: String) -> void:
+	var card := Townsfolk.card_of(production, worker_id)
+	if card.is_empty():
+		return
+	var hails := hails_of(card)
+	hails["to"].erase(player_id)
+	hails["said"].erase(cue_text)
+	production.set_card(worker_id, card)
 
 
 ## [param cue] said by [param worker_id] to [param player_id] on

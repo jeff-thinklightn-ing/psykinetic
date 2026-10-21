@@ -18104,8 +18104,12 @@ the next day's run: the heard filter applies to the shared cues only
 (SHARED_CUES: news, ruling, sky), since a greeting's text is the same
 from every neighbour and one greeting a day had silenced the rest; and
 the sky is a cue only with weather in it or snow on the ground
-(DayNight.describe's weather and ground), a clear sky being the cue
-that drew the narrating lines ("your bones remember"). What the day
+(DayNight.describe's weather and ground, and never Weather.at's
+"clear" kind, whose words are "the sky is clear"), a clear sky being
+the cue that drew the narrating lines ("your bones remember"). And from
+the day after: a hail the mind did not answer (timed out, "not said")
+gives its marks back (Resident.hail_undone and Main._hail_heard), so the
+town's one news line of a day is not lost to one slow answer. What the day
 also showed, left as it is and told to the coordinator: the news, the
 ruling and the plea come back as her own echo of the cue, flat but true;
 the greeting and the sky are paraphrased, and the sky's lines are the
