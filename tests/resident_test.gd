@@ -1388,7 +1388,7 @@ func _test_alms_run() -> void:
 		_check(true, "(economy's 546 is not here: skipped)")
 		return
 	var rules := Townsfolk.rules().duplicate(true)
-	rules["runner"] = {"name": "Pip", "trade": "hauler", "hour": 6, "hours_each_way": 1, "lost_chance": 1.0, "barrow": TOWN, "niche": "niche", "found_reach": 2, "leanings": {"superstition": 2, "intellect": 4}}
+	rules["runner"] = {"name": "Pip", "trade": "acolyte", "hour": 6, "hours_each_way": 1, "lost_chance": 1.0, "barrow": TOWN, "niche": "niche", "found_reach": 2, "leanings": {"superstition": 2, "intellect": 4}}
 	Townsfolk.use_rules(rules)
 	for body: GridEntity in World.townsfolk().duplicate():
 		World.despawn(body)
@@ -1397,6 +1397,12 @@ func _test_alms_run() -> void:
 	if World.production.worker(priest).is_empty():
 		World.production.add_worker(priest, "Aldous", ["priest"], STORE, "appointed")  # The test town is at its room: a worker, not a move-in.
 	_check(not World.production.worker(priest).is_empty(), "(Aldous keeps the test town's temple)")
+	# The town has a Pip of its own already, a carpenter at a bench (the box, 2026-10-20).
+	var carp := "carp:" + STORE
+	if World.production.worker(carp).is_empty():
+		World.production.add_worker(carp, "Pip", ["carpenter"], STORE, "settled")
+	World.production.add_workshop("bench:" + STORE, "carpenter", STORE)
+	_check(World.production.assign("bench:" + STORE, carp), "(Pip the carpenter works a bench)")
 	World.economy.add_gold(Net.player_id, 40, "the test")
 	World.economy.temple_offering(STORE, Net.player_id, false)
 	World.economy.temple_offering(STORE, Net.player_id, false)
@@ -1416,6 +1422,9 @@ func _test_alms_run() -> void:
 		"at the hour Pip takes the altar's gold and is away: %s with %d" % [pip, int(run.get("gold", 0))])
 	_check(str(World.production.worker(pip).get("name", "")) == "Pip" and str(World.production.worker(pip).get("master", "")) == priest and str(World.production.worker(pip).get("origin", "")) == "settled",
 		"seated as a settled resident, the priest's apprentice")
+	var pips: Array = World.production.worker_ids(STORE).filter(func(id: String) -> bool: return str(World.production.worker(id).get("name", "")) == "Pip")
+	_check(pip == carp and Array(World.production.worker(pip).get("trades", [])) == ["acolyte"] and pips.size() == 1 and str(World.production.workshop("bench:" + STORE).get("worker", "")).is_empty(),
+		"the town's own Pip, the carpenter, is the acolyte in place: one Pip, trade acolyte, his bench left empty (%s)" % [pips])
 	var card := Townsfolk.card_of(World.production, pip)
 	var legacy: Dictionary = CompanionCard.legacy_look("Pip")
 	_check(Townsfolk.leaning_of(World.production, pip, "superstition") == 2 and Townsfolk.leaning_of(World.production, pip, "intellect") == 4 and (legacy.is_empty() or legacy.keys().all(func(k: Variant) -> bool: return card.get("look", {}).get(k) == legacy[k])),

@@ -412,7 +412,29 @@ func assign(workshop_id: String, worker_id: String) -> bool:
 	return true
 
 
+## [param worker_id] leaves their trades for [param trade] alone (decision 546,
+## npc's side, amended: Pip the carpenter becomes the priest's acolyte in
+## place): their record, name, card, purse and home kept; their workshop left
+## empty for the town to fill again, a job they were at put back in the queue,
+## and an apprentice of theirs freed, as remove_worker does. False for nobody.
+func retrain(worker_id: String, trade: String) -> bool:
+	if not _workers.has(worker_id) or trade.is_empty():
+		return false
+	for shop: Dictionary in _workshops.values():
+		if shop["worker"] == worker_id:
+			shop["worker"] = ""
+	for each: Dictionary in _jobs.values():
+		if each["worker"] == worker_id and each["state"] == "working":
+			each["state"] = "queued"
+			each["worker"] = ""
+	set_apprentice(worker_id, "")
+	var trades: Array = [trade]
+	_workers[worker_id]["trades"] = trades
+	return true
+
+
 ## [param worker_id] is away (true) or back: an away worker's job waits.
+
 ## Their work is counted up to now first, so it goes by when they left.
 func set_away(worker_id: String, away: bool) -> void:
 	if not _workers.has(worker_id) or _workers[worker_id]["away"] == away:

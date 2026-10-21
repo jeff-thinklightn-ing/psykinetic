@@ -7375,12 +7375,18 @@ func _runner_of(town: String) -> String:
 			if str(World.production.worker(id).get("name", "")) == name:
 				who = id
 				break
+	var trade := str(rule.get("trade", "acolyte"))
 	if who.is_empty():
 		who = "runner:" + town
 		if World.production.worker(who).is_empty():
-			if World.towns == null or not World.towns.move_in(town, who, name, str(rule.get("trade", "hauler")), "settled"):
+			if World.towns == null or not World.towns.move_in(town, who, name, trade, "settled"):
 				return ""
 			print("[runner] %s, the priest's apprentice, lives in %s" % [name, town])
+	elif trade not in World.production.worker(who).get("trades", []):
+		# The town's own Pip (the box's carpenter, 2026-10-20): the acolyte in place, his
+		# name, card and home kept, his bench left for the town to fill again.
+		World.production.retrain(who, trade)
+		print("[runner] %s leaves his bench to be the priest's acolyte in %s" % [name, town])
 	if str(World.production.worker(who).get("master", "")).is_empty() and str(World.production.worker(priest).get("apprentice", "")).is_empty():
 		World.production.set_apprentice(priest, who)
 	_runner_card(who, name, rule)

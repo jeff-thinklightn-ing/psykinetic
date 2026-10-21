@@ -17086,6 +17086,32 @@ before has none. Numbers in townsfolk.json "runner". resident_test.
 Parts to come: Aldous's secrets as lore's entries with knowers; "Take the
 offering down" (a kept offering births the "cheated" standing key from
 Jeff's list) and "Find the runner".
+
+Amended (2026-10-20, the coordinator from Jeff's screenshot of the box: "Pip
+[carpenter]" by Held's store beside Aldous): part 2 found the town's own Pip
+by name and made him the runner with his carpentry kept, which read wrong
+against the page. One Pip stands (442 amended): the resident of his name
+becomes the acolyte in place. Main._runner_of, finding him with a trade the
+runner rule's is not, calls Production.retrain (new): his trades become the
+rule's one trade, "acolyte" (economy's word: no building's trade, no
+official, not in Items.TRADES, so no town wage; not "apprentice", which
+would read as the 498 apprentice system in ledgers and logs, and not
+"hauler", which a rich maker takes as an apprentice of the trade's kind),
+his name, card, purse, home and the town's memories of him kept; his
+workshop left with no worker, a job he was at put back in the queue and an
+apprentice of his freed, as remove_worker does (economy: a shop keeps its
+worker whatever his trades say, and jobs take the shop's worker). The
+minted runner takes the same word, so both read "Pip [acolyte]". The
+other way, a fresh acolyte beside a renamed carpenter, would have renamed a
+saved resident the town remembers by name. Nobody refilled an empty bench
+before this (carpenters came by rescue alone), and a town whose only
+carpenter is Pip would stop building, so economy landed a carpenter newcomer
+first (552, "a maker comes": a workshop of a maker's or built_by trade with
+no resident of the trade draws one, origin growth, after three days) and
+this lands on it: the retrade is that rule's trigger. On the box nothing is
+rewritten at the deploy: at the first runner hour after it the saved
+carpenter becomes the acolyte and the runs begin. resident_test
+_test_alms_run seats a carpenter Pip at a bench first.
 ## 536, ui's side: talk with no panel
 
 Jeff, from his play tests (2026-10-19): "the npc interaction ui, the
