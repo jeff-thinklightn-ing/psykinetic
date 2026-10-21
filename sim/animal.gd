@@ -306,6 +306,24 @@ func charging() -> bool:
 	return super() or role == Role.GAME and World.tick < _charge_until and is_instance_valid(_foe) and _foe.spawned
 
 
+## Whether it would fight [param entity] (decision 551, enemy-ai's side):
+## prey never; a boar the one it charges; a predator its diet, and a player
+## or kept companion while bold or just hurt.
+func threatens(entity: GridEntity) -> bool:
+	if not _may_threaten(entity):
+		return false
+	match role:
+		Role.PREY:
+			return false
+		Role.GAME:
+			return charging() and _foe == entity
+	if entity is Animal:
+		return str(entity.spawn_spec.get("kind", "")) in diet
+	if entity is Player or (entity is Companion and (entity as Companion).keeper != null):
+		return _bold or World.tick - hurt_tick < CHARGE_TICKS
+	return false
+
+
 ## Its side is its herd.
 func _same_side(other: GridEntity) -> bool:
 	return other is Animal and (other as Animal).herd == herd

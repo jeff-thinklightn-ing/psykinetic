@@ -99,6 +99,7 @@ func _ready() -> void:
 	_test_room_guard()
 	_test_draugr()
 	_test_charging()
+	_test_threatens()
 	_test_archer()
 	_test_worn_bundles()
 	_test_shield()
@@ -2708,3 +2709,77 @@ func _test_art_slots() -> void:
 		if not slot.is_empty() and not ArtKit.has(slot):
 			unknown.append("%s: %s" % [kind, slot])
 	_check(unknown.is_empty(), "every row's art is a slot ArtKit knows (%s)" % [unknown])
+
+
+func _test_threatens() -> void:
+	print("
+== threatens(): whom a monster would fight, for companions' guide (decision 551) ==")
+	Monster.idling = false
+	Monster._read_factions = null
+	var rows: Array[String] = ["#############", "#P.....i.k.x#", "#.g.........#", "#############"]
+	Level.register("mt_threat", Level.image_from_rows(rows), null, {"regenerate": {"anchors": [{"rect": [1, 1, 3, 2], "name": "altar"}]}})
+	var e := _build(rows, {}, {}, "mt_threat")
+	var player: GridEntity = e["P"][0]
+	var imp: Monster = e["i"][0]
+	var skeleton: Monster = e["k"][0]
+	var guard: Monster = e["g"][0]
+	var robber: Monster = e["x"][0]
+	player.protected = false
+	_check(imp.threatens(player) and skeleton.threatens(player) and robber.threatens(player), "a player, to any of them (a skeleton walking home too)")
+	_check(not imp.threatens(skeleton) and skeleton.threatens(robber) and robber.threatens(skeleton) and not skeleton.threatens(guard),
+		"a monster of its foes alone: the dead and robbers each other, never their own, and the imp neither")
+	_check(guard.threatens(player), "a room keeper, one in its room")
+	_move_to(player, Vector2i(5, 2))
+	_check(not guard.threatens(player) and imp.threatens(player), "and not one outside it")
+	player.protected = true
+	_check(not imp.threatens(player), "nobody in their spawn grace")
+	player.protected = false
+	var pip := EntityFactory.build({"script": "res://sim/resident.gd", "shape": "capsule", "name": "Pip"}) as Resident
+	pip.worker_id = "w-pip"
+	_room.add_child(pip)
+	World.spawn(pip, Vector2i(6, 2))
+	World.step()
+	_check(pip in World.townsfolk() and skeleton.threatens(pip) and robber.threatens(pip) and not imp.threatens(pip),
+		"a resident, to a side that fights the town, not the imp")
+	imp.raid = "mt_raid"
+	_check(imp.threatens(pip), "and to a raider")
+	imp.raid = ""
+	skeleton.lay_down()
+	_check(not skeleton.threatens(player) and not skeleton.threatens(robber), "lying in its grave, nobody")
+	Level.unregister("mt_threat")
+
+	rows = ["#############", "#.....u.....#", "#...........#", "#..........P#", "#############"]
+	Level.register("mt_threat_lair", Level.image_from_rows(rows), null, {"regenerate": {"anchors": [{"rect": [1, 1, 8, 3], "name": "lair"}]}})
+	e = _build(rows, {}, {}, "mt_threat_lair")
+	var draugr := e["u"][0] as Draugr
+	var challenger := e["P"][0] as Player
+	challenger.player_id = "p1"
+	challenger.protected = false
+	_move_to(challenger, Vector2i(4, 2))
+	_check(not draugr.threatens(challenger), "the draugr seated: nobody unasked")
+	draugr._provoked = challenger
+	_check(draugr.threatens(challenger), "one that struck him, in his lair")
+	draugr._provoked = null
+	draugr.state = Draugr.State.PACT
+	draugr.challenger_id = "p1"
+	_check(draugr.threatens(challenger), "his pact's challenger in his lair")
+	_move_to(challenger, Vector2i(10, 3))
+	_check(not draugr.threatens(challenger), "but not out of it")
+	_move_to(challenger, Vector2i(4, 2))
+	draugr.state = Draugr.State.AT_REST
+	_check(not draugr.threatens(challenger), "resting, nobody")
+	draugr.state = Draugr.State.SEATED
+	draugr.challenger_id = ""
+	Level.unregister("mt_threat_lair")
+
+	e = _build(["##############", "#P..w..r..d..#", "##############"])
+	var wolf: Animal = e["w"][0]
+	var hunter: GridEntity = e["P"][0]
+	hunter.protected = false
+	wolf._bold = false
+	wolf.hurt_tick = -100000
+	_check(not wolf.threatens(hunter) and wolf.threatens(e["d"][0]) and not e["r"][0].threatens(hunter) and not e["d"][0].threatens(hunter),
+		"a wolf by day: its diet, not a hunter; prey nobody")
+	wolf._bold = true
+	_check(wolf.threatens(hunter), "a bold wolf, the hunter")
+	Monster.idling = true

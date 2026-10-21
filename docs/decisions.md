@@ -17336,3 +17336,27 @@ a leg's cells up and down a slope at the leg's steps (the downhill walk
 stopped at its first cell before the fix); route_round round a camp
 (longer, no camp cell, along follows it), [] against a wall edge to edge,
 unchanged by a camp in another area.
+## 551, enemy-ai's side: Monster.threatens(entity), for companions' guide
+
+Companions' guide (551) stops when danger shows. Asking every monster whom
+it would fight keeps the foes tables, rooms, pacts and herds with enemy-ai,
+and the guide never reads them (the coordinator's ask; agreed with
+companions-ba). `threatens(entity) -> bool` answers for now, without
+distance or sight: those stay the asker's (her Senses, her range).
+
+- Never while the monster is gone, dead or lying in its grave, nor for a
+  body gone, dead, downed (544) or in its spawn grace.
+- A monster: a player or a kept companion (not one it has given up on a
+  while); a resident when its side fights the town (545) or it is a raider
+  made real in a zone (World.townsfolk, as its targeting has it); a monster
+  of a faction it fights on sight. A room keeper only one in its room; a
+  skeleton walking home counts (547: it fights who is in its way, and a
+  guide leading through its path is there).
+- Animal: prey never; a boar the one it charges; a predator its diet, and a
+  player or kept companion while bold or just hurt (as its targeting).
+- Draugr: in his lair, one that struck him or his pact's party; resting,
+  nobody; seated and unprovoked, nobody.
+
+A waiting companion with no keeper is never threatened (monsters do not go
+for one). Server only, protocol unchanged, no new class_name. monster_test
+_test_threatens.

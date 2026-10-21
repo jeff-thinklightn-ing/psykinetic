@@ -97,6 +97,16 @@ func _world_tick(seconds: float) -> void:
 		_rise_again()
 
 
+## Whether he would fight [param entity] (decision 551, enemy-ai's side):
+## in his lair, his pact's party, or one that struck him; resting, nobody.
+func threatens(entity: GridEntity) -> bool:
+	if state == State.AT_REST or not _may_threaten(entity) or not _in_lair(entity):
+		return false
+	if entity == _provoked or entity == _struck_by():
+		return true
+	return state == State.PACT and entity in _party()
+
+
 ## Whom he fights: in a pact, the challenger and theirs in his lair; else
 ## one that struck him, while in his lair.
 func _nearest_visible_target() -> GridEntity:

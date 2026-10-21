@@ -1763,6 +1763,32 @@ func _may_fight(other: GridEntity) -> bool:
 	return other is Monster and not other is Animal and _factions().of_kind(World.kind_of(other)) in foes
 
 
+## Whether it would fight [param entity] as things stand (decision 551,
+## enemy-ai's side, for companions' guide): a player or kept companion; a
+## resident when its side fights the town, or it raids; a monster of its
+## foes. A room keeper only one in its room; one walking home counts (it
+## fights who is in its way). Never while it lies in its grave, nor one
+## gone, downed or in its spawn grace. Distance and sight are the asker's.
+func threatens(entity: GridEntity) -> bool:
+	if not _may_threaten(entity):
+		return false
+	if keeps_room and not _room.has_point(entity.tile):
+		return false
+	if entity is Player or (entity is Companion and (entity as Companion).keeper != null):
+		return _given_up.is_empty() or not _letting_be(entity)
+	if raid != "" or "town" in foes:
+		if entity in World.townsfolk():
+			return true
+	return _may_fight(entity)
+
+
+## Whether either of it and [param entity] is out of any fight: gone, dead,
+## lying in its grave, downed or in its spawn grace (threatens).
+func _may_threaten(entity: GridEntity) -> bool:
+	return spawned and hp > 0 and not laid and entity != null and is_instance_valid(entity) and entity != self \
+			and entity.spawned and entity.hp > 0 and not entity.protected and not World.is_downed(entity)
+
+
 ## HOMEWARD's target: the one in its way (_blocker) or that struck it, while
 ## it is in sight; else nobody, and it walks on.
 func _in_the_way() -> GridEntity:
