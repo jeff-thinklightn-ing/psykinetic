@@ -2028,16 +2028,27 @@ static func arm(spec: Dictionary) -> void:
 		spec["props"] = props
 
 
+## Whether [param spec] is a chest, a crate, a cart or a monster: what keeps
+## or carries things a make or a grave mark is set on (474, 555). A monster
+## kind with a class of its own (levels/monsters.json "script", the draugr's,
+## 548) is a monster too.
+static func _keeps_things(spec: Dictionary) -> bool:
+	var script := str(spec.get("script", ""))
+	if script in [CHEST, CARGO, MONSTER]:
+		return true
+	var kind := str(spec.get("kind", ""))
+	return not kind.is_empty() and script == str(Monster.kinds().get(kind, {}).get("script", ""))
+
+
 ## The make of what a chest, a crate or a cart keeps or a monster carries
 ## and drops (decision 474): its entry's props "style" if it is one of Items.STYLES, else the
 ## level's "item_style" (dungeon sets it per source: below the castle
 ## dwarven, the tower dark elven), else none. An unknown one is warned
 ## about and the next tried. Animals and the rest have none.
 static func _style(props: Dictionary, spec: Dictionary, config: Dictionary, warnings: Array[String], at: Vector2i) -> void:
-	var script := str(spec.get("script", ""))
 	var own: Variant = props.get("style")
 	props.erase("style")
-	if script not in [CHEST, CARGO, MONSTER]:
+	if not _keeps_things(spec):
 		if own != null:
 			warnings.append("style at %s: only a chest, a crate, a cart or a monster has a make" % at)
 		return
@@ -2055,10 +2066,9 @@ static func _style(props: Dictionary, spec: Dictionary, config: Dictionary, warn
 ## the level's "grave_goods" (dungeon's barrow), else not. Kept as props
 ## "grave": true for World.grave_from.
 static func _grave(props: Dictionary, spec: Dictionary, config: Dictionary, warnings: Array[String], at: Vector2i) -> void:
-	var script := str(spec.get("script", ""))
 	var own: Variant = props.get("grave")
 	props.erase("grave")
-	if script not in [CHEST, CARGO, MONSTER]:
+	if not _keeps_things(spec):
 		if own != null:
 			warnings.append("grave at %s: only a chest, a crate, a cart or a monster holds grave goods" % at)
 		return

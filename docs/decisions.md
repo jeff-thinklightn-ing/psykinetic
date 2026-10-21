@@ -18212,3 +18212,15 @@ Each is a Standing.bump naming what her player did, in companion_traits
 - companion_test _test_loyalty: left alone, let bleed, warned once and
   wary after it; cleared, and not by the Blood Rot (where the test room has
   a place). Server only, no protocol change beyond 555's, no new class_name.
+## 555, items' side, amended: a monster kind with a class of its own
+
+dungeon's barrow test on 420d6993 found the Draugr unmarked: Level._grave
+(and 474's _style beside it) kept to chests, crates, carts and the plain
+Monster script, and a kind with a class of its own (levels/monsters.json
+"script", the draugr's, 548) failed that check, so what he carries and drops
+was neither grave goods nor of the level's make. Both now ask
+Level._keeps_things(spec): a chest, crate, cart or Monster, or a spec whose
+script is its monster kind's own. items_test lays a draugr marker in a
+grave_goods level and finds him marked. _stock's loot table keeps its own
+check (monster or animal); whether a scripted kind takes a level's loot is
+the monster owners' call. Protocol unchanged; no new class_name.

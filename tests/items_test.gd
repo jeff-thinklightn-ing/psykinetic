@@ -1279,14 +1279,16 @@ func _test_bound() -> void:
 func _test_grave() -> void:
 	print("\n== grave goods: marked where they are minted (decision 555) ==")
 	var rows: Array[String] = ["#######", "#.....#", "#.....#", "#######"]
-	var markers := {Vector2i(1, 1): "chest", Vector2i(3, 1): "chest", Vector2i(2, 2): "monster_imp", Vector2i(5, 2): "start"}
-	var config := {"name": "grave_test", "grave_goods": true, "entities": [{"at": [3, 1], "props": {"grave": false}}]}
+	var markers := {Vector2i(1, 1): "chest", Vector2i(3, 1): "chest", Vector2i(2, 2): "monster_imp", Vector2i(4, 2): "monster_draugr", Vector2i(5, 2): "start"}
+	var config := {"name": "grave_test", "grave_goods": true, "legend": {"monster_draugr": "#5a4636"},
+		"entities": [{"at": [3, 1], "props": {"grave": false}}]}
 	var level := Level.parse(Level.image_from_rows(Terrain.expand(rows), markers, config), null, config)
 	var grave_at := {}
 	for spec: Dictionary in level["entities"]:
 		grave_at[spec["tile"]] = spec.get("props", {}).get("grave", false)
 	_check(grave_at.get(Vector2i(1, 1)) == true and grave_at.get(Vector2i(2, 2)) == true and grave_at.get(Vector2i(3, 1)) == false,
 			"the level's grave_goods: its chest and its imp; a marker's own false wins (%s)" % [grave_at])
+	_check(grave_at.get(Vector2i(4, 2)) == true, "a kind with a class of its own, the draugr, is a monster too (%s)" % [grave_at])
 	var imp: GridEntity = null
 	for monster in World.monsters():
 		if str(monster.spawn_spec.get("kind", "")) == "imp":
