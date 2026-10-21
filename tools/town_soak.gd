@@ -53,6 +53,27 @@ const WOODLOT := "wilds/soak_woodlot"
 var _retrain := {}
 const QUESTIONS := ["Who are you?", "What is new in the town?", "What do you need?", "What do you think of %s?", "Is it true that %s"]
 var _prev := {}  # Main's own context callbacks, put back before the quit.
+## Hails (554), the mood (555) and the road's knowledge (551 phase 2), the
+## coordinator's soak of 2026-10-21. The counted soak records every hail the
+## resident mind is asked (SoakMind, which echoes the cue), seats a resting
+## companion "Wren" whose mood turns sullen on day 3, apart on day 10 and
+## fond on day 20, counts the town's "is unhappy with" lines a day, and
+## feeds the road's news to a scratch companion card through RoadKnowledge.
+## --hail-day: one day over the real mind (the box's Ollama through the
+## tunnel): at four hours each player stands by each resident with the
+## day's mark cleared, so every cue kind is asked in turn, at most
+## --hail-calls=N asks; the lines go to --review=<file> (hails.md) for Jeff.
+var _hail_day := false
+var _hail_calls := 60
+var _review := "C:/dev/review/npc/hails.md"
+var _hails: Array = []  # {day, hour, resident, player, kind, cue, others}
+var _hail_visits: Array = []  # hail day: {day, hour, resident, player, kind}
+var _road_card := {}
+var _road_news: Array = []
+var _road_areas: Array = []
+var _road_days: Array = []
+var _mood_days := {}  # day -> {entry id: true} of "is unhappy with" lines first said that day
+const WREN := "companion:Wren"
 
 
 func _ready() -> void:
@@ -71,6 +92,12 @@ func _run() -> void:
 			_out = arg.trim_prefix("--out=")
 		elif arg == "--ask":
 			_ask = true
+		elif arg == "--hail-day":
+			_hail_day = true
+		elif arg.begins_with("--hail-calls="):
+			_hail_calls = maxi(int(arg.trim_prefix("--hail-calls=")), 1)
+		elif arg.begins_with("--review="):
+			_review = arg.trim_prefix("--review=")
 		elif arg.begins_with("--give="):
 			_give = maxi(int(arg.trim_prefix("--give=")), 0)
 		elif arg.begins_with("--woodlot="):
@@ -105,7 +132,7 @@ func _run() -> void:
 	add_child(_main)
 	await get_tree().process_frame
 	await get_tree().process_frame
-	if _ask:
+	if _ask or _hail_day:
 		_main.mind_kind = "ollama"  # The real resident mind (Net.llm_url and llm_model from the flags), never the stub for words.
 	print("######## soak: %d days, %d players, the wilds, lawspeaker %s, mind %s %s ########" % [days, players, Net.lawspeaker, _main.mind_kind, Net.llm_model if _ask else ""])
 	# The town's people.
@@ -122,6 +149,27 @@ func _run() -> void:
 			_players.append(entity)
 	for player: Player in _players:
 		World.economy.add_gold(player.player_id, 60, "soak")
+	if not _ask and not _hail_day:
+		var mind := SoakMind.new()
+		mind.soak = self
+		_main._resident_mind = mind  # Every hail asked is recorded; the answer echoes the cue (554).
+	var prev_road: Callable = _main.road_heard
+	_main.road_heard = func(town: String, news: Dictionary) -> void:
+		_road_news.append("day %d: %s %s camp %s areas %s" % [news.get("day", -1), news.get("kind", ""), news.get("route", ""), news.get("camp", ""), news.get("areas", [])])
+		for area: Variant in news.get("areas", []):
+			if str(area) not in _road_areas:
+				_road_areas.append(str(area))
+		var entry := RoadKnowledge.heard(_road_card, news, World.holdings, Guide.rules())
+		if not entry.is_empty():
+			_count("road_heard")
+		if prev_road.is_valid():
+			prev_road.call(town, news)
+	# A companion resting in town, a worker among them with no body of her own (555): her mood turns on days 3, 10 and 20.
+	World.production.add_worker(WREN, "Wren", ["cook"], TOWN, WREN)
+	World.production.set_origin(WREN, "companion:" + _players[0].player_id)
+	World.production.set_away(WREN, false)
+	if _hail_day:
+		_seed_hail_day()
 	if _woodlot != Vector2i(-99999, -99999):
 		# A place the level doesn't have, for the measure only: put straight into Holdings.
 		var store: Dictionary = World.holdings.place(TOWN)
@@ -248,6 +296,28 @@ func _hourly() -> void:
 				var was: Array = World.production.worker(who)["trades"]
 				World.production.retrain(who, _retrain["trade"])
 				print("SOAK day %d: %s the %s turns %s" % [day, _retrain["name"], ", ".join(was), _retrain["trade"]])
+	if hour == 0:
+		if day == 3:
+			World.production.set_mood(WREN, "sullen", "they struck her")
+		elif day == 10:
+			World.production.set_mood(WREN, "apart", "they left her behind")
+		elif day == 20:
+			World.production.set_mood(WREN, "fond", "")
+		var mood := Townsfolk.mood_of(World.production, WREN)
+		if mood == "apart" and Townsfolk.whereabouts("cook", 10.0, Season.name_at(World.steps), "", WREN, day, mood) != "temple":
+			_count("mood_apart_not_seated")
+		if not _road_areas.is_empty():
+			var weighed := RoadKnowledge.weigh(_road_card, _road_areas, day, World.holdings, Guide.rules())
+			_road_days.append("day %d: weight %.1f, dangers %d, worst %s" % [day, weighed["weight"], RoadKnowledge.dangers_of(_road_card).size(),
+				weighed["worst"].get("why", "")])
+	if hour == 23:
+		var log: Variant = Offers._call(Offers.ctx, "memory", [TOWN])
+		if log is Array:
+			for entry: Variant in log:
+				if entry is Dictionary and " is unhappy with " in str(entry.get("text", "")):
+					_mood_days.get_or_add(Townsfolk.day_of(int(entry.get("first_said", 0))), {})[str(entry.get("id", ""))] = true
+	if _hail_day and (_hours_seen - 1) % 24 in [9, 11, 13, 15]:  # By the soak's own hourly count: the clock's hour lands on an integer only by chance.
+		await _hail_round(day, (_hours_seen - 1) % 24)
 	if hour == 0:
 		print("SOAK day %d: treasury %d, residents %d, bodies %d, inn %s" % [day, World.stockpile.count(TOWN, "gold"), World.towns.residents(TOWN).size(),
 			World.townsfolk().size(), "standing" if inn.size != Vector2i.ZERO else "none"])
@@ -425,4 +495,244 @@ func _report(days: int) -> void:
 	print("SOAK hours seen %d; party log last lines:" % _hours_seen)
 	for line: String in _main.party_log.last(40):
 		print("SOAK party " + line)
+	_report_hails()
 	print("SOAK DONE")
+
+
+# --- Hails, the mood and the road (the coordinator's soak, 2026-10-21) ---------------
+
+## The recording mind's answer to [param ask]: a hail is recorded with the
+## day, the hour, who to whom, the cue's kind and text, and how many other
+## asks stood in the queue at that moment (none should); the answer echoes
+## the cue, so the spoken path runs. Any other ask gets a word.
+func _soak_voice(ask: Dictionary) -> Dictionary:
+	var kind := str(ask.get("hail", ""))
+	if kind.is_empty():
+		return {"say": "Aye, so it is."}
+	var user := str(ask.get("user", ""))
+	var player := user.substr(0, maxi(user.find(" comes within speaking distance"), 0))
+	var cue := _cue_of(user)
+	_hails.append({"day": Townsfolk.day_of(World.steps), "hour": int(DayNight.hour(DayNight.now())), "resident": str(ask.get("speaker", "")),
+		"player": player, "kind": kind, "cue": cue, "others": _main._resident_asks.size() + _main._resident_out.size() - 1})
+	_count("hail")
+	_count("hail_" + kind)
+	return {"say": cue}
+
+
+## The cue text out of a hail's user turn.
+static func _cue_of(user: String) -> String:
+	var head := "One thing is on your mind: "
+	var a := user.find(head)
+	var b := user.find(" Say one line to them about it")
+	return user.substr(a + head.length(), b - a - head.length()) if a >= 0 and b > a else ""
+
+
+## The hail day's ground: a thing the town noted today, a memory the
+## lawspeaker ruled today (he is off in the soak), and a loan on the
+## smith, so the plea, the news and the ruling can be asked beside the sky
+## and the greeting.
+func _seed_hail_day() -> void:
+	var log: Variant = Offers._call(Offers.ctx, "memory", [TOWN])
+	if log is Array:
+		var news := TownMemory.note(log, "a wagon was struck on the road to the market", "soak", "", World.steps)
+		if not news.is_empty():
+			news["tier"] = TownMemory.CANDIDATE
+			news["event"] = true  # The town's own line, as Townsfolk._remember marks it.
+		var ruled := TownMemory.note(log, "the well was fouled by goblins in the night", "soak", "", World.steps)
+		if not ruled.is_empty():
+			ruled["tier"] = TownMemory.MEMORY
+			ruled["ruling"] = {"ruling": "accept", "because": "the guard saw them", "step": World.steps}
+		Offers._call(Offers.ctx, "set_memory", [TOWN, log])
+	World.production.set_loan("smith_1", 12.0)
+
+
+## The hail day's round at [param hour] of [param day]: each of the first
+## two players stands by each resident in turn with the day's mark and the
+## minute cleared, Main's hail tick runs, and when a hail was queued the
+## loop waits for the mind's answer (one request, no retries), at most
+## _hail_calls in all.
+func _hail_round(day: int, hour: int) -> void:
+	var bodies: Array = World.townsfolk().duplicate()
+	bodies.sort_custom(func(a: Resident, b: Resident) -> bool: return a.worker_id < b.worker_id)
+	for body: Resident in bodies:
+		for i in mini(_players.size(), 2):
+			if _hail_visits.size() >= _hail_calls:
+				return
+			var player: Player = _players[i]
+			if not is_instance_valid(body) or not body.spawned or not is_instance_valid(player) or not player.spawned:
+				continue
+			# The world stands still between visits, so the mind's last result is taken here; an ask still out blocks a hail (the lowest ask), so wait for it.
+			var cleared := 0.0
+			_main._resident_voices()
+			while not _main._resident_out.is_empty() and cleared < ANSWER_WAIT:
+				await get_tree().create_timer(0.5).timeout
+				cleared += 0.5
+				_main._resident_voices()
+			if not _main._resident_out.is_empty():
+				print("SOAK hail day: an ask stayed out %.0f s; cleared for the soak" % cleared)
+				_main._resident_out.clear()
+			var card := Townsfolk.card_of(World.production, body.worker_id)
+			if card.get("hails", {}).get("to", {}).has(player.player_id):
+				card["hails"]["to"].erase(player.player_id)
+				World.production.set_card(body.worker_id, card)
+			_main._hail_tried.clear()
+			_main._hail_at.clear()
+			_main._mind_last_ticks = 0
+			World._relocate(player, _main._nearest_free(body.tile + Vector2i(1, 0)))
+			var before_asks: int = _main._resident_asks.size()
+			_main._hails_tick()
+			if _main._resident_asks.size() <= before_asks:
+				var why := "blocked" if _main._hail_blocked(player, Time.get_ticks_msec(), Townsfolk.rules().get("hail", {})) else (
+					"out %d asks %d slow %d" % [_main._resident_out.size(), _main._resident_asks.size(), _main._mind_last_ticks]
+					if not _main._resident_out.is_empty() or _main._mind_last_ticks > 50 else "no cue")
+				print("SOAK hail day %d %02d:00: %s to %s: nothing (%s)" % [day, hour, body.person, _main._display_name(player), why])
+				continue
+			var kind := str(_main._resident_asks.back()["ask"].get("hail", ""))
+			_hail_visits.append({"day": day, "hour": hour, "resident": body.person, "player": _main._display_name(player), "kind": kind})
+			print("SOAK hail day %d %02d:00: %s to %s (%s)" % [day, hour, body.person, _main._display_name(player), kind])
+			var before := Transcript.written
+			var waited := 0.0
+			while Transcript.written < before + 1 and waited < ANSWER_WAIT:
+				await get_tree().create_timer(0.5).timeout
+				waited += 0.5
+				_main._resident_voices()
+			if Transcript.written < before + 1:
+				print("SOAK hail unanswered after %.0f s: %s" % [waited, body.person])
+
+
+## The hails' tallies: the limits (one a resident a player a day, none
+## with another ask waiting), repeats of a cue by one resident, the kinds,
+## the mood's gossip a day, the road's news and its weight, the names in
+## the cues and the lines, and any id in a done or lapse line. The hail
+## day writes its lines to the review file.
+func _report_hails() -> void:
+	print("SOAK hails %d" % _hails.size())
+	var per_pair := {}  # resident|player|day -> n
+	var per_player_day := {}
+	var per_cue := {}  # resident|cue -> [days]
+	var kinds := {}
+	var with_others := 0
+	for hail: Dictionary in _hails:
+		var key := "%s|%s|%d" % [hail["resident"], hail["player"], hail["day"]]
+		per_pair[key] = int(per_pair.get(key, 0)) + 1
+		var pkey := "%s|%d" % [hail["player"], hail["day"]]
+		per_player_day[pkey] = int(per_player_day.get(pkey, 0)) + 1
+		per_cue.get_or_add("%s|%s" % [hail["resident"], hail["cue"]], []).append(int(hail["day"]))
+		kinds[hail["kind"]] = int(kinds.get(hail["kind"], 0)) + 1
+		if int(hail["others"]) > 0:
+			with_others += 1
+	var pair_max := 0
+	for key: String in per_pair:
+		pair_max = maxi(pair_max, per_pair[key])
+	var player_max := 0
+	var player_sum := 0
+	for key: String in per_player_day:
+		player_max = maxi(player_max, per_player_day[key])
+		player_sum += per_player_day[key]
+	print("SOAK hail kinds %s" % [kinds])
+	print("SOAK hail limit: most by one resident to one player in a day %d (1 is the rule); most in a player's hearing in a day %d, mean %.1f over %d player-days" % [
+		pair_max, player_max, float(player_sum) / maxf(per_player_day.size(), 1.0), per_player_day.size()])
+	print("SOAK hail with another ask waiting or out: %d (0 is the rule)" % with_others)
+	var repeats := 0
+	var repeat_lines: Array = []
+	for key: String in per_cue:
+		var days: Array = per_cue[key]
+		if days.size() > 1:
+			repeats += 1
+			repeat_lines.append("%s x%d days %s" % [key.left(60), days.size(), days])
+	print("SOAK hail repeats (one resident, one cue text, more than once): %d" % repeats)
+	for line: String in repeat_lines.slice(0, 12):
+		print("SOAK hail repeat " + line)
+	for hail: Dictionary in _hails.slice(0, 12):
+		print("SOAK hail sample day %d %02d:00 %s to %s [%s]: %s" % [hail["day"], hail["hour"], hail["resident"], hail["player"], hail["kind"], hail["cue"]])
+	var mood_max := 0
+	var mood_days: Array = _mood_days.keys()
+	mood_days.sort()
+	for day: int in mood_days:
+		mood_max = maxi(mood_max, _mood_days[day].size())
+	print("SOAK mood gossip: %d lines over days %s, most in a day %d (1 is the rule); apart not seated %d" % [
+		mood_days.reduce(func(n: int, d: int) -> int: return n + _mood_days[d].size(), 0), mood_days, mood_max, int(_counts.get("mood_apart_not_seated", 0))])
+	print("SOAK road news %d (heard as dangers %d), areas %s" % [_road_news.size(), int(_counts.get("road_heard", 0)), _road_areas])
+	for line: String in _road_news.slice(0, 10):
+		print("SOAK road " + line)
+	for line: String in _road_days:
+		print("SOAK road " + line)
+	_name_check()
+	var ids := RegEx.create_from_string("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}")
+	var leaked := 0
+	for line: String in _done_lines:
+		if ids.search(line) != null:
+			leaked += 1
+			print("SOAK id in a done or lapse line: " + line)
+	print("SOAK ids in done or lapse lines: %d (0 is the rule)" % leaked)
+	if _hail_day:
+		_write_review()
+
+
+## Every capitalised word in the cues that is not a resident's or a player's
+## name, the town's word, or a sentence's first word: for npc to read.
+func _name_check() -> void:
+	var known := {}
+	for each: Array in FOLK:
+		known[each[1]] = true
+	for name: String in PLAYER_NAMES:
+		known[name] = true
+	for word: String in ["Wren", "I", "The", "It", "You", "Because", "Nothing", "Aye", "Jeff"]:
+		known[word] = true
+	for part: String in str(_main._world_map.areas.get(World.zone.name, {}).get("display_name", "")).split(" "):
+		known[part] = true
+	var caps := RegEx.create_from_string("(?<=[a-z,;:] )[A-Z][a-z]+")
+	var unknown := {}
+	for hail: Dictionary in _hails:
+		for hit: RegExMatch in caps.search_all(str(hail["cue"])):
+			if not known.has(hit.get_string()):
+				unknown[hit.get_string()] = int(unknown.get(hit.get_string(), 0)) + 1
+	print("SOAK hail names not a resident's, a player's or the town's: %s" % [unknown])
+
+
+## The hail day's lines, from the mind log Main wrote (each hail's prompt,
+## the words said and the aside, in the order the visits queued them), to
+## the review file as a table.
+func _write_review() -> void:
+	var rows: Array = []
+	if FileAccess.file_exists(Net.mind_log_path):
+		var file := FileAccess.open(Net.mind_log_path, FileAccess.READ)
+		while not file.eof_reached():
+			var line := file.get_line()
+			if line.is_empty():
+				continue
+			var row: Variant = JSON.parse_string(line)
+			if row is Dictionary and str(row.get("trigger", "")).begins_with("hail: "):
+				rows.append(row)
+	var out := "# Hails: a day's worth over the box's mind\n\n"
+	out += "The town soak's hail day (decision 554, %s): each player stood by each resident with the day's mark cleared, so the resident's next thing to say was asked of the real resident mind (the box's qwen3:14b through the tunnel). Cue: what the sim put on the resident's mind, from the card, the news and the memory only. Said: the words that went out as speech. Aside: the one clause of how (336 amended). Echo marks a line that repeats the cue near enough word for word.\n\n" % Time.get_date_string_from_system()
+	out += "| # | Hour | Resident | To | Cue kind | Cue | Said | Aside | Echo |\n|---|---|---|---|---|---|---|---|---|\n"
+	var n := 0
+	for i in rows.size():
+		var row: Dictionary = rows[i]
+		var visit: Dictionary = _hail_visits[i] if i < _hail_visits.size() else {}
+		var prompt := str(row.get("prompt", ""))
+		var cue := _cue_of(prompt.substr(maxi(prompt.rfind("\n\n"), 0)))
+		var said := str(row.get("say", ""))
+		var echo := said.strip_edges().trim_suffix(".").to_lower() == cue.strip_edges().trim_suffix(".").to_lower()
+		n += 1
+		out += "| %d | %02d:00 | %s | %s | %s | %s | %s | %s | %s |\n" % [n, int(visit.get("hour", 0)), str(row.get("companion", "")), str(visit.get("player", "")),
+			str(row.get("trigger", "")).trim_prefix("hail: ").get_slice(",", 0), cue.replace("|", "/"), said.replace("|", "/"), str(row.get("aside", "")).replace("|", "/"),
+			"echo" if echo else ("" if str(row.get("outcome", "")) == "said" else str(row.get("outcome", "")))]
+	out += "\n%d hails asked, %d answered.\n" % [_hail_visits.size(), rows.size()]
+
+	DirAccess.make_dir_recursive_absolute(_review.get_base_dir())
+	var file := FileAccess.open(_review, FileAccess.WRITE)
+	if file != null:
+		file.store_string(out)
+		print("SOAK review written: %s (%d rows)" % [_review, n])
+	else:
+		print("SOAK review could not be written: %s" % _review)
+
+
+## The counted soak's resident mind: every ask comes here.
+class SoakMind:
+	extends CompanionMind
+	var soak: Node
+	func voice(ask: Dictionary) -> Dictionary:
+		return soak._soak_voice(ask)

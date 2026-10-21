@@ -228,6 +228,7 @@ var _hail_at: Dictionary = {}
 var _blow_at: Dictionary = {}
 var _mind_last_ticks := 0
 var _hail_tried: Dictionary = {}
+var _hail_heard: Dictionary = {}  # player id -> {cue text: day}: no two residents tell one player the same thing in a day
 ## Talk with no panel (decision 536): the offer standing for each player,
 ## player id -> {worker, id, title, at, zone}: what a resident last spoke to
 ## them, taken by a yes, a name or an amount said back; one per player, not
@@ -8047,7 +8048,12 @@ func _hails_tick() -> void:
 	var now_msec := Time.get_ticks_msec()
 	var now := World.production.now()
 	var day := Townsfolk.day_of(now)
-	var sky := str(DayNight.describe(World.fields.region, DayNight.now()).get("sentence", "")) if World.fields != null else ""
+	var sky := ""
+	if World.fields != null:
+		# The sky is worth a word when there is weather in it or snow on the ground; a clear sky is not (554 amended: it drew the invented lines).
+		var now_words := DayNight.describe(World.fields.region, DayNight.now())
+		if not str(now_words.get("weather", "")).is_empty() or not str(now_words.get("ground", "")).is_empty():
+			sky = str(now_words.get("sentence", ""))
 	for entity in World.townsfolk():
 		var body := entity as Resident
 		if body == null or not body.spawned or body.strayed or not body.escort_of.is_empty() or not body.card.is_empty() \
@@ -8065,10 +8071,15 @@ func _hails_tick() -> void:
 			var tried := body.worker_id + "|" + player.player_id
 			if World.tick - int(_hail_tried.get(tried, -World.WORLD_TICK_STEPS)) < World.WORLD_TICK_STEPS:
 				continue
-			var cue := Resident.hail_cue(body.worker_id, body.town, player.player_id, _display_name(player), World.production, now, sky)
+			var heard: Dictionary = _hail_heard.get_or_add(player.player_id, {})
+			for text: Variant in heard.keys():
+				if int(heard[text]) != day:
+					heard.erase(text)
+			var cue := Resident.hail_cue(body.worker_id, body.town, player.player_id, _display_name(player), World.production, now, sky, Offers.ctx, heard.keys())
 			if cue.is_empty():
 				_hail_tried[tried] = World.tick
 				continue
+			heard[str(cue.get("text", ""))] = day
 			Resident.hail_done(World.production, body.worker_id, player.player_id, cue, day, sky)
 			_write_resident_card(body)
 			_resident_serial += 1

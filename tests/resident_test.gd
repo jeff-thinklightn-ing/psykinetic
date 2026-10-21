@@ -1616,7 +1616,7 @@ func _test_hails() -> void:
 	Offers._call(Offers.ctx, "set_memory", [STORE, log])
 	Resident.hail_done(World.production, "rs-mara", pid, cue, today, "")
 	cue = Resident.hail_cue("rs-mara", STORE, pid, "Jeff", World.production, now, "")
-	_check(cue.get("kind") == "ruling" and cue.get("text") == "The lawspeaker ruled today that a wagon was struck on the road to the market, because two saw it.",
+	_check(cue.get("kind") == "ruling" and cue.get("text") == "I heard the lawspeaker rule today that a wagon was struck on the road to the market, because two saw it.",
 		"the news said once, the ruling of today with his because (%s)" % [cue])
 	Resident.hail_done(World.production, "rs-mara", pid, cue, today, "")
 	cue = Resident.hail_cue("rs-mara", STORE, pid, "Jeff", World.production, now, sky)
@@ -1630,6 +1630,24 @@ func _test_hails() -> void:
 	card = Townsfolk.card_of(World.production, "rs-mara")
 	_check(Resident.hailed_today(card, pid, today) and not Resident.hailed_today(card, pid, today + 1) and card["hails"]["said"].size() == 4 and card["hails"]["sky"] == sky,
 		"her card remembers the day, the four things said and the sky spoken of")
+	_check(Resident.hail_cue("rs-mara", STORE, pid, "Jeff", World.production, now, "It is dusk; rain falls", Offers.ctx, ["It is dusk; rain falls."]).is_empty(),
+		"but not one this player heard today from someone else")
+	_check(Resident.hail_cue("rs-mara", STORE, pid, "Bo", World.production, now, "", Offers.ctx, ["Bo is a stranger to you; you greet them as the town does a newcomer."]).get("kind") == "greeting",
+		"a greeting is each resident's own: another's does not silence it")
+	Townsfolk._remember(STORE, "Odo saw the wagon come home", "rs-mara", true, now)
+	_check(Resident.hail_cue("rs-mara", STORE, pid, "Jeff", World.production, now, "").is_empty(), "their own event line is not news to them")
+	log = Offers._call(Offers.ctx, "memory", [STORE])
+	_check(bool(log.back().get("event", false)) and log.back().get("text") == "Odo saw the wagon come home", "the town's event lines carry the mark")
+	var talk := TownMemory.note(log, "goblins did it", "rs-folk01", "", now)
+	Offers._call(Offers.ctx, "set_memory", [STORE, log])
+	var card2 := Townsfolk.card_of(World.production, "rs-mara")
+	card2.erase("hails")
+	World.production.set_card("rs-mara", card2)
+	cue = Resident.hail_cue("rs-mara", STORE, pid, "Jeff", World.production, now, "")
+	_check(cue.get("kind") == "ruling", "talk noted from speech is no news, nor their own event line nor the ruled one: the ruling (%s)" % [cue])
+	Townsfolk._remember(STORE, "Odo saw the wagon come home safe", "rs-folk02", true, now + 1)
+	cue = Resident.hail_cue("rs-mara", STORE, pid, "Jeff", World.production, now, "")
+	_check(cue.get("text") == "I heard today that Odo saw the wagon come home safe.", "the newest event line, Odo kept his capital (%s)" % [cue])
 	# Main's hail, through the voice path.
 	card.erase("hails")
 	World.production.set_card("rs-mara", card)
@@ -1654,7 +1672,7 @@ func _test_hails() -> void:
 	_check(_main._resident_asks.size() == 1 and trigger.begins_with("hail: news, Mara to "), "within reach: her hail is queued as an ask, the news first (%s)" % trigger)
 	World.step()
 	var user := str(mind.asks[0].get("user", "")) if not mind.asks.is_empty() else ""
-	_check(mind.asks.size() == 1 and "comes within speaking distance of you" in user and "One thing is on your mind: I heard today that a wagon" in user and "not the words above" in user,
+	_check(mind.asks.size() == 1 and "comes within speaking distance of you" in user and "One thing is on your mind: I heard today that" in user and "not the words above" in user,
 		"the mind is asked for one line on that one thing (%s)" % user)
 	_check(spoken == ["Mara: The kitchen's warm, at least."], "and what it says goes out as speech, 336's path (%s)" % [spoken])
 	_check(Resident.hailed_today(Townsfolk.card_of(World.production, "rs-mara"), pid, today), "her card remembers the hail")

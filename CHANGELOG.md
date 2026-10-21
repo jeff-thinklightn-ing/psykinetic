@@ -6,6 +6,7 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+- Townsfolk speak first, tuned (554 amended): the news a resident hails is the town's own (a wagon struck, home or lost), never talk another's hail started; one thing is told to you once a day by the whole town, not by each neighbour in turn; a name at the head of the news keeps its capital; the lawspeaker's ruling is told in the resident's own words. Server only.
 - Your companion's mood, without a bar (555, ui's side): her pack's title and her name on the big map carry her bond's step ("Wren's Pack, sullen", "Wren, devoted"), with her newest reason on hover ("you left her to fall alone"); when her bond drops a step the HUD says so once ("Wren hangs back") and the party log keeps the line with the reason. Fond, where she starts, shows nothing.
 
 - The priest's acolyte now lives on the temple's alms: a gold a day from what is left after the priest is paid, or from the town when the alms run dry, so Pip in Held no longer goes hungry with an empty purse. A newcomer to a town no longer takes a name someone there already has, or had (546, 552).

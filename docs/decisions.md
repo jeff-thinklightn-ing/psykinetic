@@ -18081,6 +18081,43 @@ they have something real to say; the rest of 336 stands.
   echoed as narration and a loose turn invented a stag and a barrel of
   salt.
 
+Amended (2026-10-21, after the coordinator's soak): a day's hails against
+the box's qwen3:14b with the game's own prompt (tools/town_soak.gd
+--hail-day) showed four things, fixed here. (1) The news cue took the
+newest memory noted today whatever its source, and a resident's hail,
+heard by the residents beside it, became a belief, which became the
+next hail: "I heard today that goblins did it." Now Townsfolk._remember
+marks the town's own event lines "event": true (a wagon struck, home or
+lost, the runner, the town's notes), and the news cue takes only those,
+never one the resident said themselves nor one the lawspeaker ruled
+(that is the ruling cue). (2) Twelve residents told one player the same
+news in a round: Main._hail_heard keeps, by player and day, every cue
+text they heard from anyone, and hail_cue skips it (its heard argument),
+so a thing is said to a player once a day by the whole town. (3) A name
+at the head of a line lost its capital through Hearsay._lower_first
+("hew says she saw Nix"): Resident._lead lowers the first letter only
+after an article or pronoun (LEAD_WORDS). (4) The ruling cue in the
+third person drew three inventions in seven (an opinion, wet boots, a
+wrong teller); it is in her own first person now, like the news: "I
+heard the lawspeaker rule today that ..., because ...". Two more from
+the next day's run: the heard filter applies to the shared cues only
+(SHARED_CUES: news, ruling, sky), since a greeting's text is the same
+from every neighbour and one greeting a day had silenced the rest; and
+the sky is a cue only with weather in it or snow on the ground
+(DayNight.describe's weather and ground), a clear sky being the cue
+that drew the narrating lines ("your bones remember"). What the day
+also showed, left as it is and told to the coordinator: the news, the
+ruling and the plea come back as her own echo of the cue, flat but true;
+the greeting and the sky are paraphrased, and the sky's lines are the
+liveliest and the ones that invent (a bell, blood from the mine, the
+hunters lost in fog); no line carried narration (no aside at all); two
+of nine timed out at the voice's five seconds over the tunnel, which the
+box's own Ollama does not pay. The soak tool counts hails a day by
+resident and player, repeats, hails with another ask out, the mood's
+gossip a day and the road's news through RoadKnowledge (--days=30), and
+--hail-day writes the day's lines to C:\dev\review\npc\hails.md for
+Jeff.
+
 ## 555, items' side: grave goods, marked where they are minted
 
 companions' loyalty design (555, the coordinator's approval): a

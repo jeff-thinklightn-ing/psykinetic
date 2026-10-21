@@ -1283,6 +1283,8 @@ static func _remember(town: String, text: String, teller: String, candidate: boo
 	var entry := TownMemory.note(log, text, teller, "", at)
 	if candidate and not entry.is_empty() and str(entry.get("tier", "")) == TownMemory.BELIEF:
 		entry["tier"] = TownMemory.CANDIDATE
+	if not entry.is_empty():
+		entry["event"] = true  # The town's own news (a wagon struck, home or lost, the runner), not talk: a hail's "news" cue (554).
 	Offers._call(Offers.ctx, "set_memory", [town, log])
 
 

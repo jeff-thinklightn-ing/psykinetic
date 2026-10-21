@@ -538,13 +538,15 @@ static func hailed_today(card: Dictionary, player_id: String, day: int) -> bool:
 ## What [param worker_id] has to say to [param player_id] ([param player_name])
 ## on first seeing them today, from the card, the town's news and its memory
 ## only, the first that applies: their own plea (Offers' plea: kin sick, a
-## loan, a grudge), what the town noted today (the road's news among it), a
-## memory the lawspeaker ruled today, the sky ([param sky], DayNight.describe's
-## sentence) when it has changed since they last spoke of it, a greeting by
-## standing. A cue said to anyone before (the card's said) is skipped.
-## {kind, text}, {} for nothing to say.
+## loan, a grudge), the town's own news of today (its event lines: a wagon
+## struck, home or lost, the runner; never talk, which hails themselves
+## feed), a memory the lawspeaker ruled today, the sky ([param sky],
+## DayNight.describe's sentence) when it has changed since they last spoke
+## of it, a greeting by standing. A cue said to anyone before (the card's
+## said) is skipped, and a shared one (SHARED_CUES) this player heard today
+## from anyone ([param heard], Main's). {kind, text}, {} for nothing to say.
 static func hail_cue(worker_id: String, town: String, player_id: String, player_name: String, production: Production, now: int, sky: String,
-		given: Dictionary = Offers.ctx) -> Dictionary:
+		given: Dictionary = Offers.ctx, heard: Array = []) -> Dictionary:
 	var card := Townsfolk.card_of(production, worker_id)
 	if card.is_empty():
 		return {}
@@ -565,16 +567,17 @@ static func hail_cue(worker_id: String, town: String, player_id: String, player_
 		for entry: Variant in log:
 			if not entry is Dictionary or str(entry.get("tier", "")) == TownMemory.LEFT:
 				continue
-			if Townsfolk.day_of(int(entry.get("first_said", -1))) == today and int(entry.get("first_said", -1)) >= int(newest.get("first_said", -1)):
-				newest = entry
 			var ruling: Variant = entry.get("ruling", {})
+			if bool(entry.get("event", false)) and str(entry.get("said_by", "")) != worker_id and (not ruling is Dictionary or ruling.is_empty()) \
+					and Townsfolk.day_of(int(entry.get("first_said", -1))) == today and int(entry.get("first_said", -1)) >= int(newest.get("first_said", -1)):
+				newest = entry
 			if ruling is Dictionary and ruling.has("step") and Townsfolk.day_of(int(ruling.get("step", -1))) == today and int(ruling.get("step", -1)) >= int(ruled.get("ruling", {}).get("step", -1)):
 				ruled = entry
 		if not newest.is_empty():
-			cues.append({"kind": "news", "text": "I heard today that %s" % _sentence(Hearsay._lower_first(str(newest.get("text", ""))))})
+			cues.append({"kind": "news", "text": "I heard today that %s" % _sentence(_lead(str(newest.get("text", ""))))})
 		if not ruled.is_empty():
 			var because := str(ruled.get("ruling", {}).get("because", ""))
-			cues.append({"kind": "ruling", "text": "The lawspeaker ruled today that %s%s" % [Hearsay._lower_first(str(ruled.get("text", ""))).trim_suffix("."),
+			cues.append({"kind": "ruling", "text": "I heard the lawspeaker rule today that %s%s" % [_lead(str(ruled.get("text", ""))).trim_suffix("."),
 				_sentence(", because " + because.trim_suffix(".")) if not because.is_empty() else "."]})
 	if not sky.is_empty() and str(hails.get("sky", "")) != sky:
 		cues.append({"kind": "sky", "text": _sentence(sky)})
@@ -582,9 +585,25 @@ static func hail_cue(worker_id: String, town: String, player_id: String, player_
 	if HAIL_GREETINGS.has(word):
 		cues.append({"kind": "greeting", "text": HAIL_GREETINGS[word] % player_name})
 	for cue: Dictionary in cues:
-		if not said.has(cue["text"]):
-			return cue
+		if said.has(cue["text"]):
+			continue
+		if str(cue["kind"]) in SHARED_CUES and heard.has(cue["text"]):
+			continue  # The town's one fact a day to this player; a greeting or a plea is each resident's own.
+		return cue
 	return {}
+
+
+## The cue kinds that are the town's to tell once a day to one player (the
+## heard argument); the plea and the greeting are each resident's own.
+const SHARED_CUES := ["news", "ruling", "sky"]
+
+
+## [param text] with its first letter lowered after "I heard ...", unless
+## its first word is a name (anything but these openers keeps its capital).
+const LEAD_WORDS := ["The", "A", "An", "It", "There", "They", "He", "She", "We", "Our", "Their", "His", "Her", "Some", "No", "Two", "Three", "Many"]
+static func _lead(text: String) -> String:
+	var first := text.get_slice(" ", 0)
+	return Hearsay._lower_first(text) if LEAD_WORDS.has(first) else text
 
 
 ## [param text] ended with a full stop when it has none.
