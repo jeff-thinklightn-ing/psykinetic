@@ -10374,6 +10374,19 @@ unknown"), and joining never depends on it.
 
 tests/status_test.
 
+Amended (2026-10-21, perf, found while making 450 amended): `--status-port`
+was missing from the options `Net._parse_args` reads, so `_set_option`
+never saw it and a server given it on the command line answered nothing.
+tests/status_test sets the port in code, so it never ran into this. The box
+journal had no "answering status on UDP" line in 7 days. The flag is now
+read. tests/server_boot_test.sh passes `--status-port` to the exported
+server and fails without the "answering status on UDP" line and the port
+bound (on 127.0.0.1, beside 450 amended's `--bind`). It failed on the old
+`net.gd` and passes now. Status answers on the box need both pieces: this
+build, from the next release, and the installed unit with the flag. On
+2026-10-21 the unit in /etc/systemd/system still lacked it, until Jeff's
+`sudo cp` and daemon-reload (above). Server only; protocol unchanged.
+
 ## 406. Credits in the options: who made the sounds, from the takes list
 
 The options panel ends with a Credits section. It names who made what the game

@@ -74,7 +74,7 @@ for _ in $(seq 1 120); do
 	sleep 0.25
 done
 # Where it listens, while it runs: 127.0.0.1, not every address.
-netstat -an -p UDP 2>/dev/null | grep -E "[:.]$PORT[[:space:]]" >"$DIR/bound.txt"
+netstat -an -p UDP 2>/dev/null | grep -E "[:.]($PORT|$STATUS)[[:space:]]" >"$DIR/bound.txt"
 APPDATA="$(cygpath -w "$DIR/appdata")" timeout 60 "$GODOT" --headless --path . --client --address=127.0.0.1 "--port=$PORT" --token=boottest \
 	--name=BootTest --player-id=b0070000-0000-4000-8000-000000000001 --test-exit-after=25 </dev/null >"$DIR/client.log" 2>&1 &
 client=$!
@@ -85,9 +85,13 @@ code=$?
 echo "PASS  the exported server booted and quit cleanly ($(( $(date +%s) - started )) s)"
 grep -q "server listening on port $PORT" "$DIR/server.log" || fail "the server never listened"
 grep -q "joined as" "$DIR/server.log" || fail "no client joined the exported server"
+# --status-port taken from the command line (431 amended: it was left out of
+# the options Net reads, and the box never answered a status query).
+grep -q "answering status on UDP $STATUS" "$DIR/server.log" || fail "the server did not answer status on UDP $STATUS (--status-port)"
+grep -q "127.0.0.1:$STATUS" "$DIR/bound.txt" || fail "the server's status port UDP $STATUS was not bound on 127.0.0.1"
 echo "PASS  a client joined it"
 grep -q "127.0.0.1:$PORT" "$DIR/bound.txt" || fail "the server's UDP $PORT was not seen on 127.0.0.1 ($(tr -s ' ' <"$DIR/bound.txt" | head -2))"
-grep -q "0.0.0.0:$PORT\|\*:$PORT\|\[::\]:$PORT" "$DIR/bound.txt" && fail "the server listens on every address on UDP $PORT, not 127.0.0.1 alone"
+grep -q "0.0.0.0:\($PORT\|$STATUS\)\|\*:\($PORT\|$STATUS\)\|\[::\]:\($PORT\|$STATUS\)" "$DIR/bound.txt" && fail "the server listens on every address on UDP $PORT or $STATUS, not 127.0.0.1 alone"
 echo "PASS  it listened on 127.0.0.1 alone"
 errors="$(grep -h -E "SCRIPT ERROR|^ERROR:" "$DIR/export.log" "$DIR/server.log")"
 [ -z "$errors" ] || { echo "$errors" | head -20; fail "errors in the export or the exported server's log"; }
