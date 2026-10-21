@@ -56,7 +56,9 @@ const OPEN := ""
 var blocked := Callable()
 ## "<faction> <area>" -> how long making that layer's distance fields there
 ## took, in milliseconds (faction "" for the open layer), as tasks finish.
-var build_ms: Dictionary[String, float] = {}
+var build_ms: Dictionary[String, float]:
+	get:
+		return _shared.build_ms
 ## Ways the routes leave out, one line each: an edge with no floor along it,
 ## a link into an area or spawn point that is not there.
 var gaps: Array[String] = []
@@ -76,12 +78,24 @@ var _portal_at: Dictionary[String, int] = {}
 var _in_area: Dictionary[String, Array] = {}
 ## Vector2i(exit id, arrival id) -> the index of its way in WorldMap.ways.
 var _crossings: Dictionary[Vector2i, int] = {}
-var _mutex := Mutex.new()
+## What the tasks share with the routes: the tasks hold this, never the
+## routes themselves.
+var _shared := Shared.new()
+var _mutex: Mutex = _shared.mutex
 var _tasks: Array[int] = []
 var _threaded := true
 var _make_fields := true
-## Set when the routes are freed: the tasks stop at their next portal.
-var _stopping := false
+
+
+## What a pool task touches of the routes: a task holding the routes (even
+## through a weak reference, taken while they were being freed) could free
+## them a second time, the exit's crash after PASS in raid_groups_test.
+class Shared:
+	## Set when the routes are freed: the tasks stop at their next portal.
+	var stopping := false
+	## Guards the layers' version, ready and fields, and build_ms.
+	var mutex := Mutex.new()
+	var build_ms: Dictionary[String, float] = {}
 
 
 ## One faction's routes: its graph, its obstacles, its fields.
@@ -153,13 +167,9 @@ func _init(world_map: WorldMap, threaded := true, make_fields := true, obstacles
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_PREDELETE:
-		_stopping = true
-		# Freed by the last task's own hold (_make_held): not waited on by
-		# itself.
-		var mine := WorkerThreadPool.get_caller_task_id()
+		_shared.stopping = true
 		for task in _tasks:
-			if task != mine:
-				WorkerThreadPool.wait_for_task_completion(task)
+			WorkerThreadPool.wait_for_task_completion(task)
 
 
 ## The factions with a layer of their own.
@@ -227,12 +237,11 @@ func _start(job: Array[Dictionary]) -> void:
 		return
 	_reap()
 	if _threaded:
-		# Held weakly: a task still queued at exit must not keep these routes
-		# alive past the pool (freed with it, their wait on it crashed the
-		# exit: raid_groups_test's 139 after PASS).
-		_tasks.append(WorkerThreadPool.add_task(WorldRoutes._make_held.bind(weakref(self), job), false, "world routes: distance fields"))
+		# The task holds the shared part and the job's copies, not these
+		# routes (Shared).
+		_tasks.append(WorkerThreadPool.add_task(WorldRoutes._make.bind(_shared, job), false, "world routes: distance fields"))
 	else:
-		_make(job)
+		_make(_shared, job)
 
 
 ## Lets go of the tasks that are done.
@@ -243,25 +252,17 @@ func _reap() -> void:
 			_tasks.erase(task)
 
 
-## A pool task's: _make on the routes [param held] still refers to, if
-## any (they may be gone, or going: nothing to make then).
-static func _make_held(held: WeakRef, job: Array[Dictionary]) -> void:
-	var routes: WorldRoutes = held.get_ref()
-	if routes != null and not routes._stopping:
-		routes._make(job)
-
-
 ## A task: a distance field per portal, area by area, from the copies in
-## [param job] only. An area whose obstacles changed meanwhile is dropped
-## (a newer task makes it).
-func _make(job: Array[Dictionary]) -> void:
+## [param job] only, written under [param shared]'s mutex. An area whose
+## obstacles changed meanwhile is dropped (a newer task makes it).
+static func _make(shared: Shared, job: Array[Dictionary]) -> void:
 	for entry in job:
 		var started := Time.get_ticks_usec()
 		var area: Dictionary = entry["area"]
 		var size: Vector2i = area["size"]
 		var made: Dictionary[int, PackedFloat32Array] = {}
 		for portal: Array in entry["portals"]:
-			if _stopping:
+			if shared.stopping:
 				return
 			var field := PackedFloat32Array()
 			field.resize(size.x * size.y)
@@ -269,12 +270,12 @@ func _make(job: Array[Dictionary]) -> void:
 			_flood(area, portal[1], {}, field, entry["obstacles"])
 			made[portal[0]] = field
 		var layer: Layer = entry["layer"]
-		_mutex.lock()
+		shared.mutex.lock()
 		if layer.version.get(entry["name"], 0) == entry["version"]:
 			layer.fields.merge(made, true)
 			layer.ready[entry["name"]] = entry["version"]
-			build_ms["%s %s" % [layer.faction, entry["name"]]] = (Time.get_ticks_usec() - started) / 1000.0
-		_mutex.unlock()
+			shared.build_ms["%s %s" % [layer.faction, entry["name"]]] = (Time.get_ticks_usec() - started) / 1000.0
+		shared.mutex.unlock()
 
 
 # --- Routes --------------------------------------------------------------------------
