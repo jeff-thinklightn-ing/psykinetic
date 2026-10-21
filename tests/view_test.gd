@@ -48,6 +48,7 @@ func _ready() -> void:
 	_test_streams()
 	_test_tall_grass()
 	_test_rocks()
+	_test_niches()
 	_test_relief()
 	_test_sight()
 	_test_fire()
@@ -1746,6 +1747,44 @@ func _test_relief() -> void:
 ## as rocks (a large one over a 2x2 clump, small ones on the rest), never a
 ## tree, on ground of their footing and no scatter; its slopes ramps in the
 ## ground, nothing stair-like on them.
+## The barrow's burial niches (542 amended, terrain's side): a generated
+## barrow's "niches" read into terrain["niches"] (a bad one said and left
+## out), and art-kit's prop.burial_niche drawn on each, a MultiMesh a
+## variant and mesh, every niche once, the lid with it.
+func _test_niches() -> void:
+	print("
+== niches: the barrow's burial niches drawn ==")
+	var warnings: Array[String] = []
+	var parsed := Level.niches_from({"niches": [[1, 1, 0, 1, 2], [1, 1, 1, 1, 2], [1, 1, 0, 1, 4], [99, 99, 0, 1, 1]]},
+			{"floor": [Vector2i(1, 1)]}, warnings)
+	_check(parsed.size() == 1 and parsed[0]["out"] == Vector2i(0, 1) and parsed[0]["variant"] == 2 and warnings.size() == 3,
+			"niches read as {cell, out, variant}; a diagonal way out, a bad variant and no floor said and left out (%d)" % warnings.size())
+	var made := Regen.generate("barrow", 1)
+	if made.is_empty():
+		_check(false, "the barrow generates")
+		return
+	var level := Level.parse(made["layout"], made["height"], made["config"], made.get("relief"))
+	var niches: Array = level["terrain"].get("niches", [])
+	_check(not niches.is_empty() and niches.all(func(n: Dictionary) -> bool: return level["terrain"]["floor"].has(n["cell"])),
+			"a generated barrow's niches reach the terrain, each on floor (%d)" % niches.size())
+	_rig.rebuild(level["terrain"], level["centre"])
+	var holder := _rig._room.get_node_or_null("Niches") as Node3D
+	var by_variant: Dictionary = {}
+	for n: Dictionary in niches:
+		by_variant[n["variant"]] = by_variant.get(n["variant"], 0) + 1
+	var drawn: Dictionary = {}
+	var meshes_a_variant: Dictionary = {}
+	if holder != null:
+		for many: MultiMeshInstance3D in holder.find_children("*", "MultiMeshInstance3D", false, false):
+			var variant := int(String(many.name).get_slice("_", 1))
+			meshes_a_variant[variant] = meshes_a_variant.get(variant, 0) + 1
+			if String(many.name).get_slice("_", 2) == "0":
+				drawn[variant] = many.multimesh.instance_count
+	_check(holder != null and drawn == by_variant and meshes_a_variant.values().all(func(c: int) -> bool: return c >= 2),
+			"prop.burial_niche on each niche, a MultiMesh a variant and mesh, the lid with it (%s; meshes %s)" % [drawn, meshes_a_variant])
+	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+
+
 func _test_rocks() -> void:
 	print("\n== rocks and slopes: rocks for trees, ramps for slopes ==")
 	var sample := Level.load_level("sample")

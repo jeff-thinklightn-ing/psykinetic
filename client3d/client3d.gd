@@ -226,6 +226,9 @@ const BRIDGE_END := "bridge.wood.end"
 ## Rocks (decision 513, terrain's side): art-kit's rock.large over each 2x2
 ## clump of rock cells, rock.small on every other one; each turned, sized
 ## and sunk by its cell (sizes and sinks: these ranges).
+## A burial niche's piece (542 amended, terrain's side): art-kit's, its +z
+## out of the wall into the room.
+const BURIAL_NICHE := "prop.burial_niche"
 const ROCK_SMALL := "rock.small"
 const ROCK_LARGE := "rock.large"
 const ROCK_SMALL_SIZES := Vector2(0.9, 1.3)
@@ -3199,6 +3202,7 @@ func _build_room() -> void:
 	_build_water()
 	_add_cliffs()
 	_add_rocks()
+	_add_niches()
 	for cell: Vector2i in _terrain.get("torches", []):
 		_add_torch(cell)
 	for cell: Vector2i in _terrain.get("lanterns", []):
@@ -5473,6 +5477,45 @@ func _add_bridge(building: Dictionary) -> void:
 ## round as it does the void; the view draws the rock instead).
 func _rock_edge(key: Vector3i) -> bool:
 	return Terrain.edge_cells(key).any(func(cell: Vector2i) -> bool: return _rocks.has(cell))
+
+
+## The barrow's burial niches (terrain "niches"; 542 amended, terrain's
+## side): art-kit's prop.burial_niche on each niche's cell, at its
+## middle and height, its +z turned out of the wall (the niche's way out),
+## the niche's variant; its "lid" part with it (a part is one of the
+## slot's meshes, placed where the slot has it). One MultiMesh a variant
+## and mesh under "Niches", casting shadows.
+func _add_niches() -> void:
+	var niches: Array = _terrain.get("niches", [])
+	if niches.is_empty() or not ArtKit.has(BURIAL_NICHE):
+		return
+	var pieces: Dictionary[int, Array] = {}
+	for niche: Dictionary in niches:
+		var cell: Vector2i = niche["cell"]
+		pieces.get_or_add(int(niche["variant"]), []).append(
+				Transform3D(_turned_to(niche["out"]), Vector3(cell.x, _height_in(cell, Vector2(cell)), cell.y)))
+	var holder := Node3D.new()
+	holder.name = "Niches"
+	for variant: int in pieces:
+		var made := ArtKit.instance(BURIAL_NICHE, variant)
+		var meshes := made.find_children("*", "MeshInstance3D", true, false)
+		for m in meshes.size():
+			var drawn := meshes[m] as MeshInstance3D
+			var local := ArtKit._place_in(drawn, made)
+			var multimesh := MultiMesh.new()
+			multimesh.transform_format = MultiMesh.TRANSFORM_3D
+			multimesh.mesh = drawn.mesh
+			multimesh.instance_count = pieces[variant].size()
+			for i in pieces[variant].size():
+				multimesh.set_instance_transform(i, pieces[variant][i] * local)
+			var many := MultiMeshInstance3D.new()
+			many.name = "niche_%d_%d" % [variant, m]
+			many.multimesh = multimesh
+			many.material_override = drawn.material_override if drawn.material_override != null else drawn.get_active_material(0)
+			many.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+			holder.add_child(many)
+		made.free()
+	_room.add_child(holder)
 
 
 ## The rocks (terrain "rocks", decision 513, terrain's side): rock_plan's

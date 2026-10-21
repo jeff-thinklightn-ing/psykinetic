@@ -628,6 +628,7 @@ static func parse(layout: Image, height: Image, config: Dictionary, relief: Imag
 	_lay_bridges(level)
 	_lay_solid(level)
 	level["terrain"]["streams"] = streams_from(config, level["terrain"], warnings)
+	level["terrain"]["niches"] = niches_from(config, level["terrain"], warnings)
 	_check_fords(level["terrain"], warnings)
 	_check_water(level["terrain"], warnings)
 	level["building_cells"] = inside_cells(level["buildings"])
@@ -1229,6 +1230,36 @@ static func _elevation(terrain: Dictionary, cell: Vector2i) -> float:
 	if terrain.has("relief"):
 		return Relief.at(terrain["relief"], terrain["relief_size"], cell)
 	return int(terrain["heights"].get(cell, 0)) * Relief.LEVEL_M
+
+
+## level.json's "niches" (542 amended, terrain's side: dungeon's barrow):
+## [[x, y, dx, dy, variant], ...], a burial niche's alcove cell (floor to the
+## sim), (dx, dy) the way out of the wall into the room, the variant 1 to 3;
+## as [{cell, out, variant}] for terrain to stand prop.burial_niche on. One
+## that is no floor, whose way out is not one step to a side, or whose
+## variant is not 1 to 3 is said in [param warnings] and left out.
+static func niches_from(config: Dictionary, terrain: Dictionary, warnings: Array[String]) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var listed: Variant = config.get("niches", [])
+	if not listed is Array:
+		warnings.append("\"niches\" in level.json is not a list")
+		return out
+	var floor := {}
+	for cell: Vector2i in terrain.get("floor", []):
+		floor[cell] = true
+	for index in (listed as Array).size():
+		var entry: Variant = listed[index]
+		if not entry is Array or (entry as Array).size() != 5:
+			warnings.append("niche %d is not [x, y, dx, dy, variant]: left out" % index)
+			continue
+		var cell := Vector2i(int(entry[0]), int(entry[1]))
+		var way := Vector2i(int(entry[2]), int(entry[3]))
+		var variant := int(entry[4])
+		if not floor.has(cell) or absi(way.x) + absi(way.y) != 1 or variant < 1 or variant > 3:
+			warnings.append("niche %d at %s (way out %s, variant %d) is no floor, no side or no variant: left out" % [index, cell, way, variant])
+			continue
+		out.append({"cell": cell, "out": way, "variant": variant})
+	return out
 
 
 ## level.json's "streams" (decision 505): [{"path": [[x, y], ...]}], each a

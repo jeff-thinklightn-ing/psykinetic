@@ -17249,3 +17249,26 @@ No mound prefab exists, so builder meets one only where a level has it.
 The door is one rule, Level.solid_door (front_cell - facing), which
 _lay_solid and BuilderSession.solid_door both call (maps' OK for level.gd).
 Protocol unchanged. builder_test _test_solid.
+## 542 amended, terrain's side: the barrow's burial niches drawn
+
+542 amended (dungeon, 74336596) writes a generated barrow's burial niches
+into its level.json as "niches": [[x, y, dx, dy, variant], ...], each an
+alcove cell open on one side, floor to the sim; art-kit's prop.burial_niche
+is what lies in one. This draws it. Client only; nothing walks or sees
+differently (a niche stays floor).
+
+- Level.niches_from reads them into terrain["niches"] as {cell, out,
+  variant}; one whose cell is no floor, whose way out is not one step to a
+  side, or whose variant is not 1 to 3 is said and left out. The list's shape
+  suits the slot as it is (art-kit and dungeon agreed; no change asked).
+  The editor does not offer them (EditorFields.NOT_OFFERED): the barrow's
+  generator writes them, nobody paints them.
+- Client3D._add_niches stands the slot on each niche's cell, at its middle
+  and height, its +z (the bier's front) turned out of the wall along the way
+  out (_turned_to), in the niche's variant (1 the town's plundered, 2 old
+  bones with goods, 3 the oldest wrapped); its "lid" part comes with it, a
+  mesh of the slot placed where the slot has it. One MultiMesh a variant and
+  mesh under "Niches", casting shadows; a grey box until the slot has art.
+
+tests/view_test (niches_from's checks; a generated barrow's niches in its
+terrain on floor, each drawn once in its variant with the lid).

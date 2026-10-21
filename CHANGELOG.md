@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The Barrow's burial niches are drawn (542): each alcove holds its bier and remains, plundered near the top, old bones and grave goods deeper, the oldest wrapped burials at the bottom.
 - The Barrow fills in: its generated plan lists every grave between the tombs with how deep it lies, so enemy-ai's walking skeletons can each be given one to go home to (Jeff's crypt page: "the dead are only trying to go back to their graves"), and the wall niches with their facing for the burial-niche art; skeletons and robbers replace the imps and sneaks, three skeleton guards stand in the altar room and the draugr in his lair; a niche off the altar room where a lost Pip may be found, and the runner's pack in the lair.
 - Builder mode knows a solid building (a barrow's mound): its checks walk round it and in at its door, and it takes no use (550, builder's side).
 - The barrow's door in the wilds is a grassy mound now, a solid hill you walk round, its doorway the way in (550). Server and client: protocol 26.
