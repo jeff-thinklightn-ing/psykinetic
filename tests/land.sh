@@ -44,6 +44,7 @@ part() {
 }
 part heavy_job_test python -B tests/heavy_job_test.py
 part changelog_check_test python -B tests/changelog_check_test.py
+part changelog_resolve_test python -B tests/changelog_resolve_test.py
 # Started a little apart, as the suite starts its scenes (decision 530: Godots
 # launched in the same instant died at launch).
 part suite env PSYKINETIC_TEST_JOBS="$suite_jobs" bash tests/run.sh &
@@ -57,7 +58,7 @@ wait
 
 code=0
 failed=""
-for name in heavy_job_test changelog_check_test suite net_test state_test server_boot_test; do
+for name in heavy_job_test changelog_check_test changelog_resolve_test suite net_test state_test server_boot_test; do
 	read -r status took <"$LOGS/$name.status"
 	if [ "$status" -ne 0 ]; then
 		code=1
@@ -84,7 +85,7 @@ if [ -n "$failed" ]; then
 fi
 echo
 if [ "$code" -eq 0 ]; then
-	echo "LANDING TESTS: PASS (suite, net_test, state_test, server_boot_test, heavy_job_test, changelog_check_test; $(( $(date +%s) - started ))s)"
+	echo "LANDING TESTS: PASS (suite, net_test, state_test, server_boot_test, heavy_job_test, changelog_check_test, changelog_resolve_test; $(( $(date +%s) - started ))s)"
 else
 	echo "LANDING TESTS: FAIL ($failed; $(( $(date +%s) - started ))s)"
 fi

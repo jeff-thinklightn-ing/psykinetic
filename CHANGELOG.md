@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Landing scripts share one fix for change-log conflicts during a rebase, which no longer copies released lines back (539 amended); tools only.
 - Landing tests warn of a change-log line that begins like one already released, a likely copy brought back by a rebase (539 amended); tools only.
 - The network test records any of its game instances that crash, with where they crashed, so repeated crashes show up in the daily summary (530 amended); tools only.
 - You can see yourself under a cliff (549): when a hillside or a cliff's edge stands between the camera and you, it thins around you, as near walls fade.

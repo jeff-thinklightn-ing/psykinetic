@@ -42,6 +42,9 @@ Write-Output "$(if ($gateOk) { 'PASS' } else { 'FAIL' })  heavy_job_test"
 $changelogTest = & python -B (Join-Path $root 'tests\changelog_check_test.py') 2>&1
 $changelogOk = $LASTEXITCODE -eq 0
 Write-Output "$(if ($changelogOk) { 'PASS' } else { 'FAIL' })  changelog_check_test"
+$resolveTest = & python -B (Join-Path $root 'tests\changelog_resolve_test.py') 2>&1
+$resolveOk = $LASTEXITCODE -eq 0
+Write-Output "$(if ($resolveOk) { 'PASS' } else { 'FAIL' })  changelog_resolve_test"
 $parts = [ordered]@{ suite = 'run.ps1'; net_test = 'net_test.ps1'; state_test = 'state_test.ps1'; server_boot_test = 'server_boot_test.ps1' }
 $running = @{}
 $env:PSYKINETIC_TEST_JOBS = "$suiteJobs"  # Only the suite reads it.
@@ -65,6 +68,10 @@ if (-not $gateOk) {
 if (-not $changelogOk) {
 	$failed += 'changelog_check_test'
 	$changelogTest | Write-Output
+}
+if (-not $resolveOk) {
+	$failed += 'changelog_resolve_test'
+	$resolveTest | Write-Output
 }
 $done = @{}
 while ($done.Count -lt $parts.Count) {
@@ -100,7 +107,7 @@ Remove-Item $logs -Recurse -Force -ErrorAction SilentlyContinue
 $seconds = [int]((Get-Date) - $started).TotalSeconds
 Write-Output ''
 if ($failed.Count -eq 0) {
-	Write-Output "LANDING TESTS: PASS (suite, net_test, state_test, server_boot_test, heavy_job_test, changelog_check_test; ${seconds}s)"
+	Write-Output "LANDING TESTS: PASS (suite, net_test, state_test, server_boot_test, heavy_job_test, changelog_check_test, changelog_resolve_test; ${seconds}s)"
 	exit 0
 }
 Write-Output "LANDING TESTS: FAIL ($($failed -join ', '); ${seconds}s)"

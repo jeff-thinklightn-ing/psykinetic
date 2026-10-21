@@ -16163,6 +16163,23 @@ release changes what the server and client send each other: ...") at commits
 before a second release had used them, rightly there. changelog_check_test:
 the edited copy warned of, a short "Fixed" clause and a set phrase not.
 
+Amended (3) (release, 2026-10-20: after the v0.1.160 cut dungeon, maps,
+terrain and perf each had a rebase resolver copy released bullets back under
+Unreleased, each refused by this check a gate slot late): one shared resolver,
+tools/changelog_resolve.py, for a rebase stopped with CHANGELOG.md the only
+conflicted file. It writes the file as it stands on the side rebased onto
+(HEAD), cut and all, plus, first under ## Unreleased in their order, the
+bullets the commit being rebased (REBASE_HEAD) adds against its parent that
+the file does not carry anywhere, less any bullet that commit takes out (a
+rewording is not doubled), keeps the line ends, and `git add`s it; the land
+script then continues the rebase, once per commit that stops. Exit 1 and
+nothing written on a conflict beyond CHANGELOG.md, outside a rebase, or with
+no ## Unreleased. Land scripts call it instead of keeping both sides.
+tests/changelog_resolve_test (in the landing): a scratch repository rebased
+across a cut (Unreleased is main's plus the branch's one, each released
+bullet once, the rebase continues with the commit on top), CRLF, a
+rewording, a conflict in another file left alone.
+
 ## 436 amended: the quick asks go
 
 Jeff, from his play tests (2026-10-19, through the coordinator): "the npc
