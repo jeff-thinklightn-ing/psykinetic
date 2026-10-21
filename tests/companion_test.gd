@@ -1804,6 +1804,12 @@ func _test_loyalty() -> void:
 	record.companion["standing"] = {Net.player_id: {"score": 0, "why": [], "since": World.steps}}
 	var score := func() -> int: return Standing.score(record.companion, Net.player_id)
 	var newest := func() -> String: return Main.mood_why_of(record.companion, Net.player_id, "you")
+	# A hurt is told her voice as it happens, even just after she spoke.
+	pet._last_speech_tick = World.tick
+	var asked := pet._serial
+	_main._bond(record, "struck", "struck you")
+	_check(pet._serial > asked, "a drop told her voice at once, past the rate limit")
+	record.companion["standing"] = {Net.player_id: {"score": 0, "why": [], "since": World.steps}}
 	var near_tile := owner.tile
 	var away := _far_cell(pet.tile, Companion.HEARING_RANGE + 1, Companion.HEARING_RANGE + 6)
 	if away != Vector2i(-1, -1):

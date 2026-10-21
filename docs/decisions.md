@@ -18207,7 +18207,7 @@ Each is a Standing.bump naming what her player did, in companion_traits
   (555's turns_down), so this is the close companion's cost. It is no gift.
 - warned -1: her player takes her into the area she refused that day as
   unsafe (551 phase 2's refusal keeps the worst danger's area), once a
-  refusal: "took you where you said it wasn't safe".
+  refusal: "ignored your warning and took you there".
 - Unpaid days wait: the game has no companion pay (economy and Jeff).
 - companion_test _test_loyalty: left alone, let bleed, warned once and
   wary after it; cleared, and not by the Blood Rot (where the test room has
@@ -18303,3 +18303,8 @@ town has (Towns._free_name). If every name is taken it keeps the pick.
 Towns.died remembers the last DEAD_NAMES (40) names in the town's
 "dead_names". farm_test _test_maker_comes.
 
+- After the proof run (the coordinator's, for Jeff): a drop is told her
+  voice past the speech rate limit (always), as one just after she spoke
+  was lost; and "warned" reads "ignored your warning and took you there",
+  since "took you where you said..." turned into "her said" for the
+  player's and the town's reading. companion_test checks the first.

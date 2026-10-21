@@ -7116,7 +7116,7 @@ func _bond(record: PlayerRecord, event: String, why: String) -> void:
 	# A hurt she says so of, as it happens (decision 555): told her voice once.
 	var pet: Companion = _companions.get(record.player_id)
 	if delta < 0 and is_instance_valid(pet) and pet.spawned:
-		pet._ask_voice("%s just %s." % [record.name, why])
+		pet._ask_voice("%s just %s." % [record.name, why], "", true)  # Past the rate limit: a hurt is told.
 	MindLog.record({"kind": "bond", "companion": str(record.companion.get("name", "")), "mind": "hands", "trigger": event,
 		"note": why, "outcome": "%s (%d)" % [Standing.words(record.companion, record.player_id, Standing.COMPANION),
 			Standing.score(record.companion, record.player_id)]})
@@ -7637,7 +7637,7 @@ func _bond_warned(pet: Companion) -> void:
 		var entry: Dictionary = refused[key]
 		if int(entry.get("day", -1)) == day and str(entry.get("area", "")) == pet.zone and not entry.get("walked", false):
 			entry["walked"] = true
-			_bond(_record_of(pet), "warned", "took you where you said it wasn't safe")
+			_bond(_record_of(pet), "warned", "ignored your warning and took you there")
 
 
 ## Each temple counter in the zone shows what is held for the first player
