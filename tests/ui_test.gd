@@ -345,6 +345,54 @@ func _test_sim_reads() -> void:
 	sick.free()
 	_check(Main.pile_words(PackedStringArray(["herbs"])) == "herbs" and Main.pile_words(PackedStringArray(["herbs", "dagger", "rope"])) == "herbs and 2 more"
 		and Main.pile_words(PackedStringArray()) == "", "a pile's words: the first thing's short name, and how many more")
+	# 555, ui's side: her bond read without a bar.
+	_check(Main.bond_shown("fond") == "" and Main.bond_shown("devoted") == "devoted" and Main.bond_shown("sullen") == "sullen",
+		"her step shows as its word, warm or cold; fond (the start) as nothing")
+	_check(Main.bond_dropped("fond", "sullen") and Main.bond_dropped("close", "fond") and not Main.bond_dropped("sullen", "fond")
+		and not Main.bond_dropped("", "sullen") and not Main.bond_dropped("fond", "fond"),
+		"a drop is a colder step than last seen; warming, the same step or an unknown word is none")
+	_check(Main.bond_words("Wren", "sullen") == "Wren hangs back" and Main.bond_words("Wren", "cooling") == "Wren is quiet"
+		and Main.bond_words("Wren", "wary") == "Wren keeps her distance" and Main.bond_words("Wren", "apart") == "Wren walks apart"
+		and Main.bond_words("Wren", "close") == "", "the hint's words per cold step; none for a warm one")
+	var cut := Main.reason_short("you gave her " + "a long-named thing ".repeat(5))
+	_check(Main.reason_short("you struck her") == "you struck her" and cut.length() <= 60 and cut.ends_with("…"), "a reason is cut to one row with an ellipsis")
+	var pet: Companion = _main._own_companion()
+	if pet != null and _main.pack_panel != null:
+		var her := String(pet.name)
+		var step_was := str(pet.bond_step)
+		var why_was := str(pet.bond_why)
+		pet.bond_step = "sullen"
+		pet.bond_why = "you left her to fall alone"
+		_main.pack_panel.open(pet)
+		_check(_main.pack_panel.title_shown(false) == "%s's Pack" % her and _main.pack_panel.mood_shown() == ", sullen"
+			and _main.pack_panel.mood_hover() == "you left her to fall alone", "her pack's title carries her step, the reason on hover")
+		pet.bond_step = "fond"
+		_main.pack_panel._refresh()
+		_check(_main.pack_panel.mood_shown() == "", "at fond the title is plain")
+		_main.pack_panel.open(null)
+		pet.bond_step = "devoted"
+		_main._refresh_world_map()
+		var hers: Dictionary = {}
+		for member: Dictionary in map.party:
+			if str(member.get("name", "")) == her:
+				hers = member
+		_check(hers.get("mood", "") == "devoted" and WorldMapPanel.party_words(hers) == "%s, devoted" % her
+			and hers.get("why", "") == "you left her to fall alone", "the map's party list reads her step too, warm ones included; the reason rides for the hover")
+		_main._bond_seen[her] = "fond"
+		pet.bond_step = "sullen"
+		var lines_before: int = _main.talk.lines.size()
+		_main._watch_bond()
+		_check(_main._bond_hint == "%s hangs back" % her and _main.talk.lines.size() == lines_before + 1
+			and _main.talk.lines[-1][2] == "%s hangs back: you left her to fall alone" % her, "her step drops: the HUD's hint and one party log line with the reason")
+		_main._watch_bond()
+		_check(_main.talk.lines.size() == lines_before + 1 and _main._bond_seen[her] == "sullen", "told once per drop; the step seen is kept")
+		_main._bond_hint = ""
+		pet.bond_step = step_was
+		pet.bond_why = why_was
+		_main._bond_seen.erase(her)
+		_main._refresh_world_map()
+	else:
+		print("  (no companion in this world: her line's checks skipped)")
 
 
 func _test_minimap_turn() -> void:

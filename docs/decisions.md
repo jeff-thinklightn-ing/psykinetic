@@ -18232,3 +18232,43 @@ exempt by its entry's props "grave": false. The key survives every
 generation (Regen.generated_config passes top-level keys through), and
 the generated chests and dead, marker cells with no entry, take it from
 the level config in Level._grave. level_test checks the marks.
+
+## 555, ui's side: her mood read without a bar
+
+Decision (ui; the coordinator's queue after 551, approved 2026-10-21 with
+one addition; companions' 555 d2d3918e puts Companion.bond_step and
+bond_why on the wire). Jeff's rule stands: no bars. Her bond is read in
+words, where her name already is, and in one cue when it sours.
+
+- Her line. The pack's title over her row reads "Wren's Pack, sullen": the
+  step word companions send, warm or cold, after her name in the caption
+  size and text_dim (PackPanel._other_mood beside the title in one row);
+  fond, where she starts, shows nothing, so today's read stays plain
+  (Main.bond_shown). Hovering the title or the step gives her newest reason
+  (bond_why, in the second person: "you left her to fall alone"), cut to
+  one row with an ellipsis (Main.reason_short, 60 characters: a gift's
+  reason names the thing). The big map's party list reads the same way
+  ("Wren, devoted"; WorldMapPanel.party_words from the party entry's "mood"
+  and "why", set in Main._refresh_world_map), the reason in a words box
+  beside the line on hover (_party_rows, party_at). The coordinator's
+  addition: the warm steps show too, so a player sees the bond grow and
+  not only sour.
+- The cue. Main._watch_bond, on the HUD's tick: the first sight of a
+  companion seeds the step last seen (a join or a rebuilt world says
+  nothing); a colder step than last seen (Main.bond_dropped on
+  Companion.STEPS) puts her words on the HUD's state line for
+  BOND_HINT_SECONDS (8, the talk panel's fade), once per drop: cooling "Wren
+  is quiet", wary "Wren keeps her distance", sullen "Wren hangs back", apart
+  "Wren walks apart" (BOND_WORDS, Main.bond_words), and one party log line
+  with the reason ("Wren hangs back: you left her to fall alone", speaker
+  "Party"). Warming says nothing on the HUD: her line's word and her own
+  voice (companions') say it.
+- --test-show=bond (her pack open on a sullen companion) and bond_drop (the
+  hint) stand the samples for the shots docs/ui/shots/sim/bond_pack.jpg and
+  bond_hint.jpg, taken in release's next shot slot (economy's soak excludes
+  benches) and landed docs-only after the code, as 551's were.
+
+ui_test: the step words and fond's silence, the drop rule, the hint's words,
+the cut reason, her pack's title and hover, the map's party entry, one hint
+and one log line per drop. Client only; nothing numeric; the protocol bump
+is companions'; no new class_name.

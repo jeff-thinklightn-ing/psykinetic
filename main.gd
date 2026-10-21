@@ -43,6 +43,10 @@ const FACE_SEND_INTERVAL := 0.15
 ## WASD into someone who will not move: the step (a bump) is sent at most
 ## this often, and one into a wall not at all.
 const BUMP_SEND_INTERVAL := 0.25
+## 555, ui's side: how long the HUD says her step dropped, and the words per
+## cold step (Companion.bond_step); a warm step says nothing on the HUD.
+const BOND_HINT_SECONDS := 8.0
+const BOND_WORDS := {"cooling": "%s is quiet", "wary": "%s keeps her distance", "sullen": "%s hangs back", "apart": "%s walks apart"}
 ## Camera: the fraction of the remaining distance to the player closed per
 ## second, as an exponential rate. Higher is tighter.
 const CAMERA_FOLLOW_RATE := 6.0
@@ -473,6 +477,11 @@ var last_screenshot := ""
 ## last_step_tick is stamped on the server alone.
 var _still_tile := Vector2i(-100000, -100000)
 var _still_since := 0
+## Her bond's step as last seen, per companion name (555, ui's side), so a
+## drop is told once; the hint's words and until when (seconds on the ticks clock).
+var _bond_seen: Dictionary = {}
+var _bond_hint := ""
+var _bond_hint_until := 0.0
 var _talk_hint_until := 0.0
 ## Talking with a town's person (536, ui's side: no panel; the say line, their speech, the HUD).
 ## Channels this view has seen (544, ui's side): channeler instance id ->
@@ -8587,6 +8596,9 @@ func _on_world_ticked(tick: int) -> void:
 			hp_text += "   bow drawn"  # How far: the body, the ring and the creak (decision 475); F3 has the number.
 		if _hidden_in_cover(player, tick):
 			hp_text += "   hidden in the grass"  # Decision 515: the one cue that the cover works.
+		_watch_bond()
+		if not _bond_hint.is_empty() and Time.get_ticks_msec() / 1000.0 < _bond_hint_until:
+			hp_text += "   " + _bond_hint  # 555, ui's side: her step dropped, said for BOND_HINT_SECONDS.
 		if not standing_title.is_empty():
 			hp_text += "   " + standing_words(standing_title)  # 536: an offer stands; "yes" (Y) takes it.
 		if not player.led_by.is_empty():  # 551, ui's side: she leads; the place from led_to when it is on the wire.
@@ -8687,7 +8699,9 @@ func _refresh_world_map() -> void:
 		if entity is Player and entity != player and entity.spawned:
 			here.append({"name": _display_name(entity), "area": world_map_panel.own_area, "kind": "player"})
 		elif entity is Companion and entity.spawned:
-			here.append({"name": String(entity.name), "area": world_map_panel.own_area, "kind": "companion"})
+			# 555, ui's side: her bond's step on her line, the reason for the hover.
+			here.append({"name": String(entity.name), "area": world_map_panel.own_area, "kind": "companion",
+				"mood": bond_shown(str(entity.bond_step)), "why": reason_short(str(entity.bond_why))})
 	var state: Variant = get("world_state")
 	world_map_panel.set_world_state(state if state is Dictionary else {}, here)
 
@@ -8719,6 +8733,53 @@ static func led_words(name: String, place: String) -> String:
 	if place.is_empty():
 		return "Following %s - move to take the lead" % name
 	return "Following %s to %s - move to take the lead" % [name, place]
+
+
+## Her bond's step, watched for a drop (555, ui's side; companions'
+## Companion.bond_step and bond_why on the wire): the first sight of a
+## companion seeds what was seen, so a join says nothing; a colder step than
+## last seen puts her words on the HUD for BOND_HINT_SECONDS and one party
+## log line with the reason; warming says nothing here (her voice and her
+## line's word say it).
+func _watch_bond() -> void:
+	var pet := _own_companion()
+	if pet == null:
+		return
+	var name := String(pet.name)
+	var step := str(pet.bond_step)
+	if _bond_seen.has(name) and bond_dropped(str(_bond_seen[name]), step):
+		_bond_hint = bond_words(name, step)
+		_bond_hint_until = Time.get_ticks_msec() / 1000.0 + BOND_HINT_SECONDS
+		if talk != null:
+			var why := reason_short(str(pet.bond_why))
+			talk.add_line("Party", _bond_hint + (": " + why if not why.is_empty() else ""), true, true)
+	_bond_seen[name] = step
+
+
+## Her step as her line shows it (555, ui's side): the word companions send,
+## warm or cold, and "" at fond (the start), so the plain read stays plain.
+static func bond_shown(step: String) -> String:
+	return "" if step == "fond" else step
+
+
+## Whether [param now] is a colder step than [param last] (Companion.STEPS,
+## coldest first); an unknown word on either side is no drop.
+static func bond_dropped(last: String, now: String) -> bool:
+	var was := Companion.STEPS.find(last)
+	var is_now := Companion.STEPS.find(now)
+	return was >= 0 and is_now >= 0 and is_now < was
+
+
+## The HUD's words as her step drops to [param step] (BOND_WORDS); "" for a
+## warm step.
+static func bond_words(name: String, step: String) -> String:
+	return str(BOND_WORDS[step]) % name if BOND_WORDS.has(step) else ""
+
+
+## A reason cut to one row: [param limit] characters, an ellipsis at the end
+## (a gift's reason names the thing, and a long title can run past a row).
+static func reason_short(why: String, limit := 60) -> String:
+	return why if why.length() <= limit else why.left(limit - 1).strip_edges() + "…"
 
 
 ## The item action [param keycode] is bound to (Keys), "" for none.
@@ -9922,6 +9983,17 @@ func _run_test_show(player: Player) -> void:
 					world_state = WorldNews.merge(world_state, {"full": false, "guide": {"companion": her, "places": [there], "areas": []}})
 					open_world_map()
 					world_map_panel.show_ask(there)
+			"bond", "bond_drop":
+				# 555, ui's side, for the shots: her bond read on her pack's title
+				# (bond), or the HUD's hint as her step drops (bond_drop). The bond
+				# itself is companions'.
+				var pet := _own_companion()
+				if pet != null:
+					_bond_seen[String(pet.name)] = "sullen" if what == "bond" else "fond"
+					pet.bond_step = "sullen"
+					pet.bond_why = "you left her to fall alone"
+					if what == "bond":
+						open_other(pet)
 			"world":
 				open_world_map()
 				if world_map_panel != null and world_map_panel.trade.is_empty() and world_map_panel.world != null:

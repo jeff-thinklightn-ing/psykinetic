@@ -74,6 +74,10 @@ var shown := true:
 			_refresh()
 
 var _other_title: Label
+## The open row's title and, for a companion, her bond's step beside it
+## (555, ui's side): ", sullen" dim, nothing at fond; hover: her reason.
+var _other_head: HBoxContainer
+var _other_mood: Label
 var _other_row: HBoxContainer
 var _player_title: Label
 var _player_row: HBoxContainer
@@ -171,8 +175,18 @@ func _ready() -> void:
 	var column := VBoxContainer.new()
 	column.add_theme_constant_override("separation", UiTheme.constant("row"))
 	add_child(column)
+	_other_head = HBoxContainer.new()
+	_other_head.add_theme_constant_override("separation", 0)
+	column.add_child(_other_head)
 	_other_title = _title()
-	column.add_child(_other_title)
+	_other_title.mouse_filter = Control.MOUSE_FILTER_PASS  # For the reason's tooltip.
+	_other_head.add_child(_other_title)
+	_other_mood = Label.new()
+	_other_mood.theme_type_variation = &"Caption"
+	_other_mood.add_theme_color_override("font_color", UiTheme.color("text_dim"))
+	_other_mood.size_flags_vertical = Control.SIZE_SHRINK_END
+	_other_mood.mouse_filter = Control.MOUSE_FILTER_PASS
+	_other_head.add_child(_other_mood)
 	_other_row = _row(false)
 	column.add_child(_other_row)
 	_player_title = _title()
@@ -323,13 +337,31 @@ func title_shown(mine: bool) -> String:
 	return (_player_title if mine else _other_title).text
 
 
+## Her bond's step beside the open row's title (", sullen"; "" at fond or
+## for a chest) and the reason its hover gives (555, ui's side).
+func mood_shown() -> String:
+	return _other_mood.text
+
+
+func mood_hover() -> String:
+	return _other_mood.tooltip_text
+
+
 func _refresh() -> void:
 	if not is_instance_valid(other):
 		other = null
 	visible = (shown or other != null) and is_instance_valid(player)
+	_other_head.visible = other != null
 	_other_title.visible = other != null
 	_other_row.visible = other != null
 	_other_title.text = title_of(other) if other != null else ""
+	# 555, ui's side: her bond's step after her name, the reason on hover.
+	var mood := Main.bond_shown(str((other as Companion).bond_step)) if other is Companion else ""
+	var why := Main.reason_short(str((other as Companion).bond_why)) if other is Companion else ""
+	_other_mood.text = ", %s" % mood if not mood.is_empty() else ""
+	_other_mood.visible = not mood.is_empty()
+	_other_mood.tooltip_text = why
+	_other_title.tooltip_text = why
 	_player_title.text = title_of(player) if is_instance_valid(player) else ""
 	var landed: GridEntity = null
 	for row: HBoxContainer in [_other_row, _player_row]:

@@ -6,6 +6,7 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+- Your companion's mood, without a bar (555, ui's side): her pack's title and her name on the big map carry her bond's step ("Wren's Pack, sullen", "Wren, devoted"), with her newest reason on hover ("you left her to fall alone"); when her bond drops a step the HUD says so once ("Wren hangs back") and the party log keeps the line with the reason. Fond, where she starts, shows nothing.
 
 - What the barrow keeps is grave goods now (555): the altar's gold, the chests between the tombs and whatever the dead carry are marked from the grave for life, so a companion knows where it came from. The runner's pack is a robber's own and is not.
 - What the barrow's draugr carries and drops is grave goods too.

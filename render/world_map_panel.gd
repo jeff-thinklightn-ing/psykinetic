@@ -66,6 +66,10 @@ var _rows: Dictionary = {}
 ## The known row under the cursor ("" for none), and the one the ask box
 ## stands beside.
 var _hover_row := ""
+## Each area box's party line rect and the first bond reason on it (555,
+## ui's side), and the area whose line is hovered: the reason in a box.
+var _party_rows: Dictionary = {}
+var _hover_party := ""
 var _ask := ""
 var _ask_box := Rect2()
 ## Where the left button went down; a release within CLICK_SLOP of it is a
@@ -109,6 +113,7 @@ func close() -> void:
 	visible = false
 	_ask = ""
 	_hover_row = ""
+	_hover_party = ""
 	_dragging = false
 
 
@@ -312,6 +317,10 @@ func _gui_input(event: InputEvent) -> void:
 		if row != _hover_row:
 			_hover_row = row
 			queue_redraw()
+		var line := party_at(motion.position)
+		if line != _hover_party:
+			_hover_party = line
+			queue_redraw()
 		var dot := caravan_at(motion.position)
 		if dot != _hover_caravan:
 			_hover_caravan = dot
@@ -343,6 +352,22 @@ func row_at(at: Vector2) -> String:
 		if (_rows[id] as Rect2).has_point(at):
 			return id
 	return ""
+
+
+## The area whose party line is under [param at], "" for none (555, ui's side).
+func party_at(at: Vector2) -> String:
+	for area_name: String in _party_rows:
+		if (_party_rows[area_name]["rect"] as Rect2).has_point(at):
+			return area_name
+	return ""
+
+
+## A party member's words on the area box (555, ui's side): "Wren, sullen"
+## with her bond's step when it is not the plain one (Main.bond_shown), a
+## player's name alone.
+static func party_words(member: Dictionary) -> String:
+	var mood := str(member.get("mood", ""))
+	return "%s, %s" % [member.get("name", ""), mood] if not mood.is_empty() else str(member.get("name", ""))
 
 
 ## A click, not a drag, at [param at]: on the ask box, the ask goes; on a
@@ -517,6 +542,7 @@ func _draw() -> void:
 			draw_circle(b, 6.0 * scale, UiTheme.color("brass"))
 	_draw_trade(scale)
 	_rows.clear()
+	_party_rows.clear()
 	for area_name: String in positions:
 		var rect := Rect2(positions[area_name] * scale + pan, sizes[area_name] * scale)
 		var area: Dictionary = world.areas[area_name]
@@ -560,12 +586,18 @@ func _draw() -> void:
 				_mark_row(id, at, sans.get_string_size(words, HORIZONTAL_ALIGNMENT_LEFT, -1, int(caption * scale)).x, caption * scale, scale)
 			at.y += caption * 1.2 * scale
 		var here: Array[String] = []
+		var why := ""  # The first bond reason on the line, for the hover (555, ui's side).
 		for member: Dictionary in party:
 			if str(member.get("area", "")) == area_name:
-				here.append(str(member.get("name", "")))
+				here.append(party_words(member))
+				if why.is_empty():
+					why = str(member.get("why", ""))
 		if not here.is_empty():
-			draw_string(serif, Vector2(rect.position.x + 18.0 * scale, rect.end.y - 12.0 * scale), ", ".join(here),
-				HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 36.0 * scale, int(caption * scale), UiTheme.color("friend"))
+			var line_words := ", ".join(here)
+			var at_party := Vector2(rect.position.x + 18.0 * scale, rect.end.y - 12.0 * scale)
+			draw_string(serif, at_party, line_words, HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 36.0 * scale, int(caption * scale), UiTheme.color("friend"))
+			var line_width := minf(serif.get_string_size(line_words, HORIZONTAL_ALIGNMENT_LEFT, -1, int(caption * scale)).x, rect.size.x - 36.0 * scale)
+			_party_rows[area_name] = {"rect": Rect2(at_party.x, at_party.y - caption * scale, line_width, caption * 1.3 * scale), "why": why}
 	# The caravans over the boxes.
 	for route: Dictionary in trade:
 		var line := trade_line(route, scale)
@@ -601,6 +633,10 @@ func _draw() -> void:
 	elif not _hover_row.is_empty() and _rows.has(_hover_row):
 		var row: Rect2 = _rows[_hover_row]
 		_words_box(Vector2(row.end.x, row.position.y + row.size.y * 0.5), knows_words(companion), scale, caption, sans)
+	elif not _hover_party.is_empty() and _party_rows.has(_hover_party) and not str(_party_rows[_hover_party]["why"]).is_empty():
+		# Her bond's reason, beside the party line (555, ui's side).
+		var line: Rect2 = _party_rows[_hover_party]["rect"]
+		_words_box(Vector2(line.end.x, line.position.y + line.size.y * 0.5), str(_party_rows[_hover_party]["why"]), scale, caption, sans)
 	# The title and how to leave.
 	draw_string(serif, Vector2(UiTheme.constant("margin"), UiTheme.constant("margin") + heading), "The known world",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, UiTheme.size("title"), UiTheme.color("text"))
