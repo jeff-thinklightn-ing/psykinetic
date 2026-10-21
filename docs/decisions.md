@@ -18262,7 +18262,10 @@ words, where her name already is, and in one cue when it sours.
   "Wren walks apart" (BOND_WORDS, Main.bond_words), and one party log line
   with the reason ("Wren hangs back: you left her to fall alone", speaker
   "Party"). Warming says nothing on the HUD: her line's word and her own
-  voice (companions') say it.
+  voice (companions') say it. Nor does a drop that lands on a warm step
+  (devoted to close, close to fond): it has no words, so no hint and no log
+  line (the first build logged ": you struck her" with nothing before the
+  colon; companions' still, fixed the same morning).
 - --test-show=bond (her pack open on a sullen companion) and bond_drop (the
   hint) stand the samples for the shots docs/ui/shots/sim/bond_pack.jpg and
   bond_hint.jpg, taken in release's next shot slot (economy's soak excludes

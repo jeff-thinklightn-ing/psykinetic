@@ -8747,7 +8747,10 @@ func _watch_bond() -> void:
 		return
 	var name := String(pet.name)
 	var step := str(pet.bond_step)
-	if _bond_seen.has(name) and bond_dropped(str(_bond_seen[name]), step):
+	# A drop to a warm step (devoted to close, close to fond) has no words:
+	# nothing on the HUD and no log line (companions' still showed ": you
+	# struck her" with nothing before the colon, 2026-10-21).
+	if _bond_seen.has(name) and bond_dropped(str(_bond_seen[name]), step) and not bond_words(name, step).is_empty():
 		_bond_hint = bond_words(name, step)
 		_bond_hint_until = Time.get_ticks_msec() / 1000.0 + BOND_HINT_SECONDS
 		if talk != null:

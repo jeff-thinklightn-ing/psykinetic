@@ -387,6 +387,11 @@ func _test_sim_reads() -> void:
 		_main._watch_bond()
 		_check(_main.talk.lines.size() == lines_before + 1 and _main._bond_seen[her] == "sullen", "told once per drop; the step seen is kept")
 		_main._bond_hint = ""
+		_main._bond_seen[her] = "close"
+		pet.bond_step = "fond"
+		_main._watch_bond()
+		_check(_main._bond_hint == "" and _main.talk.lines.size() == lines_before + 1 and _main._bond_seen[her] == "fond",
+			"a drop to a warm step (close to fond) says nothing: no hint, no log line (companions' still, 2026-10-21)")
 		pet.bond_step = step_was
 		pet.bond_why = why_was
 		_main._bond_seen.erase(her)
