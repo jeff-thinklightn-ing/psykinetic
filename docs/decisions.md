@@ -18568,3 +18568,64 @@ of reach), both passing with the external takes moved aside.
 Rejected: the fall as a louder stretch of the stream's own loop (one
 player per stream would have to sit at the fall and at the nearest point
 at once); a one-shot splash now and then (a fall pours without pause).
+## 558. The ground relaxed
+
+Step 4 of terrain's unsquaring design, after 553, 556 and 557. The
+coordinator approved it with one care: the drawing only, and no seam where
+relaxed ground meets ground drawn as before.
+
+**Drawing only: the sim's walk and cliff_between are untouched.** They read
+the cells' heights as before; nothing here changes a cell's height or which
+steps are cliffs. Client only, protocol unchanged.
+
+**Why it was square.** Every cell was two triangles with the same diagonal
+(top-right to bottom-left), every vertex on the grid, so the hillshade's
+facets lined up in rows and columns on a slope.
+
+**The move.** Client3D._relax, on a level that gives its relief:
+- A ground corner is free when the four cells round it are natural ground
+  (_relax_ground: the level's floor, not water, a bed, a ford, dry water, a
+  ramp, a rock, a building's floor, the shore's finer cells or a ledge's
+  cap) and all draw it at one height.
+- A corner on an edge two cells draw apart (a face, or a wedge's thin end)
+  stays, so the faces still meet the ground.
+- A free corner moves up to RELAX_MOST 0.2 of a cell sideways, by a roll of
+  where it is (the same every build). Its height is re-read there: the
+  bilinear of the corners of the cell it lands in, the relief's surface. The
+  shape is kept; only the facets' lines stop running straight.
+
+**The diagonal.** A cell with all four corners free is split along the
+diagonal whose middle is nearer the cell's own height (Relief.at): on a
+crest or in a trough it runs along it. _relax_flips holds the cells split
+the other way.
+
+**What follows it.** _height_in reads the drawn quad (_quad_height): the
+cell's own, or a neighbour's where a moved edge put the point past it.
+Puppets, scatter, props and 549's sight check all go through it. A cell
+with no moved corner and no flip keeps the old path. Normals stay the sum
+of the faces round each vertex.
+
+**What stays.** Levels without relief (the castle, the wilds) are drawn as
+before: _relax does not run.
+
+**Cost**, map_bench A/B against main, alternated, two passes:
+- frame median: the sample 1.60 to 1.68 ms, the hills 1.22 to 1.25;
+  _height_in reads each relaxed cell's quad, cached at build
+  (_relax_quads), with no allocations. Building the quad per call first
+  cost the sample +0.27 ms.
+- rebuild: the hills about 826 to 893 ms, the sample 47 to 52.
+- In the shots the change is slight. From the game's camera the grass
+  texture dominates, and the facet lines show only where the light runs
+  along a slope. Jeff may veto it in game.
+
+tests/view_test _test_relax:
+- On the hills (6054 corners moved, 1265 cells flipped) and the sample: no
+  corner past RELAX_MOST, none on a cliff's edge, each moved corner a vertex
+  of the mesh on the ground's surface.
+- Every edge between a relaxed cell and a cell beside it drawn from the same
+  two points at the same heights along it (no gap, no sliver).
+- _height_in the drawn triangle's inside relaxed cells.
+- The castle and the wilds unchanged.
+_test_relief's slope check reads the drawn corners, and its ridge test sets
+the relax aside while it lays a ridge on the corners. Shots and A/B in
+C:\dev\review\ground (ab-*.png). No new class_name.

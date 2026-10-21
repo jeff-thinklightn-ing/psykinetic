@@ -226,6 +226,9 @@ const SHORE_WARP := 0.1
 ## cell along it, RIBBON_UNDER of a cell past its water under the banks; a
 ## step down its path of more than FALL_LEAST metres is a fall.
 const RIBBON_STEPS := 8
+## The ground relaxed (decision 558, _relax): a free corner moves up to this
+## much of a cell sideways.
+const RELAX_MOST := 0.2
 const RIBBON_UNDER := 0.3
 const FALL_LEAST := 0.25
 ## The ledges' rims (decision 556, _rim_band): sampled RIM_RES a side; each
@@ -1348,6 +1351,13 @@ var _shore_image: Image
 var _shore_heights: Dictionary[Vector2i, PackedFloat32Array] = {}
 ## The streams' own cells (decision 557, _streams_cells) and their ribbons.
 var _stream_cells: Dictionary[Vector2i, bool] = {}
+## The ground relaxed (decision 558, _relax): each moved corner's offset
+## and height there, the cells split the other way, and each relaxed
+## cell's quad as drawn.
+var _relax_moves: Dictionary[Vector2i, Vector2] = {}
+var _relax_heights: Dictionary[Vector2i, float] = {}
+var _relax_flips: Dictionary[Vector2i, bool] = {}
+var _relax_quads: Dictionary[Vector2i, PackedVector3Array] = {}
 var _stream_ribbons: Array[MeshInstance3D] = []
 ## Where the streams fall (decision 557): {cell: Vector2i, drop: float}
 ## each, the cell below the step; a new array each build (sound's ambience
@@ -2309,6 +2319,19 @@ func _height_in(cell: Vector2i, point: Vector2) -> float:
 			return fine[q] + (fine[q + 1] - fine[q]) * at.x + (fine[q + row] - fine[q]) * at.y
 		return fine[q + row + 1] + (fine[q + row] - fine[q + row + 1]) * (1.0 - at.x) \
 				+ (fine[q + 1] - fine[q + row + 1]) * (1.0 - at.y)
+	if _relax_quads.has(cell):
+		# The ground relaxed (decision 558): the quad drawn there, its own or,
+		# where a moved edge put the point past it, a neighbour's.
+		var drawn := _quad_height(cell, point)
+		if not is_nan(drawn):
+			return drawn
+		for y in range(-1, 2):
+			for x in range(-1, 2):
+				var near := cell + Vector2i(x, y)
+				if near != cell and _relaxed(near) and not _shore_heights.has(near):
+					drawn = _quad_height(near, point)
+					if not is_nan(drawn):
+						return drawn
 	var h := _corner_heights(cell)
 	# The quad's two triangles: (0, 1, 2) where x + y <= 1, (1, 3, 2) past it.
 	if at.x + at.y <= 1.0:
@@ -5120,6 +5143,8 @@ func _build_ground(kinds: Dictionary) -> void:
 	_shore_heights = _shore_band(cells, floor_count, water_end)
 	# The ledges' rims carried out over the cells under them (decision 556).
 	_rim_caps = _rim_band(cells, floor_count)
+	# Natural ground's facets off the grid (decision 558).
+	_relax(cells, floor_count)
 	# A chunk's vertex for each corner (or a shore cell's finer point, in
 	# SHORE_RES units) and height (mm): one a side of a cliff.
 	var local: Dictionary[Vector3i, int] = {}
@@ -5157,7 +5182,10 @@ func _build_ground(kinds: Dictionary) -> void:
 						var next := corner + around[a]
 						var other := at[(next.y - origin.y) * across + next.x - origin.x]
 						sunk = sunk and other >= floor_count and other < water_end
-					positions.append(Vector3(corner.x - 0.5, level - (WATER_BED_DEPTH if sunk else 0.0), corner.y - 0.5))
+					if _relax_moves.has(corner):
+						positions.append(_drawn_corner(cell, c))
+					else:
+						positions.append(Vector3(corner.x - 0.5, level - (WATER_BED_DEPTH if sunk else 0.0), corner.y - 0.5))
 					var global := _vertex_chunk.size()
 					_vertex_chunk.append(chunk_index)
 					_vertex_byte.append(byte_start + vertex * _ground_stride + _ground_custom)
@@ -5179,7 +5207,10 @@ func _build_ground(kinds: Dictionary) -> void:
 					feet.append(255 if foot else roundi(_concavity(corner, level) * 255.0))
 					tops.append(255 if top else roundi(_crest(corner, level) * 255.0))
 				ends[c] = vertex
-			indices.append_array([ends[0], ends[1], ends[2], ends[1], ends[3], ends[2]])
+			if _relax_flips.has(cell):
+				indices.append_array([ends[0], ends[1], ends[3], ends[0], ends[3], ends[2]])
+			else:
+				indices.append_array([ends[0], ends[1], ends[2], ends[1], ends[3], ends[2]])
 		# The ledges' caps (decision 556), over the cells under them.
 		for i in chunks[chunk]:
 			if _rim_caps.has(cells[i]):
@@ -5757,6 +5788,158 @@ func _build_ribbons() -> void:
 		_room.add_child(drawn)
 		_stream_ribbons.append(drawn)
 	stream_falls = falls
+
+
+## The ground relaxed (decision 558, step 4 of the unsquaring), on relief:
+## each ground corner free to move (_relax_free) moved up to RELAX_MOST of
+## a cell sideways by a roll of where it is, its height the ground's there
+## (the bilinear of the corners of the cell it lands in), so the facets'
+## lines stop running straight while the shape stays; and each cell with
+## no pinned corner split along the diagonal nearer its own height at its
+## middle (Relief.at), the other way where that fits better. Drawing only:
+## the sim's walk and cliff_between read the cells' heights as before.
+func _relax(cells: Array, floor_count: int) -> void:
+	_relax_moves.clear()
+	_relax_heights.clear()
+	_relax_flips.clear()
+	_relax_quads.clear()
+	if not _relief_given or _glimpse:
+		return
+	# A corner on an edge the two cells either side draw apart (a face, or
+	# a wedge's thin end) stays: the faces are laid on the cells' edges.
+	var pinned: Dictionary[Vector2i, bool] = {}
+	var sides: Array[Vector2i] = [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]
+	for i in floor_count:
+		var cell: Vector2i = cells[i]
+		if not _relax_ground(cell, floor_count):
+			continue
+		var own := _corner_heights(cell)
+		for side in sides:
+			var next := cell + side
+			var split := not _grounds.has(next)
+			if not split:
+				var theirs := _corner_heights(next)
+				for c in 4:
+					var k := GROUND_CORNERS.find(cell + GROUND_CORNERS[c] - next)
+					if k >= 0:
+						split = split or absf(theirs[k] - own[c]) > Relief.EPSILON
+			if split:
+				for c in 4:
+					var corner := cell + GROUND_CORNERS[c]
+					if GROUND_CORNERS.has(corner - next):
+						pinned[corner] = true
+	for i in floor_count:
+		var cell: Vector2i = cells[i]
+		if not _relax_ground(cell, floor_count):
+			continue
+		var free := 0
+		for c in 4:
+			var corner := cell + GROUND_CORNERS[c]
+			if _relax_moves.has(corner):
+				free += 1
+				continue
+			if pinned.has(corner) or not _relax_free(corner, floor_count):
+				continue
+			var turn := _roll(corner, 558) * TAU
+			var off := Vector2.from_angle(turn) * sqrt(_roll(corner, 559)) * RELAX_MOST
+			_relax_moves[corner] = off
+			var at := Vector2(corner) - Vector2(0.5, 0.5) + off
+			var under := Vector2i(roundi(at.x), roundi(at.y))
+			var h := _corner_heights(under)
+			var f := at - Vector2(under) + Vector2(0.5, 0.5)
+			_relax_heights[corner] = lerpf(lerpf(h[0], h[1], f.x), lerpf(h[2], h[3], f.x), f.y)
+			free += 1
+		if free == 4:
+			var h := _corner_heights(cell)
+			var middle := _elevation(cell)
+			if absf((h[0] + h[3]) * 0.5 - middle) < absf((h[1] + h[2]) * 0.5 - middle) - 0.001:
+				_relax_flips[cell] = true
+	# Each relaxed cell's quad as drawn, for _height_in.
+	for i in floor_count:
+		var cell: Vector2i = cells[i]
+		var moved := _relax_flips.has(cell)
+		for corner in GROUND_CORNERS:
+			moved = moved or _relax_moves.has(cell + corner)
+		if moved:
+			_relax_quads[cell] = PackedVector3Array([_drawn_corner(cell, 0), _drawn_corner(cell, 1), _drawn_corner(cell, 2), _drawn_corner(cell, 3)])
+
+
+## Whether [param cell] is natural ground the relax may move (decision
+## 558): the level's floor, not water, a bed, a ford, dry water, a ramp, a
+## rock, a building's floor, the shore's finer cells or a ledge's cap.
+func _relax_ground(cell: Vector2i, floor_count: int) -> bool:
+	var index: int = _grounds.get(cell, -1)
+	return index >= 0 and index < floor_count and not _wet.has(cell) and not _bed_levels.has(cell) \
+			and not _fords.has(cell) and not _dry_water.has(cell) and not _ramp_heights.has(cell) \
+			and not _rocks.has(cell) and not _shore_heights.has(cell) and not _rim_caps.has(cell) \
+			and _floor_bytes_at(cell) == 0
+
+
+## Whether ground corner [param corner] may move: the four cells round it
+## all natural ground (_relax_ground), all drawing it at one height.
+func _relax_free(corner: Vector2i, floor_count: int) -> bool:
+	var level := NAN
+	for a in 4:
+		var cell := corner + SHORE_AROUND[a]
+		if not _relax_ground(cell, floor_count):
+			return false
+		var here := _corner_heights(cell)[3 - a]
+		if is_nan(level):
+			level = here
+		elif absf(here - level) > Relief.EPSILON:
+			return false
+	return true
+
+
+## [param cell]'s corner [param c] where it is drawn (decision 558): moved
+## and its height re-read where the relax moved it.
+func _drawn_corner(cell: Vector2i, c: int) -> Vector3:
+	var corner := cell + GROUND_CORNERS[c]
+	var off: Vector2 = _relax_moves.get(corner, Vector2.ZERO)
+	var level: float = _relax_heights[corner] if _relax_moves.has(corner) else _corner_heights(cell)[c]
+	return Vector3(corner.x - 0.5 + off.x, level, corner.y - 0.5 + off.y)
+
+
+## The height of [param cell]'s drawn quad (decision 558, _relax_quads)
+## over [param point], its triangles split as _relax_flips has it; NAN off
+## it. Every puppet every frame: no allocations.
+func _quad_height(cell: Vector2i, point: Vector2) -> float:
+	var q: PackedVector3Array = _relax_quads[cell]
+	var y := NAN
+	if _relax_flips.has(cell):
+		y = _triangle_height(point, q[0], q[1], q[3])
+		if is_nan(y):
+			y = _triangle_height(point, q[0], q[3], q[2])
+	else:
+		y = _triangle_height(point, q[0], q[1], q[2])
+		if is_nan(y):
+			y = _triangle_height(point, q[1], q[3], q[2])
+	return y
+
+
+## The height over [param point] of the triangle [param a], [param b],
+## [param c] (x, z the ground's), NAN off it.
+static func _triangle_height(point: Vector2, a: Vector3, b: Vector3, c: Vector3) -> float:
+	var v0x := b.x - a.x
+	var v0z := b.z - a.z
+	var v1x := c.x - a.x
+	var v1z := c.z - a.z
+	var d := v0x * v1z - v1x * v0z
+	if absf(d) < 0.000001:
+		return NAN
+	var px := point.x - a.x
+	var pz := point.y - a.z
+	var u := (px * v1z - v1x * pz) / d
+	var w := (v0x * pz - px * v0z) / d
+	if u < -0.0001 or w < -0.0001 or u + w > 1.0001:
+		return NAN
+	return a.y + (b.y - a.y) * u + (c.y - a.y) * w
+
+
+## Whether [param cell] is drawn off the grid (decision 558): a corner of
+## it moved, or split the other way (its quad in _relax_quads).
+func _relaxed(cell: Vector2i) -> bool:
+	return _relax_quads.has(cell)
 
 
 ## The cells round a corner, the corner being each one's corner 3 - a.
