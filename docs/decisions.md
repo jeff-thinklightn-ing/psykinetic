@@ -16148,6 +16148,21 @@ Amended (economy's clean-tree check, by release): a test importing a module
 from tools/ left an untracked tools/__pycache__/. The landing runs its Python
 with -B (no bytecode written), and .gitignore ignores __pycache__/.
 
+Amended (2) (release and the coordinator, 2026-10-20; at the v0.1.160 cut,
+533's "Clearer skies in the town lands" bullet was back under Unreleased as
+first written, after v0.1.159 had shipped it with a sentence cut, and the exact
+comparison let it by): an Unreleased bullet whose first clause (to the first
+":", ";" or "(", case and whitespace folded; its first 60 characters when that
+is under 20, so "Fixed" or "Landing tests" match nothing) begins a released
+bullet is warned of, naming that bullet and its version: "probably already
+released, check". A clause that begins two or more released bullets is a set
+phrase and is not matched on. A warning, not a failure: replayed over 444 of
+main's CHANGELOGs since 2026-10-14 it found the Clearer skies copy at all 19
+commits that had it, and the protocol notes of v0.1.140 and v0.1.150 ("This
+release changes what the server and client send each other: ...") at commits
+before a second release had used them, rightly there. changelog_check_test:
+the edited copy warned of, a short "Fixed" clause and a set phrase not.
+
 ## 436 amended: the quick asks go
 
 Jeff, from his play tests (2026-10-19, through the coordinator): "the npc

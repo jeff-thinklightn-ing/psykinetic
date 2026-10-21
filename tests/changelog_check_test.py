@@ -58,6 +58,25 @@ problems, _ = run(twice)
 check(len(problems) == 2 and all("drop it:" in each for each in problems)
     and "v0.1.158 already carries it" in problems[0] and "v0.1.157 already carries it" in problems[1], "terrain's forge and an older one: %s" % problems)
 
+print("== a bullet released edited, back as it was ==")
+# 539 amended (2): 533's bullet, shipped in v0.1.159 with its last sentence
+# cut, came back under Unreleased as first written.
+edited = V158.replace("- Hills are drawn (525).", "- Clearer skies in the town lands: fog half as often (533).")
+TAGS["v0.1.158"] = HEAD + "## Unreleased\n\n" + edited + V157
+problems, warnings = run(HEAD + "## Unreleased\n\n- Clearer skies in the town lands: fog half as often (533). The server needs admin.sh.\n\n" + edited + V157)
+check(problems == [] and len(warnings) == 1 and "probably already released" in warnings[0] and "v0.1.158" in warnings[0]
+    and "Clearer skies" in warnings[0], "warned of, naming the released one: %s" % warnings)
+fixed = V158.replace("- Hills", "- Fixed: walking onto grass paced wrong.\n- Hills")
+TAGS["v0.1.158"] = HEAD + "## Unreleased\n\n" + fixed + V157
+problems, warnings = run(HEAD + "## Unreleased\n\n- Fixed: a door that would not open (550).\n\n" + fixed + V157)
+check(problems == [] and warnings == [], "a short first clause (\"Fixed\") is not matched on: %s" % warnings)
+phrase = "- This release changes what the server and client send each other: update both."
+twice = V158.replace("- Hills", phrase + "\n- Hills") + V157.replace("- Caravans", phrase.replace("both", "the game") + "\n- Caravans")
+TAGS["v0.1.158"] = HEAD + "## Unreleased\n\n" + twice
+problems, warnings = run(HEAD + "## Unreleased\n\n" + phrase.replace("both", "everything") + "\n\n" + twice)
+check(problems == [] and warnings == [], "a set phrase two releases began with is not matched on: %s" % warnings)
+TAGS["v0.1.158"] = HEAD + "## Unreleased\n\n" + V158 + V157
+
 print("== at a cut ==")
 cut = HEAD + "## Unreleased\n\n## v0.1.159\n\n- A new thing (539).\n\n" + V158 + V157
 problems, warnings = run(cut)

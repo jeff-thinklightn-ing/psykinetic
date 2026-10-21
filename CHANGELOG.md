@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Landing tests warn of a change-log line that begins like one already released, a likely copy brought back by a rebase (539 amended); tools only.
 - The network test records any of its game instances that crash, with where they crashed, so repeated crashes show up in the daily summary (530 amended); tools only.
 - Hills read at a glance (525 amended): slopes are lit from one side, like a relief map, so a ridge and its valley show at any hour; valley floors are darker, crests catch the light, and a brook's low banks are grass running into the water.
 - Downed by the draugr's blessing, the HUD counts down "You are down: n s"; whoever brings you back has a brass ring closing in on you and "bringing <name> back: n s" on their own line.

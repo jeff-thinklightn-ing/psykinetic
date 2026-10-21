@@ -10,6 +10,8 @@ keeps a bullet beside the heading it was next to, and a cut moves the heading.
     heading has no tag yet (the suite runs before release_client tags it):
     then the next section down is checked against its own tag.
   * No bullet line under ## Unreleased may also stand in a released section.
+  * One that begins as a released bullet does (its first clause, _clause;
+    539 amended (2)) is warned of: probably already released, check.
 
 Tags are fetched first (git fetch -q --tags); a tag that cannot be had is a
 warning, not a failure.
@@ -46,6 +48,23 @@ def _bullets(section_text):
     return [line.rstrip("\r\n") for line in section_text.splitlines() if line.startswith("- ")]
 
 
+## A first clause shorter than this ("Fixed", "Landing tests") says too
+## little to match on: the bullet's first CLAUSE_CHARS characters are taken.
+CLAUSE_MIN_CHARS = 20
+CLAUSE_CHARS = 60
+
+
+def _clause(bullet):
+    """A bullet's first clause, to the first ":", ";" or "(", case and
+    whitespace folded; its first CLAUSE_CHARS characters when that is under
+    CLAUSE_MIN_CHARS (539 amended (2): 533's "Clearer skies in the town lands"
+    came back under Unreleased as written, after v0.1.159 shipped it edited)."""
+    text = " ".join(bullet[2:].split()).lower()
+    ends = [at for at in (text.find(":"), text.find(";"), text.find("(")) if at >= 0]
+    clause = text[:min(ends)].strip() if ends else text
+    return clause if len(clause) >= CLAUSE_MIN_CHARS else text[:CLAUSE_CHARS]
+
+
 def check(text, tag_changelog):
     """(problems, warnings) for CHANGELOG [param text]. [param tag_changelog]
     (version) gives that tag's CHANGELOG.md text, or None if there is no such
@@ -54,15 +73,29 @@ def check(text, tag_changelog):
     found = sections(_lf(text))
     released = [(heading, body) for heading, body in found if _released(heading)]
     unreleased = [body for heading, body in found if heading.strip() == UNRELEASED]
-    # A bullet both unreleased and released.
+    # A bullet both unreleased and released: the same line, or (539 amended
+    # (2)) the same first clause, for a cut may have shipped an edited copy.
+    # A clause that begins two or more released bullets is a set phrase ("This
+    # release changes what the server and client send each other"), not one.
     carried = {}
+    begun = {}
+    uses = {}
     for heading, body in released:
         for bullet in _bullets(body):
             carried.setdefault(bullet, heading[3:].strip())
+            begun.setdefault(_clause(bullet), (heading[3:].strip(), bullet))
+            uses[_clause(bullet)] = uses.get(_clause(bullet), 0) + 1
+    begun = {clause: was for clause, was in begun.items() if uses[clause] == 1}
     for body in unreleased:
         for bullet in _bullets(body):
             if bullet in carried:
                 problems.append("under ## Unreleased: drop it: %s already carries it: %s" % (carried[bullet], _short(bullet)))
+            elif _clause(bullet) in begun:
+                # A warning: a set phrase used a second time reads the same
+                # (the protocol notes of v0.1.140 and v0.1.150 would have hit).
+                version, theirs = begun[_clause(bullet)]
+                warnings.append("under ## Unreleased, it begins as %s's %r: probably already released, check: drop it, or reword it if it is new: %s"
+                    % (version, _short(theirs), _short(bullet)))
     # The newest released section, as its tag has it (the one below at a cut).
     for heading, body in released[:2]:
         version = heading[3:].split()[0]
