@@ -19,6 +19,9 @@ const STOP := 2
 const WALKING_TICKS := 12
 const NONE := Vector2i(-1, -1)
 
+## How far the leader gets before she sets off (START; a companion's bond
+## moves it, decision 555).
+var start := START
 ## She has set off after the leader and not yet closed in.
 var catching_up := false
 var _leader_at := NONE
@@ -32,7 +35,7 @@ func follow(body: GridEntity, leader: GridEntity) -> void:
 		catching_up = false
 		return
 	var distance := World.distance(body.tile, leader.tile)
-	if distance >= START and not catching_up:
+	if distance >= start and not catching_up:
 		catching_up = true
 	if leader.tile != _leader_at:
 		_leader_at = leader.tile

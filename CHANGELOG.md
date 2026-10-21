@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Your companion's loyalty shows in what she does (555): close or devoted she keeps nearer and offers to lead you where she knows the way, and devoted she stands over you when you're down; cooling she says she's unhappy and why; wary she hangs back, fights only what comes at you both and pulls back sooner; sullen she won't carry your things or lead you anywhere, though she still takes food and a gift. A superstitious companion won't touch grave goods unless she's close to you. Her mood, and the newest reason for it, is sent to your client.
 - A companion resting in town shows her mood (555, npc's side): kept apart from you she sits alone at the temple instead of her trade, and sullen or apart, the town's gossip says she is unhappy with you and why. Server only.
 - Townsfolk speak first (554): a resident with something to say, a plea of their own, news the town heard today, a ruling of the lawspeaker, the weather turning or a greeting by how they know you, says one line as you first come within talking reach that day, with how they say it; once a day each, one in your hearing a minute, never while you are led, fighting or already talking. Server only.
 - On the hills the ground casts its own shadow: at a low sun the escarpments and the ways up throw their shade across the valley (525 amended).

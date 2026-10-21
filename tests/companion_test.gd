@@ -89,6 +89,7 @@ func _ready() -> void:
 	_test_companion_named()
 	await _test_guide()
 	_test_guide_refuses()
+	_test_loyalty()
 	_test_out_of_reach()
 	_test_knows_level()
 	_test_wild()
@@ -1725,6 +1726,68 @@ func _test_guide_refuses() -> void:
 	_main._guide_refused.clear()
 	_main._guide_offers.clear()
 	pet.guide = null
+
+
+func _test_loyalty() -> void:
+	print("
+== her loyalty shown in what she does (decision 555) ==")
+	_kill_monsters()
+	var owner := _player()
+	var pet := _companion()
+	_settle(pet)
+	var record: PlayerRecord = _main._records[Net.player_id]
+	var kept_standing: Variant = record.companion.get("standing", {}).duplicate(true)
+	# The steps by score.
+	var card := {}
+	var steps := []
+	for score in [0, -1, -3, -5, -7, 3, 6]:
+		card["standing"] = {"p": {"score": score, "why": ["struck you"]}}
+		steps.append(Main.bond_step_of(card, "p"))
+	_check(steps == ["fond", "cooling", "wary", "sullen", "apart", "close", "devoted"], "the steps by score (%s)" % [steps])
+	card["standing"] = {"p": {"score": 1, "why": ["bandaged your wounds", "fell with you at their side"]}}
+	_check(Main.mood_why_of(card, "p") == "they fell with her at their side" and Main.mood_why_of(card, "p", "you") == "you fell with her at your side",
+		"her newest reason, for the town and for her player (%s / %s)" % [Main.mood_why_of(card, "p"), Main.mood_why_of(card, "p", "you")])
+	# Sullen: on her record, her body, the wire; hangs back, flees sooner, leads nowhere.
+	record.companion["standing"] = {Net.player_id: {"score": -5, "why": ["struck you"], "since": World.steps}}
+	_main._set_mood(record)
+	_check(record.companion["mood"] == "sullen" and pet.bond_step == "sullen" and pet.bond_why == "you struck her" and pet.heel.start == 5,
+		"sullen: her record, her body, her reason for her player, her heel slack (%s, %s, %d)" % [pet.bond_step, pet.bond_why, pet.heel.start])
+	_check(pet.hangs_back() and is_equal_approx(pet._retreat_below(), 0.5) and "do as little" in str(pet.bond_words.call()),
+		"sullen: she hangs back, pulls back at half her hp, and her voice is told so")
+	_main._guides.clear()
+	pet.guide = null
+	_main._start_guide(pet, owner, {"key": "test/x", "kind": "place", "name": "the corner", "area": String(World.zone.name), "cell": owner.tile + Vector2i(5, 0)})
+	_check(pet.guide == null and "will not lead them anywhere" in pet.guide_note, "sullen: she leads nowhere")
+	# Guarding, sullen: a monster in sight not after them she leaves be.
+	var stance := pet.stance
+	pet.stance = Companion.Stance.GUARD
+	var imp := _spawn_imp(_free_tile_between(pet, 2, 3))
+	imp.acts = false
+	for i in 3:
+		World.step()
+	_check(pet.intent_target != imp, "sullen, guarding: a monster near but not after them, left be (%s)" % pet.intent_name())
+	World.despawn(imp)
+	pet.stance = stance
+	# What she takes, sullen: food and a gift, not a load.
+	World.set_slots(pet, [])
+	World.set_slots(owner, ["ore_sack", "ration", "dagger"])
+	_put(owner, _free_tile_between(pet, 1, 1))
+	var free := pet.slots.find("")
+	_check(not World.try_transfer(owner, owner, 0, pet, maxi(free, 0)), "sullen: a load handed her, refused")
+	_check(World.try_transfer(owner, owner, 1, pet, maxi(free, 0)), "food she takes, sullen or not")
+	_check(World.try_transfer(owner, owner, 2, pet, pet.slots.find("")), "a gift (gear into a free slot) she takes")
+	# Fond again: her heel as before, she leads.
+	record.companion["standing"] = {Net.player_id: {"score": 0, "why": [], "since": World.steps}}
+	_main._set_mood(record)
+	_check(pet.bond_step == "fond" and pet.heel.start == Heel.START and not pet.hangs_back() and pet.bond_why == "",
+		"fond: as she always was")
+	record.companion["standing"] = {Net.player_id: {"score": 6, "why": ["carried you out of the raiders' camp"], "since": World.steps}}
+	_main._set_mood(record)
+	_check(pet.bond_step == "devoted" and pet.heel.start == 2, "devoted: she keeps closer (%d)" % pet.heel.start)
+	World.set_slots(pet, [])
+	World.set_slots(owner, [])
+	record.companion["standing"] = kept_standing
+	_main._set_mood(record)
 
 
 ## A free floor cell [param low]..[param high] from [param from], a walk away.

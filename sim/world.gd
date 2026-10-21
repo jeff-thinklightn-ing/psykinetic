@@ -1791,6 +1791,10 @@ func try_transfer(by: GridEntity, from: GridEntity, from_slot: int, to: GridEnti
 		return _sell(by, from, from_slot, to)
 	var uid := slot_uid(from, from_slot)
 	var other_uid := slot_uid(to, to_slot)
+	# A companion may turn a thing down (decision 555: grave goods, or her
+	# bond gone sullen); she says why.
+	if from != to and to.has_method("turns_down") and not str(to.call("turns_down", by, uid, other_uid)).is_empty():
+		return false
 	_fit_uids(from)
 	_fit_uids(to)
 	# New arrays, so each synchronizer sees a change.

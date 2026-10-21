@@ -3993,7 +3993,12 @@ func _join_companion(record: PlayerRecord, player: Player) -> void:
 	if Standing.entry(record.companion, record.player_id).is_empty():
 		Standing.met(record.companion, record.player_id, World.steps)
 	pet.bond_words = func() -> String:
-		return Standing.fact(record.companion, record.player_id, record.name, Standing.COMPANION)
+		# And what her bond's step does to her (decision 555).
+		var step: String = (Companion.loyalty().get("words", {}) as Dictionary).get(pet.bond_step, "")
+		var fact := Standing.fact(record.companion, record.player_id, record.name, Standing.COMPANION)
+		return fact if step.is_empty() else (fact + " " + step % record.name).strip_edges()
+	pet.superstition = CompanionCard.leaning(record.companion.get("traits", {}), record.player_id, "superstition")
+	_set_mood(record)
 	pet.talk.assign(record.companion.get("talk", []))
 	pet.facts_changed.connect(_on_facts_changed.bind(pet, record))
 	pet.restore_said(record.companion.get("said", []))
@@ -4051,7 +4056,10 @@ func _roads_words(record: PlayerRecord, pet: Companion) -> String:
 	var names: Array[String] = []
 	for each: Dictionary in known.slice(0, int(Guide.setting("places_told", 5.0))):
 		names.append(str(each["name"]))
-	return "You know the way to %s, having been there with %s, and can lead them there." % [", ".join(names), record.name]
+	# Close, she offers; fond, she waits to be asked; wary, she leads only
+	# when asked; sullen, not at all (decision 555).
+	var offer: String = (Companion.loyalty().get("guide_words", {}) as Dictionary).get(pet.bond_step, "")
+	return ("You know the way to %s, having been there with %s, and can lead them there. %s" % [", ".join(names), record.name, offer]).strip_edges()
 
 
 ## Her player's map told what she knows the way to (decision 551): the
@@ -4119,6 +4127,12 @@ func _guide_said(player: Player, pet: Companion, line: String) -> bool:
 ## destination), her voice told so once; unless the road there is not safe
 ## (551 phase 2), or she refused it earlier today: her voice told why.
 func _start_guide(pet: Companion, player: Player, to: Dictionary) -> void:
+	if not pet.bond_at_least("wary"):
+		# Sullen or colder (decision 555): she leads nowhere.
+		pet.guide_note = "%s asked you to lead them to %s, but you will not lead them anywhere now: you are unhappy with them." % [
+			_display_name(player), to["name"]]
+		party_log.add("%s won't lead the way." % pet.name)
+		return
 	var day := Townsfolk.day_of(World.steps)
 	var before: Dictionary = (_guide_refused.get(pet.keeper_id, {}) as Dictionary).get(str(to.get("key", "")), {})
 	if int(before.get("day", -1)) == day:
@@ -5810,6 +5824,66 @@ func _heard_to_worker(record: PlayerRecord) -> void:
 	var traits: Dictionary = record.companion.get("traits", {})
 	for key in CompanionCard.LEANINGS:
 		World.production.set_mind(who, key, CompanionCard.leaning(traits, record.player_id, key))
+	_mood_to_worker(record)
+
+
+## Her bond's step with her player (decision 555), by her Standing score:
+## devoted and close at Standing's top and trusted, wary at its wronged,
+## cooling, sullen and apart at companion_traits "loyalty" steps; else fond.
+static func bond_step_of(card: Dictionary, player_id: String) -> String:
+	var score := Standing.score(card, player_id)
+	var steps: Dictionary = Companion.loyalty().get("steps", {})
+	if score >= Standing.setting("top"):
+		return "devoted"
+	if score >= Standing.setting("trusted"):
+		return "close"
+	if score <= int(steps.get("apart", -7)):
+		return "apart"
+	if score <= int(steps.get("sullen", -5)):
+		return "sullen"
+	if score <= Standing.setting("wronged"):
+		return "wary"
+	if score <= int(steps.get("cooling", -1)):
+		return "cooling"
+	return "fond"
+
+
+## Her bond's newest reason in the third person, for the town's talk
+## (decision 555, npc's gossip): "they struck her"; "" for none.
+static func mood_why_of(card: Dictionary, player_id: String, by := "they") -> String:
+	var why: Array = Standing.entry(card, player_id).get("why", [])
+	if why.is_empty():
+		return ""
+	var words := PackedStringArray()
+	for word in str(why[-1]).split(" "):
+		var said: String = {"you": "her", "your": "her", "yourself": "herself"}.get(word, word)
+		words.append("your" if word == "their" and by == "you" else said)
+	return by + " " + " ".join(words)
+
+
+## Her bond moved, or she joined or rests (decision 555): her step on her
+## record ("mood"), her body (bond_step), and while she rests the town's
+## worker record.
+func _set_mood(record: PlayerRecord) -> void:
+	if record == null or record.companion.is_empty():
+		return
+	var step := bond_step_of(record.companion, record.player_id)
+	record.companion["mood"] = step
+	var pet: Companion = _companions.get(record.player_id)
+	if is_instance_valid(pet):
+		pet.bond_step = step
+		pet.bond_why = mood_why_of(record.companion, record.player_id, "you")
+	if record.companion.has("resident"):
+		_mood_to_worker(record)
+
+
+## Her mood and its newest reason onto her worker record while she rests
+## (decision 555, for npc's resting body and the town's gossip).
+func _mood_to_worker(record: PlayerRecord) -> void:
+	var who := "companion:%s" % record.companion.get("name", "")
+	if World.production == null or World.production.worker(who).is_empty():
+		return
+	World.production.set_mood(who, bond_step_of(record.companion, record.player_id), mood_why_of(record.companion, record.player_id))
 
 
 ## She leaves the town with her player again: what she heard there comes
@@ -7014,6 +7088,11 @@ func _bond(record: PlayerRecord, event: String, why: String) -> void:
 	if delta == 0:
 		return
 	Standing.bump(record.companion, record.player_id, delta, why, World.steps)
+	_set_mood(record)
+	# A hurt she says so of, as it happens (decision 555): told her voice once.
+	var pet: Companion = _companions.get(record.player_id)
+	if delta < 0 and is_instance_valid(pet) and pet.spawned:
+		pet._ask_voice("%s just %s." % [record.name, why])
 	MindLog.record({"kind": "bond", "companion": str(record.companion.get("name", "")), "mind": "hands", "trigger": event,
 		"note": why, "outcome": "%s (%d)" % [Standing.words(record.companion, record.player_id, Standing.COMPANION),
 			Standing.score(record.companion, record.player_id)]})
@@ -7038,7 +7117,8 @@ func _tend_bonds() -> void:
 		var together := is_instance_valid(pet) and pet.spawned and is_instance_valid(pet.keeper)
 		if not together:
 			if not record.companion.get("resident", {}).is_empty() or record.companion.has("taken"):
-				Standing.decay(record.companion, World.steps)
+				if not Standing.decay(record.companion, World.steps).is_empty():
+					_set_mood(record)
 			continue
 		if int(record.companion.get("bond_day", -1)) == day:
 			continue

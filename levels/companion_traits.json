@@ -26,6 +26,15 @@
 		"bond": {"wary": -1, "fond": 0, "close": 1, "devoted": 2},
 		"company": 1
 	},
+	"loyalty": {
+		"_note": "Her loyalty shown in what she does, and the warning signs before leaving (decision 555; drafts for Jeff). Her bond's step with her player from her Standing score: devoted and close at Standing's top and trusted, wary at its wronged (residents.json 'standing'), cooling, sullen and apart at steps; else fond. heel_start: how far her player gets before she sets off (Heel.START 3 otherwise). Wary or colder she fights only what is at her or after them, never presses, and pulls back under retreat_below of her hp; devoted she stands over her downed player. At grave_superstition or more (her 442 leaning) she won't touch grave goods below close. Sullen or colder she takes only food and a gift (gear into a free slot), and leads nowhere. words: what her voice is told of her step (%s her player); guide_words: whether she offers to lead.",
+		"steps": {"cooling": -1, "sullen": -5, "apart": -7},
+		"heel_start": {"devoted": 2, "wary": 5, "sullen": 5, "apart": 5},
+		"retreat_below": 0.5,
+		"grave_superstition": 6,
+		"words": {"cooling": "You are unhappy with %s, and may say so.", "wary": "You keep your distance from %s now, and fight only what comes at you.", "sullen": "You do as little for %s as you can: you won't carry their things or lead them anywhere.", "apart": "You are thinking of leaving %s."},
+		"guide_words": {"devoted": "If they speak of one of these places or seem unsure of the way, offer to lead them.", "close": "If they speak of one of these places or seem unsure of the way, offer to lead them.", "cooling": "You lead them only if they ask.", "wary": "You lead them only if they ask.", "sullen": "But you will not lead them anywhere now.", "apart": "But you will not lead them anywhere now."}
+	},
 	"bond": {
 		"_note": "Her bond with her player (decision 444, on npc's Standing, 443): what each of their deeds moves it by, drafts for Jeff. Standing's COMPANION ladder: fond to start, wary at -3, close at 3, devoted at 6 (residents.json 'standing'). A day together counts only up to close: devotion is earned by deeds.",
 		"bandaged": 1, "gift": 1, "fed": 1, "rescued": 4, "day": 1, "stood_by": 1, "kept_from": -1, "struck": -1

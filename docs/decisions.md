@@ -18128,3 +18128,59 @@ player as the town knows them and the why is companions' text verbatim.
 - Rules: residents.json "mood" {apart_at}. townsfolk_test
   _test_mood_in_town. Server only, nothing on the wire, no new
   class_name, no new content in levels. Leaving itself waits on Jeff.
+
+## 555: a companion's loyalty shown in what she does, and the warning signs before leaving
+
+Jeff's companion_rewards.md (Loyalty, Leaving; his students: "a companion
+should change her behaviour based on what you do"). The coordinator
+approved the design (2026-10-21) with one change: sullen, she still takes a
+gift and food, since those are the amends path. Steps and numbers are
+drafts for Jeff. Nothing random: her bond moves only by Standing.bump
+naming what her player did (444), and fades toward nothing only while she
+is apart (Standing.decay), which is the way back. Leaving itself waits on
+Jeff's answers (does she take what she earned; how far it goes). This is
+part 1, what each step changes. Part 2 (555 amended) adds the new events.
+
+- Her step (Main.bond_step_of): from her Standing score with her player,
+  devoted at Standing's top (6), close at its trusted (3), wary at its
+  wronged (-3), cooling at -1, sullen at -5 and apart at -7
+  (companion_traits "loyalty" steps); else fond. Main._set_mood writes it:
+  - on her record as "mood";
+  - on her body as Companion.bond_step;
+  - while she rests, on her worker record ("companion:<her name>", via
+    Production.set_mood) as mood and mood_why, the newest reason
+    ready-made in the third person ("they struck her"), for npc's resting
+    body and the town's gossip (555, npc's side).
+  It runs at her join, at every bond move, and when a fading moves her
+  while apart.
+- The wire: Companion.bond_step and bond_why are replicated. bond_why is the
+  newest reason as her player reads it ("you struck her"), for ui's mood
+  read. SUBCLASS_REPLICATED gains both; PROTOCOL_REVISION stays 28
+  (unshipped; release).
+- What each step changes, on Companion:
+  - Heel: how far her player gets before she sets off (Heel.start, now
+    per follower, START by default): devoted 2, wary and colder 5.
+  - Fighting: wary and colder, guarding or pressing, she fights only what
+    is at her or going for her or her player (_after_us). She holds no door
+    of her own choice, and pulls back under retreat_below (0.5) of her hp,
+    not REFLEX_BELOW. Devoted, she stands over her downed player within 2
+    cells (HOLD), low or not.
+  - What she takes (Companion.turns_down, asked by World.try_transfer):
+    food always. Grave goods (items' World.items.is_grave, "555, items'
+    side") she won't touch below close when her superstition (442) is
+    grave_superstition (6) or more. Sullen and colder, she takes only food
+    and a gift (gear into a free slot, nothing back): no loads, no swaps.
+    She says why in the party log.
+  - Guiding (551): sullen and colder, she leads nowhere. Her voice is told
+    by step whether she offers to lead (close and devoted), waits to be
+    asked (cooling, wary), or won't (loyalty guide_words).
+  - Voice: Standing's fact, plus one sentence for the step (loyalty
+    words: cooling "unhappy with them, and may say so", wary "keep your
+    distance", sullen "do as little as you can", apart "thinking of
+    leaving"). Every drop is told her voice once, as it happens ("Jeff just
+    struck you."), so she says so.
+- companion_test _test_loyalty: the steps by score, the reasons both ways,
+  sullen on the record, the body and the wire, hanging back, the voice,
+  leading nowhere, a monster not after them left be, a load refused, food
+  and a gift taken, fond as before, devoted closer. Server and wire, no new
+  class_name.

@@ -346,6 +346,19 @@ var heard: Array = []
 ## (decision 444: Main's, Standing.fact on the COMPANION ladder: "You are
 ## close to Jeff: they carried you out of the raiders' camp."); none unset.
 var bond_words := Callable()
+## Her bond's step with her player (decision 555; Main's, from Standing's
+## score by companion_traits "loyalty"), STEPS' word: how close she keeps
+## at heel, how she fights, what she takes from them and whether she leads.
+var bond_step := "fond":
+	set(value):
+		bond_step = value
+		heel.start = int((loyalty().get("heel_start", {}) as Dictionary).get(value, Heel.START))
+## Her bond's newest reason as her player reads it (decision 555, Main's):
+## "you struck her"; "" for none.
+var bond_why := ""
+## Her superstition (442's leaning, Main's at her join): at grave_superstition
+## or more she won't carry grave goods below close (555).
+var superstition := 5
 ## Her sickness in one sentence while she has one (decision 501: Main's,
 ## from her record's "sick", Companion.sick_sentence); none unset.
 var sick_words := Callable()
@@ -545,6 +558,8 @@ func _init() -> void:
 	replicate("channel_until")
 	# Her player's peer changes when they rejoin and she was waiting.
 	replicate("keeper_peer")
+	replicate("bond_step")  # Decision 555: her bond, read on her player's client.
+	replicate("bond_why")
 	replicate("body")
 	mass = 75.0
 	senses = Senses.new(self, SIGHT_RANGE, -1.0)
@@ -3180,7 +3195,7 @@ func _act() -> void:
 	var before_target := intent_target
 	_keep_quarry()
 	var foe := _adjacent_hostile()
-	var low := max_hp > 0 and float(hp) / max_hp < REFLEX_BELOW
+	var low := max_hp > 0 and float(hp) / max_hp < _retreat_below()
 	if current_intent == Intent.YIELD and World.tick < _yield_until and not (low and foe != null):
 		return
 	intent_target = null
@@ -3190,6 +3205,9 @@ func _act() -> void:
 	if _reviving():
 		# Her player downed (decision 544): a foe at her fought off, then to them.
 		_fight_or(foe, Intent.REVIVE)
+	elif _stands_over():
+		# Devoted (decision 555): she stands over her downed player, low or not.
+		_fight_or(foe, Intent.HOLD)
 	else:
 		_choose(foe, low)
 	if current_intent != before or intent_target != before_target:
@@ -3217,6 +3235,9 @@ func _choose(foe: GridEntity, low: bool) -> void:
 		current_intent = Intent.GUIDE  # Leading her player somewhere (decision 551).
 	elif _holds_door(foe):
 		pass
+	elif hangs_back() and (stance == Stance.GUARD or stance == Stance.PRESS):
+		# Wary or worse (decision 555): only what is at her, or after them.
+		_fight_or(foe if foe != null else _after_us(), Intent.FOLLOW)
 	else:
 		match stance:
 			Stance.PULL_BACK:
@@ -3235,7 +3256,7 @@ func _choose(foe: GridEntity, low: bool) -> void:
 ## own choice: she stands in it and fights what comes at her there. True
 ## if she does; the ask lapses once there is none.
 func _holds_door(foe: GridEntity) -> bool:
-	if not _door_asked and stance != Stance.GUARD and stance != Stance.PRESS:
+	if not _door_asked and (stance != Stance.GUARD and stance != Stance.PRESS or hangs_back()):
 		return false
 	var door := _door_to_hold()
 	if door == NONE:
@@ -3244,6 +3265,78 @@ func _holds_door(foe: GridEntity) -> bool:
 	_door_hold = door
 	_fight_or(foe, Intent.HOLD)
 	return true
+
+
+# --- Her bond in what she does (decision 555) ---------------------------------
+
+## The steps of her bond, coldest first (Main sets bond_step to one).
+const STEPS: Array[String] = ["apart", "sullen", "wary", "cooling", "fond", "close", "devoted"]
+
+
+## The rules: companion_traits.json "loyalty".
+static func loyalty() -> Dictionary:
+	var table: Variant = CompanionCard.tables().get("loyalty", {})
+	return table if table is Dictionary else {}
+
+
+## Whether her bond is at [param step] or warmer.
+func bond_at_least(step: String) -> bool:
+	return STEPS.find(bond_step) >= STEPS.find(step)
+
+
+## Wary or colder: she hangs back, joins late, flees sooner.
+func hangs_back() -> bool:
+	return not bond_at_least("cooling")
+
+
+## The hp fraction under which she pulls back: retreat_below hanging back,
+## else REFLEX_BELOW.
+func _retreat_below() -> float:
+	return float(loyalty().get("retreat_below", 0.5)) if hangs_back() else REFLEX_BELOW
+
+
+## Devoted, with her player lying downed within 2 cells: she stands over them.
+func _stands_over() -> bool:
+	return bond_at_least("devoted") and is_instance_valid(keeper) and keeper.spawned and World.is_downed(keeper) \
+		and World.distance(tile, keeper.tile) <= 2
+
+
+## The nearest hostile in sight going for her or her player; null for none.
+func _after_us() -> GridEntity:
+	var best: GridEntity = null
+	var best_distance := SIGHT_RANGE + 1
+	for entity in World.get_entities():
+		var monster := entity as Monster
+		if monster == null or not _hostile(monster) or _out_of_reach(monster) or monster.target == null:
+			continue
+		var distance := World.distance(tile, monster.tile)
+		if (monster.target == self or monster.target == keeper) and distance < best_distance:
+			best = monster
+			best_distance = distance
+	return best
+
+
+## [param by] would put [param uid] in her hands or pack (World.try_transfer),
+## [param back] (0 none) coming out to them: why she won't take it, said in
+## the party log, or "" if she takes it. Food she always takes. Grave goods
+## (items' World.items.is_grave) she won't touch below close at
+## grave_superstition. Sullen or colder, she takes only food and a gift (a
+## thing of gear into a free slot, nothing back): no loads, no swaps.
+func turns_down(by: GridEntity, uid: int, back: int) -> String:
+	if by == self or uid == 0 or World.items == null:
+		return ""
+	var id := World.items.id_of(uid)
+	if str(Items.def(id).get("use", "")) == "eat":
+		return ""
+	var why := ""
+	if World.items.has_method("is_grave") and bool(World.items.call("is_grave", uid)) \
+			and superstition >= int(loyalty().get("grave_superstition", 6)) and not bond_at_least("close"):
+		why = "%s won't touch grave goods" % name
+	elif not bond_at_least("wary") and (back != 0 or not Items.is_gear(id)):
+		why = "%s won't carry that for %s" % [name, keeper_name()]
+	if not why.is_empty() and party_log != null:
+		party_log.add("%s." % why)
+	return why
 
 
 func _fight_or(foe: GridEntity, otherwise: Intent) -> void:
@@ -3525,7 +3618,7 @@ func _follow() -> void:
 	# Her player stalking: she keeps still till they are farther off, and
 	# closes less (decision 332), so fewer of her steps reach the animal.
 	var quiet := stalking() != null
-	if distance >= (STALK_START if quiet else FOLLOW_START) and not _catching_up:
+	if distance >= (STALK_START if quiet else heel.start) and not _catching_up:
 		_catching_up = true
 	if quiet:
 		if _catching_up and distance <= STALK_CLOSE:
