@@ -465,7 +465,11 @@ const CANOPY_FOG := Color(0.3, 0.38, 0.28)
 const CANOPY_EASE := 3.0
 const CANOPY_AROUND := 2
 const FOG_DENSITY := 0.012
-const RAIN_FOG_DENSITY := 0.008
+## Rain's own haze is a trace (0.008 until decision 534 amended: rain read
+## as fog); fog and storms bring theirs through their fog.
+const RAIN_FOG_DENSITY := 0.001
+## How much rain darkens the greyed colours under it (0.25 until 534 amended).
+const RAIN_DARK := 0.1
 const FOG_HEIGHT := 2.5
 const FOG_HEIGHT_DENSITY := 0.22
 ## Under this height (degrees) the light is the moon's, opposite the sun.
@@ -1652,7 +1656,7 @@ static func weathered_look(look: Dictionary, weather: Dictionary) -> Dictionary:
 	var rain := float(weather.get("rain", 0.0))
 	var out := look.duplicate()
 	var grey := func(colour: Color, amount: float) -> Color:
-		var value := colour.get_luminance() * (1.0 - 0.25 * rain)
+		var value := colour.get_luminance() * (1.0 - RAIN_DARK * rain)
 		return colour.lerp(Color(value, value, value * 1.04), amount)
 	out["top"] = grey.call(look["top"], 0.75 * cloud)
 	out["horizon"] = grey.call(look["horizon"], 0.6 * cloud)

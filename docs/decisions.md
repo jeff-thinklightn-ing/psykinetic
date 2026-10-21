@@ -16374,6 +16374,18 @@ the one before.
   about 10° up) before and after: docs/shots/environment/shadow_0700.jpg;
   a tall wall still lays a band of shade across a plaza (2.75 times its
   height), shorter than before; a higher SHADOW_LOW shortens it further.
+
+Amended 2026-10-20 (Jeff's first F12 shots on v0.1.159, 16:00 in rain: the
+scene milky, the grass grey-green; the coordinator, under the tone approval
+and the veto rule): rain read as fog. Its own haze, RAIN_FOG_DENSITY 0.008
+x rain on top of its fog's 0.15 x FOG_DENSITY, tinted pale grey, lay over
+the whole view. Now RAIN_FOG_DENSITY 0.001 (a trace) and RAIN_DARK 0.1
+(0.25), what rain darkens the greyed colours by; fog spells and storms
+keep their haze through their own fog. The same plaza at 16:00 in rain
+(late spring, rain 0.7, cloud 0.9, fog 0.15), saturation / brightness /
+spread: today 25 / 135 / 12.4, haze 0.004 32 / 133 / 14.4, haze 0 50 / 122
+/ 17.6 (docs/shots/environment/rain_1600.jpg, left to right; 0.001 lies
+between the last two, nearer the last). Client only.
 Retuned, the same stills: clear noon unchanged, overcast noon 64 / 123 /
 27.2, the box's state 47 / 130 / 25.9 (what is left there is the low sun's
 own light, kept as designed). Client only (Season.LOOK is read only by the

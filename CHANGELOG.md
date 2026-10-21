@@ -10,6 +10,8 @@ notes (decision 324).
 - Archers draw properly (462): the string hand comes back along the jaw to below the ear with the elbow out and level behind it, instead of wrapping behind the head, and on the way it stays in front of the chest instead of passing through it; the bow arm keeps a soft elbow, and a carried bow hangs close at the side of the thigh.
 - The Hills have escarpments: a 3 m rock face looking east over the valley with a long slope up to its edge from the west and a ramp through it, and a lower one south-east of the valley facing north; the valley is a metre deeper. Jeff, after walking it: "big ledge with slope looks quite good" (525 amended (2)).
 - Pip the carpenter becomes Aldous's acolyte: a town whose own Pip has a trade keeps him as one Pip, the priest's acolyte in place from the first morning after the update ("Pip [acolyte]"), his bench left for the town's next carpenter; the alms runs are his only work (546, npc's side, amended). Server only.
+- Rain reads as rain, not fog: a rainy day keeps its colours under the falling streaks instead of a milky haze (534 amended).
+
 - The talk log shows how a townsperson said a line, dim after their words ("— his voice steady despite the rain"); the bubble over their head stays the words alone (336 amended, ui's side).
 - When a town loses its last carpenter, smith or other maker, a newcomer of that trade now moves in after three days and takes the empty bench, so the town keeps building (552).
 - Screenshots taken on a joined client are named with the area again ("wilds_209-201_..."), and the big map marks your own area and lists your party under it when you joined a server, not only when hosting (538 amended).
