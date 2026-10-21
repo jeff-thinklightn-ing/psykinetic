@@ -52,6 +52,7 @@ func _ready() -> void:
 	_test_sick_body()
 	_test_placed_captive()
 	_test_offer_words()
+	_test_monster_talk()
 	_test_herbs()
 	_test_resident_voices()
 	_test_means_in_voice()
@@ -1301,6 +1302,51 @@ func _test_offer_words() -> void:
 	World.production.set_away("rs-folk11", true)
 	Townsfolk._set_sickness(World.production, "rs-folk10", {})
 	_sync()
+
+
+## A monster that talks (decision 546, npc's side; the draugr, 548): its
+## first words stand unasked, an amount said takes them, a bare yes does not.
+func _test_monster_talk() -> void:
+	print("\n== a monster that talks: the deal spoken unasked and standing, taken by an amount said, never by a bare yes (decision 546, npc's side) ==")
+	for body: GridEntity in World.townsfolk().duplicate():
+		World.despawn(body)
+	var player := _player()
+	var talker := _main._spawn({"script": "res://tests/talker_stub.gd", "shape": "capsule", "name": "Draugr", "tile": _main._nearest_free(player.tile + Vector2i(2, 0))}) as Monster
+	_check(talker != null and talker.talks and _main._talkers.has(talker.get_instance_id()), "(a talking monster spawned and hooked)")
+	if talker == null:
+		return
+	var mind := VoiceMind.new()
+	_main._resident_mind = mind
+	_main._standing.clear()
+	talker.offer_spoken.emit(Net.player_id, talker.offers_for(Net.player_id)[0])
+	var standing: Dictionary = _main._standing.get(Net.player_id, {})
+	_check(str(standing.get("worker", "")) == String(talker.get_path()) and str(standing.get("title", "")) == "Face the draugr", "he talks first: his deal stands, keyed by his path: %s" % [standing.get("title", "")])
+	_main._chat_tick.clear()
+	_main._player_said(player, "Yes.")
+	World.step()
+	_check(talker.got == [0] and _main._standing.has(Net.player_id) and mind.asks.is_empty(), "a bare yes reaches him with no gold: his own refusal, and the deal still stands (no resident mind): %s" % [talker.got])
+	World.economy.add_gold(Net.player_id, 30, "the test")
+	_main._chat_tick.clear()
+	_main._player_said(player, "give 40")
+	World.step()
+	_check(talker.got == [0] and _main._standing.has(Net.player_id), "over the purse: refused by Main, he is not asked: %s" % [talker.got])
+	_main._chat_tick.clear()
+	_main._player_said(player, "Draugr, here is 16")
+	World.step()
+	_check(talker.got == [0, 16] and talker.pact and not _main._standing.has(Net.player_id), "an amount said reaches accept_offer with it; ok, nothing stands: %s" % [talker.got])
+	_main._chat_tick.clear()
+	_main._player_said(player, "Any work for me?")
+	World.step()
+	_check(not _main._standing.has(Net.player_id), "with a pact on he offers nothing: nothing stands")
+	talker.pact = false
+	_main._chat_tick.clear()
+	_main._player_said(player, "Any work for me?")
+	World.step()
+	_check(_main._standing.has(Net.player_id), "asked, he speaks the deal again and it stands")
+	talker.offer_withdrawn.emit(Net.player_id)
+	_check(not _main._standing.has(Net.player_id), "withdrawn from his side: nothing stands")
+	_main._resident_mind = null
+	World.despawn(talker)
 
 func _sync() -> void:
 	_main._sync_residents()

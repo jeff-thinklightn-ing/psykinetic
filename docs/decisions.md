@@ -16853,3 +16853,38 @@ the talk): a draugr spawns from a script an older client lacks, and the
 replicated property. dungeon's barrow swaps its stand-in for a
 monster_draugr marker in its level.json legend. monster_test
 (_test_draugr); level_test, protocol_test, builder_test unchanged.
+
+
+## 546, npc's side: the crypt's people, and a speaker that is not a townsperson
+
+Economy's 546 holds the offering, the alms and the altar's ledger; this is
+npc's side of Jeff's crypt (docs/lore/crypt.md), landed in parts as the
+pieces it waits on arrive. Part 1 (2026-10-20): a speaker that is a
+Resident or a monster that talks. 536's spoken-offer path keyed everything
+on a resident's worker id; now a Monster with talks (enemy-ai's 548: the
+draugr, Monster.talks) and offers_for(player_id) is a speaker too
+(Main._monster_addressed: named in the line within hearing, else nearest
+within RESIDENT_EARSHOT, looked at only when no resident takes the line).
+Its offers come from its own offers_for in 536's shape; an ask for wares,
+work or news speaks the first (asked again, the next) and it stands, keyed
+by the entity's path (Main._standing "worker" holds a worker id or a path;
+_standing_for reads either); a yes word or an amount said goes to its
+accept_offer(player, offer, gold) with the amount (0 for a bare yes: the
+monster's own refusal in its words, the offer still standing), after Main's
+one check, the purse ("You have but 9 gold."); its reply {ok, say, line} is
+spoken and logged, and on ok nothing stands; a no clears. It talks first
+through its offer_spoken(player_id, offer) signal (the draugr's, when a
+player comes near him in his lair): Main speaks the words and sets them
+standing unasked; offer_withdrawn(player_id) clears (the pact begun, the
+challenger gone). Hooked as the monster spawns (Main._spawn, once per
+instance). The "offers" message for a monster carries its path, its name,
+its offers and the standing offer: 548's PROTOCOL_REVISION 25 covers an
+offer from a monster, so this lands on it with no bump (release). The
+difficulty from the gold (floor(gold / offering), 1x to 3x), the pact, the
+mark and the fight are enemy-ai's and companions'. tests/talker_stub.gd (a
+talking Monster with the contract and nothing of the draugr's) and
+resident_test. Parts to come: Pip's bodiless alms run on the world tick
+(economy's take_altar and altar_down), lost only once a player knows
+Aldous's secret, the gossip and the lived fact; Aldous's secrets as lore's
+entries with knowers; "Take the offering down" (a kept offering births the
+"cheated" standing key from Jeff's list) and "Find the runner".

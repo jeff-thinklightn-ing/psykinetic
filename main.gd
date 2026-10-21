@@ -3547,6 +3547,8 @@ func _spawn(spec: Dictionary) -> GridEntity:
 		entity.queue_free()
 		return null
 	Net.interest.add(entity)
+	if entity is Monster and entity.has_method("offers_for"):
+		_hook_talker(entity)  # One that talks (the draugr, 548): its first words and its withdrawals (decision 546, npc's side).
 	if spec.has("spawn"):
 		_alive_slots[spec["spawn"]] = entity
 		_dead_since.erase(spec["spawn"])
@@ -6294,6 +6296,10 @@ func _player_said(player: Player, text: String, phrase := 0) -> void:
 	var resident := _resident_addressed(player, line, pet if hears else null) if phrase == 0 else null
 	if resident != null:
 		to = resident.person
+	# Or a monster that talks (the draugr, 548; decision 546, npc's side): named, or nearest within earshot.
+	var talker: GridEntity = _monster_addressed(player, line) if resident == null and phrase == 0 else null
+	if talker != null:
+		to = _display_name(talker)
 	# Every other companion within earshot hears it too, labelled; her voice
 	# decides whether it was meant for her.
 	for entity in World.get_entities():
@@ -6309,6 +6315,10 @@ func _player_said(player: Player, text: String, phrase := 0) -> void:
 	if resident != null:
 		if not _offer_said(resident, player, line):  # An ask for wares, work or news, or a word taking the offer standing (decision 536).
 			_ask_resident(resident, _display_name(player), line, player)
+		if hears:
+			pet.overheard(_display_name(player), line, false)
+	elif talker != null:
+		_monster_said(talker, player, line)
 		if hears:
 			pet.overheard(_display_name(player), line, false)
 	elif to != "":
@@ -7053,7 +7063,7 @@ func _offer_said(body: Resident, player: Player, line: String) -> bool:
 		if offer.is_empty():
 			return false  # Nothing of that kind: the mind answers as it would.
 		Transcript.record(body.person, _display_name(player), line)
-		_speak_offer(body, player, offer)
+		_speak_offer(body, body.worker_id, body.person, player, offer)
 		return true
 	var target := Offers.named(body.worker_id, player_id, line)
 	if target.is_empty() and (ask == "yes" or amount > 0) and not standing.is_empty():
@@ -7073,7 +7083,7 @@ func _offer_said(body: Resident, player: Player, line: String) -> bool:
 		gold = mini(int(target.get("cost", 0)), World.gold_of(player_id))  # A yes to a debt: what is owed, or all they have.
 	var refusal := Offers.amount_refusal(target, amount, World.gold_of(player_id))
 	if not refusal.is_empty():
-		_say_plain(body, refusal)
+		_say_plain(body, body.person, refusal)
 		return true
 	_accept_offer(player, str(target["id"]), gold)
 	return true
@@ -7081,24 +7091,28 @@ func _offer_said(body: Resident, player: Player, line: String) -> bool:
 
 ## [param body] speaks [param offer]'s words to [param player], exactly, as
 ## its speech and the party log's line, and it stands for them.
-func _speak_offer(body: Resident, player: Player, offer: Dictionary) -> void:
+func _speak_offer(speaker: GridEntity, key: String, name: String, player: Player, offer: Dictionary) -> void:
 	var words := str(offer.get("words", ""))
 	if words.is_empty():
 		words = str(offer.get("title", ""))
-	_standing[player.player_id] = {"worker": body.worker_id, "id": str(offer.get("id", "")), "title": str(offer.get("title", "")),
-		"at": World.steps, "zone": body.zone}
-	MindLog.record({"kind": "offer", "companion": body.person, "mind": "resident", "say": words, "outcome": "spoken"})
-	_say_plain(body, words, "[offer] ")
-	_send_offers(body, player.player_id, player.owner_peer)
+	_standing[player.player_id] = {"worker": key, "id": str(offer.get("id", "")), "title": str(offer.get("title", "")),
+		"at": World.steps, "zone": speaker.zone, "offer": offer.duplicate(true)}
+	MindLog.record({"kind": "offer", "companion": name, "mind": "resident" if speaker is Resident else "monster", "say": words, "outcome": "spoken"})
+	_say_plain(speaker, name, words, "[offer] ")
+	if speaker is Resident:
+		_send_offers(speaker, player.player_id, player.owner_peer)
+	else:
+		_send_monster_offers(speaker, player.player_id, player.owner_peer)
 
 
 ## [param body] says [param words] with no mind asked: the transcript (with
 ## [param note]), the party log, those near, the speech bubble.
-func _say_plain(body: Resident, words: String, note := "") -> void:
-	Transcript.record(body.person, body.person, note + words)
-	party_log.add("%s said: \"%s\"" % [body.person, words])
-	_heard_near(body, body.person, words)
-	Net.broadcast_to(hearers(body.tile), "speech", {"entity": String(body.get_path()), "speaker": body.person, "text": words})
+func _say_plain(speaker: GridEntity, name: String, words: String, note := "") -> void:
+	Transcript.record(name, name, note + words)
+	party_log.add("%s said: \"%s\"" % [name, words])
+	if speaker is Resident:
+		_heard_near(speaker, name, words)
+	Net.broadcast_to(hearers(speaker.tile), "speech", {"entity": String(speaker.get_path()), "speaker": name, "text": words})
 
 
 ## The offer standing for [param player_id] with [param worker_id], {} for
@@ -7114,15 +7128,141 @@ func _standing_for(player_id: String, worker_id: String) -> Dictionary:
 	for each: Player in _players.values():
 		if is_instance_valid(each) and each.player_id == player_id:
 			player = each
-	var body: Resident = null
-	for entity: GridEntity in World.townsfolk():
-		if entity is Resident and (entity as Resident).worker_id == worker_id:
-			body = entity
+	var body: GridEntity = null
+	if worker_id.begins_with("/"):
+		var node := get_node_or_null(worker_id)  # A talking monster, by its path (548).
+		body = node if node is GridEntity and (node as GridEntity).spawned else null
+	else:
+		for entity: GridEntity in World.townsfolk():
+			if entity is Resident and (entity as Resident).worker_id == worker_id:
+				body = entity
 	if World.steps - int(standing.get("at", 0)) > maxi(DayNight.day_steps, 1) or body == null or player == null \
 			or body.zone != player.zone or World.distance(body.tile, player.tile) > HEARING_RANGE:
 		_standing.erase(player_id)
 		return {}
 	return standing
+
+
+
+## The talking monsters hooked (instance id -> true), so each is hooked once.
+var _talkers: Dictionary = {}
+
+
+## Server: the monster that talks (Monster.talks, with offers_for: the
+## draugr, 548) that [param line] from [param player] is for: one named in
+## it within hearing, else the nearest within RESIDENT_EARSHOT; null for
+## none. Residents are looked at first (_resident_addressed).
+func _monster_addressed(player: Player, line: String) -> GridEntity:
+	var nearest: GridEntity = null
+	for entity: GridEntity in World.get_entities():
+		if not entity is Monster or not (entity as Monster).talks or not entity.has_method("offers_for") or entity.zone != player.zone:
+			continue
+		var d := World.distance(entity.tile, player.tile)
+		if d > HEARING_RANGE:
+			continue
+		if Companion._named(line, _display_name(entity)):
+			return entity
+		if d <= RESIDENT_EARSHOT and (nearest == null or d < World.distance(nearest.tile, player.tile)):
+			nearest = entity
+	return nearest
+
+
+## Server: [param line] said to talking monster [param monster] (decision
+## 546, npc's side; the draugr, 548): an ask for wares, work or news speaks
+## its first offer (offers_for; asked again, the next) and it stands; a yes
+## word or an amount said goes to its accept_offer with the gold (0 for a
+## bare yes: the monster's own refusal), after Main's one check, the purse;
+## its reply is spoken, its line logged, and on ok nothing stands; a no
+## clears what stands. True when handled.
+func _monster_said(monster: GridEntity, player: Player, line: String) -> bool:
+	if monster == null or player == null or not monster.has_method("offers_for"):
+		return false
+	var key := String(monster.get_path())
+	var name := _display_name(monster)
+	var player_id := player.player_id
+	var ask := Offers.ask_kind(line)
+	var amount := Offers.amount_said(line)
+	var standing := _standing_for(player_id, key)
+	if ask in ["wares", "work", "news"]:
+		var offers: Array = monster.offers_for(player_id)
+		if offers.is_empty():
+			return false
+		var pick: Dictionary = offers[0]
+		for i in offers.size():
+			if str(offers[i].get("id", "")) == str(standing.get("id", "")):
+				pick = offers[(i + 1) % offers.size()]
+		Transcript.record(name, _display_name(player), line)
+		_speak_offer(monster, key, name, player, pick)
+		return true
+	if ask == "no" and not standing.is_empty():
+		_standing.erase(player_id)
+		Transcript.record(name, _display_name(player), line)
+		_send_monster_offers(monster, player_id, player.owner_peer)
+		return true
+	if standing.is_empty() or not (ask == "yes" or amount > 0):
+		return false
+	var offer: Dictionary = standing.get("offer", {})
+	Transcript.record(name, _display_name(player), line)
+	if amount > World.gold_of(player_id):
+		_say_plain(monster, name, "You have but %d gold." % World.gold_of(player_id))
+		return true
+	var result: Variant = monster.accept_offer(player, offer, amount)
+	if not result is Dictionary:
+		return true
+	if not str(result.get("say", "")).is_empty():
+		_say_plain(monster, name, str(result["say"]))
+	if not str(result.get("line", "")).is_empty():
+		party_log.add(str(result["line"]))
+	if bool(result.get("ok", false)):
+		_standing.erase(player_id)
+	_send_monster_offers(monster, player_id, player.owner_peer)
+	return true
+
+
+## The "offers" message for a talking monster: its offers_for, under its
+## path and name, with the offer standing (548's revision 25 covers it).
+func _send_monster_offers(monster: GridEntity, player_id: String, peer: int) -> void:
+	if monster == null or not is_instance_valid(monster) or player_id.is_empty() or peer < 0 or not monster.has_method("offers_for"):
+		return
+	var data := {"entity": String(monster.get_path()), "speaker": _display_name(monster), "offers": monster.offers_for(player_id)}
+	var standing := _standing_for(player_id, String(monster.get_path()))
+	if not standing.is_empty():
+		data["standing"] = {"id": standing["id"], "title": standing["title"]}
+	Net.message_to(peer, "offers", data)
+
+
+## [param monster] talks (offers_for): its offer_spoken (it talks first:
+## the words spoken and standing for that player) and offer_withdrawn
+## (nothing stands) are heard; once per instance.
+func _hook_talker(monster: GridEntity) -> void:
+	if monster == null or _talkers.has(monster.get_instance_id()):
+		return
+	_talkers[monster.get_instance_id()] = true
+	if monster.has_signal("offer_spoken"):
+		monster.connect("offer_spoken", func(player_id: String, offer: Dictionary) -> void: _on_offer_spoken(monster, player_id, offer))
+	if monster.has_signal("offer_withdrawn"):
+		monster.connect("offer_withdrawn", func(player_id: String) -> void: _on_offer_withdrawn(monster, player_id))
+
+
+func _on_offer_spoken(monster: GridEntity, player_id: String, offer: Dictionary) -> void:
+	if not is_instance_valid(monster) or not monster.spawned:
+		return
+	for player: Player in _players.values():
+		if is_instance_valid(player) and player.player_id == player_id and player.zone == monster.zone:
+			_speak_offer(monster, String(monster.get_path()), _display_name(monster), player, offer)
+			return
+
+
+func _on_offer_withdrawn(monster: GridEntity, player_id: String) -> void:
+	if not is_instance_valid(monster):
+		return
+	var standing: Dictionary = _standing.get(player_id, {})
+	if str(standing.get("worker", "")) != String(monster.get_path()):
+		return
+	_standing.erase(player_id)
+	for player: Player in _players.values():
+		if is_instance_valid(player) and player.player_id == player_id:
+			_send_monster_offers(monster, player_id, player.owner_peer)
 
 
 # --- A level-placed captive (decision 518) ------------------------------------------
