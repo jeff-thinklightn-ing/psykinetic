@@ -6268,6 +6268,7 @@ func _build_talk() -> void:
 	$HUD.add_child(counter_panel)
 	counter_told.connect(_on_counter_told)
 	world_map_panel = WorldMapPanel.new()
+	world_map_panel.guide_asked.connect(_ask_guide)  # The map's "ask her to lead you there" (551).
 	$HUD.add_child(world_map_panel)
 	if has_signal("world_changed"):
 		connect("world_changed", _refresh_world_map)
@@ -8224,6 +8225,8 @@ func _on_world_ticked(tick: int) -> void:
 			hp_text += "   hidden in the grass"  # Decision 515: the one cue that the cover works.
 		if not standing_title.is_empty():
 			hp_text += "   " + standing_words(standing_title)  # 536: an offer stands; "yes" (Y) takes it.
+		if not player.led_by.is_empty():  # 551, ui's side: she leads; the place from led_to when it is on the wire.
+			hp_text += "   " + led_words(player.led_by, world_map_panel.place_words(led_to_of(player)) if world_map_panel != null else "")
 		if World.is_downed(player):
 			hp_text += "   " + downed_words(ceili((player.downed_until - tick) * World.TICK_DT))  # 544, ui's side.
 		elif not player.channel_of.is_empty() and tick < player.channel_until:
@@ -8313,6 +8316,7 @@ func _refresh_world_map() -> void:
 	var player := _local_player()
 	world_map_panel.own_area = zone_name_here()  # 538 amended: the same read, so a joined client's own area is marked.
 	world_map_panel.own_cell = player.tile if player != null else Vector2i(-1, -1)
+	world_map_panel.led = {"by": player.led_by if player != null else "", "to": led_to_of(player)}  # 551, ui's side.
 	var here: Array[Dictionary] = []
 	for entity in World.get_entities():
 		if entity is Player and entity != player and entity.spawned:
@@ -8321,6 +8325,35 @@ func _refresh_world_map() -> void:
 			here.append({"name": String(entity.name), "area": world_map_panel.own_area, "kind": "companion"})
 	var state: Variant = get("world_state")
 	world_map_panel.set_world_state(state if state is Dictionary else {}, here)
+
+
+## The map's ask (551, ui's side): the "guide" command for [param to], a
+## place id or area name she knows the way to; the map closes, the HUD
+## line and her own words say the rest.
+func _ask_guide(to: String) -> void:
+	var player := _local_player()
+	if player != null and not to.is_empty():
+		World.command(player, "guide", {"to": to})
+	if world_map_panel != null:
+		world_map_panel.close()
+
+
+## Where the companion leads [param player] (companions' Player.led_to, a
+## place id or area name; "" when not led or before that field is on main:
+## read by name, so this compiles either way).
+static func led_to_of(player: Player) -> String:
+	if player == null:
+		return ""
+	var to: Variant = player.get("led_to")
+	return to if to is String else ""
+
+
+## The HUD's words while led (551, ui's side): who leads, where to when the
+## wire says, and how to take the lead back (any step or order does).
+static func led_words(name: String, place: String) -> String:
+	if place.is_empty():
+		return "Following %s - move to take the lead" % name
+	return "Following %s to %s - move to take the lead" % [name, place]
 
 
 ## The item action [param keycode] is bound to (Keys), "" for none.
@@ -9505,6 +9538,25 @@ func _run_test_show(player: Player) -> void:
 					func(slot: int) -> String: return ["Wren's dagger", "hammer"][slot])
 			"shot":
 				get_tree().create_timer(3.0).timeout.connect(take_screenshot)  # The log line and the first-time hint, in the shot.
+			"led", "guide_map":
+				# 551, ui's side, for the shots: she leads the player to the first
+				# place of this area (the HUD line), or knows the way there and the
+				# map's ask box stands beside it. The guide itself is companions'.
+				var pet := _own_companion()
+				var her := String(pet.name) if pet != null else "Wren"
+				world_map_panel._ensure_world()
+				var own_places: Variant = (world_map_panel.world.areas.get(zone_name_here(), {}) as Dictionary).get("places", {})
+				var there := ""
+				if own_places is Dictionary and not (own_places as Dictionary).is_empty():
+					there = "%s/%s" % [zone_name_here(), (own_places as Dictionary).keys()[0]]
+				if what == "led":
+					player.led_by = her
+					if "led_to" in player:
+						player.set("led_to", there)
+				else:
+					world_state = WorldNews.merge(world_state, {"full": false, "guide": {"companion": her, "places": [there], "areas": []}})
+					open_world_map()
+					world_map_panel.show_ask(there)
 			"world":
 				open_world_map()
 				if world_map_panel != null and world_map_panel.trade.is_empty() and world_map_panel.world != null:

@@ -474,6 +474,28 @@ func _test_world_map() -> void:
 		"party": [{"name": "Wren", "area": "castle", "kind": "companion"}]}, [{"name": "Tam", "area": panel.own_area, "kind": "player"}])
 	_check(panel.holdings.has("wilds/camp") and panel.known_areas.has("wilds") and panel.party.size() == 2,
 		"maps' world_state read: holdings, known, the party here and elsewhere")
+	# The guide (551, ui's side): what she knows the way to, the marks' words, the ask box.
+	panel.set_world_state({"guide": {"companion": "Wren", "places": ["wilds/camp"], "areas": ["castle"]}}, [])
+	_check(panel.knows_way("wilds/camp") and panel.knows_way("castle") and not panel.knows_way("wilds/well") and not panel.knows_way(""),
+		"what she knows the way to, from world_state's guide")
+	_check(WorldMapPanel.knows_words("Wren") == "Wren knows the way" and WorldMapPanel.ask_words("Wren").begins_with("ask Wren to lead you there")
+		and WorldMapPanel.leads_words("Wren") == "> Wren leads you here", "the mark's words, the ask box's, the led row's")
+	_check(Main.led_words("Wren", "the Barrow") == "Following Wren to the Barrow - move to take the lead"
+		and Main.led_words("Wren", "") == "Following Wren - move to take the lead", "the HUD's words while led, with and without the place")
+	_check(panel.place_words("castle") == str(panel.world.areas["castle"].get("display_name", "castle"))
+		and panel.place_words("nowhere/x") == "nowhere/x" and panel.place_words("") == "", "a place or area's shown name from the map")
+	var asked: Array = []
+	panel.guide_asked.connect(func(to: String) -> void: asked.append(to))
+	panel.show_ask("wilds/camp")
+	_check(panel.ask_pending() == "wilds/camp", "the ask box stands beside a place she knows")
+	panel.confirm_ask()
+	_check(asked == ["wilds/camp"] and panel.ask_pending() == "", "Enter: the ask goes out as the guide command's place, the box gone")
+	panel.show_ask("wilds/well")
+	_check(panel.ask_pending() == "", "no box for a place she does not know")
+	panel.show_ask("wilds/camp")
+	panel.close()
+	_check(panel.ask_pending() == "", "closing the map closes the box")
+	_main.open_world_map()
 	panel.set_world_state({}, [])
 	_main.escape()
 	_check(not panel.visible, "Esc closes it")

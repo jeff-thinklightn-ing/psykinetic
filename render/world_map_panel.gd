@@ -53,6 +53,30 @@ var _hover := ""
 var _hover_caravan: Dictionary = {}
 ## How near the cursor must come to a caravan's dot, in canvas units at zoom 1.
 const CARAVAN_GRIP := 14.0
+## What the player's companion knows the way to (companions' 551; Main's
+## world_state "guide"): {companion, places: [place ids], areas: [names]};
+## {} for none.
+var guide: Dictionary = {}
+## The local player led (Player.led_by, led_to): {"by": her name, "to": the
+## place id or area name}; "" when not led.
+var led: Dictionary = {"by": "", "to": ""}
+## The rows drawn this frame she knows the way to: place id or area name ->
+## the rect of its words and mark (screen), for the hover and the click.
+var _rows: Dictionary = {}
+## The known row under the cursor ("" for none), and the one the ask box
+## stands beside.
+var _hover_row := ""
+var _ask := ""
+var _ask_box := Rect2()
+## Where the left button went down; a release within CLICK_SLOP of it is a
+## click on a row, further is the drag it always was.
+var _press_at := Vector2(-1.0e9, -1.0e9)
+const CLICK_SLOP := 4.0
+## The mark after a row she knows the way to, in canvas units at zoom 1.
+const GUIDE_MARK := 5.0
+## A click on the ask box or Enter: ask her to lead the player to [param to]
+## (Main sends the "guide" command, 551).
+signal guide_asked(to: String)
 
 
 func _init() -> void:
@@ -65,18 +89,27 @@ func _init() -> void:
 ## Opened: the graph built the first time, the view centred on the
 ## player's area.
 func open() -> void:
-	if world == null:
-		world = WorldMap.build()
-		_read_layout()
-		_lay_out()
-		_read_factions()
+	_ensure_world()
 	visible = true
 	centre_on(own_area)
 	queue_redraw()
 
 
+## The graph built once (the HUD's place words may ask before the first open).
+func _ensure_world() -> void:
+	if world == null:
+		world = WorldMap.build()
+		_read_layout()
+		_lay_out()
+		_read_factions()
+
+
+## Closed; the ask box goes with it (551).
 func close() -> void:
 	visible = false
+	_ask = ""
+	_hover_row = ""
+	_dragging = false
 
 
 ## Maps' world_state (phase B): {holdings: {place_id: [faction, strength]},
@@ -91,6 +124,9 @@ func set_world_state(state: Dictionary, here: Array[Dictionary]) -> void:
 	for id: Variant in state.get("known_places", []):
 		known_places[str(id)] = true
 	trade = (state.get("trade", []) as Array).duplicate(true) if state.get("trade") is Array else []
+	guide = (state.get("guide") as Dictionary).duplicate(true) if state.get("guide") is Dictionary else {}
+	if not knows_way(_ask):
+		_ask = ""
 	party.clear()
 	party.append_array(here)
 	for member: Variant in state.get("party", []):
@@ -255,7 +291,13 @@ func _gui_input(event: InputEvent) -> void:
 		zoom(1 if click.button_index == MOUSE_BUTTON_WHEEL_UP else -1)
 		accept_event()
 	elif click != null and click.button_index == MOUSE_BUTTON_LEFT:
-		_dragging = click.pressed
+		if click.pressed:
+			_press_at = click.position
+			_dragging = true
+		else:
+			_dragging = false
+			if _press_at.distance_to(click.position) <= CLICK_SLOP:
+				_clicked(click.position)  # Still: a click (551); moved: the drag.
 		accept_event()
 	var motion := event as InputEventMouseMotion
 	if motion != null:
@@ -266,10 +308,135 @@ func _gui_input(event: InputEvent) -> void:
 		if over != _hover:
 			_hover = over
 			queue_redraw()
+		var row := row_at(motion.position)
+		if row != _hover_row:
+			_hover_row = row
+			queue_redraw()
 		var dot := caravan_at(motion.position)
 		if dot != _hover_caravan:
 			_hover_caravan = dot
 			queue_redraw()
+
+
+## Enter while the ask box stands: the ask goes (551).
+func _input(event: InputEvent) -> void:
+	if not visible or _ask.is_empty():
+		return
+	var key := event as InputEventKey
+	if key != null and key.pressed and not key.echo and key.keycode in [KEY_ENTER, KEY_KP_ENTER]:
+		confirm_ask()
+		get_viewport().set_input_as_handled()
+
+
+## Whether the companion knows the way to [param id], a place id or an area
+## name (world_state "guide", companions' 551).
+func knows_way(id: String) -> bool:
+	if id.is_empty() or guide.is_empty():
+		return false
+	return (guide.get("places", []) as Array).has(id) or (guide.get("areas", []) as Array).has(id)
+
+
+## The row she knows the way to whose words or mark are under [param at]
+## (screen); "" for none.
+func row_at(at: Vector2) -> String:
+	for id: String in _rows:
+		if (_rows[id] as Rect2).has_point(at):
+			return id
+	return ""
+
+
+## A click, not a drag, at [param at]: on the ask box, the ask goes; on a
+## row she knows the way to (its words or its mark), the box opens beside
+## it; anywhere else closes the box.
+func _clicked(at: Vector2) -> void:
+	if not _ask.is_empty() and _ask_box.has_point(at):
+		confirm_ask()
+		return
+	var row := row_at(at)
+	_ask = row if knows_way(row) else ""
+	queue_redraw()
+
+
+## The ask box's yes: guide_asked with the place, the box gone (Main sends
+## the command and closes the map).
+func confirm_ask() -> void:
+	if _ask.is_empty():
+		return
+	var to := _ask
+	_ask = ""
+	queue_redraw()
+	guide_asked.emit(to)
+
+
+## The ask box opened beside [param id] when she knows the way there
+## (tests, --test-show=guide_map).
+func show_ask(id: String) -> void:
+	_ask = id if knows_way(id) else ""
+	queue_redraw()
+
+
+## The place or area the ask box stands beside, "" for none.
+func ask_pending() -> String:
+	return _ask
+
+
+## Hovering a marked row: "Wren knows the way".
+static func knows_words(name: String) -> String:
+	return "%s knows the way" % name
+
+
+## The ask box's words.
+static func ask_words(name: String) -> String:
+	return "ask %s to lead you there   (Enter: yes, Esc: no)" % name
+
+
+## A row's words while she leads the player there.
+static func leads_words(name: String) -> String:
+	return "> %s leads you here" % name
+
+
+## The shown name of [param id]: a place's name for "<area>/<key>", an
+## area's display name for an area, the id itself for anything else, "" for
+## "". Builds the graph if need be.
+func place_words(id: String) -> String:
+	if id.is_empty():
+		return ""
+	_ensure_world()
+	var area_name := id.get_slice("/", 0)
+	var area: Variant = world.areas.get(area_name)
+	if not area is Dictionary:
+		return id
+	if not id.contains("/"):
+		return str(area.get("display_name", id))
+	var key := id.get_slice("/", 1)
+	var places: Variant = (area as Dictionary).get("places", {})
+	var place: Variant = places.get(key) if places is Dictionary else null
+	return str(place.get("name", key)) if place is Dictionary else key
+
+
+## The mark after a row she knows the way to (551): a small friend-coloured
+## dot past the words' end; the row's rect, words and mark, kept for the
+## hover and the click.
+func _mark_row(id: String, at: Vector2, words_width: float, height: float, scale: float) -> void:
+	var middle := Vector2(at.x + words_width + 12.0 * scale, at.y - height * 0.32)
+	draw_circle(middle, GUIDE_MARK * scale, UiTheme.color("friend"))
+	_rows[id] = Rect2(at.x, at.y - height, words_width + 20.0 * scale, height * 1.3)
+
+
+## A box of words beside [param anchor] (the row's right end), the caravan
+## box's shape (515); its rect, for the click.
+func _words_box(anchor: Vector2, words: String, scale: float, caption: float, sans: Font) -> Rect2:
+	var text_size := sans.get_string_size(words, HORIZONTAL_ALIGNMENT_LEFT, -1, int(caption * scale))
+	var pad := 10.0 * scale
+	var box := Rect2(anchor + Vector2(10.0 * scale, -text_size.y - pad * 1.5), text_size + Vector2(pad * 2.0, pad * 2.0))
+	if box.end.x > size.x:
+		box.position.x = maxf(0.0, anchor.x - box.size.x - 10.0 * scale)
+	if box.position.y < 0.0:
+		box.position.y = anchor.y + 6.0 * scale
+	draw_rect(box, UiTheme.color("backing_deep"))
+	draw_rect(box, UiTheme.color("brass"), false, 1.0 * scale)
+	draw_string(sans, box.position + Vector2(pad, pad + text_size.y * 0.78), words, HORIZONTAL_ALIGNMENT_LEFT, -1, int(caption * scale), UiTheme.color("text"))
+	return box
 
 
 ## The caravan whose dot is within CARAVAN_GRIP of [param at] (screen), as
@@ -349,6 +516,7 @@ func _draw() -> void:
 		if not edge:
 			draw_circle(b, 6.0 * scale, UiTheme.color("brass"))
 	_draw_trade(scale)
+	_rows.clear()
 	for area_name: String in positions:
 		var rect := Rect2(positions[area_name] * scale + pan, sizes[area_name] * scale)
 		var area: Dictionary = world.areas[area_name]
@@ -359,8 +527,11 @@ func _draw() -> void:
 		if not is_known:
 			continue
 		var at := rect.position + Vector2(18.0, 18.0 + heading * 0.8) * scale
-		draw_string(serif, at, str(area.get("display_name", area_name)), HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 36.0 * scale,
+		var area_words := str(area.get("display_name", area_name))
+		draw_string(serif, at, area_words, HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 36.0 * scale,
 			int(heading * scale), UiTheme.color("text"))
+		if knows_way(area_name):  # She knows the way to the area itself (551).
+			_mark_row(area_name, at, serif.get_string_size(area_words, HORIZONTAL_ALIGNMENT_LEFT, -1, int(heading * scale)).x, heading * scale, scale)
 		at.y += caption * 1.3 * scale
 		var places: Dictionary = area.get("places", {})
 		for key: String in places:
@@ -381,7 +552,12 @@ func _draw() -> void:
 				if Vector2(own_cell - cell).length_squared() <= radius * radius:
 					words = "> " + words
 					colour = UiTheme.color("brass_bright")
+			if id == str(led.get("to", "")) and not str(led.get("by", "")).is_empty():
+				words = leads_words(str(led["by"]))  # She leads the player here (551).
+				colour = UiTheme.color("friend")
 			draw_string(sans, at, words, HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 36.0 * scale, int(caption * scale), colour)
+			if knows_way(id):
+				_mark_row(id, at, sans.get_string_size(words, HORIZONTAL_ALIGNMENT_LEFT, -1, int(caption * scale)).x, caption * scale, scale)
 			at.y += caption * 1.2 * scale
 		var here: Array[String] = []
 		for member: Dictionary in party:
@@ -415,8 +591,21 @@ func _draw() -> void:
 			draw_rect(box, UiTheme.color("backing_deep"))
 			draw_rect(box, UiTheme.color("brass"), false, 1.0 * scale)
 			draw_string(sans, box.position + Vector2(pad, pad + text_size.y * 0.78), words, HORIZONTAL_ALIGNMENT_LEFT, -1, int(caption * scale), UiTheme.color("text"))
+	# The guide (551): the ask box beside the row clicked, else the hovered
+	# mark's words.
+	var companion := str(guide.get("companion", ""))
+	_ask_box = Rect2()
+	if not _ask.is_empty() and _rows.has(_ask):
+		var row: Rect2 = _rows[_ask]
+		_ask_box = _words_box(Vector2(row.end.x, row.position.y + row.size.y * 0.5), ask_words(companion), scale, caption, sans)
+	elif not _hover_row.is_empty() and _rows.has(_hover_row):
+		var row: Rect2 = _rows[_hover_row]
+		_words_box(Vector2(row.end.x, row.position.y + row.size.y * 0.5), knows_words(companion), scale, caption, sans)
 	# The title and how to leave.
 	draw_string(serif, Vector2(UiTheme.constant("margin"), UiTheme.constant("margin") + heading), "The known world",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, UiTheme.size("title"), UiTheme.color("text"))
+	var how := "wheel: zoom   drag: pan   Esc or M: close"
+	if not guide.is_empty():
+		how += "   a marked place: ask %s to lead you there" % companion
 	draw_string(sans, Vector2(UiTheme.constant("margin"), UiTheme.constant("margin") + heading + caption * 1.6),
-		"wheel: zoom   drag: pan   Esc or M: close", HORIZONTAL_ALIGNMENT_LEFT, -1, caption, UiTheme.color("text_dim"))
+		how, HORIZONTAL_ALIGNMENT_LEFT, -1, caption, UiTheme.color("text_dim"))

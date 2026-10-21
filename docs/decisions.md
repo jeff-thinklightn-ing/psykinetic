@@ -17817,3 +17817,38 @@ Main sets and clears it with led_by. ui resolves the display name from the
 world map. PROTOCOL_REVISION stays 28 (release): 28 has not shipped, and a
 new replicated field changes the hash by itself. companion_test _test_guide
 checks it set, cleared, and kept across a way out.
+## 551, ui's side: the guide read on the HUD and asked for on the big map
+
+Companions' 551 (57a46bfe, PROTOCOL_REVISION 28): a companion leads her
+player to a place she knows on the real ways; Player.led_by (her name,
+"" when not) and, in companions' follow-up, Player.led_to (the place id
+or area name) are replicated; the "world" message's "guide" {companion,
+places, areas} says what she knows the way to; the "guide" command
+{"to": id} asks her. This is how it reads and is asked for, client only.
+
+- The HUD's state line, while led_by is set: "Following Wren to the
+  Barrow - move to take the lead" (Main.led_words), the place's shown
+  name from the world map's data (WorldMapPanel.place_words) when led_to
+  is on the wire, "Following Wren - move to take the lead" until then
+  (Main.led_to_of reads the field by name, so this compiles before and
+  after companions' landing). No prediction work: the server walks the
+  led body with ordinary move orders and any input takes the lead back,
+  so the client draws it as any server move.
+- The big map: a small friend-coloured mark after every place or area
+  she knows the way to (world_state "guide"); hovering it, "Wren knows
+  the way". A click on the row's words or its mark (a press and release
+  within CLICK_SLOP 4 px; further is the drag it always was) opens a
+  one-line box beside it, "ask Wren to lead you there   (Enter: yes,
+  Esc: no)"; Enter or a click on the box emits guide_asked, Main sends
+  World.command(player, "guide", {"to": id}) and closes the map; a click
+  elsewhere, Esc or any closing of the map drops the box. While led,
+  the destination's row reads "> Wren leads you here" in friend colour.
+  The foot line names the ask when she knows any way.
+- --test-show=led and guide_map stand a sample for the shots (the guide
+  itself is companions'; a fresh world's companion knows no road yet):
+  docs/ui/shots/sim/led.jpg and bigmap_guide.jpg, taken once the shot runs
+  are allowed again after the 2026-10-21 restart (short landings only till then).
+
+ui_test: knows_way, the words, place_words, the ask box's open, confirm,
+refusal and close. Client only; protocol unchanged on this side; no new
+class_name.

@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- While your companion leads you somewhere the HUD says so ("Following Wren to the Barrow - move to take the lead"), and the big map marks every place she knows the way to: click one and ask her to lead you there (551, ui's side).
 - Developer tools: long simulation soaks have their own slot in the job gate (394 amended (8)). They run beside the landing tests at low priority instead of holding them up, and the gate no longer mistakes a reused process for a job that has ended.
 - Cliff faces are as dark as the ground beside them at night, lit only by the moon and torches, instead of glowing pale through the dark (513 amended).
 - The orcs are art-kit's hand-built orc now (Jeff's pick over the generated one, 529): blue-grey, its iron shoulder plate and chain, the face reworked with rolled lip, flared nose and slanted lids, each orc still its own build, skin and mark.
