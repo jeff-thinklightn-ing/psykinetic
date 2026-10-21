@@ -2010,6 +2010,20 @@ func _test_hills() -> void:
 	_check(ledges > 0 and missing.is_empty(), "a face down each of the %d cliff steps (missing: %s)" % [ledges, missing.slice(0, 5)])
 	_check(slopes > ledges * 4 and on_slopes.is_empty(),
 			"and none on the %d steps down a walkable slope: hills, not terraces (faces there: %s)" % [slopes, on_slopes.slice(0, 5)])
+	# On relief the ground casts its shadow; a level without relief's doesn't.
+	var casting := func() -> Array:
+		var settings := []
+		for drawn: Node in _rig._room.get_children():
+			if drawn is MeshInstance3D and String(drawn.name).begins_with("Ground_"):
+				settings.append((drawn as MeshInstance3D).cast_shadow)
+		return settings
+	var on_hills: Array = casting.call()
+	var wilds := Level.load_level("wilds")
+	_rig.rebuild(wilds["terrain"], wilds["centre"])
+	var on_wilds: Array = casting.call()
+	_check(not on_hills.is_empty() and on_hills.all(func(s: int) -> bool: return s == GeometryInstance3D.SHADOW_CASTING_SETTING_ON)
+			and not on_wilds.is_empty() and on_wilds.all(func(s: int) -> bool: return s == GeometryInstance3D.SHADOW_CASTING_SETTING_OFF),
+			"the hills' ground casts its shadow (%d chunks), the wilds' (no relief) doesn't (%d)" % [on_hills.size(), on_wilds.size()])
 
 
 func _test_heights() -> void:

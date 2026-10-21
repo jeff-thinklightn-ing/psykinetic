@@ -5127,7 +5127,11 @@ func _build_ground(kinds: Dictionary) -> void:
 		drawn.name = "Ground_%d_%d" % [chunk.x, chunk.y]
 		drawn.mesh = mesh
 		drawn.material_override = material
-		drawn.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		# On relief the ground casts (the hills' cues sheet): an escarpment's
+		# back and a way throw their shadow across the valley at a low sun,
+		# no longer than SHADOW_LOW lets any shadow be.
+		drawn.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if _relief_given \
+				else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		_room.add_child(drawn)
 	_chunk_byte_start.append(_ground_bytes.size())
 	# The pairs gathered by cell.

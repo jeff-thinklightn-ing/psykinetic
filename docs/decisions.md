@@ -17995,3 +17995,24 @@ walk's keys are four actions in the table like any other.
 ui_test: the four defaults, the AZERTY read, a rebind to Up held and named,
 the saved line, the reset. Client only; protocol unchanged; no new
 class_name.
+## 525 amended (3). The ground casts its shadow on relief
+
+The hills' cues sheet (Jeff: "hills don't read as hills"; maps' escarpment
+hills, ad4ed790): the ground chunks were SHADOW_CASTING_SETTING_OFF, so only
+the cliff faces, trees, buildings and scatter cast. On a level that gives its
+relief the ground chunks now cast (Client3D._build_ground). At a low sun an
+escarpment's back and a way throw their shadow across the valley, the
+strongest of the cues tried. At noon and on the flat it adds little.
+Approved by the coordinator under Jeff's veto rule. A level without relief
+is unchanged.
+- Cost: none measurable (map_bench, 10 s at 16:00, 1600 x 900, two passes
+  each, median frame ms): hills 1.21 and 1.19 off, 1.19 and 1.19 on; wilds
+  0.94 and 0.94 off, 0.96 and 0.95 on.
+- 534's clamp holds: the ground casts from the one sun, which casts from at
+  least SHADOW_LOW (20 degrees) up, so no ground shadow runs longer than
+  about three times its rise. Shots at 06:00, 07:00, 19:00 and 20:00.
+- Not taken from the sheet: the tint by height (x0.85 on the floor to x1.12
+  on the crests, barely visible) and a lower camera (40 and 35 degrees read
+  as 50 at these zooms).
+Shots in C:\dev\review\hills2 (sheets 1 to 3, cues\, lowsun\). view_test _test_hills.
+Client only, protocol unchanged, no new class_name.
