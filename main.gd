@@ -70,6 +70,8 @@ const TALK_REACH := RESIDENT_EARSHOT
 ## How long a talk walk waits to arrive before it is forgotten.
 const TALK_WAIT_MSEC := 15000
 const RESIDENT_ASK_TICKS := 150
+## How often residents look for a player to hail (decision 554): every second.
+const HAIL_CHECK_TICKS := 10
 ## A town's homes: the map's huts and houses linked to nothing within so
 ## many cells of its store, each with room for so many.
 const HOME_TILES := 24
@@ -213,6 +215,15 @@ var map_generation := 0
 ## resident; the ask out, by serial.
 var _resident_mind: CompanionMind
 var _resident_asks: Array[Dictionary] = []
+## Residents speaking unprompted (decision 554): the msec of the last hail
+## in each player's hearing, the tick of each player's last blow given
+## (_hail_struck), how many ticks the resident mind took over its last
+## answer (a slow mind: no hails), and when each resident last found
+## nothing to say to a player (worker id + player id -> tick).
+var _hail_at: Dictionary = {}
+var _blow_at: Dictionary = {}
+var _mind_last_ticks := 0
+var _hail_tried: Dictionary = {}
 ## Talk with no panel (decision 536): the offer standing for each player,
 ## player id -> {worker, id, title, at, zone}: what a resident last spoke to
 ## them, taken by a yes, a name or an amount said back; one per player, not
@@ -759,6 +770,7 @@ func _go_online() -> void:
 		World.entity_died.connect(_roads_fell)
 		World.entity_damaged.connect(_roads_struck)
 		road_heard = _road_heard  # The road's news she hears (551 phase 2).
+		World.entity_damaged.connect(_hail_struck)  # A blow given (decision 554).
 		World.channel_changed.connect(_on_channel)
 		World.command_received.connect(_on_command)
 		World.slots_changed.connect(_on_slots_changed)
@@ -5566,6 +5578,9 @@ func _resident_voices() -> void:
 		var out: Dictionary = _resident_out.get(int(result.get("serial", 0)), {})
 		_resident_out.erase(int(result.get("serial", 0)))
 		if not out.is_empty():
+			_mind_last_ticks = World.tick - int(out.get("at", World.tick))  # A slow mind hails nobody (decision 554).
+			if not str(out.get("player", "")).is_empty():
+				_hail_at[str(out["player"])] = Time.get_ticks_msec()  # An answer to them is a talk: no hail within the minute.
 			_resident_answered(out, result.get("answer", {}), str(result.get("error", "")))
 	for each: Dictionary in _resident_asks.duplicate():
 		if World.tick - int(each["at"]) > RESIDENT_ASK_TICKS:
@@ -7846,6 +7861,79 @@ func _crypt_asks(town: String, player_id: String) -> Dictionary:
 ## Server, on the world tick: a player with a crypt commission standing
 ## within reach of the barrow's Altar (the offering laid) or of the Runner's
 ## pack (the runner's fate found) has met it (Offers.crypt_done).
+## Residents speaking unprompted (decision 554, narrowing 336): every
+## HAIL_CHECK_TICKS, a resident out and about with something to say
+## (Resident.hail_cue: a plea, the town's news, a ruling, the sky, a
+## greeting) hails the first player within TALK_REACH it has not hailed
+## today, as the lowest ask of all: none while any ask waits or is out, or
+## the mind's last answer came slower than hail.slow_ticks, and none to a
+## player led, fighting, in a talk, or hailed within hail.minute_seconds.
+## One a tick. The card remembers (Resident.hail_done); the answer takes
+## 336's spoken path (_resident_answered: the words and the aside).
+func _hails_tick() -> void:
+	if World.production == null or not Net.is_authority():
+		return
+	var rules: Dictionary = Townsfolk.rules().get("hail", {})
+	if not bool(rules.get("on", true)):
+		return
+	if not _resident_asks.is_empty() or not _resident_out.is_empty() or _mind_last_ticks > int(rules.get("slow_ticks", 50)):
+		return
+	var now_msec := Time.get_ticks_msec()
+	var now := World.production.now()
+	var day := Townsfolk.day_of(now)
+	var sky := str(DayNight.describe(World.fields.region, DayNight.now()).get("sentence", "")) if World.fields != null else ""
+	for entity in World.townsfolk():
+		var body := entity as Resident
+		if body == null or not body.spawned or body.strayed or not body.escort_of.is_empty() or not body.card.is_empty() \
+				or body.doing in [Resident.Doing.HIDE, Resident.Doing.BED, Resident.Doing.STRAYED, Resident.Doing.ESCORT]:
+			continue
+		for other in World.get_entities():
+			var player := other as Player
+			if player == null or not player.spawned or player.player_id.is_empty() or World.distance(player.tile, body.tile) > TALK_REACH:
+				continue
+			if _hail_blocked(player, now_msec, rules):
+				continue
+			var card := Townsfolk.card_of(World.production, body.worker_id)
+			if card.is_empty() or Resident.hailed_today(card, player.player_id, day):
+				continue
+			var tried := body.worker_id + "|" + player.player_id
+			if World.tick - int(_hail_tried.get(tried, -World.WORLD_TICK_STEPS)) < World.WORLD_TICK_STEPS:
+				continue
+			var cue := Resident.hail_cue(body.worker_id, body.town, player.player_id, _display_name(player), World.production, now, sky)
+			if cue.is_empty():
+				_hail_tried[tried] = World.tick
+				continue
+			Resident.hail_done(World.production, body.worker_id, player.player_id, cue, day, sky)
+			_write_resident_card(body)
+			_resident_serial += 1
+			_resident_asks.append({"body": body.get_instance_id(), "ask": body.hail_ask(_display_name(player), cue, _resident_serial), "at": World.tick,
+				"player": player.player_id, "peer": player.owner_peer})
+			_hail_at[player.player_id] = now_msec
+			print("[hail] %s to %s: %s" % [body.person, _display_name(player), cue.get("kind", "")])
+			return
+
+
+## Why [param player] hears no hail now (decision 554): led by a companion,
+## a blow given or taken within hail.quiet_seconds, a resident's answer to
+## them within the minute (a talk), or a hail within hail.minute_seconds.
+func _hail_blocked(player: Player, now_msec: int, rules: Dictionary) -> bool:
+	var pid := player.player_id
+	if _guides.has(pid):
+		return true
+	var quiet := int(float(rules.get("quiet_seconds", 10)) * World.TICK_RATE)
+	if World.tick - player.hurt_tick < quiet or World.tick - int(_blow_at.get(pid, -100000)) < quiet:
+		return true
+	var minute := int(float(rules.get("minute_seconds", 60)) * 1000.0)
+	return now_msec - int(_hail_at.get(pid, -minute)) < minute
+
+
+## A blow given by a player (World.entity_damaged): remembered for _hail_blocked.
+func _hail_struck(_target: GridEntity, _amount: int, source: GridEntity, _cause: StringName) -> void:
+	var player := source as Player
+	if player != null and not player.player_id.is_empty():
+		_blow_at[player.player_id] = World.tick
+
+
 func _crypt_asks_tick() -> void:
 	if World.production == null:
 		return
@@ -8301,6 +8389,8 @@ func _on_world_ticked(tick: int) -> void:
 			_gather_herbs()  # The medicine man takes herbs on his way (decision 502, npc's side).
 			_alms_runs_tick()  # Pip's run with the alms (decision 546, npc's side).
 			_crypt_asks_tick()  # Aldous's commissions met at the altar or the pack (part 3).
+		if tick % HAIL_CHECK_TICKS == 0:
+			_hails_tick()  # Residents speaking unprompted (decision 554).
 		_respawn_due_players(tick)
 		_check_respawns(tick)
 		t = World.part("respawns", t)

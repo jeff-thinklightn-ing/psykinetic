@@ -477,12 +477,138 @@ func _free_cell(area: Rect2i) -> Vector2i:
 ## The voice ask for [param line], said to it by [param speaker]
 ## (CompanionMind.voice's shape, plain text back).
 func voice_ask(speaker: String, line: String, serial: int) -> Dictionary:
-	var system := VOICE % [person, town_name if not town_name.is_empty() else "a town", " as a " + trade if not trade.is_empty() else "", card_words(),
-		" ".join(facts_now()), speaker, bound_words()]
+	var system := system_for(speaker)
 	var user := "%s says to you: \"%s\"" % [speaker, line]
 	return {"kind": "voice", "serial": serial, "trigger": "%s spoke to %s." % [speaker, person], "speaker": person,
 		"system": system, "user": user, "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
 		"spoken_to": true, "asked": true, "heard": line}
+
+
+## The one prompt for who they are (voice_ask's and hail_ask's).
+func system_for(speaker: String) -> String:
+	return VOICE % [person, town_name if not town_name.is_empty() else "a town", " as a " + trade if not trade.is_empty() else "", card_words(),
+		" ".join(facts_now()), speaker, bound_words()]
+
+
+# --- Speaking unprompted (decision 554) ------------------------------------------------
+
+## The user turn of a hail: the cue is the whole of what is on their mind.
+const HAIL_USER := "%s comes within speaking distance of you. One thing is on your mind: %s Say one line to them about it, unprompted, as yourself and in your own words, not the words above. Say only what the thought holds: add no place, cause, name or detail it does not give, for nothing else is true. Ask nothing of them you would not ask to their face."
+
+## The greeting cue by standing (Standing.words' word -> the thought).
+const HAIL_GREETINGS := {
+	"stranger": "%s is a stranger to you; you greet them as the town does a newcomer.",
+	"known": "You have met %s before; you greet them as one you know.",
+	"trusted": "You trust %s; you greet them warmly.",
+	"wronged": "%s wronged you once; you greet them coolly, and say so without a quarrel.",
+}
+
+## Spoken unprompted to [param speaker] (decision 554; the ask Main queues
+## as a voice ask, lowest of all): voice_ask's shape with [param cue]
+## ({kind, text}, hail_cue's) as the user turn, trigger "hail: <kind>".
+func hail_ask(speaker: String, cue: Dictionary, serial: int) -> Dictionary:
+	var system := system_for(speaker)
+	var user := HAIL_USER % [speaker, str(cue.get("text", ""))]
+	return {"kind": "voice", "serial": serial, "trigger": "hail: %s, %s to %s." % [str(cue.get("kind", "")), person, speaker], "speaker": person,
+		"system": system, "user": user, "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
+		"spoken_to": false, "asked": false, "heard": "", "hail": str(cue.get("kind", ""))}
+
+
+## Their hails on [param card]: {to: {player id: day of the last}, said:
+## [the cue texts said, newest last, said_kept of them], sky: the sky
+## sentence last hailed about}, made when missing.
+static func hails_of(card: Dictionary) -> Dictionary:
+	var hails: Variant = card.get("hails")
+	if not hails is Dictionary:
+		hails = {}
+		card["hails"] = hails
+	if not hails.get("to") is Dictionary:
+		hails["to"] = {}
+	if not hails.get("said") is Array:
+		hails["said"] = []
+	return hails
+
+
+## Whether [param card]'s person hailed [param player_id] on [param day] already.
+static func hailed_today(card: Dictionary, player_id: String, day: int) -> bool:
+	return int(hails_of(card).get("to", {}).get(player_id, -1)) == day
+
+
+## What [param worker_id] has to say to [param player_id] ([param player_name])
+## on first seeing them today, from the card, the town's news and its memory
+## only, the first that applies: their own plea (Offers' plea: kin sick, a
+## loan, a grudge), what the town noted today (the road's news among it), a
+## memory the lawspeaker ruled today, the sky ([param sky], DayNight.describe's
+## sentence) when it has changed since they last spoke of it, a greeting by
+## standing. A cue said to anyone before (the card's said) is skipped.
+## {kind, text}, {} for nothing to say.
+static func hail_cue(worker_id: String, town: String, player_id: String, player_name: String, production: Production, now: int, sky: String,
+		given: Dictionary = Offers.ctx) -> Dictionary:
+	var card := Townsfolk.card_of(production, worker_id)
+	if card.is_empty():
+		return {}
+	var hails := hails_of(card)
+	var said: Array = hails["said"]
+	var today := Townsfolk.day_of(now)
+	var cues: Array[Dictionary] = []
+	var with_production := given.duplicate()
+	with_production["production"] = production
+	for offer: Dictionary in Offers.of(worker_id, player_id, with_production):
+		if str(offer.get("kind", "")) == Offers.PLEA and not str(offer.get("words", "")).is_empty():
+			cues.append({"kind": "plea", "text": "You have a plea to make: %s" % _sentence(str(offer["words"]))})
+			break
+	var log: Variant = Offers._call(given, "memory", [town]) if not town.is_empty() else null
+	if log is Array:
+		var newest := {}
+		var ruled := {}
+		for entry: Variant in log:
+			if not entry is Dictionary or str(entry.get("tier", "")) == TownMemory.LEFT:
+				continue
+			if Townsfolk.day_of(int(entry.get("first_said", -1))) == today and int(entry.get("first_said", -1)) >= int(newest.get("first_said", -1)):
+				newest = entry
+			var ruling: Variant = entry.get("ruling", {})
+			if ruling is Dictionary and ruling.has("step") and Townsfolk.day_of(int(ruling.get("step", -1))) == today and int(ruling.get("step", -1)) >= int(ruled.get("ruling", {}).get("step", -1)):
+				ruled = entry
+		if not newest.is_empty():
+			cues.append({"kind": "news", "text": "I heard today that %s" % _sentence(Hearsay._lower_first(str(newest.get("text", ""))))})
+		if not ruled.is_empty():
+			var because := str(ruled.get("ruling", {}).get("because", ""))
+			cues.append({"kind": "ruling", "text": "The lawspeaker ruled today that %s%s" % [Hearsay._lower_first(str(ruled.get("text", ""))).trim_suffix("."),
+				_sentence(", because " + because.trim_suffix(".")) if not because.is_empty() else "."]})
+	if not sky.is_empty() and str(hails.get("sky", "")) != sky:
+		cues.append({"kind": "sky", "text": _sentence(sky)})
+	var word := Standing.words(card, player_id)
+	if HAIL_GREETINGS.has(word):
+		cues.append({"kind": "greeting", "text": HAIL_GREETINGS[word] % player_name})
+	for cue: Dictionary in cues:
+		if not said.has(cue["text"]):
+			return cue
+	return {}
+
+
+## [param text] ended with a full stop when it has none.
+static func _sentence(text: String) -> String:
+	var clean := text.strip_edges()
+	return clean if clean.is_empty() or clean.ends_with(".") or clean.ends_with("!") or clean.ends_with("?") else clean + "."
+
+
+## [param cue] said by [param worker_id] to [param player_id] on
+## [param day] (the hail queued): the card remembers the day, the text
+## (the newest said_kept, townsfolk.json "hail") and the sky it spoke of.
+static func hail_done(production: Production, worker_id: String, player_id: String, cue: Dictionary, day: int, sky: String) -> void:
+	var card := Townsfolk.card_of(production, worker_id)
+	if card.is_empty():
+		return
+	var hails := hails_of(card)
+	hails["to"][player_id] = day
+	var said: Array = hails["said"]
+	said.append(str(cue.get("text", "")))
+	var keep := int(Townsfolk.rules().get("hail", {}).get("said_kept", 8))
+	while said.size() > keep:
+		said.pop_front()
+	if str(cue.get("kind", "")) == "sky":
+		hails["sky"] = sky
+	production.set_card(worker_id, card)
 
 
 ## Who it is: a companion's own card; else its resident card (decision 398:

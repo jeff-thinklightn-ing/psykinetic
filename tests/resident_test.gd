@@ -52,6 +52,7 @@ func _ready() -> void:
 	_test_sick_body()
 	_test_placed_captive()
 	_test_aloud()
+	_test_hails()
 	_test_crypt_secrets()
 	_test_offer_words()
 	_test_monster_talk()
@@ -1578,3 +1579,123 @@ func _check(ok: bool, label: String) -> void:
 	if not ok:
 		_failures += 1
 	print("  %s  %s" % ["PASS" if ok else "FAIL", label])
+
+
+func _test_hails() -> void:
+	print("\n== a resident with something to say hails a player come near, once a day, one a minute, the lowest ask (decision 554) ==")
+	for body: GridEntity in World.townsfolk().duplicate():
+		World.despawn(body)
+	for i in 14:
+		World.production.set_away("rs-folk%02d" % i, true)
+	World.production.set_away("rs-bram", true)
+	DayNight.set_hour(12.0)
+	World.towns.note_rescue(STORE, "rs-mara", "Mara", "cook")
+	_sync()
+	var mara := _body("rs-mara")
+	var player := _player()
+	var pid: String = player.player_id
+	var now := World.production.now()
+	var today := Townsfolk.day_of(now)
+	_check(mara != null and mara.person == "Mara", "(Mara the cook stands in the town)")
+	# The cues, pure: the first that applies, none said twice.
+	var card := Townsfolk.card_of(World.production, "rs-mara")
+	card.erase("hails")
+	World.production.set_card("rs-mara", card)
+	var cue := Resident.hail_cue("rs-mara", STORE, pid, "Jeff", World.production, now, "")
+	_check(cue.get("kind") == "greeting" and "Jeff is a stranger to you" in str(cue.get("text", "")), "nothing else to say: a greeting by standing, a stranger (%s)" % [cue])
+	var sky := "It is noon in high summer; the sky is clear"
+	cue = Resident.hail_cue("rs-mara", STORE, pid, "Jeff", World.production, now, sky)
+	_check(cue.get("kind") == "sky" and cue.get("text") == sky + ".", "the sky before the greeting (%s)" % [cue])
+	Townsfolk._remember(STORE, "A wagon was struck on the road to the market", "Mara", true, now)
+	cue = Resident.hail_cue("rs-mara", STORE, pid, "Jeff", World.production, now, sky)
+	_check(cue.get("kind") == "news" and cue.get("text") == "I heard today that a wagon was struck on the road to the market.", "what the town noted today before the sky (%s)" % [cue])
+	var log: Array = Offers._call(Offers.ctx, "memory", [STORE])
+	var entry: Dictionary = log.back()
+	entry["tier"] = TownMemory.MEMORY
+	entry["ruling"] = {"ruling": "accept", "because": "two saw it", "step": now}
+	Offers._call(Offers.ctx, "set_memory", [STORE, log])
+	Resident.hail_done(World.production, "rs-mara", pid, cue, today, "")
+	cue = Resident.hail_cue("rs-mara", STORE, pid, "Jeff", World.production, now, "")
+	_check(cue.get("kind") == "ruling" and cue.get("text") == "The lawspeaker ruled today that a wagon was struck on the road to the market, because two saw it.",
+		"the news said once, the ruling of today with his because (%s)" % [cue])
+	Resident.hail_done(World.production, "rs-mara", pid, cue, today, "")
+	cue = Resident.hail_cue("rs-mara", STORE, pid, "Jeff", World.production, now, sky)
+	_check(cue.get("kind") == "sky", "then the sky")
+	Resident.hail_done(World.production, "rs-mara", pid, cue, today, sky)
+	cue = Resident.hail_cue("rs-mara", STORE, pid, "Jeff", World.production, now, sky)
+	_check(cue.get("kind") == "greeting", "the same sky again: the greeting")
+	Resident.hail_done(World.production, "rs-mara", pid, cue, today, sky)
+	_check(Resident.hail_cue("rs-mara", STORE, pid, "Jeff", World.production, now, sky).is_empty(), "everything said: nothing")
+	_check(Resident.hail_cue("rs-mara", STORE, pid, "Jeff", World.production, now, "It is dusk; rain falls").get("kind") == "sky", "the sky turned: that")
+	card = Townsfolk.card_of(World.production, "rs-mara")
+	_check(Resident.hailed_today(card, pid, today) and not Resident.hailed_today(card, pid, today + 1) and card["hails"]["said"].size() == 4 and card["hails"]["sky"] == sky,
+		"her card remembers the day, the four things said and the sky spoken of")
+	# Main's hail, through the voice path.
+	card.erase("hails")
+	World.production.set_card("rs-mara", card)
+	var mind := VoiceMind.new()
+	_main._resident_mind = mind
+	var spoken: Array[String] = []
+	var heard := func(kind: String, data: Dictionary) -> void:
+		if kind == "speech":
+			spoken.append("%s: %s" % [data.get("speaker", ""), data.get("text", "")])
+	Net.message_received.connect(heard)
+	_main._hail_at.clear()
+	_main._blow_at.clear()
+	_main._hail_tried.clear()
+	_main._mind_last_ticks = 0
+	_main._resident_asks.clear()
+	_put(player, _main._nearest_free(mara.tile + Vector2i(5, 0)))
+	_main._hails_tick()
+	_check(_main._resident_asks.is_empty(), "out of talking reach: nothing")
+	_put(player, _main._nearest_free(mara.tile + Vector2i(1, 0)))
+	_main._hails_tick()
+	var trigger := str(_main._resident_asks[0]["ask"].get("trigger", "")) if not _main._resident_asks.is_empty() else ""
+	_check(_main._resident_asks.size() == 1 and trigger.begins_with("hail: news, Mara to "), "within reach: her hail is queued as an ask, the news first (%s)" % trigger)
+	World.step()
+	var user := str(mind.asks[0].get("user", "")) if not mind.asks.is_empty() else ""
+	_check(mind.asks.size() == 1 and "comes within speaking distance of you" in user and "One thing is on your mind: I heard today that a wagon" in user and "not the words above" in user,
+		"the mind is asked for one line on that one thing (%s)" % user)
+	_check(spoken == ["Mara: The kitchen's warm, at least."], "and what it says goes out as speech, 336's path (%s)" % [spoken])
+	_check(Resident.hailed_today(Townsfolk.card_of(World.production, "rs-mara"), pid, today), "her card remembers the hail")
+	_main._hails_tick()
+	_check(_main._resident_asks.is_empty(), "not twice today")
+	var again := func() -> void:
+		var fresh := Townsfolk.card_of(World.production, "rs-mara")
+		fresh["hails"]["to"].erase(pid)
+		World.production.set_card("rs-mara", fresh)
+		_main._hail_tried.clear()
+	again.call()
+	_main._hails_tick()
+	_check(_main._resident_asks.is_empty(), "a hail in their hearing within the minute (her answer counts too): nothing")
+	_main._hail_at.clear()
+	_main._guides[pid] = Guide.new({})
+	_main._hails_tick()
+	_check(_main._resident_asks.is_empty(), "led by a companion: nothing")
+	_main._guides.erase(pid)
+	player.hurt_tick = World.tick
+	_main._hails_tick()
+	_check(_main._resident_asks.is_empty(), "a blow taken just now: nothing")
+	player.hurt_tick = -100000
+	_main._blow_at[pid] = World.tick
+	_main._hails_tick()
+	_check(_main._resident_asks.is_empty(), "a blow given just now: nothing")
+	_main._blow_at.clear()
+	_main._mind_last_ticks = 999
+	_main._hails_tick()
+	_check(_main._resident_asks.is_empty(), "the mind slow over its last answer: nothing")
+	_main._mind_last_ticks = 0
+	_main._resident_asks.append({"body": 0, "ask": {"serial": 0, "trigger": "a plea", "speaker": "Someone"}, "at": World.tick, "player": "", "peer": -1})
+	_main._hails_tick()
+	_check(_main._resident_asks.size() == 1 and not Resident.hailed_today(Townsfolk.card_of(World.production, "rs-mara"), pid, today),
+		"an ask waiting: no hail, and none counted")
+	_main._resident_asks.clear()
+	_main._hails_tick()
+	trigger = str(_main._resident_asks[0]["ask"].get("trigger", "")) if not _main._resident_asks.is_empty() else ""
+	_check(_main._resident_asks.size() == 1 and trigger.begins_with("hail: ruling"), "free again: the next thing she has to say, the ruling (%s)" % trigger)
+	_main._resident_asks.clear()
+	Net.message_received.disconnect(heard)
+	_main._resident_mind = null
+	_main._hail_at.clear()
+	_main._hail_tried.clear()
+	World.despawn(mara)

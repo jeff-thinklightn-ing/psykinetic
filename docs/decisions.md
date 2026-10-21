@@ -6512,6 +6512,9 @@ known residue, the model's: a plain or official voice slips a trait onto a
 named person about once in sixty answers; Snagfin does not volunteer that
 he is a goblin (his body says it) but answers truthfully when asked.
 
+Narrowed by 554 (2026-10-21): a resident with something real to say hails
+a player once, unprompted; idle chatter stays turned down.
+
 ## 335. The bow's shot: the first body on the line, by the draw
 
 Weapons as verbs in the fight, part 1 of 5 (the roadmap's combat step, the
@@ -18016,3 +18019,64 @@ is unchanged.
   as 50 at these zooms).
 Shots in C:\dev\review\hills2 (sheets 1 to 3, cues\, lowsun\). view_test _test_hills.
 Client only, protocol unchanged, no new class_name.
+## 554. Residents speak unprompted: the hail
+
+Jeff's talk notes (2026-10-19): "town npc verbalize their thoughts", and
+his liking for the narration that followed (336 amended). The coordinator
+held the design back until the aside landed, and approved it 2026-10-21.
+This narrows 336, "residents speak when spoken to", which also turned
+down idle chatter: a resident now says one line unprompted, once, when
+they have something real to say; the rest of 336 stands.
+
+- When: every HAIL_CHECK_TICKS (a second), Main._hails_tick: a resident
+  out and about (spawned; not strayed, escorting, hiding, in bed, or a
+  companion resting in town) sees a player within TALK_REACH it has not
+  hailed today. Silent to a player who is led (_guides), gave or took a
+  blow within hail.quiet_seconds (GridEntity.hurt_tick; a blow given is
+  remembered by _hail_struck on World.entity_damaged), was answered by a
+  resident within the minute (a talk), or heard a hail within
+  hail.minute_seconds, so a street is not a chorus. One hail a tick.
+- Lowest of all asks (the coordinator): none while any resident ask waits
+  or is out, or the mind's last answer took longer than hail.slow_ticks
+  (_mind_last_ticks), so a greeting never delays a plea or a commission
+  on the box's Ollama; a skipped hail is not counted as one.
+- What (Resident.hail_cue, pure, from the card, the news and the memory
+  only; nothing invented), the first that applies: their own plea
+  (Offers' plea: kin sick, a loan, a grudge, the panel's own words); what
+  the town noted today (TownMemory's newest entry first said today: the
+  road's news among it, "I heard today that ..."); a memory the lawspeaker ruled today (the
+  ruling's step, with his "because"); the sky (DayNight.describe's
+  sentence) when it has changed since they last spoke of it; a greeting
+  by Standing.words (stranger, known, trusted, wronged). A cue text said
+  before is skipped (the card's hails.said, the newest hail.said_kept);
+  nothing applies, nothing is said, and that pair is not looked at again
+  for a world tick (_hail_tried).
+- How: Resident.hail_ask, voice_ask's shape (system_for, now shared)
+  with the cue as the user turn ("<name> comes within speaking distance
+  of you. One thing is on your mind: <cue> Say one line to them about
+  it, unprompted, as yourself and in your own words, not the words
+  above. Say only what the thought holds: add no place, cause, name or
+  detail it does not give, for nothing else is true."), trigger "hail:
+  <kind>", queued in _resident_asks like
+  any ask (the mind's timeouts drop a slow one) and answered through
+  _resident_answered unchanged: Resident.spoken's words and aside, the
+  mind log, the transcript, the party log, the "speech" message. Never a
+  panel; the player answers in chat as ever.
+- Remembered: the card's hails {to: {player id: day}, said: [...], sky}
+  (Resident.hail_done), written with the card.
+- Rules: townsfolk.json "hail" {on, quiet_seconds 10, minute_seconds 60,
+  slow_ticks 50, said_kept 8}. No new class_name, nothing on the wire
+  ("speech" carries the aside since 336 amended), server only, no new
+  content in levels.
+- resident_test _test_hails: the cue order and the skip of a said text;
+  Main's hail to a stranger within reach, once a day, the card's memory,
+  none out of reach, led, after a blow given or taken, in a talk, within
+  the minute, while an ask waits or the mind is slow. The transcript
+  check (the box's qwen3:14b through the tunnel with the game's own
+  prompt from the test's mind log, two lines a cue kind, 2026-10-21):
+  the news, the ruling and the plea come back as her own first-person
+  echo of the cue, the sky and the greeting paraphrased from the card's
+  facts (the town's wants, the mill); the cues are written in her own
+  voice for that reason, since a bare fact in the third person was
+  echoed as narration and a loose turn invented a stag and a barrel of
+  salt.
