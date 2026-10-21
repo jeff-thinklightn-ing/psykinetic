@@ -17761,3 +17761,25 @@ no new class_name. townsfolk_test _test_road_news: RoadStub's route gains
 areas; the raid's news (kind, camp, far end, crew, areas, told, the
 memory's text, the food taken), the homecoming's, none at the market or
 for a closed road, the loss with its crew.
+## 513 amended, terrain's side: cliff faces dark at night
+
+Jeff's screenshot (the hills at 02:00 under rain, 2026-10-20): the
+plateau's face drew as a broad pale band across a night-dark scene. The
+ground is lit as the sim lights it: its colour times the sky's light on the
+floor (Client3D._set_sky_floor's sky_floor, FLOOR_DARKEST 0.3 at night,
+worked in sRGB) or the cell's own lights; the cliff faces (cliff.gdshader,
+549) drew their vertex colours whole, under a moon held at least
+SHADOW_LOW 20 degrees up that lights an upright face nearly three times
+as much as the flat. Approved by the coordinator.
+- cliff.gdshader takes the ground's sky_floor: ALBEDO is the vertex colour
+  times sky_floor to the 2.2 (the ground's sRGB product). The sun, the moon
+  and a torch's OmniLight3D light it as before.
+- Client3D._set_sky_floor sets it on the cliff material (_cliff_material)
+  with the ground's, and _add_cliffs sets it at build. Client3D.cliff_sky
+  gives 1 indoors (sky_floor 0, where the ground is lit by the cell's own
+  lights alone), so a face indoors keeps its look.
+- The sight cut-out variants of the ground take sky_floor already; the
+  scatter is lit by the scene's lights and was never too bright.
+Shots in C:\dev\review\cliffnight (before/after, 02:00 rain from two
+yaws, noon unchanged). view_test _test_hills. Client only, protocol
+unchanged, no new class_name.

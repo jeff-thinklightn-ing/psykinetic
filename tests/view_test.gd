@@ -2082,6 +2082,17 @@ func _test_heights() -> void:
 			and _rig._room.find_children("Stair_*", "", false, false).is_empty()
 			and _rig._room.find_children("Cliff_*", "", false, false).is_empty(),
 			"ledges are rock faces, a mesh a chunk; no stone boxes, no steps")
+	# The faces under the sky's light as the ground (513 amended): dark at
+	# night, as before indoors.
+	var sky_was := _rig._sky_floor
+	_rig._set_sky_floor(Client3D.FLOOR_DARKEST)
+	var night: Variant = _rig._cliff_material.get_shader_parameter("sky_floor")
+	_rig._set_sky_floor(0.0)
+	var indoors: Variant = _rig._cliff_material.get_shader_parameter("sky_floor")
+	_rig._set_sky_floor(sky_was)
+	_check(is_equal_approx(night, Client3D.FLOOR_DARKEST) and is_equal_approx(indoors, 1.0)
+			and FileAccess.get_file_as_string("res://client3d/cliff.gdshader").contains("pow(sky_floor, 2.2)"),
+			"a cliff face takes the ground's sky light (%s at night, %s indoors)" % [night, indoors])
 	_rig.hover(stair, true)
 	_check(absf(_rig._hover.position.y - _rig._ground_height(Vector2(stair))) < 0.05 and _rig._hover.basis.y.y < 0.995
 			and _rig._hover.basis.y.dot(Vector3(up.x, 0.0, up.y)) < 0.0,

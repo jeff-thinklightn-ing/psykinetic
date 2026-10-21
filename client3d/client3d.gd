@@ -1276,6 +1276,8 @@ var _shafts: Node3D
 ## 0 indoors).
 var _ground_shader_material: ShaderMaterial
 var _sky_floor := 0.0
+## The cliff faces' material: the same sky light (decision 513 amended).
+var _cliff_material: ShaderMaterial
 ## Floor and water cells: the land the forest stands around.
 var _land: Dictionary[Vector2i, bool] = {}
 ## The ground's elevation (decision 525): terrain "relief", metres a cell
@@ -1564,6 +1566,13 @@ static func floor_brightness(light: float) -> float:
 	return lerpf(FLOOR_DARKEST, 1.0, smoothstep(FLOOR_LIGHT_LOW, FLOOR_LIGHT_HIGH, light))
 
 
+## The cliff faces' sky_floor for the floor's [param level] (decision 513
+## amended): the same outdoors, so a face is as dark as the ground at night;
+## 1 indoors (level 0), the faces as before.
+static func cliff_sky(level: float) -> float:
+	return level if level > 0.0 else 1.0
+
+
 ## The sky's light on the outdoor floor, as a brightness (0 indoors); under
 ## a full canopy [param roof] (the same if under 0).
 func _set_sky_floor(level: float, roof := -1.0) -> void:
@@ -1571,6 +1580,8 @@ func _set_sky_floor(level: float, roof := -1.0) -> void:
 	if _ground_shader_material != null:
 		_ground_shader_material.set_shader_parameter("sky_floor", level)
 		_ground_shader_material.set_shader_parameter("sky_floor_roof", level if roof < 0.0 else roof)
+	if _cliff_material != null:
+		_cliff_material.set_shader_parameter("sky_floor", cliff_sky(level))
 	for view in _glimpses:
 		view._set_sky_floor(level, roof)
 
@@ -5688,10 +5699,13 @@ func _add_cliffs() -> void:
 			var from := Vector2(cell + GROUND_CORNERS[mine[0]]) - Vector2(0.5, 0.5)
 			var to := Vector2(cell + GROUND_CORNERS[mine[1]]) - Vector2(0.5, 0.5)
 			_cliff_strip(faces[chunk], from, to, top, bottom, Vector3(direction.x, 0.0, direction.y))
-	# Their vertex colours, rough, both sides; seen through where they hide
-	# the player (cliff.gdshader, decision 549).
+	# Their vertex colours, rough, both sides, under the sky's light as the
+	# ground (513 amended); seen through where they hide the player
+	# (cliff.gdshader, decision 549).
 	var material := ShaderMaterial.new()
 	material.shader = CLIFF_SHADER
+	material.set_shader_parameter("sky_floor", cliff_sky(_sky_floor))
+	_cliff_material = material
 	for chunk: Vector2i in faces:
 		var arrays := []
 		arrays.resize(Mesh.ARRAY_MAX)

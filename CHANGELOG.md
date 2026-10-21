@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Cliff faces are as dark as the ground beside them at night, lit only by the moon and torches, instead of glowing pale through the dark (513 amended).
 - The orcs are art-kit's hand-built orc now (Jeff's pick over the generated one, 529): blue-grey, its iron shoulder plate and chain, the face reworked with rolled lip, flared nose and slanted lids, each orc still its own build, skin and mark.
 - Aldous's secrets and his errands: a priest tells the barrow's secrets (the founding, where the alms go, Pip's errand) only to one he trusts; told, you may carry the temple's offering down to the altar yourself (the gold in your purse until you lay it there; keep it past the week and he knows you for a cheat), and find what became of Pip when he is lost below, his pack in the lair (546, npc's side, part 3). Server only.
 - The road's news reaches companions: a wagon struck by a camp, home again or lost is handed to the companion guide as a heard danger, with the route's areas and the camp (551, npc's side; companions' side decides who hears it and what she makes of it). Server only.
