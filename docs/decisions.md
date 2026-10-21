@@ -18080,3 +18080,24 @@ they have something real to say; the rest of 336 stands.
   voice for that reason, since a bare fact in the third person was
   echoed as narration and a loose turn invented a stag and a barrel of
   salt.
+
+## 555, items' side: grave goods, marked where they are minted
+
+companions' loyalty design (555, the coordinator's approval): a
+superstitious companion will not carry grave goods. An item mark for them,
+set at mint as 474's style is, so a player's own sword laid in a niche and
+taken back is never marked, and grave gold stays grave goods through every
+later hand.
+- Level._grave: a chest, crate, cart or monster entry's props "grave"
+  (true or false) if given, else the level's "grave_goods" (dungeon sets it
+  on the barrow), kept as props "grave": true. A non-boolean is warned
+  about; so is "grave" on anything else.
+- World.grave_from(entity): its label when its props say grave, else "".
+  The three mint sites (World.slot_uid's stock, Main's chest top-up,
+  Monster.remains) call ItemBook.mark_grave(uid, place): saved as "grave",
+  noted "grave goods" (a kept event), once, for life. So a barrow dead's own
+  drops are grave goods too (companions: a wight's sword is).
+- Companions read World.items.is_grave(uid) and grave_of(uid) (the
+  place's label); false and "" for an unknown uid. The note says "grave
+  goods", the story "taken from the grave".
+items_test. Protocol unchanged; no new class_name.

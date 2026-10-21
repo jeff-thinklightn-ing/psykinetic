@@ -744,6 +744,7 @@ static func _place(level: Dictionary, markers: Array[Dictionary], config: Dictio
 		_stock(props, spec, entry, config, warnings, at)
 		_arm(props, spec, entry, warnings, at)
 		_style(props, spec, config, warnings, at)
+		_grave(props, spec, config, warnings, at)
 		if not props.is_empty():
 			spec["props"] = props
 		if spec.get("script") == MONSTER:
@@ -2047,6 +2048,25 @@ static func _style(props: Dictionary, spec: Dictionary, config: Dictionary, warn
 			props["style"] = str(given)
 			return
 		warnings.append("style at %s: no make %s (Items.STYLES has %s)" % [at, given, ", ".join(Items.STYLES)])
+
+
+## Whether what a chest keeps or a monster carries and drops is grave goods
+## (decision 555): its entry's props "grave" (true or false) if given, else
+## the level's "grave_goods" (dungeon's barrow), else not. Kept as props
+## "grave": true for World.grave_from.
+static func _grave(props: Dictionary, spec: Dictionary, config: Dictionary, warnings: Array[String], at: Vector2i) -> void:
+	var script := str(spec.get("script", ""))
+	var own: Variant = props.get("grave")
+	props.erase("grave")
+	if script not in [CHEST, CARGO, MONSTER]:
+		if own != null:
+			warnings.append("grave at %s: only a chest, a crate, a cart or a monster holds grave goods" % at)
+		return
+	var grave: Variant = own if own is bool else config.get("grave_goods", false)
+	if own != null and own is not bool:
+		warnings.append("grave at %s: %s is not true or false" % [at, own])
+	if grave == true:
+		props["grave"] = true
 
 
 ## A prop read from JSON: body_material by name, numbers as floats except

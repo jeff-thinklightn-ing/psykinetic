@@ -1287,7 +1287,9 @@ func remains() -> Array[int]:
 		for i in dropped(drop, roll):
 			# Its make (decision 474): the row's own, else this monster's.
 			var style := str(drop.get("style", World.style_from(self)))
-			uids.append(World.items.mint(str(drop["item"]), "remains", World._label_of(self), zone, tile, style))
+			var uid := World.items.mint(str(drop["item"]), "remains", World._label_of(self), zone, tile, style)
+			World.items.mark_grave(uid, World.grave_from(self), zone, tile)  # Decision 555.
+			uids.append(uid)
 	return uids
 
 

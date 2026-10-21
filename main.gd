@@ -3245,6 +3245,7 @@ func _top_up(entity: GridEntity, saved_spec: Dictionary) -> void:
 			continue
 		slots[free] = id
 		uids[free] = World.items.mint(id, "stocked", World._label_of(entity), entity.zone, entity.tile, World.style_from(entity))
+		World.items.mark_grave(uids[free], World.grave_from(entity), entity.zone, entity.tile)  # Decision 555.
 		stocked.append(id)
 		given.append(id)
 	props["stocked"] = stocked

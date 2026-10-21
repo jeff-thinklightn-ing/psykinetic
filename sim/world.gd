@@ -2076,6 +2076,7 @@ func slot_uid(entity: GridEntity, slot: int) -> int:
 	if uid != 0 and items.id_of(uid) == entity.slots[slot]:
 		return uid
 	uid = items.mint(entity.slots[slot], "stocked", _label_of(entity), entity.zone, entity.tile, style_from(entity))
+	items.mark_grave(uid, grave_from(entity), entity.zone, entity.tile)  # Decision 555.
 	var carrier := _carrier_of(entity)
 	items.place(uid, holder_key(entity), carrier[0], carrier[1])
 	entity.slot_items[slot] = uid
@@ -2088,6 +2089,14 @@ func slot_uid(entity: GridEntity, slot: int) -> int:
 static func style_from(entity: GridEntity) -> String:
 	var props: Variant = entity.spawn_spec.get("props", {}) if is_instance_valid(entity) else {}
 	return str(props.get("style", "")) if props is Dictionary else ""
+
+
+## The grave goods source [param entity] is (decision 555): its label when
+## its props say "grave" (a level's grave_goods, or its marker's own, put
+## there by Level), else "".
+func grave_from(entity: GridEntity) -> String:
+	var props: Variant = entity.spawn_spec.get("props", {}) if is_instance_valid(entity) else {}
+	return _label_of(entity) if props is Dictionary and props.get("grave") == true else ""
 
 
 ## Every slot's instance (slot_uid), made where missing: what a save keeps.
@@ -2297,6 +2306,8 @@ func item_note(uid: int) -> String:
 		more.append("short measure")  # Decision 493.
 	if not items.bound_to(uid).is_empty():
 		more.append("bound")  # Decision 544.
+	if items.is_grave(uid):
+		more.append("grave goods")  # Decision 555.
 	if not items.bane_of(uid).is_empty():
 		more.append("%s-bane" % items.bane_of(uid))  # Decision 417.
 	if not items.grudge_of(uid).is_empty():
@@ -2356,6 +2367,8 @@ func story_line(uid: int) -> String:
 		parts.append("%s work" % items.style_of(uid))  # Decision 474.
 	if items.short_of(uid) < 1.0:
 		parts.append("short measure")  # Decision 493.
+	if items.is_grave(uid):
+		parts.append("taken from the grave")  # Decision 555.
 	if not items.kept_from(uid).is_empty() and not name.is_empty():
 		parts.append("kept from %s" % name["holder"])
 	if not items.blessed_for(uid).is_empty():

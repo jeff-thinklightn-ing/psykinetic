@@ -37,7 +37,7 @@ extends RefCounted
 const MAX_CARRIERS := 8
 const MAX_EVENTS := 5
 ## Events that stay past MAX_EVENTS, as events[0] does.
-const KEPT_EVENTS: Array[String] = ["named", "reforged", "kept", "back", "bane", "grudge", "avenged", "blessed", "unblessed", "character", "gave way", "short", "bound"]
+const KEPT_EVENTS: Array[String] = ["named", "reforged", "kept", "back", "bane", "grudge", "avenged", "blessed", "unblessed", "character", "gave way", "short", "bound", "grave goods"]
 
 ## Gives World.steps (the clock history is kept in).
 var clock: Callable = func() -> int: return 0
@@ -398,6 +398,28 @@ func bless(uid: int, owner: String, zone := "", tile := Vector2i(-1, -1)) -> voi
 	give_character(uid, "blessed", zone, tile)  # Decision 472.
 
 
+## Where [param uid] was taken from the dead (decision 555): the grave
+## goods source's label ("Altar"); "" for a thing that is not grave goods.
+func grave_of(uid: int) -> String:
+	return str(_book[uid].get("grave", "")) if _book.has(uid) else ""
+
+
+## Whether [param uid] is grave goods (decision 555): a superstitious
+## companion will not carry it.
+func is_grave(uid: int) -> bool:
+	return not grave_of(uid).is_empty()
+
+
+## [param uid] marked grave goods from [param place] for life (decision
+## 555): set where it is minted, in a grave goods source (World.grave_from).
+## Noted "grave goods". Nothing for an empty place or a thing marked already.
+func mark_grave(uid: int, place: String, zone := "", tile := Vector2i(-1, -1)) -> void:
+	if not _book.has(uid) or place.is_empty() or is_grave(uid):
+		return
+	_book[uid]["grave"] = place
+	note(uid, "grave goods", place, zone, tile)
+
+
 ## Who [param uid] is bound to (a carrier key; decision 544); "" when it is
 ## not bound.
 func bound_to(uid: int) -> String:
@@ -561,6 +583,8 @@ static func from_dict(data: Variant, steps: Callable = Callable()) -> ItemBook:
 				items._book[int(key)]["style"] = str(entry["style"])
 			if entry.get("blessed") is Dictionary and entry["blessed"].get("for") is String:
 				items._book[int(key)]["blessed"] = {"for": entry["blessed"]["for"], "step": int(entry["blessed"].get("step", 0))}
+			if entry.get("grave") is String and not entry["grave"].is_empty():
+				items._book[int(key)]["grave"] = entry["grave"]
 			if entry.get("bound") is String and not entry["bound"].is_empty():
 				items._book[int(key)]["bound"] = entry["bound"]
 			if entry.get("bane") is String and not entry["bane"].is_empty():

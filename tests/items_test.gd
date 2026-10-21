@@ -60,6 +60,7 @@ func _ready() -> void:
 	_test_style()
 	_test_short()
 	_test_bound()
+	_test_grave()
 	_test_story()
 	_test_bless()
 	_test_reforge()
@@ -1273,6 +1274,57 @@ func _test_bound() -> void:
 			"no verb, not a tool, not made: never named (365), never sold or made")
 	World.set_slots(host, had_slots, had_uids)
 	World.items.end(half, "gone")
+
+
+func _test_grave() -> void:
+	print("\n== grave goods: marked where they are minted (decision 555) ==")
+	var rows: Array[String] = ["#######", "#.....#", "#.....#", "#######"]
+	var markers := {Vector2i(1, 1): "chest", Vector2i(3, 1): "chest", Vector2i(2, 2): "monster_imp", Vector2i(5, 2): "start"}
+	var config := {"name": "grave_test", "grave_goods": true, "entities": [{"at": [3, 1], "props": {"grave": false}}]}
+	var level := Level.parse(Level.image_from_rows(Terrain.expand(rows), markers, config), null, config)
+	var grave_at := {}
+	for spec: Dictionary in level["entities"]:
+		grave_at[spec["tile"]] = spec.get("props", {}).get("grave", false)
+	_check(grave_at.get(Vector2i(1, 1)) == true and grave_at.get(Vector2i(2, 2)) == true and grave_at.get(Vector2i(3, 1)) == false,
+			"the level's grave_goods: its chest and its imp; a marker's own false wins (%s)" % [grave_at])
+	var imp: GridEntity = null
+	for monster in World.monsters():
+		if str(monster.spawn_spec.get("kind", "")) == "imp":
+			imp = monster
+			break
+	_check(imp != null, "an imp to carry and drop grave goods")
+	if imp == null:
+		return
+	var props: Dictionary = imp.spawn_spec.get("props", {})
+	var had_props := props.duplicate()
+	var had_slots := imp.slots
+	_check(World.grave_from(imp).is_empty(), "no grave goods without the mark")
+	props["grave"] = true
+	imp.spawn_spec["props"] = props
+	imp.slots = Items.tidy(["dagger"], Items.CARRIED)
+	var held := World.slot_uid(imp, 0)
+	_check(World.items.is_grave(held) and World.items.grave_of(held) == World._label_of(imp)
+			and World.items.history(held)["events"].back()["kind"] == "grave goods",
+			"what it carries is grave goods from it (%s)" % World.items.grave_of(held))
+	var row: Dictionary = Monster.kinds()["imp"]
+	var had_drops: Variant = row.get("drops")
+	row["drops"] = [{"item": "ration"}]
+	var dropped := (imp as Monster).remains()
+	_check(dropped.size() == 1 and World.items.is_grave(dropped[0]), "and so is what it drops")
+	_check("grave goods" in World.item_note(held) and World.story_line(held).ends_with("taken from the grave"),
+			"its note and story say so (%s; %s)" % [World.item_note(held), World.story_line(held)])
+	World.items.mark_grave(held, "somewhere else")
+	_check(World.items.grave_of(held) == World._label_of(imp), "marked once, for life")
+	_check(ItemBook.from_dict(World.items.to_dict()).is_grave(held) and not World.items.is_grave(0), "saved and read back; an unknown uid is not")
+	if had_drops == null:
+		row.erase("drops")
+	else:
+		row["drops"] = had_drops
+	for uid in dropped:
+		World.items.end(uid, "gone")
+	World.items.end(held, "gone")
+	imp.slots = had_slots
+	imp.spawn_spec["props"] = had_props
 
 
 func _test_bane() -> void:
