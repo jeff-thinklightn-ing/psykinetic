@@ -50,6 +50,18 @@ rendering_device/driver.windows="d3d12"
 
 [shader_globals]
 
+sight_cut={
+"type": "float",
+"value": 0.0
+}
+sight_focus={
+"type": "vec4",
+"value": Vector4(0, 0, 0, 0)
+}
+sight_toward={
+"type": "vec4",
+"value": Vector4(0, 1, 0, 0)
+}
 season={
 "type": "vec4",
 "value": Vector4(1, 0, 0, 0)

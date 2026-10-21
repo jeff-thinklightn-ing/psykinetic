@@ -304,6 +304,11 @@ const RIDGE_EASE := 40.0
 ## top-down and loses the slope and the player (better a ridge's edge in
 ## the way than no view of the hill at all).
 const RIDGE_PITCH_MAX := 70.0
+## Seeing the player through ground that hides them (decision 549): a
+## sight-line cut-out in the ground's, cliffs' and scatter's shaders
+## (sight.gdshaderinc), eased in and out over this long (s), as a wall fades.
+const SIGHT_EASE := 0.25
+const CLIFF_SHADER := preload("res://client3d/cliff.gdshader")
 ## Picking on the drawn ground: how far apart (m, across) the ray is tried.
 const PICK_STEP := 0.2
 const CAMERA_DISTANCE := 40.0
@@ -1290,6 +1295,8 @@ var _ramp_heights: Dictionary[Vector2i, PackedFloat32Array] = {}
 ## The camera's pitch while a ridge would hide the player (_ridge_lift),
 ## eased; 0 when none.
 var _ridge_pitch := 0.0
+## How far the sight-line cut-out is in (0..1), eased (_update_sight).
+var _sight_cut := 0.0
 ## Where the map's water is, a texel a cell (_build_ground), for the ground's
 ## wet shore and the water's own; its first cell and size; the bodies drawn.
 var _water_mask: ImageTexture
@@ -1764,6 +1771,37 @@ func _follow(delta: float) -> void:
 	_camera_target = _camera_ease.follow(puppet.position, delta) + Vector3(_lead.x, 0.0, _lead.y) + pan
 	_ridge_pitch = move_toward(_ridge_pitch, ridge_pitch(puppet.position), RIDGE_EASE * delta)
 	_place_camera()
+	_update_sight(puppet.position, delta)
+
+
+## The sight-line cut-out (decision 549): eased in while the ground
+## hides the player at [param at] (their feet) from the camera as it now
+## stands, out when not; the shaders' globals set for it.
+func _update_sight(at: Vector3, delta: float) -> void:
+	var hidden := hidden_by_ground(at, maxf(pitch, _ridge_pitch))
+	_sight_cut = move_toward(_sight_cut, 1.0 if hidden else 0.0, delta / SIGHT_EASE)
+	var toward := _camera_offset().normalized()
+	RenderingServer.global_shader_parameter_set("sight_focus", Vector4(at.x, at.y + RIDGE_AIM, at.z, at.y))
+	RenderingServer.global_shader_parameter_set("sight_toward", Vector4(toward.x, toward.y, toward.z, 0.0))
+	RenderingServer.global_shader_parameter_set("sight_cut", _sight_cut)
+
+
+## Whether the ground stands over the line from the camera, at
+## [param pitch_degrees] and this yaw, to the middle of a body at
+## [param at] (its feet): the relief between them, RIDGE_REACH back; never
+## on a level with no relief.
+func hidden_by_ground(at: Vector3, pitch_degrees: float) -> bool:
+	if _relief.is_empty():
+		return false
+	var back := Vector2(1.0, 1.0).normalized().rotated(-deg_to_rad(yaw))
+	var rise := tan(deg_to_rad(pitch_degrees))
+	var aim := at.y + RIDGE_AIM
+	var d := 0.75
+	while d <= RIDGE_REACH:
+		if _ground_height(Vector2(at.x, at.z) + back * d) > aim + d * rise:
+			return true
+		d += 0.25
+	return false
 
 
 ## The ground's relief light set for the camera's yaw, when it turned.
@@ -5573,10 +5611,10 @@ func _add_cliffs() -> void:
 			var from := Vector2(cell + GROUND_CORNERS[mine[0]]) - Vector2(0.5, 0.5)
 			var to := Vector2(cell + GROUND_CORNERS[mine[1]]) - Vector2(0.5, 0.5)
 			_cliff_strip(faces[chunk], from, to, top, bottom, Vector3(direction.x, 0.0, direction.y))
-	var material := StandardMaterial3D.new()
-	material.vertex_color_use_as_albedo = true
-	material.roughness = 1.0
-	material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	# Their vertex colours, rough, both sides; seen through where they hide
+	# the player (cliff.gdshader, decision 549).
+	var material := ShaderMaterial.new()
+	material.shader = CLIFF_SHADER
 	for chunk: Vector2i in faces:
 		var arrays := []
 		arrays.resize(Mesh.ARRAY_MAX)

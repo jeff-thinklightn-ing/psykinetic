@@ -49,6 +49,7 @@ func _ready() -> void:
 	_test_tall_grass()
 	_test_rocks()
 	_test_relief()
+	_test_sight()
 	_test_fire()
 	await _test_wall_runs()
 	_test_cave_walls()
@@ -1553,6 +1554,43 @@ func _test_fire() -> void:
 	_check(_rig._fire_lights.size() == torches.size() + fire.filter(func(c: Vector2i) -> bool: return _rig._grounds.has(c)).size()
 			and energies.max() != energies.min() and World.light_at(cell) == before,
 			"each fire's drawn light flickers; World's light stays as it was (%s)" % [energies])
+	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+
+
+## Seeing the player through ground that hides them (decision 549): on
+## levels/hills, at the foot of the plateau's face with the camera on the
+## plateau's side the player is hidden (any pitch the camera has), on the
+## valley floor not; the cut-out eases in over SIGHT_EASE and back out, its
+## globals set; the castle (no relief) never hides.
+func _test_sight() -> void:
+	print("
+== sight: the ground thinned where it hides the player, as a wall fades ==")
+	var hills := Level.load_level("hills")
+	_rig.rebuild(hills["terrain"], hills["centre"])
+	var had_yaw := _rig.yaw
+	_rig.yaw = 45.0  # The camera east of its aim: the plateau's side.
+	var foot := Vector2i(59, 20)
+	var at := Vector3(foot.x, _rig._ground_height(Vector2(foot)), foot.y)
+	var valley := Vector3(48.0, _rig._ground_height(Vector2(48.0, 72.0)), 72.0)
+	var under := _rig.hidden_by_ground(at, Client3D.CAMERA_PITCH)
+	var lifted := _rig.hidden_by_ground(at, Client3D.RIDGE_PITCH_MAX)
+	var open := _rig.hidden_by_ground(valley, Client3D.CAMERA_PITCH)
+	_check(under and not open,
+			"under the plateau's face, its top between the player and the camera: hidden; on the valley floor, not (%s, lifted %s, %s)" % [under, lifted, open])
+	_rig._sight_cut = 0.0
+	for i in 3:
+		_rig._update_sight(at, Client3D.SIGHT_EASE / 2.0)
+	var cut := _rig._sight_cut
+	var toward := _rig._camera_offset().normalized()
+	for i in 3:
+		_rig._update_sight(valley, Client3D.SIGHT_EASE / 2.0)
+	# (Headless, global shader uniforms read back nil: the eased strength.)
+	_check(is_equal_approx(cut, 1.0) and toward.y > 0.5 and toward.x > 0.3 and is_equal_approx(_rig._sight_cut, 0.0),
+			"the cut-out eases in while hidden and out again, toward the camera (%.2f, %s)" % [cut, toward])
+	var castle := Level.load_level("castle")
+	_rig.rebuild(castle["terrain"], castle["centre"])
+	_check(not _rig.hidden_by_ground(Vector3(10.0, 0.0, 10.0), Client3D.CAMERA_PITCH), "the castle (no relief) never hides the player behind ground")
+	_rig.yaw = had_yaw
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
 

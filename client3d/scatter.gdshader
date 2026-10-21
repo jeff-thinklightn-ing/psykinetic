@@ -14,10 +14,13 @@ shader_type spatial;
 // them, by where it stands), still in the wind and drier.
 render_mode cull_disabled, shadows_disabled;
 
+#include "res://client3d/sight.gdshaderinc"
+
 global uniform vec4 wind;
 // The season (decision 362): x green, y turn (autumn), z snow cover.
 global uniform vec4 season;
 varying float up;
+varying vec3 world;
 varying float snow_cover;
 varying float straw_light;
 varying float trodden;
@@ -58,6 +61,7 @@ vec3 lift(vec3 c, float sat, float val) {
 }
 
 void vertex() {
+	world = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 	COLOR.rgb = to_linear(COLOR.rgb);
 	COLOR.rgb = lift(max(hue_turn(COLOR.rgb, GRASS_HUE), vec3(0.0)), GRASS_SAT, GRASS_VAL);
 	vec2 at = MODEL_MATRIX[3].xz;
@@ -82,6 +86,10 @@ void vertex() {
 }
 
 void fragment() {
+	// Seen through where it hides the player (decision 549).
+	if (sight_cut_here(world, FRAGCOORD.xy)) {
+		discard;
+	}
 	// Out of season the green dries toward straw, in autumn it turns, and
 	// snow lies on the tops.
 	vec3 colour = COLOR.rgb;

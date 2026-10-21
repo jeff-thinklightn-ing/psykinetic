@@ -17064,3 +17064,39 @@ paint or scene this build cannot load (ResourceLoader.exists, then a null check)
 duplicating a null; _make_model leaves a model in its own material the same way.
 anim_rig_test _test_warm_painted: each painted model warmed twice, a missing paint passed over
 with no error.
+## 549. Seeing the player through ground that hides them
+
+525's hills can hide the player: at the foot of the plateau's face on
+levels/hills, the camera on the plateau's side, the plateau's edge stands
+between them at any pitch the camera has (the ridge lift's 70 degrees did
+not show them; the review shot h3-game-under-cliff). Walls fade for this
+(188), piece by piece by material; the ground and the cliff faces are one
+mesh a chunk, so they cannot. The coordinator's design. Client only.
+
+- Hidden: Client3D.hidden_by_ground walks the camera's line back from the
+  player's middle (RIDGE_AIM over the feet) over the drawn ground, RIDGE_REACH
+  metres at the camera's pitch (its ridge lift's if higher); never on a
+  level with no relief.
+- _update_sight eases sight_cut toward 1 while hidden, 0 when not, over
+  SIGHT_EASE 0.25 s (a wall's fade feel), and sets three global shader
+  uniforms (project.godot's shader_globals): sight_focus (the player's
+  middle, w their feet's height), sight_toward (toward the camera), sight_cut.
+- sight.gdshaderinc's sight_cut_here: a fragment in front of the player
+  toward the camera, within SIGHT_RADIUS 1.3 m of that line and SIGHT_ABOVE
+  0.4 m or more over their feet, is dropped by a 4x4 ordered dither, SIGHT_KEEP
+  0.3 of it left (a faded wall's 0.3), soft at the edge. Opaque throughout:
+  no sorting, no flicker (188's trouble with translucent pieces). The ground
+  (ground.gdshader), the scatter (scatter.gdshader) and the cliff faces
+  (cliff.gdshader, new: their vertex colours, rough, both sides, as their
+  plain material was) take it. Rocks and props on the strip stay drawn.
+- Cost: the castle at night, map_bench under the bench lock, 4.64 ms median
+  before, 3.76 after (noise); levels/hills at noon 1.49 to 1.92 ms: a
+  discard in a shader costs its early depth test whether or not it cuts.
+
+tests/view_test (on hills, the foot of the plateau's face hidden from the
+plateau's side and the valley floor not; the cut eases in and out; the
+castle never hides). Shots: C:\dev\review\hills2, sight-before/after-under-face.
+
+Rejected: lifting the camera further (top-down loses the hill); 188's
+translucent swap per chunk (a 16 m square of ground ghosted); fading only
+the cliff faces (the plateau's top strip still hides the player).

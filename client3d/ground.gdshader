@@ -15,6 +15,8 @@ shader_type spatial;
 // light and heat) is the same either way.
 render_mode blend_mix, depth_draw_opaque, cull_back, diffuse_burley, specular_schlick_ggx;
 
+#include "res://client3d/sight.gdshaderinc"
+
 uniform sampler2D kinds : filter_linear, repeat_disable;
 // The world cell at kinds' texel (0, 0), and the texture's size in cells.
 uniform vec2 kinds_origin;
@@ -262,6 +264,10 @@ vec3 lift(vec3 c, float sat, float val) {
 }
 
 void fragment() {
+	// Seen through where it hides the player (decision 549).
+	if (sight_cut_here(world, FRAGCOORD.xy)) {
+		discard;
+	}
 	vec2 at = world.xz;
 	// Where the kinds are read: pushed about at two scales, a slow drift of
 	// up to a cell and a half (about 3 m across) and a quicker wobble (about
