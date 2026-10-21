@@ -36,6 +36,7 @@ func _ready() -> void:
 	_test_woodcutter()
 	_test_flock()
 	_test_season_scale()
+	_test_maker_comes()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -255,3 +256,30 @@ func _test_season_scale() -> void:
 	var long := _year(_towns(), 56)
 	Season.season_days = 7
 	_check(absi(long - 2 * short) <= 4, "a 14-day year (56 days) brings in twice a 7-day one's food (%d, %d): the same a day" % [long, short])
+
+
+## A maker's bench left with nobody of its trade (decision 552): a
+## newcomer of it after maker_comes.growth_days, seated there; only one.
+func _test_maker_comes() -> void:
+	print("
+== a carpenter's bench with nobody ==")
+	var towns := _towns(1, false)
+	towns.note_rescue(TOWN, "c1", "Pip", "carpenter")
+	var shop := towns.production.workshop_of("c1")
+	_check(not shop.is_empty(), "the carpenter is seated (%s)" % shop)
+	var carpenters := func() -> Array:
+		return towns.residents(TOWN).filter(func(id: String) -> bool: return "carpenter" in towns.production.worker(id)["trades"])
+	_year(towns, 5)
+	_check(carpenters.call().size() == 1, "none comes while he works")
+	# Turned to other work (npc's acolyte): off his bench, another trade.
+	towns.production.assign(shop, "")
+	towns.production._workers["c1"]["trades"] = ["acolyte"]
+	_year(towns, int(_rules["maker_comes"]["growth_days"]) - 1)
+	_check(carpenters.call().is_empty(), "not before growth_days")
+	_year(towns, 2)
+	var came: Array = carpenters.call()
+	_check(came.size() == 1 and towns.production.worker(came[0])["origin"] == "growth" and towns.production.workshop_of(came[0]) == shop,
+		"then a carpenter comes, at his bench (%s)" % [came])
+	_year(towns, 7)
+	_check(carpenters.call().size() == 1, "and only one")
+

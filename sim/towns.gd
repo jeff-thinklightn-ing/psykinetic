@@ -378,6 +378,7 @@ func tick() -> void:
 		_weaver_comes(town)
 		_woodcut(town)
 		_woodcutter_comes(town)
+		_maker_comes(town)
 		# One build at a time, unless the one in hand has stalled on its
 		# materials (decision 522).
 		if production.building_in(town) and not production.builds_stalled(town):
@@ -1141,6 +1142,32 @@ func _comes(town: String, trade: String, wanted: bool, days: float, names: Array
 	_note(town, "%s the %s comes to %s" % [name, trade, town])
 	_seat(town)
 	return true
+
+
+## A town with a workshop of a maker's trade (Items.TRADES) or of a
+## building's built_by trade (the carpenter, who builds everything) and no
+## resident of that trade (died, or turned to other work: npc's Pip, made
+## Aldous's acolyte) gets one, a newcomer, once it has gone maker_comes.
+## growth_days without (decision 552). Not while one of the trade is held
+## captive: they may come back. One trade at a time, by name.
+func _maker_comes(town: String) -> void:
+	var rule: Dictionary = rules.get("maker_comes", {})
+	if rule.is_empty():
+		return
+	var builders := {}
+	for kind: String in rules.get("buildings", {}):
+		builders[str(rules["buildings"][kind].get("built_by", ""))] = true
+	var held: Array = _town(town).get("captives", []).map(func(each: Dictionary) -> String: return str(each.get("trade", "")))
+	var trades := {}
+	for id in production.workshop_ids(town):
+		var trade := str(production.workshop(id)["trade"])
+		if (trade in Items.TRADES or builders.has(trade)) and trade not in held:
+			trades[trade] = true
+	var names: Array = trades.keys()
+	names.sort()
+	for trade: String in names:
+		# _comes forgets the wait once one of the trade is there.
+		_comes(town, trade, true, float(rule.get("growth_days", 3)), rule.get("names", []), "%s_newcomer" % trade)
 
 
 # --- Woodcutters (decision 497) --------------------------------------------------

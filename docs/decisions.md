@@ -17360,3 +17360,22 @@ distance or sight: those stay the asker's (her Senses, her range).
 A waiting companion with no keeper is never threatened (monsters do not go
 for one). Server only, protocol unchanged, no new class_name. monster_test
 _test_threatens.
+## 552. A maker comes
+
+The coordinator's ruling (2026-10-20, from Jeff's screenshot "Pip
+[carpenter]"): Held's Pip becomes Aldous's acolyte (546 npc's side
+amended), which left his bench empty. Nothing filled it: makers came only
+by rescue, and the carpenter is every building's built_by, so a town whose
+only carpenter left would stop building. Approved by the coordinator.
+- Towns._maker_comes, each tick: for each workshop of the town whose trade
+  is a maker's (Items.TRADES) or a building's built_by, with no resident
+  of that trade, a newcomer of it comes on the _comes pattern (origin
+  "growth") once the town has gone rules' maker_comes.growth_days (3)
+  without, named from maker_comes.names, and is seated at the empty
+  bench. Not while one of the trade is the town's captive. This covers a
+  maker who died as well as one who changed trades.
+- Production.workshop_ids(town).
+- The order: npc's retrade (Production.retrain, "acolyte") lands after
+  this, so Held is never left without a carpenter for more than the wait.
+farm_test _test_maker_comes. Not soak-measured.
+

@@ -35,6 +35,7 @@
 		"names": ["Hew", "Bram", "Tilda", "Ada", "Wat", "Joan", "Piers", "Agnes", "Col", "Maud", "Ren", "Sib"]},
 	"work_up": {"ore": ["weapon", "shield"], "wood": ["shield", "weapon"], "cloth": ["bandage"], "food": ["food"]},
 	"defend_trades": ["smith", "carpenter", "cook"],
+	"maker_comes": {"growth_days": 3, "names": ["Hob", "Elric", "Maud", "Garth", "Isolde", "Ned", "Bryn", "Odo"]},
 	"busy": {"quiet_below": 4, "busy_from": 20},
 	"wage": 0,
 	"tax": {"sale": 0.2, "buy": 0.1, "trade": 0.1, "trade_rich": 0.3, "wage": 0.1},

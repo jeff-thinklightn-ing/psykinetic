@@ -615,6 +615,16 @@ func worker(id: String) -> Dictionary:
 	return _workers.get(id, {}).duplicate(true)
 
 
+## [param town]'s workshop ids, in order.
+func workshop_ids(town: String) -> Array[String]:
+	var out: Array[String] = []
+	for id: String in _workshops:
+		if _workshops[id]["town"] == town:
+			out.append(id)
+	out.sort()
+	return out
+
+
 func workshop(id: String) -> Dictionary:
 	return _workshops.get(id, {}).duplicate(true)
 

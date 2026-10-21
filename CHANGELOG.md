@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- When a town loses its last carpenter, smith or other maker, a newcomer of that trade now moves in after three days and takes the empty bench, so the town keeps building (552).
 - Screenshots taken on a joined client are named with the area again ("wilds_209-201_..."), and the big map marks your own area and lists your party under it when you joined a server, not only when hosting (538 amended).
 - Trade wagons and raiding parties walk up hills, stairs and fords on their way instead of waiting at the foot of the first climb and then jumping to the end of that stretch; and the routes can now give a companion her way leg by leg, or a way round a camp she knows, for leading her player (551, maps' side).
 - The Barrow's burial niches are drawn (542): each alcove holds its bier and remains, plundered near the top, old bones and grave goods deeper, the oldest wrapped burials at the bottom.
