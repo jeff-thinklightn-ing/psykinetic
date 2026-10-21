@@ -17246,4 +17246,6 @@ knows it, as the coordinator asked:
 - The prompt says what a solid building is.
 
 No mound prefab exists, so builder meets one only where a level has it.
+The door is one rule, Level.solid_door (front_cell - facing), which
+_lay_solid and BuilderSession.solid_door both call (maps' OK for level.gd).
 Protocol unchanged. builder_test _test_solid.

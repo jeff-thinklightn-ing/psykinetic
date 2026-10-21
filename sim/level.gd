@@ -1366,6 +1366,11 @@ static func _check_fords(terrain: Dictionary, warnings: Array[String]) -> void:
 			warnings.append("the ford at %s is beside no water: in no stream" % [cell])
 
 
+## A solid building's door (decision 550): the front row's middle.
+static func solid_door(rect: Rect2i, facing: Vector2i) -> Vector2i:
+	return front_cell(rect, facing) - facing
+
+
 ## The solid buildings in [param level] (SOLID, decision 550) laid into its
 ## terrain: each footprint cell but its door (the front row's middle, the
 ## building's "door") out of the floor and into terrain "solid".
@@ -1375,7 +1380,7 @@ static func _lay_solid(level: Dictionary) -> void:
 	for building: Dictionary in level["buildings"]:
 		if not str(building["slot"]) in SOLID:
 			continue
-		var door: Vector2i = front_cell(building["rect"], building["facing"]) - building["facing"]
+		var door := solid_door(building["rect"], building["facing"])
 		building["door"] = door
 		for cell in rect_cells(building["rect"]):
 			if cell != door:

@@ -1033,10 +1033,9 @@ func walk_ground() -> Dictionary:
 	return out
 
 
-## A solid building's door cell (Level._lay_solid's rule): its front row's middle.
+## A solid building entry's door cell (Level.solid_door, _lay_solid's own).
 static func solid_door(entry: Dictionary) -> Vector2i:
-	var facing := Level.building_facing(entry)
-	return Level.front_cell(Level.building_rect(entry), facing) - facing
+	return Level.solid_door(Level.building_rect(entry), Level.building_facing(entry))
 
 
 ## Why the building [param entry] can't stand on this level's relief
