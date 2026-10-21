@@ -54,7 +54,7 @@ which worktree owns each step, and the design rules not to break without asking 
   and unfreezes. Between releases `main` runs ahead of the box; that's expected. Say in
   your landing message if your change alters the wire format, so it isn't left unreleased.
   After a rebase, check your bullet still sits under `## Unreleased`, above the first
-  `## v` heading: a cut moves the heading, and git keeps a bullet beside the old top one; since 539, land.sh fails on a bullet in a shipped section or in two places, naming it.
+  `## v` heading: a cut moves the heading, and git keeps a bullet beside the old top one; since 539, land.sh fails on a bullet in a shipped section or in two places, naming it. On a CHANGELOG-only rebase conflict, run `python -B tools/changelog_resolve.py`, then `GIT_EDITOR=true git rebase --continue`, once per commit that stops; never keep both sides (four trees' own resolvers did, each costing a refused landing, 2026-10-20).
 - Every architectural choice gets its own numbered entry at the bottom of
   `docs/decisions.md`, in the same commit as the code. With several worktree sessions
   running, ask the release session for the number before
