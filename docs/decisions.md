@@ -11785,6 +11785,34 @@ headless run registers no skin to bake); the old clips fail it (the man's bow 28
 his back standing). Not changed, asked of Jeff: the body turned to the target before the release
 (the puppet's facing, an aim layer if the shot goes off-axis) and the pull's pace (the sim's draw
 ticks, items').
+
+Amended (2) (Jeff on v0.1.160: "the bow draw back arm is all wrong, it clips through the body then
+is held as if the arm is behind wrapping behind the head to hold it"; "bow arm is too long, bow is
+held out too far away from body too"). The string arm had been aimed bone by bone (a direction for
+the upper arm, one for the forearm) and the check above counted the bow and the left forearm only:
+at full draw the string wrist sat 0.22 m behind the head, at head height, the elbow 0.26 behind the
+shoulder, and on the way there (nock to pull) the forearm crossed the chest. Now the arms are
+reached, not aimed: humanoid_clips.py gains REACH (an arm's two bones solved so its wrist meets a
+point, the elbow bent toward a pole; the point a weighted sum of bones' heads plus offsets, so a
+pose is placed against the head and the bow hand, not guessed) and GRASP (the hand turned so a held
+piece's length and flat lie along given directions: the socket's +Y is the hand's own +Z in the
+pack's bones, measured). Full draw: the string wrist beside the right jaw below the ear, 0.11 m
+out from the head's centre line, the elbow out to the right and level behind it; the bow arm's
+elbow soft (wrist 0.49 m from the shoulder of the arm's 0.52, grip 0.60; it was straight, the grip 0.61), aimed
+a touch to the right so the arrow runs nearly along the shot. The draw keyed more densely so the
+blend cannot swing through the body: carried, the bow lifted out before the leg, the nock low
+before the belly with the trunk only a fifth turned and the right shoulder brought forward, raised
+with the string hand out before the chest, pulled along the jaw, full draw; the release slides the
+hand back past the ear and comes down the same way. Carried (BOW_LOW): the arm hanging at the side,
+the wrist by the thigh, the bow upright beside the leg, its top forward (the grip 0.16 ahead of the
+hips, was 0.22), the bundle's arm a little out from the hip. No bone is stretched: the arm's
+shoulder-to-wrist never passes its bones' length (measured on every build; the builds share the
+skeleton, shape keys move only the skin). anim_rig_test _test_bow_clear now takes ten moments (carried
+walking and standing, lifted, nocked, raised twice, pulled, full draw, released, coming down) on the
+five builds and counts the bow in the trunk or the left leg, the left forearm in the trunk, and the
+right forearm and hand in the trunk or the head; and at full draw the string wrist within 0.2 m of
+the head and not behind it. The clips before this fail both (the right arm in the body at the lift,
+nock, raise and coming down; the wrist 0.22 behind the head).
 ## 460. Moving in: a person the town remembers arrives, with room and the lawspeaker's word
 
 Phase 4 of Jeff's lawspeaker proposal (docs/lore/lawspeaker.md, Jeff: "when

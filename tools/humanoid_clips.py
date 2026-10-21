@@ -15,6 +15,12 @@
 #   TILT (about +Y): the top toward its left.
 #   (bone, Vector, AIM): the bone pointed along that direction (character axes: up is
 #     (0, 0, 1), ahead (0, -1, 0), its left (1, 0, 0)), from wherever it points.
+#   ("upperarm_x", (target, pole), REACH): the arm's two bones turned so its wrist (the hand's
+#     head) comes to [target], the elbow bent toward [pole] (a direction); [target] is
+#     [(bone, offset, weight), ...], the weighted sum of those bones' heads (as the pose stands
+#     without its reaches; reaches are met in order, each seeing the ones before) plus offsets.
+#   ("hand_x", (length, side), GRASP): the hand turned so a held piece's length (the hand's own +Z;
+#     Client3D's socket) lies along [length], its side (the hand's -X) toward [side].
 # A strike's contact (the moment it lands, seconds) is measured, not guessed: the moment its
 # striking bone (STRIKES) moves fastest forward (and down) relative to the pelvis. The UAL's own strikes are
 # measured the same way (--contacts prints them all); the game's tables (Client3D) carry them.
@@ -30,6 +36,8 @@ LIFT = Vector((-1.0, 0.0, 0.0))
 TURN = Vector((0.0, 0.0, 1.0))
 TILT = Vector((0.0, 1.0, 0.0))
 AIM = None
+REACH = "reach"
+GRASP = "grasp"
 
 
 def P(base: str, at: float = 0.0, turns: list = (), move: tuple = (0.0, 0.0, 0.0)) -> dict:
@@ -144,27 +152,55 @@ CLIPS["Sprint_Short_Loop"] = {"loop": True, "segment": ("Sprint_Loop", 0.0, 0.66
 # The bow (Jeff: archery wants playtesting): a right-handed archer, the bow in the left hand
 # (Client3D draws a held bow there, the arrows in the right), side on to the shot: the trunk
 # turned to its right so the left shoulder leads, the head turned back to look ahead.
-# BOW_LOW: the bow held low and forward, an arrow's bundle at the right hip. NOCK: both
-# hands before the chest, an arrow to the string. DRAWN: the bow arm straight at the target,
-# the drawing hand back at the jaw, the elbow up behind it. The draw's contact is full draw.
+# BOW_LOW: the bow carried at the left thigh, an arrow's bundle at the right hip. NOCK: the bow
+# low before the belly, the trunk half turned, the string hand at the string. DRAWN: the bow arm
+# out at the target, its elbow soft; the string hand's wrist at the right jaw, below the ear, the
+# elbow out to the right and level behind it. The draw's contact is full draw.
+# The arms are reached (REACH), not aimed bone by bone (462 amended; Jeff on v0.1.160: "the bow
+# draw back arm is all wrong, it clips through the body then is held as if the arm is behind
+# wrapping behind the head", "bow arm is too long, bow is held out too far away from body"): the
+# wrists placed against the shoulder, the head and the bow hand, so the pull runs before the face
+# and back along the jaw, never behind the head nor through the chest.
 AHEAD = Vector((0.0, -1.0, 0.0))
 SIDE_ON = [("spine_01", TURN, -18.0), ("spine_02", TURN, -22.0), ("spine_03", TURN, -20.0),
 	("neck_01", TURN, 30.0), ("Head", TURN, 28.0)]
-# The bow hand rolled thumb up about the arm (ROLL), so the bow held in it stands upright.
-ROLL = [("hand_l", AHEAD, -90.0)]
-# BOW_LOW (462 amended; Jeff: "arm and bow clipping body"): the arm hanging a little out and
-# forward, the grip at the left side (0.25 m ahead, 0.84 up on the man), the hand turned so the bow
-# (its length out of the thumb's side) stands upright, its top a little forward and out, clear of the
-# shoulder and the leg. It hung behind the body, the bow up through the back.
-BOW_LOW_HAND = [("hand_l", Vector((-0.573, 0.740, 0.352)), 48.0)]
-BOW_LOW = [("upperarm_l", Vector((0.3, -0.12, -1.0)), AIM), ("lowerarm_l", Vector((0.15, -0.5, -0.85)), AIM)] + BOW_LOW_HAND + [
+
+
+def side_on(share: float) -> list:
+	"""SIDE_ON [share] of the way."""
+	return [(bone, axis, degrees * share) for bone, axis, degrees in SIDE_ON]
+
+
+def bow_arm(ahead: float, out: float, up: float, length: tuple, side: tuple = (1.0, 0.0, 0.1), pole: tuple = (1.0, 0.1, -0.5)) -> list:
+	"""The bow arm: its wrist [ahead], [out] (to its left) and [up] of the shoulder, the elbow
+	toward [pole]; the bow's length along [length], its flat to [side]."""
+	return [("upperarm_l", ([("upperarm_l", (out, -ahead, up), 1.0)], pole), REACH), ("hand_l", (length, side), GRASP)]
+
+
+def string_arm(nock: float, pole: tuple, back: float = 0.0, out: float = 0.0) -> list:
+	"""The string arm: its wrist [nock] of the way from the string at the bow (0) to the anchor
+	at the jaw (1); [back] moves the anchor back past the ear (the release), [out] the wrist out to
+	its right (clear of the chin on the way); the elbow toward [pole]."""
+	string = (-0.04 - out, 0.13, 0.0)
+	anchor = (-0.14 - out, 0.03 + back, -0.04)
+	return [("upperarm_r", ([("hand_l", string, 1.0 - nock), ("Head", anchor, nock)], pole), REACH),
+		("hand_r", Vector((0.1, -1.0, 0.0)), AIM)]
+
+
+BOW_UP = (-0.12, 0.15, 1.0)
+DRAWN_ARM = (0.49, -0.16, 0.05)
+# BOW_LOW (462 amended; Jeff: "arm and bow clipping body", then "held out too far away from
+# body"): the arm hanging at the side, the wrist by the thigh, the bow upright beside the leg, its
+# top a little forward.
+BOW_LOW = bow_arm(0.0, 0.16, -0.46, (0.2, -0.45, 1.0), (1.0, 0.0, 0.0), (0.3, 1.0, 0.0)) + [
 	# The bundle's arm hanging at its side, the hand by the hip (it was lifted, the bundle at the
 	# chest; the coordinator on the bow check).
-	("upperarm_r", Vector((-0.18, 0.02, -1.0)), AIM), ("lowerarm_r", Vector((-0.08, -0.3, -1.0)), AIM)]
-NOCK = SIDE_ON + [("upperarm_l", Vector((0.15, -1.0, -0.25)), AIM), ("lowerarm_l", Vector((-0.1, -1.0, -0.1)), AIM),
-	("upperarm_r", Vector((-0.2, -0.7, -0.6)), AIM), ("lowerarm_r", Vector((0.55, -0.8, 0.15)), AIM)] + ROLL
-DRAWN = SIDE_ON + [("upperarm_l", Vector((0.0, -1.0, 0.04)), AIM), ("lowerarm_l", Vector((0.0, -1.0, 0.04)), AIM),
-	("upperarm_r", Vector((-0.35, 0.9, 0.05)), AIM), ("lowerarm_r", Vector((0.5, -0.85, 0.05)), AIM)] + ROLL
+	("upperarm_r", Vector((-0.4, 0.02, -1.0)), AIM), ("lowerarm_r", Vector((-0.3, -0.3, -1.0)), AIM)]
+NOCK = side_on(0.2) + [("clavicle_r", TURN, 20.0)] + bow_arm(0.36, -0.14, -0.2, (0.15, 0.0, 1.0), pole=(1.0, 0.3, -0.6)) + string_arm(0.0, (-1.0, -0.2, 0.1))
+# Between the thigh and the nock, the bow swung out before the leg.
+LIFTING = side_on(0.1) + bow_arm(0.32, 0.12, -0.32, (-0.1, -0.6, 1.0), (1.0, 0.0, 0.0), (0.6, 0.6, -0.3)) + [
+	("upperarm_r", Vector((-0.4, -0.05, -1.0)), AIM), ("lowerarm_r", Vector((-0.3, -0.6, -0.8)), AIM)]
+DRAWN = SIDE_ON + bow_arm(*DRAWN_ARM, BOW_UP) + string_arm(1.0, (-1.0, 0.6, 0.1))
 # Fidgets (Jeff: "the idle need variability and same scratch is very predictable"): short
 # things a person does standing about, each from Idle and back to it, so any may follow any.
 # Shift: the weight onto one leg, the hip out and the shoulders tilting against it.
@@ -209,29 +245,33 @@ CLIPS["Bow_Idle_Loop"] = {"loop": True, "keys": [
 	(1.25, P("Idle_Loop", 1.25, BOW_LOW + [("spine_02", LIFT, -2.0)])),
 	(2.5, P("Idle_Loop", 0.0, BOW_LOW)),
 ]}
+# The draw: nocked low, the bow raised to the target as the string hand comes up before the
+# chest, then drawn back along the arrow's line to the jaw.
 CLIPS["Bow_Draw"] = {"keys": [
 	(0.0, P("Idle_Loop", 0.0, BOW_LOW)),
+	(0.15, P("Idle_Loop", 0.15, LIFTING)),
 	(0.3, P("Idle_Loop", 0.3, NOCK)),
-	(0.65, P("Idle_Loop", 0.6, DRAWN[:5] + [("upperarm_l", Vector((0.0, -1.0, 0.04)), AIM), ("lowerarm_l", Vector((0.0, -1.0, 0.04)), AIM),
-		("upperarm_r", Vector((-0.3, -0.2, 0.0)), AIM), ("lowerarm_r", Vector((0.4, -0.9, 0.05)), AIM)] + ROLL)),
+	(0.42, P("Idle_Loop", 0.4, side_on(0.35) + [("clavicle_r", TURN, 20.0)] + bow_arm(0.4, -0.14, -0.12, (-0.05, 0.0, 1.0))
+		+ string_arm(0.12, (-1.0, -0.2, 0.1), out=0.1))),
+	(0.55, P("Idle_Loop", 0.5, side_on(0.6) + [("clavicle_r", TURN, 15.0)] + bow_arm(0.45, -0.13, 0.0, BOW_UP) + string_arm(0.25, (-1.0, -0.1, 0.0), out=0.1))),
+	(0.68, P("Idle_Loop", 0.6, side_on(0.95) + bow_arm(0.48, -0.15, 0.04, BOW_UP) + string_arm(0.5, (-1.0, 0.3, -0.3), out=0.08))),
+	(0.8, P("Idle_Loop", 0.7, SIDE_ON + bow_arm(*DRAWN_ARM, BOW_UP) + string_arm(0.7, (-1.0, 0.4, -0.25)))),
 	(1.0, P("Idle_Loop", 0.9, DRAWN)),
 ]}
 CLIPS["Bow_Hold_Loop"] = {"loop": True, "keys": [
 	(0.0, P("Idle_Loop", 0.0, DRAWN)),
-	(0.75, P("Idle_Loop", 0.75, DRAWN + [("spine_02", LIFT, 1.0), ("upperarm_r", LIFT, 1.5)])),
+	(0.75, P("Idle_Loop", 0.75, [("spine_02", LIFT, 1.0)] + DRAWN)),
 	(1.5, P("Idle_Loop", 0.0, DRAWN)),
 ]}
 CLIPS["Bow_Loose"] = {"keys": [
 	(0.0, P("Idle_Loop", 0.0, DRAWN)),
-	# The release (Jeff: "firing animation is awkward"): the string hand slides back past the jaw,
-	# its forearm turning out a little (a turn of the forearm, not a swing through the front), the
-	# bow arm dropping a touch with the string's kick; held a moment; then the hand back to the
-	# nock and the bow down.
-	(0.08, P("Idle_Loop", 0.08, SIDE_ON + [("upperarm_l", Vector((0.0, -1.0, -0.04)), AIM), ("lowerarm_l", Vector((0.0, -1.0, -0.06)), AIM),
-		("upperarm_r", Vector((-0.45, 0.85, 0.1)), AIM), ("lowerarm_r", Vector((-0.4, -0.85, 0.15)), AIM)] + ROLL)),
-	(0.3, P("Idle_Loop", 0.3, SIDE_ON + [("upperarm_l", Vector((0.0, -1.0, -0.06)), AIM), ("lowerarm_l", Vector((0.0, -1.0, -0.08)), AIM),
-		("upperarm_r", Vector((-0.45, 0.85, 0.05)), AIM), ("lowerarm_r", Vector((-0.4, -0.85, 0.1)), AIM)] + ROLL)),
+	# The release (Jeff: "firing animation is awkward"): the string hand slides back along the
+	# jaw past the ear, the bow arm dropping a touch with the string's kick; held a moment; then
+	# the hand back to the nock and the bow down.
+	(0.08, P("Idle_Loop", 0.08, SIDE_ON + bow_arm(0.49, -0.16, 0.02, BOW_UP) + string_arm(1.0, (-1.0, 0.7, 0.05), 0.09))),
+	(0.3, P("Idle_Loop", 0.3, SIDE_ON + bow_arm(0.48, -0.16, -0.01, BOW_UP) + string_arm(1.0, (-1.0, 0.7, 0.0), 0.1))),
 	(0.6, P("Idle_Loop", 0.6, NOCK)),
+	(0.8, P("Idle_Loop", 0.8, LIFTING)),
 	(1.0, P("Idle_Loop", 1.0, BOW_LOW)),
 ]}
 
@@ -270,10 +310,20 @@ class Rig:
 
 	def pose(self, spec: dict) -> dict:
 		"""[spec]'s matrices: its base's, each bone turned about its own head after its parents'
-		turns carried it, the pelvis moved."""
+		turns carried it, the pelvis moved; its reaches met in order."""
+		turns = [t for t in spec["turns"] if t[2] != REACH]
+		for bone, (target, pole), _reach in [t for t in spec["turns"] if t[2] == REACH]:
+			now = self.turned(spec, turns)
+			fore, hand = bone.replace("upperarm", "lowerarm"), bone.replace("upperarm", "hand")
+			at = sum(((now[b].translation + Vector(off)) * w for b, off, w in target), Vector())
+			upper, lower = solve(now[bone].translation, now[fore].translation, now[hand].translation, at, Vector(pole))
+			turns = turns + [(bone, upper, AIM), (fore, lower, AIM)]
+		return self.turned(spec, turns)
+
+	def turned(self, spec: dict, listed: list) -> dict:
 		base = self.posed(spec["base"], spec["at"])
 		turns = {}
-		for bone, axis, degrees in spec["turns"]:
+		for bone, axis, degrees in listed:
 			turns.setdefault(bone, []).append((axis, degrees))
 		out = {}
 		for b in self.bones:
@@ -286,6 +336,12 @@ class Rig:
 				if degrees is None:
 					# AIM: pointed along [axis], from wherever it points now.
 					turn = carried.col[1].xyz.normalized().rotation_difference(axis.normalized())
+				elif degrees == GRASP:
+					length, side = (Vector(v).normalized() for v in axis)
+					z = length
+					x = -(side - z * side.dot(z)).normalized()
+					want = Matrix((x, z.cross(x), z)).transposed()
+					turn = (want @ carried.to_3x3().normalized().inverted()).to_quaternion()
 				else:
 					turn = Quaternion(axis, math.radians(degrees))
 				head = carried.translation.copy()
@@ -343,6 +399,19 @@ class Rig:
 		print("clip %-12s %.2f s%s%s" % (name, (frames[1] - frames[0]) / FPS, ", loops" if clip.get("loop") else "",
 			", contact %.2f s" % CONTACT[name] if name in CONTACT else ""))
 		return action
+
+
+def solve(shoulder: Vector, elbow: Vector, wrist: Vector, target: Vector, pole: Vector) -> tuple:
+	"""The upper arm's and forearm's directions that bring the wrist to [target], the elbow
+	toward [pole]; a target past the arm's reach is met as far as the straight arm goes."""
+	upper, fore = (elbow - shoulder).length, (wrist - elbow).length
+	to = target - shoulder
+	d = min(max(to.length, abs(upper - fore) + 1e-4), (upper + fore) * 0.9999)
+	u = to.normalized()
+	v = (pole - u * pole.dot(u)).normalized()
+	cos = (upper * upper + d * d - fore * fore) / (2.0 * upper * d)
+	bend = shoulder + (u * cos + v * math.sqrt(max(0.0, 1.0 - cos * cos))) * upper
+	return (bend - shoulder).normalized(), (shoulder + u * d - bend).normalized()
 
 
 ## Which bones each part of "stride" scales.

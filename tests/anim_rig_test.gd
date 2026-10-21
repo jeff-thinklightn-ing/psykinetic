@@ -174,11 +174,14 @@ func _test_one_strike_clip() -> void:
 	puppet.queue_free()
 
 
-## The bow clear of the body (Jeff: "arm and bow clipping body"): on five builds (the man as
-## built, heavy, broad, lean; the woman), the bow in the left hand and the bundle in the right as
-## Client3D sockets them, in the held pose walking and standing, at the nock, at full draw and at
-## the release, no vertex of the bow nor of the left forearm inside the trunk (each against the
-## nearest trunk vertex's normal, the body baked as posed).
+## The bow clear of the body (Jeff: "arm and bow clipping body"; on v0.1.160: "the bow draw back
+## arm is all wrong, it clips through the body then is held as if the arm is behind wrapping
+## behind the head"): on five builds (the man as built, heavy, broad, lean; the woman), the bow in
+## the left hand as Client3D sockets it, carried walking and standing, lifted, at the nock, raised,
+## pulled, at full draw, at the release and coming down, no vertex of the bow inside the trunk or
+## the left leg, of the left forearm inside the trunk, nor of the right forearm or hand inside the
+## trunk or the head (each against the nearest such vertex's normal, the body skinned as posed);
+## and at full draw the string hand at the jaw: the wrist beside the head, not behind it.
 func _test_bow_clear() -> void:
 	print("== the bow clear of the body ==")
 	var lib := load(CLIPS) as AnimationLibrary
@@ -187,9 +190,12 @@ func _test_bow_clear() -> void:
 		["man broad", "res://art/models/characters/human_m.glb", {"heavy": 0.6, "broad": 1.0}],
 		["man lean", "res://art/models/characters/human_m.glb", {"lean": 1.0, "narrow": 1.0}],
 		["woman", "res://art/models/characters/human_f.glb", {}]]
-	var poses := [["walk", "Walk", "Bow_Idle", 0.3], ["stand", "Idle", "Bow_Idle", 0.3], ["nock", "Idle", "Bow_Draw", 0.3],
-		["full", "Idle", "Bow_Draw", 1.0], ["release", "Idle", "Bow_Loose", 0.09]]
+	var poses := [["walk", "Walk", "Bow_Idle", 0.3], ["stand", "Idle", "Bow_Idle", 0.0], ["lift", "Idle", "Bow_Draw", 0.15],
+		["nock", "Idle", "Bow_Draw", 0.3], ["raise", "Idle", "Bow_Draw", 0.42], ["raised", "Idle", "Bow_Draw", 0.5],
+		["pull", "Idle", "Bow_Draw", 0.68], ["full", "Idle", "Bow_Draw", 1.0], ["release", "Idle", "Bow_Loose", 0.09],
+		["down", "Idle", "Bow_Loose", 0.8]]
 	var found: Array[String] = []
+	var anchors: Array[String] = []
 	for build: Array in builds:
 		for pose: Array in poses:
 			var model := (load(build[1]) as PackedScene).instantiate() as Node3D
@@ -211,18 +217,27 @@ func _test_bow_clear() -> void:
 				rig.upper_at(pose[2], float(pose[3]) * rig.length(pose[2]))
 				await get_tree().process_frame
 			var counts := _bow_inside(model, bow)
-			if counts.x > 0 or counts.y > 0:
-				found.append("%s %s: bow %d, forearm %d" % [build[0], pose[0], counts.x, counts.y])
+			if counts != Vector3i.ZERO:
+				found.append("%s %s: bow %d, left forearm %d, right arm %d" % [build[0], pose[0], counts.x, counts.y, counts.z])
+			if pose[0] == "full":
+				var skeleton := model.find_children("*", "Skeleton3D", true, false)[0] as Skeleton3D
+				var head := skeleton.get_bone_global_pose(skeleton.find_bone("Head")).origin
+				var wrist := skeleton.get_bone_global_pose(skeleton.find_bone("RightHand")).origin
+				# Skeleton space: the body faces +z; behind the head is -z.
+				if wrist.distance_to(head) > 0.2 or wrist.z - head.z < -0.04:
+					anchors.append("%s: wrist %.2f from the head, %.2f ahead of it" % [build[0], wrist.distance_to(head), wrist.z - head.z])
 			model.queue_free()
 			holder.free()
-	_check(found.is_empty(), "no bow or forearm inside the trunk, five builds, held, nock, full draw, release (%s)" % ", ".join(found))
+	_check(found.is_empty(), "no bow nor arm inside the body, five builds, carried, nocked, drawn, released (%s)" % ", ".join(found))
+	_check(anchors.is_empty(), "at full draw the string hand at the jaw, not behind the head (%s)" % ", ".join(anchors))
 
 
 const TRUNK_BONES := ["Hips", "Spine", "Chest", "UpperChest", "Neck"]
 
 
-## Bow and left-forearm vertices inside [param model]'s trunk, as (bow, forearm).
-static func _bow_inside(model: Node3D, bow: Node3D) -> Vector2i:
+## Vertices inside [param model]'s body, as (the bow in the trunk or the left leg, the left
+## forearm in the trunk, the right forearm and hand in the trunk or the head).
+static func _bow_inside(model: Node3D, bow: Node3D) -> Vector3i:
 	# Skinned here, not baked (a headless run registers no skin): each vertex, its shape keys
 	# added, by its bones' poses over their binds.
 	var body := model.find_child("Body", true, false) as MeshInstance3D
@@ -248,9 +263,14 @@ static func _bow_inside(model: Node3D, bow: Node3D) -> Vector2i:
 	for b in skin.get_bind_count():
 		var bone_index := skin.get_bind_bone(b) if skin.get_bind_name(b) == &"" else skeleton.find_bone(skin.get_bind_name(b))
 		poses.append(skeleton.global_transform * skeleton.get_bone_global_pose(bone_index) * skin.get_bind_pose(b))
-	var trunk := PackedVector3Array()
-	var trunk_n := PackedVector3Array()
-	var forearm := PackedVector3Array()
+	# {part: [points, normals]}
+	var parts := {}
+	for part: String in ["trunk", "head", "leg", "forearm", "right"]:
+		parts[part] = [PackedVector3Array(), PackedVector3Array()]
+	var part_of := {"Head": "head", "LeftUpperLeg": "leg", "LeftLowerLeg": "leg", "LeftLowerArm": "forearm",
+		"RightLowerArm": "right", "RightHand": "right"}
+	for name: String in TRUNK_BONES:
+		part_of[name] = "trunk"
 	for i in verts.size():
 		var p := Vector3.ZERO
 		var n := Vector3.ZERO
@@ -266,17 +286,18 @@ static func _bow_inside(model: Node3D, bow: Node3D) -> Vector2i:
 				best = k
 		var b := bones[i * per + best]
 		var bone := String(skin.get_bind_name(b)) if skin.get_bind_name(b) != &"" else skeleton.get_bone_name(skin.get_bind_bone(b))
-		if bone in TRUNK_BONES:
-			trunk.append(p)
-			trunk_n.append(n.normalized())
-		elif bone == "LeftLowerArm":
-			forearm.append(p)
+		if part_of.has(bone):
+			parts[part_of[bone]][0].append(p)
+			parts[part_of[bone]][1].append(n.normalized())
 	var points := PackedVector3Array()
 	for mesh: MeshInstance3D in bow.find_children("*", "MeshInstance3D", true, false):
 		for s in mesh.mesh.get_surface_count():
 			for v: Vector3 in mesh.mesh.surface_get_arrays(s)[Mesh.ARRAY_VERTEX]:
 				points.append(mesh.global_transform * v)
-	return Vector2i(_inside(points, trunk, trunk_n), _inside(forearm, trunk, trunk_n))
+	var trunk: Array = parts["trunk"]
+	return Vector3i(_inside(points, trunk[0] + parts["leg"][0], trunk[1] + parts["leg"][1]),
+		_inside(parts["forearm"][0], trunk[0], trunk[1]),
+		_inside(parts["right"][0], trunk[0] + parts["head"][0], trunk[1] + parts["head"][1]))
 
 
 static func _inside(points: PackedVector3Array, surface: PackedVector3Array, normals: PackedVector3Array) -> int:
