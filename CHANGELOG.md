@@ -8,6 +8,8 @@ notes (decision 324).
 ## Unreleased
 - Your companion's mood, without a bar (555, ui's side): her pack's title and her name on the big map carry her bond's step ("Wren's Pack, sullen", "Wren, devoted"), with her newest reason on hover ("you left her to fall alone"); when her bond drops a step the HUD says so once ("Wren hangs back") and the party log keeps the line with the reason. Fond, where she starts, shows nothing.
 
+- The priest's acolyte now lives on the temple's alms: a gold a day from what is left after the priest is paid, or from the town when the alms run dry, so Pip in Held no longer goes hungry with an empty purse. A newcomer to a town no longer takes a name someone there already has, or had (546, 552).
+
 - What the barrow keeps is grave goods now (555): the altar's gold, the chests between the tombs and whatever the dead carry are marked from the grave for life, so a companion knows where it came from. The runner's pack is a robber's own and is not.
 - What the barrow's draugr carries and drops is grave goods too.
 - What you do moves your companion's bond (555 amended): laying the draugr to rest together and clearing a camp together bring you closer; leaving her to fall alone, letting her bleed out when you could have brought her back, making a superstitious companion carry grave goods, and taking her where she said it wasn't safe drive her off.

@@ -288,6 +288,10 @@ func died(town: String, who_id: String, why: String) -> bool:
 			production.stockpile.deposit(town, "gold", purse - to_bank, "estate:%s" % who_id, "what %s left" % name)
 	record["residents"].erase(who_id)
 	production.remove_worker(who_id)
+	# Remembered, so no newcomer takes their name (552 amended).
+	var dead: Array = record.get("dead_names", [])
+	dead.append(name)
+	record["dead_names"] = dead.slice(-DEAD_NAMES)
 	_note(town, "%s died of %s" % [name, why])
 	_seat(town)
 	resident_died.emit(town, who_id, name, why)
@@ -1019,7 +1023,7 @@ func _farmer_comes(town: String) -> void:
 	record["farmers_came"] = count
 	record.erase("farmer_wanted")
 	var names: Array = rule.get("names", ["Tam"])
-	var name := str(names[absi(hash("%s/%d" % [town, count])) % names.size()])
+	var name := _free_name(town, names, absi(hash("%s/%d" % [town, count])))
 	var id := "farmer_%s_%d" % [town.replace("/", "_"), count]
 	if production.add_worker(id, name, ["farmer"], town, "growth"):
 		record["residents"].append(id)
@@ -1134,7 +1138,7 @@ func _comes(town: String, trade: String, wanted: bool, days: float, names: Array
 	var count := int(record.get("%ss_came" % key, 0)) + 1
 	record["%ss_came" % key] = count
 	record.erase("%s_wanted" % key)
-	var name := str(names[absi(hash("%s/%s/%d" % [town, key, count])) % names.size()]) if not names.is_empty() else trade.capitalize()
+	var name := _free_name(town, names, absi(hash("%s/%s/%d" % [town, key, count]))) if not names.is_empty() else trade.capitalize()
 	var id := "%s_%s_%d" % [key, town.replace("/", "_"), count]
 	if not production.add_worker(id, name, [trade], town, "growth"):
 		return false
@@ -1237,7 +1241,7 @@ func _woodcutter_comes(town: String) -> void:
 	record["woodcutters_came"] = count
 	record.erase("woodcutter_wanted")
 	var names: Array = rule.get("names", ["Bran"])
-	var name := str(names[absi(hash("%s/wood/%d" % [town, count])) % names.size()])
+	var name := _free_name(town, names, absi(hash("%s/wood/%d" % [town, count])))
 	var id := "woodcutter_%s_%d" % [town.replace("/", "_"), count]
 	if production.add_worker(id, name, [trade], town, "growth"):
 		record["residents"].append(id)
@@ -1547,6 +1551,30 @@ func faction_name(id: String) -> String:
 	if production.holdings != null and production.holdings.factions != null:
 		return production.holdings.factions.display_name(id)
 	return id
+
+
+## How many of a town's dead it remembers by name (552 amended).
+const DEAD_NAMES := 40
+
+
+## A newcomer's name for [param town] from [param names], [param pick]
+## first (552 amended, the two Bryns): the first from there on that no
+## resident, captive or remembered dead of the town already has; [param
+## pick]'s own when every one is taken.
+func _free_name(town: String, names: Array, pick: int) -> String:
+	var record := _town(town)
+	var used := {}
+	for who: String in record["residents"]:
+		used[str(production.worker(who).get("name", ""))] = true
+	for each: Dictionary in record["captives"]:
+		used[str(each.get("name", ""))] = true
+	for name: Variant in record.get("dead_names", []):
+		used[str(name)] = true
+	for i in names.size():
+		var name := str(names[(pick + i) % names.size()])
+		if not used.has(name):
+			return name
+	return str(names[pick % names.size()])
 
 
 func _seated(who: String) -> bool:

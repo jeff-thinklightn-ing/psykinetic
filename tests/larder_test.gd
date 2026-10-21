@@ -975,6 +975,29 @@ func _test_offering() -> void:
 	_check(economy.lift_below(TOWN, 100) == taken and economy.below_gold(TOWN) == 0, "robbers lift what is there, no more")
 	var saved := Economy.new(economy.to_dict(), stock, work, clock, _rules)
 	_check(saved.last_down_day(TOWN) == 3, "saved and loaded")
+	# The acolyte lives on the alms after the priest's share (546 amended).
+	work.add_worker("ac", "Pip", ["acolyte"], TOWN, "test", "steady")
+	var keep := int(_rules["return"]["acolyte"]["keep"])
+	economy._alms[TOWN] = wage + 2 * keep
+	economy._floor_turn()
+	_now += DayNight.day_steps
+	economy._floor_turn()
+	_check(int(work.worker("ac")["purse"]) == keep and economy.alms(TOWN) == wage + keep, "the acolyte kept %d a day from the alms" % keep)
+	_now += DayNight.day_steps
+	economy._floor_turn()
+	_check(int(work.worker("ac")["purse"]) == 2 * keep and economy.alms(TOWN) == wage, "never from the priest's share (%d left)" % economy.alms(TOWN))
+	# The alms short: the treasury keeps him, as it pays the priest.
+	var floor := int(_rules.get("gold_floor", 0))
+	stock.deposit(TOWN, "gold", floor + 5, "test", "test")
+	var before := stock.count(TOWN, "gold")
+	_now += DayNight.day_steps
+	economy._floor_turn()
+	_check(int(work.worker("ac")["purse"]) == 3 * keep and stock.count(TOWN, "gold") == before - keep and economy.alms(TOWN) == wage,
+		"the alms short: the treasury keeps him (%d)" % stock.count(TOWN, "gold"))
+	stock.take(TOWN, "gold", stock.count(TOWN, "gold") - floor, "test")
+	_now += DayNight.day_steps
+	economy._floor_turn()
+	_check(int(work.worker("ac")["purse"]) == 3 * keep and int(work.worker("ac").get("owed", 0)) == keep, "the treasury at its floor: owed him")
 
 
 func _check(ok: bool, what: String) -> void:

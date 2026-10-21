@@ -837,6 +837,7 @@ func _floor_turn() -> void:
 		return
 	var days := day - _floor_day if _floor_day >= 0 else 0
 	_floor_day = day
+	_acolyte_turn(days)
 	var trades: Dictionary = rule.get("trades", {})
 	for id in production.worker_ids():
 		var who := production.worker(id)
@@ -877,6 +878,34 @@ func temple_offering(town: String, player_id: String, waived: bool, for_name := 
 	_alms[town] = int(_alms.get(town, 0)) + paid
 	stockpile.note(town, "gold", paid, "alms:%s" % player_id, "alms at the temple, %d" % paid)
 	return paid
+
+
+## The acolyte lives on the alms (546 amended; the coordinator's ruling
+## for Pip, Aldous's acolyte): each resident of return.acolyte.trade is
+## paid return.acolyte.keep a day for [param days] days from their town's
+## alms after the priest's share (altar_gold); what the alms can't keep,
+## the treasury pays as it does the priest's wage, or owes it (never past
+## store.owed_cap), after the officials (the temple's second man, the
+## coordinator's ruling). Their loan stands as any resident's.
+func _acolyte_turn(days: int) -> void:
+	var rule: Dictionary = rules.get("return", {}).get("acolyte", {})
+	if rule.is_empty() or days <= 0:
+		return
+	var trade := str(rule.get("trade", "acolyte"))
+	for id in production.worker_ids():
+		var who := production.worker(id)
+		var town := str(who["town"])
+		if trade not in who["trades"] or town.is_empty():
+			continue
+		var due := int(rule.get("keep", 1)) * days
+		var keep := mini(due, altar_gold(town))
+		if keep > 0:
+			_alms[town] = alms(town) - keep
+			production.pay(id, keep, "an acolyte's keep from the alms")
+			print("[economy] %s the %s is kept %d gold from %s's alms, %d left, step %d" % [who["name"], trade, keep, town, alms(town), now()])
+		var rest := mini(due - keep, maxi(int(rules.get("store", {}).get("owed_cap", 30)) - int(who.get("owed", 0)), 0))
+		if rest > 0:
+			_owe_or_pay(town, id, rest, "an acolyte's keep from the treasury")
 
 
 ## [param town]'s alms held at the temple.

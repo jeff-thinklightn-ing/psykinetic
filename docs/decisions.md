@@ -18272,3 +18272,34 @@ ui_test: the step words and fond's silence, the drop rule, the hint's words,
 the cut reason, her pack's title and hover, the map's party entry, one hint
 and one log line per drop. Client only; nothing numeric; the protocol bump
 is companions'; no new class_name.
+## 546 amended. The acolyte lives on the alms
+
+The coordinator's ruling (2026-10-21), from economy's soak of 552 with
+npc's retrain: an acolyte (npc's runner, Pip on the box) had no income,
+and Pell, retrained on day 5, ended the soak with an empty purse and a
+loan of 28. Each resident of return.acolyte.trade ("acolyte") is paid
+return.acolyte.keep (1) gold a day from their town's alms after the
+priest's share: from altar_gold, the alms above a day of the priest's
+wage, so the priest is still paid first. What the alms can't keep, the
+treasury pays as it does the priest's wage (above gold_floor), or owes
+him, never past store.owed_cap. That comes after the officials, as the
+temple's second man and not an idle resident (the coordinator's
+ruling). He is not excused tools or mending. At most this costs Held 30
+gold a month (1 a day), against its officials' 4 a day each. Their loan
+stands as any resident's.
+Economy._acolyte_turn runs in the daily turn with the wage floor
+(_floor_turn's day), and pays for every day since the last turn. The
+alms the runner takes down are less by the keep. It changes the box's
+world on the next deploy: Pip, at 0, is kept from Held's alms. larder_test
+_test_offering.
+
+## 552 amended. A newcomer's name is the town's own
+
+From the same soak: Bryn the carpenter came beside Bryn the shepherd.
+Every _comes newcomer (maker, shepherd, weaver), and the farmer's and
+the woodcutter's, now takes the first name from its list, starting at
+its hashed pick, that no resident, captive or remembered dead of the
+town has (Towns._free_name). If every name is taken it keeps the pick.
+Towns.died remembers the last DEAD_NAMES (40) names in the town's
+"dead_names". farm_test _test_maker_comes.
+

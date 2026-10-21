@@ -282,4 +282,9 @@ func _test_maker_comes() -> void:
 		"then a carpenter comes, at his bench (%s)" % [came])
 	_year(towns, 7)
 	_check(carpenters.call().size() == 1, "and only one")
+	# A newcomer's name is one the town doesn't have (552 amended).
+	var names := ["Pip", "Wat", "Lise"]
+	towns._town(TOWN)["dead_names"] = ["Wat"]
+	_check(towns._free_name(TOWN, names, 0) == "Lise", "not a resident's name, nor a dead one's (%s)" % towns._free_name(TOWN, names, 0))
+	_check(towns._free_name(TOWN, ["Pip"], 0) == "Pip", "every one taken: the first pick")
 
