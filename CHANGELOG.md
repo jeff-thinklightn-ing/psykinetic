@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Talking to townsfolk has no panel any more (Jeff: "I'd rather not have the ui at all"): click them or press E and type; they answer in the world and the talk log, an offer is spoken as a line, and while one stands the HUD says `say "yes" to take it` (Y says it for you); what you have promised them is a line in your pack.
 - Pip, the priest's apprentice, carries the temple's alms down to the barrow's altar each morning (546, npc's side, part 2), whether or not anyone is about; once the secret is out a run can go wrong, and he is lost below until someone finds him in a niche in the wall. The town notices when he is gone.
 - A monster can talk (546, npc's side, part 1): the draugr speaks his deal when you come near and it stands like any offer; "give 16" or "here is 24" takes it, a bare "yes" is not enough for him. Nothing else changes in talk.
 - The draugr waits in the barrow's lair. He speaks first: give him gold and he offers a pact, a fight whose difficulty your gold sets (one, two or three measures of the offering). Beat him and he yields and blesses everyone standing in his lair; then he rests for three days and the barrow's dead lie still, until he rises again. Lose, or leave his lair, and he keeps the gold. Clients must update (protocol revision 25).

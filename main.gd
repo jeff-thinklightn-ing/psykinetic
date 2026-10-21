@@ -440,8 +440,6 @@ var _test_hint_thing: GridEntity
 var _test_hint_cell := Vector2i(-100000, -100000)
 ## --test-show=counter: the pack panel, for the counter screen's sample.
 var _test_counter_shown: Node
-## --test-show=converse: the panel wanted on the nearest resident, once there is one.
-var _test_converse_due := false
 ## The aim ring and outline wear the draw's look (Client3D.draw_look): reset once it ends.
 var _draw_shown := false
 ## The one-time line the first time a townsperson is near (Net.hinted_talk), and when it goes.
@@ -456,8 +454,11 @@ var last_screenshot := ""
 var _still_tile := Vector2i(-100000, -100000)
 var _still_since := 0
 var _talk_hint_until := 0.0
-## Talking with a town's person (ConversePanel; ui's step 4).
-var converse: ConversePanel
+## Talking with a town's person (536, ui's side: no panel; the say line, their speech, the HUD).
+## The offer that stands with a resident for this player (npc's 536: the
+## "offers" message's "standing" title, "" for none): said on the HUD
+## line, taken by "yes" (Y, or typed).
+var standing_title := ""
 ## The world map (WorldMapPanel; ui's step 5), M after the zone's big map.
 var world_map_panel: WorldMapPanel
 ## The counter screen beside the pack (CounterPanel; economy's job, 438).
@@ -936,6 +937,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	if Keys.pressed(event, "screenshot"):
 		take_screenshot()
 		return
+	if Keys.pressed(event, "yes") and not standing_title.is_empty() and not is_typing():
+		_send_chat("yes")  # 536: the word, said; the server takes it.
+		return
 	if Keys.pressed(event, "hints"):
 		toggle_hints()
 		return
@@ -1083,12 +1087,13 @@ func _talk_to(player: Player, friend: GridEntity) -> void:
 ## for a player the chat box.
 func _open_talk(friend: GridEntity) -> void:
 	_talk_wanted = null
-	if friend is Resident:
-		open_converse(friend)
-		return
 	_open_chat()
-	if friend is Companion and _chat_box.visible:
-		_chat_box.text = "%s, " % _display_name(friend)
+	if (friend is Companion or friend is Resident) and _chat_box.visible:
+		# Addressed to them (536, ui's side: no panel): a townsperson by their name, as the server matches a line.
+		var person := str(friend.get("person")) if friend is Resident and friend.get("person") != null else ""
+		_chat_box.text = "%s, " % (person if not person.is_empty() else _display_name(friend))
+	if friend is Resident:
+		ask_offers(friend)
 		_chat_box.caret_column = _chat_box.text.length()
 
 
@@ -1159,7 +1164,7 @@ func _tap_e(player: Player) -> void:
 		return
 	if is_instance_valid(target) and target.spawned and target is Resident \
 			and World.distance(player.tile, target.tile) <= HEARING_RANGE:
-		open_converse(target)
+		_open_talk(target)
 		return
 	var door := _e_door
 	if is_instance_valid(door) and player.tile in Terrain.edge_cells(door.key):
@@ -3831,8 +3836,6 @@ func _on_counter_message(data: Dictionary) -> void:
 func _on_shop_message(data: Dictionary) -> void:
 	if data.has("gold"):
 		gold = int(data["gold"])
-		if converse != null:
-			converse.gold = gold
 	if shop_panel != null:
 		shop_panel.gold = gold
 		if data.has("shop"):
@@ -6000,10 +6003,6 @@ func _build_talk() -> void:
 	$HUD.add_child(world_map_panel)
 	if has_signal("world_changed"):
 		connect("world_changed", _refresh_world_map)
-	converse = ConversePanel.new()
-	converse.offer_accepted.connect(_accept_offer_from_panel)
-	converse.close_pressed.connect(func() -> void: converse.close())
-	$HUD.add_child(converse)
 	_context_hint = Label.new()
 	_context_hint.name = "ContextHint"
 	_context_hint.theme_type_variation = &"Outlined"
@@ -6177,14 +6176,8 @@ func _send_chat(text: String, phrase := 0) -> void:
 			World.command(me, "party", {"text": words})
 		return
 	World.command(me, "say", {"text": line, "phrase": phrase})
-	# Said to a town's person in earshot (decision 336's rule, read here too):
-	# the conversation panel on them, with the line and "thinking".
-	var body := _resident_addressed(me, line, _own_companion())
-	if body != null and converse != null:
-		if converse.resident != body:
-			open_converse(body)
-		converse.add_line(_display_name(me), line, false)
-		converse.set_thinking(true)
+	# Said to a town's person in earshot (decision 336's rule): the server answers as
+	# their speech, and takes a word that accepts their standing offer (536).
 
 
 ## This peer's own companion in the world, or null.
@@ -6195,60 +6188,31 @@ func _own_companion() -> Companion:
 	return null
 
 
-## The conversation panel on [param body] (ConversePanel), and their offers
-## asked for once npc's "offers" message exists (the client's "offers"
-## command names the body; the server answers with the list).
-func open_converse(body: GridEntity) -> void:
-	if converse == null or body == null:
-		return
-	converse.open(body, _display_name(body))
+## [param body]'s offers asked for (the client's "offers" command names the
+## body; the server answers with the list, its "open" ones and "standing"):
+## the pack's Promised line and the HUD's standing line follow (536, ui's side).
+func ask_offers(body: GridEntity) -> void:
 	var player := _local_player()
-	converse.gold = gold
-	converse.at_counter = player != null and shop_counter_in_reach(player)
-	if player != null and "offers" in Net.MESSAGE_KINDS:
+	if body != null and player != null and "offers" in Net.MESSAGE_KINDS:
 		World.command(player, "offers", {"entity": str(body.get_path())})
 
 
-## Client: whether a shop counter stands within [param player]'s reach, the
-## test the server makes for a buy from the talk (_counter_near, without
-## the town, which the client cannot name); for ConversePanel.at_counter
-## (decision 512).
-func shop_counter_in_reach(player: GridEntity) -> bool:
-	if player == null:
-		return false
-	for entity: GridEntity in World.get_entities():
-		if entity is Chest and (entity as Chest).shop and entity.spawned and World.reaches(player, entity):
-			return true
-	return false
-
-
-## An offer accepted on the panel: npc's "offer" command ({id}, and gold
-## for a loan); the server (its own _accept_offer, 435) answers with the
-## offers again.
-func _accept_offer_from_panel(id: String, gold: int) -> void:
-	var player := _local_player()
-	if player == null or "offers" not in Net.MESSAGE_KINDS:
-		return
-	var args := {"id": id}
-	if gold > 0:
-		args["gold"] = gold
-	World.command(player, "offer", args)
-
-
-## npc's "offers" message: the resident's offers for the panel (opened on
-## them if it is not), the open commissions listed as what the player owes.
+## npc's "offers" message (536, ui's side: no panel): the open commissions
+## become the pack's "Promised" line, and "standing" (the offer that
+## stands with that resident, npc's 536) the HUD's title; absent, none.
 func _on_offers_message(data: Dictionary) -> void:
-	var body := get_node_or_null(NodePath(str(data.get("entity", "")))) as GridEntity
-	if body == null or converse == null:
-		return
-	if converse.resident != body:
-		converse.open(body, _display_name(body))
-	var given: Array = []
-	var owed: Array = []
+	var owed: Array[String] = []
 	for each: Variant in data.get("offers", []):
-		if each is Dictionary:
-			(owed if bool(each.get("open", false)) else given).append(each)
-	converse.show_offers(given, owed)
+		if each is Dictionary and bool(each.get("open", false)):
+			owed.append(str(each.get("title", each.get("words", ""))))
+	if pack_panel != null:
+		pack_panel.promised = owed
+	standing_title = str((data["standing"] as Dictionary).get("title", "")) if data.get("standing") is Dictionary else ""
+
+
+## The HUD's words while an offer stands (536, ui's side): how to take it, and what it is.
+static func standing_words(title: String) -> String:
+	return 'say "yes" to take it: %s' % title if not title.is_empty() else ""
 
 
 ## The latest blow (_narrate_damage): who was struck and by whom, so a
@@ -6502,8 +6466,6 @@ func _on_message(kind: String, data: Dictionary) -> void:
 		talk.add_line(speaker, str(data.get("text", "")))
 		if entity != null:
 			bubbles.show_line(entity.get_instance_id(), str(data.get("text", "")))
-		if converse != null and converse.visible and entity != null and entity == converse.resident:
-			converse.add_line(speaker, str(data.get("text", "")), true)
 	if kind == "offers":
 		_on_offers_message(data)
 
@@ -7860,9 +7822,9 @@ func _on_world_ticked(tick: int) -> void:
 			hp_text += "   bow drawn"  # How far: the body, the ring and the creak (decision 475); F3 has the number.
 		if _hidden_in_cover(player, tick):
 			hp_text += "   hidden in the grass"  # Decision 515: the one cue that the cover works.
+		if not standing_title.is_empty():
+			hp_text += "   " + standing_words(standing_title)  # 536: an offer stands; "yes" (Y) takes it.
 	_hud_tick = tick
-	if converse != null and converse.visible and player != null:
-		converse.at_counter = shop_counter_in_reach(player)  # Decision 512: the buy's place, as the player moves.
 	hud.text = hp_text
 	if player != null and _connect_joining and connect_screen != null:
 		_connect_joining = false
@@ -7882,8 +7844,7 @@ func _on_world_ticked(tick: int) -> void:
 	_run_test_door(player, tick)
 	_run_test_chest(player)
 	_run_test_show(player)
-	if _test_converse_due and player != null:
-		_test_converse_due = not _test_converse(player)
+	_run_test_offer(player)
 	if world_map_panel != null and world_map_panel.visible:
 		_refresh_world_map()
 	_first_talk_hint(player)
@@ -7911,7 +7872,8 @@ func hint_lines() -> Array[String]:
 		"RMB in pack\tuse it (eat, open a purse, bandage)",
 		"%s\ttalk (/w whisper)" % Keys.name_of("talk"), "%s\ttalk log" % Keys.name_of("talk_log"), "%s\tmap" % Keys.name_of("map"), "%s\tlantern" % Keys.name_of("lantern"),
 		"%s\treset the room" % Keys.name_of("reset"), "%s\toptions" % Keys.name_of("options"), "%s\tdebug" % Keys.name_of("debug"), "%s\tfullscreen" % Keys.name_of("fullscreen"),
-		"%s\tscreenshot, saved under %s" % [Keys.name_of("screenshot"), ProjectSettings.globalize_path(str(screenshot_folder()[0]))], "%s\thide these" % Keys.name_of("hints")])
+		"%s\tscreenshot, saved under %s" % [Keys.name_of("screenshot"), ProjectSettings.globalize_path(str(screenshot_folder()[0]))],
+		"%s\tsay yes to an offer that stands (or type it)" % Keys.name_of("yes"), "%s\thide these" % Keys.name_of("hints")])
 	if Net.mode == Net.Mode.HOST:
 		lines.append("%s\tbuilder mode" % Keys.name_of("builder"))
 	return lines
@@ -7977,8 +7939,6 @@ func escape() -> void:
 		world_map_panel.close()
 	elif game_menu != null and game_menu.visible:
 		game_menu.open(false)
-	elif converse != null and converse.visible:
-		converse.close()
 	elif options_panel != null and options_panel.visible:
 		toggle_options()
 	elif pack_panel != null and pack_panel.other != null:
@@ -9013,46 +8973,57 @@ func take_screenshot() -> void:
 		Net.set_hinted_shot(true)
 
 
-## --test-show=converse: the panel on the nearest town's person, with sample
-## offers in npc's shape (the words are a test's); false while there is none.
-func _test_converse(player: Player) -> bool:
-	var nearest: GridEntity = null
-	for entity in World.get_entities():
-		if entity is Resident and (nearest == null
-				or World.distance(player.tile, entity.tile) < World.distance(player.tile, nearest.tile)):
-			nearest = entity
-	if nearest == null:
-		return false
-	if "sick" in Net.test_show:
-		nearest.ailing = "a fever"  # The sick read's shot (515 amended): the hint and the title say it.
-		_test_hint_thing = nearest
-	open_converse(nearest)
-	converse.add_line(_display_name(player), "(a test line) Any work for me?", false)
-	converse.add_line(converse._name.text, "(a test line) Bram's boy is held at the goblins' camp. Bring him home and the town will not forget it.", true)
-	var purse := 1  # Decision 512: a purse too short for the loaf, in the shot.
-	var given: Array = [
-		{"id": "t1", "kind": "commission", "title": "Bring Bram home", "words": "He was carried off in the raid.", "accept": "take", "cost": 0},
-		{"id": "t2", "kind": "shop", "title": "A loaf, 2 gold", "words": "Baked this morning.", "accept": "buy", "cost": 2},
-		{"id": "t3", "kind": "rumour", "title": "What Tam said", "words": "At the well, Tam told me the mine is cursed.", "accept": "", "cost": 0}]
-	if "give" in Net.test_show:
-		# npc's building fund (499): the official's two give lines, a purse of 20.
-		var waits := "The inn waits on 6 wood and 2 stone and 14 gold; what you give goes to it."
-		given = [  # Titles as npc's 74775fa8 words them: no sum, the brass beside says it; the second line's words empty.
-			{"id": "g1", "kind": "give", "title": "Give toward the inn", "words": waits, "accept": "give", "cost": 10},
-			{"id": "g2", "kind": "give", "title": "Give the rest", "words": "", "accept": "give", "cost": 14}]
-		purse = 20
-	elif "news" in Net.test_show:
-		# npc's road news (504): the counter's rumour lines after a wagon's trip.
-		given = [
-			{"id": "n1", "kind": "rumour", "title": "What Ren said", "accept": "", "cost": 0,
-				"words": "Ren told me at the counter that she came home from the castle market: food and wood went, salt and cloth came back, and it sold well against what the goods were worth."},
-			{"id": "n2", "kind": "rumour", "title": "What Oda said", "accept": "", "cost": 0,
-				"words": "Oda told me that the goblins of the ridge camp struck the town's wagon on the road to the castle market, took its food, and carried Wat off with it."}]
-	converse.show_offers(given, [{"id": "t0", "kind": "commission", "title": "Walk Tam home", "open": true}])
-	converse.gold = purse
-	if shop_panel != null:
-		shop_panel.gold = purse  # The badge by the pack says the same purse.
-	return true
+## --test-show=offer and sick (536, ui's side): once a resident is there,
+## the player walks to their side; then (offer) asks them for work after
+## TEST_OFFER_ASK seconds and says "yes" after TEST_OFFER_YES, the server
+## speaking the offer and taking the word (npc's 536), the HUD line
+## between; (sick) their ailing set and the hint on them.
+var _test_offer_due := false
+var _test_offer_since := 0.0
+var _test_offer_body: GridEntity
+var _test_offer_asked := false
+var _test_offer_said_yes := false
+const TEST_OFFER_ASK := 5.0
+const TEST_OFFER_YES := 11.0
+
+
+func _run_test_offer(player: Player) -> void:
+	if not _test_offer_due or player == null:
+		return
+	if _test_offer_body == null:
+		var nearest: GridEntity = null
+		for entity in World.get_entities():
+			if entity is Resident and (nearest == null
+					or World.distance(player.tile, entity.tile) < World.distance(player.tile, nearest.tile)):
+				nearest = entity
+		if nearest == null:
+			return
+		_test_offer_body = nearest
+		if "sick" in Net.test_show:
+			nearest.ailing = "a fever"  # The sick read's shot (515 amended): the hint says it.
+			_test_hint_thing = nearest
+	if "offer" not in Net.test_show or not is_instance_valid(_test_offer_body):
+		return
+	var now := Time.get_ticks_msec() / 1000.0
+	var body := _test_offer_body
+	if not _test_offer_asked:
+		if World.distance(player.tile, body.tile) > RESIDENT_EARSHOT:
+			# Walking to their side (the goal renewed each second: they move on their day).
+			if now - _test_offer_since >= 1.0:
+				_test_offer_since = now
+				for step: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+					if World.is_walkable(body.tile + step):
+						World.command_move(player, body.tile + step)
+						break
+			return
+		_test_offer_asked = true
+		_test_offer_since = now
+		_send_chat("any work for me?")  # In earshot: addressed by nearness, as a player's line is.
+	elif now - _test_offer_since >= 1.5 and standing_title.is_empty() and not _test_offer_said_yes:
+		standing_title = "(a test offer) Bring Bram home"  # Nothing stood with them: a sample, so the shot shows the HUD's line.
+	elif now - _test_offer_since >= TEST_OFFER_YES - TEST_OFFER_ASK and not _test_offer_said_yes:
+		_test_offer_said_yes = true
+		_send_chat("yes")
 
 
 ## --test-show: the named HUD panels opened once the player is in, for
@@ -9143,8 +9114,8 @@ func _run_test_show(player: Player) -> void:
 				options_panel.begin_rebind("open")
 				get_tree().create_timer(0.5).timeout.connect(func() -> void:
 					options_panel._scroll.scroll_vertical = 2400)
-			"converse", "sick", "give", "news":
-				_test_converse_due = true  # Residents come with the town's sync: tried each tick.
+			"offer", "sick":
+				_test_offer_due = true  # Residents come with the town's sync: tried each tick.
 			"hint":
 				for entity in World.get_entities():
 					if entity is Cargo or entity is Chest:

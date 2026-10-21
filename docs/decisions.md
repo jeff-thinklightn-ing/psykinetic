@@ -16940,3 +16940,37 @@ before has none. Numbers in townsfolk.json "runner". resident_test.
 Parts to come: Aldous's secrets as lore's entries with knowers; "Take the
 offering down" (a kept offering births the "cheated" standing key from
 Jeff's list) and "Find the runner".
+## 536, ui's side: talk with no panel
+
+Jeff, from his play tests (2026-10-19): "the npc interaction ui, the
+questions at the bottom don't seem natural when every npc is the same...
+I'd rather not have the ui at all." The coordinator's two steps: the
+quick asks went first (436 amended); this is the second, with npc's 536
+(the three asks answered with the offer's words verbatim as speech, one
+standing offer per player and resident, taken by "yes", "I'll take it",
+"done", the thing's or person's name, "the rest" or an amount said;
+"offers" carries "standing" {id, title}, PROTOCOL_REVISION 23).
+
+- ConversePanel (436, with 512's trade reads and 515's sick title) is
+  retired: the class is gone, and with it Main's open_converse, the accept
+  from the panel, the chat path's "thinking", and the test states
+  converse, give and news. The shop and counter panels stay: goods, not
+  conversation.
+- E or a click on a townsperson puts the cursor in the say line addressed
+  to them ("Hob, ") as a companion's is, and asks the server for their
+  offers (Main.ask_offers, the "offers" command) so the lists below are
+  fresh; their words are their bubble and the talk log, as every line.
+- While "standing" is in the "offers" message (sent with every one of
+  them), the HUD's state line says `say "yes" to take it: <title>`
+  (Main.standing_words); Y (Keys "yes", rebindable, in the controls list)
+  says "yes" as a say line while an offer stands and the say line is not
+  open; the server takes the word. Without the key nothing is said.
+- Open commissions ("open" in the same message) are the pack's foot line
+  "Promised: Bring Bram home" (PackPanel.promised), in brass, at a glance.
+- The sick read (515 amended) stays in the cursor hint alone.
+- --test-show=offer walks the player to the nearest resident's side, asks
+  them for work after TEST_OFFER_ASK seconds and says "yes" after
+  TEST_OFFER_YES, for the shots; --test-show=sick keeps its hint.
+
+ui_test: no panel, the standing words, an offers message's effect and its
+absence, Y's default. Client only; the protocol change is npc's.

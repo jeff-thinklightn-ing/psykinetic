@@ -25,7 +25,7 @@ func _ready() -> void:
 	_test_item_tip()
 	await _test_talk_panel()
 	_test_context_and_place()
-	_test_converse_panel()
+	_test_talk_no_panel()
 	_test_sim_reads()
 	_test_minimap_turn()
 	_test_screenshot_key()
@@ -285,63 +285,26 @@ func _test_context_and_place() -> void:
 		"the controls list in two columns (%d lines)" % _main.hint_panel.lines().size())
 
 
-func _test_converse_panel() -> void:
-	print("== the conversation panel: who speaks, the exchange, the offers, the asks ==")
-	var panel: ConversePanel = _main.converse
-	_check(panel != null and not panel.visible, "there, hidden")
-	panel.open(null, "Mara [cook]")
-	_check(panel.visible and panel._name.text == "Mara [cook]", "opened on a label when the body has no person")
-	panel.add_line("Player", "Any work for me?", false)
-	panel.set_thinking(true)
-	_check(panel.thinking and panel._dots.text.begins_with("thinking"), "a line sent: thinking")
-	panel.add_line("Mara", "Bring Bram home.", true)
-	_check(not panel.thinking and panel._lines.get_child_count() == 2, "their answer: the exchange, thinking over")
-	panel.show_offers([
+func _test_talk_no_panel() -> void:
+	print("== talk with no panel (536, ui's side): the standing offer on the HUD, Y, what is promised in the pack ==")
+	_check(not _main.has_node("HUD/ConversePanel") and _main.get("converse") == null, "no conversation panel (436 retired)")
+	_check(Main.standing_words("A loaf, 2 gold") == 'say "yes" to take it: A loaf, 2 gold' and Main.standing_words("") == "",
+		"the HUD's words while an offer stands")
+	_main._on_offers_message({"entity": "", "offers": [
 		{"id": "a", "kind": "commission", "title": "Bring Bram home", "words": "He was carried off.", "accept": "take", "cost": 0},
-		{"id": "b", "kind": "shop", "title": "A loaf, 2 gold", "words": "Baked today.", "accept": "buy", "cost": 2},
-		{"id": "c", "kind": "rumour", "title": "What Tam said", "words": "The mine is cursed.", "accept": "", "cost": 0},
-		{"id": "d", "kind": "plea", "title": "A loan of 10", "words": "Lend me ten gold.", "accept": "lend", "cost": 10}],
-		[{"id": "z", "kind": "commission", "title": "Walk Tam home", "open": true}])
-	_check(panel.offers_shown() == ["Bring Bram home [Take it on]", "A loaf, 2 gold [Buy]", "What Tam said", "A loan of 10 [Lend]"],
-		"the offers: a title, the accept's words, none for a rumour (%s)" % [panel.offers_shown()])
-	_check(panel._owed.visible and panel._owed.text == "You owe them: Walk Tam home", "an open commission as what the player owes")
-	# Decision 512: the shop row reads the purse and the counter's reach.
-	panel.gold = 5
-	panel.at_counter = true
-	var loaf: HBoxContainer = panel._offer_rows.get_child(1)
-	_check(panel.offers_shown()[1] == "A loaf, 2 gold [Buy]" and (loaf.get_node("Price") as Label).text == "2 gold"
-		and (loaf.find_child("Where", true, false) as Label).text == "at the town's counter" and panel._purse.visible and panel._purse.text == "You carry 5 gold",
-		"at the counter with gold enough: Buy, the price in brass, the purse in the foot (%s)" % [panel.offers_shown()])
-	panel.gold = 1
-	panel.at_counter = false
-	loaf = panel._offer_rows.get_child(1)
-	_check(panel.offers_shown()[1] == "A loaf, 2 gold [Buy at the counter]" and (loaf.get_node("Price") as Label).text == "2 gold, you carry 1"
-		and (loaf.find_child("Where", true, false) as Label).text == "walk to the town's counter first",
-		"away from it and short: Buy at the counter, the price with what they carry, where to stand (%s)" % [panel.offers_shown()])
-	_check(_main.shop_counter_in_reach(_main._local_player()) == false, "the client's reach test: no shop counter near the test player")
-	panel.gold = 5
-	panel.at_counter = true
-	var got := []
-	panel.offer_accepted.connect(func(id: String, gold: int) -> void: got.assign([id, gold]))
-	(panel._offer_rows.get_child(0).get_node("Accept") as Button).pressed.emit()
-	_check(got == ["a", 0], "Take it on: the offer's id (%s)" % [got])
-	(panel._offer_rows.get_child(3).get_node("Accept") as Button).pressed.emit()
-	_check(got == ["d", 10], "Lend: the id and the gold asked, up to the loan (%s)" % [got])
-	_check(panel._foot.get_child_count() == 1 and (panel._foot.get_child(0) as Button).text == "Close",
-		"no quick-ask buttons: the foot is Close alone (436 amended, Jeff's play test; talk is the say line)")
-	_main.escape()
-	_check(not panel.visible, "Esc closes it")
+		{"id": "z", "kind": "commission", "title": "Walk Tam home", "open": true}],
+		"standing": {"id": "a", "title": "Bring Bram home"}})
+	_check(_main.standing_title == "Bring Bram home" and _main.pack_panel.promised == ["Walk Tam home"]
+		and _main.pack_panel._promised.visible and _main.pack_panel._promised.text == "Promised: Walk Tam home",
+		"an offers message: the standing title kept, the open commissions as the pack's Promised line")
+	_main._on_offers_message({"entity": "", "offers": []})
+	_check(_main.standing_title.is_empty() and _main.pack_panel.promised.is_empty() and not _main.pack_panel._promised.visible,
+		"without the key nothing stands, and nothing is promised")
+	_check(Keys.DEFAULTS["yes"] == KEY_Y and Keys.WORDS.has("yes"), "Y says yes by default, in the Options' key rows")
 	_check(Main.server_status_words({"ok": false, "why": "no answer"}) == "status unknown", "no answer is status unknown")
 	var fonts := UiTheme.credits()
 	_check(fonts["entries"].size() == 2 and UiTheme.credits in OptionsPanel.credit_providers(),
 		"the fonts' credit (Alegreya, Alegreya Sans, OFL) is one of the Credits' providers")
-	# npc's give offer (499): the kind's word, the verb, the price in brass, the purse with it.
-	panel.gold = 5
-	panel.show_offers([{"id": "g", "kind": "give", "title": "Give 10 toward the inn", "words": "The inn waits on 14 gold.", "accept": "give", "cost": 10}], [])
-	var give_row: HBoxContainer = panel._offer_rows.get_child(0)
-	_check(panel.offers_shown() == ["Give 10 toward the inn [Give]"] and (give_row.get_node("Kind") as Label).text == "a gift"
-		and (give_row.get_node("Price") as Label).text == "10 gold" and panel._purse.visible and panel._purse.text == "You carry 5 gold",
-		"a gift toward the town's build: 'a gift', Give, the gold in brass, the purse shown (%s)" % [panel.offers_shown()])
 
 
 func _test_sim_reads() -> void:
@@ -367,15 +330,8 @@ func _test_sim_reads() -> void:
 	sick.person = "Oda"
 	sick.trade = "cook"
 	sick.ailing = "a fever"
-	var panel: ConversePanel = _main.converse
-	panel.open(sick)
-	_check(panel._name.text == "Oda" and panel._trade.text == "cook, in bed with a fever", "the talk's title says who is in bed with what (515 amended, npc's ailing)")
 	if _main._local_player() != null:
-		_check(_main.context_hint_for(sick) == "LMB  talk   in bed with a fever", "and the hint over them says it too")
-	sick.ailing = ""
-	panel.open(sick)
-	_check(panel._trade.text == "cook", "well again: the trade alone")
-	panel.close()
+		_check(_main.context_hint_for(sick) == "LMB  talk   in bed with a fever", "the hint over someone in bed says it (515 amended)")
 	sick.free()
 	_check(Main.pile_words(PackedStringArray(["herbs"])) == "herbs" and Main.pile_words(PackedStringArray(["herbs", "dagger", "rope"])) == "herbs and 2 more"
 		and Main.pile_words(PackedStringArray()) == "", "a pile's words: the first thing's short name, and how many more")
@@ -553,7 +509,7 @@ func _test_keys() -> void:
 	var today := {"open": KEY_E, "pack": KEY_I, "pick_up": KEY_F, "drop": KEY_G, "throw": KEY_T, "talk": KEY_ENTER,
 		"talk_log": KEY_TAB, "map": KEY_M, "lantern": KEY_L, "reset": KEY_R, "options": KEY_O, "hints": KEY_H,
 		"debug": KEY_F3, "fullscreen": KEY_F11, "builder": KEY_B, "phrase_1": KEY_1, "phrase_2": KEY_2,
-		"phrase_3": KEY_3, "phrase_4": KEY_4, "attack_friend": KEY_SHIFT, "screenshot": KEY_F12}
+		"phrase_3": KEY_3, "phrase_4": KEY_4, "attack_friend": KEY_SHIFT, "screenshot": KEY_F12, "yes": KEY_Y}
 	var same := Keys.DEFAULTS.size() == today.size()
 	for action: String in today:
 		same = same and int(Keys.DEFAULTS.get(action, -1)) == int(today[action])

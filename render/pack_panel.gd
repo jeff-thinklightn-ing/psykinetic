@@ -78,6 +78,17 @@ var _other_row: HBoxContainer
 var _player_title: Label
 var _player_row: HBoxContainer
 var _weight: Label
+## What the player has promised the townsfolk (open commissions, npc's
+## "offers" with "open"; 536, ui's side): a caption in the foot, "Promised:
+## Bring Bram home", nothing when none.
+var promised: Array[String] = []:
+	set(value):
+		if value == promised:
+			return
+		promised = value
+		if is_node_ready():
+			_refresh()
+var _promised: Label
 ## The hover tip, a sibling above the panel (made on the first hover).
 var tip: ItemTip
 ## Each row's entity and contents as last shown: an item new in a slot is
@@ -171,6 +182,11 @@ func _ready() -> void:
 	_weight = Label.new()
 	_weight.theme_type_variation = &"Caption"
 	column.add_child(_weight)
+	_promised = Label.new()
+	_promised.theme_type_variation = &"Caption"
+	_promised.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_promised.add_theme_color_override("font_color", UiTheme.color("brass"))
+	column.add_child(_promised)
 	_refresh()
 
 
@@ -266,7 +282,7 @@ func _icon_arrived(_id: String) -> void:
 func _signature() -> Array:
 	var who := player if is_instance_valid(player) else null
 	var opened := other if is_instance_valid(other) else null
-	var sig: Array = [who, opened, shown, icons != null, _icons_seen]
+	var sig: Array = [who, opened, shown, icons != null, _icons_seen, promised.duplicate()]
 	for entity in [who, opened]:
 		if entity != null:
 			sig.append(entity.slots.duplicate())
@@ -350,6 +366,8 @@ func _refresh() -> void:
 			carried += Items.weight_of(item)
 	_weight.text = "carrying %s kg" % str(snappedf(carried, 0.1)) if carried > 0.0 else ""
 	_weight.visible = carried > 0.0
+	_promised.text = "Promised: %s" % ", ".join(promised) if not promised.is_empty() else ""
+	_promised.visible = not promised.is_empty()
 	_signature_shown = _signature()
 
 

@@ -15,7 +15,7 @@ const DEFAULTS := {
 	"talk": KEY_ENTER, "talk_log": KEY_TAB, "map": KEY_M, "lantern": KEY_L, "reset": KEY_R,
 	"options": KEY_O, "hints": KEY_H, "debug": KEY_F3, "fullscreen": KEY_F11, "builder": KEY_B,
 	"phrase_1": KEY_1, "phrase_2": KEY_2, "phrase_3": KEY_3, "phrase_4": KEY_4,
-	"attack_friend": KEY_SHIFT, "screenshot": KEY_F12,
+	"attack_friend": KEY_SHIFT, "screenshot": KEY_F12, "yes": KEY_Y,
 }
 ## What each action is called in the Options, in the order shown.
 const WORDS := {
@@ -25,6 +25,7 @@ const WORDS := {
 	"debug": "Debug text", "fullscreen": "Fullscreen", "builder": "Builder mode",
 	"phrase_1": "Quick phrase 1", "phrase_2": "Quick phrase 2", "phrase_3": "Quick phrase 3", "phrase_4": "Quick phrase 4",
 	"attack_friend": "Held with a click: attack a friend", "screenshot": "Screenshot",
+	"yes": "Say yes to an offer that stands",
 }
 ## Enter's other key counts as Enter.
 const ALIASES := {KEY_ENTER: [KEY_KP_ENTER]}
