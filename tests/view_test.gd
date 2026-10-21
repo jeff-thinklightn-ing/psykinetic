@@ -1658,16 +1658,36 @@ func _test_relief() -> void:
 	# a water cell's corner dry bank).
 	var hills := Level.load_level("hills")
 	_rig.rebuild(hills["terrain"], hills["centre"])
+	# Its water a ribbon (decision 557): at each path cell's middle the
+	# water's surface (its corners' means), never rising down the stream,
+	# over its bed all along.
 	var off_surface := 0
 	var heights_seen: Dictionary = {}
-	for body: MeshInstance3D in _rig._water_bodies:
-		for point: Vector3 in (body.mesh as ArrayMesh).surface_get_arrays(0)[Mesh.ARRAY_VERTEX]:
-			var vertex := Vector2i(roundi(point.x + 0.5), roundi(point.z + 0.5))
-			# A bank's corner with no water round it (decision 553) is its cell's.
-			if _rig._water_corner(vertex) == INF:
-				continue
-			off_surface += 0 if absf(point.y - _rig._water_corner(vertex) - Client3D.WATER_LIFT) < 0.001 else 1
-			heights_seen[snappedf(point.y, 0.01)] = true
+	var rising := 0
+	var under_bed := 0
+	var stream_path: Array = hills["terrain"]["streams"][0]["path"]
+	var middles: PackedVector3Array = (_rig._stream_ribbons[0].mesh as ArrayMesh).surface_get_arrays(0)[Mesh.ARRAY_VERTEX] \
+			if not _rig._stream_ribbons.is_empty() else PackedVector3Array()
+	for k in range(1, middles.size(), 3):
+		var point := middles[k]
+		heights_seen[snappedf(point.y, 0.01)] = true
+		if k >= 4 and point.y > middles[k - 3].y + 0.001:
+			rising += 1
+		var spot := Vector2(point.x, point.z)
+		if point.y < _rig._ground_height(spot) - 0.001:
+			under_bed += 1
+	for cell: Vector2i in stream_path:
+		var water_level: float = _rig._water_surface(Vector2(cell)) + Client3D.WATER_LIFT
+		var nearest := INF
+		var y := 0.0
+		for k in range(1, middles.size(), 3):
+			var gap := Vector2(middles[k].x, middles[k].z).distance_to(Vector2(cell))
+			if gap < nearest:
+				nearest = gap
+				y = middles[k].y
+		off_surface += 0 if nearest < 0.01 and absf(y - water_level) < 0.001 else 1
+	var covered := _ribbon_report(_rig, Vector2.ZERO)
+	off_surface += rising + under_bed + covered["uncovered"].size()
 	var dry_bed := []
 	for cell: Vector2i in _rig._wet:
 		var bed := _rig._corner_heights(cell)
@@ -1677,7 +1697,16 @@ func _test_relief() -> void:
 				dry_bed.append(cell)
 				break
 	_check(off_surface == 0 and heights_seen.size() > 3 and dry_bed.is_empty(),
-			"a stream's surface slopes down its valley, each corner its water's mean, its bed under it (%d heights; off: %d; beds above: %s)" % [heights_seen.size(), off_surface, dry_bed.slice(0, 4)])
+			"a stream's ribbon slopes down its valley, at each path cell its water, never rising, over its bed, over all its cells (%d heights; off: %d, rising %d, under its bed %d, uncovered %s; beds above: %s)" % [heights_seen.size(), off_surface, rising, under_bed, covered["uncovered"].slice(0, 3), dry_bed.slice(0, 4)])
+	# Its falls (decision 557, for sound's ambience): each a step down its
+	# path of more than FALL_LEAST, the cell below it; a new array a build.
+	var falls := _rig.stream_falls
+	var true_falls := falls.all(func(fall: Dictionary) -> bool:
+		var i := stream_path.find(fall["cell"])
+		return i > 0 and absf(_rig._elevation(stream_path[i - 1]) - _rig._elevation(stream_path[i]) - float(fall["drop"])) < 0.001 				and float(fall["drop"]) > Client3D.FALL_LEAST)
+	_rig.rebuild(hills["terrain"], hills["centre"])
+	_check(not falls.is_empty() and true_falls and not is_same(falls, _rig.stream_falls) and falls == _rig.stream_falls,
+			"the stream's falls listed, each a step down its path over %.2f m (%s), a new array each build" % [Client3D.FALL_LEAST, falls])
 	# Its banks: within a walk of the water a grassy slope into it, no face;
 	# a face only where the land stands a cliff over it.
 	var faces: Dictionary = {}
@@ -1939,17 +1968,25 @@ func _test_streams() -> void:
 	_check(texel.call(ford).r > 0.9 and texel.call(ford).b > 0.9 and texel.call(under).r > 0.9 and texel.call(under).b < 0.1
 			and texel.call(plain).r > 0.9 and texel.call(plain).b < 0.1,
 			"the mask: the ford water and shallow, the bridge's cell water, the stream's water not shallow")
-	var flow := _rig._flow_mask.get_image()
+	# Its water a ribbon along its path (decision 557): over every one of
+	# its own cells' middles, running down the path, the cells marked its
+	# own in the mask's a and left out of the bodies.
 	var path: Array = streams[0]["path"]
 	var down := Vector2(path[-1] - path[0]).normalized()
-	var all_down := path.all(func(cell: Vector2i) -> bool:
-		var way := Vector2(flow.get_pixelv(cell - _rig._mask_origin).r, flow.get_pixelv(cell - _rig._mask_origin).g) * 2.0 - Vector2.ONE
-		return way.dot(down) > 0.9)
-	var away: Vector2i = terrain["floor"].filter(func(cell: Vector2i) -> bool:
-		return path.all(func(on: Vector2i) -> bool: return (cell - on).length() > Client3D.STREAM_REACH + 1))[0]
-	var dry_way := flow.get_pixelv(away - _rig._mask_origin)
-	_check(all_down and absf(dry_way.r - 0.5) < 0.01 and absf(dry_way.g - 0.5) < 0.01,
-			"the flow runs down the path at each of its cells, none away from it")
+	_check(_rig._stream_ribbons.size() == streams.size(), "a ribbon a stream (%d for %d)" % [_rig._stream_ribbons.size(), streams.size()])
+	var report := _ribbon_report(_rig, down)
+	_check(report["uncovered"].is_empty() and report["against"] == 0,
+			"the ribbon over each of its cells' middles (uncovered: %s), running down the path (%d points against it)" % [report["uncovered"].slice(0, 3), report["against"]])
+	var in_bodies := []
+	for body: MeshInstance3D in _rig._water_bodies:
+		for point: Vector3 in (body.mesh as ArrayMesh).surface_get_arrays(0)[Mesh.ARRAY_VERTEX]:
+			var corner := Vector2i(roundi(point.x + 0.5), roundi(point.z + 0.5))
+			var round_it := [corner - Vector2i.ONE, corner - Vector2i(0, 1), corner - Vector2i(1, 0), corner]
+			if round_it.all(func(c: Vector2i) -> bool: return _rig._stream_cells.has(c)):
+				in_bodies.append(corner)
+	var running: Vector2i = path.filter(func(cell: Vector2i) -> bool: return not fords.has(cell) and not bridged.has(cell))[0]
+	_check(texel.call(ford).a > 0.9 and texel.call(running).a > 0.9 and texel.call(plain).a < 0.1 and in_bodies.is_empty(),
+			"the stream's cells its own in the mask's a (a pond's not), none drawn by a body (%s)" % [in_bodies.slice(0, 3)])
 	var bed := _rig._grounds.get(under, -1) as int
 	_check(bed >= _rig._ground_floor_end and bed < _rig._ground_water_end and _rig._bed_levels.get(under, -1) == int(terrain["heights"].get(plain, 0)),
 			"under the bridge the ground is the stream's bed, at its level")
@@ -2042,7 +2079,8 @@ func _test_shore() -> void:
 		_check(checked > 0 and astray.is_empty(),
 				"%s: the water's edge within %.2f of its cells' (%d points; astray: %s)" % [name, Client3D.SHORE_BOUND, checked, astray.slice(0, 4)])
 		if not bool(level["terrain"].get("relief_given", false)):
-			_check(not wet.is_empty() and _rig._shore_heights.is_empty(), "%s (no relief): its ground drawn whole, its water's edge the shaders'" % name)
+			_check(not wet.is_empty() and _rig._shore_heights.is_empty() and _rig._stream_ribbons.is_empty() and _rig.stream_falls.is_empty(),
+					"%s (no relief): its ground drawn whole, its water's edge the shaders', no ribbon" % name)
 			continue
 		# Drawn finer only in the band: water and land in its 3 x 3.
 		var outside := []
@@ -2174,6 +2212,34 @@ func _test_ledges() -> void:
 		_check(shown, "%s: the drawn height takes a cap in, a puppet's doesn't" % name)
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
+
+
+## The ribbons of [param rig] (decision 557): its stream cells whose middle
+## no ribbon triangle covers ("uncovered"), and how many ribbon points run
+## against [param down] ("against"; none counted for a zero one).
+static func _ribbon_report(rig: Client3D, down: Vector2) -> Dictionary:
+	var triangles: Array[PackedVector2Array] = []
+	var against := 0
+	for ribbon: MeshInstance3D in rig._stream_ribbons:
+		var arrays := (ribbon.mesh as ArrayMesh).surface_get_arrays(0)
+		var points: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+		var colours: PackedColorArray = arrays[Mesh.ARRAY_COLOR]
+		var indices: PackedInt32Array = arrays[Mesh.ARRAY_INDEX]
+		for t in range(0, indices.size(), 3):
+			var flat := PackedVector2Array()
+			for k in 3:
+				flat.append(Vector2(points[indices[t + k]].x, points[indices[t + k]].z))
+			triangles.append(flat)
+		for colour: Color in colours:
+			if down != Vector2.ZERO and Vector2(colour.r * 2.0 - 1.0, colour.g * 2.0 - 1.0).dot(down) < 0.0:
+				against += 1
+	var uncovered := []
+	for cell: Vector2i in rig._stream_cells:
+		var middle := Vector2(cell)
+		if not triangles.any(func(flat: PackedVector2Array) -> bool:
+				return Geometry2D.point_is_inside_triangle(middle, flat[0], flat[1], flat[2])):
+			uncovered.append(cell)
+	return {"uncovered": uncovered, "against": against}
 
 ## levels/hills (decision 358; relief since 525, drawn from its whole
 ## levels until terrain's side reads metres): every ledge between two of

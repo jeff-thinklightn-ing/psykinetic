@@ -18487,3 +18487,60 @@ over it; faces within their cells; capped cells side by side meet on
 their edge; the drawn height takes a cap in and a puppet's doesn't; the
 castle and the wilds without caps. Shots and A/B in C:\dev\review\ledges
 (ab-*.png). Client only, protocol unchanged, no new class_name.
+## 557. Streams as ribbons
+
+Step 2 of terrain's unsquaring design, on 553's spline (Jeff: "square
+rivers"). The coordinator approved it with two cares: a ford still reads
+as a crossing (shallow, the stones showing), and sound hears where the
+falls are. The hills' stream and the sample's are the checks.
+
+**The ribbon.** A stream's water was the body's cell quads, its flow a
+texel a cell (flow_mask), turning at cell edges. Now each stream is a
+ribbon (Client3D._build_ribbons):
+- It runs along the Catmull-Rom through its path cells' middles, the line
+  553's shore field draws a narrow stream along, at RIBBON_STEPS 8 points
+  a cell and 3 across. It goes half a cell on past each end.
+- Its width comes from the stream's own cells: at each path cell, the
+  stream's cells across the flow each side, out half a cell past the last
+  one and RIBBON_UNDER 0.3 more under the banks. It eases between path
+  cells. The shore field (553) still draws the visible edge and its foam,
+  within SHORE_BOUND.
+- Its surface is the water's surface along it (_water_surface: over the
+  cell it is in, the bilinear of _water_corner, as the bed's _shore_bed
+  is), so the bed stays SHORE_SINK under it and a stream slopes down its
+  valley as before.
+- Each point's colour carries the way it runs (r, g), how fast (b: faster
+  where the ground drops more down the path) and a fall's foam (a).
+  water.gdshader drifts the ripples that way in two cross-faded phases,
+  as it did by flow_mask, which is gone.
+- A fall is a step down the path of more than FALL_LEAST 0.25 m of
+  ground (relief). It foams white over its step. Client3D.stream_falls
+  lists the falls as {cell, drop}, a new array each build, for sound's
+  ambience (sound-33's ask: a splash at each fall, later, its own design).
+  The hills have one, at (46, 79), 0.46 m.
+
+**Ponds, fords and bridges.**
+- A stream's own cells (_streams_cells) are its path's and the water
+  beside them that is not a pond's inside (water all round). They are
+  marked in the water mask's a.
+- The bodies (_build_water) leave them out, and a ribbon leaves a pond's
+  water (the mask's r without a) to the pond's body, so the two meet on a
+  cell edge.
+- A ford is on its stream's path: the ribbon runs over it, and the shader
+  draws it shallow and clear over the stones from the mask's b, as before.
+- A bridge's cells are on the path too: the ribbon runs on under the deck
+  at the water there. Its width is the bridged cells', so the deck's ends
+  stand on the banks past it.
+
+tests/view_test:
+- _test_streams on the sample: a ribbon a stream, over each of its cells'
+  middles, running down the path; the stream's cells marked in the mask's
+  a, a pond's not, none drawn by a body.
+- _test_relief on the hills: the ribbon at each path cell's middle at the
+  water's surface, never rising downstream, over its bed, over all its
+  cells; the falls listed, each a real step over FALL_LEAST, a new array
+  each build.
+- _test_shore: the wilds (no streams) have no ribbon.
+
+Shots and A/B in C:\dev\review\streams2 (ab-*.png; t3 and t4 a second apart, the
+flow). Client only, protocol unchanged, no new class_name.

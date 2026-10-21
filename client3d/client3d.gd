@@ -212,9 +212,6 @@ const CONCAVITY_MOST := 0.5
 ## CREST_MOST of the ledge top's lift at CONCAVITY_FULL metres over.
 const CREST_MOST := 1.0
 const WATER_BED_KIND := "dirt"
-## A stream's flow (decision 505, terrain's side) reaches this many cells out
-## from its path, across its width (Streams.lay's are 1 to 3 wide).
-const STREAM_REACH := 2
 ## The water's edge unsquared (decision 553): the shore field (shore_image)
 ## has SHORE_RES texels a cell; a one-wide stream winds within its cells up
 ## to STREAM_WIND either side of their middles, STREAM_HALF wide each side
@@ -225,6 +222,12 @@ const STREAM_WIND := 0.2
 const STREAM_HALF := 0.42
 const SHORE_BOUND := 0.35
 const SHORE_WARP := 0.1
+## A stream's ribbon (decision 557, _build_ribbons): RIBBON_STEPS points a
+## cell along it, RIBBON_UNDER of a cell past its water under the banks; a
+## step down its path of more than FALL_LEAST metres is a fall.
+const RIBBON_STEPS := 8
+const RIBBON_UNDER := 0.3
+const FALL_LEAST := 0.25
 ## The ledges' rims (decision 556, _rim_band): sampled RIM_RES a side; each
 ## stands out RIM_LEAST to RIM_MOST of a cell from the higher cells (never
 ## past SHORE_BOUND), easing to none within RIM_TAPER of a pinned corner.
@@ -1335,9 +1338,6 @@ var _sight_key := Vector4.INF
 ## Where the map's water is, a texel a cell (_build_ground), for the ground's
 ## wet shore and the water's own; its first cell and size; the bodies drawn.
 var _water_mask: ImageTexture
-## The streams' flow, a texel a cell as the water mask (flow_mask); null
-## with no streams.
-var _flow_mask: ImageTexture
 ## The shore field (decision 553, shore_image): SHORE_RES texels a cell
 ## over the water mask's cells, the water's edge where it is a half; its
 ## image too, for what stands on the ground (shore_at).
@@ -1346,6 +1346,13 @@ var _shore_image: Image
 ## The shore's cells drawn finer (decision 553, _shore_band): each one's
 ## heights, (SHORE_RES + 1) squared row by row.
 var _shore_heights: Dictionary[Vector2i, PackedFloat32Array] = {}
+## The streams' own cells (decision 557, _streams_cells) and their ribbons.
+var _stream_cells: Dictionary[Vector2i, bool] = {}
+var _stream_ribbons: Array[MeshInstance3D] = []
+## Where the streams fall (decision 557): {cell: Vector2i, drop: float}
+## each, the cell below the step; a new array each build (sound's ambience
+## tells a new level by it).
+var stream_falls: Array[Dictionary] = []
 ## The ledges' caps by the cell under them (decision 556, _rim_band), the
 ## corners the rims keep to, and the noise along them.
 var _rim_caps: Dictionary[Vector2i, Dictionary] = {}
@@ -3028,6 +3035,7 @@ func rebuild(terrain: Dictionary, centre: Vector2i) -> void:
 	_roofs_off.clear()
 	_runs.clear()
 	_water_bodies.clear()
+	_stream_ribbons.clear()
 	_occluders.clear()
 	_occluders_built = false
 	_faded.clear()
@@ -4989,6 +4997,12 @@ func _build_ground(kinds: Dictionary) -> void:
 	wet.append_array(_bed_levels.keys())
 	var cells: Array = land + dry + wet
 	var floor_count := floor_size + dry.size()
+	# A stream's own cells (decision 557), its ribbon's: the mask's a.
+	var running: Dictionary = {}
+	for cell: Vector2i in wet:
+		running[cell] = true
+	running.merge(_fords)
+	_stream_cells = _streams_cells(running)
 	var water_end := cells.size()
 	# Under the stands the floor is their needles (the forest floor's), so
 	# the land runs only into the first ring.
@@ -5062,6 +5076,8 @@ func _build_ground(kinds: Dictionary) -> void:
 			water_bytes[place * 4] = 255
 		if _fords.has(cell):
 			water_bytes[place * 4 + 2] = 255
+		if _stream_cells.has(cell):
+			water_bytes[place * 4 + 3] = 255
 		var chunk := Vector2i(floori(cell.x / float(FLOOR_CHUNK)), floori(cell.y / float(FLOOR_CHUNK)))
 		if not chunks.has(chunk):
 			chunks[chunk] = PackedInt32Array()
@@ -5079,7 +5095,6 @@ func _build_ground(kinds: Dictionary) -> void:
 	for cell: Vector2i in wet:
 		wet_cells[cell] = true
 	wet_cells.merge(_fords)
-	_flow_mask = flow_mask(_terrain.get("streams", []), wet_cells, origin, Vector2i(across, down))
 	_shore_image = shore_image(_terrain.get("streams", []), wet_cells, origin, Vector2i(across, down))
 	_shore_mask = ImageTexture.create_from_image(_shore_image)
 	_floor_mask = ImageTexture.create_from_image(Image.create_from_data(across, down, false, Image.FORMAT_R8, _floor_bytes))
@@ -5601,6 +5616,149 @@ func _rim_cap_into(cap: Dictionary, positions: PackedVector3Array, indices: Pack
 		indices.append(vertex)
 
 
+## The water's surface at [param point] (decision 557): over the cell it is
+## in, the bilinear of its corners' (_water_corner), as the bed under it
+## (_shore_bed) is; a corner with no water round it the mean of the cell's
+## that have; the cell's own level with none.
+func _water_surface(point: Vector2) -> float:
+	var cell := Vector2i(roundi(point.x), roundi(point.y))
+	var ys := PackedFloat32Array([INF, INF, INF, INF])
+	var sum := 0.0
+	var count := 0
+	for c in 4:
+		ys[c] = _water_corner(cell + GROUND_CORNERS[c])
+		if ys[c] < INF:
+			sum += ys[c]
+			count += 1
+	if count == 0:
+		return _bed_levels.get(cell, _elevation(cell))
+	for c in 4:
+		if ys[c] == INF:
+			ys[c] = sum / count
+	var f := (point - Vector2(cell) + Vector2(0.5, 0.5)).clamp(Vector2.ZERO, Vector2.ONE)
+	return lerpf(lerpf(ys[0], ys[1], f.x), lerpf(ys[2], ys[3], f.x), f.y)
+
+
+## A stream's own cells (decision 557): its path's, and the water beside
+## them (side or corner) that is not a pond's inside (water all round).
+## The ribbons draw them; the bodies (_build_water) leave them out.
+func _streams_cells(wet: Dictionary) -> Dictionary[Vector2i, bool]:
+	var own: Dictionary[Vector2i, bool] = {}
+	for stream: Dictionary in _terrain.get("streams", []):
+		for cell: Vector2i in stream.get("path", []):
+			own[cell] = true
+			for y in range(-1, 2):
+				for x in range(-1, 2):
+					var near := cell + Vector2i(x, y)
+					if not wet.has(near) or own.has(near):
+						continue
+					var inside := true
+					for yy in range(-1, 2):
+						for xx in range(-1, 2):
+							inside = inside and wet.has(near + Vector2i(xx, yy))
+					if not inside:
+						own[near] = true
+	return own
+
+
+## Each stream's water as a ribbon along its path (decision 557, step 2 of
+## the unsquaring, on 553's spline): the Catmull-Rom through its path
+## cells' middles, RIBBON_STEPS a cell, out half a cell from the furthest of
+## its own cells across the flow each side and RIBBON_UNDER more under the
+## banks, where the shore field (553) draws the edge. Its surface the
+## water's along it (_water_surface), so a fall's drop (over FALL_LEAST)
+## slopes over its cell and the bed stays SHORE_SINK under it. Each
+## point's colour: the way it runs (r, g: 0.5 plus half of it), how fast
+## (b: half FLOW_SPEED's share, faster where it drops), its fall's foam (a).
+## The falls listed in stream_falls, a new array each build.
+func _build_ribbons() -> void:
+	var falls: Array[Dictionary] = []
+	for index in (_terrain.get("streams", []) as Array).size():
+		var path: Array = _terrain["streams"][index].get("path", [])
+		if path.size() < 2:
+			continue
+		var levels := PackedFloat32Array()
+		var widths := PackedVector2Array()
+		for i in path.size():
+			var cell: Vector2i = path[i]
+			# The ground's drop down the path (a bridge's cell by its relief
+			# too): its falls and how fast it runs.
+			levels.append(_elevation(cell))
+			var way: Vector2i = (path[mini(i + 1, path.size() - 1)] - path[maxi(i - 1, 0)]).sign()
+			var across := Vector2i(0, 1) if absi(way.x) >= absi(way.y) else Vector2i(1, 0)
+			var reach := Vector2.ZERO
+			for k in range(1, 3):
+				if _stream_cells.has(cell + across * k) and reach.x == k - 1:
+					reach.x = k
+				if _stream_cells.has(cell - across * k) and reach.y == k - 1:
+					reach.y = k
+			# Across the flow's normal (turned left of the way): which side
+			# is the axis's plus.
+			var left := Vector2(-way.y, way.x)
+			widths.append(Vector2(reach.x, reach.y) if left.dot(Vector2(across)) >= 0.0 else Vector2(reach.y, reach.x))
+		for i in range(1, path.size()):
+			var drop := levels[i - 1] - levels[i]
+			if drop > FALL_LEAST:
+				falls.append({"cell": path[i], "drop": drop})
+		var positions := PackedVector3Array()
+		var colours := PackedColorArray()
+		var indices := PackedInt32Array()
+		var samples := (path.size() - 1) * RIBBON_STEPS
+		for s in range(-RIBBON_STEPS / 2, samples + RIBBON_STEPS / 2 + 1):
+			# Past either end, on along the way it runs, half a cell.
+			var at := clampi(s, 0, samples)
+			var i := mini(at / RIBBON_STEPS, path.size() - 2)
+			var t := (at - i * RIBBON_STEPS) / float(RIBBON_STEPS)
+			var a := Vector2(path[maxi(i - 1, 0)])
+			var b := Vector2(path[i])
+			var c := Vector2(path[i + 1])
+			var d := Vector2(path[mini(i + 2, path.size() - 1)])
+			var point := 0.5 * (2.0 * b + (c - a) * t + (2.0 * a - 5.0 * b + 4.0 * c - d) * t * t
+					+ (3.0 * b - a - 3.0 * c + d) * t * t * t)
+			var tangent := (0.5 * ((c - a) + 2.0 * (2.0 * a - 5.0 * b + 4.0 * c - d) * t
+					+ 3.0 * (3.0 * b - a - 3.0 * c + d) * t * t)).normalized()
+			if tangent == Vector2.ZERO:
+				tangent = (c - b).normalized()
+			point += tangent * (s - at) / float(RIBBON_STEPS)
+			var normal := Vector2(-tangent.y, tangent.x)
+			var width: Vector2 = widths[i].lerp(widths[i + 1], t)
+			var drop := levels[i] - levels[i + 1]
+			var level := _water_surface(point) + WATER_LIFT
+			var fall := smoothstep(FALL_LEAST * 0.5, FALL_LEAST * 2.0, drop) * sin(t * PI)
+			var speed := clampf(0.5 + drop * 0.6, 0.5, 1.0)
+			var colour := Color(tangent.x * 0.5 + 0.5, tangent.y * 0.5 + 0.5, speed, fall)
+			for side: float in [width.x + 0.5 + RIBBON_UNDER, 0.0, -(width.y + 0.5 + RIBBON_UNDER)]:
+				var spot := point + normal * side
+				positions.append(Vector3(spot.x, level, spot.y))
+				colours.append(colour)
+			if s > -RIBBON_STEPS / 2:
+				var row := positions.size() - 3
+				var last := row - 3
+				for k in 2:
+					indices.append_array([last + k, row + k, last + k + 1, last + k + 1, row + k, row + k + 1])
+		var normals := PackedVector3Array()
+		normals.resize(positions.size())
+		normals.fill(Vector3.UP)
+		var arrays := []
+		arrays.resize(Mesh.ARRAY_MAX)
+		arrays[Mesh.ARRAY_VERTEX] = positions
+		arrays[Mesh.ARRAY_NORMAL] = normals
+		arrays[Mesh.ARRAY_COLOR] = colours
+		arrays[Mesh.ARRAY_INDEX] = indices
+		var mesh := ArrayMesh.new()
+		mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+		var drawn := MeshInstance3D.new()
+		drawn.name = "Stream_%d" % index
+		drawn.mesh = mesh
+		var material := _water_material()
+		material.set_shader_parameter("ribbon", true)
+		drawn.material_override = material
+		drawn.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		_room.add_child(drawn)
+		_stream_ribbons.append(drawn)
+	stream_falls = falls
+
+
 ## The cells round a corner, the corner being each one's corner 3 - a.
 const SHORE_AROUND: Array[Vector2i] = [Vector2i(-1, -1), Vector2i(0, -1), Vector2i(-1, 0), Vector2i(0, 0)]
 
@@ -5828,6 +5986,10 @@ func _build_water() -> void:
 		water[cell] = true
 	for cell: Vector2i in _bed_levels:
 		water[cell] = true
+	# A stream's own cells are its ribbon's (decision 557).
+	for cell: Vector2i in _stream_cells:
+		water.erase(cell)
+	_build_ribbons()
 	if water.is_empty():
 		return
 	var material := _water_material()
@@ -5860,7 +6022,8 @@ func _build_water() -> void:
 			for y in range(-1, 2):
 				for x in range(-1, 2):
 					var near := cell + Vector2i(x, y)
-					if covered.has(near) or water.has(near) or not _grounds.has(near) 							or (not _relief_given and absf(_elevation(near) - level) > Relief.EPSILON):
+					if covered.has(near) or water.has(near) or _stream_cells.has(near) or not _grounds.has(near) \
+							or (not _relief_given and absf(_elevation(near) - level) > Relief.EPSILON):
 						continue
 					var walled := false
 					for step: Vector2i in [Vector2i(x, 0), Vector2i(0, y)]:
@@ -5941,45 +6104,6 @@ func _measure_streams() -> void:
 		for cell in Level.rect_cells(rect):
 			if bridged.has(cell):
 				_bed_levels[cell] = level if level < INF else _elevation(cell)
-
-
-## The way [param streams] (terrain "streams": {path}, source to mouth) run
-## as an RG8 texture of [param size] texels from cell [param origin]: each
-## of the [param wet] cells within STREAM_REACH of a path takes the way the
-## path runs at its nearest path cell (the step from the cell before to the
-## cell after), 128 + 127 times it; elsewhere still (128, 128). Null with no
-## streams.
-static func flow_mask(streams: Array, wet: Dictionary, origin: Vector2i, size: Vector2i) -> ImageTexture:
-	if streams.is_empty():
-		return null
-	var ways: Dictionary[Vector2i, Vector2] = {}
-	var frontier: Array[Vector2i] = []
-	for stream: Dictionary in streams:
-		var path: Array = stream.get("path", [])
-		for i in path.size():
-			var before: Vector2i = path[maxi(i - 1, 0)]
-			var after: Vector2i = path[mini(i + 1, path.size() - 1)]
-			if not ways.has(path[i]):
-				ways[path[i]] = Vector2(after - before).normalized()
-				frontier.append(path[i])
-	for ring in STREAM_REACH:
-		var reached: Array[Vector2i] = []
-		for cell in frontier:
-			for direction: Vector2i in World.DIRECTIONS:
-				var near := cell + direction
-				if wet.has(near) and not ways.has(near):
-					ways[near] = ways[cell]
-					reached.append(near)
-		frontier = reached
-	var bytes := PackedByteArray()
-	bytes.resize(size.x * size.y * 2)
-	bytes.fill(128)
-	for cell: Vector2i in ways:
-		var at := cell - origin
-		if at.x >= 0 and at.y >= 0 and at.x < size.x and at.y < size.y:
-			bytes[(at.y * size.x + at.x) * 2] = clampi(roundi(128.0 + 127.0 * ways[cell].x), 0, 255)
-			bytes[(at.y * size.x + at.x) * 2 + 1] = clampi(roundi(128.0 + 127.0 * ways[cell].y), 0, 255)
-	return ImageTexture.create_from_image(Image.create_from_data(size.x, size.y, false, Image.FORMAT_RG8, bytes))
 
 
 ## The shore field (decision 553): an L8 image of [param size] cells from
@@ -6288,8 +6412,6 @@ func _water_material() -> ShaderMaterial:
 	material.set_shader_parameter("shallow", swatch(WATER_SHALLOW.x, WATER_SHALLOW.y))
 	material.set_shader_parameter("deep", swatch(WATER_DEEP.x, WATER_DEEP.y))
 	material.set_shader_parameter("foam", swatch(WATER_FOAM.x, WATER_FOAM.y))
-	material.set_shader_parameter("flow", _flow_mask)
-	material.set_shader_parameter("flowing", _flow_mask != null)
 	material.set_shader_parameter("shore", _shore_mask)
 	return material
 

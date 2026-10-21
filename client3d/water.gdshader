@@ -8,10 +8,13 @@ shader_type spatial;
 // distance into the water's cells (the mask, a texel a cell, 1 for water;
 // worked out from the 9 cells round the point).
 // Foam on the land side of the shore; deeper and less clear toward the
-// middle; ripples that drift. A stream's (decision 505, terrain's side) run
-// down its flow (Client3D.flow_mask), two phases of the flow cross-faded so
-// they never stretch; over a ford (the mask's b) it is pale and clear over
-// the stones, with foam where the current meets them.
+// middle; ripples that drift. A stream is a ribbon along its path
+// (decision 557, Client3D._build_ribbons): its ripples run the way its
+// points' colour says (r, g; how fast, b), two phases of the flow
+// cross-faded so they never stretch, white where it falls (a); it leaves
+// a pond's water (the mask's r, not a) to the pond's body. Over a ford
+// (the mask's b) it is pale and clear over the stones, with foam where the
+// current meets them.
 render_mode blend_mix, depth_draw_never, cull_disabled, diffuse_burley, specular_schlick_ggx;
 
 uniform sampler2D water : filter_linear, repeat_disable;
@@ -22,14 +25,13 @@ uniform sampler2D noise_tex : filter_linear_mipmap, repeat_enable;
 uniform vec3 shallow : source_color = vec3(0.25, 0.55, 0.7);
 uniform vec3 deep : source_color = vec3(0.08, 0.22, 0.42);
 uniform vec3 foam : source_color = vec3(0.85, 0.92, 0.95);
-// The streams' flow, a texel a cell as the mask: 0.5 still, else 0.5 plus
-// half the way the water runs.
-uniform sampler2D flow : filter_linear, repeat_disable;
-uniform bool flowing = false;
+// A stream's ribbon (decision 557): its flow in its points' colours.
+uniform bool ribbon = false;
 // The shore field, Client3D.SHORE_RES texels a cell over the mask's cells.
 uniform sampler2D shore : hint_default_black, filter_linear, repeat_disable;
 
 varying vec3 world;
+varying vec4 running;
 
 // As the ground's: smooth noise 0..1, about a feature a unit of p.
 float noise(vec2 p) {
@@ -81,6 +83,7 @@ float into_water(vec2 at) {
 
 void vertex() {
 	world = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
+	running = ribbon ? COLOR : vec4(0.5, 0.5, 0.0, 0.0);
 }
 
 void fragment() {
@@ -92,13 +95,18 @@ void fragment() {
 	if (into < -FOAM) {
 		discard;
 	}
+	vec2 uv = (at - mask_origin + 0.5) / mask_size;
+	// A ribbon leaves a pond's water to the pond's body.
+	vec4 cell = texelFetch(water, clamp(ivec2(round(at)) - ivec2(round(mask_origin)), ivec2(0), ivec2(round(mask_size)) - 1), 0);
+	if (ribbon && cell.r > 0.5 && cell.a < 0.5) {
+		discard;
+	}
 	float inside = smoothstep(-0.02, 0.03, into);
 	float depth = smoothstep(0.15, 1.2, into_water(at));
 	float t = TIME * 0.12;
 	// Down a stream the surface drifts with the water, in two phases: each
 	// carried FLOW_SPEED along and faded out as the other comes in.
-	vec2 uv = (at - mask_origin + 0.5) / mask_size;
-	vec2 way = flowing ? texture(flow, uv).rg * 2.0 - 1.0 : vec2(0.0);
+	vec2 way = (running.rg * 2.0 - 1.0) * running.b * 2.0;
 	float phase = fract(TIME / FLOW_CYCLE);
 	float other = fract(phase + 0.5);
 	float swap = abs(phase - 0.5) * 2.0;
@@ -116,7 +124,9 @@ void fragment() {
 	band *= smoothstep(0.3, 0.6, churn);
 	float riffle = shoal * (1.0 - shoal) * 4.0 * smoothstep(0.35, 0.6, churn) * min(length(way) * 2.0, 1.0);
 	float flecks = shoal * smoothstep(0.7, 0.85, churn) * 0.35;
-	band = max(band, max(riffle, flecks));
+	// A fall: white water down its step, broken up by the churn.
+	float fall = running.a * smoothstep(0.2, 0.55, churn);
+	band = max(max(band, fall), max(riffle, flecks));
 	colour = mix(colour, foam, band);
 	ALBEDO = colour;
 	ALPHA = max(inside * mix(0.6, 0.88, depth) * mix(1.0, 0.4, shoal), band * 0.85);
