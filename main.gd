@@ -4019,6 +4019,7 @@ func _wire_guide(pet: Companion, record: PlayerRecord, player: Player) -> void:
 		walk.bind(pet, player)
 		pet.guide = walk
 		player.led_by = String(pet.name) if walk.going() else ""
+		player.led_to = str(walk.goal.get("key", "")) if walk.going() else ""
 	_tell_roads(record, pet)
 
 
@@ -4104,6 +4105,7 @@ func _start_guide(pet: Companion, player: Player, to: Dictionary) -> void:
 	_guides[pet.keeper_id] = walk
 	pet.guide = walk
 	player.led_by = String(pet.name)
+	player.led_to = str(to.get("key", ""))
 	pet.guide_note = "%s asked you to lead them to %s, and you know the way: you are leading them there now, walking ahead." % [_display_name(player), to["name"]]
 	party_log.add("%s leads the way to %s." % [pet.name, to["name"]])
 	print("[guide] %s leads %s to %s (%s)" % [pet.name, _display_name(player), to["name"], to["key"]])
@@ -4138,6 +4140,7 @@ func _guide_done(pet: Companion, why: String) -> void:
 	var who := _display_name(walk.leader) if is_instance_valid(walk.leader) else (record.name if record != null else "")
 	if is_instance_valid(walk.leader):
 		walk.leader.led_by = ""
+		walk.leader.led_to = ""
 	var words := Guide.stop_words(why, who)
 	print("[guide] %s stops: %s" % [pet.name, why])
 	if why == "arrived":

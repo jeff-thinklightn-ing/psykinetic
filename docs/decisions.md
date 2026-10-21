@@ -17783,3 +17783,13 @@ as much as the flat. Approved by the coordinator.
 Shots in C:\dev\review\cliffnight (before/after, 02:00 rain from two
 yaws, noon unchanged). view_test _test_hills. Client only, protocol
 unchanged, no new class_name.
+## 551 amended: where she leads them, on the wire
+
+ui asked for it: the HUD line names where she is leading ("Following Wren
+to the Barrow"), and the big map marks that place. Player.led_to, replicated
+beside led_by, is the walk's destination key: a place's Holdings id or an
+area's name, the same key the "guide" command takes. It is "" when not led.
+Main sets and clears it with led_by. ui resolves the display name from the
+world map. PROTOCOL_REVISION stays 28 (release): 28 has not shipped, and a
+new replicated field changes the hash by itself. companion_test _test_guide
+checks it set, cleared, and kept across a way out.

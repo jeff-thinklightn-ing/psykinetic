@@ -225,14 +225,15 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## 27: the "speech" message carries "aside", one clause of how a resident
 ## said the words, "" when none (336 amended).
 ## 28: a player carries led_by, the name of the companion leading them,
-## "" when none; while led the server walks their body (decision 551).
+## "" when none, and led_to, where she leads them (a place id or an area);
+## while led the server walks their body (decision 551 and amended).
 const PROTOCOL_REVISION := 28
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]
 ## Every kind of message (message, message_to, broadcast, broadcast_to).
 const MESSAGE_KINDS: Array[String] = ["builder", "chat", "counter", "death", "grass", "map", "offers", "party", "roofs", "shop", "sky", "speech", "terrain", "town", "world"]
 ## Properties entity subclasses add with replicate().
-const SUBCLASS_REPLICATED: Array[String] = ["ailing", "ailments", "alert", "body", "buffs", "channel_of", "channel_until", "down_until", "downed_until", "emit_light", "hands", "keeper_peer", "led_by", "mending", "move_ticks", "pose", "raised", "raised_tick", "slot_notes", "slots"]
+const SUBCLASS_REPLICATED: Array[String] = ["ailing", "ailments", "alert", "body", "buffs", "channel_of", "channel_until", "down_until", "downed_until", "emit_light", "hands", "keeper_peer", "led_by", "led_to", "mending", "move_ticks", "pose", "raised", "raised_tick", "slot_notes", "slots"]
 const SETTINGS_FILE := "settings.cfg"
 ## First launch: half the 3840x2160 base, windowed.
 const DEFAULT_WINDOW_SIZE := Vector2i(1920, 1080)

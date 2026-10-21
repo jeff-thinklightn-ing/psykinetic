@@ -1530,7 +1530,7 @@ func _test_guide() -> void:
 	_check(far != Vector2i(-1, -1), "a cell 9-14 away to lead to (%s)" % far)
 	var goal := {"key": "test/far", "kind": "place", "name": "the far corner", "area": here, "cell": far}
 	_main._start_guide(pet, owner, goal)
-	_check(pet.guide != null and pet.guide.going() and owner.led_by == String(pet.name) and "leading them there now" in pet.guide_note,
+	_check(pet.guide != null and pet.guide.going() and owner.led_by == String(pet.name) and owner.led_to == "test/far" and "leading them there now" in pet.guide_note,
 		"asked: she sets off, her player led by her, her voice told she agreed")
 	_step_until(func() -> bool: return pet.current_intent == Companion.Intent.GUIDE and World.distance(owner.tile, came_from) >= 3, 120)
 	_check(pet.current_intent == Companion.Intent.GUIDE and World.distance(owner.tile, came_from) >= 3 and "leading" in pet.doing(),
@@ -1538,7 +1538,7 @@ func _test_guide() -> void:
 	# Their own step takes control back.
 	World.order_step(owner, Vector2i(0, 1), owner.refusals, false)
 	World.step()
-	_check(not pet.guide.going() and pet.guide.stopped == "moved" and owner.led_by == "" and not owner.has_move_order,
+	_check(not pet.guide.going() and pet.guide.stopped == "moved" and owner.led_by == "" and owner.led_to == "" and not owner.has_move_order,
 		"their own step: the walk stops, control theirs (%s)" % pet.guide.stopped)
 	_step_until(func() -> bool: return owner.queued_steps.is_empty(), 10)
 	_main._guide_said(owner, pet, "lead on")
@@ -1611,7 +1611,7 @@ func _test_guide() -> void:
 	World.enter_named(there)
 	owner = _player()
 	pet = _companion()
-	_check(pet != null and pet.guide == walk and walk.pet == pet and owner.led_by == String(pet.name), "the same walk goes on with them there")
+	_check(pet != null and pet.guide == walk and walk.pet == pet and owner.led_by == String(pet.name) and owner.led_to == there, "the same walk goes on with them there")
 	walk.stop("moved")
 	owner.led_by = ""
 	_main._guides.clear()

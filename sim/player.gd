@@ -35,6 +35,9 @@ var body: StringName = &"male"
 ## "" when none. While it is set the server walks their body at her heel,
 ## and their own step or order takes it back.
 var led_by := ""
+## Where she leads them (decision 551 amended, ui's map and HUD): the
+## place's Holdings id or the area's name she set off for; "" when not led.
+var led_to := ""
 
 
 func _init() -> void:
@@ -64,6 +67,7 @@ func _init() -> void:
 	replicate("emit_light")
 	replicate("body")
 	replicate("led_by")
+	replicate("led_to")
 
 
 
