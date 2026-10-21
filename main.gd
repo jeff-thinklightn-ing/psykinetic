@@ -230,6 +230,9 @@ var _resident_serial := 0
 ## once, the first time they are spoken to; the plain card stands until then.
 var _resident_cards_out: Dictionary = {}
 var _companions: Dictionary[String, Companion] = {}
+## Each player's companion's walk leading them (decision 551), by player id:
+## kept across the zones it crosses, and stopped, to be taken up again.
+var _guides: Dictionary[String, Guide] = {}
 ## Server only: the companions whose voice is on the Claude API (decision
 ## 363, the console's `mind claude`), by player id -> model id; for this
 ## session only, so a companion who comes back is wrapped again.
@@ -744,6 +747,11 @@ func _go_online() -> void:
 		# The draugr's blessed, downed and brought back (decision 544).
 		World.downed = _downed
 		World.entity_downed.connect(_on_downed)
+		# What she lives through is a danger of the place (decision 551).
+		World.entity_downed.connect(_roads_downed)
+		World.entity_taken.connect(_roads_taken)
+		World.entity_died.connect(_roads_fell)
+		World.entity_damaged.connect(_roads_struck)
 		World.channel_changed.connect(_on_channel)
 		World.command_received.connect(_on_command)
 		World.slots_changed.connect(_on_slots_changed)
@@ -3981,6 +3989,7 @@ func _join_companion(record: PlayerRecord, player: Player) -> void:
 	# The draugr's blessing (decision 544): she brings her downed player back.
 	pet.can_revive = func() -> bool: return _can_revive(pet, record)
 	pet.revive = func(by: GridEntity, body: GridEntity) -> bool: return _start_channel(by, body)
+	_wire_guide(pet, record, player)  # Her guiding (decision 551).
 	pet.mind = _make_mind()
 	if _claude_voices.has(record.player_id):
 		pet.mind = ClaudeMind.new(pet.mind, _claude_voices[record.player_id], self)
@@ -3993,6 +4002,211 @@ func _join_companion(record: PlayerRecord, player: Player) -> void:
 	print("[net] %s's companion %s is at %s%s" % [
 		record.name, pet.name, tile, " (new)" if is_new else ""])
 	_tell_sickness(pet, record, true)
+
+
+# --- Her guiding (decision 551) ---------------------------------------------------
+
+## Server: [param pet]'s guiding wired as she joins (decision 551): the
+## world's routes, her walk's stops and ways out, what she knows for her
+## voice, and a walk her player's id still has (they crossed into this zone
+## with her, or a stopped one to take up again) bound to the new bodies.
+func _wire_guide(pet: Companion, record: PlayerRecord, player: Player) -> void:
+	pet.guide_routes = func() -> WorldRoutes: return World.raid_groups.routes if World.raid_groups != null else null
+	pet.guide_done = _guide_done
+	pet.guide_words = func() -> String: return _roads_words(record, pet)
+	var walk: Guide = _guides.get(record.player_id)
+	if walk != null:
+		walk.bind(pet, player)
+		pet.guide = walk
+		player.led_by = String(pet.name) if walk.going() else ""
+	_tell_roads(record, pet)
+
+
+## What she knows of the roads, for her voice: the places nearest first
+## (places_told of them) she knows the way to; none for none.
+func _roads_words(record: PlayerRecord, pet: Companion) -> String:
+	var known := Guide.destinations(record.companion, World.holdings, _world_map)
+	if known.is_empty():
+		return ""
+	var here := func(each: Dictionary) -> int:
+		return World.distance(each["cell"], pet.tile) if each["area"] == pet.zone else 100000
+	known.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return here.call(a) < here.call(b))
+	var names: Array[String] = []
+	for each: Dictionary in known.slice(0, int(Guide.setting("places_told", 5.0))):
+		names.append(str(each["name"]))
+	return "You know the way to %s, having been there with %s, and can lead them there." % [", ".join(names), record.name]
+
+
+## Her player's map told what she knows the way to (decision 551): the
+## "world" message's "guide" {companion, places (Holdings ids), areas}.
+func _tell_roads(record: PlayerRecord, pet: Companion) -> void:
+	var peer := _peer_of(record.player_id)
+	if peer == 0 or _world_news == null or not _world_news.send.is_valid():
+		return
+	var roads := Guide.roads_of(record.companion)
+	_world_news.send.call(peer, {"full": false, "guide": {"companion": String(pet.name),
+		"places": (roads["places"] as Array).duplicate(), "areas": (roads["areas"] as Array).duplicate()}})
+
+
+## Each companion out with her player comes to know where she stands (her
+## roads, decision 551), on the same beat as her player's own fog.
+func _observe_roads() -> void:
+	if World.holdings == null:
+		return
+	for id: String in _companions:
+		var pet: Companion = _companions[id]
+		var record: PlayerRecord = _records.get(id)
+		if record == null or not is_instance_valid(pet) or not pet.spawned or record.companion.has("resident") \
+				or not is_instance_valid(pet.keeper) or not pet.keeper.spawned:
+			continue
+		var places: Array = []
+		for place_id: String in World.holdings.places_in(pet.zone):
+			places.append({"id": place_id, "cell": World.holdings.place(place_id)["cell"]})
+		if Guide.observe(record.companion, pet.zone, pet.tile, places):
+			_tell_roads(record, pet)
+
+
+## Her player's words to her (decision 551): an ask to lead the way to a
+## place she knows sets her off, and her voice, about to answer, is told
+## she agreed; one she does not know, that she does not know the way;
+## "lead on" takes a stopped walk up again. True if it was such an ask.
+func _guide_said(player: Player, pet: Companion, line: String) -> bool:
+	var record := _record_of(pet)
+	if record == null:
+		return false
+	var walk: Guide = _guides.get(record.player_id)
+	if Guide.asks_resume(line) and walk != null and not walk.going() and walk.keeps():
+		_start_guide(pet, player, walk.goal)
+		return true
+	if not Guide.asks(line):
+		return false
+	var known := Guide.destinations(record.companion, World.holdings, _world_map)
+	var to := Guide.named_in(line, known)
+	if to.is_empty():
+		pet.guide_note = "%s asks you to lead them somewhere you have not been with them: you do not know the way there." % record.name
+		return true
+	if pet.zone == to["area"] and World.distance(pet.tile, to["cell"]) <= int(Guide.setting("arrive", 3.0)):
+		pet.guide_note = "%s asks you to lead them to %s, and you are there already." % [record.name, to["name"]]
+		return true
+	_start_guide(pet, player, to)
+	return true
+
+
+## [param pet] sets off leading [param player] to [param to] (Guide's
+## destination), her voice told so once.
+func _start_guide(pet: Companion, player: Player, to: Dictionary) -> void:
+	var walk: Guide = _guides.get(pet.keeper_id)
+	if walk != null and walk.goal.get("key") == to.get("key"):
+		walk.resume()
+	else:
+		walk = Guide.new(to)
+	walk.bind(pet, player)
+	_guides[pet.keeper_id] = walk
+	pet.guide = walk
+	player.led_by = String(pet.name)
+	pet.guide_note = "%s asked you to lead them to %s, and you know the way: you are leading them there now, walking ahead." % [_display_name(player), to["name"]]
+	party_log.add("%s leads the way to %s." % [pet.name, to["name"]])
+	print("[guide] %s leads %s to %s (%s)" % [pet.name, _display_name(player), to["name"], to["key"]])
+
+
+## The "guide" command (decision 551, the map's "ask her to lead you
+## there"): its "to", a place's Holdings id or an area's name she knows.
+func _guide_asked(player: Player, to_key: String) -> void:
+	var pet: Companion = _companions.get(_peer_ids.get(player.owner_peer, ""))
+	var record := _record_of(pet) if is_instance_valid(pet) and pet.spawned else null
+	if record == null or pet.zone != player.zone:
+		return
+	for each: Dictionary in Guide.destinations(record.companion, World.holdings, _world_map):
+		if each["key"] == to_key:
+			_start_guide(pet, player, each)
+			return
+
+
+## Her walk stopped, or at a way out (Companion.guide_done, Guide.step's
+## [param why]): through the way with her player; else stopped, control
+## theirs, the party log and her voice told why.
+func _guide_done(pet: Companion, why: String) -> void:
+	var walk := pet.guide
+	if walk == null:
+		return
+	if why == "cross" and _guide_cross(pet, walk):
+		return
+	if why == "cross":
+		why = "no_way"
+	walk.stop(why)
+	var record := _record_of(pet)
+	var who := _display_name(walk.leader) if is_instance_valid(walk.leader) else (record.name if record != null else "")
+	if is_instance_valid(walk.leader):
+		walk.leader.led_by = ""
+	var words := Guide.stop_words(why, who)
+	print("[guide] %s stops: %s" % [pet.name, why])
+	if why == "arrived":
+		party_log.add("%s has brought %s to %s." % [pet.name, who, walk.goal["name"]])
+		pet.guide = null
+		_guides.erase(pet.keeper_id)
+		pet._ask_voice("You have led %s to %s, as they asked." % [who, walk.goal["name"]])
+	elif why != "moved" and why != "lost":
+		party_log.add("%s stops leading the way: %s." % [pet.name, words])
+		pet._ask_voice("You stopped leading %s to %s: %s." % [who, walk.goal["name"], words])
+
+
+## Through the way out her walk is at (Guide.crossing, at
+## Guide.crossing_at): a link (closed, or sealed to her player, stops it)
+## or an edge, her player and she together, after the tick (Main.travel).
+## False if it cannot be taken.
+func _guide_cross(pet: Companion, walk: Guide) -> bool:
+	var way := walk.crossing
+	var peer := walk.leader.owner_peer
+	if way.is_empty() or not Level.exists(str(way.get("to", ""))):
+		return false
+	if way["kind"] == "link":
+		for link: Dictionary in level.get("links", []):
+			if link["tile"] == way["at"] and (link.get("closed", false) or not sealed_open(link, peer)):
+				return false
+		travel.call_deferred(peer, str(way["to"]), str(way.get("to_spawn", "")))
+	else:
+		var out: Vector2i = Guide.SIDES.get(str(way["side"]), Vector2i.ZERO)
+		travel.call_deferred(peer, str(way["to"]), "", {"side": way["side"], "cell": walk.crossing_at + out})
+	walk.crossing_now = true
+	print("[guide] %s takes %s through to %s" % [pet.name, _display_name(walk.leader), way["to"]])
+	return true
+
+
+## What she lives through, kept as a danger of the area (decision 551):
+## downed, carried off, her player falling beside her, a blow leaving her or
+## them under hurt_mark of their hp.
+func _roads_downed(entity: GridEntity, _source: GridEntity, _ticks: int) -> void:
+	_roads_lived(entity, "downed")
+
+
+func _roads_taken(entity: GridEntity, _by: String) -> void:
+	if entity is Companion:
+		_roads_lived(entity, "taken")
+
+
+func _roads_fell(entity: GridEntity, _cause: StringName) -> void:
+	if entity is Player:
+		_roads_lived(entity, "fell")
+
+
+func _roads_struck(entity: GridEntity, amount: int, _source: GridEntity, _cause: StringName) -> void:
+	if amount > 0 and entity.hp > 0 and entity.max_hp > 0 and float(entity.hp) / entity.max_hp < Guide.setting("hurt_mark", 0.25):
+		_roads_lived(entity, "hurt")
+
+
+## [param entity] (her, or her player with her near) lived [param why]
+## where they stand: the danger noted on her roads.
+func _roads_lived(entity: GridEntity, why: String) -> void:
+	var pet := entity as Companion
+	if pet == null and entity is Player:
+		var near: Companion = _companions.get(_peer_ids.get(entity.owner_peer, ""))
+		if is_instance_valid(near) and near.spawned and near.zone == entity.zone and World.distance(near.tile, entity.tile) <= HEARING_RANGE:
+			pet = near
+	var record := _record_of(pet) if pet != null else null
+	if record == null or record.companion.has("resident"):
+		return
+	if not Guide.note_danger(record.companion, entity.zone, why, Townsfolk.day_of(World.steps)).is_empty():
+		print("[guide] %s will remember %s: %s" % [pet.name, entity.zone, why])
 
 
 # --- The draugr's blessing (decision 544) -------------------------------------
@@ -5848,7 +6062,14 @@ func _remember_companion(id: String) -> void:
 ## authority's own player always; from anyone else only while
 ## Net.player_reset is on.
 func _on_command(entity: GridEntity, command_name: String, args: Dictionary) -> void:
-	if command_name == "say" and entity is Player:
+	# Led by her (decision 551): doing anything but talk takes control back.
+	if entity is Player and command_name not in ["say", "party", "guide", "face"]:
+		var walk: Guide = _guides.get(_peer_ids.get(entity.owner_peer, ""))
+		if walk != null and walk.going() and is_instance_valid(walk.pet):
+			_guide_done(walk.pet, "moved")
+	if command_name == "guide" and entity is Player:
+		_guide_asked(entity, str(args.get("to", "")))
+	elif command_name == "say" and entity is Player:
 		_player_said(entity, str(args.get("text", "")), int(args.get("phrase", 0)))
 	elif command_name == "party" and entity is Player:
 		_party_said(entity, str(args.get("text", "")))
@@ -6393,6 +6614,8 @@ func _player_said(player: Player, text: String, phrase := 0) -> void:
 		if hears:
 			pet.overheard(_display_name(player), line, false)
 	elif to != "":
+		if phrase == 0:
+			_guide_said(player, pet, line)  # An ask to lead the way (decision 551).
 		pet.owner_spoke(line, phrase)
 
 
@@ -6974,6 +7197,7 @@ func _tell_world(tick: int) -> void:
 		var player: Player = _players[peer]
 		if is_instance_valid(player) and player.spawned:
 			_world_news.observe(peer, player.zone, player.tile)
+	_observe_roads()  # Hers too (decision 551).
 	_world_news.update()
 
 

@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- A companion can lead the way (551): say "take me to the mill" to name a place or area she has been with you, and she walks ahead on the real roads while you follow on your own feet. Move, act, take a hit, or let her see danger, and control is yours again. "Lead on" takes the walk up again, and she takes you through links and map edges. She also remembers where things went badly. Server and client: protocol 28.
 ## v0.1.161
 
 - This version changes what goes over the network, so v0.1.160 and older can't join the server: update through the launcher first.

@@ -17585,3 +17585,90 @@ way and its end, its back rising, no other cliff, every cell reached, its
 faces returned); lay returns the plateau's faces; the hills' cliffs on the
 plateau and the escarpments, the west face about 3 m, every floor cell
 walked to from the link.
+## 551: a companion guides her player where she has been with them
+
+Jeff's companion_rewards.md (2026-10-20): "a companion who has been to a
+place can guide you there: you follow her on autopilot", and next time she
+could refuse a road that is not safe. The coordinator approved the design
+in three phases. Its rulings, flagged to Jeff as the coordinator's: real
+time at the player's own pace with no time-skip (the world is shared and
+moves on, so autopilot means the player stops steering); talking her round
+waits (it needs a judgement the mind cannot act on); only her own player is
+led, and the rest of the party walks. This is phase 1: what she knows, the
+walk, and the stops. Phase 2 is refusal by the weight of the dangers on the
+route against her boldness and bond, with the world clearing them. Phase 3
+is her birthplace, once lore gives birthplaces world places.
+
+- What she knows is her record's "roads": {areas, places, dangers}.
+  - areas: each area she has stood in while out with her player.
+  - places: each place she came within 7 cells of, on the same beat as her
+    player's own fog (Main._tell_world, now _observe_roads too).
+  - dangers: what she lived through in an area, each with a weight:
+    downed 3, carried off 3, her player falling near her 3, a blow leaving
+    her or her player under hurt_mark (25%) of their hp 2. One entry a day
+    for each area and kind. Nothing reads them yet; phase 2 weighs them.
+  - It starts empty: an old record cannot say where she went.
+  - PlayerRecord.from_dict keeps it.
+  - Her player's map is told it as the "world" message's "guide" key,
+    {companion, places, areas}, sent by Main whole when it changes and kept
+    through a full message (WorldNews.merge).
+  - Her voice gets one sentence naming the nearest few places she knows the
+    way to (places_told).
+- Asking:
+  - A spoken line to her that asks to be led somewhere (Guide.ASK: "take me
+    to ...", "show us the way to ...") and names a place or area she knows
+    (Guide.named_in, the longest name) sets her off. The sim decides, before
+    her voice answers, and her voice is told once (Companion.guide_note)
+    that she agreed, that she does not know the way, or that they are there
+    already.
+  - "lead on" takes a stopped walk up again within keep_minutes.
+  - The map's command "guide" {to: a place's Holdings id or an area's
+    name} sets her off the same way.
+  - A place goes by its cell; an area by its first start.
+- The walk: new class_name Guide (sim/guide.gd), one per walk, held by Main
+  by her player's id (_guides), so it survives the zones it crosses.
+  - Her intent is GUIDE (Intent.GUIDE, after a reflex or an errand). She
+    walks the route's first leg (WorldRoutes.route from where she is; maps'
+    leg_cells once it lands, a walk there until then). She goes round a body
+    in her way by a short walk a few cells ahead.
+  - Her player's body follows her: their move order is set to her heel's
+    cell (Heel.cell, with the roles swapped) whenever they are two or more
+    cells off, so they walk at their own pace.
+  - She waits whenever they are more than wait (3) cells behind.
+  - Before the world's routes are in, a walk in her own area goes straight
+    there; one beyond waits.
+  - At a way out (the leg's end, with her player near), Main takes them both
+    through after the tick: Main.travel for a link (closed, or sealed to her
+    player, stops the walk instead), or the edge's crossing. The walk binds
+    to the new bodies on the far side and goes on, routing afresh.
+- Control comes back, and the walk stops:
+  - "moved": the player's own step, move order, strike or swing, or any
+    command but talk, the map's guide or facing.
+  - "danger": a monster in her sight range she sees that would fight her or
+    her player. enemy-ai's Monster.threatens(entity) is used where it
+    exists; until it lands, a monster she counts hostile.
+  - "struck": either of them loses hp.
+  - "hurt": her player under hurt_below (half) of their hp.
+  - "downed": either of them downed.
+  - "lost": her player gone from her zone.
+  - "no_way": no route, or a way out that cannot be taken.
+  - "arrived": within arrive (3) cells of the place, with them near; the
+    party log says she has brought them there.
+  - Each stop but moved and lost is in the party log and asks her voice.
+- Wire: Player.led_by, replicated, is her name while she leads them ("" when
+  not). It is for ui's HUD line ("Following Wren to the Barrow - move to take
+  the lead"). Their body is walked by the server's own move orders, which a
+  client already draws as it draws any server move (Prediction keeps no
+  target for them). PROTOCOL_REVISION 28 (npc's 336 amended took 27).
+- Numbers in levels/companion_traits.json "guide".
+
+tests/companion_test _test_guide covers:
+- what she comes to know;
+- the ask, and a place she does not know;
+- the walk, with their body at her heel;
+- each stop: their step, a command, danger, a blow;
+- lead on;
+- arriving;
+- a danger kept, and roads kept through a save;
+- the map's message, and the map's command;
+- across test_room's link to sample, and the same walk going on there.

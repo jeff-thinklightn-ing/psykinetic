@@ -28,10 +28,10 @@ extends GridEntity
 ## her player said in the last ECHO_TICKS, or her own last SAID_REMEMBERED, are
 ## dropped.
 
-enum Intent { FOLLOW, HOLD, ATTACK, SHOVE, RETREAT, IDLE, YIELD, ERRAND, REVIVE }
+enum Intent { FOLLOW, HOLD, ATTACK, SHOVE, RETREAT, IDLE, YIELD, ERRAND, REVIVE, GUIDE }
 enum Stance { STAY_CLOSE, HOLD, PRESS, GUARD, PULL_BACK }
 
-const INTENT_NAMES: Array[String] = ["FOLLOW", "HOLD", "ATTACK", "SHOVE", "RETREAT", "IDLE", "YIELD", "ERRAND", "REVIVE"]
+const INTENT_NAMES: Array[String] = ["FOLLOW", "HOLD", "ATTACK", "SHOVE", "RETREAT", "IDLE", "YIELD", "ERRAND", "REVIVE", "GUIDE"]
 const STANCE_NAMES: Array[String] = ["STAY_CLOSE", "HOLD", "PRESS", "GUARD", "PULL_BACK"]
 const DEFAULT_STANCE := Stance.GUARD
 ## A bump this soon after the last one is the same bump (a held key).
@@ -354,6 +354,16 @@ var sick_words := Callable()
 ## bool; and the channel begun, (her, body) -> bool.
 var can_revive := Callable()
 var revive := Callable()
+## Her guiding (decision 551), Main's: the walk she leads (Guide) or null;
+## the world's routes, () -> WorldRoutes; the walk stopped or at a way out,
+## (her, why) -> void (Guide.step's reasons); and what she knows of the
+## roads for her voice, () -> String. [member guide_note]: told her voice
+## once, at her next line (she agreed, or does not know the way).
+var guide: Guide = null
+var guide_routes := Callable()
+var guide_done := Callable()
+var guide_words := Callable()
+var guide_note := ""
 var talk: Array[String] = []
 var _talk_tick := -100000
 var _merging: Array[Dictionary] = []
@@ -1865,6 +1875,12 @@ func voice_messages(asked := false, heard := "") -> Array[Dictionary]:
 	var sick := str(sick_words.call()) if sick_words.is_valid() else ""
 	if not sick.is_empty():
 		met += " " + sick
+	var roads := str(guide_words.call()) if guide_words.is_valid() else ""
+	if not roads.is_empty():
+		met += " " + roads
+	if not guide_note.is_empty():
+		now.append(guide_note)
+		guide_note = ""
 	var standing := standing_words()
 	if not standing.is_empty():
 		met += " " + standing
@@ -1968,6 +1984,8 @@ func doing() -> String:
 			action = "waiting"
 		Intent.ERRAND:
 			action = "on your way to %s" % errand.get("words", "do what you were asked")
+		Intent.GUIDE:
+			action = "leading %s to %s" % [keeper_name(), guide.goal.get("name", "where they asked") if guide != null else "where they asked"]
 		_:
 			action = "keeping by %s" % keeper_name()
 	return "You are %s; right now you are %s." % [words, action]
@@ -3167,6 +3185,8 @@ func _act() -> void:
 		return
 	intent_target = null
 	_door_hold = NONE
+	if guide != null and guide.going() and (foe != null or low):
+		_guide_ends("danger" if foe != null else "hurt")
 	if _reviving():
 		# Her player downed (decision 544): a foe at her fought off, then to them.
 		_fight_or(foe, Intent.REVIVE)
@@ -3193,6 +3213,8 @@ func _choose(foe: GridEntity, low: bool) -> void:
 		current_intent = Intent.RETREAT
 	elif _on_errand():
 		current_intent = Intent.ERRAND
+	elif guide != null and guide.going():
+		current_intent = Intent.GUIDE  # Leading her player somewhere (decision 551).
 	elif _holds_door(foe):
 		pass
 	else:
@@ -3301,8 +3323,29 @@ func _execute() -> void:
 			_errand_step()
 		Intent.REVIVE:
 			_revive_step()
+		Intent.GUIDE:
+			var why := guide.step(guide_routes.call() if guide_routes.is_valid() else null, _threatens)
+			if not why.is_empty():
+				_guide_ends(why)
 		Intent.IDLE, Intent.SHOVE:
 			pass
+
+
+## Her walk (decision 551) stops, or is at a way out, for [param why]:
+## Main's guide_done says so and takes them through.
+func _guide_ends(why: String) -> void:
+	if guide_done.is_valid():
+		guide_done.call(self, why)
+	elif why != "cross":
+		guide.stop(why)
+
+
+## Whether [param entity] would fight her or her player (enemy-ai's
+## Monster.threatens where it is; else a monster she counts hostile).
+func _threatens(entity: GridEntity) -> bool:
+	if entity.has_method("threatens"):
+		return bool(entity.call("threatens", keeper)) or bool(entity.call("threatens", self))
+	return _hostile(entity)
 
 
 ## REVIVE (decision 544): to a cell beside her downed player, then the

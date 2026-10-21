@@ -14,6 +14,9 @@ extends RefCounted
 ## merge() folds each into Main.world_state. "trade" (decision 504): the
 ## trade routes through areas the player knows, and the caravans on them;
 ## sent like the party, whole when it changes; a client before it ignores it.
+## "guide" (decision 551, sent by Main, not here): what the player's
+## companion knows the way to, {"companion", "places": [place_id],
+## "areas": [area]}, whole when it changes, kept through a full message.
 
 ## How near a place's cell a player comes to know it (Senses' sight range).
 const SIGHT := 7
@@ -186,4 +189,10 @@ static func merge(state: Dictionary, data: Dictionary) -> Dictionary:
 		out["party"] = (data["party"] as Array).duplicate(true)
 	if data.get("trade") is Array:
 		out["trade"] = (data["trade"] as Array).duplicate(true)
+	# What the player's companion knows the way to (decision 551, Main's):
+	# whole when it changes, and kept through a full message.
+	if data.get("guide") is Dictionary:
+		out["guide"] = (data["guide"] as Dictionary).duplicate(true)
+	elif data.get("full", false) and state.get("guide") is Dictionary:
+		out["guide"] = (state["guide"] as Dictionary).duplicate(true)
 	return out

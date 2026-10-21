@@ -87,6 +87,7 @@ func _ready() -> void:
 	_test_sickness()
 	_test_field_return()
 	_test_companion_named()
+	await _test_guide()
 	_test_out_of_reach()
 	_test_knows_level()
 	_test_wild()
@@ -1493,6 +1494,139 @@ func _test_companion_named() -> void:
 	record.companion["alive"] = true
 	_check(CompanionCard.leaning({"name": "Pip", "leanings": {"intellect": 4, "superstition": 8}}, "old", "superstition") == 2,
 		"Pip's low superstition is fixed, whatever a record saved (crypt.md)")
+
+
+func _test_guide() -> void:
+	print("
+== she leads her player where she has been with them (decision 551) ==")
+	_kill_monsters()
+	var owner := _player()
+	var pet := _companion()
+	_settle(pet)
+	var record: PlayerRecord = _main._records[Net.player_id]
+	var here := String(World.zone.name)
+	var came_from := owner.tile
+	record.companion.erase("roads")
+	# What she knows: where she stands with her player, and places within sight.
+	var card := {}
+	_check(Guide.observe(card, "a", Vector2i(10, 10), [{"id": "a/near", "cell": Vector2i(14, 15)}, {"id": "a/far", "cell": Vector2i(30, 10)}])
+		and card["roads"]["areas"] == ["a"] and card["roads"]["places"] == ["a/near"], "seen: the area, the place within sight, not the far one")
+	_check(not Guide.observe(card, "a", Vector2i(10, 10), []), "nothing new: no change")
+	var known: Array[Dictionary] = [{"key": "a/well", "kind": "place", "name": "The Old Well", "area": "a", "cell": Vector2i.ZERO},
+		{"key": "b", "kind": "area", "name": "Well Hill", "area": "b", "cell": Vector2i.ZERO}]
+	_check(str(Guide.named_in("Take me to the old well, please", known).get("key")) == "a/well"
+		and str(Guide.named_in("can you lead us to well hill?", known).get("key")) == "b" and Guide.named_in("take me home", known).is_empty(),
+		"the place her player names, the longest name, the or not; none named: none")
+	_check(Guide.asks("Take me to the barrow") and Guide.asks("show us the way to the mill") and not Guide.asks("I took the barrow road")
+		and Guide.asks_resume("lead on") and not Guide.asks_resume("lead on to the mill, then"), "an ask to lead, and lead on, and what is neither")
+	_main._observe_roads()
+	_check(here in Guide.roads_of(record.companion)["areas"], "out with her player, she comes to know where she stands (%s)" % [record.companion.get("roads")])
+	# Asked the way to somewhere she has not been: no walk, her voice told so.
+	_main._guide_said(owner, pet, "Take me to Nowhere Fen")
+	_check(pet.guide == null and "do not know the way" in pet.guide_note and owner.led_by == "", "a place she has not been: she does not know the way")
+	pet.guide_note = ""
+	# A walk in this zone, to a cell some way off.
+	var far := _far_cell(owner.tile, 9, 14)
+	_check(far != Vector2i(-1, -1), "a cell 9-14 away to lead to (%s)" % far)
+	var goal := {"key": "test/far", "kind": "place", "name": "the far corner", "area": here, "cell": far}
+	_main._start_guide(pet, owner, goal)
+	_check(pet.guide != null and pet.guide.going() and owner.led_by == String(pet.name) and "leading them there now" in pet.guide_note,
+		"asked: she sets off, her player led by her, her voice told she agreed")
+	_step_until(func() -> bool: return pet.current_intent == Companion.Intent.GUIDE and World.distance(owner.tile, came_from) >= 3, 120)
+	_check(pet.current_intent == Companion.Intent.GUIDE and World.distance(owner.tile, came_from) >= 3 and "leading" in pet.doing(),
+		"she walks ahead and their body follows at her heel (%s to %s)" % [came_from, owner.tile])
+	# Their own step takes control back.
+	World.order_step(owner, Vector2i(0, 1), owner.refusals, false)
+	World.step()
+	_check(not pet.guide.going() and pet.guide.stopped == "moved" and owner.led_by == "" and not owner.has_move_order,
+		"their own step: the walk stops, control theirs (%s)" % pet.guide.stopped)
+	_step_until(func() -> bool: return owner.queued_steps.is_empty(), 10)
+	_main._guide_said(owner, pet, "lead on")
+	_check(pet.guide.going() and owner.led_by == String(pet.name), "lead on: taken up again")
+	# A danger she sees.
+	var imp := _spawn_imp(_free_tile_between(pet, 3, 5))
+	World.step()
+	_check(not pet.guide.going() and pet.guide.stopped == "danger" and owner.led_by == "", "a monster in her sight: she stops (%s)" % pet.guide.stopped)
+	World.despawn(imp)
+	_main._guide_said(owner, pet, "lead on")
+	World.step()
+	World.damage(owner, 1, null, &"attack")
+	World.step()
+	_check(pet.guide.stopped == "struck", "a blow on her player: she stops (%s)" % pet.guide.stopped)
+	owner.hp = owner.max_hp
+	# Anything but talk stops it too (the lantern).
+	_main._guide_said(owner, pet, "lead on")
+	_main._on_command(owner, "lantern", {})
+	_check(not pet.guide.going() and pet.guide.stopped == "moved", "a command (the lantern): control theirs")
+	_main._on_command(owner, "lantern", {})
+	_main._guide_said(owner, pet, "lead on")
+	_step_until(func() -> bool:
+		if World.get_entities().any(func(each: GridEntity) -> bool: return each is Monster):
+			_kill_monsters()
+		return pet.guide == null, 600)
+	_check(pet.guide == null and owner.led_by == "" and World.distance(pet.tile, far) <= 3 and World.distance(owner.tile, pet.tile) <= 3,
+		"there: she has brought them, the walk done (her %s, them %s, %s)" % [pet.tile, owner.tile, far])
+	# What she lives through is a danger of the place.
+	World.damage(pet, pet.hp - 1, null, &"attack")
+	var dangers: Array = Guide.roads_of(record.companion)["dangers"]
+	_check(dangers.size() == 1 and dangers[0]["area"] == here and dangers[0]["why"] == "hurt" and int(dangers[0]["weight"]) == 2,
+		"badly hurt here: a danger of this area, weight 2 (%s)" % [dangers])
+	pet.hp = pet.max_hp
+	var saved := PlayerRecord.from_dict(JSON.parse_string(JSON.stringify(record.to_dict())))
+	_check(saved.companion.get("roads") == record.companion["roads"] and saved.companion["roads"]["dangers"][0]["day"] is int,
+		"her roads kept through a save and a load")
+	var merged := WorldNews.merge({}, {"full": false, "guide": {"companion": "Wren", "places": ["a/near"], "areas": ["a"]}})
+	merged = WorldNews.merge(merged, {"full": true, "holdings": {}})
+	_check(merged.get("guide", {}).get("places") == ["a/near"], "her player's map keeps what she knows through a full world message")
+	# The map's command: a destination she knows by its key.
+	_main._on_command(owner, "guide", {"to": here})
+	_check(pet.guide != null and str(pet.guide.goal.get("key")) == here, "the guide command, an area she knows: she leads")
+	_main._guide_done(pet, "moved")
+	_kill_monsters()
+	# Across a way out: she leads them into the next area.
+	var routes: WorldRoutes = World.raid_groups.routes if World.raid_groups != null else null
+	var way := {}
+	if _main._world_map != null:
+		for each: Dictionary in _main._world_map.ways:
+			if each["from"] == here and not each.get("closed", false) and Level.exists(str(each["to"])) and each["to"] != here:
+				way = each
+				break
+	if routes == null or way.is_empty():
+		_check(false, "a way out of %s to cross (%s)" % [here, way])
+		return
+	routes.wait()
+	var there := String(way["to"])
+	Guide.roads_of(record.companion)["areas"].append(there)
+	var named := str(_main._world_map.areas[there].get("display_name", there))
+	_main._guide_said(owner, pet, "Take me to %s" % named)
+	_check(pet.guide != null and pet.guide.going() and str(pet.guide.goal.get("key")) == there, "asked by name for %s, where she has been: she leads" % named)
+	var walk: Guide = pet.guide
+	_step_until(func() -> bool:
+		if World.get_entities().any(func(each: GridEntity) -> bool: return each is Monster):
+			_kill_monsters()  # The test room's own, respawning: no danger on this walk.
+		return walk.crossing_now or not walk.going(), 3000)
+	_check(walk.crossing_now and walk.going(), "at the way out with them beside her (%s, %s)" % [walk.stopped, walk.crossing])
+	await get_tree().process_frame
+	_check(str(record.zone) == there, "through: both in %s (record %s)" % [there, record.zone])
+	World.enter_named(there)
+	owner = _player()
+	pet = _companion()
+	_check(pet != null and pet.guide == walk and walk.pet == pet and owner.led_by == String(pet.name), "the same walk goes on with them there")
+	walk.stop("moved")
+	owner.led_by = ""
+	_main._guides.clear()
+	_main.travel(Net.local_id, here, "", {}, came_from)
+	World.enter_named(here)
+	_settle(_companion())
+
+
+## A free floor cell [param low]..[param high] from [param from], a walk away.
+func _far_cell(from: Vector2i, low: int, high: int) -> Vector2i:
+	for d in range(high, low - 1, -1):
+		for at: Vector2i in [from + Vector2i(d, 0), from + Vector2i(-d, 0), from + Vector2i(0, d), from + Vector2i(0, -d), from + Vector2i(d, d), from + Vector2i(-d, -d)]:
+			if World.is_walkable(at) and World.is_free(at) and not World.find_path(from, at, true).is_empty():
+				return at
+	return Vector2i(-1, -1)
 
 
 func _test_out_of_reach() -> void:

@@ -204,6 +204,16 @@ static func from_dict(entry: Variant) -> PlayerRecord:
 			var sick: Variant = pet.get(key)
 			if sick is Dictionary and not sick.is_empty():
 				record.companion[key] = _numbers(sick)
+		# Her roads (decision 551): where she has been with her player, and
+		# the dangers she lived through there.
+		var roads: Variant = pet.get("roads")
+		if roads is Dictionary:
+			var dangers: Array = []
+			for danger: Variant in roads.get("dangers", []):
+				if danger is Dictionary:
+					dangers.append(_numbers(danger))
+			record.companion["roads"] = {"areas": Array(_strings(roads.get("areas", []))),
+				"places": Array(_strings(roads.get("places", []))), "dangers": dangers}
 	return record
 
 

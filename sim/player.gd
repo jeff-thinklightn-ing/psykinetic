@@ -31,6 +31,10 @@ var player_id := ""
 ## The body this player wears (Net.BODIES; decision 388): their setting, from
 ## their record. What the views draw and sound voices them by.
 var body: StringName = &"male"
+## The companion leading this player somewhere (decision 551), by name;
+## "" when none. While it is set the server walks their body at her heel,
+## and their own step or order takes it back.
+var led_by := ""
 
 
 func _init() -> void:
@@ -59,6 +63,7 @@ func _init() -> void:
 	# Its lantern lit or covered (L): what the views draw and monsters see by.
 	replicate("emit_light")
 	replicate("body")
+	replicate("led_by")
 
 
 
