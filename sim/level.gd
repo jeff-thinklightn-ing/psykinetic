@@ -110,7 +110,7 @@ const NORTHS := {"up": Vector2i(0, -1), "down": Vector2i(0, 1), "left": Vector2i
 ## are the map's own edges on its outline (decision 265).
 const BUILDINGS := {"building.hut": Vector2i(3, 3), "building.house": Vector2i(4, 6), "building.shed": Vector2i(2, 3),
 	"building.well": Vector2i(1, 1), "building.temple": Vector2i(4, 6), "building.healers_hut": Vector2i(3, 3),
-	"building.field": Vector2i(4, 4)}
+	"building.field": Vector2i(4, 4), "building.mound": Vector2i(5, 5)}
 ## The buildings that stand on water, not floor: no inside, no walls (a
 ## well: its water is what stops walkers, and sight passes over it).
 const ON_WATER: Array[String] = ["building.well"]
@@ -119,6 +119,13 @@ const ON_WATER: Array[String] = ["building.well"]
 ## (the slot's own mesh draws it): they stop walkers, not sight, and are
 ## not drawn as walls; a gap in it is an open edge.
 const OPEN_AIR: Array[String] = ["building.field"]
+## The buildings that are solid (decision 550): no inside and no floor but
+## their door, the front row's middle cell (a barrow's mound: its link is
+## there). Their other cells are taken out of the floor (nobody walks onto
+## them, routes go round) and listed in terrain "solid", which stops sight
+## as a wall does; their outline has no walls (the slot's mesh is the
+## mound), none expected.
+const SOLID: Array[String] = ["building.mound"]
 ## A bridge (decision 505): a building entry {slot: "bridge", at, facing,
 ## length, width (1 or 2)} across water, its long axis along its facing,
 ## from a bank to a bank of one height. Its cells are walked on at the
@@ -619,6 +626,7 @@ static func parse(layout: Image, height: Image, config: Dictionary, relief: Imag
 	_check_anchors(level, warnings)
 	level["buildings"] = buildings_from(config, level["terrain"], warnings)
 	_lay_bridges(level)
+	_lay_solid(level)
 	level["terrain"]["streams"] = streams_from(config, level["terrain"], warnings)
 	_check_fords(level["terrain"], warnings)
 	_check_water(level["terrain"], warnings)
@@ -1139,7 +1147,7 @@ static func buildings_from(config: Dictionary, terrain: Dictionary, warnings: Ar
 		for cell in cells:
 			taken[cell] = true
 		var open: Array[Vector3i] = []
-		for key in blocks_outline(cells) if not on_water and not str(entry.get("slot", "")) in OPEN_AIR else []:
+		for key in blocks_outline(cells) if not on_water and not str(entry.get("slot", "")) in OPEN_AIR and not str(entry.get("slot", "")) in SOLID else []:
 			if not terrain["edges"].has(key):
 				open.append(key)
 		if not open.is_empty():
@@ -1356,6 +1364,24 @@ static func _check_fords(terrain: Dictionary, warnings: Array[String]) -> void:
 			beside = beside or wet.has(cell + direction)
 		if not beside:
 			warnings.append("the ford at %s is beside no water: in no stream" % [cell])
+
+
+## The solid buildings in [param level] (SOLID, decision 550) laid into its
+## terrain: each footprint cell but its door (the front row's middle, the
+## building's "door") out of the floor and into terrain "solid".
+static func _lay_solid(level: Dictionary) -> void:
+	var terrain: Dictionary = level["terrain"]
+	var solid: Array[Vector2i] = []
+	for building: Dictionary in level["buildings"]:
+		if not str(building["slot"]) in SOLID:
+			continue
+		var door: Vector2i = front_cell(building["rect"], building["facing"]) - building["facing"]
+		building["door"] = door
+		for cell in rect_cells(building["rect"]):
+			if cell != door:
+				terrain["floor"].erase(cell)
+				solid.append(cell)
+	terrain["solid"] = solid
 
 
 ## The bridges in [param level]'s buildings laid into its terrain: their
@@ -1807,6 +1833,7 @@ static func blocks_outline(cells: Array[Vector2i]) -> Array[Vector3i]:
 ## well, a field or a ruin).
 static func has_inside(building: Dictionary) -> bool:
 	return not str(building.get("slot", "")) in ON_WATER and not str(building.get("slot", "")) in OPEN_AIR \
+			and not str(building.get("slot", "")) in SOLID \
 			and not str(building.get("slot", "")) in SPANS_WATER and not building.get("ruined", false)
 
 

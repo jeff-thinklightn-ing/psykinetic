@@ -352,7 +352,13 @@ All of it is optional.
   the trim are drawn (art-kit's `building.*` slots), and what counts as
   inside. A well stands on a water cell instead (`Level.ON_WATER`): the
   water stops walkers and lets sight pass, it has no walls and no inside,
-  and its water is drawn as ground under its rim. One not on floor (or
+  and its water is drawn as ground under its rim. A solid building
+  (`Level.SOLID`, decision 550: building.mound 5 x 5, a barrow) has no
+  inside and no floor but its door, the front row's middle cell: the rest
+  of its footprint is taken out of the floor as the level is read (nobody
+  walks onto it, routes go round), listed in terrain `solid`, and stops
+  sight as a wall does; it has no walls on its outline and none is asked
+  for (its slot's mesh is the mound), and a link may sit on its door. One not on floor (or
   water) of one height, or overlapping another, is left
   out with a warning; one whose outline has open edges stands, with a
   warning. The building prefabs below lay the walls and the record together

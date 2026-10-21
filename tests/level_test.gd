@@ -32,6 +32,7 @@ func _ready() -> void:
 	_test_sight_over_walls()
 	_test_hills()
 	_test_admin_move()
+	_test_solid()
 	_test_forest()
 	_test_buildings()
 	_test_field()
@@ -385,6 +386,39 @@ func _test_admin_move() -> void:
 	_check(_main._walkable_near(far, Vector2i(0, 0)) == World.NO_CELL and _main._walkable_near(far, Vector2i(14, 15)) == Vector2i(20, 20),
 		"nothing walkable within %d: none (refused); within it, the nearest floor" % _main.MOVE_REACH)
 	_main.load_map("test_room")
+
+
+## A solid building (decision 550): building.mound's footprint is no floor
+## but its door (the front row's middle), in terrain "solid", no inside, no
+## open edges said; it stops sight and a walker, routes go round; refused
+## off clear floor like any building; the wilds' mound on the barrow's link.
+func _test_solid() -> void:
+	print("== a solid building: the mound ==")
+	var rows: Array[String] = []
+	for y in 2 * 12 - 1:
+		rows.append(".".repeat(2 * 14 - 1))
+	var config := {"outdoor": true, "buildings": [{"slot": "building.mound", "at": [4, 3], "facing": [0, 1]}]}
+	var level := Level.parse(Level.image_from_rows(rows, {Vector2i(1, 1): "start"}), null, config)
+	var terrain: Dictionary = level["terrain"]
+	var mound: Dictionary = level["buildings"][0] if not level["buildings"].is_empty() else {}
+	_check(mound.get("door") == Vector2i(6, 7) and terrain["solid"].size() == 24 and Vector2i(6, 7) in terrain["floor"]
+		and not Vector2i(6, 5) in terrain["floor"] and Vector2i(6, 5) in terrain["solid"], "its cells no floor but its door, the front row's middle (%s)" % [mound.get("door")])
+	_check(level["warnings"].is_empty() and not level["building_cells"].has(Vector2i(6, 5)), "no inside, no open edges said (%s)" % [level["warnings"]])
+	var uneven := Level.parse(Level.image_from_rows(rows, {Vector2i(1, 1): "start", Vector2i(5, 4): "water"}), null, config)
+	_check(uneven["buildings"].is_empty() and not uneven["terrain"]["solid"].size(), "off clear floor it is left out, like any building")
+	Level.register("lt_mound", Level.image_from_rows(rows, {Vector2i(1, 1): "start"}), null, config)
+	_check(_main.load_map("lt_mound"), "the level loads")
+	_check(not World.is_walkable(Vector2i(6, 5)) and World.is_walkable(Vector2i(6, 7)), "nobody walks onto it; its door is walked")
+	_check(not World.has_line_of_sight(Vector2i(6, 1), Vector2i(6, 10)) and World.has_line_of_sight(Vector2i(1, 1), Vector2i(12, 1)), "it stops sight across it, not beside it")
+	var path := World.find_path(Vector2i(6, 1), Vector2i(6, 10))
+	_check(not path.is_empty() and path.all(func(cell: Vector2i) -> bool: return not cell in terrain["solid"]), "a path goes round it (%d steps)" % path.size())
+	_main.load_map("test_room")
+	Level.unregister("lt_mound")
+	var wilds := Level.load_level("wilds")
+	var mounds: Array = wilds["buildings"].filter(func(b: Dictionary) -> bool: return b["slot"] == "building.mound")
+	var link: Array = wilds["links"].filter(func(l: Dictionary) -> bool: return l["to_map"] == "barrow" and l["to_spawn"] == "from_wilds")
+	_check(mounds.size() == 1 and not link.is_empty() and mounds[0]["door"] == link[0]["tile"] and wilds["spawn_points"].get("from_barrow") == Vector2i(236, 187)
+		and not Vector2i(236, 187) in wilds["terrain"]["solid"], "the wilds' mound stands, its door on the barrow's link, from_barrow outside (%s)" % [wilds["warnings"]])
 
 
 ## [param prefab_name] stamped onto [param map] at [param at], turned

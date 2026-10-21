@@ -17166,3 +17166,38 @@ Amended (549 amended): the cost, and Jeff's hills strength.
   tint by height was shot beside it and left out, too faint within one
   valley; its numbers stay here as a lever: over the level's height range,
   the lowest ground x (0.90, 0.93, 1.00), the highest x (1.08, 1.05, 0.96).
+## 550. Solid buildings: the barrow's mound
+
+Dungeon's barrow (542) has a mound for its door in the wilds; art-kit's
+building.mound (0d561e71) is 5 x 5 with its doorway at the front row's
+middle, "blocking the other cells is the map's job". No building kind
+blocked its own cells: a footprint was an inside walled by edges (a hut)
+or open ground (a field). The coordinator approved this.
+
+- Level.BUILDINGS gains building.mound (5 x 5); Level.SOLID lists the
+  solid kinds (the mound). A solid building stands where any building does
+  (clear floor of one height, clear of the others: the pad rule), has no
+  inside (has_inside), and asks for no walls on its outline (no open-edges
+  warning). Level._lay_solid then takes each of its footprint cells but its
+  door (front_cell less its facing: the front row's middle, the building's
+  "door") out of the floor and lists them in terrain "solid".
+- World holds "solid" with the zone: no floor, so nobody steps onto it
+  and routes go round; sight stops at a solid cell (both walks, in levels
+  and over relief) and so does light (line_doors), as at a wall. A link may
+  sit on the door.
+- The views: Client3D counts a solid cell as land (ground under the
+  mound's mesh, never a tree); the slot draws the mound.
+- levels/wilds: the mound at (234, 182) facing south, its door on the
+  barrow's link at (236, 186), from_barrow (236, 187) just outside; the
+  forest's edge trimmed by two cells, (238, 182) and (238, 183), to grass
+  for its footprint.
+- PROTOCOL_REVISION 26 (release: as 19 for the bridge slot and 21 for
+  slope and rock, a new meaning carried in the level files clients read; an
+  older client would walk and predict into the mound).
+
+tests: level_test _test_solid: the footprint no floor but the door, no
+inside, nothing said; refused off clear floor; not walked, sight stopped
+across it, a path round it; the wilds' mound on the link.
+
+Builder's set_building and pad check are to know a solid kind (builder's
+side).

@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The barrow's door in the wilds is a grassy mound now, a solid hill you walk round, its doorway the way in (550). Server and client: protocol 26.
 - Hills read more plainly (549 amended): the slope shading is twice as strong, so a valley and its ridge show at a glance; seeing yourself under a cliff no longer costs any frame time when you are not under one.
 - Landing scripts share one fix for change-log conflicts during a rebase, which no longer copies released lines back (539 amended); tools only.
 - Landing tests warn of a change-log line that begins like one already released, a likely copy brought back by a rebase (539 amended); tools only.

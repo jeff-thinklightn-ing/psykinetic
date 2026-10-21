@@ -417,6 +417,9 @@ var _water: Dictionary[Vector2i, bool] = {}
 ## Fords (decision 505): shallow water walked through at FORD_TICK_SCALE;
 ## floor.
 var _fords: Dictionary[Vector2i, bool] = {}
+## A solid building's cells (terrain "solid", decision 550): no floor, and
+## they stop sight and light as a wall does.
+var _solid: Dictionary[Vector2i, bool] = {}
 ## Each cell's cover (decision 508), row by row over _cover_rect (0 off
 ## it): TALL_GRASS_COVER on tall grass, 0 elsewhere; a trampled cell
 ## (_trampled_here) has none while it is flat.
@@ -1201,6 +1204,7 @@ func enter(to: Zone) -> Zone:
 	from.relief_given = _relief_given
 	from.water = _water
 	from.fords = _fords
+	from.solid = _solid
 	from.cover = _cover
 	from.cover_rect = _cover_rect
 	from.torches = _torches
@@ -1225,6 +1229,7 @@ func enter(to: Zone) -> Zone:
 	_relief_given = to.relief_given
 	_water = to.water
 	_fords = to.fords
+	_solid = to.solid
 	_cover = to.cover
 	_cover_rect = to.cover_rect
 	_torches = to.torches
@@ -1342,6 +1347,7 @@ func reset() -> void:
 	_relief_given = false
 	_water.clear()
 	_fords.clear()
+	_solid.clear()
 	_cover = PackedFloat32Array()
 	_cover_rect = Rect2i()
 	_next_id = 1
@@ -1452,6 +1458,7 @@ func _set_terrain(terrain: Dictionary) -> void:
 	_relief_given = false
 	_water.clear()
 	_fords.clear()
+	_solid.clear()
 	_torches.clear()
 	for cell: Vector2i in terrain.get("torches", []):
 		_torches[cell] = true
@@ -1469,6 +1476,8 @@ func _set_terrain(terrain: Dictionary) -> void:
 		_stairs[cell] = stairs[cell]
 	for cell: Vector2i in terrain.get("water", []):
 		_water[cell] = true
+	for cell: Vector2i in terrain.get("solid", []):
+		_solid[cell] = true
 	for cell: Vector2i in terrain.get("fords", []):
 		_fords[cell] = true
 	_load_cover(terrain)
@@ -4700,6 +4709,7 @@ func mirror_reset() -> void:
 	_relief_given = false
 	_water.clear()
 	_fords.clear()
+	_solid.clear()
 	tick = 0
 	tick_alpha = 0.0
 	_clock = 0.0
@@ -5815,7 +5825,7 @@ func line_doors(from: Vector2i, to: Vector2i) -> Variant:
 					return null
 				return LINE_ASK
 		at += step
-		if at != to and height_at(at) > top:
+		if at != to and (height_at(at) > top or _solid.has(at)):
 			return null
 	return doors
 
@@ -5860,7 +5870,7 @@ func _line_of_sight(from: Vector2i, to: Vector2i) -> bool:
 		if _sight_crosses_edge(at, step):
 			return false
 		at += step
-		if at != to and (blocks_sight(at) or height_at(at) > top):
+		if at != to and (blocks_sight(at) or _solid.has(at) or height_at(at) > top):
 			return false
 	return true
 
@@ -5890,7 +5900,7 @@ func _line_in_metres(from: Vector2i, to: Vector2i) -> bool:
 		if _sight_crosses_edge(at, step):
 			return false
 		at += step
-		if at != to and (blocks_sight(at) or elevation_at(at) > lerpf(eye, aim, Vector2(from).distance_to(Vector2(at)) / length)):
+		if at != to and (blocks_sight(at) or _solid.has(at) or elevation_at(at) > lerpf(eye, aim, Vector2(from).distance_to(Vector2(at)) / length)):
 			return false
 	return true
 

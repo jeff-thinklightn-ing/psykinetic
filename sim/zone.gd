@@ -22,6 +22,8 @@ var relief_size := Vector2i.ZERO
 var relief_given := false
 var water: Dictionary[Vector2i, bool] = {}
 var fords: Dictionary[Vector2i, bool] = {}
+## A solid building's cells (decision 550): they stop sight.
+var solid: Dictionary[Vector2i, bool] = {}
 ## Each cell's cover in its rect (World.cover_at, decision 508).
 var cover := PackedFloat32Array()
 var cover_rect := Rect2i()

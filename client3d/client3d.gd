@@ -3163,6 +3163,9 @@ func _build_room() -> void:
 	for cell: Vector2i in _terrain.get("rocks", []):
 		_rocks[cell] = true
 		_land[cell] = true
+	# A solid building's cells (decision 550) are land under its mesh, no tree.
+	for cell: Vector2i in _terrain.get("solid", []):
+		_land[cell] = true
 	_glimpse_plans.clear()
 	if _outdoor:
 		_glimpse_plans = _plan_glimpses()
