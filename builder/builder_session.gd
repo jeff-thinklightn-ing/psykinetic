@@ -389,7 +389,7 @@ Running water is a stream: the stream tool lays its course, from where it rises 
 
 Levels join at their edges: walking off one edge arrives on the neighbour's opposite edge, at the same row (east, west) or column (north, south). When the area touches the map's edge with nothing beyond it, new_area makes a new level there (its own map; a first draft of grass, groves and forest round it, open where the way arrives) and carves a way out to the edge through the area. Use it when asked for somewhere new beyond the edge ("a new area east", "the woods past here"), not for changes inside the area.
 
-Places are what factions hold (the goblins, the town, or nobody): a camp, a keep, a farm, a gate, a mine. Each is a cell and a radius; the ground within the radius is its holder's, and no one else's group may walk through it. mark_place names one (its key, kind, cell, radius, who holds it at the start). Mark a place when you build one: a camp's place on its gather point (where its monsters gather), a farmstead's in its yard. A goblin camp can hold captives from the start (mark_place's holds), each taken from a town (the request lists them): someone of that town, or kin of one of its workers ("the smith's daughter"). In town their kin asks players to bring them home, and they go free when the camp falls, so a camp holding a captive is worth clearing. A town's work sites are places too: a woodlot (woods its woodcutter fells: put it at the forest's edge), a hunting ground (open land with game, its hunter's), a quarry (rock to cut stone from), a farm (fields), a mine. Mark one with the town it works for (mark_place's town: the key of the town's stockpile place), held by the town, not far from it, and with a way on foot from the store to it: a site the goblins hold, or that can't be reached, is worked by no one, and the tool's answer says so. %s Some prefabs bring their place with them. A building prefab is a roofed building players walk into: stamp it whole, door and all, rather than drawing its walls yourself. A building can serve a town: set_building gives one in the area a use (%s) and its town, the key of a stockpile place in this level (a place of kind stockpile, held by the town). A town has one building of each use. Stamping over a building drops its use: set it again. town_wall walls a town in: give the rectangle of cells it encloses (its buildings, its store, room to walk) and the wall stands on the edges just outside it, with gates (doors) where roads come in, one in the middle of each side if you name none. One wall per town; it looks as strong as the town has built it (a bank of rubble at first). roof puts a roof over a rectangle of floor of one height that no building covers: a room you walled yourself, or an open shelter (a market stall, a woodshed) on posts at its corners; give it a use and town and it serves the town as a building does.
+Places are what factions hold (the goblins, the town, or nobody): a camp, a keep, a farm, a gate, a mine. Each is a cell and a radius; the ground within the radius is its holder's, and no one else's group may walk through it. mark_place names one (its key, kind, cell, radius, who holds it at the start). Mark a place when you build one: a camp's place on its gather point (where its monsters gather), a farmstead's in its yard. A goblin camp can hold captives from the start (mark_place's holds), each taken from a town (the request lists them): someone of that town, or kin of one of its workers ("the smith's daughter"). In town their kin asks players to bring them home, and they go free when the camp falls, so a camp holding a captive is worth clearing. A town's work sites are places too: a woodlot (woods its woodcutter fells: put it at the forest's edge), a hunting ground (open land with game, its hunter's), a quarry (rock to cut stone from), a farm (fields), a mine. Mark one with the town it works for (mark_place's town: the key of the town's stockpile place), held by the town, not far from it, and with a way on foot from the store to it: a site the goblins hold, or that can't be reached, is worked by no one, and the tool's answer says so. %s Some prefabs bring their place with them. A solid building (a mound, a barrow's: earth through) stands on flat ground like any, but no one walks its cells but its door, the middle of its front row, and it takes no use; the settings show it, the grid draws its cells as the ground they were. A building prefab is a roofed building players walk into: stamp it whole, door and all, rather than drawing its walls yourself. A building can serve a town: set_building gives one in the area a use (%s) and its town, the key of a stockpile place in this level (a place of kind stockpile, held by the town). A town has one building of each use. Stamping over a building drops its use: set it again. town_wall walls a town in: give the rectangle of cells it encloses (its buildings, its store, room to walk) and the wall stands on the edges just outside it, with gates (doors) where roads come in, one in the middle of each side if you name none. One wall per town; it looks as strong as the town has built it (a bank of rubble at first). roof puts a roof over a rectangle of floor of one height that no building covers: a room you walled yourself, or an open shelter (a market stall, a woodshed) on posts at its corners; give it a use and town and it serves the town as a building does.
 
 Ground has a height, 0 to 6 (the grid's Heights block, shown when any cell has one). A step of a level or more between two cells is a ledge: a wall to anyone walking, though a body pushed off it falls to the ground below, and higher ground sees over walls. Stairs join one level to the next: a stair climbs to the one cell beside it a level up. A slope is a stair that looks like a ramp of earth: use slopes outdoors (on hills, banks, outcrops) and stairs in and round buildings; hill and stairs make slopes when asked. Rock is bare rock standing out of the ground, walled round: no one walks on or through it. height raises, lowers or sets cells; hill makes a rounded hill of rings a level each, with stairs up the sides asked; stairs puts a stair or a flight onto a ledge or up from flat ground. Whatever stands on raised ground (things, starts, buildings) needs stairs to it, and a building stands on one height: when a change leaves something cut off or a stair climbing nowhere, the tool's answer says so: put it right. Some outdoor levels have their ground shaped in metres (the request says so): there the Heights block is in half metres (0-9, then a, b, c ...), a rise of more than 0.45 m between neighbours is a cliff no one walks, height, hill and stairs are refused (the ground is shaped in the editor), and a building needs ground flat within 0.05 m under it: stamp it where the ground is flat, or stamp it with pad to cut the ground flat under it (the only shaping you do: a house on a hillside sits on a cut pad).
 
@@ -1012,6 +1012,33 @@ func _padded(stamped: Dictionary, placed: Array, done: String) -> Dictionary:
 	return laid
 
 
+## The ground as HeightTools walks it: relief() and "solid", each solid
+## building's cells but its door (Level.SOLID, maps' 550: a mound is earth
+## through, its door the front row's middle), which the map still paints
+## as floor.
+func walk_ground() -> Dictionary:
+	var out := relief()
+	var solid: Dictionary[Vector2i, bool] = {}
+	for entry: Variant in working.config.get("buildings", []) if working.config.get("buildings") is Array else []:
+		if not entry is Dictionary or str(entry.get("slot", "")) not in Level.SOLID:
+			continue
+		var rect: Variant = Level.building_rect(entry)
+		if rect == null:
+			continue
+		for cell in Level.rect_cells(rect):
+			if cell != solid_door(entry):
+				solid[cell] = true
+	if not solid.is_empty():
+		out["solid"] = solid
+	return out
+
+
+## A solid building's door cell (Level._lay_solid's rule): its front row's middle.
+static func solid_door(entry: Dictionary) -> Vector2i:
+	var facing := Level.building_facing(entry)
+	return Level.front_cell(Level.building_rect(entry), facing) - facing
+
+
 ## Why the building [param entry] can't stand on this level's relief
 ## (decision 527): its cells not within Relief.PAD_FLAT of each other
 ## (Level.parse would leave it out), naming the cell furthest off; "" if
@@ -1065,6 +1092,9 @@ func _set_building(given: Dictionary) -> Dictionary:
 	if not uneven.is_empty():
 		return _no(uneven + ": the level leaves it out, so it serves no town")
 	var use := str(given.get("use", "")).strip_edges()
+	if not use.is_empty() and str(buildings[index].get("slot", "")) in Level.SOLID:
+		return _no("the %s at %s is solid (earth through, a door into what lies under it): it has no inside for a use" % [
+			building_name(buildings[index]), buildings[index].get("at")])
 	var town := str(given.get("town", "")).strip_edges()
 	if not use.is_empty() and use not in building_uses():
 		return _no("use is one of %s, or empty" % ", ".join(building_uses()))
@@ -1416,7 +1446,7 @@ func _kept(changes: Dictionary) -> Dictionary:
 func site_checks() -> Array[String]:
 	var out: Array[String] = []
 	var places: Dictionary = Level.places_from(working.config, [] as Array[String])
-	var ground := relief()
+	var ground := walk_ground()
 	for key: String in places:
 		var town := str(places[key].get("town", ""))
 		if town.is_empty() or not places.has(town):
@@ -1459,11 +1489,12 @@ func height_checks() -> Array[String]:
 		var rect: Variant = Level.building_rect(building)
 		if rect == null or not area.intersects(rect):
 			continue
+		var solid := str(building.get("slot", "")) in Level.SOLID
 		if not ground.is_empty():
 			var uneven := pad_problem(building)
 			if not uneven.is_empty():
 				out.append(uneven)
-			things.append(rect.position)
+			things.append(solid_door(building) if solid else rect.position)
 			continue
 		var levels := {}
 		for y in range(rect.position.y, rect.end.y):
@@ -1472,8 +1503,9 @@ func height_checks() -> Array[String]:
 					levels[int(map.heights.get(Vector2i(x, y), 0))] = true
 		if levels.size() > 1:
 			out.append("the building at %s stands on more than one height: level it" % rect.position)
-		things.append(rect.position)
-	out.append_array(HeightTools.ledge_warnings(map, things, ground))
+		# A solid one (a mound) is reached at its door (decision 550).
+		things.append(solid_door(building) if solid else rect.position)
+	out.append_array(HeightTools.ledge_warnings(map, things, walk_ground()))
 	return out
 
 

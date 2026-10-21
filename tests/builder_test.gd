@@ -32,6 +32,7 @@ func _ready() -> void:
 	await _test_work_sites()
 	_test_relief()
 	_test_codes()
+	_test_solid()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -645,6 +646,26 @@ func _test_codes() -> void:
 	_check(BuilderUI.coords_text(Vector2i(212, 207), Vector2i(210, 205), Vector2i(-1, -1)) == "212, 207      you 210, 205", "the coordinates line")
 	var front: Vector2i = preload("res://main.gd").front_of(hut)
 	_check(not (hut["rect"] as Rect2i).has_point(front) and front.y == (hut["rect"] as Rect2i).end.y, "a move to H2 lands at its front: %s" % front)
+
+
+func _test_solid() -> void:
+	print("\n== solid buildings (maps' 550): a mound is walked round, entered at its door, given no use ==")
+	_check("A solid building (a mound" in BuilderSession.system_prompt(), "the prompt says what a solid building is")
+	var doc := _doc()
+	doc.config["buildings"] = [{"slot": "building.mound", "at": [10, 10], "facing": [0, 1]}]
+	doc.config["places"] = {"store": {"at": [12, 22], "kind": "stockpile", "holder": "town"},
+		"inside": {"at": [11, 11], "kind": "woodlot", "holder": "town", "town": "store"},
+		"door": {"at": [12, 14], "kind": "hunting_ground", "holder": "town", "town": "store"},
+		"behind": {"at": [12, 6], "kind": "quarry", "holder": "town", "town": "store"}}
+	var session := BuilderSession.new(doc, Rect2i(0, 0, 40, 30), "test_field", StubClaude.new([]))
+	var ground := session.walk_ground()
+	_check((ground.get("solid", {}) as Dictionary).size() == 24 and not ground["solid"].has(Vector2i(12, 14)), "its 25 cells but the door are solid (%d)" % (ground.get("solid", {}) as Dictionary).size())
+	var sites := session.site_checks()
+	_check(sites.size() == 1 and "woodlot inside at (11, 11) can't be reached" in sites[0], "a site inside the mound can't be reached; its door and the ground behind it can (%s)" % [sites])
+	var used: Dictionary = session.run_tool("set_building", {"at": [12, 12], "use": "inn", "town": "store"})
+	_check(not used["ok"] and "solid" in str(used["text"]), "no use for a mound (%s)" % used["text"])
+	_check(session.run_tool("set_building", {"at": [12, 12]})["ok"], "scenery it may be")
+	_check(session.height_checks().is_empty(), "nothing said of a mound on flat ground (%s)" % [session.height_checks()])
 
 
 func _test_relief() -> void:

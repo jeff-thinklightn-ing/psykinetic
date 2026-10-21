@@ -17226,3 +17226,24 @@ across it, a path round it; the wilds' mound on the link.
 
 Builder's set_building and pad check are to know a solid kind (builder's
 side).
+
+## 550, builder's side. Builder mode and solid buildings
+
+Maps' 550 made a solid building (Level.SOLID: building.mound) earth
+through: its footprint but its door (the front row's middle) is no floor
+to the sim, though the map still paints it as ground. Builder mode now
+knows it, as the coordinator asked:
+
+- BuilderSession.walk_ground() is relief() plus "solid", each solid
+  building's cells but its door (solid_door, _lay_solid's rule), and
+  HeightTools' steps, reaches, ledge_warnings and _patch walk round them
+  (_walks). So site_checks says a site inside a mound can't be reached,
+  and height_checks reaches a mound at its door.
+- set_building refuses a use for a solid building (no inside for one);
+  it may be scenery.
+- The pad check (pad_problem) is any building's: a mound stands on flat
+  ground. It needs no outline walls, and builder lays none.
+- The prompt says what a solid building is.
+
+No mound prefab exists, so builder meets one only where a level has it.
+Protocol unchanged. builder_test _test_solid.

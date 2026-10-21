@@ -212,16 +212,23 @@ static func climbs(map: LevelMap, at: Vector2i) -> Vector2i:
 ## a walkable neighbour half a level to STAIR_RISE up with no edge
 ## between), or [method climbs] with no relief.
 static func climbs_over(map: LevelMap, at: Vector2i, relief := {}) -> Vector2i:
-	if relief.is_empty():
+	if not relief.has("field"):
 		return climbs(map, at)
 	if map.cell(at) not in ["stair", "slope"]:
 		return Vector2i.ZERO
 	for side in FOUR:
 		var rise := _metres(relief, at + side) - _metres(relief, at)
-		if map.walkable(at + side) and rise >= Relief.LEVEL_M * 0.5 and rise <= Relief.STAIR_RISE + Relief.EPSILON \
+		if _walks(map, relief, at + side) and rise >= Relief.LEVEL_M * 0.5 and rise <= Relief.STAIR_RISE + Relief.EPSILON \
 				and map.edge(Terrain.edge_key(at, side)) == "clear":
 			return side
 	return Vector2i.ZERO
+
+
+## Whether [param at] is ground to walk on: walkable on [param map] and
+## not in [param relief]'s "solid" (a solid building's cells but its door,
+## Level.SOLID, decision 550).
+static func _walks(map: LevelMap, relief: Dictionary, at: Vector2i) -> bool:
+	return map.walkable(at) and not (relief.has("solid") and (relief["solid"] as Dictionary).has(at))
 
 
 static func _metres(relief: Dictionary, at: Vector2i) -> float:
@@ -233,9 +240,9 @@ static func _metres(relief: Dictionary, at: Vector2i) -> float:
 ## over [param relief] ({field, size}, decision 527) Relief.step's rule, a
 ## rise of WALK_RISE or less or a stair (Relief.cliff_between).
 static func steps(map: LevelMap, a: Vector2i, b: Vector2i, relief := {}) -> bool:
-	if not map.walkable(a) or not map.walkable(b) or map.edge(Terrain.edge_key(a, b - a)) == "wall":
+	if not _walks(map, relief, a) or not _walks(map, relief, b) or map.edge(Terrain.edge_key(a, b - a)) == "wall":
 		return false
-	if not relief.is_empty():
+	if relief.has("field"):
 		var stairs := {a: climbs_over(map, a, relief), b: climbs_over(map, b, relief)}
 		return Relief.step(relief["field"], relief["size"], stairs, a, b - a) == 0
 	var rise := int(map.heights.get(b, 0)) - int(map.heights.get(a, 0))
@@ -275,7 +282,7 @@ static func ledge_warnings(map: LevelMap, cells: Array[Vector2i], relief := {}) 
 	var out: Array[String] = []
 	var told: Dictionary[Vector2i, bool] = {}
 	for start in cells:
-		if told.has(start) or not map.walkable(start):
+		if told.has(start) or not _walks(map, relief, start):
 			continue
 		var patch := _patch(map, start, relief)
 		var seen: Dictionary = patch["cells"]
@@ -297,8 +304,8 @@ static func ledge_warnings(map: LevelMap, cells: Array[Vector2i], relief := {}) 
 				break
 		if biggest > seen.size():
 			out.append("%s is on a patch of %d cells at %s with %s round it and no stair to it" % [
-				start, seen.size(), "height %d" % int(map.heights.get(start, 0)) if relief.is_empty() else "%.2f m" % _metres(relief, start),
-				"ledges" if relief.is_empty() else "cliffs"])
+				start, seen.size(), "height %d" % int(map.heights.get(start, 0)) if not relief.has("field") else "%.2f m" % _metres(relief, start),
+				"ledges" if not relief.has("field") else "cliffs"])
 	return out
 
 
@@ -314,10 +321,10 @@ static func _patch(map: LevelMap, start: Vector2i, relief := {}) -> Dictionary:
 		var at: Vector2i = queue.pop_back()
 		for side in FOUR:
 			var next := at + side
-			if seen.has(next) or not map.walkable(next):
+			if seen.has(next) or not _walks(map, relief, next):
 				continue
 			if steps(map, at, next, relief):
-				if int(map.heights.get(next, 0)) != int(map.heights.get(at, 0)) if relief.is_empty() \
+				if int(map.heights.get(next, 0)) != int(map.heights.get(at, 0)) if not relief.has("field") \
 						else Relief.cliff_between(_metres(relief, at), _metres(relief, next)):
 					climbs_out = true
 				seen[next] = true
