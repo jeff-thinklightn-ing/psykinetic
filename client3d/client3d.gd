@@ -6403,9 +6403,16 @@ func _cliff_strip(into: Array, from: Vector2, to: Vector2, top: Vector2, bottom:
 				point += _cliff_jitter(point) * minf((high - low) / LEVEL_RISE, 1.0)
 			row.append(point)
 		points.append(row)
+	# Taken out of [param into] while they grow: a packed array still held
+	# there too is copied whole by its first append (copy on write), so a
+	# chunk's faces cost the square of its size (the hills' rebuild, about
+	# 150 ms).
 	var positions: PackedVector3Array = into[0]
 	var normals: PackedVector3Array = into[1]
 	var colours: PackedColorArray = into[2]
+	into[0] = PackedVector3Array()
+	into[1] = PackedVector3Array()
+	into[2] = PackedColorArray()
 	var rock := swatch(CLIFF_ROCK.x, CLIFF_ROCK.y)
 	for j in rows:
 		for i in across:
@@ -6413,10 +6420,10 @@ func _cliff_strip(into: Array, from: Vector2, to: Vector2, top: Vector2, bottom:
 			var b := points[j][i + 1]
 			var c := points[j + 1][i]
 			var d := points[j + 1][i + 1]
-			for triangle: Array in [[a, b, c], [b, d, c]]:
-				var p0: Vector3 = triangle[0]
-				var p1: Vector3 = triangle[1]
-				var p2: Vector3 = triangle[2]
+			for t in 2:
+				var p0 := a if t == 0 else b
+				var p1 := b if t == 0 else d
+				var p2 := c
 				var normal := (p1 - p0).cross(p2 - p0)
 				if normal.length_squared() < 0.000001:
 					continue  # A wedge's point.
@@ -6428,9 +6435,15 @@ func _cliff_strip(into: Array, from: Vector2, to: Vector2, top: Vector2, bottom:
 				# Darker toward the foot.
 				shade *= lerpf(0.72, 1.0, clampf(inverse_lerp(minf(bottom.x, bottom.y), maxf(top.x, top.y), middle.y), 0.0, 1.0))
 				var colour := Color(rock * shade, 1.0)
-				positions.append_array([p0, p1, p2])
-				normals.append_array([normal, normal, normal])
-				colours.append_array([colour, colour, colour])
+				positions.append(p0)
+				positions.append(p1)
+				positions.append(p2)
+				normals.append(normal)
+				normals.append(normal)
+				normals.append(normal)
+				colours.append(colour)
+				colours.append(colour)
+				colours.append(colour)
 	into[0] = positions
 	into[1] = normals
 	into[2] = colours

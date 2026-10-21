@@ -11,6 +11,7 @@ notes (decision 324).
 - Ponds, streams and fords lose their square edges: the water's edge rounds its corners (a one-tile pond is round), narrow streams wind within their banks, and on the hills the bank slopes down to it in finer steps (553).
 - Townsfolk speak first: greeted, not mobbed (554 amended): on your first day three residents greet you, not every one you pass; the rest keep their greetings and say something else if they have it. Server only.
 - Townsfolk speak first, tuned again (554 amended): a clear sky is nothing to remark on, and a greeting lost to a slow answer is tried again later in the day. Server only.
+- The hills load faster: their cliff faces are built in about 140 ms less (the 3D rebuild about 980 to 840 ms), with the same faces as before.
 ## v0.1.162
 
 - This version changes what goes over the network, so v0.1.161 and older can't join the server: update through the launcher first.
