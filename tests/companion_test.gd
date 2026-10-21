@@ -1781,6 +1781,20 @@ func _test_loyalty() -> void:
 	_main._set_mood(record)
 	_check(pet.bond_step == "fond" and pet.heel.start == Heel.START and not pet.hangs_back() and pet.bond_why == "",
 		"fond: as she always was")
+	# Grave goods (items' mark): superstitious and fond she won't touch them;
+	# close she carries them, and it costs her.
+	var leaning := pet.superstition
+	pet.superstition = 8
+	World.set_slots(pet, [])
+	World.set_slots(owner, ["dagger"])
+	World.items.mark_grave(World.slot_uid(owner, 0), "Altar")
+	_check(not World.try_transfer(owner, owner, 0, pet, 0), "superstitious and fond: grave goods refused")
+	record.companion["standing"] = {Net.player_id: {"score": 3, "why": [], "since": World.steps}}
+	_main._set_mood(record)
+	_check(World.try_transfer(owner, owner, 0, pet, 0) and Standing.score(record.companion, Net.player_id) == 2
+		and Main.mood_why_of(record.companion, Net.player_id, "you") == "you made her carry grave goods",
+		"close: she carries them, and it costs her (%d)" % Standing.score(record.companion, Net.player_id))
+	pet.superstition = leaning
 	record.companion["standing"] = {Net.player_id: {"score": 6, "why": ["carried you out of the raiders' camp"], "since": World.steps}}
 	_main._set_mood(record)
 	_check(pet.bond_step == "devoted" and pet.heel.start == 2, "devoted: she keeps closer (%d)" % pet.heel.start)
