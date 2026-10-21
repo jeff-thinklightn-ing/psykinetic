@@ -156,10 +156,12 @@ The sample level has one: its whole levels lifted 0.2 m over its water,
 and a gentle rise of about 0.9 m east of the stream. `levels/hills` is the
 showcase (`tools/make_hills.tscn`): a valley winding down the middle, its
 floor falling 5 m north to south and its stream running down it with a
-ford and a bridge, a ridge 7 m over hills rolling 2 m either way to the
-west, a knoll across the stream, and a plateau 6 m up to the east whose
-west side is the map's one cliff, its south side a spur falling 0.25 m a
-cell that is the way up; 2.3 to 15.9 m west of the plateau. Its flanks
+ford and a bridge, hills rolling 2 m either way, two escarpments (525
+amended (2)): one to the west with a 3 m face east over the valley, a long
+slope up to it from the west and a ramp through its face, and one 2.5 m
+high south-east of the valley facing north; and a plateau 6 m up to the
+east whose west side is a cliff, its south side a spur falling 0.25 m a
+cell that is the way up. Its flanks
 are mostly 0.3 m a step, the full walkable 0.4 in bands; its ground is
 painted by slope with no stone (the stone ground draws as paving): bare
 dirt on the steep bands, the crests, the banks and the plateau's rim,
@@ -174,6 +176,14 @@ priority flood, then the cells draining most, keeping to a valley's floor),
 carved under their banks. A valley has a floor (`valley_floor` cells either
 side of its line) falling `valley_fall` along it, so its stream runs its
 length; a ridge entry may be `{line, height, width}` (a knoll: one point).
+An `escarpments` entry, `{line, face, height, back, taper, ways,
+way_width}`, is a face `height` m high down its line, looking `face`
+(a side or a Vector2i), with the ground behind rising to it over `back`
+cells; its edges are kept out of the cap but where the `taper` at its ends
+brings it under the walk, within `way_width` / 2 of each of its `ways`
+(fractions along the line), or where it comes out under 1 m, and there the
+cap makes ramps fanning out below it. `lay` returns the `faces` it kept out
+of the cap, for a later pass over the same ground to keep.
 With `kinds` it paints the ground by slope too: stone where a step to a
 neighbour is 0.34 m or more, bare dirt from 0.24 m, on a crest (0.3 m over
 the cells within 3) and beside water, grass elsewhere, the thresholds

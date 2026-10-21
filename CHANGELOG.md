@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The Hills have escarpments: a 3 m rock face looking east over the valley with a long slope up to its edge from the west and a ramp through it, and a lower one south-east of the valley facing north; the valley is a metre deeper. Jeff, after walking it: "big ledge with slope looks quite good" (525 amended (2)).
 - The talk log shows how a townsperson said a line, dim after their words ("— his voice steady despite the rain"); the bubble over their head stays the words alone (336 amended, ui's side).
 - When a town loses its last carpenter, smith or other maker, a newcomer of that trade now moves in after three days and takes the empty bench, so the town keeps building (552).
 - Screenshots taken on a joined client are named with the area again ("wilds_209-201_..."), and the big map marks your own area and lists your party under it when you joined a server, not only when hosting (538 amended).

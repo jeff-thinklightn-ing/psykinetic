@@ -17448,3 +17448,60 @@ gossip in earshot stay a design of their own. resident_test _test_aloud:
 the two lines from the box and ten shapes round them (the join, the
 over-eight fall-back, the name, the movement that is no aside). Server
 only beyond the key; the bump rides v0.1.161.
+## 525 amended (2). Escarpments: a face on one side, a long slope on the other
+
+Jeff, walking the gentler hills on the box: "slopes slightly perceptible,
+big ledge with slope looks quite good though." The cue that reads is a real
+drop with a walkable way up beside it (the plateau's face and its spur), so
+landforms become escarpments rather than rolling ground alone (coordinator's
+approval, after a trial sheet at 2, 3 and 4 m; maps' pick 3 m).
+
+**Relief.lay "escarpments".** Each entry is `{line, face, height (3), back
+(24), taper (8), ways, way_width (4)}`. On the side away from `face` (a
+side's name or a Vector2i: the way the face looks), the ground rises over
+`back` cells to the line, `height` metres over the roll there, eased to
+nothing over `taper` cells at the line's ends. On the face side it stays as
+laid, so the line is a face about `height` high. The 4-neighbour edges
+across the line are kept out of the slope's cap, as a plateau's faces
+already are: a face is a cliff by the sim's rule (a step over WALK_RISE),
+nothing new to the sim, the routes or the views. The cap still holds:
+- within `way_width` / 2 cells of each of its `ways` (fractions along the
+  line);
+- where the taper brings the face under the walk;
+- where, after the cap, the face came out under FACE_LEAST (1 m), the roll
+  against it near an end, so no ledge a few centimetres over the walk, or
+  one the wrong way round, is left. The ground is capped again without it.
+There the cap's raising pass makes ramps that fan out below the face: the
+ways up, "the big ledge with slope". A per-cell cap (steep_bands) can't make
+a cliff: the raising pass takes the lower cell's cap and the lowering pass
+the higher's, so the neighbours smooth it away. Hence edges, kept out by
+the faces' set _limit already had.
+
+**lay() returns "faces"**: the edge keys it kept out of the cap (plateaus'
+and escarpments'). A later _limit over the same ground (make_hills' ford)
+passes them, or the faces come back as slopes. Terrain draws cliffs from
+the relief itself, as before; the set is for the level tools.
+
+**levels/hills, laid again.**
+- The west ridge and the knoll across the stream become two escarpments:
+  - the west one from (30, 4) to (32, 66), a 3 m face east over the valley,
+    a back slope of 22 cells, a way at 55%;
+  - the south-east one from (50, 57) to (87, 65), 2.5 m, facing north to
+    the plateau's foot, a back of 20 cells, a way at 30%.
+- The valley is 4.5 m deep (was 3.5) and the roll is kept.
+- The ford's banks are walked to over 4 rows either side (FORD_FREE, was
+  2): with the deeper valley the stream's fixed banks two rows off stood
+  too high to ramp to.
+- make_hills says any cliff on neither the plateau nor an escarpment
+  (none).
+- Measured: 61 face edges besides the plateau's 40, the west face's median
+  3.06 m. Every floor cell is reached from the link. Grass 5839 and dirt
+  897, no stone; the stream is 85 cells.
+- Terrain shoots it in game at 09:00, noon and 16:00 from the valley floor,
+  the way and the crest; Jeff vetoes from those or on foot.
+
+tests/relief_test: an escarpment alone (a 3 m face, walked across at its
+way and its end, its back rising, no other cliff, every cell reached, its
+faces returned); lay returns the plateau's faces; the hills' cliffs on the
+plateau and the escarpments, the west face about 3 m, every floor cell
+walked to from the link.

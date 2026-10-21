@@ -49,6 +49,7 @@ func _ready() -> void:
 	_test_message()
 	_test_sample()
 	_test_lay()
+	_test_escarpment()
 	_test_hills()
 	_main.load_map(Level.DEFAULT_MAP)
 	Level.unregister("rl_hill")
@@ -314,6 +315,8 @@ func _test_lay() -> void:
 	_check(laid["relief"] == again["relief"] and laid["streams"] == again["streams"], "the same seed lays the same ground")
 	_check(laid["relief"] != Relief.lay(map, Rect2i(0, 0, 48, 40), 4, options)["relief"], "another seed, other ground")
 	_check(not laid["relief"].has(Vector2i(5, 5)), "void is left as it is")
+	_check(laid["faces"].has(Terrain.edge_key(Vector2i(35, 8), Vector2i(1, 0))) and laid["faces"].has(Terrain.edge_key(Vector2i(40, 3), Vector2i(0, 1))),
+		"lay returns the plateau's faces, for a later _limit to keep (%d)" % laid["faces"].size())
 	for at: Vector2i in laid["relief"]:
 		map.set_relief(at, laid["relief"][at])
 	for at: Vector2i in laid["cells"]:
@@ -374,6 +377,45 @@ func _test_lay() -> void:
 		range(25).map(func(i: int) -> Vector2i: return Vector2i(i, 0)), 0.0), "Relief.pad levels a footprint and its apron (%d cells)" % ring.size())
 
 
+## An escarpment (525 amended (2)): a face down its line, its long back
+## slope walked, ramps at its way and its ends, everything reached.
+func _test_escarpment() -> void:
+	print("== Relief.lay escarpments ==")
+	var size := Vector2i(40, 50)
+	var map := LevelMap.new(size)
+	for y in size.y:
+		for x in size.x:
+			map.set_cell(Vector2i(x, y), "grass")
+	var options := {"base": 4.0, "amplitude": 0.0, "streams": 0,
+		"escarpments": [{"line": [Vector2i(20, 1), Vector2i(20, 48)], "face": "east", "height": 3.0, "back": 15.0, "ways": [0.5]}]}
+	var laid := Relief.lay(map, Rect2i(Vector2i.ZERO, size), 5, options)
+	for at: Vector2i in laid["relief"]:
+		map.set_relief(at, laid["relief"][at])
+	var drop := func(y: int) -> float: return map.relief_at(Vector2i(20, y)) - map.relief_at(Vector2i(21, y))
+	# Its way's ramp fans out along the foot, so the face is lower near it.
+	_check(drop.call(11) > 2.5 and drop.call(38) > 2.5, "a face of about its height down the line (%.2f, %.2f)" % [drop.call(11), drop.call(38)])
+	_check(laid["faces"].has(Terrain.edge_key(Vector2i(20, 11), Vector2i(1, 0))), "its edges are returned as faces")
+	_check(not Relief.cliff_between(map.relief_at(Vector2i(20, 24)), map.relief_at(Vector2i(21, 24)))
+		and not Relief.cliff_between(map.relief_at(Vector2i(20, 2)), map.relief_at(Vector2i(21, 2))),
+		"walked across at its way and its tapered end (%.2f, %.2f)" % [drop.call(24), drop.call(2)])
+	_check(map.relief_at(Vector2i(20, 8)) - map.relief_at(Vector2i(6, 8)) > 2.0, "its back rises to the line (%.2f to %.2f)" % [map.relief_at(Vector2i(6, 8)), map.relief_at(Vector2i(20, 8))])
+	var stray := 0
+	for at: Vector2i in map.cells:
+		for step: Vector2i in [Vector2i(1, 0), Vector2i(0, 1)]:
+			if map.cells.has(at + step) and Relief.cliff_between(map.relief_at(at), map.relief_at(at + step)) 					and not laid["faces"].has(Terrain.edge_key(at, step)):
+				stray += 1
+	_check(stray == 0, "no cliff but on its face (%d others)" % stray)
+	var floor := {}
+	for at: Vector2i in map.cells:
+		floor[at] = true
+	var area := {"relief": map.relief, "relief_size": size, "stairs": {}, "heights": {}, "edges": {}, "floor": floor, "size": size}
+	var field := PackedFloat32Array()
+	field.resize(size.x * size.y)
+	field.fill(-1.0)
+	WorldRoutes._flood(area, Vector2i(30, 8), {}, field)
+	_check(not field.has(-1.0), "every cell is walked to from below the face (%d not)" % field.count(-1.0))
+
+
 func _test_hills() -> void:
 	print("== levels/hills ==")
 	var level := Level.load_level("hills")
@@ -396,7 +438,15 @@ func _test_hills() -> void:
 					face += 1
 				else:
 					off_face += 1
-	_check(face >= 30 and off_face == 0, "one cliff, the plateau's west face (%d edges; %d elsewhere)" % [face, off_face])
+	_check(face >= 30 and off_face >= 60, "the plateau's west face and the escarpments' (%d and %d edges)" % [face, off_face])
+	var west := []
+	for y in range(8, 30):
+		for x in range(20, 40):
+			var drop := Relief.at(field, size, Vector2i(x, y)) - Relief.at(field, size, Vector2i(x + 1, y))
+			if floor.has(Vector2i(x, y)) and floor.has(Vector2i(x + 1, y)) and drop > Relief.WALK_RISE:
+				west.append(drop)
+	west.sort()
+	_check(west.size() >= 15 and west[west.size() / 2] > 2.5, "the west escarpment's face is about 3 m (%d edges, median %.2f)" % [west.size(), west[west.size() / 2] if not west.is_empty() else 0.0])
 	var lowest := INF
 	var highest := -INF
 	for cell: Vector2i in floor:
@@ -413,6 +463,12 @@ func _test_hills() -> void:
 	_check(terrain["streams"].size() == 1 and not terrain["fords"].is_empty() and level["buildings"].any(func(b: Dictionary) -> bool: return b["slot"] == "bridge"),
 		"its stream, a ford and a bridge")
 	var area := {"relief": field, "relief_size": size, "stairs": terrain["stairs"], "heights": {}, "edges": terrain["edges"], "floor": floor, "size": size}
+	var reached := PackedFloat32Array()
+	reached.resize(size.x * size.y)
+	reached.fill(-1.0)
+	WorldRoutes._flood(area, level["spawn_points"]["from_wilds"], {}, reached)
+	var unreached := floor.keys().filter(func(cell: Vector2i) -> bool: return reached[cell.y * size.x + cell.x] < 0.0)
+	_check(unreached.is_empty(), "every floor cell is walked to from the link (%d not: %s)" % [unreached.size(), unreached.slice(0, 5)])
 	var top := Vector2i(80, 20)
 	var steps := WorldRoutes._steps_between(area, level["spawn_points"]["from_wilds"], top)
 	_check(floor.has(top) and steps > 0.0, "the plateau's top is walked to from the link, round by its spur (%.0f steps)" % steps)

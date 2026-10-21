@@ -213,6 +213,8 @@ const LAY_SLOPE := 0.4
 ## How far under its banks Relief.lay sinks a stream's surface.
 const STREAM_DEPTH := 0.4
 const FOUR: Array[Vector2i] = [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]
+## An escarpment's face lower than this after the cap is made a ramp.
+const FACE_LEAST := 1.0
 const SIDES := {"north": Vector2i(0, -1), "east": Vector2i(1, 0), "south": Vector2i(0, 1), "west": Vector2i(-1, 0)}
 ## Relief.lay's "kinds": the ground it paints, and by what (metres a step,
 ## a crest's height over the cells round it).
@@ -245,6 +247,18 @@ const KIND_WANDER := 0.04
 ##   metres over the ground round them, their faces ("north", "east",
 ##   "south", "west"; all if not given) cliffs left steep, their other sides
 ##   falling away walkably, no steeper than spur (LAY_SLOPE) metres a cell;
+## - escarpments: [{line: [Vector2i, ...], face, height (3), back (24),
+##   taper (8), ways: [fractions along the line], way_width (4)}] (525
+##   amended (2)): on the side away from face ("north", "east", "south",
+##   "west" or a Vector2i: the way the face looks) the ground rises over
+##   back cells to the line, height metres over the roll there, eased to
+##   nothing over taper cells at the line's ends; on the face side it stays
+##   as laid, so the line is a face of about height metres. The edges
+##   across the line are kept out of the slope's cap (a cliff by the rule:
+##   steeper than WALK_RISE) but within way_width / 2 cells of each way and
+##   where the taper brings the drop under the walk, or the face comes out
+##   under FACE_LEAST, which the cap makes ramps fanning out below the
+##   face: the ways up;
 ## - keep_flat: [Rect2i], pads levelled with a one-cell apron (pad);
 ## - streams (1): how many streams run down the valleys to the area's edge,
 ##   each width (1 or 2) cells wide; min_flow (area / 60): the fewest cells
@@ -256,10 +270,12 @@ const KIND_WANDER := 0.04
 ## down with them; void, water and keep_clear left). The same seed
 ## lays the same ground. Returns {relief: cell -> metres, cells: cell ->
 ## "water" (the streams; with kinds, the ground's meanings too), streams: [[Vector2i, ...]] (each from its source to
-## its mouth, for level.json "streams")}.
+## its mouth, for level.json "streams"), faces: the edge keys
+## (Terrain.edge_key) kept out of the cap, the plateaus' and escarpments',
+## for a later _limit of the same ground to keep them}.
 static func lay(map: LevelMap, rect: Rect2i, lay_seed: int, options := {}) -> Dictionary:
 	var area := rect.intersection(Rect2i(Vector2i.ZERO, map.size))
-	var out := {"relief": {}, "cells": {}, "streams": []}
+	var out := {"relief": {}, "cells": {}, "streams": [], "faces": {}}
 	if area.size.x < 3 or area.size.y < 3:
 		return out
 	var field := map.relief_field()
@@ -340,6 +356,47 @@ static func lay(map: LevelMap, rect: Rect2i, lay_seed: int, options := {}) -> Di
 				var out_of: Vector2i = at + SIDES.get(side, Vector2i.ZERO)
 				if not top.has_point(out_of):
 					faces[Terrain.edge_key(at, SIDES[side])] = true
+	# Escarpments: a long slope rising to the line on its back side, a face
+	# down off it on the other; the face's edges kept out of the cap but at
+	# its ways and tapered ends, which the cap makes ramps.
+	var scarp_faces := {}  # edge key -> [the cell above, the cell below]
+	for scarp: Dictionary in options.get("escarpments", []):
+		var line: Array = scarp["line"]
+		var face: Variant = scarp.get("face", "east")
+		var facing := Vector2(SIDES[face]) if face is String else Vector2(face)
+		var high := float(scarp.get("height", 3.0))
+		var back := maxf(2.0, float(scarp.get("back", 24.0)))
+		var taper := maxf(1.0, float(scarp.get("taper", 8.0)))
+		var way_width := float(scarp.get("way_width", 4.0))
+		var length := 0.0
+		for i in range(1, line.size()):
+			length += Vector2(line[i]).distance_to(Vector2(line[i - 1]))
+		# Cell -> [distance, along (cells), on the face side].
+		var placed := {}
+		for at: Vector2i in ground:
+			var where := _along_line(at, line)
+			if where.x > back + 1.0:
+				continue
+			var nearest := _nearest_on_line(at, line)
+			placed[at] = [where.x, where.y * length, (Vector2(at) - nearest).dot(facing) > 0.0]
+		for at: Vector2i in placed:
+			var entry: Array = placed[at]
+			if entry[2]:
+				continue
+			var ends := smoothstep(0.0, taper, minf(entry[1], length - entry[1]))
+			heights[at] = float(heights[at]) + high * ends * maxf(0.0, 1.0 - entry[0] / back)
+			if entry[0] > 1.5 or high * ends <= WALK_RISE:
+				continue
+			var in_way := false
+			for way: Variant in scarp.get("ways", []):
+				in_way = in_way or absf(entry[1] - float(way) * length) < way_width / 2.0
+			if in_way:
+				continue
+			for direction in FOUR:
+				var next: Vector2i = at + direction
+				if placed.has(next) and placed[next][2]:
+					faces[Terrain.edge_key(at, direction)] = true
+					scarp_faces[Terrain.edge_key(at, direction)] = [at, next]
 	for pad_rect: Rect2i in options.get("keep_flat", []):
 		var cells: Array = ground.keys().filter(func(at: Vector2i) -> bool: return pad_rect.grow(1).has_point(at))
 		if cells.is_empty():
@@ -372,6 +429,14 @@ static func lay(map: LevelMap, rect: Rect2i, lay_seed: int, options := {}) -> Di
 			if band.get_noise_2d(at.x, at.y) > 1.0 - 2.0 * bands:
 				steeper[at] = LAY_SLOPE
 	_limit(heights, fixed, cliff_side, cap, faces, steeper)
+	# An escarpment's face that came out lower than FACE_LEAST (the roll
+	# against it, near a tapered end) is walked instead: capped again.
+	var low_faces := scarp_faces.keys().filter(func(key: Vector3i) -> bool:
+		return float(heights[scarp_faces[key][0]]) - float(heights[scarp_faces[key][1]]) < FACE_LEAST)
+	for key: Vector3i in low_faces:
+		faces.erase(key)
+	if not low_faces.is_empty():
+		_limit(heights, fixed, cliff_side, cap, faces, steeper)
 	# Streams down the valleys: water follows the lowest way out of the area.
 	var flow := _flow(heights, area)
 	var taken: Dictionary[Vector2i, bool] = {}
@@ -392,6 +457,7 @@ static func lay(map: LevelMap, rect: Rect2i, lay_seed: int, options := {}) -> Di
 				if heights.has(at + direction):
 					fixed[at + direction] = true
 		_limit(heights, fixed, cliff_side, cap, faces, steeper)
+	out["faces"] = faces
 	# relief.png holds nothing under 0 m: the whole of it lifted if it dips.
 	var lowest := 0.0
 	for at: Vector2i in heights:
@@ -503,6 +569,17 @@ static func _along_line(at: Vector2i, line: Array) -> Vector2:
 			along = (walked + a.distance_to(nearest)) / maxf(total, 0.001)
 		walked += a.distance_to(b)
 	return Vector2(best, along)
+
+
+## The point of the polyline [param line] nearest [param at].
+static func _nearest_on_line(at: Vector2i, line: Array) -> Vector2:
+	var point := Vector2(at)
+	var best := Vector2(line[0])
+	for i in range(1, line.size()):
+		var nearest := Geometry2D.get_closest_point_to_segment(point, Vector2(line[i - 1]), Vector2(line[i]))
+		if point.distance_to(nearest) < point.distance_to(best):
+			best = nearest
+	return best
 
 
 ## How far [param at] is from the polyline [param line] (cells).

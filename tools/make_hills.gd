@@ -10,12 +10,13 @@ extends Node
 ## - a valley winding north to south down the middle, its floor falling to
 ##   the south, its stream (2 wide) found by the water's own way down,
 ##   crossed by a ford and a bridge;
-## - to the west, hills rolling 2 m either way over 70 cells and a ridge
-##   7 m over them, 40 cells out, running north to south, its highest knoll
-##   crowned with trees (void): from its crest you look down into the
-##   valley;
-## - across the stream, a knoll 6 m high, so the valley has a shape from
-##   both sides;
+## - hills rolling 2 m either way over 70 cells, and two escarpments
+##   (Relief.lay "escarpments", 525 amended (2); Jeff: "big ledge with
+##   slope looks quite good"): to the west one running north to south, a
+##   3 m face east over the valley and a long walkable slope up to it from
+##   the west, a way up through its face, its highest ground crowned with
+##   trees (void); south-east of the valley one 2.5 m high facing north
+##   to the plateau's foot, so the valley has a shape from both sides;
 ## - to the east, a plateau 6 m up, its west side a sheer cliff (the map's
 ##   one), bare dirt along its rim, its south side falling away as a long
 ##   walkable spur: the way up;
@@ -49,14 +50,19 @@ const PLATEAU_HEIGHT := 6.0
 ## The ground's middle height, and how it leans (metres a cell, north up).
 const BASE := 8.0
 const TILT := Vector2.ZERO
-## The valley's line, the ridge's, and the knoll across the stream.
+## The valley's line.
 const VALLEY: Array[Vector2i] = [Vector2i(46, 0), Vector2i(42, 30), Vector2i(50, 60), Vector2i(44, 95)]
-const RIDGE: Array[Vector2i] = [Vector2i(8, 10), Vector2i(17, 34), Vector2i(12, 62), Vector2i(19, 88)]
-const KNOLL := Vector2i(68, 76)
+## The escarpments: their lines, which way their faces look, how high.
+const WEST_SCARP: Array[Vector2i] = [Vector2i(30, 4), Vector2i(27, 36), Vector2i(32, 66)]
+const SOUTH_SCARP: Array[Vector2i] = [Vector2i(50, 57), Vector2i(87, 65)]
+const SCARP_HEIGHT := 3.0
 ## The rows the ford and the bridge cross the stream nearest to (the
 ## nearest it runs through, the bridge at least 7 rows from the ford).
 const FORD_ROW := 38
 const BRIDGE_ROW := 78
+## The ford's banks are walked to over this many rows either side of it
+## (the stream's banks further off kept as laid).
+const FORD_FREE := 4
 ## The low wall: its column (the edge east of it) and rows.
 const WALL_X := 55
 const WALL_ROWS := Vector2i(34, 42)
@@ -66,6 +72,8 @@ var config := {"name": "The Hills", "outdoor": true, "zone": "outdoors", "region
 var entries: Array = []
 ## The ford's row, once laid (the bridge keeps away from it).
 var _ford_row := -100
+## The escarpments' faces as laid (edge keys), kept by the ford's limiting.
+var _faces: Dictionary = {}
 
 
 func _ready() -> void:
@@ -79,8 +87,11 @@ func _ready() -> void:
 	var arrival := _link()
 	var laid := Relief.lay(map, Rect2i(Vector2i.ZERO, SIZE), SEED, {
 		"base": BASE, "amplitude": 2.0, "scale": 70.0, "octaves": 2, "tilt": TILT,
-		"ridges": [RIDGE, {"line": [KNOLL], "height": 6.0, "width": 20.0}], "ridge_height": 7.0, "ridge_width": 40.0, "slope": 0.3, "steep_bands": 0.3, "rock_step": Relief.MAX_M, "dirt_step": 0.33,
-		"valleys": [VALLEY], "valley_depth": 3.5, "valley_floor": 3.0, "valley_fall": 5.0, "valley_width": 30.0, "kinds": true, "min_flow": 30,
+		"escarpments": [
+			{"line": WEST_SCARP, "face": "east", "height": SCARP_HEIGHT, "back": 22.0, "ways": [0.55]},
+			{"line": SOUTH_SCARP, "face": "north", "height": SCARP_HEIGHT - 0.5, "back": 20.0, "ways": [0.3]}],
+		"slope": 0.3, "steep_bands": 0.3, "rock_step": Relief.MAX_M, "dirt_step": 0.33,
+		"valleys": [VALLEY], "valley_depth": 4.5, "valley_floor": 3.0, "valley_fall": 5.0, "valley_width": 30.0, "kinds": true, "min_flow": 30,
 		"plateaus": [{"rect": Rect2i(CLIFF_X, 0, SIZE.x - CLIFF_X, FOOT), "height": PLATEAU_HEIGHT, "faces": ["west"], "spur": 0.25}],
 		"keep_flat": [Rect2i(arrival - Vector2i(2, 3), Vector2i(4, 7))],
 		"streams": 1, "width": 2, "keep_clear": {}})
@@ -106,6 +117,7 @@ func _ready() -> void:
 	for at: Vector2i in laid["cells"]:
 		if laid["cells"][at] == "water":
 			water[at] = true
+	_faces = laid["faces"]
 	_ford(water)
 	_bridge(water)
 	_rock()
@@ -155,12 +167,12 @@ func _ford(water: Dictionary) -> void:
 		if map.cell(at) == "water":
 			wet[at] = true
 		for step: Vector2i in Relief.FOUR:
-			if heights.has(at + step) and not water.has(at + step) and absi(at.y - across[0].y) > 2:
+			if heights.has(at + step) and not water.has(at + step) and absi(at.y - across[0].y) > FORD_FREE:
 				fixed[at + step] = true
 	for bank: Vector2i in [across[0] - Vector2i(1, 0), across[across.size() - 1] + Vector2i(1, 0)]:
 		heights[bank] = surface + 0.3
 		fixed[bank] = true
-	var face := {}
+	var face := _faces.duplicate()
 	for y in FOOT:
 		face[Terrain.edge_key(Vector2i(CLIFF_X - 1, y), Vector2i(1, 0))] = true
 	Relief._limit(heights, fixed, wet, Relief.LAY_SLOPE, face)
@@ -223,7 +235,8 @@ func _rock() -> void:
 				map.set_cell(at, "dirt")
 
 
-## The ridge's highest knoll west of the valley, crowned with trees.
+## The highest ground west of the valley (the west escarpment's crest),
+## crowned with trees.
 func _knoll() -> void:
 	var top := Vector2i(-1, -1)
 	for at: Vector2i in map.cells:
@@ -240,10 +253,12 @@ func _wall() -> void:
 		map.set_edge(Vector3i(WALL_X, y, Terrain.EAST), "wall")
 
 
-## Says the cliff edges the relief has (the plateau's face is meant).
+## Says the cliff edges the relief has (the plateau's face and the
+## escarpments' are meant; any other is a stray).
 func _say_cliffs() -> void:
 	var count := 0
 	var off_face := 0
+	var stray := 0
 	for at: Vector2i in map.cells:
 		if not map.walkable(at):
 			continue
@@ -252,7 +267,8 @@ func _say_cliffs() -> void:
 				count += 1
 				if not (step == Vector2i(1, 0) and at.x == CLIFF_X - 1 and at.y < FOOT):
 					off_face += 1
-	print("[hills] %d cliff edges, %d off the plateau's face" % [count, off_face])
+					stray += 0 if _faces.has(Terrain.edge_key(at, step)) else 1
+	print("[hills] %d cliff edges, %d off the plateau's face, %d of them on no escarpment" % [count, off_face, stray])
 
 
 ## The link to the wilds on the east edge at LINK_ROW, its arrival two
