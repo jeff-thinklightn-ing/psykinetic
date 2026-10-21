@@ -177,7 +177,9 @@ func _test_one_strike_clip() -> void:
 ## The bow clear of the body (Jeff: "arm and bow clipping body"; on v0.1.160: "the bow draw back
 ## arm is all wrong, it clips through the body then is held as if the arm is behind wrapping
 ## behind the head"): on five builds (the man as built, heavy, broad, lean; the woman), the bow in
-## the left hand as Client3D sockets it, carried walking and standing, lifted, at the nock, raised,
+## the left hand as Client3D sockets it, carried walking, jogging and sprinting with no upper layer
+## (462 amended (3): the arm swinging with the gait, at four places along each, the bow turned
+## as Client3D.BOW_CARRY turns it; the bow alone checked there, the arms being the gait's), standing, lifted, at the nock, raised,
 ## pulled, at full draw, at the release and coming down, no vertex of the bow inside the trunk or
 ## the left leg, of the left forearm inside the trunk, nor of the right forearm or hand inside the
 ## trunk or the head (each against the nearest such vertex's normal, the body skinned as posed);
@@ -190,7 +192,12 @@ func _test_bow_clear() -> void:
 		["man broad", "res://art/models/characters/human_m.glb", {"heavy": 0.6, "broad": 1.0}],
 		["man lean", "res://art/models/characters/human_m.glb", {"lean": 1.0, "narrow": 1.0}],
 		["woman", "res://art/models/characters/human_f.glb", {}]]
-	var poses := [["walk", "Walk", "Bow_Idle", 0.3], ["stand", "Idle", "Bow_Idle", 0.0], ["lift", "Idle", "Bow_Draw", 0.15],
+	# A carry's last field is the seed of where along its gait the loop starts.
+	var poses := [["walk", Client3D.HUMAN_GAITS[0][0], "", 1], ["walk", Client3D.HUMAN_GAITS[0][0], "", 2], ["walk", Client3D.HUMAN_GAITS[0][0], "", 3],
+		["walk", Client3D.HUMAN_GAITS[0][0], "", 4], ["jog", JOG, "", 1], ["jog", JOG, "", 2],
+		["jog", JOG, "", 3], ["jog", JOG, "", 4], ["sprint", SPRINT, "", 1],
+		["sprint", SPRINT, "", 2], ["sprint", SPRINT, "", 3], ["sprint", SPRINT, "", 4],
+		["stand", "Idle", "Bow_Idle", 0.0], ["lift", "Idle", "Bow_Draw", 0.15],
 		["nock", "Idle", "Bow_Draw", 0.3], ["raise", "Idle", "Bow_Draw", 0.42], ["raised", "Idle", "Bow_Draw", 0.5],
 		["pull", "Idle", "Bow_Draw", 0.68], ["full", "Idle", "Bow_Draw", 1.0], ["release", "Idle", "Bow_Loose", 0.09],
 		["down", "Idle", "Bow_Loose", 0.8]]
@@ -209,16 +216,23 @@ func _test_bow_clear() -> void:
 			Client3D._attach_sockets(model, Client3D.HUMAN_SOCKETS, 1.0, holder)
 			var bow := ArtKit.instance("item.bow")
 			(holder.get_meta("sockets")["hand_l"] as Node3D).add_child(bow)
+			if pose[2] == "":
+				bow.transform = Client3D.BOW_CARRY
 			var rng := RandomNumberGenerator.new()
-			rng.seed = 1
+			rng.seed = int(pose[3]) if pose[2] == "" else 1
 			var rig := AnimRig.make(model, lib, 0.0, true, rng)
-			rig.loop(pose[1])
+			rig.loop(pose[1], 0.0)
 			for i in 3:
-				rig.upper_at(pose[2], float(pose[3]) * rig.length(pose[2]))
+				if pose[2] != "":
+					rig.upper_at(pose[2], float(pose[3]) * rig.length(pose[2]))
 				await get_tree().process_frame
 			var counts := _bow_inside(model, bow)
+			if pose[2] == "":
+				# Carried, the arms are the gait's own (the clip's, not the bow's): the bow alone.
+				counts = Vector3i(counts.x, 0, 0)
 			if counts != Vector3i.ZERO:
-				found.append("%s %s: bow %d, left forearm %d, right arm %d" % [build[0], pose[0], counts.x, counts.y, counts.z])
+				found.append("%s %s%s: bow %d, left forearm %d, right arm %d" % [build[0], pose[0],
+					" %.2f" % rig.position() if pose[2] == "" else "", counts.x, counts.y, counts.z])
 			if pose[0] == "full":
 				var skeleton := model.find_children("*", "Skeleton3D", true, false)[0] as Skeleton3D
 				var head := skeleton.get_bone_global_pose(skeleton.find_bone("Head")).origin
@@ -232,6 +246,9 @@ func _test_bow_clear() -> void:
 	_check(anchors.is_empty(), "at full draw the string hand at the jaw, not behind the head (%s)" % ", ".join(anchors))
 
 
+## The people's own run and sprint (Client3D.HUMAN_GAITS).
+const JOG := "Jog_Short"
+const SPRINT := "Sprint_Short"
 const TRUNK_BONES := ["Hips", "Spine", "Chest", "UpperChest", "Neck"]
 
 

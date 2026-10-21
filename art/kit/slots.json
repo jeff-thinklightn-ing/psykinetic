@@ -2160,6 +2160,19 @@
 			"source": {"by": "art-kit", "tool": "blender", "license": "own", "date": "2026-10-17",
 				"notes": "a stand-in by hand: a four-sided shaft, three vanes, the head by variant; 30 to 46 tris"}
 		},
+		"gear.quiver": {
+			"category": "items",
+			"type": "mesh",
+			"kind": "held",
+			"origin": "centre",
+			"size": [0.12, 0.72, 0.13],
+			"tolerance": 0.15,
+			"budget": 400,
+			"variants": 3,
+			"sockets": {"grip": [0, 0, 0]},
+			"uses": "an archer's quiver (decision 462 amended (3); Jeff: \"arrows should just be a quiver on the back\"): not an item of its own, worn on a body's back socket (Client3D's \"back\": between the shoulder blades, up and over the right shoulder) while a bow is in hand and arrows in the other hand's slot, which then shows nothing; origin at the middle of the piece's height, on the face that lies against the back (z = 0), the tube along +y to its mouth and the arrows' fletching at +y, out from the body toward -z, the strap on +z; variant 1 plain, 2 flame (a red cord under the mouth), 3 barbed (dark fletching), as the bundles item.arrows, _flame, _barbed",
+			"grey": [{"at": [0, -0.08, -0.065], "size": [0.12, 0.56, 0.13]}, {"at": [0, 0.28, -0.065], "size": [0.08, 0.16, 0.08]}]
+		},
 		"ground.needles": {
 			"category": "ground",
 			"type": "texture",

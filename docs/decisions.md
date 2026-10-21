@@ -11853,6 +11853,33 @@ five builds and counts the bow in the trunk or the left leg, the left forearm in
 right forearm and hand in the trunk or the head; and at full draw the string wrist within 0.2 m of
 the head and not behind it. The clips before this fail both (the right arm in the body at the lift,
 nock, raise and coming down; the wrist 0.22 behind the head).
+
+Amended (3) (Jeff on v0.1.162: "running with walking carrying arrow bundle and bow at side needs to
+be bow swinging with arm, arrows should just be a quiver on the back and right arm swinging while
+running like normal. bow string doesn't bend, it needs real physics"; the coordinator approved the
+method). The carry: at a walk or run with the bow down (Client3D's bow state "carry", the base clip
+one of the puppet's gaits) the upper layer lets go, so both arms swing with the gait, and the bow
+turns in the left hand to BOW_CARRY (a quarter turn about the socket's x, 0.04 m out from the
+grip), found by trial so its limbs clear the hip and leg through the walk, jog and sprint on the
+five builds (anim_rig_test _test_bow_clear: twelve carried moments, the bow alone counted, the arms
+being the gait's own); standing, Bow_Idle again, the bow turning back over BOW_TURN_SECONDS. The
+arrows leave the hand: while a bow is held and arrows are in the other hand's slot, that hand
+shows nothing and a quiver hangs on the body's "back" socket (between the shoulder blades, up and
+over the right shoulder): slot gear.quiver, art-kit's, kind held, not an item of its own, its
+variant the arrows' kind (1 plain, 2 flame, 3 barbed, as fx.arrow's), a grey box until its art
+lands. No arrow count is shown (the pack's count isn't replicated to the puppet; a fixed
+fletching). The string: art-kit's straight "string" box is hidden and drawn instead as two closed
+boxes of its thickness and material (seen from every side), tip to nock and nock to tip, the tips
+read off the box's bounds, so every bow and variant bends with no new art. Drawn, the nock follows
+the drawing hand (never past it, never forward of the brace) and the arrow sits on it. Let go,
+the nock goes back by Client3D.bow_string: to the brace in STRING_SNAP (0.03 s, a quarter swing),
+then a damped ring about it (9 Hz, damping ratio 0.2) whose first swing past the brace is 0.12 of
+the draw and never more than 0.05 m, still after 0.4 s; a function of the time since the loose, so
+a long frame can't fling the string across the body. The arrow leaves the string on the loose
+(_on_shot's flight takes over). Next, if Jeff wants more: the limbs flexing with the draw (a
+vertex bend keyed to the pull). Fixed on the way: a hand's old thing is taken out of its socket
+before it is freed, so the new one is the socket's "Held" (two in one frame, the new one had been
+renamed and the bow's string and the bundle looked up on the old).
 ## 460. Moving in: a person the town remembers arrives, with room and the lawspeaker's word
 
 Phase 4 of Jeff's lawspeaker proposal (docs/lore/lawspeaker.md, Jeff: "when

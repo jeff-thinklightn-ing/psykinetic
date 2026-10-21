@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Archers run like runners now (462): walking or running, the bow swings in the left hand with the arm and the right arm swings free; the arrows ride in a quiver on the back, not in the hand. The bowstring bends back to the drawing hand and springs forward with a short shiver when the arrow flies.
 - A stream's fall is white water broken into streaks that trail downstream, instead of a straight white line across it (557 amended).
 - Hillsides lose their grid: the ground's facets no longer line up in rows and columns, and each tile follows the slope's lie, while the hills keep their shape and where you can walk is unchanged (558).
 - A stream's falls are heard: water tumbling over the step, louder the further it drops, over the stream's running water.

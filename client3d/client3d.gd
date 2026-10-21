@@ -8968,13 +8968,30 @@ static func _attach_sockets(scene: Node3D, sizes: Dictionary, model_scale: float
 ## What [param entity] holds in each hand drawn at its puppet's hand sockets
 ## (decision 451): each thing from its art slot (ArtKit: its own art, a
 ## fill, or a grey box sized as the slot is until it has art), swapped when
-## the slot changes, gone when the hand empties.
+## the slot changes, gone when the hand empties. An archer's arrows aren't in
+## its hand but in a quiver on its back (decision 462 amended (3)).
 func _sync_held(entity: GridEntity, puppet: Node3D) -> void:
 	if not puppet.has_meta("sockets"):
 		return
 	var held: Array = puppet.get_meta("held")
 	var sockets: Dictionary = puppet.get_meta("sockets")
 	var ids := held_ids(entity)
+	var quiver := ""
+	if World.drawn_with(entity) != "" and ARROW_VARIANTS.has(ids[0]):
+		quiver = ids[0]
+		ids[0] = ""
+	if quiver != str(puppet.get_meta("quiver", "")):
+		puppet.set_meta("quiver", quiver)
+		var back := sockets.get("back") as Node3D
+		if back != null:
+			var old := back.get_node_or_null("Quiver")
+			if old != null:
+				back.remove_child(old)
+				old.queue_free()
+			if quiver != "" and ArtKit.has(QUIVER):
+				var piece := ArtKit.instance(QUIVER, int(ARROW_VARIANTS[quiver]))
+				piece.name = "Quiver"
+				back.add_child(piece)
 	for hand in 2:
 		var id: String = ids[hand]
 		if id == held[hand]:
@@ -8984,6 +9001,8 @@ func _sync_held(entity: GridEntity, puppet: Node3D) -> void:
 		if socket == null:
 			continue
 		for old in socket.get_children():
+			# Out of the way now, so the new thing is the one named "Held".
+			socket.remove_child(old)
 			old.queue_free()
 		if id == "":
 			continue
@@ -9029,6 +9048,12 @@ static func _hanging_lantern() -> Node3D:
 	return lantern
 
 
+## The arrows' kinds as their nocked arrow's and their quiver's variants
+## (fx.arrow, gear.quiver); an archer's quiver on its back socket (462 amended (3)).
+const ARROW_VARIANTS := {"arrows": 1, "arrows_flame": 2, "arrows_barbed": 3}
+const QUIVER := "gear.quiver"
+
+
 ## What [param entity] holds as drawn [right hand, left hand]: its hand
 ## slots, but a bow (World.drawn_slot) always in the left and the other
 ## hand's thing (its arrows) in the right, as a right-handed archer holds
@@ -9070,7 +9095,9 @@ static func bow_pull(entity: GridEntity) -> float:
 ## World.draw_of grows), then Bow_Hold once it reaches 1; the
 ## shot (_on_shot), Bow_Loose; a draw let go with no shot, back to Bow_Idle. A
 ## raised shield ("block") holds the guard (Block_Idle) on the upper layer.
-## While drawn the bundle's hand shows one arrow (fx.arrow, its kind's
+## Walking or running with the bow down ("carry", 462 amended (3)) the upper
+## layer lets go: both arms swing with the gait, the bow in the left hand.
+## While drawn the drawing hand shows one arrow (fx.arrow, its kind's
 ## variant) on the bow's string, the string pulled back to that hand.
 func _sync_bow(entity: GridEntity, puppet: Node3D) -> void:
 	if not puppet.has_meta("rig") or not puppet.has_meta("sockets"):
@@ -9090,6 +9117,9 @@ func _sync_bow(entity: GridEntity, puppet: Node3D) -> void:
 		want = "hold" if World.draw_of(entity) >= 1.0 else "draw"
 	elif bow != "":
 		want = "loose" if state == "loose" and now < int(puppet.get_meta("bow_until", 0)) else "idle"
+		if want == "idle" and (puppet.get_meta("gaits", GAITS) as Array).any(
+				func(gait: Array) -> bool: return gait[0] == rig.base_clip()):
+			want = "carry"
 	if want == "draw":
 		var clip := str(moves.get("bow_draw", ""))
 		rig.upper_at(clip, bow_pull(entity) * rig.length(clip))
@@ -9101,36 +9131,65 @@ func _sync_bow(entity: GridEntity, puppet: Node3D) -> void:
 				rig.upper(str(moves.get("bow_idle", "")))
 			"block":
 				rig.upper(str(moves.get("block", "")))
-			"":
+			"", "carry":
 				rig.upper_off()
 	puppet.set_meta("bow_state", want)
+	if bow != "":
+		_turn_carried(puppet, want == "carry", now)
 	_show_nocked(puppet, ids, want in ["draw", "hold"])
 
 
-## While drawn, the bundle hidden and one arrow on the bow's string at its
-## nock, the string (the bow art's "string" part) pulled back toward the
-## drawing hand; else as they were.
+## The bow as it's carried at a walk or run (462 amended (3)): a quarter turn
+## in the hand and out from it a little, so its limbs clear the hip and leg as
+## the arm swings (no vertex inside the body through the gaits, five builds,
+## anim_rig_test); turned to it and back over about BOW_TURN_SECONDS.
+const BOW_CARRY := Transform3D(Basis(Vector3.RIGHT, -PI * 0.5), Vector3(0.04, 0.0, 0.0))
+const BOW_TURN_SECONDS := 0.2
+func _turn_carried(puppet: Node3D, carried: bool, now: int) -> void:
+	var bow := ((puppet.get_meta("sockets") as Dictionary)["hand_l"] as Node3D).get_node_or_null("Held") as Node3D
+	var then := int(puppet.get_meta("bow_turned_at", now))
+	puppet.set_meta("bow_turned_at", now)
+	if bow == null:
+		return
+	var want := BOW_CARRY if carried else Transform3D.IDENTITY
+	if bow.transform.is_equal_approx(want):
+		return
+	var step := 1.0 - exp(-(now - then) / 1000.0 * 5.0 / BOW_TURN_SECONDS)
+	bow.transform = bow.transform.interpolate_with(want, clampf(step, 0.0, 1.0))
+	if bow.transform.origin.distance_to(want.origin) < 0.002 and bow.basis.get_rotation_quaternion().angle_to(want.basis.get_rotation_quaternion()) < 0.02:
+		bow.transform = want
+
+
+## While drawn, one arrow on the bow's string at its nock, the string pulled
+## back toward the drawing hand; let go, the arrow gone and the string
+## springing back (bow_string).
 func _show_nocked(puppet: Node3D, ids: Array, drawn: bool) -> void:
 	var sockets: Dictionary = puppet.get_meta("sockets")
-	var bundle := (sockets["hand_r"] as Node3D).get_node_or_null("Held") as Node3D
 	var bow := (sockets["hand_l"] as Node3D).get_node_or_null("Held") as Node3D
 	if bow == null:
 		return
 	var string := bow.find_child("string", true, false) as Node3D
 	var arrow := bow.find_child("Nocked", true, false) as Node3D
-	if bundle != null:
-		bundle.visible = not drawn
+	if string != null and not string.has_meta("rest"):
+		_string_segments(string)
 	if not drawn:
 		if arrow != null:
 			arrow.queue_free()
-		if string != null and string.has_meta("rest"):
-			string.position = string.get_meta("rest")
+		if string != null and string.has_meta("pulled"):
+			# Let go: the spring from where it was drawn to.
+			string.set_meta("loosed", [Time.get_ticks_msec(), float(string.get_meta("pulled"))])
+			string.remove_meta("pulled")
+		if string != null and string.has_meta("loosed"):
+			var loosed: Array = string.get_meta("loosed")
+			var at := (Time.get_ticks_msec() - int(loosed[0])) / 1000.0
+			var rest: Vector3 = string.get_meta("rest")
+			string.position = rest + Vector3(0.0, 0.0, bow_string(float(loosed[1]), at))
+			if at >= STRING_SETTLE:
+				string.remove_meta("loosed")
+			_string_bend(string)
 		return
-	if string != null and not string.has_meta("rest"):
-		string.set_meta("rest", string.position)
 	if arrow == null and ArtKit.has("fx.arrow"):
-		var kinds := {"arrows": 1, "arrows_flame": 2, "arrows_barbed": 3}
-		arrow = ArtKit.instance("fx.arrow", int(kinds.get(str(ids[0]), 1)))
+		arrow = ArtKit.instance("fx.arrow", int(ARROW_VARIANTS.get(str(ids[0]), 1)))
 		arrow.name = "Nocked"
 		# Its notch at the nock, its head (+y) toward the target (the bow's +z).
 		arrow.basis = Basis(Vector3.RIGHT, PI * 0.5)
@@ -9138,9 +9197,105 @@ func _show_nocked(puppet: Node3D, ids: Array, drawn: bool) -> void:
 		(string if string != null else nock if nock != null else bow).add_child(arrow)
 	if string != null:
 		# Back toward the drawing hand, never past it nor forward of the brace.
-		var hand := bow.global_transform.affine_inverse() * (sockets["hand_r"] as Node3D).global_position
+		var hand := (string.get_parent() as Node3D).global_transform.affine_inverse() * (sockets["hand_r"] as Node3D).global_position
 		var rest: Vector3 = string.get_meta("rest")
 		string.position = Vector3(rest.x, rest.y, minf(rest.z, hand.z))
+		string.set_meta("pulled", rest.z - string.position.z)
+		if string.has_meta("loosed"):
+			string.remove_meta("loosed")
+		_string_bend(string)
+
+
+## The string's nock point [param seconds] after a draw of [param pulled] m
+## was let go, along the bow's z from its brace (+ toward the target): back
+## to the brace in STRING_SNAP, a quarter swing; then a damped ring about it
+## (STRING_HZ, damped by STRING_DAMPING) whose first swing past the brace is
+## STRING_OVERSHOOT of the draw, never more than STRING_OVERSHOOT_MAX; still
+## after STRING_SETTLE. A function of the time alone, so a long frame can't
+## throw it further than the swing itself goes.
+const STRING_SNAP := 0.03
+const STRING_HZ := 9.0
+const STRING_DAMPING := 0.2
+const STRING_OVERSHOOT := 0.12
+const STRING_OVERSHOOT_MAX := 0.05
+const STRING_SETTLE := 0.4
+static func bow_string(pulled: float, seconds: float) -> float:
+	if seconds >= STRING_SETTLE or pulled <= 0.0:
+		return 0.0
+	if seconds < STRING_SNAP:
+		return -pulled * cos(PI * 0.5 * seconds / STRING_SNAP)
+	var omega := TAU * STRING_HZ
+	var t := seconds - STRING_SNAP
+	var ring := minf(pulled * STRING_OVERSHOOT, STRING_OVERSHOOT_MAX)
+	return ring * exp(-STRING_DAMPING * omega * t) * sin(omega * sqrt(1.0 - STRING_DAMPING * STRING_DAMPING) * t)
+
+
+## The bow art's "string" part (a straight box tip to tip, its pivot at the
+## nock) drawn instead as two thin segments, tip to nock and nock to tip
+## (462 amended (3)), so a drawn string bends at the hand: the box hidden,
+## the tips read off its bounds, the segments closed boxes of its own
+## thickness and material (seen from every side), every corner on the
+## string's own swatch (its first vertex's UV). Kept as the string's metas
+## "rest", "tips" and "segments".
+static var _string_boxes := {}
+static func _string_segments(string: Node3D) -> void:
+	string.set_meta("rest", string.position)
+	var boxes := string.find_children("*", "MeshInstance3D", true, false)
+	var box := string as MeshInstance3D if string is MeshInstance3D else (boxes.front() as MeshInstance3D if not boxes.is_empty() else null)
+	if box == null:
+		return
+	var parent := string.get_parent() as Node3D
+	var to_parent := parent.global_transform.affine_inverse() * box.global_transform
+	var bounds := box.get_aabb()
+	var middle := bounds.get_center()
+	var top := to_parent * Vector3(middle.x, bounds.end.y, middle.z)
+	var bottom := to_parent * Vector3(middle.x, bounds.position.y, middle.z)
+	var width := (to_parent.basis * Vector3(minf(bounds.size.x, bounds.size.z), 0.0, 0.0)).length()
+	var uv := Vector2.ZERO
+	if box.mesh != null and box.mesh.get_surface_count() > 0:
+		var uvs: Variant = box.mesh.surface_get_arrays(0)[Mesh.ARRAY_TEX_UV]
+		if uvs is PackedVector2Array and not (uvs as PackedVector2Array).is_empty():
+			uv = (uvs as PackedVector2Array)[0]
+	if not _string_boxes.has(uv):
+		var arrays := BoxMesh.new().get_mesh_arrays()
+		var flat := PackedVector2Array()
+		flat.resize((arrays[Mesh.ARRAY_VERTEX] as PackedVector3Array).size())
+		flat.fill(uv)
+		arrays[Mesh.ARRAY_TEX_UV] = flat
+		var made := ArrayMesh.new()
+		made.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+		_string_boxes[uv] = made
+	var segments: Array[MeshInstance3D] = []
+	for i in 2:
+		var piece := MeshInstance3D.new()
+		piece.name = "StringSegment%d" % i
+		piece.mesh = _string_boxes[uv]
+		piece.material_override = box.get_active_material(0)
+		piece.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		parent.add_child(piece)
+		segments.append(piece)
+	box.visible = false
+	string.set_meta("tips", [top, bottom, maxf(width, 0.002)])
+	string.set_meta("segments", segments)
+	_string_bend(string)
+
+
+## The two segments from the tips to the string's nock as it is now.
+static func _string_bend(string: Node3D) -> void:
+	if not string.has_meta("segments"):
+		return
+	var tips: Array = string.get_meta("tips")
+	var nock := string.position
+	var segments: Array = string.get_meta("segments")
+	var width: float = tips[2]
+	for i in 2:
+		var tip: Vector3 = tips[i]
+		var along := tip - nock
+		var length := maxf(along.length(), 0.001)
+		var up := along / length
+		var side := up.cross(Vector3.FORWARD if absf(up.z) < 0.9 else Vector3.RIGHT).normalized()
+		(segments[i] as MeshInstance3D).transform = Transform3D(
+			Basis(side * width, up * length, side.cross(up).normalized() * width), (nock + tip) * 0.5)
 
 
 ## A human body's meshes in HUMAN_MATERIAL, each part in its own colour (its

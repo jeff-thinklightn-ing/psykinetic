@@ -3795,9 +3795,22 @@ func _test_bow() -> void:
 	var rig := puppet.get_meta("rig") as AnimRig
 	var bow := (sockets["hand_l"] as Node3D).get_node_or_null("Held")
 	var bundle := (sockets["hand_r"] as Node3D).get_node_or_null("Held")
-	_check(bow != null and bundle != null and Client3D.held_ids(player) == ["arrows", "bow"],
-			"a bow in the right hand's slot is drawn in the left, its arrows in the right")
+	var quiver := (sockets["back"] as Node3D).get_node_or_null("Quiver")
+	_check(bow != null and Client3D.held_ids(player) == ["arrows", "bow"],
+			"a bow in the right hand's slot is drawn in the left")
+	_check(bundle == null and quiver != null, "its arrows not in the right hand but in a quiver on the back (462 amended (3))")
 	_check(rig.upper_clip() == "Bow_Idle", "a bow in hand: Bow_Idle (%s)" % rig.upper_clip())
+	# Walking or running: no upper layer, both arms swinging with the gait.
+	rig.loop(str((puppet.get_meta("gaits") as Array)[1][0]))
+	_rig._sync_bow(player, puppet)
+	_check(rig.upper_clip() == "" and puppet.get_meta("bow_state") == "carry", "running with the bow down: the arms swing with the gait (%s over %s)" % [rig.upper_clip(), rig.base_clip()])
+	rig.loop(Client3D.CLIP_IDLE)
+	_rig._sync_bow(player, puppet)
+	_check(rig.upper_clip() == "Bow_Idle", "standing again: Bow_Idle (%s)" % rig.upper_clip())
+	var string := bow.find_child("string", true, false) as Node3D
+	var segments: Array = string.get_meta("segments", []) if string != null else []
+	_check(segments.size() == 2 and string.get_children().all(func(n: Node) -> bool: return not (n is MeshInstance3D and (n as MeshInstance3D).visible)),
+			"the string drawn as two segments, the art's straight box hidden")
 	# The pose is scrubbed by the draw (bow_pull), carried on between ticks by
 	# World.tick_alpha: held at a tick's start here, so the check doesn't hang
 	# on where in a tick the test happens to run.
@@ -3806,8 +3819,8 @@ func _test_bow() -> void:
 	player.raised = "draw"
 	player.raised_tick = World.tick
 	_rig._process(0.0)
-	_check(rig.upper_clip() == "Bow_Draw" and rig.upper_position() < 0.01 and not bundle.visible,
-			"drawing: Bow_Draw from the nock, the bundle put away (%s, %.2f)" % [rig.upper_clip(), rig.upper_position()])
+	_check(rig.upper_clip() == "Bow_Draw" and rig.upper_position() < 0.01,
+			"drawing: Bow_Draw from the nock (%s, %.2f)" % [rig.upper_clip(), rig.upper_position()])
 	World.tick_alpha = alpha_was
 	_check(bow.find_child("Nocked", true, false) != null or not ArtKit.has("fx.arrow"), "an arrow on the string")
 	# Scrubbed by the sim's draw (bow_pull): the nock by the ticks to draw_min,
@@ -3829,10 +3842,32 @@ func _test_bow() -> void:
 	player.raised_tick = World.tick - 20
 	_rig._process(0.0)
 	_check(rig.upper_clip() == "Bow_Hold", "at full draw: Bow_Hold (%s)" % rig.upper_clip())
+	if segments.size() == 2:
+		# Bent: both segments meet at the nock, drawn back of the brace.
+		var rest: Vector3 = string.get_meta("rest")
+		var tips: Array = string.get_meta("tips")
+		var ends := range(2).map(func(i: int) -> float:
+			var seg := segments[i] as MeshInstance3D
+			return (seg.position - seg.basis.y * 0.5).distance_to(string.position) + (seg.position + seg.basis.y * 0.5).distance_to(tips[i]))
+		_check(float(string.get_meta("pulled", 0.0)) > 0.0 and string.position.z < rest.z and ends.all(func(d: float) -> bool: return d < 0.001),
+				"drawn: the string bent at the nock, back toward the hand (%.3f m), its two segments tip to nock (%s)" % [string.get_meta("pulled", 0.0), ends])
 	player.shot.emit(player.tile + Vector2i(4, 0))
 	player.raised = ""
 	_rig._process(0.0)
-	_check(rig.upper_clip() == "Bow_Loose" and bundle.visible, "loosed: Bow_Loose, the bundle back (%s)" % rig.upper_clip())
+	_check(rig.upper_clip() == "Bow_Loose", "loosed: Bow_Loose (%s)" % rig.upper_clip())
+	var nocked := bow.find_child("Nocked", true, false)
+	_check((nocked == null or nocked.is_queued_for_deletion()) and (string == null or string.has_meta("loosed")),
+			"loosed: the arrow gone from the string, the string springing back")
+	# The spring: the brace in STRING_SNAP, a ring past it never more than
+	# STRING_OVERSHOOT_MAX nor back of the draw, still by STRING_SETTLE (a function of
+	# the time, so a long frame can't throw it further).
+	var swing := []
+	for ms in range(0, 600, 5):
+		swing.append(Client3D.bow_string(0.5, ms / 1000.0))
+	_check(absf(Client3D.bow_string(0.5, Client3D.STRING_SNAP)) < 0.001 and swing.max() > 0.01
+			and swing.max() <= Client3D.STRING_OVERSHOOT_MAX + 0.0001 and swing.min() >= -0.5 and swing.slice(swing.size() - 30).all(func(z: float) -> bool: return z == 0.0),
+			"the string's spring: at the brace by %.2f s, rings past it at most %.2f m (%.3f), still after %.1f s" % [
+				Client3D.STRING_SNAP, Client3D.STRING_OVERSHOOT_MAX, swing.max(), Client3D.STRING_SETTLE])
 	puppet.set_meta("bow_until", 0)
 	_rig._process(0.0)
 	_check(rig.upper_clip() == "Bow_Idle", "then Bow_Idle again")
