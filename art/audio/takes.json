@@ -58,6 +58,35 @@
 				"sha256": "eb88794d7d2617d2c9505678286bc99e20e54092e050d54b6e3df8299b993d09"
 			}
 		],
+		"amb.falls": [
+			{
+				"file": "amb.falls.ogg",
+				"from": "freesound",
+				"original": "freesound 191879: Water running through weir (from 0 s for 56 s)",
+				"sha256": "687ac82a82e3e3faf3a234d6f1da37cda9632e2caaa81e482d48b85fb3d8672b",
+				"by": "zachrau",
+				"url": "https://freesound.org/people/zachrau/sounds/191879/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "amb.falls.2.ogg",
+				"from": "freesound",
+				"original": "freesound 727048: Cascade (3) (from 0 s for 46 s)",
+				"sha256": "1a9aad148e54a8f0e2e1e54d4e703a9b87e336c073bc710c1d6758ff7358fe32",
+				"by": "xslimits",
+				"url": "https://freesound.org/people/xslimits/sounds/727048/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "amb.falls.3.ogg",
+				"from": "freesound",
+				"original": "freesound 537681: waterfall river sound effect (from 8 s for 60 s)",
+				"sha256": "955a4b98f8821e313d8133071bc9cf3cbf26e4bef8d4f1804cfc01746e5c9e63",
+				"by": "Garuda1982",
+				"url": "https://freesound.org/people/Garuda1982/sounds/537681/",
+				"license": "CC0 1.0"
+			}
+		],
 		"amb.field_wind": [
 			{
 				"file": "amb.field_wind.ogg",

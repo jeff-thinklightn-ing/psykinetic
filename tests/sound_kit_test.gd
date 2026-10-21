@@ -275,6 +275,11 @@ func _test_ambience_weights() -> void:
 	_check(past.at == 2 and is_equal_approx(past.t, 1.0) and is_equal_approx(past.distance, 4.0), "past its end: its end (%s)" % past)
 	_check(Ambience.nearest_on([Vector2i(3, 3)], Vector2(3, 7)).distance == 4.0 and Ambience.nearest_on([], Vector2.ZERO).is_empty(), "one cell; none")
 	_check(SoundKit.positional("amb.stream") and SoundKit.reach("amb.stream") >= 12, "a stream heard from %d cells" % SoundKit.reach("amb.stream"))
+	# A stream's fall (decision 557): louder the further it drops.
+	_check(is_equal_approx(Ambience.fall_db(Client3D.FALL_LEAST), Ambience.FALL_DB.x) and is_equal_approx(Ambience.fall_db(3.0), Ambience.FALL_DB.y)
+			and Ambience.fall_db(0.46) > Ambience.FALL_DB.x and Ambience.fall_db(0.46) < Ambience.FALL_DB.y,
+			"a fall: %.1f dB at the least, %.1f at the hills' 0.46 m, %.1f at 3 m" % [Ambience.fall_db(Client3D.FALL_LEAST), Ambience.fall_db(0.46), Ambience.fall_db(3.0)])
+	_check(SoundKit.positional("amb.falls") and SoundKit.reach("amb.falls") > 0, "a fall heard from %d cells" % SoundKit.reach("amb.falls"))
 	for bed: String in Ambience.BEDS:
 		_check(SoundKit.has(bed) and not SoundKit.positional(bed), "%s is a flat slot" % bed)
 

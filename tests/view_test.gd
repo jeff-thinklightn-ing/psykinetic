@@ -188,6 +188,20 @@ func _test_ambience_runs() -> void:
 	else:
 		_rig._terrain["streams"] = had
 	_rig.ambience._weigh()
+	# A stream's fall (decision 557) heard from the fall, as loud as its drop.
+	var had_falls: Array[Dictionary] = _rig.stream_falls
+	var fall_takes := not SoundKit.files("amb.falls").is_empty()
+	_rig.stream_falls = [{"cell": listener + Vector2i(2, 0), "drop": 0.46}] as Array[Dictionary]
+	_rig.ambience._weigh()
+	var falling: Variant = _rig.ambience._falls.get(0)
+	_check(falling == null if not fall_takes else falling is AudioStreamPlayer3D
+			and (falling as AudioStreamPlayer3D).position.distance_to(_rig._tile_position(listener + Vector2i(2, 0))) < 0.01,
+			"a fall two cells off: its loop there (%s)" % ("held" if falling != null else "no takes"))
+	_rig.stream_falls = [{"cell": listener + Vector2i(40, 0), "drop": 0.46}] as Array[Dictionary]
+	_rig.ambience._weigh()
+	_check(_rig.ambience._falls.is_empty() and (falling == null or (falling as Node).is_queued_for_deletion()), "a fall out of reach: none held")
+	_rig.stream_falls = had_falls
+	_rig.ambience._weigh()
 
 
 func _test_options_panel() -> void:

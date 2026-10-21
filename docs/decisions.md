@@ -18544,3 +18544,27 @@ tests/view_test:
 
 Shots and A/B in C:\dev\review\streams2 (ab-*.png; t3 and t4 a second apart, the
 flow). Client only, protocol unchanged, no new class_name.
+
+
+## 557, sound's side: a stream's fall heard
+
+Terrain draws a short fall with foam where a stream drops more than
+Client3D.FALL_LEAST (0.25 m) between two path cells, and lists them in
+Client3D.stream_falls ({cell, drop}, a new array each build); the
+coordinator approved a sound for them on release's agreement. A new
+positional loop, amb.falls (3 Freesound takes, CC0: 191879, 727048,
+537681; reach 10 cells), is held by Ambience at each fall within reach
+(+2, as a stream's loop), at the cell below the step, over the stream's own
+running water (505, sound's side), which is unchanged. It is louder the
+further it drops: Ambience.fall_db, FALL_DB -6 dB at the least fall to 0 dB
+at FALL_LOUDEST 1 m and over (the hills' 0.46 m fall: -4.3 dB). Heard as
+any sound (Sfx.steer: walls muffle it, the canopy doesn't), ducked with
+the beds; the loops are rebuilt when stream_falls is a new array.
+
+Tests: sound_kit_test (fall_db at the least, the hills' and a tall fall;
+the slot's reach); view_test (a fall two cells off held there, let go out
+of reach), both passing with the external takes moved aside.
+
+Rejected: the fall as a louder stretch of the stream's own loop (one
+player per stream would have to sit at the fall and at the nearest point
+at once); a one-shot splash now and then (a fall pours without pause).

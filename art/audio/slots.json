@@ -1339,6 +1339,15 @@
 			"range": 16,
 			"volume_db": -8.0,
 			"uses": "running water: a stream heard from the nearest point of its course, before it is seen; Ambience, one per stream at the point of its course nearest the listener"
+		},
+		"amb.falls": {
+			"category": "ambience",
+			"type": "loop",
+			"bus": "ambience",
+			"noise": null,
+			"range": 10,
+			"volume_db": -6.0,
+			"uses": "water tumbling down a stream's fall, from the fall, louder with its drop; Ambience, one at each fall (Client3D.stream_falls) within reach"
 		}
 	}
 }

@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- A stream's falls are heard: water tumbling over the step, louder the further it drops, over the stream's running water.
 - Streams flow along their course instead of tile by tile: the current follows the stream's curve and runs faster where it drops, and where a stream falls, white water foams down the step (557).
 - Ledges and outcrops lose their square edges: a cliff's rim now runs along a gentle curve instead of the tiles' straight lines and right angles, while ramps stay where they are (556).
 - Ponds, streams and fords lose their square edges: the water's edge rounds its corners (a one-tile pond is round), narrow streams wind within their banks, and on the hills the bank slopes down to it in finer steps (553).

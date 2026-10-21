@@ -33,6 +33,8 @@ extends Node
 ## loop (amb.stream) plays from the point of its course nearest the
 ## listener (nearest_on), sliding along the water as they move, heard
 ## before the trees let it be seen and muffled only by walls (Sfx.hearing).
+## Where a stream falls (decision 557: Client3D.stream_falls) its fall is
+## heard over it, from the fall (amb.falls), louder the further it drops.
 ## A bed with no takes plays nothing.
 
 ## Seconds a bed takes to ease most of the way to its new loudness.
@@ -62,6 +64,10 @@ const BAT_SECONDS := 20.0
 ## TOWER_FAR.
 const TOWER_NEAR := 4.0
 const TOWER_FAR := 12.0
+## A stream's fall (decision 557): dB over amb.falls' own at the least fall
+## and at FALL_LOUDEST metres and over.
+const FALL_DB := Vector2(-6.0, 0.0)
+const FALL_LOUDEST := 1.0
 ## Below this weight a bed is stopped.
 const SILENT := 0.01
 const BEDS: Array[String] = ["amb.forest_dawn", "amb.forest_day", "amb.forest_night", "amb.field_wind",
@@ -85,6 +91,9 @@ var _torch: AudioStreamPlayer3D
 ## the listener is within its reach; and the streams they were made for.
 var _streams := {}
 var _stream_paths: Array = []
+## Fall (its index in Client3D.stream_falls) -> its held loop, as streams'.
+var _falls := {}
+var _fall_list: Array = []
 var _since_weigh := INF
 
 
@@ -124,6 +133,7 @@ func _weigh() -> void:
 			canopy, drip))
 	_place_torch(cell)
 	_place_streams(cell)
+	_place_falls(cell)
 	var rates := calls(zone, DayNight.daylight(steps), weather, canopy, _tower_nearness(cell))
 	for slot: String in rates:
 		if randf() < rates[slot] * WEIGH_EVERY:
@@ -251,6 +261,44 @@ func _place_streams(cell: Vector2i) -> void:
 				continue
 			_streams[i] = player
 		view.sfx.steer(player, at, 1.0, duck_db)
+
+
+## Each stream's fall within its reach of [param cell] held, at the fall
+## (the cell below its step), as loud as fall_db has its drop.
+func _place_falls(cell: Vector2i) -> void:
+	var falls: Array = view.stream_falls
+	if not is_same(falls, _fall_list):
+		for player: Variant in _falls.values():
+			if is_instance_valid(player):
+				player.queue_free()
+		_falls.clear()
+		_fall_list = falls
+	var reach := SoundKit.reach("amb.falls")
+	for i in falls.size():
+		var fall: Dictionary = falls[i]
+		var player: Variant = _falls.get(i)
+		if player != null and not is_instance_valid(player):
+			player = null
+		var at_cell: Vector2i = fall["cell"]
+		if maxi(absi(at_cell.x - cell.x), absi(at_cell.y - cell.y)) > reach + 2:
+			if player != null:
+				player.queue_free()
+			_falls.erase(i)
+			continue
+		var at := view._tile_position(at_cell)
+		if player == null:
+			player = view.sfx.hold("amb.falls", at)
+			if player == null:
+				continue
+			_falls[i] = player
+		view.sfx.steer(player, at, 1.0, fall_db(float(fall["drop"])) + duck_db)
+
+
+## How much louder or quieter (dB) a fall of [param drop] metres is heard
+## than its slot: FALL_DB.x at Client3D.FALL_LEAST, up to FALL_DB.y at
+## FALL_LOUDEST and over.
+static func fall_db(drop: float) -> float:
+	return lerpf(FALL_DB.x, FALL_DB.y, clampf(inverse_lerp(Client3D.FALL_LEAST, FALL_LOUDEST, drop), 0.0, 1.0))
 
 
 ## The point of [param path] (cells in order, each beside the one before)
