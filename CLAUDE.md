@@ -82,7 +82,7 @@ which worktree owns each step, and the design rules not to break without asking 
 - Heavy jobs go through the resource gate (Jeff, 2026-10-17): before a mesh or image
   generation, a full test suite, a bench, a Godot import or export, run it through the gate:
   `sh tools/heavy_job.sh run <tree> <kind> -- <command>` (or `heavy_job.ps1`; kinds:
-  trellis_mesh, comfy_batch, suite, bench, godot_import, godot_export; `status`, `kinds` and
+  trellis_mesh, comfy_batch, suite, bench, godot_import, godot_export, soak; `status`, `kinds` and
   `summary` show the rest; `take`/`release` only for a script that can't wrap). Perf lands
   it; until then, one such job per session at a time and the bench lock. The gate checks
   free RAM (and GPU memory for GPU jobs) against the kind's recorded estimate plus an 8 GB
@@ -101,7 +101,11 @@ which worktree owns each step, and the design rules not to break without asking 
   memory falls under
   the margin while jobs run, the newest job's own wrapper stops it first and retries;
   nobody stops another session's job. The daily summary lists jobs that waited or were
-  stopped.
+  stopped. A soak (a run that counts sim days, not timings: town_soak, town_balance, npc's 30-day
+  run) is the `soak` kind since 394's eighth amendment (751cb726): it runs beside suites, never beside a
+  bench, one at a time, at below-normal priority, with a 180-minute default limit (`--expect` overrides);
+  never register a soak as a bench (economy's 150-minute soak as a bench held five landings and a cut,
+  2026-10-21).
 - Stop only processes you started, by PID. Never `taskkill /IM` or `pkill` a program
   name: that kills every tree's Godot, including other sessions' tests and benches.
   Stopping a background task can leave its shell script and Godot children running: after
