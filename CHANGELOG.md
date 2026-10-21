@@ -7,25 +7,26 @@ notes (decision 324).
 
 ## Unreleased
 
-- Archers draw properly (462): the string hand comes back along the jaw to below the ear with the elbow out and level behind it, instead of wrapping behind the head, and on the way it stays in front of the chest instead of passing through it; the bow arm keeps a soft elbow, and a carried bow hangs close at the side of the thigh.
+## v0.1.161
+
+- This version changes what goes over the network, so v0.1.160 and older can't join the server: update through the launcher first.
 - The Hills have escarpments: a 3 m rock face looking east over the valley with a long slope up to its edge from the west and a ramp through it, and a lower one south-east of the valley facing north; the valley is a metre deeper. Jeff, after walking it: "big ledge with slope looks quite good" (525 amended (2)).
+- Hills read more plainly (549 amended): the slope shading is twice as strong, so a valley and its ridge show at a glance; seeing yourself under a cliff no longer costs any frame time when you are not under one.
+- You can see yourself under a cliff (549): when a hillside or a cliff's edge stands between the camera and you, it thins around you, as near walls fade.
+- Townsfolk speak their words and no more: the stage direction the model wrapped round a resident's answer ("You nod, your voice steady despite the rain. ...") leaves the speech bubble, which carries the words alone, whole; one clause of how it was said follows the line in the talk log, dim ("his voice steady despite the rain"), and the town's gossip hears only the words (336 amended, from Jeff's play on v0.1.160; PROTOCOL_REVISION 27, the "speech" message's "aside").
+- Archers draw properly (462): the string hand comes back along the jaw to below the ear with the elbow out and level behind it, instead of wrapping behind the head, and on the way it stays in front of the chest instead of passing through it; the bow arm keeps a soft elbow, and a carried bow hangs close at the side of the thigh.
 - Pip the carpenter becomes Aldous's acolyte: a town whose own Pip has a trade keeps him as one Pip, the priest's acolyte in place from the first morning after the update ("Pip [acolyte]"), his bench left for the town's next carpenter; the alms runs are his only work (546, npc's side, amended). Server only.
 - Rain reads as rain, not fog: a rainy day keeps its colours under the falling streaks instead of a milky haze (534 amended).
-
-- The talk log shows how a townsperson said a line, dim after their words ("— his voice steady despite the rain"); the bubble over their head stays the words alone (336 amended, ui's side).
 - When a town loses its last carpenter, smith or other maker, a newcomer of that trade now moves in after three days and takes the empty bench, so the town keeps building (552).
 - Screenshots taken on a joined client are named with the area again ("wilds_209-201_..."), and the big map marks your own area and lists your party under it when you joined a server, not only when hosting (538 amended).
-- Townsfolk speak their words and no more: the stage direction the model wrapped round a resident's answer ("You nod, your voice steady despite the rain. ...") leaves the speech bubble, which carries the words alone, whole; one clause of how it was said follows the line in the talk log, dim ("his voice steady despite the rain"), and the town's gossip hears only the words (336 amended, from Jeff's play on v0.1.160; PROTOCOL_REVISION 27, the "speech" message's "aside").
 - Trade wagons and raiding parties walk up hills, stairs and fords on their way instead of waiting at the foot of the first climb and then jumping to the end of that stretch; and the routes can now give a companion her way leg by leg, or a way round a camp she knows, for leading her player (551, maps' side).
 - The Barrow's burial niches are drawn (542): each alcove holds its bier and remains, plundered near the top, old bones and grave goods deeper, the oldest wrapped burials at the bottom.
 - The Barrow fills in: its generated plan lists every grave between the tombs with how deep it lies, so enemy-ai's walking skeletons can each be given one to go home to (Jeff's crypt page: "the dead are only trying to go back to their graves"), and the wall niches with their facing for the burial-niche art; skeletons and robbers replace the imps and sneaks, three skeleton guards stand in the altar room and the draugr in his lair; a niche off the altar room where a lost Pip may be found, and the runner's pack in the lair.
 - Builder mode knows a solid building (a barrow's mound): its checks walk round it and in at its door, and it takes no use (550, builder's side).
 - The barrow's door in the wilds is a grassy mound now, a solid hill you walk round, its doorway the way in (550). Server and client: protocol 26.
-- Hills read more plainly (549 amended): the slope shading is twice as strong, so a valley and its ridge show at a glance; seeing yourself under a cliff no longer costs any frame time when you are not under one.
 - Landing scripts share one fix for change-log conflicts during a rebase, which no longer copies released lines back (539 amended); tools only.
 - Landing tests warn of a change-log line that begins like one already released, a likely copy brought back by a rebase (539 amended); tools only.
 - The network test records any of its game instances that crash, with where they crashed, so repeated crashes show up in the daily summary (530 amended); tools only.
-- You can see yourself under a cliff (549): when a hillside or a cliff's edge stands between the camera and you, it thins around you, as near walls fade.
 - Joining a server in its first seconds after a restart no longer fails: the trade roads wait for the world's routes instead of working them out the slow way on the first tick (504).
 - Fixed an error printed when a level was built, from the orc and kobold's painted bodies (529 amended).
 
