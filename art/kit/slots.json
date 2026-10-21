@@ -2161,6 +2161,7 @@
 				"notes": "a stand-in by hand: a four-sided shaft, three vanes, the head by variant; 30 to 46 tris"}
 		},
 		"gear.quiver": {
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-21", "notes": "C:/dev/review/quiver/make_quiver.py (Jeff, 2026-10-21: \"arrows should just be a quiver on the back\"): an 8-sided leather tube, a darker cup at its foot, two bands where the strap is sewn, a rolled rim, the strap down the body side toward the shoulder; six arrows' ends out of the mouth, a shaft and three double-sided vanes each; variant 1 cream fletching, 2 a banner-red cord under the rim, 3 dark fletching; 352 tris"},
 			"category": "items",
 			"type": "mesh",
 			"kind": "held",
