@@ -53,6 +53,7 @@ func _ready() -> void:
 	_test_placed_captive()
 	_test_offer_words()
 	_test_monster_talk()
+	_test_alms_run()
 	_test_herbs()
 	_test_resident_voices()
 	_test_means_in_voice()
@@ -97,7 +98,8 @@ func _register_levels() -> void:
 			spec["places"] = {"camp": {"at": [20, 10], "kind": "camp", "radius": 2, "holder": "goblins", "name": "the goblin camp",
 				"holds": [{"town": STORE, "resident": "a carpenter's daughter", "name": "Tilda"}]}}
 		if level_name == TOWN:
-			spec["places"] = {"store": {"at": [5, 3], "kind": "stockpile", "radius": 2, "holder": "town", "name": "the stockpile"}}
+			spec["places"] = {"store": {"at": [5, 3], "kind": "stockpile", "radius": 2, "holder": "town", "name": "the stockpile"},
+				"niche": {"at": [14, 10], "kind": "other", "radius": 1, "holder": "nobody", "name": "a niche in the wall"}}  # The barrow's niche, for the runner's test (546).
 			# A home for residents' bodies (decision 333): a hut linked to nothing.
 			# And a healer's hut (decision 404): a place of its own, no town; and a shed (decision 391).
 			spec["buildings"] = [{"slot": "building.hut", "at": [9, 5]}, {"slot": "building.healers_hut", "at": [1, 6], "facing": [0, -1]},
@@ -1348,6 +1350,80 @@ func _test_monster_talk() -> void:
 	_check(not _main._standing.has(Net.player_id), "withdrawn from his side: nothing stands")
 	_main._resident_mind = null
 	World.despawn(talker)
+
+
+## Pip's alms run (decision 546, npc's side): seated as the priest's
+## apprentice with the companion table's Pip on his card, down and back
+## bodiless, lost once the secret is out, found at the niche.
+func _test_alms_run() -> void:
+	print("\n== Pip's alms run: the priest's apprentice carries the altar's gold down on the world tick, is lost once the secret is out, and found at the niche (decision 546, npc's side) ==")
+	if World.economy == null or not World.economy.has_method("altar_gold"):
+		_check(true, "(economy's 546 is not here: skipped)")
+		return
+	var rules := Townsfolk.rules().duplicate(true)
+	rules["runner"] = {"name": "Pip", "trade": "hauler", "hour": 6, "hours_each_way": 1, "lost_chance": 1.0, "barrow": TOWN, "niche": "niche", "found_reach": 2, "leanings": {"superstition": 2, "intellect": 4}}
+	Townsfolk.use_rules(rules)
+	for body: GridEntity in World.townsfolk().duplicate():
+		World.despawn(body)
+	var player := _player()
+	var priest := "priest:" + STORE
+	if World.production.worker(priest).is_empty():
+		World.production.add_worker(priest, "Aldous", ["priest"], STORE, "appointed")  # The test town is at its room: a worker, not a move-in.
+	_check(not World.production.worker(priest).is_empty(), "(Aldous keeps the test town's temple)")
+	World.economy.add_gold(Net.player_id, 40, "the test")
+	World.economy.temple_offering(STORE, Net.player_id, false)
+	World.economy.temple_offering(STORE, Net.player_id, false)
+	var altar: int = World.economy.altar_gold(STORE)
+	_check(altar > 0, "(two offerings leave gold at the altar above the priest's day: %d)" % altar)
+	_main._alms_runs.clear()
+	_main._runs_day.clear()
+	_main._crypt_told.clear()
+	DayNight.set_hour(5.0)
+	_main._alms_runs_tick()
+	_check(_main._alms_runs.is_empty(), "before the hour, no run")
+	DayNight.set_hour(6.5)
+	_main._alms_runs_tick()
+	var run: Dictionary = _main._alms_runs.get(STORE, {})
+	var pip := str(run.get("who", ""))
+	_check(not run.is_empty() and int(run["gold"]) == altar and World.economy.altar_gold(STORE) == 0 and bool(World.production.worker(pip).get("away", false)),
+		"at the hour Pip takes the altar's gold and is away: %s with %d" % [pip, int(run.get("gold", 0))])
+	_check(str(World.production.worker(pip).get("name", "")) == "Pip" and str(World.production.worker(pip).get("master", "")) == priest and str(World.production.worker(pip).get("origin", "")) == "settled",
+		"seated as a settled resident, the priest's apprentice")
+	var card := Townsfolk.card_of(World.production, pip)
+	var legacy: Dictionary = CompanionCard.legacy_look("Pip")
+	_check(Townsfolk.leaning_of(World.production, pip, "superstition") == 2 and Townsfolk.leaning_of(World.production, pip, "intellect") == 4 and (legacy.is_empty() or legacy.keys().all(func(k: Variant) -> bool: return card.get("look", {}).get(k) == legacy[k])),
+		"his card is the companion table's Pip: superstition 2, intellect 4, the legacy look")
+	World.steps += 3 * (DayNight.day_steps / 24)
+	_main._alms_runs_tick()
+	_check(_main._alms_runs.is_empty() and World.economy.below_gold(STORE) == altar and not bool(World.production.worker(pip).get("away", false)), "two hours on he is home and the gold lies below: %d" % World.economy.below_gold(STORE))
+	_main._alms_runs_tick()
+	_check(_main._alms_runs.is_empty(), "one run a day")
+	# The secret out: the next run goes wrong (chance 1).
+	_main._crypt_told[Net.player_id] = true
+	World.economy.temple_offering(STORE, Net.player_id, false)
+	World.economy.temple_offering(STORE, Net.player_id, false)
+	var second: int = World.economy.altar_gold(STORE)
+	World.steps += DayNight.day_steps
+	DayNight.set_hour(6.5)
+	_main._alms_runs_tick()
+	World.steps += DayNight.day_steps / 24 + 1
+	_main._alms_runs_tick()
+	run = _main._alms_runs.get(STORE, {})
+	var aldous_facts: Array = Townsfolk.card_of(World.production, priest).get("facts", []).map(func(f: Dictionary) -> String: return str(f["text"]))
+	_check(bool(run.get("lost", false)) and bool(World.production.worker(pip).get("away", false)) and World.economy.below_gold(STORE) == altar and "Pip has not been seen since morning." in aldous_facts,
+		"at the altar the run goes wrong: Pip is lost below with the gold, and Aldous's card says he has not been seen: %s" % [aldous_facts.back()])
+	World.steps += DayNight.day_steps
+	_main._alms_runs_tick()
+	_check(bool(_main._alms_runs.get(STORE, {}).get("lost", false)), "a day on, still lost: nobody has come")
+	_put(player, _main._nearest_free(Vector2i(14, 9)))
+	_main._alms_runs_tick()
+	var pip_facts: Array = Townsfolk.card_of(World.production, pip).get("facts", []).map(func(f: Dictionary) -> String: return str(f["text"]))
+	_check(_main._alms_runs.is_empty() and not bool(World.production.worker(pip).get("away", false)) and World.economy.below_gold(STORE) == altar + second and pip_facts.back().ends_with("saw the draugr bargain for gold, and lived."),
+		"a player at the niche finds him: the gold goes down, he comes home with the lived fact: %s" % [pip_facts.back()])
+	_main._crypt_told.clear()
+	World.production.set_away(pip, true)
+	World.production.set_away(priest, true)
+	_put(player, Vector2i(2, 2))
 
 func _sync() -> void:
 	_main._sync_residents()

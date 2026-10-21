@@ -16911,3 +16911,32 @@ when a player takes him along. So:
 The recruit path, resident to companion, is companions' to design later.
 companion_test _test_companion_named; resident_test's Pip leanings.
 Protocol unchanged; no new class_name.
+resident_test.
+
+Part 2 (2026-10-20): Pip's alms run. Pip is a settled resident of the town,
+the priest's apprentice (the coordinator's (A): his worker record is the
+one Pip; the companion of that name is the same person taken along,
+companions' recruit path later): Main._runner_of finds the priest's
+apprentice, else the resident of his name, else seats him (Towns.move_in,
+origin "settled", trade townsfolk.json runner.trade) and makes him the
+apprentice; his card reads the companion table's Pip (CompanionCard's
+legacy look; leanings superstition 2, intellect 4 on his record), not a
+roll, so the two records agree. While any player's companion named Pip is
+alive and untaken (companions' ctx companion_named) the resident is away:
+no body, no run, the gold waits. Each day from runner.hour, with gold at
+the altar (economy's altar_gold above the priest's day) and Pip about, he
+takes it (take_altar) and is away hours_each_way there and back, bodiless,
+on the world tick whether or not anyone is near; home, altar_down. At the
+altar, once any player has learned Aldous's secret (Main._crypt_told, set
+by part 3), lost_chance a run: he stays below with the gold (not down: the
+creep, enemy-ai's, reads last_down_day), the priest's card says "Pip has
+not been seen since morning." (gossip carries it), until a player comes
+within found_reach of the barrow's niche place (dungeon's "barrow/niche"):
+the gold goes down, he comes home, his card keeps the lived fact ("saw the
+draugr bargain for gold, and lived"), the priest's says he came up, the
+finder is told. His body below is companions' (flavour; nothing depends on
+him). Saved: "alms_runs" and "crypt_told" in the snapshot; a world from
+before has none. Numbers in townsfolk.json "runner". resident_test.
+Parts to come: Aldous's secrets as lore's entries with knowers; "Take the
+offering down" (a kept offering births the "cheated" standing key from
+Jeff's list) and "Find the runner".

@@ -195,6 +195,16 @@ var _regen: Dictionary = {}
 ## A level-placed captive (decision 518): camp place id -> the worker ids it
 ## holds from the level, placed once; saved ("placed_captives").
 var _placed_captives: Dictionary = {}
+## The alms runs (decision 546, npc's side): town -> {who, gold, started,
+## at_altar, back_at, rolled, lost}, Pip's run down with the altar's gold;
+## saved ("alms_runs"). And the players who have learned Aldous's secret
+## ("crypt_told"): only then may a run go wrong.
+var _alms_runs: Dictionary = {}
+var _crypt_told: Dictionary = {}
+## The runners away by this hand (a run, or a companion of his name out
+## with a player), so only this hand brings them back ("runner_out").
+var _runner_out: Dictionary = {}
+var _runs_day: Dictionary = {}
 ## A client: the generation of the regenerating level its player is in, as
 ## the "map" message said (0: a level that does not regenerate).
 var map_generation := 0
@@ -2097,6 +2107,9 @@ func _boot() -> void:
 	_regen = Regen.states_from(snapshot.get("regen", {}))
 	# A level-placed captive (decision 518): the camps whose holds are placed already, so each is placed once.
 	_placed_captives = snapshot.get("placed_captives", {}).duplicate(true) if snapshot.get("placed_captives") is Dictionary else {}
+	_alms_runs = snapshot.get("alms_runs", {}).duplicate(true) if snapshot.get("alms_runs") is Dictionary else {}
+	_crypt_told = snapshot.get("crypt_told", {}).duplicate(true) if snapshot.get("crypt_told") is Dictionary else {}
+	_runner_out = snapshot.get("runner_out", {}).duplicate(true) if snapshot.get("runner_out") is Dictionary else {}
 	# The hour and the day's length go on as saved (DayNight), unless
 	# --hour or --day-minutes say otherwise.
 	DayNight.reset()
@@ -3393,6 +3406,9 @@ func _save_state(wait := true) -> void:
 		"raid_groups": World.raid_groups.to_dict() if World.raid_groups != null else {},
 		"trade": World.trade.to_dict() if World.trade != null else {},
 		"placed_captives": _placed_captives.duplicate(true),
+		"alms_runs": _alms_runs.duplicate(true),
+		"crypt_told": _crypt_told.duplicate(true),
+		"runner_out": _runner_out.duplicate(true),
 		"economy": World.economy.to_dict() if World.economy != null else {},
 		"herds": World.herds.to_dict() if World.herds != null else {},
 		"items": World.items.to_dict(),
@@ -7283,6 +7299,209 @@ func _on_offer_withdrawn(monster: GridEntity, player_id: String) -> void:
 			_send_monster_offers(monster, player_id, player.owner_peer)
 
 
+
+# --- Pip's alms run (decision 546, npc's side) ----------------------------------------
+
+## The runner's rules (townsfolk.json "runner").
+func _runner_rule() -> Dictionary:
+	return Townsfolk.rules().get("runner", {})
+
+
+## [param town]'s priest (the temple's official), "" for none.
+func _priest_of(town: String) -> String:
+	if World.production == null:
+		return ""
+	var trade := str(World.production.rules.get("return", {}).get("places", {}).get("temple", {}).get("trade", "priest"))
+	var ids := World.production.worker_ids(town)
+	ids.sort()
+	for id: String in ids:
+		if trade in World.production.worker(id).get("trades", []):
+			return id
+	return ""
+
+
+## Server: [param town]'s runner, Pip (decision 546, npc's side): the
+## priest's apprentice, else the resident of that name, else seated now
+## as a settled resident of the town (Towns.move_in, origin "settled": his
+## own, not the town's growth) and made the priest's apprentice. His card
+## reads the companion table's Pip (CompanionCard: his look, his leanings:
+## superstition 2, intellect 4), not a roll, so the resident and the
+## companion are one person. "" with no priest (no temple, no runs).
+func _runner_of(town: String) -> String:
+	var priest := _priest_of(town)
+	if priest.is_empty():
+		return ""
+	var rule := _runner_rule()
+	var name := str(rule.get("name", "Pip"))
+	var who := str(World.production.worker(priest).get("apprentice", ""))
+	if who.is_empty() or World.production.worker(who).is_empty():
+		who = ""
+		for id: String in World.production.worker_ids(town):
+			if str(World.production.worker(id).get("name", "")) == name:
+				who = id
+				break
+	if who.is_empty():
+		who = "runner:" + town
+		if World.production.worker(who).is_empty():
+			if World.towns == null or not World.towns.move_in(town, who, name, str(rule.get("trade", "hauler")), "settled"):
+				return ""
+			print("[runner] %s, the priest's apprentice, lives in %s" % [name, town])
+	if str(World.production.worker(who).get("master", "")).is_empty() and str(World.production.worker(priest).get("apprentice", "")).is_empty():
+		World.production.set_apprentice(priest, who)
+	_runner_card(who, name, rule)
+	return who
+
+
+## Pip's card and leanings from the companion table, once.
+func _runner_card(who: String, name: String, rule: Dictionary) -> void:
+	var card := Townsfolk.card_of(World.production, who)
+	if card.is_empty() or bool(card.get("runner", false)):
+		return
+	card["runner"] = true
+	var look: Dictionary = CompanionCard.legacy_look(name)
+	if not look.is_empty():
+		var kept: Dictionary = card.get("look", {})
+		for key: String in look:
+			kept[key] = look[key]
+		card["look"] = kept
+	var leanings: Dictionary = rule.get("leanings", {})
+	for key: String in leanings:
+		World.production.set_mind(who, key, int(leanings[key]))
+	World.production.set_card(who, card)
+
+
+## Whether the runner [param who] is about: not away, not sick, and no
+## player's companion of his name is alive and untaken (companions' ctx
+## companion_named: then the resident is away, his companion body being
+## the Pip people see); such a companion gone, he is back.
+func _runner_here(who: String, name: String) -> bool:
+	var record := World.production.worker(who)
+	if record.is_empty() or Townsfolk.is_sick(World.production, who):
+		return false
+	var taken: Variant = Offers._call(Offers.ctx, "companion_named", [name])
+	var out_with_a_player: bool = taken is Dictionary and not taken.is_empty() and str(taken.get("where", "")) != "taken"
+	var on_a_run := _alms_runs.values().any(func(run: Dictionary) -> bool: return str(run.get("who", "")) == who)
+	if out_with_a_player and not bool(record.get("away", false)):
+		World.production.set_away(who, true)
+		_runner_out[who] = true
+	elif not out_with_a_player and not on_a_run and bool(record.get("away", false)) and _runner_out.has(who):
+		World.production.set_away(who, false)
+		_runner_out.erase(who)
+	return not out_with_a_player and not on_a_run and not bool(World.production.worker(who).get("away", false))
+
+
+## Server, on the world tick: Pip's run (decision 546, npc's side). Once a
+## day from the rule's hour, with gold at the altar (economy's altar_gold)
+## and the runner about, he takes it (take_altar) and is away hours_each_way
+## there and back, bodiless; home, it is laid below (altar_down). At the
+## altar, once any player has learned Aldous's secret, lost_chance a run:
+## he stays below with the gold until a player comes within found_reach of
+## the barrow's niche place; the priest's card says he has not been seen
+## (gossip carries it). Found: the gold goes down, he comes home, his card
+## keeps the lived fact, the finder is told.
+func _alms_runs_tick() -> void:
+	if not Net.is_authority() or World.economy == null or World.production == null or not World.economy.has_method("altar_gold"):
+		return
+	var rule := _runner_rule()
+	if rule.is_empty():
+		return
+	var name := str(rule.get("name", "Pip"))
+	var hour_steps := maxi(DayNight.day_steps, 24) / 24
+	var today := Townsfolk.day_of(World.steps)
+	for town: String in World.towns.towns() if World.towns != null and World.towns.has_method("towns") else _towns_with_priests():
+		var run: Dictionary = _alms_runs.get(town, {})
+		if not run.is_empty():
+			if bool(run.get("lost", false)):
+				_runner_found(town, run, rule)
+				continue
+			if not bool(run.get("rolled", false)) and World.steps >= int(run.get("at_altar", 0)):
+				run["rolled"] = true
+				var rng := RandomNumberGenerator.new()
+				rng.seed = hash("run:%s:%d" % [town, int(run.get("started", 0))])
+				if not _crypt_told.is_empty() and rng.randf() < float(rule.get("lost_chance", 0.0)):
+					run["lost"] = true
+					var priest := _priest_of(town)
+					if not priest.is_empty():
+						Townsfolk.learn(World.production, priest, "%s has not been seen since morning." % name)
+					MindLog.record({"kind": "runner", "companion": name, "mind": "resident", "say": "lost below with %d gold" % int(run.get("gold", 0)), "outcome": "lost"})
+					print("[runner] %s is lost below %s's barrow with %d gold" % [name, town, int(run.get("gold", 0))])
+					continue
+			if World.steps >= int(run.get("back_at", 0)):
+				World.economy.altar_down(town, int(run.get("gold", 0)))
+				_runner_home(town, run)
+				print("[runner] %s is home: %d gold laid at %s's altar" % [name, int(run.get("gold", 0)), town])
+			continue
+		if int(_runs_day.get(town, -1)) == today or DayNight.hour(World.steps) < float(rule.get("hour", 6)):
+			continue
+		var gold := int(World.economy.altar_gold(town))
+		if gold <= 0:
+			continue
+		var who := _runner_of(town)
+		if who.is_empty() or not _runner_here(who, name):
+			continue
+		_runs_day[town] = today
+		gold = int(World.economy.take_altar(town))
+		if gold <= 0:
+			continue
+		var each_way := int(float(rule.get("hours_each_way", 2)) * hour_steps)
+		_alms_runs[town] = {"who": who, "gold": gold, "started": World.steps, "at_altar": World.steps + each_way, "back_at": World.steps + 2 * each_way, "rolled": false, "lost": false}
+		World.production.set_away(who, true)
+		_runner_out[who] = true
+		print("[runner] %s takes %d gold down from %s's temple, step %d" % [name, gold, town, World.steps])
+
+
+## The towns with a priest, when Towns lists none itself.
+func _towns_with_priests() -> Array[String]:
+	var out: Array[String] = []
+	var seen := {}
+	for id: String in World.production.worker_ids():
+		var town := str(World.production.worker(id).get("town", ""))
+		if not town.is_empty() and not seen.has(town) and not _priest_of(town).is_empty():
+			seen[town] = true
+			out.append(town)
+	out.sort()
+	return out
+
+
+## The runner of [param run] is home: back on the streets, the run over.
+func _runner_home(town: String, run: Dictionary) -> void:
+	var who := str(run.get("who", ""))
+	_alms_runs.erase(town)
+	_runner_out.erase(who)
+	if not World.production.worker(who).is_empty():
+		World.production.set_away(who, false)
+
+
+## A lost runner found: a player within found_reach of the barrow's niche
+## place ("<barrow>/<niche>" in Holdings). The gold goes down, he comes
+## home with the lived fact, the priest's card says so, the finder is told.
+func _runner_found(town: String, run: Dictionary, rule: Dictionary) -> void:
+	if World.holdings == null:
+		return
+	var place := World.holdings.place("%s/%s" % [rule.get("barrow", "barrow"), rule.get("niche", "niche")])
+	if place.is_empty():
+		return
+	var finder: Player = null
+	for player: Player in _players.values():
+		if is_instance_valid(player) and player.spawned and player.zone == str(place.get("area", "")) and World.distance(player.tile, place["cell"]) <= int(rule.get("found_reach", 2)):
+			finder = player
+			break
+	if finder == null:
+		return
+	var who := str(run.get("who", ""))
+	var name := str(World.production.worker(who).get("name", rule.get("name", "Pip")))
+	World.economy.altar_down(town, int(run.get("gold", 0)))
+	_runner_home(town, run)
+	Townsfolk.learn(World.production, who, "%s was lost below the barrow, saw the draugr bargain for gold, and lived." % name)
+	var priest := _priest_of(town)
+	if not priest.is_empty():
+		Townsfolk.learn(World.production, priest, "%s came up from the barrow, found by %s, and would not say what he saw." % [name, _display_name(finder)])
+	party_log.add("%s finds %s in a niche in the wall, shaking; he makes his way up." % [_display_name(finder), name])
+	Net.broadcast_to([finder.owner_peer], "party", {"from": name, "text": "You find %s in a niche in the wall, shaking. He will not say what he saw, and makes his way up." % name})
+	MindLog.record({"kind": "runner", "companion": name, "mind": "resident", "say": "found by %s" % _display_name(finder), "outcome": "found"})
+	print("[runner] %s is found below %s's barrow by %s: %d gold laid at the altar" % [name, town, _display_name(finder), int(run.get("gold", 0))])
+
+
 # --- A level-placed captive (decision 518) ------------------------------------------
 
 ## Words a hold may use for its resident: "a <trade>'s <word>".
@@ -7601,6 +7820,7 @@ func _on_world_ticked(tick: int) -> void:
 			_visits_due()  # The medicine man's visits that have run their hours (decision 501).
 			_sickness_in_party()  # A sick companion with her player gets well (decision 501).
 			_gather_herbs()  # The medicine man takes herbs on his way (decision 502, npc's side).
+			_alms_runs_tick()  # Pip's run with the alms (decision 546, npc's side).
 		_respawn_due_players(tick)
 		_check_respawns(tick)
 		t = World.part("respawns", t)

@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Pip, the priest's apprentice, carries the temple's alms down to the barrow's altar each morning (546, npc's side, part 2), whether or not anyone is about; once the secret is out a run can go wrong, and he is lost below until someone finds him in a niche in the wall. The town notices when he is gone.
 - A monster can talk (546, npc's side, part 1): the draugr speaks his deal when you come near and it stands like any offer; "give 16" or "here is 24" takes it, a bare "yes" is not enough for him. Nothing else changes in talk.
 - The draugr waits in the barrow's lair. He speaks first: give him gold and he offers a pact, a fight whose difficulty your gold sets (one, two or three measures of the offering). Beat him and he yields and blesses everyone standing in his lair; then he rests for three days and the barrow's dead lie still, until he rises again. Lose, or leave his lair, and he keeps the gold. Clients must update (protocol revision 25).
 - The draugr's blessing (decision 544): beat the draugr and you are blessed, and so is your companion if she was there with you. A blessed player or companion beaten to nothing lies downed for 30 seconds instead of falling; hold E beside them, still and unhit, for 4 seconds to bring them back at half health, one use of your count (5, 10 or 15 by the draugr's difficulty) each time. Your companion does it for you on her own. Nobody in time, or no uses left, and the fall is as before. Foes leave the downed alone.
