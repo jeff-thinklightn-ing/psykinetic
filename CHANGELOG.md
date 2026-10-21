@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- A stream's fall is white water broken into streaks that trail downstream, instead of a straight white line across it (557 amended).
 - Hillsides lose their grid: the ground's facets no longer line up in rows and columns, and each tile follows the slope's lie, while the hills keep their shape and where you can walk is unchanged (558).
 - A stream's falls are heard: water tumbling over the step, louder the further it drops, over the stream's running water.
 - Streams flow along their course instead of tile by tile: the current follows the stream's curve and runs faster where it drops, and where a stream falls, white water foams down the step (557).

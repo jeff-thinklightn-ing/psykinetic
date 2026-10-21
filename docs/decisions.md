@@ -18629,3 +18629,16 @@ tests/view_test _test_relax:
 _test_relief's slope check reads the drawn corners, and its ridge test sets
 the relax aside while it lays a ridge on the corners. Shots and A/B in
 C:\dev\review\ground (ab-*.png). No new class_name.
+## 557 amended. A fall's white water shaped
+
+557's falls drew a straight white band across the stream at the step. The
+coordinator asked for a band broken by the flow and the stones.
+- water.gdshader: a fall's foam is streaks drawn out along the flow and
+  carried down it, plus white where it breaks over the stones (fixed
+  spots by a noise), broken up by the churn. It is no longer even across
+  the stream.
+- Client3D._build_ribbons: the white water rises over the step to the
+  cell below and trails off over the cell after it, (1 - t) to the 1.5,
+  instead of ending at the step.
+Shots: C:\dev\review\unsquaring\5-hills-fall.png (v0.1.161 against now).
+Client only, protocol unchanged, no new class_name.

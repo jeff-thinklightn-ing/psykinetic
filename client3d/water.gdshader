@@ -124,8 +124,16 @@ void fragment() {
 	band *= smoothstep(0.3, 0.6, churn);
 	float riffle = shoal * (1.0 - shoal) * 4.0 * smoothstep(0.35, 0.6, churn) * min(length(way) * 2.0, 1.0);
 	float flecks = shoal * smoothstep(0.7, 0.85, churn) * 0.35;
-	// A fall: white water down its step, broken up by the churn.
-	float fall = running.a * smoothstep(0.2, 0.55, churn);
+	// A fall: white water down its step, not a band across it: streaks
+	// drawn out along the flow and carried down it, and white where it
+	// breaks over the stones (fixed spots), both thinning toward the step's
+	// ends (running.a) and broken up by the churn.
+	vec2 down = length(way) > 0.001 ? normalize(way) : vec2(0.0, 1.0);
+	vec2 across = vec2(-down.y, down.x);
+	vec2 along = vec2(dot(at, across) * 3.5, dot(at, down) * 0.8 - TIME * FLOW_SPEED * 1.5);
+	float streaks = smoothstep(0.42, 0.62, noise(along * 9.0));
+	float stones = smoothstep(0.58, 0.7, noise(at * 6.0 + 31.0));
+	float fall = smoothstep(0.15, 0.6, running.a) * max(streaks, stones) * smoothstep(0.15, 0.5, churn);
 	band = max(max(band, fall), max(riffle, flecks));
 	colour = mix(colour, foam, band);
 	ALBEDO = colour;

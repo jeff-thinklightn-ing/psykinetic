@@ -5755,7 +5755,11 @@ func _build_ribbons() -> void:
 			var width: Vector2 = widths[i].lerp(widths[i + 1], t)
 			var drop := levels[i] - levels[i + 1]
 			var level := _water_surface(point) + WATER_LIFT
-			var fall := smoothstep(FALL_LEAST * 0.5, FALL_LEAST * 2.0, drop) * sin(t * PI)
+			# White water from a fall's step: rising over the step to the cell
+			# below, trailing off over the cell after it (557 amended).
+			var after := levels[i - 1] - levels[i] if i > 0 else 0.0
+			var fall := maxf(smoothstep(FALL_LEAST * 0.5, FALL_LEAST * 2.0, drop) * (sin(t * PI) if t < 0.5 else 1.0),
+					smoothstep(FALL_LEAST * 0.5, FALL_LEAST * 2.0, after) * pow(1.0 - t, 1.5))
 			var speed := clampf(0.5 + drop * 0.6, 0.5, 1.0)
 			var colour := Color(tangent.x * 0.5 + 0.5, tangent.y * 0.5 + 0.5, speed, fall)
 			for side: float in [width.x + 0.5 + RIBBON_UNDER, 0.0, -(width.y + 0.5 + RIBBON_UNDER)]:
