@@ -493,6 +493,14 @@ the barrow stays its template, its anchors in the rock. A test that wants
 generations switches `Net.regenerate` on and points `Level.overlay_dir` at
 its own scratch folder, as regen_test does.
 
+The barrow's level.json sets `"grave_goods": true` (decision 555, items'
+grave goods for the companions' loyalty): everything a chest keeps or one
+of the dead carries and drops there is minted as grave goods, the altar,
+the generated chests, the skeletons, the robbers and the draugr alike; the
+generated level.json keeps the key (`Regen.generated_config` passes any
+top-level key through). The Runner's pack, a robber's own, is exempt by
+its entry's props `"grave": false`.
+
 A generated level.json also carries (decision 542 amended) `"graves":
 [[x, y, band], ...]`, one per dead-end floor cell outside the anchors (the
 tomb niches and the blind ways' ends), none with a chest on it, the band 0,

@@ -3,6 +3,7 @@
 	"outdoor": false,
 	"walls": "stone",
 	"floors": "stone",
+	"grave_goods": true,
 	"starts": [
 		[
 			21,
@@ -68,6 +69,7 @@
 			],
 			"name": "Runner's pack",
 			"props": {
+				"grave": false,
 				"slots": [
 					"",
 					"",

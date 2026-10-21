@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- What the barrow keeps is grave goods now (555): the altar's gold, the chests between the tombs and whatever the dead carry are marked from the grave for life, so a companion knows where it came from. The runner's pack is a robber's own and is not.
 - What the barrow's draugr carries and drops is grave goods too.
 - What you do moves your companion's bond (555 amended): laying the draugr to rest together and clearing a camp together bring you closer; leaving her to fall alone, letting her bleed out when you could have brought her back, making a superstitious companion carry grave goods, and taking her where she said it wasn't safe drive her off.
 - Your companion's loyalty shows in what she does (555): close or devoted she keeps nearer and offers to lead you where she knows the way, and devoted she stands over you when you're down; cooling she says she's unhappy and why; wary she hangs back, fights only what comes at you both and pulls back sooner; sullen she won't carry your things or lead you anywhere, though she still takes food and a gift. A superstitious companion won't touch grave goods unless she's close to you. Her mood, and the newest reason for it, is sent to your client.

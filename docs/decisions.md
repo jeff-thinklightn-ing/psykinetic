@@ -18224,3 +18224,11 @@ script is its monster kind's own. items_test lays a draugr marker in a
 grave_goods level and finds him marked. _stock's loot table keeps its own
 check (monster or animal); whether a scripted kind takes a level's loot is
 the monster owners' call. Protocol unchanged; no new class_name.
+
+Dungeon's side (2026-10-21): levels/barrow/level.json sets "grave_goods":
+true, so the altar, the generated chests and every one of the dead there
+mint grave goods; the Runner's pack (a robber's own, npc's errand) is
+exempt by its entry's props "grave": false. The key survives every
+generation (Regen.generated_config passes top-level keys through), and
+the generated chests and dead, marker cells with no entry, take it from
+the level config in Level._grave. level_test checks the marks.
