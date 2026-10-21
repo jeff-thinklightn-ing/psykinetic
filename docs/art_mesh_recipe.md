@@ -44,6 +44,10 @@ anatomical prompt, no cleanup and the TRELLIS texture, not the sampler.
    Drops loose islands under 1% of the faces, cuts out single-point joins and edges on more than two faces, fills
    every hole (a fan where holes_fill can't), triangulates, normals out, and checks watertight. On the goblin's own
    4000f mesh it gives 3702 tris watertight (the hand cleanup: 3780). Hand fixes only where it reports something left.
+   If cleaning at the budget cuts away more than about 10% of the faces, or a turntable shows a limb or muzzle
+   broken, clean the 4x mesh instead and then decimate it to the budget: merge vertices first (the GLB arrives with
+   split corners), collapse-decimate, then goblin_clean again. Ram c10, 2026-10-21: at 2500 the cleanup cut 102 joins
+   and broke a leg and the muzzle (2352 to 1820 faces); 10k cleaned to 7922, decimated to 2450, cleaned to 2370, whole.
 5. **Colour**: `blender -b --factory-startup -P paint_bake.py -- <clean.glb> <stem> <front_cutout.png> [<tq_cutout.png>]
    [--parts N]`, using TRELLIS's own cutouts (`<stem>_cutout.png`, the views it read). Writes two versions:
    - `<stem>_flat.glb`: every face one flat part colour (the goblin's part materials). Parts are k-means of the
