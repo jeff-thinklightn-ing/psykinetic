@@ -17067,7 +17067,7 @@ of hills (real amplitude, ground kinds laid by slope), the ground now shows
 its relief:
 
 - Slopes lit by a relief light, as a relief map's hillshade: ground.gdshader's
-  slope_shade (SLOPE_SHADE 3.0 where the level gives relief, 0 elsewhere, so
+  slope_shade (SLOPE_SHADE 3.0, doubled to 6.0 in 549 amended, where the level gives relief, 0 elsewhere, so
   the castle is as before; a constant to tune from the shots) lightens a
   slope facing the light and darkens one facing away, between SLOPE_DARKEST
   0.5 and SLOPE_LIGHTEST 1.35 of the flat's light. The light is fixed, from
@@ -17142,3 +17142,27 @@ castle never hides). Shots: C:\dev\review\hills2, sight-before/after-under-face.
 Rejected: lifting the camera further (top-down loses the hill); 188's
 translucent swap per chunk (a 16 m square of ground ghosted); fading only
 the cliff faces (the plateau's top strip still hides the player).
+
+Amended (549 amended): the cost, and Jeff's hills strength.
+
+- The everyday ground and scatter carry no cut-out: their whole shaders
+  moved to ground.gdshaderinc and scatter.gdshaderinc, the discard behind
+  #ifdef SIGHT; ground.gdshader and scatter.gdshader include them as they
+  are, ground_sight.gdshader and scatter_sight.gdshader define SIGHT first.
+  _update_sight swaps the ground's material and the soft scatter's to the
+  sight shaders while sight_cut is over 0 and back at 0 (a ShaderMaterial
+  keeps its parameters across the swap). Cliff faces keep theirs (few).
+- What the first cost (hills at noon 1.49 to 1.92 ms) turned out to be:
+  not the discard (the swap alone left 2.09) but the walk over the ground
+  and the three global sets every frame. hidden_by_ground is asked again
+  only when the player's place (to a quarter metre), the yaw or the pitch
+  moved (_sight_key, cleared by a rebuild), and the globals are set only
+  while the cut is in or easing. A/B under the bench lock, map_bench 10 s,
+  alternated: hills at noon 1.46 and 1.54 ms before 549, 1.62 and 1.43
+  after; the castle at night 4.16 and 3.74: noise.
+- 525 amended's relief light at double strength: SLOPE_SHADE 6.0 (was 3.0),
+  the limits as they were (Jeff on the hills: "that's not working"; the
+  coordinator's pick of the trial shots, C:\dev\review\hills2\h4-shade2). A
+  tint by height was shot beside it and left out, too faint within one
+  valley; its numbers stay here as a lever: over the level's height range,
+  the lowest ground x (0.90, 0.93, 1.00), the highest x (1.08, 1.05, 0.96).

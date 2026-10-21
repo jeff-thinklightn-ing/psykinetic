@@ -203,7 +203,7 @@ const SHORE_SINK := 0.02
 ## shots), how high that light stands (degrees), and the valley floors'
 ## darkening: a corner CONCAVITY_FULL metres under the ground round it
 ## (CONCAVITY_REACH cells away) takes CONCAVITY_MOST of the foot's shade.
-const SLOPE_SHADE := 3.0
+const SLOPE_SHADE := 6.0
 const HILLSHADE_HIGH := 40.0
 const CONCAVITY_FULL := 1.5
 const CONCAVITY_REACH := 2
@@ -240,6 +240,11 @@ const TORCH := Color(1.0, 0.72, 0.38)
 ## draws, and squares off screen are culled.
 const FLOOR_CHUNK := 16
 const GROUND_SHADER := preload("res://client3d/ground.gdshader")
+## The ground and the scatter with the sight-line cut-out, swapped in only
+## while it is in (decision 549 amended: a discard costs the GPU its early
+## depth test on every frame, cut or not).
+const GROUND_SIGHT_SHADER := preload("res://client3d/ground_sight.gdshader")
+const SCATTER_SIGHT_SHADER := preload("res://client3d/scatter_sight.gdshader")
 const LightShafts := preload("res://client3d/light_shafts.gd")
 ## A cell's corners, from its top left, in the order the ground's arrays
 ## keep them.
@@ -1297,6 +1302,10 @@ var _ramp_heights: Dictionary[Vector2i, PackedFloat32Array] = {}
 var _ridge_pitch := 0.0
 ## How far the sight-line cut-out is in (0..1), eased (_update_sight).
 var _sight_cut := 0.0
+## Whether the ground hides the player, worked out for _sight_key (their
+## place and the camera's angle).
+var _sight_hidden := false
+var _sight_key := Vector4.INF
 ## Where the map's water is, a texel a cell (_build_ground), for the ground's
 ## wet shore and the water's own; its first cell and size; the bodies drawn.
 var _water_mask: ImageTexture
@@ -1778,8 +1787,25 @@ func _follow(delta: float) -> void:
 ## hides the player at [param at] (their feet) from the camera as it now
 ## stands, out when not; the shaders' globals set for it.
 func _update_sight(at: Vector3, delta: float) -> void:
-	var hidden := hidden_by_ground(at, maxf(pitch, _ridge_pitch))
-	_sight_cut = move_toward(_sight_cut, 1.0 if hidden else 0.0, delta / SIGHT_EASE)
+	if _relief.is_empty() and _sight_cut == 0.0:
+		return
+	# Asked again only when the player's place or the camera's angle moved
+	# (a walk over the ground a frame cost about half a millisecond).
+	var key := Vector4(snappedf(at.x, 0.25), snappedf(at.z, 0.25), yaw, snappedf(maxf(pitch, _ridge_pitch), 0.5))
+	if key != _sight_key:
+		_sight_key = key
+		_sight_hidden = hidden_by_ground(at, maxf(pitch, _ridge_pitch))
+	var was := _sight_cut
+	_sight_cut = move_toward(_sight_cut, 1.0 if _sight_hidden else 0.0, delta / SIGHT_EASE)
+	if _sight_cut == 0.0 and was == 0.0:
+		return  # Nothing cut, nothing to tell the shaders.
+	# The cut-out's shaders only while it is in; the materials keep their
+	# parameters across the swap.
+	var cutting := _sight_cut > 0.0
+	if _ground_look != null and (_ground_look.shader == GROUND_SIGHT_SHADER) != cutting:
+		_ground_look.shader = GROUND_SIGHT_SHADER if cutting else GROUND_SHADER
+	if _scatter_sway != null and (_scatter_sway.shader == SCATTER_SIGHT_SHADER) != cutting:
+		_scatter_sway.shader = SCATTER_SIGHT_SHADER if cutting else SCATTER_SHADER
 	var toward := _camera_offset().normalized()
 	RenderingServer.global_shader_parameter_set("sight_focus", Vector4(at.x, at.y + RIDGE_AIM, at.z, at.y))
 	RenderingServer.global_shader_parameter_set("sight_toward", Vector4(toward.x, toward.y, toward.z, 0.0))
@@ -3157,6 +3183,7 @@ func _build_room() -> void:
 	if _outdoor:
 		_forest_distance = _measure_forest()
 	_read_field()
+	_sight_key = Vector4.INF  # A new ground: ask again whether it hides the player.
 	_bed_levels.clear()
 	_corners.clear()
 	_wet.clear()

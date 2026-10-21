@@ -1587,6 +1587,17 @@ func _test_sight() -> void:
 	# (Headless, global shader uniforms read back nil: the eased strength.)
 	_check(is_equal_approx(cut, 1.0) and toward.y > 0.5 and toward.x > 0.3 and is_equal_approx(_rig._sight_cut, 0.0),
 			"the cut-out eases in while hidden and out again, toward the camera (%.2f, %s)" % [cut, toward])
+	# Its shaders only while it is in (549 amended): the everyday ground and
+	# scatter carry no discard.
+	_rig._sight_cut = 0.0
+	_rig._update_sight(at, Client3D.SIGHT_EASE / 2.0)
+	var in_shader := _rig._ground_look.shader
+	for i in 3:
+		_rig._update_sight(valley, Client3D.SIGHT_EASE / 2.0)
+	var everyday := FileAccess.get_file_as_string("res://client3d/ground.gdshader") + FileAccess.get_file_as_string("res://client3d/scatter.gdshader")
+	_check(in_shader == Client3D.GROUND_SIGHT_SHADER and _rig._ground_look.shader == Client3D.GROUND_SHADER
+			and _rig._ground_look.get_shader_parameter("slope_shade") == Client3D.SLOPE_SHADE and not everyday.contains("SIGHT"),
+			"the cut-out's shaders swapped in only while it is in, the ground's parameters kept")
 	var castle := Level.load_level("castle")
 	_rig.rebuild(castle["terrain"], castle["centre"])
 	_check(not _rig.hidden_by_ground(Vector3(10.0, 0.0, 10.0), Client3D.CAMERA_PITCH), "the castle (no relief) never hides the player behind ground")
@@ -2320,7 +2331,7 @@ func _test_pine_stands() -> void:
 func _test_seasons() -> void:
 	print("
 == in season: broadleaf dries and turns, pines and dead wood only take snow ==")
-	_check((Client3D.GROUND_SHADER as Shader).code.contains("global uniform vec4 season")
+	_check(FileAccess.get_file_as_string("res://client3d/ground.gdshaderinc").contains("global uniform vec4 season")
 			and (Client3D.SEASON_SHADER as Shader).code.contains("season.gdshaderinc"),
 			"the ground's shader and the trees' read the season")
 	var castle := Level.load_level("castle")
