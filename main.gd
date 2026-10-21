@@ -233,6 +233,12 @@ var _companions: Dictionary[String, Companion] = {}
 ## Each player's companion's walk leading them (decision 551), by player id:
 ## kept across the zones it crosses, and stopped, to be taken up again.
 var _guides: Dictionary[String, Guide] = {}
+## What she refused to lead each player to (551 phase 2), by player id ->
+## goal key -> {day, reason, as_far}: refused again the rest of that day
+## (talking her round waits); and the place she offered to go as far as,
+## by player id ({day, to}), taken by "lead on".
+var _guide_refused: Dictionary[String, Dictionary] = {}
+var _guide_offers: Dictionary[String, Dictionary] = {}
 ## Server only: the companions whose voice is on the Claude API (decision
 ## 363, the console's `mind claude`), by player id -> model id; for this
 ## session only, so a companion who comes back is wrapped again.
@@ -752,6 +758,7 @@ func _go_online() -> void:
 		World.entity_taken.connect(_roads_taken)
 		World.entity_died.connect(_roads_fell)
 		World.entity_damaged.connect(_roads_struck)
+		road_heard = _road_heard  # The road's news she hears (551 phase 2).
 		World.channel_changed.connect(_on_channel)
 		World.command_received.connect(_on_command)
 		World.slots_changed.connect(_on_slots_changed)
@@ -4020,6 +4027,8 @@ func _wire_guide(pet: Companion, record: PlayerRecord, player: Player) -> void:
 		pet.guide = walk
 		player.led_by = String(pet.name) if walk.going() else ""
 		player.led_to = str(walk.goal.get("key", "")) if walk.going() else ""
+		if walk.going():
+			_guide_check.call_deferred(pet)  # The road on from here, once her voice is in.
 	_tell_roads(record, pet)
 
 
@@ -4076,9 +4085,15 @@ func _guide_said(player: Player, pet: Companion, line: String) -> bool:
 	if record == null:
 		return false
 	var walk: Guide = _guides.get(record.player_id)
-	if Guide.asks_resume(line) and walk != null and not walk.going() and walk.keeps():
-		_start_guide(pet, player, walk.goal)
-		return true
+	if Guide.asks_resume(line):
+		# As far as she offered (551 phase 2), else the stopped walk.
+		var offer: Dictionary = _guide_offers.get(record.player_id, {})
+		if int(offer.get("day", -1)) == Townsfolk.day_of(World.steps):
+			_start_guide(pet, player, offer["to"])
+			return true
+		if walk != null and not walk.going() and walk.keeps():
+			_start_guide(pet, player, walk.goal)
+			return true
 	if not Guide.asks(line):
 		return false
 	var known := Guide.destinations(record.companion, World.holdings, _world_map)
@@ -4094,8 +4109,23 @@ func _guide_said(player: Player, pet: Companion, line: String) -> bool:
 
 
 ## [param pet] sets off leading [param player] to [param to] (Guide's
-## destination), her voice told so once.
+## destination), her voice told so once; unless the road there is not safe
+## (551 phase 2), or she refused it earlier today: her voice told why.
 func _start_guide(pet: Companion, player: Player, to: Dictionary) -> void:
+	var day := Townsfolk.day_of(World.steps)
+	var before: Dictionary = (_guide_refused.get(pet.keeper_id, {}) as Dictionary).get(str(to.get("key", "")), {})
+	if int(before.get("day", -1)) == day:
+		pet.guide_note = "%s asks you again to lead them to %s; you refused earlier today and still will not: it isn't safe: %s." % [
+			_display_name(player), to["name"], before["reason"]]
+		return
+	var no := _guide_refusal(pet, player, to)
+	if not no.is_empty():
+		_guide_refuse(pet, player, to, no)
+		pet.guide_note = "%s asked you to lead them to %s, but you will not go: it isn't safe: %s.%s Tell them so." % [
+			_display_name(player), to["name"], no["reason"], _as_far_words(no)]
+		party_log.add("%s won't lead the way to %s: it isn't safe." % [pet.name, to["name"]])
+		return
+	_guide_offers.erase(pet.keeper_id)
 	var walk: Guide = _guides.get(pet.keeper_id)
 	if walk != null and walk.goal.get("key") == to.get("key"):
 		walk.resume()
@@ -4172,7 +4202,100 @@ func _guide_cross(pet: Companion, walk: Guide) -> bool:
 		travel.call_deferred(peer, str(way["to"]), "", {"side": way["side"], "cell": walk.crossing_at + out})
 	walk.crossing_now = true
 	print("[guide] %s takes %s through to %s" % [pet.name, _display_name(walk.leader), way["to"]])
+	# Through this area from a way in to a way out with no stop: a safe
+	# passage halves its dangers (551 phase 2, RoadKnowledge's).
+	var record := _record_of(pet)
+	if walk.clean and record != null and RoadKnowledge.passed(record.companion, pet.zone, Townsfolk.day_of(World.steps)):
+		print("[guide] %s came through %s safely" % [pet.name, pet.zone])
 	return true
+
+
+## The refusal of the road from where [param pet] stands to [param to],
+## leading [param player] (Guide.refusal): {} if she will go. Her offer is
+## dropped when it is where she stands or the goal itself.
+func _guide_refusal(pet: Companion, player: Player, to: Dictionary) -> Dictionary:
+	var record := _record_of(pet)
+	if record == null:
+		return {}
+	var routes: WorldRoutes = pet.guide_routes.call() if pet.guide_routes.is_valid() else null
+	var company := 0
+	for peer: int in _players:
+		var other: Player = _players[peer]
+		if other != player and is_instance_valid(other) and other.spawned and other.zone == player.zone \
+				and World.distance(other.tile, player.tile) <= HEARING_RANGE:
+			company += 1
+	var no := Guide.refusal(record.companion, record.player_id, Guide.road_of(routes, pet.zone, pet.tile, to), company,
+		Townsfolk.day_of(World.steps), World.holdings, Guide.destinations(record.companion, World.holdings, _world_map), _world_map)
+	var as_far: Dictionary = no.get("as_far", {})
+	if not as_far.is_empty() and (as_far["key"] == to["key"]
+			or as_far["area"] == pet.zone and World.distance(as_far["cell"], pet.tile) <= int(Guide.setting("arrive", 3.0))):
+		no["as_far"] = {}
+	return no
+
+
+## She refused to lead [param player] to [param to] for [param no]
+## (_guide_refusal's): kept for the day, her offer standing.
+func _guide_refuse(pet: Companion, player: Player, to: Dictionary, no: Dictionary) -> void:
+	var day := Townsfolk.day_of(World.steps)
+	var refused: Dictionary = _guide_refused.get(pet.keeper_id, {})
+	for key: String in refused.keys():
+		if int(refused[key].get("day", -1)) != day:
+			refused.erase(key)
+	refused[str(to["key"])] = {"day": day, "reason": no["reason"], "as_far": no["as_far"]}
+	_guide_refused[pet.keeper_id] = refused
+	if (no["as_far"] as Dictionary).is_empty():
+		_guide_offers.erase(pet.keeper_id)
+	else:
+		_guide_offers[pet.keeper_id] = {"day": day, "to": no["as_far"]}
+	print("[guide] %s refuses to lead %s to %s: %s" % [pet.name, _display_name(player), to["key"], no["reason"]])
+
+
+## Her offer in [param no], for her voice: " You would lead them as far as
+## the mill." or "".
+func _as_far_words(no: Dictionary) -> String:
+	var as_far: Dictionary = no.get("as_far", {})
+	return "" if as_far.is_empty() else " You would lead them as far as %s, and no further." % as_far["name"]
+
+
+## [param pet]'s walk weighed again from where she stands (551 phase 2:
+## come into a new area, or news heard): stopped if the road on is not
+## safe, her voice told why. True if it stopped.
+func _guide_check(pet: Companion) -> bool:
+	if not is_instance_valid(pet) or pet.guide == null or not pet.guide.going() or not is_instance_valid(pet.guide.leader):
+		return false
+	var walk := pet.guide
+	var no := _guide_refusal(pet, walk.leader, walk.goal)
+	if no.is_empty():
+		return false
+	var who := _display_name(walk.leader)
+	_guide_refuse(pet, walk.leader, walk.goal, no)
+	walk.stop("unsafe")
+	walk.leader.led_by = ""
+	walk.leader.led_to = ""
+	party_log.add("%s stops leading the way to %s: it isn't safe." % [pet.name, walk.goal["name"]])
+	pet._ask_voice("You stopped leading %s to %s: it isn't safe: %s.%s" % [who, walk.goal["name"], no["reason"], _as_far_words(no)])
+	return true
+
+
+## The road's news (551 phase 2, npc's road_news through road_heard): heard
+## by each companion out with a player in [param town]'s zone (news told)
+## or resting in that town, kept as a heard danger (RoadKnowledge.heard); a
+## walk going on is weighed again.
+func _road_heard(town: String, news: Dictionary) -> void:
+	var told: Array = news.get("told", [])
+	for id: String in _records:
+		var record: PlayerRecord = _records[id]
+		if record.companion.is_empty():
+			continue
+		var pet: Companion = _companions.get(id)
+		var resident: Variant = record.companion.get("resident")
+		var hears := str(resident.get("place", "")) == town if resident is Dictionary \
+			else id in told and is_instance_valid(pet) and pet.spawned
+		if not hears or RoadKnowledge.heard(record.companion, news, World.holdings, Guide.rules()).is_empty():
+			continue
+		print("[guide] %s hears of the raid by %s" % [record.companion.get("name", ""), news.get("camp", "")])
+		if is_instance_valid(pet) and pet.guide != null:
+			_guide_check(pet)
 
 
 ## What she lives through, kept as a danger of the area (decision 551):

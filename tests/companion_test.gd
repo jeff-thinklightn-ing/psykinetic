@@ -88,6 +88,7 @@ func _ready() -> void:
 	_test_field_return()
 	_test_companion_named()
 	await _test_guide()
+	_test_guide_refuses()
 	_test_out_of_reach()
 	_test_knows_level()
 	_test_wild()
@@ -1618,6 +1619,112 @@ func _test_guide() -> void:
 	_main.travel(Net.local_id, here, "", {}, came_from)
 	World.enter_named(here)
 	_settle(_companion())
+
+
+func _test_guide_refuses() -> void:
+	print("
+== she refuses a road that is not safe (decision 551 phase 2) ==")
+	_kill_monsters()
+	var owner := _player()
+	var pet := _companion()
+	_settle(pet)
+	var record: PlayerRecord = _main._records[Net.player_id]
+	var here := String(World.zone.name)
+	var today := Townsfolk.day_of(World.steps)
+	# Her nerve: temperament, bond, company.
+	var bold := {"traits": {"temperament": "blunt and fearless"}}
+	var wary := {"traits": {"temperament": "quick and wary"}}
+	_check(is_equal_approx(Guide.nerve(bold, "p", 0), 5.0) and is_equal_approx(Guide.nerve(bold, "p", 1), 6.0)
+		and is_equal_approx(Guide.nerve(wary, "p", 0), 2.0) and is_equal_approx(Guide.nerve({}, "p", 0), 3.0),
+		"nerve: fearless 5, one beside them 6, wary 2, none listed 3")
+	# The road's areas, before the routes are in.
+	var to_b := {"key": "b", "kind": "area", "name": "Bee Hill", "area": "b", "cell": Vector2i(4, 4)}
+	_check(Guide.road_of(null, "a", Vector2i(1, 1), to_b) == [{"area": "a", "to": Vector2i(1, 1)}, {"area": "b", "to": Vector2i(4, 4)}]
+		and Guide.road_of(null, "b", Vector2i(1, 1), to_b) == [{"area": "b", "to": Vector2i(4, 4)}], "the road: here and there, or there alone")
+	# Carried off on Bee Hill: the wary one refuses, names it, offers the mill short of it.
+	Guide.note_danger(wary, "b", "taken", today)
+	var mill := {"key": "a/mill", "kind": "place", "name": "the mill", "area": "a", "cell": Vector2i(9, 9)}
+	var known: Array[Dictionary] = [mill, to_b]
+	var road := Guide.road_of(null, "a", Vector2i(1, 1), to_b)
+	var no := Guide.refusal(wary, "p", road, 0, today, World.holdings, known)
+	_check(not no.is_empty() and "carried off" in str(no["reason"]) and no["as_far"].get("key") == "a/mill",
+		"weight 3 over nerve 2: refused, the reason hers, as far as the mill (%s)" % [no])
+	Guide.note_danger(bold, "b", "taken", today)
+	_check(Guide.refusal(bold, "p", road, 0, today, World.holdings, known).is_empty(), "the fearless one goes (3 under 5)")
+	_check(Guide.refusal(wary, "p", road, 0, today + 16, World.holdings, known).is_empty(), "sixteen days on it has faded: she goes")
+	var near := {"traits": {"temperament": "quick and wary"}}
+	Guide.note_danger(near, "a", "downed", today)
+	_check((Guide.refusal(near, "p", road, 0, today, World.holdings, known)["as_far"] as Dictionary).is_empty(),
+		"the danger where she stands: nowhere short of it to offer")
+	# Asked here, with the dangers she lived through here: no walk, her voice told why.
+	_main._guides.clear()
+	pet.guide = null
+	record.companion["roads"] = {"areas": [here], "places": [], "dangers": [], "passed": {}}
+	var traits: Dictionary = record.companion.get("traits", {})
+	var temper := str(traits.get("temperament", ""))
+	traits["temperament"] = "quick and wary"
+	record.companion["traits"] = traits
+	Guide.note_danger(record.companion, here, "taken", today)
+	Guide.note_danger(record.companion, here, "downed", today)
+	var far := _far_cell(owner.tile, 9, 14)
+	var goal := {"key": "test/refused", "kind": "place", "name": "the far corner", "area": here, "cell": far}
+	_main._start_guide(pet, owner, goal)
+	_check(pet.guide == null and owner.led_by == "" and "isn't safe" in pet.guide_note and "carried off" in pet.guide_note,
+		"weight 6 here: she will not go, and says why (%s)" % pet.guide_note)
+	_main._start_guide(pet, owner, goal)
+	_check(pet.guide == null and "refused earlier today" in pet.guide_note, "asked again the same day: still no")
+	# Clear roads: she goes; a danger met on the way stops her.
+	_main._guide_refused.clear()
+	Guide.roads_of(record.companion)["dangers"].clear()
+	_main._start_guide(pet, owner, goal)
+	_check(pet.guide != null and pet.guide.going(), "the road clear: she leads")
+	Guide.note_danger(record.companion, here, "taken", today)
+	Guide.note_danger(record.companion, here, "downed", today)
+	_check(_main._guide_check(pet) and pet.guide.stopped == "unsafe" and owner.led_by == "" and owner.led_to == "",
+		"weighed again on the way: it isn't safe, the walk stops")
+	_main._guide_said(owner, pet, "lead on")
+	_check(not pet.guide.going() and "refused earlier today" in pet.guide_note, "lead on: not that way today")
+	# Her offer: "lead on" takes her as far as she said.
+	_main._guide_refused.clear()
+	Guide.roads_of(record.companion)["dangers"].clear()
+	var short := {"key": "test/short", "kind": "place", "name": "the near corner", "area": here, "cell": _far_cell(owner.tile, 4, 6)}
+	_main._guide_offers[Net.player_id] = {"day": today, "to": short}
+	_main._guide_said(owner, pet, "lead on")
+	_check(pet.guide != null and pet.guide.going() and pet.guide.goal["key"] == "test/short" and not _main._guide_offers.has(Net.player_id),
+		"lead on after her offer: as far as she said")
+	_main._guide_done(pet, "moved")
+	# A clean passage: into an area by a way, out by one, no stop.
+	var walk: Guide = pet.guide
+	walk.resume()
+	walk.crossing_now = true
+	walk.bind(pet, owner)
+	_check(walk.clean, "come in by a way: clean")
+	walk.stop("moved")
+	_check(not walk.clean, "stopped: no longer a clean passage")
+	# The road's news: a raid by a camp someone holds, told to her player here.
+	var camp := ""
+	for id in World.holdings.all_places():
+		if World.holdings.holder(id) != Factions.NOBODY:
+			camp = id
+			break
+	if camp.is_empty():
+		_check(false, "a held place in the test world to be the raiding camp")
+	else:
+		_main._road_heard("t/town", {"kind": "raided", "day": today, "camp": camp, "goods": "3 wool", "told": [Net.player_id]})
+		var heard: Array = Guide.roads_of(record.companion)["dangers"].filter(func(each: Dictionary) -> bool: return each.get("from") == "heard")
+		_check(heard.size() == 1 and heard[0]["camp"] == camp, "news of a raid, told in her player's zone: she has heard it (%s)" % [heard])
+		_main._road_heard("t/town", {"kind": "raided", "day": today + 1, "camp": camp, "told": ["someone else"]})
+		_check(Guide.roads_of(record.companion)["dangers"].filter(func(each: Dictionary) -> bool: return each.get("from") == "heard").size() == 1,
+			"told to others elsewhere: not heard")
+	Guide.roads_of(record.companion)["passed"] = {here: today}
+	var saved := PlayerRecord.from_dict(JSON.parse_string(JSON.stringify(record.to_dict())))
+	_check(saved.companion["roads"]["passed"] == {here: today}, "the areas she came through safely kept through a save")
+	traits["temperament"] = temper
+	record.companion.erase("roads")
+	_main._guides.clear()
+	_main._guide_refused.clear()
+	_main._guide_offers.clear()
+	pet.guide = null
 
 
 ## A free floor cell [param low]..[param high] from [param from], a walk away.

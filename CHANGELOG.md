@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- A companion refuses a road that isn't safe (551 phase 2): asked to lead somewhere, she weighs what she lived through and heard on the way against her nerve (her temperament, her bond with you, and how many friends walk with you), says why she won't go, and offers to go as far as the last place short of the danger ("lead on" takes her up on it); she won't be talked round the same day, and stops partway if the road ahead turns bad. Server only.
 - A companion knows the roads (551 phase 2, npc's side): a wagon struck by a camp, heard in town, is a danger of that road to her, beside what she lived through there; hearsay fades in days and lived memory slower, a camp nobody holds any more clears its danger at once, and a walk through without trouble halves what she fears there. Her refusal comes with companions' half. Server only.
 - While your companion leads you somewhere the HUD says so ("Following Wren to the Barrow - move to take the lead"), and the big map marks every place she knows the way to: click one and ask her to lead you there (551, ui's side).
 - Developer tools: long simulation soaks have their own slot in the job gate (394 amended (8)). They run beside the landing tests at low priority instead of holding them up, and the gate no longer mistakes a reused process for a job that has ended.

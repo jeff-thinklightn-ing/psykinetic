@@ -5,7 +5,10 @@ extends RefCounted
 ## you there"). What she knows is her record's "roads": the areas she has
 ## stood in with her player and the places she came within SIGHT of
 ## (WorldNews' fog, her own), and the dangers she lived through there,
-## each an area's, with a weight (the refusal that weighs them is phase 2).
+## each an area's, with a weight, beside what she heard of the roads
+## (RoadKnowledge, npc's). Phase 2: asked, she refuses a road whose dangers
+## reach her nerve (temperament, bond, company), naming the worst, and
+## offers to go as far as the last place short of them.
 ## The walk is on the world's real routes (WorldRoutes): she walks each
 ## leg's cells and her player's body follows at her heel (Heel's cell, set
 ## as their move order each tick), at their own pace, in real time; at a
@@ -33,6 +36,7 @@ const STOPS := {
 	"downed": "one of you went down",
 	"lost": "%s is not with you",
 	"no_way": "there is no way on from here",
+	"unsafe": "it isn't safe ahead",
 }
 
 ## Where she leads: {key ("area/key" for a place, the area's name for an
@@ -55,6 +59,9 @@ var crossing_now := false
 ## The cell last given the leader as their move order, and the hp seen.
 var _ordered := NONE
 var _hp := Vector2i(-1, -1)
+## Whether the walk came into this area by a way and has not stopped since:
+## leaving it by a way then is a safe passage (RoadKnowledge.passed).
+var clean := false
 
 
 ## The rules (companion_traits.json "guide").
@@ -115,6 +122,69 @@ static func note_danger(card: Dictionary, area: String, why: String, day: int, p
 		"weight": int((weights as Dictionary).get(why, 1)) if weights is Dictionary else 1}
 	dangers.append(entry)
 	return entry
+
+
+## How much danger on a road she will walk into (phase 2): her boldness by
+## temperament (rules boldness, else boldness_default), her bond with
+## [param player_id] (Standing's COMPANION word, rules bond), and
+## [param company] other players beside them (rules company each).
+static func nerve(card: Dictionary, player_id: String, company: int) -> float:
+	var bold: Variant = rules().get("boldness", {})
+	var temper := str((card.get("traits", {}) as Dictionary).get("temperament", "")) if card.get("traits") is Dictionary else ""
+	var value := float((bold as Dictionary).get(temper, setting("boldness_default", 3.0))) if bold is Dictionary else setting("boldness_default", 3.0)
+	var bond: Variant = rules().get("bond", {})
+	if bond is Dictionary:
+		value += float((bond as Dictionary).get(Standing.words(card, player_id, Standing.COMPANION), 0))
+	return value + company * setting("company", 1.0)
+
+
+## The areas a walk from [param area] at [param cell] to [param to]
+## (destinations') crosses, in order, each {area, to: the cell it leaves
+## by, or the goal's}: [param routes]' route when they are in, else here
+## and there.
+static func road_of(routes: WorldRoutes, area: String, cell: Vector2i, to: Dictionary) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	if routes != null and routes.is_ready(WorldRoutes.OPEN):
+		for leg in routes.route(area, cell, to["area"], to["cell"]):
+			if out.is_empty() or out[-1]["area"] != leg["area"]:
+				out.append({"area": str(leg["area"]), "to": leg["to"]})
+			else:
+				out[-1]["to"] = leg["to"]
+	if out.is_empty() or out[-1]["area"] != to["area"]:
+		if out.is_empty() and area != to["area"]:
+			out.append({"area": area, "to": cell})
+		out.append({"area": str(to["area"]), "to": to["cell"]})
+	return out
+
+
+## Whether she will walk [param road] (road_of's) with [param player_id]
+## on [param day]: {} if so; else {reason (RoadKnowledge's clause), worst,
+## as_far (the destination of [param known] she would still lead to, the
+## nearest to the way into the first area too dangerous, {} for none)}.
+## Refused when the dangers on it (RoadKnowledge.weigh) reach her nerve.
+static func refusal(card: Dictionary, player_id: String, road: Array[Dictionary], company: int, day: int,
+		holdings: Holdings, known: Array[Dictionary], world_map: WorldMap = null) -> Dictionary:
+	var areas: Array = road.map(func(each: Dictionary) -> String: return each["area"])
+	var can := nerve(card, player_id, company)
+	var weighed := RoadKnowledge.weigh(card, areas, day, holdings, rules())
+	if float(weighed["weight"]) <= 0.0 or float(weighed["weight"]) < can:
+		return {}
+	# As far as she would go: the last area before the dangers ahead of it
+	# reach her nerve, and the place there nearest its way on.
+	var as_far := {}
+	for i in road.size():
+		if float(RoadKnowledge.weigh(card, areas.slice(0, i + 1), day, holdings, rules())["weight"]) < can:
+			continue
+		if i == 0:
+			break  # The danger is here: nowhere short of it.
+		var last: Dictionary = road[i - 1]
+		var best := 1 << 30
+		for each in known:
+			if each["area"] == last["area"] and World.distance(each["cell"], last["to"]) < best:
+				best = World.distance(each["cell"], last["to"])
+				as_far = each
+		break
+	return {"reason": RoadKnowledge.reason(weighed["worst"], day, world_map), "worst": weighed["worst"], "as_far": as_far}
 
 
 ## The places and areas she can lead to, from her roads: a named place she
@@ -208,6 +278,7 @@ func bind(with_pet: Companion, with_leader: Player) -> void:
 	_cells.clear()
 	_ordered = NONE
 	_hp = Vector2i(-1, -1)
+	clean = crossing_now and going()
 	crossing_now = false
 
 
@@ -222,6 +293,7 @@ func stop(why: String) -> void:
 		return
 	stopped = why
 	stopped_at = World.steps
+	clean = false
 	_leg = {}
 	_cells.clear()
 	if is_instance_valid(leader) and leader.spawned and leader.has_move_order and leader.move_order == _ordered:

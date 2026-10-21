@@ -212,8 +212,15 @@ static func from_dict(entry: Variant) -> PlayerRecord:
 			for danger: Variant in roads.get("dangers", []):
 				if danger is Dictionary:
 					dangers.append(_numbers(danger))
+			# The areas she came through safely, and on which day (551 phase 2).
+			var passed := {}
+			var went: Variant = roads.get("passed", {})
+			if went is Dictionary:
+				for area: Variant in went:
+					if went[area] is float or went[area] is int:
+						passed[str(area)] = int(went[area])
 			record.companion["roads"] = {"areas": Array(_strings(roads.get("areas", []))),
-				"places": Array(_strings(roads.get("places", []))), "dangers": dangers}
+				"places": Array(_strings(roads.get("places", []))), "dangers": dangers, "passed": passed}
 	return record
 
 

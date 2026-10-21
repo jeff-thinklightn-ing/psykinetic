@@ -17903,3 +17903,52 @@ her words, who hears the news and the stop.
   lost and an unknown camp add nothing), the fading by day and the
   pruning, lived outlasting heard, the cleared camp, the passage halving
   once a day, the words, the rules. Server only, no protocol change.
+
+## 551 phase 2, companions' side. She refuses a road that is not safe
+
+Jeff (companion_rewards.md): "next time she could refuse: it isn't safe,
+there are bandits on that road". The coordinator approved the split with
+npc (2026-10-21): npc's RoadKnowledge keeps what she knows of a road and
+how fresh it is; this side decides when she refuses, what she says, who
+hears the road's news, and when a walk stops for it.
+
+- Her nerve (Guide.nerve): boldness by her temperament (companion_traits
+  "guide" boldness: fearless 5, cheerful or restless 4, steady, warm or
+  quiet 3, quick and wary or careful 2; boldness_default 3 for one not
+  listed), plus her bond with her player (Standing's COMPANION word: wary
+  -1, fond 0, close 1, devoted 2), plus company (1) for each other player
+  within hearing of hers. Drafts for Jeff.
+- The road (Guide.road_of): the areas WorldRoutes.route crosses from where
+  she stands, in order, each with the cell it is left by; before the
+  routes are in, here and the goal's area.
+- The refusal (Guide.refusal): RoadKnowledge.weigh over the road's areas;
+  refused when the weight is above nothing and reaches her nerve. Her
+  reason is RoadKnowledge.reason's clause (the worst danger). Her offer:
+  the last area before the dangers so far reach her nerve, and the place
+  she knows there nearest its way on; none when the danger is where she
+  stands, the goal itself, or where she already is.
+- Asked (spoken, the map's "guide" command, or "lead on"), Main weighs
+  the road before the walk starts. Refused, no walk: her voice is told
+  "you will not go: it isn't safe: <reason>", with her offer, the party
+  log "<she> won't lead the way to <there>: it isn't safe". The same goal
+  is refused again the rest of that day, whatever changes (talking her
+  round waits, 551's ruling): Main._guide_refused, by player id and goal,
+  for the session only. "lead on" the same day takes her offer.
+- On the way: come into a new area (the walk bound afresh after a way
+  out), or road news heard while walking, the road on is weighed again;
+  refused, the walk stops ("unsafe"), her voice told why.
+- A clean passage: a walk that came into an area by a way and leaves it by
+  a way with no stop (Guide.clean, set at bind after a crossing, cleared
+  by any stop) calls RoadKnowledge.passed for the area, halving its
+  dangers once a day.
+- Who hears the news (Main.road_heard = _road_heard): a companion out
+  with her player in the town's zone (news "told" holds her player's id),
+  or resting in that town (resident.place is the town).
+  RoadKnowledge.heard decides what she keeps.
+- PlayerRecord.from_dict keeps roads.passed {area: day}.
+- companion_test _test_guide_refuses: the nerve, the road, the refusal and
+  its reason, the fearless going, the faded going, no offer for a danger
+  underfoot, refused at the ask and again that day, stopped on the way,
+  "lead on" for the offer, a clean passage, the news heard by her player's
+  companion only, passed kept. Server only, no protocol change, no new
+  class_name.
