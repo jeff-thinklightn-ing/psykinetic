@@ -1109,7 +1109,7 @@ static func wagon_left(production: Production, trade: Object, id: String, route_
 ## A wagon arrived: at the far end nothing is said at home; home again, its
 ## people tell what went and what came back (and how it sold, if economy
 ## said), the town saw them come, and the town's memory may keep it.
-static func wagon_arrived(production: Production, _trade: Object, id: String, _route_id: String, at_end: String, cargo: Dictionary) -> void:
+static func wagon_arrived(production: Production, trade: Object, id: String, route_id: String, at_end: String, cargo: Dictionary) -> void:
 	var members: Array = cargo.get("members", [])
 	var went: Dictionary = _wagons.get(id, {})
 	var town := str(went.get("town", ""))
@@ -1140,8 +1140,10 @@ static func wagon_arrived(production: Production, _trade: Object, id: String, _r
 			continue
 		learn(production, other, "%s saw %s come home from %s with the wagon." % [production.worker(other).get("name", other), names, where])
 	if not members.is_empty():
-		_remember(town, "%s's wagon came home from %s%s" % [production.worker(str(members[0])).get("name", members[0]), where,
-			" with " + back if not back.is_empty() else ""], str(members[0]), false, production.now())
+		var home := "%s's wagon came home from %s%s" % [production.worker(str(members[0])).get("name", members[0]), where,
+			" with " + back if not back.is_empty() else ""]
+		_remember(town, home, str(members[0]), false, production.now())
+		_road_news(production, trade, town, "arrived", route_id, str(went.get("far", "")), "", back, members, home)
 
 
 ## A camp struck a wagon: the taken are captives already (maps, through
@@ -1183,6 +1185,7 @@ static func wagon_raided(production: Production, trade: Object, id: String, rout
 		if not taken_ids.is_empty():
 			text += " and carried off %s" % taken_names
 		_remember(town, text, teller, true, production.now())
+		_road_news(production, trade, town, "raided", route_id, far, camp_id, _goods_words(taken.get("goods", {})), went.get("all", members), text)
 
 
 ## A wagon lost: nobody left after a raid ("taken"), a candidate for the
@@ -1202,11 +1205,45 @@ static func wagon_lost(production: Production, trade: Object, id: String, route_
 			teller = officials[0]
 		var raiders := str(went.get("struck_by", "raiders"))
 		var gone := _names(production, went.get("all", []))
+		var lost := "The wagon to %s was lost on the road to %s%s" % [where, raiders, ", and %s with it" % gone if not gone.is_empty() else ""]
 		if not teller.is_empty():
-			_remember(town, "The wagon to %s was lost on the road to %s%s" % [where, raiders, ", and %s with it" % gone if not gone.is_empty() else ""], teller, true, production.now())
+			_remember(town, lost, teller, true, production.now())
+		_road_news(production, trade, town, "lost", route_id, str(went.get("far", _far_end(trade, route_id, town))), "", "", went.get("all", []), lost)
 	elif why == "no way":
 		for official: String in _officials(production, town):
 			learn(production, official, "The wagon to %s turned back: the road is closed." % where)
+
+
+## The road's news to whoever else listens (decision 551, npc's side:
+## companions' guide, a companion's heard dangers): ctx "road_news"(town,
+## news) once per event, right after the town's memory line, with news =
+## {kind: "raided" | "arrived" | "lost", day, hour, step, route, far (the
+## far end's id), camp (a raid's camp, else ""), goods (the words: taken,
+## brought back, or ""), members (the crew's worker ids), areas (the
+## route's, in walking order from its from-end; [] unknown), text (the
+## townsfolk's own line), told (the players in the town's zone now, ctx
+## "players_in")}. Nothing happens here without the key.
+static func _road_news(production: Production, trade: Object, town: String, kind: String, route_id: String, far: String, camp: String, goods: String, members: Array, text: String) -> void:
+	if not Offers.ctx.has("road_news"):
+		return
+	var areas: Array[String] = []
+	if trade != null and trade.has_method("route"):
+		var way: Variant = trade.route(route_id)
+		if way is Dictionary:
+			for area: Variant in way.get("areas", []):
+				areas.append(str(area))
+	var told: Array[String] = []
+	var here: Variant = Offers._call(Offers.ctx, "players_in", [town.get_slice("/", 0)])
+	if here is Array:
+		for id: Variant in here:
+			told.append(str(id))
+	var crew: Array[String] = []
+	for who: Variant in members:
+		crew.append(str(who))
+	var now := production.now()
+	var news := {"kind": kind, "day": day_of(now), "hour": DayNight.hour(now), "step": now, "route": route_id, "far": far, "camp": camp,
+		"goods": goods, "members": crew, "areas": areas, "text": text, "told": told}
+	Offers._call(Offers.ctx, "road_news", [town, news])
 
 
 ## Economy's caravan_sold: how the wagon's load sold, for the words home.

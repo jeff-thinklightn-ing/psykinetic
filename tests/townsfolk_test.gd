@@ -478,12 +478,13 @@ func _work_has(method: String) -> bool:
 class RoadStub extends RefCounted:
 	var town := ""
 	func route(_id: String) -> Dictionary:
-		return {"from": town, "to": "market:castle"}
+		return {"from": town, "to": "market:castle", "areas": ["wilds", "hills", "castle"]}
 	func eta(_id: String) -> int:
 		return 360  # x 300 steps x 2 ways / 54000 a day = 4 days.
 
 
 var _road_memory: Array = []
+var _road_news_got: Array = []
 
 ## The road's news (decision 504, npc's side): what a wagon's people, their
 ## kin and the officials say of it, the raid as a candidate memory.
@@ -516,7 +517,10 @@ func _test_road_news() -> void:
 		"set_memory": func(_t: String, log: Array) -> void: _road_memory = log,
 		"lawspeaker_of": func(_t: String) -> String: return "w-law", "model": func() -> String: return "off",
 		"holder_of": func(_place: String) -> String: return "blood_rot", "value_of": func(_kind: String) -> int: return 2,
-		"town_name": func(_t: String) -> String: return "Tf"}
+		"town_name": func(_t: String) -> String: return "Tf",
+		"players_in": func(_area: String) -> Array: return ["p-one"],
+		"road_news": func(_t: String, news: Dictionary) -> void: _road_news_got.append(news)}
+	_road_news_got = []
 	var road := RoadStub.new()
 	road.town = TOWN
 	var raiders := ResidentCard.faction_name("blood_rot")
@@ -541,6 +545,11 @@ func _test_road_news() -> void:
 	var candidates: Array = _road_memory.filter(func(e: Dictionary) -> bool: return str(e.get("tier", "")) == TownMemory.CANDIDATE)
 	_check(candidates.size() == 1 and str(candidates[0]["text"]) == "%s struck the town's wagon on the road to the castle market and carried off Oda" % Townsfolk._upper_first(raiders) and str(candidates[0]["said_by"]) == "w-ren",
 		"the town's memory holds the raid as a candidate, by the survivor: %s" % [candidates.map(func(e: Dictionary) -> String: return str(e["text"]))])
+	# The road's news to companions (decision 551, npc's side): once per event, after the memory line.
+	_check(_road_news_got.size() == 1 and str(_road_news_got[0]["kind"]) == "raided" and str(_road_news_got[0]["camp"]) == "camp:x" and str(_road_news_got[0]["far"]) == "market:castle"
+		and Array(_road_news_got[0]["members"]) == ["w-ren", "w-oda"] and Array(_road_news_got[0]["areas"]) == ["wilds", "hills", "castle"] and Array(_road_news_got[0]["told"]) == ["p-one"]
+		and str(_road_news_got[0]["text"]) == str(candidates[0]["text"]) and str(_road_news_got[0]["goods"]) == Townsfolk._goods_words({"food": 3}) and int(_road_news_got[0]["day"]) == Townsfolk.day_of(_work.now()),
+		"the raid's news: kind, camp, far end, crew, the route's areas, who was in town, the memory's text, the food taken: %s" % [_road_news_got])
 	# The way home: a new id from the market with the same people, then home.
 	Townsfolk.wagon_left(_work, road, "c2", "r1", {"items": [], "goods": {"cloth": 6}, "members": ["w-ren"]})
 	_check(not Townsfolk._wagons.has("c1") and Townsfolk._wagons.has("c2") and last.call("w-law").begins_with("Ren and Oda left"), "the way home moves the record to the new id, nothing said")
@@ -553,6 +562,8 @@ func _test_road_news() -> void:
 	_check(last.call("w-oda").begins_with("Oda was carried off"), "the captive hears nothing")
 	var beliefs: Array = _road_memory.filter(func(e: Dictionary) -> bool: return str(e.get("tier", "")) == TownMemory.BELIEF)
 	_check(beliefs.size() == 1 and str(beliefs[0]["text"]) == "Ren's wagon came home from the castle market with %s" % back, "a small memory of the homecoming, a belief: %s" % [beliefs.map(func(e: Dictionary) -> String: return str(e["text"]))])
+	_check(_road_news_got.size() == 2 and str(_road_news_got[1]["kind"]) == "arrived" and str(_road_news_got[1]["goods"]) == back and str(_road_news_got[1]["camp"]).is_empty() and str(_road_news_got[1]["text"]) == str(beliefs[0]["text"]),
+		"the homecoming's news, nothing at the market: %s" % [_road_news_got[1]["kind"]])
 	# Lost: the road closed, a word on the officials' cards; taken, a candidate by the lawspeaker.
 	Townsfolk.wagon_left(_work, road, "c3", "r1", {"items": [], "goods": {}, "members": ["w-bram"]})
 	Townsfolk.wagon_lost(_work, road, "c3", "r1", "no way")
@@ -564,6 +575,8 @@ func _test_road_news() -> void:
 	_check(candidates.size() == 3 and str(candidates.back()["text"]) == "The wagon to the castle market was lost on the road to %s, and Ada with it" % raiders and str(candidates.back()["said_by"]) == "w-law",
 		"taken: the lawspeaker's candidate: %s" % [candidates.map(func(e: Dictionary) -> String: return str(e["text"]))])
 	_check(not Townsfolk._wagons.has("c4") and not Townsfolk._wagons.has("c3"), "the records are let go")
+	_check(_road_news_got.size() == 4 and str(_road_news_got[2]["kind"]) == "raided" and str(_road_news_got[3]["kind"]) == "lost" and Array(_road_news_got[3]["members"]) == ["w-ada"] and str(_road_news_got[3]["text"]) == str(candidates.back()["text"]),
+		"the road closed is no news; the loss is, with the crew lost: %s" % [_road_news_got.slice(2).map(func(n: Dictionary) -> String: return str(n["kind"]))])
 	Townsfolk._wagons.clear()
 	Offers.ctx = {}
 

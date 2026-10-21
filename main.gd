@@ -4954,6 +4954,7 @@ func _offers_context() -> Dictionary:
 		"send_healer": func(healer_id: String, sick_id: String, player_id: String) -> bool: return _send_healer(healer_id, sick_id, player_id),
 		# One Pip (the coordinator's ruling with npc): the companion of that name, if a player has her.
 		"companion_named": func(wanted: String) -> Dictionary: return companion_named(wanted),
+		"road_news": func(town: String, news: Dictionary) -> void: _road_news(town, news),
 		"companion_sick": func(id: String) -> Dictionary:
 			var record: PlayerRecord = _records.get(id.trim_prefix("companion:"))
 			return record.companion.get("sick", {}).duplicate(true) if record != null and record.companion.get("sick") is Dictionary else {},
@@ -4998,7 +4999,22 @@ func _offers_context() -> Dictionary:
 
 
 ## The ids of the players in play whose body or record is in [param area].
+## Companions' hook for the road's news (decision 551, npc's side): their
+## side sets it to a Callable taking (town: String, news: Dictionary); until
+## then the news is logged and goes nowhere. The news dictionary's keys:
+## Townsfolk._road_news.
+var road_heard := Callable()
+
+
+## Townsfolk's road_news (ctx): logged, and handed to road_heard when set.
+func _road_news(town: String, news: Dictionary) -> void:
+	print("[road] %s: the wagon %s on %s%s" % [town, news.get("kind", ""), news.get("route", ""), (" at " + str(news["camp"])) if not str(news.get("camp", "")).is_empty() else ""])
+	if road_heard.is_valid():
+		road_heard.call(town, news)
+
+
 func _players_in(area: String) -> Array:
+
 	var out := []
 	for peer: int in _peer_ids:
 		var player_id := str(_peer_ids[peer])

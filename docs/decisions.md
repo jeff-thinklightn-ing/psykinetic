@@ -17672,3 +17672,29 @@ tests/companion_test _test_guide covers:
 - a danger kept, and roads kept through a save;
 - the map's message, and the map's command;
 - across test_room's link to sample, and the same walk going on there.
+
+## 551, npc's side. The road's news to companions
+
+Companions' guide (551: a companion weighs the roads her player walks by
+the dangers she has heard of, phase 2) wants the road's news events of
+504 (a wagon struck by a camp, home again, or lost) as her "heard"
+dangers; the coordinator routed it here, the shape agreed with
+companions-ba (2026-10-20). Townsfolk's wagon_raided, wagon_arrived (at
+the home end only) and wagon_lost (a wagon taken; a road closed is no
+danger) call ctx "road_news"(town, news) once each, right after the
+town's memory line, with news = {kind, day, hour, step, route, far, camp,
+goods, members (the whole crew that left), areas (TradeRoutes.route's, in
+walking order from the from-end; [] unknown), text (the townsfolk's own
+line), told (the player ids in the town's zone at that moment, ctx
+players_in: a companion whose player stands in the town hears it with
+the town)}. Main wires the key to Main.road_heard, a Callable companions'
+side sets (town, news); until it is set the news is logged ("[road]")
+and goes nowhere, so the two halves land in either order. Who hears it
+(resting or passing in that town at that hour, or her player told) and
+what it does to her are companions': they keep it apart from 442's heard
+claims, as a structured roads.dangers {area, camp, weight, day} that
+fades on its own, their record their from_dict line. Nothing on the wire,
+no new class_name. townsfolk_test _test_road_news: RoadStub's route gains
+areas; the raid's news (kind, camp, far end, crew, areas, told, the
+memory's text, the food taken), the homecoming's, none at the market or
+for a closed road, the loss with its crew.
