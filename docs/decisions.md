@@ -17852,3 +17852,54 @@ places, areas} says what she knows the way to; the "guide" command
 ui_test: knows_way, the words, place_words, the ask box's open, confirm,
 refusal and close. Client only; protocol unchanged on this side; no new
 class_name.
+
+## 551 phase 2, npc's side. What she knows of the roads
+
+Jeff's companion_rewards.md: "next time she could refuse: it isn't safe,
+there are bandits on that road." The coordinator split phase 2 with
+companions (2026-10-21): npc owns what a companion knows of a road and how
+fresh it is; companions owns the refusal (temper and bond tipping it),
+her words, who hears the news and the stop.
+
+- RoadKnowledge (sim/road_knowledge.gd, static, a new class_name) reads,
+  fades and prunes the roads.dangers on her card (Guide's 551 shape);
+  Guide.note_danger still writes the lived ones. It never names Guide,
+  so the Guide -> WorldNews -> PlayerRecord -> Companion chain stays
+  open: the guide rules come in as an argument (Guide.rules()).
+- heard(card, news, holdings, rules): the road's news of 551 npc's side.
+  "raided" adds one heard danger in the camp's own area {area, camp,
+  faction (its display word at the time, "" for nobody), goods, why
+  "raided", from "heard", day, weight: heard_weights.raided 2}; the same
+  camp on one day is one entry. "lost" adds nothing (no camp, so no
+  guessed area) and "arrived" adds nothing (a wagon that got through was
+  lucky: time and the world clear roads, not luck; companions dropped
+  "wagon_arrived lowers" from their design for this).
+- weigh(card, areas, day, holdings, rules) -> {weight, worst}: the sum
+  over the dangers on the route's areas, each whole for fresh_days of its
+  kind (heard 4, lived 8: lived outlasts hearsay), then straight down to
+  nothing at twice that. worst is the heaviest standing entry with its
+  "standing", so companions can name the road even when the camp is gone.
+- The world's three answers: prune (weigh's first step) drops a danger
+  faded to nothing and a heard one whose camp nobody holds any more
+  (Holdings.holder NOBODY) or that is no place; the days fade them;
+  passed(card, area, day), Guide's to call when she leads through an area
+  to its far side without a stop, halves that area's dangers once a day
+  (roads.passed {area: day}), rounded down so a restart's whole numbers
+  (PlayerRecord._numbers) keep it; at nothing the entry is pruned next.
+- reason(worst, day, world_map) -> a fact clause for her voice's
+  guide_note and the stop words, not a line: heard "there are bandits on
+  the road through the Wilds: the Blood Rot struck a wagon carrying 3
+  wool there four days back" (the area's display name, else its id's last
+  word); lived, first person, "I was carried off there, six days back";
+  day words today / yesterday / N days back.
+- Rules in companion_traits.json "guide": heard_weights {raided: 2},
+  fresh_days {heard: 4, lived: 8}; companions' refusal numbers go beside
+  them in their commit. Companions' half: the refusal at the ask and at
+  each new leg's area as she crosses, the same goal refused again the
+  rest of that day ("talking her round waits"), who hears (her player in
+  news.told or her resting in that town), PlayerRecord.from_dict keeping
+  roads.passed.
+- road_knowledge_test: the news heard (one a camp a day; home again,
+  lost and an unknown camp add nothing), the fading by day and the
+  pruning, lived outlasting heard, the cleared camp, the passage halving
+  once a day, the words, the rules. Server only, no protocol change.

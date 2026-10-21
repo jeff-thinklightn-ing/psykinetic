@@ -11,14 +11,16 @@
 		"quiet_seconds": 60
 	},
 	"guide": {
-		"_note": "Her guiding (decision 551): she leads her player to a place or area she has been with them (record.companion roads), on the world's routes, waiting while they are more than wait cells behind; there within arrive cells of it; a stopped walk is taken up again by 'lead on' within keep_minutes; her voice is told the nearest places_told places she knows the way to; it stops when her player falls under hurt_below of their hp. What she lived through somewhere is kept as a danger of that area with its weight (weights; 'hurt' when a blow leaves her or her player under hurt_mark of their hp), the heaviest a day per area and kind; the refusal by weight comes in phase 2.",
+		"_note": "Her guiding (decision 551): she leads her player to a place or area she has been with them (record.companion roads), on the world's routes, waiting while they are more than wait cells behind; there within arrive cells of it; a stopped walk is taken up again by 'lead on' within keep_minutes; her voice is told the nearest places_told places she knows the way to; it stops when her player falls under hurt_below of their hp. What she lived through somewhere is kept as a danger of that area with its weight (weights; 'hurt' when a blow leaves her or her player under hurt_mark of their hp), the heaviest a day per area and kind; the refusal by weight comes in phase 2. What she hears of the roads (551 phase 2, npc's side, RoadKnowledge): a wagon struck by a camp is a heard danger of the camp's area at heard_weights; a danger weighs its whole for fresh_days of its kind, then straight down to nothing at twice that; a camp nobody holds drops its heard dangers, and a passage through an area without a stop halves that area's dangers once a day.",
 		"wait": 3,
 		"arrive": 3,
 		"keep_minutes": 5,
 		"places_told": 5,
 		"hurt_below": 0.5,
 		"hurt_mark": 0.25,
-		"weights": {"downed": 3, "taken": 3, "fell": 3, "hurt": 2}
+		"weights": {"downed": 3, "taken": 3, "fell": 3, "hurt": 2},
+		"heard_weights": {"raided": 2},
+		"fresh_days": {"heard": 4, "lived": 8}
 	},
 	"bond": {
 		"_note": "Her bond with her player (decision 444, on npc's Standing, 443): what each of their deeds moves it by, drafts for Jeff. Standing's COMPANION ladder: fond to start, wary at -3, close at 3, devoted at 6 (residents.json 'standing'). A day together counts only up to close: devotion is earned by deeds.",
