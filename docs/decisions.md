@@ -17952,3 +17952,31 @@ hears the road's news, and when a walk stops for it.
   "lead on" for the offer, a clean passage, the news heard by her player's
   companion only, passed kept. Server only, no protocol change, no new
   class_name.
+## 453 amended. The walk reads the rebindable keys
+
+Decision (ui, the coordinator's next after 551, 2026-10-21): 453's Keys table
+left the walk reading the letters W, A, S, D itself, so the Options' Controls
+section could rebind every key but the four a player presses most. Now the
+walk's keys are four actions in the table like any other.
+
+- Keys.DEFAULTS and WORDS gain "forward", "back", "left", "right" (W, S, A, D),
+  listed first in the Options' Controls rows, saved as key_forward= lines
+  like the rest, swapped like the rest (no key bound twice), Esc never.
+- Keys.WALK maps each to the letter the walk has always read ("w", "a", "s",
+  "d"); Keys.walk_held() gives the held ones as that string, so
+  Main.key_vector, wasd_direction and --test-walk (which still names the
+  letters) are untouched. Main._held_key_names reads it (the WASD scheme's
+  walk and the click scheme's camera tilt and turn, which were the same
+  letters); _held_letters is gone.
+- Keys.held: a key still at its default also counts when held by its
+  physical place on the keyboard (the walk on an AZERTY keyboard keeps
+  working without a visit to the Options, as it did when the walk read
+  physical keys); a rebound key is read by its keycode alone, the key the
+  player pressed in the Options. The coordinator's call.
+- The controls list's walk line names the bound keys (Keys.walk_names:
+  "WASD" while each is one letter, else "Up Left Down Right"), and the click
+  scheme's "W / S tilt", "A / D turn" lines name theirs.
+
+ui_test: the four defaults, the AZERTY read, a rebind to Up held and named,
+the saved line, the reset. Client only; protocol unchanged; no new
+class_name.

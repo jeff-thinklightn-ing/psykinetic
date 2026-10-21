@@ -7,10 +7,14 @@ extends RefCounted
 ## the other handlers ask Keys.is(event, "open") in place of a keycode
 ## test, and Keys.held("attack_friend") for a modifier, so a rebinding
 ## changes no behaviour; the hints list and the cursor's hint say the bound
-## key (Keys.name_of). Esc is never rebound; the WASD walk keys stay as they
-## are in this pass (the walk reads the letters themselves).
+## key (Keys.name_of). Esc is never rebound. The walk's four keys (453
+## amended: forward, back, left, right; W, S, A, D) are rows like any other,
+## read by Main through walk_held as the letters the walk has always taken
+## ("wd"), so arrows or ZQSD work once bound; a walk key still at its default
+## is also read by its physical place on the keyboard, as before.
 
 const DEFAULTS := {
+	"forward": KEY_W, "back": KEY_S, "left": KEY_A, "right": KEY_D,
 	"open": KEY_E, "pack": KEY_I, "pick_up": KEY_F, "drop": KEY_G, "throw": KEY_T,
 	"talk": KEY_ENTER, "talk_log": KEY_TAB, "map": KEY_M, "lantern": KEY_L, "reset": KEY_R,
 	"options": KEY_O, "hints": KEY_H, "debug": KEY_F3, "fullscreen": KEY_F11, "builder": KEY_B,
@@ -19,6 +23,8 @@ const DEFAULTS := {
 }
 ## What each action is called in the Options, in the order shown.
 const WORDS := {
+	"forward": "Walk forward (click scheme: tilt the view up)", "back": "Walk back (click scheme: tilt it down)",
+	"left": "Walk left (click scheme: turn)", "right": "Walk right (click scheme: turn)",
 	"open": "Open a chest or a door; talk to someone", "pack": "Your pack", "pick_up": "Pick up",
 	"drop": "Put down", "throw": "Throw", "talk": "Talk", "talk_log": "Pin the talk box", "map": "Map",
 	"lantern": "Lantern", "reset": "Reset the room", "options": "Options", "hints": "The controls list",
@@ -29,6 +35,9 @@ const WORDS := {
 }
 ## Enter's other key counts as Enter.
 const ALIASES := {KEY_ENTER: [KEY_KP_ENTER]}
+## The walk's actions and the letter each has always been to the walk
+## (Main.key_vector, --test-walk), in the order the controls list names them.
+const WALK := {"forward": "w", "left": "a", "back": "s", "right": "d"}
 
 ## action -> keycode, as bound now.
 static var bound: Dictionary = DEFAULTS.duplicate()
@@ -49,9 +58,38 @@ static func matches(keycode: int, action: String) -> bool:
 	return keycode == want or keycode in ALIASES.get(want, [])
 
 
-## Whether [param action]'s key is held now (a modifier such as attack_friend).
+## Whether [param action]'s key is held now (a modifier such as attack_friend,
+## a walk key). A key still at its default also counts when held by its
+## physical place on the keyboard (the walk's W on an AZERTY keyboard, as
+## it always did); a rebound one is read by its keycode alone, the key the
+## player pressed in the Options.
 static func held(action: String) -> bool:
-	return Input.is_key_pressed(int(bound.get(action, DEFAULTS.get(action, KEY_NONE))))
+	var want := code(action)
+	if Input.is_key_pressed(want):
+		return true
+	return want == int(DEFAULTS.get(action, KEY_NONE)) and Input.is_physical_key_pressed(want)
+
+
+## The walk keys held now, as the letters the walk reads ("wd" for
+## forward and right), whatever keys they are bound to.
+static func walk_held() -> String:
+	var held_letters := ""
+	for action: String in WALK:
+		if held(action):
+			held_letters += str(WALK[action])
+	return held_letters
+
+
+## The walk keys' names for the controls list, forward, left, back, right:
+## "WASD" while each is one letter, else spaced ("Up Left Down Right").
+static func walk_names() -> String:
+	var names := PackedStringArray()
+	var short := true
+	for action: String in WALK:
+		var name := name_of(action)
+		names.append(name)
+		short = short and name.length() == 1
+	return "".join(names) if short else " ".join(names)
 
 
 ## Whether [param action]'s key is held as [param event] arrives: the event's

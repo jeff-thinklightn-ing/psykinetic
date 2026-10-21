@@ -1253,25 +1253,18 @@ static func grid_direction(vector: Vector2) -> Vector2i:
 	return Vector2i(roundi(cos(angle)), roundi(sin(angle)))
 
 
-## The movement keys held, as letters ("wd"), from the keyboard or from
-## --test-walk while it runs.
+## The walk keys held, as the letters the walk reads ("wd"), from the
+## keyboard through the bound keys (Keys.walk_held, 453 amended: arrows
+## or ZQSD once bound in the Options) or from --test-walk while it runs
+## (which names the letters).
 func _held_key_names() -> String:
-	return _held_letters([KEY_W, KEY_A, KEY_S, KEY_D])
-
-
-## Which of [param keys] are held, as lower-case letters, from the
-## keyboard or from --test-walk while it runs (which may name any).
-func _held_letters(keys: Array[Key]) -> String:
 	if not Net.test_walk.is_empty():
 		return _test_walk_keys()
 	if is_typing():
 		return ""
-	var held := ""
-	if DisplayServer.get_name() != "headless":
-		for key in keys:
-			if Input.is_physical_key_pressed(key):
-				held += OS.get_keycode_string(key).to_lower()
-	return held
+	if DisplayServer.get_name() == "headless":
+		return ""
+	return Keys.walk_held()
 
 
 ## (D - A, W - S) for [param keys] as _held_key_names gives them.
@@ -1337,14 +1330,15 @@ func _end_middle_drag() -> void:
 	_drag = Drag.UNDECIDED
 
 
-## Click scheme, 3D: W/S tilt (W up toward top-down, S toward level) and
-## A/D turn the camera while held; letting go springs the tilt back and
-## settles the turn on a diamond (saved). The keys do nothing else in this
-## scheme (and nothing at all in 2D); Q/E are unbound.
+## Click scheme, 3D: the walk's forward/back keys tilt (forward up toward
+## top-down, back toward level) and left/right turn the camera while held
+## (W/S and A/D by default, the Options' bindings); letting go springs the
+## tilt back and settles the turn on a diamond (saved). The keys do nothing
+## else in this scheme (and nothing at all in 2D).
 func _drive_camera_keys(delta: float) -> void:
 	if _client3d == null or Net.controls != "click":
 		return
-	var keys := _held_letters([KEY_W, KEY_A, KEY_S, KEY_D])
+	var keys := _held_key_names()
 	var tilt := float("w" in keys) - float("s" in keys)
 	var turn := float("d" in keys) - float("a" in keys)
 	if tilt != 0.0:
@@ -8387,7 +8381,7 @@ func _on_world_ticked(tick: int) -> void:
 func hint_lines() -> Array[String]:
 	var lines: Array[String] = []
 	if Net.controls == "wasd":
-		lines.append_array(["WASD\twalk", "Mouse\taim", "LMB\tattack (far: walk); a friend: talk", "%s+LMB\tattack a friend" % Keys.name_of("attack_friend"),
+		lines.append_array(["%s\twalk" % Keys.walk_names(), "Mouse\taim", "LMB\tattack (far: walk); a friend: talk", "%s+LMB\tattack a friend" % Keys.name_of("attack_friend"),
 			"RMB\toff hand; empty: grab (drag to toss)"])
 		if _client3d != null:
 			lines.append_array(["MMB drag\tturn, look up / down", "Wheel\tzoom (MMB click: 1x)"])
@@ -8395,7 +8389,8 @@ func hint_lines() -> Array[String]:
 		lines.append_array(["LMB\tmove / attack (hold to steer); a friend: talk", "%s+LMB\tattack a friend" % Keys.name_of("attack_friend"),
 			"RMB\toff hand; empty: shove (drag to toss)"])
 		if _client3d != null:
-			lines.append_array(["W / S\ttilt", "A / D\tturn", "MMB drag\tpan (springs back)", "Wheel\tzoom"])
+			lines.append_array(["%s / %s\ttilt" % [Keys.name_of("forward"), Keys.name_of("back")],
+				"%s / %s\tturn" % [Keys.name_of("left"), Keys.name_of("right")], "MMB drag\tpan (springs back)", "Wheel\tzoom"])
 	for i in Net.phrases.size():
 		lines.append("%s\t%s" % [Keys.name_of("phrase_%d" % (i + 1)), Net.phrases[i]])
 	lines.append_array(["RMB, shield\tblock while held", "RMB, bow\tdraw; let go to shoot at the cursor",

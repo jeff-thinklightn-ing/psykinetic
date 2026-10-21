@@ -6,6 +6,7 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+- The walk reads its keys from the Options: bind forward, back, left and right to arrows, ZQSD or whatever you like under Controls, and the walk (and the click scheme's view tilt and turn) follows; the controls list names the keys you chose; nothing changes for anyone who keeps W, A, S, D (453 amended).
 
 - A companion refuses a road that isn't safe (551 phase 2): asked to lead somewhere, she weighs what she lived through and heard on the way against her nerve (her temperament, her bond with you, and how many friends walk with you), says why she won't go, and offers to go as far as the last place short of the danger ("lead on" takes her up on it); she won't be talked round the same day, and stops partway if the road ahead turns bad. Server only.
 - A companion knows the roads (551 phase 2, npc's side): a wagon struck by a camp, heard in town, is a danger of that road to her, beside what she lived through there; hearsay fades in days and lived memory slower, a camp nobody holds any more clears its danger at once, and a walk through without trouble halves what she fears there. Her refusal comes with companions' half. Server only.

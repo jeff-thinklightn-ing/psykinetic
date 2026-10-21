@@ -557,7 +557,8 @@ func _test_access() -> void:
 
 func _test_keys() -> void:
 	print("== the keys: today's defaults, a rebinding swap, settings round trip, the Options rows ==")
-	var today := {"open": KEY_E, "pack": KEY_I, "pick_up": KEY_F, "drop": KEY_G, "throw": KEY_T, "talk": KEY_ENTER,
+	var today := {"forward": KEY_W, "back": KEY_S, "left": KEY_A, "right": KEY_D,
+		"open": KEY_E, "pack": KEY_I, "pick_up": KEY_F, "drop": KEY_G, "throw": KEY_T, "talk": KEY_ENTER,
 		"talk_log": KEY_TAB, "map": KEY_M, "lantern": KEY_L, "reset": KEY_R, "options": KEY_O, "hints": KEY_H,
 		"debug": KEY_F3, "fullscreen": KEY_F11, "builder": KEY_B, "phrase_1": KEY_1, "phrase_2": KEY_2,
 		"phrase_3": KEY_3, "phrase_4": KEY_4, "attack_friend": KEY_SHIFT, "screenshot": KEY_F12, "yes": KEY_Y}
@@ -584,6 +585,29 @@ func _test_keys() -> void:
 	Keys.read({"key_open": "I", "key_pack": "E", "key_map": "nonsense"})
 	_check(Keys.code("open") == KEY_I and Keys.code("pack") == KEY_E and Keys.code("map") == KEY_M, "read back; nonsense left as it was")
 	Keys.reset()
+	# 453 amended: the walk reads its keys through the table. The controls
+	# list's walk line belongs to the WASD scheme (the click scheme's lines
+	# name the tilt and turn keys).
+	var scheme := Net.controls
+	Net.controls = "wasd"
+	_check(Keys.walk_names() == "WASD" and _main.hint_lines().has("WASD\twalk"), "the walk's keys by default: WASD, named so in the controls list")
+	Input.parse_input_event(_key_event(KEY_Z, true, KEY_W))  # W's place on an AZERTY keyboard sends Z.
+	Input.flush_buffered_events()
+	_check(Keys.walk_held() == "w", "a walk key at its default is read by its physical place too (AZERTY's Z walks forward)")
+	Keys.bind("forward", KEY_UP)
+	_check(Keys.walk_held() == "", "rebound, it is read by its keycode alone")
+	Input.parse_input_event(_key_event(KEY_Z, false, KEY_W))
+	Input.parse_input_event(_key_event(KEY_UP, true))
+	Input.flush_buffered_events()
+	_check(Keys.walk_held() == "w" and Keys.walk_names() == "Up A S D" and _main.hint_lines().has("Up A S D\twalk")
+			and "key_forward=Up" in Keys.lines(), "Up bound to forward: held, it walks forward; the list says Up A S D; saved as key_forward=Up")
+	Net.controls = "click"
+	_check(_main._client3d == null or _main.hint_lines().has("Up / S\ttilt"), "the click scheme's tilt line names it too")
+	Input.parse_input_event(_key_event(KEY_UP, false))
+	Input.flush_buffered_events()
+	Keys.reset()
+	Net.controls = scheme
+	_check(Keys.walk_held() == "" and Keys.walk_names() == "WASD", "let go and reset: nothing held, WASD again")
 	_check(_main.hint_lines().has("E\topen a chest, crate, cart, door; your companion's pack") and _main._item_action_of(KEY_G) == "drop"
 			and _main._phrase_of(KEY_3) == 3 and _main._phrase_of(KEY_9) == 0, "Main reads the table: the hints' keys, the item keys, the phrases")
 	var panel: OptionsPanel = _main.options_panel
@@ -615,3 +639,13 @@ func _check(ok: bool, label: String) -> void:
 	if not ok:
 		_failures += 1
 	print("  %s  %s" % ["PASS" if ok else "FAIL", label])
+
+
+## A key event as the keyboard would send it: [param keycode] pressed or
+## released, from the key at [param physical] (the same key when not given).
+static func _key_event(keycode: Key, pressed: bool, physical: Key = KEY_NONE) -> InputEventKey:
+	var event := InputEventKey.new()
+	event.keycode = keycode
+	event.physical_keycode = physical if physical != KEY_NONE else keycode
+	event.pressed = pressed
+	return event
