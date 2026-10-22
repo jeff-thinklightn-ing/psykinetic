@@ -76,6 +76,7 @@ func _ready() -> void:
 	_test_person_garb()
 	_test_attach_points()
 	_test_bow()
+	_test_standing_turn()
 	_test_goblins_differ()
 	_test_allies()
 	_test_shadows_in_view()
@@ -3744,6 +3745,57 @@ func _test_person_looks() -> void:
 		scene.free()
 	var library := load(str(Client3D.HUMAN["clips"])) as AnimationLibrary
 	_check(Client3D.POSTURES.values().all(func(clip: String) -> bool: return library.has_animation(clip)), "the postures are in the clips")
+
+
+## 560, pc-character's side: a person standing turns slowly, shuffling; a resident addressing
+## someone looks at them and talks.
+func _test_standing_turn() -> void:
+	print("
+== a standing turn and a resident's look (560): turned over a moment, the head toward whom it addresses ==")
+	var player := _player()
+	_rig._process(0.0)
+	var puppet: Node3D = _rig._puppets[player.get_instance_id()]
+	var rig := puppet.get_meta("rig") as AnimRig
+	puppet.remove_meta("turned_ms")
+	puppet.set_meta("speed", 0.0)
+	_check(is_equal_approx(_rig._standing_turn(puppet, 0.0, PI * 0.9), PI * 0.9), "first drawn: facing as it is")
+	puppet.set_meta("turned_ms", Time.get_ticks_msec() - 50)
+	var turned := _rig._standing_turn(puppet, 0.0, PI * 0.9)
+	_check(turned > 0.1 and turned < 0.6 and int(puppet.get_meta("shuffle_until", 0)) > Time.get_ticks_msec(),
+			"standing, a half turn not at once: %.2f of %.2f rad after 50 ms, its feet shuffling" % [turned, PI * 0.9])
+	_rig._animate(puppet)
+	_check(rig.base_clip() == Client3D.CLIP_WALK, "the shuffle: the walk while it turns (%s)" % rig.base_clip())
+	puppet.set_meta("shuffle_until", 0)
+	puppet.set_meta("turning", false)
+	puppet.set_meta("speed", 2.0)
+	_check(is_equal_approx(_rig._standing_turn(puppet, 0.0, PI * 0.9), PI * 0.9), "moving: it follows its facing")
+	puppet.set_meta("speed", 0.0)
+	var resident := Resident.new()
+	resident.name = "AddressTestResident"
+	add_child(resident)
+	resident.addressing = String(player.get_path())
+	_rig._sync_addressing(resident, puppet)
+	var look := puppet.get_node_or_null("Look") as Node3D
+	var turn := look.get_meta("turn") as LookAtModifier3D if look != null else null
+	if look != null:
+		look.set_meta("eased_ms", Time.get_ticks_msec() - 1000)
+	_rig._sync_addressing(resident, puppet)
+	_rig._animate(puppet)
+	_check(turn != null and turn.bone_name == "Head" and is_equal_approx(turn.influence, 1.0) and turn.get_node_or_null(turn.target_node) == look,
+			"addressing: the head turned toward them (a LookAtModifier3D on Head, influence %.2f)" % [turn.influence if turn != null else -1.0])
+	_check(rig.base_clip() == Client3D.CLIP_TALKING or not rig.has(Client3D.CLIP_TALKING), "and talking (%s)" % rig.base_clip())
+	resident.addressing = ""
+	if look != null:
+		look.set_meta("eased_ms", Time.get_ticks_msec() - 1000)
+	_rig._sync_addressing(resident, puppet)
+	_check(turn != null and is_zero_approx(turn.influence) and str(puppet.get_meta("addressing", "")) == "",
+			"addressing no one: the head its own again")
+	resident.free()
+	if turn != null:
+		turn.free()
+	if look != null:
+		look.free()
+	_rig._animate(puppet)
 
 
 func _test_attach_points() -> void:

@@ -8310,9 +8310,14 @@ func _sync_puppets() -> void:
 		var yaw := -entity.shown_facing().angle()
 		var facing := puppet.get_node_or_null("Facing") as Node3D
 		# (Angles kept as float32: compared near enough, not ==.)
-		if facing != null and not is_equal_approx(facing.rotation.y, yaw):
-			facing.rotation.y = yaw
+		if facing != null:
+			if not entity is Monster:
+				yaw = _standing_turn(puppet, facing.rotation.y, yaw)
+			if not is_equal_approx(facing.rotation.y, yaw):
+				facing.rotation.y = yaw
 		_sync_held(entity, puppet)
+		if entity is Resident:
+			_sync_addressing(entity as Resident, puppet)
 		_sync_bow(entity, puppet)
 		if entity is Player:
 			var lantern := puppet.get_node_or_null("Lantern") as Node3D
@@ -9670,6 +9675,110 @@ static func _sitting(puppet: Node3D) -> bool:
 	return entity != null and entity.pose == Monster.Pose.SIT
 
 
+## A body standing still turns slower than it walks round (560, pc-character's
+## side; Jeff: a resident clicked "stop, turn to face the player"): when its
+## facing swings by more than STAND_TURN_MIN while it stands, the puppet turns
+## at STAND_TURN_SPEED (a half turn in about 0.4 s), its feet shuffling
+## (shuffle_until, the walk at STAND_SHUFFLE_PACE), not spun on the spot in a
+## tenth of a second as the shown facing eases; moving, it follows the facing.
+## People only (residents, companions, players): a monster still turns at
+## once, its threat read from its facing. The yaw to show from [param shown] toward [param yaw].
+const STAND_TURN_MIN := PI / 4.0
+const STAND_TURN_SPEED := PI / 0.4
+const STAND_SHUFFLE_PACE := 0.6
+const CLIP_TALKING := "Idle_Talking"
+func _standing_turn(puppet: Node3D, shown: float, yaw: float) -> float:
+	var now := Time.get_ticks_msec()
+	var then := int(puppet.get_meta("turned_ms", -1))
+	puppet.set_meta("turned_ms", now)
+	var left := angle_difference(shown, yaw)
+	var turning: bool = puppet.get_meta("turning", false)
+	if then < 0 or float(puppet.get_meta("speed", 0.0)) > WALKING or not turning and absf(left) <= STAND_TURN_MIN:
+		puppet.set_meta("turning", false)
+		return yaw
+	var step := STAND_TURN_SPEED * clampf((now - then) / 1000.0, 0.0, 0.1)
+	if absf(left) <= step:
+		puppet.set_meta("turning", false)
+		return yaw
+	puppet.set_meta("turning", true)
+	puppet.set_meta("shuffle_until", now + 120)
+	return shown + signf(left) * step
+
+
+## A resident addressing someone (Resident.addressing, npc's, 560) looks at
+## them: its head turned toward theirs by a LookAtModifier3D on its skeleton
+## (made the first time, its limits a neck's: LOOK_LIMIT across, LOOK_LIMIT_UP
+## up and down), eased in and out over LOOK_EASE; and while it stands it plays
+## CLIP_TALKING (_animate). The target is a marker kept at their eyes
+## (_eyes_of).
+const LOOK_LIMIT := deg_to_rad(70.0)
+const LOOK_LIMIT_UP := deg_to_rad(35.0)
+const LOOK_EASE := 0.3
+const LOOK_EYES := 1.6
+func _sync_addressing(resident: Resident, puppet: Node3D) -> void:
+	var whom := resident.get_node_or_null(NodePath(resident.addressing)) as GridEntity if resident.addressing != "" else null
+	var body: Node3D = _puppets.get(whom.get_instance_id()) if whom != null else null
+	puppet.set_meta("addressing", resident.addressing if body != null else "")
+	var look := puppet.get_node_or_null("Look") as Node3D
+	if body == null and look == null:
+		return
+	if look == null:
+		var skeletons := puppet.find_children("*", "Skeleton3D", true, false)
+		if skeletons.is_empty():
+			return
+		var skeleton := skeletons[0] as Skeleton3D
+		var head := skeleton.find_bone("Head")
+		if head < 0:
+			return
+		look = Node3D.new()
+		look.name = "Look"
+		puppet.add_child(look)
+		var turn := LookAtModifier3D.new()
+		turn.name = "LookAt"
+		turn.bone_name = "Head"
+		turn.forward_axis = _bone_axis(skeleton.get_bone_global_rest(head).basis.inverse() * Vector3.BACK)
+		turn.use_angle_limitation = true
+		turn.symmetry_limitation = true
+		turn.primary_limit_angle = LOOK_LIMIT
+		turn.secondary_limit_angle = LOOK_LIMIT_UP
+		turn.duration = LOOK_EASE
+		turn.influence = 0.0
+		skeleton.add_child(turn)
+		turn.target_node = turn.get_path_to(look)
+		look.set_meta("turn", turn)
+	var turn := look.get_meta("turn") as LookAtModifier3D
+	var wanted := 1.0 if body != null else 0.0
+	if body != null:
+		look.global_position = _eyes_of(body)
+	var step := clampf((Time.get_ticks_msec() - int(look.get_meta("eased_ms", Time.get_ticks_msec()))) / 1000.0 / LOOK_EASE, 0.0, 1.0)
+	look.set_meta("eased_ms", Time.get_ticks_msec())
+	turn.influence = move_toward(turn.influence, wanted, step)
+
+
+## Where [param body]'s eyes are: its head bone as posed, else LOOK_EYES m up.
+static func _eyes_of(body: Node3D) -> Vector3:
+	var skeletons := body.find_children("*", "Skeleton3D", true, false)
+	if not skeletons.is_empty():
+		var skeleton := skeletons[0] as Skeleton3D
+		var head := skeleton.find_bone("Head")
+		if head >= 0:
+			return skeleton.global_transform * skeleton.get_bone_global_pose(head).origin
+	return body.global_position + Vector3.UP * LOOK_EYES
+
+
+## The bone axis (SkeletonModifier3D.BoneAxis) nearest [param along], a
+## direction in the bone's own frame.
+static func _bone_axis(along: Vector3) -> SkeletonModifier3D.BoneAxis:
+	var axis := along.abs().max_axis_index()
+	var plus := along[axis] >= 0.0
+	match axis:
+		Vector3.AXIS_X:
+			return SkeletonModifier3D.BONE_AXIS_PLUS_X if plus else SkeletonModifier3D.BONE_AXIS_MINUS_X
+		Vector3.AXIS_Y:
+			return SkeletonModifier3D.BONE_AXIS_PLUS_Y if plus else SkeletonModifier3D.BONE_AXIS_MINUS_Y
+	return SkeletonModifier3D.BONE_AXIS_PLUS_Z if plus else SkeletonModifier3D.BONE_AXIS_MINUS_Z
+
+
 ## Standing: tired when hurt or winded, else idle.
 static func _idle_clip(puppet: Node3D) -> String:
 	var entity := instance_from_id(int(puppet.get_meta("entity_id", 0))) as GridEntity
@@ -9728,6 +9837,14 @@ func _animate(puppet: Node3D) -> void:
 		var gaits: Array = puppet.get_meta("gaits", GAITS)
 		var gait: Array = gaits[gait_for(rig.base_clip(), speed / pace, gaits)]
 		rig.loop(gait[0], clampf(speed / (float(gait[1]) * pace), 0.3, 3.0))
+		return
+	if now < int(puppet.get_meta("shuffle_until", 0)) and rig.has(CLIP_WALK):
+		# Turning where it stands (_standing_turn): its feet shuffle round.
+		rig.loop(CLIP_WALK, STAND_SHUFFLE_PACE)
+		return
+	if str(puppet.get_meta("addressing", "")) != "" and rig.has(CLIP_TALKING):
+		# Addressing someone (560): it talks to them.
+		rig.loop(CLIP_TALKING, tempo)
 		return
 	var idle := _idle_clip(puppet)
 	if idle == CLIP_IDLE and calm and puppet.has_meta("rng") and now >= int(puppet.get_meta("fidget_at", 0)):

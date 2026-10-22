@@ -19123,3 +19123,18 @@ ground and no cliff between them, the water crossed only on the bridge,
 from its start to its end, no turn over 0.35 rad a quarter cell; none with
 no bridge); the Hills' dirt road from the link over the bridge to the west
 of the west way.
+## 560, pc-character's side: the resident turns where it stands and looks at whom it addresses
+
+Jeff: LMB on a resident makes them "stop, turn to face the player and address them"; the coordinator
+approved through ui. The sim already turns a body (GridEntity.facing, replicated, eased in
+shown_facing at TURN_RATE 30), which at a standstill spun a body on its feet in a tenth of a second.
+Client3D._standing_turn: a person (resident, companion, player; not a monster, whose threat reads
+from its facing at once) whose facing swings by more than STAND_TURN_MIN (45 degrees) while it
+stands turns at STAND_TURN_SPEED (a half turn in about 0.4 s), its feet shuffling round (the walk at
+STAND_SHUFFLE_PACE while it turns, shuffle_until); moving, it follows its facing as before. And
+Client3D._sync_addressing reads npc's Resident.addressing (the addressed body's node path, "" when
+none): its head turns toward theirs, a LookAtModifier3D on the Head bone made the first time (its
+forward axis read off the bone's rest; limits a neck's, 70 degrees across and 35 up and down)
+aimed at a marker kept at their head bone, eased in and out over LOOK_EASE (0.3 s), since the
+8-way facing leaves a body up to 22 degrees off them; and while it stands addressing them it plays
+Idle_Talking. Client only; nothing on the wire beyond npc's field.
