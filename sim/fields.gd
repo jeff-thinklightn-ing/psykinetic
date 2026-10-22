@@ -148,7 +148,9 @@ func load(terrain: Dictionary) -> void:
 		roofs.append(roof["rect"])
 	for building: Dictionary in terrain.get("buildings", []) + terrain.get("roofs", []):
 		if not str(building.get("use", "")).is_empty() and not str(building.get("town_id", "")).is_empty():
-			town_buildings.append({"rect": building["rect"], "use": building["use"], "town_id": building["town_id"]})
+			# Its outline too: the wall edges that stand only once its walls are up (566).
+			var outline := Level.building_outline(building) if building.has("blocks") else Level.blocks_outline(Level.rect_cells(building["rect"]))
+			town_buildings.append({"rect": building["rect"], "use": building["use"], "town_id": building["town_id"], "outline": outline})
 	_roofed = _roofed_whole.duplicate()
 	_source_list = []
 	mark_dirty()

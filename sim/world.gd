@@ -475,6 +475,10 @@ var _accumulator := 0.0
 
 ## Server: every loaded zone by name, and the one World is working on.
 var zones: Dictionary[String, Zone] = {}
+## Level -> {edge key: what it was}: the wall edges of town buildings whose
+## walls are not up yet (decision 566, maps' side), taken out of the level's
+## edges until they are.
+var _walls_down: Dictionary[String, Dictionary] = {}
 ## The damaged roofs (decision 383): "<level>/<x>,<y>" (the roof's rect's
 ## top-left, so an edit to the level's list moves none) -> true. Saved in
 ## the snapshot; the server's (environment's storms damage, economy's
@@ -1185,6 +1189,47 @@ func open_roofs(level: String) -> void:
 	fields_of.set_open(open)
 	if fields_of == fields:
 		fields_changed()
+	_open_walls(level, fields_of)
+
+
+## [param level]'s town buildings whose walls are not up (Towns.walls_up,
+## decision 566: below the walls stage, or only planned) with their outline
+## open both ways: their wall edges taken out of the level's edges (kept in
+## _walls_down), and put back once the walls are up. The server reads its
+## Towns, a client the "town" message's "walls" (World.towns_seen), so its
+## prediction walks the same; with no word, the walls stand. On a town's
+## change and its terrain read, beside open_roofs.
+func _open_walls(level: String, fields_of: Fields) -> void:
+	var zone_of: Zone = zones.get(level)
+	var edges: Dictionary = _edges if fields_of == fields else (zone_of.edges if zone_of != null else {})
+	var down: Dictionary = _walls_down.get_or_add(level, {})
+	var want: Dictionary[Vector3i, bool] = {}
+	for building: Dictionary in fields_of.town_buildings:
+		var told: Dictionary = towns.buildings_of(building["town_id"]) if towns != null else towns_seen.get(building["town_id"], {})
+		if bool(told.get(building["use"], {}).get("walls", true)):
+			continue
+		for key: Vector3i in building.get("outline", []):
+			want[key] = true
+	var changed := false
+	for key: Vector3i in down.keys():
+		if not want.has(key):
+			edges[key] = down[key]
+			down.erase(key)
+			changed = true
+	for key: Vector3i in want:
+		if edges.get(key, Terrain.Edge.OPEN) == Terrain.Edge.WALL:
+			down[key] = Terrain.Edge.WALL
+			edges.erase(key)
+			changed = true
+	if not changed:
+		return
+	# The paths' step cache read the old edges.
+	if fields_of == fields:
+		_grid_rect = Rect2i()
+		_grid_steps = PackedByteArray()
+	elif zone_of != null:
+		zone_of.grid_rect = Rect2i()
+		zone_of.grid_steps = PackedByteArray()
 
 
 ## Works on [param to] from now on: its state swapped into World's fields,
@@ -1489,6 +1534,9 @@ func _set_terrain(terrain: Dictionary) -> void:
 	var edges: Dictionary = terrain["edges"]
 	for key: Vector3i in edges:
 		_edges[key] = edges[key]
+	# The edges are the level's again: its unbuilt walls opened anew (566).
+	_walls_down.erase(fields.level)
+	_open_walls(fields.level, fields)
 
 
 ## Doors register on every peer: the server reads and changes them, a client

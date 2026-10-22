@@ -241,6 +241,9 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## code: bool}.
 ## 29 (562, items' side): a body's buffs may carry "speed", a share its
 ## steps are quicker by, which World.step_ticks reads on both sides.
+## 29 (566, maps' side): a town building's wall edges stand only once its
+## "walls" are up; below that its outline is open, on the server and in a
+## client's prediction alike (World._open_walls).
 const PROTOCOL_REVISION := 29
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]

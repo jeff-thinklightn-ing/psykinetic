@@ -1074,6 +1074,20 @@ func _test_roof_damage() -> void:
 	World.open_roofs("roof_fixture")
 	var house_open := Level.rect_cells(house["rect"]).filter(func(cell: Vector2i) -> bool: return zone.fields.under_sky(cell))
 	_check(house_open.size() == Level.broken_cells(house["rect"]).size(), "a damaged town building: a third of its cells under the sky (%d)" % house_open.size())
+	# Its walls not up (566): its outline open both ways, and the path cache
+	# dropped; up, its walls stand again.
+	var outline := Level.blocks_outline(Level.rect_cells(house["rect"]))
+	for key in outline:
+		zone.edges[key] = Terrain.Edge.WALL
+	zone.grid_rect = Rect2i(0, 0, 4, 4)
+	World.towns_seen["roof_fixture/square"] = {"forge": {"state": Towns.BUILDING, "level": 0, "walls": false}}
+	World.open_roofs("roof_fixture")
+	_check(outline.all(func(key: Vector3i) -> bool: return not zone.edges.has(key)) and zone.grid_rect == Rect2i(),
+		"walls not up (566): its %d outline edges open, the path cache dropped" % outline.size())
+	World.towns_seen["roof_fixture/square"] = {"forge": {"state": Towns.BUILDING, "level": 0, "walls": true}}
+	World.open_roofs("roof_fixture")
+	_check(outline.all(func(key: Vector3i) -> bool: return zone.edges.get(key) == Terrain.Edge.WALL), "walls up: they stand again")
+	World._walls_down.erase("roof_fixture")
 	World.towns = towns
 	World.towns_seen.erase("roof_fixture/square")
 	World.roof_changed.disconnect(heard)

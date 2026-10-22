@@ -19548,3 +19548,39 @@ link pads, the ridge and the valley are in C:/dev/review/wilds_marks/.
 tests/relief_test: the wilds' relief given and nothing said; the ridge's
 face about 3.5 m; the relief cuts nothing off; every link, spawn point and
 start on level ground.
+
+## 566, maps' side: a building's walls stand once they are up
+
+566 ruled that a town building's wall edges block only from the walls stage
+(economy's Towns.walls_up: standing, damaged, a level already up, or built
+to BUILD_STAGES[1], 0.35); below that, or only planned, its outline is open
+both ways. Level.parse is static and runs before any town state, and the
+progress moves while the server runs, so the edges are opened live, not at
+load.
+
+**World._open_walls(level, fields)**, beside open_roofs (it runs at the end
+of it, so on the same triggers: a town's change, building_changed at every
+build stage, and a terrain read):
+- Fields.town_buildings now carries each town building's outline
+  (Level.building_outline, or its rect's for a roof);
+- the outline of every town building whose walls are not up is opened: its
+  WALL edges taken out of the level's edges (World._edges for the current
+  level, the zone's edges for another) and kept in _walls_down; put back
+  when the walls are up. Doors are left (they open anyway);
+- the server reads its Towns (buildings_of's "walls"), a client the "town"
+  message's (World.towns_seen), so net/prediction walks the same; with no
+  word, the walls stand;
+- everything that reads the edges follows (edge_kind, edge_blocks, sight,
+  the path step cache, which is dropped when they change);
+- a terrain read restores the level's edges, so _walls_down is cleared
+  there and the walls opened again.
+
+WorldRoutes keeps the outlines as walls (its copy of the edges is made once):
+a wagon or a raid never plans through a half-built house, the cautious way.
+The view draws an unbuilt building as buildings' staked plot.
+
+Protocol: a line under PROTOCOL_REVISION 29 (what walking means between the
+stages, on the server and in a client's prediction alike).
+
+tests/view_test: a town building with its walls not up has its outline
+open and the path cache dropped; up, its walls stand again.
