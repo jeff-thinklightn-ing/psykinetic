@@ -1726,15 +1726,37 @@ func _test_relief() -> void:
 				break
 	_check(off_surface == 0 and heights_seen.size() > 3 and dry_bed.is_empty(),
 			"a stream's ribbon slopes down its valley, on its curve's surface, never rising, over its bed, over all its cells (%d heights; off: %d, rising %d, under its bed %d, uncovered %s; beds above: %s)" % [heights_seen.size(), off_surface, rising, under_bed, covered["uncovered"].slice(0, 3), dry_bed.slice(0, 4)])
+	# No fall past its bridge (557 amended (2)): the level writes the deck's
+	# height into the relief under a bridge, and the water there is read at
+	# its bed, so the deck is no step.
+	var by_bridge := _rig.stream_falls.filter(func(fall: Dictionary) -> bool:
+		return (hills["terrain"].get("bridged", []) as Array).any(func(cell: Vector2i) -> bool: return (cell - (fall["cell"] as Vector2i)).length() < 2.0))
+	_check(by_bridge.is_empty(), "no fall past the hills' bridge, its deck no step (%s)" % [by_bridge])
 	# Its falls (decision 557, for sound's ambience): each a step down its
 	# path of more than FALL_LEAST, the cell below it; a new array a build.
+	# The hills have no real step, so one is made: the land past the
+	# stream's middle (away from its bridge) lowered FALL_STEP.
+	const FALL_STEP := 0.6
+	var stepped: Dictionary = hills["terrain"].duplicate(true)
+	var step_index := stream_path.size() / 2
+	while step_index > 1 and (stepped.get("bridged", []) as Array).any(func(cell: Vector2i) -> bool: return (cell - (stream_path[step_index] as Vector2i)).length() < 4.0):
+		step_index -= 1
+	var step_at: Vector2i = stream_path[step_index]
+	var way: Vector2i = step_at - (stream_path[step_index - 1] as Vector2i)
+	var relief: PackedFloat32Array = stepped["relief"]
+	var relief_size: Vector2i = stepped["relief_size"]
+	for y in relief_size.y:
+		for x in relief_size.x:
+			if Vector2(Vector2i(x, y) - step_at).dot(Vector2(way)) >= 0.0:
+				relief[y * relief_size.x + x] -= FALL_STEP
+	stepped["relief"] = relief
+	_rig.rebuild(stepped, hills["centre"])
 	var falls := _rig.stream_falls
+	var bed := func(cell: Vector2i) -> float: return _rig._bed_levels.get(cell, _rig._elevation(cell))
 	var true_falls := falls.all(func(fall: Dictionary) -> bool:
 		var i := stream_path.find(fall["cell"])
-		return i > 0 and absf(_rig._elevation(stream_path[i - 1]) - _rig._elevation(stream_path[i]) - float(fall["drop"])) < 0.001 				and float(fall["drop"]) > Client3D.FALL_LEAST)
-	_rig.rebuild(hills["terrain"], hills["centre"])
-	_check(not falls.is_empty() and true_falls and not is_same(falls, _rig.stream_falls) and falls == _rig.stream_falls,
-			"the stream's falls listed, each a step down its path over %.2f m (%s), a new array each build" % [Client3D.FALL_LEAST, falls])
+		return i > 0 and absf(bed.call(stream_path[i - 1]) - bed.call(stream_path[i]) - float(fall["drop"])) < 0.001 and float(fall["drop"]) > Client3D.FALL_LEAST)
+	var at_step := falls.any(func(fall: Dictionary) -> bool: return fall["cell"] == step_at)
 	# Each fall white on the water drawn there (559, terrain's side: from
 	# the curve's ground, not its smoothed surface).
 	var dry_falls := []
@@ -1749,7 +1771,11 @@ func _test_relief() -> void:
 					white = true
 		if not white:
 			dry_falls.append(fall["cell"])
+	_rig.rebuild(stepped, hills["centre"])
+	_check(at_step and true_falls and not is_same(falls, _rig.stream_falls) and falls == _rig.stream_falls,
+			"a step %.1f m down the stream at %s a fall there, each a step down its path over %.2f m (%s), a new array each build" % [FALL_STEP, step_at, Client3D.FALL_LEAST, falls])
 	_check(dry_falls.is_empty(), "each fall white on the water there (none: %s)" % [dry_falls])
+	_rig.rebuild(hills["terrain"], hills["centre"])
 	# Its banks: within a walk of the water a grassy slope into it, no face;
 	# a face only where the land stands a cliff over it.
 	var faces: Dictionary = {}

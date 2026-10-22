@@ -19838,3 +19838,30 @@ tests/relief_test: under the hills' and the wilds' bridges the relief is the
 water's and the walked relief the deck's, a walk from bank to bank straight
 over (4 steps each, as before); the hills' and wilds' walking checks and the
 corners' agreement read the walked relief.
+
+## 557 amended (2). No fall where a bridge's deck is
+
+Found by maps-c8 on the wilds (568): the only falls on the hills and the
+wilds were a bridge's deck. Level._lay_bridges wrote the deck's height
+into the relief under a bridge (since 505 amended, Level.walk_relief lays
+it back for Client3D._relief), so the walk is at bank height there. A
+stream's falls (_build_ribbons, since 557) and a curve's white water
+(_curve_ground(curve, false), since 559) read that relief, so the water
+past every bridge "dropped" from the deck to its bed: hills (42, 79)
+0.46 m, wilds (95, 129) 0.41 m. relief.png is smooth at both.
+
+- Falls and a river's ground along its curve read a bridged cell at its
+  bed (_bed_levels, the lowest water round the bridge), as the water's
+  surface already did. _curve_ground loses its under_bridges argument.
+- Neither map has a fall now. 557's fall foam and sound's amb.falls
+  (557, sound's side) wait for a real step: maps' 570 (a stream off the
+  hills' plateau dropping 6 m into a pool; the coordinator, 2026-10-22).
+- The coordinator's ruling: a fake fall is not a look we keep.
+- 505 amended (maps, cb3d2840) takes the deck out of terrain["relief"]
+  into terrain["decks"]; Client3D._relief reads Level.walk_relief, so
+  _elevation still has the deck and the bed reading here is still needed
+  (_bed_levels is the water round the bridge, no deck key read).
+
+view_test _test_relief: no fall past the hills' bridge; the hills with
+the land past the stream's middle lowered 0.6 m give a fall at that cell,
+white on the water. Client only, protocol unchanged, no new class_name.

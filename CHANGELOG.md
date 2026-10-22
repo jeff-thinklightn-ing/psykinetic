@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The white water and falls sound just past the hills' bridge are gone: a bridge's deck was being read as a step in the stream (557 amended (2)). Real falls come with the hills' new waterfall.
 - Herbs now grow near the medicine man's hut, from the game day after the server update, so he gathers his own and makes remedies even when nobody brings him herbs (562 amended).
 - A maker's Barter (a smith, cook, carpenter, tanner, fletcher, weaver or the medicine man) opens their own goods in person, "Oda's goods", and buys their trade's materials from their own purse; the merchant's Barter and the counter's E keep the town's shop. An empty shelf reads "nothing to trade" (562, ui's side; the goods and prices are economy's).
 - The medicine man trades: barter with him for the remedies and stamina potions he makes, and he buys herbs from your pack with his own gold. Herbs are worth nothing anywhere else, and he makes a remedy first while anyone is sick (562).

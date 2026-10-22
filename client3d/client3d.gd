@@ -5763,9 +5763,10 @@ func _build_ribbons() -> void:
 		var widths := PackedVector2Array()
 		for i in path.size():
 			var cell: Vector2i = path[i]
-			# The ground's drop down the path (a bridge's cell by its relief
-			# too): its falls and how fast it runs.
-			levels.append(_elevation(cell))
+			# The ground's drop down the path (a bridge's cell by its bed, not
+			# the deck the level writes into its relief): its falls and how
+			# fast it runs.
+			levels.append(_bed_levels.get(cell, _elevation(cell)))
 			var way: Vector2i = (path[mini(i + 1, path.size() - 1)] - path[maxi(i - 1, 0)]).sign()
 			var across := Vector2i(0, 1) if absi(way.x) >= absi(way.y) else Vector2i(1, 0)
 			var reach := Vector2.ZERO
@@ -6106,14 +6107,13 @@ func _curve_near(point: Vector2) -> Vector3:
 
 
 ## The ground under each of [param curve]'s samples, before any
-## smoothing: for its surface a bridge's water at its bed
-## ([param under_bridges]); for its falls and how fast it runs the relief
-## itself, as stream_falls measures a step.
-func _curve_ground(curve: Dictionary, under_bridges := true) -> PackedFloat32Array:
+## smoothing: a bridge's water at its bed, not the deck the level writes
+## into its relief (that read as a fall past every bridge).
+func _curve_ground(curve: Dictionary) -> PackedFloat32Array:
 	var base := PackedFloat32Array()
 	for point: Vector2 in curve["points"]:
 		var cell := Vector2i(roundi(point.x), roundi(point.y))
-		base.append(_bed_levels.get(cell, _elevation(cell)) if under_bridges else _elevation(cell))
+		base.append(_bed_levels.get(cell, _elevation(cell)))
 	return base
 
 
@@ -6218,7 +6218,7 @@ func _build_curve_ribbon(w: int) -> void:
 	else:
 		var profile: PackedFloat32Array = water["profile"]
 		var shoal: PackedFloat32Array = water["shoal"]
-		var ground := _curve_ground(curve, false)
+		var ground := _curve_ground(curve)
 		var n := points.size()
 		var reach := int(1.0 / Curves.SPACING)
 		# From the first sample over its own water to the last: past them the
