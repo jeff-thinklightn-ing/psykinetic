@@ -1267,10 +1267,10 @@ static func niches_from(config: Dictionary, terrain: Dictionary, warnings: Array
 ## level.json's "waters" and "roads" (decision 559: curves, the cells
 ## rasterised from them) laid into [param terrain]:
 ## terrain "waters" and "roads" as Curves.parse has them; each water's
-## floor cells (Curves.cells; under the void it runs on unseen) water, but
-## a ford's or a bridge's (not floor); each road's
-## floor cells its kind, but water's. A cell the layout has otherwise is
-## made so, and said in [param warnings] (a curve moved without its cells).
+## floor cells (Curves.laid; under the void it runs on unseen) water, but
+## a ford's or a bridge's (not floor), a cell the layout has dry made so
+## and said in [param warnings] (a curve moved without its cells); each
+## road's floor cells not water its kind (decision 563), unsaid.
 ## Returns [param config] with "streams" from each open water's middle (its
 ## longest run over the ground, Curves.laid) after level.json's own, for
 ## streams_from.
@@ -1308,15 +1308,12 @@ static func _lay_curves(terrain: Dictionary, config: Dictionary, warnings: Array
 			warnings.append("water %d's curve covers %d cells the layout has dry: water" % [index, made])
 		if not water["closed"] and laid["path"].size() >= 2:
 			streams.append({"path": laid["path"].map(func(cell: Vector2i) -> Array: return [cell.x, cell.y])})
-	for index in roads.size():
-		var road: Dictionary = roads[index]
-		var changed := 0
+	# A road's ground is its curve's (a marker on it, whose ground the layout
+	# takes from its neighbours, too), so nothing is said.
+	for road: Dictionary in roads:
 		for cell: Vector2i in Curves.cells(road["curve"], false):
-			if floor.has(cell) and not wet.has(cell) and terrain["kinds"].get(cell, "") != road["kind"]:
+			if floor.has(cell) and not wet.has(cell):
 				terrain["kinds"][cell] = road["kind"]
-				changed += 1
-		if changed > 0:
-			warnings.append("road %d's curve covers %d cells the layout has not %s: %s" % [index, changed, road["kind"], road["kind"]])
 	var out := config.duplicate()
 	out["streams"] = streams
 	return out

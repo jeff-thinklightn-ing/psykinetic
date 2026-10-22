@@ -53,6 +53,7 @@ func _ready() -> void:
 	_test_curves()
 	_test_curves_laid()
 	_test_river()
+	_test_road()
 	_test_hills()
 	_main.load_map(Level.DEFAULT_MAP)
 	Level.unregister("rl_hill")
@@ -519,6 +520,44 @@ func _test_river() -> void:
 	_check(other["streams"][0] != path, "another seed, other loops")
 
 
+## A road laid as a curve (decision 563): from its start to its end over
+## the bridge (water crossed nowhere else), its cells on walkable ground with
+## no cliff between them, round (no sharp turn); none where no way is.
+func _test_road() -> void:
+	print("== Relief.road ==")
+	var size := Vector2i(40, 30)
+	var map := LevelMap.new(size)
+	for y in size.y:
+		for x in size.x:
+			map.set_cell(Vector2i(x, y), "water" if x in [19, 20] else "grass")
+			map.set_relief(Vector2i(x, y), 2.0 + (1.5 if x > 30 and y < 8 else 0.0))
+	var crossings := {Vector2i(19, 22): true, Vector2i(20, 22): true}
+	var laid := Relief.road(map, Vector2i(3, 4), [], Vector2i(36, 26), 2.0, crossings)
+	_check(not laid.is_empty(), "a road from (3, 4) to (36, 26) over the bridge")
+	if laid.is_empty():
+		return
+	var cells: Dictionary = laid["cells"]
+	var on_ground := true
+	var cliff := false
+	for cell: Vector2i in cells:
+		on_ground = on_ground and (map.walkable(cell) or crossings.has(cell))
+		for step: Vector2i in [Vector2i(1, 0), Vector2i(0, 1)]:
+			if cells.has(cell + step) and Relief.cliff_between(map.relief_at(cell), map.relief_at(cell + step)):
+				cliff = true
+	var wet_crossed := cells.keys().filter(func(cell: Vector2i) -> bool: return map.cell(cell) == "water")
+	_check(on_ground and not cliff and wet_crossed.all(func(cell: Vector2i) -> bool: return crossings.has(cell)) and not wet_crossed.is_empty(),
+		"its cells on the ground, the water crossed only on the bridge (%s), no cliff between them" % [wet_crossed])
+	var points: PackedVector2Array = laid["points"]
+	_check(points[0] == Vector2(3, 4) and points[-1] == Vector2(36, 26), "from its start to its end (%s to %s)" % [points[0], points[-1]])
+	var curve := Curves.sample(points, laid["widths"])
+	var tangents: PackedVector2Array = curve["tangents"]
+	var sharpest := 0.0
+	for i in range(1, tangents.size()):
+		sharpest = maxf(sharpest, absf(tangents[i].angle_to(tangents[i - 1])))
+	_check(sharpest < 0.35, "round: no turn over 0.35 rad a quarter cell (%.3f)" % sharpest)
+	_check(Relief.road(map, Vector2i(3, 4), [], Vector2i(36, 26), 2.0, {}).is_empty(), "no bridge, no way over: none")
+
+
 func _test_escarpment() -> void:
 	print("== Relief.lay escarpments ==")
 	var size := Vector2i(40, 50)
@@ -614,6 +653,13 @@ func _test_hills() -> void:
 	WorldRoutes._flood(area, level["spawn_points"]["from_wilds"], {}, reached)
 	var unreached := floor.keys().filter(func(cell: Vector2i) -> bool: return reached[cell.y * size.x + cell.x] < 0.0)
 	_check(unreached.is_empty(), "every floor cell is walked to from the link (%d not: %s)" % [unreached.size(), unreached.slice(0, 5)])
+	var roads: Array = terrain["roads"]
+	var road_cells := Curves.cells(roads[0]["curve"], false) if roads.size() == 1 else {} as Dictionary[Vector2i, int]
+	var road_points: PackedVector2Array = roads[0]["points"] if roads.size() == 1 else PackedVector2Array()
+	var bridge_cell: Vector2i = level["buildings"].filter(func(b: Dictionary) -> bool: return b["slot"] == "bridge")[0]["rect"].position
+	_check(roads.size() == 1 and roads[0]["kind"] == "dirt" and road_cells.has(bridge_cell) and road_points[-1].x < 20.0
+		and road_cells.keys().all(func(cell: Vector2i) -> bool: return terrain["kinds"].get(cell, "dirt") == "dirt"),
+		"a dirt road from the link over the bridge and up through the west way (563; %d cells)" % road_cells.size())
 	var top := Vector2i(80, 20)
 	var steps := WorldRoutes._steps_between(area, level["spawn_points"]["from_wilds"], top)
 	_check(floor.has(top) and steps > 0.0, "the plateau's top is walked to from the link, round by its spur (%.0f steps)" % steps)

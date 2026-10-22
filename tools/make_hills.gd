@@ -56,6 +56,11 @@ const VALLEY: Array[Vector2i] = [Vector2i(46, 0), Vector2i(42, 30), Vector2i(50,
 const WEST_SCARP: Array[Vector2i] = [Vector2i(30, 4), Vector2i(27, 36), Vector2i(32, 66)]
 const SOUTH_SCARP: Array[Vector2i] = [Vector2i(50, 57), Vector2i(87, 65)]
 const SCARP_HEIGHT := 3.0
+## Where along the west escarpment its way up is (the road goes up it).
+const WEST_WAY := 0.55
+## The road: its width, and how far west past the way it runs.
+const ROAD_WIDTH := 2.0
+const ROAD_END_WEST := 14
 ## The river down the valley (Relief.lay "rivers", decision 559; Jeff: "a
 ## meandering stream not a straight line"): its loops' length and swing
 ## either way, in cells, and its width, wandering between the two.
@@ -101,7 +106,7 @@ func _ready() -> void:
 	var laid := Relief.lay(map, Rect2i(Vector2i.ZERO, SIZE), SEED, {
 		"base": BASE, "amplitude": 2.0, "scale": 70.0, "octaves": 2, "tilt": TILT,
 		"escarpments": [
-			{"line": WEST_SCARP, "face": "east", "height": SCARP_HEIGHT, "back": 22.0, "ways": [0.55]},
+			{"line": WEST_SCARP, "face": "east", "height": SCARP_HEIGHT, "back": 22.0, "ways": [WEST_WAY]},
 			{"line": SOUTH_SCARP, "face": "north", "height": SCARP_HEIGHT - 0.5, "back": 20.0, "ways": [0.3]}],
 		"slope": 0.3, "steep_bands": 0.3, "rock_step": Relief.MAX_M, "dirt_step": 0.33,
 		"valleys": [VALLEY], "valley_depth": 4.5, "valley_floor": RIVER_FLOOR, "valley_fall": 5.0, "valley_width": 30.0, "kinds": true, "min_flow": 30,
@@ -134,6 +139,7 @@ func _ready() -> void:
 	_rock()
 	_knoll()
 	_wall()
+	_road(arrival)
 	# Boulders and crates by the rim, to push off.
 	for at in [Vector2i(CLIFF_X + 1, 24), Vector2i(CLIFF_X + 2, 40)]:
 		map.set_cell(at, "boulder")
@@ -256,6 +262,47 @@ func _knoll() -> void:
 	for cell in _disc(top, 2.2):
 		if map.cell(cell) in ["grass", "dirt"]:
 			map.set_cell(cell, "void")
+
+
+## The road (decision 563): dirt, from the link's arrival west over the
+## bridge and up through the west escarpment's way to ROAD_END_WEST cells
+## past it, laid as a curve (Relief.road), its cells bare dirt.
+func _road(arrival: Vector2i) -> void:
+	if not config.has("buildings"):
+		return
+	var bridge: Dictionary = config["buildings"][0]
+	var west := Vector2i(int(bridge["at"][0]), int(bridge["at"][1]))
+	var length := int(bridge["length"])
+	var crossings := {}
+	for i in length:
+		crossings[west + Vector2i(i, 0)] = true
+	var way := _along(WEST_SCARP, WEST_WAY)
+	var beyond := Vector2i(roundi(way.x) - ROAD_END_WEST, roundi(way.y))
+	while not map.walkable(beyond) and beyond.x < roundi(way.x):
+		beyond.x += 1
+	var laid := Relief.road(map, arrival, [west + Vector2i(length, 0), west - Vector2i(1, 0)], beyond, ROAD_WIDTH, crossings)
+	if laid.is_empty():
+		push_error("[hills] no way for the road")
+		return
+	for cell: Vector2i in laid["cells"]:
+		if map.cell(cell) in ["grass", "dirt"]:
+			map.set_cell(cell, "dirt")
+	config["roads"] = [{"points": Curves.to_json(laid["points"], laid["widths"]), "kind": "dirt"}]
+	print("[hills] the road: %d control points, %d cells" % [laid["points"].size(), laid["cells"].size()])
+
+
+## The point [param fraction] of the way along the polyline [param line].
+func _along(line: Array[Vector2i], fraction: float) -> Vector2:
+	var total := 0.0
+	for i in range(1, line.size()):
+		total += Vector2(line[i]).distance_to(Vector2(line[i - 1]))
+	var left := total * fraction
+	for i in range(1, line.size()):
+		var span := Vector2(line[i]).distance_to(Vector2(line[i - 1]))
+		if left <= span:
+			return Vector2(line[i - 1]).lerp(Vector2(line[i]), left / span)
+		left -= span
+	return Vector2(line[-1])
 
 
 ## The low wall below the cliff: the edges east of WALL_X over WALL_ROWS.

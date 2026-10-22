@@ -19078,3 +19078,48 @@ sketch. The footprint itself was grass already: its bare look is the
 client's drawing of solid cells (terrain's side), not the layout. The door
 (236, 186), the link and the spawn are untouched. Layout only, protocol
 unchanged; it ships in the full cut with the rest.
+
+## 563. Roads laid as curves
+
+559 made "roads" a level's data (control points, a width each; the cells'
+ground from the curve on load); this lays them. Jeff's rule holds for roads
+as for water: smooth curves, then cells; no straight runs or right angles.
+
+**Relief.road(map, from, via, to, width, crossings)** returns {points,
+widths, cells} for level.json "roads":
+- the walk: A* over the map's walkable cells, eight ways (a diagonal only
+  where both its sides are open), never into water but the crossings (a
+  bridge's cells; a ford is ground), never up or down a cliff (a step over
+  WALK_RISE); a step costs its length, ROAD_CLIMB (6) cells a metre of rise
+  and ROAD_EDGE (2) more beside water, void or a cliff, so it keeps to the
+  flat and its width clear; through each of via in turn;
+- the shape (_road_shape), between crossings: the walk's corners cut
+  (Chaikin) up to four times, swung across its way up to ROAD_SWING (2.5)
+  cells by a noise over ROAD_WAVE (24) cells, eased to nothing at the ends,
+  a control point every ROAD_SPACING (4) cells, to two places; a crossing's
+  cells and two either side kept as walked, so the curve runs straight over
+  a bridge;
+- the fit (_road_fit): the curve's cells (Curves.cells) must lie on
+  walkable ground or the crossings with no cliff between two of them; a
+  cell that fails narrows the control point nearest it by a third, down to
+  one cell (eight tries). The wander, then the rounding, is given up only
+  as far as that needs: the roundest, most winding road that fits.
+On load (Level._lay_curves) a road's floor cells not water take its kind
+without a word: a marker on the road takes its ground from its neighbours
+in the layout, so the layout cannot say it, and the curve is the road's
+data. (559 said a cell the layout had otherwise; for roads it no longer
+does.)
+
+**levels/hills**: one dirt road (make_hills _road), from the link's arrival
+over the bridge (via its east and west banks, its cells the crossings) to
+14 cells past the west escarpment's way (WEST_WAY, now a constant), width
+2; its cells bare dirt in the layout. 31 control points, 199 cells.
+
+Level data, protocol unchanged since 559's 29; it ships in the same full
+cut. Terrain draws it from the curve.
+
+tests/relief_test: a road alone (over the only bridge, its cells on the
+ground and no cliff between them, the water crossed only on the bridge,
+from its start to its end, no turn over 0.35 rad a quarter cell; none with
+no bridge); the Hills' dirt road from the link over the bridge to the west
+of the west way.

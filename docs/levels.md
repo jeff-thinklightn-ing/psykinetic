@@ -157,7 +157,9 @@ and a gentle rise of about 0.9 m east of the stream. `levels/hills` is the
 showcase (`tools/make_hills.tscn`): a valley winding down the middle, its
 floor falling 5 m north to south and its river looping down it as a
 curve (`waters`, 559), 1.7 to 3.2 cells wide, swinging about 7 cells
-either way every 26 or so, with a ford and a bridge, hills rolling 2 m either way, two escarpments (525
+either way every 26 or so, with a ford and a bridge, a dirt road (563)
+from the link west over the bridge and up through the west escarpment's
+way, hills rolling 2 m either way, two escarpments (525
 amended (2)): one to the west with a 3 m face east over the valley, a long
 slope up to it from the west and a ramp through its face, and one 2.5 m
 high south-east of the valley facing north; and a plateau 6 m up to the
@@ -183,7 +185,15 @@ round all through), loops `wavelength` cells of the line long reaching
 tenth of a wavelength, each its width (`[least, most]`, wandering); its
 cells the curve's raster, as on load; its curve returned in `waters` for
 level.json. Keep it to a valley's floor at least `amplitude` + `most`
-wide. A valley has a floor (`valley_floor` cells either
+wide. `Relief.road(map, from, via, to, width, crossings)` (563) lays a
+road as a curve for `roads`: the cheapest walk over walkable ground (never
+into water but the `crossings`, a bridge's cells; never up or down a
+cliff; climbs and the edges of water, void and cliffs dearer), then made
+round: its corners cut, a gentle wander across it, a control point every 4
+cells, a crossing's cells and two either side kept so it runs straight
+over a bridge, each point `width` wide but narrowed where it must be, as
+round and winding as lets its cells lie on the ground with no cliff
+between them. A valley has a floor (`valley_floor` cells either
 side of its line) falling `valley_fall` along it, so its stream runs its
 length; a ridge entry may be `{line, height, width}` (a knoll: one point).
 An `escarpments` entry, `{line, face, height, back, taper, ways,

@@ -973,3 +973,210 @@ static func _meander_shape(swing: float) -> Vector2:
 		along += cos(swing * sin(t)) * PI / steps
 		across += sin(swing * sin(t)) * PI / steps
 	return Vector2(along / PI, across)
+
+
+# --- Roads (decision 563) ---------------------------------------------------------
+
+## A road's walk prefers the flat: each metre of rise costs this many cells.
+const ROAD_CLIMB := 6.0
+## And keeps its width clear: a step beside water, void or a cliff costs this
+## many cells more.
+const ROAD_EDGE := 2.0
+## Its control points this many cells apart along it.
+const ROAD_SPACING := 4.0
+## It wanders up to this many cells either side of its walk, over turns this
+## long (cells), where the ground lets it.
+const ROAD_SWING := 2.5
+const ROAD_WAVE := 24.0
+
+
+## A road over [param map] (a LevelMap) from [param from] through each of
+## [param via] to [param to], as a curve for level.json "roads" (decision
+## 563): walked by the cheapest way over walkable ground, never into water
+## but its [param crossings] (a bridge's cells; a ford is ground), never up
+## or down a cliff (a step over WALK_RISE), the climb and the edges of water,
+## void and cliffs costing more (ROAD_CLIMB, ROAD_EDGE); then made round
+## (_road_shape: its corners cut, a gentle wander across it, a control point
+## every ROAD_SPACING), as round and winding as lets the curve's cells lie
+## on walkable ground or the crossings with no cliff between two of them (a
+## crossing's cells and two either side of it kept, so it runs straight
+## over a bridge), each point [param width] wide but where it must be
+## narrower (to one cell: a bridge, a way between cliffs). Returns {points,
+## widths, cells (the curve's cells, Curves.cells)}, or {} if there is no
+## way.
+static func road(map: LevelMap, from: Vector2i, via: Array, to: Vector2i, width := 2.0, crossings: Dictionary = {}) -> Dictionary:
+	var stops: Array[Vector2i] = [from]
+	for point: Variant in via:
+		stops.append(point)
+	stops.append(to)
+	var walk: Array[Vector2i] = []
+	for i in range(1, stops.size()):
+		var leg := _road_walk(map, stops[i - 1], stops[i], crossings)
+		if leg.is_empty():
+			return {}
+		if not walk.is_empty():
+			leg.remove_at(0)
+		walk.append_array(leg)
+	# Its pieces: the walk between crossings (each crossing's cells and two
+	# either side kept as they are, so it runs straight over a bridge).
+	var pieces: Array[PackedVector2Array] = []
+	var pinned: Array[bool] = []
+	var near_crossing := func(i: int) -> bool:
+		for k in range(maxi(0, i - 2), mini(walk.size(), i + 3)):
+			if crossings.has(walk[k]):
+				return true
+		return false
+	for i in walk.size():
+		var here: bool = near_crossing.call(i)
+		if pieces.is_empty() or here != pinned[-1]:
+			var piece := PackedVector2Array()
+			if not pieces.is_empty():
+				piece.append(pieces[-1][-1])
+			pieces.append(piece)
+			pinned.append(here)
+		pieces[-1].append(Vector2(walk[i]))
+	var keep := func(cell: Vector2i) -> bool:
+		return map.walkable(cell) or crossings.has(cell)
+	var wander := FastNoiseLite.new()
+	wander.seed = from.x * 7919 + from.y * 104729 + to.x * 31 + to.y
+	wander.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+	wander.frequency = 1.0 / ROAD_WAVE
+	# The roundest, most winding that fits: the wander, then the smoothing,
+	# given up only as far as the ground makes it.
+	for swing: float in [ROAD_SWING, ROAD_SWING / 2.0, 0.0]:
+		for rounds: int in [4, 3, 2, 1, 0]:
+			var points := PackedVector2Array()
+			for p in pieces.size():
+				var piece: PackedVector2Array = pieces[p] if pinned[p] else _road_shape(pieces[p], rounds, swing, wander)
+				if not points.is_empty():
+					piece = piece.slice(1)
+				points.append_array(piece)
+			var widths := PackedFloat32Array()
+			widths.resize(points.size())
+			widths.fill(width)
+			var fitted := _road_fit(map, points, widths, keep, crossings)
+			if not fitted.is_empty():
+				return fitted
+	return {}
+
+
+## [param piece] (a road's walk between crossings, cells) made round:
+## corners cut [param rounds] times (Chaikin), swung across its way up to
+## [param swing] cells by [param wander] (eased to nothing at its ends), and
+## its points ROAD_SPACING apart along it, its ends kept.
+static func _road_shape(piece: PackedVector2Array, rounds: int, swing: float, wander: FastNoiseLite) -> PackedVector2Array:
+	var line := piece
+	for round_count in rounds:
+		if line.size() < 3:
+			break
+		var cut := PackedVector2Array([line[0]])
+		for i in line.size() - 1:
+			cut.append(line[i].lerp(line[i + 1], 0.25))
+			cut.append(line[i].lerp(line[i + 1], 0.75))
+		cut.append(line[-1])
+		line = cut
+	var length := 0.0
+	for i in range(1, line.size()):
+		length += line[i].distance_to(line[i - 1])
+	var out := PackedVector2Array([line[0]])
+	var count := maxi(1, roundi(length / ROAD_SPACING))
+	var walked := 0.0
+	var segment := 0
+	for k in range(1, count):
+		var s := length * k / count
+		while segment < line.size() - 2 and walked + line[segment].distance_to(line[segment + 1]) < s:
+			walked += line[segment].distance_to(line[segment + 1])
+			segment += 1
+		var a := line[segment]
+		var b := line[segment + 1]
+		var point := a.lerp(b, clampf((s - walked) / maxf(a.distance_to(b), 0.0001), 0.0, 1.0))
+		var way := (b - a).normalized()
+		var ease := smoothstep(0.0, ROAD_WAVE / 2.0, minf(s, length - s))
+		out.append((point + Vector2(-way.y, way.x) * swing * ease * wander.get_noise_1d(s)).snappedf(0.01))
+	out.append(line[-1])
+	return out
+
+
+## The road through [param points] if its cells (Curves.cells) lie on
+## [param keep]'s ground with no cliff between two of them but at
+## [param crossings], each point [param widths] wide but narrowed where it
+## must be (the point nearest each cell that fails a third narrower, to one
+## cell): {points, widths, cells}, or {} if it cannot be made to fit.
+static func _road_fit(map: LevelMap, points: PackedVector2Array, widths: PackedFloat32Array, keep: Callable, crossings: Dictionary) -> Dictionary:
+	for narrowing in 8:
+		var curve := Curves.sample(points, widths)
+		var cells := Curves.cells(curve, false)
+		var bad: Array[Vector2i] = []
+		for cell: Vector2i in cells:
+			if not keep.call(cell):
+				bad.append(cell)
+				continue
+			for step: Vector2i in [Vector2i(1, 0), Vector2i(0, 1)]:
+				if cells.has(cell + step) and not crossings.has(cell) and not crossings.has(cell + step) 						and cliff_between(map.relief_at(cell), map.relief_at(cell + step)):
+					bad.append(cell)
+		if bad.is_empty():
+			return {"points": points, "widths": widths, "cells": cells}
+		var narrowed := false
+		for cell in bad:
+			var nearest := 0
+			for k in points.size():
+				if points[k].distance_to(Vector2(cell)) < points[nearest].distance_to(Vector2(cell)):
+					nearest = k
+			if widths[nearest] > 1.0:
+				widths[nearest] = maxf(1.0, widths[nearest] * 0.67)
+				narrowed = true
+		if not narrowed:
+			return {}
+	return {}
+
+
+## The cheapest walk for a road from [param from] to [param to] over
+## [param map] (road()'s rules), its cells in order, or [] if none.
+static func _road_walk(map: LevelMap, from: Vector2i, to: Vector2i, crossings: Dictionary) -> Array[Vector2i]:
+	var none: Array[Vector2i] = []
+	var open_cell := func(cell: Vector2i) -> bool:
+		return map.in_bounds(cell) and ((map.walkable(cell) and map.cell(cell) != "water") or crossings.has(cell))
+	if not open_cell.call(from) or not open_cell.call(to):
+		return none
+	var edge_cost := func(cell: Vector2i) -> float:
+		for direction in FOUR:
+			var next := cell + direction
+			if not open_cell.call(next) or (not crossings.has(cell) and not crossings.has(next)
+					and cliff_between(map.relief_at(cell), map.relief_at(next))):
+				return ROAD_EDGE
+		return 0.0
+	var best := {from: 0.0}
+	var came := {}
+	var queue: Array = [[Vector2(from).distance_to(Vector2(to)), from]]
+	var done := {}
+	while not queue.is_empty():
+		var top: Array = queue.pop_back()
+		var cell: Vector2i = top[1]
+		if done.has(cell):
+			continue
+		done[cell] = true
+		if cell == to:
+			var walk: Array[Vector2i] = [to]
+			while walk[-1] != from:
+				walk.append(came[walk[-1]])
+			walk.reverse()
+			return walk
+		for y in range(-1, 2):
+			for x in range(-1, 2):
+				var step := Vector2i(x, y)
+				var next := cell + step
+				if step == Vector2i.ZERO or done.has(next) or not open_cell.call(next):
+					continue
+				if x != 0 and y != 0 and (not open_cell.call(cell + Vector2i(x, 0)) or not open_cell.call(cell + Vector2i(0, y))):
+					continue
+				var rise := absf(map.relief_at(next) - map.relief_at(cell))
+				if not crossings.has(cell) and not crossings.has(next) and cliff_between(map.relief_at(cell), map.relief_at(next), x != 0 and y != 0):
+					continue
+				var cost: float = best[cell] + Vector2(step).length() + ROAD_CLIMB * rise + edge_cost.call(next)
+				if cost < float(best.get(next, INF)):
+					best[next] = cost
+					came[next] = cell
+					var entry := [cost + Vector2(next).distance_to(Vector2(to)), next]
+					var index := queue.bsearch_custom(entry, func(p: Array, q: Array) -> bool: return p[0] > q[0])
+					queue.insert(index, entry)
+	return none

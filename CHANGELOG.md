@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The Hills have a road: a dirt track winding from where you arrive from the wilds, west over the bridge and up through the gap in the west ridge, laid as a smooth curve with no sharp turns (563).
 - The barrow's mound in the wilds stands on grass all round: the forest steps back a cell on its north-east, so the dome's foot and its ring of kerb stones clear the trees (550 amended).
 - Builder mode knows a town's plots, the ground kept for new buildings (564): the request lists them, and builder says when a new building on a plot doesn't face the plot's street, or a building serving a town doesn't open its door onto a road.
 - The bow bends as it is drawn (462): its limbs curve back toward the string at full draw and spring straight again with the string when the arrow flies.
