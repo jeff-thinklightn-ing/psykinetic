@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Sheep have bodies of their own, a ewe and a horned ram, ready for a flock: art-kit's hand-fixed meshes in their own paint, grazing, walking, galloping and falling on the cow's rig.
 - Building sites have art for each stage: marking stakes and string, hewn sill beams, scaffold bays (one with a ladder), bare rafters, a woodpile that fills in three steps, a sawbuck with a log, a stack of planks, and a warm glow for lit wood and stone windows.
 - A log for carrying on the shoulder has art: a crooked length of trunk with furrowed bark, branch stubs and sawn ends.
 - Work tools have art for the townsfolk to carry: a felling axe, a carpenter's claw hammer and a hand saw.

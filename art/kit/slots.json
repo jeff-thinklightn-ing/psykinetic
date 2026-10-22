@@ -2171,6 +2171,7 @@
 			"kind": "creature",
 			"size": [0.55, 0.9, 1.2],
 			"tolerance": 0.15,
+			"source": {"by": "art-gen (mesh), art-kit (hand fixes and paint), pc-character (clean, rig fit); rig and clips Quaternius", "tool": "Qwen-Image-2512, TRELLIS.2, blender (art-kit's fixes; pc-character's tools/creature_clean.py, creature_rig.py)", "license": "own (mesh and paint); CC0 1.0 (the Quaternius Cow's rig and clips, docs/licenses/quaternius-cc0_2026-10-15.txt)", "date": "2026-10-21", "notes": "N:/assets/candidates/creature.sheep/mesh/creature.sheep_ewe_paint_fixed.glb (variant 1, the ewe, art-gen's c2) and creature.sheep_ram_paint_fixed.glb (variant 2, the ram, c10), art-kit's hand fixes (C:/dev/review/sheep/sheep_hand_fixes.png); cleaned by creature_clean.py (welded, voxel remeshed, 1,200 quads, the paint baked across), fitted to the Quaternius Cow's skeleton and clips at 0.9 m by creature_rig.py, keeping its paint"},
 			"budget": 2500,
 			"variants": 2,
 			"uses": "a sheep, variant 1 the ewe (art-gen's c2), 2 the ram (c10; its spiral horns about 0.6 across, the box widened from 0.5 to 0.55 so both sit inside the tolerance): a rigged body (one Skeleton3D) and its clips, by the names listed (any one of a clip's names, after any \"Armature|\" prefix); front +z, origin under its middle, standing at rest; a keeper's yard's beast for wool (Jeff, 2026-10-18: \"sheep and wool yes\"), not in the Quaternius pack on disk: art-gen's concept by the goblin recipe (one figure, side and front, white), rigged by pc-character as the rabbit was",

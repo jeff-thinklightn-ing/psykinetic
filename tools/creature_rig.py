@@ -4,7 +4,7 @@
 # art-kit's palette, ready for the creature's art slot.
 #
 #   blender -b -P tools/creature_rig.py -- <mesh .glb> <reference .glb> <out.glb>
-#       [--height M] [--length M] [--tris N] [--turn DEGREES] [--colours SWATCHES]
+#       [--height M] [--length M] [--tris N] [--turn DEGREES] [--colours SWATCHES] [--no-tail]
 #
 # The mesh should stand four-square as the reference does: legs straight down and apart,
 # head toward -Y (Blender's front; --turn 180 if it faces +Y). It is centred, stood on z = 0,
@@ -27,6 +27,10 @@
 # region=row,col pairs, comma-free between pairs: e.g. body=5,5 underside=5,4 hooves=5,7.
 # Regions: hooves (the bottom of the legs), underside (faces looking down, under the belly
 # line), body (the rest).
+#
+# --no-tail: for a body whose tail is a stub (a sheep on the cow's rig): every weight on the
+# reference's tail bones (named Tail...) given to the tail's root's parent, so its clips' tail swing
+# doesn't drag the rump out into a spike.
 #
 # The output: the armature (the reference's name) with every clip, once each by its plain
 # name ("Walk", not "AnimalArmature|Walk"), and the mesh, flat-shaded.
@@ -290,6 +294,31 @@ def warp(obj, fit: Fit) -> None:
 	obj.data.update()
 
 
+def drop_tail(body, arm) -> int:
+	"""The tail bones' weights onto the tail's root's parent; the vertices moved."""
+	tails = [b for b in arm.data.bones if b.name.startswith("Tail")]
+	if not tails:
+		return 0
+	root = min(tails, key=lambda b: len(b.parent_recursive))
+	keeper = root.parent.name
+	if keeper not in body.vertex_groups:
+		body.vertex_groups.new(name=keeper)
+	into = body.vertex_groups[keeper]
+	names = {b.name for b in tails}
+	indices = {g.index: g.name for g in body.vertex_groups if g.name in names}
+	moved = 0
+	for v in body.data.vertices:
+		weight = sum(e.weight for e in v.groups if e.group in indices)
+		if weight <= 0.0:
+			continue
+		have = next((e.weight for e in v.groups if e.group == into.index), 0.0)
+		into.add([v.index], have + weight, "REPLACE")
+		moved += 1
+	for name in indices.values():
+		body.vertex_groups.remove(body.vertex_groups[name])
+	return moved
+
+
 def transfer_weights(ref, body, arm) -> None:
 	for group in ref.vertex_groups:
 		body.vertex_groups.new(name=group.name)
@@ -381,7 +410,7 @@ def main() -> None:
 	if len(a) < 3:
 		raise SystemExit("usage: -- <mesh .glb> <reference .glb> <out.glb> [--height M] [--length M] [--tris N] [--turn DEG] [--colours region=row,col ...]")
 	mesh_path, ref_path, out = (os.path.abspath(p) for p in a[:3])
-	height, length, target, turn, swatches = None, None, 0, 0.0, {}
+	height, length, target, turn, swatches, no_tail = None, None, 0, 0.0, {}, False
 	rest = a[3:]
 	i = 0
 	while i < len(rest):
@@ -397,6 +426,9 @@ def main() -> None:
 		elif rest[i] == "--turn":
 			turn = float(rest[i + 1])
 			i += 2
+		elif rest[i] == "--no-tail":
+			no_tail = True
+			i += 1
 		elif rest[i] == "--colours":
 			i += 1
 			while i < len(rest) and not rest[i].startswith("--"):
@@ -432,6 +464,8 @@ def main() -> None:
 	fit_armature(arm, fit)
 	warp(ref, fit)
 	transfer_weights(ref, body, arm)
+	if no_tail:
+		print("no tail: %d vertices' tail weights onto its root's parent" % drop_tail(body, arm))
 	bpy.data.objects.remove(ref)
 	unweighted = sum(1 for v in body.data.vertices if not v.groups)
 	print("rigged: %d vertices, %d with no weight, %d tris" % (len(body.data.vertices), unweighted, tris(body)))
