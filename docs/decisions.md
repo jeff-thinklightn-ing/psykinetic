@@ -22087,7 +22087,7 @@ coordinator: designed once, for every boss.
   Main.telegraphs and emits telegraph_started / telegraph_ended for ui's
   decal (drawn from "cells", ui's side) and sound's cues. "kind" names the
   move: "spin", "throw", "charge" for the draugr (603).
-- Wire: a new message kind, PROTOCOL_REVISION 32.
+- Wire: a new message kind, under PROTOCOL_REVISION 31 (it rides v0.1.165).
 
 combat_test: the cone's 16 cells and its gap behind, a line straight and
 slanting, a ring, a shape that does not read; walls clip a line and keep a
@@ -22153,7 +22153,7 @@ levels/combat.json "moves".
   His row also needs "swing_stamina": true and a max_stamina, enemy-ai's.
 - The axe's flight for the views is physics' hurled (606). The telegraphs
   are ui's decal; the cues are sound's; the clips are pc-character's.
-- No wire of its own beyond 602's and 606's (revision 32).
+- No wire of its own beyond 602's and 606's (under revision 31).
 
 combat_test: the spin's cone (ahead and beside struck, behind spared),
 thrown and knocked down, spent and winded, no second spin winded; a bash
