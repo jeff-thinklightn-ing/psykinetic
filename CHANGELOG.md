@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- An animal, a townsperson or a companion standing on a way to another place (the castle's road out of the wilds, a barrow's door) no longer bars it: you go through anyway when you step at it, and they no longer stop or drop things there (571).
 - The white water and falls sound just past the hills' bridge are gone: a bridge's deck was being read as a step in the stream (557 amended (2)). Real falls come with the hills' new waterfall.
 - Herbs now grow near the medicine man's hut, from the game day after the server update, so he gathers his own and makes remedies even when nobody brings him herbs (562 amended).
 - A maker's Barter (a smith, cook, carpenter, tanner, fletcher, weaver or the medicine man) opens their own goods in person, "Oda's goods", and buys their trade's materials from their own purse; the merchant's Barter and the counter's E keep the town's shop. An empty shelf reads "nothing to trade" (562, ui's side; the goods and prices are economy's).

@@ -115,6 +115,9 @@ signal entity_bumped(mover: GridEntity, occupant: GridEntity, direction: Vector2
 ## Server: a move by [param entity] that failed because the cell ahead is
 ## no floor (a wall's far side, void, off the map): an edge link's trigger.
 signal walked_off(entity: GridEntity, direction: Vector2i)
+## A player's step onto a level link's cell refused (someone stood on it):
+## Main takes the link all the same (decision 571).
+signal link_bumped(entity: GridEntity, at: Vector2i)
 ## An attack or a swing at air: [param direction] is where it went.
 signal entity_swung(entity: GridEntity, direction: Vector2i)
 
@@ -891,6 +894,7 @@ func _step_zone() -> void:
 	# mid-tick leaves this one as it was.
 	var near := _tier_origins()
 	_take_roster()
+	_clear_links()
 	t = part("tiers, roster", t)
 	for entity in _actors:
 		# Not its turn by the tier it has, and that tier not due to be
@@ -3981,7 +3985,9 @@ func _ground_room(cell: Vector2i) -> Vector2i:
 				if maxi(absi(dx), absi(dy)) != radius:
 					continue
 				var each := cell + Vector2i(dx, dy)
-				if is_walkable(each) and not is_water(each) and zone.ground.get(each, PackedInt32Array()).size() < GROUND_PER_CELL:
+				# Nothing put down on a level link's cell (decision 571).
+				if is_walkable(each) and not is_water(each) and not is_link_cell(each) \
+						and zone.ground.get(each, PackedInt32Array()).size() < GROUND_PER_CELL:
 					return each
 	return NO_CELL
 
@@ -4187,6 +4193,10 @@ func try_move(entity: GridEntity, direction: Vector2i) -> bool:
 		return false
 	if _meets_brace(entity, entity.tile + direction, direction):
 		return false
+	# A level link's cell is a player's way out alone (decision 571): no
+	# other body steps onto one.
+	if not entity is Player and is_link_cell(entity.tile + direction):
+		return false
 	var duration := step_ticks(entity, direction)
 	# A walk in progress keeps its own clock: a step due at 12.5 and taken
 	# on tick 13 starts at 12.5, so the next is due at 15, not 15.5.
@@ -4200,6 +4210,11 @@ func try_move(entity: GridEntity, direction: Vector2i) -> bool:
 			entity_bumped.emit(entity, ahead, direction)
 		elif not is_walkable(entity.tile + direction):
 			walked_off.emit(entity, direction)
+		# Someone on a link's cell does not shut the way: a player who
+		# steps at it takes the link all the same (decision 571).
+		if entity is Player and is_link_cell(entity.tile + direction) \
+				and not _terrain_blocks_step(entity.tile, direction, true):
+			link_bumped.emit(entity, entity.tile + direction)
 		return false
 	entity.next_move_tick = start + duration
 	entity.last_step_tick = tick  # (A braced spear stands still: braced.)
@@ -4211,6 +4226,25 @@ func try_move(entity: GridEntity, direction: Vector2i) -> bool:
 	if entity is Player or entity is Companion:
 		noise(entity.tile, Senses.step_radius(entity), &"step", entity)
 	return true
+
+
+## Whether [param at] is one of this zone's level links' cells (Fields
+## link_cells, decision 571).
+func is_link_cell(at: Vector2i) -> bool:
+	return fields.link_cells.has(at)
+
+
+## Each body but a player that finds itself on a level link's cell (spawned
+## or saved there, pushed on) steps off it, the first free way (decision
+## 571), when its step's timer lets it; a link's cell is a player's way out.
+func _clear_links() -> void:
+	for at: Vector2i in fields.link_cells:
+		var on: GridEntity = _occupancy.get(at)
+		if on == null or on is Player or not on.spawned or tick < on.next_move_tick:
+			continue
+		for direction: Vector2i in DIRECTIONS:
+			if try_move(on, direction):
+				break
 
 
 ## A swing at nothing: the attack's cooldown, facing and lunge, with no

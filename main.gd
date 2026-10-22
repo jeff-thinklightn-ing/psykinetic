@@ -826,6 +826,7 @@ func _go_online() -> void:
 		if Net.mode == Net.Mode.SERVER:
 			World.entity_moved.connect(_log_player_move)
 		World.entity_moved.connect(_on_entity_moved)
+		World.link_bumped.connect(_on_link_bumped)
 		World.walked_off.connect(_on_walked_off)
 		var drawn := map_name
 		_boot()
@@ -3002,6 +3003,20 @@ func load_map(level_name: String) -> bool:
 func _on_entity_moved(entity: GridEntity, _from: Vector2i, to: Vector2i) -> void:
 	if not entity is Player:
 		return
+	_take_link(entity, to)
+
+
+## Server: a player whose step onto a level link's cell was refused (a body
+## stood on it) takes the link all the same (decision 571): a body there
+## never shuts the way.
+func _on_link_bumped(entity: GridEntity, at: Vector2i) -> void:
+	if entity is Player:
+		_take_link(entity, at)
+
+
+## [param entity] (a player) at level link [param to] goes through it, or is
+## told it is closed or sealed; off any link, told again next time.
+func _take_link(entity: GridEntity, to: Vector2i) -> void:
 	for link: Dictionary in level.get("links", []):
 		if link["tile"] == to and link.get("closed", false):
 			# Shown, not travelled yet (decision 463): said once a stand.

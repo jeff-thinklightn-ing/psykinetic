@@ -69,6 +69,9 @@ var _roofed_whole: Dictionary[Vector2i, bool] = {}
 var level := ""
 var roofs: Array[Rect2i] = []
 var town_buildings: Array[Dictionary] = []
+## Its level links' cells (terrain "links_at", decision 571): no body but a
+## player stands on one, nothing is put down on one. {cell: true}.
+var link_cells: Dictionary[Vector2i, bool] = {}
 ## The wall edges on an open-air building's outline (Level.OPEN_AIR,
 ## decision 452): a fence, which sight crosses (World.edge_blocks_sight).
 var fences: Dictionary[Vector3i, bool] = {}
@@ -144,6 +147,9 @@ func load(terrain: Dictionary) -> void:
 	level = str(terrain.get("level", ""))
 	roofs.clear()
 	town_buildings.clear()
+	link_cells.clear()
+	for cell: Vector2i in terrain.get("links_at", []):
+		link_cells[cell] = true
 	for roof: Dictionary in terrain.get("roofs", []):
 		roofs.append(roof["rect"])
 	for building: Dictionary in terrain.get("buildings", []) + terrain.get("roofs", []):

@@ -291,7 +291,8 @@ func _test_piles() -> void:
 	print("\n== what lies on the ground is drawn: each thing's art slot in a ring; gone when taken ==")
 	var cell := Vector2i(-1, -1)
 	for each: Vector2i in _main._terrain["floor"]:
-		if World.is_walkable(each) and not World.is_water(each):
+		# Not a link's cell: nothing is put down on one (571).
+		if World.is_walkable(each) and not World.is_water(each) and not World.is_link_cell(each):
 			cell = each
 			break
 	var kit := World.items.mint("bandaging_kit", "built")

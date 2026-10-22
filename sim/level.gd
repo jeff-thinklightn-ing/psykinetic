@@ -818,6 +818,8 @@ static func _place(level: Dictionary, markers: Array[Dictionary], config: Dictio
 	level["starts"] = starts
 	level["spawn_points"] = spawn_points
 	level["links"] = links
+	# Where they are, for the terrain's readers (World keeps them clear, 571).
+	level["terrain"]["links_at"] = links.map(func(link: Dictionary) -> Vector2i: return link["tile"])
 	level["centre"] = centre if centre != null else starts[0] if not starts.is_empty() else Vector2i.ZERO
 	level["display_name"] = str(config.get("name", ""))
 

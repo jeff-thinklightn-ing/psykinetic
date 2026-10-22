@@ -44,6 +44,7 @@ func _ready() -> void:
 	_test_town_walls()
 	_test_roofs()
 	await _test_level_links()
+	await _test_links_kept_clear()
 	await _test_sealed_link()
 	_test_barrow_level()
 	await _test_edge_links()
@@ -821,6 +822,45 @@ func _test_level_links() -> void:
 	_check(arrived != null and arrived.tile == Vector2i(2, 2), "and Player arrives at its spawn point gate, (2, 2) (%s)" % [arrived.tile if arrived else "none"])
 	_check(World.zones.has("test_link_a") and arrived != null and arrived.zone == "test_link_b",
 		"in the zone test_link_b; test_link_a stays loaded")
+
+
+## A level link's cell is a player's way out alone (decision 571): no other
+## body steps onto it, one put there steps off, nothing is put down on it,
+## and a player stepping at it while a body stands there takes the link.
+func _test_links_kept_clear() -> void:
+	print("
+== links kept clear (571): a body on a link's cell never shuts the way ==")
+	_main.load_map("test_link_a")
+	var link := Vector2i(4, 1)
+	_check(World.is_link_cell(link) and not World.is_link_cell(Vector2i(3, 1)), "the link's cell is known as one")
+	var body := Resident.new()
+	body.name = "Tam"
+	_check(World.spawn(body, Vector2i(3, 1)), "(a resident beside the link)")
+	_wait_for_step(body)
+	_check(not World.try_move(body, Vector2i(1, 0)) and body.tile == Vector2i(3, 1), "a resident does not step onto the link's cell")
+	World._relocate(body, link)
+	for i in 20:
+		World.step()
+		if body.tile != link:
+			break
+	_check(body.tile != link, "one put on it steps off it (%s)" % [body.tile])
+	var player := _player()
+	_put(player, Vector2i(2, 1))
+	World._relocate(body, link)
+	_put(player, Vector2i(3, 1))
+	_wait_for_step(player)
+	World.try_move(player, Vector2i(1, 0))
+	await get_tree().process_frame
+	await get_tree().process_frame
+	_check(_main.map_name == "test_link_b", "a player stepping at it with a body on it takes the link (%s)" % _main.map_name)
+	_main.load_map("test_link_a")
+	var uid := World.items.mint("bandaging_kit", "made")
+	var landed := World.put_on_ground(uid, link)
+	_check(landed != link and landed != World.NO_CELL, "nothing is put down on the link's cell (%s)" % [landed])
+	if is_instance_valid(body):
+		if body.spawned:
+			World.despawn(body)
+		body.free()
 
 
 func _test_sealed_link() -> void:

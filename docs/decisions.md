@@ -19865,3 +19865,41 @@ past every bridge "dropped" from the deck to its bed: hills (42, 79)
 view_test _test_relief: no fall past the hills' bridge; the hills with
 the land past the stream's middle lowered 0.6 m give a fall at that cell,
 white on the water. Client only, protocol unchanged, no new class_name.
+## 571. A level link's cell is kept clear, and a body on it never shuts the way
+
+Jeff, on the box: "i cant get into the castle zone from wilds". The link at
+(128, 20) was sound in the level (floor, free, no edges; a step onto it took
+the castle, checked on a local world with v0.1.162's files and main's). His
+walks there all ended a cell short from several sides: a player's move order
+paths to its target even when someone stands on it, and when its last step
+is refused the walk gives up ("the contest is decided"). The journal named
+nothing on (128, 20), but herd bodies and residents don't log their steps.
+A body resting on a link's cell shut the zone to players.
+
+**Kept clear** (World, so every kind of body is covered: herds, strays,
+residents, companions at heel, monsters):
+- Level puts the links' cells in terrain "links_at"; Fields keeps them as
+  link_cells; World.is_link_cell(at);
+- try_move refuses any body but a player a step onto a link's cell;
+- each zone tick, a body but a player on a link's cell (spawned or saved
+  there, pushed on) steps off it the first free way when its step's timer
+  lets it (World._clear_links);
+- nothing is put down on one (_ground_room passes it over).
+A link mid-corridor would now be a cell no monster passes; links stand at
+ways out (edges, doors, a mound's door), where none needs to.
+
+**A body on it never shuts the way**: when a player's step onto a link's
+cell is refused (someone there, the terrain not blocking), World emits
+link_bumped and Main takes the link as for a step onto it (Main._take_link,
+which _on_entity_moved now calls too): closed and sealed links answer as
+before. A click (a move order, walked by the server) and a WASD step (sent to
+the server whatever the client predicts) both reach it, so today's clients
+take it without a change.
+
+Server rules; the protocol is unchanged (clients do not predict other
+bodies, and a player's step is the server's to take). It ships with the next
+cut (the box runs 28, main 29).
+
+tests/level_test: a link's cell known as one; a resident does not step onto
+it; one put on it steps off; a player stepping at it while a body stands
+there takes the link; nothing is put down on it.
