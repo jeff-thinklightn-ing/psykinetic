@@ -125,6 +125,71 @@
 					"ask": "B3"
 				}
 			]
+		},
+		{
+			"id": "old_gods",
+			"type": "world",
+			"name": "the old gods",
+			"status": "agreed",
+			"source": "Jeff",
+			"summary": "The forgotten gods of war who give the barrow's draugr his power and send the fallen back to battle; angered by the robbers, appeased by gold that returns what was stolen; known to Aldous and the draugr, not to the temple's goers (Jeff, 2026-10-22; docs/lore/crypt.md).",
+			"relations": [
+				{
+					"to": "crypt",
+					"kind": "in"
+				}
+			],
+			"tags": [
+				"history",
+				"return"
+			],
+			"facts": [
+				{
+					"id": "old_gods.war",
+					"text": "The old gods are forgotten gods of war; through the draugr they bless, and they raise the fallen to send them back to battle.",
+					"known": "secret",
+					"where": [],
+					"knowers": [
+						"priest",
+						"draugr"
+					],
+					"tags": [
+						"return"
+					],
+					"source": "Jeff",
+					"status": "agreed"
+				},
+				{
+					"id": "old_gods.gold",
+					"text": "Robbers who pilfer the barrow anger the old gods; gold offerings appease them, because they return what was stolen.",
+					"known": "secret",
+					"where": [],
+					"knowers": [
+						"priest",
+						"draugr"
+					],
+					"tags": [
+						"return"
+					],
+					"source": "Jeff",
+					"status": "agreed"
+				},
+				{
+					"id": "old_gods.temple",
+					"text": "The temple's goers do not know their gifts go to the old gods.",
+					"known": "secret",
+					"where": [],
+					"knowers": [
+						"priest",
+						"draugr"
+					],
+					"tags": [
+						"return"
+					],
+					"source": "Jeff",
+					"status": "agreed"
+				}
+			]
 		}
 	]
 }

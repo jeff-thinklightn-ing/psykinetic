@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Aldous and the draugr know the old gods: forgotten gods of war who send the fallen back to battle, angered by grave robbers and appeased by gold that returns what was stolen.
 - Townsfolk know the Barrow of the Fallen's layers: the wealthy's newer dead on top, the Ossuary below, a damp, dark third layer, and the draugr's Hall of Fallen Souls. Grave robbers, not the town's founders, plundered it.
 - A player who dies where a priest or medicine man is about is brought back at once, "brought back from near death", instead of after a minute's wait; the server can now tell everyone when all have fallen and how long until they all come back (587, economy's side).
 - Snagfin is now the only one who buys grave goods, and only at night at half the town's price; by day he refuses them and his own goods cost more, and every other counter, maker and the store won't take grave goods at all (586).

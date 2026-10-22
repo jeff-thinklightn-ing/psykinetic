@@ -306,6 +306,31 @@ not the town's people's, and the old dead are on the second and third layers.
 | Ghostly warriors fill the hall, promised an eternal feast and battle. | rumour, true, town |
 | The town's first folk moved the old dead down, the oldest as far as they dared. | secret: Aldous |
 
+## The old gods (Jeff, 2026-10-22)
+
+Jeff's answer to who the old gods' anger falls on now the plunder is the robbers', his
+words relayed by the coordinator. It supersedes "This angered the old gods, who sent the
+draugr" above.
+
+- **[Jeff]** "the old gods are what grants the draugr his power, his ability to grant you
+  the old gods blessings... people forgot how to worship the old gods, they are gods of
+  war, and they will use their power to send the dead back into battle, thats why they
+  give you the power of resurrection, they are angered by the cowardly robbers who just
+  pilfer.. they are appeased by gold offers because it returns whats stolen. the town
+  cleric Aldous has knowledge of this and keeps the town safe... his temple goers don't
+  know they are donating to the old gods."
+
+| Fact | Known |
+|---|---|
+| The old gods are forgotten gods of war; through the draugr they bless, and they raise the fallen to send them back to battle. | secret: Aldous, the draugr |
+| Robbers who pilfer the barrow anger the old gods; gold offerings appease them, because they return what was stolen. | secret: Aldous, the draugr |
+| The temple's goers do not know their gifts go to the old gods. | secret: Aldous, the draugr |
+
+Three facts, not six: Aldous's lore budget (600 characters) must still hold his barrow
+secrets beside them.
+
+The temple's goers do not know any of it; a player learns it below, from the draugr.
+
 ---
 
 ## Log
@@ -354,3 +379,4 @@ not the town's people's, and the old dead are on the second and third layers.
 - 2026-10-21, cont.: warriors' spears planted around the mound like spikes (Jeff).
 - 2026-10-22: the layers: the newer (wealthy) dead on top, the Ossuary, the damp, dark
   third layer, the Hall of Fallen Souls; the plunder is the grave robbers' (Jeff).
+- 2026-10-22, cont.: the old gods are war gods who power the draugr and send the dead back to battle; angered by the robbers, appeased by gold (Jeff).
