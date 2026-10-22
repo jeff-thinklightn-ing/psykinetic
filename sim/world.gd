@@ -363,6 +363,14 @@ var recover_at := 25
 var winded_move_scale := 1.5
 var winded_blow_scale := 0.5
 var winded_regen_delay := 20
+## A boss's moves (decision 603), by name: "spin", "throw", "charge", each a
+## Dictionary of its numbers (levels/combat.json's "moves"; drafts for Jeff).
+var moves := {
+	"spin": {"windup": 15, "length": 2.0, "half_angle": 150.0, "fists_length": 1.0, "damage_scale": 2.5,
+		"down_ticks": 15, "needs": 90, "leaves": 10, "weight_impulse": 20.0, "impulse_scale": 0.84},
+	"throw": {"windup": 12, "length": 8.0, "width": 1, "damage_scale": 2.0, "cost": 40, "speed": 14.0},
+	"charge": {"roar": 6, "cells": 12},
+}
 @export var shove_scale := 0.1
 ## A pushed body slides this many cells per unit of speed, at most
 ## max_travel (a sanity limit: bodies under about 16 kg are all flattened
@@ -1015,6 +1023,7 @@ func _step_zone() -> void:
 	t = Time.get_ticks_usec()
 	# 2. Hits (attacks and shoves) queued during the act phase.
 	_tend_wind_ups()  # Wound-up blows struck when due (decision 392).
+	_tend_boss_moves()  # A boss's spin, throw and charge (decision 603).
 	_resolve_hits()
 	t = part("hits", t)
 	# 3. Hazard tiles; what ails (burning, bleeding; decision 375).
@@ -3487,6 +3496,13 @@ func load_combat_rules(text: String) -> void:
 		return
 	for key: String in data:
 		var given: Variant = data[key]
+		if key == "moves" and given is Dictionary:
+			for move: String in given:
+				if given[move] is Dictionary and moves.has(move):
+					moves[move].merge(given[move], true)  # Decision 603.
+				else:
+					push_warning("World: %s's moves.%s is not a move" % [COMBAT_RULES, move])
+			continue
 		if not key in ["swing_base", "swing_per_kg", "ref_mass", "whiff_scale", "recover_at", "winded_move_scale",
 				"winded_blow_scale", "winded_regen_delay"]:
 			push_warning("World: %s's %s is not a combat rule" % [COMBAT_RULES, key])
@@ -3604,6 +3620,379 @@ func _clear_between(from: Vector2i, to: Vector2i) -> bool:
 		if at != to and not (is_walkable(at) or is_water(at)):
 			return false
 	return true
+
+
+## A boss's move under way (decision 603): entity -> {move: "spin" | "throw"
+## | "charge", telegraph: id, lands: tick, ...}.
+var _boss_moves: Dictionary[GridEntity, Dictionary] = {}
+## A boss's thrown weapon (decision 603): entity -> {uid, cell, disarmed}.
+var _axes: Dictionary[GridEntity, Dictionary] = {}
+
+
+## [param by] winds up its spin (decision 603; the draugr's, Jeff's
+## "telegraphed wind up spin that he stands still, winds up for 1.5
+## seconds"): it stands, a cone telegraph round it (moves.spin: length,
+## half_angle either side of its facing, a gap behind), and windup ticks on
+## every body in the cone's cells takes damage_scale times its blow, its
+## guard broken, pushed outward by its weapon (apply_blow at
+## swing_impulse) and knocked down; then it is spent: its stamina at
+## leaves (a percentage), winded. A stun or a knockdown before then gives it
+## up. Needs stamina at least needs, not winded; disarmed, the sweep is its
+## fists' (fists_length). False, nothing begun, if it cannot.
+func try_spin(by: GridEntity) -> bool:
+	var move: Dictionary = moves["spin"]
+	if not _boss_can_begin(by) or by.stamina < int(move["needs"]):
+		return false
+	var shape := _spin_shape(by)
+	var id := telegraph(by, "spin", shape, int(move["windup"]))
+	_boss_moves[by] = {"move": "spin", "telegraph": id, "lands": tick + int(move["windup"]), "shape": shape, "from": by.tile}
+	by._world_winding(by.facing, int(move["windup"]))
+	by._world_note_exertion(tick)
+	_log("spin: %s winds up, %d ticks" % [by.name, int(move["windup"])])
+	return true
+
+
+## The bodies [param by]'s spin would strike now (decision 603): any body in
+## its cone's cells, whoever it is.
+func spin_targets(by: GridEntity) -> Array[GridEntity]:
+	return _bodies_in(by, telegraph_cells(_spin_shape(by)))
+
+
+func _spin_shape(by: GridEntity) -> Dictionary:
+	var move: Dictionary = moves["spin"]
+	var facing := Vector2(by.facing) if by.facing != Vector2i.ZERO else Vector2(1, 0)
+	var length := float(move["fists_length"]) if _axe_slot(by) < 0 else float(move["length"])
+	return Telegraph.cone(by.tile, facing, length, float(move["half_angle"]))
+
+
+## [param by] winds up the overhead throw of its two-handed weapon at
+## [param at] (decision 603; Jeff's "he winds up and throws it, you can tell
+## the direction ... by a longer narrow cone"): a line telegraph from it
+## toward [param at], fixed now (moves.throw: length, width); windup ticks
+## on, the weapon flies down it: the first body on the line takes
+## damage_scale times its blow and is launched; the weapon lies in the cell
+## before that body, else at the line's end. Costs cost. False, nothing
+## begun, if it cannot (winded, short of stamina, nothing two-handed in
+## hand, no line).
+func try_axe_throw(by: GridEntity, at: Vector2i) -> bool:
+	var move: Dictionary = moves["throw"]
+	if not _boss_can_begin(by) or by.stamina < int(move["cost"]) or _axe_slot(by) < 0 or at == by.tile:
+		return false
+	var shape := _throw_shape(by, at)
+	if telegraph_cells(shape).is_empty():
+		return false
+	by.stamina = maxi(0, by.stamina - int(move["cost"]))
+	by._world_set_facing(Vector2i(signi(at.x - by.tile.x), signi(at.y - by.tile.y)))
+	var id := telegraph(by, "throw", shape, int(move["windup"]))
+	_boss_moves[by] = {"move": "throw", "telegraph": id, "lands": tick + int(move["windup"]), "shape": shape, "from": by.tile}
+	by._world_winding(by.facing, int(move["windup"]))
+	by._world_note_exertion(tick)
+	_log("throw: %s winds up at %s" % [by.name, at])
+	return true
+
+
+func _throw_shape(by: GridEntity, at: Vector2i) -> Dictionary:
+	var move: Dictionary = moves["throw"]
+	return Telegraph.line(by.tile, Vector2(at - by.tile).normalized(), float(move["length"]), int(move["width"]))
+
+
+## The first body on [param by]'s throw toward [param at] (decision 603),
+## or null.
+func axe_line_hit(by: GridEntity, at: Vector2i) -> GridEntity:
+	if at == by.tile:
+		return null
+	for cell in telegraph_cells(_throw_shape(by, at)):
+		var body: GridEntity = _occupancy.get(cell)
+		if body != null and body != by and body.spawned:
+			return body
+	return null
+
+
+## [param by] charges to its thrown weapon to take it up (decision 603;
+## Jeff's "after he throws the axe he uses charges to the axe to pick it
+## up, if you are able to interrupt the charge he is disarmed"): a line
+## telegraph to the weapon's cell for moves.charge's roar ticks, then a rush
+## along it (physics' rush, decision 604, when it is in; else a cell a tick
+## here). Reaching the cell with the weapon there, it takes it up; stopped
+## short (a blow, a body, a brace, a wall, a stun) or the weapon gone from
+## its cell, it is disarmed (is_disarmed). False, nothing begun, if it
+## cannot (no weapon lying, disarmed).
+func try_axe_charge(by: GridEntity) -> bool:
+	var axe: Dictionary = _axes.get(by, {})
+	if axe.is_empty() or bool(axe.get("disarmed", false)) or not _boss_can_begin(by, true):
+		return false
+	var cell: Vector2i = axe["cell"]
+	if cell == by.tile:
+		_take_axe(by)
+		return true
+	var move: Dictionary = moves["charge"]
+	var shape := Telegraph.line(by.tile, Vector2(cell - by.tile).normalized(), Vector2(cell - by.tile).length())
+	var id := telegraph(by, "charge", shape, int(move["roar"]))
+	_boss_moves[by] = {"move": "charge", "telegraph": id, "lands": tick + int(move["roar"]), "to": cell, "steps": 0,
+		"rushing": false}
+	by._world_note_exertion(tick)
+	_log("charge: %s roars, toward its weapon at %s" % [by.name, cell])
+	return true
+
+
+## Where [param by]'s weapon is (decision 603): {where: "hand" (two-handed,
+## in its hands), "ground" (thrown, lying at cell), "gone" (taken from where
+## it lay, or never had), cell, uid}.
+func axe_state(by: GridEntity) -> Dictionary:
+	var slot := _axe_slot(by)
+	if slot >= 0:
+		return {"where": "hand", "cell": by.tile, "uid": slot_uid(by, slot)}
+	var axe: Dictionary = _axes.get(by, {})
+	if axe.is_empty():
+		return {"where": "gone", "cell": NO_CELL, "uid": 0}
+	var cell: Vector2i = axe["cell"]
+	var there := ground_uids(cell).has(int(axe["uid"]))
+	return {"where": "ground" if there else "gone", "cell": cell, "uid": int(axe["uid"])}
+
+
+## Whether [param by]'s charge to its weapon was stopped (decision 603): it
+## fights without it.
+func is_disarmed(by: GridEntity) -> bool:
+	return bool(_axes.get(by, {}).get("disarmed", false))
+
+
+## Whether [param by] is in the middle of something (decision 603): a move
+## winding up, a charge under way, a heavy wind-up (392), stunned or lying.
+func boss_busy(by: GridEntity) -> bool:
+	return _boss_moves.has(by) or not by.wind_up.is_empty() or is_stunned(by) or is_down(by)
+
+
+## Whether [param by] may begin a move now: alive, not mid-move, stunned,
+## lying, or winded ([param winded_ok]: the charge, which costs nothing).
+func _boss_can_begin(by: GridEntity, winded_ok := false) -> bool:
+	if not Net.is_authority() or not _alive(by) or _boss_moves.has(by) or not by.wind_up.is_empty():
+		return false
+	if is_stunned(by) or is_down(by) or (by.winded and not winded_ok):
+		return false
+	return tick >= by.next_move_tick
+
+
+## The hand [param by]'s two-handed weapon is in, -1 for none.
+func _axe_slot(by: GridEntity) -> int:
+	if not holds_in_hands(by):
+		return -1
+	for slot in [Items.RIGHT_HAND, Items.LEFT_HAND]:
+		var id := by.slots[slot]
+		if not id.is_empty() and int(Items.def(id).get("hands", 1)) == 2:
+			return slot
+	return -1
+
+
+## The bodies standing on [param cells], [param by] not among them.
+func _bodies_in(by: GridEntity, cells: Array[Vector2i]) -> Array[GridEntity]:
+	var out: Array[GridEntity] = []
+	for cell in cells:
+		var body: GridEntity = _occupancy.get(cell)
+		if body != null and body != by and _alive(body):
+			out.append(body)
+	return out
+
+
+## Each tick, each move under way (decision 603): given up if its maker was
+## stunned, knocked down or moved off its cell while winding up; struck when
+## due; a charge tended.
+func _tend_boss_moves() -> void:
+	for by: GridEntity in _boss_moves.keys():
+		if not _alive(by):
+			_boss_moves.erase(by)
+			continue
+		var job: Dictionary = _boss_moves[by]
+		if str(job["move"]) == "charge":
+			_tend_charge(by, job)
+			continue
+		if is_stunned(by) or is_down(by) or by.tile != job["from"]:
+			_boss_moves.erase(by)
+			end_telegraph(int(job["telegraph"]), false)
+			by._world_winding(by.facing, 0)
+			_log("%s: %s gives it up" % [job["move"], by.name])
+			continue
+		if tick < int(job["lands"]):
+			continue
+		_boss_moves.erase(by)
+		end_telegraph(int(job["telegraph"]), true)
+		if str(job["move"]) == "spin":
+			_spin_lands(by, job["shape"])
+		else:
+			_throw_lands(by, job["shape"])
+
+
+## The spin's sweep (decision 603): every body in its cells struck, guard
+## broken, pushed outward and knocked down; then its maker spent.
+func _spin_lands(by: GridEntity, shape: Dictionary) -> void:
+	var move: Dictionary = moves["spin"]
+	var slot := _axe_slot(by)
+	var id := by.slots[slot] if slot >= 0 else ""
+	var impulse := blow_impulse(by, blow_verb(by)) + (Items.weight_of(id) if not id.is_empty() else 0.0) * float(move["weight_impulse"])
+	if has_method("swing_impulse") and not id.is_empty():
+		impulse = float(call("swing_impulse", by, id))  # Physics' (605), when it is in.
+	impulse *= float(move.get("impulse_scale", 1.0))  # Jeff's knob (a wall's impact grows with its square).
+	var struck := 0
+	for body in _bodies_in(by, telegraph_cells(shape)):
+		if not can_target(by, body):
+			continue
+		var amount := maxi(1, roundi(by.attack_damage * float(move["damage_scale"])))
+		var met: Variant = _meet_guard(body, by, amount, 99.0, false, true)
+		if met != null:
+			amount = met[0]
+		damage(body, amount, by, &"attack")
+		if _alive(body):
+			apply_blow(by, body, {"impulse": impulse, "direction": Vector2(body.tile - by.tile)})
+		if _alive(body):
+			knock_down(body, by, int(move["down_ticks"]))
+		struck += 1
+	by.stamina = mini(by.stamina, roundi(by.max_stamina * float(move["leaves"]) / 100.0))
+	by.winded = by.max_stamina > 0
+	by._world_note_exertion(tick)
+	by._world_swung(by.facing)
+	entity_swung.emit(by, by.facing)
+	noise(by.tile, Senses.NOISE_FIGHT, &"fight", by)
+	_log("spin: %s sweeps, %d struck; spent at %d" % [by.name, struck, by.stamina])
+
+
+## The throw's flight (decision 603): down the line's cells, the first body
+## struck and launched (physics' launch, 598, when it is in), the weapon
+## lying in the cell before it or at the line's end.
+func _throw_lands(by: GridEntity, shape: Dictionary) -> void:
+	var move: Dictionary = moves["throw"]
+	var slot := _axe_slot(by)
+	if slot < 0:
+		return
+	if has_method("hurl"):
+		_hurl_lands(by, slot, shape)  # Physics' (606), when it is in.
+		return
+	var hit: GridEntity = null
+	var rest := by.tile
+	for cell in telegraph_cells(shape):
+		var body: GridEntity = _occupancy.get(cell)
+		if body != null and body != by and _alive(body):
+			hit = body
+			break
+		rest = cell
+	var weight := Items.weight_of(by.slots[slot])
+	var uid := slot_uid(by, slot)
+	if uid == 0:
+		return
+	_hand_set(by, slot, 0)
+	var lay := put_on_ground(uid, rest, by.tile)
+	_axes[by] = {"uid": uid, "cell": lay if lay != NO_CELL else rest, "disarmed": false}
+	by._world_shot(rest if hit == null else hit.tile)
+	noise(by.tile, Senses.NOISE_FIGHT, &"fight", by)
+	if hit != null and can_target(by, hit):
+		damage(hit, maxi(1, roundi(by.attack_damage * float(move["damage_scale"]))), by, &"attack")
+		if _alive(hit):
+			var impulse := weight * float(move["speed"])
+			if has_method("launch"):
+				call("launch", by, hit, Vector2(hit.tile - by.tile), impulse)
+			else:
+				apply_blow(by, hit, {"impulse": impulse, "direction": Vector2(hit.tile - by.tile)})
+	_log("throw: %s throws, %s; it lies at %s" % [by.name, hit.name if hit != null else "nothing hit", _axes[by]["cell"]])
+
+
+## The throw by physics' hurl (606): it flies the weapon down the line and
+## launches the first body; the damage is this side's, the weapon lies where
+## hurl says.
+func _hurl_lands(by: GridEntity, slot: int, shape: Dictionary) -> void:
+	var move: Dictionary = moves["throw"]
+	var uid := slot_uid(by, slot)
+	var result: Dictionary = call("hurl", by, slot, Telegraph.facing_of(shape), int(float(move["length"])), float(move["speed"]))
+	var hit: Variant = result.get("hit")
+	if hit is GridEntity and _alive(hit) and can_target(by, hit):
+		damage(hit, maxi(1, roundi(by.attack_damage * float(move["damage_scale"]))), by, &"attack")
+	var landed: Variant = result.get("landed")
+	if landed is Vector2i and uid != 0:
+		_axes[by] = {"uid": uid, "cell": landed, "disarmed": false}
+	noise(by.tile, Senses.NOISE_FIGHT, &"fight", by)
+	_log("throw: %s hurls, %s; it lies at %s" % [by.name, (hit as GridEntity).name if hit is GridEntity else "nothing hit", landed])
+
+
+## A charge under way (decision 603): the roar, then the rush; physics'
+## (604) tells its end by rush_ended, else a cell a tick here: a refused
+## step ends it ("body", "wall"), as a stun does.
+func _tend_charge(by: GridEntity, job: Dictionary) -> void:
+	if bool(job["rushing"]):
+		return  # Physics' rush is under way; _on_rush_ended ends it.
+	if is_stunned(by) or is_down(by):
+		_charge_over(by, job, "stunned")
+		return
+	if tick < int(job["lands"]):
+		return
+	if _telegraphs.has(int(job["telegraph"])):
+		end_telegraph(int(job["telegraph"]), true)
+	var to: Vector2i = job["to"]
+	if axe_state(by)["where"] != "ground":
+		_charge_over(by, job, "gone")
+		return
+	if by.tile == to:
+		_charge_over(by, job, "arrived")
+		return
+	if has_method("rush"):
+		if not has_signal("rush_ended") or not is_connected("rush_ended", _on_rush_ended):
+			connect("rush_ended", _on_rush_ended)
+		job["rushing"] = bool(call("rush", by, Vector2(to - by.tile), distance(by.tile, to), {"through": true, "to": to}))
+		if not job["rushing"]:
+			_charge_over(by, job, "wall")
+		return
+	var step := (to - by.tile).clamp(Vector2i(-1, -1), Vector2i(1, 1))
+	by.next_move_tick = 0
+	if int(job["steps"]) >= int(moves["charge"]["cells"]) or not try_move(by, step):
+		_charge_over(by, job, "body" if _occupancy.has(by.tile + step) else "wall")
+		return
+	job["steps"] = int(job["steps"]) + 1
+	if by.tile == to:
+		_charge_over(by, job, "arrived")
+
+
+## Physics' rush over (604): a charge's end, by its reason.
+func _on_rush_ended(entity: GridEntity, reason: String, _at: Variant = null, _result: Variant = null) -> void:
+	if _boss_moves.has(entity) and str(_boss_moves[entity]["move"]) == "charge":
+		_charge_over(entity, _boss_moves[entity], reason)
+
+
+## A charge over (decision 603): [param reason] "arrived", it takes its
+## weapon up if it still lies there; anything else, disarmed.
+func _charge_over(by: GridEntity, job: Dictionary, reason: String) -> void:
+	_boss_moves.erase(by)
+	if _telegraphs.has(int(job["telegraph"])):
+		end_telegraph(int(job["telegraph"]), false)
+	if reason == "arrived" and by.tile == job["to"] and axe_state(by)["where"] == "ground":
+		_take_axe(by)
+		return
+	if _axes.has(by):
+		_axes[by]["disarmed"] = true
+	_log("charge: %s stopped (%s): disarmed" % [by.name, reason])
+
+
+## [param by] takes its weapon up from its cell into its hands.
+func _take_axe(by: GridEntity) -> void:
+	var axe: Dictionary = _axes.get(by, {})
+	if axe.is_empty():
+		return
+	var cell: Vector2i = axe["cell"]
+	var index := ground_uids(cell).find(int(axe["uid"]))
+	if index < 0:
+		return
+	var uid := take_from_ground(cell, index)
+	if uid != 0:
+		_hand_set(by, Items.RIGHT_HAND, uid)
+		_axes.erase(by)
+		_log("charge: %s takes its weapon up" % by.name)
+
+
+## [param by]'s hand [param slot] holds [param uid] (0: emptied), by
+## set_slots, as a monster's hands are filled (a monster takes nothing
+## through try_transfer's rules).
+func _hand_set(by: GridEntity, slot: int, uid: int) -> void:
+	var contents := by.slots.duplicate()
+	var uids := Array(by.slot_items)
+	uids.resize(contents.size())
+	contents[slot] = items.id_of(uid) if uid != 0 else ""
+	uids[slot] = uid
+	set_slots(by, contents, uids)
 
 
 ## Who last pushed each crate or cart, by entity, for the stockpile's
@@ -4550,6 +4939,8 @@ func despawn(entity: GridEntity) -> void:
 ## buff, mending, wind-up and downed lapse with it. A freed node read by
 ## these each tick crashed the release template (572).
 func _forget_jobs(entity: GridEntity) -> void:
+	_boss_moves.erase(entity)
+	_axes.erase(entity)
 	for id: int in _telegraphs.keys():
 		if _telegraphs[id]["source"] == entity:
 			end_telegraph(id, false)  # Its source gone: never lands (decision 602).
@@ -6221,7 +6612,7 @@ func _regen_stamina() -> void:
 			entity.winded = false
 		var delay := winded_regen_delay if entity.winded else stamina_regen_delay
 		if entity.max_stamina > 0 and entity.stamina < entity.max_stamina \
-				and tick - entity.last_exertion_tick() > delay:
+				and tick - entity.last_exertion_tick() > delay and tick % maxi(1, entity.stamina_regen_every) == 0:
 			entity.stamina = mini(entity.stamina + stamina_regen, entity.max_stamina)
 
 

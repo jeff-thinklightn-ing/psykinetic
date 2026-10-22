@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The draugr fights with his battle axe (603): a slow spin marked by a red cone that throws everyone in it down and leaves him winded, an overhead throw marked by a long line, then a charge to fetch the axe; stand in his way or knock him off course and he fights on with his fists.
 - Melee weapons to try: two chests beside the wilds town's chest hold a sword, a spear, a hammer, a shield, a giant axe, a dagger and a buckler.
 - A boss's heavy blow shows where it will land before it does: the cells it will hit glow on the ground, brightening as it comes, with a flash as it lands (602, ui's side; the draugr's spin and throw are combat's).
 - A held weapon can be thrown down a line (606), the motion behind the draugr's coming axe throw: it knocks back the first body it hits by weight and lands at their feet to be picked up again; its flight is sent to the views (a protocol change).

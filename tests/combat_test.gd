@@ -33,6 +33,9 @@ func _ready() -> void:
 	_test_telegraph_shapes()
 	_test_telegraph_ground()
 	_test_telegraph_lifecycle()
+	_test_spin()
+	_test_spin_broken()
+	_test_throw_and_charge()
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -285,3 +288,109 @@ func _check(ok: bool, label: String) -> void:
 	if not ok:
 		_failures += 1
 	print("  %s  %s" % ["PASS" if ok else "FAIL", label])
+
+
+## A boss for the moves (decision 603): the dummy made a 120 kg draugr's
+## like, a two-handed weapon (the giant axe till items' battle axe), 100
+## stamina it pays from, its blow 3.
+func _boss(dummy: GridEntity) -> void:
+	dummy.max_stamina = 100
+	dummy.stamina = 100
+	dummy.pays_swings = true
+	dummy.attack_damage = 3
+	dummy.strength = 6
+	dummy.facing = Vector2i(-1, 0)
+	dummy.slots = Items.tidy(["", "", "", "", "", ""], Items.CARRIED)  # Hands to hold it, as a kind's "wields".
+	World.set_slots(dummy, Items.tidy(["", "", "", "", "giant_axe", ""], Items.CARRIED))
+
+
+func _test_spin() -> void:
+	print("\n== the spin: 1.5 s standing, the cone struck, the gap behind spared, then spent (decision 603) ==")
+	var e := _build(["#########", "#...P...#", "#..PmP..#", "#.......#", "#########"])
+	var boss: GridEntity = e["m"][0]
+	_boss(boss)
+	var front: GridEntity = e["P"][1]  # (3,2), the way he faces.
+	var behind: GridEntity = e["P"][2]  # (5,2), straight behind.
+	var side: GridEntity = e["P"][0]  # (4,1), beside.
+	var hp := [front.hp, behind.hp, side.hp]
+	_check(World.spin_targets(boss).size() == 2 and front in World.spin_targets(boss) and behind not in World.spin_targets(boss),
+			"the cone holds the one ahead and the one beside, not the one behind")
+	_check(World.try_spin(boss) and World.boss_busy(boss) and World.telegraphs().size() == 1, "he winds up: busy, a telegraph shown")
+	_check(not World.try_spin(boss), "not twice at once")
+	for i in 14:
+		World.step()
+	_check(front.hp == hp[0], "nothing yet at 14 ticks")
+	World.step()
+	World.step()
+	_check(front.hp < hp[0] and side.hp < hp[1 + 1] and behind.hp == hp[1],
+			"at 15: ahead and beside struck (%d, %d), behind spared (%d)" % [front.hp, side.hp, behind.hp])
+	_check(World.is_down(front) and front.tile != Vector2i(3, 2), "the one ahead knocked down and thrown (%s)" % front.tile)
+	_check(side.spawned and side.hp > 0 and side.hp <= 5, "the one beside, swept into the wall from full: left at a sliver (%d)" % side.hp)
+	_check(boss.stamina <= 10 and World.is_winded(boss), "spent: %d stamina, winded" % boss.stamina)
+	_check(not World.try_spin(boss), "winded: no spin")
+	_check(World.telegraphs().is_empty(), "its telegraph over")
+
+
+func _test_spin_broken() -> void:
+	print("\n== a shield bash in the wind-up breaks the spin; a sword blow does not ==")
+	var e := _build(["#########", "#..PmP..#", "#########"])
+	var boss: GridEntity = e["m"][0]
+	_boss(boss)
+	var swordsman: GridEntity = e["P"][1]  # (5,1), behind him.
+	var bearer: GridEntity = e["P"][0]  # (3,1), ahead.
+	_give(swordsman, "sword")
+	World.put_item(bearer, bearer, Player.LEFT_HAND, World.items.mint("shield", "built"))
+	_check(World.try_spin(boss), "he winds up")
+	_blow(swordsman, boss)
+	World.step()
+	_check(World.boss_busy(boss) and World.telegraphs().size() == 1, "a sword blow: still winding up")
+	bearer.next_move_tick = 0
+	_check(World.try_bash(bearer, boss), "the bearer bashes him")
+	World._resolve_hits()
+	var hp := bearer.hp
+	for i in 20:
+		World.step()
+	_check(World.telegraphs().is_empty() and bearer.hp == hp and boss.stamina > 10,
+			"the spin given up: nobody struck, not spent (%d)" % boss.stamina)
+
+
+func _test_throw_and_charge() -> void:
+	print("\n== the throw down its line, the axe lying before the one struck; the charge stopped, then made ==")
+	var e := _build(["##############", "#P....m......#", "#............#", "##############"])
+	var boss: GridEntity = e["m"][0]
+	_boss(boss)
+	var target: GridEntity = e["P"][0]  # (1,1), five cells west.
+	_check(World.axe_line_hit(boss, target.tile) == target, "the line's first body: the target")
+	var hp := target.hp
+	_check(World.try_axe_throw(boss, target.tile) and boss.stamina == 60, "he winds up the throw: 40 stamina (%d)" % boss.stamina)
+	for i in 13:
+		World.step()
+	var axe := World.axe_state(boss)
+	_check(target.hp < hp and axe["where"] == "ground", "thrown: the target struck (%d -> %d), the axe on the ground at %s" % [hp, target.hp, axe["cell"]])
+	_check(Vector2i(axe["cell"]).x >= 1 and World.ground_uids(axe["cell"]).has(int(axe["uid"])),
+			"it lies before the one it struck, or at their feet (physics' hurl, 606)")
+	# A body in the way: the charge is stopped, he is disarmed.
+	var cell: Vector2i = axe["cell"]
+	var blocker_at := boss.tile + Vector2i(-1, 0)
+	World._relocate(target, blocker_at)
+	_check(World.try_axe_charge(boss), "he roars and charges")
+	for i in 12:
+		World.step()
+	_check(World.is_disarmed(boss) and World.axe_state(boss)["where"] == "ground" and not World.boss_busy(boss),
+			"stopped by the body in his way: disarmed, the axe still lying")
+	_check(not World.try_axe_charge(boss) and not World.try_axe_throw(boss, target.tile), "disarmed: no charge, no throw")
+	# Again with the way clear (a fresh throw): he reaches it and takes it up.
+	World._axes.erase(boss)
+	World._relocate(target, Vector2i(12, 2))
+	var uid := World.take_from_ground(cell, World.ground_uids(cell).find(int(axe["uid"])))
+	World._hand_set(boss, Player.RIGHT_HAND, uid)
+	boss.stamina = 100
+	boss.winded = false
+	_check(World.try_axe_throw(boss, Vector2i(1, 1)), "thrown again, nobody in the way")
+	for i in 13:
+		World.step()
+	_check(World.axe_state(boss)["where"] == "ground", "it lies at the line's end (%s)" % World.axe_state(boss)["cell"])
+	_check(World.try_axe_charge(boss), "he charges")
+	for i in 20:
+		World.step()
+	_check(World.axe_state(boss)["where"] == "hand" and not World.is_disarmed(boss), "he reached it: the axe in his hands again")

@@ -201,6 +201,9 @@ var winded := false
 ## Server: whether its swings cost stamina (decision 597, World.swing_cost):
 ## players and companions; a monster by its kind's "swing_stamina".
 var pays_swings := true
+## Server: stamina comes back only on every this many ticks (decision 603: a
+## boss's slow breath; its kind's "stamina_regen_every").
+var stamina_regen_every := 1
 ## Server only: the tick the grace runs out.
 var protected_until_tick := 0
 ## Direction of the last step or attack.

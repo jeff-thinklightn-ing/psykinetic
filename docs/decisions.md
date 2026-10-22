@@ -22094,3 +22094,70 @@ slanting, a ring, a shape that does not read; walls clip a line and keep a
 cone to the floor; shown, its data's cells the struck cells, landed, ended
 once, its source gone. controls_test: the host's client told, then told it
 landed. New class_name: Telegraph.
+
+## 603. The draugr's moves: the spin, the axe throw, the charge to his axe, disarmed
+
+Jeff (2026-10-22): "the draugr will have a large battle axe that he drops as
+loot, he has a telegraphed wind up spin that he stands still, winds up for
+1.5 seconds thing a devestating swing, a small red cone on the ground
+indicates the area, his stamina drops to 10% after that and slowly builds
+back up, he might have another move thats a overhead axe throw. he winds up
+and throws it, you can tell the direction he's going to throw it by a longer
+narrow cone. after he throws the axe he uses charges to the axe to pick it
+up, if you are able to interrupt the charge he is disarmed to only using
+fists." combat's design (C:/dev/review/combat/draugr/design.md), approved by
+the coordinator, with enemy-ai (his mind, which calls these) and physics
+(604 rush, 605 sweep, 606 hurl). The combat side, in World, for any body
+that holds a two-handed weapon. The numbers are drafts for Jeff, in
+levels/combat.json "moves".
+
+- try_spin(by): he stands. A 602 cone telegraph round his facing (spin:
+  length 2, half_angle 150, so a 60 degree gap behind; fists_length 1
+  disarmed) for windup 15 ticks. Needs stamina at least needs (90) and not
+  winded. A stun or a knockdown, or being moved off his cell, before then
+  gives it up, its telegraph ended unlanded: a shield bash's stagger does,
+  a sword blow does not. Landing, every body on the telegraph's cells:
+  - takes damage_scale (2.5) times his blow, its guard broken (_meet_guard
+    crushing);
+  - is pushed outward along its own line by apply_blow at swing_impulse
+    (physics', when in; else blow_impulse + weight x weight_impulse 20),
+    times impulse_scale (0.84, about 150 of physics' 178: the coordinator's
+    default on Jeff's list, so a full-health player swept into a wall is
+    left at a sliver, 8 + 9 of 20, the kill only on one already hurt; at
+    1.0 it is 8 + 12, a kill from full);
+  - is knocked down down_ticks (15).
+  Then he is spent: stamina at leaves (10)% and winded (597's rules).
+- try_axe_throw(by, at): costs cost (40). A 602 line telegraph toward
+  [at], fixed at the start (throw: length 8, width 1), for windup 12. Then
+  the weapon flies: physics' hurl (606) when in, else down the telegraph's
+  cells here. The first body takes damage_scale (2.0) times his blow and is
+  launched (weight x speed 14). The weapon lies at the struck body's feet,
+  or the cell before it here, else at the line's end. Recorded as his
+  thrown weapon (_axes).
+- try_axe_charge(by): to his lying weapon. A line telegraph to its cell for
+  roar (6) ticks, then physics' rush (604) through, to that cell (its
+  rush_ended reason), else a cell a tick here (a refused step: "body" or
+  "wall"; a stun: "stunned"). "arrived" with the weapon still there: he
+  takes it up (set_slots: a monster's hands are filled that way, not by
+  try_transfer's rules). Anything else, or the weapon gone from its cell
+  (a player took it): disarmed (is_disarmed). No charge and no throw then;
+  fists, and the fists' 1-cell spin, till enemy-ai's mind walks him back to
+  it (Jeff's open line: or the rest of the fight).
+- For enemy-ai: spin_targets(by), axe_line_hit(by, at), axe_state(by)
+  {where: hand | ground | gone, cell, uid}, is_disarmed(by), boss_busy(by).
+  _tend_boss_moves runs each tick after the wind-ups (392). A move's state
+  goes with its maker (_forget_jobs).
+- GridEntity.stamina_regen_every (a kind's "stamina_regen_every"): stamina
+  comes back only every that many ticks. The draugr's slow breath: at 4,
+  half a point a tick, about 5 s winded after the spin, full in about 20 s.
+  His row also needs "swing_stamina": true and a max_stamina, enemy-ai's.
+- The axe's flight for the views is physics' hurled (606). The telegraphs
+  are ui's decal; the cues are sound's; the clips are pc-character's.
+- No wire of its own beyond 602's and 606's (revision 32).
+
+combat_test: the spin's cone (ahead and beside struck, behind spared),
+thrown and knocked down, spent and winded, no second spin winded; a bash
+breaks the wind-up and a sword blow does not; the throw strikes the first
+body and lies before it; a charge stopped by a body disarms, a clear one
+re-arms. A two-handed giant axe stands in for items' battle_axe (603,
+items' side). No new class_name.
