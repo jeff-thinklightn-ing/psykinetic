@@ -2939,18 +2939,26 @@ func _show_outline(puppet: Node3D, show: bool) -> void:
 
 ## [param source] drawn with its materials' copies that mark the stencil
 ## (OUTLINE_STENCIL) where it draws, or ([param mark] false) with its own
-## again. The copies look the same.
+## again, its surfaces' own overrides too (a painted ally's paint, the
+## palette: put back, not cleared, or a body unmarked, as one is when it
+## dies, went white). The copies look the same.
 func _mark_stencil(source: MeshInstance3D, mark: bool) -> void:
 	if not mark:
 		if source.has_meta("own_override"):
 			source.material_override = source.get_meta("own_override")
 			source.remove_meta("own_override")
+			var own_surfaces: Array = source.get_meta("own_surfaces", [])
 			for surface in source.get_surface_override_material_count():
-				source.set_surface_override_material(surface, null)
+				source.set_surface_override_material(surface, own_surfaces[surface] if surface < own_surfaces.size() else null)
+			source.remove_meta("own_surfaces")
 		return
 	if source.has_meta("own_override"):
 		return
 	source.set_meta("own_override", source.material_override)
+	var kept: Array[Material] = []
+	for surface in source.get_surface_override_material_count():
+		kept.append(source.get_surface_override_material(surface))
+	source.set_meta("own_surfaces", kept)
 	if source.material_override != null:
 		source.material_override = _marking_copy(source.material_override)
 		return

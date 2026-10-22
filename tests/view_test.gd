@@ -3392,6 +3392,21 @@ func _test_allies() -> void:
 				and (puppet.get_meta("rig") as AnimRig)._posture == null,
 				"a %s in its own paint, its look its name's (%s), no posture over its stance" % [orc.spawn_spec["kind"], str(look.get("words", ""))])
 	_check(painted[0] != painted[1], "two orcs differ")
+	# Outlined (hovered, targeted) and let go, as a body is when it dies, it keeps its paint
+	# (Jeff: "killed a brute and sneak and the corpses had no palette").
+	for orc: Monster in [orcs[0], kobold]:
+		var puppet: Node3D = _rig._puppets[orc.get_instance_id()]
+		var meshes := (puppet.get_node("Body") as Node3D).find_children("*", "MeshInstance3D", true, false)
+		var before := meshes.map(func(mesh: MeshInstance3D) -> Array:
+			return range(mesh.get_surface_override_material_count()).map(func(i: int) -> Material: return mesh.get_surface_override_material(i)))
+		_rig._show_outline(puppet, true)
+		var marked := meshes.map(func(mesh: MeshInstance3D) -> Array:
+			return range(mesh.get_surface_override_material_count()).map(func(i: int) -> Material: return mesh.get_surface_override_material(i)))
+		_rig._show_outline(puppet, false)
+		var after := meshes.map(func(mesh: MeshInstance3D) -> Array:
+			return range(mesh.get_surface_override_material_count()).map(func(i: int) -> Material: return mesh.get_surface_override_material(i)))
+		_check(marked != before and after == before,
+				"a %s outlined and let go keeps its paint, as a corpse does" % orc.spawn_spec["kind"])
 	# Their fidgets (Jeff: "the idle need variability"): their own, never the same twice
 	# running, timed by a generator of this run's (the name and _session_seed).
 	var orc_puppet: Node3D = _rig._puppets[orcs[0].get_instance_id()]
