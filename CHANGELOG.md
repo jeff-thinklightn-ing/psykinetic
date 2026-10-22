@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Dirt roads wind across the wilds from the castle, the hills and the forest to the waystone at the middle, the hills road crossing the river by the bridge (569).
 - Dying where a priest or medicine man can bring you back now takes exactly their 60 s of work, not up to 90; if they stop partway (night, away, the place down) you come back the plain way in 2 s instead of waiting up to 10 minutes; the server now tells your game who is bringing you back, where and how long, for the HUD's countdown (396 amended).
 - Roads are drawn from their own curves: a winding dirt or stone band with worn edges, not squares of dirt along the tiles (563).
 - Killed orcs and kobolds keep their paint: a body that was outlined (hovered or targeted) when it died no longer turns white; letting go of the outline now puts back each surface's own material instead of clearing it.

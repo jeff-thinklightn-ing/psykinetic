@@ -28,6 +28,10 @@ extends Node
 ##   level.json "waters" and the bridge written into its text, the layout's
 ##   water cells and relief.png. Once: with "waters" in level.json the ponds
 ##   are left as they are and the river laid again the same.
+## - roads (decision 569): dirt roads laid as curves (Relief.road) from the
+##   castle's, the hills' and the forest's links to the crossroads round the
+##   waystone, the hills road over the bridge; their cells bare dirt,
+##   level.json "roads" written into its text. Once, as the water.
 ## The same seed lays the same ground.
 
 const FOLDER := "res://levels/wilds/"
@@ -60,6 +64,18 @@ const FORD_ROW := 40
 const BRIDGE_ROW := 128
 ## The ford's banks walked to over this many rows either side of it.
 const FORD_FREE := 4
+## The roads (569): each from its link's spawn point to its end beside the
+## waystone (its cell is solid), and its width.
+const ROADS := [
+	{"from": "from_castle", "to": Vector2i(128, 125)},
+	{"from": "from_hills", "to": Vector2i(125, 128)},
+	{"from": "from_forest", "to": Vector2i(131, 128)},
+]
+const ROAD_WIDTH := 2.0
+## Their wander either side of the way walked, and its turns' length (cells):
+## more than the hills' (Relief.ROAD_SWING), the roads long and the ground open.
+const ROAD_SWING := 7.0
+const ROAD_WAVE := 48.0
 ## A body of water this many cells or more is a pond traced into a curve
 ## (a well's lone cell is left).
 const POND_LEAST := 6
@@ -86,6 +102,8 @@ func _ready() -> void:
 	var map := doc.map
 	_place_marks()
 	var new_waters := not doc.config.has("waters")
+	if not new_waters:
+		_unlay_river()
 	_clear_groves()
 	var ponds: Array = _trace_ponds() if new_waters else []
 	var laid := Relief.lay(map, Rect2i(Vector2i.ZERO, map.size), SEED, {
@@ -115,6 +133,8 @@ func _ready() -> void:
 	var bridge := _bridge(river)
 	_ponds(river)
 	_check_clear(river)
+	var new_roads := not doc.config.has("roads")
+	var roads: Array = _roads(bridge) if new_roads else []
 	var path := FOLDER + "relief.png"
 	map.to_relief_image().save_png(ProjectSettings.globalize_path(path))
 	LevelMap.ensure_image_import(ProjectSettings.globalize_path(path), path)
@@ -130,6 +150,9 @@ func _ready() -> void:
 		if not bridge.is_empty():
 			doc.config["buildings"].append(bridge)
 			_write_buildings([bridge] as Array[Dictionary])
+	if new_roads and not roads.is_empty():
+		doc.config["roads"] = roads
+		_write_key("roads", roads)
 	var level := Level.parse(map.to_image(), null, doc.config, map.to_relief_image())
 	print("[wilds] relief.png laid; %s" % ("nothing said" if level["warnings"].is_empty() else "; ".join(level["warnings"])))
 	_say(laid["faces"])
@@ -299,6 +322,17 @@ func _clear_groves() -> void:
 	print("[wilds] groves cleared under the river: %d cells" % cleared)
 
 
+## The river level.json has made ground again (its water and ford cells
+## grass), so the lay carves it again as it was: a layer laid again over
+## the water once laid (569 over 568).
+func _unlay_river() -> void:
+	var map := doc.map
+	var made := Relief.river_curve(_river_option(), SEED + 10 + RIVER_SEED)
+	for cell: Vector2i in Curves.cells(Curves.sample(made["points"], made["widths"]), false):
+		if map.cell(cell) in ["water", "ford"]:
+			map.set_cell(cell, "grass")
+
+
 ## The river's Relief.lay "rivers" entry.
 func _river_option() -> Dictionary:
 	return {"line": VALLEY, "wavelength": RIVER_WAVELENGTH, "amplitude": RIVER_AMPLITUDE, "width": RIVER_WIDTH, "seed": RIVER_SEED}
@@ -433,6 +467,37 @@ func _crossing(river: Dictionary, row: int, straight: bool) -> Array[Vector2i]:
 	return []
 
 
+## The roads (569): each of ROADS laid by Relief.road from its link's spawn
+## point to its end by the waystone, the bridge's cells its crossings (by
+## [param bridge], or the one level.json has); their cells made bare dirt
+## where they are grass. As level.json "roads" entries.
+func _roads(bridge: Dictionary) -> Array:
+	var map := doc.map
+	var crossings := {}
+	var entry := bridge
+	if entry.is_empty():
+		for listed: Dictionary in doc.config.get("buildings", []):
+			if str(listed.get("slot", "")) == "bridge":
+				entry = listed
+	if not entry.is_empty():
+		for i in int(entry["length"]):
+			crossings[Vector2i(int(entry["at"][0]) + i, int(entry["at"][1]))] = true
+	var spawns: Dictionary = doc.config.get("spawn_points", {})
+	var out: Array = []
+	for road: Dictionary in ROADS:
+		var from := _cell(spawns[road["from"]])
+		var laid := Relief.road(map, from, [], road["to"], ROAD_WIDTH, crossings, ROAD_SWING, ROAD_WAVE)
+		if laid.is_empty():
+			push_error("[wilds] no way for the road from %s" % road["from"])
+			continue
+		for cell: Vector2i in laid["cells"]:
+			if map.cell(cell) == "grass":
+				map.set_cell(cell, "dirt")
+		out.append({"points": Curves.to_json(laid["points"], laid["widths"]), "kind": "dirt"})
+		print("[wilds] the road %s: %d control points, %d cells" % [road["from"], laid["points"].size(), laid["cells"].size()])
+	return out
+
+
 ## Says whether [param river] touches a pad (the town, a link, a spawn
 ## point, a start, a building, the camp): it must not.
 func _check_clear(river: Dictionary) -> void:
@@ -476,6 +541,8 @@ func _pads() -> Array:
 	var ring := Rect2i()
 	for building: Dictionary in doc.config.get("buildings", []):
 		var slot := str(building.get("slot", ""))
+		if slot in Level.SPANS_WATER:
+			continue  # A bridge spans the river; its banks are levelled apart.
 		if not slot in Level.DOORLESS:
 			spots.append(_cell(building["at"]) + Vector2i(2, 2))
 		elif slot == "building.standing_stone":

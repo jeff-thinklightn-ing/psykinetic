@@ -1015,10 +1015,12 @@ const ROAD_WAVE := 24.0
 ## on walkable ground or the crossings with no cliff between two of them (a
 ## crossing's cells and two either side of it kept, so it runs straight
 ## over a bridge), each point [param width] wide but where it must be
-## narrower (to one cell: a bridge, a way between cliffs). Returns {points,
+## narrower (to one cell: a bridge, a way between cliffs); its wander up to
+## [param swing] cells either side over turns [param wave] long (ROAD_SWING,
+## ROAD_WAVE; a long road across open ground wants more, 569). Returns {points,
 ## widths, cells (the curve's cells, Curves.cells)}, or {} if there is no
 ## way.
-static func road(map: LevelMap, from: Vector2i, via: Array, to: Vector2i, width := 2.0, crossings: Dictionary = {}) -> Dictionary:
+static func road(map: LevelMap, from: Vector2i, via: Array, to: Vector2i, width := 2.0, crossings: Dictionary = {}, swing := ROAD_SWING, wave := ROAD_WAVE) -> Dictionary:
 	var stops: Array[Vector2i] = [from]
 	for point: Variant in via:
 		stops.append(point)
@@ -1054,14 +1056,14 @@ static func road(map: LevelMap, from: Vector2i, via: Array, to: Vector2i, width 
 	var wander := FastNoiseLite.new()
 	wander.seed = from.x * 7919 + from.y * 104729 + to.x * 31 + to.y
 	wander.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
-	wander.frequency = 1.0 / ROAD_WAVE
+	wander.frequency = 1.0 / wave
 	# The roundest, most winding that fits: the wander, then the smoothing,
 	# given up only as far as the ground makes it.
-	for swing: float in [ROAD_SWING, ROAD_SWING / 2.0, 0.0]:
+	for sway: float in [swing, swing * 0.75, swing * 0.5, swing * 0.3, 0.0]:
 		for rounds: int in [4, 3, 2, 1, 0]:
 			var points := PackedVector2Array()
 			for p in pieces.size():
-				var piece: PackedVector2Array = pieces[p] if pinned[p] else _road_shape(pieces[p], rounds, swing, wander)
+				var piece: PackedVector2Array = pieces[p] if pinned[p] else _road_shape(pieces[p], rounds, sway, wave, wander)
 				if not points.is_empty():
 					piece = piece.slice(1)
 				points.append_array(piece)
@@ -1075,10 +1077,12 @@ static func road(map: LevelMap, from: Vector2i, via: Array, to: Vector2i, width 
 
 
 ## [param piece] (a road's walk between crossings, cells) made round:
-## corners cut [param rounds] times (Chaikin), swung across its way up to
-## [param swing] cells by [param wander] (eased to nothing at its ends), and
-## its points ROAD_SPACING apart along it, its ends kept.
-static func _road_shape(piece: PackedVector2Array, rounds: int, swing: float, wander: FastNoiseLite) -> PackedVector2Array:
+## corners cut [param rounds] times (Chaikin), swung across its way
+## [param swing] cells by a sine whose turns are [param wave] cells long,
+## 0.7 to 1.3 of that by [param wander]
+## (eased to nothing over half of one at its ends), and its points
+## ROAD_SPACING apart along it, its ends kept.
+static func _road_shape(piece: PackedVector2Array, rounds: int, swing: float, wave: float, wander: FastNoiseLite) -> PackedVector2Array:
 	var line := piece
 	for round_count in rounds:
 		if line.size() < 3:
@@ -1096,8 +1100,14 @@ static func _road_shape(piece: PackedVector2Array, rounds: int, swing: float, wa
 	var count := maxi(1, roundi(length / ROAD_SPACING))
 	var walked := 0.0
 	var segment := 0
+	# The swing a sine along it, each turn's length wandering by the noise,
+	# so it bends one way and the other all along, no straight run.
+	var phase := TAU * (wander.get_noise_1d(-500.0) * 0.5 + 0.5)
+	var last_s := 0.0
 	for k in range(1, count):
 		var s := length * k / count
+		phase += TAU * (s - last_s) / (wave * (1.0 + 0.3 * wander.get_noise_1d(s)))
+		last_s = s
 		while segment < line.size() - 2 and walked + line[segment].distance_to(line[segment + 1]) < s:
 			walked += line[segment].distance_to(line[segment + 1])
 			segment += 1
@@ -1105,8 +1115,8 @@ static func _road_shape(piece: PackedVector2Array, rounds: int, swing: float, wa
 		var b := line[segment + 1]
 		var point := a.lerp(b, clampf((s - walked) / maxf(a.distance_to(b), 0.0001), 0.0, 1.0))
 		var way := (b - a).normalized()
-		var ease := smoothstep(0.0, ROAD_WAVE / 2.0, minf(s, length - s))
-		out.append((point + Vector2(-way.y, way.x) * swing * ease * wander.get_noise_1d(s)).snappedf(0.01))
+		var ease := smoothstep(0.0, wave / 2.0, minf(s, length - s))
+		out.append((point + Vector2(-way.y, way.x) * swing * ease * sin(phase)).snappedf(0.01))
 	out.append(line[-1])
 	return out
 

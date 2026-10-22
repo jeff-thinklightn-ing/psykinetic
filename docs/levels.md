@@ -968,6 +968,11 @@ land kept: it runs on unseen under it at the edges), a ford across it at
 row 41 and a bridge at row 128 where the hills road will cross; and the
 three ponds traced from their cells into closed curves (`Curves.trace`),
 their cells then the curve's. `level.json` gains `waters` and the bridge.
+The roads (569): three dirt roads laid as curves (`Relief.road`, swinging up
+to 7 cells either side over turns of about 48) from the castle's, the
+hills' and the forest's spawn points to the crossroads round the waystone,
+the hills road over the bridge; their grass cells bare dirt; `level.json`
+gains `roads`. The south-east road to the mound and Held waits for Held.
 
 ## Prefabs
 

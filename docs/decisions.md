@@ -20013,3 +20013,41 @@ In Main, the player is told {Ned, healers_hut, 60} at death and is back
 at the hut 600 steps later; with nobody manned, {"", "", 2}. The test's
 killed imps stay dead (a respawn on the step of the return moved the
 player by spawn safety).
+## 569. The wilds' landmarks, layer four: the roads
+
+The landmarks design's roads: the way to the middle and on, followed by eye.
+
+**levels/wilds** (make_wilds_marks' roads layer, once: with "roads" in
+level.json they are left; the water re-laid under them as 568 laid it, its
+river made ground again first so the lay carves it the same, _unlay_river):
+three dirt roads by Relief.road, width 2, from the spawn points the links
+arrive at to the crossroads round the waystone (its cell solid, so each
+road ends beside it: (128, 125), (125, 128), (131, 128)):
+- from the castle's (128, 22) south;
+- from the hills' (16, 128) east, over 568's bridge (its cells the road's
+  crossings);
+- from the forest's (237, 128) west.
+Their grass cells are bare dirt in the layout; level.json gains "roads". The
+south-east road to the mound and Held waits for Held's decision.
+
+**Relief.road** gains swing and wave (ROAD_SWING 2.5, ROAD_WAVE 24 as before
+by default): a road a hundred cells long over open ground came out nearly
+straight with a noise's wander, which rarely reaches its full swing and
+evens out over a long turn. Its swing is now a sine across its way, each
+turn 0.7 to 1.3 of wave by the noise, so it bends one way and the other all
+along; when it does not fit, a quarter, a half, 0.7 and all of the swing
+are given up in turn (was half, then all). The wilds' roads swing 7 cells
+over turns of 48 (the castle road keeps 2.1 of it between the groves and
+the old path). A bridge (Level.SPANS_WATER) gets no level pad in
+make_wilds_marks: it spans the river, its banks levelled apart.
+
+**Walking**: ground kinds do not change a step's pace (nothing in the step,
+the paths or the prediction reads "dirt"), so a road walks as the grass;
+its use is to be seen and followed. Terrain draws the roads from the curves
+(563's drawing side); until that lands the wilds show them as the dirt
+cells.
+
+Level data, protocol unchanged (559's 29); a full cut.
+
+tests/relief_test: the wilds' three dirt roads from the castle's, the hills'
+and the forest's links, the hills road over the bridge.
