@@ -31,6 +31,9 @@ signal blow_resolved(source: GridEntity, target: GridEntity, result: Dictionary)
 ## A lunge resolved (lunge, decision 596): [param result]'s cells, stopped_by,
 ## struck and impact_damage. Server only.
 signal lunge_resolved(entity: GridEntity, result: Dictionary)
+## A body launched (launch, decision 598): [param result] as
+## blow_resolved's. Server only.
+signal launched(by: GridEntity, body: GridEntity, result: Dictionary)
 signal entity_despawned(entity: GridEntity)
 ## Reduced to 0 hp by [param cause] (&"attack", &"shot", &"impact", &"fire"), just
 ## before it is removed.
@@ -5621,8 +5624,7 @@ func _push(mover: GridEntity, first: GridEntity, way: Vector2, force: float, tos
 ## stopped_by, impact_damage (the target's), struck (bodies knocked on),
 ## knocked_down, speed}; emitted as blow_resolved.
 func apply_blow(source: GridEntity, target: GridEntity, blow: Dictionary) -> Dictionary:
-	var result := {"moved": false, "distance": 0, "cells": [], "stopped_by": "", "impact_damage": 0,
-		"struck": [], "knocked_down": false, "speed": 0.0}
+	var result := _slide_result()
 	if not Net.is_authority() or not _alive(source) or not _alive(target) or source == target:
 		return result
 	var direction: Vector2 = blow.get("direction", Vector2.ZERO)
@@ -5634,19 +5636,54 @@ func apply_blow(source: GridEntity, target: GridEntity, blow: Dictionary) -> Dic
 			+ momentum_push(source, target, direction)
 	result["speed"] = way.length()
 	if way.length() >= knockback_min_force:
-		var pushed := _push(source, target, way, way.length(), false, int(blow.get("stagger", -1)))
-		for each: Dictionary in pushed:
-			result["cells"].append(each["to"])
-			if each["body"] == target:
-				result["moved"] = each["cells"] > 0
-				result["distance"] = each["cells"]
-				result["stopped_by"] = each["stopped_by"]
-				result["impact_damage"] = each["impact"]
-			else:
-				result["struck"].append(each["body"])
+		_fill_slide(result, target, _push(source, target, way, way.length(), false, int(blow.get("stagger", -1))))
 	result["knocked_down"] = is_down(target)
 	blow_resolved.emit(source, target, result)
 	return result
+
+
+## A body launched (decision 598): [param body] thrown by [param by] along
+## [param toward] (any angle) at [param impulse] over its pushed mass, through
+## 592's _push: it slides, meets walls, bodies and drops as any push does, and
+## is not held to knockback_min_force (a throw, not a blow). Aimed back past
+## [param by] from beside it, it goes over its head and lands behind, as a
+## toss does. For the staff's grab and throw (combat weighs its cost by
+## mass_of) and the heavy shot. [param stagger] as apply_blow's. Server only,
+## at once. The same result as apply_blow's; emitted as launched.
+func launch(by: GridEntity, body: GridEntity, toward: Vector2, impulse: float, stagger := -1) -> Dictionary:
+	var result := _slide_result()
+	if not Net.is_authority() or not _alive(by) or not _alive(body) or by == body or toward == Vector2.ZERO \
+			or impulse <= 0.0:
+		return result
+	var speed := impulse / maxf(pushed_mass(body), 0.001)
+	result["speed"] = speed
+	var away := Vector2(body.tile - by.tile)
+	_fill_slide(result, body, _push(by, body, toward, speed, toward.normalized().dot(away.normalized()) < 0.99, stagger))
+	result["knocked_down"] = is_down(body)
+	_log("launch: %s throws %s toward %s at %.2f: %d cells, stopped by %s" % [by.name, body.name, toward, speed,
+			result["distance"], result["stopped_by"]])
+	launched.emit(by, body, result)
+	return result
+
+
+## An empty result of a slide (apply_blow's, launch's).
+func _slide_result() -> Dictionary:
+	return {"moved": false, "distance": 0, "cells": [], "stopped_by": "", "impact_damage": 0,
+		"struck": [], "knocked_down": false, "speed": 0.0}
+
+
+## [param result] filled from _push's [param pushed], [param target] the
+## body set moving first.
+func _fill_slide(result: Dictionary, target: GridEntity, pushed: Array[Dictionary]) -> void:
+	for each: Dictionary in pushed:
+		result["cells"].append(each["to"])
+		if each["body"] == target:
+			result["moved"] = each["cells"] > 0
+			result["distance"] = each["cells"]
+			result["stopped_by"] = each["stopped_by"]
+			result["impact_damage"] = each["impact"]
+		else:
+			result["struck"].append(each["body"])
 
 
 ## A body moving itself down a line (decision 596): [param entity] lunges

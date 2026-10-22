@@ -35,6 +35,7 @@ func _ready() -> void:
 	_test_brace()
 	_test_lunge()
 	_test_charge()
+	_test_launch()
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -250,6 +251,31 @@ func _test_charge() -> void:
 			"a 200 kg ogre: neither moves past the meeting, the charge stops dead (at %s, %s)" % [ogre.tile, player.tile])
 	_check(result["impact_damage"] == 1 and _damage(ogre, &"impact") == 1,
 			"the energy lost, 40 - 0.8 - 11.8, shared: 1 each (%d, %d)" % [result["impact_damage"], _damage(ogre, &"impact")])
+
+
+func _test_launch() -> void:
+	print("
+== a launched body: thrown along a line by mass, not held to the threshold (598) ==")
+	var cells: Array[int] = []
+	for mass: float in [25.0, 70.0]:
+		var e := _build(["##############", "#Pm..........#", "##############"], mass)
+		var result := World.launch(e["P"][0], e["m"][0], Vector2(1, 0), 100.0)
+		cells.append(result["distance"])
+	# 100 / 25 = 4, 6 cells; 100 / 70 = 1.43 (under the blow's 1.5, but a throw), 2.
+	_check(cells == [6, 2], "an impulse of 100 throws 25 kg 6 cells and 70 kg 2 (%s)" % [cells])
+
+	var e := _build(["##########", "#Pmm.....#", "##########"], 40.0)
+	var result := World.launch(e["P"][0], e["m"][0], Vector2(1, 0), 120.0)
+	# 3.0 into the second at once: it goes on at 1.2 x 40 x 3 / 80 = 1.8, 2 cells.
+	_check(e["m"][0].tile == Vector2i(2, 1) and e["m"][1].tile == Vector2i(5, 1) and result["struck"].size() == 1,
+			"a goblin thrown into a goblin knocks it on 2 (at %s, %s)" % [e["m"][0].tile, e["m"][1].tile])
+
+	e = _build(["##########", "#....Pm..#", "##########"], 40.0)
+	result = World.launch(e["P"][0], e["m"][0], Vector2(-1, 0), 120.0)
+	# 3.0, 4 cells: 2 over the thrower's head, then 2 more beyond it.
+	_check(e["m"][0].tile == Vector2i(2, 1) and result["distance"] == 4,
+			"thrown back over its thrower: lands behind and slides on, 4 cells to (2, 1) (at %s, %d)" % [e["m"][0].tile, result["distance"]])
+	_check(not World.launch(e["P"][0], e["P"][0], Vector2(1, 0), 50.0)["moved"], "nobody throws itself")
 
 
 # --- helpers ------------------------------------------------------------------

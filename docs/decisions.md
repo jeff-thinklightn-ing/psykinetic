@@ -21915,3 +21915,27 @@ spear's charge down a line (the doc's example move).
 
 tests/physics_test: the lunge (25 kg 3 cells, 70 kg 0; a wall ends it after 2 of 4), the
 charge (the goblin twice, the ogre).
+
+## 598: a launched body (physics step 2b)
+
+Physics step 2's second part (step2_design.md, the coordinator's approval, 2026-10-22), on
+592's model, for the staff's grab and throw (combat's build step 5) and the heavy shot.
+
+- World.launch(by, body, toward: Vector2, impulse, stagger := -1) throws `body` along the
+  line (any angle) at impulse / pushed_mass, through 592's _push, with `by` as the mover:
+  it slides, and meets walls, bodies (a collision by mass) and drops as any push does. It is
+  a throw, not a blow, so it is not held to knockback_min_force. An impulse of 100 throws
+  25 kg 6 cells and 70 kg 2.
+- Aimed back past `by` from beside it, the body goes over its head and lands behind, then
+  slides on: _push's toss, as today's overhead shove.
+- Combat weighs the cost (the staff's mind) by mass_of and decides when; physics only
+  moves. The heavy shot is combat's call to launch what an arrow hits. Existing archery
+  (World.shoot) is untouched, per the combat doc's rule. A pin is a body stopped against a
+  wall with speed left; the stun already follows that speed, with no pin case.
+- Returns apply_blow's result and emits launched(by, body, result). apply_blow and launch
+  share _slide_result and _fill_slide.
+- On the wire it is a push: the push event and the tile change, as 592 sends. Protocol
+  unchanged.
+
+tests/physics_test: 25 and 70 kg (6, 2), a goblin thrown into a goblin, a body thrown back
+over its thrower (4 cells, 2 of them overhead), nobody throws itself.
