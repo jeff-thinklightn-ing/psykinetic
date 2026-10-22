@@ -1182,6 +1182,9 @@ var _fords: Dictionary[Vector2i, bool] = {}
 ## Rocks (terrain "rocks", decision 513): no floor to the sim, but ground of
 ## their footing here, under a rock, and never a tree.
 var _rocks: Dictionary[Vector2i, bool] = {}
+## A solid building's cells (decision 550): land under its mesh, not floor,
+## so no ground the relax moves (558: its edges are the ground's sides).
+var _solid_cells: Dictionary[Vector2i, bool] = {}
 var _posts: Dictionary[Vector2i, Node3D] = {}
 ## Door edge key -> the doorway node (jambs, lintel, hinge). A double
 ## door's two edges share theirs (decision 403).
@@ -3289,8 +3292,10 @@ func _build_room() -> void:
 		_rocks[cell] = true
 		_land[cell] = true
 	# A solid building's cells (decision 550) are land under its mesh, no tree.
+	_solid_cells.clear()
 	for cell: Vector2i in _terrain.get("solid", []):
 		_land[cell] = true
+		_solid_cells[cell] = true
 	_glimpse_plans.clear()
 	if _outdoor:
 		_glimpse_plans = _plan_glimpses()
@@ -5927,13 +5932,14 @@ func _relax(cells: Array, floor_count: int) -> void:
 
 ## Whether [param cell] is natural ground the relax may move (decision
 ## 558): the level's floor, not water, a bed, a ford, dry water, a ramp, a
-## rock, a building's floor, the shore's finer cells or a ledge's cap.
+## rock, a building's floor, the shore's finer cells, a ledge's cap or a
+## solid building's cell (565: the wilds' relief brought the mound into it).
 func _relax_ground(cell: Vector2i, floor_count: int) -> bool:
 	var index: int = _grounds.get(cell, -1)
 	return index >= 0 and index < floor_count and not _wet.has(cell) and not _bed_levels.has(cell) \
 			and not _fords.has(cell) and not _dry_water.has(cell) and not _ramp_heights.has(cell) \
 			and not _rocks.has(cell) and not _shore_heights.has(cell) and not _rim_caps.has(cell) \
-			and _floor_bytes_at(cell) == 0
+			and not _solid_cells.has(cell) and _floor_bytes_at(cell) == 0
 
 
 ## Whether ground corner [param corner] may move: the four cells round it
@@ -7079,6 +7085,9 @@ func _add_cliffs() -> void:
 	material.set_shader_parameter("sky_floor", cliff_sky(_sky_floor))
 	_cliff_material = material
 	for chunk: Vector2i in faces:
+		# A rim with nothing to drop from (565: the wilds' relief has some).
+		if (faces[chunk][0] as PackedVector3Array).is_empty():
+			continue
 		var arrays := []
 		arrays.resize(Mesh.ARRAY_MAX)
 		arrays[Mesh.ARRAY_VERTEX] = faces[chunk][0]

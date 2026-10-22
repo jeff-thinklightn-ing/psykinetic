@@ -2514,12 +2514,13 @@ func _test_hills() -> void:
 				settings.append((drawn as MeshInstance3D).cast_shadow)
 		return settings
 	var on_hills: Array = casting.call()
-	var wilds := Level.load_level("wilds")
+	# The castle has no relief (the wilds have, since 565).
+	var wilds := Level.load_level("castle")
 	_rig.rebuild(wilds["terrain"], wilds["centre"])
 	var on_wilds: Array = casting.call()
 	_check(not on_hills.is_empty() and on_hills.all(func(s: int) -> bool: return s == GeometryInstance3D.SHADOW_CASTING_SETTING_ON)
 			and not on_wilds.is_empty() and on_wilds.all(func(s: int) -> bool: return s == GeometryInstance3D.SHADOW_CASTING_SETTING_OFF),
-			"the hills' ground casts its shadow (%d chunks), the wilds' (no relief) doesn't (%d)" % [on_hills.size(), on_wilds.size()])
+			"the hills' ground casts its shadow (%d chunks), the castle's (no relief) doesn't (%d)" % [on_hills.size(), on_wilds.size()])
 
 
 func _test_heights() -> void:
