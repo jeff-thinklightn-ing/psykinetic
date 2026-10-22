@@ -33,6 +33,7 @@ func _ready() -> void:
 	_test_relief()
 	_test_codes()
 	_test_solid()
+	_test_plots()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -666,6 +667,35 @@ func _test_solid() -> void:
 	_check(not used["ok"] and "solid" in str(used["text"]), "no use for a mound (%s)" % used["text"])
 	_check(session.run_tool("set_building", {"at": [12, 12]})["ok"], "scenery it may be")
 	_check(session.height_checks().is_empty(), "nothing said of a mound on flat ground (%s)" % [session.height_checks()])
+
+
+func _test_plots() -> void:
+	print("\n== plots (564): listed for the request, a door on the plot's street side, a town's door on a street ==")
+	_check("A plot (the request lists those here)" in BuilderSession.system_prompt(), "the prompt says what a plot is")
+	var high: int = (Level.building_rect({"slot": "building.hut", "at": [0, 0]}) as Rect2i).size.y
+	var doc := _doc()
+	doc.config["places"] = {"store": {"at": [12, 22], "kind": "stockpile", "holder": "town"}}
+	doc.config["plots"] = [{"key": "p1", "rect": [4, 4, 6, 6], "facing": [0, 1]}, {"rect": [30, 2, 4, 4]}]
+	doc.config["roads"] = [{"points": [[0, 15, 2], [39, 15, 2]], "kind": "stone"}]
+	doc.config["buildings"] = [
+		{"slot": "building.hut", "at": [5, 5], "facing": [0, -1]},
+		{"slot": "building.hut", "at": [20, 2], "facing": [0, 1], "use": "inn", "town": "store"},
+		{"slot": "building.hut", "at": [28, 14 - high], "facing": [0, 1], "use": "forge", "town": "store"},
+		{"slot": "building.hut", "at": [34, 2], "facing": [0, 1]}]
+	Level.fill_codes(doc.config)
+	_check(BuilderSession.plots_from(doc.config).size() == 1, "a plot with no key is left out")
+	var session := BuilderSession.new(doc, Rect2i(0, 0, 40, 30), "test_field", StubClaude.new([]))
+	var streets := session.street_checks()
+	_check(streets.size() == 2 and "the H1 hut on the plot p1 faces north, but the plot's street is to the south" in streets[0]
+		and "the door of the H2 hut at (20, 2) does not open onto a street" in streets[1],
+		"a hut turned from its plot's street, an inn far from the road: said; a forge at the road, a hut with no use: not (%s)" % [streets])
+	_check(BuilderSession.new(doc, Rect2i(18, 0, 6, 6), "test_field", StubClaude.new([])).street_checks().size() == 1, "only the area's buildings")
+	_check("Plots here (ground the town keeps for new buildings): p1 at (4, 4), 6 x 6, its street to the south." in session._situation(), "the request lists the plots")
+	doc.config.erase("roads")
+	_check(BuilderSession.new(doc, Rect2i(0, 0, 40, 30), "test_field", StubClaude.new([])).street_checks().size() == 1, "no roads in the level: only the plot's side is said")
+	var moved := LevelMap.moved_config(doc.config, func(cell: Vector2i) -> Vector2i: return Vector2i(29 - cell.y, cell.x), 1)
+	var plot: Dictionary = moved["plots"][0]
+	_check(plot["rect"] == [20, 4, 6, 6] and plot["facing"] == [-1, 0], "a quarter turn moves a plot and turns its street side (%s)" % [plot])
 
 
 func _test_relief() -> void:

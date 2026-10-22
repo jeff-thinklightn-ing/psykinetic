@@ -134,6 +134,7 @@ func ask(text: String) -> Dictionary:
 					var before := Stockpile.check(working.config)
 					var ground_before := height_checks()
 					var sites_before := site_checks()
+					var streets_before := street_checks()
 					var outcome := run_tool(str(block.get("name")), block.get("input", {}))
 					# What the change did to the town's store, said at once (decision 301).
 					var new := Stockpile.check(working.config).filter(func(warning: String) -> bool: return warning not in before)
@@ -149,6 +150,10 @@ Heights now: " + "; ".join(ground)
 					var sites := site_checks().filter(func(warning: String) -> bool: return warning not in sites_before)
 					if not sites.is_empty():
 						outcome["text"] += "\nWork sites now: " + "; ".join(sites)
+					# And to the doors onto the streets and the plots (decision 564).
+					var streets := street_checks().filter(func(warning: String) -> bool: return warning not in streets_before)
+					if not streets.is_empty():
+						outcome["text"] += "\nStreets now: " + "; ".join(streets)
 					results.append({"type": "tool_result", "tool_use_id": block.get("id"),
 						"content": outcome["text"], "is_error": not outcome["ok"]})
 			messages.append({"role": "user", "content": results})
@@ -172,6 +177,7 @@ Heights now: " + "; ".join(ground)
 	result["warnings"] = Stockpile.check(working.config)
 	result["height_warnings"] = height_checks()
 	result["site_warnings"] = site_checks()
+	result["street_warnings"] = street_checks()
 	result["cost"] = spent
 	busy = false
 	return result
@@ -389,7 +395,7 @@ Running water is a stream: the stream tool lays its course, from where it rises 
 
 Levels join at their edges: walking off one edge arrives on the neighbour's opposite edge, at the same row (east, west) or column (north, south). When the area touches the map's edge with nothing beyond it, new_area makes a new level there (its own map; a first draft of grass, groves and forest round it, open where the way arrives) and carves a way out to the edge through the area. Use it when asked for somewhere new beyond the edge ("a new area east", "the woods past here"), not for changes inside the area.
 
-Places are what factions hold (the goblins, the town, or nobody): a camp, a keep, a farm, a gate, a mine. Each is a cell and a radius; the ground within the radius is its holder's, and no one else's group may walk through it. mark_place names one (its key, kind, cell, radius, who holds it at the start). Mark a place when you build one: a camp's place on its gather point (where its monsters gather), a farmstead's in its yard. A goblin camp can hold captives from the start (mark_place's holds), each taken from a town (the request lists them): someone of that town, or kin of one of its workers ("the smith's daughter"). In town their kin asks players to bring them home, and they go free when the camp falls, so a camp holding a captive is worth clearing. A town's work sites are places too: a woodlot (woods its woodcutter fells: put it at the forest's edge), a hunting ground (open land with game, its hunter's), a quarry (rock to cut stone from), a farm (fields), a mine. Mark one with the town it works for (mark_place's town: the key of the town's stockpile place), held by the town, not far from it, and with a way on foot from the store to it: a site the goblins hold, or that can't be reached, is worked by no one, and the tool's answer says so. %s Some prefabs bring their place with them. A solid building (a mound, a barrow's: earth through) stands on flat ground like any, but no one walks its cells but its door, the middle of its front row, and it takes no use; the settings show it, the grid draws its cells as the ground they were. A building prefab is a roofed building players walk into: stamp it whole, door and all, rather than drawing its walls yourself. A building can serve a town: set_building gives one in the area a use (%s) and its town, the key of a stockpile place in this level (a place of kind stockpile, held by the town). A town has one building of each use. Stamping over a building drops its use: set it again. town_wall walls a town in: give the rectangle of cells it encloses (its buildings, its store, room to walk) and the wall stands on the edges just outside it, with gates (doors) where roads come in, one in the middle of each side if you name none. One wall per town; it looks as strong as the town has built it (a bank of rubble at first). roof puts a roof over a rectangle of floor of one height that no building covers: a room you walled yourself, or an open shelter (a market stall, a woodshed) on posts at its corners; give it a use and town and it serves the town as a building does.
+Places are what factions hold (the goblins, the town, or nobody): a camp, a keep, a farm, a gate, a mine. Each is a cell and a radius; the ground within the radius is its holder's, and no one else's group may walk through it. mark_place names one (its key, kind, cell, radius, who holds it at the start). Mark a place when you build one: a camp's place on its gather point (where its monsters gather), a farmstead's in its yard. A goblin camp can hold captives from the start (mark_place's holds), each taken from a town (the request lists them): someone of that town, or kin of one of its workers ("the smith's daughter"). In town their kin asks players to bring them home, and they go free when the camp falls, so a camp holding a captive is worth clearing. A town's work sites are places too: a woodlot (woods its woodcutter fells: put it at the forest's edge), a hunting ground (open land with game, its hunter's), a quarry (rock to cut stone from), a farm (fields), a mine. Mark one with the town it works for (mark_place's town: the key of the town's stockpile place), held by the town, not far from it, and with a way on foot from the store to it: a site the goblins hold, or that can't be reached, is worked by no one, and the tool's answer says so. %s Some prefabs bring their place with them. A solid building (a mound, a barrow's: earth through) stands on flat ground like any, but no one walks its cells but its door, the middle of its front row, and it takes no use; the settings show it, the grid draws its cells as the ground they were. A building prefab is a roofed building players walk into: stamp it whole, door and all, rather than drawing its walls yourself. A building can serve a town: set_building gives one in the area a use (%s) and its town, the key of a stockpile place in this level (a place of kind stockpile, held by the town). A town has one building of each use. Stamping over a building drops its use: set it again. town_wall walls a town in: give the rectangle of cells it encloses (its buildings, its store, room to walk) and the wall stands on the edges just outside it, with gates (doors) where roads come in, one in the middle of each side if you name none. One wall per town; it looks as strong as the town has built it (a bank of rubble at first). roof puts a roof over a rectangle of floor of one height that no building covers: a room you walled yourself, or an open shelter (a market stall, a woodshed) on posts at its corners; give it a use and town and it serves the town as a building does. A plot (the request lists those here) is ground the town keeps for a new building: put a new building on an empty plot before anywhere else, whole within it, its door on the plot's street side; and a building that serves a town opens its door onto a street (a road). The tool's answer says when one doesn't.
 
 Ground has a height, 0 to 6 (the grid's Heights block, shown when any cell has one). A step of a level or more between two cells is a ledge: a wall to anyone walking, though a body pushed off it falls to the ground below, and higher ground sees over walls. Stairs join one level to the next: a stair climbs to the one cell beside it a level up. A slope is a stair that looks like a ramp of earth: use slopes outdoors (on hills, banks, outcrops) and stairs in and round buildings; hill and stairs make slopes when asked. Rock is bare rock standing out of the ground, walled round: no one walks on or through it. height raises, lowers or sets cells; hill makes a rounded hill of rings a level each, with stairs up the sides asked; stairs puts a stair or a flight onto a ledge or up from flat ground. Whatever stands on raised ground (things, starts, buildings) needs stairs to it, and a building stands on one height: when a change leaves something cut off or a stair climbing nowhere, the tool's answer says so: put it right. Some outdoor levels have their ground shaped in metres (the request says so): there the Heights block is in half metres (0-9, then a, b, c ...), a rise of more than 0.45 m between neighbours is a cliff no one walks, height, hill and stairs are refused (the ground is shaped in the editor), and a building needs ground flat within 0.05 m under it: stamp it where the ground is flat, or stamp it with pad to cut the ground flat under it (the only shaping you do: a house on a hillside sits on a cut pad).
 
@@ -431,6 +437,13 @@ func _situation() -> String:
 			coded.append("%s %s at %s" % [entry["code"], building_name(entry), Level._tile(entry.get("at"))])
 	if not coded.is_empty():
 		text += "\n\nBuildings in this level, by code (the player may name one so; it is the same entry's \"code\" in the settings): " + ", ".join(coded) + "."
+	var plots := PackedStringArray()
+	for plot: Dictionary in plots_from(doc.config):
+		var rect: Rect2i = plot["rect"]
+		if area.grow(MARGIN).intersects(rect):
+			plots.append("%s at (%d, %d), %d x %d, its street to the %s" % [plot["key"], rect.position.x, rect.position.y, rect.size.x, rect.size.y, side_name(plot["facing"])])
+	if not plots.is_empty():
+		text += "\n\nPlots here (ground the town keeps for new buildings): " + ", ".join(plots) + "."
 	var towns := town_ids()
 	if not towns.is_empty():
 		text += "\n\nTowns a camp may hold captives from: " + ", ".join(towns) + "."
@@ -1456,6 +1469,56 @@ func site_checks() -> Array[String]:
 		elif not HeightTools.reaches(working.map, places[town]["cell"], site["cell"], 70000, ground):
 			out.append("the %s %s at %s can't be reached on foot from its town's store %s at %s: open a way" % [site["kind"], key, site["cell"], town, places[town]["cell"]])
 	return out
+
+
+## level.json's "plots" (decision 564): [{key, rect: [x, y, w, h], facing:
+## [dx, dy], the side its street is on}], ground a town keeps for new
+## buildings, laid out in the editor and filled in builder mode; as [{key,
+## rect (Rect2i), facing}]. One without a key or a rect is left out.
+static func plots_from(config: Dictionary) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var listed: Variant = config.get("plots", [])
+	for entry: Variant in listed if listed is Array else []:
+		var rect: Variant = Level.town_wall_rect(entry)
+		if rect == null or str(entry.get("key", "")).is_empty():
+			continue
+		out.append({"key": str(entry["key"]), "rect": rect, "facing": Level.building_facing(entry)})
+	return out
+
+
+## Each building in the area on a plot that does not face the plot's street, and, in a
+## level with roads (level.json's "roads", decision 559), each other
+## building serving a town whose door does not open onto a street: no road
+## cell at its front cell or beside it (decision 564). A solid building's
+## door leads under it, not to a street: left out.
+func street_checks() -> Array[String]:
+	var out: Array[String] = []
+	var plots := plots_from(working.config)
+	var streets := {}
+	for road: Dictionary in Curves.parse(working.config, "roads", [] as Array[String]):
+		streets.merge(Curves.cells(road["curve"], false))
+	for entry: Variant in working.config.get("buildings", []) if working.config.get("buildings") is Array else []:
+		var rect: Variant = Level.building_rect(entry)
+		if rect == null or str(entry.get("slot", "")) in Level.SOLID or not area.intersects(rect):
+			continue
+		var facing := Level.building_facing(entry)
+		var name := ("%s %s" % [entry.get("code", ""), building_name(entry)]).strip_edges()
+		var on := plots.filter(func(plot: Dictionary) -> bool: return (plot["rect"] as Rect2i).intersects(rect))
+		if not on.is_empty():
+			if facing != on[0]["facing"]:
+				out.append("the %s on the plot %s faces %s, but the plot's street is to the %s: turn it" % [name, on[0]["key"], side_name(facing), side_name(on[0]["facing"])])
+			continue
+		if streets.is_empty() or str(entry.get("use", "")).is_empty():
+			continue
+		var front := Level.front_cell(rect, facing)
+		if not [Vector2i.ZERO, Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN].any(func(step: Vector2i) -> bool: return streets.has(front + step)):
+			out.append("the door of the %s at %s does not open onto a street (no road at or beside %s)" % [name, rect.position, front])
+	return out
+
+
+## A side's word: (0, 1) "south".
+static func side_name(side: Vector2i) -> String:
+	return {Vector2i(0, -1): "north", Vector2i(1, 0): "east", Vector2i(0, 1): "south", Vector2i(-1, 0): "west"}.get(side, str(side))
 
 
 ## What is wrong with the area's heights on the working copy: a stair

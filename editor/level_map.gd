@@ -345,6 +345,22 @@ static func moved_config(config: Dictionary, move: Callable, turns := 0, dropped
 			entry["rect"] = [mini(a.x, b.x), mini(a.y, b.y), absi(a.x - b.x) + 1, absi(a.y - b.y) + 1]
 			rings.append(entry)
 		out["town_walls"] = rings
+	if out.get("plots") is Array:
+		# A plot's street side turns with it (decision 564).
+		var plots: Array = []
+		for entry: Variant in out["plots"]:
+			var rect: Variant = Level.town_wall_rect(entry)
+			var a: Variant = move.call(rect.position) if rect != null else null
+			var b: Variant = move.call(rect.end - Vector2i.ONE) if rect != null else null
+			if a == null or b == null:
+				dropped.append("plot %s" % [entry])
+				continue
+			entry["rect"] = [mini(a.x, b.x), mini(a.y, b.y), absi(a.x - b.x) + 1, absi(a.y - b.y) + 1]
+			if turns != 0:
+				var turned := turn(Level.building_facing(entry), turns)
+				entry["facing"] = [turned.x, turned.y]
+			plots.append(entry)
+		out["plots"] = plots
 	if out.get("roofs") is Array:
 		# A roof's ridge turns with it: along x, a quarter turn puts it along z.
 		var roofs: Array = []

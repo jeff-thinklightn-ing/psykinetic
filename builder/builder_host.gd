@@ -144,6 +144,9 @@ func _ask(peer: int, player_id: String, zone_name: String, args: Dictionary) -> 
 	var sites: Array = result.get("site_warnings", [])
 	if not sites.is_empty():
 		reply["summary"] += "\nWork sites: " + "; ".join(sites)
+	var streets: Array = result.get("street_warnings", [])
+	if not streets.is_empty():
+		reply["summary"] += "\nStreets: " + "; ".join(streets)
 	reply["cost"] = result["cost"]
 	reply["total"] = session.usage["cost"]
 	_reply(peer, reply)

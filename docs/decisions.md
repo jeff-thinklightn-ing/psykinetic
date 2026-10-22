@@ -19043,3 +19043,25 @@ both sides, up_to, fenced and won't-buy, the shortfall, Confirm's ask, a
 refusal, close); the hint; the bar's name and its going without a bubble.
 Client only; protocol unchanged on this side (the kinds are economy's and
 npc's); new class_name BarterPanel.
+
+## 564. Plots: ground a town keeps for new buildings, and doors onto streets
+
+On maps' design of Held as a map of its own (Jeff: "the town gets its own
+map ... more civilized"; the coordinator's ruling, builder's part (b)).
+level.json "plots" lists [{key, rect: [x, y, w, h], facing: [dx, dy]}]: a
+plot is ground the town keeps for a new building, laid out in the editor,
+its facing the side its street is on (a building's facing rule, south if
+not said). Builder mode fills them: the request lists the plots near the
+area ("p1 at (4, 4), 6 x 6, its street to the south"), the prompt says to
+put a new building on an empty plot first, whole within it, its door on
+the plot's street side, and BuilderSession.street_checks (beside
+site_checks: after each tool, what it newly broke; with the proposal, all)
+says, for the buildings in the area, one on a plot that does not face its
+street, and, in a level with 559's "roads", one serving a town whose front
+cell has no road cell at it or beside it. A solid building's door leads
+under it and is left out; a building with no use and no plot is not asked
+to face a street. Only builder mode and the editor read "plots" (the
+server's world and the client's drawing don't), so nothing travels and
+the protocol is unchanged: EditorFields doesn't offer it, LevelMap's
+moved_config moves a plot and turns its street side with the map. A plot
+holds no claim: a building may still go elsewhere, and is only told.
