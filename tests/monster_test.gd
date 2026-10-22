@@ -2920,6 +2920,19 @@ func _test_barrow_layers() -> void:
 	Level.unregister("mt_handlair")
 	Level.unregister("mt_deep")
 
+	# The lair's oldest dead: its level's word on them (barrow_lair's "dead").
+	var dark_rows: Array[String] = ["#######", "#.k.x.#", "#######"]
+	Level.register("mt_dark", Level.image_from_rows(dark_rows), null, {"dead": {"temper": "bold", "sees_in_dark": true, "graves": false}})
+	e = _build(dark_rows, {}, {}, "mt_dark")
+	var old: Monster = e["k"][0]
+	var thief: Monster = e["x"][0]
+	_check(old.temper == Monster.Temper.BOLD and old.idle == Monster.Idle.WANDER and old.senses.dark_sight,
+		"on a level with a word on its dead: bold, wandering, no grave, seeing in the dark")
+	_check(not thief.senses.dark_sight, "a robber there as ever")
+	Level.unregister("mt_dark")
+	e = _build(dark_rows, {}, {}, "mt_plain")
+	_check(e["k"][0].idle == Monster.Idle.HOMEWARD and not e["k"][0].senses.dark_sight, "elsewhere the dead walk home to their graves, and need light")
+
 
 func _test_wolf_pack_bold() -> void:
 	print("

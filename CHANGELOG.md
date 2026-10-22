@@ -7,8 +7,8 @@ notes (decision 324).
 
 ## Unreleased
 
+- In the barrow's new layers, the draugr laid to rest stills the dead on every layer, and they rise again on time even with nobody near; the oldest dead round his hall are angry, have no graves and see you in the dark without a lantern; his raised dead come up round him where he can see them, and grave robbers chase up to 14 cells from home in the bigger halls (580).
 - The draugr's offer now speaks of the old gods of war: your gold returns what the robbers stole, and their blessing raises you to fight again (lore's old gods, wording a draft for Jeff).
-- In the barrow's new layers, the draugr laid to rest stills the dead on the layer above too, and they rise again on time even with nobody near; his raised dead come up round him where he can see them, and grave robbers chase up to 14 cells from home in the bigger halls (580).
 - The Runner's pack is found in the robbers' camp under the mound, as the barrow's layers now have it (580, npc's side). Server only, text.
 - Grave robbers are drawn as people, in the same varied human bodies as townsfolk, hooded.
 - The barrow's dead have bodies of their own: the skeleton, the barrow guard in helm, mail and shield, the crowned draugr, and a ghost whose see-through shroud casts no shadow.

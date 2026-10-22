@@ -465,8 +465,24 @@ func _ready() -> void:
 		call_reach = int(row.get("call", Senses.NOISE_CALL))
 		if keeps_room:
 			_room = room_of(home)
+		var dead := _level_dead(kind)
+		if TEMPER_NAMES.has(str(dead.get("temper", ""))):
+			temper = TEMPER_NAMES[str(dead["temper"])]
+		if not bool(dead.get("graves", true)) and idle == Idle.HOMEWARD:
+			idle = Idle.WANDER
 		leash = roundi(int(row.get("leash", LEASH)) * (BOLD_LEASH if temper == Temper.BOLD else 1.0))
 		senses = Senses.new(self, sight_range, Senses.CONE_COS if _wary else -1.0)
+		senses.dark_sight = bool(dead.get("sees_in_dark", false))
+
+
+## Its level's word on the dead (decision 580: barrow_lair's "dead", the
+## draugr's oldest, angry and animated by his magic): {temper, sees_in_dark,
+## graves} for a kind of the dead's side; {} for any other, or none given.
+func _level_dead(kind: String) -> Dictionary:
+	var given: Variant = _zone_config().get("dead", {})
+	if not given is Dictionary or (given as Dictionary).is_empty() or _factions().of_kind(kind) != "dead":
+		return {}
+	return given
 
 
 ## How it idles, where its home is and which way it faces, from its spawn

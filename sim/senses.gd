@@ -69,6 +69,9 @@ var agent: GridEntity
 var sight_range := 7
 ## Off (-1.0 or less): it sees all the way round.
 var cone_cos := CONE_COS
+## It sees the living by life, not light: the dark hides nobody from it
+## (the draugr's oldest dead, decision 580).
+var dark_sight := false
 ## {at, radius, kind, source, tick}, oldest first.
 var heard: Array[Dictionary] = []
 ## When it last heard anything (World.tick; -1 never): a number to compare
@@ -99,7 +102,7 @@ func sees(entity: GridEntity, d := -1, in_cone := true, farther := 1.0) -> bool:
 	if d > NOTICE_ALWAYS:
 		if in_cone and not _in_cone(at):
 			return false
-		if entity.emit_light <= 0.0 and not is_lit(at):
+		if entity.emit_light <= 0.0 and not dark_sight and not is_lit(at):
 			return false
 		if hidden_by_cover(entity, d, not in_cone):
 			return false

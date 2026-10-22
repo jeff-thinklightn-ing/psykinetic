@@ -21739,22 +21739,25 @@ Jeff: "have the grave robbers use the character body type" (via the coordinator,
 
 Tests: view_test `_test_person_monster`. Client only, no new class_name.
 ## 580, enemy-ai's side. The barrow in layers: the lair's own anchors, the rest over the deep, the retinue in his sight
+## 580, enemy-ai's side. The barrow in layers: the rest over every layer, the oldest dead, the retinue in his sight
 
 Dungeon's design (C:/dev/review/dungeon/barrow_layers_design.md, Jeff's
 "crypt is still too cramped": three levels, robbers on the first, the dead
 on the second, the draugr in a hall of his own), the coordinator's
-approval. Counts and respawn_s move with dungeon's levels (4 robbers on
-barrow, 6 skeletons and 2 guards on barrow_deep, the draugr on
-barrow_lair).
+approval, and Jeff's answers after it. Counts and respawn_s move with
+dungeon's levels: barrow (the robbers and the altar's two guards), barrow_deep
+(the Ossuary, 6 skeletons), barrow_lair (a dark generated layer, 6 of the
+oldest dead, the Hall of Fallen Souls his "lair" anchor in its regenerate
+block, as room_of finds it already).
 
-- **A hand-drawn level's rooms.** `Monster.room_of` reads a level's
-  top-level "anchors" as well as its "regenerate" block's, so the fixed
-  barrow_lair's "lair" anchor (the hall and its bays) is his lair, not a
-  leash circle.
+- **A level's own rooms.** `Monster.room_of` also reads a level's
+  top-level "anchors" beside its "regenerate" block's, for a level drawn
+  by hand (none yet: the lair came to be generated).
 - **His rest over other zones.** Laid to rest, the draugr no longer stills
   only the dead he can reach: `World.dead_rest` (zone name -> {until, side},
   saved by Main as "dead_rest") holds his rest over his own zone and each
-  his level's "stills" names (barrow_lair: barrow_deep). Every monster of
+  his level's "stills" names (barrow_lair: barrow_deep and barrow, the
+  altar's guards being dead too; robbers are never his side). Every monster of
   that side reads it for its zone on its sim and world ticks
   (`Monster._mind_the_rest`): it lies still while `World.steps` is under
   `until` (`stilled`, kept in its props; a respawn lies down too) and gets
@@ -21764,10 +21767,18 @@ barrow_lair).
 - **The retinue.** It rises within `Draugr.RETINUE_REACH` (3, was 2) of him
   on free floor of his lair in his line of sight: round the dais, not
   behind a pillar.
+- **The oldest dead.** A level's "dead" ({temper, sees_in_dark, graves};
+  barrow_lair's {"bold", true, false}, Jeff's "angry", "animated by the
+  magic of the Draugr") sets its dead-side monsters at spawn
+  (`Monster._level_dead`): the temper (bold: never holds back, leash x1.5),
+  `Senses.dark_sight` (the living seen by life, not light: a player with no
+  lantern seen within their sight), and with graves false no grave to lie
+  in or walk home to (HOMEWARD becomes WANDER). No new kind, no new body.
 - **The robbers' leash** 10 to 14 in halls twice as big; their call stays 6
   (a fight keeps to its room). A draft for Jeff.
 - 573 untouched: his charges and the living's coming read his own zone,
   the lair (Jeff's "in the zone" is the room he fights in).
 
-monster_test `_test_barrow_layers`; the robber's leash check 14. Server
+monster_test `_test_barrow_layers` (also the level's word on its dead); the
+robber's leash check 14. Server
 only, protocol unchanged, no new class_name.
