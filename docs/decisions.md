@@ -20636,3 +20636,67 @@ tests/production_test: the walk there and back and the spell, 2 ×
 ceil(26 × 4) + 120 = 328. Server only, protocol unchanged, no new
 class_name.
 
+## 575. The forest's edge drawn from curves
+
+Jeff's rule (2026-10-21): "never cell regions with rounded edges". The
+forest's edge was the cells' edge: a tree on every cell of its first ring
+(nudged at most 0.42 within it), the ground turned to forest floor by the
+cells' mask, the scatter's kind by its cell; a straight run read as a
+row, a diagonal as steps, a grove as a block. The coordinator's approval,
+2026-10-22.
+
+**The curve, traced here.** The land's cells stay the truth: the sim, the
+walk and sight never see the curve, and nobody authors the forest's shape,
+so the client traces it (_read_edges) round the cells the forest grows
+round (_wooded):
+- every loop of their outline (the land's rim and each grove in it;
+  _outline_loops, turning right where two cells meet at a corner alone,
+  so each loop keeps round its own cells), as its edges' middles;
+- simplified within EDGE_SIMPLIFY (0.3: a staircase's run is a line), a
+  point a cell along each run (through a long run's ends alone the curve
+  bowed half a cell off it), each moved up to EDGE_WOBBLE (0.14) across it
+  by a slow noise;
+- a closed curve through them (Curves.sample), within EDGE_BOUND (0.45)
+  of the cells' edge everywhere: no walkable cell's middle reads forest,
+  no forest cell's open;
+- an authored forest's shape would be maps' "forests" curves in level.json
+  later, read here the same way (the door is open; nothing laid now).
+
+**Which side.** _edge_signed: the distance to the nearest curve near a
+point, positive on the forest's side, by the way the curve runs (the land
+on its right going round), searched round the nearest sample of the point's
+cell (_stamp_near's maps, as the waters'). Its field (_edge_field, RG8 at
+the shore field's texels near an edge) turns the ground to forest floor
+along the curve (ground.gdshaderinc "forest_edge"); the cells' mask still
+holds it away from an edge.
+
+**The trees at the edge** (_add_edge_trees) come from the curve, not the
+first ring's cells: one every EDGE_SPACING (0.7 to 1.1) along it,
+EDGE_DEPTH (0.3 to 1.4) into the forest, the nearest kept EDGE_NEAR_KEEP
+(0.75) of the time, a tree a cell, only on the forest's cells and side;
+where a pine stand or a deeper tree has the place, just inside the first
+ring instead. A felled one's stump and a sapling by a tree now and then, as
+the first ring had them. The deeper rings as before.
+
+**The scatter** by an edge: the land's kinds and the forest's both offered
+in a cell near it, each point kept on its own side of the curve; the edge's
+roots on the land within EDGE_ROOTS (0.7) of it.
+
+Not in this step: tall grass's patch edge and the rocks' cells (a grey
+square where the wilds' grove thinned) still follow their cells; the hills'
+straight runs stay straight, as its land is (its shape is maps').
+
+Shots in C:/dev/review/forestedge (the hills' north edge, east edge and
+corner, the wilds' north edge and three groves, noon and 16:00; before is
+main 2a65179b). Cost: map_bench rebuild, alternated twice with main:
+hills 1149/1123 ms before, 1232/1232 after (+95 ms, 8%); wilds 5167/4911
+before, 5488/5460 after (+435 ms, 9%), the field and the trace. Frame times
+read nothing that hour (the machine's 30 fps cap, 570 amended's note): a
+frame re-bench is owed when the display wakes.
+
+view_test _test_forest_edge (hills, wilds): the curve within EDGE_BOUND of
+the cells' edge; its sides as the cells' away from it, nought on it; every
+tree on the forest's cells and side; the scatter by it on its own side.
+_test_forest: the first ring's every-cell check became a tree (or stump)
+within 2.2 of every stretch of the edge; the lane's trees either side
+within 1.6. Client only, protocol unchanged, no new class_name.

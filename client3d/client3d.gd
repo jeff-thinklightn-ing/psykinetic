@@ -247,6 +247,22 @@ const CURTAIN_ROWS := 4
 ## from the churn, each MIST_SIZE across, lasting MIST_SECONDS; a fall
 ## MIST_FULL tall or more has them all, a shorter one fewer.
 const MIST_PUFFS := 24
+## The forest's edge as curves (decision 575, _read_edges): the outline of
+## the cells the forest grows round, simplified within EDGE_SIMPLIFY
+## (a staircase's run a line), each point moved up to EDGE_WOBBLE across
+## it by a slow noise, so the curve keeps within EDGE_BOUND of the cells'
+## edge: no walkable cell looks forest, no forest cell open.
+const EDGE_SIMPLIFY := 0.3
+const EDGE_WOBBLE := 0.14
+const EDGE_BOUND := 0.45
+## The trees along it (_add_edge_trees): one every EDGE_SPACING (a range)
+## along the curve, EDGE_DEPTH (a range) into the forest, the nearest
+## thinned to EDGE_NEAR_KEEP of them.
+const EDGE_SPACING := Vector2(0.7, 1.1)
+const EDGE_DEPTH := Vector2(0.3, 1.4)
+const EDGE_NEAR_KEEP := 0.75
+## Roots on the land within this of the edge (the scatter, 575).
+const EDGE_ROOTS := 0.7
 const MIST_SIZE := 1.1
 const MIST_SECONDS := 2.6
 const MIST_FULL := 6.0
@@ -1394,6 +1410,13 @@ var _road_curves: Array[Dictionary] = []
 var _road_cells: Dictionary[Vector2i, int] = {}
 var _road_near_sample: Dictionary[Vector2i, Vector2i] = {}
 var _road_near_also: Dictionary[Vector2i, Array] = {}
+## The forest's edge as closed curves (decision 575, _read_edges): each
+## {curve: Curves.sample's, closed}; each cell near one -> (which, its
+## nearest sample); the others'; its field (_edge_field) for the ground.
+var _edge_curves: Array[Dictionary] = []
+var _edge_near_sample: Dictionary[Vector2i, Vector2i] = {}
+var _edge_near_also: Dictionary[Vector2i, Array] = {}
+var _edge_mask: ImageTexture
 var _road_image: Image
 var _road_mask: ImageTexture
 ## The ground relaxed (decision 558, _relax): each moved corner's offset
@@ -3373,6 +3396,7 @@ func _build_room() -> void:
 	_forest_distance.clear()
 	if _outdoor:
 		_forest_distance = _measure_forest()
+	_read_edges()
 	_read_field()
 	_sight_key = Vector4.INF  # A new ground: ask again whether it hides the player.
 	_bed_levels.clear()
@@ -4071,6 +4095,10 @@ func _add_forest() -> void:
 		var away := distance[cell]
 		if away == 0 or stood.has(cell):
 			continue
+		# The first ring's trees from the edge's curve (decision 575,
+		# _add_edge_trees), not a tree a cell along the cells' edge.
+		if away == 1 and not _edge_curves.is_empty():
+			continue
 		if stands and away >= PineStands.FROM:
 			# A solo pine between stands, once tree.pine has art: the holes
 			# read as more of the stand.
@@ -4099,6 +4127,7 @@ func _add_forest() -> void:
 			_room.add_child(rock)
 		elif roll < 0.33 + DEADWOOD_CHANCE:
 			_add_deadwood(cell, "tree.log" if _roll(cell, 58) < LOG_SHARE else "tree.stump", distance)
+	_add_edge_trees(distance, stood)
 	var floor_mesh := PlaneMesh.new()
 	floor_mesh.size = Vector2(high - low) + Vector2.ONE * 2.0
 	var forest_floor := MeshInstance3D.new()
@@ -4233,19 +4262,40 @@ func _scatter_plan(chunk: Vector2i) -> Dictionary[String, Array]:
 		if not forest and _by_water(cell):
 			density = density.duplicate()
 			density["reeds"] = SCATTER_REEDS
+		# By the forest's edge's curve (decision 575) each point is the
+		# forest's or the land's by its side of the curve, not by its cell:
+		# the land's kinds and the forest's both offered, each point kept
+		# on its own side, the roots on the land within EDGE_ROOTS of it.
+		var sides: Array = [[density, forest, false]]
+		if not _edge_curves.is_empty() and _edge_near_sample.has(cell) and not _tall.has(cell):
+			var land: Dictionary = SCATTER_DENSITY.get(_ground_kinds.get(cell, "grass") if _ground_kinds.get(cell, "") != "forest" else "grass", {}).duplicate()
+			land["root"] = land.get("root", 0.0) + SCATTER_EDGE_ROOTS
+			if _by_water(cell):
+				land["reeds"] = SCATTER_REEDS
+			sides = [[land, false, true], [SCATTER_DENSITY.get("forest", {}), true, true]]
 		var salt := 0
-		for kind: String in density:
-			salt += 10
-			var count := floori(density[kind] + _roll(cell, 100 + salt))
-			for n in count:
-				var at := Vector2(cell) + Vector2(_roll(cell, 101 + salt + n * 7), _roll(cell, 102 + salt + n * 7)) - Vector2(0.5, 0.5)
-				if _rim_top(at) > -INF:
-					continue  # Under a ledge's cap (decision 556).
-				if not _road_curves.is_empty() and _road_near(at).x > -0.1:
-					continue  # On a road (563, terrain's side).
-				if not placed.has(kind):
-					placed[kind] = []
-				placed[kind].append([cell, at, n + salt, forest])
+		for side: Array in sides:
+			var offered: Dictionary = side[0]
+			var on_forest: bool = side[1]
+			var by_curve: bool = side[2]
+			if on_forest and by_curve:
+				salt += 500
+			for kind: String in offered:
+				salt += 10
+				var count := floori(offered[kind] + _roll(cell, 100 + salt))
+				for n in count:
+					var at := Vector2(cell) + Vector2(_roll(cell, 101 + salt + n * 7), _roll(cell, 102 + salt + n * 7)) - Vector2(0.5, 0.5)
+					if _rim_top(at) > -INF:
+						continue  # Under a ledge's cap (decision 556).
+					if not _road_curves.is_empty() and _road_near(at).x > -0.1:
+						continue  # On a road (563, terrain's side).
+					if by_curve:
+						var into := _edge_signed(at)
+						if not is_nan(into) and ((into > 0.0) != on_forest or kind == "root" and not on_forest and into < -EDGE_ROOTS):
+							continue
+					if not placed.has(kind):
+						placed[kind] = []
+					placed[kind].append([cell, at, n + salt, on_forest])
 	return placed
 
 
@@ -4747,7 +4797,7 @@ func _draw_glimpse(terrain: Dictionary) -> void:
 ## cell's middle, so every peer grows the same forest and no row shows.
 ## [param kind] a slot to use (a solo pine between stands), else broadleaf
 ## or small, now and then dead.
-func _add_tree(cell: Vector2i, clump := 0.5, kind := "") -> void:
+func _add_tree(cell: Vector2i, clump := 0.5, kind := "", at := Vector2.INF) -> void:
 	var slot := kind if kind != "" else ("tree.broadleaf" if _roll(cell, 1) < 0.6 else "tree.small")
 	if kind == "" and _roll(cell, 59) < DEAD_TREE_CHANCE and _deadwood_drawn("tree.dead"):
 		slot = "tree.dead"
@@ -4757,9 +4807,58 @@ func _add_tree(cell: Vector2i, clump := 0.5, kind := "") -> void:
 	tree.scale = Vector3.ONE * TREE_HEIGHT * size / ArtKit.size(slot).y
 	tree.rotation = Vector3((_roll(cell, 6) - 0.5) * 2.0 * TREE_LEAN, _roll(cell, 3) * TAU, (_roll(cell, 7) - 0.5) * 2.0 * TREE_LEAN)
 	tree.position = _tile_position(cell) + Vector3(_roll(cell, 4) - 0.5, 0.0, _roll(cell, 5) - 0.5) * TREE_NUDGE * 2.0
+	if at != Vector2.INF:
+		tree.position = Vector3(at.x, _ground_height(at), at.y)
 	season_dress(tree, slot != "tree.dead" and slot != "tree.pine")
 	_room.add_child(tree)
 	_trees[cell] = tree
+
+
+## The trees at the forest's edge from its curve (decision 575): along
+## each, one every EDGE_SPACING, EDGE_DEPTH into the forest along its
+## normal, the nearer thinned (kept EDGE_NEAR_KEEP of the time at the
+## least depth, always at the most), a tree a cell at most and only on the
+## forest's cells ([param distance] 1 or more, not a pine stand's in
+## [param stood]): the edge ragged, its line the curve's, no row of cells.
+func _add_edge_trees(distance: Dictionary[Vector2i, int], stood: Dictionary[Vector2i, bool]) -> void:
+	for w in _edge_curves.size():
+		var curve: Dictionary = _edge_curves[w]["curve"]
+		var points: PackedVector2Array = curve["points"]
+		var tangents: PackedVector2Array = curve["tangents"]
+		var key := Vector2i(0, w * 7919)
+		var next := lerpf(EDGE_SPACING.x, EDGE_SPACING.y, _roll(key, 61))
+		var walked := 0.0
+		for k in points.size():
+			walked += Curves.SPACING
+			if walked < next:
+				continue
+			walked = 0.0
+			key = Vector2i(k, w * 7919)
+			next = lerpf(EDGE_SPACING.x, EDGE_SPACING.y, _roll(key, 61))
+			var depth := lerpf(EDGE_DEPTH.x, EDGE_DEPTH.y, _roll(key, 62))
+			if _roll(key, 63) > lerpf(EDGE_NEAR_KEEP, 1.0, inverse_lerp(EDGE_DEPTH.x, EDGE_DEPTH.y, depth)):
+				continue
+			# Into the forest: left of the way round (the land on its right).
+			var into := Vector2(tangents[k].y, -tangents[k].x)
+			var at := points[k] + into * depth + Vector2(tangents[k]) * (_roll(key, 64) - 0.5) * 0.4
+			var cell := Vector2i(roundi(at.x), roundi(at.y))
+			# Its place taken (a stand's, a deeper tree's): just inside the
+			# first ring instead, so the edge still reads closed.
+			if stood.has(cell) or _trees.has(cell) or distance.get(cell, 0) < 1:
+				at = points[k] + into * lerpf(EDGE_DEPTH.x, 0.55, _roll(key, 65)) + Vector2(tangents[k]) * (_roll(key, 64) - 0.5) * 0.4
+				cell = Vector2i(roundi(at.x), roundi(at.y))
+			if distance.get(cell, 0) < 1 or stood.has(cell) or _trees.has(cell) or _edge_signed(at) < EDGE_DEPTH.x * 0.5:
+				continue
+			# Now and then a tree felled at the edge, its stump left (as the
+			# cells' first ring had them); else the tree, a sapling by it
+			# toward the land now and then.
+			if distance[cell] == 1 and _roll(cell, 50) >= SAPLING_CHANCE and _roll(cell, 57) < STUMP_EDGE_CHANCE \
+					and _deadwood_drawn("tree.stump") and not _room.has_node("Deadwood_%d_%d" % [cell.x, cell.y]):
+				_add_deadwood(cell, "tree.stump", distance)
+				continue
+			_add_tree(cell, _field(at, FOREST_CLUMP, 40), "", at)
+			if distance[cell] == 1 and _roll(cell, 50) < SAPLING_CHANCE:
+				_add_sapling(cell, distance)
 
 
 ## The forest floor under the trees past the first ring: the stands'
@@ -5241,6 +5340,8 @@ func _build_ground(kinds: Dictionary) -> void:
 	canopy_origin = origin
 	var material := _ground_material(kind_bytes, across, down, origin)
 	material.set_shader_parameter("roads", _road_mask)
+	_edge_mask = ImageTexture.create_from_image(_edge_field(origin, _shore_image.get_size())) if not _edge_curves.is_empty() else null
+	material.set_shader_parameter("forest_edge", _edge_mask)
 	# Hills read (decision 525, terrain's side): slopes lit against the sun.
 	material.set_shader_parameter("slope_shade", SLOPE_SHADE if _relief_given else 0.0)
 	_ground_look = material
@@ -6460,6 +6561,190 @@ func _build_curve_ribbon(w: int) -> void:
 	drawn.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_room.add_child(drawn)
 	_stream_ribbons.append(drawn)
+
+
+## The forest's edge drawn from curves, not cells (decision 575; Jeff:
+## "never cell regions with rounded edges"): the outline of the cells the
+## forest grows round (_wooded: the land, glimpses, grown trunks), every
+## loop of it (the land's rim and each grove inside it), each simplified
+## (a staircase's run a line), its points moved across it a little by a
+## slow noise, then a closed curve through them (Curves.sample). The land's
+## cells stay the truth: the sim, the walk and sight never see the curve.
+## Traced here: an authored forest's shape would be maps' "forests" curves
+## in level.json later, read here the same way.
+func _read_edges() -> void:
+	_edge_curves.clear()
+	_edge_near_sample.clear()
+	_edge_near_also.clear()
+	if not _outdoor or _wooded.is_empty() or _forest_distance.is_empty():
+		return
+	for loop: PackedVector2Array in _outline_loops(_wooded):
+		var simple := _simplify_loop(loop, EDGE_SIMPLIFY)
+		if simple.size() < 3:
+			continue
+		# A point a cell along each run: the curve through them keeps to the
+		# runs (through their ends alone it bowed half a cell off a long one).
+		var points := PackedVector2Array()
+		for i in simple.size():
+			var a := simple[i]
+			var b := simple[(i + 1) % simple.size()]
+			var steps := maxi(1, roundi(a.distance_to(b)))
+			for j in steps:
+				points.append(a.lerp(b, float(j) / steps))
+		var moved := PackedVector2Array()
+		for i in points.size():
+			var along := (points[(i + 1) % points.size()] - points[i - 1]).normalized()
+			var side := Vector2(-along.y, along.x)
+			moved.append(points[i] + side * (_field(points[i], 3.0, 77) - 0.5) * 2.0 * EDGE_WOBBLE)
+		var widths := PackedFloat32Array()
+		widths.resize(moved.size())
+		var curve := Curves.sample(moved, widths, true)
+		if (curve["points"] as PackedVector2Array).size() < 3:
+			continue
+		_stamp_near(curve, true, _edge_curves.size(), _edge_near_sample, _edge_near_also)
+		_edge_curves.append({"curve": curve, "closed": true})
+
+
+## Every loop of the outline of [param cells] (their squares' outer edges,
+## each loop going round with the cells on its right, y down), as the
+## middles of its edges, so no corner of the grid is left. Where two cells
+## meet at a corner alone (a pinch), the way on turns right: each loop
+## keeps tight round its own cells.
+static func _outline_loops(cells: Dictionary) -> Array[PackedVector2Array]:
+	var leaving: Dictionary[Vector2, Array] = {}
+	var edges := 0
+	for cell: Vector2i in cells:
+		var x := float(cell.x)
+		var y := float(cell.y)
+		var corners: Array[Vector2] = [Vector2(x - 0.5, y - 0.5), Vector2(x + 0.5, y - 0.5), Vector2(x + 0.5, y + 0.5), Vector2(x - 0.5, y + 0.5)]
+		var sides: Array[Vector2i] = [Vector2i(0, -1), Vector2i(1, 0), Vector2i(0, 1), Vector2i(-1, 0)]
+		for k in 4:
+			if not cells.has(cell + sides[k]):
+				if not leaving.has(corners[k]):
+					leaving[corners[k]] = []
+				leaving[corners[k]].append(corners[(k + 1) % 4])
+				edges += 1
+	var loops: Array[PackedVector2Array] = []
+	while edges > 0:
+		var start: Vector2 = leaving.keys()[0]
+		var at := start
+		var way := Vector2.ZERO
+		var middles := PackedVector2Array()
+		while leaving.has(at):
+			var ends: Array = leaving[at]
+			var pick := 0
+			if ends.size() > 1 and way != Vector2.ZERO:
+				var turn := -INF
+				for i in ends.size():
+					var to: Vector2 = ends[i] - at
+					var right := way.x * to.y - way.y * to.x
+					if right > turn:
+						turn = right
+						pick = i
+			var after: Vector2 = ends[pick]
+			ends.remove_at(pick)
+			if ends.is_empty():
+				leaving.erase(at)
+			edges -= 1
+			middles.append((at + after) / 2.0)
+			way = after - at
+			at = after
+			if at == start and not leaving.has(at):
+				break
+			if at == start and middles.size() > 2:
+				break
+		loops.append(middles)
+	return loops
+
+
+## [param loop] (closed) with the fewest points within [param tolerance]
+## of it (Douglas-Peucker, split at its two points farthest apart).
+static func _simplify_loop(loop: PackedVector2Array, tolerance: float) -> PackedVector2Array:
+	if loop.size() <= 4:
+		return loop
+	var far := 0
+	for i in loop.size():
+		if loop[i].distance_squared_to(loop[0]) > loop[far].distance_squared_to(loop[0]):
+			far = i
+	var first := _simplify_run(loop.slice(0, far + 1), tolerance)
+	var back := loop.slice(far)
+	back.append(loop[0])
+	var second := _simplify_run(back, tolerance)
+	var out := first.slice(0, first.size() - 1)
+	out.append_array(second.slice(0, second.size() - 1))
+	return out
+
+
+## [param run]'s ends and the fewest points between within [param
+## tolerance] of it (Douglas-Peucker).
+static func _simplify_run(run: PackedVector2Array, tolerance: float) -> PackedVector2Array:
+	if run.size() <= 2:
+		return run
+	var a := run[0]
+	var b := run[run.size() - 1]
+	var worst := -1.0
+	var at := 0
+	for i in range(1, run.size() - 1):
+		var gap := run[i].distance_to(Geometry2D.get_closest_point_to_segment(run[i], a, b))
+		if gap > worst:
+			worst = gap
+			at = i
+	if worst <= tolerance:
+		return PackedVector2Array([a, b])
+	var left := _simplify_run(run.slice(0, at + 1), tolerance)
+	var right := _simplify_run(run.slice(at), tolerance)
+	left.resize(left.size() - 1)
+	left.append_array(right)
+	return left
+
+
+## How far [param point] is into the forest past its edge's curve (decision
+## 575): positive on the forest's side, negative on the land's; NAN with no
+## edge near. The nearest of the curves near, its side by the way it runs
+## (the land on its right going round).
+func _edge_signed(point: Vector2) -> float:
+	var cell := Vector2i(roundi(point.x), roundi(point.y))
+	if not _edge_near_sample.has(cell):
+		return NAN
+	var best := INF
+	var signed := NAN
+	for near: Vector2i in [_edge_near_sample[cell]] + _edge_near_also.get(cell, []):
+		var points: PackedVector2Array = _edge_curves[near.x]["curve"]["points"]
+		var n := points.size()
+		for j in range(near.y - CURVE_SEARCH, near.y + CURVE_SEARCH):
+			var a := points[posmod(j, n)]
+			var b := points[posmod(j + 1, n)]
+			var way := b - a
+			# The seam's near-repeat point is no segment: its side is none.
+			if way.length_squared() < 0.0025:
+				continue
+			var on := Geometry2D.get_closest_point_to_segment(point, a, b)
+			var gap := point.distance_to(on)
+			if gap < best:
+				best = gap
+				var cross := way.x * (point.y - a.y) - way.y * (point.x - a.x)
+				signed = -gap if cross > 0.0 else gap
+	return signed
+
+
+## The forest edge's field (decision 575): an RG8 image the shore field's
+## size and texels, r 0.5 plus the signed distance into the forest
+## (_edge_signed: its edge at a half), g 1 where it is written (near an
+## edge); the ground reads the cells' forest mask elsewhere.
+func _edge_field(origin: Vector2i, size: Vector2i) -> Image:
+	var image := Image.create(size.x, size.y, false, Image.FORMAT_RG8)
+	for cell: Vector2i in _edge_near_sample:
+		var at := cell - origin
+		if at.x < 0 or at.y < 0 or at.x * SHORE_RES >= size.x or at.y * SHORE_RES >= size.y:
+			continue
+		for v in SHORE_RES:
+			for u in SHORE_RES:
+				var point := Vector2(cell) + (Vector2(u, v) + Vector2(0.5, 0.5)) / SHORE_RES - Vector2(0.5, 0.5)
+				var signed := _edge_signed(point)
+				if is_nan(signed):
+					continue
+				image.set_pixelv(Vector2i(at.x * SHORE_RES + u, at.y * SHORE_RES + v), Color(clampf(0.5 + signed, 0.0, 1.0), 1.0, 0.0))
+	return image
 
 
 ## Mist at each tall fall's foot (570 amended, terrain's side; the

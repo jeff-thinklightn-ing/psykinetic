@@ -57,6 +57,11 @@ uniform sampler2D roads : hint_default_black, filter_linear, repeat_disable;
 // Outdoors, the forest's floor (the mask's g): the land runs into it along
 // a ragged line.
 uniform vec3 forest_floor : source_color = vec3(0.17, 0.26, 0.14);
+// The forest's edge from its curve (decision 575, Client3D._edge_field): r
+// a half at the edge, more into the forest; g 1 where written (near an
+// edge), the cells' mask (the water mask's g) elsewhere. SHORE_RES texels
+// a cell over the kinds' cells.
+uniform sampler2D forest_edge : hint_default_black, filter_linear, repeat_disable;
 // Past pine stands, the needles' own texture there (decision 423's
 // ground.needles), so the land's edge meets the floor beyond it.
 uniform sampler2D needles_tex : source_color, filter_linear_mipmap, repeat_enable;
@@ -354,7 +359,8 @@ void fragment() {
 	}
 	float wet = smoothstep(0.3, 0.55, texture(shore, (at - kinds_origin + 0.5) / kinds_size).r);
 	colour = mix(colour, colour * vec3(0.5, 0.58, 0.62), wet);
-	float forest = smoothstep(0.35, 0.65, texture(water, uv).g + (noise(at * 1.9 + 40.0) - 0.5) * 0.35);
+	vec2 edge = texture(forest_edge, uv).rg;
+	float forest = smoothstep(0.35, 0.65, mix(texture(water, uv).g, edge.r, edge.g) + (noise(at * 1.9 + 40.0) - 0.5) * 0.35);
 	// Under a grown forest's roof (decisions 466, 467) the grass is needles
 	// where the cover passes a half, raggedly; the path's dirt and the
 	// floors stay.

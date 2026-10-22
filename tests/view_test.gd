@@ -46,6 +46,7 @@ func _ready() -> void:
 	_test_hills()
 	_test_shore()
 	_test_curves_meet()
+	_test_forest_edge()
 	_test_ledges()
 	_test_relax()
 	_test_solid_ground()
@@ -2163,6 +2164,81 @@ func _test_streams() -> void:
 ## pond's corners (a lone cell a disc) yet keeps to its cells, the hills'
 ## shore cells drawn finer and meeting the ground round them, a level
 ## without relief drawn whole.
+## The forest's edge drawn from curves (decision 575): traced round the
+## cells the forest grows round, never past EDGE_BOUND of their edge; the
+## land's side and the forest's by the curve agreeing with the cells away
+## from it; the ground's field a half on the curve; the edge's trees on the
+## forest's cells and its side; the scatter by it on its own side.
+func _test_forest_edge() -> void:
+	print("\n== the forest's edge: a curve traced round the land, its trees and scatter by it ==")
+	for name: String in ["hills", "wilds"]:
+		var level := Level.load_level(name)
+		_rig.rebuild(level["terrain"], level["centre"])
+		var wooded: Dictionary = _rig._wooded
+		# How far a point is from the cells' edge (wooded beside not).
+		var off_edge := func(at: Vector2) -> float:
+			var nearest := INF
+			var cell := Vector2i(roundi(at.x), roundi(at.y))
+			for y in range(-1, 2):
+				for x in range(-1, 2):
+					var here := cell + Vector2i(x, y)
+					for side: Vector2i in [Vector2i(1, 0), Vector2i(0, 1)]:
+						if wooded.has(here) == wooded.has(here + side):
+							continue
+						var middle := Vector2(here) + Vector2(side) * 0.5
+						var along := Vector2(side.y, side.x) * 0.5
+						nearest = minf(nearest, at.distance_to(Geometry2D.get_closest_point_to_segment(at, middle - along, middle + along)))
+			return nearest
+		var astray := []
+		var samples := 0
+		for edge: Dictionary in _rig._edge_curves:
+			for point: Vector2 in edge["curve"]["points"]:
+				samples += 1
+				if off_edge.call(point) > Client3D.EDGE_BOUND:
+					astray.append(point)
+		_check(not _rig._edge_curves.is_empty() and astray.is_empty(),
+				"%s: %d edge curves, every point within %.2f of the cells' edge (%d points; astray: %s)" % [name, _rig._edge_curves.size(), Client3D.EDGE_BOUND, samples, astray.slice(0, 4)])
+		var wrong := []
+		var field_off := []
+		for cell: Vector2i in _rig._edge_near_sample:
+			var into := _rig._edge_signed(Vector2(cell))
+			if is_nan(into) or absf(into) < Client3D.EDGE_BOUND + 0.05:
+				continue
+			if (into > 0.0) == wooded.has(cell):
+				wrong.append(cell)
+		for edge: Dictionary in _rig._edge_curves:
+			var points: PackedVector2Array = edge["curve"]["points"]
+			for k in range(0, points.size(), 16):
+				var into := _rig._edge_signed(points[k])
+				if is_nan(into) or absf(into) > 0.05:
+					field_off.append(points[k])
+		_check(wrong.is_empty() and field_off.is_empty(),
+				"%s: the land's side and the forest's by the curve as the cells have them away from it (wrong: %s), nought on the curve (off: %s)" % [name, wrong.slice(0, 4), field_off.slice(0, 4)])
+		var on_land := []
+		for cell: Vector2i in _rig._trees:
+			var tree: Node3D = _rig._trees[cell]
+			var at := Vector2(tree.position.x, tree.position.z)
+			var into := _rig._edge_signed(at)
+			if _rig._land.has(Vector2i(roundi(at.x), roundi(at.y))) or not is_nan(into) and into < 0.0:
+				on_land.append(at)
+		_check(on_land.is_empty(), "%s: every tree on the forest's cells and its side of the edge (%d trees; on the land: %s)" % [name, _rig._trees.size(), on_land.slice(0, 4)])
+		var astray_scatter := 0
+		var by_edge := 0
+		for chunk: Vector2i in _rig._scatter_chunks:
+			var plan := _rig._scatter_plan(chunk)
+			for kind: String in plan:
+				for item: Array in plan[kind]:
+					var into := _rig._edge_signed(item[1])
+					if is_nan(into) or not _rig._edge_near_sample.has(item[0]):
+						continue
+					by_edge += 1
+					if (into > 0.0) != bool(item[3]) or kind == "root" and not item[3] and into < -Client3D.EDGE_ROOTS:
+						astray_scatter += 1
+		_check(by_edge > 0 and astray_scatter == 0,
+				"%s: the scatter by the edge on its own side of the curve, the roots within %.1f of it (%d by it; astray: %d)" % [name, Client3D.EDGE_ROOTS, by_edge, astray_scatter])
+	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+
+
 ## Where two waters' curves meet (570, terrain's side: a stream into a
 ## river): the field their union, so a point inside the river nearer the
 ## stream's end than any of the river's samples is still in the water.
@@ -2832,14 +2908,27 @@ func _test_outdoor() -> void:
 		_check(forest_floor.position.y < bed and bed < surface,
 				"its water is drawn above its bed, and both above the forest floor, not hidden under it")
 	var land: Dictionary = _rig._land
-	var bare: Array[Vector2i] = []
-	for cell: Vector2i in land:
-		for direction: Vector2i in World.DIRECTIONS:
-			var next := cell + direction
-			if not land.has(next) and not _rig._trees.has(next) and next not in bare and not _rig._wooded.has(next) 					and not _rig._room.has_node("Deadwood_%d_%d" % [next.x, next.y]):
-				bare.append(next)
-	_check(not _rig._trees.is_empty() and bare.is_empty(),
-			"a tree (or a felled one's stump) on every cell beside the land but a way's lane (%d trees; bare: %s)" % [_rig._trees.size(), bare.slice(0, 5)])
+	# The edge reads closed (decision 575: its trees from its curve, not a
+	# tree a cell): along every edge curve, every cell's stretch of it has a
+	# tree (or a felled one's stump) within EDGE_CLOSED of it, but by a
+	# way's lane.
+	const EDGE_CLOSED := 2.2
+	var standing: Array[Vector2] = []
+	for tree: Node3D in _rig._trees.values():
+		standing.append(Vector2(tree.position.x, tree.position.z))
+	for wood: Node3D in _rig._room.find_children("Deadwood_*", "", false, false):
+		standing.append(Vector2(wood.position.x, wood.position.z))
+	var bare: Array[Vector2] = []
+	for edge: Dictionary in _rig._edge_curves:
+		var points: PackedVector2Array = edge["curve"]["points"]
+		for k in range(0, points.size(), 4):
+			var by_lane := _rig._glimpse_plans.any(func(plan: Dictionary) -> bool:
+				return (plan["cells"] as Dictionary).has(Vector2i(roundi(points[k].x), roundi(points[k].y))) \
+						or (plan["cells"] as Dictionary).keys().any(func(cell: Vector2i) -> bool: return Vector2(cell).distance_to(points[k]) < 2.0))
+			if not by_lane and not standing.any(func(at: Vector2) -> bool: return at.distance_to(points[k]) < EDGE_CLOSED):
+				bare.append(points[k])
+	_check(not _rig._trees.is_empty() and not _rig._edge_curves.is_empty() and bare.is_empty(),
+			"a tree (or a felled one's stump) within %.1f of every stretch of the forest's edge but a way's lane (%d trees; bare: %s)" % [EDGE_CLOSED, _rig._trees.size(), bare.slice(0, 5)])
 	var outline_walls := 0
 	var inner_walls := 0
 	var edges: Dictionary = terrain["edges"]
@@ -2905,7 +2994,9 @@ func _test_outdoor() -> void:
 			_check(on_land == 0 and lane.all(func(cell: Vector2i) -> bool: return cells.has(cell)) and cells.has(Vector2i(16, 33)),
 					"none of it on our land; a lane from the link through the trees; the wilds' from_castle (128, 22) across from our link, at (16, 33)")
 			var wooded := cells.keys().filter(func(cell: Vector2i) -> bool: return _rig._trees.has(cell)).size()
-			_check(wooded == 0 and _rig._trees.has(Vector2i(14, 24)) and _rig._trees.has(Vector2i(18, 24)),
+			var near_tree := func(at: Vector2) -> bool:
+				return _rig._trees.values().any(func(tree: Node3D) -> bool: return Vector2(tree.position.x, tree.position.z).distance_to(at) < 1.6)
+			_check(wooded == 0 and near_tree.call(Vector2(14, 24)) and near_tree.call(Vector2(18, 24)),
 					"no tree on it, the trees either side of the lane")
 			var view: Client3D = _rig._glimpses[0]
 			_check(view.find_children("*", "Area3D", true, false).is_empty() and not view.is_processing()
