@@ -644,8 +644,8 @@ func _test_crypt_commissions() -> void:
 	offer = _offers("o-aldous", "p1").filter(func(o: Dictionary) -> bool: return str(o["title"]) == "Find the runner")[0]
 	taken = Offers.accept("o-aldous", "p1", "Jeff", offer["id"], 0, _ctx)
 	_check(bool(taken["ok"]) and str(taken["line"]) == "Jeff takes Aldous's commission: to find what became of Pip.", "taken: %s" % taken["line"])
-	_check(Offers.crypt_done(TOWN, "p1", Offers.RUNNER, _ctx) and _done.size() == 2 and str(_done[1][2]) == "Jeff found Pip's pack in the lair below the altar, and told Aldous."
-		and str(Townsfolk.card_of(_work, "o-aldous")["facts"].back()["text"]) == "Jeff found Pip's pack in the barrow's lair: he was lost below, past the altar.", "the pack found: met, and Aldous learns the fate: %s" % [_done[1][2]])
+	_check(Offers.crypt_done(TOWN, "p1", Offers.RUNNER, _ctx) and _done.size() == 2 and str(_done[1][2]) == "Jeff found Pip's pack in the robbers' camp, and told Aldous."
+		and str(Townsfolk.card_of(_work, "o-aldous")["facts"].back()["text"]) == "Jeff found Pip's pack in the robbers' camp under the mound: he fell to them on his way.", "the pack found: met, and Aldous learns the fate: %s" % [_done[1][2]])
 	# The offering kept: after the days it lapses as a cheat.
 	lost[0] = ""
 	pot[0] = 8

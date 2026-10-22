@@ -21511,6 +21511,17 @@ three), regen_test (the marked list), view_test (the Ossuary's niches).
 Level data both sides read: ships in a full cut only; protocol unchanged;
 no new class_name.
 
+## 580, npc's side: the Runner's pack in the robbers' camp
+
+Dungeon's barrow in layers (580, step 1 12ab659f) keeps the altar, its
+guards and Pip's niche on the first layer with the "Runner's pack" chest
+in the robbers' camp, so the runner rule moves nothing (runner.barrow stays
+"barrow", the niche place "barrow/niche"). Pip's run is a timed absence
+with no walked route, so he marks no hidden door found: the search stays
+the players'. npc's side is text alone: Offers' three lines on the pack
+found (Aldous's fact, the party line, the town's memory) say the robbers'
+camp under the mound, no longer the lair below the altar. offers_test
+follows. Server only, protocol unchanged.
 
 ## 573 amended. The draugr's hall as a puzzle: the shut door, his two lines, the gold, the Draugr's Totem
 

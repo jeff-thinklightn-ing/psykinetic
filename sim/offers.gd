@@ -332,9 +332,9 @@ static func crypt_done(town: String, player_id: String, sub: String, given: Dict
 				"%s laid the offering at the altar, as promised to %s." % [by, name], "", 1, given, OFFERING, "carried the offering down")
 		else:
 			var runner := str(ask.get("what", {}).get("name", "Pip"))
-			_close(pair[0], ask, "%s found %s's pack in the barrow's lair: he was lost below, past the altar." % [by, runner],
-				"%s found %s's pack in the lair below the altar, and told %s." % [by, runner, name], "", 1, given, RUNNER, "found the runner's pack")
-			Townsfolk._remember(town, "%s's pack was found in the barrow's lair, below the altar" % runner, pair[0], false, production.now())
+			_close(pair[0], ask, "%s found %s's pack in the robbers' camp under the mound: he fell to them on his way." % [by, runner],
+				"%s found %s's pack in the robbers' camp, and told %s." % [by, runner, name], "", 1, given, RUNNER, "found the runner's pack")
+			Townsfolk._remember(town, "%s's pack was found in the robbers' camp under the mound" % runner, pair[0], false, production.now())
 		return true
 	return false
 

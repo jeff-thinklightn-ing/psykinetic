@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The Runner's pack is found in the robbers' camp under the mound, as the barrow's layers now have it (580, npc's side). Server only, text.
 - Grave robbers are drawn as people, in the same varied human bodies as townsfolk, hooded.
 - The barrow's dead have bodies of their own: the skeleton, the barrow guard in helm, mail and shield, the crowned draugr, and a ghost whose see-through shroud casts no shadow.
 - The Draugr's Totem holds your resurrection charges; it stays with you and can't be traded, dropped or sold (573 amended).
