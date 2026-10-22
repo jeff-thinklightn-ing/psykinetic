@@ -7,30 +7,34 @@ notes (decision 324).
 
 ## Unreleased
 
+## v0.1.164
+
+- This version changes what goes over the network, so v0.1.163 and older can't join the server: update through the launcher first.
+- The live world changes with this update: the wilds' town gets a woodlot to the south-west with a chopping block and a woodpile, and the barrow is laid out again for the draugr's new deals.
 - The crickets are gone from the night: no more constant rattle, in any season. The night is left to the wind, owls and bats, and three crackly stream and waterfall recordings are dropped, leaving the smoother ones (578, 578 amended; Jeff: "a noise that sounds like bugs or a hard drive", "a constant rattle").
-- Groundwork for what each area teaches: the draugr's blessing is now the first entry in a catalog of capabilities, and a way sealed by one opens if you or the companion with you holds it (576).
-- Entering the wilds is quicker: building its ground takes about 4.8 s instead of 5.7 s (the hills 1.16 s instead of 1.27 s), drawn exactly as before.
-- The forest's edge follows a curve round the land instead of the tiles: trees stand at varied depths along it, and the forest floor and its scatter change along the curve (575).
-- The woodcutter has time at his block: a body at its work walks its real route at full pace however far away, and chops until it must set off to be home when the wood lands (521 amended, npc's side; economy adds the spell of work to the trip). Server only.
-- The woodcutter, hunter and farmer now spend a spell working at their site before walking home, instead of turning back as they arrive (521 amended, economy's side); the wood comes in about 4% slower.
-- A resident who takes up a new trade works it at once: their body follows the trade (it kept the old one until they stood again), and the town soak reports where each body is seen at work (566 amended, npc's side, part 3). Server only.
-- The town in the wilds has a woodlot at the copse to its south-west, with a chopping block, and a woodpile in the store's yard, so the woodcutter has somewhere to work (566 amended).
-- Herbs keep growing round the wilds when the town gets a woodlot or other work site: only the town's store clears a ring of them (562 amended (2)).
-- A soft mist now rises from the pool at the foot of a tall waterfall and drifts downstream (570 amended).
-- A level may stand a chopping block and a woodpile (building.chopping_block, building.woodpile: solid, no door, 1 x 1) for the woodcutter's work (566 amended, npc's side, part 2). Data rule only.
-- A woodcutter's axe now comes down on top of the chopping block in front of them, not short of it and off to the right.
-- The woodcutter chops at the woodlot's chopping block and carries his logs to the woodpile by the store when a level stands them (566 amended, npc's side; the props and the wilds' woodlot follow from art-kit and maps). Server only.
-- New standing pieces for the woodlot (566 amended): a chopping block with a log stood on it to split, and a log pile in three fills held in by end stakes; nothing places them yet.
-- A resident chopping wood holds the axe in both hands, the left at the end of the handle and the right up it, and swings it overhead and down into the block; before, the left hand gripped nothing.
+- The draugr's blessing gives resurrection charges (573, Jeff's words: a counter, not an item): laid to rest, he blesses the players in his lair and their companions and gives the deal's charges, 5, 10 or 15 by the gold given, up to what you can hold (25, 50, 75 by the hardest deal beaten); a return in the field drains one of the resurrector's charges, with no device to carry; the player carries the count and the room on the wire (revision 30). The deals' gold steps, his level by the charges in the zone and the heal when someone zones in follow on enemy-ai's side.
+- The draugr's pact is bought by the deal: 20, 50 or 100 gold for 5, 10 or 15 charges (under 20 he refuses; between steps you get the lower one). He stands harder for every charge the players in the barrow hold when the fight begins, and heals half his health at once whenever someone comes into the barrow while it is on (573).
+- Once the draugr has blessed you, your pack shows the resurrection charges you hold, "charges 23 of 50", at its foot; nothing shows before that (573, ui's side; the charges are dungeon's).
+- Anyone with the draugr's blessing now lies downed when beaten, even with no charges of their own, so a blessed friend with a charge can bring them back; a companion says she can't when her player has none (573, companions' side).
 - The Hills have a waterfall: a stream crosses the plateau's top and drops nearly 8 m off its west cliff into a pool, then runs down to the river, forded below the pool (570).
 - A tall waterfall now hangs as a white curtain from its lip into the pool below, and a stream meeting a river joins it with no dry seam or step (570, terrain's side).
-- Anyone with the draugr's blessing now lies downed when beaten, even with no charges of their own, so a blessed friend with a charge can bring them back; a companion says she can't when her player has none (573, companions' side).
+- A soft mist now rises from the pool at the foot of a tall waterfall and drifts downstream (570 amended).
+- The forest's edge follows a curve round the land instead of the tiles: trees stand at varied depths along it, and the forest floor and its scatter change along the curve (575).
+- The town in the wilds has a woodlot at the copse to its south-west, with a chopping block, and a woodpile in the store's yard, so the woodcutter has somewhere to work (566 amended).
+- The woodcutter chops at the woodlot's chopping block and carries his logs to the woodpile by the store when a level stands them (566 amended, npc's side; the props and the wilds' woodlot follow from art-kit and maps). Server only.
+- The woodcutter has time at his block: a body at its work walks its real route at full pace however far away, and chops until it must set off to be home when the wood lands (521 amended, npc's side; economy adds the spell of work to the trip). Server only.
+- The woodcutter, hunter and farmer now spend a spell working at their site before walking home, instead of turning back as they arrive (521 amended, economy's side); the wood comes in about 4% slower.
+- Groundwork for what each area teaches: the draugr's blessing is now the first entry in a catalog of capabilities, and a way sealed by one opens if you or the companion with you holds it (576).
+- Entering the wilds is quicker: building its ground takes about 4.8 s instead of 5.7 s (the hills 1.16 s instead of 1.27 s), drawn exactly as before.
+- A resident who takes up a new trade works it at once: their body follows the trade (it kept the old one until they stood again), and the town soak reports where each body is seen at work (566 amended, npc's side, part 3). Server only.
+- Herbs keep growing round the wilds when the town gets a woodlot or other work site: only the town's store clears a ring of them (562 amended (2)).
+- A level may stand a chopping block and a woodpile (building.chopping_block, building.woodpile: solid, no door, 1 x 1) for the woodcutter's work (566 amended, npc's side, part 2). Data rule only.
+- A woodcutter's axe now comes down on top of the chopping block in front of them, not short of it and off to the right.
+- New standing pieces for the woodlot (566 amended): a chopping block with a log stood on it to split, and a log pile in three fills held in by end stakes; nothing places them yet.
+- A resident chopping wood holds the axe in both hands, the left at the end of the handle and the right up it, and swings it overhead and down into the block; before, the left hand gripped nothing.
 - A resident carrying a log on the shoulder no longer has it through the head: the log sits out on the shoulder, level as they walk, with the hand under it.
-- Once the draugr has blessed you, your pack shows the resurrection charges you hold, "charges 23 of 50", at its foot; nothing shows before that (573, ui's side; the charges are dungeon's).
-- The draugr's pact is bought by the deal: 20, 50 or 100 gold for 5, 10 or 15 charges (under 20 he refuses; between steps you get the lower one). He stands harder for every charge the players in the barrow hold when the fight begins, and heals half his health at once whenever someone comes into the barrow while it is on (573).
 - A companion no longer says a bare list of names ("Wren, Aldous, Snagfin.") unless you asked her something, and no longer tells you whether you will make it; she says what she fears or what to do (574).
-- The draugr's blessing gives resurrection charges (573, Jeff's words: a counter, not an item): laid to rest, he blesses the players in his lair and their companions and gives the deal's charges, 5, 10 or 15 by the gold given, up to what you can hold (25, 50, 75 by the hardest deal beaten); a return in the field drains one of the resurrector's charges, with no device to carry; the player carries the count and the room on the wire (revision 30). The deals' gold steps, his level by the charges in the zone and the heal when someone zones in follow on enemy-ai's side.
-- Groundwork for the Crypt's charges: the draugr's deals (20, 50 or 100 gold for 5, 10 or 15 charges) and a charge capacity that grows with the hardest deal beaten (25, 50, 75) are now in the rules; nothing changes in play until the barrow's side lands (573, economy's side).
+
 ## v0.1.163
 
 - This version changes what goes over the network, so v0.1.162 and older can't join the server: update through the launcher first.
