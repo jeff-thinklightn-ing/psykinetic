@@ -292,33 +292,64 @@ def left_arm(ahead: float, out: float, up: float, pole: tuple) -> list:
 
 
 # Chopping: both hands on the haft, each placed (REACH) so neither forearm crosses the chest
-# (Axe_Overhead's hold did, for the brute): ready held across the front, the left hand low by the
-# left hip, the right up by the right side, the head up to the right; raised over the right
-# shoulder, the head behind; brought down ahead into the log, the right hand leading, the trunk
-# bowing into it; a breath, again. The haft lies from the left hand through the right (GRASP),
-# its edge toward [edge] made square to it.
-SHOULDERS = 0.17
+# (Axe_Overhead's hold did, for the brute): ready, the head resting toward the block ahead and
+# low; raised over the right shoulder, the head up behind; brought down ahead into the block,
+# the trunk bowing into it; a breath, again. The right wrist within reach of its shoulder (0.46 m:
+# farther, the arm stops short and the left hand missed the haft by 0.33 m); the haft along
+# [haft] from the left hand, at its butt, through the right, CHOP_GRIP between them (Client3D
+# slides tool.axe, its origin at the butt, that far and a little over down the right hand); its
+# edge toward [edge] made square to it.
+CHOP_GRIP = 0.18
+# The trunk turned, the right shoulder brought forward (the base holds it 0.12 m back): the axe
+# out in front, the left forearm clear of the chest.
+SQUARED = [("spine_02", TURN, 18.0), ("spine_03", TURN, 14.0)]
+# Where a hand holds a thing, from its wrist in its own bone's axes here: Client3D's hand socket,
+# (0, HAND_GRIP 0.10, HAND_PALM 0.03) in Godot's, whose bone axes are these turned (x there is z
+# here, z there is -x here); a thing held lies along the socket's +y, the right bone's +z here, the
+# left's -z.
+HOLD_AT = (-0.03, 0.10, 0.0)
 
 
-def chop(right: tuple, left: tuple, edge: tuple, poles: tuple = ((-1.0, 0.3, -0.5), (1.0, 0.2, -0.6))) -> list:
-	"""The right wrist at [right] = (ahead, out to its right, up) of the right shoulder, the left
-	at [left] = (ahead, out to its left, up) of the left; the axe along from the left to the right."""
-	r = Vector((-SHOULDERS - right[1], -right[0], right[2]))
-	l = Vector((SHOULDERS + left[1], -left[0], left[2]))
-	length = (r - l).normalized()
+def grasped(length: Vector, side: Vector) -> tuple:
+	"""The hand's axes (x, y, z) here as GRASP turns it to [length] and [side]."""
+	z = length.normalized()
+	x = -(side - z * side.dot(z)).normalized()
+	return x, z.cross(x), z
+
+
+def holding(length: Vector, side: Vector) -> Vector:
+	"""From the wrist to where the hand holds, the hand GRASPed to [length] and [side]."""
+	x, y, _z = grasped(length, side)
+	return x * HOLD_AT[0] + y * HOLD_AT[1]
+
+
+def chop(right: tuple, haft: tuple, edge: tuple, poles: tuple = ((-1.0, 0.3, -0.5), (0.8, -0.6, -0.4))) -> list:
+	"""The right wrist at [right] = (ahead, out to its right, up) of the right shoulder; the haft
+	along [haft] = (ahead, to the right, up) from the left hand's hold, CHOP_GRIP back down it from
+	the right's, each hand turned along it (GRASP), the left wrist placed for its hold from the
+	right wrist as posed (the base turns the shoulders: the right one sat 0.12 m back of the left)."""
+	length = Vector((-haft[1], -haft[0], haft[2])).normalized()
 	e = Vector(edge)
 	e = (e - length * e.dot(length)).normalized()
-	return right_arm(right[0], right[1], right[2], poles[0]) + left_arm(left[0], left[1], left[2], poles[1]) + [
-		("hand_r", (tuple(length), tuple(e)), GRASP)]
+	# Both hands wrapping the haft from the same side (the left's turned end for end, its side too).
+	left = holding(length, e) - length * CHOP_GRIP - holding(-length, -e)
+	return SQUARED + right_arm(right[0], right[1], right[2], poles[0]) + [
+		("upperarm_l", ([("hand_r", tuple(left), 1.0)], poles[1]), REACH),
+		("hand_r", (tuple(length), tuple(e)), GRASP), ("hand_l", (tuple(-length), tuple(-e)), GRASP)]
 
 
-CHOP_READY = chop((0.45, 0.1, -0.2), (0.4, -0.05, -0.5), (0.0, -1.0, 0.0))
-CHOP_UP = chop((0.05, 0.12, 0.3), (0.25, -0.15, 0.1), (0.0, -1.0, 0.5)) + [("spine_02", LIFT, 8.0), ("spine_03", LIFT, 4.0)]
-CHOP_DOWN = chop((0.66, 0.02, -0.42), (0.38, -0.12, -0.4), (0.0, 0.0, -1.0)) + [
+CHOP_READY = chop((0.45, 0.04, 0.0), (0.85, 0.0, -0.5), (0.0, 0.0, -1.0), ((-1.0, 0.3, -0.5), (1.0, -0.6, -0.1))) + [
+	("spine_02", LIFT, -2.0)]
+CHOP_UP = chop((0.16, 0.06, 0.38), (-0.4, 0.1, 0.9), (0.0, -1.0, 0.45)) + [("spine_02", LIFT, 8.0), ("spine_03", LIFT, 4.0)]
+# Halfway down, the head high ahead (between the raise and the strike, each hand solved, not
+# their blend: blended, the left left the haft and the head dipped into the body).
+CHOP_SWING = chop((0.34, 0.02, 0.22), (0.45, 0.05, 0.9), (0.0, -1.0, 0.0)) + [("spine_02", LIFT, 2.0)]
+CHOP_DOWN = chop((0.42, -0.06, -0.2), (0.75, 0.05, -0.65), (0.0, 0.0, -1.0)) + [
 	("spine_01", LIFT, -14.0), ("spine_02", LIFT, -10.0), ("Head", LIFT, 10.0)]
 CLIPS["Chop_Loop"] = {"loop": True, "keys": [
 	(0.0, P("Idle_Loop", 0.0, CHOP_READY)),
 	(0.45, P("Idle_Loop", 0.45, CHOP_UP)),
+	(0.54, P("Idle_Loop", 0.54, CHOP_SWING)),
 	(0.62, P("Idle_Loop", 0.62, CHOP_DOWN, move=(0.0, -0.04, -0.05))),
 	(0.8, P("Idle_Loop", 0.8, CHOP_DOWN)),
 	(1.3, P("Idle_Loop", 1.3, CHOP_READY + [("spine_02", LIFT, 2.0)])),

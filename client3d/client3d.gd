@@ -9717,6 +9717,8 @@ func _sync_held(entity: GridEntity, puppet: Node3D) -> void:
 				# grip's axis turns it out of the back of the hand, its thin side
 				# across the forearm.
 				thing.basis = Basis(Vector3.UP, PI * 0.5)
+			if own and hand == 0:
+				_grip(thing, work)
 			socket.add_child(thing)
 
 
@@ -10360,13 +10362,16 @@ static func _sitting(puppet: Node3D) -> bool:
 ## as the body shows it: the clip it plays standing at the work ("clip"; walking,
 ## its gait), the tool in its right hand while that hand is empty ("right", an
 ## art slot: art-kit's tool.*), the load on its shoulder ("shoulder": carry.*),
-## an upper-layer clip over its walk and stand ("upper"), lying ("lying").
+## an upper-layer clip over its walk and stand ("upper"), lying ("lying"), the
+## tool slid down the hand by "grip" metres along its length (its +y; the axe's
+## origin is its butt: two-handed, the right hand holds it up the haft and the
+## butt is in the left, humanoid_clips.py's CHOP_GRIP and a little over).
 ## A word not here shows nothing (the sim may name one before it's drawn). The
 ## sim sets only the facing (toward the work); the strokes are the client's,
 ## each body out of step with the next (AnimRig.loop starts a clip somewhere
 ## along it, seeded per body).
 const ACTIVITIES := {
-	"chop": {"clip": "Chop", "right": "tool.axe"},
+	"chop": {"clip": "Chop", "right": "tool.axe", "grip": 0.22},
 	"saw": {"clip": "Saw", "right": "tool.saw"},
 	"hammer": {"clip": "Hammer", "right": "tool.hammer"},
 	"carry_log": {"upper": "Carry_Shoulder", "shoulder": "carry.log"},
@@ -10374,6 +10379,11 @@ const ACTIVITIES := {
 }
 ## A hand's id that names an art slot, not an item (a work's tool).
 const ART_ID := "art:"
+
+
+## [param tool] in its socket as [param work] holds it (its "grip").
+static func _grip(tool: Node3D, work: Dictionary) -> void:
+	tool.position = Vector3(0.0, -float(work.get("grip", 0.0)), 0.0)
 
 
 ## [param entity]'s work as ACTIVITIES has it ({} for none).

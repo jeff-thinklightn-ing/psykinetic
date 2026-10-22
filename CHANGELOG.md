@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- A resident chopping wood holds the axe in both hands, the left at the end of the handle and the right up it, and swings it overhead and down into the block; before, the left hand gripped nothing.
 - The Hills have a waterfall: a stream crosses the plateau's top and drops nearly 8 m off its west cliff into a pool, then runs down to the river, forded below the pool (570).
 - A tall waterfall now hangs as a white curtain from its lip into the pool below, and a stream meeting a river joins it with no dry seam or step (570, terrain's side).
 - Anyone with the draugr's blessing now lies downed when beaten, even with no charges of their own, so a blessed friend with a charge can bring them back; a companion says she can't when her player has none (573, companions' side).

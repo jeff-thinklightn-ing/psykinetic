@@ -258,9 +258,10 @@ func _test_work_clear() -> void:
 		["man broad", "res://art/models/characters/human_m.glb", {"heavy": 0.6, "broad": 1.0}],
 		["man lean", "res://art/models/characters/human_m.glb", {"lean": 1.0, "narrow": 1.0}],
 		["woman", "res://art/models/characters/human_f.glb", {}]]
-	var moments := [["Chop", "tool.axe", [0.0, 0.3, 0.45, 0.55, 0.62, 0.8, 1.3]], ["Saw", "tool.saw", [0.0, 0.2, 0.4, 0.6]],
-		["Hammer", "tool.hammer", [0.0, 0.22, 0.5]]]
+	var moments := [["Chop", "chop", [0.0, 0.3, 0.45, 0.55, 0.62, 0.8, 1.3]], ["Saw", "saw", [0.0, 0.2, 0.4, 0.6]],
+		["Hammer", "hammer", [0.0, 0.22, 0.5]]]
 	var found: Array[String] = []
+	var off_haft: Array[String] = []
 	for build: Array in builds:
 		for moment: Array in moments:
 			for at: float in moment[2]:
@@ -273,7 +274,9 @@ func _test_work_clear() -> void:
 							mesh.set_blend_shape_value(i, build[2][key])
 				var holder := Node3D.new()
 				Client3D._attach_sockets(model, Client3D.HUMAN_SOCKETS, 1.0, holder)
-				var tool := ArtKit.instance(moment[1])
+				var work: Dictionary = Client3D.ACTIVITIES[moment[1]]
+				var tool := ArtKit.instance(work["right"])
+				Client3D._grip(tool, work)
 				(holder.get_meta("sockets")["hand_r"] as Node3D).add_child(tool)
 				var rig := AnimRig.make(model, lib, 0.0, true, null)
 				rig.loop(moment[0], 0.0, 0.0, true)
@@ -283,9 +286,20 @@ func _test_work_clear() -> void:
 				var counts := _bow_inside(model, tool)
 				if counts != Vector3i.ZERO:
 					found.append("%s %s %.2f: tool %d, left forearm %d, right arm %d" % [build[0], moment[0], at, counts.x, counts.y, counts.z])
+				if work.has("grip"):
+					# Two hands on the haft: the left hand's grip (its socket, where it holds a thing) near
+					# the line of the haft, between its butt and the right hand.
+					var wrist := (holder.get_meta("sockets")["hand_l"] as Node3D).global_position
+					var butt := tool.global_position
+					var up := tool.global_basis.y.normalized()
+					var along := (wrist - butt).dot(up)
+					var off := (wrist - butt - up * along).length()
+					if off > 0.09 or along < -0.05 or along > float(work["grip"]):
+						off_haft.append("%s %.2f: %.2f off, %.2f along" % [build[0], at, off, along])
 				model.queue_free()
 				holder.free()
 	_check(found.is_empty(), "no tool nor arm inside the body, five builds, chopping, sawing, hammering (%s)" % ", ".join(found))
+	_check(off_haft.is_empty(), "chopping, the left hand on the haft by its butt, five builds (%s)" % ", ".join(off_haft))
 	# The log on the shoulder (Carry_Shoulder over the walk, held level by _level_load): none of
 	# the head or the trunk inside it (art-kit's 0.27 m log went through the crown, in from the
 	# shoulder and tipped with the walk's lean).
