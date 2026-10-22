@@ -14206,6 +14206,15 @@ the bodied take, the guard, the hut's take with no body standing, and the
 walk of a sick resident to the healer completing the kin's plea by the
 walker's name (501's third way, now covered).
 
+Amended (2026-10-22, economy's 562 soak): the gathered herbs went to the
+area's town store through deliver_to, bought by the town's treasury,
+while his workshop (Main._seat_healers: the hut, its own holding) makes
+from the hut's store, so in thirty days he made nothing and the town paid
+for herbs nobody else uses, against Jeff's rule. Now Main._take_herbs
+deposits them in his own town's store, the hut's (Stockpile.deposit, his
+own gathering, nobody paying), where economy's barter herbs meet them;
+the area's town store only for a medicine man with no town of his own.
+
 ## 504. Trade routes: caravans between a town and a market, raidable where they pass a camp
 
 Economy's phase 2 of the gold economy (Jeff: "trade with other town. think

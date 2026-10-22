@@ -5680,7 +5680,12 @@ func _herbs_today(id: String, today: int) -> int:
 ## instance ended as a banked resource's is; a delivery refused puts them
 ## back where they were. True when herbs were taken and delivered.
 func _take_herbs(id: String, name: String, area: String, cell: Vector2i, today: int) -> bool:
-	var store := _town_store_of(area)
+	# His own gathering goes into his own town's store, the hut's (502 amended, economy's soak: his workshop makes
+	# from the hut's store, and nobody pays him for herbs the town has no use for); the area's town store only for
+	# a medicine man with no town of his own.
+	var store := str(World.production.worker(id).get("town", ""))
+	if store.is_empty() or World.holdings.place(store).is_empty():
+		store = _town_store_of(area)
 	if store.is_empty():
 		return false
 	var uid: int = World.forage.take_near(area, cell, HERB_REACH)
@@ -5691,7 +5696,7 @@ func _take_herbs(id: String, name: String, area: String, cell: Vector2i, today: 
 		yields = {World.items.id_of(uid): 1}
 	var delivered := false
 	for what: String in yields:
-		if World.production.deliver_to(store, id, what, int(yields[what]), name, "gathered by the medicine man"):
+		if World.stockpile.deposit(store, what, int(yields[what]), name, "gathered by the medicine man", id):
 			delivered = true
 	if not delivered:
 		World.put_on_ground(uid, cell)

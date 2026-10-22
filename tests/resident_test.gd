@@ -653,7 +653,7 @@ func _test_sick_body() -> void:
 ## The medicine man takes herbs on his way (decision 502, npc's side): the
 ## nearest within HERB_REACH of his body go to his hut's store.
 func _test_herbs() -> void:
-	print("\n== the medicine man takes herbs on his way and banks them at his hut (decision 502, npc's side) ==")
+	print("\n== the medicine man takes herbs on his way and banks them at his hut, his own (decision 502, npc's side, amended) ==")
 	var hut: String = _main._healers_hut_of(STORE)
 	if Items.def("herbs").is_empty() or World.forage == null or hut.is_empty():
 		_check(true, "(items' herbs, World.forage or the test hut is not here: skipped)")
@@ -674,12 +674,14 @@ func _test_herbs() -> void:
 		_main._herbs_gathered.clear()
 		DayNight.set_hour(12.0)
 		_main._gather_herbs()
-		var had := World.stockpile.count(STORE, "herbs")
-		_check(not World.ground_at(laid).has("herbs") and had >= 1 and not World.items.has(uid), "on the world tick he takes them and the town's store buys them (%d herbs)" % had)
+		var town_had := World.stockpile.count(STORE, "herbs")
+		var had := World.stockpile.count(hut, "herbs")
+		_check(not World.ground_at(laid).has("herbs") and had >= 1 and not World.items.has(uid), "on the world tick he takes them into his own hut's store, unpaid (%d herbs)" % had)
+		_check(World.stockpile.count(STORE, "herbs") == town_had, "the town's store neither holds nor paid for them")
 		var second := World.items.mint("herbs", "grew", "the test", oren.zone, oren.tile)
 		var again := World.put_on_ground(second, oren.tile + Vector2i(2, 0))
 		_main._gather_herbs()
-		_check(again != World.NO_CELL and World.ground_at(again).has("herbs") and World.stockpile.count(STORE, "herbs") == had, "a day's gather once: the second pile waits for tomorrow")
+		_check(again != World.NO_CELL and World.ground_at(again).has("herbs") and World.stockpile.count(hut, "herbs") == had, "a day's gather once: the second pile waits for tomorrow")
 		# Without a body: the next day, at the hut, once the hour has come.
 		World.production.set_away("medicine_man:" + hut, true)
 		_sync()
@@ -690,7 +692,7 @@ func _test_herbs() -> void:
 		_check(_body("medicine_man:" + hut) == null and World.ground_at(again).has("herbs"), "before the gathering hour, with no body, the pile lies")
 		DayNight.set_hour(15.0)
 		_main._gather_herbs()
-		_check(not World.ground_at(again).has("herbs") and World.stockpile.count(STORE, "herbs") == had + 1, "after it, the hut's gather takes the pile with no body standing (%d herbs)" % World.stockpile.count(STORE, "herbs"))
+		_check(not World.ground_at(again).has("herbs") and World.stockpile.count(hut, "herbs") == had + 1, "after it, the hut's gather takes the pile with no body standing (%d herbs)" % World.stockpile.count(hut, "herbs"))
 		var far := World.items.mint("herbs", "grew", "the test", oren.zone, oren.tile)
 		var away := World.put_on_ground(far, oren.tile + Vector2i(_main.HERB_REACH + 3, 0))
 		World.steps += DayNight.day_steps
