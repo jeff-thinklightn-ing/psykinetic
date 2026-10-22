@@ -212,6 +212,8 @@ static func image(field: PackedFloat32Array, size: Vector2i) -> Image:
 const LAY_SLOPE := 0.4
 ## How far under its banks Relief.lay sinks a stream's surface.
 const STREAM_DEPTH := 0.4
+## A river's curve this wide where a fall lands: its pool (570).
+const POOL_WIDTH := 3.4
 const FOUR: Array[Vector2i] = [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]
 ## An escarpment's face lower than this after the cap is made a ramp.
 const FACE_LEAST := 1.0
@@ -274,6 +276,8 @@ const KIND_WANDER := 0.04
 ##   rising. Laid on the ground as capped; keep it to a valley's floor
 ##   (valley_floor at least amplitude + most) so its banks are low; its
 ##   curve in "waters", its middle in "streams" after the found ones;
+##   where its curve crosses a face (a plateau's, an escarpment's) it falls
+##   the face's height into a 3 x 3 pool (570; in "falls": {cell, drop});
 ## - keep_clear (cell -> anything): cells left as they are;
 ## - kinds (false): the ground's kinds set by slope and height too (_kinds).
 ## Everything else is slope-limited to LAY_SLOPE a step, so walked. Only
@@ -288,7 +292,7 @@ const KIND_WANDER := 0.04
 ## for a later _limit of the same ground to keep them}.
 static func lay(map: LevelMap, rect: Rect2i, lay_seed: int, options := {}) -> Dictionary:
 	var area := rect.intersection(Rect2i(Vector2i.ZERO, map.size))
-	var out := {"relief": {}, "cells": {}, "streams": [], "waters": [], "faces": {}}
+	var out := {"relief": {}, "cells": {}, "streams": [], "waters": [], "falls": [], "faces": {}}
 	if area.size.x < 3 or area.size.y < 3:
 		return out
 	var field := map.relief_field()
@@ -461,6 +465,7 @@ static func lay(map: LevelMap, rect: Rect2i, lay_seed: int, options := {}) -> Di
 			out["waters"].append({"points": river["points"], "widths": river["widths"]})
 			if river["path"].size() >= 2:
 				out["streams"].append(river["path"])
+			out["falls"].append_array(river["falls"])
 	if not out["streams"].is_empty():
 		# The ground round the water walked again; the water and its banks kept.
 		for at: Vector2i in out["cells"]:
@@ -873,17 +878,69 @@ static func _river(heights: Dictionary, river: Dictionary, river_seed: int, cell
 		return {}
 	var points: PackedVector2Array = made["points"]
 	var widths: PackedFloat32Array = made["widths"]
-	var curve := Curves.sample(points, widths)
 	var ground := {}
 	for at: Vector2i in heights:
 		if not taken.has(at):
 			ground[at] = true
-	var laid := Curves.laid(curve, false, ground)
+	var run := _river_run(points, widths, heights, ground)
+	if run.is_empty():
+		return {}
+	# A fall (570): where its curve crosses a face the water drops the
+	# face's height between two cells of its middle; below, a pool: the
+	# curve widened to POOL_WIDTH at the first control point past where it
+	# lands, so the pool is the curve's own (laid, loaded and drawn alike).
+	var falls: Array[Dictionary] = []
+	var path: Array[Vector2i] = run["path"]
+	var surfaces: PackedFloat32Array = run["surfaces"]
+	for i in range(1, path.size()):
+		var drop := surfaces[i - 1] - surfaces[i]
+		if drop <= WALK_RISE:
+			continue
+		falls.append({"cell": path[i], "drop": snappedf(drop, 0.01)})
+		# The widening starts below the foot: the first control point a cell
+		# past where it lands, so the stream is as narrow as it was to its lip.
+		var lip := Vector2(path[i - 1])
+		var foot := Vector2(path[i])
+		var below := points.size() - 1
+		for k in points.size():
+			if points[k].distance_to(foot) < points[k].distance_to(lip) and points[k].distance_to(lip) >= lip.distance_to(foot) + 1.0:
+				below = k
+				break
+		widths[below] = maxf(widths[below], POOL_WIDTH)
+	if not falls.is_empty():
+		run = _river_run(points, widths, heights, ground)
+		if run.is_empty():
+			return {}
+		path = run["path"]
+		surfaces = run["surfaces"]
+		falls.clear()
+		for i in range(1, path.size()):
+			if surfaces[i - 1] - surfaces[i] > WALK_RISE:
+				falls.append({"cell": path[i], "drop": snappedf(surfaces[i - 1] - surfaces[i], 0.01)})
+	var wet: Dictionary = run["wet"]
+	for cell: Vector2i in wet:
+		heights[cell] = wet[cell]
+		cells[cell] = "water"
+		taken[cell] = true
+	for cell: Vector2i in wet:
+		for direction in FOUR:
+			var bank := cell + direction
+			# Not another water's cell (the river a stream runs into, 570).
+			if heights.has(bank) and not wet.has(bank) and not cells.has(bank) and float(heights[bank]) < float(heights[cell]) + SHORE_LIP + 0.05:
+				heights[bank] = float(heights[cell]) + SHORE_LIP + 0.05
+	return {"points": points, "widths": widths, "path": path, "falls": falls}
+
+
+## A river's curve through [param points] ([param widths]) laid on
+## [param ground] (Curves.laid): its middle's longest run over it ("path"),
+## each middle cell's surface STREAM_DEPTH under [param heights]' ground
+## there, never rising ("surfaces"), and each cell -> the surface of the
+## middle cell it was laid from ("wet"); {} if the run is under two cells.
+static func _river_run(points: PackedVector2Array, widths: PackedFloat32Array, heights: Dictionary, ground: Dictionary) -> Dictionary:
+	var laid := Curves.laid(Curves.sample(points, widths), false, ground)
 	var path: Array[Vector2i] = laid["path"]
 	if path.size() < 2:
 		return {}
-	# The surface down its middle: under the ground, never rising; each of
-	# its cells at that of the middle cell it was laid from.
 	var first: int = laid["first"]
 	var surfaces := PackedFloat32Array()
 	var surface := INF
@@ -893,16 +950,7 @@ static func _river(heights: Dictionary, river: Dictionary, river_seed: int, cell
 	var wet := {}
 	for cell: Vector2i in laid["cells"]:
 		wet[cell] = surfaces[laid["cells"][cell] - first]
-	for cell: Vector2i in wet:
-		heights[cell] = wet[cell]
-		cells[cell] = "water"
-		taken[cell] = true
-	for cell: Vector2i in wet:
-		for direction in FOUR:
-			var bank := cell + direction
-			if heights.has(bank) and not wet.has(bank) and float(heights[bank]) < float(heights[cell]) + SHORE_LIP + 0.05:
-				heights[bank] = float(heights[cell]) + SHORE_LIP + 0.05
-	return {"points": points, "widths": widths, "path": path}
+	return {"path": path, "surfaces": surfaces, "wet": wet}
 
 
 ## The points of a meander about [param line] (cells), every quarter cell

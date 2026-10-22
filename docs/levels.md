@@ -159,7 +159,8 @@ floor falling 5 m north to south and its river looping down it as a
 curve (`waters`, 559), 1.7 to 3.2 cells wide, swinging about 7 cells
 either way every 26 or so, with a ford and a bridge, a dirt road (563)
 from the link west over the bridge and up through the west escarpment's
-way, hills rolling 2 m either way, two escarpments (525
+way, a waterfall (570): a stream across the plateau's top dropping 7.9 m off
+its west cliff into a pool, forded below it, running on into the river, hills rolling 2 m either way, two escarpments (525
 amended (2)): one to the west with a 3 m face east over the valley, a long
 slope up to it from the west and a ramp through its face, and one 2.5 m
 high south-east of the valley facing north; and a plateau 6 m up to the

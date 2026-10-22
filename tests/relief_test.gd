@@ -659,8 +659,27 @@ func _test_hills() -> void:
 	var columns := course.map(func(cell: Vector2i) -> int: return cell.x)
 	_check(course.size() > 120 and columns.max() - columns.min() >= 16,
 		"the river loops down the valley's length (%d cells, columns %d to %d; 559)" % [course.size(), columns.min(), columns.max()])
-	_check(terrain["streams"].size() == 1 and not terrain["fords"].is_empty() and level["buildings"].any(func(b: Dictionary) -> bool: return b["slot"] == "bridge"),
-		"its stream, a ford and a bridge")
+	_check(terrain["streams"].size() == 2 and not terrain["fords"].is_empty() and level["buildings"].any(func(b: Dictionary) -> bool: return b["slot"] == "bridge"),
+		"its river and the fall's stream, a ford and a bridge")
+	# The fall (570): the stream off the plateau drops its face's height
+	# between two cells of its path, into a 3 x 3 pool.
+	var fall_path: Array = terrain["streams"][1]["path"] if terrain["streams"].size() == 2 else []
+	var fall := Vector2i(-1, -1)
+	var drop := 0.0
+	for i in range(1, fall_path.size()):
+		var here := Relief.at(field, size, fall_path[i - 1]) - Relief.at(field, size, fall_path[i])
+		if here > drop:
+			drop = here
+			fall = fall_path[i]
+	# Its pool: the water at its foot's level within 2.5 cells, wider than the stream.
+	var landing := Relief.at(field, size, fall)
+	var pool := 0
+	for y in range(-3, 4):
+		for x in range(-3, 4):
+			var at := fall + Vector2i(x, y)
+			if wet.has(at) and Vector2(x, y).length() <= 2.5 and absf(Relief.at(field, size, at) - landing) < 0.5:
+				pool += 1
+	_check(drop > 5.0 and pool >= 7, "a fall off the plateau's cliff, %.1f m, into a pool at %s (%d cells at its level; 570)" % [drop, fall, pool])
 	var area := {"relief": field, "relief_size": size, "stairs": terrain["stairs"], "heights": {}, "edges": terrain["edges"], "floor": floor, "size": size}
 	var reached := PackedFloat32Array()
 	reached.resize(size.x * size.y)
@@ -678,7 +697,7 @@ func _test_hills() -> void:
 	var top := Vector2i(80, 20)
 	var steps := WorldRoutes._steps_between(area, level["spawn_points"]["from_wilds"], top)
 	_check(floor.has(top) and steps > 0.0, "the plateau's top is walked to from the link, round by its spur (%.0f steps)" % steps)
-	var foot := Vector2i(58, 20)
+	var foot := Vector2i(58, 30)
 	_check(floor.has(foot) and Relief.at(field, size, top) - Relief.at(field, size, foot) > 4.0, "it stands over the valley at its face")
 
 

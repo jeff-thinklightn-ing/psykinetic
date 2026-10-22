@@ -20445,3 +20445,41 @@ bed); the falls check down any stream's path. Shots in
 C:/dev/review/falls (maps' 570 data, before without this and after).
 Client only, protocol
 unchanged, no new class_name.
+
+## 570. Falls: a river crossing a face drops its height into a pool
+
+The approved design's falls: where a river (559's "rivers") crosses a face
+(a plateau's, an escarpment's) the water drops the face's height between
+two cells of its middle, into a pool at the foot; on the hills a side stream
+off the plateau's west cliff; on the wilds none (the river's course does
+not cross the ridge's face). Terrain draws the curtain (its tall-fall side,
+cd3c4453), which lands first.
+
+**Relief.lay "rivers"**: a river's surface already falls with the ground
+(never rising), so where its curve crosses a face it drops between two
+middle cells. Where a drop is over WALK_RISE it is a fall: lay's "falls"
+lists {cell, drop}. Its pool is the curve's own: the control point a cell
+past where the water lands is widened to POOL_WIDTH (3.4), and the curve is
+laid again, so the pool is the curve's raster (laid, loaded and drawn
+alike) and the stream is as narrow as it was up to its lip (_river_run, the
+lay of a curve on the ground, split out). A bank raised to its shore lip is
+never another water's cell (a stream raised the river it ran into).
+
+**A stream into a river**: a later water's cells stop where an earlier one's
+are. Relief.lay laid it so (taken); Level._lay_curves now does too, the
+earlier waters' cells no ground to a later one, so a tributary's cells and
+its "streams" path end where it joins (it took the river's cells past the
+junction, which rose).
+
+**levels/hills**: a second river, FALL_STREAM, from the plateau's top at
+(84, 12) west over its cliff to the river at (53, 22) (wavelength 14,
+amplitude 2, width 1.4 to 2.2): it falls 7.9 m at (62, 22) to (61, 22) into
+its pool, and a ford across it at (56, 20) below the pool (_fall_ford, its
+banks walked to as the river's ford), so the ground between the river, the
+stream and the cliff is still walked to. Every floor cell is reached; no
+stray cliff.
+
+Level data, protocol unchanged (no new field); a full cut.
+
+tests/relief_test: the hills' river and the fall's stream; a fall off the
+plateau's cliff over 5 m into a pool of water at its foot's level.

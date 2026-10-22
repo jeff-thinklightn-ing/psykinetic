@@ -1304,11 +1304,17 @@ static func _lay_curves(terrain: Dictionary, config: Dictionary, warnings: Array
 	for cell: Vector2i in terrain["floor"]:
 		floor[cell] = true
 	var streams: Array = (config.get("streams") as Array).duplicate(true) if config.get("streams") is Array else []
+	# The cells each water lays are no ground to a later one: a stream into
+	# the river ends where it joins it (570), as Relief.lay laid it.
+	var claimed := {}
 	for index in waters.size():
 		var water: Dictionary = waters[index]
 		var ground := floor.duplicate()
 		ground.merge(wet)
+		for cell: Vector2i in claimed:
+			ground.erase(cell)
 		var laid := Curves.laid(water["curve"], water["closed"], ground)
+		claimed.merge(laid["cells"])
 		var made := 0
 		for cell: Vector2i in laid["cells"]:
 			if wet.has(cell):

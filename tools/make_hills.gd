@@ -71,6 +71,10 @@ const RIVER_WIDTH: Array[float] = [1.6, 3.2]
 ## loops on it (wider reaches into the escarpments' feet and flattens their
 ## faces).
 const RIVER_FLOOR := 9.0
+## The fall's stream (570): off the plateau's top west over its cliff (6 m)
+## into a pool at its foot, then down to the river, its line ending in the
+## river's water (so the way on from it is the river's).
+const FALL_STREAM: Array[Vector2i] = [Vector2i(84, 12), Vector2i(74, 16), Vector2i(66, 19), Vector2i(59, 21), Vector2i(53, 22)]
 ## Its loops' seed (added to SEED's): the one whose loops keep clear of the
 ## south escarpment's foot.
 const RIVER_SEED := 5
@@ -113,7 +117,8 @@ func _ready() -> void:
 		"plateaus": [{"rect": Rect2i(CLIFF_X, 0, SIZE.x - CLIFF_X, FOOT), "height": PLATEAU_HEIGHT, "faces": ["west"], "spur": 0.25}],
 		"keep_flat": [Rect2i(arrival - Vector2i(2, 3), Vector2i(4, 7))],
 		"streams": 0, "keep_clear": {},
-		"rivers": [{"line": VALLEY, "wavelength": RIVER_WAVELENGTH, "amplitude": RIVER_AMPLITUDE, "width": RIVER_WIDTH, "seed": RIVER_SEED}]})
+		"rivers": [{"line": VALLEY, "wavelength": RIVER_WAVELENGTH, "amplitude": RIVER_AMPLITUDE, "width": RIVER_WIDTH, "seed": RIVER_SEED},
+			{"line": FALL_STREAM, "wavelength": 14.0, "amplitude": 2.0, "width": [1.4, 2.2]}]})
 	map.relief = PackedFloat32Array()
 	map.relief.resize(SIZE.x * SIZE.y)
 	var filled := PackedByteArray()
@@ -134,6 +139,8 @@ func _ready() -> void:
 		if laid["cells"][at] == "water":
 			water[at] = true
 	_faces = laid["faces"]
+	if laid["streams"].size() > 1:
+		_fall_ford(laid["streams"][1], water)
 	_ford(water)
 	_bridge(water)
 	_rock()
@@ -195,6 +202,48 @@ func _ford(water: Dictionary) -> void:
 	Relief._limit(heights, fixed, wet, Relief.LAY_SLOPE, face)
 	for at: Vector2i in heights:
 		map.set_relief(at, heights[at])
+
+
+## A ford across the fall's stream (570) in the valley below the cliff:
+## the first column west of the cliff's foot where the stream's water runs
+## one or two cells across with walkable ground either side, so the ground
+## between the river, the stream and the cliff is still walked to.
+func _fall_ford(path: Array, water: Dictionary) -> void:
+	for cell: Vector2i in path:
+		# Clear of the pool below the fall, short of the river.
+		if cell.x >= CLIFF_X - 5 or cell.x < CLIFF_X - 9:
+			continue
+		var across: Array[Vector2i] = []
+		for y in range(cell.y - 2, cell.y + 3):
+			if water.has(Vector2i(cell.x, y)):
+				across.append(Vector2i(cell.x, y))
+		if across.is_empty() or across.size() > 2 or across[-1].y - across[0].y != across.size() - 1:
+			continue
+		if not map.walkable(across[0] - Vector2i(0, 1)) or not map.walkable(across[-1] + Vector2i(0, 1)):
+			continue
+		for at in across:
+			map.set_cell(at, "ford")
+		# Its banks a walk over it, the ground near brought down to them.
+		var surface := map.relief_at(across[0])
+		var heights := {}
+		var fixed := {}
+		var wet := {}
+		for at: Vector2i in map.cells:
+			if map.walkable(at) or map.cell(at) == "water":
+				heights[at] = map.relief_at(at)
+				if at.distance_to(across[0]) > 5.0 or map.cell(at) in ["water", "ford"]:
+					fixed[at] = true
+				if map.cell(at) == "water":
+					wet[at] = true
+		for bank: Vector2i in [across[0] - Vector2i(0, 1), across[-1] + Vector2i(0, 1)]:
+			heights[bank] = surface + 0.3
+			fixed[bank] = true
+		Relief._limit(heights, fixed, wet, Relief.LAY_SLOPE, _faces)
+		for at: Vector2i in heights:
+			map.set_relief(at, heights[at])
+		print("[hills] the fall's stream forded at %s" % [across])
+		return
+	push_error("[hills] no ford over the fall's stream")
 
 
 ## The bridge over the stream on the row nearest BRIDGE_ROW: its banks
