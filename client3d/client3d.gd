@@ -655,7 +655,7 @@ static func _sockets(hand: float, hip: float, back: float, chest: float) -> Dict
 		# The left hip, a hung thing's length down.
 		"belt_l": ["Hips", Transform3D(Basis(Vector3(0, 0, 1), PI), Vector3(hip, 0.0, 0.0))],
 	}
-const HUMAN_SOCKETS := {"hand": 1.0, "hip": 0.17, "back": 0.13, "chest": 0.04}
+const HUMAN_SOCKETS := {"hand": 1.0, "hip": 0.17, "back": 0.13, "chest": 0.04, "crown": true}
 const GOBLIN_SOCKETS := {"hand": 0.69, "hip": 0.19, "back": 0.16, "chest": 0.02}
 ## The Blood Rot's allies' (decision 478): their hands as long as a human's
 ## times their people's (body_gen's PROPORTIONS and height), their bodies
@@ -10444,6 +10444,7 @@ func _make_model(model: Dictionary, puppet: Node3D) -> Node3D:
 	rig.loop(CLIP_IDLE)
 	if model.has("sockets"):
 		_attach_sockets(scene, model["sockets"], float(puppet.get_meta("model_scale", 1.0)), puppet)
+		_wear_hat(scene, puppet)
 	if puppet.has_meta("look") and not model.has("paint"):
 		# (A painted ally's mesh stands in its concept's stance already: no second hunch.)
 		var posture := str(POSTURES.get((puppet.get_meta("look") as PersonLook).posture, ""))
@@ -10467,6 +10468,9 @@ static func _attach_sockets(scene: Node3D, sizes: Dictionary, model_scale: float
 	var shoulder := _shoulder_socket(skeleton, sizes["hand"])
 	if not shoulder.is_empty():
 		table["shoulder"] = shoulder
+	var crown := _head_socket(skeleton) if sizes.get("crown", false) else []
+	if not crown.is_empty():
+		table["head"] = crown
 	for name: String in table:
 		var bone: String = table[name][0]
 		if skeleton.find_bone(bone) < 0:
@@ -11277,6 +11281,63 @@ static func _level_load(sockets: Dictionary) -> void:
 ## shoulder is. [] without the bones.
 const SHOULDER_OUT := 1.4
 const SHOULDER_UP := 0.09
+## The "head" socket (the bard's hat; npc's look word hat=<word>): on the Head
+## bone at the top of the skull, its Body's highest vertex within HEAD_LINE of
+## the bone's centre line at rest (ears and hair aside), the skull's middle
+## front to back (HEAD_BAND below that), +x forward and +y up,
+## level in the body's frame (SHOULDER_LEVEL), as art-kit's gear.hat is made:
+## its origin at the cap's inside crown. Measured once per body mesh, so the
+## woman's head (0.216 m above the bone) and the man's (0.228) each get theirs.
+## People only (their sockets' "crown"); [] without the bone or the Body.
+const HEAD_LINE := 0.05
+const HEAD_BAND := 0.08
+static var _crowns := {}
+static func _head_socket(skeleton: Skeleton3D) -> Array:
+	var head := skeleton.find_bone("Head")
+	var body := skeleton.get_node_or_null("Body") as MeshInstance3D
+	if head < 0 or body == null or body.mesh == null:
+		return []
+	var rest := skeleton.get_bone_global_rest(head)
+	if not _crowns.has(body.mesh):
+		var vertices: PackedVector3Array = body.mesh.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]
+		var top := rest.origin.y
+		for v in vertices:
+			if absf(v.x - rest.origin.x) < HEAD_LINE:
+				top = maxf(top, v.y)
+		# Front to back, the skull's middle within HEAD_BAND of its top (the top vertex is forward
+		# of it: a cap there stood off the brow and the back of the head came through its band).
+		var front := -INF
+		var back := INF
+		for v in vertices:
+			if v.y > top - HEAD_BAND and v.y > rest.origin.y:
+				front = maxf(front, v.z)
+				back = minf(back, v.z)
+		_crowns[body.mesh] = Vector3(rest.origin.x, top, (front + back) * 0.5 if front > back else rest.origin.z)
+	return ["Head", Transform3D(rest.basis.orthonormalized().inverse() * SHOULDER_LEVEL, rest.affine_inverse() * (_crowns[body.mesh] as Vector3))]
+
+
+## A hat by its look word (npc's look_spec "hat=<word>"; the bard's): HATS'
+## art slot and variant on the "head" socket, the look's own headwear (hood,
+## brimmed hat, cap) put away under it. A word not in HATS, or a build
+## without the piece, wears nothing new (as an old client does).
+const HATS := {"bard": ["gear.hat", 1]}
+const HEADWEAR_MESHES: Array[String] = ["Hood", "Hat_Brimmed", "Cap_Soft"]
+static func _wear_hat(scene: Node3D, puppet: Node3D) -> void:
+	var look := puppet.get_meta("look") as PersonLook if puppet.has_meta("look") else null
+	var head := (puppet.get_meta("sockets", {}) as Dictionary).get("head") as Node3D
+	if look == null or head == null:
+		return
+	var hat: Array = HATS.get(str(look.words.get("hat", "")), [])
+	if hat.is_empty() or not ArtKit.has(hat[0]):
+		return
+	var piece := ArtKit.instance(hat[0], int(hat[1]))
+	piece.name = "Hat"
+	head.add_child(piece)
+	for mesh: MeshInstance3D in scene.find_children("*", "MeshInstance3D", true, false):
+		if String(mesh.name) in HEADWEAR_MESHES:
+			mesh.visible = false
+
+
 ## A load on the shoulder, in the skeleton's frame: +x the body's front, +y up.
 const SHOULDER_LEVEL := Basis(Vector3(0, 0, 1), Vector3.UP, Vector3(-1, 0, 0))
 static func _shoulder_socket(skeleton: Skeleton3D, hand: float) -> Array:

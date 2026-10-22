@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- People can wear a hat on their heads by a look word; the town's bard will wear a felt cap with a feather once its piece and the bard's look are in.
 - Drawing a bow shows the arrow on the string again, from the first moment of the draw; it had been hidden along with the bow's old string.
 - The temple and the town follow Theus, the one god of their homeland; Aldous and the draugr know the old gods' war god, Psyke, empowers the draugr, and Pip keeps quiet for his pay and a promised holy knighthood of Theus.
 - Townsfolk know where the smith went: after a rumoured great dwarven forge deep below the castle, with hired guards, until an ambush took him; the goblins have him working weapons for the Blood Rot's raids.

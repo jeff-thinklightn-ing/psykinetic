@@ -81,6 +81,7 @@ func _ready() -> void:
 	_test_bow()
 	_test_standing_turn()
 	_test_visible_work()
+	_test_head_socket()
 	_test_goblins_differ()
 	_test_allies()
 	_test_barrow_dead()
@@ -4398,6 +4399,37 @@ func _test_standing_turn() -> void:
 	if look != null:
 		look.free()
 	_rig._animate(puppet)
+
+
+## The head socket (the bard's hat): on a person's Head bone at the top of the skull, level, +x
+## its front; a hat word with no piece in this build (or none known) wears nothing new and leaves
+## the look's own headwear as it was.
+func _test_head_socket() -> void:
+	print("
+== the head socket: at the crown; a hat by its look word ==")
+	var player := _player()
+	_rig._process(0.0)
+	var puppet: Node3D = _rig._puppets[player.get_instance_id()]
+	var sockets: Dictionary = puppet.get_meta("sockets")
+	var head := sockets.get("head") as Node3D
+	var on := head.get_parent() as BoneAttachment3D if head != null else null
+	var model := puppet.get_node("Body/Model") as Node3D
+	var above := (head.global_position.y - on.global_position.y) / float(puppet.get_meta("model_scale", 1.0)) if head != null else 0.0
+	_check(head != null and on.bone_name == "Head" and absf(above - 0.228) < 0.03,
+			"a person has a head socket on the Head bone at the top of the skull (%.3f m above the bone)" % above)
+	var plain := Node3D.new()
+	var look := PersonLook.make("hat=no_such_hat")
+	var shown := {}
+	for mesh: MeshInstance3D in model.find_children("*", "MeshInstance3D", true, false):
+		shown[mesh.name] = mesh.visible
+	puppet.set_meta("look", look)
+	Client3D._wear_hat(model, puppet)
+	var after := {}
+	for mesh: MeshInstance3D in model.find_children("*", "MeshInstance3D", true, false):
+		after[mesh.name] = mesh.visible
+	_check(head.get_node_or_null("Hat") == null and after == shown, "a hat word it doesn't know: nothing new worn, the look's own headwear as it was")
+	_check(Client3D.HATS.has("bard"), "the bard's hat by its word")
+	plain.free()
 
 
 ## 566, pc-character's side: a resident's activity word as its body shows it.

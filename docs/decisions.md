@@ -13405,6 +13405,24 @@ piece of gear (no quality tiers on gear).
 Protocol unchanged: a client reads no yield, and the note is the server's
 text. items_test's _test_short.
 
+**Amended (the bard's hat, pc-character's side; Jeff said yes via the coordinator, 2026-10-22).**
+People get a "head" socket, and a hat drawn on it from a look word.
+- The socket: on the Head bone at the top of the skull, at its middle front to back, +x to the
+  face and +y up, level in the body's frame as the shoulder's is (`Client3D._head_socket`). It is
+  measured once per body mesh from its own vertices, so the man (0.228 m above the bone) and the
+  woman (0.216) each get theirs; the builds' shape keys leave the head alone. People only (their
+  sockets' "crown").
+- The word: "hat=<word>" in a look spec (npc's `ResidentCard.look_spec` gives the bard "hat=bard"),
+  read from `PersonLook.words`. `Client3D.HATS` maps it to an art slot and variant ("bard":
+  art-kit's gear.hat, a felt cap with a feather, made in the socket's frame). `_wear_hat` puts it on
+  and hides the look's own hood, brimmed hat or cap.
+- A word not in HATS, or a build without the piece, wears nothing new and leaves the look as it
+  was, so an old client ignores the word.
+- Fitted on the five builds: nothing through the band, at most 4 cm off the head. The first
+  socket, at the skull's top vertex, sat forward of the skull's middle, and the back of the head
+  came 3 cm through the band.
+- Tests: view_test `_test_head_socket`. Client only, protocol unchanged.
+
 ## 491. The scholar's chronicle
 
 The hidden types' side-doings (393; the scholar's first three in 440),
