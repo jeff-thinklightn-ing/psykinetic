@@ -779,7 +779,7 @@ func _test_kinds() -> void:
 						reached[at + side] = true
 						todo.append(at + side)
 			var outline := Level.blocks_outline(cells)
-			var doors := Level.kind_doors(entry)
+			var doors := Level.kind_doors(entry) + Level.kind_open(entry)
 			var rect: Rect2i = Level.building_rect(entry)
 			if area != cells.size() or reached.size() != cells.size() or doors.is_empty() \
 					or not doors.all(func(key: Vector3i) -> bool: return key in outline) \
@@ -801,11 +801,21 @@ func _test_kinds() -> void:
 			var level := Level.parse(prefab["map"].to_image(), null, config)
 			var said := (level["warnings"] as Array).filter(func(text: String) -> bool: return not text.begins_with("no player start"))
 			var standing: Array = level["buildings"]
+			# Walled round but its open edges (a forge's front), and a way in.
 			if not said.is_empty() or standing.size() != 1 or Level.building_outline(standing[0]).any(func(key: Vector3i) -> bool:
-					return not level["terrain"]["edges"].has(key)) or not Level.building_outline(standing[0]).any(func(key: Vector3i) -> bool:
-					return level["terrain"]["edges"][key] == Terrain.Edge.DOOR):
+					return not level["terrain"]["edges"].has(key) and not key in standing[0]["open"]) 					or not Level.building_outline(standing[0]).any(func(key: Vector3i) -> bool:
+					return level["terrain"]["edges"].get(key) == Terrain.Edge.DOOR or key in standing[0]["open"]):
 				unsaid.append("%s turned %d: %s" % [prefab_name, turns, said])
-	_check(unsaid.is_empty(), "each kind's prefab at four turns: walled round its blocks, a door, nothing said (%s)" % [unsaid])
+	_check(unsaid.is_empty(), "each kind's prefab at four turns: walled round its blocks but its open edges, a way in, nothing said (%s)" % [unsaid])
+	var forge := Prefab.load_prefab("building_forge_small")
+	var forged := Level.parse(forge["map"].to_image(), null, forge["config"])
+	var smithy: Dictionary = forged["buildings"][0]
+	var front_open := (smithy["open"] as Array).size() == 6 and (smithy["open"] as Array).all(func(key: Vector3i) -> bool:
+		return not forged["terrain"]["edges"].has(key))
+	var site := Level.site_cells(smithy)
+	_check(front_open and (smithy["doors"] as Array).is_empty() and not Level.building_cells(smithy).has(smithy["front"])
+			and Level.building_cells(smithy).has(site["work"]),
+			"the forge: its lean-to's front open (no wall, no door), its front and its work found from it (%s)" % [smithy["front"]])
 	# An L-house and a ruined hut, loaded.
 	var map := LevelMap.new(Vector2i(24, 14))
 	for y in 14:

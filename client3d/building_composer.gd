@@ -45,7 +45,7 @@ const FACETS := 11
 const FACET_STRAY := 0.05
 ## The kinds that may have a chimney, and how likely.
 const CHIMNEYS := {"house": 0.7, "l_house": 0.7, "house_leanto": 0.6, "house_wing": 0.7, "two_storey": 0.8,
-	"cottage": 0.8, "inn": 0.9, "hall": 0.6, "longhouse": 0.5, "hut": 0.3, "healers_hut": 0.5}
+	"cottage": 0.8, "inn": 0.9, "hall": 0.6, "longhouse": 0.5, "hut": 0.3, "healers_hut": 0.5, "forge": 1.0, "butchery": 0.5}
 const CHIMNEY := Vector3(0.75, 0.9, 0.65)
 ## The kinds that may have a porch over their front door, and how likely;
 ## those with a cruck frame on a gable end, and the gable's span (cells)

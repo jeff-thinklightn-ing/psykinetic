@@ -305,6 +305,9 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## damage_at; walking drawn keeps the draw at half pace.
 ## 32 (599, items' side): a "search" command {target: a cache chest's
 ## path}; a Chest carries cache and cache_place (from its props).
+## 32 (488 amended, two kinds): a level may carry the "forge" and "butchery"
+## kinds, and a kind's "open" outline edges, no wall and no door, which both
+## sides read from the kinds file as walkable.
 const PROTOCOL_REVISION := 32
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]

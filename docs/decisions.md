@@ -13080,6 +13080,18 @@ so they follow; no real level used the regrown kinds. The slot buildings
 (265: hut and healers_hut 3x3, shed 2x3, house and temple 4x6) are meshes
 and stay; the town that used them is laid fresh in Held as kinds (maps,
 Jeff's Held answer), and the wilds keeps its own.
+Amended (two kinds, the coordinator's approval: the forge for Held's core,
+maps' ask; the butchery for economy's meat chain, Jeff's herder, butcher,
+cook): a kind's size may name "open", outline edges given as its doors
+are, left with no wall and no door (Level.kind_open; the prefab leaves
+them, parse does not call them open edges, building["open"]); its front
+and its site cells (566) come from its doors, else its open edges
+(Level.entrances). "forge": stone, a stone floor, a 6x5 smithy and a 6x2
+lean-to across its front, that front open (7x6 and 7x2 large), always a
+chimney. "butchery": wood walls on a stone floor, 6x6 with a 4x2 outshot
+behind (7x7 and 5x2), a front door, a chimney one time in two. Neither is
+in a real level. level_test: the forge's front open, its front and work
+cell found from it. No counter or hooks yet: no art-kit pieces for them.
 
 Amended, builder's side: a plot (564) narrower than Level.MIN_ROOM either
 way holds no building, so BuilderSession.street_checks says so for each

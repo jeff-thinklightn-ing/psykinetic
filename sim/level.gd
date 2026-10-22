@@ -1194,8 +1194,12 @@ static func buildings_from(config: Dictionary, terrain: Dictionary, warnings: Ar
 		for cell in cells:
 			taken[cell] = true
 		var open: Array[Vector3i] = []
+		# A kind's own open edges (its "open": a forge's front) are meant so.
+		var meant: Array[Vector3i] = []
+		if entry.has("kind"):
+			meant = kind_open(entry)
 		for key in blocks_outline(cells) if not on_water and not str(entry.get("slot", "")) in OPEN_AIR and not str(entry.get("slot", "")) in SOLID else []:
-			if not terrain["edges"].has(key):
+			if not terrain["edges"].has(key) and not key in meant:
 				open.append(key)
 		if not open.is_empty():
 			warnings.append("the %s at %s has %d open edges on its outline (%s)" % [what, rect.position, open.size(), open[0]])
@@ -2067,6 +2071,17 @@ static func building_blocks(entry: Variant) -> Array[Rect2i]:
 
 ## A kind building entry's doors on the map, as Terrain edge keys.
 static func kind_doors(entry: Dictionary) -> Array[Vector3i]:
+	return _kind_edges(entry, "doors")
+
+
+## The outline edges a kind size leaves open, no wall and no door (its
+## "open", [x, y, side] as its doors: a forge's front under its lean-to),
+## where [param entry] stands them.
+static func kind_open(entry: Dictionary) -> Array[Vector3i]:
+	return _kind_edges(entry, "open")
+
+
+static func _kind_edges(entry: Dictionary, list: String) -> Array[Vector3i]:
 	var out: Array[Vector3i] = []
 	var rect: Variant = building_rect(entry)
 	var spec := kind_size(entry)
@@ -2074,16 +2089,22 @@ static func kind_doors(entry: Dictionary) -> Array[Vector3i]:
 		return out
 	var size := _frame(spec)
 	var facing := building_facing(entry)
-	for door: Array in spec.get("doors", []):
+	for door: Array in spec.get(list, []):
 		var cell: Vector2i = rect.position + _turned(Vector2i(int(door[0]), int(door[1])), size, facing)
 		out.append(Terrain.edge_key(cell, _turned_side(DOOR_SIDES[str(door[2])], facing)))
 	return out
 
 
+## The ways into a kind [param building]: its doors, then its open edges.
+static func entrances(building: Dictionary) -> Array:
+	return (building.get("doors", []) as Array) + (building.get("open", []) as Array)
+
+
 ## Sets kind building [param building]'s own from [param entry]: its kind,
 ## size, its blocks' roles, seed (its entry's, else from its cell, so every peer draws it
 ## alike), ruined (no roof, no inside), its kind's words, sets, storeys,
-## eaves and place, and its front (the cell outside its first door).
+## eaves and place, its open edges, and its front (the cell outside its
+## first door, else its first open edge).
 static func _kind_of(building: Dictionary, entry: Dictionary) -> void:
 	var kind: Dictionary = kinds()[str(entry["kind"])]
 	var at: Vector2i = building["cell"]
@@ -2102,10 +2123,11 @@ static func _kind_of(building: Dictionary, entry: Dictionary) -> void:
 	# Each block's role, as its blocks are ordered (main, wing, leanto, ...).
 	building["roles"] = (kind_size(entry)["blocks"] as Array).map(func(block: Array) -> String:
 		return str(block[4]) if block.size() > 4 else "main")
-	var doors := kind_doors(entry)
-	building["doors"] = doors
-	if not doors.is_empty():
-		var sides := Terrain.edge_cells(doors[0])
+	building["doors"] = kind_doors(entry)
+	building["open"] = kind_open(entry)
+	var ways := entrances(building)
+	if not ways.is_empty():
+		var sides := Terrain.edge_cells(ways[0])
 		var cells := _union(building["blocks"])
 		building["front"] = sides[1] if cells.has(sides[0]) else sides[0]
 
@@ -2117,11 +2139,11 @@ static func _kind_of(building: Dictionary, entry: Dictionary) -> void:
 ## "sawbuck" the one on its other side (else one further out from the
 ## door), and "saw" the one beyond the sawbuck from the door, where the
 ## carpenter stands to saw, facing it (566 amended, the coordinator's: the
-## saw lands on the sawbuck). A building with no door has its first cell
-## for all.
+## saw lands on the sawbuck). Its first open edge where it has no door;
+## a building with neither has its first cell for all.
 static func site_cells(building: Dictionary) -> Dictionary:
 	var cells := building_cells(building)
-	var doors: Array = building.get("doors", [])
+	var doors := entrances(building)
 	if doors.is_empty():
 		return {"work": cells[0], "woodpile": cells[0], "sawbuck": cells[0], "saw": cells[0]}
 	var sides := Terrain.edge_cells(doors[0])

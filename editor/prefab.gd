@@ -53,7 +53,8 @@ static func kind_names() -> Array[String]:
 
 ## Kind building prefab [param prefab_name] ({} if it names no kind and
 ## size): its blocks' cells as ground (stone under a floor set, else dirt),
-## walls round their union but its doors, a ring of dirt round it so the
+## walls round their union but its doors and its open edges (none there),
+## a ring of dirt round it so the
 ## walls are its own, and its entry {kind, size, at, facing south}.
 static func kind_prefab(prefab_name: String) -> Dictionary:
 	if not prefab_name.begins_with(KIND_PREFIX):
@@ -74,8 +75,10 @@ static func kind_prefab(prefab_name: String) -> Dictionary:
 	for cell in cells:
 		map.set_cell(cell, ground)
 	var doors := Level.kind_doors(entry)
+	var open := Level.kind_open(entry)
 	for key in Level.blocks_outline(cells):
-		map.set_edge(key, "door" if key in doors else "wall")
+		if not key in open:
+			map.set_edge(key, "door" if key in doors else "wall")
 	return {"map": map, "config": {"buildings": [entry]}}
 
 
