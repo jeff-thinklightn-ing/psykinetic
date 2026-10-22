@@ -21104,3 +21104,21 @@ brute into imp; the brace). push_test's numbers where the rule changed: a monste
 a monster takes 2 and gives 2 (was 6 and 6: the energy goes into moving the second), a shove
 just after a step 7 against the wall (was 6) and the lane's last shove 1 cell (was 0), both by
 the step's momentum, and the one run into stunned 6 (was 4) by the speed left.
+
+## 562 amended (3). A landmark is no part of a town's herb ring
+
+Found by maps' 579, which moves the barrow's 12×12 mound to (165..176,
+180..191), about 35 cells from the wilds' store at (210, 200).
+Forage.ring_of widens a town's herb-free ring to the furthest cell of any
+building with a cell within reach (48), plus clear (4). The mound took
+the ring to about 53, past reach, and no ground was left for herbs:
+forage_test's "per_day of them lie in wilds" found none.
+
+ring_of now skips landmarks no town builds: Level.DOORLESS (the great
+tree, cairns, standing stones, waystones, the woodlot's chopping block
+and woodpile) and Forage.LANDMARKS (["building.mound"]). The town's own
+buildings still set its ring.
+
+tests/forage_test: a 12×12 mound 35 cells from the store leaves the
+ring as it was. Server only, protocol unchanged, no new class_name.
+

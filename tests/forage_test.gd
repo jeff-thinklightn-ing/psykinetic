@@ -111,6 +111,15 @@ func _test_lay() -> void:
 				"it grew there, a pile anyone sees")
 	_check(towns.size() > 0 and World.forage.ring_of(AREA, towns[0], rule) > float(rule["ring"]),
 			"the town's ring goes out past its buildings (%.0f)" % World.forage.ring_of(AREA, towns[0], rule))
+	# A landmark near the town is no part of it (562 amended (3): the barrow's mound).
+	var ring := World.forage.ring_of(AREA, towns[0], rule)
+	var buildings: Array = World.forage.world_map.areas[AREA].get("buildings", [])
+	var mound := {"slot": "building.mound", "rect": Rect2i(towns[0].x - 35, towns[0].y - 20, 12, 12)}
+	buildings.append(mound)
+	World.forage._rings.clear()
+	_check(is_equal_approx(World.forage.ring_of(AREA, towns[0], rule), ring), "a mound 35 cells off leaves the ring as it was (%.0f)" % World.forage.ring_of(AREA, towns[0], rule))
+	buildings.erase(mound)
+	World.forage._rings.clear()
 	var before := _count()
 	World.forage.tick()
 	World.forage.tick()

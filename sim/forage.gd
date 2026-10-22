@@ -35,6 +35,9 @@ const GREW := "grew"
 ## The client draws a pile of these standing, as the first art slot of
 ## PLANTS there is (Client3D._on_pile_shown).
 const HERBS := "herbs"
+## Landmarks no town builds, beside Level.DOORLESS: no part of a town's ring
+## (562 amended (3)).
+const LANDMARKS: Array[String] = ["building.mound"]
 const PLANTS: Array[String] = ["plant.herb", "plant.fern"]
 const DEFAULTS := {"per_day": 4, "most": 10, "reach": 48, "ring": 14, "clear": 4, "wither_days": 3}
 ## Cells drawn for each one laid before it gives up for the day.
@@ -227,6 +230,10 @@ func ring_of(area: String, town: Vector2i, rule: Dictionary) -> float:
 	var ring := float(rule["ring"])
 	for building: Dictionary in world_map.areas[area].get("buildings", []):
 		if not building.has("rect") and not building.has("blocks"):
+			continue
+		# A landmark is no town building (562 amended (3): the barrow's mound
+		# moved near the wilds' store widened the ring past reach).
+		if str(building.get("slot", "")) in Level.DOORLESS or str(building.get("slot", "")) in LANDMARKS:
 			continue
 		var cells := Level.building_cells(building)
 		var furthest := 0.0
