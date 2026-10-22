@@ -22653,3 +22653,36 @@ guess corrected by the server as ever. Protocol unchanged.
 
 tests/physics_test: the shove on open ground (3 cells) and through a ford (1), and a step into
 the ford twice as long as before.
+## 580, environment's side. A damp level: no flame, a short lantern
+
+Jeff on the barrow's third layer, barrow_lair: "damp and dark, human
+eyesight barely lights it up, its too moist to light lamps". The
+coordinator ruled the key and the split (2026-10-22). Dungeon sets the key
+on its level with a low "ambient" (about 0.03) and lays no torches.
+Terrain draws the look (darker, a faint cold haze, small dim lanterns, no
+flames) and lands after this.
+
+- **The key.** level.json "damp" (true or false, default false). Read by
+  Level.damp_from; a value that is not a bool is said and read as false.
+  It is kept as terrain["damp"], and Fields.damp follows it. The level
+  editor offers it as a checkbox ("too damp to light").
+- **No flame burns.** On a damp level, Level._quench puts out its torches,
+  lanterns and fire as it is read, with one warning per kind ("too damp to
+  light: torches put out (n cells)"). Nothing in the game lights a torch
+  or brazier during play, so the level check is the whole refusal; a
+  later lighting action reads the same key.
+- **A short lantern.** A carried light reaches Fields.carried_reach(damp)
+  cells: CARRIED_REACH (4), or DAMP_REACH (0.5) of it when damp, which is
+  2. Fields.light_at, Fields.carried_light and Senses._light read it, so
+  the floor, what is lit and what a monster sees by all agree. Terrain's
+  view scales its lantern by the same function. The lantern is still lit
+  and still toggled with L.
+- **Untouched:** the eyes (with an ambient under GLIMPSE, beyond a
+  lantern's pool nothing is seen, which is Jeff's "barely"), carried heat,
+  and the res-charge window (the channel is beside the body).
+
+tests/day_night_test _test_damp: a dry level keeps its torch, lantern and
+fire; a damp one puts them out and says so; a non-bool "damp" is said; the
+reach is 4 and 2; a lantern's light three cells off is there when dry and
+none when damp, one cell off lit. docs/levels.md. Sim and level parse,
+protocol unchanged, no new class_name.

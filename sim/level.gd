@@ -623,6 +623,8 @@ static func parse(layout: Image, height: Image, config: Dictionary, relief: Imag
 			# Lit by the sky on the world clock, unless level.json sets its
 			# light outright (decision 291).
 			"daylight": zone == "outdoors" and not config.has("ambient"),
+			# Too damp for a flame (damp_from).
+			"damp": damp_from(config, warnings),
 			# The wall and floor sets it is drawn in (decision 285).
 			"walls": str(config.get("walls", "castle")),
 			"floors": str(config.get("floors", "castle")),
@@ -632,6 +634,7 @@ static func parse(layout: Image, height: Image, config: Dictionary, relief: Imag
 		"size": cells,
 		"warnings": warnings,
 	}
+	_quench(level["terrain"], warnings)
 	var clearings := clearings_from(config, warnings)
 	level["terrain"]["clearings"] = clearings
 	level["terrain"]["canopy_kind"] = canopy_kind(config, warnings)
@@ -657,6 +660,29 @@ static func parse(layout: Image, height: Image, config: Dictionary, relief: Imag
 	level["roofs"] = roofs_from(config, level["terrain"], level["buildings"], warnings)
 	level["terrain"]["roofs"] = level["roofs"]
 	return level
+
+
+## level.json's "damp" (the barrow's deepest: "too moist to light lamps"):
+## true, or false when missing or not a bool (said). A damp level's carried
+## lights reach Fields.DAMP_REACH as far, and no flame burns in it (_quench).
+static func damp_from(config: Dictionary, warnings: Array[String]) -> bool:
+	var damp: Variant = config.get("damp", false)
+	if damp is bool:
+		return damp
+	warnings.append("\"damp\" in level.json is %s: true or false; it is false" % [damp])
+	return false
+
+
+## On a damp [param terrain], its torches, lanterns and fire are put out,
+## each kind said once.
+static func _quench(terrain: Dictionary, warnings: Array[String]) -> void:
+	if not terrain["damp"]:
+		return
+	for kind: String in ["torches", "lanterns", "fire"]:
+		var cells: Array = terrain[kind]
+		if not cells.is_empty():
+			warnings.append("too damp to light: %s put out (%d cells)" % [kind, cells.size()])
+			cells.clear()
 
 
 ## A cell's code in parse: no meaning (void, or off the map).

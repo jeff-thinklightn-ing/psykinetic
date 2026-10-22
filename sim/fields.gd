@@ -35,12 +35,17 @@ extends RefCounted
 const FIRE := {"heat": 10.0, "light": 0.8, "reach": 4}
 const TORCH := {"heat": 2.0, "light": 1.0, "reach": 5}
 const LANTERN := {"heat": 0.0, "light": 0.9, "reach": 4}
-## A carried light reaches this far.
+## A carried light reaches this far; on a damp level (level.json "damp",
+## the barrow's deepest) DAMP_REACH of it (carried_reach).
 const CARRIED_REACH := 4
+const DAMP_REACH := 0.5
 ## Heat kept per pace of distance.
 const HEAT_FALLOFF := 0.35
 
 var ambient := 1.0
+## Whether the level is damp (Level's terrain "damp"): its carried lights
+## reach less far (carried_reach), and nothing burns there.
+var damp := false
 ## Whether the open sky lights this level (Level's terrain "daylight").
 var daylight := false
 ## Under the sky (the level is outdoors, level.json "outdoor" or "zone"):
@@ -123,6 +128,7 @@ func load(terrain: Dictionary) -> void:
 	_torches.assign(terrain.get("torches", []))
 	_lanterns.assign(terrain.get("lanterns", []))
 	ambient = clampf(float(terrain.get("ambient", 1.0)), 0.0, 1.0)
+	damp = bool(terrain.get("damp", false))
 	daylight = bool(terrain.get("daylight", false))
 	outdoor = bool(terrain.get("outdoor", false))
 	region = str(terrain.get("region", Level.DEFAULT_REGION))
@@ -294,7 +300,7 @@ func light_at(world: Node, cell: Vector2i, carried := true, sky := true) -> floa
 	if carried:
 		for entity: GridEntity in world.get_entities():
 			if entity.emit_light > 0.0 and entity.spawned:
-				light += _reaching(world, entity.tile, cell, CARRIED_REACH, entity.emit_light, false)
+				light += _reaching(world, entity.tile, cell, carried_reach(damp), entity.emit_light, false)
 	return minf(light, 1.0)
 
 
@@ -360,7 +366,13 @@ func open_sky(cell: Vector2i) -> bool:
 ## What a lantern of [param amount] carried at [param source] gives
 ## [param cell] (Senses: a monster looking into the dark).
 func carried_light(world: Node, source: Vector2i, cell: Vector2i, amount: float) -> float:
-	return _reaching(world, source, cell, CARRIED_REACH, amount, false)
+	return _reaching(world, source, cell, carried_reach(damp), amount, false)
+
+
+## How far a carried light reaches, cells: CARRIED_REACH, or DAMP_REACH of it
+## on a [param is_damp] level. The 3D view draws its lanterns to the same.
+static func carried_reach(is_damp: bool) -> int:
+	return maxi(1, roundi(CARRIED_REACH * DAMP_REACH)) if is_damp else CARRIED_REACH
 
 
 ## Where the heat at [param cell] comes from: the sum of the offsets to its

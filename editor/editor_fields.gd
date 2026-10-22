@@ -33,6 +33,7 @@ const KINDS := {
 		{"key": "border", "label": "past its edge", "type": "enum", "choices": ["forest", "none"]},
 		{"key": "north", "label": "north is", "type": "enum", "choices": "norths"},
 		{"key": "ambient", "label": "light (no sky)", "type": "float", "min": 0.0, "max": 1.0},
+		{"key": "damp", "label": "too damp to light", "type": "bool"},
 		{"key": "walls", "label": "wall set", "type": "string"},
 		{"key": "floors", "label": "floor set", "type": "string"},
 		{"key": "canopy/kind", "label": "canopy", "type": "enum", "choices": ["", "evergreen", "broadleaf"]},

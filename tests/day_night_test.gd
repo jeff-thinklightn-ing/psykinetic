@@ -20,6 +20,7 @@ func _ready() -> void:
 	_test_daylight_in_the_field()
 	_test_zones()
 	_test_zone_light()
+	_test_damp()
 	_test_saved()
 	_test_sky_look()
 	DayNight.reset()
@@ -148,6 +149,39 @@ func _test_zone_light() -> void:
 	_check(dungeon < Senses.GLIMPSE and dungeon > 0.0, "a dungeon: blind without a light, never black (%.2f)" % dungeon)
 	_check(Fields.LANTERN["light"] + dungeon >= Senses.DARK and Fields.TORCH["light"] + dungeon >= Senses.DARK,
 			"a lantern or a torch makes its own cell seen even in a dungeon")
+
+
+func _test_damp() -> void:
+	print("
+== a damp level: no flame burns, a lantern reaches half as far ==")
+	var rows: Array[String] = ["~.....", "......"]
+	var markers := {Vector2i(1, 0): "torch", Vector2i(2, 0): "lantern"}
+	var dry := Level.parse(Level.image_from_rows(rows, markers), null, {"zone": "dungeon"})
+	_check(not dry["terrain"]["damp"] and not dry["terrain"]["torches"].is_empty() and not dry["terrain"]["lanterns"].is_empty()
+			and not dry["terrain"]["fire"].is_empty(), "no \"damp\": its torch, lantern and fire as laid")
+	var wet := Level.parse(Level.image_from_rows(rows, markers), null, {"zone": "dungeon", "damp": true, "ambient": 0.03})
+	var terrain: Dictionary = wet["terrain"]
+	_check(terrain["damp"] and terrain["torches"].is_empty() and terrain["lanterns"].is_empty() and terrain["fire"].is_empty(),
+			"\"damp\": true: torches, lanterns and fire put out")
+	_check(wet["warnings"].filter(func(w: String) -> bool: return w.begins_with("too damp to light")).size() == 3,
+			"and said (%s)" % [wet["warnings"]])
+	var odd := Level.parse(Level.image_from_rows(rows, markers), null, {"damp": "yes"})
+	_check(not odd["terrain"]["damp"] and odd["warnings"].any(func(w: String) -> bool: return w.contains("\"damp\"")),
+			"a \"damp\" that is not a bool is said and read as false")
+	_check(Fields.carried_reach(false) == Fields.CARRIED_REACH and Fields.carried_reach(true) == 2,
+			"a lantern reaches %d cells, %d on a damp level" % [Fields.carried_reach(false), Fields.carried_reach(true)])
+	# In the field: a lantern's light three cells off, dry and damp.
+	var floor_cells: Array[Vector2i] = []
+	for x in 8:
+		floor_cells.append(Vector2i(x, 0))
+	var fields := Fields.new()
+	fields.load({"floor": floor_cells, "ambient": 0.03})
+	var carrier := Vector2i(0, 0)
+	var dry_light := fields.carried_light(World, carrier, Vector2i(3, 0), Player.LANTERN)
+	fields.load({"floor": floor_cells, "ambient": 0.03, "damp": true})
+	_check(fields.damp and dry_light > 0.0 and is_equal_approx(fields.carried_light(World, carrier, Vector2i(3, 0), Player.LANTERN), 0.0)
+			and fields.carried_light(World, carrier, Vector2i(1, 0), Player.LANTERN) > 0.0,
+			"three cells off a lantern: lit when dry (%.2f), dark when damp; one off, lit" % dry_light)
 
 
 func _test_saved() -> void:

@@ -213,7 +213,7 @@ static func _light(cell: Vector2i, enough: float) -> float:
 		return light
 	for carrier in World.carried_lights():
 		var d := maxi(absi(carrier.tile.x - cell.x), absi(carrier.tile.y - cell.y))
-		if d > Fields.CARRIED_REACH:
+		if d > Fields.carried_reach(World.fields.damp):
 			continue
 		light += World.fields.carried_light(World, carrier.tile, cell, carrier.emit_light)
 		if light >= enough:

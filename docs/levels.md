@@ -223,6 +223,12 @@ rect)` levels a footprint and a cell round it.
   with nothing near is dark: drawn darker in 3D, and a companion says so.
   Fire, torches, lanterns and the lantern every player and companion
   carries light it (docs/design.md, Heat and light).
+- `"damp"` (`true` or `false`, default `false`): too damp for a flame (the
+  barrow's deepest layer). Its torches, lanterns and fire are put out as it
+  is read, each kind said in a warning ("too damp to light"), and a carried
+  lantern reaches `Fields.carried_reach(true)` cells (2, half its 4). Set it
+  with a low `"ambient"` (about 0.03): beyond a lantern's short pool it is
+  dark.
 - `"outdoor"` (`true` or `false`, default `false`): under the sky. The 3D
   view lights it with a day sky and sun instead of the dark under-stone
   look, lays a forest floor under everything, and draws its outline (every

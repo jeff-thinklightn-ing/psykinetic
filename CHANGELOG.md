@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- A level can be damp ("damp": true, for the barrow's deepest layer): torches, lanterns and fire there are put out ("too damp to light"), and a carried lantern lights only 2 cells around you instead of 4 (580, environment's side).
 - The bow's aim marker and its pips are a little larger on the ground, so they read from the camera's height (583, ui's side).
 - The ground slows a knockback as it slows a walk (607): a body knocked back through a ford, tall grass or up a slope slides a shorter way.
 - A thrown thing now knocks back what it hits by weight (606 amended): a heavy sack sends a small creature back a cell, a light thing only staggers; a thrown sack hurts a little less than before (2, was 3).
