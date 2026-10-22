@@ -1376,6 +1376,27 @@
 				{"at": [0, 2.405, 0], "size": [0.4, 0.81, 0.4]}
 			]
 		},
+		"building.great_tree": {
+			"category": "buildings",
+			"type": "mesh",
+			"kind": "cell",
+			"footprint": [3, 3],
+			"size": [7.18, 7.58, 7.22],
+			"middle": [0.05, 0, -0.24],
+			"budget": 3000,
+			"leaf": true,
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-21", "notes": "C:/dev/review/landmarks/make_tree.py: a low uneven knoll of turf inside the 3 x 3, six roots running out over it half sunk; a thick gnarled trunk flaring at its foot, forking at about 3 m into five great limbs that spread wide and climb, each forking once (tubes along their paths, wobbled), bark on row 2; the crown some 20 lumpy leaf balls melted into one shell (a voxel remesh, thinned to 1100 tris, lumped again), wider than deep, its colours by facing on row 4's mid greens (lighter on top, darker under), as the forest's trees; the crown the part \"roof\" from (0, 4, 0); 1856 tris"},
+			"uses": "a lone great tree on a knoll, about twice the forest's trees, 3 x 3 cells, a whole piece standing on grass (decision 550's solid cell), its crown spreading over the cells round it: the wilds' landmarks (maps, the coordinator approved, 2026-10-21; Jeff: \"wilds needs better land marks\"). Its crown is the part \"roof\", so it fades when it hides the player as a building's roof does and casts its shadow; \"leaf\" asks the client to dress it in season as a forest tree (season_dress, leaf) once _add_buildings reads it",
+			"grey": [
+				{"at": [0, 0.2, 0], "size": [2.9, 0.4, 2.9]},
+				{"at": [0, 1.9, 0], "size": [0.9, 3.0, 0.9]}
+			],
+			"parts": [
+				{"name": "roof", "motion": "fixed", "pivot": [0, 4.0, 0], "grey": [
+					{"at": [0.05, 1.79, -0.24], "size": [7.18, 3.58, 7.22]}
+				]}
+			]
+		},
 		"door.double": {
 			"category": "doors",
 			"type": "mesh",
