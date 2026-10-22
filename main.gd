@@ -2209,7 +2209,7 @@ func _rebuild_regenerated(level_name: String, anchors: Array) -> void:
 	var respawns: Array[Dictionary] = []
 	for slot: int in _dead_since:
 		respawns.append({"spawn": slot, "spawn_key": _key_of(slot),
-			"ticks_left": maxi(RESPAWN_DELAY_TICKS - (World.tick - _dead_since[slot]), 0)})
+			"ticks_left": maxi(_respawn_delay(slot) - (World.tick - _dead_since[slot]), 0)})
 	for entity in World.get_entities():
 		World.slot_uids(entity)
 	var ground: Array[Dictionary] = []
@@ -3212,7 +3212,7 @@ func _spawn_saved(section: Dictionary) -> bool:
 	for respawn: Dictionary in section.get("respawns", []):
 		var dead := _slot_for(int(respawn["spawn"]), str(respawn.get("spawn_key", "")))
 		if dead >= 0 and not _alive_slots.has(dead) and not recorded.has(dead):
-			_dead_since[dead] = World.tick - (RESPAWN_DELAY_TICKS - respawn["ticks_left"])
+			_dead_since[dead] = World.tick - (_respawn_delay(dead) - respawn["ticks_left"])
 	# Slots with neither are new in the level since the save (every dead
 	# slot's timer is saved): there now, or dead from now if their tile is taken.
 	for slot in level_entities.size():
@@ -3508,6 +3508,13 @@ func _level_spec_for(saved: Dictionary) -> Dictionary:
 ## The spawn table entry for [param slot], tagged with its index so the
 ## entity can be tracked through death and respawn, and its key, which a
 ## snapshot keeps (decision 433).
+## A dead slot's wait (ticks): its level's "respawn_s" for its kind
+## (decision 561: the barrow's dead 10 minutes, its robbers 5), else
+## RESPAWN_DELAY_TICKS.
+func _respawn_delay(slot: int) -> int:
+	return Monster.respawn_ticks(str(level_entities[slot].get("kind", "")), RESPAWN_DELAY_TICKS)
+
+
 func _slot_spec(slot: int) -> Dictionary:
 	var spec: Dictionary = level_entities[slot].duplicate(true)
 	spec["spawn"] = slot
@@ -3546,7 +3553,7 @@ func _slot_for(spawn: int, key: String) -> int:
 	return spawn if spawn >= 0 and spawn < level_entities.size() else -1
 
 
-## Brings dead level entities back: after RESPAWN_DELAY_TICKS, with no player
+## Brings dead level entities back: after their wait (_respawn_delay), with no player
 ## within RESPAWN_MIN_DISTANCE of the spawn tile (RESPAWN_JOIN_DISTANCE of
 ## one just put down), onto a free tile; one a zone every
 ## RESPAWN_STAGGER_TICKS, the farthest from every player first (decision
@@ -3559,7 +3566,7 @@ func _check_respawns(tick: int, force := false) -> int:
 		return 0
 	var due: Array[Array] = []  # [steps from the nearest player, slot, spec]
 	for slot: int in _dead_since.keys():
-		if not force and tick - _dead_since[slot] < RESPAWN_DELAY_TICKS:
+		if not force and tick - _dead_since[slot] < _respawn_delay(slot):
 			continue
 		var spec := _slot_spec(slot)
 		var tile: Vector2i = spec["tile"]
@@ -3636,7 +3643,7 @@ func _save_state(wait := true) -> void:
 		var respawns: Array[Dictionary] = []
 		for slot: int in _dead_since:
 			respawns.append({"spawn": slot, "spawn_key": _key_of(slot),
-				"ticks_left": maxi(RESPAWN_DELAY_TICKS - (World.tick - _dead_since[slot]), 0)})
+				"ticks_left": maxi(_respawn_delay(slot) - (World.tick - _dead_since[slot]), 0)})
 		for entity in World.get_entities():
 			World.slot_uids(entity)  # A chest's things get their instances before the book is saved.
 			if int(entity.spawn_spec.get("spawn", -1)) >= 0:

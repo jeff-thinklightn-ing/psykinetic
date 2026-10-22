@@ -208,6 +208,11 @@ const SIT_CHANCE := 0.5
 ## and a step it cannot take now is tried again after this long (ticks).
 const MARCH_NEAR := 2
 const MARCH_RETRY_TICKS := 15
+## The dead walking home, blocked by the same one: they wait so long
+## (ticks), stepping aside, before they fight it; a block older than
+## BLOCKED_FORGET_TICKS is forgotten (decision 561).
+const BLOCKED_WAIT_TICKS := 20
+const BLOCKED_FORGET_TICKS := 60
 ## How far (tiles looked at) it searches for its way home or about.
 const IDLE_SEARCH_TILES := 400
 ## Choosing a tile to stroll to or a patrol waypoint within so many tiles of
@@ -295,12 +300,19 @@ var raid_strength := 0.0
 ## The factions its kind's fights on sight (Factions.on_sight, decision
 ## 545): their monsters, and "town" the residents' bodies. Most kinds none.
 var foes: Array[String] = []
+## How far (cells) its call for help carries: its kind's "call", else
+## Senses.NOISE_CALL (decision 561: a grave robber's is 6).
+var call_reach := Senses.NOISE_CALL
 ## HOMEWARD (decision 547): the grave it walks to (NO_TILE till chosen) and
 ## whether it lies there still, both kept in its saved props; whom it fights
 ## on the way: one in its way, or one that struck it.
 var grave := NO_TILE
 var laid := false
 var _provoked: GridEntity
+## Who blocks its way home, since when and when last (decision 561).
+var _blocked_by: GridEntity
+var _blocked_since := -1
+var _blocked_last := -1
 ## Its kind's: it never flees (the dead); it keeps to the room it stands in
 ## (the anchor of its level round its home: the altar's guards), sees and
 ## fights nobody outside it, and goes after no noise.
@@ -447,6 +459,7 @@ func _ready() -> void:
 		picks_up = bool(row.get("picks_up", false))
 		fearless = bool(row.get("fearless", false))
 		keeps_room = bool(row.get("keeps_room", false))
+		call_reach = int(row.get("call", Senses.NOISE_CALL))
 		if keeps_room:
 			_room = room_of(home)
 		leash = roundi(int(row.get("leash", LEASH)) * (BOLD_LEASH if temper == Temper.BOLD else 1.0))
@@ -1354,7 +1367,8 @@ static func read_kinds(path: String) -> Dictionary:
 			"wields": (row["wields"] as Dictionary).duplicate() if row.get("wields") is Dictionary else {},
 			"picks_up": bool(row.get("picks_up", false)), "art": str(row.get("art", "")),
 			"label": str(row.get("label", "")), "fearless": bool(row.get("fearless", false)),
-			"keeps_room": bool(row.get("keeps_room", false)), "script": str(row.get("script", ""))}
+			"keeps_room": bool(row.get("keeps_room", false)), "script": str(row.get("script", "")),
+			"call": int(row.get("call", Senses.NOISE_CALL))}
 	return out
 
 
@@ -1553,7 +1567,7 @@ func _call_for_help() -> void:
 	if World.tick - _called_tick < CALL_EVERY_TICKS:
 		return
 	_called_tick = World.tick
-	_cry(&"call", Senses.NOISE_CALL)
+	_cry(&"call", call_reach)
 
 
 ## Whether [param other] is of its side (Factions.of_kind, allies one side,
@@ -1688,8 +1702,29 @@ func _homeward() -> void:
 		return
 	if _idle_step(grave, HOMEWARD_SEARCH_TILES):
 		return
-	_provoked = _blocker()
+	# Blocked (decision 561, 547's "in the way" amended): it waits
+	# BLOCKED_WAIT_TICKS for the same one, stepping aside, before it fights.
+	var blocker := _blocker()
+	if blocker != null:
+		if blocker != _blocked_by or World.tick - _blocked_last > BLOCKED_FORGET_TICKS:
+			_blocked_by = blocker
+			_blocked_since = World.tick
+		_blocked_last = World.tick
+		if World.tick - _blocked_since >= BLOCKED_WAIT_TICKS:
+			_provoked = blocker
+		else:
+			_step_aside(blocker)
 	_idle_until = World.tick + MARCH_RETRY_TICKS
+
+
+## Out of [param blocker]'s way: a step straight back from it, else to a
+## side, onto a free cell; none, and it stands.
+func _step_aside(blocker: GridEntity) -> void:
+	var back := Vector2i(signi(tile.x - blocker.tile.x), signi(tile.y - blocker.tile.y))
+	var ways: Array[Vector2i] = [back, Vector2i(back.y, back.x), Vector2i(-back.y, -back.x)]
+	for way in ways:
+		if way != Vector2i.ZERO and World.is_walkable(tile + way) and World.is_free(tile + way) and World.try_move(self, way):
+			return
 
 
 ## Whether it has a grave, choosing one the first time (choose_grave, kept
@@ -1697,7 +1732,14 @@ func _homeward() -> void:
 func _settle_grave() -> bool:
 	if grave != NO_TILE:
 		return true
-	grave = choose_grave()
+	# Every other one of the zone's dead takes the free grave nearest it, a
+	# few steps off, and lies there; the rest walk home (decision 561: of the barrow's four,
+	# two lie and two walk).
+	var settled := 0
+	for other in World.monsters():
+		if other != self and other is Monster and (other as Monster).grave != NO_TILE:
+			settled += 1
+	grave = choose_grave(settled % 2 == 1)
 	if grave == NO_TILE:
 		idle = Idle.WANDER
 		return false
@@ -1709,8 +1751,9 @@ func _settle_grave() -> bool:
 ## each, band 0 shallowest) in a band shallower than the grave nearest where
 ## it stands (the old dead walk up, home), else one no deeper, else any;
 ## none another of the zone's monsters has; of those, one by its name.
-## NO_TILE when there are none.
-func choose_grave() -> Vector2i:
+## With [param nearest], the free one nearest it (decision 561). NO_TILE
+## when there are none.
+func choose_grave(nearest_one := false) -> Vector2i:
 	var graves := zone_graves()
 	if graves.is_empty():
 		return NO_TILE
@@ -1737,6 +1780,12 @@ func choose_grave() -> Vector2i:
 			no_deeper.append(at)
 		if each.z < mine:
 			shallower.append(at)
+	if nearest_one and not free.is_empty():
+		var best := free[0]
+		for at in free:
+			if World.distance(tile, at) < World.distance(tile, best):
+				best = at
+		return best
 	var pick := shallower if not shallower.is_empty() else (no_deeper if not no_deeper.is_empty() else free)
 	if pick.is_empty():
 		return NO_TILE
@@ -1861,6 +1910,19 @@ func _keep_prop(key: String, value: Variant) -> void:
 	var kept: Dictionary = (props as Dictionary).duplicate() if props is Dictionary else {}
 	kept[key] = value
 	spawn_spec["props"] = kept
+
+
+## How long (ticks) a dead [param kind] of the zone's level waits to come
+## back: its level.json "respawn_s" (seconds; one number for every kind, or
+## by kind), else [param otherwise] (decision 561: the barrow's dead 600,
+## its robbers 300).
+static func respawn_ticks(kind: String, otherwise: int) -> int:
+	var given: Variant = _zone_config().get("respawn_s")
+	if given is Dictionary:
+		given = given.get(kind)
+	if given is float or given is int:
+		return maxi(0, roundi(float(given) * World.TICK_RATE))
+	return otherwise
 
 
 ## The graves of the zone's level (its level.json "graves", [x, y, band]

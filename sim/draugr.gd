@@ -23,9 +23,9 @@ enum State { SEATED, PACT, AT_REST }
 ## Main.bless's names, 5, 10 or 15 uses (economy.json return.field.uses).
 const DIFFICULTIES: Array[String] = ["easy", "normal", "hard"]
 ## His hp and blows at each, times his kind's; and the dead he raises in
-## his lair to fight beside him.
+## his lair to fight beside him (0, 1 or 2 since decision 561).
 const SCALE := {"easy": 1.0, "normal": 1.5, "hard": 2.0}
-const RETINUE := {"easy": 0, "normal": 2, "hard": 4}
+const RETINUE := {"easy": 0, "normal": 1, "hard": 2}
 ## Game days he rests once laid to rest (a rules number, Jeff's to move).
 const RISE_DAYS := 3
 ## How near a player comes before he speaks first (cells, in his lair).

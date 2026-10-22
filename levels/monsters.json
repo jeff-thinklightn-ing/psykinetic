@@ -68,7 +68,7 @@
 	},
 	"skeleton": {
 		"label": "Skeleton",
-		"body": {"mass": 30.0, "move_ticks": 4.0, "max_hp": 6},
+		"body": {"mass": 30.0, "move_ticks": 4.0, "max_hp": 6, "sight_range": 5},
 		"tactic": "plain",
 		"idle": "homeward",
 		"opens_doors": true,
@@ -80,7 +80,7 @@
 	},
 	"skeleton_guard": {
 		"label": "Barrow guard",
-		"body": {"mass": 45.0, "move_ticks": 4.0, "max_hp": 10, "attack_damage": 2},
+		"body": {"mass": 45.0, "move_ticks": 4.0, "max_hp": 10, "attack_damage": 2, "sight_range": 5},
 		"tactic": "plain",
 		"idle": "guard",
 		"opens_doors": true,
@@ -93,12 +93,13 @@
 	},
 	"robber": {
 		"label": "Grave robber",
-		"body": {"mass": 70.0, "move_ticks": 3.5, "max_hp": 10},
+		"body": {"mass": 70.0, "move_ticks": 3.5, "max_hp": 10, "sight_range": 5},
 		"tactic": "flank",
 		"idle": "wander",
 		"opens_doors": true,
 		"door_force": 1,
-		"leash": 20,
+		"leash": 10,
+		"call": 6,
 		"strength": 1,
 		"temperament": {"bold": 0, "cautious": 2, "cowardly": 1},
 		"wields": {"right": "dagger"}
@@ -106,7 +107,7 @@
 	"draugr": {
 		"label": "Draugr",
 		"script": "res://sim/draugr.gd",
-		"body": {"mass": 120.0, "move_ticks": 4.5, "max_hp": 30, "attack_ticks": 14, "attack_damage": 3},
+		"body": {"mass": 120.0, "move_ticks": 4.5, "max_hp": 30, "attack_ticks": 14, "attack_damage": 3, "sight_range": 5},
 		"tactic": "heavy",
 		"idle": "guard",
 		"opens_doors": false,

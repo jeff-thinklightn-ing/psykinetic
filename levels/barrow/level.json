@@ -172,6 +172,11 @@
 		"monster_robber": "#8a5a2a",
 		"monster_draugr": "#5a4636"
 	},
+	"respawn_s": {
+		"skeleton": 600,
+		"skeleton_guard": 600,
+		"robber": 300
+	},
 	"places": {
 		"niche": {
 			"at": [

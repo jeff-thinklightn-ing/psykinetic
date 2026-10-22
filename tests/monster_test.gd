@@ -100,6 +100,7 @@ func _ready() -> void:
 	_test_draugr()
 	_test_charging()
 	_test_threatens()
+	_test_quieter()
 	_test_archer()
 	_test_worn_bundles()
 	_test_shield()
@@ -2239,8 +2240,8 @@ func _test_draugr() -> void:
 	var taken := draugr.accept_offer(player, offers[0], Draugr.offering() * 2)
 	_check(taken["ok"] and draugr.state == Draugr.State.PACT and draugr.difficulty == "normal" and World.gold_of("p1") == 50 - Draugr.offering() * 2,
 		"two measures: a pact at normal, his gold (%s, %s)" % [taken, World.gold_of("p1")])
-	_check(draugr.max_hp == roundi(30 * 1.5) and draugr.hp == draugr.max_hp and spawned.size() == 2 and draugr.offers_for("p1").is_empty(),
-		"he grows to it, raises two of the dead, and offers nothing while it is on (%d hp, %d risen)" % [draugr.max_hp, spawned.size()])
+	_check(draugr.max_hp == roundi(30 * 1.5) and draugr.hp == draugr.max_hp and spawned.size() == 1 and draugr.offers_for("p1").is_empty(),
+		"he grows to it, raises one of the dead (0/1/2 since decision 561), and offers nothing while it is on (%d hp, %d risen)" % [draugr.max_hp, spawned.size()])
 	var fought := false
 	for i in 20:
 		World.step()
@@ -2782,4 +2783,58 @@ func _test_threatens() -> void:
 		"a wolf by day: its diet, not a hunter; prey nobody")
 	wolf._bold = true
 	_check(wolf.threatens(hunter), "a bold wolf, the hunter")
+	Monster.idling = true
+
+
+func _test_quieter() -> void:
+	print("
+== the barrow made quieter (decision 561): half the dead lie at once, a blocked one waits, nearer sight and calls, longer respawns ==")
+	Monster.idling = true
+	Monster._read_factions = null
+	var rows: Array[String] = ["###############", "#k.k.k.k......#", "#.............#", "#.............#", "###############"]
+	Level.register("mt_quiet", Level.image_from_rows(rows), null, {"graves": [[2, 2, 2], [6, 2, 2], [13, 1, 0], [13, 3, 0]],
+		"respawn_s": {"skeleton": 600, "robber": 300}})
+	var e := _build(rows, {}, {}, "mt_quiet")
+	for i in 400:
+		World.step()
+	var bands := {0: 0, 2: 0}
+	for each: Monster in e["k"]:
+		bands[2 if each.grave.x < 10 else 0] += 1
+	_check(bands[0] == 2 and bands[2] == 2, "of four, two take the deep grave beside them and two walk home (%s)" % [bands])
+	_check(e["k"].all(func(each: Monster) -> bool: return each.laid and each.tile == each.grave), "and all four lie in their graves")
+	_check(Monster.respawn_ticks("skeleton", 600) == 6000 and Monster.respawn_ticks("robber", 600) == 3000 and Monster.respawn_ticks("imp", 600) == 600,
+		"the level's respawn_s by kind, in ticks; a kind it does not name waits as ever")
+	Level.unregister("mt_quiet")
+	Level.register("mt_quiet", Level.image_from_rows(rows), null, {"respawn_s": 30})
+	_build(rows, {}, {}, "mt_quiet")
+	_check(Monster.respawn_ticks("imp", 600) == 300, "one number, every kind")
+	Level.unregister("mt_quiet")
+
+	rows = ["###########", "#k.....P..#", "###########"]
+	Level.register("mt_quiet", Level.image_from_rows(rows), null, {"graves": [[9, 1, 0]]})
+	e = _build(rows, {}, {}, "mt_quiet")
+	var walker: Monster = e["k"][0]
+	var player: GridEntity = e["P"][0]
+	walker.sight_range = 7
+	walker.senses.cone_cos = -1.0
+	var met := -1
+	var backed := false
+	var fought := -1
+	for i in 300:
+		World.step()
+		if met < 0 and World.distance(walker.tile, player.tile) == 1:
+			met = World.tick
+		backed = backed or (met >= 0 and World.distance(walker.tile, player.tile) > 1)
+		if walker.target == player:
+			fought = World.tick
+			break
+	_check(met >= 0 and backed and fought - met >= Monster.BLOCKED_WAIT_TICKS,
+		"blocked, it steps back and waits %d ticks before it fights (met %d, fought %d, stepped back %s)" % [Monster.BLOCKED_WAIT_TICKS, met, fought, backed])
+	Level.unregister("mt_quiet")
+
+	e = _build(["###########", "#x.g.k.u.i#", "###########"])
+	_check(e["x"][0].call_reach == 6 and e["i"][0].call_reach == Senses.NOISE_CALL, "a robber calls 6 cells, an imp as ever")
+	_check(["robber", "skeleton_guard", "skeleton", "draugr"].all(func(kind: String) -> bool: return Monster.bodies()[kind].get("sight_range") == 5)
+			and e["x"][0].leash == 10,
+		"the barrow's kinds see 5 cells; a robber goes 10 from home")
 	Monster.idling = true

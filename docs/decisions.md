@@ -19379,3 +19379,38 @@ the Lie clip falls back, its head 1.14 m behind the feet' 0.23 ahead, so the mod
 back by LIE_MIDDLE (0.46 m) to lie on the bed cell; a bed is the home's floor corner (no piece to
 lie on). Client only; nothing on the wire beyond npc's field. Shots wait for the coordinator's
 all-clear (Jeff in Blender).
+
+## 561. The barrow made quieter (547 and 548 tuned; Jeff, 2026-10-21)
+
+Jeff on the barrow: "too many enemies and aggro should be lower". The
+coordinator approved, as one step: fewer of each, nearer notice, no room
+joining the next, and a cleared room staying cleared a while. Dungeon
+widens the halls beside it (541 amended), and sets the counts there.
+
+- Counts (dungeon's level.json): skeletons 6 to 4, robbers 3 to 2, altar
+  guards 3 to 2, one each side of the altar. The draugr's retinue in a
+  pact 0/2/4 to 0/1/2 (Draugr.RETINUE).
+- Half the dead lie from the start: every other one of a zone's dead to
+  choose a grave (by how many others have one) takes the free grave
+  nearest it, a few steps off, and lies there; the rest walk home to a
+  shallower one as before (Monster.choose_grave(nearest_one)). Of the
+  barrow's four, two lie and two walk.
+- 547's "in the way" amended (the coordinator's earlier ruling: only what
+  blocks its path, or strikes it): a walker blocked by the same one steps
+  back (else aside) and waits BLOCKED_WAIT_TICKS (20, 2 s) before it fights
+  it; a block older than BLOCKED_FORGET_TICKS (60) is forgotten. Struck,
+  it fights back at once, as before.
+- Notice: the barrow's kinds see 5 cells (their body's sight_range; was
+  7); a kind's "call" sets how far its call for help carries (default
+  Senses.NOISE_CALL, 12), a grave robber's 6, so only the robber beside
+  him joins; a robber's leash 20 to 10. A fight's noise (5) is unchanged,
+  and nothing wakes as a room: skeletons, guards and the draugr hear
+  nothing, as before.
+- Respawn: a level's "respawn_s" (seconds; one number for every kind, or
+  by kind) sets how long its dead wait to come back
+  (Monster.respawn_ticks, Main._respawn_delay), else RESPAWN_DELAY_TICKS
+  (60 s) as ever. The barrow's: skeletons and guards 600, robbers 300. It
+  stays in a generated barrow (Regen keeps the template's top-level keys).
+
+Server only, protocol unchanged, no new class_name. monster_test
+_test_quieter; the draugr's retinue check in _test_draugr.

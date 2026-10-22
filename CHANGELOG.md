@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The barrow is quieter (Jeff's "too many enemies, aggro lower"): its skeletons, guards, robbers and the draugr see 5 cells, not 7; a grave robber's call for help reaches 6 cells, not 12, and he roams 10 from home; half the skeletons lie in their graves from the start; one walking home that you block steps back and waits 2 s before it fights; the draugr raises 1 skeleton at normal and 2 at hard (was 2 and 4); a level can set how long its dead take to come back ("respawn_s"): the barrow's dead 10 minutes, its robbers 5 (was 1 minute). Fewer of them come with dungeon's widened barrow (4 skeletons, 2 robbers, 2 guards).
 - Townsfolk are seen at their work (566): chopping at the woodlot with an axe, shouldering logs home, sawing at a building's woodpile, hammering at its frame, and lying down to sleep at home at night.
 - Builder mode warns when a woodlot has no spot beside the trees for its woodcutter to work, and lists the buildings a town has started with no place marked on the map for them (566).
 - The town tells your game how far each building is built, whether its walls stand yet, and which houses are awake, so building work can be drawn in stages and lit windows go dark at night (566).
