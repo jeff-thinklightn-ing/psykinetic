@@ -60,6 +60,7 @@ func _ready() -> void:
 	_test_style()
 	_test_short()
 	_test_bound()
+	_test_gold_drop()
 	_test_grave()
 	_test_story()
 	_test_bless()
@@ -1225,7 +1226,10 @@ func _test_style() -> void:
 	var row: Dictionary = Monster.kinds()["imp"]
 	var had_drops: Variant = row.get("drops")
 	row["drops"] = [{"item": "dagger"}, {"item": "ration", "style": "dwarven"}]
+	var had_purse: Variant = row.get("purse")
+	row["purse"] = [0, 0]  # No gold here (decision 601 has its own test).
 	var dropped := (imp as Monster).remains()
+	row["purse"] = had_purse
 	_check(dropped.size() == 2 and World.items.style_of(dropped[0]) == "dark elven" and World.items.style_of(dropped[1]) == "dwarven",
 			"its remains: of its make, a row's own style winning")
 	if had_drops == null:
@@ -1273,6 +1277,66 @@ func _test_short() -> void:
 	_check(back.yields_of(sack) == {"food": 3} and back.short_of(sword) == 1.0, "saved and read back")
 	for uid in [sword, sack, arrows, hide]:
 		World.items.end(uid, "gone")
+
+
+func _test_gold_drop() -> void:
+	print("
+== a humanoid's gold where it falls; none from an animal or the undead (decision 601) ==")
+	var kinds := Monster.kinds()
+	_check(kinds["imp"]["purse"] == [1, 3] and kinds["sneak"]["purse"] == [1, 3] and kinds["brute"]["purse"] == [4, 10]
+			and kinds["wolf"]["purse"] == [0, 0] and kinds["skeleton"]["purse"] == [0, 0] and kinds["draugr"]["purse"] == [0, 0],
+			"the goblin, the kobold and the orc carry a purse; the wolf, the skeleton and the draugr none")
+	var host := _player(Net.local_id)
+	var beside := _far_cell(host)
+	var imp := _main._spawn({"script": "res://sim/monster.gd", "shape": "capsule", "name": "PurseImp%d" % World.tick,
+		"tile": beside, "kind": "imp", "props": {"mass": 40.0, "sight_range": 0}}) as Monster
+	imp.acts = false
+	var row: Dictionary = kinds["imp"]
+	var had_drops: Variant = row.get("drops")
+	row["drops"] = []
+	var at := imp.tile
+	var before := World.ground_uids(at)
+	World.damage(imp, imp.hp, host, &"attack")
+	var purses: Array[int] = []
+	for cell: Vector2i in [at] + Array(World.DIRECTIONS).map(func(d: Vector2i) -> Vector2i: return at + d):
+		for uid in World.ground_uids(cell):
+			if not uid in before and World.items.id_of(uid) == "coin_purse":
+				purses.append(uid)
+	var gold := World.items.gold_of(purses[0]) if purses.size() == 1 else -1
+	_check(purses.size() == 1 and gold >= 1 and gold <= 3, "a goblin falls: one purse where it fell, %d gold (1 to 3)" % gold)
+	_check(not purses.is_empty() and World.items.yields_of(purses[0]) == {"gold": gold} and ("%d gold" % gold) in World.item_note(purses[0]),
+			"banked or opened it gives its own gold, and says so (%s)" % (World.item_note(purses[0]) if not purses.is_empty() else ""))
+	_check(not purses.is_empty() and ItemBook.from_dict(World.items.to_dict()).gold_of(purses[0]) == gold, "kept through a save")
+	if had_drops == null:
+		row.erase("drops")
+	else:
+		row["drops"] = had_drops
+	for uid in purses:
+		World.take_from_ground(_cell_of(uid), World.ground_uids(_cell_of(uid)).find(uid))
+		World.items.end(uid, "gone")
+	var wolf := _main._spawn({"script": "res://sim/animal.gd", "shape": "capsule", "name": "PurseWolf%d" % World.tick,
+		"tile": beside, "kind": "wolf", "props": {"sight_range": 0}}) as GridEntity
+	if wolf != null:
+		wolf.acts = false
+		var wolf_at := wolf.tile
+		var ground := World.ground_uids(wolf_at)
+		World.damage(wolf, wolf.hp, host, &"attack")
+		var coins := 0
+		for cell: Vector2i in [wolf_at] + Array(World.DIRECTIONS).map(func(d: Vector2i) -> Vector2i: return wolf_at + d):
+			for uid in World.ground_uids(cell):
+				if not uid in ground and World.items.id_of(uid) == "coin_purse":
+					coins += 1
+		_check(coins == 0, "a wolf falls: no gold")
+		for cell: Vector2i in [wolf_at] + Array(World.DIRECTIONS).map(func(d: Vector2i) -> Vector2i: return wolf_at + d):
+			for uid in World.ground_uids(cell):
+				if not uid in ground:
+					World.take_from_ground(cell, World.ground_uids(cell).find(uid))
+					World.items.end(uid, "gone")
+
+
+func _cell_of(uid: int) -> Vector2i:
+	var xy := World.items.at_of(uid).get_slice("@", 1).split(",")
+	return Vector2i(int(xy[0]), int(xy[1]))
 
 
 func _test_bound() -> void:
@@ -1337,7 +1401,10 @@ func _test_grave() -> void:
 	var row: Dictionary = Monster.kinds()["imp"]
 	var had_drops: Variant = row.get("drops")
 	row["drops"] = [{"item": "ration"}]
+	var had_purse: Variant = row.get("purse")
+	row["purse"] = [0, 0]  # No gold here (decision 601 has its own test).
 	var dropped := (imp as Monster).remains()
+	row["purse"] = had_purse
 	_check(dropped.size() == 1 and World.items.is_grave(dropped[0]), "and so is what it drops")
 	_check("grave goods" in World.item_note(held) and World.story_line(held).ends_with("taken from the grave"),
 			"its note and story say so (%s; %s)" % [World.item_note(held), World.story_line(held)])
@@ -1881,7 +1948,11 @@ func _test_loot() -> void:
 		return
 	foe.slots = PackedStringArray(["dagger", "", "coin_purse", ""])
 	var at := foe.tile
+	var foe_row: Dictionary = Monster.kinds().get(str(foe.spawn_spec.get("kind", "")), {})
+	var had_purse: Variant = foe_row.get("purse")
+	foe_row["purse"] = [0, 0]  # Only what it carried here (decision 601 has its own test).
 	World.damage(foe, 1000, host)
+	foe_row["purse"] = had_purse
 	var dropped := []
 	for cell: Vector2i in World.zone.ground.keys():
 		if World.distance(cell, at) <= 1:

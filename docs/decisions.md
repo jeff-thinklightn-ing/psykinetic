@@ -21558,4 +21558,30 @@ This is dungeon's side.
 
 level_test _test_hall_door; labyrinth_test (the hall's one door on layer
 3). Protocol unchanged (a Door's open and lock replicate already); no new
+## 601. Gold from humanoid enemies
+
+Jeff: "one feature i really want before the cut is gold drop from
+humanoid enemies". When a humanoid enemy dies it leaves a few coins where
+it falls, through the coin purse every player already picks up and opens
+into gold. There's no new pickup.
+- A monster row's "purse": [least, most], whole gold (Monster.kinds, read
+  by Monster._purse; [0, 0] when absent or wrong). Monster.remains rolls
+  it with the rest of its drops (seeded by its name and the tick) and
+  mints one coin_purse holding that much: ItemBook.set_gold, the
+  instance's own gold, saved. It's minted, a small leak into economy's
+  loop, so the numbers stay low. Grave goods mark it as any drop (555).
+- ItemBook.gold_of / set_gold; yields_of gives the instance's own gold in
+  place of the catalog's 10, so banking it and opening it (World.try_use
+  "purse") both pay what it holds. Its note says "N gold". A shop won't
+  buy a purse with gold of its own ("open the purse: it is gold
+  already"), so a 2-gold purse can't be sold at a full purse's price.
+- 601, enemy-ai's side (enemy-ai-85's rows, in this commit): imp (the
+  goblin) [1, 3], sneak (the kobold) [1, 3], brute (the orc) [4, 10]. None
+  for animals, the undead, or the robber (economy's band purse already
+  drops his share). A bandit, chief or captain row, when it comes, takes
+  the same key (enemy-ai's draft for a captain: [8, 20]).
+items_test _test_gold_drop: a goblin's death leaves one purse of 1 to 3
+gold, banked and opened for that, kept through a save; a wolf's leaves
+none. No protocol change: the purse travels as any ground thing, and its
+gold is server-side (the note text rides the slot notes as ever). No new
 class_name.

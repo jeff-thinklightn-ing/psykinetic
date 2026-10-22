@@ -1938,9 +1938,15 @@ func _test_wild_remains() -> void:
 	var uid: int = World.ground_uids(World.zone.ground.keys().filter(
 			func(cell: Vector2i) -> bool: return "antlers" in World.ground_at(cell))[0])[0]
 	_check(World.items.history(uid)["events"][0]["kind"] == "remains", "the antlers' history begins as its remains")
-	var before := World.zone.ground.size()
+	var before := World.zone.ground.duplicate()
 	World.damage(imp, imp.hp)
-	_check(not imp.spawned and World.zone.ground.size() == before, "an imp's row drops nothing")
+	var fell: Array[String] = []
+	for cell: Vector2i in World.zone.ground:
+		for each in World.ground_uids(cell):
+			if not each in before.get(cell, PackedInt32Array()):
+				fell.append(World.items.id_of(each))
+	_check(not imp.spawned and fell.all(func(id: String) -> bool: return id == "coin_purse") and fell.size() <= 1,
+			"an imp's row drops no meat or hide: at most its purse of gold (decision 601; %s)" % [fell])
 
 
 func _test_kobold_dagger_and_pick() -> void:

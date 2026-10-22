@@ -1290,8 +1290,11 @@ func _calm() -> void:
 ## What it leaves where it falls (decision 318): its kind's "drops" (each
 ## {item, count: [least, most], chance}, levels/monsters.json), made now
 ## (ItemBook.mint, "remains" of it), as many of each as dropped rolls,
-## seeded by its name and the tick. World.damage lays them on the ground.
-## Server only.
+## seeded by its name and the tick, and its kind's "purse" (decision 601;
+## Jeff: "gold drop from humanoid enemies"): a coin purse holding a roll
+## of [least, most] gold (ItemBook.set_gold; minted, a small leak into
+## the economy), none for a row without one (animals, the undead) or a
+## roll of 0. World.damage lays them on the ground. Server only.
 func remains() -> Array[int]:
 	var uids: Array[int] = []
 	var row: Dictionary = kinds().get(str(spawn_spec.get("kind", "")), {})
@@ -1304,7 +1307,19 @@ func remains() -> Array[int]:
 			var uid := World.items.mint(str(drop["item"]), "remains", World._label_of(self), zone, tile, style)
 			World.items.mark_grave(uid, World.grave_from(self), zone, tile)  # Decision 555.
 			uids.append(uid)
+	var purse: Array = row.get("purse", [0, 0])
+	var gold := roll.randi_range(int(purse[0]), int(purse[1])) if purse.size() == 2 and int(purse[1]) > 0 else 0
+	if gold > 0 and Items.exists(PURSE):
+		var uid := World.items.mint(PURSE, "remains", World._label_of(self), zone, tile)
+		World.items.set_gold(uid, gold)
+		World.items.mark_grave(uid, World.grave_from(self), zone, tile)  # Decision 555.
+		uids.append(uid)
 	return uids
+
+
+## The thing a humanoid's gold falls as (decision 601): a coin purse,
+## picked up and opened ("use") into gold as any.
+const PURSE := "coin_purse"
 
 
 ## How many of drop row [param drop] fall, by [param roll]: none if its
@@ -1365,12 +1380,22 @@ static func read_kinds(path: String) -> Dictionary:
 			"role": str(row.get("role", "")), "herd": str(row.get("herd", kind)),
 			"diet": (row.get("diet", []) as Array).duplicate() if row.get("diet") is Array else [],
 			"drops": (row.get("drops", []) as Array).duplicate(true) if row.get("drops") is Array else [],
+			"purse": _purse(row.get("purse")),
 			"wields": (row["wields"] as Dictionary).duplicate() if row.get("wields") is Dictionary else {},
 			"picks_up": bool(row.get("picks_up", false)), "art": str(row.get("art", "")),
 			"label": str(row.get("label", "")), "fearless": bool(row.get("fearless", false)),
 			"keeps_room": bool(row.get("keeps_room", false)), "script": str(row.get("script", "")),
 			"call": int(row.get("call", Senses.NOISE_CALL))}
 	return out
+
+
+## A row's "purse" (decision 601): [least, most] whole gold, least at
+## least 0 and most at least least; [0, 0] (none) for anything else.
+static func _purse(value: Variant) -> Array:
+	if value is not Array or (value as Array).size() != 2 or not ((value[0] is float or value[0] is int) and (value[1] is float or value[1] is int)):
+		return [0, 0]
+	var least := maxi(int(value[0]), 0)
+	return [least, maxi(int(value[1]), least)]
 
 
 ## Each kind's body (mass, hp, pace, blows): what Level.MONSTER_TYPES gives a

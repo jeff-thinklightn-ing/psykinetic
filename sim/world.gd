@@ -2437,6 +2437,8 @@ func item_note(uid: int) -> String:
 		more.append("%d of %d" % [items.condition_of(uid), Items.condition_max(items.id_of(uid))])
 	if items.short_of(uid) < 1.0:
 		more.append("short measure")  # Decision 493.
+	if items.gold_of(uid) >= 0:
+		more.append("%d gold" % items.gold_of(uid))  # A fallen humanoid's purse (decision 601).
 	if not items.bound_to(uid).is_empty():
 		more.append("bound")  # Decision 544.
 	if items.is_grave(uid):
@@ -3134,6 +3136,9 @@ func _sell(by: GridEntity, from: GridEntity, from_slot: int, shop: GridEntity) -
 	var who := (by as Player).player_id
 	var item := from.slots[from_slot]
 	var uid := slot_uid(from, from_slot)
+	if items.gold_of(uid) >= 0:
+		traded.emit(by, shop, "open the purse: it is gold already")  # Not sold at a whole purse's price (decision 601).
+		return false
 	var deal := economy.sell(who, place, item, items.is_grave(uid))  # Grave goods fenced (560).
 	if not deal["ok"]:
 		_log("shop: %s refused %s at %s: %s" % [by.name, item, place, deal["why"]])
@@ -4049,7 +4054,7 @@ func try_use(by: GridEntity, slot: int) -> bool:
 			return try_bandage(by, by)
 		"purse":
 			var player_id: Variant = by.get("player_id")
-			var gold := int(Items.def(id)["yield"].get("gold", 0))
+			var gold := int(items.yields_of(slot_uid(by, slot)).get("gold", 0))  # Its own, a humanoid's purse (decision 601).
 			if player_id is not String or str(player_id).is_empty() or gold <= 0:
 				return false
 			var uid := take_item(by, by, slot)

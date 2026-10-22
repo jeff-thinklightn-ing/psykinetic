@@ -5274,6 +5274,8 @@ func _pile_sounds(pile: GroundPile, ids: PackedStringArray) -> void:
 		_pile_ids[pile] = ids.duplicate()
 	if Time.get_ticks_msec() < _piles_quiet_until or _room == null:
 		return
+	if not is_inside_tree() or not is_instance_valid(sfx) or not sfx.is_inside_tree():
+		return  # The scene coming down: its piles leave too, unheard (a fallen goblin's purse at a test's end, decision 601).
 	if World.zone != null and pile.zone != "" and pile.zone != World.zone.name:
 		return  # Another zone's (a host's), or the one just left.
 	var at := _tile_position(pile.tile) + Vector3.UP * 0.2
