@@ -1509,6 +1509,22 @@
 				{"at": [0, 1.502, 0], "size": [2.04, 3.004, 1.731]}
 			]
 		},
+		"building.link_arch": {
+			"category": "buildings",
+			"type": "mesh",
+			"kind": "cell",
+			"footprint": [3, 1],
+			"size": [3.05, 4.0, 0.9],
+			"tolerance": 0.2,
+			"variants": 2,
+			"materials": 2,
+			"budget": 1200,
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-22", "notes": "C:/dev/review/transitions/make_arch.py: variant 1 timber, two rough squared posts on stone pads leaning in a hair, a heavy lintel under a ridge cap of boards, knee braces, a weathered sign board with a dark arrow hung on two chains, an iron lantern hanging behind it, its flame the warm glow material (energy 1), 175 tris; variant 2 stone, two piers of coursed blocks each course its own, battered, a round arch of nine voussoirs proud of the wall with a lighter keystone, spandrels, a two-step coping, 336 tris"},
+			"uses": "a gate over a zone link (decision 589, maps' zone-transition cues, the coordinator approved; Jeff: \"descending/ascending steps, arches, etc.\"), 3 x 1 cells: the link the middle cell under it, the posts on the side cells; scenery only, placed by the loader from the link's data (the sim's walk unchanged), its posts thick at the cells' edges so they read solid; front +z the way out; variant 1 timber (the default), 2 stone (where a castle, town or barrow lies beyond)",
+			"grey": [
+				{"at": [0, 2.0, 0], "size": [3.05, 4.0, 0.9]}
+			]
+		},
 		"building.waystone": {
 			"category": "buildings",
 			"type": "mesh",

@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- A gate arch for zone crossings, in timber with a sign and lantern or in stone with a round arch, ready for the roads' links to other zones (589).
 - The Barrow of the Fallen's mound is twice the size and stands out in the open on a slight rise between the town and the waystone, a landmark on the way, its doorway facing the road; anyone who logged out where it now stands comes back beside it (579).
 - Herbs keep growing round the wilds when a landmark such as the barrow's mound stands near the town; only the town's own buildings clear a ring of them (562 amended (3)).
 - Knockback follows mass, momentum and angle (592): a blow pushes a body by the two weights, stepping into a blow hits harder, a push can go at any angle, a body knocked into another knocks it on by their weights, and a light body hits a wall harder than a heavy one; the numbers are in levels/physics.json; a braced spear throws a charging boar back 1 cell, not 3.
