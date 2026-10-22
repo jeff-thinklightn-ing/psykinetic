@@ -45,6 +45,7 @@ func _ready() -> void:
 	_test_heights()
 	_test_hills()
 	_test_shore()
+	_test_curves_meet()
 	_test_ledges()
 	_test_relax()
 	_test_solid_ground()
@@ -1723,7 +1724,9 @@ func _test_relief() -> void:
 			var corner := cell + Client3D.GROUND_CORNERS[c]
 			var at := Vector2(corner) - Vector2(0.5, 0.5)
 			var surface := _rig._curve_surface(at) if _rig._curve_cells.has(cell) else _rig._water_corner(corner)
-			if _rig.shore_at(at) > 0.6 and bed[c] >= surface:
+			# A lip's corner on a tall fall's line stands over the foot's
+			# water: the face between them, not a dry bed (570).
+			if _rig.shore_at(at) > 0.6 and bed[c] >= surface and bed[c] - surface < Client3D.FALL_TALL:
 				dry_bed.append(cell)
 				break
 	_check(off_surface == 0 and heights_seen.size() > 3 and dry_bed.is_empty(),
@@ -1755,9 +1758,12 @@ func _test_relief() -> void:
 	_rig.rebuild(stepped, hills["centre"])
 	var falls := _rig.stream_falls
 	var bed := func(cell: Vector2i) -> float: return _rig._bed_levels.get(cell, _rig._elevation(cell))
+	# Down any of its streams' paths (a tall fall's stream, 570, too).
 	var true_falls := falls.all(func(fall: Dictionary) -> bool:
-		var i := stream_path.find(fall["cell"])
-		return i > 0 and absf(bed.call(stream_path[i - 1]) - bed.call(stream_path[i]) - float(fall["drop"])) < 0.001 and float(fall["drop"]) > Client3D.FALL_LEAST)
+		return (stepped["streams"] as Array).any(func(stream: Dictionary) -> bool:
+			var path: Array = stream["path"]
+			var i := path.find(fall["cell"])
+			return i > 0 and absf(bed.call(path[i - 1]) - bed.call(path[i]) - float(fall["drop"])) < 0.001 and float(fall["drop"]) > Client3D.FALL_LEAST))
 	var at_step := falls.any(func(fall: Dictionary) -> bool: return fall["cell"] == step_at)
 	# Each fall white on the water drawn there (559, terrain's side: from
 	# the curve's ground, not its smoothed surface).
@@ -1777,6 +1783,50 @@ func _test_relief() -> void:
 	_check(at_step and true_falls and not is_same(falls, _rig.stream_falls) and falls == _rig.stream_falls,
 			"a step %.1f m down the stream at %s a fall there, each a step down its path over %.2f m (%s), a new array each build" % [FALL_STEP, step_at, Client3D.FALL_LEAST, falls])
 	_check(dry_falls.is_empty(), "each fall white on the water there (none: %s)" % [dry_falls])
+	# A tall fall (570, terrain's side): the land past the step lowered
+	# FALL_TALL and more, the stream's surface keeps the step (never under
+	# its bed either side) and hangs a curtain from the lip to the water
+	# below, white, facing down the stream.
+	var tall: Dictionary = hills["terrain"].duplicate(true)
+	var tall_relief: PackedFloat32Array = tall["relief"]
+	for y in relief_size.y:
+		for x in relief_size.x:
+			if Vector2(Vector2i(x, y) - step_at).dot(Vector2(way)) >= 0.0:
+				tall_relief[y * relief_size.x + x] -= 3.0
+	tall["relief"] = tall_relief
+	_rig.rebuild(tall, hills["centre"])
+	var curtain_rows := 0
+	var curtain_top := -INF
+	var curtain_foot := INF
+	var curtain_wrong := 0
+	for ribbon: MeshInstance3D in _rig._stream_ribbons:
+		var arrays := (ribbon.mesh as ArrayMesh).surface_get_arrays(0)
+		var points: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+		var colours: PackedColorArray = arrays[Mesh.ARRAY_COLOR]
+		var uvs: PackedVector2Array = arrays[Mesh.ARRAY_TEX_UV]
+		var normals: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL]
+		for k in points.size():
+			if uvs[k].y < 0.5:
+				continue
+			curtain_rows += 1
+			curtain_top = maxf(curtain_top, points[k].y)
+			curtain_foot = minf(curtain_foot, points[k].y)
+			if colours[k].a < 0.99 or normals[k].y > 0.5:
+				curtain_wrong += 1
+	var dry_under := 0
+	for curve_water: Dictionary in _rig._curve_waters:
+		if curve_water["closed"]:
+			continue
+		var profile: PackedFloat32Array = curve_water["profile"]
+		var ground := _rig._curve_ground(curve_water["curve"])
+		for k in profile.size():
+			# Over its own cells (past the map's edge the relief is none).
+			var sample_cell := Vector2i(((curve_water["curve"]["points"] as PackedVector2Array)[k]).round())
+			if _rig._curve_cells.has(sample_cell) and profile[k] < ground[k] - 0.5:
+				dry_under += 1
+	_check(curtain_rows >= (Client3D.CURTAIN_ROWS + 1) * 3 and curtain_top - curtain_foot > 2.5 and curtain_wrong == 0 and dry_under == 0,
+			"a 3 m step down the stream hangs a curtain from its lip to the water below (%d points, %.2f m tall; wrong: %d), its surface never far under its bed (%d)" % [curtain_rows, curtain_top - curtain_foot, curtain_wrong, dry_under])
+	_rig.rebuild(hills["terrain"], hills["centre"])
 	_rig.rebuild(hills["terrain"], hills["centre"])
 	# Its banks: within a walk of the water a grassy slope into it, no face;
 	# a face only where the land stands a cliff over it.
@@ -2094,6 +2144,27 @@ func _test_streams() -> void:
 ## pond's corners (a lone cell a disc) yet keeps to its cells, the hills'
 ## shore cells drawn finer and meeting the ground round them, a level
 ## without relief drawn whole.
+## Where two waters' curves meet (570, terrain's side: a stream into a
+## river): the field their union, so a point inside the river nearer the
+## stream's end than any of the river's samples is still in the water.
+func _test_curves_meet() -> void:
+	print("
+== curves meet: a stream's end in a river, the water their union ==")
+	var river := Curves.sample(PackedVector2Array([Vector2(-6, 0), Vector2(0, 0), Vector2(6, 0)]), PackedFloat32Array([4.0, 4.0, 4.0]))
+	var stream := Curves.sample(PackedVector2Array([Vector2(0, 8), Vector2(0, 5), Vector2(0, 3)]), PackedFloat32Array([0.5, 0.5, 0.5]))
+	var curves: Array = [{"curve": river, "closed": false}, {"curve": stream, "closed": false}]
+	var near_map: Dictionary = {}
+	var also: Dictionary = {}
+	_rig._stamp_near(river, false, 0, near_map, also)
+	_rig._stamp_near(stream, false, 1, near_map, also)
+	# (0.2, 1.6): 0.4 inside the river's edge, 1.4 from the stream's end.
+	var point := Vector2(0.2, 1.6)
+	var at := _rig._near_on(curves, near_map, point, also)
+	var one := _rig._near_on(curves, {Vector2i(0, 2): Vector2i(1, (stream["points"] as PackedVector2Array).size() - 1)}, point, {})
+	_check(also.has(Vector2i(0, 2)) and int(at.z) == 0 and absf(at.x - 0.4) < 0.05 and one.x < 0.0,
+			"a point in the river by the stream's end is in the river (%s; the stream's end alone: %s)" % [at, one])
+
+
 func _test_shore() -> void:
 	print("\n== shore: the water's edge rounded, within SHORE_BOUND of its cells; the bank drawn finer on relief ==")
 	# A lone cell is a disc: wet in its middle, dry at its corners; a 3 x 3

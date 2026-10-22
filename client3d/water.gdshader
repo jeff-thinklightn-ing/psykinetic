@@ -30,7 +30,8 @@ uniform vec3 foam : source_color = vec3(0.85, 0.92, 0.95);
 // A stream's ribbon (decision 557): its flow in its points' colours.
 uniform bool ribbon = false;
 // A water drawn from its curve (559, terrain's side): its fords' shallows
-// in UV's x, not the mask's cells.
+// in UV's x, not the mask's cells; a tall fall's curtain (570) UV's y 1,
+// and a stream's end in another water fading out (UV's y under a half).
 uniform bool curved = false;
 // The shore field, Client3D.SHORE_RES texels a cell over the mask's cells.
 uniform sampler2D shore : hint_default_black, filter_linear, repeat_disable;
@@ -118,6 +119,13 @@ void fragment() {
 	vec2 down = length(way) > 0.001 ? normalize(way) : vec2(0.0, 1.0);
 	vec2 across = vec2(-down.y, down.x);
 	vec2 along = vec2(dot(at, across) * 3.5, dot(at, down) * 0.8 - TIME * FLOW_SPEED * 1.5);
+	// A tall fall's curtain (Client3D._build_curve_ribbon): its streaks
+	// down its height, falling fast, every bit of it white.
+	float curtain = curved ? step(0.5, UV.y) : 0.0;
+	if (curtain > 0.5) {
+		along = vec2(dot(at, across) * 3.5, world.y * 0.5 + TIME * FLOW_SPEED * 4.0);
+		churn = max(churn, 0.6);
+	}
 	float streaks = smoothstep(0.42, 0.62, noise(along * 9.0));
 	float stones = smoothstep(0.58, 0.7, noise(at * 6.0 + 31.0));
 	float fall = smoothstep(0.15, 0.6, running.a) * max(streaks, stones) * smoothstep(0.15, 0.5, churn);
@@ -125,8 +133,16 @@ void fragment() {
 	colour = mix(colour, foam, band);
 	ALBEDO = colour;
 	ALPHA = max(inside * mix(0.6, 0.88, depth) * mix(1.0, 0.4, shoal), band * 0.85);
+	if (curved && UV.y < 0.5) {
+		ALPHA *= 1.0 - UV.y * 2.0;
+	}
 	// Ripples: the noise's slope, two layers drifting apart.
-	NORMAL = normalize((VIEW_MATRIX * vec4(normalize(vec3(-slope.x * 1.5, 1.0, -slope.y * 1.5)), 0.0)).xyz);
+	// A curtain keeps its own facing (down the stream), rippled a little.
+	if (curtain < 0.5) {
+		NORMAL = normalize((VIEW_MATRIX * vec4(normalize(vec3(-slope.x * 1.5, 1.0, -slope.y * 1.5)), 0.0)).xyz);
+	} else {
+		NORMAL = normalize(NORMAL + (VIEW_MATRIX * vec4(slope.x * 0.6, 0.0, slope.y * 0.6, 0.0)).xyz);
+	}
 	ROUGHNESS = 0.12;
 	SPECULAR = 0.6;
 	METALLIC = 0.0;

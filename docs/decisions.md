@@ -20380,3 +20380,68 @@ So whose charges the fallen hold no longer decides whether they go down.
 companion_test _test_field_return: with no charges both still go down,
 she cannot bring her player back, and she is told so. Server sim,
 protocol unchanged, no new class_name.
+## 570, terrain's side: a tall fall's curtain, and waters that meet
+
+maps' 570 lays the hills' first real fall: a stream off the plateau's
+west cliff dropping 7.9 m into a pool (the curve widened there), meeting
+the river below. Two view_test checks failed on it, and the approved
+design (the coordinator, 2026-10-22) answers both. The order: this
+first, maps' 570 straight after, so main never has the fall's data
+without its drawing.
+
+**Waters that meet.** Where a stream runs into a river a point inside
+the river can lie nearer the stream's end sample than any of the
+river's, and read dry.
+- The nearest-sample map keeps one sample per curve near a cell
+  (_stamp_near: the first curve's in the map, any other's in an "also"
+  map), and _near_on takes the one the point is furthest into: the
+  field is the waters' union (roads' too, where they cross).
+- An earlier water keeps a cell a later one reaches (as the level lays
+  them: the stream stops at the river).
+- A stream ending in an earlier river is no lower than the river's
+  surface there (_meet_at_end), so the two meet with no step.
+- Its ribbon runs on over the river's cells (it used to stop at its own,
+  a cell short, a strip of dry ground and a straight cut between them),
+  fading out over a cell (UV's y under a half, water.gdshader's alpha).
+
+**The profile keeps its falls.** _curve_profile smoothed over
+CURVE_SMOOTH samples before its running minimum, so across a tall step
+it pulled the surface metres under the bed above the lip. Now a drop of
+over FALL_LEAST from one sample to the next starts a new run, and each
+run is smoothed on its own; the running minimum is as before. For a cell
+past a fall the pool stands on its ground (the smoothing had it under the
+foot cell's, a dry band between the curtain and the water).
+
+**The bed under the curve's water.** A narrow stream's cell beside a
+cliff is drawn whole (not finer: _curve_fine skips cells with a cliff
+edge), its corners at the mean of its cells' water, which can stand
+over the curve's own surface. _shore_bed takes the curve's surface where
+that is lower, so no dry corner shows inside the water. Across a tall
+fall a water cell's corners (_water_corner, _shore_bed with its level)
+and a bank's take only the water within FALL_TALL of their own level: the
+mean of the lip's and the foot's water had ramped the bed between them, a
+slope of ground in front of the curtain's lower half; now the cliff's
+face stands there and the curtain hangs on it.
+
+**The curtain.** Where a river's surface drops FALL_TALL (1 m) or more
+from one sample to the next, _build_curve_ribbon hangs a curtain from
+the lip to the water below: CURTAIN_ROWS rows, out down the stream as
+the square root of the drop (as water falls), from the lip's width to
+the foot's, white, facing down the stream, their UV's y 1.
+water.gdshader streaks a curtain by its height (world y) falling fast,
+keeps its own facing rippled a little, all of it white. The white water
+past the foot is the fall's as before (557 amended). Mist waits (the
+coordinator). Sound's cue plays at the fall's true drop (stream_falls,
+unchanged in shape: the 7.9 m drop clamps to FALL_LOUDEST).
+
+Rejected: having the data end the stream in a pool short of the river
+(maps offered); streams meet rivers, and Jeff wants rivers.
+
+view_test: _test_curves_meet (two curves, a point in the river by the
+stream's end); _test_relief: a 3 m step down the hills' stream hangs a
+curtain from its lip to the water below, its surface never far under
+its bed (a lip's corner over the foot's water is the face, not a dry
+bed); the falls check down any stream's path. Shots in
+C:/dev/review/falls (maps' 570 data, before without this and after).
+Client only, protocol
+unchanged, no new class_name.

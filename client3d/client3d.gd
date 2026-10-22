@@ -237,6 +237,11 @@ const CURVE_SMOOTH := 4
 ## much of a cell sideways.
 const RELAX_MOST := 0.2
 const RIBBON_UNDER := 0.3
+## A fall this tall (m) or more hangs as a curtain from its lip to the
+## water below (_build_curve_ribbon), in CURTAIN_ROWS rows bowed out down
+## the stream; a shorter one is a white slope.
+const FALL_TALL := 1.0
+const CURTAIN_ROWS := 4
 const FALL_LEAST := 0.25
 ## The ledges' rims (decision 556, _rim_band): sampled RIM_RES a side; each
 ## stands out RIM_LEAST to RIM_MOST of a cell from the higher cells (never
@@ -1371,12 +1376,16 @@ var _stream_cells: Dictionary[Vector2i, bool] = {}
 var _curve_waters: Array[Dictionary] = []
 var _curve_cells: Dictionary[Vector2i, int] = {}
 var _curve_near_sample: Dictionary[Vector2i, Vector2i] = {}
+## A cell near more than one water (where a stream meets a river): the
+## others' (which water, its nearest sample), so the field is their union.
+var _curve_near_also: Dictionary[Vector2i, Array] = {}
 ## The roads as curves (563, terrain's side, _read_roads): each one's
 ## curve and kind; their cells (-> which road); each cell near one ->
 ## (which road, its nearest sample); their field (_road_field).
 var _road_curves: Array[Dictionary] = []
 var _road_cells: Dictionary[Vector2i, int] = {}
 var _road_near_sample: Dictionary[Vector2i, Vector2i] = {}
+var _road_near_also: Dictionary[Vector2i, Array] = {}
 var _road_image: Image
 var _road_mask: ImageTexture
 ## The ground relaxed (decision 558, _relax): each moved corner's offset
@@ -2392,7 +2401,7 @@ func _ground_corners(cell: Vector2i) -> PackedFloat32Array:
 		# bed there (_shore_bed); the mesh sinks those with water all round.
 		var own := PackedFloat32Array([0.0, 0.0, 0.0, 0.0])
 		for c in 4:
-			own[c] = _shore_bed(cell + GROUND_CORNERS[c])
+			own[c] = _shore_bed(cell + GROUND_CORNERS[c], _bed_levels.get(cell, _elevation(cell)))
 		return own
 	if _relief_given and _relief_size != Vector2i.ZERO and Relief.on_map(_relief_size, cell) and not _ramp_heights.has(cell):
 		# A bank: a corner the water touches comes down to the water's edge
@@ -2405,7 +2414,10 @@ func _ground_corners(cell: Vector2i) -> PackedFloat32Array:
 			var vertex := cell + GROUND_CORNERS[c]
 			var top := _water_top(vertex)
 			if top > -INF and _land_low(vertex) - top <= Relief.WALK_RISE:
-				own[c] = _shore_bed(vertex)
+				# The water on this land's side of a tall fall, if any is
+				# (570, terrain's side: no bank pulled up the face).
+				var bed := _shore_bed(vertex, _elevation(cell))
+				own[c] = bed if not is_inf(bed) else _shore_bed(vertex)
 		return own
 	if _bed_levels.has(cell):
 		var bed := _bed_levels[cell]
@@ -2431,13 +2443,19 @@ func _elevations() -> Dictionary:
 
 ## The water's surface at the ground's corner [param vertex] (decision 525):
 ## the mean of the surfaces of the water cells round it (a bridge's water at
-## its bed), so a pond's is flat and a stream's slopes down its path.
-func _water_corner(vertex: Vector2i) -> float:
+## its bed), so a pond's is flat and a stream's slopes down its path. For a
+## water cell at [param level], only the water within FALL_TALL of it (570,
+## terrain's side): across a tall fall the cells above and below keep their
+## own, a face between them, not a bed ramped from the lip to the foot.
+func _water_corner(vertex: Vector2i, level := NAN) -> float:
 	var sum := 0.0
 	var count := 0
 	for cell: Vector2i in [vertex - Vector2i.ONE, vertex - Vector2i(0, 1), vertex - Vector2i(1, 0), vertex]:
 		if _wet.has(cell) or _bed_levels.has(cell):
-			sum += _bed_levels.get(cell, _elevation(cell))
+			var surface: float = _bed_levels.get(cell, _elevation(cell))
+			if not is_nan(level) and absf(surface - level) >= FALL_TALL:
+				continue
+			sum += surface
 			count += 1
 	return sum / count if count > 0 else INF
 
@@ -2461,12 +2479,19 @@ func _water_top(vertex: Vector2i) -> float:
 
 
 ## The ground's height under the water at corner [param vertex] (decision
-## 525): just under the surface (SHORE_SINK), a ford's FORD_DEPTH under.
-func _shore_bed(vertex: Vector2i) -> float:
+## 525): just under the surface (SHORE_SINK), a ford's FORD_DEPTH under. On
+## a river's curve the surface is the curve's where that is lower than its
+## cells' mean (559, terrain's side: a narrow stream's corner by a cliff,
+## drawn whole, under the water drawn there).
+func _shore_bed(vertex: Vector2i, level := NAN) -> float:
 	var ford := false
 	for cell: Vector2i in [vertex - Vector2i.ONE, vertex - Vector2i(0, 1), vertex - Vector2i(1, 0), vertex]:
 		ford = ford or _fords.has(cell)
-	return _water_corner(vertex) - (FORD_DEPTH if ford else SHORE_SINK)
+	var surface := _water_corner(vertex, level)
+	var curved := _curve_surface(Vector2(vertex) - Vector2(0.5, 0.5))
+	if not is_nan(curved) and (is_nan(level) or absf(curved - level) < FALL_TALL):
+		surface = minf(surface, curved)
+	return surface - (FORD_DEPTH if ford else SHORE_SINK)
 
 
 ## How much of a valley floor corner [param vertex] is at [param height]
@@ -6052,6 +6077,7 @@ func _read_curves() -> void:
 	_curve_waters.clear()
 	_curve_cells.clear()
 	_curve_near_sample.clear()
+	_curve_near_also.clear()
 	if _glimpse:
 		return
 	for w in (_terrain.get("waters", []) as Array).size():
@@ -6063,18 +6089,48 @@ func _read_curves() -> void:
 		if points.size() < 2:
 			continue
 		for cell: Vector2i in Curves.cells(curve, closed):
-			if _grounds.has(cell) or _terrain_water_has(cell):
+			# An earlier water keeps a cell a later one meets (as the level
+			# lays them: a stream stops at the river).
+			if (_grounds.has(cell) or _terrain_water_has(cell)) and not _curve_cells.has(cell):
 				_curve_cells[cell] = w
-		_stamp_near(curve, closed, _curve_waters.size(), _curve_near_sample)
+		_stamp_near(curve, closed, _curve_waters.size(), _curve_near_sample, _curve_near_also)
 		_curve_waters.append({"curve": curve, "closed": closed, "profile": PackedFloat32Array(), "shoal": PackedFloat32Array()})
 	# Ponds inside their closed curve: every cell inside reads its curve too.
 	for w in _curve_waters.size():
 		if not _curve_waters[w]["closed"]:
 			_curve_waters[w]["profile"] = _curve_profile(_curve_waters[w]["curve"])
 			_curve_waters[w]["shoal"] = _curve_shoal(w)
+			_meet_at_end(w)
 	for cell: Vector2i in _curve_cells:
 		if not _curve_near_sample.has(cell):
 			_curve_near_sample[cell] = Vector2i(_curve_cells[cell], 0)
+
+
+## A stream [param w] that ends in an earlier river (where it meets it, a
+## confluence): its surface no lower than the river's there, so the two
+## meet with no step down into the river's own water.
+func _meet_at_end(w: int) -> void:
+	var points: PackedVector2Array = _curve_waters[w]["curve"]["points"]
+	var end := points[points.size() - 1]
+	var cell := Vector2i(roundi(end.x), roundi(end.y))
+	if not _curve_near_sample.has(cell):
+		return
+	var level := -INF
+	for near: Vector2i in [_curve_near_sample[cell]] + _curve_near_also.get(cell, []):
+		if near.x >= w or _curve_waters[near.x]["closed"]:
+			continue
+		var at := _near_one(_curve_waters, near, end)
+		if at.x <= 0.0:
+			continue
+		var profile: PackedFloat32Array = _curve_waters[near.x]["profile"]
+		var i := clampi(floori(at.y), 0, profile.size() - 1)
+		level = maxf(level, lerpf(profile[i], profile[mini(i + 1, profile.size() - 1)], at.y - i))
+	if level == -INF:
+		return
+	var own: PackedFloat32Array = _curve_waters[w]["profile"]
+	for k in own.size():
+		own[k] = maxf(own[k], level)
+	_curve_waters[w]["profile"] = own
 
 
 ## Whether the level lays water at [param cell] (its water, fords or bridges).
@@ -6088,16 +6144,18 @@ func _terrain_water_has(cell: Vector2i) -> bool:
 ## z which water (-1: none near). Searched round the nearest sample of the
 ## point's cell, so a lookup costs a few segments, never the whole curve.
 func _curve_near(point: Vector2) -> Vector3:
-	return _near_on(_curve_waters, _curve_near_sample, point)
+	return _near_on(_curve_waters, _curve_near_sample, point, _curve_near_also)
 
 
 ## Each cell within reach of [param curve] (CURVE_REACH past its half
-## width) -> (its [param index], its nearest sample) in [param into], the
-## nearer kept where curves meet.
-func _stamp_near(curve: Dictionary, closed: bool, index: int, into: Dictionary) -> void:
+## width) -> (its [param index], its nearest sample) in [param into]; a
+## cell another curve already reaches gets it in [param also] instead
+## (where curves meet, _near_on takes their union).
+func _stamp_near(curve: Dictionary, closed: bool, index: int, into: Dictionary, also: Dictionary) -> void:
 	var points: PackedVector2Array = curve["points"]
 	var widths: PackedFloat32Array = curve["widths"]
 	var gaps: Dictionary[Vector2i, float] = {}
+	var nearest: Dictionary[Vector2i, int] = {}
 	for k in points.size():
 		var reach := (widths[k] * 0.5 if not closed else 0.0) + CURVE_REACH
 		var point := points[k]
@@ -6107,16 +6165,32 @@ func _stamp_near(curve: Dictionary, closed: bool, index: int, into: Dictionary) 
 				var gap := Vector2(cell).distance_to(point)
 				if gap <= reach + 0.71 and gap < float(gaps.get(cell, INF)):
 					gaps[cell] = gap
-					into[cell] = Vector2i(index, k)
+					nearest[cell] = k
+	for cell: Vector2i in nearest:
+		if into.has(cell):
+			(also.get_or_add(cell, []) as Array).append(Vector2i(index, nearest[cell]))
+		else:
+			into[cell] = Vector2i(index, nearest[cell])
 
 
 ## _curve_near over [param curves] (each {curve, closed}) by their
-## [param near] map (_stamp_near's).
-func _near_on(curves: Array, near_map: Dictionary, point: Vector2) -> Vector3:
+## [param near] map and [param also] (_stamp_near's): where curves meet,
+## the one the point is furthest into (their union).
+func _near_on(curves: Array, near_map: Dictionary, point: Vector2, also: Dictionary) -> Vector3:
 	var cell := Vector2i(roundi(point.x), roundi(point.y))
 	if not near_map.has(cell):
 		return Vector3(-INF, 0.0, -1.0)
-	var near: Vector2i = near_map[cell]
+	var best := _near_one(curves, near_map[cell], point)
+	for near: Vector2i in also.get(cell, []):
+		var other := _near_one(curves, near, point)
+		if other.x > best.x:
+			best = other
+	return best
+
+
+## Where [param point] is to one curve of [param curves], searched round
+## its sample [param near] (which curve, which sample): as _curve_near.
+func _near_one(curves: Array, near: Vector2i, point: Vector2) -> Vector3:
 	var water: Dictionary = curves[near.x]
 	var curve: Dictionary = water["curve"]
 	var points: PackedVector2Array = curve["points"]
@@ -6160,20 +6234,42 @@ func _curve_ground(curve: Dictionary) -> PackedFloat32Array:
 
 ## A river's surface along its samples (559, terrain's side): the ground under
 ## each (a bridge's water at its bed) smoothed over CURVE_SMOOTH samples
-## either side, then never rising from the source down.
+## either side, then never rising from the source down. A fall (a drop of
+## over FALL_LEAST from one sample to the next) breaks the smoothing: each
+## run between falls smoothed on its own, so the water keeps the step
+## (a tall one hangs as a curtain, _build_curve_ribbon) and never sinks
+## under the bed above the lip.
 func _curve_profile(curve: Dictionary) -> PackedFloat32Array:
 	var base := _curve_ground(curve)
+	var runs := PackedInt32Array()
+	runs.resize(base.size())
+	for k in range(1, base.size()):
+		runs[k] = runs[k - 1] + (1 if base[k - 1] - base[k] > FALL_LEAST else 0)
 	var out := PackedFloat32Array()
 	out.resize(base.size())
 	for k in base.size():
 		var sum := 0.0
 		var count := 0
 		for j in range(maxi(k - CURVE_SMOOTH, 0), mini(k + CURVE_SMOOTH, base.size() - 1) + 1):
-			sum += base[j]
-			count += 1
+			if runs[j] == runs[k]:
+				sum += base[j]
+				count += 1
 		out[k] = sum / count
 	for k in range(1, out.size()):
 		out[k] = minf(out[k], out[k - 1])
+	# The pool at a fall's foot stands on the ground there for a cell (the
+	# smoothing had it under the foot cell's ground, a dry band between the
+	# curtain and the water), never rising past it.
+	var reach := int(1.0 / Curves.SPACING)
+	for k in range(1, out.size()):
+		if runs[k] == runs[k - 1]:
+			continue
+		for j in range(k, mini(k + reach + 1, out.size())):
+			out[j] = minf(maxf(out[j], base[j] + SHORE_SINK), out[j - 1])
+		for j in range(k + reach + 1, out.size()):
+			if out[j] <= out[j - 1]:
+				break
+			out[j] = out[j - 1]
 	return out
 
 
@@ -6230,8 +6326,12 @@ func _curve_field(image: Image, depth: Image, origin: Vector2i) -> void:
 ## along its own samples, out to its width / 2 and RIBBON_UNDER under the
 ## banks each side, at its profile; each point's colour the way it runs
 ## (its tangent), how fast (b: faster where it drops), a fall's foam (a);
-## its UV's x the fords' shallows. A pond (closed) is its curve's polygon,
-## pushed out RIBBON_UNDER, at its level.
+## its UV's x the fords' shallows. Where its surface drops FALL_TALL or more
+## from one sample to the next (a tall fall, 570) it hangs as a curtain from
+## the lip to the water below: rows bowed out down the stream (as water
+## falls, out as the square root of the drop), white, their UV's y 1 (the
+## shader's streaks run down it), facing down the stream. A pond (closed)
+## is its curve's polygon, pushed out RIBBON_UNDER, at its level.
 func _build_curve_ribbon(w: int) -> void:
 	var water: Dictionary = _curve_waters[w]
 	var curve: Dictionary = water["curve"]
@@ -6241,6 +6341,7 @@ func _build_curve_ribbon(w: int) -> void:
 	var positions := PackedVector3Array()
 	var colours := PackedColorArray()
 	var uvs := PackedVector2Array()
+	var normals := PackedVector3Array()
 	var indices := PackedInt32Array()
 	if water["closed"]:
 		var level := -INF
@@ -6255,6 +6356,7 @@ func _build_curve_ribbon(w: int) -> void:
 			positions.append(Vector3(point.x, level + WATER_LIFT, point.y))
 			colours.append(Color(0.5, 0.5, 0.0, 0.0))
 			uvs.append(Vector2.ZERO)
+			normals.append(Vector3.UP)
 		indices = Geometry2D.triangulate_polygon(shape)
 	else:
 		var profile: PackedFloat32Array = water["profile"]
@@ -6262,15 +6364,23 @@ func _build_curve_ribbon(w: int) -> void:
 		var ground := _curve_ground(curve)
 		var n := points.size()
 		var reach := int(1.0 / Curves.SPACING)
-		# From the first sample over its own water to the last: past them the
-		# curve runs on over land (off the map's edge, where the level lays
-		# none of its cells).
+		# From the first sample over water to the last: past them the curve
+		# runs on over land (off the map's edge, where the level lays none
+		# of its cells). Over another water's cells (a stream's end in the
+		# river it meets, 570) it runs on, fading out over a cell (UV's y
+		# under a half), so it ends in that water with no edge or gap.
 		var start := 0
 		var stop := n - 1
-		while start < stop and _curve_cells.get(Vector2i(points[start].round()), -1) != w:
+		while start < stop and not _curve_cells.has(Vector2i(points[start].round())):
 			start += 1
-		while stop > start and _curve_cells.get(Vector2i(points[stop].round()), -1) != w:
+		while stop > start and not _curve_cells.has(Vector2i(points[stop].round())):
 			stop -= 1
+		var first_own := start
+		var last_own := stop
+		while first_own < stop and _curve_cells.get(Vector2i(points[first_own].round()), -1) != w:
+			first_own += 1
+		while last_own > first_own and _curve_cells.get(Vector2i(points[last_own].round()), -1) != w:
+			last_own -= 1
 		for k in range(start, stop + 1):
 			var tangent := tangents[k]
 			var normal := Vector2(-tangent.y, tangent.x)
@@ -6285,19 +6395,35 @@ func _build_curve_ribbon(w: int) -> void:
 			var fall := maxf(smoothstep(FALL_LEAST * 0.5, FALL_LEAST * 2.0, drop), smoothstep(FALL_LEAST * 0.5, FALL_LEAST * 2.0, behind) * 0.8)
 			var speed := clampf(0.5 + drop * 0.6, 0.5, 1.0)
 			var colour := Color(tangent.x * 0.5 + 0.5, tangent.y * 0.5 + 0.5, speed, fall)
+			# A tall fall: the curtain's rows from the lip (the last sample's
+			# place and height, on) down to this one's, before its own row.
+			if k > start and profile[k - 1] - profile[k] >= FALL_TALL:
+				var lip := points[k - 1]
+				var drop_here := profile[k - 1] - profile[k]
+				var facing := Vector3(tangent.x, 0.25, tangent.y).normalized()
+				var lip_half := widths[k - 1] * 0.5 + RIBBON_UNDER
+				for r in CURTAIN_ROWS + 1:
+					var t := r / float(CURTAIN_ROWS)
+					var at := lip.lerp(points[k], sqrt(t))
+					var across := Vector2(-tangents[k - 1].y, tangents[k - 1].x).lerp(normal, t)
+					var curtain_half := lerpf(lip_half, half, t)
+					for side: float in [curtain_half, 0.0, -curtain_half]:
+						var spot := at + across * side
+						positions.append(Vector3(spot.x, profile[k - 1] - drop_here * t + WATER_LIFT, spot.y))
+						colours.append(Color(colour.r, colour.g, 1.0, 1.0))
+						uvs.append(Vector2(0.0, 1.0))
+						normals.append(facing)
+					_ribbon_quads(positions.size(), indices)
+			var outside := maxi(first_own - k, k - last_own)
+			var fade := clampf(outside / float(reach), 0.0, 1.0) * 0.49
 			for side: float in [half, 0.0, -half]:
 				var spot := points[k] + normal * side
 				positions.append(Vector3(spot.x, profile[k] + WATER_LIFT, spot.y))
 				colours.append(colour)
-				uvs.append(Vector2(shoal[k], 0.0))
+				uvs.append(Vector2(shoal[k], fade))
+				normals.append(Vector3.UP)
 			if k > start:
-				var row := positions.size() - 3
-				var last := row - 3
-				for j in 2:
-					indices.append_array([last + j, row + j, last + j + 1, last + j + 1, row + j, row + j + 1])
-	var normals := PackedVector3Array()
-	normals.resize(positions.size())
-	normals.fill(Vector3.UP)
+				_ribbon_quads(positions.size(), indices)
 	var arrays := []
 	arrays.resize(Mesh.ARRAY_MAX)
 	arrays[Mesh.ARRAY_VERTEX] = positions
@@ -6317,6 +6443,15 @@ func _build_curve_ribbon(w: int) -> void:
 	drawn.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_room.add_child(drawn)
 	_stream_ribbons.append(drawn)
+
+
+## The two quads joining a ribbon's last row of three points (ending at
+## [param size]) to the row before it, into [param indices].
+static func _ribbon_quads(size: int, indices: PackedInt32Array) -> void:
+	var row := size - 3
+	var last := row - 3
+	for j in 2:
+		indices.append_array([last + j, row + j, last + j + 1, last + j + 1, row + j, row + j + 1])
 
 
 ## The depth of [param wet]'s water (cells without a curve; 559, terrain's
@@ -6406,6 +6541,7 @@ func _read_roads() -> void:
 	_road_curves.clear()
 	_road_cells.clear()
 	_road_near_sample.clear()
+	_road_near_also.clear()
 	if _glimpse:
 		return
 	for road: Dictionary in _terrain.get("roads", []):
@@ -6415,7 +6551,7 @@ func _read_roads() -> void:
 		var index := _road_curves.size()
 		for cell: Vector2i in Curves.cells(curve, false):
 			_road_cells[cell] = index
-		_stamp_near(curve, false, index, _road_near_sample)
+		_stamp_near(curve, false, index, _road_near_sample, _road_near_also)
 		_road_curves.append({"curve": curve, "closed": false, "kind": str(road.get("kind", "dirt"))})
 
 
@@ -6423,7 +6559,7 @@ func _read_roads() -> void:
 ## x the signed distance, inside its width positive; y along it; z which
 ## road (-1: none near). As _curve_near.
 func _road_near(point: Vector2) -> Vector3:
-	return _near_on(_road_curves, _road_near_sample, point)
+	return _near_on(_road_curves, _road_near_sample, point, _road_near_also)
 
 
 ## The kind a road's [param cell] is drawn as under the road (563,
