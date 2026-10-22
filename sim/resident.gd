@@ -98,6 +98,15 @@ var _wander_at := -1
 var addressing := ""
 var _address_until := -1
 const ADDRESS_REACH := 2
+## Visible work (decision 566, npc's side): what the body is doing where it
+## stands, replicated for pc-character's clip with the tool in hand ("chop",
+## "carry_log", "saw", "hammer", "sleep"; "" idle), set from [member task]
+## (Main's, from the sim's state: {kind, cell, face, walking}) while the
+## routine says work, and "sleep" at home in the sleep hours. The sim's
+## yields and clocks never read it: a body is the visible version of work
+## the production tick already does.
+var activity := ""
+var task := {}
 var _listened := -1
 
 
@@ -292,6 +301,7 @@ func _init() -> void:
 	max_hp = 10
 	replicate("ailing")
 	replicate("addressing")
+	replicate("activity")
 	move_ticks = 3.0
 	senses = Senses.new(self, SIGHT_RANGE, -1.0)
 
@@ -362,8 +372,8 @@ func _sim_tick() -> void:
 	var far := _far()
 	if far and (World.tick + id) % FAR_EVERY != 0:
 		return
-	if not far and World.tick % LOOK_EVERY == 0:
-		_look()
+	if not far and World.tick % LOOK_EVERY == 0 and activity.is_empty():
+		_look()  # Not while at work or asleep (566): the work sets the facing.
 	if World.tick - hurt_tick <= 1:
 		_hide_until = World.tick + HIDE_TICKS
 	var now := Doing.HIDE if World.tick < _hide_until else (Doing.VISIT if not visit.is_empty() else doing_now(trade, type, worker_id))
@@ -372,6 +382,7 @@ func _sim_tick() -> void:
 		_pick_goal()
 	elif doing == Doing.SQUARE and tile == _goal and World.tick >= _wander_at:
 		_pick_goal()
+	_show_work()
 	if far:
 		if tile != _goal:
 			World.walk(self, _goal, FAR_EVERY)
@@ -449,6 +460,12 @@ func _pick_goal() -> void:
 	var area: Rect2i = places.get(PLACE_OF[doing], places.get("square", Rect2i())) if doing != Doing.ROUNDS else _round_area()
 	if doing == Doing.VISIT and visit.get("rect") is Rect2i:
 		area = visit["rect"]
+	if doing == Doing.WORK and not task.is_empty():
+		_goal = task["cell"]  # At the work the sim says (566): the woodlot's spot, the build's cells, the store with the log.
+		return
+	if doing == Doing.HOME and asleep_now() and places.get("home") is Rect2i and (places["home"] as Rect2i).size != Vector2i.ZERO:
+		_goal = bed_cell(places["home"], places.get("square", Rect2i()))
+		return
 	if area.size == Vector2i.ZERO:
 		_goal = tile
 		return
@@ -659,6 +676,86 @@ static func hail_done(production: Production, worker_id: String, player_id: Stri
 	if str(cue.get("kind", "")) == "sky":
 		hails["sky"] = sky
 	production.set_card(worker_id, card)
+
+
+# --- Visible work (decision 566, npc's side) ---------------------------------------------
+
+## The body's activity from the sim's state, each tick: at work with a task,
+## the task's kind once at its cell (facing the task's "face" cell), or on
+## the way when the task is "walking" (a log carried home); at home in the
+## sleep hours, "sleep" on the bed cell, lying along the room's long side
+## with the head to the wall; else "". A task's goal is kept when the
+## routine's pick strayed from it.
+func _show_work() -> void:
+	if doing == Doing.WORK and not task.is_empty():
+		var cell: Vector2i = task.get("cell", NO_CELL)
+		if cell != NO_CELL and _goal != cell:
+			_aim(cell)
+		if tile == cell:
+			activity = str(task.get("kind", ""))
+			var face: Vector2i = task.get("face", NO_CELL)
+			if face != NO_CELL and face != tile and facing != _toward(face):
+				World.face(self, _toward(face))
+		else:
+			activity = str(task.get("kind", "")) if bool(task.get("walking", false)) else ""
+		return
+	if doing == Doing.HOME and asleep_now() and places.get("home") is Rect2i and (places["home"] as Rect2i).size != Vector2i.ZERO:
+		var home: Rect2i = places["home"]
+		var bed := bed_cell(home, places.get("square", Rect2i()))
+		if _goal != bed:
+			_aim(bed)
+		if tile == bed:
+			if facing != head_of(home, bed):
+				World.face(self, head_of(home, bed))
+			activity = "sleep"
+		else:
+			activity = ""
+		return
+	activity = ""
+
+
+## A new goal, the route begun afresh.
+func _aim(cell: Vector2i) -> void:
+	_goal = cell
+	_route.clear()
+	_stuck = 0
+
+
+## The direction from here toward [param cell], one of the eight.
+func _toward(cell: Vector2i) -> Vector2i:
+	var d := cell - tile
+	if d == Vector2i.ZERO:
+		return facing
+	return Vector2i(signi(d.x), signi(d.y)) if absi(d.x) == absi(d.y) else (Vector2i(signi(d.x), 0) if absi(d.x) > absi(d.y) else Vector2i(0, signi(d.y)))
+
+
+## Whether the sleep hours (residents.json "sleep": from, to) hold now.
+static func asleep_now() -> bool:
+	var rule: Dictionary = Townsfolk.days().get("sleep", {})
+	return Townsfolk._within(DayNight.hour(DayNight.now()), float(rule.get("from", 21)), float(rule.get("to", 6)))
+
+
+## The bed in [param home]: its walkable corner farthest from the square's
+## middle (the door's side faces the street), else its middle.
+static func bed_cell(home: Rect2i, square: Rect2i) -> Vector2i:
+	var middle := square.get_center() if square.size != Vector2i.ZERO else home.get_center()
+	var corners: Array[Vector2i] = [home.position, home.position + Vector2i(home.size.x - 1, 0),
+		home.position + Vector2i(0, home.size.y - 1), home.position + home.size - Vector2i.ONE]
+	corners.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
+		return (a - middle).length_squared() > (b - middle).length_squared())
+	for corner: Vector2i in corners:
+		if World.is_walkable(corner):
+			return corner
+	return home.get_center()
+
+
+## Which way a sleeper's head points on [param bed] in [param home]: along
+## the room's long side, into the corner.
+static func head_of(home: Rect2i, bed: Vector2i) -> Vector2i:
+	var middle := home.get_center()
+	if home.size.x >= home.size.y:
+		return Vector2i(1 if bed.x >= middle.x else -1, 0)
+	return Vector2i(0, 1 if bed.y >= middle.y else -1)
 
 
 # --- Addressed by a click (decision 560, npc's side) -------------------------------------

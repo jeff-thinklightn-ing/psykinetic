@@ -64,6 +64,7 @@ func _ready() -> void:
 	_test_hearsay()
 	_test_houses()
 	_test_companion_hearsay()
+	_test_visible_work()
 	_test_bodies_only_near()  # Last: its resident would answer the voice tests.
 
 	Production.type_of = Townsfolk.roll_type
@@ -1829,3 +1830,132 @@ func _test_greet() -> void:
 	_main._greet_at.clear()
 	_main._hail_at.clear()
 	World.despawn(mara)
+
+
+func _test_visible_work() -> void:
+	print("\n== seen at their work: the bed at night, a task walked to and shown, the woodcutter's trip, the carpenter's cells, the lamp (decision 566, npc's side) ==")
+	for body: GridEntity in World.townsfolk().duplicate():
+		World.despawn(body)
+	for i in 14:
+		World.production.set_away("rs-folk%02d" % i, true)
+	World.production.set_away("rs-bram", true)
+	DayNight.set_hour(12.0)
+	World.towns.note_rescue(STORE, "rs-mara", "Mara", "cook")
+	_sync()
+	var mara := _body("rs-mara")
+	_check(mara != null and mara.person == "Mara", "(Mara the cook stands in the town)")
+	var sleep: Dictionary = Townsfolk.days().get("sleep", {})
+	_check(int(sleep.get("from", 0)) == 21 and int(sleep.get("to", 0)) == 6, "residents.json sleep: 21 to 6")
+	_check(not Resident.asleep_now(), "noon: nobody sleeps")
+	# The bed and the head.
+	var home: Rect2i = mara.places.get("home", Rect2i())
+	var square: Rect2i = mara.places.get("square", Rect2i())
+	_check(home.size != Vector2i.ZERO, "(she has a home: %s)" % [home])
+	var bed := Resident.bed_cell(home, square)
+	_check(home.has_point(bed) and World.is_walkable(bed), "the bed is a walkable corner of her home (%s)" % [bed])
+	var corners: Array[Vector2i] = [home.position, home.position + Vector2i(home.size.x - 1, 0), home.position + Vector2i(0, home.size.y - 1), home.position + home.size - Vector2i.ONE]
+	var far_most := true
+	for corner: Vector2i in corners:
+		if World.is_walkable(corner) and (corner - square.get_center()).length_squared() > (bed - square.get_center()).length_squared():
+			far_most = false
+	_check(far_most, "the walkable corner farthest from the square")
+	var head := Resident.head_of(home, bed)
+	_check((home.size.x >= home.size.y and head.y == 0 and head.x != 0) or (home.size.x < home.size.y and head.x == 0 and head.y != 0), "the head along the room's long side (%s)" % [head])
+	# Night: she goes to bed and lies down.
+	DayNight.set_hour(23.0)
+	_check(Resident.asleep_now(), "23:00: the sleep hours")
+	for i in 400:
+		World.step()
+		if mara.activity == "sleep":
+			break
+	for i in 6:
+		World.step()
+	_check(mara.doing == Resident.Doing.HOME and mara.tile == bed and mara.activity == "sleep" and mara.facing == head, "at home at night she lies on the bed, head to the wall (%s at %s, %s)" % [mara.activity, mara.tile, mara.facing])
+	var awake: Dictionary = _main._awake_map()
+	var code := ""
+	for building: Dictionary in _main._world_map.areas.get(World.zone.name, {}).get("buildings", []):
+		if building.get("rect") is Rect2i and (building["rect"] as Rect2i).has_point(bed):
+			code = str(building.get("code", ""))
+	_check(code.is_empty() or (awake.has(code) and awake[code] == false), "the lamp: her house is asleep (%s: %s)" % [code, awake])
+	DayNight.set_hour(8.0)
+	for i in Resident.FAR_EVERY + 2:
+		World.step()
+	_check(mara.activity != "sleep", "morning: up")
+	# The woodcutter's trip, end to end: a woodlot by the store, economy's trip stood in for, Main's tick sets her task.
+	DayNight.set_hour(10.0)
+	World.step()
+	_check(mara.doing == Resident.Doing.WORK, "(10:00: at work)")
+	var store: Dictionary = World.holdings.place(STORE)
+	var lot := STORE.get_slice("/", 0) + "/soak_woodlot"
+	var centre: Vector2i = _main._nearest_free(store.get("cell", Vector2i.ZERO) + Vector2i(0, 6))
+	World.holdings._places[lot] = {"id": lot, "area": store["area"], "key": "soak_woodlot", "cell": centre, "name": "the test woodlot", "kind": "woodlot", "radius": 3, "worth": 1, "start": "town", "town": STORE}
+	World.holdings._holder[lot] = "town"
+	World.holdings._strength[lot] = 1
+	World.holdings._since[lot] = World.steps
+	mara.trade = "woodcutter"
+	var site: Dictionary = World.production.site_of(STORE, "woodcutter")
+	_check(not site.is_empty() and site.get("id") == lot, "(economy's site_of finds the woodlot)")
+	var spot: Dictionary = _main._site_spot(site, STORE)
+	_check(World.is_walkable(spot["cell"]) and absi(centre.x - spot["cell"].x) <= 3 and absi(centre.y - spot["cell"].y) <= 3
+		and (spot["face"] == Resident.NO_CELL or not World.is_walkable(spot["face"])),
+		"the woodlot's spot: a walkable cell within its radius with something that cannot be walked beside it (%s)" % [spot])
+	var now := World.production.now()
+	_main._trip_stub["rs-mara"] = {"site": lot, "from": now, "back_at": now + 40000}
+	_put(_player(), _main._nearest_free(centre + Vector2i(2, 2)))
+	var task: Dictionary = _main._task_for(mara)
+	_check(task.get("kind") == "chop" and task.get("cell") == spot["cell"] and not bool(task.get("walking", true)), "outbound: the task is to chop at the spot (%s)" % [task])
+	for i in 600:
+		World.step()
+		if mara.tile == spot["cell"]:
+			break
+	for i in Resident.FAR_EVERY + 2:
+		World.step()
+	var want_face: Vector2i = mara.facing if spot["face"] == Resident.NO_CELL else mara._toward(spot["face"])
+	_check(mara.tile == spot["cell"] and mara.activity == "chop" and mara.facing == want_face,
+		"she walks to the spot and chops there, facing the tree (%s at %s, %s; spot %s, goal %s, doing %s)" % [mara.activity, mara.tile, mara.facing, spot, mara._goal, mara.doing])
+	_main._trip_stub["rs-mara"] = {"site": lot, "from": now - 40000, "back_at": now + 100}
+	task = _main._task_for(mara)
+	_check(task.get("kind") == "carry_log" and bool(task.get("walking", false)) and World.distance(task.get("cell", Vector2i.ZERO), store["cell"]) <= 2, "the return half: a log carried to the store (%s)" % [task])
+	for i in Main.WORK_CHECK_TICKS + Resident.FAR_EVERY + 2:
+		World.step()
+	_check(mara.activity == "carry_log", "shown on the way home (%s at %s)" % [mara.activity, mara.tile])
+	_main._trip_stub["rs-mara"] = {}
+	for i in Main.WORK_CHECK_TICKS + Resident.FAR_EVERY + 2:
+		World.step()
+	_check(_main._task_for(mara).is_empty() and mara.activity.is_empty(), "off the trip: nothing shown (%s)" % mara.activity)
+	_main._trip_stub.erase("rs-mara")
+	World.holdings._places.erase(lot)
+	World.holdings._holder.erase(lot)
+	World.holdings._strength.erase(lot)
+	World.holdings._since.erase(lot)
+	_main._site_spots.clear()
+	mara.trade = "cook"
+	# The carpenter's cells by progress.
+	var rect := Rect2i(mara.tile + Vector2i(6, 6), Vector2i(4, 3))
+	var saw: Dictionary = _main._build_task(rect, Vector2i(0, 1), 0.05)
+	var hammer: Dictionary = _main._build_task(rect, Vector2i(0, 1), 0.5)
+	var front := Level.front_cell(rect, Vector2i(0, 1))
+	_check(saw.get("kind") == "saw" and not rect.has_point(saw.get("cell", rect.position)) and World.distance(saw.get("cell", front), front) <= 1, "the pad stage: sawing just outside the front door (%s, front %s)" % [saw, front])
+	_check(hammer.get("kind") == "hammer" and hammer.get("face") == rect.get_center(), "walls up: hammering, facing the building's middle (%s)" % [hammer])
+	_main._build_stub["rs-mara"] = {"use": "no_such_use", "progress": 0.5}
+	_check(_main._task_for(mara).is_empty(), "a build with no map building here: nothing to stand at")
+	_main._build_stub.erase("rs-mara")
+	mara.task = {}
+	World.despawn(mara)
+
+
+## A free cell of [param area] (not [param from]) a path from [param from]
+## reaches, the farthest such; [param from] when none.
+func _reachable_from(from: Vector2i, area: Rect2i) -> Vector2i:
+	var best := from
+	var best_d := 0
+	for y in area.size.y:
+		for x in area.size.x:
+			var cell := area.position + Vector2i(x, y)
+			if cell == from or not World.is_walkable(cell) or not World.is_free(cell):
+				continue
+			var d := World.distance(from, cell)
+			if d > best_d and not World.find_path(from, cell, false).is_empty():
+				best = cell
+				best_d = d
+	return best

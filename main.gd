@@ -76,6 +76,8 @@ const TALK_WAIT_MSEC := 15000
 const RESIDENT_ASK_TICKS := 150
 ## How often residents look for a player to hail (decision 554): every second.
 const HAIL_CHECK_TICKS := 10
+## How often the bodies' work is read from the sim (decision 566): every second.
+const WORK_CHECK_TICKS := 10
 ## A town's homes: the map's huts and houses linked to nothing within so
 ## many cells of its store, each with room for so many.
 const HOME_TILES := 24
@@ -231,6 +233,13 @@ var _hail_tried: Dictionary = {}
 var _hail_heard: Dictionary = {}  # player id -> {cue text: day}: no two residents tell one player the same thing in a day
 var _hail_greetings: Dictionary = {}  # player id -> {day, n}: greetings by standing a player heard today, capped at hail.greetings_a_day
 var _greet_at: Dictionary = {}  # "worker id|player id" -> msec of the last click greeting (560): one a greet.again_seconds
+## Visible work (decision 566): a site's spot for a body (site id -> {cell, face}),
+## what was last told of each house's waking (building code -> bool), and
+## the tests' stand-ins for economy's trip and build (worker id -> ...).
+var _site_spots: Dictionary = {}
+var _awake_sent: Dictionary = {}
+var _trip_stub: Dictionary = {}
+var _build_stub: Dictionary = {}
 ## Talk with no panel (decision 536): the offer standing for each player,
 ## player id -> {worker, id, title, at, zone}: what a resident last spoke to
 ## them, taken by a yes, a name or an amount said back; one per player, not
@@ -8412,6 +8421,175 @@ func _hail_now(body: Resident, player: Player, rules: Dictionary, now_msec: int,
 	return true
 
 
+# --- Visible work (decision 566, npc's side) ---------------------------------------------
+
+## Every second: each townsperson's task from the sim's state (Resident.task,
+## read by its own tick for the goal and the activity), and each house's
+## waking for the lamp (economy's Towns.set_awake, by building code).
+func _visible_work_tick() -> void:
+	if World.production == null or not Net.is_authority():
+		return
+	for entity in World.townsfolk():
+		var body := entity as Resident
+		if body == null or not body.spawned or body.strayed or not body.escort_of.is_empty() or not body.card.is_empty():
+			continue
+		body.task = _task_for(body)
+	_awake_tick()
+
+
+## What [param body]'s work looks like now, from the sim: a woodcutter on
+## 521's trip (economy's Production.trip: the outbound half to the woodlot's
+## spot, chopping; the return half home with a log), a carpenter whose
+## build job is working (at the woodpile sawing in the pad stage, inside
+## hammering after, by Towns.build_progress); {} when the routine's work
+## place is the place. Only a site or a building in the body's own area.
+func _task_for(body: Resident) -> Dictionary:
+	if body.trade == "woodcutter":
+		var site: Dictionary = World.production.site_of(body.town, body.trade)
+		if site.is_empty() or str(site.get("area", "")) != World.zone.name:
+			return {}
+		var trip := _trip_of(body.worker_id)
+		if trip.is_empty():
+			return {}
+		var now := World.production.now()
+		var from := int(trip.get("from", -1))
+		var back_at := int(trip.get("back_at", -1))
+		if from < 0 or back_at < 0 or now < (from + back_at) / 2:
+			var spot := _site_spot(site, body.town)
+			return {"kind": "chop", "cell": spot["cell"], "face": spot["face"], "walking": false}
+		var store: Dictionary = World.holdings.place(body.town)
+		return {"kind": "carry_log", "cell": _nearest_free(store.get("cell", body.tile)), "face": Resident.NO_CELL, "walking": true}
+	var build := _build_of(body)
+	if not build.is_empty():
+		return _build_task(build["rect"], build["facing"], float(build["progress"]))
+	return {}
+
+
+## Economy's trip for [param worker_id] ({site, from, back_at}; {} off a
+## trip), or the tests' stand-in; before economy's Production.trip lands,
+## 521's turn alone: WALKING counts as the outbound half.
+func _trip_of(worker_id: String) -> Dictionary:
+	if _trip_stub.has(worker_id):
+		return _trip_stub[worker_id]
+	if World.production.has_method("trip"):
+		return World.production.trip(worker_id)
+	var who := World.production.worker(worker_id)
+	var trade := str(who.get("trades", [""])[0]) if not who.get("trades", []).is_empty() else ""
+	if World.production.site_turn(str(who.get("town", "")), worker_id, trade) == "WALKING":
+		return {"site": "", "from": -1, "back_at": -1}
+	return {}
+
+
+## Where a body works [param site] (a Holdings place with a radius): the
+## walkable cell within the radius with something to fell beside it (a
+## cell that cannot be walked: the forest, a tree), nearest the town's
+## store, facing it; the site's own cell when none. Kept by site id.
+func _site_spot(site: Dictionary, town: String) -> Dictionary:
+	var id := str(site.get("id", ""))
+	if _site_spots.has(id):
+		return _site_spots[id]
+	var centre: Vector2i = site.get("cell", Vector2i.ZERO)
+	var radius := int(site.get("radius", 2))
+	var store: Vector2i = World.holdings.place(town).get("cell", centre)
+	var best := {"cell": centre, "face": Resident.NO_CELL}
+	var best_d := INF
+	for dy in range(-radius, radius + 1):
+		for dx in range(-radius, radius + 1):
+			var cell := centre + Vector2i(dx, dy)
+			if not World.is_walkable(cell):
+				continue
+			for side: Vector2i in [Vector2i(0, -1), Vector2i(1, 0), Vector2i(0, 1), Vector2i(-1, 0)]:
+				if World.is_walkable(cell + side):
+					continue
+				var d := float((cell - store).length_squared())
+				if d < best_d:
+					best_d = d
+					best = {"cell": cell, "face": cell + side}
+				break
+	_site_spots[id] = best
+	return best
+
+
+## The building [param body] is building now: a working build job of its
+## trade in its town whose use has a map building here, with its rect,
+## facing and progress (Towns.build_progress when economy's is in, else the
+## job's worked over needed); the tests' stand-in first; {} for none.
+func _build_of(body: Resident) -> Dictionary:
+	var use := ""
+	var progress := -1.0
+	if _build_stub.has(body.worker_id):
+		use = str(_build_stub[body.worker_id].get("use", ""))
+		progress = float(_build_stub[body.worker_id].get("progress", 0.0))
+	else:
+		for id: int in World.production.jobs():
+			var job := World.production.job(id)
+			if str(job.get("kind", "")) != "build" or str(job.get("state", "")) != "working" or str(job.get("town", "")) != body.town:
+				continue
+			if str(job.get("worker", "")) != body.worker_id and str(job.get("trade", "")) != body.trade:
+				continue
+			use = str(job.get("recipe", ""))
+			progress = float(job.get("worked", 0)) / maxf(float(job.get("needed", 1)), 1.0)
+			if World.towns.has_method("build_progress"):
+				var told: float = World.towns.build_progress(body.town, use)
+				if told >= 0.0:
+					progress = told
+			break
+	if use.is_empty():
+		return {}
+	var key := str(World.holdings.place(body.town).get("key", ""))
+	for building: Dictionary in _world_map.areas.get(World.zone.name, {}).get("buildings", []):
+		if str(building.get("town", "")) == key and str(building.get("use", "")) == use and building.get("rect") is Rect2i:
+			return {"rect": building["rect"], "facing": building.get("facing", Vector2i(0, 1)), "progress": progress}
+	return {}
+
+
+## The carpenter's task at a build (buildings' site cells until their
+## BuildingComposer.site_cells lands: the woodpile just outside the front
+## door, one to the side; the work cell just inside it): sawing at the
+## woodpile on the plot and the frame (progress under 0.35, buildings' walls
+## stage), hammering inside after,
+## facing the building's middle.
+func _build_task(rect: Rect2i, facing: Vector2i, progress: float) -> Dictionary:
+	var front := Level.front_cell(rect, facing)
+	var side := Vector2i(facing.y, -facing.x)
+	var woodpile := front + side if World.is_walkable(front + side) else front
+	var inside := front - facing
+	var work := inside if rect.has_point(inside) and World.is_walkable(inside) else (_nearest_free(rect.get_center()) if World.is_walkable(_nearest_free(rect.get_center())) else front)
+	if progress < 0.35:
+		return {"kind": "saw", "cell": woodpile, "face": rect.get_center(), "walking": false}
+	return {"kind": "hammer", "cell": work, "face": rect.get_center(), "walking": false}
+
+
+## Each house with someone inside: awake when any of them is not asleep
+## (the lamp, buildings' pane by building code; economy's Towns.set_awake
+## carries it); told only when it changes, and only for houses with a body
+## in them, the rest falling back to the hour on the client.
+func _awake_tick() -> void:
+	var now := _awake_map()
+	for code: String in now:
+		if _awake_sent.get(code) != now[code]:
+			_awake_sent[code] = now[code]
+			if World.towns.has_method("set_awake"):
+				World.towns.set_awake(World.zone.name, code, now[code])
+
+
+## Building code -> whether anyone inside it is awake, for the bodies in
+## this zone's buildings now.
+func _awake_map() -> Dictionary:
+	var out := {}
+	var buildings: Array = _world_map.areas.get(World.zone.name, {}).get("buildings", [])
+	for entity in World.townsfolk():
+		var body := entity as Resident
+		if body == null or not body.spawned:
+			continue
+		for building: Dictionary in buildings:
+			if building.get("rect") is Rect2i and (building["rect"] as Rect2i).has_point(body.tile) and not str(building.get("code", "")).is_empty():
+				var code := str(building["code"])
+				out[code] = bool(out.get(code, false)) or body.activity != "sleep"
+				break
+	return out
+
+
 ## A click on [param body] by [param player] (decision 560, npc's side;
 ## Jeff: "the resident stops, turns to face the player and addresses
 ## them"). Within TALK_REACH: one greeting a greet.again_seconds for the
@@ -8948,6 +9126,8 @@ func _on_world_ticked(tick: int) -> void:
 			_crypt_asks_tick()  # Aldous's commissions met at the altar or the pack (part 3).
 		if tick % HAIL_CHECK_TICKS == 0:
 			_hails_tick()  # Residents speaking unprompted (decision 554).
+		if tick % WORK_CHECK_TICKS == 0:
+			_visible_work_tick()  # The bodies at the work the sim does (decision 566).
 		_respawn_due_players(tick)
 		_check_respawns(tick)
 		t = World.part("respawns", t)

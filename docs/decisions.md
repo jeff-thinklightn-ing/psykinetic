@@ -19228,3 +19228,68 @@ tests/view_test:
 
 Shots and A/B in C:\dev\review\curves. Client only. The protocol is 559's
 (29). No new class_name.
+
+## 566. Visible work: the town's people seen doing it
+
+Jeff (2026-10-21): "town people need to be doing activities to better
+the town, chopping wood, going hunting, building a half constructed
+building, sleeping at night." The design is a page, docs/visible_work.md
+in the main checkout (npc led; economy, pc-character, buildings, builder,
+art-kit and maps each have a side under this number), approved by the
+coordinator 2026-10-21. Its rule: a body is the visible version of work
+the production tick already does; no yield or clock moves. Phase 1 is
+woodcutting, building stages and sleep; phase 2 (hunting, the fields and
+the flock) is "566 amended" when it comes. The coordinator's two rulings,
+Jeff's to overturn: a building's wall edges block only from the walls
+stage (progress 0.35; economy's progress decides, the edges toggled live
+on the sim's side, maps' and economy's to work out), and planned shows
+the staked plot, behind one switch of buildings', since a town is seen
+being built; a fresh town's first look changes, and the box's Held,
+mostly built, changes little.
+
+npc's side:
+- Resident.activity, a replicated String ("chop", "carry_log", "saw",
+  "hammer", "sleep"; "" idle), listed in SUBCLASS_REPLICATED, so the
+  protocol hash moves with no revision (release). pc-character plays a
+  clip per word with the tool in hand and times the strokes itself; the
+  sim sends only the facing toward the work.
+- Resident.task, Main's ({kind, cell, face, walking}): while the routine
+  says work, the goal is the task's cell (_pick_goal, _show_work: the
+  route begun afresh when it changes), the activity the task's kind once
+  there, facing the task's cell, or on the way when the task walks (the
+  log home). Main._visible_work_tick every WORK_CHECK_TICKS (a second)
+  sets each townsperson's task from the sim (_task_for):
+  - the woodcutter on 521's trip (economy's Production.trip, {site, from,
+    back_at}; before it lands, site_turn's WALKING counts as outbound):
+    the outbound half to the woodlot's spot, "chop"; the return half to
+    the store, "carry_log", walking. The spot (_site_spot, by site id):
+    the walkable cell within the site's radius with something that
+    cannot be walked beside it (the forest, a tree), nearest the store,
+    facing it; builder's site check keeps one there. Only a site in the
+    body's own area; another area's keeps today's body.
+  - the carpenter whose build job is working (a Production job of kind
+    build, the body's or its trade's, with a map building of that use in
+    the town here): "saw" at the woodpile on the plot and the frame
+    (progress under 0.35, buildings' walls stage), "hammer" inside after,
+    facing the building's middle;
+    progress from Towns.build_progress when economy's is in, else the
+    job's worked over needed. The cells are the front door's (Level.
+    front_cell): the woodpile one to its side outside, the work cell
+    just inside; buildings' Level.site_cells replaces them when it lands. A build with no map building draws nothing (builder's
+    list names it).
+- Sleep: residents.json "sleep" {from 21, to 6}, inside the routine's
+  home stint. At home in those hours the goal is the bed (Resident.
+  bed_cell: the walkable corner farthest from the square, the street
+  being the door's side) and the body lies there, "sleep", facing along
+  the room's long side into the corner (head_of); up when the hours end.
+  No LIE in Monster's Pose (pc-character): the word is enough.
+- The lamp's flag: Main._awake_map, by building code (537), true when any
+  body inside a building is not asleep; _awake_tick tells economy's
+  Towns.set_awake(town, code, awake) only when it changes and only for
+  houses with a body in them, the rest falling back to the hour on the
+  client (buildings' pane). Nothing is saved; the bodies set it again.
+- resident_test _test_visible_work: the sleep hours and the bed, a task
+  walked to and shown, the carried log on the way, the woodcutter's trip
+  halves against a stand-in trip and a woodlot, the carpenter's cells by
+  progress, the awake map. Server and client: the hash moves; no new
+  class_name.
