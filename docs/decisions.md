@@ -23469,3 +23469,45 @@ which way you are in. Economy's wire (584 amended): the barter message's
 
 ui_test _test_barter: the words, the buttons by price and cover, the ask
 with its pay, held. Client only; no new class_name.
+## 583, items' side. Archery: range by held steps, damage by step, aim at any angle
+
+pc-character's redesign (Jeff's combat feel and archery plan; the
+coordinator's approval). This is the sim's shot.
+- A bow's verb (Items.VERBS "ranged") has "steps", the cells each step of
+  the draw reaches ([3, 5, 7, 9]), and "damage_at", each step's damage
+  multiple ([1.5, 1.2, 1.0, 0.8]: the shortest hardest; Jeff: "you can
+  aim shorter for higher damage, not depending on bow cock - there's no
+  throttle"). The first step comes at draw_min (5 ticks), each next one
+  draw_step (5) later; a quick bow's strength scales both. "cells" (the
+  longest step) and "draw_full" (the ticks to it) are filled in from them,
+  for what reads a bow's whole reach (an archer's band) or the pull's pose.
+- World.draw_step(entity) (-1 before draw_min), World.range_of(entity)
+  (the cells the step reaches now, 0 before), World.longest_range(entity).
+  draw_of stays for the pose and the creak.
+- World.try_loose(by, angle): radians on the grid (Vector2.angle(): 0
+  east, PI / 2 south); loosed(by, angle, step). World.shoot(by, angle,
+  step): damage is the blow times the bow's damage times damage_at[step].
+- World.shot_ray(from, angle, cells): a ray from the cell's centre (a
+  cell's centre is Vector2(cell)), walked cell by cell; where it passes
+  exactly through a corner, both cells beside it count (a supercover:
+  nothing slips between two bodies). Its reach is Chebyshev, as
+  World.distance counts. It stops at a wall or closed door (as sight
+  crosses edges), higher ground or the map's end. Over relief it aims at
+  the height of the ground under its range's end, since only an angle is
+  sent. World.shot_aim(by, angle, cells) adds the first body. shot_line is
+  gone.
+- GridEntity.shot(to: Vector2, struck: StringName): the point it stopped
+  at, in cell units, and &"body", &"wood", &"stone" or &"ground" (its
+  range spent: it comes down past the point). Client3D._on_shot reads the
+  cell for now; the point and the sag are pc-character's.
+- Walking while drawn: allowed at half pace (DRAWN_TICK_SCALE in
+  step_ticks, read by a client's prediction too); a step no longer
+  spoils the draw. This is the coordinator's default until Jeff answers.
+- The "loose" command carries "angle"; "at" is still read as a fallback
+  (ui sends both). Monster archers loose at the angle to their target once
+  range_of covers its distance or reaches the longest step, and
+  _clear_shot reads shot_aim. monster_test's archer now shoots at 15
+  ticks, at 7 cells.
+- Arrows are not used up or picked up, as before.
+Wire: PROTOCOL_REVISION 31. items_test, monster_test, cliff_test,
+relief_test and view_test follow. No new class_name.

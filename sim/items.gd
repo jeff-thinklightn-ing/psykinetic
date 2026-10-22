@@ -461,8 +461,12 @@ static func weight_of(id: String) -> float:
 ##   knockdown (giant axe): arc, down_ticks (prone, can't act or resist).
 ##   reach (spear): cells (how far it hits), brace (stops a charge).
 ##   backstab (dagger): behind (damage multiple from behind, by facing).
-##   ranged (bow): cells, draw_min and draw_full (ticks: the shortest draw
-##     that shoots, and the one that shoots at full strength).
+##   ranged (bow; decision 583): steps, the cells each step of the draw
+##     reaches, shortest first; damage_at, each step's damage multiple
+##     (the shortest hardest: Jeff, "you can aim shorter for higher
+##     damage"); draw_min, the ticks to the first step, and draw_step,
+##     the ticks to each next one. Filled in from those: cells, the
+##     longest step, and draw_full, the ticks to it.
 const VERBS := {
 	"knockback": {"force": 3.0},
 	"block": {"arc": 1, "absorb": 1.0, "stamina": 8, "breaks_at": 2.0,
@@ -470,7 +474,8 @@ const VERBS := {
 	"knockdown": {"arc": 1, "down_ticks": 15},
 	"reach": {"cells": 2, "brace": true},
 	"backstab": {"behind": 2.0},
-	"ranged": {"cells": 8, "draw_min": 5, "draw_full": 20},
+	"ranged": {"steps": [3, 5, 7, 9], "damage_at": [1.5, 1.2, 1.0, 0.8], "draw_min": 5, "draw_step": 5,
+		"cells": 9, "draw_full": 20},
 }
 ## Every verb's: speed (a multiple of the wielder's attack time: under 1
 ## quicker), damage and force (multiples of the wielder's blow); windup, the
@@ -493,6 +498,11 @@ static func verb_from(id: String, verb: Dictionary) -> Dictionary:
 		var given: Variant = verb.get(key, defaults[key])
 		if defaults[key] is bool:
 			out[key] = bool(given) if given is bool else defaults[key]
+		elif defaults[key] is Array:
+			out[key] = _numbers(given, defaults[key], defaults[key][0] is int)
+			if out[key].is_empty():
+				push_warning("Items: %s's verb %s is %s; %s" % [id, key, given, defaults[key]])
+				out[key] = defaults[key].duplicate()
 		elif (given is int or given is float) and float(given) >= 0.0:
 			out[key] = int(given) if defaults[key] is int else float(given)
 		else:
@@ -503,6 +513,27 @@ static func verb_from(id: String, verb: Dictionary) -> Dictionary:
 	for key: String in verb:
 		if key not in ["kind", "says"] and not defaults.has(key):
 			push_warning("Items: %s's verb has an unknown %s; left out" % [id, key])
+	if kind == "ranged":
+		if out["steps"].size() != out["damage_at"].size():
+			push_warning("Items: %s's verb has %d steps and %d damage_at; the defaults" % [id, out["steps"].size(), out["damage_at"].size()])
+			out["steps"] = defaults["steps"].duplicate()
+			out["damage_at"] = defaults["damage_at"].duplicate()
+		# The longest step's reach and draw, for what reads a bow's whole range (an archer's band, the pull's pose).
+		out["cells"] = int(out["steps"].max())
+		out["draw_full"] = int(out["draw_min"]) + int(out["draw_step"]) * (out["steps"].size() - 1)
+	return out
+
+
+## [param given] as numbers over 0 (ints when [param ints]), in order; []
+## when it is not an array of them.
+static func _numbers(given: Variant, _defaults: Array, ints: bool) -> Array:
+	if given is not Array or (given as Array).is_empty():
+		return []
+	var out := []
+	for each: Variant in given:
+		if not (each is int or each is float) or float(each) <= 0.0:
+			return []
+		out.append(int(each) if ints else float(each))
 	return out
 
 

@@ -99,7 +99,9 @@ signal bandage_changed(by: GridEntity, patient: GridEntity, state: StringName)
 signal buff_changed(entity: GridEntity, kind: String, state: StringName)
 ## [param by] let a drawn bow go at [param at], drawn [param strength] (0
 ## to 1, World.draw_of): for combat to shoot (decision 329).
-signal loosed(by: GridEntity, at: Vector2i, strength: float)
+## [param by] let its drawn bow go at [param angle] (radians on the grid)
+## with its draw at [param step] (the verb's steps; decision 583).
+signal loosed(by: GridEntity, angle: float, step: int)
 signal pile_gone(pile: GroundPile)
 ## [param target]'s guard met a blow or a shot from [param source]
 ## (decision 340): taken on it, or [param broken] by it.
@@ -245,6 +247,9 @@ const CLOCK_LEAD_MAX := 2.5
 const DIAGONAL_TICK_SCALE := 1.5
 ## A step into a ford (decision 505) takes this many times as long: wading.
 const FORD_TICK_SCALE := 2.0
+## A step with a bow drawn (decision 583: walking drawn, at half pace,
+## the draw kept) takes this many times as long.
+const DRAWN_TICK_SCALE := 2.0
 ## Tall grass (decision 508): the cover of a cell of it standing (0..1;
 ## Senses reads cover_at), a step into it so many times as long, and a body
 ## of TRAMPLE_MASS or more stepping off it flattens it for TRAMPLE_DAYS
@@ -3962,7 +3967,7 @@ func _throw_lands(by: GridEntity, shape: Dictionary) -> void:
 	_hand_set(by, slot, 0)
 	var lay := put_on_ground(uid, rest, by.tile)
 	_axes[by] = {"uid": uid, "cell": lay if lay != NO_CELL else rest, "disarmed": false}
-	by._world_shot(rest if hit == null else hit.tile)
+	by._world_shot(Vector2(rest if hit == null else hit.tile), &"ground" if hit == null else &"body")  # 583's shot: a point and what stopped it.
 	noise(by.tile, Senses.NOISE_FIGHT, &"fight", by)
 	if hit != null and can_target(by, hit):
 		damage(hit, maxi(1, roundi(by.attack_damage * float(move["damage_scale"]))), by, &"attack")
@@ -4566,7 +4571,8 @@ func try_stance(by: GridEntity, kind: String) -> bool:
 
 
 ## How far [param entity]'s bow is drawn, 0 to 1: nothing until its verb's
-## draw_min ticks, full at draw_full; 0 when not drawing.
+## draw_min ticks, full at draw_full (its longest step); 0 when not
+## drawing. For the pull's pose and the creak; what it shoots is its step.
 func draw_of(entity: GridEntity) -> float:
 	if not is_instance_valid(entity) or entity.raised != "draw":
 		return 0.0
@@ -4574,58 +4580,95 @@ func draw_of(entity: GridEntity) -> float:
 	if verb.is_empty():
 		return 0.0
 	var drawn := tick - entity.raised_tick
-	# A quick bow (decision 365) draws in less time.
-	var quick := float(Items.strength_value(slot_strength(entity, drawn_slot(entity)), "draw", 1.0))
+	var quick := _draw_quick(entity)
 	if drawn < roundi(int(verb["draw_min"]) * quick):
 		return 0.0
 	return clampf(float(drawn) / maxf(1.0, float(verb["draw_full"]) * quick), 0.0, 1.0)
 
 
-## [param by] lets its drawn bow go at [param at] (the right button
-## released): loosed is emitted with the draw (draw_of), and it shoots
-## (shoot); drawn too little, nothing. The stance ends either way.
-func try_loose(by: GridEntity, at: Vector2i) -> bool:
-	if not Net.is_authority() or not is_instance_valid(by) or by.raised != "draw":
+## A quick bow (decision 365) draws in less time: its ticks' multiple.
+func _draw_quick(entity: GridEntity) -> float:
+	return float(Items.strength_value(slot_strength(entity, drawn_slot(entity)), "draw", 1.0))
+
+
+## The step [param entity]'s drawn bow has reached (decision 583): 0,
+## the verb's first, at draw_min ticks, one more every draw_step, held at
+## the last; -1 before draw_min or when not drawing.
+func draw_step(entity: GridEntity) -> int:
+	if not is_instance_valid(entity) or entity.raised != "draw":
+		return -1
+	var verb := Items.verb_of(drawn_with(entity))
+	if verb.is_empty():
+		return -1
+	var quick := _draw_quick(entity)
+	var past := tick - entity.raised_tick - roundi(int(verb["draw_min"]) * quick)
+	if past < 0:
+		return -1
+	return mini(floori(past / maxf(1.0, float(verb["draw_step"]) * quick)), (verb["steps"] as Array).size() - 1)
+
+
+## The cells [param entity]'s drawn bow reaches now (its step's; decision
+## 583); 0 before draw_min or when not drawing. What the views show.
+func range_of(entity: GridEntity) -> int:
+	var step := draw_step(entity)
+	return 0 if step < 0 else int(Items.verb_of(drawn_with(entity))["steps"][step])
+
+
+## The cells the bow in [param entity]'s hands reaches at its longest step;
+## 0 with none.
+func longest_range(entity: GridEntity) -> int:
+	return int(Items.verb_of(drawn_with(entity)).get("cells", 0))
+
+
+## [param by] lets its drawn bow go at [param angle] (radians on the grid,
+## Vector2.angle(): 0 east, PI / 2 south; the right button released):
+## loosed is emitted with its step (draw_step), and it shoots (shoot);
+## before the first step, nothing. The stance ends either way.
+func try_loose(by: GridEntity, angle: float) -> bool:
+	if not Net.is_authority() or not is_instance_valid(by) or by.raised != "draw" or not is_finite(angle):
 		return false
-	var strength := draw_of(by)
+	var step := draw_step(by)
 	by.raised = ""
-	if strength <= 0.0:
+	if step < 0:
 		return false
-	_log("loose: %s at %s, drawn %.2f" % [by.name, at, strength])
-	loosed.emit(by, at, strength)
-	shoot(by, at, strength)
+	_log("loose: %s at %.2f rad, step %d" % [by.name, angle, step])
+	loosed.emit(by, angle, step)
+	shoot(by, angle, step)
 	return true
 
 
-## [param by]'s shot toward [param at], its bow drawn [param strength] (0
-## to 1; decision 335). Along the line from its cell through
-## [param at] and on (shot_line), as far as its bow's cells, it hits the
-## first body there; a wall, a closed door, higher ground or the map's end
-## stops it first. A body it may not attack (can_target) or a friend it spares (spares) stops it unharmed.
-## Damage is its blow (attack_damage) times the bow's damage times the
-## draw, at least 1, cause &"shot"; no push. It faces the shot, is heard
-## NOISE_BOW about it, and the views draw the arrow's flight
-## (GridEntity.shot). The body struck, or null.
-func shoot(by: GridEntity, at: Vector2i, strength: float) -> GridEntity:
-	if not Net.is_authority() or not is_instance_valid(by) or at == by.tile or strength <= 0.0:
-		return null
-	var aim := shot_aim(by, at)
-	if aim.is_empty():
+## [param by]'s shot at [param angle], its bow drawn to [param step]
+## (decision 583; 335 before it). Along the ray from its cell's centre
+## (shot_aim), as far as that step's cells, it hits the first body there; a
+## wall, a closed door, higher ground or the map's end stops it first, and
+## past its range it comes down. A body it may not attack (can_target) or a
+## friend it spares (spares) stops it unharmed. Damage is its blow
+## (attack_damage) times the bow's damage times the step's damage_at (the
+## shortest hardest), at least 1, cause &"shot"; no push. It faces the
+## shot, is heard NOISE_BOW about it, and the views draw the arrow's flight
+## to where it stopped and what stopped it (GridEntity.shot). The body
+## struck, or null.
+func shoot(by: GridEntity, angle: float, step: int) -> GridEntity:
+	if not Net.is_authority() or not is_instance_valid(by) or step < 0 or not is_finite(angle):
 		return null
 	var verb := Items.verb_of(drawn_with(by))
+	if verb.is_empty():
+		return null
+	step = mini(step, (verb["steps"] as Array).size() - 1)
+	var aim := shot_aim(by, angle, int(verb["steps"][step]))
 	var hit: GridEntity = aim["hit"]
-	var end: Vector2i = aim["end"]
-	by._world_set_facing(Vector2i(signi(at.x - by.tile.x), signi(at.y - by.tile.y)))
-	by._world_shot(end)
+	var way := Vector2.from_angle(angle)
+	by._world_set_facing(Vector2i(roundi(way.x), roundi(way.y)))
+	by._world_shot(aim["end"], aim["struck"])
 	noise(by.tile, NOISE_BOW, &"bow", by)
 	if hit == null or not can_target(by, hit) or spares(by, hit) or not hit.is_breakable():
-		_log("shot: %s at %s, drawn %.2f, %s" % [by.name, end, strength, "nothing hit" if hit == null else "stopped by %s" % hit.name])
+		_log("shot: %s at %.2f rad, step %d, %s" % [by.name, angle, step, "nothing hit (%s at %s)" % [aim["struck"], aim["end"]] if hit == null else "stopped by %s" % hit.name])
 		return null
-	var amount := maxi(1, roundi(by.attack_damage * float(verb["damage"]) * strength))
+	var amount := maxi(1, roundi(by.attack_damage * float(verb["damage"]) * float(verb["damage_at"][step])))
 	var met: Variant = _meet_guard(hit, by, amount, 0.0, true)
 	if met != null:
 		amount = met[0]
-	_log("shot: %s hits %s at %s for %d, drawn %.2f" % [by.name, hit.name, hit.tile, amount, strength])
+	_log("shot: %s hits %s at %s for %d, step %d" % [by.name, hit.name, hit.tile, amount, step])
 	if amount > 0:
 		var creature := hit.is_creature()
 		var ammo := Items.ammo_of(by.slots[bundle_slot(by)]) if bundle_slot(by) >= 0 else {}
@@ -4713,64 +4756,112 @@ static func spares(by: GridEntity, body: GridEntity) -> bool:
 	return (by is Player or by is Companion) and (body is Resident or body is Companion or body is Player)
 
 
-## Where [param by]'s shot toward [param at] would go with the bow in its
-## hands: {end: the last cell it crosses (its own if none), hit: the first
-## body on the way, or null}; {} with no bow. The server's shoot and the
-## client's aim while drawing (Main) read the same line.
-func shot_aim(by: GridEntity, at: Vector2i) -> Dictionary:
+## Where [param by]'s shot at [param angle] would go with the bow in its
+## hands, reaching [param cells] (its longest step's when under 0; decision
+## 583): {end: the point it stops at (cell units, a cell's centre at
+## Vector2(cell)), cell: the last cell it crosses (its own if none), hit:
+## the first body on the way, or null, struck: what stopped it, &"body"
+## or shot_ray's}; {} with no bow. The server's shoot, a client's aim while
+## drawing (Main) and an archer's clear shot (Monster) read the same ray.
+func shot_aim(by: GridEntity, angle: float, cells := -1) -> Dictionary:
 	var verb := Items.verb_of(drawn_with(by))
-	if verb.is_empty() or at == by.tile:
+	if verb.is_empty() or not is_finite(angle):
 		return {}
-	var hit: GridEntity = null
-	var end := by.tile
-	for cell in shot_line(by.tile, at, int(verb["cells"])):
-		end = cell
+	var ray := shot_ray(by.tile, angle, int(verb["cells"]) if cells < 0 else cells)
+	var out := {"end": ray["end"], "cell": by.tile, "hit": null, "struck": ray["struck"]}
+	var start := Vector2(by.tile)
+	var way := Vector2.from_angle(angle)
+	for cell: Vector2i in ray["cells"]:
+		out["cell"] = cell
 		var body: GridEntity = _occupancy.get(cell)
 		if body != null and body != by:
-			hit = body
+			out["hit"] = body
+			out["struck"] = &"body"
+			out["end"] = start + way * maxf(0.0, way.dot(Vector2(cell) - start))  # Abreast of its centre.
 			break
-	return {"end": end, "hit": hit}
-
-
-## The cells a shot from [param from] toward [param toward] crosses, in
-## order, at most [param cells] away: a Bresenham line through
-## [param toward] and on. It ends before a wall edge or a closed door
-## (crossed as sight is: _sight_crosses_edge), a cell higher than the
-## shooter's, or one with no ground and no water (the map's end).
-func shot_line(from: Vector2i, toward: Vector2i, cells: int) -> Array[Vector2i]:
-	var out: Array[Vector2i] = []
-	var d := toward - from
-	var longest := maxi(absi(d.x), absi(d.y))
-	if longest == 0 or cells <= 0:
-		return out
-	var to := from + d * maxi(1, ceili(float(cells) / longest))
-	var top := height_at(from)
-	# Over relief (decision 525) the arrow flies from the eye toward the
-	# aim over [param toward], and ground above that line stops it.
-	var eye := elevation_at(from) + Relief.EYE_M
-	var drop_per_cell := (eye - elevation_at(toward) - Relief.AIM_M) / Vector2(from).distance_to(Vector2(toward))
-	var span: Vector2i = (to - from).abs()
-	var s := Vector2i(1 if from.x < to.x else -1, 1 if from.y < to.y else -1)
-	var err: int = span.x - span.y
-	var at: Vector2i = from
-	while at != to:
-		var e2: int = 2 * err
-		var step := Vector2i.ZERO
-		if e2 > -span.y:
-			err -= span.y
-			step.x = s.x
-		if e2 < span.x:
-			err += span.x
-			step.y = s.y
-		if _sight_crosses_edge(at, step):
-			break
-		at += step
-		var above := elevation_at(at) > eye - drop_per_cell * Vector2(from).distance_to(Vector2(at)) if _relief_given \
-				else height_at(at) > top
-		if distance(from, at) > cells or above or not (is_walkable(at) or is_water(at)):
-			break
-		out.append(at)
 	return out
+
+
+## The ray of a shot from [param from]'s centre at [param angle] (radians
+## on the grid; decision 583), at most [param cells] away as
+## World.distance counts (Chebyshev: as far along a diagonal as straight):
+## {cells: every cell it crosses, in order, not its own; where it passes
+## exactly through a corner, both cells beside it too (a supercover: no
+## slipping between two bodies), end: the point it stops at, struck: what
+## stopped it, &"wood" (a closed door), &"stone" (a wall, higher ground,
+## the map's end) or &"ground" (its range spent: it comes down past end)}.
+## A wall edge or a closed door is crossed as sight is
+## (_sight_crosses_edge); over relief (decision 525) the arrow flies from
+## the eye toward the aim height over the range's end, and ground above
+## that stops it.
+func shot_ray(from: Vector2i, angle: float, cells: int) -> Dictionary:
+	var out: Array[Vector2i] = []
+	var start := Vector2(from)
+	var result := {"cells": out, "end": start, "struck": &"ground"}
+	if cells <= 0 or not is_finite(angle):
+		return result
+	var way := Vector2.from_angle(angle)
+	way = Vector2(0.0 if absf(way.x) < 1e-9 else way.x, 0.0 if absf(way.y) < 1e-9 else way.y)
+	var reach := float(cells) / maxf(absf(way.x), absf(way.y))
+	var s := Vector2i(1 if way.x > 0.0 else -1, 1 if way.y > 0.0 else -1)
+	var delta := Vector2(INF if way.x == 0.0 else 1.0 / absf(way.x), INF if way.y == 0.0 else 1.0 / absf(way.y))
+	var next := delta * 0.5  # The ray's length to the first cell side across, each axis.
+	var top := height_at(from)
+	var eye := elevation_at(from) + Relief.EYE_M
+	var aim_at: Vector2i = Vector2i((start + way * reach).round())
+	var drop_per_cell := (eye - elevation_at(aim_at) - Relief.AIM_M) / reach
+	var at := from
+	while true:
+		var t := minf(next.x, next.y)
+		if t > reach + 1e-6:
+			result["end"] = start + way * reach
+			return result
+		var step := Vector2i(s.x if next.x - t < 1e-6 else 0, s.y if next.y - t < 1e-6 else 0)
+		var point := start + way * t
+		if step.x != 0 and step.y != 0:
+			for side: Vector2i in [Vector2i(step.x, 0), Vector2i(0, step.y)]:
+				if not edge_blocks_sight(at, side) and _shot_open(from, at + side, eye, drop_per_cell, top):
+					out.append(at + side)
+		if _sight_crosses_edge(at, step):
+			result["end"] = point
+			result["struck"] = _edge_struck(at, step)
+			return result
+		if not _shot_open(from, at + step, eye, drop_per_cell, top):
+			result["end"] = point
+			result["struck"] = &"stone"
+			return result
+		at += step
+		out.append(at)
+		next += Vector2(delta.x if step.x != 0 else 0.0, delta.y if step.y != 0 else 0.0)
+	return result
+
+
+## Whether a shot from [param from] flies through [param cell]: ground or
+## water, and not above the arrow (shot_ray's line, or without relief no
+## higher than the shooter's cell).
+func _shot_open(from: Vector2i, cell: Vector2i, eye: float, drop_per_cell: float, top: float) -> bool:
+	if not (is_walkable(cell) or is_water(cell)):
+		return false
+	if _relief_given:
+		return elevation_at(cell) <= eye - drop_per_cell * Vector2(from).distance_to(Vector2(cell))
+	return height_at(cell) <= top
+
+
+## What a shot crossing from [param at] by [param step] meets on the edge
+## that stops it: &"wood" for a closed door on any edge of the way, else
+## &"stone".
+func _edge_struck(at: Vector2i, step: Vector2i) -> StringName:
+	var edges: Array = [[at, step]]
+	if step.x != 0 and step.y != 0:
+		var via_x := Vector2i(step.x, 0)
+		var via_y := Vector2i(0, step.y)
+		edges = [[at, via_x], [at + via_x, via_y], [at, via_y], [at + via_y, via_x]]
+	for edge: Array in edges:
+		var door := door_across(edge[0], edge[1])
+		if door != null and not door.open:
+			return &"wood"
+	return &"stone"
+
 
 ## Whether [param entity] carries the key to [param lock] (a thing whose
 ## catalog "opens" is it), in its pack or a hand: World.key_check's own.
@@ -5207,8 +5298,6 @@ func try_move(entity: GridEntity, direction: Vector2i) -> bool:
 	entity.step_until = entity.next_move_tick
 	entity.last_step_tick = tick  # (A braced spear stands still: braced.)
 	_trample(entity, entity.tile - direction)
-	if entity.raised == "draw":
-		entity.raised_tick = tick  # A step spoils the draw: it starts again.
 	entity._world_set_facing(direction)
 	entity.protected = false  # Moving ends spawn grace.
 	if entity is Player or entity is Companion:
@@ -7225,6 +7314,8 @@ func step_ticks(entity: GridEntity, direction: Vector2i, from := NO_CELL) -> flo
 		from = entity.tile
 	if entity.winded:
 		ticks *= winded_move_scale  # Decision 597; winded replicates, so a client's prediction agrees.
+	if entity.raised == "draw":
+		ticks *= DRAWN_TICK_SCALE  # Walking drawn (decision 583); raised replicates, so a client's prediction agrees.
 	ticks /= 1.0 + buff(entity, "speed")  # A stamina potion (decision 562); buffs replicate, so a client's prediction agrees.
 	return ticks * ground_drag(from, direction)  # The ground (607), as a slide meets it.
 

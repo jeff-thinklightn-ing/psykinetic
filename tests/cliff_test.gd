@@ -107,9 +107,9 @@ func _test_sight() -> void:
 	_check(World.has_line_of_sight(Vector2i(8, 3), Vector2i(2, 3)) and World.has_line_of_sight(Vector2i(9, 5), Vector2i(2, 6)), "from on top, everything below")
 	_check(World.has_clear_line(Vector2i(2, 3), Vector2i(8, 3)), "light still reaches past the lip (has_clear_line)")
 	_check(not World.has_line_of_sight(Vector2i(7, 2), Vector2i(9, 2)), "the rock stops sight across it")
-	var line := World.shot_line(Vector2i(8, 4), Vector2i(3, 4), 8)
+	var line: Array = World.shot_ray(Vector2i(8, 4), PI, 8)["cells"]
 	_check(Vector2i(3, 4) in line, "an archer on top: the shot line reaches a player below (%s)" % [line])
-	_check(not Vector2i(8, 4) in World.shot_line(Vector2i(3, 4), Vector2i(8, 4), 8), "and none from below to the top")
+	_check(not Vector2i(8, 4) in World.shot_ray(Vector2i(3, 4), 0.0, 8)["cells"], "and none from below to the top")
 	var path := World.find_path(Vector2i(2, 3), Vector2i(6, 3), true)
 	_check(not path.is_empty(), "a monster below that saw its quarry on the lip walks there, by the slope (%d steps)" % path.size())
 

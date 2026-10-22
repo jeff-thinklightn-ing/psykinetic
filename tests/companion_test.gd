@@ -1481,7 +1481,7 @@ func _test_focus() -> void:
 	var imp := _spawn_imp(_main._nearest_free(pet.tile + Vector2i(2, 0)))
 	World.damage(imp, 1, pet, &"attack")
 	_check(is_equal_approx(float(pet.focus["fight"]), 40.1) and record.companion["focus"] == pet.focus, "a blow of hers that lands: fighting grows (%s)" % [pet.focus])
-	World.loosed.emit(pet, imp.tile, 1.0)
+	World.loosed.emit(pet, Vector2(imp.tile - pet.tile).angle(), 1)  # 583's loosed: the angle, the step.
 	_check(is_equal_approx(float(pet.focus["stealth"]), 40.1), "her bow loosed: stealth grows (%s)" % [pet.focus])
 	var before := float(pet.focus["fight"])
 	World.add_buff(pet, "mass", 10.0, 100)

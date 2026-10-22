@@ -298,6 +298,11 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## 32 (601 amended): GroundPile replicates "gold" (whole gold lying on the
 ## cell, a count, never a thing; a pile may hold gold alone); the coin_purse
 ## item is gone from the catalog.
+## 32 (583, items' side): the "loose" command carries "angle" (radians on
+## the grid; "at" still read as a fallback); GridEntity._net_shot carries
+## the point an arrow stopped at (Vector2, cell units) and what stopped it
+## (&"body", &"wood", &"stone", &"ground"); a bow's verb has steps and
+## damage_at; walking drawn keeps the draw at half pace.
 const PROTOCOL_REVISION := 32
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]

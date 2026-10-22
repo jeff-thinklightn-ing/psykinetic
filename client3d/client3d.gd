@@ -11986,7 +11986,8 @@ func _on_guarded(broken: bool, id: int) -> void:
 ## streaks from the shooter's chest to that cell. As it arrives, a body
 ## there is heard struck (_on_struck) or guarding (_on_guarded); else what
 ## stopped it (_arrow_landed).
-func _on_shot(to: Vector2i, id: int) -> void:
+func _on_shot(point: Vector2, _struck: StringName, id: int) -> void:
+	var to := Vector2i(point.round())  # The cell it stopped in (decision 583; the point and what stopped it are pc-character's to draw).
 	var puppet: Node3D = _puppets.get(id)
 	if puppet == null or puppet.get_parent() == null:
 		return

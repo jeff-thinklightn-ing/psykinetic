@@ -24,9 +24,12 @@ signal impacted(amount: int, against: StringName)
 signal struck(amount: int, cause: StringName)
 ## An attack or a swing at air went [param direction]: views lunge.
 signal swung(direction: Vector2i)
-## A shot (World.shoot) flew from here to [param to], the last cell it
-## reached: views draw the arrow. On every peer.
-signal shot(to: Vector2i)
+## A shot (World.shoot) flew from here to [param to], the point it stopped
+## at in cell units (a cell's centre at Vector2(cell); decision 583),
+## stopped by [param struck]: &"body", &"wood", &"stone", or &"ground"
+## (its range spent: it comes down past the point). Views draw the arrow.
+## On every peer.
+signal shot(to: Vector2, struck: StringName)
 ## A thing it held (Items id [param item_id]) was thrown down a line
 ## (World.hurl, decision 606) and came down at [param to]: views draw its
 ## flight with the thing's art. On every peer.
@@ -744,10 +747,10 @@ func _world_swung(direction: Vector2i) -> void:
 		_net_swung.rpc_id(peer, direction)
 
 
-func _world_shot(to: Vector2i) -> void:
-	shot.emit(to)
+func _world_shot(to: Vector2, struck: StringName) -> void:
+	shot.emit(to, struck)
 	for peer in viewers():
-		_net_shot.rpc_id(peer, to)
+		_net_shot.rpc_id(peer, to, struck)
 
 
 func _world_hurled(item_id: String, to: Vector2i) -> void:
@@ -1117,8 +1120,8 @@ func _net_swung(direction: Vector2i) -> void:
 
 
 @rpc("authority", "call_remote", "reliable")
-func _net_shot(to: Vector2i) -> void:
-	shot.emit(to)
+func _net_shot(to: Vector2, struck: StringName) -> void:
+	shot.emit(to, struck)
 
 
 @rpc("authority", "call_remote", "reliable")

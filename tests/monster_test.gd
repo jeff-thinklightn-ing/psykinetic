@@ -2413,7 +2413,7 @@ func _test_archer() -> void:
 			break
 	_check(drawn and not shot.is_empty() and shot["entity"] == player and archer.tile == from,
 			"it draws where it stands and shoots the player 7 off (%s)" % [shot])
-	_check(not shot.is_empty() and int(shot["tick"]) >= 20, "at full draw (tick %s)" % shot.get("tick"))
+	_check(not shot.is_empty() and int(shot["tick"]) >= 15, "once its draw's step reaches it, 7 cells, 15 ticks (decision 583; tick %s)" % shot.get("tick"))
 	# Struck as it draws: the draw starts again.
 	for i in 12:
 		World.step()

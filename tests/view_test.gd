@@ -439,7 +439,7 @@ func _test_bow_sounds() -> void:
 	_check(not takes or creaks[0].is_queued_for_deletion(), "the draw let down: the creak stops")
 	var before := _rig.sfx.played.size()
 	var loosed := _heard(func() -> void:
-		player._world_shot(imp.tile)
+		player._world_shot(Vector2(imp.tile), &"body")
 		World.damage(imp, 1, player, &"shot"))
 	_check(loosed.slice(0, 1) == ["sfx.bow_loose"] and not loosed.has("sfx.arrow_hit_flesh"),
 			"loosed at the imp: the twang, its hit not yet (%s)" % [loosed])
@@ -497,7 +497,7 @@ func _test_bow_sounds() -> void:
 	var miss := _rig.sfx.played.size()
 	var unheard := _rig.sfx.unheard.size()
 	var expected := Client3D._arrow_landed(player.tile, open)
-	player._world_shot(open)
+	player._world_shot(Vector2(open), &"ground")
 	await get_tree().create_timer(0.5).timeout
 	_check((_rig.sfx.played.slice(miss).map(func(entry: Array) -> String: return entry[0]) + _rig.sfx.unheard.slice(unheard)).has(expected),
 			"loosed at nobody: as it gets there, what stopped it (%s)" % expected)
@@ -505,7 +505,7 @@ func _test_bow_sounds() -> void:
 	if friend != null and World.spares(player, friend):
 		var heard := _rig.sfx.played.size()
 		var unheard_before := _rig.sfx.unheard.size()
-		player._world_shot(friend.tile)
+		player._world_shot(Vector2(friend.tile), &"body")
 		await get_tree().create_timer(0.5).timeout
 		_check((_rig.sfx.played.slice(heard).map(func(entry: Array) -> String: return entry[0]) + _rig.sfx.unheard.slice(unheard_before)).has("sfx.arrow_spared"),
 				"loosed at a companion, who is spared (456): it sticks in, softly")
@@ -4669,7 +4669,7 @@ func _test_bow() -> void:
 				and Client3D.bent(Vector3(0.0, 0.05, 0.0), bend, reach) == Vector3(0.0, 0.05, 0.0)
 				and is_equal_approx(Client3D.bent(Vector3(0.0, reach, 0.0), bend, reach).z, -bend),
 				"drawn: the limbs bent %.3f m at the tips, the grip still ([moving, of, at most] %s)" % [bend, moved])
-	player.shot.emit(player.tile + Vector2i(4, 0))
+	player.shot.emit(Vector2(player.tile + Vector2i(4, 0)), &"ground")
 	player.raised = ""
 	_rig._process(0.0)
 	_check(rig.upper_clip() == "Bow_Loose", "loosed: Bow_Loose (%s)" % rig.upper_clip())
@@ -4777,7 +4777,7 @@ func _test_goblin() -> void:
 	_check(animator.playing() in Client3D.HIT_CLIPS, "struck: %s" % animator.playing())
 	await get_tree().create_timer(0.6).timeout
 	var aimed := imp.tile + Vector2i(6, 0)
-	imp.shot.emit(aimed)
+	imp.shot.emit(Vector2(aimed), &"body")
 	var flying: Array = _rig._arrows.filter(func(arrow: Dictionary) -> bool: return arrow["end"] == aimed)
 	var due := int(flying[0]["arrive"]) - Time.get_ticks_msec() if not flying.is_empty() else 0
 	_check(due > 100 and due < 250, "an arrow shot six cells off gets there in its flight's time (%d ms)" % due)

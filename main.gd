@@ -954,10 +954,11 @@ func _process(delta: float) -> void:
 		# Items' 583 shot_aim takes the angle and the range ({end, cell, hit,
 		# struck}); before it lands, the cell ({end, hit}). Called by name, so
 		# either side lands first.
-		if World.has_method("draw_step") and aim_drawn:
+		if World.has_method("draw_step"):
 			var steps := range_steps(player)
 			var reach := range_now(player)
-			aim = World.call("shot_aim", player, aim_angle, reach if reach > 0 else int(steps[0]) if not steps.is_empty() else 1)
+			var angle := aim_angle if aim_drawn else Vector2(aim_tile - player.tile).angle()
+			aim = World.call("shot_aim", player, angle, reach if reach > 0 else int(steps[0]) if not steps.is_empty() else 1)
 		else:
 			aim = World.call("shot_aim", player, aim_tile)
 	if _client3d != null and drawing:
@@ -5342,7 +5343,7 @@ func _focus_struck(entity: GridEntity, amount: int, source: GridEntity, cause: S
 
 
 ## Her bow loosed: stealth.
-func _focus_shot(by: GridEntity, _at: Vector2i, _strength: float) -> void:
+func _focus_shot(by: GridEntity, _angle: float, _step: int) -> void:  # World.loosed (583: the angle and the draw's step).
 	if by is Companion:
 		_grow_focus(by as Companion, "shot")
 
@@ -7579,9 +7580,14 @@ func _on_command(entity: GridEntity, command_name: String, args: Dictionary) -> 
 			else:
 				World.try_bandage(entity, on)
 	elif command_name == "loose" and entity is Player:
+		# Its "angle" (radians on the grid; decision 583), else the
+		# angle to its "at" cell.
+		var angle: Variant = args.get("angle")
 		var at: Variant = args.get("at")
-		if at is Array and (at as Array).size() == 2:
-			World.try_loose(entity, Vector2i(int(at[0]), int(at[1])))
+		if angle is float or angle is int:
+			World.try_loose(entity, float(angle))
+		elif at is Array and (at as Array).size() == 2:
+			World.try_loose(entity, Vector2(Vector2i(int(at[0]), int(at[1])) - entity.tile).angle())
 	elif command_name in ["pick_up", "drop", "throw"] and entity is Player:
 		_item_command(entity, command_name, args)
 	elif command_name == "lantern" and entity is Player:

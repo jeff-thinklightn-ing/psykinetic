@@ -536,22 +536,27 @@ func _test_weapons() -> void:
 	_check(World.off_hand(host) == "" and not World.try_stance(host, "draw"), "a bow without arrows: nothing to draw (decision 375)")
 	_give(host, "arrows", Player.LEFT_HAND)
 	var shots := []
-	var shot := func(by: GridEntity, at: Vector2i, strength: float) -> void: shots.append([by, at, strength])
+	var shot := func(by: GridEntity, angle: float, step: int) -> void: shots.append([by, angle, step])
 	World.loosed.connect(shot)
 	_check(World.off_hand(host) == "draw" and World.try_stance(host, "draw") and host.raised == "draw", "a bow, and a bundle of arrows in the other hand: the right button draws it")
 	host.raised_tick = World.tick - 3
-	_check(World.draw_of(host) == 0.0 and not World.try_loose(host, host.tile + Vector2i(4, 0)) and shots.is_empty() and host.raised == "",
+	_check(World.range_of(host) == 0 and World.draw_step(host) == -1 and not World.try_loose(host, 0.0) and shots.is_empty() and host.raised == "",
 			"let go before draw_min (5 ticks): no shot, the bow lowered")
 	World.try_stance(host, "draw")
+	var reached := []
+	for drawn in [5, 9, 10, 15, 20, 40]:
+		host.raised_tick = World.tick - drawn
+		reached.append(World.range_of(host))
+	_check(reached == [3, 3, 5, 7, 9, 9] and World.longest_range(host) == 9,
+			"range by the hold, in steps (decision 583): 3 cells at draw_min, 5, 7, 9 every 5 ticks after, held at 9 (%s)" % [reached])
 	host.raised_tick = World.tick - 10
-	_check(is_equal_approx(World.draw_of(host), 0.5), "drawn 10 ticks of 20: half (%.2f)" % World.draw_of(host))
+	_check(is_equal_approx(World.draw_of(host), 0.5), "drawn 10 ticks of 20: half the pull's pose (%.2f)" % World.draw_of(host))
 	host.raised_tick = World.tick - 40
-	var aim := host.tile + Vector2i(4, 0)
-	_check(World.try_loose(host, aim) and shots.size() == 1 and shots[0] == [host, aim, 1.0] and host.raised == "",
-			"drawn past draw_full: loosed at the aim, full strength, for combat to shoot (%s)" % [shots])
+	_check(World.try_loose(host, 0.5) and shots.size() == 1 and shots[0] == [host, 0.5, 3] and host.raised == "",
+			"held past the last step: loosed at the angle, at its longest step, for combat to shoot (%s)" % [shots])
 	_check(not World.try_stance(host, "block"), "a bow is no shield")
 	World.loosed.disconnect(shot)
-	print("\n== the bow shoots: the first body on the line, harder the longer the draw (decision 335) ==")
+	print("\n== the bow shoots along a ray at any angle: the first body, shortest steps hardest (decisions 335, 583) ==")
 	var imp: GridEntity = null
 	for monster in World.monsters():
 		imp = monster
@@ -559,45 +564,76 @@ func _test_weapons() -> void:
 	var mark := _open_line(host, 4)
 	_check(imp != null and mark != World.NO_CELL, "an imp, and an open line 4 cells long")
 	if imp != null and mark != World.NO_CELL:
-		var line := World.shot_line(host.tile, mark, 8)
+		var toward := Vector2(mark - host.tile).angle()
+		var line: Array[Vector2i] = World.shot_ray(host.tile, toward, 8)["cells"]
 		_check(line.size() >= 4 and line[3] == mark and line.all(func(cell: Vector2i) -> bool: return World.distance(host.tile, cell) <= 8),
-				"the line runs through the aim and on, never past 8 cells (%s)" % [line])
+				"the ray runs through the aim and on, never past 8 cells (%s)" % [line])
+		var slant: Array[Vector2i] = World.shot_ray(host.tile, atan2(1.0, 2.0), 6)["cells"]
+		var touching := true
+		var last := host.tile
+		for cell in slant:
+			touching = touching and absi(cell.x - last.x) + absi(cell.y - last.y) == 1
+			last = cell
+		_check(touching, "at a slant every cell it crosses, side by side: no slipping past a corner (%s)" % [slant])
+		var corner: Dictionary = World.shot_ray(host.tile, PI / 4.0, 1)
+		var beside: Array = [host.tile + Vector2i(1, 0), host.tile + Vector2i(0, 1)]
+		_check(corner["cells"].has(host.tile + Vector2i(1, 1)) == false or beside.all(func(cell: Vector2i) -> bool:
+				return corner["cells"].has(cell) or not World.is_walkable(cell) or World._terrain_blocks_step(host.tile, cell - host.tile, false, false)),
+				"through a corner exactly: the cells beside it too (%s)" % [corner["cells"]])
 		var near := host.tile + (mark - host.tile) / 2
+		var imp_hp := imp.hp
 		World._relocate(imp, mark)
 		var ends := []
-		var seen := func(to: Vector2i) -> void: ends.append(to)
+		var seen := func(to: Vector2, struck: StringName) -> void: ends.append([to, struck])
 		host.shot.connect(seen)
 		var hp := imp.hp
-		_check(World.shoot(host, mark + (mark - host.tile), 1.0) == imp and imp.hp == hp - 4 and ends == [mark],
-				"a full draw aimed past it: the imp, the first body, hit for 4 (a blow of 2, the bow's 2) (%d -> %d); the arrow ends there" % [hp, imp.hp])
-		_check(World.shot_aim(host, mark + (mark - host.tile)) == {"end": mark, "hit": imp},
-				"the aim while drawing reads the same line: the imp outlined, where the arrow ends")
+		_check(World.shoot(host, toward, 2) == imp and imp.hp == hp - 4 and ends.size() == 1
+				and ends[0][0].is_equal_approx(Vector2(mark)) and ends[0][1] == &"body",
+				"the third step (7 cells, x1.0): the imp, the first body, hit for 4 (a blow of 2, the bow's 2) (%d -> %d); the arrow ends at it (%s)" % [hp, imp.hp, ends])
+		var aim := World.shot_aim(host, toward, 7)
+		_check(aim["hit"] == imp and aim["cell"] == mark and aim["struck"] == &"body",
+				"the aim while drawing reads the same ray: the imp outlined, where the arrow ends")
+		imp.hp = imp.max_hp
 		hp = imp.hp
-		_check(World.shoot(host, mark, 0.5) == imp and imp.hp == hp - 2, "a half draw: 2 (%d -> %d)" % [hp, imp.hp])
-		_check(World.shoot(host, mark, 0.1) == imp and imp.hp == hp - 3, "a short draw: still at least 1")
+		_check(World.shoot(host, toward, 1) == imp and imp.hp == hp - 5, "the second step (x1.2): 5 (%d -> %d)" % [hp, imp.hp])
+		imp.hp = imp.max_hp
+		hp = imp.hp
+		_check(World.shoot(host, toward, 3) == imp and imp.hp == hp - 3, "the longest (x0.8): 3 (%d -> %d)" % [hp, imp.hp])
+		imp.hp = imp.max_hp
+		hp = imp.hp
+		_check(World.shoot(host, toward, 0) == null and imp.hp == hp and ends.back()[1] == &"ground"
+				and ends.back()[0].is_equal_approx(Vector2(host.tile) + Vector2(mark - host.tile) * 0.75),
+				"the shortest step reaches 3 cells: short of the imp at 4, it comes down (%s)" % [ends.back()])
 		var friend := Resident.new()
 		friend.name = "Tam"
 		World._relocate(imp, _far_cell(host))
 		_check(World.spawn(friend, mark), "(a resident stands where the imp stood)")
 		var friend_hp := friend.hp
-		_check(World.shoot(host, mark, 1.0) == null and friend.hp == friend_hp and friend.ailments.is_empty() and ends.back() == mark,
+		_check(World.shoot(host, toward, 3) == null and friend.hp == friend_hp and friend.ailments.is_empty() and ends.back()[1] == &"body",
 				"a shot meets a friend: it ends there, no harm (Jeff: arrows dont harm friendlies, decision 456)")
 		_check(World.spares(host, friend) and not World.spares(imp, host) and not World.spares(host, imp), "a player's arrow spares a friend; a monster's spares nobody")
 		World.despawn(friend)
 		hp = imp.hp
-		_check(World.shot_aim(host, near)["hit"] == null and World.shot_aim(host, host.tile).is_empty(), "the aim with nobody on the line: no body, and none at its own cell")
-		_check(World.shoot(host, near, 1.0) == null and imp.hp == hp, "nothing on the line: nothing hit")
+		_check(World.shot_aim(host, toward)["hit"] == null and World.shot_aim(host, NAN).is_empty(), "the aim with nobody on the ray: no body; none at no angle")
+		_check(World.shoot(host, toward, 3) == null and imp.hp == hp, "nothing on the ray: nothing hit")
 		host.shot.disconnect(seen)
+		imp.hp = maxi(1, imp_hp - 7)  # Left as hurt as its shots here always left it: the tests after count on it.
 		World.try_stance(host, "draw")
 		host.raised_tick = World.tick - 30
+		var drawn_ticks := World.step_ticks(host, Vector2i(1, 0))
+		var drawn_from := host.raised_tick
 		var stepped := false
 		for direction: Vector2i in World.DIRECTIONS:
 			if World.is_free(host.tile + direction):
 				host.next_move_tick = 0
 				stepped = World.try_move(host, direction)
 				break
-		_check(stepped and host.raised == "draw" and host.raised_tick == World.tick and World.draw_of(host) == 0.0,
-				"a step while drawn: still drawn, but the draw starts again")
+		host.raised = ""
+		var plain_ticks := World.step_ticks(host, Vector2i(1, 0))
+		host.raised = "draw"
+		_check(stepped and host.raised == "draw" and host.raised_tick == drawn_from and World.range_of(host) == 9
+				and is_equal_approx(drawn_ticks, plain_ticks * World.DRAWN_TICK_SCALE),
+				"a step while drawn: the draw kept, at half pace (%.2f ticks a step, %.2f not drawn)" % [drawn_ticks, plain_ticks])
 		World.try_stance(host, "")
 		var quiver := World.quiver_check
 		World.quiver_check = func(_entity: GridEntity) -> bool: return false
@@ -748,7 +784,7 @@ func _test_block() -> void:
 	imp._world_set_facing(-ahead)
 	_give(host, "bow", Player.RIGHT_HAND)
 	hp = imp.hp
-	_check(World.shoot(host, imp.tile, 1.0) == imp and imp.hp == hp, "a shot into a raised shield: taken on it (%d -> %d)" % [hp, imp.hp])
+	_check(World.shoot(host, Vector2(imp.tile - host.tile).angle(), 2) == imp and imp.hp == hp, "a shot into a raised shield: taken on it (%d -> %d)" % [hp, imp.hp])
 	World.items.end(World.take_item(host, host, Player.RIGHT_HAND), "gone")
 	imp.raised = ""
 	imp.slots = PackedStringArray()
@@ -1918,7 +1954,7 @@ func _test_arrows() -> void:
 		"tile": beside, "kind": "imp", "props": {"mass": 40.0, "sight_range": 0}}) as GridEntity
 	imp.acts = false
 	imp.hp = imp.max_hp
-	World.shoot(host, imp.tile, 1.0)
+	World.shoot(host, Vector2(imp.tile - host.tile).angle(), 2)
 	_check(host.slot_items[Player.RIGHT_HAND] == bundle and World.items.condition_of(bundle) == 10 and imp.ailments.is_empty(),
 			"a shot uses nothing up; a plain arrow does nothing more")
 	# Blunt hits wear it.
@@ -1967,7 +2003,7 @@ func _test_arrows() -> void:
 	World.items.end(World.take_item(host, host, Player.RIGHT_HAND), "gone")
 	_give(host, "flame_arrows", Player.RIGHT_HAND)
 	imp.hp = imp.max_hp
-	World.shoot(host, imp.tile, 1.0)
+	World.shoot(host, Vector2(imp.tile - host.tile).angle(), 2)
 	var shot_hp := imp.hp
 	_check(imp.ailments.has("burn"), "a flame arrow sets it burning (%s)" % [imp.ailments])
 	_steps(30)
@@ -1975,7 +2011,7 @@ func _test_arrows() -> void:
 	World.items.end(World.take_item(host, host, Player.RIGHT_HAND), "gone")
 	_give(host, "barbed_arrows", Player.RIGHT_HAND)
 	imp.hp = imp.max_hp
-	World.shoot(host, imp.tile, 1.0)
+	World.shoot(host, Vector2(imp.tile - host.tile).angle(), 2)
 	shot_hp = imp.hp
 	_check(imp.ailments.has("bleed"), "a barbed one bleeds it")
 	_steps(60)

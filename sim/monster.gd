@@ -685,7 +685,8 @@ func _special_tick() -> bool:
 
 ## An archer's fight (decision 341): in its band (KEEP_NEAR to its bow's
 ## cells) with a clear shot it stands, draws (World.try_stance "draw") and
-## looses at full draw (try_loose); struck, its draw is spoilt. Too near,
+## looses at the angle to it once its draw's step reaches it, or at its
+## longest step (try_loose; decision 583); struck, its draw is spoilt. Too near,
 ## it steps back; true for all of that. False when its fight is its kind's
 ## as ever: no clear shot from here, or out of reach (it closes as any
 ## monster does, till it has one), or too near and nowhere to step back
@@ -705,8 +706,8 @@ func _shoot_tick() -> bool:
 	World.face(self, Senses.way_toward(tile, target.tile))
 	if raised != "draw":
 		World.try_stance(self, "draw")
-	elif World.draw_of(self) >= 1.0:
-		World.try_loose(self, target.tile)
+	elif World.range_of(self) >= mini(d, World.longest_range(self)):
+		World.try_loose(self, Vector2(target.tile - tile).angle())
 	return true
 
 
@@ -792,21 +793,17 @@ func _pick_up(fighting: bool) -> bool:
 
 
 ## Whether its arrow would fly to its target: the first body on the shot's
-## line (World.shot_line, as far as its bow's cells) is the target, so no
-## wall, door or friend is in the way.
+## ray at the angle to it (World.shot_aim, as far as its bow's longest
+## step) is the target, so no wall, door or friend is in the way.
 func _clear_shot() -> bool:
 	var cells := 0
 	for hand in [Items.RIGHT_HAND, Items.LEFT_HAND]:
 		var verb := Items.verb_of(slots[hand]) if hand < slots.size() and not slots[hand].is_empty() else {}
 		if verb.get("kind") == "ranged":
 			cells = int(verb["cells"])
-	if World.distance(tile, target.tile) > cells:
+	if World.distance(tile, target.tile) > cells or target.tile == tile:
 		return false
-	for cell in World.shot_line(tile, target.tile, cells):
-		var body := World.get_entity_at(cell)
-		if body != null:
-			return body == target
-	return false
+	return World.shot_aim(self, Vector2(target.tile - tile).angle(), cells).get("hit") == target
 
 
 ## A step away from its target, to the free neighbouring cell farthest from

@@ -259,7 +259,7 @@ func _test_sight() -> void:
 	_check(World.has_line_of_sight(Vector2i(2, 9), Vector2i(12, 9)), "on the flat, far")
 	_check(World.has_line_of_sight(Vector2i(13, 9), Vector2i(15, 9)) and not World.has_line_of_sight(Vector2i(13, 9), Vector2i(18, 9)),
 		"from under the plateau its lip is seen, not what stands back from it")
-	var line := World.shot_line(Vector2i(2, 3), Vector2i(18, 3), 20)
+	var line: Array = World.shot_ray(Vector2i(2, 3), 0.0, 20)["cells"]
 	_check(not Vector2i(18, 3) in line and not line.is_empty(), "a shot over the ridge stops on its side (%d cells)" % line.size())
 
 
