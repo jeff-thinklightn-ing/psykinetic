@@ -1328,12 +1328,6 @@ static func _deal_rank(deal: String, field: Dictionary) -> int:
 	return names.find(deal)
 
 
-## The charges a player's [param barrow] record holds (PlayerRecord.barrow:
-## {tokens, best, containers}).
-static func barrow_tokens(barrow: Dictionary) -> int:
-	return maxi(int(barrow.get("tokens", 0)), 0)
-
-
 ## The most charges [param barrow] may hold: capacity_step for each step of
 ## the hardest deal beaten (25, 50, 75), and one more for each container
 ## (a named source, each once); 0 unblessed. Derived, never stored, so it
@@ -1346,27 +1340,16 @@ static func barrow_capacity(barrow: Dictionary, field: Dictionary) -> int:
 	return int(field.get("capacity_step", 25)) * (1 + rank + (containers.size() if containers is Array else 0))
 
 
-## The draugr beaten at [param deal]: [param barrow] with the deal's charges
-## taken up to the capacity, best raised if the deal is harder (never
-## lowered). {barrow: the new record, took, spilled: what was over}.
+## The draugr beaten at [param deal]: [param barrow] with best raised if
+## the deal is harder (never lowered); the charges themselves go on the
+## Draugr's Totem (573 amended: Main adds field_tokens(deal) with
+## World.totem_add up to barrow_capacity). {barrow: the new record}.
 static func barrow_won(barrow: Dictionary, deal: String, field: Dictionary) -> Dictionary:
-	var out := {"tokens": barrow_tokens(barrow), "best": str(barrow.get("best", "")),
+	var out: Dictionary = {"best": str(barrow.get("best", "")),
 		"containers": (barrow.get("containers", []) as Array).duplicate() if barrow.get("containers", []) is Array else []}
 	if _deal_rank(deal, field) > _deal_rank(out["best"], field):
 		out["best"] = deal
-	var given := field_tokens(deal, field)
-	var room := maxi(barrow_capacity(out, field) - int(out["tokens"]), 0)
-	var took := mini(given, room)
-	out["tokens"] = int(out["tokens"]) + took
-	return {"barrow": out, "took": took, "spilled": given - took}
-
-
-## One charge off [param barrow] (in place): false, and nothing taken, at 0.
-static func barrow_spend(barrow: Dictionary) -> bool:
-	if barrow_tokens(barrow) <= 0:
-		return false
-	barrow["tokens"] = barrow_tokens(barrow) - 1
-	return true
+	return {"barrow": out}
 
 
 ## A saved barrow record as 573 keeps it: one from before ({uses, of,

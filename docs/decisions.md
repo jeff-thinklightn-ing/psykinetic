@@ -23280,3 +23280,24 @@ is a place of kind "fort" whose counter is the town's shop.
 production_test (the fisherman's trip and catch, nothing from a bank not
 held, the fort's counter the town's shop). Level data both sides read:
 the new place kinds under the open revision; no new class_name.
+
+## 573 amended, economy's side. The record's charge helpers retired
+
+Dungeon's 573 amended (1beb8148) moved the resurrection charges onto the
+Draugr's Totem: Main reads Economy.barrow_won for best alone, and
+Economy.field_tokens and barrow_capacity for the charges and their
+ceiling. Nothing reads the record's count any more, so:
+
+- Economy.barrow_tokens and Economy.barrow_spend are removed.
+- Economy.barrow_won raises best (never lowers it) and returns
+  {barrow: {best, containers}}: no tokens sum, no took or spilled.
+- barrow_capacity, field_tokens, deals, deal_for and barrow_migrated are
+  unchanged.
+- barrow_migrated keeps dungeon's fix: 573's shape is read as its own,
+  and a saved "tokens" count is kept for Main.migrate_totem on the join.
+
+tests/economy_test _test_barrow_charges: best and capacity by wins, never
+lowered, a container's 25, the migration both ways. companion_test,
+level_test and return_test pass. Server only, protocol unchanged, no new
+class_name.
+

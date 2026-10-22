@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Tidied: the old charge count on a player's record is no longer read or kept by the economy now that the Draugr's Totem holds the charges (573 amended, economy's side).
 - A town that holds a fishing place on the river and has grown to a village gets a fisherman, who walks to the bank and back with fish for the store; the counter in Snagfin's fort across the river is the town's shop (594).
 - Towns now grow through stages, hamlet, village, town and city, rising as they gain people, officials, buildings and gold; the woodcutter's wood will come from the trees he fells once the forest is real, and a cut-bare woodlot still yields a little deadwood (591, economy's side).
 - Towns with a flock of 8 or more build a butchery and take on a butcher; each autumn the shepherd culls the flock down for him, and he turns each sheep into 3 meat and a hide for the town's store (590).
