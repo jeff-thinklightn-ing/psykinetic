@@ -546,11 +546,17 @@ const FOG_HEIGHT := 2.5
 const FOG_HEIGHT_DENSITY := 0.22
 ## Under this height (degrees) the light is the moon's, opposite the sun.
 const MOON_BELOW := -1.0
-## Shadows are cast from at least this high (degrees), so none is longer
-## than about three times what casts it (14° let a house's run 30-40 cells;
-## Jeff, decision 534); and they fade out over SHADOW_FADE either side of
-## MOON_BELOW, where the light swaps to the moon.
-const SHADOW_LOW := 20.0
+## Shadows are cast from a sun lifted toward the zenith (shadow_elevation):
+## from SHADOW_LOW (degrees) at the horizon, so even the first and last
+## hour's are under one and a half times what casts them, to SHADOW_HIGH
+## overhead, so noon's are short (Jeff: "shadows in general are too long,
+## it should be pretty subtle"; 20° flat until 534 amended (2), 14° before
+## 534 let a house's run 30-40 cells). They are SHADOW_STRENGTH dark (1 is
+## black), and fade out over SHADOW_FADE either side of MOON_BELOW, where
+## the light swaps to the moon.
+const SHADOW_LOW := 35.0
+const SHADOW_HIGH := 85.0
+const SHADOW_STRENGTH := 0.6
 const SHADOW_FADE := 5.0
 ## Away from the sky, each kind of place's ambient light, [colour, energy]
 ## (decision 304), spread as the sim's light is: a room is dim but all of
@@ -1843,14 +1849,16 @@ func _update_sky(delta: float) -> void:
 		var elevation := DayNight.elevation_at(fraction)
 		_look = sky_look(elevation).duplicate()
 		_look_daylight = smoothstep(DayNight.TWILIGHT_LOW, DayNight.TWILIGHT_HIGH, elevation)
-		# The moon by night, opposite the sun; either casts from at least
-		# SHADOW_LOW up.
+		# The moon by night, opposite the sun; either casts from its
+		# height lifted (shadow_elevation), from where it stands round.
 		var toward := DayNight.sun_at(fraction)
 		_toward_sun = _level_direction(toward).normalized()
 		if elevation < MOON_BELOW:
 			toward = -toward
-		toward.y = maxf(toward.y, sin(deg_to_rad(SHADOW_LOW)))
-		_sun.shadow_opacity = smoothstep(0.0, SHADOW_FADE, absf(elevation - MOON_BELOW))
+		var round_by := Vector2(toward.x, toward.z).normalized()
+		var lifted := deg_to_rad(shadow_elevation(rad_to_deg(asin(clampf(toward.y, -1.0, 1.0)))))
+		toward = Vector3(round_by.x * cos(lifted), sin(lifted), round_by.y * cos(lifted))
+		_sun.shadow_opacity = SHADOW_STRENGTH * smoothstep(0.0, SHADOW_FADE, absf(elevation - MOON_BELOW))
 		_sun.basis = Basis.looking_at(-_level_direction(toward.normalized()), Vector3.UP)
 	var look := canopied_look(weathered_look(seasoned_look(_look, season), _weather_view.weather),
 			_canopy_cover * World.fields.canopy_shade / DayNight.CANOPY_SHADE)
@@ -1873,6 +1881,12 @@ func _update_sky(delta: float) -> void:
 	var roof := DayNight.NIGHT + (day - DayNight.NIGHT) * share * (1.0 - World.fields.canopy_shade)
 	var lit := bool(_terrain.get("daylight", false))
 	_set_sky_floor(floor_brightness(light) if lit else 0.0, floor_brightness(roof) if lit else 0.0)
+
+
+## The height (degrees) shadows are cast from for a light [param elevation]
+## high: SHADOW_LOW at or under the horizon, rising to SHADOW_HIGH overhead.
+static func shadow_elevation(elevation: float) -> float:
+	return lerpf(SHADOW_LOW, SHADOW_HIGH, clampf(elevation, 0.0, 90.0) / 90.0)
 
 
 ## [param look] (sky_look's) in [param season] (Season.at's): winter's
@@ -5875,7 +5889,7 @@ func _build_ground(kinds: Dictionary) -> void:
 		drawn.material_override = material
 		# On relief the ground casts (the hills' cues sheet): an escarpment's
 		# back and a way throw their shadow across the valley at a low sun,
-		# no longer than SHADOW_LOW lets any shadow be.
+		# no longer than shadow_elevation lets any shadow be.
 		drawn.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if _relief_given \
 				else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		_room.add_child(drawn)

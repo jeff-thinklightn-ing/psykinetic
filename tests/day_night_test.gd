@@ -214,7 +214,14 @@ func _test_sky_look() -> void:
 	_check(at_swap["energy"] < 0.05, "where the sun hands over to the moon, the light is out, so the swap does not show")
 	# Decision 534: no shadow longer than about three times its caster, and
 	# none at the swap.
-	_check(1.0 / tan(deg_to_rad(Client3D.SHADOW_LOW)) <= 3.0, "a shadow is at most about three times what casts it")
+	# 534 amended (2), Jeff: "it should be pretty subtle".
+	var length := func(elevation: float) -> float: return 1.0 / tan(deg_to_rad(Client3D.shadow_elevation(elevation)))
+	_check(length.call(0.0) <= 1.5 and length.call(-10.0) == length.call(0.0),
+			"a shadow at sunrise is under one and a half times what casts it (%.2f)" % length.call(0.0))
+	var noon_length: float = length.call(90.0 - DayNight.LATITUDE)
+	_check(noon_length <= 0.6 and noon_length < length.call(10.0) and length.call(10.0) < length.call(0.0),
+			"shorter as the sun climbs: an equinox noon's is %.2f of it" % noon_length)
+	_check(Client3D.SHADOW_STRENGTH < 1.0 and Client3D.shadow_elevation(90.0) < 90.0, "shadows lighter than black; never cast from straight up")
 	_check(Client3D.sky_look(12.0)["light"] == Client3D.DAY_SUN and Client3D.sky_look(6.0)["fog_density"] <= noon["fog_density"],
 			"the day look from 12° up, and no thicker haze while the sun is up")
 

@@ -16661,6 +16661,20 @@ Retuned, the same stills: clear noon unchanged, overcast noon 64 / 123 /
 own light, kept as designed). Client only (Season.LOOK is read only by the
 view), protocol unchanged. day_night_test, season_test, weather_test.
 
+Amended (2) 2026-10-22 (Jeff on the hills' shadows: "shadows are okay for
+hills but shadows in general are too long, it should be pretty subtle";
+the coordinator): shorter and lighter all day. The sun, and the moon, cast
+from Client3D.shadow_elevation(their height): SHADOW_LOW 35° at or under
+the horizon rising linearly to SHADOW_HIGH 85° overhead, kept to where the
+light stands round. So a shadow is at most 1.43 times its caster in the
+first and last hour, 0.58 at an equinox noon and 0.31 at
+midsummer's, where the flat 20° floor gave 2.75, 1 and 0.4. Shadows are
+SHADOW_STRENGTH 0.6 opaque (was 1), times the swap's fade as before. This
+holds for everything that casts: buildings, trees, bodies and, on relief,
+the ground (terrain's hillshade is its own fixed light and unchanged).
+Before/after at noon, 15:30 and dusk in C:/dev/review/shadows/. Client
+only, protocol unchanged. day_night_test.
+
 ## 532, art-kit's side: the castle's walls warm sandstone again
 
 532 lifted the ground's greens; this is its other half in castle-8-final (Jeff,
