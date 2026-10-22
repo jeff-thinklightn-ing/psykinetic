@@ -52,8 +52,12 @@ const GONE_TILES := 12
 ## How often, resting, he stills any of the dead that stirred (a respawn).
 const STILL_EVERY_TICKS := 20
 
-## Drafts for Jeff's wording (573).
-const WORDS := "You bring the living's gold. Give it, and face me: win, and the dead will give you back to the living, as often as I grant. Twenty gold for five returns, fifty for ten, a hundred for fifteen. The more of you that come carrying them, the harder I stand."
+## Drafts for Jeff's wording (573), on lore's agreed secrets of the old
+## gods (old_gods.war, old_gods.gold): the gold appeases them because it
+## returns what the robbers stole; their blessing is the fallen raised and
+## sent back to battle. (old_gods.temple, the temple's gifts going to them,
+## he keeps.)
+const WORDS := "The old gods of war keep this barrow, and the robbers' pilfering angers them. Gold given back returns what was stolen: give it, and face me. Win, and through me they bless you: fall after, and they raise you and send you back to battle. Twenty gold for five risings, fifty for ten, a hundred for fifteen. The more of you that come carrying their blessing, the harder I stand."
 const TITLE := "Face the draugr"
 
 var state := State.SEATED
@@ -178,14 +182,14 @@ func accept_offer(player: Player, offer: Dictionary, gold: int) -> Dictionary:
 	if not str(offer.get("id", "")).begins_with("deal:"):
 		return {"ok": false, "say": "", "line": ""}
 	if deal.is_empty():
-		return {"ok": false, "say": "Not for so little. %d gold at the least." % int(deals()[0]["gold"]), "line": ""}
+		return {"ok": false, "say": "Not for so little. The old gods were robbed of more: %d gold at the least." % int(deals()[0]["gold"]), "line": ""}
 	if gold > World.gold_of(player.player_id):
 		return {"ok": false, "say": "You have not so much.", "line": ""}
 	World.add_gold(player.player_id, -gold, "the draugr's pact")
 	start_pact(player, str(deal["name"]))
 	var says := {"easy": "So be it. Stand and face me.", "normal": "Good. The dead rise beside me.",
 		"hard": "The hardest, then. Few have stood it."}
-	return {"ok": true, "say": says.get(difficulty, "So be it."), "line": "%s gives the draugr %d gold and takes up his pact for %d returns." % [player.name, gold, int(deal["charges"])]}
+	return {"ok": true, "say": says.get(difficulty, "So be it."), "line": "%s gives the draugr %d gold and takes up his pact for %d risings." % [player.name, gold, int(deal["charges"])]}
 
 
 ## His deals, least first (economy.json return.field.deals, 573; DEALS when
