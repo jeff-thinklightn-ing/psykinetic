@@ -455,6 +455,8 @@ func tick() -> void:
 		_flock_turn(town)
 		_shepherd_comes(town)
 		_weaver_comes(town)
+		_butcher_comes(town)
+		_butcher(town)
 		_woodcut(town)
 		_woodcutter_comes(town)
 		_maker_comes(town)
@@ -537,6 +539,9 @@ func choose(town: String) -> String:
 	# (decision 500): built first, their newcomer comes to it.
 	if kinds.has("pasture") and int(building(town, "pasture").get("level", 0)) < 1 and _farmed(town):
 		wants.append("pasture")
+	if kinds.has("butchery") and int(building(town, "butchery").get("level", 0)) < 1 \
+			and float(_town(town).get("flock", {}).get("count", 0.0)) >= float(rules.get("butcher", {}).get("from", 8)):
+		wants.append("butchery")  # Decision 590: a butcher's block once the flock can feed one.
 	if kinds.has("loom") and int(building(town, "loom").get("level", 0)) < 1 			and production.stockpile.count(town, "wool") >= int(rules.get("flock", {}).get("weaver", {}).get("wool", 6)):
 		wants.append("loom")
 	var housing: Array = kinds.keys().filter(func(kind: String) -> bool:
@@ -1154,6 +1159,62 @@ func _flock_turn(town: String) -> void:
 	if wool > 0:
 		production.deliver_to(town, production.worker_at("%s:pasture" % town), "wool", wool, "shearing", "the %s shearing" % season)
 		_note(town, "the flock is sheared: %d wool" % wool)
+	if season == "autumn":
+		_cull(town, flock_now)
+
+
+## The autumn cull (decision 590: Jeff's "the herder, the butcher, the cook
+## - its a supply chain"): with a butcher in town, the shepherd drives the
+## flock down to butcher.keep of the pasture's room, the culled sheep into
+## the store live ("sheep"), delivered at its price.
+func _cull(town: String, flock_now: Dictionary) -> void:
+	var rule: Dictionary = rules.get("butcher", {})
+	var trade := str(rule.get("trade", "butcher"))
+	if rule.is_empty() or not residents(town).any(func(who: String) -> bool: return trade in production.worker(who).get("trades", [])):
+		return
+	var house := building(town, "pasture")
+	var levels := int(house.get("level", 0)) if house.get("state") in [STANDING, BUILDING] else 0
+	var room := float(rules.get("flock", {}).get("per_level", 12)) * levels if levels > 0 else float(rules.get("flock", {}).get("start", 6))
+	var culled := floori(float(flock_now["count"]) - room * float(rule.get("keep", 0.5)))
+	if culled < 1:
+		return
+	flock_now["count"] = float(flock_now["count"]) - culled
+	production.deliver_to(town, production.worker_at("%s:pasture" % town), "sheep", culled, "culling", "the autumn cull")
+	_note(town, "the shepherd culls %d sheep for the butcher, %d left in the flock" % [culled, floori(float(flock_now["count"]))])
+
+
+## A town whose butchery stands (built once its flock reaches butcher.from:
+## choose) with no butcher gets one, a newcomer, once it has stood
+## butcher.growth_days without (decision 590).
+func _butcher_comes(town: String) -> void:
+	var rule: Dictionary = rules.get("butcher", {})
+	var wanted: bool = not rule.is_empty() and _stands(town, "butchery")
+	_comes(town, str(rule.get("trade", "butcher")), wanted, float(rule.get("growth_days", 3)), rule.get("names", ["Hew"]), "butcher")
+
+
+## The butcher at his manned butchery works the store's sheep: each
+## butcher.steps of work one sheep becomes butcher.meat meat and
+## butcher.hide hide, delivered into the store at their price (decision
+## 590); the meat joins the hunter's in the one pool.
+func _butcher(town: String) -> void:
+	var rule: Dictionary = rules.get("butcher", {})
+	var record := _town(town)
+	var at := now()
+	var since := maxi(at - int(record.get("butcher_at", at)), 0)
+	record["butcher_at"] = at
+	var shop := "%s:butchery" % town
+	if rule.is_empty() or production.stockpile.count(town, "sheep") < 1 or not production.manned(shop):
+		record["butcher_worked"] = 0
+		return
+	record["butcher_worked"] = int(record.get("butcher_worked", 0)) + since
+	var steps := maxi(int(rule.get("steps", 900)), 1)
+	var who := production.worker_at(shop)
+	while int(record["butcher_worked"]) >= steps and production.stockpile.count(town, "sheep") >= 1:
+		record["butcher_worked"] = int(record["butcher_worked"]) - steps
+		production.stockpile.take(town, "sheep", 1, "butchered by %s" % production.worker(who).get("name", who))
+		production.deliver_to(town, who, "meat", int(rule.get("meat", 3)), "butchering", "a sheep butchered")
+		production.deliver_to(town, who, "hide", int(rule.get("hide", 1)), "butchering", "a sheep butchered")
+		_note(town, "the butcher dresses a sheep: %d meat, %d hide" % [int(rule.get("meat", 3)), int(rule.get("hide", 1))])
 
 
 ## Whether [param town]'s field stands and has its farmer.
@@ -1988,7 +2049,10 @@ func from_dict(saved: Dictionary) -> void:
 		if flock_saved is Dictionary and not flock_saved.is_empty():
 			record["flock"] = {"count": maxf(float(flock_saved.get("count", 0.0)), 0.0), "season": str(flock_saved.get("season", "")),
 				"sheared": bool(flock_saved.get("sheared", false)), "worked": maxi(int(flock_saved.get("worked", 0)), 0), "at": int(flock_saved.get("at", 0))}
-		for key: String in ["shepherd", "weaver"]:
+		if entry.has("butcher_at"):
+			record["butcher_at"] = int(entry["butcher_at"])
+			record["butcher_worked"] = maxi(int(entry.get("butcher_worked", 0)), 0)
+		for key: String in ["shepherd", "weaver", "butcher"]:
 			if entry.has("%s_wanted" % key):
 				record["%s_wanted" % key] = int(entry["%s_wanted" % key])
 			record["%ss_came" % key] = maxi(int(entry.get("%ss_came" % key, 0)), 0)

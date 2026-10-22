@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Towns with a flock of 8 or more build a butchery and take on a butcher; each autumn the shepherd culls the flock down for him, and he turns each sheep into 3 meat and a hide for the town's store (590).
 - A medicine man's hut brings you back only once you are in his care: hand him 10 gold, 5 herbs or 5 antlers to be taken in at once, or do his first errand, which opens his further errands (584 amended).
 - Fixed: opening Options from the main menu kept the world, your body and its nameplate showing through the panel's dim; the menu's dark backdrop now stays under the options (418 amended).
 - People can wear a hat on their heads by a look word; the town's bard will wear a felt cap with a feather once its piece and the bard's look are in.

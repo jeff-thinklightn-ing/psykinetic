@@ -37,6 +37,7 @@ func _ready() -> void:
 	_test_look()
 	_test_woodcutter()
 	_test_flock()
+	_test_butcher()
 	_test_season_scale()
 	_test_maker_comes()
 	_test_sought()
@@ -245,6 +246,46 @@ func _test_flock() -> void:
 	_check(is_equal_approx(float(towns.flock(TOWN)["count"]), int(rule["start"]) + lambs), "lambs in spring: %.1f sheep" % float(towns.flock(TOWN)["count"]))
 	var saved := Towns.new(JSON.parse_string(JSON.stringify(towns.to_dict())), towns.production, _rules, func() -> int: return _now)
 	_check(is_equal_approx(float(saved.flock(TOWN)["count"]), float(towns.flock(TOWN)["count"])), "the flock saved and loaded")
+
+
+## The meat chain (decision 590): a flock of butcher.from builds a
+## butchery, which brings a butcher; the autumn cull drives the flock to
+## butcher.keep of the pasture's room, live sheep into the store; the
+## butcher makes each into meat and hide.
+func _test_butcher() -> void:
+	print("
+== the herder, the butcher, the cook ==")
+	var rule: Dictionary = _rules["butcher"]
+	_check(int(rule["from"]) == 8 and float(rule["keep"]) == 0.5 and int(rule["meat"]) == 3 and int(rule["hide"]) == 1
+		and int(_rules["value"]["sheep"]) == 5 and "sheep" in Stockpile.RESOURCES, "the rules are economy.json's (%s)" % [rule])
+	var towns := _towns()
+	towns._town(TOWN)["xp"] = 1000
+	towns._town(TOWN)["buildings"]["pasture"] = {"kind": "pasture", "level": 1, "state": Towns.STANDING, "since": 0, "job": 0}
+	towns.note_rescue(TOWN, "s1", "Wat", "shepherd")
+	towns._town(TOWN)["flock"] = {"count": 7.0, "season": Season.name_at(_now), "sheared": false, "worked": 0, "at": _now}
+	_check(towns.choose(TOWN) != "butchery", "a flock of 7: no butchery (%s)" % towns.choose(TOWN))
+	towns._town(TOWN)["flock"]["count"] = 10.0
+	_check(towns.choose(TOWN) == "butchery", "a flock of 10: the town would build a butchery (%s)" % towns.choose(TOWN))
+	var flock: Dictionary = towns._town(TOWN)["flock"]
+	towns._cull(TOWN, flock)
+	_check(towns.production.stockpile.count(TOWN, "sheep") == 0 and float(flock["count"]) == 10.0, "no butcher: no cull")
+	towns._town(TOWN)["xp"] = 0  # Nothing to spend on raising it while the butcher comes.
+	towns._town(TOWN)["buildings"]["butchery"] = {"kind": "butchery", "level": 1, "state": Towns.STANDING, "since": _now, "job": 0}
+	_year(towns, int(rule["growth_days"]) + 1)
+	var butchers := towns.residents(TOWN).filter(func(id: String) -> bool: return "butcher" in towns.production.worker(id)["trades"])
+	_check(butchers.size() == 1 and towns.production.manned(TOWN + ":butchery"), "the butchery brings a butcher, at his block (%s)" % [butchers])
+	flock["count"] = 10.0
+	towns._cull(TOWN, flock)
+	_check(towns.production.stockpile.count(TOWN, "sheep") == 4 and float(flock["count"]) == 6.0,
+		"the autumn cull: 10 down to 6 (half the pasture's 12), 4 sheep to the store (%d)" % towns.production.stockpile.count(TOWN, "sheep"))
+	var meat := towns.production.stockpile.count(TOWN, "meat")
+	var hide := towns.production.stockpile.count(TOWN, "hide")
+	_year(towns, 1)
+	_check(towns.production.stockpile.count(TOWN, "sheep") == 0 and towns.production.stockpile.count(TOWN, "meat") - meat == 12
+		and towns.production.stockpile.count(TOWN, "hide") - hide == 4, "a day: the butcher dresses the 4, 12 meat and 4 hide (%d, %d)"
+		% [towns.production.stockpile.count(TOWN, "meat") - meat, towns.production.stockpile.count(TOWN, "hide") - hide])
+	var saved := Towns.new(JSON.parse_string(JSON.stringify(towns.to_dict())), towns.production, _rules, func() -> int: return _now)
+	_check(saved.residents(TOWN).size() == towns.residents(TOWN).size() and int(saved._town(TOWN).get("butchers_came", 0)) == 1, "saved and loaded: his coming kept")
 
 
 ## Longer seasons (decision 533): a 14-day season's harvest is twice a

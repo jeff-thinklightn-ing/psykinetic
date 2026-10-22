@@ -23150,3 +23150,54 @@ others); a hut out in the land's rule; 4 gold and no herbs refused; 10
 gold into care, his purse paid; not twice; the errand upgrading the way
 in; five antlers into his hut's store; the player then brought back at
 the hut. Server and client (revision 32); no new class_name.
+## 590. The meat chain: the herder, the butcher, the cook
+
+Jeff: "farm animals do feed the town, but that employes the herder, the
+butcher, the cook - its a supply chain". The coordinator approved
+economy's design.
+
+- **Today's meat:** the hunter (every 3000 steps, from the herds at the
+  hunting ground) brings meat and hide into the store, paid at delivery.
+  The cook's roast takes 1 meat and 1 food, and residents' meals and
+  raids read the store's meat. All unchanged.
+- **The herder:** the shepherd and Towns.flock, as since 500. At the
+  autumn turn, after the shearing, with a butcher in town, he culls the
+  flock down to butcher.keep (0.5) of the pasture's room (Towns._cull).
+  - The culled sheep go into the store live as a new resource, "sheep"
+    (Stockpile.RESOURCES; value 5), delivered at the price as wool is.
+  - Without a butcher there is no cull.
+- **The butcher, a new trade:** a newcomer (Towns._butcher_comes, as the
+  weaver comes).
+  - The town chooses a butchery once its flock reaches butcher.from
+    (8). He comes once it has stood growth_days (3).
+  - economy.json buildings.butchery: trade butcher, built by the
+    carpenter, wood 8, 3000 steps, max_level 2. It is a kind for
+    buildings-6f to draw at 5x5 or more; nothing in real levels.
+  - At his manned butchery, each butcher.steps (900) of work turns one
+    sheep from the store into butcher.meat (3) meat and butcher.hide
+    (1) hide, delivered at their price (Towns._butcher).
+  - It is a rule over resources, as the shearing is: not an Items
+    "made", so no item and no Items.TRADES entry (items agreed).
+  - wage_floor gains "butcher": "meat".
+- **One meat pool:** the store's meat, whichever source brought it.
+  Hunting stays the bulk; the flock steadies it when the herds thin.
+  Raids never take sheep (they aren't in raids' takes).
+- **The draft rate:** a level-1 pasture (room 12) culled to 6 lambs
+  about 2 a year (lambs × (1 − count/room)), so about 6 meat a year; a
+  level-3 one about 18. Small beside the hunter's, and Jeff may raise
+  lambs or lower keep. A soak follows.
+- "sheep" reaches no client: no message lists the store's resources
+  (the counter's shortfall reads item recipes only). Server only,
+  protocol unchanged.
+
+tests/farm_test _test_butcher:
+- the rules
+- no butchery at 7 sheep, a butchery at 10
+- no cull without a butcher
+- the butchery brings a butcher at his block
+- the cull, 10 down to 6, 4 sheep to the store
+- a day's work, 12 meat and 4 hide
+- his coming saved
+
+No new class_name.
+
