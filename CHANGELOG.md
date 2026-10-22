@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The barrow mound sits on grass: no square of bare dirt round its dome (550 amended).
 - Companions no longer say the tower over the mine was built by earlier humans.
 
 - Archers run like runners now (462): walking or running, the bow swings in the left hand with the arm and the right arm swings free; the arrows ride in a quiver on the back, not in the hand. The bowstring bends back to the drawing hand and springs forward with a short shiver when the arrow flies.

@@ -47,6 +47,7 @@ func _ready() -> void:
 	_test_shore()
 	_test_ledges()
 	_test_relax()
+	_test_solid_ground()
 	_test_water()
 	_test_streams()
 	_test_tall_grass()
@@ -2376,6 +2377,27 @@ func _test_relax() -> void:
 		_check(sampled > 100 and wrong.is_empty(), "%s: what stands on a relaxed cell stands on its drawn triangle (%d points; off: %s)" % [name, sampled, wrong.slice(0, 3)])
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
+
+
+## A solid building's cells (decision 550: the barrow's mound on the wilds)
+## drawn as land of the level's own kind, so the round mound sits on its
+## grass, not on the forest's floor in a square round it.
+func _test_solid_ground() -> void:
+	print("
+== solid ground: a solid building's cells drawn as the level's own ground ==")
+	var wilds := Level.load_level("wilds")
+	var terrain: Dictionary = wilds["terrain"]
+	_rig.rebuild(terrain, wilds["centre"])
+	var solid: Array = terrain.get("solid", [])
+	var kinds: Dictionary = terrain["kinds"]
+	var wrong := []
+	for cell: Vector2i in solid:
+		var index: int = _rig._grounds.get(cell, -1)
+		if index < 0 or index >= _rig._ground_floor_end or _rig._ground_kinds.get(cell, "") != str(kinds.get(cell, "stone")):
+			wrong.append([cell, index, _rig._ground_kinds.get(cell, ""), kinds.get(cell, "")])
+	_check(not solid.is_empty() and wrong.is_empty(),
+			"the mound's %d solid cells drawn as land of the level's kind (%s; wrong: %s)" % [solid.size(), kinds.get(solid[0] if not solid.is_empty() else Vector2i.ZERO, ""), wrong.slice(0, 3)])
+	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
 ## levels/hills (decision 358; relief since 525, drawn from its whole
 ## levels until terrain's side reads metres): every ledge between two of

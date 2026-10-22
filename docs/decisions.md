@@ -18702,3 +18702,13 @@ coordinator asked for a band broken by the flow and the stones.
   instead of ending at the step.
 Shots: C:\dev\review\unsquaring\5-hills-fall.png (v0.1.161 against now).
 Client only, protocol unchanged, no new class_name.
+## 550 amended, terrain's side: a solid building on its level's ground
+
+Jeff on the barrow's mound in game: "the base has square corners of dirt".
+_lay_solid (550) takes a solid building's cells out of the floor, and
+Client3D drew no ground there: the forest floor's ring showed through in a
+square round the round dome. Now _build_ground draws a solid building's
+cells as land of the level's own kind (kinds: the mound's grass), as it
+draws a rock's footing. Only building.mound is SOLID, so the castle and
+the town are unchanged. view_test _test_solid_ground (the wilds' mound: 24
+cells, grass). Client only, protocol unchanged, no new class_name.

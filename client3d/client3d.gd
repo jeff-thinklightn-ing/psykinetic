@@ -5012,6 +5012,12 @@ func _build_ground(kinds: Dictionary) -> void:
 			land.append(cell)
 	# A rock's ground is its footing (kinds), under the rock (_add_rocks).
 	land.append_array(_rocks.keys())
+	# A solid building's cells (decision 550) are out of the floor, but the
+	# ground under it is the level's own kind (a mound's grass), so a round
+	# piece on its square sits on that, not the forest's floor.
+	for cell: Vector2i in _terrain.get("solid", []):
+		if not _rocks.has(cell):
+			land.append(cell)
 	var floor_size: int = land.size()
 	var dry: Array = []
 	var wet: Array = []
