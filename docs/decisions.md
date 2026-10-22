@@ -22002,3 +22002,28 @@ along its own line from the source, so the push fans out.
 tests/physics_test: a 90 degree, 2-cell cone at 178 on 80, 70 and 40 kg (3 cells east,
 3 south-east at the edge, 6 along (2, -1)) and one behind untouched; no sweep through a wall;
 a giant axe's swing_impulse 142.5.
+
+## 606: a thing thrown down a line (the draugr fight, physics' half; step 2c's first part)
+
+The draugr's overhead throw of his axe (draugr_physics.md, agreed with combat).
+World.hurl(by, slot, toward: Vector2, cells, speed): the thing in `by`'s hand leaves it and
+flies along the line (any angle, traced a cell at a time), at most `cells`. A wall, a closed
+door or higher ground stops it before.
+
+- The first body on the line is launched (598) along it at the thing's weight x speed, and
+  takes impact by 592's rule. A 5 kg axe at 20 knocks an 80 kg player 1 cell; a 3 kg hammer
+  at 20 knocks a 25 kg body 3. The hit's damage is combat's.
+- The thing lands at that body's feet (the cell it was struck on), else where its flight
+  ended, on dry ground (put_on_ground, spilling if full), noted thrown in its history and
+  heard as a thud, for anyone to pick up: the axe the draugr charges back to (604).
+- Any body that holds_in_hands may throw, a wielding monster too. take_item's slot-clearing
+  is now _take_out, which hurl calls after its own rules.
+- The views are told the flight: GridEntity.hurled(item_id, to), a new RPC (_net_hurled) to
+  the body's viewers, drawn with the thing's art by the views. A line under
+  PROTOCOL_REVISION 31 in net.gd (31 still unreleased; the fight rides v0.1.165).
+- Returns, and World emits hurled(by, item_id, to, hit), {landed, hit, hit_result}.
+- try_throw (the pack's throw) is unchanged here; making it a hurl, so every thrown thing
+  moves what it hits, is the rest of step 2c, later.
+
+tests/physics_test: a hammer launching 25 kg 3 cells and lying at its feet, with the views
+told; landing at the line's end; stopped by a wall; a monster throwing its axe at a player.

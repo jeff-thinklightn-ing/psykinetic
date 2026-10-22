@@ -39,6 +39,10 @@ signal rush_ended(entity: GridEntity, reason: String, at: Vector2i, result: Dict
 ## A sweep resolved (sweep, decision 605): each struck body's {body, result}.
 ## Server only.
 signal swept(source: GridEntity, struck: Array)
+## A thing thrown down a line (hurl, decision 606) by [param by], landed at
+## [param to], [param hit] the body it struck or null. Server only (the
+## views hear it through GridEntity.hurled).
+signal hurled(by: GridEntity, item_id: String, to: Vector2i, hit: GridEntity)
 ## A body launched (launch, decision 598): [param result] as
 ## blow_resolved's. Server only.
 signal launched(by: GridEntity, body: GridEntity, result: Dictionary)
@@ -2016,12 +2020,21 @@ func take_item(by: GridEntity, from: GridEntity, slot: int) -> int:
 		return 0
 	if slot < 0 or slot >= from.slots.size() or from.slots[slot].is_empty():
 		return 0
+	_log("slots: %s took %s out of %s %d" % [by.name, from.slots[slot], from.name, slot])
+	return _take_out(from, slot)
+
+
+## The thing in [param from]'s slot [param slot] out of its slots, no
+## questions asked (take_item's after its rules; hurl's): its uid, the slot
+## empty, nowhere till its new holder says (items.place).
+func _take_out(from: GridEntity, slot: int) -> int:
+	if slot < 0 or slot >= from.slots.size() or from.slots[slot].is_empty():
+		return 0
 	var uid := slot_uid(from, slot)
 	if soulbound(uid):
 		return 0  # Not dropped, thrown, eaten or banked (decision 573 amended).
 	var taken := from.slots.duplicate()
 	var taken_uids := from.slot_items.duplicate()
-	_log("slots: %s took %s out of %s %d" % [by.name, taken[slot], from.name, slot])
 	taken[slot] = ""
 	taken_uids[slot] = 0
 	from.slots = taken
@@ -5997,6 +6010,60 @@ func _sweep_reaches(from: Vector2i, to: Vector2i) -> bool:
 ## player knocked 3 cells.
 func swing_impulse(wielder: GridEntity, item: String) -> float:
 	return blow_impulse(wielder, Items.verb_of(item)) + Items.weight_of(item) * swing_speed
+
+
+## A thing thrown down a line (decision 606): what [param by] holds in
+## [param slot] leaves its hand and flies along [param toward] (any angle,
+## traced a cell at a time), at most [param cells]; a wall, a closed door or
+## higher ground stops it before. The first body on the line is launched
+## (598) along it at the thing's weight x [param speed] and takes impact by
+## 592's rule; the thing lands at that body's feet (the cell it was struck
+## on), else where its flight ended, on dry ground (put_on_ground, spilling
+## if the cell is full), for anyone to pick up. Its flight is told to the
+## views (GridEntity.hurled). The damage of the hit is the caller's (combat).
+## Server only, at once. {landed (a cell, NO_CELL if it found no ground),
+## hit (the body, or null), hit_result (launch's, {} for none)}; emitted as
+## hurled.
+func hurl(by: GridEntity, slot: int, toward: Vector2, cells: int, speed: float) -> Dictionary:
+	var out := {"landed": NO_CELL, "hit": null, "hit_result": {}}
+	if not Net.is_authority() or not _alive(by) or is_stunned(by) or not holds_in_hands(by) \
+			or slot not in [Items.RIGHT_HAND, Items.LEFT_HAND] or by.slots[slot].is_empty() or toward == Vector2.ZERO or cells <= 0:
+		return out
+	var id := by.slots[slot]
+	var line := toward / maxf(absf(toward.x), absf(toward.y))
+	var at := by.tile
+	var dry := by.tile
+	var hit: GridEntity = null
+	for k in range(1, cells + 1):
+		var next: Vector2i = by.tile + Vector2i((line * k).round())
+		var step := next - at
+		if _terrain_blocks_step(at, step, false, false) and not is_water(next) or edge_blocks(at, step):
+			break
+		var body: GridEntity = _occupancy.get(next)
+		if body != null and body != by:
+			hit = body
+			at = next
+			break
+		at = next
+		if not is_water(at):
+			dry = at
+	var uid := _take_out(by, slot)  # A wielding monster's hand too (the draugr's axe).
+	if uid == 0:
+		return out
+	_put_down_by[uid] = _label_of(by)
+	var feet := at if hit != null else dry
+	if hit != null:
+		items.note(uid, "thrown", "at %s by %s" % [_label_of(hit), _label_of(by)], zone.name, hit.tile)
+		out["hit"] = hit
+		out["hit_result"] = launch(by, hit, line, Items.weight_of(id) * speed)
+	var landed := put_on_ground(uid, feet, by.tile)
+	out["landed"] = landed
+	_thud(landed, id, by)
+	by._world_hurled(id, landed if landed != NO_CELL else at)
+	_log("hurl: %s threw %s from %s toward %s, landing at %s%s" % [by.name, id, by.tile, toward, landed,
+			"" if hit == null else ", hitting %s" % hit.name])
+	hurled.emit(by, id, landed, hit)
+	return out
 
 
 ## The impulse of [param attacker]'s blow with [param verb] (blow_verb's),

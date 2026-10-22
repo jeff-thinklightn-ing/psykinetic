@@ -272,6 +272,8 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## {at} and "apply_item" {slot, target}; "stance" may carry "at".
 ## 31 (597): every entity replicates "winded"; a winded body's steps take
 ## World.winded_move_scale times the ticks (levels/combat.json).
+## 31 (606): GridEntity's _net_hurled RPC (World.hurl, a thing thrown down a
+## line): its Items id and the cell it came down on, for the views' flight.
 const PROTOCOL_REVISION := 31
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]

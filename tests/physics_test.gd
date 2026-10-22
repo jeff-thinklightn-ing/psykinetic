@@ -40,6 +40,7 @@ func _ready() -> void:
 	_test_launch()
 	_test_rush()
 	_test_sweep()
+	_test_hurl()
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -416,6 +417,47 @@ func _test_sweep() -> void:
 	# 10 x 85 x 0.1 x 0.5 x 1 + 5 x 20.
 	_check(is_equal_approx(World.swing_impulse(e["P"][0], "giant_axe"), 142.5),
 			"a giant axe's swing: the blow 42.5 and its 5 kg swung, 142.5 (%s)" % World.swing_impulse(e["P"][0], "giant_axe"))
+
+
+func _test_hurl() -> void:
+	print("
+== a thing thrown down a line: it launches the first body and lands at its feet (606) ==")
+	var e := _build(["##############", "#P....m......#", "##############"], 25.0)
+	var player: GridEntity = e["P"][0]
+	var dummy: GridEntity = e["m"][0]
+	_give(player, "hammer")
+	var told: Array = []
+	player.hurled.connect(func(id: String, to: Vector2i) -> void: told.append([id, to]))
+	var out := World.hurl(player, Player.RIGHT_HAND, Vector2(1, 0), 8, 20.0)
+	# 3 kg x 20 = 60 on 25 kg: 2.4, 3 cells.
+	_check(out["hit"] == dummy and dummy.tile == Vector2i(9, 1), "a 3 kg hammer at 20 knocks 25 kg 3 cells (at %s)" % dummy.tile)
+	_check(out["landed"] == Vector2i(6, 1) and player.slots[Player.RIGHT_HAND].is_empty(),
+			"and lands at its feet, (6, 1), out of the hand (%s)" % out["landed"])
+	_check(told.size() == 1 and told[0][0] == "hammer" and told[0][1] == Vector2i(6, 1), "the views are told its flight (%s)" % [told])
+
+	e = _build(["##############", "#P...........#", "##############"], 25.0)
+	_give(e["P"][0], "hammer")
+	out = World.hurl(e["P"][0], Player.RIGHT_HAND, Vector2(1, 0), 4, 20.0)
+	_check(out["hit"] == null and out["landed"] == Vector2i(5, 1), "nobody on its line: it lands at the line's end, 4 off (%s)" % out["landed"])
+
+	e = _build(["##############", "#P..#........#", "##############"], 25.0)
+	_give(e["P"][0], "hammer")
+	out = World.hurl(e["P"][0], Player.RIGHT_HAND, Vector2(1, 0), 8, 20.0)
+	_check(out["landed"] == Vector2i(3, 1), "a wall stops it before (%s)" % out["landed"])
+
+	# The draugr's case: a monster with hands throws its axe at a player.
+	e = _build(["##############", "#..P.....m...#", "##############"], 120.0)
+	player = e["P"][0]
+	var thrower: GridEntity = e["m"][0]
+	var hands := PackedStringArray()
+	hands.resize(Items.CARRIED)
+	thrower.slots = hands
+	hands[Player.RIGHT_HAND] = "giant_axe"
+	World.set_slots(thrower, hands)
+	out = World.hurl(thrower, Player.RIGHT_HAND, Vector2(-1, 0), 8, 20.0)
+	# 5 kg x 20 = 100 on the 80 kg player: 1.25, 1 cell.
+	_check(out["hit"] == player and player.tile == Vector2i(2, 1) and out["landed"] == Vector2i(3, 1),
+			"a monster throws its 5 kg axe: the player knocked 1 cell, the axe at their feet (%s, %s)" % [player.tile, out["landed"]])
 
 
 # --- helpers ------------------------------------------------------------------

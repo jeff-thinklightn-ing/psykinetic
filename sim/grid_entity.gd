@@ -27,6 +27,10 @@ signal swung(direction: Vector2i)
 ## A shot (World.shoot) flew from here to [param to], the last cell it
 ## reached: views draw the arrow. On every peer.
 signal shot(to: Vector2i)
+## A thing it held (Items id [param item_id]) was thrown down a line
+## (World.hurl, decision 606) and came down at [param to]: views draw its
+## flight with the thing's art. On every peer.
+signal hurled(item_id: String, to: Vector2i)
 ## A blow or a shot was taken on its guard, or [param broken] it
 ## (World._meet_guard): views knock and stagger. On every peer.
 signal guarded(broken: bool)
@@ -739,6 +743,12 @@ func _world_shot(to: Vector2i) -> void:
 		_net_shot.rpc_id(peer, to)
 
 
+func _world_hurled(item_id: String, to: Vector2i) -> void:
+	hurled.emit(item_id, to)
+	for peer in viewers():
+		_net_hurled.rpc_id(peer, item_id, to)
+
+
 func _world_guarded(broken: bool) -> void:
 	guarded.emit(broken)
 	for peer in viewers():
@@ -1102,6 +1112,11 @@ func _net_swung(direction: Vector2i) -> void:
 @rpc("authority", "call_remote", "reliable")
 func _net_shot(to: Vector2i) -> void:
 	shot.emit(to)
+
+
+@rpc("authority", "call_remote", "reliable")
+func _net_hurled(item_id: String, to: Vector2i) -> void:
+	hurled.emit(item_id, to)
 
 
 @rpc("authority", "call_remote", "reliable")
