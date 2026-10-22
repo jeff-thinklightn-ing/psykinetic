@@ -39,6 +39,7 @@ func _ready() -> void:
 	_test_charge()
 	_test_launch()
 	_test_rush()
+	_test_sweep()
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -376,6 +377,45 @@ func _test_rush() -> void:
 		if not World.rushing(dummy):
 			break
 	_check(_rush_ends.back()["reason"] == "brace", "a braced spear stops it (%s, at %s)" % [_rush_ends.back()["reason"], dummy.tile])
+
+
+func _test_sweep() -> void:
+	print("
+== a sweep through a cone: each body pushed out along its own line (605) ==")
+	var rows: Array[String] = ["################"]
+	for y in 11:
+		rows.append("#..............#")
+	rows.append("################")
+	var e := _build(rows, 80.0)
+	var source := EntityFactory.build({"script": "res://sim/player.gd", "shape": "capsule", "name": "Sweeper", "tile": Vector2i(5, 6)})
+	_room.add_child(source)
+	World.spawn(source, Vector2i(5, 6))
+	var bodies := {}
+	for each: Array in [["A", Vector2i(6, 6), 80.0], ["B", Vector2i(6, 7), 70.0], ["C", Vector2i(7, 5), 40.0], ["D", Vector2i(4, 6), 80.0]]:
+		var body := EntityFactory.build({"script": "res://sim/monster.gd", "shape": "capsule", "name": each[0], "tile": each[1],
+			"props": {"mass": each[2], "max_hp": 50}})
+		(body as Monster).sight_range = 0
+		_room.add_child(body)
+		World.spawn(body, each[1])
+		body.hp = 50
+		bodies[each[0]] = body
+	var struck := World.sweep(source, Vector2(1, 0), 90.0, 2, {"impulse": 178.0})
+	# 178 / m along each one's own line: A 2.23 east, 3 cells; B 2.54 south-east,
+	# 3; C 4.45 along (2, -1), 6; D is behind.
+	_check(struck.size() == 3, "three in the cone struck (%d)" % struck.size())
+	_check(bodies["A"].tile == Vector2i(9, 6), "80 kg ahead knocked 3 cells east (at %s)" % bodies["A"].tile)
+	_check(bodies["B"].tile == Vector2i(9, 10), "70 kg at the cone's edge knocked 3 cells south-east (at %s)" % bodies["B"].tile)
+	_check(bodies["C"].tile == Vector2i(13, 2), "40 kg two cells off knocked 6 along its own line (at %s)" % bodies["C"].tile)
+	_check(bodies["D"].tile == Vector2i(4, 6), "the one behind untouched (at %s)" % bodies["D"].tile)
+
+	e = _build(["######", "#P#m.#", "######"], 40.0)
+	_check(World.sweep(e["P"][0], Vector2(1, 0), 90.0, 2, {"impulse": 178.0}).is_empty(), "no sweep through a wall")
+
+	e = _build(["######", "#Pm..#", "######"], 40.0)
+	_give(e["P"][0], "giant_axe")
+	# 10 x 85 x 0.1 x 0.5 x 1 + 5 x 20.
+	_check(is_equal_approx(World.swing_impulse(e["P"][0], "giant_axe"), 142.5),
+			"a giant axe's swing: the blow 42.5 and its 5 kg swung, 142.5 (%s)" % World.swing_impulse(e["P"][0], "giant_axe"))
 
 
 # --- helpers ------------------------------------------------------------------

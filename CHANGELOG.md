@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- A weapon can sweep through a cone (605), the motion behind the draugr's coming axe sweep: everyone in front of him is knocked outward along their own line, by their weight and the axe's.
 - A charge can now be stopped on the way (604), the motion behind the draugr's coming charge for his axe: blows from the front slow it and enough of them stop it (three sword hits, one hammer), a heavy blow knocks him off his line, a braced spear or someone standing in his path stops him, and blows from behind do nothing.
 - A body can be thrown along a line by weight (598), the motion behind the staff's coming grab and throw: light bodies fly far, heavy ones a little, and one thrown into another knocks it on.
 - A body can lunge down a line (596), the motion behind the coming shield bash and spear charge: a bash stops at the first body and its blow lands with the lunge's momentum; a charge goes through, knocking a goblin on but stopped dead by something as heavy as an ogre.

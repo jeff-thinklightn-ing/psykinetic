@@ -21980,3 +21980,25 @@ time.
 tests/physics_test: arrived at its cell in 5 ticks; three swords from the front; a hammer
 once; four swords from behind, nothing; a blow from the side, knocked; one player in its
 line; a wall; a stun; a braced spear.
+
+## 605: a sweep through a cone (the draugr fight, physics' half)
+
+The great axe's sweep (draugr_physics.md, agreed with combat). World.sweep(source, toward:
+Vector2, arc_degrees, cells, {impulse, stagger}): every body within `cells` of the source
+whose angle off `toward` is within half the arc, and that a swing reaches (_sweep_reaches:
+each step of the straight line to it open, can_melee, bodies aside), takes 592's apply_blow
+along its own line from the source, so the push fans out.
+
+- The bodies are taken as they stand when it starts, and struck from one edge of the cone to
+  the other. One knocked out of the cone by an earlier push is passed over. Returns, and
+  emits swept, each struck body's {body, result}.
+- World.swing_impulse(wielder, item) = blow_impulse at the item's verb + its weight x
+  swing_speed (20, physics.json): a weapon's own mass swung. The draugr (120 kg, strength 6)
+  with items' 7 kg battle axe: 6 x 127 x 0.05 + 140 = 178, so an 80 kg player is knocked
+  3 cells. (2 x blow_impulse, 76, would move a player nothing: combat's first draft.) Combat
+  pushes first and knocks down after (a body down counts as half its mass).
+- Server sim only: pushes on the wire as 592's. Protocol unchanged.
+
+tests/physics_test: a 90 degree, 2-cell cone at 178 on 80, 70 and 40 kg (3 cells east,
+3 south-east at the edge, 6 along (2, -1)) and one behind untouched; no sweep through a wall;
+a giant axe's swing_impulse 142.5.

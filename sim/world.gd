@@ -36,6 +36,9 @@ signal lunge_resolved(entity: GridEntity, result: Dictionary)
 ## result] as lunge_resolved's. Every reason but "arrived" is an
 ## interruption. Server only.
 signal rush_ended(entity: GridEntity, reason: String, at: Vector2i, result: Dictionary)
+## A sweep resolved (sweep, decision 605): each struck body's {body, result}.
+## Server only.
+signal swept(source: GridEntity, struck: Array)
 ## A body launched (launch, decision 598): [param result] as
 ## blow_resolved's. Server only.
 signal launched(by: GridEntity, body: GridEntity, result: Dictionary)
@@ -387,6 +390,9 @@ var winded_regen_delay := 20
 ## A rush (decision 604) ends when the hits on it leave its speed this or
 ## less: a charge this slow is no charge.
 @export var rush_stop_speed := 0.1
+## A swing's own weight in its impulse (swing_impulse, decision 605): the
+## thing's kilos times this.
+@export var swing_speed := 20.0
 ## SHOVE_COST_BASE and SHOVE_COST_SCALE: a shove costs
 ## base + force x target_mass x scale stamina.
 @export var shove_cost_base := 5.0
@@ -3441,7 +3447,7 @@ func load_physics_rules(text: String) -> void:
 		var given: Variant = data[key]
 		if not field in ["shove_scale", "knockback_min_force", "slide_per_speed", "max_travel", "momentum_scale",
 				"momentum_ticks", "restitution", "impact_per_energy", "brace_restitution", "stun_ticks_base",
-				"stun_ticks_per_force", "knockback_stun_ticks", "lunge_ticks_per_cell", "lunge_min_speed", "rush_stop_speed"]:
+				"stun_ticks_per_force", "knockback_stun_ticks", "lunge_ticks_per_cell", "lunge_min_speed", "rush_stop_speed", "swing_speed"]:
 			push_warning("World: %s's %s is not a physics rule" % [PHYSICS_RULES, key])
 		elif (given is int or given is float) and float(given) >= 0.0:
 			set(field, int(given) if get(field) is int else float(given))
@@ -5928,6 +5934,69 @@ func _lunge_finish(state: Dictionary) -> Dictionary:
 		noise(entity.tile, Senses.NOISE_FIGHT, &"fight", entity)
 	return {"cells": state["moved"], "stopped_by": state["stopped_by"], "struck": state["struck"],
 		"impact_damage": state["impact"]}
+
+
+## A sweep through a cone (decision 605): every body within [param cells]
+## of [param source] whose angle off [param toward] is within half of
+## [param arc_degrees], and that a swing could reach (no wall or closed door
+## on the cells between: _sweep_reaches), takes apply_blow along its own
+## line from the source, so the push fans out. [param blow] as apply_blow's
+## (impulse, stagger; swing_impulse gives a weapon's). The bodies are taken
+## as they stand when it starts and struck from one edge of the cone to the
+## other; one already knocked out of it on the way is passed over. Server
+## only, at once. Each struck body's {body, result}; emitted as swept.
+func sweep(source: GridEntity, toward: Vector2, arc_degrees: float, cells: int, blow: Dictionary) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	if not Net.is_authority() or not _alive(source) or toward == Vector2.ZERO or cells <= 0:
+		return out
+	var half := deg_to_rad(arc_degrees) / 2.0 + 0.01
+	var found: Array[Array] = []
+	for dy in range(-cells, cells + 1):
+		for dx in range(-cells, cells + 1):
+			var off := Vector2i(dx, dy)
+			if off == Vector2i.ZERO:
+				continue
+			var body: GridEntity = _occupancy.get(source.tile + off)
+			if body == null or body == source or not _alive(body):
+				continue
+			var angle := toward.angle_to(Vector2(off))
+			if absf(angle) <= half and _sweep_reaches(source.tile, source.tile + off):
+				found.append([angle, body])
+	found.sort_custom(func(a: Array, b: Array) -> bool: return a[0] < b[0])
+	for each: Array in found:
+		var body: GridEntity = each[1]
+		if not _alive(body):
+			continue
+		var off := body.tile - source.tile
+		if maxi(absi(off.x), absi(off.y)) > cells or absf(toward.angle_to(Vector2(off))) > half:
+			continue  # Knocked out of the cone by one struck before it.
+		out.append({"body": body, "result": apply_blow(source, body, {"impulse": float(blow.get("impulse", 0.0)),
+				"direction": Vector2(off), "stagger": int(blow.get("stagger", -1))})})
+	_log("sweep: %s toward %s, %.0f degrees, %d cells: %d struck" % [source.name, toward, arc_degrees, cells, out.size()])
+	swept.emit(source, out)
+	return out
+
+
+## Whether a swing from [param from] reaches [param to]: every step of the
+## straight line between them open (can_melee), bodies aside.
+func _sweep_reaches(from: Vector2i, to: Vector2i) -> bool:
+	var off := to - from
+	var steps := maxi(absi(off.x), absi(off.y))
+	var at := from
+	for k in range(1, steps + 1):
+		var next := from + Vector2i((Vector2(off) * float(k) / steps).round())
+		if not can_melee(at, next):
+			return false
+		at = next
+	return true
+
+
+## A weapon's swing's impulse (decision 605): [param wielder]'s blow with
+## [param item] (blow_impulse at its verb) and the thing's own weight swung,
+## weight x swing_speed. For the draugr's 7 kg battle axe, 178: an 80 kg
+## player knocked 3 cells.
+func swing_impulse(wielder: GridEntity, item: String) -> float:
+	return blow_impulse(wielder, Items.verb_of(item)) + Items.weight_of(item) * swing_speed
 
 
 ## The impulse of [param attacker]'s blow with [param verb] (blow_verb's),
