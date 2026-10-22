@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Fixed: the server could crash when someone who had eaten, or was being bandaged or brought back, died or left for another place (572 amended).
 ## v0.1.164
 
 - This version changes what goes over the network, so v0.1.163 and older can't join the server: update through the launcher first.

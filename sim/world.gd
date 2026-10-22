@@ -3953,10 +3953,13 @@ func buff(entity: GridEntity, kind: String) -> float:
 func _fade_buffs() -> void:
 	if _buffed.is_empty():
 		return
-	for entity: GridEntity in _buffed.keys():
-		if not is_instance_valid(entity):
-			_buffed.erase(entity)
+	# Untyped till checked: one freed since (gone with its zone, dead) never
+	# goes into a typed variable (decision 572 amended).
+	for held: Variant in _buffed.keys():
+		if not is_instance_valid(held):
+			_buffed.erase(held)
 			continue
+		var entity: GridEntity = held
 		if entity.zone != zone.name:
 			continue
 		var now: Dictionary = entity.buffs.duplicate(true)
@@ -4144,6 +4147,7 @@ func despawn(entity: GridEntity) -> void:
 	if not entity.spawned:
 		return
 	_let_go_things(entity)
+	_forget_jobs(entity)
 	_occupancy.erase(entity.tile)
 	_entities.erase(entity)
 	_roster_changed()
@@ -4151,6 +4155,28 @@ func despawn(entity: GridEntity) -> void:
 	entity._world_remove()
 	entity_despawned.emit(entity)
 	entity.queue_free()
+
+
+## [param entity] leaving the world, before it is freed (decision 572
+## amended): no job of the world's keeps it, as key or as patient or body.
+## A bandaging or a channel it was in ends as broken off (told, as ever); its
+## buff, mending, wind-up and downed lapse with it. A freed node read by
+## these each tick crashed the release template (572).
+func _forget_jobs(entity: GridEntity) -> void:
+	_buffed.erase(entity)
+	_mending.erase(entity)
+	_winders.erase(entity)
+	_downed.erase(entity)
+	for by: GridEntity in _bandaging.keys():
+		var patient: GridEntity = _bandaging[by]["patient"]
+		if by == entity or patient == entity:
+			_bandaging.erase(by)
+			if patient != entity and _alive(patient):
+				patient.mending = 0
+			bandage_changed.emit(by, patient, &"interrupted")
+	for by: GridEntity in _channels.keys():
+		if by == entity or _channels[by]["body"] == entity:
+			_end_channel(by, &"broken")
 
 
 ## Spawn grace: for [param ticks], or until it moves or attacks, monsters do

@@ -20806,3 +20806,25 @@ slots stay, for a take that passes).
 578's fade by the cold goes with them: it was there for the insects, and
 it would have quieted the owls' bed in winter. Ambience.weights is as it
 was before 578. Client only, protocol unchanged, no new class_name.
+## 572 amended. The world's jobs never hold a freed node
+
+The same crash class as 572, in World: its per-tick jobs are kept in
+dictionaries keyed by entities (_buffed, _bandaging, _mending, _winders,
+_channels, _downed), some naming another entity (a bandaging's patient, a
+channel's body), and each tick loops `for entity: GridEntity in
+dict.keys()`. Nothing took a despawned entity out, so once one left the
+world (died, or went to another zone) with a buff on (anyone who had
+eaten), mid-bandage, mid-channel or downed, the next tick put the freed
+node into a typed variable: the debug build logs "Trying to assign
+invalid previously freed instance", the release template reads freed
+memory (572). companion_test's 577 checks found it: the companion ate,
+then travelled.
+
+- World.despawn calls _forget_jobs(entity) before the free: its buff,
+  mending, wind-up and downed entries go; a bandaging or a channel it was
+  in, as either side, ends as broken off (bandage_changed "interrupted",
+  channel_changed "broken", said as ever).
+- _fade_buffs takes its keys untyped and checks them before the typed
+  variable, for a node freed some other way.
+
+Server sim, protocol unchanged, no new class_name.
