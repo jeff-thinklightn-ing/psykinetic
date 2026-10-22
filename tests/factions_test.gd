@@ -21,7 +21,8 @@ func _ready() -> void:
 		"imps are goblins, brutes orcs, sneaks kobolds")
 	_check(factions.allies_of("goblins") == _strings(["kobolds", "orcs"]) and factions.allies_of("orcs").is_empty(),
 		"the orcs and kobolds are the Blood Rot's allies; an ally has none")
-	_check(factions.lore_id("orcs") == "goblins" and factions.lore_id("town") == "town", "lore ids: the allies' facts are in goblins; the town its own")
+	_check(factions.lore_id("orcs") == "orcs" and factions.lore_id("kobolds") == "kobolds" and factions.lore_id("town") == "town",
+		"lore ids: the orcs' and the kobolds' facts their own (lore's entries, 416 amended, maps' side); the town its own")
 
 	print("== sides ==")
 	_check(factions.side("orcs") == "goblins" and factions.side("goblins") == "goblins" and factions.side("town") == "town", "each ally's side is the Blood Rot's")

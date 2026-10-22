@@ -9851,6 +9851,8 @@ allied_to is its own side). Protocol unchanged.
 
 tests/factions_test.
 
+416 amended, maps' side: the orcs' and the kobolds' lore_id are lore's own "orcs" and "kobolds" entries (11ef89d0), no longer "goblins".
+
 ## 426. Wells keep a town's water; the carpenter mends storm-broken roofs
 
 On environment's 384 (town weather: rain fills wells, storms break roofs;

@@ -11,14 +11,14 @@
 		"colour": "#4f8a3a",
 		"monsters": ["brute"],
 		"allied_to": "goblins",
-		"lore_id": "goblins"
+		"lore_id": "orcs"
 	},
 	"kobolds": {
 		"name": "the kobolds",
 		"colour": "#8fb84a",
 		"monsters": ["sneak"],
 		"allied_to": "goblins",
-		"lore_id": "goblins"
+		"lore_id": "kobolds"
 	},
 	"town": {
 		"name": "the town",
