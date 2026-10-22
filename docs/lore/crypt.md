@@ -271,6 +271,41 @@ Companion files: `castle.md` (the labyrinths, the other delve-again place),
    to come back: intended as the risk of bringing her?
 4. Does the blessing ever wear off, or is it for life?
 
+## The layers (Jeff, 2026-10-22)
+
+Jeff's answers to dungeon's three-layer design, his words relayed by the coordinator.
+They supersede the lines above where they differ: the plunder is the grave robbers',
+not the town's people's, and the old dead are on the second and third layers.
+
+- **[Jeff]** "the lore remains that the top floor is the newer dead, there could be
+  several rooms off the main altar room too, but only the wealthy get the barrow, the
+  poor are in pauper's graves outside."
+- **[Jeff]** "the ancient dead were moved to the second layer could be called The
+  Ossuary, the grave robbers would have gold on them, either from stealing or from
+  other jobs."
+- **[Jeff]** "third layer, where the oldest dead were moved as far as the town people
+  dared go, its damp and dark, human eyesight barely lights it up, its too moist to
+  light lamps.. the dead are angry about being disturbed and they are animated by the
+  magic of the Draugr."
+- **[Jeff]** "the Draugr's hall can be 'Hall of Fallen Souls' it could be set up like
+  castle hall, with a round table with chairs around it, pillars, broken tables at the
+  sides, and the hidden exit behind the throne -- the hall is filled with ghostly
+  warriors that were promised eternal feast and battle."
+- **[Jeff]** "lets change the plunder from the towns people to graver robbers.. its
+  just that the dead donk know the difference"
+
+| Fact | Known |
+|---|---|
+| Only the wealthy are laid in the barrow; the poor lie in paupers' graves outside. | common in town |
+| The barrow's top floor holds the town's newer dead. | common in town |
+| Below the top floor lies the Ossuary, where the ancient dead were moved. | common in town |
+| The third layer, where the oldest dead lie, is damp and dark, too moist for any lamp. | rumour, true, town |
+| Grave robbers plunder the barrow; the dead do not know them from anyone else. | common in town |
+| The dead below are angry at being disturbed; the draugr's magic moves them. | rumour, true, town |
+| The draugr keeps the Hall of Fallen Souls, at the bottom of the barrow. | rumour, true, town |
+| Ghostly warriors fill the hall, promised an eternal feast and battle. | rumour, true, town |
+| The town's first folk moved the old dead down, the oldest as far as they dared. | secret: Aldous |
+
 ---
 
 ## Log
@@ -317,3 +352,5 @@ Companion files: `castle.md` (the labyrinths, the other delve-again place),
   venturing far from town (Jeff).
 - 2026-10-21: named the Barrow of the Fallen, from Jeff's map sketch.
 - 2026-10-21, cont.: warriors' spears planted around the mound like spikes (Jeff).
+- 2026-10-22: the layers: the newer (wealthy) dead on top, the Ossuary, the damp, dark
+  third layer, the Hall of Fallen Souls; the plunder is the grave robbers' (Jeff).

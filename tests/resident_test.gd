@@ -1273,7 +1273,7 @@ func _test_crypt_secrets() -> void:
 	voice.trade = "priest"
 	voice.town = STORE
 	voice.asked_by = "p-stranger"
-	var founders := "The town's founders plundered the barrow for its gold and pushed the old dead deeper."
+	var founders := "The town's first folk moved the old dead down to make room for their own, the oldest as far down as they dared go."
 	_check(not founders in voice.world_facts() and told.is_empty(), "a stranger is told no secret")
 	var card := Townsfolk.card_of(World.production, priest)
 	Standing.bump(card, "p-friend", Standing.setting("trusted"), "brought the sick home", World.production.now())

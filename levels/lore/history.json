@@ -79,7 +79,7 @@
 			"name": "the Barrow of the Fallen",
 			"status": "agreed",
 			"source": "Jeff",
-			"summary": "The Barrow of the Fallen, a mound a little outside town with a sealed way from the temple: the founders plundered it for the town's gold and pushed the old dead deeper, and the temple's alms go down to keep the upper tombs quiet (docs/lore/crypt.md; decision 546, npc's side, part 3: the [Jeff] rows; lore adds the [proposal] rows).",
+			"summary": "The Barrow of the Fallen, a mound a little outside town with a sealed way from the temple: the wealthy town's newer dead on its top floor, the ancient dead moved down to the Ossuary, the oldest to a damp, dark third layer, and the draugr's Hall of Fallen Souls; grave robbers plunder it, and the temple's alms go down to keep the upper tombs quiet (docs/lore/crypt.md; decision 546, npc's side, part 3: the [Jeff] rows; lore adds the [proposal] rows).",
 			"relations": [],
 			"tags": [
 				"history"
@@ -98,7 +98,7 @@
 				},
 				{
 					"id": "crypt.founders",
-					"text": "The town's founders plundered the barrow for its gold and pushed the old dead deeper.",
+					"text": "The town's first folk moved the old dead down to make room for their own, the oldest as far down as they dared go.",
 					"known": "secret",
 					"where": [],
 					"knowers": [
@@ -107,6 +107,98 @@
 					"tags": [
 						"history"
 					],
+					"source": "Jeff",
+					"status": "agreed"
+				},
+				{
+					"id": "crypt.wealthy",
+					"text": "Only the wealthy are laid in the barrow; the poor lie in paupers' graves outside.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"source": "Jeff",
+					"status": "agreed"
+				},
+				{
+					"id": "crypt.top_floor",
+					"text": "The barrow's top floor holds the town's newer dead.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"source": "Jeff",
+					"status": "agreed"
+				},
+				{
+					"id": "crypt.ossuary",
+					"text": "Below the barrow's top floor lies the Ossuary, where the ancient dead were moved.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"source": "Jeff",
+					"status": "agreed"
+				},
+				{
+					"id": "crypt.third_layer",
+					"text": "The barrow's third layer, where the oldest dead lie, is damp and dark, too moist for any lamp to burn.",
+					"known": "rumour",
+					"where": [
+						"town_lands"
+					],
+					"true": true,
+					"tags": [],
+					"source": "Jeff",
+					"status": "agreed"
+				},
+				{
+					"id": "crypt.robbers",
+					"text": "Grave robbers plunder the barrow, and the dead below do not know them from anyone else who comes down.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"source": "Jeff",
+					"status": "agreed"
+				},
+				{
+					"id": "crypt.angry_dead",
+					"text": "The dead below are angry at being disturbed, and the draugr's magic moves them.",
+					"known": "rumour",
+					"where": [
+						"town_lands"
+					],
+					"true": true,
+					"tags": [],
+					"source": "Jeff",
+					"status": "agreed"
+				},
+				{
+					"id": "crypt.fallen_souls",
+					"text": "The draugr keeps the Hall of Fallen Souls, at the bottom of the barrow.",
+					"known": "rumour",
+					"where": [
+						"town_lands"
+					],
+					"true": true,
+					"tags": [],
+					"source": "Jeff",
+					"status": "agreed"
+				},
+				{
+					"id": "crypt.ghost_warriors",
+					"text": "Ghostly warriors fill the Hall of Fallen Souls, promised an eternal feast and battle.",
+					"known": "rumour",
+					"where": [
+						"town_lands"
+					],
+					"true": true,
+					"tags": [],
 					"source": "Jeff",
 					"status": "agreed"
 				},
