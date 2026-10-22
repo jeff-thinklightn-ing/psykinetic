@@ -176,7 +176,7 @@ func _test_lift() -> void:
 
 func _test_hidden() -> void:
 	print("\n== never shown ==")
-	_check(Resident.label_of("Sly", "cook") == "Sly [cook]", "the label is name and profession, no type")
+	_check(Resident.label_of("Sly", "cook") == "Sly" and Resident.label_of("Sly", "") == "Sly", "the label is the name alone, no profession, no type (333 amended, 2026-10-22)")
 	var body := Resident.new()
 	body.worker_id = "w_thief"
 	body.person = "Sly"

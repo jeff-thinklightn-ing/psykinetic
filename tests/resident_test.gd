@@ -303,10 +303,10 @@ func _test_bodies_in_town() -> void:
 	_check(World.towns.note_rescue(STORE, "rs-bram", "Bram", "smith"), "(Bram the smith rescued: a resident of the town)")
 	_sync()
 	var bram := _body("rs-bram")
-	_check(bram != null and bram.label == "Bram [smith]" and bram.town == STORE and bram.trade == "smith",
-		"a body for him, named \"Name [profession]\" over his head (%s)" % [bram.label if bram != null else "none"])
-	_check(Resident.label_of("Odo", "medicine_man") == "Odo [medicine man]" and Resident.label_of("Wren", "") == "Wren",
-		"a trade id's underscores spaced in the label, a bare name for no trade")
+	_check(bram != null and bram.label == "Bram" and bram.town == STORE and bram.trade == "smith",
+		"a body for him, named by his name alone over his head (%s)" % [bram.label if bram != null else "none"])
+	_check(Resident.label_of("Odo", "medicine_man") == "Odo" and Resident.label_of("Wren", "") == "Wren",
+		"the name alone whatever the trade (333 amended, 2026-10-22)")
 	var look := str(bram.spawn_spec.get("look", "")) if bram != null else ""
 	_check(look.begins_with("seed=") and look.contains(" build=") and look.ends_with("apron=yes trade=smith"),
 		"his spawn spec carries his look for the character generator (419), the smith's apron on: %s" % look)
@@ -403,7 +403,7 @@ func _test_healer_at_hut() -> void:
 	_check(World.production.add_worker("medicine_man:" + hut_place, "Oren", ["medicine_man"], hut_place, "wilds"), "(Oren seated at the hut, as economy does)")
 	_sync()
 	var oren := _body("medicine_man:" + hut_place)
-	_check(oren != null and oren.town == hut_place and oren.trade == "medicine_man" and oren.label == "Oren [medicine man]", "a body at the hut, its town the hut's place")
+	_check(oren != null and oren.town == hut_place and oren.trade == "medicine_man" and oren.label == "Oren", "a body at the hut, its town the hut's place")
 	_check(oren != null and oren.doing == Resident.Doing.WORK and World.distance(oren.tile, cell) <= 3, "at midday he is at his work, in or beside the hut (at %s, the front %s)" % [oren.tile if oren != null else Vector2i.ZERO, cell])
 	DayNight.set_hour(23.0)
 	_step_until(func() -> bool: return oren.doing == Resident.Doing.HOME, 40)
@@ -440,7 +440,7 @@ func _test_settled_goblin() -> void:
 	_main._write_settled_card("rs-snag", table["settled"]["rs-snag"])
 	_sync()
 	var snag := _body("rs-snag")
-	_check(snag != null and snag.label == "Snagfin [merchant]" and str(snag.spawn_spec.get("kind", "")) == "imp", "a body, labelled, with the goblin's kind in its spec (%s)" % [snag.spawn_spec.get("kind", "") if snag != null else "none"])
+	_check(snag != null and snag.label == "Snagfin" and str(snag.spawn_spec.get("kind", "")) == "imp", "a body, labelled, with the goblin's kind in its spec (%s)" % [snag.spawn_spec.get("kind", "") if snag != null else "none"])
 	_check(snag != null and snag.places["home"] == Rect2i(3, 3, 3, 3) and snag.places["work"] == Rect2i(4, 2, 3, 3), "his home the stall about the marked cell, his work the store's counter (%s)" % [snag.places if snag != null else {}])
 	var card := Townsfolk.card_of(World.production, "rs-snag")
 	_check(card.get("came", "") == "came to the town from the goblins and stays, somewhat outcast but tolerated" and card.get("outcast", false)

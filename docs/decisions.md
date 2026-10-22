@@ -6408,6 +6408,18 @@ Still the spawn spec's caption, drawn as is: protocol unchanged. Ledger and
 log prose ("Bram the smith, taken by...") and worker record names stay as
 they are: they are sentences, not labels.
 
+Amended again (2026-10-22; Jeff: "for npc's another change have their name
+on one line overhead, lets drop the profession"): the label is the name
+alone, "Bram", never "Bram [smith]" (Resident.label_of keeps its trade
+argument for its callers and ignores it). Nothing else rides on the label.
+The profession still shows where it is spoken: the greeting word by trade
+(560), the ledger's and the party log's prose ("Bram the smith"), the
+hail's trigger line. Main._display_name and companions' perception read
+the same label, so they name the person alone now. ui's half (the control
+hints over things and the "LMB interact" hint behind hints=off) lands
+beside it. Protocol unchanged: the caption is the spawn spec's, drawn as
+is.
+
 ## 330. Loot: tables as data, named by a level or the builder; monsters drop what they carried
 
 Jeff's items step 6, as mechanism only (2026-10-15, through the

@@ -306,13 +306,12 @@ func _init() -> void:
 	senses = Senses.new(self, SIGHT_RANGE, -1.0)
 
 
-## The name over a resident's head: "Bram [smith]", the profession in
-## brackets after the name (Jeff, 2026-10-17: never "Bram, smith"), a trade
-## id's underscores spaced ("medicine man"); the bare name for no trade.
-static func label_of(person_name: String, of_trade: String) -> String:
-	if of_trade.is_empty():
-		return person_name
-	return "%s [%s]" % [person_name, of_trade.replace("_", " ")]
+## The label over a resident's head: the name alone on one line (333 amended
+## twice; Jeff, 2026-10-22: "have their name on one line overhead, lets drop
+## the profession"). The trade is kept in the call for its callers; the
+## greeting word, the ledger and the party log's prose still name it.
+static func label_of(person_name: String, _of_trade: String) -> String:
+	return person_name
 
 
 ## What one of [param of_trade] is doing at [param hour] (0..24), by its

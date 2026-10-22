@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Townsfolk carry their name alone over their heads, the profession dropped from the label (333 amended; Jeff, 2026-10-22). Server spec, drawn as is.
 - A priest's secret that the words had no room for is no longer counted as told; the old gods' secrets count as the crypt's (546 amended, npc's side). Server only.
 - A gate arch for zone crossings, in timber with a sign and lantern or in stone with a round arch, ready for the roads' links to other zones (589).
 - The Barrow of the Fallen's mound is twice the size and stands out in the open on a slight rise between the town and the waystone, a landmark on the way, its doorway facing the road; anyone who logged out where it now stands comes back beside it (579).
