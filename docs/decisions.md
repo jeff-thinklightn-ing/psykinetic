@@ -15660,7 +15660,14 @@ microseconds a step, the worst a one-off spike both times (2.7 s, then
 woodcutter and a carpenter a town leave the far tier. Caught in the
 samples: a quarter of the chops faced the way the body arrived, since
 World.face is refused while the arriving step runs; the activity now
-shows once the body has turned to its work (sleep likewise). resident_test: the turn by the
+shows once the body has turned to its work (sleep likewise). The
+carpenter on buildings' cells (their 566 side fd167d4b): Main._build_task
+takes the building record and, for a composed kind with a door, stands
+him on Level.site_cells' "saw" cell facing its "sawbuck" through the
+plot and the frame, so the stroke crosses the sawhorse's log, and on
+"work" inside the door after; a slot building with no door record keeps
+the front-cell geometry. The has_method guards on economy's trip,
+build_progress and set_awake are gone (all on main). resident_test: the turn by the
 walk home against a stand-in trip. Server only, protocol unchanged.
 
 ## 513, terrain's side: rocks and slopes drawn

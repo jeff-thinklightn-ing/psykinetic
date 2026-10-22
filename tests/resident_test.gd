@@ -1996,11 +1996,20 @@ func _test_visible_work() -> void:
 	_sync()
 	# The carpenter's cells by progress.
 	var rect := Rect2i(mara.tile + Vector2i(6, 6), Vector2i(4, 3))
-	var saw: Dictionary = _main._build_task(rect, Vector2i(0, 1), 0.05)
-	var hammer: Dictionary = _main._build_task(rect, Vector2i(0, 1), 0.5)
+	var slot_house := {"rect": rect, "facing": Vector2i(0, 1), "slot": "building.house"}
+	var saw: Dictionary = _main._build_task(slot_house, 0.05)
+	var hammer: Dictionary = _main._build_task(slot_house, 0.5)
 	var front := Level.front_cell(rect, Vector2i(0, 1))
-	_check(saw.get("kind") == "saw" and not rect.has_point(saw.get("cell", rect.position)) and World.distance(saw.get("cell", front), front) <= 1, "the pad stage: sawing just outside the front door (%s, front %s)" % [saw, front])
+	_check(saw.get("kind") == "saw" and not rect.has_point(saw.get("cell", rect.position)) and World.distance(saw.get("cell", front), front) <= 1, "a slot building, no door record: the pad stage saws just outside the front cell (%s, front %s)" % [saw, front])
 	_check(hammer.get("kind") == "hammer" and hammer.get("face") == rect.get_center(), "walls up: hammering, facing the building's middle (%s)" % [hammer])
+	# A composed kind with a door (buildings' Level.site_cells, fd167d4b): the saw cell faces the sawbuck, the work cell is inside the door.
+	var kind_house := {"rect": rect, "blocks": [rect], "facing": Vector2i(0, 1), "kind": "house", "seed": 2, "doors": [Vector3i(front.x, front.y - 1, Terrain.SOUTH)]}  # The edge between the cell inside the door and the front cell outside it.
+	var cells: Dictionary = Level.site_cells(kind_house)
+	saw = _main._build_task(kind_house, 0.05)
+	hammer = _main._build_task(kind_house, 0.5)
+	_check(saw.get("kind") == "saw" and saw.get("cell") == cells["saw"] and saw.get("face") == cells["sawbuck"] and not rect.has_point(cells["saw"]) and World.distance(cells["saw"], cells["sawbuck"]) == 1,
+		"a kind with a door: sawing on buildings' saw cell facing the sawbuck (%s, cells %s)" % [saw, cells])
+	_check(hammer.get("kind") == "hammer" and hammer.get("cell") == cells["work"] and rect.has_point(cells["work"]) and hammer.get("face") == rect.get_center(), "walls up: hammering on the work cell inside the door (%s)" % [hammer])
 	_main._build_stub["rs-mara"] = {"use": "no_such_use", "progress": 0.5}
 	_check(_main._task_for(mara).is_empty(), "a build with no map building here: nothing to stand at")
 	_main._build_stub.erase("rs-mara")

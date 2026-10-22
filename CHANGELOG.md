@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The carpenter saws at the building site's sawhorse, facing it, and hammers inside the door, on buildings' site cells (566, npc's follow-up). Server only.
 - Townsfolk carry their name alone over their heads, the profession dropped from the label (333 amended; Jeff, 2026-10-22). Server spec, drawn as is.
 - A priest's secret that the words had no room for is no longer counted as told; the old gods' secrets count as the crypt's (546 amended, npc's side). Server only.
 - A gate arch for zone crossings, in timber with a sign and lantern or in stone with a round arch, ready for the roads' links to other zones (589).

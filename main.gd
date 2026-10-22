@@ -8776,7 +8776,7 @@ func _task_for(body: Resident) -> Dictionary:
 		return {"kind": "carry_log", "cell": pile.get("cell", _nearest_free(store_cell)), "face": pile.get("face", Resident.NO_CELL), "walking": true}
 	var build := _build_of(body)
 	if not build.is_empty():
-		return _build_task(build["rect"], build["facing"], float(build["progress"]))
+		return _build_task(build["building"], float(build["progress"]))
 	return {}
 
 
@@ -8798,13 +8798,7 @@ func _walk_home(body: Resident, spot: Vector2i, store: Vector2i) -> int:
 func _trip_of(worker_id: String) -> Dictionary:
 	if _trip_stub.has(worker_id):
 		return _trip_stub[worker_id]
-	if World.production.has_method("trip"):
-		return World.production.trip(worker_id)
-	var who := World.production.worker(worker_id)
-	var trade := str(who.get("trades", [""])[0]) if not who.get("trades", []).is_empty() else ""
-	if World.production.site_turn(str(who.get("town", "")), worker_id, trade) == "WALKING":
-		return {"site": "", "from": -1, "back_at": -1}
-	return {}
+	return World.production.trip(worker_id)
 
 
 ## Where a body works [param site] (a Holdings place with a radius): beside
@@ -8896,27 +8890,36 @@ func _build_of(body: Resident) -> Dictionary:
 				continue
 			use = str(job.get("recipe", ""))
 			progress = float(job.get("worked", 0)) / maxf(float(job.get("needed", 1)), 1.0)
-			if World.towns.has_method("build_progress"):
-				var told: float = World.towns.build_progress(body.town, use)
-				if told >= 0.0:
-					progress = told
+			var told: float = World.towns.build_progress(body.town, use)
+			if told >= 0.0:
+				progress = told
 			break
 	if use.is_empty():
 		return {}
 	var key := str(World.holdings.place(body.town).get("key", ""))
 	for building: Dictionary in _world_map.areas.get(World.zone.name, {}).get("buildings", []):
 		if str(building.get("town", "")) == key and str(building.get("use", "")) == use and building.get("rect") is Rect2i:
-			return {"rect": building["rect"], "facing": building.get("facing", Vector2i(0, 1)), "progress": progress}
+			return {"building": building, "progress": progress}
 	return {}
 
 
-## The carpenter's task at a build (buildings' site cells until their
-## BuildingComposer.site_cells lands: the woodpile just outside the front
-## door, one to the side; the work cell just inside it): sawing at the
-## woodpile on the plot and the frame (progress under 0.35, buildings' walls
-## stage), hammering inside after,
-## facing the building's middle.
-func _build_task(rect: Rect2i, facing: Vector2i, progress: float) -> Dictionary:
+## The carpenter's task at a build [param building] (a world map record):
+## on buildings' Level.site_cells (566, buildings' side, fd167d4b: work,
+## woodpile, sawbuck, saw) for a composed kind with a door, sawing on the
+## "saw" cell facing the sawbuck through the plot and the frame (progress
+## under 0.35, buildings' walls stage) so the stroke crosses its log, and
+## hammering on the "work" cell after, facing the building's middle; for a
+## slot building with no door record (the kinds carry doors and seed), the
+## woodpile just outside the front cell, one to the side, and the cell
+## inside it, as before.
+func _build_task(building: Dictionary, progress: float) -> Dictionary:
+	var rect: Rect2i = building["rect"]
+	if not (building.get("doors", []) as Array).is_empty():
+		var cells: Dictionary = Level.site_cells(building)
+		if progress < 0.35:
+			return {"kind": "saw", "cell": cells["saw"], "face": cells["sawbuck"], "walking": false}
+		return {"kind": "hammer", "cell": cells["work"], "face": rect.get_center(), "walking": false}
+	var facing: Vector2i = building.get("facing", Vector2i(0, 1))
 	var front := Level.front_cell(rect, facing)
 	var side := Vector2i(facing.y, -facing.x)
 	var woodpile := front + side if World.is_walkable(front + side) else front
@@ -8936,8 +8939,7 @@ func _awake_tick() -> void:
 	for code: String in now:
 		if _awake_sent.get(code) != now[code]:
 			_awake_sent[code] = now[code]
-			if World.towns.has_method("set_awake"):
-				World.towns.set_awake(World.zone.name, code, now[code])
+			World.towns.set_awake(World.zone.name, code, now[code])
 
 
 ## Building code -> whether anyone inside it is awake, for the bodies in
