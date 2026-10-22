@@ -1375,17 +1375,14 @@
 			"type": "mesh",
 			"kind": "cell",
 			"footprint": [5, 5],
-			"size": [5.0, 2.2, 5.0],
-			"budget": 2500,
-			"uses": "the Barrow's mound in the wilds (decision 542, dungeon's; Jeff's docs/lore/crypt.md), 5 x 5 cells, a whole piece standing on grass: a turf-covered dome over a ring of kerb stones, its door at the front (+z) middle cell, a stone-framed doorway (two jambs and a lintel, row 1's grey stone) with a dark passage cut a little way into the mound; that cell is the level's link (the wilds' (236, 186), facing south toward the town) and stays walkable, the other cells are blocked by the map, not the piece. Turf in row 4's greens, its top worn to earth; older than the town (the lore: ancient, plundered by the founders). A relief mound may replace the dome later (the coordinator, 2026-10-19)",
+			"size": [11.848, 3.493, 11.857],
+			"middle": [-0.016, 0, -0.009],
+			"budget": 4600,
+			"source": {"by": "Jeff, by hand (on art-kit's scripted mound)", "tool": "blender", "license": "own", "date": "2026-10-22", "notes": "Jeff's hand edit (N:/psykinetic-art/barrow/mound_edit.blend, md5 91d6619d): the mound at twice the size, its dome sculpted, a stone arch for the doorway over a black passage, the kerb rounded, twenty spears remade; prepared for the game by art-kit (C:/dev/review/barrow_mound/prep_for_export.py, decision 579): his flat materials onto the palette (stone 545049, iron 3e4044, wood 6a523a, the passage black 0d181d), nine of the doorway's stones turned outward, the dome's foot eased in along its radius (past 5 m, a third of the overrun kept, its outline round), the kerb drawn in 0.85 to sit at the dome's foot and the eight spears standing outside brought in, all within the 12 x 12 footprint, all twenty spears kept; each shaft thickened 2.5 times (Jeff), remade as a pole on his shaft's line, each head twice as long and 1.8 times as broad, his heads' faces otherwise his, none decimated; the kerb's baked bevel thinned to half; everything below the ground cut; 3059 tris (Jeff approved a 4,600 budget)"},
+			"uses": "the Barrow's mound in the wilds (decision 542, dungeon's; Jeff's docs/lore/crypt.md; 12 x 12 by decision 579), a whole piece standing on grass: a turf mound over a ring of kerb stones, old spears planted round it, its door at the front (+z): a stone arch over a dark passage spanning the front row's middle pair of cells, the west one the door (Level.solid_door) and the level's link, walkable; the other cells blocked by the map, not the piece",
 			"grey": [
-				{"at": [0, 0.6, -0.5], "size": [4.8, 1.2, 3.8]},
-				{"at": [0, 1.65, -0.6], "size": [3.2, 0.9, 2.8]},
-				{"at": [-1.5, 0.5, 1.9], "size": [1.8, 1.0, 1.0]},
-				{"at": [1.5, 0.5, 1.9], "size": [1.8, 1.0, 1.0]},
-				{"at": [-0.6, 0.8, 1.5], "size": [0.3, 1.6, 0.4]},
-				{"at": [0.6, 0.8, 1.5], "size": [0.3, 1.6, 0.4]},
-				{"at": [0, 1.75, 1.5], "size": [1.6, 0.3, 0.45]}
+				{"at": [-0.016, 0.1, -0.009], "size": [11.848, 0.2, 11.857]},
+				{"at": [-0.1, 1.7465, -0.4], "size": [9.6, 3.493, 9.4]}
 			]
 		},
 		"building.standing_stone": {

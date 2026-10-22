@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The Barrow's mound is Jeff's own hand-made one, twice the size (12 by 12 cells): a sculpted turf mound with a stone arch over its dark passage, a ring of kerb stones and old spears planted round it (579).
 - Every building kind has room inside: at least 5 by 5 floor cells in its main room, so huts, sheds, watchtowers, round huts and the healer's hut are bigger.
 - Wooden houses stand on a stone footing, which reaches down to the ground on a slope instead of leaving a gap under the walls; a building's walls stand on its own level ground, so on a hillside they no longer poke up through its roof.
 - A building being built is seen going up (566): a staked plot and a woodpile, then its frame, its walls rising, rafters and the roof going on, with scaffold while a level is raised or it is repaired. Windows glow at night while the people inside are awake.
