@@ -2,9 +2,12 @@ class_name Draugr
 extends Monster
 ## The barrow's draugr (decision 548; Jeff's docs/lore/crypt.md, the
 ## coordinator's rulings): he talks first, and for gold offers a pact, a
-## fight in his lair at a difficulty the gold sets; beaten, he yields (at
-## 1 hp, never dies) and the players in his lair are blessed (Main.bless,
-## 544); then he rests, and the barrow's dead lie still, till he rises
+## fight in his lair at the deal the gold buys (573: 20, 50 or 100 gold for
+## 5, 10 or 15 charges), his level that deal's and one more for each charge
+## the players in his zone hold when it begins; the living coming in while
+## it is on give him half his most again (living_came). Beaten, he yields (at
+## 1 hp, never dies) and the players in his lair are blessed (World.bless,
+## Main's barrow_won, 544 and 573); then he rests, and the barrow's dead lie still, till he rises
 ## again (RISE_DAYS). Per challenger: he rises from his rest for each new
 ## pact, and his rest runs on. Server only; to a client he is a monster.
 ##
@@ -19,31 +22,43 @@ extends Monster
 
 enum State { SEATED, PACT, AT_REST }
 
-## The difficulties by measures of the offering given (1, 2, 3 or more):
-## Main.bless's names, 5, 10 or 15 uses (economy.json return.field.uses).
-const DIFFICULTIES: Array[String] = ["easy", "normal", "hard"]
-## His hp and blows at each, times his kind's; and the dead he raises in
-## his lair to fight beside him (0, 1 or 2 since decision 561).
+## The deals when economy.json gives none (return.field.deals, 573): the
+## gold a step costs and the charges it gives, the highest step the gold
+## reaches taken; their names are Main's barrow_won's.
+const DEALS: Array[Dictionary] = [{"name": "easy", "gold": 20, "charges": 5},
+	{"name": "normal", "gold": 50, "charges": 10}, {"name": "hard", "gold": 100, "charges": 15}]
+## His hp and blows at each deal, times his kind's; and the dead he raises
+## in his lair to fight beside him (0, 1 or 2 since decision 561).
 const SCALE := {"easy": 1.0, "normal": 1.5, "hard": 2.0}
 const RETINUE := {"easy": 0, "normal": 1, "hard": 2}
+## His level past the deal's (573, enemy-ai's side; drafts for Jeff): each
+## charge held in his zone at a pact's start adds CHARGE_SCALE to his hp and
+## blows, and each CHARGES_PER_RISEN one more of the dead, MOST_MORE_RISEN
+## at most.
+const CHARGE_SCALE := 0.05
+const CHARGES_PER_RISEN := 10
+const MOST_MORE_RISEN := 3
+## The living come in while a pact is on: this much of his most back.
+const LIVING_HEAL := 0.5
 ## Game days he rests once laid to rest (a rules number, Jeff's to move).
 const RISE_DAYS := 3
 ## How near a player comes before he speaks first (cells, in his lair).
 const HEARING_TILES := 5
 ## A player this far off has left: he speaks to them again when they come back.
 const GONE_TILES := 12
-## The offering when economy.json gives none (return.offering).
-const OFFERING := 8
 ## How often, resting, he stills any of the dead that stirred (a respawn).
 const STILL_EVERY_TICKS := 20
 
-const WORDS := "You bring the living's gold. Give it, and face me: win, and the dead will let you go. One measure for an easy fight, two for a harder, three for the hardest."
+## Drafts for Jeff's wording (573).
+const WORDS := "You bring the living's gold. Give it, and face me: win, and the dead will give you back to the living, as often as I grant. Twenty gold for five returns, fifty for ten, a hundred for fifteen. The more of you that come carrying them, the harder I stand."
 const TITLE := "Face the draugr"
 
 var state := State.SEATED
-## The pact's: whose it is (a player id), at what difficulty.
+## The pact's: whose it is (a player id), at what deal (its name), and the
+## charges held in his zone when it began.
 var challenger_id := ""
 var difficulty := ""
+var charges_met := 0
 ## World.steps when he rises from his rest (-1: not resting); kept in his
 ## props, so a restart finds him resting.
 var rests_until := -1
@@ -143,44 +158,50 @@ func offers_for(player_id: String) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	if state == State.PACT:
 		return out  # A pact is on (theirs or another's): no more words.
-	var offering := offering()
+	var steps: Array = deals().map(func(each: Dictionary) -> int: return int(each["gold"]))
 	out.append({"id": "deal:%d" % id, "kind": "deal", "title": TITLE, "words": WORDS,
-		"what": {"offering": offering, "least": offering, "most": offering * DIFFICULTIES.size()},
-		"accept": "give", "cost": offering})
+		"what": {"offering": steps[0], "least": steps[0], "most": steps[-1], "steps": steps},
+		"accept": "give", "cost": steps[0]})
 	return out
 
 
-## [param player] says yes to his offer with [param gold]: under the
-## offering he refuses; else the gold is his, and the pact begins at the
-## difficulty its measures set.
+## [param player] says yes to his offer with [param gold]: under the least
+## deal he refuses; else the gold is his, and the pact begins at the deal
+## it buys (the highest step it reaches).
 func accept_offer(player: Player, offer: Dictionary, gold: int) -> Dictionary:
-	var offering := offering()
+	var deal := deal_for(gold)
 	if state == State.PACT:
 		return {"ok": false, "say": "I am bound in another's pact. Wait.", "line": ""}
 	if not str(offer.get("id", "")).begins_with("deal:"):
 		return {"ok": false, "say": "", "line": ""}
-	if gold < offering:
-		return {"ok": false, "say": "Not for so little. The living's measure: %d gold at the least." % offering, "line": ""}
+	if deal.is_empty():
+		return {"ok": false, "say": "Not for so little. %d gold at the least." % int(deals()[0]["gold"]), "line": ""}
 	if gold > World.gold_of(player.player_id):
 		return {"ok": false, "say": "You have not so much.", "line": ""}
 	World.add_gold(player.player_id, -gold, "the draugr's pact")
-	start_pact(player, difficulty_for(gold))
+	start_pact(player, str(deal["name"]))
 	var says := {"easy": "So be it. Stand and face me.", "normal": "Good. The dead rise beside me.",
 		"hard": "The hardest, then. Few have stood it."}
-	return {"ok": true, "say": says[difficulty], "line": "%s gives the draugr %d gold and takes up his pact (%s)." % [player.name, gold, difficulty]}
+	return {"ok": true, "say": says.get(difficulty, "So be it."), "line": "%s gives the draugr %d gold and takes up his pact for %d returns." % [player.name, gold, int(deal["charges"])]}
 
 
-## The offering a measure of gold is (economy.json return.offering).
-static func offering() -> int:
+## His deals, least first (economy.json return.field.deals, 573; DEALS when
+## it gives none).
+static func deals() -> Array:
 	var rules: Variant = Production.read_rules().get("return", {})
-	return maxi(int(rules.get("offering", OFFERING)) if rules is Dictionary else OFFERING, 1)
+	var field: Variant = rules.get("field", {}) if rules is Dictionary else {}
+	var given := Economy.deals(field) if field is Dictionary else []
+	return given if not given.is_empty() else DEALS.duplicate()
 
 
-## The difficulty [param gold] buys: a measure easy, two normal, three or
-## more hard.
-static func difficulty_for(gold: int) -> String:
-	var measures := clampi(gold / offering(), 1, DIFFICULTIES.size())
-	return DIFFICULTIES[measures - 1]
+## The deal [param gold] buys: the highest step it reaches; {} under the
+## least.
+static func deal_for(gold: int) -> Dictionary:
+	var best := {}
+	for each: Dictionary in deals():
+		if gold >= int(each.get("gold", 0)):
+			best = each
+	return best
 
 
 ## Speaks first to a player come near him in his lair (once a visit), when
@@ -209,7 +230,8 @@ func start_pact(player: Player, level: String) -> void:
 	challenger_id = player.player_id
 	difficulty = level
 	_provoked = null
-	var scale := float(SCALE[level])
+	charges_met = maxi(int(World.charges_in.call(zone if zone != "" else World.zone.name)), 0) if World.charges_in.is_valid() else 0
+	var scale := float(SCALE.get(level, 1.0)) + CHARGE_SCALE * charges_met
 	max_hp = roundi(_base_hp * scale)
 	hp = max_hp
 	attack_damage = roundi(_base_damage * scale)
@@ -217,7 +239,15 @@ func start_pact(player: Player, level: String) -> void:
 	for each in World.sought():
 		if each is Player:
 			offer_withdrawn.emit((each as Player).player_id)  # Nothing stands while he fights.
-	_raise_retinue(int(RETINUE[level]))
+	_raise_retinue(int(RETINUE.get(level, 0)) + mini(charges_met / CHARGES_PER_RISEN, MOST_MORE_RISEN))
+
+
+## [param player] come into his zone (Main's _living_came, 573): in a pact
+## he draws breath from them, half his most back at once; his level stays.
+func living_came(player: Player) -> void:
+	if state != State.PACT or player == null:
+		return
+	hp = mini(hp + roundi(max_hp * LIVING_HEAL), max_hp)
 
 
 ## Whether the pact is still on: its challenger standing in his lair.
@@ -231,6 +261,7 @@ func _pact_holds() -> bool:
 func _end_pact() -> void:
 	challenger_id = ""
 	difficulty = ""
+	charges_met = 0
 	_restore()
 	state = State.AT_REST if rests_until > World.steps else State.SEATED
 
@@ -251,6 +282,7 @@ func _yield() -> void:
 			World.bless.call(ids, difficulty)  # Main's (544).
 		challenger_id = ""
 		difficulty = ""
+		charges_met = 0
 		if rests_until <= World.steps:
 			rests_until = World.steps + RISE_DAYS * DayNight.day_steps
 			_keep_prop("rests_until", rests_until)

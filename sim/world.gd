@@ -394,6 +394,9 @@ var downed: Callable
 ## The draugr beaten in a pact (decision 548): (player ids, difficulty) ->
 ## how many blessed; Main's bless (544). Unset, nobody is blessed.
 var bless: Callable
+## The charges the players in a zone hold, summed: (zone name) -> int;
+## Main's charges_in_zone (573). Unset, none.
+var charges_in: Callable
 ## Puts an entity of a spec ({kind, name, tile, props, idle...}) into the
 ## zone World is in, as a level's are (Main's _spawn); null if it cannot.
 ## Unset (a test that builds its own), nothing is spawned.

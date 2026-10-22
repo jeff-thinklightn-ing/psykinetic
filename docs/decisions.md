@@ -20295,3 +20295,41 @@ companion_test: the shot's line loses its list; "Wren and Aldous." goes
 unasked and stays asked; "Run, Snagfin!" stays; the rule is in her
 voice's rules. Server sim (her voice is the server's), protocol
 unchanged, no new class_name.
+
+## 573, enemy-ai's side. The draugr's pact by the deals; his level by the charges; the living's coming heals him
+
+Dungeon's design as Jeff corrected it, the coordinator's approval: "you
+choose the difficulty by how much gold you donate ... 20, 50, 100 for 5, 10
+and 15 res charges. The draugr's level is equal to base level + how many
+player resurrection points are in the zone when he starts the fight. If a
+player zones in while the fight is active, he heals 50% of his health
+immediately."
+
+- **The deal.** `Draugr.deals()` reads economy's `return.field.deals`
+  (`Economy.deals`; `DEALS` the same three steps when the rules give none);
+  `deal_for(gold)` takes the highest step the gold reaches, {} under the
+  least. `offers_for` offers the pact at the least step (cost 20; what
+  {offering, least, most, steps}); `accept_offer` refuses under it, else
+  takes the gold (as ever, its own spending) and starts the pact at the
+  deal's name (easy, normal, hard: `World.bless`'s second argument, Main's
+  `barrow_won`). The measures of 548 (`offering()`, `difficulty_for`,
+  `OFFERING`, `DIFFICULTIES`) are gone. A lost pact keeps the gold; the
+  run goes on (a retry).
+- **His level.** At `start_pact` he asks `World.charges_in` (a Callable,
+  Main's `charges_in_zone`) for the charges held by the players in his
+  zone (`charges_met`). His hp and blows are his kind's times
+  `SCALE[deal]` (1, 1.5, 2) + `CHARGE_SCALE` (0.05) a charge; he raises
+  `RETINUE[deal]` (0, 1, 2) of the dead and one more each
+  `CHARGES_PER_RISEN` (10), `MOST_MORE_RISEN` (3) more at most. Drafts for
+  Jeff. The halls do not scale.
+- **The living come.** `Draugr.living_came(player)`, called by Main's
+  `_living_came` on every entry into the zone: in a pact he gets
+  `LIVING_HEAL` (half) of his most back at once, capped at it; his level
+  stays as it began. Seated or resting, nothing.
+- **Words.** WORDS and the accept line name the gold steps and the returns
+  (drafts for Jeff's wording, through the coordinator).
+
+The yield, the rest (548) and the hook are as they were. monster_test
+_test_draugr: the steps offered, 19 refused, 60 the normal deal, 10 charges
+making him 60 hp with 2 risen, the living's coming healing 30, 20 gold the
+easy deal. Server only, protocol unchanged, no new class_name.

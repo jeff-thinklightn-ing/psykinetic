@@ -2200,7 +2200,7 @@ func _test_room_guard() -> void:
 
 func _test_draugr() -> void:
 	print("
-== the draugr: talks first, a pact for gold at a difficulty, yields at 1 hp, rests and stills the dead, rises again (decision 548) ==")
+== the draugr: talks first, a pact for gold at a deal, his level by the charges in his zone, the living's coming heals him, yields at 1 hp, rests and stills the dead, rises again (decisions 548, 573) ==")
 	Monster.idling = true
 	var rows: Array[String] = ["#############", "#...........#", "#.....u.....#", "#...........#", "#..........k#", "#############"]
 	Level.register("mt_lair", Level.image_from_rows(rows), null, {"regenerate": {"anchors": [{"rect": [1, 1, 8, 4], "name": "lair"}]}})
@@ -2216,7 +2216,7 @@ func _test_draugr() -> void:
 	draugr.sight_range = 8
 	draugr.senses.cone_cos = -1.0
 	var was_economy := World.economy
-	World.economy = Economy.new({"purses": {"p1": 50}})
+	World.economy = Economy.new({"purses": {"p1": 200}})
 	var spawned: Array[GridEntity] = []
 	World.spawn_spec = func(spec: Dictionary) -> GridEntity:
 		var risen := EntityFactory.build(spec)
@@ -2227,8 +2227,8 @@ func _test_draugr() -> void:
 	var spoken: Array = []
 	draugr.offer_spoken.connect(func(id: String, offer: Dictionary) -> void: spoken.append([id, offer]))
 	var offers := draugr.offers_for("p1")
-	_check(draugr.talks and offers.size() == 1 and offers[0]["kind"] == "deal" and offers[0]["cost"] == Draugr.offering()
-		and offers[0]["what"]["most"] == Draugr.offering() * 3, "he talks, and offers a pact for the offering (%s)" % [offers])
+	_check(draugr.talks and offers.size() == 1 and offers[0]["kind"] == "deal" and offers[0]["cost"] == 20
+		and offers[0]["what"]["most"] == 100 and offers[0]["what"]["steps"] == [20, 50, 100], "he talks, and offers a pact at the deals' steps (%s)" % [offers])
 	World.step()
 	_check(spoken.is_empty(), "outside his lair he says nothing")
 	_move_to(player, Vector2i(7, 2))
@@ -2236,13 +2236,24 @@ func _test_draugr() -> void:
 		World.step()
 	_check(spoken.size() == 1 and spoken[0][0] == "p1", "come into his lair, he speaks first, once (%s)" % [spoken.size()])
 	_check(draugr.target == null and player.hp == player.max_hp, "seated, he fights nobody unasked")
-	var refused := draugr.accept_offer(player, offers[0], Draugr.offering() - 1)
-	_check(not refused["ok"] and str(refused["say"]).begins_with("Not for so little") and World.gold_of("p1") == 50, "under the offering he refuses, and takes nothing")
-	var taken := draugr.accept_offer(player, offers[0], Draugr.offering() * 2)
-	_check(taken["ok"] and draugr.state == Draugr.State.PACT and draugr.difficulty == "normal" and World.gold_of("p1") == 50 - Draugr.offering() * 2,
-		"two measures: a pact at normal, his gold (%s, %s)" % [taken, World.gold_of("p1")])
-	_check(draugr.max_hp == roundi(30 * 1.5) and draugr.hp == draugr.max_hp and spawned.size() == 1 and draugr.offers_for("p1").is_empty(),
-		"he grows to it, raises one of the dead (0/1/2 since decision 561), and offers nothing while it is on (%d hp, %d risen)" % [draugr.max_hp, spawned.size()])
+	var refused := draugr.accept_offer(player, offers[0], 19)
+	_check(not refused["ok"] and str(refused["say"]).begins_with("Not for so little") and World.gold_of("p1") == 200, "under the least deal (20) he refuses, and takes nothing")
+	var zones_asked: Array = []
+	World.charges_in = func(zone_name: String) -> int:
+		zones_asked.append(zone_name)
+		return 10
+	var taken := draugr.accept_offer(player, offers[0], 60)
+	_check(taken["ok"] and draugr.state == Draugr.State.PACT and draugr.difficulty == "normal" and World.gold_of("p1") == 140,
+		"60 gold: the normal deal (50 reached, not 100), and the gold his (%s, %s)" % [taken, World.gold_of("p1")])
+	_check(zones_asked.size() == 1 and draugr.charges_met == 10 and draugr.max_hp == roundi(30 * (1.5 + 10 * Draugr.CHARGE_SCALE)) and draugr.hp == draugr.max_hp
+		and spawned.size() == 2 and draugr.offers_for("p1").is_empty(),
+		"10 charges in his zone: he grows to normal's and a step a charge, raises normal's one and one more, and offers nothing while it is on (%d hp, %d risen)" % [draugr.max_hp, spawned.size()])
+	World.charges_in = Callable()
+	World.damage(draugr, 40, player)
+	var hurt := draugr.hp
+	draugr.living_came(player)
+	_check(draugr.hp == mini(hurt + roundi(draugr.max_hp * Draugr.LIVING_HEAL), draugr.max_hp) and draugr.hp > hurt and draugr.max_hp == 60,
+		"the living come in: half his most back at once, his level as it was (%d to %d of %d)" % [hurt, draugr.hp, draugr.max_hp])
 	var fought := false
 	for i in 20:
 		World.step()
@@ -2258,9 +2269,9 @@ func _test_draugr() -> void:
 		"and lies at rest three days, kept in his props")
 	_check(spawned.all(func(r: GridEntity) -> bool: return not r.spawned) and skeleton.laid, "his risen gone, the barrow's dead lie still")
 	var resting_till := draugr.rests_until
-	draugr.accept_offer(player, draugr.offers_for("p1")[0], Draugr.offering())
-	_check(draugr.state == Draugr.State.PACT and not World.is_down(draugr) and draugr.rests_until == resting_till,
-		"another pact raises him from his rest, which runs on")
+	draugr.accept_offer(player, draugr.offers_for("p1")[0], 20)
+	_check(draugr.state == Draugr.State.PACT and draugr.difficulty == "easy" and draugr.max_hp == 30 and not World.is_down(draugr) and draugr.rests_until == resting_till,
+		"another pact (20 gold, easy, no charges told) raises him from his rest, which runs on")
 	_move_to(player, Vector2i(11, 2))
 	World.step()
 	_check(draugr.state == Draugr.State.AT_REST and draugr.hp == 30, "the challenger gone from his lair, the pact is lost: he rests on, healed")
@@ -2275,7 +2286,10 @@ func _test_draugr() -> void:
 	World.damage(draugr, 999, player)
 	_check(draugr.blessed_last.is_empty() and draugr.state == Draugr.State.SEATED and draugr.hp == 30,
 		"beaten without a pact, he yields, but blesses nobody")
-	_check(Draugr.difficulty_for(Draugr.offering() * 7) == "hard" and Draugr.difficulty_for(Draugr.offering()) == "easy", "three measures or more, hard")
+	draugr.living_came(player)
+	_check(draugr.hp == 30, "seated, the living's coming gives him nothing")
+	_check(Draugr.deal_for(500)["name"] == "hard" and Draugr.deal_for(99)["name"] == "normal" and Draugr.deal_for(20)["name"] == "easy" and Draugr.deal_for(19).is_empty(),
+		"a hundred or more, hard; between steps, the lower")
 	World.economy = was_economy
 	World.spawn_spec = Callable()
 	Level.unregister("mt_lair")
