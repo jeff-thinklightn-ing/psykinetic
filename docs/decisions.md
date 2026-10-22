@@ -20540,3 +20540,25 @@ most 24 quads; a re-bench when the display wakes is owed.
 view_test _test_relief: one mist a curtain on the hills, its puffs capped,
 at its foot; none on the sample. Client only, protocol unchanged, no new
 class_name.
+
+## 562 amended (2). Herbs ring a town's store, not its work sites
+
+Found by maps' 566 amended, whose "woodlot" place for wilds/store (a work
+site the town holds, for npc's woodcutter's trip) failed forage_test's
+"per_day of them lie in wilds". Forage.towns_in took every town-held
+place but a healer's hut as a town's centre. So the woodlot drew its own
+herb-free ring: out to the furthest building within reach plus clear,
+about 50 cells round the copse. Half of _lay's tries started there and
+fell inside a ring, and within TRIES one herb found no cell.
+
+towns_in now takes the town's own stores, places of kind Stockpile.KIND
+the town holds, as Towns counts a town. A woodlot, a farm, a hunting
+ground or a healer's hut is no centre, and herbs may grow round them.
+
+The box: the wilds' only town-held place in v0.1.163 is the store, as in
+every level on main (no code makes a place the town's in play), so
+today's herbs are unchanged.
+
+tests/forage_test: a woodlot the town holds leaves towns_in as it was.
+Server only, protocol unchanged, no new class_name.
+

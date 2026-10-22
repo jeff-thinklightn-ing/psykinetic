@@ -84,6 +84,14 @@ func _test_lay() -> void:
 	for cell: Vector2i in hut_herbs:
 		found.erase(cell)
 	var towns := World.forage.towns_in(AREA)
+	# A work site the town holds is no town (562 amended (2): maps' woodlot drew a ring of its own).
+	var site := "%s/woodlot@20,20" % AREA
+	World.holdings._places[site] = {"id": site, "area": AREA, "key": "woodlot@20,20", "cell": Vector2i(20, 20), "name": "the woodlot",
+		"kind": "woodlot", "radius": 4, "worth": 0, "start": WorldRichness.TOWN}
+	World.holdings._holder[site] = WorldRichness.TOWN
+	_check(towns.size() == 1 and World.forage.towns_in(AREA) == towns, "the town's store alone is its centre, not a woodlot it holds (%s)" % [towns])
+	World.holdings._places.erase(site)
+	World.holdings._holder.erase(site)
 	var size: Vector2i = World.forage.world_map.areas[AREA]["size"]
 	var grass: PackedByteArray = World.forage.world_map.areas[AREA]["grass"]
 	for cell: Vector2i in found:

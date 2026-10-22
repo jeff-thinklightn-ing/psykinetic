@@ -185,15 +185,14 @@ func _lay_huts(area: String, id: String, day: int) -> void:
 					break
 
 
-## The cells of [param area]'s places the town holds (a healer's hut not
-## among them: it grows its own, _lay_huts).
+## The cells of [param area]'s towns: the stores the town holds (a healer's
+## hut grows its own, _lay_huts; a work site is no town).
 func towns_in(area: String) -> Array[Vector2i]:
 	var out: Array[Vector2i] = []
-	var huts: Array = []
-	for each: Dictionary in rules.values():
-		huts.append_array(each.get("hut", {}).get("kinds", []))
+	# The town's own store, as Towns counts a town (562 amended (2)): never a
+	# work site it holds (a woodlot, a farm), nor a healer's hut.
 	for place_id in holdings.places_in(area):
-		if holdings.holder(place_id) == WorldRichness.TOWN and str(holdings.place(place_id).get("kind", "")) not in huts:
+		if holdings.holder(place_id) == WorldRichness.TOWN and str(holdings.place(place_id).get("kind", "")) == Stockpile.KIND:
 			out.append(holdings.place(place_id)["cell"])
 	return out
 

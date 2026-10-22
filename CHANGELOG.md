@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Herbs keep growing round the wilds when the town gets a woodlot or other work site: only the town's store clears a ring of them (562 amended (2)).
 - A soft mist now rises from the pool at the foot of a tall waterfall and drifts downstream (570 amended).
 - A level may stand a chopping block and a woodpile (building.chopping_block, building.woodpile: solid, no door, 1 x 1) for the woodcutter's work (566 amended, npc's side, part 2). Data rule only.
 - A woodcutter's axe now comes down on top of the chopping block in front of them, not short of it and off to the right.
