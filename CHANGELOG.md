@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- A second waystone, carved with a gate mark and arrows pointing the way out, to stand in pairs where a road leaves the map (589).
 - Stairs for zone crossings: a stair down into the dark (stone, or timber for a mine or cellar) and a stair up (stone steps, or a ladder on a rock face for a climb) (589).
 - Pieces for Held's Old Tower, the ancients' broken-down castle: the broken keep, rubble heaps and a fallen column (600).
 - The castle's ponds are round-shored curves now, not squares of water, as every river, stream and pond in the world is (568 amended).
