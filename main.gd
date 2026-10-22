@@ -10014,23 +10014,38 @@ func _start_return(who: String, kind: String, cell: Vector2i) -> bool:
 	if who.is_empty() or not returns:
 		return false
 	var at := _return_place(cell)
-	var id := World.production.open_return(at["workshop"], who, kind, at["place"]) if not at.is_empty() else 0
+	# A player comes back at once, from near death (decision 587: Mortally
+	# Wounded's Bleed Out, or the blood run out); others after the keeper's work.
+	var id := World.production.open_return(at["workshop"], who, kind, at["place"], kind == "player") if not at.is_empty() else 0
 	if id != 0 and kind == "player":
 		var keeper := World.production.worker(str(World.production.job(id).get("worker", "")))
 		_tell_return(_peer_of(who), str(keeper.get("name", "")), str(World.holdings.place(at["place"]).get("kind", "")),
-			World.production.return_left(id))
+			World.production.return_left(id), {"near_death": true})
 	return id != 0
 
 
 ## Tells the fallen player on [param peer] who brings them back, where (a
 ## kind of rules' return.places; "" and "" for the plain respawn) and in how
 ## many [param steps] (-1 not known): the "return" message (396 amended,
-## for ui's countdown), {by, where, seconds}.
-func _tell_return(peer: int, by: String, where: String, steps: int) -> void:
+## for ui's countdown), {by, where, seconds}, and [param more] (decision
+## 587: near_death).
+func _tell_return(peer: int, by: String, where: String, steps: int, more := {}) -> void:
 	if peer == 0:
 		return
-	Net.message_to(peer, "return", {"by": by, "where": where,
-		"seconds": ceili(steps / float(World.TICK_RATE)) if steps >= 0 else -1})
+	var data := {"by": by, "where": where, "seconds": ceili(steps / float(World.TICK_RATE)) if steps >= 0 else -1}
+	data.merge(more)
+	Net.message_to(peer, "return", data)
+
+
+## Server: everyone in a zone is down (companions' detection, decision 587):
+## the players on [param peers] are told they all come back in
+## return.everyone_s seconds ("return" {all_fallen: seconds}). The seconds.
+func tell_all_fallen(peers: Array) -> int:
+	var seconds := int(World.production.rules.get("return", {}).get("everyone_s", 20)) if World.production != null else 20
+	for peer: Variant in peers:
+		if int(peer) != 0:
+			Net.message_to(int(peer), "return", {"all_fallen": seconds})
+	return seconds
 
 
 ## The peer [param player_id] plays on now; 0 if none.
@@ -10083,8 +10098,9 @@ func _on_returned(job: Dictionary) -> void:
 				_join_player(peer, who, record.name, true, cell)
 			else:
 				travel(peer, area, "", {}, cell)
-			Net.broadcast_to([peer], "party", {"from": by, "text": "%s is brought back at %s by %s%s." % [record.name, where, by,
-				", for an offering of %d gold" % offered if offered > 0 else ""]})
+			var words := "%s brought you back from near death" % by if bool(job.get("near_death", false)) \
+				else "%s is brought back at %s by %s" % [record.name, where, by]  # Decision 587.
+			Net.broadcast_to([peer], "party", {"from": by, "text": "%s%s." % [words, ", for an offering of %d gold" % offered if offered > 0 else ""]})
 		"companion":
 			var record: PlayerRecord = _records.get(who)
 			if record == null or record.companion.is_empty():

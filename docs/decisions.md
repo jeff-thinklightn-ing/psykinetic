@@ -23029,7 +23029,7 @@ maps/builder have sides.
 - **Wire:** the "barter" message gains "fence" ("" | "day" | "night")
   for the counter. "fenced" {uid: gold} is filled only at his counter
   by night. ui's hover reads "won't buy", "not by day" and "pays N gold,
-  fenced". A line under PROTOCOL_REVISION 31.
+  fenced". A line under PROTOCOL_REVISION 32.
 - Drafts for Jeff's folder (the coordinator's): factor 0.5, day_markup
   1.3, his night prices the town's, no night gate on the thief.
 
@@ -23043,4 +23043,41 @@ tests:
 - townsfolk_test: the thief fences through the fence alone.
 
 Server and client (the message's meaning); no new class_name.
+## 587, economy's side. Back at once from near death
+
+Jeff's down screen, through the coordinator (companions' design:
+"Mortally Wounded", Slow Heart / Bleed Out): "if you bleed out you return
+to the temple, the game says 'Aldous brought you back from near death' ...
+If everyone dies you just automatically respawn". Economy's side lands
+first, then companions' (the down state, the heart, the commands,
+everyone-down's detection).
+
+- **A player comes back at once.** Main._start_return opens the
+  player's return with Production.open_return(..., at_once = true):
+  needed 0 and "near_death", so Production.returns_due finishes it in
+  the same World.step, after the zones have stepped. Every player death
+  comes this way: Bleed Out pressed, the blood run out, or everyone_s
+  up. It replaces 396 amended's 60 s keeper wait for players.
+  - The nearest manned temple or healer's hut still brings them back
+    (584's care will narrow which huts).
+  - Nobody manned anywhere means the plain respawn, as before.
+  - Companions' and residents' returns still take the keeper's
+    return.steps, and give up after give_up.
+- **The words:** the party line is "<keeper> brought you back from near
+  death." The "return" message carries {by, where, seconds: 0,
+  near_death: true}.
+- **Everyone down:** Main.tell_all_fallen(peers) sends "return"
+  {all_fallen: seconds}, the seconds from economy.json
+  return.everyone_s (20; Jeff: "only a 15-20 second timer after
+  'all have fallen' is fine", a data number he can drop to 15), and returns
+  them. Companions' side calls it, keeps the clock and bleeds the downed
+  out when it runs down. It sends {all_fallen: 0} when someone stands
+  again: the wait is called off.
+- A saved return job keeps "near_death".
+- The message's new keys sit in the line under PROTOCOL_REVISION 32.
+
+tests/return_test, in Main: a player who dies is told {Ned,
+healers_hut, 0, near_death} and is back at the hut, at full hp, on the
+next step; the party line names Ned; tell_all_fallen says 20. Server
+and client (the message's keys); no new class_name.
 

@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- A player who dies where a priest or medicine man is about is brought back at once, "brought back from near death", instead of after a minute's wait; the server can now tell everyone when all have fallen and how long until they all come back (587, economy's side).
 - Snagfin is now the only one who buys grave goods, and only at night at half the town's price; by day he refuses them and his own goods cost more, and every other counter, maker and the store won't take grave goods at all (586).
 - Rich townsfolk now pay half of what they earn from a trade or service to the treasury, up from 30% (528 amended (2)).
 - The barrow's grave robbers now carry gold: they take half the alms laid at the altar each day and a cut of the town thief's takings, and a robber who falls drops his share as coin purses, up to 40 gold (580, economy's side).

@@ -549,7 +549,9 @@ func workshop_of(worker_id: String) -> String:
 ## once, worked by whoever works there: [param who] ([param who_kind]:
 ## player, companion, resident) brought back after rules' return.steps, at
 ## Holdings place [param place]. Its id; 0 if the workshop has nobody.
-func open_return(workshop_id: String, who: String, who_kind: String, place := "") -> int:
+## [param at_once] (a player brought back from near death, decision 587):
+## no work to wait on, finished by the next returns_due, this step.
+func open_return(workshop_id: String, who: String, who_kind: String, place := "", at_once := false) -> int:
 	var shop: Dictionary = _workshops.get(workshop_id, {})
 	if shop.is_empty() or str(shop["worker"]).is_empty():
 		return 0
@@ -557,7 +559,8 @@ func open_return(workshop_id: String, who: String, who_kind: String, place := ""
 	var each: Dictionary = _jobs[id]
 	each["state"] = "working"
 	each["worker"] = shop["worker"]
-	each["needed"] = maxi(int(rules.get("return", {}).get("steps", 600)), 1)
+	each["needed"] = 0 if at_once else maxi(int(rules.get("return", {}).get("steps", 600)), 1)
+	each["near_death"] = at_once
 	each["last"] = now()
 	each["opened"] = now()
 	each["who"] = who
@@ -1849,6 +1852,7 @@ func from_dict(saved: Dictionary) -> void:
 				each["who_kind"] = str(entry.get("who_kind", ""))
 				each["opened"] = int(entry.get("opened", 0))
 				each["place"] = str(entry.get("place", ""))
+				each["near_death"] = bool(entry.get("near_death", false))
 			var cost: Variant = entry.get("cost", {})
 			if cost is Dictionary:
 				for what: String in cost:

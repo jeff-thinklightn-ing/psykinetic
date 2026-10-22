@@ -280,6 +280,10 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## 32 (585): level.json "ledges", terrain["ledges"] (each {curve: {points,
 ## tangents, tops, feet, length}, up, closed}) the views draw faces along;
 ## the hills' and the wilds' faces wander, so their relief differs.
+## 32 (586): the "barter" message gains "fence" ("" | "day" | "night"): the
+## counter's fence state, Snagfin's by day or by night (World.fence_state).
+## 32 (587, economy's side): the "return" message gains "near_death" (a
+## player back at once) and {all_fallen: seconds} (0 calls the wait off).
 const PROTOCOL_REVISION := 32
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]

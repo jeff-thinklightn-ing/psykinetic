@@ -19,6 +19,7 @@ var _now := 0
 var _rules := {}
 var _done: Array[Dictionary] = []
 var _told: Array[Dictionary] = []
+var _said: Array[String] = []
 var _main: Node
 
 
@@ -162,7 +163,9 @@ func _test_main() -> void:
 	add_child(_main)
 	Net.message_received.connect(func(kind: String, data: Dictionary) -> void:
 		if kind == "return":
-			_told.append(data))
+			_told.append(data)
+		elif kind == "party":
+			_said.append(str(data.get("text", ""))))
 	_kill_monsters()
 	var hut := Vector2i(4, 4)
 	var id := "%s/healers_hut@4,4" % World.zone.name
@@ -183,18 +186,17 @@ func _test_main() -> void:
 	World.damage(_player(), 999)
 	_check(_player() == null, "the player died")
 	var hob := str(World.production.worker(keeper)["name"])
-	_check(_told.size() == 1 and _told[0] == {"by": hob, "where": "healers_hut", "seconds": int(_rules["return"]["steps"]) / World.TICK_RATE},
-		"told who brings them back, where and how long: %s" % [_told])
-	for i in _main.RESPAWN_TICKS + 1:
-		World.step()
-	_check(_player() == null, "not back by the old respawn timer")
-	# Back on the step it is due, not at the next world tick (396 amended).
-	for i in int(_rules["return"]["steps"]) - _main.RESPAWN_TICKS:
-		_kill_monsters()  # The test room's imps come back; spawn safety would move the player.
-		World.step()
+	_check(_told.size() == 1 and _told[0] == {"by": hob, "where": "healers_hut", "seconds": 0, "near_death": true},
+		"told who brings them back, where, at once, from near death (decision 587): %s" % [_told])
+	_kill_monsters()  # The test room's imps come back; spawn safety would move the player.
+	World.step()
 	player = _player()
 	_check(player != null and World.distance(player.tile, hut) <= 2 and player.hp == player.max_hp,
-		"brought back at the hut, at full hp (at %s)" % (player.tile if player else World.NO_CELL))
+		"brought back at the hut on the next step, at full hp (at %s)" % (player.tile if player else World.NO_CELL))
+	_check(_said.any(func(text: String) -> bool: return text == "%s brought you back from near death." % hob), "said: %s brought you back from near death (%s)" % [hob, _said])
+	var reply: Variant = World.production.rules["return"].get("everyone_s")
+	_check(int(reply) == 20 and _main.tell_all_fallen([Net.local_id]) == 20 and _told.back() == {"all_fallen": 20},
+		"everyone down: told all come back in everyone_s, 20 s (%s)" % [_told.back()])
 	# Nobody to bring them back anywhere (the wilds' temple is a walk away too).
 	for each in World.production.worker_ids():
 		if World.production.worker(each)["trades"].any(func(t: String) -> bool: return t in ["priest", "medicine_man"]):
