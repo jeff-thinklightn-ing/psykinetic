@@ -133,7 +133,7 @@ static func tick(production: Production, stockpile: Stockpile, economy: Economy 
 		# "thieves could be the answer to balancing the economy"), else goods.
 		var victim := _mark(production, town, id, thief, _rich_line(economy))
 		if not victim.is_empty():
-			var gold := _lift_gold(production, town, id, victim, thief, at, due)
+			var gold := _lift_gold(production, town, id, victim, thief, at, due, economy)
 			if gold != 0:
 				continue
 		var goods := lift(stockpile, town, thief)
@@ -780,7 +780,8 @@ static func _mark(production: Production, town: String, thief: String, rule: Dic
 ## [param thief] lifts the take from [param victim]'s purse (economy's
 ## Production.lift_gold), the victim's card remembering a loss with no name;
 ## or is caught at it. The gold moved (0 for none, or caught).
-static func _lift_gold(production: Production, town: String, thief: String, victim: String, rule: Dictionary, at: int, due: int) -> int:
+static func _lift_gold(production: Production, town: String, thief: String, victim: String, rule: Dictionary, at: int, due: int,
+		economy: Economy = null) -> int:
 	if not production.has_method("lift_gold"):
 		return 0
 	var taken := int(production.lift_gold(victim, int(rule.get("gold_take", 0)), thief))
@@ -795,6 +796,8 @@ static func _lift_gold(production: Production, town: String, thief: String, vict
 			production.return_gold(thief, victim, taken)
 		_caught(production, town, thief, catcher, victim, "with a hand in %s's purse" % production.worker(victim).get("name", victim), at, rule)
 		return taken
+	if economy != null:
+		economy.thief_cut(production, thief, taken)  # He pays the barrow's robbers to move it (580, economy's side).
 	var pronoun := str(production.worker(victim).get("card", {}).get("traits", {}).get("pronoun", "their"))
 	learn(production, victim, "%s missed %d gold from %s purse." % [production.worker(victim).get("name", victim), taken,
 		{"she": "her", "he": "his"}.get(pronoun, "their")])

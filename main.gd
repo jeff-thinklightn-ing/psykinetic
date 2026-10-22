@@ -856,6 +856,7 @@ func _go_online() -> void:
 		World.shield_bashed.connect(_narrate_bash)
 		World.entity_bumped.connect(_on_bumped)
 		World.entity_died.connect(_on_entity_died)
+		World.entity_died.connect(_robber_fell)  # The grave robbers' gold (580, economy's side).
 		World.entity_taken.connect(_on_entity_taken)
 		World.telegraph_started.connect(_tell_telegraph)  # Decision 602.
 		World.telegraph_ended_in.connect(_tell_telegraph_ended)
@@ -7950,6 +7951,26 @@ var _blow_source: GridEntity = null
 ## Server: a creature or a breakable thing was killed. Every view hears of
 ## it ("death"), with what it was and where, since its node goes at once;
 ## a companion says a last line.
+## A grave robber fallen in the barrow: his share of the band's purse
+## (Economy.band_share) laid where he fell as coin purses.
+func _robber_fell(entity: GridEntity, _cause: StringName) -> void:
+	if not entity is Monster or World.economy == null:
+		return
+	var rule: Dictionary = World.economy.rules.get("robbers", {})
+	var kinds: Array = rule.get("kinds", [])
+	var kind := str(entity.spawn_spec.get("kind", ""))
+	var barrow := str(rule.get("barrow", ""))
+	if kind not in kinds or entity.zone != barrow:
+		return
+	var standing := World.get_entities().filter(func(each: GridEntity) -> bool:
+		return each is Monster and str(each.spawn_spec.get("kind", "")) in kinds and each.zone == barrow and (each == entity or each.hp > 0)).size()
+	var purse := str(rule.get("purse", "coin_purse"))
+	var gold := World.economy.band_share(barrow, standing)
+	var each_gold := maxi(int(Items.def(purse).get("yield", {}).get("gold", 10)), 1)
+	for i in gold / each_gold:
+		World.put_on_ground(World.items.mint(purse, "remains", World._label_of(entity), entity.zone, entity.tile), entity.tile)
+
+
 func _on_entity_died(entity: GridEntity, cause: StringName) -> void:
 	var kind := "object"
 	if entity is Player:

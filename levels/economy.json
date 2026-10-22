@@ -64,6 +64,8 @@
 		"lawspeaker": {"wage": 4, "every": 54000, "from": 6, "names": ["Ulf", "Sigrid", "Halvard", "Ingrid", "Torvald", "Asa"]}},
 	"town_work": {"fee": 1, "per_steps": 600},
 	"contribute": {"gold_per_xp": 2},
+	"robbers": {"_": "Decision 580, economy's side: the grave robbers of the barrow level carry gold. Their purse fills once a game day with altar_share of the gold below at every town's altar (the plunder, what angers the old gods in lore) and with thief_cut of each lift a town's thief makes (his fence); a robber of kinds fallen in the barrow drops his share, the purse over those standing, at most most, as whole purse items.",
+		"barrow": "barrow", "kinds": ["robber"], "altar_share": 0.5, "thief_cut": 0.25, "most": 40, "purse": "coin_purse"},
 	"return": {
 		"steps": 600, "fee": 0, "give_up": 1200, "offering": 8, "waived_by": "draugr", "acolyte": {"trade": "acolyte", "keep": 1},
 		"field": {"_": "Decision 544: the draugr's blessed brought back where they fell. A blessed body (a player marked draugr, a companion with draugr in her marks) whose player has charges left lies downed window_s seconds at 0 HP; a blessed hand beside it, still and unhit for channel_s, brings it back at hp of its most, one charge off the channeler's player's count; else it dies as ever. Decision 573: the draugr's deals, the gold a player gives buying the highest step it reaches (under the least refused), its charges taken up to the capacity: capacity_step for each step of the hardest deal beaten, and one more for each named container (none yet). The charges are a count on the player's record, no item.", "window_s": 30, "channel_s": 4, "hp": 0.5,

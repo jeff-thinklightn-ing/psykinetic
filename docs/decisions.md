@@ -21190,6 +21190,53 @@ buildings still set its ring.
 
 tests/forage_test: a 12×12 mound 35 cells from the store leaves the
 ring as it was. Server only, protocol unchanged, no new class_name.
+## 580, economy's side. The grave robbers carry gold
+
+Jeff's words, routed by the coordinator from dungeon's barrow in layers
+(580): "the grave robbers would have gold on them, either from stealing or
+from other jobs". Approved as written, the thief's cut by default. Nothing
+is minted ("everything has to be gathered and someone paid to do it"), and
+no player's gold is taken.
+
+- **The band's purse.** Economy keeps the robbers' gold by barrow level
+  (economy.json robbers.barrow, "barrow", layer 1, where the altar is),
+  in the snapshot ("bands", "band_day"). It fills two ways:
+  - **Stealing, from the altar.** Once a game day, on the world tick
+    (Economy._band_turn), the band lifts robbers.altar_share (0.5) of
+    the gold below at every town's altar (Economy.lift_below, which
+    nothing called before). This is the plunder: the robbers' pilfering
+    of the altar's gold is what angers the old gods in lore (the
+    pilferers), so the share they take is the plunder. Pip's runs still
+    lay the alms down (546); half is gone by the next day.
+  - **Other jobs, as the thief's fence.** A town's thief pays
+    robbers.thief_cut (0.25) of each lift he isn't caught at from his
+    own purse to the band (Economy.thief_cut, from
+    Townsfolk._lift_gold), for moving what he took.
+- **On a robber.** A robber's gold leaves the band only when he falls,
+  so nothing goes back when the barrow sleeps or is laid again.
+  - Main._robber_fell, on World.entity_died: a monster of robbers.kinds
+    (["robber"]) fallen in the barrow takes Economy.band_share.
+  - The share is the band's gold over the robbers standing (him among
+    them), at most robbers.most (40), in whole purses (coin_purse's
+    yield, 10).
+  - It lies where he fell as coin purses; the rest stays with the band.
+  - An empty band means empty pockets. A respawned robber carries what
+    is left, so farming them drains the band until the altar and the
+    thief fill it again.
+- Owners: economy only. Dungeon's levels need nothing (the altar stays on
+  layer 1); enemy-ai's Monster.remains is untouched.
+
+tests/economy_test:
+- _test_robbers_band: a day's lift of half the altar's gold, once a day;
+  the thief's quarter; a share in whole purses and the cap; the purse
+  saved; no rules, no gold.
+- _test_robber_falls (in Main, the test's zone standing for the
+  barrow): one of two robbers falls with 50 in the band, two purses of
+  10 where he fell, 30 left; a skeleton carries none.
+
+A 30-day soak follows the landing: what the altar gets and what a robber
+carries, with treasury, unpaid and the inn against a fresh baseline.
+Server only, protocol unchanged, no new class_name.
 
 ## 579, maps' side: the barrow's mound at 12 x 12, a landmark on the way
 

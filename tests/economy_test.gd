@@ -48,6 +48,7 @@ func _ready() -> void:
 	_test_barter()
 	_test_maker_barter()
 	_test_barrow_charges()
+	_test_robbers_band()
 	_test_restart()
 	await _test_in_town()
 	print("")
@@ -168,6 +169,41 @@ func _test_barter() -> void:
 
 ## The medicine man's barter (decision 562; Jeff: "hob can have a stamina
 ## potion ... and trades for herbs - other npcs don't find herbs useful").
+func _test_robbers_band() -> void:
+	print("
+== the grave robbers' purse (580, economy's side) ==")
+	var robbers: Dictionary = Production.read_rules(Economy.PATH)["robbers"]
+	_check(float(robbers["altar_share"]) == 0.5 and float(robbers["thief_cut"]) == 0.25 and int(robbers["most"]) == 40
+		and robbers["kinds"] == ["robber"] and robbers["barrow"] == "barrow", "the rules are economy.json's (%s)" % [robbers])
+	var rules := RULES.duplicate(true)
+	rules["robbers"] = robbers
+	_now = 0
+	var clock := func() -> int: return _now
+	var stock := Stockpile.new({}, clock, ItemBook.new(clock))
+	var work := Production.new({}, stock, null, clock, rules, func() -> Dictionary: return CATALOG)
+	var economy := Economy.new({}, stock, work, clock, rules, func() -> Dictionary: return CATALOG)
+	economy.altar_down(TOWN, 50)
+	economy._band_turn()
+	_check(economy.band_gold("barrow") == 25 and economy.below_gold(TOWN) == 25, "a day: the robbers lift half the altar's gold (%d, %d left)"
+		% [economy.band_gold("barrow"), economy.below_gold(TOWN)])
+	economy._band_turn()
+	_check(economy.band_gold("barrow") == 25, "and once a day only")
+	_now = DayNight.day_steps
+	economy._band_turn()
+	_check(economy.band_gold("barrow") == 37 and economy.below_gold(TOWN) == 13, "the next day half again (%d)" % economy.band_gold("barrow"))
+	work.add_worker("nell", "Nell", ["weaver"], TOWN)
+	work.pay("nell", 8, "test")
+	_check(economy.thief_cut(work, "nell", 8) == 2 and int(work.worker("nell")["purse"]) == 6 and economy.band_gold("barrow") == 39,
+		"the thief pays a quarter of his lift to the robbers (%d left him)" % int(work.worker("nell")["purse"]))
+	_check(economy.band_share("barrow", 3) == 10 and economy.band_gold("barrow") == 29, "one of three falls: 39 / 3 is 13, a whole purse of 10")
+	economy.band_add("barrow", 200, "test")
+	_check(economy.band_share("barrow", 1) == 40, "at most 40 on one robber")
+	var saved: Dictionary = JSON.parse_string(JSON.stringify(economy.to_dict()))
+	var loaded := Economy.new(saved, stock, work, clock, rules, func() -> Dictionary: return CATALOG)
+	_check(loaded.band_gold("barrow") == 189 and loaded._band_day == 1, "the purse and its day saved (%d)" % loaded.band_gold("barrow"))
+	_check(_fresh().band_share("barrow", 1) == 0, "no rules, no gold: empty pockets")
+
+
 func _test_barrow_charges() -> void:
 	print("== the draugr's deals and a player's charges (573, economy's side) ==")
 	var field: Dictionary = Production.read_rules()["return"]["field"]
@@ -353,6 +389,7 @@ func _test_in_town() -> void:
 	_main._save_state()
 	_check(Snapshot.load(Net.state_path)["economy"]["purses"].get(me) == 18, "the snapshot keeps the host's 18 gold")
 	await _test_barter_in_town(host, counter)
+	_test_robber_falls(host)
 	remove_child(_main)
 	_main.free()
 	World.clear_zones()
@@ -397,6 +434,34 @@ func _test_barter_in_town(host: Player, counter: Chest) -> void:
 	World.command(host, "barter", {"shop": str(counter.get_path())})
 	_check(_main.barter_data.get("why") == "too far from the counter", "away from the counter and any merchant: too far")
 	await get_tree().process_frame
+
+
+## A robber falls in the barrow (580, economy's side; the test's zone stands
+## for it): his share of the band's purse lies where he fell as coin purses.
+func _test_robber_falls(host: Player) -> void:
+	print("
+== a grave robber falls with gold on him ==")
+	World.economy.rules["robbers"] = Production.read_rules(Economy.PATH)["robbers"].duplicate(true)
+	World.economy.rules["robbers"]["barrow"] = World.zone.name
+	var robbers: Array[GridEntity] = []
+	for i in 2:
+		robbers.append(_main._spawn({"script": "res://sim/monster.gd", "shape": "capsule", "kind": "robber", "name": "Robber%d" % i,
+			"tile": _main._nearest_free(host.tile + Vector2i(3 + i, 2))}))
+	_check(robbers.all(func(each: GridEntity) -> bool: return each != null), "two robbers stand")
+	World.economy.band_add(World.zone.name, 50, "test")
+	var at := robbers[0].tile
+	World.damage(robbers[0], 999)
+	var dropped := Array(World.ground_at(at)).filter(func(id: String) -> bool: return id == "coin_purse")
+	_check(dropped.size() == 2 and World.economy.band_gold(World.zone.name) == 30, "one of two falls: 25 is two purses of 10, 30 left the band (%s)"
+		% [Array(World.ground_at(at))])
+	var none: GridEntity = _main._spawn({"script": "res://sim/monster.gd", "shape": "capsule", "kind": "skeleton", "name": "Bones",
+		"tile": _main._nearest_free(host.tile + Vector2i(-3, 2))})
+	var bones_at: Vector2i = none.tile
+	var before := Array(World.ground_at(bones_at)).count("coin_purse")
+	World.damage(none, 999)
+	_check(Array(World.ground_at(bones_at)).count("coin_purse") == before and World.economy.band_gold(World.zone.name) == 30,
+		"a skeleton carries none of it (%s)" % [Array(World.ground_at(bones_at))])
+	World.damage(robbers[1], 999)
 
 
 func _check(ok: bool, label: String) -> void:

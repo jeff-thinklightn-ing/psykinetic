@@ -102,6 +102,10 @@ var _below: Dictionary = {}
 var _down_day: Dictionary = {}
 ## The day of the last wage floor turn (decision 528), -1 before the first.
 var _floor_day := -1
+## The grave robbers' purse by barrow level (580, economy's side), and the
+## day they last lifted from the altars.
+var _bands: Dictionary = {}
+var _band_day := -1
 ## What each worker the town owes is owed for: worker id -> [resource]
 ## (522 amended: the head build's suppliers paid first).
 var _owed_what: Dictionary = {}
@@ -635,6 +639,7 @@ func sell(player_id: String, town: String, id: String, is_fenced := false, at :=
 ## makes any. Each trade is a ledger line (Stockpile.note) and the
 ## worker's last_trade; Production.on_dole a signal.
 func tick() -> void:
+	_band_turn()
 	var folk: Dictionary = rules.get("folk", {})
 	var needs: Dictionary = folk.get("needs", {})
 	if needs.is_empty():
@@ -1299,6 +1304,67 @@ static func barrow_migrated(saved: Dictionary) -> Dictionary:
 	if best.is_empty() and (uses > 0 or saved.has("of")):
 		best = "easy"
 	return {"tokens": uses, "best": best, "containers": []}
+
+
+## The robbers' rules (economy.json "robbers", 580 economy's side).
+func _robbers() -> Dictionary:
+	var rule: Variant = rules.get("robbers", {})
+	return rule if rule is Dictionary else {}
+
+
+## The gold the grave robbers of [param barrow] (a level) hold among them.
+func band_gold(barrow: String) -> int:
+	return int(_bands.get(barrow, 0))
+
+
+## [param gold] into [param barrow]'s robbers' purse, from [param why].
+func band_add(barrow: String, gold: int, why: String) -> void:
+	if gold <= 0 or barrow.is_empty():
+		return
+	_bands[barrow] = band_gold(barrow) + gold
+	print("[economy] the robbers of %s take %d gold (%s): %d now, step %d" % [barrow, gold, why, band_gold(barrow), now()])
+
+
+## Once a game day the robbers lift robbers.altar_share of the gold below
+## at every town's altar (the plunder: what angers the old gods in lore,
+## the pilferers), into their purse.
+func _band_turn() -> void:
+	var rule := _robbers()
+	var barrow := str(rule.get("barrow", ""))
+	var day := now() / maxi(DayNight.day_steps, 1)
+	if barrow.is_empty() or day == _band_day:
+		return
+	_band_day = day
+	var towns: Array = _below.keys()
+	towns.sort()
+	for town: String in towns:
+		band_add(barrow, lift_below(town, floori(below_gold(town) * float(rule.get("altar_share", 0.0)))), "%s's altar" % town)
+
+
+## The thief's cut to the robbers (robbers.thief_cut of what he lifted):
+## what [param thief] of [param production] pays from his purse to move it.
+func thief_cut(production: Production, thief: String, lifted: int) -> int:
+	var rule := _robbers()
+	var cut := floori(lifted * float(rule.get("thief_cut", 0.0)))
+	if cut <= 0 or not production.spend(thief, cut, "the robbers' cut"):
+		return 0
+	band_add(str(rule.get("barrow", "")), cut, "%s's cut" % production.worker(thief).get("name", thief))
+	return cut
+
+
+## A robber of [param barrow] fallen with [param standing] of the band up
+## (him among them): his share of the purse, taken out of it, in whole
+## purses (the purse item's gold) and at most robbers.most. 0 if empty.
+func band_share(barrow: String, standing: int) -> int:
+	var rule := _robbers()
+	var each := int(Items.def(str(rule.get("purse", "coin_purse"))).get("yield", {}).get("gold", 10))
+	var share := mini(band_gold(barrow) / maxi(standing, 1), int(rule.get("most", 40)))
+	share -= share % maxi(each, 1)
+	if share <= 0:
+		return 0
+	_bands[barrow] = band_gold(barrow) - share
+	print("[economy] a robber of %s falls with %d gold, %d left them, step %d" % [barrow, share, band_gold(barrow), now()])
+	return share
 
 
 ## Robbers or a player lift [param amount] from [param town]'s altar: what
@@ -2152,7 +2218,7 @@ func pay_commission(player_id: String, town: String, gold_owed: int) -> int:
 func to_dict() -> Dictionary:
 	return {"purses": _purses.duplicate(), "log": _log.duplicate(true), "paid": _paid.duplicate(true), "hauled": _hauled.duplicate(),
 		"player_owed": _player_owed.duplicate(true), "apprentice_paid": _apprentice_paid.duplicate(), "funds": _funds.duplicate(true),
-		"caravans": _caravans.duplicate(true), "bought": _bought.duplicate(true), "trade_day": _trade_day, "floor_day": _floor_day, "alms": _alms.duplicate(), "below": _below.duplicate(), "down_day": _down_day.duplicate(), "landed": _landed.duplicate(), "owed_what": _owed_what.duplicate(true),
+		"caravans": _caravans.duplicate(true), "bought": _bought.duplicate(true), "trade_day": _trade_day, "floor_day": _floor_day, "alms": _alms.duplicate(), "below": _below.duplicate(), "down_day": _down_day.duplicate(), "bands": _bands.duplicate(), "band_day": _band_day, "landed": _landed.duplicate(), "owed_what": _owed_what.duplicate(true),
 		"commissions": _commissions.duplicate()}
 
 
@@ -2178,6 +2244,11 @@ func from_dict(saved: Dictionary) -> void:
 					_bought[str(market)][str(what)] = maxf(float(bought[market][what]), 0.0)
 	_trade_day = int(saved.get("trade_day", -1))
 	_floor_day = int(saved.get("floor_day", -1))
+	_band_day = int(saved.get("band_day", -1))
+	var bands: Variant = saved.get("bands", {})
+	if bands is Dictionary:
+		for barrow: Variant in bands:
+			_bands[str(barrow)] = maxi(int(bands[barrow]), 0)
 	for key: String in ["alms", "below", "down_day"]:
 		var each: Variant = saved.get(key, {})
 		if each is Dictionary:
