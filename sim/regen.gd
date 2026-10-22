@@ -59,12 +59,20 @@ static func in_test_run() -> bool:
 	return false
 
 
-## Whether a generation may be laid now: the server was started with
+## Whether this run may write the overlay it reads: no test run (tests/run.sh's
+## --run-marker) ever writes the shared one (CLAUDE.md); a test with its own
+## overlay may.
+static func overlay_safe() -> bool:
+	return not in_test_run() or Level.overlay_dir != Level.OVERLAY
+
+
+## Whether a generation may be laid when due: the server was started with
 ## --regenerate or the console switched it on (Net.regenerate, as raid
 ## groups with --raids, 328), and this is no test run on the shared
-## overlay. Off, a marked level stays as it is.
+## overlay. Off, a marked level stays as it is (the console's "regenerate
+## now <level>" lays one regardless, 541 amended).
 static func may_write() -> bool:
-	return Net.regenerate and (not in_test_run() or Level.overlay_dir != Level.OVERLAY)
+	return Net.regenerate and overlay_safe()
 
 
 ## The levels and their blocks are read again on the next ask: a level

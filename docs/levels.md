@@ -528,7 +528,11 @@ sealed `draugr` (540). The wilds hold the other ends (maps' side of 542).
 Levels regenerate only on a server started with `--regenerate` (as raid
 groups with `--raids`, decision 328) or after the console's `regenerate on`
 (`regenerate` alone lists the marked levels and their generations); the
-box's service runs with it. Off, and in any test run (tests/run.sh passes
+box's service runs with it. `regenerate now <level>` (541 amended) lays a
+marked level again at once, due or not, the switch on or off, so long as
+nobody is in it (it says so otherwise): release runs it after a deploy
+that changes a template, players checked first, so Jeff meets the new
+shape at the deploy rather than at the next due day. Off, and in any test run (tests/run.sh passes
 `--run-marker`) on the shared overlay, nothing is laid (`Regen.may_write`):
 the barrow stays its template, its anchors in the rock. A test that wants
 generations switches `Net.regenerate` on and points `Level.overlay_dir` at

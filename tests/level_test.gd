@@ -897,6 +897,9 @@ func _test_barrow_level() -> void:
 	var listed: String = _main.admin_command("regenerate")
 	_check(listed.begins_with("regenerate on") and "barrow: generation 0, every 3 days" in listed, "the console lists the marked levels (%s)" % listed.replace("\n", "; "))
 	_check(_main.admin_command("regenerate off").begins_with("regenerate off") and not Net.regenerate, "and switches it off")
+	_check(_main.admin_command("regenerate now barrow") == "regenerate now: refused in a test run on the shared overlay" and not Level.overlaid("barrow"),
+		"regenerate now (541 amended) is refused in a test run on the shared overlay: the barrow stays its template")
+	_check(_main.admin_command("regenerate now castle").begins_with("regenerate now: castle is no shifting level"), "and names a level that does not shift")
 
 
 func _test_edge_links() -> void:

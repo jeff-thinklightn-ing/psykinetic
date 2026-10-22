@@ -9956,10 +9956,32 @@ func _count_down_restart() -> void:
 
 ## Server: the console's raids (decision 328): on, off, the groups out, or
 ## one sent at once from a camp at a town.
-## The console's "regenerate [on|off]" (decision 542): whether the shifting
+## The console's "regenerate now <level>" (541 amended, Jeff meets the wider
+## barrow at the deploy): the level laid again at once, due or not, the
+## switch on or off, so long as nobody is in it (release runs it after a
+## deploy that changes a template, players checked first); never in a
+## test run on the shared overlay. Says what it did.
+func _regenerate_now(level_name: String) -> String:
+	if not Net.is_authority():
+		return "regenerate now: the server's alone"
+	if not Regen.marked(level_name):
+		return "regenerate now: %s is no shifting level (%s)" % [level_name, ", ".join(Regen.marked_levels())]
+	if not Regen.overlay_safe():
+		return "regenerate now: refused in a test run on the shared overlay"
+	var zone: Zone = World.zones.get(level_name)
+	if zone != null and World.zone_awake(zone):
+		return "regenerate now: %s is awake, someone is in it; again when it sleeps" % level_name
+	if _regenerate(level_name, Regen.config_of(level_name)):
+		return "regenerate now: %s laid again, generation %d" % [level_name, generation_of(level_name)]
+	return "regenerate now: %s could not be laid (%d tries, or its overlay copy is edited)" % [level_name, Regen.TRIES]
+
+
+## The console's "regenerate [on|off|now <level>]" (decision 542; 541 amended): whether the shifting
 ## levels are laid again on this server (Net.regenerate; --regenerate sets
 ## it from the start), and which levels are marked, each with its generation.
 func _regenerate_command(words: PackedStringArray) -> String:
+	if words.size() >= 3 and words[1] == "now":
+		return _regenerate_now(words[2])
 	if words.size() >= 2 and words[1] in ["on", "off"]:
 		Net.regenerate = words[1] == "on"
 		return "regenerate %s: %s" % [words[1], "the shifting levels are laid again when due" if Net.regenerate else "the shifting levels stay as they are"]
@@ -10226,7 +10248,7 @@ func admin_command(line: String) -> String:
 					peers.append("%s rtt %d ms" % [_players[peer].name, roundi(link.get_statistic(ENetPacketPeer.PEER_ROUND_TRIP_TIME))])
 			return "%s\n%s" % [Net.stats.server_text(), ", ".join(peers) if not peers.is_empty() else "no peers"]
 		"help":
-			return "reset | respawn | players | net | version | restart|stop [<seconds>] [<why>] | restart cancel | reload <zone>|all | raids [on|off|send <camp> <town>] | regenerate [on|off] | companions | zones | zone reset <name> | zone move <player> <zone> | mark <player> <mark>|-<mark> | " \
+			return "reset | respawn | players | net | version | restart|stop [<seconds>] [<why>] | restart cancel | reload <zone>|all | raids [on|off|send <camp> <town>] | regenerate [on|off|now <level>] | companions | zones | zone reset <name> | zone move <player> <zone> | mark <player> <mark>|-<mark> | " \
 				+ "mind scripted|ollama | mind log on|off | mind last <name> | perception list|grid|both | " \
 				+ "transcript <name> [<date>] | companion facts <player> | companion forget <player> <id> | save | builder | builder export | builder drop <name> | hour [<h>] | day_minutes [<m>] | season [<name>] | season_days [<n>] | weather [<kind>|auto|reload] [<minutes>] [<region>|all]"
 	return "unknown command %s (try help)" % words[0]

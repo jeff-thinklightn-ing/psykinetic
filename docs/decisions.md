@@ -16719,8 +16719,14 @@ moves with them, the wilds refer to the barrow by spawn names alone, so maps
 changes nothing; the block's monsters take enemy-ai's approved counts, 4
 skeletons and 2 robbers, and two skeleton_guard markers stand by the altar
 instead of three. The level is data both sides read, so it ships only in a full
-cut, never server-alone. labyrinth_test (the bands at 32 and 62, the width),
-level_test; docs/levels.md; CHANGELOG.
+cut, never server-alone. The console gains "regenerate now <level>"
+(Main._regenerate_now; admin.sh passes it): the level laid again at once,
+due or not, the switch on or off, when nobody is in it (it says so
+otherwise), never in a test run on the shared overlay (Regen.overlay_safe,
+split from may_write), so release runs it after the deploy, players
+checked first, and Jeff meets the wider barrow then rather than at its
+next due day. labyrinth_test (the bands at 32 and 62, the width),
+level_test, regen_test (regenerate now); docs/levels.md; CHANGELOG.
 ## 542. The Barrow: the first real level that regenerates
 
 Jeff asked for it (docs/lore/crypt.md, 2026-10-19: "the barrow is the

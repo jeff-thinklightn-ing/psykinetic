@@ -59,6 +59,7 @@ func _ready() -> void:
 	_test_edited_level_refused()
 	_test_saved()
 	_test_castle_never_marked()
+	_test_regenerate_now()
 
 	DirAccess.remove_absolute(Net.state_path)
 	Net.state_path = ""
@@ -368,6 +369,23 @@ func _test_castle_never_marked() -> void:
 		if not level_name.begins_with("rg_") and Regen.marked(level_name):
 			marked.append(level_name)
 	_check(marked == ["barrow"], "under levels/ the barrow alone is, Jeff's starter dungeon (542) (%s)" % [marked])
+
+
+func _test_regenerate_now() -> void:
+	print("\n== the console's regenerate now <level> (541 amended): laid at once, due or not, never under anyone's feet ==")
+	_check(_main.admin_command("regenerate now rg_halls").begins_with("regenerate now: rg_halls is awake") and _main.generation_of("rg_halls") == 3,
+		"refused while Bo is in the halls: still generation 3")
+	_check(_main.admin_command("regenerate now rg_edited").begins_with("regenerate now: rg_edited could not be laid") and _main.generation_of("rg_edited") == 0,
+		"the edited level's write is refused as ever")
+	var template := Level.template("rg_halls")
+	Level.register("rg_now", template["layout"], null, template["config"])
+	Net.regenerate = false
+	var first: String = _main.admin_command("regenerate now rg_now")
+	_check(first == "regenerate now: rg_now laid again, generation 1" and _main.generation_of("rg_now") == 1 and Level.overlaid("rg_now"),
+		"a level nobody is in is laid at once, the switch off (%s)" % first)
+	var second: String = _main.admin_command("regenerate now rg_now")
+	_check(second == "regenerate now: rg_now laid again, generation 2" and _main.generation_of("rg_now") == 2, "and again, due or not (%s)" % second)
+	Net.regenerate = true
 
 
 # --- Helpers ----------------------------------------------------------------------
