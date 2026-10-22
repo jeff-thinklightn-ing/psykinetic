@@ -21328,3 +21328,14 @@ closing them (Esc, O, Main.toggle_options) brings the menu back; in play
 nothing changes. --test-show=menu_options for the shot. ui_test: the
 options on top with the menu aside, Esc bringing it back, the panel's
 place. Client only; no new class_name.
+
+## 597, ui's side: "winded" on the HUD's state line
+
+Combat's step 2 (597): swings cost stamina and a body at 0 is winded
+until a quarter is back (GridEntity.winded, replicated). There is no
+stamina bar (the no-bars rule; F3 has the number), so ui's read is one
+word on the HUD's state line while the flag is true, "winded", as "hidden
+in the grass" and "bow drawn" read there (Main.is_winded, the flag read by
+name, false on a body without it, so either side lands first); the body's
+slump and the breath are pc-character's and sound's. The coordinator's
+yes, 2026-10-22. ui_test. Client only; protocol unchanged on this side.

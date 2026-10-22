@@ -536,6 +536,13 @@ func _test_aim() -> void:
 	World.step()
 	_main._on_world_ticked(World.tick)
 	_check(not _main.hud.text.begins_with("HP"), "the HUD's line carries no HP number (%s)" % _main.hud.text)
+	# Combat's stamina: "winded" on the state line while the replicated flag is true, read by name.
+	var winded_body: GridEntity = load(Main.RESIDENT).new()
+	_check(not Main.is_winded(winded_body) and not Main.is_winded(null), "no winded flag on a body (or no body): not winded")
+	if "winded" in winded_body:
+		winded_body.set("winded", true)
+		_check(Main.is_winded(winded_body), "the flag set: winded")
+	winded_body.free()
 
 
 func _test_revive_reads() -> void:

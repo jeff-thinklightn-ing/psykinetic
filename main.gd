@@ -7450,6 +7450,13 @@ static func standing_words(title: String) -> String:
 	return 'say "yes" to take it: %s' % title if not title.is_empty() else ""
 
 
+## Whether [param body] is winded (combat's replicated GridEntity.winded,
+## read by name: false on a body without it).
+static func is_winded(body: GridEntity) -> bool:
+	var flag: Variant = body.get("winded") if body != null else null
+	return flag is bool and flag
+
+
 ## The HUD's words while the local player lies dead (396 amended, ui's
 ## side; Jeff's "not respawning"): who is bringing them back and where,
 ## with the seconds left, "soon" when the wait is not known ([param
@@ -9750,6 +9757,8 @@ func _on_world_ticked(tick: int) -> void:
 			hp_text += "   bow drawn"  # How far: the body, the ring and the creak (decision 475); F3 has the number.
 		if _hidden_in_cover(player, tick):
 			hp_text += "   hidden in the grass"  # Decision 515: the one cue that the cover works.
+		if is_winded(player):
+			hp_text += "   winded"  # Combat's stamina (step 2), ui's side: the one word, no bar; the body and the breath say the rest.
 		_watch_bond()
 		if not _bond_hint.is_empty() and Time.get_ticks_msec() / 1000.0 < _bond_hint_until:
 			hp_text += "   " + _bond_hint  # 555, ui's side: her step dropped, said for BOND_HINT_SECONDS.

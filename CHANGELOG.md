@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Out of breath after too many swings, the top line says "winded" until you have some wind back; no bar, the body and the breath say the rest (597, ui's side; the stamina costs are combat's).
 - The HP number is gone from the top of the screen: how hurt you are reads from your body and the grey, as the no-bars rule says; F3 still has the number (401 amended).
 - The main menu no longer blocks the options screen: Options steps the menu aside, and Esc or O brings it back (418 amended).
 - The medicine man's barter window offers his care: "Pay 10 to be in his care" (then "In his care"), so a healer's hut brings you back once you have paid (584, ui's side; the care itself is economy's).
