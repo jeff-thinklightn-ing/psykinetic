@@ -803,9 +803,9 @@ func _test_bash() -> void:
 	var expect := World.push_force(host, imp) * World.ATTACK_FORCE_FACTOR * 2.0
 	var from := imp.tile
 	var at := World.tick
-	World.command_attack(host, imp)
+	World.order_signature(host, imp)  # Ctrl and a click (decision 593; 379's left button with the shield up before).
 	_steps(1)
-	_check(bashes == [false] and imp.hp == hp and World.is_stunned(imp), "raised: the left button bashes; no damage, the imp staggered")
+	_check(bashes == [false] and imp.hp == hp and World.is_stunned(imp), "the signature bashes; no damage, the imp staggered")
 	_check(host.stamina == host.max_stamina - 3 and host.next_bash_tick >= at + 20 and not World.bash_ready(host),
 			"3 stamina (%d of %d), and not again for 20 ticks" % [host.stamina, host.max_stamina])
 	_check((imp.tile != from) == (expect >= World.knockback_min_force),

@@ -4670,8 +4670,10 @@ func order_step(entity: GridEntity, direction: Vector2i, epoch: int, predicted: 
 	player.queued_steps.append({"direction": direction, "predicted": predicted})
 
 
-## Player intent: swing toward [param direction] at the next free tick (an
-## attack with nothing there).
+## Player intent: swing toward [param direction] where it stands (decision
+## 593's stand-and-swing; the WASD scheme's click), at the next free tick:
+## whatever stands in its way then (stand_target) takes the blow, else it is
+## a swing at the air. It never steps.
 func order_swing(entity: GridEntity, direction: Vector2i) -> void:
 	if not Net.is_authority():
 		return
@@ -4681,6 +4683,50 @@ func order_swing(entity: GridEntity, direction: Vector2i) -> void:
 	entity.action_target = null
 	entity.action_direction = direction
 	entity.has_move_order = false
+
+
+## Player intent (decision 593: Ctrl and a click): [param entity]'s
+## signature move (signature_of) at [param target], from where it stands:
+## refused out of reach, never walked to.
+func order_signature(entity: GridEntity, target: GridEntity) -> void:
+	if not Net.is_authority() or signature_of(entity).is_empty():
+		return
+	_order_action(entity, GridEntity.Order.SIGNATURE, target, Vector2i.ZERO)
+
+
+## [param entity]'s signature move (decision 593): "bash" with a shield that
+## bashes in its left hand (bash_verb, 379), else what the weapon in its
+## right hand names as its "signature" (the bow's heavy shot, the spear's
+## charge, later); "" for none.
+func signature_of(entity: GridEntity) -> String:
+	if not bash_verb(entity).is_empty():
+		return "bash"
+	if not is_instance_valid(entity) or not holds_in_hands(entity):
+		return ""
+	return str(Items.verb_of(entity.slots[Items.RIGHT_HAND]).get("signature", ""))
+
+
+## Who a swing by [param entity] toward [param direction] from where it
+## stands would strike (decision 593): the first body that way it may attack
+## and can reach (in_reach: the cell beside, a spear's further along), never
+## its keeper's own companion; null for none.
+func stand_target(entity: GridEntity, direction: Vector2i) -> GridEntity:
+	if direction not in DIRECTIONS:
+		return null
+	var cells := 1
+	var verb := blow_verb(entity)
+	if verb.get("kind") == "reach":
+		cells = int(verb["cells"])
+	for i in range(1, cells + 1):
+		var other: GridEntity = _occupancy.get(entity.tile + direction * i)
+		if other == null or other == entity:
+			continue
+		if not other.spawned or not can_target(entity, other) or not in_reach(entity, other):
+			return null
+		if other.keeper_peer != 0 and other.keeper_peer == entity.owner_peer:
+			return null
+		return other
+	return null
 
 
 ## Player intent: attack [param target] on the entity's next free tick.

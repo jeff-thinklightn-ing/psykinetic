@@ -40,6 +40,8 @@ func _ready() -> void:
 	_test_schemes_are_inert_outside()
 	_test_click_uses_the_frame_pick()
 	_test_friend_click()
+	_test_stand_and_signature()
+	_test_cursor_bandage()
 	_test_item_keys()
 
 	print("")
@@ -615,7 +617,7 @@ func _test_click_uses_the_frame_pick() -> void:
 
 func _test_friend_click() -> void:
 	print("
-== a left click on a friend talks, never attacks; Shift+click attacks one (decision 454) ==")
+== a left click on a friend talks, never attacks; Shift's swing strikes one (decisions 454, 593) ==")
 	var saved: String = Net.controls
 	Net.controls = "click"
 	var player := _place_player(Vector2i(11, 3))
@@ -634,22 +636,134 @@ func _test_friend_click() -> void:
 	Net.hints = true
 	_check(_main.context_hint_for(body) == "LMB  interact", "the hint says interact with hints=on (560; %s)" % _main.context_hint_for(body))
 	Net.hints = hints_were
-	_check("Shift+LMB	attack a friend" in _main.hint_lines(), "the controls list says Shift+LMB attacks a friend")
+	_check("Shift+LMB	swing where you stand" in _main.hint_lines(), "the controls list says Shift+LMB swings where you stand")
 	player.has_move_order = false
 	_left(true)
-	_check(player.action_order == GridEntity.Order.ATTACK and _main._talk_wanted == null, "Shift+click: an attack order")
+	_check(player.action_order == GridEntity.Order.SWING and not player.has_move_order and _main._talk_wanted == null,
+			"Shift+click from afar: a swing where you stand, no walk, no talk")
+	var hp := body.hp
+	_wait_free(player)
+	World.step()
+	_check(body.hp == hp and player.tile == Vector2i(11, 3), "out of reach: nothing struck, not a step taken")
+	_place_player(Vector2i(10, 5))
+	_left(true)
+	_wait_free(player)
+	World.step()
+	_resolve()
+	_check(body.hp < hp, "beside them, Shift+click strikes the friend that way (%d -> %d)" % [hp, body.hp])
 	player.action_order = GridEntity.Order.NONE
 	World.despawn(body)
 	Net.controls = saved
 
 
-func _left(shift: bool) -> void:
+func _left(shift: bool, ctrl := false) -> void:
 	for pressed in [true, false]:
 		var click := InputEventMouseButton.new()
 		click.button_index = MOUSE_BUTTON_LEFT
 		click.pressed = pressed
 		click.shift_pressed = shift
+		click.ctrl_pressed = ctrl
 		_main._unhandled_input(click)
+
+
+## A few ticks, for queued hits to resolve.
+func _resolve() -> void:
+	for i in 3:
+		World.step()
+
+
+func _test_stand_and_signature() -> void:
+	print("
+== Shift swings at air where you stand; Ctrl is the shield's bash, a plain click with it up strikes (decision 593) ==")
+	var saved: String = Net.controls
+	Net.controls = "click"
+	_kill_monsters()
+	var player := _place_player(Vector2i(11, 3))
+	_main._pick_grid = Vector2(13.0, 3.2)
+	_swings.clear()
+	_left(true)
+	_wait_free(player)
+	World.step()
+	_check(_swings == [Vector2i(1, 0)] and player.tile == Vector2i(11, 3), "Shift on empty ground: a swing east at the air, no step (%s)" % [_swings])
+	var imp := _main._spawn({"script": "res://sim/monster.gd", "shape": "capsule",
+		"name": "BashImp", "tile": Vector2i(12, 3), "props": {"mass": 40.0}}) as Monster
+	imp.sight_range = 0
+	_main._pick_grid = Vector2(12.1, 3.0)
+	_left(false, true)
+	_check(player.action_order == GridEntity.Order.NONE, "Ctrl+click with no shield: no signature, nothing ordered")
+	var shield := World.items.mint("shield", "built")
+	World.put_item(player, player, Player.LEFT_HAND, shield)
+	_check(World.signature_of(player) == "bash", "a shield in the left hand: the signature is the bash")
+	var bashes := []
+	var bashed := func(_by: GridEntity, _target: GridEntity, opened: bool) -> void: bashes.append(opened)
+	World.shield_bashed.connect(bashed)
+	_wait_free(player)
+	_left(false, true)
+	_check(player.action_order == GridEntity.Order.SIGNATURE, "Ctrl+click on the imp: a signature order")
+	_resolve()
+	_check(bashes.size() == 1 and World.is_stunned(imp), "bashed: the imp staggered")
+	World.try_stance(player, "block")
+	_wait_free(player)
+	var hp := imp.hp
+	_left(false)
+	_check(player.action_order == GridEntity.Order.ATTACK, "a plain click with the shield up: an attack order")
+	_wait_free(player)
+	_resolve()
+	_check(bashes.size() == 1 and imp.hp < hp, "a blow, not a bash (379's left button moved to Ctrl; %d -> %d)" % [hp, imp.hp])
+	World.try_stance(player, "")
+	_kill_monsters()
+	var two := Vector2i(-1, -1)  # Two cells off, the one between free.
+	for direction: Vector2i in World.DIRECTIONS:
+		if World.is_free(player.tile + direction) and World.is_free(player.tile + direction * 2) 				and World.can_melee(player.tile, player.tile + direction):
+			two = player.tile + direction * 2
+			break
+	var far := _main._spawn({"script": "res://sim/monster.gd", "shape": "capsule",
+		"name": "FarImp", "tile": two, "props": {"mass": 40.0}}) as Monster
+	far.sight_range = 0
+	_main._pick_grid = Vector2(two)
+	player.next_bash_tick = 0
+	_left(false, true)
+	_resolve()
+	_check(bashes.size() == 1 and player.tile == Vector2i(11, 3), "Ctrl+click two cells off: no walk, no bash")
+	World.shield_bashed.disconnect(bashed)
+	World.items.end(World.take_item(player, player, Player.LEFT_HAND), "gone")
+	_kill_monsters()
+	player.action_order = GridEntity.Order.NONE
+	Net.controls = saved
+
+
+func _test_cursor_bandage() -> void:
+	print("
+== B puts a bandage on the cursor; a click applies it, never an attack; Esc puts it back (decision 593) ==")
+	var saved: String = Net.controls
+	Net.controls = "click"
+	_kill_monsters()
+	var player := _place_player(Vector2i(11, 3))
+	_press(KEY_B)
+	_check(_main._cursor_item.is_empty(), "no kit: B puts nothing on the cursor")
+	var kit := World.items.mint("bandaging_kit", "built")
+	World.put_item(player, player, Player.RIGHT_HAND, kit)
+	_press(KEY_B)
+	_check(_main._cursor_item.get("kind") == "bandage", "with a kit: a bandage on the cursor")
+	_press(KEY_ESCAPE)
+	_check(_main._cursor_item.is_empty(), "Esc puts it back")
+	var imp := _main._spawn({"script": "res://sim/monster.gd", "shape": "capsule",
+		"name": "CursorImp", "tile": Vector2i(12, 3), "props": {"mass": 40.0}}) as Monster
+	imp.sight_range = 0
+	_press(KEY_B)
+	_main._pick_grid = Vector2(12.0, 3.0)
+	_left(false)
+	_check(player.action_order == GridEntity.Order.NONE and not player.has_move_order and _main._cursor_item.is_empty(),
+			"a click on a monster with the bandage on the cursor: no attack, no walk; the cursor emptied")
+	_kill_monsters()
+	player.hp = player.max_hp - 5
+	player.hurt_tick = -1000
+	_press(KEY_B)
+	_main._pick_grid = Vector2(11.0, 3.0)
+	_left(false)
+	_check(player.mending == 1, "B, then a click on yourself: the bandage goes on")
+	World.items.end(World.take_item(player, player, Player.RIGHT_HAND), "gone")
+	Net.controls = saved
 
 
 # --- helpers ------------------------------------------------------------------

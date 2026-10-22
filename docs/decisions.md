@@ -21339,3 +21339,46 @@ in the grass" and "bow drawn" read there (Main.is_winded, the flag read by
 name, false on a body without it, so either side lands first); the body's
 slump and the breath are pc-character's and sound's. The coordinator's
 yes, 2026-10-22. ui_test. Client only; protocol unchanged on this side.
+## 593. Combat step 1: input plumbing (stand and swing, the signature, the cursor's bandage)
+
+Jeff's combat design (docs/combat_design.md, 588), its build order's first
+step; the coordinator approved combat's design (2026-10-22,
+C:/dev/review/combat/step1_audit_and_input.md) with its conflicts settled.
+
+- Shift and a left click (Keys "stand", was 454's "attack_friend"; a
+  settings line key_attack_friend is read as stand's): a swing where you
+  stand toward the cursor's ground point, no step. The client sends
+  "swing" {at: [x, y]}; the server snaps it to one of the eight ways and
+  orders the swing (World.order_swing). When it is due, World.stand_target
+  names who stands that way within reach (the cell beside, a spear's
+  further along; never its keeper's own companion) and that one takes an
+  ordinary blow (a heavy weapon's wind-up, 392); nobody: a swing at the
+  air. A friend there is struck, as Shift did before; from afar nobody is
+  walked to. The WASD scheme's click-a-direction swing ("dir") goes the
+  same way, so a crate or anyone beside it now takes a WASD swing.
+- Ctrl and a left click (Keys "signature"): the held weapon's signature
+  move (World.signature_of): "bash" with a shield that bashes in the left
+  hand (379), else the right hand's verb "signature" (none yet; the bow's
+  heavy shot, the spear's charge later, items' data). "signature" {at};
+  the server orders it on the body beside it that way
+  (World.order_signature, Order.SIGNATURE): out of reach it is dropped,
+  never walked to. 379's bash on the left button with the shield raised is
+  gone: a plain click with the shield up is a blow.
+- The right button with a shield raised sends the cursor's point
+  ("stance" {kind, at}) and the bearer turns to it: the shield's arc is
+  aimed by the cursor. The bow's right button is untouched (Jeff,
+  2026-10-22: the draw moves to the left button in pc-character's archery
+  refinement, the right becomes combat's backstep, after it lands).
+- B (Keys "bandage"; builder mode moves to K): a bandage on the cursor
+  from the kit carried (Main._cursor_item {kind, slot}); a left click on
+  yourself or an ally sends "apply_item" {slot, target} (the server: the
+  slot's thing used to "bandage", then try_bandage, or the return on the
+  downed, as E's hold); any other click, B again, the right button or Esc
+  puts it back, and no click with it on attacks or walks. E held still
+  bandages, until Jeff has played a cut with B. The cursor's look is ui's.
+- Wire: PROTOCOL_REVISION 31.
+
+controls_test: Shift on air, out of reach, beside a friend; Ctrl without a
+shield, with one, two cells off; a plain click with the shield up; B, Esc,
+a click on a monster, a click on yourself. items_test's bash goes through
+order_signature. ui_test's key table. No new class_name.

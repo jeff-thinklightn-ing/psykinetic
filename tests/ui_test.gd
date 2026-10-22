@@ -705,8 +705,8 @@ func _test_keys() -> void:
 	var today := {"forward": KEY_W, "back": KEY_S, "left": KEY_A, "right": KEY_D,
 		"open": KEY_E, "pack": KEY_I, "pick_up": KEY_F, "drop": KEY_G, "throw": KEY_T, "talk": KEY_ENTER,
 		"talk_log": KEY_TAB, "map": KEY_M, "lantern": KEY_L, "reset": KEY_R, "options": KEY_O, "hints": KEY_H,
-		"debug": KEY_F3, "fullscreen": KEY_F11, "builder": KEY_B, "phrase_1": KEY_1, "phrase_2": KEY_2,
-		"phrase_3": KEY_3, "phrase_4": KEY_4, "attack_friend": KEY_SHIFT, "screenshot": KEY_F12, "yes": KEY_Y}
+		"debug": KEY_F3, "fullscreen": KEY_F11, "builder": KEY_K, "phrase_1": KEY_1, "phrase_2": KEY_2,
+		"phrase_3": KEY_3, "phrase_4": KEY_4, "stand": KEY_SHIFT, "signature": KEY_CTRL, "bandage": KEY_B, "screenshot": KEY_F12, "yes": KEY_Y}
 	var same := Keys.DEFAULTS.size() == today.size()
 	for action: String in today:
 		same = same and int(Keys.DEFAULTS.get(action, -1)) == int(today[action])

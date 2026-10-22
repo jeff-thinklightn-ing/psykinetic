@@ -5,7 +5,7 @@ extends RefCounted
 ## always had them, read from settings.cfg (key_<action>=<key name>) and
 ## written back by the Options' Controls section ("press a key"). Main and
 ## the other handlers ask Keys.is(event, "open") in place of a keycode
-## test, and Keys.held("attack_friend") for a modifier, so a rebinding
+## test, and Keys.held("stand") for a modifier, so a rebinding
 ## changes no behaviour; the hints list and the cursor's hint say the bound
 ## key (Keys.name_of). Esc is never rebound. The walk's four keys (453
 ## amended: forward, back, left, right; W, S, A, D) are rows like any other,
@@ -17,9 +17,9 @@ const DEFAULTS := {
 	"forward": KEY_W, "back": KEY_S, "left": KEY_A, "right": KEY_D,
 	"open": KEY_E, "pack": KEY_I, "pick_up": KEY_F, "drop": KEY_G, "throw": KEY_T,
 	"talk": KEY_ENTER, "talk_log": KEY_TAB, "map": KEY_M, "lantern": KEY_L, "reset": KEY_R,
-	"options": KEY_O, "hints": KEY_H, "debug": KEY_F3, "fullscreen": KEY_F11, "builder": KEY_B,
+	"options": KEY_O, "hints": KEY_H, "debug": KEY_F3, "fullscreen": KEY_F11, "builder": KEY_K,
 	"phrase_1": KEY_1, "phrase_2": KEY_2, "phrase_3": KEY_3, "phrase_4": KEY_4,
-	"attack_friend": KEY_SHIFT, "screenshot": KEY_F12, "yes": KEY_Y,
+	"stand": KEY_SHIFT, "signature": KEY_CTRL, "bandage": KEY_B, "screenshot": KEY_F12, "yes": KEY_Y,
 }
 ## What each action is called in the Options, in the order shown.
 const WORDS := {
@@ -30,7 +30,8 @@ const WORDS := {
 	"lantern": "Lantern", "reset": "Reset the room", "options": "Options", "hints": "The controls list",
 	"debug": "Debug text", "fullscreen": "Fullscreen", "builder": "Builder mode",
 	"phrase_1": "Quick phrase 1", "phrase_2": "Quick phrase 2", "phrase_3": "Quick phrase 3", "phrase_4": "Quick phrase 4",
-	"attack_friend": "Held with a click: attack a friend", "screenshot": "Screenshot",
+	"stand": "Held with a click: swing where you stand, at whatever is there", "signature": "Held with a click: your weapon's own move (a shield bashes)",
+	"bandage": "A bandage on the cursor: click yourself or an ally", "screenshot": "Screenshot",
 	"yes": "Say yes to an offer that stands",
 }
 ## Enter's other key counts as Enter.
@@ -58,7 +59,7 @@ static func matches(keycode: int, action: String) -> bool:
 	return keycode == want or keycode in ALIASES.get(want, [])
 
 
-## Whether [param action]'s key is held now (a modifier such as attack_friend,
+## Whether [param action]'s key is held now (a modifier such as stand,
 ## a walk key). A key still at its default also counts when held by its
 ## physical place on the keyboard (the walk's W on an AZERTY keyboard, as
 ## it always did); a rebound one is read by its keycode alone, the key the
@@ -135,10 +136,11 @@ static func reset() -> void:
 
 
 ## The bindings from settings lines (key_open=E ...): unknown actions and
-## keys are left as they were.
+## keys are left as they were. 593 renamed attack_friend to stand: its old
+## line is read as stand's.
 static func read(settings: Dictionary) -> void:
 	for action: String in DEFAULTS:
-		var given := str(settings.get("key_%s" % action, ""))
+		var given := str(settings.get("key_%s" % action, settings.get("key_attack_friend", "") if action == "stand" else ""))
 		if given.is_empty():
 			continue
 		var found := OS.find_keycode_from_string(given)

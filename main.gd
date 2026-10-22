@@ -199,7 +199,7 @@ var _players: Dictionary[int, Player] = {}
 var _peer_ids: Dictionary[int, String] = {}
 ## Builder mode on this server or host (null when it is off: no key, no stub).
 var _builder: BuilderHost
-## Builder mode on this client (B): selecting, asking, the ghost.
+## Builder mode on this client (K): selecting, asking, the ghost.
 var _builder_ui: BuilderUI
 ## Server only: everyone who has ever joined, by player_id. Saved in the
 ## snapshot, so a player comes back where they left off, in their colour.
@@ -391,6 +391,9 @@ var _e_door: Door
 ## The off hand raised with the right button (World.off_hand): "block",
 ## "draw", or "" (the button shoves and tosses).
 var _stance := ""
+## The thing on the cursor (decision 593): {kind: "bandage", slot}; while
+## set, a left click applies it and never attacks. {} for none.
+var _cursor_item := {}
 var _toss_from := Vector2.ZERO
 ## WASD: the camera's lean toward the cursor, in grid units (see
 ## CAMERA_LEAN_*).
@@ -1057,6 +1060,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		minimap.toggle()
 		get_viewport().set_input_as_handled()
 		return
+	if key != null and key.pressed and not key.echo and key.keycode == KEY_ESCAPE and not _cursor_item.is_empty():
+		_cursor_item = {}  # Esc puts the cursor's thing back first (decision 593).
+		get_viewport().set_input_as_handled()
+		return
 	if key != null and key.pressed and not key.echo and key.keycode == KEY_ESCAPE:
 		escape()
 		get_viewport().set_input_as_handled()
@@ -1094,6 +1101,9 @@ func _unhandled_input(event: InputEvent) -> void:
 			World.command(me, "reset", {})
 		elif Net.is_authority():
 			_start_level()
+		return
+	if Keys.pressed(event, "bandage"):
+		press_bandage()
 		return
 	if Keys.pressed(event, "lantern"):
 		var holder := _local_player()
@@ -1141,6 +1151,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		_toss_target = null
 		_held_target = NONE
 		return
+	if not _cursor_item.is_empty() and click.pressed and click.button_index in [MOUSE_BUTTON_LEFT, MOUSE_BUTTON_RIGHT]:
+		_click_cursor_item(player, click.button_index)
+		get_viewport().set_input_as_handled()
+		return
 	if click.button_index == MOUSE_BUTTON_RIGHT and not click.pressed:
 		if _stance == "block":
 			_lower_off_hand(player)  # The draw is the left button's (Jeff, 2026-10-22).
@@ -1179,18 +1193,24 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if click.button_index == MOUSE_BUTTON_RIGHT and _raise_off_hand(player):
 		return
+	# Ctrl: the held weapon's signature move; Shift: a swing where you
+	# stand, toward the cursor, at whatever is there (decision 593).
+	if click.button_index == MOUSE_BUTTON_LEFT and Keys.held_in(click, "signature"):
+		_send_at(player, "signature")
+		return
+	if click.button_index == MOUSE_BUTTON_LEFT and Keys.held_in(click, "stand"):
+		_talk_wanted = null
+		_send_at(player, "swing")
+		return
 	if click.button_index == MOUSE_BUTTON_LEFT and target is Chest:
 		_walk_to_chest(player, target)
 		return
 	var targetable := target != null and target != player and World.can_target(player, target)
 	# Left on a friend (a resident, a companion, another player), both
-	# schemes: talk, never an attack (decision 454); Shift attacks one.
+	# schemes: talk, never an attack (decision 454); Shift's swing (above)
+	# strikes one.
 	if click.button_index == MOUSE_BUTTON_LEFT and target != player and is_friend(target):
-		if not Keys.held_in(click, "attack_friend"):
-			_talk_to(player, target)
-		elif targetable and not _is_own_companion(target):
-			_talk_wanted = null
-			World.command_attack(player, target)
+		_talk_to(player, target)
 		return
 	if Net.controls == "wasd" and not on_sprite:
 		_wasd_click(player, click.button_index)
@@ -1485,8 +1505,46 @@ func _raise_off_hand(player: Player) -> bool:
 	if _stance.is_empty():
 		return false
 	_toss_target = null
-	World.command(player, "stance", {"kind": _stance})
+	var at := _mouse_grid()
+	World.command(player, "stance", {"kind": _stance} if is_nan(at.x) else {"kind": _stance, "at": [at.x, at.y]})
 	return true
+
+
+## [param command_name] ("swing", "signature") toward the ground point under
+## the cursor (decision 593); the server picks who is struck.
+func _send_at(player: Player, command_name: String) -> void:
+	var at := _mouse_grid()
+	if is_nan(at.x):
+		return
+	World.command(player, command_name, {"at": [at.x, at.y]})
+
+
+## B (decision 593): a bandage on the cursor from the kit carried, or put
+## back if one is on it already. No kit, nothing.
+func press_bandage() -> void:
+	var player := _local_player()
+	if not _cursor_item.is_empty() or player == null:
+		_cursor_item = {}
+		return
+	var slot := World.bandage_kit(player)
+	if slot >= 0:
+		_cursor_item = {"kind": "bandage", "slot": slot}
+
+
+## A click with the cursor's thing on it (decision 593): the left button
+## applies it to whoever is under the cursor (yourself, an ally; the server
+## says whether it can), the right puts it back. Either way it leaves the
+## cursor, and no attack is made.
+func _click_cursor_item(player: Player, button: MouseButton) -> void:
+	var item := _cursor_item
+	_cursor_item = {}
+	if button != MOUSE_BUTTON_LEFT:
+		return
+	var on := _entity_under_mouse()
+	if on == null:
+		on = World.get_entity_at(_mouse_tile())
+	if on != null and (on is Player or on is Companion):
+		World.command(player, "apply_item", {"slot": int(item["slot"]), "target": str(on.get_path())})
 
 
 ## The right button released: a drawn bow is loosed the aim's way ("loose"
@@ -1899,7 +1957,7 @@ func _wasd_click(player: Player, button: MouseButton) -> void:
 		if tile != NONE and World.distance(at, tile) > 1:
 			_move_click(player, tile)
 			_held_target = NONE  # No hold-to-move in WASD: the keys steer.
-		elif reachable and is_friend(next) and not Keys.held("attack_friend"):
+		elif reachable and is_friend(next) and not Keys.held("stand"):
 			_talk_to(player, next)  # Decision 454: a friend beside you is talked to, not hit.
 		elif reachable and next.is_creature() and not _is_own_companion(next):
 			World.command_attack(player, next)
@@ -7015,7 +7073,25 @@ func _on_command(entity: GridEntity, command_name: String, args: Dictionary) -> 
 	elif command_name == "use" and entity is Player:
 		World.try_use(entity, int(args.get("slot", -1)))
 	elif command_name == "stance" and entity is Player:
-		World.try_stance(entity, str(args.get("kind", "")))
+		var stance := str(args.get("kind", ""))
+		var toward := _point_direction(entity, args)
+		if World.try_stance(entity, stance) and stance == "block" and toward != Vector2i.ZERO:
+			World.face(entity, toward)  # The shield toward the cursor (decision 593).
+	elif command_name == "signature" and entity is Player:
+		# Ctrl and a click (decision 593): the body that way, beside it.
+		var way := _point_direction(entity, args)
+		var marked := World.get_entity_at(entity.tile + way) if way != Vector2i.ZERO else null
+		if marked != null:
+			World.order_signature(entity, marked)
+	elif command_name == "apply_item" and entity is Player:
+		# The thing on the cursor, applied by a click (decision 593): a bandage.
+		var on := get_node_or_null(NodePath(str(args.get("target", "")))) as GridEntity
+		var slot := int(args.get("slot", -1))
+		if on != null and slot >= 0 and slot < entity.slots.size() and Items.def(entity.slots[slot]).get("use") == "bandage":
+			if World.is_downed(on):
+				_start_channel(entity, on)
+			else:
+				World.try_bandage(entity, on)
 	elif command_name == "loose" and entity is Player:
 		var at: Variant = args.get("at")
 		if at is Array and (at as Array).size() == 2:
@@ -7025,7 +7101,7 @@ func _on_command(entity: GridEntity, command_name: String, args: Dictionary) -> 
 	elif command_name == "lantern" and entity is Player:
 		(entity as Player).toggle_lantern()
 	elif command_name == "swing" and entity is Player:
-		var swing := _direction_arg(args)
+		var swing := _point_direction(entity, args) if args.has("at") else _direction_arg(args)
 		if swing != Vector2i.ZERO:
 			World.order_swing(entity, swing)
 	elif command_name == "face":
@@ -7114,6 +7190,18 @@ static func _direction_arg(args: Dictionary) -> Vector2i:
 		return Vector2i.ZERO
 	var direction := Vector2i(int(raw[0]), int(raw[1]))
 	return direction if direction in World.DIRECTIONS else Vector2i.ZERO
+
+
+## The way from [param entity] to a command's "at" ([x, y], a ground point
+## in grid units, decision 593), snapped to one of the eight; ZERO for none.
+static func _point_direction(entity: GridEntity, args: Dictionary) -> Vector2i:
+	var raw: Variant = args.get("at")
+	if raw is not Array or raw.size() != 2:
+		return Vector2i.ZERO
+	var point := Vector2(float(raw[0]), float(raw[1]))
+	if not point.is_finite():
+		return Vector2i.ZERO
+	return grid_direction(point - Vector2(entity.tile))
 
 
 ## The talk panel (Tab) and the chat box (Enter), on the HUD.
@@ -9803,22 +9891,23 @@ func _on_world_ticked(tick: int) -> void:
 func hint_lines() -> Array[String]:
 	var lines: Array[String] = []
 	if Net.controls == "wasd":
-		lines.append_array(["%s\twalk" % Keys.walk_names(), "Mouse\taim", "LMB\tattack (far: walk); a friend: talk", "%s+LMB\tattack a friend" % Keys.name_of("attack_friend"),
+		lines.append_array(["%s\twalk" % Keys.walk_names(), "Mouse\taim", "LMB\tattack (far: walk); a friend: talk", "%s+LMB\tswing where you stand" % Keys.name_of("stand"),
 			"RMB\toff hand; empty: grab (drag to toss)"])
 		if _client3d != null:
 			lines.append_array(["MMB drag\tturn, look up / down", "Wheel\tzoom (MMB click: 1x)"])
 	else:
-		lines.append_array(["LMB\tmove / attack (hold to steer); a friend: talk", "%s+LMB\tattack a friend" % Keys.name_of("attack_friend"),
+		lines.append_array(["LMB\tmove / attack (hold to steer); a friend: talk", "%s+LMB\tswing where you stand" % Keys.name_of("stand"),
 			"RMB\toff hand; empty: shove (drag to toss)"])
 		if _client3d != null:
 			lines.append_array(["%s / %s\ttilt" % [Keys.name_of("forward"), Keys.name_of("back")],
 				"%s / %s\tturn" % [Keys.name_of("left"), Keys.name_of("right")], "MMB drag\tpan (springs back)", "Wheel\tzoom"])
 	for i in Net.phrases.size():
 		lines.append("%s\t%s" % [Keys.name_of("phrase_%d" % (i + 1)), Net.phrases[i]])
-	lines.append_array(["RMB, shield\tblock while held", "RMB, bow\tdraw; let go to shoot at the cursor",
+	lines.append_array(["%s+LMB\tyour weapon's own move (a shield bashes)" % Keys.name_of("signature"), "RMB, shield\tblock toward the cursor while held","RMB, bow\tdraw; let go to shoot at the cursor",
 		"%s\topen a chest, crate, cart, door; your companion's pack" % Keys.name_of("open"), "%s\tyour pack" % Keys.name_of("pack"),
 		"%s\tpick up" % Keys.name_of("pick_up"), "%s\tput down (hand, else pack)" % Keys.name_of("drop"), "%s\tthrow at the cursor" % Keys.name_of("throw"),
-		"%s hold\tbandage an ally beside you, else yourself (a kit, out of combat)" % Keys.name_of("open"),
+		"%s\ta bandage on the cursor: click yourself or an ally beside you (a kit, out of combat)" % Keys.name_of("bandage"),
+		"%s hold\tbandage an ally beside you, else yourself" % Keys.name_of("open"),
 		"RMB in pack\tuse it (eat, open a purse, bandage)",
 		"%s\ttalk (/w whisper)" % Keys.name_of("talk"), "%s\ttalk log" % Keys.name_of("talk_log"), "%s\tmap" % Keys.name_of("map"), "%s\tlantern" % Keys.name_of("lantern"),
 		"%s\treset the room" % Keys.name_of("reset"), "%s\toptions" % Keys.name_of("options"), "%s\tdebug" % Keys.name_of("debug"), "%s\tfullscreen" % Keys.name_of("fullscreen"),

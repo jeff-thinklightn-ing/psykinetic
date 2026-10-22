@@ -58,6 +58,10 @@ extends Node
 ##   items_spear: the spear (decision 344): a boar shot from 6 cells turns
 ##     and charges (enemy-ai's 345); the hunter, standing still with a
 ##     spear (braced), stops the charge and throws it back.
+##   melee_audit: today's melee as it plays (combat's audit, 2026-10-22):
+##     --weapon=sword|giant_axe|fists against --foe=brute|wolf, a bout in
+##     a lit room, the player's own hp and stamina, till one falls or 40 s.
+##     The log line a tick: both sides' hp, stamina, stun, wind-up, raised.
 ##   items_pickup: monsters take up weapons (decision 347): a dagger is
 ##     dropped by an imp; it takes it up (its AI's call, made here by
 ##     item_pick: World.try_pick_up_weapon), heavier by it, and fights
@@ -162,6 +166,9 @@ const REEL_TICKS := 12
 const SLAM_TICKS := 20
 ## The tick a "sound_fight" step gives up by.
 var _fight_until := -1
+## melee_audit's weapon (an item id, or "fists") and foe (a monster kind).
+var _weapon := "sword"
+var _foe := "brute"
 
 
 func _ready() -> void:
@@ -171,6 +178,10 @@ func _ready() -> void:
 			scenario = pair[1]
 		elif pair.size() == 2 and pair[0] == "clip-max-seconds":
 			max_seconds = pair[1].to_float()
+		elif pair.size() == 2 and pair[0] == "weapon":
+			_weapon = pair[1]
+		elif pair.size() == 2 and pair[0] == "foe":
+			_foe = pair[1]
 	match scenario:
 		"sneak":
 			_sneak()
@@ -240,6 +251,8 @@ func _ready() -> void:
 			_wild()
 		"boar":
 			_boar()
+		"melee_audit":
+			_melee_audit()
 		_:
 			push_error("unknown scenario %s" % scenario)
 			get_tree().quit(1)
@@ -568,6 +581,30 @@ func _items_bow() -> void:
 	]
 
 
+func _melee_audit() -> void:
+	var rows: Array[String] = [
+		"#############",
+		"#...........#",
+		"#...........#",
+		"#...........#",
+		"#...........#",
+		"#############",
+	]
+	var markers := {Vector2i(3, 2): "start", Vector2i(8, 2): "monster_" + _foe}
+	var config := {"name": "Clip", "zone": "outdoors", "ambient": 0.9,
+		"entities": [{"at": [8, 2], "facing": [-1, 0], "idle": {"mode": "guard"}}]}
+	if _foe == "wolf":
+		config["legend"] = {"monster_wolf": "#606870"}  # A wild kind has no colour of its own (as items_spear's boar).
+	Level.register(NAME, Level.image_from_rows(Terrain.expand(rows), markers, config), null, config)
+	var held := "fists" if _weapon == "fists" else _weapon.replace("_", " ")
+	_script = []
+	if _weapon != "fists":
+		_script.append(["item_give", [_weapon, Player.RIGHT_HAND], ""])
+	_script.append(["say", 10, "Today's melee: %s against a %s." % [held, _foe]])
+	_script.append(["bout", 400, "Left click on it: walk up and attack."])
+	_script.append(["wait", 20, ""])
+
+
 func _items_blows() -> void:
 	var rows: Array[String] = [
 		"###############",
@@ -782,7 +819,7 @@ func _items_bash() -> void:
 		["item_face", "imp", ""],
 		["item_raise", null, "Shield up (right button held)."],
 		["wait", 15, ""],
-		["item_bash", "imp", "Left button with the shield up: a bash. Shoved, staggered, its guard knocked open."],
+		["item_bash", "imp", "Ctrl and a click: the shield's bash. Shoved, staggered, its guard knocked open."],
 		["wait", 12, ""],
 		["item_lower", null, ""],
 		["item_close", "imp", "Its shield stays down a while: in close..."],
@@ -1371,13 +1408,13 @@ func _on_tick(tick: int) -> void:
 					entity._world_set_facing(Vector2i(signi(_player.tile.x - entity.tile.x), signi(_player.tile.y - entity.tile.y)))
 					World._roster_changed()  # Who acts is kept a tick at a time.
 		"item_bash":
-			# The left button on the first monster of kind step[1] (with the
-			# shield raised, a bash: Player._pursue_action), once it can.
+			# Ctrl and a click on the first monster of kind step[1] (the
+			# shield's bash, decision 593: Player._pursue_action), once it can.
 			for entity in World.monsters():
 				if str(entity.spawn_spec.get("kind", "")) == step[1]:
 					if not World.bash_ready(_player):
 						return
-					World.command_attack(_player, entity)
+					World.order_signature(_player, entity)
 		"item_attack":
 			# The left button on the first monster of kind step[1], once the
 			# player can strike (a heavy weapon winds up: World.try_wind_up).
@@ -1573,6 +1610,19 @@ func _on_tick(tick: int) -> void:
 						World.order_attack(_player, foe)
 				return
 			_fight_until = -1
+		"bout":
+			# As "brawl", through the player's own attack order (a left click
+			# on the foe), but over when either side is down.
+			if _fight_until < 0:
+				_fight_until = tick + int(step[1])
+			var foe := _nearest_standing()
+			if tick < _fight_until and foe != null and _player.spawned and _player.hp > 0 and not World.is_downed(_player):
+				if _player.action_target != foe:
+					World.command_attack(_player, foe)
+				return
+			_caption.text = "%s fell at %.1f s." % ["The " + _foe if foe == null else "You", float(tick) / World.TICK_RATE]
+			print("[clip] bout over at tick %d: %s" % [tick, "foe fell" if foe == null else "player down or time"])
+			_fight_until = -1
 		"walk":
 			if not _walk(_beside_monster() if step[1] is String else step[1]):
 				return
@@ -1719,6 +1769,16 @@ func _log(tick: int) -> void:
 		print("[clip] tick %d: player %s hp %d stamina %d raised %s%s%s; %s" % [tick, _player.tile, _player.hp, _player.stamina,
 			_player.raised, " stunned" if World.is_stunned(_player) else "", " winding" if not World.winding(_player).is_empty() else "",
 			", ".join(them)])
+		return
+	if scenario == "melee_audit":
+		var side := func(entity: GridEntity) -> String:
+			return "%s at %s hp %d/%d st %d/%d%s%s%s%s" % [entity.name, entity.tile, entity.hp, entity.max_hp, entity.stamina,
+				entity.max_stamina, " stunned" if World.is_stunned(entity) else "", " down" if World.is_down(entity) else "",
+				" winding" if not World.winding(entity).is_empty() else "", " raised " + entity.raised if entity.raised != "" else ""]
+		var them := []
+		for entity in World.monsters():
+			them.append(side.call(entity))
+		print("[clip] tick %d: %s; %s" % [tick, side.call(_player), ", ".join(them)])
 		return
 	if scenario in ["items_bow", "items_blows"]:
 		var game := []

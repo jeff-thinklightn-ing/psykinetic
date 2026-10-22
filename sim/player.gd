@@ -1,7 +1,7 @@
 class_name Player
 extends GridEntity
 ## Carries out orders set through World.order_move / order_step /
-## order_attack / order_shove / order_swing.
+## order_attack / order_shove / order_swing / order_signature.
 ## An action order (attack, shove) walks up to its target if it is out of
 ## reach, fires once when in reach and off cooldown, and clears; a swing
 ## fires where the player stands. A move order walks the tiles it came with
@@ -168,21 +168,30 @@ func _pursue_action() -> void:
 			return
 		var swing := action_direction
 		_clear_action()
-		World.try_swing(self, swing)
+		var struck := World.stand_target(self, swing)  # Whatever is in the way takes it (decision 593).
+		if struck == null:
+			World.try_swing(self, swing)
+		elif World.windup_ticks(self) > 0:
+			World.try_wind_up(self, struck)
+		else:
+			World.try_attack(self, struck)
+		return
+	if action_order == Order.SIGNATURE:
+		# From where it stands (decision 593): out of reach, dropped.
+		if not is_instance_valid(action_target) or not action_target.spawned or not World.in_reach(self, action_target, true):
+			_clear_action()
+			return
+		if World.tick < maxi(next_bash_tick, next_move_tick):
+			return
+		var marked := action_target
+		_clear_action()
+		if World.signature_of(self) == "bash":
+			World.try_bash(self, marked)
 		return
 	if not is_instance_valid(action_target) or not action_target.spawned:
 		_clear_action()
 		return
-	# The left button with the shield raised bashes with it (decision 379).
-	var bashes := action_order == Order.ATTACK and raised == "block" and not World.bash_verb(self).is_empty()
-	if World.in_reach(self, action_target, action_order != Order.ATTACK or bashes):
-		if bashes:
-			if World.tick < maxi(next_bash_tick, next_move_tick):
-				return
-			var bashed := action_target
-			_clear_action()
-			World.try_bash(self, bashed)
-			return
+	if World.in_reach(self, action_target, action_order != Order.ATTACK):
 		# World refuses hits during the cooldown and while still mid-step.
 		if World.tick < maxf(next_attack_tick, next_move_tick):
 			return

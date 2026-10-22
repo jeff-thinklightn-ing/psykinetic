@@ -40,7 +40,7 @@ signal winding(direction: Vector2i, ticks: int)
 ## FLESH is a creature (hazards hurt it). WOOD takes impact and breaks at 0 hp.
 ## STONE and METAL never break.
 enum BodyMaterial { FLESH, WOOD, STONE, METAL }
-enum Order { NONE, ATTACK, SHOVE, SWING }
+enum Order { NONE, ATTACK, SHOVE, SWING, SIGNATURE }
 
 ## The only state sent over the network, besides World's tick.
 const REPLICATED: Array[String] = ["tile", "hp", "facing", "stamina", "protected"]
