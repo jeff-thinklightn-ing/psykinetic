@@ -36,6 +36,8 @@ func _ready() -> void:
 	_test_farmer_comes()
 	_test_look()
 	_test_woodcutter()
+	_test_felling()
+	_test_stages()
 	_test_flock()
 	_test_butcher()
 	_test_season_scale()
@@ -202,6 +204,70 @@ func _test_woodcutter() -> void:
 	_check(cutters.size() == 1 and bare.production.worker(cutters[0])["origin"] == "growth", "a woodcutter comes (%s)" % [cutters])
 	_year(bare, 3)
 	_check(bare.residents(TOWN).filter(func(id: String) -> bool: return "woodcutter" in bare.production.worker(id)["trades"]).size() == 1, "and only one")
+
+
+## The forest real (591, economy's side): a cut takes its trees from maps'
+## fell, wood_per_tree each; a lot cut bare brings deadwood, said once; the
+## walk growing is said.
+func _test_felling() -> void:
+	print("
+== wood from the forest standing ==")
+	var rule: Dictionary = _rules["woodcutter"]
+	_check(int(rule["wood_per_tree"]) == 2 and int(rule["deadwood"]) == 1, "2 wood a tree, 1 of deadwood (economy.json)")
+	var towns := _towns(1, false)
+	towns.note_rescue(TOWN, "w1", "Bran", "woodcutter")
+	var asked: Array = []
+	var standing := [3]
+	towns.fell = func(town: String, site_id: String, wanted: int) -> int:
+		asked.append([town, site_id, wanted])
+		var took := mini(wanted, standing[0])
+		standing[0] -= took
+		return took
+	var worker := towns.production.worker("w1")
+	var site := {"id": "fm/woodlot", "area": "fm", "cell": Vector2i(10, 10)}
+	_check(towns._felled(TOWN, site, 3, worker) == 4 and asked.back() == [TOWN, "fm/woodlot", 2], "a cut of 3 asks for 2 trees and brings their 4 wood (%s)" % [asked])
+	_check(towns._felled(TOWN, site, 3, worker) == 2 and standing[0] == 0, "the last tree: 2 wood")
+	var said := func(text: String) -> int: return towns.log_of(TOWN).filter(func(line: Dictionary) -> bool: return str(line["what"]).begins_with(text)).size()
+	_check(towns._felled(TOWN, site, 3, worker) == 1 and towns._felled(TOWN, site, 3, worker) == 1 and said.call("the woodlot is cut bare") == 1,
+		"cut bare: deadwood, never none, and said once")
+	standing[0] = 5
+	_check(towns._felled(TOWN, site, 3, worker) == 4 and not bool(towns._town(TOWN).get("lot_bare", false)), "the lot moved on: trees again")
+	towns._town(TOWN)["lot_walk"] = 100
+	towns._felled(TOWN, site, 3, worker)
+	_check(said.call("the woodlot has moved out") == 1, "the walk grown: said")
+	var plain := _towns(1, false)
+	plain.note_rescue(TOWN, "w1", "Bran", "woodcutter")
+	_year(plain, 1)
+	_check(plain.production.stockpile.count(TOWN, "wood") > 0, "no fell set: a cut brings its wood as before")
+
+
+## Stages toward a city (591, economy's side): a hamlet from the start, a
+## village with 8 residents, a temple and an inn and its priest; never
+## falling.
+func _test_stages() -> void:
+	print("
+== hamlet, village, town, city ==")
+	var towns := _towns(1, false)
+	var rose: Array = []
+	towns.stage_changed.connect(func(town: String) -> void: rose.append(town))
+	towns._stage_turn(TOWN)
+	_check(towns.stage(TOWN) == "hamlet" and rose == [TOWN], "a hamlet from the start")
+	towns._stage_turn(TOWN)
+	_check(towns.stage(TOWN) == "hamlet", "not yet a village")
+	for i in 7:
+		towns.production.add_worker("v%d" % i, "V%d" % i, ["hauler"], TOWN, "test")
+		towns._town(TOWN)["residents"].append("v%d" % i)
+	towns.production.add_worker("pr", "Osric", ["priest"], TOWN, "appointed")
+	towns._town(TOWN)["residents"].append("pr")
+	for kind: String in ["temple", "inn"]:
+		towns._town(TOWN)["buildings"][kind] = {"kind": kind, "level": 1, "state": Towns.STANDING, "since": 0, "job": 0}
+	towns._stage_turn(TOWN)
+	_check(towns.stage(TOWN) == "village" and rose.size() == 2, "8 residents, temple, inn, priest: a village (%s)" % towns.stage(TOWN))
+	towns._town(TOWN)["buildings"]["inn"]["state"] = Towns.DAMAGED
+	towns._stage_turn(TOWN)
+	_check(towns.stage(TOWN) == "village", "the inn damaged: still a village, never falling")
+	var saved := Towns.new(JSON.parse_string(JSON.stringify(towns.to_dict())), towns.production, _rules, func() -> int: return _now)
+	_check(saved.stage(TOWN) == "village", "the stage saved")
 
 
 func _check(ok: bool, what: String) -> void:

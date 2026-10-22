@@ -2734,6 +2734,7 @@ func _boot() -> void:
 	# How each town grows: its experience, residents and buildings.
 	World.towns = Towns.new(snapshot.get("towns", {}), World.production)
 	World.towns.building_changed.connect(_on_town_building_changed)
+	World.towns.stage_changed.connect(func(town: String) -> void: _on_town_building_changed(town, ""))  # Its stage told (591).
 	# The roofs storms broke and nobody has mended yet (decision 383).
 	World.roofs_damaged.clear()
 	for key: Variant in snapshot.get("roofs", []):
@@ -4376,7 +4377,8 @@ func _join_player(peer: int, id: String, player_name: String, respawn := false, 
 ## repaired (Towns.building_changed): every peer, and this one, is told the
 ## town's buildings ("town" {town, buildings}).
 func _on_town_building_changed(town: String, _kind: String) -> void:
-	Net.broadcast("town", {"town": town, "buildings": World.towns.buildings_of(town), "awake": World.towns.awake_of(town)})
+	Net.broadcast("town", {"town": town, "buildings": World.towns.buildings_of(town), "awake": World.towns.awake_of(town),
+		"stage": World.towns.stage(town)})
 	World.open_roofs(town.get_slice("/", 0))
 
 
@@ -4444,7 +4446,8 @@ func _send_towns(peer: int, zone_name: String) -> void:
 		return
 	for town: String in World.towns.to_dict():
 		if town.begins_with(zone_name + "/"):
-			Net.message_to(peer, "town", {"town": town, "buildings": World.towns.buildings_of(town), "awake": World.towns.awake_of(town)})
+			Net.message_to(peer, "town", {"town": town, "buildings": World.towns.buildings_of(town), "awake": World.towns.awake_of(town),
+				"stage": World.towns.stage(town)})
 
 
 ## The view's buildings drawn as their towns have them: the server's own

@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Towns now grow through stages, hamlet, village, town and city, rising as they gain people, officials, buildings and gold; the woodcutter's wood will come from the trees he fells once the forest is real, and a cut-bare woodlot still yields a little deadwood (591, economy's side).
 - Towns with a flock of 8 or more build a butchery and take on a butcher; each autumn the shepherd culls the flock down for him, and he turns each sheep into 3 meat and a hide for the town's store (590).
 - A medicine man's hut brings you back only once you are in his care: hand him 10 gold, 5 herbs or 5 antlers to be taken in at once, or do his first errand, which opens his further errands (584 amended).
 - Fixed: opening Options from the main menu kept the world, your body and its nameplate showing through the panel's dim; the menu's dark backdrop now stays under the options (418 amended).

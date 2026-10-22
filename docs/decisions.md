@@ -23200,4 +23200,54 @@ tests/farm_test _test_butcher:
 - his coming saved
 
 No new class_name.
+## 591, economy's side. Wood from the forest standing, and stages toward a city
+
+Jeff: "i eventually want held to be in its own map that leaves room to
+grow, forests to chop down, town and city growing and becoming something
+is one of the major gameplay components". The growth loop is one decision
+with sides: maps (the clearing, Clearing.fell, plot_for, the woodlot
+stepping out, regrowth), buildings-6f (STAGES, classes, the market kind),
+economy (these).
+
+- **The forest real:** Towns.fell, a Callable (town, site id, wanted) ->
+  trees, which Main sets to maps' Clearing.fell once it lands. Unset, a
+  cut brings its wood as before.
+  - Towns._woodcut, at a town with a woodlot, calls Towns._felled. It
+    asks for the cut's wood / woodcutter.wood_per_tree (2) trees and
+    brings 2 wood for each tree felled: the wood follows the forest
+    left standing.
+  - A lot cut bare brings woodcutter.deadwood (1), never none, so a town
+    never starves of wood while maps steps the lot out and the forest
+    regrows (the coordinator's care). The log says "the woodlot is cut
+    bare" once.
+  - When the walk to the lot grows (Production.site_walk, read live),
+    the log says "the woodlot has moved out: N steps there and back":
+    the walk is the cost of growth.
+- **Stages:** economy.json "stages" (drafts, Jeff's folder):
+  - hamlet: from the founding.
+  - village: 8 residents; temple and inn standing; a priest.
+  - town: 16 residents; walls standing; a lawspeaker; 150 gold in the
+    treasury; 100 wood in the store.
+  - city: 30 residents; a market standing; 2 guards; 400 gold.
+- **How a town rises:** Towns._stage_turn, on the town tick, raises it
+  one step when it meets all of the next stage's needs (Towns._meets:
+  residents, standing kinds, trades among its residents, gold, wood).
+  It never lowers it. Towns.stage(town) reads it; it is saved. A rise
+  is logged and emits Towns.stage_changed, which Main broadcasts as
+  the "town" message.
+  - The city waits on a market kind (buildings' and maps'); economy's
+    buildings get it when it exists.
+- **Wire:** the "town" message gains "stage", a field older clients
+  ignore and whose absence means no stage shown. No revision line.
+- Plots (plot_for), the town's move to "held/store" (rename_places) and
+  the soak come with maps' landings.
+
+tests/farm_test:
+- _test_felling: 2 trees asked for a cut of 3, their 4 wood; the last
+  tree; deadwood said once; trees again; the walk grown said; with no
+  fell, as before.
+- _test_stages: a hamlet at once; a village with 8 residents, temple,
+  inn and priest; never falling; saved.
+
+Server and client (a field), no new class_name.
 

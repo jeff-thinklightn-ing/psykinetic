@@ -68,6 +68,8 @@ signal building_changed(town: String, kind: String)
 ## [param town]'s sought entry [param id] was made, placed, freed, lost or
 ## came home (decision 613): npc's bodies and maps' holders read sought().
 signal sought_changed(town: String, id: String)
+## [param town] rose a stage toward a city (591): Towns.stage.
+signal stage_changed(town: String)
 
 var rules := {}
 var production: Production
@@ -105,6 +107,10 @@ var wells := Callable()
 ## Weather.storms_between), for its crop (decision 449).
 var storms := Callable()
 var rain := Callable()
+## (town, site id, wanted) -> int: the trees maps' Clearing.fell takes at a
+## woodlot's edge nearest the town (591; Main sets it); unset, a cut brings
+## its wood as before.
+var fell := Callable()
 var roofs := Callable()
 var mend_roof := Callable()
 
@@ -459,6 +465,7 @@ func tick() -> void:
 		_butcher(town)
 		_woodcut(town)
 		_woodcutter_comes(town)
+		_stage_turn(town)
 		_maker_comes(town)
 		_sought_turn(town)
 		# One build at a time, unless the one in hand has stalled on its
@@ -1560,7 +1567,72 @@ func _woodcut(town: String) -> void:
 		if trip == Production.BLOCKED:
 			continue
 		var wood := int(rule.get("wood", 2)) + int(rule.get("per_level", 1)) * levels
+		var site := production.site_of(town, trade)
+		if fell.is_valid() and not site.is_empty():
+			wood = _felled(town, site, wood, worker)
 		production.deliver_to(town, who, "wood", wood, "woodcutter:%s" % who, "%s's cutting" % worker["name"])
+
+
+## The wood a cut at [param site] brings once the forest is real (591,
+## economy's side; Held's growth): the trees maps' fell takes at the lot's
+## edge nearest the town, woodcutter.wood_per_tree each, for the
+## [param wood] a cut would bring. A lot cut bare brings
+## woodcutter.deadwood, never none, so the town never starves of wood while
+## the lot steps out and the forest regrows; the log says so, and says when
+## the walk to the lot grows.
+func _felled(town: String, site: Dictionary, wood: int, worker: Dictionary) -> int:
+	var rule: Dictionary = rules.get("woodcutter", {})
+	var per_tree := maxi(int(rule.get("wood_per_tree", 2)), 1)
+	var trees := int(fell.call(town, str(site.get("id", "")), ceili(float(wood) / per_tree)))
+	var record := _town(town)
+	var walk := production.site_walk(town, site)
+	if walk > int(record.get("lot_walk", walk)):
+		_note(town, "the woodlot has moved out: %s walks %d steps there and back now" % [worker["name"], walk])
+	record["lot_walk"] = walk
+	if trees > 0:
+		record.erase("lot_bare")
+		return trees * per_tree
+	if not bool(record.get("lot_bare", false)):
+		_note(town, "the woodlot is cut bare: %s brings deadwood till it moves on or grows back" % worker["name"])
+	record["lot_bare"] = true
+	return int(rule.get("deadwood", 1))
+
+
+## [param town]'s stage toward a city (591, economy's side): the name of the
+## highest of rules' "stages" it has reached, "" for none. Raised by
+## _stage_turn, one step at a time, never lowered.
+func stage(town: String) -> String:
+	return str(_towns.get(town, {}).get("stage", ""))
+
+
+## Raises [param town] to the next of rules' "stages" when it meets all of
+## that stage's needs: residents, standing kinds, trades counted among its
+## residents, gold in the treasury, wood in the store. Logged.
+func _stage_turn(town: String) -> void:
+	var stages: Array = rules.get("stages", [])
+	var record := _town(town)
+	var names: Array = stages.map(func(each: Variant) -> String: return str(each.get("name", "")) if each is Dictionary else "")
+	var at := names.find(stage(town))
+	if at + 1 >= stages.size() or not stages[at + 1] is Dictionary or not _meets(town, stages[at + 1]):
+		return
+	record["stage"] = names[at + 1]
+	_note(town, "%s is a %s now" % [town, names[at + 1]])
+	stage_changed.emit(town)
+
+
+## Whether [param town] meets stage [param need]'s needs.
+func _meets(town: String, need: Dictionary) -> bool:
+	if residents(town).size() < int(need.get("residents", 0)):
+		return false
+	for kind: Variant in need.get("standing", []):
+		if not _stands(town, str(kind)):
+			return false
+	var trades: Variant = need.get("trades", {})
+	if trades is Dictionary:
+		for trade: String in trades:
+			if residents(town).filter(func(who: String) -> bool: return trade in production.worker(who).get("trades", [])).size() < int(trades[trade]):
+				return false
+	return production.stockpile.count(town, "gold") >= int(need.get("gold", 0)) and production.stockpile.count(town, "wood") >= int(need.get("wood", 0))
 
 
 ## A town with a building waiting on wood and no woodcutter gets one, a
@@ -2002,6 +2074,11 @@ func from_dict(saved: Dictionary) -> void:
 			record["memory"] = (entry["memory"] as Array).duplicate(true)
 		if entry.get("lawspeaker") is Dictionary:
 			record["lawspeaker"] = (entry["lawspeaker"] as Dictionary).duplicate(true)
+		if entry.has("stage"):
+			record["stage"] = str(entry["stage"])
+		if entry.has("lot_walk"):
+			record["lot_walk"] = int(entry["lot_walk"])
+		record["lot_bare"] = bool(entry.get("lot_bare", false))
 		var held_for: Variant = entry.get("held_for", {})
 		if held_for is Dictionary:
 			for owner: Variant in held_for:
