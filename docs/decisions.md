@@ -21863,9 +21863,15 @@ is_disarmed, boss_busy).
      (combat's).
   Nothing is chosen while a move runs (boss_busy), and nothing at all
   before combat's moves exist (World.has_method).
-- **The dead in waves.** 573's retinue no longer rises at the pact's
-  start: `_risen_left` rises a share at each of WAVES (his hp past 75%,
-  50%, 25%) and at each back-off, the rest at the last.
+- **The dead in waves.** With combat's moves in, 573's retinue no longer
+  rises at the pact's start: `_risen_left` rises a share at each of WAVES
+  (his hp past 75%, 50%, 25%) and at each back-off, the rest at the last.
+  Till then (the coordinator: the waves are one of Jeff's drafts, riding
+  with the fight) they all rise at the start, as before.
+- **Landed inert.** This side landed before combat's 602/603 (the cut
+  before the fight): every choice is behind World.has_method("try_spin"),
+  and monster_test `_test_draugr_mind` skips till then. Its CHANGELOG
+  bullet comes with the fight.
 - **The axe for the winners.** A won pact calls items' `Monster.yielded`
   (his row's "yields", the battle_axe) before the blessing; a lost pact or
   the unpaid fight never.

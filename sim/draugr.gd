@@ -406,8 +406,13 @@ func start_pact(player: Player, level: String) -> void:
 	for each in World.sought():
 		if each is Player:
 			offer_withdrawn.emit((each as Player).player_id)  # Nothing stands while he fights.
-	# His dead rise in waves through the fight (603), not all at once.
+	# His dead rise in waves through the fight (603), not all at once; all
+	# at once till combat's moves are in (the waves, a draft for Jeff, ride
+	# with the fight).
 	_risen_left = int(RETINUE.get(level, 0)) + mini(charges_met / CHARGES_PER_RISEN, MOST_MORE_RISEN)
+	if not World.has_method("try_spin"):
+		_raise_retinue(_risen_left)
+		_risen_left = 0
 	_waves_passed = 0
 	_next_spin = World.tick
 	_next_throw = World.tick
