@@ -19751,3 +19751,35 @@ drafts for Jeff.
   "barter" message carries "resident" (and "shop" ""), its goods and buys
   the maker's. PROTOCOL_REVISION 29, for this cut's meaning changes.
 economy_test _test_maker_barter. No new class_name.
+## 562, ui's side: a maker's barter in person
+
+Economy's 562 lets a maker trade their own make in person: "barter" and
+"trade" take {resident: the Resident's node path} in place of {shop}, the
+reply carries "resident" with "shop" "", the goods are only their own
+make at its worth, the buys only their trade's materials from their own
+purse (up_to their need and purse), fenced always {}. The counter's
+barter (560, {shop}: the town's shop, the merchant's, every maker's goods,
+the town's buys and the fenced price) stays as it is, and so does the
+"shop" command and message until economy retires them.
+
+- The barter window is keyed on what is traded at or with
+  (BarterPanel.with: the counter, a Chest, or the maker, a Resident).
+  A barter message is for the open one when its "resident", else its
+  "shop", names it (BarterPanel.for_path; a sample names neither).
+  Confirm's trade_asked carries it and Main._trade names it the server's
+  way: {resident} for a person, {shop} for a counter.
+- The talk bar's Barter shows where a barter answers (Main._barters):
+  the merchant with a shop counter near, as before, or a maker (a trade
+  in Items.TRADES, or medicine_man; economy's rule: the server answers
+  everyone, only makers have anything). Barter on a merchant opens the
+  counter's shop ({shop}); on a maker, their own goods ({resident}).
+- The title says which: "Snagfin's shop" or "The shop" at the counter,
+  "Oda's goods" in person (BarterPanel.title_words). Where the goods
+  would be, an empty shelf reads "nothing to trade" when they buy
+  nothing either, "nothing for sale" when they still buy
+  (BarterPanel.empty_words; economy's words).
+
+ui_test _test_barter: _barters for a cook, a farmer, the medicine man
+and the merchant; for_path, title_words, empty_words; the window opened
+with a cook in person. Client only; protocol unchanged on this side (the
+command's new key is economy's 562); no new class_name.

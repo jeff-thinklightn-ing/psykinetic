@@ -1249,7 +1249,7 @@ func _open_bar(resident: GridEntity) -> void:
 	_bar_for = resident
 	var person := str(resident.get("person")) if resident.get("person") != null else ""
 	_bar_name.text = person if not person.is_empty() else _display_name(resident)
-	_bar_barter.visible = _shop_counter_near(resident) != null and str(resident.get("trade")) == "merchant"
+	_bar_barter.visible = _barters(resident)
 	_bar.visible = true
 	_update_bar()
 
@@ -1288,8 +1288,20 @@ func _bar_talk_pressed() -> void:
 		_chat_box.caret_column = _chat_box.text.length()
 
 
+## Whether [param resident] has a barter to offer: the merchant fronts the
+## town's shop (560, a counter near), a maker trades their own make in
+## person (562; economy's rule: a trade in Items.TRADES, the medicine man
+## too).
+func _barters(resident: GridEntity) -> bool:
+	var trade := str(resident.get("trade")) if resident.get("trade") != null else ""
+	if trade == "merchant":
+		return _shop_counter_near(resident) != null
+	return trade in Items.TRADES or trade == "medicine_man"
+
+
 ## The bar's Barter: the window for the shop the merchant fronts (the shop
-## counter nearest them), its goods asked with economy's "barter" command.
+## counter nearest them, economy's "barter" {shop}), or for a maker's own
+## goods in person ("barter" {resident}, 562).
 func _bar_barter_pressed() -> void:
 	var resident := _bar_for
 	_close_bar()
@@ -1298,13 +1310,17 @@ func _bar_barter_pressed() -> void:
 
 
 func _open_barter_with(resident: GridEntity) -> void:
-	var counter := _shop_counter_near(resident)
 	var player := _local_player()
-	if counter == null or player == null or barter_panel == null:
+	if player == null or barter_panel == null or not _barters(resident):
 		return
 	var person := str(resident.get("person")) if resident.get("person") != null else ""
-	barter_panel.open(counter, person)
-	World.command(player, "barter", {"shop": str(counter.get_path())})
+	if str(resident.get("trade")) == "merchant":
+		var counter := _shop_counter_near(resident)
+		barter_panel.open(counter, person)
+		World.command(player, "barter", {"shop": str(counter.get_path())})
+	else:
+		barter_panel.open(resident, person)
+		World.command(player, "barter", {"resident": str(resident.get_path())})
 
 
 ## The shop counter nearest [param near] in this zone (a Chest that is a
@@ -1321,11 +1337,13 @@ func _shop_counter_near(near: GridEntity) -> GridEntity:
 	return best
 
 
-## The window's Confirm: economy's "trade" command, by name.
-func _trade(shop: GridEntity, give: Array, take: Array, gold_balance: int) -> void:
+## The window's Confirm: economy's "trade" command, by name, naming the
+## counter ({shop}) or the maker in person ({resident}, 562).
+func _trade(with: GridEntity, give: Array, take: Array, gold_balance: int) -> void:
 	var player := _local_player()
-	if player != null and is_instance_valid(shop):
-		World.command(player, "trade", {"shop": str(shop.get_path()), "give": give, "take": take, "gold": gold_balance})
+	if player != null and is_instance_valid(with):
+		var key := "resident" if with is Resident else "shop"
+		World.command(player, "trade", {key: str(with.get_path()), "give": give, "take": take, "gold": gold_balance})
 
 
 ## Economy's barter message (Main.barter_told, 560, economy's side): the
@@ -9512,7 +9530,7 @@ func open_other(target: GridEntity) -> void:
 		var player := _local_player()
 		if player != null:
 			World.command(player, "shop", {"shop": str(target.get_path())})
-	if barter_panel != null and target is Chest and (target as Chest).shop and barter_panel.shop != target:
+	if barter_panel != null and target is Chest and (target as Chest).shop and barter_panel.with != target:
 		# 560, ui's side: the counter opens the barter window, fed by economy's "barter".
 		barter_panel.open(target, "")
 		var player := _local_player()

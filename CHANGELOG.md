@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- A maker's Barter (a smith, cook, carpenter, tanner, fletcher, weaver or the medicine man) opens their own goods in person, "Oda's goods", and buys their trade's materials from their own purse; the merchant's Barter and the counter's E keep the town's shop. An empty shelf reads "nothing to trade" (562, ui's side; the goods and prices are economy's).
 - The medicine man trades: barter with him for the remedies and stamina potions he makes, and he buys herbs from your pack with his own gold. Herbs are worth nothing anywhere else, and he makes a remedy first while anyone is sick (562).
 - A river now winds down the wilds from the north edge to the south, crossed by a ford in the north and a bridge in the middle, and the wilds' three ponds have rounded shores (568); anyone who logged out where the water now runs comes back on the nearest dry ground.
 - The medicine man keeps the herbs he gathers at his own hut, unpaid, where his remedies and potions are made (502 amended); the town's treasury no longer buys them. Server only.

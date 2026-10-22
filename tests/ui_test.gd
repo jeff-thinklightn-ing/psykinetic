@@ -768,7 +768,26 @@ func _test_barter() -> void:
 	if _main._local_player() != null:
 		_check(_main.context_hint_for(oda) == "LMB  interact", "the hint over a townsperson: LMB  interact")
 	_main._open_bar(oda)
-	_check(_main._bar_name.text == "Oda" and not _main._bar_barter.visible, "the bar names them; Barter only for a merchant with a counter")
+	_check(_main._bar_name.text == "Oda" and _main._bar_barter.visible, "the bar names them; Barter for a maker (a cook, 562)")
+	oda.trade = "farmer"
+	_check(not _main._barters(oda), "no Barter for a farmer")
+	oda.trade = "medicine_man"
+	_check(_main._barters(oda), "Barter for the medicine man")
+	oda.trade = "merchant"
+	_main._open_bar(oda)
+	_check(_main._bar_barter.visible == (_main._shop_counter_near(oda) != null), "the merchant's Barter needs a counter near")
+	# 562: a maker's barter is keyed on the person, the message's "resident".
+	_check(BarterPanel.for_path({"resident": "/a/b", "shop": ""}, "/a/b") and not BarterPanel.for_path({"resident": "/a/b", "shop": ""}, "/a/c")
+		and BarterPanel.for_path({"shop": "/x"}, "/x") and not BarterPanel.for_path({"shop": "/x"}, "/y") and BarterPanel.for_path({}, "/z"),
+		"a barter message is for its resident, else its shop, else anyone")
+	_check(BarterPanel.title_words("Oda", true) == "Oda's goods" and BarterPanel.title_words("Snagfin", false) == "Snagfin's shop" and BarterPanel.title_words("", false) == "The shop",
+		"the title: a maker's goods in person, the shop at the counter")
+	_check(BarterPanel.empty_words({"goods": [], "buys": {}}) == "nothing to trade" and BarterPanel.empty_words({"goods": [], "buys": {"herb": {"gold": 2, "up_to": 3}}}) == "nothing for sale",
+		"an empty shelf: nothing to trade, or nothing for sale when they still buy")
+	oda.trade = "cook"
+	panel.open(oda, "Oda")
+	_check(panel.title_shown() == "Oda's goods", "opened with the cook in person: Oda's goods")
+	panel.close()
 	_main._update_bar()
 	_check(not _main._bar.visible, "no bubble to sit under: the bar goes")
 	_check(not _main._bubble_clicked(), "a click with nobody greeted opens nothing")

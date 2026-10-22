@@ -14,10 +14,11 @@ extends Control
 ## economy's "trade" command (trade_asked; Main sends it). The server
 ## prices the trade and answers with the barter message again
 ## (show_barter), a refusal's why under the foot in rust (refused: Main's
-## error sound). Economy's wire (560, economy's side): "barter" {shop,
+## error sound). Economy's wire (560, economy's side; 562: the trade is
+## with a person, "resident" in place of "shop"): "barter" {resident,
 ## town, gold, goods: [{uid, id, price}], buys: {id: {gold, up_to}},
-## fenced: {uid: gold}, pack: [{slot, uid, id}], why}; "trade" {shop, give:
-## [uids], take: [uids], gold}. In the shared theme's look (UiTheme,
+## fenced: {uid: gold}, pack: [{slot, uid, id}], why}; "trade" {resident,
+## give: [uids], take: [uids], gold}. In the shared theme's look (UiTheme,
 ## docs/ui_style.md); sizes in the HUD's 3840 x 2160 units.
 
 const GAP := 20
@@ -31,15 +32,18 @@ static var SELECT: Color = UiTheme.color("brass_bright")
 
 ## Confirm: the trade for Main to send ([param gold] signed from the
 ## player's side, positive when they receive).
-signal trade_asked(shop: GridEntity, give: Array, take: Array, gold: int)
+signal trade_asked(with: GridEntity, give: Array, take: Array, gold: int)
 ## The server refused the trade: [param why].
 signal refused(why: String)
 
 ## The pack panel the window sits beside (its boxes are the player's side).
 var pack: PackPanel
-## The shop counter traded at, or null (closed; a test's sample).
-var shop: GridEntity
-## Who fronts it, for the title ("Snagfin's shop"); "" for "The shop".
+## What is traded at or with: the shop's counter (560, a Chest; the town's
+## shop, the merchant's) or a maker in person (562, a Resident; their own
+## make, the message's "resident"); null closed, or a test's sample.
+var with: GridEntity
+## Who fronts it, for the title ("Snagfin's shop", "Oda's goods"); "" for
+## "The shop".
 var merchant := ""
 ## The barter message as last received.
 var data: Dictionary = {}
@@ -122,13 +126,13 @@ func _ready() -> void:
 	_rebuild()
 
 
-## Opens the window for [param counter]'s shop, fronted by [param who]
-## (the merchant's name, "" when opened at the counter); the goods come
-## with the server's barter message (Main sends the "barter" command).
-func open(counter: GridEntity, who := "") -> void:
-	if counter != shop:
+## Opens the window for a trade with [param person] (their name [param
+## who]); the goods come with the server's barter message (Main sends the
+## "barter" command).
+func open(person: GridEntity, who := "") -> void:
+	if person != with:
 		data = {}
-	shop = counter
+	with = person
 	merchant = who
 	give.clear()
 	take.clear()
@@ -139,7 +143,7 @@ func open(counter: GridEntity, who := "") -> void:
 
 func close() -> void:
 	_open = false
-	shop = null
+	with = null
 	give.clear()
 	take.clear()
 	data = {}
@@ -151,13 +155,14 @@ func is_open() -> bool:
 	return _open
 
 
-## The server's barter message: for the open shop (a sample when none is
-## open, tests and shots); a selection of something gone is dropped; a
-## refusal's why shown and said (refused).
+## The server's barter message: for the person open (its "resident" path,
+## or 560's "shop" until economy retires it; a sample names neither, tests
+## and shots); a selection of something gone is dropped; a refusal's why
+## shown and said (refused).
 func show_barter(given: Dictionary) -> void:
 	if not _open:
 		return
-	if is_instance_valid(shop) and str(given.get("shop", "")) != str(shop.get_path()):
+	if is_instance_valid(with) and with.is_inside_tree() and not for_path(given, str(with.get_path())):
 		return
 	data = given
 	for uid: Variant in take.keys():
@@ -170,6 +175,32 @@ func show_barter(given: Dictionary) -> void:
 	if not why.is_empty():
 		refused.emit(why)
 	_rebuild()
+
+
+## Whether a barter message [param given] is for [param path] (the person
+## traded with, or 560's counter): its "resident", else its "shop", else
+## nobody named (a sample).
+static func for_path(given: Dictionary, path: String) -> bool:
+	var named := str(given.get("resident", ""))
+	if named.is_empty():
+		named = str(given.get("shop", ""))
+	return named.is_empty() or named == path
+
+
+## The window's title: the shop's at a counter ("Snagfin's shop", "The
+## shop"), a maker's own goods in person ("Oda's goods").
+static func title_words(who: String, in_person: bool) -> String:
+	if in_person:
+		return "%s's goods" % who if not who.is_empty() else "Their goods"
+	return "%s's shop" % who if not who.is_empty() else "The shop"
+
+
+## The words where the goods would be when [param given] has none:
+## "nothing to trade" when they buy nothing either (a maker with a bare
+## shelf who needs nothing now, 562), else "nothing for sale".
+static func empty_words(given: Dictionary) -> String:
+	var buys: Variant = given.get("buys", {})
+	return "nothing for sale" if buys is Dictionary and not buys.is_empty() else "nothing to trade"
 
 
 ## Whether the merchant still has [param uid] for sale.
@@ -364,7 +395,7 @@ func _confirm() -> void:
 		return
 	var gives: Array = give.keys()
 	var takes: Array = take.keys()
-	trade_asked.emit(shop, gives, takes, balance_of(gives, takes))
+	trade_asked.emit(with, gives, takes, balance_of(gives, takes))
 
 
 ## PackPanel's select hook: a left click on one of the player's boxes while
@@ -422,7 +453,7 @@ func _rebuild() -> void:
 			pack.set_selected([])
 		_box.visible = false
 		return
-	_title.text = "%s's shop" % merchant if not merchant.is_empty() else "The shop"
+	_title.text = title_words(merchant, with is Resident)
 	var goods: Variant = data.get("goods", [])
 	if goods is Array:
 		for each: Variant in goods:
@@ -432,7 +463,7 @@ func _rebuild() -> void:
 		var empty := Label.new()
 		empty.theme_type_variation = &"Caption"
 		empty.add_theme_color_override("font_color", DIM)
-		empty.text = "nothing for sale" if not data.is_empty() else "asking..."
+		empty.text = empty_words(data) if not data.is_empty() else "asking..."
 		_goods.add_child(empty)
 	_hover.text = _hover_words
 	var gives: Array = give.keys()
@@ -506,7 +537,7 @@ func _process(_delta: float) -> void:
 ## Beside the pack, to its left, its foot on the pack's (ShopPanel's
 ## place, 280); hidden with the pack.
 func _place() -> void:
-	if _open and not is_instance_valid(shop) and shop != null:
+	if _open and not is_instance_valid(with) and with != null:
 		close()
 	var pack_shown := pack != null and pack.visible
 	_box.visible = _open and pack_shown
