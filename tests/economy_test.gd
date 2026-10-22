@@ -47,6 +47,7 @@ func _ready() -> void:
 	_test_selling()
 	_test_barter()
 	_test_maker_barter()
+	_test_barrow_charges()
 	_test_restart()
 	await _test_in_town()
 	print("")
@@ -167,6 +168,44 @@ func _test_barter() -> void:
 
 ## The medicine man's barter (decision 562; Jeff: "hob can have a stamina
 ## potion ... and trades for herbs - other npcs don't find herbs useful").
+func _test_barrow_charges() -> void:
+	print("== the draugr's deals and a player's charges (573, economy's side) ==")
+	var field: Dictionary = Production.read_rules()["return"]["field"]
+	_check(Economy.deal_for(19, field).is_empty(), "under 20 gold: no deal")
+	_check(Economy.deal_for(20, field).get("name") == "easy" and Economy.deal_for(99, field).get("name") == "normal"
+		and Economy.deal_for(500, field).get("name") == "hard", "20 buys easy, 99 normal, 500 hard: the highest step reached")
+	_check(Economy.field_tokens("easy", field) == 5 and Economy.field_tokens("normal", field) == 10 and Economy.field_tokens("hard", field) == 15,
+		"charges by deal: 5, 10, 15")
+	_check(Economy.field_tokens("normal", {"uses": {"normal": 7}}) == 7, "before the deals, the rules' uses read")
+	var none := {}
+	_check(Economy.barrow_capacity(none, field) == 0 and Economy.barrow_tokens(none) == 0, "unblessed: no capacity, no charges")
+	var won := Economy.barrow_won(none, "easy", field)
+	var barrow: Dictionary = won["barrow"]
+	_check(barrow == {"tokens": 5, "best": "easy", "containers": []} and won["took"] == 5 and won["spilled"] == 0,
+		"easy beaten: 5 charges, best easy (%s)" % [won])
+	_check(Economy.barrow_capacity(barrow, field) == 25, "capacity 25")
+	for i in 5:
+		barrow = Economy.barrow_won(barrow, "easy", field)["barrow"]
+	won = Economy.barrow_won(barrow, "easy", field)
+	_check(int(won["barrow"]["tokens"]) == 25 and won["took"] == 0 and won["spilled"] == 5, "at capacity: the deal's charges spill (%s)" % [won])
+	won = Economy.barrow_won(won["barrow"], "hard", field)
+	_check(won["barrow"]["best"] == "hard" and Economy.barrow_capacity(won["barrow"], field) == 75 and int(won["barrow"]["tokens"]) == 40
+		and won["took"] == 15, "hard beaten: capacity 75, 15 more taken (%s)" % [won])
+	var after := Economy.barrow_won(won["barrow"], "easy", field)
+	_check(after["barrow"]["best"] == "hard", "an easier win never lowers best")
+	var with_one: Dictionary = after["barrow"].duplicate(true)
+	with_one["containers"] = ["a boss"]
+	_check(Economy.barrow_capacity(with_one, field) == 100, "a named container: 25 more")
+	var spent := {"tokens": 1, "best": "easy", "containers": []}
+	_check(Economy.barrow_spend(spent) and int(spent["tokens"]) == 0, "a charge spent")
+	_check(not Economy.barrow_spend(spent) and int(spent["tokens"]) == 0, "none at 0")
+	_check(Economy.barrow_migrated({"uses": 7, "of": 10, "difficulty": "normal", "day": 3}) == {"tokens": 7, "best": "normal", "containers": []},
+		"a saved blessing migrates: uses to charges, its difficulty best")
+	_check(Economy.barrow_migrated({"uses": 2, "of": 5}).get("best") == "easy", "blessed with no difficulty: easy")
+	var saved: Dictionary = JSON.parse_string(JSON.stringify(after["barrow"]))
+	_check(Economy.barrow_migrated(saved) == after["barrow"], "and a 573 record comes back as it was")
+
+
 func _test_maker_barter() -> void:
 	print("
 == a maker barters: the medicine man's potions for herbs from his own purse (decision 562) ==")

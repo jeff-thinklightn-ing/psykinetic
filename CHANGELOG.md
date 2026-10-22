@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Groundwork for the Crypt's charges: the draugr's deals (20, 50 or 100 gold for 5, 10 or 15 charges) and a charge capacity that grows with the hardest deal beaten (25, 50, 75) are now in the rules; nothing changes in play until the barrow's side lands (573, economy's side).
 ## v0.1.163
 
 - This version changes what goes over the network, so v0.1.162 and older can't join the server: update through the launcher first.

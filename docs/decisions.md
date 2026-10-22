@@ -20156,3 +20156,55 @@ cleared keeper already; a death now does too.
 companion_test _test_death_and_respawn: at her player's death she holds
 nothing of them (keeper, an errand, an offer). Server sim, protocol
 unchanged, no new class_name.
+
+## 573, economy's side. A player's charges and the draugr's deals
+
+Dungeon's design (C:/dev/review/dungeon/crypt_tokens_design.md, Jeff's
+corrections taken, the coordinator's approval). Economy owns the
+arithmetic, so the win (dungeon's Main.barrow_won), the channel
+(companions') and the pact (enemy-ai's Draugr) each call one helper. All
+are static on Economy; no new class_name.
+
+- **The record.** PlayerRecord.barrow becomes {tokens, best, containers}:
+  - tokens: the charges held, a number on the record (not gold, not an
+    item).
+  - best: the hardest deal beaten ("" unblessed).
+  - containers: the named sources of more capacity, each once (none
+    yet).
+- **Capacity is derived, never stored** (economy's correction), so it
+  follows the rules when Jeff moves them. Economy.barrow_capacity is
+  capacity_step × (1 + the hardest deal's place among the deals) plus
+  capacity_step per container: 25, 50, 75 from the barrow, 0 unblessed.
+- **The rules,** in return.field:
+  - "deals": [{name, gold, charges}] from the least: easy 20 gold for 5,
+    normal 50 for 10, hard 100 for 15.
+  - "capacity_step": 25.
+  - Economy.deal_for(gold, field): the highest step the gold reaches, {}
+    under 20 (enemy-ai's pact reads it).
+  - Economy.field_tokens(deal, field): the deal's charges, read from the
+    deals by name. The rules' old "uses" is kept and read as the fallback
+    until the callers move to the deals; dungeon's side drops it.
+- **Economy.barrow_won(barrow, deal, field)** returns {barrow, took,
+  spilled}. It raises best only to a harder deal, never lowers it, and
+  takes the deal's charges up to the capacity. What is over is spilled,
+  for dungeon's line.
+- **Economy.barrow_spend(barrow)** takes one charge in place; false at 0.
+  Economy.barrow_tokens reads the count.
+- **Economy.barrow_migrated(saved)** turns a pre-573 {uses, of,
+  difficulty, day} into {tokens: uses, best: difficulty, containers: []}.
+  A blessed record (uses or "of") with no difficulty gets "easy". A 573
+  record comes back as it was.
+  - It is not wired into PlayerRecord.from_entry yet. Main's readers
+    (bless, _uses_left, the channel's spend, the companion's REVIVE)
+    still read "uses", so the migration lands with the landing that
+    switches them, dungeon's, and companions' beside it. A record
+    migrated before then would read 0 uses.
+- **Nothing in gold** here: the deal's gold is the draugr's as today (a
+  spending). 546's offering, Aldous's alms and the altar's gold are
+  untouched.
+
+tests/economy_test _test_barrow_charges: the deals by gold, charges by
+deal and the uses fallback, a win's charges and capacity, the spill at
+capacity, best never lowered, a container's 25, the spend and none at 0,
+the migration both ways. Server only, protocol unchanged.
+

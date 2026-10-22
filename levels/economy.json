@@ -61,7 +61,9 @@
 	"contribute": {"gold_per_xp": 2},
 	"return": {
 		"steps": 600, "fee": 0, "give_up": 1200, "offering": 8, "waived_by": "draugr", "acolyte": {"trade": "acolyte", "keep": 1},
-		"field": {"_": "Decision 544: the draugr's blessed brought back where they fell. A blessed body (a player marked draugr, a companion with draugr in her marks) whose player has uses left lies downed window_s seconds at 0 HP; a blessed hand carrying its half of the device, beside it, still and unhit for channel_s, brings it back at hp of its most, one use off the channeler's player's count; else it dies as ever. uses: the count the draugr gives by the difficulty he was beaten at.", "window_s": 30, "channel_s": 4, "hp": 0.5, "uses": {"easy": 5, "normal": 10, "hard": 15}},
+		"field": {"_": "Decision 544: the draugr's blessed brought back where they fell. A blessed body (a player marked draugr, a companion with draugr in her marks) whose player has uses left lies downed window_s seconds at 0 HP; a blessed hand carrying its half of the device, beside it, still and unhit for channel_s, brings it back at hp of its most, one use off the channeler's player's count; else it dies as ever. uses: the count the draugr gives by the difficulty he was beaten at. Decision 573: the draugr's deals, the gold a player gives buying the highest step it reaches (under the least refused), its charges taken up to the capacity: capacity_step for each step of the hardest deal beaten, and one more for each named container (none yet). uses is read till the callers move to deals (Economy.field_tokens).", "window_s": 30, "channel_s": 4, "hp": 0.5, "uses": {"easy": 5, "normal": 10, "hard": 15},
+			"deals": [{"name": "easy", "gold": 20, "charges": 5}, {"name": "normal", "gold": 50, "charges": 10}, {"name": "hard", "gold": 100, "charges": 15}],
+			"capacity_step": 25},
 		"places": {
 			"temple": {"trade": "priest", "names": ["Aldous", "Brother Cuth", "Osric", "Wendel"]},
 			"healers_hut": {"trade": "medicine_man", "outside": true, "names": ["Ned", "Old Tam", "Hob", "Gile"]}

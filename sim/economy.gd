@@ -1200,6 +1200,101 @@ func last_down_day(town: String) -> int:
 	return int(_down_day.get(town, -1))
 
 
+## The draugr's deals (decision 573, economy's side): rules' return.field
+## "deals", [{name, gold, charges}] from the least to the most, the gold a
+## player gives him buying the highest step it reaches. [param field] is
+## return.field.
+static func deals(field: Dictionary) -> Array:
+	var out: Array = []
+	for each: Variant in field.get("deals", []):
+		if each is Dictionary:
+			out.append(each)
+	return out
+
+
+## The deal [param gold] buys: the highest step it reaches; {} under the least.
+static func deal_for(gold: int, field: Dictionary) -> Dictionary:
+	var best := {}
+	for each: Dictionary in deals(field):
+		if gold >= int(each.get("gold", 0)):
+			best = each
+	return best
+
+
+## The charges deal [param deal] (a name: easy, normal, hard) gives; before
+## 573 the rules' "uses" by difficulty, read one cut more.
+static func field_tokens(deal: String, field: Dictionary) -> int:
+	for each: Dictionary in deals(field):
+		if str(each.get("name", "")) == deal:
+			return int(each.get("charges", 0))
+	return int(field.get("uses", {}).get(deal, 0))
+
+
+## How hard deal [param deal] is: its place among the deals (0 the least);
+## -1 for none.
+static func _deal_rank(deal: String, field: Dictionary) -> int:
+	var names: Array = deals(field).map(func(each: Dictionary) -> String: return str(each.get("name", "")))
+	if names.is_empty():
+		names = ["easy", "normal", "hard"]
+	return names.find(deal)
+
+
+## The charges a player's [param barrow] record holds (PlayerRecord.barrow:
+## {tokens, best, containers}).
+static func barrow_tokens(barrow: Dictionary) -> int:
+	return maxi(int(barrow.get("tokens", 0)), 0)
+
+
+## The most charges [param barrow] may hold: capacity_step for each step of
+## the hardest deal beaten (25, 50, 75), and one more for each container
+## (a named source, each once); 0 unblessed. Derived, never stored, so it
+## follows the rules.
+static func barrow_capacity(barrow: Dictionary, field: Dictionary) -> int:
+	var rank := _deal_rank(str(barrow.get("best", "")), field)
+	if rank < 0:
+		return 0
+	var containers: Variant = barrow.get("containers", [])
+	return int(field.get("capacity_step", 25)) * (1 + rank + (containers.size() if containers is Array else 0))
+
+
+## The draugr beaten at [param deal]: [param barrow] with the deal's charges
+## taken up to the capacity, best raised if the deal is harder (never
+## lowered). {barrow: the new record, took, spilled: what was over}.
+static func barrow_won(barrow: Dictionary, deal: String, field: Dictionary) -> Dictionary:
+	var out := {"tokens": barrow_tokens(barrow), "best": str(barrow.get("best", "")),
+		"containers": (barrow.get("containers", []) as Array).duplicate() if barrow.get("containers", []) is Array else []}
+	if _deal_rank(deal, field) > _deal_rank(out["best"], field):
+		out["best"] = deal
+	var given := field_tokens(deal, field)
+	var room := maxi(barrow_capacity(out, field) - int(out["tokens"]), 0)
+	var took := mini(given, room)
+	out["tokens"] = int(out["tokens"]) + took
+	return {"barrow": out, "took": took, "spilled": given - took}
+
+
+## One charge off [param barrow] (in place): false, and nothing taken, at 0.
+static func barrow_spend(barrow: Dictionary) -> bool:
+	if barrow_tokens(barrow) <= 0:
+		return false
+	barrow["tokens"] = barrow_tokens(barrow) - 1
+	return true
+
+
+## A saved barrow record as 573 keeps it: one from before ({uses, of,
+## difficulty, day}) becomes {tokens: uses, best: difficulty, containers}
+## ("easy" for a blessed one with uses and no difficulty).
+static func barrow_migrated(saved: Dictionary) -> Dictionary:
+	if saved.has("tokens"):
+		var containers: Variant = saved.get("containers", [])
+		return {"tokens": maxi(int(saved["tokens"]), 0), "best": str(saved.get("best", "")),
+			"containers": (containers as Array).map(func(each: Variant) -> String: return str(each)) if containers is Array else []}
+	var uses := maxi(int(saved.get("uses", 0)), 0)
+	var best := str(saved.get("difficulty", ""))
+	if best.is_empty() and (uses > 0 or saved.has("of")):
+		best = "easy"
+	return {"tokens": uses, "best": best, "containers": []}
+
+
 ## Robbers or a player lift [param amount] from [param town]'s altar: what
 ## was there to take.
 func lift_below(town: String, amount: int) -> int:
