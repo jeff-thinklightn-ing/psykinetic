@@ -20852,3 +20852,59 @@ then travelled.
   variable, for a node freed some other way.
 
 Server sim, protocol unchanged, no new class_name.
+## 566, buildings' side: a building seen being built, and its lamps
+
+Approved by the coordinator with npc's visible-work page (Jeff,
+2026-10-21: "building a half constructed building, sleeping at night");
+economy's keys under protocol revision 29 carry what it reads, nothing on
+the wire of its own.
+- Stages by the town record's progress (economy's "progress", 0..1, on a
+  use's record while a job is on it): BuildingComposer.stage. A first
+  build (planned, or building at level 0) is PLOT under 0.1 (stakes and
+  string round its outline, a woodpile), FRAME to 0.35 (sills along its
+  walls, its corner posts a storey tall), four WALLS stages to 0.75 (its
+  walls a quarter of their height higher each, scaffold from the half),
+  RAFTERS to 0.9 (its main roof's rafters a metre apart), COVERING to its
+  job's end (its roofs on), then STANDING as drawn today. Its windows,
+  door, chimney, porch and cruck come with whole walls or standing.
+  The cut-offs are economy's Towns.BUILD_STAGES, which it resends the
+  record at. Anything
+  else is STANDING; a raise (building, level 1 or more) or a repair under
+  way (damaged, with progress) stands in scaffold.
+- A planned building with no progress yet is its staked plot
+  (PLANNED_AS_PLOT, the coordinator's ruling, one switch should Jeff
+  overturn it). A fresh town's first look changes: its unbuilt buildings
+  show as plots where they stood whole. The box's Held, mostly built,
+  changes little.
+- Drawn only: the client marks a stage's outline edges "plot" (no wall,
+  no post) or "frame" (no wall, corner posts) in its wall states, cuts
+  _wall_heights to the stage's part, hides the doorway, and draws the
+  edges again (rebuild_walls) when the stage changes; a roof not yet on is
+  none to hide or fade. Whether a wall blocks is the sim's (from 0.35:
+  economy's Towns.walls_up and maps' loader).
+- Site pieces: art-kit's site.stake, frame.sill, scaffold.bay (edge
+  pieces, along z, outside +x; scaffold.bay_ladder on the bay nearest the
+  door, both stretched to the eaves from their 3 m), roof.rafters (a pair
+  for a 4 m span rising 2 m, origin at the apex, stretched to the roof's),
+  and prop.woodpile (its state_full to the frame, state_half through the
+  walls, state_low under the roof) with prop.planks beside it through the
+  walls, and prop.sawhorse on its own cell to the frame (its log turned
+  across the way its sawyer faces it), where the kit has them, else
+  plain timber boxes.
+- Level.site_cells(building) -> {work, woodpile, sawbuck, saw} (in the sim, so the
+  server and the sim's tests need nothing of the client): npc's goal
+  cells for the carpenter. "work" is the cell inside its first door,
+  "woodpile" one beside the cell outside it (the side its seed picks,
+  never its own cell). 566 amended (the coordinator's, at npc's ask: the
+  saw stroke lands on the sawbuck): "sawbuck" the cell on the door's other
+  side (else one further out from the door), "saw" the one beyond it from
+  the door, where npc stands its carpenter facing the sawbuck on the plot
+  and frame stages.
+- Lamps: a kind's window piece with a "glow" node (art-kit's) is lit only
+  with the sun down; then by its building's "awake" (Client3D.set_awake:
+  economy's "town" message's {code: bool}, npc's flag, keyed by the
+  building's code, decision 537), else until LAMP_OUT (22). Looked at
+  every LAMP_CHECK seconds. No omni lights. A building not yet standing
+  (its windows in from its walls' last step) keeps its lamps out: nobody
+  lives in it yet (the review shot at 21: a house under its rafters lit).
+view_test _test_stages.

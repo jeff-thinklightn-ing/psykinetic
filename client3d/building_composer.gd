@@ -512,3 +512,212 @@ static func _chimney(building: Dictionary, main: Rect2i, rect: Rect2i, eaves: fl
 		box.position.y = part[1]
 		out.add_child(box)
 	return out
+
+
+## A building being built (decision 566): drawn in stages by its build
+## job's progress (economy's, 0..1, on its town record). PLOT its staked
+## ground, FRAME its sills and corner posts, WALLS to WALLS + 3 its walls a
+## quarter storey higher each, RAFTERS its main roof's rafters, COVERING
+## its roofs on, STANDING as it is drawn when built.
+const PLOT := 0
+const FRAME := 1
+const WALLS := 2
+const RAFTERS := 6
+const COVERING := 7
+const STANDING := 8
+## A planned building drawn as its staked plot (the coordinator's ruling on
+## 566, Jeff's to overturn): false draws one standing until its job's
+## progress is under way.
+const PLANNED_AS_PLOT := true
+## The site's plain timber where art-kit has no piece: a stake, a sill's
+## section, a scaffold's reach out from the wall and its plank's height,
+## the woodpile, a rafter's section.
+const STAKE := Vector3(0.06, 0.6, 0.06)
+const SILL := 0.2
+const SCAFFOLD_OUT := 0.7
+const SCAFFOLD_PLANK := 1.6
+const WOODPILE := Vector3(1.2, 0.5, 0.6)
+const RAFTER := 0.12
+## The woodpile and the planks beside it share its cell, this far either
+## side of its middle.
+const SITE_PROP_SPACING := 0.3
+
+
+## The stage [param record] (a town's record of the building's use: state,
+## level, progress) is drawn at: a first build (planned, or building at
+## level 0) by its progress; anything else STANDING.
+static func stage(record: Dictionary) -> int:
+	var state := str(record.get("state", Towns.STANDING))
+	var first := state == Towns.PLANNED or state == Towns.BUILDING and int(record.get("level", 0)) == 0
+	if not first:
+		return STANDING
+	var progress := float(record.get("progress", 0.0))
+	if state == Towns.PLANNED and not PLANNED_AS_PLOT and progress <= 0.0:
+		return STANDING
+	var at := PLOT
+	# Where each stage after PLOT begins: economy's, which resends the town
+	# record as progress crosses each.
+	for cut in Towns.BUILD_STAGES:
+		if progress >= cut:
+			at += 1
+	return at
+
+
+## Whether [param record]'s building stands in scaffold: a level being
+## raised, or a repair under way (damaged, with a job's progress).
+static func scaffolded(record: Dictionary) -> bool:
+	var state := str(record.get("state", Towns.STANDING))
+	return record.has("progress") and (state == Towns.DAMAGED
+			or state == Towns.BUILDING and int(record.get("level", 0)) >= 1)
+
+
+## How much of its walls' height stands at stage [param at]: none to its
+## frame, a quarter more each walls stage, all from its rafters.
+static func wall_fraction(at: int) -> float:
+	return clampf(float(at - FRAME) / 4.0, 0.0, 1.0)
+
+
+## [param building]'s site at stage [param at] (its frame, origin as
+## compose's): stakes and string round its outline on its plot; sills
+## along its walls until its rafters; its main roof's rafters at RAFTERS;
+## scaffold along its walls from its half walls until it stands, or all
+## round when [param scaffold] (a raise or a repair); its woodpile until it
+## stands; a sawhorse by it while the frame is sawn, planks while the walls
+## go up; the ladder on the bay nearest its door. Art-kit's pieces where
+## it has them, else plain timber.
+static func site(building: Dictionary, at: int, scaffold: bool) -> Node3D:
+	var out := Node3D.new()
+	out.name = "Site"
+	var wood := Client3D._wall_material("wood")
+	var doors: Array = building.get("doors", [])
+	var storey := float(building["eaves"])
+	# The bay with the ladder: the one nearest its door.
+	var ladder := Vector3i(-1, -1, -1)
+	if not doors.is_empty():
+		var door_at: Vector2 = _edge_out(building, doors[0])[0]
+		var nearest := INF
+		for key in Level.building_outline(building):
+			var far := (_edge_out(building, key)[0] as Vector2).distance_to(door_at)
+			if not doors.has(key) and far < nearest:
+				nearest = far
+				ladder = key
+	for key in Level.building_outline(building):
+		var edge := _edge_out(building, key)
+		var middle: Vector2 = edge[0]
+		var side: Vector2i = edge[1]
+		if at == PLOT:
+			out.add_child(_site_piece("site.stake", middle, side, [
+					[STAKE, Vector3(0.0, STAKE.y * 0.5, -0.5)],
+					[Vector3(0.015, 0.015, 1.0), Vector3(0.0, STAKE.y * 0.8, 0.0)]], wood))
+		elif at < RAFTERS and not doors.has(key):
+			out.add_child(_site_piece("frame.sill", middle, side, [[Vector3(SILL, SILL, 1.0), Vector3(0.0, SILL * 0.5, 0.0)]], wood))
+		if not doors.has(key) and (scaffold or at >= WALLS + 1 and at < STANDING):
+			var slot := "scaffold.bay_ladder" if key == ladder and ArtKit.has("scaffold.bay_ladder") else "scaffold.bay"
+			var bay := _site_piece(slot, middle, side, [
+					[Vector3(0.1, storey, 0.1), Vector3(SCAFFOLD_OUT, storey * 0.5, -0.45)],
+					[Vector3(0.1, storey, 0.1), Vector3(SCAFFOLD_OUT, storey * 0.5, 0.45)],
+					[Vector3(0.35, 0.05, 1.0), Vector3(SCAFFOLD_OUT - 0.15, SCAFFOLD_PLANK, 0.0)]], wood)
+			bay.name = "Bay"
+			if ArtKit.has(slot):
+				bay.scale.y = storey / Client3D.WALL_HEIGHT  # Art-kit's is a storey of 3 m.
+			out.add_child(bay)
+	if at == RAFTERS:
+		out.add_child(_rafters(building, wood))
+	if at < STANDING:
+		# Its woodpile (art-kit's prop.woodpile, full to its frame, half
+		# through its walls, low under its roof) and beside it its planks
+		# while its walls go up; its sawbuck on a cell of its own while its
+		# posts are sawn, its log across the way its sawyer faces it.
+		var cells := Level.site_cells(building)
+		var cell: Vector2i = cells["woodpile"]
+		var rect: Rect2i = building["rect"]
+		var at_cell := Vector3(cell.x - rect.position.x, 0.0, cell.y - rect.position.y)
+		var fill := "full" if at <= FRAME else "half" if at < RAFTERS else "low"
+		var pile: Node3D
+		if ArtKit.has("prop.woodpile"):
+			pile = ArtKit.instance("prop.woodpile")
+			for state: Node3D in pile.find_children("state_*", "Node3D", true, false):
+				state.visible = state.name == "state_" + fill
+		else:
+			var tall: float = WOODPILE.y * float({"full": 1.0, "half": 0.6, "low": 0.3}[fill])
+			pile = _timber(Vector3(WOODPILE.x, tall, WOODPILE.z), Vector3(0.0, tall * 0.5, 0.0), wood)
+		pile.name = "Woodpile"
+		pile.position = at_cell + Vector3(0.0, 0.0, -SITE_PROP_SPACING)
+		out.add_child(pile)
+		if at <= FRAME and ArtKit.has("prop.sawhorse"):
+			var buck: Vector2i = cells["sawbuck"]
+			var facing: Vector2i = cells["saw"] - buck
+			var sawhorse := ArtKit.instance("prop.sawhorse")
+			sawhorse.name = "Sawhorse"
+			sawhorse.position = Vector3(buck.x - rect.position.x, 0.0, buck.y - rect.position.y)
+			# Its log along x: across a sawyer to its north or south.
+			sawhorse.rotation.y = PI * 0.5 if facing.x != 0 else 0.0
+			out.add_child(sawhorse)
+		elif at > FRAME and at < RAFTERS and ArtKit.has("prop.planks"):
+			var planks := ArtKit.instance("prop.planks")
+			planks.name = "Planks"
+			planks.position = at_cell + Vector3(0.0, 0.0, SITE_PROP_SPACING)
+			out.add_child(planks)
+	return out
+
+
+## An edge piece of the site: art-kit's [param slot] as _edge_piece lays
+## it, else [param boxes] ([size, position] each, in the edge's frame:
+## along z, its outside +x) of plain [param wood].
+static func _site_piece(slot: String, middle: Vector2, out: Vector2i, boxes: Array, wood: Material) -> Node3D:
+	var piece := _edge_piece(slot, middle, out)
+	if piece != null:
+		piece.name = slot.get_slice(".", 1).capitalize()
+		return piece
+	var holder := Node3D.new()
+	holder.name = slot.get_slice(".", 1).capitalize()
+	holder.position = Vector3(middle.x, 0.0, middle.y)
+	holder.rotation.y = atan2(-float(out.y), float(out.x))
+	for box: Array in boxes:
+		holder.add_child(_timber(box[0], box[1], wood))
+	return holder
+
+
+## A plain timber box of [param size] at [param at].
+static func _timber(size: Vector3, at: Vector3, wood: Material) -> MeshInstance3D:
+	var mesh := MeshInstance3D.new()
+	var shape := BoxMesh.new()
+	shape.size = size
+	mesh.mesh = shape
+	mesh.material_override = wood
+	mesh.position = at
+	return mesh
+
+
+## [param building]'s main block's rafters: a pair a metre along its ridge,
+## from its eaves to its ridge (its rise as its roof's); art-kit's
+## roof.rafters where it has them (a pair for a 4 m span rising 2 m, its
+## origin at the apex, stretched to this one), else plain timber.
+static func _rafters(building: Dictionary, wood: Material) -> Node3D:
+	var out := Node3D.new()
+	out.name = "Rafters"
+	var blocks: Array = building["blocks"]
+	var main: Rect2i = blocks[_main_of(blocks)]
+	var rect: Rect2i = building["rect"]
+	var middle := Vector2(main.position - rect.position) + Vector2(main.size - Vector2i.ONE) * 0.5
+	var along_x := main.size.x > main.size.y
+	var span := float(main.size.y if along_x else main.size.x)
+	var length := float(main.size.x if along_x else main.size.y)
+	var rise := _main_rise(building)
+	out.position = Vector3(middle.x, float(building["eaves"]), middle.y)
+	out.rotation.y = PI * 0.5 if along_x else 0.0
+	var count := maxi(int(length), 1)
+	var slope := sqrt(span * span * 0.25 + rise * rise)
+	for k in count:
+		var z := -length * 0.5 + (k + 0.5) * length / count
+		if ArtKit.has("roof.rafters"):
+			var pair := ArtKit.instance("roof.rafters")
+			pair.position = Vector3(0.0, rise, z)
+			pair.scale = Vector3(span / 4.0, rise / 2.0, 1.0)
+			out.add_child(pair)
+			continue
+		for side: float in [-1.0, 1.0]:
+			var rafter := _timber(Vector3(slope, RAFTER, RAFTER), Vector3(side * span * 0.25, rise * 0.5, z), wood)
+			rafter.rotation.z = -side * atan2(rise, span * 0.5)
+			out.add_child(rafter)
+	return out

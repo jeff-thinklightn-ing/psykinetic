@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- A building being built is seen going up (566): a staked plot and a woodpile, then its frame, its walls rising, rafters and the roof going on, with scaffold while a level is raised or it is repaired. Windows glow at night while the people inside are awake.
 - Building kinds' roofs default to shingle; a kind may name thatch, now dressed in a ridge roll and ragged eaves; cottages, huts, barns, longhouses, stables and lean-to houses are thatched. Corner posts no longer poke through a lean-to's roof.
 - Fixed: the server could crash when someone who had eaten, or was being bandaged or brought back, died or left for another place (572 amended).
 ## v0.1.164

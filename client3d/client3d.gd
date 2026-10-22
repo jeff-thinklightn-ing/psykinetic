@@ -98,6 +98,10 @@ const RUIN_BROKEN := 0.45
 ## it); how many windows stand with their shutters open (489 amended).
 const WINDOW_STRETCH := 0.6
 const SHUTTERS_OPEN := 0.66
+## A window lit by the hour goes out at this hour, the sun down; how often
+## the window lights are looked at, seconds (decision 566).
+const LAMP_OUT := 22.0
+const LAMP_CHECK := 2.0
 ## Wall runs (_add_wall_runs), each in its set's profile and variation
 ## (_wall_set: art-kit's wall.<set>.profile, decision 287): at most this
 ## many edges a mesh; a height every WALL_SWAY edges, the body up to the
@@ -1196,6 +1200,18 @@ var _state_walls: Array[Vector3i] = []
 ## The window edges whose outside is their run's -x: the piece turned half
 ## round (_dress_window).
 var _window_flipped: Dictionary[Vector3i, bool] = {}
+## A kind's window edges -> [its town's id, its building's code] (decision
+## 566): whose window light a window there is (_dress_window): [town id,
+## building code, its building standing] (_show_stage keeps the last).
+var _window_code: Dictionary[Vector3i, Array] = {}
+## The window lights drawn: [its glow node, its _window_code row] each
+## (_update_lamps).
+var _glows: Array[Array] = []
+## Each town's buildings awake ({code: bool}, set_awake: economy's "town"
+## message, npc's flag); a code not in it is lit by the hour.
+var _awake: Dictionary[String, Dictionary] = {}
+## Seconds since the window lights were last looked at (LAMP_CHECK).
+var _lamp_clock := 0.0
 var _town_wall_sets: Array[Vector3i] = []
 var _town_walls: Array[Dictionary] = []
 var _building_floors: Array[Vector2i] = []
@@ -1612,6 +1628,10 @@ func _process(delta: float) -> void:
 	_follow(delta)
 	_fade_clock += delta
 	_update_fade()
+	_lamp_clock += delta
+	if _lamp_clock >= LAMP_CHECK:
+		_lamp_clock = 0.0
+		_update_lamps()
 	_update_grown()
 	_update_shadows()
 	_update_sky(delta)
@@ -3316,6 +3336,8 @@ func _build_room() -> void:
 		_wall_states.erase(key)
 	_state_walls.clear()
 	_window_flipped.clear()
+	_window_code.clear()
+	_glows.clear()
 	for key in _town_wall_sets:
 		_wall_sets.erase(key)
 	_town_wall_sets.clear()
@@ -3363,12 +3385,14 @@ func _build_room() -> void:
 			if building.has("kind") and wall_set == "wood" and key in windows \
 					and absf(_height_of(key) - WALL_HEIGHT) <= WINDOW_STRETCH:
 				_set_wall_state(key, "window")
+				_window_code[key] = [str(building.get("town_id", "")), str(building.get("code", "")), true]
 				var sides := Terrain.edge_cells(key)
 				# A run's +x is east for an east edge, north (its first cell) for a south one.
 				var outside_first := not cells.has(sides[0])
 				_window_flipped[key] = outside_first if key.z == Terrain.EAST else not outside_first
 			# A ruin's walls broken here and there before they are drawn (489).
-			if building.get("ruined", false) and _terrain["edges"].get(key) == Terrain.Edge.WALL 					and _roll(Vector2i(key.x, key.y), 40 + key.z) < RUIN_BROKEN:
+			if building.get("ruined", false) and _terrain["edges"].get(key) == Terrain.Edge.WALL \
+					and _roll(Vector2i(key.x, key.y), 40 + key.z) < RUIN_BROKEN:
 				_set_wall_state(key, "broken")
 		if spec.has("floor_set"):
 			var floor_set := _known_set(str(spec["floor_set"]))
@@ -3584,7 +3608,13 @@ func _add_kind(building: Dictionary) -> void:
 	var index := _buildings.size()
 	_buildings.append({"rect": rect, "node": node, "roof": roof, "off": false, "roof_at": roof.transform if roof != null else Transform3D(),
 		"use": str(building.get("use", "")), "town_id": str(building.get("town_id", "")), "damaged": false,
-		"open_air": false, "crop": "", "inside": inside, "outline": Level.building_outline(building)})
+		"open_air": false, "crop": "", "inside": inside, "outline": Level.building_outline(building),
+		"kind": building, "stage": BuildingComposer.STANDING, "scaffold": false, "heights": {}, "windows": []})
+	# Its walls as built (566): what a stage cuts down and puts back.
+	for key: Vector3i in _buildings[index]["outline"]:
+		_buildings[index]["heights"][key] = _height_of(key)
+		if _wall_states.get(key) == "window":
+			_buildings[index]["windows"].append(key)
 	_show_state(_buildings[index])
 	if _glimpse or roof == null:
 		return  # A glimpse is drawn only; a ruin is open to the sky.
@@ -3882,6 +3912,11 @@ func _show_state(building: Dictionary) -> void:
 		state = str(town_states.get(building["town_id"], {}).get(building["use"], {}).get("state", Towns.STANDING))
 	if building.get("open_air", false):
 		_show_crop(building)
+	if building.has("kind"):
+		var record: Dictionary = {}
+		if not str(building["use"]).is_empty():
+			record = town_states.get(building["town_id"], {}).get(building["use"], {})
+		_show_stage(building, BuildingComposer.stage(record), BuildingComposer.scaffolded(record))
 	var damaged := state == Towns.DAMAGED
 	if damaged == building["damaged"]:
 		return
@@ -3921,6 +3956,112 @@ func _show_state(building: Dictionary) -> void:
 		_update_fade(true)
 
 
+## A kind [param building] drawn at stage [param at] (decision 566,
+## BuildingComposer.stage), in scaffold when [param scaffold]: its site's
+## pieces; its roofs and parts only from their stages (a roof not yet on
+## is none to hide); its walls none on its plot ("plot": nor their posts),
+## its corner posts alone on its frame ("frame"), then cut to
+## BuildingComposer.wall_fraction of their height, its windows and door
+## only once its walls are whole. Its walls are drawn again
+## (rebuild_walls) only when a stage before standing is left or come to.
+func _show_stage(building: Dictionary, at: int, scaffold: bool) -> void:
+	var was: int = building["stage"]
+	if at == was and scaffold == building["scaffold"]:
+		return
+	building["stage"] = at
+	building["scaffold"] = scaffold
+	var node: Node3D = building["node"]
+	var old := node.get_node_or_null("Site")
+	if old != null:
+		node.remove_child(old)
+		old.queue_free()
+	if at != BuildingComposer.STANDING or scaffold:
+		node.add_child(BuildingComposer.site(building["kind"], at, scaffold))
+	var roof: Node3D = node.get_node_or_null("roof")
+	if roof != null:
+		roof.visible = at >= BuildingComposer.COVERING
+		if building["roof"] != null or roof.visible:
+			_set_near(roof, false)
+			_faded.erase(roof)
+			_hid_at.erase(roof)
+			_hiding.erase(roof)
+		building["roof"] = roof if roof.visible else null
+	var parts: Node3D = node.get_node_or_null("parts")
+	if parts != null:
+		parts.visible = at == BuildingComposer.STANDING
+	if at == was or at == BuildingComposer.STANDING and was == BuildingComposer.STANDING:
+		return
+	var fraction := BuildingComposer.wall_fraction(at)
+	var heights: Dictionary = building["heights"]
+	for key: Vector3i in building["outline"]:
+		match _terrain["edges"].get(key, Terrain.Edge.OPEN):
+			Terrain.Edge.WALL:
+				# Its lamps lit only once it stands: nobody lives in it before.
+				if _window_code.has(key):
+					_window_code[key][2] = at == BuildingComposer.STANDING
+				if at == BuildingComposer.PLOT:
+					_set_wall_state(key, "plot")
+				elif fraction <= 0.0:
+					_set_wall_state(key, "frame")
+				else:
+					_set_wall_state(key, "window" if fraction >= 1.0 and key in building["windows"] else "")
+				# A frame's posts stand to the walls' full height.
+				var keep := fraction if fraction > 0.0 else 1.0
+				var tall: float = heights.get(key, WALL_HEIGHT) * keep
+				if is_equal_approx(tall, WALL_HEIGHT):
+					_wall_heights.erase(key)
+				else:
+					_wall_heights[key] = tall
+			Terrain.Edge.DOOR:
+				# No post by a door on a plot either.
+				_set_wall_state(key, "plot" if at == BuildingComposer.PLOT else "")
+				if _doorways.has(key):
+					(_doorways[key] as Node3D).visible = fraction >= 1.0
+	rebuild_walls(building["outline"])
+
+
+## Whether wall edge [param key] stands unbuilt (566): on a plot ("plot")
+## or a frame ("frame"), no wall drawn.
+func _unbuilt(key: Vector3i) -> bool:
+	var state: String = _wall_states.get(key, "")
+	return state == "plot" or state == "frame"
+
+
+## [param town]'s buildings awake ({code: bool}: economy's "town" message,
+## npc's flag; decision 566): their window lights as they say.
+func set_awake(town: String, awake: Dictionary) -> void:
+	_awake[town] = awake
+	_update_lamps()
+
+
+## Each window light lit or out (lamp_lit), as its building's town says
+## and the hour; one freed with its walls is let go.
+func _update_lamps() -> void:
+	var now := DayNight.now()
+	var hour := DayNight.hour(now)
+	var sun := DayNight.elevation(now)
+	_glows = _glows.filter(func(each: Array) -> bool: return is_instance_valid(each[0]))
+	for each in _glows:
+		(each[0] as Node3D).visible = _window_lit(each[1], hour, sun)
+
+
+## Whether a window of _window_code row [param row] is lit: its building
+## standing, then as lamp_lit says.
+func _window_lit(row: Array, hour: float, sun: float) -> bool:
+	return bool(row[2]) and lamp_lit(_awake.get(row[0], {}), str(row[1]), hour, sun)
+
+
+## Whether a window of building [param code] is lit (566): only with the
+## sun down; then as [param awake] ({code: bool}) says, else until
+## LAMP_OUT o'clock.
+static func lamp_lit(awake: Dictionary, code: String, hour: float, sun: float) -> bool:
+	if sun > 0.0:
+		return false
+	if awake.has(code):
+		return bool(awake[code])
+	return hour >= 12.0 and hour < LAMP_OUT
+
+
 ## Whether a damaged building's or town wall's edge [param key] is one
 ## drawn broken: a third of them, by a hash of where it is, the same on
 ## every peer.
@@ -3937,6 +4078,12 @@ static func _broken_pick(key: Vector3i) -> bool:
 func _dress_window(made: Node3D, key: Vector3i) -> void:
 	if _window_flipped.get(key, false):
 		made.rotation.y = PI
+	# Its light (566): art-kit's "glow" pane, lit as its building is.
+	var glow := made.find_child("glow", true, false) as Node3D
+	if glow != null and _window_code.has(key):
+		_glows.append([glow, _window_code[key]])
+		glow.visible = _window_lit(_window_code[key], DayNight.hour(DayNight.now()),
+				DayNight.elevation(DayNight.now()))
 	made.scale.y = _height_of(key) / WALL_HEIGHT
 	var cell := Vector2i(key.x, key.y)
 	if _roll(cell, 50 + key.z) >= SHUTTERS_OPEN:
@@ -8084,6 +8231,8 @@ func _add_wall(key: Vector3i) -> void:
 func _add_wall_runs(keys: Array[Vector3i]) -> void:
 	var lines: Dictionary[Vector2i, Array] = {}
 	for key in keys:
+		if _unbuilt(key):
+			continue  # A building's plot or frame (566): no wall yet.
 		var line := _line_of(key)
 		if not lines.has(line):
 			lines[line] = []
@@ -8148,9 +8297,12 @@ func rebuild_walls(edges: Array[Vector3i]) -> void:
 		_hid_at.erase(piece)
 	_free_later(old.keys())
 	_add_wall_runs(keys)
-	var kind_at := func(key: Vector3i) -> int: return _terrain["edges"].get(key, Terrain.Edge.OPEN)
+	# A plot's edges (566) are none: no post stands on them.
+	var kind_at := func(key: Vector3i) -> int:
+		return Terrain.Edge.OPEN if _wall_states.get(key) == "plot" else _terrain["edges"].get(key, Terrain.Edge.OPEN)
 	for vertex in vertices:
-		if _needs_post(vertex, kind_at) or _sets_meet(vertex):
+		var built := WallEdge.edges_at_vertex(vertex).any(func(entry: Array) -> bool: return kind_at.call(entry[0]) != Terrain.Edge.OPEN)
+		if built and (_needs_post(vertex, kind_at) or _sets_meet(vertex)):
 			_add_post(vertex)
 	_occluders_built = false
 	_update_fade()
@@ -8961,7 +9113,7 @@ func _add_post(vertex: Vector2i) -> void:
 	# than a storey (a lean-to's, decision 489), so it stands no higher.
 	var tall := 0.0
 	for entry: Array in WallEdge.edges_at_vertex(vertex):
-		if _terrain["edges"].get(entry[0], Terrain.Edge.OPEN) != Terrain.Edge.OPEN:
+		if _terrain["edges"].get(entry[0], Terrain.Edge.OPEN) != Terrain.Edge.OPEN and _wall_states.get(entry[0]) != "plot":
 			tall = maxf(tall, _height_of(entry[0]))
 	if tall <= 0.0:
 		tall = WALL_HEIGHT

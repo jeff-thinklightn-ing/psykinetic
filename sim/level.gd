@@ -1943,6 +1943,35 @@ static func _kind_of(building: Dictionary, entry: Dictionary) -> void:
 		building["front"] = sides[1] if cells.has(sides[0]) else sides[0]
 
 
+## Where the work of [param building]'s build goes on (decision 566,
+## buildings' side; npc's goal cells for its carpenter): "work" the cell
+## inside its first door, "woodpile" one beside the cell outside it (the
+## side its seed picks, else the other: never one of its own cells),
+## "sawbuck" the one on its other side (else one further out from the
+## door), and "saw" the one beyond the sawbuck from the door, where the
+## carpenter stands to saw, facing it (566 amended, the coordinator's: the
+## saw lands on the sawbuck). A building with no door has its first cell
+## for all.
+static func site_cells(building: Dictionary) -> Dictionary:
+	var cells := building_cells(building)
+	var doors: Array = building.get("doors", [])
+	if doors.is_empty():
+		return {"work": cells[0], "woodpile": cells[0], "sawbuck": cells[0], "saw": cells[0]}
+	var sides := Terrain.edge_cells(doors[0])
+	var inside: Vector2i = sides[0] if cells.has(sides[0]) else sides[1]
+	var outside: Vector2i = sides[1] if inside == sides[0] else sides[0]
+	var across := Vector2i(absi(outside.y - inside.y), absi(outside.x - inside.x))
+	var first := 1 if int(building["seed"]) % 2 == 0 else -1
+	var woodpile := outside + across * first
+	var sawbuck := outside - across * first
+	if cells.has(woodpile):
+		woodpile = sawbuck
+		sawbuck = outside + across * first
+	if cells.has(sawbuck) or sawbuck == woodpile:
+		sawbuck = outside + (outside - inside)
+	return {"work": inside, "woodpile": woodpile, "sawbuck": sawbuck, "saw": sawbuck + (outside - inside)}
+
+
 ## The cells of [param blocks], each once.
 static func _union(blocks: Array) -> Array[Vector2i]:
 	var seen: Dictionary[Vector2i, bool] = {}

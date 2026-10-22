@@ -1260,6 +1260,98 @@ func _test_kinds() -> void:
 			and outline.all(func(key: Vector3i) -> bool: return _rig._wall_sets.get(key, "wood") == "wood"),
 			"its outline walled round both blocks, its door a doorway (%d of %d; %s)" % [walls.size(), outline.size(), doors])
 	_test_composer()
+	_test_stages()
+
+
+## A building being built (decision 566): its stages by its town record's
+## progress (its plot staked, no wall nor post; its frame's corner posts
+## and sills; its walls cut to a part of their height, its door not yet
+## hung; standing again as built), a raise's scaffold, where its carpenter
+## works, and when a window is lit.
+func _test_stages() -> void:
+	print("\n== a building being built: its stages, its site, its lamps (decision 566) ==")
+	var c := BuildingComposer
+	var stages := [c.stage({"state": Towns.PLANNED}), c.stage({"state": Towns.PLANNED, "progress": 0.2}),
+		c.stage({"state": Towns.PLANNED, "progress": 0.5}), c.stage({"state": Towns.BUILDING, "level": 0, "progress": 0.8}),
+		c.stage({"state": Towns.PLANNED, "progress": 0.95}), c.stage({"state": Towns.STANDING}),
+		c.stage({"state": Towns.BUILDING, "level": 1, "progress": 0.3})]
+	_check(stages == [c.PLOT, c.FRAME, c.WALLS + 1, c.RAFTERS, c.COVERING, c.STANDING, c.STANDING],
+			"its stages by progress, a planned one staked (%s)" % [stages])
+	_check(c.scaffolded({"state": Towns.BUILDING, "level": 1, "progress": 0.3}) and c.scaffolded({"state": Towns.DAMAGED, "progress": 0.1})
+			and not c.scaffolded({"state": Towns.DAMAGED}) and not c.scaffolded({"state": Towns.PLANNED, "progress": 0.2}),
+			"scaffold on a raise or a repair under way, not on a first build's record alone")
+	var level := _kinds_level([["building_l_house_small", Vector2i(1, 1), false]])
+	var parsed: Dictionary = level["buildings"][0]
+	var site := Level.site_cells(parsed)
+	var cells := Level.building_cells(parsed)
+	var front: Vector2i = parsed["front"]
+	_check(cells.has(site["work"]) and not cells.has(site["woodpile"]) and (site["woodpile"] - front).length_squared() == 1
+			and Terrain.edge_key(site["work"], front - (site["work"] as Vector2i)) == parsed["doors"][0],
+			"its carpenter works inside its door (%s), its woodpile beside its front (%s)" % [site["work"], site["woodpile"]])
+	var buck: Vector2i = site["sawbuck"]
+	var saw: Vector2i = site["saw"]
+	_check(not cells.has(buck) and not cells.has(saw) and buck != site["woodpile"] and saw != site["woodpile"]
+			and (saw - buck).length_squared() == 1 and saw - buck == front - (site["work"] as Vector2i),
+			"its sawbuck off it and its woodpile (%s), its sawyer a step further from its door, facing it (%s)" % [buck, saw])
+	_rig.rebuild(level["terrain"], Vector2i(4, 11))
+	var house: Dictionary = _rig._buildings[0]
+	house["use"] = "house"
+	house["town_id"] = "stage_town"
+	var outline: Array = house["outline"]
+	var full: Dictionary = (house["heights"] as Dictionary).duplicate()
+	var windows: Array = (house["windows"] as Array).duplicate()
+	var node: Node3D = house["node"]
+	var roof: Node3D = node.get_node("roof")
+	var walls_at := func() -> Array: return outline.filter(func(key: Vector3i) -> bool: return _rig._walls.has(key))
+	var posts_at := func() -> Array:
+		var out := []
+		for key: Vector3i in outline:
+			for end in 2:
+				var vertex := WallEdge.vertex_at(key, end)
+				if _rig._posts.has(vertex) and not out.has(vertex):
+					out.append(vertex)
+		return out
+	var door: Vector3i = parsed["doors"][0]
+	_rig.set_town("stage_town", {"house": {"state": Towns.PLANNED, "level": 0, "progress": 0.0}})
+	_check(node.has_node("Site/Woodpile") and node.has_node("Site/Sawhorse") and node.find_child("Stake", true, false) != null and not roof.visible and house["roof"] == null
+			and walls_at.call().is_empty() and posts_at.call().is_empty() and not (_rig._doorways[door] as Node3D).visible,
+			"planned: its plot staked, a woodpile, no wall, post, door or roof (%d walls, %d posts)" % [walls_at.call().size(), posts_at.call().size()])
+	_rig.set_town("stage_town", {"house": {"state": Towns.PLANNED, "level": 0, "progress": 0.2}})
+	_check(node.find_child("Sill", true, false) != null and node.find_child("Stake", true, false) == null
+			and walls_at.call().is_empty() and posts_at.call().size() >= 6,
+			"its frame: sills and its corner posts (%d), no wall yet" % posts_at.call().size())
+	_rig.set_town("stage_town", {"house": {"state": Towns.PLANNED, "level": 0, "progress": 0.5}})
+	var half := outline.all(func(key: Vector3i) -> bool:
+		return _rig._terrain["edges"].get(key) != Terrain.Edge.WALL or is_equal_approx(_rig._height_of(key), float(full[key]) * 0.5))
+	_check(walls_at.call().size() > 10 and half and not (_rig._doorways[door] as Node3D).visible
+			and not _rig._wall_states.values().has("window") and node.find_child("Bay", true, false) != null,
+			"its walls half their height, scaffold up, no window or door yet")
+	var lamps := func() -> Array:
+		var out := []
+		for each: Array in _rig._glows:
+			if is_instance_valid(each[0]):
+				out.append(_rig._window_lit(each[1], 20.0, -5.0))
+		return out
+	_rig.set_town("stage_town", {"house": {"state": Towns.PLANNED, "level": 0, "progress": 0.95}})
+	var covering: Array = lamps.call()
+	_check(not covering.is_empty() and not covering.has(true),
+			"its roof going on: its windows in, their lamps out, nobody living there yet (%s)" % [covering])
+	_rig.set_town("stage_town", {"house": {"state": Towns.STANDING, "level": 1}})
+	var standing: Array = lamps.call()
+	_check(not standing.is_empty() and not standing.has(false), "standing: its lamps lit at 20 o'clock (%s)" % [standing])
+	var restored := outline.all(func(key: Vector3i) -> bool: return is_equal_approx(_rig._height_of(key), float(full[key])))
+	var back := outline.filter(func(key: Vector3i) -> bool: return _rig._wall_states.get(key) == "window")
+	_check(not node.has_node("Site") and roof.visible and house["roof"] == roof and restored and back.size() == windows.size()
+			and (_rig._doorways[door] as Node3D).visible,
+			"standing: its roof on, its walls whole, its %d windows and its door back" % windows.size())
+	_rig.set_town("stage_town", {"house": {"state": Towns.BUILDING, "level": 1, "progress": 0.4}})
+	_check(node.find_child("Bay", true, false) != null and roof.visible and restored,
+			"a level raised: the building standing, in scaffold")
+	_rig.set_town("stage_town", {})
+	var lit := [Client3D.lamp_lit({}, "H1", 20.0, -5.0), Client3D.lamp_lit({}, "H1", 23.0, -5.0), Client3D.lamp_lit({"H1": true}, "H1", 23.0, -5.0),
+		Client3D.lamp_lit({"H1": false}, "H1", 20.0, -5.0), Client3D.lamp_lit({"H1": true}, "H1", 13.0, 40.0)]
+	_check(lit == [true, false, true, false, false],
+			"a window lit with the sun down: as its building's awake says, else till 22 (%s)" % [lit])
 
 
 ## BuildingComposer (decision 489): a wing's walls drawn to its own lower
