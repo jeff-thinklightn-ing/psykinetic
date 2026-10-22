@@ -50,6 +50,10 @@ uniform sampler2D water : hint_default_black, filter_linear, repeat_disable;
 // The shore field (decision 553, Client3D.shore_image): over the same cells,
 // Client3D.SHORE_RES texels a cell, the water's edge where it is a half.
 uniform sampler2D shore : hint_default_black, filter_linear, repeat_disable;
+// The roads (563, terrain's side, Client3D._road_field): r a dirt road's,
+// g a stone road's, a half at its edge, from its curve; SHORE_RES texels a
+// cell over the kinds' cells.
+uniform sampler2D roads : hint_default_black, filter_linear, repeat_disable;
 // Outdoors, the forest's floor (the mask's g): the land runs into it along
 // a ragged line.
 uniform vec3 forest_floor : source_color = vec3(0.17, 0.26, 0.14);
@@ -294,6 +298,13 @@ void fragment() {
 	float strongest = max(max(weights.r, weights.g), max(weights.b, weights.a));
 	weights = smoothstep(vec4(0.0), vec4(KIND_EDGE), weights - (strongest - KIND_EDGE));
 	weights /= max(weights.r + weights.g + weights.b + weights.a, 0.0001);
+	// A road over the kinds (563, terrain's side): its own kind where its
+	// curve's field is over a half, the edge worn by a noise at two scales,
+	// never the cells.
+	vec2 road = texture(roads, (at - kinds_origin + 0.5) / kinds_size).rg;
+	float worn = (noise(at * 2.1 + 70.0) - 0.5) * 0.3 + (noise(at * 6.0 + 71.0) - 0.5) * 0.12;
+	weights = mix(weights, vec4(0.0, 1.0, 0.0, 0.0), smoothstep(0.42, 0.58, road.r + worn));
+	weights = mix(weights, vec4(0.0, 0.0, 1.0, 0.0), smoothstep(0.42, 0.58, road.g + worn));
 
 	// Each kind's look, worked out only where it shows.
 	float fine = noise(at * 7.0);

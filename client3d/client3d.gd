@@ -1371,6 +1371,14 @@ var _stream_cells: Dictionary[Vector2i, bool] = {}
 var _curve_waters: Array[Dictionary] = []
 var _curve_cells: Dictionary[Vector2i, int] = {}
 var _curve_near_sample: Dictionary[Vector2i, Vector2i] = {}
+## The roads as curves (563, terrain's side, _read_roads): each one's
+## curve and kind; their cells (-> which road); each cell near one ->
+## (which road, its nearest sample); their field (_road_field).
+var _road_curves: Array[Dictionary] = []
+var _road_cells: Dictionary[Vector2i, int] = {}
+var _road_near_sample: Dictionary[Vector2i, Vector2i] = {}
+var _road_image: Image
+var _road_mask: ImageTexture
 ## The ground relaxed (decision 558, _relax): each moved corner's offset
 ## and height there, the cells split the other way, and each relaxed
 ## cell's quad as drawn.
@@ -4193,6 +4201,8 @@ func _scatter_plan(chunk: Vector2i) -> Dictionary[String, Array]:
 				var at := Vector2(cell) + Vector2(_roll(cell, 101 + salt + n * 7), _roll(cell, 102 + salt + n * 7)) - Vector2(0.5, 0.5)
 				if _rim_top(at) > -INF:
 					continue  # Under a ledge's cap (decision 556).
+				if not _road_curves.is_empty() and _road_near(at).x > -0.1:
+					continue  # On a road (563, terrain's side).
 				if not placed.has(kind):
 					placed[kind] = []
 				placed[kind].append([cell, at, n + salt, forest])
@@ -5069,6 +5079,8 @@ func _build_ground(kinds: Dictionary) -> void:
 	_stream_cells = _streams_cells(running)
 	# The waters as curves (559, terrain's side): theirs too.
 	_read_curves()
+	# The roads as curves (563, terrain's side).
+	_read_roads()
 	for cell: Vector2i in _curve_cells:
 		_stream_cells[cell] = true
 	var water_end := cells.size()
@@ -5123,6 +5135,10 @@ func _build_ground(kinds: Dictionary) -> void:
 	for i in cells.size():
 		var cell: Vector2i = cells[i]
 		var kind := str(kinds.get(cell, "stone")) if i < floor_size else _bed_kind(cell, kinds, floor_size) if i < water_end else "grass"
+		# A road's cell drawn as the ground round it: the road is drawn from
+		# its curve (563, terrain's side), never as its cells.
+		if i < floor_size and _road_cells.has(cell):
+			kind = _road_kind_round(cell, kinds)
 		if not GROUND_CHANNELS.has(kind):
 			kind = "stone"
 		_grounds[cell] = i
@@ -5176,12 +5192,15 @@ func _build_ground(kinds: Dictionary) -> void:
 	_curve_field(_shore_image, _depth_image, origin)
 	_shore_mask = ImageTexture.create_from_image(_shore_image)
 	_depth_mask = ImageTexture.create_from_image(_depth_image)
+	_road_image = _road_field(origin, _shore_image.get_size())
+	_road_mask = ImageTexture.create_from_image(_road_image)
 	_floor_mask = ImageTexture.create_from_image(Image.create_from_data(across, down, false, Image.FORMAT_R8, _floor_bytes))
 	_mask_origin = origin
 	_mask_size = Vector2i(across, down)
 	canopy_texture = canopy_mask(_terrain.get("canopy", {}), origin, _mask_size)
 	canopy_origin = origin
 	var material := _ground_material(kind_bytes, across, down, origin)
+	material.set_shader_parameter("roads", _road_mask)
 	# Hills read (decision 525, terrain's side): slopes lit against the sun.
 	material.set_shader_parameter("slope_shade", SLOPE_SHADE if _relief_given else 0.0)
 	_ground_look = material
@@ -6046,18 +6065,7 @@ func _read_curves() -> void:
 		for cell: Vector2i in Curves.cells(curve, closed):
 			if _grounds.has(cell) or _terrain_water_has(cell):
 				_curve_cells[cell] = w
-		# Each cell within reach of the curve: its nearest sample.
-		var gaps: Dictionary[Vector2i, float] = {}
-		for k in points.size():
-			var reach := (widths[k] * 0.5 if not closed else 0.0) + CURVE_REACH
-			var point := points[k]
-			for y in range(floori(point.y - reach), ceili(point.y + reach) + 1):
-				for x in range(floori(point.x - reach), ceili(point.x + reach) + 1):
-					var cell := Vector2i(x, y)
-					var gap := Vector2(cell).distance_to(point)
-					if gap <= reach + 0.71 and gap < float(gaps.get(cell, INF)):
-						gaps[cell] = gap
-						_curve_near_sample[cell] = Vector2i(w, k)
+		_stamp_near(curve, closed, _curve_waters.size(), _curve_near_sample)
 		_curve_waters.append({"curve": curve, "closed": closed, "profile": PackedFloat32Array(), "shoal": PackedFloat32Array()})
 	# Ponds inside their closed curve: every cell inside reads its curve too.
 	for w in _curve_waters.size():
@@ -6080,11 +6088,36 @@ func _terrain_water_has(cell: Vector2i) -> bool:
 ## z which water (-1: none near). Searched round the nearest sample of the
 ## point's cell, so a lookup costs a few segments, never the whole curve.
 func _curve_near(point: Vector2) -> Vector3:
+	return _near_on(_curve_waters, _curve_near_sample, point)
+
+
+## Each cell within reach of [param curve] (CURVE_REACH past its half
+## width) -> (its [param index], its nearest sample) in [param into], the
+## nearer kept where curves meet.
+func _stamp_near(curve: Dictionary, closed: bool, index: int, into: Dictionary) -> void:
+	var points: PackedVector2Array = curve["points"]
+	var widths: PackedFloat32Array = curve["widths"]
+	var gaps: Dictionary[Vector2i, float] = {}
+	for k in points.size():
+		var reach := (widths[k] * 0.5 if not closed else 0.0) + CURVE_REACH
+		var point := points[k]
+		for y in range(floori(point.y - reach), ceili(point.y + reach) + 1):
+			for x in range(floori(point.x - reach), ceili(point.x + reach) + 1):
+				var cell := Vector2i(x, y)
+				var gap := Vector2(cell).distance_to(point)
+				if gap <= reach + 0.71 and gap < float(gaps.get(cell, INF)):
+					gaps[cell] = gap
+					into[cell] = Vector2i(index, k)
+
+
+## _curve_near over [param curves] (each {curve, closed}) by their
+## [param near] map (_stamp_near's).
+func _near_on(curves: Array, near_map: Dictionary, point: Vector2) -> Vector3:
 	var cell := Vector2i(roundi(point.x), roundi(point.y))
-	if not _curve_near_sample.has(cell):
+	if not near_map.has(cell):
 		return Vector3(-INF, 0.0, -1.0)
-	var near: Vector2i = _curve_near_sample[cell]
-	var water: Dictionary = _curve_waters[near.x]
+	var near: Vector2i = near_map[cell]
+	var water: Dictionary = curves[near.x]
 	var curve: Dictionary = water["curve"]
 	var points: PackedVector2Array = curve["points"]
 	var widths: PackedFloat32Array = curve["widths"]
@@ -6363,6 +6396,99 @@ func _curve_fine(cell: Vector2i, picked: Dictionary) -> PackedFloat32Array:
 			var bed := surface - SHORE_SINK - WATER_BED_DEPTH * smoothstep(0.0, 1.0, clampf(signed * 0.5, 0.0, 1.0))
 			fine[y * row + x] = lerpf(dry, bed, under)
 	return fine
+
+
+## The level's roads as curves (563, terrain's side, maps' 563: terrain
+## "roads", each {curve: Curves.sample's, kind}), drawn from the curve, not
+## its cells: each one's cells (Curves.cells) and for every cell near one
+## its nearest sample (_road_near reads the curve from there).
+func _read_roads() -> void:
+	_road_curves.clear()
+	_road_cells.clear()
+	_road_near_sample.clear()
+	if _glimpse:
+		return
+	for road: Dictionary in _terrain.get("roads", []):
+		var curve: Dictionary = road["curve"]
+		if (curve["points"] as PackedVector2Array).size() < 2:
+			continue
+		var index := _road_curves.size()
+		for cell: Vector2i in Curves.cells(curve, false):
+			_road_cells[cell] = index
+		_stamp_near(curve, false, index, _road_near_sample)
+		_road_curves.append({"curve": curve, "closed": false, "kind": str(road.get("kind", "dirt"))})
+
+
+## Where [param point] is to the nearest road's curve (563, terrain's side):
+## x the signed distance, inside its width positive; y along it; z which
+## road (-1: none near). As _curve_near.
+func _road_near(point: Vector2) -> Vector3:
+	return _near_on(_road_curves, _road_near_sample, point)
+
+
+## The kind a road's [param cell] is drawn as under the road (563,
+## terrain's side): the one most cells round it have that are no road's
+## (grass with none), so the road's own kind is drawn from its curve alone,
+## not as its cells.
+func _road_kind_round(cell: Vector2i, kinds: Dictionary) -> String:
+	var counts: Dictionary[String, int] = {}
+	for y in range(-1, 2):
+		for x in range(-1, 2):
+			var near := cell + Vector2i(x, y)
+			if near == cell or _road_cells.has(near) or not kinds.has(near):
+				continue
+			var kind := str(kinds[near])
+			if GROUND_CHANNELS.has(kind):
+				counts[kind] = counts.get(kind, 0) + 1
+	var best := "grass"
+	for kind: String in counts:
+		if counts[kind] > counts.get(best, 0):
+			best = kind
+	return best
+
+
+## The roads' field (563, terrain's side): an RG8 image the shore field's
+## size and texels, r a dirt road's and g a stone road's, 0.5 plus the
+## signed distance from the road's curve (its edge at a half), the larger
+## kept where roads meet. Only the texels near a road are written.
+func _road_field(origin: Vector2i, size: Vector2i) -> Image:
+	var image := Image.create(size.x, size.y, false, Image.FORMAT_RG8)
+	for cell: Vector2i in _road_near_sample:
+		var at := cell - origin
+		if at.x < 0 or at.y < 0 or at.x * SHORE_RES >= size.x or at.y * SHORE_RES >= size.y:
+			continue
+		for v in SHORE_RES:
+			for u in SHORE_RES:
+				var point := Vector2(cell) + (Vector2(u, v) + Vector2(0.5, 0.5)) / SHORE_RES - Vector2(0.5, 0.5)
+				var near := _road_near(point)
+				if near.z < 0.0:
+					continue
+				var value := clampf(0.5 + near.x, 0.0, 1.0)
+				var texel := Vector2i(at.x * SHORE_RES + u, at.y * SHORE_RES + v)
+				var was := image.get_pixelv(texel)
+				if _road_curves[int(near.z)]["kind"] == "stone":
+					image.set_pixelv(texel, Color(was.r, maxf(was.g, value), 0.0))
+				else:
+					image.set_pixelv(texel, Color(maxf(was.r, value), was.g, 0.0))
+	return image
+
+
+## The roads' field (_road_field) at [param point], the larger of its two
+## (dirt and stone), read bilinearly as the shader reads it: over a half on
+## a road.
+func road_at(point: Vector2) -> float:
+	if _road_image == null:
+		return 0.0
+	var texel := (point - Vector2(_mask_origin) + Vector2(0.5, 0.5)) * SHORE_RES - Vector2(0.5, 0.5)
+	var low := Vector2i(floori(texel.x), floori(texel.y))
+	var f := texel - Vector2(low)
+	var size := _road_image.get_size()
+	var v := PackedFloat32Array([0.0, 0.0, 0.0, 0.0])
+	for k in 4:
+		var at := (low + Vector2i(k & 1, k >> 1)).clamp(Vector2i.ZERO, size - Vector2i.ONE)
+		var here := _road_image.get_pixelv(at)
+		v[k] = maxf(here.r, here.g)
+	return lerpf(lerpf(v[0], v[1], f.x), lerpf(v[2], v[3], f.x), f.y)
 
 
 ## The cells round a corner, the corner being each one's corner 3 - a.

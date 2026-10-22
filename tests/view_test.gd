@@ -48,6 +48,7 @@ func _ready() -> void:
 	_test_ledges()
 	_test_relax()
 	_test_solid_ground()
+	_test_roads()
 	_test_water()
 	_test_streams()
 	_test_tall_grass()
@@ -2491,6 +2492,58 @@ func _test_solid_ground() -> void:
 	_check(not solid.is_empty() and wrong.is_empty(),
 			"the mound's %d solid cells drawn as land of the level's kind (%s; wrong: %s)" % [solid.size(), kinds.get(solid[0] if not solid.is_empty() else Vector2i.ZERO, ""), wrong.slice(0, 3)])
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+
+## Roads drawn from their curves (563, terrain's side): the road's field
+## over a half on its curve and under it past its edge, its edge at a half;
+## its cells drawn as the ground round them (never the road's kind by
+## cell); no scatter on the road; a level without roads none.
+func _test_roads() -> void:
+	print("\n== roads: drawn from their curves, not their cells ==")
+	for name: String in ["hills", "wilds"]:
+		var level := Level.load_level(name)
+		var terrain: Dictionary = level["terrain"]
+		_rig.rebuild(terrain, level["centre"])
+		if (terrain.get("roads", []) as Array).is_empty():
+			_check(_rig._road_curves.is_empty() and _rig.road_at(Vector2(level["centre"])) == 0.0, "%s: no roads, no road drawn" % name)
+			continue
+		var on := 0
+		var wrong := []
+		var off_edge := []
+		for road: Dictionary in _rig._road_curves:
+			var points: PackedVector2Array = road["curve"]["points"]
+			var widths: PackedFloat32Array = road["curve"]["widths"]
+			var tangents: PackedVector2Array = road["curve"]["tangents"]
+			for k in range(0, points.size(), 3):
+				if not _rig._grounds.has(Vector2i(points[k].round())):
+					continue
+				var normal := Vector2(-tangents[k].y, tangents[k].x)
+				on += 1
+				if _rig.road_at(points[k]) < 0.5:
+					wrong.append(points[k])
+				for side: float in [-1.0, 1.0]:
+					var edge := points[k] + normal * side * widths[k] * 0.5
+					if absf(_rig._road_near(edge).x) < 0.02 and absf(_rig.road_at(edge) - 0.5) > 0.13:
+						off_edge.append(edge)
+					var past := points[k] + normal * side * (widths[k] * 0.5 + 0.6)
+					if _rig._road_near(past).x < -0.5 and _rig.road_at(past) > 0.5:
+						wrong.append(past)
+		_check(on > 20 and wrong.is_empty() and off_edge.is_empty(),
+				"%s: a road's field from its curve (%d points; wrong: %s; edge off a half: %s)" % [name, on, wrong.slice(0, 3), off_edge.slice(0, 3)])
+		var kinds: Dictionary = terrain["kinds"]
+		var by_cell := []
+		for cell: Vector2i in _rig._road_cells:
+			if _rig._grounds.get(cell, -1) >= 0 and _rig._grounds[cell] < _rig._ground_floor_end and _rig._ground_kinds.get(cell, "") != _rig._road_kind_round(cell, kinds):
+				by_cell.append(cell)
+		_check(not _rig._road_cells.is_empty() and by_cell.is_empty(), "%s: a road's cells drawn as the ground round them (%d cells; not: %s)" % [name, _rig._road_cells.size(), by_cell.slice(0, 3)])
+		var on_road := []
+		for chunk: Vector2i in _rig._scatter_chunks:
+			for kind: String in _rig._scatter_plan(chunk):
+				for item: Array in _rig._scatter_plan(chunk)[kind]:
+					if _rig._road_near(item[1]).x > 0.0:
+						on_road.append(item[1])
+		_check(on_road.is_empty(), "%s: no scatter on a road (%s)" % [name, on_road.slice(0, 3)])
+	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+
 
 ## levels/hills (decision 358; relief since 525, drawn from its whole
 ## levels until terrain's side reads metres): every ledge between two of

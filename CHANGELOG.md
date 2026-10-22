@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Roads are drawn from their own curves: a winding dirt or stone band with worn edges, not squares of dirt along the tiles (563).
 - Killed orcs and kobolds keep their paint: a body that was outlined (hovered or targeted) when it died no longer turns white; letting go of the outline now puts back each surface's own material instead of clearing it.
 - Coming back to a place after a long time away no longer brings its monsters back in a rush round you: one comes back at once and each of the rest a full respawn wait after the one before, and for a minute after you arrive none comes back within 12 tiles of you or in your sight (382 amended (2)).
 - An animal, a townsperson or a companion standing on a way to another place (the castle's road out of the wilds, a barrow's door) no longer bars it: you go through anyway when you step at it, and they no longer stop or drop things there (571).

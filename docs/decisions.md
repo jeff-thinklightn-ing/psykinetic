@@ -19920,3 +19920,50 @@ cut (the box runs 28, main 29).
 tests/level_test: a link's cell known as one; a resident does not step onto
 it; one put on it steps off; a player stepping at it while a body stands
 there takes the link; nothing is put down on it.
+## 563, terrain's side: roads drawn from their curves
+
+Jeff's rule (see 559, terrain's side): a road is a smooth curve drawn as
+one, never a region of cells. Maps' 563 lays each road as a curve
+(terrain "roads": Curves.sample's, a kind, dirt or stone), its floor cells
+taking its kind on load so the sim's ground under it is dirt. This draws
+it from the curve, under the coordinator's approved curves design.
+
+- Client3D._read_roads keeps each road's curve, kind and cells
+  (Curves.cells), and the nearest sample of every cell near one.
+  _stamp_near and _near_on are shared with the waters' (_curve_near,
+  _road_near).
+- _road_field: an RG8 image at the shore field's texels, r a dirt road's
+  and g a stone road's. Each is 0.5 plus the signed distance from the
+  road's curve (its edge at a half), only near a road.
+  ground.gdshaderinc's "roads" turns the kinds' weights to the road's
+  kind where it is over a half, the edge worn by a noise at two scales.
+- A road's cells are drawn as the ground round them (_road_kind_round:
+  the kind most cells round it have that are no road's, grass with none).
+  The road's own kind shows only from its curve, so no cell-shaped dirt.
+  The sim's kinds are unchanged.
+- Scatter keeps off a road (its curve's distance).
+- Client3D.road_at reads the field as the shader does, for tests.
+
+tests/view_test _test_roads:
+- On the hills: the field over a half along the curve and under it past
+  its edge, its edge at a half within 0.13 (135 points).
+- The road's 199 cells drawn as the ground round them.
+- No scatter on it.
+- The wilds (no roads): none drawn.
+
+Shots (C:/dev/review/roads, before 0b48d134 and after, six views at noon
+and 16:00, windows off-screen): the hills' road a smooth band with worn
+edges along its curve where it was cells of dirt, no grid in it, the
+ground shader's road lines compiled with no error. map_bench A/B on the
+hills (alternated, twice): rebuild 1088/1038 ms before, 1044/1063 after;
+frame median 1.28/1.16 ms before, 1.15/1.32 after (one after run's 99th
+6.9 ms, a spike the other runs of that hour showed too). No cost seen.
+Client only, protocol unchanged, no new class_name.
+
+559, terrain's side's owed bench (the same run): map_bench, ecb908d5
+(main at 568 with 559's terrain side reverted) against 448eba81, twice,
+alternated. Hills rebuild 948/930 ms before, 992/996 after (about +55 ms);
+the wilds, with 568's river and ponds as curves, 4402/4634 ms before,
+4735/4952 after (about +325 ms, 7%); frame medians unchanged (1.06 to
+1.27 ms) but for one after hills run at 6.9 ms with its 99th at 7.3, the
+same spike. The curve drawing's cost is the rebuild's, not the frame's.
