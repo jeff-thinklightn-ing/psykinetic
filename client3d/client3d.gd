@@ -981,6 +981,14 @@ const RING_SEGMENTS := 40
 ## The hover outline: a square this far from the cell's centre, this thick.
 const HOVER_HALF := 0.47
 const HOVER_LINE := 0.05
+## The aim's arc: its line's width (ground units), the marker's radius, a
+## pip's radius and spacing, the most pips (the shortest step's).
+const AIM_LINE := 0.08
+const AIM_MARK := 0.16
+const AIM_PIP := 0.05
+const AIM_PIP_GAP := 0.16
+const AIM_PIPS_MOST := 4
+const AIM_SEGMENTS := 48
 const TOSS := Color(1.0, 0.85, 0.4, 0.85)
 const TOSS_LENGTH := 1.3
 ## A speech bubble's tail sits this far over a creature's head (just
@@ -1256,6 +1264,15 @@ var _puppets: Dictionary[int, Node3D] = {}
 var _hover: MeshInstance3D
 ## The channel's ring (544, ui's side), one, on the body being brought back.
 var _channel_ring: MeshInstance3D
+## The bow's aim while drawn (the archery aim, ui's side; Jeff: "the game
+## draws a semi circle for distance... the aim can move along at many
+## degrees"): a flat semicircle on the ground round the archer, its middle
+## on the aim, its radius the range step; the marker on it at the aim's
+## angle; pips beside the marker, more at the short steps (harder).
+var _aim_arc: MeshInstance3D
+var _aim_mark: MeshInstance3D
+var _aim_pips: Array[MeshInstance3D] = []
+var _aim_arc_radius := -1.0
 ## The outline's passes (the first; each the next's next_pass), the
 ## outlined puppet (null: none), and each body material's copy that marks
 ## the stencil, by the material.
@@ -1582,6 +1599,17 @@ func setup(terrain: Dictionary, centre := Vector2i.ZERO) -> void:
 	_channel_ring = _make_flat(_make_square_outline(HOVER_HALF, HOVER_LINE), Color(UiTheme.color("brass_bright"), 0.9))
 	_channel_ring.visible = false
 	add_child(_channel_ring)
+	_aim_arc = _make_flat(_make_arc(1.0, AIM_LINE), Color(UiTheme.color("brass_bright"), 0.8))
+	_aim_arc.visible = false
+	add_child(_aim_arc)
+	_aim_mark = _make_flat(_make_ring(0.0, AIM_MARK), Color(UiTheme.color("brass_bright"), 0.95))
+	_aim_mark.visible = false
+	add_child(_aim_mark)
+	for i in AIM_PIPS_MOST:
+		var pip := _make_flat(_make_ring(0.0, AIM_PIP), Color(UiTheme.color("brass_bright"), 0.95))
+		pip.visible = false
+		add_child(pip)
+		_aim_pips.append(pip)
 	var outline_shader := Shader.new()
 	outline_shader.code = OUTLINE_SHADER
 	var after: ShaderMaterial = null
@@ -2769,6 +2797,26 @@ func _make_ring(inner: float, outer: float) -> ArrayMesh:
 	return surface.commit()
 
 
+## A semicircle's band in the ground plane, [param radius] to its middle
+## and [param line] wide, from -90 to +90 degrees about +x (the aim's way).
+static func _make_arc(radius: float, line: float) -> ArrayMesh:
+	var surface := SurfaceTool.new()
+	surface.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var inner := radius - line * 0.5
+	var outer := radius + line * 0.5
+	for i in AIM_SEGMENTS:
+		var a0 := -PI * 0.5 + PI * i / AIM_SEGMENTS
+		var a1 := -PI * 0.5 + PI * (i + 1) / AIM_SEGMENTS
+		var i0 := Vector3(cos(a0) * inner, 0.0, sin(a0) * inner)
+		var i1 := Vector3(cos(a1) * inner, 0.0, sin(a1) * inner)
+		var o0 := Vector3(cos(a0) * outer, 0.0, sin(a0) * outer)
+		var o1 := Vector3(cos(a1) * outer, 0.0, sin(a1) * outer)
+		for vertex in [i0, o0, o1, i0, o1, i1]:
+			surface.set_normal(Vector3.UP)
+			surface.add_vertex(vertex)
+	return surface.commit()
+
+
 ## Flat quads in the ground plane, each [a, b, c, d] corner order.
 static func _flat_mesh(quads: Array[PackedVector2Array]) -> ArrayMesh:
 	var surface := SurfaceTool.new()
@@ -3000,6 +3048,48 @@ func channel_ring(tile: Vector2i, fraction: float, show := true) -> void:
 		var k := 1.0 + 0.5 * (1.0 - clampf(fraction, 0.0, 1.0))
 		_channel_ring.scale = Vector3(k, 1.0, k)
 		_lay_on_ground(_channel_ring, tile, ON_FLOOR)
+
+
+## The bow's aim while drawn: the arc round [param origin] (the archer's
+## grid point), its middle at [param angle] (radians on the grid, x as 0),
+## at [param radius] cells; the marker on it at the angle; [param pips]
+## beside the marker, across the aim; all at [param alpha] (the fade-in);
+## [param show] false hides it all.
+func aim_arc(origin: Vector2, angle: float, radius: float, alpha: float, pips: int, show: bool) -> void:
+	_aim_arc.visible = show and radius > 0.0
+	_aim_mark.visible = _aim_arc.visible
+	for i in _aim_pips.size():
+		_aim_pips[i].visible = _aim_arc.visible and i < pips
+	if not _aim_arc.visible:
+		return
+	if absf(radius - _aim_arc_radius) > 0.01:
+		_aim_arc_radius = radius
+		_aim_arc.mesh = _make_arc(radius, AIM_LINE)
+	var cell := Vector2i(origin.round())
+	var centre := Vector3(origin.x, _height_in(cell, origin) + ON_FLOOR * 2.0, origin.y)
+	_aim_arc.position = centre
+	_aim_arc.rotation = Vector3(0.0, -angle, 0.0)
+	_tint_aim(_aim_arc, alpha * 0.8)
+	var way := Vector2.from_angle(angle)
+	var point := origin + way * radius
+	var at := Vector3(point.x, _height_in(Vector2i(point.round()), point) + ON_FLOOR * 3.0, point.y)
+	_aim_mark.position = at
+	_tint_aim(_aim_mark, alpha * 0.95)
+	# The pips in a row across the aim, just past the marker, centred on it.
+	var across := Vector2(-way.y, way.x)
+	for i in pips:
+		if i >= _aim_pips.size():
+			break
+		var offset := across * ((i - (pips - 1) * 0.5) * AIM_PIP_GAP) + way * (AIM_MARK + AIM_PIP_GAP)
+		var p := point + offset
+		_aim_pips[i].position = Vector3(p.x, _height_in(Vector2i(p.round()), p) + ON_FLOOR * 3.0, p.y)
+		_tint_aim(_aim_pips[i], alpha * 0.95)
+
+
+func _tint_aim(flat: MeshInstance3D, alpha: float) -> void:
+	var material := flat.material_override as StandardMaterial3D
+	if material != null:
+		material.albedo_color = Color(UiTheme.color("brass_bright"), clampf(alpha, 0.0, 1.0))
 
 
 ## A bow's draw read in the world (decision 475, ui's): the hover ring and

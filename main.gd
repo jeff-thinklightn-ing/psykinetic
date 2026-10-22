@@ -523,6 +523,19 @@ var town_notes: Dictionary = {}
 ## came, for the countdown; {} once they are back.
 var _return_told: Dictionary = {}
 var _return_at := 0.0
+## The bow's aim while drawn (the archery aim, ui's side): the angle from
+## the archer to the mouse on the grid (radians, Vector2.angle(), x as 0),
+## set every frame while aim_drawn; pc-character turns the body from them.
+var aim_angle := 0.0
+var aim_drawn := false
+## The cell on the arc the aim points at (sent as "at" beside the angle).
+var _aim_mark_cell := Vector2i.ZERO
+## A fixed aim point on the grid for a shot (--test-show=aim); NAN for the mouse.
+var _aim_fixed := Vector2(NAN, NAN)
+## When the arc first showed, for its fade-in (msec).
+var _aim_since := 0
+## The 2D view's arc, made on first use.
+var _aim_line: Line2D
 ## Talking with a town's person (536, ui's side: no panel; the say line, their speech, the HUD).
 ## Channels this view has seen (544, ui's side): channeler instance id ->
 ## [the tick first seen, its channel_until], so the ring's course runs from
@@ -906,13 +919,29 @@ func _process(delta: float) -> void:
 	var player := _local_player()
 	# One pick of the body under the cursor a frame, for the target and the hint both.
 	var under_mouse := _entity_under_mouse()
-	var aim := World.shot_aim(player, tile) if player != null and player.raised == "draw" else {}
-	if _client3d != null and not aim.is_empty():
-		# A bow drawn: the body the shot would strike is outlined, else
-		# the cell where it would come down; both tighten as the draw
-		# completes (decision 475), the one word of how far it is.
-		_client3d.target(aim["hit"])
-		_client3d.hover(aim["end"], aim["hit"] == null)
+	var drawing := player != null and player.raised == "draw"
+	_update_aim(player, drawing)
+	# The archery aim: the shot goes the aim's way to the arc's cell; the
+	# marker is the aim, so the hover square shows only without one.
+	var aim_tile := _aim_mark_cell if drawing and aim_drawn else tile
+	var aim: Dictionary = {}
+	if drawing:
+		# Items' 583 shot_aim takes the angle and the range ({end, cell, hit,
+		# struck}); before it lands, the cell ({end, hit}). Called by name, so
+		# either side lands first.
+		if World.has_method("draw_step") and aim_drawn:
+			var steps := range_steps(player)
+			var reach := range_now(player)
+			aim = World.call("shot_aim", player, aim_angle, reach if reach > 0 else int(steps[0]) if not steps.is_empty() else 1)
+		else:
+			aim = World.call("shot_aim", player, aim_tile)
+	if _client3d != null and drawing:
+		# A bow drawn: the body the shot would strike is outlined (475), the
+		# arc and its marker say how far (the archery aim).
+		var hit: GridEntity = aim.get("hit")
+		var lands: Vector2i = aim.get("cell", aim.get("end", aim_tile)) if aim.get("cell", aim.get("end")) is Vector2i else aim_tile
+		_client3d.target(hit)
+		_client3d.hover(lands, not aim_drawn and hit == null)
 		_client3d.draw_look(World.draw_of(player))
 		_draw_shown = true
 	elif _client3d != null:
@@ -923,7 +952,7 @@ func _process(delta: float) -> void:
 		_client3d.target(foe)
 		_client3d.hover(tile, foe == null and World.is_walkable(tile))
 	else:
-		cursor.visible = World.is_walkable(tile)
+		cursor.visible = World.is_walkable(tile) and not drawing
 		cursor.position = Iso.tile_to_local(tile)
 		cursor.polygon = PackedVector2Array([Iso.project(Vector2(-0.5, 0.5)), Iso.project(Vector2(-0.5, -0.5)),
 				Iso.project(Vector2(0.5, -0.5)), Iso.project(Vector2(0.5, 0.5))])
@@ -1111,10 +1140,16 @@ func _unhandled_input(event: InputEvent) -> void:
 		_held_target = NONE
 		return
 	if click.button_index == MOUSE_BUTTON_RIGHT and not click.pressed:
-		_lower_off_hand(player)
+		if _stance == "block":
+			_lower_off_hand(player)  # The draw is the left button's (Jeff, 2026-10-22).
 		_release_toss(player)
 		return
 	if click.button_index == MOUSE_BUTTON_LEFT and not click.pressed:
+		if _stance == "draw":
+			var tapped := World.draw_of(player) <= 0.0  # Let go before draw_min: a tap, no shot.
+			_lower_off_hand(player)  # Let go: the shot the aim's way, or a cancel before draw_min.
+			if tapped:
+				_tap_with_bow(player)
 		_held_target = NONE
 		return
 	if not click.pressed:
@@ -1128,9 +1163,18 @@ func _unhandled_input(event: InputEvent) -> void:
 	var tile := target.tile if target != null else _mouse_tile()
 	if target == null:
 		target = World.get_entity_at(tile)
-	# Right: the off hand (decision 329): a shield raised, a bow drawn, while
-	# held; empty-handed it shoves and tosses (below). Opening and
-	# bandaging are E's (_press_e). Left: a chest is walked to.
+	# A bow in hand: the left button held draws it (Jeff, 2026-10-22: "left
+	# mouse hold and release to fire could work, right mouse to back-step");
+	# a tap (let go before draw_min) is the click minus the attack, on the
+	# release (_tap_with_bow; the coordinator's ruling), never a quick shot.
+	# The right button with a bow is combat's backstep to come, so it does
+	# nothing here. Right otherwise: the off hand (decision 329): a shield
+	# raised while held; empty-handed it shoves and tosses (below). Opening
+	# and bandaging are E's (_press_e). Left: a chest is walked to.
+	if World.off_hand(player) == "draw":
+		if click.button_index == MOUSE_BUTTON_LEFT:
+			_raise_off_hand(player)
+		return
 	if click.button_index == MOUSE_BUTTON_RIGHT and _raise_off_hand(player):
 		return
 	if click.button_index == MOUSE_BUTTON_LEFT and target is Chest:
@@ -1164,6 +1208,27 @@ func _unhandled_input(event: InputEvent) -> void:
 			if targetable:
 				_toss_target = target
 				_toss_from = get_global_mouse_position()
+
+
+## A tap with a bow in hand (the left button let go before draw_min): what
+## a left click does, minus the attack: a chest is walked to, a friend
+## talked to, the ground walked to; a foe nothing (the bow is the weapon).
+func _tap_with_bow(player: Player) -> void:
+	var target := _entity_under_mouse()
+	var on_sprite := target != null
+	var tile := target.tile if target != null else _mouse_tile()
+	if target == null:
+		target = World.get_entity_at(tile)
+	if target is Chest:
+		_walk_to_chest(player, target)
+	elif target != null and target != player and is_friend(target):
+		_talk_to(player, target)
+	elif target != null and target != player and target.is_creature():
+		pass  # A foe: no swing with a bow in hand.
+	elif Net.controls == "wasd" and not on_sprite:
+		_wasd_click(player, MOUSE_BUTTON_LEFT)
+	else:
+		_move_click(player, tile if target != null else _snap_to_floor(_mouse_grid()))
 
 
 ## Whether [param entity] is a friend (decision 454): a town's resident, a
@@ -1414,12 +1479,13 @@ func _raise_off_hand(player: Player) -> bool:
 	return true
 
 
-## The right button released: a drawn bow is loosed at the cell under the
-## cursor ("loose"), a raised shield lowered.
+## The right button released: a drawn bow is loosed the aim's way ("loose"
+## with the angle, and the arc's cell as "at" for the old shot), a raised
+## shield lowered.
 func _lower_off_hand(player: Player) -> void:
 	if _stance == "draw":
-		var at := _mouse_tile()
-		World.command(player, "loose", {"at": [at.x, at.y]})
+		var at := _aim_mark_cell if aim_drawn else _mouse_tile()
+		World.command(player, "loose", loose_args(aim_angle if aim_drawn else NAN, at))
 	elif _stance == "block":
 		World.command(player, "stance", {"kind": ""})
 	_stance = ""
@@ -1674,6 +1740,120 @@ func _drive_wasd() -> void:
 
 ## WASD, standing still: the body turns to the cursor on this screen at
 ## once, and the facing others see follows, a few times a second at most.
+## The archery aim, each frame (ui's side; Jeff, 2026-10-22: "for aiming
+## bow and drawning back movement mouse disappears and the game draws a
+## semi circle for distance... use a circle which the aim can move along at
+## many degrees"): while the bow is drawn the cursor hides, the aim's angle
+## is read from the mouse on the grid, the arc drawn at the current range
+## step round the archer with the marker at the angle and the step's pips;
+## let go, it all goes and the cursor is back.
+func _update_aim(player: Player, drawing: bool) -> void:
+	if not drawing:
+		if aim_drawn:
+			aim_drawn = false
+			_aim_since = 0
+			_show_cursor(true)
+			if _client3d != null:
+				_client3d.aim_arc(Vector2.ZERO, 0.0, 0.0, 0.0, 0, false)
+			if _aim_line != null:
+				_aim_line.visible = false
+		return
+	var origin := Iso.local_to_grid(player.position)
+	var toward_point := _aim_fixed if is_finite(_aim_fixed.x) else _mouse_grid()
+	if is_nan(toward_point.x):
+		return
+	if not aim_drawn:
+		aim_drawn = true
+		_show_cursor(false)
+	var toward := toward_point - origin
+	if toward.length() > 0.05:
+		aim_angle = toward.angle()
+	var radius := range_now(player)
+	if radius <= 0:
+		_aim_since = 0
+	elif _aim_since == 0:
+		_aim_since = Time.get_ticks_msec()
+	var alpha := aim_fade(Time.get_ticks_msec() - _aim_since) if _aim_since > 0 else 0.0
+	var point := aim_point(origin, aim_angle, float(radius))
+	_aim_mark_cell = Vector2i(point.round())
+	var pips := aim_pips(radius, range_steps(player))
+	if _client3d != null:
+		_client3d.aim_arc(origin, aim_angle, float(radius), alpha, pips, radius > 0)
+	else:
+		_update_aim_line(origin, float(radius), alpha)
+
+
+## The current range step in cells: items' World.range_of by name (0 before
+## draw_min), else the verb's one range once the draw counts.
+static func range_now(player: GridEntity) -> int:
+	if World.has_method("range_of"):
+		return int(World.call("range_of", player))
+	var verb := Items.verb_of(World.drawn_with(player))
+	return int(verb.get("cells", 0)) if World.draw_of(player) > 0.0 else 0
+
+
+## The verb's range steps in cells, shortest first (items' "range_steps";
+## [] when the verb has none).
+static func range_steps(player: GridEntity) -> Array:
+	var verb := Items.verb_of(World.drawn_with(player))
+	var steps: Variant = verb.get("range_steps", verb.get("steps", []))
+	return steps if steps is Array else []
+
+
+## The pips beside the marker: the most at the shortest step (the hardest
+## shot), one at the longest; none when the steps are not known.
+static func aim_pips(radius: int, steps: Array) -> int:
+	var index := steps.find(radius)
+	return steps.size() - index if index >= 0 else 0
+
+
+## Where the aim lands on the arc: [param origin] plus [param radius] the
+## way of [param angle].
+static func aim_point(origin: Vector2, angle: float, radius: float) -> Vector2:
+	return origin + Vector2.from_angle(angle) * radius
+
+
+## The arc's fade-in over AIM_FADE_MSEC from the step's first show.
+const AIM_FADE_MSEC := 200.0
+static func aim_fade(msec: int) -> float:
+	return clampf(float(msec) / AIM_FADE_MSEC, 0.0, 1.0)
+
+
+## The "loose" command's arguments: the angle (radians, NAN for none: the
+## old aim) beside the cell the aim lands on, for either server.
+static func loose_args(angle: float, at: Vector2i) -> Dictionary:
+	var args := {"at": [at.x, at.y]}
+	if not is_nan(angle):
+		args["angle"] = angle
+	return args
+
+
+## The OS cursor shown or hidden (hidden while the bow is drawn; the
+## mouse still moves the aim).
+func _show_cursor(show: bool) -> void:
+	if DisplayServer.get_name() == "headless":
+		return
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE if show else Input.MOUSE_MODE_HIDDEN
+
+
+## The 2D view's arc: a Line2D through the semicircle's points, projected.
+func _update_aim_line(origin: Vector2, radius: float, alpha: float) -> void:
+	if _aim_line == null:
+		_aim_line = Line2D.new()
+		_aim_line.width = 3.0
+		_aim_line.default_color = UiTheme.color("brass_bright")
+		cursor.get_parent().add_child(_aim_line)
+	_aim_line.visible = radius > 0.0
+	if not _aim_line.visible:
+		return
+	var points := PackedVector2Array()
+	for i in 33:
+		var a := aim_angle - PI * 0.5 + PI * i / 32.0
+		points.append(Iso.grid_to_local(origin + Vector2.from_angle(a) * radius))
+	_aim_line.points = points
+	_aim_line.modulate.a = alpha
+
+
 func _aim_at_cursor(player: Player) -> void:
 	var cursor := _mouse_grid()
 	if is_nan(cursor.x) or DisplayServer.get_name() == "headless":
@@ -7139,7 +7319,7 @@ func context_hint_for(thing: Node) -> String:
 		# 560, ui's side (Jeff): the click interacts; they stop and address you.
 		return "LMB  interact   in bed with %s" % ailing if not ailing.is_empty() else "LMB  interact"
 	if thing is Monster and World.can_target(player, thing):
-		return "LMB  attack   RMB  draw, let go to shoot" if World.off_hand(player) == "draw" else "LMB  attack"
+		return "LMB hold  draw, let go to shoot" if World.off_hand(player) == "draw" else "LMB  attack"
 	if thing is Player and thing != player:
 		return "LMB  talk   E hold  bandage"
 	return ""
@@ -10950,6 +11130,12 @@ func _run_test_show(player: Player) -> void:
 					options_panel.toggle()
 			"pack":
 				pack_panel.shown = true
+			"aim":
+				# The archery aim, for the shot: the host draws the bow (the server's
+				# stance), the aim fixed north-east of the archer, the arc at the step.
+				if Net.is_authority() and player != null:
+					_aim_fixed = Iso.local_to_grid(player.position) + Vector2(6.0, -4.0)
+					World.try_stance(player, "draw")
 			"charges":
 				# 573, ui's side: the pack's charges line, for the shot (the host sets the
 				# replicated pair as the server would after a win).

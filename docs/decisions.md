@@ -21206,3 +21206,58 @@ tests: level_test's solid-building fixture at 12 x 12 (143 solid cells, the
 door (9, 14), sight and a path round it), the wilds' mound with its door on
 the barrow's link and from_barrow (170, 179) outside it; builder_test's
 mound case at 12 x 12.
+
+## 583, ui's side: the aim while a bow is drawn
+
+Jeff (2026-10-22, his words): "for aiming bow and drawning back movement
+mouse disappears and the game draws a semi circle for distance... aiming
+is right now locked by tile which is hard for the player. so use a circle
+which the aim can move along at many degrees"; then "the range has
+increments, the arc goes along the semicircle". Pc-character's archery
+redesign (583) with items (try_loose by angle, range steps, damage per
+step) and enemy-ai; the coordinator approved ui's side as written, pips
+first for the power read, Jeff to pick from the shot.
+
+- The draw is the left button held with a bow in hand (Jeff, 2026-10-22,
+  via the coordinator: "left mouse hold and release to fire could work,
+  right mouse to back-step"): the press sends the "draw" stance, the
+  release looses by the angle or cancels before draw_min. A tap (let go
+  before draw_min) is the click minus the attack, on the release
+  (Main._tap_with_bow; the coordinator's ruling on pc-character's
+  suggestion): a chest walked to, a friend talked to, the ground walked
+  to, a foe nothing, so click-to-walk stays for a bow in hand and no tap
+  is a quick shot (the first step hits hardest). The greeting bubble's
+  click still opens the bar; the right button with a bow does nothing
+  until combat's backstep; a shield's block stays the right button's.
+- Drawn (Player.raised "draw"): the OS cursor hides (Input's mouse mode;
+  the 2D view's own cursor too) and shows again on release or cancel
+  (Main._show_cursor, never headless).
+- The arc: a flat semicircle on the ground round the archer, its middle on
+  the aim, its radius the current range step in cells (Main.range_now:
+  items' World.range_of by name, else the verb's one range once the draw
+  counts), jumping outward at each step, fading in over a fifth of a
+  second from the step's first show (Main.aim_fade). Client3D.aim_arc
+  draws it as a ground mesh (_make_arc, 48 segments, brass_bright) placed
+  at the archer's grid point and turned to the angle; the 2D view a
+  Line2D through the semicircle's points.
+- The marker: a small brass disc on the arc where the line from the archer
+  to the mouse crosses it, at any angle (Main.aim_angle, radians on the
+  grid, Vector2.angle() with x as 0, Main.aim_point), no tiles.
+  Main.aim_drawn says the draw stands; pc-character turns the body from
+  the pair.
+- The power read, diegetic: pips in a row just past the marker, four at
+  the shortest step down to one at the longest (Main.aim_pips from the
+  verb's "range_steps" by name; none when the steps are not known), no
+  number, no bar.
+- Release: the "loose" command carries {"angle": radians, "at": the arc's
+  cell} (Main.loose_args): items' new try_loose reads the angle, today's
+  reads "at" (the marker's cell is what the aim lands on), so either side
+  lands first and the wire changes nothing from ui; before draw_min it
+  cancels as before. The hit outline (475) stays on the first body the
+  shot would cross to the arc's cell.
+- --test-show=aim: the host draws the bow with the aim fixed north-east,
+  for the shot docs/ui/shots/combat/aim_arc.jpg.
+
+ui_test _test_aim: the point on the arc at any angle, the axes, the pips,
+the fade, the command's shape, the aim dropped on release. Client only;
+protocol unchanged on this side; no new class_name.

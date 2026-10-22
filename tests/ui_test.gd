@@ -30,6 +30,7 @@ func _ready() -> void:
 	_test_minimap_turn()
 	_test_revive_reads()
 	_test_screenshot_key()
+	_test_aim()
 	_test_counter_panel()
 	_test_world_map()
 	_test_access()
@@ -489,6 +490,29 @@ func _test_screenshot_key() -> void:
 		_main.town_notes.clear()
 		_main._on_message("party", {"from": "Server", "text": "You find yourself in the wilds."})
 		_check(_main.talk.lines.size() == before + 1, "a Server line still goes to the log")
+
+
+func _test_aim() -> void:
+	print("== the archery aim (ui's side): the angle, the arc's point, the pips, the loose command ==")
+	var origin := Vector2(10.0, 10.0)
+	var angle := (Vector2(16.0, 6.0) - origin).angle()
+	var point := Main.aim_point(origin, angle, 5.0)
+	_check(absf((point - origin).length() - 5.0) < 0.001 and absf((point - origin).angle() - angle) < 0.001,
+		"the aim's point lies on the arc at the mouse's angle, any angle (%s)" % [point])
+	_check(Main.aim_point(origin, 0.0, 3.0) == Vector2(13.0, 10.0) and Main.aim_point(origin, PI * 0.5, 3.0).is_equal_approx(Vector2(10.0, 13.0)),
+		"x as 0, the grid's y as the second component")
+	_check(Main.aim_pips(3, [3, 5, 7, 9]) == 4 and Main.aim_pips(9, [3, 5, 7, 9]) == 1 and Main.aim_pips(4, [3, 5, 7, 9]) == 0 and Main.aim_pips(5, []) == 0,
+		"pips: four at the shortest step, one at the longest, none off the steps or without them")
+	_check(Main.aim_fade(0) == 0.0 and absf(Main.aim_fade(100) - 0.5) < 0.001 and Main.aim_fade(400) == 1.0, "the arc fades in over its first fifth of a second")
+	var args := Main.loose_args(angle, Vector2i(16, 6))
+	_check(args.get("at") == [16, 6] and absf(float(args.get("angle")) - angle) < 0.000001, "loose carries the angle and the arc's cell (%s)" % [args])
+	_check(Main.loose_args(NAN, Vector2i(2, 3)) == {"at": [2, 3]}, "no aim: the old cell alone")
+	var own: GridEntity = _main._local_player()
+	if own != null:
+		_main.aim_drawn = true
+		_main._update_aim(own, false)
+		_check(not _main.aim_drawn and _main._aim_since == 0, "the bow let go: the aim is dropped")
+		_check(Main.range_now(own) == 0, "no bow drawn: no range step")
 
 
 func _test_revive_reads() -> void:
