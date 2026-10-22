@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The Hills' stream is a river now, winding in big round loops down the valley and varying from under two to over three cells wide, instead of running nearly straight (Jeff: "a meandering stream not a straight line"); the ford and the bridge still cross it and every place stays reachable. Rivers, streams, ponds and roads are now smooth curves in the level, and the ground's cells are worked out from them, so they can be drawn as curves rather than squares (559). This version changes what goes over the network: client and server update together.
 - No wolves in the wilds any more. Elsewhere wolves run in packs of 2 or 3, fewer of them, and never make their home within 30 cells of a town's buildings or a level's way in. The wolves already in the wilds are gone after the next server update (397 amended).
 - Click a townsperson and they stop, turn to you and say a word (560, npc's side): a smith's "What is it? The forge won't wait", a guard's "State your business", "You again" for one you wronged; if they have something to tell you today it follows. In bed or busy, "Not now". Server and client: the protocol moves, so update through the launcher.
 - Barter at the shop counter, server side: trade your things for the shop's in one go with a gold balance, at the prices you were shown. Grave goods sell at half price (560).

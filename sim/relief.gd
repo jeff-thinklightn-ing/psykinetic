@@ -263,6 +263,17 @@ const KIND_WANDER := 0.04
 ## - streams (1): how many streams run down the valleys to the area's edge,
 ##   each width (1 or 2) cells wide; min_flow (area / 60): the fewest cells
 ##   that drain into a stream's source;
+## - rivers: [{line: [Vector2i, ...], wavelength (18), amplitude (6), width
+##   (2, or [least, most]), seed (0: added to the lay's, for other loops)}] (decision 559): a stream laid as a curve, not
+##   found: control points along a meander about line (a curve through its
+##   points, source first), swinging amplitude cells either way of it once
+##   every wavelength cells, both wandering by the seed so no two loops are
+##   alike, each point's width wandering between least and most (1 to
+##   3.5); its cells the curve's (Curves.cells, as Level lays them on
+##   load), its surface STREAM_DEPTH under the ground there and never
+##   rising. Laid on the ground as capped; keep it to a valley's floor
+##   (valley_floor at least amplitude + most) so its banks are low; its
+##   curve in "waters", its middle in "streams" after the found ones;
 ## - keep_clear (cell -> anything): cells left as they are;
 ## - kinds (false): the ground's kinds set by slope and height too (_kinds).
 ## Everything else is slope-limited to LAY_SLOPE a step, so walked. Only
@@ -270,12 +281,14 @@ const KIND_WANDER := 0.04
 ## down with them; void, water and keep_clear left). The same seed
 ## lays the same ground. Returns {relief: cell -> metres, cells: cell ->
 ## "water" (the streams; with kinds, the ground's meanings too), streams: [[Vector2i, ...]] (each from its source to
-## its mouth, for level.json "streams"), faces: the edge keys
+## its mouth; the found ones for level.json "streams", a river's derived
+## on load from its curve), waters: [{points, widths}] (the rivers' curves,
+## for level.json "waters": Curves.to_json), faces: the edge keys
 ## (Terrain.edge_key) kept out of the cap, the plateaus' and escarpments',
 ## for a later _limit of the same ground to keep them}.
 static func lay(map: LevelMap, rect: Rect2i, lay_seed: int, options := {}) -> Dictionary:
 	var area := rect.intersection(Rect2i(Vector2i.ZERO, map.size))
-	var out := {"relief": {}, "cells": {}, "streams": [], "faces": {}}
+	var out := {"relief": {}, "cells": {}, "streams": [], "waters": [], "faces": {}}
 	if area.size.x < 3 or area.size.y < 3:
 		return out
 	var field := map.relief_field()
@@ -429,14 +442,7 @@ static func lay(map: LevelMap, rect: Rect2i, lay_seed: int, options := {}) -> Di
 			if band.get_noise_2d(at.x, at.y) > 1.0 - 2.0 * bands:
 				steeper[at] = LAY_SLOPE
 	_limit(heights, fixed, cliff_side, cap, faces, steeper)
-	# An escarpment's face that came out lower than FACE_LEAST (the roll
-	# against it, near a tapered end) is walked instead: capped again.
-	var low_faces := scarp_faces.keys().filter(func(key: Vector3i) -> bool:
-		return float(heights[scarp_faces[key][0]]) - float(heights[scarp_faces[key][1]]) < FACE_LEAST)
-	for key: Vector3i in low_faces:
-		faces.erase(key)
-	if not low_faces.is_empty():
-		_limit(heights, fixed, cliff_side, cap, faces, steeper)
+	_cap_low_faces(heights, fixed, cliff_side, cap, faces, steeper, scarp_faces)
 	# Streams down the valleys: water follows the lowest way out of the area.
 	var flow := _flow(heights, area)
 	var taken: Dictionary[Vector2i, bool] = {}
@@ -448,6 +454,13 @@ static func lay(map: LevelMap, rect: Rect2i, lay_seed: int, options := {}) -> Di
 		var wide := clampi(int(options.get("width", 1)), 1, 2)
 		_carve(heights, path, wide, out["cells"], taken)
 		out["streams"].append(path)
+	var rivers: Array = options.get("rivers", [])
+	for i in rivers.size():
+		var river := _river(heights, rivers[i], lay_seed + 10 + i + int(rivers[i].get("seed", 0)), out["cells"], taken)
+		if not river.is_empty():
+			out["waters"].append({"points": river["points"], "widths": river["widths"]})
+			if river["path"].size() >= 2:
+				out["streams"].append(river["path"])
 	if not out["streams"].is_empty():
 		# The ground round the water walked again; the water and its banks kept.
 		for at: Vector2i in out["cells"]:
@@ -467,6 +480,21 @@ static func lay(map: LevelMap, rect: Rect2i, lay_seed: int, options := {}) -> Di
 	if options.get("kinds", false):
 		_kinds(map, heights, out["cells"], lay_seed, float(options.get("rock_step", ROCK_STEP)), float(options.get("dirt_step", DIRT_STEP)))
 	return out
+
+
+## An escarpment's faces ([param scarp_faces]: edge key -> [the cell
+## above, the cell below]) that came out lower than FACE_LEAST (the roll
+## against it, near a tapered end) taken out of
+## [param faces] and the ground capped again, once (again and again, the
+## ramps each makes lower the faces beside it, and the face is eaten):
+## walked instead of a ledge a few centimetres over the walk.
+static func _cap_low_faces(heights: Dictionary, fixed: Dictionary, cliff_side: Dictionary, cap: float, faces: Dictionary, steeper: Dictionary, scarp_faces: Dictionary) -> void:
+	var low_faces := scarp_faces.keys().filter(func(key: Vector3i) -> bool:
+		return faces.has(key) and float(heights[scarp_faces[key][0]]) - float(heights[scarp_faces[key][1]]) < FACE_LEAST)
+	for key: Vector3i in low_faces:
+		faces.erase(key)
+	if not low_faces.is_empty():
+		_limit(heights, fixed, cliff_side, cap, faces, steeper)
 
 
 ## The ground's kinds by its slope and height (Relief.lay's "kinds",
@@ -795,3 +823,153 @@ static func _carve(heights: Dictionary, path: Array[Vector2i], wide: int, cells:
 			var bank := cell + direction
 			if heights.has(bank) and not cells.has(bank) and float(heights[bank]) < float(heights[cell]) + SHORE_LIP + 0.05:
 				heights[bank] = float(heights[cell]) + SHORE_LIP + 0.05
+
+
+## A river (Relief.lay "rivers", decision 559) as a curve, its cells made
+## water in [param heights] (and [param cells], [param taken]): control
+## points every tenth of a wavelength along _meander's swing about its
+## line, each its own width (wandering by the seed between the river's
+## "width" [least, most], or one number), the cells Curves.cells of their
+## curve on this ground (as Level lays them on load), each at the surface of
+## the middle cell it was laid from (Curves.laid: its longest run over the
+## ground): STREAM_DEPTH under the ground there, never over the one
+## upstream; its banks raised to SHORE_LIP over it where
+## they were not. Returns {points, widths} (for level.json "waters") and
+## path (its middle over the water, source to mouth), or {} if it has none.
+static func _river(heights: Dictionary, river: Dictionary, river_seed: int, cells: Dictionary, taken: Dictionary) -> Dictionary:
+	var line: Array = river.get("line", [])
+	if line.size() < 2:
+		return {}
+	var wavelength := maxf(4.0, float(river.get("wavelength", 18.0)))
+	var swing := _meander(line, wavelength, maxf(0.0, float(river.get("amplitude", 6.0))), river_seed)
+	var wide: Variant = river.get("width", 2.0)
+	var least := clampf(float(wide[0]) if wide is Array else float(wide), 1.0, 3.5)
+	var most := clampf(float(wide[1]) if wide is Array else float(wide), least, 3.5)
+	var vary := FastNoiseLite.new()
+	vary.seed = river_seed + 1
+	vary.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+	vary.frequency = 1.0 / wavelength
+	var every := maxi(1, roundi(wavelength / 10.0 / 0.25))
+	var points := PackedVector2Array()
+	var widths := PackedFloat32Array()
+	# To level.json's two places, so the curve laid is the one loaded.
+	for k in range(0, swing.size(), every):
+		points.append(swing[k].snappedf(0.01))
+		widths.append(snappedf(lerpf(least, most, clampf(vary.get_noise_1d(k * 0.25) * 0.9 + 0.5, 0.0, 1.0)), 0.01))
+	if (swing.size() - 1) % every != 0:
+		points.append(swing[-1].snappedf(0.01))
+		widths.append(widths[-1])
+	var curve := Curves.sample(points, widths)
+	var ground := {}
+	for at: Vector2i in heights:
+		if not taken.has(at):
+			ground[at] = true
+	var laid := Curves.laid(curve, false, ground)
+	var path: Array[Vector2i] = laid["path"]
+	if path.size() < 2:
+		return {}
+	# The surface down its middle: under the ground, never rising; each of
+	# its cells at that of the middle cell it was laid from.
+	var first: int = laid["first"]
+	var surfaces := PackedFloat32Array()
+	var surface := INF
+	for at in path:
+		surface = minf(surface, float(heights[at]) - STREAM_DEPTH)
+		surfaces.append(surface)
+	var wet := {}
+	for cell: Vector2i in laid["cells"]:
+		wet[cell] = surfaces[laid["cells"][cell] - first]
+	for cell: Vector2i in wet:
+		heights[cell] = wet[cell]
+		cells[cell] = "water"
+		taken[cell] = true
+	for cell: Vector2i in wet:
+		for direction in FOUR:
+			var bank := cell + direction
+			if heights.has(bank) and not wet.has(bank) and float(heights[bank]) < float(heights[cell]) + SHORE_LIP + 0.05:
+				heights[bank] = float(heights[cell]) + SHORE_LIP + 0.05
+	return {"points": points, "widths": widths, "path": path}
+
+
+## The points of a meander about [param line] (cells), every quarter cell
+## along it, source first: a sine-generated curve (the way it heads swings
+## either side of the line's own way as a sine of the distance along it,
+## so its loops are round all through, no straight runs), about a smooth
+## curve through the line's points (Curves.sample), its loops
+## [param wavelength] cells of the line long and reaching [param amplitude]
+## cells either side, both wandering by [param meander_seed] (the loops 0.6
+## to 1.4 as long, the swing 0.83 to 1.07 of its own); the swing eased in
+## over half a wavelength at either end and any drift off the line steered
+## back slowly, so it leaves and reaches the line's ends.
+static func _meander(line: Array, wavelength: float, amplitude: float, meander_seed: int) -> PackedVector2Array:
+	var given := PackedVector2Array()
+	for point: Variant in line:
+		given.append(Vector2(point))
+	var course := Curves.sample(given, PackedFloat32Array())
+	var along: PackedVector2Array = course["points"]
+	var ways: PackedVector2Array = course["tangents"]
+	var length: float = course["length"]
+	var out := PackedVector2Array()
+	if along.size() < 2:
+		return out
+	# The swing whose loops reach amplitude over wavelength of the line:
+	# over a loop the river runs wavelength / J0(swing) and reaches
+	# wavelength * S(swing) / (4 pi J0(swing)) either side.
+	var low := 0.0
+	var high := 2.3
+	for i in 40:
+		var mid := (low + high) / 2.0
+		var shape := _meander_shape(mid)
+		if wavelength * shape.y / (4.0 * PI * shape.x) < amplitude:
+			low = mid
+		else:
+			high = mid
+	var swing := low
+	var wander := FastNoiseLite.new()
+	wander.seed = meander_seed
+	wander.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+	wander.frequency = 0.8 / wavelength
+	var step := 0.25
+	var at := along[0]
+	var u := 0.0
+	var phase := PI / 2.0
+	var drift := 0.0
+	out.append(at)
+	for guard in ceili(length / step) * 8:
+		if u >= length:
+			break
+		var index := clampi(roundi(u / Curves.SPACING), 0, along.size() - 1)
+		var way := ways[index]
+		var lateral := (at - along[index]).dot(Vector2(-way.y, way.x))
+		var long := wavelength * (1.0 + 0.4 * wander.get_noise_1d(u))
+		var own := minf(2.3, swing * (0.95 + 0.12 * wander.get_noise_1d(u + 1000.0)))
+		var ease := smoothstep(0.0, long / 2.0, minf(u, length - u))
+		drift = lerpf(drift, lateral, step / long)
+		var heading := way.angle() + own * ease * sin(phase) - clampf(0.1 * drift, -0.4, 0.4)
+		var moved := Vector2.from_angle(heading) * step
+		at += moved
+		u += maxf(moved.dot(way), 0.02)
+		phase += TAU * step * _meander_shape(own).x / long
+		out.append(at)
+	# On to the line's end (the swing eased out, little is left).
+	var end := along[-1]
+	while at.distance_to(end) > step:
+		at = at.move_toward(end, step)
+		out.append(at)
+	if at != end:
+		out.append(end)
+	return out
+
+
+## For a sine-generated curve swinging [param swing] radians either side:
+## (J0, S), the share of its length that goes along its line and the
+## integral of sin(swing sin t) over half a turn (how far a loop reaches).
+static func _meander_shape(swing: float) -> Vector2:
+	var along := 0.0
+	var across := 0.0
+	var steps := 64
+	for i in steps:
+		var t := (i + 0.5) / steps * PI
+		along += cos(swing * sin(t)) * PI / steps
+		across += sin(swing * sin(t)) * PI / steps
+	return Vector2(along / PI, across)

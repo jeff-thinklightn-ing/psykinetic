@@ -232,7 +232,10 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## while led the server walks their body (decision 551 and amended); a
 ## companion carries bond_step, her bond's step word, and bond_why, its
 ## newest reason as her player reads it (decision 555).
-const PROTOCOL_REVISION := 28
+## 29: a level may carry "waters" and "roads", curves its water and road
+## cells are rasterised from on load (Curves) and the views draw from, in
+## the "terrain" message's files and the levels served (decision 559).
+const PROTOCOL_REVISION := 29
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]
 ## Every kind of message (message, message_to, broadcast, broadcast_to).

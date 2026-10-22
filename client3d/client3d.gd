@@ -5741,6 +5741,7 @@ func _build_ribbons() -> void:
 		var colours := PackedColorArray()
 		var indices := PackedInt32Array()
 		var samples := (path.size() - 1) * RIBBON_STEPS
+		var before := INF
 		for s in range(-RIBBON_STEPS / 2, samples + RIBBON_STEPS / 2 + 1):
 			# Past either end, on along the way it runs, half a cell.
 			var at := clampi(s, 0, samples)
@@ -5760,7 +5761,18 @@ func _build_ribbons() -> void:
 			var normal := Vector2(-tangent.y, tangent.x)
 			var width: Vector2 = widths[i].lerp(widths[i + 1], t)
 			var drop := levels[i] - levels[i + 1]
+			# Never rising down the stream: between two path cells, within
+			# their surfaces and no higher than the point before (a wide
+			# river's cells across a bend, each laid from its own point along
+			# its curve, can lift the field a little off its path; 559).
 			var level := _water_surface(point) + WATER_LIFT
+			if s > 0 and s <= samples:
+				var upper := _water_surface(b) + WATER_LIFT
+				var lower := _water_surface(c) + WATER_LIFT
+				level = clampf(minf(level, before), minf(lower, upper), upper)
+			elif s > samples:
+				level = minf(level, before)
+			before = level
 			# White water from a fall's step: rising over the step to the cell
 			# below, trailing off over the cell after it (557 amended).
 			var after := levels[i - 1] - levels[i] if i > 0 else 0.0

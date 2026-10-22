@@ -627,7 +627,8 @@ static func parse(layout: Image, height: Image, config: Dictionary, relief: Imag
 	level["buildings"] = buildings_from(config, level["terrain"], warnings)
 	_lay_bridges(level)
 	_lay_solid(level)
-	level["terrain"]["streams"] = streams_from(config, level["terrain"], warnings)
+	var derived := _lay_curves(level["terrain"], config, warnings)
+	level["terrain"]["streams"] = streams_from(derived, level["terrain"], warnings)
 	level["terrain"]["niches"] = niches_from(config, level["terrain"], warnings)
 	_check_fords(level["terrain"], warnings)
 	_check_water(level["terrain"], warnings)
@@ -1260,6 +1261,64 @@ static func niches_from(config: Dictionary, terrain: Dictionary, warnings: Array
 			warnings.append("niche %d at %s (way out %s, variant %d) is no floor, no side or no variant: left out" % [index, cell, way, variant])
 			continue
 		out.append({"cell": cell, "out": way, "variant": variant})
+	return out
+
+
+## level.json's "waters" and "roads" (decision 559: curves, the cells
+## rasterised from them) laid into [param terrain]:
+## terrain "waters" and "roads" as Curves.parse has them; each water's
+## floor cells (Curves.cells; under the void it runs on unseen) water, but
+## a ford's or a bridge's (not floor); each road's
+## floor cells its kind, but water's. A cell the layout has otherwise is
+## made so, and said in [param warnings] (a curve moved without its cells).
+## Returns [param config] with "streams" from each open water's middle (its
+## longest run over the ground, Curves.laid) after level.json's own, for
+## streams_from.
+static func _lay_curves(terrain: Dictionary, config: Dictionary, warnings: Array[String]) -> Dictionary:
+	var waters := Curves.parse(config, "waters", warnings)
+	var roads := Curves.parse(config, "roads", warnings)
+	terrain["waters"] = waters
+	terrain["roads"] = roads
+	if waters.is_empty() and roads.is_empty():
+		return config
+	var wet := {}
+	for key in ["water", "fords", "bridged"]:
+		for cell: Vector2i in terrain.get(key, []):
+			wet[cell] = true
+	var floor := {}
+	for cell: Vector2i in terrain["floor"]:
+		floor[cell] = true
+	var streams: Array = (config.get("streams") as Array).duplicate(true) if config.get("streams") is Array else []
+	for index in waters.size():
+		var water: Dictionary = waters[index]
+		var ground := floor.duplicate()
+		ground.merge(wet)
+		var laid := Curves.laid(water["curve"], water["closed"], ground)
+		var made := 0
+		for cell: Vector2i in laid["cells"]:
+			if wet.has(cell):
+				continue
+			made += 1
+			floor.erase(cell)
+			terrain["floor"].erase(cell)
+			terrain["kinds"].erase(cell)
+			terrain["water"].append(cell)
+			wet[cell] = true
+		if made > 0:
+			warnings.append("water %d's curve covers %d cells the layout has dry: water" % [index, made])
+		if not water["closed"] and laid["path"].size() >= 2:
+			streams.append({"path": laid["path"].map(func(cell: Vector2i) -> Array: return [cell.x, cell.y])})
+	for index in roads.size():
+		var road: Dictionary = roads[index]
+		var changed := 0
+		for cell: Vector2i in Curves.cells(road["curve"], false):
+			if floor.has(cell) and not wet.has(cell) and terrain["kinds"].get(cell, "") != road["kind"]:
+				terrain["kinds"][cell] = road["kind"]
+				changed += 1
+		if changed > 0:
+			warnings.append("road %d's curve covers %d cells the layout has not %s: %s" % [index, changed, road["kind"], road["kind"]])
+	var out := config.duplicate()
+	out["streams"] = streams
 	return out
 
 

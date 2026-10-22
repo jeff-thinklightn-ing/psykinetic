@@ -155,8 +155,9 @@ its elevation rounded to levels, for what still reads levels.
 The sample level has one: its whole levels lifted 0.2 m over its water,
 and a gentle rise of about 0.9 m east of the stream. `levels/hills` is the
 showcase (`tools/make_hills.tscn`): a valley winding down the middle, its
-floor falling 5 m north to south and its stream running down it with a
-ford and a bridge, hills rolling 2 m either way, two escarpments (525
+floor falling 5 m north to south and its river looping down it as a
+curve (`waters`, 559), 1.7 to 3.2 cells wide, swinging about 7 cells
+either way every 26 or so, with a ford and a bridge, hills rolling 2 m either way, two escarpments (525
 amended (2)): one to the west with a 3 m face east over the valley, a long
 slope up to it from the west and a ramp through its face, and one 2.5 m
 high south-east of the valley facing north; and a plateau 6 m up to the
@@ -173,7 +174,16 @@ valleys and ridges over an area of a `LevelMap`: a rolling noise (`base`,
 `plateaus` raised with cliff `faces` (the other sides falling away as a
 `spur`), `keep_flat` pads, and `streams` found where the water runs (a
 priority flood, then the cells draining most, keeping to a valley's floor),
-carved under their banks. A valley has a floor (`valley_floor` cells either
+carved under their banks. A `rivers` entry, `{line, wavelength,
+amplitude, width, seed}` (559), is laid as a curve rather than found: a
+sine-generated meander about its line (the way it heads swings either
+side of the line's as a sine of the distance along it, so its loops are
+round all through), loops `wavelength` cells of the line long reaching
+`amplitude` either side, both wandering by the seed; control points every
+tenth of a wavelength, each its width (`[least, most]`, wandering); its
+cells the curve's raster, as on load; its curve returned in `waters` for
+level.json. Keep it to a valley's floor at least `amplitude` + `most`
+wide. A valley has a floor (`valley_floor` cells either
 side of its line) falling `valley_fall` along it, so its stream runs its
 length; a ridge entry may be `{line, height, width}` (a knoll: one point).
 An `escarpments` entry, `{line, face, height, back, taper, ways,
@@ -301,6 +311,21 @@ All of it is optional.
   under a bridge) beside the one before; water with no entry is still.
   The editor's path tool lays one ("as a stream"); `Streams.lay` lays one
   in a generator.
+- `waters` and `roads` (decision 559; Jeff: water and roads "drawn as
+  smooth curves, then rasterized to cells"): `"waters": [{"points": [[x,
+  y, width], ...], "closed": false}]`, control points in cell units, a
+  river or stream source first, its width per point; `"closed": true` a
+  pond or lake, the curve its shore (width unused). `"roads": [{"points":
+  [[x, y, width], ...], "kind": "dirt"}]` ("stone" too). The curve is a
+  centripetal Catmull-Rom through the points sampled every quarter cell
+  (`Curves.sample`), widths eased between the points'. On load the cells
+  come from it (`Curves.cells`): an open water's floor cells within its
+  width / 2, a closed one's inside it, are water (a ford's or a bridge's
+  kept); a road's floor cells take its kind. An open water's middle
+  (`Curves.middle`, a side step at a time) is its `streams` path. The
+  layout carries the same cells (whatever lays the curve writes both); a
+  cell it has otherwise is made so and said. The views draw the water and
+  the roads from the curves, not the cells.
 - a bridge is a building entry: `{"slot": "bridge", "at": [x, y],
   "facing": [dx, dy], "length": n, "width": 1 or 2}` (decision 505), its
   length along its facing, all of it over water or fords, a bank of one

@@ -18829,3 +18829,121 @@ amended, enemy-ai's side, its own).
 So the box's wilds wolves are culled at the next deploy: the live world
 changes. Server only, protocol unchanged, no new class_name. herds_test
 _test_no_wolves.
+
+## 559. Water and roads are curves; the cells are rasterised from them
+
+Jeff, on the unsquared Hills in game: "what i'd like to see is a meandering
+stream not a straight lines", and then, a design rule from now on:
+"somethings just really off with the level generation -- I don't want
+isometric minecraft levels. I want Rivers, streams, roads and shorelines are
+drawn as smooth curves, then rasterized to cells. Never cell regions with
+rounded edges. A river's course meanders with smooth turns and varies in
+width; no straight runs or right angles. Nothing inside the water shows the
+grid." A stream found by the water's own way down follows the valley's
+floor, as straight as the valley, and a ribbon drawn from cells can only
+curve as much as the cells do.
+
+**The curve is the level's data.** level.json:
+- "waters": [{points: [[x, y, width], ...], closed}], control points in cell
+  units; open, a river or stream, source first, a width per point; closed,
+  a pond or lake, the curve its shore (width unused);
+- "roads": [{points: [[x, y, width], ...], kind: "dirt" | "stone"}].
+Curves (sim/curves.gd, new class_name, all static) is the one place a curve
+becomes points or cells, so the sim, the tools, the editor and the views
+agree to the bit:
+- sample(points, widths, closed): a centripetal Catmull-Rom through the
+  points (no cusps or loops at uneven spacing; round to the start if
+  closed), a point every SPACING (a quarter cell) of its length, the widths
+  eased between the points' (a one-dimensional Catmull-Rom kept within the
+  two, at least LEAST_WIDTH), each point's tangent; {points, widths,
+  tangents, length};
+- nearest(curve, at): {distance, along, width, index}; inside(curve, at);
+- cells(curve, closed): open, each cell whose middle lies within the width
+  / 2 there of the curve, and middle()'s, -> the middle index it was laid
+  from (the nearest point of the curve's); closed, each cell whose middle
+  lies inside, -> -1;
+- laid(curve, closed, ground): cells() on the ground, an open curve's
+  only those laid from the longest run of its middle on the ground (its
+  "path"), so a river running on under the void lays nothing there;
+- middle(curve): the cells the curve runs through, a side step at a time
+  (a corner turned through the side cell nearer the curve, so nothing steps
+  diagonally between two water cells), a loop that comes back on itself
+  cut out;
+- parse(config, key, warnings), to_json(points, widths).
+
+**On load** (Level._lay_curves, after the bridges and the solid buildings):
+each water's floor cells in Curves.laid (the ground its floor and the
+water) become water (a ford's and a
+bridge's kept; under the void it runs on unseen); each road's floor cells
+not water take its kind. An open water's path (laid's) is a "streams" path after level.json's own, checked by streams_from
+as any (no rise), so ambience, the flow mask, the routes and the fords are
+unchanged. The layout carries the same cells, written by whatever lays the
+curve; a floor cell it has dry under a water, or not of a road's kind, is
+made so and said ("water 0's curve covers 3 cells the layout has dry"), so
+a curve moved without its cells is seen. terrain "waters" and "roads" carry
+the parsed entries with their samples, for the views: terrain draws the
+water and the roads from the curves (distance to the curve, inside the
+shore), never from the cells.
+
+**Relief.lay "rivers"**: [{line, wavelength (18), amplitude (6), width (2 or
+[least, most]), seed}], laid as a curve:
+- the course a sine-generated curve (the way it heads swings either side of
+  the line's own as a sine of the distance along it: Langbein and
+  Leopold's meander, round all through, no straight runs), about a smooth
+  curve through the line's points; the swing solved so a loop wavelength
+  cells of the line long reaches amplitude either side (over a loop the
+  river runs wavelength / J0(swing) and reaches wavelength S(swing) / (4 pi
+  J0(swing)), S the integral of sin(swing sin t) over half a turn); the
+  loops 0.6 to 1.4 as long and the swing 0.83 to 1.07 of its own by the
+  seed; eased in over half a wavelength at either end, a slow pull against
+  drift off the line, and run on to the line's end;
+- control points every tenth of a wavelength along it, to level.json's two
+  places (so the curve laid is the curve loaded), each its width wandering
+  between least and most;
+- its cells Curves.laid on this ground, each at the surface of the middle
+  cell it was laid from (STREAM_DEPTH under the ground there, never over the
+  one upstream), its banks raised to SHORE_LIP over it, the ground round
+  walked again; its curve in lay's "waters", its middle in "streams".
+A level keeps it to a valley's floor (valley_floor at least amplitude +
+most) or its banks are cut deep into the flanks.
+
+**levels/hills, laid again**: the valley's stream is one river along the
+valley's line (wavelength 26, amplitude 7, width 1.6 to 3.2, seed 5: of the
+first six, the loops that keep clear of the south escarpment's tapered
+foot, the others leaving a stray step there), on a floor 9 cells either
+side (RIVER_FLOOR; was 3): wider, the held floor reaches the escarpments'
+feet and leaves faces a few tenths over the walk, which the view draws no
+face for, or flattens them. An escarpment's low faces are capped in one
+pass (Relief._cap_low_faces, as before): repeated, each ramp lowers the
+faces beside it and the face is eaten. 61 face edges besides the plateau's
+40. level.json carries its curve in "waters" and no
+"streams". The ford and the bridge are found as before, on rows the river
+crosses 1 to 3 cells wide (was 2): a 3-wide ford's middle cell has no ground
+beside it, so its footing is stone (the riverbed). Every floor cell is still
+reached from the link, through the ford or over the bridge; make_hills
+names any stray cliff's cell.
+
+The 557 ribbon (terrain's, until it draws from the curves) holds its
+surface between two path cells within theirs and never rising: a wide
+river's cells across a bend, each laid from its own point along the curve,
+lifted the sampled field a few millimetres off the path.
+
+PROTOCOL_REVISION 29 (shared this cycle with the other meaning changes before
+the cut): the "terrain" message's files carry a key the client
+lays cells from and draws, so a server and a client that read it
+differently must not join. The new Hills ship in a full cut, client and
+server together.
+
+Next, each its own number: the editor's stream tool edits a curve's points;
+the wilds' ponds traced into closed curves once; the fall where a river
+crosses a face; the roads laid.
+
+tests/relief_test: Curves (sampled evenly, through its points, smooth, its
+widths, the raster within its width, the middle a side step at a time end
+to end, a closed curve's cells inside it, come round to its start); Level
+lays waters and roads from curves (cells the layout lacks made water and
+said, a stream's path from its middle, a pond's cells, a road's kind, a bad
+point said); a river alone (its water its curve's raster, its width
+varying, its middle source to mouth, never rising, swinging off its line,
+the same for the same seed); the Hills' river loops down the valley; a
+ford's footing left out of the no-stone check.

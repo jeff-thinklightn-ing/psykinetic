@@ -50,6 +50,9 @@ func _ready() -> void:
 	_test_sample()
 	_test_lay()
 	_test_escarpment()
+	_test_curves()
+	_test_curves_laid()
+	_test_river()
 	_test_hills()
 	_main.load_map(Level.DEFAULT_MAP)
 	Level.unregister("rl_hill")
@@ -379,6 +382,143 @@ func _test_lay() -> void:
 
 ## An escarpment (525 amended (2)): a face down its line, its long back
 ## slope walked, ramps at its way and its ends, everything reached.
+## Curves (decision 559): a sample every SPACING along a smooth curve
+## through the points, widths eased between theirs; the raster an open
+## curve's cells within its width, its middle a side step at a time; a
+## closed curve's cells inside it.
+func _test_curves() -> void:
+	print("== Curves ==")
+	var points := PackedVector2Array([Vector2(0, 5), Vector2(10, 2), Vector2(20, 8), Vector2(30, 5)])
+	var widths := PackedFloat32Array([1.0, 3.0, 3.0, 1.0])
+	var curve := Curves.sample(points, widths)
+	var sampled: PackedVector2Array = curve["points"]
+	var even := true
+	for i in range(1, sampled.size() - 1):
+		even = even and absf(sampled[i].distance_to(sampled[i - 1]) - Curves.SPACING) < 0.02
+	_check(sampled[0].distance_to(points[0]) < 0.01 and sampled[-1].distance_to(points[3]) < 0.3 and even,
+		"sampled every quarter cell from its first point to its last (%d points, %.1f cells)" % [sampled.size(), curve["length"]])
+	var through := Array(points.slice(1, 3))
+	_check(through.all(func(point: Vector2) -> bool: return Curves.nearest(curve, point)["distance"] < 0.05), "it passes through its points")
+	var turns := 0.0
+	var tangents: PackedVector2Array = curve["tangents"]
+	for i in range(1, tangents.size()):
+		turns = maxf(turns, absf(tangents[i].angle_to(tangents[i - 1])))
+	_check(turns < 0.2 and tangents.size() == sampled.size(), "smooth: no turn over 0.2 rad a sample (%.3f)" % turns)
+	var at_point := Curves.nearest(curve, Vector2(10, 2))
+	var wide_ok: bool = absf(at_point["width"] - 3.0) < 0.05 and absf(Curves.nearest(curve, Vector2(0, 5))["width"] - 1.0) < 0.05
+	_check(wide_ok, "its width is each point's there (%.2f at the second)" % at_point["width"])
+	var raster := Curves.cells(curve, false)
+	var middle := Curves.middle(curve)
+	var stepped := true
+	for i in range(1, middle.size()):
+		stepped = stepped and absi(middle[i].x - middle[i - 1].x) + absi(middle[i].y - middle[i - 1].y) == 1
+	var within := true
+	for cell: Vector2i in raster:
+		var near := Curves.nearest(curve, Vector2(cell))
+		within = within and (near["distance"] < near["width"] / 2.0 + 0.01 or middle.has(cell))
+	_check(stepped and middle[0] == Vector2i(0, 5) and middle[-1] == Vector2i(30, 5) and middle.all(func(cell: Vector2i) -> bool: return raster.has(cell)),
+		"its middle a side step at a time, end to end, in its cells (%d)" % middle.size())
+	_check(within and raster.has(Vector2i(10, 1)) and raster.has(Vector2i(10, 3)) and not raster.has(Vector2i(1, 4)),
+		"its cells lie within its width there: 3 wide at the second point, 1 at the first")
+	var pond := Curves.sample(PackedVector2Array([Vector2(5, 5), Vector2(15, 4), Vector2(16, 12), Vector2(6, 13)]), PackedFloat32Array([0, 0, 0, 0]), true)
+	var inside := Curves.cells(pond, true)
+	_check(inside.has(Vector2i(10, 8)) and not inside.has(Vector2i(2, 8)) and inside.keys().all(func(cell: Vector2i) -> bool: return Curves.inside(pond, Vector2(cell))),
+		"a closed curve's cells are those inside it (%d)" % inside.size())
+	var pond_points: PackedVector2Array = pond["points"]
+	_check(pond_points[0].distance_to(pond_points[-1]) < 0.3, "a closed curve comes round to its start")
+
+
+## Level lays "waters" and "roads" from their curves (decision 559): the
+## cells the layout lacks made water and said, a stream's path from its
+## middle, a pond's cells inside it, a road's ground its kind.
+func _test_curves_laid() -> void:
+	print("== waters and roads laid from curves ==")
+	var size := Vector2i(24, 16)
+	var rows: Array[String] = []
+	for y in 2 * size.y - 1:
+		rows.append(".".repeat(2 * size.x - 1))
+	var markers := {}
+	for y in size.y:
+		for x in size.x:
+			markers[Vector2i(x, y)] = "grass"
+	markers[Vector2i(1, 14)] = "start"
+	var field := PackedFloat32Array()
+	for y in size.y:
+		for x in size.x:
+			field.append(4.0 - 0.1 * x)
+	var config := {"outdoor": true,
+		"waters": [{"points": [[0, 4, 2], [8, 2, 2.5], [16, 6, 2], [23, 4, 2]]}, {"points": [[4, 9], [10, 9, 0], [10, 13, 0], [4, 13, 0]], "closed": true},
+			{"points": [[14, 9, 0], [20, 9, 0], [20, 13, 0]], "closed": true}],
+		"roads": [{"points": [[0, 7, 1.5], [23, 8, 1.5]], "kind": "stone"}]}
+	var level := Level.parse(Level.image_from_rows(rows, markers), null, config, Relief.image(field, size))
+	var terrain: Dictionary = level["terrain"]
+	var warned: Array = level["warnings"]
+	_check(warned.any(func(w: String) -> bool: return w.begins_with("waters 1 has a point")) and terrain["waters"].size() == 2,
+		"a point not [x, y, width] leaves its water out, said (%s)" % [warned])
+	var river: Dictionary = terrain["waters"][0]
+	var wet := {}
+	for cell: Vector2i in terrain["water"]:
+		wet[cell] = true
+	var raster := Curves.cells(river["curve"], false)
+	_check(raster.keys().all(func(cell: Vector2i) -> bool: return wet.has(cell) or not Rect2i(Vector2i.ZERO, size).has_point(cell)) and not terrain["floor"].has(Vector2i(8, 2)),
+		"the river's cells are water, out of the floor (%d)" % raster.size())
+	_check(warned.any(func(w: String) -> bool: return w.begins_with("water 0's curve covers")), "the cells the layout had dry are said")
+	var streams: Array = terrain["streams"]
+	_check(streams.size() == 1 and streams[0]["path"][0] == Vector2i(0, 4) and streams[0]["path"][-1] == Vector2i(23, 4),
+		"its \"streams\" path from its middle, source to mouth (%s)" % [streams])
+	var pond: Dictionary = terrain["waters"][1]
+	_check(pond["closed"] and wet.has(Vector2i(17, 10)) and not wet.has(Vector2i(13, 10)), "the pond's cells, inside its curve, are water")
+	_check(terrain["kinds"].get(Vector2i(5, 7), "") == "stone" and terrain["kinds"].get(Vector2i(5, 11), "") == "grass", "the road's ground is stone, beside it grass")
+
+
+## A river laid along a meander (decision 559): its middle one step at a
+## time, its water never rising, swinging well off its line and back, about
+## its width wide, the same for the same seed.
+func _test_river() -> void:
+	print("== Relief.lay rivers ==")
+	var size := Vector2i(40, 60)
+	var map := LevelMap.new(size)
+	for y in size.y:
+		for x in size.x:
+			map.set_cell(Vector2i(x, y), "grass")
+	var options := {"base": 6.0, "amplitude": 0.5, "streams": 0, "valleys": [[Vector2i(20, 0), Vector2i(20, 59)]],
+		"valley_depth": 2.0, "valley_floor": 12.0, "valley_fall": 3.0, "valley_width": 18.0,
+		"rivers": [{"line": [Vector2i(20, 0), Vector2i(20, 59)], "wavelength": 20.0, "amplitude": 7.0, "width": [1.5, 3.0]}]}
+	var laid := Relief.lay(map, Rect2i(Vector2i.ZERO, size), 7, options)
+	_check(laid["streams"].size() == 1 and laid["waters"].size() == 1, "one river, its curve in waters, its middle in streams")
+	if laid["streams"].size() != 1 or laid["waters"].size() != 1:
+		return
+	var water: Dictionary = laid["waters"][0]
+	var curve := Curves.sample(water["points"], water["widths"])
+	var raster := Curves.cells(curve, false)
+	var made: Array = laid["cells"].keys().filter(func(at: Vector2i) -> bool: return laid["cells"][at] == "water")
+	_check(made.all(func(at: Vector2i) -> bool: return raster.has(at)) and raster.keys().all(func(at: Vector2i) -> bool: return laid["cells"].get(at, "") == "water" or not map.walkable(at)),
+		"its water is its curve's raster, as Level lays it on load (%d cells)" % made.size())
+	var widths: PackedFloat32Array = water["widths"]
+	var thinnest := Array(widths).min() as float
+	var widest := Array(widths).max() as float
+	_check(thinnest >= 1.5 and widest <= 3.0 and widest - thinnest > 0.6, "its width varies along it (%.2f to %.2f)" % [thinnest, widest])
+	var path: Array[Vector2i] = laid["streams"][0]
+	var steps_ok := true
+	var falls := true
+	var spread := Vector2i(1 << 30, -(1 << 30))
+	for i in path.size():
+		steps_ok = steps_ok and laid["cells"].get(path[i], "") == "water"
+		spread = Vector2i(mini(spread.x, path[i].x), maxi(spread.y, path[i].x))
+		if i > 0:
+			var step := path[i] - path[i - 1]
+			steps_ok = steps_ok and absi(step.x) + absi(step.y) == 1
+			falls = falls and laid["relief"][path[i]] <= laid["relief"][path[i - 1]] + 0.0001
+	_check(path[0].y == 0 and path[-1].y == size.y - 1 and steps_ok, "its middle runs source to mouth, water, a side step at a time (%d cells, %s to %s, steps %s)" % [path.size(), path[0], path[-1], steps_ok])
+	_check(falls, "its water never rises downstream")
+	_check(spread.x <= 14 and spread.y >= 26, "it swings about 7 cells either way of its line (columns %d to %d)" % [spread.x, spread.y])
+	_check(made.size() > path.size() * 1.3 and made.size() < path.size() * 3.2, "about its width wide (%d cells of water, %d in its middle)" % [made.size(), path.size()])
+	var again := Relief.lay(map, Rect2i(Vector2i.ZERO, size), 7, options)
+	_check(again["streams"][0] == path, "the same seed lays the same river")
+	var other := Relief.lay(map, Rect2i(Vector2i.ZERO, size), 8, options)
+	_check(other["streams"][0] != path, "another seed, other loops")
+
+
 func _test_escarpment() -> void:
 	print("== Relief.lay escarpments ==")
 	var size := Vector2i(40, 50)
@@ -456,10 +596,15 @@ func _test_hills() -> void:
 	_check(highest - lowest > 8.0, "hills and valleys: %.1f m between the lowest and the highest" % (highest - lowest))
 	var kinds := {}
 	for cell: Vector2i in terrain["kinds"]:
-		kinds[terrain["kinds"][cell]] = int(kinds.get(terrain["kinds"][cell], 0)) + 1
+		# A ford's footing is the ground beside it, stone mid-river (559).
+		if not terrain["fords"].has(cell):
+			kinds[terrain["kinds"][cell]] = int(kinds.get(terrain["kinds"][cell], 0)) + 1
 	_check(kinds.get("stone", 0) == 0 and kinds.get("grass", 0) > 3000 and kinds.get("dirt", 0) > 500,
 		"its ground by slope: grass, bare dirt on the steep bands, crests and banks, no stone (paving) on its slopes (%s)" % [kinds])
-	_check(terrain["streams"][0]["path"].size() > 60, "the stream runs the valley's length (%d cells)" % terrain["streams"][0]["path"].size())
+	var course: Array = terrain["streams"][0]["path"]
+	var columns := course.map(func(cell: Vector2i) -> int: return cell.x)
+	_check(course.size() > 120 and columns.max() - columns.min() >= 16,
+		"the river loops down the valley's length (%d cells, columns %d to %d; 559)" % [course.size(), columns.min(), columns.max()])
 	_check(terrain["streams"].size() == 1 and not terrain["fords"].is_empty() and level["buildings"].any(func(b: Dictionary) -> bool: return b["slot"] == "bridge"),
 		"its stream, a ford and a bridge")
 	var area := {"relief": field, "relief_size": size, "stairs": terrain["stairs"], "heights": {}, "edges": terrain["edges"], "floor": floor, "size": size}
