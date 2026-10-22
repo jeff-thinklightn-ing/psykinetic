@@ -35,10 +35,10 @@
 		{
 			"id": "town_lands",
 			"type": "region",
-			"name": "the town's lands",
+			"name": "the Woodlands",
 			"status": "draft",
-			"source": "roadmap",
-			"summary": "The town and the farmsteads and fields around it, far from the mine.",
+			"source": "Jeff",
+			"summary": "The Woodlands, where Held sits, with the farmsteads and fields around it, far from the mine (Jeff, 2026-10-22: \"Held sit in the Woodlands\").",
 			"relations": [
 				{
 					"to": "blood_rot_lands",
@@ -47,6 +47,15 @@
 			],
 			"tags": [],
 			"facts": [
+				{
+					"id": "town_lands.woodlands",
+					"text": "Held sits in the Woodlands.",
+					"known": "common",
+					"where": [],
+					"tags": [],
+					"source": "Jeff",
+					"status": "draft"
+				},
 				{
 					"id": "town_lands.farms",
 					"text": "Farmsteads and fields lie near the town.",
@@ -81,10 +90,10 @@
 		{
 			"id": "farmstead",
 			"type": "place",
-			"name": "a farmstead",
+			"name": "the old farmstead",
 			"status": "draft",
-			"source": "roadmap",
-			"summary": "A farmstead near the town.",
+			"source": "Jeff",
+			"summary": "An old farmstead in the wilds, abandoned, with tools and bandages left inside (Jeff, 2026-10-22); not the Blood Rot's doing.",
 			"place_kind": "farm",
 			"relations": [
 				{
@@ -95,12 +104,90 @@
 			"tags": [],
 			"facts": [
 				{
-					"id": "farmstead.raided",
-					"text": "Whether a farmstead was raided and the smith taken from it.",
+					"id": "farmstead.abandoned",
+					"text": "The old farmstead in the wilds stands abandoned; tools and bandages lie inside.",
 					"known": "common",
-					"where": [],
-					"status": "asked",
-					"ask": "C3"
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"source": "Jeff",
+					"status": "draft"
+				}
+			]
+		},
+		{
+			"id": "old_tower",
+			"type": "place",
+			"name": "the Old Tower",
+			"status": "draft",
+			"source": "Jeff",
+			"summary": "The Old Tower across the river from Held: a broken-down castle the ancients lived in, conquered in the battle; its fallen warriors were buried before the people moved on, and nothing is known of them since. Snagfin keeps his counter there (Jeff, 2026-10-22).",
+			"place_kind": "keep",
+			"relations": [
+				{
+					"to": "town_lands",
+					"kind": "in"
+				}
+			],
+			"tags": [
+				"history"
+			],
+			"facts": [
+				{
+					"id": "old_tower.ancients",
+					"text": "The Old Tower, across the river from Held, is a broken-down castle the ancients lived in.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"source": "Jeff",
+					"status": "draft"
+				},
+				{
+					"id": "old_tower.conquered",
+					"text": "The Old Tower, the ancients' castle, was conquered in the battle, and its fallen warriors were buried before the people moved on.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"source": "Jeff",
+					"status": "draft"
+				},
+				{
+					"id": "old_tower.unknown",
+					"text": "Nothing is known of the ancients' history, or of them since they left.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"source": "Jeff",
+					"status": "draft"
+				},
+				{
+					"id": "old_tower.barrow",
+					"text": "No dead lie by the Old Tower: the dead are in the barrows, and the tower is where they lived.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"source": "Jeff",
+					"status": "agreed"
+				},
+				{
+					"id": "old_tower.snagfin",
+					"text": "Snagfin the goblin keeps his counter in the Old Tower.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"source": "Jeff",
+					"status": "draft"
 				}
 			]
 		},
@@ -331,7 +418,7 @@
 		{
 			"id": "tower",
 			"type": "place",
-			"name": "the tower",
+			"name": "the tower over the mine",
 			"status": "agreed",
 			"source": "Jeff",
 			"summary": "A tower over the mine, built by orcs to dark elven designs, whose shifting inside still holds old artifacts and treasures.",
@@ -361,7 +448,7 @@
 				},
 				{
 					"id": "tower.built",
-					"text": "The tower was built by orcish labour to the designs of dark elven architects, in their majestic style.",
+					"text": "The tower over the mine was built by orcish labour to the designs of dark elven architects, in their majestic style.",
 					"known": "common",
 					"where": [
 						"blood_rot_lands"
@@ -370,7 +457,7 @@
 				},
 				{
 					"id": "tower.treasures",
-					"text": "The tower holds old artifacts and treasures; dark elven artifacts come from it.",
+					"text": "The tower over the mine holds old artifacts and treasures; dark elven artifacts come from it.",
 					"known": "rumour",
 					"where": [
 						"blood_rot_lands"
@@ -380,7 +467,7 @@
 				},
 				{
 					"id": "tower.shifts",
-					"text": "The tower's inside shifts, perhaps by magic; its treasures have never all been carried out, and adventurers still come.",
+					"text": "The inside of the tower over the mine shifts, perhaps by magic; its treasures have never all been carried out, and adventurers still come.",
 					"known": "rumour",
 					"where": [
 						"blood_rot_lands"

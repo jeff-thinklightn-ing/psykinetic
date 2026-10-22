@@ -58,6 +58,12 @@ beyond.
 The town is where the players and their companions belong. It is named Held
 (Jeff, 2026-10-18: "town named Held"). It lies in the Blood Rot's land, at a distance from the mine.
 
+In draft until Jeff checks the wording (2026-10-22): Held sits in the Woodlands. Across the
+river stands the Old Tower, a broken-down castle the ancients lived in. It was conquered in
+the battle, and its fallen warriors were buried (in the Barrow of the Fallen) before the
+people moved on; nothing is known of them since. Snagfin the goblin keeps his counter
+there. An old farmstead in the wilds stands abandoned, with tools and bandages inside.
+
 Everything found on the road (gold, ore, wood, cloth, food, weapons and gear)
 comes home to the town's shared stockpile, and the town grows from what is
 brought back, not one person's wealth. People rescued from captivity come to live
