@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Clicking a townsperson now reads "LMB  interact": they stop, turn to you and say a word (npc's side); click their speech bubble for the bar with Talk and Barter. Barter opens the merchant's goods beside your pack: hover a thing for what they take or pay ("pays 5 gold, fenced" for grave goods), click to pick things on either side, and the one button reads the deal, "+sword -hide +10g = Confirm". The counter's E opens the same window; selling by dropping things in the counter is no longer needed (560, ui's side; the greeting is npc's and the prices economy's).
 - Companions know their town's name: Held.
 
 - The Hills' stream is a river now, winding in big round loops down the valley and varying from under two to over three cells wide, instead of running nearly straight (Jeff: "a meandering stream not a straight line"); the ford and the bridge still cross it and every place stays reachable. Rivers, streams, ponds and roads are now smooth curves in the level, and the ground's cells are worked out from them, so they can be drawn as curves rather than squares (559). This version changes what goes over the network: client and server update together.

@@ -508,6 +508,8 @@ var minimap: Minimap
 var item_icons: ItemIcons
 ## An open shop's goods, and the player's gold over the pack (ShopPanel).
 var shop_panel: ShopPanel
+## The barter window beside the pack (BarterPanel, 560, ui's side).
+var barter_panel: BarterPanel
 ## The menus' sounds (UiSounds).
 var ui_sounds: UiSounds
 ## The local player's gold, as the server last said ("shop" messages).
@@ -533,6 +535,13 @@ var _pack_wanted: GridEntity
 ## TALK_REACH, if before _talk_until (msec).
 var _talk_wanted: GridEntity
 var _talk_until := 0
+## 560, ui's side: the resident last greeted by a click (their bubble opens
+## the talk bar), the bar itself (their name, Talk, Barter) and who it is for.
+var _greeted_by_click: GridEntity
+var _bar: PanelContainer
+var _bar_name: Label
+var _bar_barter: Button
+var _bar_for: GridEntity
 ## The pack sounds asked for, "set entity" each, newest last (tests).
 var sounds: Array[String] = []
 var _test_chest_done := false
@@ -879,6 +888,7 @@ func _process(delta: float) -> void:
 	_show_channel_ring()
 	_update_pack()
 	_update_talk()
+	_update_bar()
 	var hud_began := Time.get_ticks_usec()
 	if compass != null:
 		compass.north_on_screen = screen_north()
@@ -1029,6 +1039,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	var click := event as InputEventMouseButton
 	if click == null:
 		return
+	if click.button_index == MOUSE_BUTTON_LEFT and click.pressed and _bubble_clicked():
+		get_viewport().set_input_as_handled()  # 560, ui's side: the greeting's bubble opens the talk bar.
+		return
 	if click.button_index in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN] and minimap != null and minimap.big:
 		# The big map open: the wheel zooms it instead.
 		if click.pressed:
@@ -1137,6 +1150,9 @@ func _talk_to(player: Player, friend: GridEntity) -> void:
 ## for a player the chat box.
 func _open_talk(friend: GridEntity) -> void:
 	_talk_wanted = null
+	if friend is Resident:
+		_greet(friend)  # 560, ui's side: the click greets; the bar's Talk opens the say line.
+		return
 	_open_chat()
 	if (friend is Companion or friend is Resident) and _chat_box.visible:
 		# Addressed to them (536, ui's side: no panel): a townsperson by their name, as the server matches a line.
@@ -1145,6 +1161,168 @@ func _open_talk(friend: GridEntity) -> void:
 	if friend is Resident:
 		ask_offers(friend)
 		_chat_box.caret_column = _chat_box.text.length()
+
+
+## The resident nearest [param player] in this zone, or null (560's shots).
+func _nearest_resident(player: Player) -> GridEntity:
+	var who: GridEntity = null
+	var nearest := 1000000
+	if player == null:
+		return null
+	for entity in World.townsfolk():  # The town's people, as the first-talk hint reads them.
+		if entity is Resident and entity.spawned:
+			var distance := World.distance(player.tile, entity.tile)
+			if distance < nearest:
+				nearest = distance
+				who = entity
+	return who
+
+
+## --test-show=greet's sample (560, ui's side): once a resident is in the
+## world, the player beside them, a greeting bubble over them and the talk
+## bar under it; tried once a second for a while, as the town's people
+## spawn after the level.
+const GREET_SHOT_TRIES := 8
+
+
+func _greet_sample(player: Player, tried: int) -> void:
+	var who := _nearest_resident(player)
+	if who == null or bubbles == null:
+		if tried < GREET_SHOT_TRIES and is_instance_valid(player):
+			get_tree().create_timer(1.0).timeout.connect(_greet_sample.bind(player, tried + 1))
+		return
+	if Net.is_authority() and _beside(who.tile, player.tile) != NONE:
+		World._relocate(player, _beside(who.tile, player.tile))  # In the shot, beside them.
+	bubbles.show_line(who.get_instance_id(), "Wares, if you have coin.")
+	_greeted_by_click = who
+	_open_bar(who)
+
+
+## A click on [param resident] in reach (560, ui's side; Jeff: "the npc
+## stops, faces you, and addresses you"): npc's "greet" command, sent by
+## name (the resident stops, turns and speaks one line through the spoken
+## path; npc's rules and cooldown); their bubble then opens the talk bar
+## (_bubble_clicked). The standing-offer read (536) is asked as before.
+func _greet(resident: GridEntity) -> void:
+	var player := _local_player()
+	if player == null or not is_instance_valid(resident):
+		return
+	_greeted_by_click = resident
+	World.command(player, "greet", {"resident": str(resident.get_path())})
+	ask_offers(resident)
+
+
+## A left click over the greeted resident's bubble opens the talk bar under
+## it (true: the click is taken); any other click closes an open bar.
+func _bubble_clicked() -> bool:
+	if _bar != null and _bar.visible:
+		_close_bar()
+	if bubbles == null or not is_instance_valid(_greeted_by_click) or not _greeted_by_click.spawned:
+		return false
+	var key := bubbles.key_under_mouse()
+	if key == 0 or key != _greeted_by_click.get_instance_id():
+		return false
+	_open_bar(_greeted_by_click)
+	return true
+
+
+## The talk bar (560, ui's side): the resident's name and two options,
+## Talk (536's say line addressed to them) and Barter (the window, a
+## merchant's), under their bubble while it stands.
+func _open_bar(resident: GridEntity) -> void:
+	if _bar == null:
+		return
+	_bar_for = resident
+	var person := str(resident.get("person")) if resident.get("person") != null else ""
+	_bar_name.text = person if not person.is_empty() else _display_name(resident)
+	_bar_barter.visible = _shop_counter_near(resident) != null and str(resident.get("trade")) == "merchant"
+	_bar.visible = true
+	_update_bar()
+
+
+func _close_bar() -> void:
+	if _bar != null:
+		_bar.visible = false
+	_bar_for = null
+
+
+## Each frame: the bar follows its resident's bubble, and goes with it.
+func _update_bar() -> void:
+	if _bar == null or not _bar.visible:
+		return
+	if not is_instance_valid(_bar_for) or bubbles == null:
+		_close_bar()
+		return
+	var rect := bubbles.rect_of(_bar_for.get_instance_id())
+	if rect.size.y <= 0.0:
+		_close_bar()
+		return
+	_bar.reset_size()
+	_bar.global_position = Vector2(rect.position.x + rect.size.x * 0.5 - _bar.size.x * 0.5, rect.end.y + 8.0)
+
+
+## The bar's Talk: the say line addressed to them, as the click did before 560.
+func _bar_talk_pressed() -> void:
+	var resident := _bar_for
+	_close_bar()
+	if not is_instance_valid(resident):
+		return
+	_open_chat()
+	if _chat_box.visible:
+		var person := str(resident.get("person")) if resident.get("person") != null else ""
+		_chat_box.text = "%s, " % (person if not person.is_empty() else _display_name(resident))
+		_chat_box.caret_column = _chat_box.text.length()
+
+
+## The bar's Barter: the window for the shop the merchant fronts (the shop
+## counter nearest them), its goods asked with economy's "barter" command.
+func _bar_barter_pressed() -> void:
+	var resident := _bar_for
+	_close_bar()
+	if is_instance_valid(resident):
+		_open_barter_with(resident)
+
+
+func _open_barter_with(resident: GridEntity) -> void:
+	var counter := _shop_counter_near(resident)
+	var player := _local_player()
+	if counter == null or player == null or barter_panel == null:
+		return
+	var person := str(resident.get("person")) if resident.get("person") != null else ""
+	barter_panel.open(counter, person)
+	World.command(player, "barter", {"shop": str(counter.get_path())})
+
+
+## The shop counter nearest [param near] in this zone (a Chest that is a
+## shop), or null.
+func _shop_counter_near(near: GridEntity) -> GridEntity:
+	var best: GridEntity = null
+	var best_distance := 1000000
+	for entity in World.get_entities():
+		if entity is Chest and (entity as Chest).shop and entity.spawned:
+			var distance := World.distance(near.tile, entity.tile)
+			if distance < best_distance:
+				best_distance = distance
+				best = entity
+	return best
+
+
+## The window's Confirm: economy's "trade" command, by name.
+func _trade(shop: GridEntity, give: Array, take: Array, gold_balance: int) -> void:
+	var player := _local_player()
+	if player != null and is_instance_valid(shop):
+		World.command(player, "trade", {"shop": str(shop.get_path()), "give": give, "take": take, "gold": gold_balance})
+
+
+## Economy's barter message (Main.barter_told, 560, economy's side): the
+## window redrawn, the purse read.
+func _on_barter_told(data: Dictionary) -> void:
+	if data.has("gold"):
+		gold = int(data["gold"])
+		if shop_panel != null:
+			shop_panel.gold = gold
+	if barter_panel != null:
+		barter_panel.show_barter(data)
 
 
 ## Each frame: a friend walked to opens talk once within TALK_REACH; gone,
@@ -6534,6 +6712,39 @@ func _build_talk() -> void:
 	ui_sounds.watch(options_panel)
 	ui_sounds.watch(pack_panel)
 	shop_panel.refused.connect(func(_why: String) -> void: ui_sounds.play("ui.error"))
+	shop_panel.box_shown = false  # 560, ui's side: the barter window shows the goods.
+	# 560, ui's side: the barter window beside the pack, fed by economy's
+	# barter message (Main.barter_told, connected by name so either side
+	# lands first), and the talk bar under a greeting resident's bubble.
+	barter_panel = BarterPanel.new()
+	barter_panel.name = "Barter"
+	barter_panel.pack = pack_panel
+	barter_panel.trade_asked.connect(_trade)
+	barter_panel.refused.connect(func(_why: String) -> void: ui_sounds.play("ui.error"))
+	$HUD.add_child(barter_panel)
+	if has_signal("barter_told"):
+		connect("barter_told", _on_barter_told)
+	_bar = PanelContainer.new()
+	_bar.name = "TalkBar"
+	_bar.visible = false
+	var bar_row := HBoxContainer.new()
+	bar_row.add_theme_constant_override("separation", UiTheme.constant("row"))
+	_bar.add_child(bar_row)
+	_bar_name = Label.new()
+	_bar_name.theme_type_variation = &"Heading"
+	_bar_name.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	bar_row.add_child(_bar_name)
+	var bar_talk := Button.new()
+	bar_talk.text = "Talk"
+	bar_talk.focus_mode = Control.FOCUS_NONE
+	bar_talk.pressed.connect(_bar_talk_pressed)
+	bar_row.add_child(bar_talk)
+	_bar_barter = Button.new()
+	_bar_barter.text = "Barter"
+	_bar_barter.focus_mode = Control.FOCUS_NONE
+	_bar_barter.pressed.connect(_bar_barter_pressed)
+	bar_row.add_child(_bar_barter)
+	$HUD.add_child(_bar)
 	talk = TalkPanel.new()
 	talk.line_added.connect(_line_sound)
 	talk.anchor_left = 0.0
@@ -6659,7 +6870,8 @@ func context_hint_for(thing: Node) -> String:
 	if thing is Resident:
 		# Decision 454: Shift+LMB attacks, said in the controls list. 515 amended: in bed, their ailment (npc's Resident.ailing).
 		var ailing := str((thing as Resident).ailing)
-		return "LMB  talk   in bed with %s" % ailing if not ailing.is_empty() else "LMB  talk"
+		# 560, ui's side (Jeff): the click interacts; they stop and address you.
+		return "LMB  interact   in bed with %s" % ailing if not ailing.is_empty() else "LMB  interact"
 	if thing is Monster and World.can_target(player, thing):
 		return "LMB  attack   RMB  draw, let go to shoot" if World.off_hand(player) == "draw" else "LMB  attack"
 	if thing is Player and thing != player:
@@ -8983,7 +9195,11 @@ func _phrase_of(keycode: int) -> int:
 ## Esc: whatever is open closes first (the options, an open chest or
 ## companion's pack, the menu itself); with nothing open, the game menu.
 func escape() -> void:
-	if world_map_panel != null and world_map_panel.visible:
+	if _bar != null and _bar.visible:
+		_close_bar()  # 560, ui's side: the talk bar, then the barter window.
+	elif barter_panel != null and barter_panel.is_open():
+		close_other()
+	elif world_map_panel != null and world_map_panel.visible:
 		world_map_panel.close()
 	elif game_menu != null and game_menu.visible:
 		game_menu.open(false)
@@ -9069,10 +9285,18 @@ func open_other(target: GridEntity) -> void:
 			_sound(SoundKit.opening(target), target)
 		pack_panel.open(target)
 	if shop_panel != null and target is Chest and (target as Chest).shop and shop_panel.shop != target:
+		# The "shop" read stays (the gold caption, economy_test) until economy retires
+		# the message; its goods box is not shown (560, ui's side: the barter window is).
 		shop_panel.open(target)
 		var player := _local_player()
 		if player != null:
 			World.command(player, "shop", {"shop": str(target.get_path())})
+	if barter_panel != null and target is Chest and (target as Chest).shop and barter_panel.shop != target:
+		# 560, ui's side: the counter opens the barter window, fed by economy's "barter".
+		barter_panel.open(target, "")
+		var player := _local_player()
+		if player != null:
+			World.command(player, "barter", {"shop": str(target.get_path())})
 	if counter_panel != null and target != null and not World.counter_kind(target).is_empty():
 		var player := _local_player()
 		if player != null:
@@ -9085,6 +9309,8 @@ func close_other() -> void:
 		pack_panel.open(null)
 	if shop_panel != null:
 		shop_panel.open(null)
+	if barter_panel != null:
+		barter_panel.close()
 
 
 ## A line in the talk panel: someone else's chat pings, a party line
@@ -9929,7 +10155,7 @@ func _first_talk_hint(player: Player) -> void:
 		return
 	for entity in World.townsfolk():
 		if entity is Resident and World.distance(entity.tile, player.tile) <= RESIDENT_EARSHOT + 2:
-			_show_top_hint("Click a townsperson to talk, or press %s" % Keys.name_of("open"))
+			_show_top_hint("Click a townsperson to interact, or press %s" % Keys.name_of("open"))  # 560: interact.
 			Net.set_hinted_talk(true)
 			return
 
@@ -10165,6 +10391,28 @@ func _run_test_show(player: Player) -> void:
 					world_state = WorldNews.merge(world_state, {"full": false, "guide": {"companion": her, "places": [there], "areas": []}})
 					open_world_map()
 					world_map_panel.show_ask(there)
+			"greet", "barter":
+				# 560, ui's side, for the shots: a resident's greeting bubble with the
+				# talk bar under it (greet), or the barter window with a sword taken
+				# and a hide given (barter; a sample message, economy's shape).
+				var who := _nearest_resident(player)
+				if what == "greet":
+					# The town's people spawn a moment after the level: the greeting
+					# waits for the first of them, up to GREET_SHOT_TRIES seconds.
+					_greet_sample(player, 0)
+				elif what == "barter" and barter_panel != null and player != null:
+					var counter := _shop_counter_near(who if who != null else player)
+					if player.slots.size() >= 2:
+						player.slots[0] = "hide"
+						player.slots[1] = "dagger"
+					var person := str(who.get("person")) if who != null and who.get("person") != null else "Snagfin"
+					barter_panel.open(counter, person)
+					barter_panel.show_barter({"shop": str(counter.get_path()) if counter != null else "", "town": zone_name_here(), "gold": 12,
+						"goods": [{"uid": 101, "id": "sword", "price": 10}, {"uid": 102, "id": "bandaging_kit", "price": 1}],
+						"buys": {"hide": {"gold": 20, "up_to": 2}, "dagger": {"gold": 6, "up_to": 1}}, "fenced": {},
+						"pack": [{"slot": 0, "uid": 201, "id": "hide"}, {"slot": 1, "uid": 202, "id": "dagger"}], "why": ""})
+					barter_panel.toggle_take(101)
+					barter_panel.toggle_give(201)
 			"bond", "bond_drop":
 				# 555, ui's side, for the shots: her bond read on her pack's title
 				# (bond), or the HUD's hint as her step drops (bond_drop). The bond

@@ -89,6 +89,21 @@ func rect_of(key: int) -> Rect2:
 	return Rect2(bubble.position, bubble.size) if bubble != null else Rect2()
 
 
+## The speaker whose bubble is under the mouse, 0 for none (560, ui's
+## side: a click on the greeting resident's bubble opens the talk bar; the
+## bubbles themselves never take the mouse).
+func key_under_mouse() -> int:
+	return key_at(get_local_mouse_position())
+
+
+func key_at(at: Vector2) -> int:
+	for key: int in _bubbles:
+		var bubble: Bubble = _bubbles[key]
+		if bubble.visible and Rect2(bubble.position, bubble.size).has_point(at):
+			return key
+	return 0
+
+
 func _drop(key: int, bubble: Bubble) -> void:
 	if _bubbles.get(key) == bubble:
 		_bubbles.erase(key)

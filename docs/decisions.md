@@ -18947,3 +18947,77 @@ point said); a river alone (its water its curve's raster, its width
 varying, its middle source to mouth, never rising, swinging off its line,
 the same for the same seed); the Hills' river loops down the valley; a
 ford's footing left out of the no-stone check.
+## 560, ui's side: the resident click that interacts, the talk bar, the barter window
+
+Decision (ui leads; Jeff, 2026-10-21 evening, his words through the
+coordinator: "lmb opens up chat with the npc name, UI says LMB to chat;
+clicking should be 'LMB to interact' - and the npc stops, faces you, and
+addresses you. If you click their chat bubble that could open up the 'text
+bar below'... a couple options for bartering; when clicking bartering the
+window should show the npc's inventory of goods, next your pack, hovering
+over an item would show what the npc will pay in gold, or what they'll take
+in gold. direct trading should be possible too. click to select what you
+want to trade, it would show a sum in the bottom... the button changes to
++sword -hide +10g = Confirm"). Approved whole with npc's, economy's and
+pc-character's sides (560, npc's side: the greet; 560, economy's side: the
+barter wire; pc-character: the standing turn and look-at). ui's side:
+
+- The hint over a townsperson reads "LMB  interact" (in bed: "LMB
+  interact   in bed with a fever"). A left click (or E) on one in reach
+  sends npc's "greet" command by name (Main._greet; the resident stops,
+  turns and speaks one line through the spoken path, npc's rules and
+  cooldown); no chat box opens. Out of reach the click walks to them and
+  greets on arrival, as talk did (454). The standing-offer read (536) is
+  asked as before.
+- The greeting's bubble is clickable while it stands (SpeechBubbles.key_at
+  and key_under_mouse; the bubbles never take the mouse themselves): a
+  left click over the greeted resident's bubble opens the talk bar under
+  it (Main._open_bar: their name, Talk, Barter; Barter only for a merchant
+  with a shop counter in the zone), which follows the bubble and goes with
+  it; Esc or any other click closes it. Talk opens 536's say line with
+  "Oda, " typed, exactly what the click did before. Barter opens the window
+  for the shop counter nearest the merchant and asks economy's "barter"
+  command. 536's rule stands: the talk is spoken; the bar and the window
+  are the two surfaces, each opened by a deliberate second click.
+- The barter window (render/barter_panel.gd, class_name BarterPanel):
+  beside the pack where ShopPanel's goods box stood (280), the merchant's
+  goods as a row of boxes in the pack's look (icon, short name, the item's
+  colour), titled "Snagfin's shop" ("The shop" from the counter). Hover
+  over theirs: "takes 10 gold"; over the player's own boxes (PackPanel's
+  hover_hook): "pays 20 gold", "pays 5 gold, fenced" for grave goods (555;
+  the coordinator's ruling: never refused, half price, the way 461's thief
+  fences), or "won't buy". A click selects on either side (PackPanel's
+  select_hook takes the left click on the player's boxes; a selected slot
+  is framed in bright brass, PackPanel.selected_style, and never dragged),
+  a second unselects; past the town's up_to for a kind the pick is refused
+  with "the town has enough of that". The foot's one button reads the sum
+  from the player's side, BarterPanel.sum_words: "+sword -hide +10g =
+  Confirm" (+ what they take, - what they give, the gold they receive or
+  pay); "Confirm" alone, dim, with nothing picked; "you need N more gold"
+  in rust and Confirm dim when the purse can't cover what is owed. Confirm
+  emits trade_asked and Main sends economy's "trade" command {shop, give:
+  [uids], take: [uids], gold}; the server prices it and answers with the
+  barter message again (Main.barter_told, economy's hook, connected by name
+  so either side lands first), the window redrawn, a refusal's why under
+  the foot in rust with the error sound; a pick of something gone is
+  dropped. Gold-only buys and sells are the same window with one side
+  picked. It closes on Esc, with the pack's open row (close_other), or when
+  the counter is gone.
+- The counter's E opens the same window (open_other sends "barter" beside
+  the "shop" command it always sent); ShopPanel's goods box is no longer
+  shown (box_shown false), while the class stays reading the "shop"
+  message for the player's gold caption and economy_test's checks, until
+  economy retires that message (then both go); CounterPanel (438: orders,
+  reforge, bless) stays the counter's own panel.
+- --test-show=greet (a greeting bubble with the bar under it) and barter
+  (the window with a sword taken and a hide given, a sample message in
+  economy's shape) stand the samples for the shots docs/ui/shots/trade/
+  barter.jpg (landed with the code) and greet_bar.jpg (docs-only after it:
+  the sample waits for the town's people, who come out a few seconds in).
+
+ui_test _test_barter: the sum's, the button's, the hover's and the
+shortfall's words; the window on a sample message (the title, picks on
+both sides, up_to, fenced and won't-buy, the shortfall, Confirm's ask, a
+refusal, close); the hint; the bar's name and its going without a bubble.
+Client only; protocol unchanged on this side (the kinds are economy's and
+npc's); new class_name BarterPanel.

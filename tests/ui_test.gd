@@ -34,6 +34,7 @@ func _ready() -> void:
 	_test_world_map()
 	_test_access()
 	_test_keys()
+	_test_barter()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -341,7 +342,7 @@ func _test_sim_reads() -> void:
 	sick.trade = "cook"
 	sick.ailing = "a fever"
 	if _main._local_player() != null:
-		_check(_main.context_hint_for(sick) == "LMB  talk   in bed with a fever", "the hint over someone in bed says it (515 amended)")
+		_check(_main.context_hint_for(sick) == "LMB  interact   in bed with a fever", "the hint over someone in bed says it (515 amended; 560: interact)")
 	sick.free()
 	_check(Main.pile_words(PackedStringArray(["herbs"])) == "herbs" and Main.pile_words(PackedStringArray(["herbs", "dagger", "rope"])) == "herbs and 2 more"
 		and Main.pile_words(PackedStringArray()) == "", "a pile's words: the first thing's short name, and how many more")
@@ -702,3 +703,73 @@ static func _key_event(keycode: Key, pressed: bool, physical: Key = KEY_NONE) ->
 	event.physical_keycode = physical if physical != KEY_NONE else keycode
 	event.pressed = pressed
 	return event
+
+
+## 560, ui's side: the click that interacts, the bubble's bar, the barter window.
+func _test_barter() -> void:
+	print("== the resident click and the barter window (560, ui's side) ==")
+	_check(BarterPanel.sum_words(["sword"], ["hide"], 10) == "+sword -hide +10g" and BarterPanel.sum_words([], ["hide"], 20) == "-hide +20g"
+		and BarterPanel.sum_words(["sword"], [], -10) == "+sword -10g" and BarterPanel.sum_words([], [], 0) == "",
+		"the sum's words, Jeff's form: +what you take, -what you give, the gold signed from your side")
+	_check(BarterPanel.button_words("+sword -hide +10g") == "+sword -hide +10g = Confirm" and BarterPanel.button_words("") == "Confirm",
+		"the button reads the sum then = Confirm; Confirm alone with nothing picked")
+	_check(BarterPanel.hover_words(true, 10, 0, false) == "takes 10 gold" and BarterPanel.hover_words(false, 0, 20, false) == "pays 20 gold"
+		and BarterPanel.hover_words(false, 0, 5, true) == "pays 5 gold, fenced" and BarterPanel.hover_words(false, 0, 0, false) == "won't buy",
+		"the hover: takes N gold over theirs; pays N gold, pays N gold fenced, or won't buy over yours")
+	_check(BarterPanel.shortfall_words(-15, 12) == "you need 3 more gold" and BarterPanel.shortfall_words(-5, 12) == "" and BarterPanel.shortfall_words(10, 0) == "",
+		"the shortfall when the purse can't cover what is owed")
+	var panel: BarterPanel = _main.barter_panel
+	var pack: PackPanel = _main.pack_panel
+	if panel == null or pack == null:
+		print("  (no barter panel in this scene: its checks skipped)")
+		return
+	var asked: Array = []
+	panel.trade_asked.connect(func(_shop: GridEntity, give: Array, take: Array, gold_balance: int) -> void: asked.append([give, take, gold_balance]))
+	var refusals: Array = []
+	panel.refused.connect(func(why: String) -> void: refusals.append(why))
+	var sample := {"shop": "", "town": "Held", "gold": 12,
+		"goods": [{"uid": 101, "id": "sword", "price": 10}, {"uid": 102, "id": "bandaging_kit", "price": 1}],
+		"buys": {"hide": {"gold": 20, "up_to": 1}, "dagger": {"gold": 6, "up_to": 1}}, "fenced": {203: 3},
+		"pack": [{"slot": 0, "uid": 201, "id": "hide"}, {"slot": 1, "uid": 202, "id": "dagger"}, {"slot": 2, "uid": 204, "id": "hide"},
+			{"slot": 3, "uid": 203, "id": "dagger"}, {"slot": 4, "uid": 205, "id": "food_sack"}], "why": ""}
+	panel.open(null, "Snagfin")
+	panel.show_barter(sample)
+	_check(panel.is_open() and panel.title_shown() == "Snagfin's shop" and panel.button_shown() == "Confirm", "opened for the merchant: the title, Confirm alone")
+	panel.toggle_take(101)
+	panel.toggle_give(201)
+	_check(panel.button_shown() == "+sword -hide +10g = Confirm" and panel.balance_of([201], [101]) == 10 and pack.selected.has(0),
+		"a sword taken and a hide given: +sword -hide +10g = Confirm, the hide's box framed (%s)" % panel.button_shown())
+	panel.toggle_give(204)
+	_check(not panel.give.has(204) and panel.hover_shown() == "the town has enough of that", "a second hide past up_to stays unpicked and says why")
+	_check(panel.pays_for(203) == 3 and panel.is_fenced(203) and panel.pays_for(205) == 0, "grave goods pay the fenced half; a thing the town won't buy pays nothing")
+	panel.toggle_give(205)
+	_check(not panel.give.has(205) and panel.hover_shown() == "won't buy", "won't buy: unpicked, said")
+	panel._hover_mine(true, 3)
+	_check(panel.hover_shown() == "pays 3 gold, fenced", "hover over the grave dagger: pays 3 gold, fenced")
+	panel._hover_theirs(102)
+	_check(panel.hover_shown() == "takes 1 gold", "hover over theirs: takes 1 gold")
+	panel.toggle_take(102)
+	panel.toggle_give(201)
+	_check(panel.button_shown() == "+sword +bandages -11g = Confirm" and panel._button.disabled == false, "two taken, nothing given: -11g, within the purse (%s)" % panel.button_shown())
+	panel.show_barter({"shop": "", "gold": 5, "goods": sample["goods"], "buys": sample["buys"], "fenced": {}, "pack": sample["pack"], "why": ""})
+	_check(panel._button.disabled and panel._foot.text == "you need 6 more gold", "the purse down to 5: you need 6 more gold, Confirm dim")
+	panel.toggle_take(102)
+	panel._confirm()
+	_check(asked == [[[], [101], -10]], "Confirm asks the trade: give none, take the sword, -10 (%s)" % [asked])
+	panel.show_barter({"shop": "", "gold": 5, "goods": [], "buys": {}, "fenced": {}, "pack": [], "why": "the prices have moved"})
+	_check(panel.why_shown() == "the prices have moved" and refusals == ["the prices have moved"] and panel.take.is_empty(),
+		"a refusal: why shown and said; a sword no longer on the shelf is dropped from the pick")
+	panel.close()
+	_check(not panel.is_open() and pack.selected.is_empty() and panel.button_shown() == "Confirm", "closed: nothing picked, no frames")
+	# The bar under a greeting resident's bubble: without a bubble it closes at once.
+	var oda: GridEntity = load(Main.RESIDENT).new()
+	oda.person = "Oda"
+	oda.trade = "cook"
+	if _main._local_player() != null:
+		_check(_main.context_hint_for(oda) == "LMB  interact", "the hint over a townsperson: LMB  interact")
+	_main._open_bar(oda)
+	_check(_main._bar_name.text == "Oda" and not _main._bar_barter.visible, "the bar names them; Barter only for a merchant with a counter")
+	_main._update_bar()
+	_check(not _main._bar.visible, "no bubble to sit under: the bar goes")
+	_check(not _main._bubble_clicked(), "a click with nobody greeted opens nothing")
+	oda.free()

@@ -21,6 +21,11 @@ var pack: PackPanel
 var buy: Callable
 ## The open shop's counter, or null.
 var shop: GridEntity
+## Whether the goods box is shown at all: false since 560 (ui's side), when
+## the barter window beside the pack took the goods over; the panel still
+## reads the "shop" message (the gold caption, rows_shown for economy_test)
+## until economy retires that message.
+var box_shown := true
 ## The player's gold, as the server last said.
 var gold := 0:
 	set(value):
@@ -190,7 +195,7 @@ func _place() -> void:
 		shop = null
 	var pack_shown := pack != null and pack.visible
 	_gold_box.visible = pack_shown
-	_box.visible = pack_shown and shop != null
+	_box.visible = pack_shown and shop != null and box_shown
 	if not pack_shown:
 		return
 	var rect := pack.get_global_rect()

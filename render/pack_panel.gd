@@ -73,6 +73,14 @@ var shown := true:
 		if is_node_ready():
 			_refresh()
 
+## The barter window's hooks (BarterPanel, 560): a left click on one of the
+## player's boxes goes to select_hook(mine, index) first (true: taken, no
+## drag); the mouse over one, or off (index -1), to hover_hook; the slots
+## selected to give are framed (set_selected) and never dragged.
+var select_hook: Callable
+var hover_hook: Callable
+var selected: Dictionary = {}
+
 var _other_title: Label
 ## The open row's title and, for a companion, her bond's step beside it
 ## (555, ui's side): ", sullen" dim, nothing at fond; hover: her reason.
@@ -112,8 +120,14 @@ class SlotBox:
 	var note := ""
 
 	func _ready() -> void:
-		mouse_entered.connect(func() -> void: panel.show_tip(self))
-		mouse_exited.connect(func() -> void: panel.hide_tip())
+		mouse_entered.connect(func() -> void:
+			panel.show_tip(self)
+			if panel.hover_hook.is_valid():
+				panel.hover_hook.call(mine, index))
+		mouse_exited.connect(func() -> void:
+			panel.hide_tip()
+			if panel.hover_hook.is_valid():
+				panel.hover_hook.call(mine, -1))
 
 	func owner_entity() -> GridEntity:
 		return panel.player if mine else panel.other
@@ -122,6 +136,8 @@ class SlotBox:
 		var entity := owner_entity()
 		if not is_instance_valid(entity) or index >= entity.slots.size() or entity.slots[index].is_empty():
 			return null
+		if mine and panel.selected.has(index):
+			return null  # Selected for barter (560): it stays put until unselected.
 		if icon.texture != null:
 			var picture := TextureRect.new()
 			picture.texture = icon.texture
@@ -139,6 +155,11 @@ class SlotBox:
 
 	func _gui_input(event: InputEvent) -> void:
 		var click := event as InputEventMouseButton
+		# The barter window open (560): a left click selects the thing to give.
+		if click != null and click.pressed and click.button_index == MOUSE_BUTTON_LEFT and panel.select_hook.is_valid() \
+				and panel.select_hook.call(mine, index):
+			accept_event()
+			return
 		if click == null or not click.pressed or click.button_index != MOUSE_BUTTON_RIGHT or not mine:
 			return
 		var entity := owner_entity()
@@ -330,6 +351,33 @@ func shown_in(mine: bool, index: int) -> String:
 func icon_in(mine: bool, index: int) -> Texture2D:
 	var row := _player_row if mine else _other_row
 	return (row.get_child(index) as SlotBox).icon.texture
+
+
+## The player's slots selected to give in a barter (560): [param indices]
+## framed in the selected style, the rest as they were.
+func set_selected(indices: Array) -> void:
+	selected.clear()
+	for index: Variant in indices:
+		if int(index) >= 0:
+			selected[int(index)] = true
+	if _player_row == null:
+		return
+	for box: SlotBox in _player_row.get_children():
+		if selected.has(box.index):
+			box.add_theme_stylebox_override("panel", selected_style())
+		else:
+			box.remove_theme_stylebox_override("panel")
+
+
+## The frame of a box selected for barter: the inset's backing with a bright
+## brass border (the theme's colours).
+static func selected_style() -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = UiTheme.color("backing_deep")
+	style.border_color = UiTheme.color("brass_bright")
+	style.set_border_width_all(4)
+	style.set_corner_radius_all(6)
+	return style
 
 
 ## The title over the open row ([param mine] false) or the player's.
