@@ -21032,3 +21032,15 @@ fixed), the pull and the floor, her card and body, focus_of, a blow, a
 shot and a meal growing it, the day's cap, her voice's lean, the world
 message. Server sim and the world message's merge, no replicated field,
 no new class_name.
+
+## 572 amended (2). A reset forgets the world's jobs too
+
+World.reset takes a zone's entities out with _world_remove, not despawn,
+so 572 amended's _forget_jobs never ran for them: a body left downed, a
+channel, a buff or a bandaging outlived the reset and was read freed on
+the next tick (enemy-ai-17 found it with a test that left a body downed).
+reset now calls _forget_jobs on each entity it removes. A typed
+dictionary refuses a freed key even to look one up or erase it, so
+_forget_jobs and _fade_buffs rebuild theirs from keys and values side by
+side, keeping the live entries (items_test's rebuild left a bandaging
+holding a freed body). Server sim, protocol unchanged, no new class_name.

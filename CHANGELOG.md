@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Fixed: a world reset could leave the world holding freed bodies (572 amended (2)).
 - Each companion now has a focus split between fighting, magic and stealth, rolled from who she is and slowly shaped by what she does (eating and fighting, shooting a bow); she knows which way she leans (577).
 - A bard's hat, a red felt cap with a long feather, made for the bard to wear once the head attachment is in.
 - New pieces for the Barrow's redesign (580), not yet placed: the old king's burial table, a torch-lit pillar, an old curled skeleton in a burial niche (and art for the niches' other three kinds), the hidden door's wall crack and its opened niche with a stair down, and the edge and steps of the draugr's dais.

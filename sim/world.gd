@@ -1386,6 +1386,7 @@ func reset() -> void:
 	zone.recalls_due.clear()
 	for entity in _entities:
 		if is_instance_valid(entity):
+			_forget_jobs(entity)  # As despawn does (decision 572 amended (2)).
 			entity._world_remove()
 	_entities.clear()
 	_roster_changed()
@@ -3953,13 +3954,16 @@ func buff(entity: GridEntity, kind: String) -> float:
 func _fade_buffs() -> void:
 	if _buffed.is_empty():
 		return
-	# Untyped till checked: one freed since (gone with its zone, dead) never
-	# goes into a typed variable (decision 572 amended).
-	for held: Variant in _buffed.keys():
-		if not is_instance_valid(held):
-			_buffed.erase(held)
-			continue
-		var entity: GridEntity = held
+	# One freed some other way never goes into a typed variable, nor is
+	# looked up or erased by (a typed dictionary refuses a freed key):
+	# the live ones are kept (decision 572 amended).
+	if _buffed.keys().any(func(held: Variant) -> bool: return not is_instance_valid(held)):
+		var live: Dictionary[GridEntity, bool] = {}
+		for held: Variant in _buffed.keys():
+			if is_instance_valid(held):
+				live[held] = true
+		_buffed = live
+	for entity: GridEntity in _buffed.keys():
 		if entity.zone != zone.name:
 			continue
 		var now: Dictionary = entity.buffs.duplicate(true)
@@ -4167,16 +4171,40 @@ func _forget_jobs(entity: GridEntity) -> void:
 	_mending.erase(entity)
 	_winders.erase(entity)
 	_downed.erase(entity)
-	for by: GridEntity in _bandaging.keys():
-		var patient: GridEntity = _bandaging[by]["patient"]
-		if by == entity or patient == entity:
-			_bandaging.erase(by)
-			if patient != entity and _alive(patient):
-				patient.mending = 0
-			bandage_changed.emit(by, patient, &"interrupted")
-	for by: GridEntity in _channels.keys():
-		if by == entity or _channels[by]["body"] == entity:
-			_end_channel(by, &"broken")
+	# Untyped till checked, by keys and values side by side (a typed
+	# dictionary refuses a freed key even to look up or erase): a job holding
+	# one freed some other way goes quietly, one naming [param entity] as
+	# broken off.
+	var keys := _bandaging.keys()
+	var jobs := _bandaging.values()
+	var kept: Dictionary[GridEntity, Dictionary] = {}
+	var broken: Array = []
+	for i in keys.size():
+		var patient: Variant = jobs[i]["patient"]
+		if not is_instance_valid(keys[i]) or not is_instance_valid(patient):
+			continue
+		if keys[i] == entity or patient == entity:
+			broken.append([keys[i], patient])
+		else:
+			kept[keys[i]] = jobs[i]
+	_bandaging = kept
+	for pair: Array in broken:
+		if pair[1] != entity and _alive(pair[1]):
+			pair[1].mending = 0
+		bandage_changed.emit(pair[0], pair[1], &"interrupted")
+	keys = _channels.keys()
+	jobs = _channels.values()
+	var channels: Dictionary[GridEntity, Dictionary] = {}
+	var ending: Array = []
+	for i in keys.size():
+		if not is_instance_valid(keys[i]) or not is_instance_valid(jobs[i]["body"]):
+			continue
+		channels[keys[i]] = jobs[i]
+		if keys[i] == entity or jobs[i]["body"] == entity:
+			ending.append(keys[i])
+	_channels = channels
+	for by: GridEntity in ending:
+		_end_channel(by, &"broken")
 
 
 ## Spawn grace: for [param ticks], or until it moves or attacks, monsters do
