@@ -1514,13 +1514,13 @@ func _test_field_return() -> void:
 	var whose := "player:" + id
 	_check(_main._downed(owner, null, &"attack") == 0 and _main._downed(pet, null, &"attack") == 0, "unblessed: nobody goes down, they fall as ever")
 	_put(pet, owner.tile + Vector2i(1, 0))
-	_check(_main.barrow_won([id], "easy") == 1 and "draugr" in record.marks and Economy.barrow_tokens(record.barrow) == 5 and record.barrow.get("best") == "easy",
+	_check(_main.barrow_won([id], "easy") == 1 and "draugr" in record.marks and World.totem_charges(World.totem_of(id)) == 5 and record.barrow.get("best") == "easy",
 		"the draugr laid to rest at the easy deal: the player marked, 5 charges (%s)" % [record.barrow])
 	_check(not World.carries_bound(owner, "barrow_half", whose) and not World.carries_bound(pet, "return_token", whose)
 		and "draugr" in record.companion.get("marks", []), "no device minted (573); the mark to her, beside them")
 	_check(pet.grown.facts.any(func(fact: Dictionary) -> bool: return "laid the draugr to rest" in str(fact.get("text", ""))), "and it is a fact of hers")
 	_main.barrow_won([id], "easy")
-	_check(Economy.barrow_tokens(record.barrow) == 10 and owner.charges == 10 and owner.charge_room == 25,
+	_check(World.totem_charges(World.totem_of(id)) == 10 and owner.charges == 10 and owner.charge_room == 25 and World.soulbound(World.totem_of(id)),
 		"laid to rest again: the charges add up, and the player carries the count and the room (%d of %d)" % [owner.charges, owner.charge_room])
 	var saved := PlayerRecord.from_dict(JSON.parse_string(JSON.stringify(record.to_dict())))
 	_check(saved.barrow == record.barrow and "draugr" in saved.companion.get("marks", []), "the count and her mark are kept through a save and a load")
@@ -1531,7 +1531,7 @@ func _test_field_return() -> void:
 	World.damage(owner, 5, imp, &"attack")
 	_check(owner.hp == 1 and not imp._nearest_visible_target() == owner, "no blow lands on the downed, and no foe minds them")
 	_step_until(func() -> bool: return not World.is_downed(owner), 120)
-	_check(not World.is_downed(owner) and owner.spawned and owner.hp == roundi(owner.max_hp * 0.5) and int(record.barrow["tokens"]) == 9,
+	_check(not World.is_downed(owner) and owner.spawned and owner.hp == roundi(owner.max_hp * 0.5) and World.totem_charges(World.totem_of(id)) == 9,
 		"she goes to them and brings them back: half their hp, one charge spent (%d hp, %s)" % [owner.hp, record.barrow])
 	# She downed: her player brings her back by holding E on her.
 	World.despawn(imp)
@@ -1547,10 +1547,10 @@ func _test_field_return() -> void:
 	_put(owner, pet.tile + Vector2i(-1, 0))
 	_main._on_command(owner, "bandage", {"target": str(pet.get_path())})
 	_step_until(func() -> bool: return not World.is_downed(pet), 80)
-	_check(not World.is_downed(pet) and int(record.barrow["tokens"]) == 8 and _player().charges == 8, "held still: she is back, another charge spent, the count told (%s)" % [record.barrow])
+	_check(not World.is_downed(pet) and World.totem_charges(World.totem_of(id)) == 8 and _player().charges == 8, "held still: she is back, another charge spent, the count told (%d)" % World.totem_charges(World.totem_of(id)))
 	# Out of charges (573): still downed, for anyone blessed with a charge to
 	# bring back; she knows she cannot.
-	record.barrow["tokens"] = 0
+	World.items.set_charges(World.totem_of(id), 0)
 	_check(_main._downed(owner, null, &"attack") > 0 and _main._downed(pet, null, &"attack") > 0 and not _main._can_revive(pet, record),
 		"the count spent: still downed, for someone else's charge; she cannot bring them back")
 	pet._exchange.clear()
@@ -1558,7 +1558,7 @@ func _test_field_return() -> void:
 	_check(pet._exchange.any(func(turn: Dictionary) -> bool: return "You cannot bring them back; someone blessed, with a charge, may." in str(turn["text"])),
 		"her player down with no charge: she is told so")
 	# The window runs out: the fall as ever.
-	record.barrow["tokens"] = 2
+	World.items.set_charges(World.totem_of(id), 2)
 	World.damage(owner, owner.hp, null, &"attack")
 	owner.downed_until = World.tick + 1
 	pet.can_revive = func() -> bool: return false
@@ -1567,9 +1567,10 @@ func _test_field_return() -> void:
 	_step_until(func() -> bool: return _player() != null, 60)
 	_main._join_companion(record, _player())
 	pet.can_revive = func() -> bool: return _main._can_revive(pet, record)
-	# Leave things as they were.
+	# Leave things as they were (the totem stays, bound for life, emptied).
 	record.marks.erase("draugr")
 	record.barrow = {}
+	World.items.set_charges(World.totem_of(id), 0)
 	record.companion.erase("marks")
 	for entity: GridEntity in [_player(), pet]:
 		var kept := entity.slots.duplicate()
@@ -1920,10 +1921,13 @@ func _test_loyalty() -> void:
 	else:
 		_check(false, "a cell out of her hearing to stand her player in")
 	var barrow := record.barrow
-	record.barrow = {"tokens": 2, "best": "normal", "containers": []}  # 573: the charges.
+	record.barrow = {"best": "normal", "containers": []}  # 573 amended: the charges on the totem.
+	var totem := World.mint_totem(owner)
+	World.items.set_charges(totem, 2)
 	_main._bond_fell(pet, &"bled")
 	_check(score.call() == -3 and newest.call() == "you let her bleed out", "bled out with her blessed player near: let bleed (%d)" % score.call())
 	record.barrow = barrow
+	World.items.set_charges(totem, 0)
 	_main._guide_refused[Net.player_id] = {"test/x": {"day": Townsfolk.day_of(World.steps), "reason": "", "as_far": {}, "area": String(World.zone.name)}}
 	_main._bond_warned(pet)
 	_main._bond_warned(pet)

@@ -21554,7 +21554,12 @@ This is dungeon's side.
   before, and drops "tokens"); the win line is Jeff's; Main.barrow_won
   mints and adds, _sync_charges and charges_in_zone read the totem
   (World.totem_charges of World.totem_of); the field return reads it
-  (companions'). The look of a held door is the Door's own replicated lock.
+  (companions': _uses_left and the spend read the totem, carried here so
+  main never has two sources; Main.migrate_totem runs on every join).
+  Economy.barrow_migrated reads the new shape (best and containers with
+  no count) as 573's own, keeping a saved count for the join's migration;
+  it took a record without "tokens" for the old form. The look of a held
+  door is the Door's own replicated lock.
 
 level_test _test_hall_door; labyrinth_test (the hall's one door on layer
 3). Protocol unchanged (a Door's open and lock replicate already); no new

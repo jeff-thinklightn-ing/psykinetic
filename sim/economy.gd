@@ -1284,10 +1284,16 @@ static func barrow_spend(barrow: Dictionary) -> bool:
 ## difficulty, day}) becomes {tokens: uses, best: difficulty, containers}
 ## ("easy" for a blessed one with uses and no difficulty).
 static func barrow_migrated(saved: Dictionary) -> Dictionary:
-	if saved.has("tokens"):
+	if saved.has("tokens") or saved.has("best") or saved.has("containers"):
+		# 573's shape, with or without a count: since 573 amended the Draugr's
+		# Totem holds the charges and the record keeps best and containers; a
+		# "tokens" count still saved is kept for Main.migrate_totem on the join.
 		var containers: Variant = saved.get("containers", [])
-		return {"tokens": maxi(int(saved["tokens"]), 0), "best": str(saved.get("best", "")),
+		var out := {"best": str(saved.get("best", "")),
 			"containers": (containers as Array).map(func(each: Variant) -> String: return str(each)) if containers is Array else []}
+		if saved.has("tokens"):
+			out["tokens"] = maxi(int(saved["tokens"]), 0)
+		return out
 	var uses := maxi(int(saved.get("uses", 0)), 0)
 	var best := str(saved.get("difficulty", ""))
 	if best.is_empty() and (uses > 0 or saved.has("of")):

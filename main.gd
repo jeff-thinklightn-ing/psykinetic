@@ -4248,6 +4248,7 @@ func _join_player(peer: int, id: String, player_name: String, respawn := false, 
 	Net.interest.centre(peer, World.zone.name, player.tile)
 	_players[peer] = player
 	_peer_ids[peer] = id
+	migrate_totem(record)  # A count from before 573 amended onto the totem (items').
 	_sync_charges(record)
 	_living_came(player)
 	_fell_at.erase(peer)
@@ -4991,7 +4992,9 @@ func _field_rules() -> Dictionary:
 ## decisions 544 and 573): each player of [param player_ids] standing alive
 ## is blessed if not yet (marked BLESSED, for good) and takes the charges of
 ## [param deal] (easy, normal or hard: economy's return.field deals) up to
-## their capacity (Economy.barrow_won; over it, lost and said); their
+## their capacity onto their Draugr's Totem (573 amended: World.mint_totem
+## at the first win, World.totem_add; over it, lost and said; the record
+## keeps best and containers, Economy.barrow_won raising best); their
 ## companion, standing alive in the same zone and not downed, is blessed
 ## too, with the fact and the bond. Nothing is minted (573: the charges are
 ## a count on the record, no item). How many players were blessed.
@@ -5007,12 +5010,18 @@ func barrow_won(player_ids: Array, deal: String) -> int:
 		var first := not BLESSED in record.marks
 		var won: Dictionary = Economy.barrow_won(record.barrow, deal, field)
 		record.barrow = won["barrow"]
+		# The Draugr's Totem holds the charges (573 amended, items' side): the
+		# record keeps best and containers alone.
+		record.barrow.erase("tokens")
+		var uid := World.mint_totem(player)
+		var given := Economy.field_tokens(deal, field)
+		var took := World.totem_add(uid, given, Economy.barrow_capacity(record.barrow, field))
 		_sync_charges(record)
 		blessed += 1
 		var line := "The draugr yields. %s %stakes %d charges (%d of %d)." % [record.name, "is blessed and " if first else "",
-			int(won["took"]), Economy.barrow_tokens(record.barrow), Economy.barrow_capacity(record.barrow, field)]
-		if int(won["spilled"]) > 0:
-			line += " The dead's gift spills: %d more than they can hold." % int(won["spilled"])
+			took, World.totem_charges(uid), Economy.barrow_capacity(record.barrow, field)]
+		if given - took > 0:
+			line += " The dead's gift spills: %d more than they can hold." % (given - took)
 		party_log.add(line)
 		grant_capability(BLESSED, [id])  # The mark, hers too (decision 576's catalog).
 	return blessed
@@ -5151,9 +5160,7 @@ func charges_in_zone(zone_name: String) -> int:
 	var total := 0
 	for peer: int in _peer_ids:
 		if World.peer_zone.get(peer, "") == zone_name:
-			var record: PlayerRecord = _records.get(_peer_ids[peer])
-			if record != null:
-				total += Economy.barrow_tokens(record.barrow)
+			total += World.totem_charges(World.totem_of(_peer_ids[peer]))
 	return total
 
 
@@ -5182,7 +5189,7 @@ func migrate_totem(record: PlayerRecord) -> int:
 func _sync_charges(record: PlayerRecord) -> void:
 	var player: Player = _players.get(_peer_of(record.player_id))
 	if is_instance_valid(player):
-		player.charges = Economy.barrow_tokens(record.barrow)
+		player.charges = World.totem_charges(World.totem_of(record.player_id))
 		player.charge_room = Economy.barrow_capacity(record.barrow, _field_rules())
 
 
@@ -5260,9 +5267,10 @@ func _can_revive(pet: Companion, record: PlayerRecord) -> bool:
 	return _blessed(pet) and _uses_left(record) > 0
 
 
-## Charges left on [param record]'s count (decision 573; "uses" before).
+## Charges left on [param record]'s Draugr's Totem (573 amended; the
+## record's count before, "uses" before that).
 static func _uses_left(record: PlayerRecord) -> int:
-	return Economy.barrow_tokens(record.barrow) if record != null else 0
+	return World.totem_charges(World.totem_of(record.player_id)) if record != null else 0
 
 
 ## World.downed (decision 544): a blessed body lies downed for the field
@@ -5312,7 +5320,7 @@ func _on_channel(by: GridEntity, body: GridEntity, state: StringName) -> void:
 		party_log.add("%s's return of %s is broken." % [_display_name(by) if is_instance_valid(by) else "Someone", _display_name(body)])
 	elif state == &"done":
 		var record := _blessing_record(by)
-		if record == null or not Economy.barrow_spend(record.barrow):
+		if record == null or not World.totem_spend(World.totem_of(record.player_id)):
 			return
 		_sync_charges(record)
 		World.raise_downed(body, roundi(body.max_hp * float(_field_rules().get("hp", 0.5))))
@@ -8572,7 +8580,7 @@ func _bond_fell(entity: GridEntity, cause: StringName) -> void:
 	if record == null:
 		return
 	if cause == &"bled":
-		if _near_keeper(pet) and Economy.barrow_tokens(record.barrow) > 0:
+		if _near_keeper(pet) and World.totem_charges(World.totem_of(record.player_id)) > 0:
 			_bond(record, "let_bleed", "let you bleed out")
 	elif not _near_keeper(pet):
 		_bond(record, "left_alone", "left you to fall alone")
