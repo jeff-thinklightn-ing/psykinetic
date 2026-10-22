@@ -56,6 +56,7 @@ var _work: Production
 var _towns: Towns
 var _reports: Array[Dictionary] = []
 var _changed: Array[String] = []
+var _last_state := {}
 
 
 func _ready() -> void:
@@ -86,7 +87,12 @@ func _fresh() -> void:
 	_towns = Towns.new({}, _work, RULES, clock)
 	_towns.raided.connect(func(town: String, report: Dictionary) -> void: _reports.append(report))
 	_towns.building_changed.connect(func(_town: String, kind: String) -> void:
-		_changed.append("%s %s" % [kind, _towns.building(_town, kind)["state"]]))
+		# Each building's change of state: a build's or a repair's stages
+		# (decision 566) tell the views again in the same state.
+		var state := str(_towns.building(_town, kind).get("state", ""))
+		if not kind.is_empty() and _last_state.get(kind) != state:
+			_last_state[kind] = state
+			_changed.append("%s %s" % [kind, state]))
 
 
 func _at(step: int) -> void:
@@ -186,7 +192,7 @@ func _test_repair() -> void:
 	_check(_towns.building(TOWN, "walls")["state"] == Towns.STANDING and _towns.defence(TOWN) == 6.0,
 		"the walls stand: defence 6 (Bram is away)")
 	_check(_changed.slice(-4) == ["walls damaged", "forge damaged", "forge standing", "walls standing"]
-		and _towns.buildings_of(TOWN) == {"walls": {"state": "standing", "level": 1}, "forge": {"state": "standing", "level": 1}},
+		and _towns.buildings_of(TOWN) == {"walls": {"state": "standing", "level": 1, "walls": true}, "forge": {"state": "standing", "level": 1, "walls": true}},
 		"building_changed told each damage and repair; buildings_of for the views (%s)" % [_changed])
 
 

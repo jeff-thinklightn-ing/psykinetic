@@ -235,6 +235,10 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## 29: a level may carry "waters" and "roads", curves its water and road
 ## cells are rasterised from on load (Curves) and the views draw from, in
 ## the "terrain" message's files and the levels served (decision 559).
+## 29 (566, economy's side): the "town" message's buildings carry
+## "progress" (0..1) while a job builds, raises or repairs one and
+## "walls" (Towns.walls_up), and the message carries "awake" {map building
+## code: bool}.
 const PROTOCOL_REVISION := 29
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]

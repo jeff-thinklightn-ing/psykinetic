@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The town tells your game how far each building is built, whether its walls stand yet, and which houses are awake, so building work can be drawn in stages and lit windows go dark at night (566).
 - Townsfolk are seen at their work (566, npc's side): the woodcutter walks out to the woodlot and chops, and carries a log home; the carpenter saws at the woodpile and hammers inside the house he is building; at night everyone lies down to sleep. The clips, the tools, the half-built houses and the lamps going out follow from pc-character, art-kit, buildings and economy under the same number. Server and client: the protocol moves, so update through the launcher.
 - Rivers are drawn from their own curves: smooth bends with no tile edges or squares inside the water, the banks and riverbed following the curve, its ford a shallow stretch and its fall white water (559).
 - A resident you click turns to you where they stand, shuffling round rather than spinning, looks you in the face and talks while they address you (560).

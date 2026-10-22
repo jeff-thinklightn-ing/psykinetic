@@ -100,11 +100,36 @@ func _test_rescues_and_the_forge() -> void:
 	_check(job.get("state") == "working" and job.get("worker") == "dag" and _stock.count(TOWN, "wood") == 50
 		and _stock.count(TOWN, "ore") == 25, "Dag starts on it at once, taking 10 wood and 5 ore (%s)" % [job])
 	_check(not _towns.allows({"trade": "smith", "town": TOWN}), "no forge stands yet: a smith's workshop may not work")
+	# Seen being built (decision 566): progress, the walls stage, told again at each stage.
+	var told: Array[String] = []
+	var on_told := func(_town: String, kind: String) -> void: told.append(kind)
+	_towns.building_changed.connect(on_told)
+	_check(is_equal_approx(float(_towns.buildings_of(TOWN)["forge"].get("progress", -1.0)), 0.0) and not _towns.walls_up(TOWN, "forge"),
+		"planned and begun: progress 0, no walls yet (%s)" % [_towns.buildings_of(TOWN)["forge"]])
+	_at(1800)
+	_towns._stages(TOWN)  # (The tick reads the stage before the work moves on: here after.)
+	var at_frame := told.size()
+	_check(is_equal_approx(_towns.build_progress(TOWN, "forge"), 0.3) and not _towns.walls_up(TOWN, "forge") and at_frame >= 1 and told.has("forge"),
+		"at 1800: 0.3 built, past the frame (0.1) so the views are told, no walls (%.2f, %s)" % [_towns.build_progress(TOWN, "forge"), told])
+	_at(2400)
+	_towns._stages(TOWN)
+	_check(_towns.walls_up(TOWN, "forge") and _towns.buildings_of(TOWN)["forge"]["walls"] == true and told.size() == at_frame + 1,
+		"at 2400: 0.4, past the walls stage: walls up, told again")
+	_at(2650)
+	_towns._stages(TOWN)
+	_check(told.size() == at_frame + 1, "nothing more to tell at 0.44")
+	var before_awake := told.size()
+	_towns.set_awake(TOWN, "H3", true)
+	_towns.set_awake(TOWN, "H3", true)
+	_towns.set_awake(TOWN, "H4", false)
+	_check(_towns.awake_of(TOWN) == {"H3": true, "H4": false} and told.size() == before_awake + 2, "awake by map building, told on each change only (%s)" % [_towns.awake_of(TOWN)])
+	_towns.building_changed.disconnect(on_told)
 	_at(5700)
 	_check(_towns.building(TOWN, "forge")["state"] == Towns.PLANNED, "at 5700, still being built")
 	_at(6000)
 	_check(_towns.building(TOWN, "forge").get("state") == Towns.STANDING and _towns.building(TOWN, "forge")["level"] == 1,
 		"at 6000 the forge stands, level 1")
+	_check(not _towns.buildings_of(TOWN)["forge"].has("progress") and _towns.walls_up(TOWN, "forge"), "standing: no progress, walls up")
 	_check(_work.workshop_of("bram") == "%s:forge" % TOWN, "Bram works at it (%s)" % _work.workshop_of("bram"))
 	var forge_shop := "%s:forge" % TOWN
 	var sword := _work.job(int(_work.workshop(forge_shop)["job"]))

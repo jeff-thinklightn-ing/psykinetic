@@ -340,10 +340,16 @@ func _test_sites() -> void:
 	var walk := _work.site_walk(STORE, _work.site_of(STORE, "woodcutter"))
 	_check(walk == 2 * ceili(26.0 * 4), "the walk there and back: %d steps" % walk)
 	_check(_work.site_turn(STORE, "wc", "woodcutter") == Production.WALKING and _work.outside("wc"), "due: off to the woodlot, outside the walls")
+	var trip := _work.trip("wc")
+	_check(str(trip.get("site", {}).get("id", "")) == "pt_town/woodlot" and int(trip.get("from", -1)) == 0 and int(trip.get("back_at", -1)) == walk,
+		"the trip (decision 566): to the woodlot, from 0, back at %d (%s)" % [walk, trip])
+	var saved: Dictionary = JSON.parse_string(JSON.stringify(_work.to_dict()))
+	_check(int(saved.get("trip_from", {}).get("wc", -1)) == 0, "its start saved")
 	_now = walk - 1
 	_check(_work.site_turn(STORE, "wc", "woodcutter") == Production.WALKING, "still on the way")
 	_now = walk
-	_check(_work.site_turn(STORE, "wc", "woodcutter") == Production.BACK and not _work.outside("wc"), "back: the wood comes in")
+	_check(_work.site_turn(STORE, "wc", "woodcutter") == Production.BACK and not _work.outside("wc") and _work.trip("wc").is_empty(),
+		"back: the wood comes in, no trip")
 	_check(_work._safety(STORE, 0) == Production.SAFE, "the town holds its sites: safe")
 	_holdings.take("pt_town/woodlot", "goblins")
 	_check(_work.site_turn(STORE, "wc", "woodcutter") == Production.BLOCKED and not _work.site_works(STORE, "woodcutter"),

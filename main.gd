@@ -416,6 +416,9 @@ var _client3d: Client3D
 ## Town id -> {kind: {state, level}}: the towns' buildings as the server
 ## last told ("town", decision 297), for the view's buildings.
 var town_states := {}
+## Town id -> {map building code: awake} as the server last told ("town"
+## "awake", decision 566), for the window light; the view's set_awake.
+var town_awake := {}
 ## Each level's damaged roofs (their indices) as this client was last told
 ## ("roofs", decision 383), for the view.
 var roof_states := {}
@@ -3921,7 +3924,7 @@ func _join_player(peer: int, id: String, player_name: String, respawn := false, 
 ## repaired (Towns.building_changed): every peer, and this one, is told the
 ## town's buildings ("town" {town, buildings}).
 func _on_town_building_changed(town: String, _kind: String) -> void:
-	Net.broadcast("town", {"town": town, "buildings": World.towns.buildings_of(town)})
+	Net.broadcast("town", {"town": town, "buildings": World.towns.buildings_of(town), "awake": World.towns.awake_of(town)})
 	World.open_roofs(town.get_slice("/", 0))
 
 
@@ -3961,7 +3964,7 @@ func _send_towns(peer: int, zone_name: String) -> void:
 		return
 	for town: String in World.towns.to_dict():
 		if town.begins_with(zone_name + "/"):
-			Net.message_to(peer, "town", {"town": town, "buildings": World.towns.buildings_of(town)})
+			Net.message_to(peer, "town", {"town": town, "buildings": World.towns.buildings_of(town), "awake": World.towns.awake_of(town)})
 
 
 ## The view's buildings drawn as their towns have them: the server's own
@@ -7227,6 +7230,10 @@ func _on_message(kind: String, data: Dictionary) -> void:
 	if kind == "town":
 		var town := str(data.get("town", ""))
 		var buildings: Variant = data.get("buildings", {})
+		if not town.is_empty() and data.get("awake") is Dictionary:
+			town_awake[town] = data["awake"]
+			if _client3d != null and _client3d.has_method("set_awake"):
+				_client3d.call("set_awake", town, data["awake"])
 		if not town.is_empty() and buildings is Dictionary:
 			town_states[town] = buildings
 			World.towns_seen[town] = buildings

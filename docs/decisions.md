@@ -19293,3 +19293,38 @@ npc's side:
   halves against a stand-in trip and a woodlot, the carpenter's cells by
   progress, the awake map. Server and client: the hash moves; no new
   class_name.
+## 566, economy's side: visible work's readers and the "town" message
+
+Jeff: "town people need to be doing activities to better the town, chopping
+wood, going hunting, building a half constructed building, sleeping at
+night." npc leads the design (566, npc's side: the bodies' activity), on
+the rule that a body is only the visible version of work the production
+tick already does: no yield or clock moves. Economy gives the readers.
+- Production.trip(worker_id) -> {site, from, back_at}, or {} when not on a
+  trip (521's walk to the site and back). The start is kept in _trip_from
+  and saved ("trip_from"). The outbound half is from to the midpoint, and
+  the yield comes in at back_at, as before. Production.outside is
+  unchanged.
+- Towns.build_progress(town, use) -> 0..1: worked / needed of the job that
+  builds, raises or repairs it (a "planned" first build starts at 0, a
+  raise is "building", a repair is "damaged"); -1 with no job.
+- Towns.walls_up(town, use): standing or damaged, or a level already up,
+  or built to BUILD_STAGES[1] (0.35). The coordinator's ruling: wall edges
+  block only from the walls stage. Maps' World.open_walls reads it, on
+  server and client.
+- Towns.BUILD_STAGES [0.1, 0.35, 0.45, 0.55, 0.65, 0.75, 0.9] are
+  buildings' stages (frame, walls, the walls' steps, rafters, covering),
+  which its composer reads. Towns._stages, each tick, emits
+  building_changed when a build crosses one, so the "town" message is
+  resent then and at the job's end, not every step.
+- Towns.set_awake(town, code, awake) / awake_of(town): npc's bodies set
+  whether a map building's people (by decision 537's code, "H3") are
+  awake, for buildings' window light, per house. It is not saved, and
+  building_changed fires only on a flip.
+- The "town" message: each building carries "walls" and, while a job is
+  on it, "progress"; the message carries "awake" {code: bool}. The client
+  keeps Main.town_awake and calls Client3D.set_awake if it has it. This
+  is a line under the shared PROTOCOL_REVISION 29.
+Phase 2 (field_work, shearing) is 566 amended, later. towns_test (progress,
+the stages told, walls_up, awake), production_test (trip, its start
+saved). No new class_name.

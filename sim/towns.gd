@@ -46,6 +46,11 @@ const DAMAGED := "damaged"
 const LOG_SIZE := 50
 ## A repair job's building id: REPAIR + the kind.
 const REPAIR := "repair:"
+## The build progress at which the views are told again (decision 566: a
+## building drawn in stages; buildings' composer reads them): the frame, the
+## walls (BUILD_STAGES[1]: from it they stand and block, walls_up, the
+## coordinator's ruling), the walls' steps, the rafters, the covering.
+const BUILD_STAGES: Array[float] = [0.1, 0.35, 0.45, 0.55, 0.65, 0.75, 0.9]
 ## A roof's build job's id prefix: "roof:<index>" (decision 426).
 const ROOF := "roof:"
 
@@ -101,6 +106,8 @@ var mend_roof := Callable()
 ## captives: Array[{id, name, trade, origin, purse, taken_at, by,
 ## held_by}], log: Array[{step, what}]}.
 var _towns: Dictionary[String, Dictionary] = {}
+## Town id -> {map building code: awake} (set_awake; not saved).
+var _awake: Dictionary = {}
 
 
 func _init(saved := {}, with_production: Production = null, with_rules := {}, with_clock := Callable()) -> void:
@@ -145,15 +152,73 @@ func building(town: String, kind: String) -> Dictionary:
 	return _towns.get(town, {}).get("buildings", {}).get(kind, {}).duplicate(true)
 
 
-## Every building of [param town]: kind -> {state, level}, for the views.
+## Every building of [param town]: kind -> {state, level, walls
+## (walls_up)}, for the views; "progress" (build_progress) while a job
+## builds, raises or repairs it (decision 566).
 func buildings_of(town: String) -> Dictionary:
 	var out := {}
 	var houses: Dictionary = _towns.get(town, {}).get("buildings", {})
 	for kind: String in houses:
 		out[kind] = {"state": houses[kind]["state"], "level": houses[kind]["level"]}
+		var progress := build_progress(town, kind)
+		if progress >= 0.0:
+			out[kind]["progress"] = progress
+		out[kind]["walls"] = walls_up(town, kind)  # Whether its walls block (566; maps' open_walls).
 	if out.has("field"):
 		out["field"]["crop"] = crop_look(town)  # The field's look (decision 457).
 	return out
+
+
+## How far [param town]'s [param kind] is built (decision 566: visible
+## work): its job's worked / needed steps, 0..1, while one builds it (a
+## planned one, a raise: "building", a repair: "damaged"); -1 with no job.
+func build_progress(town: String, kind: String) -> float:
+	var job_id := int(_towns.get(town, {}).get("buildings", {}).get(kind, {}).get("job", 0))
+	var job := production.job(job_id) if job_id != 0 else {}
+	if job.is_empty():
+		return -1.0
+	return clampf(float(job.get("worked", 0)) / maxf(float(job.get("needed", 0)), 1.0), 0.0, 1.0)
+
+
+## Whether [param town]'s [param kind] has walls that block (566, the
+## coordinator's ruling: from the walls stage): standing or damaged, or a
+## level already up (a raise), or built to BUILD_STAGES[1].
+func walls_up(town: String, kind: String) -> bool:
+	var house := building(town, kind)
+	if house.is_empty():
+		return false
+	if house["state"] in [STANDING, DAMAGED] or int(house["level"]) >= 1:
+		return true
+	return build_progress(town, kind) >= BUILD_STAGES[1]
+
+
+## Each building of [param town] whose build crossed one of BUILD_STAGES since
+## the views were last told: told again (building_changed).
+func _stages(town: String) -> void:
+	var houses: Dictionary = _towns.get(town, {}).get("buildings", {})
+	for kind: String in houses:
+		var progress := build_progress(town, kind)
+		var stage := BUILD_STAGES.filter(func(at: float) -> bool: return progress >= at).size() if progress >= 0.0 else -1
+		if stage != int(houses[kind].get("stage", -1)):
+			houses[kind]["stage"] = stage
+			if progress >= 0.0:
+				building_changed.emit(town, kind)
+
+
+## Whether the people of map building [param code] (its decision 537 code,
+## "H3") of [param town] are awake (decision 566: npc's bodies set it, the
+## window light reads it). Not saved: the bodies set it again.
+func set_awake(town: String, code: String, awake: bool) -> void:
+	var told: Dictionary = _awake.get_or_add(town, {})
+	if told.get(code) == awake:
+		return
+	told[code] = awake
+	building_changed.emit(town, "")
+
+
+## [param town]'s map buildings as set_awake left them: code -> bool.
+func awake_of(town: String) -> Dictionary:
+	return _awake.get(town, {}).duplicate()
 
 
 ## How many times worker [param worker_id] has been carried off by
@@ -376,6 +441,7 @@ func tick() -> void:
 		_water(town)
 		_crop(town)
 		_crop_shown(town)
+		_stages(town)
 		_farmer_comes(town)
 		_flock_turn(town)
 		_shepherd_comes(town)

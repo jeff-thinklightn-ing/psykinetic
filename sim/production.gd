@@ -99,6 +99,8 @@ var town_pays := Callable()
 ## Workers on the way to or at their trade's site: worker id -> the step
 ## they are back (decision 521).
 var _trips: Dictionary = {}
+## When each trip set out: worker id -> step (visible work: its outbound half).
+var _trip_from: Dictionary = {}
 ## Each site's last state said (decision 521): site id -> why ("" worked).
 var _site_said: Dictionary = {}
 ## (town, worker_id, what, count, why) -> bool: a gatherer's delivery to
@@ -1194,6 +1196,7 @@ func site_turn(town: String, id: String, trade: String) -> String:
 	var site := site_of(town, trade)
 	if site.is_empty():
 		_trips.erase(id)
+		_trip_from.erase(id)
 		return NO_SITE
 	var why := site_blocked(town, site)
 	if why != str(_site_said.get(site["id"], "")):
@@ -1205,17 +1208,38 @@ func site_turn(town: String, id: String, trade: String) -> String:
 			print("[production] %s's %s is %s: %s gets nothing from it, step %d" % [town, site["kind"].replace("_", " "), why, who, now()])
 	if not why.is_empty():
 		_trips.erase(id)
+		_trip_from.erase(id)
 		return BLOCKED
 	if not _trips.has(id):
 		var walk := site_walk(town, site)
 		if walk <= 0:
 			return BACK
 		_trips[id] = now() + walk
+		_trip_from[id] = now()
 		return WALKING
 	if now() < int(_trips[id]):
 		return WALKING
 	_trips.erase(id)
+	_trip_from.erase(id)
 	return BACK
+
+
+## Worker [param worker_id]'s trip to their trade's site (visible work: the
+## body goes there and back): {site (the Holdings place), from (the step it
+## set out), back_at (the step it is home, its yield then)}; {} when not on
+## one. The outbound half is from to (from + back_at) / 2.
+func trip(worker_id: String) -> Dictionary:
+	if not _trips.has(worker_id):
+		return {}
+	var worker_record: Dictionary = _workers.get(worker_id, {})
+	var site := {}
+	for trade: Variant in worker_record.get("trades", []):
+		site = site_of(str(worker_record.get("town", "")), str(trade))
+		if not site.is_empty():
+			break
+	var back_at := int(_trips[worker_id])
+	var from := int(_trip_from.get(worker_id, back_at - site_walk(str(worker_record.get("town", "")), site) if not site.is_empty() else back_at))
+	return {"site": site, "from": from, "back_at": back_at}
 
 
 ## Whether [param town]'s [param trade] may work its site now: no site, or
@@ -1662,7 +1686,7 @@ func to_dict() -> Dictionary:
 		var window := int(rules.get("window", 6000))
 		state["sales"] = state["sales"].filter(func(sale: Dictionary) -> bool: return int(sale["step"]) >= now() - window)
 		towns[town] = state
-	return {"earned": _earned.duplicate(), "trips": _trips.duplicate(), "workers": _workers.duplicate(true), "workshops": _workshops.duplicate(true), "jobs": saved_jobs,
+	return {"earned": _earned.duplicate(), "trips": _trips.duplicate(), "trip_from": _trip_from.duplicate(), "workers": _workers.duplicate(true), "workshops": _workshops.duplicate(true), "jobs": saved_jobs,
 		"next_job": _next_job, "towns": towns}
 
 
@@ -1744,6 +1768,11 @@ func from_dict(saved: Dictionary) -> void:
 	if trips is Dictionary:
 		for id: Variant in trips:
 			_trips[str(id)] = int(trips[id])
+	var trip_from: Variant = saved.get("trip_from", {})
+	if trip_from is Dictionary:
+		for id: Variant in trip_from:
+			if _trips.has(str(id)):
+				_trip_from[str(id)] = int(trip_from[id])
 	var saved_jobs: Variant = saved.get("jobs", {})
 	if saved_jobs is Dictionary:
 		for key: Variant in saved_jobs:
