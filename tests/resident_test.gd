@@ -1894,7 +1894,9 @@ func _test_visible_work() -> void:
 	World.holdings._holder[lot] = "town"
 	World.holdings._strength[lot] = 1
 	World.holdings._since[lot] = World.steps
-	mara.trade = "woodcutter"
+	World.production.retrain("rs-mara", "woodcutter")  # The worker's trade, which the body follows on the sync (566 amended, part 3).
+	_sync()
+	_check(mara.trade == "woodcutter", "retrained, her body follows the trade (%s)" % mara.trade)
 	var site: Dictionary = World.production.site_of(STORE, "woodcutter")
 	_check(not site.is_empty() and site.get("id") == lot, "(economy's site_of finds the woodlot)")
 	var spot: Dictionary = _main._site_spot(site, STORE)
@@ -1969,7 +1971,8 @@ func _test_visible_work() -> void:
 	World.holdings._strength.erase(lot)
 	World.holdings._since.erase(lot)
 	_main._site_spots.clear()
-	mara.trade = "cook"
+	World.production.retrain("rs-mara", "cook")
+	_sync()
 	# The carpenter's cells by progress.
 	var rect := Rect2i(mara.tile + Vector2i(6, 6), Vector2i(4, 3))
 	var saw: Dictionary = _main._build_task(rect, Vector2i(0, 1), 0.05)

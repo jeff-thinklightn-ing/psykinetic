@@ -5135,6 +5135,11 @@ func _sync_residents() -> void:
 		if wanted.has(body.worker_id):
 			have[body.worker_id] = true
 			body.places = wanted[body.worker_id]["places"]
+			# A retrained worker's body follows its trade (Pip to acolyte, a soak's retrain; 566 amended: the
+			# work tick reads it), its label the spawn's until it stands again.
+			var trade := str(wanted[body.worker_id].get("trade", ""))
+			if not trade.is_empty() and body.trade != trade:
+				body.trade = trade
 		else:
 			_travelling = true
 			World.despawn(body)

@@ -29,6 +29,9 @@ var _done_lines: Array = []
 var _songs: Array = []
 var _stints := {}  # worker id -> {doing: true}
 var _hours_seen := 0
+## The visible work seen (566 amended): activity -> {"name tile facing": samples}, sampled every WORK_EVERY steps.
+var _work := {}
+const WORK_EVERY := 20
 var _out := ""
 ## --ask: the words soak. Each day one player asks each resident one of the
 ## usual things, in rotation, and the loop waits for the answer (the
@@ -205,6 +208,8 @@ func _run() -> void:
 	var next_hour := 0
 	for s in steps:
 		World.step()  # Main syncs the bodies and ticks the town on World.ticked.
+		if s % WORK_EVERY == 0:
+			_sample_work()
 		if s >= next_hour:
 			next_hour += HOUR
 			await get_tree().process_frame
@@ -220,6 +225,18 @@ func _run() -> void:
 
 func _count(key: String, by := 1) -> void:
 	_counts[key] = int(_counts.get(key, 0)) + by
+
+
+## Each body's activity where it shows it (566 amended): a chop should stand
+## beside the woodlot's block facing it, a carried log end beside the pile.
+func _sample_work() -> void:
+	for entity in World.townsfolk():
+		var body := entity as Resident
+		if body == null or body.activity.is_empty():
+			continue
+		var seen: Dictionary = _work.get_or_add(body.activity, {})
+		var where := "%s %s %s" % [body.person, body.tile, body.facing]
+		seen[where] = int(seen.get(where, 0)) + 1
 
 
 ## Every hour of the day: where the players stand (the inn of an evening,
@@ -465,6 +482,12 @@ func _report(days: int) -> void:
 	for key: String in keys:
 		print("SOAK count %s %d" % [key, _counts[key]])
 	print("SOAK offered by kind %s" % [_offered])
+	var kinds: Array = _work.keys()
+	kinds.sort()
+	for kind: String in kinds:
+		var places: Array = _work[kind].keys()
+		places.sort_custom(func(a: String, b: String) -> bool: return int(_work[kind][a]) > int(_work[kind][b]))
+		print("SOAK work %s: %d samples at %s" % [kind, _work[kind].values().reduce(func(acc: int, n: int) -> int: return acc + n, 0), places.slice(0, 6).map(func(p: String) -> String: return "%s x%d" % [p, _work[kind][p]])])
 	var ledger := World.stockpile.ledger(TOWN).map(func(line: Dictionary) -> String: return "%s %s" % [line.get("by", ""), line.get("from", "")])
 	print("SOAK tally %s" % [Townsfolk.tally])  # The side-doings' own count: the store's ledger keeps only its last lines.
 	print("SOAK ledger (its last %d lines only): loans %d, repaid %d" % [ledger.size(),
