@@ -1397,7 +1397,8 @@ static func _clear_tall_grass(level: Dictionary, warnings: Array[String]) -> voi
 static func _check_water(terrain: Dictionary, warnings: Array[String]) -> void:
 	if not terrain.get("relief_given", false):
 		return
-	var field: PackedFloat32Array = terrain["relief"]
+	# A bridge's deck is a shore to the water beside it, as walked.
+	var field := walk_relief(terrain)
 	var size: Vector2i = terrain["relief_size"]
 	var bridged: Array = terrain.get("bridged", [])
 	var flowing: Dictionary[Vector2i, bool] = {}
@@ -1508,6 +1509,7 @@ static func _lay_solid(level: Dictionary) -> void:
 static func _lay_bridges(level: Dictionary) -> void:
 	var terrain: Dictionary = level["terrain"]
 	var bridged: Array[Vector2i] = []
+	var decks: Dictionary[Vector2i, float] = {}
 	var railings: Array[Vector3i] = []
 	for building: Dictionary in level["buildings"]:
 		if building["slot"] != BRIDGE:
@@ -1528,8 +1530,9 @@ static func _lay_bridges(level: Dictionary) -> void:
 				terrain["kinds"][cell] = bank_kind
 				if int(building["height"]) > 0:
 					terrain["heights"][cell] = int(building["height"])
-				if terrain.has("relief") and Relief.on_map(terrain["relief_size"], cell):
-					terrain["relief"][cell.y * terrain["relief_size"].x + cell.x] = float(building["elevation"])
+				# Its deck's height apart from the relief, which keeps the water
+				# under it (505 amended): walk_relief lays it back for walking.
+				decks[cell] = float(building["elevation"])
 				bridged.append(cell)
 				for side in sides:
 					if not rect.has_point(cell + side):
@@ -1538,6 +1541,22 @@ static func _lay_bridges(level: Dictionary) -> void:
 						railings.append(key)
 	terrain["bridged"] = bridged
 	terrain["railings"] = railings
+	terrain["decks"] = decks
+
+
+## [param terrain]'s relief as it is walked (505 amended): each bridge's
+## deck (terrain "decks") laid over the water the relief keeps under it. A
+## copy; the terrain's own relief is the ground and the water, the deck
+## never in it. World, WorldMap's routes and the view walk and stand bodies
+## on this.
+static func walk_relief(terrain: Dictionary) -> PackedFloat32Array:
+	var field: PackedFloat32Array = (terrain.get("relief", PackedFloat32Array()) as PackedFloat32Array).duplicate()
+	var size: Vector2i = terrain.get("relief_size", Vector2i.ZERO)
+	var decks: Dictionary = terrain.get("decks", {})
+	for cell: Vector2i in decks:
+		if Relief.on_map(size, cell) and cell.y * size.x + cell.x < field.size():
+			field[cell.y * size.x + cell.x] = float(decks[cell])
+	return field
 
 
 ## A building entry's link to its town's records ("use": what it is to the

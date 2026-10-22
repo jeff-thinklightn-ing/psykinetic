@@ -2495,7 +2495,9 @@ func _bend(vertex: Vector2i, height: float) -> float:
 
 ## The terrain's relief (decision 525) for this build: its field, or none.
 func _read_field() -> void:
-	_relief = _terrain.get("relief", PackedFloat32Array())
+	# As walked: bodies stand on a bridge's deck (505 amended); terrain
+	# "relief" alone has the water under it.
+	_relief = Level.walk_relief(_terrain) if _terrain.has("relief") else PackedFloat32Array()
 	_relief_size = _terrain.get("relief_size", Vector2i.ZERO)
 	_relief_given = bool(_terrain.get("relief_given", false))
 	if _relief.size() != _relief_size.x * _relief_size.y:

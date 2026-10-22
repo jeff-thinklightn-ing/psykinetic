@@ -109,7 +109,7 @@ func _parse_area(area_name: String, layout: Image, height: Image, config: Dictio
 		"starts": level["starts"], "spawn_points": level["spawn_points"], "links": level["links"],
 		"neighbours": level["neighbours"], "warnings": level["warnings"], "floor": floor_cells,
 		"edges": level["terrain"]["edges"], "heights": level["terrain"]["heights"], "stairs": level["terrain"]["stairs"],
-		"relief": level["terrain"]["relief"], "relief_size": level["terrain"]["relief_size"],
+		"relief": Level.walk_relief(level["terrain"]), "relief_size": level["terrain"]["relief_size"],
 		"places": level["places"], "buildings": level["buildings"], "markets": level["markets"],
 		# Fords (decision 505): floor, a step into one costing FORD_COST.
 		"fords": _set_of(level["terrain"].get("fords", [])),

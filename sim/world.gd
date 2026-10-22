@@ -5338,7 +5338,8 @@ func has_relief() -> bool:
 func _load_relief(terrain: Dictionary) -> void:
 	_relief_given = bool(terrain.get("relief_given", false))
 	if terrain.has("relief"):
-		_relief = terrain["relief"]
+		# As walked: the bridges' decks over the water (505 amended).
+		_relief = Level.walk_relief(terrain)
 		_relief_size = terrain["relief_size"]
 		return
 	var high := Vector2i.ZERO

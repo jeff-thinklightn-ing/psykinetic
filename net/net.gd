@@ -251,6 +251,9 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## 29 (562, economy's side): the "barter" message and the "barter"/"trade"
 ## commands carry "resident", a maker's path, in place of "shop" for a
 ## barter with that maker.
+## 29 (505 amended): a level's terrain "relief" keeps the water under a
+## bridge, its deck's height apart in terrain "decks"; Level.walk_relief
+## lays the decks back for walking, on the server and in a client alike.
 const PROTOCOL_REVISION := 29
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]

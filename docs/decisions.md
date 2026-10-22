@@ -19807,3 +19807,34 @@ potions.
 forage_test (one round the hut on the first day, 2 to 12 cells out, its
 own most of 3; the towns' per_day and most as before). Server only,
 protocol unchanged, no new class_name.
+
+## 505 amended. A bridge's deck kept out of the relief
+
+Level._lay_bridges wrote a bridge's deck elevation (its banks' height) into
+terrain "relief" under it, so walkers crossed at the banks' height. But the
+relief is the ground and the water: terrain's falls (557 amended), reading
+the ground along a river's curve, found a 0.41 m fall where the wilds' river
+left its bridge and a 0.46 m one at the hills' (the only falls either map
+had), artifacts of the deck in the relief. The coordinator: the relief
+shouldn't carry the deck.
+
+Now terrain "relief" keeps the water under a bridge, as relief.png has it,
+and terrain "decks" {cell: elevation} carries each bridge cell's deck.
+Level.walk_relief(terrain) is the relief as walked: a copy with the decks
+laid back. Everything that walks or stands a body reads it, so crossing a
+bridge is as it was:
+- World._load_relief (steps, cliffs, sight, the server and a client's
+  prediction);
+- WorldMap's areas (WorldRoutes: the routes over bridges);
+- Client3D's own relief (bodies stand on the deck; its ground under the
+  bridge is drawn from the bed as before, _bed_levels);
+- Level._check_water (a deck is the water's shore beside it).
+Terrain's falls read terrain "relief" (or the bed), so no fall at a bridge.
+
+A line under PROTOCOL_REVISION 29: terrain "relief" means the ground and the
+water on both sides now, the decks apart.
+
+tests/relief_test: under the hills' and the wilds' bridges the relief is the
+water's and the walked relief the deck's, a walk from bank to bank straight
+over (4 steps each, as before); the hills' and wilds' walking checks and the
+corners' agreement read the walked relief.

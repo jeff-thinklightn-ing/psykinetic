@@ -56,6 +56,7 @@ func _ready() -> void:
 	_test_road()
 	_test_hills()
 	_test_wilds()
+	_test_bridge_decks()
 	_main.load_map(Level.DEFAULT_MAP)
 	Level.unregister("rl_hill")
 	print("")
@@ -614,7 +615,7 @@ func _test_hills() -> void:
 	var level := Level.load_level("hills")
 	var terrain: Dictionary = level["terrain"]
 	_check(terrain["relief_given"] and level["warnings"].is_empty(), "relief.png, nothing said (%s)" % [level["warnings"]])
-	var field: PackedFloat32Array = terrain["relief"]
+	var field := Level.walk_relief(terrain)
 	var size: Vector2i = terrain["relief_size"]
 	var floor: Dictionary = {}
 	for cell: Vector2i in terrain["floor"]:
@@ -691,7 +692,7 @@ func _test_wilds() -> void:
 	var level := Level.load_level("wilds")
 	var terrain: Dictionary = level["terrain"]
 	_check(terrain["relief_given"] and level["warnings"].is_empty(), "relief.png, nothing said (%s)" % [level["warnings"]])
-	var field: PackedFloat32Array = terrain["relief"]
+	var field := Level.walk_relief(terrain)
 	var size: Vector2i = terrain["relief_size"]
 	var floor: Dictionary = {}
 	for cell: Vector2i in terrain["floor"]:
@@ -769,11 +770,37 @@ func _test_wilds() -> void:
 		"crossed by a ford (%d cells) and a bridge (%d), both walked to" % [terrain["fords"].size(), bridged.size()])
 
 
+## A bridge's deck kept out of the relief (505 amended): under each of the
+## hills' and the wilds' bridges the relief is the water's, the walked relief
+## the deck's (its banks' height), and a walk from bank to bank goes
+## straight over it, as before.
+func _test_bridge_decks() -> void:
+	print("== bridge decks ==")
+	for name: String in ["hills", "wilds"]:
+		var level := Level.load_level(name)
+		var terrain: Dictionary = level["terrain"]
+		var size: Vector2i = terrain["relief_size"]
+		var walked := Level.walk_relief(terrain)
+		var bridge: Dictionary = level["buildings"].filter(func(b: Dictionary) -> bool: return b["slot"] == Level.BRIDGE)[0]
+		var cells := Level.rect_cells(bridge["rect"])
+		var under := cells.all(func(cell: Vector2i) -> bool:
+			return Relief.at(terrain["relief"], size, cell) < float(bridge["elevation"]) - 0.1 and is_equal_approx(Relief.at(walked, size, cell), float(bridge["elevation"])))
+		var floor: Dictionary = {}
+		for cell: Vector2i in terrain["floor"]:
+			floor[cell] = true
+		var area := {"relief": walked, "relief_size": size, "stairs": terrain["stairs"], "heights": {}, "edges": terrain["edges"], "floor": floor, "size": size}
+		var banks: Array = bridge["banks"]
+		var steps := WorldRoutes._steps_between(area, banks[0], banks[1])
+		var straight := float(cells.size() + 1)
+		_check(under and steps > 0.0 and steps < straight + 1.5,
+			"%s: the relief under the bridge is the water's, the walked one its deck's; bank to bank %.1f steps (straight over: %.0f)" % [name, steps, straight])
+
+
 ## The first few pairs of orthogonal neighbours of [param terrain]'s
 ## relief, no cliff between them, whose shared corners differ (the view
 ## would draw a face between them); [] if none.
 static func _corners_agree(terrain: Dictionary) -> Array:
-	var field: PackedFloat32Array = terrain["relief"]
+	var field := Level.walk_relief(terrain)
 	var size: Vector2i = terrain["relief_size"]
 	var out := []
 	for y in size.y:
