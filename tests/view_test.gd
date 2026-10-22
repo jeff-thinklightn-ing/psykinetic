@@ -84,6 +84,7 @@ func _ready() -> void:
 	_test_goblins_differ()
 	_test_allies()
 	_test_barrow_dead()
+	_test_person_monster()
 	_test_shadows_in_view()
 	_test_no_2d_under_3d()
 	await _test_doors_swing()
@@ -3758,6 +3759,43 @@ func _test_fade() -> void:
 	_check(not _rig._faded.has(wall), "walk away, the camera with them: that wall is solid again")
 	_place(player, start)
 	await get_tree().create_timer(1.0).timeout
+
+
+## A monster kind drawn as a person (Jeff: "have the grave robbers use the character body type"):
+## its row's "person" words put it in the human body with a build and a look, the words worn, its
+## hands and head sockets a person's; without them it is drawn as before.
+func _test_person_monster() -> void:
+	print("
+== a monster kind drawn as a person: the grave robber ==")
+	var row: Dictionary = Monster.kinds().get("robber", {})
+	_check(not row.is_empty(), "the robber's row is there")
+	if row.is_empty():
+		return
+	var had: Variant = row.get("person")
+	row["person"] = "headwear=hood garb=none"
+	var robber := _spawn_imp(Vector2i(9, 6), "robber")
+	_rig._process(0.0)
+	var puppet: Node3D = _rig._puppets[robber.get_instance_id()]
+	var scene := puppet.get_node("Body/Model") as Node3D
+	var look := puppet.get_meta("look") as PersonLook if puppet.has_meta("look") else null
+	var sockets: Dictionary = puppet.get_meta("sockets", {})
+	var hood := scene.find_child("Hood", true, false) as MeshInstance3D
+	_check(scene.scene_file_path in [Client3D.HUMAN["scene"], Client3D.HUMAN_F["scene"]] and look != null and hood != null and hood.visible
+			and sockets.has("hand_r") and sockets.has("hand_l"),
+			"a grave robber in the human body (%s), its look's words worn (its hood up: %s), a person's hands" % [scene.scene_file_path.get_file(), hood != null and hood.visible])
+	World.despawn(robber)
+	_rig._process(0.0)
+	if had == null:
+		row.erase("person")
+	else:
+		row["person"] = had
+	var plain := _spawn_imp(Vector2i(9, 6), "robber")
+	_rig._process(0.0)
+	var plain_scene := (_rig._puppets[plain.get_instance_id()] as Node3D).get_node_or_null("Body/Model") as Node3D
+	_check(had != null or plain_scene == null or not plain_scene.scene_file_path in [Client3D.HUMAN["scene"], Client3D.HUMAN_F["scene"]],
+			"without the words, drawn as before")
+	World.despawn(plain)
+	_rig._process(0.0)
 
 
 func _test_allies() -> void:

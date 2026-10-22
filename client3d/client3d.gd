@@ -10365,8 +10365,9 @@ static func creature_slot_for(entity: GridEntity) -> String:
 
 
 ## The model for [param entity]: HUMAN or HUMAN_F by its look's body for a
-## person (a player, a companion, a resident), MODELS' entry for a monster of a
-## kind that has one, or {}.
+## person (a player, a companion, a resident, or a monster whose kind is drawn
+## as one: person_words), MODELS' entry for a monster of a kind that has one,
+## or {}.
 static func model_for(entity: GridEntity) -> Dictionary:
 	var kind := str(entity.spawn_spec.get("kind", ""))
 	if entity is Resident and MODELS.has(kind):
@@ -10375,7 +10376,7 @@ static func model_for(entity: GridEntity) -> Dictionary:
 		var model: Dictionary = MODELS[kind].duplicate()
 		model["at_home"] = true
 		return model
-	if entity is Player or entity is Companion or entity is Resident:
+	if entity is Player or entity is Companion or entity is Resident or not person_words(entity).is_empty():
 		return HUMAN_F if look_for(entity).body == &"female" else HUMAN
 	if not entity is Monster:
 		return {}
@@ -11678,7 +11679,23 @@ static func look_for(entity: GridEntity) -> PersonLook:
 		var people := str(MODELS.get(str(entity.spawn_spec.get("kind", "")), {}).get("people", ""))
 		if people != "":
 			look += " people=" + people
+		var words := person_words(entity)
+		if not words.is_empty():
+			look += " " + words
 	return PersonLook.make(look, body_of(entity))
+
+
+## A monster kind drawn as a person (Jeff: "have the grave robbers use the
+## character body type"): its row's "person" in monsters.json, look words
+## laid over its seed's (e.g. "headwear=hood garb=none"), puts it in the
+## human body with a build and a look, as townsfolk are: their sockets (its
+## row's "wields" in its hands, the head socket), their gaits and clips. ""
+## for a kind drawn its own way, and for anything not a monster.
+static func person_words(entity: GridEntity) -> String:
+	if not entity is Monster:
+		return ""
+	var row: Variant = Monster.kinds().get(str(entity.spawn_spec.get("kind", "")), {})
+	return str((row as Dictionary).get("person", "")) if row is Dictionary else ""
 
 
 ## [param entity]'s body (decision 388), &"" if it wears none.

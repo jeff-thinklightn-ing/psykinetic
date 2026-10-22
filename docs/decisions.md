@@ -21706,3 +21706,19 @@ Tests: view_test `_test_barrow_dead` checks each body's own scene on the palette
 shadow while its bones have one. art_kit_test passes with the three entries.
 
 Client only, protocol unchanged, no new class_name.
+## 580, pc-character's side. The grave robbers in the character body
+
+Jeff: "have the grave robbers use the character body type" (via the coordinator, 2026-10-22).
+
+- A monster kind whose monsters.json row carries "person" is drawn as a person: the human body,
+  HUMAN or HUMAN_F by its look, with a build, a stature and colours from its name's seed, as a
+  townsman's are (`Client3D.person_words`, `model_for`).
+- The row's words are laid over the seed's look (`look_for`). enemy-ai's robber row gives them,
+  e.g. "headwear=hood garb=none apron=no".
+- It has a person's sockets, so the row's "wields" shows in its hands, and a person's gaits and
+  clips.
+- The key isn't "body", which the row already uses for its physical stats. The sim ignores
+  "person", and the client reads it from `Monster.kinds()`: no protocol change.
+- A kind without it is drawn as before.
+
+Tests: view_test `_test_person_monster`. Client only, no new class_name.
