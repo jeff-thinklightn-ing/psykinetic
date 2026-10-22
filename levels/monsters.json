@@ -96,6 +96,7 @@
 	},
 	"robber": {
 		"label": "Grave robber",
+		"person": "headwear=hood garb=none apron=no",
 		"body": {"mass": 70.0, "move_ticks": 3.5, "max_hp": 10, "sight_range": 5},
 		"tactic": "flank",
 		"idle": "wander",
