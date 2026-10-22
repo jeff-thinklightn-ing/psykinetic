@@ -13338,6 +13338,19 @@ night, the next fact after; no standing inn, no song). Protocol unchanged
 Rejected: a model writing the song (invention); singing beliefs or
 rumours (422 passes those as talk); every zone hearing it (the inn's
 walls); pay for the bard (Jeff may want a hat passed, later).
+
+Amended (art-kit's side, 2026-10-22; Jeff, through the coordinator: "bard
+could wear a hat yes"): the bard's hat is art-kit's gear.hat, a held slot
+(category items, not an item) worn on pc-character's "head" socket: a red
+felt cap peaked toward the back, the brim turned up behind and drawn to a
+point over the brow, a buckled band, a long feather on the left; 304 tris.
+Its frame, agreed with pc-character: origin at the inside of the crown on
+the skull's top (the socket measured per body at the skull's middle, front
+to back), +y up, +x toward the face, the band 0.075 m below ("base"); sized
+to human_m's head and fitted by pc-character on the five builds with no
+scaling (0.6 to 4 cm off the head at the band, nothing through). Nothing
+draws it until pc-character's socket and npc's "hat=bard" land; client art
+only, protocol unchanged.
 ## 492, economy's side (npc's scoundrel, on 393: the coordinator's approval)
 
 The hooks npc's scoundrel calls; the numbers are npc's drafts, Jeff's to

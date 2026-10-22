@@ -2422,6 +2422,22 @@
 			"source": {"by": "art-kit", "tool": "blender", "license": "own", "date": "2026-10-17",
 				"notes": "a stand-in by hand: a four-sided shaft, three vanes, the head by variant; 30 to 46 tris"}
 		},
+		"gear.hat": {
+			"category": "items",
+			"type": "mesh",
+			"kind": "held",
+			"size": [0.451, 0.153, 0.268],
+			"base": -0.075,
+			"middle": [0.006, 0, 0],
+			"tolerance": 0.15,
+			"budget": 400,
+			"sockets": {"grip": [0, 0, 0]},
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-22", "notes": "C:/dev/review/bard_hat/make_hat.py: a felt cap in row 7's deep red, its soft crown pulled to a peak leaning back with one darker fold behind, the brim turned up behind and at the sides and drawn down to a point over the brow (its underside darker), a dark leather band with a brass buckle, a long cream feather with a dark spine tucked in the band on the left sweeping up and back; 304 tris"},
+			"uses": "the bard's hat (decision 490 amended; npc's look spec \"hat=bard\"; Jeff: \"bard could wear a hat yes\"): not an item of its own, worn on a body's \"head\" socket (pc-character's: on the Head bone at the top of the skull on the centre line, measured per body); origin at the inside of the crown where it rests on the skull's top, +y up, +x toward the face, z to the side; the band 0.075 m below the origin at the brow",
+			"grey": [
+				{"at": [0.006, 0.0015, 0], "size": [0.451, 0.153, 0.268]}
+			]
+		},
 		"gear.quiver": {
 			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-21", "notes": "C:/dev/review/quiver/make_quiver.py (Jeff, 2026-10-21: \"arrows should just be a quiver on the back\"): an 8-sided leather tube, a darker cup at its foot, two bands where the strap is sewn, a rolled rim, the strap down the body side toward the shoulder; six arrows' ends out of the mouth, a shaft and three double-sided vanes each; variant 1 cream fletching, 2 a banner-red cord under the rim, 3 dark fletching; 352 tris"},
 			"category": "items",

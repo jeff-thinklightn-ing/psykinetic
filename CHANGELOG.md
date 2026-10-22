@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- A bard's hat, a red felt cap with a long feather, made for the bard to wear once the head attachment is in.
 - New pieces for the Barrow's redesign (580), not yet placed: the old king's burial table, a torch-lit pillar, an old curled skeleton in a burial niche (and art for the niches' other three kinds), the hidden door's wall crack and its opened niche with a stair down, and the edge and steps of the draugr's dais.
 - The Barrow's mound is Jeff's own hand-made one, twice the size (12 by 12 cells): a sculpted turf mound with a stone arch over its dark passage, a ring of kerb stones and old spears planted round it (579).
 - Every building kind has room inside: at least 5 by 5 floor cells in its main room, so huts, sheds, watchtowers, round huts and the healer's hut are bigger.
