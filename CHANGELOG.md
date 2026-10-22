@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Townsfolk may colour the news, a ruling or the sky they hail you with by one small detail of their own, a trial on Jeff's word behind townsfolk.json hail.lively; pleas and greetings stay as they were (554 amended). Server only.
 - The carpenter saws at the building site's sawhorse, facing it, and hammers inside the door, on buildings' site cells (566, npc's follow-up). Server only.
 - Townsfolk carry their name alone over their heads, the profession dropped from the label (333 amended; Jeff, 2026-10-22). Server spec, drawn as is.
 - A priest's secret that the words had no room for is no longer counted as told; the old gods' secrets count as the crypt's (546 amended, npc's side). Server only.

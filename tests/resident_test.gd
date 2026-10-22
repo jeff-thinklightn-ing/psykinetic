@@ -1613,6 +1613,21 @@ func _test_hails() -> void:
 	var pid: String = player.player_id
 	var now := World.production.now()
 	var today := Townsfolk.day_of(now)
+	# The lively trial's switch (554 amended): the user turn by townsfolk.json hail.lively, for the shared cues only; strict one edit away.
+	var hail_rules: Dictionary = Townsfolk.rules().get("hail", {})
+	var was_lively: Variant = hail_rules.get("lively")
+	hail_rules["lively"] = true
+	var news_turn := str(mara.hail_ask("Jeff", {"kind": "news", "text": "I heard today that a cart broke."}, 1).get("user", ""))
+	var plea_turn := str(mara.hail_ask("Jeff", {"kind": "plea", "text": "I owe the town 3 gold; could you spare some of it?"}, 2).get("user", ""))
+	_check(news_turn.contains("in your own colour") and news_turn.contains("no weather, no cause") and not plea_turn.contains("in your own colour") and plea_turn.contains("add no place, cause, name or detail"),
+		"lively on: the news takes the trial's bounded turn, a plea keeps the strict one")
+	hail_rules["lively"] = false
+	news_turn = str(mara.hail_ask("Jeff", {"kind": "news", "text": "I heard today that a cart broke."}, 3).get("user", ""))
+	_check(not news_turn.contains("in your own colour") and news_turn.contains("add no place, cause, name or detail"), "lively off: the strict sentence for all")
+	if was_lively == null:
+		hail_rules.erase("lively")
+	else:
+		hail_rules["lively"] = was_lively
 	_check(mara != null and mara.person == "Mara", "(Mara the cook stands in the town)")
 	# The cues, pure: the first that applies, none said twice.
 	var card := Townsfolk.card_of(World.production, "rs-mara")

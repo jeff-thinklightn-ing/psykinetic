@@ -527,6 +527,9 @@ func system_for(speaker: String) -> String:
 
 ## The user turn of a hail: the cue is the whole of what is on their mind.
 const HAIL_USER := "%s comes within speaking distance of you. One thing is on your mind: %s Say one line to them about it, unprompted, as yourself and in your own words, not the words above. Say only what the thought holds: add no place, cause, name or detail it does not give, for nothing else is true. Ask nothing of them you would not ask to their face."
+## The trial's turn (554 amended; Jeff, 2026-10-22: "trial with livelier"), chosen by townsfolk.json hail.lively:
+## one small everyday detail allowed, nothing invented that the bound names. Strict is one edit away.
+const HAIL_USER_LIVELY := "%s comes within speaking distance of you. One thing is on your mind: %s Say one line to them about it, unprompted, as yourself and in your own words, not the words above. Say what the thought holds, in your own colour: you may add one small everyday detail of your own things (a broken wheel, a barrel, the mud on your boots), but invent no person, no place, no building, no name, no price, no weather, no cause, and cast no doubt on the thought; name nobody it does not, for nothing else is true. Ask nothing of them you would not ask to their face."
 
 ## The greeting cue by standing (Standing.words' word -> the thought).
 const HAIL_GREETINGS := {
@@ -541,7 +544,10 @@ const HAIL_GREETINGS := {
 ## ({kind, text}, hail_cue's) as the user turn, trigger "hail: <kind>".
 func hail_ask(speaker: String, cue: Dictionary, serial: int, how := "hail") -> Dictionary:
 	var system := system_for(speaker)
-	var user := HAIL_USER % [speaker, str(cue.get("text", ""))]
+	# The lively trial (554 amended) colours the news, the ruling and the sky only: a plea is an ask with a number in
+	# it (the colour twice ate the sum in the batch), a greeting a table word; both keep the strict turn.
+	var lively := bool(Townsfolk.rules().get("hail", {}).get("lively", false)) and str(cue.get("kind", "")) in SHARED_CUES
+	var user := (HAIL_USER_LIVELY if lively else HAIL_USER) % [speaker, str(cue.get("text", ""))]
 	return {"kind": "voice", "serial": serial, "trigger": "%s: %s, %s to %s." % [how, str(cue.get("kind", "")), person, speaker], "speaker": person,
 		"system": system, "user": user, "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
 		"spoken_to": false, "asked": false, "heard": "", "hail": str(cue.get("kind", "")), "cue": str(cue.get("text", ""))}

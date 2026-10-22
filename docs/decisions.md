@@ -18410,6 +18410,25 @@ gossip a day and the road's news through RoadKnowledge (--days=30), and
 --hail-day writes the day's lines to C:\dev\review\npc\hails.md for
 Jeff.
 
+Amended (2026-10-22, the lively trial; Jeff: "trial with livelier"): the
+hail's one strict sentence ("add no place, cause, name or detail it does
+not give") is loosened as a trial on Jeff's word, behind townsfolk.json
+hail.lively (true for the trial; false is the strict sentence back for
+every cue, one edit). The trial's sentence (Resident.HAIL_USER_LIVELY)
+allows one small everyday detail of the speaker's own things and names the
+bound: no person, place, building, name, price, weather or cause invented,
+no doubt cast on the thought, nobody named it does not. It applies to the
+news, the ruling and the sky cues (SHARED_CUES) only: a plea is an ask with
+a number in it and a greeting a table word, and both keep the strict turn.
+Measured first by the tunnel method on the five hail days' real prompts,
+strict beside lively for the same twenty cues (C:/dev/review/npc/
+hails_lively.md): the first sentence let 3 of 20 past the bound (a ridge, a
+mill, a fog), 2 undercut a ruling and 5 pleas took on weather; the sentence
+that ships, on the fourteen news, ruling and sky cues, 11 clean, 1 past
+the bound, 1 undercutting, 1 with old rain; the pleas lost their sum twice
+under either, hence the kinds gate. Jeff judges it in play; the
+nothing-invented rule stands for everything but this colour.
+
 ## 555, items' side: grave goods, marked where they are minted
 
 companions' loyalty design (555, the coordinator's approval): a
