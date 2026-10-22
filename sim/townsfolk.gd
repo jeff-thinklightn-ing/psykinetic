@@ -146,7 +146,7 @@ static func tick(production: Production, stockpile: Stockpile, economy: Economy 
 			stockpile.deposit(town, goods, 1, "returned")
 			_caught(production, town, id, catcher, "", "taking %s from the store" % goods.replace("_", " "), at, thief)
 			continue
-		var merchant := _merchant(production, town, id)
+		var merchant := _merchant(production, town, id, economy)
 		if not merchant.is_empty() and economy != null and economy.has_method("fence"):
 			if int(economy.fence(town, merchant, id, goods, float(thief.get("fence", 0.5)), float(thief.get("margin", 0.4)))) > 0:
 				_tally("fenced")
@@ -873,13 +873,14 @@ static func _caught(production: Production, town: String, thief: String, catcher
 	production.set_card(thief, mine)
 
 
-## A merchant of [param town] who is not [param thief], to fence through; "".
-static func _merchant(production: Production, town: String, thief: String) -> String:
-	for id: String in production.worker_ids(town):
-		if id != thief and not id.begins_with(COMPANION) and str(production.worker(id).get("type", "")) == "merchant" \
-				and not bool(production.worker(id).get("away", false)):
-			return id
-	return ""
+## The fence of [param town] who is not [param thief], to fence through
+## (decision 586: Snagfin alone takes what is lifted, in his own town);
+## "" for none there.
+static func _merchant(production: Production, town: String, thief: String, economy: Economy = null) -> String:
+	var fence := economy.fence_by() if economy != null else ""
+	if fence.is_empty() or fence == thief or str(production.worker(fence).get("town", "")) != town:
+		return ""
+	return fence
 
 
 ## A thief's lift at [param town]'s store: one of the first of the rules'

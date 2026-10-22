@@ -143,8 +143,11 @@ func _test_barter() -> void:
 	_check(offered == {"ore_sack": {"gold": 9, "up_to": 4}, "sword": {"gold": 11, "up_to": 2}},
 		"ore at 9, four sacks to its 20; a sword at 11, two to its want; no crown (%s)" % [offered])
 	_check(Economy.fenced(9) == 4 and Economy.fenced(1) == 1, "fenced: half, at least 1")
-	var quote := economy.barter_quote(TOWN, "p1", [{"id": "ore_sack"}, {"id": "ore_sack", "fenced": true}], [])
-	_check(quote["ok"] and quote["gives"] == [9, 4] and quote["balance"] == 13, "two sacks, one grave goods: 9 and 4, 13 to the player (%s)" % [quote])
+	var graves := [{"id": "ore_sack"}, {"id": "ore_sack", "fenced": true}]
+	_check(economy.barter_quote(TOWN, "p1", graves, [])["why"] == "won't buy that", "grave goods at any counter but the fence's: won't buy (586)")
+	_check(economy.barter_quote(TOWN, "p1", graves, [], Economy.FENCE_DAY)["why"] == "not by day", "at the fence's by day: not by day")
+	var quote := economy.barter_quote(TOWN, "p1", graves, [], Economy.FENCE_NIGHT)
+	_check(quote["ok"] and quote["gives"] == [9, 4] and quote["balance"] == 13, "at the fence's by night: 9 and 4 fenced, 13 to the player (%s)" % [quote])
 	var five: Array = []
 	for i in 5:
 		five.append({"id": "ore_sack"})
@@ -162,7 +165,35 @@ func _test_barter() -> void:
 	_check(sold["paid"] == 9 and again["paid"] == 9 and bought["ok"] and bought["price"] == 18 and economy.gold("p1") == 0,
 		"settled at the quoted prices, though the town's need moved between (%s, %s, %s)" % [sold, again, bought])
 	var now_pays := int(economy.offers(TOWN, ["ore_sack"])["ore_sack"])
-	_check(economy.sell("p1", TOWN, "ore_sack", true)["paid"] == Economy.fenced(now_pays), "a grave goods sack at the counter: fenced, half of %d" % now_pays)
+	_check(economy.sell("p1", TOWN, "ore_sack", true)["why"] == "won't buy that", "a grave goods sack at a counter: won't buy")
+	_check(economy.sell("p1", TOWN, "ore_sack", true, -1, Economy.FENCE_NIGHT)["paid"] == Economy.fenced(now_pays),
+		"at the fence's counter by night: fenced, half of %d" % now_pays)
+	var with_fence: Dictionary = economy.rules.duplicate(true)
+	with_fence["fence"] = Production.read_rules(Economy.PATH)["fence"]
+	economy.rules = with_fence
+	_check(economy.rules["fence"]["by"] == "snagfin" and float(economy.rules["fence"]["factor"]) == 0.5 and float(economy.rules["fence"]["day_markup"]) == 1.3,
+		"the fence's rules are economy.json's: Snagfin, half, 1.3 by day")
+	var other := _shop_sword(economy)
+	_check(economy.goods(TOWN, Economy.FENCE_DAY).filter(func(each: Dictionary) -> bool: return each["uid"] == other)[0]["price"] == ceili(18 * 1.3)
+		and economy.goods(TOWN, Economy.FENCE_NIGHT).filter(func(each: Dictionary) -> bool: return each["uid"] == other)[0]["price"] == 18,
+		"his goods by day: 18 marked up to %d; by night 18" % ceili(18 * 1.3))
+	_check(economy.fence_by() == "", "no Snagfin in this town: no fence")
+	economy.production.add_worker("snagfin", "Snagfin", ["merchant"], TOWN, "settled", "merchant")
+	_check(economy.fence_by() == "snagfin", "Snagfin in town: the fence")
+	economy.production.set_away("snagfin", true)
+	_check(economy.fence_by() == "", "Snagfin away: none")
+	economy.production.set_away("snagfin", false)
+	var night_at := -1
+	var noon_at := -1
+	for step in range(0, DayNight.day_steps, maxi(DayNight.day_steps / 48, 1)):
+		if night_at < 0 and DayNight.daylight(step) < DayNight.DARK_LIGHT:
+			night_at = step
+		if noon_at < 0 and DayNight.daylight(step) >= DayNight.DARK_LIGHT:
+			noon_at = step
+	_now = night_at
+	var at_night := economy.is_night()
+	_now = noon_at
+	_check(at_night and not economy.is_night(), "night when it is dark under the sky (step %d), day when not (%d)" % [night_at, noon_at])
 	economy.stockpile.take(TOWN, "gold", economy.stockpile.count(TOWN, "gold") - 25, "test")
 	_check(economy.barter_quote(TOWN, "p1", [{"id": "ore_sack"}], [])["why"] == "the town can't pay for it now", "25 gold over a floor of 20: can't pay 9")
 
@@ -413,13 +444,28 @@ func _test_barter_in_town(host: Player, counter: Chest) -> void:
 	World.put_item(host, host, 1, ore)
 	World.command(host, "barter", {"shop": str(counter.get_path())})
 	var told: Dictionary = _main.barter_data
+	_check(told.get("fence") == "" and told.get("fenced", {}).is_empty(), "a counter not the fence's: no fence, nothing fenced (586)")
+	World.command(host, "trade", {"shop": str(counter.get_path()), "give": [ore], "take": [], "gold": 0})
+	_check(_main.barter_data.get("why") == "won't buy that" and host.slots[1] == "ore_sack", "grave goods: won't buy (%s)" % _main.barter_data.get("why"))
+	# Snagfin keeps this counter for the test (his settled entry moved here), by night.
+	var days: Dictionary = Townsfolk.days().duplicate(true)
+	days["settled"]["snagfin"]["town"] = STORE
+	days["settled"]["snagfin"]["home"] = [counter.tile.x, counter.tile.y]
+	Townsfolk.use_days(days)
+	if World.production.worker("snagfin").is_empty():
+		World.production.add_worker("snagfin", "Snagfin", ["merchant"], STORE, "settled", "merchant")
+	var was_steps := World.steps
+	while DayNight.daylight(World.steps) >= DayNight.DARK_LIGHT:
+		World.steps += 600
+	World.command(host, "barter", {"shop": str(counter.get_path())})
+	told = _main.barter_data
 	var paid := int(told.get("buys", {}).get("ore_sack", {}).get("gold", 0))
 	var fenced := int(told.get("fenced", {}).get(ore, 0))
 	var asks := 0
 	for each: Dictionary in told.get("goods", []):
 		if int(each["uid"]) == kit:
 			asks = int(each["price"])
-	_check(told.get("town") == STORE and paid > 0 and fenced == Economy.fenced(paid) and asks > 0
+	_check(told.get("fence") == "night" and told.get("town") == STORE and paid > 0 and fenced == Economy.fenced(paid) and asks > 0
 		and told.get("pack", []).any(func(each: Dictionary) -> bool: return int(each["uid"]) == ore and int(each["slot"]) == 1),
 		"the message: the kit asked %d, the sack's %d fenced to %d, the sack in the pack at slot 1 (%s)" % [asks, paid, fenced, told])
 	var gold := World.gold_of(host.player_id)
@@ -430,6 +476,12 @@ func _test_barter_in_town(host: Player, counter: Chest) -> void:
 	_check(_main.barter_data.get("why") == "" and World.gold_of(host.player_id) == gold + fenced - asks
 		and kit in World.slot_uids(host) and ore not in World.slot_uids(host) and kit not in World.stockpile.shop(STORE),
 		"traded: the sack banked, the kit in the pack, %d gold (%s, %d)" % [gold + fenced - asks, Array(host.slots), World.gold_of(host.player_id)])
+	while DayNight.daylight(World.steps) < DayNight.DARK_LIGHT:
+		World.steps += 600
+	World.command(host, "barter", {"shop": str(counter.get_path())})
+	_check(_main.barter_data.get("fence") == "day", "by day his counter says so (%s)" % _main.barter_data.get("fence"))
+	World.steps = was_steps
+	Townsfolk.use_days({})
 	World._relocate(host, Vector2i(11, 7))
 	World.command(host, "barter", {"shop": str(counter.get_path())})
 	_check(_main.barter_data.get("why") == "too far from the counter", "away from the counter and any merchant: too far")

@@ -212,7 +212,7 @@ func _thief_town(with_merchant := false) -> void:
 	_work.pay("t-gar", 30, "test")
 	_stock.deposit(TOWN, "cloth", 5, "test")
 	# Economy's line for a rich purse is its rules' (economy.json folk.rich_above): 25 here, whatever the file says.
-	_economy = Economy.new({}, _stock, _work, func() -> int: return _now, {"folk": {"rich_above": 25}, "gold_floor": 0, "value": {"cloth": 10}}, func() -> Dictionary: return CATALOG)
+	_economy = Economy.new({}, _stock, _work, func() -> int: return _now, {"folk": {"rich_above": 25}, "gold_floor": 0, "value": {"cloth": 10}, "fence": {"by": "t-mab"}}, func() -> Dictionary: return CATALOG)
 	Townsfolk.tick(_work, _stock, _economy)  # Arms the lift's clock.
 	_now += 100
 

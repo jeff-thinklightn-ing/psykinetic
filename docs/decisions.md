@@ -22992,3 +22992,55 @@ that never answers covered by her word; a voice answering PRESS to "wait
 here" leaves her waiting. Lines in older tests that are now orders were
 reworded to keep testing the model's path. Server only, protocol unchanged,
 no new class_name.
+## 586. Snagfin is the only fence, and only by night
+
+Jeff, through the coordinator: "Snagfin could be the only fence, he will
+buy stolen and grave goods, no one else wants them, he has a little larger
+place on the outskirts of town, he might only do that at night ... he
+sells overpriced goods during the day and wont buy stolen goods unless its
+night time and at a fenced goods discount". This replaces 560's ruling
+that any counter's merchant fences at half. Economy leads; npc, ui and
+maps/builder have sides.
+
+- **The fence:** economy.json "fence" {by: "snagfin", factor 0.5,
+  day_markup 1.3}. Economy.fence_by() is the settled resident by, while
+  he is in his town and not away; "" otherwise.
+- **His counter:** World.fence_state(shop). It is the shop counter of
+  his town nearest his home (residents.json settled "home"), so it
+  follows him if maps moves his place to the outskirts.
+  - Economy.FENCE_NIGHT while it is dark under the open sky
+    (Economy.is_night: DayNight.daylight below DARK_LIGHT), else
+    FENCE_DAY.
+  - "" for every other counter.
+- **Grave goods** (ItemBook.is_grave, 555), a player's stolen goods:
+  - At his counter by night: bought at fence_price, half the town's
+    price (Economy.sell, barter_quote).
+  - At his counter by day: refused, "not by day".
+  - At any other counter and with any maker: refused, "won't buy that".
+  - At the store's depot: refused as a raw good's banking, so the gold
+    can't come round the fence.
+- **By day his goods are dear:** at his counter, Economy.goods,
+  barter_quote's takes and buy price his shop's goods at day_markup;
+  at night at the town's price.
+- **The thief:** Townsfolk._merchant is the fence alone, in his own
+  town (no fence there means no fencing; the goods stay lifted). The
+  thief deals off-screen whenever he lifts: no night gate, a draft Jeff
+  may move.
+- **Wire:** the "barter" message gains "fence" ("" | "day" | "night")
+  for the counter. "fenced" {uid: gold} is filled only at his counter
+  by night. ui's hover reads "won't buy", "not by day" and "pays N gold,
+  fenced". A line under PROTOCOL_REVISION 31.
+- Drafts for Jeff's folder (the coordinator's): factor 0.5, day_markup
+  1.3, his night prices the town's, no night gate on the thief.
+
+tests:
+- economy_test _test_barter: grave goods refused at a counter, "not by
+  day" at his by day, fenced at his by night; the markup by day; the
+  fence present, absent, away; night and day.
+- economy_test, in Main: a counter not his sends "fence" "" and refuses
+  them; Snagfin seated at the test's counter by night fences them
+  through the trade command; by day his counter says "day".
+- townsfolk_test: the thief fences through the fence alone.
+
+Server and client (the message's meaning); no new class_name.
+

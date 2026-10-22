@@ -2941,6 +2941,9 @@ func _bank(by: GridEntity, from: GridEntity, from_slot: int, depot: GridEntity) 
 		_log("slots: %s refused %s: no stockpile the town holds there" % [depot.name, item])
 		return false
 	var uid := slot_uid(from, from_slot)
+	if not yields.is_empty() and items.is_grave(uid) and owner_of(by).begins_with("player:"):
+		_log("slots: %s refused %s: grave goods, only the fence takes them" % [depot.name, item])  # 586.
+		return false
 	var taken := from.slots.duplicate()
 	var taken_uids := from.slot_items.duplicate()
 	taken[from_slot] = ""
@@ -2988,6 +2991,29 @@ func add_gold(player_id: String, amount: int, why := "") -> int:
 ## Player [param player_id]'s gold (0 on a client).
 func gold_of(player_id: String) -> int:
 	return economy.gold(player_id) if economy != null else 0
+
+
+## Shop counter [param shop]'s fence state (decision 586): the counter
+## in the fence's town nearest his home (residents.json settled) is his,
+## Economy.FENCE_NIGHT by night, FENCE_DAY by day; "" for any other, or with
+## the fence away.
+func fence_state(shop: GridEntity) -> String:
+	var place := shop_place(shop)
+	var by := economy.fence_by() if economy != null and not place.is_empty() else ""
+	var entry: Dictionary = Townsfolk.settled().get(by, {}) if not by.is_empty() else {}
+	var home: Variant = entry.get("home", [])
+	if str(entry.get("town", "")) != place or not home is Array or (home as Array).size() < 2:
+		return ""
+	var at := Vector2i(int(home[0]), int(home[1]))
+	var nearest: GridEntity = null
+	for each in get_entities():
+		if each is Chest and (each as Chest).shop and each.zone == shop.zone and shop_place(each) == place \
+				and (nearest == null or distance(each.tile, at) < distance(nearest.tile, at)
+					or distance(each.tile, at) == distance(nearest.tile, at) and str(each.name) < str(nearest.name)):
+			nearest = each
+	if nearest != shop:
+		return ""
+	return Economy.FENCE_NIGHT if economy.is_night() else Economy.FENCE_DAY
 
 
 ## The town's place a shop counter [param shop] stands in, if the town
@@ -3317,7 +3343,7 @@ func _sell(by: GridEntity, from: GridEntity, from_slot: int, shop: GridEntity) -
 	if items.gold_of(uid) >= 0:
 		traded.emit(by, shop, "open the purse: it is gold already")  # Not sold at a whole purse's price (decision 601).
 		return false
-	var deal := economy.sell(who, place, item, items.is_grave(uid))  # Grave goods fenced (560).
+	var deal := economy.sell(who, place, item, items.is_grave(uid), -1, fence_state(shop))  # Grave goods: the fence's, by night (586).
 	if not deal["ok"]:
 		_log("shop: %s refused %s at %s: %s" % [by.name, item, place, deal["why"]])
 		traded.emit(by, shop, str(deal["why"]))
@@ -3378,7 +3404,7 @@ func try_buy(by: GridEntity, shop: GridEntity, uid: int) -> bool:
 		traded.emit(by, shop, "no room to carry it" if not id.is_empty() else "that is no longer for sale")
 		return false
 	var who := (by as Player).player_id
-	var deal := economy.buy(who, place, uid)
+	var deal := economy.buy(who, place, uid, -1, fence_state(shop))
 	if not deal["ok"]:
 		traded.emit(by, shop, str(deal["why"]))
 		return false
@@ -3420,7 +3446,7 @@ func try_barter(by: GridEntity, shop: GridEntity, give: Array, take: Array, bala
 			return "that is no longer in your pack"
 		from_slots.append(slot)
 		gives.append({"id": by.slots[slot], "fenced": items.is_grave(uid)})
-	var quote := economy.barter_quote(place, who, gives, take) if maker.is_empty() else economy.maker_quote(maker, who, gives, take)
+	var quote := economy.barter_quote(place, who, gives, take, fence_state(shop)) if maker.is_empty() else economy.maker_quote(maker, who, gives, take)
 	if not quote["ok"]:
 		return str(quote["why"])
 	if int(quote["balance"]) != balance:
