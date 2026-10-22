@@ -18758,3 +18758,45 @@ there is no PROTOCOL_REVISION bump (release). Phase 2, a maker selling
 their own make and buying their trade's materials from their own purse,
 follows without asking again. economy_test _test_barter and
 _test_barter_in_town. No new class_name.
+
+## 560, npc's side. The resident stops and addresses you
+
+Jeff's rework of the resident click (ui leads the design, approved by
+the coordinator 2026-10-21; ui's and economy's sides have the same
+number): the left button on a townsperson is "interact": they stop, turn
+to face the player and address them; clicking their bubble opens the
+text bar with talk (536's say line, unchanged) and barter (economy's).
+npc's half is what the resident does and says.
+
+- The "greet" command on the request path (World.command(player,
+  "greet", {"resident": path}), by name like companions' "guide"; no new
+  message kind), handled by Main._greeted. It does not end a companion's
+  lead (551): it is talk.
+- Two tiers, so a click answers at once and the mind is never spammed.
+  The resident stops and faces the player for greet.stop_seconds
+  (Resident.address: Resident.addressing, a new replicated String with
+  the addressed body's node path, "" when none, read by pc-character's
+  look and talking clip; their _sim_tick stands while it lasts and they
+  stay within ADDRESS_REACH), and says one word at once from
+  townsfolk.json "greet" without the mind (Resident.greet_word: the
+  standing's word for one the town knows, wronged, known or trusted;
+  else one of the trade's lines, picked by the day), through the spoken
+  path with no aside (Main._resident_says: transcript, party log, the
+  neighbours' hearing, the "speech" message, the player's offers for
+  the bar). Then, if they have something real to say to that player
+  today, 554's hail follows at once (Main._hail_now with clicked: the
+  cue, the limits, the heard and greeting caps all as 554's; only the
+  pause after a pair found nothing is skipped), its trigger "greet:
+  <kind>" in the mind log. Nothing from the mind if they have nothing.
+- Refusals: in bed, hiding, strayed, escorting, a companion resting in
+  town, or with an ask of theirs waiting or out to the mind: no stop,
+  the greet.refuse word at most ("Not now.").
+- One greeting a pair in greet.again_seconds: a click within it turns
+  them to the player again and says nothing new.
+- Rules: townsfolk.json "greet" {stop_seconds 8, again_seconds 10,
+  refuse, standing, trades}. net.gd SUBCLASS_REPLICATED gains
+  "addressing": the protocol hash moves, no PROTOCOL_REVISION bump
+  (release: a new replicated field keeps old clients out by itself).
+  resident_test _test_greet. Server and client in one landing; ui's
+  client side (the hint, the bubble's click, the bar) lands by the
+  command's name.

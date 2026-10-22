@@ -53,6 +53,7 @@ func _ready() -> void:
 	_test_placed_captive()
 	_test_aloud()
 	_test_hails()
+	_test_greet()
 	_test_crypt_secrets()
 	_test_offer_words()
 	_test_monster_talk()
@@ -1743,4 +1744,88 @@ func _test_hails() -> void:
 	_main._resident_mind = null
 	_main._hail_at.clear()
 	_main._hail_tried.clear()
+	World.despawn(mara)
+
+
+func _test_greet() -> void:
+	print("\n== clicked, a townsperson stops, turns and says a word; what they have to tell you follows (decision 560, npc's side) ==")
+	for body: GridEntity in World.townsfolk().duplicate():
+		World.despawn(body)
+	for i in 14:
+		World.production.set_away("rs-folk%02d" % i, true)
+	World.production.set_away("rs-bram", true)
+	DayNight.set_hour(12.0)
+	World.towns.note_rescue(STORE, "rs-mara", "Mara", "cook")
+	_sync()
+	var mara := _body("rs-mara")
+	var player := _player()
+	var pid: String = player.player_id
+	_check(mara != null and mara.person == "Mara", "(Mara the cook stands in the town)")
+	var rules: Dictionary = Townsfolk.rules().get("greet", {})
+	_check(int(rules.get("stop_seconds", 0)) == 8 and int(rules.get("again_seconds", 0)) == 10 and rules.get("trades", {}).has("cook"), "townsfolk.json greet: the stop, the again window, the cook's lines")
+	var cook: Array = rules["trades"]["cook"]
+	_check(Resident.greet_word("cook", "stranger", rules, 3) in cook and Resident.greet_word("cook", "stranger", rules, 4) in cook
+		and Resident.greet_word("cook", "stranger", rules, 3) != Resident.greet_word("cook", "stranger", rules, 4), "a stranger gets one of the cook's lines, by the day")
+	_check(Resident.greet_word("cook", "wronged", rules, 3) == "You again." and Resident.greet_word("cook", "trusted", rules, 3) == "Good to see you.", "one the town knows gets the standing's word")
+	_check(Resident.greet_word("weaver", "stranger", rules, 1) in rules["trades"]["default"], "a trade not listed: the default's")
+	var mind := VoiceMind.new()
+	_main._resident_mind = mind
+	var spoken: Array[String] = []
+	var heard := func(kind: String, data: Dictionary) -> void:
+		if kind == "speech":
+			spoken.append("%s: %s|%s" % [data.get("speaker", ""), data.get("text", ""), data.get("aside", "")])
+	Net.message_received.connect(heard)
+	var card := Townsfolk.card_of(World.production, "rs-mara")
+	card.erase("hails")
+	World.production.set_card("rs-mara", card)
+	_main._greet_at.clear()
+	_main._hail_at.clear()
+	_main._hail_tried.clear()
+	_main._hail_heard.clear()
+	_main._hail_greetings.clear()
+	_main._resident_asks.clear()
+	_put(player, _main._nearest_free(mara.tile + Vector2i(5, 0)))
+	_main._greeted(player, mara)
+	_check(spoken.is_empty() and mara.addressing.is_empty(), "out of talking reach: nothing")
+	_put(player, _main._nearest_free(mara.tile + Vector2i(1, 0)))
+	var tick_before := World.tick
+	World.command(player, "greet", {"resident": String(mara.get_path())})
+	_check(spoken.size() == 1 and spoken[0].begins_with("Mara: ") and spoken[0].get_slice("|", 0).trim_prefix("Mara: ") in cook and spoken[0].ends_with("|"),
+		"the greet command: her word at once, one of the cook's, no aside, as speech (%s)" % [spoken])
+	_check(mara.addressing == String(player.get_path()) and mara._address_until == tick_before + 8 * World.TICK_RATE, "she addresses the player for the stop")
+	var d := player.tile - mara.tile
+	var toward := Vector2i(signi(d.x), signi(d.y)) if absi(d.x) == absi(d.y) else (Vector2i(signi(d.x), 0) if absi(d.x) > absi(d.y) else Vector2i(0, signi(d.y)))
+	_check(mara.facing == toward, "turned to face them (%s toward %s)" % [mara.facing, d])
+	_check(_main._resident_asks.size() == 1 and str(_main._resident_asks[0]["ask"].get("trigger", "")).begins_with("greet: "),
+		"and what she has to say today follows as a hail, brought forward (%s)" % [_main._resident_asks[0]["ask"].get("trigger", "") if not _main._resident_asks.is_empty() else ""])
+	World.step()
+	_check(spoken.size() == 2 and spoken[1] == "Mara: The kitchen's warm, at least.|", "the mind's line goes out as speech after the word (%s)" % [spoken])
+	_main._greeted(player, mara)
+	_check(spoken.size() == 2, "a second click within the again window: nothing new said")
+	_check(not mara.addressing.is_empty(), "still addressing them")
+	for i in 8 * World.TICK_RATE + 2:
+		World.step()
+	_check(mara.addressing.is_empty(), "the stop over: she goes about her day")
+	_main._greet_at.clear()
+	_put(player, _main._nearest_free(mara.tile + Vector2i(1, 0)))
+	_main._greeted(player, mara)
+	_check(spoken.size() == 3 and not mara.addressing.is_empty(), "after the window: greeted again (%s)" % spoken[2])
+	for i in 8 * World.TICK_RATE + 2:
+		World.step()
+	_main._greet_at.clear()
+	_put(player, _main._nearest_free(mara.tile + Vector2i(1, 0)))
+	mara.doing = Resident.Doing.BED
+	_main._greeted(player, mara)
+	_check(spoken.size() == 4 and spoken[3] == "Mara: Not now.|" and mara.addressing.is_empty(), "in bed: no stop, the refusal word (%s)" % spoken[3])
+	mara.doing = Resident.Doing.SQUARE
+	_main._greet_at.clear()
+	_put(player, _main._nearest_free(mara.tile + Vector2i(1, 0)))
+	_main._resident_asks.append({"body": mara.get_instance_id(), "ask": {"serial": 0, "trigger": "x", "speaker": "Mara"}, "at": World.tick, "player": "", "peer": -1})
+	_main._greeted(player, mara)
+	_check(spoken.size() == 5 and spoken[4] == "Mara: Not now.|", "an ask of hers waiting: the same")
+	_main._resident_asks.clear()
+	Net.message_received.disconnect(heard)
+	_main._resident_mind = null
+	_main._greet_at.clear()
+	_main._hail_at.clear()
 	World.despawn(mara)

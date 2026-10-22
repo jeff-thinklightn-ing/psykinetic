@@ -17,5 +17,23 @@
 		"slow_ticks": 50,
 		"said_kept": 8,
 		"greetings_a_day": 3
+	},
+	"greet": {
+		"_note": "A click on a townsperson (decision 560, npc's side; Jeff: they stop, turn and address you). stop_seconds: how long they stand facing the player; again_seconds: one greeting a pair in this long (a click within it only turns them again); refuse: the word when they cannot stop (in bed, hiding, strayed, escorting, an ask of theirs out); standing: the word for one the town knows (Standing.words: wronged, known, trusted; a stranger gets the trade's); trades: a trade's lines, one picked a day (the default's for a trade not listed). The word is said at once without the mind; what they have to tell the player today follows as a hail (554) under its limits.",
+		"stop_seconds": 8,
+		"again_seconds": 10,
+		"refuse": "Not now.",
+		"standing": {"wronged": "You again.", "known": "Back again?", "trusted": "Good to see you."},
+		"trades": {
+			"default": ["What is it?", "Aye?", "Yes?"],
+			"smith": ["What is it? The forge won't wait.", "Aye? Make it quick, the iron's hot."],
+			"cook": ["What is it? The pot's on.", "Hungry, are you?"],
+			"merchant": ["Wares, if you have coin.", "Looking to buy?"],
+			"guard": ["State your business.", "Something wrong?"],
+			"priest": ["Peace on you. What is it?", "Yes, child?"],
+			"hunter": ["Quiet, you'll scare the game. What?", "Aye?"],
+			"farmer": ["What is it? The field won't hoe itself.", "Aye?"],
+			"hauler": ["What? I've a load to shift.", "Aye?"]
+		}
 	}
 }

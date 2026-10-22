@@ -91,6 +91,13 @@ var _route: Array[Vector2i] = []
 var _stuck := 0
 var _hide_until := -1
 var _wander_at := -1
+## Addressing a player who clicked them (decision 560, npc's side): the
+## addressed body's node path, replicated for the look and the talking
+## clip (pc-character's), "" when none; they stand facing them until
+## _address_until or the player leaves ADDRESS_REACH.
+var addressing := ""
+var _address_until := -1
+const ADDRESS_REACH := 2
 var _listened := -1
 
 
@@ -284,6 +291,7 @@ func _init() -> void:
 	super()
 	max_hp = 10
 	replicate("ailing")
+	replicate("addressing")
 	move_ticks = 3.0
 	senses = Senses.new(self, SIGHT_RANGE, -1.0)
 
@@ -345,6 +353,12 @@ func _sim_tick() -> void:
 		ailing = ""  # Well again (501 amended).
 	if not visit.is_empty() and World.steps >= int(visit.get("until", 0)):
 		visit = {}
+	if not addressing.is_empty():
+		# Addressing a player (560): standing, facing them, while the stop lasts and they stay in reach.
+		var who := get_node_or_null(NodePath(addressing)) as GridEntity
+		if World.tick < _address_until and who != null and who.spawned and World.distance(who.tile, tile) <= ADDRESS_REACH:
+			return
+		addressing = ""
 	var far := _far()
 	if far and (World.tick + id) % FAR_EVERY != 0:
 		return
@@ -507,10 +521,10 @@ const HAIL_GREETINGS := {
 ## Spoken unprompted to [param speaker] (decision 554; the ask Main queues
 ## as a voice ask, lowest of all): voice_ask's shape with [param cue]
 ## ({kind, text}, hail_cue's) as the user turn, trigger "hail: <kind>".
-func hail_ask(speaker: String, cue: Dictionary, serial: int) -> Dictionary:
+func hail_ask(speaker: String, cue: Dictionary, serial: int, how := "hail") -> Dictionary:
 	var system := system_for(speaker)
 	var user := HAIL_USER % [speaker, str(cue.get("text", ""))]
-	return {"kind": "voice", "serial": serial, "trigger": "hail: %s, %s to %s." % [str(cue.get("kind", "")), person, speaker], "speaker": person,
+	return {"kind": "voice", "serial": serial, "trigger": "%s: %s, %s to %s." % [how, str(cue.get("kind", "")), person, speaker], "speaker": person,
 		"system": system, "user": user, "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
 		"spoken_to": false, "asked": false, "heard": "", "hail": str(cue.get("kind", "")), "cue": str(cue.get("text", ""))}
 
@@ -645,6 +659,33 @@ static func hail_done(production: Production, worker_id: String, player_id: Stri
 	if str(cue.get("kind", "")) == "sky":
 		hails["sky"] = sky
 	production.set_card(worker_id, card)
+
+
+# --- Addressed by a click (decision 560, npc's side) -------------------------------------
+
+## Stops and turns to [param target], addressing them for [param ticks].
+func address(target: GridEntity, ticks: int) -> void:
+	addressing = String(target.get_path())
+	_address_until = World.tick + ticks
+	var d := target.tile - tile
+	if d != Vector2i.ZERO:
+		World.face(self, Vector2i(signi(d.x), signi(d.y)) if absi(d.x) == absi(d.y) else (Vector2i(signi(d.x), 0) if absi(d.x) > absi(d.y) else Vector2i(0, signi(d.y))))
+
+
+## The word said at once when clicked, from townsfolk.json "greet": the
+## standing's word when [param standing_word] has one (wronged, known,
+## trusted), else one of the trade's lines (the default's for a trade not
+## listed), picked by [param seed] so the same person says the same thing
+## for a day and another the next.
+static func greet_word(trade: String, standing_word: String, rules: Dictionary, seed: int) -> String:
+	var by_standing: Variant = rules.get("standing", {})
+	if by_standing is Dictionary and by_standing.has(standing_word):
+		return str(by_standing[standing_word])
+	var trades: Variant = rules.get("trades", {})
+	var lines: Variant = trades.get(trade, trades.get("default", [])) if trades is Dictionary else []
+	if not lines is Array or (lines as Array).is_empty():
+		return "What is it?"
+	return str(lines[absi(seed) % (lines as Array).size()])
 
 
 ## Who it is: a companion's own card; else its resident card (decision 398:

@@ -230,6 +230,7 @@ var _mind_last_ticks := 0
 var _hail_tried: Dictionary = {}
 var _hail_heard: Dictionary = {}  # player id -> {cue text: day}: no two residents tell one player the same thing in a day
 var _hail_greetings: Dictionary = {}  # player id -> {day, n}: greetings by standing a player heard today, capped at hail.greetings_a_day
+var _greet_at: Dictionary = {}  # "worker id|player id" -> msec of the last click greeting (560): one a greet.again_seconds
 ## Talk with no panel (decision 536): the offer standing for each player,
 ## player id -> {worker, id, title, at, zone}: what a resident last spoke to
 ## them, taken by a yes, a name or an amount said back; one per player, not
@@ -6365,12 +6366,14 @@ func _remember_companion(id: String) -> void:
 ## Net.player_reset is on.
 func _on_command(entity: GridEntity, command_name: String, args: Dictionary) -> void:
 	# Led by her (decision 551): doing anything but talk takes control back.
-	if entity is Player and command_name not in ["say", "party", "guide", "face"]:
+	if entity is Player and command_name not in ["say", "party", "guide", "face", "greet"]:
 		var walk: Guide = _guides.get(_peer_ids.get(entity.owner_peer, ""))
 		if walk != null and walk.going() and is_instance_valid(walk.pet):
 			_guide_done(walk.pet, "moved")
 	if command_name == "guide" and entity is Player:
 		_guide_asked(entity, str(args.get("to", "")))
+	elif command_name == "greet" and entity is Player:
+		_greeted(entity, get_node_or_null(NodePath(str(args.get("resident", "")))) as Resident)  # A click on a townsperson (decision 560, npc's side).
 	elif command_name == "say" and entity is Player:
 		_player_said(entity, str(args.get("text", "")), int(args.get("phrase", 0)))
 	elif command_name == "party" and entity is Player:
@@ -8118,54 +8121,135 @@ func _hails_tick() -> void:
 	var now_msec := Time.get_ticks_msec()
 	var now := World.production.now()
 	var day := Townsfolk.day_of(now)
-	var sky := ""
-	if World.fields != null:
-		# The sky is worth a word when there is weather in it or snow on the ground; a clear sky is not (554 amended: it drew the invented lines).
-		var now_words := DayNight.describe(World.fields.region, DayNight.now())
-		var kind := str(Weather.at(World.fields.region, DayNight.now()).get("kind", "clear"))
-		if (kind != "clear" and not str(now_words.get("weather", "")).is_empty()) or not str(now_words.get("ground", "")).is_empty():
-			sky = str(now_words.get("sentence", ""))
+	var sky := _sky_now()
 	for entity in World.townsfolk():
 		var body := entity as Resident
-		if body == null or not body.spawned or body.strayed or not body.escort_of.is_empty() or not body.card.is_empty() \
-				or body.doing in [Resident.Doing.HIDE, Resident.Doing.BED, Resident.Doing.STRAYED, Resident.Doing.ESCORT]:
+		if not _hail_able(body):
 			continue
 		for other in World.get_entities():
 			var player := other as Player
 			if player == null or not player.spawned or player.player_id.is_empty() or World.distance(player.tile, body.tile) > TALK_REACH:
 				continue
-			if _hail_blocked(player, now_msec, rules):
-				continue
-			var card := Townsfolk.card_of(World.production, body.worker_id)
-			if card.is_empty() or Resident.hailed_today(card, player.player_id, day):
-				continue
-			var tried := body.worker_id + "|" + player.player_id
-			if World.tick - int(_hail_tried.get(tried, -World.WORLD_TICK_STEPS)) < World.WORLD_TICK_STEPS:
-				continue
-			var heard: Dictionary = _hail_heard.get_or_add(player.player_id, {})
-			for text: Variant in heard.keys():
-				if int(heard[text]) != day:
-					heard.erase(text)
-			var greeted: Dictionary = _hail_greetings.get_or_add(player.player_id, {"day": day, "n": 0})
-			if int(greeted.get("day", -1)) != day:
-				greeted["day"] = day
-				greeted["n"] = 0
-			var greeting_ok := int(greeted["n"]) < int(rules.get("greetings_a_day", 3))
-			var cue := Resident.hail_cue(body.worker_id, body.town, player.player_id, _display_name(player), World.production, now, sky, Offers.ctx, heard.keys(), greeting_ok)
-			if cue.is_empty():
-				_hail_tried[tried] = World.tick
-				continue
-			if str(cue.get("kind", "")) == "greeting":
-				greeted["n"] = int(greeted["n"]) + 1
-			heard[str(cue.get("text", ""))] = day
-			Resident.hail_done(World.production, body.worker_id, player.player_id, cue, day, sky)
-			_write_resident_card(body)
-			_resident_serial += 1
-			_resident_asks.append({"body": body.get_instance_id(), "ask": body.hail_ask(_display_name(player), cue, _resident_serial), "at": World.tick,
-				"player": player.player_id, "peer": player.owner_peer})
-			_hail_at[player.player_id] = now_msec
-			print("[hail] %s to %s: %s" % [body.person, _display_name(player), cue.get("kind", "")])
-			return
+			if _hail_now(body, player, rules, now_msec, now, day, sky):
+				return
+
+
+## Whether [param body] is one to hail or greet at all: spawned, out and
+## about (not strayed, escorting, hiding, in bed), a townsperson (not a
+## companion resting in town, who speaks for herself).
+func _hail_able(body: Resident) -> bool:
+	return body != null and is_instance_valid(body) and body.spawned and not body.strayed and body.escort_of.is_empty() and body.card.is_empty() \
+			and body.doing not in [Resident.Doing.HIDE, Resident.Doing.BED, Resident.Doing.STRAYED, Resident.Doing.ESCORT]
+
+
+## The sky as a hail's cue: its sentence when there is weather in it or
+## snow on the ground, "" for a clear sky (554 amended: it drew the
+## invented lines).
+func _sky_now() -> String:
+	if World.fields == null:
+		return ""
+	var now_words := DayNight.describe(World.fields.region, DayNight.now())
+	var kind := str(Weather.at(World.fields.region, DayNight.now()).get("kind", "clear"))
+	if (kind != "clear" and not str(now_words.get("weather", "")).is_empty()) or not str(now_words.get("ground", "")).is_empty():
+		return str(now_words.get("sentence", ""))
+	return ""
+
+
+## One hail of [param body] to [param player] now, under 554's limits (the
+## player not blocked, not hailed by them today, a cue left, the heard and
+## greeting caps); [param clicked] (560) skips only the pause after a pair
+## found nothing. True when an ask was queued.
+func _hail_now(body: Resident, player: Player, rules: Dictionary, now_msec: int, now: int, day: int, sky: String, clicked := false) -> bool:
+	if _hail_blocked(player, now_msec, rules):
+		return false
+	var card := Townsfolk.card_of(World.production, body.worker_id)
+	if card.is_empty() or Resident.hailed_today(card, player.player_id, day):
+		return false
+	var tried := body.worker_id + "|" + player.player_id
+	if not clicked and World.tick - int(_hail_tried.get(tried, -World.WORLD_TICK_STEPS)) < World.WORLD_TICK_STEPS:
+		return false
+	var heard: Dictionary = _hail_heard.get_or_add(player.player_id, {})
+	for text: Variant in heard.keys():
+		if int(heard[text]) != day:
+			heard.erase(text)
+	var greeted: Dictionary = _hail_greetings.get_or_add(player.player_id, {"day": day, "n": 0})
+	if int(greeted.get("day", -1)) != day:
+		greeted["day"] = day
+		greeted["n"] = 0
+	var greeting_ok := int(greeted["n"]) < int(rules.get("greetings_a_day", 3))
+	var cue := Resident.hail_cue(body.worker_id, body.town, player.player_id, _display_name(player), World.production, now, sky, Offers.ctx, heard.keys(), greeting_ok)
+	if cue.is_empty():
+		_hail_tried[tried] = World.tick
+		return false
+	if str(cue.get("kind", "")) == "greeting":
+		greeted["n"] = int(greeted["n"]) + 1
+	heard[str(cue.get("text", ""))] = day
+	Resident.hail_done(World.production, body.worker_id, player.player_id, cue, day, sky)
+	_write_resident_card(body)
+	_resident_serial += 1
+	_resident_asks.append({"body": body.get_instance_id(), "ask": body.hail_ask(_display_name(player), cue, _resident_serial, "greet" if clicked else "hail"), "at": World.tick,
+		"player": player.player_id, "peer": player.owner_peer})
+	_hail_at[player.player_id] = now_msec
+	print("[%s] %s to %s: %s" % ["greet" if clicked else "hail", body.person, _display_name(player), cue.get("kind", "")])
+	return true
+
+
+## A click on [param body] by [param player] (decision 560, npc's side;
+## Jeff: "the resident stops, turns to face the player and addresses
+## them"). Within TALK_REACH: one greeting a greet.again_seconds for the
+## pair (a click within it only turns them again); in bed, hiding, strayed,
+## escorting, a companion resting, or with an ask of theirs waiting or out:
+## no stop, the greet.refuse word at most; else they stop and face the
+## player for greet.stop_seconds (Resident.address, addressing replicated
+## for the look), say the table's word at once through the spoken path
+## (no mind, no aside), and if they have something real to say today the
+## hail follows, brought forward under 554's limits (_hail_now, clicked).
+func _greeted(player: Player, body: Resident) -> void:
+	if player == null or body == null or not is_instance_valid(body) or not body.spawned or player.player_id.is_empty() \
+			or World.distance(player.tile, body.tile) > TALK_REACH or World.production == null:
+		return
+	var rules: Dictionary = Townsfolk.rules().get("greet", {})
+	var now_msec := Time.get_ticks_msec()
+	var key := body.worker_id + "|" + player.player_id
+	if now_msec - int(_greet_at.get(key, -1000000)) < int(float(rules.get("again_seconds", 10)) * 1000.0):
+		if not body.addressing.is_empty():
+			body.address(player, int(float(rules.get("stop_seconds", 8)) * World.TICK_RATE))  # Turned to them again, nothing new said.
+		return
+	_greet_at[key] = now_msec
+	var busy := false
+	for each: Dictionary in _resident_asks:
+		if int(each["body"]) == body.get_instance_id():
+			busy = true
+	for serial: Variant in _resident_out:
+		if int(_resident_out[serial].get("body", 0)) == body.get_instance_id():
+			busy = true
+	if not _hail_able(body) or busy:
+		var refuse := str(rules.get("refuse", "Not now."))
+		if not refuse.is_empty() and body.card.is_empty():  # A companion resting in town speaks for herself.
+			_resident_says(body, refuse, "", player)
+		return
+	body.address(player, int(float(rules.get("stop_seconds", 8)) * World.TICK_RATE))
+	var card := Townsfolk.card_of(World.production, body.worker_id)
+	var now := World.production.now()
+	var day := Townsfolk.day_of(now)
+	var word := Resident.greet_word(body.trade, Standing.words(card, player.player_id) if not card.is_empty() else "stranger", rules, hash(body.worker_id + ":" + str(day)))
+	_resident_says(body, word, "", player)
+	_hail_now(body, player, Townsfolk.rules().get("hail", {}), now_msec, now, day, _sky_now(), true)
+
+
+## [param line] said by [param body] to [param player] without the mind
+## (560's greeting word, its refusal): the transcript, the party log, the
+## neighbours' hearing, the "speech" message with [param aside] ("" for
+## none), and the player's offers (536).
+func _resident_says(body: Resident, line: String, aside: String, player: Player) -> void:
+	Transcript.record(body.person, body.person, line)
+	if not aside.is_empty():
+		Transcript.record(body.person, body.person, "[aside] " + aside)
+	party_log.add("%s said: \"%s\"%s" % [body.person, line, (" (%s)" % aside) if not aside.is_empty() else ""])
+	_heard_near(body, body.person, line)
+	_own_tale(body, line, _display_name(player))
+	Net.broadcast_to(hearers(body.tile), "speech", {"entity": String(body.get_path()), "speaker": body.person, "text": line, "aside": aside})
+	_send_offers(body, player.player_id, player.owner_peer)
 
 
 ## Why [param player] hears no hail now (decision 554): led by a companion,
