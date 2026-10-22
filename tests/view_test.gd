@@ -4826,6 +4826,18 @@ func _test_bow() -> void:
 	player.raised = ""
 	_rig._process(0.0)
 	_check(rig.upper_clip() == "Bow_Loose", "loosed: Bow_Loose (%s)" % rig.upper_clip())
+	# Drawn, the body turns to ui's aim (583), any angle; not drawn, its facing.
+	var had_aim: Variant = _main.get("aim_drawn")
+	if had_aim != null:
+		player.raised = "draw"
+		_main.set("aim_drawn", true)
+		_main.set("aim_angle", 1.0)
+		var aimed := _rig._aimed_yaw(player, 0.25)
+		player.raised = ""
+		var loose_yaw := _rig._aimed_yaw(player, 0.25)
+		_main.set("aim_drawn", had_aim)
+		_check(is_equal_approx(aimed, -1.0) and is_equal_approx(loose_yaw, 0.25),
+				"drawn, the archer turns to the aim at any angle (%.2f), else its facing (%.2f)" % [aimed, loose_yaw])
 	var nocked := bow.find_child("Nocked", true, false)
 	_check((nocked == null or nocked.is_queued_for_deletion()) and (string == null or string.has_meta("loosed")),
 			"loosed: the arrow gone from the string, the string springing back")

@@ -10008,7 +10008,7 @@ func _sync_puppets() -> void:
 		var at := Vector3(grid.x, _ground_height(grid), grid.y)
 		if puppet.position != at:
 			puppet.position = at
-		var yaw := -entity.shown_facing().angle()
+		var yaw := _aimed_yaw(entity, -entity.shown_facing().angle())
 		var facing := puppet.get_node_or_null("Facing") as Node3D
 		# (Angles kept as float32: compared near enough, not ==.)
 		if facing != null:
@@ -11608,6 +11608,19 @@ func _lay(puppet: Node3D, body: Node3D, yaw: float) -> void:
 	var want := float(puppet.get_meta("faces")) + (PI if lying else 0.0)
 	if not is_equal_approx(model.rotation.y, want):
 		model.rotation.y = want
+
+
+## While the local player draws (decision 583), its body turns to ui's aim,
+## Main.aim_angle (radians on the grid, as the sim's), not its eight-way
+## facing, so the bow points at the marker; [param yaw] otherwise. Read by
+## name: before ui's aim it is the facing, as before.
+func _aimed_yaw(entity: GridEntity, yaw: float) -> float:
+	if String(entity.name) != _local_name or entity.raised != "draw":
+		return yaw
+	var main := get_parent()
+	if main == null or main.get("aim_drawn") != true:
+		return yaw
+	return -float(main.get("aim_angle"))
 
 
 ## A body standing still turns slower than it walks round (560, pc-character's
