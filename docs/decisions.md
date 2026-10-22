@@ -13052,6 +13052,22 @@ companion_test's know_level by cells.
 Rejected: a mesh per kind (boxes again, and no variation); footprints
 off the grid (the sim's walls are edges); saved prefab folders per kind
 (two sources for one shape).
+Amended (Jeff: "building sizes all need space inside, minimum 5x5 - no
+more 3x3 shacks"; the coordinator's approval): a kind's main block (its
+role "main", else its first; Level.main_block) is at least Level.MIN_ROOM
+(5) floor cells each way. Its walls are the edges round it, so a 5x5 house
+has a 5x5 floor, room for a bed, a table and a hearth with a walk round
+them. A wing, a bay, a lean-to or an outshot may be less: each is room
+added. Regrown: hut 5x5 and 6x6 (were 4x5, 5x6); shed 5x5 and 5x6 (3x4,
+4x5); watchtower 5x5 and 6x6 (3x3, 4x4); round_hut and healers_hut a main
+block of 5x5 and 6x6 (3x5, 4x6), their bays kept, 7x5 and 8x6 round. The
+rest already were. Level.kinds() pushes an error for a kind under it, so
+one cannot come back (an engine error fails the suite), and level_test
+says which. The kind prefabs are made from the file (Prefab.kind_prefab),
+so they follow; no real level used the regrown kinds. The slot buildings
+(265: hut and healers_hut 3x3, shed 2x3, house and temple 4x6) are meshes
+and stay; the town that used them is laid fresh in Held as kinds (maps,
+Jeff's Held answer), and the wilds keeps its own.
 
 ## 486. A quarrel brought before the lawspeaker
 

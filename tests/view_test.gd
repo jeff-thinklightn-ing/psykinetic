@@ -1451,7 +1451,7 @@ func _test_composer() -> void:
 	one.free()
 	two.free()
 	_rig.rebuild(level["terrain"], Vector2i(4, 11))
-	var round_hut := _rig._buildings.filter(func(each: Dictionary) -> bool: return each["rect"] == Rect2i(14, 2, 5, 5))
+	var round_hut := _rig._buildings.filter(func(each: Dictionary) -> bool: return each["rect"] == Rect2i(14, 2, 7, 5))
 	_check(round_hut.size() == 1 and (round_hut[0]["node"] as Node3D).find_child("Cone", true, false) != null,
 			"the round hut: one cone over its blocks")
 	var house := _rig._buildings.filter(func(each: Dictionary) -> bool: return each["rect"] == Rect2i(2, 2, 10, 8))

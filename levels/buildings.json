@@ -2,14 +2,14 @@
 	"_about": "Building kinds (decision 488): each kind's sizes as blocks of cells in its own frame, x across, y deep, its front the +y side (the last row's south edges), doors as [x, y, side] on its outline (side N, S, E or W of that cell). A kind may name its roof_set (thatch, shingle; Client3D.KIND_ROOF when none). A level.json building entry {kind, size, at, facing, seed, ruined, use, town} stands its blocks there, turned to its facing. The cells are the sim's rules (walls and doors are the map's edges round the blocks' union); what is drawn need not show them (BuildingComposer).",
 	"kinds": {
 		"hut": {"roof_set": "thatch", "words": "a small hut", "wall_set": "wood", "floor_set": "wood", "sizes": {
-			"small": {"blocks": [[0, 0, 4, 5, "main"]], "doors": [[1, 4, "S"]]},
-			"large": {"blocks": [[0, 0, 5, 6, "main"]], "doors": [[2, 5, "S"]]}}},
+			"small": {"blocks": [[0, 0, 5, 5, "main"]], "doors": [[2, 4, "S"]]},
+			"large": {"blocks": [[0, 0, 6, 6, "main"]], "doors": [[2, 5, "S"]]}}},
 		"round_hut": {"words": "a round hut", "wall_set": "wood", "floor_set": "wood", "roof": "round", "sizes": {
-			"small": {"blocks": [[1, 0, 3, 5, "main"], [0, 1, 1, 3, "bay"], [4, 1, 1, 3, "bay"]], "doors": [[2, 4, "S"]]},
-			"large": {"blocks": [[1, 0, 4, 6, "main"], [0, 1, 1, 4, "bay"], [5, 1, 1, 4, "bay"]], "doors": [[2, 5, "S"], [3, 5, "S"]]}}},
+			"small": {"blocks": [[1, 0, 5, 5, "main"], [0, 1, 1, 3, "bay"], [6, 1, 1, 3, "bay"]], "doors": [[3, 4, "S"]]},
+			"large": {"blocks": [[1, 0, 6, 6, "main"], [0, 1, 1, 4, "bay"], [7, 1, 1, 4, "bay"]], "doors": [[3, 5, "S"], [4, 5, "S"]]}}},
 		"shed": {"words": "a shed", "wall_set": "wood", "floor_set": "wood", "sizes": {
-			"small": {"blocks": [[0, 0, 3, 4, "main"]], "doors": [[1, 3, "S"]]},
-			"large": {"blocks": [[0, 0, 4, 5, "main"]], "doors": [[1, 4, "S"]]}}},
+			"small": {"blocks": [[0, 0, 5, 5, "main"]], "doors": [[2, 4, "S"]]},
+			"large": {"blocks": [[0, 0, 5, 6, "main"]], "doors": [[2, 5, "S"]]}}},
 		"cottage": {"roof_set": "thatch", "words": "a stone cottage", "wall_set": "stone", "floor_set": "stone", "sizes": {
 			"small": {"blocks": [[0, 0, 5, 6, "main"]], "doors": [[2, 5, "S"]]},
 			"large": {"blocks": [[0, 0, 6, 7, "main"], [6, 2, 2, 4, "outshot"]], "doors": [[2, 6, "S"]]}}},
@@ -47,13 +47,13 @@
 			"small": {"blocks": [[0, 0, 6, 6, "main"]], "doors": [[2, 5, "S"]]},
 			"large": {"blocks": [[0, 0, 7, 7, "main"]], "doors": [[3, 6, "S"]]}}},
 		"watchtower": {"words": "a watchtower", "wall_set": "wood", "floor_set": "wood", "storeys": 3, "sizes": {
-			"small": {"blocks": [[0, 0, 3, 3, "main"]], "doors": [[1, 2, "S"]]},
-			"large": {"blocks": [[0, 0, 4, 4, "main"]], "doors": [[1, 3, "S"]]}}},
+			"small": {"blocks": [[0, 0, 5, 5, "main"]], "doors": [[2, 4, "S"]]},
+			"large": {"blocks": [[0, 0, 6, 6, "main"]], "doors": [[2, 5, "S"]]}}},
 		"temple": {"words": "the temple", "wall_set": "stone", "floor_set": "stone", "eaves": 4.5, "place": "temple", "sizes": {
 			"small": {"blocks": [[0, 0, 6, 10, "main"]], "doors": [[2, 9, "S"], [3, 9, "S"]]},
 			"large": {"blocks": [[0, 0, 8, 12, "main"]], "doors": [[3, 11, "S"], [4, 11, "S"]]}}},
 		"healers_hut": {"words": "the healer's hut", "wall_set": "wood", "floor_set": "wood", "roof": "round", "place": "healers_hut", "sizes": {
-			"small": {"blocks": [[1, 0, 3, 5, "main"], [0, 1, 1, 3, "bay"], [4, 1, 1, 3, "bay"]], "doors": [[2, 4, "S"]]},
-			"large": {"blocks": [[1, 0, 4, 6, "main"], [0, 1, 1, 4, "bay"], [5, 1, 1, 4, "bay"]], "doors": [[2, 5, "S"], [3, 5, "S"]]}}}
+			"small": {"blocks": [[1, 0, 5, 5, "main"], [0, 1, 1, 3, "bay"], [6, 1, 1, 3, "bay"]], "doors": [[3, 4, "S"]]},
+			"large": {"blocks": [[1, 0, 6, 6, "main"], [0, 1, 1, 4, "bay"], [7, 1, 1, 4, "bay"]], "doors": [[3, 5, "S"], [4, 5, "S"]]}}}
 	}
 }

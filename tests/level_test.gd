@@ -637,6 +637,13 @@ func _test_kinds() -> void:
 					or not doors.any(func(key: Vector3i) -> bool: return key.z == Terrain.SOUTH and key.y == rect.end.y - 1):
 				bad.append("%s %s" % [kind, size])
 	_check(bad.is_empty() and Prefab.kind_names().size() >= 30, "every kind's sizes: blocks meeting, not overlapping, a door in front (%d prefabs; bad %s)" % [Prefab.kind_names().size(), bad])
+	var cramped: Array[String] = []
+	for kind: String in Level.kinds():
+		for size: String in Level.kinds()[kind]["sizes"]:
+			var main := Level.main_block(Level.kinds()[kind]["sizes"][size])
+			if mini(main.size.x, main.size.y) < Level.MIN_ROOM:
+				cramped.append("%s %s %s" % [kind, size, main.size])
+	_check(cramped.is_empty(), "every kind's main block at least %d x %d floor cells (Jeff's minimum; under: %s)" % [Level.MIN_ROOM, Level.MIN_ROOM, cramped])
 	var unsaid: Array[String] = []
 	for prefab_name in Prefab.kind_names():
 		for turns in 4:

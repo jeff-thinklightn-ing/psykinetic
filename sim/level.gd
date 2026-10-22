@@ -154,6 +154,11 @@ const SPANS_WATER: Array[String] = [BRIDGE]
 const KINDS_FILE := "res://levels/buildings.json"
 ## A kind's size when an entry names none.
 const KIND_SIZE := "small"
+## The least a kind's main block measures each way, in floor cells (Jeff:
+## "building sizes all need space inside, minimum 5x5 - no more 3x3
+## shacks"): its walls are the edges round it, so all of it is floor. A
+## wing, a bay or an outshot may be less. kinds() says so of any under it.
+const MIN_ROOM := 5
 ## A kind's wall height when it names no "eaves": a storey's.
 const STOREY := 3.0
 ## The sides a kind's door names, in its own frame (front +y).
@@ -1835,7 +1840,25 @@ static func kinds() -> Dictionary:
 		if not parsed is Dictionary:
 			push_error("Level: %s does not read as JSON: no building kinds" % KINDS_FILE)
 		_kinds = parsed.get("kinds", {}) if parsed is Dictionary else {}
+		for kind: String in _kinds:
+			for size: String in _kinds[kind].get("sizes", {}):
+				var main := main_block(_kinds[kind]["sizes"][size])
+				if mini(main.size.x, main.size.y) < MIN_ROOM:
+					push_error("Level: kind %s %s's main block is %s, under MIN_ROOM %d each way" % [kind, size, main.size, MIN_ROOM])
 	return _kinds
+
+
+## A kind size's main block ({blocks}: the one whose role is "main", else
+## its first), in its own frame.
+static func main_block(spec: Dictionary) -> Rect2i:
+	var blocks: Array = spec.get("blocks", [])
+	for block: Array in blocks:
+		if block.size() > 4 and str(block[4]) == "main":
+			return Rect2i(int(block[0]), int(block[1]), int(block[2]), int(block[3]))
+	if blocks.is_empty():
+		return Rect2i()
+	var first: Array = blocks[0]
+	return Rect2i(int(first[0]), int(first[1]), int(first[2]), int(first[3]))
 
 
 ## The size a kind building [param entry] names ({blocks, doors}), {} if
