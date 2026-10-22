@@ -2265,6 +2265,18 @@
 			"uses": "a carpenter's claw hammer in a townsman's hand (decision 566, art-kit's side; Jeff, 2026-10-21: \"building a half constructed building\"): not an item (item.hammer is a war hammer), held on hand_r for the hammer activity (pc-character's clip); its origin the grip, the handle along +y, its face toward +x",
 			"grey": [{"at": [0, 0.1, 0], "size": [0.03, 0.32, 0.03]}, {"at": [-0.02, 0.285, 0], "size": [0.17, 0.05, 0.033]}]
 		},
+		"carry.log": {
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-21", "notes": "C:/dev/review/tools/make_log.py: an 8-sided trunk length 1.6 m, thicker at its butt, a little crooked, its bark in two browns in furrows along it, two sawn-off branch stubs, both ends sawn (pale sapwood, a darker ring, the heart); 204 tris"},
+			"category": "items",
+			"type": "mesh",
+			"kind": "held",
+			"size": [1.6, 0.323, 0.27],
+			"base": -0.033,
+			"budget": 250,
+			"sockets": {"grip": [0, 0, 0]},
+			"uses": "a log carried on the shoulder (decision 566, art-kit's side; Jeff, 2026-10-21: \"chopping wood\"), for the carry_log activity on pc-character's \"shoulder\" socket: its origin where it rests on the shoulder, 0.12 m behind its middle (more of it ahead, toward +x), its underside there; its length along x, fore and aft on the socket (pc-character's +x forward along the body), resting on y",
+			"grey": [{"at": [0.12, 0.1285, -0.005], "size": [1.6, 0.323, 0.27]}]
+		},
 		"tool.saw": {
 			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-21", "notes": "C:/dev/review/tools/make_tool.py saw: a hand saw, a closed wooden D handle with the hand's hole drawn dark on both faces, two brass rivets, a tapering steel blade with its teeth along +x; the grip (the origin) the hole's middle; 304 tris"},
 			"category": "items",

@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- A log for carrying on the shoulder has art: a crooked length of trunk with furrowed bark, branch stubs and sawn ends.
 - Work tools have art for the townsfolk to carry: a felling axe, a carpenter's claw hammer and a hand saw.
 - A lone great tree has art: an old broadleaf about twice the forest's height on a low knoll, its roots running over the turf and its crown spreading some seven metres across.
 - Cairns have art: a lumpy pile of rough stones nearly three metres high, leaning a little, with tumbled stones round its foot and a long stone stood upright on top.
