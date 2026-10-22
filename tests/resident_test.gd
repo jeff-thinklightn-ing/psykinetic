@@ -1281,6 +1281,17 @@ func _test_crypt_secrets() -> void:
 	voice.asked_by = "p-friend"
 	var facts := voice.world_facts()
 	_check(founders in facts and told.any(func(t: Array) -> bool: return t[0] == "p-friend" and t[1] == "crypt.founders"), "one he trusts is told, and Main hears which: %s / %s" % [told, facts])
+	# A secret the budget cuts is not reported told (546 amended; lore's old gods filled his budget).
+	var days: Dictionary = Townsfolk.days()
+	var had_chars: Variant = days.get("lore_chars")
+	days["lore_chars"] = {voice.hidden_type(): 1}
+	told.clear()
+	var squeezed := voice.world_facts()
+	_check(squeezed.is_empty() and told.is_empty(), "a budget too small for any secret: none said, none reported told (%s / %s)" % [squeezed, told])
+	if had_chars == null:
+		days.erase("lore_chars")
+	else:
+		days["lore_chars"] = had_chars
 	voice.asked_by = ""
 	_check(not founders in voice.world_facts(), "spoken to by nobody in particular: no secret")
 	Offers.ctx.erase("secret_told")
@@ -1288,6 +1299,8 @@ func _test_crypt_secrets() -> void:
 	_main._secret_told("p-friend", "crypt.founders")
 	_main._secret_told("p-other", "star_fall.age")
 	_check(bool(_main._crypt_told.get("p-friend", false)) and not _main._crypt_told.has("p-other"), "Main marks the crypt's secrets told, no other")
+	_main._secret_told("p-other", "old_gods.war")
+	_check(bool(_main._crypt_told.get("p-other", false)), "and the old gods' (lore's old_gods.*), the same secret's deeper why")
 	_main._crypt_told.clear()
 
 

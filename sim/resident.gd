@@ -1074,10 +1074,8 @@ func world_facts() -> Array[String]:
 		return float(a["weight"]) > float(b["weight"]))
 	var length := 0
 	for fact in facts:
-		if bool(fact.get("secret", false)):
-			if not trusted:
-				continue
-			Offers._call(Offers.ctx, "secret_told", [asked_by, str(fact.get("id", ""))])
+		if bool(fact.get("secret", false)) and not trusted:
+			continue
 		var text := str(fact["text"]).strip_edges()
 		if bool(fact.get("hearsay", false)):
 			text = "It is said that %s" % Hearsay._lower_first(text)
@@ -1085,6 +1083,9 @@ func world_facts() -> Array[String]:
 			break
 		length += text.length() + 1
 		out.append(text)
+		if bool(fact.get("secret", false)):
+			# Told only once it is in the words (546 amended: lore found a secret cut by the budget reported as told).
+			Offers._call(Offers.ctx, "secret_told", [asked_by, str(fact.get("id", ""))])
 	# What the town remembers (447, ruled on by the lawspeaker, 448): as
 	# memory, not fact, after lore's facts, within the same budget.
 	var log: Variant = Offers._call(Offers.ctx, "memory", [town]) if not town.is_empty() else null

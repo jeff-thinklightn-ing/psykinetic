@@ -17360,6 +17360,17 @@ resident_test. Parts to come: Pip's bodiless alms run on the world tick
 Aldous's secret, the gossip and the lived fact; Aldous's secrets as lore's
 entries with knowers; "Take the offering down" (a kept offering births the
 "cheated" standing key from Jeff's list) and "Find the runner".
+
+Amended (2026-10-22, lore's old gods, lore-18's find): world_facts reported
+a secret told (ctx "secret_told") before the budget check, so a secret cut
+by the budget counted as told; the call now follows the words. Aldous's
+three old_gods.* secrets (the war gods, the gold that returns what was
+stolen, the temple's unknowing gifts; lore's f1581ee7) mark the crypt told
+as the crypt.* ones do (Main._secret_told keys on both). The budget stays:
+secrets go only to a trusted player, and the rest hear his common facts
+whole. resident_test: a budget too small for any secret reports none told;
+an old_gods.* told marks the crypt.
+
 ## 442 amended: one Pip
 
 The coordinator's ruling with npc (2026-10-20, Jeff's crypt.md): Pip is a

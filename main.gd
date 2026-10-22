@@ -8613,7 +8613,8 @@ func _give_gold(player_id: String, gold: int, why: String) -> void:
 
 
 func _secret_told(player_id: String, fact_id: String) -> void:
-	if fact_id.begins_with("crypt.") and not player_id.is_empty() and not _crypt_told.get(player_id, false):
+	# The crypt's secrets and the old gods' (lore's old_gods.*, the same secret's deeper why) both mark it.
+	if (fact_id.begins_with("crypt.") or fact_id.begins_with("old_gods.")) and not player_id.is_empty() and not _crypt_told.get(player_id, false):
 		_crypt_told[player_id] = true
 		print("[crypt] %s has been told %s" % [player_id, fact_id])
 
