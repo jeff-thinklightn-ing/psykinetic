@@ -10690,6 +10690,7 @@ func _turn_carried(puppet: Node3D, carried: bool, now: int) -> void:
 ## While drawn, one arrow on the bow's string at its nock, the string pulled
 ## back toward the drawing hand; let go, the arrow gone and the string
 ## springing back (bow_string).
+const NOCKED_TURN := Basis(Vector3.RIGHT, PI * 0.5)
 func _show_nocked(puppet: Node3D, ids: Array, drawn: bool) -> void:
 	var sockets: Dictionary = puppet.get_meta("sockets")
 	var bow := (sockets["hand_l"] as Node3D).get_node_or_null("Held") as Node3D
@@ -10721,10 +10722,13 @@ func _show_nocked(puppet: Node3D, ids: Array, drawn: bool) -> void:
 	if arrow == null and ArtKit.has("fx.arrow"):
 		arrow = ArtKit.instance("fx.arrow", int(ARROW_VARIANTS.get(str(ids[0]), 1)))
 		arrow.name = "Nocked"
-		# Its notch at the nock, its head (+y) toward the target (the bow's +z).
-		arrow.basis = Basis(Vector3.RIGHT, PI * 0.5)
+		# Its notch at the nock, its head (+y) toward the target (the bow's +z). On the
+		# string's parent, kept at the string below, never under the string itself: the art's
+		# string box is hidden for the drawn segments (_string_segments), and the arrow went with it
+		# (Jeff: "the arrow doesn't load into the bow with drawing").
+		arrow.basis = NOCKED_TURN
 		var nock := bow.find_child("nock", true, false) as Node3D
-		(string if string != null else nock if nock != null else bow).add_child(arrow)
+		(string.get_parent() if string != null else nock if nock != null else bow).add_child(arrow)
 	if string != null:
 		# Back toward the drawing hand, never past it nor forward of the brace,
 		# nor further than a bow draws (BOW_DRAW_MAX: a pose not yet applied).
@@ -10735,6 +10739,8 @@ func _show_nocked(puppet: Node3D, ids: Array, drawn: bool) -> void:
 		if string.has_meta("loosed"):
 			string.remove_meta("loosed")
 		_string_bend(string, flex)
+		if arrow != null:
+			arrow.transform = string.transform * Transform3D(NOCKED_TURN, Vector3.ZERO)
 
 
 ## The string's nock point [param seconds] after a draw of [param pulled] m

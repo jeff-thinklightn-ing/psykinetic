@@ -4549,7 +4549,9 @@ func _test_bow() -> void:
 	_check(rig.upper_clip() == "Bow_Draw" and rig.upper_position() < 0.01,
 			"drawing: Bow_Draw from the nock (%s, %.2f)" % [rig.upper_clip(), rig.upper_position()])
 	World.tick_alpha = alpha_was
-	_check(bow.find_child("Nocked", true, false) != null or not ArtKit.has("fx.arrow"), "an arrow on the string")
+	var on_string := bow.find_child("Nocked", true, false) as Node3D
+	_check((on_string != null and on_string.is_visible_in_tree()) or not ArtKit.has("fx.arrow"),
+			"an arrow on the string, shown (Jeff: \"the arrow doesn't load into the bow with drawing\")")
 	# Scrubbed by the sim's draw (bow_pull): the nock by the ticks to draw_min,
 	# then the pull by draw_of (0.5 at 10 of the bow's 20 ticks: a third of the
 	# way from draw_min's 0.25 to 1).

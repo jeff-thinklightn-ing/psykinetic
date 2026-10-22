@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Drawing a bow shows the arrow on the string again, from the first moment of the draw; it had been hidden along with the bow's old string.
 - The temple and the town follow Theus, the one god of their homeland; Aldous and the draugr know the old gods' war god, Psyke, empowers the draugr, and Pip keeps quiet for his pay and a promised holy knighthood of Theus.
 - Townsfolk know where the smith went: after a rumoured great dwarven forge deep below the castle, with hired guards, until an ambush took him; the goblins have him working weapons for the Blood Rot's raids.
 - Aldous and the draugr know the old gods: forgotten gods of war who send the fallen back to battle, angered by grave robbers and appeased by gold that returns what was stolen.
