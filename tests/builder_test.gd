@@ -710,6 +710,11 @@ func _test_plots() -> void:
 	_check("Plots here (ground the town keeps for new buildings): p1 at (4, 4), 6 x 6, its street to the south." in session._situation(), "the request lists the plots")
 	doc.config.erase("roads")
 	_check(BuilderSession.new(doc, Rect2i(0, 0, 40, 30), "test_field", StubClaude.new([])).street_checks().size() == 1, "no roads in the level: only the plot's side is said")
+	(doc.config["plots"] as Array).append({"key": "p2", "rect": [30, 20, 4, 6], "facing": [0, 1]})
+	var small := BuilderSession.new(doc, Rect2i(0, 0, 40, 30), "test_field", StubClaude.new([])).street_checks()
+	_check(small.size() == 2 and "the plot p2 is 4 x 6: too small for a building, whose room is 5 x 5 at least" in small[0],
+		"a plot under Level.MIN_ROOM one way: said (%s)" % [small])
+	_check(BuilderSession.new(doc, Rect2i(0, 0, 20, 20), "test_field", StubClaude.new([])).street_checks().size() == 1, "a small plot outside the area: not said")
 	var moved := LevelMap.moved_config(doc.config, func(cell: Vector2i) -> Vector2i: return Vector2i(29 - cell.y, cell.x), 1)
 	var plot: Dictionary = moved["plots"][0]
 	_check(plot["rect"] == [20, 4, 6, 6] and plot["facing"] == [-1, 0], "a quarter turn moves a plot and turns its street side (%s)" % [plot])

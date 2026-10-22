@@ -13081,6 +13081,13 @@ so they follow; no real level used the regrown kinds. The slot buildings
 and stay; the town that used them is laid fresh in Held as kinds (maps,
 Jeff's Held answer), and the wilds keeps its own.
 
+Amended, builder's side: a plot (564) narrower than Level.MIN_ROOM either
+way holds no building, so BuilderSession.street_checks says so for each
+plot in the area ("the plot p2 is 4 x 6: too small for a building, whose
+room is 5 x 5 at least: make it bigger"), reading the constant, so the
+number lives in one place. Builder's prefab list was already the kinds
+file's. builder_test _test_plots.
+
 ## 486. A quarrel brought before the lawspeaker
 
 The coordinator's assignment of 2026-10-18 ("errands from what is

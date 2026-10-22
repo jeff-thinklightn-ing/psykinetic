@@ -1553,6 +1553,10 @@ static func plots_from(config: Dictionary) -> Array[Dictionary]:
 func street_checks() -> Array[String]:
 	var out: Array[String] = []
 	var plots := plots_from(working.config)
+	for plot: Dictionary in plots:
+		var room: Rect2i = plot["rect"]
+		if area.intersects(room) and mini(room.size.x, room.size.y) < Level.MIN_ROOM:
+			out.append("the plot %s is %d x %d: too small for a building, whose room is %d x %d at least: make it bigger" % [plot["key"], room.size.x, room.size.y, Level.MIN_ROOM, Level.MIN_ROOM])
 	var streets := {}
 	for road: Dictionary in Curves.parse(working.config, "roads", [] as Array[String]):
 		streets.merge(Curves.cells(road["curve"], false))
