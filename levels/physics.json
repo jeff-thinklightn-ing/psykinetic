@@ -1,0 +1,14 @@
+{
+	"shove_scale": 0.1,
+	"knockback_min_speed": 1.5,
+	"slide_per_speed": 1.5,
+	"max_travel": 10,
+	"momentum_scale": 0.25,
+	"momentum_ticks": 3,
+	"restitution": 0.2,
+	"impact_per_energy": 0.075,
+	"brace_restitution": 1.0,
+	"stun_ticks_base": 4,
+	"stun_ticks_per_speed": 3.0,
+	"knockback_stun_ticks": 7
+}

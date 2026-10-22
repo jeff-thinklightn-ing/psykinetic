@@ -123,6 +123,11 @@ var down_until := 0
 var downed_until := 0
 var channel_of := ""
 var channel_until := 0
+## Server: its last step's velocity in cells a tick (World.try_move), for
+## the momentum it carries into a blow (World.body_velocity, decision 592).
+var step_velocity := Vector2.ZERO
+## Server: the tick (maybe fractional) that step ends.
+var step_until := -100000.0
 ## Server: the tick it last took a step (World.try_move): a spear is braced
 ## standing still (World.braced, decision 344).
 var last_step_tick := -100000

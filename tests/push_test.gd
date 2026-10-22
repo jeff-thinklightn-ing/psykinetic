@@ -5,10 +5,12 @@ extends Node
 ##
 ## Numbers below assume the scene defaults: player mass 80 / strength 10 /
 ## stamina 100, imp mass 40 / hp 12 / strength 6 / stamina 60, crate mass 30 /
-## hp 12, boulder mass 200, and World's force_scale 0.1, max_force 4,
-## impact_per_force 2, ratio clamp 1.5. So a player's shove has force
-## 10 * 80 / 40 * 0.1 = 2.0 on a rested imp and 2.67 on a crate, each with
-## ratio 1.5, and costs 5 + force * mass * 0.15 = 17 stamina. Force is then
+## hp 12, boulder mass 200, and levels/physics.json's (decision 592)
+## shove_scale 0.1, slide_per_speed 1.5, impact_per_energy 0.075,
+## restitution 0.2, momentum_scale 0.25. So a player's shove has force (the
+## speed it gives) 10 * 80 * 0.1 / 40 = 2.0 on a rested imp, 3 cells, and
+## 2.67 on a crate, and costs 5 + force * mass * 0.15 = 17 stamina; against
+## a wall at once it hurts 0.075 * 1/2 * 40 * 2^2 = 6. Force is then
 ## scaled by the shover's stamina fraction. Regen is 2 per tick, starting 10
 ## ticks after the last exertion.
 
@@ -85,8 +87,10 @@ func _test_shove_monster_into_monster() -> void:
 	var second: GridEntity = e["m"][1]
 	_shove(e["P"][0], first)
 	_check(first.tile == Vector2i(2, 1), "first imp is stopped at once by the second")
-	_check(_damage(first, &"impact") == 6, "first imp takes impact 6 (got %d)" % _damage(first, &"impact"))
-	_check(_damage(second, &"impact") == 6, "second imp takes impact 6 (got %d)" % _damage(second, &"impact"))
+	# A collision (decision 592): the second goes on at 1.2 * 40 * 2 / 80
+	# = 1.2 (one tile), and the energy lost, 80 - 28.8, is shared: 2 each.
+	_check(_damage(first, &"impact") == 2, "first imp takes impact 2 (got %d)" % _damage(first, &"impact"))
+	_check(_damage(second, &"impact") == 2, "second imp takes impact 2 (got %d)" % _damage(second, &"impact"))
 	_check(second.tile == Vector2i(4, 1), "second imp moves exactly one tile (at %s)" % second.tile)
 
 
@@ -239,7 +243,8 @@ func _test_no_friendly_fire() -> void:
 	_check(first.next_attack_tick == 0, "the refused hits cost no cooldown")
 	_walk_to(second, Vector2i(3, 1))
 	_shove(second, imp)
-	_check(_damage(imp, &"impact") == 6, "players can still shove monsters (impact %d)" % _damage(imp, &"impact"))
+	# Its step just taken adds momentum (decision 592): 2.2 against the wall, 7.
+	_check(_damage(imp, &"impact") == 7, "players can still shove monsters (impact %d)" % _damage(imp, &"impact"))
 
 
 func _test_stamina() -> void:
@@ -341,7 +346,9 @@ func _test_stamina() -> void:
 		var before := imp.tile.x
 		_shove(player, imp)
 		thrown.append(imp.tile.x - before)
-	_check(thrown == [3, 2, 2, 1, 1, 0], "knockback fades shove by shove instead of cutting out: %s" % [thrown])
+	# Each shove comes straight off a step, its momentum keeping the last
+	# one moving (decision 592).
+	_check(thrown == [3, 2, 2, 1, 1, 1], "knockback fades shove by shove instead of cutting out: %s" % [thrown])
 
 
 func _test_stun() -> void:
@@ -373,10 +380,10 @@ func _test_stun() -> void:
 	var second: GridEntity = e["m"][1]
 	_shove(e["P"][0], first)
 	_check(first.tile == Vector2i(4, 1) and second.tile == Vector2i(5, 1), "first imp flies two tiles and stops against the second")
-	_check(_damage(first, &"impact") == 0 and _damage(second, &"impact") == 0, "with no force left, the collision does no damage")
+	_check(_damage(first, &"impact") == 0 and _damage(second, &"impact") == 0, "with 0.67 speed left, the collision does no damage")
 	_check(World.is_stunned(first) and World.is_stunned(second), "but both imps are stunned")
 	_check(first.stunned_until_tick == World.tick + 11, "the thrown one for its 4-tick slide + 7 (until %d, now %d)" % [first.stunned_until_tick, World.tick])
-	_check(second.stunned_until_tick == World.tick + 4, "the one run into for the base 4 ticks (until %d, now %d)" % [second.stunned_until_tick, World.tick])
+	_check(second.stunned_until_tick == World.tick + 6, "the one run into for 4 + 3 x 0.67 ticks (until %d, now %d)" % [second.stunned_until_tick, World.tick])
 	_check(not World.is_stunned(e["P"][0]), "the shover is not")
 
 	# Knocked back across open ground, hitting nothing: still stunned a beat.

@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Knockback follows mass, momentum and angle (592): a blow pushes a body by the two weights, stepping into a blow hits harder, a push can go at any angle, a body knocked into another knocks it on by their weights, and a light body hits a wall harder than a heavy one; the numbers are in levels/physics.json; a braced spear throws a charging boar back 1 cell, not 3.
 - Fixed: a world reset could leave the world holding freed bodies (572 amended (2)).
 - Each companion now has a focus split between fighting, magic and stealth, rolled from who she is and slowly shaped by what she does (eating and fighting, shooting a bow); she knows which way she leans (577).
 - A bard's hat, a red felt cap with a long feather, made for the bard to wear once the head attachment is in.

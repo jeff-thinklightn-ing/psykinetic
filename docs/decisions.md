@@ -21044,3 +21044,63 @@ dictionary refuses a freed key even to look one up or erase it, so
 _forget_jobs and _fade_buffs rebuild theirs from keys and values side by
 side, keeping the live entries (items_test's rebuild left a bandaging
 holding a freed body). Server sim, protocol unchanged, no new class_name.
+## 592: knockback by impulse, mass, momentum and angle (physics step 1)
+
+The physics tree's first step (C:/dev/review/physics/model.md and step1_design.md;
+the coordinator's approval, 2026-10-22). The sim's push had no velocity, so moving into a
+blow added nothing (a blow mid-step is refused); it went only the eight compass ways; two
+clamps flattened mass (max_force 4 made every body under 20 kg fly as one of 20, the ratio
+clamp 1.5 stopped it mattering under 53 kg) and mass counted twice; and a body knocked into
+a body passed on "force left - 1" whatever the two weighed, with the mover's mass a budget.
+
+- A push's "force" is now the speed it gives its body. A shove's impulse is strength x the
+  shover's mass x shove_scale; the body's speed is that over its pushed mass (exhausted and
+  downed still halve it). One division by mass, no clamp. A blow carries
+  ATTACK_FORCE_FACTOR x its verb's force of it (World.blow_impulse), held to
+  knockback_min_force as Jeff's rule says (decision 305), now a speed. The guard (340)
+  weighs the same number, so guards are unchanged.
+- The slide: slide_per_speed cells per unit of speed, at most max_travel 10 (a sanity
+  limit, the coordinator's: bodies under about 16 kg are all flattened by it, the one place
+  mass is), along the push's line at any angle, traced a cell at a time (the longer axis a
+  whole cell each step), speed lost as it goes (each cell, diagonal or not, 1 over
+  slide_per_speed, as before).
+- Momentum: a step sets the body's step_velocity (direction / its step's ticks, server
+  only, never sent) till momentum_ticks after it ends (World.body_velocity). A blow, shove
+  or bash adds momentum_scale (a swing's share) x the attacker's mass x that velocity over
+  the target's mass, as a vector: along the blow it adds, across it it angles the push,
+  backward along it it is dropped. A toss is aimed and takes none.
+- What a sliding body meets, with speed u left: a wall, a closed door or a step up stops it
+  and hurts impact_per_energy x 1/2 m u^2 (a door takes the same), so the same shove hurts a
+  light body more against a wall (240 / m with the defaults). A body: a collision along the
+  line with restitution: the one met goes on at (1 + e) m1 u / (m1 + m2), the mover stops
+  behind it, the energy lost is shared between them as impact, and the one met may knock on
+  another. The mover's mass budget is gone: a body moves when its speed carries a cell. Drops
+  (falls keep their 3 a level), water and fire are as before; stuns as before, by speed left.
+- The braced spear (344): the charger's whole momentum (a body run onto a stop, not a
+  swing's share) turned back, (1 + brace_restitution, 1 at most) x its speed, plus the
+  spear's blow, not held to the threshold; BRACE_FORCE_PER_KG is gone. A charging boar at its
+  pace goes back 1 cell, where it went 3: the one feel number this step changes.
+- For combat (combat-1d's interface, agreed): World.apply_blow(source, target, {impulse,
+  direction: Vector2, stagger}) pushes at once (not queued), the source's momentum added,
+  and returns and emits blow_resolved {moved, distance, cells, stopped_by, impact_damage,
+  struck, knocked_down, speed}; stagger is combat's beat past a slide (-1,
+  knockback_stun_ticks). World.body_velocity and World.mass_of for its timing and costs.
+  Damage stays combat's, collision damage physics'. _push returns each body's
+  {body, from, to, cells, stopped_by, impact}.
+- The numbers are in levels/physics.json (World.load_physics_rules at start; a value missing
+  or not a number at least 0 keeps its default, warned), for combat and Jeff to tune. Drafted
+  to keep today's feel: for bodies under 53 kg the distances are today's exactly (the old
+  ratio clamp was 1.5, now slide_per_speed); heavier ones go a little farther (a hammer moves
+  a 70 kg brute 2 cells, was 1); a fist or a sword still moves a 70 kg brute nothing.
+- The client's guess of a shove (predict_push_end) reads the same speed and slide, the mover
+  standing. Thrown things (try_throw) keep their old impact rule (impact_per_force,
+  mass_ratio) till a later step makes them move what they hit.
+
+tests/physics_test (new: the rules file; one hammer blow on 25, 40, 70, 90 kg, 7, 4, 2, 0
+cells; an 85 kg body standing still under a hammer blow, knocked 2 when the blow comes
+stepping in, unmoved when backing away; a push along (2, 1) six cells off every compass
+line; the same shove into a wall 10, 6, 3 hp by mass; goblin into goblin, into a boulder,
+brute into imp; the brace). push_test's numbers where the rule changed: a monster shoved into
+a monster takes 2 and gives 2 (was 6 and 6: the energy goes into moving the second), a shove
+just after a step 7 against the wall (was 6) and the lane's last shove 1 cell (was 0), both by
+the step's momentum, and the one run into stunned 6 (was 4) by the speed left.

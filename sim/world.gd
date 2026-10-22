@@ -24,6 +24,10 @@ signal entity_moved(entity: GridEntity, from: Vector2i, to: Vector2i)
 ## [param cause] is &"attack", &"shot", &"impact" or &"fire".
 signal entity_damaged(entity: GridEntity, amount: int, source: GridEntity, cause: StringName)
 signal entity_pushed(entity: GridEntity, by: GridEntity, direction: Vector2i, tiles: int, impact: int, stopped_by: String)
+## A blow's push resolved (apply_blow, decision 592): [param result]'s
+## moved, distance, cells, stopped_by, impact_damage, struck, knocked_down
+## and speed, for combat's hit-stop, sound and stagger. Server only.
+signal blow_resolved(source: GridEntity, target: GridEntity, result: Dictionary)
 signal entity_despawned(entity: GridEntity)
 ## Reduced to 0 hp by [param cause] (&"attack", &"shot", &"impact", &"fire"), just
 ## before it is removed.
@@ -300,7 +304,7 @@ const DOWN_MASS_FACTOR := 0.5
 ## A spear is braced (decision 344) once its holder has stood this
 ## many ticks without a step; a creature charging into its reach is then
 ## stopped, struck for BRACE_DAMAGE_FACTOR times the blow and pushed back
-## with BRACE_FORCE_PER_KG times its own mass: its own charge, turned.
+## by the blow and its own momentum, turned (brace_restitution, decision 592).
 const BRACE_TICKS := 5
 ## The least status of lore's name forms that names things (decision 365;
 ## Lore.name_forms): "agreed" in play; tests and clips use "draft".
@@ -309,17 +313,44 @@ var name_least := "agreed"
 ## 370; the pack panel tints a slot that says it).
 const KEPT_MARK := "ill-starred"
 const BRACE_DAMAGE_FACTOR := 2.0
-const BRACE_FORCE_PER_KG := 0.03
 ## Mass multiplier for being pushed while at 0 stamina.
 const EXHAUSTED_MASS_FACTOR := 0.5
 
 # Exported vars, not consts: GDScript cannot export constants.
-## Impact damage per unit of force left over when a pushed entity is stopped.
+## A thing thrown into a body (try_throw): impact per unit of its force,
+## scaled by mass_ratio. The one push left outside decision 592's model,
+## till thrown things move what they hit.
 @export var impact_per_force := 2
-## FORCE_SCALE: force = strength x mover_mass / target_mass x this.
-@export var force_scale := 0.1
-## MAX_FORCE: upper clamp on that force.
-@export var max_force := 4.0
+## The knockback model (decision 592): every value from PHYSICS_RULES,
+## read at start (load_physics_rules), so combat and Jeff tune them there.
+## A "force" is the speed a push gives its body, in cells a tick over
+## slide_per_speed: a shove's is strength x the shover's mass x
+## shove_scale / the body's pushed mass (push_force).
+const PHYSICS_RULES := "res://levels/physics.json"
+@export var shove_scale := 0.1
+## A pushed body slides this many cells per unit of speed, at most
+## max_travel (a sanity limit: bodies under about 16 kg are all flattened
+## by it, the one place mass is), speed lost as it goes.
+@export var slide_per_speed := 1.5
+@export var max_travel := 10
+## Moving into a blow adds momentum_scale (the share of a body's momentum
+## a swing carries) x the attacker's mass x its
+## step's velocity (cells a tick; body_velocity) over the target's mass,
+## for momentum_ticks after its step ends; only forward along the blow
+## (moving across it angles the push, backing away takes nothing off).
+@export var momentum_scale := 0.25
+@export var momentum_ticks := 3
+## A sliding body meeting another: the one met goes on at
+## (1 + restitution) m1 u / (m1 + m2), the mover stops behind it, and the
+## energy lost is shared between them as impact.
+@export var restitution := 0.2
+## Impact hp per unit of energy (1/2 m u^2, u the speed left) when a body
+## is stopped by a wall, a door, a step up or a body.
+@export var impact_per_energy := 0.075
+## A braced spear is a stiff stop: a charger's whole momentum (not a
+## blow's share of it) comes back at it (1 + this) times, 1 at most, an
+## elastic stop (_meets_brace).
+@export var brace_restitution := 1.0
 ## SHOVE_COST_BASE and SHOVE_COST_SCALE: a shove costs
 ## base + force x target_mass x scale stamina.
 @export var shove_cost_base := 5.0
@@ -327,15 +358,15 @@ const EXHAUSTED_MASS_FACTOR := 0.5
 ## STAMINA_REGEN: stamina regained on a tick spent resting or walking.
 @export var stamina_regen := 2
 ## A creature that is thrown into a wall or another entity, or is the one run
-## into, is stunned for base + round(remaining force x per_force) ticks.
+## into, is stunned for base + round(remaining speed x per_force) ticks.
 @export var stun_ticks_base := 4
 @export var stun_ticks_per_force := 3.0
 ## A creature knocked back (it moved) is stunned at least this many ticks
 ## past the end of its slide, wall or no wall: a beat to double over before
 ## it can act again.
 @export var knockback_stun_ticks := 7
-## An attack's blow (after ATTACK_FORCE_FACTOR) pushes only from this force
-## up; a lighter one only hurts. Shoves, tosses, throws and falls are not
+## An attack's blow (after ATTACK_FORCE_FACTOR and momentum) pushes only
+## from this speed up; a lighter one only hurts. Shoves, tosses, throws and falls are not
 ## held to it (decision 305).
 @export var knockback_min_force := 1.5
 ## Ticks after attacking, shoving or being thrown before regen resumes.
@@ -597,6 +628,9 @@ class Hit:
 	var direction := Vector2i.ZERO
 	## Which way the target is pushed. The same as direction unless tossed.
 	var push_direction := Vector2i.ZERO
+	## The line it is pushed along (decision 592): push_direction, angled
+	## by the source's momentum; ZERO, push_direction's own.
+	var push_way := Vector2.ZERO
 	var damage := 0
 	var force := 0.0
 
@@ -3221,6 +3255,30 @@ func _ready() -> void:
 	entity_moved.connect(_on_moved_for_stockpile)
 	entity_pushed.connect(_on_pushed_for_stockpile)
 	entity_despawned.connect(func(entity: GridEntity) -> void: _pushed_by.erase(entity))
+	load_physics_rules(FileAccess.get_file_as_string(PHYSICS_RULES))
+
+
+## The knockback model's numbers (decision 592) from [param text], the
+## rules file's JSON: each key it gives sets its value; one missing, or not
+## a number at least 0, keeps the default (and is warned about).
+func load_physics_rules(text: String) -> void:
+	var data: Variant = JSON.parse_string(text) if not text.is_empty() else null
+	if data is not Dictionary:
+		push_warning("World: %s unreadable; the physics defaults hold" % PHYSICS_RULES)
+		return
+	# The file's names where they differ from the vars'.
+	var names := {"knockback_min_speed": "knockback_min_force", "stun_ticks_per_speed": "stun_ticks_per_force"}
+	for key: String in data:
+		var field: String = names.get(key, key)
+		var given: Variant = data[key]
+		if not field in ["shove_scale", "knockback_min_force", "slide_per_speed", "max_travel", "momentum_scale",
+				"momentum_ticks", "restitution", "impact_per_energy", "brace_restitution", "stun_ticks_base",
+				"stun_ticks_per_force", "knockback_stun_ticks"]:
+			push_warning("World: %s's %s is not a physics rule" % [PHYSICS_RULES, key])
+		elif (given is int or given is float) and float(given) >= 0.0:
+			set(field, int(given) if get(field) is int else float(given))
+		else:
+			push_warning("World: %s's %s is %s; %s kept" % [PHYSICS_RULES, key, given, get(field)])
 
 
 ## Who last pushed each crate or cart, by entity, for the stockpile's
@@ -4279,6 +4337,8 @@ func try_move(entity: GridEntity, direction: Vector2i) -> bool:
 			link_bumped.emit(entity, entity.tile + direction)
 		return false
 	entity.next_move_tick = start + duration
+	entity.step_velocity = Vector2(direction) / duration  # Its momentum (body_velocity).
+	entity.step_until = entity.next_move_tick
 	entity.last_step_tick = tick  # (A braced spear stands still: braced.)
 	_trample(entity, entity.tile - direction)
 	if entity.raised == "draw":
@@ -4483,7 +4543,9 @@ func try_bash(by: GridEntity, target: GridEntity) -> bool:
 		return false
 	var verb := bash_verb(by)
 	var aim := target.tile - by.tile
-	var force := push_force(by, target) * ATTACK_FORCE_FACTOR * float(verb["bash_force"])
+	var way := Vector2(aim).normalized() * push_force(by, target) * ATTACK_FORCE_FACTOR * float(verb["bash_force"]) \
+			+ momentum_push(by, target, Vector2(aim))  # Lunging into it (decision 592).
+	var force := way.length()
 	var raw_force := force
 	if force < knockback_min_force:
 		force = 0.0  # Too light to move it: the stagger alone.
@@ -4498,6 +4560,7 @@ func try_bash(by: GridEntity, target: GridEntity) -> bool:
 	by.protected = false
 	noise(by.tile, Senses.NOISE_FIGHT, &"fight", by)
 	_queue_hit(by, target, aim, aim.clamp(Vector2i(-1, -1), Vector2i(1, 1)), 0, force, raw_force, true, 0)
+	_hits[-1].push_way = way
 	_hits[-1].bash = int(verb["bash_stagger"])
 	return true
 
@@ -4736,14 +4799,11 @@ func _note_strike_sent(entity: GridEntity) -> void:
 ## (force, stamina, mass, terrain, whoever is in the way), changing
 ## nothing. A client's guess: the server's _push is what happens.
 func predict_push_end(mover: GridEntity, body: GridEntity, direction: Vector2i) -> Vector2i:
-	var body_mass := pushed_mass(body)
-	if body_mass > mover.mass:
-		return body.tile
 	var force := push_force(mover, body)
 	var cost := shove_cost(force, body)
 	if mover.max_stamina > 0 and cost > 0 and mover.stamina < cost:
 		force *= float(mover.stamina) / cost
-	var max_tiles: int = floori(force * mass_ratio(mover.mass, body_mass) + 0.001)
+	var max_tiles: int = mini(floori(force * slide_per_speed + 0.001), max_travel)  # The mover standing (decision 592).
 	var at := body.tile
 	var tiles := 0
 	while tiles < max_tiles:
@@ -5038,17 +5098,22 @@ func _try_hit(attacker: GridEntity, target: GridEntity, hit_damage: int, is_shov
 				attacker.stamina = 0
 			else:
 				attacker.stamina -= cost
-	var raw_force := force
 	if not is_shove:
 		force *= ATTACK_FORCE_FACTOR * float(verb.get("force", 1.0))
-		raw_force = force
-		if force < knockback_min_force:
-			force = 0.0  # A blow too light to knock back: damage only.
-		if hit_damage > 0 and not verb.is_empty():
-			var scale := float(verb["damage"])
-			if verb.get("kind") == "backstab" and is_behind(attacker, target):
-				scale *= float(verb["behind"])
-			hit_damage = maxi(1, roundi(hit_damage * scale))
+	# Moving into it adds the attacker's momentum (decision 592), and
+	# moving across it angles the push; a toss is aimed, and takes none.
+	var push_way := Vector2(push_direction)
+	if push_direction == aim.clamp(Vector2i(-1, -1), Vector2i(1, 1)):
+		push_way = push_way.normalized() * force + momentum_push(attacker, target, push_way)
+		force = push_way.length()
+	var raw_force := force
+	if not is_shove and force < knockback_min_force:
+		force = 0.0  # A blow too light to knock back: damage only.
+	if not is_shove and hit_damage > 0 and not verb.is_empty():
+		var scale := float(verb["damage"])
+		if verb.get("kind") == "backstab" and is_behind(attacker, target):
+			scale *= float(verb["behind"])
+		hit_damage = maxi(1, roundi(hit_damage * scale))
 	var down := int(verb["down_ticks"]) if verb.get("kind") == "knockdown" else 0
 	if down > 0:
 		down += int(Items.strength_value(slot_strength(attacker, Items.RIGHT_HAND), "down_ticks", 0))  # A heavy axe's.
@@ -5056,6 +5121,7 @@ func _try_hit(attacker: GridEntity, target: GridEntity, hit_damage: int, is_shov
 	if not is_shove:
 		deed = "downed" if down > 0 else "behind" if verb.get("kind") == "backstab" and is_behind(attacker, target) else "struck"
 	_queue_hit(attacker, target, aim, push_direction, hit_damage, force, raw_force, is_shove, down)
+	_hits[-1].push_way = push_way
 	_hits[-1].deed = deed
 	if down > 0 and aim in DIRECTIONS:
 		# A giant axe's arc (decision 343): the cells either side of the
@@ -5126,40 +5192,49 @@ func _resolve_hits() -> void:
 			elif creature and holder_grudge(hit.source, kind_of(hit.target)):
 				_stun_for(hit.target, int(Items.growth()["grudge_stagger"]))  # A grudge's blow (decision 417).
 		if hit.force > 0.0 and _alive(hit.target):
-			_push(hit.source, hit.target, hit.push_direction, hit.force, hit.push_direction != hit.direction)
+			var way := hit.push_way if hit.push_way != Vector2.ZERO else Vector2(hit.push_direction)
+			_push(hit.source, hit.target, way, hit.force, hit.push_direction != hit.direction)
 
 
-## Force push. The mover's mass is a budget: each body set in motion spends its
-## own mass from it, and a body heavier than what is left does not move. A body
-## travels up to floor(force * ratio) tiles; whatever force is left when
-## something stops it becomes impact. Nothing here knows what kind of entity
-## it is pushing.
+## Force push (decision 592). [param force] is the speed the push gives
+## [param first]; it slides slide_per_speed cells a unit of it (at most
+## max_travel) along [param way], a line at any angle traced a cell at a
+## time, losing speed as it goes. Stopped by a wall, a closed door or a
+## step up, the speed left (u) hurts it, impact_per_energy x 1/2 m u^2;
+## by a body, the two collide: the one met goes on at
+## (1 + restitution) m1 u / (m1 + m2) (and may knock on another), the
+## energy lost is shared as impact. Off a drop it falls, and the fall is
+## what hurts. Nothing here knows what kind of entity it is pushing.
 ## [param toss]: the first body was tossed (aimed another way than straight
-## on), for the views; what it knocks on is pushed.
-func _push(mover: GridEntity, first: GridEntity, direction: Vector2i, force: float, toss := false) -> void:
-	var mover_mass: float = mover.mass
-	var budget: float = mover_mass
+## on), for the views; what it knocks on is pushed. [param stagger]: the
+## ticks a body that slid stays stunned past its slide (combat's; -1,
+## knockback_stun_ticks). What happened to each body set moving, in order:
+## {body, from, to, cells, stopped_by, impact}.
+func _push(mover: GridEntity, first: GridEntity, way: Vector2, force: float, toss := false,
+		stagger := -1) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	if way == Vector2.ZERO:
+		return out
+	# One cell a step along the line: the longer axis a whole cell each.
+	var line := way / maxf(absf(way.x), absf(way.y))
 	var body: GridEntity = first
-	var f: float = force
-	while body != null and f > 0.0:
-		# An exhausted body counts as half its mass for everything below.
+	var u: float = force
+	while body != null and u > 0.0:
+		# An exhausted or downed body counts as less mass (pushed_mass).
 		var body_mass := pushed_mass(body)
-		if body_mass > budget:
+		# Less than a tile's worth of speed moves nothing and hurts nothing.
+		var max_tiles: int = mini(floori(u * slide_per_speed + 0.001), max_travel)
+		if max_tiles == 0:
 			if _logs_for(mover):
-				_log("push: %s -> %s blocked: too heavy (mass %s, %s left)" % [
-					mover.name, body.name, body_mass, budget])
-			return
-		budget -= body_mass
-
-		var ratio := mass_ratio(mover_mass, body_mass)
-		# Less than a tile's worth of force moves nothing and hurts nothing.
-		var max_tiles: int = floori(f * ratio + 0.001)
+				_log("push: %s -> %s blocked: too heavy (mass %s, speed %.2f)" % [mover.name, body.name, body_mass, u])
+			return out
 		var start: Vector2i = body.tile
 		var tiles := 0
 		var stopped := false
 		var collided := false
 		var stopped_by := "nothing (force spent)"
 		var blocker: GridEntity = null
+		var direction := Vector2i(roundi(line.x), roundi(line.y))
 		# An overhead toss: the first body is lifted over the mover's own tile
 		# and comes down behind it. That is two tiles of travel in one go.
 		var lofted := body == first and body.tile + direction == mover.tile
@@ -5182,7 +5257,8 @@ func _push(mover: GridEntity, first: GridEntity, direction: Vector2i, force: flo
 		var door_hit: Door = null
 		var fall := 0
 		while tiles < max_tiles:
-			var next: Vector2i = body.tile + direction
+			var next: Vector2i = start + Vector2i((line * (tiles + 1)).round())
+			direction = next - body.tile
 			if is_water(next) and not edge_blocks(body.tile, direction):
 				# The water's edge: it stops there, unhurt.
 				stopped = true
@@ -5219,12 +5295,25 @@ func _push(mover: GridEntity, first: GridEntity, direction: Vector2i, force: flo
 				stopped = true
 				stopped_by = "fire"
 				break
+		if tiles > 0:
+			body.step_velocity = Vector2.ZERO  # Thrown off its feet: no step's momentum left.
 
-		# Force spent on travel, rounded up; the rest is what hits.
+		# Speed spent on travel; what is left is what hits.
 		var remaining := 0.0
 		if stopped and fall == 0:
-			remaining = maxf(f - ceili(tiles / ratio - 0.001), 0.0)
-		var impact := impact_damage(remaining, ratio)
+			remaining = maxf(u - tiles / slide_per_speed, 0.0)
+		var impact := 0
+		var passed := 0.0
+		var blocker_impact := 0
+		if blocker != null:
+			# A collision along the line: the one met takes up the speed.
+			var blocker_mass := pushed_mass(blocker)
+			passed = (1.0 + restitution) * body_mass * remaining / (body_mass + blocker_mass)
+			var lost := 0.5 * body_mass * remaining * remaining - 0.5 * blocker_mass * passed * passed
+			impact = roundi(impact_per_energy * maxf(lost, 0.0) * 0.5)
+			blocker_impact = impact
+		else:
+			impact = roundi(impact_per_energy * 0.5 * body_mass * remaining * remaining)
 
 		if tiles > 0:
 			body._world_slide_from(start, tick, push_slide_ticks(tiles))
@@ -5252,22 +5341,72 @@ func _push(mover: GridEntity, first: GridEntity, direction: Vector2i, force: flo
 		if collided:
 			_stun(body, remaining)
 		if tiles > 0 and fall == 0:
-			_stun_for(body, push_slide_ticks(tiles) + knockback_stun_ticks)
+			_stun_for(body, push_slide_ticks(tiles) + (knockback_stun_ticks if stagger < 0 else stagger))
 		if blocker != null:
 			_stun(blocker, remaining)
-			var blocker_impact := impact_damage(
-					remaining, mass_ratio(mover_mass, pushed_mass(blocker)))
-			note = " (%s takes %d)" % [blocker.name, blocker_impact]
+			note = " (%s takes %d, goes on at %.2f)" % [blocker.name, blocker_impact, passed]
 			if blocker_impact > 0:
 				_impact(blocker, blocker_impact, mover, &"body")
 			if _alive(blocker):
 				next_body = blocker
 		_log("push: %s -> %s dir=%s force=%.2f tiles=%d impact=%d stopped_by=%s%s" % [
-			mover.name, body.name, direction, f, tiles, impact, stopped_by, note])
+			mover.name, body.name, direction, u, tiles, impact, stopped_by, note])
 		entity_pushed.emit(body, mover, direction, tiles, impact, stopped_by)
+		out.append({"body": body, "from": start, "to": body.tile if is_instance_valid(body) else start,
+			"cells": tiles, "stopped_by": stopped_by, "impact": impact})
 
-		body = next_body
-		f = remaining - 1.0
+		body = next_body  # It goes on from where it was met, the same way.
+		u = passed
+	return out
+
+
+## A blow's push (decision 592), for combat: [param target] struck by
+## [param source] with [param blow]'s impulse (kg x speed; blow_impulse
+## gives the default), along its direction (a Vector2 at any angle; ZERO,
+## source to target), the source's momentum added, held to
+## knockback_min_force, then slid; its stagger the ticks stunned past the
+## slide (-1, knockback_stun_ticks). Damage is the caller's. Server only;
+## at once, not queued. {moved, distance (cells), cells (each body's end),
+## stopped_by, impact_damage (the target's), struck (bodies knocked on),
+## knocked_down, speed}; emitted as blow_resolved.
+func apply_blow(source: GridEntity, target: GridEntity, blow: Dictionary) -> Dictionary:
+	var result := {"moved": false, "distance": 0, "cells": [], "stopped_by": "", "impact_damage": 0,
+		"struck": [], "knocked_down": false, "speed": 0.0}
+	if not Net.is_authority() or not _alive(source) or not _alive(target) or source == target:
+		return result
+	var direction: Vector2 = blow.get("direction", Vector2.ZERO)
+	if direction == Vector2.ZERO:
+		direction = Vector2(target.tile - source.tile)
+	if direction == Vector2.ZERO:
+		return result
+	var way := direction.normalized() * float(blow.get("impulse", 0.0)) / maxf(pushed_mass(target), 0.001) \
+			+ momentum_push(source, target, direction)
+	result["speed"] = way.length()
+	if way.length() >= knockback_min_force:
+		var pushed := _push(source, target, way, way.length(), false, int(blow.get("stagger", -1)))
+		for each: Dictionary in pushed:
+			result["cells"].append(each["to"])
+			if each["body"] == target:
+				result["moved"] = each["cells"] > 0
+				result["distance"] = each["cells"]
+				result["stopped_by"] = each["stopped_by"]
+				result["impact_damage"] = each["impact"]
+			else:
+				result["struck"].append(each["body"])
+	result["knocked_down"] = is_down(target)
+	blow_resolved.emit(source, target, result)
+	return result
+
+
+## The impulse of [param attacker]'s blow with [param verb] (blow_verb's),
+## standing (decision 592's draft, today's feel): strength x its mass x
+## shove_scale x ATTACK_FORCE_FACTOR x the verb's force x its stamina
+## fraction. A body of mass m is pushed at this over m.
+func blow_impulse(attacker: GridEntity, verb: Dictionary) -> float:
+	if attacker.strength <= 0:
+		return 0.0
+	return attacker.strength * attacker.mass * shove_scale * ATTACK_FORCE_FACTOR * float(verb.get("force", 1.0)) \
+			* attacker.stamina_fraction()
 
 
 ## True if a body tossed over [param mover] in [param direction] has a free
@@ -5841,10 +5980,12 @@ func _meets_brace(mover: GridEntity, cell: Vector2i, direction: Vector2i) -> boo
 			if k == 2 and (_occupancy.has(cell - facing) and _occupancy.get(cell - facing) != mover or not can_melee(holder.tile, cell - facing)):
 				continue
 			var amount := maxi(1, roundi(holder.attack_damage * float(blow_verb(holder)["damage"]) * BRACE_DAMAGE_FACTOR))
-			var force := BRACE_FORCE_PER_KG * mover.mass
+			# Pushed back by the spear's blow and its own momentum, turned
+			# (decision 592): a collision, not held to knockback_min_force.
+			var force := push_force(holder, mover) * ATTACK_FORCE_FACTOR * float(blow_verb(holder)["force"]) \
+					+ (1.0 + brace_restitution) * body_velocity(mover).length()  # All of it: a body run onto a stop.
 			_log("brace: %s's spear stops %s's charge (%d, force %.2f)" % [holder.name, mover.name, amount, force])
-			_queue_hit(holder, mover, mover.tile - holder.tile, -direction, amount,
-					force if force >= knockback_min_force else 0.0, force, false, 0)
+			_queue_hit(holder, mover, mover.tile - holder.tile, -direction, amount, force, force, false, 0)
 			_hits[-1].deed = "braced"
 			holder._world_swung(cell - holder.tile)
 			braced_against.emit(holder, mover)
@@ -5976,17 +6117,44 @@ func knock_down(target: GridEntity, source: GridEntity, ticks: int) -> void:
 	knocked_down.emit(target, source)
 
 
-## Force of a shove by [param attacker] on [param target]:
-## strength x mover_mass / target_mass x force_scale, clamped to max_force,
-## then scaled by how much stamina the attacker has left. So pushes fade as
-## the attacker tires, down to nothing at 0. A melee attack carries half.
+## Force of a shove by [param attacker] on [param target], the speed it
+## gives it (decision 592): its impulse, strength x the attacker's mass x
+## shove_scale, over the target's pushed mass, scaled by how much stamina
+## the attacker has left. So pushes fade as the attacker tires, down to
+## nothing at 0. A melee attack carries half.
 func push_force(attacker: GridEntity, target: GridEntity) -> float:
 	if attacker.strength <= 0:
 		return 0.0
-	var raw := attacker.strength * attacker.mass / maxf(pushed_mass(target), 0.001) * force_scale
-	return clampf(raw, 0.0, max_force) * attacker.stamina_fraction()
+	return attacker.strength * attacker.mass * shove_scale / maxf(pushed_mass(target), 0.001) \
+			* attacker.stamina_fraction()
 
 
+## [param entity]'s velocity in cells a tick (decision 592): its step's,
+## while it steps and momentum_ticks after; ZERO standing. Server only.
+func body_velocity(entity: GridEntity) -> Vector2:
+	if not is_instance_valid(entity) or tick > entity.step_until + momentum_ticks:
+		return Vector2.ZERO
+	return entity.step_velocity
+
+
+## The mass [param entity] is pushed as (pushed_mass), for combat's costs.
+func mass_of(entity: GridEntity) -> float:
+	return pushed_mass(entity)
+
+
+## What [param attacker]'s motion adds to a push of [param target] along
+## [param way] (decision 592): its momentum over the target's mass, the
+## part backward along the way dropped; ZERO standing.
+func momentum_push(attacker: GridEntity, target: GridEntity, way: Vector2) -> Vector2:
+	var velocity := body_velocity(attacker)
+	if velocity == Vector2.ZERO or way == Vector2.ZERO:
+		return Vector2.ZERO
+	var push := velocity * attacker.mass * momentum_scale / maxf(pushed_mass(target), 0.001)
+	var along := push.dot(way.normalized())
+	return push - way.normalized() * along if along < 0.0 else push
+
+
+## Stamina a shove of [param force] on [param target] costs.
 func shove_cost(force: float, target: GridEntity) -> int:
 	return roundi(shove_cost_base + force * pushed_mass(target) * shove_cost_scale)
 
