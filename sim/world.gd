@@ -751,6 +751,8 @@ func step() -> void:
 	var every := WORLD_TICK_STEPS / WORLD_TICK_SLICES
 	if steps % every == 0:
 		world_tick(steps / every % WORLD_TICK_SLICES)
+	if production != null:
+		production.returns_due(production.now())  # The fallen back on time (396 amended).
 	t = Time.get_ticks_usec()
 	_world_tick_due(WORLD_TICK_BUDGET_USEC)
 	t = part("far and sleeping monsters", t)

@@ -7801,6 +7801,7 @@ func _on_entity_despawned(entity: GridEntity) -> void:
 			print("[net] %s died; to be brought back" % entity.name)
 		else:
 			_respawn_at[peer] = World.tick + RESPAWN_TICKS
+			_tell_return(peer, "", "", RESPAWN_TICKS)
 			print("[net] %s died; respawning in %d ticks" % [entity.name, RESPAWN_TICKS])
 	if entity is Companion:
 		var record: PlayerRecord = _records.get(entity.keeper_id)
@@ -9105,7 +9106,23 @@ func _start_return(who: String, kind: String, cell: Vector2i) -> bool:
 	if who.is_empty() or not returns:
 		return false
 	var at := _return_place(cell)
-	return not at.is_empty() and World.production.open_return(at["workshop"], who, kind, at["place"]) != 0
+	var id := World.production.open_return(at["workshop"], who, kind, at["place"]) if not at.is_empty() else 0
+	if id != 0 and kind == "player":
+		var keeper := World.production.worker(str(World.production.job(id).get("worker", "")))
+		_tell_return(_peer_of(who), str(keeper.get("name", "")), str(World.holdings.place(at["place"]).get("kind", "")),
+			World.production.return_left(id))
+	return id != 0
+
+
+## Tells the fallen player on [param peer] who brings them back, where (a
+## kind of rules' return.places; "" and "" for the plain respawn) and in how
+## many [param steps] (-1 not known): the "return" message (396 amended,
+## for ui's countdown), {by, where, seconds}.
+func _tell_return(peer: int, by: String, where: String, steps: int) -> void:
+	if peer == 0:
+		return
+	Net.message_to(peer, "return", {"by": by, "where": where,
+		"seconds": ceili(steps / float(World.TICK_RATE)) if steps >= 0 else -1})
 
 
 ## The peer [param player_id] plays on now; 0 if none.
@@ -9149,7 +9166,9 @@ func _on_returned(job: Dictionary) -> void:
 					record.tile = cell
 				return
 			if cell == World.NO_CELL:
-				_respawn_at[peer] = World.tick
+				# Given up on (the keeper stopped, or too long): the plain respawn.
+				_respawn_at[peer] = World.tick + RESPAWN_TICKS
+				_tell_return(peer, "", "", RESPAWN_TICKS)
 				return
 			if str(World.peer_zone.get(peer, record.zone)) == area:
 				World.enter_named(area)

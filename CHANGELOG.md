@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Dying where a priest or medicine man can bring you back now takes exactly their 60 s of work, not up to 90; if they stop partway (night, away, the place down) you come back the plain way in 2 s instead of waiting up to 10 minutes; the server now tells your game who is bringing you back, where and how long, for the HUD's countdown (396 amended).
 - Roads are drawn from their own curves: a winding dirt or stone band with worn edges, not squares of dirt along the tiles (563).
 - Killed orcs and kobolds keep their paint: a body that was outlined (hovered or targeted) when it died no longer turns white; letting go of the outline now puts back each surface's own material instead of clearing it.
 - Coming back to a place after a long time away no longer brings its monsters back in a rush round you: one comes back at once and each of the rest a full respawn wait after the one before, and for a minute after you arrive none comes back within 12 tiles of you or in your sight (382 amended (2)).

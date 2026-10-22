@@ -60,7 +60,7 @@
 	"town_work": {"fee": 1, "per_steps": 600},
 	"contribute": {"gold_per_xp": 2},
 	"return": {
-		"steps": 600, "fee": 0, "give_up": 6000, "offering": 8, "waived_by": "draugr", "acolyte": {"trade": "acolyte", "keep": 1},
+		"steps": 600, "fee": 0, "give_up": 1200, "offering": 8, "waived_by": "draugr", "acolyte": {"trade": "acolyte", "keep": 1},
 		"field": {"_": "Decision 544: the draugr's blessed brought back where they fell. A blessed body (a player marked draugr, a companion with draugr in her marks) whose player has uses left lies downed window_s seconds at 0 HP; a blessed hand carrying its half of the device, beside it, still and unhit for channel_s, brings it back at hp of its most, one use off the channeler's player's count; else it dies as ever. uses: the count the draugr gives by the difficulty he was beaten at.", "window_s": 30, "channel_s": 4, "hp": 0.5, "uses": {"easy": 5, "normal": 10, "hard": 15}},
 		"places": {
 			"temple": {"trade": "priest", "names": ["Aldous", "Brother Cuth", "Osric", "Wendel"]},

@@ -19967,3 +19967,49 @@ the wilds, with 568's river and ponds as curves, 4402/4634 ms before,
 4735/4952 after (about +325 ms, 7%); frame medians unchanged (1.06 to
 1.27 ms) but for one after hills run at 6.9 ms with its 99th at 7.3, the
 same spike. The curve drawing's cost is the rebuild's, not the frame's.
+
+## 396 amended. The fallen back on time, and told how long
+
+From Jeff's play (2026-10-22): he died in the castle, was queued for Hob's
+hut, and came back 70 s later with the HUD saying only "dead, respawning".
+A return job's work only moved on the world tick (every
+WORLD_TICK_STEPS, 30 s), so return.steps 600 (60 s) took 60 to 90 s. A
+keeper who stopped mid-job (off work, away, his place down) left the
+player waiting up to give_up 6000 steps (10 minutes). The coordinator's
+rulings, which Jeff can move:
+- Return jobs are checked every step: Production.returns_due(at), which
+  World.step calls, finishes one on the step it is due (_rate, split out
+  of _advance, is the keeper's pace). The wait is return.steps of the
+  keeper's work exactly; 60 s stands as a draft.
+- A dead player never waits on a keeper's day: if the keeper stops
+  mid-job, returns_due gives the player's job up at once, and they come
+  back by the plain respawn (RESPAWN_TICKS, 2 s; the give-up now waits
+  that too, where it was at once). A companion's or a resident's still
+  waits, up to give_up.
+- give_up drops to 1200 steps (2 minutes), the ceiling for any other
+  stall.
+- The "return" message, a new kind (ui's design, the coordinator's
+  approval), goes to the fallen player's peer as {by, where, seconds}:
+  - by: the keeper's name; where: the place's kind from rules'
+    return.places ("temple", "healers_hut"); seconds: the steps left at
+    the keeper's pace (Production.return_left) over TICK_RATE, rounded
+    up, or -1 if not known.
+  - Sent when the job opens (Main._start_return).
+  - Sent as {"", "", 2} at a death with no manned place, and when a
+    return is given up on (Main._tell_return).
+  - Each message restarts ui's countdown ("Hob is bringing you back to
+    the healer's hut: 58 s").
+
+A new message kind moves the protocol hash and needs no bump.
+
+tests/return_test _test_due:
+- A job opened off the world tick's beat is done on exactly its
+  600th step.
+- The keeper going away gives the player's job up on the next step and
+  keeps a companion's.
+- give_up is 1200.
+
+In Main, the player is told {Ned, healers_hut, 60} at death and is back
+at the hut 600 steps later; with nobody manned, {"", "", 2}. The test's
+killed imps stay dead (a respawn on the step of the return moved the
+player by spawn safety).

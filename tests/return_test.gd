@@ -18,6 +18,7 @@ var _failures := 0
 var _now := 0
 var _rules := {}
 var _done: Array[Dictionary] = []
+var _told: Array[Dictionary] = []
 var _main: Node
 
 
@@ -26,6 +27,7 @@ func _ready() -> void:
 	Level.overlay_dir = preload("res://tests/test_ports.gd").scratch("return_test/no_overlay/")
 	_rules = Production.read_rules()
 	_test_job()
+	_test_due()
 	_test_officials()
 	_test_main()
 	print("")
@@ -94,6 +96,38 @@ func _test_job() -> void:
 	_check(not gone.job(id).is_empty(), "a return whose temple is gone is kept, to give up in time (never lost)")
 
 
+func _test_due() -> void:
+	print("
+== every step: on time, and no waiting on a keeper who stopped (396 amended) ==")
+	var steps := int(_rules["return"]["steps"])
+	_check(int(_rules["return"]["give_up"]) == 1200, "give_up is 1200 steps, two minutes, the ceiling")
+	var work := _work()
+	_now = 7  # Off the world tick's beat.
+	var id := work.open_return(TOWN + ":temple", "p1", "player", "rt/temple@3,3")
+	_check(work.return_left(id) == steps, "at the start, return.steps left (%d)" % work.return_left(id))
+	while _now < 7 + steps - 1:
+		_now += 1
+		work.returns_due(_now)
+	_check(_done.is_empty() and work.return_left(id) == 1, "a step short: not yet (%d left)" % work.return_left(id))
+	_now += 1
+	work.returns_due(_now)
+	_check(_done.size() == 1 and not _done[0].get("fallback", false), "done the step it is due, not at the next world tick")
+	_check(work.return_left(id) == -1, "and no steps left of a job that is gone")
+
+	work = _work()
+	id = work.open_return(TOWN + ":temple", "p1", "player", "rt/temple@3,3")
+	var other := work.open_return(TOWN + ":temple", "c1", "companion", "rt/temple@3,3")
+	_now += 50
+	work.returns_due(_now)
+	work.set_away("priest:" + TOWN, true)
+	_check(work.return_left(id) == -1, "the keeper gone: not known")
+	_now += 1
+	work.returns_due(_now)
+	_check(_done.size() == 1 and _done[0]["who"] == "p1" and _done[0].get("fallback", false),
+		"the keeper stops mid-job: the player given up on at once, brought back as before")
+	_check(not work.job(other).is_empty(), "a companion's waits for him, to give_up")
+
+
 func _test_officials() -> void:
 	print("\n== the priest, the medicine man ==")
 	_check(int(_rules["official"]["priest"]["wage"]) == 4 and int(_rules["official"]["priest"]["every"]) == 54000,
@@ -126,6 +160,9 @@ func _test_main() -> void:
 	Net.companions = false
 	_main = preload("res://main.tscn").instantiate()
 	add_child(_main)
+	Net.message_received.connect(func(kind: String, data: Dictionary) -> void:
+		if kind == "return":
+			_told.append(data))
 	_kill_monsters()
 	var hut := Vector2i(4, 4)
 	var id := "%s/healers_hut@4,4" % World.zone.name
@@ -145,12 +182,15 @@ func _test_main() -> void:
 	_kill_monsters()
 	World.damage(_player(), 999)
 	_check(_player() == null, "the player died")
+	var hob := str(World.production.worker(keeper)["name"])
+	_check(_told.size() == 1 and _told[0] == {"by": hob, "where": "healers_hut", "seconds": int(_rules["return"]["steps"]) / World.TICK_RATE},
+		"told who brings them back, where and how long: %s" % [_told])
 	for i in _main.RESPAWN_TICKS + 1:
 		World.step()
 	_check(_player() == null, "not back by the old respawn timer")
-	for i in int(_rules["return"]["steps"]) + World.WORLD_TICK_STEPS:
-		if i % 100 == 0:
-			_kill_monsters()  # The test room's imps come back; spawn safety would move the player.
+	# Back on the step it is due, not at the next world tick (396 amended).
+	for i in int(_rules["return"]["steps"]) - _main.RESPAWN_TICKS:
+		_kill_monsters()  # The test room's imps come back; spawn safety would move the player.
 		World.step()
 	player = _player()
 	_check(player != null and World.distance(player.tile, hut) <= 2 and player.hp == player.max_hp,
@@ -159,7 +199,10 @@ func _test_main() -> void:
 	for each in World.production.worker_ids():
 		if World.production.worker(each)["trades"].any(func(t: String) -> bool: return t in ["priest", "medicine_man"]):
 			World.production.set_away(each, true)
+	_told.clear()
 	World.damage(player, 999)
+	_check(_told == [{"by": "", "where": "", "seconds": _main.RESPAWN_TICKS / World.TICK_RATE}],
+		"told: nobody, coming back in %d s (%s)" % [_main.RESPAWN_TICKS / World.TICK_RATE, _told])
 	for i in _main.RESPAWN_TICKS + 1:
 		World.step()
 	player = _player()
@@ -171,6 +214,8 @@ func _kill_monsters() -> void:
 	for entity in World.get_entities():
 		if entity is Monster:
 			World.damage(entity, 999)
+	if _main != null:
+		_main._dead_since.clear()  # And they stay dead: one back on the step of a return moves its player.
 
 
 func _player() -> Player:

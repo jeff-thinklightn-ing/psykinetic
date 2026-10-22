@@ -814,18 +814,58 @@ func _advance(at: int, cat: Dictionary) -> void:
 		if each["state"] != "working":
 			continue
 		if _present(each["worker"], each["workshop"]):
-			var rate := float(work_rate.call(_workshops.get(each["workshop"], {}))) if work_rate.is_valid() else 1.0
-			# An apprentice at hand works the job faster (498 amended).
-			var helper := str(_workers.get(each["worker"], {}).get("apprentice", ""))
-			if not helper.is_empty() and _workers.has(helper) and not off_work(_workers[helper]):
-				rate *= float(rules.get("apprentice", {}).get("speed", 1.0))
-			each["worked"] = int(each["worked"]) + roundi((at - int(each["last"])) * rate)
+			each["worked"] = int(each["worked"]) + roundi((at - int(each["last"])) * _rate(each))
 		each["last"] = at
 		if each["kind"] == "return" and int(each["worked"]) < int(each["needed"]) 				and at - int(each["opened"]) >= int(rules.get("return", {}).get("give_up", 6000)):
 			each["fallback"] = true  # Nobody there to do it: brought back as before.
 			_finish(each, cat)
 		elif int(each["worked"]) >= int(each["needed"]):
 			_finish(each, cat)
+
+
+## How fast [param each]'s worker works it: the workshop's rate (towns'
+## water), quicker with an apprentice at hand (498 amended).
+func _rate(each: Dictionary) -> float:
+	var rate := float(work_rate.call(_workshops.get(each["workshop"], {}))) if work_rate.is_valid() else 1.0
+	var helper := str(_workers.get(each["worker"], {}).get("apprentice", ""))
+	if not helper.is_empty() and _workers.has(helper) and not off_work(_workers[helper]):
+		rate *= float(rules.get("apprentice", {}).get("speed", 1.0))
+	return rate
+
+
+## The return jobs under way (decision 396 amended), every step rather than
+## the world tick's, so the fallen wait the keeper's work and no more: one
+## done by [param at] is finished then; a player's whose keeper has stopped
+## (off work, away, the place down) is given up on at once, brought back as
+## before, so nobody waits on a keeper's day. World.step calls it.
+func returns_due(at: int) -> void:
+	var due: Array[int] = []
+	for id: int in _jobs:
+		if _jobs[id]["kind"] == "return" and _jobs[id]["state"] == "working":
+			due.append(id)
+	due.sort()
+	for id in due:
+		var each: Dictionary = _jobs[id]
+		if not _present(each["worker"], each["workshop"]):
+			if each["who_kind"] == "player":
+				each["fallback"] = true
+				_finish(each, {})
+			continue
+		if int(each["worked"]) + roundi((at - int(each["last"])) * _rate(each)) >= int(each["needed"]):
+			each["worked"] = int(each["worked"]) + roundi((at - int(each["last"])) * _rate(each))
+			each["last"] = at
+			_finish(each, {})
+
+
+## The steps return job [param id] has left at its keeper's pace now; -1 if
+## there is no such job or its keeper isn't at it.
+func return_left(id: int) -> int:
+	var each: Dictionary = _jobs.get(id, {})
+	if each.get("kind") != "return" or not _present(each["worker"], each["workshop"]):
+		return -1
+	var at := now()
+	var left := int(each["needed"]) - int(each["worked"]) - roundi((at - int(each["last"])) * _rate(each))
+	return ceili(maxi(left, 0) / _rate(each))
 
 
 func _present(worker_id: String, workshop_id: String) -> bool:
