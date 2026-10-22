@@ -20956,3 +20956,33 @@ the wire of its own.
   (its windows in from its walls' last step) keeps its lamps out: nobody
   lives in it yet (the review shot at 21: a house under its rafters lit).
 view_test _test_stages.
+
+## 588. The combat tree and Jeff's combat design
+
+Jeff (2026-10-22: "today is going to be about combat feel and archery
+refinement" and "we also need a combat work-tree"). A worktree,
+C:/dev/psykinetic-trees/combat (branch combat, port offset 3800), owns how
+fighting feels for the player: the player's melee verbs and their timing,
+hit feedback, blocking, dodging and their cost, the damage model shared by
+players, companions and monsters, the fights' pace, and, once the archery
+refinement of 2026-10-22 has landed, World.shoot and the ranged verbs. Its
+row in docs/roadmap.md is the charter.
+
+- Jeff's design, docs/combat_design.md, is copied in unchanged as the
+  tree's brief: its [decided] lines are Jeff's and stand; its [proposed]
+  ones are built as data and tuned by play.
+- Not combat's: monsters' minds (enemy-ai; "enemies use the same moves" is
+  a design with them), bodies and clips (pc-character), what weapons are
+  (items), the screen (ui), and mass, force, knockback, momentum and thrown
+  bodies (the physics tree, from 2026-10-22): combat sends a move as an
+  intent and a physics event, physics resolves it.
+- Rules: the sim decides every hit (no client-side hits); every feel
+  change is seen in a play clip beside a before, in C:/dev/review/combat/;
+  designs go to the coordinator before they are built.
+- The doc's "existing archery is off-limits" means stand-and-shoot,
+  backstep and heavy shot are added alongside the bow after the archery
+  refinement lands; the refinement itself goes on. Open with Jeff: whether
+  the bow's right button stays the draw (462) or becomes the doc's defend
+  and backstep.
+
+Docs only, protocol unchanged, no new class_name.
