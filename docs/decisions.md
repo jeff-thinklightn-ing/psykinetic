@@ -21804,3 +21804,34 @@ things the longer window changed, the coordinator's nod on both:
 
 monster_test `_test_downed_not_hunted`, and a check in `_test_draugr`.
 Server only, protocol unchanged, no new class_name.
+
+## 573 amended, enemy-ai's side. The draugr's Hall: the door, his question, the unpaid fight
+
+Jeff's words on the draugr (dungeon leads 573 amended; the coordinator):
+the door closes on entry; he says "Why have you entered my Hall, <name>?",
+pauses, then "Return the gold your people stole from this place, when you
+do that you may leave", and explains nothing more (the deals are a
+puzzle); under 20 gold he attacks at his base level, and his death opens
+the door with "...warrior, you have my respect."; at a deal, the fight as
+573, won with "...you have honored the pact, I shall give you the power to
+cheat death".
+
+- `Draugr.hall_door(open)`: false when the first player comes into his lair
+  while he sits (`hall_shut`), true when it is settled (the pact won or
+  lost, the unpaid fight ended, nobody living left in his lair, or his zone
+  asleep). Dungeon connects it and shuts the door edges on the lair's rim
+  (no way out from inside while he sits unpaid; the sealed shortcut is the
+  way in mid-fight).
+- `Draugr.said(text)`: his unasked lines (ASKED, then WON or RESPECT),
+  Main's plain speech. After ASK_DELAY_TICKS (3 s) his offer is spoken with
+  WORDS (Jeff's second line); the deals' steps leave his words, and his
+  accept lines are gone.
+- Gold under the least deal (more than 0): he keeps it and attacks at his
+  kind's own level (`_provoked`), as when struck unasked. Beaten unpaid
+  he yields as ever (never despawns) but it reads as his death: RESPECT,
+  no blessing, laid to rest RISE_DAYS with the dead stilled (580's rest),
+  the Hall open. (548's "unpaid wins nothing, he sits again" is replaced.)
+
+monster_test _test_draugr: the Hall shuts and he asks, the pause and the
+gold asked for once, the win line and the door, 19 gold fought and his
+respect. Server only, protocol unchanged, no new class_name.

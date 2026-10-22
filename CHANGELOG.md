@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The draugr's Hall shuts behind you: he asks why you came and to return the stolen gold, and says no more; hand him too little and he fights you, and beaten so he gives you his respect and the door opens (573 amended).
 - A monster no longer hunts round you when you fall: it goes back to what it was doing, so a companion can come and raise you; and the draugr's pact holds while you lie downed in his lair, so being raised mid-fight still wins it (587).
 - In the barrow's new layers, the draugr laid to rest stills the dead on every layer, and they rise again on time even with nobody near; the oldest dead round his hall are angry, have no graves and see you in the dark without a lantern; his raised dead come up round him where he can see them, and grave robbers chase up to 14 cells from home in the bigger halls (580).
 - The draugr's offer now speaks of the old gods of war: your gold returns what the robbers stole, and their blessing raises you to fight again (lore's old gods, wording a draft for Jeff).

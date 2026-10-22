@@ -11,9 +11,12 @@ extends Monster
 ## again (RISE_DAYS). Per challenger: he rises from his rest for each new
 ## pact, and his rest runs on. Server only; to a client he is a monster.
 ##
-## Seated (awake, the curse on) he fights nobody unless struck: then he
-## fights back, and yields as ever, but blesses nobody (a fight without the
-## pact wins nothing; Jeff's to decide, on his list). Resting he lies still,
+## Seated (awake, the curse on) he fights nobody unless struck. The first
+## player into his lair shuts his Hall (hall_door) and is asked why they
+## came and to return the stolen gold, nothing more (573 amended, Jeff's
+## words). Under the least deal, or struck unasked, he fights at his own
+## level; beaten so (his "death") he gives his respect, blesses nobody and
+## is laid to rest. The Hall opens when it is settled. Resting he lies still,
 ## struck or not, till a pact raises him. A pact is lost when the challenger
 ## dies (not while they lie downed and may be raised), or leaves the lair:
 ## he heals and keeps the gold.
@@ -53,12 +56,14 @@ const GONE_TILES := 12
 ## How often, resting, he stills any of the dead that stirred (a respawn).
 const STILL_EVERY_TICKS := 20
 
-## Drafts for Jeff's wording (573), on lore's agreed secrets of the old
-## gods (old_gods.war, old_gods.gold): the gold appeases them because it
-## returns what the robbers stole; their blessing is the fallen raised and
-## sent back to battle. (old_gods.temple, the temple's gifts going to them,
-## he keeps.)
-const WORDS := "The old gods of war give me my strength, and the robbers' pilfering angers them. Gold given back returns what was stolen: give it, and face me. Win, and through me they bless you: fall after, and they raise you and send you back to battle. Twenty gold for five risings, fifty for ten, a hundred for fifteen. The more of you that come carrying their blessing, the harder I stand."
+## His words, Jeff's own (573 amended): he asks why one entered, then what
+## he asks of them, and explains nothing more (the deals are a puzzle).
+const ASKED := "Why have you entered my Hall, %s?"
+const WORDS := "Return the gold your people stole from this place, when you do that you may leave."
+const WON := "...you have honored the pact, I shall give you the power to cheat death"
+const RESPECT := "...warrior, you have my respect."
+## Ticks between his question and his asking (a pause).
+const ASK_DELAY_TICKS := 30
 const TITLE := "Face the draugr"
 
 var state := State.SEATED
@@ -77,9 +82,20 @@ var _base_damage := 0
 var _retinue: Array[GridEntity] = []
 var _spoken_to: Dictionary[String, bool] = {}
 var _stilled_tick := -100000
+## His Hall shut on a visit; whom he asked, and when he asks them (tick).
+var hall_shut := false
+var _asking := ""
+var _ask_at := -1
 
 signal offer_spoken(player_id: String, offer: Dictionary)
 signal offer_withdrawn(player_id: String)
+## His Hall's door (573 amended; dungeon shuts or opens its edges): shut
+## (false) when the first player comes into his lair while he sits, open
+## (true) when it is settled: his pact won or lost, or the unpaid fight
+## ended, or nobody living left in his lair.
+signal hall_door(open: bool)
+## A line he says unasked (Main's plain speech).
+signal said(text: String)
 
 
 func _ready() -> void:
@@ -114,6 +130,7 @@ func _sim_tick() -> void:
 
 func _world_tick(seconds: float) -> void:
 	super(seconds)
+	_open_hall()  # His zone asleep: nobody in his Hall.
 	if state == State.PACT:
 		_end_pact()  # Nobody near: the pact is forfeit.
 	if state == State.AT_REST and World.steps >= rests_until:
@@ -182,15 +199,19 @@ func accept_offer(player: Player, offer: Dictionary, gold: int) -> Dictionary:
 		return {"ok": false, "say": "I am bound in another's pact. Wait.", "line": ""}
 	if not str(offer.get("id", "")).begins_with("deal:"):
 		return {"ok": false, "say": "", "line": ""}
-	if deal.is_empty():
-		return {"ok": false, "say": "Not for so little. More was stolen than that: %d gold at the least." % int(deals()[0]["gold"]), "line": ""}
+	if gold <= 0:
+		return {"ok": false, "say": "", "line": ""}
 	if gold > World.gold_of(player.player_id):
 		return {"ok": false, "say": "You have not so much.", "line": ""}
 	World.add_gold(player.player_id, -gold, "the draugr's pact")
+	if deal.is_empty():
+		# Under the least deal (573 amended): he keeps it and attacks, at his
+		# kind's own level; beaten, he gives his respect and nothing more.
+		_provoked = player
+		target = player
+		return {"ok": true, "say": "", "line": "%s gives the draugr %d gold, too little: he attacks." % [player.name, gold]}
 	start_pact(player, str(deal["name"]))
-	var says := {"easy": "So be it. Stand and face me.", "normal": "Good. The dead rise beside me.",
-		"hard": "The hardest, then. Few have stood it."}
-	return {"ok": true, "say": says.get(difficulty, "So be it."), "line": "%s gives the draugr %d gold and takes up his pact for %d risings." % [player.name, gold, int(deal["charges"])]}
+	return {"ok": true, "say": "", "line": "%s gives the draugr %d gold and takes up his pact for %d risings." % [player.name, gold, int(deal["charges"])]}
 
 
 ## His deals, least first (economy.json return.field.deals, 573; DEALS when
@@ -215,6 +236,7 @@ static func deal_for(gold: int) -> Dictionary:
 ## Speaks first to a player come near him in his lair (once a visit), when
 ## he has an offer for them.
 func _speak() -> void:
+	_tend_hall()
 	for entity in World.sought():
 		if not entity is Player:
 			continue
@@ -222,11 +244,47 @@ func _speak() -> void:
 		var d := World.distance(tile, entity.tile)
 		if d > GONE_TILES:
 			_spoken_to.erase(player_id)
-		elif d <= HEARING_TILES and _in_lair(entity) and not _spoken_to.has(player_id):
+		elif d <= HEARING_TILES and _in_lair(entity) and not _spoken_to.has(player_id) and player_id != _asking:
 			var offers := offers_for(player_id)
 			if not offers.is_empty():
 				_spoken_to[player_id] = true
 				offer_spoken.emit(player_id, offers[0])
+
+
+## His Hall on a visit (573 amended): the first player into his lair while
+## he sits shuts it, is asked why they came, and after ASK_DELAY_TICKS is
+## told what he asks of them (his offer's words); it opens again when nobody
+## living (downed counts as living) is left in his lair.
+func _tend_hall() -> void:
+	if not hall_shut:
+		if state != State.SEATED:
+			return
+		for entity in World.sought():
+			if entity is Player and entity.hp > 0 and _in_lair(entity):
+				hall_shut = true
+				_asking = (entity as Player).player_id
+				_ask_at = World.tick + ASK_DELAY_TICKS
+				hall_door.emit(false)
+				said.emit(ASKED % entity.name)
+				return
+		return
+	if _asking != "" and World.tick >= _ask_at:
+		var offers := offers_for(_asking)
+		if not offers.is_empty():
+			_spoken_to[_asking] = true
+			offer_spoken.emit(_asking, offers[0])
+		_asking = ""
+	for entity in World.sought():
+		if entity is Player and entity.hp > 0 and entity.spawned and _in_lair(entity):
+			return
+	_open_hall()
+
+
+func _open_hall() -> void:
+	if hall_shut:
+		hall_shut = false
+		_asking = ""
+		hall_door.emit(true)
 
 
 # --- The pact -------------------------------------------------------------------------
@@ -273,6 +331,7 @@ func _end_pact() -> void:
 	difficulty = ""
 	charges_met = 0
 	_restore()
+	_open_hall()
 	state = State.AT_REST if rests_until > World.steps else State.SEATED
 
 
@@ -288,15 +347,21 @@ func _yield() -> void:
 			if entity is Player and _in_lair(entity) and entity.hp > 0:
 				ids.append((entity as Player).player_id)
 		blessed_last = ids
+		said.emit(WON)
 		if World.bless.is_valid():
 			World.bless.call(ids, difficulty)  # Main's (544).
 		challenger_id = ""
 		difficulty = ""
 		charges_met = 0
-		if rests_until <= World.steps:
-			rests_until = World.steps + RISE_DAYS * DayNight.day_steps
-			_keep_prop("rests_until", rests_until)
-		_rest_over(rests_until)
+	else:
+		# Unpaid (573 amended): his "death". He yields as ever, blesses
+		# nobody, gives his respect and is laid to rest.
+		said.emit(RESPECT)
+	if rests_until <= World.steps:
+		rests_until = World.steps + RISE_DAYS * DayNight.day_steps
+		_keep_prop("rests_until", rests_until)
+	_rest_over(rests_until)
+	_open_hall()
 	_restore()
 	if rests_until > World.steps:
 		state = State.AT_REST

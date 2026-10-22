@@ -2252,18 +2252,24 @@ func _test_draugr() -> void:
 		return risen
 	var spoken: Array = []
 	draugr.offer_spoken.connect(func(id: String, offer: Dictionary) -> void: spoken.append([id, offer]))
+	var said: Array = []
+	draugr.said.connect(func(text: String) -> void: said.append(text))
+	var doors: Array = []
+	draugr.hall_door.connect(func(open: bool) -> void: doors.append(open))
 	var offers := draugr.offers_for("p1")
 	_check(draugr.talks and offers.size() == 1 and offers[0]["kind"] == "deal" and offers[0]["cost"] == 20
 		and offers[0]["what"]["most"] == 100 and offers[0]["what"]["steps"] == [20, 50, 100], "he talks, and offers a pact at the deals' steps (%s)" % [offers])
 	World.step()
 	_check(spoken.is_empty(), "outside his lair he says nothing")
 	_move_to(player, Vector2i(7, 2))
-	for i in 10:
+	World.step()
+	_check(doors == [false] and said == [Draugr.ASKED % player.name] and spoken.is_empty() and draugr.hall_shut,
+		"come into his lair: his Hall shuts, and he asks why (%s, %s)" % [doors, said])
+	for i in Draugr.ASK_DELAY_TICKS + 5:
 		World.step()
-	_check(spoken.size() == 1 and spoken[0][0] == "p1", "come into his lair, he speaks first, once (%s)" % [spoken.size()])
+	_check(spoken.size() == 1 and spoken[0][0] == "p1" and spoken[0][1]["words"] == Draugr.WORDS and said.size() == 1,
+		"after a pause he asks for the gold, once, and explains nothing more (%s)" % [spoken.size()])
 	_check(draugr.target == null and player.hp == player.max_hp, "seated, he fights nobody unasked")
-	var refused := draugr.accept_offer(player, offers[0], 19)
-	_check(not refused["ok"] and str(refused["say"]).begins_with("Not for so little") and World.gold_of("p1") == 200, "under the least deal (20) he refuses, and takes nothing")
 	var zones_asked: Array = []
 	World.charges_in = func(zone_name: String) -> int:
 		zones_asked.append(zone_name)
@@ -2297,6 +2303,7 @@ func _test_draugr() -> void:
 	World.damage(draugr, 999, player)
 	_check(draugr.spawned and draugr.hp == draugr.max_hp and draugr.max_hp == 30 and draugr.blessed_last == ["p1"],
 		"beaten, he yields, never dies: the players in his lair are blessed (%s)" % [draugr.blessed_last])
+	_check(said.back() == Draugr.WON and doors.back() == true and not draugr.hall_shut, "\"%s\", and his Hall opens" % said.back())
 	_check(draugr.state == Draugr.State.AT_REST and draugr.rests_until == World.steps + Draugr.RISE_DAYS * DayNight.day_steps
 		and draugr.spawn_spec["props"].get("rests_until") == draugr.rests_until and World.is_down(draugr),
 		"and lies at rest three days, kept in his props")
@@ -2313,12 +2320,17 @@ func _test_draugr() -> void:
 	_check(draugr.state == Draugr.State.SEATED and not skeleton.laid and draugr.rests_until == -1, "rested, he rises, and the dead stir")
 	draugr.blessed_last = []
 	_move_to(player, Vector2i(7, 2))
-	World.damage(draugr, 2, player)
+	for i in Draugr.ASK_DELAY_TICKS + 2:
+		World.step()
+	var gold_was := World.gold_of("p1")
+	var short := draugr.accept_offer(player, draugr.offers_for("p1")[0], 19)
 	World.step()
-	_check(draugr.target == player, "struck unasked, he fights back")
+	_check(short["ok"] and World.gold_of("p1") == gold_was - 19 and draugr.state == Draugr.State.SEATED and draugr.target == player and draugr.max_hp == 30,
+		"19 gold, under the least deal: he keeps it and attacks, at his own level")
 	World.damage(draugr, 999, player)
-	_check(draugr.blessed_last.is_empty() and draugr.state == Draugr.State.SEATED and draugr.hp == 30,
-		"beaten without a pact, he yields, but blesses nobody")
+	_check(draugr.blessed_last.is_empty() and draugr.state == Draugr.State.AT_REST and draugr.hp == 30 and said.back() == Draugr.RESPECT
+		and doors.back() == true and skeleton.laid,
+		"beaten unpaid, his \"death\": his respect, no blessing, laid to rest with the dead stilled, his Hall open")
 	draugr.living_came(player)
 	_check(draugr.hp == 30, "seated, the living's coming gives him nothing")
 	_check(Draugr.deal_for(500)["name"] == "hard" and Draugr.deal_for(99)["name"] == "normal" and Draugr.deal_for(20)["name"] == "easy" and Draugr.deal_for(19).is_empty(),
