@@ -1404,6 +1404,34 @@
 				{"at": [0, 0.1, 0], "size": [1.2, 0.2, 0.87]}
 			]
 		},
+		"building.chopping_block": {
+			"category": "buildings",
+			"type": "mesh",
+			"kind": "cell",
+			"footprint": [1, 1],
+			"size": [0.972, 0.791, 0.885],
+			"middle": [0.026, 0, 0.044],
+			"budget": 500,
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-22", "notes": "C:/dev/review/site/make_block.py: a squat chopping block, a short butt of a big trunk (10 sides, 0.44 m, bark on in row 2's browns and greys, a little out of round and leaning), its top end grain worn and out of level with five dark axe scars; a log stood on it to be split (8 sides, 0.36 m, fresh end grain, ring and heart), its top 0.79 m up where the stroke lands; two split halves and three quarters fallen round its foot, ten chips; 290 tris"},
+			"uses": "the woodlot's chop spot (566 amended, npc's: a chopping block with a log at the chop spot), 1 x 1 cell, a doorless solid building turned by a free yaw: the body stands on a neighbouring cell facing it, its axe stroke landing on the log's top, 0.79 m above the ground near the cell's middle",
+			"grey": [
+				{"at": [0.026, 0.4, 0.044], "size": [0.972, 0.791, 0.885]}
+			]
+		},
+		"building.woodpile": {
+			"category": "buildings",
+			"type": "mesh",
+			"kind": "cell",
+			"footprint": [1, 1],
+			"size": [1.348, 1.074, 0.482],
+			"variants": 3,
+			"budget": 1200,
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-22", "notes": "C:/dev/review/site/make_bwoodpile.py from prop.woodpile.blend: its bearers and one of its stacks per variant (1 low, two courses, 452 tris; 2 half, four, 792; 3 full, six, 1120), since the building path hides state_* nodes; four rough stakes driven at its ends' corners, leant in on the stack, their tops sawn on a slant, the same in every variant so each fills the slot's box"},
+			"uses": "a log pile where the carried logs land (566 amended, npc's), 1 x 1 cell, a doorless solid building turned by a free yaw, its long side along x a little over the cell: variant 1 low, 2 half, 3 full (maps stands 2 for now); prop.woodpile stays the build site's, its fills as states",
+			"grey": [
+				{"at": [0, 0.537, 0], "size": [1.348, 1.074, 0.482]}
+			]
+		},
 		"building.waystone": {
 			"category": "buildings",
 			"type": "mesh",
