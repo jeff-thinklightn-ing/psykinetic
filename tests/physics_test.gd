@@ -20,11 +20,13 @@ const NAMES := {"P": "Player", "m": "Dummy", "o": "Boulder"}
 var _failures := 0
 var _room: Node2D
 var _damage_log: Array[Dictionary] = []
+var _rush_ends: Array[Dictionary] = []
 
 
 func _ready() -> void:
 	World.set_process(false)
 	World.entity_damaged.connect(_on_entity_damaged)
+	World.rush_ended.connect(_on_rush_ended)
 
 	_test_rules_file()
 	_test_mass_decides()
@@ -36,6 +38,7 @@ func _ready() -> void:
 	_test_lunge()
 	_test_charge()
 	_test_launch()
+	_test_rush()
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -278,6 +281,103 @@ func _test_launch() -> void:
 	_check(not World.launch(e["P"][0], e["P"][0], Vector2(1, 0), 50.0)["moved"], "nobody throws itself")
 
 
+func _test_rush() -> void:
+	print("
+== a rush: a charge spread over time, stopped by what it meets, by mass (604) ==")
+	# A 120 kg dummy (the draugr's mass) rushing west, a cell a tick at speed 1.
+	var e := _build(["##############", "#............#", "#.P.......m..#", "#............#", "#............#", "##############"], 120.0)
+	var dummy: GridEntity = e["m"][0]
+	_check(World.rush(dummy, Vector2(-1, 0), 8, {"to": Vector2i(5, 2)}), "it starts")
+	_check(not World.rush(dummy, Vector2(-1, 0), 8), "and cannot start another while it runs")
+	for i in 5:
+		World.step()
+	_check(dummy.tile == Vector2i(5, 2) and _rush_ends.back()["reason"] == "arrived",
+			"5 ticks, 5 cells: arrived at its cell (at %s, %s)" % [dummy.tile, _rush_ends.back()["reason"]])
+	_check(not World.rushing(dummy), "and is rushing no more")
+
+	# A sword from the front: 10 x 81.5 x 0.05 / 120 = 0.34 off its speed, less
+	# as each swing spends the player's stamina (597): 0.34, 0.32, 0.30 leave
+	# 0.04, under rush_stop_speed 0.1.
+	e = _build(["##############", "#............#", "#.P.......m..#", "#............#", "#............#", "##############"], 120.0)
+	var player: GridEntity = e["P"][0]
+	dummy = e["m"][0]
+	_give(player, "sword")
+	World.rush(dummy, Vector2(-1, 0), 8, {"through": true})
+	var hits := 0
+	while World.rushing(dummy) and hits < 5:
+		World._relocate(player, dummy.tile + Vector2i.LEFT)
+		_blow(player, dummy)
+		hits += 1
+	_check(hits == 3 and _rush_ends.back()["reason"] == "blow", "three sword hits from the front stop it (%d, %s)" % [hits, _rush_ends.back()["reason"]])
+
+	e = _build(["##############", "#............#", "#.P.......m..#", "#............#", "#............#", "##############"], 120.0)
+	player = e["P"][0]
+	dummy = e["m"][0]
+	_give(player, "hammer")
+	World.rush(dummy, Vector2(-1, 0), 8, {"through": true})
+	World._relocate(player, dummy.tile + Vector2i.LEFT)
+	_blow(player, dummy)
+	# 10 x 83 x 0.05 x 3 / 120 = 1.04: spent at once, and under 1.5, so not knocked back.
+	_check(not World.rushing(dummy) and _rush_ends.back()["reason"] == "blow" and dummy.tile == Vector2i(10, 2),
+			"a hammer stops it dead in one, where it stands (%s, at %s)" % [_rush_ends.back()["reason"], dummy.tile])
+
+	e = _build(["##############", "#............#", "#.P.......m..#", "#............#", "#............#", "##############"], 120.0)
+	player = e["P"][0]
+	dummy = e["m"][0]
+	_give(player, "sword")
+	World.rush(dummy, Vector2(-1, 0), 8, {"through": true})
+	for i in 4:
+		World._relocate(player, dummy.tile + Vector2i.RIGHT)
+		_blow(player, dummy)
+	_check(World.rushing(dummy) and is_equal_approx(World._rushers[dummy]["u"], 1.0),
+			"four sword hits from behind: nothing (still rushing at %.2f)" % World._rushers[dummy]["u"] if World.rushing(dummy) else "four sword hits from behind: nothing (it stopped)")
+
+	World.apply_blow(player, dummy, {"impulse": 240.0, "direction": Vector2(0, 1)})
+	_check(not World.rushing(dummy) and _rush_ends.back()["reason"] == "knocked",
+			"a blow from the side that moves it: knocked off its line (%s)" % _rush_ends.back()["reason"])
+
+	# A player standing in its line: met at 1, shoved 1 cell (1.2 x 120 / 200 = 0.72);
+	# it goes on at 104 / 200 = 0.52, meets them again too slow to move them, and ends.
+	e = _build(["##############", "#............#", "#..P...m.....#", "#............#", "#............#", "##############"], 120.0)
+	player = e["P"][0]
+	dummy = e["m"][0]
+	World.rush(dummy, Vector2(-1, 0), 8, {"through": true})
+	for i in 8:
+		World.step()
+		if not World.rushing(dummy):
+			break
+	_check(_rush_ends.back()["reason"] == "body" and player.tile == Vector2i(2, 2) and dummy.tile == Vector2i(3, 2),
+			"one player in its line: shoved a cell to (2, 2), and the rush ends against them at (3, 2) (%s, %s, %s)" % [
+			_rush_ends.back()["reason"], player.tile, dummy.tile])
+
+	e = _build(["########", "#......#", "#.m....#", "#......#", "########"], 120.0)
+	dummy = e["m"][0]
+	World.rush(dummy, Vector2(-1, 0), 8)
+	for i in 3:
+		World.step()
+	_check(_rush_ends.back()["reason"] == "wall" and dummy.tile == Vector2i(1, 2), "a wall ends it (%s, at %s)" % [_rush_ends.back()["reason"], dummy.tile])
+
+	e = _build(["##############", "#............#", "#.P.......m..#", "#............#", "#............#", "##############"], 120.0)
+	dummy = e["m"][0]
+	World.rush(dummy, Vector2(-1, 0), 8)
+	World._stun_for(dummy, 5)
+	World.step()
+	_check(_rush_ends.back()["reason"] == "stunned" and dummy.tile == Vector2i(10, 2), "a stun ends it (%s)" % _rush_ends.back()["reason"])
+
+	e = _build(["##############", "#............#", "#.P.......m..#", "#............#", "#............#", "##############"], 120.0)
+	var host: GridEntity = e["P"][0]
+	dummy = e["m"][0]
+	_give(host, "spear")
+	host._world_set_facing(Vector2i.RIGHT)
+	host.last_step_tick = World.tick - World.BRACE_TICKS
+	World.rush(dummy, Vector2(-1, 0), 10, {"through": true})
+	for i in 10:
+		World.step()
+		if not World.rushing(dummy):
+			break
+	_check(_rush_ends.back()["reason"] == "brace", "a braced spear stops it (%s, at %s)" % [_rush_ends.back()["reason"], dummy.tile])
+
+
 # --- helpers ------------------------------------------------------------------
 
 ## A cell map as push_test's: '#' solid, '.' floor, 'P' player, 'm' a dummy
@@ -347,6 +447,10 @@ func _check(ok: bool, label: String) -> void:
 	if not ok:
 		_failures += 1
 	print("  %s  %s" % ["PASS" if ok else "FAIL", label])
+
+
+func _on_rush_ended(entity: GridEntity, reason: String, at: Vector2i, _result: Dictionary) -> void:
+	_rush_ends.append({"entity": entity, "reason": reason, "at": at})
 
 
 func _on_entity_damaged(entity: GridEntity, amount: int, _source: GridEntity, cause: StringName) -> void:

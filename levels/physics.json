@@ -12,5 +12,6 @@
 	"stun_ticks_per_speed": 3.0,
 	"knockback_stun_ticks": 7,
 	"lunge_ticks_per_cell": 1.0,
-	"lunge_min_speed": 0.5
+	"lunge_min_speed": 0.5,
+	"rush_stop_speed": 0.1
 }

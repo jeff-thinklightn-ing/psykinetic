@@ -31,6 +31,11 @@ signal blow_resolved(source: GridEntity, target: GridEntity, result: Dictionary)
 ## A lunge resolved (lunge, decision 596): [param result]'s cells, stopped_by,
 ## struck and impact_damage. Server only.
 signal lunge_resolved(entity: GridEntity, result: Dictionary)
+## A rush ended (rush, decision 604) for [param reason] ("arrived", "blow",
+## "knocked", "brace", "body", "wall", "stunned") at [param at]; [param
+## result] as lunge_resolved's. Every reason but "arrived" is an
+## interruption. Server only.
+signal rush_ended(entity: GridEntity, reason: String, at: Vector2i, result: Dictionary)
 ## A body launched (launch, decision 598): [param result] as
 ## blow_resolved's. Server only.
 signal launched(by: GridEntity, body: GridEntity, result: Dictionary)
@@ -379,6 +384,9 @@ var winded_regen_delay := 20
 ## least speed a charge going through bodies keeps going at.
 @export var lunge_ticks_per_cell := 1.0
 @export var lunge_min_speed := 0.5
+## A rush (decision 604) ends when the hits on it leave its speed this or
+## less: a charge this slow is no charge.
+@export var rush_stop_speed := 0.1
 ## SHOVE_COST_BASE and SHOVE_COST_SCALE: a shove costs
 ## base + force x target_mass x scale stamina.
 @export var shove_cost_base := 5.0
@@ -629,6 +637,8 @@ var _buffed: Dictionary[GridEntity, bool] = {}
 var _mending: Dictionary[GridEntity, Dictionary] = {}
 ## The longest a thing's story line runs in its slot's note (story_line).
 const STORY_LONGEST := 80
+## Whoever is rushing (rush, decision 604): its state, for _tend_rushes.
+var _rushers: Dictionary[GridEntity, Dictionary] = {}
 ## Whoever is winding up a blow (try_wind_up), for _tend_wind_ups.
 var _winders: Dictionary[GridEntity, bool] = {}
 
@@ -970,6 +980,7 @@ func _step_zone() -> void:
 	var near := _tier_origins()
 	_take_roster()
 	_clear_links()
+	_tend_rushes()  # Each rush's next cell when due (decision 604).
 	t = part("tiers, roster", t)
 	for entity in _actors:
 		# Not its turn by the tier it has, and that tier not due to be
@@ -1460,6 +1471,7 @@ func reset() -> void:
 	zone.comings += 1
 	_occupancy.clear()
 	_hits.clear()
+	_rushers.clear()
 	_grid_rect = Rect2i()
 	_grid_steps = PackedByteArray()
 	_floor.clear()
@@ -3429,7 +3441,7 @@ func load_physics_rules(text: String) -> void:
 		var given: Variant = data[key]
 		if not field in ["shove_scale", "knockback_min_force", "slide_per_speed", "max_travel", "momentum_scale",
 				"momentum_ticks", "restitution", "impact_per_energy", "brace_restitution", "stun_ticks_base",
-				"stun_ticks_per_force", "knockback_stun_ticks", "lunge_ticks_per_cell", "lunge_min_speed"]:
+				"stun_ticks_per_force", "knockback_stun_ticks", "lunge_ticks_per_cell", "lunge_min_speed", "rush_stop_speed"]:
 			push_warning("World: %s's %s is not a physics rule" % [PHYSICS_RULES, key])
 		elif (given is int or given is float) and float(given) >= 0.0:
 			set(field, int(given) if get(field) is int else float(given))
@@ -4428,6 +4440,7 @@ func _forget_jobs(entity: GridEntity) -> void:
 	_buffed.erase(entity)
 	_mending.erase(entity)
 	_winders.erase(entity)
+	_rushers.erase(entity)
 	_downed.erase(entity)
 	# Untyped till checked, by keys and values side by side (a typed
 	# dictionary refuses a freed key even to look up or erase): a job holding
@@ -5445,9 +5458,11 @@ func _resolve_hits() -> void:
 				_felled_with(hit.source, Items.RIGHT_HAND, hit.target)
 			elif creature and holder_grudge(hit.source, kind_of(hit.target)):
 				_stun_for(hit.target, int(Items.growth()["grudge_stagger"]))  # A grudge's blow (decision 417).
+		var way := hit.push_way if hit.push_way != Vector2.ZERO else Vector2(hit.push_direction)
 		if hit.force > 0.0 and _alive(hit.target):
-			var way := hit.push_way if hit.push_way != Vector2.ZERO else Vector2(hit.push_direction)
 			_push(hit.source, hit.target, way, hit.force, hit.push_direction != hit.direction)
+		if _alive(hit.target):
+			_rush_struck(hit.target, way.normalized() * hit.raw_force)  # A rush slowed or stopped (604).
 
 
 ## Force push (decision 592). [param force] is the speed the push gives
@@ -5551,6 +5566,8 @@ func _push(mover: GridEntity, first: GridEntity, way: Vector2, force: float, tos
 				break
 		if tiles > 0:
 			body.step_velocity = Vector2.ZERO  # Thrown off its feet: no step's momentum left.
+			if _rushers.has(body) and body != mover:
+				_end_rush(body, "knocked")  # Off its line (decision 604).
 
 		# Speed spent on travel; what is left is what hits.
 		var remaining := 0.0
@@ -5637,6 +5654,7 @@ func apply_blow(source: GridEntity, target: GridEntity, blow: Dictionary) -> Dic
 	result["speed"] = way.length()
 	if way.length() >= knockback_min_force:
 		_fill_slide(result, target, _push(source, target, way, way.length(), false, int(blow.get("stagger", -1))))
+	_rush_struck(target, way)  # A rush slowed or stopped (604).
 	result["knocked_down"] = is_down(target)
 	blow_resolved.emit(source, target, result)
 	return result
@@ -5659,6 +5677,7 @@ func launch(by: GridEntity, body: GridEntity, toward: Vector2, impulse: float, s
 	result["speed"] = speed
 	var away := Vector2(body.tile - by.tile)
 	_fill_slide(result, body, _push(by, body, toward, speed, toward.normalized().dot(away.normalized()) < 0.99, stagger))
+	_rush_struck(body, toward.normalized() * speed)  # A rush slowed or stopped (604).
 	result["knocked_down"] = is_down(body)
 	_log("launch: %s throws %s toward %s at %.2f: %d cells, stopped by %s" % [by.name, body.name, toward, speed,
 			result["distance"], result["stopped_by"]])
@@ -5703,81 +5722,212 @@ func _fill_slide(result: Dictionary, target: GridEntity, pushed: Array[Dictionar
 ## once. {cells (moved), stopped_by, struck: [{body, cells, impact}],
 ## impact_damage (the lunger's)}; emitted as lunge_resolved.
 func lunge(entity: GridEntity, toward: Vector2, cells: int, opts := {}) -> Dictionary:
-	var result := {"cells": 0, "stopped_by": "", "struck": [], "impact_damage": 0}
+	var state := _lunge_begin(entity, toward, cells, opts)
+	if state.is_empty():
+		return {"cells": 0, "stopped_by": "", "struck": [], "impact_damage": 0}
+	while str(state["reason"]).is_empty():
+		_lunge_cell(state, false)
+	var moved: int = state["moved"]
+	if moved > 0:
+		entity._world_slide_from(state["start"], tick, moved * float(state["ticks"]))
+		entity.next_move_tick = maxf(entity.next_move_tick, tick + moved * float(state["ticks"]))
+	var result := _lunge_finish(state)
+	_log("lunge: %s from %s %d cells toward %s, stopped by %s" % [entity.name, state["start"], moved, toward, result["stopped_by"]])
+	lunge_resolved.emit(entity, result)
+	return result
+
+
+## A charge spread over time (decision 604): 596's lunge, a cell each
+## lunge_ticks_per_cell / its speed, from the next tick on (_tend_rushes),
+## so it can be met and struck on the way. [param opts] as lunge's, and
+## "to": the cell it runs for (arrived there), else it runs its cells. Its
+## speed u starts at 1 and is changed by what it meets: every hit on it
+## (any blow or shove, even one under knockback_min_force) adds the hit's
+## speed along the rush (impulse over its mass; the part behind it adds
+## nothing), and it ends when u is rush_stop_speed or less ("blow"). A push
+## that moves it ends it ("knocked"); so do a braced spear ("brace"), a body
+## it cannot go on through ("body"), the terrain ("wall") and a stun
+## ("stunned"); reaching its cell or running its cells is "arrived". Each
+## end emits rush_ended(entity, reason, at, result). True if it started.
+## Server only. A rushing body does not walk or strike on its own.
+func rush(entity: GridEntity, toward: Vector2, cells: int, opts := {}) -> bool:
+	if _rushers.has(entity):
+		return false
+	var state := _lunge_begin(entity, toward, cells, opts)
+	if state.is_empty():
+		return false
+	state["due"] = float(tick) + 1.0
+	_rushers[entity] = state
+	entity.next_move_tick = maxf(entity.next_move_tick, state["due"])
+	_log("rush: %s from %s toward %s, %d cells%s" % [entity.name, entity.tile, toward, cells,
+			"" if state["to"] == NO_CELL else " to %s" % state["to"]])
+	return true
+
+
+## Whether [param entity] is rushing (rush).
+func rushing(entity: GridEntity) -> bool:
+	return _rushers.has(entity)
+
+
+## Each rush's cell when due, in id order (the zone's step, before the act
+## phase).
+func _tend_rushes() -> void:
+	if _rushers.is_empty():
+		return
+	var each: Array[GridEntity] = []
+	each.assign(_rushers.keys())
+	each.sort_custom(func(a: GridEntity, b: GridEntity) -> bool: return a.id < b.id)
+	for entity in each:
+		var state: Dictionary = _rushers.get(entity, {})
+		if state.is_empty():
+			continue
+		if not _alive(entity):
+			_rushers.erase(entity)
+			continue
+		if is_stunned(entity):
+			_end_rush(entity, "stunned")
+			continue
+		if float(tick) < float(state["due"]):
+			continue
+		_lunge_cell(state, true)
+		if not str(state["reason"]).is_empty():
+			_end_rush(entity, state["reason"])
+		else:
+			state["due"] = float(tick) + float(state["ticks"])
+			entity.next_move_tick = maxf(entity.next_move_tick, state["due"])
+
+
+## A hit on [param body] (a blow's, shove's or launch's [param way], its
+## speed vector before the threshold): a rushing body's speed changes by its
+## part along the rush (decision 604), ending the rush once spent.
+func _rush_struck(body: GridEntity, way: Vector2) -> void:
+	var state: Dictionary = _rushers.get(body, {})
+	if state.is_empty() or way == Vector2.ZERO:
+		return
+	var along := way.dot(Vector2(state["line"]).normalized())
+	if along >= 0.0:
+		return  # From behind: it adds nothing, and never stops it.
+	state["u"] = float(state["u"]) + along
+	_log("rush: %s struck, %.2f, its speed now %.2f" % [body.name, along, state["u"]])
+	if float(state["u"]) <= rush_stop_speed:
+		_end_rush(body, "blow")
+	else:
+		state["ticks"] = maxf(lunge_ticks_per_cell, 0.1) / float(state["u"])
+		body.step_velocity = Vector2(state["line"]) / float(state["ticks"])
+
+
+## [param entity]'s rush ends for [param reason]: rush_ended.
+func _end_rush(entity: GridEntity, reason: String) -> void:
+	var state: Dictionary = _rushers.get(entity, {})
+	if state.is_empty():
+		return
+	_rushers.erase(entity)
+	if str(state["reason"]).is_empty():
+		state["reason"] = reason
+		state["stopped_by"] = reason
+	var result := _lunge_finish(state)
+	result["reason"] = reason
+	_log("rush: %s ends at %s after %d cells: %s" % [entity.name, entity.tile if _alive(entity) else state["start"], state["moved"], reason])
+	rush_ended.emit(entity, reason, entity.tile if _alive(entity) else NO_CELL, result)
+
+
+## A lunge's or a rush's state, or {} if [param entity] cannot.
+func _lunge_begin(entity: GridEntity, toward: Vector2, cells: int, opts: Dictionary) -> Dictionary:
 	if not Net.is_authority() or not _alive(entity) or is_stunned(entity) or toward == Vector2.ZERO or cells <= 0:
-		return result
+		return {}
 	var line := toward / maxf(absf(toward.x), absf(toward.y))
-	var blow: Dictionary = opts.get("blow", {})
-	var through := bool(opts.get("through", false))
-	var start := entity.tile
 	var ticks := maxf(lunge_ticks_per_cell, 0.1)
 	# Its own speed from the start (a cell a lunge step), for the momentum it
 	# carries and for a braced spear to read.
-	var u := line.length() / ticks
 	entity.step_velocity = line / ticks
 	entity.step_until = tick + cells * ticks
 	entity._world_set_facing(Vector2i(roundi(line.x), roundi(line.y)))
 	entity._world_note_exertion(tick)
 	entity.protected = false
-	var moved := 0
-	var stopped_by := "nothing (the lunge's length)"
-	while moved < cells:
-		var next: Vector2i = start + Vector2i((line * (moved + 1)).round())
-		var direction := next - entity.tile
-		if _terrain_blocks_step(entity.tile, direction, true) or not is_walkable(next) \
-				or entity.is_creature() and is_burning(next) or not entity is Player and is_link_cell(next):
-			stopped_by = "wall" if _closed_door_across(entity.tile, direction) == null else "a door"
-			break
-		if _meets_brace(entity, next, direction, true):
-			stopped_by = "a braced spear"
-			break
-		var body: GridEntity = _occupancy.get(next)
-		if body != null:
-			if not through:
-				stopped_by = body.name
-				if not blow.is_empty():
-					var landed := apply_blow(entity, body, {"impulse": float(blow.get("impulse", 0.0)),
-							"direction": line, "stagger": int(blow.get("stagger", -1))})
-					result["struck"].append({"body": body, "cells": landed["distance"], "impact": landed["impact_damage"]})
-				break
-			var m1 := pushed_mass(entity)
-			var m2 := pushed_mass(body)
-			var given := (1.0 + restitution) * m1 * u / (m1 + m2)
-			var kept := (m1 - restitution * m2) * u / (m1 + m2)
-			var lost := 0.5 * m1 * u * u - 0.5 * m1 * maxf(kept, 0.0) * maxf(kept, 0.0) - 0.5 * m2 * given * given
-			var impact := roundi(impact_per_energy * maxf(lost, 0.0) * 0.5)
-			var speed := given + float(blow.get("impulse", 0.0)) / maxf(m2, 0.001)
-			var pushed := _push(entity, body, line, speed, false, int(blow.get("stagger", -1)))
-			var went := 0
-			for each: Dictionary in pushed:
-				if each["body"] == body:
-					went = each["cells"]
-			if impact > 0:
-				_impact(body, impact, entity, &"body")
-				_impact(entity, impact, entity, &"body")
-				result["impact_damage"] = int(result["impact_damage"]) + impact
-			result["struck"].append({"body": body, "cells": went, "impact": impact})
-			_log("lunge: %s meets %s at %.2f: it goes %d, the charge goes on at %.2f" % [entity.name, body.name, u, went, kept])
-			u = kept
-			if not _alive(entity) or u < lunge_min_speed or _occupancy.has(next):
-				stopped_by = body.name
-				break
-		var from := entity.tile
-		_relocate(entity, next)
-		moved += 1
-		_trample(entity, from)
-	entity.step_velocity = line.normalized() * u if moved > 0 or through else entity.step_velocity
-	if moved > 0:
-		entity._world_slide_from(start, tick, moved * ticks)
-		entity.next_move_tick = maxf(entity.next_move_tick, tick + moved * ticks)
-		entity.last_step_tick = tick
-	if entity.is_creature():
+	return {"entity": entity, "start": entity.tile, "line": line, "cells": cells, "ticks": ticks,
+		"u": line.length() / ticks, "blow": opts.get("blow", {}), "through": bool(opts.get("through", false)),
+		"to": opts.get("to", NO_CELL), "moved": 0, "reason": "", "stopped_by": "", "struck": [], "impact": 0}
+
+
+## One cell of a lunge or a rush ([param timed]: a rush's, drawn as it is
+## taken). Sets state's reason and stopped_by when it ends.
+func _lunge_cell(state: Dictionary, timed: bool) -> void:
+	var entity: GridEntity = state["entity"]
+	var line: Vector2 = state["line"]
+	var moved: int = state["moved"]
+	if moved >= int(state["cells"]) or entity.tile == state["to"]:
+		state["reason"] = "arrived"
+		state["stopped_by"] = "nothing (the lunge's length)"
+		return
+	var next: Vector2i = state["start"] + Vector2i((line * (moved + 1)).round())
+	var direction := next - entity.tile
+	if _terrain_blocks_step(entity.tile, direction, true) or not is_walkable(next) \
+			or entity.is_creature() and is_burning(next) or not entity is Player and is_link_cell(next):
+		state["reason"] = "wall"
+		state["stopped_by"] = "wall" if _closed_door_across(entity.tile, direction) == null else "a door"
+		return
+	if _meets_brace(entity, next, direction, true):
+		state["reason"] = "brace"
+		state["stopped_by"] = "a braced spear"
+		return
+	var blow: Dictionary = state["blow"]
+	var body: GridEntity = _occupancy.get(next)
+	if body != null:
+		if not state["through"]:
+			state["reason"] = "body"
+			state["stopped_by"] = body.name
+			if not blow.is_empty():
+				var landed := apply_blow(entity, body, {"impulse": float(blow.get("impulse", 0.0)),
+						"direction": line, "stagger": int(blow.get("stagger", -1))})
+				state["struck"].append({"body": body, "cells": landed["distance"], "impact": landed["impact_damage"]})
+			return
+		var u: float = state["u"]
+		var m1 := pushed_mass(entity)
+		var m2 := pushed_mass(body)
+		var given := (1.0 + restitution) * m1 * u / (m1 + m2)
+		var kept := (m1 - restitution * m2) * u / (m1 + m2)
+		var lost := 0.5 * m1 * u * u - 0.5 * m1 * maxf(kept, 0.0) * maxf(kept, 0.0) - 0.5 * m2 * given * given
+		var impact := roundi(impact_per_energy * maxf(lost, 0.0) * 0.5)
+		var speed := given + float(blow.get("impulse", 0.0)) / maxf(m2, 0.001)
+		var pushed := _push(entity, body, line, speed, false, int(blow.get("stagger", -1)))
+		var went := 0
+		for each: Dictionary in pushed:
+			if each["body"] == body:
+				went = each["cells"]
+		if impact > 0:
+			_impact(body, impact, entity, &"body")
+			_impact(entity, impact, entity, &"body")
+			state["impact"] = int(state["impact"]) + impact
+		state["struck"].append({"body": body, "cells": went, "impact": impact})
+		_log("lunge: %s meets %s at %.2f: it goes %d, the charge goes on at %.2f" % [entity.name, body.name, u, went, kept])
+		state["u"] = kept
+		if kept > 0.0:
+			state["ticks"] = maxf(lunge_ticks_per_cell, 0.1) / kept
+		if not _alive(entity) or kept < lunge_min_speed or _occupancy.has(next):
+			state["reason"] = "body"
+			state["stopped_by"] = body.name
+			return
+	var from := entity.tile
+	_relocate(entity, next)
+	state["moved"] = moved + 1
+	_trample(entity, from)
+	entity.step_velocity = line / float(state["ticks"])
+	entity.step_until = tick + float(state["ticks"])
+	entity.last_step_tick = tick
+	if timed:
+		entity._world_slide_from(from, tick, float(state["ticks"]))
+	if entity.tile == state["to"]:
+		state["reason"] = "arrived"
+		state["stopped_by"] = "nothing (it arrived)"
+
+
+## A lunge's or a rush's result from its state.
+func _lunge_finish(state: Dictionary) -> Dictionary:
+	var entity: GridEntity = state["entity"]
+	if _alive(entity) and entity.is_creature():
 		noise(entity.tile, Senses.NOISE_FIGHT, &"fight", entity)
-	result["cells"] = moved
-	result["stopped_by"] = stopped_by
-	_log("lunge: %s from %s %d cells toward %s, stopped by %s" % [entity.name, start, moved, toward, stopped_by])
-	lunge_resolved.emit(entity, result)
-	return result
+	return {"cells": state["moved"], "stopped_by": state["stopped_by"], "struck": state["struck"],
+		"impact_damage": state["impact"]}
 
 
 ## The impulse of [param attacker]'s blow with [param verb] (blow_verb's),

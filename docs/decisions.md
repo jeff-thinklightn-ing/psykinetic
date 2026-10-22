@@ -21939,3 +21939,44 @@ Physics step 2's second part (step2_design.md, the coordinator's approval, 2026-
 
 tests/physics_test: 25 and 70 kg (6, 2), a goblin thrown into a goblin, a body thrown back
 over its thrower (4 cells, 2 of them overhead), nobody throws itself.
+
+## 604: a rush, a charge spread over time (the draugr fight, physics' half)
+
+Jeff's draugr boss fight (combat-f6 leads; C:/dev/review/physics/draugr_physics.md, agreed
+with combat; the coordinator put it on the prototype's path, 2026-10-22). His charge to the
+fallen axe must be stoppable on the way, and 596's lunge resolves at once, in one tick. So
+World.rush(entity, toward: Vector2, cells, {through, blow, to}) is the lunge spread over
+time.
+
+- From the next tick on (World._tend_rushes, in the zone's step before the act phase, in id
+  order), it takes one cell each lunge_ticks_per_cell / u, through the same one-cell step as
+  596 (_lunge_cell: the same stops, the same collisions through bodies, a braced spear), and
+  is drawn a cell at a time. u is its speed, starting at 1. A rushing body does not walk or
+  strike on its own (next_move_tick held to its next cell). World.rushing(entity) says if it
+  is.
+- One rule by mass stops it. Every hit on it (a blow or a shove through _resolve_hits, even
+  one under knockback_min_force; apply_blow; launch) changes u by the hit's speed along the
+  rush (impulse over its mass). The part behind it adds nothing, as 592 drops it. A slowed
+  rush moves slower. It ends when u is rush_stop_speed (0.1: a charge this slow is no
+  charge) or less ("blow").
+- Its other ends: a push that moves it ("knocked", off its line); a braced spear ("brace",
+  592's turned momentum); a body it cannot go on through, by 596's collision ("body"); the
+  terrain ("wall"); a stun ("stunned"); its cell (`to`) reached, or its cells run
+  ("arrived"). Each end emits rush_ended(entity, reason, at, result). Every reason but
+  "arrived" is the interruption that disarms the draugr, which is combat's and enemy-ai's to
+  apply.
+- Numbers for the draugr, 120 kg at speed 1 (combat's asks):
+  - A player's sword from the front takes 0.34, then 0.32, then 0.30 (each swing spends
+    stamina, 597, and the push fades with it): three hits stop him.
+  - A hammer (1.04) stops him dead in one, without knocking him back.
+  - Nothing from behind stops him.
+  - One player standing in his line is shoved a cell (1.2 x 120 / 200), and the rush goes on
+    at 0.52, meets them again too slow to move them, and ends ("body").
+- 596's lunge now runs through the same _lunge_begin / _lunge_cell / _lunge_finish; its
+  behaviour is as before (its tests unchanged).
+- rush_stop_speed in levels/physics.json. Server sim only: a rush is a tile change a cell at
+  a time, as a walk is. Protocol unchanged.
+
+tests/physics_test: arrived at its cell in 5 ticks; three swords from the front; a hammer
+once; four swords from behind, nothing; a blow from the side, knocked; one player in its
+line; a wall; a stun; a braced spear.
