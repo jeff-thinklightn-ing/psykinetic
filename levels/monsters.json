@@ -62,7 +62,7 @@
 	"wolf": {
 		"side": "wild", "role": "predator", "herd": "wolf", "label": "Wolf", "art": "creature.wolf", "diet": ["rabbit", "deer", "stag"],
 		"body": {"mass": 40.0, "max_hp": 12, "move_ticks": 2.8, "attack_damage": 2, "sight_range": 8},
-		"tactic": "dart", "idle": "wander", "opens_doors": false, "door_force": 0, "leash": 30,
+		"tactic": "dart", "idle": "wander", "opens_doors": false, "door_force": 0, "leash": 15,
 		"temperament": {"bold": 0, "cautious": 1, "cowardly": 0},
 		"drops": [{"item": "hide", "count": [1, 1]}]
 	},

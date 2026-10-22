@@ -33,10 +33,11 @@ const CHARGE_TICKS := 90
 const CORNERED_TILES := 2
 ## A predator is bold under this much of the sky's light (DayNight), and
 ## sees this much farther; or with this many of its pack (itself too)
-## within PACK_TILES.
+## within PACK_TILES (decision 397 amended, enemy-ai's side: 4 and 1, drafts for Jeff; were 3
+## and 2, so a pack of economy's 2 or 3 lets a player be by day).
 const NIGHT_LIGHT := 0.35
-const NIGHT_SIGHT := 2
-const PACK_BOLD := 3
+const NIGHT_SIGHT := 1
+const PACK_BOLD := 4
 const PACK_TILES := 8
 ## A predator looks over its diet in sight every so many ticks, and
 ## settles whether it is bold as often.

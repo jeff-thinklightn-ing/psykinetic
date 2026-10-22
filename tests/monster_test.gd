@@ -101,6 +101,7 @@ func _ready() -> void:
 	_test_charging()
 	_test_threatens()
 	_test_quieter()
+	_test_wolf_pack_bold()
 	_test_archer()
 	_test_worn_bundles()
 	_test_shield()
@@ -2837,4 +2838,26 @@ func _test_quieter() -> void:
 	_check(["robber", "skeleton_guard", "skeleton", "draugr"].all(func(kind: String) -> bool: return Monster.bodies()[kind].get("sight_range") == 5)
 			and e["x"][0].leash == 10,
 		"the barrow's kinds see 5 cells; a robber goes 10 from home")
+	Monster.idling = true
+
+
+func _test_wolf_pack_bold() -> void:
+	print("
+== wolves by day: a pack of 3 lets a hunter be, of 4 it is bold (397 amended) ==")
+	Monster.idling = false
+	var e := _build(["##############", "#..w.w.w.....#", "#.P..........#", "##############"])
+	_outdoors("clear")
+	DayNight.set_hour(12.0)
+	for i in Animal.PREY_LOOK_TICKS + 2:
+		World.step()
+	_check(e["w"].all(func(wolf: Animal) -> bool: return not wolf._bold and not wolf.threatens(e["P"][0])), "three by day: none bold")
+	e = _build(["##############", "#..w.w.w.w...#", "#.P..........#", "##############"])
+	_outdoors("clear")
+	DayNight.set_hour(12.0)
+	for i in Animal.PREY_LOOK_TICKS + 2:
+		World.step()
+	_check(e["w"].all(func(wolf: Animal) -> bool: return wolf._bold), "four by day: bold")
+	_check(Monster.kinds()["wolf"]["leash"] == 15 and Animal.NIGHT_SIGHT == 1, "it chases 15 from its den, and sees 1 farther at night")
+	DayNight.reset()
+	_indoors()
 	Monster.idling = true

@@ -19414,3 +19414,21 @@ widens the halls beside it (541 amended), and sets the counts there.
 
 Server only, protocol unchanged, no new class_name. monster_test
 _test_quieter; the draugr's retinue check in _test_draugr.
+
+## 397 amended, enemy-ai's side: wolves less keen
+
+Jeff: "wolf packs of 4 near the town are too much ... no way to survive
+that". Economy's side makes packs of 2-3, fewer, and none within 30 cells
+of a level's places or link pads (and none in the wilds). Under 315's
+rules a pack of 3 was still bold by day, so the coordinator approved,
+as drafts for Jeff:
+
+- Animal.PACK_BOLD 3 to 4: by day a wolf goes for a player only with 4
+  of its pack within PACK_TILES; economy's packs never are, unless struck.
+- The wolf's leash 30 to 15 (levels/monsters.json): a player who runs gets
+  away.
+- Animal.NIGHT_SIGHT 2 to 1: a night pack notices from 9 cells, not 10.
+
+Struck, a wolf fights back as before, and its hunting of deer is
+unchanged. Server only, protocol unchanged, no new class_name.
+monster_test _test_wolf_pack_bold.
