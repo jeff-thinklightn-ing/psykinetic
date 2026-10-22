@@ -1,0 +1,14 @@
+[remap]
+
+importer="image"
+type="Image"
+uid="uid://budy46auvah53"
+path="res://.godot/imported/relief.png-db7949830ab2da3213d2da75799a4056.image"
+
+[deps]
+
+source_file="res://levels/wilds/relief.png"
+dest_files=["res://.godot/imported/relief.png-db7949830ab2da3213d2da75799a4056.image"]
+
+[params]
+

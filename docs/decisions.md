@@ -19496,3 +19496,55 @@ item and its buff. The numbers are drafts for Jeff.
   (552).
 Wire: PROTOCOL_REVISION 29, "speed" in a body's buffs. items_test
 _test_stamina_potion. No new class_name.
+
+## 565. The wilds' landmarks, layer one: the relief
+
+Jeff: "wilds needs better land marks, in the wilds its tough to know where
+you are". The wilds were flat (no relief.png), with no streams and three
+ponds of a dozen cells: nothing rose and nothing ran anywhere. The
+coordinator approved a design in layers (the relief; the river and the
+ponds as curves; the roads; the marks), each its own landing, the town's
+ground untouched until Held's own map is decided.
+
+**tools/make_wilds_marks.tscn** lays a layer over the hand-edited wilds
+(make_wilds.gd remade would undo the hand edits; this never does). Layer
+one, the relief, writes relief.png alone: the layout and level.json are as
+they were, every cell keeps its kind.
+- Relief.lay over the whole map (seed 565): base 6 m, a roll of 1.5 m
+  either way over 64 cells, the cap 0.25 m a step;
+- a ridge, an escarpment (525 amended (2)) along (140, 30), (178, 46),
+  (215, 70): its face 3.5 m looking south-west over the middle, its back
+  rising over 30 cells from the north-east, tapered over 12 at its ends, a
+  way 5 wide 45% along; north of the goblin camp's gathering point (199,
+  81), which stays 20 cells below the face;
+- a valley along (62, 0), (70, 56), (96, 104), (104, 168), (118, 255) for
+  layer two's river, 2.5 m deep, a floor 6 either side falling 3 m to the
+  south, eased over 26;
+- level pads (keep_flat) on the town's rectangle (190..227, 190..231) and
+  3 cells round every link, spawn point, start, building and the camp's
+  gathering point; none round things lying on the ground (a kit, a chest):
+  a pad there against the valley's held floor asked a step the cap could
+  not give, and left a stray ledge;
+- the forest and the water filled from the ground beside them; each pond
+  then level 0.3 m under its lowest shore (Level's water rules).
+
+**What changes for walking**: slopes everywhere, uphill slower (525); the
+ridge's face is a cliff (88 edges, median 3.4 m), crossed at its way or
+round its tapered ends. The face cuts nothing off: every floor cell walked
+to from the castle's link on flat ground is walked to with the relief (a
+few cells the hand-painted forest already closed in are as they were).
+
+**Saved positions stay valid**: no cell changes kind, so every saved spot
+(players, residents, strays), camp, herd home and building is still on
+floor; links, spawn points and starts stand on level pads (checked); a
+herd home or camp is chosen among floor cells and a face is an edge, not
+a cell, so none lands "on" it. Checked on the repo's level, never the box's
+world.json.
+
+Level data, protocol unchanged (relief.png is in the "terrain" message since
+525); it ships in a full cut. Before/after shots from the crossroads, the
+link pads, the ridge and the valley are in C:/dev/review/wilds_marks/.
+
+tests/relief_test: the wilds' relief given and nothing said; the ridge's
+face about 3.5 m; the relief cuts nothing off; every link, spawn point and
+start on level ground.

@@ -55,6 +55,7 @@ func _ready() -> void:
 	_test_river()
 	_test_road()
 	_test_hills()
+	_test_wilds()
 	_main.load_map(Level.DEFAULT_MAP)
 	Level.unregister("rl_hill")
 	print("")
@@ -665,6 +666,61 @@ func _test_hills() -> void:
 	_check(floor.has(top) and steps > 0.0, "the plateau's top is walked to from the link, round by its spur (%.0f steps)" % steps)
 	var foot := Vector2i(58, 20)
 	_check(floor.has(foot) and Relief.at(field, size, top) - Relief.at(field, size, foot) > 4.0, "it stands over the valley at its face")
+
+
+## levels/wilds' relief (decision 565): given, nothing said; the ridge's
+## face about its height; every floor cell walked to from the castle's
+## link on flat ground walked to still (the face cuts nothing off); every link, spawn
+## point and start on level ground (its pad), so a saved spot or an arrival
+## is never on a slope or a face.
+func _test_wilds() -> void:
+	print("== levels/wilds ==")
+	var level := Level.load_level("wilds")
+	var terrain: Dictionary = level["terrain"]
+	_check(terrain["relief_given"] and level["warnings"].is_empty(), "relief.png, nothing said (%s)" % [level["warnings"]])
+	var field: PackedFloat32Array = terrain["relief"]
+	var size: Vector2i = terrain["relief_size"]
+	var floor: Dictionary = {}
+	for cell: Vector2i in terrain["floor"]:
+		floor[cell] = true
+	var drops := []
+	for cell: Vector2i in floor:
+		for step: Vector2i in [Vector2i(1, 0), Vector2i(0, 1)]:
+			if floor.has(cell + step) and Relief.cliff_between(Relief.at(field, size, cell), Relief.at(field, size, cell + step)):
+				drops.append(absf(Relief.at(field, size, cell) - Relief.at(field, size, cell + step)))
+	drops.sort()
+	_check(drops.size() >= 60 and drops[drops.size() / 2] > 2.5, "the ridge's face, about 3.5 m (%d edges, median %.2f)" % [drops.size(), drops[drops.size() / 2] if not drops.is_empty() else 0.0])
+	var area := {"relief": field, "relief_size": size, "stairs": terrain["stairs"], "heights": {}, "edges": terrain["edges"], "floor": floor, "size": size}
+	var reached := PackedFloat32Array()
+	reached.resize(size.x * size.y)
+	reached.fill(-1.0)
+	WorldRoutes._flood(area, level["spawn_points"]["from_castle"], {}, reached)
+	var unreached := floor.keys().filter(func(cell: Vector2i) -> bool: return reached[cell.y * size.x + cell.x] < 0.0)
+	# The layout's own islands (cells the forest closes in) are as they were.
+	var flat := area.duplicate()
+	var level_ground := PackedFloat32Array()
+	level_ground.resize(field.size())
+	flat["relief"] = level_ground
+	var reached_flat := PackedFloat32Array()
+	reached_flat.resize(size.x * size.y)
+	reached_flat.fill(-1.0)
+	WorldRoutes._flood(flat, level["spawn_points"]["from_castle"], {}, reached_flat)
+	var cut_off := unreached.filter(func(cell: Vector2i) -> bool: return reached_flat[cell.y * size.x + cell.x] >= 0.0)
+	_check(cut_off.is_empty(), "the relief cuts nothing off: every floor cell walked to on flat ground still is (%d not: %s)" % [cut_off.size(), cut_off.slice(0, 5)])
+	var spots: Array[Vector2i] = []
+	for link: Dictionary in level["links"]:
+		spots.append(link["tile"])
+	for at: Vector2i in level["spawn_points"].values():
+		spots.append(at)
+	for at: Vector2i in level["starts"]:
+		spots.append(at)
+	var tilted := spots.filter(func(at: Vector2i) -> bool:
+		var here := Relief.at(field, size, at)
+		for step in Relief.FOUR:
+			if floor.has(at + step) and absf(Relief.at(field, size, at + step) - here) > Relief.PAD_FLAT:
+				return true
+		return false)
+	_check(tilted.is_empty(), "every link, spawn point and start stands on level ground (%d spots; tilted: %s)" % [spots.size(), tilted])
 
 
 ## The first few pairs of orthogonal neighbours of [param terrain]'s

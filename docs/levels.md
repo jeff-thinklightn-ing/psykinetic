@@ -946,6 +946,17 @@ path, and the link there goes back to (16, 22). Run the tool again to
 remake it, then touch it up in the editor (running it again undoes the
 touching up).
 
+Its landmarks (Jeff: "wilds needs better land marks") are laid over the
+touched-up map a layer at a time by `tools/make_wilds_marks.tscn`, which
+writes only what its layer owns. The relief (565): `relief.png`, laid by
+`Relief.lay`: a roll of 1.5 m either way, a ridge across the north-east
+from (140, 30) to (215, 70) whose 3.5 m escarpment face looks south-west
+over the middle, its long back rising from the north-east, a way up it
+45% along; a valley from the north edge at (62, 0) down to the south at
+(118, 255), about 3 m under its flanks; each pond level 0.3 m under its
+lowest shore. The town, every link, spawn point, start and building, and
+the camp's gathering point stand on level pads. Every cell keeps its kind.
+
 ## Prefabs
 
 A prefab is a piece of map to stamp elsewhere, kept in
