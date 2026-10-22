@@ -368,7 +368,7 @@ var superstition := 5
 ## from her record's "sick", Companion.sick_sentence); none unset.
 var sick_words := Callable()
 ## The draugr's blessing (decision 544), Main's: whether she can bring her
-## downed player back now (her mark, her token, her player's count), () ->
+## downed player back now (her mark, a charge on her player's count), () ->
 ## bool; and the channel begun, (her, body) -> bool.
 var can_revive := Callable()
 var revive := Callable()
@@ -949,7 +949,11 @@ func forget(entity: GridEntity) -> void:
 
 func note_downed(theirs: bool) -> void:
 	if theirs:
-		_narrate("%s is down. You may bring them back where they lie." % keeper_name())
+		# A charge of her player's to spend, or not (573: the window is every
+		# blessed body's, whoever pays).
+		var can := can_revive.is_valid() and bool(can_revive.call())
+		_narrate("%s is down. %s" % [keeper_name(), "You may bring them back where they lie." if can
+			else "You cannot bring them back; someone blessed, with a charge, may."])
 		_ask_voice("%s is down." % keeper_name(), "", true)
 	else:
 		_narrate("You are down, and lie where you fell.")

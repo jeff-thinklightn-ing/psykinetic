@@ -1459,9 +1459,15 @@ func _test_field_return() -> void:
 	_main._on_command(owner, "bandage", {"target": str(pet.get_path())})
 	_step_until(func() -> bool: return not World.is_downed(pet), 80)
 	_check(not World.is_downed(pet) and int(record.barrow["tokens"]) == 8 and _player().charges == 8, "held still: she is back, another charge spent, the count told (%s)" % [record.barrow])
-	# Out of charges: down no more.
+	# Out of charges (573): still downed, for anyone blessed with a charge to
+	# bring back; she knows she cannot.
 	record.barrow["tokens"] = 0
-	_check(_main._downed(owner, null, &"attack") == 0 and _main._downed(pet, null, &"attack") == 0, "the count spent: they fall as ever")
+	_check(_main._downed(owner, null, &"attack") > 0 and _main._downed(pet, null, &"attack") > 0 and not _main._can_revive(pet, record),
+		"the count spent: still downed, for someone else's charge; she cannot bring them back")
+	pet._exchange.clear()
+	pet.note_downed(true)
+	_check(pet._exchange.any(func(turn: Dictionary) -> bool: return "You cannot bring them back; someone blessed, with a charge, may." in str(turn["text"])),
+		"her player down with no charge: she is told so")
 	# The window runs out: the fall as ever.
 	record.barrow["tokens"] = 2
 	World.damage(owner, owner.hp, null, &"attack")

@@ -4818,10 +4818,11 @@ static func _uses_left(record: PlayerRecord) -> int:
 	return Economy.barrow_tokens(record.barrow) if record != null else 0
 
 
-## World.downed (decision 544): a blessed body whose player has uses left
-## lies downed for the field rules' window; anyone else dies as ever.
+## World.downed (decision 544): a blessed body lies downed for the field
+## rules' window, whatever its own player's charges (573: anyone blessed with
+## a charge may bring it back); the unblessed die as ever.
 func _downed(target: GridEntity, _source: GridEntity, _cause: StringName) -> int:
-	if not (target is Player or target is Companion) or not _blessed(target) or _uses_left(_blessing_record(target)) <= 0:
+	if not (target is Player or target is Companion) or not _blessed(target):
 		return 0
 	if target is Player and not _players.has(target.owner_peer):
 		return 0

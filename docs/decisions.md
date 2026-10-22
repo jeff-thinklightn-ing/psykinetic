@@ -20358,3 +20358,25 @@ channel lines of 544 stand):
 ui_test: the words; the line from the player's pair; none unblessed.
 Client only; protocol unchanged on this side (dungeon's revision 30); no
 new class_name.
+## 573, companions' side. The window for every blessed body
+
+Jeff's words: "once you have a charge you can resurrect anyone that is
+dead, but it drains an active res token from you"; the coordinator: only
+the blessed get the window, and the charge drained is the resurrector's.
+So whose charges the fallen hold no longer decides whether they go down.
+
+- Main._downed: a blessed body (a player marked "draugr", a companion
+  with the mark) lies downed for the field rules' window whatever its
+  own player's charges; the unblessed die as ever (544's gate on the
+  body's player's uses is gone). A player offline still dies as ever.
+- Companion.note_downed: her player down, she is told "You may bring
+  them back where they lie." only when can_revive says so (her mark and
+  a charge on her player's count); otherwise "You cannot bring them
+  back; someone blessed, with a charge, may."
+- Dungeon's side (3d7d7875) switched the channel's reads: Main._uses_left
+  reads Economy.barrow_tokens, _on_channel spends the channeler's
+  player's charge, no half is carried.
+
+companion_test _test_field_return: with no charges both still go down,
+she cannot bring her player back, and she is told so. Server sim,
+protocol unchanged, no new class_name.

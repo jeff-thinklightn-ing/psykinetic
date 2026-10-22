@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Anyone with the draugr's blessing now lies downed when beaten, even with no charges of their own, so a blessed friend with a charge can bring them back; a companion says she can't when her player has none (573, companions' side).
 - A resident carrying a log on the shoulder no longer has it through the head: the log sits out on the shoulder, level as they walk, with the hand under it.
 - Once the draugr has blessed you, your pack shows the resurrection charges you hold, "charges 23 of 50", at its foot; nothing shows before that (573, ui's side; the charges are dungeon's).
 - The draugr's pact is bought by the deal: 20, 50 or 100 gold for 5, 10 or 15 charges (under 20 he refuses; between steps you get the lower one). He stands harder for every charge the players in the barrow hold when the fight begins, and heals half his health at once whenever someone comes into the barrow while it is on (573).
