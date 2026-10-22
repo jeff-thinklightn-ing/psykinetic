@@ -2278,10 +2278,13 @@ func _test_draugr() -> void:
 	_check(taken["ok"] and draugr.state == Draugr.State.PACT and draugr.difficulty == "normal" and World.gold_of("p1") == 140,
 		"60 gold: the normal deal (50 reached, not 100), and the gold his (%s, %s)" % [taken, World.gold_of("p1")])
 	_check(zones_asked.size() == 1 and draugr.charges_met == 10 and draugr.max_hp == roundi(30 * (1.5 + 10 * Draugr.CHARGE_SCALE)) and draugr.hp == draugr.max_hp
-		and spawned.size() == 2 and draugr.offers_for("p1").is_empty(),
-		"10 charges in his zone: he grows to normal's and a step a charge, raises normal's one and one more, and offers nothing while it is on (%d hp, %d risen)" % [draugr.max_hp, spawned.size()])
+		and spawned.is_empty() and draugr._risen_left == 2 and draugr.offers_for("p1").is_empty(),
+		"10 charges in his zone: he grows to normal's and a step a charge, his dead (normal's one and one more) to rise in waves, and offers nothing while it is on (%d hp)" % draugr.max_hp)
 	World.charges_in = Callable()
-	World.damage(draugr, 40, player)
+	World.damage(draugr, 16, player)
+	_check(spawned.size() == 1, "past three quarters of his hp, the first wave rises (%d)" % spawned.size())
+	World.damage(draugr, 24, player)
+	_check(spawned.size() == 2 and draugr._risen_left == 0, "past a half, the rest (%d)" % spawned.size())
 	var hurt := draugr.hp
 	draugr.living_came(player)
 	_check(draugr.hp == mini(hurt + roundi(draugr.max_hp * Draugr.LIVING_HEAL), draugr.max_hp) and draugr.hp > hurt and draugr.max_hp == 60,
@@ -2926,6 +2929,7 @@ func _test_barrow_layers() -> void:
 		risen.append(made)
 		return made
 	draugr.accept_offer(player, draugr.offers_for("p1")[0], 100)
+	World.damage(draugr, roundi(draugr.max_hp * 0.8), player)  # Past every wave but the last: all hard's dead up.
 	var near_seen := true
 	for r in risen:
 		near_seen = near_seen and World.distance(draugr.tile, r.tile) <= Draugr.RETINUE_REACH and World.has_line_of_sight(draugr.tile, r.tile)

@@ -591,6 +591,8 @@ func _sim_tick() -> void:
 		return  # Its heavy blow wound up: it stands till World strikes it.
 	if _meet_wind_up():
 		return
+	if _special_tick():
+		return  # A kind's own moves (the draugr's spin, throw and charge: 603).
 	match World.off_hand(self):
 		"draw":
 			if _shoot_tick():
@@ -665,6 +667,12 @@ func _unnoticing() -> void:
 	_drop_windup()
 	alert = Alert.IDLE
 	_idle_tick()
+
+
+## A kind's own moves in a fight, before its hands' (a subclass's: the
+## draugr's, 603); true when it took this tick. None here.
+func _special_tick() -> bool:
+	return false
 
 
 ## An archer's fight (decision 341): in its band (KEEP_NEAR to its bow's

@@ -64,6 +64,20 @@ const WON := "...you have honored the pact, I shall give you the power to cheat 
 const RESPECT := "...warrior, you have my respect."
 ## Ticks between his question and his asking (a pause).
 const ASK_DELAY_TICKS := 30
+## His mind in the fight (603, enemy-ai's side; combat's moves, Jeff's
+## words): drafts. At BACK_OFF_STAMINA or under (after the spin) he backs
+## off till no longer winded; his dead rise in waves as his hp passes
+## WAVES (and one at each back-off); he spins at 2 or more foes the sweep
+## would catch, or 1 that struck him twice within STRUCK_TWICE_TICKS; he
+## throws at a foe THROW_NEAR to THROW_FAR off with none beside him; he
+## charges to his thrown axe; disarmed, his fists.
+const BACK_OFF_STAMINA := 10
+const WAVES: Array[float] = [0.75, 0.5, 0.25]
+const SPIN_EVERY_TICKS := 60
+const THROW_EVERY_TICKS := 100
+const THROW_NEAR := 4
+const THROW_FAR := 8
+const STRUCK_TWICE_TICKS := 30
 const TITLE := "Face the draugr"
 
 var state := State.SEATED
@@ -84,6 +98,14 @@ var _spoken_to: Dictionary[String, bool] = {}
 var _stilled_tick := -100000
 ## His Hall shut on a visit; whom he asked, and when he asks them (tick).
 var hall_shut := false
+## The fight (603): the dead still to rise, the waves passed, when he may
+## spin or throw next, whether he is backing off, when he was struck.
+var _risen_left := 0
+var _waves_passed := 0
+var _next_spin := 0
+var _next_throw := 0
+var backing_off := false
+var _struck_at: Array[int] = []
 var _asking := ""
 var _ask_at := -1
 
@@ -174,6 +196,84 @@ func _world_damaged(amount: int, cause: StringName) -> void:
 		_yield()
 		return
 	super(amount, cause)
+	if Net.is_authority() and amount > 0:
+		_struck_at.append(World.tick)
+		while not _struck_at.is_empty() and World.tick - _struck_at[0] > STRUCK_TWICE_TICKS:
+			_struck_at.pop_front()
+		_wave_due()
+
+
+# --- The fight (603, enemy-ai's side) --------------------------------------------------
+
+## His choice each fighting tick (Monster._special_tick), the first that
+## applies: back off when spent, spin, charge to his axe or throw it; else
+## (false) he closes and strikes as any monster, with his fists if disarmed
+## (combat's). Nothing while one of his moves runs (World.boss_busy), and
+## nothing at all before combat's moves exist.
+func _special_tick() -> bool:
+	if not World.has_method("try_spin") or target == null:
+		return false
+	if bool(World.call("boss_busy", self)):
+		return true
+	if stamina <= BACK_OFF_STAMINA or backing_off and bool(World.call("is_winded", self)):
+		if not backing_off:
+			backing_off = true
+			_raise_wave()  # The dead cover him while he gets his breath.
+		if World.tick >= next_move_tick:
+			_step_back()
+		return true
+	backing_off = false
+	var winded := bool(World.call("is_winded", self))
+	var foes := 0
+	for each: Variant in World.call("spin_targets", self):
+		if each is GridEntity and threatens(each):
+			foes += 1
+	var struck_twice := _struck_at.size() >= 2
+	if not winded and World.tick >= _next_spin and (foes >= 2 or foes == 1 and struck_twice):
+		if bool(World.call("try_spin", self)):
+			_next_spin = World.tick + SPIN_EVERY_TICKS
+			_struck_at.clear()
+			return true
+	var axe: Dictionary = World.call("axe_state", self)
+	if str(axe.get("where", "")) == "ground" and not bool(World.call("is_disarmed", self)):
+		if bool(World.call("try_axe_charge", self)):
+			return true
+	if str(axe.get("where", "")) == "hand" and not winded and World.tick >= _next_throw and not _foe_beside():
+		var d := World.distance(tile, target.tile)
+		if d >= THROW_NEAR and d <= THROW_FAR and World.call("axe_line_hit", self, target.tile) == target:
+			if bool(World.call("try_axe_throw", self, target.tile)):
+				_next_throw = World.tick + THROW_EVERY_TICKS
+				return true
+	return false
+
+
+## Whether a foe stands beside him (a throw then waits for the blow).
+func _foe_beside() -> bool:
+	for entity in World.sought():
+		if World.distance(tile, entity.tile) <= 1 and threatens(entity):
+			return true
+	return false
+
+
+## A wave due: his hp past the next of WAVES raises its share of the dead
+## still to rise.
+func _wave_due() -> void:
+	if state != State.PACT:
+		return
+	while _waves_passed < WAVES.size() and float(hp) <= float(max_hp) * WAVES[_waves_passed]:
+		_waves_passed += 1
+		_raise_wave()
+
+
+## The next of his dead: their share of those left over the waves to come
+## (all left at the last), at least one while any are left.
+func _raise_wave() -> void:
+	if _risen_left <= 0:
+		return
+	var waves_left := maxi(WAVES.size() - _waves_passed + 1, 1)
+	var count := mini(ceili(float(_risen_left) / waves_left), _risen_left)
+	_risen_left -= count
+	_raise_retinue(count)
 
 
 # --- Talk (npc's offer contract) ------------------------------------------------------
@@ -305,7 +405,13 @@ func start_pact(player: Player, level: String) -> void:
 	for each in World.sought():
 		if each is Player:
 			offer_withdrawn.emit((each as Player).player_id)  # Nothing stands while he fights.
-	_raise_retinue(int(RETINUE.get(level, 0)) + mini(charges_met / CHARGES_PER_RISEN, MOST_MORE_RISEN))
+	# His dead rise in waves through the fight (603), not all at once.
+	_risen_left = int(RETINUE.get(level, 0)) + mini(charges_met / CHARGES_PER_RISEN, MOST_MORE_RISEN)
+	_waves_passed = 0
+	_next_spin = World.tick
+	_next_throw = World.tick
+	backing_off = false
+	_struck_at.clear()
 
 
 ## [param player] come into his zone (Main's _living_came, 573): in a pact
@@ -448,7 +554,7 @@ func _raise_retinue(count: int) -> void:
 		var spec := Level._spec_for("monster_skeleton", Level.MONSTER_TYPES)
 		if spec.is_empty():
 			return
-		spec["name"] = "%sRisen%d" % [name, i + 1]
+		spec["name"] = "%sRisen%d" % [name, _retinue.size() + 1]
 		spec["tile"] = spots[i]
 		spec["idle"] = {"mode": "guard"}
 		var risen: Variant = World.spawn_spec.call(spec)

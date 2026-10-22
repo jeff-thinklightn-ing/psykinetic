@@ -21835,3 +21835,41 @@ cheat death".
 monster_test _test_draugr: the Hall shuts and he asks, the pause and the
 gold asked for once, the win line and the door, 19 gold fought and his
 respect. Server only, protocol unchanged, no new class_name.
+
+## 603, enemy-ai's side. The draugr's mind in his fight
+
+Combat leads 603 (C:/dev/review/combat/draugr/design.md, Jeff's words: the
+telegraphed 1.5 s spin that leaves him at 10% stamina, the overhead axe
+throw, the charge to retrieve it, fists if it is interrupted); physics
+moves the bodies; this is his choice among combat's moves (World.try_spin,
+try_axe_throw, try_axe_charge; spin_targets, axe_line_hit, axe_state,
+is_disarmed, boss_busy).
+
+- `Monster._special_tick()`, a kind's own moves before its hands' in a
+  fight (none in Monster); the draugr's, each fighting tick, the first that
+  applies (drafts for Jeff):
+  1. **Back off** at BACK_OFF_STAMINA (10) or under, till no longer winded
+     (combat's 25): he steps back from his target, swings nothing; on
+     starting, a wave of his dead rises to cover him.
+  2. **Spin** when 2 or more foes are in the sweep (spin_targets), or 1 that
+     struck him twice within STRUCK_TWICE_TICKS (3 s); not winded; at most
+     every SPIN_EVERY_TICKS (6 s).
+  3. **Charge** to his axe when it lies on the ground and he is not
+     disarmed.
+  4. **Throw** with the axe in hand, not winded, no foe beside him, his
+     target THROW_NEAR to THROW_FAR (4 to 8) cells off and first on the
+     line (axe_line_hit); at most every THROW_EVERY_TICKS (10 s).
+  5. Else he closes and strikes as any monster; disarmed, with his fists
+     (combat's).
+  Nothing is chosen while a move runs (boss_busy), and nothing at all
+  before combat's moves exist (World.has_method).
+- **The dead in waves.** 573's retinue no longer rises at the pact's
+  start: `_risen_left` rises a share at each of WAVES (his hp past 75%,
+  50%, 25%) and at each back-off, the rest at the last.
+- **The axe for the winners.** A won pact calls items' `Monster.yielded`
+  (his row's "yields", the battle_axe) before the blessing; a lost pact or
+  the unpaid fight never.
+
+monster_test: the waves (10 charges, normal: none at the start, one past
+75%, the other past 50%). Server only, protocol unchanged, no new
+class_name.
