@@ -9190,6 +9190,9 @@ func _show_nocked(puppet: Node3D, ids: Array, drawn: bool) -> void:
 	var arrow := bow.find_child("Nocked", true, false) as Node3D
 	if string != null and not string.has_meta("rest"):
 		_string_segments(string)
+	# The limbs bend only near the camera (BOW_FLEX_RANGE): a raid's far
+	# archers keep the rigid bow, their strings still drawn.
+	var flex := _camera == null or puppet.global_position.distance_to(_camera_target) <= BOW_FLEX_RANGE
 	if not drawn:
 		if arrow != null:
 			arrow.queue_free()
@@ -9204,7 +9207,7 @@ func _show_nocked(puppet: Node3D, ids: Array, drawn: bool) -> void:
 			string.position = rest + Vector3(0.0, 0.0, bow_string(float(loosed[1]), at))
 			if at >= STRING_SETTLE:
 				string.remove_meta("loosed")
-			_string_bend(string)
+			_string_bend(string, flex)
 		return
 	if arrow == null and ArtKit.has("fx.arrow"):
 		arrow = ArtKit.instance("fx.arrow", int(ARROW_VARIANTS.get(str(ids[0]), 1)))
@@ -9214,14 +9217,15 @@ func _show_nocked(puppet: Node3D, ids: Array, drawn: bool) -> void:
 		var nock := bow.find_child("nock", true, false) as Node3D
 		(string if string != null else nock if nock != null else bow).add_child(arrow)
 	if string != null:
-		# Back toward the drawing hand, never past it nor forward of the brace.
+		# Back toward the drawing hand, never past it nor forward of the brace,
+		# nor further than a bow draws (BOW_DRAW_MAX: a pose not yet applied).
 		var hand := (string.get_parent() as Node3D).global_transform.affine_inverse() * (sockets["hand_r"] as Node3D).global_position
 		var rest: Vector3 = string.get_meta("rest")
-		string.position = Vector3(rest.x, rest.y, minf(rest.z, hand.z))
+		string.position = Vector3(rest.x, rest.y, clampf(hand.z, rest.z - BOW_DRAW_MAX, rest.z))
 		string.set_meta("pulled", rest.z - string.position.z)
 		if string.has_meta("loosed"):
 			string.remove_meta("loosed")
-		_string_bend(string)
+		_string_bend(string, flex)
 
 
 ## The string's nock point [param seconds] after a draw of [param pulled] m
@@ -9254,7 +9258,7 @@ static func bow_string(pulled: float, seconds: float) -> float:
 ## the tips read off its bounds, the segments closed boxes of its own
 ## thickness and material (seen from every side), every corner on the
 ## string's own swatch (its first vertex's UV). Kept as the string's metas
-## "rest", "tips" and "segments".
+## "rest", "tips" and "segments"; the bow's own meshes as "limbs" (_bow_limbs).
 static var _string_boxes := {}
 static func _string_segments(string: Node3D) -> void:
 	string.set_meta("rest", string.position)
@@ -9295,19 +9299,127 @@ static func _string_segments(string: Node3D) -> void:
 	box.visible = false
 	string.set_meta("tips", [top, bottom, maxf(width, 0.002)])
 	string.set_meta("segments", segments)
+	string.set_meta("limbs", _bow_limbs(parent, string, box, maxf(absf(top.y), absf(bottom.y))))
 	_string_bend(string)
 
 
-## The two segments from the tips to the string's nock as it is now.
-static func _string_bend(string: Node3D) -> void:
+## The bow's own meshes (everything under [param bow] but its string), each
+## given its own copy of its mesh to bend (462 amended (4)), made once and
+## freed with the bow: per surface [the copy, its surface, its vertex buffer
+## as the art has it, the buffer's stride and the position's offset in it,
+## the vertices that move (beyond the grip), where they are, how far out each
+## is (the square, and the cube signed by the side), the bow's -z and -y in
+## the mesh's frame]. A bend writes only the moving positions into a copy of
+## the buffer, not a new mesh. [param reach]: the limb's length, grip to tip.
+static func _bow_limbs(bow: Node3D, string: Node3D, box: MeshInstance3D, reach: float) -> Array:
+	var limbs := []
+	var grip := reach * BOW_GRIP
+	for piece: MeshInstance3D in bow.find_children("*", "MeshInstance3D", true, false):
+		if piece == box or string.is_ancestor_of(piece) or piece.name.begins_with("StringSegment") or piece.mesh == null:
+			continue
+		var to_bow := bow.global_transform.affine_inverse() * piece.global_transform
+		var back := to_bow.affine_inverse().basis
+		var own := ArrayMesh.new()
+		for i in piece.mesh.get_surface_count():
+			var arrays := piece.mesh.surface_get_arrays(i)
+			own.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays, [], {}, Mesh.ARRAY_FLAG_USE_DYNAMIC_UPDATE)
+			own.surface_set_material(i, piece.mesh.surface_get_material(i))
+			var data := RenderingServer.mesh_get_surface(own.get_rid(), i)
+			var format := int(data["format"])
+			var count := int(data["vertex_count"])
+			var points: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+			var moving := PackedInt32Array()
+			var squares := PackedFloat32Array()
+			var cubes := PackedFloat32Array()
+			for v in points.size():
+				var at := to_bow * points[v]
+				var out := clampf((absf(at.y) - grip) / maxf(reach - grip, 0.001), 0.0, 1.0)
+				if out > 0.0:
+					moving.append(v)
+					squares.append(out * out)
+					cubes.append(signf(at.y) * out * out * out)
+			limbs.append([own, i, data["vertex_data"], RenderingServer.mesh_surface_get_format_vertex_stride(format, count),
+				RenderingServer.mesh_surface_get_format_offset(format, count, Mesh.ARRAY_VERTEX), moving, points, squares, cubes,
+				back * Vector3.BACK, back * Vector3.UP])
+		piece.mesh = own
+		# Bent, it reaches a little past the art's bounds: not culled for it.
+		piece.custom_aabb = own.get_aabb().grow(BOW_BEND * 2.0)
+	return limbs
+
+
+## Where a point of the bow (in its frame: limbs along y from the grip at the
+## origin, the target toward +z) is when its limbs are bent [param bend] m at
+## the tips toward the string (-z; below 0, forward): nothing within the grip
+## (BOW_GRIP of the limb's length), then a curve growing as the square of the
+## way out to the tip, its height drawn in so the limb keeps its length.
+## [param reach] is the limb's length, grip to tip.
+const BOW_BEND := 0.05
+const BOW_GRIP := 0.12
+const BOW_DRAW := 0.45
+const BOW_DRAW_MAX := 0.75
+## The least change of the bend written again (m): half a millimetre.
+const BOW_BEND_STEP := 0.0005
+## How near the camera's mark an archer's limbs bend (m).
+const BOW_FLEX_RANGE := 14.0
+static func bent(point: Vector3, bend: float, reach: float) -> Vector3:
+	var grip := reach * BOW_GRIP
+	var out := clampf((absf(point.y) - grip) / maxf(reach - grip, 0.001), 0.0, 1.0)
+	if out <= 0.0 or is_zero_approx(bend):
+		return point
+	var shorter := 2.0 * bend * bend / (3.0 * maxf(reach - grip, 0.001))
+	return point + Vector3(0.0, -signf(point.y) * shorter * out * out * out, -bend * out * out)
+
+
+## The limbs bent as the string is drawn: BOW_BEND at the tips at a draw of
+## BOW_DRAW m (no more past it), none at rest, a little forward as the string
+## rings past the brace; the art's own positions again once it's still. Only
+## the moving positions written, into a copy of the buffer (bent's sums, in
+## the mesh's frame).
+static func _bend_limbs(string: Node3D, bend: float, reach: float) -> void:
+	var was := float(string.get_meta("bent", 0.0))
+	# Not again for less than BOW_BEND_STEP, but always back to straight.
+	if absf(bend - was) < BOW_BEND_STEP and not (bend == 0.0 and was != 0.0):
+		return
+	string.set_meta("bent", bend)
+	var grip := reach * BOW_GRIP
+	var shorter := 2.0 * bend * bend / (3.0 * maxf(reach - grip, 0.001))
+	for limb: Array in string.get_meta("limbs", []):
+		var buffer: PackedByteArray = (limb[2] as PackedByteArray).duplicate()
+		var stride: int = limb[3]
+		var offset: int = limb[4]
+		var moving: PackedInt32Array = limb[5]
+		var points: PackedVector3Array = limb[6]
+		var squares: PackedFloat32Array = limb[7]
+		var cubes: PackedFloat32Array = limb[8]
+		var toward: Vector3 = limb[9]
+		var up: Vector3 = limb[10]
+		if not is_zero_approx(bend):
+			for k in moving.size():
+				var v := moving[k]
+				var at := points[v] - toward * (bend * squares[k]) - up * (shorter * cubes[k])
+				var byte := v * stride + offset
+				buffer.encode_float(byte, at.x)
+				buffer.encode_float(byte + 4, at.y)
+				buffer.encode_float(byte + 8, at.z)
+		RenderingServer.mesh_surface_update_vertex_region((limb[0] as ArrayMesh).get_rid(), limb[1], 0, buffer)
+
+
+## The two segments from the tips to the string's nock as it is now, the
+## limbs bent by how far the nock is back of its brace (462 amended (4));
+## kept straight unless [param flex].
+static func _string_bend(string: Node3D, flex := true) -> void:
 	if not string.has_meta("segments"):
 		return
 	var tips: Array = string.get_meta("tips")
 	var nock := string.position
 	var segments: Array = string.get_meta("segments")
 	var width: float = tips[2]
+	var rest: Vector3 = string.get_meta("rest", nock)
+	var reach := maxf(absf((tips[0] as Vector3).y), absf((tips[1] as Vector3).y))
+	var bend := BOW_BEND * clampf((rest.z - nock.z) / BOW_DRAW, -0.3, 1.0) if flex else 0.0
+	_bend_limbs(string, bend, reach)
 	for i in 2:
-		var tip: Vector3 = tips[i]
+		var tip: Vector3 = bent(tips[i], bend, reach)
 		var along := tip - nock
 		var length := maxf(along.length(), 0.001)
 		var up := along / length

@@ -11880,6 +11880,28 @@ a long frame can't fling the string across the body. The arrow leaves the string
 vertex bend keyed to the pull). Fixed on the way: a hand's old thing is taken out of its socket
 before it is freed, so the new one is the socket's "Held" (two in one frame, the new one had been
 renamed and the bow's string and the bundle looked up on the old).
+
+Amended (4) (Jeff on bow3: "bow3 is perfect ... final task would be to make the bow bend slightly on
+full cock"; the coordinator approved the method). The limbs bend with the draw: each held bow's
+own meshes (all but its string) get their own copy of their mesh once, when the string is first
+drawn as segments, freed with the bow (built with dynamic update, so a bend writes only the moving
+positions into a copy of its vertex buffer, no new mesh); while the nock is off its brace the
+copies' vertices are moved by Client3D.bent: in the bow's frame (limbs along y from the grip, the target +z) nothing
+within the grip (BOW_GRIP, 0.12 of the limb's length), then toward the string (-z) as the square
+of the way out to the tip, BOW_BEND (0.05 m, about 5 degrees) at the tips at a draw of BOW_DRAW
+(0.45 m, a full draw as the clips pull it), no more past it, the height drawn in so a limb keeps
+its length. The string's segments start from the bent tips. The bend reads the nock's place
+behind its brace, so on the loose it follows the string's spring (bow_string): straight in 0.03 s,
+a little forward as the string rings, still by 0.4 s, when the art's mesh is put back; a CPU
+deform rather than a shader (the bow draws in the shared palette material) or limb bones (every
+bow re-rigged). Its cost, capped at release's ask: only archers within BOW_FLEX_RANGE (14 m) of the
+camera's mark bend (the rest keep the rigid bow, their strings still drawn), and a bend is written
+again only when it changes by BOW_BEND_STEP (half a millimetre), so nothing while the draw holds
+still or the bow is at rest. Measured windowed under the bench lock (build/bow4_raid.gd): one
+drawn archer a median 0.022 ms a frame (worst 0.11); eight drawing, holding and loosing together a
+median 0.052 ms a frame for all eight, 0.39 at the 95th percentile, 0.57 at worst (the first
+version, rebuilding the mesh each frame, was 0.21 ms for one). The string's pull is bounded too
+(BOW_DRAW_MAX, 0.75 m), so a pose not yet applied can't stretch it across the field.
 ## 460. Moving in: a person the town remembers arrives, with room and the lawspeaker's word
 
 Phase 4 of Jeff's lawspeaker proposal (docs/lore/lawspeaker.md, Jeff: "when

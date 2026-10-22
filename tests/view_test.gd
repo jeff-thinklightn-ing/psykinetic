@@ -3868,11 +3868,29 @@ func _test_bow() -> void:
 		# Bent: both segments meet at the nock, drawn back of the brace.
 		var rest: Vector3 = string.get_meta("rest")
 		var tips: Array = string.get_meta("tips")
+		var bend := float(string.get_meta("bent", 0.0))
+		var reach := maxf(absf((tips[0] as Vector3).y), absf((tips[1] as Vector3).y))
 		var ends := range(2).map(func(i: int) -> float:
 			var seg := segments[i] as MeshInstance3D
-			return (seg.position - seg.basis.y * 0.5).distance_to(string.position) + (seg.position + seg.basis.y * 0.5).distance_to(tips[i]))
+			return (seg.position - seg.basis.y * 0.5).distance_to(string.position) + (seg.position + seg.basis.y * 0.5).distance_to(Client3D.bent(tips[i], bend, reach)))
 		_check(float(string.get_meta("pulled", 0.0)) > 0.0 and string.position.z < rest.z and ends.all(func(d: float) -> bool: return d < 0.001),
-				"drawn: the string bent at the nock, back toward the hand (%.3f m), its two segments tip to nock (%s)" % [string.get_meta("pulled", 0.0), ends])
+				"drawn: the string bent at the nock, back toward the hand (%.3f m), its two segments from the bent tips to the nock (%s)" % [string.get_meta("pulled", 0.0), ends])
+		# The limbs (462 amended (4)): bent toward the string, the tips furthest, the grip not at all
+		# (each limb's moving vertices, as bent places them: the headless renderer keeps no buffer).
+		var limbs: Array = string.get_meta("limbs", [])
+		var moved := []
+		for limb: Array in limbs:
+			var moving: PackedInt32Array = limb[5]
+			var points: PackedVector3Array = limb[6]
+			var squares: PackedFloat32Array = limb[7]
+			var most := 0.0
+			for k in moving.size():
+				most = maxf(most, bend * squares[k])
+			moved.append([moving.size(), points.size(), most])
+		_check(bend > 0.04 and not limbs.is_empty() and moved.all(func(m: Array) -> bool: return m[0] > 0 and m[0] < m[1] and m[2] > 0.9 * bend)
+				and Client3D.bent(Vector3(0.0, 0.05, 0.0), bend, reach) == Vector3(0.0, 0.05, 0.0)
+				and is_equal_approx(Client3D.bent(Vector3(0.0, reach, 0.0), bend, reach).z, -bend),
+				"drawn: the limbs bent %.3f m at the tips, the grip still ([moving, of, at most] %s)" % [bend, moved])
 	player.shot.emit(player.tile + Vector2i(4, 0))
 	player.raised = ""
 	_rig._process(0.0)

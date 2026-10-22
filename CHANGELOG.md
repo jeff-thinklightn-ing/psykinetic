@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The bow bends as it is drawn (462): its limbs curve back toward the string at full draw and spring straight again with the string when the arrow flies.
 - Clicking a townsperson now reads "LMB  interact": they stop, turn to you and say a word (npc's side); click their speech bubble for the bar with Talk and Barter. Barter opens the merchant's goods beside your pack: hover a thing for what they take or pay ("pays 5 gold, fenced" for grave goods), click to pick things on either side, and the one button reads the deal, "+sword -hide +10g = Confirm". The counter's E opens the same window; selling by dropping things in the counter is no longer needed (560, ui's side; the greeting is npc's and the prices economy's).
 - Companions know their town's name: Held.
 
