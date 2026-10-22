@@ -1571,6 +1571,38 @@
 				{"at": [0, 0.285, 0], "size": [1.997, 0.57, 0.797]}
 			]
 		},
+		"building.stair_down": {
+			"category": "buildings",
+			"type": "mesh",
+			"kind": "cell",
+			"footprint": [1, 1],
+			"size": [1.0, 0.85, 0.97],
+			"middle": [0.002, 0, 0.02],
+			"tolerance": 0.3,
+			"variants": 2,
+			"budget": 500,
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-22", "notes": "C:/dev/review/transitions/make_stairs.py down and down_timber: variant 1 a rough stone surround, low side walls, a back sill and a heavy lintel stone over the far end, four step bands going down toward the way out, each darker, the last black, a black face under the lintel (64 tris); variant 2 the same well lined with planks, two posts and a cap beam over the far end, a mine's or a cellar's head (136 tris); nothing below the ground, the depth drawn dark"},
+			"uses": "a stair down at a zone link to a level below (decision 589, maps' zone-transition cues), 1 x 1 cell on the link's cell, scenery only (placed by maps' loader from the link's data); front +z the way out, the steps going down toward it under the far end's lintel; variant 1 stone, 2 timber (a mine or a cellar)",
+			"grey": [
+				{"at": [0.002, 0.425, 0.02], "size": [1.0, 0.85, 0.97]}
+			]
+		},
+		"building.stair_up": {
+			"category": "buildings",
+			"type": "mesh",
+			"kind": "cell",
+			"footprint": [1, 1],
+			"size": [0.97, 1.75, 0.85],
+			"middle": [0.015, 0, 0.07],
+			"tolerance": 0.3,
+			"variants": 2,
+			"budget": 600,
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-22", "notes": "C:/dev/review/transitions/make_stairs.py up and up_ladder: variant 1 five rough stone steps rising toward the way out to a landing at 1.1 m between low stepped side walls, a black band beyond the landing's far edge (182 tris); variant 2 a lumpy rock face across the far edge and a wooden ladder leaning on it, its rungs lashed (356 tris)"},
+			"uses": "a stair up or a climb at a zone link to a level above (decision 589, maps' zone-transition cues), 1 x 1 cell on the link's cell, scenery only (placed by maps' loader from the link's data); front +z the way out, the steps rising toward it; variant 1 stone steps, 2 a ladder on a rock face (a climb)",
+			"grey": [
+				{"at": [0.015, 0.875, 0.07], "size": [0.97, 1.75, 0.85]}
+			]
+		},
 		"building.waystone": {
 			"category": "buildings",
 			"type": "mesh",
