@@ -68,7 +68,8 @@
 		}
 	},
 	"forage": {
-		"herbs": {"per_day": 4, "most": 10, "reach": 48, "ring": 14, "clear": 4, "wither_days": 3}
+		"herbs": {"per_day": 4, "most": 10, "reach": 48, "ring": 14, "clear": 4, "wither_days": 3,
+			"hut": {"kinds": ["healers_hut"], "per_day": 1, "most": 3, "reach": 12, "ring": 2}}
 	},
 	"herds": {
 		"out_per_group": 6, "out_per_zone": 24, "seed": 0.5, "sample": 4,

@@ -49,10 +49,23 @@ func _rule() -> Dictionary:
 	return World.forage.rules[Forage.HERBS]
 
 
+## The towns' herbs lying (a healer's hut's counted apart: _hut_count).
 func _count() -> int:
 	var count := 0
-	for uids: Array in World.forage.lying(Forage.HERBS).values():
-		count += uids.size()
+	var found := World.forage.lying(Forage.HERBS)
+	for cell: Vector2i in found:
+		if not World.forage.near_hut(AREA, Forage.HERBS, cell):
+			count += found[cell].size()
+	return count
+
+
+## The herbs lying within the hut's reach (562 amended).
+func _hut_count() -> int:
+	var count := 0
+	var found := World.forage.lying(Forage.HERBS)
+	for cell: Vector2i in found:
+		if World.forage.near_hut(AREA, Forage.HERBS, cell):
+			count += found[cell].size()
 	return count
 
 
@@ -63,6 +76,13 @@ func _test_lay() -> void:
 	World.forage.daily(1)
 	var found := World.forage.lying(Forage.HERBS)
 	_check(_count() == int(rule["per_day"]), "per_day of them lie in %s (%d)" % [AREA, _count()])
+	var huts := World.forage.huts_in(AREA, rule["hut"])
+	var hut_herbs := found.keys().filter(func(cell: Vector2i) -> bool: return World.forage.near_hut(AREA, Forage.HERBS, cell))
+	_check(huts.size() == 1 and hut_herbs.size() == 1 and huts.all(func(hut: Vector2i) -> bool:
+		return hut_herbs.all(func(cell: Vector2i) -> bool: return Vector2(cell - hut).length() > 2.0 and Vector2(cell - hut).length() <= 12.0)),
+		"the healer's hut grows its own (562 amended): one, 2 to 12 cells from it (%s, %s)" % [huts, hut_herbs])
+	for cell: Vector2i in hut_herbs:
+		found.erase(cell)
 	var towns := World.forage.towns_in(AREA)
 	var size: Vector2i = World.forage.world_map.areas[AREA]["size"]
 	var grass: PackedByteArray = World.forage.world_map.areas[AREA]["grass"]
@@ -94,6 +114,7 @@ func _test_most() -> void:
 	for day in range(2, 6):
 		World.forage.daily(day)
 	_check(_count() == int(_rule()["most"]), "%d lie after five days, most" % _count())
+	_check(_hut_count() == int(_rule()["hut"]["most"]), "and round the hut its own most, %d" % _hut_count())
 
 
 func _test_wither() -> void:
@@ -124,12 +145,12 @@ func _test_take() -> void:
 	if found.is_empty():
 		return
 	var cell: Vector2i = found.keys()[0]
-	var count := _count()
+	var count := _count() + _hut_count()
 	_check(World.forage.take_near(AREA, cell + Vector2i(9, 9), 3) == 0, "none within 3 of a cell 9 away")
 	var uid := World.forage.take_near(AREA, cell + Vector2i(1, 0), 1)
 	_check(uid == int(found[cell][0]) and World.items.at_of(uid) == "" and not World.zone.ground.has(cell),
 			"the one beside: off the ground, nowhere yet (%d, %s)" % [uid, World.items.at_of(uid)])
-	_check(_count() == count - 1 and World.forage.take_near("no_such_area", cell, 1) == 0, "one fewer lie; none from an area not loaded")
+	_check(_count() + _hut_count() == count - 1 and World.forage.take_near("no_such_area", cell, 1) == 0, "one fewer lie; none from an area not loaded")
 	World.items.end(uid, "banked")
 
 

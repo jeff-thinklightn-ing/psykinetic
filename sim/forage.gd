@@ -17,7 +17,13 @@ extends RefCounted
 ## out to its furthest building within reach and clear cells more), on
 ## ground nobody holds (a camp's herbs are the camp's). Rules:
 ## levels/economy.json "forage" (economy's, after this lands): one entry
-## per item, {per_day, most, reach, ring, clear, wither_days}.
+## per item, {per_day, most, reach, ring, clear, wither_days, hut}.
+##
+## A healer's hut (the item's "hut": its place kinds) grows its own (the
+## coordinator's ruling, 2026-10-22: the medicine man gathers within
+## HERB_REACH 6 of his hut, so herbs must grow near it): per_day up to most
+## lying within its reach, outside its own small ring, wherever the towns'
+## rings fall; a hut is no town's centre.
 ##
 ## It keeps nothing of its own: what it laid is in each zone's ground (the
 ## snapshot's) and the book has when each grew (its "grew" event), so a
@@ -128,11 +134,14 @@ func _wither(area: String, id: String) -> void:
 func _lay(area: String, id: String, day: int) -> void:
 	var rule: Dictionary = rules[id]
 	var count := 0
-	for uids: Array in lying(id).values():
-		count += uids.size()
+	var found := lying(id)
+	for cell: Vector2i in found:
+		if not near_hut(area, id, cell):  # The huts' own count apart (_lay_huts).
+			count += found[cell].size()
 	var wanted := mini(int(rule["per_day"]), int(rule["most"]) - count)
 	if wanted <= 0:
 		return
+	_lay_huts(area, id, day)
 	var towns := towns_in(area)
 	if towns.is_empty():
 		return
@@ -149,11 +158,62 @@ func _lay(area: String, id: String, day: int) -> void:
 				break
 
 
-## The cells of [param area]'s places the town holds.
+## [param id]'s growth round each healer's hut of [param area] (its rules'
+## "hut"): up to per_day a day while fewer than most lie within its reach,
+## on a cell within reach and outside its ring that fits as a town's would
+## but for the towns' own rings (Forage.fits with no towns).
+func _lay_huts(area: String, id: String, day: int) -> void:
+	var hut: Dictionary = rules[id].get("hut", {})
+	if hut.is_empty():
+		return
+	var reach := int(hut.get("reach", 12))
+	var found := lying(id)
+	for cell in huts_in(area, hut):
+		var count := 0
+		for at: Vector2i in found:
+			if Vector2(at - cell).length() <= reach:
+				count += found[at].size()
+		var wanted := mini(int(hut.get("per_day", 1)), int(hut.get("most", 3)) - count)
+		var draw := RandomNumberGenerator.new()
+		draw.seed = hash("%s/%s/%s/%d" % [area, id, cell, day])
+		for i in wanted:
+			for t in TRIES:
+				var at := cell + Vector2i(draw.randi_range(-reach, reach), draw.randi_range(-reach, reach))
+				var away := Vector2(at - cell).length()
+				if away > float(hut.get("ring", 2)) and away <= reach and _grows_on(area, at):
+					World.put_on_ground(World.items.mint(id, GREW, "wild", area, at), at)
+					break
+
+
+## The cells of [param area]'s places the town holds (a healer's hut not
+## among them: it grows its own, _lay_huts).
 func towns_in(area: String) -> Array[Vector2i]:
 	var out: Array[Vector2i] = []
+	var huts: Array = []
+	for each: Dictionary in rules.values():
+		huts.append_array(each.get("hut", {}).get("kinds", []))
 	for place_id in holdings.places_in(area):
-		if holdings.holder(place_id) == WorldRichness.TOWN:
+		if holdings.holder(place_id) == WorldRichness.TOWN and str(holdings.place(place_id).get("kind", "")) not in huts:
+			out.append(holdings.place(place_id)["cell"])
+	return out
+
+
+## Whether [param cell] of [param area] is within a healer's hut's reach
+## for [param id] (its herbs counted apart from the towns').
+func near_hut(area: String, id: String, cell: Vector2i) -> bool:
+	var hut: Dictionary = rules.get(id, {}).get("hut", {})
+	for at in huts_in(area, hut):
+		if Vector2(cell - at).length() <= float(hut.get("reach", 12)):
+			return true
+	return false
+
+
+## The cells of [param area]'s healers' huts by [param hut]'s kinds, whoever
+## holds them.
+func huts_in(area: String, hut: Dictionary) -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	for place_id in holdings.places_in(area):
+		if str(holdings.place(place_id).get("kind", "")) in hut.get("kinds", []):
 			out.append(holdings.place(place_id)["cell"])
 	return out
 
@@ -195,7 +255,18 @@ func fits(area: String, cell: Vector2i, towns: Array[Vector2i], rule: Dictionary
 		if away <= ring_of(area, town, rule):
 			return false
 		near = near or away <= float(rule["reach"])
-	if not near or not World.is_walkable(cell) or World.is_water(cell) or World.is_fire(cell) or World.zone.ground.has(cell):
+	return near and _grows_on(area, cell)
+
+
+## Whether [param cell] of [param area] (the zone World is in) is ground
+## herbs grow on: grass under the sky, walkable, dry, no fire, nothing lying
+## there, nobody's.
+func _grows_on(area: String, cell: Vector2i) -> bool:
+	var area_map: Dictionary = world_map.areas[area]
+	var size: Vector2i = area_map["size"]
+	if not Rect2i(Vector2i.ZERO, size).has_point(cell) or area_map["grass"][cell.y * size.x + cell.x] == 0:
+		return false
+	if not World.is_walkable(cell) or World.is_water(cell) or World.is_fire(cell) or World.zone.ground.has(cell):
 		return false
 	if World.richness != null and not World.richness.under_sky(area, cell):
 		return false

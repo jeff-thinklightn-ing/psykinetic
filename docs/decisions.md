@@ -19783,3 +19783,27 @@ ui_test _test_barter: _barters for a cook, a farmer, the medicine man
 and the merchant; for_path, title_words, empty_words; the window opened
 with a cook in person. Client only; protocol unchanged on this side (the
 command's new key is economy's 562); no new class_name.
+## 562 amended: herbs grow round the healer's hut
+
+562's soak found the medicine man gathering nothing in 30 days. Forage
+(502) lays herbs only round the towns' held places (within reach 48,
+outside a ring of 14 or past their buildings), and Hob's hut is about 56
+cells from Held's store. The hut, where it is town-held, also kept herbs
+outside its own ring, while his gather (502, npc's side) takes only within
+HERB_REACH 6 of the hut. The coordinator ruled (2026-10-22) that herbs grow
+round each healer's hut as round a town, so his one-a-day gather happens
+and remedies exist without players; players stay the real supply for the
+potions.
+- economy.json forage.herbs.hut = {kinds ["healers_hut"], per_day 1,
+  most 3, reach 12, ring 2}.
+- Forage._lay_huts lays up to per_day a day round each hut (huts_in: places
+  of those kinds, whoever holds them) while fewer than most lie within its
+  reach, 2 to 12 cells from it, on ground herbs grow on (_grows_on: grass
+  under the sky, walkable, dry, no fire, nothing lying there, nobody's;
+  split out of fits). The towns' rings don't apply there.
+- towns_in leaves the huts out, so a hut is no town's centre. The towns'
+  _lay counts only herbs outside every hut's reach (near_hut), so the two
+  budgets stay apart.
+forage_test (one round the hut on the first day, 2 to 12 cells out, its
+own most of 3; the towns' per_day and most as before). Server only,
+protocol unchanged, no new class_name.
