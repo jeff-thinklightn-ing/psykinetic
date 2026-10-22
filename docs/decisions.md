@@ -19065,3 +19065,16 @@ server's world and the client's drawing don't), so nothing travels and
 the protocol is unchanged: EditorFields doesn't offer it, LevelMap's
 moved_config moves a plot and turns its street side with the map. A plot
 holds no claim: a building may still go elsewhere, and is only told.
+
+## 550 amended, maps' side: the mound's ring on grass
+
+art-kit's mound (its dome's foot and kerb ring a cell out from the 5 x 5
+footprint) stood against the forest on its north-east: five cells of the
+one-cell ring round the footprint (233..239, 181..187) were void in
+levels/wilds/layout.png, (238, 181) and (239, 181) to (239, 184) (dungeon's
+count). They are grass now, with the edge and corner pixels between them
+and their grass neighbours, so the ring is grass all round, as in Jeff's
+sketch. The footprint itself was grass already: its bare look is the
+client's drawing of solid cells (terrain's side), not the layout. The door
+(236, 186), the link and the spawn are untouched. Layout only, protocol
+unchanged; it ships in the full cut with the rest.
