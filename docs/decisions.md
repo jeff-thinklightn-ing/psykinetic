@@ -20211,3 +20211,61 @@ deal and the uses fallback, a win's charges and capacity, the spill at
 capacity, best never lowered, a container's 25, the spend and none at 0,
 the migration both ways. Server only, protocol unchanged.
 
+
+## 573. The Crypt: the blessing and the resurrection charges
+
+Jeff (2026-10-22, his words through the coordinator): "the draugr gives the
+blessings to any player or companion that takes the deal and wins. Before
+blessing you respawn in the town at the temple. After you have the blessing
+you can be resurrected by a companion as long as you have a resurrection
+charge token counter; it's not an item, it's part of you, it doesn't trade.
+The draugr gives more charges on higher difficulties; you choose the
+difficulty by how much gold you donate: 20, 50, 100 for 5, 10 and 15 res
+charges. The draugr's level is equal to base level + how many player
+resurrection points are in the zone when he starts the fight. If a player
+zones in while the fight is active, he heals 50% of his health immediately.
+Once you have a charge you can resurrect anyone that is dead, but it drains
+an active res token from you." Dungeon led the design
+(C:\dev\review\dungeon\crypt_tokens_design.md); the coordinator approved it
+with one ruling (only the blessed get the window; the charge drained is the
+resurrector's). It replaces 544's uses and device as the return's gate, and
+548's measures of the offering as the deal's price (explicit gold steps now).
+Sides: economy's (the record's shape and the arithmetic), enemy-ai's (the
+deals' steps, his level, the heal), companions' (the window), ui's (the pack
+line), items' (below). This is dungeon's side.
+
+- The win: World.bless (548's hook) reaches Main.barrow_won(player_ids,
+  deal): each player standing alive in his lair is blessed if not yet (the
+  mark "draugr", 540, never taken off) and takes the deal's charges up to
+  their capacity (Economy.barrow_won: {barrow, took, spilled}); the party
+  line says the count and the room ("The draugr yields. Bo is blessed and
+  takes 10 charges (10 of 50).") and the spill ("The dead's gift spills: 5
+  more than they can hold."); their companion standing alive in the zone is
+  blessed too (her mark, her fact, the bond, 555 amended). Nothing is minted.
+- The count: PlayerRecord.barrow {tokens, best, containers} (economy's
+  shape), migrated on load from 544's {uses, of, difficulty, day}
+  (Economy.barrow_migrated, wired in PlayerRecord.from_entry here). The
+  channel's reads moved with it: _uses_left reads Economy.barrow_tokens, a
+  return done spends Economy.barrow_spend ("(n charges left)"), no half is
+  carried (_start_channel, _can_revive), the refusal is "You hold no charge.
+  The draugr gives more."; the loyalty read of a bleed-out (555 amended)
+  reads the charges. economy.json return.field drops "uses" (the deals carry
+  the charges).
+- On the wire: Player.charges and Player.charge_room (ints, replicated,
+  SUBCLASS_REPLICATED), set from the record whenever it changes
+  (Main._sync_charges: the join, the win, a spend), so a client reads them
+  any time (ui's pack line). PROTOCOL_REVISION 30.
+- For the draugr: Main.charges_in_zone(zone) sums the charges of the players
+  in a zone (his level's rise at start_pact, enemy-ai's side);
+  Main._living_came(player) on every entry into a zone (travel and join both
+  go through _join_player) calls Draugr.living_came when he has it
+  (enemy-ai's), so a player zoning in during a pact heals him.
+- Items' side: the barrow_half and return_token kinds stay as keepsakes for
+  the ones held; World.mint_bound, carries_bound and ItemBook.bind stay; no
+  item text named the uses, so nothing changes in items.json.
+- Open for Jeff (drafts in his folder): a failed pact costs the gold alone;
+  capacity +25 the first time a bigger deal is won (25, 50, 75), later
+  containers from other areas' bosses; the halves no longer minted.
+
+level_test _test_barrow_won; companion_test _test_field_return adapted (no
+device, the charges counted). No new class_name.

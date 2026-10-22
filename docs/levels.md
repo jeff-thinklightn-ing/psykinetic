@@ -560,6 +560,23 @@ three skeleton guards in the altar room, the draugr in his lair), Pip's niche
 (a 2 x 2 anchor off the altar room with the place `barrow/niche`) and the
 runner's pack (a chest in the lair's corner), npc's.
 
+What the draugr gives (decision 573, Jeff's resurrection charges; 544's
+blessing before it): laid to rest in a pact, he blesses every player standing
+alive in his lair and their companion in the zone (the mark `draugr`, 540,
+for good: the sealed shortcut opens, the temple's offering is waived, 546)
+and gives each player the deal's charges, 5, 10 or 15 by the gold given
+(economy's `return.field` deals: 20, 50, 100), up to what they can hold (25,
+50, 75 by the hardest deal they ever won; `PlayerRecord.barrow` {tokens,
+best, containers}, economy's arithmetic). A charge brings a blessed body
+back where it fell (544's channel), one off the resurrector's own count; a
+charge is a count on the record, no item, nothing trades it (the device's
+halves of 544 are keepsakes now). The player carries the count and the room
+on the wire (`Player.charges`, `charge_room`; protocol 30). The draugr's
+level rises by the charges the players in the zone hold when a pact begins
+(`Main.charges_in_zone`), and a player coming into the zone during a pact
+heals him (`Draugr.living_came`, enemy-ai's), so the halls never scale, only
+he does, and spending charges makes the next pact easier.
+
 When it shifts: on the slow world tick (every `World.WORLD_TICK_STEPS`), a
 level whose `every_days` have gone by since its last generation is laid
 again, only while its zone is asleep (nobody in it, nobody dead there

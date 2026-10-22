@@ -46,6 +46,7 @@ func _ready() -> void:
 	await _test_level_links()
 	await _test_links_kept_clear()
 	await _test_sealed_link()
+	_test_barrow_won()
 	_test_barrow_level()
 	await _test_edge_links()
 	_test_console()
@@ -896,6 +897,47 @@ func _test_sealed_link() -> void:
 	_check(PlayerRecord.from_dict(record.to_dict().merged({"player_id": record.player_id})).marks == ["draugr"], "the mark is saved with the record")
 	_main.mark_player(id, "draugr", false)
 	_check(record.marks.is_empty(), "and taken off again")
+
+
+## The draugr's win as the record keeps it (decision 573, dungeon's side):
+## the deal's charges up to the capacity, the spill said, the count on the
+## player, a zone's sum, a record from before migrated.
+func _test_barrow_won() -> void:
+	print("\n== the barrow's charges (decision 573): a win's charges, the capacity, the zone's sum ==")
+	_main.load_map("test_link_s")
+	var player := _player()
+	var id: String = _main._peer_ids[Net.local_id]
+	var record: PlayerRecord = _main._records[id]
+	record.marks.erase("draugr")
+	record.barrow = {}
+	_main._sync_charges(record)
+	_check(player.charges == 0 and player.charge_room == 0 and _main.charges_in_zone("test_link_s") == 0, "unblessed: no charges, no room, none in the zone")
+	_check(_main.barrow_won([id], "normal") == 1 and record.barrow == {"tokens": 10, "best": "normal", "containers": []} and "draugr" in record.marks,
+		"laid to rest at the normal deal: blessed, 10 charges, best normal (%s)" % [record.barrow])
+	_check(_main.party_log.last(1) == ["The draugr yields. %s is blessed and takes 10 charges (10 of 50)." % record.name],
+		"said with the count and the room (%s)" % [_main.party_log.last(1)])
+	_check(player.charges == 10 and player.charge_room == 50 and _main.charges_in_zone("test_link_s") == 10 and _main.charges_in_zone("wilds") == 0,
+		"the player carries 10 of 50; the zone's sum is 10, another zone's 0")
+	_main.barrow_won([id], "easy")
+	_check(int(record.barrow["tokens"]) == 15 and record.barrow["best"] == "normal" and _main.party_log.last(1)[0].begins_with("The draugr yields. %s takes 5 charges" % record.name),
+		"an easier deal adds its 5, never lowers best, and blesses nobody twice (%s)" % [record.barrow])
+	record.barrow["tokens"] = 45
+	_main.barrow_won([id], "easy")
+	_check(int(record.barrow["tokens"]) == 50 and _main.party_log.last(1)[0].ends_with("takes 5 charges (50 of 50)."), "at the room's edge what fits is taken (%s)" % [_main.party_log.last(1)])
+	_main.barrow_won([id], "easy")
+	_check(int(record.barrow["tokens"]) == 50 and _main.party_log.last(1)[0].ends_with("The dead's gift spills: 5 more than they can hold."),
+		"full: the gift spills and is said (%s)" % [_main.party_log.last(1)])
+	_main.barrow_won([id], "hard")
+	_check(int(record.barrow["tokens"]) == 65 and record.barrow["best"] == "hard" and player.charge_room == 75, "the hard deal raises best and the room to 75: 65 of 75 (%s)" % [record.barrow])
+	var saved := PlayerRecord.from_dict(JSON.parse_string(JSON.stringify(record.to_dict())).merged({"player_id": id}))
+	_check(saved.barrow == record.barrow, "kept through a save and a load (%s)" % [saved.barrow])
+	var old := PlayerRecord.from_dict(record.to_dict().merged({"player_id": id, "barrow": {"uses": 4, "of": 10, "difficulty": "normal", "day": 3}}, true))
+	_check(old.barrow == {"tokens": 4, "best": "normal", "containers": []}, "a record from before 573 migrates on load: uses to charges, difficulty to best (%s)" % [old.barrow])
+	_check(_main.barrow_won(["nobody"], "easy") == 0, "no record: nobody blessed")
+	record.marks.erase("draugr")
+	record.barrow = {}
+	_main._sync_charges(record)
+	_check(player.charges == 0 and player.charge_room == 0, "and the player's count follows the record")
 
 
 func _test_barrow_level() -> void:

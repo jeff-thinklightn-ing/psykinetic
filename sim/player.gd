@@ -38,6 +38,10 @@ var led_by := ""
 ## Where she leads them (decision 551 amended, ui's map and HUD): the
 ## place's Holdings id or the area's name she set off for; "" when not led.
 var led_to := ""
+## The resurrection charges they hold and the most they may (decision 573):
+## the server sets both from their record; the client's pack line reads them.
+var charges := 0
+var charge_room := 0
 
 
 func _init() -> void:
@@ -68,6 +72,8 @@ func _init() -> void:
 	replicate("body")
 	replicate("led_by")
 	replicate("led_to")
+	replicate("charges")  # Decision 573: the resurrection charges, and the most they may hold.
+	replicate("charge_room")
 
 
 

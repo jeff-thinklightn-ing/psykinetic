@@ -254,13 +254,15 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## 29 (505 amended): a level's terrain "relief" keeps the water under a
 ## bridge, its deck's height apart in terrain "decks"; Level.walk_relief
 ## lays the decks back for walking, on the server and in a client alike.
-const PROTOCOL_REVISION := 29
+## 30: a player carries charges, the resurrection charges they hold, and
+## charge_room, the most they may hold (decision 573).
+const PROTOCOL_REVISION := 30
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]
 ## Every kind of message (message, message_to, broadcast, broadcast_to).
 const MESSAGE_KINDS: Array[String] = ["barter", "builder", "chat", "counter", "death", "grass", "map", "offers", "party", "return", "roofs", "shop", "sky", "speech", "terrain", "town", "world"]
 ## Properties entity subclasses add with replicate().
-const SUBCLASS_REPLICATED: Array[String] = ["activity", "addressing", "ailing", "ailments", "alert", "body", "bond_step", "bond_why", "buffs", "channel_of", "channel_until", "down_until", "downed_until", "emit_light", "hands", "keeper_peer", "led_by", "led_to", "mending", "move_ticks", "pose", "raised", "raised_tick", "slot_notes", "slots"]
+const SUBCLASS_REPLICATED: Array[String] = ["activity", "addressing", "ailing", "ailments", "alert", "body", "bond_step", "bond_why", "buffs", "channel_of", "channel_until", "charge_room", "charges", "down_until", "downed_until", "emit_light", "hands", "keeper_peer", "led_by", "led_to", "mending", "move_ticks", "pose", "raised", "raised_tick", "slot_notes", "slots"]
 const SETTINGS_FILE := "settings.cfg"
 ## First launch: half the 3840x2160 base, windowed.
 const DEFAULT_WINDOW_SIZE := Vector2i(1920, 1080)

@@ -1420,14 +1420,14 @@ func _test_field_return() -> void:
 	var whose := "player:" + id
 	_check(_main._downed(owner, null, &"attack") == 0 and _main._downed(pet, null, &"attack") == 0, "unblessed: nobody goes down, they fall as ever")
 	_put(pet, owner.tile + Vector2i(1, 0))
-	_check(_main.bless([id], "easy") == 1 and "draugr" in record.marks and int(record.barrow.get("uses", 0)) == 5,
-		"the draugr beaten on easy: the player marked, 5 uses (%s)" % [record.barrow])
-	_check(World.carries_bound(owner, "barrow_half", whose) and World.carries_bound(pet, "return_token", whose)
-		and "draugr" in record.companion.get("marks", []), "the half to them, the token and the mark to her, beside them")
+	_check(_main.barrow_won([id], "easy") == 1 and "draugr" in record.marks and Economy.barrow_tokens(record.barrow) == 5 and record.barrow.get("best") == "easy",
+		"the draugr laid to rest at the easy deal: the player marked, 5 charges (%s)" % [record.barrow])
+	_check(not World.carries_bound(owner, "barrow_half", whose) and not World.carries_bound(pet, "return_token", whose)
+		and "draugr" in record.companion.get("marks", []), "no device minted (573); the mark to her, beside them")
 	_check(pet.grown.facts.any(func(fact: Dictionary) -> bool: return "laid the draugr to rest" in str(fact.get("text", ""))), "and it is a fact of hers")
-	_main.bless([id], "easy")
-	_check(owner.slots.count("barrow_half") + owner.slots.count("return_token") == 1 and pet.slots.count("return_token") == 1,
-		"blessed again: no second half or token")
+	_main.barrow_won([id], "easy")
+	_check(Economy.barrow_tokens(record.barrow) == 10 and owner.charges == 10 and owner.charge_room == 25,
+		"laid to rest again: the charges add up, and the player carries the count and the room (%d of %d)" % [owner.charges, owner.charge_room])
 	var saved := PlayerRecord.from_dict(JSON.parse_string(JSON.stringify(record.to_dict())))
 	_check(saved.barrow == record.barrow and "draugr" in saved.companion.get("marks", []), "the count and her mark are kept through a save and a load")
 	# Her player downed: she brings them back.
@@ -1437,8 +1437,8 @@ func _test_field_return() -> void:
 	World.damage(owner, 5, imp, &"attack")
 	_check(owner.hp == 1 and not imp._nearest_visible_target() == owner, "no blow lands on the downed, and no foe minds them")
 	_step_until(func() -> bool: return not World.is_downed(owner), 120)
-	_check(not World.is_downed(owner) and owner.spawned and owner.hp == roundi(owner.max_hp * 0.5) and int(record.barrow["uses"]) == 4,
-		"she goes to them and brings them back: half their hp, one use spent (%d hp, %s)" % [owner.hp, record.barrow])
+	_check(not World.is_downed(owner) and owner.spawned and owner.hp == roundi(owner.max_hp * 0.5) and int(record.barrow["tokens"]) == 9,
+		"she goes to them and brings them back: half their hp, one charge spent (%d hp, %s)" % [owner.hp, record.barrow])
 	# She downed: her player brings her back by holding E on her.
 	World.despawn(imp)
 	_settle(pet)
@@ -1453,12 +1453,12 @@ func _test_field_return() -> void:
 	_put(owner, pet.tile + Vector2i(-1, 0))
 	_main._on_command(owner, "bandage", {"target": str(pet.get_path())})
 	_step_until(func() -> bool: return not World.is_downed(pet), 80)
-	_check(not World.is_downed(pet) and int(record.barrow["uses"]) == 3, "held still: she is back, another use spent (%s)" % [record.barrow])
-	# Out of uses: down no more.
-	record.barrow["uses"] = 0
+	_check(not World.is_downed(pet) and int(record.barrow["tokens"]) == 8 and _player().charges == 8, "held still: she is back, another charge spent, the count told (%s)" % [record.barrow])
+	# Out of charges: down no more.
+	record.barrow["tokens"] = 0
 	_check(_main._downed(owner, null, &"attack") == 0 and _main._downed(pet, null, &"attack") == 0, "the count spent: they fall as ever")
 	# The window runs out: the fall as ever.
-	record.barrow["uses"] = 2
+	record.barrow["tokens"] = 2
 	World.damage(owner, owner.hp, null, &"attack")
 	owner.downed_until = World.tick + 1
 	pet.can_revive = func() -> bool: return false
@@ -1820,7 +1820,7 @@ func _test_loyalty() -> void:
 	else:
 		_check(false, "a cell out of her hearing to stand her player in")
 	var barrow := record.barrow
-	record.barrow = {"uses": 2, "of": 2, "difficulty": "normal", "day": 0}
+	record.barrow = {"tokens": 2, "best": "normal", "containers": []}  # 573: the charges.
 	_main._bond_fell(pet, &"bled")
 	_check(score.call() == -3 and newest.call() == "you let her bleed out", "bled out with her blessed player near: let bleed (%d)" % score.call())
 	record.barrow = barrow

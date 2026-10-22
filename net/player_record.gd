@@ -55,8 +55,11 @@ var seen_generation: Dictionary = {}
 ## (level.json link "sealed": the mark it opens for): "draugr" once the
 ## draugr is beaten (enemy-ai's call to Main.mark_player).
 var marks: Array[String] = []
-## The draugr's blessing (decision 544): {uses, of, difficulty, day}, the
-## count of returns in the field this player's device has left; {} unblessed.
+## The draugr's blessing (decisions 544, 573): {tokens, best, containers},
+## the resurrection charges this player holds, the hardest deal they beat
+## (their capacity derives from it: Economy.barrow_capacity) and the named
+## containers they earned; {} unblessed. A record from before 573 ({uses,
+## of, difficulty, day}) is migrated on load (Economy.barrow_migrated).
 var barrow: Dictionary = {}
 
 
@@ -128,7 +131,7 @@ static func from_dict(entry: Variant) -> PlayerRecord:
 	record.marks = _strings(entry.get("marks", []))
 	var barrow: Variant = entry.get("barrow", {})
 	if barrow is Dictionary and not barrow.is_empty():
-		record.barrow = _numbers(barrow)
+		record.barrow = Economy.barrow_migrated(barrow)
 	var seen: Variant = entry.get("seen_generation", {})
 	if seen is Dictionary:
 		for area: Variant in seen:
