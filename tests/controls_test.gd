@@ -42,6 +42,7 @@ func _ready() -> void:
 	_test_friend_click()
 	_test_stand_and_signature()
 	_test_cursor_bandage()
+	_test_telegraph_message()
 	_test_item_keys()
 
 	print("")
@@ -730,6 +731,24 @@ func _test_stand_and_signature() -> void:
 	_kill_monsters()
 	player.action_order = GridEntity.Order.NONE
 	Net.controls = saved
+
+
+func _test_telegraph_message() -> void:
+	print("
+== a telegraph reaches the zone's players: shown, then over (decision 602) ==")
+	var player := _place_player(Vector2i(11, 3))
+	var heard := []
+	var on_start := func(id: int, data: Dictionary) -> void: heard.append(["start", id, data["cells"].size()])
+	var on_end := func(id: int, landed: bool) -> void: heard.append(["end", id, landed])
+	_main.telegraph_started.connect(on_start)
+	_main.telegraph_ended.connect(on_end)
+	var id := World.telegraph(player, "spin", Telegraph.cone(player.tile, Vector2(1, 0), 2.0, 150.0), 15)
+	_check(_main.telegraphs.has(id) and heard.size() == 1 and heard[0][0] == "start" and int(heard[0][2]) > 0,
+			"the host's own client is told, with its cells (%s)" % [heard])
+	World.end_telegraph(id, true)
+	_check(not _main.telegraphs.has(id) and heard.back() == ["end", id, true], "and told it landed (%s)" % [heard.back()])
+	_main.telegraph_started.disconnect(on_start)
+	_main.telegraph_ended.disconnect(on_end)
 
 
 func _test_cursor_bandage() -> void:

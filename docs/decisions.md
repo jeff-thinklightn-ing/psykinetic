@@ -22056,3 +22056,41 @@ door or higher ground stops it before.
 
 tests/physics_test: a hammer launching 25 kg 3 cells and lying at its feet, with the views
 told; landing at the line's end; stopped by a wall; a monster throwing its axe at a player.
+## 602. The ground telegraph: a danger area shown before its blow, the same cells it strikes
+
+Jeff (2026-10-22, the draugr): "a small red cone on the ground indicates the
+area" and, for the throw, "a longer narrow cone". combat's draugr design
+(C:/dev/review/combat/draugr/design.md, section 1), approved by the
+coordinator: designed once, for every boss.
+
+- Telegraph (sim/telegraph.gd, a new class_name): a shape is {kind: "cone"
+  | "line" | "ring", origin: [x, y], facing: [x, y] (any angle), length:
+  cells, half_angle: degrees, width: cells, inner: cells}; Telegraph.cells
+  is its cells by geometry (a cone or ring: cell centres within length +
+  0.25, a cone within half_angle of the facing; a line: sampled every half
+  cell along the facing, width lanes across), never the origin's own;
+  Telegraph.cone and Telegraph.line build them; valid() refuses a shape that
+  does not read.
+- World.telegraph_cells(shape): those cells on this ground: floor only, and
+  nothing stopping sight between the origin and the cell (a wall, a closed
+  door: _sight_crosses_edge); a line ends at its first such cell. **The one
+  function both the drawing and the blow read**: what is seen is what hits.
+- World.telegraph(source, kind, shape, ticks) -> id (0 if the shape does
+  not read): kept with its data {id, source (path), kind, shape, cells (the
+  exact cells as [x, y]), from_tick, lands_tick, zone}, telegraph_started
+  emitted. end_telegraph(id, landed): telegraph_ended (and
+  telegraph_ended_in, with its zone). Its source despawned
+  (_forget_jobs) or the room reset: ended, not landed. World.telegraphs():
+  those showing.
+- Main tells the source's zone (World.peers_in): the "telegraph" message,
+  the data when shown, {id, landed} when over. A client keeps
+  Main.telegraphs and emits telegraph_started / telegraph_ended for ui's
+  decal (drawn from "cells", ui's side) and sound's cues. "kind" names the
+  move: "spin", "throw", "charge" for the draugr (603).
+- Wire: a new message kind, PROTOCOL_REVISION 32.
+
+combat_test: the cone's 16 cells and its gap behind, a line straight and
+slanting, a ring, a shape that does not read; walls clip a line and keep a
+cone to the floor; shown, its data's cells the struck cells, landed, ended
+once, its source gone. controls_test: the host's client told, then told it
+landed. New class_name: Telegraph.

@@ -30,6 +30,9 @@ func _ready() -> void:
 	_test_paid_on_a_blow()
 	_test_winded()
 	_test_monsters_switch()
+	_test_telegraph_shapes()
+	_test_telegraph_ground()
+	_test_telegraph_lifecycle()
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -140,6 +143,71 @@ func _test_monsters_switch() -> void:
 	dummy.pays_swings = true
 	_blow(dummy, player)
 	_check(dummy.stamina < 60, "switched on, it pays (%d)" % dummy.stamina)
+
+
+func _test_telegraph_shapes() -> void:
+	print("
+== the telegraph's shapes (decision 602): a cone with a gap behind, a line, a ring ==")
+	var o := Vector2i(10, 10)
+	var cone := Telegraph.cells(Telegraph.cone(o, Vector2(1, 0), 2.0, 150.0))
+	_check(o not in cone and Vector2i(11, 10) in cone and Vector2i(12, 11) in cone and Vector2i(9, 9) in cone,
+			"a 2-cell cone of 150 degrees either side: ahead, the knight's cell, back corners (%d cells)" % cone.size())
+	_check(Vector2i(9, 10) not in cone and Vector2i(8, 10) not in cone and Vector2i(12, 12) not in cone,
+			"not straight behind (the gap), nor the far corner")
+	_check(cone.size() == 16, "16 cells: 20 within reach, 4 in the gap behind (%d)" % cone.size())
+	var line := Telegraph.cells(Telegraph.line(o, Vector2(1, 0), 8.0))
+	_check(line.size() == 8 and Vector2i(18, 10) in line and Vector2i(19, 10) not in line, "a line of 8 east: 8 cells (%d)" % line.size())
+	var slant := Telegraph.cells(Telegraph.line(o, Vector2(1, 1), 8.0))
+	_check(Vector2i(11, 11) in slant and Vector2i(15, 15) in slant and Vector2i(16, 16) not in slant,
+			"a slanting line: the diagonal cells within 8 (%s)" % [slant])
+	var ring := Telegraph.cells({"kind": "ring", "origin": [10, 10], "facing": [1, 0], "length": 2.0, "inner": 1.5})
+	_check(Vector2i(11, 10) not in ring and Vector2i(12, 10) in ring, "a ring: the inner cells left out")
+	_check(Telegraph.cells({"kind": "blob", "origin": [0, 0], "facing": [1, 0], "length": 2}).is_empty()
+			and Telegraph.cells({"kind": "cone", "origin": [0, 0], "facing": [0, 0], "length": 2}).is_empty(),
+			"a shape that does not read: no cells")
+
+
+func _test_telegraph_ground() -> void:
+	print("
+== on the ground: walls clip it, a line ends at one ==")
+	var e := _build(["##########", "#P......##", "#....#...#", "##########"])
+	var player: GridEntity = e["P"][0]
+	var line := World.telegraph_cells(Telegraph.line(player.tile, Vector2(1, 0), 8.0))
+	_check(line.size() == 6 and Vector2i(7, 1) in line and Vector2i(8, 1) not in line,
+			"a line east from (1,1) stops at the wall at (8,1): 6 cells (%s)" % [line])
+	var cone := World.telegraph_cells(Telegraph.cone(Vector2i(4, 1), Vector2(1, 0), 2.0, 150.0))
+	_check(Vector2i(5, 2) not in cone and Vector2i(4, 0) not in cone and Vector2i(5, 1) in cone,
+			"a cone keeps to the floor: no wall cell (%s)" % [cone])
+
+
+func _test_telegraph_lifecycle() -> void:
+	print("
+== shown, landed or given up; its source gone ends it ==")
+	var e := _build(["#######", "#Pm...#", "#######"])
+	var dummy: GridEntity = e["m"][0]
+	var started := []
+	var ended := []
+	var on_start := func(id: int, data: Dictionary) -> void: started.append([id, data])
+	var on_end := func(id: int, landed: bool) -> void: ended.append([id, landed])
+	World.telegraph_started.connect(on_start)
+	World.telegraph_ended.connect(on_end)
+	var id := World.telegraph(dummy, "spin", Telegraph.cone(dummy.tile, Vector2(-1, 0), 2.0, 150.0), 15)
+	_check(id > 0 and started.size() == 1 and World.telegraphs().has(id), "shown: an id, told, kept")
+	var data: Dictionary = started[0][1]
+	var cells: Array = data["cells"]
+	var want := World.telegraph_cells(data["shape"])
+	_check(data["kind"] == "spin" and int(data["lands_tick"]) - int(data["from_tick"]) == 15 and cells.size() == want.size()
+			and [Vector2i(1, 1).x, Vector2i(1, 1).y] in cells, "its data: kind, 15 ticks, the very cells it strikes (%s)" % [cells])
+	World.end_telegraph(id, true)
+	_check(ended == [[id, true]] and not World.telegraphs().has(id), "landed: told, gone")
+	World.end_telegraph(id, true)
+	_check(ended.size() == 1, "ended twice: told once")
+	var second := World.telegraph(dummy, "throw", Telegraph.line(dummy.tile, Vector2(1, 0), 8.0), 12)
+	World.despawn(dummy)
+	_check(ended.back() == [second, false], "its source gone: given up (%s)" % [ended.back()])
+	_check(World.telegraph(e["P"][0], "spin", {"kind": "cone"}, 15) == 0, "a shape that does not read: no telegraph")
+	World.telegraph_started.disconnect(on_start)
+	World.telegraph_ended.disconnect(on_end)
 
 
 func _build(rows: Array[String]) -> Dictionary:

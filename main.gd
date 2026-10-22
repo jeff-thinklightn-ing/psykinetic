@@ -438,6 +438,8 @@ var town_states := {}
 ## Town id -> {map building code: awake} as the server last told ("town"
 ## "awake", decision 566), for the window light; the view's set_awake.
 var town_awake := {}
+## The telegraphs showing on this client (decision 602): id -> their data.
+var telegraphs := {}
 ## Each level's damaged roofs (their indices) as this client was last told
 ## ("roofs", decision 383), for the view.
 var roof_states := {}
@@ -580,6 +582,11 @@ signal barter_told(data: Dictionary)
 ## party: [{name, area, kind}]}; world_changed after each "world" message.
 var world_state := {}
 signal world_changed
+## A danger area shown on the ground (decision 602; the "telegraph" message):
+## [param data] {id, source, kind, shape, cells, from_tick, lands_tick,
+## zone}; ended, landed or given up. For the views (ui's decal) and sounds.
+signal telegraph_started(id: int, data: Dictionary)
+signal telegraph_ended(id: int, landed: bool)
 ## Server: what each player's world map is told (WorldNews), and the tick
 ## it was last looked at.
 var _world_news: WorldNews
@@ -841,6 +848,8 @@ func _go_online() -> void:
 		World.entity_bumped.connect(_on_bumped)
 		World.entity_died.connect(_on_entity_died)
 		World.entity_taken.connect(_on_entity_taken)
+		World.telegraph_started.connect(_tell_telegraph)  # Decision 602.
+		World.telegraph_ended_in.connect(_tell_telegraph_ended)
 		# The draugr's blessed, downed and brought back (decision 544).
 		World.downed = _downed
 		World.entity_downed.connect(_on_downed)
@@ -4290,6 +4299,34 @@ func _on_town_building_changed(town: String, _kind: String) -> void:
 func _on_roof_changed(level: String) -> void:
 	Net.broadcast("roofs", {"level": level, "damaged": World.damaged_roofs(level)})
 	_show_towns()
+
+
+## Server: a telegraph shown (decision 602): the players in its zone are told
+## ("telegraph", its data).
+func _tell_telegraph(_id: int, data: Dictionary) -> void:
+	var peers := World.peers_in(str(data["zone"]))
+	if not peers.is_empty():
+		Net.broadcast_to(peers, "telegraph", data)
+
+
+## Server: a telegraph over: its zone's players are told ("telegraph" {id,
+## landed}).
+func _tell_telegraph_ended(zone_name: String, id: int, landed: bool) -> void:
+	var peers := World.peers_in(zone_name)
+	if not peers.is_empty():
+		Net.broadcast_to(peers, "telegraph", {"id": id, "landed": landed})
+
+
+## A "telegraph" message (decision 602): one shown (it has "cells"), kept in
+## telegraphs and telegraph_started; else one over, telegraph_ended.
+func _on_telegraph(data: Dictionary) -> void:
+	var id := int(data.get("id", 0))
+	if data.has("cells"):
+		telegraphs[id] = data
+		telegraph_started.emit(id, data)
+	elif telegraphs.has(id):
+		telegraphs.erase(id)
+		telegraph_ended.emit(id, bool(data.get("landed", false)))
 
 
 ## Server: tall grass of [param level] was trampled or stood again
@@ -7925,6 +7962,9 @@ func _on_message(kind: String, data: Dictionary) -> void:
 		return
 	if kind == "terrain":
 		_on_terrain(data)
+		return
+	if kind == "telegraph":
+		_on_telegraph(data)
 		return
 	if kind == "town":
 		var town := str(data.get("town", ""))

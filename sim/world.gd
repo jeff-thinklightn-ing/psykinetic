@@ -586,6 +586,13 @@ var peer_zone: Dictionary[int, String] = {}
 ## World switched from one zone to another (Main swaps its per-zone state).
 signal zone_switched(from: Zone, to: Zone)
 ## Every awake zone has stepped once (Main's snapshot timer).
+## A danger area shown on the ground before its blow (decision 602; every
+## boss's): telegraph() starts one, end_telegraph() ends it. Main tells the
+## zone ("telegraph").
+signal telegraph_started(id: int, data: Dictionary)
+signal telegraph_ended(id: int, landed: bool)
+## As telegraph_ended, with the zone it showed in (Main tells that zone).
+signal telegraph_ended_in(zone_name: String, id: int, landed: bool)
 signal stepped
 ## So many steps, all zones together.
 var steps := 0
@@ -1449,6 +1456,8 @@ func update_visibility(peer: int, zone_name: String) -> void:
 func reset() -> void:
 	if not Net.is_authority():
 		return
+	for id: int in _telegraphs.keys():
+		end_telegraph(id, false)  # Decision 602: none outlives the room.
 	raids.hand_back(zone.name)  # Its raiders go with the room: back to maps.
 	for entity in _entities:
 		if is_instance_valid(entity) and entity.owner_peer == 0 and entity.keeper_peer == 0:
@@ -3512,6 +3521,91 @@ func is_winded(entity: GridEntity) -> bool:
 	return is_instance_valid(entity) and entity.winded
 
 
+## The telegraphs showing now (decision 602): id -> {source, kind, shape,
+## from_tick, lands_tick}.
+var _telegraphs: Dictionary[int, Dictionary] = {}
+var _next_telegraph := 1
+
+
+## [param source] shows [param shape] (Telegraph's) on the ground, a
+## [param kind] ("spin", "throw", "charge": the views' and sounds' word) for
+## [param ticks] till it lands (decision 602): its id, 0 if the shape does
+## not read. The blow that follows strikes telegraph_cells(shape), the cells
+## drawn. Server only.
+func telegraph(source: GridEntity, kind: String, shape: Dictionary, ticks: int) -> int:
+	if not Net.is_authority() or not Telegraph.valid(shape) or not is_instance_valid(source):
+		return 0
+	var id := _next_telegraph
+	_next_telegraph += 1
+	var cells := []
+	for cell in telegraph_cells(shape):
+		cells.append([cell.x, cell.y])  # Sent as struck, so a view draws exactly what will hit.
+	var data := {"id": id, "source": str(source.get_path()), "kind": kind, "shape": shape, "cells": cells,
+		"from_tick": tick, "lands_tick": tick + maxi(0, ticks), "zone": source.zone}
+	_telegraphs[id] = {"source": source, "data": data}
+	telegraph_started.emit(id, data)
+	return id
+
+
+## Telegraph [param id] over: [param landed], its blow struck; false, given
+## up (a wind-up broken, its source gone). Unknown ids are let be.
+func end_telegraph(id: int, landed: bool) -> void:
+	if not _telegraphs.has(id):
+		return
+	var zone_name := str(_telegraphs[id]["data"]["zone"])
+	_telegraphs.erase(id)
+	telegraph_ended.emit(id, landed)
+	telegraph_ended_in.emit(zone_name, id, landed)
+
+
+## The telegraphs showing now, by id: their data as sent (decision 602).
+func telegraphs() -> Dictionary:
+	var out := {}
+	for id: int in _telegraphs:
+		out[id] = _telegraphs[id]["data"]
+	return out
+
+
+## [param shape]'s cells on this ground (decision 602): Telegraph.cells, less
+## any cell that is not floor (walkable or water) or that a wall or a closed
+## door stands between it and the shape's origin (as sight is stopped:
+## _sight_crosses_edge); a line ends at the first such cell. Both the drawing
+## and the blow read it.
+func telegraph_cells(shape: Dictionary) -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	var origin := Telegraph.origin_of(shape) if Telegraph.valid(shape) else Vector2i.ZERO
+	for cell in Telegraph.cells(shape):
+		if (is_walkable(cell) or is_water(cell)) and _clear_between(origin, cell):
+			out.append(cell)
+		elif str(shape["kind"]) == "line":
+			break
+	return out
+
+
+## Whether nothing stops sight cell by cell from [param from] to
+## [param to] (a straight line, Bresenham's), every cell between floor.
+func _clear_between(from: Vector2i, to: Vector2i) -> bool:
+	var span: Vector2i = (to - from).abs()
+	var s := Vector2i(1 if from.x < to.x else -1, 1 if from.y < to.y else -1)
+	var err: int = span.x - span.y
+	var at := from
+	while at != to:
+		var e2: int = 2 * err
+		var step := Vector2i.ZERO
+		if e2 > -span.y:
+			err -= span.y
+			step.x = s.x
+		if e2 < span.x:
+			err += span.x
+			step.y = s.y
+		if _sight_crosses_edge(at, step):
+			return false
+		at += step
+		if at != to and not (is_walkable(at) or is_water(at)):
+			return false
+	return true
+
+
 ## Who last pushed each crate or cart, by entity, for the stockpile's
 ## ledger when it is unloaded there.
 var _pushed_by: Dictionary[GridEntity, String] = {}
@@ -4456,6 +4550,9 @@ func despawn(entity: GridEntity) -> void:
 ## buff, mending, wind-up and downed lapse with it. A freed node read by
 ## these each tick crashed the release template (572).
 func _forget_jobs(entity: GridEntity) -> void:
+	for id: int in _telegraphs.keys():
+		if _telegraphs[id]["source"] == entity:
+			end_telegraph(id, false)  # Its source gone: never lands (decision 602).
 	_buffed.erase(entity)
 	_mending.erase(entity)
 	_winders.erase(entity)

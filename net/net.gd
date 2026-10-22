@@ -274,11 +274,13 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## World.winded_move_scale times the ticks (levels/combat.json).
 ## 31 (606): GridEntity's _net_hurled RPC (World.hurl, a thing thrown down a
 ## line): its Items id and the cell it came down on, for the views' flight.
+## 31 (602): the "telegraph" message, to a zone: {id, source, kind, shape,
+## cells, from_tick, lands_tick, zone} shown, {id, landed} over.
 const PROTOCOL_REVISION := 31
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]
 ## Every kind of message (message, message_to, broadcast, broadcast_to).
-const MESSAGE_KINDS: Array[String] = ["barter", "builder", "chat", "counter", "death", "grass", "map", "offers", "party", "return", "roofs", "shop", "sky", "speech", "terrain", "town", "world"]
+const MESSAGE_KINDS: Array[String] = ["barter", "builder", "chat", "counter", "death", "grass", "map", "offers", "party", "return", "roofs", "shop", "sky", "speech", "telegraph", "terrain", "town", "world"]
 ## Properties entity subclasses add with replicate().
 const SUBCLASS_REPLICATED: Array[String] = ["activity", "addressing", "ailing", "ailments", "alert", "body", "bond_step", "bond_why", "buffs", "channel_of", "channel_until", "charge_room", "charges", "down_until", "downed_until", "emit_light", "hands", "keeper_peer", "led_by", "led_to", "mending", "move_ticks", "pose", "raised", "raised_tick", "slot_notes", "slots"]
 const SETTINGS_FILE := "settings.cfg"
