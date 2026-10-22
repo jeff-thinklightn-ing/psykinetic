@@ -48,6 +48,9 @@ const RIDGE: Array[Vector2i] = [Vector2i(140, 30), Vector2i(178, 46), Vector2i(2
 const RIDGE_HEIGHT := 3.5
 const RIDGE_BACK := 30.0
 const RIDGE_WAY := 0.45
+## How far the ridge's face wanders either way of its line (585: smooth,
+## off the cells' lines).
+const RIDGE_WANDER := 1.5
 ## The valley the river runs down (568), north edge to south.
 const VALLEY: Array[Vector2i] = [Vector2i(62, 0), Vector2i(70, 56), Vector2i(96, 104), Vector2i(104, 168), Vector2i(118, 255)]
 ## The town's ground, kept level (Held's own map is undecided: 565 leaves it).
@@ -119,7 +122,7 @@ func _ready() -> void:
 	var ponds: Array = _trace_ponds() if new_waters else []
 	var laid := Relief.lay(map, Rect2i(Vector2i.ZERO, map.size), SEED, {
 		"base": BASE, "amplitude": ROLL, "scale": 64.0, "octaves": 2,
-		"escarpments": [{"line": RIDGE, "face": Vector2i(-1, 1), "height": RIDGE_HEIGHT, "back": RIDGE_BACK, "taper": 12.0, "ways": [RIDGE_WAY], "way_width": 5.0}],
+		"escarpments": [{"line": RIDGE, "face": Vector2i(-1, 1), "height": RIDGE_HEIGHT, "back": RIDGE_BACK, "taper": 12.0, "ways": [RIDGE_WAY], "way_width": 5.0, "wander": RIDGE_WANDER}],
 		"valleys": [VALLEY], "valley_depth": 2.5, "valley_floor": RIVER_FLOOR, "valley_fall": 3.0, "valley_width": 26.0,
 		"slope": 0.25, "streams": 0, "keep_flat": _pads(),
 		"rivers": [_river_option()]})
@@ -146,6 +149,7 @@ func _ready() -> void:
 	_check_clear(river)
 	var new_roads := not doc.config.has("roads")
 	var roads: Array = _roads(bridge) if new_roads else []
+	_soften(map)
 	var path := FOLDER + "relief.png"
 	map.to_relief_image().save_png(ProjectSettings.globalize_path(path))
 	LevelMap.ensure_image_import(ProjectSettings.globalize_path(path), path)
@@ -165,7 +169,14 @@ func _ready() -> void:
 		doc.config["roads"] = roads
 		_write_key("roads", roads)
 	var level := Level.parse(map.to_image(), null, doc.config, map.to_relief_image())
-	print("[wilds] relief.png laid; %s" % ("nothing said" if level["warnings"].is_empty() else "; ".join(level["warnings"])))
+	# The ledges traced from the relief as laid (585), written again each run.
+	var ledges := Level.ledges_of(level["terrain"])
+	_drop_key("ledges")
+	if not ledges.is_empty():
+		doc.config["ledges"] = ledges
+		_write_key("ledges", ledges)
+		level = Level.parse(map.to_image(), null, doc.config, map.to_relief_image())
+	print("[wilds] relief.png laid, %d ledges; %s" % [ledges.size(), "nothing said" if level["warnings"].is_empty() else "; ".join(level["warnings"])])
 	_say(laid["faces"])
 	get_tree().quit()
 
@@ -563,6 +574,23 @@ func _check_clear(river: Dictionary) -> void:
 
 ## [param value] written into level.json's text as top-level [param key]
 ## before its closing brace (the rest of the file as it was).
+## [param key] taken out of level.json's text (the last key _write_key wrote
+## sits at its end), the rest of it as it was.
+func _drop_key(key: String) -> void:
+	var path := ProjectSettings.globalize_path(FOLDER + "level.json")
+	var text := FileAccess.get_file_as_string(path)
+	var start := text.find(",\n\t" + JSON.stringify(key) + ":")
+	if start < 0:
+		return
+	var end := text.find(",\n\t\"", start + 2)
+	if end < 0:
+		end = text.rfind("\n}")
+	text = text.substr(0, start) + text.substr(end)
+	var file := FileAccess.open(path, FileAccess.WRITE)
+	file.store_string(text)
+	file.close()
+
+
 func _write_key(key: String, value: Variant) -> void:
 	var path := ProjectSettings.globalize_path(FOLDER + "level.json")
 	var text := FileAccess.get_file_as_string(path)
@@ -642,3 +670,19 @@ func _say(faces: Dictionary) -> void:
 				if not faces.has(Terrain.edge_key(at, step)):
 					strays.append(at)
 	print("[wilds] %d cliff edges, %d on no face%s" % [count, strays.size(), "" if strays.is_empty() else " (%s)" % [strays.slice(0, 6)]])
+
+
+## Relief.soften_low_steps over the map as it now stands (585: what reads
+## as a slope must be climbable), after the steps that move the ground
+## once laid.
+func _soften(map: LevelMap) -> void:
+	var heights := {}
+	var water := {}
+	for at: Vector2i in map.cells:
+		if map.cell(at) in ["water", "ford"]:
+			water[at] = true
+		if map.walkable(at) or water.has(at):
+			heights[at] = map.relief_at(at)
+	Relief.soften_low_steps(heights, water)
+	for at: Vector2i in heights:
+		map.set_relief(at, heights[at])

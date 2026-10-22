@@ -50,6 +50,7 @@ func _ready() -> void:
 	_test_sample()
 	_test_lay()
 	_test_escarpment()
+	_test_soften()
 	_test_curves()
 	_test_curves_laid()
 	_test_river()
@@ -573,6 +574,21 @@ func _test_road() -> void:
 	_check(Relief.road(map, Vector2i(3, 4), [], Vector2i(36, 26), 2.0, {}).is_empty(), "no bridge, no way over: none")
 
 
+## The rule (585): a step under FACE_LEAST the walk can't take is brought
+## within it: its high side lowered, or beside water its low side raised.
+func _test_soften() -> void:
+	print("== Relief.soften_low_steps ==")
+	var heights := {Vector2i(0, 0): 1.0, Vector2i(1, 0): 1.7, Vector2i(2, 0): 4.0}
+	Relief.soften_low_steps(heights, {})
+	_check(not Relief.cliff_between(heights[Vector2i(0, 0)], heights[Vector2i(1, 0)]) and heights[Vector2i(0, 0)] == 1.0
+		and Relief.cliff_between(heights[Vector2i(1, 0)], heights[Vector2i(2, 0)]),
+		"a 0.7 m step lowered to a walk, a face over a metre left (%s)" % [heights])
+	var banked := {Vector2i(0, 0): 2.0, Vector2i(1, 0): 2.6, Vector2i(0, 1): 1.8, Vector2i(1, 1): 2.4}
+	Relief.soften_low_steps(banked, {Vector2i(2, 0): true, Vector2i(2, 1): true})
+	_check(banked[Vector2i(1, 0)] == 2.6 and not Relief.cliff_between(banked[Vector2i(0, 0)], banked[Vector2i(1, 0)]),
+		"beside water the bank keeps its height, the low side raised (%s)" % [banked])
+
+
 func _test_escarpment() -> void:
 	print("== Relief.lay escarpments ==")
 	var size := Vector2i(40, 50)
@@ -628,7 +644,8 @@ func _test_hills() -> void:
 	for cell: Vector2i in floor:
 		for step: Vector2i in [Vector2i(1, 0), Vector2i(0, 1)]:
 			if floor.has(cell + step) and Relief.cliff_between(Relief.at(field, size, cell), Relief.at(field, size, cell + step)):
-				if step == Vector2i(1, 0) and cell.x == 61 and cell.y < 46:
+				# The plateau's west face wanders over columns 61 to 64 (585).
+				if step == Vector2i(1, 0) and cell.x >= 60 and cell.x <= 65 and cell.y < 46:
 					face += 1
 				else:
 					off_face += 1

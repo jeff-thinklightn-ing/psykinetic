@@ -277,6 +277,9 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## 31 (602): the "telegraph" message, to a zone: {id, source, kind, shape,
 ## cells, from_tick, lands_tick, zone} shown, {id, landed} over.
 ## 32 (611): new command "make_way" {target}: your own companion beside you steps aside.
+## 32 (585): level.json "ledges", terrain["ledges"] (each {curve: {points,
+## tangents, tops, feet, length}, up, closed}) the views draw faces along;
+## the hills' and the wilds' faces wander, so their relief differs.
 const PROTOCOL_REVISION := 32
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]

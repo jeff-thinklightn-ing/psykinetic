@@ -16,9 +16,10 @@ const LEAST_WIDTH := 0.5
 ## length: a centripetal Catmull-Rom (no cusps or loops at uneven spacing),
 ## round to the first point again if [param closed]; [param widths] (one a
 ## point) interpolated along it the same way, at least LEAST_WIDTH (all 0
-## for a closed curve); each point's way along it (a unit vector). As
+## for a closed curve; [param raw]: neither, the values as given, a ledge's
+## tops and feet); each point's way along it (a unit vector). As
 ## {points, widths, tangents, length}.
-static func sample(points: PackedVector2Array, widths: PackedFloat32Array, closed := false) -> Dictionary:
+static func sample(points: PackedVector2Array, widths: PackedFloat32Array, closed := false, raw := false) -> Dictionary:
 	var out := {"points": PackedVector2Array(), "widths": PackedFloat32Array(), "tangents": PackedVector2Array(), "length": 0.0}
 	var count := points.size()
 	if count < 2:
@@ -51,7 +52,8 @@ static func sample(points: PackedVector2Array, widths: PackedFloat32Array, close
 		var span := maxf(dense[segment].distance_to(dense[segment + 1]), 0.0001)
 		var t := clampf((s - walked) / span, 0.0, 1.0)
 		out["points"].append(dense[segment].lerp(dense[segment + 1], t))
-		out["widths"].append(0.0 if closed else maxf(LEAST_WIDTH, lerpf(dense_widths[segment], dense_widths[segment + 1], t)))
+		var width := lerpf(dense_widths[segment], dense_widths[segment + 1], t)
+		out["widths"].append(width if raw else (0.0 if closed else maxf(LEAST_WIDTH, width)))
 		s += SPACING
 	var sampled: PackedVector2Array = out["points"]
 	var tangents := PackedVector2Array()
@@ -242,6 +244,267 @@ static func parse(config: Dictionary, key: String, warnings: Array[String]) -> A
 				kind = "dirt"
 		out.append({"points": points, "widths": widths, "closed": closed, "kind": kind, "curve": sample(points, widths, closed)})
 	return out
+
+
+## level.json's "ledges" (decision 585; Jeff: "terrain needs to have smooth
+## edges for ledges and terraces as well. it should not conform to tiles"):
+## [{points: [[x, y, top, foot], ...], up: "left" | "right", closed}], each
+## a cliff's line in cell units with the ground's height above it (top) and
+## below it (foot) at each point (equal where the face tapers into a walk),
+## its high side left or right of the way the points run (y down: walking
+## east, south is right). Each sampled (sample, raw, a value a point: the
+## tops and the feet eased along the curve once); as [{curve: {points,
+## tangents, tops, feet, length}, up, closed}]. An entry of too few points
+## or a bad point or side is said in [param warnings] and left out.
+static func parse_ledges(config: Dictionary, warnings: Array[String]) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var listed: Variant = config.get("ledges", [])
+	if not listed is Array:
+		warnings.append("\"ledges\" in level.json is not a list")
+		return out
+	for index in (listed as Array).size():
+		var entry: Variant = listed[index]
+		var raw: Variant = entry.get("points", []) if entry is Dictionary else null
+		var closed := entry is Dictionary and bool(entry.get("closed", false))
+		var up: Variant = entry.get("up") if entry is Dictionary else null
+		if not raw is Array or (raw as Array).size() < (3 if closed else 2) or not up in ["left", "right"]:
+			warnings.append("ledge %d has too few points or no \"up\" side: left out" % index)
+			continue
+		var points := PackedVector2Array()
+		var tops := PackedFloat32Array()
+		var feet := PackedFloat32Array()
+		for point: Variant in raw:
+			if not point is Array or (point as Array).size() != 4 or (point as Array).any(func(n: Variant) -> bool: return not (n is float or n is int)):
+				points.clear()
+				break
+			points.append(Vector2(float(point[0]), float(point[1])))
+			tops.append(float(point[2]))
+			feet.append(float(point[3]))
+		if points.is_empty():
+			warnings.append("ledge %d has a point that is not [x, y, top, foot]: left out" % index)
+			continue
+		var along := sample(points, tops, closed, true)
+		var curve := {"points": along["points"], "tangents": along["tangents"], "tops": along["widths"],
+			"feet": sample(points, feet, closed, true)["widths"], "length": along["length"]}
+		out.append({"curve": curve, "up": up, "closed": closed})
+	return out
+
+
+## The ledges of [param field] (relief, metres a cell, [param size] cells)
+## as level.json's "ledges" (decision 585): every cliff edge (Relief.
+## cliff_between) between two cells of [param ground] (cell -> anything:
+## the walkable cells and the water, so a fall's face runs through its
+## river; a bank, [param water] one side only, is the shore's and left)
+## chained into lines along the cells' edges, cut where the high
+## side changes, each line's edge middles thinned to the fewest within
+## LEDGE_TOLERANCE (Douglas-Peucker; a middle on water kept, so a fall has
+## its point), each point's top and foot the two cells' heights. A line
+## that ends where the drop comes under the walk runs on to the edge's end
+## corner with top = foot there (the face tapering into the slope); lines
+## meeting at a corner end on it, the same point. A loop of edges is a
+## closed ledge (a mesa's rim, a pit's).
+static func trace_ledges(field: PackedFloat32Array, size: Vector2i, ground: Dictionary, water: Dictionary = {}) -> Array:
+	# Each cliff edge as its two corners, its middle, the cells above and below.
+	var edges: Array[Dictionary] = []
+	var at_corner := {}  # corner -> edge indices
+	for cell: Vector2i in ground:
+		for step: Vector2i in [Vector2i(1, 0), Vector2i(0, 1)]:
+			var next := cell + step
+			# A bank (water one side, land the other) is the shore's, not a ledge.
+			if not ground.has(next) or water.has(cell) != water.has(next):
+				continue
+			var a := Relief.at(field, size, cell)
+			var b := Relief.at(field, size, next)
+			if not Relief.cliff_between(a, b):
+				continue
+			# The edge's two corners: an east edge's top and bottom, a south edge's left and right.
+			var corners: Array[Vector2] = [Vector2(cell.x + 0.5, cell.y + 0.5), Vector2(cell.x + 0.5, cell.y + 0.5)]
+			corners[0] = Vector2(cell.x + 0.5, cell.y - 0.5) if step.x == 1 else Vector2(cell.x - 0.5, cell.y + 0.5)
+			var high := cell if a > b else next
+			var low := next if a > b else cell
+			edges.append({"corners": corners, "middle": (Vector2(cell) + Vector2(next)) / 2.0, "high": high, "low": low,
+				"top": maxf(a, b), "foot": minf(a, b), "wet": water.has(cell) or water.has(next)})
+			for corner in corners:
+				if not at_corner.has(corner):
+					at_corner[corner] = []
+				at_corner[corner].append(edges.size() - 1)
+	# Chained from each end or meeting corner along corners two edges share.
+	var used := {}
+	var lines: Array = []
+	var starts: Array = at_corner.keys().filter(func(corner: Vector2) -> bool: return at_corner[corner].size() != 2)
+	for pass_loops in [false, true]:
+		var from: Array = starts if not pass_loops else at_corner.keys()
+		for corner: Vector2 in from:
+			for first: int in at_corner[corner]:
+				if used.has(first):
+					continue
+				var chain: Array[int] = []
+				var at := corner
+				var edge := first
+				while not used.has(edge):
+					used[edge] = true
+					chain.append(edge)
+					var corners: Array[Vector2] = edges[edge]["corners"]
+					at = corners[1] if corners[0] == at else corners[0]
+					var onward: Array = at_corner[at]
+					if onward.size() != 2:
+						break
+					edge = onward[0] if onward[1] == edge else onward[1]
+				lines.append({"edges": chain, "start": corner, "end": at, "closed": pass_loops and at == corner})
+	var out: Array = []
+	for line: Dictionary in lines:
+		for piece: Dictionary in _split_by_side(line, edges):
+			out.append(_ledge_entry(piece, edges, at_corner, field, size))
+	return out
+
+
+## How far a traced ledge's points may stray from its edges' middles
+## (trace_ledges): the curve stays within 0.45 of a cell of its cliff edges.
+const LEDGE_TOLERANCE := 0.25
+## How far (metres) a thinned point's drop may stray from its kept
+## neighbours' eased between them.
+const LEDGE_DROP_TOLERANCE := 0.25
+
+
+## [param line] (trace_ledges' chain) cut where its high side changes
+## (a step up, then down, along one line of edges), each piece's ends.
+static func _split_by_side(line: Dictionary, edges: Array[Dictionary]) -> Array:
+	var chain: Array[int] = line["edges"]
+	var pieces: Array = []
+	var start: Vector2 = line["start"]
+	var current: Array[int] = []
+	var side := 0
+	var at := start
+	for k in chain.size():
+		var edge: Dictionary = edges[chain[k]]
+		var corners: Array[Vector2] = edge["corners"]
+		var next_at: Vector2 = corners[1] if corners[0] == at else corners[0]
+		var way := (next_at - at).normalized()
+		var off: Vector2 = Vector2(edge["high"]) - edge["middle"]
+		var this_side := 1 if way.x * off.y - way.y * off.x > 0.0 else -1
+		if not current.is_empty() and this_side != side:
+			pieces.append({"edges": current, "start": start, "end": at, "closed": false, "side": side})
+			current = []
+			start = at
+		current.append(chain[k])
+		side = this_side
+		at = next_at
+	if not current.is_empty():
+		pieces.append({"edges": current, "start": start, "end": at, "closed": line["closed"] and pieces.is_empty(), "side": side})
+	return pieces
+
+
+## One ledge's level.json entry from [param piece] (_split_by_side's).
+static func _ledge_entry(piece: Dictionary, edges: Array[Dictionary], at_corner: Dictionary, field: PackedFloat32Array, size: Vector2i) -> Dictionary:
+	var chain: Array[int] = piece["edges"]
+	var points := PackedVector2Array()
+	var tops: Array[float] = []
+	var feet: Array[float] = []
+	var keep: Array[bool] = []
+	for index in chain:
+		var edge: Dictionary = edges[index]
+		points.append(edge["middle"])
+		tops.append(edge["top"])
+		feet.append(edge["foot"])
+		keep.append(edge["wet"])
+	if not piece["closed"]:
+		# An end on its own (a face running out into a walk) tapers there; an
+		# end where lines meet is their shared corner.
+		for end in [0, 1]:
+			var corner: Vector2 = piece["start"] if end == 0 else piece["end"]
+			var edge: Dictionary = edges[chain[0] if end == 0 else chain[-1]]
+			var alone: bool = at_corner[corner].size() == 1
+			var level := (float(edge["top"]) + float(edge["foot"])) / 2.0
+			if end == 0:
+				points.insert(0, corner)
+				tops.insert(0, level if alone else float(edge["top"]))
+				feet.insert(0, level if alone else float(edge["foot"]))
+				keep.insert(0, true)
+			else:
+				points.append(corner)
+				tops.append(level if alone else float(edge["top"]))
+				feet.append(level if alone else float(edge["foot"]))
+				keep.append(true)
+	if not piece["closed"] and points.size() > 3:
+		# The faces' first and last edges, past the tapers.
+		keep[1] = true
+		keep[points.size() - 2] = true
+	var kept := _simplify_kept(points, keep, piece["closed"])
+	# A point whose drop its kept neighbours would not ease to within
+	# LEDGE_DROP_TOLERANCE kept too, until none is.
+	var changed := true
+	while changed:
+		changed = false
+		for k in range(1, kept.size()):
+			var a := kept[k - 1]
+			var b := kept[k]
+			var worst := -1
+			var off := LEDGE_DROP_TOLERANCE
+			for i in range(a + 1, b):
+				var t := float(i - a) / float(b - a)
+				var eased := lerpf(tops[a] - feet[a], tops[b] - feet[b], t)
+				if absf(tops[i] - feet[i] - eased) > off:
+					off = absf(tops[i] - feet[i] - eased)
+					worst = i
+			if worst >= 0:
+				kept.insert(k, worst)
+				changed = true
+				break
+	var json := []
+	for i in kept:
+		json.append([snappedf(points[i].x, 0.01), snappedf(points[i].y, 0.01), snappedf(tops[i], 0.01), snappedf(feet[i], 0.01)])
+	return {"points": json, "up": "right" if piece["side"] > 0 else "left", "closed": piece["closed"]}
+
+
+## The indices of [param points] Douglas-Peucker keeps within LEDGE_TOLERANCE
+## (round the loop if [param closed], split at the point farthest from the
+## first), every index [param keep] marks kept too.
+static func _simplify_kept(points: PackedVector2Array, keep: Array[bool], closed: bool) -> Array[int]:
+	var count := points.size()
+	var marked := {}
+	if count <= 3:
+		for i in count:
+			marked[i] = true
+	elif closed:
+		var far := 0
+		for i in count:
+			if points[i].distance_to(points[0]) > points[far].distance_to(points[0]):
+				far = i
+		_mark_simplified(points, range(0, far + 1), marked)
+		var back: Array = range(far, count)
+		back.append(0)
+		_mark_simplified(points, back, marked)
+	else:
+		_mark_simplified(points, range(0, count), marked)
+	for i in count:
+		if keep[i]:
+			marked[i] = true
+	var out: Array[int] = []
+	for i in count:
+		if marked.has(i):
+			out.append(i)
+	return out
+
+
+## Douglas-Peucker over [param indices] of [param points], marking the kept.
+static func _mark_simplified(points: PackedVector2Array, indices: Array, marked: Dictionary) -> void:
+	marked[indices[0]] = true
+	marked[indices[-1]] = true
+	if indices.size() < 3:
+		return
+	var a := points[indices[0]]
+	var b := points[indices[-1]]
+	var far := 0.0
+	var at := 0
+	for k in range(1, indices.size() - 1):
+		var gap := points[indices[k]].distance_to(Geometry2D.get_closest_point_to_segment(points[indices[k]], a, b))
+		if gap > far:
+			far = gap
+			at = k
+	if far <= LEDGE_TOLERANCE:
+		return
+	_mark_simplified(points, indices.slice(0, at + 1), marked)
+	_mark_simplified(points, indices.slice(at), marked)
 
 
 ## [param points] and [param widths] as level.json writes them:

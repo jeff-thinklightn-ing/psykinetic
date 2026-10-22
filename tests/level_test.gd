@@ -11,6 +11,9 @@ const NATURAL_GROUND: Array[String] = ["grass", "dirt"]
 ## Levels whose cell water is a test's fixture: the sample's pool and stream
 ## are what view_test draws cell water from (terrain's side, 553/557).
 const CELL_WATER_FIXTURES: Array[String] = ["sample"]
+## How far a ledge's curve may lie from the cliff edges it traces (585;
+## terrain's bound, as the forest edge's EDGE_BOUND).
+const LEDGE_BOUND := 0.45
 
 var _failures := 0
 var _main: Node
@@ -187,6 +190,7 @@ func _test_every_level() -> void:
 			var narrow := Level.narrow_runs(level["terrain"])
 			_check(narrow.is_empty(), "%s: no passage one cell wide in its arrangement (%s)" % [folder, narrow.slice(0, 8)])
 	_test_built_water()
+	_test_ledges()
 	print("
 == the levels connect: WorldMap.problems() (links and spawn points, ways back, reachable) ==")
 	var problems := WorldMap.build().problems()
@@ -262,6 +266,64 @@ func _test_built_water() -> void:
 						break
 		_check(loose.is_empty(), "%s: %d curveless water bodies, each under a building or with no natural ground beside it (beside it at %s)" % [
 				folder, bodies, loose.slice(0, 4)])
+
+
+## Decision 585: each level's "ledges" are its relief's as it is (traced
+## again, the same), and stay within LEDGE_BOUND of the cliff edges they
+## trace both ways: terrain draws the face on the curve while the sim's
+## cliff stays on the cell's edge, so past half a cell a walked cell would
+## look cliffed or a cliff walkable.
+func _test_ledges() -> void:
+	print("\n== ledges: traced from the relief as it is, within %.2f of its cliff edges both ways ==" % LEDGE_BOUND)
+	var traced_any := 0
+	for folder in DirAccess.get_directories_at(Level.DIR):
+		if Level.DIR + folder + "/" == Prefab.DIR or not FileAccess.file_exists(Level.DIR + folder + "/layout.png"):
+			continue
+		var level := Level.load_level(folder)
+		if level.is_empty() or not level["terrain"].has("relief"):
+			continue
+		var terrain: Dictionary = level["terrain"]
+		var config: Variant = JSON.parse_string(FileAccess.get_file_as_string(Level.DIR + folder + "/level.json"))
+		var stored: Array = (config as Dictionary).get("ledges", []) if config is Dictionary else []
+		var traced := Level.ledges_of(terrain)
+		traced_any += traced.size()
+		_check(JSON.stringify(stored) == JSON.stringify(traced), "%s: its %d ledges are its relief's (traced again: %d)" % [folder, stored.size(), traced.size()])
+		# The cliff edges as trace_ledges takes them: walked or wet cells, no bank.
+		var wet := {}
+		var ground := {}
+		for cell: Vector2i in terrain["floor"]:
+			ground[cell] = true
+		for key in ["water", "fords", "bridged"]:
+			for cell: Vector2i in terrain.get(key, []):
+				ground[cell] = true
+				wet[cell] = true
+		var edges: Array = []
+		for cell: Vector2i in ground:
+			for step: Vector2i in [Vector2i(1, 0), Vector2i(0, 1)]:
+				var next := cell + step
+				if ground.has(next) and wet.has(cell) == wet.has(next) and Relief.cliff_between(
+						Relief.at(terrain["relief"], terrain["relief_size"], cell), Relief.at(terrain["relief"], terrain["relief_size"], next)):
+					var corner := Vector2(cell) + Vector2(0.5, 0.5)
+					edges.append([corner - Vector2(0, 1) if step.x == 1 else corner - Vector2(1, 0), corner])
+		var astray := 0.0
+		var unled := 0.0
+		for ledge: Dictionary in terrain["ledges"]:
+			for point: Vector2 in ledge["curve"]["points"]:
+				var near := INF
+				for edge: Array in edges:
+					near = minf(near, point.distance_to(Geometry2D.get_closest_point_to_segment(point, edge[0], edge[1])))
+				astray = maxf(astray, near)
+		for edge: Array in edges:
+			var middle: Vector2 = (edge[0] + edge[1]) / 2.0
+			var near := INF
+			for ledge: Dictionary in terrain["ledges"]:
+				var points: PackedVector2Array = ledge["curve"]["points"]
+				for i in range(1, points.size()):
+					near = minf(near, middle.distance_to(Geometry2D.get_closest_point_to_segment(middle, points[i - 1], points[i])))
+			unled = maxf(unled, near)
+		_check(astray <= LEDGE_BOUND and (edges.is_empty() or unled <= LEDGE_BOUND),
+				"%s: every ledge point within %.2f of a cliff edge (worst %.2f), every cliff edge of a ledge (worst %.2f)" % [folder, LEDGE_BOUND, astray, unled if not edges.is_empty() else 0.0])
+	_check(traced_any > 0, "the levels with relief have ledges (%d)" % traced_any)
 
 
 func _test_round_trip() -> void:
@@ -403,14 +465,20 @@ func _test_hills() -> void:
 			break
 		World.step()
 	_check(player.tile == foot, "and back down to the valley (%s)" % player.tile)
+	# The rim on row 38: the face wanders (585), so the first cell east of the
+	# valley standing well over the one west of it.
 	var rim := Vector2i(62, 38)
+	for x in range(58, 70):
+		if World.elevation_at(Vector2i(x, 38)) - World.elevation_at(Vector2i(x - 1, 38)) > 2.0:
+			rim = Vector2i(x, 38)
+			break
 	var imp: Monster = _main._spawn({"script": Level.MONSTER, "shape": "capsule", "name": "Faller", "tile": rim, "props": {"sight_range": 0, "max_hp": 200}})
 	_put(player, rim + Vector2i(1, 0))
 	_pushes.clear()
 	var hp := imp.hp
 	var drop := World.elevation_at(rim) - World.elevation_at(rim - Vector2i(1, 0))
 	World._push(player, imp, Vector2i(-1, 0), 3.0)
-	_check(imp.tile.x < 62 and hp - imp.hp == World.FALL_IMPACT_PER_LEVEL * Relief.levels(drop),
+	_check(imp.tile.x < rim.x and hp - imp.hp == World.FALL_IMPACT_PER_LEVEL * Relief.levels(drop),
 			"pushed off the face: it falls %.1f m, %d levels, for %d (%s, %s)" % [drop, Relief.levels(drop), hp - imp.hp, imp.tile, _pushes.back()["stopped_by"]])
 	World.despawn(imp)
 	_check(World.has_line_of_sight(Vector2i(63, 37), Vector2i(53, 38)), "from the plateau's rim the valley beyond the low wall is seen")

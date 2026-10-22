@@ -650,6 +650,7 @@ static func parse(layout: Image, height: Image, config: Dictionary, relief: Imag
 	level["terrain"]["niches"] = niches_from(config, level["terrain"], warnings)
 	_check_fords(level["terrain"], warnings)
 	_check_water(level["terrain"], warnings)
+	level["terrain"]["ledges"] = _ledges(level["terrain"], config, warnings)
 	level["building_cells"] = inside_cells(level["buildings"])
 	_clear_tall_grass(level, warnings)
 	building_places(level["buildings"], level["places"])
@@ -1503,6 +1504,56 @@ static func _clear_tall_grass(level: Dictionary, warnings: Array[String]) -> voi
 ## water stands at least Relief.SHORE_LIP over it (the views' bank). What
 ## is not so is said in [param warnings], once a body; nothing is changed.
 ## A level with no relief.png's water is level by its whole levels.
+## The ledges [param terrain] (a parsed level's) has, as level.json's
+## "ledges" (decision 585): Curves.trace_ledges over its relief's cliff
+## edges between its walkable cells and its water; [] with no relief. The
+## level tools write them, and MapDoc.save writes them again when the relief
+## changed, so the editor's height brush and stairs keep them in step.
+static func ledges_of(terrain: Dictionary) -> Array:
+	if not terrain.has("relief") or (terrain["relief"] as PackedFloat32Array).is_empty():
+		return []
+	var ground := {}
+	var water := {}
+	for cell: Vector2i in terrain["floor"]:
+		ground[cell] = true
+	for key in ["water", "fords", "bridged"]:
+		for cell: Vector2i in terrain.get(key, []):
+			ground[cell] = true
+			water[cell] = true
+	return Curves.trace_ledges(terrain["relief"], terrain["relief_size"], ground, water)
+
+
+## level.json's "ledges" (decision 585: Curves.parse_ledges), the views'
+## faces and rims drawn along them; cliff_between still rules the walk. A
+## ledge whose cliff the relief does not have (more than a quarter of its
+## sampled points that drop more than the walk with no cliff between the
+## cells either side of them) is said in [param warnings]: trace again
+## (Curves.trace_ledges; MapDoc.save does).
+static func _ledges(terrain: Dictionary, config: Dictionary, warnings: Array[String]) -> Array[Dictionary]:
+	var ledges := Curves.parse_ledges(config, warnings)
+	if ledges.is_empty() or not terrain.has("relief"):
+		return ledges
+	var field: PackedFloat32Array = terrain["relief"]
+	var size: Vector2i = terrain["relief_size"]
+	for index in ledges.size():
+		var curve: Dictionary = ledges[index]["curve"]
+		var points: PackedVector2Array = curve["points"]
+		var steep := 0
+		var missing := 0
+		for i in points.size():
+			if float(curve["tops"][i]) - float(curve["feet"][i]) <= Relief.WALK_RISE:
+				continue
+			steep += 1
+			var across := Vector2(-curve["tangents"][i].y, curve["tangents"][i].x) * 0.5
+			var one := Vector2i((points[i] + across).round())
+			var other := Vector2i((points[i] - across).round())
+			if one != other and not Relief.cliff_between(Relief.at(field, size, one), Relief.at(field, size, other)):
+				missing += 1
+		if missing * 4 > steep:
+			warnings.append("ledge %d: %d of its %d steep points have no cliff across them in the relief" % [index, missing, steep])
+	return ledges
+
+
 static func _check_water(terrain: Dictionary, warnings: Array[String]) -> void:
 	if not terrain.get("relief_given", false):
 		return

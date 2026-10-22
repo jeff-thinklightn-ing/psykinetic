@@ -27,7 +27,10 @@ extends Node
 ##   face is the rock);
 ## - a low stone wall on the valley floor below the cliff, which the plateau
 ##   sees over; a few boulders and crates by the rim to push off;
-## - starts on a levelled pad by the link to the wilds (east edge).
+## - starts on a levelled pad by the link to the wilds (east edge);
+## - the faces (the escarpments', the plateau's cliff) along curves that
+##   wander WANDER cells either way of their lines, and level.json's
+##   "ledges" traced from them (decision 585: MapDoc.save traces them).
 ## No monsters, no buildings but the bridge. The same seed makes the same
 ## map.
 
@@ -56,6 +59,15 @@ const VALLEY: Array[Vector2i] = [Vector2i(46, 0), Vector2i(42, 30), Vector2i(50,
 const WEST_SCARP: Array[Vector2i] = [Vector2i(30, 4), Vector2i(27, 36), Vector2i(32, 66)]
 const SOUTH_SCARP: Array[Vector2i] = [Vector2i(50, 57), Vector2i(87, 65)]
 const SCARP_HEIGHT := 3.0
+## How far the escarpments' and the plateau's faces wander either way of
+## their lines (585: smooth, off the cells' lines).
+const WANDER := 1.5
+## The plateau's face's wander's seed (added to SEED's), and where it is
+## still: the fall's lip, so the fall lands below its line, its pool whole.
+const PLATEAU_WANDER_SEED := 0
+const FALL_LIP := Vector2i(62, 21)
+## The escarpments' wander's seed (added to SEED's).
+const SCARP_WANDER_SEED := 0
 ## Where along the west escarpment its way up is (the road goes up it).
 const WEST_WAY := 0.55
 ## The road: its width, and how far west past the way it runs.
@@ -110,11 +122,11 @@ func _ready() -> void:
 	var laid := Relief.lay(map, Rect2i(Vector2i.ZERO, SIZE), SEED, {
 		"base": BASE, "amplitude": 2.0, "scale": 70.0, "octaves": 2, "tilt": TILT,
 		"escarpments": [
-			{"line": WEST_SCARP, "face": "east", "height": SCARP_HEIGHT, "back": 22.0, "ways": [WEST_WAY]},
-			{"line": SOUTH_SCARP, "face": "north", "height": SCARP_HEIGHT - 0.5, "back": 20.0, "ways": [0.3]}],
+			{"line": WEST_SCARP, "face": "east", "height": SCARP_HEIGHT, "back": 22.0, "ways": [WEST_WAY], "wander": WANDER, "wander_seed": SCARP_WANDER_SEED},
+			{"line": SOUTH_SCARP, "face": "north", "height": SCARP_HEIGHT - 0.5, "back": 20.0, "ways": [0.3], "wander": WANDER, "wander_seed": SCARP_WANDER_SEED}],
 		"slope": 0.3, "steep_bands": 0.3, "rock_step": Relief.MAX_M, "dirt_step": 0.33,
 		"valleys": [VALLEY], "valley_depth": 4.5, "valley_floor": RIVER_FLOOR, "valley_fall": 5.0, "valley_width": 30.0, "kinds": true, "min_flow": 30,
-		"plateaus": [{"rect": Rect2i(CLIFF_X, 0, SIZE.x - CLIFF_X, FOOT), "height": PLATEAU_HEIGHT, "faces": ["west"], "spur": 0.25}],
+		"plateaus": [{"rect": Rect2i(CLIFF_X, 0, SIZE.x - CLIFF_X, FOOT), "height": PLATEAU_HEIGHT, "faces": ["west"], "spur": 0.25, "wander": WANDER, "wander_seed": PLATEAU_WANDER_SEED, "still": [FALL_LIP]}],
 		"keep_flat": [Rect2i(arrival - Vector2i(2, 3), Vector2i(4, 7))],
 		"streams": 0, "keep_clear": {},
 		"rivers": [{"line": VALLEY, "wavelength": RIVER_WAVELENGTH, "amplitude": RIVER_AMPLITUDE, "width": RIVER_WIDTH, "seed": RIVER_SEED},
@@ -152,6 +164,7 @@ func _ready() -> void:
 		map.set_cell(at, "boulder")
 	for at in [Vector2i(CLIFF_X + 1, 34), Vector2i(CLIFF_X + 1, 36)]:
 		map.set_cell(at, "crate")
+	_soften()
 	var doc := MapDoc.open(FOLDER, SIZE)
 	doc.map = map
 	doc.config = config
@@ -183,9 +196,15 @@ func _ford(water: Dictionary) -> void:
 	var heights := {}
 	var fixed := {}
 	var wet := {}
+	# The plateau's top: its north-east corner stands on it.
+	var top := map.relief_at(Vector2i(SIZE.x - 8, 4))
 	for at: Vector2i in map.cells:
 		if map.walkable(at) or map.cell(at) == "water":
 			heights[at] = map.relief_at(at)
+			# The foot the plateau's face wanders over held as laid (585: the
+			# face is no one column to keep); its top eases to its spur.
+			if at.x >= CLIFF_X and at.y < FOOT and heights[at] < top - PLATEAU_HEIGHT / 2.0:
+				fixed[at] = true
 	for at: Vector2i in water:
 		fixed[at] = true
 		if map.cell(at) == "water":
@@ -196,10 +215,7 @@ func _ford(water: Dictionary) -> void:
 	for bank: Vector2i in [across[0] - Vector2i(1, 0), across[across.size() - 1] + Vector2i(1, 0)]:
 		heights[bank] = surface + 0.3
 		fixed[bank] = true
-	var face := _faces.duplicate()
-	for y in FOOT:
-		face[Terrain.edge_key(Vector2i(CLIFF_X - 1, y), Vector2i(1, 0))] = true
-	Relief._limit(heights, fixed, wet, Relief.LAY_SLOPE, face)
+	Relief._limit(heights, fixed, wet, Relief.LAY_SLOPE, _faces)
 	for at: Vector2i in heights:
 		map.set_relief(at, heights[at])
 
@@ -440,3 +456,19 @@ func _noise(noise_seed: int, frequency: float) -> FastNoiseLite:
 	noise.frequency = frequency
 	noise.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
 	return noise
+
+
+## Relief.soften_low_steps over the map as it now stands (585: what reads
+## as a slope must be climbable), after the steps that move the ground
+## once laid.
+func _soften() -> void:
+	var heights := {}
+	var water := {}
+	for at: Vector2i in map.cells:
+		if map.cell(at) in ["water", "ford"]:
+			water[at] = true
+		if map.walkable(at) or water.has(at):
+			heights[at] = map.relief_at(at)
+	Relief.soften_low_steps(heights, water)
+	for at: Vector2i in heights:
+		map.set_relief(at, heights[at])

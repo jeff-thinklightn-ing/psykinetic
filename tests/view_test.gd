@@ -2977,6 +2977,14 @@ func _test_hills() -> void:
 	# A ledge is where the sim's rule says a step is a cliff (decision 525):
 	# each has its face; a walkable step down (a slope) has none.
 	var missing := []
+	# A cliff step whose drawn corners agree on the edge (no drawn step):
+	# counted apart, under a metre, until terrain's 585 side draws every face
+	# from the ledge's curve (its tops and feet, not the corners).
+	var flattened := []
+	var corner_sides := {
+		Vector2i(1, 0): [[1, 3], [0, 2]], Vector2i(-1, 0): [[2, 0], [3, 1]],
+		Vector2i(0, 1): [[3, 2], [1, 0]], Vector2i(0, -1): [[0, 1], [2, 3]],
+	}
 	var on_slopes := []
 	var ledges := 0
 	var slopes := 0
@@ -2991,12 +2999,21 @@ func _test_hills() -> void:
 			if Relief.cliff_between(here, _rig._elevation(next)):
 				ledges += 1
 				if not faces.has([cell, direction]):
-					missing.append([cell, direction])
+					var own := _rig._corner_heights(cell)
+					var theirs := _rig._corner_heights(next)
+					var pair: Array = corner_sides[direction]
+					if absf(own[pair[0][0]] - theirs[pair[1][0]]) <= Relief.EPSILON and absf(own[pair[0][1]] - theirs[pair[1][1]]) <= Relief.EPSILON:
+						flattened.append([cell, direction, snappedf(here - _rig._elevation(next), 0.01)])
+					else:
+						missing.append([cell, direction])
 			else:
 				slopes += 1
 				if faces.has([cell, direction]):
 					on_slopes.append([cell, direction])
-	_check(ledges > 0 and missing.is_empty(), "a face down each of the %d cliff steps (missing: %s)" % [ledges, missing.slice(0, 5)])
+	_check(ledges > 0 and missing.is_empty(), "a face down each of the %d cliff steps (missing: %s; flattened by the corners: %s)" % [ledges, missing.slice(0, 5), flattened])
+	# What reads as a slope must be climbable (585): the lay softens a
+	# cliff step under a metre, so no step is left for the corners to flatten.
+	_check(flattened.is_empty(), "no cliff step the corners draw as a slope (%s)" % [flattened])
 	_check(slopes > ledges * 4 and on_slopes.is_empty(),
 			"and none on the %d steps down a walkable slope: hills, not terraces (faces there: %s)" % [slopes, on_slopes.slice(0, 5)])
 	# On relief the ground casts its shadow; a level without relief's doesn't.

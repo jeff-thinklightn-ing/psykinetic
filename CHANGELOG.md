@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Cliffs and ledges run along smooth, wandering lines rather than straight down the grid: the hills' escarpments and the plateau's cliff, and the wilds' ridge (585).
 - Shadows are shorter and lighter all day: at most about one and a half times what casts them at sunrise and sunset, about half at noon, and no longer black (534 amended (2)).
 - A level can be damp ("damp": true, for the barrow's deepest layer): torches, lanterns and fire there are put out ("too damp to light"), and a carried lantern lights only 2 cells around you instead of 4 (580, environment's side).
 - The bow's aim marker and its pips are a little larger on the ground, so they read from the camera's height (583, ui's side).

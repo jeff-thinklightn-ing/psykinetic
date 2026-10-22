@@ -3571,6 +3571,7 @@ func _spawn_saved(section: Dictionary) -> bool:
 	for respawn: Dictionary in section.get("respawns", []):
 		_saved_keys[str(respawn.get("spawn_key", ""))] = true
 	_saved_keys.erase("")
+	_adopted = 0
 	for entry: Dictionary in saved:
 		var spec := _level_spec_for(entry["spec"])
 		var entity := _spawn(spec)
@@ -3580,6 +3581,9 @@ func _spawn_saved(section: Dictionary) -> bool:
 		if entry.get("slots") != null:
 			World.set_slots(entity, entry["slots"], entry.get("items", []))
 		_top_up(entity, entry["spec"])
+	if _adopted > 0:
+		# For release, counts only (decision 610): moved markers found.
+		print("[state] %s: %d saved level entities found their moved markers" % [World.zone.name, _adopted])
 	# Slots with no entity and a saved timer are dead: pick their timers up.
 	for respawn: Dictionary in section.get("respawns", []):
 		var dead := _slot_for(int(respawn["spawn"]), str(respawn.get("spawn_key", "")))
@@ -3841,8 +3845,10 @@ func _top_up(entity: GridEntity, saved_spec: Dictionary) -> void:
 		print("[state] %s topped up: %s" % [entity.name, ", ".join(given)])
 
 
-## The keys the snapshot being loaded names (_spawn_saved; decision 610).
+## The keys the snapshot being loaded names (_spawn_saved; decision 610),
+## and how many of its level entities found their moved markers.
 var _saved_keys := {}
+var _adopted := 0
 
 
 ## The slot of the marker [param saved] (a saved level entity whose key
@@ -3900,6 +3906,7 @@ func _level_spec_for(saved: Dictionary) -> Dictionary:
 		slot = _moved_marker(saved, key)
 		if slot >= 0:
 			_saved_keys[_key_of(slot)] = true
+			_adopted += 1
 			var moved := _slot_spec(slot)
 			moved["tile"] = level_entities[slot]["tile"]
 			return moved

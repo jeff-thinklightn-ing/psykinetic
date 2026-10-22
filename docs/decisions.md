@@ -22700,3 +22700,81 @@ fire; a damp one puts them out and says so; a non-bool "damp" is said; the
 reach is 4 and 2; a lantern's light three cells off is there when dry and
 none when damp, one cell off lit. docs/levels.md. Sim and level parse,
 protocol unchanged, no new class_name.
+
+## 585. Ledges as curves
+
+Jeff: "terrain needs to have smooth edges for ledges as and terraces as
+well. it should not conform to tiles either. see stream examples". So
+cliffs follow the curves rule (559) as water and roads do: a ledge is a
+smooth line, the faces and rims drawn along it (585, terrain's side); the
+sim's cliffs stay on the cells' edges (cliff_between rules the walk), and
+the line keeps to them. Approved by the coordinator with terrain, refined to
+one tracer for every ledge.
+- level.json "ledges": [{points: [[x, y, top, foot], ...], up: "left" |
+  "right", closed}]: control points in cell units, the ground's height
+  above (top) and below (foot) at each, equal where a face tapers into a
+  walk; "up" the high side of the way the points run (y down: walking
+  east, south is right); closed for a mesa's or a pit's rim.
+  Curves.parse_ledges samples each once (Curves.sample, raw: tops and feet
+  eased along it); terrain["ledges"] = [{curve: {points, tangents, tops,
+  feet, length}, up, closed}]. Level says where a ledge's steep points have
+  no cliff across them in the relief (more than a quarter of them).
+- Curves.trace_ledges makes them from the relief, for every level alike:
+  - every cliff edge between two walkable or wet cells (a bank, water one
+    side only, is the shore's and left; a fall's, water both sides, kept)
+    chained along the cells' edges, cut where its high side changes;
+  - each line's edge middles thinned by Douglas-Peucker to LEDGE_TOLERANCE
+    (0.25 cells), keeping the faces' first and last edges, a middle on
+    water (a fall's point), and any point whose drop its kept neighbours
+    would not ease to within LEDGE_DROP_TOLERANCE (0.25 m);
+  - a line ending where the drop comes under the walk runs on to its end
+    corner with top = foot (the face tapering into the slope); lines
+    meeting at a corner end on it, the same point; a loop is closed.
+  Level.ledges_of(terrain) runs it over a parsed level. make_hills and
+  make_wilds_marks write the ledges after laying; tools/trace_ledges.tscn
+  writes a hand-made level's (the sample's outcrop); MapDoc.save writes
+  them again whenever the relief changed, so the editor's height brush and
+  stairs keep them in step.
+- Relief.lay's faces leave the cells' lines: an escarpment's face follows a
+  smooth curve through its line (Curves.sample), wandering "wander" cells
+  either way of it over "wave" (WANDER_WAVE, 18) cells; a plateau's faced
+  sides wander in and out of its rect the same way, eased to nothing over
+  WANDER_EASE (8) cells toward a corner they share with a walkable side
+  (its spur meets the face as it did) and near its "still" cells (a fall's
+  lip: the fall lands below its line, its pool whole); the ground the face
+  wanders over is held as its foot. "wander_seed" picks another wander.
+  No wander unless asked (WANDER 0), so a face laid on a line stays there.
+  A cell of land left with no walkable neighbour (a step jutting out
+  alone) takes its nearest neighbour's height; one beside water is a bank
+  and left.
+- The rule (the coordinator: "what reads as a slope must be climbable"):
+  no cliff step lower than FACE_LEAST (1 m), a face's edge or not. The
+  views' shared corners draw such a step as a slope, so the walk takes it.
+  Relief.soften_low_steps ends Relief.lay and runs again at the end of a
+  level tool that moves the ground after laying (make_hills,
+  make_wilds_marks): the step's high side lowered to the walk over its low
+  side, or, beside water (a bank may stand higher than its water, never
+  lower), its low side raised. A future lay keeps it.
+- Laid again: the hills (the two escarpments and the plateau's west face
+  wander 1.5 cells; make_hills' ford keeps the plateau's foot as laid in
+  place of its one face column), the wilds' ridge (1.5 cells; the same
+  places, pads and marks), the sample's outcrop traced as painted.
+- tests: level_test, every level's ledges are its relief's (traced again,
+  the same) and within LEDGE_BOUND (0.45 cells, terrain's bound) of its
+  cliff edges both ways; the hills' rim found on its row; relief_test, the
+  plateau's face over the columns it wanders across.
+  view_test: a cliff step whose drawn corners agree (no drawn step) is
+  counted apart as flattened, and none is allowed (the rule above);
+  relief_test: soften_low_steps lowers a 0.7 m step, raises beside water.
+PROTOCOL_REVISION 32 (v0.1.166 shipped 31): the level data the views draw from,
+and the hills' and the wilds' relief, differ; a full cut. The wilds' ridge
+face moves by up to 1.5 cells: a player saved on a cell that is now a cliff
+step comes back on it as ground (nothing saved is keyed to a face).
+
+## 610 amended: the load says how many moved markers it found
+
+For release's journal (counts only, no ids): when a zone's snapshot loads,
+"[state] <zone>: N saved level entities found their moved markers" is
+printed if any did (main._adopted). It confirms a level move on the deploy
+that carries it; an entity once adopted is keyed to its new marker, so
+later deploys print nothing for it. spawn_key_test counts the one.

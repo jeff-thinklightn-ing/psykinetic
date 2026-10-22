@@ -268,6 +268,7 @@ func _test_a_moved_marker(path: String, data: Dictionary) -> void:
 	var at := _by_tile()
 	var chests := at.values().filter(func(entity: GridEntity) -> bool: return entity is Chest)
 	var chest: Variant = at.get(Vector2i(7, 3))
+	_check(_main._adopted == 1, "the load counts one moved marker found, for release's journal (%d)" % _main._adopted)
 	_check(chests.size() == 1 and chest is Chest and chest.spawn_spec["spawn_key"] == "7,3" and _main._alive_slots.get(_slot_keyed("7,3")) == chest,
 			"one chest, on the moved marker's slot and tile, not a stray beside a new one (%s)" % [_names(at)])
 	var crate: Variant = at.get(Vector2i(12, 4))

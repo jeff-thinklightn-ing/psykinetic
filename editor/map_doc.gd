@@ -106,6 +106,16 @@ func save() -> bool:
 	# Each building's code written in, so it stays its own (decision 537).
 	if Level.fill_codes(config):
 		config_dirty = true
+	# The ledges traced again from the relief as it now is (decision 585).
+	if relief_dirty and map.has_relief():
+		var terrain: Dictionary = Level.parse(image, map.to_height_image() if had_heights or heights_dirty else null, config, map.to_relief_image())["terrain"]
+		var ledges := Level.ledges_of(terrain)
+		if ledges != config.get("ledges", []):
+			if ledges.is_empty():
+				config.erase("ledges")
+			else:
+				config["ledges"] = ledges
+			config_dirty = true
 	if config_dirty:
 		var json := FileAccess.open(ProjectSettings.globalize_path(folder + "level.json"), FileAccess.WRITE)
 		if json == null:

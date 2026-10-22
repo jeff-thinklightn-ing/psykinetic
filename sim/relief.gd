@@ -246,6 +246,60 @@ const FOUR: Array[Vector2i] = [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), 
 ## An escarpment's face lower than this after the cap is made a ramp.
 const FACE_LEAST := 1.0
 const SIDES := {"north": Vector2i(0, -1), "east": Vector2i(1, 0), "south": Vector2i(0, 1), "west": Vector2i(-1, 0)}
+## How far (cells) an escarpment's face and a plateau's faced sides wander
+## either way of their line (585), and the wander's length.
+const WANDER := 0.0
+const WANDER_WAVE := 18.0
+## Over how many cells a plateau's faced side's wander eases in from a
+## corner it shares with a side that falls away walkably.
+const WANDER_EASE := 8.0
+
+
+## A wander either way along a line (585): smooth noise, how far either
+## way, a stream of its own for each of a plateau's sides.
+class Wander:
+	var _noise := FastNoiseLite.new()
+	var _amount := 0.0
+
+	func _init(amount: float, wave: float, wander_seed: int) -> void:
+		_amount = amount
+		_noise.seed = wander_seed
+		_noise.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+		_noise.frequency = 1.0 / maxf(2.0, wave)
+
+	## How far in (0 to twice the amount) at [param along] on [param side]'s
+	## stream (a plateau's side, 0 to 3).
+	func by(along: float, side: int) -> float:
+		return _amount * (1.0 + _noise.get_noise_2d(along, side * 1000.0))
+
+	## How far either way at [param along].
+	func across(along: float) -> float:
+		return _amount * _noise.get_noise_1d(along)
+
+
+## [param line] (cells) as a smooth curve through it (Curves.sample),
+## wandering [param amount] cells either way of it over [param wave],
+## a point a cell (585: an escarpment's face). A line of one point is left.
+static func _wandering(line: Array, amount: float, wave: float, wander_seed: int) -> Array:
+	if line.size() < 2:
+		return line
+	var points := PackedVector2Array()
+	for point: Variant in line:
+		points.append(Vector2(point))
+	var curve := Curves.sample(points, PackedFloat32Array())
+	var sampled: PackedVector2Array = curve["points"]
+	var tangents: PackedVector2Array = curve["tangents"]
+	var wander := Wander.new(amount, wave, wander_seed)
+	var out: Array = []
+	var every := maxi(1, roundi(1.0 / Curves.SPACING))
+	for k in sampled.size():
+		if k % every != 0 and k != sampled.size() - 1:
+			continue
+		var normal := Vector2(-tangents[k].y, tangents[k].x)
+		# Easing the wander in from the ends, so they stay where they were.
+		var ends := smoothstep(0.0, 6.0, minf(k, sampled.size() - 1 - k) * Curves.SPACING)
+		out.append(sampled[k] + normal * wander.across(k * Curves.SPACING) * ends)
+	return out
 ## Relief.lay's "kinds": the ground it paints, and by what (metres a step,
 ## a crest's height over the cells round it).
 const GROUND_KINDS: Array[String] = ["grass", "dirt", "stone"]
@@ -306,6 +360,12 @@ const KIND_WANDER := 0.04
 ##   curve in "waters", its middle in "streams" after the found ones;
 ##   where its curve crosses a face (a plateau's, an escarpment's) it falls
 ##   the face's height into a 3 x 3 pool (570; in "falls": {cell, drop});
+## - a plateau's or an escarpment's wander (585; WANDER, none if not given)
+##   cells either way of its line over wave (WANDER_WAVE) cells, wander_seed
+##   (0) added to the lay's for another; a plateau's faced sides only, eased
+##   in over WANDER_EASE from a corner they share with a walkable side and
+##   from a plateau's "still" cells (a fall's lip: its face where its line
+##   says);
 ## - keep_clear (cell -> anything): cells left as they are;
 ## - kinds (false): the ground's kinds set by slope and height too (_kinds).
 ## Everything else is slope-limited to LAY_SLOPE a step, so walked. Only
@@ -377,13 +437,36 @@ static func lay(map: LevelMap, rect: Rect2i, lay_seed: int, options := {}) -> Di
 	var fixed: Dictionary[Vector2i, bool] = {}
 	var cliff_side: Dictionary[Vector2i, bool] = {}
 	var faces: Dictionary[Vector3i, bool] = {}
-	for plateau: Dictionary in options.get("plateaus", []):
+	var plateaus: Array = options.get("plateaus", [])
+	for index in plateaus.size():
+		var plateau: Dictionary = plateaus[index]
 		var top: Rect2i = plateau["rect"]
-		var cells: Array = ground.keys().filter(func(at: Vector2i) -> bool: return top.has_point(at))
+		var sides: Array = plateau.get("faces", SIDES.keys())
+		# Its faced sides wander in and out of the rect (585: no face on a
+		# cell's line); a side falling away walkably stays where it is.
+		var wander := Wander.new(float(plateau.get("wander", WANDER)), float(plateau.get("wave", WANDER_WAVE)), lay_seed + 40 + index + int(plateau.get("wander_seed", 0)))
+		# Eased to nothing toward a corner where the faced side meets one that
+		# falls away walkably, so the spur meets the face as it did.
+		var eased := func(along: int, start: int, end: int, at_start: String, at_end: String) -> float:
+			return (smoothstep(0.0, WANDER_EASE, float(along - start)) if at_start not in sides else 1.0) 				* (smoothstep(0.0, WANDER_EASE, float(end - 1 - along)) if at_end not in sides else 1.0)
+		# And to nothing near each of its "still" cells (where a stream falls
+		# off it, so the fall lands where its line says).
+		var still: Array = plateau.get("still", [])
+		var calm := func(at: Vector2i) -> float:
+			var nearest := INF
+			for cell: Variant in still:
+				nearest = minf(nearest, Vector2(at).distance_to(Vector2(cell)))
+			return smoothstep(0.0, WANDER_EASE, nearest - 2.0) if nearest < INF else 1.0
+		var on_top := func(at: Vector2i) -> bool:
+			var quiet: float = calm.call(at)
+			var y_ease: float = eased.call(at.y, top.position.y, top.end.y, "north", "south") * quiet
+			var x_ease: float = eased.call(at.x, top.position.x, top.end.x, "west", "east") * quiet
+			# A cell's middle inside the side's line, the rect's edge moved in.
+			return top.has_point(at) and ("west" not in sides or at.x > top.position.x - 0.5 + wander.by(at.y, 0) * y_ease) 				and ("east" not in sides or at.x < top.end.x - 0.5 - wander.by(at.y, 1) * y_ease) 				and ("north" not in sides or at.y > top.position.y - 0.5 + wander.by(at.x, 2) * x_ease) 				and ("south" not in sides or at.y < top.end.y - 0.5 - wander.by(at.x, 3) * x_ease)
+		var cells: Array = ground.keys().filter(on_top)
 		if cells.is_empty():
 			continue
 		var level := _mean_of(heights, cells) + float(plateau.get("height", 3.0))
-		var sides: Array = plateau.get("faces", SIDES.keys())
 		# Its other sides fall away no steeper than "spur" metres a cell.
 		var spur := float(plateau.get("spur", LAY_SLOPE))
 		for at: Vector2i in ground:
@@ -397,16 +480,32 @@ static func lay(map: LevelMap, rect: Rect2i, lay_seed: int, options := {}) -> Di
 		for at: Vector2i in cells:
 			heights[at] = level
 			fixed[at] = true
-			for side: String in sides:
-				var out_of: Vector2i = at + SIDES.get(side, Vector2i.ZERO)
-				if not top.has_point(out_of):
+		# The ground a faced side wanders in over is the face's foot, held as
+		# laid: the spur's slope would climb it along the face otherwise.
+		for at: Vector2i in ground:
+			if top.has_point(at) and not on_top.call(at):
+				fixed[at] = true
+		# A face wherever the top ends at a faced side: off the rect there, or
+		# within it where that side wanders in (its steps both ways).
+		for at: Vector2i in cells:
+			for side: String in SIDES:
+				var out_of: Vector2i = at + SIDES[side]
+				if not on_top.call(out_of) and (top.has_point(out_of) or side in sides):
 					faces[Terrain.edge_key(at, SIDES[side])] = true
 	# Escarpments: a long slope rising to the line on its back side, a face
 	# down off it on the other; the face's edges kept out of the cap but at
 	# its ways and tapered ends, which the cap makes ramps.
 	var scarp_faces := {}  # edge key -> [the cell above, the cell below]
-	for scarp: Dictionary in options.get("escarpments", []):
-		var line: Array = scarp["line"]
+	var scarps: Array = options.get("escarpments", [])
+	for index in scarps.size():
+		var scarp: Dictionary = scarps[index]
+		# Its face along a smooth curve through the line, wandering either
+		# way (585: no face on a cell's line).
+		var line: Array = _wandering(scarp["line"], float(scarp.get("wander", WANDER)), float(scarp.get("wave", WANDER_WAVE)), lay_seed + 20 + index + int(scarp.get("wander_seed", 0)))
+		var reach := Rect2(Vector2(line[0]), Vector2.ZERO)
+		for point: Vector2 in line:
+			reach = reach.expand(point)
+		reach = reach.grow(float(scarp.get("back", 24.0)) + 2.0)
 		var face: Variant = scarp.get("face", "east")
 		var facing := Vector2(SIDES[face]) if face is String else Vector2(face)
 		var high := float(scarp.get("height", 3.0))
@@ -419,11 +518,14 @@ static func lay(map: LevelMap, rect: Rect2i, lay_seed: int, options := {}) -> Di
 		# Cell -> [distance, along (cells), on the face side].
 		var placed := {}
 		for at: Vector2i in ground:
+			if not reach.has_point(Vector2(at)):
+				continue
 			var where := _along_line(at, line)
 			if where.x > back + 1.0:
 				continue
 			var nearest := _nearest_on_line(at, line)
-			placed[at] = [where.x, where.y * length, (Vector2(at) - nearest).dot(facing) > 0.0]
+			# A cell on the line is the back's (past a hair: the sampled curve's float).
+			placed[at] = [where.x, where.y * length, (Vector2(at) - nearest).dot(facing) > 0.01]
 		for at: Vector2i in placed:
 			var entry: Array = placed[at]
 			if entry[2]:
@@ -503,6 +605,8 @@ static func lay(map: LevelMap, rect: Rect2i, lay_seed: int, options := {}) -> Di
 				if heights.has(at + direction):
 					fixed[at + direction] = true
 		_limit(heights, fixed, cliff_side, cap, faces, steeper)
+	_join_strays(heights, out["cells"])
+	soften_low_steps(heights, out["cells"])
 	out["faces"] = faces
 	# relief.png holds nothing under 0 m: the whole of it lifted if it dips.
 	var lowest := 0.0
@@ -513,6 +617,73 @@ static func lay(map: LevelMap, rect: Rect2i, lay_seed: int, options := {}) -> Di
 	if options.get("kinds", false):
 		_kinds(map, heights, out["cells"], lay_seed, float(options.get("rock_step", ROCK_STEP)), float(options.get("dirt_step", DIRT_STEP)))
 	return out
+
+
+## The rule (585; the coordinator: "what reads as a slope must be
+## climbable"): a step between two cells of land the walk can't take but
+## lower than FACE_LEAST, a face's edge or not, is brought within the walk,
+## since the views' shared corners draw it as a slope. Its high side is
+## lowered to the walk over its low side; where either side is a bank
+## (beside [param water]: a bank may stand higher than its water, never
+## lower) the low side is raised instead; again till none is left (a few
+## passes). Relief.lay ends with it, and a level tool that moves the ground
+## after laying runs it again.
+static func soften_low_steps(heights: Dictionary, water: Dictionary) -> void:
+	var bank := func(at: Vector2i) -> bool:
+		for direction in FOUR:
+			if water.has(at + direction):
+				return true
+		return false
+	var reach := WALK_RISE - 0.02
+	for i in 12:
+		var changed := false
+		for at: Vector2i in heights:
+			if water.has(at):
+				continue
+			for direction: Vector2i in [Vector2i(1, 0), Vector2i(0, 1)]:
+				var next: Vector2i = at + direction
+				if not heights.has(next) or water.has(next):
+					continue
+				var a := float(heights[at])
+				var b := float(heights[next])
+				if not cliff_between(a, b) or absf(a - b) >= FACE_LEAST:
+					continue
+				var high := at if a > b else next
+				var low := next if a > b else at
+				if bank.call(high) or bank.call(low):
+					heights[low] = float(heights[high]) - reach
+				else:
+					heights[high] = float(heights[low]) + reach
+				changed = true
+		if not changed:
+			return
+
+
+## A cell of land with no land beside it it can walk to (a face's step
+## jutting out alone: 585's faces wander) takes the height of the land
+## beside it nearest its own, so it is walked to from there; one beside
+## water is left (a bank, its height the water's). [param water]: the
+## water's cells (cell -> anything).
+static func _join_strays(heights: Dictionary, water: Dictionary) -> void:
+	for at: Vector2i in heights:
+		if water.has(at):
+			continue
+		var nearest := INF
+		var joined := false
+		for direction in FOUR:
+			var next: Vector2i = at + direction
+			if water.has(next):
+				# Beside water it is a bank: its height is the water's to keep.
+				joined = true
+				break
+			if not heights.has(next):
+				continue
+			var gap := absf(float(heights[next]) - float(heights[at]))
+			joined = joined or not cliff_between(float(heights[at]), float(heights[next]))
+			if gap < absf(nearest - float(heights[at])):
+				nearest = float(heights[next])
+		if not joined and nearest < INF:
+			heights[at] = nearest
 
 
 ## An escarpment's faces ([param scarp_faces]: edge key -> [the cell
