@@ -329,7 +329,7 @@ func _test_sites() -> void:
 	print("
 == work sites ==")
 	var rules := RULES.duplicate(true)
-	rules["sites"] = {"trades": {"woodcutter": "woodlot", "hunter": "hunting_ground"}, "steps_per_cell": 4, "other_area": 3000}
+	rules["sites"] = {"trades": {"woodcutter": "woodlot", "hunter": "hunting_ground"}, "steps_per_cell": 4, "work_steps": 120, "other_area": 3000}
 	rules["hunter"] = {"trade": "hunter", "every": 100}
 	_fresh({}, rules)
 	_check(_holdings.place("pt_town/woodlot")["town"] == STORE and _holdings.place(CAMP)["town"] == "",
@@ -338,7 +338,7 @@ func _test_sites() -> void:
 	_check(str(_work.site_of(STORE, "woodcutter").get("id", "")) == "pt_town/woodlot" and _work.site_of(STORE, "smith").is_empty(),
 		"the woodcutter's site is the town's woodlot; the smith has none")
 	var walk := _work.site_walk(STORE, _work.site_of(STORE, "woodcutter"))
-	_check(walk == 2 * ceili(26.0 * 4), "the walk there and back: %d steps" % walk)
+	_check(walk == 2 * ceili(26.0 * 4) + 120, "the walk there and back and a spell at the site (521 amended): %d steps" % walk)
 	_check(_work.site_turn(STORE, "wc", "woodcutter") == Production.WALKING and _work.outside("wc"), "due: off to the woodlot, outside the walls")
 	var trip := _work.trip("wc")
 	_check(str(trip.get("site", {}).get("id", "")) == "pt_town/woodlot" and int(trip.get("from", -1)) == 0 and int(trip.get("back_at", -1)) == walk,

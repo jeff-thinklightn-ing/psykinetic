@@ -1214,16 +1214,18 @@ func site_blocked(town: String, site: Dictionary) -> String:
 	return ""
 
 
-## Steps for [param town]'s worker to walk to [param site] and back: the
+## Steps for [param town]'s worker's trip to [param site] and back: the
 ## cells between its store and the site there and back at
-## sites.steps_per_cell, sites.other_area for one in another area.
+## sites.steps_per_cell, sites.other_area for one in another area, and
+## sites.work_steps once, a spell at the site (521 amended: the walk alone
+## brought the body there just as the trip turned home).
 func site_walk(town: String, site: Dictionary) -> int:
 	var rule: Dictionary = rules.get("sites", {})
 	var home := holdings.place(town) if holdings != null else {}
-	if home.is_empty() or str(home["area"]) != str(site["area"]):
-		return int(rule.get("other_area", 3000))
-	var cells := Vector2(site["cell"] - home["cell"]).length()
-	return 2 * ceili(cells * float(rule.get("steps_per_cell", 4)))
+	var walk := int(rule.get("other_area", 3000))
+	if not home.is_empty() and str(home["area"]) == str(site["area"]):
+		walk = 2 * ceili(Vector2(site["cell"] - home["cell"]).length() * float(rule.get("steps_per_cell", 4)))
+	return walk + int(rule.get("work_steps", 0)) if walk > 0 else 0
 
 
 ## Worker [param id] of [param town], their [param trade]'s work due: whether
@@ -1267,7 +1269,8 @@ func site_turn(town: String, id: String, trade: String) -> String:
 ## Worker [param worker_id]'s trip to their trade's site (visible work: the
 ## body goes there and back): {site (the Holdings place), from (the step it
 ## set out), back_at (the step it is home, its yield then)}; {} when not on
-## one. The outbound half is from to (from + back_at) / 2.
+## one. Its span is the walk there and back and sites.work_steps at the
+## site between (521 amended).
 func trip(worker_id: String) -> Dictionary:
 	if not _trips.has(worker_id):
 		return {}

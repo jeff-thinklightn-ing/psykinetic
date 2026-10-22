@@ -13,7 +13,7 @@
 	},
 	"always_want": ["resource", "repair", "luxury", "medical"], "first_when_sick": ["remedy"], "maker_only": {"herbs": "the medicine man buys herbs"},
 	"hunter": {"trade": "hunter", "every": 3000},
-	"sites": {"trades": {"woodcutter": "woodlot", "hunter": "hunting_ground", "farmer": "farm"}, "steps_per_cell": 4, "other_area": 3000},
+	"sites": {"trades": {"woodcutter": "woodlot", "hunter": "hunting_ground", "farmer": "farm"}, "steps_per_cell": 4, "work_steps": 120, "other_area": 3000},
 	"woodcutter": {"trade": "woodcutter", "every": 3000, "wood": 2, "per_level": 1, "growth_days": 2,
 		"names": ["Bran", "Alder", "Rowan", "Hazel", "Ash", "Birk"]},
 	"water": {"spring": 4, "catch": 12, "cap": 30, "draw": 0.5, "dry_slows": "cook", "dry_rate": 0.5},

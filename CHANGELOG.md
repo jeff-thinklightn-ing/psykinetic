@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The woodcutter, hunter and farmer now spend a spell working at their site before walking home, instead of turning back as they arrive (521 amended, economy's side); the wood comes in about 4% slower.
 - A resident who takes up a new trade works it at once: their body follows the trade (it kept the old one until they stood again), and the town soak reports where each body is seen at work (566 amended, npc's side, part 3). Server only.
 - The town in the wilds has a woodlot at the copse to its south-west, with a chopping block, and a woodpile in the store's yard, so the woodcutter has somewhere to work (566 amended).
 - Herbs keep growing round the wilds when the town gets a woodlot or other work site: only the town's store clears a ring of them (562 amended (2)).

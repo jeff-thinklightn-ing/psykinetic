@@ -20583,3 +20583,30 @@ If Held moves to its own map, these move with the town.
 
 tests/relief_test: the woodlot for the store, the block and the pile solid,
 their stand cells walkable; the marks' count reads the four landmarks alone.
+
+## 521 amended, economy's side. A spell of work at the site
+
+Found by npc's end-to-end check of maps' woodlot (566 amended), about 31
+cells from wilds' store. 521's trip allowed the walk alone: sites.
+steps_per_cell 4 each way, about 124 steps out and 248 for the round
+(the wilds' woodlot: 2 × ceil(31.4 × 4) = 252). A resident body walks
+about 3.3 ticks a cell, near a player or far (Resident.move_ticks 3,
+World.walk's far calls), more on grass and uphill. So the body reached
+the block just as the trip's half came and turned home at once: two
+chops against eighteen carries in two days. Jeff asked to see the work.
+
+- Production.site_walk adds sites.work_steps (120, economy.json) once to
+  the trip's total, in the area or another, so the trip is the walk and
+  a spell at the site. A site at the store (no walk) has no trip, as
+  before.
+- The woodcutter's cycle goes from about 3252 steps (every 3000 plus the
+  walk) to about 3372, about 3.6% less wood, accepted by the
+  coordinator. The hunter's and farmer's trips gain the same 120.
+- npc's side (its own landing, any order): a body on a trip ticks every
+  step and works from its arrival until back_at less its walk home, then
+  carries.
+
+tests/production_test: the walk there and back and the spell, 2 ×
+ceil(26 × 4) + 120 = 328. Server only, protocol unchanged, no new
+class_name.
+
