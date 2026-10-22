@@ -23354,3 +23354,36 @@ unblessed's last moments, no Slow Heart, no revive, Bleed Out.
 _test_field_return and _test_death_and_respawn, return_test and
 camp_fall_test follow the downed unblessed. Protocol: revision 32
 (Player.heart, the commands); no new class_name.
+
+## 587, sound's side. Mortally Wounded: the heartbeat over the ducked mix
+
+Jeff: "the heart beat becomes the dominant sound to the player". The
+companions' side gives the client Player.heart (replicated: 120, 80, 40 a
+minute while downed, 0 otherwise); this is what the local player hears.
+
+- The beat: client3d/heartbeat.gd (a preloaded script, Client3D.Heartbeat,
+  no class_name), a node under Client3D reading the local player's heart
+  each frame. Downed, a beat of sfx.heartbeat at once, then one every
+  60 / heart s. Slow Heart's step is heard at the next beat: the wait is
+  cut to the new pace if it is shorter, never stretched past the beat
+  already due. Flat, on the UI bus, so no distance, wall or duck touches it.
+- The duck: while it beats, every other bus (SFX, Voice, Ambience, Music;
+  Sfx.DUCKED) sits DUCK_DB (-14) under its slider, through Sfx.set_duck,
+  which apply_volumes keeps when a slider moves. Bus volume, not an effect:
+  the muffled twins send through their buses and duck with them, and
+  nothing is added to the audio graph. Eased down at 40 dB/s, back at 10.
+- The end: the heart back to 0. If the local player is there with hp
+  above 0 it was a revive: no last beat, the mix eased back. Otherwise
+  (Bleed Out, the window run out, a killing blow, the player gone from
+  the roster): one last beat, the mix held at SILENCE_DB (-60) for 2 s,
+  then eased back. This reads only the heart and hp, not Main's "return"
+  message: a death before the return is told still ends it.
+- Client only, protocol unchanged. Takes: freesound 249716 (daandraait,
+  "SLOW HEARTBEAT", CC0 1.0), three beats each spliced so the dub falls
+  0.3 s after the lub; the Lunardrive takes 22440 and 22417 were rejected
+  as clipped. They wait outside the shared take store until the push
+  (_pending_587).
+- view_test _test_heartbeat steps a Heartbeat by hand: the first beat at
+  once on UI, the pace at 120 and after a step to 40, the duck on SFX and
+  not UI, no last beat on a revive, a last beat then silence then the mix
+  back on bleed out.

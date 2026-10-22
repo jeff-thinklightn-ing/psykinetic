@@ -95,6 +95,7 @@ func _ready() -> void:
 	_test_piles()
 	_test_heard_as_monsters_hear()
 	_test_ambience_runs()
+	_test_heartbeat()
 	_test_options_panel()
 
 	# Every sound stopped and let go before quitting: the audio server lets
@@ -212,6 +213,42 @@ func _test_ambience_runs() -> void:
 	_check(_rig.ambience._falls.is_empty() and (falling == null or (falling as Node).is_queued_for_deletion()), "a fall out of reach: none held")
 	_rig.stream_falls = had_falls
 	_rig.ambience._weigh()
+
+
+## 587, sound's side: the downed local player's heart over the ducked mix.
+func _test_heartbeat() -> void:
+	print("
+== Mortally Wounded: the heart at its pace, the mix ducked, a last beat at bleed out ==")
+	var heart := Client3D.Heartbeat.new()
+	heart.view = _rig
+	var played := _rig.sfx.played.size()
+	heart.step(0.01, 120, false)
+	_check(heart.beats == ["beat"] and _rig.sfx.played.size() == played + 1 and _rig.sfx.played[-1][2] == "UI",
+			"downed: a beat at once, on the UI bus (%s)" % [heart.beats])
+	for i in 60:
+		heart.step(0.01, 120, false)
+	_check(heart.beats.size() == 2, "at 120 a minute: the next half a second on (%d)" % heart.beats.size())
+	_check(is_equal_approx(Sfx.duck_db, Client3D.Heartbeat.DUCK_DB)
+			and is_equal_approx(AudioServer.get_bus_volume_db(AudioServer.get_bus_index("SFX")),
+				linear_to_db(maxf(Net.sfx_volume, 0.0001)) + Client3D.Heartbeat.DUCK_DB)
+			and is_equal_approx(AudioServer.get_bus_volume_db(AudioServer.get_bus_index("UI")), linear_to_db(maxf(Net.ui_volume, 0.0001))),
+			"the mix ducked under it, the UI bus not (%.1f dB)" % Sfx.duck_db)
+	for i in 100:
+		heart.step(0.01, 40, false)
+	_check(heart.beats.size() == 3, "Slow Heart to 40: the step heard at the next beat, then a beat in 1.5 s (%d)" % heart.beats.size())
+	heart.step(0.01, 0, true)
+	for i in 300:
+		heart.step(0.01, 0, true)
+	_check(heart.beats.size() == 3 and Sfx.duck_db == 0.0, "revived: no last beat, the mix back (%s, %.1f dB)" % [heart.beats, Sfx.duck_db])
+	heart.step(0.01, 80, false)
+	heart.step(0.01, 0, false)
+	_check(heart.beats.slice(-2) == ["beat", "last"], "bled out: a last beat (%s)" % [heart.beats])
+	heart.step(0.5, 0, false)
+	_check(Sfx.duck_db < Client3D.Heartbeat.DUCK_DB, "then silence (%.1f dB)" % Sfx.duck_db)
+	for i in 100:
+		heart.step(0.1, 0, false)
+	_check(Sfx.duck_db == 0.0, "after it, the mix back (%.1f dB)" % Sfx.duck_db)
+	heart.free()
 
 
 func _test_options_panel() -> void:

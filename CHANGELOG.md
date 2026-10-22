@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Lying Mortally Wounded, you hear your own heart over everything else, the rest of the sound pushed down under it; Slow Heart slows the beat you hear, a revive brings the world's sound back, and bleeding out ends on one last beat and a moment of silence (587).
 - Mortally Wounded: at 0 HP every player now lies downed; with the draugr's blessing you can hold Slow Heart to stretch the time for a companion or friend to bring you back once it's safe, or Bleed Out to return to the temple at once; the unblessed get a few last moments (587, companions' side).
 - Tidied: the old charge count on a player's record is no longer read or kept by the economy now that the Draugr's Totem holds the charges (573 amended, economy's side).
 - A town that holds a fishing place on the river and has grown to a village gets a fisherman, who walks to the bank and back with fish for the store; the counter in Snagfin's fort across the river is the town's shop (594).

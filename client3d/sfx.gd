@@ -24,7 +24,9 @@ extends Node3D
 ## Ambience, UI and Music, each with a muffled twin (a low-pass) sending to
 ## it. Volumes come from settings.cfg, each 0..1: master_volume=,
 ## sfx_volume=, voice_volume=, ambience_volume=, ui_volume= and
-## music_volume= (Net; the options panel sets them).
+## music_volume= (Net; the options panel sets them). While the local
+## player lies Mortally Wounded every bus but UI (where their heartbeat
+## plays) is ducked under it, duck_db below its volume (set_duck, 587).
 
 const BUS := "SFX"
 ## A slot's bus -> the audio bus it plays on.
@@ -32,6 +34,8 @@ const BUSES := {"sfx": "SFX", "voice": "Voice", "ambience": "Ambience", "ui": "U
 ## Each bus's volume setting (Net's variable of that name).
 const VOLUME_SETTINGS := {"SFX": "sfx_volume", "Voice": "voice_volume", "Ambience": "ambience_volume",
 	"UI": "ui_volume", "Music": "music_volume"}
+## The buses a heartbeat ducks (set_duck): all but UI.
+const DUCKED: Array[String] = ["SFX", "Voice", "Ambience", "Music"]
 ## The muffled twin of a bus: "<bus>_Muffled", a low-pass at this.
 const MUFFLED_SUFFIX := "_Muffled"
 const MUFFLED_CUTOFF_HZ := 900.0
@@ -64,6 +68,8 @@ var next_take: Dictionary[String, int] = {}
 var played: Array[Array] = []
 ## Sounds not played because they were out of hearing, for tests: slot each.
 var unheard: Array[String] = []
+## dB the DUCKED buses sit below their volumes (0 or less; set_duck).
+static var duck_db := 0.0
 
 
 func _ready() -> void:
@@ -93,7 +99,15 @@ static func apply_volumes() -> void:
 			AudioServer.add_bus_effect(muffled, low_pass)
 	_set_bus_volume(0, Net.master_volume)
 	for name: String in VOLUME_SETTINGS:
-		_set_bus_volume(AudioServer.get_bus_index(name), float(Net.get(VOLUME_SETTINGS[name])))
+		_set_bus_volume(AudioServer.get_bus_index(name), float(Net.get(VOLUME_SETTINGS[name])),
+				duck_db if name in DUCKED else 0.0)
+
+
+## The DUCKED buses [param db] below their volumes (0: as set).
+static func set_duck(db: float) -> void:
+	duck_db = minf(db, 0.0)
+	for name in DUCKED:
+		_set_bus_volume(AudioServer.get_bus_index(name), float(Net.get(VOLUME_SETTINGS[name])), duck_db)
 
 
 ## The bus [param name], made sending to [param send] if there is none.
@@ -107,9 +121,9 @@ static func _bus(name: String, send: String) -> int:
 	return index
 
 
-static func _set_bus_volume(index: int, linear: float) -> void:
+static func _set_bus_volume(index: int, linear: float, duck := 0.0) -> void:
 	AudioServer.set_bus_mute(index, linear <= 0.0)
-	AudioServer.set_bus_volume_db(index, linear_to_db(maxf(linear, 0.0001)))
+	AudioServer.set_bus_volume_db(index, linear_to_db(maxf(linear, 0.0001)) + duck)
 
 
 ## How [param slot] made at [param at] sounds from [param from]: {heard,

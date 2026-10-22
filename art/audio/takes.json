@@ -1289,6 +1289,35 @@
 				"license": "CC0 1.0"
 			}
 		],
+		"sfx.heartbeat": [
+			{
+				"file": "sfx.heartbeat.ogg",
+				"from": "freesound",
+				"original": "freesound 249716: SLOW HEARTBEAT (the beat at 2.54 s, its dub moved to 0.3 s after the lub)",
+				"sha256": "da9d85009078437bd8321c9fe1cb0b3dd517faf212bdfce3d75e7e979aa6fb09",
+				"by": "daandraait",
+				"url": "https://freesound.org/people/daandraait/sounds/249716/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.heartbeat.2.ogg",
+				"from": "freesound",
+				"original": "freesound 249716: SLOW HEARTBEAT (the beat at 5.08 s, its dub moved to 0.3 s after the lub)",
+				"sha256": "99ed69a52b4a98318ef19046b4c3e8a92f5ee86219d43fcdcde5fe8bcfb82494",
+				"by": "daandraait",
+				"url": "https://freesound.org/people/daandraait/sounds/249716/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.heartbeat.3.ogg",
+				"from": "freesound",
+				"original": "freesound 249716: SLOW HEARTBEAT (the beat at 7.62 s, its dub moved to 0.3 s after the lub)",
+				"sha256": "7e7ba1e31b66947b358192c2164762716aed387557a92c06610018e7c9c0bb63",
+				"by": "daandraait",
+				"url": "https://freesound.org/people/daandraait/sounds/249716/",
+				"license": "CC0 1.0"
+			}
+		],
 		"sfx.hit_blade_armor": [
 			{
 				"file": "sfx.hit_blade_armor.ogg",

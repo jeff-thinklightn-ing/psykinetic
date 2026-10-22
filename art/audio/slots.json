@@ -554,6 +554,14 @@
 			"volume_db": -6.0,
 			"uses": "a step into standing tall grass, over the footstep; Client3D._step_sound, heard as far as the step"
 		},
+		"sfx.heartbeat": {
+			"category": "body",
+			"type": "oneshot",
+			"bus": "ui",
+			"positional": false,
+			"volume_db": -2.0,
+			"uses": "one beat (lub-dub) of the downed local player's heart, at Player.heart's pace, over the ducked mix (587); client3d/heartbeat.gd, a beat every 60/heart s and a last one at bleed out"
+		},
 		"sfx.door_wood_open": {
 			"category": "doors",
 			"type": "oneshot",
