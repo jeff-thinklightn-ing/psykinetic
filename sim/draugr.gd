@@ -348,6 +348,10 @@ func _yield() -> void:
 				ids.append((entity as Player).player_id)
 		blessed_last = ids
 		said.emit(WON)
+		# His battle axe for the winners, at his feet (603: his row's
+		# "yields", items' Monster.yielded); never on a lost or unpaid fight.
+		if has_method("yielded"):
+			call("yielded")
 		if World.bless.is_valid():
 			World.bless.call(ids, difficulty)  # Main's (544).
 		challenger_id = ""
