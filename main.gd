@@ -78,6 +78,14 @@ const RESIDENT_ASK_TICKS := 150
 const HAIL_CHECK_TICKS := 10
 ## How often the bodies' work is read from the sim (decision 566): every second.
 const WORK_CHECK_TICKS := 10
+## The work props a level stands (566 amended: a chopping block in the
+## woodlot, a log pile by the store; 567-style doorless solid buildings,
+## maps' to place, art-kit's slots): a body stands beside one, facing it,
+## so the stroke lands on it.
+const CHOPPING_BLOCK := "building.chopping_block"
+const WOODPILE := "building.woodpile"
+## How far from the store's cell its woodpile may stand, in cells.
+const WOODPILE_REACH := 4
 ## A town's homes: the map's huts and houses linked to nothing within so
 ## many cells of its store, each with room for so many.
 const HOME_TILES := 24
@@ -8624,8 +8632,9 @@ func _task_for(body: Resident) -> Dictionary:
 		if from < 0 or back_at < 0 or now < (from + back_at) / 2:
 			var spot := _site_spot(site, body.town)
 			return {"kind": "chop", "cell": spot["cell"], "face": spot["face"], "walking": false}
-		var store: Dictionary = World.holdings.place(body.town)
-		return {"kind": "carry_log", "cell": _nearest_free(store.get("cell", body.tile)), "face": Resident.NO_CELL, "walking": true}
+		var store_cell: Vector2i = World.holdings.place(body.town).get("cell", body.tile)
+		var pile := _pile_spot(body.town, store_cell)
+		return {"kind": "carry_log", "cell": pile.get("cell", _nearest_free(store_cell)), "face": pile.get("face", Resident.NO_CELL), "walking": true}
 	var build := _build_of(body)
 	if not build.is_empty():
 		return _build_task(build["rect"], build["facing"], float(build["progress"]))
@@ -8647,10 +8656,12 @@ func _trip_of(worker_id: String) -> Dictionary:
 	return {}
 
 
-## Where a body works [param site] (a Holdings place with a radius): the
-## walkable cell within the radius with something to fell beside it (a
-## cell that cannot be walked: the forest, a tree), nearest the town's
-## store, facing it; the site's own cell when none. Kept by site id.
+## Where a body works [param site] (a Holdings place with a radius): beside
+## the chopping block standing within the radius (566 amended), the
+## walkable neighbour nearest the town's store, facing the block; with no
+## block, the walkable cell within the radius with something to fell beside
+## it (a cell that cannot be walked: the forest, a tree), nearest the store,
+## facing it; the site's own cell when none. Kept by site id.
 func _site_spot(site: Dictionary, town: String) -> Dictionary:
 	var id := str(site.get("id", ""))
 	if _site_spots.has(id):
@@ -8658,6 +8669,10 @@ func _site_spot(site: Dictionary, town: String) -> Dictionary:
 	var centre: Vector2i = site.get("cell", Vector2i.ZERO)
 	var radius := int(site.get("radius", 2))
 	var store: Vector2i = World.holdings.place(town).get("cell", centre)
+	var block := _prop_spot(CHOPPING_BLOCK, centre, radius, store)
+	if not block.is_empty():
+		_site_spots[id] = block
+		return block
 	var best := {"cell": centre, "face": Resident.NO_CELL}
 	var best_d := INF
 	for dy in range(-radius, radius + 1):
@@ -8674,6 +8689,40 @@ func _site_spot(site: Dictionary, town: String) -> Dictionary:
 					best = {"cell": cell, "face": cell + side}
 				break
 	_site_spots[id] = best
+	return best
+
+
+## Where [param town]'s carried logs land: beside the woodpile standing
+## within WOODPILE_REACH of [param store_cell] (566 amended), facing it;
+## {} with none (the store's cell then). Kept by town.
+func _pile_spot(town: String, store_cell: Vector2i) -> Dictionary:
+	var key := "pile:" + town
+	if not _site_spots.has(key):
+		_site_spots[key] = _prop_spot(WOODPILE, store_cell, WOODPILE_REACH, store_cell)
+	return _site_spots[key]
+
+
+## Where a body stands at a prop of [param slot] in this zone within
+## [param within] cells of [param around]: {cell: the prop's walkable
+## 4-neighbour nearest [param near], face: the prop's cell}, the prop
+## nearest [param near] when several stand; {} when none stands or none
+## can be stood beside.
+func _prop_spot(slot: String, around: Vector2i, within: int, near: Vector2i) -> Dictionary:
+	var best := {}
+	var best_d := INF
+	for building: Dictionary in _world_map.areas.get(World.zone.name, {}).get("buildings", []):
+		if str(building.get("slot", "")) != slot or not building.get("rect") is Rect2i:
+			continue
+		var at: Vector2i = (building["rect"] as Rect2i).position
+		if World.distance(at, around) > within:
+			continue
+		for side: Vector2i in [Vector2i(0, -1), Vector2i(1, 0), Vector2i(0, 1), Vector2i(-1, 0)]:
+			if not World.is_walkable(at + side):
+				continue
+			var d := float((at + side - near).length_squared()) + 0.5 * float((at - near).length_squared())
+			if d < best_d:
+				best_d = d
+				best = {"cell": at + side, "face": at}
 	return best
 
 

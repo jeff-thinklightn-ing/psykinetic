@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The woodcutter chops at the woodlot's chopping block and carries his logs to the woodpile by the store when a level stands them (566 amended, npc's side; the props and the wilds' woodlot follow from art-kit and maps). Server only.
 - New standing pieces for the woodlot (566 amended): a chopping block with a log stood on it to split, and a log pile in three fills held in by end stakes; nothing places them yet.
 - A resident chopping wood holds the axe in both hands, the left at the end of the handle and the right up it, and swings it overhead and down into the block; before, the left hand gripped nothing.
 - The Hills have a waterfall: a stream crosses the plateau's top and drops nearly 8 m off its west cliff into a pool, then runs down to the river, forded below the pool (570).

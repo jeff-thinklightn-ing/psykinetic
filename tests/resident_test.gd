@@ -1921,6 +1921,44 @@ func _test_visible_work() -> void:
 	for i in Main.WORK_CHECK_TICKS + Resident.FAR_EVERY + 2:
 		World.step()
 	_check(mara.activity == "carry_log", "shown on the way home (%s at %s)" % [mara.activity, mara.tile])
+	# The work props (566 amended): a chopping block in the woodlot and a woodpile by the store, stood as doorless solid buildings.
+	var block: Vector2i = _main._nearest_free(centre + Vector2i(-1, 2))
+	var pile: Vector2i = _main._nearest_free(store["cell"] + Vector2i(3, 0))
+	_stand_prop(Main.CHOPPING_BLOCK, block)
+	_stand_prop(Main.WOODPILE, pile)
+	_main._site_spots.clear()
+	_main._trip_stub["rs-mara"] = {"site": lot, "from": now, "back_at": now + 40000}
+	spot = _main._site_spot(site, STORE)
+	_check(spot["face"] == block and World.distance(spot["cell"], block) == 1 and World.is_walkable(spot["cell"]),
+		"with a chopping block in the woodlot the spot is beside it, facing it (%s, block %s)" % [spot, block])
+	var nearer := true
+	for side: Vector2i in [Vector2i(0, -1), Vector2i(1, 0), Vector2i(0, 1), Vector2i(-1, 0)]:
+		if World.is_walkable(block + side) and (block + side - store["cell"]).length_squared() < (spot["cell"] - store["cell"]).length_squared():
+			nearer = false
+	_check(nearer, "the block's neighbour nearest the store")
+	for i in 600:
+		World.step()
+		if mara.tile == spot["cell"]:
+			break
+	for i in Resident.FAR_EVERY + 2:
+		World.step()
+	_check(mara.tile == spot["cell"] and mara.activity == "chop" and mara.facing == mara._toward(block),
+		"she chops facing the block (%s at %s, %s)" % [mara.activity, mara.tile, mara.facing])
+	_main._trip_stub["rs-mara"] = {"site": lot, "from": now - 40000, "back_at": now + 100}
+	task = _main._task_for(mara)
+	_check(task.get("kind") == "carry_log" and task.get("face") == pile and World.distance(task.get("cell", Vector2i.ZERO), pile) == 1 and World.is_walkable(task.get("cell", pile)),
+		"with a woodpile by the store the log is carried to its side (%s, pile %s)" % [task, pile])
+	for i in 600:
+		World.step()
+		if mara.tile == task["cell"]:
+			break
+	for i in Resident.FAR_EVERY + 2:
+		World.step()
+	_check(mara.tile == task["cell"] and mara.activity == "carry_log" and mara.facing == mara._toward(pile),
+		"at the pile, facing it, the log still on her shoulder (%s at %s, %s)" % [mara.activity, mara.tile, mara.facing])
+	_unstand_prop(block)
+	_unstand_prop(pile)
+	_main._site_spots.clear()
 	_main._trip_stub["rs-mara"] = {}
 	for i in Main.WORK_CHECK_TICKS + Resident.FAR_EVERY + 2:
 		World.step()
@@ -1944,6 +1982,24 @@ func _test_visible_work() -> void:
 	_main._build_stub.erase("rs-mara")
 	mara.task = {}
 	World.despawn(mara)
+
+
+## A work prop (566 amended) of [param slot] stood at [param cell] in the
+## zone, as Level lays a doorless solid building: its record on the world
+## map's buildings, its cell out of the floor.
+func _stand_prop(slot: String, cell: Vector2i) -> void:
+	var buildings: Array = _main._world_map.areas.get(World.zone.name, {}).get("buildings", [])
+	buildings.append({"slot": slot, "cell": cell, "facing": Vector2i(0, 1), "rect": Rect2i(cell, Vector2i.ONE), "blocks": [], "use": "", "town": "", "code": ""})
+	World._floor.erase(cell)
+
+
+## The prop stood at [param cell] by _stand_prop taken away again.
+func _unstand_prop(cell: Vector2i) -> void:
+	var buildings: Array = _main._world_map.areas.get(World.zone.name, {}).get("buildings", [])
+	for i in range(buildings.size() - 1, -1, -1):
+		if buildings[i].get("rect") == Rect2i(cell, Vector2i.ONE) and str(buildings[i].get("code", "-")).is_empty():
+			buildings.remove_at(i)
+	World._floor[cell] = true
 
 
 ## A free cell of [param area] (not [param from]) a path from [param from]

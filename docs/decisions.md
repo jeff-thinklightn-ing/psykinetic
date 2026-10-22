@@ -19349,6 +19349,34 @@ npc's side:
   halves against a stand-in trip and a woodlot, the carpenter's cells by
   progress, the awake map. Server and client: the hash moves; no new
   class_name.
+
+Amended (2026-10-22, the work props; npc's side, maps' and art-kit's to
+follow): pc-character's review shots showed the chop and the saw landing
+on empty ground, nothing standing at the woodlot's spot. And the wilds had
+no woodlot place at all, so no woodcutter ever made 521's trip there: the
+spot was never seen. The coordinator's call: a chopping block with a log
+on it at the chop spot, a log pile where the carried logs land, the
+sawbuck at the build site, the body facing the prop and the stroke
+landing on it. The mechanism is 567's doorless solid building (1 x 1, in
+level.json "buildings", a free "yaw"), no new place kind: art-kit's
+building.chopping_block (new) and building.woodpile (a slot of three
+variant files for its fills; fixed at 2 in phase 1, following the
+store's wood a later amendment); the sawbuck stays buildings' stage
+piece. npc: Main._site_spot prefers the block within the woodlot's
+radius (_prop_spot: the body on its walkable 4-neighbour nearest the
+store, facing the block), today's rule with none; the carried log ends
+beside the woodpile within WOODPILE_REACH (4) of the store's cell, facing
+it (_pile_spot), the store's cell with none; the carpenter will stand on
+buildings' site_cells "saw" cell facing their "sawbuck" when it lands.
+Order: npc's spots (this), art-kit's slots (view_test holds every
+Level.BUILDINGS slot to art-kit's footprint, so the slots come first),
+npc's Level constants (the footprints, SOLID, DOORLESS), then maps' wilds
+entries (a woodlot place for the store at the forest's edge, radius about
+4, the block inside it with a walkable cell on the store's side, the
+woodpile within 4 cells of the store off its door path; moved to Held with
+the town if Jeff takes a Held of its own). resident_test _test_visible_work
+stands both props at runtime. Server only, protocol unchanged.
+
 ## 566, economy's side: visible work's readers and the "town" message
 
 Jeff: "town people need to be doing activities to better the town, chopping
