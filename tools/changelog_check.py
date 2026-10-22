@@ -12,6 +12,8 @@ keeps a bullet beside the heading it was next to, and a cut moves the heading.
   * No bullet line under ## Unreleased may also stand in a released section.
   * One that begins as a released bullet does (its first clause, _clause;
     539 amended (2)) is warned of: probably already released, check.
+  * Under ## Unreleased every non-blank line is a "- " bullet (539 amended
+    (4)): a wrapped bullet, or one a resolver cut to its first line, fails.
 
 Tags are fetched first (git fetch -q --tags); a tag that cannot be had is a
 warning, not a failure.
@@ -86,6 +88,17 @@ def check(text, tag_changelog):
             begun.setdefault(_clause(bullet), (heading[3:].strip(), bullet))
             uses[_clause(bullet)] = uses.get(_clause(bullet), 0) + 1
     begun = {clause: was for clause, was in begun.items() if uses[clause] == 1}
+    # 539 amended (4): under Unreleased every line is a one-line "- " bullet
+    # or blank, so a bullet wrapped over lines, or cut to its first line with
+    # the rest left behind, fails here, not in the release notes.
+    for body in unreleased:
+        last = None
+        for line in body.splitlines()[1:]:
+            if line.startswith("- "):
+                last = line
+            elif line.strip() != "":
+                problems.append("under ## Unreleased, a line that is not a \"- \" bullet: put each bullet on one line (wrapped or cut?): %s%s"
+                    % (_short(line.strip()), " (after: %s)" % _short(last) if last else ""))
     for body in unreleased:
         for bullet in _bullets(body):
             if bullet in carried:

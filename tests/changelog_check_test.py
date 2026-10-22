@@ -77,6 +77,18 @@ problems, warnings = run(HEAD + "## Unreleased\n\n" + phrase.replace("both", "ev
 check(problems == [] and warnings == [], "a set phrase two releases began with is not matched on: %s" % warnings)
 TAGS["v0.1.158"] = HEAD + "## Unreleased\n\n" + V158 + V157
 
+print("== a line under Unreleased that is not a bullet (539 amended (4)) ==")
+problems, _ = run(HEAD + "## Unreleased\n\n- Plinths under houses (562): the ground\n  levelled round them.\n- Roads (563).\n\n" + V158 + V157)
+check(len(problems) == 1 and "not a \"- \" bullet" in problems[0] and "levelled round them." in problems[0]
+    and "Plinths under houses" in problems[0], "a wrapped bullet fails, naming it: %s" % problems)
+problems, _ = run(HEAD + "## Unreleased\n\nlevelled round them, cut from its bullet.\n\n" + V158 + V157)
+check(len(problems) == 1 and "cut from its bullet" in problems[0], "a stray line left by a cut bullet fails: %s" % problems)
+wrapped = V158.replace("- Hills are drawn (525).", "- Hills are drawn (525),\n  wrapped as old releases were.")
+TAGS["v0.1.158"] = HEAD + "## Unreleased\n\n" + wrapped + V157
+problems, _ = run(HEAD + "## Unreleased\n\n- New (562).\n\n" + wrapped + V157)
+check(problems == [], "a wrapped bullet in a released section is left alone: %s" % problems)
+TAGS["v0.1.158"] = HEAD + "## Unreleased\n\n" + V158 + V157
+
 print("== at a cut ==")
 cut = HEAD + "## Unreleased\n\n## v0.1.159\n\n- A new thing (539).\n\n" + V158 + V157
 problems, warnings = run(cut)

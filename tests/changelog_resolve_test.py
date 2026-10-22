@@ -112,12 +112,28 @@ finally:
 
 print("== a bullet reworded ==")
 onto = HEAD + "## Unreleased\n\n- Rain halves (533).\n- Hills lit (549).\n\n## v0.1.160\n\n- Older.\n"
-added, taken = resolver.added_and_taken("@@\n-- Rain halves (533).\n+- Rain halves, fog too (533).\n")
+added, taken = resolver.added_and_taken("## Unreleased\n\n- Rain halves (533).\n", "## Unreleased\n\n- Rain halves, fog too (533).\n")
 out = resolver.resolve(onto, added, taken)
 check("- Rain halves, fog too (533)." in out and "- Rain halves (533).\n" not in out and "- Hills lit (549)." in out, "the new wording only, main's others kept")
 out = resolver.resolve(onto.replace("## Unreleased\n\n- Rain halves (533).\n", "## Unreleased\n\n") + "- Rain halves (533).\n", added, taken)
 check(out.count("- Rain halves (533).") == 1, "one the cut released is left in its release")
 check(resolver.resolve("# Changelog\n\n## v0.1.1\n\n- Old.\n", ["- New."], []) is None, "no ## Unreleased: nothing written")
+
+print("== a wrapped bullet (539 amended (4)) ==")
+# Buildings' landing: a bullet wrapped over three lines came out as its
+# first line alone.
+wrapped = "- Plinths under houses (562): the ground\n  levelled round them, the porch\n  a step up.\n"
+onto = HEAD + "## Unreleased\n\n- Hills lit (549).\n\n## v0.1.160\n\n- Older.\n"
+added, taken = resolver.added_and_taken(HEAD + "## Unreleased\n\n## v0.1.160\n\n- Older.\n",
+    HEAD + "## Unreleased\n\n" + wrapped + "\n## v0.1.160\n\n- Older.\n")
+check(added == [wrapped.rstrip("\n")] and taken == [], "added as one bullet, its lines together: %r" % added)
+out = resolver.resolve(onto, added, taken)
+check("## Unreleased\n\n" + wrapped + "- Hills lit (549)." in out, "carried whole, first under Unreleased")
+check(resolver.resolve(out, added, taken) == out, "not added again where it stands already")
+added, taken = resolver.added_and_taken("## Unreleased\n\n" + wrapped, "## Unreleased\n\n" + wrapped.replace("a step up", "two steps up"))
+out = resolver.resolve(HEAD + "## Unreleased\n\n" + wrapped + "- Hills lit (549).\n", added, taken)
+check("two steps up" in out and "a step up" not in out and out.count("Plinths") == 1 and "the ground\n  levelled" in out,
+    "a continuation reworded: the old bullet out, every line of it, the new in")
 
 print("== a conflict beyond CHANGELOG.md ==")
 repo = cut_case()

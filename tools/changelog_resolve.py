@@ -10,6 +10,9 @@ late). Instead:
     not carry already (released or not);
   * less any bullet the commit takes out, so one it rewords is not doubled.
 
+A bullet is its "- " line and the indented lines under it that carry it on
+(539 amended (4): it kept a wrapped bullet's first line alone).
+
 Run while `git rebase` is stopped with CHANGELOG.md the only conflicted file:
   python -B tools/changelog_resolve.py      writes it, `git add`s it; exit 0
 It does not continue the rebase. Exit 1 (nothing written) when the rebase is
@@ -30,31 +33,54 @@ def _git(*args):
     return done.stdout.decode("utf-8")
 
 
-def added_and_taken(diff):
-    """The bullets a unified diff of CHANGELOG.md adds and takes out."""
-    added, taken = [], []
-    for line in diff.replace("\r\n", "\n").split("\n"):
-        if line.startswith("+- "):
-            added.append(line[1:])
-        elif line.startswith("-- "):
-            taken.append(line[1:])
-    return added, taken
+def bullets(lines):
+    """[(start, end)]: each bullet's lines in [param lines], its "- " line
+    and the indented ones under it that carry it on (539 amended (4): a
+    bullet wrapped over lines is one bullet)."""
+    out = []
+    i = 0
+    while i < len(lines):
+        if lines[i].startswith("- "):
+            end = i + 1
+            while end < len(lines) and lines[end].startswith("  ") and lines[end].strip() != "":
+                end += 1
+            out.append((i, end))
+            i = end
+        else:
+            i += 1
+    return out
+
+
+def _texts(text):
+    lines = text.replace("\r\n", "\n").split("\n")
+    return ["\n".join(lines[start:end]) for start, end in bullets(lines)]
+
+
+def added_and_taken(before, after):
+    """The bullets (each with its continuation lines) CHANGELOG.md
+    [param after] has that [param before] does not, and those it no longer
+    has, in their files' order."""
+    old, new = _texts(before), _texts(after)
+    return [bullet for bullet in new if bullet not in old], [bullet for bullet in old if bullet not in new]
 
 
 def resolve(onto, added, taken):
     """[param onto]'s text with [param added] put first under ## Unreleased
     (those it does not carry anywhere) and [param taken] dropped from it;
-    None if it has no ## Unreleased heading. Line ends as [param onto] has
-    them."""
+    None if it has no ## Unreleased heading. A bullet is its "- " line with
+    its continuation lines. Line ends as [param onto] has them."""
     crlf = "\r\n" in onto
     lines = onto.replace("\r\n", "\n").split("\n")
     heading = next((i for i, line in enumerate(lines) if line.strip() == UNRELEASED), None)
     if heading is None:
         return None
-    carried = {line for line in lines if line.startswith("- ")}
+    spans = bullets(lines)
+    carried = {"\n".join(lines[start:end]) for start, end in spans}
     gone = set(taken) - set(added)
-    lines = [line for i, line in enumerate(lines) if not (i > heading and line in gone and _unreleased(lines, heading, i))]
-    new = [bullet for bullet in dict.fromkeys(added) if bullet not in carried]
+    for start, end in reversed(spans):
+        if start > heading and "\n".join(lines[start:end]) in gone and _unreleased(lines, heading, start):
+            del lines[start:end]
+    new = [line for bullet in dict.fromkeys(added) if bullet not in carried for line in bullet.split("\n")]
     at = heading + 1
     while at < len(lines) and lines[at].strip() == "":
         at += 1
@@ -80,7 +106,11 @@ def main():
     if conflicted != [PATH]:
         print("changelog_resolve: conflicted are %s, not CHANGELOG.md alone" % (conflicted or "none"), file=sys.stderr)
         return 1
-    added, taken = added_and_taken(_git("diff", commit + "^", commit, "--", PATH))
+    try:
+        before = _git("show", commit + "^:" + PATH)
+    except OSError:
+        before = ""  # The commit made the file.
+    added, taken = added_and_taken(before, _git("show", commit + ":" + PATH))
     text = resolve(_git("show", "HEAD:" + PATH), added, taken)
     if text is None:
         print("changelog_resolve: HEAD's CHANGELOG.md has no %s" % UNRELEASED, file=sys.stderr)
@@ -88,8 +118,8 @@ def main():
     with open(PATH, "w", encoding="utf-8", newline="") as handle:
         handle.write(text)
     _git("add", PATH)
-    print("changelog_resolve: %s's CHANGELOG.md, %d bullet(s) of %s added, %d taken out"
-        % ("HEAD", len(added), commit[:8], len(set(taken) - set(added))))
+    print("changelog_resolve: %s's CHANGELOG.md, %d bullet(s) of %s added (%d line(s)), %d taken out"
+        % ("HEAD", len(added), commit[:8], sum(bullet.count("\n") + 1 for bullet in added), len(set(taken) - set(added))))
     return 0
 
 

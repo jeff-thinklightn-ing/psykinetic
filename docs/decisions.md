@@ -16343,6 +16343,22 @@ across a cut (Unreleased is main's plus the branch's one, each released
 bullet once, the rebase continues with the commit on top), CRLF, a
 rewording, a conflict in another file left alone.
 
+Amended (4) (release, 2026-10-21; buildings found the resolver kept only a
+bullet's first line: one wrapped over two or three lines, continuations
+indented two spaces, came out cut, silently, "1 bullet(s) added"): a bullet
+is its "- " line and the indented non-blank lines under it. The resolver
+takes the commit's added and taken bullets by comparing the file before and
+after it (not diff lines, which split a bullet whose continuation alone
+changed), and carries, matches and drops each bullet whole. And
+changelog_check fails any non-blank line under ## Unreleased that is not a
+"- " bullet, naming it and the bullet before it, so a wrapped bullet, or the
+rest of one cut, fails the landing; released sections, where old releases
+wrapped theirs, are left as tagged. Replayed over main's 103 CHANGELOGs since
+2026-10-19 it flags none. changelog_resolve_test: a wrapped bullet carried
+whole, not doubled, a reworded continuation replacing the whole bullet;
+changelog_check_test: a wrapped bullet and a stray cut line fail, a wrapped
+released bullet does not.
+
 ## 436 amended: the quick asks go
 
 Jeff, from his play tests (2026-10-19, through the coordinator): "the npc
