@@ -10,6 +10,7 @@ notes (decision 324).
 - A house still being built is walked into until its walls are up (a third of the way through the build); from then its walls stand as any house's, on the server and as your game predicts your steps (566, maps' side).
 - The wilds are no longer flat: the ground rolls gently, a long ridge runs across the north-east with a rock face about 3.5 m high looking south-west over the middle and a way up through it, and a broad valley runs from the north edge down to the south, so you can tell where you are by the land (565). Everything placed in the wilds stays where it was.
 - The medicine man makes a stamina potion from herbs: drink it to walk 25% quicker for 30 minutes; a second one resets the time (562).
+- The stamina potion has its own look: a small blue-teal glass flask with a long neck and a corked, cord-tied top, told apart from the remedy's squat green vial.
 - The medicine man now actually makes healing remedies: their recipe named a trade nobody had (562).
 - The barrow is roomier (541 amended, Jeff: "way too cramped"): its ways are three cells wide, the tombs, passage graves and caverns bigger, the altar room and the draugr's lair larger still, the whole level grown from 44 x 36 to 72 x 60; fewer dead walk it (enemy-ai's counts). The console's `regenerate now <level>` lays a shifting level again at once when nobody is in it, so the box takes the new shape right after the deploy.
 - The building hint and builder mode's click line say how far the town has built a building: "H3 house, being built 40%", "planned" or "damaged" (566).
