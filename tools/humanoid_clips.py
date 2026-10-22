@@ -344,7 +344,7 @@ CHOP_UP = chop((0.16, 0.06, 0.38), (-0.4, 0.1, 0.9), (0.0, -1.0, 0.45)) + [("spi
 # Halfway down, the head high ahead (between the raise and the strike, each hand solved, not
 # their blend: blended, the left left the haft and the head dipped into the body).
 CHOP_SWING = chop((0.34, 0.02, 0.22), (0.45, 0.05, 0.9), (0.0, -1.0, 0.0)) + [("spine_02", LIFT, 2.0)]
-CHOP_DOWN = chop((0.42, -0.06, -0.2), (0.75, 0.05, -0.65), (0.0, 0.0, -1.0)) + [
+CHOP_DOWN = chop((0.44, -0.16, -0.2), (0.8, -0.1, -0.55), (0.0, 0.0, -1.0)) + [
 	("spine_01", LIFT, -14.0), ("spine_02", LIFT, -10.0), ("Head", LIFT, 10.0)]
 CLIPS["Chop_Loop"] = {"loop": True, "keys": [
 	(0.0, P("Idle_Loop", 0.0, CHOP_READY)),

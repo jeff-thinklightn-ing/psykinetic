@@ -300,6 +300,26 @@ func _test_work_clear() -> void:
 				holder.free()
 	_check(found.is_empty(), "no tool nor arm inside the body, five builds, chopping, sawing, hammering (%s)" % ", ".join(found))
 	_check(off_haft.is_empty(), "chopping, the left hand on the haft by its butt, five builds (%s)" % ", ".join(off_haft))
+	# The blow lands on art-kit's chopping block (building.chopping_block): its log's top 0.79 m up,
+	# about 1 m ahead of the body on the next cell, in line with it.
+	var chopper := (load("res://art/models/characters/human_m.glb") as PackedScene).instantiate() as Node3D
+	add_child(chopper)
+	var chopper_holder := Node3D.new()
+	Client3D._attach_sockets(chopper, Client3D.HUMAN_SOCKETS, 1.0, chopper_holder)
+	var axe := ArtKit.instance("tool.axe")
+	Client3D._grip(axe, Client3D.ACTIVITIES["chop"])
+	(chopper_holder.get_meta("sockets")["hand_r"] as Node3D).add_child(axe)
+	var chopper_rig := AnimRig.make(chopper, lib, 0.0, true, null)
+	chopper_rig.loop("Chop", 0.0, 0.0, true)
+	for i in 3:
+		chopper_rig.upper_at("Chop", 0.7)
+		await get_tree().process_frame
+	var blade := axe.find_children("*", "MeshInstance3D", true, false)[0] as MeshInstance3D
+	var blade_box := blade.get_aabb()
+	var head := chopper.global_transform.affine_inverse() * blade.global_transform * Vector3(blade_box.get_center().x, blade_box.end.y - 0.08, blade_box.get_center().z)
+	_check(head.distance_to(CHOP_BLOCK) < 0.1, "the chop's blow lands on the block's top (%s, the top at %s)" % [head, CHOP_BLOCK])
+	chopper.queue_free()
+	chopper_holder.free()
 	# The log on the shoulder (Carry_Shoulder over the walk, held level by _level_load): none of
 	# the head or the trunk inside it (art-kit's 0.27 m log went through the crown, in from the
 	# shoulder and tipped with the walk's lean).
@@ -341,6 +361,11 @@ func _test_work_clear() -> void:
 			model.queue_free()
 			holder.free()
 	_check(through.is_empty(), "a log on the shoulder clear of the head and the trunk, five builds, along the walk (%s)" % ", ".join(through))
+
+
+## The chopping block's top in a chopper's frame (x its left, y up, z its front): art-kit's
+## building.chopping_block on the next cell, its log's top 0.79 m up.
+const CHOP_BLOCK := Vector3(0.0, 0.79, 1.0)
 
 
 ## The people's own run and sprint (Client3D.HUMAN_GAITS).
