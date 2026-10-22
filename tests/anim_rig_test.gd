@@ -286,6 +286,47 @@ func _test_work_clear() -> void:
 				model.queue_free()
 				holder.free()
 	_check(found.is_empty(), "no tool nor arm inside the body, five builds, chopping, sawing, hammering (%s)" % ", ".join(found))
+	# The log on the shoulder (Carry_Shoulder over the walk, held level by _level_load): none of
+	# the head or the trunk inside it (art-kit's 0.27 m log went through the crown, in from the
+	# shoulder and tipped with the walk's lean).
+	var through: Array[String] = []
+	for build: Array in builds:
+		for at: float in [0.0, 0.25, 0.5, 0.75]:
+			var model := (load(build[1]) as PackedScene).instantiate() as Node3D
+			add_child(model)
+			for mesh: MeshInstance3D in model.find_children("*", "MeshInstance3D", true, false):
+				for key: String in build[2]:
+					var i := mesh.find_blend_shape_by_name(key)
+					if i >= 0:
+						mesh.set_blend_shape_value(i, build[2][key])
+			var holder := Node3D.new()
+			Client3D._attach_sockets(model, Client3D.HUMAN_SOCKETS, 1.0, holder)
+			var sockets: Dictionary = holder.get_meta("sockets")
+			var piece := ArtKit.instance("carry.log")
+			piece.name = "Load"
+			(sockets["shoulder"] as Node3D).add_child(piece)
+			var rig := AnimRig.make(model, lib, 0.0, true, null)
+			rig.loop("Walk", 0.0, 0.0, true)
+			for i in 3:
+				rig.upper_at("Carry_Shoulder", at * rig.length("Carry_Shoulder"))
+				await get_tree().process_frame
+			Client3D._level_load(sockets)
+			var parts := _skinned_parts(model)
+			var count := 0
+			for mesh: MeshInstance3D in piece.find_children("*", "MeshInstance3D", true, false):
+				var box := mesh.get_aabb()
+				var middle := box.get_center()
+				var radius := minf(box.size.y, box.size.z) * 0.5
+				var into := mesh.global_transform.affine_inverse()
+				for p: Vector3 in parts["head"][0] + parts["trunk"][0]:
+					var q := into * p
+					if q.x > box.position.x and q.x < box.end.x and Vector2(q.y - middle.y, q.z - middle.z).length() < radius:
+						count += 1
+			if count > 0:
+				through.append("%s %.2f: %d" % [build[0], at, count])
+			model.queue_free()
+			holder.free()
+	_check(through.is_empty(), "a log on the shoulder clear of the head and the trunk, five builds, along the walk (%s)" % ", ".join(through))
 
 
 ## The people's own run and sprint (Client3D.HUMAN_GAITS).
@@ -297,6 +338,21 @@ const TRUNK_BONES := ["Hips", "Spine", "Chest", "UpperChest", "Neck"]
 ## Vertices inside [param model]'s body, as (the bow in the trunk or the left leg, the left
 ## forearm in the trunk, the right forearm and hand in the trunk or the head).
 static func _bow_inside(model: Node3D, bow: Node3D) -> Vector3i:
+	var parts := _skinned_parts(model)
+	var points := PackedVector3Array()
+	for mesh: MeshInstance3D in bow.find_children("*", "MeshInstance3D", true, false):
+		for s in mesh.mesh.get_surface_count():
+			for v: Vector3 in mesh.mesh.surface_get_arrays(s)[Mesh.ARRAY_VERTEX]:
+				points.append(mesh.global_transform * v)
+	var trunk: Array = parts["trunk"]
+	return Vector3i(_inside(points, trunk[0] + parts["leg"][0], trunk[1] + parts["leg"][1]),
+		_inside(parts["forearm"][0], trunk[0], trunk[1]),
+		_inside(parts["right"][0], trunk[0] + parts["head"][0], trunk[1] + parts["head"][1]))
+
+
+## [param model]'s Body skinned as it stands, by part: {part: [points, normals]} for "trunk",
+## "head", "leg" (the left), "forearm" (the left) and "right" (the right forearm and hand).
+static func _skinned_parts(model: Node3D) -> Dictionary:
 	# Skinned here, not baked (a headless run registers no skin): each vertex, its shape keys
 	# added, by its bones' poses over their binds.
 	var body := model.find_child("Body", true, false) as MeshInstance3D
@@ -348,15 +404,7 @@ static func _bow_inside(model: Node3D, bow: Node3D) -> Vector3i:
 		if part_of.has(bone):
 			parts[part_of[bone]][0].append(p)
 			parts[part_of[bone]][1].append(n.normalized())
-	var points := PackedVector3Array()
-	for mesh: MeshInstance3D in bow.find_children("*", "MeshInstance3D", true, false):
-		for s in mesh.mesh.get_surface_count():
-			for v: Vector3 in mesh.mesh.surface_get_arrays(s)[Mesh.ARRAY_VERTEX]:
-				points.append(mesh.global_transform * v)
-	var trunk: Array = parts["trunk"]
-	return Vector3i(_inside(points, trunk[0] + parts["leg"][0], trunk[1] + parts["leg"][1]),
-		_inside(parts["forearm"][0], trunk[0], trunk[1]),
-		_inside(parts["right"][0], trunk[0] + parts["head"][0], trunk[1] + parts["head"][1]))
+	return parts
 
 
 static func _inside(points: PackedVector3Array, surface: PackedVector3Array, normals: PackedVector3Array) -> int:

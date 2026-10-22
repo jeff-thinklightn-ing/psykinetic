@@ -10261,9 +10261,12 @@ func _sync_work(resident: Resident, puppet: Node3D) -> void:
 
 
 ## The shoulder's load: [param slot]'s piece on the "shoulder" socket, gone
-## when it's "" (kept as the puppet's "load").
+## when it's "" (kept as the puppet's "load"); held level with the body
+## (SHOULDER_LEVEL in the skeleton's frame), not tipped with the chest the gait
+## leans (the walk's 25°, its back end up into the head).
 func _sync_load(puppet: Node3D, sockets: Dictionary, slot: String) -> void:
 	if slot == str(puppet.get_meta("load", "")):
+		_level_load(sockets)
 		return
 	puppet.set_meta("load", slot)
 	var shoulder := sockets.get("shoulder") as Node3D
@@ -10279,21 +10282,37 @@ func _sync_load(puppet: Node3D, sockets: Dictionary, slot: String) -> void:
 		shoulder.add_child(piece)
 
 
-## The "shoulder" socket (566): on the upper chest above the right shoulder's
-## joint, a little in from it, +y up off the shoulder's top and +x forward
-## along the body (a carried log lies fore and aft, art-kit's carry.*: its
-## origin where it rests, its length along x); measured off [param skeleton]'s
-## rest, so every body has it where its own shoulder is. [] without the bones.
-const SHOULDER_IN := 0.8
+## The load on [param sockets]' shoulder, if any, level with the skeleton
+## (the socket's BoneAttachment3D's parent), however the chest leans.
+static func _level_load(sockets: Dictionary) -> void:
+	var shoulder := sockets.get("shoulder") as Node3D
+	var carried := shoulder.get_node_or_null("Load") as Node3D if shoulder != null else null
+	if carried != null:
+		carried.global_basis = (shoulder.get_parent().get_parent() as Node3D).global_basis * SHOULDER_LEVEL
+
+
+## The "shoulder" socket (566): on the upper chest over the right shoulder,
+## out past its joint (SHOULDER_OUT of the way from the chest's middle to it,
+## so a log's thickness clears the head: in from it, art-kit's 0.27 m log went
+## through the crown), +y up off the shoulder's top and +x forward along the
+## body, level in the body's own frame, not the chest bone's (its rest leans
+## forward: the log's back end rose to the head) (a carried log lies fore and
+## aft, art-kit's carry.*: its origin where it rests, its length along x);
+## measured off [param skeleton]'s rest, so every body has it where its own
+## shoulder is. [] without the bones.
+const SHOULDER_OUT := 1.4
 const SHOULDER_UP := 0.09
+## A load on the shoulder, in the skeleton's frame: +x the body's front, +y up.
+const SHOULDER_LEVEL := Basis(Vector3(0, 0, 1), Vector3.UP, Vector3(-1, 0, 0))
 static func _shoulder_socket(skeleton: Skeleton3D, hand: float) -> Array:
 	var chest := skeleton.find_bone("UpperChest")
 	var arm := skeleton.find_bone("RightUpperArm")
 	if chest < 0 or arm < 0:
 		return []
-	var joint := skeleton.get_bone_global_rest(chest).affine_inverse() * skeleton.get_bone_global_rest(arm).origin
-	return ["UpperChest", Transform3D(Basis(Vector3(0, 0, 1), Vector3.UP, Vector3(-1, 0, 0)),
-		Vector3(joint.x * SHOULDER_IN, joint.y + SHOULDER_UP * hand, joint.z))]
+	var rest := skeleton.get_bone_global_rest(chest)
+	var joint := skeleton.get_bone_global_rest(arm).origin
+	var at := Vector3(lerpf(rest.origin.x, joint.x, SHOULDER_OUT), joint.y + SHOULDER_UP * hand, joint.z)
+	return ["UpperChest", Transform3D(rest.basis.orthonormalized().inverse() * SHOULDER_LEVEL, rest.affine_inverse() * at)]
 
 
 ## A sleeper lies on its bed cell (566): the Lie clip falls back from the feet,

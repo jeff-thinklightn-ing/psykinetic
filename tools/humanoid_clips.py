@@ -350,8 +350,9 @@ CLIPS["Hammer_Loop"] = {"loop": True, "keys": [
 	(0.7, P("Idle_Loop", 0.7, BRACE + HAMMER_UP + [("spine_02", LIFT, 3.0)])),
 ]}
 # Carrying on the shoulder (the upper layer, over the walk or standing): the right hand up on the
-# load above the right shoulder, the elbow forward and down, the head tilted away from it.
-SHOULDERED = right_arm(0.1, 0.02, 0.2, (0.0, -1.0, -0.6)) + [("hand_r", Vector((0.0, -0.3, 1.0)), AIM),
+# load's outer side ahead of the shoulder (Client3D's socket puts it out past the joint, its
+# thickness clear of the head), the elbow forward and down, the head tilted away from it.
+SHOULDERED = right_arm(0.14, 0.12, 0.06, (0.0, -1.0, -0.6)) + [("hand_r", Vector((0.0, -0.3, 1.0)), AIM),
 	("neck_01", TILT, 5.0), ("Head", TILT, 7.0), ("clavicle_r", TILT, -6.0)]
 CLIPS["Carry_Shoulder_Loop"] = {"loop": True, "keys": [
 	(0.0, P("Idle_Loop", 0.0, SHOULDERED)),

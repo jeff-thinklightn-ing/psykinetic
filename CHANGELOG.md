@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- A resident carrying a log on the shoulder no longer has it through the head: the log sits out on the shoulder, level as they walk, with the hand under it.
 - Once the draugr has blessed you, your pack shows the resurrection charges you hold, "charges 23 of 50", at its foot; nothing shows before that (573, ui's side; the charges are dungeon's).
 - The draugr's pact is bought by the deal: 20, 50 or 100 gold for 5, 10 or 15 charges (under 20 he refuses; between steps you get the lower one). He stands harder for every charge the players in the barrow hold when the fight begins, and heals half his health at once whenever someone comes into the barrow while it is on (573).
 - A companion no longer says a bare list of names ("Wren, Aldous, Snagfin.") unless you asked her something, and no longer tells you whether you will make it; she says what she fears or what to do (574).
