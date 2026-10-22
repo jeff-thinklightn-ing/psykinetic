@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- No wolves in the wilds any more. Elsewhere wolves run in packs of 2 or 3, fewer of them, and never make their home within 30 cells of a town's buildings or a level's way in. The wolves already in the wilds are gone after the next server update (397 amended).
 - Click a townsperson and they stop, turn to you and say a word (560, npc's side): a smith's "What is it? The forge won't wait", a guard's "State your business", "You again" for one you wronged; if they have something to tell you today it follows. In bed or busy, "Not now". Server and client: the protocol moves, so update through the launcher.
 - Barter at the shop counter, server side: trade your things for the shop's in one go with a gold balance, at the prices you were shown. Grave goods sell at half price (560).
 - The barrow mound sits on grass: no square of bare dirt round its dome (550 amended).

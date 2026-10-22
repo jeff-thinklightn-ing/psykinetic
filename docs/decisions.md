@@ -18800,3 +18800,32 @@ npc's half is what the resident does and says.
   resident_test _test_greet. Server and client in one landing; ui's
   client side (the hint, the bubble's click, the bar) lands by the
   command's name.
+## 397 amended: no wolves in the wilds, smaller packs kept off people
+
+Jeff: "wolf packs of 4 near the town are too much, no packs in the wilds
+level. theres no way to survive that". The coordinator routed it to
+economy, with maps (the level's herds) and enemy-ai (the pack's aggro: 397
+amended, enemy-ai's side, its own).
+- levels/wilds/level.json: "herds": {"wolf": 0}. The level multiplier from
+  367 amended gives capacity 0, so the wilds seed no wolves. Deer, rabbit
+  and boar are as before.
+- levels/economy.json herds.species.wolf: size [3, 5] -> [2, 3], density
+  0.25 -> 0.15, and a new "keep_off": 30.
+- Herds.may_home(area, species, cell): not barred, and at least the
+  species' keep_off cells (Chebyshev) from every place cell and link pad
+  of the area (Herds.areas_of's "peopled"). Seeding draws up to HOME_DRAWS
+  (16) cells for each group's home and makes none if all fall inside the
+  ring. _roam_cell only roams to a cell it may home on, and a group homed
+  inside the ring (one from before, or one that fled to a pad) is moved
+  out by _rehome on its daily turn. Bodies are made within 4 of home, so a
+  pack is first met at least about 26 cells from a building or pad.
+- Herds.barred(area, species): its multiplier is 0. The cull on load:
+  - Herds._init drops barred groups (cull_barred; "[herds] culled N wolf
+    groups in wilds").
+  - Main._spawn_saved drops a zone's saved herd bodies of a barred species
+    (Herds.culls; "[herds] culled N bodies").
+  - fold_records drops their far records ("[herds] culled N far records").
+  - Herds.moved: a wolf fleeing into a barred area is gone.
+So the box's wilds wolves are culled at the next deploy: the live world
+changes. Server only, protocol unchanged, no new class_name. herds_test
+_test_no_wolves.

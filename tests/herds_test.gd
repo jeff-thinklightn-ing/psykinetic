@@ -52,6 +52,7 @@ func _ready() -> void:
 	_test_records()
 	_test_taken()
 	_test_multiplier()
+	_test_no_wolves()
 	_test_spread()
 	for body in _bodies:
 		body.free()
@@ -300,6 +301,53 @@ func _test_multiplier() -> void:
 	_check(rich.total("meadow", "wolf") > plain.total("meadow", "wolf") * 5.0, "seeded by it (%.0f wolves, %.0f)" % [rich.total("meadow", "wolf"), plain.total("meadow", "wolf")])
 	var empty: Array[String] = []
 	_check(Herds.areas_of(WorldMap.build(empty)).is_empty(), "(areas_of with no levels)")
+
+
+## Jeff: "no packs in the wilds level" (397 amended): a level's "wolf": 0
+## keeps none, its old groups, bodies and records culled on load, a wolf
+## fleeing in gone; elsewhere packs of 2-3, never homed within keep_off of
+## a place or a link pad; deer as before.
+func _test_no_wolves() -> void:
+	print("
+== no wolves where the level keeps none, none homed near people (397 amended) ==")
+	var wolf: Dictionary = _rules["species"]["wolf"]
+	_check(int(wolf["size"][0]) == 2 and int(wolf["size"][-1]) == 3 and int(wolf.get("keep_off", 0)) == 30, "packs of 2-3, kept 30 cells off (%s)" % [wolf])
+	_now = 0
+	var before := _herds_at_zero()
+	_check(before.total("meadow", "wolf") > 0.0, "a meadow with wolves (%.0f)" % before.total("meadow", "wolf"))
+	var areas := _areas.duplicate(true)
+	areas["meadow"]["herds"] = {"wolf": 0}
+	var peopled: Array[Vector2i] = [Vector2i(100, 100), Vector2i(20, 180)]
+	areas["fields"]["peopled"] = peopled
+	var after := Herds.new(JSON.parse_string(JSON.stringify(before.to_dict())), areas, _rules, func() -> int: return _now)
+	_check(after.barred("meadow", "wolf") and not after.barred("meadow", "deer") and after.groups_in("meadow", "wolf").is_empty()
+		and is_equal_approx(after.total("meadow", "deer"), before.total("meadow", "deer")),
+		"loaded where the level now keeps none: its wolf groups culled, its deer kept")
+	_check(after.culls("meadow", {"kind": "wolf", "group": "meadow_wolf_9"}) and not after.culls("meadow", {"kind": "deer", "group": "g"})
+		and not after.culls("meadow", {"kind": "wolf"}) and not after.culls("fields", {"kind": "wolf", "group": "g"}),
+		"a saved wolf body there is culled; a deer, a level's own wolf, a wolf elsewhere are not")
+	var left := after.fold_records("meadow", [{"entry": {"name": "w", "kind": "wolf", "tile": [5, 5], "spawn": -1, "group": "x"}}])
+	_check(left.is_empty() and after.groups_in("meadow", "wolf").is_empty(), "a far wolf record there folds to nothing")
+	var fields_wolf := after.groups_in("fields", "wolf")
+	_check(not fields_wolf.is_empty() and after.moved(str(fields_wolf[0]["id"]), "meadow", Vector2i(3, 3)) == ""
+		and after.groups_in("meadow", "wolf").is_empty(), "a wolf fleeing into it is gone")
+	var fresh := Herds.new({}, areas, _rules, func() -> int: return _now)
+	_tick(fresh)
+	var near := fresh.groups_in("fields", "wolf").filter(func(each: Dictionary) -> bool:
+		return peopled.any(func(at: Vector2i) -> bool: return maxi(absi(at.x - each["home"].x), absi(at.y - each["home"].y)) < 30))
+	_check(fresh.groups_in("meadow", "wolf").is_empty() and not fresh.groups_in("fields", "wolf").is_empty() and near.is_empty()
+		and fresh.groups_in("fields", "wolf").all(func(each: Dictionary) -> bool: return float(each["count"]) <= 3.0),
+		"seeded: none in the meadow; in the fields %d packs of at most 3, none within 30 of a place or pad" % fresh.groups_in("fields", "wolf").size())
+	_check(not fresh.may_home("fields", "wolf", Vector2i(110, 90)) and fresh.may_home("fields", "wolf", Vector2i(140, 100))
+		and fresh.may_home("fields", "deer", Vector2i(100, 100)), "no wolf home 10 cells off a place, one 40 off; deer anywhere")
+	_now = DAY
+	_tick(fresh)
+	near = fresh.groups_in("fields", "wolf").filter(func(each: Dictionary) -> bool:
+		return peopled.any(func(at: Vector2i) -> bool: return maxi(absi(at.x - each["home"].x), absi(at.y - each["home"].y)) < 30))
+	_check(near.is_empty(), "a day's roaming brings none near")
+	var wilds := Herds.areas_of(WorldMap.build(["wilds"] as Array[String]))
+	_check(float(wilds.get("wilds", {}).get("herds", {}).get("wolf", 1.0)) == 0.0 and not wilds.get("wilds", {}).get("peopled", []).is_empty(),
+		"the wilds' own level keeps no wolves, its places and pads read (%d)" % wilds.get("wilds", {}).get("peopled", []).size())
 
 
 func _spawn(spec: Dictionary) -> Object:

@@ -39,6 +39,8 @@ const DEFAULT_SAMPLE := 4
 ## one (perf's slow-tick line, decision 469).
 const DEFAULT_GROUND_PER_TICK := 300
 const FLOOR_PER_TICK := 5000
+## Draws for a home away from people (397 amended) before giving up.
+const HOME_DRAWS := 16
 
 var rules := {}
 ## Area name -> {floor: {cell: true}, outdoor: bool}, as WorldMap has them.
@@ -91,14 +93,24 @@ func _init(saved := {}, with_areas := {}, with_rules := {}, with_clock := Callab
 	clock = with_clock
 	holdings = with_holdings
 	from_dict(saved)
+	cull_barred()
 
 
 ## The areas of [param world_map] as Herds reads them.
 static func areas_of(world_map: WorldMap) -> Dictionary:
 	var out := {}
 	for name: String in world_map.areas:
-		out[name] = {"floor": world_map.areas[name]["floor"], "outdoor": world_map.is_outdoor(name),
-			"herds": world_map.areas[name].get("herds", {})}
+		var area: Dictionary = world_map.areas[name]
+		# Where people are: its places' cells and its link pads (397 amended).
+		var peopled: Array[Vector2i] = []
+		for place: Variant in area.get("places", {}).values():
+			if place is Dictionary and place.get("cell") is Vector2i:
+				peopled.append(place["cell"])
+		for link: Variant in area.get("links", []):
+			if link is Dictionary and link.get("tile") is Vector2i:
+				peopled.append(link["tile"])
+		out[name] = {"floor": area["floor"], "outdoor": world_map.is_outdoor(name), "herds": area.get("herds", {}),
+			"peopled": peopled}
 	return out
 
 
@@ -151,6 +163,51 @@ func capacity(area: String, species: String) -> float:
 func multiplier(area: String, species: String) -> float:
 	var given: Dictionary = areas.get(area, {}).get("herds", {})
 	return maxf(float(given.get("all", 1.0)), 0.0) * maxf(float(given.get(species, 1.0)), 0.0)
+
+
+## Whether [param area] keeps no [param species] at all (397 amended; Jeff:
+## "no packs in the wilds level"): its level's "herds" sets it to 0.
+func barred(area: String, species: String) -> bool:
+	return multiplier(area, species) <= 0.0
+
+
+## Whether [param species] may make its home at [param cell] of [param area]
+## (397 amended): not barred there, and at least its rule's keep_off cells
+## (Chebyshev) from every place and link pad of the area.
+func may_home(area: String, species: String, cell: Vector2i) -> bool:
+	if barred(area, species):
+		return false
+	var keep_off := int(_species(species).get("keep_off", 0))
+	if keep_off <= 0:
+		return true
+	for at: Vector2i in areas.get(area, {}).get("peopled", []):
+		if maxi(absi(at.x - cell.x), absi(at.y - cell.y)) < keep_off:
+			return false
+	return true
+
+
+## [param area]'s groups of a species it no longer keeps (barred) dropped,
+## with a line (397 amended: the box's wilds wolves at the next deploy).
+## How many groups went.
+func cull_barred() -> int:
+	var gone := {}
+	var ids: Array = _groups.keys()
+	ids.sort()
+	for id: String in ids:
+		var each: Dictionary = _groups[id]
+		if barred(str(each["area"]), str(each["species"])):
+			var key := "%s %s" % [each["species"], each["area"]]
+			gone[key] = int(gone.get(key, 0)) + 1
+			_groups.erase(id)
+	for key: String in gone:
+		print("[herds] culled %d %s groups in %s: the level keeps none" % [gone[key], key.get_slice(" ", 0), key.get_slice(" ", 1)])
+	return gone.values().reduce(func(sum: int, n: int) -> int: return sum + n, 0)
+
+
+## Whether a saved body of [param spec] (a herd animal: its "group") is one
+## [param area] no longer keeps (397 amended): not spawned again.
+func culls(area: String, spec: Dictionary) -> bool:
+	return spec.has("group") and barred(area, species_of(str(spec.get("kind", ""))))
 
 
 ## How much game [param cell] of [param area] keeps (richness, or the
@@ -457,9 +514,13 @@ func _seed(area: String) -> void:
 		var size: Array = _species(species).get("size", [1, 1])
 		while left >= 1.0:
 			var count := minf(float(draw.randi_range(int(size[0]), int(size[-1]))), left)
-			var home: Vector2i = ground["cells"][draw.randi_range(0, ground["cells"].size() - 1)]
-			_add_group(area, species, home, count)
 			left -= count
+			# A home away from people (397 amended): a few draws, else none.
+			for attempt in HOME_DRAWS:
+				var home: Vector2i = ground["cells"][draw.randi_range(0, ground["cells"].size() - 1)]
+				if may_home(area, species, home):
+					_add_group(area, species, home, count)
+					break
 	var made := groups_in(area).size()
 	if made > 0:
 		print("[herds] %s seeded: %d groups, %s" % [area, made, ", ".join(names.map(func(s: String) -> String:
@@ -497,10 +558,12 @@ func _daily(day: int) -> void:
 			each["count"] = float(each["count"]) - part
 			_add_group(str(each["area"]), str(each["species"]), _roam_cell(each, reach, draw), part)
 		each["home"] = _roam_cell(each, reach, draw)
+		if not may_home(str(each["area"]), str(each["species"]), each["home"]):
+			_rehome(each, draw)
 
 
 ## A rich cell of [param each]'s area within [param reach] of its home
-## (its home if a few draws find none).
+## where it may make its home (its home if a few draws find none).
 func _roam_cell(each: Dictionary, reach: int, draw: RandomNumberGenerator) -> Vector2i:
 	var home: Vector2i = each["home"]
 	if reach <= 0:
@@ -508,9 +571,25 @@ func _roam_cell(each: Dictionary, reach: int, draw: RandomNumberGenerator) -> Ve
 	var floor_cells: Dictionary = areas.get(str(each["area"]), {}).get("floor", {})
 	for attempt in 8:
 		var at := home + Vector2i(draw.randi_range(-reach, reach), draw.randi_range(-reach, reach))
-		if floor_cells.has(at) and rich(str(each["area"]), at) > 0.0:
+		if floor_cells.has(at) and rich(str(each["area"]), at) > 0.0 and may_home(str(each["area"]), str(each["species"]), at):
 			return at
 	return home
+
+
+## [param each], homed too near people (a group of before 397 amended, or
+## one that fled to a pad), moved to a rich cell of its area away from them,
+## if a few draws find one.
+func _rehome(each: Dictionary, draw: RandomNumberGenerator) -> void:
+	if not _ground.has(str(each["area"])):
+		return  # Its ground not built yet: tomorrow.
+	var cells: Array = _ground[str(each["area"])]["cells"]
+	if cells.is_empty():
+		return
+	for attempt in HOME_DRAWS:
+		var at: Vector2i = cells[draw.randi_range(0, cells.size() - 1)]
+		if may_home(str(each["area"]), str(each["species"]), at):
+			each["home"] = at
+			return
 
 
 # --- Bodies: the far tier's keeper (decision 352) ---------------------------------
@@ -609,6 +688,8 @@ func moved(id: String, to_area: String, cell: Vector2i) -> String:
 	if from.is_empty():
 		return id
 	from["out"] = maxi(int(from["out"]) - 1, 0)
+	if barred(to_area, str(from["species"])):
+		return ""  # Gone: that level keeps none (397 amended).
 	var to := _group_for("", to_area, str(from["species"]), cell)
 	to["count"] = float(to["count"]) + 1.0
 	return str(to["id"])
@@ -635,6 +716,7 @@ func _group_for(id: String, area: String, species: String, cell: Vector2i) -> Di
 ## wild animals among them folded into [param area]'s groups: what is left.
 func fold_records(area: String, records: Array) -> Array:
 	var left := []
+	var culled := 0
 	for record: Dictionary in records:
 		var entry: Dictionary = record.get("entry", {})
 		var kind := str(entry.get("kind", ""))
@@ -642,9 +724,14 @@ func fold_records(area: String, records: Array) -> Array:
 		if kind == "" or not Animal.is_wild(kind) or not rules.get("species", {}).has(species_of(kind)) 				or int(entry.get("spawn", -1)) >= 0:
 			left.append(record)
 			continue
+		if barred(area, species_of(kind)):
+			culled += 1  # The level keeps none now (397 amended).
+			continue
 		var tile: Variant = Snapshot.vector(entry.get("tile"))
 		var each := _group_for(str(entry.get("group", "")), area, species_of(kind), tile if tile is Vector2i else Vector2i.ZERO)
 		each["count"] = float(each["count"]) + 1.0
+	if culled > 0:
+		print("[herds] culled %d far records in %s: the level keeps none of their kind" % [culled, area])
 	return left
 
 

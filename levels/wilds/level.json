@@ -1,6 +1,9 @@
 {
 	"name": "The Wilds",
 	"outdoor": true,
+	"herds": {
+		"wolf": 0
+	},
 	"centre": [
 		128.0,
 		22.0

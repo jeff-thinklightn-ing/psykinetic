@@ -2993,6 +2993,12 @@ func _spawn_saved(section: Dictionary) -> bool:
 	# Monsters kept as records stay records, holding their slots (and their
 	# things) till someone comes near (decision 352); none before them.
 	if World.herds != null:
+		# A herd's bodies of a species the level no longer keeps (397 amended:
+		# the wilds' wolves): not spawned again; its records fold to nothing.
+		var was := saved.size()
+		saved = saved.filter(func(entry: Dictionary) -> bool: return not World.herds.culls(World.zone.name, entry["spec"]))
+		if saved.size() < was:
+			print("[herds] culled %d bodies in %s: the level keeps none of their kind" % [was - saved.size(), World.zone.name])
 		records = World.herds.fold_records(World.zone.name, records)  # Animals of before the herds (decision 367).
 	World.set_records(records)
 	# A record from before keys (decision 433) gets its slot's key now, while
