@@ -22,11 +22,11 @@
 			"facts": [
 				{
 					"id": "town.name",
-					"text": "The town's name.",
+					"text": "The town is named Held.",
 					"known": "common",
 					"where": [],
-					"status": "asked",
-					"ask": "A1"
+					"source": "Jeff",
+					"status": "agreed"
 				},
 				{
 					"id": "town.in_region",

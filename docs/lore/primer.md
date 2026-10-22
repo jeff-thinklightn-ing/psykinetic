@@ -55,8 +55,8 @@ beyond.
 
 ## The town
 
-The town is where the players and their companions belong. Its name is open
-*(asked: A1)*. It lies in the Blood Rot's land, at a distance from the mine.
+The town is where the players and their companions belong. It is named Held
+(Jeff, 2026-10-18: "town named Held"). It lies in the Blood Rot's land, at a distance from the mine.
 
 Everything found on the road (gold, ore, wood, cloth, food, weapons and gear)
 comes home to the town's shared stockpile, and the town grows from what is
