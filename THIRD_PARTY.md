@@ -47,7 +47,6 @@ Takes credited to their makers:
 - `amb.bat` (amb.bat.4.ogg): cut from [freesound 349225: Bat Wings (Fast)](https://freesound.org/people/Natty23/sounds/349225/) by Natty23, CC BY 4.0
 - `amb.drips` (amb.drips.ogg): cut from [freesound 277466: the sound of a forest after rain / drops falling on ferns rear (from 30 s for 60 s)](https://freesound.org/people/CRAFTCREST.com/sounds/277466/) by CRAFTCREST.com, CC BY 4.0
 - `amb.falls` (amb.falls.ogg): cut from [freesound 191879: Water running through weir (from 0 s for 56 s)](https://freesound.org/people/zachrau/sounds/191879/) by zachrau, CC0 1.0
-- `amb.falls` (amb.falls.2.ogg): cut from [freesound 727048: Cascade (3) (from 0 s for 46 s)](https://freesound.org/people/xslimits/sounds/727048/) by xslimits, CC0 1.0
 - `amb.falls` (amb.falls.3.ogg): cut from [freesound 537681: waterfall river sound effect (from 8 s for 60 s)](https://freesound.org/people/Garuda1982/sounds/537681/) by Garuda1982, CC0 1.0
 - `amb.forest_deep_day` (amb.forest_deep_day.ogg): cut from [freesound 563571: Wind in forest with creaking tree (from 5 s for 60 s)](https://freesound.org/people/Cinetony/sounds/563571/) by Cinetony, CC0 1.0
 - `amb.forest_deep_day` (amb.forest_deep_day.2.ogg): cut from [freesound 140047: A tree is creaking in the patagonian forest of Argentina in a deep creaky sound. (Argentina, Tierra del Fuego). (from 20 s for 60 s)](https://freesound.org/people/felix.blume/sounds/140047/) by felix.blume, CC0 1.0
@@ -59,9 +58,7 @@ Takes credited to their makers:
 - `amb.owl` (amb.owl.4.ogg): cut from [freesound 558398: owl_hooting_000102_0145S3 002-070 000-002 007-015.wav](https://freesound.org/people/Gerent/sounds/558398/) by Gerent, CC0 1.0
 - `amb.rain_canopy` (amb.rain_canopy.ogg): cut from [freesound 242956: Rain Fall Through Trees (from 5 s for 60 s)](https://freesound.org/people/acollier123/sounds/242956/) by acollier123, CC0 1.0
 - `amb.rain_canopy` (amb.rain_canopy.2.ogg): cut from [freesound 34073: AMBIENT - Rain on Forest Canopy - Light (LOOP).mp3](https://freesound.org/people/Arctura/sounds/34073/) by Arctura, CC BY 3.0
-- `amb.stream` (amb.stream.ogg): cut from [freesound 231536: Creek 06 (loop) (from 0 s for 35 s)](https://freesound.org/people/VKProduktion/sounds/231536/) by VKProduktion, CC0 1.0
 - `amb.stream` (amb.stream.2.ogg): cut from [freesound 415053: Brook 2.wav (from 0 s for 36 s)](https://freesound.org/people/straget/sounds/415053/) by straget, CC0 1.0
-- `amb.stream` (amb.stream.3.ogg): cut from [freesound 446019: Gentle Stream Natural Stream Sound (from 2 s for 60 s)](https://freesound.org/people/BurghRecords/sounds/446019/) by BurghRecords, CC0 1.0
 - `amb.town_night` (amb.town_night.ogg): cut from [freesound 450994: crickets night field diverse +distant village voices Putti, Uganda1 MS.wav (from 10 s for 60 s)](https://freesound.org/people/kyles/sounds/450994/) by kyles, CC0 1.0
 - `sfx.arrow_hit_flesh` (sfx.arrow_hit_flesh.ogg): cut from [freesound 161098: arrow_damage.wav](https://freesound.org/people/braqoon/sounds/161098/) by braqoon, CC0 1.0
 - `sfx.arrow_hit_flesh` (sfx.arrow_hit_flesh.2.ogg): cut from [freesound 205938: Arrow Impact](https://freesound.org/people/Twisted_Euphoria/sounds/205938/) by Twisted_Euphoria, CC0 1.0

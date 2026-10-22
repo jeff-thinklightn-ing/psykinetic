@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The crickets no longer chirp on winter nights: the night's insects quieten as the year cools and are gone wherever snow can fall, and three crackly stream and waterfall recordings are dropped, leaving the smoother ones (578; Jeff: "a noise that sounds like bugs or a hard drive").
 - Entering the wilds is quicker: building its ground takes about 4.8 s instead of 5.7 s (the hills 1.16 s instead of 1.27 s), drawn exactly as before.
 - The forest's edge follows a curve round the land instead of the tiles: trees stand at varied depths along it, and the forest floor and its scatter change along the curve (575).
 - The woodcutter has time at his block: a body at its work walks its real route at full pace however far away, and chops until it must set off to be home when the wood lands (521 amended, npc's side; economy adds the spell of work to the trip). Server only.

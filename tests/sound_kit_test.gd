@@ -240,6 +240,11 @@ func _test_ambience_weights() -> void:
 	var deep_night := Ambience.weights("outdoors", true, DayNight.NIGHT, 0.0, clear, 0.0, 0.5)
 	_check(is_equal_approx(deep_night["amb.forest_deep_night"], 0.5) and is_equal_approx(deep_night["amb.forest_night"], 1.0 - Ambience.DEEP * 0.5),
 			"half under the roof at midnight: the deep night bed half in")
+	var mild := Ambience.weights("outdoors", true, DayNight.NIGHT, 0.0, clear, 1.0, 0.5, 0.0, Ambience.INSECT_COLD.x)
+	var winter := Ambience.weights("outdoors", true, DayNight.NIGHT, 0.0, clear, 1.0, 0.5, 0.0, Ambience.INSECT_COLD.y)
+	_check(is_equal_approx(mild["amb.forest_night"], deep_night["amb.forest_night"]) and mild["amb.town_night"] == 1.0
+			and winter["amb.forest_night"] == 0.0 and winter["amb.forest_deep_night"] == 0.0 and winter["amb.town_night"] == 0.0,
+			"the night's insects: all of them while it's mild, none in the cold (Jeff: \"sounds like bugs\")")
 	var crowns := Ambience.weights("outdoors", true, 1.0, 12.0, {"kind": "rain", "rain": 1.0, "wind": 0.0}, 0.0, 1.0, 1.0)
 	_check(is_equal_approx(crowns["amb.rain_canopy"], 1.0) and is_equal_approx(crowns["amb.rain"], 1.0 - Ambience.CANOPY_RAIN)
 			and is_equal_approx(crowns["amb.drips"], 1.0), "rain under the roof: on the crowns, little through, dripping")

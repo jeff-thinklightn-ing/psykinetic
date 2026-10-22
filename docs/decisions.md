@@ -20700,3 +20700,36 @@ tree on the forest's cells and side; the scatter by it on its own side.
 _test_forest: the first ring's every-cell check became a tree (or stump)
 within 2.2 of every stretch of the edge; the lane's trees either side
 within 1.6. Client only, protocol unchanged, no new class_name.
+
+## 578. No insects in the cold; no ticking water
+
+Jeff, on v0.1.163, in the wilds at night with snow falling: "with the sound
+there an annoying noise that sounds like bugs or a hard drive noise...it goes
+away with ambience slider to 0".
+
+**What it was.** The open forest's night bed, amb.forest_night, which plays
+over all the open wilds by night: its first take is crickets (nearly all of
+its sound above 4 kHz), and nothing told the beds the season, so they
+chirped in the snow. The town's night bed and the deep forest's are insects
+too. Measured, not heard (sound's band and kurtosis report over every
+ambience take): beside the crickets, three water takes ticked, their band
+over 4 kHz full of sharp clicks (kurtosis 8 to 11 where smooth noise is 3):
+amb.stream's 231536 and 446019 and amb.falls' 727048. A stream's loop is
+heard 16 cells off, and 568's river runs down the whole of the wilds, so
+that crackle had come within earshot of most of it in v0.1.163.
+
+**The night's insects follow the cold.** Ambience.weights takes the
+season's cold (Season.at's, the listener's region); the night beds
+(amb.forest_night, amb.forest_deep_night, amb.town_night) are scaled by
+1 - smoothstep(INSECT_COLD): all of them below 0.5 (the equinoxes), none
+from Season.SNOW_FALLS' first (0.62), the cold snow starts falling at. A
+winter night is still but for the wind, the owls and the bats.
+
+**The ticking takes are dropped**, not re-cut (the clicks are in the
+recordings): amb.stream keeps 415053 (Brook 2, smooth), amb.falls 191879
+and 537681. Their files are moved aside in the library
+(takes/_dropped_578), not deleted; takes.json, THIRD_PARTY.md's sound
+block and sound_status regenerated without them.
+
+sound_kit_test: the night beds whole at INSECT_COLD's first, none at its
+second. Client only, protocol unchanged, no new class_name.

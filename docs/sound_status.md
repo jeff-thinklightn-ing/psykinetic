@@ -31,7 +31,7 @@ No takes: played as its fallback's sound where it has one, else as a blip (a bed
 | `amb.bat` | 4 | players 6 | Freesound | CC0 1.0 or CC BY (each take's own, in art/audio/takes.json) |
 | `amb.drips` | 1 |  | Freesound | CC0 1.0 or CC BY (each take's own, in art/audio/takes.json) |
 | `amb.dungeon` | 1 |  | #GameAudioGDC 2024 bundle, Sonniss | Sonniss #GameAudioGDC Bundle licence v2.0 |
-| `amb.falls` | 3 | players 10 | Freesound | CC0 1.0 or CC BY (each take's own, in art/audio/takes.json) |
+| `amb.falls` | 2 | players 10 | Freesound | CC0 1.0 or CC BY (each take's own, in art/audio/takes.json) |
 | `amb.field_wind` | 1 |  | #GameAudioGDC 2024 bundle, Sonniss | Sonniss #GameAudioGDC Bundle licence v2.0 |
 | `amb.forest_dawn` | 1 |  | #GameAudioGDC 2024 bundle, Sonniss | Sonniss #GameAudioGDC Bundle licence v2.0 |
 | `amb.forest_day` | 1 |  | #GameAudioGDC 2024 bundle, Sonniss | Sonniss #GameAudioGDC Bundle licence v2.0 |
@@ -42,7 +42,7 @@ No takes: played as its fallback's sound where it has one, else as a blip (a bed
 | `amb.rain` | 1 |  | #GameAudioGDC 2021 to 2023 bundle, Sonniss | Sonniss #GameAudioGDC Bundle licence v2.0 |
 | `amb.rain_canopy` | 2 |  | Freesound | CC0 1.0 or CC BY (each take's own, in art/audio/takes.json) |
 | `amb.storm` | 1 |  | #GameAudioGDC 2024 bundle, Sonniss | Sonniss #GameAudioGDC Bundle licence v2.0 |
-| `amb.stream` | 3 | players 16 | Freesound | CC0 1.0 or CC BY (each take's own, in art/audio/takes.json) |
+| `amb.stream` | 1 | players 16 | Freesound | CC0 1.0 or CC BY (each take's own, in art/audio/takes.json) |
 | `amb.torch_fire` | 1 | players 4 | #GameAudioGDC 2021 to 2023 bundle, Sonniss | Sonniss #GameAudioGDC Bundle licence v2.0 |
 | `amb.town_day` | 1 |  | #GameAudioGDC 2021 to 2023 bundle, Sonniss | Sonniss #GameAudioGDC Bundle licence v2.0 |
 | `amb.town_night` | 1 |  | Freesound | CC0 1.0 or CC BY (each take's own, in art/audio/takes.json) |
