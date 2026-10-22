@@ -19328,3 +19328,24 @@ tick already does: no yield or clock moves. Economy gives the readers.
 Phase 2 (field_work, shearing) is 566 amended, later. towns_test (progress,
 the stages told, walls_up, awake), production_test (trip, its start
 saved). No new class_name.
+## 566, builder's side: a woodlot's standing cell, and builds with no site
+
+On npc's visible-work page (566, the coordinator's approval): a marked but
+unbuilt building is the 0-progress site, so builder places sites as it
+places any building with a use, and needs no data of its own. Two parts
+now:
+- site_checks adds BuilderSession.stand_problem: a woodlot needs a
+  walkable cell within its radius beside the forest (outdoors, the void
+  past the floor; a solid building's cells are not walked) for the
+  woodcutter's body to stand at and face; one indoors has no trees. A
+  hunting ground needs nothing more: its own cell is open ground once
+  site_checks reaches it. The prompt says where a woodcutter stands.
+- BuilderSession.builds_without_site: per stockpile place of the level,
+  the uses Towns has in hand (planned or building) with no building of
+  that use and town marked; the request lists them ("store: inn, loom")
+  and says to place one, on a plot first (564). The town's wall is a
+  record of its own and left out. The session reads World.towns (the
+  server's records; BuilderHost runs there), null for none.
+The third part, the state in the code hint and the click line ("being
+built 40%", "planned"), waits for economy's progress key on the wire.
+Nothing travels from builder; protocol unchanged.

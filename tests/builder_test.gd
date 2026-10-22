@@ -34,6 +34,7 @@ func _ready() -> void:
 	_test_codes()
 	_test_solid()
 	_test_plots()
+	_test_visible_work()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -590,6 +591,7 @@ func _test_work_sites() -> void:
 	_check("worked by no one, and the tool's answer says so. A town's woodcutter works the first woodlot marked for it, its hunter" in BuilderSession.system_prompt(), "the prompt says which trade works which site, from economy.json (%s)" % BuilderSession.site_line())
 	var doc := _doc()
 	doc.config["places"] = {"store": {"at": [20, 20], "kind": "stockpile", "holder": "town"}}
+	doc.map.set_cell(Vector2i(4, 8), "void")  # A tree by the woodlot (566).
 	var walls := []
 	for side in ["north", "east", "south", "west"]:
 		walls.append({"at": [8, 8], "side": side, "kind": "wall"})
@@ -698,6 +700,42 @@ func _test_plots() -> void:
 	_check(plot["rect"] == [20, 4, 6, 6] and plot["facing"] == [-1, 0], "a quarter turn moves a plot and turns its street side (%s)" % [plot])
 
 
+func _test_visible_work() -> void:
+	print("\n== visible work (566, builder's side): somewhere to stand at a woodlot, builds with no site listed ==")
+	_check("a woodlot needs such a cell within its radius" in BuilderSession.system_prompt(), "the prompt says where a woodcutter stands")
+	var doc := _doc()
+	doc.config["places"] = {"store": {"at": [20, 20], "kind": "stockpile", "holder": "town"},
+		"woods": {"at": [10, 10], "kind": "woodlot", "holder": "town", "town": "store", "radius": 3},
+		"game": {"at": [30, 20], "kind": "hunting_ground", "holder": "town", "town": "store", "radius": 2}}
+	var session := BuilderSession.new(doc, Rect2i(0, 0, 40, 30), "test_field", StubClaude.new([]))
+	var sites := session.site_checks()
+	_check(sites.size() == 1 and "the woodlot woods at (10, 10) has no walkable cell beside the forest within its radius 3" in sites[0], "a woodlot in open grass: no tree to fell (%s)" % [sites])
+	session.working.map.set_cell(Vector2i(13, 11), "void")
+	_check(session.site_checks().is_empty(), "a tree 3 cells off, its neighbour inside the radius: somewhere to stand")
+	session.working.map.set_cell(Vector2i(13, 11), "grass")
+	session.working.map.set_cell(Vector2i(14, 12), "void")
+	_check(session.site_checks().size() == 1, "a tree whose neighbours are all past the radius: not")
+	session.working.config["outdoor"] = false
+	_check(session.stand_problem(Level.places_from(session.working.config, [] as Array[String])["woods"]).begins_with("the woodlot woods is not outdoors"), "a woodlot indoors: no trees")
+	# Builds in hand with no building marked for them.
+	doc = _doc()
+	doc.config["places"] = {"store": {"at": [20, 20], "kind": "stockpile", "holder": "town"}}
+	doc.config["buildings"] = [{"slot": "building.hut", "at": [6, 6], "use": "forge", "town": "store"}]
+	session = BuilderSession.new(doc, Rect2i(0, 0, 40, 30), "test_field", StubClaude.new([]))
+	var towns := Towns.new()
+	towns.from_dict({"test_field/store": {"buildings": {
+		"inn": {"kind": "inn", "level": 0, "state": Towns.PLANNED, "job": 3},
+		"forge": {"kind": "forge", "level": 0, "state": Towns.PLANNED, "job": 4},
+		"loom": {"kind": "loom", "level": 1, "state": Towns.BUILDING, "job": 5},
+		"well": {"kind": "well", "level": 1, "state": Towns.STANDING, "job": 0},
+		"walls": {"kind": "walls", "level": 0, "state": Towns.PLANNED, "job": 6}}}})
+	session.towns = towns
+	_check(Array(session.builds_without_site()) == ["store: inn, loom"], "the inn and the loom have no site; the forge has, the well stands, the wall is no building (%s)" % [session.builds_without_site()])
+	_check("Builds the towns here have in hand with no building marked for them yet (place one, on a plot first, and set_building it to the use): store: inn, loom." in session._situation(), "the request lists them")
+	session.towns = null
+	_check(session.builds_without_site().is_empty(), "no towns' records: nothing listed")
+
+
 func _test_relief() -> void:
 	print("\n== relief (527, on maps' 525): pads flat, cliffs cut ways, height tools refused ==")
 	_check("a rise of more than 0.45 m between neighbours is a cliff" in BuilderSession.system_prompt(), "the prompt says what relief means")
@@ -711,6 +749,7 @@ func _test_relief() -> void:
 	field[7 * size.x + 7] = 0.1
 	var doc := _doc()
 	doc.map.relief = field
+	doc.map.set_cell(Vector2i(18, 27), "void")  # A tree by the woodlot (566).
 	doc.config["places"] = {"store": {"at": [10, 20], "kind": "stockpile", "holder": "town"},
 		"woods": {"at": [18, 20], "kind": "woodlot", "holder": "town", "town": "store"},
 		"high": {"at": [30, 20], "kind": "hunting_ground", "holder": "town", "town": "store"}}

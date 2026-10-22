@@ -59,6 +59,9 @@ const CONFIG_KEYS: Array[String] = ["neighbours", "places", "buildings", "buildi
 ## Asks Claude: send(body: Dictionary) -> Dictionary (a Messages API
 ## response, or {"error": "..."}), awaited (ClaudeClient, StubClaude).
 var client: Object
+## The towns' records (World.towns on the server), for the builds in hand
+## with no building marked for them (decision 566); null for none.
+var towns: Towns = World.towns
 var doc: MapDoc
 var area: Rect2i
 var map_name := ""
@@ -395,7 +398,7 @@ Running water is a stream: the stream tool lays its course, from where it rises 
 
 Levels join at their edges: walking off one edge arrives on the neighbour's opposite edge, at the same row (east, west) or column (north, south). When the area touches the map's edge with nothing beyond it, new_area makes a new level there (its own map; a first draft of grass, groves and forest round it, open where the way arrives) and carves a way out to the edge through the area. Use it when asked for somewhere new beyond the edge ("a new area east", "the woods past here"), not for changes inside the area.
 
-Places are what factions hold (the goblins, the town, or nobody): a camp, a keep, a farm, a gate, a mine. Each is a cell and a radius; the ground within the radius is its holder's, and no one else's group may walk through it. mark_place names one (its key, kind, cell, radius, who holds it at the start). Mark a place when you build one: a camp's place on its gather point (where its monsters gather), a farmstead's in its yard. A goblin camp can hold captives from the start (mark_place's holds), each taken from a town (the request lists them): someone of that town, or kin of one of its workers ("the smith's daughter"). In town their kin asks players to bring them home, and they go free when the camp falls, so a camp holding a captive is worth clearing. A town's work sites are places too: a woodlot (woods its woodcutter fells: put it at the forest's edge), a hunting ground (open land with game, its hunter's), a quarry (rock to cut stone from), a farm (fields), a mine. Mark one with the town it works for (mark_place's town: the key of the town's stockpile place), held by the town, not far from it, and with a way on foot from the store to it: a site the goblins hold, or that can't be reached, is worked by no one, and the tool's answer says so. %s Some prefabs bring their place with them. A solid building (a mound, a barrow's: earth through) stands on flat ground like any, but no one walks its cells but its door, the middle of its front row, and it takes no use; the settings show it, the grid draws its cells as the ground they were. A building prefab is a roofed building players walk into: stamp it whole, door and all, rather than drawing its walls yourself. A building can serve a town: set_building gives one in the area a use (%s) and its town, the key of a stockpile place in this level (a place of kind stockpile, held by the town). A town has one building of each use. Stamping over a building drops its use: set it again. town_wall walls a town in: give the rectangle of cells it encloses (its buildings, its store, room to walk) and the wall stands on the edges just outside it, with gates (doors) where roads come in, one in the middle of each side if you name none. One wall per town; it looks as strong as the town has built it (a bank of rubble at first). roof puts a roof over a rectangle of floor of one height that no building covers: a room you walled yourself, or an open shelter (a market stall, a woodshed) on posts at its corners; give it a use and town and it serves the town as a building does. A plot (the request lists those here) is ground the town keeps for a new building: put a new building on an empty plot before anywhere else, whole within it, its door on the plot's street side; and a building that serves a town opens its door onto a street (a road). The tool's answer says when one doesn't.
+Places are what factions hold (the goblins, the town, or nobody): a camp, a keep, a farm, a gate, a mine. Each is a cell and a radius; the ground within the radius is its holder's, and no one else's group may walk through it. mark_place names one (its key, kind, cell, radius, who holds it at the start). Mark a place when you build one: a camp's place on its gather point (where its monsters gather), a farmstead's in its yard. A goblin camp can hold captives from the start (mark_place's holds), each taken from a town (the request lists them): someone of that town, or kin of one of its workers ("the smith's daughter"). In town their kin asks players to bring them home, and they go free when the camp falls, so a camp holding a captive is worth clearing. A town's work sites are places too: a woodlot (woods its woodcutter fells: put it at the forest's edge), a hunting ground (open land with game, its hunter's), a quarry (rock to cut stone from), a farm (fields), a mine. Mark one with the town it works for (mark_place's town: the key of the town's stockpile place), held by the town, not far from it, and with a way on foot from the store to it: a site the goblins hold, or that can't be reached, is worked by no one, and the tool's answer says so. %s A woodcutter fells trees standing on a walkable cell beside the forest: a woodlot needs such a cell within its radius. Some prefabs bring their place with them. A solid building (a mound, a barrow's: earth through) stands on flat ground like any, but no one walks its cells but its door, the middle of its front row, and it takes no use; the settings show it, the grid draws its cells as the ground they were. A building prefab is a roofed building players walk into: stamp it whole, door and all, rather than drawing its walls yourself. A building can serve a town: set_building gives one in the area a use (%s) and its town, the key of a stockpile place in this level (a place of kind stockpile, held by the town). A town has one building of each use. Stamping over a building drops its use: set it again. town_wall walls a town in: give the rectangle of cells it encloses (its buildings, its store, room to walk) and the wall stands on the edges just outside it, with gates (doors) where roads come in, one in the middle of each side if you name none. One wall per town; it looks as strong as the town has built it (a bank of rubble at first). roof puts a roof over a rectangle of floor of one height that no building covers: a room you walled yourself, or an open shelter (a market stall, a woodshed) on posts at its corners; give it a use and town and it serves the town as a building does. A plot (the request lists those here) is ground the town keeps for a new building: put a new building on an empty plot before anywhere else, whole within it, its door on the plot's street side; and a building that serves a town opens its door onto a street (a road). The tool's answer says when one doesn't.
 
 Ground has a height, 0 to 6 (the grid's Heights block, shown when any cell has one). A step of a level or more between two cells is a ledge: a wall to anyone walking, though a body pushed off it falls to the ground below, and higher ground sees over walls. Stairs join one level to the next: a stair climbs to the one cell beside it a level up. A slope is a stair that looks like a ramp of earth: use slopes outdoors (on hills, banks, outcrops) and stairs in and round buildings; hill and stairs make slopes when asked. Rock is bare rock standing out of the ground, walled round: no one walks on or through it. height raises, lowers or sets cells; hill makes a rounded hill of rings a level each, with stairs up the sides asked; stairs puts a stair or a flight onto a ledge or up from flat ground. Whatever stands on raised ground (things, starts, buildings) needs stairs to it, and a building stands on one height: when a change leaves something cut off or a stair climbing nowhere, the tool's answer says so: put it right. Some outdoor levels have their ground shaped in metres (the request says so): there the Heights block is in half metres (0-9, then a, b, c ...), a rise of more than 0.45 m between neighbours is a cliff no one walks, height, hill and stairs are refused (the ground is shaped in the editor), and a building needs ground flat within 0.05 m under it: stamp it where the ground is flat, or stamp it with pad to cut the ground flat under it (the only shaping you do: a house on a hillside sits on a cut pad).
 
@@ -444,6 +447,9 @@ func _situation() -> String:
 			plots.append("%s at (%d, %d), %d x %d, its street to the %s" % [plot["key"], rect.position.x, rect.position.y, rect.size.x, rect.size.y, side_name(plot["facing"])])
 	if not plots.is_empty():
 		text += "\n\nPlots here (ground the town keeps for new buildings): " + ", ".join(plots) + "."
+	var unsited := builds_without_site()
+	if not unsited.is_empty():
+		text += "\n\nBuilds the towns here have in hand with no building marked for them yet (place one, on a plot first, and set_building it to the use): " + "; ".join(unsited) + "."
 	var towns := town_ids()
 	if not towns.is_empty():
 		text += "\n\nTowns a camp may hold captives from: " + ", ".join(towns) + "."
@@ -1468,6 +1474,58 @@ func site_checks() -> Array[String]:
 			out.append("the %s %s is held by %s, not by its town %s: its worker can't work it until the town holds it" % [site["kind"], key, site["holder"], town])
 		elif not HeightTools.reaches(working.map, places[town]["cell"], site["cell"], 70000, ground):
 			out.append("the %s %s at %s can't be reached on foot from its town's store %s at %s: open a way" % [site["kind"], key, site["cell"], town, places[town]["cell"]])
+		else:
+			var stand := stand_problem(site)
+			if not stand.is_empty():
+				out.append(stand)
+	return out
+
+
+## Why a woodlot has nowhere for its woodcutter's body to stand at work
+## (decision 566, builder's side), "" if it has: a walkable cell within its
+## radius beside the forest (outdoors, the void past the floor). A hunting
+## ground's own cell is open ground once site_checks reaches it.
+func stand_problem(site: Dictionary) -> String:
+	if str(site["kind"]) != "woodlot":
+		return ""
+	if Level.zone_of(working.config) != "outdoors":
+		return "the woodlot %s is not outdoors: no trees for its woodcutter to fell" % site["key"]
+	var at: Vector2i = site["cell"]
+	var radius: int = site["radius"]
+	var solid: Dictionary = walk_ground().get("solid", {})
+	for y in range(at.y - radius, at.y + radius + 1):
+		for x in range(at.x - radius, at.x + radius + 1):
+			var cell := Vector2i(x, y)
+			if (cell - at).length_squared() > radius * radius or not working.map.walkable(cell) or solid.has(cell):
+				continue
+			if [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN].any(func(step: Vector2i) -> bool:
+					return working.map.in_bounds(cell + step) and working.map.cell(cell + step) == "void"):
+				return ""
+	return "the woodlot %s at %s has no walkable cell beside the forest within its radius %d: its woodcutter has no tree to fell (move it to the forest's edge)" % [site["key"], at, radius]
+
+
+## The builds each town of this level has in hand (Towns' records planned
+## or being built, decision 566) with no building here marked for them
+## (a building of that use and town): "store: inn, loom". A town's wall
+## is a record of its own (town_wall), not a building.
+func builds_without_site() -> PackedStringArray:
+	var out := PackedStringArray()
+	if towns == null:
+		return out
+	var places: Dictionary = Level.places_from(working.config, [] as Array[String])
+	var marked := {}
+	for entry: Variant in working.config.get("buildings", []) if working.config.get("buildings") is Array else []:
+		if entry is Dictionary and not str(entry.get("use", "")).is_empty():
+			marked["%s/%s" % [entry.get("town", ""), entry["use"]]] = true
+	for key: String in places:
+		if places[key]["kind"] != "stockpile":
+			continue
+		var records: Dictionary = towns.buildings_of("%s/%s" % [map_name, key])
+		var wanting: Array = records.keys().filter(func(kind: String) -> bool:
+			return kind != "walls" and records[kind]["state"] in [Towns.PLANNED, Towns.BUILDING] and not marked.has("%s/%s" % [key, kind]))
+		if not wanting.is_empty():
+			wanting.sort()
+			out.append("%s: %s" % [key, ", ".join(wanting)])
 	return out
 
 
