@@ -254,7 +254,7 @@
 			"name": "the tower",
 			"status": "agreed",
 			"source": "Jeff",
-			"summary": "A tower built by the earlier humans, standing over the mine and still holding their artifacts and treasures.",
+			"summary": "A tower over the mine, built by orcs to dark elven designs, whose shifting inside still holds old artifacts and treasures.",
 			"place_kind": "other",
 			"relations": [
 				{
@@ -272,7 +272,7 @@
 			"facts": [
 				{
 					"id": "tower.over_mine",
-					"text": "A tower built by humans who lived before stands over the Blood Rot's mine.",
+					"text": "A tower stands over the mine.",
 					"known": "common",
 					"where": [
 						"blood_rot_lands"
@@ -280,14 +280,33 @@
 					"status": "agreed"
 				},
 				{
+					"id": "tower.built",
+					"text": "The tower was built by orcish labour to the designs of dark elven architects, in their majestic style.",
+					"known": "common",
+					"where": [
+						"blood_rot_lands"
+					],
+					"status": "draft"
+				},
+				{
 					"id": "tower.treasures",
-					"text": "The tower still holds the earlier humans' artifacts and treasures.",
+					"text": "The tower holds old artifacts and treasures; dark elven artifacts come from it.",
 					"known": "rumour",
 					"where": [
 						"blood_rot_lands"
 					],
 					"true": true,
-					"status": "agreed"
+					"status": "draft"
+				},
+				{
+					"id": "tower.shifts",
+					"text": "The tower's inside shifts, perhaps by magic; its treasures have never all been carried out, and adventurers still come.",
+					"known": "rumour",
+					"where": [
+						"blood_rot_lands"
+					],
+					"true": true,
+					"status": "draft"
 				}
 			]
 		},

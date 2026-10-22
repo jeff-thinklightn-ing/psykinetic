@@ -61,8 +61,10 @@ are stated plainly and found as aftermath, not depicted.
 ### Allies
 
 - **[Jeff]** The first region is dominated by Blood Rot goblins.
-- **[Jeff]** The Blood Rot may have other factions allied to them. For example, the
-  brutes might be orcs and the sneaks might be kobolds.
+- **[Jeff, agreed in lore 012d57b; decision 416]** Every goblin in the region is of
+  the Blood Rot. Brutes are orcs and sneaks are kobolds, allied peoples of the Blood
+  Rot, not ranks. The allies don't worship the star, so an alliance can break or be
+  turned.
 - **[proposal]** The allies do not worship the star. They are with the Blood Rot for
   what it gets them, so an alliance can break, and one can be turned.
 - **[proposal]** Kobolds dig. They could be the ones who work the shafts for the
@@ -73,16 +75,25 @@ are stated plainly and found as aftermath, not depicted.
 
 ### The tower
 
-- **[Jeff]** A tower stands over the mine. It was built by earlier humans.
-- **[Jeff]** Those humans died off from the rot. The goblins grew stronger from it.
-- **[Jeff]** The tower still holds the earlier humans' artifacts and treasures.
-- **[proposal]** The earlier humans built over the star to claim it, as a sign of
+- **[Jeff]** A tower stands over the mine. It was built by orcish labour to the
+  designs of dark elven architects, in their majestic style.
+- **[Jeff]** Earlier humans are dropped from the tower: the world is full of mythical
+  peoples, and the tower is theirs.
+- **[Jeff]** The goblins grew stronger from the rot.
+- **[Jeff]** The tower holds old artifacts and treasures. Dark elven artifacts come
+  from the tower.
+- **[proposal]** Whoever held the tower built over the star to claim it, as a sign of
   power. The Blood Rot now hold what they built: a holding taken by the ground itself.
-- **[proposal]** Human treasures left long near the star carry the rot, like the ore.
+- **[proposal]** Treasures left long near the star carry the rot, like the ore.
   The best loot in the tower is also the most tainted.
-- **[proposal]** Some of what the earlier humans knew survives in the tower:
-  writings or carvings showing they learned too late what the star did to them.
-  This is where the learned could have first tied the curse to the ore.
+- **[proposal]** Some of what the tower's makers knew survives in it: writings or
+  carvings showing they learned too late what the star did. This is where the learned
+  could have first tied the curse to the ore.
+- **[proposal]** The orcs' ancestors laid the tower's stones, which gives the Blood
+  Rot's orc allies an old tie to it.
+- **[Jeff]** The tower's inside shifts, perhaps by magic. Its treasures have never all
+  been carried out, and adventurers still come.
+- **[proposal]** What shifts it is open: the dark elves' craft, or the star beneath.
 
 ### Proposed facts and who knows them
 
@@ -98,19 +109,17 @@ are stated plainly and found as aftermath, not depicted.
 
 ### Open threads
 
+- Did the dark elves die of the rot, leave, or still exist somewhere? Did they, or
+  the orcs, worship the star before the goblins? **[open]**
+- **[Jeff]** The castle (a separate place, the entry to the labyrinths) was built by
+  dwarven stone smiths, plain and utilitarian. Castle notes to live in their own file.
+
 - The primer's raid (goblins took the smith and his hammer) needs a new home. If the
   Blood Rot took him, why: to work the ore, or as tribute for the star? The second
   puts a clock on the rescue. **[proposal]**
-- **[Jeff]** Brutes might be orcs and sneaks might be kobolds, allied to the Blood
-  Rot. Open: is the imp the Blood Rot goblin itself (the raider rank)? **[proposal]**
-- New factions (orcs, kobolds) need keys in `levels/factions.json` from maps before
-  their entries can be `agreed`.
-- Who were the earlier humans? Ancestors of the town, or a people wholly gone?
-  Did any survive and leave? **[proposal]**
-- Did the earlier humans worship the star too, and did the goblins take up that
-  worship from them? **[proposal]**
-- Are the Blood Rot kin to the castle goblins, cousins in a feud, or unrelated?
-  (Touches C2: are the imp, brute and sneak one people?)
+- Settled by decision 416: the imp is the Blood Rot goblin; orcs and kobolds have
+  their own faction keys, allied to "goblins" (shown as the Blood Rot). Open: their
+  own lore entries, and turned or broken alliances (the hook is in 416).
 - Is sacrifice at the star the one death the fallen do not rise from? (Touches B1.)
   Would explain why the town fears the Blood Rot most. **[proposal]**
 - Do the high priests have the gift? If so, the deep is where the clan's magic lives. **[proposal]**
@@ -121,11 +130,15 @@ are stated plainly and found as aftermath, not depicted.
 ## Map team
 
 - **[Jeff]** The starter town is in this region, well away from the mine.
-- **[Jeff]** A tower built by earlier humans stands over the mine.
+- **[Jeff]** A tower stands over the mine: orc-built, to dark elven designs.
 - **[proposal]** The tower is visible across the region, including from town: the
   landmark that says where the threat lives.
+- **[Jeff]** The tower's inside shifts (a delve-again place), while the overworld
+  stays consistent.
+- **[proposal]** Fixed anchors inside the shifting tower: the entrance, the way down
+  to the mine, and the star's chamber stay put.
 - **[proposal]** Going up the tower and down the mine are two halves of one place:
-  human ruin above, Blood Rot depths below, the star at the bottom.
+  dark elven ruin above, Blood Rot depths below, the star at the bottom.
 - **[Jeff]** Raider camps are scattered through the region's forests.
 - **[Jeff]** Too many raiders and the raids spill into neighbouring regions.
 - **[proposal]** Camps grow on the always-on world's slow tick when left alone, so
@@ -173,19 +186,20 @@ All ranks and names are **[proposal]**; high priests are **[Jeff]**.
   rank. Five readable models from one skeleton; the change is visible at a glance.
 - **[proposal]** Mass rises with rank, so the shove-and-collide physics tells the
   story: raiders fly, wardens barely move. (Numbers belong to combat/economy, not lore.)
-- **[Jeff]** Brutes may become orcs and sneaks kobolds: allied peoples with their
-  own base meshes, not Blood Rot ranks.
-- **[proposal]** The imp could stay as the Blood Rot raider, sharing the goblin base.
+- **[agreed, 416]** Brutes are orcs and sneaks are kobolds: allied peoples with
+  their own base meshes, not Blood Rot ranks. The imp is the Blood Rot goblin.
 - **[proposal]** Allies show which side they are on through kit (Blood Rot markings,
   tribute trinkets) rather than the rot's changes, unless they live near the mine.
 - Keep it restrained: changed and wrong, not gory.
 
 ### The tower
 
-- **[Jeff]** Built by earlier humans; holds their artifacts and treasures.
-- **[proposal]** Human stonework underneath, goblin additions crudely built over
-  it: lashed timber, hides, offerings. Two hands, two eras, readable at a glance.
-- **[proposal]** Human artifacts are a separate item style from goblin gear: finer
+- **[Jeff]** Dark elven design, built by orcs: majestic. Contrast with the dwarven
+  castle, which is utilitarian.
+- **[proposal]** Majestic dark elven stonework underneath, goblin additions crudely
+  built over it: lashed timber, hides, offerings. Two hands, two eras, readable at a
+  glance.
+- **[proposal]** Dark elven artifacts are a separate item style from goblin gear: finer
   make, old, and (near the star) tainted.
 
 ---
@@ -202,3 +216,12 @@ All ranks and names are **[proposal]**; high priests are **[Jeff]**.
   faction of the region. Primer's castle and goblin sections to be revised.
 - Session 1, cont.: Blood Rot dominate the first region with allied factions (Jeff):
   brutes may be orcs, sneaks may be kobolds.
+- Session 2: tower built by orcish labour to dark elven designs (Jeff); conflicts
+  with "earlier humans," open. Castle returns as the dwarven-built entry to the
+  labyrinths, to get its own file.
+- Session 2, cont.: earlier humans dropped from the tower (Jeff); the tower is
+  dark elven design, orc-built. Many mythical peoples to come.
+- Session 2, cont.: tower's inside shifts, perhaps by magic (Jeff). Castle moved to
+  its own file, castle.md.
+- Session 2, cont.: dark elven artifacts come from the tower (Jeff).
+- Synced with decisions.md: allies agreed (416).

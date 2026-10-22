@@ -115,13 +115,24 @@ func _test_facts() -> void:
 func _test_shared_ids() -> void:
 	print("\n== ids shared with other files are theirs ==")
 	var factions: Variant = JSON.parse_string(FileAccess.get_file_as_string("res://levels/factions.json"))
+	# Maps' factions name their lore entry by lore_id, or by their own key without one (decision 416).
+	var lore_ids := {}
+	for key in factions:
+		lore_ids[factions[key].get("lore_id", key)] = true
+	# A faction with no lore yet (the barrow's dead, its robbers) needs no entry; one naming its lore_id does.
 	var bad: Array = []
+	for key in factions:
+		var id: String = factions[key].get("lore_id", "")
+		if not id.is_empty() and not (_entries.has(id) and _entries[id]["type"] == "faction"):
+			bad.append(id)
+	_check(bad.is_empty(), "every faction's lore_id is a lore faction %s" % [bad])
+	bad = []
 	for id in _entries:
 		var entry: Dictionary = _entries[id]
 		match entry["type"]:
 			"faction":
-				# A new faction waits for maps to add its key before it can be agreed.
-				if entry["status"] == "agreed" and not factions.has(id):
+				# A new faction waits for maps to add its key, or name it by lore_id, before it can be agreed.
+				if entry["status"] == "agreed" and not (factions.has(id) or lore_ids.has(id)):
 					bad.append(id)
 			"material":
 				if entry.has("resource") and not entry["resource"] in Stockpile.RESOURCES:

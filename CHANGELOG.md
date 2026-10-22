@@ -7,6 +7,8 @@ notes (decision 324).
 
 ## Unreleased
 
+- Companions no longer say the tower over the mine was built by earlier humans.
+
 - Archers run like runners now (462): walking or running, the bow swings in the left hand with the arm and the right arm swings free; the arrows ride in a quiver on the back, not in the hand. The bowstring bends back to the drawing hand and springs forward with a short shiver when the arrow flies.
 - The quiver on an archer's back is a leather tube with a strap and a few arrows' fletching showing, in place of a grey box: plain arrows have pale fletching, flame arrows a red cord at the mouth, barbed arrows dark fletching.
 - A stream's fall is white water broken into streaks that trail downstream, instead of a straight white line across it (557 amended).

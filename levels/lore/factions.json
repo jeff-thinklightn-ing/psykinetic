@@ -153,26 +153,6 @@
 					"status": "agreed"
 				},
 				{
-					"id": "goblins.kobolds_dig",
-					"text": "Kobolds dig the mine's shafts for the Blood Rot.",
-					"known": "common",
-					"where": [
-						"blood_rot_lands"
-					],
-					"source": "Jeff",
-					"status": "agreed"
-				},
-				{
-					"id": "goblins.orcs_paid",
-					"text": "Orcs fight for the Blood Rot for a share of what the raids bring in.",
-					"known": "common",
-					"where": [
-						"blood_rot_lands"
-					],
-					"source": "Jeff",
-					"status": "agreed"
-				},
-				{
 					"id": "goblins.holding",
 					"text": "The goblins win by holding things, captives and ground, not by taking loot.",
 					"known": "common",
@@ -185,30 +165,6 @@
 				{
 					"id": "goblins.imp",
 					"text": "The imp is small and darts in and out of a fight.",
-					"known": "common",
-					"where": [],
-					"tags": [
-						"fighting",
-						"monsters"
-					],
-					"source": "game",
-					"status": "agreed"
-				},
-				{
-					"id": "goblins.brute",
-					"text": "The brute is big and heavy, and it stands guard.",
-					"known": "common",
-					"where": [],
-					"tags": [
-						"fighting",
-						"monsters"
-					],
-					"source": "game",
-					"status": "agreed"
-				},
-				{
-					"id": "goblins.sneak",
-					"text": "The sneak patrols and comes at its prey from the side.",
 					"known": "common",
 					"where": [],
 					"tags": [
@@ -249,6 +205,100 @@
 					"where": [],
 					"status": "asked",
 					"ask": "C3"
+				}
+			]
+		},
+		{
+			"id": "orcs",
+			"type": "faction",
+			"name": "the orcs",
+			"status": "agreed",
+			"source": "Jeff",
+			"summary": "The orcs, the brutes met in the land, allied to the Blood Rot for pay.",
+			"relations": [
+				{
+					"to": "blood_rot",
+					"kind": "ally"
+				},
+				{
+					"to": "town",
+					"kind": "enemy"
+				}
+			],
+			"tags": [
+				"raiders"
+			],
+			"facts": [
+				{
+					"id": "orcs.brute",
+					"text": "The brute is an orc, big and heavy, and it stands guard.",
+					"known": "common",
+					"where": [],
+					"tags": [
+						"fighting",
+						"monsters"
+					],
+					"source": "game",
+					"status": "agreed"
+				},
+				{
+					"id": "orcs.paid",
+					"text": "Orcs fight for the Blood Rot for a share of what the raids bring in.",
+					"known": "common",
+					"where": [
+						"blood_rot_lands"
+					],
+					"source": "Jeff",
+					"status": "agreed"
+				}
+			]
+		},
+		{
+			"id": "kobolds",
+			"type": "faction",
+			"name": "the kobolds",
+			"status": "agreed",
+			"source": "Jeff",
+			"summary": "The kobolds, the sneaks met in the land, allied to the Blood Rot, who dig for them.",
+			"relations": [
+				{
+					"to": "blood_rot",
+					"kind": "ally"
+				},
+				{
+					"to": "mine",
+					"kind": "in"
+				},
+				{
+					"to": "town",
+					"kind": "enemy"
+				}
+			],
+			"tags": [
+				"raiders"
+			],
+			"facts": [
+				{
+					"id": "kobolds.sneak",
+					"text": "The sneak is a kobold; it patrols and comes at its prey from the side.",
+					"known": "common",
+					"where": [],
+					"tags": [
+						"fighting",
+						"monsters"
+					],
+					"source": "game",
+					"status": "agreed"
+				},
+				{
+					"id": "kobolds.dig",
+					"text": "Kobolds dig the mine's shafts for the Blood Rot.",
+					"known": "common",
+					"where": [
+						"blood_rot_lands"
+					],
+					"source": "Jeff",
+					"status": "agreed"
 				}
 			]
 		},
@@ -419,71 +469,16 @@
 						"blood_rot"
 					],
 					"source": "proposal"
-				}
-			]
-		},
-		{
-			"id": "earlier_humans",
-			"type": "people",
-			"name": "the earlier humans",
-			"status": "agreed",
-			"source": "Jeff",
-			"summary": "The humans who built the tower over the mine and died off from the rot.",
-			"relations": [
-				{
-					"to": "tower",
-					"kind": "from"
 				},
 				{
-					"to": "blood_rot_lands",
-					"kind": "in"
-				}
-			],
-			"tags": [
-				"history"
-			],
-			"facts": [
-				{
-					"id": "earlier_humans.built",
-					"text": "Humans who lived before built the tower over the mine.",
+					"id": "blood_rot.stronger",
+					"text": "The goblins grew stronger from the rot.",
 					"known": "common",
 					"where": [
 						"blood_rot_lands"
 					],
-					"tags": [
-						"history"
-					],
-					"status": "agreed"
-				},
-				{
-					"id": "earlier_humans.died",
-					"text": "Those humans died off from the rot, and the goblins grew stronger from it.",
-					"known": "rumour",
-					"where": [
-						"blood_rot_lands"
-					],
-					"true": true,
-					"tags": [
-						"history",
-						"rot"
-					],
-					"status": "agreed"
-				},
-				{
-					"id": "earlier_humans.who",
-					"text": "Who the earlier humans were: the town's forebears or a people wholly gone, and whether any survived.",
-					"known": "common",
-					"where": [],
-					"status": "asked",
-					"ask": "H1"
-				},
-				{
-					"id": "earlier_humans.worship",
-					"text": "Whether the earlier humans worshipped the star, and the Blood Rot took that worship from them.",
-					"known": "common",
-					"where": [],
-					"status": "asked",
-					"ask": "H2"
+					"source": "Jeff",
+					"status": "draft"
 				}
 			]
 		}

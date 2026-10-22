@@ -88,10 +88,15 @@ near the mine call it the rot-source. The learned have tied the rot to the ore o
 the mine, some by watching and some by the gift. Blighted ore comes from there.
 What it does when worked is open *(asked: D3)*.
 
-A tower stands over the mine. It was built by humans who lived before. They died
-off from the rot, and the goblins grew stronger from it. The tower still holds
-their artifacts and treasures. Who those humans were *(asked: H1)*, and whether
-they worshipped the star too *(asked: H2)*, are open.
+A tower stands over the mine. In Jeff's second session it was built by orcish labour
+to the designs of dark elven architects, in their majestic style, and the earlier
+humans were dropped: the world is full of mythical peoples, and the tower is theirs
+*(draft until Jeff confirms the wording)*. The goblins grew stronger from the rot.
+The tower holds old artifacts and treasures, and dark elven artifacts come from it.
+Its inside shifts, perhaps by magic; its treasures have never all been carried out,
+and adventurers still come. Whether the dark elves died of the rot, left or still
+live, and whether they or the orcs worshipped the star before the goblins, are
+open.
 
 ## The smith
 

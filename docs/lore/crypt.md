@@ -1,0 +1,305 @@
+# The crypt under the temple
+
+Status: **draft**. From Jeff's lore session, 2026-10-19. Jeff decides; Dire playtests
+and brings ideas to Jeff. **[Jeff]** lines paraphrase him and stay draft until lore
+checks the wording. Touches lore question B1 (does coming back cost anything?) and
+decision 396 (the fallen are brought back at a temple or a healer's hut).
+
+- **[Jeff]**: Jeff said it (paraphrased).
+- **[proposal]**: suggested in session, open to change or cut.
+
+Companion files: `castle.md` (the labyrinths, the other delve-again place),
+`blood_rot.md`.
+
+---
+
+## The idea
+
+- **[Jeff]** A crypt, tied to the town's temple. (First placed under the temple;
+  now a barrow a little outside town, with a shortcut to the temple. See below.)
+- **[Jeff]** It is a delve-again dungeon, like the labyrinths under the castle.
+- **[Jeff]** A small boss waits at the end.
+- **[Jeff]** Before the crypt is finished, being brought back at the temple takes a
+  gold offering.
+- **[Jeff]** Finishing the crypt makes being brought back free. (Refined: the draugr,
+  given gold, offers the deal; beating him wins the free return.)
+- **[Jeff]** You decide whether to take a companion down with you. A companion who
+  goes down and finishes it is marked as blessed: brought back free from then on.
+
+## The barrow
+
+- **[Jeff]** The crypt is a barrow, perhaps under a mound, but still a crypt-like
+  structure below the town.
+- **[Jeff]** It is filled with tombs.
+- **[Jeff]** Reanimated skeletons walk in it, raised by the draugr's curse.
+- **[Jeff]** The barrow lies a little outside town, not directly under the temple.
+- **[Jeff]** The temple can have a shortcut, unlocked from the draugr's room, so
+  later companions can be taken to the draugr without running the whole barrow.
+- **[Jeff]** The shortcut is magically sealed. It opens only for those who carry the
+  draugr's blessing, so it is per player, never open for everyone.
+- **[proposal]** The shortcut is an old tunnel the founders dug from the temple's
+  ground to the barrow when they plundered it. The seal is the dead's (or the old
+  gods'): it lets through only those the draugr has blessed. Aldous may not know the
+  tunnel is there. (Touches B2: magic is real enough to seal a door.)
+- **[proposal]** Pip's runs go out of town to the mound, quietly, which suits a
+  secret errand and a town that keeps away out of superstition.
+- **[proposal]** Laying the draugr to rest stills the skeletons too. When it rises
+  again, they stir again.
+- **[Jeff]** The barrow is ancient, older than the town.
+- **[Jeff]** When the town's people first came, they plundered the burial grounds
+  and melted the grave goods down for gold to found the town.
+- **[Jeff]** They moved the old dead deeper to make room for their own dead.
+- **[Jeff]** This angered the old gods, who sent the draugr.
+- **[Jeff]** The dead are only trying to go back to their graves.
+- **[proposal]** So the barrow is layered: the town's own tombs near the top, the
+  old dead shoved down below them, oldest deepest. Going down goes back in time.
+- **[proposal]** The skeletons are not hunting anyone; they are walking home, up
+  toward the graves they were taken from. Whoever stands in the way is in the way.
+- **[Jeff]** The temple's offerings keep the upper layers safe for burials.
+- **[Jeff]** Aldous gives a quest: take gold down to the lower layers. A back and
+  forth between the town and its old dead.
+- **[Jeff]** Give gold to the draugr and he offers a deal: beat him, and you can be
+  brought back without the offering.
+- **[proposal]** The deal is a duel by pact, close to the sagas' holmgang (a formal
+  fight on agreed terms). The draugr keeps his word: the dead are bound by bargains
+  in a way the living are not.
+- **[proposal]** The free return is then the dead's gift, not the temple's: they
+  let you go because you dealt fairly with them.
+
+### Aldous's secret
+
+- **[Jeff]** Aldous keeps the temple and takes alms there.
+- **[Jeff]** The crypt and the dead below are Aldous's secret, and the reason he
+  takes alms at the temple: the alms are the gold that goes down.
+- **[Jeff]** The town lives in bliss, knowing nothing of it, but keeps away from the
+  crypt out of superstition.
+- **[Jeff]** The runner who usually took the gold down for Aldous did not come back
+  from the last run.
+- **[proposal]** That is why Aldous needs the players: someone has to take the gold
+  down now, and find out what happened to the runner.
+- **[proposal]** With the gold not going down, the lower dead grow restless and creep
+  up toward the town's own tombs. On the world tick, the longer the gold is late, the
+  higher the skeletons come: a pressure the town feels without knowing why.
+- **[proposal]** The runner's fate is open: dead below, held by the draugr as the
+  price of a broken bargain, or taken by the dead walking home. A body, a pack or a
+  last word found down there would tell it.
+
+### Aldous's apprentice: Pip
+
+- **[Jeff]** Pip is Aldous's apprentice. He also hangs around town.
+- **[Jeff]** Pip is not superstitious enough to keep away from the crypt, and, a
+  squire in the making, he is looking to prove his bravery.
+- **[Jeff]** Taking the offering down is a routine trip for Pip. He delivers it in
+  secret.
+- **[Jeff]** The offering is all the gold people pay Aldous to be brought back.
+- **[Jeff]** When Pip doesn't come back, the town notices he is gone.
+- **[Jeff]** A player may happen to find him in the crypt. It is flavour: nothing in
+  the crypt depends on him.
+- **[Jeff]** Aldous may not understand the whole truth. He only knows that keeping
+  the payments on time keeps things as they are.
+- **[proposal]** Pip's runs happen on the world tick, whether or not anyone watches,
+  so they pass the living-world test. Most runs go fine; now and then one goes wrong
+  and Pip is lost below until someone finds him (no clock, H8 a). While lost, he is
+  not available as a companion, and gossip carries "Pip hasn't been seen."
+- **[proposal]** If rescued, Pip knows a bit about the draugr (a `lived` fact), more
+  than his master does.
+- **[proposal]** Pip's low superstition is a fixed fact of his, which sits against
+  the rule that companions' traits are rolled (E2): set it low and roll the rest.
+
+### Inside the barrow
+
+- **[Jeff]** The altar: where the offerings are laid.
+- **[Jeff]** Grave robbers are down there too, trying to find the altar.
+- **[Jeff]** Skeletons protect the altar in return.
+- **[Jeff]** Robbers and skeletons are both hostile to Pip.
+- **[Jeff]** A hidden passage in the altar room leads deeper, to the draugr's lair.
+- **[Jeff]** You talk to the draugr first and take his deal. If you defeat him, he
+  blesses you or your companion, and the blessed can be brought back without the
+  gold offering.
+- **[proposal]** The robbers have heard that gold goes down into the crypt (a true
+  rumour somewhere outside town), or have followed Pip. Mound-breakers are a saga
+  type, and they answer part of E1: outlaws exist.
+- **[proposal]** The altar's gold is what keeps the dead settled. If robbers carry it
+  off, the upper layers go unsafe (ties to the creep on the world tick).
+- **[proposal]** Three sides in one dungeon: the robbers want the gold, the skeletons
+  guard it, Pip carries it. The player can fight their way through all of them or
+  let robbers and skeletons wear each other down.
+
+### Who knows what
+
+| Fact | Known | Notes |
+|---|---|---|
+| The crypt is a place to keep away from. | common in town | Superstition. **[Jeff]** |
+| Things walk in the crypt. | rumour, `true: true`, town | **[proposal]** |
+| The town's founders plundered the barrow. | secret: Aldous | **[Jeff]** |
+| The temple's alms go down to the dead. | secret: Aldous, the runner | **[Jeff]** |
+| The draugr bargains. | secret: the draugr; Pip once rescued (`lived`) | Aldous does not know. **[Jeff]** |
+| Pip takes the offering down. | secret: Aldous, Pip | **[Jeff]** |
+| Gold goes down into the crypt. | rumour, `true: true`, outside town | Why the robbers come. **[proposal]** |
+| Pip hasn't been seen. | common in town, once he is lost | Gossip carries it. **[proposal]** |
+- **[proposal]** Who knows the founding: a `secret` held by the priest (and perhaps
+  the lawspeaker). The town at large does not know, or tells it as something else.
+  A town whose memory has smoothed over its own crime suits the lawspeaker's job.
+- Touches B3: the old gods exist and act. Which gods, and whether the temple is
+  theirs, is still open.
+- **[proposal]** Grave goods. Breaking a mound for its treasure is a saga deed
+  (Grettir breaks into Kárr's mound in *Grettis saga*). Things taken from the tombs
+  could fall under H12 (a named thing taken, not given, is cursed) until blessed at
+  the temple (decision 424), which ties the crypt's loot to the temple above it.
+
+## Its place in the game
+
+- **[Jeff]** The barrow is the starter dungeon: the blessing is what you need before
+  venturing far from town.
+- **[proposal]** So the first arc runs town, barrow, world. Until blessed, a fall
+  sends you back to town, which keeps new players near home without any wall.
+- **[proposal]** The farther a place is from town, the more a fall costs the
+  unblessed, so distance itself teaches why the barrow comes first.
+- **[proposal]** The draugr's harder difficulties (more uses) give a reason to come
+  back to the barrow later in the game.
+
+## Lore team
+
+- **[Jeff]** The boss is a draugr: one of the restless dead who guard their graves
+  (the Norse undead; Grettir and Glámr in *Grettis saga*).
+- **[proposal]** Why the rite works: the temple cannot bring the fallen back freely
+  while something below will not stay dead. Whoever goes down and lays it to rest
+  has the dead's peace, and the temple's work costs them nothing after.
+- **[proposal]** The draugr rises again in time, so each companion faces it once and
+  the crypt stays alive for new ones. (Fits "whoever falls rises again", turned on
+  the dead below.)
+- **[proposal]** Why it shifts stays unexplained, as with the labyrinths. One quiet
+  option: the town was built over tunnels older than anyone knew, and the crypt
+  opens into them.
+- **[proposal]** Having been below is a `lived` fact on the companion's card, and
+  common knowledge in town: people know who has and hasn't.
+
+## Map team
+
+- **[Jeff]** A mound (the barrow) with a crypt below the town: tombs, passages.
+- **[Jeff]** The barrow is a little outside town; its entrance is at the mound.
+- **[Jeff]** A shortcut from the temple to the draugr's room, unlocked from the
+  draugr's side, for later trips.
+- **[Jeff]** The altar room, with a hidden passage leading deeper to the draugr's lair.
+- **[proposal]** Fixed anchors: the mound's entrance, the altar room and its hidden
+  passage, the draugr's lair, and the shortcut's two ends. The halls between
+  regenerate.
+- **[Jeff]** The shortcut is per player: it opens only for the blessed.
+- **[Jeff]** Being brought back without Aldous is done by talking to the draugr in
+  person. The shortcut's end is right below the temple, so it is not a long trip.
+- **[proposal]** So the blessed are not brought back by the temple at all, but by
+  the dead: the free return is the draugr's, given face to face. The unblessed still
+  pay Aldous's offering at the temple above.
+- **[proposal]** Economy note: every blessing is one less payer of the offering,
+  so less gold goes down. Whether that matters (the creep), or the draugr's bargain
+  is worth it to the dead anyway, is Jeff's call.
+- Open: how it plays. Does a fallen blessed player wake in the draugr's chamber and
+  walk up the shortcut, or go down to him to be made whole? And a fallen companion:
+  does her player take her to him?
+- **[Jeff, revised]** Not a trip to the draugr each time (too much of the loop would
+  run back to the temple). The blessing is earned once, and with it the draugr
+  gives a device: a two-part thing. The player holds the item; the companion holds
+  the return token.
+- **[Jeff]** To bring a fallen companion back, the player stands still and is not hit
+  for a few seconds, even with enemies near. Being hit breaks it.
+- **[proposal]** The device as an oath-ring broken in two (oath-rings are a saga
+  thing), or a coin of the plundered grave gold cut in half: gold taken from the
+  dead, given back as a bond with them. Each half calls to the other.
+- **[Jeff]** A blessed player can be brought back in the field. An unblessed player
+  who falls starts again in town.
+- **[Jeff]** The return token has a number of uses: 5, 10 or 15, depending on the
+  difficulty the draugr was beaten at.
+- **[proposal]** In-world, each use wears the token: the cut coin thins, a little of
+  its gold going back to the dead each time.
+- **[proposal]** When it is spent, the token is renewed by going back to the draugr
+  and paying him gold. That sends gold down after all (answering the economy note
+  above) and makes the rare trip back below a choice, not the loop.
+- **[Jeff]** The uses are the blessed player's own count. If a companion brings the
+  player back, it counts down the player's uses.
+- **[Jeff]** The uses can be spent on anyone who is blessed, the player included:
+  blessed companions, blessed players, oneself.
+- **[Jeff]** The return works only on the blessed. Anyone unblessed (player or
+  companion) who falls starts again in town.
+- Open: when the token is spent, is renewal by gold, by fighting the draugr again,
+  or both?
+- **[Jeff]** A blessed player can bring a companion through the shortcut.
+- **[Jeff]** Every player must play the barrow and defeat the draugr at least once to
+  earn the shortcut. A blessed friend does not carry an unblessed player through.
+- **[Jeff]** Delve-again layout; a small boss room at the end.
+- **[proposal]** Small and early: a first delve near home, before the castle.
+
+## Art team
+
+- **[Jeff]** Tombs; reanimated skeletons; the draugr.
+- **[proposal]** Outside: a grass-covered mound a little outside town, a stone-framed
+  door. Inside: stone-lined passages, burial niches, grave goods, cold and close.
+- **[proposal]** Skeletons as one shared rig with variants (armed, armoured, the
+  draugr's own retinue); the draugr itself bigger, swollen, dark (the sagas' draugar
+  are heavy and blackened, not bare bone).
+
+## Economy / npc
+
+- **[Jeff]** Brought back at the temple: a gold offering, until blessed; free after.
+- Open: where the offering goes (the temple, the treasury, the priest's living).
+- Open: do townsfolk pay? Today (396) everyone is brought back free.
+- Open: does the healer's hut in the wilds charge too, or is it the free (or
+  different) way back?
+
+## Open questions for Jeff
+
+0. Aldous is the temple's priest (implied by "alms at the temple"): confirm.
+0. Fight the draugr without giving gold: does that win anything (loot, quiet for a
+   while), or is the deal the only way to the free return?
+
+1. Players: does finishing the crypt bless the player too, or only companions?
+2. **Naming clash:** "blessed" is already used in the game (decision 424: a kept
+   thing blessed at the temple is made its holder's own). Keep the word for both, or
+   give this its own (e.g. "has been below", "barrow-walked", "hallowed")?
+3. If a companion falls in the crypt before it is finished, she pays the offering
+   to come back: intended as the risk of bringing her?
+4. Does the blessing ever wear off, or is it for life?
+
+---
+
+## Log
+
+- 2026-10-19: crypt under the temple, delve-again, small boss, gold offering until
+  finished; a companion taken down and finishing it is blessed (Jeff).
+- 2026-10-19, cont.: a barrow, perhaps a mound, crypt-like below town; tombs;
+  skeletons raised by the draugr's curse (Jeff).
+- 2026-10-19, cont.: the barrow predates the town; the founders plundered it for
+  gold and moved the old dead deeper; the old gods sent the draugr; the dead are
+  trying to go back to their graves (Jeff).
+- 2026-10-19, cont.: offerings keep the upper layers safe for burials; Aldous's
+  quest takes gold to the lower layers; the draugr, given gold, offers a deal: beat
+  him and be brought back without the offering (Jeff).
+- 2026-10-19, cont.: the founding and the gold runs are Aldous's secret, why he takes
+  alms; the town lives in bliss but shuns the crypt; the runner never came back (Jeff).
+- 2026-10-19, cont.: Aldous has an apprentice who hangs around town; Pip, not
+  superstitious enough and wanting to prove his bravery (Jeff).
+- 2026-10-19, cont.: Pip is the apprentice and the runner; he goes missing only
+  after a player learns the secret from Aldous; rescued lost in the barrow, he knows
+  a bit about the draugr; Aldous only keeps the payments on time (Jeff).
+- 2026-10-19, cont.: Pip's run is routine and secret, carrying all the resurrection
+  gold; town notices when he's gone; finding him is flavour. The altar, grave robbers
+  seeking it, skeletons guarding it (all hostile to Pip); a hidden passage to the
+  draugr's lair; talk, take the deal, defeat him to be blessed (Jeff).
+- 2026-10-19, cont.: the barrow moves a little outside town; a shortcut from the temple
+  to the draugr's room, unlocked from his side, for later companions (Jeff).
+- 2026-10-19, cont.: the shortcut is magically sealed, per player, open only to the
+  blessed (Jeff).
+- 2026-10-19, cont.: a player may bring a companion through the shortcut; each player
+  must run the barrow and defeat the draugr once to earn it (Jeff).
+- 2026-10-19, cont.: the free return is done by talking to the draugr in person,
+  through the shortcut right below the temple (Jeff).
+- 2026-10-19, cont.: revised: blessing once gives the draugr's two-part device (player's
+  item, companion's token); a companion is brought back by standing still, unhit, a few
+  seconds (Jeff).
+- 2026-10-19, cont.: blessed players can be brought back in the field, unblessed restart
+  in town; the token has 5, 10 or 15 uses by the draugr's difficulty (Jeff).
+- 2026-10-19, cont.: one count of uses per blessed player, spent on anyone, the
+  player included; a companion bringing the player back spends it (Jeff).
+- 2026-10-19, cont.: correction: the return works only on the blessed; the unblessed
+  start again in town (Jeff).
+- 2026-10-19, cont.: the barrow is the starter dungeon; the blessing is needed before
+  venturing far from town (Jeff).
