@@ -1330,6 +1330,22 @@
 				{"at": [0, 1.75, 1.5], "size": [1.6, 0.3, 0.45]}
 			]
 		},
+		"building.standing_stone": {
+			"category": "buildings",
+			"type": "mesh",
+			"kind": "cell",
+			"footprint": [1, 1],
+			"size": [1.2, 2.45, 0.87],
+			"tolerance": 0.15,
+			"budget": 300,
+			"variants": 3,
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-21", "notes": "C:/dev/review/landmarks/make_stone.py: a lattice of rings of 8 up the stone, closer near the foot, pushed about by low noise (bulges and hollows, a squarish split-stone section), narrowing and leaning, a broken top; row 1's greys, darker at the foot, pale lichen on its top, moss up its foot in a line that climbs and drops; three or four half-sunk packing stones; variant 1 tall and slab-like, 2 broader and shorter with a slanted top, 3 thin and bowed; 188 to 194 tris"},
+			"uses": "a standing stone, one rough menhir about 2.5 m tall, 1 x 1 cell, a whole piece standing on grass (decision 550's solid cell): the wilds' landmarks (maps, the coordinator approved, 2026-10-21; Jeff: \"wilds needs better land marks\"), 7 to 9 in a ring about 6 cells across, mixed variants each turned its own way; its broad face toward +z",
+			"grey": [
+				{"at": [0, 1.225, 0], "size": [1.0, 2.45, 0.7]},
+				{"at": [0, 0.1, 0], "size": [1.2, 0.2, 0.87]}
+			]
+		},
 		"door.double": {
 			"category": "doors",
 			"type": "mesh",
