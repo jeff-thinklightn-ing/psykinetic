@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The barrow is roomier (541 amended, Jeff: "way too cramped"): its ways are three cells wide, the tombs, passage graves and caverns bigger, the altar room and the draugr's lair larger still, the whole level grown from 44 x 36 to 72 x 60; fewer dead walk it (enemy-ai's counts). The shifting halls take the new shape at the box's next regeneration.
 - The building hint and builder mode's click line say how far the town has built a building: "H3 house, being built 40%", "planned" or "damaged" (566).
 - Wolves are less keen (Jeff's "wolf packs of 4 near the town are too much"): by day a pack needs 4 together to hunt you, not 3, so the smaller packs leave you be unless struck; a wolf chases 15 cells from its den, not 30, so running gets you away; at night it sees 1 cell farther than by day, not 2.
 - The barrow is quieter (Jeff's "too many enemies, aggro lower"): its skeletons, guards, robbers and the draugr see 5 cells, not 7; a grave robber's call for help reaches 6 cells, not 12, and he roams 10 from home; half the skeletons lie in their graves from the start; one walking home that you block steps back and waits 2 s before it fights; the draugr raises 1 skeleton at normal and 2 at hard (was 2 and 4); a level can set how long its dead take to come back ("respawn_s"): the barrow's dead 10 minutes, its robbers 5 (was 1 minute). Fewer of them come with dungeon's widened barrow (4 skeletons, 2 robbers, 2 guards).

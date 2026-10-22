@@ -6,24 +6,24 @@
 	"grave_goods": true,
 	"starts": [
 		[
-			21,
+			35,
 			2
 		]
 	],
 	"spawn_points": {
 		"from_wilds": [
-			22,
+			36,
 			2
 		],
 		"from_temple": [
-			38,
-			17
+			56,
+			32
 		]
 	},
 	"links": [
 		{
 			"at": [
-				22,
+				36,
 				1
 			],
 			"to_map": "wilds",
@@ -31,8 +31,8 @@
 		},
 		{
 			"at": [
-				39,
-				17
+				57,
+				32
 			],
 			"to_map": "wilds",
 			"to_spawn": "from_barrow_shortcut",
@@ -42,8 +42,8 @@
 	"entities": [
 		{
 			"at": [
-				19,
-				17
+				29,
+				31
 			],
 			"name": "Altar",
 			"props": {
@@ -57,15 +57,15 @@
 		},
 		{
 			"at": [
-				34,
-				17
+				49,
+				32
 			],
 			"name": "Draugr"
 		},
 		{
 			"at": [
-				31,
-				20
+				44,
+				36
 			],
 			"name": "Runner's pack",
 			"props": {
@@ -83,11 +83,10 @@
 		"generator": "labyrinth",
 		"style": "barrow",
 		"every_days": 3,
-		"entrance": "entrance",
 		"anchors": [
 			{
 				"rect": [
-					19,
+					33,
 					1,
 					6,
 					4
@@ -96,50 +95,51 @@
 			},
 			{
 				"rect": [
-					16,
-					15,
-					8,
-					6
+					24,
+					27,
+					12,
+					10
 				],
 				"name": "altar"
 			},
 			{
 				"rect": [
-					24,
-					17,
+					36,
+					31,
 					7,
-					1
+					3
 				],
 				"name": "passage"
 			},
 			{
 				"rect": [
-					31,
-					14,
-					7,
-					7
+					43,
+					27,
+					12,
+					11
 				],
 				"name": "lair"
 			},
 			{
 				"rect": [
-					38,
-					16,
-					2,
-					3
+					55,
+					30,
+					3,
+					4
 				],
 				"name": "shortcut"
 			},
 			{
 				"rect": [
-					12,
-					16,
+					20,
+					30,
 					2,
 					2
 				],
 				"name": "niche"
 			}
 		],
+		"entrance": "entrance",
 		"rooms": {
 			"count": [
 				9,
@@ -147,19 +147,19 @@
 			],
 			"size": [
 				[
-					3,
-					3
+					5,
+					5
 				],
 				[
-					6,
-					5
+					8,
+					7
 				]
 			]
 		},
 		"loops": 0.15,
 		"monsters": {
-			"skeleton": 6,
-			"robber": 3
+			"skeleton": 4,
+			"robber": 2
 		},
 		"near": {
 			"robber": "altar"
@@ -167,10 +167,10 @@
 		"chests": 4
 	},
 	"legend": {
-		"monster_skeleton": "#d8d0b0",
-		"monster_skeleton_guard": "#988c64",
+		"monster_draugr": "#5a4636",
 		"monster_robber": "#8a5a2a",
-		"monster_draugr": "#5a4636"
+		"monster_skeleton": "#d8d0b0",
+		"monster_skeleton_guard": "#988c64"
 	},
 	"respawn_s": {
 		"skeleton": 600,
@@ -180,8 +180,8 @@
 	"places": {
 		"niche": {
 			"at": [
-				12,
-				16
+				20,
+				30
 			],
 			"kind": "other",
 			"radius": 1,

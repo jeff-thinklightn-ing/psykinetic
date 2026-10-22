@@ -16,16 +16,33 @@ const SIZE := Vector2i(48, 40)
 const ANCHORS := [{"rect": [2, 2, 6, 5], "name": "gatehouse"}, {"rect": [4, 18, 7, 5], "name": "west hall"},
 	{"rect": [37, 14, 7, 5], "name": "east hall"}, {"rect": [40, 33, 6, 5], "name": "deepest chamber"}]
 const OUTLINE := Color(0.25, 0.6, 1.0)
-## The sample barrow (decision 541): its size and anchors, each with the
-## sides it is walled on (the rest open to the tombs).
-const BARROW_SIZE := Vector2i(44, 36)
+## The sample barrow (decision 541; 541 amended: 72 x 60, the rooms and
+## anchors bigger, Jeff: "way too cramped"): its size and anchors, each
+## with the sides it is walled on (the rest open to the tombs). The real
+## barrow's template is written from this (levels/barrow, 542).
+const BARROW_SIZE := Vector2i(72, 60)
 const BARROW_ANCHORS := [
-	{"rect": [19, 1, 6, 4], "name": "entrance", "walled": ["north", "east", "west"]},
-	{"rect": [16, 15, 8, 6], "name": "altar", "walled": ["east", "south"]},
-	{"rect": [24, 17, 7, 1], "name": "passage", "walled": ["north", "south"]},
-	{"rect": [31, 14, 7, 7], "name": "lair", "walled": ["north", "east"]},
-	{"rect": [38, 16, 2, 3], "name": "shortcut", "walled": ["north", "east", "south"]},
-	{"rect": [12, 16, 2, 2], "name": "niche", "walled": ["north", "west", "south"]}]
+	{"rect": [33, 1, 6, 4], "name": "entrance", "walled": ["north", "east", "west"]},
+	{"rect": [24, 27, 12, 10], "name": "altar", "walled": ["east", "south"]},
+	{"rect": [36, 31, 7, 3], "name": "passage", "walled": ["north", "south"]},
+	{"rect": [43, 27, 12, 11], "name": "lair", "walled": ["north", "east"]},
+	{"rect": [55, 30, 3, 4], "name": "shortcut", "walled": ["north", "east", "south"]},
+	{"rect": [20, 30, 2, 2], "name": "niche", "walled": ["north", "west", "south"]}]
+## The barrow's named cells: the link up and the start in the vestibule,
+## the altar with a guard each side, the passage's door on the altar
+## room's east wall, the draugr and the Runner's pack in the lair, the
+## sealed link in the nook, Pip's niche.
+const BARROW_LINK := Vector2i(36, 1)
+const BARROW_START := Vector2i(35, 2)
+const BARROW_FROM_WILDS := Vector2i(36, 2)
+const BARROW_ALTAR := Vector2i(29, 31)
+const BARROW_GUARDS := [Vector2i(27, 31), Vector2i(31, 31)]
+const BARROW_DOOR_ROW := 32
+const BARROW_DRAUGR := Vector2i(49, 32)
+const BARROW_PACK := Vector2i(44, 36)
+const BARROW_SHORTCUT_LINK := Vector2i(57, 32)
+const BARROW_FROM_TEMPLE := Vector2i(56, 32)
+const BARROW_NICHE := Vector2i(20, 30)
 ## The barrow's legend: enemy-ai's kinds (547, 548), the barrow's own level.json
 ## colours, never Level.LEGEND's.
 const BARROW_LEGEND := {"monster_skeleton": "#d8d0b0", "monster_skeleton_guard": "#988c64", "monster_robber": "#8a5a2a", "monster_draugr": "#5a4636"}
@@ -169,23 +186,29 @@ static func sample_barrow() -> Dictionary:
 					"east":
 						if cell.x == rect.end.x - 1:
 							rows[cell.y * 2][cell.x * 2 + 1] = "#"
-	rows[17 * 2][23 * 2 + 1] = "+"  # The hidden passage's door, behind the altar.
-	for y in range(16, 19):
-		rows[y * 2][37 * 2 + 1] = " "  # The lair's east wall opens on the shortcut's nook.
+	var altar_rect: Rect2i = Level.town_wall_rect(BARROW_ANCHORS[1])
+	rows[BARROW_DOOR_ROW * 2][(altar_rect.end.x - 1) * 2 + 1] = "+"  # The hidden passage's door, behind the altar.
+	var lair_rect: Rect2i = Level.town_wall_rect(BARROW_ANCHORS[3])
+	var nook_rect: Rect2i = Level.town_wall_rect(BARROW_ANCHORS[4])
+	for y in range(nook_rect.position.y, nook_rect.end.y):
+		rows[y * 2][(lair_rect.end.x - 1) * 2 + 1] = " "  # The lair's east wall opens on the shortcut's nook.
 	var lines: Array[String] = []
 	for row in rows:
 		lines.append("".join(row))
-	var layout := Level.image_from_rows(lines, {Vector2i(22, 1): "link", Vector2i(21, 2): "start", Vector2i(19, 17): "chest",
-		Vector2i(17, 15): "monster_skeleton_guard", Vector2i(22, 15): "monster_skeleton_guard", Vector2i(17, 20): "monster_skeleton_guard",
-		Vector2i(34, 17): "monster_draugr", Vector2i(31, 20): "chest", Vector2i(39, 17): "link"}, {"legend": BARROW_LEGEND})
-	var config := {"name": "Sample barrow", "walls": "stone", "floors": "stone", "starts": [[21, 2]], "legend": BARROW_LEGEND,
-		"spawn_points": {"from_wilds": [22, 2], "from_temple": [38, 17]},
-		"links": [{"at": [22, 1], "to_map": "wilds", "to_spawn": "from_barrow"},
-			{"at": [39, 17], "to_map": "wilds", "to_spawn": "from_barrow_shortcut", "sealed": "draugr"}],
-		"places": {"niche": {"at": [12, 16], "kind": "other", "radius": 1, "name": "a niche in the wall"}},
-		"entities": [{"at": [19, 17], "name": "Altar", "props": {"slots": ["", "", "", ""]}}, {"at": [34, 17], "name": "Draugr"},
-			{"at": [31, 20], "name": "Runner's pack", "props": {"slots": ["", "", "", ""]}}],
+	var markers := {BARROW_LINK: "link", BARROW_START: "start", BARROW_ALTAR: "chest", BARROW_DRAUGR: "monster_draugr",
+		BARROW_PACK: "chest", BARROW_SHORTCUT_LINK: "link"}
+	for guard: Vector2i in BARROW_GUARDS:
+		markers[guard] = "monster_skeleton_guard"
+	var layout := Level.image_from_rows(lines, markers, {"legend": BARROW_LEGEND})
+	var config := {"name": "Sample barrow", "walls": "stone", "floors": "stone", "starts": [[BARROW_START.x, BARROW_START.y]], "legend": BARROW_LEGEND,
+		"spawn_points": {"from_wilds": [BARROW_FROM_WILDS.x, BARROW_FROM_WILDS.y], "from_temple": [BARROW_FROM_TEMPLE.x, BARROW_FROM_TEMPLE.y]},
+		"links": [{"at": [BARROW_LINK.x, BARROW_LINK.y], "to_map": "wilds", "to_spawn": "from_barrow"},
+			{"at": [BARROW_SHORTCUT_LINK.x, BARROW_SHORTCUT_LINK.y], "to_map": "wilds", "to_spawn": "from_barrow_shortcut", "sealed": "draugr"}],
+		"places": {"niche": {"at": [BARROW_NICHE.x, BARROW_NICHE.y], "kind": "other", "radius": 1, "name": "a niche in the wall"}},
+		"entities": [{"at": [BARROW_ALTAR.x, BARROW_ALTAR.y], "name": "Altar", "props": {"slots": ["", "", "", ""]}},
+			{"at": [BARROW_DRAUGR.x, BARROW_DRAUGR.y], "name": "Draugr"},
+			{"at": [BARROW_PACK.x, BARROW_PACK.y], "name": "Runner's pack", "props": {"grave": false, "slots": ["", "", "", ""]}}],
 		"regenerate": {"generator": "labyrinth", "style": "barrow", "every_days": 3, "anchors": BARROW_ANCHORS, "entrance": "entrance",
-			"rooms": {"count": [9, 12], "size": [[3, 3], [6, 5]]}, "loops": 0.15,
-			"monsters": {"skeleton": 6, "robber": 3}, "near": {"robber": "altar"}, "chests": 4}}
+			"rooms": {"count": [9, 12], "size": [[5, 5], [8, 7]]}, "loops": 0.15,
+			"monsters": {"skeleton": 4, "robber": 2}, "near": {"robber": "altar"}, "chests": 4}}
 	return {"layout": layout, "config": config}

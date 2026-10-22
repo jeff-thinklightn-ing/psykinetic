@@ -498,7 +498,12 @@ third the town's square tombs with doors, torches and burial niches, an
 alcove cell off the walls; the middle third narrow passage graves with
 crooked ways and niches, no doors; the deepest the old caverns; chests in
 the deepest niches first, monsters deepest first unless `"near": {kind:
-anchor}` sends a kind to an anchor, the robbers to the altar). Its own keys:
+anchor}` sends a kind to an anchor, the robbers to the altar; its ways are
+three cells wide, a brush along the path that narrows to the one door
+cell into a shallow tomb, the torches by the walls, the deep blind ways
+short, a passage grave a cell under the least width and up to four over
+the most length, a cavern grown in a box two cells bigger each way: 541
+amended, Jeff: "way too cramped"). Its own keys:
 `"rooms": {"count": [lo, hi], "size": [[w, h], [w, h]]}` (least and most),
 `"loops"` (extra ways as a share of the rooms and anchors, 0.2), `"chests"`
 and `"crates"` (counts; chests on the blind ways' ends and room corners
@@ -511,7 +516,8 @@ generation large, the anchors outlined (`--level=<name>` or
 
 The first real level that regenerates is `levels/barrow`, "The Barrow"
 (decision 542, Jeff's crypt page: the starter dungeon, a mound a little
-outside the town): 44 x 36, the barrow style every 3 days, five anchors
+outside the town): 72 x 60 (541 amended; 44 x 36 before), the barrow style
+every 3 days, rooms 5 x 5 to 8 x 7, five anchors
 kept through every generation: the entrance vestibule under the mound's
 door (the link up to the wilds' "from_barrow", the spawn point
 "from_wilds"), the altar room with the altar and the hidden passage leaving

@@ -16699,6 +16699,28 @@ the kit's weights carried over (nearest face, on the same Armature). From here e
 through tools/creature_clean.py (weld, loose shells dropped, Solidify, voxel remesh, its bits
 dropped and stairs smoothed, QuadriFlow to clean quads, Smart UV, the paint baked back: about
 4 s a body) before its rig and before any kit, and a kit's work mesh is the cleaned one.
+
+Amended (2026-10-21, the coordinator's approval on Jeff's "crypt dungeon halls are
+way too cramped, i know its more realstic but the game can't be played in small
+spaces. too many enemies and aggro should be lower"; release: the first plain
+amendment): the barrow style's ways are three cells wide, a 3 x 3 brush along
+the path (labyrinth._carve_brush: never the rim, an anchor, or the ring round a
+shallow tomb, so a tomb is entered by its one door cell; the path's own cells
+stay the corridor cells, so torches, monsters and blind ways go by the centre;
+a torch stands by the wall, _by_wall); a passage grave a cell under the least
+width and up to four over the most length, a cavern grown in a box two cells
+bigger each way; the deep blind ways two to five cells (BLIND_SHORT). The
+barrow's template (542) is redrawn from the sample barrow in tools/plan_sheet,
+its twin: 72 x 60 (44 x 36 before), rooms 5 x 5 to 8 x 7 (3 x 3 to 6 x 5), the
+entrance vestibule 6 x 4 as it was, the altar room 12 x 10 (8 x 6), the hidden
+passage 7 x 3 (7 x 1), the lair 12 x 11 (7 x 7), the shortcut's nook 3 x 4
+(2 x 3), Pip's niche 2 x 2 as it was; every cell of levels/barrow/level.json
+moves with them, the wilds refer to the barrow by spawn names alone, so maps
+changes nothing; the block's monsters take enemy-ai's approved counts, 4
+skeletons and 2 robbers, and two skeleton_guard markers stand by the altar
+instead of three. The level is data both sides read, so it ships only in a full
+cut, never server-alone. labyrinth_test (the bands at 32 and 62, the width),
+level_test; docs/levels.md; CHANGELOG.
 ## 542. The Barrow: the first real level that regenerates
 
 Jeff asked for it (docs/lore/crypt.md, 2026-10-19: "the barrow is the

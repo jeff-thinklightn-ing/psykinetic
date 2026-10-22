@@ -862,16 +862,16 @@ func _test_barrow_level() -> void:
 	print("
 == levels/barrow (decision 542): the real barrow, marked to regenerate; a test run never writes it ==")
 	var barrow := Level.load_level("barrow")
-	_check(barrow["display_name"] == "The Barrow" and barrow["size"] == Vector2i(44, 36) and barrow["warnings"].is_empty(),
-		"The Barrow, 44 x 36, parses with no warning (%s)" % [barrow["warnings"]])
+	_check(barrow["display_name"] == "The Barrow" and barrow["size"] == Vector2i(72, 60) and barrow["warnings"].is_empty(),
+		"The Barrow, 72 x 60 (541 amended), parses with no warning (%s)" % [barrow["warnings"]])
 	_check(Regen.marked("barrow") and Regen.config_of("barrow")["anchors"].size() == 6 and Regen.config_of("barrow")["style"] == "barrow",
 		"marked to regenerate in the barrow style, six anchors")
 	var kinds := {}
 	for spec: Dictionary in barrow["entities"]:
 		var kind := str(spec.get("kind", spec["name"].rstrip("0123456789").to_lower()))
 		kinds[kind] = int(kinds.get(kind, 0)) + 1
-	_check(kinds.get("skeleton_guard", 0) == 3 and kinds.get("draugr", 0) == 1 and kinds.get("altar", 0) == 1 and kinds.get("runner's pack", 0) == 1 and barrow["places"].has("niche"),
-		"three skeleton guards in the altar room, the draugr in his lair, the altar and the runner's pack, Pip's niche (%s)" % [kinds])
+	_check(kinds.get("skeleton_guard", 0) == 2 and kinds.get("draugr", 0) == 1 and kinds.get("altar", 0) == 1 and kinds.get("runner's pack", 0) == 1 and barrow["places"].has("niche"),
+		"two skeleton guards in the altar room (541 amended), the draugr in his lair, the altar and the runner's pack, Pip's niche (%s)" % [kinds])
 	# Grave goods (555, dungeon's side): the level key marks the altar, the
 	# guards and the draugr; the runner's pack, a robber's, is exempt by its entry.
 	var grave_marked := {}
@@ -881,7 +881,7 @@ func _test_barrow_level() -> void:
 		grave_marked[spec["name"]] = marked
 		if str(spec.get("kind", "")) == "skeleton_guard" and marked:
 			guards_marked += 1
-	_check(grave_marked.get("Altar", false) and grave_marked.get("Draugr", false) and not grave_marked.get("Runner's pack", true) and guards_marked == 3,
+	_check(grave_marked.get("Altar", false) and grave_marked.get("Draugr", false) and not grave_marked.get("Runner's pack", true) and guards_marked == 2,
 		"grave_goods marks the altar, the guards and the draugr as grave goods, the runner's pack exempt (%s)" % [grave_marked])
 	_check(barrow["links"].size() == 2 and barrow["links"][1]["sealed"] == "draugr" and barrow["links"][1]["to_spawn"] == "from_barrow_shortcut"
 		and barrow["spawn_points"].has("from_wilds") and barrow["spawn_points"].has("from_temple"),
