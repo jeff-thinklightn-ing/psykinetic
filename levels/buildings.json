@@ -1,65 +1,70 @@
 {
 	"_about": "Building kinds (decision 488): each kind's sizes as blocks of cells in its own frame, x across, y deep, its front the +y side (the last row's south edges), doors as [x, y, side] on its outline (side N, S, E or W of that cell); a size's \"open\" lists outline edges the same way, left open, no wall and no door (a forge's front). A kind's main block is at least Level.MIN_ROOM cells each way. A kind may name its roof_set (thatch, shingle; Client3D.KIND_ROOF when none). A level.json building entry {kind, size, at, facing, seed, ruined, use, town} stands its blocks there, turned to its facing. The cells are the sim's rules (walls and doors are the map's edges round the blocks' union); what is drawn need not show them (BuildingComposer).",
 	"kinds": {
-		"hut": {"roof_set": "thatch", "words": "a small hut", "wall_set": "wood", "floor_set": "wood", "sizes": {
+		"hut": {"stage": "hamlet", "plot": "S", "roof_set": "thatch", "words": "a small hut", "wall_set": "wood", "floor_set": "wood", "sizes": {
 			"small": {"blocks": [[0, 0, 5, 5, "main"]], "doors": [[2, 4, "S"]]},
 			"large": {"blocks": [[0, 0, 6, 6, "main"]], "doors": [[2, 5, "S"]]}}},
-		"round_hut": {"words": "a round hut", "wall_set": "wood", "floor_set": "wood", "roof": "round", "sizes": {
+		"round_hut": {"stage": "hamlet", "plot": "M", "words": "a round hut", "wall_set": "wood", "floor_set": "wood", "roof": "round", "sizes": {
 			"small": {"blocks": [[1, 0, 5, 5, "main"], [0, 1, 1, 3, "bay"], [6, 1, 1, 3, "bay"]], "doors": [[3, 4, "S"]]},
 			"large": {"blocks": [[1, 0, 6, 6, "main"], [0, 1, 1, 4, "bay"], [7, 1, 1, 4, "bay"]], "doors": [[3, 5, "S"], [4, 5, "S"]]}}},
-		"shed": {"words": "a shed", "wall_set": "wood", "floor_set": "wood", "sizes": {
+		"shed": {"stage": "hamlet", "plot": "S", "words": "a shed", "wall_set": "wood", "floor_set": "wood", "sizes": {
 			"small": {"blocks": [[0, 0, 5, 5, "main"]], "doors": [[2, 4, "S"]]},
 			"large": {"blocks": [[0, 0, 5, 6, "main"]], "doors": [[2, 5, "S"]]}}},
-		"cottage": {"roof_set": "thatch", "words": "a stone cottage", "wall_set": "stone", "floor_set": "stone", "sizes": {
+		"cottage": {"stage": "village", "plot": "M", "roof_set": "thatch", "words": "a stone cottage", "wall_set": "stone", "floor_set": "stone", "sizes": {
 			"small": {"blocks": [[0, 0, 5, 6, "main"]], "doors": [[2, 5, "S"]]},
 			"large": {"blocks": [[0, 0, 6, 7, "main"], [6, 2, 2, 4, "outshot"]], "doors": [[2, 6, "S"]]}}},
-		"house": {"words": "a house", "wall_set": "wood", "floor_set": "wood", "sizes": {
+		"house": {"stage": "village", "plot": "M", "words": "a house", "wall_set": "wood", "floor_set": "wood", "sizes": {
 			"small": {"blocks": [[0, 0, 6, 8, "main"]], "doors": [[2, 7, "S"]]},
 			"large": {"blocks": [[0, 0, 7, 10, "main"]], "doors": [[3, 9, "S"]]}}},
-		"l_house": {"words": "a house", "wall_set": "wood", "floor_set": "wood", "sizes": {
+		"l_house": {"stage": "town", "plot": "L", "words": "a house", "wall_set": "wood", "floor_set": "wood", "sizes": {
 			"small": {"blocks": [[0, 0, 6, 8, "main"], [6, 4, 4, 4, "wing"]], "doors": [[2, 7, "S"]]},
 			"large": {"blocks": [[0, 0, 7, 10, "main"], [7, 5, 5, 5, "wing"]], "doors": [[3, 9, "S"], [9, 9, "S"]]}}},
-		"house_leanto": {"roof_set": "thatch", "words": "a house", "wall_set": "wood", "floor_set": "wood", "sizes": {
+		"house_leanto": {"stage": "village", "plot": "L", "roof_set": "thatch", "words": "a house", "wall_set": "wood", "floor_set": "wood", "sizes": {
 			"small": {"blocks": [[0, 0, 6, 8, "main"], [6, 1, 2, 6, "leanto"]], "doors": [[2, 7, "S"]]},
 			"large": {"blocks": [[0, 0, 7, 10, "main"], [7, 1, 3, 8, "leanto"]], "doors": [[3, 9, "S"]]}}},
-		"house_wing": {"words": "a house", "wall_set": "wood", "floor_set": "wood", "sizes": {
+		"house_wing": {"stage": "town", "plot": "L", "words": "a house", "wall_set": "wood", "floor_set": "wood", "sizes": {
 			"small": {"blocks": [[1, 0, 4, 4, "wing"], [0, 4, 6, 8, "main"]], "doors": [[2, 11, "S"]]},
 			"large": {"blocks": [[1, 0, 5, 5, "wing"], [0, 5, 7, 10, "main"]], "doors": [[3, 14, "S"]]}}},
-		"two_storey": {"words": "a tall house", "wall_set": "wood", "floor_set": "wood", "storeys": 2, "sizes": {
+		"two_storey": {"stage": "town", "plot": "M", "words": "a tall house", "wall_set": "wood", "floor_set": "wood", "storeys": 2, "sizes": {
 			"small": {"blocks": [[0, 0, 6, 8, "main"]], "doors": [[2, 7, "S"]]},
 			"large": {"blocks": [[0, 0, 7, 10, "main"]], "doors": [[3, 9, "S"]]}}},
-		"longhouse": {"roof_set": "thatch", "words": "a longhouse", "wall_set": "wood", "floor_set": "wood", "sizes": {
+		"longhouse": {"stage": "town", "plot": "long", "roof_set": "thatch", "words": "a longhouse", "wall_set": "wood", "floor_set": "wood", "sizes": {
 			"small": {"blocks": [[0, 0, 12, 5, "main"]], "doors": [[5, 4, "S"]]},
 			"large": {"blocks": [[0, 0, 16, 6, "main"]], "doors": [[7, 5, "S"], [8, 5, "S"]]}}},
-		"barn": {"roof_set": "thatch", "words": "a barn", "wall_set": "wood", "floor_set": "", "sizes": {
+		"barn": {"stage": "village", "plot": "L", "roof_set": "thatch", "words": "a barn", "wall_set": "wood", "floor_set": "", "sizes": {
 			"small": {"blocks": [[0, 0, 8, 10, "main"]], "doors": [[3, 9, "S"], [4, 9, "S"]]},
 			"large": {"blocks": [[0, 0, 10, 14, "main"]], "doors": [[4, 13, "S"], [5, 13, "S"]]}}},
-		"stable": {"roof_set": "thatch", "words": "a stable", "wall_set": "wood", "floor_set": "", "sizes": {
+		"stable": {"stage": "village", "plot": "long", "roof_set": "thatch", "words": "a stable", "wall_set": "wood", "floor_set": "", "sizes": {
 			"small": {"blocks": [[0, 0, 10, 5, "main"]], "doors": [[4, 4, "S"], [5, 4, "S"]]},
 			"large": {"blocks": [[0, 0, 14, 6, "main"]], "doors": [[6, 5, "S"], [7, 5, "S"]]}}},
-		"inn": {"words": "an inn", "wall_set": "wood", "floor_set": "wood", "storeys": 2, "sizes": {
+		"inn": {"stage": "hamlet", "plot": "L", "words": "an inn", "wall_set": "wood", "floor_set": "wood", "storeys": 2, "sizes": {
 			"small": {"blocks": [[0, 0, 8, 10, "main"]], "doors": [[3, 9, "S"], [4, 9, "S"]]},
 			"large": {"blocks": [[0, 0, 10, 12, "main"], [10, 3, 3, 6, "leanto"]], "doors": [[4, 11, "S"], [5, 11, "S"]]}}},
-		"hall": {"words": "a hall", "wall_set": "wood", "floor_set": "wood", "sizes": {
+		"hall": {"stage": "town", "plot": "L", "words": "a hall", "wall_set": "wood", "floor_set": "wood", "sizes": {
 			"small": {"blocks": [[0, 0, 8, 12, "main"]], "doors": [[3, 11, "S"], [4, 11, "S"]]},
 			"large": {"blocks": [[0, 0, 10, 16, "main"]], "doors": [[4, 15, "S"], [5, 15, "S"]]}}},
-		"mill": {"words": "a mill", "wall_set": "stone", "floor_set": "wood", "storeys": 2, "sizes": {
+		"mill": {"stage": "village", "plot": "M", "words": "a mill", "wall_set": "stone", "floor_set": "wood", "storeys": 2, "sizes": {
 			"small": {"blocks": [[0, 0, 6, 6, "main"]], "doors": [[2, 5, "S"]]},
 			"large": {"blocks": [[0, 0, 7, 7, "main"]], "doors": [[3, 6, "S"]]}}},
-		"watchtower": {"words": "a watchtower", "wall_set": "wood", "floor_set": "wood", "storeys": 3, "sizes": {
+		"watchtower": {"stage": "town", "plot": "S", "words": "a watchtower", "wall_set": "wood", "floor_set": "wood", "storeys": 3, "sizes": {
 			"small": {"blocks": [[0, 0, 5, 5, "main"]], "doors": [[2, 4, "S"]]},
 			"large": {"blocks": [[0, 0, 6, 6, "main"]], "doors": [[2, 5, "S"]]}}},
-		"temple": {"words": "the temple", "wall_set": "stone", "floor_set": "stone", "eaves": 4.5, "place": "temple", "sizes": {
+		"temple": {"stage": "hamlet", "plot": "M", "words": "the temple", "wall_set": "stone", "floor_set": "stone", "eaves": 4.5, "place": "temple", "sizes": {
 			"small": {"blocks": [[0, 0, 6, 10, "main"]], "doors": [[2, 9, "S"], [3, 9, "S"]]},
 			"large": {"blocks": [[0, 0, 8, 12, "main"]], "doors": [[3, 11, "S"], [4, 11, "S"]]}}},
-		"healers_hut": {"words": "the healer's hut", "wall_set": "wood", "floor_set": "wood", "roof": "round", "place": "healers_hut", "sizes": {
+		"healers_hut": {"stage": "hamlet", "plot": "M", "words": "the healer's hut", "wall_set": "wood", "floor_set": "wood", "roof": "round", "place": "healers_hut", "sizes": {
 			"small": {"blocks": [[1, 0, 5, 5, "main"], [0, 1, 1, 3, "bay"], [6, 1, 1, 3, "bay"]], "doors": [[3, 4, "S"]]},
 			"large": {"blocks": [[1, 0, 6, 6, "main"], [0, 1, 1, 4, "bay"], [7, 1, 1, 4, "bay"]], "doors": [[3, 5, "S"], [4, 5, "S"]]}}},
-		"forge": {"words": "a forge", "wall_set": "stone", "floor_set": "stone", "sizes": {
+		"forge": {"stage": "village", "plot": "M", "words": "a forge", "wall_set": "stone", "floor_set": "stone", "sizes": {
 			"small": {"blocks": [[0, 0, 6, 5, "main"], [0, 5, 6, 2, "leanto"]], "doors": [], "open": [[0, 6, "S"], [1, 6, "S"], [2, 6, "S"], [3, 6, "S"], [4, 6, "S"], [5, 6, "S"]]},
 			"large": {"blocks": [[0, 0, 7, 6, "main"], [0, 6, 7, 2, "leanto"]], "doors": [], "open": [[0, 7, "S"], [1, 7, "S"], [2, 7, "S"], [3, 7, "S"], [4, 7, "S"], [5, 7, "S"], [6, 7, "S"]]}}},
-		"butchery": {"words": "a butchery", "wall_set": "wood", "floor_set": "stone", "sizes": {
+		"butchery": {"stage": "village", "plot": "M", "words": "a butchery", "wall_set": "wood", "floor_set": "stone", "sizes": {
 			"small": {"blocks": [[0, 2, 6, 6, "main"], [1, 0, 4, 2, "outshot"]], "doors": [[2, 7, "S"]]},
-			"large": {"blocks": [[0, 2, 7, 7, "main"], [1, 0, 5, 2, "outshot"]], "doors": [[3, 8, "S"]]}}}
+			"large": {"blocks": [[0, 2, 7, 7, "main"], [1, 0, 5, 2, "outshot"]], "doors": [[3, 8, "S"]]}}},
+		"market": {"stage": "city", "plot": "M", "words": "a market hall", "wall_set": "wood", "floor_set": "stone", "sizes": {
+			"small": {"blocks": [[0, 0, 7, 7, "main"]], "doors": [], "open": [[0, 6, "S"], [1, 6, "S"], [2, 6, "S"], [3, 6, "S"], [4, 6, "S"], [5, 6, "S"], [6, 6, "S"], [0, 0, "W"], [0, 1, "W"], [0, 2, "W"], [0, 3, "W"], [0, 4, "W"], [0, 5, "W"], [0, 6, "W"], [6, 0, "E"], [6, 1, "E"], [6, 2, "E"], [6, 3, "E"], [6, 4, "E"], [6, 5, "E"], [6, 6, "E"], [0, 0, "N"], [1, 0, "N"], [2, 0, "N"], [3, 0, "N"], [4, 0, "N"], [5, 0, "N"], [6, 0, "N"]]},
+			"large": {"blocks": [[0, 0, 8, 8, "main"]], "doors": [], "open": [[0, 7, "S"], [1, 7, "S"], [2, 7, "S"], [3, 7, "S"], [4, 7, "S"], [5, 7, "S"], [6, 7, "S"], [7, 7, "S"], [0, 0, "W"], [0, 1, "W"], [0, 2, "W"], [0, 3, "W"], [0, 4, "W"], [0, 5, "W"], [0, 6, "W"], [0, 7, "W"], [7, 0, "E"], [7, 1, "E"], [7, 2, "E"], [7, 3, "E"], [7, 4, "E"], [7, 5, "E"], [7, 6, "E"], [7, 7, "E"], [0, 0, "N"], [1, 0, "N"], [2, 0, "N"], [3, 0, "N"], [4, 0, "N"], [5, 0, "N"], [6, 0, "N"], [7, 0, "N"]]}}},
+		"tower_room": {"stage": "set", "plot": "S", "words": "the old tower's last roofed room", "wall_set": "castle", "floor_set": "stone", "sizes": {
+			"small": {"blocks": [[0, 0, 6, 6, "main"]], "doors": [[2, 5, "S"]]}}}
 	}
 }

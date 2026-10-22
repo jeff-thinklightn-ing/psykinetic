@@ -159,6 +159,19 @@ const KIND_SIZE := "small"
 ## shacks"): its walls are the edges round it, so all of it is floor. A
 ## wing, a bay or an outshot may be less. kinds() says so of any under it.
 const MIN_ROOM := 5
+## A town's stages (economy's Towns.stage, only ever rising; the growth
+## loop, decision 591): a kind names the first it may be built at
+## ("stage"), so a town at a stage may build that stage's kinds and every
+## earlier one's.
+const STAGES: Array[String] = ["hamlet", "village", "town", "city"]
+## The "stage" of a kind no town builds: one a set piece stands by hand
+## (the Old Tower's room). Never among kinds_at's.
+const SET_STAGE := "set"
+## The plots a town lays out (maps' plot_for, which adds a ring of a cell
+## round for its path and footing): the largest footprint each holds,
+## across by deep, its front +y. A kind names its class ("plot"), and each
+## of its sizes fits it.
+const PLOT_CLASSES := {"S": Vector2i(6, 6), "M": Vector2i(8, 12), "L": Vector2i(13, 16), "long": Vector2i(16, 6)}
 ## A kind's wall height when it names no "eaves": a storey's.
 const STOREY := 3.0
 ## The sides a kind's door names, in its own frame (front +y).
@@ -1993,7 +2006,32 @@ static func kinds() -> Dictionary:
 				var main := main_block(_kinds[kind]["sizes"][size])
 				if mini(main.size.x, main.size.y) < MIN_ROOM:
 					push_error("Level: kind %s %s's main block is %s, under MIN_ROOM %d each way" % [kind, size, main.size, MIN_ROOM])
+				var plot: Vector2i = PLOT_CLASSES.get(str(_kinds[kind].get("plot", "")), Vector2i.ZERO)
+				var frame := _frame(_kinds[kind]["sizes"][size])
+				if frame.x > plot.x or frame.y > plot.y:
+					push_error("Level: kind %s %s (%s) does not fit its plot class \"%s\" (%s)" % [kind, size, frame, _kinds[kind].get("plot", ""), plot])
+			var stage := str(_kinds[kind].get("stage", ""))
+			if not stage in STAGES and stage != SET_STAGE:
+				push_error("Level: kind %s names no stage of %s, nor \"%s\"" % [kind, STAGES, SET_STAGE])
 	return _kinds
+
+
+## The kinds a town at [param stage] may build: its stage's and every
+## earlier one's, in the kinds file's order.
+static func kinds_at(stage: String) -> Array[String]:
+	var reached := STAGES.find(stage)
+	var out: Array[String] = []
+	for kind: String in kinds():
+		var first := STAGES.find(str(kinds()[kind].get("stage", "")))
+		if first >= 0 and first <= reached:
+			out.append(kind)
+	return out
+
+
+## The plot a kind is laid on (PLOT_CLASSES): its class's footprint, across
+## by deep, front +y; ZERO for a kind of none.
+static func plot_of(kind: String) -> Vector2i:
+	return PLOT_CLASSES.get(str(kinds().get(kind, {}).get("plot", "")), Vector2i.ZERO)
 
 
 ## A kind size's main block ({blocks}: the one whose role is "main", else

@@ -1329,6 +1329,7 @@ func _test_kinds() -> void:
 	_test_composer()
 	_test_stages()
 	_test_plinth()
+	_test_open_kinds()
 
 
 ## A building being built (decision 566): its stages by its town record's
@@ -1468,6 +1469,33 @@ func _test_plinth() -> void:
 	var stone := Level.building_outline(cottage).filter(func(key: Vector3i) -> bool:
 		return _rig._walls.has(key) and (_rig._walls[key] as Node3D).has_node("Plinth"))
 	_check(stone.is_empty() and str(cottage["wall_set"]) == "stone", "the stone cottage has none")
+
+
+## Open edges (591): a market hall on posts all round, a forge's front on
+## posts under its lean-to's low eave; no wall on either.
+func _test_open_kinds() -> void:
+	print("
+== kinds with open edges on posts: a market hall, a forge's front (decision 591) ==")
+	var level := _kinds_level([["building_market_large", Vector2i(1, 1), false], ["building_forge_small", Vector2i(12, 1), false]])
+	var market: Dictionary = level["buildings"][0]
+	var forge: Dictionary = level["buildings"][1]
+	var hall := BuildingComposer.compose(market, Client3D.KIND_ROOF)
+	var smithy := BuildingComposer.compose(forge, Client3D.KIND_ROOF)
+	var posts := func(node: Node3D) -> Array:
+		return node.get_node("parts").get_children().filter(func(each: Node) -> bool: return each.name.begins_with("OpenPost"))
+	var hall_posts: Array = posts.call(hall)
+	var front_posts: Array = posts.call(smithy)
+	var low := true
+	for post: Node3D in front_posts:
+		var height := post.scale.y * Client3D.WALL_HEIGHT if post.get_child_count() > 0 else ((post as MeshInstance3D).mesh as BoxMesh).size.y
+		low = low and height < float(forge["eaves"]) - 0.1
+	var no_walls := Level.building_outline(market).all(func(key: Vector3i) -> bool: return not level["terrain"]["edges"].has(key))
+	_check(no_walls and hall_posts.size() >= 12 and hall.get_node("roof").get_child_count() > 0,
+			"the market hall: no wall, its roof on %d posts round it" % hall_posts.size())
+	_check(front_posts.size() >= 2 and low and (forge["open"] as Array).size() == 6,
+			"the forge's open front on %d posts, under its lean-to's low eave" % front_posts.size())
+	hall.free()
+	smithy.free()
 
 
 ## BuildingComposer (decision 489): a wing's walls drawn to its own lower

@@ -23615,3 +23615,40 @@ offers_test _test_care (the offers by way in, the retainer in person, the
 herbs one by one and through the window, the chain in order, the potion,
 the antlers, his voice); resident_test _test_greet (his lines and the care
 word). Server only, protocol unchanged, no new class_name.
+## 591, buildings' side: a town's kinds by its stage, on plots of a class
+
+Jeff: Held is its own map, room to grow, forests to chop and the town
+growing into a city. The coordinator approved the growth loop as a whole
+(maps' design: the clearing and plot_for; economy's Towns.stage and the
+fell calls); this is buildings' side.
+- Level.STAGES ["hamlet", "village", "town", "city"], economy's
+  Towns.stage names. Each kind names the first it may be built at
+  ("stage"); Level.kinds_at(stage) is that stage's kinds and every earlier
+  one's. Hamlet: hut, round_hut, shed, healers_hut, inn, temple (economy's
+  village needs an inn and a temple standing). Village: house,
+  house_leanto, cottage, forge, butchery, barn, stable, mill. Town:
+  l_house, house_wing, two_storey, longhouse, watchtower, hall. City: the
+  market. The stages' conditions are economy.json's, Jeff's to move.
+  Level.SET_STAGE ("set"): a kind no town builds, stood by hand in a set
+  piece, never among kinds_at's: "tower_room", the Old Tower's last roofed
+  room in Held (builder's set piece, Snagfin's counter), castle walls on a
+  stone floor, 6x6, its door at [2, 5, S].
+- Level.PLOT_CLASSES: S 6x6, M 8x12, L 13x16, long 16x6, the largest
+  footprint each holds, across by deep, front +y; maps' plot_for(town,
+  class) adds a ring of a cell for the path and footing. Each kind names
+  its class ("plot"), the smallest its every size fits, so a building
+  grows on its plot (small at its level 1, large at 2: economy's). Level.kinds()
+  pushes an error for a kind of no stage, or a size its class does not
+  hold; level_test says which.
+- "market": a market hall, open all round (its "open" every outline
+  edge, the front's first), 7x7 and 8x8, a stone floor, at city.
+- Posts under open edges (BuildingComposer._open_posts): at each corner
+  of an open run and every OPEN_POST_EVERY (2) vertices along it, none
+  where a wall or a door ends (its own post is there), each as tall as
+  its edges' walls would be (a lean-to's low eave): the market's roof and
+  the forge's front stand on them. art-kit's wall.wood.post, else timber.
+A level both sides read: a line under protocol revision 32. view_test
+_test_open_kinds; level_test the stages and classes.
+Rejected: plot classes with the ring inside (maps found the large sizes
+did not fit; the finder adds it once); a stage per size (a kind grows on
+its plot by its level instead).

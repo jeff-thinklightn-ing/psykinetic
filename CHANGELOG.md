@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Building kinds belong to a town's stage, from hamlet to city, and each fits a plot size a growing town lays out; a new market hall stands open on posts, and the forge's open front stands on posts too; the Old Tower's last roofed room is a building kind for Held.
 - Two new building kinds: a stone forge, open-fronted under a lean-to with its chimney, and a butchery with a back room.
 - The level builder says when a plot is too small to hold a building (under 5 by 5).
 - The medicine man's care now has his own words and quests behind it: pay him 10 gold ahead, or bring him 5 herbs as his first quest (5 antlers get you in but open nothing); with the herbs done he asks you to walk a sick townsman to his door, then for 3 herbs and a pair of antlers for a brew, and hands you the stamina potion; one in his care hears it in his greeting (decision 584 amended, npc's side).

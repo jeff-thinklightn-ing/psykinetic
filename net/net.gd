@@ -308,6 +308,9 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## 32 (488 amended, two kinds): a level may carry the "forge" and "butchery"
 ## kinds, and a kind's "open" outline edges, no wall and no door, which both
 ## sides read from the kinds file as walkable.
+## 32 (591, buildings' side): a level may carry the "market" kind, open all
+## round, and the set piece's "tower_room"; each kind's "stage" and "plot",
+## read alike on both sides.
 const PROTOCOL_REVISION := 32
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]

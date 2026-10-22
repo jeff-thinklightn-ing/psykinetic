@@ -793,6 +793,21 @@ func _test_kinds() -> void:
 			if mini(main.size.x, main.size.y) < Level.MIN_ROOM:
 				cramped.append("%s %s %s" % [kind, size, main.size])
 	_check(cramped.is_empty(), "every kind's main block at least %d x %d floor cells (Jeff's minimum; under: %s)" % [Level.MIN_ROOM, Level.MIN_ROOM, cramped])
+	var unfit: Array[String] = []
+	for kind: String in Level.kinds():
+		var plot := Level.plot_of(kind)
+		var stage := str(Level.kinds()[kind].get("stage", ""))
+		if not stage in Level.STAGES and stage != Level.SET_STAGE or plot == Vector2i.ZERO:
+			unfit.append(kind)
+		for size: String in Level.kinds()[kind]["sizes"]:
+			var frame := Level._frame(Level.kinds()[kind]["sizes"][size])
+			if frame.x > plot.x or frame.y > plot.y:
+				unfit.append("%s %s %s in %s" % [kind, size, frame, plot])
+	var hamlet := Level.kinds_at("hamlet")
+	_check(unfit.is_empty() and "inn" in hamlet and "temple" in hamlet and not "house" in hamlet and "house" in Level.kinds_at("village")
+			and not "market" in Level.kinds_at("town") and Level.kinds_at("city").size() == Level.kinds().size() - 1
+			and not "tower_room" in Level.kinds_at("city") and Level.kinds_at("ruin").is_empty(),
+			"each kind a stage and a plot class it fits (591): a hamlet's %d kinds (its inn and temple), a city every one but the set piece's room (unfit %s)" % [hamlet.size(), unfit])
 	var unsaid: Array[String] = []
 	for prefab_name in Prefab.kind_names():
 		for turns in 4:

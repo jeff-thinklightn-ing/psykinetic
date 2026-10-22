@@ -56,6 +56,10 @@ const CRUCKS := {"longhouse": 0.8, "cottage": 0.4, "hut": 0.3, "house": 0.2}
 const CRUCK_SPAN := Vector2i(4, 6)
 ## How likely a wall of a straight stretch is a window (windows).
 const WINDOW_ODDS := 0.3
+## Posts under open edges (591): every this many vertices along a run, and
+## a plain post's side where art-kit has none.
+const OPEN_POST_EVERY := 2
+const OPEN_POST := 0.22
 ## The roles of blocks roofed with a single slope.
 const LEANING: Array[String] = ["leanto", "outshot", "bay"]
 ## The stream salt for what is the building's own, not a block's.
@@ -183,6 +187,7 @@ static func _build(building: Dictionary, roof_set: String) -> Node3D:
 	out.add_child(parts)
 	var main: Rect2i = blocks[_main_of(blocks)]
 	var ruined: bool = building.get("ruined", false)
+	_open_posts(building, parts)
 	if not ruined:
 		var roof := Node3D.new()
 		roof.name = "roof"
@@ -679,6 +684,49 @@ static func _site_piece(slot: String, middle: Vector2, out: Vector2i, boxes: Arr
 
 
 ## A plain timber box of [param size] at [param at].
+## Posts under [param building]'s open edges (its "open", 591: a forge's
+## front, a market's every side) in [param parts], each as tall as its
+## edges' walls would stand (wall_heights: a lean-to's low eave): one at
+## each corner of an open run and every OPEN_POST_EVERY vertices along it,
+## none where a wall or a door ends (the walls' own post stands there).
+## Art-kit's wall.wood.post stretched, else a timber.
+static func _open_posts(building: Dictionary, parts: Node3D) -> void:
+	var open: Array = building.get("open", [])
+	if open.is_empty():
+		return
+	var rect: Rect2i = building["rect"]
+	var heights := wall_heights(building)
+	var walled: Dictionary[Vector2i, bool] = {}
+	var tall: Dictionary[Vector2i, float] = {}
+	var directions: Dictionary[Vector2i, Dictionary] = {}
+	for key: Vector3i in Level.building_outline(building):
+		for end in 2:
+			var vertex := WallEdge.vertex_at(key, end)
+			if not key in open:
+				walled[vertex] = true
+				continue
+			tall[vertex] = minf(tall.get(vertex, INF), float(heights.get(key, building["eaves"])))
+			if not directions.has(vertex):
+				directions[vertex] = {}
+			directions[vertex][key.z] = true
+	var wood := Client3D._wall_material("wood")
+	for vertex: Vector2i in tall:
+		var corner := (directions[vertex] as Dictionary).size() > 1
+		if walled.has(vertex) or not corner and posmod(vertex.x + vertex.y, OPEN_POST_EVERY) != 0:
+			continue
+		var height: float = tall[vertex]
+		var at := Vector3(vertex.x - 0.5 - rect.position.x, 0.0, vertex.y - 0.5 - rect.position.y)
+		var post: Node3D
+		if ArtKit.has("wall.wood.post"):
+			post = ArtKit.instance("wall.wood.post")
+			post.scale.y = height / Client3D.WALL_HEIGHT
+			post.position = at
+		else:
+			post = _timber(Vector3(OPEN_POST, height, OPEN_POST), at + Vector3(0.0, height * 0.5, 0.0), wood)
+		post.name = "OpenPost_%d_%d" % [vertex.x, vertex.y]
+		parts.add_child(post)
+
+
 static func _timber(size: Vector3, at: Vector3, wood: Material) -> MeshInstance3D:
 	var mesh := MeshInstance3D.new()
 	var shape := BoxMesh.new()
