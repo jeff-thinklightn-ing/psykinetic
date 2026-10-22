@@ -502,6 +502,10 @@ var _bond_seen: Dictionary = {}
 var _bond_hint := ""
 var _bond_hint_until := 0.0
 var _talk_hint_until := 0.0
+## A town's read-out ("party" lines from "Town": the dole, 353) by the area
+## the player was in when it came: shown on the big map's area box, not in
+## the talk log (Jeff's castle F12, 2026-10-22).
+var town_notes: Dictionary = {}
 ## Talking with a town's person (536, ui's side: no panel; the say line, their speech, the HUD).
 ## Channels this view has seen (544, ui's side): channeler instance id ->
 ## [the tick first seen, its channel_until], so the ring's course runs from
@@ -7403,6 +7407,9 @@ func _on_message(kind: String, data: Dictionary) -> void:
 		return
 	if kind == "party":
 		print("[party] %s: %s" % [data.get("from", ""), data.get("text", "")])
+		if str(data.get("from", "")) == "Town":
+			town_notes[zone_name_here()] = str(data.get("text", ""))  # The big map's box, not the log.
+			return
 		talk.add_line(str(data.get("from", "")), str(data.get("text", "")), true, true)
 		return
 	if kind == "speech":
@@ -9386,6 +9393,7 @@ func _refresh_world_map() -> void:
 	world_map_panel.own_area = zone_name_here()  # 538 amended: the same read, so a joined client's own area is marked.
 	world_map_panel.own_cell = player.tile if player != null else Vector2i(-1, -1)
 	world_map_panel.led = {"by": player.led_by if player != null else "", "to": led_to_of(player)}  # 551, ui's side.
+	world_map_panel.notes = town_notes
 	var here: Array[Dictionary] = []
 	for entity in World.get_entities():
 		if entity is Player and entity != player and entity.spawned:
@@ -10538,6 +10546,17 @@ static func screenshot_name(zone_name: String, cell: Vector2i, hour: float, stam
 	return "%s_%d-%d_%02dh_%s.png" % [zone_name, cell.x, cell.y, int(hour), stamp]
 
 
+## The talk log's one short line for a saved shot: the file's name without
+## its stamp and ".png" ("screenshot saved: wilds_128-16_17h"); the path is
+## the console's (Jeff's castle F12 wrapped three lines, 2026-10-22).
+static func screenshot_words(file: String) -> String:
+	var short := file.get_basename()
+	var cut := short.rfind("_")
+	if cut > 0:
+		short = short.left(cut)
+	return "screenshot saved: %s" % short
+
+
 ## F12 (decision 538, Jeff: "a folder for screenshot feedback"): the
 ## viewport saved as PNG in screenshot_folder(), said in the talk log with
 ## the path; the first time, the folder in a line at the top. A folder
@@ -10562,9 +10581,9 @@ func take_screenshot() -> void:
 		error = image.save_png(path)
 	last_screenshot = path if error == OK else ""
 	var shown := ProjectSettings.globalize_path(path)
+	print("[game] %s%s" % ["screenshot saved: %s" % shown if error == OK else "screenshot not saved: %s (%s)" % [shown, error_string(error)], where[1]])
 	if talk != null:
-		talk.add_line("Game", "Screenshot saved: %s%s" % [shown, where[1]] if error == OK
-				else "Screenshot not saved: %s (%s)" % [shown, error_string(error)], true, true)
+		talk.add_line("Game", screenshot_words(file) if error == OK else "screenshot not saved (%s)" % error_string(error), true, true)
 	if error == OK and not Net.hinted_shot:
 		_show_top_hint("Screenshots go to %s. Set screenshot_dir= in settings.cfg to send them elsewhere." % ProjectSettings.globalize_path(str(where[0])))
 		Net.set_hinted_shot(true)
@@ -10747,6 +10766,10 @@ func _run_test_show(player: Player) -> void:
 					pet.bond_why = "you left her to fall alone"
 					if what == "bond":
 						open_other(pet)
+			"town_note":
+				# 353 amended (2), ui's side: the town's read-out on its area box, for the shot.
+				town_notes[zone_name_here()] = "3 in town are on the dole (fed by the town, or hungry): its kitchen works for food first."
+				open_world_map()
 			"world":
 				open_world_map()
 				if world_map_panel != null and world_map_panel.trade.is_empty() and world_map_panel.world != null:

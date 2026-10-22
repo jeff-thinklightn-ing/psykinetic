@@ -60,6 +60,9 @@ var guide: Dictionary = {}
 ## The local player led (Player.led_by, led_to): {"by": her name, "to": the
 ## place id or area name}; "" when not led.
 var led: Dictionary = {"by": "", "to": ""}
+## A town's read-out by area name (Main.town_notes: the dole line, 353),
+## drawn dim under the area's places; the talk log no longer carries it.
+var notes: Dictionary = {}
 ## The rows drawn this frame she knows the way to: place id or area name ->
 ## the rect of its words and mark (screen), for the hover and the click.
 var _rows: Dictionary = {}
@@ -585,6 +588,12 @@ func _draw() -> void:
 			if knows_way(id):
 				_mark_row(id, at, sans.get_string_size(words, HORIZONTAL_ALIGNMENT_LEFT, -1, int(caption * scale)).x, caption * scale, scale)
 			at.y += caption * 1.2 * scale
+		var note := str(notes.get(area_name, ""))
+		if not note.is_empty():
+			var note_size := int(caption * 0.85 * scale)
+			var note_width := rect.size.x - 36.0 * scale
+			draw_multiline_string(sans, at, note, HORIZONTAL_ALIGNMENT_LEFT, note_width, note_size, -1, UiTheme.color("text_dim"))
+			at.y += sans.get_multiline_string_size(note, HORIZONTAL_ALIGNMENT_LEFT, note_width, note_size).y + caption * 0.3 * scale
 		var here: Array[String] = []
 		var why := ""  # The first bond reason on the line, for the hover (555, ui's side).
 		for member: Dictionary in party:

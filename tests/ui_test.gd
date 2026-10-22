@@ -464,6 +464,18 @@ func _test_screenshot_key() -> void:
 	World.zone.name = was_zone
 	_main.map_name = was_map
 	Net.screenshot_dir = ""  # The save itself is a windowed run's (--test-show=shot); headless has no picture to take.
+	# Jeff's castle F12 (2026-10-22): one short line in the log, the path in the console.
+	_check(Main.screenshot_words("wilds_128-16_17h_20261022-213005.png") == "screenshot saved: wilds_128-16_17h", "the log's line: the name without its stamp")
+	# A town's read-out ("party" from "Town") goes to the big map's box, not the log.
+	if _main.talk != null and _main.world_map_panel != null:
+		var before: int = _main.talk.lines.size()
+		_main._on_message("party", {"from": "Town", "text": "3 in town are on the dole (fed by the town, or hungry): its kitchen works for food first."})
+		_main._refresh_world_map()
+		_check(_main.talk.lines.size() == before and str(_main.world_map_panel.notes.get(_main.zone_name_here(), "")).begins_with("3 in town"),
+			"the dole line: kept for the map's area box, not added to the talk log")
+		_main.town_notes.clear()
+		_main._on_message("party", {"from": "Server", "text": "You find yourself in the wilds."})
+		_check(_main.talk.lines.size() == before + 1, "a Server line still goes to the log")
 
 
 func _test_revive_reads() -> void:

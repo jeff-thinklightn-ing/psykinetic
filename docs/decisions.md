@@ -20051,3 +20051,47 @@ Level data, protocol unchanged (559's 29); a full cut.
 
 tests/relief_test: the wilds' three dirt roads from the castle's, the hills'
 and the forest's links, the hills road over the bridge.
+
+## 538 amended (2), ui's side: one short line for a saved shot
+
+Jeff's castle F12 (2026-10-22) showed "[party] Game: Screenshot saved:
+C:/Users/.../wilds_128-16_17h_....png" wrapped across three lines of the
+talk log. (The first amendment, f2a02a8d, had no heading of its own: a
+joined client's screenshot and big map name its loaded map, Main.
+zone_name_here.)
+
+- The talk log's line is the file's name without its stamp and ".png":
+  "screenshot saved: wilds_128-16_17h" (Main.screenshot_words); a failure
+  reads "screenshot not saved (<error>)". The full path, and the note when
+  the folder fell back to the game's own, go to the console alone. The
+  first-time hint at the top naming the folder stays.
+
+ui_test _test_screenshot_key. Client only; protocol unchanged; no new
+class_name.
+
+## 353 amended (2), ui's side: the town's read-out on the big map, not in the log
+
+The same F12 carried "[party] Town: 3 in town are on the dole (fed by the
+town, or hungry): its kitchen works for food first." while Jeff fought
+imps in the castle. The line was already sent only to the players in the
+town's level (Main._on_dole_changed, World.peers_in; the castle has no
+town): it stood in the talk log from his time in the wilds, among the
+twenty lines it keeps, shown again when F12's own line woke the panel. So
+it moves to the quieter place the coordinator offered, rather than being
+filtered by zone.
+
+- A "party" message from "Town" is no longer added to the talk log: the
+  client keeps it as the town's note for the area it was in when it came
+  (Main.town_notes, by area name) and the big map draws it dim under that
+  area's places, above the party line, wrapped to the box
+  (WorldMapPanel.notes). The console print stays.
+- Routing is by the "Town" name on the client, so economy's wire and
+  words (353's dole line, its only "Town" line) are unchanged; any later
+  town read-out sent from "Town" lands in the box the same way. A shorter
+  text for the box is economy's to choose.
+
+--test-show=town_note lays the sample note on the player's area box and
+opens the map, for the shot.
+
+ui_test: a Town line kept for the map's box and not logged; a Server line
+still logged. Client only; protocol unchanged; no new class_name.
