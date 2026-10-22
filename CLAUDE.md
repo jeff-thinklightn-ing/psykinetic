@@ -79,6 +79,11 @@ which worktree owns each step, and the design rules not to break without asking 
   held, wait. Keep many-process runs short. A windowed clip recording (Godot's movie
   maker writes gigabytes of frames and starves everything else) counts as a heavy run:
   take the bench lock for it too, and clear its frames from `%TEMP%` after.
+- A windowed Godot (a shot run, a clip, a windowed bench, the editor) takes the screen and the GPU
+  from Jeff: when the coordinator says he is working on this machine (Blender, a play test), no
+  tree opens one until the all-clear; headless tests and landings go on (Jeff, 2026-10-21: "godot
+  needs to be opened in --headless, i can't get anything done in blender"). A shot run that must
+  happen puts its window off-screen (`--position 4000,4000`) and never takes focus.
 - Heavy jobs go through the resource gate (Jeff, 2026-10-17): before a mesh or image
   generation, a full test suite, a bench, a Godot import or export, run it through the gate:
   `sh tools/heavy_job.sh run <tree> <kind> -- <command>` (or `heavy_job.ps1`; kinds:
