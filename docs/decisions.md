@@ -20779,3 +20779,30 @@ the grant (both marked, the fact, the world message, kept through a full
 one), her mark alone opening a sealed way while she is with them, not
 while she rests in town. Server and client (the world message's merge),
 no replicated field.
+
+## 578 amended: no insects at all
+
+Jeff, after 578: "the cricket noise is not good, it is a constant rattle,
+it's gonna drive me insane". The coordinator: replace the night's insect
+bed with a sparse, natural take, with no steady energy over 4 kHz, quieter
+than the wind and owls, or drop the insects if no CC0 take passes.
+
+Measured (each second of a take, its sound over 4 kHz against the whole):
+the four insect takes are within 10 dB of their whole in 88 to 100% of
+their seconds: amb.forest_night's Crickets.wav (Sonniss, -0.4 dB),
+amb.forest_deep_night's freesound 662095 and 532301, amb.town_night's
+450994. Field crickets sing at about 4 to 5 kHz, so no cricket take can
+pass the measure, and none was sought. The insects are dropped: their
+files moved aside in the library (takes/_dropped_578), takes.json,
+THIRD_PARTY.md's sound block and sound_status regenerated without them.
+
+What the night keeps: amb.forest_night's tawny owls (Justsoundeffects'
+Spring Night Deciduous Forest, -28 dB over 4 kHz, 4% of its seconds), the
+wind (amb.field_wind), the owl and bat calls. amb.town_night and
+amb.forest_deep_night are left with no take, and a bed with no take is
+silent by design (Ambience: "A bed with no takes plays nothing"; their
+slots stay, for a take that passes).
+
+578's fade by the cold goes with them: it was there for the insects, and
+it would have quieted the owls' bed in winter. Ambience.weights is as it
+was before 578. Client only, protocol unchanged, no new class_name.

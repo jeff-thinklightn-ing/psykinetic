@@ -122,33 +122,7 @@
 				"license": "CC0 1.0"
 			}
 		],
-		"amb.forest_deep_night": [
-			{
-				"file": "amb.forest_deep_night.ogg",
-				"from": "freesound",
-				"original": "freesound 662095: amb_forest_night.wav (from 5 s for 60 s)",
-				"sha256": "152949d5bf99084e444c32f9e30b679afc03dd1af9bd4ab2cd817dba7c38483f",
-				"by": "Dokuta_Gerovv",
-				"url": "https://freesound.org/people/Dokuta_Gerovv/sounds/662095/",
-				"license": "CC0 1.0"
-			},
-			{
-				"file": "amb.forest_deep_night.2.ogg",
-				"from": "freesound",
-				"original": "freesound 532301: Night Woods (from 30 s for 60 s)",
-				"sha256": "bf66687a646dac6c17c411b0de8c74dfe5f930495ad7ee891f2f0ac0a291b5c1",
-				"by": "widgetstudios",
-				"url": "https://freesound.org/people/widgetstudios/sounds/532301/",
-				"license": "CC0 1.0"
-			}
-		],
 		"amb.forest_night": [
-			{
-				"file": "amb.forest_night.ogg",
-				"from": "sonniss-gdc-2021-23",
-				"original": "2021-23/Stefano Cremona - Pure Nature Ambiences/Crickets.wav (from 2 s for 60 s)",
-				"sha256": "1a458f7f186a6c8700b6a89a5acb32e4398739050614c788b65bec827ba78808"
-			},
 			{
 				"file": "amb.forest_night.2.ogg",
 				"from": "sonniss-gdc-2024",
@@ -255,17 +229,6 @@
 				"from": "sonniss-gdc-2021-23",
 				"original": "2021-23/344 Audio - UK Shops & Markets/AMBMrkt_Outdoor Market, People, Sellers, Distant_344 Audio_Shops & Markets.wav (from 10 s for 60 s)",
 				"sha256": "bf68f1751cb11c261c3040dc7ddd83cbc360f6ff4ebd7aafd83cb73f60b2c904"
-			}
-		],
-		"amb.town_night": [
-			{
-				"file": "amb.town_night.ogg",
-				"from": "freesound",
-				"original": "freesound 450994: crickets night field diverse +distant village voices Putti, Uganda1 MS.wav (from 10 s for 60 s)",
-				"sha256": "696b85769ff51506b2907952ba5dea5ea22ead8f75d0019abfaa8b70f32f6583",
-				"by": "kyles",
-				"url": "https://freesound.org/people/kyles/sounds/450994/",
-				"license": "CC0 1.0"
 			}
 		],
 		"music.dungeon_base": [

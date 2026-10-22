@@ -13,12 +13,7 @@ extends Node
 ##   dungeon's bed;
 ## - the sky over the listener (World.fields.under_sky): under a roof the
 ##   outdoor beds are quieter and muffled (the Ambience bus's low-pass twin);
-## - rain quietening the birds and crickets;
-## - the cold (Season.at's, the region's): the night beds are insects
-##   (crickets), quieter as the year cools and gone wherever snow can
-##   fall (decision 578: INSECT_COLD), so a winter night is still but for
-##   the wind and the calls (Jeff, v0.1.163, in the wilds at night with
-##   snow falling: "an annoying noise that sounds like bugs");
+## - rain quietening the birds;
 ## - a town: its day or night bed within TOWN_NEAR cells of a building that
 ##   serves one, fading out by TOWN_FAR;
 ## - a forest's canopy (decision 466) round the view (Client3D's eased
@@ -33,7 +28,11 @@ extends Node
 ## owls bats"): now and then an owl (amb.owl) up in the trees round the
 ## listener, more often under a forest's roof, and bats (amb.bat) overhead
 ## by a canopy's edges and clearings and by a town wall's towers; both
-## sparse, hushed by rain, at the rates calls() gives.
+## sparse, hushed by rain, at the rates calls() gives. No insects (decision
+## 578 amended; Jeff: "the cricket noise is not good, it is a constant
+## rattle"): the night beds keep no take with steady sound over 4 kHz, so
+## the town's and the deep forest's are empty and the open forest's is its
+## owls.
 ## A stream (decision 505's terrain "streams") is a line, not a bed: its
 ## loop (amb.stream) plays from the point of its course nearest the
 ## listener (nearest_on), sliding along the water as they move, heard
@@ -48,12 +47,8 @@ const FADE_SECONDS := 2.0
 const WEIGH_EVERY := 0.25
 ## Under a roof, outdoor beds at this share of their weight, muffled.
 const ROOFED := 0.35
-## How much rain quietens birds and crickets (at full rain).
+## How much rain quietens the birds (at full rain).
 const RAIN_HUSH := 0.7
-## The cold (Season's, 0..1) over which the night's insects quieten: all
-## of them below the first (the equinoxes'), none from the second, the cold
-## snow starts falling at (Season.SNOW_FALLS'): no bugs in snow.
-const INSECT_COLD := Vector2(0.5, Season.SNOW_FALLS.x)
 ## Under a full roof: the share of the open forest's beds the deep forest's
 ## take over, and the share of the rain kept off (heard on the crowns).
 const DEEP := 0.8
@@ -138,9 +133,8 @@ func _weigh() -> void:
 	var zone := str(view._terrain.get("zone", "outdoors" if view._outdoor else "indoors"))
 	var canopy := view._canopy_cover
 	var drip := Weather.drip_at(World.fields.region, steps, canopy) if World.fields != null else 0.0
-	var cold := float(Season.at(World.fields.region, steps)["cold"]) if World.fields != null else 0.0
 	targets.assign(weights(zone, under_sky, DayNight.daylight(steps), DayNight.hour(steps), weather, _town_nearness(cell),
-			canopy, drip, cold))
+			canopy, drip))
 	_place_torch(cell)
 	_place_streams(cell)
 	_place_falls(cell)
@@ -156,9 +150,9 @@ func _weigh() -> void:
 ## [param weather] (Weather's: rain, wind, ... each 0..1) and
 ## [param town] (0..1: how near a town's buildings), under a forest's
 ## [param canopy] (0..1: its cover round the view) with its [param drip]
-## (0..1, Weather.drip_at), in the season's [param cold] (0..1).
+## (0..1, Weather.drip_at).
 static func weights(zone: String, under_sky: bool, daylight: float, hour: float, weather: Dictionary, town: float,
-		canopy := 0.0, drip := 0.0, cold := 0.0) -> Dictionary:
+		canopy := 0.0, drip := 0.0) -> Dictionary:
 	var out := {}
 	for bed in BEDS:
 		out[bed] = 0.0
@@ -169,12 +163,11 @@ static func weights(zone: String, under_sky: bool, daylight: float, hour: float,
 		var dawn := clampf(1.0 - absf(hour - DAWN_HOUR) / DAWN_HOURS, 0.0, 1.0)
 		var hush := 1.0 - RAIN_HUSH * rain
 		var open := 1.0 - DEEP * canopy
-		var insects := 1.0 - smoothstep(INSECT_COLD.x, INSECT_COLD.y, cold)
 		out["amb.forest_dawn"] = dawn * hush * open
 		out["amb.forest_day"] = day * (1.0 - dawn) * hush * open
-		out["amb.forest_night"] = (1.0 - day) * (1.0 - dawn) * hush * open * insects
+		out["amb.forest_night"] = (1.0 - day) * (1.0 - dawn) * hush * open
 		out["amb.forest_deep_day"] = day * (1.0 - dawn) * hush * canopy
-		out["amb.forest_deep_night"] = (1.0 - day) * (1.0 - dawn) * hush * canopy * insects
+		out["amb.forest_deep_night"] = (1.0 - day) * (1.0 - dawn) * hush * canopy
 		out["amb.field_wind"] = wind
 		var storm := clampf(rain * wind * 2.0 - 0.2, 0.0, 1.0) if str(weather.get("kind", "")) == "storm" else 0.0
 		out["amb.storm"] = storm
@@ -182,7 +175,7 @@ static func weights(zone: String, under_sky: bool, daylight: float, hour: float,
 		out["amb.rain_canopy"] = rain * canopy
 		out["amb.drips"] = drip
 		out["amb.town_day"] = town * day
-		out["amb.town_night"] = town * (1.0 - day) * insects
+		out["amb.town_night"] = town * (1.0 - day)
 		if not under_sky:
 			for bed in OUTDOOR_BEDS:
 				out[bed] = out[bed] * ROOFED
