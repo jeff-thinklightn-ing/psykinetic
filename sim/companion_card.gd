@@ -98,6 +98,91 @@ static func roll_leanings(player_id: String, traits: Dictionary) -> Dictionary:
 ## companion alike), else her traits' "leanings", else rolled 1..10 by
 ## [param seed] (her player's id), the same every time, so a card from
 ## before has them with nothing saved.
+## Her focus (decision 577): fighting, magic and stealth summing to 100.
+const FOCUS: Array[String] = ["fight", "magic", "stealth"]
+
+
+## The focus rules: companion_traits.json "focus".
+static func focus_rules() -> Dictionary:
+	var rules: Variant = tables().get("focus", {})
+	return rules if rules is Dictionary else {}
+
+
+## Her first focus from [param traits]: the legacy three's fixed ones, else
+## even, moved by her profession's and temper's lean ("a hunter" to
+## stealth), whole numbers summing to 100.
+static func roll_focus(traits: Dictionary) -> Dictionary:
+	var rules := focus_rules()
+	var fixed: Variant = rules.get("legacy", {}).get(str(traits.get("name", "")))
+	var raw := {"fight": 100.0 / 3, "magic": 100.0 / 3, "stealth": 100.0 / 3}
+	if fixed is Dictionary:
+		for kind in FOCUS:
+			raw[kind] = float(fixed.get(kind, 0))
+	else:
+		for key in ["profession", "temperament"]:
+			var lean: Variant = rules.get("lean", {}).get(str(traits.get(key, "")))
+			if lean is Dictionary:
+				for kind: String in lean:
+					if kind in FOCUS:
+						raw[kind] += float(lean[kind])
+	return _whole(raw, float(rules.get("floor", 5)))
+
+
+## [param focus] grown [param points] toward [param kind], the same taken
+## from the other two in proportion to what they hold above the floor: a
+## new focus (decision 577; Jeff: "growing positively can pull from the
+## others"), to a tenth.
+static func grow_focus(focus: Dictionary, kind: String, points: float) -> Dictionary:
+	var floor_at := float(focus_rules().get("floor", 5))
+	var out := {}
+	for each in FOCUS:
+		out[each] = float(focus.get(each, 100.0 / 3))
+	var others := FOCUS.filter(func(each: String) -> bool: return each != kind)
+	var spare := 0.0
+	for each: String in others:
+		spare += maxf(out[each] - floor_at, 0.0)
+	var gain := minf(points, spare)
+	if kind not in FOCUS or gain <= 0.0:
+		return out
+	out[kind] += gain
+	for each: String in others:
+		out[each] -= gain * maxf(out[each] - floor_at, 0.0) / spare
+	for each in FOCUS:
+		out[each] = snappedf(out[each], 0.1)
+	# What the tenths left over: on the one grown.
+	out[kind] = snappedf(100.0 - float(out[others[0]]) - float(out[others[1]]), 0.1)
+	return out
+
+
+## The focus she leans to: one at lean_at or above, "" for none.
+static func lean_of(focus: Dictionary) -> String:
+	var at := float(focus_rules().get("lean_at", 45))
+	for kind in FOCUS:
+		if float(focus.get(kind, 0)) >= at:
+			return kind
+	return ""
+
+
+## [param raw] as whole numbers, none under [param floor_at], summing to 100.
+static func _whole(raw: Dictionary, floor_at: float) -> Dictionary:
+	var total := 0.0
+	for kind in FOCUS:
+		raw[kind] = maxf(float(raw[kind]), floor_at)
+		total += raw[kind]
+	var out := {}
+	var given := 0
+	for kind in FOCUS:
+		out[kind] = roundi(float(raw[kind]) * 100.0 / total)
+		given += out[kind]
+	# Rounding's remainder on the largest.
+	var top: String = FOCUS[0]
+	for kind in FOCUS:
+		if out[kind] > out[top]:
+			top = kind
+	out[top] += 100 - given
+	return out
+
+
 static func leaning(traits: Dictionary, seed: String, key: String) -> int:
 	var name := str(traits.get("name", ""))
 	if is_legacy(name):

@@ -364,6 +364,9 @@ var bond_why := ""
 ## Her superstition (442's leaning, Main's at her join): at grave_superstition
 ## or more she won't carry grave goods below close (555).
 var superstition := 5
+## Her focus (decision 577): {fight, magic, stealth} summing to 100, her
+## record's own (Main grows it in place); {} unset.
+var focus := {}
 ## Her sickness in one sentence while she has one (decision 501: Main's,
 ## from her record's "sick", Companion.sick_sentence); none unset.
 var sick_words := Callable()
@@ -1924,6 +1927,9 @@ func voice_messages(asked := false, heard := "") -> Array[Dictionary]:
 	var sick := str(sick_words.call()) if sick_words.is_valid() else ""
 	if not sick.is_empty():
 		met += " " + sick
+	var leans := focus_words()
+	if not leans.is_empty():
+		met += " " + leans
 	var roads := str(guide_words.call()) if guide_words.is_valid() else ""
 	if not roads.is_empty():
 		met += " " + roads
@@ -3322,6 +3328,24 @@ static func loyalty() -> Dictionary:
 ## Whether her bond is at [param step] or warmer.
 func bond_at_least(step: String) -> bool:
 	return STEPS.find(bond_step) >= STEPS.find(step)
+
+
+## What her focus does (decision 577) as a multiplier on [param kind]
+## ("fight", "magic", "stealth"): the rules' base + per share x her share /
+## 100 (0.8 + 0.4 x: an even split ~0.93, all in one 1.2); 1.0 unset.
+## What enemy-ai's fights read.
+func focus_of(kind: String) -> float:
+	if not focus.has(kind):
+		return 1.0
+	var rate: Array = CompanionCard.focus_rules().get("multiplier", [0.8, 0.4])
+	return float(rate[0]) + float(rate[1]) * float(focus[kind]) / 100.0
+
+
+## Her lean, in her voice's world: one sentence, "" unset.
+func focus_words() -> String:
+	if focus.is_empty():
+		return ""
+	return str(CompanionCard.focus_rules().get("words", {}).get(CompanionCard.lean_of(focus), ""))
 
 
 ## Wary or colder: she hangs back, joins late, flees sooner.

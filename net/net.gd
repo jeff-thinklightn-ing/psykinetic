@@ -263,7 +263,9 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## 30 (576): the "world" message carries "capabilities" {companion, held:
 ## [{id, words, teacher}]}, what the player's companion has learned; a level
 ## link sealed by a mark opens for the companion's mark too (Main.party_has).
-const PROTOCOL_REVISION := 30
+## 31 (577): the "world" message carries "focus" {companion, fight, magic,
+## stealth}, the player's companion's focus in whole numbers.
+const PROTOCOL_REVISION := 31
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]
 ## Every kind of message (message, message_to, broadcast, broadcast_to).

@@ -87,6 +87,7 @@ func _ready() -> void:
 	_test_sickness()
 	_test_field_return()
 	_test_capabilities()
+	_test_focus()
 	_test_companion_named()
 	await _test_guide()
 	_test_guide_refuses()
@@ -1452,6 +1453,53 @@ func _test_capabilities() -> void:
 	_check(not _main.sealed_open({"sealed": "draugr"}, peer) and _main.sealed_open({}, peer), "neither marked: sealed stays sealed; an open way is open")
 	record.marks.assign(kept_marks)
 	record.companion["marks"] = kept_hers
+
+
+func _test_focus() -> void:
+	print("
+== her focus: fighting, magic, stealth, summing to 100 (decision 577) ==")
+	var rolled := CompanionCard.roll_focus({"name": "Zed", "profession": "a hunter", "temperament": "quick and wary"})
+	_check(int(rolled["fight"]) + int(rolled["magic"]) + int(rolled["stealth"]) == 100 and int(rolled["stealth"]) > int(rolled["fight"])
+		and int(rolled["stealth"]) > int(rolled["magic"]), "rolled: a wary hunter leans to stealth, all 100 (%s)" % [rolled])
+	_check(CompanionCard.roll_focus({"name": "Pip"}) == {"fight": 30, "magic": 20, "stealth": 50}, "Pip's fixed focus")
+	var grown := CompanionCard.grow_focus({"fight": 40, "magic": 20, "stealth": 40}, "fight", 3.0)
+	_check(is_equal_approx(grown["fight"], 43.0) and is_equal_approx(grown["magic"], 19.1) and is_equal_approx(grown["stealth"], 37.9),
+		"growing pulls from the others by what they hold above the floor (%s)" % [grown])
+	_check(CompanionCard.grow_focus({"fight": 90, "magic": 5, "stealth": 5}, "fight", 1.0)["fight"] == 90.0, "none goes under the floor")
+	_kill_monsters()
+	var pet := _companion()
+	_settle(pet)
+	var record: PlayerRecord = _main._records[Net.player_id]
+	_check(record.companion.get("focus") is Dictionary and pet.focus == record.companion["focus"], "her card holds a focus, and her body reads it")
+	var kept_focus: Variant = record.companion["focus"]
+	record.companion["focus"] = {"fight": 40.0, "magic": 20.0, "stealth": 40.0}
+	pet.focus = record.companion["focus"]
+	record.companion.erase("focus_day")
+	_check(is_equal_approx(pet.focus_of("fight"), 0.96) and is_equal_approx(pet.focus_of("magic"), 0.88), "what it does: 0.8 + 0.4 x her share")
+	var imp := _spawn_imp(_main._nearest_free(pet.tile + Vector2i(2, 0)))
+	World.damage(imp, 1, pet, &"attack")
+	_check(is_equal_approx(float(pet.focus["fight"]), 40.1) and record.companion["focus"] == pet.focus, "a blow of hers that lands: fighting grows (%s)" % [pet.focus])
+	World.loosed.emit(pet, imp.tile, 1.0)
+	_check(is_equal_approx(float(pet.focus["stealth"]), 40.1), "her bow loosed: stealth grows (%s)" % [pet.focus])
+	var before := float(pet.focus["fight"])
+	World.add_buff(pet, "mass", 10.0, 100)
+	_check(is_equal_approx(float(pet.focus["fight"]), before + 0.3), "a meal she ate: fighting grows (%s)" % [pet.focus])
+	record.companion["focus_day"] = {"day": Townsfolk.day_of(World.steps), "grown": 3.0}
+	var capped: Dictionary = pet.focus.duplicate()
+	World.damage(imp, 1, pet, &"attack")
+	_check(pet.focus == capped, "past the day's cap, nothing grows")
+	if is_instance_valid(imp) and imp.spawned:
+		World.despawn(imp)
+	_check(pet.voice_prompt().contains("You are as handy one way in a fight as another."), "her voice is told her lean, even here")
+	record.companion["focus"] = {"fight": 20.0, "magic": 20.0, "stealth": 60.0}
+	pet.focus = record.companion["focus"]
+	_check(pet.voice_prompt().contains("best with a bow"), "leaning to stealth, she is told so")
+	_main._tell_focus(record, pet)
+	var told: Variant = _main.world_state.get("focus", {})
+	_check(told is Dictionary and told.get("companion") == String(pet.name) and int(told.get("stealth", 0)) == 60, "her player's map told her focus (%s)" % [told])
+	record.companion["focus"] = kept_focus
+	pet.focus = kept_focus
+	record.companion.erase("focus_day")
 
 
 func _test_field_return() -> void:

@@ -20986,3 +20986,49 @@ row in docs/roadmap.md is the charter.
   and backstep.
 
 Docs only, protocol unchanged, no new class_name.
+
+## 577. Her focus: fighting, magic, stealth, summing to 100
+
+Jeff (2026-10-22): "what makes companions distinct is their personality
+cards, trade abilities, what combination of fighting, magic, and stealth
+they tend to use ... they develop strength food eating and fighting,
+magic from using magic, wearing magical charms, and meditating, stealth
+users gain in dexterity by using bows, throwing, and games of wit -
+theres a balance in the form of a spider chart where you only have say
+100% focus, and growing positively can pull from the others". The
+coordinator approved the design (C:/dev/review/companions/
+abilities_focus_design.md, part b): floor 5, 3 a day, the player has no
+focus yet.
+
+- Her record's "focus" {fight, magic, stealth}, summing to 100, none under
+  the floor. Rolled once (CompanionCard.roll_focus): even, moved by her
+  profession's and temper's lean (companion_traits.json "focus" "lean": a
+  hunter to stealth, a hired guard to fighting), Wren, Nix and Pip fixed
+  (drafts for Jeff); an old card gets one rolled at her next join.
+- Growth (CompanionCard.grow_focus): points to one, the same taken from
+  the other two in proportion to what they hold above the floor, to a
+  tenth; at most daily_cap points a game day (record "focus_day"). What
+  grows it today (rules "grow", drafts): a meal she eats (a "mass" buff on
+  her) and her blows that land and her kills, fighting; her bow loosed,
+  stealth. Magic grows from nothing yet: charms, meditating and magic come
+  with items' and economy's content when Jeff asks (none built).
+- A lean (a share at lean_at, 45) is a sentence in her voice ("You lean
+  to dexterity: quick and quiet, best with a bow."), one for an even
+  split; a new lean is a fact on her card ("Wren has taken to the bow and
+  quiet feet.").
+- Companion.focus_of(kind): rules "multiplier" base + per share x share /
+  100 (0.8 + 0.4 x: even ~0.93, all in one 1.2), for enemy-ai's fights
+  (melee, bow and noise, charms and the channel), their step; nothing
+  reads it in play yet.
+- Her player's map is told it: the "world" message's "focus" {companion,
+  fight, magic, stealth} in whole numbers, when she joins and when a whole
+  number moves, kept through a full message (WorldNews.merge), for ui's
+  drawn chart on her card page (no numbers shown). Protocol: a key in an
+  existing message; 30 shipped in v0.1.164, so it opens revision 31
+  (release).
+
+companion_test _test_focus: the roll (a wary hunter leans to stealth; Pip
+fixed), the pull and the floor, her card and body, focus_of, a blow, a
+shot and a meal growing it, the day's cap, her voice's lean, the world
+message. Server sim and the world message's merge, no replicated field,
+no new class_name.

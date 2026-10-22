@@ -836,6 +836,10 @@ func _go_online() -> void:
 		World.entity_died.connect(_bond_fell)
 		road_heard = _road_heard  # The road's news she hears (551 phase 2).
 		World.entity_damaged.connect(_hail_struck)  # A blow given (decision 554).
+		# Her focus grows by what she does (decision 577).
+		World.entity_damaged.connect(_focus_struck)
+		World.loosed.connect(_focus_shot)
+		World.buff_changed.connect(_focus_ate)
 		World.channel_changed.connect(_on_channel)
 		World.command_received.connect(_on_command)
 		World.slots_changed.connect(_on_slots_changed)
@@ -4351,6 +4355,10 @@ func _join_companion(record: PlayerRecord, player: Player) -> void:
 		var fact := Standing.fact(record.companion, record.player_id, record.name, Standing.COMPANION)
 		return fact if step.is_empty() else (fact + " " + step % record.name).strip_edges()
 	pet.superstition = CompanionCard.leaning(record.companion.get("traits", {}), record.player_id, "superstition")
+	# Her focus (decision 577): an old card's rolled from her traits now.
+	if not record.companion.get("focus") is Dictionary or (record.companion["focus"] as Dictionary).is_empty():
+		record.companion["focus"] = CompanionCard.roll_focus(record.companion.get("traits", {}))
+	pet.focus = record.companion["focus"]
 	_set_mood(record)
 	pet.talk.assign(record.companion.get("talk", []))
 	pet.facts_changed.connect(_on_facts_changed.bind(pet, record))
@@ -4397,6 +4405,7 @@ func _wire_guide(pet: Companion, record: PlayerRecord, player: Player) -> void:
 			_guide_check.call_deferred(pet)  # The road on from here, once her voice is in.
 	_tell_roads(record, pet)
 	_tell_capabilities(record, pet)  # And what she has learned (decision 576).
+	_tell_focus(record, pet)  # And her focus (decision 577).
 
 
 ## What she knows of the roads, for her voice: the places nearest first
@@ -4791,6 +4800,71 @@ func grant_capability(id: String, player_ids: Array) -> int:
 		pet.note_fact(Capabilities.said(id, "fact", String(pet.name), record.name))
 		_bond(record, str(Capabilities.entry(id).get("bond", "earned")), str(Capabilities.entry(id).get("bond_why", "")))
 	return reached
+
+
+# --- Her focus (decision 577) ---------------------------------------------------
+
+## Her blows that land, and a kill: fighting.
+func _focus_struck(entity: GridEntity, amount: int, source: GridEntity, cause: StringName) -> void:
+	if amount <= 0 or not source is Companion or cause not in [&"attack", &"shot"] or not entity.is_creature():
+		return
+	if cause == &"attack":
+		_grow_focus(source as Companion, "struck")
+	if entity.hp <= 0:
+		_grow_focus(source as Companion, "killed")
+
+
+## Her bow loosed: stealth.
+func _focus_shot(by: GridEntity, _at: Vector2i, _strength: float) -> void:
+	if by is Companion:
+		_grow_focus(by as Companion, "shot")
+
+
+## Food she ate (a meal's "mass" buff on her): fighting.
+func _focus_ate(entity: GridEntity, kind: String, state: StringName) -> void:
+	if entity is Companion and kind == "mass" and state != &"faded":
+		_grow_focus(entity as Companion, "ate")
+
+
+## [param pet]'s focus grown by [param event] (the rules' "grow"), within the
+## day's cap: her record's and her body's; a new lean is a fact on her card,
+## and her player's map told when a whole number moves.
+func _grow_focus(pet: Companion, event: String) -> void:
+	var record := _record_of(pet)
+	var rules := CompanionCard.focus_rules()
+	var grow: Variant = rules.get("grow", {}).get(event)
+	if record == null or pet.focus.is_empty() or not grow is Array or (grow as Array).size() < 2:
+		return
+	var day := Townsfolk.day_of(World.steps)
+	var today: Dictionary = record.companion.get("focus_day", {})
+	var grown := float(today.get("grown", 0.0)) if int(today.get("day", -1)) == day else 0.0
+	var points := minf(float(grow[1]), float(rules.get("daily_cap", 3)) - grown)
+	if points <= 0.0:
+		return
+	var was := pet.focus
+	var now := CompanionCard.grow_focus(was, str(grow[0]), points)
+	record.companion["focus_day"] = {"day": day, "grown": snappedf(grown + points, 0.01)}
+	record.companion["focus"] = now
+	pet.focus = now
+	var lean := CompanionCard.lean_of(now)
+	if not lean.is_empty() and lean != CompanionCard.lean_of(was):
+		pet.note_fact(str(rules.get("taken_to", {}).get(lean, "")).replace("{her}", String(pet.name)))
+	for kind in CompanionCard.FOCUS:
+		if roundi(float(now[kind])) != roundi(float(was.get(kind, 0))):
+			_tell_focus(record, pet)
+			break
+
+
+## Her player's map told her focus (decision 577): the "world" message's
+## "focus" {companion, fight, magic, stealth}, whole numbers, for ui's chart.
+func _tell_focus(record: PlayerRecord, pet: Companion) -> void:
+	var peer := _peer_of(record.player_id)
+	if peer == 0 or _world_news == null or not _world_news.send.is_valid() or pet.focus.is_empty():
+		return
+	var told := {"companion": String(pet.name)}
+	for kind in CompanionCard.FOCUS:
+		told[kind] = roundi(float(pet.focus.get(kind, 0)))
+	_world_news.send.call(peer, {"full": false, "focus": told})
 
 
 ## Whether the player on [param peer], or the companion with them (out with

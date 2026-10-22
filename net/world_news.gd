@@ -20,6 +20,8 @@ extends RefCounted
 ## "capabilities" (decision 576, sent by Main): what the player's companion
 ## has learned, {"companion", "held": [{"id", "words", "teacher"}]}, the
 ## same way.
+## "focus" (decision 577, sent by Main): her fighting, magic and stealth,
+## {"companion", "fight", "magic", "stealth"} in whole numbers, the same way.
 
 ## How near a place's cell a player comes to know it (Senses' sight range).
 const SIGHT := 7
@@ -203,4 +205,8 @@ static func merge(state: Dictionary, data: Dictionary) -> Dictionary:
 		out["capabilities"] = (data["capabilities"] as Dictionary).duplicate(true)
 	elif data.get("full", false) and state.get("capabilities") is Dictionary:
 		out["capabilities"] = (state["capabilities"] as Dictionary).duplicate(true)
+	if data.get("focus") is Dictionary:
+		out["focus"] = (data["focus"] as Dictionary).duplicate(true)
+	elif data.get("full", false) and state.get("focus") is Dictionary:
+		out["focus"] = (state["focus"] as Dictionary).duplicate(true)
 	return out
