@@ -1033,8 +1033,8 @@ func _padded(stamped: Dictionary, placed: Array, done: String) -> Dictionary:
 
 ## The ground as HeightTools walks it: relief() and "solid", each solid
 ## building's cells but its door (Level.SOLID, maps' 550: a mound is earth
-## through, its door the front row's middle), which the map still paints
-## as floor.
+## through, its door the front row's middle; a doorless one, 567, every
+## cell), which the map still paints as floor.
 func walk_ground() -> Dictionary:
 	var out := relief()
 	var solid: Dictionary[Vector2i, bool] = {}
@@ -1052,9 +1052,10 @@ func walk_ground() -> Dictionary:
 	return out
 
 
-## A solid building entry's door cell (Level.solid_door, _lay_solid's own).
+## A solid building entry's door cell (Level.solid_door_of, _lay_solid's
+## own), Level.NO_DOOR for a doorless one (567).
 static func solid_door(entry: Dictionary) -> Vector2i:
-	return Level.solid_door(Level.building_rect(entry), Level.building_facing(entry))
+	return Level.solid_door_of(entry)
 
 
 ## Why the building [param entry] can't stand on this level's relief
@@ -1614,7 +1615,9 @@ func height_checks() -> Array[String]:
 			var uneven := pad_problem(building)
 			if not uneven.is_empty():
 				out.append(uneven)
-			things.append(solid_door(building) if solid else rect.position)
+			# A doorless one (a standing stone, 567) is no one's to reach.
+			if str(building.get("slot", "")) not in Level.DOORLESS:
+				things.append(solid_door(building) if solid else rect.position)
 			continue
 		var levels := {}
 		for y in range(rect.position.y, rect.end.y):

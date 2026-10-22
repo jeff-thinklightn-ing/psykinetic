@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The wilds have landmarks to steer by: a great lone tree in the west, a cairn on the ridge, a ring of eight standing stones in the south-west and a waystone at the middle where the roads will meet; none can be walked through (567).
 - A house still being built is walked into until its walls are up (a third of the way through the build); from then its walls stand as any house's, on the server and as your game predicts your steps (566, maps' side).
 - The wilds are no longer flat: the ground rolls gently, a long ridge runs across the north-east with a rock face about 3.5 m high looking south-west over the middle and a way up through it, and a broad valley runs from the north edge down to the south, so you can tell where you are by the land (565). Everything placed in the wilds stays where it was.
 - The medicine man makes a stamina potion from herbs: drink it to walk 25% quicker for 30 minutes; a second one resets the time (562).

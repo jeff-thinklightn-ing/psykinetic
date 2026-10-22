@@ -679,6 +679,11 @@ func _test_solid() -> void:
 	_check(not used["ok"] and "solid" in str(used["text"]), "no use for a mound (%s)" % used["text"])
 	_check(session.run_tool("set_building", {"at": [12, 12]})["ok"], "scenery it may be")
 	_check(session.height_checks().is_empty(), "nothing said of a mound on flat ground (%s)" % [session.height_checks()])
+	doc.config["buildings"].append({"slot": "building.cairn", "at": [30, 10], "facing": [0, 1]})
+	var with_cairn := BuilderSession.new(doc, Rect2i(0, 0, 40, 30), "test_field", StubClaude.new([]))
+	var stones: Dictionary = with_cairn.walk_ground().get("solid", {})
+	_check(stones.has(Vector2i(30, 10)) and stones.has(Vector2i(31, 11)) and BuilderSession.solid_door(doc.config["buildings"][1]) == Level.NO_DOOR
+		and with_cairn.height_checks().is_empty(), "a cairn (567) is solid through, no door, nothing said (%s)" % [with_cairn.height_checks()])
 
 
 func _test_plots() -> void:

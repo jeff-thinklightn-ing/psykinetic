@@ -19584,3 +19584,58 @@ stages, on the server and in a client's prediction alike).
 
 tests/view_test: a town building with its walls not up has its outline
 open and the path cache dropped; up, its walls stand again.
+
+## 567. The wilds' landmarks, layer two: the marks
+
+The landmarks design's marks (Jeff: "wilds needs better land marks"), with
+art-kit's four slots (35d8f8f2), each a whole piece on grass, seen from
+afar: building.great_tree (3 x 3, its crown the "roof" part, "leaf"),
+building.cairn (2 x 2), building.standing_stone (1 x 1, three variants),
+building.waystone (1 x 1, its carved face +Z).
+
+**Level**: the four are BUILDINGS and SOLID (550) and DOORLESS, a new case
+of 550's rule: a solid building with no door. Every cell of one is out of
+the floor and in terrain "solid" (nobody walks onto it, routes go round,
+sight stops); its outline has no walls, none expected. Level.solid_door_of
+(entry or record) gives a solid building's door, or Level.NO_DOOR for a
+doorless one; _lay_solid sets "door" only where there is one.
+- Builder (BuilderSession, builder-25's OK): solid_door(entry) is
+  Level.solid_door_of, so walk_ground makes every cell of a doorless one
+  solid; height_checks skips its spot (no one has to reach a stone, so no
+  ledge is said); set_building refuses it a use, as any solid slot.
+- A building entry may carry "variant" (which of its slot's variants, from
+  1) and "yaw" (a free turn in degrees over its facing's), kept on the
+  record: the ring's stones mix the three variants, each turned its own way.
+
+**Client**: _add_buildings instances a slot at its building's variant, turns
+it by its yaw if it has one (else its facing, as before), and dresses a slot
+whose spec has "leaf" in season (season_dress, as the forest's trees), so
+the great tree's crown browns in autumn and takes snow.
+
+**levels/wilds** (make_wilds_marks' marks layer): each mark at the nearest
+cell to its spot whose footprint and a ring round it (8 cells for the tree,
+5 the cairn, 4 the waystone, 3 the ring) are walkable grass or dirt, off the
+town, the other buildings' ground and the ridge's face; placed once, written
+into level.json's text after its last building (the rest of the file as it
+was); the relief laid again with each mark on a pad (its footprint and a
+cell round; the stone ring one pad, so no step lies between two stones):
+- the great tree at (44, 132), in the west;
+- the cairn at (184, 40), on the ridge's back above its face;
+- the waystone at (128, 128), where layer three's roads will meet;
+- eight standing stones on a ring of radius 6 round (70, 202), variants
+  1-3 in turn, each turned to the ring's middle and a little off.
+The relief otherwise as 565 laid it: 88 face edges, no stray cliff.
+
+**Walking**: the marks' cells are no floor; the face of the ridge as before.
+Saved spots stay on floor but a spot on a mark's cell, which only a body
+standing in open ground in the wilds' west, ridge back, middle or ring could
+have: there the sim's spawn finds the nearest floor, as for any cell that is
+no longer floor (checked: no link, spawn point, start or building there).
+
+Protocol: a line under PROTOCOL_REVISION 29 (new building slots and fields
+in the "terrain" message's files; a client without the kinds would walk
+through solid cells). Level data, a full cut.
+
+tests/relief_test: the wilds' marks (one tree, one cairn, one waystone, eight
+stones, each solid through with no door) and the ring's middle walked to;
+tests/builder_test: a cairn solid through, no door, nothing said.

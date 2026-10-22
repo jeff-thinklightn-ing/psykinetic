@@ -721,6 +721,26 @@ func _test_wilds() -> void:
 				return true
 		return false)
 	_check(tilted.is_empty(), "every link, spawn point and start stands on level ground (%d spots; tilted: %s)" % [spots.size(), tilted])
+	# The marks (567): each solid through, no door, in open ground; the
+	# stones' ring walked into between them.
+	var marks := {}
+	var solid: Dictionary = {}
+	for cell: Vector2i in terrain.get("solid", []):
+		solid[cell] = true
+	var through := true
+	for building: Dictionary in level["buildings"]:
+		var slot := str(building["slot"])
+		if slot in Level.DOORLESS:
+			marks[slot] = int(marks.get(slot, 0)) + 1
+			through = through and not building.has("door") and Level.rect_cells(building["rect"]).all(func(cell: Vector2i) -> bool: return solid.has(cell) and not floor.has(cell))
+	_check(marks == {"building.great_tree": 1, "building.cairn": 1, "building.waystone": 1, "building.standing_stone": 8} and through,
+		"the marks: a great tree, a cairn, a waystone, a ring of 8 standing stones, each solid through, no door (567; %s)" % [marks])
+	var stones: Array = level["buildings"].filter(func(b: Dictionary) -> bool: return b["slot"] == "building.standing_stone")
+	var ring_middle := Vector2i.ZERO
+	for stone: Dictionary in stones:
+		ring_middle += (stone["rect"] as Rect2i).position
+	ring_middle /= maxi(1, stones.size())
+	_check(floor.has(ring_middle) and reached[ring_middle.y * size.x + ring_middle.x] >= 0.0, "the ring's middle %s is walked to, between the stones" % ring_middle)
 
 
 ## The first few pairs of orthogonal neighbours of [param terrain]'s

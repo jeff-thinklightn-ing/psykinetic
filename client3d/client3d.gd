@@ -3428,7 +3428,10 @@ func _add_buildings() -> void:
 		var rect: Rect2i = building["rect"]
 		var slot := str(building["slot"])
 		var facing: Vector2i = building["facing"]
-		var node := ArtKit.instance(slot)
+		var node := ArtKit.instance(slot, int(building.get("variant", 1)))
+		# Leaves that turn with the seasons (a great tree's crown, 567).
+		if ArtKit.spec(slot).get("leaf", false):
+			season_dress(node, true)
 		# Whole (decision 287): its damaged roof and its rubble shown only damaged.
 		var damaged := node.find_children("state_*", "Node3D", true, false)
 		if node.get_node_or_null("roof_damaged") != null:
@@ -3437,7 +3440,7 @@ func _add_buildings() -> void:
 			part.visible = false
 		var middle := Vector2(rect.position) + Vector2(rect.size - Vector2i.ONE) * 0.5
 		node.position = Vector3(middle.x, _elevation(rect.position), middle.y)
-		node.rotation.y = atan2(float(facing.x), float(facing.y))
+		node.rotation.y = deg_to_rad(float(building["yaw"])) if building.has("yaw") else atan2(float(facing.x), float(facing.y))
 		_room.add_child(node)
 		var index := _buildings.size()
 		var roof: Node3D = node.get_node_or_null("roof")

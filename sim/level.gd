@@ -110,7 +110,9 @@ const NORTHS := {"up": Vector2i(0, -1), "down": Vector2i(0, 1), "left": Vector2i
 ## are the map's own edges on its outline (decision 265).
 const BUILDINGS := {"building.hut": Vector2i(3, 3), "building.house": Vector2i(4, 6), "building.shed": Vector2i(2, 3),
 	"building.well": Vector2i(1, 1), "building.temple": Vector2i(4, 6), "building.healers_hut": Vector2i(3, 3),
-	"building.field": Vector2i(4, 4), "building.mound": Vector2i(5, 5)}
+	"building.field": Vector2i(4, 4), "building.mound": Vector2i(5, 5),
+	"building.great_tree": Vector2i(3, 3), "building.cairn": Vector2i(2, 2), "building.standing_stone": Vector2i(1, 1),
+	"building.waystone": Vector2i(1, 1)}
 ## The buildings that stand on water, not floor: no inside, no walls (a
 ## well: its water is what stops walkers, and sight passes over it).
 const ON_WATER: Array[String] = ["building.well"]
@@ -125,7 +127,12 @@ const OPEN_AIR: Array[String] = ["building.field"]
 ## them, routes go round) and listed in terrain "solid", which stops sight
 ## as a wall does; their outline has no walls (the slot's mesh is the
 ## mound), none expected.
-const SOLID: Array[String] = ["building.mound"]
+const SOLID: Array[String] = ["building.mound", "building.great_tree", "building.cairn", "building.standing_stone", "building.waystone"]
+## The solid buildings with no door (decision 567: the wilds' landmarks): every
+## cell of theirs out of the floor, none walked onto or into.
+const DOORLESS: Array[String] = ["building.great_tree", "building.cairn", "building.standing_stone", "building.waystone"]
+## solid_door_of's answer for a DOORLESS building.
+const NO_DOOR := Vector2i(-1, -1)
 ## A bridge (decision 505): a building entry {slot: "bridge", at, facing,
 ## length, width (1 or 2)} across water, its long axis along its facing,
 ## from a bank to a bank of one height. Its cells are walked on at the
@@ -1157,6 +1164,12 @@ static func buildings_from(config: Dictionary, terrain: Dictionary, warnings: Ar
 			warnings.append("the %s at %s has %d open edges on its outline (%s)" % [what, rect.position, open.size(), open[0]])
 		var building := {"slot": str(entry.get("slot", "")), "cell": rect.position, "facing": building_facing(entry), "rect": rect,
 			"blocks": blocks, "use": "", "town": "", "code": codes[index]}
+		# Which of its slot's variants, and a free turn (degrees) over its
+		# facing's (decision 567: a ring of stones, each its own).
+		if entry.get("variant") is float or entry.get("variant") is int:
+			building["variant"] = maxi(1, int(entry["variant"]))
+		if entry.get("yaw") is float or entry.get("yaw") is int:
+			building["yaw"] = float(entry["yaw"])
 		if entry.has("kind"):
 			_kind_of(building, entry)
 		_link(building, entry, config, linked, warnings)
@@ -1454,6 +1467,16 @@ static func _check_fords(terrain: Dictionary, warnings: Array[String]) -> void:
 			warnings.append("the ford at %s is beside no water: in no stream" % [cell])
 
 
+## A solid building's door, given its entry or its parsed record: the front
+## row's middle (550), or NO_DOOR for a DOORLESS one (567).
+static func solid_door_of(building: Dictionary) -> Vector2i:
+	if str(building.get("slot", "")) in DOORLESS:
+		return NO_DOOR
+	var rect: Rect2i = building["rect"] if building.has("rect") else building_rect(building)
+	var facing: Vector2i = building["facing"] if building.get("facing") is Vector2i else building_facing(building)
+	return solid_door(rect, facing)
+
+
 ## A solid building's door (decision 550): the front row's middle.
 static func solid_door(rect: Rect2i, facing: Vector2i) -> Vector2i:
 	return front_cell(rect, facing) - facing
@@ -1468,8 +1491,9 @@ static func _lay_solid(level: Dictionary) -> void:
 	for building: Dictionary in level["buildings"]:
 		if not str(building["slot"]) in SOLID:
 			continue
-		var door := solid_door(building["rect"], building["facing"])
-		building["door"] = door
+		var door := solid_door_of(building)
+		if door != NO_DOOR:
+			building["door"] = door
 		for cell in rect_cells(building["rect"]):
 			if cell != door:
 				terrain["floor"].erase(cell)

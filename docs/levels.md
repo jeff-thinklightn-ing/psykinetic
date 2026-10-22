@@ -956,6 +956,11 @@ over the middle, its long back rising from the north-east, a way up it
 (118, 255), about 3 m under its flanks; each pond level 0.3 m under its
 lowest shore. The town, every link, spawn point, start and building, and
 the camp's gathering point stand on level pads. Every cell keeps its kind.
+The marks (567), placed once into `level.json`'s `buildings` (its text kept
+as it was) and padded like any building: a great tree at (44, 132), a
+cairn on the ridge's back at (184, 40), a waystone where the roads will meet
+at (128, 128), a ring of eight standing stones round (70, 202), each in open
+ground (no forest or water within a few cells), the ring one pad.
 
 ## Prefabs
 

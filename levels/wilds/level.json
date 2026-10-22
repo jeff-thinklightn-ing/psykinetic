@@ -332,6 +332,143 @@
 				0,
 				1
 			]
+		},
+		{
+			"slot": "building.great_tree",
+			"at": [
+				44,
+				132
+			],
+			"facing": [
+				0,
+				1
+			]
+		},
+		{
+			"slot": "building.cairn",
+			"at": [
+				184,
+				40
+			],
+			"facing": [
+				0,
+				1
+			]
+		},
+		{
+			"slot": "building.waystone",
+			"at": [
+				128,
+				128
+			],
+			"facing": [
+				0,
+				1
+			]
+		},
+		{
+			"slot": "building.standing_stone",
+			"at": [
+				76,
+				202
+			],
+			"facing": [
+				0,
+				1
+			],
+			"variant": 1,
+			"yaw": -100.0
+		},
+		{
+			"slot": "building.standing_stone",
+			"at": [
+				74,
+				206
+			],
+			"facing": [
+				0,
+				1
+			],
+			"variant": 2,
+			"yaw": -129.0
+		},
+		{
+			"slot": "building.standing_stone",
+			"at": [
+				70,
+				208
+			],
+			"facing": [
+				0,
+				1
+			],
+			"variant": 3,
+			"yaw": 181.0
+		},
+		{
+			"slot": "building.standing_stone",
+			"at": [
+				66,
+				206
+			],
+			"facing": [
+				0,
+				1
+			],
+			"variant": 1,
+			"yaw": 131.0
+		},
+		{
+			"slot": "building.standing_stone",
+			"at": [
+				64,
+				202
+			],
+			"facing": [
+				0,
+				1
+			],
+			"variant": 2,
+			"yaw": 81.0
+		},
+		{
+			"slot": "building.standing_stone",
+			"at": [
+				66,
+				198
+			],
+			"facing": [
+				0,
+				1
+			],
+			"variant": 3,
+			"yaw": 52.0
+		},
+		{
+			"slot": "building.standing_stone",
+			"at": [
+				70,
+				196
+			],
+			"facing": [
+				0,
+				1
+			],
+			"variant": 1,
+			"yaw": 2.0
+		},
+		{
+			"slot": "building.standing_stone",
+			"at": [
+				74,
+				198
+			],
+			"facing": [
+				0,
+				1
+			],
+			"variant": 2,
+			"yaw": -48.0
 		}
 	],
 	"became": {
