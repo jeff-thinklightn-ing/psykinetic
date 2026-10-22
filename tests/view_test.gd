@@ -1676,9 +1676,9 @@ func _test_relief() -> void:
 	# a water cell's corner dry bank).
 	var hills := Level.load_level("hills")
 	_rig.rebuild(hills["terrain"], hills["centre"])
-	# Its water a ribbon (decision 557): at each path cell's middle the
-	# water's surface (its corners' means), never rising down the stream,
-	# over its bed all along.
+	# Its water a ribbon along its curve (557; 559, terrain's side): each
+	# middle point on the river's surface there (_curve_surface), never
+	# rising down the stream, over its bed all along.
 	var off_surface := 0
 	var heights_seen: Dictionary = {}
 	var rising := 0
@@ -1694,16 +1694,9 @@ func _test_relief() -> void:
 		var spot := Vector2(point.x, point.z)
 		if point.y < _rig._ground_height(spot) - 0.001:
 			under_bed += 1
-	for cell: Vector2i in stream_path:
-		var water_level: float = _rig._water_surface(Vector2(cell)) + Client3D.WATER_LIFT
-		var nearest := INF
-		var y := 0.0
-		for k in range(1, middles.size(), 3):
-			var gap := Vector2(middles[k].x, middles[k].z).distance_to(Vector2(cell))
-			if gap < nearest:
-				nearest = gap
-				y = middles[k].y
-		off_surface += 0 if nearest < 0.01 and absf(y - water_level) < 0.001 else 1
+	for k in range(1, middles.size(), 3):
+		var spot := Vector2(middles[k].x, middles[k].z)
+		off_surface += 0 if absf(middles[k].y - _rig._curve_surface(spot) - Client3D.WATER_LIFT) < 0.002 else 1
 	var covered := _ribbon_report(_rig, Vector2.ZERO)
 	off_surface += rising + under_bed + covered["uncovered"].size()
 	var dry_bed := []
@@ -1711,11 +1704,13 @@ func _test_relief() -> void:
 		var bed := _rig._corner_heights(cell)
 		for c in 4:
 			var corner := cell + Client3D.GROUND_CORNERS[c]
-			if _rig.shore_at(Vector2(corner) - Vector2(0.5, 0.5)) > 0.6 and bed[c] >= _rig._water_corner(corner):
+			var at := Vector2(corner) - Vector2(0.5, 0.5)
+			var surface := _rig._curve_surface(at) if _rig._curve_cells.has(cell) else _rig._water_corner(corner)
+			if _rig.shore_at(at) > 0.6 and bed[c] >= surface:
 				dry_bed.append(cell)
 				break
 	_check(off_surface == 0 and heights_seen.size() > 3 and dry_bed.is_empty(),
-			"a stream's ribbon slopes down its valley, at each path cell its water, never rising, over its bed, over all its cells (%d heights; off: %d, rising %d, under its bed %d, uncovered %s; beds above: %s)" % [heights_seen.size(), off_surface, rising, under_bed, covered["uncovered"].slice(0, 3), dry_bed.slice(0, 4)])
+			"a stream's ribbon slopes down its valley, on its curve's surface, never rising, over its bed, over all its cells (%d heights; off: %d, rising %d, under its bed %d, uncovered %s; beds above: %s)" % [heights_seen.size(), off_surface, rising, under_bed, covered["uncovered"].slice(0, 3), dry_bed.slice(0, 4)])
 	# Its falls (decision 557, for sound's ambience): each a step down its
 	# path of more than FALL_LEAST, the cell below it; a new array a build.
 	var falls := _rig.stream_falls
@@ -1725,6 +1720,21 @@ func _test_relief() -> void:
 	_rig.rebuild(hills["terrain"], hills["centre"])
 	_check(not falls.is_empty() and true_falls and not is_same(falls, _rig.stream_falls) and falls == _rig.stream_falls,
 			"the stream's falls listed, each a step down its path over %.2f m (%s), a new array each build" % [Client3D.FALL_LEAST, falls])
+	# Each fall white on the water drawn there (559, terrain's side: from
+	# the curve's ground, not its smoothed surface).
+	var dry_falls := []
+	for fall: Dictionary in falls:
+		var white := false
+		for ribbon: MeshInstance3D in _rig._stream_ribbons:
+			var arrays := (ribbon.mesh as ArrayMesh).surface_get_arrays(0)
+			var points: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+			var colours: PackedColorArray = arrays[Mesh.ARRAY_COLOR]
+			for k in points.size():
+				if colours[k].a > 0.5 and Vector2(points[k].x, points[k].z).distance_to(Vector2(fall["cell"])) < 1.5:
+					white = true
+		if not white:
+			dry_falls.append(fall["cell"])
+	_check(dry_falls.is_empty(), "each fall white on the water there (none: %s)" % [dry_falls])
 	# Its banks: within a walk of the water a grassy slope into it, no face;
 	# a face only where the land stands a cliff over it.
 	var faces: Dictionary = {}
@@ -2083,6 +2093,10 @@ func _test_shore() -> void:
 					if not _rig._grounds.has(here) or seen.has(here):
 						continue
 					seen[here] = true
+					# A water laid as a curve (559, terrain's side): its edge is
+					# the curve's, checked below, not its cells'.
+					if _rig._curve_near_sample.has(here):
+						continue
 					var water := wet.has(here)
 					for v in Client3D.SHORE_RES:
 						for u in Client3D.SHORE_RES:
@@ -2099,8 +2113,44 @@ func _test_shore() -> void:
 							checked += 1
 							if (_rig.shore_at(point) > 0.5) != water:
 								astray.append([name, here, point])
-		_check(checked > 0 and astray.is_empty(),
+		_check((checked > 0 or not _rig._curve_waters.is_empty()) and astray.is_empty(),
 				"%s: the water's edge within %.2f of its cells' (%d points; astray: %s)" % [name, Client3D.SHORE_BOUND, checked, astray.slice(0, 4)])
+		# A water laid as a curve (559, terrain's side): the field is the
+		# curve's signed distance; in or out by it wherever it is past 0.15
+		# of a cell, and its edge (the curve's half width) at a half within
+		# an eighth, never from the cells.
+		var curve_points := 0
+		var crossed := []
+		var off_edge := []
+		for water: Dictionary in _rig._curve_waters:
+			if water["closed"]:
+				continue
+			var samples: PackedVector2Array = water["curve"]["points"]
+			var widths: PackedFloat32Array = water["curve"]["widths"]
+			var tangents: PackedVector2Array = water["curve"]["tangents"]
+			for k in range(0, samples.size(), 3):
+				var normal := Vector2(-tangents[k].y, tangents[k].x)
+				for side: float in [-1.0, 1.0]:
+					var edge := samples[k] + normal * side * widths[k] * 0.5
+					# Off the drawn ground (past the map's edge, where the curve
+					# runs in) is no water's.
+					if not _rig._grounds.has(Vector2i(edge.round())):
+						continue
+					var signed := _rig._curve_near(edge).x
+					if absf(signed) < 0.02 and absf(_rig.shore_at(edge) - 0.5) > 0.125:
+						off_edge.append(edge)
+					for out: float in [-0.6, -0.3, 0.3, 0.6]:
+						var p := edge + normal * side * out
+						var sd := _rig._curve_near(p).x
+						if absf(sd) < 0.15 or not _rig._grounds.has(Vector2i(p.round())):
+							continue
+						curve_points += 1
+						if (_rig.shore_at(p) > 0.5) != (sd > 0.0):
+							crossed.append(p)
+		if not _rig._curve_waters.is_empty():
+			_check(curve_points > 100 and crossed.is_empty() and off_edge.is_empty(),
+					"%s: a curve's water drawn from the curve, in or out by its distance (%d points; wrong: %s; edge off a half: %s)"
+					% [name, curve_points, crossed.slice(0, 3), off_edge.slice(0, 3)])
 		if not bool(level["terrain"].get("relief_given", false)):
 			_check(not wet.is_empty() and _rig._shore_heights.is_empty() and _rig._stream_ribbons.is_empty() and _rig.stream_falls.is_empty(),
 					"%s (no relief): its ground drawn whole, its water's edge the shaders', no ribbon" % name)
@@ -2116,7 +2166,7 @@ func _test_shore() -> void:
 					if _rig._grounds.has(near):
 						water = water or wet.has(near) or _rig._bed_levels.has(near)
 						land = land or not (wet.has(near) or _rig._bed_levels.has(near))
-			if not (water and land):
+			if not (water and land) and not _rig._curve_cells.has(cell):
 				outside.append(cell)
 		_check(not _rig._shore_heights.is_empty() and outside.is_empty(),
 				"%s: %d shore cells drawn finer, each by water and land (outside: %s)" % [name, _rig._shore_heights.size(), outside.slice(0, 4)])

@@ -4,9 +4,11 @@ shader_type spatial;
 // Client3D.shore_image: rounded corners, round ponds, streams winding within
 // their cells) over a half, read SHORE_WARP aside by a noise; the field and
 // the warp keep it within Client3D.SHORE_BOUND of the cells' true edge, so a
-// cell that is land never looks drowned nor a water cell dry. How deep: the
-// distance into the water's cells (the mask, a texel a cell, 1 for water;
-// worked out from the 9 cells round the point).
+// cell that is land never looks drowned nor a water cell dry. A water laid
+// as a curve (559, terrain's side) has its field from the curve itself, its
+// edge at the curve's half width, never from its cells. How deep: half the
+// distance into the water (depth_tex: Client3D._curve_field, or
+// _water_depth for a water without a curve).
 // Foam on the land side of the shore; deeper and less clear toward the
 // middle; ripples that drift. A stream is a ribbon along its path
 // (decision 557, Client3D._build_ribbons): its ripples run the way its
@@ -27,8 +29,14 @@ uniform vec3 deep : source_color = vec3(0.08, 0.22, 0.42);
 uniform vec3 foam : source_color = vec3(0.85, 0.92, 0.95);
 // A stream's ribbon (decision 557): its flow in its points' colours.
 uniform bool ribbon = false;
+// A water drawn from its curve (559, terrain's side): its fords' shallows
+// in UV's x, not the mask's cells.
+uniform bool curved = false;
 // The shore field, Client3D.SHORE_RES texels a cell over the mask's cells.
 uniform sampler2D shore : hint_default_black, filter_linear, repeat_disable;
+// The water's depth at the shore field's texels (559, terrain's side): half
+// the distance into it, out to two cells (Client3D._depth_image).
+uniform sampler2D depth_tex : hint_default_black, filter_linear, repeat_disable;
 
 varying vec3 world;
 varying vec4 running;
@@ -58,29 +66,6 @@ vec3 surface(vec2 at, float t) {
 	return vec3(slope, churn);
 }
 
-bool is_water(ivec2 cell) {
-	ivec2 texel = clamp(cell - ivec2(round(mask_origin)), ivec2(0), ivec2(round(mask_size)) - 1);
-	return texelFetch(water, texel, 0).r > 0.5;
-}
-
-// How far [at] is inside the water's cells (less than 0: outside, on land),
-// out to a cell and a half.
-float into_water(vec2 at) {
-	ivec2 cell = ivec2(round(at));
-	bool inside = is_water(cell);
-	float nearest = 1.5;
-	for (int y = -1; y <= 1; y++) {
-		for (int x = -1; x <= 1; x++) {
-			ivec2 other = cell + ivec2(x, y);
-			if (is_water(other) != inside) {
-				vec2 off = max(abs(at - vec2(other)) - 0.5, vec2(0.0));
-				nearest = min(nearest, length(off));
-			}
-		}
-	}
-	return inside ? nearest : -nearest;
-}
-
 void vertex() {
 	world = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 	running = ribbon ? COLOR : vec4(0.5, 0.5, 0.0, 0.0);
@@ -102,7 +87,9 @@ void fragment() {
 		discard;
 	}
 	float inside = smoothstep(-0.02, 0.03, into);
-	float depth = smoothstep(0.15, 1.2, into_water(at));
+	// How deep: half the distance into the water (from the curve, or a
+	// water without one from its cells), Client3D._depth_image.
+	float depth = smoothstep(0.15, 1.2, texture(depth_tex, (at - mask_origin + 0.5) / mask_size).r * 2.0);
 	float t = TIME * 0.12;
 	// Down a stream the surface drifts with the water, in two phases: each
 	// carried FLOW_SPEED along and faded out as the other comes in.
@@ -116,7 +103,7 @@ void fragment() {
 	float churn = moving.z;
 	// A ford: shallow and clear, the stones showing, foam across it where
 	// the current meets them and flecks on it.
-	float shoal = smoothstep(0.15, 0.85, texture(water, uv).b);
+	float shoal = smoothstep(0.15, 0.85, curved ? UV.x : texture(water, uv).b);
 	depth *= 1.0 - shoal;
 	vec3 colour = mix(shallow, deep, depth);
 	// The foam: a band at the shore, on the land side, broken up and drifting.

@@ -19154,3 +19154,77 @@ forward axis read off the bone's rest; limits a neck's, 70 degrees across and 35
 aimed at a marker kept at their head bone, eased in and out over LOOK_EASE (0.3 s), since the
 8-way facing leaves a body up to 22 degrees off them; and while it stands addressing them it plays
 Idle_Talking. Client only; nothing on the wire beyond npc's field.
+## 559, terrain's side: waters drawn from their curves
+
+Jeff's rule (2026-10-21): "Rivers, streams, roads and shorelines are drawn
+as smooth curves, then rasterized to cells. Never cell regions with
+rounded edges... Nothing inside the water shows the grid." Maps' 559 lays
+each water as a curve (terrain "waters": Curves.sample's points, widths,
+tangents), its cells derived from it. This is the drawing from that curve,
+approved by the coordinator. A level without curves draws as before (553,
+557).
+
+**The field.** Client3D._read_curves keeps each water's curve, its cells
+(Curves.cells), and for every cell near it the nearest sample.
+_curve_near gives a point's signed distance to the curve: the width / 2
+there less the distance, positive inside; a pond's from its closed curve
+by Curves.inside. It searches CURVE_SEARCH samples round the cell's
+nearest, never the whole curve. _curve_field writes from it:
+- the shore texture: 0.5 plus the distance (the edge at a half, a cell
+  from dry to wet);
+- a depth texture of its own (_depth_image, L8): half the distance into
+  the water, out to two cells.
+The cells' bilinear, its clamp, and the water shader's distance over
+cells (into_water, is_water) are not used for a curve's water. A water
+without a curve gets its depth worked out the same way (_water_depth: only
+its own texels written), so the shader reads one depth for both. The sim's cells are the curve's
+raster, so the drawn edge and the cells agree by construction.
+
+**The water.** A river is a ribbon along its curve's own samples
+(_build_curve_ribbon), out to its width / 2 and RIBBON_UNDER more under
+the banks, trimmed to the stretch over its own cells.
+- Its level is the river's surface along it (_curve_profile): the ground
+  under each sample (a bridge's water at its bed), smoothed over
+  CURVE_SMOOTH samples each side, never rising downstream.
+- The flow comes from its tangent, how fast from its drop, and a fall's
+  white water where the ground under it drops more than FALL_LEAST over a
+  cell (_curve_ground, unsmoothed, the relief even under a bridge, as
+  stream_falls measures a step).
+- A ford is a stretch of the curve: its cells' nearest samples, easing in
+  and out over a cell, carried in UV's x (water.gdshader's "curved"), not
+  the mask's cells.
+- A pond (closed) is its curve's polygon pushed out RIBBON_UNDER,
+  triangulated (none laid yet).
+- A stream laid from a curve is drawn by its curve. Its falls are still
+  listed from its path (stream_falls).
+
+**The bank and bed.** Every cell of a curve's water, and the band beside
+it, is drawn finer (_shore_band, _curve_fine).
+- Each point is the ground as drawn, easing under the water's edge (the
+  curve's distance, smoothstep 0.3 to 0.5 of the field) to the bed:
+  SHORE_SINK under the river's surface there (_curve_surface), and
+  WATER_BED_DEPTH more toward its middle.
+- So the bed under clear water shows no cell corners.
+- A point on an edge or corner shared with a cell drawn whole takes that
+  cell's ground as drawn (its sunk corners too), so they meet with no gap.
+
+Cost: the bench A/B (map_bench against 9322dfb1, alternated) follows as
+a docs-only note. It was stopped mid-run when windowed Godot was paused
+(Jeff in Blender), and the coordinator had this land on its headless
+tests and the shots. A first pass, noisy, gave the hills' rebuild
+unchanged (about 1000 ms). It also showed the wilds' rebuild up about
+60 ms with no curves there: a copy of the whole shore image, since gone
+(the depth its own image, only water's texels written). The wilds have no
+curves yet (their ponds are to be traced); the cost on ponds is to be
+measured when they are laid.
+
+tests/view_test:
+- _test_shore on the hills: the field in or out by the curve's distance
+  wherever it is past 0.15 of a cell, its edge at a half within an eighth
+  (1565 points); the finer cells drawn at their _height_in and meeting the
+  ground beside.
+- _test_relief: the ribbon on the river's surface, never rising, over its
+  bed, over all its cells; beds under the curve's surface.
+
+Shots and A/B in C:\dev\review\curves. Client only. The protocol is 559's
+(29). No new class_name.
