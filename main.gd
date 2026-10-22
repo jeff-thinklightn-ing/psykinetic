@@ -8840,6 +8840,11 @@ func _hook_talker(monster: GridEntity) -> void:
 	if monster.has_signal("hall_door"):
 		# The draugr's (573 amended): false shuts his hall's door, true opens it.
 		monster.connect("hall_door", func(open: bool) -> void: _hold_hall_door(monster.zone, not open))
+	if monster.has_signal("said"):
+		# His unasked lines (573 amended: why one entered, the win, his respect).
+		monster.connect("said", func(text: String) -> void:
+			if is_instance_valid(monster) and monster.spawned:
+				_say_plain(monster, _display_name(monster), text))
 
 
 func _on_offer_spoken(monster: GridEntity, player_id: String, offer: Dictionary) -> void:

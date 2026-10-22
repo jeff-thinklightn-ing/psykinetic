@@ -111,7 +111,7 @@
 	"draugr": {
 		"label": "Draugr",
 		"script": "res://sim/draugr.gd",
-		"body": {"mass": 120.0, "move_ticks": 4.5, "max_hp": 30, "attack_ticks": 14, "attack_damage": 3, "sight_range": 5},
+		"body": {"mass": 120.0, "move_ticks": 4.5, "max_hp": 30, "attack_ticks": 14, "attack_damage": 3, "sight_range": 5, "max_stamina": 100},
 		"tactic": "heavy",
 		"idle": "guard",
 		"opens_doors": false,
@@ -122,6 +122,8 @@
 		"fearless": true,
 		"keeps_room": true,
 		"wields": {"right": "battle_axe"},
-		"yields": [{"item": "battle_axe"}]
+		"yields": [{"item": "battle_axe"}],
+		"swing_stamina": true,
+		"stamina_regen_every": 4
 	}
 }
