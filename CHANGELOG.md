@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Coming back to a place after a long time away no longer brings its monsters back in a rush round you: one comes back at once and each of the rest a full respawn wait after the one before, and for a minute after you arrive none comes back within 12 tiles of you or in your sight (382 amended (2)).
 - An animal, a townsperson or a companion standing on a way to another place (the castle's road out of the wilds, a barrow's door) no longer bars it: you go through anyway when you step at it, and they no longer stop or drop things there (571).
 - The white water and falls sound just past the hills' bridge are gone: a bridge's deck was being read as a step in the stream (557 amended (2)). Real falls come with the hills' new waterfall.
 - Herbs now grow near the medicine man's hut, from the game day after the server update, so he gathers his own and makes remedies even when nobody brings him herbs (562 amended).

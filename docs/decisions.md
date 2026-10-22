@@ -8291,6 +8291,23 @@ Amended (coordinator): the arrival quiet has its own constant,
 `RESPAWN_ARRIVAL_TICKS` = 100 (10 s), not `SPAWN_GRACE_TICKS` (30, 3 s, the
 monsters' grace for a new player), which was too short to look round.
 
+Amended (2) (coordinator, from Jeff's play on the box, 2026-10-21): the
+castle woke after 69107 s asleep and brought 10 back in two minutes round
+him, one every 6 to 16 s; he and Pip fell within two minutes. A zone's tick
+stands while it sleeps, so its timers did not run on; but every dead one
+already due when it fell asleep (or held back by a player near) was still
+due on waking, and the stagger alone let them in at one every 6 s. Now
+`World.zone_woke` (from `_woke`) marks the zone in `Main._woken`, and its
+first respawn check after (`_space_after_wake`) spaces its dead: the
+soonest due comes when its timer says (at once if it has run out), each of
+the rest its own full wait (`_respawn_delay`) after the one before, or
+later if its own timer says so. The castle's 10 now come over about 10
+minutes, not 2. The journal says it: `[world] <zone> woke: N dead come
+back one at a time, the last in S s`. And a player just come
+(`RESPAWN_ARRIVAL_TICKS`, now 600, a minute) holds back any respawn within
+12 tiles of them or in their line of sight (`World.has_line_of_sight`).
+respawn_test `_test_wake_spaced`. Server only; no protocol change.
+
 ## 387. The seasons on the ground, the trees and the border
 
 Environment's season (362) on terrain's side, as the coordinator

@@ -20,6 +20,7 @@ func _ready() -> void:
 	_test_respawn_waits_for_time_and_distance()
 	_test_crate_respawns_at_its_spawn_tile()
 	_test_respawns_staggered()
+	_test_wake_spaced()
 	_test_console()
 	_test_player_reset()
 	_test_old_snapshot_gets_current_looks()
@@ -141,6 +142,52 @@ func _test_respawns_staggered() -> void:
 	World.step()
 	_check(_monsters() == 1, "then the first, as before")
 	_kill_monsters()
+	Monster.noticing = true
+
+
+func _test_wake_spaced() -> void:
+	print("\n== a zone woken: one of its due dead now, the rest each a full wait apart; none in a just-come player's sight (382 amended (2)) ==")
+	Monster.noticing = false
+	var player := _player()
+	var peer: int = _main._players.find_key(player)
+	_walk_to(player, Vector2i(12, 12))
+	_kill_monsters()
+	var slots: Array = _main._dead_since.keys()
+	for slot: int in slots:
+		_main._dead_since[slot] = World.tick - 10 * _main.RESPAWN_DELAY_TICKS  # Long overdue, as after a long sleep.
+	_main._respawned_at.clear()
+	_main._arrived_at[peer] = World.tick - _main.RESPAWN_ARRIVAL_TICKS
+	var zone_name: String = World.zone.name if World.zone != null else ""
+	_main._woken[zone_name] = true
+	World.step()
+	_check(_monsters() <= 1, "%d long due on waking: one at most comes back (%d)" % [slots.size(), _monsters()])
+	var back := _monsters()
+	var due: Array = []
+	for slot: int in _main._dead_since:
+		due.append(_main._dead_since[slot] + _main._respawn_delay(slot))
+	due.sort()
+	var spaced := true
+	for i in range(1, due.size()):
+		spaced = spaced and due[i] - due[i - 1] >= _main.RESPAWN_DELAY_TICKS
+	_check(due.size() == slots.size() - back and spaced and (back == 0 or due[0] >= World.tick + _main.RESPAWN_DELAY_TICKS - 1),
+			"the rest (%d) each a full %d ticks after the one before (next at +%d)" % [due.size(), _main.RESPAWN_DELAY_TICKS, due[0] - World.tick if not due.is_empty() else -1])
+	for i in _main.RESPAWN_DELAY_TICKS - 2:
+		World.step()
+	_check(_monsters() <= back + 1, "no more than one more within %d ticks (it was one every %d before)" % [_main.RESPAWN_DELAY_TICKS, _main.RESPAWN_STAGGER_TICKS])
+	_kill_monsters()
+
+	# The farthest floor tile in the player's sight (the room is small: the
+	# player stands in a corner for it; the far one, (1, 1), is a link).
+	_walk_to(player, Vector2i(14, 12))
+	var far := player.tile
+	for cell: Vector2i in World.floor_cells():
+		if World.distance(player.tile, cell) > World.distance(player.tile, far) and World.has_line_of_sight(player.tile, cell):
+			far = cell
+	_check(World.distance(player.tile, far) > _main.RESPAWN_JOIN_DISTANCE, "a floor tile %d off in the player's sight (at %s)" % [World.distance(player.tile, far), far])
+	_main._arrived_at[peer] = World.tick
+	_check(_main._nearest_player(far, World.tick) == -1, "a player just come holds it back")
+	_check(_main._nearest_player(far, World.tick + _main.RESPAWN_ARRIVAL_TICKS) > 0, "not after %d ticks" % _main.RESPAWN_ARRIVAL_TICKS)
+	_main._arrived_at[peer] = World.tick - _main.RESPAWN_ARRIVAL_TICKS
 	Monster.noticing = true
 
 

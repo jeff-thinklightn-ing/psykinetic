@@ -143,10 +143,11 @@ const RESPAWN_MIN_DISTANCE := 6
 ## player first, so a zone opened after a long sleep (or cleared and left)
 ## does not bring every due one back at once (decision 382).
 const RESPAWN_STAGGER_TICKS := 60
-## For RESPAWN_ARRIVAL_TICKS (10 s) after a player joins or comes into the
-## zone, nothing comes back within this many tiles of them.
+## For RESPAWN_ARRIVAL_TICKS (60 s; 10 s before 382 amended (2)) after a
+## player joins or comes into the zone, nothing comes back within this many
+## tiles of them, nor in their line of sight.
 const RESPAWN_JOIN_DISTANCE := 12
-const RESPAWN_ARRIVAL_TICKS := 100
+const RESPAWN_ARRIVAL_TICKS := 600
 ## A camp falls (decision 429) when for CAMP_FALL_TICKS (10 s) no living
 ## monster of its holder's side stands within its radius + CAMP_DEFEND_MARGIN
 ## and a player stands within its radius; looked at every CAMP_CHECK_TICKS.
@@ -296,6 +297,9 @@ var _herds_kept: Object = null
 var _dead_since: Dictionary[int, int] = {}
 ## Zone name -> the tick its last respawn came back (RESPAWN_STAGGER_TICKS).
 var _respawned_at: Dictionary[String, int] = {}
+## Zone names woken since their last respawn check: their dead are spaced
+## out on it (_space_after_wake, decision 382 amended (2)).
+var _woken: Dictionary[String, bool] = {}
 ## Peer -> the tick its player was last put down (a join, a zone entered, a
 ## respawn): the wider no-respawn radius while RESPAWN_ARRIVAL_TICKS last.
 var _arrived_at: Dictionary[int, int] = {}
@@ -612,6 +616,7 @@ func _ready() -> void:
 		for place_id: String in _towns_near.keys():
 			if str(World.holdings.place(place_id).get("area", "")) == each.name:
 				_towns_near.erase(place_id))
+	World.zone_woke.connect(func(each: Zone) -> void: _woken[each.name] = true)
 	if Net.test_exit_after > 0.0:
 		get_tree().create_timer(Net.test_exit_after).timeout.connect(_on_test_exit)
 	if Net.test_exit_on != "":
@@ -3597,6 +3602,9 @@ func _slot_for(spawn: int, key: String) -> int:
 ## many.
 func _check_respawns(tick: int, force := false) -> int:
 	var zone_name: String = World.zone.name if World.zone != null else ""
+	if _woken.has(zone_name):
+		_woken.erase(zone_name)
+		_space_after_wake(tick)
 	if not force and _respawned_at.has(zone_name) and tick - _respawned_at[zone_name] < RESPAWN_STAGGER_TICKS:
 		return 0
 	var due: Array[Array] = []  # [steps from the nearest player, slot, spec]
@@ -3637,10 +3645,30 @@ func _nearest_player(tile: Vector2i, tick: int) -> int:
 			continue
 		var away := World.distance(player.tile, tile)
 		var arrived := tick - int(_arrived_at.get(peer, -RESPAWN_ARRIVAL_TICKS)) < RESPAWN_ARRIVAL_TICKS
-		if away <= RESPAWN_MIN_DISTANCE or arrived and away <= RESPAWN_JOIN_DISTANCE:
+		if away <= RESPAWN_MIN_DISTANCE or arrived and (away <= RESPAWN_JOIN_DISTANCE or World.has_line_of_sight(player.tile, tile)):
 			return -1
 		nearest = mini(nearest, away)
 	return nearest
+
+
+## The zone World is in has just woken (decision 382 amended (2); Jeff died
+## in the castle to 10 back in two minutes after 19 hours away): of its dead
+## at most one is due now, each of the rest its own full wait after the one
+## before (soonest due first), or later if its own timer says so.
+func _space_after_wake(tick: int) -> void:
+	var slots: Array = _dead_since.keys()
+	if slots.is_empty():
+		return
+	var due_at := func(slot: int) -> int: return _dead_since[slot] + _respawn_delay(slot)
+	slots.sort_custom(func(a: int, b: int) -> bool: return due_at.call(a) < due_at.call(b))
+	var at := tick
+	for i in slots.size():
+		var slot: int = slots[i]
+		var delay := _respawn_delay(slot)
+		at = maxi(due_at.call(slot), tick if i == 0 else at + delay)
+		_dead_since[slot] = at - delay
+	print("[world] %s woke: %d dead come back one at a time, the last in %d s" % [World.zone.name, slots.size(),
+		roundi(float(at - tick) / World.TICK_RATE)])
 
 
 ## The snapshot's writer (decision 360): the world is gathered here, on the

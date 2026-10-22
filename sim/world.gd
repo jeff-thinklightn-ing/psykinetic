@@ -42,6 +42,8 @@ signal entity_downed(entity: GridEntity, source: GridEntity, ticks: int)
 signal channel_changed(by: GridEntity, body: GridEntity, state: StringName)
 ## [param each] fell asleep: nobody is in it now (World.step).
 signal zone_slept(each: Zone)
+## [param each] woke: someone came into it (World.step).
+signal zone_woke(each: Zone)
 ## A door opened, closed, was damaged or broke; [param by] did it.
 signal door_changed(door: Door, by: GridEntity)
 ## A door came, or its open or hp changed, on this peer (the server's
@@ -875,6 +877,7 @@ func _is_awake(each: Zone) -> bool:
 ## each monster as near as it is to whoever came.
 func _woke(each: Zone, seconds: float) -> void:
 	print("[zone] %s wakes after %.0f s asleep" % [each.name, seconds])
+	zone_woke.emit(each)
 	# Every monster's tier looked at afresh, so those near whoever came wake
 	# in turn (_tier).
 	for entity in each.entities if each != zone else _entities:
