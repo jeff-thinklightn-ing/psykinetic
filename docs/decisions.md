@@ -19467,3 +19467,32 @@ it: "being built 40%" while a job runs ("progress"), "planned" with none
 yet, "damaged"; nothing for a standing one or one serving no town. The
 cursor's hint ("H3 house, being built 40%") and builder mode's click line
 end with it. Nothing travels from builder; protocol unchanged.
+## 562, items' side. The stamina potion, and the remedy's maker
+
+Jeff, through economy (barter, phase 2): "hob can have a stamina potion that
+improves run speed and trades for herbs". Economy leads 562; this is the
+item and its buff. The numbers are drafts for Jeff.
+- Item stamina_potion, "stamina potion" (art item.stamina_potion, a small
+  stoppered flask; size [0.05, 0.11, 0.05], 0.25 kg; tags medical and
+  drink). Made by the medicine man from 3 herbs over 600 steps, with
+  "stock": 3, the shelf cap economy's Production reads (shop_cap
+  without it). No catalog value: Economy.value_of gives 4 from the recipe.
+- Its effect is a new buff kind, "speed" (Items.BUFF_KINDS, the HUD's
+  "Quick 25%"): {"amount": 0.25, "ticks": 18000}, 30 minutes at
+  TICK_RATE 10 (Jeff: "try 30 minutes not two"). World.step_ticks divides
+  a step's ticks by 1 + the buff, after slope, ford and grass. Buffs
+  replicate, so a client's walk prediction agrees with the server's.
+- Drunk from the pack like a ration (World.try_use, a thing with effects):
+  used up at once, no step and no channel. A second potion resets the time
+  and doesn't add to the amount (add_buff keeps the larger amount and the
+  later end).
+- Items.made_problem accepts an optional "stock" over 0; Items._made
+  keeps it.
+- Behaviour change: the remedy's and the potion's maker is "medicine_man"
+  (Items.TRADES: "healer" became "medicine_man"). Hob's trade and his
+  hut's workshop were always "medicine_man", so no remedy was ever made;
+  now the medicine man makes remedies. Being in TRADES also makes him a
+  maker for economy's apprentice turn (498 amended) and the newcomer rule
+  (552).
+Wire: PROTOCOL_REVISION 29, "speed" in a body's buffs. items_test
+_test_stamina_potion. No new class_name.

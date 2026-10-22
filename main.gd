@@ -9175,7 +9175,9 @@ func _on_world_ticked(tick: int) -> void:
 	if player != null:
 		hp_text = "HP %d/%d" % [player.hp, player.max_hp]
 		for kind: String in player.buffs:
-			hp_text += "   %s +%s %ds" % [Items.BUFF_KINDS.get(kind, kind), str(snappedf(float(player.buffs[kind][0]), 0.1)),
+			var amount := float(player.buffs[kind][0])  # Speed as a share: "Quick 25%" (decision 562).
+			hp_text += "   %s %s %ds" % [Items.BUFF_KINDS.get(kind, kind),
+				"%d%%" % roundi(amount * 100.0) if kind == "speed" else "+" + str(snappedf(amount, 0.1)),
 				ceili(maxi(int(player.buffs[kind][1]) - tick, 0) * World.TICK_DT)]
 		if player.raised == "block":
 			hp_text += "   shield raised"

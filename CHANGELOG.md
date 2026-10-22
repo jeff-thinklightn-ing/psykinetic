@@ -7,6 +7,8 @@ notes (decision 324).
 
 ## Unreleased
 
+- The medicine man makes a stamina potion from herbs: drink it to walk 25% quicker for 30 minutes; a second one resets the time (562).
+- The medicine man now actually makes healing remedies: their recipe named a trade nobody had (562).
 - The barrow is roomier (541 amended, Jeff: "way too cramped"): its ways are three cells wide, the tombs, passage graves and caverns bigger, the altar room and the draugr's lair larger still, the whole level grown from 44 x 36 to 72 x 60; fewer dead walk it (enemy-ai's counts). The console's `regenerate now <level>` lays a shifting level again at once when nobody is in it, so the box takes the new shape right after the deploy.
 - The building hint and builder mode's click line say how far the town has built a building: "H3 house, being built 40%", "planned" or "damaged" (566).
 - Wolves are less keen (Jeff's "wolf packs of 4 near the town are too much"): by day a pack needs 4 together to hunt you, not 3, so the smaller packs leave you be unless struck; a wolf chases 15 cells from its den, not 30, so running gets you away; at night it sees 1 cell farther than by day, not 2.

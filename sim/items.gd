@@ -36,7 +36,7 @@ const CARRIED := 6
 const FIELDS := ["id", "name", "short", "color", "art", "kind", "size", "weight", "hands", "tags", "effects", "use", "yield", "verb", "made",
 	"opens", "value", "blunt", "ammo", "condition", "mend"]
 ## Who makes things (made's "by"), as economy's production has them.
-const TRADES: Array[String] = ["smith", "cook", "carpenter", "tanner", "fletcher", "weaver", "healer"]
+const TRADES: Array[String] = ["smith", "cook", "carpenter", "tanner", "fletcher", "weaver", "medicine_man"]
 
 ## The makes a thing can be of (decision 474): set at mint by its source
 ## (a drop row, a chest's or a monster's props "style", a level's
@@ -104,7 +104,8 @@ static func read(text: String) -> Dictionary:
 ## What is wrong with a definition's [param made] given [param definitions]
 ## (every id), or "" if nothing: "by" a trade (TRADES), "steps" over 0, and
 ## either "from" (stockpile resources or item ids, each a count over 0) or
-## "rework" (an item id).
+## "rework" (an item id); an optional "stock", over 0, the most a seller's
+## shelf keeps (economy's Production, decision 562; shop_cap without it).
 static func made_problem(made: Dictionary, definitions: Dictionary) -> String:
 	if made.is_empty():
 		return ""
@@ -112,6 +113,8 @@ static func made_problem(made: Dictionary, definitions: Dictionary) -> String:
 		return "is by %s, no trade (%s)" % [made.get("by"), ", ".join(TRADES)]
 	if int(made.get("steps", 0)) <= 0:
 		return "takes no steps"
+	if made.has("stock") and int(made["stock"]) <= 0:
+		return "keeps a shelf of %s" % made["stock"]
 	if made.has("rework"):
 		return "" if definitions.has(str(made["rework"])) else "reworks %s, no item" % made["rework"]
 	var from: Variant = made.get("from")
@@ -193,6 +196,8 @@ static func _made(value: Variant) -> Dictionary:
 	var made := {"by": str(value.get("by", "")), "steps": int(value.get("steps", 0))}
 	if bool(value.get("first", false)):
 		made["first"] = true  # Its trade tries it before the rest (decision 405).
+	if value.has("stock"):
+		made["stock"] = int(value["stock"])  # Its shelf's cap (decision 562).
 	if value.has("rework"):
 		made["rework"] = str(value["rework"])
 	elif value.get("from") is Dictionary:
@@ -514,8 +519,9 @@ static func has_tag(id: String, tag: String) -> bool:
 ## What a consumed thing's effects may raise, each with its name on the HUD:
 ## mass (food: kg, heavier and harder to shove), aura (magic) and wits
 ## (social time), the last two read by whatever comes to use them
-## (World.buff).
-const BUFF_KINDS := {"mass": "Fed", "aura": "Aura", "wits": "Wits"}
+## (World.buff), and speed (a fraction: steps that much faster,
+## World.step_ticks; decision 562).
+const BUFF_KINDS := {"mass": "Fed", "aura": "Aura", "wits": "Wits", "speed": "Quick"}
 
 
 ## [param effects] as the catalog gives them, each {kind, amount, ticks},

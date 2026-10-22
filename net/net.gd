@@ -239,6 +239,8 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## "progress" (0..1) while a job builds, raises or repairs one and
 ## "walls" (Towns.walls_up), and the message carries "awake" {map building
 ## code: bool}.
+## 29 (562, items' side): a body's buffs may carry "speed", a share its
+## steps are quicker by, which World.step_ticks reads on both sides.
 const PROTOCOL_REVISION := 29
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]

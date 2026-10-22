@@ -90,7 +90,7 @@ var base_mass := -1.0
 ## A player's and a companion's replicate, for the views.
 var mending := 0
 ## Buffs (World.try_use, a thing with effects consumed): kind ("mass",
-## "aura", "wits": Items.BUFF_KINDS) -> [amount, the tick it fades]. Only
+## "aura", "wits", "speed": Items.BUFF_KINDS) -> [amount, the tick it fades]. Only
 ## ever above baseline. Reassigned whole on every change, so a player's
 ## and a companion's replicate, for the HUD.
 var buffs := {}

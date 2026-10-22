@@ -470,6 +470,32 @@ func _test_buffs() -> void:
 	_check(faded.has("mass") and host.buffs.is_empty() and is_equal_approx(host.mass, mass),
 			"then the meal: back to baseline, not below (%.1f)" % host.mass)
 	World.buff_changed.disconnect(on_faded)
+	_test_stamina_potion()
+
+
+func _test_stamina_potion() -> void:
+	print("\n== the stamina potion: quicker steps, reset not added (decision 562) ==")
+	var host := _player(Net.local_id)
+	var potion := Items.def("stamina_potion")
+	_check(potion.get("made", {}) == {"by": "medicine_man", "from": {"herbs": 3}, "steps": 600, "stock": 3}
+			and Items.effects_of("stamina_potion", potion.get("effects", [])) == [{"kind": "speed", "amount": 0.25, "ticks": 18000}],
+			"made by the medicine man from 3 herbs, a shelf of 3; +25%% for 30 minutes (%s)" % [potion.get("effects")])
+	var had := host.buffs.duplicate(true)
+	host.buffs = {}
+	var plain := World.step_ticks(host, Vector2i.RIGHT)
+	var slot := host.slots.find("")
+	_give(host, "stamina_potion", slot)
+	_check(World.try_use(host, slot) and host.slots[slot].is_empty(), "drunk from the pack: gone")
+	_check(is_equal_approx(World.step_ticks(host, Vector2i.RIGHT), plain / 1.25), "a step 25%% quicker (%.3f from %.3f)" % [World.step_ticks(host, Vector2i.RIGHT), plain])
+	var until: int = host.buffs["speed"][1]
+	_steps(3)
+	World.add_buff(host, "speed", 0.25, 18000)
+	_check(World.buff(host, "speed") == 0.25 and int(host.buffs["speed"][1]) > until, "a second resets the time, not the amount (+25% still)")
+	_check(Items.made_problem({"by": "medicine_man", "from": {"herbs": 1}, "steps": 1, "stock": 0}, {}) != "", "a shelf of none is refused")
+	host.buffs = {"speed": [0.25, World.tick + 1]}
+	_steps(2)
+	_check(not host.buffs.has("speed") and is_equal_approx(World.step_ticks(host, Vector2i.RIGHT), plain), "then it fades: back to the plain pace")
+	host.buffs = had
 
 
 func _test_weapons() -> void:
@@ -1219,9 +1245,9 @@ func _test_short() -> void:
 			and Items.measured("cloth_bolt") and Items.measured("herbs")
 			and not Items.measured("sword") and not Items.measured("bow") and not Items.measured("shield") and not Items.measured("ration") and not Items.measured("remedy"),
 			"measured: sacks, hides, bolts, herbs, a bundle of arrows; never a weapon, gear, or a whole ration")
-	_check(Items.def("cloth_bolt")["made"].get("by") == "weaver" and Items.def("remedy")["made"].get("by") == "healer"
+	_check(Items.def("cloth_bolt")["made"].get("by") == "weaver" and Items.def("remedy")["made"].get("by") == "medicine_man"
 			and Items.yield_of("cloth_bolt") == {"cloth": 3} and Items.yield_of("herbs") == {"herbs": 1},
-			"the weaver's bolt (500) and the healer's remedy from herbs (501)")
+			"the weaver's bolt (500) and the medicine man's remedy from herbs (501, 562)")
 	var luxuries := true
 	for id: String in ["wine", "spice", "silver_ring"]:
 		luxuries = luxuries and Items.has_tag(id, "luxury") and Items.yield_of(id).is_empty() \

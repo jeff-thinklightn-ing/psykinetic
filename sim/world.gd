@@ -5598,6 +5598,7 @@ func step_ticks(entity: GridEntity, direction: Vector2i, from := NO_CELL) -> flo
 	var to := from + direction
 	# Uphill is slower (Relief.pace, decision 525); a stair is not.
 	ticks *= Relief.pace(elevation_at(to) - elevation_at(from), direction.x != 0 and direction.y != 0)
+	ticks /= 1.0 + buff(entity, "speed")  # A stamina potion (decision 562); buffs replicate, so a client's prediction agrees.
 	if _fords.has(to):
 		return ticks * FORD_TICK_SCALE
 	return ticks * TALL_GRASS_TICK_SCALE if cover_at(to) > 0.0 else ticks
