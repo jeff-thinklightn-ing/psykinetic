@@ -1322,6 +1322,29 @@ func remains() -> Array[int]:
 const PURSE := "coin_purse"
 
 
+## What it leaves at its feet when it yields rather than dies (decision
+## 603, items' side; Jeff: "the draugr will have a large battle axe that he drops as
+## loot"): its kind's "yields" rows (drops' shape), minted now ("remains"
+## of it, its make) and laid on the ground where it stands. The caller says
+## when (the draugr: once per pact won, in Draugr's yield path); a lost pact or an
+## unpaid fight never asks. The uids laid. Server only.
+func yielded() -> Array[int]:
+	var uids: Array[int] = []
+	if not Net.is_authority():
+		return uids
+	var row: Dictionary = kinds().get(str(spawn_spec.get("kind", "")), {})
+	var roll := RandomNumberGenerator.new()
+	roll.seed = hash("%s/yielded/%d" % [name, World.tick])
+	for drop: Variant in row.get("yields", []):
+		for i in dropped(drop, roll):
+			var uid := World.items.mint(str(drop["item"]), "remains", World._label_of(self), zone, tile, str(drop.get("style", World.style_from(self))))
+			if World.put_on_ground(uid, tile) == World.NO_CELL:
+				World.items.end(uid, "lost", "no ground at %s" % tile, zone, tile)
+				continue
+			uids.append(uid)
+	return uids
+
+
 ## How many of drop row [param drop] fall, by [param roll]: none if its
 ## "chance" (decision 481: a kobold's pick 1 in 5; 1 when absent, and then
 ## no roll is spent on it) fails, else a roll between its count's least and
@@ -1381,6 +1404,7 @@ static func read_kinds(path: String) -> Dictionary:
 			"diet": (row.get("diet", []) as Array).duplicate() if row.get("diet") is Array else [],
 			"drops": (row.get("drops", []) as Array).duplicate(true) if row.get("drops") is Array else [],
 			"purse": _purse(row.get("purse")),
+			"yields": (row.get("yields", []) as Array).duplicate(true) if row.get("yields") is Array else [],
 			"wields": (row["wields"] as Dictionary).duplicate() if row.get("wields") is Dictionary else {},
 			"picks_up": bool(row.get("picks_up", false)), "art": str(row.get("art", "")),
 			"label": str(row.get("label", "")), "fearless": bool(row.get("fearless", false)),

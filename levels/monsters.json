@@ -119,6 +119,8 @@
 		"strength": 0,
 		"temperament": {"bold": 1, "cautious": 0, "cowardly": 0},
 		"fearless": true,
-		"keeps_room": true
+		"keeps_room": true,
+		"wields": {"right": "battle_axe"},
+		"yields": [{"item": "battle_axe"}]
 	}
 }

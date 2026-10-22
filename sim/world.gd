@@ -1912,6 +1912,8 @@ func try_transfer(by: GridEntity, from: GridEntity, from_slot: int, to: GridEnti
 	if from is Chest and (from as Chest).temple and from != to and not _collects(by, from, from_slot):
 		traded.emit(by, from, "that waits for someone else")
 		return false
+	if from != to and soulbound(slot_uid(from, from_slot)):
+		return false  # Never given to the priest, banked or sold (decision 573 amended).
 	if to is Chest and (to as Chest).temple:
 		return _hand_to_priest(by, from, from_slot, to)
 	if to is Chest and (to as Chest).depot:
@@ -1920,6 +1922,8 @@ func try_transfer(by: GridEntity, from: GridEntity, from_slot: int, to: GridEnti
 		return _sell(by, from, from_slot, to)
 	var uid := slot_uid(from, from_slot)
 	var other_uid := slot_uid(to, to_slot)
+	if from != to and (soulbound(uid) or soulbound(other_uid)):
+		return false  # It stays with its player (decision 573 amended).
 	# A companion may turn a thing down (decision 555: grave goods, or her
 	# bond gone sullen); she says why.
 	if from != to and to.has_method("turns_down") and not str(to.call("turns_down", by, uid, other_uid)).is_empty():
@@ -1979,6 +1983,8 @@ func take_item(by: GridEntity, from: GridEntity, slot: int) -> int:
 	if slot < 0 or slot >= from.slots.size() or from.slots[slot].is_empty():
 		return 0
 	var uid := slot_uid(from, slot)
+	if soulbound(uid):
+		return 0  # Not dropped, thrown, eaten or banked (decision 573 amended).
 	var taken := from.slots.duplicate()
 	var taken_uids := from.slot_items.duplicate()
 	_log("slots: %s took %s out of %s %d" % [by.name, taken[slot], from.name, slot])
@@ -2249,6 +2255,95 @@ func mint_bound(id: String, owner: String, entity: GridEntity, at_zone := "", ti
 	return uid
 
 
+## The Draugr's Totem (decision 573 amended; Jeff: "the first time you kill
+## him you get a Draugr's Totem that holds the charges"): the one item that
+## holds a player's resurrection charges.
+const TOTEM := "draugr_totem"
+
+
+## Whether [param uid] never leaves its bound carrier (tag "soulbound",
+## bound: the Draugr's Totem): never traded, given, sold, dropped, thrown
+## or taken out of their slots (try_transfer, take_item), and kept through
+## a death, as everything a player carries is.
+func soulbound(uid: int) -> bool:
+	return uid != 0 and Items.has_tag(items.id_of(uid), "soulbound") and not items.bound_to(uid).is_empty()
+
+
+## [param player_id]'s Draugr's Totem, wherever it is: its uid, 0 for
+## none.
+func totem_of(player_id: String) -> int:
+	var owner := "player:" + player_id
+	for uid: int in items._book:
+		if items.id_of(uid) == TOTEM and items.bound_to(uid) == owner:
+			return uid
+	return 0
+
+
+## The charges [param uid] (a totem) holds.
+func totem_charges(uid: int) -> int:
+	return items.charges_of(uid)
+
+
+## One of [param uid]'s charges spent: false, and nothing spent, at none.
+func totem_spend(uid: int) -> bool:
+	if items.charges_of(uid) <= 0:
+		return false
+	items.set_charges(uid, items.charges_of(uid) - 1)
+	_totem_shown(uid)
+	return true
+
+
+## [param amount] charges put on [param uid] up to [param capacity]: how
+## many it took (the rest spill, decision 573).
+func totem_add(uid: int, amount: int, capacity: int) -> int:
+	if not items.has(uid) or amount <= 0:
+		return 0
+	var took := clampi(capacity - items.charges_of(uid), 0, amount)
+	items.set_charges(uid, items.charges_of(uid) + took)
+	_totem_shown(uid)
+	return took
+
+
+## [param player]'s Draugr's Totem: theirs if they have one, else a new
+## one, bound to them for life and put in their pack (with no room, the
+## pack's last thing goes to the ground at their feet; the totem never
+## does). Its uid; 0 for no player.
+func mint_totem(player: GridEntity) -> int:
+	var player_id: Variant = player.get("player_id") if is_instance_valid(player) else null
+	if not Net.is_authority() or player_id is not String or str(player_id).is_empty():
+		return 0
+	var have := totem_of(player_id)
+	if have != 0:
+		return have
+	var uid := mint_bound(TOTEM, holder_key(player), player, player.zone, player.tile)
+	items.set_charges(uid, 0)
+	var slot := player.slots.slice(0, Items.PACK).find("")
+	if slot < 0:
+		slot = Items.PACK - 1
+		var out := slot_uid(player, slot)
+		if soulbound(out):
+			slot = Items.PACK - 2
+			out = slot_uid(player, slot)
+		var slots := player.slots.duplicate()
+		var uids := slot_uids(player)
+		slots[slot] = ""
+		uids[slot] = 0
+		set_slots(player, slots, uids)
+		put_on_ground(out, player.tile)
+	put_item(player, player, slot, uid)
+	_log("totem: %s's Draugr's Totem in slot %d" % [player.name, slot])
+	return uid
+
+
+## The slot notes of whoever carries [param uid] said again: its charges
+## changed.
+func _totem_shown(uid: int) -> void:
+	for entity in _entities:
+		if is_instance_valid(entity) and uid in entity.slot_items:
+			_show_notes(entity)
+			return
+
+
 ## Whether [param entity] carries, in any slot, an [param id] bound to
 ## [param owner] (decision 544): a half bound to anyone else does nothing.
 func carries_bound(entity: GridEntity, id: String, owner: String) -> bool:
@@ -2443,6 +2538,8 @@ func item_note(uid: int) -> String:
 		more.append("bound")  # Decision 544.
 	if items.is_grave(uid):
 		more.append("grave goods")  # Decision 555.
+	if items.id_of(uid) == TOTEM:
+		more.append("%d charge%s" % [items.charges_of(uid), "" if items.charges_of(uid) == 1 else "s"])  # Decision 573 amended.
 	if not items.bane_of(uid).is_empty():
 		more.append("%s-bane" % items.bane_of(uid))  # Decision 417.
 	if not items.grudge_of(uid).is_empty():
@@ -2451,6 +2548,9 @@ func item_note(uid: int) -> String:
 		more.append("blessed")  # Decision 424.
 	if not more.is_empty():
 		note = "%s, %s" % [note if not note.is_empty() else Items.name_of(items.id_of(uid)), ", ".join(more)]
+	var about := str(Items.def(items.id_of(uid)).get("about", ""))
+	if not about.is_empty():
+		note = "%s. %s" % [note if not note.is_empty() else Items.name_of(items.id_of(uid)), about]  # What it is for, in plain words.
 	return note
 
 

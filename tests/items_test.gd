@@ -62,6 +62,8 @@ func _ready() -> void:
 	_test_bound()
 	_test_gold_drop()
 	_test_grave()
+	_test_totem()
+	_test_battle_axe()
 	_test_story()
 	_test_bless()
 	_test_reforge()
@@ -1364,6 +1366,78 @@ func _test_bound() -> void:
 			"no verb, not a tool, not made: never named (365), never sold or made")
 	World.set_slots(host, had_slots, had_uids)
 	World.items.end(half, "gone")
+
+
+func _test_battle_axe() -> void:
+	print("
+== the draugr's battle axe, left at his feet when he yields (decision 603, items' side) ==")
+	var verb := Items.verb_of("battle_axe")
+	_check(Items.def("battle_axe")["hands"] == 2 and is_equal_approx(Items.def("battle_axe")["weight"], 7.0) and verb["kind"] == "knockdown"
+			and verb["arc"] == 1 and verb["down_ticks"] == 15 and is_equal_approx(verb["damage"], 1.6) and is_equal_approx(verb["speed"], 2.2) and verb["windup"] == 8,
+			"two hands, 7 kg, a knockdown: arc 1, 15 ticks down, x1.6, x2.2 slower, wound up 8 (%s)" % [verb])
+	_check(Items.def("battle_axe")["made"].is_empty() and Monster.kinds()["draugr"]["yields"] == [{"item": "battle_axe"}],
+			"nobody makes one; the draugr's row yields it")
+	var host := _player(Net.local_id)
+	var imp := _main._spawn({"script": "res://sim/monster.gd", "shape": "capsule", "name": "YieldImp%d" % World.tick,
+		"tile": _far_cell(host), "kind": "imp", "props": {"mass": 40.0, "sight_range": 0}}) as Monster
+	imp.acts = false
+	var row: Dictionary = Monster.kinds()["imp"]
+	row["yields"] = [{"item": "battle_axe"}]
+	var laid := imp.yielded()
+	row["yields"] = []
+	_check(laid.size() == 1 and World.items.id_of(laid[0]) == "battle_axe" and World.items.at_of(laid[0]).contains("@")
+			and World.distance(_ground_cell(laid[0]), imp.tile) <= World.GROUND_SPILL and World.items.history(laid[0])["events"][0]["kind"] == "remains",
+			"yielded: the axe on the ground at its feet, its remains (%s, it at %s)" % [World.items.at_of(laid[0]) if not laid.is_empty() else "", imp.tile])
+	_check(imp.spawned and imp.yielded().is_empty(), "it stands; a row with no yields leaves nothing")
+	for uid in laid:
+		World.take_from_ground(_ground_cell(uid), World.ground_uids(_ground_cell(uid)).find(uid))
+		World.items.end(uid, "gone")
+	World.despawn(imp)
+
+
+## Where a thing on the ground lies (its "zone@x,y").
+func _ground_cell(uid: int) -> Vector2i:
+	var xy := World.items.at_of(uid).get_slice("@", 1).split(",")
+	return Vector2i(int(xy[0]), int(xy[1])) if xy.size() == 2 else World.NO_CELL
+
+
+func _test_totem() -> void:
+	print("\n== the Draugr's Totem: the charges on one thing that never leaves its player (decision 573 amended) ==")
+	var host := _player(Net.local_id)
+	var record: PlayerRecord = _main._records[Net.player_id]
+	var had_slots := host.slots.duplicate()
+	var had_uids := World.slot_uids(host)
+	var had_barrow := record.barrow.duplicate()
+	_check(World.totem_of(Net.player_id) == 0, "no totem before the draugr is beaten")
+	var uid := World.mint_totem(host)
+	var slot := host.slot_items.find(uid)
+	_check(uid != 0 and slot >= 0 and slot < Items.PACK and World.mint_totem(host) == uid and World.totem_of(Net.player_id) == uid,
+			"minted once, bound to its player, in the pack (slot %d); again, the same one" % slot)
+	_check(World.items.bound_to(uid) == "player:" + Net.player_id and World.soulbound(uid), "bound for life, soulbound")
+	_check(World.totem_add(uid, 5, 3) == 3 and World.totem_charges(uid) == 3 and World.totem_add(uid, 2, 3) == 0,
+			"charges up to its capacity: 3 of 5 taken, the rest spill; full, none more")
+	_check(World.totem_spend(uid) and World.totem_charges(uid) == 2, "one spent: 2 left")
+	var note := World.item_note(uid)
+	_check(note.begins_with("Draugr's Totem") and "2 charges" in note and note.ends_with("Carrying this totem allows you to receive another chance to fight."),
+			"its note: its charges and Jeff's words (%s)" % note)
+	var chest := _chest()
+	var host_at := host.tile
+	_beside(host, chest)
+	var free := chest.slots.find("")
+	_check(free < 0 or not World.try_transfer(host, host, slot, chest, free), "never put in a chest")
+	_check(not World.try_drop(host, slot) and World.take_item(host, host, slot) == 0 and host.slot_items[slot] == uid,
+			"never dropped, thrown or taken out of their slots")
+	var other := (slot + 1) % Items.PACK
+	_check(World.try_transfer(host, host, slot, host, other) and host.slot_items[other] == uid, "moved within their own pack: yes")
+	_check(ItemBook.from_dict(World.items.to_dict()).charges_of(uid) == 2, "its charges saved and read back")
+	record.barrow["tokens"] = 4
+	_check(_main.migrate_totem(record) == uid and World.totem_charges(uid) == 6 and not record.barrow.has("tokens"),
+			"a record's old tokens moved onto the totem, off the record")
+	_check(_main.migrate_totem(record) == 0, "nothing more to move")
+	World.items.end(uid, "gone")
+	World.set_slots(host, had_slots, had_uids)
+	World._relocate(host, host_at)
+	record.barrow = had_barrow
 
 
 func _test_grave() -> void:

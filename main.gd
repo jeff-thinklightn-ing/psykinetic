@@ -5157,6 +5157,26 @@ func charges_in_zone(zone_name: String) -> int:
 	return total
 
 
+## [param record]'s charges moved off the record onto a Draugr's Totem
+## (decision 573 amended): a record with barrow "tokens" left, its player
+## in the game, gets its totem (World.mint_totem) holding them, and the
+## record's tokens go. For the switch-over's join (dungeon's and
+## companions' sides, which read the totem); nothing calls it before they
+## land. The totem's uid, 0 if nothing moved.
+func migrate_totem(record: PlayerRecord) -> int:
+	var player: Player = _players.get(_peer_of(record.player_id)) if record != null else null
+	var tokens := int(record.barrow.get("tokens", 0)) if record != null else 0
+	if tokens <= 0 or not is_instance_valid(player) or not player.spawned:
+		return 0
+	var uid := World.mint_totem(player)
+	if uid == 0:
+		return 0
+	World.items.set_charges(uid, World.items.charges_of(uid) + tokens)
+	record.barrow.erase("tokens")
+	print("[state] %s's %d charges moved onto their Draugr's Totem" % [record.name, tokens])
+	return uid
+
+
 ## [param record]'s player, if in the game, told its charges and the most it
 ## may hold (Player.charges and charge_room, replicated; decision 573).
 func _sync_charges(record: PlayerRecord) -> void:

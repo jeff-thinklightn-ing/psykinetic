@@ -453,6 +453,19 @@ func bind(uid: int, owner: String, zone := "", tile := Vector2i(-1, -1)) -> void
 	note(uid, "bound", owner, zone, tile)
 
 
+## The charges [param uid] holds (decision 573 amended: the Draugr's
+## Totem's, its player's resurrection charges, held nowhere else); 0 for
+## none.
+func charges_of(uid: int) -> int:
+	return int(_book[uid].get("charges", 0)) if _book.has(uid) else 0
+
+
+## [param uid]'s charges set to [param amount] (at least 0).
+func set_charges(uid: int, amount: int) -> void:
+	if _book.has(uid):
+		_book[uid]["charges"] = maxi(amount, 0)
+
+
 ## [param uid] given by its blessed owner to [param owner]: the blessing
 ## goes with the gift (decision 424).
 func pass_blessing(uid: int, owner: String) -> void:
@@ -605,6 +618,8 @@ static func from_dict(data: Variant, steps: Callable = Callable()) -> ItemBook:
 				items._book[int(key)]["bound"] = entry["bound"]
 			if entry.get("gold") is float or entry.get("gold") is int:
 				items._book[int(key)]["gold"] = maxi(int(entry["gold"]), 0)  # Decision 601.
+			if entry.get("charges") is float or entry.get("charges") is int:
+				items._book[int(key)]["charges"] = maxi(int(entry["charges"]), 0)  # Decision 573 amended.
 			if entry.get("bane") is String and not entry["bane"].is_empty():
 				items._book[int(key)]["bane"] = entry["bane"]
 			if entry.get("grudge") is Dictionary and entry["grudge"].get("kind") is String:

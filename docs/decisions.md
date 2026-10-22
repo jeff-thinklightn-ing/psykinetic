@@ -21585,3 +21585,75 @@ gold, banked and opened for that, kept through a save; a wolf's leaves
 none. No protocol change: the purse travels as any ground thing, and its
 gold is server-side (the note text rides the slot notes as ever). No new
 class_name.
+Jeff, through the coordinator: "old farmstead in the wilds - abandoned,
+tools and bandages found inside". A small one-time stash, per player,
+that never respawns.
+- A cache is a Chest with props {"cache": a loot table, "cache_place":
+  where the find comes from}. Its own slots stay empty: a shared chest
+  can't hold "once per player", since the first comer would empty it for
+  everyone. Level._stock leaves a cache's slots alone (no level loot) and
+  warns on an unknown table or a "loot" key on one.
+- E on a cache (Main.open_other, so walking up to one from afar works as
+  for any chest) sends "search" in place of opening the panel. There's
+  no key hint: it reads as a chest (Jeff's no-hints rule of the day).
+- Main.search(player, chest), on the server: the first time, the table
+  is rolled by the player and the cache (the same if tried again); each
+  thing is minted "cached" from cache_place (a thing with a condition at
+  half: nothing fine) and put in a free hand or pack slot
+  (free_slot_for), else on the ground at their feet. The cache goes on
+  PlayerRecord.caches (saved), so it is once per player for life. They
+  are told "You find in the old farmstead: bandaging kit (2), knife."; a
+  second search is "Nothing more here." Companions don't search.
+- World.story_line reads "cached" as "found in <place>".
+- levels/loot.json "farmstead_cache": two bandaging kits, a knife, and a
+  pick at 0.5. No new item kinds.
+- Maps places it (599, maps' side): the wilds' north farmstead hut,
+  (119, 139).
+Wire: under PROTOCOL_REVISION 31 (with 583). items_test _test_cache. No
+new class_name.
+## 573 amended, items' side. The Draugr's Totem
+
+Jeff: "the first time you kill him you get a Draugr's Totem that holds the
+charges and the item explains 'carrying this totem allows you to receive
+another chance to fight'". Agreed with dungeon and companions; the
+coordinator approved.
+- Item draugr_totem, "Draugr's Totem" (art item.draugr_totem), tags
+  token and soulbound, and a new catalog field "about" (plain words its
+  note ends with): "Carrying this totem allows you to receive another
+  chance to fight."
+- Its charges live on the instance (ItemBook "charges", saved) and
+  nowhere else. Capacity stays derived from record.barrow's best and
+  containers (Economy.barrow_capacity); record.barrow drops "tokens".
+- World.mint_totem(player) -> uid: bound to its player (544's bind), put
+  in a pack slot (with none free, the pack's last thing goes to the
+  ground; the totem never does); idempotent. World.totem_of(player_id),
+  totem_charges(uid), totem_spend(uid) -> bool, totem_add(uid, n,
+  capacity) -> taken (the rest spill). The carrier's slot notes are said
+  again when its charges change.
+- World.soulbound(uid): never moved out of its player's slots
+  (try_transfer, including a chest, a companion, the priest, a depot and
+  a shop), never taken out (take_item: no drop, throw or use). A player
+  keeps what they carry through a death already.
+- Main.migrate_totem(record): a record's old barrow tokens moved onto its
+  totem. Nothing calls it in this commit. Dungeon's barrow_won switch and
+  companions' reads call it on join, so main never has two sources.
+items_test _test_totem. No protocol change: the note rides the slot
+notes. No new class_name.
+## 603, items' side. The draugr's battle axe
+
+Combat's draugr fight (603; Jeff: "the draugr will have a large battle
+axe that he drops as loot").
+- Item battle_axe, "battle axe" (art item.battle_axe): two-handed, 7 kg
+  (the giant axe is 5), verb knockdown: arc 1, down_ticks 15, damage
+  1.6, speed 2.2, windup 8. Nobody makes one. All drafts for Jeff.
+- A monster row's "yields" (drops' rows' shape): what a monster that
+  yields rather than dies leaves at its feet. Monster.yielded() mints
+  them ("remains" of it, its make) and lays them on the ground where it
+  stands, returning the uids. The draugr's row: "yields": [{"item":
+  "battle_axe"}], and he wields it ("wields": {"right": "battle_axe"}, a
+  two-hander in the right hand, as Level arms any) for combat's spin and
+  throw. Enemy-ai calls it in Draugr's yield path, once per pact
+  won, before World.bless; a lost pact or an unpaid fight never does. His
+  wielded axe stays his ("wields", enemy-ai's), so he rises with his own
+  again.
+items_test _test_battle_axe. No protocol change; no new class_name.

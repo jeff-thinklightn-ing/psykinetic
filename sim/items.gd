@@ -34,7 +34,7 @@ const RIGHT_HAND := 4
 const LEFT_HAND := 5
 const CARRIED := 6
 const FIELDS := ["id", "name", "short", "color", "art", "kind", "size", "weight", "hands", "tags", "effects", "use", "yield", "verb", "made",
-	"opens", "value", "blunt", "ammo", "condition", "mend"]
+	"opens", "value", "blunt", "ammo", "condition", "mend", "about"]
 ## Who makes things (made's "by"), as economy's production has them.
 const TRADES: Array[String] = ["smith", "cook", "carpenter", "tanner", "fletcher", "weaver", "medicine_man"]
 
@@ -161,6 +161,7 @@ static func _definition(id: String, entry: Dictionary) -> Dictionary:
 		"blunt": entry.get("blunt") == true,
 		"ammo": _ammo(entry["ammo"]) if entry.get("ammo") is Dictionary else {},
 		"condition": maxi(int(entry.get("condition", 0)), 0) if entry.get("condition") is float or entry.get("condition") is int else 0,
+		"about": str(entry.get("about", "")),
 	}
 
 

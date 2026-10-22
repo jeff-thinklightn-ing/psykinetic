@@ -134,6 +134,30 @@
 			"type": "mesh",
 			"uses": "half a cut coin (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
 		},
+		"item.battle_axe": {
+			"budget": 500,
+			"category": "items",
+			"kind": "held",
+			"size": [
+				0.7,
+				1.6,
+				0.12
+			],
+			"sockets": {
+				"grip": [
+					0,
+					0,
+					0
+				],
+				"grip_2": [
+					0,
+					0.96,
+					0
+				]
+			},
+			"type": "mesh",
+			"uses": "battle axe (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
+		},
 		"item.bow": {
 			"budget": 500,
 			"category": "items",
@@ -229,6 +253,25 @@
 			},
 			"type": "mesh",
 			"uses": "dagger (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
+		},
+		"item.draugr_totem": {
+			"budget": 500,
+			"category": "items",
+			"kind": "held",
+			"size": [
+				0.06,
+				0.14,
+				0.06
+			],
+			"sockets": {
+				"grip": [
+					0,
+					0,
+					0
+				]
+			},
+			"type": "mesh",
+			"uses": "Draugr's Totem (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
 		},
 		"item.food_sack": {
 			"budget": 500,

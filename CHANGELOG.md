@@ -7,6 +7,8 @@ notes (decision 324).
 
 ## Unreleased
 
+- The Draugr's Totem holds your resurrection charges; it stays with you and can't be traded, dropped or sold (573 amended).
+- The draugr's battle axe: a two-handed knockdown weapon he leaves at his feet when you win his pact (603).
 - Humanoid enemies drop gold: a goblin or a kobold leaves a purse of 1 to 3 gold where it falls, an orc 4 to 10; animals and the undead drop none (601).
 - The draugr's hall is a puzzle now (573 amended, Jeff's words): its door shuts and locks behind the first one in while he sits, and his gold, his death or your own are the ways out; he asks why you have entered his hall and tells you to return the gold your people stole, and says no more; under 20 gold he attacks and, slain, opens the door with his respect; the right amounts buy the pact and the charges, and the first win gives the Draugr's Totem that holds them, bound to you for good (his lines, the fight and the totem land on their own sides).
 - The barrow is three levels now (580, Jeff: "crypt is still too cramped"): the first hall under the mound with its burial table and the town's dead in the wall niches, the altar room and the town's tombs off it, and the robbers' camp; a stair down to the Ossuary, the ancient dead's tombs; and below that the dark caverns of the oldest dead and the Hall of Fallen Souls, where the draugr sits his throne with the temple's hidden way out behind it. Every way is five cells clear and the rooms are bigger (Jeff: "halls need to be at least 2 tiles wider than the walls"). The hidden door, the hall's furnishings, the dark and the ghostly warriors follow in their own steps; the box takes the new shape at the deploy.
