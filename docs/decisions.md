@@ -20333,3 +20333,28 @@ The yield, the rest (548) and the hook are as they were. monster_test
 _test_draugr: the steps offered, 19 refused, 60 the normal deal, 10 charges
 making him 60 hp with 2 risen, the living's coming healing 30, 20 gold the
 easy deal. Server only, protocol unchanged, no new class_name.
+
+## 573, ui's side: the charges read on the pack
+
+Dungeon's 573 (Jeff's crypt rework, 2026-10-22) replicates Player.charges
+and Player.charge_room (the resurrection charges held and the most they
+may hold; 0 and 0 unblessed; dungeon's side, revision 30). The door's
+choice of the earlier draft is gone with the rework, so nothing of it is
+built. Read diegetically, no bar, nothing on the HUD (the downed and
+channel lines of 544 stand):
+
+- The pack's foot carries one dim caption line, "charges 23 of 50"
+  (PackPanel.charges_words), under the weight and the Promised line,
+  shown once charge_room is over 0 and gone otherwise. The pair is read
+  by name (PackPanel.charges_of), so the panel draws without it on a body
+  that lacks it. The line joins the pack's redraw signature, so a win or a
+  spend redraws it.
+- --test-show=charges sets the pair on the host's player and opens the
+  pack, for the shot docs/ui/shots/sim/pack_charges.jpg (docs-only, after
+  the code).
+- The party lines at the yield, the return and at zero are "Server" lines
+  and draw in the talk log as today.
+
+ui_test: the words; the line from the player's pair; none unblessed.
+Client only; protocol unchanged on this side (dungeon's revision 30); no
+new class_name.

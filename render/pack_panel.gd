@@ -101,6 +101,10 @@ var promised: Array[String] = []:
 		if is_node_ready():
 			_refresh()
 var _promised: Label
+## The resurrection charges the player holds, "charges 23 of 50" (dungeon's
+## 573: Player.charges and charge_room, replicated; shown once blessed,
+## charge_room over 0; no bar).
+var _charges: Label
 ## The hover tip, a sibling above the panel (made on the first hover).
 var tip: ItemTip
 ## Each row's entity and contents as last shown: an item new in a slot is
@@ -222,6 +226,10 @@ func _ready() -> void:
 	_promised.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_promised.add_theme_color_override("font_color", UiTheme.color("brass"))
 	column.add_child(_promised)
+	_charges = Label.new()
+	_charges.theme_type_variation = &"Caption"
+	_charges.add_theme_color_override("font_color", UiTheme.color("text_dim"))
+	column.add_child(_charges)
 	_refresh()
 
 
@@ -317,7 +325,7 @@ func _icon_arrived(_id: String) -> void:
 func _signature() -> Array:
 	var who := player if is_instance_valid(player) else null
 	var opened := other if is_instance_valid(other) else null
-	var sig: Array = [who, opened, shown, icons != null, _icons_seen, promised.duplicate()]
+	var sig: Array = [who, opened, shown, icons != null, _icons_seen, promised.duplicate(), charges_of(who)]
 	for entity in [who, opened]:
 		if entity != null:
 			sig.append(entity.slots.duplicate())
@@ -448,7 +456,31 @@ func _refresh() -> void:
 	_weight.visible = carried > 0.0
 	_promised.text = "Promised: %s" % ", ".join(promised) if not promised.is_empty() else ""
 	_promised.visible = not promised.is_empty()
+	var held := charges_of(player if is_instance_valid(player) else null)
+	_charges.text = charges_words(held[0], held[1])
+	_charges.visible = not _charges.text.is_empty()
 	_signature_shown = _signature()
+
+
+## The pack's line for the resurrection charges (573, ui's side): "charges
+## 23 of 50"; "" unblessed (no room yet).
+static func charges_words(charges: int, room: int) -> String:
+	return "charges %d of %d" % [charges, room] if room > 0 else ""
+
+
+## [param who]'s replicated charges and room, read by name ([charges,
+## room]; [0, 0] for nobody or a body without them).
+static func charges_of(who: GridEntity) -> Array[int]:
+	if who == null:
+		return [0, 0]
+	var charges: Variant = who.get("charges")
+	var room: Variant = who.get("charge_room")
+	return [int(charges) if charges is int else 0, int(room) if room is int else 0]
+
+
+## The charges line shown (tests).
+func charges_shown() -> String:
+	return _charges.text if _charges.visible else ""
 
 
 ## [param picture] in [param box], its name a caption under it; null: the

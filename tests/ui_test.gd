@@ -309,6 +309,19 @@ func _test_talk_no_panel() -> void:
 		and _main.pack_panel._promised.visible and _main.pack_panel._promised.text == "Promised: Walk Tam home",
 		"an offers message: the standing title kept, the open commissions as the pack's Promised line")
 	_main._on_offers_message({"entity": "", "offers": []})
+	# 573, ui's side: the pack's charges line from Player's replicated pair; nothing unblessed.
+	_check(PackPanel.charges_words(23, 50) == "charges 23 of 50" and PackPanel.charges_words(0, 50) == "charges 0 of 50" and PackPanel.charges_words(0, 0) == "",
+		"the charges line's words: charges 23 of 50; nothing without room")
+	var own: GridEntity = _main._local_player()
+	if own != null and _main.pack_panel != null:
+		own.set("charges", 7)
+		own.set("charge_room", 25)
+		_main.pack_panel._refresh()
+		_check(_main.pack_panel.charges_shown() == "charges 7 of 25", "the line reads the player's replicated charges (%s)" % _main.pack_panel.charges_shown())
+		own.set("charges", 0)
+		own.set("charge_room", 0)
+		_main.pack_panel._refresh()
+		_check(_main.pack_panel.charges_shown() == "", "unblessed: no line")
 	_check(_main.standing_title.is_empty() and _main.pack_panel.promised.is_empty() and not _main.pack_panel._promised.visible,
 		"without the key nothing stands, and nothing is promised")
 	_check(Keys.DEFAULTS["yes"] == KEY_Y and Keys.WORDS.has("yes"), "Y says yes by default, in the Options' key rows")

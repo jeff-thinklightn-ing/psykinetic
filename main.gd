@@ -10747,6 +10747,13 @@ func _run_test_show(player: Player) -> void:
 					options_panel.toggle()
 			"pack":
 				pack_panel.shown = true
+			"charges":
+				# 573, ui's side: the pack's charges line, for the shot (the host sets the
+				# replicated pair as the server would after a win).
+				pack_panel.shown = true
+				if Net.is_authority() and player != null:
+					player.set("charges", 23)
+					player.set("charge_room", 50)
 			"talk":
 				talk.add_line("Wren", "(a test line) The door's barred from the other side.")
 				talk.add_line("Aldous", "(a test line) I've been meaning to thank you for the food you brought.", false, false, "his voice steady despite the rain")  # 336 amended: the aside.
