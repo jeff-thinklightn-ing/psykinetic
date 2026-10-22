@@ -91,6 +91,12 @@ static func pace(rise: float, diagonal := false) -> float:
 	return 1.0 + UPHILL_PACE * slope / WALK_RISE
 
 
+## Toward each corner of a cell, in GROUND_CORNERS order (corner_heights).
+const CORNERS: Array[Vector2i] = [Vector2i(-1, -1), Vector2i(1, -1), Vector2i(-1, 1), Vector2i(1, 1)]
+## The most a straight step may rise and be no cliff (cliff_between's).
+const STEP_MOST := WALK_RISE + EPSILON
+
+
 ## The four corners of [param cell]'s ground, in GROUND_CORNERS order
 ## ((0, 0), (1, 0), (0, 1), (1, 1) from its top-left): each the mean of
 ## the cells meeting at that corner that are joined to this one round the
@@ -102,34 +108,56 @@ static func pace(rise: float, diagonal := false) -> float:
 static func corner_heights(field: PackedFloat32Array, size: Vector2i, cell: Vector2i) -> PackedFloat32Array:
 	var out := PackedFloat32Array()
 	out.resize(4)
+	# Called for every cell of a map's ground (a second of the wilds'
+	# rebuild): the 3 x 3 round the cell read once (at, on_map; row by row
+	# from the top-left), the steps tested inline (cliff_between's, straight),
+	# the same sums in the same order.
+	var heights := PackedFloat32Array()
+	heights.resize(9)
+	var on := PackedByteArray()
+	on.resize(9)
+	for dy in 3:
+		for dx in 3:
+			var x := cell.x + dx - 1
+			var y := cell.y + dy - 1
+			if x >= 0 and y >= 0 and x < size.x and y < size.y:
+				on[dy * 3 + dx] = 1
+				if not field.is_empty():
+					heights[dy * 3 + dx] = field[y * size.x + x]
+	var h0 := heights[4]
+	var on0 := on[4] == 1
 	var i := 0
-	for corner: Vector2i in [Vector2i(-1, -1), Vector2i(1, -1), Vector2i(-1, 1), Vector2i(1, 1)]:
-		var ring: Array[Vector2i] = [cell, cell + Vector2i(corner.x, 0), cell + corner, cell + Vector2i(0, corner.y)]
-		var heights := PackedFloat32Array()
-		var on := PackedByteArray()
-		for spot in ring:
-			heights.append(at(field, size, spot))
-			on.append(1 if on_map(size, spot) else 0)
-		# Link k joins ring[k] and ring[k + 1] (round to the start).
-		var open := PackedByteArray()
-		for k in 4:
-			var other := (k + 1) % 4
-			open.append(1 if on[k] == 1 and on[other] == 1 and not cliff_between(heights[k], heights[other]) else 0)
-		var joined := PackedByteArray([1, 0, 0, 0])
-		var k := 0
-		while k < 3 and open[k] == 1:
-			k += 1
-			joined[k] = 1
-		k = 0
-		while k > -3 and open[(k + 3) % 4] == 1:
-			k -= 1
-			joined[(k + 4) % 4] = 1
-		var sum := 0.0
-		var count := 0
-		for m in 4:
-			if joined[m] == 1:
-				sum += heights[m]
-				count += 1
+	for corner: Vector2i in CORNERS:
+		# The ring: the cell, across, the diagonal, along; link k joins ring
+		# k and k + 1 (round to the start).
+		var across := 4 + corner.x
+		var diagonal := 4 + corner.y * 3 + corner.x
+		var along := 4 + corner.y * 3
+		var h1 := heights[across]
+		var h2 := heights[diagonal]
+		var h3 := heights[along]
+		var on1 := on[across] == 1
+		var on2 := on[diagonal] == 1
+		var on3 := on[along] == 1
+		var open0 := on0 and on1 and not absf(h1 - h0) > STEP_MOST
+		var open1 := on1 and on2 and not absf(h2 - h1) > STEP_MOST
+		var open2 := on2 and on3 and not absf(h3 - h2) > STEP_MOST
+		var open3 := on3 and on0 and not absf(h0 - h3) > STEP_MOST
+		# Joined to the cell going round either way while the links hold.
+		var joined1 := open0 or (open3 and open2 and open1)
+		var joined2 := (open0 and open1) or (open3 and open2)
+		var joined3 := (open0 and open1 and open2) or open3
+		var sum := h0
+		var count := 1
+		if joined1:
+			sum += h1
+			count += 1
+		if joined2:
+			sum += h2
+			count += 1
+		if joined3:
+			sum += h3
+			count += 1
 		out[i] = sum / count
 		i += 1
 	return out

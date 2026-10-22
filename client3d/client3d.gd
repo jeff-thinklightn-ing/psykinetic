@@ -1403,6 +1403,12 @@ var _curve_near_sample: Dictionary[Vector2i, Vector2i] = {}
 ## A cell near more than one water (where a stream meets a river): the
 ## others' (which water, its nearest sample), so the field is their union.
 var _curve_near_also: Dictionary[Vector2i, Array] = {}
+## The segments worth searching from a cell (_near_segments), as found:
+## (cell, which curve, its nearest sample) -> each segment's first sample;
+## the waters', the roads' and the forest edge's (by cell alone).
+var _curve_kept: Dictionary[Vector4i, PackedInt32Array] = {}
+var _road_kept: Dictionary[Vector4i, PackedInt32Array] = {}
+var _edge_kept: Dictionary[Vector2i, PackedVector2Array] = {}
 ## The roads as curves (563, terrain's side, _read_roads): each one's
 ## curve and kind; their cells (-> which road); each cell near one ->
 ## (which road, its nearest sample); their field (_road_field).
@@ -2446,6 +2452,16 @@ func _ground_corners(cell: Vector2i) -> PackedFloat32Array:
 		# the sim's step to it is: decided by the corner, so every land cell
 		# meeting there agrees; a true cliff keeps its face.
 		var own := Relief.corner_heights(_relief, _relief_size, cell)
+		# A corner's cells are all in the 3 x 3 round the cell: with no water
+		# there, no corner is a bank (most of a map; _water_top asks each).
+		var near_water := false
+		for dy in range(-1, 2):
+			for dx in range(-1, 2):
+				var round_cell := cell + Vector2i(dx, dy)
+				if _wet.has(round_cell) or _bed_levels.has(round_cell):
+					near_water = true
+		if not near_water:
+			return own
 		for c in 4:
 			var vertex := cell + GROUND_CORNERS[c]
 			var top := _water_top(vertex)
@@ -6194,6 +6210,7 @@ func _read_curves() -> void:
 	_curve_cells.clear()
 	_curve_near_sample.clear()
 	_curve_near_also.clear()
+	_curve_kept.clear()
 	if _glimpse:
 		return
 	for w in (_terrain.get("waters", []) as Array).size():
@@ -6235,7 +6252,7 @@ func _meet_at_end(w: int) -> void:
 	for near: Vector2i in [_curve_near_sample[cell]] + _curve_near_also.get(cell, []):
 		if near.x >= w or _curve_waters[near.x]["closed"]:
 			continue
-		var at := _near_one(_curve_waters, near, end)
+		var at := _near_one(_curve_waters, near, end, _curve_kept)
 		if at.x <= 0.0:
 			continue
 		var profile: PackedFloat32Array = _curve_waters[near.x]["profile"]
@@ -6260,7 +6277,7 @@ func _terrain_water_has(cell: Vector2i) -> bool:
 ## z which water (-1: none near). Searched round the nearest sample of the
 ## point's cell, so a lookup costs a few segments, never the whole curve.
 func _curve_near(point: Vector2) -> Vector3:
-	return _near_on(_curve_waters, _curve_near_sample, point, _curve_near_also)
+	return _near_on(_curve_waters, _curve_near_sample, point, _curve_near_also, _curve_kept)
 
 
 ## Each cell within reach of [param curve] (CURVE_REACH past its half
@@ -6292,21 +6309,59 @@ func _stamp_near(curve: Dictionary, closed: bool, index: int, into: Dictionary, 
 ## _curve_near over [param curves] (each {curve, closed}) by their
 ## [param near] map and [param also] (_stamp_near's): where curves meet,
 ## the one the point is furthest into (their union).
-func _near_on(curves: Array, near_map: Dictionary, point: Vector2, also: Dictionary) -> Vector3:
+func _near_on(curves: Array, near_map: Dictionary, point: Vector2, also: Dictionary, kept := {}) -> Vector3:
 	var cell := Vector2i(roundi(point.x), roundi(point.y))
 	if not near_map.has(cell):
 		return Vector3(-INF, 0.0, -1.0)
-	var best := _near_one(curves, near_map[cell], point)
+	var best := _near_one(curves, near_map[cell], point, kept)
 	for near: Vector2i in also.get(cell, []):
-		var other := _near_one(curves, near, point)
+		var other := _near_one(curves, near, point, kept)
 		if other.x > best.x:
 			best = other
 	return best
 
 
+## A point is at most this far from its cell's middle (half a cell's
+## diagonal, and a little over for rounding).
+const CELL_REACH := 0.75
+
+
+## The segments of [param points] searched round sample [param at] (by
+## [param span], as _near_one and _edge_signed search them, in their
+## order) that can be the nearest to some point of [param cell]: none
+## whose distance from the cell's middle is over CELL_REACH x 2 past the
+## nearest's, which no point of the cell can be nearer than the nearest's
+## (each point is within CELL_REACH of the middle), so the search finds the
+## same segment, the first at the least distance, in a few. Each segment
+## by its first sample's index.
+static func _near_segments(points: PackedVector2Array, closed: bool, at: int, span: int, cell: Vector2i) -> PackedInt32Array:
+	var n := points.size()
+	var middle := Vector2(cell)
+	var found := PackedInt32Array()
+	var gaps := PackedFloat32Array()
+	var least := INF
+	for j in range(at - span, at + span):
+		var i := j
+		if closed:
+			i = posmod(j, n)
+		elif i < 0 or i + 1 >= n:
+			continue
+		var gap := middle.distance_to(Geometry2D.get_closest_point_to_segment(middle, points[i], points[(i + 1) % n]))
+		found.append(i)
+		gaps.append(gap)
+		least = minf(least, gap)
+	var out := PackedInt32Array()
+	for k in found.size():
+		if gaps[k] <= least + CELL_REACH * 2.0:
+			out.append(found[k])
+	return out
+
+
 ## Where [param point] is to one curve of [param curves], searched round
 ## its sample [param near] (which curve, which sample): as _curve_near.
-func _near_one(curves: Array, near: Vector2i, point: Vector2) -> Vector3:
+## [param kept] holds _near_segments' by cell and [param near], made on
+## first use (cleared with the curves; a test's own curves, a fresh one).
+func _near_one(curves: Array, near: Vector2i, point: Vector2, kept := {}) -> Vector3:
 	var water: Dictionary = curves[near.x]
 	var curve: Dictionary = water["curve"]
 	var points: PackedVector2Array = curve["points"]
@@ -6317,12 +6372,11 @@ func _near_one(curves: Array, near: Vector2i, point: Vector2) -> Vector3:
 	var along := 0.0
 	var width := 0.0
 	var span := CURVE_SEARCH if not closed else n
-	for j in range(near.y - span, near.y + span):
-		var i := j
-		if closed:
-			i = posmod(j, n)
-		elif i < 0 or i + 1 >= n:
-			continue
+	var cell := Vector2i(roundi(point.x), roundi(point.y))
+	var key := Vector4i(cell.x, cell.y, near.x, near.y)
+	if not kept.has(key):
+		kept[key] = _near_segments(points, closed, near.y, span, cell)
+	for i: int in kept[key]:
 		var a := points[i]
 		var b := points[(i + 1) % n]
 		var on := Geometry2D.get_closest_point_to_segment(point, a, b)
@@ -6576,6 +6630,7 @@ func _read_edges() -> void:
 	_edge_curves.clear()
 	_edge_near_sample.clear()
 	_edge_near_also.clear()
+	_edge_kept.clear()
 	if not _outdoor or _wooded.is_empty() or _forest_distance.is_empty():
 		return
 	for loop: PackedVector2Array in _outline_loops(_wooded):
@@ -6706,25 +6761,57 @@ func _edge_signed(point: Vector2) -> float:
 	var cell := Vector2i(roundi(point.x), roundi(point.y))
 	if not _edge_near_sample.has(cell):
 		return NAN
+	if not _edge_kept.has(cell):
+		_edge_kept[cell] = _edge_segments(cell)
+	return _edge_signed_on(point, _edge_kept[cell])
+
+
+## _edge_signed against the segments [param ends] (_edge_segments' for the
+## point's cell).
+static func _edge_signed_on(point: Vector2, ends: PackedVector2Array) -> float:
 	var best := INF
 	var signed := NAN
+	for k in range(0, ends.size(), 2):
+		var a := ends[k]
+		var b := ends[k + 1]
+		var way := b - a
+		var on := Geometry2D.get_closest_point_to_segment(point, a, b)
+		var gap := point.distance_to(on)
+		if gap < best:
+			best = gap
+			var cross := way.x * (point.y - a.y) - way.y * (point.x - a.x)
+			signed = -gap if cross > 0.0 else gap
+	return signed
+
+
+## The edge's segments searched from [param cell] (round its near curves'
+## samples, CURVE_SEARCH each way, in that order) that can be the nearest
+## to a point of it, as _near_segments: each segment's two ends in turn.
+func _edge_segments(cell: Vector2i) -> PackedVector2Array:
+	var middle := Vector2(cell)
+	var found := PackedVector2Array()
+	var gaps := PackedFloat32Array()
+	var least := INF
 	for near: Vector2i in [_edge_near_sample[cell]] + _edge_near_also.get(cell, []):
 		var points: PackedVector2Array = _edge_curves[near.x]["curve"]["points"]
 		var n := points.size()
 		for j in range(near.y - CURVE_SEARCH, near.y + CURVE_SEARCH):
 			var a := points[posmod(j, n)]
 			var b := points[posmod(j + 1, n)]
-			var way := b - a
 			# The seam's near-repeat point is no segment: its side is none.
-			if way.length_squared() < 0.0025:
+			if (b - a).length_squared() < 0.0025:
 				continue
-			var on := Geometry2D.get_closest_point_to_segment(point, a, b)
-			var gap := point.distance_to(on)
-			if gap < best:
-				best = gap
-				var cross := way.x * (point.y - a.y) - way.y * (point.x - a.x)
-				signed = -gap if cross > 0.0 else gap
-	return signed
+			var gap := middle.distance_to(Geometry2D.get_closest_point_to_segment(middle, a, b))
+			found.append(a)
+			found.append(b)
+			gaps.append(gap)
+			least = minf(least, gap)
+	var out := PackedVector2Array()
+	for k in gaps.size():
+		if gaps[k] <= least + CELL_REACH * 2.0:
+			out.append(found[k * 2])
+			out.append(found[k * 2 + 1])
+	return out
 
 
 ## The forest edge's field (decision 575): an RG8 image the shore field's
@@ -6737,10 +6824,16 @@ func _edge_field(origin: Vector2i, size: Vector2i) -> Image:
 		var at := cell - origin
 		if at.x < 0 or at.y < 0 or at.x * SHORE_RES >= size.x or at.y * SHORE_RES >= size.y:
 			continue
+		# Every texel's point rounds to this cell: its segments, once.
+		if not _edge_kept.has(cell):
+			_edge_kept[cell] = _edge_segments(cell)
+		var ends: PackedVector2Array = _edge_kept[cell]
+		if ends.is_empty():
+			continue
 		for v in SHORE_RES:
 			for u in SHORE_RES:
 				var point := Vector2(cell) + (Vector2(u, v) + Vector2(0.5, 0.5)) / SHORE_RES - Vector2(0.5, 0.5)
-				var signed := _edge_signed(point)
+				var signed := _edge_signed_on(point, ends)
 				if is_nan(signed):
 					continue
 				image.set_pixelv(Vector2i(at.x * SHORE_RES + u, at.y * SHORE_RES + v), Color(clampf(0.5 + signed, 0.0, 1.0), 1.0, 0.0))
@@ -6921,6 +7014,7 @@ func _read_roads() -> void:
 	_road_cells.clear()
 	_road_near_sample.clear()
 	_road_near_also.clear()
+	_road_kept.clear()
 	if _glimpse:
 		return
 	for road: Dictionary in _terrain.get("roads", []):
@@ -6938,7 +7032,7 @@ func _read_roads() -> void:
 ## x the signed distance, inside its width positive; y along it; z which
 ## road (-1: none near). As _curve_near.
 func _road_near(point: Vector2) -> Vector3:
-	return _near_on(_road_curves, _road_near_sample, point, _road_near_also)
+	return _near_on(_road_curves, _road_near_sample, point, _road_near_also, _road_kept)
 
 
 ## The kind a road's [param cell] is drawn as under the road (563,
