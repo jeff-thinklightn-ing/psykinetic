@@ -111,6 +111,11 @@ func _test_retaken() -> void:
 	_walk_to(player, Vector2i(9, 6))
 	_check(_main._retake_camps() == 1 and World.holdings.holder(_camp) == "goblins" and World.holdings.fallen_camps().is_empty(),
 		"after them, with nobody in it, the goblins take it back")
+	# Clear of the imp's tile (RESPAWN_MIN_DISTANCE) and past the grace of their
+	# respawn earlier on (_arrived_at): this passed only while the player happened
+	# to die again here.
+	_walk_to(player, Vector2i(12, 1))
+	_main._arrived_at.clear()
 	_main._respawned_at.clear()
 	_step(_main.RESPAWN_STAGGER_TICKS * 4)
 	_check(_slot_entity(IMP_SLOT) is Monster, "the goblins hold it again: the imp comes back")

@@ -2585,7 +2585,14 @@ func _test_death_and_respawn() -> void:
 	World.step()
 	mind.clear()
 	pet._last_speech_tick = -1000
-	World.damage(_player(), 999, null, &"attack")
+	var owner := _player()
+	pet.errand = {"verb": "bandage", "words": "bandage Player", "patient": owner, "phase": "going", "serial": 0, "until": World.tick + 100}
+	pet._offered[9999] = [{"verb": "bandage", "words": "bandage Player", "patient": owner}]
+	World.damage(owner, 999, null, &"attack")
+	# Decision 572: freed at the frame's end, so nothing of hers holds them
+	# (the box's server crashed reading the freed Player through keeper).
+	_check(pet.keeper == null and pet.errand.is_empty() and not pet._offered.has(9999),
+		"her player's death: she holds them no more (keeper, the errand, the offer naming them)")
 	World.step()
 	var death: Dictionary = mind.voice_asks.back() if not mind.voice_asks.is_empty() else {}
 	_check(death.get("trigger") == "Player died.", "her voice is asked: %s" % death.get("trigger", "nothing"))

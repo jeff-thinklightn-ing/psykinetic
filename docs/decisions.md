@@ -20125,3 +20125,34 @@ the death until the return, the way the downed countdown reads (544).
 
 ui_test: the words, the countdown on the client's clock, past zero, no
 message. Client only; protocol unchanged on this side; no new class_name.
+## 572. A companion never holds a freed node (crash fix)
+
+The box's server segfaulted twice (v0.1.162, 2026-10-22, 02:20 and
+02:25), each within seconds of a player's death in the barrow, with no
+script error logged. The cause: a freed Player held by Companion.keeper,
+dereferenced in the release template. World.despawn frees a dead player
+at the frame's end, but Companion.keeper still pointed at it; her voice,
+asked a moment later (the kills she saw, once nothing hostile was near),
+built _wound_words from `for each: GridEntity in [self, keeper]`, which
+puts the freed node into a typed variable. A debug build checks that and
+logs "previously freed"; the release template skips the check and reads
+the freed object to learn its class (locally on Windows it logged "an
+object of type 'Object'"; on the box's Linux build, by every sign, a segfault before any
+line). Reproduced on a local dedicated server with one client: moved to
+the barrow, killed there by the skeletons or outright; the errors on
+every death are gone with the fix. The castle death that night did not
+crash: no kills were waiting for her voice there.
+
+The rule: a companion lets go of every node the moment it leaves the
+world. Main, on World.entity_despawned (before the free), calls
+Companion.forget(entity) on each companion: her keeper, intent target,
+quarry and stalked animal are cleared, an errand naming it ends, and a
+voice ask's offers naming it are dropped whole (a [DO: n] counts from
+that list). A reader of keeper checks _alive / is_instance_valid first,
+and a node that may be freed never goes into a typed variable (the loop
+over her companions in that handler is untyped). A player's leaving
+cleared keeper already; a death now does too.
+
+companion_test _test_death_and_respawn: at her player's death she holds
+nothing of them (keeper, an errand, an offer). Server sim, protocol
+unchanged, no new class_name.

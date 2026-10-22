@@ -917,6 +917,31 @@ func note_carried_off() -> void:
 
 ## Downed (decision 544): her player ([param theirs]), else she herself.
 ## Her player: told, and her voice asked, as at a death.
+## [param entity] leaves the world (Main, on World.entity_despawned, before
+## it is freed; decision 572): every hold she has on it is let go: her
+## player, her target, her quarry, what she stalks, an errand or an offer
+## naming it. A freed node read later crashed the box's server: her voice,
+## asked after her player died in the barrow, read the freed Player through
+## keeper (_wound_words), which the release template dereferences.
+func forget(entity: GridEntity) -> void:
+	if keeper == entity:
+		keeper = null
+	if intent_target == entity:
+		intent_target = null
+	if _quarry == entity:
+		_quarry = null
+	if _stalked == entity:
+		_stalked = null
+	if not errand.is_empty() and errand.values().has(entity):
+		errand = {}
+	# An offer naming it is dropped whole: [DO: n] counts from its list.
+	for serial: int in _offered.keys():
+		if _offered[serial].any(func(action: Dictionary) -> bool: return action.values().has(entity)):
+			_offered.erase(serial)
+	if _offering.any(func(action: Dictionary) -> bool: return action.values().has(entity)):
+		_offering = []
+
+
 func note_downed(theirs: bool) -> void:
 	if theirs:
 		_narrate("%s is down. You may bring them back where they lie." % keeper_name())
@@ -2202,15 +2227,18 @@ func voice_situation() -> String:
 func _wound_words() -> String:
 	var who := keeper_name()
 	var told: Array[String] = []
-	for each: GridEntity in [self, keeper]:
-		if not _alive(each):
-			continue
+	# Her player only while alive: a freed node never goes into a typed
+	# variable (decision 572).
+	var both: Array[GridEntity] = [self]
+	if _alive(keeper):
+		both.append(keeper)
+	for each in both:
 		for kind: String in AILING:
 			if each.ailments.has(kind):
 				told.append(("You are %s." if each == self else who + " is %s.") % AILING[kind])
 	var open_wounds: Array[GridEntity] = []
-	for each: GridEntity in [self, keeper]:
-		if not _alive(each) or each.hp >= each.max_hp:
+	for each in both:
+		if each.hp >= each.max_hp:
 			continue
 		var whose := "Your" if each == self else "%s's" % who
 		if each.mending == 1:

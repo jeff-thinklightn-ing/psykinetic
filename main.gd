@@ -7838,6 +7838,11 @@ func _leave(peer: int, player: Player, id: String) -> void:
 ## A player that dies comes back after RESPAWN_TICKS, as long as its peer is
 ## still here. Placeholder rule so the test room stays usable.
 func _on_entity_despawned(entity: GridEntity) -> void:
+	# Whatever goes, no companion holds it once it is freed (decision 572).
+	# Untyped: a freed one is never put in a typed variable.
+	for pet: Variant in _companions.values():
+		if is_instance_valid(pet) and pet != entity:
+			pet.forget(entity)
 	if _travelling:
 		return  # Gone to another zone, not dead.
 	if entity.spawn_spec.has("spawn"):
