@@ -21657,3 +21657,52 @@ axe that he drops as loot").
   wielded axe stays his ("wields", enemy-ai's), so he rises with his own
   again.
 items_test _test_battle_axe. No protocol change; no new class_name.
+## 582. The barrow's dead, drawn
+
+The coordinator approved art-kit's design (2026-10-22): the barrow's dead are made by hand on the
+human skeleton, on the shared palette, and drawn for enemy-ai's kinds.
+
+**art-kit's side.** The meshes by hand over human_m.blend's Armature in its T-pose
+(C:/dev/review/barrow_bodies/).
+- creature.skeleton: variant 1 a man's bones stylised chunky so they read at the game's distance
+  (knobbed long bones, the ribs as hoops over a dark hollow so the chest reads as a body, a skull
+  with dark sockets), row 3's tans; variant 2 the barrow guard, a rusted helm, a ragged mail shirt
+  and a round shield on the left forearm, rigid parts named for their bones.
+- creature.draugr: the same armature scaled 1.2 once (about 2.2 m), blue-black withered skin, pale
+  eye points, a long grey beard, an old gold-bronze crown set with amber so he reads as the king of
+  the hall (the coordinator), a rotted mail hauberk in broad rust stains, a ragged cloak, arm rings,
+  claws.
+- creature.ghost: the skeleton's bones under a shroud on the kit's second material "ghost" (glTF
+  alpha blend 0.45, pale blue-green with a faint glow, two-sided), drawn after the opaque pieces and
+  casting no shadow (the coordinator's ruling; the model path turns its shadow off).
+- All on the shared palette but the ghost's shroud; under 3,000 tris each.
+
+**The rig (pc-character's side).** `tools/creature_byhand_rig.py`, as for the hand-built orc and
+kobold (529 amended):
+- The Body is weighted from human_m's own Body by nearest face (same armature, same T-pose).
+- Parts named by a "bone" property join rigid on that bone: the helm, the shield, the crown, the
+  cloak.
+- "~part" weights a part like the Body: the guard's mail, which hangs to the hips and, rigid on
+  spine_03, would cut into the legs.
+- "=part" weights it so but keeps it its own mesh: the ghost's shroud, whose shadow the client
+  turns off per mesh.
+- "x1.2" scales the reference for the draugr.
+- Each .glb is in its slot folder, imported through the UAL bone map. No clips are baked in; the
+  human library plays through ual.tres.
+
+**Drawn (Client3D.MODELS).**
+- "skeleton" and "skeleton_guard" use the slot's two variants, with the human gaits and sockets.
+- "draugr" uses `DRAUGR_SCALE` 1.2, with his gaits and sockets scaled to match.
+- "ghost" is in ahead of enemy-ai's kind.
+- All play `DEAD_FIDGETS`: a look round, a shift, a look back; no drinking or talking.
+- Any surface in the `GHOST_MATERIAL` ("ghost") casts no shadow (the coordinator's ruling); the
+  bones under it keep theirs.
+
+**The slots.** Sizes are as measured. The skeleton's depth sits between the plain (0.33 m) and
+the guard (0.58 m, its shield), at a tolerance of 0.3.
+
+Tests: view_test `_test_barrow_dead` checks each body's own scene on the palette, a man's height
+(the draugr's 2.1 m), idle clips, hands, the guard wearing more, and the ghost's shroud with no
+shadow while its bones have one. art_kit_test passes with the three entries.
+
+Client only, protocol unchanged, no new class_name.

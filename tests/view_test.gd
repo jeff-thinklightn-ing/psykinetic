@@ -83,6 +83,7 @@ func _ready() -> void:
 	_test_visible_work()
 	_test_goblins_differ()
 	_test_allies()
+	_test_barrow_dead()
 	_test_shadows_in_view()
 	_test_no_2d_under_3d()
 	await _test_doors_swing()
@@ -3853,6 +3854,46 @@ func _test_allies() -> void:
 			and Client3D.HUMAN_FIDGETS.keys().all(func(clip: String) -> bool: return orc_rig.has(clip)),
 			"a person has %d fidgets in the library, the head scratch the rarest" % Client3D.HUMAN_FIDGETS.size())
 	for entity: Monster in orcs + [kobold]:
+		World.despawn(entity)
+	_rig._process(0.0)
+
+
+## The barrow's dead (art-kit's by hand, rigged on the human skeleton): the skeleton and the barrow
+## guard each their creature.skeleton variant, on the shared palette, a man's height, their clips
+## and their hands the human ones.
+func _test_barrow_dead() -> void:
+	print("
+== the barrow's dead: the skeleton, its guard, the draugr, the ghost ==")
+	var dead: Array[Monster] = [_spawn_imp(Vector2i(9, 6), "skeleton"), _spawn_imp(Vector2i(10, 6), "skeleton_guard"),
+		_spawn_imp(Vector2i(11, 6), "draugr"), _spawn_imp(Vector2i(12, 6), "ghost")]
+	_rig._process(0.0)
+	var palette := load(ArtKit.PALETTE)
+	for entity: Monster in dead:
+		var kind := str(entity.spawn_spec["kind"])
+		var puppet: Node3D = _rig._puppets[entity.get_instance_id()]
+		var scene := puppet.get_node("Body/Model") as Node3D
+		var body := scene.find_child("Body", true, false) as MeshInstance3D
+		var painted := body != null and range(body.mesh.get_surface_count()).all(func(i: int) -> bool:
+			return body.get_surface_override_material(i) == palette)
+		var top := body.get_aabb().end.y * float(puppet.get_meta("model_scale")) if body != null else 0.0
+		var rig := puppet.get_meta("rig") as AnimRig
+		var sockets: Dictionary = puppet.get_meta("sockets", {})
+		_check(scene.scene_file_path == Client3D.MODELS[kind]["scene"] and painted and absf(top - float(Client3D.MODELS[kind]["height"])) < 0.15
+				and (rig.playing() == Client3D.CLIP_IDLE or Client3D.DEAD_FIDGETS.has(rig.playing()))
+				and sockets.has("hand_r") and sockets.has("hand_l"),
+				"a %s: its own body on the palette, %.2f m, its clips playing (%s), hands to hold things" % [kind, top, rig.playing()])
+	var guard := (_rig._puppets[dead[1].get_instance_id()] as Node3D).get_node("Body/Model").find_child("Body", true, false) as MeshInstance3D
+	var plain := (_rig._puppets[dead[0].get_instance_id()] as Node3D).get_node("Body/Model").find_child("Body", true, false) as MeshInstance3D
+	_check(guard.get_aabb().size.x > plain.get_aabb().size.x or guard.mesh.surface_get_array_len(0) > plain.mesh.surface_get_array_len(0),
+			"the guard wears more than the plain skeleton (its helm, mail and shield)")
+	var ghost := (_rig._puppets[dead[3].get_instance_id()] as Node3D).get_node("Body/Model") as Node3D
+	var shadows := {}
+	for mesh: MeshInstance3D in ghost.find_children("*", "MeshInstance3D", true, false):
+		var own := mesh.mesh.surface_get_material(0)
+		shadows[own.resource_name if own != null else ""] = mesh.cast_shadow != GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_check(shadows.get(Client3D.GHOST_MATERIAL) == false and shadows.get(ArtKit.PALETTE_NAME) == true,
+			"the ghost's shroud casts no shadow, its bones do (%s)" % shadows)
+	for entity: Monster in dead:
 		World.despawn(entity)
 	_rig._process(0.0)
 

@@ -2337,6 +2337,395 @@
 				{"at": [0, 0.25, 0.14], "size": [0.12, 0.14, 0.14]}
 			]
 		},
+		"creature.skeleton": {
+			"category": "creatures",
+			"type": "mesh",
+			"kind": "creature",
+			"size": [
+				1.86,
+				1.75,
+				0.45
+			],
+			"tolerance": 0.3,
+			"variants": 2,
+			"clip_library": "res://art/models/animations/goblin.res",
+			"budget": 3000,
+			"source": {
+				"by": "art-kit (mesh and paint, by hand), pc-character (rig)",
+				"tool": "blender (art-kit's build; pc-character's rig tools)",
+				"license": "own (mesh and paint); CC0 1.0 (the UAL skeleton and clips, Quaternius)",
+				"date": "2026-10-22",
+				"notes": "C:/dev/review/barrow_bodies/make_skeleton.py over human_m.blend's Armature in its T-pose: variant 1 a man's bones stylised chunky to read at the game's distance (knobbed long bones, the ribs as hoops over a dark hollow, a pelvis bowl, the column, shoulder blades, a skull with dark sockets and a dropped jaw, fingers and toes as bone chains; row 3's tans), 2,070 tris; variant 2 the barrow guard, the same bones under a rusted helm with a nasal, a ragged mail shirt and a round wooden shield on the left forearm, 2,542 tris"
+			},
+			"uses": "the barrow's dead (the coordinator approved art-kit's design, decision 582): variant 1 the skeleton, variant 2 the barrow guard (enemy-ai's skeleton and skeleton_guard; its shield makes it 0.58 m deep to the skeleton's 0.33, so the slot's depth is between them, at ±30%); skinned on the UAL skeleton, the human clip library through ual.tres, the human sockets (its weapon from the replicated hands); front +z, origin between its feet, T-pose rest",
+			"clips": [
+				{
+					"name": "idle",
+					"names": [
+						"idle",
+						"idle_loop"
+					],
+					"required": true
+				},
+				{
+					"name": "walk",
+					"names": [
+						"walk",
+						"walk_loop"
+					],
+					"required": true
+				},
+				{
+					"name": "run",
+					"names": [
+						"jog_fwd",
+						"sprint",
+						"jog_fwd_loop",
+						"sprint_loop",
+						"run"
+					],
+					"required": true
+				},
+				{
+					"name": "attack",
+					"names": [
+						"axe_overhead",
+						"sword_attack",
+						"punch_cross",
+						"punch_jab",
+						"attack"
+					],
+					"required": true
+				},
+				{
+					"name": "hit",
+					"names": [
+						"hit_chest",
+						"hit_head",
+						"hit"
+					],
+					"fallback": "a flinch tween"
+				},
+				{
+					"name": "death",
+					"names": [
+						"death01",
+						"death02",
+						"death"
+					],
+					"required": true
+				}
+			],
+			"grey": [
+				{
+					"at": [
+						0,
+						1.417,
+						0
+					],
+					"size": [
+						1.86,
+						0.14,
+						0.14
+					]
+				},
+				{
+					"at": [
+						0,
+						0.455,
+						0
+					],
+					"size": [
+						0.428,
+						0.91,
+						0.245
+					]
+				},
+				{
+					"at": [
+						0,
+						1.173,
+						0
+					],
+					"size": [
+						0.446,
+						0.56,
+						0.45
+					]
+				},
+				{
+					"at": [
+						0,
+						1.619,
+						0
+					],
+					"size": [
+						0.242,
+						0.263,
+						0.245
+					]
+				}
+			]
+		},
+		"creature.draugr": {
+			"category": "creatures",
+			"type": "mesh",
+			"kind": "creature",
+			"size": [
+				2.34,
+				2.23,
+				0.56
+			],
+			"tolerance": 0.15,
+			"clip_library": "res://art/models/animations/goblin.res",
+			"budget": 3000,
+			"source": {
+				"by": "art-kit (mesh and paint, by hand), pc-character (rig)",
+				"tool": "blender (art-kit's build; pc-character's rig tools)",
+				"license": "own (mesh and paint); CC0 1.0 (the UAL skeleton and clips, Quaternius)",
+				"date": "2026-10-22",
+				"notes": "C:/dev/review/barrow_bodies/make_draugr.py over human_m.blend's Armature, the whole scaled 1.2: a dead warrior-king grown huge, blue-black withered skin (row 8), pale eye points, a long grey beard and lank hair, an old gold-bronze crown of points set with amber, a rotted mail hauberk to the knees in broad rust stains, a ragged dark cloak, bronze arm rings, clawed hands, bare feet; 2,006 tris"
+			},
+			"uses": "the draugr, the king of the Hall of Fallen Souls (decision 582; the coordinator: \"crowned and bearded so he reads as the king of the hall\"): skinned on the UAL skeleton at 1.2, the human clip library, the human sockets; front +z, origin between its feet, T-pose rest",
+			"clips": [
+				{
+					"name": "idle",
+					"names": [
+						"idle",
+						"idle_loop"
+					],
+					"required": true
+				},
+				{
+					"name": "walk",
+					"names": [
+						"walk",
+						"walk_loop"
+					],
+					"required": true
+				},
+				{
+					"name": "run",
+					"names": [
+						"jog_fwd",
+						"sprint",
+						"jog_fwd_loop",
+						"sprint_loop",
+						"run"
+					],
+					"required": true
+				},
+				{
+					"name": "attack",
+					"names": [
+						"axe_overhead",
+						"sword_attack",
+						"punch_cross",
+						"punch_jab",
+						"attack"
+					],
+					"required": true
+				},
+				{
+					"name": "hit",
+					"names": [
+						"hit_chest",
+						"hit_head",
+						"hit"
+					],
+					"fallback": "a flinch tween"
+				},
+				{
+					"name": "death",
+					"names": [
+						"death01",
+						"death02",
+						"death"
+					],
+					"required": true
+				}
+			],
+			"grey": [
+				{
+					"at": [
+						0,
+						1.806,
+						0
+					],
+					"size": [
+						2.34,
+						0.178,
+						0.178
+					]
+				},
+				{
+					"at": [
+						0,
+						0.58,
+						0
+					],
+					"size": [
+						0.538,
+						1.16,
+						0.312
+					]
+				},
+				{
+					"at": [
+						0,
+						1.494,
+						0
+					],
+					"size": [
+						0.562,
+						0.714,
+						0.56
+					]
+				},
+				{
+					"at": [
+						0,
+						2.063,
+						0
+					],
+					"size": [
+						0.304,
+						0.334,
+						0.312
+					]
+				}
+			]
+		},
+		"creature.ghost": {
+			"category": "creatures",
+			"type": "mesh",
+			"kind": "creature",
+			"size": [
+				1.86,
+				1.82,
+				0.47
+			],
+			"tolerance": 0.15,
+			"materials": 2,
+			"clip_library": "res://art/models/animations/goblin.res",
+			"budget": 3000,
+			"source": {
+				"by": "art-kit (mesh and paint, by hand), pc-character (rig)",
+				"tool": "blender (art-kit's build; pc-character's rig tools)",
+				"license": "own (mesh and paint); CC0 1.0 (the UAL skeleton and clips, Quaternius)",
+				"date": "2026-10-22",
+				"notes": "C:/dev/review/barrow_bodies/make_ghost.py: creature.skeleton's variant 1 bones (opaque, the palette) under a shroud in the kit's second material \"ghost\" (translucent, glTF alpha blend 0.45, pale blue-green with a faint glow, two-sided; casts no shadow in the game): a deep hood open at the face, a robe fraying to wisps above the feet, wide sleeves, a spectral helm's rim and nasal; 2,388 tris"
+			},
+			"uses": "a ghostly warrior of the Hall of Fallen Souls, \"promised eternal feast and battle\" (decision 582; enemy-ai's ghost kind), seated at the round table until the draugr's pact starts: skinned on the UAL skeleton, the human clip library (its sit clip pc-character's); the shroud's material \"ghost\", drawn after the opaque pieces, no shadow; front +z, origin between its feet, T-pose rest",
+			"clips": [
+				{
+					"name": "idle",
+					"names": [
+						"idle",
+						"idle_loop"
+					],
+					"required": true
+				},
+				{
+					"name": "walk",
+					"names": [
+						"walk",
+						"walk_loop"
+					],
+					"required": true
+				},
+				{
+					"name": "run",
+					"names": [
+						"jog_fwd",
+						"sprint",
+						"jog_fwd_loop",
+						"sprint_loop",
+						"run"
+					],
+					"required": true
+				},
+				{
+					"name": "attack",
+					"names": [
+						"axe_overhead",
+						"sword_attack",
+						"punch_cross",
+						"punch_jab",
+						"attack"
+					],
+					"required": true
+				},
+				{
+					"name": "hit",
+					"names": [
+						"hit_chest",
+						"hit_head",
+						"hit"
+					],
+					"fallback": "a flinch tween"
+				},
+				{
+					"name": "death",
+					"names": [
+						"death01",
+						"death02",
+						"death"
+					],
+					"required": true
+				}
+			],
+			"grey": [
+				{
+					"at": [
+						0,
+						1.474,
+						0
+					],
+					"size": [
+						1.86,
+						0.146,
+						0.146
+					]
+				},
+				{
+					"at": [
+						0,
+						0.473,
+						0
+					],
+					"size": [
+						0.428,
+						0.946,
+						0.255
+					]
+				},
+				{
+					"at": [
+						0,
+						1.219,
+						0
+					],
+					"size": [
+						0.446,
+						0.582,
+						0.47
+					]
+				},
+				{
+					"at": [
+						0,
+						1.683,
+						0
+					],
+					"size": [
+						0.242,
+						0.273,
+						0.255
+					]
+				}
+			]
+		},
 		"creature.orc": {
 			"category": "creatures",
 			"type": "mesh",

@@ -673,7 +673,13 @@ const KOBOLD_GAITS: Array[Array] = [[CLIP_WALK, 0.39], ["Jog_Short", 1.63], ["Sp
 ## allied peoples (decision 416), each body_gen's (decision 478) and drawn as a
 ## person is ("parts", a PersonLook of its "people"), or art-gen's mesh in its
 ## own paint (decision 529: "paint", its material, the goblin's shader; its
-## PersonLook only its stature, its mesh hunched as its concept stands).
+## PersonLook only its stature, its mesh hunched as its concept stands). The
+## barrow's dead are art-kit's by hand on the human skeleton, on the palette:
+## the skeleton creature.skeleton's variant 1, the barrow guard its variant 2
+## (helm, mail and shield), the human gaits and sockets, fidgets of their own;
+## the draugr creature.draugr, the human skeleton scaled DRAUGR_SCALE (its
+## gaits and sockets so too); the ghost creature.ghost, the skeleton under a
+## translucent shroud that casts no shadow (GHOST_MATERIAL).
 const MODELS := {
 	"imp": {"scene": "res://art/models/characters/goblin.glb", "clips": "res://art/models/animations/goblin.res", "height": 1.2,
 		"faces": PI * 0.5, "moves": HUMANOID_MOVES, "sockets": GOBLIN_SOCKETS, "goblin": true},
@@ -685,7 +691,22 @@ const MODELS := {
 		"faces": PI * 0.5, "by_mass": false, "gaits": KOBOLD_GAITS, "backpedal": 2.10, "people": "kobold",
 		"paint": "res://art/models/characters/kobold_body.tres",
 		"fidgets": KOBOLD_FIDGETS, "moves": HUMANOID_MOVES, "sockets": KOBOLD_SOCKETS},
+	"skeleton": {"scene": "res://art/kit/creatures/creature.skeleton/creature.skeleton.glb",
+		"clips": "res://art/models/animations/goblin.res", "height": 1.75, "faces": PI * 0.5, "by_mass": false,
+		"gaits": HUMAN_GAITS, "fidgets": DEAD_FIDGETS, "moves": HUMANOID_MOVES, "sockets": HUMAN_SOCKETS},
+	"skeleton_guard": {"scene": "res://art/kit/creatures/creature.skeleton/creature.skeleton.2.glb",
+		"clips": "res://art/models/animations/goblin.res", "height": 1.75, "faces": PI * 0.5, "by_mass": false,
+		"gaits": HUMAN_GAITS, "fidgets": DEAD_FIDGETS, "moves": HUMANOID_MOVES, "sockets": HUMAN_SOCKETS},
+	"draugr": {"scene": "res://art/kit/creatures/creature.draugr/creature.draugr.glb",
+		"clips": "res://art/models/animations/goblin.res", "height": 1.75 * DRAUGR_SCALE, "faces": PI * 0.5, "by_mass": false,
+		"gaits": DRAUGR_GAITS, "fidgets": DEAD_FIDGETS, "moves": HUMANOID_MOVES, "sockets": DRAUGR_SOCKETS},
+	"ghost": {"scene": "res://art/kit/creatures/creature.ghost/creature.ghost.glb",
+		"clips": "res://art/models/animations/goblin.res", "height": 1.75, "faces": PI * 0.5, "by_mass": false,
+		"gaits": HUMAN_GAITS, "fidgets": DEAD_FIDGETS, "moves": HUMANOID_MOVES, "sockets": HUMAN_SOCKETS},
 }
+## A model's surface in this material (art-kit's ghost's shroud) is see-through
+## and casts no shadow (the coordinator's ruling): its mesh's shadow is off.
+const GHOST_MATERIAL := "ghost"
 ## Each modelled monster is its own (_vary, seeded by its name, so every
 ## view sees the same one): its size goes with its mass, as the cube root of
 ## its mass over MODEL_MASS, within MODEL_SCALE_MIN/MAX, give or take
@@ -718,6 +739,8 @@ const FIDGETS := {"Idle_LookAround": 4, "Idle_Talking": 2, "Drink": 1, "Fixing_K
 ## (tools/humanoid_clips.py's fidgets); the orc's and the kobold's their own.
 const HUMAN_FIDGETS := {"Idle_LookAround": 1, "Fidget_Shift": 3, "Fidget_LookBack": 3, "Fidget_Shoulders": 3,
 	"Fidget_Sleeve": 2, "Fidget_ArmsCrossed": 2}
+## The dead's: no drinking or talking, a look round and a shift of the bones.
+const DEAD_FIDGETS := {"Idle_LookAround": 2, "Fidget_Shift": 2, "Fidget_LookBack": 1}
 const ORC_FIDGETS := {"Idle_LookAround": 1, "Fidget_Shoulders": 3, "Fidget_ArmsCrossed": 3, "Fidget_Shift": 2}
 const KOBOLD_FIDGETS := {"Idle_LookAround": 1, "Fidget_LookBack": 3, "Fidget_Sleeve": 3, "Fidget_Shift": 2}
 ## This run's: so a person's fidgets come at other moments each run.
@@ -798,6 +821,11 @@ const HUMAN := {"scene": "res://art/models/characters/human_m.glb", "clips": "re
 ## by a person's stature: the jog gives way to the sprint at about 5.2 tiles
 ## a second.
 const HUMAN_GAITS: Array[Array] = [[CLIP_WALK, 0.94], ["Jog_Short", 3.63], ["Sprint_Short", 5.55]]
+## The draugr: the human skeleton scaled up (art-kit's, 2.1 m and more), its
+## strides and its hands' sockets with it.
+const DRAUGR_SCALE := 1.2
+const DRAUGR_GAITS: Array[Array] = [[CLIP_WALK, 0.94 * DRAUGR_SCALE], ["Jog_Short", 3.63 * DRAUGR_SCALE], ["Sprint_Short", 5.55 * DRAUGR_SCALE]]
+const DRAUGR_SOCKETS := {"hand": DRAUGR_SCALE, "hip": 0.17 * DRAUGR_SCALE, "back": 0.13 * DRAUGR_SCALE, "chest": 0.04 * DRAUGR_SCALE}
 const HUMAN_F_GAITS: Array[Array] = [[CLIP_WALK, 0.89], ["Jog_Short", 3.44], ["Sprint_Short", 5.27]]
 ## The human bodies' one material, shared: each body's parts' colours are its
 ## instance's (HUMAN_PARTS, from its mesh's extras; the tunic the player's).
@@ -10373,6 +10401,8 @@ func _make_model(model: Dictionary, puppet: Node3D) -> Node3D:
 			var own := mesh.mesh.surface_get_material(surface)
 			if own != null and own.resource_name == ArtKit.PALETTE_NAME:
 				mesh.set_surface_override_material(surface, load(ArtKit.PALETTE))
+			elif own != null and own.resource_name == GHOST_MATERIAL:
+				mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	if model.get("parts", false):
 		# A person's tunic in their colour; an ally's in its look's.
 		var tunic: Color = Color.WHITE if model.has("people") else puppet.get_meta("tint", Color.WHITE)

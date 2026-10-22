@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The barrow's dead have bodies of their own: the skeleton, the barrow guard in helm, mail and shield, the crowned draugr, and a ghost whose see-through shroud casts no shadow.
 - The Draugr's Totem holds your resurrection charges; it stays with you and can't be traded, dropped or sold (573 amended).
 - The draugr's battle axe: a two-handed knockdown weapon he leaves at his feet when you win his pact (603).
 - Humanoid enemies drop gold: a goblin or a kobold leaves a purse of 1 to 3 gold where it falls, an orc 4 to 10; animals and the undead drop none (601).
