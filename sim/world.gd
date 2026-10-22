@@ -327,6 +327,24 @@ const EXHAUSTED_MASS_FACTOR := 0.5
 ## slide_per_speed: a shove's is strength x the shover's mass x
 ## shove_scale / the body's pushed mass (push_force).
 const PHYSICS_RULES := "res://levels/physics.json"
+## What a swing costs and what being winded does (decision 597): every value
+## from COMBAT_RULES, read at start (load_combat_rules), drafts for Jeff.
+const COMBAT_RULES := "res://levels/combat.json"
+## A swing costs ceil(swing_base + swing_per_kg x the weapon's weight x
+## ref_mass / the wielder's own mass) stamina (swing_cost); one that
+## strikes nobody whiff_scale times that.
+var swing_base := 3.0
+var swing_per_kg := 2.0
+var ref_mass := 70.0
+var whiff_scale := 1.25
+## Winded from 0 stamina until it is back at recover_at: steps take
+## winded_move_scale times the ticks, blows winded_blow_scale of their
+## damage (the push fades by stamina in push_force alone, physics'), regen
+## waits winded_regen_delay ticks.
+var recover_at := 25
+var winded_move_scale := 1.5
+var winded_blow_scale := 0.5
+var winded_regen_delay := 20
 @export var shove_scale := 0.1
 ## A pushed body slides this many cells per unit of speed, at most
 ## max_travel (a sanity limit: bodies under about 16 kg are all flattened
@@ -3256,6 +3274,7 @@ func _ready() -> void:
 	entity_pushed.connect(_on_pushed_for_stockpile)
 	entity_despawned.connect(func(entity: GridEntity) -> void: _pushed_by.erase(entity))
 	load_physics_rules(FileAccess.get_file_as_string(PHYSICS_RULES))
+	load_combat_rules(FileAccess.get_file_as_string(COMBAT_RULES))
 
 
 ## The knockback model's numbers (decision 592) from [param text], the
@@ -3279,6 +3298,50 @@ func load_physics_rules(text: String) -> void:
 			set(field, int(given) if get(field) is int else float(given))
 		else:
 			push_warning("World: %s's %s is %s; %s kept" % [PHYSICS_RULES, key, given, get(field)])
+
+
+## The swing's cost and being winded (decision 597) from [param text], the
+## rules file's JSON, as load_physics_rules: a key it gives sets its value;
+## one unknown, or not a number at least 0, keeps the default (warned).
+func load_combat_rules(text: String) -> void:
+	var data: Variant = JSON.parse_string(text) if not text.is_empty() else null
+	if data is not Dictionary:
+		push_warning("World: %s unreadable; the combat defaults hold" % COMBAT_RULES)
+		return
+	for key: String in data:
+		var given: Variant = data[key]
+		if not key in ["swing_base", "swing_per_kg", "ref_mass", "whiff_scale", "recover_at", "winded_move_scale",
+				"winded_blow_scale", "winded_regen_delay"]:
+			push_warning("World: %s's %s is not a combat rule" % [COMBAT_RULES, key])
+		elif (given is int or given is float) and float(given) >= 0.0:
+			set(key, int(given) if get(key) is int else float(given))
+		else:
+			push_warning("World: %s's %s is %s; %s kept" % [COMBAT_RULES, key, given, get(key)])
+
+
+## The stamina a swing by [param entity] costs (decision 597): by the weight
+## of what it strikes with (wielded; fists 0) against its own mass (without
+## what it carries); [param whiff], striking nobody, whiff_scale times it.
+func swing_cost(entity: GridEntity, whiff := false) -> int:
+	var id := wielded(entity)
+	var weight := Items.weight_of(id) if not id.is_empty() else 0.0
+	var own := entity.base_mass if entity.base_mass > 0.0 else entity.mass
+	var cost := swing_base + swing_per_kg * weight * ref_mass / maxf(own, 1.0)
+	return ceili(cost * (whiff_scale if whiff else 1.0))
+
+
+## [param entity] pays for a swing (decision 597), if it pays for swings at
+## all (pays_swings: players and companions; a monster by its row's
+## "swing_stamina"); never below 0.
+func _pay_swing(entity: GridEntity, whiff: bool) -> void:
+	if entity.max_stamina > 0 and entity.pays_swings:
+		entity.stamina = maxi(0, entity.stamina - swing_cost(entity, whiff))
+
+
+## Whether [param entity] is winded (decision 597): out of stamina, and not
+## yet back to recover_at.
+func is_winded(entity: GridEntity) -> bool:
+	return is_instance_valid(entity) and entity.winded
 
 
 ## Who last pushed each crate or cart, by entity, for the stockpile's
@@ -4371,7 +4434,7 @@ func _clear_links() -> void:
 
 ## A swing at nothing: the attack's cooldown, facing and lunge, with no
 ## target. Refused like an attack while cooling down, mid-step or stunned.
-func try_swing(entity: GridEntity, direction: Vector2i) -> bool:
+func try_swing(entity: GridEntity, direction: Vector2i, paid := false) -> bool:
 	if not Net.is_authority():
 		return false
 	if not entity.spawned or direction not in DIRECTIONS or is_stunned(entity):
@@ -4381,6 +4444,9 @@ func try_swing(entity: GridEntity, direction: Vector2i) -> bool:
 	entity.next_attack_tick = tick + attack_ticks_of(entity)
 	entity._world_set_facing(direction)
 	entity.protected = false
+	if not paid:
+		_pay_swing(entity, true)  # A whiff (decision 597).
+		entity._world_note_exertion(tick)
 	entity._world_swung(direction)
 	entity_swung.emit(entity, direction)
 	noise(entity.tile, Senses.NOISE_FIGHT, &"fight", entity)
@@ -4454,6 +4520,7 @@ func try_wind_up(by: GridEntity, target: GridEntity) -> bool:
 		return false
 	var direction := (target.tile - by.tile).clamp(Vector2i(-1, -1), Vector2i(1, 1))
 	by.wind_up = {"target": target, "lands": tick + ticks, "direction": direction, "from": by.tile}
+	_pay_swing(by, false)  # Paid as it begins; given up, not refunded (decision 597).
 	_winders[by] = true
 	by._world_set_facing(direction)
 	by._world_note_exertion(tick)
@@ -4496,12 +4563,12 @@ func _tend_wind_ups() -> void:
 		_winders.erase(entity)
 		var first := _hits.size()
 		if is_instance_valid(aimed) and (aimed as GridEntity).spawned and in_reach(entity, aimed as GridEntity) \
-				and _try_hit(entity, aimed as GridEntity, entity.attack_damage, false):
+				and _try_hit(entity, aimed as GridEntity, entity.attack_damage, false, Vector2i.ZERO, true):
 			for i in range(first, _hits.size()):
 				_hits[i].crushing = true
 			_log("windup: %s strikes %s" % [entity.name, (aimed as GridEntity).name])
 		else:
-			try_swing(entity, direction)
+			try_swing(entity, direction, true)
 			_log("windup: %s strikes the air" % entity.name)
 
 
@@ -4519,8 +4586,8 @@ func bash_verb(entity: GridEntity) -> Dictionary:
 ## it. For the monsters' AI as well as the player's.
 func bash_ready(entity: GridEntity) -> bool:
 	var verb := bash_verb(entity)
-	if verb.is_empty() or is_stunned(entity) or tick < entity.next_bash_tick:
-		return false
+	if verb.is_empty() or is_stunned(entity) or tick < entity.next_bash_tick or entity.winded:
+		return false  # Winded: no bash (decision 597).
 	return entity.max_stamina <= 0 or entity.stamina >= int(verb["bash_stamina"])
 
 
@@ -5102,7 +5169,7 @@ func mirror_changed() -> void:
 
 
 func _try_hit(attacker: GridEntity, target: GridEntity, hit_damage: int, is_shove: bool,
-		push_direction := Vector2i.ZERO) -> bool:
+		push_direction := Vector2i.ZERO, paid := false) -> bool:
 	if not Net.is_authority():
 		return false
 	if not attacker.spawned or not target.spawned or attacker == target:
@@ -5134,6 +5201,8 @@ func _try_hit(attacker: GridEntity, target: GridEntity, hit_damage: int, is_shov
 	attacker._world_note_exertion(tick)
 	attacker.protected = false  # So does attacking or shoving.
 	var force := push_force(attacker, target)
+	if not is_shove and not paid:
+		_pay_swing(attacker, false)  # Decision 597, after its push is weighed; a wound-up blow paid as it began.
 	if is_shove:
 		# Paid now, whatever the shove goes on to do. Short on stamina: the
 		# force shrinks in proportion and everything left is spent.
@@ -5160,6 +5229,8 @@ func _try_hit(attacker: GridEntity, target: GridEntity, hit_damage: int, is_shov
 		if verb.get("kind") == "backstab" and is_behind(attacker, target):
 			scale *= float(verb["behind"])
 		hit_damage = maxi(1, roundi(hit_damage * scale))
+	if not is_shove and hit_damage > 0 and attacker.winded:
+		hit_damage = maxi(1, roundi(hit_damage * winded_blow_scale))  # Decision 597.
 	var down := int(verb["down_ticks"]) if verb.get("kind") == "knockdown" else 0
 	if down > 0:
 		down += int(Items.strength_value(slot_strength(attacker, Items.RIGHT_HAND), "down_ticks", 0))  # A heavy axe's.
@@ -5494,8 +5565,15 @@ func _impact(entity: GridEntity, amount: int, source: GridEntity, against: Strin
 ## than one tile in a tick stops it for that tick and stamina_regen_delay more.
 func _regen_stamina() -> void:
 	for entity in _entities:
+		# Winded (decision 597): from 0 until back at recover_at, for those
+		# who pay for their swings.
+		if entity.max_stamina > 0 and entity.pays_swings and not entity.winded and entity.stamina <= 0:
+			entity.winded = true
+		elif entity.winded and (entity.stamina >= mini(recover_at, entity.max_stamina) or not entity.pays_swings):
+			entity.winded = false
+		var delay := winded_regen_delay if entity.winded else stamina_regen_delay
 		if entity.max_stamina > 0 and entity.stamina < entity.max_stamina \
-				and tick - entity.last_exertion_tick() > stamina_regen_delay:
+				and tick - entity.last_exertion_tick() > delay:
 			entity.stamina = mini(entity.stamina + stamina_regen, entity.max_stamina)
 
 
@@ -5935,6 +6013,8 @@ func step_ticks(entity: GridEntity, direction: Vector2i, from := NO_CELL) -> flo
 	var to := from + direction
 	# Uphill is slower (Relief.pace, decision 525); a stair is not.
 	ticks *= Relief.pace(elevation_at(to) - elevation_at(from), direction.x != 0 and direction.y != 0)
+	if entity.winded:
+		ticks *= winded_move_scale  # Decision 597; winded replicates, so a client's prediction agrees.
 	ticks /= 1.0 + buff(entity, "speed")  # A stamina potion (decision 562); buffs replicate, so a client's prediction agrees.
 	if _fords.has(to):
 		return ticks * FORD_TICK_SCALE

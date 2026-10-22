@@ -1,0 +1,10 @@
+{
+	"swing_base": 3.0,
+	"swing_per_kg": 2.0,
+	"ref_mass": 70.0,
+	"whiff_scale": 1.25,
+	"recover_at": 25,
+	"winded_move_scale": 1.5,
+	"winded_blow_scale": 0.5,
+	"winded_regen_delay": 20
+}

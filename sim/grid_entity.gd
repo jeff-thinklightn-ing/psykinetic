@@ -43,7 +43,7 @@ enum BodyMaterial { FLESH, WOOD, STONE, METAL }
 enum Order { NONE, ATTACK, SHOVE, SWING, SIGNATURE }
 
 ## The only state sent over the network, besides World's tick.
-const REPLICATED: Array[String] = ["tile", "hp", "facing", "stamina", "protected"]
+const REPLICATED: Array[String] = ["tile", "hp", "facing", "stamina", "protected", "winded"]
 ## Reconciliation: a misprediction this far off or less is blended away over
 ## RECONCILE_BLEND_TICKS and the walk goes on; anything further ends the
 ## walk and slides there from where it is drawn, RECOVER_TICKS_PER_TILE a
@@ -191,6 +191,12 @@ var stamina := 0
 ## ends after a while or as soon as the entity moves or attacks. Replicated
 ## so clients can draw it faded.
 var protected := false
+## Winded (decision 597; World._regen_stamina): out of stamina, until back
+## at World.recover_at. Slower steps, blows at half damage, no bash.
+var winded := false
+## Server: whether its swings cost stamina (decision 597, World.swing_cost):
+## players and companions; a monster by its kind's "swing_stamina".
+var pays_swings := true
 ## Server only: the tick the grace runs out.
 var protected_until_tick := 0
 ## Direction of the last step or attack.

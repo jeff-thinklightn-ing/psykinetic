@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Swinging tires you (597): every swing costs stamina, more for heavier weapons and for lighter builds, more still when it hits nothing; run out and you are winded until you have caught your breath: slower on your feet, blows at half damage and pushing weakly, no shield bash. Monsters don't tire yet.
 - Out of breath after too many swings, the top line says "winded" until you have some wind back; no bar, the body and the breath say the rest (597, ui's side; the stamina costs are combat's).
 - The HP number is gone from the top of the screen: how hurt you are reads from your body and the grey, as the no-bars rule says; F3 still has the number (401 amended).
 - The main menu no longer blocks the options screen: Options steps the menu aside, and Esc or O brings it back (418 amended).

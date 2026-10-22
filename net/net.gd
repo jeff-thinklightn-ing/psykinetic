@@ -270,6 +270,8 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## 31 (593): the "swing" command may carry "at" (a ground point) in place of
 ## "dir", and strikes whoever stands that way; new commands "signature"
 ## {at} and "apply_item" {slot, target}; "stance" may carry "at".
+## 31 (597): every entity replicates "winded"; a winded body's steps take
+## World.winded_move_scale times the ticks (levels/combat.json).
 const PROTOCOL_REVISION := 31
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]

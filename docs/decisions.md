@@ -21382,3 +21382,50 @@ controls_test: Shift on air, out of reach, beside a friend; Ctrl without a
 shield, with one, two cells off; a plain click with the shield up; B, Esc,
 a click on a monster, a click on yourself. items_test's bash goes through
 order_signature. ui_test's key table. No new class_name.
+
+## 597. Combat step 2: swings cost stamina, and being winded
+
+Jeff's combat design (588): "swings cost stamina; larger weapons drain
+faster" and "rapid repeated swings ... must deplete stamina" [decided]; the
+rest [proposed]. combat's design (C:/dev/review/combat/step2_stamina.md),
+approved by the coordinator 2026-10-22, its numbers drafts for Jeff (his
+folder has the table and the about 30% a fight). Until now a blow cost
+nothing (the audit: every bout ended at 100).
+
+- levels/combat.json, combat's rules file, read at start like physics'
+  (World.load_combat_rules; a key unknown or not a number at least 0 kept
+  and warned): swing_base 3, swing_per_kg 2, ref_mass 70, whiff_scale
+  1.25, recover_at 25, winded_move_scale 1.5, winded_blow_scale 0.5,
+  winded_regen_delay 20.
+- World.swing_cost(entity, whiff): ceil(swing_base + swing_per_kg x the
+  weight of what it strikes with (wielded; fists 0) x ref_mass / its own
+  mass (base_mass, without what it carries)), whiff_scale times it for a
+  swing that strikes nobody. An 80 kg player: fists 3, sword 6, giant axe
+  12; a 50 kg build 17 for the axe, a 90 kg one 11.
+- Paid (_pay_swing, never below 0) by a blow in _try_hit (after its push
+  is weighed, so a blow pushes by the stamina it had; push_force already
+  scales by it, 592), by a swing at the air (try_swing, a whiff, and an
+  exertion now), and by a wind-up as it begins (try_wind_up; its blow and
+  its swing at the air are not paid again; given up, not refunded). Once
+  per swing: the giant axe's arc is one swing. Shoves, guards and the bash
+  keep their own costs.
+- Who pays: GridEntity.pays_swings, true for players and companions; a
+  monster by its kind's row "swing_stamina", false for every kind until
+  enemy-ai's design (their AI must know to back off winded).
+- Winded (GridEntity.winded, replicated): set in _regen_stamina when one who
+  pays has 0 stamina, cleared once back at recover_at. Steps take
+  winded_move_scale times the ticks (step_ticks; client prediction agrees),
+  blows winded_blow_scale of their damage (at least 1), no bash
+  (bash_ready; the signature), regen waits winded_regen_delay ticks;
+  pushed as half its mass, as an exhausted body already was. Its look is
+  pc-character's (stance, breath, the slower walk), the HUD's word ui's.
+- The push fades by stamina in one place, physics' push_force
+  (stamina_fraction, as a shove's always has): at 25 of 100 a blow pushes
+  at a quarter, so winded_blow_scale takes nothing more off the force
+  (agreed with physics, 2026-10-22).
+- Wire: "winded" in GridEntity.REPLICATED, under PROTOCOL_REVISION 31.
+
+tests/combat_test (no port: World stepped by hand): the rules file, the
+cost table, paid on a blow, a whiff and a wind-up, whiffs till winded,
+half damage, 1.5 times the step, no bash, the 20-tick wait, back at 25, a
+monster's switch. No new class_name.

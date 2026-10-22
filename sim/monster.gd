@@ -459,6 +459,7 @@ func _ready() -> void:
 		picks_up = bool(row.get("picks_up", false))
 		fearless = bool(row.get("fearless", false))
 		keeps_room = bool(row.get("keeps_room", false))
+		pays_swings = bool(row.get("swing_stamina", false))  # Decision 597: off until enemy-ai's design.
 		call_reach = int(row.get("call", Senses.NOISE_CALL))
 		if keeps_room:
 			_room = room_of(home)
