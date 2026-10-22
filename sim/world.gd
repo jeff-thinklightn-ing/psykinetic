@@ -3132,13 +3132,16 @@ func try_buy(by: GridEntity, shop: GridEntity, uid: int) -> bool:
 ## saw (what they get, less what they pay): refused, "the prices have
 ## moved", when Economy.barter_quote's differs. Grave goods fenced. The
 ## gives go first, then each take into the first slot it fits once the
-## gives are out. "" when done, else why nothing moved.
-func try_barter(by: GridEntity, shop: GridEntity, give: Array, take: Array, balance: int) -> String:
+## gives are out. "" when done, else why nothing moved. With [param maker]
+## (a worker id; decision 562, [param shop] their body) the barter is with
+## that maker: their own make off their town's shelf, the gives bought from
+## their purse (Economy.maker_quote) into their store.
+func try_barter(by: GridEntity, shop: GridEntity, give: Array, take: Array, balance: int, maker := "") -> String:
 	if not Net.is_authority():
 		return "not here"
-	var place := shop_place(shop)
+	var place := shop_place(shop) if maker.is_empty() 			else str(production.worker(maker).get("town", "")) if production != null else ""
 	if not by is Player or (by as Player).player_id.is_empty() or place.is_empty() or economy == null 			or not reaches(by, shop):
-		return "no shop the town holds here"
+		return "no shop the town holds here" if maker.is_empty() else "nobody to trade with here"
 	if give.is_empty() and take.is_empty():
 		return "nothing to trade"
 	give = give.map(func(uid: Variant) -> int: return int(uid))
@@ -3153,7 +3156,7 @@ func try_barter(by: GridEntity, shop: GridEntity, give: Array, take: Array, bala
 			return "that is no longer in your pack"
 		from_slots.append(slot)
 		gives.append({"id": by.slots[slot], "fenced": items.is_grave(uid)})
-	var quote := economy.barter_quote(place, who, gives, take)
+	var quote := economy.barter_quote(place, who, gives, take) if maker.is_empty() else economy.maker_quote(maker, who, gives, take)
 	if not quote["ok"]:
 		return str(quote["why"])
 	if int(quote["balance"]) != balance:
@@ -3178,6 +3181,10 @@ func try_barter(by: GridEntity, shop: GridEntity, give: Array, take: Array, bala
 		after[slot] = id
 		to_slots.append(slot)
 	for i in from_slots.size():
+		if not maker.is_empty():
+			if economy.maker_sell(maker, who, str(gives[i]["id"]), int(quote["gives"][i])):
+				_sold(by, by, from_slots[i], int(give[i]), place, who, int(quote["gives"][i]), shop)
+			continue
 		var deal := economy.sell(who, place, str(gives[i]["id"]), bool(gives[i]["fenced"]), int(quote["gives"][i]))
 		if deal["ok"]:
 			_sold(by, by, from_slots[i], int(give[i]), place, who, int(deal["paid"]), shop)

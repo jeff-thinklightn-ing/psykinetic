@@ -4027,17 +4027,23 @@ func _send_shop(player: Player, shop: GridEntity, why := "") -> void:
 ## Server: sends [param player]'s client the barter at [param shop]
 ## (decision 560): "barter" {shop, town, gold, goods [{uid, id, price}],
 ## buys {id: {gold, up_to}}, fenced {uid: gold} (their grave goods, at
-## the fenced price), pack [{slot, uid, id}] (their own things), why};
-## a shop the town doesn't hold is sent with none.
-func _send_barter(player: Player, shop: GridEntity, why := "") -> void:
-	var place := World.shop_place(shop)
-	var data := {"shop": str(shop.get_path()), "town": place, "gold": World.gold_of(player.player_id),
-		"goods": [], "buys": {}, "fenced": {}, "pack": [], "why": why}
+## the fenced price), pack [{slot, uid, id}] (their own things), resident,
+## why}; a shop the town doesn't hold is sent with none. With [param maker]
+## (decision 562: a maker's barter, [param shop] their body) "shop" is ""
+## and "resident" their path: their own make, and what they buy from their
+## purse ("" otherwise).
+func _send_barter(player: Player, shop: GridEntity, why := "", maker := "") -> void:
+	var place := World.shop_place(shop) if maker.is_empty() else str(World.production.worker(maker).get("town", ""))
+	var data := {"shop": str(shop.get_path()) if maker.is_empty() else "", "resident": str(shop.get_path()) if not maker.is_empty() else "",
+		"town": place, "gold": World.gold_of(player.player_id), "goods": [], "buys": {}, "fenced": {}, "pack": [], "why": why}
 	var uids := World.slot_uids(player)
 	for slot in player.slots.size():
 		if not player.slots[slot].is_empty():
 			data["pack"].append({"slot": slot, "uid": uids[slot], "id": player.slots[slot]})
-	if not place.is_empty() and World.economy != null:
+	if not maker.is_empty() and World.economy != null:
+		data["goods"] = World.economy.maker_goods(maker)
+		data["buys"] = World.economy.maker_buys(maker, Array(player.slots))
+	elif not place.is_empty() and World.economy != null:
 		data["goods"] = World.economy.goods(place)
 		data["buys"] = World.economy.buys(place, Array(player.slots))
 		for each: Dictionary in data["pack"]:
@@ -6632,16 +6638,28 @@ func _on_command(entity: GridEntity, command_name: String, args: Dictionary) -> 
 		else:
 			_send_shop(entity as Player, shop)
 	elif command_name in ["barter", "trade"] and entity is Player:
-		# Barter at a shop's counter (decision 560): look, or trade all or nothing.
-		var shop := get_node_or_null(NodePath(str(args.get("shop", "")))) as GridEntity
-		if shop == null:
-			return
-		var why := "" if _barter_reach(entity, shop) else "too far from the counter"
+		# Barter at a shop's counter (decision 560), or with a maker (562: a
+		# "resident" in place of "shop"): look, or trade all or nothing.
+		var maker := ""
+		var shop: GridEntity = null
+		var why := ""
+		if args.has("resident"):
+			var body := get_node_or_null(NodePath(str(args.get("resident", "")))) as Resident
+			if body == null or World.production == null or World.production.worker(body.worker_id).is_empty():
+				return
+			maker = body.worker_id
+			shop = body
+			why = "" if World.reaches(entity, body) else "too far away"
+		else:
+			shop = get_node_or_null(NodePath(str(args.get("shop", "")))) as GridEntity
+			if shop == null:
+				return
+			why = "" if _barter_reach(entity, shop) else "too far from the counter"
 		if command_name == "trade" and why.is_empty():
 			var give: Variant = args.get("give", [])
 			var take: Variant = args.get("take", [])
-			why = World.try_barter(entity, shop, give if give is Array else [], take if take is Array else [], int(args.get("gold", 0)))
-		_send_barter(entity as Player, shop, why)
+			why = World.try_barter(entity, shop, give if give is Array else [], take if take is Array else [], int(args.get("gold", 0)), maker)
+		_send_barter(entity as Player, shop, why, maker)
 	elif command_name == "counter" and entity is Player:
 		# A temple's or a shop's counter's work (decision 438): look, order, collect.
 		var counter := get_node_or_null(NodePath(str(args.get("counter", "")))) as GridEntity

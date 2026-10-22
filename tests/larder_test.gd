@@ -500,11 +500,13 @@ func _test_delivery() -> void:
 	stock.deposit(TOWN, "gold", 100)
 	economy._pay_player("p1")
 	_check(economy.owed_to("p1", TOWN) == 0 and economy.gold("p1") == sale - now_paid and told == [["p1", sale - now_paid]], "the rest paid as gold comes in, and told")
-	# A bunch of herbs banked (items' herbs, 501 amended): a sale like any raw.
+	# A bunch of herbs banked (items' herbs, 501 amended): only the medicine
+	# man buys herbs (562, Jeff: "other npcs don't find herbs useful"), so the
+	# town banks them unpaid.
 	stock.deposit(TOWN, "gold", 100)
-	var herb_price := roundi(economy.raw_price(TOWN, "herbs") * float(_rules["store"]["buy"]))
-	_check(Items.yield_of("herbs") == {"herbs": 1} and herb_price >= 1 and economy.bank_sale(TOWN, "p1", Items.yield_of("herbs")) == herb_price,
-		"a bunch of herbs banked: %d gold" % herb_price)
+	var owed_before := economy.owed_to("p1", TOWN)
+	_check(Items.yield_of("herbs") == {"herbs": 1} and economy.bank_sale(TOWN, "p1", Items.yield_of("herbs")) == 0
+		and economy.owed_to("p1", TOWN) == owed_before, "a bunch of herbs banked at the town: nothing paid, nothing owed")
 	# Leather pays for its hides and the work (2 hides a piece): the tanner
 	# no longer makes it at a loss (by the value table, as stocks move both).
 	var value: Dictionary = _rules["value"]

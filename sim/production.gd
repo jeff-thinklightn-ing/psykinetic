@@ -1390,11 +1390,16 @@ func _bid(shop: Dictionary, wants: Array[String], signals: Dictionary, cat: Dict
 		return _order_bid(shop, first_build, starved)
 	var recipes: Array = cat.values().filter(func(entry: Dictionary) -> bool:
 		return _recipe_ok(entry) and entry["made"]["by"] == shop["trade"])
+	# The remedy first while anyone is sick (562: rules' first_when_sick).
+	var when_sick: Array = rules.get("first_when_sick", [])
+	var sick := recipes.any(func(entry: Dictionary) -> bool: return entry["id"] in when_sick) 			and _workers.keys().any(func(id: String) -> bool: return not id.begins_with(Townsfolk.COMPANION) and Townsfolk.is_sick(self, id))
+	var first := func(entry: Dictionary) -> bool:
+		return bool(entry["made"].get("first", false)) or sick and entry["id"] in when_sick
 	recipes.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
 		# A recipe marked "first" (the cook's roast, decision 405) is tried
 		# before the others: what the hunt brings home is cooked, not left.
-		if bool(a["made"].get("first", false)) != bool(b["made"].get("first", false)):
-			return bool(a["made"].get("first", false))
+		if first.call(a) != first.call(b):
+			return first.call(a)
 		if signals["busy"] == BUSY and int(a["made"]["steps"]) != int(b["made"]["steps"]):
 			return int(a["made"]["steps"]) < int(b["made"]["steps"])
 		return str(a["id"]) < str(b["id"]))
@@ -1455,11 +1460,14 @@ func _recipe_ok(entry: Dictionary) -> bool:
 
 
 ## Whether making [param entry] serves [param want] in [param town]: of
-## that tag ("goods": anything), and the shop not yet holding shop_cap of it.
+## that tag ("goods": anything), and the shop not yet holding shop_cap of it
+## (or its recipe's own "stock", 562: the medicine man's potions).
 func _serves(town: String, entry: Dictionary, want: String, cat: Dictionary) -> bool:
 	if want != "goods" and want not in _tags_of(entry["id"], cat):
 		return false
 	var in_shop := stockpile.shop(town).filter(func(uid: int) -> bool: return book().id_of(uid) == entry["id"]).size()
+	if entry["made"].has("stock"):
+		return in_shop < int(entry["made"]["stock"])
 	# A luxury (the smith's ring, decision 514) only up to luxury.stock: the
 	# rich are few.
 	if "luxury" in _tags_of(entry["id"], cat):

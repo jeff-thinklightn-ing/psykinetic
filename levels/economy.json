@@ -11,7 +11,7 @@
 		"stock": ["bandage", "food", "weapon", "shield"],
 		"surplus": ["goods", "rework"]
 	},
-	"always_want": ["resource", "repair", "luxury"],
+	"always_want": ["resource", "repair", "luxury", "medical"], "first_when_sick": ["remedy"], "maker_only": {"herbs": "the medicine man buys herbs"},
 	"hunter": {"trade": "hunter", "every": 3000},
 	"sites": {"trades": {"woodcutter": "woodlot", "hunter": "hunting_ground", "farmer": "farm"}, "steps_per_cell": 4, "other_area": 3000},
 	"woodcutter": {"trade": "woodcutter", "every": 3000, "wood": 2, "per_level": 1, "growth_days": 2,

@@ -19705,3 +19705,49 @@ Level data, protocol unchanged since 559's 29 ("waters"); a full cut.
 tests/relief_test: Curves.trace on a disc; the wilds' river (over 200
 cells down its middle), three ponds as closed curves, a ford and a bridge
 both walked to; the relief still cuts nothing off.
+## 562, economy's side: the medicine man barters (barter phase 2)
+
+Jeff: "hob can have a stamina potion that improves run speed and trades for
+herbs - other npcs don't find herbs useful". The coordinator approved it as
+one piece: items' side has the potion, the "speed" buff and the remedy's
+maker fix; npc's side is a check; this side is the medicine man's trade.
+It is the first case of 560's phase 2, a maker who sells their own make
+and buys their trade's materials from their own purse. The numbers are
+drafts for Jeff.
+- Production: Hob's hut is a holding of its own, in the defend tier, whose
+  wants never named a medical thing. So economy.json always_want gains
+  "medical", and the remedy and the potion are made whatever the tier.
+  _serves caps a recipe at its own "made" "stock" when it has one (the
+  potion 3, items' side), else shop_cap. _bid puts a recipe of rules'
+  first_when_sick (["remedy"]) first while any resident (not a companion)
+  is sick (Townsfolk.is_sick). npc's check: his own tick makes them with
+  nothing new on npc's side, and 501's visit stays his skill.
+- Economy.maker_materials(worker): the resources their trade's recipes use,
+  times each recipe's shelf (its stock, else shop_cap). For the medicine
+  man that is 3x3 + 6x2 = 21 herbs.
+- Economy.maker_buys(worker, ids): id -> {gold, up_to}, only for things
+  yielding those materials. Each yield is priced at its value times the
+  maker's own need: factor(_short(the store's count, the materials'
+  want)). up_to is that want less the store's count, and no more than
+  their purse pays for.
+- Economy.maker_goods(worker): their own make on their town's shelf, at
+  maker_price, which is the shop's price but never under value_of. His hut
+  wants no medical thing, so the shop's price would halve it; the potion
+  asks 4.
+- Economy.maker_quote: barter_quote for a maker (their own make only;
+  "<name> has no use for that", "has enough of that", "can't pay for it
+  now"). Economy.maker_sell takes the price from the maker's purse
+  ("makers have more expense") and gives it to the player; they earn it
+  back as the maker's share when their make sells.
+- Herbs elsewhere: economy.json "maker_only": {"herbs": "the medicine man
+  buys herbs"}. refuses() gives it as the reason (the barter hover "won't
+  buy"). bank_sale banks such a resource unpaid at a town's store. His own
+  gathering (502) still delivers to his store at the delivery price.
+- World.try_barter(..., maker): with a worker id, the place is their town;
+  the gives are sold to their purse (maker_sell) and banked in their
+  store (_sold), and the takes bought off their shelf at the quoted price.
+- Main: "barter" and "trade" take {resident: a Resident's path} in place
+  of {shop}, within World.reaches of them, else "too far away". The
+  "barter" message carries "resident" (and "shop" ""), its goods and buys
+  the maker's. PROTOCOL_REVISION 29, for this cut's meaning changes.
+economy_test _test_maker_barter. No new class_name.

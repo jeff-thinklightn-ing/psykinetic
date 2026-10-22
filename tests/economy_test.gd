@@ -46,6 +46,7 @@ func _ready() -> void:
 	_test_buying()
 	_test_selling()
 	_test_barter()
+	_test_maker_barter()
 	_test_restart()
 	await _test_in_town()
 	print("")
@@ -162,6 +163,65 @@ func _test_barter() -> void:
 	_check(economy.sell("p1", TOWN, "ore_sack", true)["paid"] == Economy.fenced(now_pays), "a grave goods sack at the counter: fenced, half of %d" % now_pays)
 	economy.stockpile.take(TOWN, "gold", economy.stockpile.count(TOWN, "gold") - 25, "test")
 	_check(economy.barter_quote(TOWN, "p1", [{"id": "ore_sack"}], [])["why"] == "the town can't pay for it now", "25 gold over a floor of 20: can't pay 9")
+
+
+## The medicine man's barter (decision 562; Jeff: "hob can have a stamina
+## potion ... and trades for herbs - other npcs don't find herbs useful").
+func _test_maker_barter() -> void:
+	print("
+== a maker barters: the medicine man's potions for herbs from his own purse (decision 562) ==")
+	var cat := CATALOG.duplicate(true)
+	cat["herbs"] = {"id": "herbs", "tags": ["resource"], "yield": {"herbs": 1}, "value": 1}
+	cat["a_potion"] = {"id": "a_potion", "tags": ["medical", "drink"], "made": {"by": "medicine_man", "from": {"herbs": 3}, "steps": 600, "stock": 3}}
+	cat["remedy"] = {"id": "remedy", "tags": ["medical"], "value": 4, "made": {"by": "medicine_man", "from": {"herbs": 2}, "steps": 600}}
+	var rules := RULES.duplicate(true)
+	rules["value"]["herbs"] = 1
+	rules["shop_cap"] = 6
+	rules["maker_only"] = {"herbs": "the medicine man buys herbs"}
+	rules["first_when_sick"] = ["remedy"]
+	_now = 0
+	var clock := func() -> int: return _now
+	var book := ItemBook.new(clock)
+	var stock := Stockpile.new({}, clock, book)
+	stock.deposit(TOWN, "gold", 100, "test")
+	var catalog := func() -> Dictionary: return cat
+	var work := Production.new({}, stock, null, clock, rules, catalog)
+	work.add_worker("bram", "Bram", ["smith"], TOWN, "rescued:bram")
+	work.add_worker("hob", "Hob", ["medicine_man"], TOWN, "rescued:hob")
+	work.pay("hob", 10, "a test purse")
+	var economy := Economy.new({}, stock, work, clock, rules, catalog)
+	_check(economy.maker_materials("hob") == {"herbs": 21}, "his shelf's worth of makes: 3 potions of 3 herbs, 6 remedies of 2: 21 herbs (%s)" % [economy.maker_materials("hob")])
+	var buys := economy.maker_buys("hob", ["herbs", "ore_sack", "herbs"])
+	_check(buys == {"herbs": {"gold": 2, "up_to": 5}}, "herbs at 2 (none in store: twice their value), as many as his 10 gold pays: 5; no ore (%s)" % [buys])
+	_check(economy.refuses(TOWN, "herbs") == "the medicine man buys herbs" and not economy.offers(TOWN, ["herbs"]).has("herbs")
+		and economy.bank_sale(TOWN, "p1", {"herbs": 3}) == 0, "the town won't buy herbs, nor pay for them banked")
+	var potion := book.mint("a_potion", "made", "Hob")
+	stock.stock_shop(TOWN, potion, "Hob", "hob")
+	var sword := _shop_sword(economy)
+	var goods := economy.maker_goods("hob")
+	_check(goods.size() == 1 and int(goods[0]["uid"]) == potion, "his goods: his own potion, not Bram's sword (%s)" % [goods])
+	_check(int(goods[0]["price"]) == 4, "at its worth, 4, though the town wants none (%s)" % [goods])
+	var quote := economy.maker_quote("hob", "p1", [{"id": "herbs"}, {"id": "herbs"}], [potion])
+	_check(quote["ok"] and quote["gives"] == [2, 2] and quote["takes"] == [4] and quote["balance"] == 0, "two herbs for a potion: even (%s)" % [quote])
+	_check(economy.maker_quote("hob", "p1", [], [sword])["why"] == "that is no longer for sale", "Bram's sword is not his to sell")
+	_check(economy.maker_quote("hob", "p1", [{"id": "ore_sack"}], [])["why"] == "Hob has no use for that", "ore: no use to him")
+	_check(economy.maker_sell("hob", "p1", "herbs", 2) and int(work.worker("hob")["purse"]) == 8 and economy.gold("p1") == 2,
+		"a herb bought from his purse: 8 left him, 2 to the player")
+	# The workshop: up to its stock of potions, the remedy first while anyone is sick.
+	work.add_workshop("hut", "medicine_man", TOWN)
+	work.assign("hut", "hob")
+	stock.deposit(TOWN, "herbs", 10, "test")
+	var shop := work.workshop("hut")
+	var wants: Array[String] = ["medical"]
+	var signals := work.signals_of(TOWN, cat)
+	_check(str(work._bid(shop, wants, signals, cat).get("recipe")) == "a_potion", "nobody sick: the potion first (by id)")
+	work.set_card("bram", {"look": "test"})
+	Townsfolk._set_sickness(work, "bram", {"kind": "a cough", "day": 0})
+	_check(str(work._bid(shop, wants, signals, cat).get("recipe")) == "remedy", "Bram sick: the remedy first")
+	for i in 2:
+		stock.stock_shop(TOWN, book.mint("a_potion", "made", "Hob"), "Hob", "hob")
+	_check(not work._serves(TOWN, cat["a_potion"], "medical", cat) and work._serves(TOWN, cat["remedy"], "medical", cat),
+		"three potions on the shelf: its stock, no more made; remedies still")
 
 
 func _test_restart() -> void:

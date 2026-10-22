@@ -313,6 +313,8 @@ func refuses(town: String, id: String, cat := {}) -> String:
 	var yields: Variant = cat[id].get("yield", {})
 	if yields is Dictionary and yields.has("gold"):
 		return "gold is given, not sold: put it in the depot"
+	if rules.get("maker_only", {}).has(id):
+		return str(rules["maker_only"][id])  # Only its maker buys it (562: the herbs).
 	if short_of(town, id, cat) <= 0.0:
 		return "the town has enough of that"
 	var pays: int = Economy.taxed(price(town, id, BUY, cat), "buy", rules)[1]
@@ -391,6 +393,134 @@ func up_to(town: String, id: String, cat := {}) -> int:
 ## treasury.
 static func fenced(paid: int) -> int:
 	return maxi(paid / 2, 1)
+
+
+# --- A maker barters (decision 562, barter's phase 2) ------------------------------
+
+## The trades of worker [param worker_id]'s recipes' materials: resource ->
+## how many their shelf's worth of makes uses (each recipe of their trade
+## its "stock", else shop_cap, times its from).
+func maker_materials(worker_id: String, cat := {}) -> Dictionary:
+	if cat.is_empty():
+		cat = catalog.call()
+	var trades: Array = production.worker(worker_id).get("trades", [])
+	var out := {}
+	for id: String in cat:
+		var made: Variant = cat[id].get("made", {})
+		if not made is Dictionary or str(made.get("by", "")) not in trades:
+			continue
+		var shelf := int(made.get("stock", rules.get("shop_cap", 6)))
+		var from: Dictionary = made.get("from", {})
+		for what: String in from:
+			if what in Stockpile.RESOURCES:
+				out[what] = int(out.get(what, 0)) + shelf * int(from[what])
+	return out
+
+
+## Worker [param worker_id]'s own make on their town's shelf, for the
+## barter window: [{uid, id, price}] by uid, at maker_price.
+func maker_goods(worker_id: String) -> Array[Dictionary]:
+	var town := str(production.worker(worker_id).get("town", ""))
+	var cat: Dictionary = catalog.call()
+	var out: Array[Dictionary] = []
+	for each in goods(town):
+		if stockpile.maker_of(town, int(each["uid"])) == worker_id:
+			each["price"] = maker_price(town, int(each["uid"]), cat)
+			out.append(each)
+	return out
+
+
+## What a maker asks for their own make [param uid] at [param town]: the
+## shop's price, never under its worth (value_of: the medicine man's potion
+## 4, though his hut wants none of it).
+func maker_price(town: String, uid: int, cat := {}) -> int:
+	if cat.is_empty():
+		cat = catalog.call()
+	return maxi(item_price(town, uid, cat), value_of(stockpile.book.id_of(uid), cat))
+
+
+## What maker [param worker_id] pays from their own purse for each of
+## [param ids] (a player's things): only those yielding their recipes'
+## materials, each yield at its value times the maker's own need (their
+## shelf's worth of makes, less their store's: factor), id -> {gold,
+## up_to}; up_to as many as that need takes and their purse pays for.
+func maker_buys(worker_id: String, ids: Array) -> Dictionary:
+	var cat: Dictionary = catalog.call()
+	var who := production.worker(worker_id)
+	var town := str(who.get("town", ""))
+	var wants := maker_materials(worker_id, cat)
+	var purse := int(who.get("purse", 0))
+	var out := {}
+	for raw: Variant in ids:
+		var id := str(raw)
+		var yields: Variant = cat.get(id, {}).get("yield", {})
+		if id.is_empty() or out.has(id) or not yields is Dictionary or yields.is_empty():
+			continue
+		var gold := 0.0
+		var most := 0
+		for what: String in yields:
+			if not wants.has(what):
+				gold = 0.0
+				break
+			var have := stockpile.count(town, what)
+			gold += float(rules.get("value", {}).get(what, 1)) * factor(_short(have, int(wants[what]))) * int(yields[what])
+			most = maxi(most, ceili(float(int(wants[what]) - have) / maxi(int(yields[what]), 1)))
+		var each := maxi(roundi(gold), 1)
+		if gold <= 0.0 or most <= 0 or purse < each:
+			continue
+		out[id] = {"gold": each, "up_to": mini(most, purse / each)}
+	return out
+
+
+## A barter with maker [param worker_id] priced (decision 562), as
+## barter_quote: [param gives] the player's things ([{id}]) bought from the
+## maker's purse, [param takes] uids of their own make off their town's
+## shelf at maker_price. {ok, gives, takes, balance, why}.
+func maker_quote(worker_id: String, player_id: String, gives: Array, takes: Array) -> Dictionary:
+	var cat: Dictionary = catalog.call()
+	var town := str(production.worker(worker_id).get("town", ""))
+	var out := {"ok": false, "gives": [], "takes": [], "balance": 0, "why": ""}
+	var offered := maker_buys(worker_id, gives.map(func(give: Dictionary) -> String: return str(give["id"])))
+	var counts := {}
+	var paid := 0
+	for give: Dictionary in gives:
+		var id := str(give["id"])
+		counts[id] = int(counts.get(id, 0)) + 1
+		if not offered.has(id) or int(counts[id]) > int(offered[id]["up_to"]):
+			out["why"] = "%s has no use for that" % production.worker(worker_id).get("name", "they") if not offered.has(id) 					else "%s has enough of that" % production.worker(worker_id).get("name", "they")
+			return out
+		out["gives"].append(int(offered[id]["gold"]))
+		paid += int(offered[id]["gold"])
+	if paid > int(production.worker(worker_id).get("purse", 0)):
+		out["why"] = "%s can't pay for it now" % production.worker(worker_id).get("name", "they")
+		return out
+	var cost := 0
+	var shelf := stockpile.shop(town)
+	for uid: int in takes:
+		if uid not in shelf or takes.count(uid) > 1 or stockpile.maker_of(town, uid) != worker_id:
+			out["why"] = "that is no longer for sale"
+			return out
+		var each := maker_price(town, uid, cat)
+		out["takes"].append(each)
+		cost += each
+	if gold(player_id) + paid < cost:
+		out["why"] = "not enough gold (%d)" % (cost - paid)
+		return out
+	out["balance"] = paid - cost
+	out["ok"] = true
+	return out
+
+
+## Maker [param worker_id] buys a [param id] from [param player_id] for
+## [param at] gold (priced by maker_quote) from their own purse: the
+## maker's expense ("makers have more expense"), earned back as the maker's
+## share of what they make of it. The thing is the caller's to bank in the
+## maker's store. False, nothing paid, if they can't.
+func maker_sell(worker_id: String, player_id: String, id: String, at: int) -> bool:
+	if not production.spend(worker_id, at, "bought %s from a player" % id):
+		return false
+	add_gold(player_id, at, "sold %s to %s" % [id, production.worker(worker_id).get("name", "")])
+	return true
 
 
 ## A barter at [param town]'s shop priced (decision 560): [param gives]
@@ -1135,7 +1265,8 @@ func _hauler_for(town: String, gatherer: String, trade: String) -> String:
 ## gold_floor (call it before the goods are banked: the price reads the
 ## store as it was), the rest owed them and paid as gold comes in (owed_paid).
 ## Past store.owed_cap owed in that town, the goods are the town's as a
-## gift, said in the ledger. The gold paid now (the caller's to give).
+## gift, said in the ledger. A resource only its maker buys (maker_only:
+## the herbs, 562) is banked unpaid. The gold paid now (the caller's to give).
 func bank_sale(town: String, player_id: String, yields: Dictionary) -> int:
 	var store: Dictionary = rules.get("store", {})
 	var owed := int(_player_owed.get(player_id, {}).get(town, 0))
@@ -1144,6 +1275,8 @@ func bank_sale(town: String, player_id: String, yields: Dictionary) -> int:
 		return 0
 	var price := 0
 	for what: String in yields:
+		if rules.get("maker_only", {}).has(what):
+			continue  # The town has no use for it: only its maker buys it (562).
 		var unit := raw_price(town, what) * float(store.get("buy", 1.0))
 		price += roundi(unit * int(yields[what]))
 		if not _paid.has(town):

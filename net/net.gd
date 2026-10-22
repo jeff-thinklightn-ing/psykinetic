@@ -248,6 +248,9 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## .cairn, .standing_stone, .waystone), solid with no door, and a building's
 ## "variant" and "yaw", in the "terrain" message's files and the levels
 ## served.
+## 29 (562, economy's side): the "barter" message and the "barter"/"trade"
+## commands carry "resident", a maker's path, in place of "shop" for a
+## barter with that maker.
 const PROTOCOL_REVISION := 29
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]
