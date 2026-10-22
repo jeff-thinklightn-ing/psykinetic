@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Arrows fly from the bow as real arrows: a shot that runs out of range drops past its mark and sticks in the ground, an arrow sticks in a closed door, glances off stone to lie at the wall's foot, and arrows left lying go after 10 seconds.
 ## v0.1.169
 
 - What goes over the network changes, so v0.1.168 and older can't join the server: update through the launcher first.

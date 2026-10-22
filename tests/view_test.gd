@@ -412,6 +412,13 @@ func _test_hp_bars() -> void:
 	_rig._process(0.0)
 
 
+## The arrows shot that are still about (_on_shot's ShotArrow*).
+func _shot_arrows() -> Array:
+	var parent := (_rig._puppets.values()[0] as Node3D).get_parent()
+	return parent.get_children().filter(func(node: Node) -> bool:
+		return String(node.name).begins_with("ShotArrow") and not node.is_queued_for_deletion())
+
+
 func _test_bow_sounds() -> void:
 	print("
 == the bow: a creak as it's drawn, a twang as it's loosed, the arrow heard where it ends as it gets there ==")
@@ -497,11 +504,53 @@ func _test_bow_sounds() -> void:
 	_rig.sfx.listener = archer
 	var miss := _rig.sfx.played.size()
 	var unheard := _rig.sfx.unheard.size()
-	var expected := Client3D._arrow_landed(player.tile, open)
+	var expected := Client3D._shot_sound(&"ground", open)  # As the sim says what stopped it (583).
+	var arrows_before := _shot_arrows()
 	player._world_shot(Vector2(open), &"ground")
 	await get_tree().create_timer(0.5).timeout
 	_check((_rig.sfx.played.slice(miss).map(func(entry: Array) -> String: return entry[0]) + _rig.sfx.unheard.slice(unheard)).has(expected),
 			"loosed at nobody: as it gets there, what stopped it (%s)" % expected)
+	# Its flight (Jeff: "after the full range it sags down and lands in ground, not hitting ground
+	# at its target like it does now"): past the cell it was shot at, in the ground, nose down.
+	# From where the player stands: a cell its shot falls short at, and one it meets stone at.
+	var spent := Vector2i(-1, -1)
+	var stone := Vector2i(-1, -1)
+	for target: Vector2i in _main._terrain["floor"]:
+		var d: Vector2i = target - player.tile
+		if maxi(absi(d.x), absi(d.y)) < 3 or maxi(absi(d.x), absi(d.y)) > 8 or World.get_entity_at(target) != null:
+			continue
+		var heard := Client3D._arrow_landed(player.tile, target)
+		if spent.x < 0 and heard == "sfx.arrow_land":
+			spent = target
+		if stone.x < 0 and heard == "sfx.arrow_hit_stone":
+			stone = target
+	open = spent
+	wall = stone
+	expected = "sfx.arrow_land"
+	arrows_before = _shot_arrows()
+	player._world_shot(Vector2(open), &"ground")
+	await get_tree().create_timer(0.6).timeout
+	var landed := _shot_arrows().filter(func(arrow: Node3D) -> bool: return not arrow in arrows_before)
+	if open.x >= 0 and landed.size() == 1:
+		var arrow: Node3D = landed[0]
+		var aimed := _rig._tile_position(open)
+		var from := (_rig._puppets[player.get_instance_id()] as Node3D).position
+		var along := Vector3(aimed.x - from.x, 0.0, aimed.z - from.z).normalized()
+		var past := (arrow.position - aimed).dot(along)
+		var ground := _rig._ground_height(Vector2(arrow.position.x, arrow.position.z))
+		_check(past > 1.0 and absf(arrow.position.y - ground) < 0.3 and arrow.transform.basis.y.normalized().y < -0.3,
+				"a spent arrow falls past where it was aimed (%.2f m on) and stands in the ground nose down (%.2f m off it, heading %s)" % [past, arrow.position.y - ground, arrow.transform.basis.y.normalized()])
+	else:
+		_check(false, "a spent arrow landed (%s, %d new)" % [expected, landed.size()])
+	if wall.x >= 0:
+		arrows_before = _shot_arrows()
+		player._world_shot(Vector2(wall) + Vector2(wall - player.tile).normalized() * 0.5, &"stone")
+		await get_tree().create_timer(1.0).timeout
+		var glanced := _shot_arrows().filter(func(arrow: Node3D) -> bool: return not arrow in arrows_before)
+		var at_wall := _rig._tile_position(wall)
+		_check(glanced.size() == 1 and absf((glanced[0] as Node3D).position.y - _rig._ground_height(Vector2((glanced[0] as Node3D).position.x, (glanced[0] as Node3D).position.z))) < 0.1
+				and Vector2((glanced[0] as Node3D).position.x - at_wall.x, (glanced[0] as Node3D).position.z - at_wall.z).length() < 1.2,
+				"an arrow off a stone wall lies on the ground at its foot (%s, the wall cell at %s)" % [glanced.map(func(arrow: Node3D) -> Vector3: return arrow.position), at_wall])
 	var friend := _companion()
 	if friend != null and World.spares(player, friend):
 		var heard := _rig.sfx.played.size()

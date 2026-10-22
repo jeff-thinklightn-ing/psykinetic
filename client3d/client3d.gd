@@ -1100,7 +1100,20 @@ const DOWN_TILT_SPEED := 9.0
 const SHOT_SPEED := 40.0
 ## A shot that strikes nobody stands in the ground this long, and one that
 ## meets a friend sticks in them as long (decision 456).
-const SHOT_STUCK_SECONDS := 4.0
+const SHOT_STUCK_SECONDS := 10.0
+## An arrow's flight (_on_shot): into a body this high on it (times its
+## model's scale); its head this far into what it sticks in; past a spent range
+## on this far, falling to the ground, ARROW_SAG_SLOW times slower than its
+## flight; off stone back ARROW_GLANCE, up ARROW_GLANCE_UP, turned
+## ARROW_GLANCE_TURN, over ARROW_GLANCE_SECONDS.
+const ARROW_CHEST := 1.1
+const ARROW_BURY := 0.12
+const ARROW_SAG := 1.8
+const ARROW_SAG_SLOW := 1.6
+const ARROW_GLANCE := 0.5
+const ARROW_GLANCE_UP := 0.3
+const ARROW_GLANCE_TURN := 2.2
+const ARROW_GLANCE_SECONDS := 0.35
 ## The bow's held creak (decision 475): its pitch, and its level over the
 ## slot's in dB, from no draw (x) to full (y).
 const CREAK_PITCH := Vector2(0.85, 1.25)
@@ -10479,6 +10492,21 @@ func _arrow_to(cell: Vector2i) -> Dictionary:
 	return {}
 
 
+## What an arrow's end sounds like by what stopped it (the sim's struck,
+## decision 583): wood, stone, or, its range spent, the ground or water at
+## [param cell]; a body's hit is _on_struck's.
+static func _shot_sound(struck: StringName, cell: Vector2i, from := Vector2i(2147483647, 0), trees: Dictionary = {}) -> String:
+	match struck:
+		&"wood":
+			return "sfx.arrow_hit_wood"
+		&"stone":
+			# A forest's edge is stone to the sim but a tree to the ear (609): _arrow_landed's look past it.
+			if from.x != 2147483647 and _arrow_landed(from, cell, trees) == "sfx.arrow_hit_wood":
+				return "sfx.arrow_hit_wood"
+			return "sfx.arrow_hit_stone"
+	return "sfx.arrow_water" if World.is_water(cell) else "sfx.arrow_land"
+
+
 ## What an arrow from [param from] that stopped at [param end] without
 ## striking anyone sounds like, by what lies past it along the shot
 ## (World.shot_line's stops): a closed door's or a tree's wood (a cell of
@@ -12170,12 +12198,13 @@ func _on_guarded(broken: bool, id: int) -> void:
 		_play_once(puppet, _pick_clip(puppet, HIT_CLIPS))
 
 
-## A shot (World.shoot) flew to [param to]: the bow's twang, and an arrow
-## streaks from the shooter's chest to that cell. As it arrives, a body
-## there is heard struck (_on_struck) or guarding (_on_guarded); else what
-## stopped it (_arrow_landed).
-func _on_shot(point: Vector2, _struck: StringName, id: int) -> void:
-	var to := Vector2i(point.round())  # The cell it stopped in (decision 583; the point and what stopped it are pc-character's to draw).
+## A shot (World.shoot) stopped at [param point] (cells), [param struck]
+## stopping it (decision 583): the bow's twang, and the arrow flies from the
+## bow to there (its landing below). As it arrives, a body there is heard
+## struck (_on_struck) or guarding (_on_guarded); else what stopped it
+## (_shot_sound).
+func _on_shot(point: Vector2, struck: StringName, id: int) -> void:
+	var to := Vector2i(point.round())  # The cell it stopped in.
 	var puppet: Node3D = _puppets.get(id)
 	if puppet == null or puppet.get_parent() == null:
 		return
@@ -12187,60 +12216,85 @@ func _on_shot(point: Vector2, _struck: StringName, id: int) -> void:
 		rig.upper(clip, 1.0, true)
 		puppet.set_meta("bow_state", "loose")
 		puppet.set_meta("bow_until", Time.get_ticks_msec() + int(rig.length(clip) * 1000.0))
-	var from := puppet.position + Vector3.UP * 1.1
-	var end := _tile_position(to)
-	end.y = _ground_height(Vector2(end.x, end.z)) + 1.0
+	var shooter := instance_from_id(id) as GridEntity
+	var from := _bow_tip(puppet)
+	var hit := World.get_entity_at(to) if struck == &"body" else null
+	var body: Node3D = _puppets.get(hit.get_instance_id()) if hit != null and hit != shooter else null
+	var landed := _shot_sound(struck, to, shooter.tile if shooter != null else to, _trees)
+	# Where it stops (decision 583, the sim's point): abreast of the body struck, chest high; at the
+	# face of the wall or closed door it met; else its range's end. Flown level at the bow's height.
+	var stop := Vector3(point.x, from.y, point.y)
+	var along := Vector3(stop.x - from.x, 0.0, stop.z - from.z).normalized()
+	if along.is_zero_approx():
+		along = Vector3.FORWARD
+	if body != null:
+		stop.y = body.position.y + ARROW_CHEST * float(body.get_meta("model_scale", 1.0))
 	_stop_creak(puppet)
 	sfx.play("sfx.bow_loose", from)
-	var shooter := instance_from_id(id) as GridEntity
-	var flight := 0.0 if from.distance_to(end) < 0.1 else maxf(0.06, from.distance_to(end) / SHOT_SPEED)
-	var flying := {"end": to, "arrive": Time.get_ticks_msec() + roundi(flight * 1000.0), "heard": false}
+	var flight := 0.0 if from.distance_to(stop) < 0.1 else maxf(0.06, from.distance_to(stop) / SHOT_SPEED)
+	# Nothing struck short of a wall: on past the end into a short fall (Jeff: "after the full range
+	# it sags down and lands in ground, not hitting ground at its target like it does now").
+	var sags := body == null and landed in ["sfx.arrow_land", "sfx.arrow_water"]
+	var down := stop + along * ARROW_SAG
+	down.y = _ground_height(Vector2(down.x, down.z))
+	var falling := ARROW_SAG / SHOT_SPEED * ARROW_SAG_SLOW if sags else 0.0
+	var end := down if sags else stop
+	var flying := {"end": to, "arrive": Time.get_ticks_msec() + roundi((flight + falling) * 1000.0), "heard": false}
 	_arrows.append(flying)
 	# The hit, sent with the shot, comes first; whatever is left by the
 	# arrow's arrival is a friend spared or a miss.
-	var origin := shooter.tile if shooter != null else to
-	get_tree().create_timer(maxf(flight, 0.05)).timeout.connect(func() -> void:
+	get_tree().create_timer(maxf(flight + falling, 0.05)).timeout.connect(func() -> void:
 		_arrows.erase(flying)
 		if not flying["heard"] and is_instance_valid(sfx) and sfx.is_inside_tree():
 			var met := World.get_entity_at(to)
 			# A friend on the line (decision 456): it sticks in them, softly.
 			var by := instance_from_id(id) as GridEntity  # By id: the shooter may be gone by now.
 			var spared := met != null and by != null and World.spares(by, met)
-			sfx.play("sfx.arrow_spared" if spared else _arrow_landed(origin, to, _trees), end))
+			sfx.play("sfx.arrow_spared" if spared else landed, end))
 	if flight <= 0.0:
 		return
-	_whistle(from, end, flight)
-	var arrow := MeshInstance3D.new()
-	var mesh := BoxMesh.new()
-	mesh.size = Vector3(0.03, 0.03, 0.7)
-	arrow.mesh = mesh
-	var paint := StandardMaterial3D.new()
-	paint.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	paint.albedo_color = Color(0.85, 0.8, 0.65)
-	arrow.material_override = paint
-	puppet.get_parent().add_child(arrow)
-	arrow.position = from
-	arrow.look_at_from_position(from, end, Vector3.UP)
+	_whistle(from, end, flight + falling)
+	var arrow := _flying_arrow(shooter)
+	arrow.name = "ShotArrow"
+	puppet.get_parent().add_child(arrow, true)
+	_head_arrow(arrow, from, stop - from)
 	var tween := create_tween()
-	tween.tween_property(arrow, "position", end, flight)
-	var struck := World.get_entity_at(to)
-	var body: Node3D = _puppets.get(struck.get_instance_id()) if struck != null else null
-	if body != null and shooter != null and World.spares(shooter, struck):
+	tween.tween_method(func(t: float) -> void: _head_arrow(arrow, from.lerp(stop, t), stop - from), 0.0, 1.0, flight)
+	if body != null and shooter != null and World.spares(shooter, hit):
 		# A friend on the line (decision 456): it sticks in them a while,
 		# moving with them.
 		tween.tween_callback(func() -> void:
 			if is_instance_valid(body) and is_instance_valid(arrow):
 				arrow.reparent(body))
 		tween.tween_interval(SHOT_STUCK_SECONDS)
-	elif struck == null:
-		# A miss: it stands in the ground where it came down a while.
-		var stuck := _tile_position(to)
-		stuck.y = _ground_height(Vector2(stuck.x, stuck.z)) + 0.2
-		var along := Vector3(end.x - from.x, 0.0, end.z - from.z).normalized()
-		if along.is_zero_approx():
-			along = Vector3.FORWARD
-		tween.tween_callback(func() -> void: arrow.look_at_from_position(stuck, stuck + along + Vector3.DOWN, Vector3.UP))
+	elif body != null:
+		pass  # Into the body struck: gone with the hit.
+	elif landed == "sfx.arrow_hit_wood":
+		# Into the wood at its angle, its head in a little.
+		tween.tween_callback(func() -> void: _head_arrow(arrow, stop + along * ARROW_BURY, stop - from))
 		tween.tween_interval(SHOT_STUCK_SECONDS)
+	elif landed == "sfx.arrow_hit_stone":
+		# Off the stone: back a little, turning over, and down to lie on the ground below it.
+		var rest := stop - along * ARROW_GLANCE
+		rest.y = _ground_height(Vector2(rest.x, rest.z)) + 0.02
+		var lying := along.rotated(Vector3.UP, ARROW_GLANCE_TURN)
+		tween.tween_method(func(t: float) -> void:
+			_head_arrow(arrow, stop.lerp(rest, t) + Vector3.UP * sin(PI * t) * ARROW_GLANCE_UP,
+				(-along).slerp(lying, t) + Vector3.UP * (1.0 - 2.0 * t) * 0.5), 0.0, 1.0, ARROW_GLANCE_SECONDS)
+		tween.tween_callback(func() -> void: _head_arrow(arrow, rest, lying))
+		tween.tween_interval(SHOT_STUCK_SECONDS)
+	else:
+		# Its range spent: on and down in a short fall, nose first, to stand in the ground at its
+		# angle; into water it's gone.
+		var drop := stop.y - down.y
+		tween.tween_method(func(t: float) -> void:
+			_head_arrow(arrow, stop + along * ARROW_SAG * t + Vector3.DOWN * drop * t * t,
+				along * ARROW_SAG + Vector3.DOWN * 2.0 * drop * t), 0.0, 1.0, falling)
+		if landed == "sfx.arrow_land":
+			tween.tween_callback(func() -> void:
+				_head_arrow(arrow, down + (along * ARROW_SAG + Vector3.DOWN * 2.0 * drop).normalized() * ARROW_BURY,
+					along * ARROW_SAG + Vector3.DOWN * 2.0 * drop))
+			tween.tween_interval(SHOT_STUCK_SECONDS)
 	tween.tween_callback(func() -> void:
 		if is_instance_valid(arrow):
 			arrow.queue_free())
@@ -12261,6 +12315,47 @@ func _whistle(from: Vector3, end: Vector3, flight: float) -> void:
 	get_tree().create_timer(maxf(along * flight, 0.01)).timeout.connect(func() -> void:
 		if is_instance_valid(sfx) and sfx.is_inside_tree():
 			sfx.play("sfx.arrow_flight", by))
+
+
+## Where a shot leaves [param puppet]'s bow: the arrow on its string if it is
+## still drawn, else the bow in its hand, else chest high; in the puppets'
+## parent's frame.
+func _bow_tip(puppet: Node3D) -> Vector3:
+	var sockets: Dictionary = puppet.get_meta("sockets", {})
+	var bow := (sockets["hand_l"] as Node3D).get_node_or_null("Held") as Node3D if sockets.has("hand_l") else null
+	var nocked := bow.find_child("Nocked", true, false) as Node3D if bow != null else null
+	var at := nocked if nocked != null else bow
+	if at == null or not at.is_inside_tree() or puppet.get_parent() == null:
+		return puppet.position + Vector3.UP * 1.1
+	return (puppet.get_parent() as Node3D).to_local(at.global_position)
+
+
+## The arrow in flight: art-kit's fx.arrow, its shooter's arrows' variant;
+## a pale stick where this build lacks it.
+static func _flying_arrow(shooter: GridEntity) -> Node3D:
+	if ArtKit.has("fx.arrow"):
+		var ids := held_ids(shooter) if shooter != null else ["", ""]
+		return ArtKit.instance("fx.arrow", int(ARROW_VARIANTS.get(str(ids[0]), 1)))
+	var stick := MeshInstance3D.new()
+	var mesh := BoxMesh.new()
+	mesh.size = Vector3(0.03, 0.7, 0.03)
+	stick.mesh = mesh
+	var paint := StandardMaterial3D.new()
+	paint.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	paint.albedo_color = Color(0.85, 0.8, 0.65)
+	stick.material_override = paint
+	return stick
+
+
+## [param arrow] at [param at], its head (its +y, as art-kit draws it) along
+## [param heading].
+static func _head_arrow(arrow: Node3D, at: Vector3, heading: Vector3) -> void:
+	if not is_instance_valid(arrow):
+		return
+	var y := heading.normalized() if not heading.is_zero_approx() else Vector3.FORWARD
+	var x := y.cross(Vector3.UP) if absf(y.dot(Vector3.UP)) < 0.99 else Vector3.RIGHT
+	x = x.normalized()
+	arrow.transform = Transform3D(Basis(x, y, x.cross(y)), at)
 
 
 ## A blow wound up over [param ticks]: the heavy swing, timed to connect

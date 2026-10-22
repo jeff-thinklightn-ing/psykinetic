@@ -24218,3 +24218,26 @@ view_test _test_low_camera (the room stays ortho; the castle goes
 perspective at the numbers; haze, shadows, reach, the far click, the wheel,
 the pan, the tilt floor; off restores exactly); ui_test _test_access (the
 row, the signal once, camera=low|high in settings.cfg).
+## 583, pc-character's side. The arrow on the string, its flight and its landing
+
+The design is pc-character's, approved by the coordinator with Jeff's answers (2026-10-22); it is
+written out with each owner's part in docs/archery.md.
+
+- **The nocked arrow** (a fix in 462, landed before this): it shows on the string from the first
+  frame of the draw. It had been hidden with the bow's old string box.
+- **The flight** (`Client3D._on_shot` on `shot(point, struck)`): art-kit's fx.arrow leaves the
+  bow (`_bow_tip`) and flies level at the bow's height to the sim's point. Then:
+  - a body: it stops abreast of it chest high and is gone with the hit; a spared friend keeps it a
+    while (456);
+  - wood (a closed door): it sticks at its angle, its head in (`ARROW_BURY`);
+  - stone: it glances back and down to lie at the wall's foot (`ARROW_GLANCE*`);
+  - ground (range spent): it carries on `ARROW_SAG` (1.8 m) in a short fall and stands in the ground
+    nose down (Jeff: "after the full range it sags down and lands in ground, not hitting ground at
+    its target like it does now"); into water it's gone.
+- What it sounds like on arrival follows the sim's struck (`_shot_sound`).
+- Arrows left lying go after `SHOT_STUCK_SECONDS`, now 10 (Jeff: "decay over 10 seconds like they
+  do now"); they're not picked up.
+- Still to come on this side: the archer turning continuously to ui's `Main.aim_angle` while drawn.
+
+Tests: view_test checks the nocked arrow is visible, a spent arrow falls past its aim and stands
+nose down, and an arrow off stone lies at the wall's foot. Client only, no new class_name.
