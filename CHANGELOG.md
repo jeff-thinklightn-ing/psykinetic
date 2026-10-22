@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The castle's ponds are round-shored curves now, not squares of water, as every river, stream and pond in the world is (568 amended).
 ## v0.1.166
 
 - A client-only fix for v0.1.165's play test: the server is unchanged, so v0.1.165 still joins, but update through the launcher to get the fixes. The draugr tiring after his spin comes with the next server update.

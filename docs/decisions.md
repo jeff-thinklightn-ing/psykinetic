@@ -22187,3 +22187,31 @@ DRAW_HOLD_MSEC (250, a draft) with the button held, then raises the bow
 drawn, everything is as before: let go before draw_min is the tap, after it the
 shot. The left button stays the draw (the coordinator): the backstep is combat's,
 later. Client only, protocol unchanged, no new class_name.
+## 568 amended: the last cell-painted water as curves
+
+Jeff's rule: rivers, streams and shorelines are smooth curves, never cell
+regions with rounded edges. Terrain (595) now draws water that no "waters"
+curve lays as built: square and still. Natural water is a curve, so
+whatever no curve lays is built. The castle's three ponds were still
+cell-painted on grass, and would have drawn square.
+- tools/trace_waters.tscn (once; a level with "waters" is left): every body
+  of water of two cells or more in the castle is traced into a closed curve
+  (Curves.trace), as make_wilds_marks traced the wilds' ponds: the ponds at
+  (19, 1), (2, 6) and (23, 10). Each body's cells become the curve's
+  (Curves.laid on the level's floor and water as Level reads them, so the
+  cells written are the ones Level lays on load); the old water outside the
+  curve becomes grass. A lone water cell is a well's, and is left.
+- level_test: in every level under levels/, each body of water no curve
+  lays lies under a building or has no natural ground (grass, dirt) beside
+  it. Today that means the wilds' two wells: the town's under its building,
+  the farmstead's in paving. A cell-painted pond fails the suite. The
+  sample is left out (CELL_WATER_FIXTURES): its pool and straight stream
+  are the fixture view_test draws cell water from (553, 557). Making it
+  curves would take terrain's tests of cell water with it; that's terrain's
+  call.
+- view_test: the water test draws the sample's pool, not the castle's
+  ponds (its stream's cells left to their ribbon); the outdoor test reads a
+  curve's surface where the castle has no cell water body.
+Level data only, protocol unchanged; the server takes it at the next cut.
+The castle's ponds change shape slightly (a pond's cells within a cell of
+what they were); nothing saved is keyed to their cells.

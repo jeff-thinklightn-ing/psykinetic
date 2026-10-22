@@ -6,6 +6,11 @@ extends Node
 ## and quits with exit code 1 if any assertion failed, 0 otherwise.
 
 const LEGACY := preload("res://tests/legacy_test_room.gd")
+## The floor kinds a pond would lie in (Level.GROUNDS but stone, the paving).
+const NATURAL_GROUND: Array[String] = ["grass", "dirt"]
+## Levels whose cell water is a test's fixture: the sample's pool and stream
+## are what view_test draws cell water from (terrain's side, 553/557).
+const CELL_WATER_FIXTURES: Array[String] = ["sample"]
 
 var _failures := 0
 var _main: Node
@@ -175,6 +180,7 @@ func _test_every_level() -> void:
 		_check(images_ok and not level.is_empty() and level["warnings"].is_empty(),
 				"%s: %d cells, %d entities (%s)" % [folder, level["terrain"]["floor"].size() if not level.is_empty() else 0,
 					level["entities"].size() if not level.is_empty() else 0, level.get("warnings", "no level")])
+	_test_built_water()
 	print("
 == the levels connect: WorldMap.problems() (links and spawn points, ways back, reachable) ==")
 	var problems := WorldMap.build().problems()
@@ -191,6 +197,65 @@ func _test_every_level() -> void:
 		var warnings: Array = Level.parse(prefab["map"].to_image(), null, prefab["config"])["warnings"].filter(
 				func(warning: String) -> bool: return not warning.begins_with("no player start"))
 		_check(image_ok and warnings.is_empty(), "%s: %s cells (%s)" % [prefab_name, prefab["map"].size, warnings])
+
+
+## Natural water is a curve (Jeff's rule); water no "waters" curve lays is
+## built, and terrain draws it square and still (568 amended). So every
+## curveless body of water in a level lies under a building or in paving (a
+## well, a basin): none of it beside natural ground, where a pond would be.
+## The cell-water fixtures (CELL_WATER_FIXTURES) are left out.
+func _test_built_water() -> void:
+	print("\n== water no curve lays is built: under a building, or no natural ground beside it ==")
+	for folder in DirAccess.get_directories_at(Level.DIR):
+		if Level.DIR + folder + "/" == Prefab.DIR or not FileAccess.file_exists(Level.DIR + folder + "/layout.png") or folder in CELL_WATER_FIXTURES:
+			continue
+		var level := Level.load_level(folder)
+		if level.is_empty():
+			continue
+		var terrain: Dictionary = level["terrain"]
+		var wet := {}
+		for key in ["water", "fords", "bridged"]:
+			for cell: Vector2i in terrain.get(key, []):
+				wet[cell] = true
+		var curved := {}
+		for water: Dictionary in terrain.get("waters", []):
+			curved.merge(Curves.cells(water["curve"], water["closed"]))
+		var housed := {}
+		for building: Dictionary in level["buildings"]:
+			for cell in Level.building_cells(building):
+				housed[cell] = true
+		var seen := {}
+		var bodies := 0
+		var loose: Array[Vector2i] = []
+		for start: Vector2i in wet:
+			if seen.has(start):
+				continue
+			var body: Array[Vector2i] = [start]
+			seen[start] = true
+			var natural := false
+			var index := 0
+			while index < body.size():
+				var cell := body[index]
+				index += 1
+				natural = natural or curved.has(cell)
+				for step: Vector2i in [Vector2i.RIGHT, Vector2i.LEFT, Vector2i.DOWN, Vector2i.UP]:
+					var next := cell + step
+					if wet.has(next) and not seen.has(next):
+						seen[next] = true
+						body.append(next)
+			if natural:
+				continue
+			bodies += 1
+			for cell in body:
+				if housed.has(cell):
+					continue
+				for step: Vector2i in [Vector2i.RIGHT, Vector2i.LEFT, Vector2i.DOWN, Vector2i.UP]:
+					var next := cell + step
+					if not wet.has(next) and str(terrain["kinds"].get(next, "")) in NATURAL_GROUND:
+						loose.append(cell)
+						break
+		_check(loose.is_empty(), "%s: %d curveless water bodies, each under a building or with no natural ground beside it (beside it at %s)" % [
+				folder, bodies, loose.slice(0, 4)])
 
 
 func _test_round_trip() -> void:

@@ -1687,14 +1687,18 @@ func _test_town_walls() -> void:
 
 func _test_water() -> void:
 	print("\n== water: a surface a body over a bed the ground sinks into, drawn under the marks ==")
-	var castle := Level.load_level("castle")
+	# The sample's pool and stream, cell water (the castle's ponds are curves
+	# since 568 amended: CELL_WATER_FIXTURES in level_test).
+	var castle := Level.load_level("sample")
 	var terrain: Dictionary = castle["terrain"]
 	_rig.rebuild(terrain, castle["centre"])
 	var water: Array = terrain["water"]
-	# Bodies by hand: cells joined side to side.
+	# Bodies by hand: cells joined side to side, a stream's cells left to its
+	# ribbon (557).
 	var left: Dictionary = {}
 	for cell: Vector2i in water:
-		left[cell] = true
+		if not _rig._stream_cells.has(cell):
+			left[cell] = true
 	var bodies := 0
 	while not left.is_empty():
 		bodies += 1
@@ -3091,7 +3095,10 @@ func _test_outdoor() -> void:
 		for mesh: ArrayMesh in _rig._ground_meshes:
 			for point: Vector3 in mesh.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]:
 				bed = minf(bed, point.y)
-		var surface: float = (_rig._water_bodies[0].mesh as ArrayMesh).surface_get_arrays(0)[Mesh.ARRAY_VERTEX][0].y
+		# A body drawn by its cells, or (568 amended: the castle's ponds are
+		# curves) a curve's surface.
+		var drawn: MeshInstance3D = _rig._water_bodies[0] if not _rig._water_bodies.is_empty() else _rig._room.get_node("Water_curve_0")
+		var surface: float = (drawn.mesh as ArrayMesh).surface_get_arrays(0)[Mesh.ARRAY_VERTEX][0].y
 		var forest_floor := _rig._room.get_node("ForestFloor") as Node3D
 		_check(forest_floor.position.y < bed and bed < surface,
 				"its water is drawn above its bed, and both above the forest floor, not hidden under it")
