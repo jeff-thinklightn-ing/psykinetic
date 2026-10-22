@@ -21305,3 +21305,26 @@ his care").
 
 ui_test _test_barter: the words, the row offered within the purse, the ask,
 the short purse, held, closed. Client only; no new class_name.
+
+## 401 amended: no HP number on the HUD
+
+Jeff (2026-10-22, his words): "we dont need an hp number on the HUD",
+answering 401's open question. The HUD's state line no longer opens with
+"HP 17/20": it is the state alone (the buffs, "shield raised", "bow
+drawn", "hidden in the grass", her step, an offer standing, being led,
+downed, channeling, the return), empty when nothing stands; hurt reads
+from the body and the grey, as the charter says; F3 keeps the number. The
+party's bars over heads stay until Jeff says (his call). companion_test's
+top-line check reads the state alone. Client only.
+
+## 418 amended: the main menu steps aside for Options
+
+Jeff (2026-10-22): "main menu doesn't stays open when you select options
+so that's blocking the options screen". The options panel lived under
+the HUD, which the main menu hides, so the menu's Options showed nothing.
+Now the panel lives over the HUD and the menu both (a child of Main), the
+menu's Options hides the menu and opens them (Main._menu_options), and
+closing them (Esc, O, Main.toggle_options) brings the menu back; in play
+nothing changes. --test-show=menu_options for the shot. ui_test: the
+options on top with the menu aside, Esc bringing it back, the panel's
+place. Client only; no new class_name.

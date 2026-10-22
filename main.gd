@@ -462,6 +462,8 @@ var compass: HudCompass
 var hint_panel: HintPanel
 ## The options (O): sound volumes; other trees add their sections.
 var options_panel: OptionsPanel
+## The options were opened from the main menu, which comes back when they close.
+var _options_from_menu := false
 ## Esc's menu (GameMenu; the game never pauses), the main menu (MainMenu) while it shows, and
 ## the join flow's screen (ConnectScreen) while it shows; null otherwise.
 var game_menu: GameMenu
@@ -691,7 +693,7 @@ func _show_menu() -> void:
 	if main_menu == null:
 		main_menu = MainMenu.new()
 		main_menu.play_pressed.connect(_play)
-		main_menu.options_pressed.connect(toggle_options)
+		main_menu.options_pressed.connect(_menu_options)
 		main_menu.quit_pressed.connect(_quit_game)
 		add_child(main_menu)
 	main_menu.visible = true
@@ -7135,7 +7137,7 @@ func _build_talk() -> void:
 	options_panel.hints_changed.connect(func(shown: bool) -> void:
 		if hint_panel != null:
 			hint_panel.visible = shown)
-	$HUD.add_child(options_panel)
+	add_child(options_panel)  # Over the HUD and the main menu both (Jeff, 2026-10-22: the menu blocked the options screen).
 	pack_panel = PackPanel.new()
 	pack_panel.name = "Pack"
 	pack_panel.transfer = _transfer
@@ -9736,7 +9738,7 @@ func _on_world_ticked(tick: int) -> void:
 		hp_text = return_shown()  # 396 amended, ui's side: who brings them back, in how long.
 	if player != null:
 		_return_told = {}  # Back.
-		hp_text = "HP %d/%d" % [player.hp, player.max_hp]
+		hp_text = ""  # No HP number (Jeff, 2026-10-22: "we dont need an hp number on the HUD"): hurt reads from the body; F3 has it.
 		for kind: String in player.buffs:
 			var amount := float(player.buffs[kind][0])  # Speed as a share: "Quick 25%" (decision 562).
 			hp_text += "   %s %s %ds" % [Items.BUFF_KINDS.get(kind, kind),
@@ -9762,7 +9764,7 @@ func _on_world_ticked(tick: int) -> void:
 			hp_text += "   " + channel_words(_display_name(body) if body != null else player.channel_of,
 					ceili((player.channel_until - tick) * World.TICK_DT))
 	_hud_tick = tick
-	hud.text = hp_text
+	hud.text = hp_text.strip_edges()
 	if player != null and _connect_joining and connect_screen != null:
 		_connect_joining = false
 		connect_screen.visible = false  # In: the world shows.
@@ -9980,9 +9982,30 @@ func escape() -> void:
 		game_menu.open(true, str(level.get("display_name", level.get("name", ""))))
 
 
-## O: the options shown or hidden; hiding writes what changed.
+## O: the options shown or hidden; hiding writes what changed. Closed
+## from the main menu's Options, the menu comes back (Jeff, 2026-10-22:
+## "main menu doesn't stays open when you select options so that's
+## blocking the options screen": the menu steps aside while they show).
 func toggle_options() -> void:
-	if options_panel != null:
+	if options_panel == null:
+		return
+	var closing := options_panel.visible
+	options_panel.toggle()
+	if closing and _options_from_menu:
+		_options_from_menu = false
+		if main_menu != null:
+			main_menu.visible = true
+
+
+## The main menu's Options: the menu steps aside, the options on top; Esc
+## or O brings the menu back.
+func _menu_options() -> void:
+	if options_panel == null:
+		return
+	_options_from_menu = true
+	if main_menu != null:
+		main_menu.visible = false
+	if not options_panel.visible:
 		options_panel.toggle()
 
 
@@ -11317,6 +11340,10 @@ story: carried by Wren for 3 days; named for Wren"
 				pack_panel.tip.show_for("dagger", sample, pack_panel._player_row.get_child(0).get_global_rect().position)
 			"menu":
 				_show_menu()
+			"menu_options":
+				# The main menu's Options (Jeff, 2026-10-22): the menu aside, the options on top.
+				_show_menu()
+				_menu_options()
 			"setup":
 				_connect_screen().edit()
 			"connect":

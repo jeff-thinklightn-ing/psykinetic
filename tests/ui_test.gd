@@ -521,6 +521,21 @@ func _test_aim() -> void:
 		_main._update_aim(own, false)
 		_check(not _main.aim_drawn and _main._aim_since == 0, "the bow let go: the aim is dropped")
 		_check(Main.range_now(own) == 0, "no bow drawn: no range step")
+	# Jeff (2026-10-22): the menu blocked the options screen. Now it steps aside and comes back.
+	if _main.options_panel != null:
+		var hud_was: bool = _main.get_node("HUD").visible
+		_main._show_menu()
+		_main._menu_options()
+		_check(_main.options_panel.visible and not _main.main_menu.visible, "the main menu's Options: the options on top, the menu aside")
+		_main.escape()
+		_check(not _main.options_panel.visible and _main.main_menu.visible, "Esc: the options close and the menu is back")
+		_main.main_menu.visible = false
+		_main.get_node("HUD").visible = hud_was
+		_check(_main.options_panel.get_parent() == _main, "the options live over the HUD and the menu both")
+	# Jeff (2026-10-22): no HP number on the HUD.
+	World.step()
+	_main._on_world_ticked(World.tick)
+	_check(not _main.hud.text.begins_with("HP"), "the HUD's line carries no HP number (%s)" % _main.hud.text)
 
 
 func _test_revive_reads() -> void:

@@ -2118,8 +2118,8 @@ func _test_quick_phrases() -> void:
 	World.step()
 	_check("1\tWith me!" in _main.hint_panel.lines() and "4\tFall back!" in _main.hint_panel.lines(), "the HUD's list shows them")
 	# The mode and the tick are F3's since decision 418 (ui's); the line is the state alone.
-	_check(RegEx.create_from_string("^(HP \\d+/\\d+|no player|dead, respawning)").search(_main.hud.text) != null,
-			"the top line is only HP and the state: %s" % _main.hud.text)
+	_check(not _main.hud.text.begins_with("HP") and not "tick" in _main.hud.text,
+			"the top line is the state alone, no HP number (Jeff, 2026-10-22) and no tick: %s" % _main.hud.text)
 	var shown: bool = Net.hints
 	_main.toggle_hints()
 	_check(_main.hint_panel.visible != shown and Net.hints != shown, "H hides the list (and it is remembered: Net.hints)")

@@ -7,6 +7,8 @@ notes (decision 324).
 
 ## Unreleased
 
+- The HP number is gone from the top of the screen: how hurt you are reads from your body and the grey, as the no-bars rule says; F3 still has the number (401 amended).
+- The main menu no longer blocks the options screen: Options steps the menu aside, and Esc or O brings it back (418 amended).
 - The medicine man's barter window offers his care: "Pay 10 to be in his care" (then "In his care"), so a healer's hut brings you back once you have paid (584, ui's side; the care itself is economy's).
 - The control hints over things are gone ("LMB interact", "E open", "F pick up", "RMB draw") and so is the first-time talk hint: the world's own cues do the work; settings.cfg hints=on brings them back with the controls list (333 amended, ui's side; the name alone over a townsperson's head is npc's).
 - Drawing a bow is now the left button held (a tap still walks, talks or goes to a chest, never a quick shot; the right button with a bow is for the back-step to come), and it aims by a circle, not a tile: the cursor hides, a semicircle on the ground round you marks the shot's reach and jumps out as you hold the draw, the marker on it follows your mouse at any angle, and pips beside it read the power (more at the short steps, which hit harder); let go to shoot that way (583, ui's side; the flight and the hit are pc-character's and items').
