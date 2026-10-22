@@ -763,7 +763,7 @@ func _test_wilds() -> void:
 	var through := true
 	for building: Dictionary in level["buildings"]:
 		var slot := str(building["slot"])
-		if slot in Level.DOORLESS:
+		if slot in ["building.great_tree", "building.cairn", "building.waystone", "building.standing_stone"]:
 			marks[slot] = int(marks.get(slot, 0)) + 1
 			through = through and not building.has("door") and Level.rect_cells(building["rect"]).all(func(cell: Vector2i) -> bool: return solid.has(cell) and not floor.has(cell))
 	_check(marks == {"building.great_tree": 1, "building.cairn": 1, "building.waystone": 1, "building.standing_stone": 8} and through,
@@ -774,6 +774,14 @@ func _test_wilds() -> void:
 		ring_middle += (stone["rect"] as Rect2i).position
 	ring_middle /= maxi(1, stones.size())
 	_check(floor.has(ring_middle) and reached[ring_middle.y * size.x + ring_middle.x] >= 0.0, "the ring's middle %s is walked to, between the stones" % ring_middle)
+	# The woodlot (566 amended): the store's woodlot place, its chopping block
+	# and the woodpile solid, the cells npc's woodcutter stands on walkable.
+	var woodlot: Dictionary = level["places"].get("woodlot", {})
+	var pieces: Array = level["buildings"].filter(func(b: Dictionary) -> bool: return b["slot"] in ["building.chopping_block", "building.woodpile"])
+	_check(woodlot.get("kind", "") == "woodlot" and woodlot.get("town", "") == "store" and pieces.size() == 2
+		and pieces.all(func(b: Dictionary) -> bool: return solid.has((b["rect"] as Rect2i).position))
+		and [Vector2i(195, 225), Vector2i(196, 226), Vector2i(208, 201)].all(func(cell: Vector2i) -> bool: return floor.has(cell)),
+		"the woodlot for the store, its chopping block and the woodpile solid, their stand cells walkable (566 amended)")
 	# The water (568): a river the wilds' length, crossed by a ford and a
 	# bridge (both walked over), the ponds closed curves; still nothing cut off.
 	var waters: Array = terrain["waters"]

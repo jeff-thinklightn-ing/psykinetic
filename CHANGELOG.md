@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The town in the wilds has a woodlot at the copse to its south-west, with a chopping block, and a woodpile in the store's yard, so the woodcutter has somewhere to work (566 amended).
 - Herbs keep growing round the wilds when the town gets a woodlot or other work site: only the town's store clears a ring of them (562 amended (2)).
 - A soft mist now rises from the pool at the foot of a tall waterfall and drifts downstream (570 amended).
 - A level may stand a chopping block and a woodpile (building.chopping_block, building.woodpile: solid, no door, 1 x 1) for the woodcutter's work (566 amended, npc's side, part 2). Data rule only.

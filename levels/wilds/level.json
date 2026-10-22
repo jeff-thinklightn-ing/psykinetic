@@ -481,6 +481,29 @@
 				0
 			],
 			"length": 3
+		},
+		{
+			"slot": "building.chopping_block",
+			"at": [
+				195,
+				226
+			],
+			"facing": [
+				0,
+				1
+			]
+		},
+		{
+			"slot": "building.woodpile",
+			"at": [
+				207,
+				201
+			],
+			"facing": [
+				0,
+				1
+			],
+			"variant": 2
 		}
 	],
 	"became": {
@@ -496,6 +519,17 @@
 			"radius": 4.0,
 			"holder": "town",
 			"name": "the town's store"
+		},
+		"woodlot": {
+			"at": [
+				194,
+				227
+			],
+			"kind": "woodlot",
+			"holder": "town",
+			"town": "store",
+			"radius": 4,
+			"name": "the woodlot"
 		}
 	},
 	"waters": [

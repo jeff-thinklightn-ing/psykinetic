@@ -20562,3 +20562,24 @@ today's herbs are unchanged.
 tests/forage_test: a woodlot the town holds leaves towns_in as it was.
 Server only, protocol unchanged, no new class_name.
 
+## 566 amended, maps' side: the wilds' woodlot, chopping block and woodpile
+
+npc's visible work (566 amended) stands the woodcutter at a chopping block in
+the town's woodlot and brings the logs to a woodpile by the store; the wilds
+had no woodlot, so the woodcutter never took 521's trip.
+make_wilds_marks' woodlot layer (once) writes into levels/wilds/level.json
+as text:
+- the place "woodlot" {at (194, 227), kind woodlot, holder town, town
+  store, radius 4}: the copse south-west of the town, the forest edge
+  nearest the store (210, 200), about 30 cells;
+- building.chopping_block at (195, 226), in its radius; the cells npc's body
+  stands on, the block's 4-neighbours nearest the store, (195, 225) and
+  (196, 226), are walkable grass;
+- building.woodpile at (207, 201), variant 2, in the store's yard, 3 cells
+  from the store's cell (Chebyshev), west of the depot's and shop's doorways
+  ((209, 200), (211, 200)); its cell toward the store, (208, 201), walkable.
+Both doorless solids (567, npc's constants ebd2ed5e); the relief as before.
+If Held moves to its own map, these move with the town.
+
+tests/relief_test: the woodlot for the store, the block and the pile solid,
+their stand cells walkable; the marks' count reads the four landmarks alone.

@@ -32,6 +32,9 @@ extends Node
 ##   castle's, the hills' and the forest's links to the crossroads round the
 ##   waystone, the hills road over the bridge; their cells bare dirt,
 ##   level.json "roads" written into its text. Once, as the water.
+## - the woodlot (566 amended, npc's visible work): the town's "woodlot"
+##   place at the copse south-west of it, a chopping block in it, a
+##   woodpile in the store's yard. Once.
 ## The same seed lays the same ground.
 
 const FOLDER := "res://levels/wilds/"
@@ -72,6 +75,13 @@ const ROADS := [
 	{"from": "from_forest", "to": Vector2i(131, 128)},
 ]
 const ROAD_WIDTH := 2.0
+## The woodlot (566 amended): the place's cell and reach, its chopping block,
+## and the woodpile by the store (each its side cell toward the store
+## walkable: (195, 225) and (196, 226) by the block, (208, 201) by the pile).
+const WOODLOT := Vector2i(194, 227)
+const WOODLOT_RADIUS := 4
+const CHOPPING_BLOCK := Vector2i(195, 226)
+const WOODPILE := Vector2i(207, 201)
 ## Their wander either side of the way walked, and its turns' length (cells):
 ## more than the hills' (Relief.ROAD_SWING), the roads long and the ground open.
 const ROAD_SWING := 7.0
@@ -101,6 +111,7 @@ func _ready() -> void:
 	doc = MapDoc.open(FOLDER)
 	var map := doc.map
 	_place_marks()
+	_place_woodlot()
 	var new_waters := not doc.config.has("waters")
 	if not new_waters:
 		_unlay_river()
@@ -186,6 +197,46 @@ func _ponds(river: Dictionary) -> void:
 		if shore < INF:
 			for at in body:
 				map.set_relief(at, shore - POND_DEPTH)
+
+
+## The woodlot (566 amended), once: the store's "woodlot" place at
+## WOODLOT (WOODLOT_RADIUS round), a chopping block at CHOPPING_BLOCK in it
+## and a woodpile at WOODPILE in the store's yard (npc's woodcutter stands
+## on the block's side cell nearest the store, the logs land by the pile);
+## the place written into level.json's "places", the two into its
+## "buildings", as text.
+func _place_woodlot() -> void:
+	var places: Dictionary = doc.config.get("places", {})
+	if places.has("woodlot"):
+		return
+	var place := {"at": [WOODLOT.x, WOODLOT.y], "kind": "woodlot", "holder": "town", "town": "store", "radius": WOODLOT_RADIUS, "name": "the woodlot"}
+	places["woodlot"] = place
+	doc.config["places"] = places
+	_write_place("woodlot", place)
+	var added: Array[Dictionary] = [
+		{"slot": "building.chopping_block", "at": [CHOPPING_BLOCK.x, CHOPPING_BLOCK.y], "facing": [0, 1]},
+		{"slot": "building.woodpile", "at": [WOODPILE.x, WOODPILE.y], "facing": [0, 1], "variant": 2}]
+	(doc.config["buildings"] as Array).append_array(added)
+	_write_buildings(added)
+	print("[wilds] the woodlot at %s, its block at %s, the woodpile at %s" % [WOODLOT, CHOPPING_BLOCK, WOODPILE])
+
+
+## [param value] written into level.json's "places" object as text, after
+## its last entry (the rest of the file as it was).
+func _write_place(key: String, value: Dictionary) -> void:
+	var path := ProjectSettings.globalize_path(FOLDER + "level.json")
+	var text := FileAccess.get_file_as_string(path)
+	var start := text.find('	"places": {')
+	var close := text.find("
+	}", start)
+	var entry := "		" + JSON.stringify(key) + ": " + JSON.stringify(value, "	", false).replace("
+", "
+		")
+	text = text.substr(0, close) + ",
+" + entry + text.substr(close)
+	var file := FileAccess.open(path, FileAccess.WRITE)
+	file.store_string(text)
+	file.close()
 
 
 ## The marks placed, once: each landmark at the nearest cell to its spot
