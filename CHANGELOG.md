@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The control hints over things are gone ("LMB interact", "E open", "F pick up", "RMB draw") and so is the first-time talk hint: the world's own cues do the work; settings.cfg hints=on brings them back with the controls list (333 amended, ui's side; the name alone over a townsperson's head is npc's).
 - Drawing a bow is now the left button held (a tap still walks, talks or goes to a chest, never a quick shot; the right button with a bow is for the back-step to come), and it aims by a circle, not a tile: the cursor hides, a semicircle on the ground round you marks the shot's reach and jumps out as you hold the draw, the marker on it follows your mouse at any angle, and pips beside it read the power (more at the short steps, which hit harder); let go to shoot that way (583, ui's side; the flight and the hit are pc-character's and items').
 - Townsfolk may colour the news, a ruling or the sky they hail you with by one small detail of their own, a trial on Jeff's word behind townsfolk.json hail.lively; pleas and greetings stay as they were (554 amended). Server only.
 - The carpenter saws at the building site's sawhorse, facing it, and hammers inside the door, on buildings' site cells (566, npc's follow-up). Server only.

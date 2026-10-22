@@ -1005,8 +1005,8 @@ func _process(delta: float) -> void:
 						if entity.spawned and entity.tile == tile and (entity is Chest or entity is Cargo or entity is Companion):
 							_hint_words = context_hint_for(entity)
 							break
-				if _hint_words.is_empty() and player != null and not World.ground_at(tile).is_empty():
-					_hint_words = "%s  pick up %s" % [Keys.name_of("pick_up"), pile_words(World.ground_at(tile))]
+				if _hint_words.is_empty() and Net.hints and player != null and not World.ground_at(tile).is_empty():
+					_hint_words = "%s  pick up %s" % [Keys.name_of("pick_up"), pile_words(World.ground_at(tile))]  # Behind hints=on (Jeff, 2026-10-22).
 				if _hint_words.is_empty() and tile != NONE:
 					# The building under the cursor by its code (decision 537): "H3 house",
 					# and how far its town has built it (566): "H3 house, being built 40%".
@@ -1019,7 +1019,7 @@ func _process(delta: float) -> void:
 			# --test-show=hint: the hint as the cursor on that thing would show it.
 			words = context_hint_for(_test_hint_thing)
 			at = _client3d.screen_of_tile(_test_hint_thing.tile)
-		elif _test_hint_cell != Vector2i(-100000, -100000) and _client3d != null and not World.ground_at(_test_hint_cell).is_empty():
+		elif _test_hint_cell != Vector2i(-100000, -100000) and _client3d != null and Net.hints and not World.ground_at(_test_hint_cell).is_empty():
 			# --test-show=herbs: the pile's hint, as the cursor on it would show it (decision 515).
 			words = "%s  pick up %s" % [Keys.name_of("pick_up"), pile_words(World.ground_at(_test_hint_cell))]
 			at = _client3d.screen_of_tile(_test_hint_cell)
@@ -7303,8 +7303,8 @@ static func pile_words(ids: PackedStringArray) -> String:
 ## (items' E and F, doors' E).
 func context_hint_for(thing: Node) -> String:
 	var player := _local_player()
-	if thing == null or player == null:
-		return ""
+	if thing == null or player == null or not Net.hints:
+		return ""  # Jeff (2026-10-22): no control hints over things; settings.cfg hints=on brings them back for a test.
 	if thing is Chest:
 		return "%s  open the shop" % Keys.name_of("open") if (thing as Chest).shop else "E  open"
 	if thing is Cargo:
@@ -10926,8 +10926,8 @@ func _run_test_chest(player: Player) -> void:
 func _first_talk_hint(player: Player) -> void:
 	if _talk_hint != null and _talk_hint.visible and Time.get_ticks_msec() / 1000.0 > _talk_hint_until:
 		_talk_hint.visible = false
-	if player == null or Net.hinted_talk or DisplayServer.get_name() == "headless":
-		return
+	if player == null or Net.hinted_talk or not Net.hints or DisplayServer.get_name() == "headless":
+		return  # The first-time talk hint only with hints=on (Jeff, 2026-10-22: "it's going to be intuitive").
 	for entity in World.townsfolk():
 		if entity is Resident and World.distance(entity.tile, player.tile) <= RESIDENT_EARSHOT + 2:
 			_show_top_hint("Click a townsperson to interact, or press %s" % Keys.name_of("open"))  # 560: interact.

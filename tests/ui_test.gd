@@ -277,8 +277,13 @@ func _test_context_and_place() -> void:
 	for entity in World.get_entities():
 		if entity is Chest and chest == null:
 			chest = entity
-	_check(chest != null and _main.context_hint_for(chest) == "E  open", "a chest: E open")
+	var hints_were: bool = Net.hints
+	Net.hints = false
+	_check(chest != null and _main.context_hint_for(chest) == "", "hints off (the default; Jeff, 2026-10-22): no hint over a chest")
+	Net.hints = true
+	_check(chest != null and _main.context_hint_for(chest) == "E  open", "a chest with hints=on: E open")
 	_check(_main.context_hint_for(null) == "", "nothing under the cursor: nothing")
+	Net.hints = hints_were
 	var player: GridEntity = _main._local_player()
 	var zone_name := str(_main.level.get("display_name", _main.level.get("name", "")))
 	var places: Dictionary = _main.level.get("places", {})
@@ -356,7 +361,10 @@ func _test_sim_reads() -> void:
 	sick.trade = "cook"
 	sick.ailing = "a fever"
 	if _main._local_player() != null:
-		_check(_main.context_hint_for(sick) == "LMB  interact   in bed with a fever", "the hint over someone in bed says it (515 amended; 560: interact)")
+		var hints_kept: bool = Net.hints
+		Net.hints = true
+		_check(_main.context_hint_for(sick) == "LMB  interact   in bed with a fever", "the hint over someone in bed says it (515 amended; 560: interact; hints=on)")
+		Net.hints = hints_kept
 	sick.free()
 	_check(Main.pile_words(PackedStringArray(["herbs"])) == "herbs" and Main.pile_words(PackedStringArray(["herbs", "dagger", "rope"])) == "herbs and 2 more"
 		and Main.pile_words(PackedStringArray()) == "", "a pile's words: the first thing's short name, and how many more")
@@ -827,7 +835,12 @@ func _test_barter() -> void:
 	oda.person = "Oda"
 	oda.trade = "cook"
 	if _main._local_player() != null:
-		_check(_main.context_hint_for(oda) == "LMB  interact", "the hint over a townsperson: LMB  interact")
+		var hints_on: bool = Net.hints
+		Net.hints = true
+		_check(_main.context_hint_for(oda) == "LMB  interact", "the hint over a townsperson with hints=on: LMB  interact")
+		Net.hints = false
+		_check(_main.context_hint_for(oda) == "", "hints off: nothing over a townsperson (Jeff, 2026-10-22)")
+		Net.hints = hints_on
 	_main._open_bar(oda)
 	_check(_main._bar_name.text == "Oda" and _main._bar_barter.visible, "the bar names them; Barter for a maker (a cook, 562)")
 	oda.trade = "farmer"

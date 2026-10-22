@@ -630,7 +630,10 @@ func _test_friend_click() -> void:
 	_check(player.action_order != GridEntity.Order.ATTACK and player.has_move_order
 			and World.distance(player.move_order, body.tile) == 1 and _main._talk_wanted == body,
 			"a plain click walks beside them to talk, no attack (%s)" % player.move_order)
-	_check(_main.context_hint_for(body) == "LMB  interact", "the hint says interact (560; %s)" % _main.context_hint_for(body))
+	var hints_were: bool = Net.hints
+	Net.hints = true
+	_check(_main.context_hint_for(body) == "LMB  interact", "the hint says interact with hints=on (560; %s)" % _main.context_hint_for(body))
+	Net.hints = hints_were
 	_check("Shift+LMB	attack a friend" in _main.hint_lines(), "the controls list says Shift+LMB attacks a friend")
 	player.has_move_order = false
 	_left(true)

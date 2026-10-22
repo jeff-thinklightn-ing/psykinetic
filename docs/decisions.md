@@ -21261,3 +21261,26 @@ first for the power read, Jeff to pick from the shot.
 ui_test _test_aim: the point on the arc at any angle, the axes, the pips,
 the fade, the command's shape, the aim dropped on release. Client only;
 protocol unchanged on this side; no new class_name.
+
+## 333 amended, ui's side: no control hints over things
+
+Jeff (2026-10-22, his words): "have their name on one line overhead, lets
+drop the profession -- don't show the mouse of tip for LMB to interact,
+try to remove any reference tooltips, it's going to be intuitive". Npc's
+half (333 amended): the overhead label is the name alone. Ui's half:
+
+- The cursor's hint line over things (Main.context_hint_for: "LMB
+  interact", "E open", "E open or close", "LMB talk", "LMB attack   RMB
+  draw, let go to shoot", "LMB talk   E hold bandage"), the pile's "F pick
+  up herbs" line and the first-time talk hint (Main._first_talk_hint) show
+  only with settings.cfg hints=on (Net.hints, H's controls list), off by
+  default; the code stays for a test. The builder's building code under
+  the cursor (537, 566) is not a control hint and stays. The first-time
+  screenshot folder line (538) stays: it says where a file went.
+- What does the work instead: the greeting bubble and the talk bar (560),
+  the hover outline on a foe, the pile's glint, the shop and counter
+  panels, the pack's hover names and histories (365, 375), the talk bar's
+  Talk and Barter (choices, not references).
+
+ui_test and controls_test: the hints with hints=on as before, nothing
+with it off. Client only; protocol unchanged; no new class_name.
