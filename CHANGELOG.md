@@ -7,6 +7,8 @@ notes (decision 324).
 
 ## Unreleased
 
+- Waystones have art: a dressed marker stone about head height with a low ridged cap, a sun ring and arrows cut into its faces, on a rough footing stone.
+
 - Standing stones have art: three rough, weathered menhirs about two and a half metres tall, with moss up their feet and lichen on their tops, ready for the wilds' stone ring.
 - The Hills have a road: a dirt track winding from where you arrive from the wilds, west over the bridge and up through the gap in the west ridge, laid as a smooth curve with no sharp turns (563).
 - The barrow's mound in the wilds stands on grass all round: the forest steps back a cell on its north-east, so the dome's foot and its ring of kerb stones clear the trees (550 amended).

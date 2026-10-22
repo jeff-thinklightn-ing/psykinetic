@@ -1346,6 +1346,21 @@
 				{"at": [0, 0.1, 0], "size": [1.2, 0.2, 0.87]}
 			]
 		},
+		"building.waystone": {
+			"category": "buildings",
+			"type": "mesh",
+			"kind": "cell",
+			"footprint": [1, 1],
+			"size": [0.88, 1.79, 0.65],
+			"budget": 500,
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-21", "notes": "C:/dev/review/landmarks/make_waystone.py: a squarish pillar with chamfered corners in rings of 8, each vertex cut a little off, tapering and leaning a touch; a low ridged cap with proud eaves; a rough flat footing stone half sunk; cut into it in row 1's dark grey strokes (each end a little off): on the front a sun ring over an arrow up the road, an arrow out on each side, two bands under the cap; pale lichen on the cap, moss creeping up the foot; 238 tris"},
+			"uses": "a waystone, a dressed marker stone about head height at a crossroads, 1 x 1 cell, a whole piece standing on grass (decision 550's solid cell): the wilds' landmarks (maps, the coordinator approved, 2026-10-21; Jeff: \"wilds needs better land marks\"); its carved face toward +z, turned to look down the main road",
+			"grey": [
+				{"at": [0, 0.92, 0], "size": [0.55, 1.74, 0.4]},
+				{"at": [0, 0.06, 0], "size": [0.88, 0.12, 0.65]},
+				{"at": [0, 1.7, 0], "size": [0.6, 0.18, 0.45]}
+			]
+		},
 		"door.double": {
 			"category": "doors",
 			"type": "mesh",
