@@ -287,7 +287,7 @@ func _test_barrow() -> void:
 		if level["terrain"]["edges"][key] == Terrain.Edge.DOOR:
 			doors += 1
 	kinds = _kinds(level)
-	_check(doors == 0 and level["terrain"]["torches"].is_empty(), "the dark below: no doors, no torches, every room a cavern (%d doors, %d torches)" % [doors, level["terrain"]["torches"].size()])
+	_check(doors == 1 and level["terrain"]["torches"].is_empty(), "the dark below: no door but the hall's own, no torches, every room a cavern (%d doors, %d torches)" % [doors, level["terrain"]["torches"].size()])
 	_check(kinds.get("skeleton", 0) == 6 and kinds.get("chest", 0) == 4 and kinds.get("draugr", 0) == 1 and kinds.get("robber", 0) == 0,
 		"six of the oldest dead and four chests laid; the draugr kept on his throne (%s)" % [kinds])
 	var in_hall := 0

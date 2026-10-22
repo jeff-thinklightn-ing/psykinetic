@@ -4974,6 +4974,9 @@ func _roads_lived(entity: GridEntity, why: String) -> void:
 ## The mark the draugr's blessed carry (540's, on a player's record; on a
 ## companion's, record.companion["marks"]).
 const BLESSED := "draugr"
+## The lock on the draugr's hall door while it is held shut (573 amended):
+## a key nobody holds.
+const HALL_LOCK := "draugr_hall"
 ## The device's two halves (items' kinds, 544's items' side): minted no more
 ## since 573 (the charges are a count on the record); those held are keepsakes.
 
@@ -5161,6 +5164,44 @@ func _sync_charges(record: PlayerRecord) -> void:
 	if is_instance_valid(player):
 		player.charges = Economy.barrow_tokens(record.barrow)
 		player.charge_room = Economy.barrow_capacity(record.barrow, _field_rules())
+
+
+## The doors of the draugr's hall in zone [param zone_name] (573 amended):
+## the door edges on the rim of its "lair" anchor (580's Hall of Fallen
+## Souls, one in its north wall).
+func _hall_doors(zone_name: String) -> Array[Door]:
+	var out: Array[Door] = []
+	var rect := Rect2i()
+	for anchor: Dictionary in Regen.config_of(zone_name).get("anchors", []):
+		if str(anchor.get("name", "")) == "lair":
+			rect = anchor["rect"]
+	if not rect.has_area():
+		return out
+	for door: Door in World.get_doors():
+		if door.zone != zone_name:
+			continue
+		var cells := Terrain.edge_cells(door.key)
+		if rect.has_point(cells[0]) != rect.has_point(cells[1]):
+			out.append(door)
+	return out
+
+
+## The draugr's hall_door (573 amended, Jeff: "the door closes when you
+## enter"): [param held], his hall's doors shut and locked behind the first
+## player in (HALL_LOCK, a key nobody holds; stone, no blow breaks them), so
+## the ways out are his gold, his death or one's own; let go (a pact won,
+## an unpaid fall, a fight lost), the lock lifted. Said to the party.
+func _hold_hall_door(zone_name: String, held: bool) -> void:
+	var zone: Zone = World.zones.get(zone_name)
+	if zone == null:
+		return
+	var was := World.enter(zone)
+	var doors := _hall_doors(zone_name)
+	for door in doors:
+		World.hold_door(door, held, HALL_LOCK)
+	World.enter(was)
+	if not doors.is_empty():
+		party_log.add("The hall's door shuts behind you." if held else "The hall's door opens.")
 
 
 ## [param player] come into the zone (joined, or travelled in): a draugr
@@ -7116,7 +7157,11 @@ func _on_command(entity: GridEntity, command_name: String, args: Dictionary) -> 
 	elif command_name == "door":
 		var edge: Variant = args.get("edge")
 		if edge is Array and edge.size() == 3:
-			World.try_toggle_door(entity, Vector3i(int(edge[0]), int(edge[1]), int(edge[2])))
+			var key := Vector3i(int(edge[0]), int(edge[1]), int(edge[2]))
+			var held := World.door_on(key)
+			if held != null and not held.open and held.lock == HALL_LOCK and entity is Player:
+				Net.broadcast_to([entity.owner_peer], "party", {"from": "Server", "text": "The door is shut."})
+			World.try_toggle_door(entity, key)
 	elif command_name == "shop" and entity is Player:
 		var shop := get_node_or_null(NodePath(str(args.get("shop", "")))) as GridEntity
 		if shop == null or not World.reaches(entity, shop):
@@ -8756,6 +8801,9 @@ func _hook_talker(monster: GridEntity) -> void:
 		monster.connect("offer_spoken", func(player_id: String, offer: Dictionary) -> void: _on_offer_spoken(monster, player_id, offer))
 	if monster.has_signal("offer_withdrawn"):
 		monster.connect("offer_withdrawn", func(player_id: String) -> void: _on_offer_withdrawn(monster, player_id))
+	if monster.has_signal("hall_door"):
+		# The draugr's (573 amended): false shuts his hall's door, true opens it.
+		monster.connect("hall_door", func(open: bool) -> void: _hold_hall_door(monster.zone, not open))
 
 
 func _on_offer_spoken(monster: GridEntity, player_id: String, offer: Dictionary) -> void:

@@ -47,6 +47,7 @@ func _ready() -> void:
 	await _test_links_kept_clear()
 	await _test_sealed_link()
 	_test_barrow_won()
+	await _test_hall_door()
 	_test_barrow_level()
 	await _test_edge_links()
 	_test_console()
@@ -947,6 +948,44 @@ func _test_barrow_won() -> void:
 	record.barrow = {}
 	_main._sync_charges(record)
 	_check(player.charges == 0 and player.charge_room == 0, "and the player's count follows the record")
+
+
+## The draugr's hall door held shut (573 amended, dungeon's side): the door
+## edges on the lair anchor's rim lock behind the first player in (a key
+## nobody holds, stone), no walk or E opens them, and let go they open.
+func _test_hall_door() -> void:
+	print("\n== the draugr's hall door (573 amended): held shut, no way through, let go ==")
+	var rows: Array[String] = []
+	for py in 10 * 2 - 1:
+		var row := ""
+		for px in 12 * 2 - 1:
+			var floor_here := px % 2 == 0 and py % 2 == 0
+			var north_wall := py == 7 and px % 2 == 0 and px / 2 >= 2 and px / 2 <= 9
+			row += ("+" if px / 2 == 5 else "#") if north_wall else ("." if floor_here else " ")
+		rows.append(row)
+	Level.register("lt_hall", Level.image_from_rows(rows, {Vector2i(5, 1): "start"}), null,
+		{"regenerate": {"anchors": [{"rect": [2, 4, 8, 5], "name": "lair"}]}})
+	_main.load_map("lt_hall")
+	var player := _player()
+	var key := Terrain.edge_key(Vector2i(5, 4), Vector2i(0, -1))
+	var door := World.door_on(key)
+	_check(door != null and not door.open and door.lock.is_empty() and _main._hall_doors("lt_hall").size() == 1 and _main._hall_doors("lt_hall")[0] == door,
+		"the hall's one door, on its lair anchor's north wall, is found (%s)" % [door])
+	_put(player, Vector2i(5, 3))
+	_wait_for_step(player)
+	_main._hold_hall_door("lt_hall", true)
+	_check(door != null and not door.open and door.lock == "draugr_hall" and door.body_material == GridEntity.BodyMaterial.STONE
+		and _main.party_log.last(1) == ["The hall's door shuts behind you."], "held: shut, locked with a key nobody holds, stone, and said (%s)" % [_main.party_log.last(1)])
+	_check(not World.try_move(player, Vector2i(0, 1)) and player.tile == Vector2i(5, 3), "no walk goes through it")
+	_check(not World.try_toggle_door(player, key) and not door.open, "and E rattles it")
+	_main._hold_hall_door("lt_hall", false)
+	_check(door.lock.is_empty() and not door.open and _main.party_log.last(1) == ["The hall's door opens."], "let go: the lock lifted, still shut till opened, and said")
+	await get_tree().process_frame
+	_check(World.try_toggle_door(player, key) and door.open, "E opens it now")
+	_main._hold_hall_door("nowhere", true)
+	_check(_main._hall_doors("test_room").is_empty(), "a level with no lair anchor has no hall door; an unknown zone is let be")
+	_main.load_map("test_room")
+	Level.unregister("lt_hall")
 
 
 func _test_barrow_level() -> void:

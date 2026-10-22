@@ -555,7 +555,11 @@ hides about 2.5 cells behind it). The templates are written from
   its middle (rock in step 1; art-kit's pieces, chairs and broken tables in
   step 3), the dais at the far end with the draugr on his throne, and the
   hidden exit behind the throne, the temple's sealed shortcut's end (540,
-  `draugr`, the spawn point "from_temple"). The level's `"stills":
+  `draugr`, the spawn point "from_temple"); its one door, in the north wall,
+  shuts and locks behind the first player in while he sits (573 amended,
+  Jeff's puzzle: `Main._hold_hall_door` on the draugr's `hall_door` signal,
+  `World.hold_door` with a lock nobody holds, stone; his gold, his death or
+  one's own are the ways out; the sealed shortcut stays the blessed's way). The level's `"stills":
   ["barrow_deep", "barrow"]` names the zones whose dead he stills when laid
   to rest, and its `"dead"` key how the oldest dead differ (bold, seeing the
   living in the dark, lying in no grave): enemy-ai's.

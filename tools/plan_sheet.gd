@@ -235,7 +235,7 @@ static func sample_barrow_deep() -> Dictionary:
 static func sample_barrow_lair() -> Dictionary:
 	var rows := _blank_rows(LAIR_SIZE)
 	_lay_anchors(rows, LAIR_ANCHORS)
-	_edge(rows, LAIR_DOOR, "north", " ")  # The hall's one door, where the way comes in.
+	_edge(rows, LAIR_DOOR, "north", "+")  # The hall's one door, where the way comes in (held shut behind the first player in, 573 amended).
 	for pillar in LAIR_PILLARS:
 		_rock_rect(rows, pillar)
 	_rock_rect(rows, LAIR_TABLE)

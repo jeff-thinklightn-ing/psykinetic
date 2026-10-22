@@ -1847,6 +1847,22 @@ func try_bash_door(entity: GridEntity, key: Vector3i, amount: int) -> bool:
 	return true
 
 
+## A door held shut (573 amended: the Hall of Fallen Souls' door behind the
+## first player in): closed and locked with [param lock], a key nobody
+## holds, so it rattles and no walk opens it; stone while held, so no blow
+## breaks it. Let go, the lock is lifted and it stays closed till someone
+## opens it.
+func hold_door(door: Door, held: bool, lock: String) -> void:
+	if door == null:
+		return
+	if held:
+		door.open = false
+		door.lock = lock
+		door.body_material = GridEntity.BodyMaterial.STONE
+	elif door.lock == lock:
+		door.lock = ""
+
+
 func _set_door(door: Door, open: bool, by: GridEntity) -> void:
 	if door.open == open:
 		return

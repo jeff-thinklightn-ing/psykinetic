@@ -21510,3 +21510,52 @@ the links and spawn points, the wilds' shortcut, the console listing all
 three), regen_test (the marked list), view_test (the Ossuary's niches).
 Level data both sides read: ships in a full cut only; protocol unchanged;
 no new class_name.
+
+
+## 573 amended. The draugr's hall as a puzzle: the shut door, his two lines, the gold, the Draugr's Totem
+
+Jeff (2026-10-22, his words through the coordinator): "I don't want the
+draugr to explain everything in one sentence. Make it somewhat of a puzzle
+to figure out. The door closes when you enter. "Why have you entered my
+Hall, "name"?" after a pause, he says, "Return the gold your people stole
+from this place, when you do that you may leave". Depending on how much
+gold you turn in you get a different result, for < 20 gold, he attacks and
+if you kill him the door opens and he says "...warrior, you have my
+respect." if you turn in the right amounts of gold you get resurrection
+tokens. He says "...you have honored the pact, I shall give you the power
+to cheat death" the first time you kill him you get a Draugr's Totem that
+holds the charges and the item explains "carrying this totem allows you to
+recieve another chance to fight"." Dungeon led the design (the coordinator
+approved it as written); sides: enemy-ai's (his behaviour and lines, the
+`hall_door` signal), items' (the totem), companions' (the return reads it),
+economy's (the helper), lore's (the lines verbatim, "receive" spelt right).
+This is dungeon's side.
+
+- The door: the Hall of Fallen Souls' one door (580, a door edge in the
+  hall's north wall) shuts and locks behind the first player into his lair
+  while he sits: the draugr's `hall_door(false)` reaches
+  Main._hold_hall_door, which finds the door edges on the "lair" anchor's
+  rim (_hall_doors) and holds each (World.hold_door: closed, the lock
+  HALL_LOCK "draugr_hall" that no key opens, so it rattles and no walk goes
+  through; stone, so no blow breaks it), either way, so others outside are
+  kept out too (the blessed still come and go by the sealed shortcut behind
+  the throne, the one way the heal rule fires mid-fight). `hall_door(true)`
+  lets go (the lock lifted, the door shut till opened): a pact won, an
+  unpaid fall, a fight lost. A player who pays nothing and will not fight
+  has no way out but gold, his death or their own (the temple return): the
+  puzzle's teeth. "The hall's door shuts behind you." / "The hall's door
+  opens." to the party; E on a held door says "The door is shut." A restart
+  spawns the doors afresh, unlocked (the pact was forfeit anyway, 548).
+- The totem (items' shape): the charges live on the Draugr's Totem, an
+  item bound to its player, never traded, dropped, sold or lost on death,
+  minted at the first pact won (World.mint_totem), every win adding the
+  deal's charges up to the capacity (World.totem_add; record.barrow keeps
+  "best" and "containers", so Economy.barrow_capacity derives it as
+  before, and drops "tokens"); the win line is Jeff's; Main.barrow_won
+  mints and adds, _sync_charges and charges_in_zone read the totem
+  (World.totem_charges of World.totem_of); the field return reads it
+  (companions'). The look of a held door is the Door's own replicated lock.
+
+level_test _test_hall_door; labyrinth_test (the hall's one door on layer
+3). Protocol unchanged (a Door's open and lock replicate already); no new
+class_name.
