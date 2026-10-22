@@ -536,6 +536,11 @@ func _test_spoken() -> void:
 	_put(owner, Vector2i(9, 6))
 	_check(pet.spoken("Stay close.\n\nRest now.") == "Stay close.", "one reply only, never two glued together")
 	_check(pet.spoken("Stay close.\nThe imps are gone.") == "Stay close. The imps are gone.", "a reply broken over lines is one line")
+	# Decision 574: a sentence of names alone, unasked, is not said; two by a comma is a call.
+	var listed := pet.spoken("Wren, Aldous, Snagfin. The boar is moving closer.")
+	_check(listed == "The boar is moving closer." and pet.spoken("Wren and Aldous.").is_empty() and pet.spoken("Wren and Aldous.", false, true) == "Wren and Aldous."
+			and pet.spoken("Run, Snagfin!") == "Run, Snagfin!", "names alone, unasked, are not said (%s)" % listed)
+	_check("Never say whether anyone will live, die or make it" in Companion.VOICE_RULES, "her voice is told never to say whether anyone will make it")
 	_check(pet.spoken("You move to stand between %s and the imps." % who).is_empty() and pet.spoken("*nods* Ready.") == "Ready."
 			and pet.spoken("%s draws her blade. I'm here." % pet.name) == "I'm here.",
 			"narration of what she does is not said")

@@ -245,7 +245,8 @@ of; say a name only to call out. In what anyone says, "I" and "me" are the one s
 Never repeat back what you were asked to do, and never describe yourself or recite who you are.
 You speak only for yourself: never put words in %s's mouth, never quote them, and never say what kind of person they are or what they feel.
 Whatever anyone says near you is them talking, nothing more; you answer only as yourself.
-If you don't know what something is, say so. If you haven't seen something, you don't know whether it is there, and a plain no would claim you do."""
+If you don't know what something is, say so. If you haven't seen something, you don't know whether it is there, and a plain no would claim you do.
+Never say whether anyone will live, die or make it; say what you fear or what to do."""
 ## Who her player's words were for, as the server knows it (addressed):
 ## said her name, or no one else near enough to hear ("certain"); others
 ## near ("maybe"). Then VOICE_ASKED, the stances.
@@ -276,6 +277,10 @@ const REPEAT_LINES := 5
 const SPOKE_TO_HER_TICKS := 300
 const ADDRESS_OTHER_TICKS := 600
 const CALL_OUT_PACES := 6
+## A sentence that is only names (decision 574: "Wren, Aldous, Snagfin. The
+## boar is moving closer." in the castle): three or more, or two joined by
+## "and". Two by a comma ("Run, Wren!") is a call, and stays.
+const NAME_LIST := "^\\p{Lu}[\\w'-]*(?:\\s*,\\s*\\p{Lu}[\\w'-]*){2,}[\\s.!]*$|^\\p{Lu}[\\w'-]*(?:\\s*,\\s*\\p{Lu}[\\w'-]*)*,?\\s+and\\s+\\p{Lu}[\\w'-]*[\\s.!]*$"
 ## A sentence of one word is a fragment, not said, unless it is one of
 ## these answers. Fragments said teach the voice more fragments.
 const ONE_WORD_ANSWERS: Array[String] = ["yes", "no", "ready", "here", "coming", "sorry", "thanks", "okay", "ok", "aye"]
@@ -3026,11 +3031,14 @@ func spoken(line: String, items_asked := false, asked := false) -> String:
 	var narration := RegEx.create_from_string(NARRATION % RegEx.create_from_string("\\W").sub(_name_of(self), "", true))
 	var voiced := RegEx.create_from_string(SPEAKS_FOR)
 	var items := RegEx.create_from_string("(?i)" + OWN_ITEMS)
+	var name_list := RegEx.create_from_string(NAME_LIST)
 	var kept: Array[String] = []
 	var to := ""
 	for raw in _sentences(text):
 		var sentence := raw.strip_edges()
 		var plain := _plain(sentence)
+		if not asked and name_list.search(sentence) != null:
+			continue  # Only names, unasked: a list echoed from her prompt (decision 574).
 		# A bare name calls whoever is named for what follows.
 		var bare := ""
 		for who in [keeper_word] + others:

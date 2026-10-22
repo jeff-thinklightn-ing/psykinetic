@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- A companion no longer says a bare list of names ("Wren, Aldous, Snagfin.") unless you asked her something, and no longer tells you whether you will make it; she says what she fears or what to do (574).
 - The draugr's blessing gives resurrection charges (573, Jeff's words: a counter, not an item): laid to rest, he blesses the players in his lair and their companions and gives the deal's charges, 5, 10 or 15 by the gold given, up to what you can hold (25, 50, 75 by the hardest deal beaten); a return in the field drains one of the resurrector's charges, with no device to carry; the player carries the count and the room on the wire (revision 30). The deals' gold steps, his level by the charges in the zone and the heal when someone zones in follow on enemy-ai's side.
 - Groundwork for the Crypt's charges: the draugr's deals (20, 50 or 100 gold for 5, 10 or 15 charges) and a charge capacity that grows with the hardest deal beaten (25, 50, 75) are now in the rules; nothing changes in play until the barrow's side lands (573, economy's side).
 ## v0.1.163

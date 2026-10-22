@@ -20269,3 +20269,29 @@ line), items' (below). This is dungeon's side.
 
 level_test _test_barrow_won; companion_test _test_field_return adapted (no
 device, the charges counted). No new class_name.
+## 574. No bare name lists, no verdicts on who lives
+
+Jeff's shot from the castle (2026-10-22) showed Pip saying "Wren, Aldous,
+Snagfin. The boar is moving closer." and, with two imps on them, "You're
+not going to make it. I'm not either."
+
+The name list: nothing in her prompt lists names bare (a local castle
+prompt printed whole); names reach it as the friends she sees ("Snagfin
+the merchant, ..."), hearsay ("Aldous told you that ..."), the exchange's
+labelled speech and lore, and the model compressed one of those into a
+list. Whatever the source, Companion.spoken now drops, unasked, a sentence
+that is only names (NAME_LIST): three or more, or two joined by "and".
+Two by a comma ("Run, Snagfin!") is a call and stays; asked by her player
+("who is in town?"), a list is an answer and stays.
+
+The verdict: no rule wrote it. Her situation said both were close to
+falling and "You are both in danger.", and the model turned the facts
+into odds. The coordinator's ruling: fear fits, a verdict on who lives
+reads as the game telling the player they have lost. VOICE_RULES gains
+"Never say whether anyone will live, die or make it; say what you fear
+or what to do."
+
+companion_test: the shot's line loses its list; "Wren and Aldous." goes
+unasked and stays asked; "Run, Snagfin!" stays; the rule is in her
+voice's rules. Server sim (her voice is the server's), protocol
+unchanged, no new class_name.
