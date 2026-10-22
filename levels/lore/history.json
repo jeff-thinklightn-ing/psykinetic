@@ -76,10 +76,10 @@
 		{
 			"id": "crypt",
 			"type": "place",
-			"name": "the barrow under the temple",
+			"name": "the Barrow of the Fallen",
 			"status": "agreed",
 			"source": "Jeff",
-			"summary": "The barrow the town was built over: the founders plundered it for the town's gold and pushed the old dead deeper, and the temple's alms go down to keep the upper tombs quiet (docs/lore/crypt.md; decision 546, npc's side, part 3: the [Jeff] rows; lore adds the [proposal] rows).",
+			"summary": "The Barrow of the Fallen, a mound a little outside town with a sealed way from the temple: the founders plundered it for the town's gold and pushed the old dead deeper, and the temple's alms go down to keep the upper tombs quiet (docs/lore/crypt.md; decision 546, npc's side, part 3: the [Jeff] rows; lore adds the [proposal] rows).",
 			"relations": [],
 			"tags": [
 				"history"
@@ -89,7 +89,9 @@
 					"id": "crypt.keep_away",
 					"text": "The crypt is a place to keep away from.",
 					"known": "common",
-					"where": ["town_lands"],
+					"where": [
+						"town_lands"
+					],
 					"tags": [],
 					"source": "Jeff",
 					"status": "agreed"
@@ -99,8 +101,12 @@
 					"text": "The town's founders plundered the barrow for its gold and pushed the old dead deeper.",
 					"known": "secret",
 					"where": [],
-					"knowers": ["priest"],
-					"tags": ["history"],
+					"knowers": [
+						"priest"
+					],
+					"tags": [
+						"history"
+					],
 					"source": "Jeff",
 					"status": "agreed"
 				},
@@ -109,7 +115,10 @@
 					"text": "The temple's alms go down to the dead, to keep the upper tombs quiet.",
 					"known": "secret",
 					"where": [],
-					"knowers": ["priest", "acolyte"],
+					"knowers": [
+						"priest",
+						"acolyte"
+					],
 					"tags": [],
 					"source": "Jeff",
 					"status": "agreed"
@@ -119,7 +128,9 @@
 					"text": "The draugr bargains for gold.",
 					"known": "secret",
 					"where": [],
-					"knowers": ["draugr"],
+					"knowers": [
+						"draugr"
+					],
 					"tags": [],
 					"source": "Jeff",
 					"status": "agreed"
@@ -129,10 +140,34 @@
 					"text": "Pip carries the temple's offering down to the altar in the barrow.",
 					"known": "secret",
 					"where": [],
-					"knowers": ["priest", "acolyte", "pip"],
+					"knowers": [
+						"priest",
+						"acolyte",
+						"pip"
+					],
 					"tags": [],
 					"source": "Jeff",
 					"status": "agreed"
+				},
+				{
+					"id": "crypt.outside_town",
+					"text": "The Barrow of the Fallen lies a little outside town, under a grass-covered mound with a stone-framed door.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					],
+					"source": "Jeff",
+					"status": "draft"
+				},
+				{
+					"id": "crypt.spears",
+					"text": "Warriors' spears are planted around the outside of the mound, standing up like spikes.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					],
+					"source": "Jeff",
+					"status": "draft"
 				}
 			]
 		}

@@ -28,6 +28,17 @@ Companion files: `castle.md` (the labyrinths, the other delve-again place),
 
 ## The barrow
 
+- **[Jeff]** Name: **the Barrow of the Fallen** (from Jeff's map sketch, 2026-10-21).
+- **[Jeff]** Sketch: a grass-covered mound with a stone-framed door, south of a river
+  that winds down from a waterfall over cliffs, with hills and roads to the north.
+- **[Jeff]** Warriors' spears are planted around the outside of the mound, standing up
+  like spikes.
+- **[proposal]** They are the old dead's own spears, planted at their burials. The
+  founders took the gold and left the iron: the spears are the one part of the old
+  dead's goods still where it belongs.
+- **[proposal]** Taking one is a theft from the dead like any other (H12, cursed until
+  blessed), and the town's superstition keeps anyone from touching them.
+
 - **[Jeff]** The crypt is a barrow, perhaps under a mound, but still a crypt-like
   structure below the town.
 - **[Jeff]** It is filled with tombs.
@@ -232,7 +243,8 @@ Companion files: `castle.md` (the labyrinths, the other delve-again place),
 
 - **[Jeff]** Tombs; reanimated skeletons; the draugr.
 - **[proposal]** Outside: a grass-covered mound a little outside town, a stone-framed
-  door. Inside: stone-lined passages, burial niches, grave goods, cold and close.
+  door. A ring of old spears planted upright around it, weathered shafts and rusted
+  heads, leaning at different angles (Jeff: spears like spikes). Inside: stone-lined passages, burial niches, grave goods, cold and close.
 - **[proposal]** Skeletons as one shared rig with variants (armed, armoured, the
   draugr's own retinue); the draugr itself bigger, swollen, dark (the sagas' draugar
   are heavy and blackened, not bare bone).
@@ -303,3 +315,5 @@ Companion files: `castle.md` (the labyrinths, the other delve-again place),
   start again in town (Jeff).
 - 2026-10-19, cont.: the barrow is the starter dungeon; the blessing is needed before
   venturing far from town (Jeff).
+- 2026-10-21: named the Barrow of the Fallen, from Jeff's map sketch.
+- 2026-10-21, cont.: warriors' spears planted around the mound like spikes (Jeff).
