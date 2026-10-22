@@ -260,6 +260,9 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## (building.chopping_block, building.woodpile), solid with no door, that a
 ## woodcutter stands beside, in the "terrain" message's files and the levels
 ## served.
+## 30 (576): the "world" message carries "capabilities" {companion, held:
+## [{id, words, teacher}]}, what the player's companion has learned; a level
+## link sealed by a mark opens for the companion's mark too (Main.party_has).
 const PROTOCOL_REVISION := 30
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]

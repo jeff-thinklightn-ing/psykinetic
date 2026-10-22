@@ -20733,3 +20733,49 @@ block and sound_status regenerated without them.
 
 sound_kit_test: the night beds whole at INSECT_COLD's first, none at its
 second. Client only, protocol unchanged, no new class_name.
+## 576. Capabilities: what each area teaches, and the world as a lock
+
+Jeff (2026-10-22): "companions do learn everything -- ability is more like
+metroidvania, each helps you in higher difficulty areas ... each area in
+turn add capability; an example would be visiting the elven lands for an
+ability that counters 'rot' allowing you to explore the deeper areas of
+the blood rot caverns." The coordinator approved the design
+(C:/dev/review/companions/abilities_focus_design.md, part a), with
+party-level gates until Jeff says otherwise.
+
+- A capability is a mark (a player's record.marks, a companion's
+  record.companion["marks"], 540 and 544) with an entry in
+  levels/capabilities.json: words, area, teacher, holders, status (live,
+  or draft: no area yet, nothing gives or checks it), companion_line,
+  fact, bond and bond_why, gates. Marks have no cap, so everything can be
+  learned. New class_name Capabilities (sim/capabilities.gd, static):
+  catalog, entry, live, held (the live ones among some marks, for her
+  card), said (a line with {her} and {player} filled in).
+- The catalog: draugr live (the blessing, 544/573: moved onto it, no
+  change in play); rot_ward, dwarf_craft, healer_lore and dark_gift as
+  drafts, their teachers and places following lore's pages.
+- Main.grant_capability(id, player_ids): each player in the game marked
+  (holders permitting), and the companion with them, alive and up in
+  their zone: her mark, the catalog's party line, its fact on her card,
+  her bond event (the blessing keeps "blessed"; others "earned", +2 in
+  companion_traits.json "bond"). A draft is given to nobody. barrow_won
+  marks through it; its own lines (the charges) stay its own.
+- Main.party_has(peer, id): the player's mark, or the mark of the
+  companion out with them (alive, in their zone, not resting in a town).
+  Main.sealed_open reads it, so a link sealed by a mark opens when either
+  holds it: bringing her opens the way.
+- Her player's map is told what she holds: the "world" message's
+  "capabilities" {companion, held: [{id, words, teacher}]}, sent when she
+  joins and when she learns one, kept through a full message
+  (WorldNews.merge) like 551's "guide". For ui's card page; the client
+  draws nothing of it yet. Protocol: a key in an existing message, under
+  revision 30 (release; net.gd's comment).
+- The other gate kinds (hostile air, a locked craft, a fight's counter)
+  are built with the first area that needs them, by items, economy and
+  enemy-ai.
+
+companion_test _test_capabilities: the catalog, a draft given to nobody,
+the grant (both marked, the fact, the world message, kept through a full
+one), her mark alone opening a sealed way while she is with them, not
+while she rests in town. Server and client (the world message's merge),
+no replicated field.

@@ -86,6 +86,7 @@ func _ready() -> void:
 	_test_bond()
 	_test_sickness()
 	_test_field_return()
+	_test_capabilities()
 	_test_companion_named()
 	await _test_guide()
 	_test_guide_refuses()
@@ -1411,6 +1412,46 @@ func _test_sickness() -> void:
 	_main._tell_sickness(pet, record, true)
 	_check(_main.party_log.size() == log_size, "told once only")
 	World.steps = steps_were
+
+
+func _test_capabilities() -> void:
+	print("
+== what an area teaches: the catalog, the grant, the party's keys (decision 576) ==")
+	_kill_monsters()
+	var owner := _player()
+	var pet := _companion()
+	_settle(pet)
+	var record: PlayerRecord = _main._records[Net.player_id]
+	var id := record.player_id
+	var kept_marks := record.marks.duplicate()
+	var kept_hers: Variant = record.companion.get("marks", []).duplicate()
+	_check(Capabilities.live("draugr") and not Capabilities.live("rot_ward") and Capabilities.entry("_about").is_empty(),
+		"the catalog: the blessing live, the rot ward a draft")
+	_check(Capabilities.held(["rot_ward", "draugr"]).map(func(each: Dictionary) -> String: return each["id"]) == ["draugr"],
+		"what her card shows: the live ones she holds")
+	record.marks.erase("draugr")
+	record.companion["marks"] = []
+	_check(_main.grant_capability("rot_ward", [id]) == 0 and not "rot_ward" in record.marks, "a draft is given to nobody")
+	_put(pet, owner.tile + Vector2i(1, 0))
+	_check(_main.grant_capability("draugr", [id]) == 1 and "draugr" in record.marks and "draugr" in record.companion["marks"],
+		"granted: the player marked, and she, beside them")
+	_check(pet.grown.facts.any(func(fact: Dictionary) -> bool: return "laid the draugr to rest" in str(fact["text"])), "the catalog's fact on her card")
+	var told: Variant = _main.world_state.get("capabilities", {})
+	_check(told is Dictionary and told.get("companion") == String(pet.name) and (told.get("held", []) as Array).size() == 1
+		and told["held"][0]["words"] == "the draugr's blessing", "her player's map told what she has learned (%s)" % [told])
+	var merged := WorldNews.merge(_main.world_state, {"full": true})
+	_check(merged.get("capabilities") == told, "kept through a full world message")
+	# The party's keys: hers opens the way while she is with them.
+	record.marks.erase("draugr")
+	var peer := owner.owner_peer
+	_check(_main.party_has(peer, "draugr") and _main.sealed_open({"sealed": "draugr"}, peer), "her mark alone opens a sealed way, she being with them")
+	record.companion["resident"] = {"place": "x"}
+	_check(not _main.party_has(peer, "draugr"), "not while she rests in a town")
+	record.companion.erase("resident")
+	record.companion["marks"] = []
+	_check(not _main.sealed_open({"sealed": "draugr"}, peer) and _main.sealed_open({}, peer), "neither marked: sealed stays sealed; an open way is open")
+	record.marks.assign(kept_marks)
+	record.companion["marks"] = kept_hers
 
 
 func _test_field_return() -> void:

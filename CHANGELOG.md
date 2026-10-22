@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Groundwork for what each area teaches: the draugr's blessing is now the first entry in a catalog of capabilities, and a way sealed by one opens if you or the companion with you holds it (576).
 - The crickets no longer chirp on winter nights: the night's insects quieten as the year cools and are gone wherever snow can fall, and three crackly stream and waterfall recordings are dropped, leaving the smoother ones (578; Jeff: "a noise that sounds like bugs or a hard drive").
 - Entering the wilds is quicker: building its ground takes about 4.8 s instead of 5.7 s (the hills 1.16 s instead of 1.27 s), drawn exactly as before.
 - The forest's edge follows a curve round the land instead of the tiles: trees stand at varied depths along it, and the forest floor and its scatter change along the curve (575).

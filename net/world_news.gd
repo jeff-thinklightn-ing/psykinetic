@@ -17,6 +17,9 @@ extends RefCounted
 ## "guide" (decision 551, sent by Main, not here): what the player's
 ## companion knows the way to, {"companion", "places": [place_id],
 ## "areas": [area]}, whole when it changes, kept through a full message.
+## "capabilities" (decision 576, sent by Main): what the player's companion
+## has learned, {"companion", "held": [{"id", "words", "teacher"}]}, the
+## same way.
 
 ## How near a place's cell a player comes to know it (Senses' sight range).
 const SIGHT := 7
@@ -195,4 +198,9 @@ static func merge(state: Dictionary, data: Dictionary) -> Dictionary:
 		out["guide"] = (data["guide"] as Dictionary).duplicate(true)
 	elif data.get("full", false) and state.get("guide") is Dictionary:
 		out["guide"] = (state["guide"] as Dictionary).duplicate(true)
+	# What she has learned (decision 576, Main's): the same way.
+	if data.get("capabilities") is Dictionary:
+		out["capabilities"] = (data["capabilities"] as Dictionary).duplicate(true)
+	elif data.get("full", false) and state.get("capabilities") is Dictionary:
+		out["capabilities"] = (state["capabilities"] as Dictionary).duplicate(true)
 	return out

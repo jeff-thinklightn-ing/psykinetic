@@ -1,0 +1,63 @@
+{
+	"_about": "What each area teaches (decision 576, Jeff's 'companions learn everything ... each area adds capability'): a capability is a mark on a player's record (record.marks) or a companion's (record.companion[\"marks\"]) with an entry here. Capabilities reads it; Main.grant_capability gives one to the players and their companions who earned it, Main.party_has asks whether a player or the companion with them holds one (a level link sealed by it opens for either). Keys: words (its name, in her voice and on her card), area and teacher (lore's), holders (player, companion or both), status (live: given and checked; draft: no area yet, nothing gives or checks it), companion_line (the party log when she takes it; {her} her name), fact (on her card; {her}, {player}), bond and bond_why (her bond event, 555's table), gates (what it opens, by kind: sealed, air, craft, fight).",
+	"draugr": {
+		"words": "the draugr's blessing",
+		"area": "barrow",
+		"teacher": "the draugr",
+		"holders": "both",
+		"status": "live",
+		"companion_line": "The draugr blesses {her} too.",
+		"fact": "{her} went down into the barrow with {player} and laid the draugr to rest.",
+		"bond": "blessed",
+		"bond_why": "laid the draugr to rest with you",
+		"gates": ["sealed", "downed window and charges (544, 573)"]
+	},
+	"rot_ward": {
+		"words": "the rot ward",
+		"area": "the elven lands",
+		"teacher": "the elves",
+		"holders": "both",
+		"status": "draft",
+		"companion_line": "The elves teach {her} the rot ward too.",
+		"fact": "{her} learned the rot ward from the elves, beside {player}.",
+		"bond": "earned",
+		"bond_why": "learned the rot ward with you",
+		"gates": ["sealed: the deeper Blood Rot caverns", "air: the rot"]
+	},
+	"dwarf_craft": {
+		"words": "the dwarves' craft",
+		"area": "the castle's labyrinths",
+		"teacher": "the dwarves' halls",
+		"holders": "both",
+		"status": "draft",
+		"companion_line": "{her} learns the dwarves' craft too.",
+		"fact": "{her} learned the dwarves' craft in their halls, beside {player}.",
+		"bond": "earned",
+		"bond_why": "learned the dwarves' craft with you",
+		"gates": ["craft: heavy arms, smithing"]
+	},
+	"healer_lore": {
+		"words": "the healer's lore",
+		"area": "the healer's hut",
+		"teacher": "the medicine man",
+		"holders": "both",
+		"status": "draft",
+		"companion_line": "The medicine man teaches {her} too.",
+		"fact": "{her} learned the healer's lore from the medicine man, beside {player}.",
+		"bond": "earned",
+		"bond_why": "learned the healer's lore with you",
+		"gates": ["craft: remedies"]
+	},
+	"dark_gift": {
+		"words": "the dark elves' gift",
+		"area": "the dark elves' tower",
+		"teacher": "what remains of their craft",
+		"holders": "both",
+		"status": "draft",
+		"companion_line": "{her} takes something of the dark elves' gift too.",
+		"fact": "{her} took something of the dark elves' gift in their tower, beside {player}.",
+		"bond": "earned",
+		"bond_why": "took the dark elves' gift with you",
+		"gates": ["fight: the first magic"]
+	}
+}

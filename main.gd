@@ -2885,13 +2885,12 @@ func _move_command(words: PackedStringArray) -> String:
 
 ## Whether [param link] (a level's, Level.parse) lets [param peer]'s player
 ## through (decision 540): a link not sealed does; a sealed one only when
-## their record holds its mark. Their companion goes with them, as always.
+## they or the companion with them hold its mark (party_has, decision 576). Their companion goes with them, as always.
 func sealed_open(link: Dictionary, peer: int) -> bool:
 	var mark := str(link.get("sealed", ""))
 	if mark.is_empty():
 		return true
-	var record: PlayerRecord = _records.get(_peer_ids.get(peer, ""))
-	return record != null and mark in record.marks
+	return party_has(peer, mark)
 
 
 ## Server: mark [param mark] put on player [param id]'s record (decision
@@ -4397,6 +4396,7 @@ func _wire_guide(pet: Companion, record: PlayerRecord, player: Player) -> void:
 		if walk.going():
 			_guide_check.call_deferred(pet)  # The road on from here, once her voice is in.
 	_tell_roads(record, pet)
+	_tell_capabilities(record, pet)  # And what she has learned (decision 576).
 
 
 ## What she knows of the roads, for her voice: the places nearest first
@@ -4745,7 +4745,6 @@ func barrow_won(player_ids: Array, deal: String) -> int:
 		if record == null or not is_instance_valid(player) or not player.spawned:
 			continue
 		var first := not BLESSED in record.marks
-		mark_player(id, BLESSED)
 		var won: Dictionary = Economy.barrow_won(record.barrow, deal, field)
 		record.barrow = won["barrow"]
 		_sync_charges(record)
@@ -4755,17 +4754,70 @@ func barrow_won(player_ids: Array, deal: String) -> int:
 		if int(won["spilled"]) > 0:
 			line += " The dead's gift spills: %d more than they can hold." % int(won["spilled"])
 		party_log.add(line)
-		var pet: Companion = _companions.get(id)
-		if is_instance_valid(pet) and pet.spawned and pet.zone == player.zone and not World.is_downed(pet):
-			var marks: Array = record.companion.get("marks", [])
-			if not BLESSED in marks:
-				marks.append(BLESSED)
-				marks.sort()
-				record.companion["marks"] = marks
-				party_log.add("The draugr blesses %s too." % pet.name)
-			pet.note_fact("%s went down into the barrow with %s and laid the draugr to rest." % [pet.name, record.name])
-			_bond(record, "blessed", "laid the draugr to rest with you")  # 555 amended.
+		grant_capability(BLESSED, [id])  # The mark, hers too (decision 576's catalog).
 	return blessed
+
+
+## Server: capability [param id] (levels/capabilities.json, decision 576)
+## given to each player of [param player_ids] in the game, and to the
+## companion with them, alive and up, in their zone: her mark, the
+## catalog's party line, fact on her card and bond event, and her player's
+## map told what she now holds. The players' own lines are the caller's
+## (barrow_won's charges). How many players it reached.
+func grant_capability(id: String, player_ids: Array) -> int:
+	if not Capabilities.live(id):
+		return 0  # Unknown, or a draft with no area yet.
+	var holders := str(Capabilities.entry(id).get("holders", "both"))
+	var reached := 0
+	for each: Variant in player_ids:
+		var player_id := str(each)
+		var record: PlayerRecord = _records.get(player_id)
+		var player: Player = _players.get(_peer_of(player_id))
+		if record == null or not is_instance_valid(player) or not player.spawned:
+			continue
+		reached += 1
+		if holders != "companion":
+			mark_player(player_id, id)
+		var pet: Companion = _companions.get(player_id)
+		if holders == "player" or not is_instance_valid(pet) or not pet.spawned or pet.zone != player.zone or World.is_downed(pet):
+			continue
+		var marks: Array = record.companion.get("marks", [])
+		if not id in marks:
+			marks.append(id)
+			marks.sort()
+			record.companion["marks"] = marks
+			party_log.add(Capabilities.said(id, "companion_line", String(pet.name), record.name))
+			_tell_capabilities(record, pet)
+		pet.note_fact(Capabilities.said(id, "fact", String(pet.name), record.name))
+		_bond(record, str(Capabilities.entry(id).get("bond", "earned")), str(Capabilities.entry(id).get("bond_why", "")))
+	return reached
+
+
+## Whether the player on [param peer], or the companion with them (out with
+## them, alive, in their zone), holds capability or mark [param id]
+## (decision 576: bringing her opens the way).
+func party_has(peer: int, id: String) -> bool:
+	var player_id: String = _peer_ids.get(peer, "")
+	var record: PlayerRecord = _records.get(player_id)
+	if record == null or id.is_empty():
+		return false
+	if id in record.marks:
+		return true
+	var pet: Companion = _companions.get(player_id)
+	var player: Player = _players.get(peer)
+	return is_instance_valid(pet) and pet.spawned and not record.companion.has("resident") and is_instance_valid(player) \
+		and pet.zone == player.zone and id in (record.companion.get("marks", []) as Array)
+
+
+## Her player's map told what she has learned (decision 576): the "world"
+## message's "capabilities" {companion, held: [{id, words, teacher}]}, the
+## live ones of her marks.
+func _tell_capabilities(record: PlayerRecord, pet: Companion) -> void:
+	var peer := _peer_of(record.player_id)
+	if peer == 0 or _world_news == null or not _world_news.send.is_valid():
+		return
+	_world_news.send.call(peer, {"full": false, "capabilities": {"companion": String(pet.name),
+		"held": Capabilities.held(record.companion.get("marks", []))}})
 
 
 ## The charges held by the players in zone [param zone_name], summed: what
