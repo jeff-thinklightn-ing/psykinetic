@@ -98,6 +98,7 @@ func _ready() -> void:
 	_test_homeward()
 	_test_room_guard()
 	_test_draugr()
+	_test_barrow_layers()
 	_test_charging()
 	_test_threatens()
 	_test_quieter()
@@ -2856,9 +2857,68 @@ func _test_quieter() -> void:
 	e = _build(["###########", "#x.g.k.u.i#", "###########"])
 	_check(e["x"][0].call_reach == 6 and e["i"][0].call_reach == Senses.NOISE_CALL, "a robber calls 6 cells, an imp as ever")
 	_check(["robber", "skeleton_guard", "skeleton", "draugr"].all(func(kind: String) -> bool: return Monster.bodies()[kind].get("sight_range") == 5)
-			and e["x"][0].leash == 10,
-		"the barrow's kinds see 5 cells; a robber goes 10 from home")
+			and e["x"][0].leash == 14,
+		"the barrow's kinds see 5 cells; a robber goes 14 from home (580; 10 in 561)")
 	Monster.idling = true
+
+
+func _test_barrow_layers() -> void:
+	print("
+== the barrow in layers (580): a hand-drawn lair's own anchors; his rest stills the dead of the zones his level names, asleep or not, and lifts on time ==")
+	Monster.idling = true
+	var rows: Array[String] = ["##############", "#............#", "#.....u......#", "#............#", "#...........k#", "##############"]
+	Level.register("mt_handlair", Level.image_from_rows(rows), null, {"anchors": [{"rect": [1, 1, 9, 4], "name": "lair"}], "stills": ["mt_deep"]})
+	var e := _build(rows, {}, {}, "mt_handlair")
+	var draugr := e["u"][0] as Draugr
+	var skeleton: Monster = e["k"][0]
+	_check(Monster.room_of(Vector2i(3, 2)) == Rect2i(1, 1, 9, 4) and Monster.room_of(Vector2i(12, 4)) == Rect2i(),
+		"a level drawn by hand: its top-level anchors are its rooms (%s)" % Monster.room_of(Vector2i(3, 2)))
+	_check(draugr._in_lair_cell(Vector2i(9, 4)) and not draugr._in_lair_cell(Vector2i(12, 4)), "his lair is that anchor, not a leash circle")
+	var player := EntityFactory.build(SPECS["P"].merged({"name": "Player1"})) as Player
+	player.player_id = "p1"
+	_room.add_child(player)
+	World.spawn(player, Vector2i(4, 2))
+	var was_economy := World.economy
+	World.economy = Economy.new({"purses": {"p1": 100}})
+	var risen: Array[GridEntity] = []
+	World.spawn_spec = func(spec: Dictionary) -> GridEntity:
+		var made := EntityFactory.build(spec)
+		_room.add_child(made)
+		World.spawn(made, spec["tile"])
+		risen.append(made)
+		return made
+	draugr.accept_offer(player, draugr.offers_for("p1")[0], 100)
+	var near_seen := true
+	for r in risen:
+		near_seen = near_seen and World.distance(draugr.tile, r.tile) <= Draugr.RETINUE_REACH and World.has_line_of_sight(draugr.tile, r.tile)
+	_check(risen.size() == 2 and near_seen, "hard: two rise within %d of him, in his sight" % Draugr.RETINUE_REACH)
+	World.damage(draugr, 9999, player)
+	var until := draugr.rests_until
+	var side := Monster._factions().of_kind("draugr")
+	_check(World.dead_rest.get("mt_handlair", {}).get("until") == until and World.dead_rest.get("mt_deep", {}).get("until") == until
+		and World.dead_rest["mt_deep"]["side"] == side, "laid to rest: his rest is laid over his zone and the deep (%s)" % [World.dead_rest])
+	World.step()
+	_check(skeleton.laid and skeleton.stilled, "his own zone's dead lie still")
+	var rest_kept := World.dead_rest.duplicate(true)
+
+	# The deep, another level: its dead lie as they think, his zone asleep or gone.
+	Level.register("mt_deep", Level.image_from_rows(["#######", "#.k.x.#", "#######"]), null, {})
+	e = _build(["#######", "#.k.x.#", "#######"], {}, {}, "mt_deep")
+	World.dead_rest = rest_kept
+	var deep: Monster = e["k"][0]
+	var robber: Monster = e["x"][0]
+	World.steps = until - 10
+	World.step()
+	_check(deep.laid and deep.stilled and deep.spawn_spec["props"].get("stilled") == true and not robber.laid,
+		"in the deep his side's dead lie still, kept in its props; a robber does not")
+	World.steps = until
+	World.step()
+	_check(not deep.laid and not deep.stilled, "his rest run out, the deep's dead rise without him")
+	World.dead_rest.clear()
+	World.economy = was_economy
+	World.spawn_spec = Callable()
+	Level.unregister("mt_handlair")
+	Level.unregister("mt_deep")
 
 
 func _test_wolf_pack_bold() -> void:

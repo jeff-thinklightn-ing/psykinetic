@@ -21738,3 +21738,36 @@ Jeff: "have the grave robbers use the character body type" (via the coordinator,
 - A kind without it is drawn as before.
 
 Tests: view_test `_test_person_monster`. Client only, no new class_name.
+## 580, enemy-ai's side. The barrow in layers: the lair's own anchors, the rest over the deep, the retinue in his sight
+
+Dungeon's design (C:/dev/review/dungeon/barrow_layers_design.md, Jeff's
+"crypt is still too cramped": three levels, robbers on the first, the dead
+on the second, the draugr in a hall of his own), the coordinator's
+approval. Counts and respawn_s move with dungeon's levels (4 robbers on
+barrow, 6 skeletons and 2 guards on barrow_deep, the draugr on
+barrow_lair).
+
+- **A hand-drawn level's rooms.** `Monster.room_of` reads a level's
+  top-level "anchors" as well as its "regenerate" block's, so the fixed
+  barrow_lair's "lair" anchor (the hall and its bays) is his lair, not a
+  leash circle.
+- **His rest over other zones.** Laid to rest, the draugr no longer stills
+  only the dead he can reach: `World.dead_rest` (zone name -> {until, side},
+  saved by Main as "dead_rest") holds his rest over his own zone and each
+  his level's "stills" names (barrow_lair: barrow_deep). Every monster of
+  that side reads it for its zone on its sim and world ticks
+  (`Monster._mind_the_rest`): it lies still while `World.steps` is under
+  `until` (`stilled`, kept in its props; a respawn lies down too) and gets
+  up when it runs out, so the deep's dead rise on time with his zone
+  asleep or unloaded. His `_rise_again` clears his zones' entries. A new
+  pact raising him early leaves his rest running, as 548.
+- **The retinue.** It rises within `Draugr.RETINUE_REACH` (3, was 2) of him
+  on free floor of his lair in his line of sight: round the dais, not
+  behind a pillar.
+- **The robbers' leash** 10 to 14 in halls twice as big; their call stays 6
+  (a fight keeps to its room). A draft for Jeff.
+- 573 untouched: his charges and the living's coming read his own zone,
+  the lair (Jeff's "in the zone" is the room he fights in).
+
+monster_test `_test_barrow_layers`; the robber's leash check 14. Server
+only, protocol unchanged, no new class_name.

@@ -2654,6 +2654,13 @@ func _boot() -> void:
 	World.steps = snapshot.get("steps", 0)
 	# Each regenerating level's generation (decision 465), before any zone opens.
 	_regen = Regen.states_from(snapshot.get("regen", {}))
+	# The draugr's rest over the barrow's dead, by zone (decision 580).
+	World.dead_rest.clear()
+	var rests: Variant = snapshot.get("dead_rest", {})
+	if rests is Dictionary:
+		for zone_name: Variant in rests:
+			if rests[zone_name] is Dictionary:
+				World.dead_rest[str(zone_name)] = (rests[zone_name] as Dictionary).duplicate()
 	# A level-placed captive (decision 518): the camps whose holds are placed already, so each is placed once.
 	_placed_captives = snapshot.get("placed_captives", {}).duplicate(true) if snapshot.get("placed_captives") is Dictionary else {}
 	_alms_runs = snapshot.get("alms_runs", {}).duplicate(true) if snapshot.get("alms_runs") is Dictionary else {}
@@ -4013,6 +4020,7 @@ func _save_state(wait := true) -> void:
 		"herds": World.herds.to_dict() if World.herds != null else {},
 		"items": World.items.to_dict(),
 		"regen": _regen,
+		"dead_rest": World.dead_rest,
 		"sky": _sky_saved()}).duplicate(true)  # Its own: the sim goes on meanwhile.
 	_finish_saving()
 	_saver = Thread.new()

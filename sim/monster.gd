@@ -304,10 +304,12 @@ var foes: Array[String] = []
 ## Senses.NOISE_CALL (decision 561: a grave robber's is 6).
 var call_reach := Senses.NOISE_CALL
 ## HOMEWARD (decision 547): the grave it walks to (NO_TILE till chosen) and
-## whether it lies there still, both kept in its saved props; whom it fights
+## whether it lies there still, both kept in its saved props (and whether
+## the draugr's rest laid it, stilled, decision 580); whom it fights
 ## on the way: one in its way, or one that struck it.
 var grave := NO_TILE
 var laid := false
+var stilled := false
 var _provoked: GridEntity
 ## Who blocks its way home, since when and when last (decision 561).
 var _blocked_by: GridEntity
@@ -512,6 +514,7 @@ func _temper() -> void:
 func _sim_tick() -> void:
 	if not _bundle_rolled:
 		_wear_bundle()
+	_mind_the_rest()
 	if laid:
 		_lie_still()  # Struck or not, it stays down (decision 547).
 		return
@@ -1940,11 +1943,32 @@ func rise() -> void:
 	if not laid:
 		return
 	laid = false
+	if stilled:
+		stilled = false
+		_keep_prop("stilled", false)
 	down_until = World.tick
 	_keep_prop("laid", false)
 	if idle == Idle.HOMEWARD and grave != NO_TILE and tile == grave:
 		idle = Idle.GUARD
 		home = grave
+
+
+## The draugr's rest over its zone (World.dead_rest, decision 580): one of
+## the resting side lies still while it lasts, wherever he is and whether
+## or not his zone is awake (a respawn too), and one it laid gets up when it
+## is over. Not the draugr himself, who keeps his own rest.
+func _mind_the_rest() -> void:
+	if World.dead_rest.is_empty() and not stilled:
+		return
+	var rest: Dictionary = World.dead_rest.get(World.zone.name, {})
+	var resting := not rest.is_empty() and World.steps < int(rest.get("until", 0)) and not self is Draugr \
+			and _factions().same_side(_factions().of_kind(World.kind_of(self)), str(rest.get("side", "")))
+	if resting and not laid:
+		stilled = true
+		_keep_prop("stilled", true)
+		lay_down()
+	elif not resting and stilled:
+		rise()
 
 
 func _lie_still() -> void:
@@ -1988,11 +2012,16 @@ static func zone_graves() -> Array[Vector3i]:
 	return out
 
 
-## The room round [param cell]: the anchor of the zone's level (its
-## "regenerate" block's) it lies in; an empty Rect2i in none.
+## The room round [param cell]: the anchor of the zone's level it lies in,
+## its "regenerate" block's or, on a level drawn by hand, its own top-level
+## "anchors" (decision 580: the draugr's lair); an empty Rect2i in none.
 static func room_of(cell: Vector2i) -> Rect2i:
-	var block: Variant = _zone_config().get("regenerate", {})
-	var anchors: Variant = block.get("anchors", []) if block is Dictionary else []
+	var config := _zone_config()
+	var block: Variant = config.get("regenerate", {})
+	var anchors: Variant = (block.get("anchors", []) if block is Dictionary else []).duplicate()
+	var own: Variant = config.get("anchors", [])
+	if anchors is Array and own is Array:
+		anchors.append_array(own)
 	if anchors is Array:
 		for anchor: Variant in anchors:
 			var rect: Variant = anchor.get("rect") if anchor is Dictionary else null
@@ -2257,6 +2286,7 @@ func _world_tick(seconds: float) -> void:
 	_drop_windup()
 	_glancing = false
 	_calm()
+	_mind_the_rest()
 	if laid:
 		return
 	if idle == Idle.HOMEWARD:

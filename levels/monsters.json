@@ -101,7 +101,7 @@
 		"idle": "wander",
 		"opens_doors": true,
 		"door_force": 1,
-		"leash": 10,
+		"leash": 14,
 		"call": 6,
 		"strength": 1,
 		"temperament": {"bold": 0, "cautious": 2, "cowardly": 1},

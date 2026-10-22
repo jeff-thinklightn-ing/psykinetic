@@ -38,6 +38,9 @@ const RETINUE := {"easy": 0, "normal": 1, "hard": 2}
 const CHARGE_SCALE := 0.05
 const CHARGES_PER_RISEN := 10
 const MOST_MORE_RISEN := 3
+## How far round him the dead rise (cells), on free floor of his lair in
+## his sight: round the dais, not behind a pillar (580; 2 before).
+const RETINUE_REACH := 3
 ## The living come in while a pact is on: this much of his most back.
 const LIVING_HEAL := 0.5
 ## Game days he rests once laid to rest (a rules number, Jeff's to move).
@@ -286,6 +289,7 @@ func _yield() -> void:
 		if rests_until <= World.steps:
 			rests_until = World.steps + RISE_DAYS * DayNight.day_steps
 			_keep_prop("rests_until", rests_until)
+		_rest_over(rests_until)
 	_restore()
 	if rests_until > World.steps:
 		state = State.AT_REST
@@ -313,6 +317,8 @@ func _restore() -> void:
 func _rise_again() -> void:
 	rests_until = -1
 	_keep_prop("rests_until", -1)
+	for zone_name in _rest_zones():
+		World.dead_rest.erase(zone_name)
 	if state == State.AT_REST:
 		state = State.SEATED
 		down_until = World.tick
@@ -321,13 +327,34 @@ func _rise_again() -> void:
 			(entity as Monster).rise()
 
 
-## Laid to rest: every one of the barrow's dead in his zone lies still.
+## Laid to rest: every one of the barrow's dead in his zone lies still
+## (those in the zones his level "stills" as each next thinks, 580).
 func _still_the_dead() -> void:
 	_stilled_tick = World.tick
 	for entity in World.monsters():
 		if entity != self and entity is Monster and _is_dead(entity) and not (entity as Monster).laid \
 				and not entity in _retinue:
-			(entity as Monster).lay_down()
+			(entity as Monster)._mind_the_rest()
+
+
+## His rest, till World.steps [param until], laid over his side's dead in
+## his own zone and each his level "stills" (World.dead_rest, decision 580;
+## saved, so it holds in a zone asleep, unloaded or after a restart).
+func _rest_over(until: int) -> void:
+	var side := _factions().of_kind(World.kind_of(self))
+	for zone_name in _rest_zones():
+		World.dead_rest[zone_name] = {"until": until, "side": side}
+
+
+## His own zone and those his level's "stills" names.
+func _rest_zones() -> Array[String]:
+	var out: Array[String] = [World.zone.name]
+	var named: Variant = _zone_config().get("stills", [])
+	if named is Array:
+		for each: Variant in named:
+			if str(each) not in out:
+				out.append(str(each))
+	return out
 
 
 ## [param count] of the dead raised round him in his lair (World.spawn_spec).
@@ -335,10 +362,10 @@ func _raise_retinue(count: int) -> void:
 	if count <= 0 or not World.spawn_spec.is_valid():
 		return
 	var spots: Array[Vector2i] = []
-	for dy in range(-2, 3):
-		for dx in range(-2, 3):
+	for dy in range(-RETINUE_REACH, RETINUE_REACH + 1):
+		for dx in range(-RETINUE_REACH, RETINUE_REACH + 1):
 			var at := tile + Vector2i(dx, dy)
-			if at != tile and _in_lair_cell(at) and World.is_free(at):
+			if at != tile and _in_lair_cell(at) and World.is_free(at) and World.has_line_of_sight(tile, at):
 				spots.append(at)
 	spots.sort_custom(func(a: Vector2i, b: Vector2i) -> bool: return World.distance(tile, a) < World.distance(tile, b))
 	for i in mini(count, spots.size()):

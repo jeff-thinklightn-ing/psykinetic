@@ -541,6 +541,11 @@ var _walls_down: Dictionary[String, Dictionary] = {}
 ## the snapshot; the server's (environment's storms damage, economy's
 ## repairs mend: damage_roof, repair_roof).
 var roofs_damaged: Dictionary[String, bool] = {}
+## The draugr laid to rest (decisions 548, 580): zone name -> {"until":
+## World.steps, "side": a faction}; that side's monsters in that zone lie
+## still till then (Monster._mind_the_rest), asleep or awake, his own zone or
+## one his level "stills". Main saves it ("dead_rest").
+var dead_rest: Dictionary[String, Dictionary] = {}
 ## A roof of [param level] was damaged or mended (Main tells the peers).
 signal roof_changed(level: String)
 ## A client's: each town's buildings as the server told ("town"), for
@@ -1461,6 +1466,7 @@ func reset() -> void:
 	_cover = PackedFloat32Array()
 	_cover_rect = Rect2i()
 	_next_id = 1
+	dead_rest.clear()
 	zone.tier_origins = []
 	tick = 0
 	tick_alpha = 0.0
