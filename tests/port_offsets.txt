@@ -22,3 +22,4 @@ npc 3000
 ui 3200
 psykinetic-release 3400
 dungeon 3600
+combat 3800
