@@ -19,6 +19,7 @@ func _ready() -> void:
 	await _test_strike()
 	await _test_one_strike_clip()
 	await _test_bow_clear()
+	await _test_work_clear()
 	_test_warm_painted()
 	await _test_upper()
 	await _test_upper_timed()
@@ -244,6 +245,47 @@ func _test_bow_clear() -> void:
 			holder.free()
 	_check(found.is_empty(), "no bow nor arm inside the body, five builds, carried, nocked, drawn, released (%s)" % ", ".join(found))
 	_check(anchors.is_empty(), "at full draw the string hand at the jaw, not behind the head (%s)" % ", ".join(anchors))
+
+
+## The work's clips (566) with the tool in the right hand as Client3D sockets it: at moments along
+## each loop, on the five builds, no vertex of the tool inside the trunk or the left leg, of the
+## left forearm inside the trunk, nor of the right forearm or hand inside the trunk or the head.
+func _test_work_clear() -> void:
+	print("== the work's tools clear of the body ==")
+	var lib := load(CLIPS) as AnimationLibrary
+	var builds := [["man", "res://art/models/characters/human_m.glb", {}],
+		["man heavy", "res://art/models/characters/human_m.glb", {"heavy": 1.0}],
+		["man broad", "res://art/models/characters/human_m.glb", {"heavy": 0.6, "broad": 1.0}],
+		["man lean", "res://art/models/characters/human_m.glb", {"lean": 1.0, "narrow": 1.0}],
+		["woman", "res://art/models/characters/human_f.glb", {}]]
+	var moments := [["Chop", "tool.axe", [0.0, 0.3, 0.45, 0.55, 0.62, 0.8, 1.3]], ["Saw", "tool.saw", [0.0, 0.2, 0.4, 0.6]],
+		["Hammer", "tool.hammer", [0.0, 0.22, 0.5]]]
+	var found: Array[String] = []
+	for build: Array in builds:
+		for moment: Array in moments:
+			for at: float in moment[2]:
+				var model := (load(build[1]) as PackedScene).instantiate() as Node3D
+				add_child(model)
+				for mesh: MeshInstance3D in model.find_children("*", "MeshInstance3D", true, false):
+					for key: String in build[2]:
+						var i := mesh.find_blend_shape_by_name(key)
+						if i >= 0:
+							mesh.set_blend_shape_value(i, build[2][key])
+				var holder := Node3D.new()
+				Client3D._attach_sockets(model, Client3D.HUMAN_SOCKETS, 1.0, holder)
+				var tool := ArtKit.instance(moment[1])
+				(holder.get_meta("sockets")["hand_r"] as Node3D).add_child(tool)
+				var rig := AnimRig.make(model, lib, 0.0, true, null)
+				rig.loop(moment[0], 0.0, 0.0, true)
+				for i in 3:
+					rig.upper_at(moment[0], at)
+					await get_tree().process_frame
+				var counts := _bow_inside(model, tool)
+				if counts != Vector3i.ZERO:
+					found.append("%s %s %.2f: tool %d, left forearm %d, right arm %d" % [build[0], moment[0], at, counts.x, counts.y, counts.z])
+				model.queue_free()
+				holder.free()
+	_check(found.is_empty(), "no tool nor arm inside the body, five builds, chopping, sawing, hammering (%s)" % ", ".join(found))
 
 
 ## The people's own run and sprint (Client3D.HUMAN_GAITS).

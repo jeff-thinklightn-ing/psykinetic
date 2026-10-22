@@ -275,6 +275,90 @@ CLIPS["Bow_Loose"] = {"keys": [
 	(1.0, P("Idle_Loop", 1.0, BOW_LOW)),
 ]}
 
+# Visible work (566, pc-character's side; Jeff: "town people need to be doing activities to better
+# the town, chopping wood ... building a half constructed building"): the work a resident shows,
+# looped, a tool in the right hand (art-kit's tool.*: the grip at the origin, the length +y, the
+# edge or face +x, so GRASP's length and side are the tool's).
+
+
+def right_arm(ahead: float, out: float, up: float, pole: tuple) -> list:
+	"""The right wrist [ahead], [out] (to its right) and [up] of its shoulder, the elbow toward [pole]."""
+	return [("upperarm_r", ([("upperarm_r", (-out, -ahead, up), 1.0)], pole), REACH)]
+
+
+def left_arm(ahead: float, out: float, up: float, pole: tuple) -> list:
+	"""The left wrist [ahead], [out] (to its left) and [up] of its shoulder, the elbow toward [pole]."""
+	return [("upperarm_l", ([("upperarm_l", (out, -ahead, up), 1.0)], pole), REACH)]
+
+
+# Chopping: both hands on the haft, each placed (REACH) so neither forearm crosses the chest
+# (Axe_Overhead's hold did, for the brute): ready held across the front, the left hand low by the
+# left hip, the right up by the right side, the head up to the right; raised over the right
+# shoulder, the head behind; brought down ahead into the log, the right hand leading, the trunk
+# bowing into it; a breath, again. The haft lies from the left hand through the right (GRASP),
+# its edge toward [edge] made square to it.
+SHOULDERS = 0.17
+
+
+def chop(right: tuple, left: tuple, edge: tuple, poles: tuple = ((-1.0, 0.3, -0.5), (1.0, 0.2, -0.6))) -> list:
+	"""The right wrist at [right] = (ahead, out to its right, up) of the right shoulder, the left
+	at [left] = (ahead, out to its left, up) of the left; the axe along from the left to the right."""
+	r = Vector((-SHOULDERS - right[1], -right[0], right[2]))
+	l = Vector((SHOULDERS + left[1], -left[0], left[2]))
+	length = (r - l).normalized()
+	e = Vector(edge)
+	e = (e - length * e.dot(length)).normalized()
+	return right_arm(right[0], right[1], right[2], poles[0]) + left_arm(left[0], left[1], left[2], poles[1]) + [
+		("hand_r", (tuple(length), tuple(e)), GRASP)]
+
+
+CHOP_READY = chop((0.45, 0.1, -0.2), (0.4, -0.05, -0.5), (0.0, -1.0, 0.0))
+CHOP_UP = chop((0.05, 0.12, 0.3), (0.25, -0.15, 0.1), (0.0, -1.0, 0.5)) + [("spine_02", LIFT, 8.0), ("spine_03", LIFT, 4.0)]
+CHOP_DOWN = chop((0.66, 0.02, -0.42), (0.38, -0.12, -0.4), (0.0, 0.0, -1.0)) + [
+	("spine_01", LIFT, -14.0), ("spine_02", LIFT, -10.0), ("Head", LIFT, 10.0)]
+CLIPS["Chop_Loop"] = {"loop": True, "keys": [
+	(0.0, P("Idle_Loop", 0.0, CHOP_READY)),
+	(0.45, P("Idle_Loop", 0.45, CHOP_UP)),
+	(0.62, P("Idle_Loop", 0.62, CHOP_DOWN, move=(0.0, -0.04, -0.05))),
+	(0.8, P("Idle_Loop", 0.8, CHOP_DOWN)),
+	(1.3, P("Idle_Loop", 1.3, CHOP_READY + [("spine_02", LIFT, 2.0)])),
+	(1.6, P("Idle_Loop", 0.0, CHOP_READY)),
+]}
+# Sawing at the woodpile: bent over the log, the left hand pressing it down ahead to the left,
+# the saw in the right hand pushed and drawn ahead and down, the blade sloping into the cut, the
+# teeth below; the trunk rocking a little with each stroke.
+BENT = [("spine_01", LIFT, -14.0), ("spine_02", LIFT, -12.0), ("Head", LIFT, -10.0), ("thigh_l", LIFT, 8.0),
+	("calf_l", LIFT, -12.0), ("thigh_r", LIFT, 4.0), ("calf_r", LIFT, -8.0)]
+SAW_HOLD = left_arm(0.42, 0.18, -0.52, (1.0, 0.4, 0.2)) + [("hand_l", Vector((0.1, -0.4, -1.0)), AIM)]
+CLIPS["Saw_Loop"] = {"loop": True, "keys": [
+	(0.0, P("Idle_Loop", 0.0, BENT + SAW_HOLD + right_arm(0.24, 0.14, -0.36, (-1.0, 0.6, -0.2))
+		+ [("hand_r", ((0.0, -1.0, -0.55), (0.0, 0.55, -1.0)), GRASP)])),
+	(0.4, P("Idle_Loop", 0.4, BENT + [("spine_02", LIFT, -4.0)] + SAW_HOLD + right_arm(0.58, 0.12, -0.5, (-1.0, 0.4, -0.3))
+		+ [("hand_r", ((0.0, -1.0, -0.6), (0.0, 0.6, -1.0)), GRASP)], move=(0.0, -0.02, -0.01))),
+	(0.8, P("Idle_Loop", 0.0, BENT + SAW_HOLD + right_arm(0.24, 0.14, -0.36, (-1.0, 0.6, -0.2))
+		+ [("hand_r", ((0.0, -1.0, -0.55), (0.0, 0.55, -1.0)), GRASP)])),
+]}
+# Hammering at the frame: standing to it, the left hand braced on the timber ahead, the hammer
+# raised by the head, its face toward the work, then struck at chest height, the face square on.
+BRACE = left_arm(0.42, 0.12, 0.02, (1.0, 0.3, -0.4)) + [("hand_l", Vector((0.0, -1.0, 0.1)), AIM)]
+HAMMER_UP = right_arm(0.12, 0.14, 0.26, (-1.0, 0.3, -0.3)) + [("hand_r", ((0.0, 0.4, 1.0), (0.0, -1.0, 0.4)), GRASP)]
+HAMMER_DOWN = right_arm(0.44, 0.1, -0.04, (-1.0, 0.2, -0.6)) + [("hand_r", ((0.0, -1.0, 0.25), (0.0, -0.25, -1.0)), GRASP)]
+CLIPS["Hammer_Loop"] = {"loop": True, "keys": [
+	(0.0, P("Idle_Loop", 0.0, BRACE + HAMMER_UP + [("spine_02", LIFT, 3.0)])),
+	(0.22, P("Idle_Loop", 0.22, BRACE + HAMMER_DOWN + [("spine_02", LIFT, -5.0)], move=(0.0, -0.01, 0.0))),
+	(0.32, P("Idle_Loop", 0.32, BRACE + HAMMER_DOWN + [("spine_02", LIFT, -4.0)])),
+	(0.7, P("Idle_Loop", 0.7, BRACE + HAMMER_UP + [("spine_02", LIFT, 3.0)])),
+]}
+# Carrying on the shoulder (the upper layer, over the walk or standing): the right hand up on the
+# load above the right shoulder, the elbow forward and down, the head tilted away from it.
+SHOULDERED = right_arm(0.1, 0.02, 0.2, (0.0, -1.0, -0.6)) + [("hand_r", Vector((0.0, -0.3, 1.0)), AIM),
+	("neck_01", TILT, 5.0), ("Head", TILT, 7.0), ("clavicle_r", TILT, -6.0)]
+CLIPS["Carry_Shoulder_Loop"] = {"loop": True, "keys": [
+	(0.0, P("Idle_Loop", 0.0, SHOULDERED)),
+	(1.0, P("Idle_Loop", 1.0, SHOULDERED + [("spine_02", LIFT, -2.0)])),
+	(2.0, P("Idle_Loop", 0.0, SHOULDERED)),
+]}
+
 
 def args() -> list:
 	return sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []

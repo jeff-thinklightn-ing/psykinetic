@@ -77,6 +77,7 @@ func _ready() -> void:
 	_test_attach_points()
 	_test_bow()
 	_test_standing_turn()
+	_test_visible_work()
 	_test_goblins_differ()
 	_test_allies()
 	_test_shadows_in_view()
@@ -3845,6 +3846,57 @@ func _test_standing_turn() -> void:
 		turn.free()
 	if look != null:
 		look.free()
+	_rig._animate(puppet)
+
+
+## 566, pc-character's side: a resident's activity word as its body shows it.
+func _test_visible_work() -> void:
+	print("\n== visible work (566): the work's clip, its tool in hand, a log on the shoulder, lying to sleep ==")
+	var player := _player()
+	_rig._process(0.0)
+	var puppet: Node3D = _rig._puppets[player.get_instance_id()]
+	var rig := puppet.get_meta("rig") as AnimRig
+	var sockets: Dictionary = puppet.get_meta("sockets")
+	_check(sockets.has("shoulder") and (sockets["shoulder"].get_parent() as BoneAttachment3D).bone_name == "UpperChest",
+			"a person has a shoulder socket on the upper chest")
+	var resident := Resident.new()
+	resident.name = "WorkTestResident"
+	add_child(resident)
+	puppet.set_meta("speed", 0.0)
+	puppet.set_meta("shuffle_until", 0)
+	var held: Array = puppet.get_meta("held")
+	var show := func(word: String) -> void:
+		resident.activity = word
+		_rig._sync_held(resident, puppet)
+		_rig._sync_work(resident, puppet)
+		_rig._animate(puppet)
+	var tools := {}
+	for word: String in ["chop", "saw", "hammer"]:
+		show.call(word)
+		var thing := (sockets["hand_r"] as Node3D).get_node_or_null("Held")
+		tools[word] = [rig.base_clip(), held[0], thing != null]
+	_check(tools["chop"] == ["Chop", "art:tool.axe", true] and tools["saw"] == ["Saw", "art:tool.saw", true]
+			and tools["hammer"] == ["Hammer", "art:tool.hammer", true],
+			"at work: chopping, sawing, hammering, each its tool in the right hand (%s)" % tools)
+	show.call("carry_log")
+	var log_piece := (sockets["shoulder"] as Node3D).get_node_or_null("Load")
+	_check(log_piece != null and rig.upper_clip() == "Carry_Shoulder" and held[0] == "",
+			"carrying a log: on the shoulder, the hand up to it (%s), the axe put away" % rig.upper_clip())
+	show.call("sleep")
+	_rig._lay(puppet, puppet.get_node("Body"), 0.0)
+	var body := puppet.get_node("Body") as Node3D
+	var model := body.get_node("Model") as Node3D
+	_check(rig.base_clip() == "Lie" and body.position.distance_to(Vector3(-Client3D.LIE_MIDDLE * float(puppet.get_meta("model_scale", 1.0)), 0, 0)) < 0.001
+			and is_equal_approx(wrapf(model.rotation.y - float(puppet.get_meta("faces")), 0.0, TAU), PI),
+			"asleep: lying (%s), turned to put the head the way it faces, on its cell (%s)" % [rig.base_clip(), body.position])
+	show.call("dig_for_treasure")
+	_rig._lay(puppet, puppet.get_node("Body"), 0.0)
+	_check(rig.upper_clip() == "" and (sockets["shoulder"] as Node3D).get_node_or_null("Load") == null and body.position == Vector3.ZERO
+			and is_equal_approx(model.rotation.y, float(puppet.get_meta("faces"))) and rig.base_clip() != "Lie",
+			"a word it doesn't know: standing as before, nothing carried (%s)" % rig.base_clip())
+	resident.free()
+	_rig._sync_held(player, puppet)
+	puppet.set_meta("work", "")
 	_rig._animate(puppet)
 
 

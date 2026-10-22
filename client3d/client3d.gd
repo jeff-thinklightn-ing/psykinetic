@@ -8703,6 +8703,7 @@ func _sync_puppets() -> void:
 		_sync_held(entity, puppet)
 		if entity is Resident:
 			_sync_addressing(entity as Resident, puppet)
+			_sync_work(entity as Resident, puppet)
 		_sync_bow(entity, puppet)
 		if entity is Player:
 			var lantern := puppet.get_node_or_null("Lantern") as Node3D
@@ -8716,6 +8717,7 @@ func _sync_puppets() -> void:
 		_sync_ailments(entity, puppet)
 		if puppet.has_meta("rig"):
 			var body := puppet.get_node("Body") as Node3D
+			_lay(puppet, body, yaw)
 			if not is_equal_approx(body.rotation.y, yaw):
 				body.rotation.y = yaw
 			(puppet.get_meta("rig") as AnimRig).every = _pose_every(puppet)
@@ -9355,6 +9357,9 @@ static func _attach_sockets(scene: Node3D, sizes: Dictionary, model_scale: float
 	var skeleton := skeletons[0] as Skeleton3D
 	var made := {}
 	var table := _sockets(sizes["hand"], sizes["hip"], sizes["back"], sizes["chest"])
+	var shoulder := _shoulder_socket(skeleton, sizes["hand"])
+	if not shoulder.is_empty():
+		table["shoulder"] = shoulder
 	for name: String in table:
 		var bone: String = table[name][0]
 		if skeleton.find_bone(bone) < 0:
@@ -9384,6 +9389,10 @@ func _sync_held(entity: GridEntity, puppet: Node3D) -> void:
 	var held: Array = puppet.get_meta("held")
 	var sockets: Dictionary = puppet.get_meta("sockets")
 	var ids := held_ids(entity)
+	var work := work_of(entity)
+	if work.has("right") and ids[0] == "":
+		ids[0] = ART_ID + str(work["right"])
+	_sync_load(puppet, sockets, str(work.get("shoulder", "")))
 	var quiver := ""
 	if World.drawn_with(entity) != "" and ARROW_VARIANTS.has(ids[0]):
 		quiver = ids[0]
@@ -9414,11 +9423,12 @@ func _sync_held(entity: GridEntity, puppet: Node3D) -> void:
 			old.queue_free()
 		if id == "":
 			continue
-		var art := str(Items.def(id).get("art", "item." + id))
+		var own := id.begins_with(ART_ID)
+		var art := id.substr(ART_ID.length()) if own else str(Items.def(id).get("art", "item." + id))
 		if ArtKit.has(art):
 			var thing := ArtKit.instance(art)
 			thing.name = "Held"
-			if "shield" in Items.def(id).get("tags", []):
+			if not own and "shield" in Items.def(id).get("tags", []):
 				# A shield's face is its +z (art_style): a quarter turn about its
 				# grip's axis turns it out of the back of the hand, its thin side
 				# across the forearm.
@@ -10060,6 +10070,109 @@ static func _sitting(puppet: Node3D) -> bool:
 	return entity != null and entity.pose == Monster.Pose.SIT
 
 
+## Visible work (566, pc-character's side; Jeff: "town people need to be doing
+## activities to better the town, chopping wood, going hunting, building a half
+## constructed building, sleeping at night"): npc's Resident.activity, a word,
+## as the body shows it: the clip it plays standing at the work ("clip"; walking,
+## its gait), the tool in its right hand while that hand is empty ("right", an
+## art slot: art-kit's tool.*), the load on its shoulder ("shoulder": carry.*),
+## an upper-layer clip over its walk and stand ("upper"), lying ("lying").
+## A word not here shows nothing (the sim may name one before it's drawn). The
+## sim sets only the facing (toward the work); the strokes are the client's,
+## each body out of step with the next (AnimRig.loop starts a clip somewhere
+## along it, seeded per body).
+const ACTIVITIES := {
+	"chop": {"clip": "Chop", "right": "tool.axe"},
+	"saw": {"clip": "Saw", "right": "tool.saw"},
+	"hammer": {"clip": "Hammer", "right": "tool.hammer"},
+	"carry_log": {"upper": "Carry_Shoulder", "shoulder": "carry.log"},
+	"sleep": {"clip": "Lie", "lying": true},
+}
+## A hand's id that names an art slot, not an item (a work's tool).
+const ART_ID := "art:"
+
+
+## [param entity]'s work as ACTIVITIES has it ({} for none).
+static func work_of(entity: GridEntity) -> Dictionary:
+	return ACTIVITIES.get((entity as Resident).activity, {}) if entity is Resident else {}
+
+
+## The work kept on the puppet ("work", read by _animate and _lay), and its
+## upper layer: the work's, else let go of if it was a work's.
+func _sync_work(resident: Resident, puppet: Node3D) -> void:
+	var work := work_of(resident)
+	puppet.set_meta("work", resident.activity if not work.is_empty() else "")
+	if not puppet.has_meta("rig"):
+		return
+	var rig := puppet.get_meta("rig") as AnimRig
+	var upper := str(work.get("upper", ""))
+	if upper != "" and rig.upper_clip() != upper and rig.has(upper):
+		rig.upper(upper)
+	elif upper == "" and rig.upper_clip() != "" and ACTIVITIES.values().any(func(w: Dictionary) -> bool: return str(w.get("upper", "")) == rig.upper_clip()):
+		rig.upper_off()
+
+
+## The shoulder's load: [param slot]'s piece on the "shoulder" socket, gone
+## when it's "" (kept as the puppet's "load").
+func _sync_load(puppet: Node3D, sockets: Dictionary, slot: String) -> void:
+	if slot == str(puppet.get_meta("load", "")):
+		return
+	puppet.set_meta("load", slot)
+	var shoulder := sockets.get("shoulder") as Node3D
+	if shoulder == null:
+		return
+	var old := shoulder.get_node_or_null("Load")
+	if old != null:
+		shoulder.remove_child(old)
+		old.queue_free()
+	if slot != "" and ArtKit.has(slot):
+		var piece := ArtKit.instance(slot)
+		piece.name = "Load"
+		shoulder.add_child(piece)
+
+
+## The "shoulder" socket (566): on the upper chest above the right shoulder's
+## joint, a little in from it, +y up off the shoulder's top and +x forward
+## along the body (a carried log lies fore and aft, art-kit's carry.*: its
+## origin where it rests, its length along x); measured off [param skeleton]'s
+## rest, so every body has it where its own shoulder is. [] without the bones.
+const SHOULDER_IN := 0.8
+const SHOULDER_UP := 0.09
+static func _shoulder_socket(skeleton: Skeleton3D, hand: float) -> Array:
+	var chest := skeleton.find_bone("UpperChest")
+	var arm := skeleton.find_bone("RightUpperArm")
+	if chest < 0 or arm < 0:
+		return []
+	var joint := skeleton.get_bone_global_rest(chest).affine_inverse() * skeleton.get_bone_global_rest(arm).origin
+	return ["UpperChest", Transform3D(Basis(Vector3(0, 0, 1), Vector3.UP, Vector3(-1, 0, 0)),
+		Vector3(joint.x * SHOULDER_IN, joint.y + SHOULDER_UP * hand, joint.z))]
+
+
+## A sleeper lies on its bed cell (566): the Lie clip falls back from the feet,
+## its head behind them, so the model turns half round to put the head toward
+## the facing (the sim's: to the wall) and the body moves back by the lying
+## body's middle (LIE_MIDDLE, measured: the head 1.14 m behind the feet' 0.23
+## ahead) so it lies on the cell, not beside it. Else as it stands. [param yaw]
+## the facing's, turned by the caller.
+const LIE_MIDDLE := 0.46
+func _lay(puppet: Node3D, body: Node3D, yaw: float) -> void:
+	var lying := bool((ACTIVITIES.get(str(puppet.get_meta("work", "")), {}) as Dictionary).get("lying", false))
+	var offset := Vector3.ZERO
+	if lying:
+		var ahead := Vector3(cos(yaw), 0.0, -sin(yaw))
+		offset = -ahead * LIE_MIDDLE * float(puppet.get_meta("model_scale", 1.0))
+	if body.position != offset:
+		body.position = offset
+	var model := body.get_node_or_null("Model") as Node3D
+	if model == null:
+		return
+	if not puppet.has_meta("faces"):
+		puppet.set_meta("faces", model.rotation.y)
+	var want := float(puppet.get_meta("faces")) + (PI if lying else 0.0)
+	if not is_equal_approx(model.rotation.y, want):
+		model.rotation.y = want
+
+
 ## A body standing still turns slower than it walks round (560, pc-character's
 ## side; Jeff: a resident clicked "stop, turn to face the player"): when its
 ## facing swings by more than STAND_TURN_MIN while it stands, the puppet turns
@@ -10222,6 +10335,11 @@ func _animate(puppet: Node3D) -> void:
 		var gaits: Array = puppet.get_meta("gaits", GAITS)
 		var gait: Array = gaits[gait_for(rig.base_clip(), speed / pace, gaits)]
 		rig.loop(gait[0], clampf(speed / (float(gait[1]) * pace), 0.3, 3.0))
+		return
+	var work: Dictionary = ACTIVITIES.get(str(puppet.get_meta("work", "")), {})
+	if speed <= WALKING and work.has("clip") and rig.has(str(work["clip"])):
+		# At its work (566): the work's clip, looped.
+		rig.loop(str(work["clip"]), tempo)
 		return
 	if now < int(puppet.get_meta("shuffle_until", 0)) and rig.has(CLIP_WALK):
 		# Turning where it stands (_standing_turn): its feet shuffle round.

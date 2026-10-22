@@ -19349,3 +19349,33 @@ now:
 The third part, the state in the code hint and the click line ("being
 built 40%", "planned"), waits for economy's progress key on the wire.
 Nothing travels from builder; protocol unchanged.
+
+## 566, pc-character's side: the work a resident is at, as its body shows it
+
+Jeff: "town people need to be doing activities to better the town, chopping wood, going hunting,
+building a half constructed building, sleeping at night"; npc's design page, approved by the
+coordinator. npc's Resident.activity (a replicated word; the sim sets only the facing, toward the
+work) is drawn by Client3D.ACTIVITIES: chop (Chop, tool.axe in the right hand), saw (Saw, tool.saw),
+hammer (Hammer, tool.hammer), carry_log (Carry_Shoulder on the upper layer over the walk and the
+stand, art-kit's carry.log on a new "shoulder" socket), sleep (Lie). A tool shows only while the
+right hand is empty (an "art:" id in the hand's held list, its art slot named, not an item); a word
+the client doesn't know shows nothing, so the sim can name phase 2's words (stalk, carry_game,
+hoe, herd, shear: 566 amended) before they are drawn. Standing at the work the body loops its clip,
+each one started somewhere along it (AnimRig's seeded start), so two at the woodlot are out of
+step; walking, its gait. The clips are new in tools/humanoid_clips.py, placed by REACH and GRASP as
+the bow's are, the pack having no loop of them: Chop_Loop (both hands on the haft, each placed, the
+haft through them: ready across the front, raised over the right shoulder, struck ahead into the
+log; Axe_Overhead's hold put the right forearm in the chest), Saw_Loop (bent over the log, the left
+hand on it, the saw pushed and drawn ahead and down), Hammer_Loop (standing to the frame, the left
+hand braced, the hammer raised by the head and struck at chest height; the pack's Fixing_Kneeling
+is a 5 s kneel-and-rise, not a loop), Carry_Shoulder_Loop (the right hand up on the load, the head
+tilted from it). anim_rig_test _test_work_clear: at moments along each loop, on the five builds, no
+vertex of the tool or the left forearm in the trunk, nor of the right arm in the trunk or head. The
+"shoulder" socket: on UpperChest above the right shoulder's joint (measured off each skeleton's
+rest, 0.8 of the way out, 0.09 up by the hand's scale), +y up off the shoulder and +x forward, a
+load lying fore and aft (art-kit's carry.*: its origin where it rests, its length along x). Asleep:
+the Lie clip falls back, its head 1.14 m behind the feet' 0.23 ahead, so the model turns half round
+(the head toward the facing, npc's: along the room's long side into the corner) and the body moves
+back by LIE_MIDDLE (0.46 m) to lie on the bed cell; a bed is the home's floor corner (no piece to
+lie on). Client only; nothing on the wire beyond npc's field. Shots wait for the coordinator's
+all-clear (Jeff in Blender).
