@@ -536,6 +536,13 @@ func _test_aim() -> void:
 	World.step()
 	_main._on_world_ticked(World.tick)
 	_check(not _main.hud.text.begins_with("HP"), "the HUD's line carries no HP number (%s)" % _main.hud.text)
+	# Combat's ground telegraph (602, ui's side): the fill and the cells by name.
+	_check(Client3D.telegraph_fill(100, 130, 100) == 0.0 and absf(Client3D.telegraph_fill(100, 130, 115) - 0.5) < 0.001
+		and Client3D.telegraph_fill(100, 130, 140) == 1.0 and Client3D.telegraph_fill(100, 100, 100) == 1.0,
+		"a telegraph fills from its start to its landing tick")
+	var cone: Array = Main.telegraph_cells({"kind": "cone", "origin": [10, 10], "facing": [1, 0], "length": 4, "half_angle": 30})
+	var has_class := ProjectSettings.get_global_class_list().any(func(e: Dictionary) -> bool: return str(e.get("class", "")) == "Telegraph")
+	_check(cone.is_empty() == not has_class, "the cells come from combat's Telegraph when it is there (%d cells, class %s)" % [cone.size(), has_class])
 	# Combat's stamina: "winded" on the state line while the replicated flag is true, read by name.
 	var winded_body: GridEntity = load(Main.RESIDENT).new()
 	_check(not Main.is_winded(winded_body) and not Main.is_winded(null), "no winded flag on a body (or no body): not winded")

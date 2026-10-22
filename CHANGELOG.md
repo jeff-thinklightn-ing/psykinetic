@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- A boss's heavy blow shows where it will land before it does: the cells it will hit glow on the ground, brightening as it comes, with a flash as it lands (602, ui's side; the draugr's spin and throw are combat's).
 - A held weapon can be thrown down a line (606), the motion behind the draugr's coming axe throw: it knocks back the first body it hits by weight and lands at their feet to be picked up again; its flight is sent to the views (a protocol change).
 - A weapon can sweep through a cone (605), the motion behind the draugr's coming axe sweep: everyone in front of him is knocked outward along their own line, by their weight and the axe's.
 - A charge can now be stopped on the way (604), the motion behind the draugr's coming charge for his axe: blows from the front slow it and enough of them stop it (three sword hits, one hammer), a heavy blow knocks him off his line, a braced spear or someone standing in his path stops him, and blows from behind do nothing.

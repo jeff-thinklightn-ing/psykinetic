@@ -1017,6 +1017,12 @@ const AIM_PIP := 0.05
 const AIM_PIP_GAP := 0.16
 const AIM_PIPS_MOST := 4
 const AIM_SEGMENTS := 48
+## A telegraph's fill: faint at its start, full as it lands; the landing
+## flash's alpha and length.
+const TELEGRAPH_FAINT := 0.18
+const TELEGRAPH_FULL := 0.6
+const TELEGRAPH_FLASH := 0.95
+const TELEGRAPH_FLASH_MSEC := 300
 const TOSS := Color(1.0, 0.85, 0.4, 0.85)
 const TOSS_LENGTH := 1.3
 ## A speech bubble's tail sits this far over a creature's head (just
@@ -1301,6 +1307,12 @@ var _aim_arc: MeshInstance3D
 var _aim_mark: MeshInstance3D
 var _aim_pips: Array[MeshInstance3D] = []
 var _aim_arc_radius := -1.0
+## The bosses' ground telegraphs (combat's 602, ui's side; Jeff: "a small
+## red cone on the ground indicates the area"): id -> {quads, from, lands,
+## landed_at}; one flat quad per cell that will be hit, filling toward
+## lands_tick, a flash on landing.
+var _telegraphs: Dictionary = {}
+var _cell_quad: ArrayMesh
 ## The outline's passes (the first; each the next's next_pass), the
 ## outlined puppet (null: none), and each body material's copy that marks
 ## the stencil, by the material.
@@ -3076,6 +3088,75 @@ func channel_ring(tile: Vector2i, fraction: float, show := true) -> void:
 		var k := 1.0 + 0.5 * (1.0 - clampf(fraction, 0.0, 1.0))
 		_channel_ring.scale = Vector3(k, 1.0, k)
 		_lay_on_ground(_channel_ring, tile, ON_FLOOR)
+
+
+## A telegraph [param id] shown on [param cells] (combat's Telegraph.cells:
+## the cells that will be hit), from [param from_tick] to [param
+## lands_tick] (world ticks); shown again replaces it.
+func telegraph_show(id: String, cells: Array, from_tick: int, lands_tick: int) -> void:
+	telegraph_drop(id)
+	if _cell_quad == null:
+		_cell_quad = _flat_mesh([PackedVector2Array([Vector2(-0.5, -0.5), Vector2(0.5, -0.5), Vector2(0.5, 0.5), Vector2(-0.5, 0.5)])])
+	var quads: Array[MeshInstance3D] = []
+	for each: Variant in cells:
+		var cell := Vector2i(each) if each is Vector2i or each is Vector2 else (Vector2i(int(each[0]), int(each[1])) if each is Array and each.size() >= 2 else Vector2i(-100000, -100000))
+		if cell.x <= -100000:
+			continue
+		var quad := _make_flat(_cell_quad, Color(UiTheme.color("alarm"), TELEGRAPH_FAINT))
+		_lay_on_ground(quad, cell, ON_FLOOR * 1.5)
+		add_child(quad)
+		quads.append(quad)
+	_telegraphs[id] = {"quads": quads, "from": from_tick, "lands": lands_tick, "landed_at": -1}
+
+
+## Telegraph [param id] ended: [param landed] true flashes it and lets it
+## go; false (called off) takes it away at once.
+func telegraph_land(id: String, landed: bool) -> void:
+	if not _telegraphs.has(id):
+		return
+	if landed:
+		_telegraphs[id]["landed_at"] = Time.get_ticks_msec()
+	else:
+		telegraph_drop(id)
+
+
+func telegraph_drop(id: String) -> void:
+	if not _telegraphs.has(id):
+		return
+	for quad: MeshInstance3D in _telegraphs[id]["quads"]:
+		quad.queue_free()
+	_telegraphs.erase(id)
+
+
+## Each frame at world [param tick]: every telegraph's fill, the flash of
+## one landed, gone after TELEGRAPH_FLASH_MSEC.
+func telegraph_tick(tick: int) -> void:
+	var now := Time.get_ticks_msec()
+	for id: String in _telegraphs.keys():
+		var entry: Dictionary = _telegraphs[id]
+		var alpha: float
+		if int(entry["landed_at"]) >= 0:
+			if now - int(entry["landed_at"]) > TELEGRAPH_FLASH_MSEC:
+				telegraph_drop(id)
+				continue
+			alpha = TELEGRAPH_FLASH
+		else:
+			alpha = lerpf(TELEGRAPH_FAINT, TELEGRAPH_FULL, telegraph_fill(int(entry["from"]), int(entry["lands"]), tick))
+		for quad: MeshInstance3D in entry["quads"]:
+			var material := quad.material_override as StandardMaterial3D
+			if material != null:
+				material.albedo_color = Color(UiTheme.color("alarm"), alpha)
+
+
+## How far a telegraph has run (0 to 1) from [param from_tick] to [param
+## lands_tick] at [param tick]; 1 when the window is empty.
+static func telegraph_fill(from_tick: int, lands_tick: int, tick: int) -> float:
+	return 1.0 if lands_tick <= from_tick else clampf(float(tick - from_tick) / float(lands_tick - from_tick), 0.0, 1.0)
+
+
+## The telegraphs shown (tests).
+func telegraphs_shown() -> int:
+	return _telegraphs.size()
 
 
 ## The bow's aim while drawn: the arc round [param origin] (the archer's

@@ -963,6 +963,8 @@ func _process(delta: float) -> void:
 				Iso.project(Vector2(0.5, -0.5)), Iso.project(Vector2(0.5, 0.5))])
 	_retarget_held()
 	_show_channel_ring()
+	if _client3d != null:
+		_client3d.telegraph_tick(World.tick)  # 602, ui's side: the telegraphs' fill.
 	_update_pack()
 	_update_talk()
 	_update_bar()
@@ -7350,6 +7352,11 @@ func _build_talk() -> void:
 	$HUD.add_child(barter_panel)
 	if has_signal("barter_told"):
 		connect("barter_told", _on_barter_told)
+	# Combat's ground telegraphs (602, ui's side), connected by name so either side lands first.
+	if has_signal("telegraph_started"):
+		connect("telegraph_started", _on_telegraph_started)
+	if has_signal("telegraph_ended"):
+		connect("telegraph_ended", _on_telegraph_ended)
 	_bar = PanelContainer.new()
 	_bar.name = "TalkBar"
 	_bar.visible = false
@@ -7617,6 +7624,42 @@ func _on_offers_message(data: Dictionary) -> void:
 ## The HUD's words while an offer stands (536, ui's side): how to take it, and what it is.
 static func standing_words(title: String) -> String:
 	return 'say "yes" to take it: %s' % title if not title.is_empty() else ""
+
+
+## A boss's telegraph begins (combat's 602: the "telegraph" message {id,
+## source, kind, shape, from_tick, lands_tick}; Main.telegraph_started):
+## its cells from combat's Telegraph.cells, the same cells that hit, drawn
+## on the ground filling toward lands_tick (Client3D.telegraph_show).
+func _on_telegraph_started(id: Variant, data: Dictionary) -> void:
+	if _client3d == null:
+		return
+	# The message carries the exact cells the blow will strike (clipped by the
+	# server); without them, combat's Telegraph.cells on the shape.
+	var cells: Variant = data.get("cells")
+	if not cells is Array:
+		var shape: Variant = data.get("shape", {})
+		cells = telegraph_cells(shape if shape is Dictionary else {})
+	var from_tick := int(data.get("from_tick", World.tick))
+	_client3d.telegraph_show(str(id), cells, from_tick, int(data.get("lands_tick", from_tick)))
+
+
+## A telegraph ends: landed, it flashes and goes; called off, it goes at once.
+func _on_telegraph_ended(id: Variant, landed: bool) -> void:
+	if _client3d != null:
+		_client3d.telegraph_land(str(id), landed)
+
+
+## The cells combat's Telegraph.cells gives for [param shape], the class
+## found by name in the global class list (so this parses before combat's
+## side lands); [] without it.
+static func telegraph_cells(shape: Dictionary) -> Array:
+	for entry: Dictionary in ProjectSettings.get_global_class_list():
+		if str(entry.get("class", "")) == "Telegraph":
+			var script: Variant = load(str(entry.get("path", "")))
+			if script is GDScript and (script as GDScript).has_method("cells"):
+				var cells: Variant = (script as GDScript).call("cells", shape)
+				return cells if cells is Array else []
+	return []
 
 
 ## Whether [param body] is winded (combat's replicated GridEntity.winded,
@@ -11349,6 +11392,15 @@ func _run_test_show(player: Player) -> void:
 					options_panel.toggle()
 			"pack":
 				pack_panel.shown = true
+			"telegraph":
+				# 602, ui's side: a sample cone ahead of the player, landing in 3 s, for the shot.
+				if player != null:
+					var cells: Array = []
+					for dx in range(1, 6):
+						for dy in range(-(dx / 2), dx / 2 + 1):
+							cells.append([player.tile.x + dx, player.tile.y + dy])
+					_on_telegraph_started(1, {"id": 1, "kind": "spin", "shape": {"kind": "cone", "origin": [player.tile.x, player.tile.y],
+						"facing": [1, 0], "length": 5, "half_angle": 30}, "cells": cells, "from_tick": World.tick, "lands_tick": World.tick + 30})
 			"aim":
 				# The archery aim, for the shot: the host draws the bow (the server's
 				# stance), the aim fixed north-east of the archer, the arc at the step.

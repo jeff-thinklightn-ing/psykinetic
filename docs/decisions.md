@@ -21878,6 +21878,35 @@ is_disarmed, boss_busy).
 
 monster_test: the waves (10 charges, normal: none at the start, one past
 75%, the other past 50%). Server only, protocol unchanged, no new
+
+## 602, ui's side: the ground telegraph drawn
+
+Combat's 602 (the draugr fight prototype, the gate for the next cut; the
+coordinator's approval): a boss's heavy blow is telegraphed to the zone
+("telegraph" message {id, source, kind, shape, from_tick, lands_tick},
+then {id, landed}); Telegraph.cells(shape) gives the cells it will hit,
+the same function that decides the hit. Jeff (2026-10-22): "a small red
+cone on the ground indicates the area", "a longer narrow cone" for the
+throw.
+
+- Main connects combat's Main.telegraph_started and telegraph_ended by
+  name (either side lands first) and draws the message's "cells", the
+  exact cells the blow will strike as the server clipped them, so what
+  shows is what hits; a message without them falls back to Telegraph.cells
+  on the shape through the global class list (Main.telegraph_cells; []
+  before combat's class exists).
+- Client3D draws one flat quad per cell on the ground in the theme's
+  alarm colour (the palette's danger colour, magenta for colour blindness;
+  Jeff's "red" is his to pick from the shot), faint at the start and
+  filling to full by lands_tick (telegraph_show, telegraph_tick,
+  Client3D.telegraph_fill), a bright flash for a third of a second when it
+  lands, gone at once when called off (telegraph_land). Nothing on the HUD;
+  the 2D view draws none.
+- --test-show=telegraph lays a sample cone's cells ahead of the player,
+  landing in three seconds, for the shot docs/ui/shots/combat/telegraph.jpg.
+
+ui_test: the fill; the cells by name with and without the class. Client
+only; protocol unchanged on this side (the message is combat's); no new
 class_name.
 ## 596: a lunge, a body moving itself down a line (physics step 2a)
 
