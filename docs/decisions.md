@@ -20066,7 +20066,8 @@ zone_name_here.)
   the folder fell back to the game's own, go to the console alone. The
   first-time hint at the top naming the folder stays.
 
-ui_test _test_screenshot_key. Client only; protocol unchanged; no new
+ui_test _test_screenshot_key. Shot: docs/ui/shots/sim/log_screenshot_line.jpg
+(docs-only, after the code). Client only; protocol unchanged; no new
 class_name.
 
 ## 353 amended (2), ui's side: the town's read-out on the big map, not in the log
@@ -20091,7 +20092,8 @@ filtered by zone.
   text for the box is economy's to choose.
 
 --test-show=town_note lays the sample note on the player's area box and
-opens the map, for the shot.
+opens the map, for the shot docs/ui/shots/sim/bigmap_town_note.jpg (the
+line wraps to three in The Wilds' box; docs-only, after the code).
 
 ui_test: a Town line kept for the map's box and not logged; a Server line
 still logged. Client only; protocol unchanged; no new class_name.
@@ -20121,7 +20123,8 @@ the death until the return, the way the downed countdown reads (544).
   back. No bar, the downed line's place and size (the diegetic rule).
 - The party log's line on the return stays as it is.
 - --test-show=return lays the sample line and lets the host's death path
-  run, for a shot after the windowed all-clear.
+  run, for the shot docs/ui/shots/sim/return_line.jpg (docs-only, after
+  the code).
 
 ui_test: the words, the countdown on the client's clock, past zero, no
 message. Client only; protocol unchanged on this side; no new class_name.
