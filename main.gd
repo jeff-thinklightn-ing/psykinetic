@@ -4963,6 +4963,12 @@ func _join_companion(record: PlayerRecord, player: Player) -> void:
 		Net.broadcast_to([player.owner_peer], "party", {"from": "Server", "text": "%s was carried off by raiders and is held by them still." % [
 			record.companion.get("name", "Your companion")]})
 		return
+	# Gone home, having left them (decision 581): she does not come.
+	if record.companion.has("left"):
+		var town := _town_words(str(record.companion["left"].get("place", "")))
+		print("[net] %s's companion %s left them and lives in %s" % [record.name, record.companion.get("name", "?"), town])
+		Net.broadcast_to([player.owner_peer], "party", {"from": "Server", "text": "%s left you and lives in %s now." % [record.companion.get("name", "Your companion"), town]})
+		return
 	# Working in a town (decision 284): elsewhere, she stays at it; here,
 	# she leaves it and goes with them, her job waiting.
 	var resident: Dictionary = record.companion.get("resident", {})
@@ -5467,6 +5473,155 @@ const HALL_LOCK := "draugr_hall"
 const HIDDEN_LOCK := "hidden_niche"
 ## The device's two halves (items' kinds, 544's items' side): minted no more
 ## since 573 (the charges are a count on the record); those held are keepsakes.
+
+
+# --- Leaving (decision 581) -------------------------------------------------------
+
+## The leaving rules: companion_traits.json "leaving".
+static func leaving_rules() -> Dictionary:
+	var rules: Variant = CompanionCard.tables().get("leaving", {})
+	return rules if rules is Dictionary else {}
+
+
+## After her bond moved by [param event] ([param why]): at the bottom step,
+## or on the last straw at or below its step, she will leave (her record's
+## "leaving" {deed, why, day}); she goes at the next calm moment
+## (_leaving_tick), or, dead now (bled out), when she is next back.
+func _check_leaving(record: PlayerRecord, event: String, why: String) -> void:
+	if record.companion.has("left") or record.companion.has("leaving") or record.companion.has("resident"):
+		return
+	var step := bond_step_of(record.companion, record.player_id)
+	var straw: Dictionary = leaving_rules().get("last_straw", {})
+	var straw_at := Companion.STEPS.find(str(straw.get("at", "sullen")))
+	if step == Companion.STEPS[0] or event == str(straw.get("deed", "")) and Companion.STEPS.find(step) <= straw_at:
+		record.companion["leaving"] = {"deed": event, "why": why, "day": Townsfolk.day_of(World.steps)}
+		print("[bond] %s's companion %s will leave them (%s: %s)" % [record.name, record.companion.get("name", "?"), event, why])
+
+
+## Each tick, this zone's companions who will leave: at a calm moment
+## (nothing hostile near her, neither she nor her player down) she says so
+## and sets off for the nearest way out; there, or past walk_s and out of
+## her player's sight (at most twice walk_s), she is gone home.
+func _leaving_tick() -> void:
+	for id: String in _companions.keys():
+		var pet: Companion = _companions[id]
+		var record: PlayerRecord = _records.get(id)
+		if record == null or not record.companion.has("leaving") or not is_instance_valid(pet) or not pet.spawned or pet.zone != World.zone.name:
+			continue
+		var going: Dictionary = record.companion["leaving"]
+		var player: Player = _players.get(_peer_of(id))
+		if not pet.leaving:
+			if not World.calm(pet) or World.is_downed(pet) or is_instance_valid(player) and World.is_downed(player):
+				continue
+			_begin_leaving(record, pet, going, player)
+			continue
+		var seen := is_instance_valid(player) and player.spawned and player.zone == pet.zone \
+				and World.distance(player.tile, pet.tile) <= Companion.SIGHT_RANGE and World.has_line_of_sight(player.tile, pet.tile)
+		var from := int(going.get("from", World.tick))
+		var until := int(going.get("until", 0))
+		if pet.tile == pet.leaving_to or World.tick >= until and not seen or World.tick >= until + (until - from):
+			_gone_home(record, pet, id)
+
+
+## She says she is leaving and sets off (decision 581): her voice asked past
+## the rate limit, the party told where she goes, her player's things put
+## down for them, a walk she was leading ended.
+func _begin_leaving(record: PlayerRecord, pet: Companion, going: Dictionary, player: Player) -> void:
+	pet.leaving = true
+	pet.leaving_to = _nearest_way_out(pet.tile)
+	going["from"] = World.tick
+	going["until"] = World.tick + roundi(float(leaving_rules().get("walk_s", 30)) * World.TICK_RATE)
+	going["place"] = _home_place(record)
+	var town := _town_words(str(going["place"]))
+	if _guides.has(record.player_id):
+		_guide_done(pet, "moved")
+	pet._ask_voice("You are leaving %s for good, and going home to %s: they %s." % [record.name, town, str(going.get("why", "wronged you"))], "", true)
+	party_log.add("%s leaves you, and goes home to %s." % [pet.name, town])
+	_return_gear(record, pet, player)
+
+
+## What of her player's she carries goes back (decision 581): a thing her
+## player once carried and did not name for her (a named gift is hers),
+## put down at their feet (at hers, with no player here); her own things
+## and named gifts go with her.
+func _return_gear(record: PlayerRecord, pet: Companion, player: Player) -> void:
+	var theirs := "player:" + record.player_id
+	var returned: Array[String] = []
+	for slot in pet.slots.size():
+		var uid := World.slot_uid(pet, slot)
+		if uid == 0:
+			continue
+		var history := World.items.history(uid)
+		var carried: bool = (history.get("carriers", []) as Array).any(func(row: Dictionary) -> bool: return str(row["who"]) == theirs)
+		var named: bool = (history.get("events", []) as Array).any(func(event: Dictionary) -> bool: return str(event.get("kind", "")) == "named")
+		if not carried or named:
+			continue
+		var what := World.item_title(uid).get_slice(" (", 0)
+		if what.is_empty():
+			what = "the " + str(Items.def(World.items.id_of(uid)).get("name", World.items.id_of(uid)))
+		var taken := World.take_item(pet, pet, slot)
+		if taken == 0:
+			continue
+		World.put_on_ground(taken, player.tile if is_instance_valid(player) and player.zone == pet.zone else pet.tile)
+		returned.append(what)
+	if not returned.is_empty():
+		party_log.add("%s leaves you %s." % [pet.name, Companion._listed(returned)])
+
+
+## Gone home (decision 581): a resident of her home town (her record's
+## "leaving" place), working her trade; her record "left" {day, deed, why,
+## place}, and she no longer joins her player.
+func _gone_home(record: PlayerRecord, pet: Companion, id: String) -> void:
+	var going: Dictionary = record.companion.get("leaving", {})
+	var place := str(going.get("place", ""))
+	pet.leaving = false
+	if not _rest_in_town(record, pet, id, place, false):
+		_travelling = true
+		World.despawn(pet)
+		_travelling = false
+		_companions.erase(id)
+	record.companion["left"] = {"day": Townsfolk.day_of(World.steps), "deed": str(going.get("deed", "")), "why": str(going.get("why", "")),
+		"place": str(record.companion.get("resident", {}).get("place", place))}
+	record.companion.erase("leaving")
+	print("[bond] %s's companion %s left them and lives in %s" % [record.name, record.companion.get("name", "?"), record.companion["left"]["place"]])
+
+
+## Her home town's store place: her record's "home" if it is still a town's
+## store, else the first town with one.
+func _home_place(record: PlayerRecord) -> String:
+	var home := str(record.companion.get("home", {}).get("place", ""))
+	if not home.is_empty() and World.holdings != null and World.holdings.place(home).get("kind") == Stockpile.KIND:
+		return home
+	return _first_town()
+
+
+## The first town's store place, "" for none.
+func _first_town() -> String:
+	if World.holdings == null:
+		return ""
+	var places := World.holdings.places_of(Stockpile.TOWN)
+	places.sort()
+	for each in places:
+		if World.holdings.place(each).get("kind") == Stockpile.KIND:
+			return each
+	return ""
+
+
+## A town's store place [param place] in words: its area's shown name.
+func _town_words(place: String) -> String:
+	var area := str(World.holdings.place(place).get("area", "")) if World.holdings != null and not place.is_empty() else ""
+	return Companion.place_name(area) if not area.is_empty() else "her town"
+
+
+## The nearest level link's cell to [param from] in this zone; NONE for none.
+func _nearest_way_out(from: Vector2i) -> Vector2i:
+	var best := Companion.NONE
+	var links: Array = Level.load_level(World.zone.name).get("links", []) if Level.exists(World.zone.name) else []
+	for link: Dictionary in links:
+		var at: Vector2i = link["tile"]
+		if best == Companion.NONE or World.distance(from, at) < World.distance(from, best):
+			best = at
+	return best
 
 
 ## The rules of the field return: economy.json "return" "field".
@@ -7849,16 +8004,10 @@ func _stay_in_town(record: PlayerRecord, pet: Companion) -> bool:
 ## trade if she has one, until her player comes to that zone
 ## (_join_companion). Nowhere for her (no town holds a stockpile yet), she
 ## waits where she is, as any companion.
-func _rest_in_town(record: PlayerRecord, pet: Companion, id: String) -> bool:
+func _rest_in_town(record: PlayerRecord, pet: Companion, id: String, at := "", told := true) -> bool:
 	if World.towns == null or World.holdings == null:
 		return false
-	var place := ""
-	var places := World.holdings.places_of(Stockpile.TOWN)
-	places.sort()
-	for each in places:
-		if World.holdings.place(each).get("kind") == Stockpile.KIND:
-			place = each
-			break
+	var place := at if not at.is_empty() else _first_town()
 	if place.is_empty():
 		return false
 	var pet_name := String(record.companion.get("name", pet.name))
@@ -7874,7 +8023,8 @@ func _rest_in_town(record: PlayerRecord, pet: Companion, id: String) -> bool:
 	_travelling = false
 	_companions.erase(id)
 	print("[town] %s's companion %s rests in %s between trips" % [record.name, pet_name, place])
-	party_log.add("%s goes back to the town to rest." % pet_name)
+	if told:
+		party_log.add("%s goes back to the town to rest." % pet_name)
 	return true
 
 
@@ -9178,6 +9328,8 @@ func _bond(record: PlayerRecord, event: String, why: String) -> void:
 	else:
 		Standing.bump(record.companion, record.player_id, delta, why, World.steps)
 	_set_mood(record)
+	if delta < 0:
+		_check_leaving(record, event, why)  # The bottom step, or the last straw (decision 581).
 	# A hurt she says so of, as it happens (decision 555): told her voice once.
 	var pet: Companion = _companions.get(record.player_id)
 	if delta < 0 and is_instance_valid(pet) and pet.spawned:
@@ -11190,6 +11342,7 @@ func _on_world_ticked(tick: int) -> void:
 		_respawn_due_players(tick)
 		_tend_hearts()  # Mortally Wounded: the downed's hearts, and all of them fallen.
 		_all_fallen_tick()
+		_leaving_tick()  # A companion leaving her player (decision 581).
 		_check_respawns(tick)
 		t = World.part("respawns", t)
 		if tick % CAMP_CHECK_TICKS == 0:

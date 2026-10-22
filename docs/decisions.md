@@ -25738,3 +25738,45 @@ crowded out. Read from dungeon's marker on main, no cell hard-coded (agreed
 with dungeon; its World.hidden_niche() is a convenience this needn't wait
 for). Server only, protocol unchanged. tests: companion_test (the words; near
 the niche, not on it, the air told; found, nothing hidden).
+reset now calls _forget_jobs on each entity it removes. Server sim,
+protocol unchanged, no new class_name.
+
+## 581. She leaves, and goes home to live
+
+Jeff (2026-10-22): "companion keeps their blessings and abilities but goes
+back to their home town to live and work their vocation ... companion
+would never become an enemy". The coordinator approved the design
+(C:/dev/review/companions/leaving_design.md), in steps: this one (she
+leaves and goes home), then winning her favour back (581 amended) and
+recruiting her again (581 amended (2)).
+
+- When: her bond at the bottom step, apart (555's ladder, -7), or the
+  last straw: companion_traits.json "leaving" "last_straw" (let_bleed, at
+  sullen or colder). Main._bond's drops check it (_check_leaving) and set
+  her record's "leaving" {deed, why, day}. Dead now (a let_bleed is her
+  bleeding out), she leaves when she is next back.
+- Main._leaving_tick, at a calm moment (World.calm: nothing hostile near
+  her, neither she nor her player downed): her voice is asked past the
+  rate limit ("You are leaving <player> for good, and going home to
+  <town>: they <why>."), the party told ("Wren leaves you, and goes home
+  to The Wilds."), a walk she was leading ended, and her player's things
+  put down at their feet (_return_gear: a thing her player once carried
+  that they did not name for her; her own things and named gifts stay
+  hers, told "Wren leaves you the bundle of arrows.").
+- She walks to the zone's nearest level link (Companion.leaving,
+  leaving_to: she heeds no one meanwhile); there, or past walk_s (30 s,
+  draft) and out of her player's sight, at most twice that, she is gone
+  home: _rest_in_town to her home (her record's home place if still a
+  town's store, else the first town), working her trade, with no party
+  line of resting; her record "left" {day, deed, why, place}.
+- Main._join_companion: one who left does not come: "Wren left you and
+  lives in The Wilds now." She keeps her card, facts, marks (the blessing,
+  her capabilities, 576), focus (577) and roads (551).
+- Never hostile: a resident, as any companion resting in town. The legacy
+  three the same. A town's faction switch is a later system.
+
+companion_test _test_leaving: the last straw while sullen and not a
+lesser wrong; the bottom step; at a calm moment she says so and sets off,
+her player's arrows put down for them; gone home as a resident with
+"left"; she no longer joins her player. Server sim, protocol unchanged,
+no new class_name.

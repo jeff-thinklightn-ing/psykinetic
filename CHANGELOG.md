@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- A companion pushed to the bottom of her bond (or let bleed out while she sulks) now leaves you: she says so, leaves you what was yours, and goes home to live and work in her town, keeping all she earned; never an enemy (581).
 - Ask your companion to search for secrets and, in the barrow's first hall, she walks over near the hidden niche and tells you she feels air moving from the wall; elsewhere she looks about and finds nothing (608 amended).
 - A new potion, the steadying draught (642): the medicine man brews it from two herbs and an antler; drunk, your bow's cone of flight is 40% narrower for half an hour, the reach unchanged. Draft numbers; the second healer's hut will sell it.
 - A bow drawn in armour (622, step 2): in leather it draws quicker; in a mail shirt it reaches 7 cells at most, in plate 5, however long you hold; robes change nothing.

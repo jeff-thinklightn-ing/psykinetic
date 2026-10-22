@@ -422,6 +422,11 @@ var bond_why := ""
 ## Her superstition (442's leaning, Main's at her join): at grave_superstition
 ## or more she won't carry grave goods below close (555).
 var superstition := 5
+## Leaving her player for good (decision 581, Main's): she walks to
+## [member leaving_to] (the zone's nearest way out, NONE for none) and
+## heeds no one; Main takes her home when she is there or out of sight.
+var leaving := false
+var leaving_to := NONE
 ## Her focus (decision 577): {fight, magic, stealth} summing to 100, her
 ## record's own (Main grows it in place); {} unset.
 var focus := {}
@@ -1611,6 +1616,13 @@ func _sim_tick() -> void:
 	if mind != null:
 		for result: Dictionary in mind.take_results():
 			_take_result(result)
+	if leaving:
+		# Leaving her player for good (decision 581): she walks off to the
+		# way out (leaving_to), heeding no one; Main ends it.
+		current_intent = Intent.IDLE
+		if leaving_to != NONE and tile != leaving_to:
+			_step_toward(leaving_to, true)
+		return
 	if keeper == null or not is_instance_valid(keeper) or not keeper.spawned:
 		# Nobody to follow: stand still until her player is back. A death
 		# (her player's own, say) is still a moment for her voice.

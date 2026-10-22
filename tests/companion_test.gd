@@ -97,6 +97,7 @@ func _ready() -> void:
 	_test_guide_refuses()
 	_bond_as(0, kept_bond)
 	_test_loyalty()
+	_test_leaving()
 	_test_out_of_reach()
 	_test_knows_level()
 	_test_wild()
@@ -2178,6 +2179,51 @@ func _test_guide_refuses() -> void:
 	_main._guide_refused.clear()
 	_main._guide_offers.clear()
 	pet.guide = null
+
+
+func _test_leaving() -> void:
+	print("
+== she leaves at the bottom step, and goes home to live (decision 581) ==")
+	_kill_monsters()
+	var owner := _player()
+	var pet := _companion()
+	_settle(pet)
+	var record: PlayerRecord = _main._records[Net.player_id]
+	var kept: Dictionary = record.companion.duplicate(true)
+	# The last straw: let bleed out while sullen.
+	record.companion["standing"] = {Net.player_id: {"score": -5, "why": ["struck you"], "since": World.steps}}
+	_main._check_leaving(record, "let_bleed", "let you bleed out")
+	_check(record.companion.has("leaving"), "sullen, let bleed out: the last straw, she will leave")
+	record.companion.erase("leaving")
+	_main._check_leaving(record, "warned", "ignored your warning and took you there")
+	_check(not record.companion.has("leaving"), "sullen, a lesser wrong: she stays")
+	# A thing of her player's in her pack, and the bottom step.
+	_put(pet, owner.tile + Vector2i(1, 0))
+	var uid := World.items.mint("arrows", "stocked", "", World.zone.name, owner.tile)
+	var free := owner.slots.find("")
+	World.put_item(owner, owner, free, uid)
+	World.try_transfer(owner, owner, free, pet, pet.slots.find(""))
+	_check(World.holder_key(pet) in str(World.items.history(uid).get("at", "")), "her player handed her their arrows")
+	record.companion["standing"] = {Net.player_id: {"score": -6, "why": ["struck you"], "since": World.steps}}
+	_main._bond(record, "left_alone", "left her alone")
+	_check(record.companion.has("leaving") and _main.bond_step_of(record.companion, Net.player_id) == "apart", "apart: she will leave")
+	World.step()
+	_check(pet.leaving and "leaves you, and goes home to" in " ".join(_main.party_log.last(4)), "at a calm moment she says so and sets off (%s)" % [_main.party_log.last(3)])
+	_check(not World.items.history(uid).get("at", "").contains(World.holder_key(pet)) and "leaves you the bundle of arrows" in _main.party_log.last(1)[0],
+		"her player's arrows put down for them (%s)" % [World.items.history(uid).get("at", "")])
+	record.companion["leaving"]["until"] = World.tick
+	record.companion["leaving"]["from"] = World.tick - 1
+	World.step()
+	World.step()
+	_check(not pet.spawned and record.companion.has("left") and record.companion.has("resident") and not _main._companions.has(Net.player_id),
+		"gone home: a resident of her town (%s)" % [record.companion.get("left", {})])
+	_main._join_companion(record, owner)
+	_check(_companion() == null, "she no longer joins her player")
+	# As she was, for what follows.
+	record.companion = kept
+	record.companion.erase("resident")
+	_main._join_companion(record, _player())
+	_check(_companion() != null, "(restored)")
 
 
 func _test_loyalty() -> void:

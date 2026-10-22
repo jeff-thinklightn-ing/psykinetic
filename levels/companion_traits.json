@@ -66,6 +66,11 @@
 		"watch": {"near": 4, "road_cells": 300, "road_share": 0.6, "fire_cells": 2, "fire_ticks": 1800, "town_ticks": 6000,
 			"heavy_share": 0.75, "heavy_cells": 400, "heavy_warn": "This pack is breaking my back.", "low_hp": 0.334, "rest_ask": "I need to rest before the next fight."}
 	},
+	"leaving": {
+		"_note": "Decision 581 (Jeff: 'companion keeps their blessings and abilities but goes back to their home town to live and work their vocation ... would never become an enemy'): at the bottom step (apart) she leaves her player, at the next calm moment; on the last straw (its deed, when her bond is at or below its step) too, even dead, when she is next back. She walks to the zone's nearest way out for at most walk_s, gone there or once out of their sight, and lives in her home town as a resident. Drafts for Jeff.",
+		"last_straw": {"deed": "let_bleed", "at": "sullen"},
+		"walk_s": 30
+	},
 	"focus": {
 		"_note": "Her focus (decision 577, Jeff's: 'what combination of fighting, magic, and stealth they tend to use ... a spider chart where you only have say 100% focus, and growing positively can pull from the others'): fight, magic and stealth on her record (record.companion['focus']), summing to 100, none under floor. Rolled from even, moved by her profession and temper (lean), the legacy three fixed; grown by what she does (grow: event -> [focus, points]), each gain taken from the other two in proportion, at most daily_cap points a game day. lean_at: the share from which she leans one way (her voice told so; a new lean is a fact). multiplier: [base, per share] for Companion.focus_of (0.8 + 0.4 x share / 100), what enemy-ai reads. All drafts for Jeff.",
 		"floor": 5, "daily_cap": 3, "lean_at": 45, "multiplier": [0.8, 0.4],
