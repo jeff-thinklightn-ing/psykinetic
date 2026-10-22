@@ -47,8 +47,6 @@ func _ready() -> void:
 	_test_shore()
 	_test_curves_meet()
 	_test_forest_edge()
-	_test_ledges()
-	_test_relax()
 	_test_solid_ground()
 	_test_roads()
 	_test_water()
@@ -1893,8 +1891,8 @@ func _test_relief() -> void:
 	var h := _rig._corner_heights(sloped)
 	var corners_met := true
 	for c in 4:
-		# Where the corner is drawn (decision 558 may move it).
-		var drawn := _rig._drawn_corner(sloped, c)
+		var corner := sloped + Client3D.GROUND_CORNERS[c]
+		var drawn := Vector3(corner.x - 0.5, h[c], corner.y - 0.5)
 		corners_met = corners_met and absf(_rig._height_in(sloped, Vector2(drawn.x, drawn.z)) - drawn.y) < 0.0001
 	var middle := _rig._tile_position(sloped).y
 	_check(corners_met and Array(h).max() - Array(h).min() > 0.1 and middle > Array(h).min() and middle < Array(h).max(),
@@ -2115,16 +2113,11 @@ func _test_relief() -> void:
 	var flat := _rig.ridge_pitch(Vector3(4.0, _rig._ground_height(Vector2(4.0, 4.0)), 4.0))
 	var back := Vector2(1.0, 1.0).normalized().rotated(-deg_to_rad(_rig.yaw))
 	var had := _rig._corners.duplicate()
-	# The ridge laid on the cells' corners as drawn: the relax (decision 558)
-	# set aside meanwhile.
-	var had_quads := _rig._relax_quads.duplicate()
-	_rig._relax_quads.clear()
 	for d in range(3, 7):
 		var cell := Vector2i((Vector2(at.x, at.z) + back * d).round())
 		_rig._corners[cell] = PackedFloat32Array([at.y + 6.0, at.y + 6.0, at.y + 6.0, at.y + 6.0])
 	var lifted := _rig.ridge_pitch(at)
 	_rig._corners = had
-	_rig._relax_quads = had_quads
 	_check(lifted > Client3D.CAMERA_PITCH and flat < Client3D.CAMERA_PITCH,
 			"the camera lifts over a ridge between it and the player (%.0f degrees), not on the flat (%.0f)" % [lifted, flat])
 	# The castle: no relief.png, its ground exactly its whole levels.
@@ -2671,78 +2664,6 @@ func _test_shore() -> void:
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
 
-## The ledges' rims along a curve (decision 556): on relief a cap carries
-## the higher ground out over the cell under it to a curve within
-## SHORE_BOUND, never over a cell's middle, the faces down from it; the
-## caps of two cells meet on their edge; a level without relief keeps its
-## straight faces.
-func _test_ledges() -> void:
-	print("\n== ledges: rims along a curve on relief, within SHORE_BOUND, never over a cell's middle ==")
-	var row := Client3D.RIM_RES + 1
-	for name: String in ["hills", "sample", "castle", "wilds"]:
-		var level := Level.load_level(name)
-		_rig.rebuild(level["terrain"], level["centre"])
-		if not bool(level["terrain"].get("relief_given", false)):
-			_check(_rig._rim_caps.is_empty(),
-					"%s (no relief): no caps, its faces on the cells' edges (%d faces)" % [name, _rig._cliff_edges.size()])
-			continue
-		var middles := []
-		var astray := []
-		var faces := 0
-		var stray_faces := []
-		var samples := 0
-		for cell: Vector2i in _rig._rim_caps:
-			var cap: Dictionary = _rig._rim_caps[cell]
-			var tops: PackedFloat32Array = cap["tops"]
-			var over: Array[Vector2i] = cap["over"]
-			if tops[(row / 2) * row + row / 2] > -INF:
-				middles.append(cell)
-			for k in row * row:
-				if tops[k] == -INF:
-					continue
-				samples += 1
-				var point := Vector2(cell) + Vector2(k % row, k / row) / Client3D.RIM_RES - Vector2(0.5, 0.5)
-				if float(Client3D._rim_nearest(point, over)[1]) > Client3D.SHORE_BOUND:
-					astray.append([cell, point])
-			for segment: Array in cap["segments"]:
-				faces += 1
-				for end: Vector2 in [segment[0], segment[1]]:
-					var off := (end - Vector2(cell)).abs()
-					if off.x > 0.5001 or off.y > 0.5001:
-						stray_faces.append([cell, end])
-		_check(not _rig._rim_caps.is_empty() and samples > 0 and middles.is_empty() and astray.is_empty(),
-				"%s: %d cells capped (%d samples), none over a cell's middle (%s), all within %.2f of the cells over them (astray: %s)"
-				% [name, _rig._rim_caps.size(), samples, middles.slice(0, 3), Client3D.SHORE_BOUND, astray.slice(0, 3)])
-		_check(faces > 0 and stray_faces.is_empty(), "%s: %d faces down the rims' curves, each within its cell (stray: %s)" % [name, faces, stray_faces.slice(0, 3)])
-		# Two capped cells side by side meet on their edge: the same cap there.
-		var unmet := []
-		for cell: Vector2i in _rig._rim_caps:
-			for side: Vector2i in [Vector2i(1, 0), Vector2i(0, 1)]:
-				var next := cell + side
-				if not _rig._rim_caps.has(next):
-					continue
-				var mine: PackedFloat32Array = _rig._rim_caps[cell]["tops"]
-				var theirs: PackedFloat32Array = _rig._rim_caps[next]["tops"]
-				for t in row:
-					var a := (t * row + Client3D.RIM_RES) if side.x == 1 else (Client3D.RIM_RES * row + t)
-					var b := (t * row) if side.x == 1 else t
-					if (mine[a] == -INF) != (theirs[b] == -INF) or (mine[a] > -INF and absf(mine[a] - theirs[b]) > 0.001):
-						unmet.append([cell, next, t])
-						break
-		_check(unmet.is_empty(), "%s: capped cells side by side meet on their edge (unmet: %s)" % [name, unmet.slice(0, 4)])
-		# What the camera sees takes the caps in; where a puppet stands doesn't.
-		var shown := false
-		for cell: Vector2i in _rig._rim_caps:
-			var tops: PackedFloat32Array = _rig._rim_caps[cell]["tops"]
-			for k in row * row:
-				if tops[k] > -INF and not shown:
-					var point := Vector2(cell) + Vector2(k % row, k / row) / Client3D.RIM_RES - Vector2(0.5, 0.5)
-					shown = absf(_rig._drawn_height(point) - tops[k]) < 0.001 and _rig._ground_height(point) < tops[k] - 0.1
-		_check(shown, "%s: the drawn height takes a cap in, a puppet's doesn't" % name)
-	_rig.rebuild(_main._terrain, Vector2i.ZERO)
-
-
-
 ## The ribbons of [param rig] (decision 557): its stream cells whose middle
 ## no ribbon triangle covers ("uncovered"), and how many ribbon points run
 ## against [param down] ("against"; none counted for a zero one).
@@ -2769,121 +2690,6 @@ static func _ribbon_report(rig: Client3D, down: Vector2) -> Dictionary:
 				return Geometry2D.point_is_inside_triangle(middle, flat[0], flat[1], flat[2])):
 			uncovered.append(cell)
 	return {"uncovered": uncovered, "against": against}
-
-## The ground relaxed (decision 558): on relief the free corners moved up
-## to RELAX_MOST, none on a cliff's edge, each on the ground's surface;
-## the cells beside a relaxed one meeting it on the same drawn edge (no gap,
-## no sliver); _height_in the mesh's triangle; a level without relief as
-## it was.
-func _test_relax() -> void:
-	print("\n== relax: natural ground's facets off the grid, the shape kept, no seam ==")
-	for name: String in ["hills", "sample", "castle", "wilds"]:
-		var level := Level.load_level(name)
-		_rig.rebuild(level["terrain"], level["centre"])
-		if not bool(level["terrain"].get("relief_given", false)):
-			_check(_rig._relax_moves.is_empty() and _rig._relax_flips.is_empty(), "%s (no relief): its ground on the grid as it was" % name)
-			continue
-		var far := []
-		for corner: Vector2i in _rig._relax_moves:
-			if _rig._relax_moves[corner].length() > Client3D.RELAX_MOST + 0.0001:
-				far.append(corner)
-		var on_cliffs := []
-		for edge: Array in _rig._cliff_edges:
-			var cell: Vector2i = edge[0]
-			var direction: Vector2i = edge[1]
-			for corner in Client3D.GROUND_CORNERS:
-				var at: Vector2i = cell + corner
-				if Client3D.GROUND_CORNERS.has(at - cell - direction) and _rig._relax_moves.has(at):
-					on_cliffs.append(at)
-		_check(_rig._relax_moves.size() > 20 and far.is_empty() and on_cliffs.is_empty(),
-				"%s: %d corners moved (%d cells split the other way), none past %.1f (%s), none on a cliff's edge (%s)"
-				% [name, _rig._relax_moves.size(), _rig._relax_flips.size(), Client3D.RELAX_MOST, far.slice(0, 3), on_cliffs.slice(0, 3)])
-		# Each moved corner a vertex of the mesh, at the ground's height there.
-		var drawn: Dictionary = {}
-		var triangles: Dictionary = {}
-		for mesh: ArrayMesh in _rig._ground_meshes:
-			var arrays := mesh.surface_get_arrays(0)
-			var points: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
-			var indices: PackedInt32Array = arrays[Mesh.ARRAY_INDEX]
-			for point in points:
-				drawn[Vector2i(roundi(point.x * 1000.0), roundi(point.z * 1000.0))] = point.y
-			for t in range(0, indices.size(), 3):
-				var tri := [points[indices[t]], points[indices[t + 1]], points[indices[t + 2]]]
-				var middle: Vector3 = (tri[0] + tri[1] + tri[2]) / 3.0
-				var key := Vector2i(roundi(middle.x), roundi(middle.z))
-				if not triangles.has(key):
-					triangles[key] = []
-				triangles[key].append(tri)
-		var off_surface := []
-		for corner: Vector2i in _rig._relax_moves:
-			var at := Vector2(corner) - Vector2(0.5, 0.5) + _rig._relax_moves[corner]
-			var under := Vector2i(roundi(at.x), roundi(at.y))
-			var h := _rig._corner_heights(under)
-			var f := at - Vector2(under) + Vector2(0.5, 0.5)
-			var surface := lerpf(lerpf(h[0], h[1], f.x), lerpf(h[2], h[3], f.x), f.y)
-			var key := Vector2i(roundi(at.x * 1000.0), roundi(at.y * 1000.0))
-			if not drawn.has(key) or absf(float(drawn[key]) - surface) > 0.0001:
-				off_surface.append(corner)
-		_check(off_surface.is_empty(), "%s: each moved corner drawn there, on the ground's surface (off: %s)" % [name, off_surface.slice(0, 3)])
-		# The seam: a relaxed cell and each cell beside it draw their shared
-		# edge from the same two points, at the same heights along it.
-		var seams := []
-		var unmatched := []
-		var checked := 0
-		for corner: Vector2i in _rig._relax_moves:
-			for a in 4:
-				var cell: Vector2i = corner + Client3D.SHORE_AROUND[a]
-				for side: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
-					var next := cell + side
-					if not _rig._grounds.has(next):
-						continue
-					var ends := []
-					for c in 4:
-						var k := Client3D.GROUND_CORNERS.find(cell + Client3D.GROUND_CORNERS[c] - next)
-						if k >= 0:
-							ends.append([_rig._drawn_corner(cell, c), _rig._drawn_corner(next, k)])
-					if ends.size() != 2:
-						continue
-					var mine_a: Vector3 = ends[0][0]
-					var mine_b: Vector3 = ends[1][0]
-					if not mine_a.is_equal_approx(ends[0][1]) or not mine_b.is_equal_approx(ends[1][1]):
-						if absf(mine_a.y - ends[0][1].y) <= Relief.EPSILON and absf(mine_b.y - ends[1][1].y) <= Relief.EPSILON:
-							seams.append([cell, next])
-						continue
-					for t: float in [0.25, 0.5, 0.75]:
-						checked += 1
-						var p := Vector2(mine_a.x, mine_a.z).lerp(Vector2(mine_b.x, mine_b.z), t)
-						if absf(_rig._height_in(cell, p) - _rig._height_in(next, p)) > 0.0001:
-							unmatched.append([cell, next, t])
-		_check(checked > 0 and seams.is_empty() and unmatched.is_empty(),
-				"%s: relaxed cells meet the cells beside them on one drawn edge (%d points; apart: %s; heights differ: %s)"
-				% [name, checked, seams.slice(0, 3), unmatched.slice(0, 3)])
-		# _height_in the drawn triangle's, inside each relaxed cell.
-		var wrong := []
-		var sampled := 0
-		for cell: Vector2i in _rig._grounds:
-			if not _rig._relaxed(cell) or sampled > 1500:
-				continue
-			for p: Vector2 in [Vector2(-0.4, -0.4), Vector2(0.4, -0.4), Vector2(-0.4, 0.4), Vector2(0.4, 0.4), Vector2(0.1, -0.2)]:
-				var point := Vector2(cell) + p
-				var mesh_height := NAN
-				for y in range(-1, 2):
-					for x in range(-1, 2):
-						for tri: Array in triangles.get(cell + Vector2i(x, y), []):
-							var a: Vector3 = tri[0]
-							var b: Vector3 = tri[1]
-							var c: Vector3 = tri[2]
-							if Geometry2D.point_is_inside_triangle(point, Vector2(a.x, a.z), Vector2(b.x, b.z), Vector2(c.x, c.z)):
-								var bary := Geometry3D.get_triangle_barycentric_coords(Vector3(point.x, 0.0, point.y), Vector3(a.x, 0.0, a.z), Vector3(b.x, 0.0, b.z), Vector3(c.x, 0.0, c.z))
-								mesh_height = a.y * bary.x + b.y * bary.y + c.y * bary.z
-				if is_nan(mesh_height):
-					continue
-				sampled += 1
-				if absf(_rig._height_in(cell, point) - mesh_height) > 0.001:
-					wrong.append([cell, p])
-		_check(sampled > 100 and wrong.is_empty(), "%s: what stands on a relaxed cell stands on its drawn triangle (%d points; off: %s)" % [name, sampled, wrong.slice(0, 3)])
-	_rig.rebuild(_main._terrain, Vector2i.ZERO)
-
 
 
 ## A solid building's cells (decision 550: the barrow's mound on the wilds)

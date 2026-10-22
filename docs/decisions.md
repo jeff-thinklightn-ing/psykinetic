@@ -22778,3 +22778,41 @@ For release's journal (counts only, no ids): when a zone's snapshot loads,
 printed if any did (main._adopted). It confirms a level move on the deploy
 that carries it; an entity once adopted is keyed to its new marker, so
 later deploys print nothing for it. spawn_key_test counts the one.
+## 556 amended, 558 amended: withdrawn (Jeff's veto)
+
+Jeff on the unsquaring page (2026-10-22): "the afters were all vetoed, the
+new unsquaring with the winding river is better"; then "terrain needs to
+have smooth edges for ledges and terraces as well. it should not conform to
+tiles either. see stream examples". The coordinator's reading: the first
+unsquaring's cell-smoothing is vetoed as a method; what is drawn from
+curves stays.
+
+Withdrawn:
+- 558, the ground relaxed: no corner moved, no cell split the other way;
+  the ground drawn on its cells' corners again (_relax and its helpers,
+  _height_in's quads, _test_relax gone).
+- 556, ledges along a curve: no caps carried over the cells under a
+  cliff; the cliffs' faces on the sim's edges again until a ledge is a
+  curve in the level's data (_rim_band and its helpers, _drawn_height,
+  the faces behind the caps, the scatter's skip under them, _test_ledges
+  gone). The cliff strip's columns argument and perf's copy-on-write
+  (de0c6640) stay, as does maps' empty-chunk guard.
+- Curved ledges come as 585, terrain's side: maps' level.json "ledges"
+  (points with a top and a foot each, the high side, ramp ends at drop
+  0, the cliff cells rasterised from them), the faces and rims drawn
+  along the curve as the river is.
+
+Stays (drawn from curves): 559 (waters), 563 (roads), 570 (falls, where
+waters meet), 575 (the forest's edge).
+
+553 and 557: their cell paths draw only where a level has no curves.
+Every shipped level's natural water is a curve (the wilds' two lone cells
+are wells). The castle's 18 cells and the sample's pool and straight
+stream are cell-painted natural water: maps traces them into "waters"
+curves (568 amended). Water no curve lays is then built (595: drawn
+square, never rounded); the tests keep the cell path as the fallback, so
+marked in _build_ground.
+
+view_test: _test_relax and _test_ledges gone; the relief's slope check
+reads the cells' corners. Shots of the hills and the wilds follow the
+landing. Client only, protocol unchanged, no new class_name.

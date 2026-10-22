@@ -242,9 +242,6 @@ const RIBBON_STEPS := 8
 const CURVE_REACH := 2.5
 const CURVE_SEARCH := 8
 const CURVE_SMOOTH := 4
-## The ground relaxed (decision 558, _relax): a free corner moves up to this
-## much of a cell sideways.
-const RELAX_MOST := 0.2
 const RIBBON_UNDER := 0.3
 ## A fall this tall (m) or more hangs as a curtain from its lip to the
 ## water below (_build_curve_ribbon), in CURTAIN_ROWS rows bowed out down
@@ -276,13 +273,6 @@ const MIST_SIZE := 1.1
 const MIST_SECONDS := 2.6
 const MIST_FULL := 6.0
 const FALL_LEAST := 0.25
-## The ledges' rims (decision 556, _rim_band): sampled RIM_RES a side; each
-## stands out RIM_LEAST to RIM_MOST of a cell from the higher cells (never
-## past SHORE_BOUND), easing to none within RIM_TAPER of a pinned corner.
-const RIM_RES := 8
-const RIM_LEAST := 0.12
-const RIM_MOST := 0.32
-const RIM_TAPER := 0.6
 ## A bridge's pieces stand this far over the banks' height, so the water
 ## drawn under (WATER_LIFT up) never shows through the deck.
 const BRIDGE_LIFT := 0.04
@@ -1524,13 +1514,6 @@ var _niche_at: Dictionary[Vector3i, Dictionary] = {}
 var _hidden_niches: Dictionary[Vector3i, Array] = {}
 var _road_image: Image
 var _road_mask: ImageTexture
-## The ground relaxed (decision 558, _relax): each moved corner's offset
-## and height there, the cells split the other way, and each relaxed
-## cell's quad as drawn.
-var _relax_moves: Dictionary[Vector2i, Vector2] = {}
-var _relax_heights: Dictionary[Vector2i, float] = {}
-var _relax_flips: Dictionary[Vector2i, bool] = {}
-var _relax_quads: Dictionary[Vector2i, PackedVector3Array] = {}
 var _stream_ribbons: Array[MeshInstance3D] = []
 ## Each tall fall's foot (570 amended, terrain's side): {at (the foot's
 ## middle on the water), across, down (the stream's way, flat), width,
@@ -1541,11 +1524,6 @@ var _mists: Array[GPUParticles3D] = []
 ## each, the cell below the step; a new array each build (sound's ambience
 ## tells a new level by it).
 var stream_falls: Array[Dictionary] = []
-## The ledges' caps by the cell under them (decision 556, _rim_band), the
-## corners the rims keep to, and the noise along them.
-var _rim_caps: Dictionary[Vector2i, Dictionary] = {}
-var _rim_pins: Dictionary[Vector2i, bool] = {}
-var _rim_noise: FastNoiseLite
 ## How far each void cell outdoors is from the land, out to FOREST_REACH
 ## (_measure_forest); the ground's cells in index order, and where its
 ## forest ones (after floor and water) begin.
@@ -2090,7 +2068,7 @@ func hidden_by_ground(at: Vector3, pitch_degrees: float) -> bool:
 	var aim := at.y + RIDGE_AIM
 	var d := 0.75
 	while d <= RIDGE_REACH:
-		if _drawn_height(Vector2(at.x, at.z) + back * d) > aim + d * rise:
+		if _ground_height(Vector2(at.x, at.z) + back * d) > aim + d * rise:
 			return true
 		d += 0.25
 	return false
@@ -2485,23 +2463,6 @@ func _ground_height(grid: Vector2) -> float:
 	return _height_in(Vector2i(roundi(grid.x), roundi(grid.y)), grid)
 
 
-## How high the ground is drawn at [param grid], a ledge's cap over it
-## (decision 556) taken in: what the camera sees, not where a puppet stands.
-func _drawn_height(grid: Vector2) -> float:
-	return maxf(_ground_height(grid), _rim_top(grid))
-
-
-## A ledge's cap's height over [param grid] (decision 556, its nearest
-## sample), -INF where no cap is.
-func _rim_top(grid: Vector2) -> float:
-	var cell := Vector2i(roundi(grid.x), roundi(grid.y))
-	if not _rim_caps.has(cell):
-		return -INF
-	var at := ((grid - Vector2(cell) + Vector2(0.5, 0.5)) * RIM_RES).round()
-	var tops: PackedFloat32Array = _rim_caps[cell]["tops"]
-	return tops[clampi(int(at.y), 0, RIM_RES) * (RIM_RES + 1) + clampi(int(at.x), 0, RIM_RES)]
-
-
 ## How high [param cell]'s ground is at [param point] (on it or its edge),
 ## on the triangle the mesh draws there (its corners: _corner_heights): a
 ## slope's, a ramp's, or flat. Every puppet every frame: a lookup and a
@@ -2520,19 +2481,6 @@ func _height_in(cell: Vector2i, point: Vector2) -> float:
 			return fine[q] + (fine[q + 1] - fine[q]) * at.x + (fine[q + row] - fine[q]) * at.y
 		return fine[q + row + 1] + (fine[q + row] - fine[q + row + 1]) * (1.0 - at.x) \
 				+ (fine[q + 1] - fine[q + row + 1]) * (1.0 - at.y)
-	if _relax_quads.has(cell):
-		# The ground relaxed (decision 558): the quad drawn there, its own or,
-		# where a moved edge put the point past it, a neighbour's.
-		var drawn := _quad_height(cell, point)
-		if not is_nan(drawn):
-			return drawn
-		for y in range(-1, 2):
-			for x in range(-1, 2):
-				var near := cell + Vector2i(x, y)
-				if near != cell and _relaxed(near) and not _shore_heights.has(near):
-					drawn = _quad_height(near, point)
-					if not is_nan(drawn):
-						return drawn
 	var h := _corner_heights(cell)
 	# The quad's two triangles: (0, 1, 2) where x + y <= 1, (1, 3, 2) past it.
 	if at.x + at.y <= 1.0:
@@ -4695,8 +4643,6 @@ func _scatter_plan(chunk: Vector2i) -> Dictionary[String, Array]:
 				var count := floori(offered[kind] + _roll(cell, 100 + salt))
 				for n in count:
 					var at := Vector2(cell) + Vector2(_roll(cell, 101 + salt + n * 7), _roll(cell, 102 + salt + n * 7)) - Vector2(0.5, 0.5)
-					if _rim_top(at) > -INF:
-						continue  # Under a ledge's cap (decision 556).
 					if not _road_curves.is_empty() and _road_near(at).x > -0.1:
 						continue  # On a road (563, terrain's side).
 					if by_curve:
@@ -5731,7 +5677,10 @@ func _build_ground(kinds: Dictionary) -> void:
 		wet_cells[cell] = true
 	wet_cells.merge(_fords)
 	# The cells' field for water without a curve, a curve's from the curve
-	# itself (559, terrain's side), never from its cells.
+	# itself (559, terrain's side), never from its cells. The cells' path
+	# (553's rounded cells, 557's cell streams) is only a fallback for a
+	# level with no curves (the sample, tests): Jeff vetoed it (556 and 558
+	# withdrawn), and every shipped level's water is a curve.
 	var by_cells: Dictionary[Vector2i, bool] = {}
 	for cell: Vector2i in wet_cells:
 		if not _curve_cells.has(cell):
@@ -5769,10 +5718,6 @@ func _build_ground(kinds: Dictionary) -> void:
 	var ends := PackedInt32Array([0, 0, 0, 0])
 	# The shore's cells drawn finer, SHORE_RES a side (decision 553).
 	_shore_heights = _shore_band(cells, floor_count, water_end)
-	# The ledges' rims carried out over the cells under them (decision 556).
-	_rim_caps = _rim_band(cells, floor_count)
-	# Natural ground's facets off the grid (decision 558).
-	_relax(cells, floor_count)
 	# A chunk's vertex for each corner (or a shore cell's finer point, in
 	# SHORE_RES units) and height (mm): one a side of a cliff.
 	var local: Dictionary[Vector3i, int] = {}
@@ -5810,10 +5755,7 @@ func _build_ground(kinds: Dictionary) -> void:
 						var next := corner + around[a]
 						var other := at[(next.y - origin.y) * across + next.x - origin.x]
 						sunk = sunk and other >= floor_count and other < water_end
-					if _relax_moves.has(corner):
-						positions.append(_drawn_corner(cell, c))
-					else:
-						positions.append(Vector3(corner.x - 0.5, level - (WATER_BED_DEPTH if sunk else 0.0), corner.y - 0.5))
+					positions.append(Vector3(corner.x - 0.5, level - (WATER_BED_DEPTH if sunk else 0.0), corner.y - 0.5))
 					var global := _vertex_chunk.size()
 					_vertex_chunk.append(chunk_index)
 					_vertex_byte.append(byte_start + vertex * _ground_stride + _ground_custom)
@@ -5835,14 +5777,7 @@ func _build_ground(kinds: Dictionary) -> void:
 					feet.append(255 if foot else roundi(_concavity(corner, level) * 255.0))
 					tops.append(255 if top else roundi(_crest(corner, level) * 255.0))
 				ends[c] = vertex
-			if _relax_flips.has(cell):
-				indices.append_array([ends[0], ends[1], ends[3], ends[0], ends[3], ends[2]])
-			else:
-				indices.append_array([ends[0], ends[1], ends[2], ends[1], ends[3], ends[2]])
-		# The ledges' caps (decision 556), over the cells under them.
-		for i in chunks[chunk]:
-			if _rim_caps.has(cells[i]):
-				_rim_cap_into(_rim_caps[cells[i]], positions, indices, feet, tops, chunk_index, byte_start, pair_cell, pair_vertex)
+			indices.append_array([ends[0], ends[1], ends[2], ends[1], ends[3], ends[2]])
 		var custom := PackedByteArray()
 		custom.resize(positions.size() * 4)
 		_ground_bytes.resize(byte_start + positions.size() * _ground_stride)
@@ -6036,248 +5971,6 @@ func _shore_corner(corner: Vector2i, picked: Dictionary, floor_count: int, water
 	return Vector2(minf(bed, _water_corner(corner) - SHORE_SINK), bed)
 
 
-## The ledges' rims along a curve (decision 556): each land cell under a
-## cliff (a neighbour, side or corner, standing over it: its drawn corners
-## over this one's where they meet, none under) gets a cap, the higher
-## ground carried out over it to a curve, and a face down from that curve
-## (_add_cliffs). The cap is where the distance to the higher cells is
-## under _rim_reach (RIM_LEAST to RIM_MOST by a noise, none by a pinned
-## corner), found on RIM_RES samples a side by marching squares, so a
-## cell's middle, half a cell from its edges, is never under one. Each cap:
-## "points" (its triangles' points), "heights" and "uppers" (each point's
-## height, and the ground index of the cell over it that lights it),
-## "segments" (the faces: [from, to, top, bottom, out]), "tops" (each
-## sample's cap height, -INF off the cap), "over" (the cells over it) and
-## "covers" (the sides toward them it covers whole, their faces undrawn).
-func _rim_band(cells: Array, floor_count: int) -> Dictionary[Vector2i, Dictionary]:
-	var band: Dictionary[Vector2i, Dictionary] = {}
-	_rim_pins.clear()
-	if not _relief_given or _glimpse:
-		return band
-	for i in floor_count:
-		var cell: Vector2i = cells[i]
-		if not _rim_ground(cell, floor_count):
-			continue
-		var own := _corner_heights(cell)
-		var uppers: Array[Vector2i] = []
-		for y in range(-1, 2):
-			for x in range(-1, 2):
-				var near := cell + Vector2i(x, y)
-				if near == cell or not _rim_ground(near, floor_count):
-					continue
-				var theirs := _corner_heights(near)
-				var over := false
-				var under := false
-				for c in 4:
-					var k := GROUND_CORNERS.find(cell + GROUND_CORNERS[c] - near)
-					if k >= 0:
-						over = over or theirs[k] > own[c] + Relief.EPSILON
-						under = under or theirs[k] < own[c] - Relief.EPSILON
-				if over and not under:
-					uppers.append(near)
-		if uppers.is_empty():
-			continue
-		var cap := _rim_cap(cell, uppers)
-		if not cap.is_empty():
-			band[cell] = cap
-	return band
-
-
-## Whether [param cell] is ground a rim may run over: land of the level's
-## floor, not water, a ramp, a rock, a building's floor or the shore's
-## finer cells.
-func _rim_ground(cell: Vector2i, floor_count: int) -> bool:
-	var index: int = _grounds.get(cell, -1)
-	return index >= 0 and index < floor_count and not _wet.has(cell) and not _bed_levels.has(cell) \
-			and not _ramp_heights.has(cell) and not _rocks.has(cell) and not _shore_heights.has(cell) \
-			and _floor_bytes_at(cell) == 0
-
-
-## Whether the rim keeps to the cells at ground corner [param corner]: a
-## cell round it is no rim ground (a ramp's side, the water, a building,
-## the map's edge), or three heights meet there.
-func _rim_pinned(corner: Vector2i) -> bool:
-	if _rim_pins.has(corner):
-		return _rim_pins[corner]
-	var pinned := false
-	var heights: Array[float] = []
-	for a in 4:
-		var cell := corner + SHORE_AROUND[a]
-		if not _rim_ground(cell, _ground_floor_end):
-			pinned = true
-			break
-		var level := _corner_heights(cell)[3 - a]
-		if not heights.any(func(h: float) -> bool: return absf(h - level) <= Relief.EPSILON):
-			heights.append(level)
-	pinned = pinned or heights.size() > 2
-	_rim_pins[corner] = pinned
-	return pinned
-
-
-## The pinned corners (_rim_pinned) within RIM_TAPER of [param cell], as
-## points.
-func _rim_pins_near(cell: Vector2i) -> PackedVector2Array:
-	var pins := PackedVector2Array()
-	for y in range(cell.y - 1, cell.y + 3):
-		for x in range(cell.x - 1, cell.x + 3):
-			if _rim_pinned(Vector2i(x, y)):
-				pins.append(Vector2(x, y) - Vector2(0.5, 0.5))
-	return pins
-
-
-## How far the rim stands out from the higher cells at [param point]:
-## RIM_LEAST to RIM_MOST by a noise along it, easing to none within
-## RIM_TAPER of a pinned corner (of [param pins]).
-func _rim_reach(point: Vector2, pins: PackedVector2Array) -> float:
-	var nearest := RIM_TAPER
-	for pin in pins:
-		nearest = minf(nearest, point.distance_to(pin))
-	if _rim_noise == null:
-		_rim_noise = FastNoiseLite.new()
-		_rim_noise.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
-		_rim_noise.seed = 556
-		_rim_noise.frequency = 0.4
-		_rim_noise.fractal_type = FastNoiseLite.FRACTAL_NONE
-	var reach := lerpf(RIM_LEAST, RIM_MOST, _rim_noise.get_noise_2dv(point) * 0.5 + 0.5)
-	return reach * smoothstep(0.0, RIM_TAPER, nearest)
-
-
-## Of [param uppers], the cell nearest [param point], and how far it is.
-static func _rim_nearest(point: Vector2, uppers: Array[Vector2i]) -> Array:
-	var best := uppers[0]
-	var gap := INF
-	for upper in uppers:
-		var off := ((point - Vector2(upper)).abs() - Vector2(0.5, 0.5)).max(Vector2.ZERO)
-		if off.length() < gap:
-			gap = off.length()
-			best = upper
-	return [best, gap]
-
-
-## Under 0 on [param cell]'s cap: the distance to the nearest of
-## [param uppers] less the rim's reach there.
-func _rim_field(point: Vector2, uppers: Array[Vector2i], pins: PackedVector2Array) -> float:
-	return float(_rim_nearest(point, uppers)[1]) - _rim_reach(point, pins)
-
-
-## [param cell]'s cap under [param uppers] (see _rim_band), or none.
-func _rim_cap(cell: Vector2i, uppers: Array[Vector2i]) -> Dictionary:
-	var row := RIM_RES + 1
-	var pins := _rim_pins_near(cell)
-	var field := PackedFloat32Array()
-	field.resize(row * row)
-	var on := false
-	for y in row:
-		for x in row:
-			field[y * row + x] = _rim_field(Vector2(cell) + Vector2(x, y) / RIM_RES - Vector2(0.5, 0.5), uppers, pins)
-			on = on or field[y * row + x] < 0.0
-	if not on:
-		return {}
-	# The sides it covers whole: its samples a step in from a side under a
-	# cell over it all on the cap, past where the face on the cells' edge
-	# is pushed (CLIFF_JITTER): that face goes undrawn.
-	var covers: Array[Vector2i] = []
-	for side: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
-		if not uppers.has(cell + side):
-			continue
-		var whole := true
-		for t in row:
-			var x := t if side.x == 0 else (RIM_RES - 1 if side.x > 0 else 1)
-			var y := t if side.y == 0 else (RIM_RES - 1 if side.y > 0 else 1)
-			whole = whole and field[y * row + x] < 0.0
-		if whole:
-			covers.append(side)
-	var points := PackedVector2Array()
-	var heights := PackedFloat32Array()
-	var lit := PackedInt32Array()
-	var segments := []
-	var tops := PackedFloat32Array()
-	tops.resize(row * row)
-	# Each point's cell over it and height there, worked out once: a point
-	# is shared by the squares round it.
-	var known: Dictionary[Vector2, Vector2] = {}
-	var over_at := func(point: Vector2) -> Vector2:
-		if not known.has(point):
-			var upper: Vector2i = _rim_nearest(point, uppers)[0]
-			known[point] = Vector2(_height_in(upper, point), _grounds[upper])
-		return known[point]
-	var top_at := func(point: Vector2) -> float:
-		return over_at.call(point).x
-	for k in row * row:
-		var point := Vector2(cell) + Vector2(k % row, k / row) / RIM_RES - Vector2(0.5, 0.5)
-		tops[k] = top_at.call(point) if field[k] < 0.0 else -INF
-	var ring: Array[Vector2i] = [Vector2i(0, 0), Vector2i(1, 0), Vector2i(1, 1), Vector2i(0, 1)]
-	for y in RIM_RES:
-		for x in RIM_RES:
-			# Marching squares: the square's corners on the cap, and where its
-			# sides cross the rim, in order round it.
-			var shape := PackedVector2Array()
-			var crossings := PackedVector2Array()
-			for i in 4:
-				var a := Vector2i(x, y) + ring[i]
-				var b := Vector2i(x, y) + ring[(i + 1) % 4]
-				var fa := field[a.y * row + a.x]
-				var fb := field[b.y * row + b.x]
-				var pa := Vector2(cell) + Vector2(a) / RIM_RES - Vector2(0.5, 0.5)
-				var pb := Vector2(cell) + Vector2(b) / RIM_RES - Vector2(0.5, 0.5)
-				if fa < 0.0:
-					shape.append(pa)
-				if (fa < 0.0) != (fb < 0.0):
-					var crossing := pa.lerp(pb, fa / (fa - fb))
-					shape.append(crossing)
-					crossings.append(crossing)
-			for t in range(1, shape.size() - 1):
-				var triangle := [shape[0], shape[t], shape[t + 1]]
-				# Wound as the ground's, up: (p2 - p0) x (p1 - p0) points up.
-				var up := Vector3(triangle[2].x - triangle[0].x, 0.0, triangle[2].y - triangle[0].y).cross(
-						Vector3(triangle[1].x - triangle[0].x, 0.0, triangle[1].y - triangle[0].y))
-				if up.y < 0.0:
-					triangle = [triangle[0], triangle[2], triangle[1]]
-				for point: Vector2 in triangle:
-					var over: Vector2 = over_at.call(point)
-					points.append(point)
-					heights.append(over.x)
-					lit.append(int(over.y))
-			for s in range(0, crossings.size() - 1, 2):
-				var from := crossings[s]
-				var to := crossings[s + 1]
-				var top := Vector2(top_at.call(from), top_at.call(to))
-				var bottom := Vector2(_height_in(cell, from), _height_in(cell, to))
-				if (top - bottom).length() <= Relief.EPSILON or from.distance_to(to) < 0.001:
-					continue
-				# Facing away from the cells over it, where the field rises.
-				var along := (to - from).normalized()
-				var out := Vector2(-along.y, along.x)
-				var middle := (from + to) * 0.5
-				if _rim_field(middle + out * 0.02, uppers, pins) < _rim_field(middle - out * 0.02, uppers, pins):
-					out = -out
-				segments.append([from, to, top, bottom, Vector3(out.x, 0.0, out.y)])
-	return {"points": points, "heights": heights, "uppers": lit, "segments": segments, "tops": tops, "over": uppers, "covers": covers}
-
-
-## [param cap]'s triangles into a chunk's arrays (decision 556): points of
-## their own, each lit by the cell over it.
-func _rim_cap_into(cap: Dictionary, positions: PackedVector3Array, indices: PackedInt32Array,
-		feet: PackedByteArray, tops: PackedByteArray, chunk_index: int, byte_start: int,
-		pair_cell: PackedInt32Array, pair_vertex: PackedInt32Array) -> void:
-	var points: PackedVector2Array = cap["points"]
-	var heights: PackedFloat32Array = cap["heights"]
-	var lit: PackedInt32Array = cap["uppers"]
-	for k in points.size():
-		var vertex := positions.size()
-		positions.append(Vector3(points[k].x, heights[k], points[k].y))
-		var global := _vertex_chunk.size()
-		_vertex_chunk.append(chunk_index)
-		_vertex_byte.append(byte_start + vertex * _ground_stride + _ground_custom)
-		_vertex_cells.append_array([lit[k], -1, -1, -1])
-		pair_cell.append(lit[k])
-		pair_vertex.append(global)
-		feet.append(0)
-		var corner := Vector2i(roundi(points[k].x + 0.5), roundi(points[k].y + 0.5))
-		tops.append(roundi(_crest(corner, heights[k]) * 255.0))
-		indices.append(vertex)
-
-
 ## The water's surface at [param point] (decision 557): over the cell it is
 ## in, the bilinear of its corners' (_water_corner), as the bed under it
 ## (_shore_bed) is; a corner with no water round it the mean of the cell's
@@ -6440,159 +6133,6 @@ func _build_ribbons() -> void:
 		_room.add_child(drawn)
 		_stream_ribbons.append(drawn)
 	stream_falls = falls
-
-
-## The ground relaxed (decision 558, step 4 of the unsquaring), on relief:
-## each ground corner free to move (_relax_free) moved up to RELAX_MOST of
-## a cell sideways by a roll of where it is, its height the ground's there
-## (the bilinear of the corners of the cell it lands in), so the facets'
-## lines stop running straight while the shape stays; and each cell with
-## no pinned corner split along the diagonal nearer its own height at its
-## middle (Relief.at), the other way where that fits better. Drawing only:
-## the sim's walk and cliff_between read the cells' heights as before.
-func _relax(cells: Array, floor_count: int) -> void:
-	_relax_moves.clear()
-	_relax_heights.clear()
-	_relax_flips.clear()
-	_relax_quads.clear()
-	if not _relief_given or _glimpse:
-		return
-	# A corner on an edge the two cells either side draw apart (a face, or
-	# a wedge's thin end) stays: the faces are laid on the cells' edges.
-	var pinned: Dictionary[Vector2i, bool] = {}
-	var sides: Array[Vector2i] = [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]
-	for i in floor_count:
-		var cell: Vector2i = cells[i]
-		if not _relax_ground(cell, floor_count):
-			continue
-		var own := _corner_heights(cell)
-		for side in sides:
-			var next := cell + side
-			var split := not _grounds.has(next)
-			if not split:
-				var theirs := _corner_heights(next)
-				for c in 4:
-					var k := GROUND_CORNERS.find(cell + GROUND_CORNERS[c] - next)
-					if k >= 0:
-						split = split or absf(theirs[k] - own[c]) > Relief.EPSILON
-			if split:
-				for c in 4:
-					var corner := cell + GROUND_CORNERS[c]
-					if GROUND_CORNERS.has(corner - next):
-						pinned[corner] = true
-	for i in floor_count:
-		var cell: Vector2i = cells[i]
-		if not _relax_ground(cell, floor_count):
-			continue
-		var free := 0
-		for c in 4:
-			var corner := cell + GROUND_CORNERS[c]
-			if _relax_moves.has(corner):
-				free += 1
-				continue
-			if pinned.has(corner) or not _relax_free(corner, floor_count):
-				continue
-			var turn := _roll(corner, 558) * TAU
-			var off := Vector2.from_angle(turn) * sqrt(_roll(corner, 559)) * RELAX_MOST
-			_relax_moves[corner] = off
-			var at := Vector2(corner) - Vector2(0.5, 0.5) + off
-			var under := Vector2i(roundi(at.x), roundi(at.y))
-			var h := _corner_heights(under)
-			var f := at - Vector2(under) + Vector2(0.5, 0.5)
-			_relax_heights[corner] = lerpf(lerpf(h[0], h[1], f.x), lerpf(h[2], h[3], f.x), f.y)
-			free += 1
-		if free == 4:
-			var h := _corner_heights(cell)
-			var middle := _elevation(cell)
-			if absf((h[0] + h[3]) * 0.5 - middle) < absf((h[1] + h[2]) * 0.5 - middle) - 0.001:
-				_relax_flips[cell] = true
-	# Each relaxed cell's quad as drawn, for _height_in.
-	for i in floor_count:
-		var cell: Vector2i = cells[i]
-		var moved := _relax_flips.has(cell)
-		for corner in GROUND_CORNERS:
-			moved = moved or _relax_moves.has(cell + corner)
-		if moved:
-			_relax_quads[cell] = PackedVector3Array([_drawn_corner(cell, 0), _drawn_corner(cell, 1), _drawn_corner(cell, 2), _drawn_corner(cell, 3)])
-
-
-## Whether [param cell] is natural ground the relax may move (decision
-## 558): the level's floor, not water, a bed, a ford, dry water, a ramp, a
-## rock, a building's floor, the shore's finer cells, a ledge's cap or a
-## solid building's cell (565: the wilds' relief brought the mound into it).
-func _relax_ground(cell: Vector2i, floor_count: int) -> bool:
-	var index: int = _grounds.get(cell, -1)
-	return index >= 0 and index < floor_count and not _wet.has(cell) and not _bed_levels.has(cell) \
-			and not _fords.has(cell) and not _dry_water.has(cell) and not _ramp_heights.has(cell) \
-			and not _rocks.has(cell) and not _shore_heights.has(cell) and not _rim_caps.has(cell) \
-			and not _solid_cells.has(cell) and _floor_bytes_at(cell) == 0
-
-
-## Whether ground corner [param corner] may move: the four cells round it
-## all natural ground (_relax_ground), all drawing it at one height.
-func _relax_free(corner: Vector2i, floor_count: int) -> bool:
-	var level := NAN
-	for a in 4:
-		var cell := corner + SHORE_AROUND[a]
-		if not _relax_ground(cell, floor_count):
-			return false
-		var here := _corner_heights(cell)[3 - a]
-		if is_nan(level):
-			level = here
-		elif absf(here - level) > Relief.EPSILON:
-			return false
-	return true
-
-
-## [param cell]'s corner [param c] where it is drawn (decision 558): moved
-## and its height re-read where the relax moved it.
-func _drawn_corner(cell: Vector2i, c: int) -> Vector3:
-	var corner := cell + GROUND_CORNERS[c]
-	var off: Vector2 = _relax_moves.get(corner, Vector2.ZERO)
-	var level: float = _relax_heights[corner] if _relax_moves.has(corner) else _corner_heights(cell)[c]
-	return Vector3(corner.x - 0.5 + off.x, level, corner.y - 0.5 + off.y)
-
-
-## The height of [param cell]'s drawn quad (decision 558, _relax_quads)
-## over [param point], its triangles split as _relax_flips has it; NAN off
-## it. Every puppet every frame: no allocations.
-func _quad_height(cell: Vector2i, point: Vector2) -> float:
-	var q: PackedVector3Array = _relax_quads[cell]
-	var y := NAN
-	if _relax_flips.has(cell):
-		y = _triangle_height(point, q[0], q[1], q[3])
-		if is_nan(y):
-			y = _triangle_height(point, q[0], q[3], q[2])
-	else:
-		y = _triangle_height(point, q[0], q[1], q[2])
-		if is_nan(y):
-			y = _triangle_height(point, q[1], q[3], q[2])
-	return y
-
-
-## The height over [param point] of the triangle [param a], [param b],
-## [param c] (x, z the ground's), NAN off it.
-static func _triangle_height(point: Vector2, a: Vector3, b: Vector3, c: Vector3) -> float:
-	var v0x := b.x - a.x
-	var v0z := b.z - a.z
-	var v1x := c.x - a.x
-	var v1z := c.z - a.z
-	var d := v0x * v1z - v1x * v0z
-	if absf(d) < 0.000001:
-		return NAN
-	var px := point.x - a.x
-	var pz := point.y - a.z
-	var u := (px * v1z - v1x * pz) / d
-	var w := (v0x * pz - px * v0z) / d
-	if u < -0.0001 or w < -0.0001 or u + w > 1.0001:
-		return NAN
-	return a.y + (b.y - a.y) * u + (c.y - a.y) * w
-
-
-## Whether [param cell] is drawn off the grid (decision 558): a corner of
-## it moved, or split the other way (its quad in _relax_quads).
-func _relaxed(cell: Vector2i) -> bool:
-	return _relax_quads.has(cell)
 
 
 ## The level's waters as curves (559, terrain's side, maps' 559: terrain "waters",
@@ -8203,23 +7743,12 @@ func _add_cliffs() -> void:
 			if (top - bottom).length() <= Relief.EPSILON:
 				continue
 			_cliff_edges.append([cell, direction])
-			# Behind a ledge's face along its rim's curve (decision 556).
-			if _rim_caps.has(next) and (_rim_caps[next]["covers"] as Array).has(-direction):
-				continue
 			var chunk := Vector2i(floori(cell.x / float(FLOOR_CHUNK)), floori(cell.y / float(FLOOR_CHUNK)))
 			if not faces.has(chunk):
 				faces[chunk] = [PackedVector3Array(), PackedVector3Array(), PackedColorArray()]
 			var from := Vector2(cell + GROUND_CORNERS[mine[0]]) - Vector2(0.5, 0.5)
 			var to := Vector2(cell + GROUND_CORNERS[mine[1]]) - Vector2(0.5, 0.5)
 			_cliff_strip(faces[chunk], from, to, top, bottom, Vector3(direction.x, 0.0, direction.y))
-	# The ledges' faces down from their rims' curves (decision 556), in
-	# front of the faces on the cells' edges, which the caps cover.
-	for cell: Vector2i in _rim_caps:
-		var chunk := Vector2i(floori(cell.x / float(FLOOR_CHUNK)), floori(cell.y / float(FLOOR_CHUNK)))
-		if not faces.has(chunk):
-			faces[chunk] = [PackedVector3Array(), PackedVector3Array(), PackedColorArray()]
-		for segment: Array in _rim_caps[cell]["segments"]:
-			_cliff_strip(faces[chunk], segment[0], segment[1], segment[2], segment[3], segment[4], 1)
 	# Their vertex colours, rough, both sides, under the sky's light as the
 	# ground (513 amended); seen through where they hide the player
 	# (cliff.gdshader, decision 549).
