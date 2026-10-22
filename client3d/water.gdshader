@@ -33,6 +33,9 @@ uniform bool ribbon = false;
 // in UV's x, not the mask's cells; a tall fall's curtain (570) UV's y 1,
 // and a stream's end in another water fading out (UV's y under a half).
 uniform bool curved = false;
+// Built water (decision 595, Client3D._built_water): a basin's own cells,
+// its edge theirs, crisp; no shore field, no foam, still.
+uniform bool built = false;
 // The shore field, Client3D.SHORE_RES texels a cell over the mask's cells.
 uniform sampler2D shore : hint_default_black, filter_linear, repeat_disable;
 // The water's depth at the shore field's texels (559, terrain's side): half
@@ -77,7 +80,7 @@ void fragment() {
 	// The shore: the field's half, read a little aside; about a cell from
 	// dry to wet, so a half less it is about how far into the water.
 	vec2 aside = vec2(noise(at * 0.9) - 0.5, noise(at * 0.9 + 17.0) - 0.5) * 2.0 * SHORE_WARP;
-	float into = texture(shore, (at + aside - mask_origin + 0.5) / mask_size).r - 0.5;
+	float into = built ? 0.5 : texture(shore, (at + aside - mask_origin + 0.5) / mask_size).r - 0.5;
 	if (into < -FOAM) {
 		discard;
 	}
@@ -90,7 +93,7 @@ void fragment() {
 	float inside = smoothstep(-0.02, 0.03, into);
 	// How deep: half the distance into the water (from the curve, or a
 	// water without one from its cells), Client3D._depth_image.
-	float depth = smoothstep(0.15, 1.2, texture(depth_tex, (at - mask_origin + 0.5) / mask_size).r * 2.0);
+	float depth = built ? 0.55 : smoothstep(0.15, 1.2, texture(depth_tex, (at - mask_origin + 0.5) / mask_size).r * 2.0);
 	float t = TIME * 0.12;
 	// Down a stream the surface drifts with the water, in two phases: each
 	// carried FLOW_SPEED along and faded out as the other comes in.
@@ -100,8 +103,9 @@ void fragment() {
 	float swap = abs(phase - 0.5) * 2.0;
 	vec3 moving = mix(surface(at - way * FLOW_SPEED * FLOW_CYCLE * phase, t),
 			surface(at - way * FLOW_SPEED * FLOW_CYCLE * other + vec2(0.5) * length(way), t), swap);
-	vec2 slope = moving.xy;
-	float churn = moving.z;
+	// Built water is still: its ripples a third as deep.
+	vec2 slope = moving.xy * (built ? 0.35 : 1.0);
+	float churn = built ? 0.0 : moving.z;
 	// A ford: shallow and clear, the stones showing, foam across it where
 	// the current meets them and flecks on it.
 	float shoal = smoothstep(0.15, 0.85, curved ? UV.x : texture(water, uv).b);

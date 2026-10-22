@@ -22816,3 +22816,35 @@ marked in _build_ground.
 view_test: _test_relax and _test_ledges gone; the relief's slope check
 reads the cells' corners. Shots of the hills and the wilds follow the
 landing. Client only, protocol unchanged, no new class_name.
+
+## 595. Built water drawn square
+
+Jeff's curve rule ("rivers, streams, roads and shorelines are drawn as
+smooth curves... never cell regions with rounded edges") is for natural
+water: its shorelines are natural ones. Every shipped level's natural water
+is a "waters" curve (559 and maps', with the castle's ponds and the
+sample's pool and stream traced in 568 amended). What no curve lays is
+built: a well's cell (the wilds' farmstead and town wells), a basin, a
+cistern. 553's cell path drew those with rounded corners, a noisy edge and
+foam: the cell region with rounded edges the rule bans. Drawn as built.
+
+- Client3D._built_water: water with no curve near it (within a curve's
+  reach, so a bank cell the level lays beside a curve's own stays natural),
+  not a ford, a bridge's or a stream's path; computed after the curves are
+  read, each build. No level data, no protocol line.
+- Its body (_build_water) covers its own cells alone, not the land round
+  them: its edge is its cells' edge, crisp. Its material's "built"
+  (water.gdshader): no shore field (left out of shore_image, so no foam or
+  wet ground round it), an even depth, still (ripples a third as deep, no
+  churn).
+- On relief the shore band takes built water as land, so the ground round
+  a well does not dip to it.
+- 553 stays for natural water drawn without a curve only as the fallback
+  of a level with none (tests); maps' level_test (568 amended) fails a
+  level whose curveless water is neither under a building nor clear of
+  natural ground (grass, dirt, sand) round it.
+
+view_test _test_built_water: the wilds' wells built, each body over its own
+cells, no shore field round them; the hills' water all natural.
+_test_shore skips built water. Client only, protocol unchanged, no new
+class_name.

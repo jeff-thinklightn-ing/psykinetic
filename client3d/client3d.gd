@@ -1515,6 +1515,10 @@ var _hidden_niches: Dictionary[Vector3i, Array] = {}
 var _road_image: Image
 var _road_mask: ImageTexture
 var _stream_ribbons: Array[MeshInstance3D] = []
+## Built water (decision 595): water no "waters" curve lays and no stream's
+## path, a stone basin, a well's or a cistern's cells; drawn square and still
+## (_build_water), never rounded, its own field none.
+var _built_water: Dictionary[Vector2i, bool] = {}
 ## Each tall fall's foot (570 amended, terrain's side): {at (the foot's
 ## middle on the water), across, down (the stream's way, flat), width,
 ## drop}, from _build_curve_ribbon; its mist (_build_mists).
@@ -5580,6 +5584,18 @@ func _build_ground(kinds: Dictionary) -> void:
 	_read_roads()
 	for cell: Vector2i in _curve_cells:
 		_stream_cells[cell] = true
+	# Built water (decision 595): Jeff's curve rule is for natural water
+	# (rivers, streams, natural shorelines), and all of it is a curve; water
+	# with no curve near it (within its reach, so a bank cell the level lays
+	# beside a curve's own is natural) is built, drawn square.
+	_built_water.clear()
+	var stream_path: Dictionary[Vector2i, bool] = {}
+	for stream: Dictionary in _terrain.get("streams", []):
+		for cell: Vector2i in stream.get("path", []):
+			stream_path[cell] = true
+	for cell: Vector2i in _wet:
+		if not _fords.has(cell) and not _curve_near_sample.has(cell) and not stream_path.has(cell) and not _bed_levels.has(cell):
+			_built_water[cell] = true
 	var water_end := cells.size()
 	# Under the stands the floor is their needles (the forest floor's), so
 	# the land runs only into the first ring.
@@ -5683,7 +5699,7 @@ func _build_ground(kinds: Dictionary) -> void:
 	# withdrawn), and every shipped level's water is a curve.
 	var by_cells: Dictionary[Vector2i, bool] = {}
 	for cell: Vector2i in wet_cells:
-		if not _curve_cells.has(cell):
+		if not _curve_cells.has(cell) and not _built_water.has(cell):
 			by_cells[cell] = true
 	var cell_streams: Array = (_terrain.get("streams", []) as Array).filter(func(stream: Dictionary) -> bool:
 		return not (stream.get("path", []) as Array).all(func(cell: Vector2i) -> bool: return _curve_cells.has(cell)))
@@ -5873,7 +5889,7 @@ func _shore_band(cells: Array, floor_count: int, water_end: int) -> Dictionary[V
 				var index: int = _grounds.get(near, -1)
 				if index < 0 or index >= water_end:
 					continue
-				if _wet.has(near) or _bed_levels.has(near):
+				if (_wet.has(near) and not _built_water.has(near)) or _bed_levels.has(near):
 					water = true
 				else:
 					land = true
@@ -7297,8 +7313,13 @@ func _build_water() -> void:
 		# the water where the shore field rounds into it, and stands over
 		# the water elsewhere, hiding it.
 		var covered: Dictionary[Vector2i, bool] = {}
+		# Built water (decision 595) draws its own cells alone: a basin's
+		# edge is its cells' edge, crisp.
+		var built := body.all(func(cell: Vector2i) -> bool: return _built_water.has(cell))
 		for cell in body:
 			covered[cell] = true
+			if built:
+				continue
 			for y in range(-1, 2):
 				for x in range(-1, 2):
 					var near := cell + Vector2i(x, y)
@@ -7352,6 +7373,10 @@ func _build_water() -> void:
 		drawn.name = "Water_%d_%d" % [start.x, start.y]
 		drawn.mesh = mesh
 		drawn.material_override = material
+		if built:
+			var still := _water_material()
+			still.set_shader_parameter("built", true)
+			drawn.material_override = still
 		drawn.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		_room.add_child(drawn)
 		_water_bodies.append(drawn)

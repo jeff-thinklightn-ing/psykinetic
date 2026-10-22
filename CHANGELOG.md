@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Built water (wells and basins, which no curve lays) is drawn square and still with a crisp edge, not as a rounded pond; natural water stays on its curves (595).
 - The first unsquaring's cell smoothing is withdrawn (Jeff's veto): ledge rims and jittered ground facets are gone, and cliffs stand on their tiles' edges until ledges are drawn from curves (556 amended, 558 amended).
 - Cliffs and ledges run along smooth, wandering lines rather than straight down the grid: the hills' escarpments and the plateau's cliff, and the wilds' ridge (585).
 - Shadows are shorter and lighter all day: at most about one and a half times what casts them at sunrise and sunset, about half at noon, and no longer black (534 amended (2)).

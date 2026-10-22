@@ -46,6 +46,7 @@ func _ready() -> void:
 	_test_hills()
 	_test_shore()
 	_test_curves_meet()
+	_test_built_water()
 	_test_forest_edge()
 	_test_solid_ground()
 	_test_roads()
@@ -2479,6 +2480,41 @@ func _test_forest_edge() -> void:
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
 
+## Built water (decision 595): water no curve lays (the wilds' wells) drawn
+## square and still: each body over its own cells alone, its edge theirs, no
+## shore field round it; natural water (a curve's) as before.
+func _test_built_water() -> void:
+	print("
+== built water: the wilds' wells square and still, natural water from its curves ==")
+	var wilds := Level.load_level("wilds")
+	_rig.rebuild(wilds["terrain"], wilds["centre"])
+	var built_bodies := 0
+	var astray := []
+	var fielded := []
+	for body: MeshInstance3D in _rig._water_bodies:
+		var material := body.material_override as ShaderMaterial
+		if not bool(material.get_shader_parameter("built")):
+			continue
+		built_bodies += 1
+		for point: Vector3 in (body.mesh as ArrayMesh).surface_get_arrays(0)[Mesh.ARRAY_VERTEX]:
+			# Each corner a corner of a built cell.
+			var touches := false
+			for dy in [-0.5, 0.5]:
+				for dx in [-0.5, 0.5]:
+					touches = touches or _rig._built_water.has(Vector2i(roundi(point.x + dx), roundi(point.z + dy)))
+			if not touches:
+				astray.append(Vector2(point.x, point.z))
+	for cell: Vector2i in _rig._built_water:
+		if _rig.shore_at(Vector2(cell)) > 0.01:
+			fielded.append(cell)
+	_check(not _rig._built_water.is_empty() and built_bodies >= 1 and astray.is_empty() and fielded.is_empty(),
+			"wilds: its wells built water (%d cells, %d bodies), each over its own cells alone (astray: %s), no shore field round them (%s)" % [_rig._built_water.size(), built_bodies, astray.slice(0, 3), fielded.slice(0, 3)])
+	var hills := Level.load_level("hills")
+	_rig.rebuild(hills["terrain"], hills["centre"])
+	_check(_rig._built_water.is_empty(), "hills: all its water natural, from its curves (built: %s)" % [_rig._built_water.keys().slice(0, 3)])
+	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+
+
 ## Where two waters' curves meet (570, terrain's side: a stream into a
 ## river): the field their union, so a point inside the river nearer the
 ## stream's end than any of the river's samples is still in the water.
@@ -2545,6 +2581,10 @@ func _test_shore() -> void:
 					# A water laid as a curve (559, terrain's side): its edge is
 					# the curve's, checked below, not its cells'.
 					if _rig._curve_near_sample.has(here):
+						continue
+					# Built water (decision 595) has no shore field: its edge is
+					# its cells', drawn square (_test_built_water).
+					if _rig._built_water.has(here) or [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1), Vector2i(1, 1), Vector2i(-1, -1), Vector2i(1, -1), Vector2i(-1, 1)].any(func(d: Vector2i) -> bool: return _rig._built_water.has(here + d)):
 						continue
 					var water := wet.has(here)
 					for v in Client3D.SHORE_RES:
