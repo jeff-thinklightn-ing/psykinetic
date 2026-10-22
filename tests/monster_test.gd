@@ -100,6 +100,7 @@ func _ready() -> void:
 	_test_room_guard()
 	_test_draugr()
 	_test_barrow_layers()
+	_test_draugr_mind()
 	_test_charging()
 	_test_threatens()
 	_test_quieter()
@@ -2901,6 +2902,96 @@ func _test_quieter() -> void:
 			and e["x"][0].leash == 14,
 		"the barrow's kinds see 5 cells; a robber goes 14 from home (580; 10 in 561)")
 	Monster.idling = true
+
+
+func _test_draugr_mind() -> void:
+	print("
+== the draugr's mind in his fight (603): crowded he spins, spent he backs off with his dead, one standing off takes the axe, then he charges for it ==")
+	if not World.has_method("try_spin"):
+		print("  (combat's moves not in: skipped)")
+		return
+	Monster.idling = true
+	var rows: Array[String] = ["##############", "#............#", "#............#", "#.....u......#", "#............#", "#............#", "##############"]
+	Level.register("mt_mind", Level.image_from_rows(rows), null, {"regenerate": {"anchors": [{"rect": [1, 1, 12, 5], "name": "lair"}]}})
+	var e := _build(rows, {}, {}, "mt_mind")
+	var draugr := e["u"][0] as Draugr
+	draugr.max_stamina = 100
+	draugr.stamina = 100
+	draugr.pays_swings = true
+	draugr.sight_range = 8
+	draugr.senses.cone_cos = -1.0
+	draugr.slots = Items.tidy(["", "", "", "", "", ""], Items.CARRIED)
+	World.set_slots(draugr, Items.tidy(["", "", "", "", "giant_axe", ""], Items.CARRIED))
+	var a := EntityFactory.build(SPECS["P"].merged({"name": "PlayerA"})) as Player
+	a.player_id = "pa"
+	_room.add_child(a)
+	World.spawn(a, Vector2i(5, 3))
+	var b := EntityFactory.build(SPECS["P"].merged({"name": "PlayerB"})) as Player
+	b.player_id = "pb"
+	_room.add_child(b)
+	World.spawn(b, Vector2i(6, 2))
+	var was_economy := World.economy
+	World.economy = Economy.new({"purses": {"pa": 200, "pb": 0}})
+	var risen: Array[GridEntity] = []
+	World.spawn_spec = func(spec: Dictionary) -> GridEntity:
+		var made := EntityFactory.build(spec)
+		_room.add_child(made)
+		World.spawn(made, spec["tile"])
+		risen.append(made)
+		return made
+	draugr.accept_offer(a, draugr.offers_for("pa")[0], 50)
+	draugr.target = a
+	var spun := false
+	for i in 10:
+		World.step()
+		if World.boss_busy(draugr) and draugr._next_spin > World.tick:
+			spun = true
+			break
+	_check(spun, "two of them within his sweep: he winds up the spin")
+	var backed := false
+	for i in 40:
+		World.step()
+		if draugr.backing_off:
+			backed = true
+			break
+	_check(backed and draugr.stamina <= Draugr.BACK_OFF_STAMINA + 5 and risen.size() == 1,
+		"the sweep spends him: he backs off, and his dead (normal's one) rise to cover him (stamina %d, %d risen)" % [draugr.stamina, risen.size()])
+	World.dead_rest.clear()
+
+	# One standing off, nobody beside him, his breath back: the throw, then the charge.
+	e = _build(rows, {}, {}, "mt_mind")
+	draugr = e["u"][0] as Draugr
+	draugr.max_stamina = 100
+	draugr.stamina = 100
+	draugr.pays_swings = true
+	draugr.sight_range = 8
+	draugr.senses.cone_cos = -1.0
+	draugr.slots = Items.tidy(["", "", "", "", "", ""], Items.CARRIED)
+	World.set_slots(draugr, Items.tidy(["", "", "", "", "giant_axe", ""], Items.CARRIED))
+	a = EntityFactory.build(SPECS["P"].merged({"name": "PlayerA"})) as Player
+	a.player_id = "pa"
+	_room.add_child(a)
+	World.spawn(a, Vector2i(12, 3))
+	draugr.accept_offer(a, draugr.offers_for("pa")[0], 20)
+	draugr.target = a
+	var threw := false
+	for i in 10:
+		World.step()
+		if World.boss_busy(draugr) and draugr._next_throw > World.tick:
+			threw = true
+			break
+	_check(threw and World.distance(draugr.tile, a.tile) >= Draugr.THROW_NEAR, "one standing %d off: he winds up the throw" % World.distance(draugr.tile, a.tile))
+	var charged := false
+	for i in 60:
+		World.step()
+		if str(World.axe_state(draugr)["where"]) == "ground" and World.boss_busy(draugr):
+			charged = true
+			break
+	_check(charged, "the axe flown and lying: he charges for it")
+	World.economy = was_economy
+	World.spawn_spec = Callable()
+	World.dead_rest.clear()
+	Level.unregister("mt_mind")
 
 
 func _test_barrow_layers() -> void:

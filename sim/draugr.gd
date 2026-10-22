@@ -224,10 +224,11 @@ func _special_tick() -> bool:
 		return true
 	backing_off = false
 	var winded := bool(World.call("is_winded", self))
+	World.face(self, Senses.way_toward(tile, target.tile))  # His sweep's gap behind him, away from his target.
 	var foes := 0
 	for each: Variant in World.call("spin_targets", self):
-		if each is GridEntity and threatens(each):
-			foes += 1
+		if each is GridEntity and each != self and (each is Player or each is Companion) and not _is_dead(each):
+			foes += 1  # The living in his sweep, his challenger's party or not; never his own dead.
 	var struck_twice := _struck_at.size() >= 2
 	if not winded and World.tick >= _next_spin and (foes >= 2 or foes == 1 and struck_twice):
 		if bool(World.call("try_spin", self)):
@@ -250,7 +251,7 @@ func _special_tick() -> bool:
 ## Whether a foe stands beside him (a throw then waits for the blow).
 func _foe_beside() -> bool:
 	for entity in World.sought():
-		if World.distance(tile, entity.tile) <= 1 and threatens(entity):
+		if World.distance(tile, entity.tile) <= 1 and entity != self and (entity is Player or entity is Companion):
 			return true
 	return false
 
