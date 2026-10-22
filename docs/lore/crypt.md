@@ -331,6 +331,29 @@ secrets beside them.
 
 The temple's goers do not know any of it; a player learns it below, from the draugr.
 
+## The draugr's hall as a puzzle (Jeff, 2026-10-22)
+
+Jeff's words through the coordinator (decision 573 amended; "receive" spelt right):
+
+- **[Jeff]** "I don't want the draugr to explain everything in one sentence. Make it
+  somewhat of a puzzle to figure out. The door closes when you enter. "Why have you
+  entered my Hall, "name"?" after a pause, he says, "Return the gold your people stole
+  from this place, when you do that you may leave". Depending on how much gold you turn
+  in you get a different result, for < 20 gold, he attacks and if you kill him the door
+  opens and he says "...warrior, you have my respect." if you turn in the right amounts
+  of gold you get resurrection tokens. He says "...you have honored the pact, I shall
+  give you the power to cheat death" the first time you kill him you get a Draugr's
+  Totem that holds the charges and the item explains "carrying this totem allows you to
+  receive another chance to fight"."
+
+His lines are enemy-ai's to say and the totem's words items'; lore keeps what is so,
+known only to the draugr, so no one in town gives the puzzle away:
+
+| Fact | Known |
+|---|---|
+| The door of the Hall of Fallen Souls closes behind whoever enters, and opens again for gold returned or for his defeat. | secret: the draugr |
+| Carrying the Draugr's Totem gives its holder another chance to fight. | secret: the draugr |
+
 ---
 
 ## Log
@@ -380,3 +403,4 @@ The temple's goers do not know any of it; a player learns it below, from the dra
 - 2026-10-22: the layers: the newer (wealthy) dead on top, the Ossuary, the damp, dark
   third layer, the Hall of Fallen Souls; the plunder is the grave robbers' (Jeff).
 - 2026-10-22, cont.: the old gods are war gods who power the draugr and send the dead back to battle; angered by the robbers, appeased by gold (Jeff).
+- 2026-10-22, cont.: the draugr's hall as a puzzle: the door shuts behind you, gold returned or his defeat opens it, the Draugr's Totem (Jeff, 573 amended).

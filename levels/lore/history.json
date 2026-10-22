@@ -228,6 +228,30 @@
 					"status": "agreed"
 				},
 				{
+					"id": "crypt.hall_door",
+					"text": "The door of the Hall of Fallen Souls closes behind whoever enters, and opens again for gold returned or for his defeat.",
+					"known": "secret",
+					"where": [],
+					"knowers": [
+						"draugr"
+					],
+					"tags": [],
+					"source": "Jeff",
+					"status": "agreed"
+				},
+				{
+					"id": "crypt.totem",
+					"text": "Carrying the Draugr's Totem gives its holder another chance to fight.",
+					"known": "secret",
+					"where": [],
+					"knowers": [
+						"draugr"
+					],
+					"tags": [],
+					"source": "Jeff",
+					"status": "agreed"
+				},
+				{
 					"id": "crypt.pip_carries",
 					"text": "Pip carries the temple's offering down to the altar in the barrow.",
 					"known": "secret",
