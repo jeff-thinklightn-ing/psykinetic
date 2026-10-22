@@ -15552,6 +15552,32 @@ tools/town_soak --woodlot=30,0, taken by goblins at day 15
 treasury end 1 (the inn never stood, short of wood and leather).
 Protocol unchanged. production_test.
 
+Amended (2026-10-22, 521 amended, npc's side; economy's work_steps the
+other half, under the coordinator's one number): on the real wilds the
+woodcutter reached the block only at the trip's turn and left at once
+(the town soak: two chop samples in two days against eighteen carries).
+The trip's straight-line 4 steps a cell is close to a body's own pace
+(move_ticks 3, about 3.3 ticks a cell near or far: World.walk's far call
+covers 6 cells per 20 ticks), so the half of 126 steps is the walk
+itself, with nothing left over at the site. Two halves: economy adds
+sites.work_steps once to site_walk's there-and-back, a spell of work at
+the site (the cut cycle 3252 to about 3372 steps, a 3.6 percent dip Jeff
+takes to see the work); npc's body at a task keeps the near tick and its
+real route however far the players are (Resident._sim_tick: far only
+with no task), and chops from its arrival until back_at minus its own
+walk home (Main._walk_home: the route's cells at move_ticks times
+WALK_HOME_SLACK 1.3, kept by body and spot), carrying after, so it is
+home when the yield lands whatever the route. A trip with no spell
+(today's) still turns at the walk home. Economy's half fc89a674 (sites.work_steps 120: the wilds'
+trip 252 to 372 steps). Release's cost question, a two-day town soak
+timing World.step at main's head and with this: avg 1258 then 952
+microseconds a step, the worst a one-off spike both times (2.7 s, then
+1.2 s), chop samples 5 then 8 before economy's spell; at most a
+woodcutter and a carpenter a town leave the far tier. Caught in the
+samples: a quarter of the chops faced the way the body arrived, since
+World.face is refused while the arriving step runs; the activity now
+shows once the body has turned to its work (sleep likewise). resident_test: the turn by the
+walk home against a stand-in trip. Server only, protocol unchanged.
 
 ## 513, terrain's side: rocks and slopes drawn
 

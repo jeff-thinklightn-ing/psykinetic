@@ -86,6 +86,10 @@ const CHOPPING_BLOCK := "building.chopping_block"
 const WOODPILE := "building.woodpile"
 ## How far from the store's cell its woodpile may stand, in cells.
 const WOODPILE_REACH := 4
+## The walk home from a site is reckoned this much over the route's cells at
+## the body's pace (grass, slopes and diagonals slow it), so it is home
+## when the yield lands (521 amended).
+const WALK_HOME_SLACK := 1.3
 ## A town's homes: the map's huts and houses linked to nothing within so
 ## many cells of its store, each with room for so many.
 const HOME_TILES := 24
@@ -8634,16 +8638,31 @@ func _task_for(body: Resident) -> Dictionary:
 		var now := World.production.now()
 		var from := int(trip.get("from", -1))
 		var back_at := int(trip.get("back_at", -1))
-		if from < 0 or back_at < 0 or now < (from + back_at) / 2:
-			var spot := _site_spot(site, body.town)
-			return {"kind": "chop", "cell": spot["cell"], "face": spot["face"], "walking": false}
+		var spot := _site_spot(site, body.town)
 		var store_cell: Vector2i = World.holdings.place(body.town).get("cell", body.tile)
+		# At the site until it must leave to be home when the yield lands (521 amended): the walk home at its own
+		# pace over the real route, not the trip's straight-line half, so the spell at the site is what the trip
+		# leaves over the walk there and back.
+		if from < 0 or back_at < 0 or now < back_at - _walk_home(body, spot["cell"], store_cell):
+			return {"kind": "chop", "cell": spot["cell"], "face": spot["face"], "walking": false}
 		var pile := _pile_spot(body.town, store_cell)
 		return {"kind": "carry_log", "cell": pile.get("cell", _nearest_free(store_cell)), "face": pile.get("face", Resident.NO_CELL), "walking": true}
 	var build := _build_of(body)
 	if not build.is_empty():
 		return _build_task(build["rect"], build["facing"], float(build["progress"]))
 	return {}
+
+
+## Steps for [param body] to walk home from [param spot] to [param store]
+## over the real route at its pace (the trip's turn, 521 amended); the
+## straight line's cells when no route is found. Kept by body and spot.
+func _walk_home(body: Resident, spot: Vector2i, store: Vector2i) -> int:
+	var key := "home:%s:%s" % [body.worker_id, spot]
+	if not _site_spots.has(key):
+		var path := World.find_path(spot, store, true)
+		var cells := path.size() if not path.is_empty() else World.distance(spot, store)
+		_site_spots[key] = ceili(float(cells) * body.move_ticks * WALK_HOME_SLACK)
+	return int(_site_spots[key])
 
 
 ## Economy's trip for [param worker_id] ({site, from, back_at}; {} off a

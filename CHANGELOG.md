@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The woodcutter has time at his block: a body at its work walks its real route at full pace however far away, and chops until it must set off to be home when the wood lands (521 amended, npc's side; economy adds the spell of work to the trip). Server only.
 - The woodcutter, hunter and farmer now spend a spell working at their site before walking home, instead of turning back as they arrive (521 amended, economy's side); the wood comes in about 4% slower.
 - A resident who takes up a new trade works it at once: their body follows the trade (it kept the old one until they stood again), and the town soak reports where each body is seen at work (566 amended, npc's side, part 3). Server only.
 - The town in the wilds has a woodlot at the copse to its south-west, with a chopping block, and a woodpile in the store's yard, so the woodcutter has somewhere to work (566 amended).

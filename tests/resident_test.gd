@@ -1917,7 +1917,7 @@ func _test_visible_work() -> void:
 	var want_face: Vector2i = mara.facing if spot["face"] == Resident.NO_CELL else mara._toward(spot["face"])
 	_check(mara.tile == spot["cell"] and mara.activity == "chop" and mara.facing == want_face,
 		"she walks to the spot and chops there, facing the tree (%s at %s, %s; spot %s, goal %s, doing %s)" % [mara.activity, mara.tile, mara.facing, spot, mara._goal, mara.doing])
-	_main._trip_stub["rs-mara"] = {"site": lot, "from": now - 40000, "back_at": now + 100}
+	_main._trip_stub["rs-mara"] = {"site": lot, "from": now - 40000, "back_at": now + 5}
 	task = _main._task_for(mara)
 	_check(task.get("kind") == "carry_log" and bool(task.get("walking", false)) and World.distance(task.get("cell", Vector2i.ZERO), store["cell"]) <= 2, "the return half: a log carried to the store (%s)" % [task])
 	for i in Main.WORK_CHECK_TICKS + Resident.FAR_EVERY + 2:
@@ -1946,7 +1946,15 @@ func _test_visible_work() -> void:
 		World.step()
 	_check(mara.tile == spot["cell"] and mara.activity == "chop" and mara.facing == mara._toward(block),
 		"she chops facing the block (%s at %s, %s)" % [mara.activity, mara.tile, mara.facing])
-	_main._trip_stub["rs-mara"] = {"site": lot, "from": now - 40000, "back_at": now + 100}
+	# The turn by the walk home (521 amended): at the block while back_at leaves time to walk home, carrying once it does not.
+	var walk_home: int = _main._walk_home(mara, spot["cell"], store["cell"])
+	now = World.production.now()  # The clock has run on since the trip began.
+	_check(walk_home >= World.distance(spot["cell"], store["cell"]) * 3, "the walk home is the route at her pace at least (%d steps)" % walk_home)
+	_main._trip_stub["rs-mara"] = {"site": lot, "from": now - 40000, "back_at": now + walk_home + 40}
+	_check(_main._task_for(mara).get("kind") == "chop", "forty steps more than the walk home: still chopping")
+	_main._trip_stub["rs-mara"] = {"site": lot, "from": now - 40000, "back_at": now + walk_home - 1}
+	_check(_main._task_for(mara).get("kind") == "carry_log", "one step short of it: she sets off home with the log")
+	_main._trip_stub["rs-mara"] = {"site": lot, "from": now - 40000, "back_at": now + 5}
 	task = _main._task_for(mara)
 	_check(task.get("kind") == "carry_log" and task.get("face") == pile and World.distance(task.get("cell", Vector2i.ZERO), pile) == 1 and World.is_walkable(task.get("cell", pile)),
 		"with a woodpile by the store the log is carried to its side (%s, pile %s)" % [task, pile])

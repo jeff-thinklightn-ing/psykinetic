@@ -369,7 +369,9 @@ func _sim_tick() -> void:
 		if World.tick < _address_until and who != null and who.spawned and World.distance(who.tile, tile) <= ADDRESS_REACH:
 			return
 		addressing = ""
-	var far := _far()
+	# A body at a task (566; 521 amended) keeps the near tick and its real route however far the players are:
+	# the trip's clock runs whether anyone watches, and the far walk's cadence would eat the spell at the site.
+	var far := _far() and task.is_empty()
 	if far and (World.tick + id) % FAR_EVERY != 0:
 		return
 	if not far and World.tick % LOOK_EVERY == 0 and activity.is_empty():
@@ -692,10 +694,12 @@ func _show_work() -> void:
 		if cell != NO_CELL and _goal != cell:
 			_aim(cell)
 		if tile == cell:
-			activity = str(task.get("kind", ""))
+			# The stroke starts once the body has turned to its work (521 amended; the soak caught chops facing
+			# the way it arrived): World.face is refused while the arriving step still runs.
 			var face: Vector2i = task.get("face", NO_CELL)
 			if face != NO_CELL and face != tile and facing != _toward(face):
 				World.face(self, _toward(face))
+			activity = str(task.get("kind", "")) if face == NO_CELL or face == tile or facing == _toward(face) else ""
 		else:
 			activity = str(task.get("kind", "")) if bool(task.get("walking", false)) else ""
 		return
@@ -707,7 +711,7 @@ func _show_work() -> void:
 		if tile == bed:
 			if facing != head_of(home, bed):
 				World.face(self, head_of(home, bed))
-			activity = "sleep"
+			activity = "sleep" if facing == head_of(home, bed) else ""
 		else:
 			activity = ""
 		return

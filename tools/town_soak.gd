@@ -32,6 +32,10 @@ var _hours_seen := 0
 ## The visible work seen (566 amended): activity -> {"name tile facing": samples}, sampled every WORK_EVERY steps.
 var _work := {}
 const WORK_EVERY := 20
+## The server's step cost (release's ask, 521 amended): World.step timed, in microseconds.
+var _tick_total := 0
+var _tick_worst := 0
+var _tick_n := 0
 var _out := ""
 ## --ask: the words soak. Each day one player asks each resident one of the
 ## usual things, in rotation, and the loop waits for the answer (the
@@ -207,7 +211,12 @@ func _run() -> void:
 	var steps := days * DAY
 	var next_hour := 0
 	for s in steps:
+		var t0 := Time.get_ticks_usec()
 		World.step()  # Main syncs the bodies and ticks the town on World.ticked.
+		var dt := Time.get_ticks_usec() - t0
+		_tick_total += dt
+		_tick_worst = maxi(_tick_worst, dt)
+		_tick_n += 1
 		if s % WORK_EVERY == 0:
 			_sample_work()
 		if s >= next_hour:
@@ -482,6 +491,7 @@ func _report(days: int) -> void:
 	for key: String in keys:
 		print("SOAK count %s %d" % [key, _counts[key]])
 	print("SOAK offered by kind %s" % [_offered])
+	print("SOAK tick avg %.0f us, worst %d us, over %d steps" % [float(_tick_total) / maxi(_tick_n, 1), _tick_worst, _tick_n])
 	var kinds: Array = _work.keys()
 	kinds.sort()
 	for kind: String in kinds:
