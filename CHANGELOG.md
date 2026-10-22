@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Rich townsfolk now pay half of what they earn from a trade or service to the treasury, up from 30% (528 amended (2)).
 - The barrow's grave robbers now carry gold: they take half the alms laid at the altar each day and a cut of the town thief's takings, and a robber who falls drops his share as coin purses, up to 40 gold (580, economy's side).
 - Your companion now does plain orders at once, whatever her voice says: "wait here", "follow me", "rest", "bandage me" or "patch yourself up", "carry my dagger" and "give it back", "lead the way"; resting, she mends and gets up when whole or when a fight starts (616).
 - Cliffs and terraces follow smooth curves instead of the tiles' edges, their faces winding along the ledge and the ground meeting them on the curve (585, terrain's side).

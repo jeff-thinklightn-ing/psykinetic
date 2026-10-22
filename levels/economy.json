@@ -43,7 +43,7 @@
 	"maker_comes": {"growth_days": 3,"names": ["Hob", "Elric", "Maud", "Garth", "Isolde", "Ned", "Bryn", "Odo"]},
 	"busy": {"quiet_below": 4, "busy_from": 20},
 	"wage": 0,
-	"tax": {"sale": 0.2, "buy": 0.1, "trade": 0.1, "trade_rich": 0.3, "wage": 0.1},
+	"tax": {"sale": 0.2, "buy": 0.1, "trade": 0.1, "trade_rich": 0.5, "wage": 0.1},
 	"tax_class": {"staple": 0.1, "made": 0.2, "luxury": 0.5},
 	"value": {"gold": 1, "food": 1, "wood": 1, "ore": 2, "cloth": 3, "meat": 1, "hide": 3, "leather": 8, "wool": 2, "herbs": 1},
 	"labour": 1,

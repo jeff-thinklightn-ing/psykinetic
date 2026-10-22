@@ -21236,6 +21236,16 @@ tests/economy_test:
 
 A 30-day soak follows the landing: what the altar gets and what a robber
 carries, with treasury, unpaid and the inn against a fresh baseline.
+## 528 amended (2). The rich's tax is half
+
+Jeff, through the coordinator: "rich tax can be 50%". economy.json
+tax.trade_rich goes from 0.3 to 0.5. It is the tax on a service or trade
+fee a resident earns while their purse is above luxury.above (60):
+Economy._pay, since 528. The poor's 0.1, the luxury class's 0.5 on sales,
+and every other tax are unchanged. The treasury takes more from the rich
+residents' earnings, and the town pays its official wages from it.
+
+tests/larder_test: a 10-gold fee pays 1 under the line and 5 above it.
 Server only, protocol unchanged, no new class_name.
 
 ## 579, maps' side: the barrow's mound at 12 x 12, a landmark on the way

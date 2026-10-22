@@ -924,7 +924,7 @@ func _test_livings() -> void:
 	gold = stock.count(TOWN, "gold")
 	economy._pay(TOWN, "c1", 10, "trade", "test")
 	var rich := stock.count(TOWN, "gold") - gold
-	_check(poor == 1 and rich == 3, "a service fee taxed 0.1 for a purse under luxury.above, 0.3 above it (%d, %d)" % [poor, rich])
+	_check(poor == 1 and rich == 5, "a service fee taxed 0.1 for a purse under luxury.above, 0.5 above it (528 amended (2): Jeff's \"rich tax can be 50%%\") (%d, %d)" % [poor, rich])
 	# The officials first (528 amended): a wage the treasury can't pay is owed, and paid before anyone's.
 	stock.take(TOWN, "gold", stock.count(TOWN, "gold") - floor_gold)
 	work.add_worker("g1", "Gar", ["guard"], TOWN, "test", "steady")
