@@ -33,6 +33,8 @@ func _ready() -> void:
 	_test_wall_by_mass()
 	_test_body_on_body()
 	_test_brace()
+	_test_lunge()
+	_test_charge()
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -203,6 +205,51 @@ func _test_brace() -> void:
 	var cells := floori(back * 1.5 + 0.001)
 	_check(cells >= 1 and boar.tile.x == 4 + cells,
 			"thrown back by the blow and its own charge, %.2f: %d cells (at %s)" % [back, cells, boar.tile])
+
+
+func _test_lunge() -> void:
+	print("
+== a lunge stops at the first body and lands its blow, its momentum added (596) ==")
+	var cells: Array[int] = []
+	for mass: float in [25.0, 70.0]:
+		var e := _build(["##############", "#P.m.........#", "##############"], mass)
+		var result := World.lunge(e["P"][0], Vector2(1, 0), 2, {"blow": {"impulse": 40.0}})
+		_check(e["P"][0].tile == Vector2i(2, 1) and result["cells"] == 1 and result["stopped_by"] == "Dummy1",
+				"the lunger goes 1 cell and meets it (at %s, %d, %s)" % [e["P"][0].tile, result["cells"], result["stopped_by"]])
+		cells.append(e["m"][0].tile.x - 3)
+	# 40 / m plus 0.25 x 80 x 1 / m: 2.4 on 25 kg (3 cells); 0.86 on 70 kg, under the threshold.
+	_check(cells == [3, 0], "25 kg knocked 3 cells, 70 kg not at all (%s)" % [cells])
+
+	var e := _build(["######", "#P..##", "######"], 40.0)
+	var result := World.lunge(e["P"][0], Vector2(1, 0), 4)
+	_check(e["P"][0].tile == Vector2i(3, 1) and result["cells"] == 2 and result["stopped_by"] == "wall",
+			"a wall ends it: 2 cells of 4 (at %s, %s)" % [e["P"][0].tile, result["stopped_by"]])
+	_check(is_equal_approx(e["P"][0].next_move_tick, World.tick + 2.0), "and it may step again when its 2 lunge steps are done")
+
+
+func _test_charge() -> void:
+	print("
+== a charge goes through bodies by mass: a goblin is knocked on, an ogre stops it (596) ==")
+	var e := _build(["##############", "#P.m.........#", "##############"], 40.0)
+	var player: GridEntity = e["P"][0]
+	var goblin: GridEntity = e["m"][0]
+	var result := World.lunge(player, Vector2(1, 0), 6, {"through": true, "blow": {"impulse": 41.0}})
+	# Met at speed 1: the goblin 1.2 x 80 / 120 + 41 / 40 = 1.83, 2 cells; the
+	# charge on at 72 / 120 = 0.6, meets it again: 0.48 + 1.03 = 1.5, 2 more;
+	# the charge at 0.36 stops.
+	_check(goblin.tile == Vector2i(7, 1) and player.tile == Vector2i(4, 1) and result["cells"] == 3,
+			"the goblin knocked on twice to (7, 1), the charger 3 cells to (4, 1) (at %s, %s, %d)" % [goblin.tile, player.tile, result["cells"]])
+	_check(result["struck"].size() == 2, "it met the goblin twice (%d)" % result["struck"].size())
+
+	e = _build(["##############", "#P.m.........#", "##############"], 200.0)
+	player = e["P"][0]
+	var ogre: GridEntity = e["m"][0]
+	result = World.lunge(player, Vector2(1, 0), 6, {"through": true, "blow": {"impulse": 41.0}})
+	# 1.2 x 80 / 280 + 41 / 200 = 0.55, under a cell; the charge on at 40 / 280 = 0.14.
+	_check(ogre.tile == Vector2i(3, 1) and player.tile == Vector2i(2, 1) and result["stopped_by"] == "Dummy1",
+			"a 200 kg ogre: neither moves past the meeting, the charge stops dead (at %s, %s)" % [ogre.tile, player.tile])
+	_check(result["impact_damage"] == 1 and _damage(ogre, &"impact") == 1,
+			"the energy lost, 40 - 0.8 - 11.8, shared: 1 each (%d, %d)" % [result["impact_damage"], _damage(ogre, &"impact")])
 
 
 # --- helpers ------------------------------------------------------------------

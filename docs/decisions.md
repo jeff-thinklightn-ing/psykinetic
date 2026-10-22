@@ -21879,3 +21879,39 @@ is_disarmed, boss_busy).
 monster_test: the waves (10 charges, normal: none at the start, one past
 75%, the other past 50%). Server only, protocol unchanged, no new
 class_name.
+## 596: a lunge, a body moving itself down a line (physics step 2a)
+
+Physics step 2's first part (C:/dev/review/physics/step2_design.md, the coordinator's
+approval, 2026-10-22), on 592's model, for combat's shield bash (its build step 3) and the
+spear's charge down a line (the doc's example move).
+
+- World.lunge(entity, toward: Vector2, cells, {blow: {impulse, stagger}, through}) moves
+  the entity up to `cells` along the line (any angle, traced as a push is), each cell a
+  step of lunge_ticks_per_cell (1 tick, about twice a run), so its step_velocity and
+  step_until are real and its momentum counts (592). Walls, closed doors, ledges, the map's
+  edge, fire for a creature and a link's cell for anyone but a player stop it, as they stop
+  a walk. A braced spear meets it as it meets a charge: _meets_brace takes `rushing`, so any
+  body lunging meets one, not only a charging monster, and the brace turns the lunger's
+  speed back as in 592.
+- Without `through` (the shield bash): it stops at the first body met, and the blow lands
+  there through apply_blow, the lunge's momentum added. A lunge of 2 with an impulse of 40
+  knocks a 25 kg body 3 cells and leaves a 70 kg one where it is.
+- With `through` (a charge): each body met is a collision of the whole charger at its speed
+  u, as the brace reads it. The one met is pushed (592's _push) at
+  (1 + restitution) m1 u / (m1 + m2) plus the blow's impulse over its mass. The charger
+  goes on at (m1 - restitution m2) u / (m1 + m2) if that is lunge_min_speed (0.5) or more
+  and the cell came free, else it stops there. The energy lost is shared between the two
+  as impact. A player charging with a spear's 41 knocks a goblin on twice (to 4 cells off)
+  and stops at its third cell; a 200 kg ogre stops it dead with neither moving, 1 impact
+  each. Mass decides, with no case for an ogre.
+- The lunger may step again when its lunge steps are done (next_move_tick). It is drawn
+  sliding from its start over its cells' ticks. On the wire it is a tile change, which a
+  client already draws over a tick a cell (up to 3): nothing new is sent, protocol
+  unchanged. A player's own lunge is drawn by its client as a misprediction blended away,
+  until combat's input step predicts it.
+- Returns, and emits lunge_resolved, {cells, stopped_by, struck: [{body, cells, impact}],
+  impact_damage}, for combat's feel and pc-character's views.
+- lunge_ticks_per_cell and lunge_min_speed in levels/physics.json.
+
+tests/physics_test: the lunge (25 kg 3 cells, 70 kg 0; a wall ends it after 2 of 4), the
+charge (the goblin twice, the ogre).

@@ -10,5 +10,7 @@
 	"brace_restitution": 1.0,
 	"stun_ticks_base": 4,
 	"stun_ticks_per_speed": 3.0,
-	"knockback_stun_ticks": 7
+	"knockback_stun_ticks": 7,
+	"lunge_ticks_per_cell": 1.0,
+	"lunge_min_speed": 0.5
 }

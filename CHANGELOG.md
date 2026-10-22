@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- A body can lunge down a line (596), the motion behind the coming shield bash and spear charge: a bash stops at the first body and its blow lands with the lunge's momentum; a charge goes through, knocking a goblin on but stopped dead by something as heavy as an ogre.
 - The draugr's battle axe and the Draugr's Totem have their own look: a great bearded iron axe with runes on its blade, and a little crowned, bearded carved figure.
 - The draugr's Hall shuts behind you: he asks why you came and to return the stolen gold, and says no more; hand him too little and he fights you, and beaten so he gives you his respect and the door opens (573 amended).
 - A monster no longer hunts round you when you fall: it goes back to what it was doing, so a companion can come and raise you; and the draugr's pact holds while you lie downed in his lair, so being raised mid-fight still wins it (587).
