@@ -358,6 +358,18 @@
 			"overhang": 0.4,
 			"material": "material.roof.thatch"
 		},
+		"roof.rafters": {
+			"category": "roofs",
+			"type": "mesh",
+			"kind": "edge",
+			"size": [4.51, 2.34, 0.218],
+			"middle": [0, 0, 0.036],
+			"base": -2.255,
+			"budget": 200,
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-21", "notes": "C:/dev/review/site/make_edge.py rafters: two 0.12 rafters halved together just past the apex, their feet at x +-2 on the eaves line, tails 0.3 m past; a collar tie at two-thirds height beside them, pegged through each; plain, to stretch; 100 tris"},
+			"uses": "a pair of bare rafters (decision 566, art-kit's side; buildings' stage set): one A-pair a metre along the main block's ridge at the RAFTERS stage, modelled for a 4 m span rising 2 m, its origin at the apex; the composer scales x by span / 4 and y by rise / 2",
+			"grey": [{"at": [0, -1.085, 0.036], "size": [4.51, 2.34, 0.218]}]
+		},
 		"roof.thatch.ridge": {
 			"category": "roofs",
 			"type": "mesh",
@@ -435,6 +447,49 @@
 			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-18", "notes": "a wall plate, two posts out at 1.25 m with a beam and knee braces, rafters and a lean-to of planks falling from the wall (2.7 m) to past the posts (2.25 m), a plank deck a step high; 432 tris; a stand-in for an art-gen concept"},
 			"uses": "a timber porch 3 m wide on a wall's outside, for BuildingComposer (buildings' composer, decision 489; Jeff, 2026-10-18: building variety): an edge piece along z, its origin on the edge's middle at the ground, its front (the open side) toward +x, so it stands from x 0 out to 1.43 (its box's middle 0.71 m out: \"middle\")"
 		},
+		"site.stake": {
+			"category": "buildings",
+			"type": "mesh",
+			"kind": "edge",
+			"size": [0.095, 0.601, 1.028],
+			"middle": [-0.013, 0, -0.014],
+			"budget": 150,
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-21", "notes": "C:/dev/review/site/make_edge.py stake: a split stake leaning a touch, its head bruised wider, a twist of string round it at 0.45 m and a red rag tag; the string a thin line sagging a little to the next corner; 80 tris"},
+			"uses": "a building plot's marking (decision 566, art-kit's side; buildings' stage set): an edge piece along z laid on every outline edge at the PLOT stage, its stake at z -0.5 (the edge's start corner), the string at about 0.45 m from it to z +0.5 where the next edge's stake stands; origin the edge's middle on the ground at the wall line",
+			"grey": [{"at": [-0.013, 0.3005, -0.5], "size": [0.095, 0.601, 0.06]}, {"at": [-0.013, 0.43, -0.014], "size": [0.02, 0.04, 1.028]}]
+		},
+		"frame.sill": {
+			"category": "buildings",
+			"type": "mesh",
+			"kind": "edge",
+			"size": [0.211, 0.2, 1.05],
+			"budget": 150,
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-21", "notes": "C:/dev/review/site/make_edge.py sill: a hewn squared beam, its section a little off square with small chamfers, each face adzed in facets along it in two browns, its ends sawn; 60 tris"},
+			"uses": "a sill beam (decision 566, art-kit's side; buildings' stage set): an edge piece along z, 1.05 m so neighbours overlap, 0.2 x 0.2 on the ground at the wall line, laid on every non-door edge at the FRAME and walls stages (the corner posts are the wall set's own)",
+			"grey": [{"at": [0, 0.1, 0], "size": [0.211, 0.2, 1.05]}]
+		},
+		"scaffold.bay": {
+			"category": "buildings",
+			"type": "mesh",
+			"kind": "edge",
+			"size": [0.75, 3.0, 1.013],
+			"middle": [0.475, 0, -0.006],
+			"budget": 400,
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-21", "notes": "C:/dev/review/site/make_edge.py bay: two crooked poles at x 0.7, z +-0.45, 3 m; a ledger under the deck, two putlogs back to x 0.1 lashed with rope, two planks at 1.6 m from x 0.5 to 0.85, a brace across the outer face, a guard rail a metre over the deck; 216 tris"},
+			"uses": "a scaffold bay outside a wall (decision 566, art-kit's side; buildings' stage set): an edge piece along z, +x outward, laid on every non-door edge from half walls until standing and on raises and repairs; the composer scales y to the eaves / 3",
+			"grey": [{"at": [0.7, 1.5, 0], "size": [0.1, 3.0, 1.0]}, {"at": [0.475, 1.6, -0.006], "size": [0.75, 0.1, 1.013]}]
+		},
+		"scaffold.bay_ladder": {
+			"category": "buildings",
+			"type": "mesh",
+			"kind": "edge",
+			"size": [1.327, 3.0, 1.0],
+			"middle": [0.7635, 0, 0],
+			"budget": 600,
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-21", "notes": "C:/dev/review/site/make_edge.py bay_ladder: scaffold.bay with prop.ladder's own mesh turned across the edge, shortened to reach and leaning on the deck from outside; 414 tris"},
+			"uses": "a scaffold bay with a ladder up to its deck (decision 566, art-kit's side; buildings' stage set): as scaffold.bay, one per building on the bay nearest the door",
+			"grey": [{"at": [0.7, 1.5, 0], "size": [0.1, 3.0, 1.0]}, {"at": [0.7635, 0.9, 0], "size": [1.327, 1.8, 0.6]}]
+		},
 		"frame.cruck": {
 			"category": "buildings",
 			"type": "mesh",
@@ -511,9 +566,10 @@
 			"category": "walls",
 			"type": "mesh",
 			"kind": "edge",
+			"materials": 2,
 			"size": [0.3, 3, 1],
 			"budget": 600,
-			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/wall.wood.window/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c2's 400 mesh cut to 1 m round the opening, depth to 0.3, 378 tris"},
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/wall.wood.window/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c2's 400 mesh cut to 1 m round the opening, depth to 0.3, 378 tris; art-kit, 2026-10-21 (566, buildings' stage set): the object \"glow\", a pane filling the opening at x 0.09, behind the shutters, its own warm emissive material \"glow\" (1.0, 0.72, 0.42) at energy 1, shown per building by the composer"},
 			"uses": "a 1 m wall section with an opening to see through; it still blocks movement; shuttered: two shutters hung in the opening's reveal (z -0.35 to 0.35, 1.3 to 2.0 m up), flush with the outside face (+x), shutter_a hinged at z -0.35 and shutter_b at z +0.35, closed in the glb, swinging out to +x as BuildingComposer opens them (buildings, decision 489)",
 			"grey": [
 				{"at": [0, 0.6, 0], "size": [0.3, 1.2, 1]},
@@ -719,9 +775,10 @@
 			"category": "walls",
 			"type": "mesh",
 			"kind": "edge",
+			"materials": 2,
 			"size": [0.5, 3, 1],
 			"budget": 400,
-			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/wall.stone.window/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; c2 cut to 1 m round the opening): its 1600 mesh cut to 1 m, decimated to 382, depth to 0.5"},
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/wall.stone.window/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; c2 cut to 1 m round the opening): its 1600 mesh cut to 1 m, decimated to 382, depth to 0.5; art-kit, 2026-10-21 (566, buildings' stage set): the object \"glow\", a pane filling the opening at x -0.06, behind the bars, its own warm emissive material \"glow\" (1.0, 0.72, 0.42) at energy 1, shown per building by the composer"},
 			"uses": "a 1 m wall section with an opening to see through; it still blocks movement; a barred grate",
 			"grey": [
 				{"at": [0, 0.6, 0], "size": [0.5, 1.2, 1]},
@@ -1657,6 +1714,37 @@
 			"budget": 500,
 			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-19", "notes": "rebuilt by hand in big clean planes for Jeff's crispness note (2026-10-19, \"the graphics not crisp\"; the coordinator's ask; art-gen's c1 fit (a crumpled heap of triangles) read as mush at game zoom): four square posts (the head pair taller) with caps, a planked headboard and footboard, side rails, a linen mattress and pillow, a blue-grey wool blanket (row 8's muted blues) folded back; 216 tris"},
 			"uses": "a bed, its head toward -z"
+		},
+		"prop.woodpile": {
+			"category": "props",
+			"type": "mesh",
+			"kind": "cell",
+			"size": [1.195, 0.996, 0.483],
+			"budget": 2100,
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-21", "notes": "C:/dev/review/site/make_site.py woodpile: split firewood (wedges of 4 or 5 sides, a little uneven, bark and fresh split faces) in courses between two crisscrossed cribs on two bearers, the split ends to the front and back; the bearers the body (24 tris), the stack three whole states (state_* nodes) of their own pieces: state_low two courses (336), state_half four (676), state_full six (1004)"},
+			"uses": "a woodpile by a building site or the store (decision 566, art-kit's side; buildings' stage set), 1 x 1 cell, its long side along x, its ends toward +z: show one of state_low, state_half and state_full by how much wood there is (full on the plot and frame, half through the walls, low under the roof; the store's grows with its wood)",
+			"states": ["low", "half", "full"],
+			"grey": [{"at": [0.008, 0.498, 0], "size": [1.195, 0.996, 0.483]}]
+		},
+		"prop.sawhorse": {
+			"category": "props",
+			"type": "mesh",
+			"kind": "cell",
+			"size": [1.168, 0.863, 0.574],
+			"budget": 300,
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-21", "notes": "C:/dev/review/site/make_site.py sawhorse: a sawbuck, two X frames of weathered timber joined by a stretcher, a log in their crotches with a dark kerf sawn partway, three sawn rounds on the ground, one on its side; 180 tris"},
+			"uses": "a sawbuck with a log on it, beside the woodpile on a building site's plot and frame stages, the saw activity's place (decision 566, art-kit's side; buildings' stage set), 1 x 1 cell, its log along x",
+			"grey": [{"at": [0, 0.43, 0], "size": [1.168, 0.863, 0.574]}]
+		},
+		"prop.planks": {
+			"category": "props",
+			"type": "mesh",
+			"kind": "cell",
+			"size": [1.163, 0.44, 0.604],
+			"budget": 500,
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-21", "notes": "C:/dev/review/site/make_site.py planks: sawn boards in four layers on three bearers, spacer sticks between the layers, each board a little out of line, two squared beams laid crosswise on top; 372 tris"},
+			"uses": "a stack of sawn planks and beams on a building site through the walls stages (decision 566, art-kit's side; buildings' stage set), 1 x 1 cell, its boards along x",
+			"grey": [{"at": [0, 0.22, 0], "size": [1.163, 0.44, 0.604]}]
 		},
 		"prop.sack": {
 			"category": "props",
