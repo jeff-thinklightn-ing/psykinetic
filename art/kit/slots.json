@@ -1068,14 +1068,67 @@
 			"category": "props",
 			"type": "mesh",
 			"kind": "cell",
-			"size": [0.9, 0.7, 0.8],
-			"budget": 600,
-			"variants": 3,
-			"uses": "what lies in a burial niche of the Barrow (decision 542; Jeff's docs/lore/crypt.md): one cell, the alcove the barrow style carves off a tomb wall (its walls and floor the map's, its back and flanks rock), the piece its contents: a stone bier against the back (-z, so the piece faces out of the wall into the room, +z; dungeon gives each niche that facing) with the remains on it. Variants by the barrow's layers, going back in time as it goes down: 1 the town's own, plundered and pried (the slab shoved aside, the bier bare, a scrap of shroud), 2 the old dead moved down, bones with a few grave goods (a pot, a corroded blade), 3 the oldest, an old wrapped burial, its goods untouched (row 6's bronze). Its slab a part, \"lid\" (fixed, its origin at the bier's top middle), so a variant can lie it shifted or off",
+			"size": [0.911, 0.748, 0.815],
+			"budget": 800,
+			"variants": 4,
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-22", "notes": "C:/dev/review/crypt/make_niche.py 1-4: a rough stone bier 0.9 x 0.5 x 0.8 against the back, its slab the part \"lid\" (origin the bier's top middle): 1 the slab pried up on one side, the iron bar left under it, a scrap of shroud over the front (248 tris); 2 a heap of bones, a skull, a clay pot, a corroded blade (510); 3 a long wrapped bundle in shroud and cords, a bronze bowl, a green-corroded blade, a bronze lump (512); 4 a skeleton curled on its side, knees drawn up, hands by its face, the skull's sockets dark, dust over it (748)"},
+			"uses": "what lies in a burial niche of the Barrow (decision 542; Jeff's docs/lore/crypt.md): one cell, the alcove the barrow style carves off a tomb wall (its walls and floor the map's, its back and flanks rock), the piece its contents: a stone bier against the back (-z, so the piece faces out of the wall into the room, +z; dungeon gives each niche that facing) with the remains on it. Variants by the barrow's layers, going back in time as it goes down: 1 the town's own, plundered and pried (the slab shoved aside, the bier bare, a scrap of shroud), 2 the old dead moved down, bones with a few grave goods (a pot, a corroded blade), 3 the oldest, an old wrapped burial, its goods untouched (row 6's bronze), 4 \"an old one\" (decision 580: 14 line the first hall's walls), a skeleton lying curled on its side as the oldest dead were laid, static, never a monster. Its slab a part, \"lid\" (fixed, its origin at the bier's top middle), so a variant can lie it shifted or off",
 			"parts": [{"name": "lid", "motion": "fixed", "pivot": [0, 0.5, 0], "grey": [{"at": [0, 0.04, 0], "size": [0.85, 0.08, 0.7]}]}],
 			"grey": [
-				{"at": [0, 0.25, 0], "size": [0.9, 0.5, 0.8]},
-				{"at": [0, 0.62, 0], "size": [0.6, 0.16, 0.3]}
+				{"at": [0, 0.25, 0], "size": [0.911, 0.5, 0.815]},
+				{"at": [0, 0.624, 0], "size": [0.6, 0.248, 0.3]}
+			]
+		},
+		"prop.burial_niche_open": {
+			"category": "props",
+			"type": "mesh",
+			"kind": "cell",
+			"size": [1.011, 0.848, 0.823],
+			"middle": [0.028, 0, -0.012],
+			"budget": 700,
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-22", "notes": "C:/dev/review/crypt/make_niche.py open: the bier shoved aside to the left, its slab (\"lid\") stood on its long edge against the right flank, and where the bier stood a stair down: three step bands with pale noses dropping into a black well, a rough stone rim round it, dust; 386 tris"},
+			"uses": "the hidden door found (decision 580): prop.burial_niche's cell and frame (the bier's back -z, facing +z), swapped for the plain niche one for one on the found tiles; the stair is the look, the level's link does the moving",
+			"grey": [
+				{"at": [0.028, 0.424, -0.012], "size": [1.011, 0.848, 0.823]}
+			]
+		},
+		"prop.wall_crack": {
+			"category": "props",
+			"type": "mesh",
+			"kind": "edge",
+			"size": [0.524, 1.846, 0.422],
+			"middle": [0.56, 0, 0.021],
+			"budget": 120,
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-22", "notes": "C:/dev/review/crypt/make_edges.py crack: a jagged black crack up the cave wall's room face (following wall.cave.profile's slope, a hair proud of it), widest at its middle, two short branches, its rim chipped pale; a fan of grey dust on the floor below; 54 tris"},
+			"uses": "the hidden door's tell (decision 580): an edge piece on the true niche's wall edge, in buildings' edge frame (along z 1 m, origin at the edge's middle on the floor at the wall line, +x into the room), laid by the generator and moved each generation; drawn on the cave wall's face",
+			"grey": [
+				{"at": [0.56, 0.923, 0.021], "size": [0.524, 1.846, 0.422]}
+			]
+		},
+		"dais.edge": {
+			"category": "buildings",
+			"type": "mesh",
+			"kind": "edge",
+			"size": [0.359, 0.534, 1.002],
+			"middle": [-0.127, 0, 0.001],
+			"budget": 200,
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-22", "notes": "C:/dev/review/crypt/make_edges.py dais_edge: two courses of laid blocks, each its own length and a little rough, a dark backing for the joints, long coping slabs over them overhanging a little; 110 tris"},
+			"uses": "the draugr's dais's edge (decision 580): the dais one height level (0.5 m) up on the edge's -x side, the hall's floor on +x; in buildings' edge frame (along z 1 m, origin at the edge's middle on the low floor at the edge's line, +x the low side); run round the dais but its front",
+			"grey": [
+				{"at": [-0.127, 0.267, 0.001], "size": [0.359, 0.534, 1.002]}
+			]
+		},
+		"dais.steps": {
+			"category": "buildings",
+			"type": "mesh",
+			"kind": "edge",
+			"size": [0.93, 0.534, 1.001],
+			"middle": [0.159, 0, 0.001],
+			"budget": 250,
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-22", "notes": "C:/dev/review/crypt/make_edges.py dais_steps: dais.edge's face and coping with two broad rough steps out from it onto the low floor; 146 tris"},
+			"uses": "the draugr's dais's front edge (decision 580): as dais.edge, with two steps up to it out on the low side (+x), the way onto the dais from the hall",
+			"grey": [
+				{"at": [0.159, 0.267, 0.001], "size": [0.93, 0.534, 1.001]}
 			]
 		},
 		"rock.boulder": {
@@ -1427,6 +1480,33 @@
 			"uses": "a log pile where the carried logs land (566 amended, npc's), 1 x 1 cell, a doorless solid building turned by a free yaw, its long side along x a little over the cell: variant 1 low, 2 half, 3 full (maps stands 2 for now); prop.woodpile stays the build site's, its fills as states",
 			"grey": [
 				{"at": [0, 0.537, 0], "size": [1.348, 1.074, 0.482]}
+			]
+		},
+		"building.burial_table": {
+			"category": "buildings",
+			"type": "mesh",
+			"kind": "cell",
+			"footprint": [3, 2],
+			"size": [2.66, 1.084, 1.612],
+			"budget": 1200,
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-22", "notes": "C:/dev/review/crypt/make_crypt.py table: a thick slab with chipped edges and a carved border on a stepped plinth (row 1's greys in broad patches, worn lighter on top); on it a bronze bowl with verdigris, a cup on its side, a corroded sword; 869 tris"},
+			"uses": "the old king's table at the Barrow's first hall's centre (decision 580, dungeon's barrow layers), 3 x 2 cells, a doorless solid building (550's solid cells): its long side along x, front +z",
+			"grey": [
+				{"at": [0, 0.542, 0], "size": [2.66, 1.084, 1.612]}
+			]
+		},
+		"building.crypt_pillar": {
+			"category": "buildings",
+			"type": "mesh",
+			"kind": "cell",
+			"footprint": [2, 2],
+			"size": [2.04, 3.004, 1.731],
+			"budget": 1500,
+			"materials": 2,
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-22", "notes": "C:/dev/review/crypt/make_crypt.py pillar: three dressed drums laid each a little off the last with dark joints, on a stepped base under a two-step capital; iron torch brackets on its +-x faces, each torch's flame two crossed diamonds on its own warm emissive material \"glow\" (1, 0.55, 0.2) at energy 1; 1476 tris"},
+			"uses": "the draugr's hall's pillars (decision 580), 2 x 2 cells, a doorless solid building that blocks sight, 3 m to the cave walls' height; its torches on its two side faces (+-x) light the look, no light nodes",
+			"grey": [
+				{"at": [0, 1.502, 0], "size": [2.04, 3.004, 1.731]}
 			]
 		},
 		"building.waystone": {
