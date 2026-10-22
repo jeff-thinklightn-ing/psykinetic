@@ -3004,12 +3004,25 @@ func _sell(by: GridEntity, from: GridEntity, from_slot: int, shop: GridEntity) -
 		return false
 	var who := (by as Player).player_id
 	var item := from.slots[from_slot]
-	var deal := economy.sell(who, place, item)
+	var uid := slot_uid(from, from_slot)
+	var deal := economy.sell(who, place, item, items.is_grave(uid))  # Grave goods fenced (560).
 	if not deal["ok"]:
 		_log("shop: %s refused %s at %s: %s" % [by.name, item, place, deal["why"]])
 		traded.emit(by, shop, str(deal["why"]))
 		return false
-	var uid := slot_uid(from, from_slot)
+	_sold(by, from, from_slot, uid, place, who, int(deal["paid"]), shop)
+	gold_changed.emit(who, economy.gold(who))
+	traded.emit(by, shop, "")
+	return true
+
+
+## [param from]'s [param from_slot], thing [param uid], sold by player
+## [param who] for [param paid] gold to [param place]'s shop counter
+## [param shop]: out of the slot, gear onto the shelf, a raw banked as
+## its yield.
+func _sold(by: GridEntity, from: GridEntity, from_slot: int, uid: int, place: String, who: String, paid: int,
+		shop: GridEntity) -> void:
+	var item := from.slots[from_slot]
 	var taken := from.slots.duplicate()
 	var taken_uids := from.slot_items.duplicate()
 	taken[from_slot] = ""
@@ -3018,15 +3031,12 @@ func _sell(by: GridEntity, from: GridEntity, from_slot: int, shop: GridEntity) -
 	from.slot_items = taken_uids
 	if Items.yield_of(item).is_empty():
 		items.place(uid, "")
-		items.note(uid, "sold", "to %s by %s for %d gold" % [place, who, deal["paid"]])
+		items.note(uid, "sold", "to %s by %s for %d gold" % [place, who, paid])
 		stockpile.stock_shop(place, uid, "sold:%s" % who)
 	else:
 		_bank_thing(place, uid, "sold:%s" % who, _label_of(from), shop.zone, shop.tile)
-	_log("shop: %s sold %s at %s for %d gold" % [by.name, item, place, deal["paid"]])
+	_log("shop: %s sold %s at %s for %d gold" % [by.name, item, place, paid])
 	_slots_changed(from)
-	gold_changed.emit(who, economy.gold(who))
-	traded.emit(by, shop, "")
-	return true
 
 
 ## Player [param by], within reach of shop counter [param shop], buys
@@ -3065,6 +3075,71 @@ func try_buy(by: GridEntity, shop: GridEntity, uid: int) -> bool:
 	gold_changed.emit(who, economy.gold(who))
 	traded.emit(by, shop, "")
 	return true
+
+
+## Player [param by], within reach of shop counter [param shop], barters
+## (decision 560): their things [param give] (uids in their slots) to the
+## town, [param take] (uids off its shelf) from it, each at the price the
+## barter message showed, all or nothing. [param balance] is the gold they
+## saw (what they get, less what they pay): refused, "the prices have
+## moved", when Economy.barter_quote's differs. Grave goods fenced. The
+## gives go first, then each take into the first slot it fits once the
+## gives are out. "" when done, else why nothing moved.
+func try_barter(by: GridEntity, shop: GridEntity, give: Array, take: Array, balance: int) -> String:
+	if not Net.is_authority():
+		return "not here"
+	var place := shop_place(shop)
+	if not by is Player or (by as Player).player_id.is_empty() or place.is_empty() or economy == null 			or not reaches(by, shop):
+		return "no shop the town holds here"
+	if give.is_empty() and take.is_empty():
+		return "nothing to trade"
+	give = give.map(func(uid: Variant) -> int: return int(uid))
+	take = take.map(func(uid: Variant) -> int: return int(uid))
+	var who := (by as Player).player_id
+	var uids := slot_uids(by)
+	var gives: Array = []
+	var from_slots: Array[int] = []
+	for uid: int in give:
+		var slot := uids.find(uid)
+		if uid == 0 or slot < 0 or slot in from_slots:
+			return "that is no longer in your pack"
+		from_slots.append(slot)
+		gives.append({"id": by.slots[slot], "fenced": items.is_grave(uid)})
+	var quote := economy.barter_quote(place, who, gives, take)
+	if not quote["ok"]:
+		return str(quote["why"])
+	if int(quote["balance"]) != balance:
+		return "the prices have moved"
+	# Room for the takes once the gives are out.
+	var after := by.slots.duplicate()
+	for slot in from_slots:
+		after[slot] = ""
+	var to_slots: Array[int] = []
+	for uid: int in take:
+		var id := items.id_of(uid)
+		var slot := -1
+		for i in after.size():
+			if after[i].is_empty():
+				var given := after.duplicate()
+				given[i] = id
+				if hands_allow(by, given):
+					slot = i
+					break
+		if slot < 0:
+			return "no room to carry it"
+		after[slot] = id
+		to_slots.append(slot)
+	for i in from_slots.size():
+		var deal := economy.sell(who, place, str(gives[i]["id"]), bool(gives[i]["fenced"]), int(quote["gives"][i]))
+		if deal["ok"]:
+			_sold(by, by, from_slots[i], int(give[i]), place, who, int(deal["paid"]), shop)
+	for i in take.size():
+		var deal := economy.buy(who, place, int(take[i]), int(quote["takes"][i]))
+		if deal["ok"]:
+			put_item(by, by, to_slots[i], int(take[i]))
+			_log("shop: %s bought %s at %s for %d gold" % [by.name, deal["id"], place, deal["price"]])
+	gold_changed.emit(who, economy.gold(who))
+	return ""
 
 
 ## Who last put each thing on the ground (a drop or a throw), by uid, for

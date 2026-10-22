@@ -18712,3 +18712,49 @@ cells as land of the level's own kind (kinds: the mound's grass), as it
 draws a rock's footing. Only building.mound is SOLID, so the castle and
 the town are unchanged. view_test _test_solid_ground (the wilds' mound: 24
 cells, grass). Client only, protocol unchanged, no new class_name.
+## 560, economy's side: barter at the shop's counter
+
+Jeff's barter rework: clicking "barter" shows the resident's goods beside
+the player's pack; a hover says what the resident pays or asks; the player
+picks items on either side and sees the running sum. ui leads the design
+and lands the window; the coordinator approved it, with these rulings
+(Jeff's to move): phase 1 is the town's shop, fronted by its merchant.
+Prices are per item with no bundle discount, and grave goods are taken
+fenced at half price. Economy lands the wire and the sim:
+- Economy.buys(town, ids): id -> {gold, up_to}. gold is offers()' price.
+  up_to is how many the town takes before it has enough: a raw good's
+  yields under "comfort", or gear's room under its tags' "wants".
+- Economy.barter_quote(town, player, gives [{id, fenced}], takes [uids]):
+  each priced as its hover showed it, all or nothing. It refuses with the
+  town's own reasons, past up_to, when a take is gone or named twice, when
+  the treasury can't pay the gives above gold_floor, or when the purse
+  plus the gives can't pay the takes. The balance is what the player gets
+  less what they pay.
+- Economy.fenced(paid): grave goods (ItemBook.is_grave) are paid half, at
+  least 1. The other half is never paid, so it stays in the treasury.
+  There is no refusal for the mark. Economy.sell(..., is_fenced) applies
+  this, so a grave good dropped into the counter (World._sell) is fenced
+  too.
+- Economy.sell and buy take a quoted price ("at"). A barter settles at the
+  prices the player saw, even though each give moves the town's need
+  before the next.
+- World.try_barter(by, shop, give uids, take uids, balance) finds each give
+  in the player's slots by uid, so an item moved before confirming still
+  trades. It refuses with "the prices have moved" when the quote's balance
+  is not the player's. It checks room for the takes once the gives are
+  out, then sells the gives (World._sold, split out of _sell) and puts
+  each take in its slot. "" when done, else why nothing moved.
+- Main: the "barter" command {shop} opens or refreshes the window; the
+  "trade" command {shop, give, take, gold} trades. Both answer with the
+  "barter" message {shop, town, gold, goods [{uid, id, price}], buys,
+  fenced {uid: gold}, pack [{slot, uid, id}], why}. pack is there because
+  the client never learns its own uids (slot_items isn't replicated). The
+  player must be within reach of the counter or of a merchant of its town
+  (the merchant trade or type), else "too far from the counter".
+- The client keeps Main.barter_data and emits barter_told; ui's window
+  reads them by name.
+"barter" is a new message kind, which changes the protocol by itself;
+there is no PROTOCOL_REVISION bump (release). Phase 2, a maker selling
+their own make and buying their trade's materials from their own purse,
+follows without asking again. economy_test _test_barter and
+_test_barter_in_town. No new class_name.

@@ -514,6 +514,9 @@ var gold := 0
 ## The last "counter" message, for ui's counter screen (decision 438).
 var counter_data := {}
 signal counter_told(data: Dictionary)
+## The barter window's last "barter" message (decision 560), for ui's window.
+var barter_data := {}
+signal barter_told(data: Dictionary)
 ## Client: the world map's server data (decision 446, WorldNews.merge):
 ## {holdings: {place_id: [faction, strength]}, known_areas, known_places,
 ## party: [{name, area, kind}]}; world_changed after each "world" message.
@@ -3815,6 +3818,46 @@ func _send_shop(player: Player, shop: GridEntity, why := "") -> void:
 	Net.message_to(player.owner_peer, "shop", data)
 
 
+## Server: sends [param player]'s client the barter at [param shop]
+## (decision 560): "barter" {shop, town, gold, goods [{uid, id, price}],
+## buys {id: {gold, up_to}}, fenced {uid: gold} (their grave goods, at
+## the fenced price), pack [{slot, uid, id}] (their own things), why};
+## a shop the town doesn't hold is sent with none.
+func _send_barter(player: Player, shop: GridEntity, why := "") -> void:
+	var place := World.shop_place(shop)
+	var data := {"shop": str(shop.get_path()), "town": place, "gold": World.gold_of(player.player_id),
+		"goods": [], "buys": {}, "fenced": {}, "pack": [], "why": why}
+	var uids := World.slot_uids(player)
+	for slot in player.slots.size():
+		if not player.slots[slot].is_empty():
+			data["pack"].append({"slot": slot, "uid": uids[slot], "id": player.slots[slot]})
+	if not place.is_empty() and World.economy != null:
+		data["goods"] = World.economy.goods(place)
+		data["buys"] = World.economy.buys(place, Array(player.slots))
+		for each: Dictionary in data["pack"]:
+			if data["buys"].has(each["id"]) and World.items.is_grave(int(each["uid"])):
+				data["fenced"][each["uid"]] = Economy.fenced(int(data["buys"][each["id"]]["gold"]))
+	Net.message_to(player.owner_peer, "barter", data)
+
+
+## Server: whether [param player] can barter at [param shop] (decision
+## 560): within reach of the counter, or of a merchant of its town (a
+## resident of the merchant trade or type) who fronts it.
+func _barter_reach(player: GridEntity, shop: GridEntity) -> bool:
+	if World.reaches(player, shop):
+		return true
+	var place := World.shop_place(shop)
+	if place.is_empty() or World.production == null:
+		return false
+	for entity: GridEntity in World.townsfolk():
+		if not entity is Resident or (entity as Resident).town != place or not World.reaches(player, entity):
+			continue
+		var who := World.production.worker((entity as Resident).worker_id)
+		if "merchant" in who.get("trades", []) or str(who.get("type", "")) == "merchant":
+			return true
+	return false
+
+
 ## Server: [param player]'s client is sent counter [param counter]'s work
 ## for them (World.counter_view: "counter" message, decision 438).
 func _send_counter(player: Player, counter: GridEntity, why := "") -> void:
@@ -6375,6 +6418,17 @@ func _on_command(entity: GridEntity, command_name: String, args: Dictionary) -> 
 			World.try_buy(entity, shop, int(args.get("uid", 0)))  # Answered by traded.
 		else:
 			_send_shop(entity as Player, shop)
+	elif command_name in ["barter", "trade"] and entity is Player:
+		# Barter at a shop's counter (decision 560): look, or trade all or nothing.
+		var shop := get_node_or_null(NodePath(str(args.get("shop", "")))) as GridEntity
+		if shop == null:
+			return
+		var why := "" if _barter_reach(entity, shop) else "too far from the counter"
+		if command_name == "trade" and why.is_empty():
+			var give: Variant = args.get("give", [])
+			var take: Variant = args.get("take", [])
+			why = World.try_barter(entity, shop, give if give is Array else [], take if take is Array else [], int(args.get("gold", 0)))
+		_send_barter(entity as Player, shop, why)
 	elif command_name == "counter" and entity is Player:
 		# A temple's or a shop's counter's work (decision 438): look, order, collect.
 		var counter := get_node_or_null(NodePath(str(args.get("counter", "")))) as GridEntity
@@ -6977,6 +7031,12 @@ func _on_message(kind: String, data: Dictionary) -> void:
 		return
 	if kind == "shop":
 		_on_shop_message(data)
+	elif kind == "barter":
+		barter_data = data
+		if data.has("gold"):
+			gold = int(data["gold"])
+		barter_told.emit(data)
+		return
 	elif kind == "counter":
 		_on_counter_message(data)
 		return

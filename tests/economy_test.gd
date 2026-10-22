@@ -45,6 +45,7 @@ func _ready() -> void:
 	_test_prices()
 	_test_buying()
 	_test_selling()
+	_test_barter()
 	_test_restart()
 	await _test_in_town()
 	print("")
@@ -129,6 +130,38 @@ func _test_selling() -> void:
 	economy.stockpile.take(TOWN, "gold", 65, "test")
 	_check(economy.stockpile.count(TOWN, "gold") == 26 and economy.refuses(TOWN, "ore_sack") == "the town can't pay for it now",
 		"26 gold, a floor of 20: it can't pay 9 for ore")
+
+
+func _test_barter() -> void:
+	print("
+== barter: what the town takes, how many, grave goods fenced, all or nothing (decision 560) ==")
+	var economy := _fresh()
+	var offered := economy.buys(TOWN, ["ore_sack", "sword", "crown", "ore_sack"])
+	_check(offered == {"ore_sack": {"gold": 9, "up_to": 4}, "sword": {"gold": 11, "up_to": 2}},
+		"ore at 9, four sacks to its 20; a sword at 11, two to its want; no crown (%s)" % [offered])
+	_check(Economy.fenced(9) == 4 and Economy.fenced(1) == 1, "fenced: half, at least 1")
+	var quote := economy.barter_quote(TOWN, "p1", [{"id": "ore_sack"}, {"id": "ore_sack", "fenced": true}], [])
+	_check(quote["ok"] and quote["gives"] == [9, 4] and quote["balance"] == 13, "two sacks, one grave goods: 9 and 4, 13 to the player (%s)" % [quote])
+	var five: Array = []
+	for i in 5:
+		five.append({"id": "ore_sack"})
+	_check(economy.barter_quote(TOWN, "p1", five, [])["why"] == "the town has enough of that", "a fifth sack: past up_to, refused")
+	_check(economy.barter_quote(TOWN, "p1", [{"id": "crown"}], [])["why"] == "the town has enough of that", "a crown: refused, the town's own why")
+	var sword := _shop_sword(economy)
+	quote = economy.barter_quote(TOWN, "p1", [{"id": "ore_sack"}], [sword])
+	_check(not quote["ok"] and quote["why"] == "not enough gold (9)", "a sack (9) for a sword (18) with no gold: 9 short (%s)" % [quote])
+	quote = economy.barter_quote(TOWN, "p1", [{"id": "ore_sack"}, {"id": "ore_sack"}], [sword])
+	_check(quote["ok"] and quote["takes"] == [18] and quote["balance"] == 0, "two sacks for the sword: even (%s)" % [quote])
+	_check(economy.barter_quote(TOWN, "p1", [], [sword, sword])["why"] == "that is no longer for sale", "one sword can't be taken twice")
+	var sold := economy.sell("p1", TOWN, "ore_sack", false, 9)
+	var again := economy.sell("p1", TOWN, "ore_sack", false, 9)
+	var bought := economy.buy("p1", TOWN, sword, 18)
+	_check(sold["paid"] == 9 and again["paid"] == 9 and bought["ok"] and bought["price"] == 18 and economy.gold("p1") == 0,
+		"settled at the quoted prices, though the town's need moved between (%s, %s, %s)" % [sold, again, bought])
+	var now_pays := int(economy.offers(TOWN, ["ore_sack"])["ore_sack"])
+	_check(economy.sell("p1", TOWN, "ore_sack", true)["paid"] == Economy.fenced(now_pays), "a grave goods sack at the counter: fenced, half of %d" % now_pays)
+	economy.stockpile.take(TOWN, "gold", economy.stockpile.count(TOWN, "gold") - 25, "test")
+	_check(economy.barter_quote(TOWN, "p1", [{"id": "ore_sack"}], [])["why"] == "the town can't pay for it now", "25 gold over a floor of 20: can't pay 9")
 
 
 func _test_restart() -> void:
@@ -220,6 +253,7 @@ func _test_in_town() -> void:
 		and _main.shop_panel.why_shown().begins_with("gold is given"), "a coin purse in the counter: refused, said why")
 	_main._save_state()
 	_check(Snapshot.load(Net.state_path)["economy"]["purses"].get(me) == 18, "the snapshot keeps the host's 18 gold")
+	await _test_barter_in_town(host, counter)
 	remove_child(_main)
 	_main.free()
 	World.clear_zones()
@@ -228,6 +262,42 @@ func _test_in_town() -> void:
 	Net.state_path = ""
 	Net.map_name = ""
 	Level.unregister(ZONE)
+
+
+## Barter at the counter (decision 560): the "barter" message, a trade all
+## or nothing through the "trade" command, grave goods fenced.
+func _test_barter_in_town(host: Player, counter: Chest) -> void:
+	print("
+== in a town: barter at the counter ==")
+	World.take_item(host, host, 1)
+	var kit := World.items.mint("bandaging_kit", "made", "test")
+	World.stockpile.stock_shop(STORE, kit, "Wren", "wren")
+	var ore := World.items.mint("ore_sack", "found", "test")
+	World.items.mark_grave(ore, "Altar")
+	World.put_item(host, host, 1, ore)
+	World.command(host, "barter", {"shop": str(counter.get_path())})
+	var told: Dictionary = _main.barter_data
+	var paid := int(told.get("buys", {}).get("ore_sack", {}).get("gold", 0))
+	var fenced := int(told.get("fenced", {}).get(ore, 0))
+	var asks := 0
+	for each: Dictionary in told.get("goods", []):
+		if int(each["uid"]) == kit:
+			asks = int(each["price"])
+	_check(told.get("town") == STORE and paid > 0 and fenced == Economy.fenced(paid) and asks > 0
+		and told.get("pack", []).any(func(each: Dictionary) -> bool: return int(each["uid"]) == ore and int(each["slot"]) == 1),
+		"the message: the kit asked %d, the sack's %d fenced to %d, the sack in the pack at slot 1 (%s)" % [asks, paid, fenced, told])
+	var gold := World.gold_of(host.player_id)
+	World.command(host, "trade", {"shop": str(counter.get_path()), "give": [ore], "take": [kit], "gold": fenced - asks + 1})
+	_check(_main.barter_data.get("why") == "the prices have moved" and host.slots[1] == "ore_sack" and World.gold_of(host.player_id) == gold,
+		"a stale sum: refused, nothing moved (%s)" % _main.barter_data.get("why"))
+	World.command(host, "trade", {"shop": str(counter.get_path()), "give": [ore], "take": [kit], "gold": fenced - asks})
+	_check(_main.barter_data.get("why") == "" and World.gold_of(host.player_id) == gold + fenced - asks
+		and kit in World.slot_uids(host) and ore not in World.slot_uids(host) and kit not in World.stockpile.shop(STORE),
+		"traded: the sack banked, the kit in the pack, %d gold (%s, %d)" % [gold + fenced - asks, Array(host.slots), World.gold_of(host.player_id)])
+	World._relocate(host, Vector2i(11, 7))
+	World.command(host, "barter", {"shop": str(counter.get_path())})
+	_check(_main.barter_data.get("why") == "too far from the counter", "away from the counter and any merchant: too far")
+	await get_tree().process_frame
 
 
 func _check(ok: bool, label: String) -> void:

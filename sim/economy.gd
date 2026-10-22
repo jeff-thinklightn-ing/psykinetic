@@ -345,16 +345,115 @@ func offers(town: String, ids: Array) -> Dictionary:
 	return out
 
 
+## Barter's offers (decision 560): what [param town] pays for each of
+## [param ids], the tax taken, and how many it takes at that price before
+## it has enough: id -> {gold, up_to}; the ones it won't buy left out.
+func buys(town: String, ids: Array) -> Dictionary:
+	var cat: Dictionary = catalog.call()
+	var paid := offers(town, ids)
+	var out := {}
+	for id: String in paid:
+		out[id] = {"gold": int(paid[id]), "up_to": up_to(town, id, cat)}
+	return out
+
+
+## How many [param id] [param town] takes before it has enough of it: for
+## a raw good the most of its yields that fit under rules' "comfort", for
+## gear the most room under any of its tags' "wants". At least 1 for a
+## thing it is short of now, 0 for one it is not.
+func up_to(town: String, id: String, cat := {}) -> int:
+	if cat.is_empty():
+		cat = catalog.call()
+	if short_of(town, id, cat) <= 0.0:
+		return 0
+	var def: Dictionary = cat.get(id, {})
+	var most := 1
+	var yields: Variant = def.get("yield", {})
+	if yields is Dictionary and not yields.is_empty():
+		var comfort: Dictionary = rules.get("comfort", {})
+		for what: String in yields:
+			var room := int(comfort.get(what, 0)) - stockpile.count(town, what)
+			if room > 0 and int(yields[what]) > 0:
+				most = maxi(most, ceili(float(room) / int(yields[what])))
+		return most
+	var wants: Dictionary = rules.get("wants", {})
+	var extra: Dictionary = rules.get("uneasy_extra", {}) if production.tier(town) == Production.DEFEND else {}
+	var have := _gear_by_tag(town, cat)
+	for tag: Variant in def.get("tags", []):
+		if wants.has(tag):
+			most = maxi(most, int(wants[tag]) + int(extra.get(tag, 0)) - int(have.get(tag, 0)))
+	return most
+
+
+## What [param town] pays for grave goods (decision 560: the coordinator's
+## ruling, Jeff's to move): the merchant takes them fenced, at half the
+## town's price [param paid] (at least 1); the other half stays in the
+## treasury.
+static func fenced(paid: int) -> int:
+	return maxi(paid / 2, 1)
+
+
+## A barter at [param town]'s shop priced (decision 560): [param gives]
+## the player's things ([{id, fenced}]), [param takes] uids off its shelf.
+## {ok, gives: [gold each], takes: [gold each], balance (what the player
+## gets, less what they pay), why}. All or nothing: each give the town
+## would buy, no more of an id than up_to, each take still for sale, the
+## treasury able to pay the gives above gold_floor, and [param player_id]
+## able to pay the takes with what the gives bring. Each priced as its
+## hover showed it: no bundle price.
+func barter_quote(town: String, player_id: String, gives: Array, takes: Array) -> Dictionary:
+	var cat: Dictionary = catalog.call()
+	var out := {"ok": false, "gives": [], "takes": [], "balance": 0, "why": ""}
+	var ids: Array = gives.map(func(give: Dictionary) -> String: return str(give["id"]))
+	var offered := buys(town, ids)
+	var counts := {}
+	var paid := 0
+	for give: Dictionary in gives:
+		var id := str(give["id"])
+		if not offered.has(id):
+			out["why"] = refuses(town, id, cat)
+			if str(out["why"]).is_empty():
+				out["why"] = "the town won't buy that"
+			return out
+		counts[id] = int(counts.get(id, 0)) + 1
+		if int(counts[id]) > int(offered[id]["up_to"]):
+			out["why"] = "the town has enough of that"
+			return out
+		var gold_each := int(offered[id]["gold"])
+		if bool(give.get("fenced", false)):
+			gold_each = Economy.fenced(gold_each)
+		out["gives"].append(gold_each)
+		paid += gold_each
+	var cost := 0
+	var shelf := stockpile.shop(town)
+	for uid: int in takes:
+		if uid not in shelf or takes.count(uid) > 1:
+			out["why"] = "that is no longer for sale"
+			return out
+		var each := item_price(town, uid, cat)
+		out["takes"].append(each)
+		cost += each
+	if paid > 0 and stockpile.count(town, "gold") - paid < int(rules.get("gold_floor", 0)):
+		out["why"] = "the town can't pay for it now"
+		return out
+	if gold(player_id) + paid < cost:
+		out["why"] = "not enough gold (%d)" % (cost - paid)
+		return out
+	out["balance"] = paid - cost
+	out["ok"] = true
+	return out
+
+
 # --- Trade ---------------------------------------------------------------------------
 
-## [param player_id] buys [param uid] from [param town]'s shop at its price:
-## {ok, price, why}. On ok the thing is out of the shop, held by nothing
+## [param player_id] buys [param uid] from [param town]'s shop at its price
+## (or [param at], a barter's quoted price, decision 560): {ok, price, why}. On ok the thing is out of the shop, held by nothing
 ## (the caller puts it somewhere), the gold paid out.
-func buy(player_id: String, town: String, uid: int) -> Dictionary:
+func buy(player_id: String, town: String, uid: int, at := -1) -> Dictionary:
 	if uid not in stockpile.shop(town):
 		return {"ok": false, "why": "that is no longer for sale"}
 	var id := stockpile.book.id_of(uid)
-	var cost := item_price(town, uid)
+	var cost := item_price(town, uid) if at < 0 else at
 	if gold(player_id) < cost:
 		return {"ok": false, "price": cost, "why": "not enough gold (%d)" % cost}
 	var maker := stockpile.maker_of(town, uid)
@@ -369,14 +468,18 @@ func buy(player_id: String, town: String, uid: int) -> Dictionary:
 
 
 ## [param town] buys [param id] from [param player_id], if it would
-## (refuses): {ok, paid, why}, the treasury paying, the buy tax kept in it.
+## (refuses): {ok, paid, why}, the treasury paying, the buy tax kept in it;
+## half that for grave goods ([param is_fenced], decision 560), or
+## [param at] when given (a barter priced by barter_quote, its checks made).
 ## The thing itself is the caller's to bank (World._bank_thing, or the shop).
-func sell(player_id: String, town: String, id: String) -> Dictionary:
+func sell(player_id: String, town: String, id: String, is_fenced := false, at := -1) -> Dictionary:
 	var cat: Dictionary = catalog.call()
-	var why := refuses(town, id, cat)
+	var why := refuses(town, id, cat) if at < 0 else ""
 	if not why.is_empty():
 		return {"ok": false, "why": why}
-	var pays: int = Economy.taxed(price(town, id, BUY, cat), "buy", rules)[1]
+	var pays: int = Economy.taxed(price(town, id, BUY, cat), "buy", rules)[1] if at < 0 else at
+	if is_fenced and at < 0:
+		pays = Economy.fenced(pays)
 	if not stockpile.take(town, "gold", pays, "bought:%s" % player_id):
 		return {"ok": false, "why": "the town can't pay for it now"}
 	add_gold(player_id, pays, "sold %s" % id)
