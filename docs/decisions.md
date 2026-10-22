@@ -19650,3 +19650,58 @@ through solid cells). Level data, a full cut.
 tests/relief_test: the wilds' marks (one tree, one cairn, one waystone, eight
 stones, each solid through with no door) and the ring's middle walked to;
 tests/builder_test: a cairn solid through, no door, nothing said.
+
+## 568. The wilds' landmarks, layer three: the water
+
+The landmarks design's water: a river down 565's valley, and the wilds'
+ponds as curves (559: water is curves, the cells rasterised from them).
+
+**Curves.trace(cells, tolerance)**: a region's shore as a closed curve's
+control points: its outline (the cells' squares' outer edges, chained into
+loops, the longest kept) cut at each edge's middle, so no grid corner is
+left, then the fewest points within tolerance (0.6 cells; Douglas-Peucker
+round the loop, split at the point farthest from the first), at least four.
+A disc of 63 cells traces into 12 points whose curve holds all 63 (67 in
+all). For the ponds now; the editor's curve tool later.
+
+**Relief.river_curve(river, seed)**: what Relief.lay "rivers" lays (the
+control points and widths along _meander), split out of _river, so a tool
+can see the curve before the lay.
+
+**levels/wilds** (make_wilds_marks' water layer, once: with "waters" in
+level.json the ponds are left and the river laid again the same):
+- the groves (void inside the land, not joined to the forest round it)
+  under the river's curve and a cell round it made grass, 67 cells, so the
+  river's cells (laid only on the ground) run unbroken; the forest round
+  the land is kept and the river runs on unseen under it at both edges;
+- the three ponds of 6 cells or more traced into closed curves (5, 7 and 6
+  points), their cells the curve's on the ground (16 to 22, 16, 11 to 10);
+  a well's lone water cell left;
+- the river (Relief.lay "rivers" in the same lay as 565's relief: wavelength
+  34, amplitude 7, width 2 to 3.2, the valley's floor 11 either side, was
+  6): 878 cells, clear of every pad (the town, links, spawn points, starts,
+  buildings, the camp), its curve in level.json "waters";
+- a ford where it runs straight and level nearest row 40 (row 41, 2 cells),
+  its banks walked to (make_hills' ford: the ground near it capped again,
+  the ridge's faces kept, the rest held); a bridge nearest row 128 (row
+  128, 3 cells, (94..96, 128)), its banks levelled, where layer four's hills
+  road will cross;
+- each pond level under its shore; the river falls as laid.
+level.json gains "waters" and the bridge, written into its text; layout.png's
+water, ford and grass cells and relief.png are written.
+
+**What changes for walking**: the river splits the wilds west and east; it is
+crossed at the ford (row 41) and the bridge (row 128), and nowhere else (no
+other fords). Every floor cell walked to on flat ground is still walked to
+(through a crossing). Checked: world_map_test, trade_routes_test,
+raid_groups_test, raids_test, camp_fall_test and herds_test pass, so the
+trade routes' and raid groups' legs still have a way; no camp or herd home
+is cut off (nothing on the floor is). A saved spot on a cell the river or
+a pond now covers is no floor: the player comes back on the nearest dry
+ground (Main._nearest_free). Checked on the repo's level, never the box's.
+
+Level data, protocol unchanged since 559's 29 ("waters"); a full cut.
+
+tests/relief_test: Curves.trace on a disc; the wilds' river (over 200
+cells down its middle), three ponds as closed curves, a ford and a bridge
+both walked to; the relief still cuts nothing off.

@@ -20,6 +20,14 @@ extends Node
 ##   meet. Each goes in level.json's "buildings" (written into the file's
 ##   text, the rest of it as it was) once; the relief is laid again round
 ##   them.
+## - water (decision 568): a river laid as a curve (Relief.lay "rivers")
+##   down the valley from the north edge to the south, a ford across it
+##   near FORD_ROW and a bridge near BRIDGE_ROW (where the hills road will
+##   cross), and the ponds of POND_LEAST cells or more traced from their
+##   cells into closed curves (Curves.trace), their cells then the curve's;
+##   level.json "waters" and the bridge written into its text, the layout's
+##   water cells and relief.png. Once: with "waters" in level.json the ponds
+##   are left as they are and the river laid again the same.
 ## The same seed lays the same ground.
 
 const FOLDER := "res://levels/wilds/"
@@ -33,13 +41,28 @@ const RIDGE: Array[Vector2i] = [Vector2i(140, 30), Vector2i(178, 46), Vector2i(2
 const RIDGE_HEIGHT := 3.5
 const RIDGE_BACK := 30.0
 const RIDGE_WAY := 0.45
-## The valley the river will run down (layer two), north edge to south.
+## The valley the river runs down (568), north edge to south.
 const VALLEY: Array[Vector2i] = [Vector2i(62, 0), Vector2i(70, 56), Vector2i(96, 104), Vector2i(104, 168), Vector2i(118, 255)]
 ## The town's ground, kept level (Held's own map is undecided: 565 leaves it).
 const TOWN := Rect2i(190, 190, 38, 42)
 ## How far round a link, a spawn point, a start, a building or a placed
 ## thing its pad reaches.
 const PAD := 3
+## The river (568): its loops' length and swing (cells), its width, its
+## seed (added to SEED's); the valley's floor wide enough for its loops.
+const RIVER_WAVELENGTH := 34.0
+const RIVER_AMPLITUDE := 7.0
+const RIVER_WIDTH: Array[float] = [2.0, 3.2]
+const RIVER_SEED := 0
+const RIVER_FLOOR := 11.0
+## The rows the ford and the bridge cross the river nearest to.
+const FORD_ROW := 40
+const BRIDGE_ROW := 128
+## The ford's banks walked to over this many rows either side of it.
+const FORD_FREE := 4
+## A body of water this many cells or more is a pond traced into a curve
+## (a well's lone cell is left).
+const POND_LEAST := 6
 ## A pond lies this far under its lowest shore.
 const POND_DEPTH := 0.3
 
@@ -62,11 +85,15 @@ func _ready() -> void:
 	doc = MapDoc.open(FOLDER)
 	var map := doc.map
 	_place_marks()
+	var new_waters := not doc.config.has("waters")
+	_clear_groves()
+	var ponds: Array = _trace_ponds() if new_waters else []
 	var laid := Relief.lay(map, Rect2i(Vector2i.ZERO, map.size), SEED, {
 		"base": BASE, "amplitude": ROLL, "scale": 64.0, "octaves": 2,
 		"escarpments": [{"line": RIDGE, "face": Vector2i(-1, 1), "height": RIDGE_HEIGHT, "back": RIDGE_BACK, "taper": 12.0, "ways": [RIDGE_WAY], "way_width": 5.0}],
-		"valleys": [VALLEY], "valley_depth": 2.5, "valley_floor": 6.0, "valley_fall": 3.0, "valley_width": 26.0,
-		"slope": 0.25, "streams": 0, "keep_flat": _pads()})
+		"valleys": [VALLEY], "valley_depth": 2.5, "valley_floor": RIVER_FLOOR, "valley_fall": 3.0, "valley_width": 26.0,
+		"slope": 0.25, "streams": 0, "keep_flat": _pads(),
+		"rivers": [_river_option()]})
 	var size := map.size
 	map.relief = PackedFloat32Array()
 	map.relief.resize(size.x * size.y)
@@ -76,24 +103,44 @@ func _ready() -> void:
 		map.relief[at.y * size.x + at.x] = laid["relief"][at]
 		filled[at.y * size.x + at.x] = 1
 	# The forest and the water stand at the height of the ground beside them;
-	# then each pond lies level, POND_DEPTH under its lowest shore.
+	# then each pond lies level, POND_DEPTH under its lowest shore (the
+	# river falls as laid).
 	LevelMap._fill_gaps(map.relief, filled, size)
-	_ponds()
-	# relief.png alone: the layout and level.json are left as they are.
+	var river := {}
+	for at: Vector2i in laid["cells"]:
+		if laid["cells"][at] == "water":
+			map.set_cell(at, "water")
+			river[at] = true
+	_ford(river, laid["faces"])
+	var bridge := _bridge(river)
+	_ponds(river)
+	_check_clear(river)
 	var path := FOLDER + "relief.png"
 	map.to_relief_image().save_png(ProjectSettings.globalize_path(path))
 	LevelMap.ensure_image_import(ProjectSettings.globalize_path(path), path)
+	var layout := FOLDER + "layout.png"
+	map.to_image().save_png(ProjectSettings.globalize_path(layout))
+	LevelMap.ensure_image_import(ProjectSettings.globalize_path(layout), layout)
+	if new_waters:
+		var waters: Array = laid["waters"].map(func(water: Dictionary) -> Dictionary:
+			return {"points": Curves.to_json(water["points"], water["widths"])})
+		waters.append_array(ponds)
+		doc.config["waters"] = waters
+		_write_key("waters", waters)
+		if not bridge.is_empty():
+			doc.config["buildings"].append(bridge)
+			_write_buildings([bridge] as Array[Dictionary])
 	var level := Level.parse(map.to_image(), null, doc.config, map.to_relief_image())
 	print("[wilds] relief.png laid; %s" % ("nothing said" if level["warnings"].is_empty() else "; ".join(level["warnings"])))
 	_say(laid["faces"])
 	get_tree().quit()
 
 
-## Each body of water (four-way joined water cells) made level at
-## POND_DEPTH under the lowest walkable cell beside it.
-func _ponds() -> void:
+## Each body of water (four-way joined water cells) but [param river]'s
+## made level at POND_DEPTH under the lowest walkable cell beside it.
+func _ponds(river: Dictionary) -> void:
 	var map := doc.map
-	var seen := {}
+	var seen := river.duplicate()
 	for start: Vector2i in map.cells:
 		if seen.has(start) or map.cell(start) != "water":
 			continue
@@ -208,6 +255,204 @@ func _write_buildings(added: Array[Dictionary]) -> void:
 	text = text.substr(0, close) + ",
 " + ",
 ".join(lines) + text.substr(close)
+	var file := FileAccess.open(path, FileAccess.WRITE)
+	file.store_string(text)
+	file.close()
+
+
+## The groves (void inside the land, not joined to the forest round it)
+## under the river's curve (Relief.river_curve, what lay will lay) and a
+## cell round it made grass, so the river runs on unbroken (its cells are
+## laid only on the ground); the forest round the land is left, the river
+## running on unseen under it at the edges.
+func _clear_groves() -> void:
+	var map := doc.map
+	var made := Relief.river_curve(_river_option(), SEED + 10 + RIVER_SEED)
+	var raster := Curves.cells(Curves.sample(made["points"], made["widths"]), false)
+	var border := {}
+	var queue: Array[Vector2i] = []
+	for i in map.size.x:
+		for at: Vector2i in [Vector2i(i, 0), Vector2i(i, map.size.y - 1)]:
+			if map.cell(at) == "void" and not border.has(at):
+				border[at] = true
+				queue.append(at)
+	for i in map.size.y:
+		for at: Vector2i in [Vector2i(0, i), Vector2i(map.size.x - 1, i)]:
+			if map.cell(at) == "void" and not border.has(at):
+				border[at] = true
+				queue.append(at)
+	while not queue.is_empty():
+		var at: Vector2i = queue.pop_back()
+		for step in Relief.FOUR:
+			var next: Vector2i = at + step
+			if map.in_bounds(next) and not border.has(next) and map.cell(next) == "void":
+				border[next] = true
+				queue.append(next)
+	var cleared := 0
+	for cell: Vector2i in raster:
+		for y in range(-1, 2):
+			for x in range(-1, 2):
+				var near: Vector2i = cell + Vector2i(x, y)
+				if map.in_bounds(near) and map.cell(near) == "void" and not border.has(near):
+					map.set_cell(near, "grass")
+					cleared += 1
+	print("[wilds] groves cleared under the river: %d cells" % cleared)
+
+
+## The river's Relief.lay "rivers" entry.
+func _river_option() -> Dictionary:
+	return {"line": VALLEY, "wavelength": RIVER_WAVELENGTH, "amplitude": RIVER_AMPLITUDE, "width": RIVER_WIDTH, "seed": RIVER_SEED}
+
+
+## Each pond of POND_LEAST cells or more traced into a closed curve
+## (Curves.trace) and its cells made the curve's (Curves.laid: inside it on
+## the ground or the water, water; the old water outside it grass), as
+## level.json "waters" entries.
+func _trace_ponds() -> Array:
+	var map := doc.map
+	var out: Array = []
+	var seen := {}
+	for start: Vector2i in map.cells:
+		if seen.has(start) or map.cell(start) != "water":
+			continue
+		var body := {start: true}
+		seen[start] = true
+		var queue: Array[Vector2i] = [start]
+		while not queue.is_empty():
+			var at: Vector2i = queue.pop_back()
+			for step in Relief.FOUR:
+				var next: Vector2i = at + step
+				if not seen.has(next) and map.cell(next) == "water":
+					seen[next] = true
+					body[next] = true
+					queue.append(next)
+		if body.size() < POND_LEAST:
+			continue
+		var points := Curves.trace(body)
+		var widths := PackedFloat32Array()
+		widths.resize(points.size())
+		var ground := {}
+		for cell: Vector2i in body:
+			for y in range(-3, 4):
+				for x in range(-3, 4):
+					var near: Vector2i = cell + Vector2i(x, y)
+					if map.cell(near) in ["grass", "dirt", "water"]:
+						ground[near] = true
+		var inside: Dictionary = Curves.laid(Curves.sample(points, widths, true), true, ground)["cells"]
+		for cell: Vector2i in body:
+			if not inside.has(cell):
+				map.set_cell(cell, "grass")
+		for cell: Vector2i in inside:
+			map.set_cell(cell, "water")
+		out.append({"points": Curves.to_json(points, widths), "closed": true})
+		print("[wilds] pond at %s: %d cells traced into %d points, %d cells now" % [start, body.size(), points.size(), inside.size()])
+	return out
+
+
+## The ford: [param river]'s cells on the row nearest FORD_ROW it crosses
+## straight, 1 to 3 wide; its banks set a walk over the water and the
+## ground round them brought down to them (Relief._limit, the ridge's
+## [param faces] kept; the ground off its reach held), the river's other
+## banks kept (make_hills' ford).
+func _ford(river: Dictionary, faces: Dictionary) -> void:
+	var map := doc.map
+	var across := _crossing(river, FORD_ROW, true)
+	if across.is_empty():
+		push_error("[wilds] no ford")
+		return
+	for at in across:
+		map.set_cell(at, "ford")
+	var surface := map.relief_at(across[0])
+	var heights := {}
+	var fixed := {}
+	var wet := {}
+	for at: Vector2i in map.cells:
+		if map.walkable(at) or map.cell(at) == "water":
+			heights[at] = map.relief_at(at)
+	for at: Vector2i in heights:
+		if absi(at.y - across[0].y) > FORD_FREE + 8 or absi(at.x - across[0].x) > 16:
+			fixed[at] = true
+	for at: Vector2i in river:
+		fixed[at] = true
+		if map.cell(at) == "water":
+			wet[at] = true
+		for step: Vector2i in Relief.FOUR:
+			if heights.has(at + step) and not river.has(at + step) and absi(at.y - across[0].y) > FORD_FREE:
+				fixed[at + step] = true
+	for bank: Vector2i in [across[0] - Vector2i(1, 0), across[across.size() - 1] + Vector2i(1, 0)]:
+		heights[bank] = surface + 0.3
+		fixed[bank] = true
+	Relief._limit(heights, fixed, wet, Relief.LAY_SLOPE, faces)
+	for at: Vector2i in heights:
+		map.set_relief(at, heights[at])
+	print("[wilds] the ford: %s" % [across])
+
+
+## The bridge over [param river] on the row nearest BRIDGE_ROW: its banks
+## levelled at the higher of them; its building entry, or {} if none.
+func _bridge(river: Dictionary) -> Dictionary:
+	var map := doc.map
+	var across := _crossing(river, BRIDGE_ROW, false)
+	if across.is_empty():
+		push_error("[wilds] no bridge")
+		return {}
+	var west := across[0]
+	var banks: Array[Vector2i] = [west - Vector2i(1, 0), across[across.size() - 1] + Vector2i(1, 0)]
+	var top := maxf(map.relief_at(banks[0]), map.relief_at(banks[1]))
+	for bank in banks:
+		map.set_relief(bank, top)
+	print("[wilds] the bridge: %s" % [across])
+	return {"slot": "bridge", "at": [west.x, west.y], "facing": [1, 0], "length": across.size()}
+
+
+## The river's water cells on the row nearest [param row] that it crosses
+## 1 to 3 wide, west to east, with walkable ground either side (where it
+## runs [param straight] and level, for a ford: water on the same columns a
+## row either way, within 0.25 m).
+func _crossing(river: Dictionary, row: int, straight: bool) -> Array[Vector2i]:
+	var map := doc.map
+	for offset in 60:
+		for y: int in [row + offset, row - offset]:
+			var cells: Array[Vector2i] = []
+			for x in map.size.x:
+				if river.has(Vector2i(x, y)) and map.cell(Vector2i(x, y)) == "water":
+					cells.append(Vector2i(x, y))
+			if cells.is_empty() or cells.size() > 3 or cells[-1].x - cells[0].x != cells.size() - 1:
+				continue
+			if not map.walkable(cells[0] - Vector2i(1, 0)) or not map.walkable(cells[-1] + Vector2i(1, 0)):
+				continue
+			if straight:
+				var surface := map.relief_at(cells[0])
+				var level := true
+				for cell in cells:
+					for side: Vector2i in [Vector2i(0, -1), Vector2i(0, 1)]:
+						level = level and river.has(cell + side) and absf(map.relief_at(cell + side) - surface) <= 0.25
+				if not level:
+					continue
+			return cells
+	return []
+
+
+## Says whether [param river] touches a pad (the town, a link, a spawn
+## point, a start, a building, the camp): it must not.
+func _check_clear(river: Dictionary) -> void:
+	var touched := []
+	for pad: Rect2i in _pads():
+		for at: Vector2i in river:
+			if pad.has_point(at):
+				touched.append(pad)
+				break
+	print("[wilds] the river: %d cells; %s" % [river.size(), "clear of every pad" if touched.is_empty() else "TOUCHES %s" % [touched]])
+
+
+## [param value] written into level.json's text as top-level [param key]
+## before its closing brace (the rest of the file as it was).
+func _write_key(key: String, value: Variant) -> void:
+	var path := ProjectSettings.globalize_path(FOLDER + "level.json")
+	var text := FileAccess.get_file_as_string(path)
+	var close := text.rfind("}")
+	var body := text.substr(0, close).rstrip("\n\t ")
+	text = body + ",\n\t" + JSON.stringify(key) + ": " + JSON.stringify(value, "\t", false).replace("\n", "\n\t") + "\n}\n"
 	var file := FileAccess.open(path, FileAccess.WRITE)
 	file.store_string(text)
 	file.close()

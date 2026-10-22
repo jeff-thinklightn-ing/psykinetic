@@ -825,18 +825,13 @@ static func _carve(heights: Dictionary, path: Array[Vector2i], wide: int, cells:
 				heights[bank] = float(heights[cell]) + SHORE_LIP + 0.05
 
 
-## A river (Relief.lay "rivers", decision 559) as a curve, its cells made
-## water in [param heights] (and [param cells], [param taken]): control
-## points every tenth of a wavelength along _meander's swing about its
-## line, each its own width (wandering by the seed between the river's
-## "width" [least, most], or one number), the cells Curves.cells of their
-## curve on this ground (as Level lays them on load), each at the surface of
-## the middle cell it was laid from (Curves.laid: its longest run over the
-## ground): STREAM_DEPTH under the ground there, never over the one
-## upstream; its banks raised to SHORE_LIP over it where
-## they were not. Returns {points, widths} (for level.json "waters") and
-## path (its middle over the water, source to mouth), or {} if it has none.
-static func _river(heights: Dictionary, river: Dictionary, river_seed: int, cells: Dictionary, taken: Dictionary) -> Dictionary:
+## A river's curve (Relief.lay "rivers", decision 559) for [param river]
+## and [param river_seed] (lay's seed plus 10, its index and its "seed"):
+## control points every tenth of a wavelength along _meander's swing about
+## its line, each its own width, to level.json's two places; {points,
+## widths}, or {} with no line. What _river lays, for a tool to see first
+## (568: the wilds' groves cleared under it).
+static func river_curve(river: Dictionary, river_seed: int) -> Dictionary:
 	var line: Array = river.get("line", [])
 	if line.size() < 2:
 		return {}
@@ -852,13 +847,32 @@ static func _river(heights: Dictionary, river: Dictionary, river_seed: int, cell
 	var every := maxi(1, roundi(wavelength / 10.0 / 0.25))
 	var points := PackedVector2Array()
 	var widths := PackedFloat32Array()
-	# To level.json's two places, so the curve laid is the one loaded.
 	for k in range(0, swing.size(), every):
 		points.append(swing[k].snappedf(0.01))
 		widths.append(snappedf(lerpf(least, most, clampf(vary.get_noise_1d(k * 0.25) * 0.9 + 0.5, 0.0, 1.0)), 0.01))
 	if (swing.size() - 1) % every != 0:
 		points.append(swing[-1].snappedf(0.01))
 		widths.append(widths[-1])
+	return {"points": points, "widths": widths}
+
+
+## A river (Relief.lay "rivers", decision 559) as a curve, its cells made
+## water in [param heights] (and [param cells], [param taken]): control
+## points every tenth of a wavelength along _meander's swing about its
+## line, each its own width (wandering by the seed between the river's
+## "width" [least, most], or one number), the cells Curves.cells of their
+## curve on this ground (as Level lays them on load), each at the surface of
+## the middle cell it was laid from (Curves.laid: its longest run over the
+## ground): STREAM_DEPTH under the ground there, never over the one
+## upstream; its banks raised to SHORE_LIP over it where
+## they were not. Returns {points, widths} (for level.json "waters") and
+## path (its middle over the water, source to mouth), or {} if it has none.
+static func _river(heights: Dictionary, river: Dictionary, river_seed: int, cells: Dictionary, taken: Dictionary) -> Dictionary:
+	var made := river_curve(river, river_seed)
+	if made.is_empty():
+		return {}
+	var points: PackedVector2Array = made["points"]
+	var widths: PackedFloat32Array = made["widths"]
 	var curve := Curves.sample(points, widths)
 	var ground := {}
 	for at: Vector2i in heights:

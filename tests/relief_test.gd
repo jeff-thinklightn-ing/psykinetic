@@ -428,6 +428,19 @@ func _test_curves() -> void:
 		"a closed curve's cells are those inside it (%d)" % inside.size())
 	var pond_points: PackedVector2Array = pond["points"]
 	_check(pond_points[0].distance_to(pond_points[-1]) < 0.3, "a closed curve comes round to its start")
+	# A region traced into a closed curve (568): a few points, its cells about the region's.
+	var region := {}
+	for y in range(-4, 5):
+		for x in range(-5, 6):
+			if Vector2(x / 5.0, y / 4.0).length() <= 1.0:
+				region[Vector2i(20 + x, 20 + y)] = true
+	var traced := Curves.trace(region)
+	var zero := PackedFloat32Array()
+	zero.resize(traced.size())
+	var back := Curves.cells(Curves.sample(traced, zero, true), true)
+	var shared := back.keys().filter(func(cell: Vector2i) -> bool: return region.has(cell)).size()
+	_check(traced.size() >= 4 and traced.size() < region.size() / 3 and shared >= region.size() * 0.8 and back.size() <= region.size() * 1.25,
+		"a region traced (568): %d points for %d cells, the curve holding %d of them (%d in all)" % [traced.size(), region.size(), shared, back.size()])
 
 
 ## Level lays "waters" and "roads" from their curves (decision 559): the
@@ -741,6 +754,19 @@ func _test_wilds() -> void:
 		ring_middle += (stone["rect"] as Rect2i).position
 	ring_middle /= maxi(1, stones.size())
 	_check(floor.has(ring_middle) and reached[ring_middle.y * size.x + ring_middle.x] >= 0.0, "the ring's middle %s is walked to, between the stones" % ring_middle)
+	# The water (568): a river the wilds' length, crossed by a ford and a
+	# bridge (both walked over), the ponds closed curves; still nothing cut off.
+	var waters: Array = terrain["waters"]
+	var open_waters := waters.filter(func(w: Dictionary) -> bool: return not w["closed"])
+	var ponds := waters.filter(func(w: Dictionary) -> bool: return w["closed"])
+	var course: Array = terrain["streams"][0]["path"] if not terrain["streams"].is_empty() else []
+	_check(open_waters.size() == 1 and ponds.size() == 3 and course.size() > 200,
+		"a river down the valley (%d cells in its middle) and three ponds as curves (568)" % course.size())
+	var bridged: Array = terrain.get("bridged", [])
+	_check(not terrain["fords"].is_empty() and not bridged.is_empty()
+		and terrain["fords"].all(func(cell: Vector2i) -> bool: return reached[cell.y * size.x + cell.x] >= 0.0)
+		and bridged.all(func(cell: Vector2i) -> bool: return reached[cell.y * size.x + cell.x] >= 0.0),
+		"crossed by a ford (%d cells) and a bridge (%d), both walked to" % [terrain["fords"].size(), bridged.size()])
 
 
 ## The first few pairs of orthogonal neighbours of [param terrain]'s

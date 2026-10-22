@@ -291,3 +291,85 @@ static func _centripetal(p0: Vector2, p1: Vector2, p2: Vector2, p3: Vector2, t: 
 static func _hermite(w0: float, w1: float, w2: float, w3: float, t: float) -> float:
 	var value := 0.5 * (2.0 * w1 + (w2 - w0) * t + (2.0 * w0 - 5.0 * w1 + 4.0 * w2 - w3) * t * t + (3.0 * w1 - w0 - 3.0 * w2 + w3) * t * t * t)
 	return clampf(value, minf(w1, w2), maxf(w1, w2))
+
+
+## The shore of [param cells] (a region of cells, four-way joined) as a
+## closed curve's control points (for "waters" closed): its outline (the
+## cells' squares' outer edges, the longest loop of them) cut at each
+## edge's middle, so no corner of the grid is left, then the fewest points
+## within [param tolerance] cells of that (Douglas-Peucker, round the loop),
+## at least four. A closed curve through them (sample, cells) holds about
+## the region's cells. [] for an empty region.
+static func trace(cells: Dictionary, tolerance := 0.6) -> PackedVector2Array:
+	var none := PackedVector2Array()
+	if cells.is_empty():
+		return none
+	# Each outer edge, clockwise round its cell, from corner to corner.
+	var next_of := {}
+	for cell: Vector2i in cells:
+		var x := float(cell.x)
+		var y := float(cell.y)
+		var corners := [Vector2(x - 0.5, y - 0.5), Vector2(x + 0.5, y - 0.5), Vector2(x + 0.5, y + 0.5), Vector2(x - 0.5, y + 0.5)]
+		var sides: Array[Vector2i] = [Vector2i(0, -1), Vector2i(1, 0), Vector2i(0, 1), Vector2i(-1, 0)]
+		for k in 4:
+			if not cells.has(cell + sides[k]):
+				next_of[corners[k]] = corners[(k + 1) % 4]
+	# Chained into loops; the longest is the outline.
+	var best: Array = []
+	var left := next_of.duplicate()
+	while not left.is_empty():
+		var start: Vector2 = left.keys()[0]
+		var loop: Array = [start]
+		var at: Vector2 = left[start]
+		left.erase(start)
+		while at != start and left.has(at):
+			loop.append(at)
+			var after: Vector2 = left[at]
+			left.erase(at)
+			at = after
+		if loop.size() > best.size():
+			best = loop
+	var middles := PackedVector2Array()
+	for i in best.size():
+		middles.append((best[i] + best[(i + 1) % best.size()]) / 2.0)
+	if middles.size() <= 4:
+		return middles
+	# Douglas-Peucker round the loop: split at the two points farthest apart.
+	var far := 0
+	for i in middles.size():
+		if middles[i].distance_to(middles[0]) > middles[far].distance_to(middles[0]):
+			far = i
+	var first := _simplify(middles.slice(0, far + 1), tolerance)
+	var back := middles.slice(far)
+	back.append(middles[0])
+	var second := _simplify(back, tolerance)
+	first.remove_at(first.size() - 1)
+	second.remove_at(second.size() - 1)
+	first.append_array(second)
+	if first.size() < 4:
+		var even := PackedVector2Array()
+		for k in 4:
+			even.append(middles[k * middles.size() / 4])
+		return even
+	return first
+
+
+## [param line]'s fewest points within [param tolerance] of it
+## (Douglas-Peucker), its ends kept.
+static func _simplify(line: PackedVector2Array, tolerance: float) -> PackedVector2Array:
+	if line.size() < 3:
+		return line
+	var far := 0.0
+	var at := 0
+	for i in range(1, line.size() - 1):
+		var gap := line[i].distance_to(Geometry2D.get_closest_point_to_segment(line[i], line[0], line[-1]))
+		if gap > far:
+			far = gap
+			at = i
+	if far <= tolerance:
+		return PackedVector2Array([line[0], line[-1]])
+	var head := _simplify(line.slice(0, at + 1), tolerance)
+	var tail := _simplify(line.slice(at), tolerance)
+	head.remove_at(head.size() - 1)
+	head.append_array(tail)
+	return head

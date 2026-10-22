@@ -961,6 +961,13 @@ as it was) and padded like any building: a great tree at (44, 132), a
 cairn on the ridge's back at (184, 40), a waystone where the roads will meet
 at (128, 128), a ring of eight standing stones round (70, 202), each in open
 ground (no forest or water within a few cells), the ring one pad.
+The water (568): a river laid as a curve down the valley from the north
+edge to the south (wavelength 34, swinging 7 cells, 2 to 3.2 wide, on a
+floor 11 either side), the groves under it cleared (the forest round the
+land kept: it runs on unseen under it at the edges), a ford across it at
+row 41 and a bridge at row 128 where the hills road will cross; and the
+three ponds traced from their cells into closed curves (`Curves.trace`),
+their cells then the curve's. `level.json` gains `waters` and the bridge.
 
 ## Prefabs
 

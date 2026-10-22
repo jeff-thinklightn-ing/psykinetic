@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- A river now winds down the wilds from the north edge to the south, crossed by a ford in the north and a bridge in the middle, and the wilds' three ponds have rounded shores (568); anyone who logged out where the water now runs comes back on the nearest dry ground.
 - The medicine man keeps the herbs he gathers at his own hut, unpaid, where his remedies and potions are made (502 amended); the town's treasury no longer buys them. Server only.
 - The wilds have landmarks to steer by: a great lone tree in the west, a cairn on the ridge, a ring of eight standing stones in the south-west and a waystone at the middle where the roads will meet; none can be walked through (567).
 - A house still being built is walked into until its walls are up (a third of the way through the build); from then its walls stand as any house's, on the server and as your game predicts your steps (566, maps' side).
