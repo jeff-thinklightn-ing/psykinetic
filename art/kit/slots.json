@@ -1361,6 +1361,21 @@
 				{"at": [0, 1.7, 0], "size": [0.6, 0.18, 0.45]}
 			]
 		},
+		"building.cairn": {
+			"category": "buildings",
+			"type": "mesh",
+			"kind": "cell",
+			"footprint": [2, 2],
+			"size": [1.9, 2.81, 1.91],
+			"budget": 1600,
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-21", "notes": "C:/dev/review/landmarks/make_cairn.py: some 100 rough chunks (each a hull of points spread round a squashed ball, a little in or out), laid course on course round a lumpy cone that leans a little and bulges on one side, a filling stone inside each course, a skirt of tumbled stones round the foot, a long stone stood upright at the top, sunk among the top course, the whole 2.8 m tall (terrain, 2026-10-21: under 3 m it reads as a marker beside a player, not a landmark); each stone its own grey of row 1, lichen on the upper stones' tops, a little moss low down; 1478 tris"},
+			"uses": "a cairn, a pile of rough stones on a ridge top, 2 x 2 cells, a whole piece standing on grass (decision 550's solid cell): the wilds' landmarks (maps, the coordinator approved, 2026-10-21; Jeff: \"wilds needs better land marks\"), its upright top stone reading against the sky from afar",
+			"grey": [
+				{"at": [0, 0.4, 0], "size": [1.9, 0.8, 1.91]},
+				{"at": [0, 1.4, 0], "size": [1.2, 1.2, 1.2]},
+				{"at": [0, 2.405, 0], "size": [0.4, 0.81, 0.4]}
+			]
+		},
 		"door.double": {
 			"category": "doors",
 			"type": "mesh",
