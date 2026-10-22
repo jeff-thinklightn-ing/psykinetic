@@ -645,6 +645,16 @@ func _test_codes() -> void:
 	var hut: Dictionary = parsed["buildings"][1]
 	_check(hut["code"] == "H2" and BuilderUI.building_words(hut) == "H2 hut", "Level.parse gives each building its code: %s" % BuilderUI.building_words(hut))
 	_check(BuilderUI.building_line(hut) == "H2 hut at 13, 7, facing south, use: inn, town: store", "the party log line: %s" % BuilderUI.building_line(hut))
+	# How far its town has built it (566), from the "town" message's buildings state.
+	hut["town_id"] = "test_field/store"  # As Level.load names a building's town.
+	var states := {hut["town_id"]: {"inn": {"state": Towns.PLANNED, "level": 0, "progress": 0.4}}}
+	_check(BuilderUI.building_line(hut, states).ends_with("town: store, being built 40%"), "a build under way: %s" % BuilderUI.building_line(hut, states))
+	states[hut["town_id"]]["inn"] = {"state": Towns.PLANNED, "level": 0}
+	_check(BuilderUI.build_state(hut, states) == "planned", "planned, no job yet")
+	states[hut["town_id"]]["inn"] = {"state": Towns.STANDING, "level": 1}
+	_check(BuilderUI.build_state(hut, states) == "" and BuilderUI.build_state(hut, {}) == "", "standing, or no record: nothing said")
+	states[hut["town_id"]]["inn"] = {"state": Towns.DAMAGED, "level": 1}
+	_check(BuilderUI.build_state(hut, states) == "damaged" and BuilderUI.build_state(parsed["buildings"][0], states) == "", "damaged; a building with no use: nothing")
 	_check(BuilderUI.building_at(parsed["buildings"], Vector2i(13, 7)) == hut and BuilderUI.building_at(parsed["buildings"], Vector2i(30, 20)).is_empty(), "the building under a cell")
 	_check(BuilderUI.coords_text(Vector2i(212, 207), Vector2i(210, 205), Vector2i(-1, -1)) == "212, 207      you 210, 205", "the coordinates line")
 	var front: Vector2i = preload("res://main.gd").front_of(hut)

@@ -111,9 +111,23 @@ static func building_words(building: Dictionary) -> String:
 	return ("%s %s" % [building.get("code", ""), name.replace("_", " ")]).strip_edges()
 
 
+## How far a building's town has built it (decision 566), from the town's
+## buildings state as the "town" message carries it (Main.town_states):
+## "being built 40%" while a job runs, "planned" with none yet, "damaged";
+## "" for a standing one, or a building that serves no town.
+static func build_state(building: Dictionary, states: Dictionary) -> String:
+	if str(building.get("use", "")).is_empty():
+		return ""
+	var record: Dictionary = states.get(str(building.get("town_id", "")), {}).get(str(building["use"]), {})
+	var progress := float(record.get("progress", -1.0))
+	if progress >= 0.0:
+		return "being built %d%%" % roundi(progress * 100.0)
+	return {Towns.PLANNED: "planned", Towns.DAMAGED: "damaged"}.get(str(record.get("state", "")), "")
+
+
 ## The party log's line for a building clicked in builder mode:
-## "H3 house at 212, 207, facing south, use: inn".
-static func building_line(building: Dictionary) -> String:
+## "H3 house at 212, 207, facing south, use: inn, being built 40%".
+static func building_line(building: Dictionary, states := {}) -> String:
 	var at: Vector2i = building.get("cell", Vector2i.ZERO)
 	var facing: Vector2i = building.get("facing", Vector2i(0, 1))
 	var side: String = {Vector2i(0, -1): "north", Vector2i(1, 0): "east", Vector2i(0, 1): "south", Vector2i(-1, 0): "west"}.get(facing, str(facing))
@@ -122,6 +136,9 @@ static func building_line(building: Dictionary) -> String:
 		line += ", use: %s" % building["use"]
 	if not str(building.get("town", "")).is_empty():
 		line += ", town: %s" % building["town"]
+	var state := build_state(building, states)
+	if not state.is_empty():
+		line += ", " + state
 	return line
 
 
@@ -157,7 +174,7 @@ func handle_input(event: InputEvent) -> bool:
 		if button.pressed and at != main.NONE:
 			var clicked := building_at(main.level.get("buildings", []), at)
 			if not clicked.is_empty():
-				main.talk.add_line("Builder", building_line(clicked), true, true)
+				main.talk.add_line("Builder", building_line(clicked, main.town_states), true, true)
 		if button.pressed and at != main.NONE and state in ["idle", "asking", "proposal"]:
 			if state == "proposal":
 				_send({"op": "discard"})

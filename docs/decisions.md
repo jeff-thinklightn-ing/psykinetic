@@ -19432,3 +19432,10 @@ as drafts for Jeff:
 Struck, a wolf fights back as before, and its hunting of deer is
 unchanged. Server only, protocol unchanged, no new class_name.
 monster_test _test_wolf_pack_bold.
+The third part, on economy's progress key (fe9d19e3): BuilderUI.build_state
+reads a building's town record from Main.town_states (the "town"
+message's buildings state, by the building's town_id and use) and names
+it: "being built 40%" while a job runs ("progress"), "planned" with none
+yet, "damaged"; nothing for a standing one or one serving no town. The
+cursor's hint ("H3 house, being built 40%") and builder mode's click line
+end with it. Nothing travels from builder; protocol unchanged.
