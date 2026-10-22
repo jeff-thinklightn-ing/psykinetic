@@ -68,6 +68,7 @@ func _ready() -> void:
 	_test_hearing()
 	_test_noise_reach()
 	_test_hunt()
+	_test_downed_not_hunted()
 	_test_leash()
 	_test_roused()
 	_test_door_openers()
@@ -1102,6 +1103,24 @@ func _test_noise_reach() -> void:
 	near = e["b"][0]
 	World.damage(e["c"][0], 999, null, &"impact")
 	_check(not near.senses.heard.is_empty() and near.senses.heard.back()["kind"] == &"break", "a crate smashed is heard: break")
+
+
+func _test_downed_not_hunted() -> void:
+	print("
+== its target downed (Mortally Wounded): not lost but fallen; no hunt, back to its idle ==")
+	Monster.idling = true
+	var e := _build(["##########", "#........#", "#.i......#", "#........#", "#....P...#", "##########"], {"i": {"facing": Vector2i(1, 1)}})
+	var imp: Monster = e["i"][0]
+	var player: GridEntity = e["P"][0]
+	imp.sight_range = 7
+	imp.reaction_ticks = 0
+	World.step()
+	_check(imp.target == player and imp.alert == Monster.Alert.FIGHTING, "it sees them: fighting")
+	World.lay_downed(player, 300)
+	World.step()
+	_check(imp.target == null and imp.alert != Monster.Alert.HUNTING and imp.alert != Monster.Alert.FIGHTING,
+		"downed: no target, and no hunt over the body (%s)" % Monster.Alert.keys()[imp.alert])
+	World.raise_downed(player, player.max_hp)  # World.reset keeps its downed: none left behind.
 
 
 func _test_hunt() -> void:
@@ -2261,6 +2280,13 @@ func _test_draugr() -> void:
 	draugr.living_came(player)
 	_check(draugr.hp == mini(hurt + roundi(draugr.max_hp * Draugr.LIVING_HEAL), draugr.max_hp) and draugr.hp > hurt and draugr.max_hp == 60,
 		"the living come in: half his most back at once, his level as it was (%d to %d of %d)" % [hurt, draugr.hp, draugr.max_hp])
+	var before := draugr.hp
+	World.lay_downed(player, 50)
+	World.step()
+	World.step()
+	_check(draugr.state == Draugr.State.PACT and draugr.hp == before and draugr.challenger_id == "p1",
+		"his challenger downed in his lair: the pact holds, and he does not heal (Mortally Wounded)")
+	World.raise_downed(player, player.max_hp)
 	var fought := false
 	for i in 20:
 		World.step()

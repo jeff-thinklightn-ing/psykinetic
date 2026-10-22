@@ -15,7 +15,8 @@ extends Monster
 ## fights back, and yields as ever, but blesses nobody (a fight without the
 ## pact wins nothing; Jeff's to decide, on his list). Resting he lies still,
 ## struck or not, till a pact raises him. A pact is lost when the challenger
-## falls, or leaves the lair: he heals and keeps the gold.
+## dies (not while they lie downed and may be raised), or leaves the lair:
+## he heals and keeps the gold.
 ##
 ## His talk is npc's offer contract (talks, offers_for, accept_offer,
 ## offer_spoken, offer_withdrawn): Main's speaker lookup reads it.
@@ -257,10 +258,12 @@ func living_came(player: Player) -> void:
 	hp = mini(hp + roundi(max_hp * LIVING_HEAL), max_hp)
 
 
-## Whether the pact is still on: its challenger standing in his lair.
+## Whether the pact is still on: its challenger in his lair, standing or
+## lying downed (Mortally Wounded: while they may yet be raised he turns to
+## the others, or waits, and does not heal); lost when they die or leave.
 func _pact_holds() -> bool:
 	var player := _challenger()
-	return player != null and player.hp > 0 and not World.is_downed(player) and _in_lair(player)
+	return player != null and player.spawned and player.hp > 0 and _in_lair(player)
 
 
 ## The pact lost (the challenger fallen, or gone): he heals, keeps the gold,

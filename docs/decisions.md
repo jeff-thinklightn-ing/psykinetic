@@ -21782,3 +21782,25 @@ block, as room_of finds it already).
 monster_test `_test_barrow_layers` (also the level's word on its dead); the
 robber's leash check 14. Server
 only, protocol unchanged, no new class_name.
+
+## 587, enemy-ai's side. Mortally Wounded: the downed are not hunted; the draugr's pact holds through a fall
+
+Companions' design (C:/dev/review/companions/mortally_wounded_design.md,
+Jeff's down screen): every player at 0 hp lies downed, the blessed 30 s (up
+to about 150 s with Slow Heart), the unblessed 10 s. 544's rules stand:
+monsters never target the downed, no blow lands, no finishing blows. Two
+things the longer window changed, the coordinator's nod on both:
+
+- **No hunt over the body.** A wary monster whose target went down saw it
+  "lost" and hunted it: to its cell and round it for HUNT_TICKS, keeping
+  the spot unsafe for whoever comes to raise it. `Monster._hunt` now
+  returns false for one downed (`World.is_downed`): fallen, not lost; the
+  monster goes back to its idle.
+- **The draugr's pact holds through a fall.** `Draugr._pact_holds` no
+  longer ends the pact when the challenger is downed: lying in his lair
+  they may yet be raised, and meanwhile he turns to the others there, or
+  waits, without healing. The pact is lost when they die (gone, or 0 hp)
+  or leave his lair, as before.
+
+monster_test `_test_downed_not_hunted`, and a check in `_test_draugr`.
+Server only, protocol unchanged, no new class_name.

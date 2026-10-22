@@ -1097,10 +1097,12 @@ func _heard(noise: Dictionary) -> void:
 
 ## [param lost] went out of its sight: after it, to where it last saw it and
 ## on HUNT_ON_TILES the way it was going. False (no hunt) for a monster of
-## no kind, one gone, or one it has given up on.
+## no kind, one gone, or one it has given up on; nor one downed, not lost but
+## fallen (Mortally Wounded: it goes back to its idle, and does not stand
+## over the body while it could be raised).
 func _hunt(lost: GridEntity) -> bool:
 	if not _wary or idle == Idle.HOMEWARD or keeps_room or lost == null or not is_instance_valid(lost) or not lost.spawned \
-			or _given_up.has(lost.get_instance_id()):
+			or _given_up.has(lost.get_instance_id()) or World.is_downed(lost):
 		return false
 	_quarry = lost
 	var lead := _quarry_at if _quarry_at != NO_TILE else tile
