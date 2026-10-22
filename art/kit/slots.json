@@ -2241,6 +2241,42 @@
 			"uses": "an archer's quiver (decision 462 amended (3); Jeff: \"arrows should just be a quiver on the back\"): not an item of its own, worn on a body's back socket (Client3D's \"back\": between the shoulder blades, up and over the right shoulder) while a bow is in hand and arrows in the other hand's slot, which then shows nothing; origin at the middle of the piece's height, on the face that lies against the back (z = 0), the tube along +y to its mouth and the arrows' fletching at +y, out from the body toward -z, the strap on +z; variant 1 plain, 2 flame (a red cord under the mouth), 3 barbed (dark fletching), as the bundles item.arrows, _flame, _barbed",
 			"grey": [{"at": [0, -0.08, -0.065], "size": [0.12, 0.56, 0.13]}, {"at": [0, 0.28, -0.065], "size": [0.08, 0.16, 0.08]}]
 		},
+		"tool.axe": {
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-21", "notes": "C:/dev/review/tools/make_tool.py axe: a curved oval ash haft with a swelled knob at its foot, a leather wrap at the grip, a bearded iron head with a bright edge strip toward +x and a short poll; 192 tris"},
+			"category": "items",
+			"type": "mesh",
+			"kind": "held",
+			"size": [0.22, 0.92, 0.032],
+			"base": -0.09,
+			"budget": 300,
+			"sockets": {"grip": [0, 0, 0]},
+			"uses": "a felling axe in a townsman's hand (decision 566, art-kit's side; Jeff, 2026-10-21: \"town people need to be doing activities ... chopping wood\"): not an item, held on hand_r for the chop activity (pc-character's clip); its origin the grip, the haft along +y, the head at the top, its edge toward +x",
+			"grey": [{"at": [-0.015, 0.345, 0], "size": [0.03, 0.87, 0.03]}, {"at": [0.045, 0.766, 0], "size": [0.22, 0.132, 0.032]}]
+		},
+		"tool.hammer": {
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-21", "notes": "C:/dev/review/tools/make_tool.py hammer: a carpenter's claw hammer, a tapering wooden handle, an iron head across its top, a round bright face toward +x on a neck and a split claw curling back toward -x; 196 tris"},
+			"category": "items",
+			"type": "mesh",
+			"kind": "held",
+			"size": [0.17, 0.37, 0.033],
+			"base": -0.06,
+			"budget": 300,
+			"sockets": {"grip": [0, 0, 0]},
+			"uses": "a carpenter's claw hammer in a townsman's hand (decision 566, art-kit's side; Jeff, 2026-10-21: \"building a half constructed building\"): not an item (item.hammer is a war hammer), held on hand_r for the hammer activity (pc-character's clip); its origin the grip, the handle along +y, its face toward +x",
+			"grey": [{"at": [0, 0.1, 0], "size": [0.03, 0.32, 0.03]}, {"at": [-0.02, 0.285, 0], "size": [0.17, 0.05, 0.033]}]
+		},
+		"tool.saw": {
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-21", "notes": "C:/dev/review/tools/make_tool.py saw: a hand saw, a closed wooden D handle with the hand's hole drawn dark on both faces, two brass rivets, a tapering steel blade with its teeth along +x; the grip (the origin) the hole's middle; 304 tris"},
+			"category": "items",
+			"type": "mesh",
+			"kind": "held",
+			"size": [0.135, 0.675, 0.027],
+			"base": -0.095,
+			"budget": 400,
+			"sockets": {"grip": [0, 0, 0]},
+			"uses": "a hand saw in a townsman's hand (decision 566, art-kit's side; Jeff, 2026-10-21: \"building a half constructed building\"): not an item, held on hand_r for the saw activity (pc-character's clip); its origin the grip in the handle's hole, the blade along +y, its teeth toward +x",
+			"grey": [{"at": [0.0, -0.03, 0], "size": [0.135, 0.13, 0.027]}, {"at": [0.03, 0.3, 0], "size": [0.07, 0.56, 0.006]}]
+		},
 		"ground.needles": {
 			"category": "ground",
 			"type": "texture",
