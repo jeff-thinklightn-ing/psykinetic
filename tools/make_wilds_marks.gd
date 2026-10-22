@@ -594,7 +594,10 @@ func _pads() -> Array:
 		var slot := str(building.get("slot", ""))
 		if slot in Level.SPANS_WATER:
 			continue  # A bridge spans the river; its banks are levelled apart.
-		if not slot in Level.DOORLESS:
+		if slot in Level.SOLID and not slot in Level.DOORLESS:
+			# A mound (579: 12 x 12): its footprint and a cell round it.
+			pads.append((Level.building_rect(building) as Rect2i).grow(1))
+		elif not slot in Level.DOORLESS:
 			spots.append(_cell(building["at"]) + Vector2i(2, 2))
 		elif slot == "building.standing_stone":
 			# The stone ring is one pad, so no step lies between two stones.
@@ -603,8 +606,18 @@ func _pads() -> Array:
 		else:
 			# A landmark's own footprint and a cell round it.
 			pads.append((Level.building_rect(building) as Rect2i).grow(1))
+	# A solid building's pad (579: the mound) holds its door and the spawn
+	# by it level; their own pads, at their own height, would break it.
+	var solid_pads: Array[Rect2i] = []
+	for building: Dictionary in doc.config.get("buildings", []):
+		var slot := str(building.get("slot", ""))
+		if slot in Level.SOLID and not slot in Level.DOORLESS:
+			solid_pads.append((Level.building_rect(building) as Rect2i).grow(2))
 	for spot in spots:
-		pads.append(Rect2i(spot - Vector2i(PAD, PAD), Vector2i(PAD * 2 + 1, PAD * 2 + 1)))
+		var pad := Rect2i(spot - Vector2i(PAD, PAD), Vector2i(PAD * 2 + 1, PAD * 2 + 1))
+		if solid_pads.any(func(solid: Rect2i) -> bool: return solid.intersects(pad.grow(1))):
+			continue
+		pads.append(pad)
 	if ring.size != Vector2i.ZERO:
 		pads.append(ring.grow(1))
 	return pads

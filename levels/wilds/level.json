@@ -40,8 +40,8 @@
 			128
 		],
 		"from_barrow": [
-			236,
-			187
+			170,
+			179
 		],
 		"from_barrow_shortcut": [
 			217,
@@ -75,8 +75,8 @@
 		},
 		{
 			"at": [
-				236,
-				186
+				170,
+				180
 			],
 			"to_map": "barrow",
 			"to_spawn": "from_wilds"
@@ -325,12 +325,12 @@
 		{
 			"slot": "building.mound",
 			"at": [
-				234,
-				182
+				165,
+				180
 			],
 			"facing": [
 				0,
-				1
+				-1
 			]
 		},
 		{

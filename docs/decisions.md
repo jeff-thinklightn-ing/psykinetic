@@ -21122,3 +21122,38 @@ buildings still set its ring.
 tests/forage_test: a 12×12 mound 35 cells from the store leaves the
 ring as it was. Server only, protocol unchanged, no new class_name.
 
+## 579, maps' side: the barrow's mound at 12 x 12, a landmark on the way
+
+Jeff tried the mound at twice its size; the coordinator set building.mound to
+12 x 12, and Jeff: "i want the barrow outside town, not at the map edge, it
+double as a travel landmark". Art-kit's piece (579, art-kit's side) lands
+first.
+- Level.BUILDINGS building.mound 5 x 5 -> 12 x 12, and art/kit/slots.json's
+  footprint with it (art-kit's piece, 6849050a, fills it). Its door, the front
+  row's middle (solid_door), is at an even width the west cell of the
+  middle pair, where the piece's doorway's walkable half is.
+- levels/wilds: the mound to (165..176, 180..191) ("at" (165, 180), facing
+  north), its door (170, 180); the barrow's link marker and entry to (170,
+  180), from_barrow to (170, 179) outside it. Chosen by search: 12 x 12 of
+  grass or dirt with 8 cells of the same round it (no forest, no water),
+  nothing placed or laid within 8 cells, its middle 20 cells from the town's
+  north-west corner (190, 190) toward the waystone (128, 128), on the line
+  the south-east road will take (it waits on Held), standing 0.27 m over the
+  ground round it, the most of the spots that fit: a slight rise. It faces
+  north, to that road. The old spot (234..238, 182..186) is grass again.
+  The barrow's own link names its spawn, so dungeon's side is unchanged.
+  Edited as text, the marker's pixel moved in the layout.
+- make_wilds_marks pads a solid building (not a doorless one) by its
+  footprint and a cell round it, and gives no pad of its own to a link,
+  spawn point or start whose pad would touch it (the mound's pad holds its
+  door and from_barrow level). The relief laid again; nothing said.
+- Live players: a saved spot on the mound's new solid cells is no floor:
+  the player comes back at the nearest floor (Main._nearest_free). No link,
+  start, spawn point or placed thing is inside it or within 8 cells.
+PROTOCOL_REVISION 31 (v0.1.164 shipped 30): what is solid differs on both
+sides.
+
+tests: level_test's solid-building fixture at 12 x 12 (143 solid cells, the
+door (9, 14), sight and a path round it), the wilds' mound with its door on
+the barrow's link and from_barrow (170, 179) outside it; builder_test's
+mound case at 12 x 12.

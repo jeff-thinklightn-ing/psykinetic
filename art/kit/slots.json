@@ -1427,7 +1427,7 @@
 			"category": "buildings",
 			"type": "mesh",
 			"kind": "cell",
-			"footprint": [5, 5],
+			"footprint": [12, 12],
 			"size": [11.848, 3.493, 11.857],
 			"middle": [-0.016, 0, -0.009],
 			"budget": 4600,

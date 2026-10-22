@@ -110,7 +110,7 @@ const NORTHS := {"up": Vector2i(0, -1), "down": Vector2i(0, 1), "left": Vector2i
 ## are the map's own edges on its outline (decision 265).
 const BUILDINGS := {"building.hut": Vector2i(3, 3), "building.house": Vector2i(4, 6), "building.shed": Vector2i(2, 3),
 	"building.well": Vector2i(1, 1), "building.temple": Vector2i(4, 6), "building.healers_hut": Vector2i(3, 3),
-	"building.field": Vector2i(4, 4), "building.mound": Vector2i(5, 5),
+	"building.field": Vector2i(4, 4), "building.mound": Vector2i(12, 12),
 	"building.great_tree": Vector2i(3, 3), "building.cairn": Vector2i(2, 2), "building.standing_stone": Vector2i(1, 1),
 	"building.waystone": Vector2i(1, 1), "building.chopping_block": Vector2i(1, 1), "building.woodpile": Vector2i(1, 1)}
 ## The buildings that stand on water, not floor: no inside, no walls (a

@@ -668,11 +668,11 @@ func _test_solid() -> void:
 	doc.config["buildings"] = [{"slot": "building.mound", "at": [10, 10], "facing": [0, 1]}]
 	doc.config["places"] = {"store": {"at": [12, 22], "kind": "stockpile", "holder": "town"},
 		"inside": {"at": [11, 11], "kind": "woodlot", "holder": "town", "town": "store"},
-		"door": {"at": [12, 14], "kind": "hunting_ground", "holder": "town", "town": "store"},
+		"door": {"at": [15, 22], "kind": "hunting_ground", "holder": "town", "town": "store"},
 		"behind": {"at": [12, 6], "kind": "quarry", "holder": "town", "town": "store"}}
 	var session := BuilderSession.new(doc, Rect2i(0, 0, 40, 30), "test_field", StubClaude.new([]))
 	var ground := session.walk_ground()
-	_check((ground.get("solid", {}) as Dictionary).size() == 24 and not ground["solid"].has(Vector2i(12, 14)), "its 25 cells but the door are solid (%d)" % (ground.get("solid", {}) as Dictionary).size())
+	_check((ground.get("solid", {}) as Dictionary).size() == 143 and not ground["solid"].has(Vector2i(15, 21)), "its 144 cells but the door are solid (12 x 12, 579; %d)" % (ground.get("solid", {}) as Dictionary).size())
 	var sites := session.site_checks()
 	_check(sites.size() == 1 and "woodlot inside at (11, 11) can't be reached" in sites[0], "a site inside the mound can't be reached; its door and the ground behind it can (%s)" % [sites])
 	var used: Dictionary = session.run_tool("set_building", {"at": [12, 12], "use": "inn", "town": "store"})
