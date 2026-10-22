@@ -1433,6 +1433,14 @@ func _shop_counter_near(near: GridEntity) -> GridEntity:
 	return best
 
 
+## The window's care row (economy's healer's care): the "retain" command
+## for the healer in person; the answer is the barter message again.
+func _retain(with: GridEntity) -> void:
+	var player := _local_player()
+	if player != null and is_instance_valid(with) and with is Resident and with.is_inside_tree():
+		World.command(player, "retain", {"resident": str(with.get_path())})
+
+
 ## The window's Confirm: economy's "trade" command, by name, naming the
 ## counter ({shop}) or the maker in person ({resident}, 562).
 func _trade(with: GridEntity, give: Array, take: Array, gold_balance: int) -> void:
@@ -7166,6 +7174,7 @@ func _build_talk() -> void:
 	barter_panel.name = "Barter"
 	barter_panel.pack = pack_panel
 	barter_panel.trade_asked.connect(_trade)
+	barter_panel.care_asked.connect(_retain)
 	barter_panel.refused.connect(func(_why: String) -> void: ui_sounds.play("ui.error"))
 	$HUD.add_child(barter_panel)
 	if has_signal("barter_told"):

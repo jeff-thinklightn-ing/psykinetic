@@ -862,6 +862,23 @@ func _test_barter() -> void:
 	panel.open(oda, "Oda")
 	_check(panel.title_shown() == "Oda's goods", "opened with the cook in person: Oda's goods")
 	panel.close()
+	# The healer's care (economy): a service row in the window, "retain" on Confirm.
+	_check(BarterPanel.care_words({"gold": 10, "in_care": false}) == "Pay 10 to be in his care" and BarterPanel.care_words({"gold": 10, "in_care": true}) == "In his care"
+		and BarterPanel.care_words(null) == "", "the care row's words: pay for it, or held; none without it")
+	var cared: Array = []
+	panel.care_asked.connect(func(who: GridEntity) -> void: cared.append(who))
+	oda.trade = "medicine_man"
+	panel.open(oda, "Hob")
+	panel.show_barter({"gold": 12, "goods": [], "buys": {}, "fenced": {}, "pack": [], "why": "", "care": {"gold": 10, "in_care": false}})
+	_check(panel.care_shown() == "Pay 10 to be in his care" and not panel._care.disabled, "the healer's window offers his care within the purse")
+	panel._ask_care()
+	_check(cared == [oda], "Confirming it asks for his care")
+	panel.show_barter({"gold": 5, "goods": [], "buys": {}, "fenced": {}, "pack": [], "why": "", "care": {"gold": 10, "in_care": false}})
+	_check(panel._care.disabled, "a short purse: the row dim")
+	panel.show_barter({"gold": 2, "goods": [], "buys": {}, "fenced": {}, "pack": [], "why": "", "care": {"gold": 10, "in_care": true}})
+	_check(panel.care_shown() == "In his care" and not panel._care.visible, "held: In his care, no button")
+	panel.close()
+	_check(panel.care_shown() == "", "closed: no care row")
 	_main._update_bar()
 	_check(not _main._bar.visible, "no bubble to sit under: the bar goes")
 	_check(not _main._bubble_clicked(), "a click with nobody greeted opens nothing")

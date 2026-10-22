@@ -21284,3 +21284,24 @@ half (333 amended): the overhead label is the name alone. Ui's half:
 
 ui_test and controls_test: the hints with hints=on as before, nothing
 with it off. Client only; protocol unchanged; no new class_name.
+
+## 584, ui's side: the healer's care in the barter window
+
+Economy's healer's care (584; the coordinator's approval): a healer's hut
+returns a player only once they have paid the medicine man's retainer or
+done his errand. The barter message for a healer carries "care": {gold,
+in_care}; confirming sends the "retain" command; the answer is the barter
+message again, its "why" on a refusal ("not enough gold (10)", "already in
+his care").
+
+- The window's service row under the goods (BarterPanel): a button "Pay
+  10 to be in his care" (BarterPanel.care_words), dim when the purse is
+  short; "In his care" as a dim caption while held; nothing without the
+  key. The button emits care_asked and Main._retain sends "retain"
+  {resident: his path}; a refusal's why reads in rust with the error sound
+  as any barter refusal. The row hides with the window.
+- Nothing on the wire from ui; the message's key and the command are
+  economy's.
+
+ui_test _test_barter: the words, the row offered within the purse, the ask,
+the short purse, held, closed. Client only; no new class_name.

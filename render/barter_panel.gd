@@ -35,6 +35,9 @@ static var SELECT: Color = UiTheme.color("brass_bright")
 signal trade_asked(with: GridEntity, give: Array, take: Array, gold: int)
 ## The server refused the trade: [param why].
 signal refused(why: String)
+## The healer's care (economy's healer's care): the player asks to be in
+## [param with]'s care for the message's care.gold (Main sends "retain").
+signal care_asked(with: GridEntity)
 
 ## The pack panel the window sits beside (its boxes are the player's side).
 var pack: PackPanel
@@ -60,6 +63,9 @@ var _foot: Label
 var _button: Button
 var _why: Label
 var _hover_words := ""
+## The healer's care row: the button to pay for it, or the line while held.
+var _care: Button
+var _care_held: Label
 
 
 ## One of the merchant's things: a box in the pack's look, clicked to
@@ -97,6 +103,14 @@ func _ready() -> void:
 	_goods = HBoxContainer.new()
 	_goods.add_theme_constant_override("separation", UiTheme.constant("slot_gap"))
 	column.add_child(_goods)
+	_care = Button.new()
+	_care.focus_mode = Control.FOCUS_NONE
+	_care.pressed.connect(_ask_care)
+	column.add_child(_care)
+	_care_held = Label.new()
+	_care_held.theme_type_variation = &"Caption"
+	_care_held.add_theme_color_override("font_color", DIM)
+	column.add_child(_care_held)
 	_hover = Label.new()
 	_hover.theme_type_variation = &"Caption"
 	_hover.add_theme_color_override("font_color", DIM)
@@ -377,6 +391,26 @@ func button_shown() -> String:
 	return _button.text
 
 
+## The care row's words (economy's healer's care): "Pay 10 to be in his
+## care" to buy it, "In his care" while held; "" when the message has none.
+static func care_words(care: Variant) -> String:
+	if not care is Dictionary:
+		return ""
+	return "In his care" if bool(care.get("in_care", false)) else "Pay %d to be in his care" % int(care.get("gold", 0))
+
+
+## The care row shown (tests): the button's or the line's words.
+func care_shown() -> String:
+	if _care.visible:
+		return _care.text
+	return _care_held.text if _care_held.visible else ""
+
+
+func _ask_care() -> void:
+	if _open and data.get("care") is Dictionary and not bool(data["care"].get("in_care", false)):
+		care_asked.emit(with)
+
+
 func hover_shown() -> String:
 	return _hover.text
 
@@ -452,6 +486,8 @@ func _rebuild() -> void:
 		if pack != null:
 			pack.set_selected([])
 		_box.visible = false
+		_care.visible = false
+		_care_held.visible = false
 		return
 	_title.text = title_words(merchant, with is Resident)
 	var goods: Variant = data.get("goods", [])
@@ -478,6 +514,13 @@ func _rebuild() -> void:
 	var why := str(data.get("why", ""))
 	_why.text = why
 	_why.visible = not why.is_empty()
+	var care: Variant = data.get("care")
+	var held := care is Dictionary and bool(care.get("in_care", false))
+	_care.visible = care is Dictionary and not held
+	_care.text = care_words(care) if _care.visible else ""
+	_care.disabled = _care.visible and int(care.get("gold", 0)) > int(data.get("gold", 0))
+	_care_held.visible = held
+	_care_held.text = care_words(care) if held else ""
 	if pack != null:
 		var slots := []
 		for uid: Variant in give:
