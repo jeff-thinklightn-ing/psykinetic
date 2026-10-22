@@ -191,14 +191,6 @@
 					"status": "draft"
 				},
 				{
-					"id": "goblins.castle",
-					"text": "Whether the goblins hold a castle near the town.",
-					"known": "common",
-					"where": [],
-					"status": "asked",
-					"ask": "A2"
-				},
-				{
 					"id": "goblins.why_smith",
 					"text": "Who took the smith and his hammer, and why.",
 					"known": "common",

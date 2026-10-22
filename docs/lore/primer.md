@@ -103,9 +103,18 @@ open.
 In the roadmap's first scenario the smith is taken, and his hammer with him, and
 the players bring him home. The first draft had goblins take him from a
 farmstead and hold him in an overrun castle's keep. That castle was a
-placeholder. Who takes him now, from where and why, is open *(asked: C3)*, as is
-whether there is a castle at all *(asked: A2)*. The smith's name, and whether his
-hammer has one, are open *(asked: E3)*.
+placeholder. Who takes him now, from where and why, is open *(asked: C3)*. The
+smith's name, and whether his hammer has one, are open *(asked: E3)*.
+
+## The castle and the labyrinths
+
+From Jeff's second session (`castle.md`), draft until he confirms the wording. The
+castle is ancient and dilapidated, built by dwarven stone smiths, plain and
+utilitarian, over a known entrance to the labyrinths, to guard it. It guards a
+treasure that was rumoured and never found. It is no longer dwarven, and it is
+mostly overrun; by whom is open *(asked: A2)*. The maps of the labyrinths were lost
+long ago, and the labyrinths shift, which is why their treasures were never carried
+out and why adventurers still come. Dwarven artifacts come from the dungeons below.
 
 ## The goblins in play and their allies
 

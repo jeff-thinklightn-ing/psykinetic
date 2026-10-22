@@ -171,10 +171,9 @@
 			"id": "castle",
 			"type": "place",
 			"name": "the castle",
-			"status": "asked",
-			"source": "roadmap",
-			"summary": "A castle; the one in the first draft was a placeholder.",
-			"ask": "A2",
+			"status": "draft",
+			"source": "Jeff",
+			"summary": "An ancient, dilapidated castle built by dwarven stone smiths over a known entrance to the shifting labyrinths, to guard it; mostly overrun now (docs/lore/castle.md).",
 			"level": "castle",
 			"place_kind": "keep",
 			"relations": [
@@ -186,10 +185,91 @@
 			"tags": [],
 			"facts": [
 				{
-					"id": "castle.whose",
-					"text": "Whether there is a castle in the region, whose it is, and whether it has a keep.",
+					"id": "castle.ancient",
+					"text": "The castle is ancient and dilapidated.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					],
+					"source": "Jeff",
+					"status": "draft"
+				},
+				{
+					"id": "castle.dwarven",
+					"text": "The castle was built by dwarven stone smiths, plain and utilitarian.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					],
+					"source": "Jeff",
+					"status": "draft"
+				},
+				{
+					"id": "castle.guards_way",
+					"text": "The dwarves built the castle over the labyrinths, as a cover over a known entrance, to guard it.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					],
+					"source": "Jeff",
+					"status": "draft"
+				},
+				{
+					"id": "castle.treasure",
+					"text": "The castle guards a treasure that was rumoured and never found.",
+					"known": "rumour",
+					"where": [],
+					"source": "Jeff",
+					"status": "draft",
+					"true": true
+				},
+				{
+					"id": "castle.overrun",
+					"text": "The castle is no longer dwarven; it is mostly overrun.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					],
+					"source": "Jeff",
+					"status": "draft"
+				},
+				{
+					"id": "castle.maps_lost",
+					"text": "The maps of the labyrinths below the castle were lost long ago.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					],
+					"source": "Jeff",
+					"status": "draft"
+				},
+				{
+					"id": "castle.shifting",
+					"text": "The labyrinths shift: their ways are never the same twice for long, which is why their treasures were never carried out and why adventurers still come.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					],
+					"source": "Jeff",
+					"status": "draft"
+				},
+				{
+					"id": "castle.dwarven_artifacts",
+					"text": "Dwarven artifacts come from the dungeons below the castle.",
+					"known": "rumour",
+					"where": [
+						"town_lands"
+					],
+					"source": "Jeff",
+					"status": "draft",
+					"true": true
+				},
+				{
+					"id": "castle.overrun_by",
+					"text": "Who has overrun the castle: the Blood Rot, their orc or kobold allies, something from below, or several at once.",
 					"known": "common",
 					"where": [],
+					"status": "asked",
 					"ask": "A2"
 				}
 			]
