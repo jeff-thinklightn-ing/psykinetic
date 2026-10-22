@@ -424,6 +424,13 @@ func _test_solid() -> void:
 	var link: Array = wilds["links"].filter(func(l: Dictionary) -> bool: return l["to_map"] == "barrow" and l["to_spawn"] == "from_wilds")
 	_check(mounds.size() == 1 and not link.is_empty() and mounds[0]["door"] == link[0]["tile"] and wilds["spawn_points"].get("from_barrow") == Vector2i(170, 179)
 		and not Vector2i(170, 179) in wilds["terrain"]["solid"], "the wilds' mound stands, its door on the barrow's link, from_barrow outside (%s)" % [wilds["warnings"]])
+	# Jeff: "add some of the melee weapons to the town chest for testing": two chests beside it.
+	var held := []
+	for spec: Dictionary in wilds["entities"]:
+		if spec["tile"] in [Vector2i(220, 226), Vector2i(219, 225)] and str(spec.get("script", "")).ends_with("chest.gd"):
+			held.append_array(Array(spec.get("props", {}).get("slots", [])))
+	_check(["sword", "spear", "hammer", "shield", "giant_axe", "dagger", "buckler"].all(func(id: String) -> bool: return id in held),
+			"the town chest's two beside it hold a sword, a spear, a hammer, a shield, a giant axe, a dagger and a buckler (%s)" % [held])
 
 
 ## [param prefab_name] stamped onto [param map] at [param at], turned

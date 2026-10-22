@@ -193,6 +193,34 @@
 		},
 		{
 			"at": [
+				220.0,
+				226.0
+			],
+			"props": {
+				"slots": [
+					"sword",
+					"spear",
+					"hammer",
+					"shield"
+				]
+			}
+		},
+		{
+			"at": [
+				219.0,
+				225.0
+			],
+			"props": {
+				"slots": [
+					"giant_axe",
+					"dagger",
+					"buckler",
+					""
+				]
+			}
+		},
+		{
+			"at": [
 				209.0,
 				199.0
 			],
