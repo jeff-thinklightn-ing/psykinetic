@@ -1261,6 +1261,7 @@ func _test_kinds() -> void:
 			"its outline walled round both blocks, its door a doorway (%d of %d; %s)" % [walls.size(), outline.size(), doors])
 	_test_composer()
 	_test_stages()
+	_test_plinth()
 
 
 ## A building being built (decision 566): its stages by its town record's
@@ -1352,6 +1353,54 @@ func _test_stages() -> void:
 		Client3D.lamp_lit({"H1": false}, "H1", 20.0, -5.0), Client3D.lamp_lit({"H1": true}, "H1", 13.0, 40.0)]
 	_check(lit == [true, false, true, false, false],
 			"a window lit with the sun down: as its building's awake says, else till 22 (%s)" % [lit])
+
+
+## The plinth (decision 489 amended): a kind's wood walls on a stone band
+## PLINTH_HEIGHT over its pad, down to the lowest ground beside them on a
+## slope; its walls, posts and roof on its pad, not the ground outside; a
+## stone kind none.
+func _test_plinth() -> void:
+	print("\n== a kind's wood walls on a stone plinth, on its pad (decision 489 amended) ==")
+	var level := _kinds_level([["building_l_house_small", Vector2i(1, 1), false], ["building_cottage_small", Vector2i(13, 1), false]], 0.3)
+	var warned := (level["warnings"] as Array).filter(func(each: String) -> bool: return not each.begins_with("no player start"))
+	_check(warned.is_empty(), "the sloped plot parses, its pads level (%s)" % [warned])
+	_rig.rebuild(level["terrain"], Vector2i(4, 20))
+	var house: Dictionary = level["buildings"][0]
+	var cottage: Dictionary = level["buildings"][1]
+	var pad := _rig._elevation(Level.building_cells(house)[0])
+	var walls := Level.building_outline(house).filter(func(key: Vector3i) -> bool:
+		return _rig._terrain["edges"].get(key) == Terrain.Edge.WALL)
+	var on_pad := walls.all(func(key: Vector3i) -> bool:
+		return _rig._walls.has(key) and is_equal_approx((_rig._walls[key] as Node3D).position.y, pad))
+	var plinths := walls.all(func(key: Vector3i) -> bool: return _rig._walls.has(key) and (_rig._walls[key] as Node3D).has_node("Plinth"))
+	var deepest := 0.0
+	var reached := true
+	for key: Vector3i in walls:
+		if not _rig._walls.has(key):
+			continue
+		var plinth := (_rig._walls[key] as Node3D).get_node_or_null("Plinth") as MeshInstance3D
+		if plinth == null:
+			continue
+		var box := plinth.mesh.get_aabb()
+		reached = reached and is_equal_approx(box.end.y, Client3D.PLINTH_HEIGHT)
+		for cell in Terrain.edge_cells(key):
+			var below := _rig._elevation(cell) - pad
+			deepest = minf(deepest, below)
+			reached = reached and box.position.y <= below
+	_check(on_pad and plinths and reached and deepest < -0.2,
+			"the L-house's walls on its pad, each on a plinth %.1f m up, down to the ground %.2f m below it" % [Client3D.PLINTH_HEIGHT, -deepest])
+	var posts := true
+	for key: Vector3i in walls:
+		for end in 2:
+			var vertex := WallEdge.vertex_at(key, end)
+			if _rig._posts.has(vertex):
+				posts = posts and is_equal_approx((_rig._posts[vertex] as Node3D).position.y, pad)
+	var roofed := _rig._buildings.filter(func(each: Dictionary) -> bool: return each.get("kind") == house)
+	_check(posts and not roofed.is_empty() and is_equal_approx((roofed[0]["node"] as Node3D).position.y, pad),
+			"its posts and its roof on its pad too")
+	var stone := Level.building_outline(cottage).filter(func(key: Vector3i) -> bool:
+		return _rig._walls.has(key) and (_rig._walls[key] as Node3D).has_node("Plinth"))
+	_check(stone.is_empty() and str(cottage["wall_set"]) == "stone", "the stone cottage has none")
 
 
 ## BuildingComposer (decision 489): a wing's walls drawn to its own lower
@@ -1446,7 +1495,7 @@ func _test_composer() -> void:
 
 
 ## [param stamps] ([prefab, top-left, ruined]) stamped on grass, parsed.
-func _kinds_level(stamps: Array) -> Dictionary:
+func _kinds_level(stamps: Array, slope := 0.0) -> Dictionary:
 	var map := LevelMap.new(Vector2i(24, 24))
 	for y in 24:
 		for x in 24:
@@ -1461,7 +1510,25 @@ func _kinds_level(stamps: Array) -> Dictionary:
 		config.merge(changes.get("config", {}), true)
 		if stamp[2]:
 			(config["buildings"] as Array)[-1]["ruined"] = true
-	return Level.parse(map.to_image(), null, config)
+	if slope <= 0.0:
+		return Level.parse(map.to_image(), null, config)
+	# Ground falling [param slope] metres a row southward, each building on a
+	# pad level at its middle row (relief.png, decision 525).
+	var size := Vector2i(24, 24)
+	var field := PackedFloat32Array()
+	field.resize(size.x * size.y)
+	for y in size.y:
+		for x in size.x:
+			field[y * size.x + x] = slope * (size.y - y)
+	for building: Dictionary in Level.parse(map.to_image(), null, config)["buildings"]:
+		var cells := Level.building_cells(building)
+		var middle := 0.0
+		for cell in cells:
+			middle += cell.y
+		var pad := slope * (size.y - roundf(middle / cells.size()))
+		for cell in cells:
+			field[cell.y * size.x + cell.x] = pad
+	return Level.parse(map.to_image(), null, config, Relief.image(field, size))
 
 
 func _test_double_doors() -> void:

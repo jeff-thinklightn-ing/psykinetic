@@ -97,6 +97,10 @@ const RUIN_BROKEN := 0.45
 ## A window's wall may differ from a storey this much (it is stretched to
 ## it); how many windows stand with their shutters open (489 amended).
 const WINDOW_STRETCH := 0.6
+## A kind's wood walls stand on a stone footing (decision 489 amended, the
+## plinth): this tall over its pad, this much proud of the wood each side.
+const PLINTH_HEIGHT := 0.6
+const PLINTH_PROUD := 0.05
 const SHUTTERS_OPEN := 0.66
 ## A window lit by the hour goes out at this hour, the sun down; how often
 ## the window lights are looked at, seconds (decision 566).
@@ -1192,6 +1196,12 @@ var _building_walls: Array[Vector3i] = []
 ## the temple's 4.5 m), by edge; an edge not here is WALL_HEIGHT. Terrain's
 ## runs draw them so.
 var _wall_heights: Dictionary[Vector3i, float] = {}
+## A kind building's outline edges (489 amended): a cell of its pad, whose
+## elevation its walls, posts and doors stand at whatever the ground outside.
+var _pad_cell: Dictionary[Vector3i, Vector2i] = {}
+## A kind building's wood wall edges, which stand on a stone plinth
+## (_add_plinth).
+var _plinths: Dictionary[Vector3i, bool] = {}
 ## The edges in _wall_states and _wall_sets that are there for a damaged
 ## building or a town wall (_show_state, _show_town_wall), and each town
 ## wall drawn: {town_id, walls, gates, rect, towers (vertex -> Node3D),
@@ -3331,6 +3341,8 @@ func _build_room() -> void:
 		_wall_sets.erase(key)
 		_wall_heights.erase(key)
 	_building_walls.clear()
+	_pad_cell.clear()
+	_plinths.clear()
 	# A damaged building's and a town wall's looks: the last map's out.
 	for key in _state_walls:
 		_wall_states.erase(key)
@@ -3368,11 +3380,13 @@ func _build_room() -> void:
 		var heights: Dictionary[Vector3i, float] = {}
 		var windows: Array[Vector3i] = []
 		var cells: Dictionary[Vector2i, bool] = {}
+		var pad := Vector2i.ZERO
 		if building.has("kind"):
 			heights = BuildingComposer.wall_heights(building)
 			windows = BuildingComposer.windows(building, _terrain["edges"])
 			for cell in Level.building_cells(building):
 				cells[cell] = true
+			pad = cells.keys()[0]
 		for key in Level.building_outline(building):
 			if not _wall_sets.has(key):
 				_building_walls.append(key)
@@ -3380,6 +3394,10 @@ func _build_room() -> void:
 				var tall: float = heights.get(key, wall_height)
 				if not is_equal_approx(tall, WALL_HEIGHT):
 					_wall_heights[key] = tall
+				if building.has("kind"):
+					_pad_cell[key] = pad
+					if wall_set == "wood":
+						_plinths[key] = true
 			# A kind's windows (489 amended), its wood walls of a storey's height:
 			# art-kit's window there, turned so its shutters open outward.
 			if building.has("kind") and wall_set == "wood" and key in windows \
@@ -3593,7 +3611,9 @@ func _add_buildings() -> void:
 func _add_kind(building: Dictionary) -> void:
 	var rect: Rect2i = building["rect"]
 	var cells := Level.building_cells(building)
-	var base := _elevation(rect.position)
+	# Its pad (Relief.flat): any of its cells, not its rect's corner, which an
+	# L's notch leaves outside it.
+	var base := _elevation(cells[0])
 	var eaves := float(building["eaves"])
 	var named := str(building.get("roof_set", ""))
 	var roof_set := named if not named.is_empty() and ArtKit.has("material.roof." + named) else KIND_ROOF
@@ -8195,8 +8215,11 @@ func _add_torch(cell: Vector2i) -> void:
 	_fire_lights.append([light, light.light_energy, _roll(cell, 142) * TAU, Flames.TORCH_FLICKER])
 
 
-## The base of an edge's wall: the higher of the cells it stands between.
+## The base of an edge's wall: a kind building's its pad (_pad_cell), else
+## the higher of the cells it stands between.
 func _edge_base(key: Vector3i) -> float:
+	if _pad_cell.has(key):
+		return _elevation(_pad_cell[key])
 	var cells := Terrain.edge_cells(key)
 	return maxf(_elevation(cells[0]), _elevation(cells[1]))
 
@@ -8479,7 +8502,9 @@ func _add_wall_run(run: Array[Vector3i]) -> void:
 		if _wall_states.get(run[k]) == "window":
 			_dress_window(made, run[k])
 		holder.add_child(made)
-	if mesh[0].is_empty() and pieces.is_empty():
+	if _plinths.has(first):
+		_add_plinth(holder, run, base, wall_set["half"])
+	if mesh[0].is_empty() and holder.get_child_count() == 0:
 		holder.free()
 		return
 	_room.add_child(holder)
@@ -8499,6 +8524,52 @@ func _add_wall_run(run: Array[Vector3i]) -> void:
 	drawn.name = "Body"
 	drawn.mesh = array_mesh
 	drawn.material_override = _wall_material(set_name)
+	holder.add_child(drawn)
+
+
+## [param run]'s stone plinth (489 amended) in [param holder] (the run's
+## frame: x across, y up from [param base], z along): a band PLINTH_HEIGHT
+## over its pad, PLINTH_PROUD wider than the wood's [param half] each side,
+## its foot down to the lowest ground beside the run (on a slope, a taller
+## footing downhill rather than a gap under the timber), its ends reaching
+## half its width on past a corner, not into a door or the next plinth's run.
+func _add_plinth(holder: Node3D, run: Array[Vector3i], base: float, half: float) -> void:
+	var out := half + PLINTH_PROUD
+	var low := 0.0
+	for key in run:
+		for cell in Terrain.edge_cells(key):
+			low = minf(low, _elevation(cell) - base)
+	low -= PLINTH_PROUD
+	var reach := func(key: Vector3i) -> float:
+		var kind: int = _terrain["edges"].get(key, Terrain.Edge.OPEN)
+		return 0.0 if kind == Terrain.Edge.DOOR or _plinths.has(key) and kind == Terrain.Edge.WALL else out
+	var first := run[0]
+	var last := run[-1]
+	var step := Vector3i(0, 1, 0) if first.z == Terrain.EAST else Vector3i(1, 0, 0)
+	var from: float = -reach.call(first - step)
+	var to: float = run.size() + reach.call(last + step)
+	var mesh := [PackedVector3Array(), PackedVector3Array(), PackedVector2Array(), PackedInt32Array()]
+	for side: float in [-1.0, 1.0]:
+		var x := side * out
+		_wall_quad(mesh, Vector3(x, low, from), Vector3(x, PLINTH_HEIGHT, from), Vector3(x, PLINTH_HEIGHT, to), Vector3(x, low, to),
+				Vector3(side, 0.0, 0.0), false)
+	_wall_quad(mesh, Vector3(-out, PLINTH_HEIGHT, from), Vector3(out, PLINTH_HEIGHT, from), Vector3(out, PLINTH_HEIGHT, to),
+			Vector3(-out, PLINTH_HEIGHT, to), Vector3.UP, true)
+	for end: float in [from, to]:
+		_wall_quad(mesh, Vector3(-out, low, end), Vector3(out, low, end), Vector3(out, PLINTH_HEIGHT, end), Vector3(-out, PLINTH_HEIGHT, end),
+				Vector3(0.0, 0.0, -1.0 if end == from else 1.0), false)
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = mesh[0]
+	arrays[Mesh.ARRAY_NORMAL] = mesh[1]
+	arrays[Mesh.ARRAY_TEX_UV] = mesh[2]
+	arrays[Mesh.ARRAY_INDEX] = mesh[3]
+	var array_mesh := ArrayMesh.new()
+	array_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	var drawn := MeshInstance3D.new()
+	drawn.name = "Plinth"
+	drawn.mesh = array_mesh
+	drawn.material_override = _wall_material("stone")
 	holder.add_child(drawn)
 
 
@@ -9141,6 +9212,11 @@ func _add_post(vertex: Vector2i) -> void:
 	var base := 0.0
 	for corner: Vector2i in [vertex, vertex - Vector2i(1, 0), vertex - Vector2i(0, 1), vertex - Vector2i(1, 1)]:
 		base = maxf(base, _elevation(corner))
+	# A kind building's on its pad (_pad_cell).
+	for entry: Array in WallEdge.edges_at_vertex(vertex):
+		if _pad_cell.has(entry[0]):
+			base = _elevation(_pad_cell[entry[0]])
+			break
 	post.position = Vector3(vertex.x - 0.5, base, vertex.y - 0.5)
 	_room.add_child(post)
 	_posts[vertex] = post

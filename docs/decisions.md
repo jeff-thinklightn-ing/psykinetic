@@ -13659,6 +13659,25 @@ its trims, the eaves' side out; shingle none.
 Thatched (the coordinator, on the review shot, under Jeff's apply-and-veto
 rule): cottage, hut, barn, longhouse, stable and house_leanto name
 "roof_set": "thatch"; every other kind keeps the shingle default.
+Amended (the plinth; art-kit's footing proposal at variety time, the
+coordinator's approval): a kind building stands on its pad (Relief.flat,
+525): its outline edges, its corner posts, its doors and its composed roof
+take the elevation of a cell of its own (Client3D._pad_cell, kept as a
+cell since the field is read after the sets), not the higher of an edge's
+two cells, which on a slope stood its uphill walls on the ground outside
+and up through its roof; nor its rect's corner, which an L's notch leaves
+off the pad. Its wood walls stand on a stone plinth (Client3D._add_plinth):
+each wall run one more mesh in the run's holder (so it fades, hides and
+casts with it), a band PLINTH_HEIGHT (0.6 m) over the pad in
+material.wall.stone, PLINTH_PROUD (0.05 m) wider than the wood each side,
+its foot down to the lowest cell beside the run (a taller footing downhill,
+no gap under the timber), under window pieces too, stopped at doors, its
+ends half its width on past a corner unless a door or the next run of
+plinth is there. Stone walls have none; nor a slot building. It comes with
+the walls (none on a plot or a frame, 566). Drawn only. view_test
+_test_plinth: an L-house on a slope 0.3 m a row, its walls, posts and roof
+on its pad, each run with its plinth down to the ground beside it; the
+stone cottage none. Shots: C:/dev/review/plinth (before, after).
 
 ## 495. Shader warm-ups: a material drawn once at load, not first at play
 
