@@ -506,6 +506,11 @@ var _talk_hint_until := 0.0
 ## the player was in when it came: shown on the big map's area box, not in
 ## the talk log (Jeff's castle F12, 2026-10-22).
 var town_notes: Dictionary = {}
+## Economy's "return" message while the local player lies dead (396
+## amended, ui's side): {by, where, seconds}, and the client's clock when it
+## came, for the countdown; {} once they are back.
+var _return_told: Dictionary = {}
+var _return_at := 0.0
 ## Talking with a town's person (536, ui's side: no panel; the say line, their speech, the HUD).
 ## Channels this view has seen (544, ui's side): channeler instance id ->
 ## [the tick first seen, its channel_until], so the ring's course runs from
@@ -7102,6 +7107,41 @@ static func standing_words(title: String) -> String:
 	return 'say "yes" to take it: %s' % title if not title.is_empty() else ""
 
 
+## The HUD's words while the local player lies dead (396 amended, ui's
+## side; Jeff's "not respawning"): who is bringing them back and where,
+## with the seconds left, "soon" when the wait is not known ([param
+## seconds] under 0); nobody named, the old respawn: "coming back: n s".
+static func return_words(by: String, where: String, seconds: int) -> String:
+	var when := ": %d s" % seconds if seconds >= 0 else " soon"
+	if by.is_empty():
+		return "coming back" + when
+	return "%s is bringing you back to %s%s" % [by, return_place_words(where), when]
+
+
+## The place's words for a return message's where: the kind of place.
+static func return_place_words(where: String) -> String:
+	match where:
+		"healers_hut":
+			return "the healer's hut"
+		"temple":
+			return "the temple"
+	return "a holy place"
+
+
+## The return line now: the message's seconds counted down on the client's
+## clock since it came; past zero, "soon" (the keeper may have stepped
+## away). "" with no message.
+func return_shown() -> String:
+	if _return_told.is_empty():
+		return ""
+	var seconds := int(_return_told.get("seconds", -1))
+	if seconds >= 0:
+		seconds = ceili(seconds - (Time.get_ticks_msec() / 1000.0 - _return_at))
+		if seconds <= 0:
+			seconds = -1
+	return return_words(str(_return_told.get("by", "")), str(_return_told.get("where", "")), seconds)
+
+
 ## The HUD's words while the local player lies downed (544, ui's side): the
 ## seconds left before they are gone for good, unless brought back.
 static func downed_words(seconds: int) -> String:
@@ -7362,6 +7402,11 @@ func _on_message(kind: String, data: Dictionary) -> void:
 	if kind == "builder":
 		if _builder_ui != null:
 			_builder_ui.on_message(data)
+		return
+	if kind == "return":
+		# 396 amended, ui's side: who brings the dead player back, where, in how long.
+		_return_told = data
+		_return_at = Time.get_ticks_msec() / 1000.0
 		return
 	if kind == "shop":
 		_on_shop_message(data)
@@ -9282,7 +9327,10 @@ func _on_world_ticked(tick: int) -> void:
 		return  # Another zone's tick: the HUD and the test hooks are this view's.
 	var player := _local_player()
 	var hp_text := "no player" if Net.mode == Net.Mode.SERVER else "dead, respawning"
+	if player == null and not _return_told.is_empty():
+		hp_text = return_shown()  # 396 amended, ui's side: who brings them back, in how long.
 	if player != null:
+		_return_told = {}  # Back.
 		hp_text = "HP %d/%d" % [player.hp, player.max_hp]
 		for kind: String in player.buffs:
 			var amount := float(player.buffs[kind][0])  # Speed as a share: "Quick 25%" (decision 562).
@@ -10820,6 +10868,13 @@ func _run_test_show(player: Player) -> void:
 			"downed":
 				if Net.is_authority():
 					World.lay_downed(player, 30 * World.TICK_RATE)  # 544, ui's side: the countdown on the HUD.
+			"return":
+				# 396 amended, ui's side: the dead player's line. The sample stands
+				# until economy's own message comes; the host's death path then runs.
+				_return_told = {"by": "Hob", "where": "healers_hut", "seconds": 58}
+				_return_at = Time.get_ticks_msec() / 1000.0
+				if Net.is_authority() and player != null:
+					World.despawn(player)
 			"channel":
 				if Net.is_authority():
 					var pet := _own_companion()

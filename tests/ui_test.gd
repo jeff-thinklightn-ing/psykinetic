@@ -482,6 +482,18 @@ func _test_revive_reads() -> void:
 	print("== downed and brought back, read on the HUD (544, ui's side) ==")
 	_check(Main.downed_words(12) == "You are down: 12 s" and Main.downed_words(-3) == "You are down: 0 s", "the countdown's words")
 	_check(Main.channel_words("Wren", 3) == "bringing Wren back: 3 s", "the channeler's words, with the name the client shows")
+	# 396 amended, ui's side: the dead player's line, who brings them back and in how long.
+	_check(Main.return_words("Hob", "healers_hut", 58) == "Hob is bringing you back to the healer's hut: 58 s"
+		and Main.return_words("Ned", "temple", -1) == "Ned is bringing you back to the temple soon"
+		and Main.return_words("", "", 2) == "coming back: 2 s" and Main.return_words("", "", -1) == "coming back soon",
+		"the return's words: the keeper, the place, the seconds or soon; the old respawn's coming back")
+	_main._return_told = {"by": "Hob", "where": "healers_hut", "seconds": 10}
+	_main._return_at = Time.get_ticks_msec() / 1000.0 - 3.2
+	_check(_main.return_shown() == "Hob is bringing you back to the healer's hut: 7 s", "the countdown runs on the client's clock (%s)" % _main.return_shown())
+	_main._return_at = Time.get_ticks_msec() / 1000.0 - 12.0
+	_check(_main.return_shown() == "Hob is bringing you back to the healer's hut soon", "past the seconds: soon")
+	_main._return_told = {}
+	_check(_main.return_shown() == "", "no message: nothing")
 	_check(is_zero_approx(Main.channel_fraction(100, 140, 100)) and is_equal_approx(Main.channel_fraction(100, 140, 120), 0.5)
 		and is_equal_approx(Main.channel_fraction(100, 140, 150), 1.0) and is_equal_approx(Main.channel_fraction(100, 100, 100), 1.0),
 		"the ring's course: from first seen to the end, clamped")

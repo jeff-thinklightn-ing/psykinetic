@@ -20095,3 +20095,33 @@ opens the map, for the shot.
 
 ui_test: a Town line kept for the map's box and not logged; a Server line
 still logged. Client only; protocol unchanged; no new class_name.
+
+## 396 amended, ui's side: the return read on the HUD
+
+Jeff on the box (2026-10-22): he died in the castle, was queued to be
+brought back at the healer's hut by Hob, and came back 70 s later; in
+between the screen said only "dead, respawning", so to him it was "not
+respawning". The coordinator's ask, approved as written: a HUD line from
+the death until the return, the way the downed countdown reads (544).
+
+- Economy's wire (396 amended, economy's side): a "return" message to the
+  dead player's peer, {by: the keeper's name, where: the place kind from
+  rules' return.places ("healers_hut", "temple"), seconds}, sent when the
+  return job opens, again when the keeper leaves (seconds -1) or comes
+  back, and on the give-up or where no place is manned ({"", "",
+  RESPAWN_TICKS / TICK_RATE}: the old respawn). A new kind in
+  MESSAGE_KINDS, a hash move without a bump.
+- ui reads it by name (Main._on_message "return": the message and the
+  client's clock when it came). While the local player is gone, the HUD's
+  state line reads, in place of "dead, respawning": "Hob is bringing you
+  back to the healer's hut: 58 s" (Main.return_words, return_place_words:
+  the place's name, not the keeper's sex), the seconds counted down on the
+  client's clock (Main.return_shown); past zero or at -1, "... soon";
+  nobody named, "coming back: 2 s". The line goes when the player's body is
+  back. No bar, the downed line's place and size (the diegetic rule).
+- The party log's line on the return stays as it is.
+- --test-show=return lays the sample line and lets the host's death path
+  run, for a shot after the windowed all-clear.
+
+ui_test: the words, the countdown on the client's clock, past zero, no
+message. Client only; protocol unchanged on this side; no new class_name.

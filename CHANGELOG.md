@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- While you lie dead the screen says who is bringing you back, where and in how long: "Hob is bringing you back to the healer's hut: 58 s", counting down; "soon" when the keeper has stepped away; "coming back: 2 s" where nobody can (396 amended, ui's side; the message is economy's).
 - F12's line in the talk log is now one short line, "screenshot saved: wilds_128-16_17h"; the full path is in the console (538 amended (2)).
 - The town's dole read-out no longer lands in the talk log: it shows dim on the big map's box for that area, under its places (353 amended (2); the words are economy's).
 - Dirt roads wind across the wilds from the castle, the hills and the forest to the waystone at the middle, the hills road crossing the river by the bridge (569).
