@@ -1,0 +1,121 @@
+{
+	"name": "Hall of Fallen Souls",
+	"outdoor": false,
+	"depth": 3,
+	"walls": "stone",
+	"floors": "stone",
+	"grave_goods": true,
+	"starts": [
+		[
+			50,
+			2
+		]
+	],
+	"spawn_points": {
+		"from_above": [
+			49,
+			2
+		],
+		"from_temple": [
+			49,
+			63
+		]
+	},
+	"links": [
+		{
+			"at": [
+				49,
+				1
+			],
+			"to_map": "barrow_deep",
+			"to_spawn": "from_below"
+		},
+		{
+			"at": [
+				49,
+				64
+			],
+			"to_map": "wilds",
+			"to_spawn": "from_barrow_shortcut",
+			"sealed": "draugr"
+		}
+	],
+	"entities": [
+		{
+			"at": [
+				49,
+				62
+			],
+			"name": "Draugr"
+		}
+	],
+	"regenerate": {
+		"generator": "labyrinth",
+		"style": "barrow",
+		"layer": 3,
+		"ways": 5,
+		"every_days": 3,
+		"anchors": [
+			{
+				"rect": [
+					46,
+					1,
+					8,
+					6
+				],
+				"name": "entrance"
+			},
+			{
+				"rect": [
+					34,
+					44,
+					32,
+					22
+				],
+				"name": "lair"
+			}
+		],
+		"entrance": "entrance",
+		"rooms": {
+			"count": [
+				10,
+				14
+			],
+			"size": [
+				[
+					10,
+					8
+				],
+				[
+					16,
+					12
+				]
+			]
+		},
+		"loops": 0.15,
+		"monsters": {
+			"skeleton": 6
+		},
+		"chests": 4
+	},
+	"stills": [
+		"barrow_deep",
+		"barrow"
+	],
+	"dead": {
+		"temper": "bold",
+		"sees_in_dark": true,
+		"graves": false
+	},
+	"damp": true,
+	"ambient": 0.03,
+	"legend": {
+		"monster_skeleton": "#d8d0b0",
+		"monster_skeleton_guard": "#988c64",
+		"monster_robber": "#8a5a2a",
+		"monster_draugr": "#5a4636"
+	},
+	"respawn_s": {
+		"skeleton": 600
+	}
+}

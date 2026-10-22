@@ -165,8 +165,11 @@ static func generate(level_name: String, generation: int) -> Dictionary:
 			continue
 		var height: Image = map.to_height_image() if made["height"] != null or not map.heights.is_empty() else null
 		var generated := generated_config(made["config"], anchors, generation)
-		generated["graves"] = graves_of(map, config)
-		generated["niches"] = niches_of(map, config, generated["graves"])
+		# The barrow's first layer (580) holds the robbers' halls, no dead and
+		# no tombs: it lists no graves and no niches.
+		var tombs := int(config.get("layer", 2)) != 1
+		generated["graves"] = graves_of(map, config) if tombs else []
+		generated["niches"] = niches_of(map, config, generated["graves"]) if tombs else []
 		return {"layout": map.to_image(), "height": height, "config": generated, "seed": seed, "tries": attempt + 1, "anchors": anchors}
 	push_warning("[regen] %s: no map of %d tries joined every anchor; the last one stands" % [level_name, TRIES])
 	return {}

@@ -2128,9 +2128,9 @@ func _test_niches() -> void:
 			{"floor": [Vector2i(1, 1)]}, warnings)
 	_check(parsed.size() == 1 and parsed[0]["out"] == Vector2i(0, 1) and parsed[0]["variant"] == 2 and warnings.size() == 3,
 			"niches read as {cell, out, variant}; a diagonal way out, a bad variant and no floor said and left out (%d)" % warnings.size())
-	var made := Regen.generate("barrow", 1)
+	var made := Regen.generate("barrow_deep", 1)  # The deep holds the tombs (580); the first layer lists no niches.
 	if made.is_empty():
-		_check(false, "the barrow generates")
+		_check(false, "the barrow's deep generates")
 		return
 	var level := Level.parse(made["layout"], made["height"], made["config"], made.get("relief"))
 	var niches: Array = level["terrain"].get("niches", [])

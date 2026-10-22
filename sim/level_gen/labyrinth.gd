@@ -38,7 +38,12 @@ extends RefCounted
 ## first, the rest in rooms and corridors), "chests": n (alcoves and blind
 ## ways first, then room corners), "crates": n (in rooms); barrow:
 ## "entrance": the anchor depth is counted from (the first unless named),
-## "near": {kind: anchor name}, a kind laid nearest that anchor first.
+## "near": {kind: anchor name}, a kind laid nearest that anchor first;
+## "layer" (580, the barrow in layers): 1 lays every room shallow (the
+## town's tombs: square chambers with doors and torches, no bands, no
+## caverns), 2 (the default) the tombs by depth, 3 every room deep (the
+## dark caverns: crooked ways, no doors, no torches); "ways": how wide a
+## way is carved, 3 (the default) or 5, an odd number of cells.
 
 const Tools := preload("res://sim/level_gen/gen_tools.gd")
 const DIRECTIONS: Array[Vector2i] = [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]
@@ -80,14 +85,16 @@ static func generate(template: LevelMap, config: Dictionary, seed: int) -> Level
 	var rooms := _place_rooms(map, anchors, config, old, rng, carved, depth)
 	nodes.append_array(rooms)
 	var corridors: Dictionary[Vector2i, bool] = {}
-	# Barrow: the ring round each shallow tomb, where a way narrows to its door.
+	# Barrow: the ring round each shallow tomb, where a way narrows to its
+	# door, as wide as the brush reaches.
+	var brush := _brush_of(config)
 	var tomb_rings: Array[Rect2i] = []
 	if not depth.is_empty():
 		for room in rooms:
 			if room["kind"] == "room":
-				tomb_rings.append((room["rect"] as Rect2i).grow(1))
+				tomb_rings.append((room["rect"] as Rect2i).grow(brush))
 	for way in _ways(nodes, config, rng):
-		_carve_way(map, template, anchors, nodes[way[0]], nodes[way[1]], old, rng, carved, corridors, depth, tomb_rings)
+		_carve_way(map, template, anchors, nodes[way[0]], nodes[way[1]], old, rng, carved, corridors, depth, tomb_rings, brush)
 	var ends := _blind_ways(map, anchors, rooms, corridors, old, rng, carved, depth)
 	Tools.join_up(map, anchors, carved)
 	if not old:
@@ -113,7 +120,14 @@ static func _depth_setup(map: LevelMap, anchors: Array, config: Dictionary) -> D
 	var far := 1
 	for corner: Vector2i in [Vector2i.ZERO, Vector2i(map.size.x - 1, 0), Vector2i(0, map.size.y - 1), map.size - Vector2i.ONE]:
 		far = maxi(far, Tools.distance(centre, corner))
-	return {"centre": centre, "far": far}
+	var layer := int(config.get("layer", 2))
+	return {"centre": centre, "far": far, "fixed_band": 0 if layer == 1 else (2 if layer == 3 else -1)}
+
+
+## How far the brush reaches each side of a way's path: "ways" cells wide
+## (3 unless said, 5 for the deep), so 1 or 2.
+static func _brush_of(config: Dictionary) -> int:
+	return clampi((int(config.get("ways", 3)) - 1) / 2, 1, 3)
 
 
 ## How deep [param point] lies, 0 at the entrance to 1 at the map's farthest
@@ -126,6 +140,8 @@ static func _depth_of(depth: Dictionary, point: Vector2i) -> float:
 
 ## The band [param point] lies in: 0 shallow, 1 middle, 2 deep.
 static func _band_of(depth: Dictionary, point: Vector2i) -> int:
+	if int(depth.get("fixed_band", -1)) >= 0:
+		return int(depth["fixed_band"])  # 580: layer 1 all shallow, layer 3 all deep.
 	var d := _depth_of(depth, point)
 	return 0 if d < Regen.BANDS[0] else (1 if d < Regen.BANDS[1] else 2)
 
@@ -334,7 +350,7 @@ static func _ways(nodes: Array[Dictionary], config: Dictionary, rng: RandomNumbe
 ## corridor cells (torches, monsters and blind ways go by the centre).
 static func _carve_way(map: LevelMap, template: LevelMap, anchors: Array, a: Dictionary, b: Dictionary, old: bool,
 		rng: RandomNumberGenerator, carved: Dictionary[Vector2i, bool], corridors: Dictionary[Vector2i, bool], depth: Dictionary,
-		tomb_rings: Array[Rect2i] = []) -> void:
+		tomb_rings: Array[Rect2i] = [], brush := 1) -> void:
 	var exit: Variant = _exit(map, template, anchors, a, b["centre"])
 	var entry: Variant = _exit(map, template, anchors, b, a["centre"])
 	if exit == null or entry == null:
@@ -362,7 +378,7 @@ static func _carve_way(map: LevelMap, template: LevelMap, anchors: Array, a: Dic
 			var beside := cell + (Vector2i(0, 1) if step.x != 0 else Vector2i(1, 0))
 			_carve_corridor(map, anchors, beside, carved, corridors)
 		if barrow:
-			_carve_brush(map, anchors, cell, carved, tomb_rings)
+			_carve_brush(map, anchors, cell, carved, tomb_rings, brush)
 		last = cell
 	if not crooked:
 		for end: Array in [[a, exit], [b, entry]]:
@@ -374,20 +390,33 @@ static func _carve_way(map: LevelMap, template: LevelMap, anchors: Array, a: Dic
 			node["doors"].append(inside)
 
 
-## The eight cells round [param cell] carved (541 amended: a way three
-## wide), never the map's rim, an anchor, or a shallow tomb's ring
-## [param tomb_rings] (its door cell alone leads in). Not corridor cells.
-static func _carve_brush(map: LevelMap, anchors: Array, cell: Vector2i, carved: Dictionary[Vector2i, bool], tomb_rings: Array[Rect2i]) -> void:
-	for dy in range(-1, 2):
-		for dx in range(-1, 2):
-			if dx == 0 and dy == 0:
-				continue
-			var at := cell + Vector2i(dx, dy)
-			if at.x <= 0 or at.y <= 0 or at.x >= map.size.x - 1 or at.y >= map.size.y - 1 or not Tools.rock(map, anchors, at):
-				continue
-			if tomb_rings.any(func(ring: Rect2i) -> bool: return ring.has_point(at)):
-				continue
-			Tools.carve(map, at, carved)
+## The cells within [param brush] of [param cell] carved (541 amended: a
+## way three wide; 580: five on the deep), never the map's rim, an anchor,
+## or a shallow tomb's ring [param tomb_rings] (its door cell alone leads
+## in). Not corridor cells.
+static func _carve_brush(map: LevelMap, anchors: Array, cell: Vector2i, carved: Dictionary[Vector2i, bool], tomb_rings: Array[Rect2i],
+		brush := 1) -> void:
+	# Ring by ring out from the path cell, a cell carved only beside one
+	# already floor nearer in: a wider brush never leaves a cell cut off
+	# behind a tomb's ring or an anchor's wall (580).
+	for r in range(1, brush + 1):
+		for dy in range(-r, r + 1):
+			for dx in range(-r, r + 1):
+				if maxi(absi(dx), absi(dy)) != r:
+					continue
+				var at := cell + Vector2i(dx, dy)
+				if at.x <= 0 or at.y <= 0 or at.x >= map.size.x - 1 or at.y >= map.size.y - 1 or not Tools.rock(map, anchors, at):
+					continue
+				if tomb_rings.any(func(ring: Rect2i) -> bool: return ring.has_point(at)):
+					continue
+				var joined := false
+				for direction in DIRECTIONS:
+					var near := at + direction
+					if maxi(absi(near.x - cell.x), absi(near.y - cell.y)) < r and map.walkable(near) and not Level.in_anchors(anchors, near):
+						joined = true
+						break
+				if joined:
+					Tools.carve(map, at, carved)
 
 
 static func _carve_corridor(map: LevelMap, anchors: Array, cell: Vector2i, carved: Dictionary[Vector2i, bool],

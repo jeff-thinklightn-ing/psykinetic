@@ -950,43 +950,68 @@ func _test_barrow_won() -> void:
 
 
 func _test_barrow_level() -> void:
-	print("
-== levels/barrow (decision 542): the real barrow, marked to regenerate; a test run never writes it ==")
+	print("\n== levels/barrow, barrow_deep, barrow_lair (decisions 542, 580): the barrow in layers; a test run never writes them ==")
 	var barrow := Level.load_level("barrow")
-	_check(barrow["display_name"] == "The Barrow" and barrow["size"] == Vector2i(72, 60) and barrow["warnings"].is_empty(),
-		"The Barrow, 72 x 60 (541 amended), parses with no warning (%s)" % [barrow["warnings"]])
-	_check(Regen.marked("barrow") and Regen.config_of("barrow")["anchors"].size() == 6 and Regen.config_of("barrow")["style"] == "barrow",
-		"marked to regenerate in the barrow style, six anchors")
+	var deep := Level.load_level("barrow_deep")
+	var lair := Level.load_level("barrow_lair")
+	_check(barrow["display_name"] == "The Barrow" and barrow["size"] == Vector2i(80, 60) and barrow["warnings"].is_empty(),
+		"The Barrow, 80 x 60 (580), parses with no warning (%s)" % [barrow["warnings"]])
+	_check(deep["display_name"] == "The Ossuary" and deep["size"] == Vector2i(100, 80) and deep["warnings"].is_empty()
+		and lair["display_name"] == "Hall of Fallen Souls" and lair["size"] == Vector2i(100, 80) and lair["warnings"].is_empty(),
+		"the Ossuary and the Hall of Fallen Souls, 100 x 80 each, parse with no warning (%s %s)" % [deep["warnings"], lair["warnings"]])
+	_check(Regen.marked("barrow") and Regen.config_of("barrow")["anchors"].size() == 4 and int(Regen.config_of("barrow").get("layer", 0)) == 1
+		and Regen.marked("barrow_deep") and Regen.config_of("barrow_deep")["anchors"].size() == 2 and int(Regen.config_of("barrow_deep").get("layer", 0)) == 2
+		and Regen.marked("barrow_lair") and Regen.config_of("barrow_lair")["anchors"].size() == 2 and int(Regen.config_of("barrow_lair").get("layer", 0)) == 3
+		and int(Regen.config_of("barrow").get("ways", 0)) == 5 and int(Regen.config_of("barrow_deep").get("ways", 0)) == 5 and int(Regen.config_of("barrow_lair").get("ways", 0)) == 5,
+		"all three layers are marked to regenerate in the barrow style, layers 1, 2 and 3, every way five wide (Jeff: two tiles wider than the walls)")
 	var kinds := {}
-	for spec: Dictionary in barrow["entities"]:
-		var kind := str(spec.get("kind", spec["name"].rstrip("0123456789").to_lower()))
-		kinds[kind] = int(kinds.get(kind, 0)) + 1
-	_check(kinds.get("skeleton_guard", 0) == 2 and kinds.get("draugr", 0) == 1 and kinds.get("altar", 0) == 1 and kinds.get("runner's pack", 0) == 1 and barrow["places"].has("niche"),
-		"two skeleton guards in the altar room (541 amended), the draugr in his lair, the altar and the runner's pack, Pip's niche (%s)" % [kinds])
-	# Grave goods (555, dungeon's side): the level key marks the altar, the
-	# guards and the draugr; the runner's pack, a robber's, is exempt by its entry.
 	var grave_marked := {}
 	var guards_marked := 0
-	for spec: Dictionary in barrow["entities"]:
-		var marked: bool = spec.get("props", {}).get("grave", false) == true
-		grave_marked[spec["name"]] = marked
-		if str(spec.get("kind", "")) == "skeleton_guard" and marked:
-			guards_marked += 1
+	for level: Dictionary in [barrow, deep, lair]:
+		for spec: Dictionary in level["entities"]:
+			var kind := str(spec.get("kind", spec["name"].rstrip("0123456789").to_lower()))
+			kinds[kind] = int(kinds.get(kind, 0)) + 1
+			# Grave goods (555, dungeon's side): the level key marks the altar,
+			# the guards and the draugr; the runner's pack, a robber's, is exempt.
+			var marked: bool = spec.get("props", {}).get("grave", false) == true
+			grave_marked[spec["name"]] = marked
+			if kind == "skeleton_guard" and marked:
+				guards_marked += 1
+	_check(kinds.get("skeleton_guard", 0) == 2 and kinds.get("draugr", 0) == 1 and kinds.get("altar", 0) == 1 and kinds.get("runner's pack", 0) == 1
+		and barrow["places"].has("niche") and barrow["entities"].size() == 4 and deep["entities"].is_empty() and lair["entities"].size() == 1,
+		"the altar with its two guards, Pip's niche and the Runner's pack on the first layer, nothing kept in the Ossuary, the draugr in his hall (%s)" % [kinds])
 	_check(grave_marked.get("Altar", false) and grave_marked.get("Draugr", false) and not grave_marked.get("Runner's pack", true) and guards_marked == 2,
 		"grave_goods marks the altar, the guards and the draugr as grave goods, the runner's pack exempt (%s)" % [grave_marked])
-	_check(barrow["links"].size() == 2 and barrow["links"][1]["sealed"] == "draugr" and barrow["links"][1]["to_spawn"] == "from_barrow_shortcut"
-		and barrow["spawn_points"].has("from_wilds") and barrow["spawn_points"].has("from_temple"),
-		"the way up and the sealed shortcut, with the spawn points the wilds come in by")
+	_check(barrow["links"].size() == 2 and barrow["links"][0]["to_map"] == "wilds" and barrow["links"][1]["to_map"] == "barrow_deep" and barrow["links"][1]["to_spawn"] == "from_above"
+		and deep["links"].size() == 2 and deep["links"][0]["to_map"] == "barrow" and deep["links"][0]["to_spawn"] == "from_below" and deep["links"][1]["to_map"] == "barrow_lair"
+		and lair["links"].size() == 2 and lair["links"][0]["to_map"] == "barrow_deep" and lair["links"][1]["sealed"] == "draugr" and lair["links"][1]["to_spawn"] == "from_barrow_shortcut",
+		"the stairs link the layers both ways, and the temple's sealed shortcut ends behind the draugr's throne")
+	var floor_ok := true
+	for pair: Array in [[barrow, "from_wilds"], [barrow, "from_below"], [deep, "from_above"], [deep, "from_below"], [lair, "from_above"], [lair, "from_temple"]]:
+		var level: Dictionary = pair[0]
+		if not level["spawn_points"].has(pair[1]) or not level["terrain"]["floor"].has(level["spawn_points"][pair[1]]):
+			floor_ok = false
+	var wilds := Level.load_level("wilds")
+	var shortcut: Array = wilds["links"].filter(func(l: Dictionary) -> bool: return l["to_spawn"] == "from_temple")
+	_check(floor_ok and shortcut.size() == 1 and shortcut[0]["to_map"] == "barrow_lair" and shortcut[0]["sealed"] == "draugr",
+		"every spawn point the stairs and the wilds come in by is floor; the wilds' sealed shortcut leads to the draugr's hall")
+	_check(Level.template_config("barrow_lair").get("stills", []) == ["barrow_deep", "barrow"] and Regen.config_of("barrow_lair")["anchors"][1]["name"] == "lair",
+		"the draugr's hall is his lair anchor, and the level names the Ossuary whose dead he stills (enemy-ai's)")
 	var made := Regen.generate("barrow", 1)
-	_check(not made.is_empty() and Regen.connected(LevelMap.from_image(made["layout"], made["config"]), made["anchors"]),
-		"a generation is laid and joins every anchor (%d tries)" % made.get("tries", 0))
+	var made_deep := Regen.generate("barrow_deep", 1)
+	var made_dark := Regen.generate("barrow_lair", 1)
+	_check(not made.is_empty() and Regen.connected(LevelMap.from_image(made["layout"], made["config"]), made["anchors"])
+		and not made_deep.is_empty() and Regen.connected(LevelMap.from_image(made_deep["layout"], made_deep["config"]), made_deep["anchors"])
+		and not made_dark.is_empty() and Regen.connected(LevelMap.from_image(made_dark["layout"], made_dark["config"]), made_dark["anchors"]),
+		"a generation of each layer is laid and joins every anchor (%d, %d and %d tries)" % [made.get("tries", 0), made_deep.get("tries", 0), made_dark.get("tries", 0)])
 	_check(not Net.regenerate and not Regen.may_write() and not _main._regenerate_if_due("barrow") and not Level.overlaid("barrow"),
 		"off unless the server runs --regenerate: nothing is laid, the barrow stays its template")
 	_check(_main.admin_command("regenerate on") == "regenerate on: the shifting levels are laid again when due" and Net.regenerate, "the console switches it on")
 	_check(Regen.in_test_run() and not Regen.may_write() and not _main._regenerate_if_due("barrow") and not Level.overlaid("barrow"),
 		"and even on, a test run on the shared overlay writes nothing there")
 	var listed: String = _main.admin_command("regenerate")
-	_check(listed.begins_with("regenerate on") and "barrow: generation 0, every 3 days" in listed, "the console lists the marked levels (%s)" % listed.replace("\n", "; "))
+	_check(listed.begins_with("regenerate on") and "barrow: generation 0, every 3 days" in listed and "barrow_deep: generation 0, every 3 days" in listed
+		and "barrow_lair: generation 0, every 3 days" in listed, "the console lists all three layers (%s)" % listed.replace("\n", "; "))
 	_check(_main.admin_command("regenerate off").begins_with("regenerate off") and not Net.regenerate, "and switches it off")
 	_check(_main.admin_command("regenerate now barrow") == "regenerate now: refused in a test run on the shared overlay" and not Level.overlaid("barrow"),
 		"regenerate now (541 amended) is refused in a test run on the shared overlay: the barrow stays its template")

@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The barrow is three levels now (580, Jeff: "crypt is still too cramped"): the first hall under the mound with its burial table and the town's dead in the wall niches, the altar room and the town's tombs off it, and the robbers' camp; a stair down to the Ossuary, the ancient dead's tombs; and below that the dark caverns of the oldest dead and the Hall of Fallen Souls, where the draugr sits his throne with the temple's hidden way out behind it. Every way is five cells clear and the rooms are bigger (Jeff: "halls need to be at least 2 tiles wider than the walls"). The hidden door, the hall's furnishings, the dark and the ghostly warriors follow in their own steps; the box takes the new shape at the deploy.
 - Swinging tires you (597): every swing costs stamina, more for heavier weapons and for lighter builds, more still when it hits nothing; run out and you are winded until you have caught your breath: slower on your feet, blows at half damage and pushing weakly, no shield bash. Monsters don't tire yet.
 - Out of breath after too many swings, the top line says "winded" until you have some wind back; no bar, the body and the breath say the rest (597, ui's side; the stamina costs are combat's).
 - The HP number is gone from the top of the screen: how hurt you are reads from your body and the grey, as the no-bars rule says; F3 still has the number (401 amended).

@@ -368,7 +368,7 @@ func _test_castle_never_marked() -> void:
 	for level_name in Level.names():
 		if not level_name.begins_with("rg_") and Regen.marked(level_name):
 			marked.append(level_name)
-	_check(marked == ["barrow"], "under levels/ the barrow alone is, Jeff's starter dungeon (542) (%s)" % [marked])
+	_check(marked == ["barrow", "barrow_deep", "barrow_lair"], "under levels/ the barrow's three layers alone are, Jeff's starter dungeon (542, 580) (%s)" % [marked])
 
 
 func _test_regenerate_now() -> void:

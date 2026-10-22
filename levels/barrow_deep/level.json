@@ -1,0 +1,101 @@
+{
+	"name": "The Ossuary",
+	"outdoor": false,
+	"depth": 2,
+	"walls": "stone",
+	"floors": "stone",
+	"grave_goods": true,
+	"starts": [
+		[
+			50,
+			2
+		]
+	],
+	"spawn_points": {
+		"from_above": [
+			49,
+			2
+		],
+		"from_below": [
+			69,
+			43
+		]
+	},
+	"links": [
+		{
+			"at": [
+				49,
+				1
+			],
+			"to_map": "barrow",
+			"to_spawn": "from_below"
+		},
+		{
+			"at": [
+				70,
+				43
+			],
+			"to_map": "barrow_lair",
+			"to_spawn": "from_above"
+		}
+	],
+	"entities": [],
+	"regenerate": {
+		"generator": "labyrinth",
+		"style": "barrow",
+		"layer": 2,
+		"ways": 5,
+		"every_days": 3,
+		"anchors": [
+			{
+				"rect": [
+					46,
+					1,
+					8,
+					6
+				],
+				"name": "entrance"
+			},
+			{
+				"rect": [
+					67,
+					40,
+					6,
+					6
+				],
+				"name": "stair"
+			}
+		],
+		"entrance": "entrance",
+		"rooms": {
+			"count": [
+				10,
+				14
+			],
+			"size": [
+				[
+					8,
+					7
+				],
+				[
+					16,
+					12
+				]
+			]
+		},
+		"loops": 0.15,
+		"monsters": {
+			"skeleton": 6
+		},
+		"chests": 5
+	},
+	"legend": {
+		"monster_skeleton": "#d8d0b0",
+		"monster_skeleton_guard": "#988c64",
+		"monster_robber": "#8a5a2a",
+		"monster_draugr": "#5a4636"
+	},
+	"respawn_s": {
+		"skeleton": 600
+	}
+}

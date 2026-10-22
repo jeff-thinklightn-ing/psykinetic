@@ -515,17 +515,60 @@ generator's own and passed as written. `tools/plan_sheet.tscn` draws a
 generation large, the anchors outlined (`--level=<name>` or
 `--sample=dwarven|old|barrow`, `--generation=n`, `--out=<png>`).
 
-The first real level that regenerates is `levels/barrow`, "The Barrow"
-(decision 542, Jeff's crypt page: the starter dungeon, a mound a little
-outside the town): 72 x 60 (541 amended; 44 x 36 before), the barrow style
-every 3 days, rooms 5 x 5 to 8 x 7, five anchors
-kept through every generation: the entrance vestibule under the mound's
-door (the link up to the wilds' "from_barrow", the spawn point
-"from_wilds"), the altar room with the altar and the hidden passage leaving
-its east wall through a door, the passage, the draugr's lair (a brute
-stands in for him until enemy-ai's draugr; the spawn point "from_temple"),
-and the shortcut's nook with the link to the wilds' "from_barrow_shortcut",
-sealed `draugr` (540). The wilds hold the other ends (maps' side of 542).
+The first real levels that regenerate are the barrow's three layers
+(decision 580, Jeff's "crypt is still too cramped" and his answers on what
+each holds; 542 and 541 amended before it), one place to the players, the
+Barrow of the Fallen, three zones to the server, each laid again on its own
+in the barrow style every 3 days, every way five cells clear and every room
+8 x 7 or more (Jeff: "halls need to be at least 2 tiles wider than the
+walls"; a wall draws 0.5 m thick and 3 m tall, and across the camera's view
+hides about 2.5 cells behind it). The templates are written from
+`tools/plan_sheet`'s samples (`sample_barrow`, `sample_barrow_deep`,
+`sample_barrow_lair`), their twins.
+
+- `levels/barrow`, "The Barrow", 80 x 60, `"layer": 1` (every room shallow:
+  the town's newer tombs, square chambers with doors and torches): four
+  anchors kept through every generation: the first hall under the mound's
+  door (26 x 16: the link up to the wilds' "from_barrow", the spawn point
+  "from_wilds", the burial table a block of rock at its centre, seven
+  niches a side in its east and west walls holding the town's dead as
+  props, a bay each side where the ways come in, and the stair down to the
+  Ossuary in its south-east niche, the link to "from_above"; the hidden
+  door of step 2 moves it each generation), the altar room (18 x 14, the
+  altar and its two skeleton guards), Pip's niche off its west side (the
+  place `barrow/niche`, npc's), and the robbers' camp (10 x 8) with the
+  Runner's pack. The robbers (4) are sent near the altar; no dead walk it,
+  and the generated level.json lists no graves and no niches for it.
+- `levels/barrow_deep`, "The Ossuary", 100 x 80, `"layer": 2` (the tombs
+  by depth): the ancient dead the town moved down, walking home (6
+  skeletons) through the galleries, the graves and niches as before. Two
+  anchors: the stair foot at the top (the link back up to "from_below")
+  and the stair room at the far side with the stair down (the link to the
+  hall's "from_above", "from_below" beside it).
+- `levels/barrow_lair`, "Hall of Fallen Souls", 100 x 80, `"layer": 3`
+  (every room deep: caverns, crooked ways, no doors, no torches; `"damp":
+  true` and `"ambient"` 0.03: no flame burns well there and the dark is
+  near total, environment's sim and terrain's look): the oldest
+  dead (6 skeletons) and, kept whole as the anchor `lair` (548's room he
+  keeps), the hall itself, 32 x 22, walled all round but for one door cell
+  in its north wall: six pillars 2 x 2 in two rows and the round table at
+  its middle (rock in step 1; art-kit's pieces, chairs and broken tables in
+  step 3), the dais at the far end with the draugr on his throne, and the
+  hidden exit behind the throne, the temple's sealed shortcut's end (540,
+  `draugr`, the spawn point "from_temple"). The level's `"stills":
+  ["barrow_deep", "barrow"]` names the zones whose dead he stills when laid
+  to rest, and its `"dead"` key how the oldest dead differ (bold, seeing the
+  living in the dark, lying in no grave): enemy-ai's.
+
+Each layer's level.json carries `"depth"` (1, 2, 3 going down; the surface
+is 0): maps' zone-transition cues draw a link to a deeper level as a stair
+down and to a shallower one as a stair up from it. The block's `"layer"` and `"ways"` (3 or 5, an odd width) are the barrow
+style's own keys (`sim/level_gen/labyrinth.gd`): the brush of 541 amended
+reaches two cells each side for five, carved ring by ring so a cell is
+only carved beside one already floor nearer in (a wider brush once left
+cells cut off behind a tomb's ring). The wilds hold the mound's door and
+the shortcut's other end (maps' side of 542; the shortcut's `to_map` is
+`barrow_lair`).
 Levels regenerate only on a server started with `--regenerate` (as raid
 groups with `--raids`, decision 328) or after the console's `regenerate on`
 (`regenerate` alone lists the marked levels and their generations); the

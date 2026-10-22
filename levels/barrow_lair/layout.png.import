@@ -1,0 +1,14 @@
+[remap]
+
+importer="image"
+type="Image"
+uid="uid://k3navdudlwe"
+path="res://.godot/imported/layout.png-af6dd57d0904f27293c4c0c846f7e817.image"
+
+[deps]
+
+source_file="res://levels/barrow_lair/layout.png"
+dest_files=["res://.godot/imported/layout.png-af6dd57d0904f27293c4c0c846f7e817.image"]
+
+[params]
+

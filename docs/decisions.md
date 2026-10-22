@@ -21429,3 +21429,84 @@ tests/combat_test (no port: World stepped by hand): the rules file, the
 cost table, paid on a blow, a whiff and a wind-up, whiffs till winded,
 half damage, 1.5 times the step, no bash, the 20-tick wait, back at 25, a
 monster's switch. No new class_name.
+
+
+## 580. The barrow in layers: the town's tombs, the Ossuary, the dark below and the Hall of Fallen Souls
+
+Jeff after v0.1.163: "crypt is still too cramped.. its okay if its not
+realistic, make the first room a large room with a burial table, slots in
+the walls with ancient skeletons, these don't need to be animated. there
+would be a hidden door that leads to deeper much larger structures... at
+least 2-3 layers down.. its ancient and mysterious not built by the town,
+the grave robbers are on the first layer, the undead on the second, and
+finally the draugr has his own boss room that is large with room to
+maneuver and use strategic positioning"; his answers to lore (the top floor
+the newer dead, the wealthy's, rooms off the altar room; the ancient dead
+moved to the second layer, the Ossuary; the oldest dead moved to a third,
+damp and dark, too moist to light lamps, angry and animated by the draugr;
+his hall the Hall of Fallen Souls, a castle hall with a round table, pillars,
+broken tables, the hidden exit behind the throne, filled with ghostly
+warriors; the plunder the robbers', not the town's); and his width rule
+("halls need to be at least 2 tiles wider than the walls, this is because
+otherwise all you see is wall... the gameplay is the top priority").
+Dungeon led the design (C:\dev\review\dungeon\barrow_layers_design.md),
+the coordinator approved it and the rework on his answers; realism gives
+way to play. Sides: maps', art-kit's (the pieces, 2b9066b2), enemy-ai's
+(the foes by layer, the rest by zone), lore's, npc's, terrain's and
+environment's (the dark level's light), economy's (the robbers' gold).
+This is dungeon's side, step 1: the levels.
+
+- Three levels, one place: `barrow` (layer 1, 80 x 60: the first hall under
+  the mound with the burial table and 14 niches, the altar room with its
+  guards and Pip's niche, the robbers' camp with the Runner's pack, the
+  town's tombs between), `barrow_deep` (layer 2, 100 x 80, the Ossuary: the
+  ancient dead's tombs and graves, 6 skeletons), `barrow_lair` (layer 3,
+  100 x 80, the dark caverns of the oldest dead with the Hall of Fallen
+  Souls kept whole as the anchor `lair`: pillars, the round table, the
+  dais with the draugr on his throne, the temple's sealed shortcut ending
+  behind it). Each regenerates on its own every 3 days (465); stairs link
+  them (links to "from_above", back to "from_below"); the wilds' shortcut
+  link's `to_map` is `barrow_lair`. The old 72 x 60 barrow goes; a player
+  saved in it lands on the nearest free floor of the new one.
+- The barrow style's knobs (labyrinth.gd): `"layer"` 1 lays every room
+  shallow (the town's chambers with doors and torches), 2 the tombs by
+  depth as before, 3 every room deep (caverns, crooked ways, no doors, no
+  torches); `"ways"` 3 or 5, the brush's reach, carved ring by ring so a
+  cell is carved only beside one already floor nearer in (a wider brush
+  left two cells cut off behind a tomb's ring in a test generation); a
+  shallow tomb's ring grows with the brush, so its one door cell still
+  leads in. Regen lists no graves and no niches for layer 1 (no dead walk
+  it). Widths settled: five clear cells on every layer and rooms 8 x 7 to
+  16 x 12 (terrain: a wall is 0.5 m thick, 3 m tall, and hides about 2.5
+  cells behind it across the view at the camera's pitch; a game shot down a
+  way checks it, and a near-wall lowering in levels is terrain's design if
+  it still reads as wall).
+- `tools/plan_sheet`: the three samples are the templates' twins
+  (`sample_barrow`, `sample_barrow_deep`, `sample_barrow_lair`; the real
+  levels are written from them); `--level=` draws a level that does not
+  regenerate as it stands, its own "anchors" outlined.
+- The templates carry what the other sides read: `"respawn_s"` by level
+  (robbers 300 and guards 600 on `barrow`, skeletons 600 below),
+  `"stills": ["barrow_deep", "barrow"]` on `barrow_lair` (the altar's guards
+  are dead too) and its `"dead": {"temper": "bold", "sees_in_dark": true,
+  "graves": false}` for the oldest dead (enemy-ai's reading: they hold
+  nothing back, see the living by life not light, and lie in no grave), its
+  `"damp": true` with `"ambient"` 0.03 (the coordinator's ruling on terrain's
+  key: no flame burns well there, lanterns reach half as far, the look near
+  black; environment's sim and terrain's look), the
+  `lair` anchor in its regenerate block (Monster.room_of), `"grave_goods":
+  true` on all three.
+- Steps to come, each a landing: the hidden door (a `hidden` link, the
+  zone's `found`, the niche's lines, the crack's marker, the "map"
+  message's `found`: a revision line), the halls dressed (the table and
+  pillars as building kinds, the dais raised, the niche variants), then
+  enemy-ai's foes by layer and the ghost warriors, the dark level's light,
+  lore's rows, npc's pack level, economy's robbers' gold, maps' pauper's
+  graves; shots of each, then the box by `regenerate now` for the three.
+
+labyrinth_test (the three layers: the first hall's shape, all shallow, by
+depth, all deep; the widths; the hall kept), level_test (the three levels,
+the links and spawn points, the wilds' shortcut, the console listing all
+three), regen_test (the marked list), view_test (the Ossuary's niches).
+Level data both sides read: ships in a full cut only; protocol unchanged;
+no new class_name.
