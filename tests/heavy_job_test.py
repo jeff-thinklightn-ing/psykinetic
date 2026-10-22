@@ -329,11 +329,15 @@ began = time.time()
 code = gate.run("idle", "bench", sleeper)
 check(code == gate.STOPPED_CODE and time.time() - began < 30, "idle the whole window: stopped as hung, exit 5 (got %s after %.0f s)" % (
     code, time.time() - began))
-code = gate.run("busy", "bench", [sys.executable, "-c", "import time\nend = time.time() + 8\nwhile time.time() < end: pass"])
+# A wider window for the busy one: a 4 s window can be mostly the child's
+# own start on a loaded machine (lore's landing beside an import, 688 s,
+# 2026-10-21: stopped as hung with nothing wrong).
+gate.HUNG_SECONDS = 10.0
+code = gate.run("busy", "bench", [sys.executable, "-c", "import time\nend = time.time() + 20\nwhile time.time() < end: pass"])
 check(code == 0, "busy the whole window: left to finish (got %s)" % code)
 gate.HUNG_SECONDS = real_window
 runs = gate.kinds()["bench"].get("runs_s", [])
-check(runs and runs[-1] >= 7.0, "a clean run's time recorded for the kind's limit: %s" % runs)
+check(runs and runs[-1] >= 19.0, "a clean run's time recorded for the kind's limit: %s" % runs)
 with open(gate._path("heavy_jobs.log")) as log:
     text = log.read()
 check("\toverrun\tslow\tbench\t" in text and "\thung\tidle\tbench\t" in text, "the log says overrun and hung")
