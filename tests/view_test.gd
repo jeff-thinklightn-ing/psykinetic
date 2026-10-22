@@ -1827,6 +1827,25 @@ func _test_relief() -> void:
 	_check(curtain_rows >= (Client3D.CURTAIN_ROWS + 1) * 3 and curtain_top - curtain_foot > 2.5 and curtain_wrong == 0 and dry_under == 0,
 			"a 3 m step down the stream hangs a curtain from its lip to the water below (%d points, %.2f m tall; wrong: %d), its surface never far under its bed (%d)" % [curtain_rows, curtain_top - curtain_foot, curtain_wrong, dry_under])
 	_rig.rebuild(hills["terrain"], hills["centre"])
+	# Mist at each tall fall's foot (570 amended, terrain's side): one
+	# emitter a curtain, its puffs capped, on the water at the foot; none
+	# where there is no tall fall (the sample).
+	var curtains := 0
+	for ribbon: MeshInstance3D in _rig._stream_ribbons:
+		var uvs: PackedVector2Array = (ribbon.mesh as ArrayMesh).surface_get_arrays(0)[Mesh.ARRAY_TEX_UV]
+		var rows := 0
+		for uv in uvs:
+			rows += 1 if uv.y >= 0.5 else 0
+		curtains += rows / ((Client3D.CURTAIN_ROWS + 1) * 3)
+	var misty := _rig._mists.size() == curtains and curtains > 0
+	for mist: GPUParticles3D in _rig._mists:
+		var near_foot := _rig._fall_feet.any(func(foot: Dictionary) -> bool: return (foot["at"] as Vector3).distance_to(mist.position) < 0.5)
+		misty = misty and mist.amount <= Client3D.MIST_PUFFS and near_foot and mist.is_inside_tree()
+	var sample_level := Level.load_level("sample")
+	_rig.rebuild(sample_level["terrain"], sample_level["centre"])
+	var none_without := _rig._mists.is_empty()
+	_rig.rebuild(hills["terrain"], hills["centre"])
+	_check(misty and none_without, "mist at each tall fall's foot, %d puffs at most (%d curtains, %d mists), none without a fall (%s)" % [Client3D.MIST_PUFFS, curtains, _rig._mists.size(), none_without])
 	_rig.rebuild(hills["terrain"], hills["centre"])
 	# Its banks: within a walk of the water a grassy slope into it, no face;
 	# a face only where the land stands a cliff over it.

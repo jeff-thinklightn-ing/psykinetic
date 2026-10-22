@@ -20511,3 +20511,32 @@ Level data, protocol unchanged (no new field); a full cut.
 
 tests/relief_test: the hills' river and the fall's stream; a fall off the
 plateau's cliff over 5 m into a pool of water at its foot's level.
+
+## 570 amended, terrain's side: mist at a tall fall's foot
+
+The coordinator's next small step after the curtain: "a few soft
+particles in the pool's churn, cheap, nothing on levels without a fall".
+
+- _build_curve_ribbon notes each curtain's foot (_fall_feet: where it
+  meets the water, across, down the stream, its width and drop).
+- _build_mists puts one GPUParticles3D at each: soft round billboard
+  puffs (a radial gradient texture, proximity-faded where they meet the
+  water and the face) rising from across the foot and drifting down the
+  stream, swelling and fading over MIST_SECONDS. At most MIST_PUFFS (24)
+  a fall, fewer for a drop under MIST_FULL (6 m), at least 6. No shadows.
+- Lit as the scene is (Lambert wrap, no specular): unshaded, it glowed
+  white at dusk.
+- None where there is no tall fall: no emitter, nothing per frame.
+
+Shots in C:/dev/review/mist (the hills' fall at noon, 16:00 and dusk,
+before and after). Cost: map_bench at the fall, alternated with main,
+twice: frame median 34.4/34.4 ms before, 35.6/35.5 after. But every view
+on every commit ran about 33 ms that hour (main before 570, the bridge,
+the west; 1.2 ms on the same views that morning) with no change to frame
+pacing on main: a 30 fps cap from the machine (its display asleep, it
+seems), so the difference is not a measure. The emitter is one draw of at
+most 24 quads; a re-bench when the display wakes is owed.
+
+view_test _test_relief: one mist a curtain on the hills, its puffs capped,
+at its foot; none on the sample. Client only, protocol unchanged, no new
+class_name.

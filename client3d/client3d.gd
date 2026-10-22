@@ -242,6 +242,14 @@ const RIBBON_UNDER := 0.3
 ## the stream; a shorter one is a white slope.
 const FALL_TALL := 1.0
 const CURTAIN_ROWS := 4
+## Mist at a tall fall's foot (570 amended, terrain's side, _build_mists):
+## at most MIST_PUFFS soft puffs a fall, drifting up and down the stream
+## from the churn, each MIST_SIZE across, lasting MIST_SECONDS; a fall
+## MIST_FULL tall or more has them all, a shorter one fewer.
+const MIST_PUFFS := 24
+const MIST_SIZE := 1.1
+const MIST_SECONDS := 2.6
+const MIST_FULL := 6.0
 const FALL_LEAST := 0.25
 ## The ledges' rims (decision 556, _rim_band): sampled RIM_RES a side; each
 ## stands out RIM_LEAST to RIM_MOST of a cell from the higher cells (never
@@ -1396,6 +1404,11 @@ var _relax_heights: Dictionary[Vector2i, float] = {}
 var _relax_flips: Dictionary[Vector2i, bool] = {}
 var _relax_quads: Dictionary[Vector2i, PackedVector3Array] = {}
 var _stream_ribbons: Array[MeshInstance3D] = []
+## Each tall fall's foot (570 amended, terrain's side): {at (the foot's
+## middle on the water), across, down (the stream's way, flat), width,
+## drop}, from _build_curve_ribbon; its mist (_build_mists).
+var _fall_feet: Array[Dictionary] = []
+var _mists: Array[GPUParticles3D] = []
 ## Where the streams fall (decision 557): {cell: Vector2i, drop: float}
 ## each, the cell below the step; a new array each build (sound's ambience
 ## tells a new level by it).
@@ -3122,6 +3135,8 @@ func rebuild(terrain: Dictionary, centre: Vector2i) -> void:
 	_runs.clear()
 	_water_bodies.clear()
 	_stream_ribbons.clear()
+	_fall_feet.clear()
+	_mists.clear()
 	_occluders.clear()
 	_occluders_built = false
 	_faded.clear()
@@ -6402,6 +6417,8 @@ func _build_curve_ribbon(w: int) -> void:
 				var drop_here := profile[k - 1] - profile[k]
 				var facing := Vector3(tangent.x, 0.25, tangent.y).normalized()
 				var lip_half := widths[k - 1] * 0.5 + RIBBON_UNDER
+				_fall_feet.append({"at": Vector3(points[k].x, profile[k] + WATER_LIFT, points[k].y), "across": Vector3(normal.x, 0.0, normal.y),
+						"down": Vector3(tangent.x, 0.0, tangent.y), "width": widths[k], "drop": drop_here})
 				for r in CURTAIN_ROWS + 1:
 					var t := r / float(CURTAIN_ROWS)
 					var at := lip.lerp(points[k], sqrt(t))
@@ -6443,6 +6460,83 @@ func _build_curve_ribbon(w: int) -> void:
 	drawn.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_room.add_child(drawn)
 	_stream_ribbons.append(drawn)
+
+
+## Mist at each tall fall's foot (570 amended, terrain's side; the
+## coordinator: "a few soft particles in the pool's churn, cheap"): soft
+## white billboard puffs rising from across the curtain's foot and drifting
+## down the stream as they swell and fade, MIST_PUFFS at most a fall (fewer
+## for a shorter one). None where there is no tall fall.
+func _build_mists() -> void:
+	for foot: Dictionary in _fall_feet:
+		var mist := GPUParticles3D.new()
+		mist.name = "Mist"
+		mist.amount = maxi(6, roundi(MIST_PUFFS * clampf(float(foot["drop"]) / MIST_FULL, 0.0, 1.0)))
+		mist.lifetime = MIST_SECONDS
+		mist.preprocess = MIST_SECONDS
+		mist.local_coords = false
+		mist.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		mist.transform_align = GPUParticles3D.TRANSFORM_ALIGN_Z_BILLBOARD
+		mist.visibility_aabb = AABB(Vector3(-4.0, -1.0, -4.0), Vector3(8.0, 5.0, 8.0))
+		var down: Vector3 = foot["down"]
+		var across: Vector3 = foot["across"]
+		var process := ParticleProcessMaterial.new()
+		process.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_BOX
+		# Across the foot (its x, in the mist's own frame).
+		process.emission_box_extents = Vector3(float(foot["width"]) * 0.5, 0.05, 0.2)
+		process.direction = Vector3(0.0, 1.0, 0.6).normalized()
+		process.spread = 25.0
+		process.initial_velocity_min = 0.25
+		process.initial_velocity_max = 0.6
+		process.gravity = Vector3(0.0, -0.05, 0.0)
+		process.damping_min = 0.2
+		process.damping_max = 0.4
+		process.scale_min = 0.6
+		process.scale_max = 1.0
+		var swell := Curve.new()
+		swell.add_point(Vector2(0.0, 0.4))
+		swell.add_point(Vector2(1.0, 1.0))
+		var swell_texture := CurveTexture.new()
+		swell_texture.curve = swell
+		process.scale_curve = swell_texture
+		var fade := Gradient.new()
+		fade.set_color(0, Color(1.0, 1.0, 1.0, 0.0))
+		fade.set_color(1, Color(1.0, 1.0, 1.0, 0.0))
+		fade.add_point(0.2, Color(1.0, 1.0, 1.0, 0.32))
+		var fade_texture := GradientTexture1D.new()
+		fade_texture.gradient = fade
+		process.color_ramp = fade_texture
+		mist.process_material = process
+		var puff := QuadMesh.new()
+		puff.size = Vector2(MIST_SIZE, MIST_SIZE)
+		var material := StandardMaterial3D.new()
+		# Lit as the scene is (unshaded it glowed at dusk), soft all round.
+		material.diffuse_mode = BaseMaterial3D.DIFFUSE_LAMBERT_WRAP
+		material.specular_mode = BaseMaterial3D.SPECULAR_DISABLED
+		material.roughness = 1.0
+		material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		material.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+		material.vertex_color_use_as_albedo = true
+		material.proximity_fade_enabled = true
+		material.proximity_fade_distance = 0.6
+		var soft := Gradient.new()
+		soft.set_color(0, Color(0.92, 0.95, 0.97, 1.0))
+		soft.set_color(1, Color(0.92, 0.95, 0.97, 0.0))
+		var round_texture := GradientTexture2D.new()
+		round_texture.gradient = soft
+		round_texture.fill = GradientTexture2D.FILL_RADIAL
+		round_texture.fill_from = Vector2(0.5, 0.5)
+		round_texture.fill_to = Vector2(0.5, 0.0)
+		round_texture.width = 64
+		round_texture.height = 64
+		material.albedo_texture = round_texture
+		puff.material = material
+		mist.draw_pass_1 = puff
+		# Its frame: x across the foot, z down the stream, y up.
+		var at: Vector3 = foot["at"]
+		mist.transform = Transform3D(Basis(-across, Vector3.UP, down), at + Vector3.UP * 0.1 + down * 0.15)
+		_room.add_child(mist)
+		_mists.append(mist)
 
 
 ## The two quads joining a ribbon's last row of three points (ending at
@@ -6860,6 +6954,7 @@ func _build_water() -> void:
 	_build_ribbons()
 	for w in _curve_waters.size():
 		_build_curve_ribbon(w)
+	_build_mists()
 	if water.is_empty():
 		return
 	var material := _water_material()

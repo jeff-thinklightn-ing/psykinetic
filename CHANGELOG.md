@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- A soft mist now rises from the pool at the foot of a tall waterfall and drifts downstream (570 amended).
 - A level may stand a chopping block and a woodpile (building.chopping_block, building.woodpile: solid, no door, 1 x 1) for the woodcutter's work (566 amended, npc's side, part 2). Data rule only.
 - A woodcutter's axe now comes down on top of the chopping block in front of them, not short of it and off to the right.
 - The woodcutter chops at the woodlot's chopping block and carries his logs to the woodpile by the store when a level stands them (566 amended, npc's side; the props and the wilds' woodlot follow from art-kit and maps). Server only.
