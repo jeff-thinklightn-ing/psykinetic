@@ -19375,7 +19375,7 @@ entries (a woodlot place for the store at the forest's edge, radius about
 4, the block inside it with a walkable cell on the store's side, the
 woodpile within 4 cells of the store off its door path; moved to Held with
 the town if Jeff takes a Held of its own). resident_test _test_visible_work
-stands both props at runtime. Server only, protocol unchanged.
+stands both props at runtime. Server only, protocol unchanged. Part 2 (after art-kit's slots 65e4b44d): the two slots in Level.BUILDINGS, SOLID and DOORLESS, with release's line under PROTOCOL_REVISION 30 in net.gd's comment (a v0.1.163 client would walk through their cells; 30 keeps it out).
 
 ## 566, economy's side: visible work's readers and the "town" message
 

@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- A level may stand a chopping block and a woodpile (building.chopping_block, building.woodpile: solid, no door, 1 x 1) for the woodcutter's work (566 amended, npc's side, part 2). Data rule only.
 - A woodcutter's axe now comes down on top of the chopping block in front of them, not short of it and off to the right.
 - The woodcutter chops at the woodlot's chopping block and carries his logs to the woodpile by the store when a level stands them (566 amended, npc's side; the props and the wilds' woodlot follow from art-kit and maps). Server only.
 - New standing pieces for the woodlot (566 amended): a chopping block with a log stood on it to split, and a log pile in three fills held in by end stakes; nothing places them yet.

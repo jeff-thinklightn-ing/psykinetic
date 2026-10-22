@@ -256,6 +256,10 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## lays the decks back for walking, on the server and in a client alike.
 ## 30: a player carries charges, the resurrection charges they hold, and
 ## charge_room, the most they may hold (decision 573).
+## 30 (566 amended, npc's side): a level may carry the work props
+## (building.chopping_block, building.woodpile), solid with no door, that a
+## woodcutter stands beside, in the "terrain" message's files and the levels
+## served.
 const PROTOCOL_REVISION := 30
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]

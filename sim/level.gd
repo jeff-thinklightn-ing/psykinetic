@@ -112,7 +112,7 @@ const BUILDINGS := {"building.hut": Vector2i(3, 3), "building.house": Vector2i(4
 	"building.well": Vector2i(1, 1), "building.temple": Vector2i(4, 6), "building.healers_hut": Vector2i(3, 3),
 	"building.field": Vector2i(4, 4), "building.mound": Vector2i(5, 5),
 	"building.great_tree": Vector2i(3, 3), "building.cairn": Vector2i(2, 2), "building.standing_stone": Vector2i(1, 1),
-	"building.waystone": Vector2i(1, 1)}
+	"building.waystone": Vector2i(1, 1), "building.chopping_block": Vector2i(1, 1), "building.woodpile": Vector2i(1, 1)}
 ## The buildings that stand on water, not floor: no inside, no walls (a
 ## well: its water is what stops walkers, and sight passes over it).
 const ON_WATER: Array[String] = ["building.well"]
@@ -127,10 +127,13 @@ const OPEN_AIR: Array[String] = ["building.field"]
 ## them, routes go round) and listed in terrain "solid", which stops sight
 ## as a wall does; their outline has no walls (the slot's mesh is the
 ## mound), none expected.
-const SOLID: Array[String] = ["building.mound", "building.great_tree", "building.cairn", "building.standing_stone", "building.waystone"]
-## The solid buildings with no door (decision 567: the wilds' landmarks): every
-## cell of theirs out of the floor, none walked onto or into.
-const DOORLESS: Array[String] = ["building.great_tree", "building.cairn", "building.standing_stone", "building.waystone"]
+const SOLID: Array[String] = ["building.mound", "building.great_tree", "building.cairn", "building.standing_stone", "building.waystone",
+	"building.chopping_block", "building.woodpile"]
+## The solid buildings with no door (decision 567: the wilds' landmarks; 566
+## amended: the work props, a chopping block and a woodpile a body stands
+## beside): every cell of theirs out of the floor, none walked onto or into.
+const DOORLESS: Array[String] = ["building.great_tree", "building.cairn", "building.standing_stone", "building.waystone",
+	"building.chopping_block", "building.woodpile"]
 ## solid_door_of's answer for a DOORLESS building.
 const NO_DOOR := Vector2i(-1, -1)
 ## A bridge (decision 505): a building entry {slot: "bridge", at, facing,
