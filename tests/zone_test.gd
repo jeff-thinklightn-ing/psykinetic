@@ -136,14 +136,19 @@ func _test_stats_with_nobody_on() -> void:
 	var stats := NetStats.new()
 	var stale := Time.get_ticks_msec() - NetStats.WINDOW_MSEC - 5000
 	# Two million samples gone stale, as hours of frames with nobody on made.
+	var started := Time.get_ticks_msec()
 	for i in 2000000:
 		stats._frames.append([stale, 100])
+	var filled := Time.get_ticks_msec() - started
 	stats._ticks.append([stale, 100, 1])
-	var started := Time.get_ticks_msec()
+	started = Time.get_ticks_msec()
 	stats.record_frame(200)
 	var trimmed := Time.get_ticks_msec() - started
 	_check(stats._frames.size() == 1 and stats._ticks.is_empty(), "a sample coming in trims the stale ones (%d left)" % stats._frames.size())
-	_check(trimmed < 1000, "all at once, not one by one (%d ms for two million)" % trimmed)
+	# Against the fill, timed in the same run, so a loaded machine slows both
+	# (a fixed 1000 ms failed ui's landing beside the other suites at 1010 ms,
+	# 275 ms alone): one by one is quadratic, minutes for two million.
+	_check(trimmed < 2 * filled + 500, "all at once, not one by one (%d ms for two million, %d ms to make them)" % [trimmed, filled])
 	for i in 1000:
 		stats.record_frame(100)
 	_check(stats._frames.size() == 1001, "and keeps what is in the window (%d)" % stats._frames.size())
