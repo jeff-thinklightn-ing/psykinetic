@@ -7555,6 +7555,8 @@ func _on_command(entity: GridEntity, command_name: String, args: Dictionary) -> 
 	elif command_name == "bleed_out" and entity is Player:
 		if World.is_downed(entity):
 			World.damage(entity, entity.hp, null, &"bled")  # Bleed Out (Mortally Wounded): the return follows at once.
+	elif command_name == "search" and entity is Player:
+		search(entity, get_node_or_null(NodePath(str(args.get("target", "")))) as Chest)
 	elif command_name == "use" and entity is Player:
 		World.try_use(entity, int(args.get("slot", -1)))
 	elif command_name == "retain" and entity is Player:
@@ -10770,9 +10772,56 @@ func _beside(at: Vector2i, from: Vector2i) -> Vector2i:
 	return best
 
 
+## [param player] searches the cache [param chest] (decision 599; Jeff:
+## "old farmstead in the wilds - abandoned, tools and bandages found
+## inside"; Chest.cache, its loot table): the first time, what the table
+## gives, rolled by the player and the cache (the same if tried again), is
+## minted worn (half its condition: nothing fine), "cached" from the
+## chest's label, and put in their hands and pack, the rest on the ground
+## at their feet; the cache goes on their record (PlayerRecord.caches), so
+## it is once per player for life. They are told what they found, or
+## "Nothing more here." Companions don't search. True if anything was found.
+func search(player: Player, chest: Chest) -> bool:
+	if not Net.is_authority() or player == null or not is_instance_valid(chest) or chest.cache.is_empty() \
+			or not World.reaches(player, chest):
+		return false
+	var record: PlayerRecord = _records.get(str(player.player_id))
+	if record == null:
+		return false
+	var tell := func(text: String) -> void:
+		if player.owner_peer != 0:
+			Net.broadcast_to([player.owner_peer], "party", {"from": "Server", "text": text})
+	if chest.cache in record.caches:
+		tell.call("Nothing more here.")
+		return false
+	record.caches.append(chest.cache)
+	var place := chest.cache_place if not chest.cache_place.is_empty() else World._label_of(chest)
+	var found := Items.roll_loot(chest.cache, "%s:%s" % [record.player_id, chest.cache], 64)
+	var counts := {}
+	for id in found:
+		var uid := World.items.mint(id, "cached", place, chest.zone, chest.tile)
+		if Items.condition_max(id) > 1:
+			World.items.set_condition(uid, maxi(1, Items.condition_max(id) / 2))
+		var slot := World.free_slot_for(player, id)
+		if slot < 0 or not World.put_item(player, player, slot, uid):
+			World.put_on_ground(uid, player.tile)
+		counts[id] = int(counts.get(id, 0)) + 1
+	var words := PackedStringArray()
+	for id: String in counts:
+		words.append(str(Items.def(id).get("name", id)) + (" (%d)" % counts[id] if counts[id] > 1 else ""))
+	print("[cache] %s searched %s at %s: %s" % [player.name, chest.cache, place, ", ".join(words)])
+	tell.call("You find in %s: %s." % [place, ", ".join(words)] if not words.is_empty() else "Nothing here.")
+	return not found.is_empty()
+
+
 ## Opens [param target]'s row (a chest, or a companion's pack), with its sound.
 func open_other(target: GridEntity) -> void:
 	_pack_wanted = null
+	if target is Chest and not (target as Chest).cache.is_empty():
+		# A cache is searched, not opened (decision 599): the server hands over the find.
+		if _local_player() != null:
+			World.command(_local_player(), "search", {"target": str(target.get_path())})
+		return
 	if pack_panel != null:
 		if pack_panel.other != target:
 			_sound(SoundKit.opening(target), target)

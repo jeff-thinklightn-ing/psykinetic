@@ -2261,6 +2261,13 @@ static func _spec_for(marker: String, monster_types: Dictionary) -> Dictionary:
 ## [param at]: the same each time the level is built.
 static func _stock(props: Dictionary, spec: Dictionary, entry: Dictionary, config: Dictionary, warnings: Array[String], at: Vector2i) -> void:
 	var script := str(spec.get("script", ""))
+	if script == CHEST and props.has("cache"):
+		# A cache keeps no slots of its own: each player's find is rolled as they search (decision 599).
+		if not Items.has_loot(str(props["cache"])):
+			warnings.append("cache at %s: no loot table \"%s\" (levels/loot.json has %s)" % [at, props["cache"], ", ".join(Items.loot_tables().keys())])
+		if entry.has("loot"):
+			warnings.append("loot at %s: a cache rolls its own find (its \"cache\" table); no loot" % at)
+		return
 	var chest: bool = script == CHEST and not props.get("depot", false) and not props.get("shop", false)
 	var monster := script == MONSTER or script == ANIMAL or _own_class(spec)
 	var kind := str(spec.get("kind", ""))

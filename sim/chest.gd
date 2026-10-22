@@ -20,6 +20,14 @@ var shop := false
 ## 424): where a player hands the priest a thing and an offering, and
 ## collects what waits (economy's job, ui's screen).
 var temple := false
+## A cache (props {"cache": a loot table}, decision 599; Jeff: "old
+## farmstead in the wilds - abandoned, tools and bandages found inside"):
+## its slots stay empty, and E on it searches (Main.search): each player
+## finds what the table gives, once. "" for a plain chest.
+var cache := ""
+## Where a cache's find is said to come from (props {"cache_place": "the
+## old farmstead"}): its story's "found in"; "" for its label.
+var cache_place := ""
 
 
 func _init() -> void:

@@ -14,6 +14,11 @@
 			{"item": "bow", "chance": 0.2},
 			{"item": "arrows", "chance": 0.2}
 		],
+		"farmstead_cache": [
+			{"item": "bandaging_kit", "count": [2, 2]},
+			{"item": "knife"},
+			{"item": "pick", "chance": 0.5}
+		],
 		"pockets": [
 			{"item": "ration", "chance": 0.2},
 			{"item": "dagger", "chance": 0.1}

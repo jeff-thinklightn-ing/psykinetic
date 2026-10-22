@@ -66,6 +66,9 @@ var barrow: Dictionary = {}
 ## "quest": his first errand, npc's). A hut brings back only a player in
 ## its care.
 var care: Dictionary = {}
+## The caches they have searched (decision 599: Chest.cache, a loot
+## table's name): each gives a player its find once.
+var caches: Array[String] = []
 
 
 ## Copies the live state off the player's entity.
@@ -105,6 +108,7 @@ func to_dict() -> Dictionary:
 		"marks": marks.duplicate(),
 		"barrow": barrow.duplicate(),
 		"care": care.duplicate(),
+		"caches": caches.duplicate(),
 	}
 
 
@@ -135,6 +139,7 @@ static func from_dict(entry: Variant) -> PlayerRecord:
 	record.known_areas = _strings(entry.get("known_areas", []))
 	record.known_places = _strings(entry.get("known_places", []))
 	record.marks = _strings(entry.get("marks", []))
+	record.caches = _strings(entry.get("caches", []))
 	var barrow: Variant = entry.get("barrow", {})
 	if barrow is Dictionary and not barrow.is_empty():
 		record.barrow = Economy.barrow_migrated(barrow)

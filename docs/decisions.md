@@ -23511,3 +23511,31 @@ coordinator's approval). This is the sim's shot.
 - Arrows are not used up or picked up, as before.
 Wire: PROTOCOL_REVISION 31. items_test, monster_test, cliff_test,
 relief_test and view_test follow. No new class_name.
+## 599, items' side. A cache: each player's find, once
+
+Jeff, through the coordinator: "old farmstead in the wilds - abandoned,
+tools and bandages found inside". A small one-time stash, per player,
+that never respawns.
+- A cache is a Chest with props {"cache": a loot table, "cache_place":
+  where the find comes from}. Its own slots stay empty: a shared chest
+  can't hold "once per player", since the first comer would empty it for
+  everyone. Level._stock leaves a cache's slots alone (no level loot) and
+  warns on an unknown table or a "loot" key on one.
+- E on a cache (Main.open_other, so walking up to one from afar works as
+  for any chest) sends "search" in place of opening the panel. There's
+  no key hint: it reads as a chest (Jeff's no-hints rule of the day).
+- Main.search(player, chest), on the server: the first time, the table
+  is rolled by the player and the cache (the same if tried again); each
+  thing is minted "cached" from cache_place (a thing with a condition at
+  half: nothing fine) and put in a free hand or pack slot
+  (free_slot_for), else on the ground at their feet. The cache goes on
+  PlayerRecord.caches (saved), so it is once per player for life. They
+  are told "You find in the old farmstead: bandaging kit (2), knife."; a
+  second search is "Nothing more here." Companions don't search.
+- World.story_line reads "cached" as "found in <place>".
+- levels/loot.json "farmstead_cache": two bandaging kits, a knife, and a
+  pick at 0.5. No new item kinds.
+- Maps places it (599, maps' side): the wilds' north farmstead hut,
+  (119, 139).
+Wire: under PROTOCOL_REVISION 31 (with 583). items_test _test_cache. No
+new class_name.

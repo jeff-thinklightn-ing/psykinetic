@@ -64,6 +64,7 @@ func _ready() -> void:
 	_test_grave()
 	_test_totem()
 	_test_battle_axe()
+	_test_cache()
 	_test_story()
 	_test_bless()
 	_test_reforge()
@@ -1495,6 +1496,76 @@ func _test_totem() -> void:
 	World.set_slots(host, had_slots, had_uids)
 	World._relocate(host, host_at)
 	record.barrow = had_barrow
+
+
+func _test_cache() -> void:
+	print("\n== a cache: each player's find, once (decision 599) ==")
+	var host := _player(Net.local_id)
+	var chest := _chest()
+	var record: PlayerRecord = _main._records[Net.player_id]
+	_check(Items.roll_loot("farmstead_cache", "x", 64).count("bandaging_kit") == 2, "the farmstead's table: two bandaging kits, a knife, maybe a pick")
+	var rows: Array[String] = ["#######", "#.....#", "#######"]
+	var markers := {Vector2i(1, 1): "chest", Vector2i(3, 1): "chest", Vector2i(5, 1): "start"}
+	var config := {"name": "cache_test", "loot": {"chest": "supplies"}, "entities": [
+		{"at": [1, 1], "props": {"cache": "farmstead_cache", "cache_place": "the old farmstead"}}, {"at": [3, 1], "props": {"cache": "no_such_cache"}}]}
+	var level := Level.parse(Level.image_from_rows(Terrain.expand(rows), markers, config), null, config)
+	var kept := {}
+	for spec: Dictionary in level["entities"]:
+		kept[spec["tile"]] = Items.tidy(spec.get("props", {}).get("slots", []), Chest.SLOTS)
+	_check(kept.get(Vector2i(1, 1)) == Items.tidy([], Chest.SLOTS) and level["warnings"].any(func(w: String) -> bool: return "no_such_cache" in w),
+			"a cache in a level keeps no slots, though the level stocks its chests; an unknown table is said (%s)" % [level["warnings"]])
+	var had_slots := chest.slots.duplicate()
+	chest.cache = "farmstead_cache"
+	chest.cache_place = "the old farmstead"
+	var host_at := host.tile
+	_beside(host, chest)
+	var had := host.slot_items.duplicate()
+	var ground_before := World.ground_uids(host.tile)
+	_check(_main.search(host, chest), "searched: something found")
+	var got: Array[int] = []
+	for uid in host.slot_items:
+		if uid != 0 and not uid in had:
+			got.append(uid)
+	for uid in World.ground_uids(host.tile):
+		if not uid in ground_before:
+			got.append(uid)
+	var ids: Array[String] = []
+	for uid in got:
+		ids.append(World.items.id_of(uid))
+	_check(ids.count("bandaging_kit") == 2 and ids.count("knife") == 1 and ids.size() <= 4,
+			"two bandaging kits and a knife (and maybe a pick), in hand, pack or at their feet (%s)" % [ids])
+	_check(not got.is_empty() and World.story_line(got[0]).contains("found in the old farmstead"),
+			"its story: found in the old farmstead (%s)" % (World.story_line(got[0]) if not got.is_empty() else ""))
+	_check("farmstead_cache" in record.caches and not _main.search(host, chest) and chest.slots == had_slots,
+			"once per player: searched again, nothing more; the chest's own slots untouched")
+	_check(PlayerRecord.from_dict(record.to_dict()).caches == record.caches, "the record keeps it through a save")
+	record.caches.erase("farmstead_cache")  # As another player's record, who has not searched it.
+	var held_now := host.slot_items.duplicate()
+	var ground_now := World.ground_uids(host.tile)
+	_check(_main.search(host, chest), "a player who has not searched it finds theirs")
+	for uid in host.slot_items:
+		if uid != 0 and not uid in held_now:
+			got.append(uid)
+	for uid in World.ground_uids(host.tile):
+		if not uid in ground_now:
+			got.append(uid)
+	for uid: int in World.items._book.keys():  # Every cached find, wherever it went (a pile may spill to the next cell).
+		var events: Array = World.items.history(uid).get("events", [])
+		if events.is_empty() or events[0]["kind"] != "cached":
+			continue
+		var slot := host.slot_items.find(uid)
+		var at := World.items.at_of(uid)
+		if slot >= 0:
+			World.take_item(host, host, slot)
+		elif at.contains("@"):
+			var xy := at.get_slice("@", 1).split(",")
+			var cell := Vector2i(int(xy[0]), int(xy[1]))
+			World.take_from_ground(cell, World.ground_uids(cell).find(uid))
+		World.items.end(uid, "gone")
+	record.caches.erase("farmstead_cache")
+	World._relocate(host, host_at)
+	chest.cache = ""
+	chest.cache_place = ""
 
 
 func _test_grave() -> void:

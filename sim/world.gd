@@ -2676,6 +2676,8 @@ func story_line(uid: int) -> String:
 		for event: Dictionary in history["events"]:
 			if origin.is_empty() and event["kind"] == "made" and not str(event["what"]).is_empty():
 				origin = "made by %s" % event["what"]
+			elif origin.is_empty() and event["kind"] == "cached" and not str(event["what"]).is_empty():
+				origin = "found in %s" % event["what"]  # A cache's find (decision 599).
 			elif origin.is_empty() and event["kind"] == "hunted":
 				origin = "from %s's hunt" % event["what"] if not str(event["what"]).is_empty() else "from a hunt"
 		if not origin.is_empty():
