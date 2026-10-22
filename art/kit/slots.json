@@ -1527,6 +1527,50 @@
 				{"at": [0, 2.0, 0], "size": [3.05, 4.0, 0.9]}
 			]
 		},
+		"building.tower_ruin": {
+			"category": "buildings",
+			"type": "mesh",
+			"kind": "cell",
+			"footprint": [3, 3],
+			"size": [3.113, 7.059, 3.028],
+			"middle": [0.1, 0, 0.011],
+			"tolerance": 0.1,
+			"budget": 2000,
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-22", "notes": "C:/dev/review/old_tower/make_ruin.py tower: a square keep of coursed dressed blocks (each its own length, a little out of true, two greys of row 1 and a rare warm one), walls 0.55 m thick, standing about 7 m at its north-west corner and broken down block by block to about 2 m toward the yard (south-east), an empty window with sill and lintel high in the north face, its inside a dark well of fallen stone, fallen blocks tumbled at its south-east foot within its cells; 1682 tris"},
+			"uses": "the Old Tower's broken keep (decision 600, builder's layout; Jeff: \"the ancients' broken-down castle\", Snagfin's place in Held), 3 x 3 cells on the curtain's north-west corner, a solid doorless building (Level.SOLID, DOORLESS): its standing side the north-west (-x, -z), seen from the ford and the bridge, broken down toward the yard (+x, +z); front +z south",
+			"grey": [
+				{"at": [0.1, 3.5295, 0.011], "size": [3.113, 7.059, 3.028]}
+			]
+		},
+		"building.rubble_heap": {
+			"category": "buildings",
+			"type": "mesh",
+			"kind": "cell",
+			"footprint": [1, 1],
+			"size": [0.95, 0.75, 0.85],
+			"tolerance": 0.3,
+			"variants": 3,
+			"budget": 300,
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-22", "notes": "C:/dev/review/old_tower/make_ruin.py heap1..3: dressed blocks fallen in a heap, some on end, sunk a little in the grass; 84, 108, 72 tris"},
+			"uses": "rubble where the Old Tower's walls fell (decision 600), 1 x 1 cell, a solid doorless building a body walks round; three variants",
+			"grey": [
+				{"at": [0, 0.375, 0], "size": [0.95, 0.75, 0.85]}
+			]
+		},
+		"building.fallen_column": {
+			"category": "buildings",
+			"type": "mesh",
+			"kind": "cell",
+			"footprint": [2, 1],
+			"size": [1.997, 0.57, 0.797],
+			"tolerance": 0.1,
+			"budget": 300,
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-22", "notes": "C:/dev/review/old_tower/make_ruin.py column: three toppled drums a little apart and askew, the capital's flared end and its square abacus at the east end, half sunk in the grass; 120 tris"},
+			"uses": "a toppled column in the Old Tower's yard (decision 600), 2 x 1 cells lying east to west (along x) at facing south, a solid doorless building",
+			"grey": [
+				{"at": [0, 0.285, 0], "size": [1.997, 0.57, 0.797]}
+			]
+		},
 		"building.waystone": {
 			"category": "buildings",
 			"type": "mesh",

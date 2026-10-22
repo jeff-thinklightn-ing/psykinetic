@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Pieces for Held's Old Tower, the ancients' broken-down castle: the broken keep, rubble heaps and a fallen column (600).
 - The castle's ponds are round-shored curves now, not squares of water, as every river, stream and pond in the world is (568 amended).
 ## v0.1.166
 
