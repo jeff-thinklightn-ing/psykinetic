@@ -1486,10 +1486,10 @@ func _shop_counter_near(near: GridEntity) -> GridEntity:
 
 ## The window's care row (economy's healer's care): the "retain" command
 ## for the healer in person; the answer is the barter message again.
-func _retain(with: GridEntity) -> void:
+func _retain(with: GridEntity, pay := "gold") -> void:
 	var player := _local_player()
 	if player != null and is_instance_valid(with) and with is Resident and with.is_inside_tree():
-		World.command(player, "retain", {"resident": str(with.get_path())})
+		World.command(player, "retain", {"resident": str(with.get_path()), "pay": pay})  # 584 amended: gold, herbs or antlers.
 
 
 ## The window's Confirm: economy's "trade" command, by name, naming the

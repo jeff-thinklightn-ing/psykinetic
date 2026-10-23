@@ -23387,3 +23387,35 @@ minute while downed, 0 otherwise); this is what the local player hears.
   once on UI, the pace at 120 and after a step to 40, the duck on SFX and
   not UI, no last beat on a revive, a last beat then silence then the mix
   back on bleed out.
+- While the bow is drawn (Main.aim_drawn), the view slides off the archer
+  toward the aim's angle: Client3D.aim_lead sets a target
+  AIM_LEAD_CELLS (4) the aim's way, eased each frame at ZOOM_RATE like the
+  pan, and the WASD lean and the lead together are held to AIM_LEAD_CELLS
+  (Client3D.lead_offset: the lean alone, as ever, when no lead is on). The
+  bow lowered or put away, the lead eases back to nothing. No zoom change;
+  the pan and the peek unchanged; the 2D view unchanged.
+- ui_test: lead_offset's three cases. A sheet of the lead at the longest
+  range step for Jeff follows docs-only. Client only; protocol unchanged;
+  no new class_name.
+
+## 584 amended, ui's side: the three ways into the healer's care
+
+Jeff's settlement of 584 (2026-10-22, via the coordinator): 10 gold, 5
+herbs or 5 antlers handed to the medicine man puts you in his care at
+once, or his first quest does and opens further quests; the care row says
+which way you are in. Economy's wire (584 amended): the barter message's
+"care" {gold, herbs, antlers, in_care, by: gold | herbs | antlers | quest
+| ""}; the "retain" command {resident, pay}; refusals in the barter's why.
+
+- The window's care row is three buttons, "Pay 10 gold", "Give 5 herbs",
+  "Give 5 antlers" (BarterPanel.care_offer_words), each shown while its
+  price is above 0 and dim when the pack cannot cover it (the purse for
+  gold, the pack's things of that id otherwise: care_covered); a button
+  sends "retain" {resident, pay} (care_asked with the pay; Main._retain).
+- Held, the line reads the way in: "In his care (paid)", "(for the
+  herbs)", "(for the antlers)" or "(his errand)" (care_words); the plain
+  "In his care" when the message has no way.
+- Nothing on the wire from ui.
+
+ui_test _test_barter: the words, the buttons by price and cover, the ask
+with its pay, held. Client only; no new class_name.

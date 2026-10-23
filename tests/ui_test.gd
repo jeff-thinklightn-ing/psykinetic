@@ -901,20 +901,26 @@ func _test_barter() -> void:
 	_check(panel.title_shown() == "Oda's goods", "opened with the cook in person: Oda's goods")
 	panel.close()
 	# The healer's care (economy): a service row in the window, "retain" on Confirm.
-	_check(BarterPanel.care_words({"gold": 10, "in_care": false}) == "Pay 10 to be in his care" and BarterPanel.care_words({"gold": 10, "in_care": true}) == "In his care"
-		and BarterPanel.care_words(null) == "", "the care row's words: pay for it, or held; none without it")
+	_check(BarterPanel.care_words({"gold": 10, "in_care": true, "by": "herbs"}) == "In his care (for the herbs)"
+		and BarterPanel.care_words({"gold": 10, "in_care": true, "by": "quest"}) == "In his care (his errand)"
+		and BarterPanel.care_words({"gold": 10, "in_care": true}) == "In his care" and BarterPanel.care_words(null) == "",
+		"the care line's words: the way in (584 amended); none without the key")
+	_check(BarterPanel.care_offer_words("gold", 10) == "Pay 10 gold" and BarterPanel.care_offer_words("herbs", 5) == "Give 5 herbs"
+		and BarterPanel.care_offer_words("antlers", 5) == "Give 5 antlers", "the three ways in, as buttons")
 	var cared: Array = []
-	panel.care_asked.connect(func(who: GridEntity) -> void: cared.append(who))
+	panel.care_asked.connect(func(who: GridEntity, pay: String) -> void: cared.append([who, pay]))
 	oda.trade = "medicine_man"
 	panel.open(oda, "Hob")
-	panel.show_barter({"gold": 12, "goods": [], "buys": {}, "fenced": {}, "pack": [], "why": "", "care": {"gold": 10, "in_care": false}})
-	_check(panel.care_shown() == "Pay 10 to be in his care" and not panel._care.disabled, "the healer's window offers his care within the purse")
-	panel._ask_care()
-	_check(cared == [oda], "Confirming it asks for his care")
-	panel.show_barter({"gold": 5, "goods": [], "buys": {}, "fenced": {}, "pack": [], "why": "", "care": {"gold": 10, "in_care": false}})
-	_check(panel._care.disabled, "a short purse: the row dim")
-	panel.show_barter({"gold": 2, "goods": [], "buys": {}, "fenced": {}, "pack": [], "why": "", "care": {"gold": 10, "in_care": true}})
-	_check(panel.care_shown() == "In his care" and not panel._care.visible, "held: In his care, no button")
+	panel.show_barter({"gold": 12, "goods": [], "buys": {}, "fenced": {}, "pack": [{"slot": 0, "uid": 301, "id": "herbs"}], "why": "",
+		"care": {"gold": 10, "herbs": 5, "antlers": 0, "in_care": false, "by": ""}})
+	_check(panel.care_shown() == "Pay 10 gold / Give 5 herbs" and not panel._care["gold"].disabled and panel._care["herbs"].disabled
+		and not panel._care["antlers"].visible, "the healer's window offers the ways in with a price: gold within the purse, herbs short (one of five), no antlers offered")
+	panel._ask_care("gold")
+	_check(cared == [[oda, "gold"]], "the gold button asks for his care, paid")
+	panel.show_barter({"gold": 5, "goods": [], "buys": {}, "fenced": {}, "pack": [], "why": "", "care": {"gold": 10, "herbs": 5, "antlers": 5, "in_care": false, "by": ""}})
+	_check(panel._care["gold"].disabled and panel._care["herbs"].disabled and panel._care["antlers"].disabled, "a short purse and an empty pack: all three dim")
+	panel.show_barter({"gold": 2, "goods": [], "buys": {}, "fenced": {}, "pack": [], "why": "", "care": {"gold": 10, "herbs": 5, "antlers": 5, "in_care": true, "by": "gold"}})
+	_check(panel.care_shown() == "In his care (paid)" and not panel._care["gold"].visible, "held: In his care (paid), no buttons")
 	panel.close()
 	_check(panel.care_shown() == "", "closed: no care row")
 	_main._update_bar()

@@ -37,7 +37,11 @@ signal trade_asked(with: GridEntity, give: Array, take: Array, gold: int)
 signal refused(why: String)
 ## The healer's care (economy's healer's care): the player asks to be in
 ## [param with]'s care for the message's care.gold (Main sends "retain").
-signal care_asked(with: GridEntity)
+signal care_asked(with: GridEntity, pay: String)
+## The ways into the healer's care (584 amended; Jeff: 10 gold, 5 herbs or 5
+## antlers handed to him, or his first quest): a button each while its
+## price in the message is above 0.
+const CARE_PAYS: Array[String] = ["gold", "herbs", "antlers"]
 
 ## The pack panel the window sits beside (its boxes are the player's side).
 var pack: PackPanel
@@ -64,7 +68,7 @@ var _button: Button
 var _why: Label
 var _hover_words := ""
 ## The healer's care row: the button to pay for it, or the line while held.
-var _care: Button
+var _care: Dictionary = {}  # pay -> Button
 var _care_held: Label
 
 
@@ -103,10 +107,15 @@ func _ready() -> void:
 	_goods = HBoxContainer.new()
 	_goods.add_theme_constant_override("separation", UiTheme.constant("slot_gap"))
 	column.add_child(_goods)
-	_care = Button.new()
-	_care.focus_mode = Control.FOCUS_NONE
-	_care.pressed.connect(_ask_care)
-	column.add_child(_care)
+	var care_row := HBoxContainer.new()
+	care_row.add_theme_constant_override("separation", UiTheme.constant("row"))
+	column.add_child(care_row)
+	for pay: String in CARE_PAYS:
+		var button := Button.new()
+		button.focus_mode = Control.FOCUS_NONE
+		button.pressed.connect(_ask_care.bind(pay))
+		care_row.add_child(button)
+		_care[pay] = button
 	_care_held = Label.new()
 	_care_held.theme_type_variation = &"Caption"
 	_care_held.add_theme_color_override("font_color", DIM)
@@ -396,19 +405,51 @@ func button_shown() -> String:
 static func care_words(care: Variant) -> String:
 	if not care is Dictionary:
 		return ""
-	return "In his care" if bool(care.get("in_care", false)) else "Pay %d to be in his care" % int(care.get("gold", 0))
+	if not bool(care.get("in_care", false)):
+		return "Pay %d to be in his care" % int(care.get("gold", 0))
+	match str(care.get("by", "")):
+		"gold":
+			return "In his care (paid)"
+		"herbs":
+			return "In his care (for the herbs)"
+		"antlers":
+			return "In his care (for the antlers)"
+		"quest":
+			return "In his care (his errand)"
+	return "In his care"
 
 
-## The care row shown (tests): the button's or the line's words.
+## A way in's button words: "Pay 10 gold", "Give 5 herbs", "Give 5 antlers".
+static func care_offer_words(pay: String, price: int) -> String:
+	return "Pay %d gold" % price if pay == "gold" else "Give %d %s" % [price, pay]
+
+
+## Whether the pack can cover [param price] of [param pay]: the purse for
+## gold, the pack's things of that id otherwise.
+func care_covered(pay: String, price: int) -> bool:
+	if pay == "gold":
+		return int(data.get("gold", 0)) >= price
+	var held := 0
+	for each: Variant in data.get("pack", []):
+		if each is Dictionary and str(each.get("id", "")) == pay:
+			held += 1
+	return held >= price
+
+
+## The care row shown (tests): the buttons' words, or the held line.
 func care_shown() -> String:
-	if _care.visible:
-		return _care.text
+	var offers := PackedStringArray()
+	for pay: String in CARE_PAYS:
+		if (_care[pay] as Button).visible:
+			offers.append((_care[pay] as Button).text)
+	if not offers.is_empty():
+		return " / ".join(offers)
 	return _care_held.text if _care_held.visible else ""
 
 
-func _ask_care() -> void:
+func _ask_care(pay: String) -> void:
 	if _open and data.get("care") is Dictionary and not bool(data["care"].get("in_care", false)):
-		care_asked.emit(with)
+		care_asked.emit(with, pay)
 
 
 func hover_shown() -> String:
@@ -486,7 +527,8 @@ func _rebuild() -> void:
 		if pack != null:
 			pack.set_selected([])
 		_box.visible = false
-		_care.visible = false
+		for pay: String in CARE_PAYS:
+			(_care[pay] as Button).visible = false
 		_care_held.visible = false
 		return
 	_title.text = title_words(merchant, with is Resident)
@@ -516,9 +558,12 @@ func _rebuild() -> void:
 	_why.visible = not why.is_empty()
 	var care: Variant = data.get("care")
 	var held := care is Dictionary and bool(care.get("in_care", false))
-	_care.visible = care is Dictionary and not held
-	_care.text = care_words(care) if _care.visible else ""
-	_care.disabled = _care.visible and int(care.get("gold", 0)) > int(data.get("gold", 0))
+	for pay: String in CARE_PAYS:
+		var button: Button = _care[pay]
+		var price := int(care.get(pay, 0)) if care is Dictionary else 0
+		button.visible = care is Dictionary and not held and price > 0
+		button.text = care_offer_words(pay, price) if button.visible else ""
+		button.disabled = button.visible and not care_covered(pay, price)
 	_care_held.visible = held
 	_care_held.text = care_words(care) if held else ""
 	if pack != null:
