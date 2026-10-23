@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- In a fight, what stands between the camera and a monster coming for you or fighting you fades as it does for you, so a foe behind a wall or a tree at the low camera's angle is seen; an idle one keeps its cover.
 - A second healer keeps a hut in the forest's middle clearing, with his own remedies; the fallen in the forest come back there (641).
 - Herders live in the hills: the herder's hut and the high shieling each have a hut and a fenced sheep fold, and the sheep you see in the fold are the herder's own, fewer when he has driven some to market (640).
 - Eleven places in the wilds, the hills and the forest where a lost townsfolk may be found waiting: a far river bank, the old farmstead, a ruined barn, a herder's hut, a hill cave, a shieling, the hunters' and woodcutters' lean-tos, the thickest wood, the boar path and the fletcher's tree.

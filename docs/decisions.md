@@ -26084,3 +26084,21 @@ across the edge and level in height, the castle and the tower each a
 landmark of its own id). Data the client reads; protocol unchanged, no
 new class_name, no CHANGELOG line (nothing a player sees until terrain's
 side).
+
+## 632: the low-angle fight, 1: what hides a foe fades
+
+Jeff on 623 (v0.1.169): the low camera is the direction, but fights read harder. The
+coordinator's list for ui, 2026-10-23. The fade (310's lines from the camera to the
+player and the companion at FADE_HEIGHTS) hid what hid the party; at 22 degrees those
+lines are nearly flat and a foe behind a wall, a tree or a roof stayed hidden.
+- Client3D._fight_points: a live monster drawn within FIGHT_TILES (6) of a party point
+  whose alert is HUNTING or FIGHTING, or that struck or was struck within COMBAT_SECONDS
+  (as its bar shows), adds its own points at FADE_HEIGHTS; _update_fade hides for the
+  party's points plus these. An idle, suspicious or fleeing one keeps its cover, so what
+  the sim lets sneak up still does, and a town's bystanders fade nothing (the first draft
+  counted every live monster and broke three house checks).
+- Roofs and a room's near side still open for the party alone (_update_roofs,
+  _inside_walls take the party's points): a foe's room never opens for them.
+- A building between the camera and the player needed nothing: its walls and roof are
+  occluders already.
+view_test _test_fight_fade (helper _wall_to_hide_behind). Client only, protocol unchanged.

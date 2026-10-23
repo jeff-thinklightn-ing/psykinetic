@@ -35,6 +35,7 @@ func _ready() -> void:
 	_test_settings()
 	_test_ground_colours()
 	await _test_fade()
+	await _test_fight_fade()
 	_test_outdoor()
 	await _test_low_camera()
 	await _test_far_restart()
@@ -4277,6 +4278,22 @@ func _test_ground_colours() -> void:
 	_check(lit == _rig._grounds.size(), "every floor cell is shaded by the light on it (%d of %d)" % [lit, _rig._grounds.size()])
 
 
+## A wall of the test room with floor on both sides, free on its far side
+## from the camera: [key, the cell behind it, the cell before it], or
+## [Vector3i(-1, -1, -1), ZERO, ZERO] when none.
+func _wall_to_hide_behind() -> Array:
+	var floor_cells: Array = _main._terrain["floor"]
+	var toward := _rig._camera.global_transform.basis.z
+	for key: Vector3i in _rig._walls:
+		var cell := Vector2i(key.x, key.y)
+		var normal := Vector2i(1, 0) if key.z == Terrain.EAST else Vector2i(0, 1)
+		var other := cell + normal
+		var far := cell if Vector2(normal).dot(Vector2(toward.x, toward.z)) > 0.0 else other
+		if cell in floor_cells and other in floor_cells and World.get_entity_at(far) == null and _rig._height(cell) == _rig._height(other):
+			return [key, far, other if far == cell else cell]
+	return [Vector3i(-1, -1, -1), Vector2i.ZERO, Vector2i.ZERO]
+
+
 func _test_fade() -> void:
 	print("\n== walls fade, a whole run at once, only where they hide the player from the camera, a moment longer ==")
 	var player := _player()
@@ -4284,17 +4301,9 @@ func _test_fade() -> void:
 	var floor_cells: Array = _main._terrain["floor"]
 	# A wall with floor on both sides: stand on its far side from the camera.
 	var toward := _rig._camera.global_transform.basis.z
-	var wall_key := Vector3i(-1, -1, -1)
-	var behind := Vector2i.ZERO
-	for key: Vector3i in _rig._walls:
-		var cell := Vector2i(key.x, key.y)
-		var normal := Vector2i(1, 0) if key.z == Terrain.EAST else Vector2i(0, 1)
-		var other := cell + normal
-		var far := cell if Vector2(normal).dot(Vector2(toward.x, toward.z)) > 0.0 else other
-		if cell in floor_cells and other in floor_cells and World.get_entity_at(far) == null and _rig._height(cell) == _rig._height(other):
-			wall_key = key
-			behind = far
-			break
+	var hiding_wall := _wall_to_hide_behind()
+	var wall_key: Vector3i = hiding_wall[0]
+	var behind: Vector2i = hiding_wall[1]
 	_check(wall_key.z != -1, "the test room has a wall with floor on both sides (%s)" % wall_key)
 	if wall_key.z == -1:
 		return
@@ -4417,6 +4426,74 @@ func _test_fade() -> void:
 ## A monster kind drawn as a person (Jeff: "have the grave robbers use the character body type"):
 ## its row's "person" words put it in the human body with a build and a look, the words worn, its
 ## hands and head sockets a person's; without them it is drawn as before.
+## The low-angle fight, 1: what hides a foe fades as what hides the player
+## does, while the foe is near enough to be fought.
+func _test_fight_fade() -> void:
+	print("\n== a fight's other side: what hides a live monster near the player fades too ==")
+	var player := _player()
+	var start := player.tile
+	var found := _wall_to_hide_behind()
+	var wall_key: Vector3i = found[0]
+	var behind: Vector2i = found[1]
+	var before: Vector2i = found[2]
+	if wall_key.z == -1:
+		_check(false, "the test room has a wall with floor on both sides")
+		return
+	var wall: Node3D = _rig._walls[wall_key]
+	# The player before the wall (at their back: it never hides them), an imp behind it.
+	_place(player, before)
+	await get_tree().create_timer(1.5).timeout
+	_rig._update_fade(true)
+	_check(not _rig._hiding.has(wall), "the player before the wall, it at their back: it does not hide them")
+	var imp := _spawn_imp(behind)
+	await get_tree().create_timer(1.5).timeout  # Its body drawn where it stands.
+	_rig._sync_puppets()
+	_rig._update_fade(true)
+	_check(_rig._fight_points(_rig._focus_points()).is_empty() and not _rig._hiding.has(wall), "an idle imp behind the wall is no fight: its cover stays")
+	imp.alert = Monster.Alert.HUNTING
+	_rig._update_fade(true)
+	var fight_points: Array[Vector3] = _rig._fight_points(_rig._focus_points())
+	var imp_at: Vector3 = _rig.to_global(_rig._tile_position(behind))
+	_check(fight_points.size() == Client3D.FADE_HEIGHTS.size() and Vector2(fight_points[0].x, fight_points[0].z).distance_to(Vector2(imp_at.x, imp_at.z)) < 0.6,
+			"hunting, an imp a cell away is the fight's other side, at FADE_HEIGHTS (%d points, %s for %s)" % [fight_points.size(), fight_points[0] if not fight_points.is_empty() else Vector3.ZERO, imp_at])
+	_check(_rig._hiding.has(wall) and _rig._faded.has(wall), "the wall between the camera and the imp fades, as it would for the player")
+	imp.alert = Monster.Alert.FLEEING
+	_rig._update_fade(true)
+	_check(_rig._fight_points(_rig._focus_points()).is_empty() and not _rig._hiding.has(wall), "fleeing, its cover is its own again")
+	imp.alert = Monster.Alert.FIGHTING
+	_rig._update_fade(true)
+	_check(_rig._hiding.has(wall), "fighting, the wall fades again")
+	imp.hp = 0
+	_rig._update_fade(true)
+	_check(_rig._fight_points(_rig._focus_points()).is_empty() and not _rig._hiding.has(wall), "felled, it is no fight: the wall no longer hides anyone")
+	World.despawn(imp)
+	_rig._sync_puppets()
+	# Beyond FIGHT_TILES, a monster's cover is its own.
+	var floor_cells: Array = _main._terrain["floor"]
+	var far_cell := Vector2i(-1, -1)
+	for cell: Vector2i in floor_cells:
+		if Vector2(cell).distance_to(Vector2(behind)) > Client3D.FIGHT_TILES + 1.0 and World.get_entity_at(cell) == null:
+			far_cell = cell
+			break
+	if far_cell.x != -1:
+		_place(player, far_cell)
+		await get_tree().create_timer(1.5).timeout
+		var far_imp := _spawn_imp(behind)
+		await get_tree().create_timer(1.5).timeout
+		_rig._sync_puppets()
+		far_imp.alert = Monster.Alert.FIGHTING
+		_rig._update_fade(true)
+		_check(_rig._fight_points(_rig._focus_points()).is_empty() and not _rig._hiding.has(wall),
+				"the player %.0f tiles off: an imp behind the wall is no fight of theirs, and the wall stays" % Vector2(far_cell).distance_to(Vector2(behind)))
+		World.despawn(far_imp)
+		_rig._sync_puppets()
+	else:
+		print("  (no floor cell beyond FIGHT_TILES of the wall in the test room: the far check skipped)")
+	_place(player, start)
+	await get_tree().create_timer(1.5).timeout
+	_rig._update_fade(true)
+
+
 func _test_person_monster() -> void:
 	print("
 == a monster kind drawn as a person: the grave robber ==")

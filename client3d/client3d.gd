@@ -648,6 +648,15 @@ const FADE_HOLD := 0.4
 ## (_index_occluders), so the lines to the player are tested against those
 ## near them only, not every tree of a big map (310).
 const FADE_CHUNK := 8.0
+## A fight's other side (the low-angle fight, 1): a live monster hunting
+## or fighting (its alert, replicated) or lately struck or striking
+## (COMBAT_SECONDS, as its bar shows) within this many tiles of the local
+## player or their companion is hidden from the camera no more than they
+## are: what stands between it and the camera fades as for them
+## (_fight_points). An idle, suspicious or fleeing one keeps its cover, so
+## what the sim lets sneak up still does. Not its roof or its room's near
+## side: those open for the player alone.
+const FIGHT_TILES := 6.0
 ## A damaged building's roof until its slot has a roof_damaged part: tipped
 ## and dropped at its eaves, caved in at a glance (_show_state).
 const ROOF_SAG := Transform3D(Basis(Vector3.RIGHT, 0.18), Vector3(0.0, -0.45, 0.0))
@@ -10352,10 +10361,11 @@ func _update_fade(force := false) -> void:
 	var points := _focus_points()
 	var roofs_changed := _update_roofs(points)
 	var toward := _camera.global_transform.basis.z
-	var key := "%s %s %s" % [toward, _camera.global_position, points]
+	var fought := points + _fight_points(points)
+	var key := "%s %s %s" % [toward, _camera.global_position, fought]
 	if key != _fade_key or force:
 		_fade_key = key
-		_hiding = _hiding_pieces(points, toward)
+		_hiding = _hiding_pieces(fought, toward)
 		_hiding.merge(_inside_walls(points, toward))
 	for piece in _hiding:
 		_hid_at[piece] = _fade_clock
@@ -10500,6 +10510,36 @@ func _focus_points() -> Array[Vector3]:
 		var at := puppet.global_position if puppet != null else to_global(_tile_position(entity.tile))
 		for height in FADE_HEIGHTS:
 			out.append(at + Vector3(0.0, height, 0.0))
+	return out
+
+
+## Where the fight's other side is, at FADE_HEIGHTS: each live monster
+## drawn within FIGHT_TILES of a point of [param focus] (the player's and
+## the companion's, _focus_points). None with no one to fight.
+func _fight_points(focus: Array[Vector3]) -> Array[Vector3]:
+	var out: Array[Vector3] = []
+	if focus.is_empty():
+		return out
+	var now := Time.get_ticks_msec()
+	for entity in World.get_entities():
+		if not entity is Monster or not entity.spawned or entity.hp <= 0:
+			continue
+		var id := entity.get_instance_id()
+		var alert: Monster.Alert = (entity as Monster).alert
+		if alert != Monster.Alert.FIGHTING and alert != Monster.Alert.HUNTING and now - _combat_at.get(id, -100000) >= COMBAT_SECONDS * 1000.0:
+			continue
+		var puppet: Node3D = _puppets.get(id)
+		if puppet == null or not puppet.visible or _far.has(id):
+			continue
+		var at := puppet.global_position
+		var near := false
+		for i in range(0, focus.size(), FADE_HEIGHTS.size()):
+			if Vector2(at.x, at.z).distance_to(Vector2(focus[i].x, focus[i].z)) <= FIGHT_TILES:
+				near = true
+				break
+		if near:
+			for height in FADE_HEIGHTS:
+				out.append(at + Vector3(0.0, height, 0.0))
 	return out
 
 
