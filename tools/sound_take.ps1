@@ -84,9 +84,11 @@ if ($PeakDb -lt 0) {
 	$measure += @('-i', $Source)
 	if ($Length -gt 0) { $measure += @('-t', "$Length") }
 	$ErrorActionPreference = 'Continue'
-	$report = (& ffmpeg @measure -af volumedetect -f null - 2>&1 | ForEach-Object { "$_" }) -join "`n"
+	# astats, not volumedetect: volumedetect reads at 16 bits, so a float
+	# source over full scale measured 0 dB and its take kept the overshoot.
+	$report = (& ffmpeg @measure -af astats=measure_perchannel=none -f null - 2>&1 | ForEach-Object { "$_" }) -join "`n"
 	$ErrorActionPreference = 'Stop'
-	if ($report -notmatch 'max_volume: (-?[\d.]+) dB') { Fail "couldn't measure $Source's peak" }
+	if ($report -notmatch 'Peak level dB: (-?[\d.]+)') { Fail "couldn't measure $Source's peak" }
 	$gain = ",volume=$($PeakDb - [double]$Matches[1])dB"
 }
 $positional = -not ($spec.PSObject.Properties['positional'] -and $spec.positional -eq $false)

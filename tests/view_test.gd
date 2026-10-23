@@ -431,6 +431,31 @@ func _test_bow_sounds() -> void:
 	if door.is_open():
 		World._set_door(door, false, player)
 	_check(Client3D._arrow_landed(cell - across * 3, cell) == "sfx.arrow_hit_wood", "a closed door past it: wood")
+	var edge := Vector2i(-1, -1)
+	var pool := Vector2i(-1, -1)
+	for at: Vector2i in _main._terrain["floor"]:
+		var beyond := at + Vector2i(1, 0)
+		if edge.x < 0 and World.edge_kind(at, Vector2i(1, 0)) == Terrain.Edge.OPEN and not World.is_walkable(beyond) \
+				and not World.is_water(beyond) and not World.is_water(at):
+			edge = at
+		if pool.x < 0 and World.is_water(at):
+			pool = at
+	_check(edge.x < 0 or Client3D._arrow_landed(edge - Vector2i(3, 0), edge, {edge + Vector2i(1, 0): true}) == "sfx.arrow_hit_wood"
+			and Client3D._arrow_landed(edge - Vector2i(3, 0), edge) == "sfx.arrow_hit_stone",
+			"a tree past it: wood; the same edge with no tree: stone (%s)" % edge)
+	_check(pool.x < 0 or Client3D._arrow_landed(pool - Vector2i(3, 0), pool) == "sfx.arrow_water", "down in water: its plip (%s)" % pool)
+	var archer: Variant = _rig.sfx.listener
+	_rig.sfx.listener = player.tile
+	var whistled := _rig.sfx.played.size()
+	var whistle_unheard := _rig.sfx.unheard.size()
+	var far := _rig._tile_position(player.tile + Vector2i(-4, 1))
+	_rig._whistle(far, _rig._tile_position(player.tile + Vector2i(4, 1)), 0.2)
+	_rig._whistle(_rig._tile_position(player.tile), far, 0.2)
+	await get_tree().create_timer(0.4).timeout
+	var whistles := (_rig.sfx.played.slice(whistled).map(func(entry: Array) -> String: return entry[0]) \
+			+ _rig.sfx.unheard.slice(whistle_unheard)).count("sfx.arrow_flight")
+	_check(whistles == 1, "an arrow passing a cell off whistles by, once; the archer's own does not (%d)" % whistles)
+	_rig.sfx.listener = archer
 	var miss := _rig.sfx.played.size()
 	var unheard := _rig.sfx.unheard.size()
 	var expected := Client3D._arrow_landed(player.tile, open)

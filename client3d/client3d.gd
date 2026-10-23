@@ -10372,11 +10372,13 @@ func _arrow_to(cell: Vector2i) -> Dictionary:
 
 ## What an arrow from [param from] that stopped at [param end] without
 ## striking anyone sounds like, by what lies past it along the shot
-## (World.shot_line's stops): a closed door's wood, a wall's or higher
-## ground's stone, water's splash, else the arrow falling at its range's end.
-static func _arrow_landed(from: Vector2i, end: Vector2i) -> String:
+## (World.shot_line's stops): a closed door's or a tree's wood (a cell of
+## [param trees], the forest's, by the cell past it), a wall's or higher
+## ground's stone, water's plip, else the arrow coming down in the ground at
+## its range's end.
+static func _arrow_landed(from: Vector2i, end: Vector2i, trees: Dictionary = {}) -> String:
 	if World.is_water(end):
-		return "sfx.splash"
+		return "sfx.arrow_water"
 	var d := end - from
 	var longest := maxi(absi(d.x), absi(d.y))
 	if longest == 0:
@@ -10396,6 +10398,11 @@ static func _arrow_landed(from: Vector2i, end: Vector2i) -> String:
 			Terrain.Edge.WALL:
 				wall = true
 	var past := end + step
+	if not wall and not World.is_walkable(past) and not World.is_water(past):
+		for x in range(-1, 2):
+			for y in range(-1, 2):
+				if trees.has(past + Vector2i(x, y)):
+					return "sfx.arrow_hit_wood"
 	if wall or World.height_at(past) > World.height_at(from) or not (World.is_walkable(past) or World.is_water(past)):
 		return "sfx.arrow_hit_stone"
 	return "sfx.arrow_land"
@@ -12022,9 +12029,10 @@ func _on_shot(to: Vector2i, id: int) -> void:
 			# A friend on the line (decision 456): it sticks in them, softly.
 			var by := instance_from_id(id) as GridEntity  # By id: the shooter may be gone by now.
 			var spared := met != null and by != null and World.spares(by, met)
-			sfx.play("sfx.arrow_spared" if spared else _arrow_landed(origin, to), end))
+			sfx.play("sfx.arrow_spared" if spared else _arrow_landed(origin, to, _trees), end))
 	if flight <= 0.0:
 		return
+	_whistle(from, end, flight)
 	var arrow := MeshInstance3D.new()
 	var mesh := BoxMesh.new()
 	mesh.size = Vector3(0.03, 0.03, 0.7)
@@ -12059,6 +12067,23 @@ func _on_shot(to: Vector2i, id: int) -> void:
 	tween.tween_callback(func() -> void:
 		if is_instance_valid(arrow):
 			arrow.queue_free())
+
+
+## An arrow flying [param from] to [param end] over [param flight] seconds
+## whistles where it passes nearest the listener, as it passes; not for the
+## archer (the loose has its own), whose arrow starts within a cell of them.
+func _whistle(from: Vector3, end: Vector3, flight: float) -> void:
+	if sfx.listener == null:
+		return
+	var ear := _tile_position(sfx.listener)
+	var line := Vector2(end.x - from.x, end.z - from.z)
+	var along := clampf(Vector2(ear.x - from.x, ear.z - from.z).dot(line) / maxf(line.length_squared(), 0.0001), 0.0, 1.0)
+	if Vector2(ear.x - from.x, ear.z - from.z).length() < 1.5 or along >= 1.0:
+		return
+	var by := from.lerp(end, along)
+	get_tree().create_timer(maxf(along * flight, 0.01)).timeout.connect(func() -> void:
+		if is_instance_valid(sfx) and sfx.is_inside_tree():
+			sfx.play("sfx.arrow_flight", by))
 
 
 ## A blow wound up over [param ticks]: the heavy swing, timed to connect

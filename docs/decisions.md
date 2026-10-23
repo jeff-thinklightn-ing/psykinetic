@@ -22215,3 +22215,37 @@ cell-painted on grass, and would have drawn square.
 Level data only, protocol unchanged; the server takes it at the next cut.
 The castle's ponds change shape slightly (a pond's cells within a cell of
 what they were); nothing saved is keyed to their cells.
+## 609. Arrow impacts heard as far as a bow shoots
+
+Jeff on v0.1.165: "arrow impact needs sounds"; the coordinator: an
+impact by what the arrow meets, played where it stops, the flight's
+whistle if cheap, client only. The impacts were already played
+(Client3D._on_struck and _arrow_landed) but heard only within 4 to 6
+cells (a body's hit within 5, the fight noise), while a bow shoots 8
+(Items.VERBS ranged cells), so an archer heard nothing at range.
+
+- Every arrow impact slot is heard 12 cells out (noise null, "range" 12):
+  sfx.arrow_hit_flesh, _hit_wood, _hit_stone, sfx.arrow_land and the new
+  sfx.arrow_water. These are the view's sounds, not the sim's. The sim
+  still makes its own fight noise for a body struck, and monsters hear
+  that at its own radius. So arrow_hit_flesh no longer names the fight
+  noise, an exception to decision 269 kept to arrows: a player watches
+  their own arrow land and must hear it.
+- By what the arrow meets: a body, a thud; a closed door, or a tree by the
+  cell past where it stopped (Client3D._trees, the forest's), a knock; a
+  wall or higher ground, a crack and skitter; water, a plip
+  (sfx.arrow_water, not the body-sized sfx.splash); else the ground, a
+  soft thump (sfx.arrow_land's three stick-clatter takes are dropped for
+  thumps).
+- The whistle: sfx.arrow_flight, played at the point of the flight
+  nearest the listener as the arrow passes it (Client3D._whistle), heard
+  4 cells. It is not played for an arrow that starts within a cell of
+  the listener (the archer; the loose has its own), nor for one that
+  stops before passing the listener.
+- tools/sound_take.ps1 measures a cut's peak with astats, not
+  volumedetect: volumedetect reads at 16 bits, so a float source over
+  full scale (freesound 789389, +12 dB) measured 0 dB, and its take kept
+  the overshoot.
+- The hook stays Client3D._on_shot's arrival, as before. Pc-character's
+  583 flight is not on main; when it lands, its landing point is where
+  these play.

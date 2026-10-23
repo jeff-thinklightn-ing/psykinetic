@@ -351,6 +351,26 @@
 				"sha256": "a738a92f4e4ee454e0707d23720e1f1a6737f6e51ce3acf6b7ef36bc9e908f09"
 			}
 		],
+		"sfx.arrow_flight": [
+			{
+				"file": "sfx.arrow_flight.ogg",
+				"from": "freesound",
+				"original": "freesound 789389: Arrow Flyby (from 0 s for 0.6 s)",
+				"sha256": "e0cb71caed6dde7ad130748a1ccbbd917be4cf7f9309a89130e74ee830a976f4",
+				"by": "modusmogulus",
+				"url": "https://freesound.org/people/modusmogulus/sounds/789389/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.arrow_flight.2.ogg",
+				"from": "freesound",
+				"original": "freesound 394181: ARCHERY flyby 2.wav",
+				"sha256": "f3099ba63f59d4c84af668c197c6b4a17a1513d4d0d4924dbaa182fe92821a34",
+				"by": "saturdaysoundguy",
+				"url": "https://freesound.org/people/saturdaysoundguy/sounds/394181/",
+				"license": "CC0 1.0"
+			}
+		],
 		"sfx.arrow_hit_flesh": [
 			{
 				"file": "sfx.arrow_hit_flesh.ogg",
@@ -389,6 +409,15 @@
 				"by": "smcameron",
 				"url": "https://freesound.org/people/smcameron/sounds/50772/",
 				"license": "CC BY 4.0"
+			},
+			{
+				"file": "sfx.arrow_hit_stone.2.ogg",
+				"from": "freesound",
+				"original": "freesound 774269: wooden_rod_drop",
+				"sha256": "9e6ccc96d387773b3756b83e6cf803b826464964d498332a448673467102ac9e",
+				"by": "loganzsound",
+				"url": "https://freesound.org/people/loganzsound/sounds/774269/",
+				"license": "CC0 1.0"
 			}
 		],
 		"sfx.arrow_hit_wood": [
@@ -424,28 +453,57 @@
 			{
 				"file": "sfx.arrow_land.ogg",
 				"from": "freesound",
-				"original": "freesound 773759: Small Sticks Drop (from 0 s for 0.6 s)",
-				"sha256": "10dd8a5f98cb1931d7bad7da7c4a97dcaef34c9735b90003491baf4b97e9f162",
-				"by": "IENBA",
-				"url": "https://freesound.org/people/IENBA/sounds/773759/",
+				"original": "freesound 711443: object falling on grass",
+				"sha256": "ae59b8d09f5f9aa3907b422b62b117d555a92df04abc6bbbc7c96f79c8bd76ac",
+				"by": "F3ather",
+				"url": "https://freesound.org/people/F3ather/sounds/711443/",
 				"license": "CC0 1.0"
 			},
 			{
 				"file": "sfx.arrow_land.2.ogg",
 				"from": "freesound",
-				"original": "freesound 773759: Small Sticks Drop (from 1.5 s for 1.05 s)",
-				"sha256": "7dbceda29208a760559da5e94d675d860e71df8fc841876f4326997a7dd36e5d",
-				"by": "IENBA",
-				"url": "https://freesound.org/people/IENBA/sounds/773759/",
+				"original": "freesound 521552: Arrow Impact",
+				"sha256": "4d6b4a884a189706f21190d7721ff78ec2a3e0ddb529c24c8d96f0c7456bf2b8",
+				"by": "omerbhatti34",
+				"url": "https://freesound.org/people/omerbhatti34/sounds/521552/",
 				"license": "CC0 1.0"
 			},
 			{
 				"file": "sfx.arrow_land.3.ogg",
 				"from": "freesound",
-				"original": "freesound 773759: Small Sticks Drop (from 3.5 s for 0.65 s)",
-				"sha256": "885f60e58c7b578ccbd309ffe5d851190d1f03d25d555e85f738e8e27ad862ac",
-				"by": "IENBA",
-				"url": "https://freesound.org/people/IENBA/sounds/773759/",
+				"original": "freesound 570966: Brick Drop on Grass 1.wav (from 0 s for 0.28 s)",
+				"sha256": "540c7de7d69d1df921a381f22c8f3cfe5af54c2612d680842d0a33be05c0ed93",
+				"by": "dichardson",
+				"url": "https://freesound.org/people/dichardson/sounds/570966/",
+				"license": "CC0 1.0"
+			}
+		],
+		"sfx.arrow_water": [
+			{
+				"file": "sfx.arrow_water.ogg",
+				"from": "freesound",
+				"original": "freesound 273792: Plop.mp3",
+				"sha256": "e88b45d53e2bc224b79c6860cb1c1752c6b573bf1f56f186683ce78ac6ee7b67",
+				"by": "pacomav",
+				"url": "https://freesound.org/people/pacomav/sounds/273792/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.arrow_water.2.ogg",
+				"from": "freesound",
+				"original": "freesound 343097: PlopEnhanced.wav",
+				"sha256": "2fb7b1b32a389e42636424f1a0c864f48a7dbaca72c69ea2cff7eca5b5df970e",
+				"by": "edschaefer",
+				"url": "https://freesound.org/people/edschaefer/sounds/343097/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.arrow_water.3.ogg",
+				"from": "freesound",
+				"original": "freesound 178735: Rock In Water Splash-Plop 1.aif (from 0.48 s for 0.6 s)",
+				"sha256": "cbd2305d6847bfade97102ac573b14ba8cc9f259fe8efe155ed29c1fbd123069",
+				"by": "jc144940",
+				"url": "https://freesound.org/people/jc144940/sounds/178735/",
 				"license": "CC0 1.0"
 			}
 		],
