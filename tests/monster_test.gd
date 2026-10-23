@@ -104,6 +104,7 @@ func _ready() -> void:
 	_test_draugr_waves()
 	_test_hall_waits()
 	_test_room_leash()
+	_test_two_zones_charge()
 	_test_charging()
 	_test_threatens()
 	_test_quieter()
@@ -3084,6 +3085,76 @@ func _test_room_leash() -> void:
 	_check(draugr.leash < 17 and reached > 0 and not gave_up,
 		"his leash %d, the player 17 off in his room: he walks the whole way, never turning back (beside them at tick %d)" % [draugr.leash, reached])
 	Level.unregister("mt_long")
+
+
+func _test_two_zones_charge() -> void:
+	print("
+== with another zone awake far ahead, his throw and charge keep his steps on his lair's clock (604 amended, physics; Jeff: \"draugr no longer walks\") ==")
+	if not World.has_method("try_axe_charge"):
+		print("  (combat's moves not in: skipped)")
+		return
+	Monster.idling = true
+	var rows: Array[String] = ["##############", "#............#", "#............#", "#.....u......#", "#............#", "#............#", "##############"]
+	Level.register("mt_far", Level.image_from_rows(rows), null, {"regenerate": {"anchors": [{"rect": [1, 1, 12, 5], "name": "lair"}]}})
+	World.clear_zones()
+	var lair := World.add_zone("mt_far")
+	var other := World.add_zone("mt_other")
+	World.enter(other)
+	World.load_terrain(Terrain.parse(Terrain.expand(["#####", "#...#", "#####"])))
+	var away := EntityFactory.build(SPECS["P"].merged({"name": "Away"})) as Player
+	var away_room := Node2D.new()  # Not _room, which _build frees.
+	add_child(away_room)
+	away_room.add_child(away)
+	World.spawn(away, Vector2i(1, 1))
+	World.tick = 50000  # The box's overworld, awake since boot.
+	World.enter(lair)
+	var draugr := _build(rows, {}, {}, "mt_far")["u"][0] as Draugr
+	draugr.max_stamina = 100
+	draugr.pays_swings = true
+	draugr.slots = Items.tidy(["", "", "", "", "", ""], Items.CARRIED)
+	draugr.stamina = 100
+	draugr.sight_range = 12
+	draugr.senses.cone_cos = -1.0
+	World.set_slots(draugr, Items.tidy(["", "", "", "", "giant_axe", ""], Items.CARRIED))
+	var a := EntityFactory.build(SPECS["P"].merged({"name": "PlayerA"})) as Player
+	a.player_id = "pa"
+	_room.add_child(a)
+	World.spawn(a, Vector2i(12, 3))
+	var was_economy := World.economy
+	World.economy = Economy.new({"purses": {"pa": 200}})
+	draugr.accept_offer(a, draugr.offers_for("pa")[0], 20)
+	draugr.target = a
+	draugr.next_move_tick = World.tick + 1000  # He holds his ground till he has thrown.
+	for i in 30:
+		World.step()
+		if World.boss_busy(draugr) and draugr._next_throw > World.tick:
+			break
+	draugr.next_move_tick = World.tick
+	var charged := false
+	var stepped := false
+	var worst := 0
+	var at := Vector2i.ZERO
+	for i in 200:
+		World.step()
+		worst = maxi(worst, draugr.next_move_tick - World.tick)
+		if str(World.axe_state(draugr)["where"]) == "ground" and World.boss_busy(draugr):
+			charged = true
+		if charged and not World.boss_busy(draugr) and str(World.axe_state(draugr)["where"]) == "hand":
+			if at == Vector2i.ZERO:
+				at = draugr.tile
+				_move_to(a, Vector2i(2, 3))  # The player off across his hall.
+			elif draugr.tile != at:
+				stepped = true
+				break
+	_check(other.awake and lair.awake and charged, "both zones awake, and he threw and charged for his axe")
+	_check(worst <= 30, "his next step never past his lair's clock by more than a step's wait (worst %d ahead; the lair at %d, the other at %d)" % [worst, World.tick, other.tick])
+	_check(stepped, "his axe back in hand, the player off across his hall: he walks after them (from %s to %s)" % [at, draugr.tile])
+	World.economy = was_economy
+	World.dead_rest.clear()
+	World._axes.erase(draugr)
+	World.clear_zones()
+	away_room.free()
+	Level.unregister("mt_far")
 
 
 func _test_hall_waits() -> void:
