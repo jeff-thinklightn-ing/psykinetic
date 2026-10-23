@@ -62,6 +62,12 @@ extends Node
 ##     --weapon=sword|giant_axe|fists against --foe=brute|wolf, a bout in
 ##     a lit room, the player's own hp and stamina, till one falls or 40 s.
 ##     The log line a tick: both sides' hp, stamina, stun, wind-up, raised.
+##   draugr: his fight once through (decisions 602, 603), as
+##     tests/draugr_fight_test plays it: the player pays 20 for the pact,
+##     strikes him till he spins (the red cone), stands off for his throw
+##     (the long cone), steps into his charge to the axe and disarms him,
+##     and fights his fists with a sword till he yields. The log line a tick:
+##     both sides, his stamina and axe, the telegraphs showing.
 ##   items_pickup: monsters take up weapons (decision 347): a dagger is
 ##     dropped by an imp; it takes it up (its AI's call, made here by
 ##     item_pick: World.try_pick_up_weapon), heavier by it, and fights
@@ -169,6 +175,13 @@ var _fight_until := -1
 ## melee_audit's weapon (an item id, or "fists") and foe (a monster kind).
 var _weapon := "sword"
 var _foe := "brute"
+## draugr's part of the fight (_draugr_step), and the telegraphs seen
+## ([id, kind]) and landed (ids).
+var _part := 0
+var _shown: Array = []
+var _landed: Array[int] = []
+## Where the player steps out of his throw's line (-1, -1 till it shows).
+var _aside := Vector2i(-1, -1)
 
 
 func _ready() -> void:
@@ -253,6 +266,8 @@ func _ready() -> void:
 			_boar()
 		"melee_audit":
 			_melee_audit()
+		"draugr":
+			_draugr()
 		_:
 			push_error("unknown scenario %s" % scenario)
 			get_tree().quit(1)
@@ -603,6 +618,145 @@ func _melee_audit() -> void:
 	_script.append(["say", 10, "Today's melee: %s against a %s." % [held, _foe]])
 	_script.append(["bout", 400, "Left click on it: walk up and attack."])
 	_script.append(["wait", 20, ""])
+
+
+func _draugr() -> void:
+	var rows: Array[String] = [
+		"####################",
+		"#..................#",
+		"#..................#",
+		"#..................#",
+		"#..................#",
+		"#..................#",
+		"####################",
+	]
+	var markers := {Vector2i(11, 3): "start", Vector2i(9, 3): "monster_draugr"}
+	var config := {"name": "Clip", "ambient": 0.8, "legend": {"monster_draugr": "#5a6b5e"},
+		"entities": [{"at": [9, 3], "facing": [1, 0], "idle": {"mode": "guard"}}]}
+	Level.register(NAME, Level.image_from_rows(Terrain.expand(rows), markers, config), null, config)
+	max_seconds = maxf(max_seconds, 120.0)
+	_script = [
+		["item_give", ["sword", Player.RIGHT_HAND], ""],
+		["say", 20, "The draugr in his hall."],
+		["draugr_fight", 0, ""],
+		["wait", 30, ""],
+	]
+
+
+## One tick of the draugr's fight; true once it is over (he yields, the
+## player falls, or a part runs out of time).
+func _draugr_step(tick: int) -> bool:
+	var draugr := _monster as Draugr
+	if draugr == null or not _player.spawned or _player.hp <= 0 or World.is_downed(_player):
+		_caption.text = "You fell."
+		print("[clip] draugr: player down at tick %d (part %d)" % [tick, _part])
+		return true
+	if _fight_until >= 0 and tick > _fight_until:
+		print("[clip] draugr: part %d ran out of time at tick %d" % [_part, tick])
+		return true
+	match _part:
+		0:
+			# The pact: 20 gold, the easy deal.
+			World.telegraph_started.connect(func(id: int, data: Dictionary) -> void: _shown.append([id, str(data["kind"])]))
+			World.telegraph_ended.connect(func(id: int, landed: bool) -> void:
+				if landed:
+					_landed.append(id))
+			World.add_gold(_player.player_id, 200, "clip")
+			_player.max_hp = 40  # As the play-through's player: his spin leaves her some.
+			_player.hp = 40
+			var taken := draugr.accept_offer(_player, draugr.offers_for(_player.player_id)[0], 20)
+			print("[clip] draugr: pact %s" % taken)
+			draugr.target = _player
+			_caption.text = "20 gold: the pact, at the easy deal."
+			_next_part(tick, 300)
+		1:
+			# Struck twice beside him, he spins.
+			if _telegraph("spin", false) and not _telegraph("spin", true):
+				_caption.text = "Struck twice, he winds up the spin: the red cone."
+			if _telegraph("spin", true):
+				_caption.text = "The spin lands. He is spent, and backs off."
+				_player.action_order = GridEntity.Order.NONE
+				_player.action_target = null
+				_next_part(tick, 600)
+			elif _player.action_target != draugr:
+				World.command_attack(_player, draugr)
+		2:
+			# Six off on a clear line, he gets his breath and throws down the
+			# long cone; the player steps out of its line.
+			draugr.target = _player
+			if _aside == Vector2i(-1, -1) and _telegraph("throw", false):
+				_aside = _player.tile + (Vector2i(0, 1) if _player.tile.y < 4 else Vector2i(0, -1))
+			if _telegraph("throw", false):
+				_caption.text = "He winds up a throw: the long cone shows its line. Step aside."
+				_walk(_aside)
+			else:
+				var off := _stand_off(draugr, 6)
+				_walk(off)
+				if _player.tile == off:
+					_caption.text = "Stand off while he gets his breath."
+			if str(World.axe_state(draugr)["where"]) == "ground":
+				_caption.text = "The axe flies past and lies on the floor."
+				_next_part(tick, 200)
+		3:
+			# Into his way to the axe: the charge stops on the player.
+			_walk(_charge_way(draugr))
+			if _telegraph("charge", false):
+				_caption.text = "He roars and charges for his axe: stand in his way."
+			if World.is_disarmed(draugr):
+				_caption.text = "The charge stopped on you: he is disarmed, fists only."
+				_next_part(tick, 1500)
+			elif str(World.axe_state(draugr)["where"]) == "hand":
+				_caption.text = "He got his axe back."
+				print("[clip] draugr: he reached his axe at tick %d" % tick)
+				return true
+		4:
+			# His fists against the sword, till he yields.
+			draugr.target = _player
+			if draugr.state != Draugr.State.PACT:
+				_caption.text = "He yields: \"...you have honored the pact.\""
+				print("[clip] draugr: yielded at tick %d, blessed %s" % [tick, draugr.blessed_last])
+				return true
+			if _player.action_target != draugr:
+				World.command_attack(_player, draugr)
+	return false
+
+
+## The cell on his way from where he stands to his axe nearest the
+## player (the one the player can reach first), not his own.
+func _charge_way(draugr: Draugr) -> Vector2i:
+	var to: Vector2i = World.axe_state(draugr)["cell"]
+	var best := draugr.tile + (to - draugr.tile).clamp(Vector2i(-1, -1), Vector2i(1, 1))
+	var along := Vector2(to - draugr.tile)
+	for k in range(1, ceili(along.length())):
+		var cell := draugr.tile + Vector2i((along.normalized() * k).round())
+		if cell != draugr.tile and cell != to and (World.is_free(cell) or cell == _player.tile) 				and World.distance(cell, _player.tile) < World.distance(best, _player.tile):
+			best = cell
+	return best
+
+
+func _next_part(tick: int, limit: int) -> void:
+	_part += 1
+	_fight_until = tick + limit
+	print("[clip] draugr: part %d at tick %d" % [_part, tick])
+
+
+## Whether a telegraph of [param kind] has been shown (or, [param landed],
+## has landed).
+func _telegraph(kind: String, landed: bool) -> bool:
+	for each: Array in _shown:
+		if each[1] == kind and (not landed or int(each[0]) in _landed):
+			return true
+	return false
+
+
+## A free cell [param cells] off [param from] on a clear line, inside the
+## room.
+func _stand_off(from: GridEntity, cells: int) -> Vector2i:
+	for way: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+		var at := from.tile + way * cells
+		if at.x >= 1 and at.x <= 18 and at.y >= 1 and at.y <= 5 and (World.is_free(at) or at == _player.tile):
+			return at
+	return from.tile + Vector2i(cells, 0)
 
 
 func _items_blows() -> void:
@@ -1623,6 +1777,9 @@ func _on_tick(tick: int) -> void:
 			_caption.text = "%s fell at %.1f s." % ["The " + _foe if foe == null else "You", float(tick) / World.TICK_RATE]
 			print("[clip] bout over at tick %d: %s" % [tick, "foe fell" if foe == null else "player down or time"])
 			_fight_until = -1
+		"draugr_fight":
+			if not _draugr_step(tick):
+				return
 		"walk":
 			if not _walk(_beside_monster() if step[1] is String else step[1]):
 				return
@@ -1779,6 +1936,14 @@ func _log(tick: int) -> void:
 		for entity in World.monsters():
 			them.append(side.call(entity))
 		print("[clip] tick %d: %s; %s" % [tick, side.call(_player), ", ".join(them)])
+		return
+	if scenario == "draugr" and _monster is Draugr:
+		var draugr := _monster as Draugr
+		var showing: Array = World.telegraphs().values().map(func(data: Dictionary) -> String: return str(data["kind"]))
+		print("[clip] tick %d: part %d; player %s hp %d/%d st %d; draugr %s hp %d/%d st %d%s%s axe %s %s; telegraphs %s" % [tick, _part,
+			_player.tile, _player.hp, _player.max_hp, _player.stamina, draugr.tile, draugr.hp, draugr.max_hp, draugr.stamina,
+			" winded" if World.is_winded(draugr) else "", " backing off" if draugr.backing_off else "",
+			World.axe_state(draugr)["where"], World.axe_state(draugr)["cell"], showing])
 		return
 	if scenario in ["items_bow", "items_blows"]:
 		var game := []

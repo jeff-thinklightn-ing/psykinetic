@@ -763,7 +763,7 @@ static func _place(level: Dictionary, markers: Array[Dictionary], config: Dictio
 		_grave(props, spec, config, warnings, at)
 		if not props.is_empty():
 			spec["props"] = props
-		if spec.get("script") == MONSTER:
+		if spec.get("script") == MONSTER or _own_class(spec):
 			# Where it lives, whatever tile a snapshot later puts it on.
 			spec["home"] = at
 			var facing: Variant = facing_from(entry.get("facing"))
@@ -2118,7 +2118,7 @@ static func _spec_for(marker: String, monster_types: Dictionary) -> Dictionary:
 static func _stock(props: Dictionary, spec: Dictionary, entry: Dictionary, config: Dictionary, warnings: Array[String], at: Vector2i) -> void:
 	var script := str(spec.get("script", ""))
 	var chest: bool = script == CHEST and not props.get("depot", false) and not props.get("shop", false)
-	var monster := script == MONSTER or script == ANIMAL
+	var monster := script == MONSTER or script == ANIMAL or _own_class(spec)
 	var kind := str(spec.get("kind", ""))
 	var defaults: Variant = config.get("loot", {})
 	var table := ""
@@ -2147,6 +2147,14 @@ static func _stock(props: Dictionary, spec: Dictionary, entry: Dictionary, confi
 	props["slots"] = slots
 
 
+## Whether [param spec] is a monster of a kind with a class of its own
+## (levels/monsters.json "script", the draugr's, decision 548): a monster
+## as Monster's own are, its hands, loot and home given the same.
+static func _own_class(spec: Dictionary) -> bool:
+	var own := str(Monster.kinds().get(str(spec.get("kind", "")), {}).get("script", ""))
+	return not own.is_empty() and spec.get("script") == own
+
+
 ## A monster's hands (decision 338): its entry's "wields", else its
 ## kind's (levels/monsters.json), {"right": id, "left": id}. Its slots
 ## become a carrier's (Items.CARRIED: the pack, what loot gave it, then the
@@ -2156,7 +2164,7 @@ static func _stock(props: Dictionary, spec: Dictionary, entry: Dictionary, confi
 ## about and left out.
 static func _arm(props: Dictionary, spec: Dictionary, entry: Dictionary, warnings: Array[String], at: Vector2i) -> void:
 	var script := str(spec.get("script", ""))
-	if script != MONSTER and script != ANIMAL:
+	if script != MONSTER and script != ANIMAL and not _own_class(spec):
 		if entry.has("wields"):
 			warnings.append("wields at %s: only a monster wields things" % at)
 		return

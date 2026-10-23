@@ -36,6 +36,7 @@ func _ready() -> void:
 	_test_spin()
 	_test_spin_broken()
 	_test_throw_and_charge()
+	_test_level_draugr_armed()
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -394,3 +395,26 @@ func _test_throw_and_charge() -> void:
 	for i in 20:
 		World.step()
 	_check(World.axe_state(boss)["where"] == "hand" and not World.is_disarmed(boss), "he reached it: the axe in his hands again")
+
+
+## A draugr a level places is armed, looted and housed as a Monster is
+## (Level._own_class): his class of his own once left him empty-handed, so
+## the barrow's draugr had no axe to throw or charge for (v0.1.165).
+func _test_level_draugr_armed() -> void:
+	print("
+== a level's draugr: his kind's battle axe in his hands, his home where he stands ==")
+	var rows: Array[String] = ["#####", "#...#", "#####"]
+	var markers := {Vector2i(2, 1): "monster_draugr", Vector2i(3, 1): "start"}
+	var config := {"name": "draugr_arms_test", "legend": {"monster_draugr": "#5a6b5e"},
+		"entities": [{"at": [2, 1], "facing": [1, 0], "idle": {"mode": "guard"}}]}
+	var level := Level.parse(Level.image_from_rows(Terrain.expand(rows), markers, config), null, config)
+	var draugr: Dictionary = {}
+	for spec: Dictionary in level["entities"]:
+		if spec.get("kind", "") == "draugr":
+			draugr = spec
+	var slots: PackedStringArray = draugr.get("props", {}).get("slots", PackedStringArray())
+	_check(draugr.get("script", "") == "res://sim/draugr.gd", "his own class (%s)" % draugr.get("script", ""))
+	_check(slots.size() == Items.CARRIED and slots[Items.RIGHT_HAND] == "battle_axe",
+			"his kind's wields: the battle axe in his right hand (%s)" % slots)
+	_check(draugr.get("home", null) == Vector2i(2, 1) and draugr.get("facing", null) == Vector2i(1, 0) and not draugr.get("idle", {}).is_empty(),
+			"his home, facing and idle from the level, as a Monster's (%s, %s)" % [draugr.get("home", null), draugr.get("facing", null)])
