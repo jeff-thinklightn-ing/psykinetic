@@ -1124,11 +1124,28 @@ const AIM_PIP := 0.13
 const AIM_PIP_GAP := 0.32
 const AIM_PIPS_MOST := 4
 const AIM_SEGMENTS := 48
+## The aim's ring, the cone's fill and its sides are built in strips this
+## long (cells), every vertex on the ground under it (_height_in, the
+## ground mesh's own height: a cell's two triangles, the shore's fine quads,
+## the dais stairs), so they lie on a slope, a ridge, a ramp or stairs
+## instead of sinking into rising ground or floating over a dip (Jeff:
+## "on a slanted ground it disappears into the terrain"), as the telegraph
+## fill and the stand ring do; rebuilt only when the aim or the archer moves.
+const AIM_STRIP := 0.25
 ## The cone of flight (Jeff: "a cone of flight that narrows the longer the
 ## aim"; combat's design): the fill's alpha, the time the drawn half-angle
 ## eases toward the sim's over, in ticks (so a tick's step never pops).
 const AIM_CONE_FILL := 0.18
 const AIM_CONE_EASE_TICKS := 1.0
+## Under a camera pitched below AIM_LOW_PITCH (degrees: the low camera, a
+## deep S tilt) the cone's edges (its sides, its far arc) stand
+## AIM_EDGE_LIFT (m) above the ground and its fill is AIM_CONE_FILL_LOW
+## instead: a ring on the ground at 22 degrees is squashed near three to
+## one and reads as a sliver (the low-angle fight, combat's (d);
+## edge_lift).
+const AIM_LOW_PITCH := 30.0
+const AIM_EDGE_LIFT := 0.1
+const AIM_CONE_FILL_LOW := 0.32
 ## The most the view leads the archer by, the WASD lean counted (perf, 617:
 ## the view's reach stays inside World.NEAR_TILES on every aspect).
 const AIM_LEAD_CELLS := 4.0
@@ -1468,6 +1485,10 @@ var _aim_arc_radius := -1.0
 ## the half-angle drawn now, eased toward the sim's; -1 while no cone.
 var _aim_cone: MeshInstance3D
 var _aim_cone_rim: MeshInstance3D
+var _aim_arc_lift := 0.0
+## The archer's grid point the ring was last built from (the ground under
+## it differs from cell to cell).
+var _aim_arc_origin := Vector2(INF, INF)
 var _aim_cone_shown := -1.0
 var _aim_arc_span := -1.0
 ## The archer's aim lead (decision 617; Jeff: "archers should be able to
@@ -3602,25 +3623,29 @@ func aim_arc(origin: Vector2, angle: float, radius: float, alpha: float, pips: i
 		return
 	_aim_cone_shown = eased_spread(_aim_cone_shown, spread, get_process_delta_time()) if cone else -1.0
 	var span := _aim_cone_shown if cone else PI * 0.5
-	var moved := absf(radius - _aim_arc_radius) > 0.01 or absf(angle - _aim_arc_angle) > 0.002 or absf(span - _aim_arc_span) > 0.0005
-	if moved:
-		_aim_arc_radius = radius
-		_aim_arc_angle = angle
-		_aim_arc_span = span
-		_aim_arc.mesh = _make_arc(radius, AIM_LINE, angle, span)
+	var lift := edge_lift()
+	var moved := absf(radius - _aim_arc_radius) > 0.01 or absf(angle - _aim_arc_angle) > 0.002 or absf(span - _aim_arc_span) > 0.0005 \
+			or absf(lift - _aim_arc_lift) > 0.001
 	var cell := Vector2i(origin.round())
 	var base := _height_in(cell, origin)
 	var centre := Vector3(origin.x, base + ON_FLOOR * 2.0, origin.y)
-	_aim_arc.position = centre
+	if moved or origin != _aim_arc_origin:
+		_aim_arc_radius = radius
+		_aim_arc_angle = angle
+		_aim_arc_span = span
+		_aim_arc_lift = lift
+		_aim_arc_origin = origin
+		_aim_arc.mesh = _ground_arc_mesh(origin, radius, AIM_LINE, angle, span, base)
+	_aim_arc.position = centre + Vector3.UP * lift
 	_aim_arc.rotation = Vector3.ZERO  # The mesh carries the angle (_make_arc).
 	_tint_aim(_aim_arc, alpha * 0.8)
 	if cone:
 		if moved or _aim_cone.position != centre:
 			_aim_cone.mesh = _cone_mesh(origin, angle, radius, span, base)
-			_aim_cone_rim.mesh = _cone_rim_mesh(origin, angle, radius, span, base)
+			_aim_cone_rim.mesh = _cone_rim_mesh(origin, angle, radius, span, base, lift)
 		_aim_cone.position = centre
 		_aim_cone_rim.position = centre
-		_tint_aim(_aim_cone, alpha * AIM_CONE_FILL)
+		_tint_aim(_aim_cone, alpha * (AIM_CONE_FILL_LOW if lift > 0.0 else AIM_CONE_FILL))
 		_tint_aim(_aim_cone_rim, alpha * 0.8)
 	var way := Vector2.from_angle(angle)
 	var point := origin + way * radius
@@ -3636,6 +3661,12 @@ func aim_arc(origin: Vector2, angle: float, radius: float, alpha: float, pips: i
 		var p := point + offset
 		_aim_pips[i].position = Vector3(p.x, _height_in(Vector2i(p.round()), p) + ON_FLOOR * 3.0, p.y)
 		_tint_aim(_aim_pips[i], alpha * 0.95)
+
+
+## How far the cone's edges stand off the ground: AIM_EDGE_LIFT under a
+## camera pitched below AIM_LOW_PITCH, else none.
+func edge_lift() -> float:
+	return AIM_EDGE_LIFT if pitch < AIM_LOW_PITCH else 0.0
 
 
 ## The drawn half-angle this frame: [param target] at once from none
@@ -3663,34 +3694,79 @@ func _cone_vertex(origin: Vector2, point: Vector2, base: float, lift: float) -> 
 	return Vector3(point.x - origin.x, _height_in(Vector2i(point.round()), point) - base + lift, point.y - origin.y)
 
 
-## The cone's fill: a fan from the archer to its far end, each triangle's
-## far corners on the ground.
+## How many pieces an arc [param length] cells long is drawn in: AIM_STRIP
+## a piece, AIM_SEGMENTS at least.
+static func arc_pieces(length: float) -> int:
+	return maxi(AIM_SEGMENTS, ceili(length / AIM_STRIP))
+
+
+## The aim's ring on the ground: the band [param radius] to its middle and
+## [param line] wide, [param span] either side of [param angle], as a strip
+## of quads AIM_STRIP long at most, each corner on the ground under it,
+## relative to the archer's cell at [param base] (_cone_vertex). The node
+## carries the floor bias and the low camera's lift (aim_arc).
+func _ground_arc_mesh(origin: Vector2, radius: float, line: float, angle: float, span: float, base: float) -> ArrayMesh:
+	var surface := SurfaceTool.new()
+	surface.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var inner := radius - line * 0.5
+	var outer := radius + line * 0.5
+	var pieces := arc_pieces(2.0 * span * radius)
+	for i in pieces:
+		var a0 := angle - span + 2.0 * span * i / pieces
+		var a1 := angle - span + 2.0 * span * (i + 1) / pieces
+		var quad: Array[Vector3] = [_cone_vertex(origin, origin + Vector2.from_angle(a0) * inner, base, 0.0),
+			_cone_vertex(origin, origin + Vector2.from_angle(a0) * outer, base, 0.0),
+			_cone_vertex(origin, origin + Vector2.from_angle(a1) * outer, base, 0.0),
+			_cone_vertex(origin, origin + Vector2.from_angle(a1) * inner, base, 0.0)]
+		for j: int in [0, 1, 2, 0, 2, 3]:
+			surface.set_normal(Vector3.UP)
+			surface.add_vertex(quad[j])
+	return surface.commit()
+
+
+## The cone's fill: rings AIM_STRIP apart from the archer to its far end,
+## each ring's points AIM_STRIP apart at most, every vertex on the ground
+## under it, so the wedge lies on whatever ground rises or falls between.
 func _cone_mesh(origin: Vector2, angle: float, radius: float, half: float, base: float) -> ArrayMesh:
 	var surface := SurfaceTool.new()
 	surface.begin(Mesh.PRIMITIVE_TRIANGLES)
-	var points := cone_points(origin, angle, radius, half)
+	var rings := maxi(ceili(radius / AIM_STRIP), 1)
+	var pieces := arc_pieces(2.0 * half * radius)
 	var apex := Vector3(0.0, ON_FLOOR, 0.0)
-	for i in points.size() - 1:
-		for vertex: Vector3 in [apex, _cone_vertex(origin, points[i], base, ON_FLOOR), _cone_vertex(origin, points[i + 1], base, ON_FLOOR)]:
-			surface.set_normal(Vector3.UP)
-			surface.add_vertex(vertex)
+	var last: Array[Vector3] = []
+	for r in range(1, rings + 1):
+		var ring: Array[Vector3] = []
+		for i in pieces + 1:
+			var point := origin + Vector2.from_angle(angle - half + 2.0 * half * i / pieces) * (radius * r / rings)
+			ring.append(_cone_vertex(origin, point, base, ON_FLOOR))
+		for i in pieces:
+			var corners: Array[Vector3] = []
+			if r == 1:
+				corners.assign([apex, ring[i], ring[i + 1]])
+			else:
+				corners.assign([last[i], ring[i], ring[i + 1], last[i], ring[i + 1], last[i + 1]])
+			for vertex in corners:
+				surface.set_normal(Vector3.UP)
+				surface.add_vertex(vertex)
+		last = ring
 	return surface.commit()
 
 
 ## The cone's two sides as lines AIM_LINE wide from the archer to the far
-## end's corners, a piece a cell so each follows the ground.
-func _cone_rim_mesh(origin: Vector2, angle: float, radius: float, half: float, base: float) -> ArrayMesh:
+## end's corners, a piece AIM_STRIP long so each follows the ground,
+## [param lift] above it.
+func _cone_rim_mesh(origin: Vector2, angle: float, radius: float, half: float, base: float, lift := 0.0) -> ArrayMesh:
 	var surface := SurfaceTool.new()
 	surface.begin(Mesh.PRIMITIVE_TRIANGLES)
-	var pieces := maxi(int(ceil(radius)), 1)
+	var pieces := maxi(ceili(radius / AIM_STRIP), 1)
 	for side: float in [-1.0, 1.0]:
 		var way := Vector2.from_angle(angle + side * half)
 		var across := Vector2(-way.y, way.x) * AIM_LINE * 0.5
 		for i in pieces:
 			var a := origin + way * (radius * i / pieces)
 			var b := origin + way * (radius * (i + 1) / pieces)
-			var quad: Array[Vector3] = [_cone_vertex(origin, a - across, base, ON_FLOOR * 1.5), _cone_vertex(origin, b - across, base, ON_FLOOR * 1.5),
-				_cone_vertex(origin, b + across, base, ON_FLOOR * 1.5), _cone_vertex(origin, a + across, base, ON_FLOOR * 1.5)]
+			var quad: Array[Vector3] = [_cone_vertex(origin, a - across, base, ON_FLOOR * 1.5 + lift), _cone_vertex(origin, b - across, base, ON_FLOOR * 1.5 + lift),
+				_cone_vertex(origin, b + across, base, ON_FLOOR * 1.5 + lift), _cone_vertex(origin, a + across, base, ON_FLOOR * 1.5 + lift)]
 			for j: int in [0, 1, 2, 0, 2, 3]:
 				surface.set_normal(Vector3.UP)
 				surface.add_vertex(quad[j])

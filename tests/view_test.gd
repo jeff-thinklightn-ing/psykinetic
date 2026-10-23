@@ -42,6 +42,8 @@ func _ready() -> void:
 	await _test_low_pick()
 	await _test_reach_ease()
 	await _test_low_names()
+	_test_cone_lift()
+	_test_arc_on_ground()
 	_test_pine_stands()
 	_test_ground_textures()
 	_test_canopy_mask()
@@ -6273,3 +6275,109 @@ func _test_low_names() -> void:
 	_rig._sync_puppets()
 	Net.set_camera_low(low_was, false)
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+
+
+## The low-angle fight, combat's (d): under a camera pitched below
+## AIM_LOW_PITCH the cone of flight's edges stand off the ground and its
+## fill is fuller; at the ortho pitch, as before.
+## Jeff: "for the archery circle (arc) -- on a slanted ground it disappears
+## into the terrain": the ring, the cone's fill and its sides lie on the
+## ground in quarter-cell strips, every vertex on the ground mesh's own
+## height, nothing under it, on the hills' slopes.
+func _test_arc_on_ground() -> void:
+	print("\n== the aim's ring and cone of flight lie on sloped ground, strip by strip ==")
+	var hills := Level.load_level("hills")
+	if hills.is_empty():
+		print("  (no hills level here: skipped)")
+		return
+	_rig.rebuild(hills["terrain"], hills["centre"])
+	# The cell with the steepest slope (not a cliff) over five cells eastward, near the middle.
+	var centre: Vector2i = hills["centre"]
+	var origin := Vector2(centre)
+	var steepest := 0.0
+	for y in range(centre.y - 40, centre.y + 40, 2):
+		for x in range(centre.x - 40, centre.x + 40, 2):
+			var cell := Vector2i(x, y)
+			var rise := absf(_rig._ground_height(Vector2(cell) + Vector2(5.0, 0.0)) - _rig._ground_height(Vector2(cell)))
+			var sloped := true  # A slope, not a cliff: no single cell's step over 0.6.
+			for k in 5:
+				if absf(_rig._ground_height(Vector2(cell) + Vector2(k + 1.0, 0.0)) - _rig._ground_height(Vector2(cell) + Vector2(float(k), 0.0))) > 0.6:
+					sloped = false
+			if sloped and rise > steepest:
+				steepest = rise
+				origin = Vector2(cell)
+	_check(steepest >= 0.5, "a slope on the hills to aim across: %.2f up or down over five cells from %s" % [steepest, origin])
+	_rig.aim_arc(origin, 0.0, 5.0, 1.0, 0, true, 0.4)
+	var base: float = _rig._height_in(Vector2i(origin.round()), origin)
+	var worst := 0.0
+	var mid_worst := 0.0
+	var faces := 0
+	var creases := 0
+	for pair: Array in [[_rig._aim_arc, 0.0], [_rig._aim_cone, Client3D.ON_FLOOR], [_rig._aim_cone_rim, Client3D.ON_FLOOR * 1.5]]:
+		var mesh: MeshInstance3D = pair[0]
+		var bias: float = pair[1]
+		var vertices := (mesh.mesh as ArrayMesh).get_faces()
+		faces += vertices.size() / 3
+		for i in range(0, vertices.size(), 3):
+			var tri: Array[Vector3] = [vertices[i], vertices[i + 1], vertices[i + 2]]
+			for j in 3:
+				var a := tri[j]
+				var b := tri[(j + 1) % 3]
+				var at_a := origin + Vector2(a.x, a.z)
+				var at_b := origin + Vector2(b.x, b.z)
+				worst = maxf(worst, absf(a.y - (_rig._height_in(Vector2i(at_a.round()), at_a) - base + bias)))
+				# The edge's middle: on the ground where the edge lies on one of a cell's two
+				# triangles; across a crease (a cell's fold, a cliff's foot) the strip bridges it.
+				var cell := Vector2i(at_a.round())
+				var in_a := at_a - Vector2(cell) + Vector2(0.5, 0.5)
+				var in_b := at_b - Vector2(cell) + Vector2(0.5, 0.5)
+				if cell != Vector2i(at_b.round()) or (in_a.x + in_a.y <= 1.0) != (in_b.x + in_b.y <= 1.0) or _rig._shore_heights.has(cell):
+					creases += 1
+					continue
+				var mid := (at_a + at_b) * 0.5
+				mid_worst = maxf(mid_worst, absf((a.y + b.y) * 0.5 - (_rig._height_in(cell, mid) - base + bias)))
+	_check(faces > 3 * Client3D.AIM_SEGMENTS, "built strip by strip: %d triangles for a five-cell cone (a fan was %d)" % [faces, Client3D.AIM_SEGMENTS])
+	_check(worst < 0.01, "every corner of the ring, the fill and the sides on the ground under it (worst %.3f off)" % worst)
+	_check(mid_worst < 0.01 and creases > 0, "every strip's middle on the ground where it lies on one ground triangle (worst %.3f off); %d strip edges bridge a crease" % [mid_worst, creases])
+	var ring_y: Array[float] = []
+	for vertex in (_rig._aim_arc.mesh as ArrayMesh).get_faces():
+		ring_y.append(vertex.y)
+	_check(ring_y.max() - ring_y.min() > 0.2, "the ring itself climbs the slope (%.2f from its lowest to its highest point)" % (ring_y.max() - ring_y.min()))
+	# Moving the archer a cell rebuilds the ring on the new ground.
+	var ring_was: ArrayMesh = _rig._aim_arc.mesh
+	_rig.aim_arc(origin + Vector2(1.0, 0.0), 0.0, 5.0, 1.0, 0, true, 0.4)
+	_check(_rig._aim_arc.mesh != ring_was, "the archer a cell on: the ring built again for the ground there")
+	_rig.aim_arc(origin, 0.0, 0.0, 0.0, 0, false)
+	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+
+
+func _test_cone_lift() -> void:
+	print("\n== the cone of flight under a low pitch: its edges lifted, its fill fuller ==")
+	var pitch_was: float = _rig.pitch
+	var origin := Vector2(9.0, 4.0)
+	_rig.aim_arc(origin, 0.0, 5.0, 1.0, 0, true, 0.4)
+	var flat_y: float = _rig._aim_arc.position.y
+	var flat_rim: float = (_rig._aim_cone_rim.mesh as ArrayMesh).get_faces()[0].y
+	var flat_fill: float = (_rig._aim_cone.material_override as StandardMaterial3D).albedo_color.a
+	_check(_rig.pitch >= Client3D.AIM_LOW_PITCH and is_zero_approx(_rig.edge_lift()) and is_equal_approx(flat_fill, Client3D.AIM_CONE_FILL),
+			"at the ortho pitch (%.0f): no lift, the fill AIM_CONE_FILL (%.2f)" % [_rig.pitch, flat_fill])
+	_rig.pitch = Client3D.LOW_PITCH
+	_rig.aim_arc(origin, 0.0, 5.0, 1.0, 0, true, 0.4)
+	var low_rim: float = (_rig._aim_cone_rim.mesh as ArrayMesh).get_faces()[0].y
+	var low_fill: float = (_rig._aim_cone.material_override as StandardMaterial3D).albedo_color.a
+	_check(is_equal_approx(_rig.edge_lift(), Client3D.AIM_EDGE_LIFT) and is_equal_approx(_rig._aim_arc.position.y, flat_y + Client3D.AIM_EDGE_LIFT)
+			and is_equal_approx(low_rim, flat_rim + Client3D.AIM_EDGE_LIFT) and is_equal_approx(low_fill, Client3D.AIM_CONE_FILL_LOW),
+			"at LOW_PITCH: the far arc and the sides AIM_EDGE_LIFT up (%.2f, %.2f), the fill AIM_CONE_FILL_LOW (%.2f)" % [_rig._aim_arc.position.y - flat_y, low_rim - flat_rim, low_fill])
+	# Combat's check (623's fight reads): lifted, the cone is the same cone,
+	# every point of its sides over the same ground, only higher, so its
+	# drawn spread is still the sim's (World.spread_of).
+	var low_faces := (_rig._aim_cone_rim.mesh as ArrayMesh).get_faces()
+	_rig.pitch = pitch_was
+	_rig.aim_arc(origin, 0.0, 5.0, 1.0, 0, true, 0.4)
+	var flat_faces := (_rig._aim_cone_rim.mesh as ArrayMesh).get_faces()
+	var same_ground := low_faces.size() == flat_faces.size() and not flat_faces.is_empty()
+	for i in mini(low_faces.size(), flat_faces.size()):
+		same_ground = same_ground and is_equal_approx(low_faces[i].x, flat_faces[i].x) and is_equal_approx(low_faces[i].z, flat_faces[i].z) 				and is_equal_approx(low_faces[i].y, flat_faces[i].y + Client3D.AIM_EDGE_LIFT)
+	_check(same_ground, "lifted, the cone's sides stand over the same ground (%d vertices): its spread is the sim's at either pitch" % flat_faces.size())
+	_check(is_equal_approx(_rig._aim_arc.position.y, flat_y), "and back at the ortho pitch, on the ground again")
+	_rig.aim_arc(origin, 0.0, 5.0, 1.0, 0, false)

@@ -26132,3 +26132,27 @@ past NAME_TILES (8) of the local player only for the party, the marked target, a
 (hunting, fighting or lately struck, as _fight_points counts one): name_shown. The ortho
 camera's names untouched; the camera off restores scale, priority and visibility.
 view_test _test_low_names.
+
+## 636: the low-angle fight, combat's (d): the cone of flight's edges lifted
+
+Combat's numbers: at 22 degrees a cell's ground depth is 0.31 of the ortho's; a ring on
+the ground reads as a sliver. Client3D.edge_lift(): AIM_EDGE_LIFT (0.1 m) when the pitch
+is under AIM_LOW_PITCH (30 degrees), else 0; the far arc and the sides (_cone_rim_mesh's
+lift) stand that far off the ground, and the fill is AIM_CONE_FILL_LOW (0.32) instead of
+AIM_CONE_FILL (0.18). The drawn spread is unchanged (combat's check: lifted vertices over
+the same ground, 240 of them now). view_test _test_cone_lift.
+
+The ring and the cone on the ground (the coordinator's approval, folded in before 636
+landed): drawn as fans at the archer's own height, they sank into rising ground and
+floated over a dip. Now the ring (_ground_arc_mesh), the fill (_cone_mesh, rings
+AIM_STRIP = 0.25 cells apart) and the sides (_cone_rim_mesh) are strips AIM_STRIP long at
+most (arc_pieces: AIM_SEGMENTS at least), every corner on the ground under it by
+_height_in (the cell's own triangle, a shore's finer quad, a dais's stairs; _cone_vertex),
+relative to the archer's cell; the lift and the floor bias stay as above. aim_arc rebuilds
+when the archer's cell changes, not only the aim (_aim_arc_origin). A strip crossing a
+crease (a cell's fold between its two triangles, a cliff's foot) bridges it by a quarter
+cell: that is the trade for strips over clipping at every cell edge, and the depth test
+hides the sliver. view_test _test_arc_on_ground, on the hills' steepest slope that is not a
+cliff: every corner and every one-triangle strip's middle on the ground exactly, the ring
+climbing the slope, rebuilt a cell on. A decal fallback (the ground's own depth) was
+weighed and left: bodies share the ground's visual layer and a Decal takes no shader.

@@ -7,6 +7,8 @@ notes (decision 324).
 
 ## Unreleased
 
+- The archer's aim ring and cone of flight lie on the ground across a slope, a ridge, a ramp or stairs, where they used to sink into rising ground or float over a dip.
+- Under the low camera (or a deep tilt) the cone of flight's edges stand a hand off the ground and its fill is fuller, so the squashed wedge still reads.
 - Under the low camera a name over a body reads at any distance, the nearest drawn over the farther, and far off only your party's, a foe's and your marked target's names show, so a town's names don't crowd a fight.
 - Under the low camera a body at the edge of what you can see fades in as it comes and out as it goes, over half a second, instead of popping.
 - Under the low camera a click lands on a monster a thumb's width of screen either side of it however far off it stands, where before the slack was a hand's width of ground that shrank with distance.
