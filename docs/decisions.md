@@ -23269,6 +23269,8 @@ tests/farm_test _test_butcher:
 - his coming saved
 
 No new class_name.
+**npc's side (2026-10-23).** The butcher's greeting words at his block, townsfolk.json greet.trades "butcher" (560's one word on a click): "Mind the block. What?", "Meat's hung; what is it?", "Wipe your feet, there's blood about." Data only; his visible work (the cleave, the carcass carried) waits for 566's phase 2.
+
 ## 591, economy's side. Wood from the forest standing, and stages toward a city
 
 Jeff: "i eventually want held to be in its own map that leaves room to

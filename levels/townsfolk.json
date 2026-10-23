@@ -35,6 +35,7 @@
 			"guard": ["State your business.", "Something wrong?"],
 			"priest": ["Peace on you. What is it?", "Yes, child?"],
 			"hunter": ["Quiet, you'll scare the game. What?", "Aye?"],
+			"butcher": ["Mind the block. What?", "Meat's hung; what is it?", "Wipe your feet, there's blood about."],
 			"farmer": ["What is it? The field won't hoe itself.", "Aye?"],
 			"hauler": ["What? I've a load to shift.", "Aye?"]
 		}
