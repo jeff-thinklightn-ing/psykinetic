@@ -2829,6 +2829,7 @@ func _boot() -> void:
 	World.production = Production.new(snapshot.get("production", {}), World.stockpile, World.holdings, World.steps_now)
 	# How each town grows: its experience, residents and buildings.
 	World.towns = Towns.new(snapshot.get("towns", {}), World.production)
+	World.towns.herders_from_dict(snapshot.get("herders", {}))  # The hill herders (640).
 	# The forest felled and growing back, as the snapshot left it (591).
 	World.clearing = Clearing.new(snapshot.get("clearing", {}))
 	World.clearing.changed.connect(_on_clearing_changed)
@@ -2950,6 +2951,9 @@ func _boot() -> void:
 	World.economy.owed_paid.connect(func(player_id: String, gold: int) -> void: World.gold_changed.emit(player_id, gold))
 	# Players' contributions toward the next build (decision 499).
 	World.economy.shortfall = World.towns.shortfall
+	# The hill herders' droves, bought by the town (640).
+	World.towns.drove = World.economy.buy_drove
+	World.towns.folds_changed.connect(_on_folds_changed)
 	World.production.build_lacks = func(town: String) -> Dictionary: return World.towns.shortfall(town).get("needs", {})
 	World.production.town_pays = World.economy.owe_or_pay
 	# Caravans to market over maps' trade routes (decision 504, economy's side).
@@ -4208,6 +4212,7 @@ func _save_state(wait := true) -> void:
 		"stockpile": World.stockpile.to_dict() if World.stockpile != null else {},
 		"production": World.production.to_dict() if World.production != null else {},
 		"towns": World.towns.to_dict() if World.towns != null else {},
+		"herders": World.towns.herders_to_dict() if World.towns != null else {},
 		"clearing": World.clearing.to_dict() if World.clearing != null else {},
 		"roofs": World.roofs_damaged.keys(),
 		"trampled": World.trampled_to_dict(),
@@ -4541,11 +4546,21 @@ func _on_dole_changed(town: String, count: int) -> void:
 	Net.broadcast_to(peers, "party", {"from": "Town", "text": text})
 
 
+## Server: a herder's fold changed (Towns.folds_changed, 640): every peer
+## is told the folds of its area ("folds" {counts: {place id: sheep}}).
+func _on_folds_changed(place_id: String) -> void:
+	var area := str(World.holdings.place(place_id).get("area", "")) if World.holdings != null else ""
+	Net.broadcast("folds", {"counts": World.towns.folds(area)})
+
+
 ## Server: [param peer], come to [param zone_name], is told the buildings of
-## each town there.
+## each town there, and the herders' folds (640).
 func _send_towns(peer: int, zone_name: String) -> void:
 	if World.towns == null:
 		return
+	var folds := World.towns.folds(zone_name)
+	if not folds.is_empty():
+		Net.message_to(peer, "folds", {"counts": folds})
 	for town: String in World.towns.to_dict():
 		if town.begins_with(zone_name + "/"):
 			Net.message_to(peer, "town", {"town": town, "buildings": World.towns.buildings_of(town), "awake": World.towns.awake_of(town),

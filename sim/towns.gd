@@ -113,6 +113,12 @@ var rain := Callable()
 var fell := Callable()
 var roofs := Callable()
 var mend_roof := Callable()
+## (town, herder id, count, food) -> int: the sheep [param town] buys of a
+## herder's drove (640; Main: Economy.buy_drove); unset, no drove is sold.
+var drove := Callable()
+## A herder's fold changed its count (640): [param place_id]'s sheep, for
+## the "folds" message the views draw it by.
+signal folds_changed(place_id: String)
 
 ## Town -> {xp, spent, residents: Array[String] (worker ids), buildings:
 ## {kind: {kind, level, state, since, job}}, objectives (done, by id),
@@ -121,6 +127,11 @@ var mend_roof := Callable()
 var _towns: Dictionary[String, Dictionary] = {}
 ## Town id -> {map building code: awake} (set_awake; not saved).
 var _awake: Dictionary = {}
+## Herder place id -> {since (first seen, for the herder's coming), season
+## (the last seen), lambs (the part-lamb), next (the step of his next
+## drove), back (the step they are home), unsold (sheep walking home with
+## them)} (640). Saved beside the towns (herders_to_dict).
+var _herders: Dictionary = {}
 
 
 func _init(saved := {}, with_production: Production = null, with_rules := {}, with_clock := Callable()) -> void:
@@ -448,6 +459,7 @@ func note_companion_out(town: String, companion_name: String) -> void:
 ## it can't afford it.
 func tick() -> void:
 	_stock_camps()
+	_herders_turn()
 	var towns: Array[String] = []
 	towns.assign(_towns.keys())
 	towns.sort()
@@ -1119,6 +1131,104 @@ func _farmer_comes(town: String) -> void:
 
 
 # --- Sheep and wool (decision 500) ---------------------------------------------------
+
+## The hill herders (decision 640, economy's side; Jeff: "herders exist as
+## people"): each Holdings place whose key is one of rules' herder.places
+## (the hills' refuges) is a herder's holding of its own, as a healer's hut
+## is. One with no herder gets one, "<trade>:<place>", once it has stood
+## herder.growth_days, with herder.start sheep of their own (the place's
+## "sheep" in the stockpile, held by nobody). Each spring their drove lambs
+## as the town's flock does, toward herder.most. Every herder.every days,
+## home, the herder walks all but herder.keep down to the town they sell to
+## (drove_town): the fold's count drops at once, they are away
+## herder.walk_steps, and what the town didn't buy (drove: its treasury
+## pays, never owes) comes home with them.
+func _herders_turn() -> void:
+	var rule: Dictionary = rules.get("herder", {})
+	if rule.is_empty() or production.holdings == null:
+		return
+	var at := now()
+	var day := maxi(DayNight.day_steps, 1)
+	var trade := str(rule.get("trade", "herder"))
+	var stock := production.stockpile
+	for id in production.holdings.all_places():
+		var place := production.holdings.place(id)
+		if str(place.get("key", "")) not in rule.get("places", []):
+			continue
+		if not _herders.has(id):
+			_herders[id] = {"since": at, "season": "", "lambs": 0.0, "next": 0, "back": 0, "unsold": 0}
+		var herd: Dictionary = _herders[id]
+		var who := "%s:%s" % [trade, id]
+		if production.worker(who).is_empty():
+			if at - int(herd["since"]) < float(rule.get("growth_days", 3)) * day:
+				continue
+			var names: Array = rule.get("names", [])
+			var name := str(names[absi(hash(id)) % names.size()]) if not names.is_empty() else trade.capitalize()
+			production.add_worker(who, name, [trade], id, str(place.get("area", "")))
+			stock.deposit(id, "sheep", int(rule.get("start", 4)), name, "a drove of their own")
+			herd["next"] = at + int(float(rule.get("every", 3)) * day)
+			print("[towns] %s the %s keeps %s, %d sheep" % [name, trade, id, stock.count(id, "sheep")])
+			folds_changed.emit(id)
+			continue
+		if bool(production.worker(who).get("away", false)):
+			if at < int(herd["back"]):
+				continue
+			production.set_away(who, false)
+			if int(herd["unsold"]) > 0:
+				stock.deposit(id, "sheep", int(herd["unsold"]), str(production.worker(who)["name"]), "home unsold")
+				herd["unsold"] = 0
+			folds_changed.emit(id)
+		var season := Season.name_at(at)
+		if season != str(herd["season"]):
+			if season == "spring" and not str(herd["season"]).is_empty():
+				var count := float(stock.count(id, "sheep"))
+				var lambs := float(herd["lambs"]) + maxf(count * float(rule.get("lambs", 0.6)) * (1.0 - count / maxf(float(rule.get("most", 8)), 1.0)), 0.0)
+				var born := floori(lambs)
+				herd["lambs"] = lambs - born
+				if born > 0:
+					stock.deposit(id, "sheep", born, str(production.worker(who)["name"]), "lambs")
+					folds_changed.emit(id)
+			herd["season"] = season
+		if at < int(herd["next"]):
+			continue
+		herd["next"] = at + int(float(rule.get("every", 3)) * day)
+		var count := stock.count(id, "sheep") - int(rule.get("keep", 2))
+		var buyer := drove_town(id)
+		if count < 1 or buyer.is_empty() or not drove.is_valid():
+			continue
+		stock.take(id, "sheep", count, "driven to %s" % buyer)
+		var sold := int(drove.call(buyer, who, count, int(rule.get("food", 2))))
+		herd["unsold"] = count - sold
+		herd["back"] = at + int(rule.get("walk_steps", 3000))
+		production.set_away(who, true)
+		print("[towns] %s drives %d sheep to %s, sells %d" % [production.worker(who)["name"], count, buyer, sold])
+		folds_changed.emit(id)
+
+
+## The town herder place [param id]'s drove goes to: one whose butchery
+## stands and whose store holds under butcher.from sheep, in the place's
+## own area first, then by id; "" for none.
+func drove_town(id: String) -> String:
+	var area := str(production.holdings.place(id).get("area", "")) if production.holdings != null else ""
+	var under := int(rules.get("butcher", {}).get("from", 8))
+	var towns: Array = _towns.keys().filter(func(town: String) -> bool:
+		return _stands(town, "butchery") and production.stockpile.count(town, "sheep") < under)
+	towns.sort_custom(func(a: String, b: String) -> bool:
+		var near_a := str(production.holdings.place(a).get("area", "")) == area if production.holdings != null else false
+		var near_b := str(production.holdings.place(b).get("area", "")) == area if production.holdings != null else false
+		return near_a and not near_b or near_a == near_b and a < b)
+	return str(towns[0]) if not towns.is_empty() else ""
+
+
+## The herders' folds in [param area_name] (every area: ""): place id ->
+## its sheep at home (640, the "folds" message).
+func folds(area_name := "") -> Dictionary:
+	var out := {}
+	for id: String in _herders:
+		if area_name.is_empty() or production.holdings != null and str(production.holdings.place(id).get("area", "")) == area_name:
+			out[id] = production.stockpile.count(id, "sheep")
+	return out
+
 
 ## [param town]'s flock ({} for none; Jeff: "sheep and wool yes"): {count
 ## (a float: lambs come in parts), season (the last seen), sheared (this
@@ -2105,6 +2215,21 @@ func _town(town: String) -> Dictionary:
 ## to_spread}.
 func to_dict() -> Dictionary:
 	return _towns.duplicate(true)
+
+
+## The hill herders' records (640), saved beside the towns ("herders").
+func herders_to_dict() -> Dictionary:
+	return _herders.duplicate(true)
+
+
+## herders_to_dict's [param saved] over what is here.
+func herders_from_dict(saved: Dictionary) -> void:
+	for id: Variant in saved:
+		if saved[id] is Dictionary:
+			var herd: Dictionary = saved[id]
+			_herders[str(id)] = {"since": int(herd.get("since", 0)), "season": str(herd.get("season", "")),
+				"lambs": float(herd.get("lambs", 0.0)), "next": int(herd.get("next", 0)), "back": int(herd.get("back", 0)),
+				"unsold": maxi(int(herd.get("unsold", 0)), 0)}
 
 
 ## to_dict's [param saved] over what is here (after Production). Anything

@@ -415,6 +415,7 @@ func _test_in_town() -> void:
 	_test_robber_falls(host)
 	await _test_give_in_town(host)
 	_test_town_sheet(host)
+	_test_drove()
 	remove_child(_main)
 	_main.free()
 	World.clear_zones()
@@ -556,6 +557,38 @@ func _test_town_sheet(host: Player) -> void:
 		"the next stage and what it lacks (%s)" % [next])
 	_check(sheet["mood"] in ["safe", "uneasy", "on guard"] and sheet["season"] != "" and sheet["sought"] is Array, "the mood, season and sought")
 	_check(_main.ask_town_sheet(host, {"town": "nowhere/store"}).get("why") == "you don't know that town", "a town they don't know: refused")
+
+
+## A herder's drove bought by the town (640, economy's side): as many as
+## the treasury pays above gold_floor at the store's sheep price, the gold
+## to the herder (taxed as a sale), never owed; then food bought for their
+## keep, the gold back to the treasury.
+func _test_drove() -> void:
+	print("
+== a herder's drove ==")
+	var economy := World.economy
+	var stock := World.stockpile
+	World.production.add_worker("herder:test", "Grim", ["herder"], "nowhere/hut")
+	var unit := maxi(roundi(economy.raw_price(STORE, "sheep") * float(economy.rules["store"]["buy"])), 1)
+	var floor_gold := int(economy.rules.get("gold_floor", 0))
+	var gold := stock.count(STORE, "gold")
+	if gold > floor_gold + unit * 2:
+		stock.take(STORE, "gold", gold - floor_gold - unit * 2, "test")
+	var sheep := stock.count(STORE, "sheep")
+	stock.deposit(STORE, "food", 5, "test")
+	var food := stock.count(STORE, "food")
+	_check(economy.buy_drove(STORE, "herder:test", 5, 0) == 2 and stock.count(STORE, "sheep") == sheep + 2 and stock.count(STORE, "gold") == floor_gold + int(Economy.taxed(unit * 2, "sale", economy.rules)[0])
+		and int(World.production.worker("herder:test")["owed"]) == 0 and int(World.production.worker("herder:test")["purse"]) > 0,
+		"a treasury with 2 sheep's worth over its floor buys 2 of 5, owing nothing (%d)" % stock.count(STORE, "sheep"))
+	var purse := int(World.production.worker("herder:test")["purse"])
+	var each := economy.raw_price(STORE, "food")
+	stock.deposit(STORE, "gold", unit * 3, "test")
+	var before := stock.count(STORE, "gold")
+	var bought := economy.buy_drove(STORE, "herder:test", 1, 2)
+	var ate := mini(2, floori(float(purse + unit) / each))
+	_check(bought == 1 and stock.count(STORE, "food") == food - ate, "with the gold, food for their keep (%d eaten)" % (food - stock.count(STORE, "food")))
+	_check(stock.count(STORE, "gold") == before - unit + int(Economy.taxed(unit, "sale", economy.rules)[0]) + ate * each, "the food's gold back to the treasury")
+	World.production.remove_worker("herder:test")
 
 
 ## The "give_gold" command (614) in Main: to a second player beside the

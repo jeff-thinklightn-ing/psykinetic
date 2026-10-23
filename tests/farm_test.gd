@@ -43,6 +43,7 @@ func _ready() -> void:
 	_test_season_scale()
 	_test_maker_comes()
 	_test_sought()
+	_test_herders()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -477,3 +478,63 @@ func _test_sought() -> void:
 	entries = towns.sought(TOWN)
 	_check(not entries.is_empty() and entries[0]["holder"] == str(_rules["sought"]["guards"]["castle_dungeon"]["faction"]),
 		"held by sought.guards' faction there (%s)" % [entries])
+
+
+## The hill herders (decision 640, economy's side): a herder comes to each
+## hills refuge keyed in herder.places, with his start sheep; he lambs in
+## spring, and every few days walks all but keep down to the town with a
+## butchery, the fold's count dropping while he is away; the town buys
+## what its treasury pays; what it doesn't comes home with him. No
+## butchery: he stays home. Saved and loaded.
+func _test_herders() -> void:
+	print("
+== the hill herders ==")
+	var rule: Dictionary = _rules["herder"]
+	_check(rule["places"] == ["herders_hut", "hill_shieling"] and int(rule["start"]) == 4 and int(rule["keep"]) == 2,
+		"the rules are economy.json's (%s)" % [rule])
+	var rows: Array[String] = []
+	for y in 20:
+		rows.append(".".repeat(40))
+	Level.register("fh", Level.image_from_rows(rows), null, {"places": {
+		"store": {"at": [4, 4], "kind": "stockpile", "radius": 3, "holder": "town"},
+		"herders_hut": {"at": [30, 10], "kind": "other", "radius": 2, "holder": "nobody"}}})
+	_now = 0
+	var clock := func() -> int: return _now
+	var holdings := Holdings.new(WorldMap.build(["fh"] as Array[String]), null, {}, clock)
+	var stock := Stockpile.new({}, clock, ItemBook.new(clock))
+	var work := Production.new({}, stock, holdings, clock, _rules)
+	var towns := Towns.new({}, work, _rules, clock)
+	const STORE := "fh/store"
+	const HUT := "fh/herders_hut"
+	var sold: Array = []
+	var pays := [99]
+	towns.drove = func(town: String, who: String, count: int, _food: int) -> int:
+		var bought := mini(count, int(pays[0]))
+		sold.append([town, who, count, bought])
+		return bought
+	towns._town(STORE)
+	var day := DayNight.day_steps
+	var tick_to := func(step: int) -> void:
+		while _now < step:
+			_now += World.WORLD_TICK_STEPS
+			towns.tick()
+	tick_to.call(int(rule["growth_days"]) * day - World.WORLD_TICK_STEPS)
+	_check(work.worker("herder:" + HUT).is_empty(), "not before growth_days")
+	tick_to.call(int(rule["growth_days"]) * day + World.WORLD_TICK_STEPS)
+	var who := "herder:" + HUT
+	_check(not work.worker(who).is_empty() and stock.count(HUT, "sheep") == 4 and towns.folds() == {HUT: 4} and work.outside(who),
+		"a herder at the hut, with 4 sheep of his own; outside any town's purse (%s)" % [work.worker(who)])
+	tick_to.call(_now + int(rule["every"]) * day + World.WORLD_TICK_STEPS)
+	_check(sold.is_empty() and stock.count(HUT, "sheep") == 4, "no town with a butchery: no drove")
+	towns._town(STORE)["buildings"]["butchery"] = {"kind": "butchery", "level": 1, "state": Towns.STANDING, "since": _now, "job": 0}
+	_check(towns.drove_town(HUT) == STORE, "the town with a butchery buys")
+	pays[0] = 1
+	tick_to.call(_now + int(rule["every"]) * day + World.WORLD_TICK_STEPS)
+	_check(sold.size() == 1 and sold[0] == [STORE, who, 2, 1] and stock.count(HUT, "sheep") == 2 and bool(work.worker(who)["away"]),
+		"he drives 2 down (all but 2), the town pays for 1, the fold shows 2 while he walks (%s)" % [sold])
+	tick_to.call(_now + int(rule["walk_steps"]) + World.WORLD_TICK_STEPS)
+	_check(not bool(work.worker(who)["away"]) and stock.count(HUT, "sheep") == 3, "home with the unsold one: 3 (%d)" % stock.count(HUT, "sheep"))
+	var saved := Towns.new({}, work, _rules, clock)
+	saved.herders_from_dict(JSON.parse_string(JSON.stringify(towns.herders_to_dict())))
+	_check(saved.herders_to_dict()[HUT]["next"] == towns.herders_to_dict()[HUT]["next"], "saved and loaded")
+	Level.unregister("fh")

@@ -792,6 +792,33 @@ func tick() -> void:
 			dole_changed.emit(town, count)
 
 
+## Herder [param herder_id] drives [param count] sheep into [param town]'s
+## store (640, economy's side: Jeff's "herders exist as people"): the
+## town buys as many as its treasury pays above gold_floor, at the store's
+## buy price for sheep (raw_price x store.buy), never owing them (they are not
+## the town's); with the gold they buy [param food] food from the store at
+## raw_price for their own keep, eaten, so the gold comes back. The sheep
+## bought.
+func buy_drove(town: String, herder_id: String, count: int, food := 0) -> int:
+	var who := production.worker(herder_id)
+	if who.is_empty() or count < 1:
+		return 0
+	var unit := maxi(roundi(raw_price(town, "sheep") * float(rules.get("store", {}).get("buy", 1.0))), 1)
+	var spare := stockpile.count(town, "gold") - int(rules.get("gold_floor", 0))
+	var sold := mini(count, floori(float(spare) / unit))
+	if sold < 1 or not stockpile.take(town, "gold", sold * unit, "a drove of %d sheep from %s" % [sold, who["name"]]):
+		return 0
+	stockpile.deposit(town, "sheep", sold, str(who["name"]), "a drove from the hills", herder_id)
+	_pay(town, herder_id, sold * unit, "sale", "%d sheep sold to %s" % [sold, town])
+	var eats := mini(food, stockpile.count(town, "food"))
+	var each := raw_price(town, "food")
+	eats = mini(eats, floori(float(production.worker(herder_id)["purse"]) / each))
+	if eats > 0 and production.spend(herder_id, eats * each, "%d food for the hills" % eats):
+		stockpile.take(town, "food", eats, "eaten by %s" % who["name"])
+		stockpile.deposit(town, "gold", eats * each, str(who["name"]), "%d food sold to %s" % [eats, who["name"]])
+	return sold
+
+
 ## What [param town]'s store asks a resident for one of resource
 ## [param what]: its value, scaled by how short of comfort the town is.
 func raw_price(town: String, what: String) -> int:

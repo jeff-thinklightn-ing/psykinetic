@@ -617,11 +617,15 @@ func manned(workshop_id: String) -> bool:
 
 
 ## Whether [param worker_id] lives outside any town's purse (rules'
-## return.places with "outside": the medicine man): no rent, no needs.
+## return.places with "outside": the medicine man; rules' herder.trade):
+## no rent, no needs.
 func outside(worker_id: String) -> bool:
 	if _trips.has(worker_id):
 		return true
 	var trades: Array = _workers.get(worker_id, {}).get("trades", [])
+	# A hill herder keeps themself, buying food when they sell a drove (640).
+	if rules.get("herder", {}).has("trade") and str(rules["herder"]["trade"]) in trades:
+		return true
 	for place: Dictionary in rules.get("return", {}).get("places", {}).values():
 		if bool(place.get("outside", false)) and str(place.get("trade", "")) in trades:
 			return true

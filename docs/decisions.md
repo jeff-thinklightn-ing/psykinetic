@@ -25574,3 +25574,65 @@ coordinator approved it; Jeff's draft values, which he tunes in play).
 production_test _test_made_needs and _test_mail_never_made (twenty days' work
 on the real catalog: no mail, no plate). Server only, protocol unchanged, no
 new class_name.
+
+## 640, economy's side: the hill herders
+
+Jeff: "herders exist as people". The coordinator approved this design; maps
+lays the places and draws the folds (640, maps' side), art-kit makes the
+fold, and lore names the herders (sought.md). The numbers are drafts,
+built as drafted; the cut that ships them carries a tune line.
+
+- Places: rules' herder.places names the hills' two refuge tags,
+  herders_hut and hill_shieling, not a new place kind. Each Holdings place
+  with one of those keys is a herder's holding of its own, as a healer's
+  hut is (562).
+  - Its store is keyed by the place id. It is no stockpile place, so a
+    player can't bank there.
+  - The herder never reads the place's holder, so the sought butcher and
+    weaver sheltering there (613's "sought:<id>" holder) don't collide with
+    him.
+- The herder: a Production worker "herder:<place>" (trade herder), whose
+  town is the place.
+  - One comes to a place without one after herder.growth_days (3), with
+    herder.start (4) sheep, named from herder.names (lore's Grim, Asa, Ketil,
+    Thora, Ulf, Sigrun).
+  - Never sought.
+  - Production.outside counts herder.trade: no rent, no town needs.
+- The drove: the place's "sheep" in the stockpile.
+  - Each spring it lambs as the town's flock does (herder.lambs 0.6),
+    toward herder.most (8).
+  - Every herder.every (3) days, while the herder is home, they walk all but
+    herder.keep (2) to Towns.drove_town: a town whose butchery stands and
+    whose store holds under butcher.from sheep, in the place's own area
+    first, then by id.
+  - The fold's count drops at once, and the herder is away for
+    herder.walk_steps (3000).
+  - What the town doesn't buy comes home with them.
+  - No such town: they stay home.
+  - The town's autumn cull (590) stays; the drove is a second source.
+- Economy.buy_drove(town, herder, count, food):
+  - Buys as many as the treasury pays above gold_floor, at the store's buy
+    price for sheep (raw_price x store.buy).
+  - Never owes: the herder is not the town's.
+  - The gold goes to the herder as a sale (taxed).
+  - With it they buy herder.food (2) food from the store at raw_price for
+    their keep. It is eaten, and the gold comes back to the treasury.
+  - Main sets Towns.drove to it.
+- The folds:
+  - Towns.folds(area) returns place id -> sheep at home.
+  - Towns.folds_changed (a herder comes, lambs, a drove leaves, the herder
+    comes home) sends the new "folds" message {counts} to every peer.
+  - _send_towns sends a zone's folds to a peer arriving.
+  - Maps' client draws min(count, 6) sheep in the fold as scenery. The town
+    pasture's flock may later join the same map as "<town>:pasture".
+- Saved: Towns.herders_to_dict under the snapshot's "herders", beside
+  "towns". to_dict stays the towns alone, since nine callers read its keys
+  as towns.
+- Not built: the design let a raid take a herder. Raids take a town's
+  residents, and a herder is no town's, so none is taken yet. With no
+  herder, a place gets a new one after growth_days.
+
+farm_test _test_herders (the coming, the drove down, a part sold, the
+unsold home, saved); economy_test _test_drove (the treasury's limit, never
+owed, the food bought back). Wire: the "folds" message kind, a line under
+PROTOCOL_REVISION 34. No new class_name.
