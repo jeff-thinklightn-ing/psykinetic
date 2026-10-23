@@ -12,6 +12,8 @@ extends RefCounted
 ## trade> (npc's look_spec writes it from the card): a trade dresses them
 ## (TRADE_GARB) where no garb or headwear is said, the card's own words
 ## winning; a person's face its own (FACE_KEYS, seeded, never said);
+## worn=leather|mail|plate|robes (armour, a resident's: npc's look_spec;
+## a player's or a companion's is their worn item, Client3D._sync_worn);
 ## and people=orc or people=kobold (decision 478): one of the Blood Rot's
 ## allies (orc.glb, kobold.glb), drawn in its people's own skins (PEOPLE_SKINS,
 ## the Blood Rot's greens), wearing only its people's parts (an orc its hair
@@ -52,6 +54,11 @@ const HEADWEAR_PARTS := {"none": "", "hood": "Hood", "hat": "Hat_Brimmed", "cap"
 ## Garb (decision 480): what is worn over the tunic, by word; rolled is the
 ## sleeves rolled to the elbows.
 const GARB_PARTS := {"none": "", "vest": "Vest", "coat": "Coat", "cape": "Cape", "rolled": "Sleeves_Rolled"}
+## Armour (items' 622): each look's covering, by Items.armour_of's look
+## (body_gen's Armour_* parts); worn, it is shown in place of the garb
+## under it (GARB_UNDER_ARMOUR), and hair, headwear and the cape stay.
+const ARMOUR_PARTS := {"leather": "Armour_Leather", "mail": "Armour_Mail", "plate": "Armour_Plate", "robes": "Armour_Robes"}
+const GARB_UNDER_ARMOUR: Array[String] = ["Vest", "Coat", "Apron", "Sleeves_Rolled"]
 ## How likely a person with no garb said and no trade to dress them wears
 ## some, and which (one of these, alike).
 const GARB_CHANCE := 0.3
@@ -130,6 +137,8 @@ var beard := ""
 var skin := 1
 var garb := "none"
 var trade := ""
+## The armour look its words say it wears (worn=), "" for none.
+var worn := ""
 
 
 ## The look [param look] gives; [param body_by_default] when it names none
@@ -253,6 +262,7 @@ func _resolve(body_by_default: StringName) -> void:
 		_wear_headwear(str(dressed[1]))
 	if GARB_PARTS[garb] != "":
 		parts.append(GARB_PARTS[garb])
+	worn = str(words.get("worn", "")) if str(words.get("worn", "")) in ARMOUR_PARTS else ""
 
 
 ## [param worn] on the head, in place of any headwear drawn (a hood's hair
@@ -307,3 +317,34 @@ func apply(scene: Node3D, tunic := Color.WHITE) -> void:
 			mesh.set_instance_shader_parameter(part, colours[part])
 		if tunic != Color.WHITE:
 			mesh.set_instance_shader_parameter("tunic", tunic)
+
+
+## [param scene] (as apply drew it) wearing armour (items' 622): the
+## covering of [param id]'s look (Items.armour_of) shown, tinted the item's
+## colour, the garb under it (GARB_UNDER_ARMOUR) hidden; with no armour id,
+## the look's own worn= look in its kind's colour (armour_kind); with
+## neither, the look's own parts again. A body without that covering (an
+## ally's) wears nothing new and keeps its parts.
+func wear(scene: Node3D, id: String) -> void:
+	var armour := Items.armour_of(id) if not id.is_empty() else {}
+	var look := str(armour.get("look", worn))
+	var part := str(ARMOUR_PARTS.get(look, ""))
+	if not part.is_empty() and scene.find_child(part, true, false) == null:
+		part = ""
+	var colour := Items.color_of(id) if not armour.is_empty() else Items.color_of(armour_kind(look))
+	for mesh: MeshInstance3D in scene.find_children("*", "MeshInstance3D", true, false):
+		var name := String(mesh.name)
+		if name.begins_with("Armour_"):
+			mesh.visible = name == part
+			if name == part:
+				mesh.set_instance_shader_parameter("tunic", colour)
+		elif name in GARB_UNDER_ARMOUR:
+			mesh.visible = name in parts and part.is_empty()
+
+
+## The first kind in the catalog whose armour looks [param look]; "" for none.
+static func armour_kind(look: String) -> String:
+	for id: String in Items.all():
+		if str(Items.armour_of(id).get("look", "")) == look:
+			return id
+	return ""

@@ -77,6 +77,7 @@ func _ready() -> void:
 	await _test_target_marked()
 	await _test_goblin()
 	_test_humans()
+	_test_worn()
 	_test_person_looks()
 	_test_person_garb()
 	_test_attach_points()
@@ -5508,6 +5509,45 @@ func _frames(count: int) -> void:
 ## Long enough for a bar to fade all the way in or out.
 func _fade() -> void:
 	await get_tree().create_timer(1.0 / Client3D.HP_BAR_FADE + 0.1).timeout
+
+
+func _test_worn() -> void:
+	print("
+== armour worn (items' 622): its look's covering on the body, in the item's colour, the garb under it hidden ==")
+	var player := _player()
+	_rig._process(0.0)
+	var puppet: Node3D = _rig._puppets[player.get_instance_id()]
+	var look := puppet.get_meta("look") as PersonLook
+	var model := puppet.get_node_or_null("Body/Model") as Node3D
+	var shown := func() -> Array:
+		return model.find_children("Armour_*", "MeshInstance3D", true, false).filter(func(m: MeshInstance3D) -> bool: return m.visible).map(
+				func(m: MeshInstance3D) -> String: return String(m.name))
+	_check(model != null and shown.call().is_empty() and player.worn == "", "nothing worn: no covering")
+	if model == null:
+		return
+	look.parts.append("Vest")  # A vest, to be covered.
+	look.apply(model, puppet.get_meta("tint", Color.WHITE))
+	var vest := model.find_child("Vest", true, false) as MeshInstance3D
+	var each := []
+	for id: String in ["leather_armour", "mail_armour", "plate_armour", "robes"]:
+		player.worn = id
+		_rig._process(0.0)
+		var part := str(PersonLook.ARMOUR_PARTS[Items.armour_of(id)["look"]])
+		var mesh := model.find_child(part, true, false) as MeshInstance3D
+		each.append([id, shown.call(), mesh != null and mesh.get_instance_shader_parameter("tunic") == Items.color_of(id), vest.visible])
+	_check(each.all(func(e: Array) -> bool: return e[1].size() == 1 and e[2] and not e[3]),
+			"each armour its own covering, in its colour, over the vest (%s)" % [each])
+	player.worn = ""
+	_rig._process(0.0)
+	_check(shown.call().is_empty() and vest.visible, "taken off: no covering, the vest again")
+	var said := PersonLook.make("seed=7 worn=robes")
+	_check(said.worn == "robes" and PersonLook.make("seed=7 worn=gown").worn == "", "a look's worn= word (a resident's), a known look only")
+	said.wear(model, "")
+	_check(shown.call() == ["Armour_Robes"] and (model.find_child("Armour_Robes", true, false) as MeshInstance3D).get_instance_shader_parameter("tunic")
+			== Items.color_of(PersonLook.armour_kind("robes")), "a worn= word: that look, in its kind's colour")
+	look.parts.erase("Vest")
+	look.apply(model, puppet.get_meta("tint", Color.WHITE))
+	model.set_meta("worn", "")
 
 
 func _player() -> Player:

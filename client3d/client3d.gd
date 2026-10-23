@@ -10130,6 +10130,7 @@ func _sync_puppets() -> void:
 			if not is_equal_approx(facing.rotation.y, yaw):
 				facing.rotation.y = yaw
 		_sync_held(entity, puppet)
+		_sync_worn(entity, puppet)
 		if entity is Resident:
 			_sync_addressing(entity as Resident, puppet)
 			_sync_work(entity as Resident, puppet)
@@ -10894,6 +10895,22 @@ func _sync_held(entity: GridEntity, puppet: Node3D) -> void:
 			if own and hand == 0:
 				_grip(thing, work)
 			socket.add_child(thing)
+
+
+## The armour [param entity] wears (items' 622; a player's and a
+## companion's worn item, a resident's look's worn= word) drawn on its
+## body (PersonLook.wear), when it changes.
+func _sync_worn(entity: GridEntity, puppet: Node3D) -> void:
+	if not puppet.has_meta("look"):
+		return
+	var look := puppet.get_meta("look") as PersonLook
+	var id := str(entity.get("worn")) if "worn" in entity else ""
+	var key := id if not id.is_empty() else look.worn
+	var model := puppet.get_node_or_null("Body/Model") as Node3D
+	if model == null or key == str(model.get_meta("worn", "")):
+		return
+	model.set_meta("worn", key)  # On the model: a body made again wears it again.
+	look.wear(model, id)
 
 
 ## A carried lantern as it hangs at the belt: a small dark frame round a

@@ -1433,6 +1433,133 @@ def miner_cap(J: dict) -> list:
 	return [p, candle]
 
 
+## Armour (decision pending, items' armour): one covering per look, over the tunic, in the
+## "Tunic" region so the game tints each by its item's colour on its own mesh. They are built
+## from the body's own rings, so they fit every build and key as the garb does.
+
+
+def _out(r: list, k: float, dz: float = 0.0, margin: float = 0.0, belly: float = 0.0) -> list:
+	"""A ring of the torso's, [k] times as far out from the centre line and [margin] more,
+	[dz] up, its front pushed [belly] further (over the belt's buckle)."""
+	c = Vector((0.0, sum(q.y for q in r) / len(r), r[0].z))
+	out = []
+	for q in r:
+		away = Vector((q.x, q.y - c.y, 0.0))
+		way = away.normalized() if away.length > 1e-6 else Vector()
+		front = max(0.0, -way.y) ** 2
+		out.append(Vector((c.x + away.x * k + way.x * margin, c.y + away.y * k + way.y * margin - belly * front, q.z + dz)))
+	return out
+
+
+def _shell(J: dict, name: str, rows: range, out: float, hem: list = None) -> Part:
+	"""A shell over the torso, its rings [rows] of torso_rings [out] times as far out; [hem]
+	(heights below the tunic's hem, each with its flare) hang below it first."""
+	p = Part(name, "Tunic")
+	p.bones = TORSO_BONES + (["calf_l", "calf_r"] if hem and min(z for z, _ in hem) < J["calf_l"].z + 0.05 else [])
+	rings = torso_rings(J)
+	for z, flare in hem or []:
+		p.add([Vector((q.x * flare, q.y * flare, z)) for q in rings[0]])
+	for k in rows:
+		# Clear of the belt, which stands proud of the tunic at the waist (and the belly's
+		# front under it): a margin round the hips and waist, the front pushed out there.
+		margin = 0.016 if 2 <= k <= 4 else 0.004
+		p.add(_out(rings[k], out if k < 7 else out - 0.01, 0.004 if k >= 6 else 0.0, margin,
+			m("belly") * 0.8 + 0.01 if k == 2 else 0.0))
+	return p
+
+
+def _arm(J: dict, side: str, name: str, at: list, scale: float, square: float = 0.3, shoulder: bool = False) -> Part:
+	"""Rings round [side]'s arm at [at] ((place 0 shoulder .. 1 elbow .. 2 wrist, its half-height,
+	its half-depth), the sleeve's sizes) times [scale]; [shoulder] holds its first ring to the
+	clavicle and the next half with it, as the sleeve's top is."""
+	sh, el, wr = J["upperarm_" + side], J["lowerarm_" + side], J["hand_" + side]
+	along = (wr - sh).normalized()
+	p = Part(name, "Tunic")
+	p.bones = (["spine_03", "clavicle_" + side] if shoulder else []) + ["upperarm_" + side, "lowerarm_" + side, "hand_" + side]
+	k = pick(1.0, 0.86) * m("arms") * scale
+	down = Vector((0.0, 0.0, -0.018))
+	for t, rv, ru in at:
+		if t < 0.0:
+			c = sh + along * (0.07 * t) + down  # Inside the shoulder.
+		elif t <= 1.0:
+			c = sh.lerp(el, t) + (down if t < 0.1 else Vector())
+		else:
+			c = el.lerp(wr, t - 1.0)
+		p.add(ring(c, FRONT, Z, ru * k, rv * k, 8, square))
+	if shoulder:
+		p.pins = {0: "clavicle_" + side}
+		p.mixes = {1: ("clavicle_" + side, 0.5)}
+	return p
+
+
+def _shin(J: dict, side: str, name: str, at: list, scale: float, square: float = 0.35) -> Part:
+	"""Rings round [side]'s shin at [at] ((place 0 knee .. 1 ankle, half-width, half-depth)),
+	over the boot's shaft, times [scale]."""
+	knee, ankle = J["calf_" + side], J["foot_" + side]
+	p = Part(name, "Tunic")
+	p.bones = ["thigh_" + side, "calf_" + side, "foot_" + side]
+	k = pick(1.0, 0.9) * m("legs") * scale
+	for t, ru, rv in at:
+		p.add(ring(knee.lerp(ankle, t), X, FRONT, ru * k, rv * k, 8, square, (0.012 * k, 0.0)))
+	return p
+
+
+def leather_armour(J: dict) -> list:
+	"""Leather: a jerkin over the tunic from its hem to the shoulders, bracers on the forearms,
+	greaves on the shins over the boots."""
+	out = [_shell(J, "Jerkin", range(0, 8), 1.06)]
+	for side in ("l", "r"):
+		out.append(_arm(J, side, "Bracer_" + side, [(1.2, 0.050, 0.052), (1.55, 0.048, 0.048), (1.92, 0.044, 0.042)], 1.22))
+		out.append(_shin(J, side, "Greave_" + side, [(0.06, 0.074, 0.078), (0.3, 0.080, 0.084), (0.62, 0.070, 0.072)], 1.1))
+	return out
+
+
+def mail_armour(J: dict) -> list:
+	"""Mail: a long shirt to mid-thigh, its sleeves to the elbow."""
+	hem = torso_rings(J)[0][0].z
+	out = [_shell(J, "Mail_Shirt", range(0, 8), 1.05, [(hem - pick(0.16, 0.10), 1.1), (hem - pick(0.08, 0.05), 1.07)])]
+	for side in ("l", "r"):
+		out.append(_arm(J, side, "Mail_Sleeve_" + side, [(-1.0, 0.052, 0.075), (0.05, 0.060, 0.074), (0.45, 0.058, 0.058),
+			(1.05, 0.050, 0.052)], 1.12, shoulder=True))
+	return out
+
+
+def plate_armour(J: dict) -> list:
+	"""Plate: a cuirass with its skirt of plates, pauldrons over the shoulders, vambraces,
+	cuisses on the thighs and greaves on the shins; squarer than cloth."""
+	hem = torso_rings(J)[0][0].z
+	cuirass = _shell(J, "Cuirass", range(0, 8), 1.09, [(hem - 0.07, 1.12)])
+	out = [cuirass]
+	for side in ("l", "r"):
+		out.append(_arm(J, side, "Pauldron_" + side, [(-1.0, 0.070, 0.085), (0.0, 0.088, 0.096), (0.22, 0.082, 0.086),
+			(0.4, 0.066, 0.066)], 1.15, 0.45, shoulder=True))
+		out.append(_arm(J, side, "Vambrace_" + side, [(1.15, 0.050, 0.054), (1.55, 0.048, 0.048), (1.92, 0.044, 0.042)], 1.28, 0.5))
+		hip, knee = J["thigh_" + side], J["calf_" + side]
+		sign = 1.0 if side == "l" else -1.0
+		cuisse = Part("Cuisse_" + side, "Tunic")
+		cuisse.bones = ["pelvis", "thigh_" + side, "calf_" + side]
+		k = pick(1.0, 0.98) * m("legs") * m("thighs") * 1.16
+		for c, ru, rv in [(hip + Vector((-0.008 * sign, 0, -0.06)), 0.090, 0.094), (hip.lerp(knee, 0.55), 0.076, 0.079),
+				(knee + Vector((0, 0, 0.03)), 0.066, 0.070)]:
+			cuisse.add(ring(c, X, FRONT, ru * k, rv * k, 8, 0.5))
+		out.append(cuisse)
+		out.append(_shin(J, side, "Plate_Greave_" + side, [(0.04, 0.074, 0.078), (0.3, 0.082, 0.086), (0.66, 0.072, 0.074)], 1.16, 0.55))
+	return out
+
+
+def robes(J: dict) -> list:
+	"""Robes: from the shoulders down past the knees to the shins, flaring; full sleeves,
+	wider at the wrist."""
+	knee, ankle = J["calf_l"], J["foot_l"]
+	hem = torso_rings(J)[0][0].z
+	shin = knee.lerp(ankle, 0.55).z
+	out = [_shell(J, "Robe", range(0, 8), 1.04, [(shin, 1.32), (knee.z, 1.2), ((knee.z + hem) * 0.5, 1.1)])]
+	for side in ("l", "r"):
+		out.append(_arm(J, side, "Robe_Sleeve_" + side, [(-1.0, 0.052, 0.075), (0.05, 0.060, 0.074), (0.45, 0.058, 0.058),
+			(1.0, 0.052, 0.054), (1.5, 0.056, 0.056), (1.95, 0.066, 0.064)], 1.1, shoulder=True))
+	return out
+
+
 ## The parts a person may wear, by name: each its own mesh on the skeleton, shape-keyed
 ## as the body is, shown or not by the game. Bald is no hair part.
 WEARABLES = {
@@ -1450,6 +1577,11 @@ WEARABLES = {
 	"Cape": cape,
 	"Sleeves_Rolled": rolled_sleeves,
 	"Cap_Soft": soft_cap,
+	# Armour: one covering per look (Items.armour_of's), worn in place of the garb.
+	"Armour_Leather": leather_armour,
+	"Armour_Mail": mail_armour,
+	"Armour_Plate": plate_armour,
+	"Armour_Robes": robes,
 }
 ## An ally's own (decision 478): an orc may crop or bind its hair (a topknot); a kobold wears
 ## its cap or goes bare-headed.

@@ -24680,3 +24680,32 @@ Headless numbers (combat_test _test_armour):
 A 1-point shot still does 1 in plate. A spear's 10-point thrust does 7 in plate; a
 sword's cut does 10. All numbers are drafts for Jeff to tune in levels/items.json.
 Server only, protocol unchanged, no new class_name.
+## 622, pc-character's side. The armour seen
+
+Items' design (C:/dev/review/armour/design.md, the coordinator's approval): one covering per
+armour look, worn over the body in place of the garb under it.
+
+- **The coverings** (tools/body_gen.py WEARABLES, built from the body's own rings, so every build,
+  key and both bodies fit; 356 to 596 triangles each):
+  - Armour_Leather: a jerkin from the hem to the shoulders, bracers on the forearms, greaves on
+    the shins over the boots;
+  - Armour_Mail: a long shirt to mid-thigh, its sleeves to the elbow;
+  - Armour_Plate: a cuirass with its skirt of plates, pauldrons, vambraces, cuisses and greaves,
+    squarer than cloth;
+  - Armour_Robes: from the shoulders to the shins, flaring, full sleeves wider at the wrist.
+  Each stands a little clear of the belt at the waist. human_m and human_f are built again with
+  them; the body and every other part are as before.
+- **The tint:** each covering is in the "Tunic" region on its own mesh, so the client gives that
+  mesh the item's catalog colour (Items.color_of): a special armour of a known look needs
+  nothing new.
+- **Worn** (`Client3D._sync_worn`, `PersonLook.wear`): a player's or a companion's `worn` item
+  (items' replicated id) shows its look's covering (Items.armour_of) and hides the vest, coat,
+  apron and rolled sleeves (GARB_UNDER_ARMOUR); hair, headwear and the cape stay. Taken off, the
+  look's own parts come back. A resident's look may say `worn=leather|mail|plate|robes` (npc's
+  call), drawn in the first catalog kind of that look's colour. A body with no covering (an
+  ally's) shows nothing new.
+
+view_test _test_worn: nothing worn, no covering; each of the four kinds its own covering in its
+colour over a vest; taken off, the vest again; a look's worn= word, a known look only, in its
+kind's colour. Client only, protocol unchanged, no new class_name. The sheet of the four on two
+builds follows the coordinator's all-clear.
