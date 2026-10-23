@@ -287,6 +287,10 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## 32 (584 amended): the "barter" message from a medicine man carries
 ## "care" {gold, herbs, antlers, in_care, by}; new command "retain"
 ## {resident, pay: "gold" | "herbs" | "antlers"}.
+## 32 (591, economy's side): the "town" message gains "stage" (hamlet,
+## village, town, city).
+## 32 (594): place kinds "fishing" and "fort" (Level.PLACE_KINDS); a counter
+## in a fort place naming its town is that town's shop.
 const PROTOCOL_REVISION := 32
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]
