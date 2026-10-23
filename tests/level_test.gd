@@ -53,6 +53,7 @@ func _ready() -> void:
 	await _test_sealed_link()
 	_test_barrow_won()
 	await _test_hall_door()
+	await _test_hidden_niche()
 	_test_barrow_level()
 	await _test_edge_links()
 	_test_console()
@@ -1070,6 +1071,76 @@ func _test_hall_door() -> void:
 	Level.unregister("lt_hall")
 
 
+## The hidden door (608): the first hall's one true niche is a door spawned
+## locked and stone; a step into any niche presses on it ("Only the dead
+## lie here." once a stand), the true one gives, the stair behind it is
+## taken, and a climb from below pushes it open from behind.
+func _test_hidden_niche() -> void:
+	print("\n== the hidden door (608): niches pressed, the true one found, the stair behind it, opened from below ==")
+	# An 8 x 6 level: a room x 1..6, y 1..4 in the rock, three niches in its
+	# north wall at (2, 1), (4, 1) and (6, 1), the last the hidden one with
+	# its alcove at (6, 0) behind a door edge and the stair link in it.
+	var rows: Array[String] = []
+	for py in 6 * 2 - 1:
+		var row := ""
+		for px in 8 * 2 - 1:
+			var cell := Vector2i(px / 2, py / 2)
+			var floor_here := px % 2 == 0 and py % 2 == 0 and (cell.x >= 1 and cell.x <= 6 and cell.y >= 1 and cell.y <= 4 or cell == Vector2i(6, 0))
+			row += "+" if px == 12 and py == 1 else ("." if floor_here else " ")
+		rows.append(row)
+	Level.register("lt_niche", Level.image_from_rows(rows, {Vector2i(3, 3): "start", Vector2i(6, 0): "link"}), null,
+		{"niches": [[2, 1, 0, -1, "a", 1], [4, 1, 0, -1, "c", 2], [6, 1, 0, -1, "hidden", 1]],
+			"links": [{"at": [6, 0], "to_map": "test_room", "to_spawn": "", "hidden": true}],
+			"spawn_points": {"from_below": [6, 1]}})
+	var parsed := Level.load_level("lt_niche")
+	_check(parsed["warnings"].is_empty() and parsed["terrain"]["niches"].size() == 3 and parsed["links"][0]["hidden"],
+		"the level parses: three niches on the north wall, the stair link hidden (%s)" % [parsed["warnings"]])
+	_main.load_map("lt_niche")
+	var player := _player()
+	var key := Terrain.edge_key(Vector2i(6, 1), Vector2i(0, -1))
+	var door := World.door_on(key)
+	_check(door != null and not door.open and door.lock == "hidden_niche" and door.body_material == GridEntity.BodyMaterial.STONE
+		and World.niche_edges.size() == 3 and World.niche_edges.get(key) == "hidden" and World.niche_edges.get(Terrain.edge_key(Vector2i(2, 1), Vector2i(0, -1))) == "a",
+		"the hidden niche's door spawns shut, locked with a key nobody holds and stone; World knows the three niche edges (%s)" % [World.niche_edges])
+	_put(player, Vector2i(2, 1))
+	_wait_for_step(player)
+	var line := "Only the dead lie here."
+	_check(not World.try_move(player, Vector2i(0, -1)) and player.tile == Vector2i(2, 1) and _main.party_log.last(1) == [line],
+		"a step into a plain niche is stopped and says the line (%s)" % [_main.party_log.last(1)])
+	_wait_for_step(player)
+	var told: Array = _main.party_log.last(3)
+	World.try_move(player, Vector2i(0, -1))
+	_check(_main.party_log.last(3) == told, "pressing on at it says nothing more")
+	_put(player, Vector2i(4, 1))
+	_wait_for_step(player)
+	World.try_move(player, Vector2i(0, -1))
+	_check(_main.party_log.last(2) == [line, line], "another niche says it again")
+	_put(player, Vector2i(6, 1))
+	_wait_for_step(player)
+	_check(not World.may_open(player, door) and not World.try_toggle_door(player, key) and not door.open, "no walk opens the hidden niche's door and E rattles it")
+	_wait_for_step(player)
+	_check(not World.try_move(player, Vector2i(0, -1)) and player.tile == Vector2i(6, 1) and door.open and door.lock.is_empty()
+		and _main.party_log.last(1) == ["The slab swings aside: a stair goes down into the dark."],
+		"a step into the hidden niche finds it: the lock lifted, the door open, and said (%s)" % [_main.party_log.last(1)])
+	_wait_for_step(player)
+	_check(World.try_move(player, Vector2i(0, -1)) and player.tile == Vector2i(6, 0), "the alcove behind it is walked into")
+	await get_tree().process_frame
+	await get_tree().process_frame
+	_check(World.zone.name == "test_room" or World.peer_zone.get(Net.local_id, "") == "test_room", "and its stair is taken (%s)" % [World.peer_zone.get(Net.local_id, "")])
+	# Shut and locked again (a restart lays the door locked): a climb from
+	# below pushes it open from behind.
+	var there: Zone = World.zones["lt_niche"]
+	var was := World.enter(there)
+	World.hold_door(door, true, "hidden_niche")
+	World.enter(was)
+	_check(not door.open and door.lock == "hidden_niche", "locked again")
+	_main.travel(Net.local_id, "lt_niche", "from_below")
+	_check(door.open and door.lock.is_empty() and _player().tile == Vector2i(6, 1) and _main.party_log.last(2)[0] == "The slab swings aside from behind.",
+		"come up from below, the slab is pushed open from behind and said; the player stands before it (%s)" % [_main.party_log.last(2)])
+	_main.load_map("test_room")
+	Level.unregister("lt_niche")
+
+
 func _test_barrow_level() -> void:
 	print("\n== levels/barrow, barrow_deep, barrow_lair (decisions 542, 580): the barrow in layers; a test run never writes them ==")
 	var barrow := Level.load_level("barrow")
@@ -1107,6 +1178,14 @@ func _test_barrow_level() -> void:
 		and deep["links"].size() == 2 and deep["links"][0]["to_map"] == "barrow" and deep["links"][0]["to_spawn"] == "from_below" and deep["links"][1]["to_map"] == "barrow_lair"
 		and lair["links"].size() == 2 and lair["links"][0]["to_map"] == "barrow_deep" and lair["links"][1]["sealed"] == "draugr" and lair["links"][1]["to_spawn"] == "from_barrow_shortcut",
 		"the stairs link the layers both ways, and the temple's sealed shortcut ends behind the draugr's throne")
+	# The hidden door (608): the template's stair lies behind the south-east
+	# niche's door, the link hidden; the 14 niches read.
+	var niches: Array = barrow["terrain"]["niches"]
+	var hidden: Array = niches.filter(func(n: Dictionary) -> bool: return n["kind"] == "hidden")
+	_check(barrow["links"][1]["hidden"] and barrow["links"][1]["tile"] == Vector2i(52, 14) and not barrow["links"][0]["hidden"] and not deep["links"][0]["hidden"]
+		and niches.size() == 14 and hidden.size() == 1 and hidden[0]["cell"] == Vector2i(51, 14) and hidden[0]["edge"] == Terrain.edge_key(Vector2i(51, 14), Vector2i(1, 0))
+		and hidden[0]["out"] == Vector2i(-1, 0) and barrow["terrain"]["edges"][hidden[0]["edge"]] == Terrain.Edge.DOOR and barrow["spawn_points"]["from_below"] == Vector2i(51, 14),
+		"the template's stair down is hidden behind the first hall's south-east niche, a door edge, from_below before it; 14 niches on the hall's walls (%d, %s)" % [niches.size(), hidden])
 	var floor_ok := true
 	for pair: Array in [[barrow, "from_wilds"], [barrow, "from_below"], [deep, "from_above"], [deep, "from_below"], [lair, "from_above"], [lair, "from_temple"]]:
 		var level: Dictionary = pair[0]
@@ -1177,8 +1256,8 @@ func _test_castle() -> void:
 	_check(not castle.is_empty() and castle["display_name"] == "The Castle" and castle["warnings"].is_empty(),
 			"levels/castle is \"The Castle\" and loads cleanly (%s)" % [castle.get("warnings", "missing")])
 	_check(load("res://levels/castle/layout.png") is Image, "its layout.png is imported as an Image")
-	_check(str(castle["links"]) == str([{"tile": Vector2i(27, 12), "to_map": "test_room", "to_spawn": "from_castle", "one_way": false, "closed": false, "sealed": ""},
-			{"tile": Vector2i(16, 23), "to_map": "wilds", "to_spawn": "from_castle", "one_way": false, "closed": false, "sealed": ""}]),
+	_check(str(castle["links"]) == str([{"tile": Vector2i(27, 12), "to_map": "test_room", "to_spawn": "from_castle", "one_way": false, "closed": false, "sealed": "", "hidden": false},
+			{"tile": Vector2i(16, 23), "to_map": "wilds", "to_spawn": "from_castle", "one_way": false, "closed": false, "sealed": "", "hidden": false}]),
 			"its link at (27, 12) goes to the test room, at the foot of its road to the wilds (%s)" % [castle["links"]])
 	var room := Level.load_level("test_room")
 	var back: Array = (room["links"] as Array).filter(func(link: Dictionary) -> bool: return link["to_map"] == "castle")

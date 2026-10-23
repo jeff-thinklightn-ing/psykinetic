@@ -135,9 +135,13 @@ func _test_barrow() -> void:
 	var template := LevelMap.from_image(Level.template("lab_barrow")["layout"], config)
 	var a := LevelMap.from_image(first["layout"], config)
 	var b := LevelMap.from_image(second["layout"], config)
-	var kept := _anchors_kept(template, a, b, anchors, Sheet.BARROW_SIZE)
+	# The hall's columns (x 27 and 52) hold the hidden niche's alcove, the one
+	# change a generation makes inside an anchor (608).
+	var columns := func(cell: Vector2i) -> bool:
+		return Sheet.HALL.has_point(cell) and (cell.x == Sheet.HALL.position.x or cell.x == Sheet.HALL.end.x - 1)
+	var kept := _anchors_kept(template, a, b, anchors, Sheet.BARROW_SIZE, columns)
 	var floor_cells := _floor_of(a, Sheet.BARROW_SIZE)
-	_check(kept["same"], "inside the four anchors both generations are the template: the first hall with its niches and table, the altar and its guards, Pip's niche, the camp with the Runner's pack")
+	_check(kept["same"], "inside the four anchors both generations are the template: the first hall with its table, the altar and its guards, Pip's niche, the camp with the Runner's pack")
 	_check(kept["differ"] > 50 and floor_cells.size() > 800, "the tombs between differ (%d cells) and fill the rock (%d floor cells)" % [kept["differ"], floor_cells.size()])
 	_check(Regen.connected(a, anchors) and Regen.connected(b, anchors), "every anchor reaches every other in both")
 	_check(_cut_off(a, Sheet.BARROW_FROM_WILDS).is_empty() and _cut_off(b, Sheet.BARROW_FROM_WILDS).is_empty(),
@@ -149,8 +153,8 @@ func _test_barrow() -> void:
 			hall_floor += 1
 			if cell.x == Sheet.HALL.position.x or cell.x == Sheet.HALL.end.x - 1:
 				in_walls += 1
-	_check(hall_floor == 24 * 16 - 6 + 16 and in_walls == 16 and not a.walkable(Vector2i(39, 8)),
-		"the first hall: 24 x 16 of floor less the table's six cells, seven niches a side and a bay each (%d floor, %d in the walls)" % [hall_floor, in_walls])
+	_check(hall_floor == 24 * 16 - 6 + 3 and in_walls == 3 and not a.walkable(Vector2i(39, 8)),
+		"the first hall: 24 x 16 of floor less the table's six cells, a bay each side and the hidden niche's alcove in the walls (%d floor, %d in the walls)" % [hall_floor, in_walls])
 	var level := Level.parse(first["layout"], null, config)
 	var doors := 0
 	for key: Vector3i in level["terrain"]["edges"]:
@@ -172,7 +176,38 @@ func _test_barrow() -> void:
 		all_to_altar += absi(cell.x - altar.x) + absi(cell.y - altar.y)
 	_check(kinds.get("robber", 0) == 4 and robber_to_altar / 4.0 < all_to_altar / floor_cells.size(),
 		"the robbers, sent near the altar, stand closer to it than the floor's mean (%.1f against %.1f)" % [robber_to_altar / 4.0, all_to_altar / floor_cells.size()])
-	_check(config.get("graves", []).is_empty() and config.get("niches", []).is_empty(), "layer 1 lists no graves and no niches: no dead walk it")
+	_check(config.get("graves", []).is_empty(), "layer 1 lists no graves: no dead walk it")
+	# The hidden door (608): one of the first hall's 14 niches, picked with
+	# the seed, its alcove carved behind a door edge with the stair in it.
+	var niches: Array = config.get("niches", [])
+	var hidden: Array = niches.filter(func(n: Array) -> bool: return str(n[4]) == "hidden")
+	var kinds_ok := niches.all(func(n: Array) -> bool: return str(n[4]) in ["a", "c", "hidden"] and int(n[5]) in [1, 2])
+	var on_walls := true
+	for n: Array in niches:
+		var cell := Vector2i(int(n[0]), int(n[1]))
+		var step := Vector2i(int(n[2]), int(n[3]))
+		var on_wall: bool = cell.x == 28 and step == Vector2i(-1, 0) or cell.x == 51 and step == Vector2i(1, 0)
+		if not a.walkable(cell) or int(n[1]) not in Sheet.HALL_NICHE_ROWS or not on_wall or a.walkable(cell + step) != (str(n[4]) == "hidden"):
+			on_walls = false
+	_check(niches.size() == 14 and hidden.size() == 1 and kinds_ok and on_walls,
+		"the first hall's 14 niches are listed on its two long walls, arches and hollows with a slab now and then, rock behind each but the hidden one (%s)" % [niches])
+	if hidden.size() == 1:
+		var before := Vector2i(int(hidden[0][0]), int(hidden[0][1]))
+		var alcove := before + Vector2i(int(hidden[0][2]), int(hidden[0][3]))
+		var key := Terrain.edge_key(before, alcove - before)
+		_check(a.cell(alcove) == "link" and a.edge(key) == "door" and level["terrain"]["edges"].get(key) == Terrain.Edge.DOOR
+			and level["links"][1]["tile"] == alcove and level["links"][1]["hidden"] and level["spawn_points"]["from_below"] == before
+			and level["terrain"]["niches"].size() == 14 and level["terrain"]["niches"].filter(func(n: Dictionary) -> bool: return n["kind"] == "hidden")[0]["edge"] == key,
+			"the hidden niche's alcove holds the stair link (hidden) behind a door edge, from_below before it, and the parse reads all 14 (%s %s)" % [before, alcove])
+		_check(alcove == Sheet.BARROW_STAIR or not a.walkable(Sheet.BARROW_STAIR) and a.edge(Terrain.edge_key(Sheet.BARROW_FROM_BELOW, Vector2i(1, 0))) == "clear",
+			"the template's own alcove is rock again, its door edge gone, unless it is the pick (%s)" % [alcove])
+	var picks := {}
+	for generation in range(1, 7):
+		var made := Regen.generate("lab_barrow", generation)
+		for n: Array in made.get("config", {}).get("niches", []):
+			if str(n[4]) == "hidden":
+				picks[Vector2i(int(n[0]), int(n[1]))] = true
+	_check(picks.size() >= 2, "the pick moves between generations (%d different over six)" % picks.size())
 	_check(level["warnings"].is_empty() and level["links"].size() == 2 and level["links"][1]["to_map"] == "barrow_deep" and level["spawn_points"].size() == 2 and level["places"].has("niche"),
 		"no warnings; the way up and the stair down kept, the spawn points, Pip's niche place (%s)" % [level["warnings"]])
 	_check(_broad(a, floor_cells) * 10 >= floor_cells.size() * 8, "the ways are five wide: most floor cells have floor on two opposite sides (%d of %d)" % [_broad(a, floor_cells), floor_cells.size()])
@@ -256,14 +291,22 @@ func _test_barrow() -> void:
 			bands_ok = false
 	_check(graves.size() >= 6 and graves.size() == dead_ends and chests_in == 0 and bands_ok,
 		"the generated config lists every dead end outside the anchors as a grave with its band, none on a chest (%d graves, %d dead ends)" % [graves.size(), dead_ends])
-	var niches: Array = config.get("niches", [])
-	var niches_ok := not niches.is_empty()
+	# The Ossuary's niches (608): cut into the galleries' walls, rock behind
+	# each, shelves and columbarium cells with a hollow here and there.
+	niches = config.get("niches", [])
+	var deep_niches_ok := niches.size() >= 10
+	var cells_used := {}
+	var deep_kinds := {}
 	for niche: Array in niches:
 		var cell := Vector2i(int(niche[0]), int(niche[1]))
-		var mouth := Vector2i(int(niche[2]), int(niche[3]))
-		if not a.walkable(cell + mouth) or a.walkable(cell - mouth) or int(niche[4]) < 1 or int(niche[4]) > 3:
-			niches_ok = false
-	_check(niches_ok and niches.size() <= graves.size(), "the wall niches among them carry the way out of the wall and a variant 1 to 3 (%d)" % niches.size())
+		var step := Vector2i(int(niche[2]), int(niche[3]))
+		deep_kinds[str(niche[4])] = int(deep_kinds.get(str(niche[4]), 0)) + 1
+		if not a.walkable(cell) or a.walkable(cell + step) or a.edge(Terrain.edge_key(cell, step)) == "door" or Level.in_anchors(anchors, cell) \
+				or str(niche[4]) not in ["b", "c", "d"] or int(niche[5]) not in [1, 2] or cells_used.has(cell):
+			deep_niches_ok = false
+		cells_used[cell] = true
+	_check(deep_niches_ok and deep_kinds.has("b") and deep_kinds.has("d") and level["terrain"]["niches"].size() == niches.size(),
+		"the Ossuary's niches are cut into its walls with rock behind, one a cell, shelves and columbarium cells with hollows among them, none in an anchor, and the parse keeps every one (%d: %s)" % [niches.size(), deep_kinds])
 	_check(_broad(a, floor_cells) * 10 >= floor_cells.size() * 8, "the ways are five wide: most floor cells have floor on two opposite sides (%d of %d)" % [_broad(a, floor_cells), floor_cells.size()])
 	# Layer 3: the dark below, every room deep, and the Hall of Fallen Souls kept whole.
 	var dark := Regen.generate("lab_barrow_lair", 1)
@@ -287,7 +330,7 @@ func _test_barrow() -> void:
 		if level["terrain"]["edges"][key] == Terrain.Edge.DOOR:
 			doors += 1
 	kinds = _kinds(level)
-	_check(doors == 1 and level["terrain"]["torches"].is_empty(), "the dark below: no door but the hall's own, no torches, every room a cavern (%d doors, %d torches)" % [doors, level["terrain"]["torches"].size()])
+	_check(doors == 1 and level["terrain"]["torches"].is_empty() and config.get("niches", []).is_empty(), "the dark below: no door but the hall's own, no torches, no niches, every room a cavern (%d doors, %d torches)" % [doors, level["terrain"]["torches"].size()])
 	_check(kinds.get("skeleton", 0) == 6 and kinds.get("chest", 0) == 4 and kinds.get("draugr", 0) == 1 and kinds.get("robber", 0) == 0,
 		"six of the oldest dead and four chests laid; the draugr kept on his throne (%s)" % [kinds])
 	var in_hall := 0
@@ -302,18 +345,24 @@ func _test_barrow() -> void:
 
 
 ## Whether every anchor's cells and edges are the template's in both
-## [param a] and [param b], and how many cells outside differ between them.
-func _anchors_kept(template: LevelMap, a: LevelMap, b: LevelMap, anchors: Array, size: Vector2i) -> Dictionary:
+## [param a] and [param b] (but cells [param loose] says may move, and
+## the edges touching them), and how many cells outside differ between them.
+func _anchors_kept(template: LevelMap, a: LevelMap, b: LevelMap, anchors: Array, size: Vector2i, loose := Callable()) -> Dictionary:
 	var same := true
 	var differ := 0
+	var moves := func(cell: Vector2i) -> bool: return loose.is_valid() and loose.call(cell)
 	for y in size.y:
 		for x in size.x:
 			var cell := Vector2i(x, y)
 			if Level.in_anchors(anchors, cell):
+				if moves.call(cell):
+					continue
 				if a.cell(cell) != template.cell(cell) or b.cell(cell) != template.cell(cell):
 					same = false
 				for side in [Terrain.EAST, Terrain.SOUTH]:
 					var key := Vector3i(x, y, side)
+					if moves.call(Terrain.edge_cells(key)[1]):
+						continue
 					if a.edge(key) != template.edge(key) or b.edge(key) != template.edge(key):
 						same = false
 			elif a.cell(cell) != b.cell(cell):

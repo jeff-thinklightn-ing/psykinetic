@@ -43,7 +43,10 @@ extends RefCounted
 ## town's tombs: square chambers with doors and torches, no bands, no
 ## caverns), 2 (the default) the tombs by depth, 3 every room deep (the
 ## dark caverns: crooked ways, no doors, no torches); "ways": how wide a
-## way is carved, 3 (the default) or 5, an odd number of cells.
+## way is carved, 3 (the default) or 5, an odd number of cells; "niches"
+## (608, layer 1; Regen passes the template's top-level list): the first
+## hall's niche edges, re-rolled and one of them made the hidden door each
+## generation (niche_plan).
 
 const Tools := preload("res://sim/level_gen/gen_tools.gd")
 const DIRECTIONS: Array[Vector2i] = [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]
@@ -65,6 +68,10 @@ const NICHES := 3
 ## style's wander up to BLIND_LONG).
 const BLIND_SHORT := 5
 const BLIND_LONG := 10
+## 608: the niche roll's own seed salt (the layout's rng is not touched),
+## the share of the first hall's niches sealed with a slab (variant 2).
+const NICHE_SALT := 0x6e1c4e
+const NICHE_SLAB := 0.2
 
 
 static func generate(template: LevelMap, config: Dictionary, seed: int) -> LevelMap:
@@ -75,6 +82,7 @@ static func generate(template: LevelMap, config: Dictionary, seed: int) -> Level
 	var old := style == "old"
 	var map := template.copy()
 	Tools.clear_outside(map, anchors)
+	_move_hidden(map, niche_plan(config, seed))
 	var depth := _depth_setup(map, anchors, config) if style == "barrow" else {}
 	var carved: Dictionary[Vector2i, bool] = {}
 	var nodes := _anchor_nodes(template, anchors, depth)
@@ -101,6 +109,69 @@ static func generate(template: LevelMap, config: Dictionary, seed: int) -> Level
 		_torches(map, anchors, rooms, corridors, depth)
 	_markers(map, anchors, rooms, corridors, ends, config, rng, depth)
 	return map
+
+
+# --- The hidden door (608) --------------------------------------------------------------
+
+## The first hall's niches for a generation (608; layer 1 with the
+## template's "niches" in [param config]): each [x, y, dx, dy, kind,
+## variant] re-rolled, the town's dead in arches ("a") or hollows ("c"), a
+## slab (variant 2) NICHE_SLAB of the time, and one of them picked as the
+## hidden door ("hidden", variant 1), by its own rng from [param seed] and
+## NICHE_SALT. {niches, before: the hall cell at the pick, alcove: the cell
+## behind it, edge: the door's edge key, was_alcove and was_edge: the
+## template's own hidden niche's, if it has one}; {} off layer 1 or with
+## no niches listed.
+static func niche_plan(config: Dictionary, seed: int) -> Dictionary:
+	var listed: Variant = config.get("niches", [])
+	if int(config.get("layer", 2)) != 1 or not listed is Array or (listed as Array).is_empty():
+		return {}
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed ^ NICHE_SALT
+	var niches: Array = []
+	var was := -1
+	for entry: Variant in listed:
+		if not entry is Array or (entry as Array).size() != 6:
+			continue
+		if str(entry[4]) == "hidden":
+			was = niches.size()
+		niches.append([int(entry[0]), int(entry[1]), int(entry[2]), int(entry[3]),
+				"a" if rng.randf() < 0.5 else "c", 2 if rng.randf() < NICHE_SLAB else 1])
+	if niches.is_empty():
+		return {}
+	var pick := rng.randi_range(0, niches.size() - 1)
+	niches[pick][4] = "hidden"
+	niches[pick][5] = 1
+	var before := Vector2i(niches[pick][0], niches[pick][1])
+	var step := Vector2i(niches[pick][2], niches[pick][3])
+	var plan := {"niches": niches, "before": before, "alcove": before + step, "edge": Terrain.edge_key(before, step)}
+	if was >= 0:
+		var was_before := Vector2i(niches[was][0], niches[was][1])
+		var was_step := Vector2i(niches[was][2], niches[was][3])
+		plan["was_alcove"] = was_before + was_step
+		plan["was_edge"] = Terrain.edge_key(was_before, was_step)
+	return plan
+
+
+## The hidden door moved on [param map] as [param plan] (niche_plan) says:
+## the template's alcove filled with rock, its door edge and the walls
+## round it cleared (the hall's wall stands there again), the pick's
+## alcove carved with the link marker in it, a door edge between and walls
+## on its other sides. The one change a generation makes inside the
+## entrance anchor (465 keeps the rest verbatim).
+static func _move_hidden(map: LevelMap, plan: Dictionary) -> void:
+	if plan.is_empty():
+		return
+	if plan.has("was_alcove"):
+		var was: Vector2i = plan["was_alcove"]
+		map.set_cell(was, "void")
+		for direction: Vector2i in DIRECTIONS:
+			map.set_edge(Terrain.edge_key(was, direction), "clear")
+	var alcove: Vector2i = plan["alcove"]
+	map.set_cell(alcove, "link")
+	for direction: Vector2i in DIRECTIONS:
+		var key := Terrain.edge_key(alcove, direction)
+		map.set_edge(key, "door" if key == plan["edge"] else "wall")
 
 
 # --- Depth (barrow) -------------------------------------------------------------------

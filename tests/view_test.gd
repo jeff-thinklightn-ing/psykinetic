@@ -2155,10 +2155,12 @@ func _test_niches() -> void:
 	print("
 == niches: the barrow's burial niches drawn ==")
 	var warnings: Array[String] = []
-	var parsed := Level.niches_from({"niches": [[1, 1, 0, 1, 2], [1, 1, 1, 1, 2], [1, 1, 0, 1, 4], [99, 99, 0, 1, 1]]},
-			{"floor": [Vector2i(1, 1)]}, warnings)
-	_check(parsed.size() == 1 and parsed[0]["out"] == Vector2i(0, 1) and parsed[0]["variant"] == 2 and warnings.size() == 3,
-			"niches read as {cell, out, variant}; a diagonal way out, a bad variant and no floor said and left out (%d)" % warnings.size())
+	var wall := Terrain.edge_key(Vector2i(1, 1), Vector2i(0, 1))
+	var parsed := Level.niches_from({"niches": [[1, 1, 0, 1, "a", 2], [1, 1, 1, 1, "a", 2], [1, 1, 0, 1, "a", 4], [99, 99, 0, 1, "a", 1], [1, 1, 0, 1, "x", 1],
+			[1, 1, 0, -1, "hidden", 1], [1, 1, 1, 0, "b", 1]]},
+			{"floor": [Vector2i(1, 1), Vector2i(2, 1)], "edges": {wall: Terrain.Edge.WALL, Terrain.edge_key(Vector2i(1, 1), Vector2i(0, -1)): Terrain.Edge.DOOR}}, warnings)
+	_check(parsed.size() == 1 and parsed[0]["out"] == Vector2i(0, -1) and parsed[0]["edge"] == wall and parsed[0]["kind"] == "a" and parsed[0]["variant"] == 2 and warnings.size() == 6,
+			"niches read as {cell, out, edge, kind, variant} (608); a diagonal step, a bad variant, no floor, a kind there is not, a hidden one with rock behind its door and a wall with floor behind said and left out (%d)" % warnings.size())
 	var made := Regen.generate("barrow_deep", 1)  # The deep holds the tombs (580); the first layer lists no niches.
 	if made.is_empty():
 		_check(false, "the barrow's deep generates")

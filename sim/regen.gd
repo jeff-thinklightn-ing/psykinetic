@@ -153,6 +153,9 @@ static func generate(level_name: String, generation: int) -> Dictionary:
 		push_warning("[regen] %s names a generator there is not: %s" % [level_name, generator_path])
 		return {}
 	var generator: GDScript = load(generator_path)
+	# The first hall's niches (608): the template's list goes to the
+	# generator, which re-rolls them and moves the hidden door.
+	config["niches"] = made["config"].get("niches", [])
 	var template := LevelMap.from_image(layout, made["config"])
 	template.read_heights(made["height"])
 	var anchors: Array = config["anchors"]
@@ -166,10 +169,17 @@ static func generate(level_name: String, generation: int) -> Dictionary:
 		var height: Image = map.to_height_image() if made["height"] != null or not map.heights.is_empty() else null
 		var generated := generated_config(made["config"], anchors, generation)
 		# The barrow's first layer (580) holds the robbers' halls, no dead and
-		# no tombs: it lists no graves and no niches.
-		var tombs := int(config.get("layer", 2)) != 1
-		generated["graves"] = graves_of(map, config) if tombs else []
-		generated["niches"] = niches_of(map, config, generated["graves"]) if tombs else []
+		# no tombs: it lists no graves; its niches are the first hall's with
+		# the hidden door among them (608), the Ossuary's are cut along its
+		# galleries, the dark below has none.
+		var layer := int(config.get("layer", 2))
+		var barrow := str(config.get("style", "")) == "barrow"
+		generated["graves"] = graves_of(map, config) if layer != 1 else []
+		generated["niches"] = []
+		if barrow and layer == 1 and generator.has_method("niche_plan"):
+			_lay_hidden(generated, generator.niche_plan(config, seed))
+		elif barrow and layer == 2:
+			generated["niches"] = niches_of(map, anchors, seed)
 		return {"layout": map.to_image(), "height": height, "config": generated, "seed": seed, "tries": attempt + 1, "anchors": anchors}
 	push_warning("[regen] %s: no map of %d tries joined every anchor; the last one stands" % [level_name, TRIES])
 	return {}
@@ -215,30 +225,63 @@ static func graves_of(map: LevelMap, config: Dictionary) -> Array:
 	return out
 
 
-## The burial niches of a generated [param map] for art-kit's prop.burial_niche
-## (542 amended): of the [param graves], those that are a wall niche, an
-## alcove open on one side alone (a blind way's end turns a corner and is
-## none), as [[x, y, dx, dy, variant], ...]: (dx, dy) the way out of the
-## wall into the room, the variant 1 to 3 by the band (the town's
-## plundered tombs, the old bones with their goods, the oldest wrapped).
-## Written into the generated level.json as "niches"; the client places
-## the slot by it.
-static func niches_of(map: LevelMap, _config: Dictionary, graves: Array) -> Array:
+## The first hall's niches and its hidden door laid into [param generated]
+## (608) as [param plan] (Labyrinth.niche_plan) says: "niches" the
+## re-rolled list, the link that stood in the template's alcove moved to
+## the pick's (and marked "hidden"), "from_below" to the hall cell before
+## it.
+static func _lay_hidden(generated: Dictionary, plan: Dictionary) -> void:
+	if plan.is_empty():
+		return
+	generated["niches"] = plan["niches"]
+	var alcove: Vector2i = plan["alcove"]
+	var before: Vector2i = plan["before"]
+	if plan.has("was_alcove") and generated.get("links") is Array:
+		for link: Variant in generated["links"]:
+			if link is Dictionary and Level._tile(link.get("at")) == plan["was_alcove"]:
+				link["at"] = [alcove.x, alcove.y]
+				link["hidden"] = true
+	if generated.get("spawn_points") is Dictionary and generated["spawn_points"].has("from_below"):
+		generated["spawn_points"]["from_below"] = [before.x, before.y]
+
+
+## 608: the niche roll's seed salt (Labyrinth.NICHE_SALT, the same), the
+## share of the Ossuary's wall cells that get a niche, and of those the
+## share that are hollows ("c") among the shelves ("b") and the columbarium
+## cells ("d").
+const NICHE_SALT := 0x6e1c4e
+const NICHE_SHARE := 0.17
+const NICHE_HOLLOW := 0.17
+
+## The Ossuary's burial niches (608; 542 amended's alcoves before): cut
+## into the galleries' walls, as [[x, y, dx, dy, kind, variant], ...]:
+## (x, y) a floor cell of [param map] outside the [param anchors] (no
+## link's), (dx, dy) the step onto a wall with rock behind it (never a
+## door), kind "b" (shelves) or "d" (columbarium cells), "c" (a hollow)
+## NICHE_HOLLOW of the time, variant 1 or 2; about NICHE_SHARE of the
+## cells by a wall, one niche a cell at most, by an rng of [param seed] and
+## NICHE_SALT, the cells in a set order. Written into the generated
+## level.json as "niches" (Level.niches_from); the client draws art-kit's
+## wall.crypt pieces on the edges.
+static func niches_of(map: LevelMap, anchors: Array, seed: int) -> Array:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed ^ NICHE_SALT
 	var out: Array = []
-	for grave: Array in graves:
-		var cell := Vector2i(int(grave[0]), int(grave[1]))
-		var mouth := Vector2i.ZERO
-		var open := 0
-		for direction: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
-			var next := cell + direction
-			if map.in_bounds(next) and map.walkable(next) and map.edge(Terrain.edge_key(cell, direction)) != "wall":
-				open += 1
-				mouth = direction
-		if open != 1:
+	var cells: Array = map.cells.keys()
+	cells.sort_custom(func(a: Vector2i, b: Vector2i) -> bool: return a.y < b.y or a.y == b.y and a.x < b.x)
+	for cell: Vector2i in cells:
+		if not map.walkable(cell) or map.cell(cell) == "link" or Level.in_anchors(anchors, cell):
 			continue
-		# The mouth leads straight on into the room, not round a corner: the
-		# cell beyond it is floor too, or the mouth cell has floor beside it.
-		out.append([cell.x, cell.y, mouth.x, mouth.y, int(grave[2]) + 1])
+		var sides: Array[Vector2i] = []
+		for direction: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+			var far := cell + direction
+			if map.in_bounds(far) and not map.walkable(far) and map.edge(Terrain.edge_key(cell, direction)) != "door":
+				sides.append(direction)
+		if sides.is_empty() or rng.randf() >= NICHE_SHARE:
+			continue
+		var side: Vector2i = sides[rng.randi_range(0, sides.size() - 1)]
+		var kind := "c" if rng.randf() < NICHE_HOLLOW else ("b" if rng.randf() < 0.5 else "d")
+		out.append([cell.x, cell.y, side.x, side.y, kind, 1 if rng.randf() < 0.5 else 2])
 	return out
 
 

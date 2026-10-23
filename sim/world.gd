@@ -142,6 +142,9 @@ signal walked_off(entity: GridEntity, direction: Vector2i)
 ## A player's step onto a level link's cell refused (someone stood on it):
 ## Main takes the link all the same (decision 571).
 signal link_bumped(entity: GridEntity, at: Vector2i)
+## A step into a burial niche's edge (niche_edges) refused by it: a press
+## on the niche (608: the hidden door is found so; Main says what gives).
+signal niche_pressed(entity: GridEntity, key: Vector3i)
 ## An attack or a swing at air: [param direction] is where it went.
 signal entity_swung(entity: GridEntity, direction: Vector2i)
 
@@ -529,6 +532,9 @@ var _trampled_here: Dictionary = {}
 signal grass_changed(level: String, flat: PackedInt32Array, stood: PackedInt32Array)
 ## Torches on their posts (cells), for what a companion sees around her.
 var _torches: Dictionary[Vector2i, bool] = {}
+## Edge key -> the kind of the burial niche cut into it (terrain "niches",
+## 608): "a" to "d" art-kit's pieces, "hidden" the first hall's hidden door.
+var niche_edges: Dictionary[Vector3i, String] = {}
 ## Heat and light per cell (Fields).
 var fields := Fields.new()
 ## The level's north, as a cell offset (level.json "north"; up in the
@@ -1369,6 +1375,7 @@ func enter(to: Zone) -> Zone:
 	from.cover = _cover
 	from.cover_rect = _cover_rect
 	from.torches = _torches
+	from.niche_edges = niche_edges
 	from.fields = fields
 	from.north = north
 	from.outdoor = outdoor
@@ -1394,6 +1401,7 @@ func enter(to: Zone) -> Zone:
 	_cover = to.cover
 	_cover_rect = to.cover_rect
 	_torches = to.torches
+	niche_edges = to.niche_edges
 	fields = to.fields
 	_trampled_here = _trampled_of(fields.level)
 	north = to.north
@@ -1628,6 +1636,9 @@ func _set_terrain(terrain: Dictionary) -> void:
 	_torches.clear()
 	for cell: Vector2i in terrain.get("torches", []):
 		_torches[cell] = true
+	niche_edges.clear()
+	for niche: Dictionary in terrain.get("niches", []):
+		niche_edges[niche["edge"]] = str(niche["kind"])
 	north = terrain.get("north", Vector2i(0, -1))
 	outdoor = bool(terrain.get("outdoor", false))
 	fields.load(terrain)
@@ -5055,6 +5066,11 @@ func try_move(entity: GridEntity, direction: Vector2i) -> bool:
 		if entity is Player and is_link_cell(entity.tile + direction) \
 				and not _terrain_blocks_step(entity.tile, direction, true):
 			link_bumped.emit(entity, entity.tile + direction)
+		# A step into a burial niche's edge that stops it presses on the
+		# niche (608): the hidden door's slab gives to a press, nothing else.
+		if (direction.x == 0 or direction.y == 0) and niche_edges.has(Terrain.edge_key(entity.tile, direction)) \
+				and edge_blocks(entity.tile, direction):
+			niche_pressed.emit(entity, Terrain.edge_key(entity.tile, direction))
 		return false
 	entity.next_move_tick = start + duration
 	entity.step_velocity = Vector2(direction) / duration  # Its momentum (body_velocity).

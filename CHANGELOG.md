@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The barrow's hidden door (580 step 2, decision 608): the first hall's dead lie in niches cut into its walls, and the stair down to the Ossuary hides behind one of them, picked anew each generation; walk into the niches to find it ("Only the dead lie here." till the slab gives), and a climb from below pushes it open from behind. The Ossuary's galleries get niches of their own.
 ## v0.1.167
 
 - What goes over the network is unchanged, so v0.1.165 and v0.1.166 still join, but the server updates too: the barrow's draugr now fights armed on the live server. Update through the launcher to hear the arrows and see the new pieces.

@@ -813,7 +813,7 @@ static func _place(level: Dictionary, markers: Array[Dictionary], config: Dictio
 				continue
 			links.append({"tile": at, "to_map": str(entry.get("to_map", "")), "to_spawn": str(entry.get("to_spawn", "")),
 					"one_way": bool(entry.get("one_way", false)), "closed": bool(entry.get("closed", false)),
-					"sealed": str(entry.get("sealed", ""))})
+					"sealed": str(entry.get("sealed", "")), "hidden": bool(entry.get("hidden", false))})
 	for at in link_tiles:
 		if links.all(func(link: Dictionary) -> bool: return link["tile"] != at):
 			warnings.append("the link marker at %s goes nowhere (no entry in level.json \"links\")" % at)
@@ -1257,12 +1257,24 @@ static func _elevation(terrain: Dictionary, cell: Vector2i) -> float:
 	return int(terrain["heights"].get(cell, 0)) * Relief.LEVEL_M
 
 
-## level.json's "niches" (542 amended, terrain's side: dungeon's barrow):
-## [[x, y, dx, dy, variant], ...], a burial niche's alcove cell (floor to the
-## sim), (dx, dy) the way out of the wall into the room, the variant 1 to 3;
-## as [{cell, out, variant}] for terrain to stand prop.burial_niche on. One
-## that is no floor, whose way out is not one step to a side, or whose
-## variant is not 1 to 3 is said in [param warnings] and left out.
+## The kinds a burial niche may be (608): art-kit's wall.crypt.niche_a
+## (arches), _b (shelves), _c (hollows), _d (columbarium cells), and
+## "hidden", the first hall's hidden door (wall.crypt.cracked till found,
+## wall.crypt.niche_open after).
+const NICHE_KINDS: Array[String] = ["a", "b", "c", "d", "hidden"]
+
+
+## level.json's "niches" (608, dungeon's barrow; 542 amended's alcove cells
+## before): [[x, y, dx, dy, kind, variant], ...], a burial niche cut into a
+## wall edge: (x, y) the room's floor cell before it, (dx, dy) the step
+## onto the wall (a wall edge with rock behind it; for kind "hidden" a door
+## edge with its alcove, a floor cell, behind), kind one of NICHE_KINDS,
+## variant 1 or 2; as [{cell, out: the step out of the wall into the room,
+## edge: the Terrain edge key, kind, variant}] for terrain to draw the
+## wall.crypt piece on, its +x toward the cell, and for World to know what
+## a step into that edge presses on. One that is no floor, whose step is
+## not one to a side, whose kind or variant is none, or whose edge is not
+## such a wall (or door) is said in [param warnings] and left out.
 static func niches_from(config: Dictionary, terrain: Dictionary, warnings: Array[String]) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	var listed: Variant = config.get("niches", [])
@@ -1272,18 +1284,25 @@ static func niches_from(config: Dictionary, terrain: Dictionary, warnings: Array
 	var floor := {}
 	for cell: Vector2i in terrain.get("floor", []):
 		floor[cell] = true
+	var edges: Dictionary = terrain.get("edges", {})
 	for index in (listed as Array).size():
 		var entry: Variant = listed[index]
-		if not entry is Array or (entry as Array).size() != 5:
-			warnings.append("niche %d is not [x, y, dx, dy, variant]: left out" % index)
+		if not entry is Array or (entry as Array).size() != 6:
+			warnings.append("niche %d is not [x, y, dx, dy, kind, variant]: left out" % index)
 			continue
 		var cell := Vector2i(int(entry[0]), int(entry[1]))
 		var way := Vector2i(int(entry[2]), int(entry[3]))
-		var variant := int(entry[4])
-		if not floor.has(cell) or absi(way.x) + absi(way.y) != 1 or variant < 1 or variant > 3:
-			warnings.append("niche %d at %s (way out %s, variant %d) is no floor, no side or no variant: left out" % [index, cell, way, variant])
+		var kind := str(entry[4])
+		var variant := int(entry[5])
+		if not floor.has(cell) or absi(way.x) + absi(way.y) != 1 or kind not in NICHE_KINDS or variant < 1 or variant > 2:
+			warnings.append("niche %d at %s (step %s, kind %s, variant %d) is no floor, no side, no kind or no variant: left out" % [index, cell, way, kind, variant])
 			continue
-		out.append({"cell": cell, "out": way, "variant": variant})
+		var hidden := kind == "hidden"
+		var key := Terrain.edge_key(cell, way)
+		if int(edges.get(key, Terrain.Edge.OPEN)) != (Terrain.Edge.DOOR if hidden else Terrain.Edge.WALL) or floor.has(cell + way) != hidden:
+			warnings.append("niche %d at %s (step %s) is on no wall with rock behind it%s: left out" % [index, cell, way, " (the hidden one: a door with its alcove behind)" if hidden else ""])
+			continue
+		out.append({"cell": cell, "out": -way, "edge": key, "kind": kind, "variant": variant})
 	return out
 
 

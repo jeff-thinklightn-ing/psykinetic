@@ -321,6 +321,9 @@ var _camp_clear_since: Dictionary[String, int] = {}
 ## Peer -> the closed link (decision 463) it was last told of, so stepping
 ## about on it says so once.
 var _told_closed: Dictionary[int, Vector2i] = {}
+## Peer -> the burial niche's edge it last pressed on (608), so pressing
+## on at it says "Only the dead lie here." once.
+var _told_niche: Dictionary[int, Vector3i] = {}
 # Server console: lines from stdin (read on a thread) and from --admin-port.
 var _stdin_thread: Thread
 var _stdin_mutex := Mutex.new()
@@ -893,6 +896,7 @@ func _go_online() -> void:
 			World.entity_moved.connect(_log_player_move)
 		World.entity_moved.connect(_on_entity_moved)
 		World.link_bumped.connect(_on_link_bumped)
+		World.niche_pressed.connect(_on_niche_pressed)  # The hidden door (608).
 		World.walked_off.connect(_on_walked_off)
 		var drawn := map_name
 		_boot()
@@ -3302,6 +3306,8 @@ func travel(peer: int, to_map: String, to_spawn := "", edge := {}, at := World.N
 		record.companion["tile"] = null  # Beside their player.
 	_show_zone_to(peer, to_map, leaving)
 	_join_player(peer, id, record.name)
+	if to_spawn == "from_below":
+		_reveal_from_below(to_map)  # The hidden door pushed open from behind (608).
 	print("[zone] %s went from %s to %s" % [record.name, from_name, to_map])
 	party_log.add("%s went to %s." % [record.name, str(level.get("display_name", to_map))])
 	World.enter(World.home())
@@ -3392,13 +3398,23 @@ func _animal_crossed(animal: Animal, cross: Dictionary) -> void:
 
 ## Server: one Door node per door edge, through the spawner so every client
 ## gets it. Wood, 20 hp.
+## The level's doors spawned, wood; the hidden niche's (608: the door on
+## the "hidden" niche's edge, terrain "niches") stone and locked with
+## HIDDEN_LOCK, a key nobody holds, so only a press on it (_on_niche_pressed)
+## or a climb from below (_reveal_from_below) opens it.
 func _spawn_doors() -> void:
 	var edges: Dictionary = _terrain["edges"]
+	var hidden: Dictionary[Vector3i, bool] = {}
+	for niche: Dictionary in _terrain.get("niches", []):
+		if str(niche["kind"]) == "hidden":
+			hidden[niche["edge"]] = true
 	for key: Vector3i in edges:
 		if edges[key] == Terrain.Edge.DOOR:
+			var props := {"max_hp": 20, "body_material": GridEntity.BodyMaterial.WOOD}
+			if hidden.has(key):
+				props = {"max_hp": 20, "body_material": GridEntity.BodyMaterial.STONE, "lock": HIDDEN_LOCK}
 			Net.interest.add(spawner.spawn({"script": DOOR, "name": "Door_%d_%d_%s" % [key.x, key.y, "e" if key.z == Terrain.EAST else "s"],
-				"edge": [key.x, key.y, key.z], "zone": World.zone.name,
-				"props": {"max_hp": 20, "body_material": GridEntity.BodyMaterial.WOOD}}))
+				"edge": [key.x, key.y, key.z], "zone": World.zone.name, "props": props}))
 
 
 # --- Server: level and players ------------------------------------------------
@@ -5098,6 +5114,9 @@ const BLESSED := "draugr"
 ## The lock on the draugr's hall door while it is held shut (573 amended):
 ## a key nobody holds.
 const HALL_LOCK := "draugr_hall"
+## The hidden door's lock (608): the first hall's hidden niche, a key nobody
+## holds; lifted by a press on it or a climb from below.
+const HIDDEN_LOCK := "hidden_niche"
 ## The device's two halves (items' kinds, 544's items' side): minted no more
 ## since 573 (the charges are a count on the record); those held are keepsakes.
 
@@ -5349,6 +5368,39 @@ func _hold_hall_door(zone_name: String, held: bool) -> void:
 	World.enter(was)
 	if not doors.is_empty():
 		party_log.add("The hall's door shuts behind you." if held else "The hall's door opens.")
+
+
+## Server: [param entity] pressed on a burial niche's edge (World.niche_pressed,
+## 608: a step into it that the wall or the shut door refused). A player
+## on the hidden niche with its door still locked finds it: the lock
+## lifted, the door opened and said; any other niche, or the found door
+## shut again, "Only the dead lie here." once a stand (_told_niche).
+func _on_niche_pressed(entity: GridEntity, key: Vector3i) -> void:
+	if not entity is Player:
+		return
+	var peer: int = entity.owner_peer
+	var door := World.door_on(key)
+	if World.niche_edges.get(key, "") == "hidden" and door != null and door.lock == HIDDEN_LOCK:
+		_told_niche.erase(peer)
+		World.hold_door(door, false, HIDDEN_LOCK)
+		door.open = true
+		party_log.add("The slab swings aside: a stair goes down into the dark.")
+		print("[level] %s found the hidden door at %s in %s" % [_display_name(entity), Terrain.edge_cells(key)[0], World.zone.name])
+		return
+	if _told_niche.get(peer) != key:
+		_told_niche[peer] = key
+		party_log.add("Only the dead lie here.")
+
+
+## A player come up into [param zone_name] by its "from_below" spawn point
+## (608): the hidden door there, if still locked, is pushed open from
+## behind, and said.
+func _reveal_from_below(zone_name: String) -> void:
+	for door: Door in World.get_doors():
+		if door.zone == zone_name and door.lock == HIDDEN_LOCK and not door.open:
+			World.hold_door(door, false, HIDDEN_LOCK)
+			door.open = true
+			party_log.add("The slab swings aside from behind.")
 
 
 ## [param player] come into the zone (joined, or travelled in): a draugr
@@ -7309,6 +7361,9 @@ func _on_command(entity: GridEntity, command_name: String, args: Dictionary) -> 
 			var held := World.door_on(key)
 			if held != null and not held.open and held.lock == HALL_LOCK and entity is Player:
 				Net.broadcast_to([entity.owner_peer], "party", {"from": "Server", "text": "The door is shut."})
+			if held != null and World.niche_edges.get(key, "") == "hidden" and not held.open:
+				_on_niche_pressed(entity, key)  # E at the hidden niche presses on it (608).
+				return
 			World.try_toggle_door(entity, key)
 	elif command_name == "shop" and entity is Player:
 		var shop := get_node_or_null(NodePath(str(args.get("shop", "")))) as GridEntity

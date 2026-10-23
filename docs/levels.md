@@ -352,7 +352,10 @@ All of it is optional.
   world map's check does not flag it; `"closed": true` for a way shown but
   not travelled yet (decision 463): stepping on it says "The way on is
   closed." and goes nowhere, no route passes through it, and its `to_map`
-  may be a level still to come; `"sealed": "<mark>"` for a way open to the
+  may be a level still to come; `"hidden": true` (608) for a way behind the
+  barrow's hidden door, closed to the world map and its routes (maps' side:
+  no group walks it) while Main needs nothing from it, the door keeping the
+  way; `"sealed": "<mark>"` for a way open to the
   marked alone (decision 540): a player steps through only when their
   record holds that mark (`PlayerRecord.marks`; `Main.mark_player`, the
   console's `mark <player> <mark>` or `-<mark>`), else "The way is sealed."
@@ -531,17 +534,33 @@ hides about 2.5 cells behind it). The templates are written from
   anchors kept through every generation: the first hall under the mound's
   door (26 x 16: the link up to the wilds' "from_barrow", the spawn point
   "from_wilds", the burial table a block of rock at its centre, seven
-  niches a side in its east and west walls holding the town's dead as
-  props, a bay each side where the ways come in, and the stair down to the
-  Ossuary in its south-east niche, the link to "from_above"; the hidden
-  door of step 2 moves it each generation), the altar room (18 x 14, the
+  niches a side cut into its east and west walls holding the town's dead
+  (`"niches"` below: arches and hollows, a sealed slab now and then), a bay
+  each side where the ways come in, and the stair down to the Ossuary
+  behind one of the niches: the hidden door (608). That niche's edge is a
+  door spawned locked and stone (`Main.HIDDEN_LOCK`, a key nobody holds)
+  with one alcove cell behind it holding the link to "from_above"
+  (`"hidden": true`); the generator picks which niche each generation
+  (`Labyrinth.niche_plan`, the one change it makes inside the anchor) and
+  moves the link and "from_below" with it. A step into any niche presses
+  on it (`World.niche_pressed`): "Only the dead lie here." once a stand,
+  but the true one gives ("The slab swings aside: a stair goes down into
+  the dark."), its lock lifted and the door opened for everyone in the
+  zone until the level is laid again or the server restarts (door state is
+  not in the snapshot: it is found anew); E at it presses too; a climb
+  from below pushes it open from behind. The client draws the true niche
+  as art-kit's `wall.crypt.cracked` till found and `wall.crypt.niche_open`
+  after, by the Door's state), the altar room (18 x 14, the
   altar and its two skeleton guards), Pip's niche off its west side (the
   place `barrow/niche`, npc's), and the robbers' camp (10 x 8) with the
   Runner's pack. The robbers (4) are sent near the altar; no dead walk it,
   and the generated level.json lists no graves and no niches for it.
 - `levels/barrow_deep`, "The Ossuary", 100 x 80, `"layer": 2` (the tombs
   by depth): the ancient dead the town moved down, walking home (6
-  skeletons) through the galleries, the graves and niches as before. Two
+  skeletons) through the galleries, the graves as before and the niches
+  cut along the galleries' walls (608: shelves and columbarium cells, a
+  hollow here and there, about one wall cell in six, rock behind each; no
+  door among them). Two
   anchors: the stair foot at the top (the link back up to "from_below")
   and the stair room at the far side with the stair down (the link to the
   hall's "from_above", "from_below" beside it).
@@ -599,10 +618,21 @@ A generated level.json also carries (decision 542 amended) `"graves":
 tomb niches and the blind ways' ends), none with a chest on it, the band 0,
 1 or 2 by its depth from the `"entrance"` anchor (`Regen.BANDS`, the barrow
 style's own bands), so enemy-ai's walking skeletons are each given a grave
-in a shallower band to go home to; and `"niches": [[x, y, dx, dy,
-variant], ...]`, the wall niches among the graves (open on one side alone)
-with the way out of the wall into the room and a variant 1 to 3 by band, for
-art-kit's `prop.burial_niche` to stand in them. The barrow's template holds
+in a shallower band to go home to; and `"niches": [[x, y, dx, dy, kind,
+variant], ...]` (608; 542 amended's alcove cells before), the burial niches
+cut into wall edges: `(x, y)` the room's floor cell before one, `(dx, dy)` the
+step onto its wall (a wall edge with rock behind it; for kind `"hidden"` a
+door edge with its alcove, a floor cell, behind), `kind` `"a"` (arches),
+`"b"` (shelves), `"c"` (hollows), `"d"` (columbarium cells) or `"hidden"`
+(the first hall's hidden door), `variant` 1 (open) or 2 (sealed, slabbed or
+full). `Level.niches_from` reads them into terrain `"niches"` as `[{cell,
+out, edge, kind, variant}]` (`out` the step out of the wall into the room,
+`edge` the Terrain edge key) for terrain's draw (art-kit's
+`wall.crypt.niche_<kind>` on the edge, +x toward the cell) and
+`World.niche_edges`; a bad one is said and left out. The first hall's 14 are
+the template's (`tools/plan_sheet.barrow_niches`), re-rolled each generation;
+the Ossuary's are generated (`Regen.niches_of`); the dark below has none. The
+barrow's template holds
 enemy-ai's kinds by the level's own `"legend"` colours (skeleton, robber,
 three skeleton guards in the altar room, the draugr in his lair), Pip's niche
 (a 2 x 2 anchor off the altar room with the place `barrow/niche`) and the

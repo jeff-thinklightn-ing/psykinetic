@@ -28,16 +28,19 @@ const OUTLINE := Color(0.25, 0.6, 1.0)
 ##
 ## Layer 1, "barrow": the town's newer dead, the wealthy's. The first hall
 ## under the mound (a large room, the burial table at its centre as a block
-## of rock, seven niches a side in its east and west walls holding the
-## town's dead as props, a bay each side where the ways come in), the stair
-## down in one niche (a plain link in step 1; the hidden door of step 2
-## moves it each generation), the altar room with its guards and the tombs
+## of rock, seven niches a side cut into its east and west walls holding
+## the town's dead, art-kit's wall.crypt pieces on the edges, a bay each
+## side where the ways come in), the stair down behind one of them, the
+## hidden door (608: a locked stone door on that niche's edge with one
+## alcove cell behind it, found by pressing on it; the generator moves it
+## each generation), the altar room with its guards and the tombs
 ## the generator lays off it, Pip's niche, the robbers' camp with the
 ## Runner's pack; the robbers walk it, after the altar's gold.
 const BARROW_SIZE := Vector2i(80, 60)
 const HALL := Rect2i(27, 1, 26, 16)
-## The hall's floor is x 28..51; the niche cells sit in the columns outside
-## it, every other row, and the two bays on row 9 are where the ways come in.
+## The hall's floor is x 28..51; the columns outside it (x 27 and 52) are
+## rock the niches are cut into, every other row, but the two bays on row 9
+## where the ways come in and the hidden niche's alcove (BARROW_STAIR).
 const HALL_NICHE_ROWS: Array[int] = [2, 4, 6, 8, 10, 12, 14]
 const HALL_BAY_ROW := 9
 const HALL_TABLE := Rect2i(38, 8, 3, 2)
@@ -179,16 +182,16 @@ static func sample_barrow() -> Dictionary:
 	_wall_side(rows, inner, "north")
 	_wall_side(rows, inner, "south")
 	for side_x: int in [HALL.position.x, HALL.end.x - 1]:
-		var outer := "west" if side_x == HALL.position.x else "east"
-		for y: int in HALL_NICHE_ROWS:
-			var cell := Vector2i(side_x, y)
-			rows[cell.y * 2][cell.x * 2] = "."
-			for side: String in ["north", "south", outer]:
-				_edge(rows, cell, side, "#")
 		var bay := Vector2i(side_x, HALL_BAY_ROW)
 		rows[bay.y * 2][bay.x * 2] = "."
 		_edge(rows, bay, "north", "#")
 		_edge(rows, bay, "south", "#")
+	# The hidden niche's alcove (608): the stair's cell behind a door edge in
+	# the east wall, walled on its other sides.
+	rows[BARROW_STAIR.y * 2][BARROW_STAIR.x * 2] = "."
+	_edge(rows, BARROW_FROM_BELOW, "east", "+")
+	for side: String in ["north", "south", "east"]:
+		_edge(rows, BARROW_STAIR, side, "#")
 	_rock_rect(rows, HALL_TABLE)
 	var markers := {BARROW_LINK: "link", BARROW_START: "start", BARROW_STAIR: "link", BARROW_ALTAR: "chest", BARROW_PACK: "chest"}
 	for guard: Vector2i in BARROW_GUARDS:
@@ -200,7 +203,8 @@ static func sample_barrow() -> Dictionary:
 		"starts": [[BARROW_START.x, BARROW_START.y]],
 		"spawn_points": {"from_wilds": [BARROW_FROM_WILDS.x, BARROW_FROM_WILDS.y], "from_below": [BARROW_FROM_BELOW.x, BARROW_FROM_BELOW.y]},
 		"links": [{"at": [BARROW_LINK.x, BARROW_LINK.y], "to_map": "wilds", "to_spawn": "from_barrow"},
-			{"at": [BARROW_STAIR.x, BARROW_STAIR.y], "to_map": "barrow_deep", "to_spawn": "from_above"}],
+			{"at": [BARROW_STAIR.x, BARROW_STAIR.y], "to_map": "barrow_deep", "to_spawn": "from_above", "hidden": true}],
+		"niches": barrow_niches(),
 		"places": {"niche": {"at": [BARROW_NICHE.x, BARROW_NICHE.y], "kind": "other", "radius": 1, "name": "a niche in the wall"}},
 		"entities": [{"at": [BARROW_ALTAR.x, BARROW_ALTAR.y], "name": "Altar", "props": {"slots": ["", "", "", ""]}},
 			{"at": [BARROW_PACK.x, BARROW_PACK.y], "name": "Runner's pack", "props": {"grave": false, "slots": ["", "", "", ""]}}],
@@ -209,6 +213,26 @@ static func sample_barrow() -> Dictionary:
 			"monsters": {"robber": 4}, "near": {"robber": "altar"}, "chests": 3},
 		"legend": BARROW_LEGEND, "respawn_s": {"robber": 300, "skeleton_guard": 600}}
 	return {"layout": layout, "config": config}
+
+
+## The first hall's niches as the template lists them (608): seven a side
+## on the floor cells by the hall's west and east walls, each facing its
+## wall ([x, y, dx, dy, kind, variant]: the town's dead in arches, "a", and
+## hollows, "c", a slab, variant 2, now and then), the south-east one
+## "hidden" (the stair's door, BARROW_STAIR behind it). The generator
+## re-rolls the kinds and the pick each generation (Labyrinth.niche_plan).
+static func barrow_niches() -> Array:
+	var out: Array = []
+	for i in HALL_NICHE_ROWS.size():
+		var y: int = HALL_NICHE_ROWS[i]
+		var kind := "a" if i % 2 == 0 else "c"
+		out.append([HALL.position.x + 1, y, -1, 0, kind, 2 if i == 2 else 1])
+		var east := Vector2i(HALL.end.x - 2, y)
+		if east == BARROW_FROM_BELOW:
+			out.append([east.x, east.y, 1, 0, "hidden", 1])
+		else:
+			out.append([east.x, east.y, 1, 0, kind, 2 if i == 4 else 1])
+	return out
 
 
 ## Layer 2, the Ossuary: {layout, config}, DEEP_SIZE cells (decision 580).

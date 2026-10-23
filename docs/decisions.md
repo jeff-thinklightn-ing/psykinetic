@@ -22287,3 +22287,68 @@ tests: spawn_key_test, a marker moved a cell brings its saved chest back on
 it, alone; one moved three cells does not (the saved one as saved, a new one
 on the marker); level_test's weapon chests by their new tile.
 Server only, level data; protocol unchanged.
+## 608. The hidden door: niches as wall edges, the true one a locked stone door (580 step 2, dungeon's side)
+
+Jeff on the crypt walls art-kit drew him: "i like all the crypt walls, mix
+and match"; before it, 580: "there would be a hidden door that leads to
+deeper much larger structures". With art-kit's set as built (the niche
+pieces wall edges 0.5 m thick in wall.stone's runs, one-sided, +x into the
+room), 580's step 2 is reworked: the niches are cut into the walls, the
+hidden door is one of them, and nothing of it crosses the wire. The old
+plan (a `found` field on the "map" message with its revision line,
+`prop.wall_crack`, `prop.burial_niche` standing in alcove cells) goes.
+
+- Level data: `"niches": [[x, y, dx, dy, kind, variant], ...]`, `(x, y)`
+  the room's floor cell before a niche, `(dx, dy)` the step onto its wall
+  edge, kind `"a"`, `"b"`, `"c"`, `"d"` (art-kit's four) or `"hidden"`,
+  variant 1 or 2; `Level.niches_from` keeps one whose edge is a wall with
+  rock behind it (a door with its alcove, floor, behind for the hidden one)
+  as `{cell, out, edge, kind, variant}`. A link may say `"hidden": true`;
+  `Level.parse` keeps it. The barrow template's first hall has flat long
+  walls, 14 niches on them (`plan_sheet.barrow_niches`), the south-east one
+  hidden with its alcove at (52, 14) behind a door edge, the stair link in
+  it, "from_below" before it. The Ossuary's niches are generated along its
+  galleries (`Regen.niches_of`: rock behind each, one a cell, shelves and
+  columbarium cells with a hollow one in six, about one wall cell in six);
+  the dark below has none.
+- The generator (`Labyrinth.niche_plan`, layer 1): the template's 14
+  re-rolled with the seed (arches or hollows, a slab one in five) and one
+  picked as the hidden door; `_move_hidden` fills the template's alcove,
+  carves the pick's with the link marker and a door edge, the one change a
+  generation makes inside the entrance anchor (465 keeps the rest);
+  `Regen._lay_hidden` moves the link (hidden) and "from_below" with it.
+  Its own rng (`NICHE_SALT`), so the layout's roll is untouched.
+- The sim: `Main._spawn_doors` spawns the hidden niche's door stone and
+  locked with `HIDDEN_LOCK`, a key nobody holds, so no walk, no E and no
+  blow opens it (as the draugr's hall door, 573 amended). `World.niche_edges`
+  (terrain "niches", swapped with the zone) and `World.niche_pressed`: a
+  step into a niche's edge that the wall or the shut door refused.
+  `Main._on_niche_pressed`: a player on the hidden niche with its door
+  locked finds it (the lock lifted, the door opened, "The slab swings
+  aside: a stair goes down into the dark.", a `[level]` line); any other
+  niche, or the found door shut again, "Only the dead lie here." once a
+  stand (`_told_niche`); E at the hidden niche presses too. It stays open
+  to everyone in the zone till the level is laid again (the pick moves) or
+  the server restarts: door state is not in the snapshot, so it is found
+  anew, which is the rule for now. `Main.travel` by "from_below" pushes it
+  open from behind (`_reveal_from_below`, "The slab swings aside from
+  behind."). From the alcove side a press opens it too.
+- Sides: terrain draws a niche edge as `wall.crypt.niche_<kind>` in place
+  of the wall piece and the hidden one's door edge as `wall.crypt.cracked`
+  while shut and `wall.crypt.niche_open` once open, no doorway (608,
+  terrain's side); maps' `WorldMap.build` reads a hidden link as a closed
+  way (608, maps' side, carried here: one line). A companion's word near
+  the true niche and the slab's sound are later, theirs.
+- Kept: 580's levels and anchors, the sealed shortcut (540), the charges
+  (573), regeneration's rules (465), `regenerate now` (541 amended).
+
+labyrinth_test (the 14 listed on the hall's walls, kinds and variants, rock
+behind each but the hidden one; its alcove, door edge, link and spawn; the
+template's alcove rock again; the pick moving over six generations; the
+Ossuary's niches cut into its walls, none in an anchor, one a cell; none on
+layer 3), level_test (`_test_hidden_niche`: the door locked and stone at
+spawn, the three niche edges known, the plain niche's line once a stand,
+the press that finds it and the stair taken, locked again and opened from
+below; the templates' hidden stair and 14 niches), view_test (the parse).
+Level data both sides read: ships in a full cut; protocol unchanged; no
+new class_name.
