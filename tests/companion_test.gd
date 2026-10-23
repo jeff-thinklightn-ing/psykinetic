@@ -1502,6 +1502,17 @@ func _test_focus() -> void:
 	record.companion["focus"] = kept_focus
 	pet.focus = kept_focus
 	record.companion.erase("focus_day")
+	print("\n== her gold on her card (decision 614, the card's side) ==")
+	var purse := Economy.companion_purse(Net.player_id)
+	World.economy.add_gold(Net.player_id, 5, "test")
+	var held := World.gold_of(purse)
+	World.give_gold(Net.player_id, purse, 3)
+	var gold: Variant = _main.world_state.get("companion_gold", {})
+	_check(gold is Dictionary and gold.get("companion") == String(pet.name) and int(gold.get("gold", -1)) == held + 3,
+		"given gold, her player's card is told her purse (%s)" % [gold])
+	World.give_gold(purse, Net.player_id, 3)
+	gold = _main.world_state.get("companion_gold", {})
+	_check(int(gold.get("gold", -1)) == held, "taken back, told again (%s)" % [gold])
 
 
 func _test_mortally_wounded() -> void:

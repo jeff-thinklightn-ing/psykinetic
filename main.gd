@@ -4553,6 +4553,9 @@ func _show_towns() -> void:
 
 ## Server: a player's gold changed; their client is told ("shop" {gold}).
 func _on_gold_changed(id: String, gold: int) -> void:
+	if id.begins_with("companion:"):
+		tell_companion_gold(id.trim_prefix("companion:"))  # Her purse (decision 614): to her card.
+		return
 	for peer: int in _peer_ids:
 		if _peer_ids[peer] == id:
 			Net.message_to(peer, "shop", {"gold": gold})
@@ -4990,6 +4993,7 @@ func _wire_guide(pet: Companion, record: PlayerRecord, player: Player) -> void:
 	_tell_roads(record, pet)
 	_tell_capabilities(record, pet)  # And what she has learned (decision 576).
 	_tell_focus(record, pet)  # And her focus (decision 577).
+	tell_companion_gold(record.player_id)  # And her gold (decision 614).
 
 
 ## What she knows of the roads, for her voice: the places nearest first
@@ -5476,6 +5480,18 @@ func _tell_focus(record: PlayerRecord, pet: Companion) -> void:
 	for kind in CompanionCard.FOCUS:
 		told[kind] = roundi(float(pet.focus.get(kind, 0)))
 	_world_news.send.call(peer, {"full": false, "focus": told})
+
+
+## Her keeper's client told her gold (decision 614, the card's side): the
+## "world" message's "companion_gold" {companion, gold}, from her purse
+## (Economy.companion_purse), on join and whenever it changes.
+func tell_companion_gold(keeper_id: String) -> void:
+	var peer := _peer_of(keeper_id)
+	var pet: Variant = _companions.get(keeper_id)  # Untyped: a freed one is never read typed (572).
+	if peer == 0 or not is_instance_valid(pet) or _world_news == null or not _world_news.send.is_valid():
+		return
+	_world_news.send.call(peer, {"full": false, "companion_gold": {"companion": String((pet as Companion).name),
+		"gold": World.gold_of(Economy.companion_purse(keeper_id))}})
 
 
 ## Whether the player on [param peer], or the companion with them (out with

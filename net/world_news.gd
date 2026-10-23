@@ -22,6 +22,8 @@ extends RefCounted
 ## same way.
 ## "focus" (decision 577, sent by Main): her fighting, magic and stealth,
 ## {"companion", "fight", "magic", "stealth"} in whole numbers, the same way.
+## "companion_gold" (decision 614, sent by Main): the gold in her purse,
+## {"companion", "gold"}, the same way.
 
 ## How near a place's cell a player comes to know it (Senses' sight range).
 const SIGHT := 7
@@ -209,4 +211,8 @@ static func merge(state: Dictionary, data: Dictionary) -> Dictionary:
 		out["focus"] = (data["focus"] as Dictionary).duplicate(true)
 	elif data.get("full", false) and state.get("focus") is Dictionary:
 		out["focus"] = (state["focus"] as Dictionary).duplicate(true)
+	if data.get("companion_gold") is Dictionary:
+		out["companion_gold"] = (data["companion_gold"] as Dictionary).duplicate(true)
+	elif data.get("full", false) and state.get("companion_gold") is Dictionary:
+		out["companion_gold"] = (state["companion_gold"] as Dictionary).duplicate(true)
 	return out

@@ -24014,3 +24014,17 @@ purse saved) and _test_give_in_town (Main: 7 gold to a second player
 beside the host; not more than the host has, never taken from a player,
 not out of reach). A new command, so a line under the open protocol
 revision; no new class_name.
+
+## 614, companions' side: her gold told to her card
+
+Economy's 614 gives her a purse (Economy.companion_purse(keeper_id)). Her
+keeper's client is told what is in it: Main.tell_companion_gold(keeper_id)
+sends the "world" message's "companion_gold" {companion, gold}, kept through
+a full message as her focus is (WorldNews.merge). It is sent on join and from
+Main._on_gold_changed whenever World.gold_changed names a "companion:" purse,
+so any later change to it (her pay, if Jeff says yes) reaches the card too;
+economy's handler calls nothing of companions'. ui draws it on the card page.
+What she does with it waits on Jeff's companions-paid question. tests:
+companion_test (given gold and taken back, her player is told each time).
+A world message field: a line under protocol revision 33 (economy's 614
+opened it); no new class_name.

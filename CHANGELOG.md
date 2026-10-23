@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Your companion's purse is told to your game whenever it changes, ready for her card page (614, companions' side).
 - Gold can be given to another player standing beside you, or to your own companion and taken back from her; it moves from one purse to the other, and both of you are told (614).
 - A hidden way (a door nobody has found yet) no longer shows on the zone's big map or the known world, nor names where it leads (589 amended, ui's side).
 - Pip keeps what he is paid to keep: a secret lore marks as kept by him never enters his words, even for a friend; asked, he says only that he keeps what he sees to himself (decision 615, npc's side).

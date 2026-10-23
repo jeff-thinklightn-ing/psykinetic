@@ -318,6 +318,8 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## terrain["clearing"] (cell -> stage) the views draw.
 ## 33 (614): new command "give_gold" {to: a player's or your companion's path,
 ## amount} or {from: your companion's path, amount}: gold from purse to purse.
+## 33 (614, companions' side): the world message carries "companion_gold"
+## {companion, gold}: what is in her purse, for her keeper's card.
 const PROTOCOL_REVISION := 33
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]
