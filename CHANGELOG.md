@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Skeletons lying at their graves in the barrow sit up and come for you when you come into their sight, instead of lying on as you pass; after the draugr is laid to rest the dead still lie still.
 - The draugr's Hall door waits up to 5 seconds for your companion while she is coming along behind you (Jeff: it shut in her face); one told to wait, resting or fleeing is not waited for.
 - A sheep fold for the herders in the hills: a fenced pen with a wide gate, trodden earth, straw and a stone water trough (640).
 - Moss and spiderwebs for the barrow's damp lair: moss patches on the floor and along the walls' feet, webs high in corners and across niche mouths (580).

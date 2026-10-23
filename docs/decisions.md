@@ -24873,3 +24873,27 @@ monster_test `_test_hall_waits`: she comes along 4 off and the Hall shuts as she
 4 off and it shuts at 50 ticks; told to wait, it shuts at once. Server only, protocol unchanged,
 no new class_name.
 
+## 580 amended: the dead at their graves sit up for a foe in sight (enemy-ai's side)
+
+Jeff on v0.1.169: "not enough skeletons in the ossuary and the ones that are are lying down or
+stuck in their niches". Dungeon's data: each skeleton walks to a grave (a dead-end cell) and lies
+there (547), the barrow laying them deepest first, so he passed lying skeletons that never rose.
+Dungeon raises the count (14, a draft) and spreads them by band; the coordinator approved
+enemy-ai's rule for the lie.
+
+- One lying at its grave gets up when a foe of its side (`_may_fight`: a player, a kept
+  companion, a resident or monster its side fights) comes within its `sight_range` and it sees
+  them (`Monster._waking_foe`: no cone, lying any way; a barrow layer's dead see in the dark).
+  It rises as when the curse renews (`rise`: it keeps its grave, GUARD there), turned to that one,
+  and fights. Struck while lying with nobody in sight, it still lies on (547).
+- The draugr's rest holds (`_under_rest`, factored out of `_mind_the_rest`): while it lasts, one
+  stilled, or lying at its grave in a zone under his rest, never wakes, whatever comes. The rest
+  over every layer in his level's "stills" stays as Jeff's crypt rule (three game days, every dead
+  thing still: a won pact's quiet walk out); if he wants it on the lair alone, that is dungeon's
+  data line (barrow_lair's "stills"), not code.
+- No gap between risings: each wakes on its own sight, so a band rises by who is near, not all at
+  once; a gap (about 20 ticks a zone) only if dungeon's 14 shows a crowd.
+
+monster_test `_test_homeward`: one lying with a foe past its sight lies on; under the draugr's
+rest with one beside it, it lies on; with one within its sight, it gets up, guards its grave and
+goes for them. Server only, protocol unchanged, no new class_name.

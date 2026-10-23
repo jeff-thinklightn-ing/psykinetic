@@ -2158,6 +2158,33 @@ func _test_homeward() -> void:
 	_check(World.is_down(walker) and walker.down_until - World.tick > Monster.LAID_RENEW_TICKS, "and never gets up of itself")
 	walker.rise()
 	_check(not walker.laid and walker.idle == Monster.Idle.GUARD and walker.home == walker.grave, "risen, it guards its grave")
+	# A foe in sight (580 amended): it sits up as one passes; stilled by the
+	# draugr's rest, never.
+	var passer := EntityFactory.build(SPECS["P"].merged({"name": "Passer"})) as Player
+	passer.player_id = "pp"
+	_room.add_child(passer)
+	World.spawn(passer, Vector2i(2, 1))
+	walker.lay_down()
+	walker.sight_range = 5
+	walker.senses.dark_sight = true
+	World.step()
+	_check(walker.laid, "one 10 off, past its sight: it lies on")
+	_move_to(passer, Vector2i(9, 2))
+	World.dead_rest["mt_barrow"] = {"until": World.steps + 100, "side": walker._factions().of_kind(World.kind_of(walker))}
+	World.step()
+	_check(walker.laid, "stilled by the draugr's rest, it lies on with one beside it")
+	World.dead_rest.clear()
+	World.step()  # His rest over: it gets up of itself.
+	walker.lay_down()
+	World.step()
+	var went := false
+	for i in 10:
+		World.step()
+		went = went or walker.target == passer
+	_check(not walker.laid and walker.idle == Monster.Idle.GUARD and went,
+		"lying at its grave, one within its sight: it gets up and goes for them (target %s)" % [walker.target])
+	passer.queue_free()
+	World.despawn(passer)
 
 	rows = ["###########", "#k.....P..#", "###########"]
 	Level.register("mt_barrow", Level.image_from_rows(rows), null, {"graves": [[9, 1, 0]]})

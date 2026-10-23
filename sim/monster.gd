@@ -548,8 +548,12 @@ func _sim_tick() -> void:
 		_wear_bundle()
 	_mind_the_rest()
 	if laid:
-		_lie_still()  # Struck or not, it stays down (decision 547).
-		return
+		var woke_by := _waking_foe()
+		if woke_by == null:
+			_lie_still()  # Struck or not, it stays down (decision 547).
+			return
+		rise()  # A foe in sight: it sits up, turned to them, and keeps its grave (GUARD).
+		World.face(self, Senses.way_toward(tile, woke_by.tile))
 	if not noticing:
 		_unnoticing()
 		return
@@ -2047,6 +2051,24 @@ func lay_down() -> void:
 	_lie_still()
 
 
+## The foe of its side one lying at its grave sees and gets up for, or null
+## (580 amended; Jeff, the Ossuary: "the ones that are are lying down"):
+## within its sight_range, any way it lies (no cone), by its own sight (a
+## barrow layer's dead see in the dark). Never one stilled by the draugr's
+## rest (stilled, or lying at its grave while it lasts), which holds
+## whatever comes.
+func _waking_foe() -> GridEntity:
+	if stilled or sight_range <= 0 or not World.dead_rest.is_empty() and _under_rest():
+		return null
+	for entity in World.sought():
+		if entity == self or not entity.spawned or entity.hp <= 0 or entity.protected or World.is_downed(entity):
+			continue
+		var d := World.distance(tile, entity.tile)
+		if d <= sight_range and _may_fight(entity) and senses.sees(entity, d, false):
+			return entity
+	return null
+
+
 ## Up again when the curse renews: one that lay at its grave keeps it
 ## (GUARD there); one stilled on its way walks on.
 func rise() -> void:
@@ -2070,15 +2092,21 @@ func rise() -> void:
 func _mind_the_rest() -> void:
 	if World.dead_rest.is_empty() and not stilled:
 		return
-	var rest: Dictionary = World.dead_rest.get(World.zone.name, {})
-	var resting := not rest.is_empty() and World.steps < int(rest.get("until", 0)) and not self is Draugr \
-			and _factions().same_side(_factions().of_kind(World.kind_of(self)), str(rest.get("side", "")))
+	var resting := _under_rest()
 	if resting and not laid:
 		stilled = true
 		_keep_prop("stilled", true)
 		lay_down()
 	elif not resting and stilled:
 		rise()
+
+
+## Whether the draugr's rest holds it now: its zone's, over its side, not
+## run out; never the draugr himself.
+func _under_rest() -> bool:
+	var rest: Dictionary = World.dead_rest.get(World.zone.name, {})
+	return not rest.is_empty() and World.steps < int(rest.get("until", 0)) and not self is Draugr \
+			and _factions().same_side(_factions().of_kind(World.kind_of(self)), str(rest.get("side", "")))
 
 
 func _lie_still() -> void:
