@@ -20,6 +20,7 @@ const DEFAULTS := {
 	"options": KEY_O, "hints": KEY_H, "debug": KEY_F3, "fullscreen": KEY_F11, "builder": KEY_K,
 	"phrase_1": KEY_1, "phrase_2": KEY_2, "phrase_3": KEY_3, "phrase_4": KEY_4,
 	"stand": KEY_SHIFT, "signature": KEY_CTRL, "bandage": KEY_B, "screenshot": KEY_F12, "yes": KEY_Y,
+	"card": KEY_C,
 }
 ## What each action is called in the Options, in the order shown.
 const WORDS := {
@@ -33,6 +34,7 @@ const WORDS := {
 	"stand": "Held with a click: swing where you stand, at whatever is there", "signature": "Held with a click: your weapon's own move (a shield bashes)",
 	"bandage": "A bandage on the cursor: click yourself or an ally", "screenshot": "Screenshot",
 	"yes": "Say yes to an offer that stands",
+	"card": "Your companion's card",
 }
 ## Enter's other key counts as Enter.
 const ALIASES := {KEY_ENTER: [KEY_KP_ENTER]}

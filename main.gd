@@ -569,6 +569,8 @@ var _channel_seen: Dictionary = {}
 var standing_title := ""
 ## The world map (WorldMapPanel; ui's step 5), M after the zone's big map.
 var world_map_panel: WorldMapPanel
+## Her card page (618, ui's side): C; what she has learned and how she fights, from world_state.
+var card_page: CardPage
 ## The counter screen beside the pack (CounterPanel; economy's job, 438).
 var counter_panel: CounterPanel
 ## The player's pack, and an open chest or companion's pack (I; a right
@@ -1121,6 +1123,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if Keys.pressed(event, "pack"):
 		toggle_pack()
+		return
+	if Keys.pressed(event, "card"):
+		toggle_card()  # 618, ui's side: her card page.
 		return
 	if Keys.pressed(event, "reset"):
 		# A command like any other, so it works from a client too; the
@@ -8139,6 +8144,10 @@ func _build_talk() -> void:
 	$HUD.add_child(world_map_panel)
 	if has_signal("world_changed"):
 		connect("world_changed", _refresh_world_map)
+	card_page = CardPage.new()
+	$HUD.add_child(card_page)
+	if has_signal("world_changed"):
+		connect("world_changed", _refresh_card)  # 618: her page follows the world message while open.
 	_context_hint = Label.new()
 	_context_hint.name = "ContextHint"
 	_context_hint.theme_type_variation = &"Outlined"
@@ -10948,6 +10957,7 @@ func hint_lines() -> Array[String]:
 		lines.append("%s\t%s" % [Keys.name_of("phrase_%d" % (i + 1)), Net.phrases[i]])
 	lines.append_array(["%s+LMB\tyour weapon's own move (a shield bashes)" % Keys.name_of("signature"), "RMB, shield\tblock toward the cursor while held","RMB, bow\tdraw; let go to shoot at the cursor",
 		"%s\topen a chest, crate, cart, door; your companion's pack" % Keys.name_of("open"), "%s\tyour pack" % Keys.name_of("pack"),
+		"%s\tyour companion's card" % Keys.name_of("card"),
 		"%s\tpick up" % Keys.name_of("pick_up"), "%s\tput down (hand, else pack)" % Keys.name_of("drop"), "%s\tthrow at the cursor" % Keys.name_of("throw"),
 		"%s\ta bandage on the cursor: click yourself or an ally beside you (a kit, out of combat)" % Keys.name_of("bandage"),
 		"%s hold\tbandage an ally beside you, else yourself" % Keys.name_of("open"),
@@ -11104,6 +11114,8 @@ func escape() -> void:
 		_close_bar()  # 560, ui's side: the talk bar, then the barter window.
 	elif barter_panel != null and barter_panel.is_open():
 		close_other()
+	elif card_page != null and card_page.visible:
+		card_page.visible = false  # 618: her card page.
 	elif world_map_panel != null and world_map_panel.visible:
 		world_map_panel.close()
 	elif game_menu != null and game_menu.visible:
@@ -11121,6 +11133,27 @@ func escape() -> void:
 			game_menu.quit_pressed.connect(_quit_game)
 			$HUD.add_child(game_menu)
 		game_menu.open(true, str(level.get("display_name", level.get("name", ""))))
+
+
+## C: her card page shown or hidden (618, ui's side), fed world_state's
+## "capabilities" and "focus" (companions' 576, 577) and her name from her
+## body here when it is.
+func toggle_card() -> void:
+	if card_page == null:
+		return
+	if card_page.visible:
+		card_page.visible = false
+		return
+	_refresh_card()
+	card_page.visible = true
+
+
+func _refresh_card() -> void:
+	if card_page == null or not card_page.is_node_ready():
+		return
+	var pet := _own_companion()
+	card_page.show_state(world_state, String(pet.name) if pet != null else "",
+		pet.bond_step if pet != null else "", pet.bond_why if pet != null else "")  # Her bond (555) is on her node.
 
 
 ## O: the options shown or hidden; hiding writes what changed. Closed
@@ -12496,6 +12529,17 @@ func _run_test_show(player: Player) -> void:
 					pet.bond_why = "you left her to fall alone"
 					if what == "bond":
 						open_other(pet)
+			"card":
+				# 618, ui's side: her card page, for the shot. The sim's own words when
+				# she is here and has sent them; a sample of each the server has not.
+				var pet := _own_companion()
+				var her := String(pet.name) if pet != null else "Wren"
+				if not world_state.get("focus") is Dictionary:
+					world_state = WorldNews.merge(world_state, {"full": false, "focus": {"companion": her, "fight": 32, "magic": 18, "stealth": 50}})
+				if CardPage.held_of(world_state).is_empty():
+					world_state = WorldNews.merge(world_state, {"full": false, "capabilities": {"companion": her,
+						"held": [{"id": "draugr", "words": "the draugr's blessing", "teacher": "the draugr"}]}})
+				toggle_card()
 			"town_note":
 				# 353 amended (2), ui's side: the town's read-out on its area box, for the shot.
 				town_notes[zone_name_here()] = "3 in town are on the dole (fed by the town, or hungry): its kitchen works for food first."

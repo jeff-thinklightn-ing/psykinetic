@@ -33,6 +33,7 @@ func _ready() -> void:
 	_test_screenshot_key()
 	_test_aim()
 	_test_down_screen()
+	_test_card_page()
 	_test_counter_panel()
 	_test_world_map()
 	_test_access()
@@ -684,6 +685,84 @@ func _test_down_screen() -> void:
 	_main._return_told = {}
 
 
+func _test_card_page() -> void:
+	print("== her card page (618, ui's side): the words, the chart, the state read, C and Esc ==")
+	_check(CardPage.held_words({"id": "draugr", "words": "the draugr's blessing", "teacher": "the draugr"}) == "I hold the draugr's blessing; the draugr taught it to me."
+		and CardPage.held_words({"id": "x", "words": "the rot ward"}) == "I hold the rot ward." and CardPage.held_words({"id": "x"}) == "",
+		"a learned thing in her voice: the words and the teacher, never the id")
+	_check(CardPage.first_person("You lean to strength: in a fight you trust your arm.") == "I lean to strength: in a fight I trust my arm."
+		and CardPage.first_person("You are as handy one way in a fight as another.") == "I am as handy one way in a fight as another.",
+		"the words said to her, said by her")
+	var table: Dictionary = CompanionCard.focus_rules().get("words", {})
+	_check(CardPage.lean_words("stealth") == CardPage.first_person(str(table.get("stealth"))) and CardPage.lean_words("") == CardPage.first_person(str(table.get("")))
+		and CardPage.lean_words("stealth").begins_with("I lean to") and CardPage.lean_words("").begins_with("I am"),
+		"her lean's sentence and the even hand's come from the focus words her own voice uses (%s)" % CardPage.lean_words("stealth"))
+	_check(CardPage.AXES[0][1] == "Fighting" and CardPage.AXES[1][1] == "Magic" and CardPage.AXES[2][1] == "Stealth", "the chart's corners are the sim's three: Fighting, Magic, Stealth")
+	_check(CardPage.purse_words({}) == "" and CardPage.purse_words({"companion_gold": {"companion": "Wren", "gold": 12}}) == "I carry 12 gold for you. Only you may take it back."
+		and CardPage.purse_words({"companion_gold": {"companion": "Wren", "gold": 0}}) == "My purse is empty.", "her purse's words once the key is there; none before")
+	var points := CardPage.chart_points({"fight": 30, "magic": 60, "stealth": 90}, Vector2.ZERO, 100.0)
+	_check(points.size() == 3 and points[0].is_equal_approx(Vector2(0, -50)) and absf(points[1].length() - 100.0) < 0.01 and absf(points[2].length() - 100.0) < 0.01,
+		"the chart's points: a share's way out along its axis, full at CHART_FULL and no further")
+	_check(CardPage.her_name({"focus": {"companion": "Nix", "fight": 25, "magic": 45, "stealth": 30}}, "") == "Nix" and CardPage.her_name({}, "Pip") == "Pip"
+		and CardPage.her_name({}, "") == "", "her name: the body's, else the message's, else none")
+	var page: CardPage = _main.card_page
+	if page == null:
+		print("  (no card page in this scene: its checks skipped)")
+		return
+	var state_was: Dictionary = _main.world_state
+	var pet: Companion = _main._own_companion()
+	var body_name := String(pet.name) if pet != null else ""
+	_main.world_state = {}
+	_main.toggle_card()
+	if pet == null:
+		_check(page.visible and page.title_shown() == "Your companion" and page._alone.visible, "opened with nobody: the page says no one travels with you")
+	else:
+		_check(page.visible and page.title_shown() == body_name and page.learned_shown() == PackedStringArray([CardPage.nothing_learned_words()])
+			and page.lean_shown() == CardPage.unknown_bent_words(), "opened before the server has told anything: her body's name, nothing learned, her bent unseen")
+	_main._on_message("world", {"full": false, "capabilities": {"companion": "Wren", "held": [{"id": "draugr", "words": "the draugr's blessing", "teacher": "the draugr"}]},
+		"focus": {"companion": "Wren", "fight": 40, "magic": 20, "stealth": 40}})
+	_check(page.title_shown() == (body_name if pet != null else "Wren") and page.learned_shown() == PackedStringArray(["I hold the draugr's blessing; the draugr taught it to me."])
+		and page.lean_shown() == CardPage.lean_words("") and page._chart.focus == {"fight": 40, "magic": 20, "stealth": 40} and page.purse_shown() == "",
+		"the world message read while open: her name (the body's first), the held mark's line, the even hand, no purse row")
+	_main._on_message("world", {"full": false, "focus": {"companion": "Wren", "fight": 30, "magic": 20, "stealth": 50}})
+	_check(page.lean_shown() == CardPage.lean_words("stealth") and page._chart.lean == "stealth", "her focus moving to a lean: the sentence and the chart's mark follow")
+	# Her purse: the key companions' 614 will send; the page reads it once WorldNews.merge keeps it (theirs), the row absent till then.
+	page.show_state({"focus": {"companion": "Wren", "fight": 30, "magic": 20, "stealth": 50}, "companion_gold": {"companion": "Wren", "gold": 12}}, body_name)
+	_check(page.purse_shown() == "I carry 12 gold for you. Only you may take it back.", "companion_gold in the state is her purse row")
+	_check(page.visible and page.title_shown() == (body_name if pet != null else "Wren"), "the page stays as it was otherwise")
+	# How she feels about you: her bond's tier word (Companion.bond_step, 555) and its reason, from her node.
+	_check(CardPage.feels_words("devoted") == "Devoted." and CardPage.feels_words("wary") == "Wary." and CardPage.feels_words("") == "",
+		"the tier word as the party line says it; nothing for no step")
+	_check(page.feels_shown() == "" and not page._feels_heading.visible, "no step given: no feelings row")
+	page.show_state({"focus": {"companion": "Wren", "fight": 30, "magic": 20, "stealth": 50}}, body_name if pet != null else "Wren", "devoted", "you stood by her in the barrow")
+	_check(page.feels_shown() == "Devoted." and page.feels_why_shown() == "you stood by her in the barrow" and page._feels_heading.visible,
+		"her step and its reason: How she feels about you")
+	page.show_state({"focus": {"companion": "Wren", "fight": 30, "magic": 20, "stealth": 50}}, body_name if pet != null else "Wren", "wary", "")
+	_check(page.feels_shown() == "Wary." and page.feels_why_shown() == "" and not page._feels_why.visible, "a step with no reason: the word alone")
+	if pet != null:
+		var step_was: String = pet.bond_step
+		var why_was: String = pet.bond_why
+		pet.bond_step = "close"
+		pet.bond_why = "you fed her when she was hungry"
+		_main._refresh_card()
+		_check(page.feels_shown() == "Close." and page.feels_why_shown() == "you fed her when she was hungry", "opened on her body: her node's step and reason")
+		pet.bond_step = step_was
+		pet.bond_why = why_was
+	_main.escape()
+	_check(not page.visible, "Esc closes it")
+	if pet != null and Net.is_authority():
+		# The host's own path: the sim sets her focus and tells the client, the page reads it.
+		var record: PlayerRecord = _main._records.get(pet.keeper_id)
+		if record != null:
+			pet.focus = {"fight": 20.0, "magic": 50.0, "stealth": 30.0}
+			_main._tell_focus(record, pet)
+			_main.toggle_card()
+			_check(page.title_shown() == String(pet.name) and page._chart.focus == {"fight": 20, "magic": 50, "stealth": 30} and page.lean_shown() == CardPage.lean_words("magic"),
+				"the host's sim telling her focus: the page shows her body's name and the magic lean")
+			_main.toggle_card()
+	_main.world_state = state_was
+
+
 func _test_revive_reads() -> void:
 	print("== downed and brought back, read on the HUD (544, ui's side) ==")
 	_check(Main.downed_words(12) == "You are down: 12 s" and Main.downed_words(-3) == "You are down: 0 s", "the countdown's words")
@@ -865,7 +944,8 @@ func _test_keys() -> void:
 		"open": KEY_E, "pack": KEY_I, "pick_up": KEY_F, "drop": KEY_G, "throw": KEY_T, "talk": KEY_ENTER,
 		"talk_log": KEY_TAB, "map": KEY_M, "lantern": KEY_L, "reset": KEY_R, "options": KEY_O, "hints": KEY_H,
 		"debug": KEY_F3, "fullscreen": KEY_F11, "builder": KEY_K, "phrase_1": KEY_1, "phrase_2": KEY_2,
-		"phrase_3": KEY_3, "phrase_4": KEY_4, "stand": KEY_SHIFT, "signature": KEY_CTRL, "bandage": KEY_B, "screenshot": KEY_F12, "yes": KEY_Y}
+		"phrase_3": KEY_3, "phrase_4": KEY_4, "stand": KEY_SHIFT, "signature": KEY_CTRL, "bandage": KEY_B, "screenshot": KEY_F12, "yes": KEY_Y,
+		"card": KEY_C}
 	var same := Keys.DEFAULTS.size() == today.size()
 	for action: String in today:
 		same = same and int(Keys.DEFAULTS.get(action, -1)) == int(today[action])

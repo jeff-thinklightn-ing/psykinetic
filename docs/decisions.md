@@ -24366,3 +24366,54 @@ ui_test _test_stacks_ui (the words, the units, the shift-click and the plain
 click with the town's cap, a real stack's badge and drag counts on the
 host); items_test _test_stacks (the note no longer prefixed); view_test
 _test_piles as before (two kinds, two models).
+## 618, ui's side: her card page
+
+Step 3 of companions' abilities and focus design
+(C:/dev/review/companions/abilities_focus_design.md; the coordinator's
+assignment 2026-10-23): Jeff's "spider chart where you only have say 100%
+focus" and the capabilities "each area adds", drawn for the player.
+Companions' wire as 576 and 577 send it: the world message's
+"capabilities" {companion, held: [{id, words, teacher}]} and "focus"
+{companion, fight, magic, stealth}, kept through WorldNews.merge.
+
+- CardPage (render/card_page.gd, new class_name), a panel in the middle of
+  the screen (the world in view round it), C opens and closes it, Esc
+  closes it (Main.toggle_card; Keys "card", in the Options' key rows and
+  the controls list). Her name as the title (her body's here, else the
+  message's). Under "What she has learned", one line per held capability in
+  her voice: "I hold the draugr's blessing; the draugr taught it to me."
+  (held_words: the words and the teacher, never the id), or "Nothing yet.
+  Each land we cross will teach me something." Under "How she fights", the
+  chart (FocusChart): a triangle in the edge colour with a spoke to each
+  corner and a half-way ring for scale, Fighting, Magic and Stealth at the
+  corners (the sim's three and 577's keys; the coordinator: strength and
+  dexterity would read to Jeff as other stats), her three shares as a
+  filled shape in the companion's colour (friend), each point its share's
+  way out along its axis with CHART_FULL (60) at the corner, and a brass
+  mark on the corner she leans to (CompanionCard.lean_of); beside it the
+  sentence companion_traits.json "focus" "words" gives her own voice for
+  that lean (Companion.focus_words), said by her as "I" (first_person), so
+  the card and her mouth agree. No number anywhere.
+- Room for what lands behind it, read by name only when present: her
+  purse, once companions' "companion_gold" {companion, gold} (614) is in
+  the state ("I carry 12 gold for you. Only you may take it back."; no row
+  before: main's WorldNews.merge keeps that key only when companions' side
+  lands).
+- "How she feels about you" (the coordinator's heading; companions'
+  pointer): her bond's tier word as the party line says it ("Devoted.",
+  "Wary."; Companion.bond_step on her node, replicated since 555: apart,
+  sullen, wary, cooling, fond, close, devoted; feels_words) and its
+  newest reason under it in the dim text when there is one
+  (bond_why, the words the known world shows beside her name). Main
+  passes both from her body (_refresh_card); no step, no row. Jeff's tiers
+  change what moves the step, not its words. Nothing on the wire.
+- With nobody: "No one travels with you." The page follows the world
+  message while open (world_changed).
+- --test-show=card lays a sample focus and the blessing where the server
+  has sent none, for the shot docs/ui/shots/sim/card_page.jpg (docs-only
+  after the code).
+
+ui_test _test_card_page: the words, the purse's, the chart's points, her
+name's sources, the page read from the world message while open (a mark,
+an even hand, a lean, the purse row), Esc, and the host's own sim telling
+her focus. Client only; protocol unchanged; new class_name CardPage.
