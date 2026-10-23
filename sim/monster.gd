@@ -1439,7 +1439,11 @@ static func read_kinds(path: String) -> Dictionary:
 			"picks_up": bool(row.get("picks_up", false)), "art": str(row.get("art", "")),
 			"label": str(row.get("label", "")), "fearless": bool(row.get("fearless", false)),
 			"keeps_room": bool(row.get("keeps_room", false)), "script": str(row.get("script", "")),
-			"call": int(row.get("call", Senses.NOISE_CALL))}
+			"call": int(row.get("call", Senses.NOISE_CALL)),
+			# Kept, or a peer reading the row never sees them: the client's
+			# person_words (the robbers drawn as people), the boss's breath.
+			"person": str(row.get("person", "")), "swing_stamina": bool(row.get("swing_stamina", false)),
+			"stamina_regen_every": maxi(1, int(row.get("stamina_regen_every", 1)))}
 	return out
 
 

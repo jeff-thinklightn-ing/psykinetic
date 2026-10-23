@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Grave robbers draw as hooded people instead of capsules (fixed in the client now); the draugr tiring from his own swings and getting his breath back slowly takes effect when the server is next deployed.
 - Fixed: clicking another player or your companion no longer opens the chat window with their name; the click walks you to them, and clicking anyone's speech bubble opens the bar with Talk (and Barter for a merchant or maker) (560, ui's side).
 ## v0.1.165
 
