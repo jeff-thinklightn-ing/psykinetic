@@ -969,16 +969,24 @@ func _test_barter() -> void:
 		and BarterPanel.care_words({"gold": 10, "in_care": true, "by": "quest"}) == "In his care (his errand)"
 		and BarterPanel.care_words({"gold": 10, "in_care": true}) == "In his care" and BarterPanel.care_words(null) == "",
 		"the care line's words: the way in (584 amended); none without the key")
-	_check(BarterPanel.care_offer_words("gold", 10) == "Pay 10 gold" and BarterPanel.care_offer_words("herbs", 5) == "Give 5 herbs"
-		and BarterPanel.care_offer_words("antlers", 5) == "Give 5 antlers", "the three ways in, as buttons")
+	_check(BarterPanel.care_offer_words("gold", 10) == "Pay 10 gold" and BarterPanel.care_offer_words("herbs", 5) == "Give herbs (5 to go)"
+		and BarterPanel.care_offer_words("antlers", 5, 3) == "Give antlers (2 to go)" and BarterPanel.care_offer_words("herbs", 5, 5) == "Give herbs (0 to go)",
+		"the three ways in, as buttons: gold whole, herbs and antlers by instalments with what is left to go (584 amended (2))")
+	_check(BarterPanel.care_given({"herbs": 5, "given": {"herbs": 3}}, "herbs") == 3 and BarterPanel.care_given({"herbs": 5, "given": {"herbs": 3}}, "antlers") == 0
+		and BarterPanel.care_given({"herbs": 5}, "herbs") == 0 and BarterPanel.care_given(null, "herbs") == 0,
+		"the tally from care's given, 0 without it (a client before npc's side)")
 	var cared: Array = []
 	panel.care_asked.connect(func(who: GridEntity, pay: String) -> void: cared.append([who, pay]))
 	oda.trade = "medicine_man"
 	panel.open(oda, "Hob")
 	panel.show_barter({"gold": 12, "goods": [], "buys": {}, "fenced": {}, "pack": [{"slot": 0, "uid": 301, "id": "herbs"}], "why": "",
 		"care": {"gold": 10, "herbs": 5, "antlers": 0, "in_care": false, "by": ""}})
-	_check(panel.care_shown() == "Pay 10 gold / Give 5 herbs" and not panel._care["gold"].disabled and panel._care["herbs"].disabled
-		and not panel._care["antlers"].visible, "the healer's window offers the ways in with a price: gold within the purse, herbs short (one of five), no antlers offered")
+	_check(panel.care_shown() == "Pay 10 gold / Give herbs (5 to go)" and not panel._care["gold"].disabled and not panel._care["herbs"].disabled
+		and not panel._care["antlers"].visible, "the healer's window offers the ways in: gold within the purse, herbs with one in the pack (an instalment), no antlers offered")
+	panel.show_barter({"gold": 12, "goods": [], "buys": {}, "fenced": {}, "pack": [{"slot": 0, "uid": 301, "id": "herbs"}], "why": "",
+		"care": {"gold": 10, "herbs": 5, "antlers": 5, "in_care": false, "by": "", "given": {"herbs": 3, "antlers": 0}}})
+	_check(panel.care_shown() == "Pay 10 gold / Give herbs (2 to go) / Give antlers (5 to go)" and not panel._care["herbs"].disabled and panel._care["antlers"].disabled,
+		"three herbs handed: two to go, the antlers untouched and dim with none in the pack")
 	panel._ask_care("gold")
 	_check(cared == [[oda, "gold"]], "the gold button asks for his care, paid")
 	panel.show_barter({"gold": 5, "goods": [], "buys": {}, "fenced": {}, "pack": [], "why": "", "care": {"gold": 10, "herbs": 5, "antlers": 5, "in_care": false, "by": ""}})

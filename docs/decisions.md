@@ -24093,3 +24093,24 @@ cleared at five, the herbs in his store); four antlers then one; no
 herbs refused. offers_test _test_care: the fourth herb's count in his
 line, the tally cleared at the fifth, the brew's count and its clearing.
 Server and the barter message's key; no new class_name.
+
+## 584 amended (2), ui's side: the care's instalments on the buttons
+
+Jeff on v0.1.168: "you cant hold 5, theres only 4 inventory slots haha".
+Npc's side (584 amended (2)): the medicine man takes herbs and antlers a
+handful at a time, a per-player tally toward the number, and the barter
+message's "care" gains "given" {herbs, antlers} (absent on a client before
+their side: 0). The gold way stays whole.
+- `BarterPanel.care_offer_words(pay, price, given)`: "Pay 10 gold" for
+  gold; "Give herbs (5 to go)", then "Give herbs (2 to go)" once three
+  are handed, for herbs and antlers (`care_given` reads the tally).
+- `care_covered` for herbs or antlers is holding any (the server takes
+  what is held up to what is left); the gold button still needs the purse.
+- The button sends "retain" {resident, pay} as before; the server answers
+  with the barter again and the new tally, so the words follow. A handful
+  short of the number returns no why, so the row reads no refusal.
+- The brew and the herbs plea stay offers in the list (npc): nothing to
+  word in the row for them.
+ui_test _test_barter: the words at 0, 3 and 5 given, the tally with and
+without the key, the herb button lit with one in the pack, the antlers dim
+with none. Client only, protocol unchanged on this side, no new class_name.

@@ -419,21 +419,35 @@ static func care_words(care: Variant) -> String:
 	return "In his care"
 
 
-## A way in's button words: "Pay 10 gold", "Give 5 herbs", "Give 5 antlers".
-static func care_offer_words(pay: String, price: int) -> String:
-	return "Pay %d gold" % price if pay == "gold" else "Give %d %s" % [price, pay]
+## A way in's button words: "Pay 10 gold" for the gold, whole; the herbs
+## and the antlers come in instalments (584 amended (2); Jeff: "you cant
+## hold 5, theres only 4 inventory slots"): "Give herbs (5 to go)", then
+## "Give herbs (2 to go)" once three are handed ([param given], the care's
+## "given" tally for that pay).
+static func care_offer_words(pay: String, price: int, given := 0) -> String:
+	if pay == "gold":
+		return "Pay %d gold" % price
+	return "Give %s (%d to go)" % [pay, maxi(price - given, 0)]
 
 
-## Whether the pack can cover [param price] of [param pay]: the purse for
-## gold, the pack's things of that id otherwise.
+## What the player has handed toward [param pay] so far: the care's
+## "given" {herbs, antlers} (npc's, 584 amended (2)); 0 without it.
+static func care_given(care: Variant, pay: String) -> int:
+	if not care is Dictionary or not care.get("given") is Dictionary:
+		return 0
+	return int((care["given"] as Dictionary).get(pay, 0))
+
+
+## Whether the pack can cover a payment of [param pay]: the purse holds
+## [param price] for gold; for herbs or antlers, holding any (the server
+## takes what is held, up to what is left to go: instalments).
 func care_covered(pay: String, price: int) -> bool:
 	if pay == "gold":
 		return int(data.get("gold", 0)) >= price
-	var held := 0
 	for each: Variant in data.get("pack", []):
 		if each is Dictionary and str(each.get("id", "")) == pay:
-			held += 1
-	return held >= price
+			return true
+	return false
 
 
 ## The care row shown (tests): the buttons' words, or the held line.
@@ -562,7 +576,7 @@ func _rebuild() -> void:
 		var button: Button = _care[pay]
 		var price := int(care.get(pay, 0)) if care is Dictionary else 0
 		button.visible = care is Dictionary and not held and price > 0
-		button.text = care_offer_words(pay, price) if button.visible else ""
+		button.text = care_offer_words(pay, price, care_given(care, pay)) if button.visible else ""
 		button.disabled = button.visible and not care_covered(pay, price)
 	_care_held.visible = held
 	_care_held.text = care_words(care) if held else ""
