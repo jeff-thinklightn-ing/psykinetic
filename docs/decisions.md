@@ -25084,3 +25084,16 @@ none faster than a cell a tick, there within the display delay plus two ticks; a
 walker whose next step comes three ticks in is hurried to a cell in three, never faster,
 and ends on its tile); the walk, fast-walker, corner, push, overtaken and stall checks
 guard the rest. Client only, protocol unchanged.
+
+## 640, buildings' side: the sheep fold, an open-air building
+
+art-kit's building.fold (640, art-kit's side) is a slot of Level.BUILDINGS,
+6 x 6, and one of Level.OPEN_AIR beside building.field: open to the sky,
+nothing roofed, walked into as ground; its outline's WALL edges a fence
+(Fields.fences) that stops walkers, not sight, and is not drawn as walls,
+the piece drawing it. Its gate is the front row's middle two cells (local
+2 and 3 of 0..5, art-kit's x -1..+1), open edges two abreast (Jeff's
+two-cell rule). A "building_fold" prefab (tools/seed_prefabs.gd) stamps it
+fenced but the gate, facing south. The earth, straw and trough are the
+piece's. level_test _test_fold. Both sides read the slot from Level;
+protocol unchanged, no new class_name.

@@ -44,6 +44,7 @@ func _ready() -> void:
 	_test_forest()
 	_test_buildings()
 	_test_field()
+	_test_fold()
 	_test_kinds()
 	_test_canopy()
 	_test_building_links()
@@ -783,6 +784,35 @@ func _test_field() -> void:
 	_check(Level.rect_cells(Rect2i(2, 2, 4, 4)).all(func(cell: Vector2i) -> bool: return not World.fields._roofed.has(cell))
 			and World.fields._roofed.has(Vector2i(9, 3)), "nothing of the field is roofed; the hut is")
 	Level.unregister("test_field")
+
+
+func _test_fold() -> void:
+	print("
+== a sheep fold: open to the sky, fenced, its gate the front's middle two cells (decision 640) ==")
+	var map := LevelMap.new(Vector2i(10, 10))
+	for y in 10:
+		for x in 10:
+			map.set_cell(Vector2i(x, y), "grass")
+	map.set_cell(Vector2i(0, 0), "start")
+	var config := _stamp(map, {}, "building_fold", Vector2i(1, 1))
+	var level := Level.parse(map.to_image(), null, config)
+	var folds := (level["buildings"] as Array).filter(func(b: Dictionary) -> bool: return b["slot"] == "building.fold")
+	var said := (level["warnings"] as Array).filter(func(text: String) -> bool: return text.contains("building") or text.contains("fold"))
+	_check(folds.size() == 1 and folds[0]["rect"] == Rect2i(2, 2, 6, 6) and folds[0]["facing"] == Vector2i(0, 1) and said.is_empty(),
+			"the prefab's fold is 6 x 6, its front south, its gate not said to be open (%s, %s)" % [folds, level["warnings"]])
+	var edges: Dictionary = level["terrain"]["edges"]
+	var open := Level.outline(Rect2i(2, 2, 6, 6)).filter(func(key: Vector3i) -> bool: return edges.get(key) != Terrain.Edge.WALL)
+	open.sort()
+	_check(open == [Vector3i(4, 7, Terrain.SOUTH), Vector3i(5, 7, Terrain.SOUTH)], "fenced all round but the gate, two cells wide (%s)" % [open])
+	Level.register("test_fold", map.to_image(), null, config)
+	_check(_main.load_map("test_fold"), "the level with a fold loads")
+	_check(World.edge_blocks(Vector2i(2, 4), Vector2i(-1, 0)) and World.edge_blocks(Vector2i(6, 7), Vector2i(0, 1)), "the fence stops a walker")
+	_check(not World.edge_blocks(Vector2i(4, 7), Vector2i(0, 1)) and not World.edge_blocks(Vector2i(5, 7), Vector2i(0, 1)),
+			"the gate lets two abreast through")
+	_check(World.has_line_of_sight(Vector2i(0, 4), Vector2i(9, 4)), "sight crosses the fence")
+	_check(Level.rect_cells(Rect2i(2, 2, 6, 6)).all(func(cell: Vector2i) -> bool: return not World.fields._roofed.has(cell)),
+			"nothing of the fold is roofed")
+	Level.unregister("test_fold")
 
 
 func _test_canopy() -> void:

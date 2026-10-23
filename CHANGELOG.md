@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Herders' sheep folds can stand in a level: a 6 x 6 fenced pen open to the sky, its gate two cells wide in the middle of its front; you see over the fence but can't walk through it, and a level editor's "building_fold" stamp lays one.
 ## v0.1.171
 
 - What goes over the network changes, so v0.1.170 and older can't join the server: update through the launcher first.

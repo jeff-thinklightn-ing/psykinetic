@@ -1,0 +1,14 @@
+[remap]
+
+importer="image"
+type="Image"
+uid="uid://eetpst2aglwj"
+path="res://.godot/imported/layout.png-baad28c5e27a07cc0289568c2e39ea40.image"
+
+[deps]
+
+source_file="res://levels/prefabs/building_fold/layout.png"
+dest_files=["res://.godot/imported/layout.png-baad28c5e27a07cc0289568c2e39ea40.image"]
+
+[params]
+

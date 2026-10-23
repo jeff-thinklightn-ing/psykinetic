@@ -235,6 +235,30 @@ const PREFABS := {
 		],
 		"config": {"buildings": [{"slot": "building.field", "at": [1, 1], "facing": [0, 1]}]},
 	},
+	# The herders' sheep fold (decision 640): a 6 x 6 pen open to the sky as
+	# a field is, fenced on its outline (Level.OPEN_AIR), its gate the front
+	# row's middle two cells; art-kit's piece draws the fence, earth, straw
+	# and trough. Its "use" and "town" a level gives it.
+	"building_fold": {
+		"rows": [
+			", , , , , , , ,",
+			"  # # # # # #  ",
+			",#, , , , , ,#,",
+			"               ",
+			",#, , , , , ,#,",
+			"               ",
+			",#, , , , , ,#,",
+			"               ",
+			",#, , , , , ,#,",
+			"               ",
+			",#, , , , , ,#,",
+			"               ",
+			",#, , , , , ,#,",
+			"  # #     # #  ",
+			", , , , , , , ,",
+		],
+		"config": {"buildings": [{"slot": "building.fold", "at": [1, 1], "facing": [0, 1]}]},
+	},
 	# The Old Tower (decision 600; Jeff: the ancients' broken-down castle,
 	# Snagfin's in Held): a yard walled round but at its east gate (the
 	# bridge road, y 8) and a breach in the north-east (the ford path); the

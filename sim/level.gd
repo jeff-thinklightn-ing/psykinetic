@@ -110,7 +110,7 @@ const NORTHS := {"up": Vector2i(0, -1), "down": Vector2i(0, 1), "left": Vector2i
 ## are the map's own edges on its outline (decision 265).
 const BUILDINGS := {"building.hut": Vector2i(3, 3), "building.house": Vector2i(4, 6), "building.shed": Vector2i(2, 3),
 	"building.well": Vector2i(1, 1), "building.temple": Vector2i(4, 6), "building.healers_hut": Vector2i(3, 3),
-	"building.field": Vector2i(4, 4), "building.mound": Vector2i(12, 12),
+	"building.field": Vector2i(4, 4), "building.fold": Vector2i(6, 6), "building.mound": Vector2i(12, 12),
 	"building.great_tree": Vector2i(3, 3), "building.cairn": Vector2i(2, 2), "building.standing_stone": Vector2i(1, 1),
 	"building.waystone": Vector2i(1, 1), "building.chopping_block": Vector2i(1, 1), "building.woodpile": Vector2i(1, 1),
 	"building.tower_ruin": Vector2i(3, 3), "building.rubble_heap": Vector2i(1, 1), "building.fallen_column": Vector2i(2, 1)}
@@ -121,7 +121,7 @@ const ON_WATER: Array[String] = ["building.well"]
 ## nothing roofed, walked into as ground. Their outline's walls are a fence
 ## (the slot's own mesh draws it): they stop walkers, not sight, and are
 ## not drawn as walls; a gap in it is an open edge.
-const OPEN_AIR: Array[String] = ["building.field"]
+const OPEN_AIR: Array[String] = ["building.field", "building.fold"]
 ## The buildings that are solid (decision 550): no inside and no floor but
 ## their door, the front row's middle cell (a barrow's mound: its link is
 ## there). Their other cells are taken out of the floor (nobody walks onto
