@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Under the low camera a name over a body reads at any distance, the nearest drawn over the farther, and far off only your party's, a foe's and your marked target's names show, so a town's names don't crowd a fight.
 - Under the low camera a body at the edge of what you can see fades in as it comes and out as it goes, over half a second, instead of popping.
 - Under the low camera a click lands on a monster a thumb's width of screen either side of it however far off it stands, where before the slack was a hand's width of ground that shrank with distance.
 - In a fight, what stands between the camera and a monster coming for you or fighting you fades as it does for you, so a foe behind a wall or a tree at the low camera's angle is seen; an idle one keeps its cover.

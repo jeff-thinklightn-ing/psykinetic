@@ -41,6 +41,7 @@ func _ready() -> void:
 	await _test_far_restart()
 	await _test_low_pick()
 	await _test_reach_ease()
+	await _test_low_names()
 	_test_pine_stands()
 	_test_ground_textures()
 	_test_canopy_mask()
@@ -6208,6 +6209,67 @@ func _test_reach_ease() -> void:
 	imp.tile = near_tile
 	imp.position = Iso.grid_to_local(Vector2(near_tile))
 	World.despawn(imp)
+	_rig._sync_puppets()
+	Net.set_camera_low(low_was, false)
+	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+
+
+## The low-angle fight, 5: names under the low camera read at every
+## depth, the nearest on top, and past NAME_TILES only the party's and a
+## foe's.
+func _test_low_names() -> void:
+	print("\n== names under the low camera: sized to their depth, the nearest on top, far ones only for the party and a foe ==")
+	var low_was := Net.camera_low
+	var player := _player()
+	var start := player.tile
+	Net.set_camera_low(true, false)
+	var castle := Level.load_level("castle")
+	_rig.rebuild(castle["terrain"], castle["centre"])
+	var ahead: Vector3 = -_rig._camera.global_transform.basis.z
+	# Two imps on the room's floor: the nearest and the deepest free cells in the view (World still holds the room).
+	var near_cell := Vector2i(-1, -1)
+	var deep_cell := Vector2i(-1, -1)
+	var nearest := INF
+	var deepest := -INF
+	for cell: Vector2i in _main._terrain["floor"]:
+		if World.get_entity_at(cell) != null:
+			continue
+		var depth: float = (_rig.to_global(_rig._tile_position(cell)) - _rig._camera.global_position).dot(ahead)
+		if depth < nearest:
+			nearest = depth
+			near_cell = cell
+		if depth > deepest:
+			deepest = depth
+			deep_cell = cell
+	var near := _spawn_imp(near_cell)
+	var deep := _spawn_imp(deep_cell)
+	await _frames(4)
+	_rig._sync_puppets()
+	var near_label: Label3D = _rig._puppets[near.get_instance_id()].get_node("Name")
+	var deep_label: Label3D = _rig._puppets[deep.get_instance_id()].get_node("Name")
+	_check(deep_label.scale.x >= near_label.scale.x and near_label.scale.x >= 1.0 and deep_label.render_priority < near_label.render_priority,
+			"the deeper name is grown to read and drawn under the nearer (scales %.2f, %.2f; priorities %d, %d)" % [near_label.scale.x, deep_label.scale.x, near_label.render_priority, deep_label.render_priority])
+	var far_tiles := Vector2(deep_cell).distance_to(Vector2(player.tile))
+	# The deep imp near or far from the player by NAME_TILES: its name shown near; past it, only once it is a foe.
+	var now := Time.get_ticks_msec()
+	if far_tiles > Client3D.NAME_TILES:
+		_check(not deep_label.visible and near_label.visible == (Vector2(near_cell).distance_to(Vector2(player.tile)) <= Client3D.NAME_TILES or near.alert != Monster.Alert.IDLE),
+				"an idle imp %.0f tiles off: its name waits (%s)" % [far_tiles, deep_label.visible])
+	else:
+		print("  (the room's deepest cell is within NAME_TILES of the player: the far name check is on the alert alone)")
+	deep.alert = Monster.Alert.HUNTING
+	_rig._sync_puppets()
+	_check(deep_label.visible, "hunting, its name shows wherever it is")
+	deep.alert = Monster.Alert.IDLE
+	_rig._combat_at[deep.get_instance_id()] = Time.get_ticks_msec()
+	_rig._sync_puppets()
+	_check(deep_label.visible, "lately struck, too")
+	_rig._combat_at.erase(deep.get_instance_id())
+	_check(_rig.name_shown(player, _rig._puppets[player.get_instance_id()], now), "the party's always")
+	Net.set_camera_low(false, false)
+	_check(deep_label.visible and is_equal_approx(deep_label.scale.x, 1.0) and deep_label.render_priority == 0, "the camera off: every name as it was")
+	World.despawn(near)
+	World.despawn(deep)
 	_rig._sync_puppets()
 	Net.set_camera_low(low_was, false)
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)

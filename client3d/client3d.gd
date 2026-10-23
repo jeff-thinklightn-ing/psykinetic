@@ -1065,6 +1065,15 @@ const FLOWER_SWATCHES: Array[Vector2i] = [Vector2i(7, 0), Vector2i(7, 7), Vector
 ## Label3D: units per font pixel, with the font size, for a name about a
 ## quarter unit tall.
 const LABEL_SIZE := 0.004
+## Under the low camera a name over a body reads at every depth (the
+## low-angle fight, 5; _sync_name): never smaller on screen than at the
+## camera's aim (grown with its depth past the aim's), the nearest drawn
+## over the farther (its render priority by depth), and past NAME_TILES
+## of the local player only the party's and a foe's (hunting, fighting or
+## lately struck, as the fade's _fight_points) or the marked target's;
+## the rest wait till they are near, so a town's names don't crowd a
+## fight.
+const NAME_TILES := 8.0
 const LABEL_FONT_SIZE := 64
 const SPEECH := Color(1, 0.95, 0.6)
 const HOVER := Color(1, 1, 1, 0.35)
@@ -2325,6 +2334,11 @@ func _apply_camera_mode() -> void:
 				_set_transparency(puppet, 0.0)
 				puppet.remove_meta("reach_in")
 				puppet.remove_meta("reach_at")
+				var label := puppet.get_node_or_null("Name") as Label3D
+				if label != null:
+					label.scale = Vector3.ONE
+					label.render_priority = 0
+					label.visible = not label.text.is_empty()
 	_shadow_key = Vector3i(1 << 30, 0, 0)  # Shadows looked at again for the new reach.
 	_apply_size()
 	_place_camera()
@@ -10827,6 +10841,7 @@ func _sync_puppets() -> void:
 		_sync_down(entity, puppet)
 		_sync_draw(entity, puppet)
 		_sync_ailments(entity, puppet)
+		_sync_name(entity, puppet, now)
 		if puppet.has_meta("rig"):
 			var body := puppet.get_node("Body") as Node3D
 			_lay(puppet, body, yaw, entity.tile)
@@ -11078,6 +11093,44 @@ func _sync_ailments(entity: GridEntity, puppet: Node3D) -> void:
 	var tint := AIL_BURN if entity.ailments.has("burn") else AIL_BLEED if entity.ailments.has("bleed") else Color.WHITE
 	if label.modulate != tint:
 		label.modulate = tint
+
+
+## Its name under the low camera (NAME_TILES): sized to read at its depth,
+## the nearest over the farther, shown past NAME_TILES only for the party,
+## a foe or the marked target. Nothing under the ortho camera.
+func _sync_name(entity: GridEntity, puppet: Node3D, now: int) -> void:
+	if not _low or _camera == null:
+		return
+	var label := puppet.get_node_or_null("Name") as Label3D
+	if label == null:
+		return
+	var depth := maxf((label.global_position - _camera.global_position).dot(-_camera.global_transform.basis.z), 0.0)
+	label.scale = Vector3.ONE * maxf(1.0, depth / maxf(_camera_distance(), 1.0))
+	label.render_priority = clampi(100 - roundi(depth), -100, 100)
+	label.visible = not label.text.is_empty() and name_shown(entity, puppet, now)
+
+
+## Whether [param entity]'s name shows under the low camera: within
+## NAME_TILES of the local player (or the camera's aim with none); past
+## that only the party's, a foe's (as _fight_points counts one) or the
+## marked target's.
+func name_shown(entity: GridEntity, puppet: Node3D, now: int) -> bool:
+	if entity is Player or entity is Companion or puppet == _outlined:
+		return true
+	var own := _local_player()
+	var from := Vector2(_camera_target.x, _camera_target.z)
+	if own != null and _puppets.has(own.get_instance_id()):
+		var at: Vector3 = _puppets[own.get_instance_id()].global_position
+		from = Vector2(at.x, at.z)
+	if Vector2(puppet.global_position.x, puppet.global_position.z).distance_to(from) <= NAME_TILES:
+		return true
+	if entity is Monster:
+		var alert: Monster.Alert = (entity as Monster).alert
+		if alert == Monster.Alert.FIGHTING or alert == Monster.Alert.HUNTING:
+			return true
+		if now - _combat_at.get(entity.get_instance_id(), -100000) < COMBAT_SECONDS * 1000.0:
+			return true
+	return false
 
 
 func _sync_alert(monster: Monster, puppet: Node3D) -> void:

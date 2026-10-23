@@ -26122,3 +26122,13 @@ change eases over REACH_EASE (0.5 s) through every GeometryInstance3D's transpar
 from gone as it comes; a puppet just made beyond the edge is simply not drawn (no ghost on
 a join); the camera off puts every puppet solid and forgets the easing. The sim's edge
 (238) is untouched: the client eases only what it is sent. view_test _test_reach_ease.
+
+## 635: the low-angle fight, 5: names under the low camera
+
+Client3D._sync_name each frame under the low camera: a name's scale is max(1, its depth
+over the camera's distance from the aim), so it is never smaller on screen than at the
+aim; render priority 100 minus the depth, so the nearest draws over the farther; shown
+past NAME_TILES (8) of the local player only for the party, the marked target, and a foe
+(hunting, fighting or lately struck, as _fight_points counts one): name_shown. The ortho
+camera's names untouched; the camera off restores scale, priority and visibility.
+view_test _test_low_names.
