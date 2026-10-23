@@ -25,10 +25,13 @@ extends RefCounted
 ## economy's side).
 signal deposited(place: String, by: String, by_id: String, what: String, count: int)
 
-const RESOURCES: Array[String] = ["gold", "ore", "wood", "cloth", "food", "meat", "hide", "leather", "wool", "herbs", "sheep"]
+const RESOURCES: Array[String] = ["gold", "ore", "wood", "cloth", "food", "meat", "hide", "leather", "wool", "herbs", "sheep", "fish"]
 const KIND := "stockpile"
 ## The faction whose stockpiles take deposits.
 const TOWN := "town"
+## Place kinds that are a town's outposts away from its store (594): a
+## counter there is the shop of the town the place names.
+const OUTPOSTS: Array[String] = ["fort"]
 const LEDGER_SIZE := 200
 
 ## () -> int: the World's steps, the ledger's clock (0 if unset).
@@ -67,6 +70,14 @@ static func place_at(holdings: Holdings, area_name: String, cell: Vector2i) -> S
 	for id in holdings.places_in(area_name):
 		if holdings.place(id)["kind"] == KIND and holdings.covers(id, cell) and holdings.holder(id) == TOWN:
 			return id
+	# An outpost of a town away from its store (594: Snagfin's ruined fort
+	# across the river): its place names its town ("town"), whose shop a
+	# counter there is.
+	for id in holdings.places_in(area_name):
+		var place := holdings.place(id)
+		var town := str(place.get("town", ""))
+		if str(place["kind"]) in OUTPOSTS and holdings.covers(id, cell) and not town.is_empty() and holdings.holder(town) == TOWN:
+			return town
 	return ""
 
 
@@ -95,6 +106,13 @@ static func check(config: Dictionary) -> Array[String]:
 			if holder != TOWN:
 				out.append("the store %s is held by %s, not the town: nothing is banked or sold there" % [key, holder])
 			stores.append({"key": str(key), "at": at, "radius": int(place.get("radius", Level.PLACE_RADIUS)), "town": holder == TOWN})
+	var outposts: Array[Dictionary] = []
+	if listed is Dictionary:
+		for key: Variant in listed:
+			var place: Variant = listed[key]
+			var at: Variant = Level._tile(place.get("at")) if place is Dictionary else null
+			if place is Dictionary and str(place.get("kind", "")) in OUTPOSTS and not str(place.get("town", "")).is_empty() and at != null:
+				outposts.append({"at": at, "radius": int(place.get("radius", Level.PLACE_RADIUS))})
 	for i in stores.size():
 		for j in range(i + 1, stores.size()):
 			var reach: int = stores[i]["radius"] + stores[j]["radius"]
@@ -112,7 +130,9 @@ static func check(config: Dictionary) -> Array[String]:
 			continue
 		var inside: Array = stores.filter(func(store: Dictionary) -> bool:
 			return store["town"] and (at - store["at"]).length_squared() <= store["radius"] * store["radius"])
-		if inside.is_empty():
+		var outpost := use == "shop counter" and outposts.any(func(post: Dictionary) -> bool:
+			return (at - post["at"]).length_squared() <= post["radius"] * post["radius"])
+		if inside.is_empty() and not outpost:
 			out.append("the %s at %s does nothing: no store the town holds covers it" % [use, at])
 		elif use == "depot":
 			depots[inside[0]["key"]] = true

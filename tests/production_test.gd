@@ -60,6 +60,7 @@ func _ready() -> void:
 	_test_wages_and_rent()
 	_test_world_tick()
 	_test_sites()
+	_test_fisherman()
 
 	Level.unregister(TOWN)
 	print("")
@@ -78,6 +79,8 @@ func _register_town() -> void:
 		"camp": {"at": [15, 5], "kind": "camp", "radius": 3, "holder": "nobody"},
 		"woodlot": {"at": [30, 4], "kind": "woodlot", "radius": 2, "holder": "town", "town": "store"},
 		"grounds": {"at": [30, 14], "kind": "hunting_ground", "radius": 2, "holder": "town", "town": "store"},
+		"fishing": {"at": [36, 9], "kind": "fishing", "radius": 2, "holder": "town", "town": "store"},
+		"fort": {"at": [20, 15], "kind": "fort", "radius": 2, "holder": "nobody", "town": "store"},
 	}})
 
 
@@ -320,6 +323,53 @@ func _check(ok: bool, label: String) -> void:
 	if not ok:
 		_failures += 1
 	print("  %s  %s" % ["PASS" if ok else "FAIL", label])
+
+
+## The fisherman and the fort (594): a work-site trade at the town's
+## fishing place on the bank, a newcomer at village; a counter in a fort
+## that names the town is the town's shop.
+func _test_fisherman() -> void:
+	print("
+== the fisherman, and Snagfin's fort ==")
+	var file := Production.read_rules()
+	var rules := RULES.duplicate(true)
+	rules["sites"] = {"trades": {"fisherman": "fishing"}, "steps_per_cell": 4, "work_steps": 120, "other_area": 3000}
+	rules["fisherman"] = file["fisherman"]
+	rules["stages"] = file["stages"]
+	_check(int(file["fisherman"]["catch"]) == 2 and file["fisherman"]["stage"] == "village" and "fish" in Stockpile.RESOURCES
+		and int(file["value"]["fish"]) == 1 and "fish" in file["folk"]["needs"]["meal"]["store"], "the rules are economy.json's: 2 fish, at village, eaten as meat is")
+	_fresh({}, rules)
+	_check(Stockpile.place_at(_holdings, TOWN, Vector2i(20, 15)) == STORE and Stockpile.place_at(_holdings, TOWN, Vector2i(15, 5)) == "",
+		"a counter in the fort that names the town is its shop; the camp's is nobody's")
+	var config := {"places": {"store": {"at": [4, 4], "kind": "stockpile", "radius": 3, "holder": "town"},
+		"fort": {"at": [20, 15], "kind": "fort", "radius": 2, "town": "store"}},
+		"entities": [{"at": [4, 4], "props": {"depot": true}}, {"at": [20, 15], "props": {"shop": true}}]}
+	_check(Stockpile.check(config).is_empty(), "builder's check: the fort's counter is no stray (%s)" % [Stockpile.check(config)])
+	var towns := Towns.new({}, _work, rules, func() -> int: return _now)
+	towns._town(STORE)
+	towns.tick()
+	_check(towns.stage(STORE) == "hamlet", "a hamlet")
+	_now += 4 * DayNight.day_steps
+	towns.tick()
+	_check(not towns.residents(STORE).any(func(id: String) -> bool: return "fisherman" in _work.worker(id)["trades"]), "a hamlet: no fisherman yet")
+	towns._town(STORE)["stage"] = "village"
+	towns.tick()
+	_now += 4 * DayNight.day_steps
+	towns.tick()
+	var fishers := towns.residents(STORE).filter(func(id: String) -> bool: return "fisherman" in _work.worker(id)["trades"])
+	_check(fishers.size() == 1, "a village with a fishing place: a fisherman comes (%s)" % [fishers])
+	var until := _now + 7000
+	while _now < until:
+		_now += World.WORLD_TICK_STEPS
+		towns.tick()
+	_check(_stock.count(STORE, "fish") >= 2, "he walks to the bank and back with his catch: %d fish in the store" % _stock.count(STORE, "fish"))
+	_holdings.take("pt_town/fishing", "goblins")
+	var had := _stock.count(STORE, "fish")
+	until = _now + 7000
+	while _now < until:
+		_now += World.WORLD_TICK_STEPS
+		towns.tick()
+	_check(_stock.count(STORE, "fish") == had, "goblins on the bank: no fish")
 
 
 ## Work sites (decision 521): a trade works from its town's site of its

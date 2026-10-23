@@ -23251,3 +23251,32 @@ tests/farm_test:
 
 Server and client (a field), no new class_name.
 
+
+## 594. The fisherman, and the fort as a town's outpost
+
+Jeff (2026-10-22): "town can have fisherman that go to river and back with
+fish". Builder's Old Tower at Held (Snagfin's ruined fort across the river)
+is a place of kind "fort" whose counter is the town's shop.
+
+- **Fish** is a resource (Stockpile.RESOURCES), worth 1. It is a meal from
+  the store, as food and meat are, and raids take it at the same shares as
+  meat.
+- **The fisherman** is a work-site trade (sites.trades fisherman:
+  "fishing", a place on the river's bank). Every fisherman.every steps
+  (3000) he walks there and back (Production.site_turn, as the woodcutter
+  does), and brings fisherman.catch (2) fish, scaled by the season, into
+  the store at its price (deliver_to). A bank the town doesn't hold yields
+  nothing. His wage floor is the fish he brings.
+- **He comes** (Towns._fisherman_comes) once the town holds a fishing place
+  and has reached fisherman.stage ("village", 591's stages), after
+  growth_days. That goes through _arrive, so once 613 is on he is sought
+  like any other newcomer.
+- **Outposts.** Stockpile.OUTPOSTS ["fort"]: a counter inside a fort place
+  that names its "town" is that town's shop (place_at), and the level check
+  accepts such a counter away from the store.
+- Level.PLACE_KINDS gains "fishing" and "fort" (maps adds "fort" too: one
+  entry).
+
+production_test (the fisherman's trip and catch, nothing from a bank not
+held, the fort's counter the town's shop). Level data both sides read:
+the new place kinds under the open revision; no new class_name.

@@ -96,7 +96,7 @@ const SIDES := {"north": Vector2i(0, -1), "east": Vector2i(1, 0), "south": Vecto
 const OPPOSITE := {"north": "south", "east": "west", "south": "north", "west": "east"}
 ## What a place (level.json "places", Holdings) can be.
 const PLACE_KINDS: Array[String] = ["camp", "keep", "farm", "gate", "mine", "stockpile", "temple", "healers_hut",
-	"woodlot", "hunting_ground", "quarry", "other"]
+	"woodlot", "hunting_ground", "quarry", "fishing", "fort", "other"]
 ## The buildings that make a place of their own where they stand
 ## (building_places, decision 372): where the fallen come back.
 const BUILDING_PLACES := {"building.temple": "temple", "building.healers_hut": "healers_hut"}

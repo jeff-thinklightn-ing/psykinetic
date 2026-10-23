@@ -465,6 +465,8 @@ func tick() -> void:
 		_butcher(town)
 		_woodcut(town)
 		_woodcutter_comes(town)
+		_fish(town)
+		_fisherman_comes(town)
 		_stage_turn(town)
 		_maker_comes(town)
 		_sought_turn(town)
@@ -1598,6 +1600,53 @@ func _felled(town: String, site: Dictionary, wood: int, worker: Dictionary) -> i
 	return int(rule.get("deadwood", 1))
 
 
+## The fisherman at the river (594; Jeff: "town can have fisherman that go
+## to river and back with fish"): every fisherman.every steps he walks to
+## the town's fishing place on the bank and back (Production.site_turn, as
+## the woodcutter) and brings fisherman.catch fish, the season's scale of
+## it, into the store at its price. A bank the town doesn't hold yields
+## nothing; no fishing place, no fishing.
+func _fish(town: String) -> void:
+	var rule: Dictionary = rules.get("fisherman", {})
+	var trade := str(rule.get("trade", ""))
+	if trade.is_empty() or production.site_of(town, trade).is_empty():
+		return
+	var record := _town(town)
+	var due: Dictionary = record.get("fish_due", {})
+	record["fish_due"] = due
+	var every := maxi(int(rule.get("every", 3000)), 1)
+	for who in residents(town):
+		var worker := production.worker(who)
+		if worker.is_empty() or trade not in worker.get("trades", []) or Production.off_work(worker):
+			continue
+		if not due.has(who):
+			due[who] = now() + every
+			continue
+		if now() < int(due[who]):
+			continue
+		var trip := production.site_turn(town, who, trade)
+		if trip == Production.WALKING:
+			continue
+		due[who] = now() + every
+		if trip != Production.BACK:
+			continue
+		var fish := floori(int(rule.get("catch", 2)) * season_scale())
+		if fish > 0:
+			production.deliver_to(town, who, "fish", fish, "fisherman:%s" % who, "%s's catch" % worker["name"])
+
+
+## A town that holds a fishing place on its river's bank and has reached
+## fisherman.stage gets a fisherman, a newcomer, once it has waited
+## fisherman.growth_days (594).
+func _fisherman_comes(town: String) -> void:
+	var rule: Dictionary = rules.get("fisherman", {})
+	var trade := str(rule.get("trade", "fisherman"))
+	var stages: Array = rules.get("stages", []).map(func(each: Variant) -> String: return str(each.get("name", "")) if each is Dictionary else "")
+	var wanted: bool = not rule.is_empty() and not production.site_of(town, trade).is_empty() \
+			and stages.find(stage(town)) >= stages.find(str(rule.get("stage", "")))
+	_comes(town, trade, wanted, float(rule.get("growth_days", 3)), rule.get("names", ["Finn"]), "fisherman")
+
+
 ## [param town]'s stage toward a city (591, economy's side): the name of the
 ## highest of rules' "stages" it has reached, "" for none. Raised by
 ## _stage_turn, one step at a time, never lowered.
@@ -2129,7 +2178,11 @@ func from_dict(saved: Dictionary) -> void:
 		if entry.has("butcher_at"):
 			record["butcher_at"] = int(entry["butcher_at"])
 			record["butcher_worked"] = maxi(int(entry.get("butcher_worked", 0)), 0)
-		for key: String in ["shepherd", "weaver", "butcher"]:
+		if entry.get("fish_due") is Dictionary:
+			record["fish_due"] = {}
+			for who: Variant in entry["fish_due"]:
+				record["fish_due"][str(who)] = int(entry["fish_due"][who])
+		for key: String in ["shepherd", "weaver", "butcher", "fisherman"]:
 			if entry.has("%s_wanted" % key):
 				record["%s_wanted" % key] = int(entry["%s_wanted" % key])
 			record["%ss_came" % key] = maxi(int(entry.get("%ss_came" % key, 0)), 0)
