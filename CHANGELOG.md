@@ -10,7 +10,6 @@ notes (decision 324).
 - The Ossuary's chests may hold a mail shirt among the dead's goods, and the Hall of Fallen Souls' mail or, rarely, plate armour: the only armour the world gives, grave goods all (622, dungeon's side).
 - In the barrow's first hall, the first time you step in each time it is laid again, you feel a cool draft coming from one of the niches, while the hidden door is still shut; the clues to it all point at the true niche (608 amended, dungeon's side).
 - Armour shows on the body: leather a jerkin with bracers and greaves, mail a long shirt, plate its plates, robes to the shins, each in its own colour over the clothes.
-- Fixed: with the low camera on, every body snapped to its tile each frame (the glitchy movement; fights were harder for it), and with it off a monster that had gone far off and come back stood frozen (623's hotfix).
 - Armour now does its work: mail turns a quarter of an arrow's hurt and a fifth of a spear's or dagger's thrust, plate half and nearly a third (at least 1 always gets through), and heavy armour slows your breath: plate recovers stamina a fifth slower (622, combat's side).
 - By a camp fire you can play knucklebones with your companion (say "let's play knucklebones"): best of three, she keeps the tally and has something to say about winning or losing. After a hard day she may ask you to keep watch while she sleeps: stay by her and she wakes whole and trusts you more; wander off and let something find her, and she won't forget it (621).
 - A companion's lean is named by her focus, as her card's corners are: she leans to fighting, to magic or to stealth (577's words).
@@ -24,6 +23,12 @@ notes (decision 324).
 - A drawn bow's arrow now flies inside a cone that narrows the longer you hold: wide on a snap shot, tight after a few seconds; every bow and archer alike.
 - Arrows fly from the bow as real arrows: a shot that runs out of range drops past its mark and sticks in the ground, an arrow sticks in a closed door, glances off stone to lie at the wall's foot, and arrows left lying go after 10 seconds.
 - An armour slot beside the hands (622): leather armour, a mail shirt, plate armour and robes are worn there, never held; worn armour weighs on you like anything carried, so plate makes you hard to push. What each does and where it comes from follow; the numbers are drafts.
+
+## v0.1.170
+
+- A client-only fix to v0.1.169: it joins the same server, so update through the launcher and keep playing.
+- Fixed: with the low camera on, every body snapped to its tile each frame (the glitchy movement; fights were harder for it), and with it off a monster that had gone far off and come back stood frozen (623's hotfix).
+
 ## v0.1.169
 
 - What goes over the network changes, so v0.1.168 and older can't join the server: update through the launcher first.

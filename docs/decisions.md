@@ -24787,3 +24787,22 @@ seeds fixed, the first generation giving each named in the check's
 words), every generated chest grave marked, and the two tables the only
 ones naming armour; the templates name them. Data and a test; protocol
 unchanged; no new class_name.
+## 644. A client-only release from a branch off the last tag (release_client -Hotfix)
+
+Jeff, 2026-10-23: v0.1.169's low camera (623) shipped a wrong indent that snapped bodies under it
+and froze far ones without it, while main already ran revision 34 (620) ahead of the box, so no
+release cut from main could join the box. He chose a client-only hotfix built from the v0.1.169
+tag with the fix cherry-picked, over a full cut with a deploy.
+
+`tools/release_client.ps1 -Hotfix` releases a branch off the last release's tag: it skips the
+check that the commit has origin/main in it, and pushes its commit to origin's
+`hotfix/<tag>` branch, not to main; the tag and the GitHub release are as for any release (the
+newest is the launcher's Latest). Main then takes the hotfix's `## v<tag>` CHANGELOG section,
+moving the fix's bullet out of `## Unreleased`, and version.txt at the hotfix's version, so its
+next cut is numbered past it (v0.1.170 hotfix/v0.1.170, main's next v0.1.171).
+
+Only for a client-only fix whose protocol equals the box's: a hotfix tree's `--print-protocol`
+must read the box's, its sound store must match the tag's takes.json (no take moves until it
+is published), and it runs land.sh like any cut. Anything server-side waits for main's next
+cut. Main stays the only line of development: the hotfix commit is a cherry-pick of one that
+landed on main first.
