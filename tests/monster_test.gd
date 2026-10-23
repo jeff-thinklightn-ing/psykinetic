@@ -1976,8 +1976,8 @@ func _test_wild_remains() -> void:
 		for each in World.ground_uids(cell):
 			if not each in before.get(cell, PackedInt32Array()):
 				fell.append(World.items.id_of(each))
-	_check(not imp.spawned and fell.all(func(id: String) -> bool: return id == "coin_purse") and fell.size() <= 1,
-			"an imp's row drops no meat or hide: at most its purse of gold (decision 601; %s)" % [fell])
+	_check(not imp.spawned and fell.is_empty(),
+			"an imp's row drops no meat or hide, and its gold is a count, not a thing (601 amended; %s)" % [fell])
 
 
 func _test_kobold_dagger_and_pick() -> void:

@@ -43,6 +43,10 @@ var entities: Array[GridEntity] = []
 ## Server: what lies on the ground, cell -> ItemBook uids (the top last)
 ## (World.put_on_ground); saved with the zone.
 var ground: Dictionary[Vector2i, PackedInt32Array] = {}
+## Server: the gold lying on the ground, cell -> whole gold (601 amended:
+## gold is never an item; a fallen humanoid's falls as a count on its
+## cell's pile, taking no place there; World.drop_gold); saved with it.
+var ground_gold: Dictionary[Vector2i, int] = {}
 ## Each cell's GroundPile node (server and client): what is drawn.
 var piles: Dictionary[Vector2i, GroundPile] = {}
 var hits: Array = []

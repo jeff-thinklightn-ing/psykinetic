@@ -5339,6 +5339,13 @@ func _on_pile_shown(pile: GroundPile) -> void:
 		heap.add_child(thing)
 		if i == pile.ids.size() - 1 and pile.thrown_from != World.NO_CELL and World.tick - pile.thrown_tick < THROWN_SHOWN_TICKS:
 			_fly(thing, _tile_position(pile.thrown_from) - heap.position + Vector3.UP * 1.2, thing.position)
+	if pile.gold > 0 and ArtKit.has(Items.GOLD_ART):
+		# Its gold (601 amended: a count, never a thing): one coin purse on its
+		# side, under the rest.
+		var coins := ArtKit.instance(Items.GOLD_ART)
+		coins.rotation = Vector3(0.0, _roll(pile.tile, 9) * TAU, PI * 0.5)
+		coins.position = Vector3(-0.15 * mini(pile.ids.size(), 1), ArtKit.size(Items.GOLD_ART).z * 0.5, 0.12 * mini(pile.ids.size(), 1))
+		heap.add_child(coins)
 	_room.add_child(heap)
 	_pile_nodes[pile] = heap
 

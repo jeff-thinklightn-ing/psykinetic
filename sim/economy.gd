@@ -1421,12 +1421,11 @@ func thief_cut(production: Production, thief: String, lifted: int) -> int:
 
 ## A robber of [param barrow] fallen with [param standing] of the band up
 ## (him among them): his share of the purse, taken out of it, in whole
-## purses (the purse item's gold) and at most robbers.most. 0 if empty.
+## gold (601 amended: a count on the ground, no longer whole purses) and at
+## most robbers.most. 0 if empty.
 func band_share(barrow: String, standing: int) -> int:
 	var rule := _robbers()
-	var each := int(Items.def(str(rule.get("purse", "coin_purse"))).get("yield", {}).get("gold", 10))
 	var share := mini(band_gold(barrow) / maxi(standing, 1), int(rule.get("most", 40)))
-	share -= share % maxi(each, 1)
 	if share <= 0:
 		return 0
 	_bands[barrow] = band_gold(barrow) - share

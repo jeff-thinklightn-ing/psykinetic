@@ -1327,11 +1327,8 @@ func _calm() -> void:
 ## What it leaves where it falls (decision 318): its kind's "drops" (each
 ## {item, count: [least, most], chance}, levels/monsters.json), made now
 ## (ItemBook.mint, "remains" of it), as many of each as dropped rolls,
-## seeded by its name and the tick, and its kind's "purse" (decision 601;
-## Jeff: "gold drop from humanoid enemies"): a coin purse holding a roll
-## of [least, most] gold (ItemBook.set_gold; minted, a small leak into
-## the economy), none for a row without one (animals, the undead) or a
-## roll of 0. World.damage lays them on the ground. Server only.
+## seeded by its name and the tick. World.damage lays them on the ground,
+## and its purse_gold beside them. Server only.
 func remains() -> Array[int]:
 	var uids: Array[int] = []
 	var row: Dictionary = kinds().get(str(spawn_spec.get("kind", "")), {})
@@ -1344,19 +1341,24 @@ func remains() -> Array[int]:
 			var uid := World.items.mint(str(drop["item"]), "remains", World._label_of(self), zone, tile, style)
 			World.items.mark_grave(uid, World.grave_from(self), zone, tile)  # Decision 555.
 			uids.append(uid)
-	var purse: Array = row.get("purse", [0, 0])
-	var gold := roll.randi_range(int(purse[0]), int(purse[1])) if purse.size() == 2 and int(purse[1]) > 0 else 0
-	if gold > 0 and Items.exists(PURSE):
-		var uid := World.items.mint(PURSE, "remains", World._label_of(self), zone, tile)
-		World.items.set_gold(uid, gold)
-		World.items.mark_grave(uid, World.grave_from(self), zone, tile)  # Decision 555.
-		uids.append(uid)
 	return uids
 
 
-## The thing a humanoid's gold falls as (decision 601): a coin purse,
-## picked up and opened ("use") into gold as any.
-const PURSE := "coin_purse"
+## The gold it leaves where it falls (decision 601; Jeff: "gold drop from
+## humanoid enemies"; 601 amended, Jeff: "consolidate gold coins to being
+## stackable in the inventory but not taking up a pack slot"): a roll of
+## its kind's "purse" [least, most], seeded by its name and the tick; 0
+## for a row without one (animals, the undead). Never a thing: World.damage
+## drops it on the ground as a count (World.drop_gold), minted, a small
+## leak into the economy. Server only.
+func purse_gold() -> int:
+	var row: Dictionary = kinds().get(str(spawn_spec.get("kind", "")), {})
+	var purse: Array = row.get("purse", [0, 0])
+	if purse.size() != 2 or int(purse[1]) <= 0:
+		return 0
+	var roll := RandomNumberGenerator.new()
+	roll.seed = hash("%s/purse/%d" % [name, World.tick])
+	return roll.randi_range(int(purse[0]), int(purse[1]))
 
 
 ## What it leaves at its feet when it yields rather than dies (decision

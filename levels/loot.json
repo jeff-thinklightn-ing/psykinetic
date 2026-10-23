@@ -4,7 +4,6 @@
 		"supplies": [
 			{"item": "ration", "count": [1, 2], "chance": 0.6},
 			{"item": "bandaging_kit", "chance": 0.3},
-			{"item": "coin_purse", "chance": 0.5},
 			{"item": "food_sack", "chance": 0.2}
 		],
 		"armoury": [
@@ -16,7 +15,6 @@
 			{"item": "arrows", "chance": 0.2}
 		],
 		"pockets": [
-			{"item": "coin_purse", "chance": 0.3},
 			{"item": "ration", "chance": 0.2},
 			{"item": "dagger", "chance": 0.1}
 		]

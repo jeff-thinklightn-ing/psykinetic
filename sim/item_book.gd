@@ -339,26 +339,17 @@ func short_of(uid: int) -> float:
 	return float(_book[uid].get("short", 1.0)) if _book.has(uid) else 1.0
 
 
-## The gold [param uid] holds of its own (decision 601: a fallen
-## humanoid's purse, its roll); -1 for the catalog's yield.
-func gold_of(uid: int) -> int:
+## The gold an old coin purse [param uid] held of its own (decision 601,
+## before 601 amended made gold a count, never a thing): read once, by
+## World's migration of a saved purse (World.purse_gold); -1 for none.
+func legacy_gold(uid: int) -> int:
 	return int(_book[uid].get("gold", -1)) if _book.has(uid) else -1
 
 
-## [param uid] holding [param amount] gold of its own (at least 0), in
-## place of its catalog yield's.
-func set_gold(uid: int, amount: int) -> void:
-	if _book.has(uid):
-		_book[uid]["gold"] = maxi(amount, 0)
-
-
-## What banking [param uid] gives (Items.yield_of its id, its own gold in
-## place of the yield's: gold_of), a short one's each count cut to its
-## share, rounded down, at least 1 (decision 493).
+## What banking [param uid] gives (Items.yield_of its id), a short one's
+## each count cut to its share, rounded down, at least 1 (decision 493).
 func yields_of(uid: int) -> Dictionary:
 	var yields := Items.yield_of(id_of(uid))
-	if gold_of(uid) >= 0 and yields.has("gold"):
-		yields["gold"] = gold_of(uid)
 	var share := short_of(uid)
 	if share < 1.0:
 		for what: String in yields:
@@ -617,7 +608,7 @@ static func from_dict(data: Variant, steps: Callable = Callable()) -> ItemBook:
 			if entry.get("bound") is String and not entry["bound"].is_empty():
 				items._book[int(key)]["bound"] = entry["bound"]
 			if entry.get("gold") is float or entry.get("gold") is int:
-				items._book[int(key)]["gold"] = maxi(int(entry["gold"]), 0)  # Decision 601.
+				items._book[int(key)]["gold"] = maxi(int(entry["gold"]), 0)  # An old purse's (601), for its migration.
 			if entry.get("charges") is float or entry.get("charges") is int:
 				items._book[int(key)]["charges"] = maxi(int(entry["charges"]), 0)  # Decision 573 amended.
 			if entry.get("bane") is String and not entry["bane"].is_empty():

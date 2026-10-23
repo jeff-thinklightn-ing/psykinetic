@@ -233,7 +233,7 @@
 				]
 			},
 			"type": "mesh",
-			"uses": "coin purse (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
+			"uses": "gold on the ground (World.drop_gold): one purse drawn in its pile, however much lies there"
 		},
 		"item.dagger": {
 			"budget": 500,

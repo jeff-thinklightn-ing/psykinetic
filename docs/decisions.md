@@ -21720,6 +21720,56 @@ gold, banked and opened for that, kept through a save; a wolf's leaves
 none. No protocol change: the purse travels as any ground thing, and its
 gold is server-side (the note text rides the slot notes as ever). No new
 class_name.
+
+601 amended (the coordinator's ruling on Jeff's answer to the robbers' gold
+file: "dropping purses of coins isn't ideal, there no way to trade gold in
+game either. that should be economies concern first. consolidate gold
+coins to being stackable in the inventory but not taking up a pack slot").
+Gold is never an item:
+- The coin_purse item is gone: its catalog row, its loot rows (supplies,
+  pockets), the wilds town chest's, World.try_use's "purse", the shop's
+  purse refusal, ItemBook.set_gold and the instance's gold in yields_of.
+  Its art slot stays (Items.GOLD_ART, kept in slots_items.json by
+  Items.art_slots) as the look of gold on the ground.
+- Gold on the ground is a count on its cell: Zone.ground_gold (cell to
+  whole gold, server), taking no place among the cell's things
+  (GROUND_PER_CELL counts things only). World.drop_gold(zone_name, cell,
+  gold) adds to it (the cell if it is ground, else _ground_room's nearest)
+  and World.ground_gold(cell) reads it on any peer. The cell's GroundPile
+  replicates it as "gold" (a pile may hold gold alone), and Main spawns
+  and frees a pile on its things or its gold. It's saved with the zone's
+  ground ("gold" on the cell's entry; Main.ground_entries, read back by
+  Snapshot.parse_zone and _restore_ground), and cleared by World.reset
+  as the things are.
+- A fallen humanoid's "purse" roll is Monster.purse_gold() (seeded by its
+  name and the tick, as before). World.damage drops it as a count where it
+  fell, minted (the same small leak), no grave mark: gold is gold.
+- F takes a cell's gold first (World.try_pick_up_gold: a player in reach,
+  all of it, into the record's gold through World.add_gold, why "picked
+  up", economy's log), then a thing, one a press as before. The player is
+  told "Picked up N gold." (a party line from Server, as a refusal is).
+  Companions and monsters don't pick gold up. Shops never see gold.
+- The hover says "12 gold", "12 gold and herbs" (Main.pile_words' gold).
+  The 3D view draws one purse in the pile's heap; the 2D view a gold
+  square.
+- A saved coin purse becomes gold on load (World.purse_gold: its own roll,
+  else the old catalog's 10): in a player's slots, into their record's gold
+  (World.set_slots' _purses_migrated, "a coin purse"); in a chest's, a
+  companion's or a monster's, dropped where it stands; on the ground, a
+  count on its cell (_restore_ground). The purse's instance ends,
+  "migrated".
+- economy-fa's 580 robbers' band share goes down through drop_gold, not
+  purses (Main._robber_fell); economy.json's robbers "purse" goes, and
+  Economy.band_share pays whole gold, no longer rounded down to whole
+  purses of 10 (39 among three: 13 each, was 10). Economy builds the gold
+  trade between players; ui the pack's gold stack (the record's gold,
+  outside the slots). Wire: GroundPile's "gold", a PROTOCOL_REVISION line.
+items_test _test_gold_drop (a goblin's gold a count on its cell, its pile
+showing it, saved and read back, F into the record's gold with no slot;
+a saved purse in a pack and on the ground migrated; a wolf none);
+monster_test, economy_test (herbs refused at the counter in the purse's
+place); tools/clip.gd's two item clips without the purse. No new
+class_name.
 Jeff, through the coordinator: "old farmstead in the wilds - abandoned,
 tools and bandages found inside". A small one-time stash, per player,
 that never respawns.

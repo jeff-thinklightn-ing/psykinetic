@@ -421,10 +421,10 @@ func _test_bound_axe() -> void:
 	World._relocate(player, cell + Vector2i(0, 1))
 	_check(not World.try_pick_up(player, cell) and World.ground_uids(cell).has(int(axe["uid"])) and player.slots[Player.RIGHT_HAND].is_empty(),
 			"the player beside it cannot pick it up")
-	var purse := World.items.mint("coin_purse", "built")
-	World.zone.ground[cell] = PackedInt32Array([purse, int(axe["uid"])])  # A purse under his axe.
-	_check(World.try_pick_up(player, cell) and player.slots.has("coin_purse") and World.ground_uids(cell) == PackedInt32Array([int(axe["uid"])]),
-			"a purse on the same cell is picked up past it; the axe stays")
+	var purse := World.items.mint("ration", "built")  # 601 amended: a coin purse is no thing now.
+	World.zone.ground[cell] = PackedInt32Array([purse, int(axe["uid"])])  # A ration under his axe.
+	_check(World.try_pick_up(player, cell) and player.slots.has("ration") and World.ground_uids(cell) == PackedInt32Array([int(axe["uid"])]),
+			"a ration on the same cell is picked up past it; the axe stays")
 	World._relocate(player, boss.tile + Vector2i(-1, 0))
 	_check(World.try_axe_charge(boss), "he charges for it")
 	for i in 12:

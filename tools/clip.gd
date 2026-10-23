@@ -29,8 +29,8 @@ extends Node
 ##   items_icons: the pack's icons (ItemIcons): a chest of four things
 ##     opened, one taken into the hands, three into the pack; each box its
 ##     item's icon over its name.
-##   items_use: using things: a locked door rattles; from a chest a coin
-##     purse, opened into gold, and the key, which opens the door; a sack
+##   items_use: using things: a locked door rattles; from a chest a
+##     stamina potion, drunk, and the key, which opens the door; a sack
 ##     of ore put down beyond it, and the imp there hears the thud.
 ##   items_weapons: the seven weapons (Items.VERBS): sword and shield in
 ##     the hands, hammer, spear and dagger in the pack, the giant axe and
@@ -462,7 +462,7 @@ func _items_icons() -> void:
 	]
 	var markers := {Vector2i(2, 2): "start", Vector2i(3, 1): "chest", Vector2i(7, 3): "monster_imp"}
 	var config := {"name": "Clip", "ambient": 0.9,
-		"entities": [{"at": [3, 1], "props": {"slots": ["bandaging_kit", "ore_sack", "wood_bundle", "coin_purse"]}},
+		"entities": [{"at": [3, 1], "props": {"slots": ["bandaging_kit", "ore_sack", "wood_bundle", "ration"]}},
 			{"at": [7, 3], "facing": [-1, 0], "idle": {"mode": "guard"}}]}
 	Level.register(NAME, Level.image_from_rows(Terrain.expand(rows), markers, config), null, config)
 	_script = [
@@ -473,7 +473,7 @@ func _items_icons() -> void:
 		["wait", 20, ""],
 		["item_take", [0, 0], "The bandages into the pack."],
 		["wait", 15, ""],
-		["item_take", [3, 1], "The coin purse."],
+		["item_take", [3, 1], "A ration."],
 		["wait", 15, ""],
 		["item_take", [1, 2], "The ore."],
 		["wait", 30, "The chest empty, the pack full."],
@@ -1036,7 +1036,7 @@ func _items_buffs() -> void:
 
 
 ## Two rooms with a locked door between (the cellar's), a chest in the
-## first with a purse, the key (a catalog entry of the clip's own) and a
+## first with a stamina potion, the key (a catalog entry of the clip's own) and a
 ## sack of ore, an imp on guard in the second.
 func _items_use() -> void:
 	Items.add_for_test({"id": "items_clip_key", "name": "cellar key", "short": "Key", "color": "c8a050",
@@ -1055,7 +1055,7 @@ func _items_use() -> void:
 		rows[y] = rows[y].substr(0, 11) + ("+" if y == 6 else "#") + rows[y].substr(12)
 	var markers := {Vector2i(1, 3): "start", Vector2i(3, 1): "chest", Vector2i(10, 2): "monster_imp"}
 	var config := {"name": "Clip", "ambient": 0.9,
-		"entities": [{"at": [3, 1], "props": {"slots": ["coin_purse", "items_clip_key", "ore_sack", ""]}},
+		"entities": [{"at": [3, 1], "props": {"slots": ["stamina_potion", "items_clip_key", "ore_sack", ""]}},
 			{"at": [10, 2], "facing": [1, 0], "idle": {"mode": "guard"}}]}
 	Level.register(NAME, Level.image_from_rows(rows, markers, config), null, config)
 	_script = [
@@ -1063,11 +1063,11 @@ func _items_use() -> void:
 		["sound_door", true, "Locked: it rattles."],
 		["wait", 25, ""],
 		["walk", Vector2i(3, 2), "A chest."],
-		["item_open", true, "A coin purse, the cellar key, a sack of ore."],
+		["item_open", true, "A stamina potion, the cellar key, a sack of ore."],
 		["wait", 20, ""],
-		["item_take", [0, 0], "The purse into the pack."],
+		["item_take", [0, 0], "The potion into the pack."],
 		["wait", 15, ""],
-		["item_use", 0, "Right click it in the pack: opened, 10 gold."],
+		["item_use", 0, "Right click it in the pack: drunk, quick."],
 		["wait", 30, ""],
 		["item_take", [1, 1], "The key: carried, it opens the cellar."],
 		["item_take", [2, Player.RIGHT_HAND], "The ore in hand."],

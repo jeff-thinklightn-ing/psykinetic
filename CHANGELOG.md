@@ -25,7 +25,7 @@ notes (decision 324).
 - A player who dies where a priest or medicine man is about is brought back at once, "brought back from near death", instead of after a minute's wait; the server can now tell everyone when all have fallen and how long until they all come back (587, economy's side).
 - Snagfin is now the only one who buys grave goods, and only at night at half the town's price; by day he refuses them and his own goods cost more, and every other counter, maker and the store won't take grave goods at all (586).
 - Rich townsfolk now pay half of what they earn from a trade or service to the treasury, up from 30% (528 amended (2)).
-- The barrow's grave robbers now carry gold: they take half the alms laid at the altar each day and a cut of the town thief's takings, and a robber who falls drops his share as coin purses, up to 40 gold (580, economy's side).
+- The barrow's grave robbers now carry gold: they take half the alms laid at the altar each day and a cut of the town thief's takings, and a robber who falls drops his share as gold on the ground, up to 40 (580, economy's side).
 - Your companion now does plain orders at once, whatever her voice says: "wait here", "follow me", "rest", "bandage me" or "patch yourself up", "carry my dagger" and "give it back", "lead the way"; resting, she mends and gets up when whole or when a fight starts (616).
 - Cliffs and terraces follow smooth curves instead of the tiles' edges, their faces winding along the ledge and the ground meeting them on the curve (585, terrain's side).
 - Built water (wells and basins, which no curve lays) is drawn square and still with a crisp edge, not as a rounded pond; natural water stays on its curves (595).
@@ -41,6 +41,7 @@ notes (decision 324).
 - A battle axe won from the draugr knocks foes down again in your hands; his own blows with it stay slow, heavy hits, and only his spin floors you. He gets his breath back faster, so a long fight sees a second spin about a minute after the first (drafts for Jeff).
 - A left click on your own companion beside you makes her step out of your way at once, as walking into her does; from afar it walks you to her, in a corridor at her so you change places (611).
 - Drawing a bow is now Shift and the left button: press to draw, let go to shoot; a plain click with a bow in hand only moves you, talks or opens a chest, never attacks (583 amended (2); Jeff's word).
+- Gold is no longer an item: a fallen goblin's, kobold's or orc's coins lie on the ground as a heap of gold, and F takes them straight into your gold, using no pack slot. Coin purses you already carry turn into gold (601 amended).
 - No passage one cell wide in the dungeons (decision 612, Jeff: "the game is a multiplayer game with companions"): the generator widens every single-width way, a tomb is walled and entered by its door with the way outside it full width, and the first hall's bays are two rows tall; a test keeps every dungeon to it.
 - The draugr's waves of the dead set his fight's difficulty and are tuned from his entry: for each wave, when it rises, how many, which kinds, and how many more per extra player (the numbers are unchanged for now).
 - The draugr throws his axe only from 6 cells or more and never at someone closing on him, and once laid to rest he no longer repeats his respect each time he's struck.

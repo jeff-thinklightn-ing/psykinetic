@@ -1486,6 +1486,7 @@ func reset() -> void:
 			items.place(uid, "")
 			_unclaimed.append(uid)
 	zone.ground.clear()
+	zone.ground_gold.clear()  # 601 amended: a snapshot may bring it back.
 	zone.piles.clear()
 	# Its monsters kept as records go with the room too, their things as a
 	# level entity's do.
@@ -2610,8 +2611,6 @@ func item_note(uid: int) -> String:
 		more.append("%d of %d" % [items.condition_of(uid), Items.condition_max(items.id_of(uid))])
 	if items.short_of(uid) < 1.0:
 		more.append("short measure")  # Decision 493.
-	if items.gold_of(uid) >= 0:
-		more.append("%d gold" % items.gold_of(uid))  # A fallen humanoid's purse (decision 601).
 	if not items.bound_to(uid).is_empty():
 		more.append("bound")  # Decision 544.
 	if items.is_grave(uid):
@@ -2978,7 +2977,7 @@ func _bank_thing(place: String, uid: int, who: String, from: String, at_zone: St
 
 
 ## Gives player [param player_id] [param amount] gold (taken, under 0) for
-## [param why]: a coin purse opened ("purse"), a sale... Their gold now; 0
+## [param why]: gold picked up ("picked up"), a sale... Their gold now; 0
 ## with no economy (a client). The one way players' gold changes.
 func add_gold(player_id: String, amount: int, why := "") -> int:
 	if economy == null or player_id.is_empty():
@@ -3340,9 +3339,6 @@ func _sell(by: GridEntity, from: GridEntity, from_slot: int, shop: GridEntity) -
 	var who := (by as Player).player_id
 	var item := from.slots[from_slot]
 	var uid := slot_uid(from, from_slot)
-	if items.gold_of(uid) >= 0:
-		traded.emit(by, shop, "open the purse: it is gold already")  # Not sold at a whole purse's price (decision 601).
-		return false
 	var deal := economy.sell(who, place, item, items.is_grave(uid), -1, fence_state(shop))  # Grave goods: the fence's, by night (586).
 	if not deal["ok"]:
 		_log("shop: %s refused %s at %s: %s" % [by.name, item, place, deal["why"]])
@@ -4319,6 +4315,70 @@ func take_from_ground(cell: Vector2i, index: int) -> int:
 	return uid
 
 
+## The whole gold lying on [param cell] of the zone World is in (601
+## amended: a count on the cell's pile, never a thing). Any peer: a client
+## reads the cell's replicated GroundPile, as ground_at.
+func ground_gold(cell: Vector2i) -> int:
+	if not Net.is_authority():
+		var pile: GroundPile = zone.piles.get(cell)
+		return pile.gold if is_instance_valid(pile) else 0
+	return int(zone.ground_gold.get(cell, 0))
+
+
+## Lays [param gold] whole gold on [param cell] of zone [param zone_name]
+## (601 amended; Jeff: "consolidate gold coins to being stackable ... not
+## taking up a pack slot"): added to what lies there, taking no place
+## among its things; the cell itself if it is ground, else the nearest
+## that is (_ground_room's search). The cell it went to, NO_CELL (and the
+## gold gone) for none, 0 or less, or a zone not loaded. Server only.
+func drop_gold(zone_name: String, cell: Vector2i, gold: int) -> Vector2i:
+	var into: Zone = zone if zone_name.is_empty() or zone_name == zone.name else zones.get(zone_name)
+	if not Net.is_authority() or gold <= 0 or into == null:
+		return NO_CELL
+	var was := zone
+	enter(into)
+	var landed := cell if is_walkable(cell) and not is_water(cell) and not is_link_cell(cell) else _ground_room(cell)
+	if landed != NO_CELL:
+		zone.ground_gold[landed] = int(zone.ground_gold.get(landed, 0)) + gold
+		_log("ground: %d gold laid at %s" % [gold, landed])
+		ground_changed.emit(zone.name, landed, NO_CELL)
+	enter(was)
+	return landed
+
+
+## [param by] (a player) picks up all the gold on [param cell], one it
+## reaches, into its record's gold (add_gold, "picked up"; 601 amended:
+## no slot). The gold taken, 0 (nothing moves) if it cannot.
+func try_pick_up_gold(by: GridEntity, cell: Vector2i) -> int:
+	if not Net.is_authority() or not by is Player or (by as Player).player_id.is_empty() or economy == null \
+			or not _can_handle(by) or not reaches_cell(by, cell):
+		return 0
+	var gold := int(zone.ground_gold.get(cell, 0))
+	if gold <= 0:
+		return 0
+	zone.ground_gold.erase(cell)
+	add_gold((by as Player).player_id, gold, "picked up")
+	_log("ground: %s picked up %d gold at %s" % [by.name, gold, cell])
+	ground_changed.emit(zone.name, cell, NO_CELL)
+	return gold
+
+
+## The gold an old coin purse [param uid] held (601 amended: gold is a
+## count now, never a thing): its own roll (decision 601), else the old
+## catalog's 10; 0 for anything else. For the migration of a saved one.
+func purse_gold(uid: int) -> int:
+	if items.id_of(uid) != OLD_PURSE:
+		return 0
+	var own := items.legacy_gold(uid)
+	return own if own >= 0 else OLD_PURSE_GOLD
+
+
+## The retired coin purse (601 amended) and the gold a saved one without
+## its own held (its old catalog yield).
+const OLD_PURSE := "coin_purse"
+const OLD_PURSE_GOLD := 10
+
+
 ## [param by] throws what is in one of its hands ([param slot]) toward
 ## [param target]: a hurl (606 amended) along the line to it, as far as
 ## throw_reach, over water, until a wall, a closed door or higher ground
@@ -4724,9 +4784,8 @@ func holds_key(entity: GridEntity, lock: String) -> bool:
 
 
 ## [param by] uses what is in its slot [param slot], by the thing's catalog
-## use: a bandaging kit ("bandage") bandages [param by] (try_bandage); a
-## coin purse ("purse", a player's) is opened into their gold, its yield's
-## gold (add_gold), and is gone. A thing with effects (food, a draught, a
+## use: a bandaging kit ("bandage") bandages [param by] (try_bandage). A
+## thing with effects (food, a draught, a
 ## charm) is consumed, whatever its use is called ("eat", "drink"...): its
 ## buffs go on [param by] (add_buff) and it is gone. A key is used by
 ## carrying it (holds_key). False, and nothing happens, if it cannot.
@@ -4749,18 +4808,6 @@ func try_use(by: GridEntity, slot: int) -> bool:
 	match str(Items.def(id).get("use", "")):
 		"bandage":
 			return try_bandage(by, by)
-		"purse":
-			var player_id: Variant = by.get("player_id")
-			var gold := int(items.yields_of(slot_uid(by, slot)).get("gold", 0))  # Its own, a humanoid's purse (decision 601).
-			if player_id is not String or str(player_id).is_empty() or gold <= 0:
-				return false
-			var uid := take_item(by, by, slot)
-			if uid == 0:
-				return false
-			items.end(uid, "opened", "by %s" % _label_of(by), zone.name, by.tile)
-			add_gold(player_id, gold, "purse")
-			_log("use: %s opened %s: %d gold" % [by.name, id, gold])
-			return true
 	return false
 
 
@@ -4946,6 +4993,7 @@ func _tend_wounds() -> void:
 func set_slots(entity: GridEntity, contents: Variant, uids: Variant = []) -> void:
 	if not Net.is_authority():
 		return
+	contents = _purses_migrated(entity, contents, uids)
 	var tidy := Items.tidy(contents, entity.slots.size())
 	var kept := PackedInt32Array()
 	kept.resize(tidy.size())
@@ -4964,6 +5012,32 @@ func set_slots(entity: GridEntity, contents: Variant, uids: Variant = []) -> voi
 		entity.slots = tidy
 		entity.slot_items = kept
 		_slots_changed(entity)
+
+
+## [param contents] (set_slots') with any old coin purse in them taken out
+## (601 amended: gold is never a thing): its gold (purse_gold) into a
+## player's record gold, else dropped where [param entity] stands; the
+## purse ended. As they were when none.
+func _purses_migrated(entity: GridEntity, contents: Variant, uids: Variant) -> Variant:
+	if not (contents is Array or contents is PackedStringArray) or not OLD_PURSE in Array(contents):
+		return contents
+	var out: Array = Array(contents)
+	for slot in out.size():
+		if str(out[slot]) != OLD_PURSE:
+			continue
+		var uid := int(uids[slot]) if (uids is Array or uids is PackedInt32Array) and slot < uids.size() \
+				and (uids[slot] is int or uids[slot] is float) else 0
+		var gold := purse_gold(uid) if items.id_of(uid) == OLD_PURSE else OLD_PURSE_GOLD  # A purse with no instance: the old yield.
+		out[slot] = ""
+		if items.has(uid):
+			items.end(uid, "migrated", "into gold (601 amended)", entity.zone, entity.tile)
+		var player_id: Variant = entity.get("player_id")
+		if player_id is String and not str(player_id).is_empty() and economy != null:
+			add_gold(player_id, gold, "a coin purse")
+		else:
+			drop_gold(entity.zone if not entity.zone.is_empty() else zone.name, entity.tile, gold)
+		print("[state] %s's coin purse: %d gold (601 amended)" % [entity.name, gold])
+	return out
 
 
 func spawn(entity: GridEntity, at: Vector2i) -> bool:
@@ -5420,10 +5494,13 @@ func damage(target: GridEntity, amount: int, source: GridEntity = null,
 		elif target is Monster:
 			spilt = empty_container(target)  # What it carried (loot, decision 330).
 			spilt.append_array((target as Monster).remains())  # An animal's meat and hide (decision 318).
+		var gold := (target as Monster).purse_gold() if target is Monster else 0  # 601 amended: a count, never a thing.
 		var at := target.tile
 		despawn(target)
 		for uid in spilt:
 			put_on_ground(uid, at)
+		if gold > 0:
+			drop_gold(zone.name, at, gold)
 
 
 ## Player intent: walk to [param target], by way of [param via] first

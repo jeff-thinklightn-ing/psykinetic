@@ -241,7 +241,8 @@ static func _parse_zone(raw: Dictionary) -> Dictionary:
 	for pile: Variant in raw.get("ground", []) if raw.get("ground") is Array else []:
 		var cell: Variant = vector(pile.get("cell")) if pile is Dictionary else null
 		if cell != null and pile.get("ids") is Array:
-			ground.append({"cell": cell, "ids": pile["ids"], "items": pile["items"] if pile.get("items") is Array else []})
+			ground.append({"cell": cell, "ids": pile["ids"], "items": pile["items"] if pile.get("items") is Array else [],
+				"gold": maxi(int(pile["gold"]), 0) if pile.get("gold") is float or pile.get("gold") is int else 0})  # 601 amended.
 	# Monsters kept as records (decision 352): kept as they are (Main reads
 	# each when it recalls it); none in a snapshot from before them.
 	var records: Array[Dictionary] = []

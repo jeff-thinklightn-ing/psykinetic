@@ -7,13 +7,18 @@ extends Node2D
 ## the cell is empty, so every client in reach (Interest, by its cell)
 ## has it. It occupies nothing, blocks nothing and never acts.
 ##
+## gold is the whole gold lying there besides (601 amended: gold is a count,
+## never a thing; it takes no place among the ids), 0 for none; a pile may
+## hold gold and nothing else.
+##
 ## thrown_from is where its newest thing was thrown from (World.NO_CELL if
 ## it was put down), with thrown_tick when: the views draw the flight.
 ## Drawn here as a small square per thing in its catalog colour; the 3D
 ## view draws each thing's art slot (Client3D, World.pile_shown).
 
-const REPLICATED := ["ids", "thrown_from", "thrown_tick"]
+const REPLICATED := ["ids", "gold", "thrown_from", "thrown_tick"]
 const SIZE := 5.0
+const GOLD_COLOR := Color("e0c050")
 
 var tile := Vector2i.ZERO
 ## Its zone, as an entity's (GridEntity.zone), and its synchronizer.
@@ -23,6 +28,11 @@ var ids := PackedStringArray():
 	set(value):
 		if ids != value:
 			ids = value
+			_shown_changed()
+var gold := 0:
+	set(value):
+		if gold != value:
+			gold = value
 			_shown_changed()
 var thrown_from := World.NO_CELL
 var thrown_tick := -1
@@ -46,7 +56,7 @@ func _init() -> void:
 
 
 ## Builds one from a spawn spec: {script, name, tile: [x, y], zone, ids,
-## thrown_from: [x, y] or null, thrown_tick}.
+## gold, thrown_from: [x, y] or null, thrown_tick}.
 static func build(spec: Dictionary) -> GroundPile:
 	var pile := GroundPile.new()
 	pile.name = str(spec.get("name", "Pile"))
@@ -54,6 +64,7 @@ static func build(spec: Dictionary) -> GroundPile:
 	pile.tile = Vector2i(int(cell[0]), int(cell[1]))
 	pile.zone = str(spec.get("zone", ""))
 	pile.ids = PackedStringArray(spec.get("ids", []))
+	pile.gold = maxi(int(spec.get("gold", 0)), 0)
 	var from: Variant = spec.get("thrown_from")
 	if from is Array and from.size() == 2:
 		pile.thrown_from = Vector2i(int(from[0]), int(from[1]))
@@ -86,3 +97,8 @@ func _draw() -> void:
 		var at := Vector2((i - (ids.size() - 1) * 0.5) * (SIZE + 1.0), -SIZE * 0.5)
 		draw_rect(Rect2(at - Vector2.ONE * SIZE * 0.5, Vector2.ONE * SIZE), Items.color_of(ids[i]))
 		draw_rect(Rect2(at - Vector2.ONE * SIZE * 0.5, Vector2.ONE * SIZE), Color(0, 0, 0, 0.6), false, 1.0)
+	if gold > 0:
+		# Its gold, a small square under the things (601 amended).
+		var under := Vector2(0.0, SIZE * 0.5)
+		draw_rect(Rect2(under - Vector2.ONE * SIZE * 0.4, Vector2.ONE * SIZE * 0.8), GOLD_COLOR)
+		draw_rect(Rect2(under - Vector2.ONE * SIZE * 0.4, Vector2.ONE * SIZE * 0.8), Color(0, 0, 0, 0.6), false, 1.0)

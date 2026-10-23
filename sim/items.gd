@@ -631,6 +631,11 @@ static func yield_of(id: String) -> Dictionary:
 ## (ART_SLOTS, written by tools/items_art_slots.gd): a held piece has its
 ## grip at the origin and, two-handed, grip_2 up its length; budget a
 ## prop's (docs/art_style.md).
+## The art slot gold lying on the ground is drawn with (601 amended: gold
+## is a count, never a thing; the coin purse's slot, kept).
+const GOLD_ART := "item.coin_purse"
+
+
 static func art_slots() -> Dictionary:
 	var slots := {}
 	for id: String in ids():
@@ -652,6 +657,10 @@ static func art_slots() -> Dictionary:
 			if "shield" in item.get("tags", []):
 				entry["origin"] = "centre"
 		slots[item["art"]] = entry
+	# Gold on the ground (601 amended: a count, never a thing): the old coin
+	# purse's slot, kept for the pile's look (Client3D).
+	slots[GOLD_ART] = {"category": "items", "type": "mesh", "kind": "held", "size": [0.1, 0.12, 0.1], "budget": ART_BUDGET,
+		"sockets": {"grip": [0, 0, 0]}, "uses": "gold on the ground (World.drop_gold): one purse drawn in its pile, however much lies there"}
 	return {"about": "Generated from the item catalog (levels/items.json) by tools/items_art_slots.gd; do not edit by hand.", "slots": slots}
 
 

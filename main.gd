@@ -1032,8 +1032,8 @@ func _process(delta: float) -> void:
 						if entity.spawned and entity.tile == tile and (entity is Chest or entity is Cargo or entity is Companion):
 							_hint_words = context_hint_for(entity)
 							break
-				if _hint_words.is_empty() and Net.hints and player != null and not World.ground_at(tile).is_empty():
-					_hint_words = "%s  pick up %s" % [Keys.name_of("pick_up"), pile_words(World.ground_at(tile))]  # Behind hints=on (Jeff, 2026-10-22).
+				if _hint_words.is_empty() and Net.hints and player != null and (not World.ground_at(tile).is_empty() or World.ground_gold(tile) > 0):
+					_hint_words = "%s  pick up %s" % [Keys.name_of("pick_up"), pile_words(World.ground_at(tile), World.ground_gold(tile))]  # Behind hints=on (Jeff, 2026-10-22).
 				if _hint_words.is_empty() and tile != NONE:
 					# The building under the cursor by its code (decision 537): "H3 house",
 					# and how far its town has built it (566): "H3 house, being built 40%".
@@ -1046,9 +1046,10 @@ func _process(delta: float) -> void:
 			# --test-show=hint: the hint as the cursor on that thing would show it.
 			words = context_hint_for(_test_hint_thing)
 			at = _client3d.screen_of_tile(_test_hint_thing.tile)
-		elif _test_hint_cell != Vector2i(-100000, -100000) and _client3d != null and Net.hints and not World.ground_at(_test_hint_cell).is_empty():
+		elif _test_hint_cell != Vector2i(-100000, -100000) and _client3d != null and Net.hints \
+				and (not World.ground_at(_test_hint_cell).is_empty() or World.ground_gold(_test_hint_cell) > 0):
 			# --test-show=herbs: the pile's hint, as the cursor on it would show it (decision 515).
-			words = "%s  pick up %s" % [Keys.name_of("pick_up"), pile_words(World.ground_at(_test_hint_cell))]
+			words = "%s  pick up %s" % [Keys.name_of("pick_up"), pile_words(World.ground_at(_test_hint_cell), World.ground_gold(_test_hint_cell))]
 			at = _client3d.screen_of_tile(_test_hint_cell)
 		_context_hint.visible = not words.is_empty()
 		if not words.is_empty():
@@ -2540,9 +2541,7 @@ func _rebuild_regenerated(level_name: String, anchors: Array) -> void:
 			"ticks_left": maxi(_respawn_delay(slot) - (World.tick - _dead_since[slot]), 0)})
 	for entity in World.get_entities():
 		World.slot_uids(entity)
-	var ground: Array[Dictionary] = []
-	for cell: Vector2i in World.zone.ground:
-		ground.append({"cell": [cell.x, cell.y], "items": Array(World.zone.ground[cell]), "ids": Array(World.ground_at(cell))})
+	var ground := ground_entries(World.zone)
 	var raw: Dictionary = Snapshot.data_of({level_name: {"tick": World.tick, "entities": World.get_entities(), "respawns": respawns,
 		"ground": ground, "records": World.record_list()}})["zones"][level_name]
 	var sifted := Regen.keep_section(Snapshot.parse_zone(raw), anchors)
@@ -4091,9 +4090,7 @@ func _save_state(wait := true) -> void:
 			if int(entity.spawn_spec.get("spawn", -1)) >= 0:
 				level_held += 1
 				keyed += 1 if str(entity.spawn_spec.get("spawn_key", "")) != "" else 0
-		var ground: Array[Dictionary] = []
-		for cell: Vector2i in each.ground:
-			ground.append({"cell": [cell.x, cell.y], "items": Array(each.ground[cell]), "ids": Array(World.ground_at(cell))})
+		var ground := ground_entries(each)
 		zones[each.name] = {"tick": World.tick, "entities": World.get_entities(), "respawns": respawns, "ground": ground,
 			"records": World.record_list()}
 	World.enter(was)
@@ -7898,11 +7895,15 @@ static func hidden_words_due(cover: float, still: int, carries_light: bool, ligh
 
 ## What a ground pile's hint calls what lies there (decision 515): the
 ## first thing's short name in lower case, "and N more" for the rest.
-static func pile_words(ids: PackedStringArray) -> String:
-	if ids.is_empty():
-		return ""
-	var first := Items.short_of(ids[0]).to_lower()
-	return first if ids.size() == 1 else "%s and %d more" % [first, ids.size() - 1]
+static func pile_words(ids: PackedStringArray, gold := 0) -> String:
+	var things := ""
+	if not ids.is_empty():
+		var first := Items.short_of(ids[0]).to_lower()
+		things = first if ids.size() == 1 else "%s and %d more" % [first, ids.size() - 1]
+	if gold <= 0:
+		return things
+	# Its gold first, a count (601 amended): "12 gold", "12 gold and herbs".
+	return "%d gold" % gold if things.is_empty() else "%d gold and %s" % [gold, things]
 
 
 ## What the keys do on [param thing] under the cursor (an entity or a
@@ -8185,7 +8186,8 @@ var _blow_source: GridEntity = null
 ## it ("death"), with what it was and where, since its node goes at once;
 ## a companion says a last line.
 ## A grave robber fallen in the barrow: his share of the band's purse
-## (Economy.band_share) laid where he fell as coin purses.
+## (Economy.band_share) laid where he fell as a gold count (601 amended:
+## World.drop_gold, never a thing).
 func _robber_fell(entity: GridEntity, _cause: StringName) -> void:
 	if not entity is Monster or World.economy == null:
 		return
@@ -8197,11 +8199,7 @@ func _robber_fell(entity: GridEntity, _cause: StringName) -> void:
 		return
 	var standing := World.get_entities().filter(func(each: GridEntity) -> bool:
 		return each is Monster and str(each.spawn_spec.get("kind", "")) in kinds and each.zone == barrow and (each == entity or each.hp > 0)).size()
-	var purse := str(rule.get("purse", "coin_purse"))
-	var gold := World.economy.band_share(barrow, standing)
-	var each_gold := maxi(int(Items.def(purse).get("yield", {}).get("gold", 10)), 1)
-	for i in gold / each_gold:
-		World.put_on_ground(World.items.mint(purse, "remains", World._label_of(entity), entity.zone, entity.tile), entity.tile)
+	World.drop_gold(entity.zone, entity.tile, World.economy.band_share(barrow, standing))  # A count, never a thing (601 amended).
 
 
 func _on_entity_died(entity: GridEntity, cause: StringName) -> void:
@@ -10885,6 +10883,11 @@ func _item_command(player: Player, what: String, args: Dictionary) -> void:
 			for direction: Vector2i in World.DIRECTIONS:
 				cells.append(player.tile + direction)
 			for each in cells:
+				# Its gold first (601 amended: into the record's, no slot), then a thing.
+				var gold := World.try_pick_up_gold(player, each)
+				if gold > 0:
+					Net.broadcast_to([player.owner_peer], "party", {"from": "Server", "text": "Picked up %d gold." % gold})
+					return
 				if not World.ground_uids(each).is_empty() and World.try_pick_up(player, each):
 					return
 			for each in cells:
@@ -10911,8 +10914,16 @@ func _restore_ground(ground: Array) -> void:
 	for pile: Dictionary in ground:
 		var ids: Array = pile["ids"]
 		var uids: Array = pile.get("items", [])
+		World.drop_gold(World.zone.name, pile["cell"], int(pile.get("gold", 0)))  # 601 amended.
 		for i in ids.size():
 			var id := str(ids[i])
+			if id == World.OLD_PURSE:
+				# An old coin purse on the ground: its gold, as a count (601 amended).
+				var old := int(uids[i]) if i < uids.size() and (uids[i] is float or uids[i] is int) else 0
+				World.drop_gold(World.zone.name, pile["cell"], World.purse_gold(old) if World.items.id_of(old) == id else World.OLD_PURSE_GOLD)
+				if World.items.has(old):
+					World.items.end(old, "migrated", "into gold (601 amended)", World.zone.name, pile["cell"])
+				continue
 			if not Items.exists(id):
 				continue
 			var uid := int(uids[i]) if i < uids.size() and (uids[i] is float or uids[i] is int) else 0
@@ -10922,13 +10933,30 @@ func _restore_ground(ground: Array) -> void:
 			World.put_on_ground(uid, pile["cell"])
 
 
+## What lies on [param zone]'s ground, for a save: one entry a cell, {cell,
+## items (uids), ids, gold (601 amended)}. World must be in [param zone].
+static func ground_entries(zone: Zone) -> Array[Dictionary]:
+	var ground: Array[Dictionary] = []
+	var cells: Array[Vector2i] = zone.ground.keys()
+	for cell: Vector2i in zone.ground_gold:
+		if not cell in cells:
+			cells.append(cell)
+	for cell in cells:
+		var entry := {"cell": [cell.x, cell.y], "items": Array(zone.ground.get(cell, PackedInt32Array())), "ids": Array(World.ground_at(cell))}
+		if int(zone.ground_gold.get(cell, 0)) > 0:
+			entry["gold"] = int(zone.ground_gold[cell])
+		ground.append(entry)
+	return ground
+
+
 ## Server: World's ground changed on [param cell] (of the zone World is
 ## in): its GroundPile spawned,
 ## changed or freed (the spawner does the same on the clients that see it).
 func _on_ground_changed(_zone_name: String, cell: Vector2i, thrown_from: Vector2i) -> void:
 	var ids := World.ground_at(cell)
+	var gold := World.ground_gold(cell)
 	var pile: GroundPile = World.zone.piles.get(cell)
-	if ids.is_empty():
+	if ids.is_empty() and gold <= 0:
 		if is_instance_valid(pile):
 			World.zone.piles.erase(cell)
 			Net.interest.remove(pile)
@@ -10941,9 +10969,10 @@ func _on_ground_changed(_zone_name: String, cell: Vector2i, thrown_from: Vector2
 			pile.thrown_from = thrown_from
 			pile.thrown_tick = World.tick
 		pile.ids = ids
+		pile.gold = gold
 		return
 	var spec := {"script": PILE, "name": GroundPile.name_for(cell), "tile": [cell.x, cell.y], "zone": World.zone.name,
-		"ids": Array(ids)}
+		"ids": Array(ids), "gold": gold}
 	if thrown_from != World.NO_CELL:
 		spec["thrown_from"] = [thrown_from.x, thrown_from.y]
 		spec["thrown_tick"] = World.tick

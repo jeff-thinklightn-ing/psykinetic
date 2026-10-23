@@ -412,12 +412,6 @@ func _test_use() -> void:
 	_check(World.has_key(host, "cellar") and not World.has_key(host, "keep"), "carrying the cellar key opens the cellar, not the keep")
 	_check(not World.try_use(host, slot), "a key is not used up or used: carrying it is enough")
 	World.items.end(World.take_item(host, host, slot), "gone")
-	var purse := _give(host, "coin_purse", slot)
-	var player_id: String = host.get("player_id")
-	var gold := World.gold_of(player_id)
-	_check(World.try_use(host, slot), "the host opens the coin purse")
-	_check(World.gold_of(player_id) == gold + 10 or World.economy == null, "10 gold: %d to %d" % [gold, World.gold_of(player_id)])
-	_check(host.slots[slot].is_empty() and not World.items.has(purse), "the purse is gone (opened)")
 	_check(not World.try_use(host, slot), "an empty slot: nothing to use")
 	var imp: Monster = World.monsters()[0] if not World.monsters().is_empty() else null
 	if imp != null:
@@ -1283,13 +1277,13 @@ func _test_short() -> void:
 
 func _test_gold_drop() -> void:
 	print("
-== a humanoid's gold where it falls; none from an animal or the undead (decision 601) ==")
+== a humanoid's gold where it falls, a count, never a thing; none from an animal or the undead (decision 601, 601 amended) ==")
 	var kinds := Monster.kinds()
 	_check(kinds["imp"]["purse"] == [1, 3] and kinds["sneak"]["purse"] == [1, 3] and kinds["brute"]["purse"] == [4, 10]
 			and kinds["wolf"]["purse"] == [0, 0] and kinds["skeleton"]["purse"] == [0, 0] and kinds["draugr"]["purse"] == [0, 0],
 			"the goblin, the kobold and the orc carry a purse; the wolf, the skeleton and the draugr none")
 	var host := _player(Net.local_id)
-	var beside := _far_cell(host)
+	var beside := _plain_cell(host)
 	var imp := _main._spawn({"script": "res://sim/monster.gd", "shape": "capsule", "name": "PurseImp%d" % World.tick,
 		"tile": beside, "kind": "imp", "props": {"mass": 40.0, "sight_range": 0}}) as Monster
 	imp.acts = false
@@ -1298,37 +1292,60 @@ func _test_gold_drop() -> void:
 	row["drops"] = []
 	var at := imp.tile
 	var before := World.ground_uids(at)
+	var gold_before := World.ground_gold(at)
 	World.damage(imp, imp.hp, host, &"attack")
-	var purses: Array[int] = []
-	for cell: Vector2i in [at] + Array(World.DIRECTIONS).map(func(d: Vector2i) -> Vector2i: return at + d):
-		for uid in World.ground_uids(cell):
-			if not uid in before and World.items.id_of(uid) == "coin_purse":
-				purses.append(uid)
-	var gold := World.items.gold_of(purses[0]) if purses.size() == 1 else -1
-	_check(purses.size() == 1 and gold >= 1 and gold <= 3, "a goblin falls: one purse where it fell, %d gold (1 to 3)" % gold)
-	_check(not purses.is_empty() and World.items.yields_of(purses[0]) == {"gold": gold} and ("%d gold" % gold) in World.item_note(purses[0]),
-			"banked or opened it gives its own gold, and says so (%s)" % (World.item_note(purses[0]) if not purses.is_empty() else ""))
-	_check(not purses.is_empty() and ItemBook.from_dict(World.items.to_dict()).gold_of(purses[0]) == gold, "kept through a save")
+	var gold := World.ground_gold(at) - gold_before
+	_check(gold >= 1 and gold <= 3 and World.ground_uids(at) == before, "a goblin falls: %d gold (1 to 3) on its cell, a count; no thing" % gold)
+	var pile: GroundPile = World.zone.piles.get(at)
+	_check(is_instance_valid(pile) and pile.gold == gold_before + gold and Main.pile_words(pile.ids, pile.gold).begins_with("%d gold" % (gold_before + gold)),
+			"its pile shows it: %s" % (Main.pile_words(pile.ids, pile.gold) if is_instance_valid(pile) else "no pile"))
+	var saved := Main.ground_entries(World.zone).filter(func(entry: Dictionary) -> bool: return Vector2i(int(entry["cell"][0]), int(entry["cell"][1])) == at)
+	_check(saved.size() == 1 and int(saved[0].get("gold", 0)) == gold_before + gold, "kept through a save (%s)" % [saved])
+	var parsed: Array = Snapshot.parse_zone({"tick": 0, "entities": [], "ground": JSON.parse_string(JSON.stringify(saved))})["ground"]
+	_check(parsed.size() == 1 and int(parsed[0]["gold"]) == gold_before + gold, "and read back")
 	if had_drops == null:
 		row.erase("drops")
 	else:
 		row["drops"] = had_drops
-	for uid in purses:
-		World.take_from_ground(_cell_of(uid), World.ground_uids(_cell_of(uid)).find(uid))
-		World.items.end(uid, "gone")
+	# F: the gold into the record's, no slot (601 amended).
+	var host_at := host.tile
+	var slots_before := host.slots.duplicate()
+	World._relocate(host, at)
+	var player_id: String = host.player_id
+	var had := World.gold_of(player_id)
+	var got := World.try_pick_up_gold(host, at)
+	_check(got == gold_before + gold and (World.gold_of(player_id) == had + got or World.economy == null) and World.ground_gold(at) == 0
+			and host.slots == slots_before, "picked up: %d gold into the record's (%d to %d), none left, no slot taken" % [got, had, World.gold_of(player_id)])
+	_check(World.try_pick_up_gold(host, at) == 0, "nothing more to pick up")
+	_check(before.is_empty() == not is_instance_valid(World.zone.piles.get(at)), "the pile goes with its gold, if that was all")
+	World._relocate(host, host_at)
+	# An old coin purse, saved before 601 amended: its gold, never the thing.
+	var contents := Array(host.slots)
+	var free := contents.find("")
+	if free >= 0:
+		contents[free] = World.OLD_PURSE
+		had = World.gold_of(player_id)
+		World.set_slots(host, contents, host.slot_items)
+		_check(host.slots[free].is_empty() and (World.gold_of(player_id) == had + World.OLD_PURSE_GOLD or World.economy == null),
+				"a saved purse in a pack: %d gold into the record's, the slot empty" % World.OLD_PURSE_GOLD)
+	var lying := _plain_cell(host)
+	var lay_gold := World.ground_gold(lying)
+	_main._restore_ground([{"cell": lying, "ids": [World.OLD_PURSE, "ration"], "items": []}])
+	_check(World.ground_gold(lying) == lay_gold + World.OLD_PURSE_GOLD and "ration" in World.ground_at(lying) and not World.OLD_PURSE in World.ground_at(lying),
+			"a saved purse on the ground: its gold as a count there, the rest as it was")
+	while "ration" in World.ground_at(lying):
+		World.items.end(World.take_from_ground(lying, World.ground_at(lying).find("ration")), "gone")
+	World.zone.ground_gold.erase(lying)
+	World.ground_changed.emit(World.zone.name, lying, World.NO_CELL)
 	var wolf := _main._spawn({"script": "res://sim/animal.gd", "shape": "capsule", "name": "PurseWolf%d" % World.tick,
 		"tile": beside, "kind": "wolf", "props": {"sight_range": 0}}) as GridEntity
 	if wolf != null:
 		wolf.acts = false
 		var wolf_at := wolf.tile
 		var ground := World.ground_uids(wolf_at)
+		var gold_was := World.ground_gold(wolf_at)
 		World.damage(wolf, wolf.hp, host, &"attack")
-		var coins := 0
-		for cell: Vector2i in [wolf_at] + Array(World.DIRECTIONS).map(func(d: Vector2i) -> Vector2i: return wolf_at + d):
-			for uid in World.ground_uids(cell):
-				if not uid in ground and World.items.id_of(uid) == "coin_purse":
-					coins += 1
-		_check(coins == 0, "a wolf falls: no gold")
+		_check(World.ground_gold(wolf_at) == gold_was, "a wolf falls: no gold")
 		for cell: Vector2i in [wolf_at] + Array(World.DIRECTIONS).map(func(d: Vector2i) -> Vector2i: return wolf_at + d):
 			for uid in World.ground_uids(cell):
 				if not uid in ground:
@@ -1336,9 +1353,13 @@ func _test_gold_drop() -> void:
 					World.items.end(uid, "gone")
 
 
-func _cell_of(uid: int) -> Vector2i:
-	var xy := World.items.at_of(uid).get_slice("@", 1).split(",")
-	return Vector2i(int(xy[0]), int(xy[1]))
+## A free floor cell 3 or more from [param entity], not a level link's (gold
+## put down there would land beside it, and a body stood there leaves).
+func _plain_cell(entity: GridEntity) -> Vector2i:
+	for cell: Vector2i in _main._terrain["floor"]:
+		if World.distance(cell, entity.tile) >= 3 and World.is_free(cell) and not World.is_link_cell(cell) and not World.is_water(cell):
+			return cell
+	return _far_cell(entity)
 
 
 func _test_bound() -> void:
@@ -2020,7 +2041,7 @@ func _test_loot() -> void:
 	_check(foe != null, "a monster to drop things")
 	if foe == null:
 		return
-	foe.slots = PackedStringArray(["dagger", "", "coin_purse", ""])
+	foe.slots = PackedStringArray(["dagger", "", "ration", ""])
 	var at := foe.tile
 	var foe_row: Dictionary = Monster.kinds().get(str(foe.spawn_spec.get("kind", "")), {})
 	var had_purse: Variant = foe_row.get("purse")
@@ -2036,7 +2057,7 @@ func _test_loot() -> void:
 				World.items.end(uid, "gone")
 	dropped.sort()
 	_check(not is_instance_valid(foe) or not foe.spawned, "the monster is dead")
-	_check(dropped == ["coin_purse", "dagger"], "what it carried lies where it fell (%s; taken up again)" % [dropped])
+	_check(dropped == ["dagger", "ration"], "what it carried lies where it fell (%s; taken up again)" % [dropped])
 	var doc := MapDoc.new()
 	doc.folder = preload("res://tests/test_ports.gd").scratch("items_test_builder/")
 	doc.map = LevelMap.new(Vector2i(12, 12))
@@ -2185,7 +2206,8 @@ func _test_restart() -> void:
 	var lying: Array = []
 	for cell: Vector2i in World.zone.ground:
 		lying.append_array(Array(World.ground_uids(cell)))
-	_check(lying.size() == 1 and World.items.id_of(lying[0]) == "wood_bundle" and World.zone.piles.size() == 1,
+	_check(lying.size() == 1 and World.items.id_of(lying[0]) == "wood_bundle"
+			and World.zone.piles.values().filter(func(pile: GroundPile) -> bool: return not pile.ids.is_empty()).size() == 1,
 			"the wood still lies where it was, the same thing, its pile there (%s)" % [lying])
 	_check(World.items.orphans(_all_uids()).is_empty(), "and nothing in it that nobody holds (%s)" % [World.items.orphans(_all_uids())])
 

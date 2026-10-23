@@ -226,12 +226,12 @@ func _test_robbers_band() -> void:
 	work.pay("nell", 8, "test")
 	_check(economy.thief_cut(work, "nell", 8) == 2 and int(work.worker("nell")["purse"]) == 6 and economy.band_gold("barrow") == 39,
 		"the thief pays a quarter of his lift to the robbers (%d left him)" % int(work.worker("nell")["purse"]))
-	_check(economy.band_share("barrow", 3) == 10 and economy.band_gold("barrow") == 29, "one of three falls: 39 / 3 is 13, a whole purse of 10")
+	_check(economy.band_share("barrow", 3) == 13 and economy.band_gold("barrow") == 26, "one of three falls: 39 / 3 is 13, whole gold (601 amended)")
 	economy.band_add("barrow", 200, "test")
 	_check(economy.band_share("barrow", 1) == 40, "at most 40 on one robber")
 	var saved: Dictionary = JSON.parse_string(JSON.stringify(economy.to_dict()))
 	var loaded := Economy.new(saved, stock, work, clock, rules, func() -> Dictionary: return CATALOG)
-	_check(loaded.band_gold("barrow") == 189 and loaded._band_day == 1, "the purse and its day saved (%d)" % loaded.band_gold("barrow"))
+	_check(loaded.band_gold("barrow") == 186 and loaded._band_day == 1, "the purse and its day saved (%d)" % loaded.band_gold("barrow"))
 	_check(_fresh().band_share("barrow", 1) == 0, "no rules, no gold: empty pockets")
 
 
@@ -403,10 +403,11 @@ func _test_in_town() -> void:
 	_check(World.try_transfer(host, host, 1, counter, 0), "the host puts the sack in the counter: sold")
 	_check(host.slots[1] == "" and counter.slots[0] == "" and World.stockpile.count(STORE, "ore") == 5 and _main.gold == 18,
 		"the slot empty, the counter keeps nothing, 5 ore banked, 18 gold (%d)" % _main.gold)
-	var purse := World.items.mint("coin_purse", "found", "test")
-	World.put_item(host, host, 1, purse)
-	_check(not World.try_transfer(host, host, 1, counter, 0) and host.slots[1] == "coin_purse"
-		and _main.shop_panel.why_shown().begins_with("gold is given"), "a coin purse in the counter: refused, said why")
+	var herbs := World.items.mint("herbs", "found", "test")  # 601 amended: no coin purse to refuse now.
+	World.put_item(host, host, 1, herbs)
+	_check(not World.try_transfer(host, host, 1, counter, 0) and host.slots[1] == "herbs"
+		and _main.shop_panel.why_shown() == "the medicine man buys herbs", "herbs in the counter: refused, said why (only their maker buys them)")
+	World.items.end(World.take_item(host, host, 1), "gone")
 	_main._save_state()
 	_check(Snapshot.load(Net.state_path)["economy"]["purses"].get(me) == 18, "the snapshot keeps the host's 18 gold")
 	await _test_barter_in_town(host, counter)
@@ -493,16 +494,15 @@ func _test_robber_falls(host: Player) -> void:
 	World.economy.band_add(World.zone.name, 50, "test")
 	var at := robbers[0].tile
 	World.damage(robbers[0], 999)
-	var dropped := Array(World.ground_at(at)).filter(func(id: String) -> bool: return id == "coin_purse")
-	_check(dropped.size() == 2 and World.economy.band_gold(World.zone.name) == 30, "one of two falls: 25 is two purses of 10, 30 left the band (%s)"
-		% [Array(World.ground_at(at))])
+	_check(World.ground_gold(at) == 25 and World.economy.band_gold(World.zone.name) == 25 and not "coin_purse" in World.ground_at(at),
+		"one of two falls: 25 gold where he fell, a count (601 amended), 25 left the band (%d)" % World.ground_gold(at))
 	var none: GridEntity = _main._spawn({"script": "res://sim/monster.gd", "shape": "capsule", "kind": "skeleton", "name": "Bones",
 		"tile": _main._nearest_free(host.tile + Vector2i(-3, 2))})
 	var bones_at: Vector2i = none.tile
-	var before := Array(World.ground_at(bones_at)).count("coin_purse")
+	var before := World.ground_gold(bones_at)
 	World.damage(none, 999)
-	_check(Array(World.ground_at(bones_at)).count("coin_purse") == before and World.economy.band_gold(World.zone.name) == 30,
-		"a skeleton carries none of it (%s)" % [Array(World.ground_at(bones_at))])
+	_check(World.ground_gold(bones_at) == before and World.economy.band_gold(World.zone.name) == 25,
+		"a skeleton carries none of it (%d)" % World.ground_gold(bones_at))
 	World.damage(robbers[1], 999)
 
 
