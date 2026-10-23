@@ -342,11 +342,13 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## 35 (580 step 3, dungeon's side): building.burial_table, building.crypt_pillar,
 ## building.round_table and building.broken_table are solid (Level.SOLID): a client
 ## without them would walk through their cells.
+## 35 (624, economy's side): new command "town_sheet" {town}, answered by the
+## new "town_sheet" message (Main.town_sheet's keys, or {town, why}).
 const PROTOCOL_REVISION := 35
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]
 ## Every kind of message (message, message_to, broadcast, broadcast_to).
-const MESSAGE_KINDS: Array[String] = ["barter", "builder", "chat", "clearing", "counter", "death", "grass", "map", "offers", "party", "return", "roofs", "shop", "sky", "speech", "telegraph", "terrain", "town", "world"]
+const MESSAGE_KINDS: Array[String] = ["barter", "builder", "chat", "clearing", "counter", "death", "grass", "map", "offers", "party", "return", "roofs", "shop", "sky", "speech", "telegraph", "terrain", "town", "town_sheet", "world"]
 ## Properties entity subclasses add with replicate().
 const SUBCLASS_REPLICATED: Array[String] = ["activity", "addressing", "ailing", "ailments", "alert", "body", "bond_step", "bond_why", "buffs", "channel_of", "channel_until", "charge_room", "charges", "down_until", "downed_until", "emit_light", "hands", "heart", "keeper_peer", "led_by", "led_to", "mending", "move_ticks", "person", "pose", "raised", "raised_tick", "slot_counts", "slot_notes", "slots", "trade", "worn"]
 const SETTINGS_FILE := "settings.cfg"

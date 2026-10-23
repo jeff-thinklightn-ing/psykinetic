@@ -1671,17 +1671,42 @@ func _stage_turn(town: String) -> void:
 
 ## Whether [param town] meets stage [param need]'s needs.
 func _meets(town: String, need: Dictionary) -> bool:
-	if residents(town).size() < int(need.get("residents", 0)):
-		return false
+	return stage_short(town, need).is_empty()
+
+
+## What [param town] lacks of stage [param need]'s needs: [{what, have,
+## need}], what "residents", a standing kind, a trade, "gold" or "wood"
+## (have and need counts, a kind's 0 or 1), in the rule's order.
+func stage_short(town: String, need: Dictionary) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var people := residents(town)
+	if people.size() < int(need.get("residents", 0)):
+		out.append({"what": "residents", "have": people.size(), "need": int(need["residents"])})
 	for kind: Variant in need.get("standing", []):
 		if not _stands(town, str(kind)):
-			return false
+			out.append({"what": str(kind), "have": 0, "need": 1})
 	var trades: Variant = need.get("trades", {})
 	if trades is Dictionary:
 		for trade: String in trades:
-			if residents(town).filter(func(who: String) -> bool: return trade in production.worker(who).get("trades", [])).size() < int(trades[trade]):
-				return false
-	return production.stockpile.count(town, "gold") >= int(need.get("gold", 0)) and production.stockpile.count(town, "wood") >= int(need.get("wood", 0))
+			var have := people.filter(func(who: String) -> bool: return trade in production.worker(who).get("trades", [])).size()
+			if have < int(trades[trade]):
+				out.append({"what": trade, "have": have, "need": int(trades[trade])})
+	for what: String in ["gold", "wood"]:
+		var have := production.stockpile.count(town, what)
+		if have < int(need.get(what, 0)):
+			out.append({"what": what, "have": have, "need": int(need[what])})
+	return out
+
+
+## [param town]'s next stage and what it lacks of it (the town sheet, 624):
+## {stage, needs: stage_short}; {} at the last stage.
+func next_stage(town: String) -> Dictionary:
+	var stages: Array = rules.get("stages", [])
+	var names: Array = stages.map(func(each: Variant) -> String: return str(each.get("name", "")) if each is Dictionary else "")
+	var at := names.find(stage(town))
+	if at + 1 >= stages.size() or not stages[at + 1] is Dictionary:
+		return {}
+	return {"stage": names[at + 1], "needs": stage_short(town, stages[at + 1])}
 
 
 ## A town with a building waiting on wood and no woodcutter gets one, a

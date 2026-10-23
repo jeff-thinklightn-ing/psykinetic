@@ -25510,3 +25510,37 @@ the piece's facing, with no hand offset; a slot without one is stood in at the c
 view_test: the throne's stand point faced north (0.4 toward -z, 0.1 up), none for a piece without
 one; a body on its cell drawn there, off it at the middle. Client only, protocol unchanged, no
 new class_name.
+## 624, economy's side: the town sheet's answer
+
+ui's town status sheet (624) asks the server how a town is doing; economy answers.
+
+- The "town_sheet" command {town} (Main.ask_town_sheet) is answered by a new
+  "town_sheet" message to the asker alone. It answers only for a town in the
+  player's zone or among their known places; any other town gets {town, why:
+  "you don't know that town"}. ui asks while the sheet is open (every 10 s is
+  fine); nothing is pushed.
+- Main.town_sheet(town) holds:
+  - town, name (the Holdings place's), population (residents), trades
+    {trade: residents, by first trade}, treasury (the store's gold);
+  - officials [{name, trade, paid}], paid false while the town owes them a
+    wage (528 amended);
+  - dole and hungry: residents not away whose last meal the town gave, or
+    who went without (Production.note_meal); sick (Townsfolk.is_sick);
+  - needs [{id, short, bring}]: each raw good in economy.json "comfort"
+    but gold, below it. short is 1 − have / comfort, 0..1; bring is comfort − have,
+    in the resource's own units. Worst first, then by id;
+  - builds [{kind, progress}] (Towns.build_progress, 566), season
+    (Season.name_at), day (Townsfolk.day_of), stage (591);
+  - faction {name}: its holder's display name. mood is a word from its
+    safety: "safe", "uneasy", "on guard". There is no player-town standing
+    yet; that waits for a design of its own;
+  - sought [{trade, where}] (613's wanted newcomers, where "" until placed),
+    and next_stage {stage, needs [{what, have, need}]} ({} at the last
+    stage).
+- Towns.stage_short(town, need) lists what a stage lacks. Each entry's what
+  is "residents", a standing kind, a trade, "gold" or "wood", in the rule's
+  order. _meets is now stage_short empty, and Towns.next_stage reads the same
+  list, so the sheet says what the stage turn checks.
+
+economy_test _test_town_sheet. Wire: a new command and message kind
+(MESSAGE_KINDS), a line under PROTOCOL_REVISION 34. No new class_name.

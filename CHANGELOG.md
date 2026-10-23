@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The server can now tell you how a town is doing: its people and trades, its treasury, whether its officials are paid, who is fed by the town or going hungry, who is sick, what it is short of and how much to bring, what is being built, who it seeks, and what it still lacks for its next stage (624, economy's side; ui's sheet shows it).
 - The draugr stands in front of his throne's seat instead of sunk into it.
 - The barrow grows moss on its walls and floors, thickest in the damp Hall of Fallen Souls, and spiders have webbed its corners and the open burial niches; the shifting halls roll theirs afresh each generation (decision 647, dungeon's side; terrain draws them).
 - The Hall of Fallen Souls is set for its feast: the round table with eight chairs round it, broken tables along the walls, and the draugr's throne on his dais (580 step 3, dungeon's side, 3b).

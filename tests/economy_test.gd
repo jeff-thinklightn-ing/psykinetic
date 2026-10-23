@@ -414,6 +414,7 @@ func _test_in_town() -> void:
 	await _test_barter_in_town(host, counter)
 	_test_robber_falls(host)
 	await _test_give_in_town(host)
+	_test_town_sheet(host)
 	remove_child(_main)
 	_main.free()
 	World.clear_zones()
@@ -531,6 +532,30 @@ func _test_give_gold() -> void:
 		"a companion's purse, given to and taken from")
 	var again := Economy.new(economy.to_dict(), economy.stockpile, economy.production, economy.clock, RULES, func() -> Dictionary: return CATALOG)
 	_check(again.gold(pet) == 5, "her purse saved")
+
+
+## The town sheet (624, economy's side): the "town_sheet" command answered
+## for the host's own town, its officials, needs and next stage, and refused
+## for a town they don't know.
+func _test_town_sheet(host: Player) -> void:
+	print("
+== the town sheet ==")
+	World.towns.move_in(STORE, "aldo", "Aldo", "priest")
+	World.production.set_owed("aldo", 3)
+	var sheet: Dictionary = _main.ask_town_sheet(host, {"town": STORE})
+	_check(not sheet.has("why") and sheet["treasury"] == World.stockpile.count(STORE, "gold") and sheet["population"] == World.towns.residents(STORE).size(),
+		"answered for the host's town: its treasury and people (%s)" % sheet.get("why", ""))
+	_check(sheet["officials"].any(func(each: Dictionary) -> bool: return each["name"] == "Aldo" and each["trade"] == "priest" and not each["paid"]),
+		"the priest an official, owed so not paid (%s)" % [sheet["officials"]])
+	var wood: Array = sheet["needs"].filter(func(each: Dictionary) -> bool: return each["id"] == "wood")
+	var want := int(World.economy.rules["comfort"]["wood"])
+	_check(wood.size() == 1 and wood[0]["bring"] == want - World.stockpile.count(STORE, "wood") and not sheet["needs"].any(func(each: Dictionary) -> bool: return each["id"] == "gold"),
+		"wood wanted, as much as comfort lacks; gold never a need (%s)" % [sheet["needs"]])
+	var next: Dictionary = sheet["next_stage"]
+	_check(not next.is_empty() and next["needs"] == World.towns.stage_short(STORE, World.economy.rules["stages"][World.economy.rules["stages"].map(func(each: Dictionary) -> String: return each["name"]).find(next["stage"])]),
+		"the next stage and what it lacks (%s)" % [next])
+	_check(sheet["mood"] in ["safe", "uneasy", "on guard"] and sheet["season"] != "" and sheet["sought"] is Array, "the mood, season and sought")
+	_check(_main.ask_town_sheet(host, {"town": "nowhere/store"}).get("why") == "you don't know that town", "a town they don't know: refused")
 
 
 ## The "give_gold" command (614) in Main: to a second player beside the

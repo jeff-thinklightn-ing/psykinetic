@@ -7961,6 +7961,8 @@ func _on_command(entity: GridEntity, command_name: String, args: Dictionary) -> 
 		retain(entity as Player, args)
 	elif command_name == "give_gold" and entity is Player:
 		give_gold(entity as Player, args)
+	elif command_name == "town_sheet" and entity is Player:
+		ask_town_sheet(entity as Player, args)
 	elif command_name == "stance" and entity is Player:
 		var stance := str(args.get("kind", ""))
 		var toward := _point_direction(entity, args)
@@ -8986,6 +8988,74 @@ func give_gold(player: Player, args: Dictionary) -> int:
 	Net.broadcast_to(peers, "party", {"from": "Server", "text": line})
 	print("[economy] %s" % line)
 	return given
+
+
+## Server: the "town_sheet" command (decision 624, economy's side; ui's
+## town status sheet) {town}: [param player] is answered "town_sheet"
+## (town_sheet) for a town in their zone or among their known places, else
+## {town, why}. The answer sent.
+func ask_town_sheet(player: Player, args: Dictionary) -> Dictionary:
+	var town := str(args.get("town", ""))
+	var record: PlayerRecord = _records.get(_peer_ids.get(player.owner_peer, ""))
+	var sheet := {"town": town, "why": "you don't know that town"}
+	if World.towns != null and World.towns.to_dict().has(town) \
+			and (town.begins_with(player.zone + "/") or record != null and town in record.known_places):
+		sheet = town_sheet(town)
+	Net.message_to(player.owner_peer, "town_sheet", sheet)
+	return sheet
+
+
+## [param town]'s status sheet (decision 624): {town, name, population,
+## trades {trade: residents}, treasury, officials [{name, trade, paid}],
+## dole and hungry (residents fed by the town, not fed, at their last
+## meal), sick, needs [{id, short 0..1, bring}] (raw goods under comfort,
+## worst first), builds [{kind, progress}], season, day, stage, faction
+## {name}, mood (its safety: "safe", "uneasy", "on guard"), sought
+## [{trade, where}] (613), next_stage (Towns.next_stage)}.
+func town_sheet(town: String) -> Dictionary:
+	var production := World.production
+	var people := World.towns.residents(town)
+	var trades := {}
+	var officials: Array[Dictionary] = []
+	var fed := {"dole": 0, "hungry": 0}
+	var sick := 0
+	var official_rules: Dictionary = World.economy.rules.get("official", {})
+	for id in people:
+		var who := production.worker(id)
+		var theirs: Array = who.get("trades", [])
+		if not theirs.is_empty():
+			trades[str(theirs[0])] = int(trades.get(str(theirs[0]), 0)) + 1
+		var office: Array = theirs.filter(func(trade: Variant) -> bool: return official_rules.has(str(trade)))
+		if not office.is_empty():
+			officials.append({"name": str(who.get("name", id)), "trade": str(office[0]), "paid": int(who.get("owed", 0)) <= 0})
+		if not bool(who.get("away", false)) and fed.has(str(who.get("fed", ""))):
+			fed[str(who["fed"])] += 1
+		if Townsfolk.is_sick(production, id):
+			sick += 1
+	var needs: Array[Dictionary] = []
+	var comfort: Dictionary = World.economy.rules.get("comfort", {})
+	for what: String in comfort:
+		var want := int(comfort[what])
+		var have := World.stockpile.count(town, what)
+		if what != "gold" and want > 0 and have < want:
+			needs.append({"id": what, "short": clampf(1.0 - float(have) / want, 0.0, 1.0), "bring": want - have})
+	needs.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a["short"] > b["short"] or a["short"] == b["short"] and a["id"] < b["id"])
+	var builds: Array[Dictionary] = []
+	var houses := World.towns.buildings_of(town)
+	for kind: String in houses:
+		if houses[kind].has("progress"):
+			builds.append({"kind": kind, "progress": float(houses[kind]["progress"])})
+	var safety := str(production.signals_of(town, production.catalog.call())["safety"])
+	var place := World.holdings.place(town) if World.holdings != null else {}
+	var holder := World.holdings.holder(town) if World.holdings != null else Stockpile.TOWN
+	return {"town": town, "name": str(place.get("name", town)), "population": people.size(), "trades": trades,
+		"treasury": World.stockpile.count(town, "gold"), "officials": officials, "dole": fed["dole"], "hungry": fed["hungry"],
+		"sick": sick, "needs": needs, "builds": builds, "season": Season.name_at(World.steps), "day": Townsfolk.day_of(World.steps),
+		"stage": World.towns.stage(town),
+		"faction": {"name": World.holdings.factions.display_name(holder) if World.holdings != null else "the town"},
+		"mood": {Production.SAFE: "safe", Production.UNEASY: "uneasy"}.get(safety, "on guard"),
+		"sought": World.towns.sought(town).map(func(entry: Dictionary) -> Dictionary: return {"trade": entry["trade"], "where": entry.get("where", "")}),
+		"next_stage": World.towns.next_stage(town)}
 
 
 func _display_name(entity: GridEntity) -> String:
