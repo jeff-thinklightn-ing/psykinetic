@@ -92,6 +92,11 @@ const THROW_NEAR := 6
 const THROW_FAR := 8
 const STRUCK_TWICE_TICKS := 30
 const CLOSING_TICKS := 10
+## Disarmed (combat's stopped charge; his axe bound to him, Jeff), he walks
+## back for it, at once with nobody beside him, else after this many blows
+## of his fists (a draft: a foe staying on him buys a few blows, not the
+## fight).
+const FISTS_BEFORE_AXE := 3
 const TITLE := "Face the draugr"
 
 var state := State.SEATED
@@ -125,6 +130,9 @@ var _target_was := Vector2i.ZERO
 var _target_was_of: GridEntity = null
 var _closing_until := 0
 var backing_off := false
+## His fist blows since he was disarmed, and the attack he last counted.
+var _fists := 0
+var _fist_seen := -1
 var _struck_at: Array[int] = []
 var _asking := ""
 var _ask_at := -1
@@ -259,6 +267,12 @@ func _special_tick() -> bool:
 			_struck_at.clear()
 			return true
 	var axe: Dictionary = World.call("axe_state", self)
+	if bool(World.call("is_disarmed", self)) and World.has_method("recall_axe"):
+		if _walk_for_axe(axe):
+			return true
+	else:
+		_fists = 0
+		_fist_seen = -1
 	if str(axe.get("where", "")) == "ground" and not bool(World.call("is_disarmed", self)):
 		if bool(World.call("try_axe_charge", self)):
 			return true
@@ -274,6 +288,25 @@ func _special_tick() -> bool:
 				_next_throw = World.tick + THROW_EVERY_TICKS
 				return true
 	return false
+
+
+## Disarmed: a step for his axe where it lies (combat's World takes it up
+## for him once he is on or beside it), at once with no foe beside him,
+## else once he has struck FISTS_BEFORE_AXE blows with his fists; true while
+## he goes (no blow), false to fight on with his fists.
+func _walk_for_axe(axe: Dictionary) -> bool:
+	if next_attack_tick != _fist_seen:
+		if _fist_seen != -1:
+			_fists += 1
+		_fist_seen = next_attack_tick
+	var cell: Variant = axe.get("cell")
+	if not cell is Vector2i or World.distance(tile, cell) <= 1:
+		return false
+	if _foe_beside() and _fists < FISTS_BEFORE_AXE:
+		return false
+	if World.tick >= next_move_tick and not _go_to(cell):
+		return false
+	return true
 
 
 ## Whether a foe stands beside him (a throw then waits for the blow).
@@ -503,6 +536,7 @@ func _pact_holds() -> bool:
 ## The pact lost (the challenger fallen, or gone): he heals, keeps the gold,
 ## and sits again (or rests on, if he was resting).
 func _end_pact() -> void:
+	_recall_axe()
 	challenger_id = ""
 	difficulty = ""
 	charges_met = 0
@@ -517,6 +551,7 @@ func _yield() -> void:
 	target = null
 	_provoked = null
 	_drop_windup()
+	_recall_axe()
 	if state == State.PACT:
 		var ids: Array = []
 		for entity in World.sought():
@@ -549,6 +584,13 @@ func _yield() -> void:
 		_still_the_dead()
 	else:
 		state = State.SEATED
+
+
+## His fight over (yielded, or the pact lost): a thrown axe, bound to him,
+## back in his hands (combat's World.recall_axe; before it, nothing).
+func _recall_axe() -> void:
+	if World.has_method("recall_axe"):
+		World.call("recall_axe", self)
 
 
 ## His kind's hp and blows again, healed, his raised dead gone.

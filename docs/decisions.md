@@ -21907,6 +21907,15 @@ is_disarmed, boss_busy).
   wave with fewest, earliest first, which splits them as the pool did. A
   back-off raises the next wave early, and it does not come again.
   RETINUE is gone. Tuning for a party is editing the row.
+- **His bound axe (603 amended; Jeff: "its magically bound to him, only
+  fulfilling the pact lets you take the axe"; combat's World.axe_bound,
+  recall_axe, _tend_disarmed).** Disarmed, he walks back for it
+  (`_walk_for_axe`, Monster._go_to; combat's World takes it up once he is
+  on or beside its cell): at once with no foe beside him, else after
+  FISTS_BEFORE_AXE (3, a draft) blows of his fists, so a foe staying on him
+  buys a few blows, not the fight. His fight over (`_yield`, `_end_pact`)
+  he calls World.recall_axe, so it never lies bound in his hall. Both
+  behind World.has_method("recall_axe").
 - **Landed inert.** This side landed before combat's 602/603 (the cut
   before the fight): every choice is behind World.has_method("try_spin"),
   and monster_test `_test_draugr_mind` skips till then. Its CHANGELOG

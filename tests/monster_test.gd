@@ -2921,6 +2921,17 @@ func _test_quieter() -> void:
 	Monster.idling = true
 
 
+## [param draugr]'s axe out of his hands onto [param cell], him disarmed
+## there (as combat's stopped charge leaves it).
+func _disarm(draugr: Draugr, cell: Vector2i) -> void:
+	var slot := World._axe_slot(draugr)
+	if slot < 0:
+		return
+	var uid: int = World._take_out(draugr, slot)
+	var lay := World.put_on_ground(uid, cell)
+	World._axes[draugr] = {"uid": uid, "cell": lay, "disarmed": true}
+
+
 ## The counts of [param waves], in order.
 func _counts(waves: Array[Dictionary]) -> Array:
 	return waves.map(func(w: Dictionary) -> int: return int(w["count"]))
@@ -3040,6 +3051,49 @@ func _test_draugr_mind() -> void:
 			charged = true
 			break
 	_check(charged, "the axe flown and lying: he charges for it")
+	if World.has_method("recall_axe"):
+		# Disarmed (combat's stopped charge), his axe lying 4 off: he walks back
+		# for it, with a foe beside him only after FISTS_BEFORE_AXE blows.
+		for i in 200:
+			World.step()
+			if not World.boss_busy(draugr) and str(World.axe_state(draugr)["where"]) == "hand":
+				break
+		_move_to(a, Vector2i(12, 1))
+		_move_to(draugr, Vector2i(5, 3))
+		_disarm(draugr, Vector2i(9, 3))
+		draugr.target = a
+		var walked := false
+		for i in 120:
+			World.step()
+			if str(World.axe_state(draugr)["where"]) == "hand":
+				walked = true
+				break
+		_check(walked and not World.is_disarmed(draugr) and World.distance(draugr.tile, Vector2i(9, 3)) <= 1,
+			"disarmed, nobody beside him: he walks back to his axe and takes it up (%s)" % draugr.tile)
+		_move_to(draugr, Vector2i(5, 3))
+		_move_to(a, Vector2i(6, 3))
+		_disarm(draugr, Vector2i(9, 3))
+		draugr._fists = 0
+		draugr._fist_seen = -1
+		draugr.next_attack_tick = 0
+		var stayed := true
+		for i in 4:
+			World.step()
+			stayed = stayed and draugr.tile == Vector2i(5, 3)
+		_check(stayed and World.is_disarmed(draugr), "a foe beside him: his fists first, he stays")
+		a.hp = a.max_hp
+		var went := false
+		for i in 200:
+			a.hp = a.max_hp
+			World.step()
+			if draugr.tile != Vector2i(5, 3):
+				went = true
+				break
+		_check(went and draugr._fists >= Draugr.FISTS_BEFORE_AXE,
+			"after %d blows of his fists he goes for it, the foe beside him or not (%d blows)" % [Draugr.FISTS_BEFORE_AXE, draugr._fists])
+		_disarm(draugr, Vector2i(9, 3))
+		draugr._end_pact()
+		_check(str(World.axe_state(draugr)["where"]) == "hand" and not World.is_disarmed(draugr), "his fight over, his axe comes back to his hands")
 	World.economy = was_economy
 	World.spawn_spec = Callable()
 	World.dead_rest.clear()
