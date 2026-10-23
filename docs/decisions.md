@@ -19244,6 +19244,12 @@ barter wire; pc-character: the standing turn and look-at). ui's side:
   dropped. Gold-only buys and sells are the same window with one side
   picked. It closes on Esc, with the pack's open row (close_other), or when
   the counter is gone.
+- Amended 2026-10-22 (Jeff on v0.1.165: "click player still pulls up the
+  chat window with their name"): a click on another player or a companion
+  walks to them and opens nothing (536's chat box with the name typed is
+  gone from that path); any friend's bubble, a townsperson's, a
+  companion's or a player's, is clickable and opens the bar
+  (Main._bubble_clicked), Talk for all, Barter for a merchant or maker.
 - The counter's E opens the same window (open_other sends "barter" beside
   the "shop" command it always sent); ShopPanel's goods box is no longer
   shown (box_shown false), while the class stays reading the "shop"

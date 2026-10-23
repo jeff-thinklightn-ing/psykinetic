@@ -1298,15 +1298,9 @@ func _open_talk(friend: GridEntity) -> void:
 	_talk_wanted = null
 	if friend is Resident:
 		_greet(friend)  # 560, ui's side: the click greets; the bar's Talk opens the say line.
-		return
-	_open_chat()
-	if (friend is Companion or friend is Resident) and _chat_box.visible:
-		# Addressed to them (536, ui's side: no panel): a townsperson by their name, as the server matches a line.
-		var person := str(friend.get("person")) if friend is Resident and friend.get("person") != null else ""
-		_chat_box.text = "%s, " % (person if not person.is_empty() else _display_name(friend))
-	if friend is Resident:
-		ask_offers(friend)
-		_chat_box.caret_column = _chat_box.text.length()
+	# A player or a companion (Jeff on v0.1.165: "click player still pulls up the
+	# chat window with their name"): the walk to them is the click's whole work;
+	# no window. Their bubble, clicked, opens the bar with Talk (_bubble_clicked).
 
 
 ## The resident nearest [param player] in this zone, or null (560's shots).
@@ -1363,12 +1357,17 @@ func _greet(resident: GridEntity) -> void:
 func _bubble_clicked() -> bool:
 	if _bar != null and _bar.visible:
 		_close_bar()
-	if bubbles == null or not is_instance_valid(_greeted_by_click) or not _greeted_by_click.spawned:
+	if bubbles == null:
 		return false
 	var key := bubbles.key_under_mouse()
-	if key == 0 or key != _greeted_by_click.get_instance_id():
+	if key == 0:
 		return false
-	_open_bar(_greeted_by_click)
+	# Any friend's bubble (560 as Jeff asked on v0.1.165): a townsperson's, a
+	# companion's or another player's; Talk for all, Barter for a merchant or maker.
+	var who := instance_from_id(key) as GridEntity
+	if who == null or not is_instance_valid(who) or not who.spawned or who == _local_player() or not is_friend(who):
+		return false
+	_open_bar(who)
 	return true
 
 

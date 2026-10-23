@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Fixed: clicking another player or your companion no longer opens the chat window with their name; the click walks you to them, and clicking anyone's speech bubble opens the bar with Talk (and Barter for a merchant or maker) (560, ui's side).
 ## v0.1.165
 
 - This version changes what goes over the network, so v0.1.164 and older can't join the server: update through the launcher first.
