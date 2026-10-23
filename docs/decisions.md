@@ -26385,3 +26385,37 @@ stays persistent as the entrance marker, the halls below it regenerate.
   ways with the castle, the guardroom's door and wall, the place) and
   `_test_castle` (three links now); regen_test lists the halls among the
   marked levels beside the barrow's three. No wire change, no new class_name.
+## 627. Bandaging heard: a cloth ruffle from the bandager
+
+Jeff on v0.1.169: "Bandages should have a ruffling sound and a kneeling
+next to the target animation. If target moves it interrupts." This is the
+sound; pc-character has the kneel and the replicated field, companions the
+behaviour.
+
+- sfx.bandage is now a loop (it was a one-shot, never played), heard 2
+  cells, -8 dB on the SFX bus. client3d/bandaging.gd (Client3D.Bandaging,
+  a preload, no class_name) holds one ruffle per bandager while bandaging
+  runs, a player's or a companion's, moved with them each frame.
+- Who bandages: World.bandage_changed is server-only, so the client reads
+  what replicates: GridEntity.tending (626, pc-character's, the patient's
+  node name while the entity bandages, its own for itself, "" otherwise),
+  the ruffle at the bandager. It is the one source: no fallback to the
+  patient's mending (the coordinator), since 626 landed first.
+- The end: tending is "" by then, so each bandager's last patient is
+  kept; the ruffle fades over 0.4 s when that patient goes on to mend
+  (mending 2, or still 1 with the news a frame behind) and over 0.06 s
+  when it was broken off (mending 0), the patient is gone, or the
+  bandager lies downed (626 amended, 0fb90f6c, breaks it off with the
+  patient's mending 0 too; the downed check reads it the same frame).
+- Take: freesound 718668, ChuckleNutsDev, "Wrapping cloth", CC0 1.0, cut
+  from 0.2 s for 2.4 s and looped (0.4 s seam), peak -3 dB; the cloth
+  wound round, steady across its 2 s. Over the three "Clothing Ruffle"
+  takes of WhiteFire43 (95% of their energy under 300 Hz: handling thumps,
+  not cloth) and martian's 19291 (crunchy, kurtosis 23 over 4 kHz: reads
+  as paper). The three Sonniss cotton rips the slot held were tearing, not
+  ruffling: dropped from takes.json (their files kept in the sound
+  library's takes/_dropped_bandage; the new take waits in takes/_pending_627 until the push).
+- view_test _test_bandaging: held at the start, moved with the bandager,
+  ended softly when done and short when broken off, and read from a
+  roster by tending only (a patient's mending alone is not heard), soft
+  or cut by that patient's mending.

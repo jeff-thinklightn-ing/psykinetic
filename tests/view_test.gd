@@ -114,6 +114,7 @@ func _ready() -> void:
 	_test_heard_as_monsters_hear()
 	_test_ambience_runs()
 	_test_heartbeat()
+	_test_bandaging()
 	_test_options_panel()
 
 	# Every sound stopped and let go before quitting: the audio server lets
@@ -296,6 +297,78 @@ func _test_heartbeat() -> void:
 		heart.step(0.1, 0, false)
 	_check(Sfx.duck_db == 0.0, "after it, the mix back (%.1f dB)" % Sfx.duck_db)
 	heart.free()
+
+
+## Bandaging heard: a cloth ruffle from the bandager while it runs, soft
+## when the patient mends, short when broken off.
+func _test_bandaging() -> void:
+	print("
+== bandaging: a cloth ruffle while it runs, faded when done, cut when broken off ==")
+	var bandaging := Client3D.Bandaging.new()
+	bandaging.view = _rig
+	var here := Vector3(2.0, 0.0, 3.0)
+	# Held only with a take (other trees lack art/audio/external).
+	var takes := not SoundKit.files("sfx.bandage").is_empty()
+	bandaging.update({"A": here}, {})
+	var ruffle: AudioStreamPlayer3D = bandaging.ruffles.get("A")
+	_check(not takes or ruffle != null and ruffle.playing and _rig.sfx.played[-1][0] == "sfx.bandage", "started: the ruffle held, playing")
+	bandaging.update({"A": here + Vector3.RIGHT}, {})
+	_check(not takes or bandaging.ruffles.size() == 1 and ruffle.position.is_equal_approx(here + Vector3.RIGHT), "still running: the same ruffle, where the bandager is")
+	bandaging.update({}, {"A": true})
+	_check(bandaging.ruffles.is_empty() and (not takes or bandaging.ended[-1] == ["A", "done"]), "done: ended softly (%s)" % [bandaging.ended])
+	bandaging.update({"B": here}, {})
+	bandaging.update({}, {"B": false})
+	_check(not takes or bandaging.ended[-1] == ["B", "cut"], "broken off: cut short (%s)" % [bandaging.ended])
+	# Who bandages, read from the roster: tending (626), the patient's mending how it ended.
+	var player := Player.new()
+	player.name = "Bandager"
+	var patient := Player.new()
+	patient.name = "Patient"
+	var roster: Array[GridEntity] = [player, patient]
+	var active: Dictionary[String, Vector3] = {}
+	var done: Dictionary[String, bool] = {}
+	patient.mending = 1
+	bandaging.read(roster, active, done)
+	_check(active.is_empty(), "the patient's mending alone: nobody heard (tending is the one source)")
+	player.tending = "Patient"
+	bandaging.read(roster, active, done)
+	_check(active.keys() == ["Bandager"], "tending the patient: heard from the bandager (%s)" % [active.keys()])
+	player.tending = ""
+	patient.mending = 2
+	active.clear()
+	done.clear()
+	bandaging.read(roster, active, done)
+	_check(active.is_empty() and done.get("Bandager") == true, "done, the patient mending: soft")
+	player.tending = "Patient"
+	patient.mending = 1
+	bandaging.read(roster, active, done)
+	player.tending = ""
+	patient.mending = 0
+	active.clear()
+	done.clear()
+	bandaging.read(roster, active, done)
+	_check(active.is_empty() and done.get("Bandager") == false, "broken off, the patient not mending: a cut")
+	player.tending = "Patient"
+	patient.mending = 1
+	bandaging.read(roster, active, done)
+	player.tending = ""
+	player.downed_until = World.tick + 100
+	active.clear()
+	done.clear()
+	bandaging.read(roster, active, done)
+	_check(active.is_empty() and done.get("Bandager") == false, "the bandager downed, the patient still bound: a cut")
+	player.downed_until = 0
+	player.tending = "Patient"
+	bandaging.read(roster, active, done)
+	player.tending = ""
+	var alone: Array[GridEntity] = [player]
+	active.clear()
+	done.clear()
+	bandaging.read(alone, active, done)
+	_check(active.is_empty() and done.get("Bandager") == false, "the patient gone: a cut")
+	patient.free()
+	player.free()
+	bandaging.free()
 
 
 func _test_options_panel() -> void:

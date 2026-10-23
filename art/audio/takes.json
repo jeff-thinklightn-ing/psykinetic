@@ -521,21 +521,12 @@
 		"sfx.bandage": [
 			{
 				"file": "sfx.bandage.ogg",
-				"from": "sonniss-gdc-2024",
-				"original": "2024/InMotionAudio - Torn T-Shirt/CLOTHRip_CottonRips13_InMotionAudio_TornTShirt.wav",
-				"sha256": "07a153b103e07ca4e95b9610720a42156e45b6ab94002859b98e89674e3c6d54"
-			},
-			{
-				"file": "sfx.bandage.2.ogg",
-				"from": "sonniss-gdc-2024",
-				"original": "2024/InMotionAudio - Torn T-Shirt/CLOTHRip_CottonRips44_InMotionAudio_TornTShirt.wav",
-				"sha256": "9ebf179bb400db84ac2ea769c634f8e6451b239ccc690a596030ef59449d0869"
-			},
-			{
-				"file": "sfx.bandage.3.ogg",
-				"from": "sonniss-gdc-2024",
-				"original": "2024/InMotionAudio - Torn T-Shirt/CLOTHRip_CottonRips92_InMotionAudio_TornTShirt.wav (from 1.66 s for 1.82 s)",
-				"sha256": "6b61d5013d2ffb662ae53fb0ebd67ded2fb085e5939086e9ab449f832fcfbdb1"
+				"from": "freesound",
+				"original": "freesound 718668: Wrapping cloth (from 0.2 s for 2.4 s)",
+				"sha256": "cc10338ac48fdb81c26c61909a114676a0d00ec40cf53f294cf56b3ae4c04ab5",
+				"by": "ChuckleNutsDev",
+				"url": "https://freesound.org/people/ChuckleNutsDev/sounds/718668/",
+				"license": "CC0 1.0"
 			}
 		],
 		"sfx.block_shield": [

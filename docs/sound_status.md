@@ -68,7 +68,7 @@ No takes: played as its fallback's sound where it has one, else as a blip (a bed
 | `sfx.arrow_hit_wood` | 3 | players 12 | Freesound | CC0 1.0 or CC BY (each take's own, in art/audio/takes.json) |
 | `sfx.arrow_land` | 3 | players 12 | Freesound | CC0 1.0 or CC BY (each take's own, in art/audio/takes.json) |
 | `sfx.arrow_water` | 3 | players 12 | Freesound | CC0 1.0 or CC BY (each take's own, in art/audio/takes.json) |
-| `sfx.bandage` | 3 | players 1 | #GameAudioGDC 2024 bundle, Sonniss | Sonniss #GameAudioGDC Bundle licence v2.0 |
+| `sfx.bandage` | 1 | players 2 | Freesound | CC0 1.0 or CC BY (each take's own, in art/audio/takes.json) |
 | `sfx.block_shield` | 1 | fight 5 | Freesound | CC0 1.0 or CC BY (each take's own, in art/audio/takes.json) |
 | `sfx.block_weapon` | 1 | fight 5 | Freesound | CC0 1.0 or CC BY (each take's own, in art/audio/takes.json) |
 | `sfx.boar_charge` | 2 | charge 6 | #GameAudioGDC 2021 to 2023 bundle, Sonniss, #GameAudioGDC 2024 bundle, Sonniss | Sonniss #GameAudioGDC Bundle licence v2.0 |
@@ -166,4 +166,4 @@ No takes: played as its fallback's sound where it has one, else as a blip (a bed
 
 Positional slots with no sim noise: players hear them (range in cells), monsters do not.
 
-`amb.bat` (6), `amb.draft` (3), `amb.falls` (10), `amb.owl` (14), `amb.stream` (16), `amb.torch_fire` (4), `sfx.arrow_flight` (4), `sfx.arrow_hit_flesh` (12), `sfx.arrow_hit_stone` (12), `sfx.arrow_hit_wood` (12), `sfx.arrow_land` (12), `sfx.arrow_water` (12), `sfx.bandage` (1), `sfx.bow_creak` (2), `sfx.bow_draw` (2), `sfx.cart_roll` (6), `sfx.deer_snort` (4), `sfx.goblin_chatter` (6), `sfx.grass_rustle` (4), `sfx.item_pickup_heavy` (2), `sfx.item_pickup_light` (2), `sfx.pack_open` (2), `sfx.splash` (4), `sfx.throw` (3), `voice.effort_lift_female` (3), `voice.effort_lift_male` (3)
+`amb.bat` (6), `amb.draft` (3), `amb.falls` (10), `amb.owl` (14), `amb.stream` (16), `amb.torch_fire` (4), `sfx.arrow_flight` (4), `sfx.arrow_hit_flesh` (12), `sfx.arrow_hit_stone` (12), `sfx.arrow_hit_wood` (12), `sfx.arrow_land` (12), `sfx.arrow_water` (12), `sfx.bandage` (2), `sfx.bow_creak` (2), `sfx.bow_draw` (2), `sfx.cart_roll` (6), `sfx.deer_snort` (4), `sfx.goblin_chatter` (6), `sfx.grass_rustle` (4), `sfx.item_pickup_heavy` (2), `sfx.item_pickup_light` (2), `sfx.pack_open` (2), `sfx.splash` (4), `sfx.throw` (3), `voice.effort_lift_female` (3), `voice.effort_lift_male` (3)

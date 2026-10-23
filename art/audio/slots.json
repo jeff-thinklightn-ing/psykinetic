@@ -782,12 +782,12 @@
 		},
 		"sfx.bandage": {
 			"category": "items",
-			"type": "oneshot",
+			"type": "loop",
 			"bus": "sfx",
 			"noise": null,
-			"range": 1,
+			"range": 2,
 			"volume_db": -8.0,
-			"uses": "binding a wound (the bandaging action, when it exists); not played yet"
+			"uses": "binding a wound: a cloth ruffle looped from the bandager while bandaging runs, faded on done, cut short when broken off; client3d/bandaging.gd, held from each bandager (GridEntity.tending, else the patient while its mending is 1)"
 		},
 		"sfx.goblin_chatter": {
 			"category": "creatures",
