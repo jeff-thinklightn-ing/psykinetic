@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- In the barrow's first hall, a faint cool draft breathes from one niche: the hidden door's. Stand close to hear it; it stops once the door is opened (608 amended, sound's side).
 - Shadows are a little darker again (0.8 instead of 0.6), so the short shadows show without the long dark ones coming back (534 amended (3)).
 - With the low camera on, the weather fits the wider view: rain and snow fall out to the distance, ground fog and cloud shadows no longer show square edges, a storm's haze hides the far hills while the ground near you stays as clear as in the usual view, and the sky's horizon fades into the haze (623, environment's side).
 - A faint cool draft drifts low out of the barrow's hidden niche into the room while its door is shut; hold a light near the niches to see it (608 amended, environment's side).

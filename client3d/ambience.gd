@@ -23,7 +23,9 @@ extends Node
 ##   the drips after it as Weather.drip_at has them (decision 477: the
 ##   drawn drops read the same).
 ## A torch is a point, not a bed: the torch loop (amb.torch_fire) plays from
-## the nearest torch within hearing (Sfx.hearing, its slot's range).
+## the nearest torch within hearing (Sfx.hearing, its slot's range). So
+## does the barrow's hidden door's draft (amb.draft, 608 amended), from its
+## edge, a clue for those who stand close, until the door is opened.
 ## Night's own voices are calls, not beds (Jeff: "no birds at night, maybe
 ## owls bats"): now and then an owl (amb.owl) up in the trees round the
 ## listener, more often under a forest's roof, and bats (amb.bat) overhead
@@ -91,6 +93,8 @@ var levels: Dictionary[String, float] = {}
 ## Every bed this much quieter (dB): Music's duck under a fight.
 var duck_db := 0.0
 var _torch: AudioStreamPlayer3D
+## The draft through the hidden door (608 amended), while it is heard.
+var _draft: AudioStreamPlayer3D
 ## Stream (its index in the terrain's "streams") -> its held loop, while
 ## the listener is within its reach; and the streams they were made for.
 var _streams := {}
@@ -136,6 +140,7 @@ func _weigh() -> void:
 	targets.assign(weights(zone, under_sky, DayNight.daylight(steps), DayNight.hour(steps), weather, _town_nearness(cell),
 			canopy, drip))
 	_place_torch(cell)
+	_place_draft(cell)
 	_place_streams(cell)
 	_place_falls(cell)
 	var rates := calls(zone, DayNight.daylight(steps), weather, canopy, _tower_nearness(cell))
@@ -319,6 +324,49 @@ static func nearest_on(path: Array, to: Vector2) -> Dictionary:
 		if best.is_empty() or distance < float(best.distance):
 			best = {"at": i, "t": t, "distance": distance}
 	return best
+
+
+## The draft (amb.draft, 608 amended's clue): a cool breath through the
+## hidden door, from the middle of its edge (terrain "niches", the entry of
+## kind "hidden"), heard from whichever cell beside the edge hears it best,
+## while that edge's Door is shut; off once it opens, or with no such niche.
+func _place_draft(cell: Vector2i) -> void:
+	var best := {}
+	var edge := Vector3i.ZERO
+	for niche: Variant in view._terrain.get("niches", []):
+		if not (niche is Dictionary and str(niche.get("kind", "")) == "hidden"):
+			continue
+		# As the niche's draw reads it (Client3D, 608): its edge, else the one
+		# behind its cell.
+		edge = niche.get("edge", Terrain.edge_key(niche["cell"], -(niche["out"] as Vector2i)))
+		var door := World.door_on(edge)
+		if door != null and door.is_open():
+			break
+		for side: Vector2i in Terrain.edge_cells(edge):
+			if maxi(absi(side.x - cell.x), absi(side.y - cell.y)) > SoundKit.reach("amb.draft"):
+				continue
+			var heard := Sfx.hearing("amb.draft", side, cell)
+			if heard.heard and (best.is_empty() or float(heard.db) > float(best.db)):
+				best = heard
+		break
+	if best.is_empty():
+		if _draft != null and _draft.playing:
+			_draft.stop()
+		return
+	if _draft == null:
+		var stream := _stream("amb.draft")
+		if stream == null:
+			return
+		_draft = AudioStreamPlayer3D.new()
+		_draft.stream = stream
+		_draft.attenuation_model = AudioStreamPlayer3D.ATTENUATION_DISABLED
+		add_child(_draft)
+	var cells := Terrain.edge_cells(edge)
+	_draft.bus = "Ambience" + (Sfx.MUFFLED_SUFFIX if best.muffled else "")
+	_draft.position = (view._tile_position(cells[0]) + view._tile_position(cells[1])) / 2.0 + Vector3.UP
+	_draft.volume_db = SoundKit.volume_db("amb.draft") + float(best.db)
+	if not _draft.playing:
+		_draft.play()
 
 
 ## The torch loop at the nearest torch heard from [param cell], else off.

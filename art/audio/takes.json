@@ -39,6 +39,17 @@
 				"license": "CC BY 4.0"
 			}
 		],
+		"amb.draft": [
+			{
+				"file": "amb.draft.ogg",
+				"from": "freesound",
+				"original": "freesound 651541: wind draft loop 1",
+				"sha256": "bd45a89026ecc38b4dca5eea360aac09da0f02f8b7157dc79cb4e10242f6c47d",
+				"by": "nsstudios",
+				"url": "https://freesound.org/people/nsstudios/sounds/651541/",
+				"license": "CC BY 4.0"
+			}
+		],
 		"amb.drips": [
 			{
 				"file": "amb.drips.ogg",

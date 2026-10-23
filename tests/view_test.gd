@@ -219,6 +219,35 @@ func _test_ambience_runs() -> void:
 	_check(_rig.ambience._falls.is_empty() and (falling == null or (falling as Node).is_queued_for_deletion()), "a fall out of reach: none held")
 	_rig.stream_falls = had_falls
 	_rig.ambience._weigh()
+	# The hidden door's draft (608 amended): from its edge's middle while
+	# its Door is shut, none once it opens or from out of reach.
+	var draft_takes := not SoundKit.files("amb.draft").is_empty()
+	var door: Door = World.get_doors()[0]
+	var was_open := door.open
+	var had_niches: Variant = _rig._terrain.get("niches")
+	var sides := Terrain.edge_cells(door.key)
+	_rig._terrain["niches"] = [{"cell": sides[0], "out": sides[1] - sides[0], "edge": door.key, "kind": "hidden", "variant": 1}]
+	door.open = false
+	_rig.sfx.listener = sides[1] + (sides[1] - sides[0])
+	_rig.ambience._weigh()
+	var draft: AudioStreamPlayer3D = _rig.ambience._draft
+	var middle := (_rig._tile_position(sides[0]) + _rig._tile_position(sides[1])) / 2.0 + Vector3.UP
+	_check(not draft_takes or draft != null and draft.playing and draft.position.distance_to(middle) < 0.01,
+			"by the hidden door, shut: its draft from the edge (%s)" % ("held" if draft != null else "no takes"))
+	door.open = true
+	_rig.ambience._weigh()
+	_check(draft == null or not draft.playing, "the hidden door open: no draft")
+	door.open = false
+	_rig.sfx.listener = sides[1] + (sides[1] - sides[0]) * 8
+	_rig.ambience._weigh()
+	_check(draft == null or not draft.playing, "the hidden door out of reach: no draft")
+	door.open = was_open
+	_rig.sfx.listener = listener
+	if had_niches == null:
+		_rig._terrain.erase("niches")
+	else:
+		_rig._terrain["niches"] = had_niches
+	_rig.ambience._weigh()
 
 
 ## 587, sound's side: the downed local player's heart over the ducked mix.

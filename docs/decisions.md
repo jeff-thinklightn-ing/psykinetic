@@ -25272,3 +25272,28 @@ Jeff on the low camera (623, ui's side): "amazing... well worth the change". Ui'
 - The sun's shadows under the low camera (LOW_SHADOW_DISTANCE 150 in two splits, ui's) stay until perf has measured them against ortho's 70; a change, if any, follows as an amendment.
 
 weather_test _test_low_view: ortho's haze is the look's; under the low camera the storm's haze to the aim matches ortho's; clear air gets only LOW_FOG; the horizon is the sky's in clear air and the haze's in a storm; the rain's box runs deep from the camera ahead with at most 1.5 times the drops; the fog's layers are 216 m wide, ahead of the aim, faded to their rims; the clouds' decal is 324 m; back in ortho everything is as it was. Client only: protocol unchanged, no new class_name.
+
+## 608 amended, sound's side: the hidden door's draft
+
+Dungeon's clue to the barrow's hidden door (608 amended; Jeff wants clues
+to it): a cool draft from the true niche. The approved design, as dungeon
+has it:
+
+- amb.draft is a quiet loop on the Ambience bus, -20 dB. It is heard within
+  3 cells of the hidden door's edge, half that with no clear line,
+  muffled (Sfx.hearing's rule). It is view only: monsters don't hear it.
+- Ambience reads the view's terrain "niches" itself (no hook from the
+  niche draw): the entry of kind "hidden", its "edge" (else the edge behind
+  its cell, as Client3D's draw reads it). It plays from the middle of that
+  edge, from whichever cell beside the edge hears it best, so it moves with
+  each generation. It is placed as the torch loop is, on the same
+  0.25 s weigh.
+- It is off once that edge's Door is open (World.door_on(edge).is_open()),
+  and with no hidden niche.
+- Take: freesound 651541, nsstudios' "wind draft loop 1" (CC BY 4.0),
+  the whole 26 s cross-faded into a loop. It was picked by measure over
+  503677 (RavenWolfProds, CC0), which had a narrow 11 kHz tone (10 dB over
+  its neighbours), crackle (1.8 clicks/s) and gusts swinging 15 dB.
+  651541 has no clicks (0.04/s), a soft 1.5 kHz whistle 5 dB proud, and
+  over 4 kHz it sits 23 dB under its whole and never steady (0% of its
+  seconds within 10 dB; Jeff's crickets, 578, were 88-100%).
