@@ -36,7 +36,8 @@ func _ready() -> void:
 	_test_ground_colours()
 	await _test_fade()
 	_test_outdoor()
-	_test_low_camera()
+	await _test_low_camera()
+	await _test_far_restart()
 	_test_pine_stands()
 	_test_ground_textures()
 	_test_canopy_mask()
@@ -3384,6 +3385,33 @@ func _test_low_camera() -> void:
 	_check(_rig.within_near(near) == near and is_equal_approx(held.distance_to(aim), World.NEAR_TILES)
 			and is_equal_approx((held - aim).angle(), (far_off - aim).angle()),
 			"a far click lands NEAR_TILES out along its line; a near one where it is")
+	# The bodies' slides under the low camera, and a body back from far off
+	# (623's hotfix, v0.1.169: the far block's restart lines had slipped
+	# under the low camera's, so a near body was caught up to its tile
+	# every frame with the camera on, and a body back from far off never
+	# ran again with it off).
+	# (World still holds the test room: a room tile within NEAR_TILES of the castle's centre.)
+	var near_tile := Vector2i(9, 4)
+	var slider := _spawn_imp(near_tile)
+	var mid_slide := Iso.grid_to_local(Vector2(near_tile) + Vector2(0.4, 0.0))
+	slider.position = mid_slide
+	_rig._sync_puppets()
+	_check(slider.position == mid_slide and slider.is_processing() and _rig._puppets[slider.get_instance_id()].visible,
+			"a near body mid-slide keeps its slide under the low camera (not caught up to its tile each frame)")
+	var far_tile := Vector2i(roundi(aim.x) + 60, roundi(aim.y) + 80)
+	slider.tile = far_tile
+	slider.position = Iso.grid_to_local(Vector2(far_tile))
+	_rig._sync_puppets()
+	_check(_rig._far.has(slider.get_instance_id()) and not slider.is_processing(), "gone far off, it is not drawn or run")
+	slider.tile = near_tile
+	slider.position = Iso.grid_to_local(Vector2(near_tile))
+	for i in Client3D.FAR_EVERY:
+		_rig._sync_puppets()
+		await get_tree().process_frame
+	_check(not _rig._far.has(slider.get_instance_id()) and slider.is_processing() and slider.position == Iso.grid_to_local(Vector2(near_tile)),
+			"back near, it runs again, shown where it is")
+	World.despawn(slider)
+	_rig._sync_puppets()
 	_rig.zoom = 0.9
 	_rig._apply_size()
 	var zoomed: Vector3 = _rig._camera_offset()
@@ -3413,6 +3441,45 @@ func _test_low_camera() -> void:
 			"Off: the ortho view exactly as before (far, pitch, haze, shadows, distance)")
 	Net.set_camera_low(low_was, false)
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+
+
+## 623's hotfix, the half Jeff saw most (the draugr at his spawn, the
+## castle's goblins dead on their feet with stale bars): under stone the
+## low camera is off, and a body back from beyond the view's reach must
+## run again there too; one that died out there falls when its body goes.
+func _test_far_restart() -> void:
+	print("\n== under stone, the low camera off: a body back from beyond the view's reach runs again; one that died out there falls ==")
+	_check(not _rig._low and _rig._camera.projection == Camera3D.PROJECTION_ORTHOGONAL, "the test room is under stone: the ortho camera, the low one off")
+	var aim := Vector2(_rig._camera_target.x, _rig._camera_target.z)
+	var imp := _spawn_imp(Vector2i(9, 4))
+	await _frames(2)
+	_rig._sync_puppets()
+	var id := imp.get_instance_id()
+	var near_tile := imp.tile
+	var far_tile := Vector2i(roundi(aim.x) + 200, roundi(aim.y) + 200)
+	imp.tile = far_tile
+	imp.position = Iso.grid_to_local(Vector2(far_tile))
+	_rig._sync_puppets()
+	_check(_rig._far.has(id) and not imp.is_processing(), "gone beyond the view's reach: its drawing stops")
+	imp.tile = near_tile
+	imp.position = Iso.grid_to_local(Vector2(near_tile))
+	for i in Client3D.FAR_EVERY:
+		_rig._sync_puppets()
+		await get_tree().process_frame
+	_check(not _rig._far.has(id) and imp.is_processing() and _rig._puppets[id].process_mode == Node.PROCESS_MODE_INHERIT,
+			"back near with the low camera off: it runs again, where it is")
+	# Died beyond the reach: the death's news fells its puppet when its body goes.
+	imp.tile = far_tile
+	imp.position = Iso.grid_to_local(Vector2(far_tile))
+	_rig._sync_puppets()
+	_check(_rig._far.has(id), "far off again")
+	var puppet: Node3D = _rig._puppets[id]
+	_rig.on_death({"entity": imp.name, "kind": "monster"})
+	imp.tile = near_tile  # (The sim's own tile, so its despawn frees the right cell.)
+	World.despawn(imp)
+	_rig._sync_puppets()
+	_check(is_instance_valid(puppet) and puppet.has_meta("corpse") and not _rig._puppets.has(id), "died out there: its puppet falls as its body goes, not left standing")
+	await _frames(2)
 
 
 ## The border's pine stands (PineStands): drawn with the stand-in while the

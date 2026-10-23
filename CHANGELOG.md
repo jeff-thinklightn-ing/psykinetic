@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Fixed: with the low camera on, every body snapped to its tile each frame (the glitchy movement; fights were harder for it), and with it off a monster that had gone far off and come back stood frozen (623's hotfix).
 - Armour now does its work: mail turns a quarter of an arrow's hurt and a fifth of a spear's or dagger's thrust, plate half and nearly a third (at least 1 always gets through), and heavy armour slows your breath: plate recovers stamina a fifth slower (622, combat's side).
 - By a camp fire you can play knucklebones with your companion (say "let's play knucklebones"): best of three, she keeps the tally and has something to say about winning or losing. After a hard day she may ask you to keep watch while she sleeps: stay by her and she wakes whole and trusts you more; wander off and let something find her, and she won't forget it (621).
 - A companion's lean is named by her focus, as her card's corners are: she leans to fighting, to magic or to stealth (577's words).

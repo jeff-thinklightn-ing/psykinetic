@@ -10111,12 +10111,12 @@ func _sync_puppets() -> void:
 			_far.erase(id)
 			puppet.remove_meta("last_at")  # Not a run from where it was last drawn.
 			puppet.process_mode = Node.PROCESS_MODE_INHERIT
+			entity.set_process(true)
+			entity._display_caught_up()
 		if _low:
 			# The low camera sees past World.NEAR_TILES: a body out there is
 			# not drawn (it would stand still, unthinking, 238).
 			puppet.visible = Vector2(entity.tile).distance_to(aim) <= World.NEAR_TILES
-			entity.set_process(true)
-			entity._display_caught_up()
 		var grid := Iso.local_to_grid(entity.position)
 		var at := Vector3(grid.x, _ground_height(grid), grid.y)
 		if puppet.position != at:
