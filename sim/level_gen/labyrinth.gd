@@ -17,6 +17,18 @@ extends RefCounted
 ## centres plus a share of extra ways for loops, then joined up wherever
 ## the anchors cut the map apart.
 ##
+## The rules every dungeon is generated under (612, Jeff: "dungeons need
+## procedural rule - whats different is just the arrangements"): a level's
+## template is its arrangement, the fixed rooms (its anchors) and where
+## they sit, and everything between comes from here. No passage is one
+## cell wide (Tools.widen after the carving, Level.narrow_runs the check):
+## a player, their companion and a second player pass each other; a
+## doorway is a door edge in a room's wall, the one cell allowed, and the
+## way outside it is as wide as any (no ring round a tomb narrows it); a
+## dead end a cell deep (an alcove, a niche) may be one. A room with doors
+## is walled where a way touches it (_wall_rooms), so its doors are its
+## ways in.
+##
 ## "barrow" (decision 541, Jeff's crypt page: tombs layered, the town's own
 ## near the top, the old dead below, oldest deepest): what each room is
 ## goes by its depth, the distance from the "entrance" anchor as a share of
@@ -66,6 +78,9 @@ const LEAN := 0.65
 const NICHES := 3
 ## Barrow: a deep blind way is this long at most (541 amended; the old
 ## style's wander up to BLIND_LONG).
+## 612: the rock between any two rooms, and from the anchors (two: a way
+## squeezed between them is two wide).
+const ROOM_GAP := 2
 const BLIND_SHORT := 5
 const BLIND_LONG := 10
 ## 608: the niche roll's own seed salt (the layout's rng is not touched),
@@ -93,18 +108,23 @@ static func generate(template: LevelMap, config: Dictionary, seed: int) -> Level
 	var rooms := _place_rooms(map, anchors, config, old, rng, carved, depth)
 	nodes.append_array(rooms)
 	var corridors: Dictionary[Vector2i, bool] = {}
-	# Barrow: the ring round each shallow tomb, where a way narrows to its
-	# door, as wide as the brush reaches.
+	# Barrow: the brush carves the way right up to a tomb's wall (612: no
+	# ring narrows it to the door); _wall_rooms keeps the tomb shut but
+	# for its door.
 	var brush := _brush_of(config)
-	var tomb_rings: Array[Rect2i] = []
-	if not depth.is_empty():
-		for room in rooms:
-			if room["kind"] == "room":
-				tomb_rings.append((room["rect"] as Rect2i).grow(brush))
+	var paths: Dictionary[Vector2i, bool] = {}
 	for way in _ways(nodes, config, rng):
-		_carve_way(map, template, anchors, nodes[way[0]], nodes[way[1]], old, rng, carved, corridors, depth, tomb_rings, brush)
+		_carve_way(map, template, anchors, nodes[way[0]], nodes[way[1]], old, rng, carved, corridors, paths, depth, [], brush)
 	var ends := _blind_ways(map, anchors, rooms, corridors, old, rng, carved, depth)
+	# The width rule (612): rooms walled where a way touches them (their
+	# alcoves stay theirs, a way through gets a door), then the map joined
+	# up and every single-width run widened, into the ring outside a walled
+	# room only when it must, and the rooms walled again where it did.
+	var ring := _wall_rooms(map, rooms, ends, paths)
 	Tools.join_up(map, anchors, carved)
+	Tools.join_all(map, anchors, carved)
+	var widened := Tools.widen(map, anchors, carved, ring)
+	_wall_rooms(map, rooms, ends, paths, widened)
 	if not old:
 		_torches(map, anchors, rooms, corridors, depth)
 	_markers(map, anchors, rooms, corridors, ends, config, rng, depth)
@@ -255,7 +275,7 @@ static func _anchor_nodes(template: LevelMap, anchors: Array, depth: Dictionary)
 	return out
 
 
-## Rooms placed at random in the rock, a cell of rock at least between
+## Rooms placed at random in the rock, ROOM_GAP cells of rock at least between
 ## any two and from the anchors and the map's edge: "count" of them (a
 ## draw between lo and hi), each "size" between least and most. Dwarven:
 ## rectangles, the first HALLS of them great halls (wider, a row of pillars
@@ -280,7 +300,7 @@ static func _place_rooms(map: LevelMap, anchors: Array, config: Dictionary, old:
 	var count := rng.randi_range(mini(lo, hi), maxi(lo, hi))
 	var taken: Array[Rect2i] = []
 	for anchor: Dictionary in anchors:
-		taken.append((anchor["rect"] as Rect2i).grow(1))
+		taken.append((anchor["rect"] as Rect2i).grow(ROOM_GAP))
 	var rooms: Array[Dictionary] = []
 	var barrow := not depth.is_empty()
 	var halls_wanted := HALLS if not old and not barrow and count >= 4 else 0
@@ -329,7 +349,7 @@ static func _place_rooms(map: LevelMap, anchors: Array, config: Dictionary, old:
 				cells[cell] = true
 		for cell: Vector2i in cells:
 			Tools.carve(map, cell, carved)
-		taken.append(rect.grow(1))
+		taken.append(rect.grow(ROOM_GAP))
 		var kind := "hall" if hall else "room"
 		if barrow:
 			kind = ["room", "grave", "cavern"][band]
@@ -420,8 +440,8 @@ static func _ways(nodes: Array[Dictionary], config: Dictionary, rng: RandomNumbe
 ## entered by its one door cell; the path's own cells alone are
 ## corridor cells (torches, monsters and blind ways go by the centre).
 static func _carve_way(map: LevelMap, template: LevelMap, anchors: Array, a: Dictionary, b: Dictionary, old: bool,
-		rng: RandomNumberGenerator, carved: Dictionary[Vector2i, bool], corridors: Dictionary[Vector2i, bool], depth: Dictionary,
-		tomb_rings: Array[Rect2i] = [], brush := 1) -> void:
+		rng: RandomNumberGenerator, carved: Dictionary[Vector2i, bool], corridors: Dictionary[Vector2i, bool], paths: Dictionary[Vector2i, bool],
+		depth: Dictionary, tomb_rings: Array[Rect2i] = [], brush := 1) -> void:
 	var exit: Variant = _exit(map, template, anchors, a, b["centre"])
 	var entry: Variant = _exit(map, template, anchors, b, a["centre"])
 	if exit == null or entry == null:
@@ -439,9 +459,10 @@ static func _carve_way(map: LevelMap, template: LevelMap, anchors: Array, a: Dic
 		path = Tools.l_path(from, to, rng.randf() < 0.5)
 		if path.any(func(cell: Vector2i) -> bool: return Level.in_anchors(anchors, cell)):
 			path = Tools.path_around(map, anchors, from, to)  # Round a walled anchor in the way.
-	var wide: bool = not old and not barrow and a["kind"] != "room" and b["kind"] != "room"
+	var wide: bool = not old and not barrow  # 612: two wide into a plain room too.
 	var last := from
 	for cell in path:
+		paths[cell] = true  # Every cell it runs through, a room's too (612: a door there).
 		_carve_corridor(map, anchors, cell, carved, corridors)
 		if wide:
 			# The cell beside it, across the way it runs.
@@ -549,6 +570,44 @@ static func _crooked(map: LevelMap, anchors: Array, from: Vector2i, to: Vector2i
 	if at != to:
 		path.append_array(Tools.path_around(map, anchors, at, to).slice(1))  # Round the anchors, never through.
 	return path
+
+
+## Each room of [param rooms] that has doors (a square-cut room or hall, a
+## shallow tomb) walled where a way or another room touches its border
+## without a door (612): a floor cell outside its rect beside a border
+## cell gets a wall edge between, so its doors are its only ways in and a
+## way carved along its side stays a way; its own alcoves ([param ends],
+## the blind ways' cells) stay open to it, and a way that runs through it
+## ([param paths], a path cell inside beside one outside) gets a door
+## there, counted among its doors. A room with no door (a cavern, a passage
+## grave) opens where it is touched, as before. With [param only], the
+## cells the widening carved, those alone are looked at (a join-up's way
+## in stays open). Returns the ring of rock cells outside every walled
+## room, which the widening avoids.
+static func _wall_rooms(map: LevelMap, rooms: Array[Dictionary], ends: Array[Vector2i], paths: Dictionary[Vector2i, bool],
+		only: Dictionary[Vector2i, bool] = {}) -> Dictionary[Vector2i, bool]:
+	var ring: Dictionary[Vector2i, bool] = {}
+	for room in rooms:
+		if (room["doors"] as Array).is_empty():
+			continue
+		var rect: Rect2i = room["rect"]
+		for cell in Tools.sorted_cells(room["cells"]):
+			for direction in DIRECTIONS:
+				var out := cell + direction
+				if rect.has_point(out) or out in ends or (not only.is_empty() and not only.has(out)):
+					continue
+				if not map.walkable(out):
+					ring[out] = true
+					continue
+				var key := Terrain.edge_key(cell, direction)
+				if map.edge(key) == "door":
+					continue
+				if paths.has(cell) and paths.has(out):
+					map.set_edge(key, "door")
+					room["doors"].append(cell)
+				else:
+					map.set_edge(key, "wall")
+	return ring
 
 
 # --- Blind ways, torches, markers ------------------------------------------------------

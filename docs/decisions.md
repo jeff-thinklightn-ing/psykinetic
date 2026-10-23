@@ -22397,3 +22397,61 @@ the cracked wall, no doorway, the open piece hidden till found. The
 barrow's first hall checked by hand: 14 niches, 13 pieces in their runs,
 the south-east one hidden. Shots: dungeon's of the first hall. Client
 only, protocol unchanged, no new class_name.
+## 612. The width rule: no passage one cell wide in a dungeon (dungeon's side)
+
+Jeff, body-blocked by Pip in the barrow, 2026-10-22: "its also that the
+crypt had multiple single tile corridors.. the game is a multiplayer game
+with companions.. its not ideal"; and on how to build it: "dungeons need
+procedural rule - whats different is just the arrangements". The
+coordinator's rule: every passage at least two cells wide, so a player,
+their companion and a second player pass each other; a doorway (a door
+edge in a wall) the one cell allowed, never a run of single cells, the
+cells either side of it two wide at once; the hall door, the hidden door
+and the alcove stair link (608) stay doors.
+
+- Where it lives: in the generator, not in levels fixed cell by cell. A
+  level's template is its arrangement, the fixed rooms as its anchors
+  (the barrow's first hall, altar room, Pip's niche and camp; the
+  Ossuary's stair foot and stair room; the Hall of Fallen Souls and its
+  stair foot) and where they sit; every passage and tomb between comes
+  from the labyrinth's rules. The barrow's three levels were already so.
+- The rules: the ring that narrowed a way to a shallow tomb's one door
+  cell goes (the brush carves right up to the tomb's wall), and a room with
+  doors is walled where a way or another room touches its border
+  (`_wall_rooms`, run before and after the widening), so its doors are its
+  only ways in, and a way that runs through such a room (a path cell
+  inside beside one outside) gets a door there, counted among its doors;
+  rooms and anchors keep two cells of rock between them (`ROOM_GAP`; one
+  before), so a way squeezed between two walled rooms is two wide; dwarven
+  corridors are two wide into plain rooms too; after the walling and the
+  join-up, `Tools.join_all` joins every walkable part to the biggest by
+  the shortest way that crosses no wall edge and enters no anchor
+  (`path_through`: a room whose way failed, an alcove a wall cut off), then
+  `Tools.widen` carves a cell beside every cell of a single-width run,
+  across its axis, on the same side along a run where it can, rock alone,
+  never the rim or an anchor's cell, into the ring outside a walled room
+  only when the other side cannot be, up to six passes, and the rooms are
+  walled again where it carved beside them. The caverns' crooked blind ways become two-wide stubs, no
+  longer dead ends (a fair loss, the coordinator): the Ossuary's graves
+  come from the tombs' alcoves, a cell deep, which the rule allows (a dead
+  end nobody passes through), and the dark below lists none (its dead lie
+  in no grave, 580).
+- The check: `Level.narrow_runs_by` (a cell is narrow along an axis when
+  neither side across it is open and a step along it is; two narrow cells
+  joined along their axis are a run), `Level.narrow_runs` on a parsed
+  level's terrain and `Tools.narrow_runs` on a LevelMap. labyrinth_test
+  fails any generated style or layer with a run; level_test fails any
+  regenerating level's template (its arrangement) with one. A run squeezed
+  between two anchors cannot be widened and the test says so.
+- The arrangement change: the first hall's bays, one cell each where the
+  ways came in, are two rows tall (rows 9 and 10), so the niche rows are
+  2, 4, 6, 8, 12, 14 and 16 and the hidden south-east niche (608) moves to
+  (51, 16) with its alcove at (52, 16); terrain and art-kit told (the draw
+  reads the data), enemy-ai's anchors unmoved.
+- Release: the box regenerates barrow, barrow_deep and barrow_lair after
+  the cut that carries it.
+
+labyrinth_test (no run in either generation of dwarven, old, and the
+barrow's three layers; the hall's floor count with the bays), level_test
+(every regenerating template; the hidden niche at (51, 16)). Level data
+and generator, no wire change, no new class_name.

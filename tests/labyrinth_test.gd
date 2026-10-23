@@ -1,4 +1,6 @@
 extends Node
+
+const Tools := preload("res://sim/level_gen/gen_tools.gd")
 ## The labyrinth generator (decision 470): rooms and halls between the
 ## anchors in the dwarven style and caverns and crooked ways in the old
 ## style, on the plan sheet's sample halls: the anchors verbatim, every
@@ -85,6 +87,7 @@ func _test_style(style: String) -> void:
 	_check(outside_floor > 150, "rooms and ways fill the rock between (%d cells)" % outside_floor)
 	_check(blocks >= 6, "rooms, not only corridors: %d cells start a 3 x 3 block of floor" % blocks)
 	_check(Regen.connected(a, anchors) and Regen.connected(b, anchors), "every anchor reaches every other in both")
+	_check(Tools.narrow_runs(a).is_empty() and Tools.narrow_runs(b).is_empty(), "no passage is one cell wide in either (%s; %s)" % [Tools.sorted_cells(Tools.narrow_runs(a)).slice(0, 8), Tools.sorted_cells(Tools.narrow_runs(b)).slice(0, 8)])
 	_check(_cut_off(a, Vector2i(4, 4)).is_empty() and _cut_off(b, Vector2i(4, 4)).is_empty(), "no room is cut off from the gatehouse")
 	var again := Regen.generate(name, 1)
 	_check(again["seed"] == first["seed"] and again["layout"].get_data() == first["layout"].get_data(), "the same seed gives the same map (seed %d)" % first["seed"])
@@ -144,6 +147,7 @@ func _test_barrow() -> void:
 	_check(kept["same"], "inside the four anchors both generations are the template: the first hall with its table, the altar and its guards, Pip's niche, the camp with the Runner's pack")
 	_check(kept["differ"] > 50 and floor_cells.size() > 800, "the tombs between differ (%d cells) and fill the rock (%d floor cells)" % [kept["differ"], floor_cells.size()])
 	_check(Regen.connected(a, anchors) and Regen.connected(b, anchors), "every anchor reaches every other in both")
+	_check(Tools.narrow_runs(a).is_empty() and Tools.narrow_runs(b).is_empty(), "no passage is one cell wide in either (%s; %s)" % [Tools.sorted_cells(Tools.narrow_runs(a)).slice(0, 8), Tools.sorted_cells(Tools.narrow_runs(b)).slice(0, 8)])
 	_check(_cut_off(a, Sheet.BARROW_FROM_WILDS).is_empty() and _cut_off(b, Sheet.BARROW_FROM_WILDS).is_empty(),
 		"nothing is cut off from the first hall (%s; %s)" % [_cut_off(a, Sheet.BARROW_FROM_WILDS).slice(0, 6), _cut_off(b, Sheet.BARROW_FROM_WILDS).slice(0, 6)])
 	var hall_floor := 0
@@ -153,8 +157,8 @@ func _test_barrow() -> void:
 			hall_floor += 1
 			if cell.x == Sheet.HALL.position.x or cell.x == Sheet.HALL.end.x - 1:
 				in_walls += 1
-	_check(hall_floor == 24 * 16 - 6 + 3 and in_walls == 3 and not a.walkable(Vector2i(39, 8)),
-		"the first hall: 24 x 16 of floor less the table's six cells, a bay each side and the hidden niche's alcove in the walls (%d floor, %d in the walls)" % [hall_floor, in_walls])
+	_check(hall_floor == 24 * 16 - 6 + 5 and in_walls == 5 and not a.walkable(Vector2i(39, 8)),
+		"the first hall: 24 x 16 of floor less the table's six cells, a bay two rows tall each side and the hidden niche's alcove in the walls (%d floor, %d in the walls)" % [hall_floor, in_walls])
 	var level := Level.parse(first["layout"], null, config)
 	var doors := 0
 	for key: Vector3i in level["terrain"]["edges"]:
@@ -228,11 +232,15 @@ func _test_barrow() -> void:
 	_check(kept["same"], "inside the two anchors both generations are the template: the stair foot and the stair down")
 	_check(kept["differ"] > 100 and floor_cells.size() > 1200, "the tombs between differ (%d cells) and fill the rock (%d floor cells)" % [kept["differ"], floor_cells.size()])
 	_check(Regen.connected(a, anchors) and Regen.connected(b, anchors), "every anchor reaches every other in both")
+	_check(Tools.narrow_runs(a).is_empty() and Tools.narrow_runs(b).is_empty(), "no passage is one cell wide in either (%s; %s)" % [Tools.sorted_cells(Tools.narrow_runs(a)).slice(0, 8), Tools.sorted_cells(Tools.narrow_runs(b)).slice(0, 8)])
 	_check(_cut_off(a, Sheet.DEEP_FROM_ABOVE).is_empty() and _cut_off(b, Sheet.DEEP_FROM_ABOVE).is_empty(),
 		"nothing is cut off from the stair foot (%s; %s)" % [_cut_off(a, Sheet.DEEP_FROM_ABOVE).slice(0, 6), _cut_off(b, Sheet.DEEP_FROM_ABOVE).slice(0, 8)])
 	# Depth from the stair foot's centre, (50, 4); the farthest corner lies
 	# 125 cells off, so the shallow band ends under 42.5 and the middle
-	# under 83.75: a cell 43 or more away lies below the shallow band.
+	# under 83.75: a cell 43 or more away lies below the shallow band. A
+	# tomb is shallow by its centre and up to 16 x 12, and a way through it
+	# gets a door on its far side too (612), so its doors and torches may
+	# lie up to 14 cells deeper than its band: 57 is the line for those.
 	var entrance := Vector2i(50, 4)
 	var depth := func(cell: Vector2i) -> int: return absi(cell.x - entrance.x) + absi(cell.y - entrance.y)
 	level = Level.parse(deep["layout"], null, config)
@@ -242,10 +250,10 @@ func _test_barrow() -> void:
 		if level["terrain"]["edges"][key] == Terrain.Edge.DOOR:
 			doors += 1
 			var sides := Terrain.edge_cells(key)
-			if not Level.in_anchors(anchors, sides[0]) and not Level.in_anchors(anchors, sides[1]) and depth.call(sides[0]) >= 43:
+			if not Level.in_anchors(anchors, sides[0]) and not Level.in_anchors(anchors, sides[1]) and depth.call(sides[0]) >= 57:
 				deep_doors += 1
 	var torches: Array = level["terrain"]["torches"]
-	var deep_torches: int = torches.filter(func(cell: Vector2i) -> bool: return depth.call(cell) >= 43).size()
+	var deep_torches: int = torches.filter(func(cell: Vector2i) -> bool: return depth.call(cell) >= 57).size()
 	_check(doors >= 2 and deep_doors == 0, "doors on the shallow tombs alone (%d doors, %d below the band)" % [doors, deep_doors])
 	_check(torches.size() >= 2 and deep_torches == 0, "torches in the shallow band alone (%d, %d below it)" % [torches.size(), deep_torches])
 	var mean_floor := 0.0
@@ -324,6 +332,7 @@ func _test_barrow() -> void:
 	_check(kept["same"], "inside the two anchors both generations are the template: the stair foot, and the hall with its pillars, table, throne and the hidden way out")
 	_check(Regen.connected(a, anchors) and Regen.connected(b, anchors) and _cut_off(a, Sheet.LAIR_FROM_ABOVE).is_empty() and _cut_off(b, Sheet.LAIR_FROM_ABOVE).is_empty(),
 		"the hall is reached from the stair foot in both, nothing cut off (%s; %s)" % [_cut_off(a, Sheet.LAIR_FROM_ABOVE).slice(0, 6), _cut_off(b, Sheet.LAIR_FROM_ABOVE).slice(0, 6)])
+	_check(Tools.narrow_runs(a).is_empty() and Tools.narrow_runs(b).is_empty(), "no passage is one cell wide in the dark below either (%s; %s)" % [Tools.sorted_cells(Tools.narrow_runs(a)).slice(0, 8), Tools.sorted_cells(Tools.narrow_runs(b)).slice(0, 8)])
 	level = Level.parse(dark["layout"], null, config)
 	doors = 0
 	for key: Vector3i in level["terrain"]["edges"]:

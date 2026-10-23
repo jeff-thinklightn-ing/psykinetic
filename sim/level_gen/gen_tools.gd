@@ -37,6 +37,60 @@ static func carve(map: LevelMap, at: Vector2i, carved: Dictionary[Vector2i, bool
 	carved[at] = true
 
 
+## The width rule (612, Level.narrow_runs_by) on [param map]: the cells of
+## its single-width runs, each with its axis (0 along x, 1 along y);
+## empty when every passage is two wide or more.
+static func narrow_runs(map: LevelMap) -> Dictionary[Vector2i, int]:
+	var cells: Array[Vector2i] = []
+	for at: Vector2i in map.cells:
+		if map.walkable(at):
+			cells.append(at)
+	var open := func(cell: Vector2i, direction: Vector2i) -> bool:
+		return map.walkable(cell + direction) and map.edge(Terrain.edge_key(cell, direction)) != "wall"
+	return Level.narrow_runs_by(cells, open)
+
+
+## The width rule kept (612): every single-width run on [param map] widened
+## to two by carving a cell beside each of its cells, across its axis, where
+## the rock allows (never the map's rim or an anchor's cell, and a cell in
+## [param avoid], the ring outside a walled room, only when the other side
+## cannot be: a run squeezed between anchors stays, and the test says so),
+## until none is left or WIDEN_PASSES passes are spent. Carves rock alone,
+## so nothing joined comes apart. Returns what it carved.
+const WIDEN_PASSES := 6
+static func widen(map: LevelMap, anchors: Array, carved: Dictionary[Vector2i, bool], avoid: Dictionary[Vector2i, bool] = {}) -> Dictionary[Vector2i, bool]:
+	var widened: Dictionary[Vector2i, bool] = {}
+	for pass_number in WIDEN_PASSES:
+		var runs := narrow_runs(map)
+		if runs.is_empty():
+			break
+		for cell: Vector2i in sorted_cells(runs):
+			var across: Array[Vector2i] = []
+			var along := Vector2i(1, 0) if runs[cell] == 0 else Vector2i(0, 1)
+			across.assign([Vector2i(0, 1), Vector2i(0, -1)] if runs[cell] == 0 else [Vector2i(1, 0), Vector2i(-1, 0)])
+			# Beside the cell before it, if that one was widened: the same side
+			# along the run; a side to avoid last.
+			for side in across:
+				if map.walkable(cell - along + side) and runs.has(cell - along):
+					across.erase(side)
+					across.push_front(side)
+					break
+			for side in across.duplicate():
+				if avoid.has(cell + side):
+					across.erase(side)
+					across.append(side)
+			for side in across:
+				var at := cell + side
+				if at.x <= 0 or at.y <= 0 or at.x >= map.size.x - 1 or at.y >= map.size.y - 1:
+					continue
+				if map.cell(at) != "void" or not rock(map, anchors, at):
+					continue
+				carve(map, at, carved)
+				widened[at] = true
+				break
+	return widened
+
+
 ## The walkable parts of [param map] that hold anchor cells, each the
 ## cells of it, flood filled through open and door edges; the biggest first.
 static func parts(map: LevelMap, anchors: Array) -> Array[Array]:
@@ -91,6 +145,85 @@ static func join_up(map: LevelMap, anchors: Array, carved: Dictionary[Vector2i, 
 		for at in path:
 			if rock(map, anchors, at):
 				carve(map, at, carved)
+
+
+## Every walkable part of [param map], flood filled through open and door
+## edges, the biggest first (612: a room or an alcove nothing reaches is a
+## part of its own).
+static func parts_all(map: LevelMap) -> Array[Array]:
+	var seen: Dictionary[Vector2i, bool] = {}
+	var out: Array[Array] = []
+	for start: Vector2i in sorted_cells(map.cells):
+		if seen.has(start) or not map.walkable(start):
+			continue
+		var part: Array[Vector2i] = [start]
+		seen[start] = true
+		var queue: Array[Vector2i] = [start]
+		while not queue.is_empty():
+			var at: Vector2i = queue.pop_front()
+			for direction: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+				var next := at + direction
+				if seen.has(next) or not map.in_bounds(next) or not map.walkable(next) or map.edge(Terrain.edge_key(at, direction)) == "wall":
+					continue
+				seen[next] = true
+				part.append(next)
+				queue.append(next)
+		out.append(part)
+	out.sort_custom(func(a: Array, b: Array) -> bool: return a.size() > b.size())
+	return out
+
+
+## Joins every part to the biggest (612; join_up before it joins only the
+## parts holding anchors): while two walkable parts stand apart, the
+## nearest pair of cells between the biggest and the next is joined by the
+## shortest way through the rock and the floor that crosses no wall edge
+## and enters no anchor (path_through), carved. A room whose way failed,
+## an alcove a wall cut off, join the rest.
+static func join_all(map: LevelMap, anchors: Array, carved: Dictionary[Vector2i, bool]) -> void:
+	for attempt in 32:
+		var found := parts_all(map)
+		if found.size() < 2:
+			return
+		var best_a := Vector2i.ZERO
+		var best_b := Vector2i.ZERO
+		var best := -1
+		for cell_a: Vector2i in found[0]:
+			for cell_b: Vector2i in found[1]:
+				var d := absi(cell_a.x - cell_b.x) + absi(cell_a.y - cell_b.y)
+				if best < 0 or d < best:
+					best = d
+					best_a = cell_a
+					best_b = cell_b
+		var path := path_through(map, anchors, best_b, best_a)
+		if path.size() < 2:
+			return  # Nothing joins them: Regen's flood fill is the judge.
+		for at in path:
+			if rock(map, anchors, at):
+				carve(map, at, carved)
+
+
+## The shortest way from [param from] to [param to] by steps through cells
+## in bounds that are no anchor's (but the ends), crossing no wall edge
+## (rock has none; a walled room is gone round or entered by its door);
+## both ends included, [from] alone when there is none.
+static func path_through(map: LevelMap, anchors: Array, from: Vector2i, to: Vector2i) -> Array[Vector2i]:
+	var came: Dictionary[Vector2i, Vector2i] = {from: from}
+	var queue: Array[Vector2i] = [from]
+	while not queue.is_empty():
+		var at: Vector2i = queue.pop_front()
+		if at == to:
+			var path: Array[Vector2i] = [to]
+			while path[-1] != from:
+				path.append(came[path[-1]])
+			path.reverse()
+			return path
+		for direction: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+			var next := at + direction
+			if came.has(next) or not map.in_bounds(next) or (next != to and Level.in_anchors(anchors, next)) 					or map.edge(Terrain.edge_key(at, direction)) == "wall":
+				continue
+			came[next] = at
+			queue.append(next)
+	return [from]
 
 
 ## The cells from [param from] to [param to], both included, along x then

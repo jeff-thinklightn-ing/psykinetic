@@ -1257,6 +1257,54 @@ static func _elevation(terrain: Dictionary, cell: Vector2i) -> float:
 	return int(terrain["heights"].get(cell, 0)) * Relief.LEVEL_M
 
 
+## The dungeon rule on width (612, Jeff: "the game is a multiplayer game
+## with companions"; a player, their companion and a second player pass
+## each other): no passage one cell wide. Of [param cells] (floor), those
+## in a single-width run two cells or longer: a cell is narrow along an
+## axis when neither side across it is open ([param open]: (cell,
+## direction) -> whether a step that way is floor through no wall; a door
+## counts as open) and a step along it is; two narrow cells joined along
+## their axis make a run. A dead end a cell deep (an alcove, a niche, the
+## hidden door's stair cell) is a run of one, allowed; a doorway is a door
+## edge, not a cell, so a door between two wide spaces is allowed too.
+static func narrow_runs_by(cells: Array[Vector2i], open: Callable) -> Dictionary[Vector2i, int]:
+	var narrow: Dictionary[Vector2i, int] = {}  # Cell -> 0 (along x) or 1 (along y).
+	for cell in cells:
+		var east: bool = open.call(cell, Vector2i(1, 0))
+		var west: bool = open.call(cell, Vector2i(-1, 0))
+		var south: bool = open.call(cell, Vector2i(0, 1))
+		var north: bool = open.call(cell, Vector2i(0, -1))
+		if not north and not south and (east or west):
+			narrow[cell] = 0
+		elif not east and not west and (north or south):
+			narrow[cell] = 1
+	var out: Dictionary[Vector2i, int] = {}
+	for cell: Vector2i in narrow:
+		var along := Vector2i(1, 0) if narrow[cell] == 0 else Vector2i(0, 1)
+		if narrow.get(cell + along, -1) == narrow[cell] and open.call(cell, along):
+			out[cell] = narrow[cell]
+			out[cell + along] = narrow[cell]
+	return out
+
+
+## narrow_runs_by over a parsed level's [param terrain] (floor and edges):
+## the cells of its single-width runs, in order; empty when it keeps the
+## width rule.
+static func narrow_runs(terrain: Dictionary) -> Array[Vector2i]:
+	var floor := {}
+	var cells: Array[Vector2i] = []
+	for cell: Vector2i in terrain.get("floor", []):
+		floor[cell] = true
+		cells.append(cell)
+	var edges: Dictionary = terrain.get("edges", {})
+	var open := func(cell: Vector2i, direction: Vector2i) -> bool:
+		return floor.has(cell + direction) and int(edges.get(Terrain.edge_key(cell, direction), Terrain.Edge.OPEN)) != Terrain.Edge.WALL
+	var out: Array[Vector2i] = []
+	out.assign(narrow_runs_by(cells, open).keys())
+	out.sort()
+	return out
+
+
 ## The kinds a burial niche may be (608): art-kit's wall.crypt.niche_a
 ## (arches), _b (shelves), _c (hollows), _d (columbarium cells), and
 ## "hidden", the first hall's hidden door (wall.crypt.cracked till found,

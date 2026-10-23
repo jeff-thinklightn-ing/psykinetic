@@ -503,11 +503,29 @@ alcove cell off the walls; the middle third narrow passage graves with
 crooked ways and niches, no doors; the deepest the old caverns; chests in
 the deepest niches first, monsters deepest first unless `"near": {kind:
 anchor}` sends a kind to an anchor, the robbers to the altar; its ways are
-three cells wide, a brush along the path that narrows to the one door
-cell into a shallow tomb, the torches by the walls, the deep blind ways
-short, a passage grave a cell under the least width and up to four over
-the most length, a cavern grown in a box two cells bigger each way: 541
-amended, Jeff: "way too cramped"). Its own keys:
+three cells wide, a brush along the path right up to a shallow tomb's
+wall, the tomb walled where the way touches it and entered by its one door
+cell, the torches by the walls, the deep blind ways short, a passage grave
+a cell under the least width and up to four over the most length, a cavern
+grown in a box two cells bigger each way: 541 amended, Jeff: "way too
+cramped"). The rules every dungeon is generated under (612, Jeff:
+"dungeons need procedural rule - whats different is just the
+arrangements"; a level's template is its arrangement, the fixed rooms as
+its anchors, and everything between comes from the rules): no passage one
+cell wide, so a player, their companion and a second player pass each
+other (`Tools.widen` after the carving carves a cell beside every cell of
+a single-width run, the dwarven corridors two wide into plain rooms too,
+the join-up paths and the caverns' blind ways widened to stubs; rooms and
+anchors two cells of rock apart, `ROOM_GAP`; `Tools.join_all` first joins
+any part a wall or a failed way left apart, through no wall); a doorway
+is a door edge in a room's wall, the one cell allowed (a way that runs
+through a walled room gets one each side), with the way outside
+it as wide as any; a dead end a cell deep (a tomb's alcove, a niche, the
+hidden door's stair cell) may be one. `Level.narrow_runs` (and
+`Tools.narrow_runs` on a LevelMap) is the check: a cell with no open side
+across its axis joined to another such cell along it; labyrinth_test runs
+it on every generated style and layer, level_test on every regenerating
+level's template. Its own keys:
 `"rooms": {"count": [lo, hi], "size": [[w, h], [w, h]]}` (least and most),
 `"loops"` (extra ways as a share of the rooms and anchors, 0.2), `"chests"`
 and `"crates"` (counts; chests on the blind ways' ends and room corners
@@ -536,7 +554,7 @@ hides about 2.5 cells behind it). The templates are written from
   "from_wilds", the burial table a block of rock at its centre, seven
   niches a side cut into its east and west walls holding the town's dead
   (`"niches"` below: arches and hollows, a sealed slab now and then), a bay
-  each side where the ways come in, and the stair down to the Ossuary
+  two rows tall each side where the ways come in (612), and the stair down to the Ossuary
   behind one of the niches: the hidden door (608). That niche's edge is a
   door spawned locked and stone (`Main.HIDDEN_LOCK`, a key nobody holds)
   with one alcove cell behind it holding the link to "from_above"

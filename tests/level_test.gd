@@ -181,6 +181,11 @@ func _test_every_level() -> void:
 		_check(images_ok and not level.is_empty() and level["warnings"].is_empty(),
 				"%s: %d cells, %d entities (%s)" % [folder, level["terrain"]["floor"].size() if not level.is_empty() else 0,
 					level["entities"].size() if not level.is_empty() else 0, level.get("warnings", "no level")])
+		# A dungeon's arrangement (a level marked to regenerate) keeps the
+		# width rule (612) as its generations do: no passage one cell wide.
+		if not level.is_empty() and not level["regenerate"].is_empty():
+			var narrow := Level.narrow_runs(level["terrain"])
+			_check(narrow.is_empty(), "%s: no passage one cell wide in its arrangement (%s)" % [folder, narrow.slice(0, 8)])
 	_test_built_water()
 	print("
 == the levels connect: WorldMap.problems() (links and spawn points, ways back, reachable) ==")
@@ -1182,9 +1187,9 @@ func _test_barrow_level() -> void:
 	# niche's door, the link hidden; the 14 niches read.
 	var niches: Array = barrow["terrain"]["niches"]
 	var hidden: Array = niches.filter(func(n: Dictionary) -> bool: return n["kind"] == "hidden")
-	_check(barrow["links"][1]["hidden"] and barrow["links"][1]["tile"] == Vector2i(52, 14) and not barrow["links"][0]["hidden"] and not deep["links"][0]["hidden"]
-		and niches.size() == 14 and hidden.size() == 1 and hidden[0]["cell"] == Vector2i(51, 14) and hidden[0]["edge"] == Terrain.edge_key(Vector2i(51, 14), Vector2i(1, 0))
-		and hidden[0]["out"] == Vector2i(-1, 0) and barrow["terrain"]["edges"][hidden[0]["edge"]] == Terrain.Edge.DOOR and barrow["spawn_points"]["from_below"] == Vector2i(51, 14),
+	_check(barrow["links"][1]["hidden"] and barrow["links"][1]["tile"] == Vector2i(52, 16) and not barrow["links"][0]["hidden"] and not deep["links"][0]["hidden"]
+		and niches.size() == 14 and hidden.size() == 1 and hidden[0]["cell"] == Vector2i(51, 16) and hidden[0]["edge"] == Terrain.edge_key(Vector2i(51, 16), Vector2i(1, 0))
+		and hidden[0]["out"] == Vector2i(-1, 0) and barrow["terrain"]["edges"][hidden[0]["edge"]] == Terrain.Edge.DOOR and barrow["spawn_points"]["from_below"] == Vector2i(51, 16),
 		"the template's stair down is hidden behind the first hall's south-east niche, a door edge, from_below before it; 14 niches on the hall's walls (%d, %s)" % [niches.size(), hidden])
 	var floor_ok := true
 	for pair: Array in [[barrow, "from_wilds"], [barrow, "from_below"], [deep, "from_above"], [deep, "from_below"], [lair, "from_above"], [lair, "from_temple"]]:

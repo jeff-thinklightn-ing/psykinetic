@@ -39,10 +39,11 @@ const OUTLINE := Color(0.25, 0.6, 1.0)
 const BARROW_SIZE := Vector2i(80, 60)
 const HALL := Rect2i(27, 1, 26, 16)
 ## The hall's floor is x 28..51; the columns outside it (x 27 and 52) are
-## rock the niches are cut into, every other row, but the two bays on row 9
-## where the ways come in and the hidden niche's alcove (BARROW_STAIR).
-const HALL_NICHE_ROWS: Array[int] = [2, 4, 6, 8, 10, 12, 14]
-const HALL_BAY_ROW := 9
+## rock the niches are cut into, every other row, but the two bays, two
+## rows each (612: no passage one wide), where the ways come in and the
+## hidden niche's alcove (BARROW_STAIR).
+const HALL_NICHE_ROWS: Array[int] = [2, 4, 6, 8, 12, 14, 16]
+const HALL_BAY_ROWS: Array[int] = [9, 10]
 const HALL_TABLE := Rect2i(38, 8, 3, 2)
 const BARROW_ANCHORS := [
 	{"rect": [27, 1, 26, 16], "name": "entrance"},
@@ -52,8 +53,8 @@ const BARROW_ANCHORS := [
 const BARROW_LINK := Vector2i(40, 1)
 const BARROW_START := Vector2i(39, 2)
 const BARROW_FROM_WILDS := Vector2i(40, 2)
-const BARROW_STAIR := Vector2i(52, 14)
-const BARROW_FROM_BELOW := Vector2i(51, 14)
+const BARROW_STAIR := Vector2i(52, 16)
+const BARROW_FROM_BELOW := Vector2i(51, 16)
 const BARROW_ALTAR := Vector2i(38, 30)
 const BARROW_GUARDS := [Vector2i(36, 30), Vector2i(40, 30)]
 const BARROW_NICHE := Vector2i(26, 28)
@@ -173,8 +174,8 @@ static func sample_barrow() -> Dictionary:
 	var rows := _blank_rows(BARROW_SIZE)
 	_lay_anchors(rows, BARROW_ANCHORS)
 	# The first hall: its floor between the niche columns, walled north and
-	# south; the niches every other row, walled on their three outer sides;
-	# the bays on row 9 open to the rock (the ways come in there); the
+	# south; the niches cut into the long walls every other row (608); the
+	# bays, two rows each, open to the rock (the ways come in there); the
 	# burial table a block of rock at the centre.
 	_rock_rect(rows, HALL)
 	var inner := Rect2i(HALL.position.x + 1, HALL.position.y, HALL.size.x - 2, HALL.size.y)
@@ -182,10 +183,10 @@ static func sample_barrow() -> Dictionary:
 	_wall_side(rows, inner, "north")
 	_wall_side(rows, inner, "south")
 	for side_x: int in [HALL.position.x, HALL.end.x - 1]:
-		var bay := Vector2i(side_x, HALL_BAY_ROW)
-		rows[bay.y * 2][bay.x * 2] = "."
-		_edge(rows, bay, "north", "#")
-		_edge(rows, bay, "south", "#")
+		for y: int in HALL_BAY_ROWS:
+			rows[y * 2][side_x * 2] = "."
+		_edge(rows, Vector2i(side_x, HALL_BAY_ROWS[0]), "north", "#")
+		_edge(rows, Vector2i(side_x, HALL_BAY_ROWS[-1]), "south", "#")
 	# The hidden niche's alcove (608): the stair's cell behind a door edge in
 	# the east wall, walled on its other sides.
 	rows[BARROW_STAIR.y * 2][BARROW_STAIR.x * 2] = "."
