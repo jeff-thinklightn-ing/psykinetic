@@ -171,6 +171,40 @@ func now() -> int:
 	return int(clock.call()) if clock.is_valid() else 0
 
 
+# --- The healer's care (decision 584 amended) --------------------------------------
+
+## The ways into a healer's care: the bypass, handed at his hut (gold, herbs,
+## antlers), and his first errand done (quest, npc's).
+const CARE_WAYS: Array[String] = ["gold", "herbs", "antlers", "quest"]
+## The ways that count as his first errand done, opening his further
+## errands (npc's chain): five herbs, however handed.
+const CARE_QUEST_WAYS: Array[String] = ["herbs", "quest"]
+
+
+## What a healer's hut takes for his care (rules' return.care; Jeff: "5
+## herbs, 5 antlers or 10 gold to bypass the quest"), {retainer, herbs,
+## antlers, sick, word_days}: any one puts a player in his care at once.
+## sick and word_days (npc's kin errand) only at a hut in a town
+## ([param in_town]); a hut out in the land (Hob's) asks the rest alone.
+func care_rule(in_town: bool) -> Dictionary:
+	var rule: Dictionary = rules.get("return", {}).get("care", {})
+	return {"retainer": int(rule.get("retainer", 10)), "herbs": int(rule.get("herbs", 5)), "antlers": int(rule.get("antlers", 5)),
+		"sick": int(rule.get("sick", 1)) if in_town else 0, "word_days": int(rule.get("word_days", 1)) if in_town else 0}
+
+
+## [param had] (a record's way in, "" for none) after [param way]: the way
+## kept, "" if [param way] changes nothing. His first errand done upgrades a
+## paid way (gold, antlers) to it; nothing else replaces a way in.
+static func care_after(had: String, way: String) -> String:
+	if way not in CARE_WAYS:
+		return ""
+	if had.is_empty():
+		return way
+	if way in CARE_QUEST_WAYS and had not in CARE_QUEST_WAYS:
+		return way
+	return ""
+
+
 # --- Players' gold -------------------------------------------------------------------
 
 ## [param player_id]'s gold.

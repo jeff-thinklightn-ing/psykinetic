@@ -183,6 +183,45 @@ func _test_main() -> void:
 	for i in 60:
 		World.step()
 	_kill_monsters()
+	# The healer's care (584 amended): his hut brings back only a player in it.
+	var me := _player().player_id
+	_check(_main._return_place(_player().tile, me).get("place", "") != id and _main._return_place(_player().tile).get("place", "") == id,
+		"not in his care: his hut is passed over for a player, not for others")
+	var rule: Dictionary = _main.care_rule(id)
+	_check(rule == {"retainer": 10, "herbs": 5, "antlers": 5, "sick": 0, "word_days": 0}, "a hut out in the land: 10 gold, 5 herbs or 5 antlers, no kin errand (%s)" % [rule])
+	var healer: Resident = null
+	for each in World.get_entities():
+		if each is Resident and each.worker_id == keeper:
+			healer = each
+	if healer == null:
+		healer = Resident.new()
+		healer.name = "Hob"
+		healer.worker_id = keeper
+		healer.trade = "medicine_man"
+		World.spawn(healer, hut + Vector2i(2, 0))
+	World._relocate(_player(), healer.tile + Vector2i(1, 0))
+	World.add_gold(me, -World.gold_of(me), "test")
+	World.add_gold(me, 4, "test")
+	_check(_main.retain(_player(), {"resident": str(healer.get_path()), "pay": "gold"}) == "" and not _main.in_care(me, id), "4 gold: refused")
+	_check(_main.retain(_player(), {"resident": str(healer.get_path()), "pay": "herbs"}) == "" and not _main.in_care(me, id), "no herbs: refused")
+	var purse := int(World.production.worker(keeper)["purse"])
+	World.add_gold(me, 6, "test")
+	_check(_main.retain(_player(), {"resident": str(healer.get_path()), "pay": "gold"}) == "gold" and _main.in_care(me, id) and _main.care_via(me, id) == "gold"
+		and World.gold_of(me) == 0 and int(World.production.worker(keeper)["purse"]) == purse + 10, "10 gold: in his care, the gold his")
+	_check(_main.retain(_player(), {"resident": str(healer.get_path()), "pay": "gold"}) == "", "not twice")
+	# Five antlers from the pack, into his hut's store.
+	_main._records[me].care.clear()
+	for slot in 5:
+		World.put_item(_player(), _player(), slot, World.items.mint("antlers", "found", "test"))
+	var store := str(World.production.worker(keeper).get("town", ""))
+	_check(_main.retain(_player(), {"resident": str(healer.get_path()), "pay": "antlers"}) == "antlers" and _main.care_via(me, id) == "antlers"
+		and not Array(_player().slots).has("antlers") and (store.is_empty() or World.stockpile.item_ids(store).count("antlers") == 5),
+		"five antlers: in his care, the antlers in his hut's store (%s)" % [store])
+	_check(_main.grant_care(me, id, "quest") and _main.care_via(me, id) == "quest" and not _main.grant_care(me, id, "antlers"), "his errand done after: the way in is the errand's; nothing replaces it")
+	World.order_move(_player(), Vector2i(12, 6))
+	for i in 60:
+		World.step()
+	_kill_monsters()
 	World.damage(_player(), 999)
 	_check(_player() == null, "the player died")
 	var hob := str(World.production.worker(keeper)["name"])

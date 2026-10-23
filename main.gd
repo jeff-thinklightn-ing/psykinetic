@@ -4515,6 +4515,12 @@ func _send_barter(player: Player, shop: GridEntity, why := "", maker := "") -> v
 	if not maker.is_empty() and World.economy != null:
 		data["goods"] = World.economy.maker_goods(maker)
 		data["buys"] = World.economy.maker_buys(maker, Array(player.slots))
+		var hut := _care_hut_of(maker)
+		if not hut.is_empty():
+			# The healer's care (584 amended): what his hut takes, and whether and how you are in it.
+			var rule := care_rule(hut)
+			data["care"] = {"gold": rule["retainer"], "herbs": rule["herbs"], "antlers": rule["antlers"],
+				"in_care": in_care(player.player_id, hut), "by": care_via(player.player_id, hut)}
 	elif not place.is_empty() and World.economy != null:
 		data["goods"] = World.economy.goods(place, data["fence"])
 		data["buys"] = World.economy.buys(place, Array(player.slots))
@@ -4522,6 +4528,116 @@ func _send_barter(player: Player, shop: GridEntity, why := "", maker := "") -> v
 			if data["fence"] == Economy.FENCE_NIGHT and data["buys"].has(each["id"]) and World.items.is_grave(int(each["uid"])):
 				data["fenced"][each["uid"]] = World.economy.fence_price(int(data["buys"][each["id"]]["gold"]))
 	Net.message_to(player.owner_peer, "barter", data)
+
+
+# --- The healer's care (decision 584 amended) ------------------------------------------
+
+## The healer's hut whose care medicine man [param worker_id] gives (his
+## town's zone's, maps' 372), "" if he is none or has no hut.
+func _care_hut_of(worker_id: String) -> String:
+	if World.production == null or not "medicine_man" in World.production.worker(worker_id).get("trades", []):
+		return ""
+	return _healers_hut_of(str(World.production.worker(worker_id).get("town", "")))
+
+
+## What the healer's hut [param place_id] takes for his care
+## (Economy.care_rule): its kin errand only at a hut a town has built.
+func care_rule(place_id: String) -> Dictionary:
+	if World.economy == null:
+		return {}
+	var shop := _return_workshop(place_id)
+	var town := shop.get_slice(":", 0) if not shop.is_empty() else ""
+	var built: bool = World.towns != null and not town.is_empty() and World.towns.building(town, "healers_hut").get("state") == Towns.STANDING
+	return World.economy.care_rule(built)
+
+
+## Whether player [param player_id] is in the care of the healer's hut
+## [param place_id] (584 amended): only then does it bring them back.
+func in_care(player_id: String, place_id: String) -> bool:
+	var record: PlayerRecord = _records.get(player_id)
+	return record != null and record.care.has(place_id)
+
+
+## How player [param player_id] came into the care of [param place_id]
+## ("gold", "herbs", "antlers", "quest"; any hut's for ""), "" if not.
+## npc reads "herbs" or "quest" as his first errand done
+## (Economy.CARE_QUEST_WAYS).
+func care_via(player_id: String, place_id := "") -> String:
+	var record: PlayerRecord = _records.get(player_id)
+	if record == null:
+		return ""
+	if not place_id.is_empty():
+		return str(record.care.get(place_id, ""))
+	for place: String in record.care:
+		return str(record.care[place])
+	return ""
+
+
+## Player [param player_id] comes into the care of the healer's hut
+## [param place_id] by [param way] (Economy.CARE_WAYS): the retain command's
+## bypass, or npc's call when his first errand is done ("quest", which also
+## upgrades a paid way). False if nothing changed.
+func grant_care(player_id: String, place_id: String, way: String) -> bool:
+	var record: PlayerRecord = _records.get(player_id)
+	if record == null or place_id.is_empty():
+		return false
+	var kept := Economy.care_after(str(record.care.get(place_id, "")), way)
+	if kept.is_empty():
+		return false
+	record.care[place_id] = kept
+	print("[economy] %s is in the care of %s (%s)" % [record.name, place_id, kept])
+	return true
+
+
+## Server: the "retain" command (584 amended) {resident: the medicine
+## man's path, pay: "gold" | "herbs" | "antlers", gold if left out}: the
+## player hands him care_rule's retainer gold (into his purse) or that many
+## herbs or antlers from their pack (into his hut's store: herbs as the
+## resource, antlers as themselves; no sale), and is in his hut's care at
+## once. The barter is sent again, its why on a refusal: too far away,
+## already in his care, not enough gold (10), 5 herbs needed (3). The way
+## in, "" if refused.
+func retain(player: Player, args: Dictionary) -> String:
+	var body := get_node_or_null(NodePath(str(args.get("resident", "")))) as Resident
+	if body == null or World.production == null or World.economy == null:
+		return ""
+	var hut := _care_hut_of(body.worker_id)
+	var pay := str(args.get("pay", "gold"))
+	var me := player.player_id
+	var why := ""
+	var rule := care_rule(hut) if not hut.is_empty() else {}
+	if hut.is_empty():
+		why = "he keeps no hut"
+	elif body.zone != player.zone or World.distance(player.tile, body.tile) > World.COMPANION_REACH:
+		why = "too far away"
+	elif in_care(me, hut):
+		why = "already in his care"
+	elif pay not in ["gold", "herbs", "antlers"]:
+		why = "he takes gold, herbs or antlers"
+	elif pay == "gold" and World.gold_of(me) < int(rule["retainer"]):
+		why = "not enough gold (%d)" % int(rule["retainer"])
+	var slots: Array[int] = []
+	if why.is_empty() and pay != "gold":
+		for slot in player.slots.size():
+			if player.slots[slot] == pay and slots.size() < int(rule[pay]):
+				slots.append(slot)
+		if slots.size() < int(rule[pay]):
+			why = "%d %s needed (%d)" % [int(rule[pay]), pay, slots.size()]
+	if why.is_empty():
+		if pay == "gold":
+			World.add_gold(me, -int(rule["retainer"]), "the healer's retainer")
+			World.production.pay(body.worker_id, int(rule["retainer"]), "a retainer")
+		else:
+			var store := str(World.production.worker(body.worker_id).get("town", ""))
+			for slot: int in slots:
+				var uid := World._take_out(player, slot)
+				if uid != 0 and not store.is_empty():
+					World._bank_thing(store, uid, _display_name(player), _display_name(player), player.zone, player.tile)
+		grant_care(me, hut, pay)
+		Net.broadcast_to([player.owner_peer], "party", {"from": "Server",
+			"text": "%s takes you into his care." % str(World.production.worker(body.worker_id).get("name", "The healer"))})
+	_send_barter(player, body, why, body.worker_id)
+	return pay if why.is_empty() else ""
 
 
 ## Server: whether [param player] can barter at [param shop] (decision
@@ -7327,6 +7443,8 @@ func _on_command(entity: GridEntity, command_name: String, args: Dictionary) -> 
 			World.try_bandage(entity, patient)
 	elif command_name == "use" and entity is Player:
 		World.try_use(entity, int(args.get("slot", -1)))
+	elif command_name == "retain" and entity is Player:
+		retain(entity as Player, args)
 	elif command_name == "stance" and entity is Player:
 		var stance := str(args.get("kind", ""))
 		var toward := _point_direction(entity, args)
@@ -9991,7 +10109,7 @@ func _return_workshop(id: String) -> String:
 ## The place someone who fell at [param cell] of the zone World is in is
 ## brought back at: the nearest of the return places that is manned, by
 ## walking across the levels ({place, workshop}); {} if none is.
-func _return_place(cell: Vector2i) -> Dictionary:
+func _return_place(cell: Vector2i, player_id := "") -> Dictionary:
 	if World.holdings == null or World.production == null:
 		return {}
 	var kinds: Array[String] = []
@@ -10000,6 +10118,8 @@ func _return_place(cell: Vector2i) -> Dictionary:
 	# The nearest that is manned, of any kind, routed once (decision 503).
 	for id: String in World.holdings.ranked(kinds, World.zone.name, cell, routes):
 		var shop := _return_workshop(id)
+		if not player_id.is_empty() and World.holdings.place(id).get("kind") == "healers_hut" and not in_care(player_id, id):
+			continue  # A healer's hut brings back only a player in its care (584 amended).
 		if not shop.is_empty() and World.production.manned(shop):
 			return {"place": id, "workshop": shop}
 	return {}
@@ -10011,7 +10131,7 @@ func _return_place(cell: Vector2i) -> Dictionary:
 func _start_return(who: String, kind: String, cell: Vector2i) -> bool:
 	if who.is_empty() or not returns:
 		return false
-	var at := _return_place(cell)
+	var at := _return_place(cell, who if kind == "player" else "")
 	# A player comes back at once, from near death (decision 587: Mortally
 	# Wounded's Bleed Out, or the blood run out); others after the keeper's work.
 	var id := World.production.open_return(at["workshop"], who, kind, at["place"], kind == "player") if not at.is_empty() else 0

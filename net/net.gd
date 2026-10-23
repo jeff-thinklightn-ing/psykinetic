@@ -284,6 +284,9 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## counter's fence state, Snagfin's by day or by night (World.fence_state).
 ## 32 (587, economy's side): the "return" message gains "near_death" (a
 ## player back at once) and {all_fallen: seconds} (0 calls the wait off).
+## 32 (584 amended): the "barter" message from a medicine man carries
+## "care" {gold, herbs, antlers, in_care, by}; new command "retain"
+## {resident, pay: "gold" | "herbs" | "antlers"}.
 const PROTOCOL_REVISION := 32
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]

@@ -61,6 +61,11 @@ var marks: Array[String] = []
 ## containers they earned; {} unblessed. A record from before 573 ({uses,
 ## of, difficulty, day}) is migrated on load (Economy.barrow_migrated).
 var barrow: Dictionary = {}
+## The healer's care (decision 584 amended): healer's hut place id -> the
+## way in ("gold", "herbs", "antlers": the bypass, handed at his hut;
+## "quest": his first errand, npc's). A hut brings back only a player in
+## its care.
+var care: Dictionary = {}
 
 
 ## Copies the live state off the player's entity.
@@ -99,6 +104,7 @@ func to_dict() -> Dictionary:
 		"seen_generation": seen_generation.duplicate(),
 		"marks": marks.duplicate(),
 		"barrow": barrow.duplicate(),
+		"care": care.duplicate(),
 	}
 
 
@@ -132,6 +138,11 @@ static func from_dict(entry: Variant) -> PlayerRecord:
 	var barrow: Variant = entry.get("barrow", {})
 	if barrow is Dictionary and not barrow.is_empty():
 		record.barrow = Economy.barrow_migrated(barrow)
+	var cared: Variant = entry.get("care", {})
+	if cared is Dictionary:
+		for place: Variant in cared:
+			if str(cared[place]) in Economy.CARE_WAYS:
+				record.care[str(place)] = str(cared[place])
 	var seen: Variant = entry.get("seen_generation", {})
 	if seen is Dictionary:
 		for area: Variant in seen:

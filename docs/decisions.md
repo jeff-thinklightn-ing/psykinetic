@@ -23106,3 +23106,47 @@ healers_hut, 0, near_death} and is back at the hut, at full hp, on the
 next step; the party line names Ned; tell_all_fallen says 20. Server
 and client (the message's keys); no new class_name.
 
+
+## 584 amended: the healer's care, economy's side
+
+Jeff (2026-10-22, through the coordinator): "5 herbs, 5 antlers or 10 gold
+to bypass the quest, but doing his 1st quest can open up further quests
+such as healing the sick, potion quests, etc." Agreed with npc and ui; the
+coordinator's approval. Economy's half of 584 had not landed, so this is
+all of it.
+
+- **The rule.** A healer's hut brings back only a player in its care
+  (Main._return_place passes over a healers_hut for a player not in it;
+  companions and residents as before; a temple always). Rules'
+  return.care {retainer 10, herbs 5, antlers 5, sick 1, word_days 1}:
+  Economy.care_rule(in_town) gives sick and word_days (npc's kin errand)
+  only at a hut a town has built; a hut out in the land (Hob's) asks the
+  rest alone. Main.care_rule(place_id) reads which. 584's
+  retainer_in_towns_only is dropped: any hut takes gold.
+- **The record.** PlayerRecord.care: hut place id -> the way in, saved.
+  Economy.CARE_WAYS: "gold", "herbs", "antlers" (the bypass) and "quest"
+  (his first errand, npc's call). Economy.CARE_QUEST_WAYS ("herbs",
+  "quest") count as the first errand done, which opens npc's chain; five
+  herbs are the errand's object however they are handed. A paid way
+  (gold, antlers) upgrades to the errand's when it is done later; nothing
+  else replaces a way in (Economy.care_after).
+- **Main.** grant_care(player, place, way), in_care(player, place),
+  care_via(player, place = any), care_rule(place).
+- **The "retain" command** {resident: the medicine man, pay: gold | herbs
+  | antlers, gold if left out}. Within reach, not in care already: the
+  retainer gold goes into his purse (Production.pay), or that many herbs or
+  antlers come out of the pack into his hut's store (herbs as the resource,
+  antlers as themselves; no sale, so no bank_sale gold). Then the player
+  is in care, with the party line "<name> takes you into his care.", and
+  the barter is sent again. A refusal's why: too far away, already in his
+  care, not enough gold (10), 5 herbs needed (3).
+- **Wire.** The barter message from a medicine man carries "care" {gold,
+  herbs, antlers, in_care, by}. ui shows three offers and "In his care
+  (paid / for the herbs / for the antlers / his errand)". These keys and
+  the command go under revision 32.
+
+return_test: the hut passed over for a player not in care (and not for
+others); a hut out in the land's rule; 4 gold and no herbs refused; 10
+gold into care, his purse paid; not twice; the errand upgrading the way
+in; five antlers into his hut's store; the player then brought back at
+the hut. Server and client (revision 32); no new class_name.
