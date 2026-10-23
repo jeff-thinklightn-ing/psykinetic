@@ -26113,3 +26113,12 @@ fov), never under PICK_SLACK; the ortho camera keeps PICK_SLACK. A fixed pixel c
 a hair on a 4K screen, hence the share. monster_near_ray picks the body nearest the ray as
 a share of its own slack, so the ortho behaviour is exactly as before. view_test
 _test_low_pick. Client only.
+
+## 634: the low-angle fight, 4: a body at the reach's edge eases in and out
+
+Under the low camera a body crossing World.NEAR_TILES popped. Client3D._ease_reach: a
+change eases over REACH_EASE (0.5 s) through every GeometryInstance3D's transparency
+(_set_transparency: meshes, name, bar), the puppet hidden only once gone and drawn at once
+from gone as it comes; a puppet just made beyond the edge is simply not drawn (no ghost on
+a join); the camera off puts every puppet solid and forgets the easing. The sim's edge
+(238) is untouched: the client eases only what it is sent. view_test _test_reach_ease.

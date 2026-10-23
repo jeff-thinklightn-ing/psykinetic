@@ -501,6 +501,11 @@ const SHADOW_MARGIN := 2.0
 ## reach and this (cells), or within earshot (Sfx.MAX_DISTANCE); further
 ## off, only what it will need on coming back (its tile, its hp).
 const PUPPET_MARGIN := 4.0
+## Under the low camera a body crossing World.NEAR_TILES eases in or out
+## over this long (s) through its meshes' transparency, instead of
+## popping (the low-angle fight, 4; _ease_reach). The sim still sends and
+## withdraws it at its own edge (238); the eased moment is the client's.
+const REACH_EASE := 0.5
 ## A puppet left far off is looked at again every this many frames (its
 ## coming near, its hp), not every frame.
 const FAR_EVERY := 4
@@ -2317,6 +2322,9 @@ func _apply_camera_mode() -> void:
 		if not low:
 			for puppet: Node3D in _puppets.values():
 				puppet.visible = true
+				_set_transparency(puppet, 0.0)
+				puppet.remove_meta("reach_in")
+				puppet.remove_meta("reach_at")
 	_shadow_key = Vector3i(1 << 30, 0, 0)  # Shadows looked at again for the new reach.
 	_apply_size()
 	_place_camera()
@@ -10698,6 +10706,39 @@ func _set_near(piece: Node3D, near: bool) -> void:
 				else GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 
 
+## Under the low camera, [param puppet] drawn or not by whether its body
+## is [param within] World.NEAR_TILES: a change eases over REACH_EASE from
+## [param now] (ms), its meshes' transparency rising as it leaves and
+## falling as it comes, hidden only once gone; a puppet just [param made]
+## is simply drawn or not.
+func _ease_reach(puppet: Node3D, within: bool, made: bool, now: int) -> void:
+	if made or not puppet.has_meta("reach_in"):
+		puppet.set_meta("reach_in", within)
+		puppet.visible = within
+		return
+	if bool(puppet.get_meta("reach_in")) != within:
+		puppet.set_meta("reach_in", within)
+		puppet.set_meta("reach_at", now)
+		puppet.visible = true
+	if not puppet.has_meta("reach_at"):
+		return
+	var share := clampf((now - int(puppet.get_meta("reach_at"))) / (REACH_EASE * 1000.0), 0.0, 1.0)
+	if share >= 1.0:
+		puppet.remove_meta("reach_at")
+		_set_transparency(puppet, 0.0 if within else 1.0)
+		puppet.visible = within
+		return
+	_set_transparency(puppet, 1.0 - share if within else share)
+
+
+## Every drawn part of [param puppet] (its meshes, its name, its bar) at
+## [param transparency] (0 solid, 1 gone).
+func _set_transparency(puppet: Node3D, transparency: float) -> void:
+	for node in _descendants(puppet):
+		if node is GeometryInstance3D:
+			(node as GeometryInstance3D).transparency = transparency
+
+
 # --- Entities ----------------------------------------------------------------
 
 ## One puppet per spawned entity, placed where its 2D node is (the grid
@@ -10753,8 +10794,9 @@ func _sync_puppets() -> void:
 			entity._display_caught_up()
 		if _low:
 			# The low camera sees past World.NEAR_TILES: a body out there is
-			# not drawn (it would stand still, unthinking, 238).
-			puppet.visible = Vector2(entity.tile).distance_to(aim) <= World.NEAR_TILES
+			# not drawn (it would stand still, unthinking, 238); one crossing
+			# the edge eases in or out (REACH_EASE).
+			_ease_reach(puppet, Vector2(entity.tile).distance_to(aim) <= World.NEAR_TILES, made, now)
 		var grid := Iso.local_to_grid(entity.position)
 		var at := Vector3(grid.x, _ground_height(grid), grid.y)
 		if puppet.position != at:

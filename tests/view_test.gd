@@ -40,6 +40,7 @@ func _ready() -> void:
 	await _test_low_camera()
 	await _test_far_restart()
 	await _test_low_pick()
+	await _test_reach_ease()
 	_test_pine_stands()
 	_test_ground_textures()
 	_test_canopy_mask()
@@ -6156,3 +6157,57 @@ func _check(ok: bool, label: String) -> void:
 	if not ok:
 		_failures += 1
 	print("  %s  %s" % ["PASS" if ok else "FAIL", label])
+
+
+## The low-angle fight, 4: under the low camera a body crossing
+## World.NEAR_TILES eases in and out instead of popping.
+func _test_reach_ease() -> void:
+	print("\n== the reach's edge under the low camera: a body crossing it eases in and out, never pops ==")
+	var low_was := Net.camera_low
+	Net.set_camera_low(true, false)
+	var castle := Level.load_level("castle")
+	_rig.rebuild(castle["terrain"], castle["centre"])
+	var imp := _spawn_imp(Vector2i(9, 4))  # (A room tile within NEAR_TILES of the camera's aim, on the player.)
+	await _frames(4)  # (Its body's puppet, made and made again once its body is known.)
+	_rig._sync_puppets()
+	var id := imp.get_instance_id()
+	var puppet: Node3D = _rig._puppets[id]
+	var meshes: Array = _rig._descendants(puppet).filter(func(node: Node) -> bool: return node is GeometryInstance3D)
+	var solid := func() -> bool: return meshes.all(func(node: GeometryInstance3D) -> bool: return is_zero_approx(node.transparency))
+	var gone := func() -> bool: return meshes.all(func(node: GeometryInstance3D) -> bool: return is_equal_approx(node.transparency, 1.0))
+	_check(meshes.size() > 0 and puppet.visible and solid.call() and not puppet.has_meta("reach_at"), "within the reach: drawn, solid (%d parts)" % meshes.size())
+	var near_tile := imp.tile
+	# Past NEAR_TILES of the camera's aim (as it stands now: it follows the player), within the puppets' reach.
+	var aim := Vector2(_rig._camera_target.x, _rig._camera_target.z)
+	var edge_tile := Vector2i(roundi(aim.x) + World.NEAR_TILES + 2, roundi(aim.y))
+	imp.tile = edge_tile
+	imp.position = Iso.grid_to_local(Vector2(edge_tile))
+	_rig._sync_puppets()
+	_check(puppet.visible and puppet.has_meta("reach_at") and not _rig._far.has(id) and _rig._puppets[id] == puppet,
+			"stepped past NEAR_TILES: still drawn, its easing out begun (same puppet %s, far %s, in %s)" % [_rig._puppets[id] == puppet, _rig._far.has(id), puppet.get_meta("reach_in", "-")])
+	puppet.set_meta("reach_at", Time.get_ticks_msec() - int(Client3D.REACH_EASE * 500.0))
+	_rig._sync_puppets()
+	var half: float = (meshes[0] as GeometryInstance3D).transparency
+	_check(puppet.visible and half > 0.3 and half < 0.7, "half way: half gone (%.2f)" % half)
+	puppet.set_meta("reach_at", Time.get_ticks_msec() - int(Client3D.REACH_EASE * 1000.0) - 50)
+	_rig._sync_puppets()
+	_check(not puppet.visible and gone.call() and not puppet.has_meta("reach_at"), "and after REACH_EASE: hidden")
+	imp.tile = near_tile
+	imp.position = Iso.grid_to_local(Vector2(near_tile))
+	_rig._sync_puppets()
+	_check(puppet.visible and gone.call() and puppet.has_meta("reach_at"), "back within: drawn at once, from gone, its easing in begun")
+	puppet.set_meta("reach_at", Time.get_ticks_msec() - int(Client3D.REACH_EASE * 1000.0) - 50)
+	_rig._sync_puppets()
+	_check(puppet.visible and solid.call() and not puppet.has_meta("reach_at"), "and after REACH_EASE: solid")
+	# The camera off: every puppet drawn and solid again, the easing forgotten.
+	imp.tile = edge_tile
+	imp.position = Iso.grid_to_local(Vector2(edge_tile))
+	_rig._sync_puppets()
+	Net.set_camera_low(false, false)
+	_check(puppet.visible and solid.call() and not puppet.has_meta("reach_in") and not puppet.has_meta("reach_at"), "the low camera off: drawn, solid, nothing remembered")
+	imp.tile = near_tile
+	imp.position = Iso.grid_to_local(Vector2(near_tile))
+	World.despawn(imp)
+	_rig._sync_puppets()
+	Net.set_camera_low(low_was, false)
+	_rig.rebuild(_main._terrain, Vector2i.ZERO)
