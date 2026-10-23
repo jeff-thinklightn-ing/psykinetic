@@ -31,6 +31,7 @@ func _ready() -> void:
 	_test_winded()
 	_test_monsters_switch()
 	_test_telegraph_shapes()
+	_test_telegraph_outline()
 	_test_telegraph_ground()
 	_test_telegraph_lifecycle()
 	_test_spin()
@@ -173,6 +174,81 @@ func _test_telegraph_shapes() -> void:
 	_check(Telegraph.cells({"kind": "blob", "origin": [0, 0], "facing": [1, 0], "length": 2}).is_empty()
 			and Telegraph.cells({"kind": "cone", "origin": [0, 0], "facing": [0, 0], "length": 2}).is_empty(),
 			"a shape that does not read: no cells")
+
+## Smooth telegraphs (Jeff: "draugr abilities should be in a smooth pattern
+## like a cone similar to archery, not blocky tiles"): the drawn outline holds
+## exactly the struck cells' centres, cones, rings and lines at every angle;
+## only a centre within a hundredth of a cell of the drawn edge is let be.
+func _test_telegraph_outline() -> void:
+	print("
+== the telegraph drawn smooth: a centre inside the outline is struck, outside is not ==")
+	var shapes: Array[Dictionary] = []
+	for turn in 72:
+		var facing := Vector2.from_angle(turn * TAU / 72.0 + 0.013)
+		for length in [1.0, 2.0, 5.0, 8.0, 12.0]:
+			for half in [20.0, 45.0, 90.0, 150.0, 180.0]:
+				shapes.append(Telegraph.cone(Vector2i.ZERO, facing, length, half))
+			for width in [1, 3]:
+				shapes.append(Telegraph.line(Vector2i.ZERO, facing, length, width))
+	for axis: Vector2 in [Vector2(1, 0), Vector2(0, 1), Vector2(1, 1), Vector2(2, 1), Vector2(-1, 2)]:
+		shapes.append(Telegraph.cone(Vector2i.ZERO, axis, 2.0, 150.0))
+		shapes.append(Telegraph.cone(Vector2i.ZERO, axis, 3.0, 45.0))
+		shapes.append(Telegraph.line(Vector2i.ZERO, axis, 8.0))
+		shapes.append(Telegraph.line(Vector2i.ZERO, axis, 12.0))
+	shapes.append({"kind": "ring", "origin": [0, 0], "facing": [1, 0], "length": 2.0, "inner": 1.5})
+	shapes.append({"kind": "ring", "origin": [0, 0], "facing": [0, 1], "length": 5.0, "inner": 2.0})
+	shapes.append({"kind": "ring", "origin": [0, 0], "facing": [1, 1], "length": 4.0, "inner": 2.0, "half_angle": 120.0})
+	var wrong := []
+	var close := 0
+	for shape in shapes:
+		var drawn := Telegraph.outline(shape)
+		var struck := {}
+		for cell in Telegraph.cells(shape):
+			struck[cell] = true
+		var reach := ceili(float(shape["length"])) + 2
+		for y in range(-reach, reach + 1):
+			for x in range(-reach, reach + 1):
+				var centre := Vector2(x, y)
+				if _edge_distance(drawn, centre) < 0.01:
+					close += 1
+					continue
+				var inside := _crossed(drawn, centre) and centre != Vector2.ZERO
+				if inside != struck.has(Vector2i(x, y)) and wrong.size() < 5:
+					wrong.append([shape, Vector2i(x, y), inside])
+	_check(wrong.is_empty(), "%d shapes at every angle: inside the outline exactly the struck centres (%d centres on an edge let be) %s" % [shapes.size(), close, wrong])
+	var slant := Telegraph.cells(Telegraph.line(Vector2i.ZERO, Vector2.from_angle(0.5236), 8.0))
+	var way := Vector2.from_angle(0.5236)
+	var ordered := true
+	var joined := true
+	var banded := true
+	for i in slant.size():
+		banded = banded and absf(Vector2(-way.y, way.x).dot(Vector2(slant[i]))) < 0.5
+		if i > 0:
+			ordered = ordered and way.dot(Vector2(slant[i])) >= way.dot(Vector2(slant[i - 1]))
+			joined = joined and slant.slice(0, i).any(func(c: Vector2i) -> bool: return (c - slant[i]).abs().x <= 1 and (c - slant[i]).abs().y <= 1)
+	_check(ordered and joined and banded and slant.size() >= 7,
+			"a line at 30 degrees: the centres within half a cell of it, in order along it, no gap (%s)" % [slant])
+
+## Whether [param point] is inside [param polygon] by the even-odd rule
+## (Geometry2D.is_point_in_polygon misreads some fine circles).
+func _crossed(polygon: PackedVector2Array, point: Vector2) -> bool:
+	var inside := false
+	for i in polygon.size():
+		var a := polygon[i]
+		var b := polygon[(i + 1) % polygon.size()]
+		if (a.y > point.y) != (b.y > point.y) and point.x < (b.x - a.x) * (point.y - a.y) / (b.y - a.y) + a.x:
+			inside = not inside
+	return inside
+
+
+## How near [param point] is to [param polygon]'s edge.
+func _edge_distance(polygon: PackedVector2Array, point: Vector2) -> float:
+	var nearest := INF
+	for i in polygon.size():
+		var on := Geometry2D.get_closest_point_to_segment(point, polygon[i], polygon[(i + 1) % polygon.size()])
+		nearest = minf(nearest, on.distance_to(point))
+	return nearest
+
 
 
 func _test_telegraph_ground() -> void:

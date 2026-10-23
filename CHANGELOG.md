@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The draugr's spin, throw and charge warnings can now be drawn as smooth shapes from his body, and they stay honest: you are struck exactly when your feet are inside the shape. His axe throw on a slant now strikes exactly along its drawn band (602 amended).
 - A charge no longer stops short or leaves its runner standing when another part of the world is busy (604 amended): the draugr's charge is run in his own lair only.
 - A charge is slower through a ford, tall grass or uphill, and hits softer there (607 amended): it picks up again on open ground.
 - The draugr now walks to you anywhere in his hall: he used to give up 12 cells from his throne and reach the door end only with his throw and rush (Jeff: "doesn't walk, long reach"); the altar room's guards likewise chase anywhere in their room.

@@ -16,6 +16,12 @@ const KINDS := ["cone", "line", "ring"]
 ## of the origin's (a cone of 2 takes the knight's-move cells, not the far
 ## corners).
 const REACH_SLACK := 0.25
+## A line takes the centres strictly inside its band, this much in from
+## half its width, so a centre on the band's edge is never in doubt.
+const LINE_EDGE := 0.001
+## The most an outline's chord falls short of its arc, in cells: under the
+## nearest a centre comes to a reach (0.0625 / (2 x reach)).
+const ARC_SAG := 0.001
 
 
 ## [param shape]'s cells, the origin's own never among them, each once, in
@@ -43,17 +49,59 @@ static func cells(shape: Dictionary) -> Array[Vector2i]:
 						continue
 					out.append(origin + Vector2i(x, y))
 		"line":
-			var width := maxi(1, int(shape.get("width", 1)))
+			# Every centre within half its width of the line, ahead and no
+			# further than length plus the slack: the band outline draws
+			# (602 amended; it had rounded half-cell steps).
+			var half := maxi(1, int(shape.get("width", 1))) * 0.5 - LINE_EDGE
 			var side := Vector2(-facing.y, facing.x)
-			var seen := {}
-			for step in range(1, int(length) * 2 + 1):
-				var along := facing * (step * 0.5)
-				for lane in width:
-					var offset := along + side * (lane - (width - 1) * 0.5)
-					var cell := origin + Vector2i(roundi(offset.x), roundi(offset.y))
-					if cell != origin and not seen.has(cell) and Vector2(cell - origin).length() <= length + REACH_SLACK:
-						seen[cell] = true
-						out.append(cell)
+			var along := {}
+			for y in range(-reach, reach + 1):
+				for x in range(-reach, reach + 1):
+					var offset := Vector2(x, y)
+					var ahead := facing.dot(offset)
+					if ahead > 0.0 and ahead <= length + REACH_SLACK and absf(side.dot(offset)) < half:
+						out.append(origin + Vector2i(x, y))
+						along[out[-1]] = ahead
+			# In order along it, nearest first: World.telegraph_cells stops a
+			# line at the first cell it cannot cross.
+			out.sort_custom(func(a: Vector2i, b: Vector2i) -> bool: return along[a] < along[b])
+	return out
+
+
+## [param shape] as drawn (decision 602 amended, smooth telegraphs): a polygon in cells about the
+## origin cell's centre, so a body is struck exactly when its cell's centre
+## is inside it (before World.telegraph_cells clips walls away). A cone's
+## sector, a ring's annulus (its gap behind, if any) or a line's band; []
+## for a shape that does not read. Its arcs are cut fine enough
+## (ARC_SAG) that no centre falls between a chord and its arc.
+static func outline(shape: Dictionary) -> PackedVector2Array:
+	var out := PackedVector2Array()
+	if not valid(shape):
+		return out
+	var facing := facing_of(shape)
+	var length := float(shape["length"]) + REACH_SLACK
+	if str(shape["kind"]) == "line":
+		var half := maxi(1, int(shape.get("width", 1))) * 0.5 - LINE_EDGE
+		var side := Vector2(-facing.y, facing.x)
+		for corner: Vector2 in [Vector2(0.0, -half), Vector2(length, -half), Vector2(length, half), Vector2(0.0, half)]:
+			out.append(facing * corner.x + side * corner.y)
+		return out
+	var half_angle := PI if str(shape["kind"]) == "ring" else minf(deg_to_rad(float(shape.get("half_angle", 180.0))) + 0.001, PI)
+	var inner := float(shape.get("inner", 0.0))
+	var whole := half_angle >= PI
+	var pieces := maxi(8, ceili(2.0 * half_angle / sqrt(8.0 * ARC_SAG / length)))
+	for i in pieces + (0 if whole else 1):
+		out.append(facing.rotated(-half_angle + 2.0 * half_angle * i / pieces) * length)
+	if inner > 0.0:
+		# The hole's edge just outside the inner radius, its chords outside
+		# it too (a centre at inner is not struck).
+		var hole := (inner + 0.001) / cos(PI / pieces)
+		if whole:
+			out.append(out[0])
+		for i in range(pieces, -1, -1):
+			out.append(facing.rotated(-half_angle + 2.0 * half_angle * i / pieces) * hole)
+	elif not whole:
+		out.append(Vector2.ZERO)
 	return out
 
 

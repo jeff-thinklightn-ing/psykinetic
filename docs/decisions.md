@@ -21568,6 +21568,10 @@ cost table, paid on a blow, a whiff and a wind-up, whiffs till winded,
 half damage, 1.5 times the step, no bash, the 20-tick wait, back at 25, a
 monster's switch. No new class_name.
 
+Accepted by Jeff 2026-10-23: the numbers in levels/combat.json (the swing
+cost formula, whiff 1.25x, winded at 0 until 25, the 20-tick winded wait,
+the rest as live since v0.1.165) stand as decided, no longer drafts.
+
 
 ## 580. The barrow in layers: the town's tombs, the Ossuary, the dark below and the Hall of Fallen Souls
 
@@ -24949,3 +24953,45 @@ take the same skip (603 amended (2)). Server sim only, protocol unchanged.
 tests/physics_test: two zones awake with a player each, the other 5000 ticks ahead; a 120 kg rush
 in the lair runs its 5 cells on the lair's clock and arrives, its next step never on the other's
 clock. Before the fix it ended "wall" after 1 cell, at the other zone's tick 5001.
+
+## 602 amended: telegraphs drawn smooth, and the rule they keep
+
+Jeff, on v0.1.169: "draugr abilities should be in a smooth pattern like a cone similar to
+archery, not blocky tiles." The coordinator's ruling: the sim keeps deciding in cells, and
+the drawn shape is honest about them. Combat's side; ui draws it (623's fight reads, (a)).
+
+- **The rule every telegraph keeps:** a body is struck exactly when its cell's centre, where
+  its feet stand, is inside the drawn shape. A later telegraph's shape must be one that
+  Telegraph.outline draws to this rule.
+- **Telegraph.outline(shape) -> PackedVector2Array:** the drawn shape as a polygon in cells
+  about the origin cell's centre, its points in order round it. A cone is its sector at
+  length + REACH_SLACK and its half-angle (+0.001 rad, as cells() reads it), back to the
+  origin. A ring is whole, with its hole just outside the inner radius. A line is a band of
+  half its width (less LINE_EDGE) out to length + REACH_SLACK. Arcs are cut so a chord falls
+  at most ARC_SAG (0.001 cell) short of its arc, under the nearest a centre comes to a reach
+  (0.0625 / (2 x reach)), so no centre sits between them. Ui meshes it from the source's cell
+  centre and masks the fill to the sent cells, so walls, closed doors and their shadows
+  (World.telegraph_cells) cut it along their own edges.
+- **A line's cells change.** They had been the cells that half-cell steps along the line
+  rounded to. They are now every centre strictly inside the band, nearest first, so the
+  drawn band holds exactly them. Straight and diagonal lines take the same cells as before.
+  A slanted line can now strike a body it used to miss, or miss one it used to catch. The
+  draugr's 8-cell throw:
+
+| aim | before | after |
+|---|---|---|
+| 20 degrees | (1,0) (1,1) (2,1) (3,1) (4,1) (4,2) (5,2) (6,2) (7,2) (7,3) | (1,0) (2,1) (3,1) (4,1) (5,2) (6,2) (7,3) |
+| 30 degrees | (1,1) (2,1) (3,1) (3,2) (4,2) (5,3) (6,3) (6,4) (7,4) | (1,1) (2,1) (3,2) (4,2) (5,3) (6,3) (6,4) (7,4) |
+| 60 degrees | (1,1) (1,2) (2,3) (2,4) (3,4) (3,5) (3,6) (4,6) (4,7) | (1,1) (1,2) (2,3) (2,4) (3,5) (3,6) (4,6) (4,7) |
+
+  The cells dropped are those whose centre lies more than half a cell off the line (the old
+  rounding's stair steps). The line stays unbroken at every angle, one or two cells a column.
+  Use an odd width for a wide line: an even one puts centres on its edge when straight.
+- **Nothing on the wire.** The "telegraph" message already carried the shape beside the
+  cells, so enemy-ai's moves need no new data.
+
+combat_test _test_telegraph_outline: 2,543 cones, rings and lines at 72 angles and on the
+axes, every centre about them inside the outline exactly when it is struck (a centre within
+a hundredth of a cell of the drawn edge is let be); a line at 30 degrees in order, banded and
+unbroken. Godot's Geometry2D.is_point_in_polygon misreads some of these fine circles, so the
+test counts crossings itself. Server and pure geometry; protocol unchanged; no new class_name.
