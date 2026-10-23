@@ -609,6 +609,77 @@
 			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/wall.wood.rubble/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c4's 400 mesh, 220 tris after its crumbs"},
 			"uses": "the blocked gap in a broken wall run: fills a whole 1 m edge, at least 0.6 m tall, so a gap never reads as a way through; fallen planks and beams"
 		},
+		"wall.crypt.niche_a": {
+			"category": "walls",
+			"type": "mesh",
+			"kind": "edge",
+			"size": [0.594, 3, 1],
+			"middle": [0.047, 0, 0],
+			"variants": 2,
+			"budget": 400,
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-22", "notes": "C:/dev/review/crypt_walls/make_cryptset.py a1, a2: an arched niche at chest height (0.85 to 1.6 m), a stone shelf lip under it; 1 a body laid head-in, its linen-wrapped feet toward the room, corded (158 tris); 2 sealed by a slab carved with a cross (104 tris). an edge piece for wall.stone's runs, 0.5 thick as wall.stone.profile: the room face at x 0.25, the cut 0.4 deep (its back black), a 0.1 back skin to x -0.25; the room on +x (the draw turns the piece so +x is the floor cell); the face palette row 1's #6b6660, at material.wall.stone's mean"},
+			"uses": "a burial niche in the first hall's long walls (the town's newer, wealthy dead): 1 open, 2 sealed; the barrow's niche walls in wall.stone's runs (Jeff: \"i like all the crypt walls, mix and match\"; dungeon's 580 step 2 picks a piece per niche edge by layer, its rock always behind)",
+			"grey": [{"at": [0, 1.5, 0], "size": [0.5, 3, 1]}, {"at": [0.287, 0.82, 0], "size": [0.114, 0.08, 0.68]}]
+		},
+		"wall.crypt.niche_b": {
+			"category": "walls",
+			"type": "mesh",
+			"kind": "edge",
+			"size": [0.529, 3, 1],
+			"middle": [0.015, 0, 0],
+			"variants": 2,
+			"budget": 400,
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-22", "notes": "C:/dev/review/crypt_walls/make_cryptset.py b1, b2: two tiers of long shelf cuts (0.45 to 0.95, 1.4 to 1.85 m); 1 bones, a skull and a pot below, a skull above (210 tris); 2 bones heaped below, a skull and a dark pot, the upper tier closed by a plain slab (258 tris). an edge piece for wall.stone's runs, 0.5 thick as wall.stone.profile: the room face at x 0.25, the cut 0.4 deep (its back black), a 0.1 back skin to x -0.25; the room on +x (the draw turns the piece so +x is the floor cell); the face palette row 1's #6b6660, at material.wall.stone's mean"},
+			"uses": "an ossuary shelf in the Ossuary's galleries (the ancient dead): 1 open, 2 the upper tier slabbed; the barrow's niche walls in wall.stone's runs (Jeff: \"i like all the crypt walls, mix and match\"; dungeon's 580 step 2 picks a piece per niche edge by layer, its rock always behind)",
+			"grey": [{"at": [0, 1.5, 0], "size": [0.5, 3, 1]}, {"at": [0.2445, 1.62, 0], "size": [0.069, 0.5, 0.9]}]
+		},
+		"wall.crypt.niche_c": {
+			"category": "walls",
+			"type": "mesh",
+			"kind": "edge",
+			"size": [0.624, 3, 1],
+			"middle": [0.062, 0, 0],
+			"variants": 2,
+			"budget": 400,
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-22", "notes": "C:/dev/review/crypt_walls/make_cryptset.py c1, c2: a deep rounded hollow (0.7 to 1.55 m) framed by a pale carved border and a heavy lip; 1 a wrapped body head-in (184 tris); 2 sealed by a slab set back inside the border, a carved ring on it (139 tris). an edge piece for wall.stone's runs, 0.5 thick as wall.stone.profile: the room face at x 0.25, the cut 0.4 deep (its back black), a 0.1 back skin to x -0.25; the room on +x (the draw turns the piece so +x is the floor cell); the face palette row 1's #6b6660, at material.wall.stone's mean"},
+			"uses": "a carved burial hollow, mostly in the first hall, a few in the Ossuary: 1 open, 2 sealed; the barrow's niche walls in wall.stone's runs (Jeff: \"i like all the crypt walls, mix and match\"; dungeon's 580 step 2 picks a piece per niche edge by layer, its rock always behind)",
+			"grey": [{"at": [0, 1.5, 0], "size": [0.5, 3, 1]}, {"at": [0.297, 0.66, 0], "size": [0.154, 0.12, 0.84]}]
+		},
+		"wall.crypt.niche_d": {
+			"category": "walls",
+			"type": "mesh",
+			"kind": "edge",
+			"size": [0.503, 3, 1],
+			"middle": [0.001, 0, 0],
+			"tolerance": 0.4,
+			"variants": 2,
+			"budget": 800,
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-22", "notes": "C:/dev/review/crypt_walls/make_cryptset.py d1, d2: a columbarium, twelve small square cells in four rows (0.55 to 2.0 m); 1 urns (clay, bronze) and skulls in about half (454 tris); 2 most cells full, bones, a skull and a pot spilled at the foot into the room (718 tris). an edge piece for wall.stone's runs, 0.5 thick as wall.stone.profile: the room face at x 0.25, the cut 0.4 deep (its back black), a 0.1 back skin to x -0.25; the room on +x (the draw turns the piece so +x is the floor cell); the face palette row 1's #6b6660, at material.wall.stone's mean"},
+			"uses": "a columbarium wall in the Ossuary's galleries: 1, 2 fuller with bones fallen at its foot; the barrow's niche walls in wall.stone's runs (Jeff: \"i like all the crypt walls, mix and match\"; dungeon's 580 step 2 picks a piece per niche edge by layer, its rock always behind)",
+			"grey": [{"at": [0, 1.5, 0], "size": [0.5, 3, 1]}]
+		},
+		"wall.crypt.cracked": {
+			"category": "walls",
+			"type": "mesh",
+			"kind": "edge",
+			"size": [0.86, 3, 1],
+			"middle": [0.18, 0, 0],
+			"budget": 400,
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-22", "notes": "C:/dev/review/crypt_walls/make_cryptset.py cracked: niche_a's open arched niche with a crack running up the face from the floor to above the arch, a pale edge beside it, and pale dust fanned on the floor at its foot (176 tris). an edge piece for wall.stone's runs, 0.5 thick as wall.stone.profile: the room face at x 0.25, the cut 0.4 deep (its back black), a 0.1 back skin to x -0.25; the room on +x (the draw turns the piece so +x is the floor cell); the face palette row 1's #6b6660, at material.wall.stone's mean"},
+			"uses": "the hidden door's tell (decision 580): the locked niche Door's edge drawn as this until it is found; the barrow's niche walls in wall.stone's runs (Jeff: \"i like all the crypt walls, mix and match\"; dungeon's 580 step 2 picks a piece per niche edge by layer, its rock always behind)",
+			"grey": [{"at": [0, 1.5, 0], "size": [0.5, 3, 1]}, {"at": [0.43, 0.005, 0], "size": [0.36, 0.01, 0.38]}]
+		},
+		"wall.crypt.niche_open": {
+			"category": "walls",
+			"type": "mesh",
+			"kind": "edge",
+			"size": [1.004, 3, 1],
+			"middle": [0.252, 0, 0],
+			"budget": 300,
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-22", "notes": "C:/dev/review/crypt_walls/make_cryptset.py open: a doorway 0.64 wide and 1.9 tall cut to the floor, steps going down into the dark within the wall's depth, a black back; the niche's slab swung out on its edge, standing 0.5 m into the room beside the doorway (50 tris). an edge piece for wall.stone's runs, 0.5 thick as wall.stone.profile: the room face at x 0.25, the cut 0.4 deep (its back black), a 0.1 back skin to x -0.25; the room on +x (the draw turns the piece so +x is the floor cell); the face palette row 1's #6b6660, at material.wall.stone's mean"},
+			"uses": "the hidden door found (decision 580): the niche Door's look when open, keyed by the Door's state; the level's link does the moving; the barrow's niche walls in wall.stone's runs (Jeff: \"i like all the crypt walls, mix and match\"; dungeon's 580 step 2 picks a piece per niche edge by layer, its rock always behind)",
+			"grey": [{"at": [0, 1.5, 0], "size": [0.5, 3, 1]}, {"at": [0.5, 0.925, 0], "size": [0.5, 1.85, 0.07]}]
+		},
 		"wall.stone.profile": {
 			"category": "walls",
 			"type": "profile",
