@@ -36,6 +36,72 @@
 			"radius": 7
 		}
 	],
+	"places": {
+		"hunters_lean_to": {
+			"at": [
+				42,
+				72
+			],
+			"kind": "refuge",
+			"where": "forest",
+			"radius": 3,
+			"name": "the hunters' lean-to"
+		},
+		"woodcutters_lean_to": {
+			"at": [
+				75,
+				15
+			],
+			"kind": "refuge",
+			"where": "forest",
+			"radius": 3,
+			"name": "a woodcutters' lean-to deep in the forest"
+		},
+		"thick_wood": {
+			"at": [
+				25,
+				66
+			],
+			"kind": "refuge",
+			"where": "forest",
+			"radius": 3,
+			"name": "where the trees are thickest"
+		},
+		"boar_path": {
+			"at": [
+				44,
+				60
+			],
+			"kind": "refuge",
+			"where": "forest",
+			"radius": 3,
+			"name": "the path to the hunters' camps"
+		},
+		"fletchers_tree": {
+			"at": [
+				80,
+				40
+			],
+			"kind": "refuge",
+			"where": "forest",
+			"radius": 3,
+			"name": "the fletcher's tree"
+		}
+	},
+	"buildings": [
+		{
+			"slot": "building.healers_hut",
+			"at": [
+				44,
+				28
+			],
+			"facing": [
+				0,
+				1
+			],
+			"code": "H1"
+		}
+	],
 	"centre": [
 		8,
 		48
@@ -88,56 +154,7 @@
 		}
 	],
 	"entities": [],
-	"places": {
-		"hunters_lean_to": {
-			"at": [
-				42,
-				72
-			],
-			"kind": "refuge",
-			"where": "forest",
-			"radius": 3,
-			"name": "the hunters' lean-to"
-		},
-		"woodcutters_lean_to": {
-			"at": [
-				75,
-				15
-			],
-			"kind": "refuge",
-			"where": "forest",
-			"radius": 3,
-			"name": "a woodcutters' lean-to deep in the forest"
-		},
-		"thick_wood": {
-			"at": [
-				25,
-				66
-			],
-			"kind": "refuge",
-			"where": "forest",
-			"radius": 3,
-			"name": "where the trees are thickest"
-		},
-		"boar_path": {
-			"at": [
-				44,
-				60
-			],
-			"kind": "refuge",
-			"where": "forest",
-			"radius": 3,
-			"name": "the path to the hunters' camps"
-		},
-		"fletchers_tree": {
-			"at": [
-				80,
-				40
-			],
-			"kind": "refuge",
-			"where": "forest",
-			"radius": 3,
-			"name": "the fletcher's tree"
-		}
+	"building_codes": {
+		"H": 1
 	}
 }

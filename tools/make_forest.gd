@@ -20,7 +20,8 @@ extends Node
 ##   trees.json (or no ForestPack yet) the map is laid without trunks;
 ## - the link back to the wilds on the west edge, and the way on to the
 ##   stronghold on the east edge, closed for now (level.json "closed").
-## No monsters, no buildings. The same seed makes the same map.
+## - the sought's refuges (613 amended) and a healer's hut (641, HEALER).
+## No monsters, no buildings but the healer's. The same seed makes the same map.
 
 const SIZE := Vector2i(96, 96)
 const SEED := 452
@@ -40,6 +41,20 @@ const CLEARINGS := [
 	{"centre": Vector2i(80, 44), "radius": 7},
 ]
 const PATH_WIDTH := 2
+## The sought's refuges here (613 amended: one place a story, its key the
+## story's tag), each {at, name}.
+const REFUGES := {
+	"hunters_lean_to": {"at": Vector2i(42, 72), "name": "the hunters' lean-to"},
+	"woodcutters_lean_to": {"at": Vector2i(75, 15), "name": "a woodcutters' lean-to deep in the forest"},
+	"thick_wood": {"at": Vector2i(25, 66), "name": "where the trees are thickest"},
+	"boar_path": {"at": Vector2i(44, 60), "name": "the path to the hunters' camps"},
+	"fletchers_tree": {"at": Vector2i(80, 40), "name": "the fletcher's tree"}}
+## The forest's healer's hut (641, maps' side; Jeff: "multiple huts that
+## offer different potions"): a building.healers_hut (its place,
+## Level.BUILDING_PLACES) in the middle clearing north of the path, its
+## door south toward it; its own medicine man (Main._seat_healers), what
+## it makes economy's (healers_hut.makes "forest").
+const HEALER := {"at": Vector2i(44, 28), "facing": Vector2i(0, 1)}
 const FOREST_PACK := "res://editor/forest_pack.gd"
 const TREES := "res://levels/forest/trees.json"
 
@@ -74,6 +89,7 @@ func _ready() -> void:
 	_path(CLEARINGS[3]["centre"], east)
 	_path(CLEARINGS[1]["centre"], CLEARINGS[2]["centre"])
 	_trunks()
+	_places()
 	_links(west, east)
 	var doc := MapDoc.open(FOLDER, SIZE)
 	doc.map = map
@@ -129,6 +145,26 @@ func _trunks() -> void:
 	var pack: GDScript = load(FOREST_PACK)
 	var count: int = pack.call("from_trees", map, TREES)
 	print("[forest] %d trunks from the grown trees" % count)
+
+
+## The refuges in "places", and the healer's hut (HEALER): its outline's
+## walls and its door, the front's middle edge, in "buildings".
+func _places() -> void:
+	var places := {}
+	for key: String in REFUGES:
+		var at: Vector2i = REFUGES[key]["at"]
+		places[key] = {"at": [at.x, at.y], "kind": "refuge", "where": "forest", "radius": 3, "name": REFUGES[key]["name"]}
+	config["places"] = places
+	var facing: Vector2i = HEALER["facing"]
+	var rect := Rect2i(HEALER["at"], Level.BUILDINGS["building.healers_hut"])
+	var door := Level.front_cell(rect, facing) - facing
+	var cells: Array[Vector2i] = []
+	for y in range(rect.position.y, rect.end.y):
+		for x in range(rect.position.x, rect.end.x):
+			cells.append(Vector2i(x, y))
+	for key in Level.blocks_outline(cells):
+		map.set_edge(key, "door" if key == Terrain.edge_key(door, facing) else "wall")
+	config["buildings"] = [{"slot": "building.healers_hut", "at": [rect.position.x, rect.position.y], "facing": [facing.x, facing.y]}]
 
 
 ## The links: back to the wilds at [param west], on to the stronghold

@@ -199,6 +199,7 @@ func _test_every_level() -> void:
 	_test_plots()
 	_test_refuges()
 	_test_herders()
+	_test_forest_healer()
 	print("
 == the levels connect: WorldMap.problems() (links and spawn points, ways back, reachable) ==")
 	var problems := WorldMap.build().problems()
@@ -607,6 +608,35 @@ func _test_herders() -> void:
 		var path := World.find_path(level["starts"][0], stand, true)
 		var into := World.find_path(stand, inside, true)
 		_check(not path.is_empty() and not into.is_empty(), "%s: walked to from the start (%d steps) and into the fold through its gate (%d)" % [key, path.size(), into.size()])
+	_main.load_map("test_room")
+
+
+func _test_forest_healer() -> void:
+	print("\n== the forest's healer's hut (641): its place, open ground round it, walked into ==")
+	var level := Level.load_level("forest")
+	_check(_main.load_map("forest"), "forest loads")
+	var huts: Array = level["buildings"].filter(func(b: Dictionary) -> bool: return b["slot"] == "building.healers_hut")
+	var places: Array = level["places"].values().filter(func(p: Dictionary) -> bool: return p["kind"] == "healers_hut")
+	_check(huts.size() == 1 and places.size() == 1 and level["warnings"].is_empty(), "one hut, one healers_hut place, no warnings (%s)" % [level["warnings"]])
+	if huts.size() != 1 or places.size() != 1:
+		_main.load_map("test_room")
+		return
+	var rect: Rect2i = huts[0]["rect"]
+	var floor := {}
+	for cell: Vector2i in level["terrain"]["floor"]:
+		floor[cell] = true
+	var blocked := []
+	var ring := rect.grow(2)
+	for y in range(ring.position.y, ring.end.y):
+		for x in range(ring.position.x, ring.end.x):
+			if not floor.has(Vector2i(x, y)):
+				blocked.append(Vector2i(x, y))
+	_check(blocked.is_empty(), "open ground two cells round it (blocked %s)" % [blocked.slice(0, 4)])
+	var front: Vector2i = places[0]["cell"]
+	var inside := rect.position + Vector2i.ONE
+	var path := World.find_path(level["starts"][0], front, true)
+	var into := World.find_path(front, inside, true)
+	_check(not path.is_empty() and not into.is_empty(), "its door walked to from the start (%d steps) and in (%d)" % [path.size(), into.size()])
 	_main.load_map("test_room")
 
 

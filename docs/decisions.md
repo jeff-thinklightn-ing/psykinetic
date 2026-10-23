@@ -25998,3 +25998,26 @@ fence and off the trough for each gate side, none for none, six drawn of
 nine, two at once after a drove leaves). Level data and client; the
 "folds" message is economy's (MESSAGE_KINDS, a line under 34, by
 whichever side lands first): a wire change. No new class_name.
+
+## 641, maps' side: the forest's healer's hut
+
+Jeff: "multiple huts that offer different potions". The coordinator's
+ruling: a second healer's hut in a zone Hob's hut in the wilds doesn't
+serve. Economy's side (641) lists what each hut makes by its place's
+key, then its area ("forest": the remedy and items' steadying draught,
+642, once both land), and Main._seat_healers already seats a medicine man
+of his own in every healers_hut place.
+- A building.healers_hut (3 x 3) at (44, 28) in the forest's middle
+  clearing, north of the path, its door south toward it; its place is
+  Level.BUILDING_PLACES' own, forest/healers_hut@45,31 (the cell before
+  the door). Open ground two cells round it (the clearing keeps it clear
+  of trunks).
+- A healer's hut is also where the fallen come back (decision 372): the
+  forest now has its own such place.
+- Laid by tools/make_forest.gd (HEALER), which now writes the forest's
+  places too (the five refuges, hand-added before), so a rerun keeps
+  them; the rerun is otherwise the level as it was.
+tests: level_test _test_forest_healer (one hut and its place, no
+warnings, open ground two cells round, its door walked to from the start
+and in); forage_test and resident_test pass with it. Level only,
+protocol unchanged, no new class_name.
