@@ -590,6 +590,18 @@ func _test_aim() -> void:
 	_check(Main.aim_pips(3, [3, 5, 7, 9]) == 4 and Main.aim_pips(9, [3, 5, 7, 9]) == 1 and Main.aim_pips(4, [3, 5, 7, 9]) == 0 and Main.aim_pips(5, []) == 0,
 		"pips: four at the shortest step, one at the longest, none off the steps or without them")
 	_check(Main.aim_fade(0) == 0.0 and absf(Main.aim_fade(100) - 0.5) < 0.001 and Main.aim_fade(400) == 1.0, "the arc fades in over its first fifth of a second")
+	# The cone of flight (combat's design, ui's side): the far end's points and the eased half-angle.
+	var ends := Client3D.cone_points(origin, 0.0, 5.0, deg_to_rad(25.0))
+	_check(ends.size() == Client3D.AIM_SEGMENTS + 1 and ends[0].is_equal_approx(origin + Vector2.from_angle(deg_to_rad(-25.0)) * 5.0)
+		and ends[ends.size() - 1].is_equal_approx(origin + Vector2.from_angle(deg_to_rad(25.0)) * 5.0)
+		and ends[Client3D.AIM_SEGMENTS / 2].is_equal_approx(origin + Vector2(5.0, 0.0))
+		and Array(ends).all(func(p: Vector2) -> bool: return absf(p.distance_to(origin) - 5.0) < 0.001),
+		"the cone's far end: the step's radius from the archer, the spread either side of the aim, the marker's point in the middle")
+	_check(Client3D.eased_spread(-1.0, 0.4, 0.016) == 0.4 and Client3D.eased_spread(0.4, -1.0, 0.016) == -1.0
+		and absf(Client3D.eased_spread(0.4, 0.2, World.TICK_DT * 0.5) - 0.3) < 0.0001 and Client3D.eased_spread(0.4, 0.2, World.TICK_DT * 2.0) == 0.2,
+		"the drawn half-angle: the sim's at once from none, else eased toward it over a tick, never past it")
+	var player_body: GridEntity = _main._local_player()
+	_check(player_body == null or Main.spread_now(player_body) >= -1.0, "the sim's spread by name, -1 for none (the arc alone)")
 	var args := Main.loose_args(angle, Vector2i(16, 6))
 	_check(args.get("at") == [16, 6] and absf(float(args.get("angle")) - angle) < 0.000001, "loose carries the angle and the arc's cell (%s)" % [args])
 	_check(Main.loose_args(NAN, Vector2i(2, 3)) == {"at": [2, 3]}, "no aim: the old cell alone")

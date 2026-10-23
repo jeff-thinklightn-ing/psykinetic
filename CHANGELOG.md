@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The archer's aim shows a cone of flight: wide as the draw starts, narrowing the longer you hold, stepping out with each range step and still narrowing at the last; the arrow flies a line inside it (620, ui's side; combat's design).
 - The zone's big map draws each way out as what stands there: an arch or waystones turned the way they face, a dark mouth for a stair down, a light ring for a stair up, a struck dot for a sealed way that names no destination; on the known world a sealed way draws dim and a way down or up ends in the mouth or the ring (589, ui's side).
 - Your companion's card page (C): her name, what she has learned from the lands you crossed and who taught it, in her words, and how she fights drawn as a small chart of fighting, magic and stealth with her lean beside it in her words; how she feels about you, the same word the party line gives with its newest reason; her purse joins the page when she carries your gold (618, ui's side).
 - Stacks on the interface: a slot holding more than one shows the count in its corner, Shift-drag moves one unit, in a barter a click gives the whole stack and Shift-click one at a time with the hover reading "3 of 5 to give", a pile's hint counts its kind ("5 herbs") and lies as one heap per kind (619, ui's side).

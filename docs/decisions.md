@@ -24449,3 +24449,30 @@ ui_test _test_card_page: the words, the purse's, the chart's points, her
 name's sources, the page read from the world message while open (a mark,
 an even hand, a lean, the purse row), Esc, and the host's own sim telling
 her focus. Client only; protocol unchanged; new class_name CardPage.
+## 620, ui's side: the cone of flight, drawn
+
+Jeff on v0.1.168: "a cone of flight that narrows the longer the aim,
+extends out to each level the final level continues to narrow down the
+longer held". Combat's design (C:/dev/review/combat/archery_cone/design.md,
+approved by the coordinator): the sim's spread, Items.spread_at(verb,
+held) through World.spread_of(entity) (radians, -1 while not drawing),
+25 degrees at the draw's start lerped down the steps to 6, then to a floor
+of 2 over 40 ticks of the last step, no reset when the aim turns; the
+server rolls the arrow's line inside it. ui draws it and never guesses an
+angle:
+- `Client3D.aim_arc` takes the spread: with one, the arc becomes the far
+  end of a wedge from the archer along the aim, as long as the step,
+  that wide either side (`_make_arc`'s span), with a translucent fill
+  (AIM_CONE_FILL) and the two sides as lines (`_cone_mesh`,
+  `_cone_rim_mesh`); the marker and the pips sit where they did. Every
+  far point and each side's piece sits on the ground under it
+  (`_cone_vertex`), so a wedge over a slope follows it instead of sinking.
+- The drawn half-angle eases toward the sim's over one tick
+  (`eased_spread`, AIM_CONE_EASE_TICKS), the sim's at once from none, so a
+  tick's step never pops; the 200 ms fade stays on the far end at each
+  step. Nothing draws before the first step (the cone has no length then).
+- `Main.spread_now` reads World.spread_of by name: -1 before
+  pc-character's sim lands or for a bow with none, and then the arc is the
+  half-circle it was. Nothing on the wire from ui; the 617 lead unchanged.
+ui_test: the far end's points, the easing, spread_now. Client only, no new
+class_name.

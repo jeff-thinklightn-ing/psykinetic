@@ -1889,7 +1889,7 @@ func _update_aim(player: Player, drawing: bool) -> void:
 	_aim_mark_cell = Vector2i(point.round())
 	var pips := aim_pips(radius, range_steps(player))
 	if _client3d != null:
-		_client3d.aim_arc(origin, aim_angle, float(radius), alpha, pips, radius > 0)
+		_client3d.aim_arc(origin, aim_angle, float(radius), alpha, pips, radius > 0, spread_now(player))
 		_client3d.aim_lead(Vector2.from_angle(aim_angle), true)  # 617: the view leads toward the aim while drawn.
 	else:
 		_update_aim_line(origin, float(radius), alpha)
@@ -1902,6 +1902,15 @@ static func range_now(player: GridEntity) -> int:
 		return int(World.call("range_of", player))
 	var verb := Items.verb_of(World.drawn_with(player))
 	return int(verb.get("cells", 0)) if World.draw_of(player) > 0.0 else 0
+
+
+## The cone of flight's half-angle now (radians): the sim's World.spread_of
+## by name (combat's design: the server rolls the line inside it; -1 while
+## not drawing), -1 before it lands or for a bow with none (the arc alone).
+static func spread_now(player: GridEntity) -> float:
+	if World.has_method("spread_of"):
+		return float(World.call("spread_of", player))
+	return -1.0
 
 
 ## The verb's range steps in cells, shortest first (items' "range_steps";
