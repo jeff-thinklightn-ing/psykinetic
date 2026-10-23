@@ -47,13 +47,12 @@
 			]
 		},
 		{
-			"id": "raid_on_farmstead",
+			"id": "smith_ambush",
 			"type": "event",
-			"name": "the raid that took the smith",
-			"status": "asked",
-			"source": "roadmap",
-			"summary": "The smith and his hammer were taken in a raid; by whom and why is open.",
-			"ask": "C3",
+			"name": "the ambush that took the smith",
+			"status": "agreed",
+			"source": "Jeff",
+			"summary": "The smith's expedition below the castle was ambushed and he was captured (docs/lore/castle.md).",
 			"relations": [
 				{
 					"to": "smith",
@@ -65,11 +64,15 @@
 			],
 			"facts": [
 				{
-					"id": "raid_on_farmstead.who",
-					"text": "Who raided, where, and why they took the smith and his hammer.",
+					"id": "smith_ambush.captured",
+					"text": "The smith's expedition was ambushed below the castle, and the smith was captured.",
 					"known": "common",
-					"where": [],
-					"ask": "C3"
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"source": "Jeff",
+					"status": "agreed"
 				}
 			]
 		},

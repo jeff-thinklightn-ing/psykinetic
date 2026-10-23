@@ -107,10 +107,12 @@ open.
 ## The smith
 
 In the roadmap's first scenario the smith is taken, and his hammer with him, and
-the players bring him home. The first draft had goblins take him from a
-farmstead and hold him in an overrun castle's keep. That castle was a
-placeholder. Who takes him now, from where and why, is open *(asked: C3)*. The
-smith's name, and whether his hammer has one, are open *(asked: E3)*.
+the players bring him home. Jeff (2026-10-22): the smith heard rumours of a great
+dwarven forge deep below the castle and went down after it, bringing an expedition of
+hired guards to protect him and carry out what they found. They were ambushed and he
+was captured. He is held at the forge, forced to work goblin weapons that supply the
+Blood Rot's raids. The smith's name, and whether his hammer has one, are open
+*(asked: E3)*.
 
 ## The castle and the labyrinths
 

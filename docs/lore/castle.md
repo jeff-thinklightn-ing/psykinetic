@@ -89,9 +89,32 @@ Companion file: `blood_rot.md` (the region's main faction and the tower).
 
 ---
 
+## The smith below the castle (Jeff, 2026-10-22)
+
+Jeff's answer to C3, relayed word for word by the coordinator, for dungeon's Dwarven
+Halls under the castle's gatehouse (613):
+
+> "blacksmith is there, heard rumors of a great dwarven forge deep below - he brought a expedition of hired guards with him to protect him and carry out what they found - they got ambushed and he was captured, forced to work goblin weapons that supply the blood rot raids"
+
+| Fact | Known | Status |
+|---|---|---|
+| `smith.forge_rumour`: Rumour tells of a great dwarven forge deep below the castle. | rumour (true), the Woodlands | agreed |
+| `smith.expedition`: The smith went down after the great dwarven forge, bringing an expedition of hired guards to protect him and carry out what they found. | common, the Woodlands | agreed |
+| `smith_ambush.captured`: The smith's expedition was ambushed below the castle, and the smith was captured. | common, the Woodlands | agreed |
+| `smith.forced`: The smith is held at the great dwarven forge, forced to work goblin weapons that supply the Blood Rot's raids. | secret: the smith, the Blood Rot | agreed |
+| `smith.guards_fallen`: The hired guards' remains and gear lie on the way down to the great dwarven forge. | secret: the smith | draft (lore's detail, the coordinator's suggestion) |
+
+So his holders are goblins, and the raids are armed from under the castle. That bears on A2
+(who overran the castle), which stays open, and on H8 (the smith at least is held, and can be
+brought home). The first draft's raid on a farmstead is gone: the event is now
+`smith_ambush`.
+
+---
+
 ## Log
 
 - Session 2: castle returns as dwarven-built cover over the labyrinths, treasure
   rumoured and never found (Jeff). Mostly overrun; maps lost; labyrinths and tower
   interior shift, perhaps by magic; adventurers still come (Jeff).
 - Session 2, cont.: dwarven artifacts come from the dungeons below (Jeff).
+- 2026-10-22: the smith went below after a rumoured great dwarven forge with hired guards, was ambushed and captured, and works goblin weapons for the Blood Rot's raids (Jeff, C3).

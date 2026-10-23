@@ -65,24 +65,68 @@
 			"id": "smith",
 			"type": "person",
 			"name": "the smith",
-			"status": "draft",
-			"source": "roadmap",
-			"summary": "The smith the town must bring home, taken with his hammer.",
+			"status": "agreed",
+			"source": "Jeff",
+			"summary": "The town's smith, who went below the castle after a rumoured great dwarven forge with hired guards; ambushed and captured, he is held at the forge, forced to work goblin weapons for the Blood Rot's raids (docs/lore/castle.md).",
 			"relations": [
 				{
 					"to": "smiths_hammer",
 					"kind": "carries"
+				},
+				{
+					"to": "castle",
+					"kind": "held_at"
 				}
 			],
 			"tags": [],
 			"facts": [
 				{
-					"id": "smith.taken",
-					"text": "Who took the smith, from where, and where he is held.",
+					"id": "smith.forge_rumour",
+					"text": "Rumour tells of a great dwarven forge deep below the castle.",
+					"known": "rumour",
+					"true": true,
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"source": "Jeff",
+					"status": "agreed"
+				},
+				{
+					"id": "smith.expedition",
+					"text": "The smith went down after the great dwarven forge, bringing an expedition of hired guards to protect him and carry out what they found.",
 					"known": "common",
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"source": "Jeff",
+					"status": "agreed"
+				},
+				{
+					"id": "smith.forced",
+					"text": "The smith is held at the great dwarven forge, forced to work goblin weapons that supply the Blood Rot's raids.",
+					"known": "secret",
 					"where": [],
-					"status": "asked",
-					"ask": "C3"
+					"knowers": [
+						"smith",
+						"blood_rot"
+					],
+					"tags": [],
+					"source": "Jeff",
+					"status": "agreed"
+				},
+				{
+					"id": "smith.guards_fallen",
+					"text": "The hired guards' remains and gear lie on the way down to the great dwarven forge.",
+					"known": "secret",
+					"where": [],
+					"knowers": [
+						"smith"
+					],
+					"tags": [],
+					"source": "lore",
+					"status": "draft"
 				},
 				{
 					"id": "smith.name",

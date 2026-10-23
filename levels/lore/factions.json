@@ -189,14 +189,6 @@
 					"where": [],
 					"source": "proposal",
 					"status": "draft"
-				},
-				{
-					"id": "goblins.why_smith",
-					"text": "Who took the smith and his hammer, and why.",
-					"known": "common",
-					"where": [],
-					"status": "asked",
-					"ask": "C3"
 				}
 			]
 		},
