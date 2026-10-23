@@ -24241,3 +24241,11 @@ written out with each owner's part in docs/archery.md.
 
 Tests: view_test checks the nocked arrow is visible, a spent arrow falls past its aim and stands
 nose down, and an arrow off stone lies at the wall's foot. Client only, no new class_name.
+
+Seen in flight (the coordinator, from the archery clip: at the game's camera
+the arrow was a hairline): while it flies the arrow is drawn ARROW_FLIGHT_GIRTH
+(2.5) times its girth, with a pale trail tapering ARROW_TRAIL (1.3 m) back from
+its tail (unlit, alpha 0.3, no shadow; it marks the line, it isn't a comet).
+Both go as it comes to rest (_rest_arrow), so an arrow standing in the ground,
+stuck in wood or lying under a wall is its true size. No art-kit change; a
+chunkier fx.arrow is the next step if Jeff still can't see it in play.

@@ -529,8 +529,17 @@ func _test_bow_sounds() -> void:
 	expected = "sfx.arrow_land"
 	arrows_before = _shot_arrows()
 	player._world_shot(Vector2(open), &"ground")
-	await get_tree().create_timer(0.6).timeout
+	await get_tree().create_timer(0.05).timeout
+	# Seen in flight (the coordinator: a hairline in the game's camera): thicker, a pale trail behind.
+	var flying := _shot_arrows().filter(func(arrow: Node3D) -> bool: return not arrow in arrows_before)
+	_check(flying.size() == 1 and (flying[0] as Node3D).get_node_or_null("Trail") != null
+			and is_equal_approx((flying[0] as Node3D).transform.basis.x.length(), Client3D.ARROW_FLIGHT_GIRTH),
+			"an arrow in flight is drawn %.1f times its girth, a pale trail behind it" % Client3D.ARROW_FLIGHT_GIRTH)
+	await get_tree().create_timer(0.55).timeout
 	var landed := _shot_arrows().filter(func(arrow: Node3D) -> bool: return not arrow in arrows_before)
+	_check(landed.size() == 1 and (landed[0] as Node3D).get_node_or_null("Trail") == null
+			and is_equal_approx((landed[0] as Node3D).transform.basis.x.length(), 1.0),
+			"come to rest: its true girth, the trail gone")
 	if open.x >= 0 and landed.size() == 1:
 		var arrow: Node3D = landed[0]
 		var aimed := _rig._tile_position(open)

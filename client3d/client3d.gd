@@ -1114,6 +1114,13 @@ const ARROW_GLANCE := 0.5
 const ARROW_GLANCE_UP := 0.3
 const ARROW_GLANCE_TURN := 2.2
 const ARROW_GLANCE_SECONDS := 0.35
+## An arrow while it flies (the coordinator: a hairline in the game's camera)
+## is drawn ARROW_FLIGHT_GIRTH times its girth, a pale trail ARROW_TRAIL long
+## tapering behind it (ARROW_TRAIL_ALPHA); both go as it comes to rest, so
+## the arrow standing or lying is its true size (_rest_arrow).
+const ARROW_FLIGHT_GIRTH := 2.5
+const ARROW_TRAIL := 1.3
+const ARROW_TRAIL_ALPHA := 0.3
 ## The bow's held creak (decision 475): its pitch, and its level over the
 ## slot's in dB, from no draw (x) to full (y).
 const CREAK_PITCH := Vector2(0.85, 1.25)
@@ -12270,9 +12277,12 @@ func _on_shot(point: Vector2, struck: StringName, id: int) -> void:
 	var arrow := _flying_arrow(shooter)
 	arrow.name = "ShotArrow"
 	puppet.get_parent().add_child(arrow, true)
+	_fly_arrow(arrow)
 	_head_arrow(arrow, from, stop - from)
 	var tween := create_tween()
 	tween.tween_method(func(t: float) -> void: _head_arrow(arrow, from.lerp(stop, t), stop - from), 0.0, 1.0, flight)
+	if not sags:
+		tween.tween_callback(_rest_arrow.bind(arrow))
 	if body != null and shooter != null and World.spares(shooter, hit):
 		# A friend on the line (decision 456): it sticks in them a while,
 		# moving with them.
@@ -12303,6 +12313,7 @@ func _on_shot(point: Vector2, struck: StringName, id: int) -> void:
 		tween.tween_method(func(t: float) -> void:
 			_head_arrow(arrow, stop + along * ARROW_SAG * t + Vector3.DOWN * drop * t * t,
 				along * ARROW_SAG + Vector3.DOWN * 2.0 * drop * t), 0.0, 1.0, falling)
+		tween.tween_callback(_rest_arrow.bind(arrow))
 		if landed == "sfx.arrow_land":
 			tween.tween_callback(func() -> void:
 				_head_arrow(arrow, down + (along * ARROW_SAG + Vector3.DOWN * 2.0 * drop).normalized() * ARROW_BURY,
@@ -12361,14 +12372,56 @@ static func _flying_arrow(shooter: GridEntity) -> Node3D:
 
 
 ## [param arrow] at [param at], its head (its +y, as art-kit draws it) along
-## [param heading].
+## [param heading]; its girth (x and z) its meta "girth" times, 1 at rest.
 static func _head_arrow(arrow: Node3D, at: Vector3, heading: Vector3) -> void:
 	if not is_instance_valid(arrow):
 		return
 	var y := heading.normalized() if not heading.is_zero_approx() else Vector3.FORWARD
 	var x := y.cross(Vector3.UP) if absf(y.dot(Vector3.UP)) < 0.99 else Vector3.RIGHT
 	x = x.normalized()
-	arrow.transform = Transform3D(Basis(x, y, x.cross(y)), at)
+	var girth := float(arrow.get_meta("girth")) if arrow.has_meta("girth") else 1.0
+	arrow.transform = Transform3D(Basis(x * girth, y, x.cross(y) * girth), at)
+
+
+## [param arrow] dressed for its flight: ARROW_FLIGHT_GIRTH thick, and a pale
+## trail tapering back from its tail (a cone, ARROW_TRAIL long; it marks the
+## line, it isn't a comet), unlit and casting no shadow.
+static func _fly_arrow(arrow: Node3D) -> void:
+	arrow.set_meta("girth", ARROW_FLIGHT_GIRTH)
+	var tail := 0.0
+	for mesh: MeshInstance3D in ([arrow] if arrow is MeshInstance3D else []) + arrow.find_children("*", "MeshInstance3D", true, false):
+		var box := mesh.get_aabb()
+		tail = minf(tail, (arrow.global_transform.affine_inverse() * mesh.global_transform * box.position).y if mesh.is_inside_tree() else box.position.y)
+	var trail := MeshInstance3D.new()
+	trail.name = "Trail"
+	var cone := CylinderMesh.new()
+	cone.height = ARROW_TRAIL
+	cone.top_radius = 0.008
+	cone.bottom_radius = 0.0
+	cone.radial_segments = 6
+	cone.rings = 1
+	trail.mesh = cone
+	var paint := StandardMaterial3D.new()
+	paint.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	paint.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	paint.albedo_color = Color(1.0, 0.97, 0.88, ARROW_TRAIL_ALPHA)
+	trail.material_override = paint
+	trail.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	trail.position = Vector3(0.0, tail - ARROW_TRAIL * 0.5, 0.0)
+	arrow.add_child(trail)
+
+
+## [param arrow] come to rest (struck, stuck, glanced, or down past its
+## range): its true girth, its trail gone.
+static func _rest_arrow(arrow: Node3D) -> void:
+	if not is_instance_valid(arrow):
+		return
+	arrow.remove_meta("girth")
+	arrow.transform.basis = arrow.transform.basis.orthonormalized()
+	var trail := arrow.get_node_or_null("Trail")
+	if trail != null:
+		arrow.remove_child(trail)
+		trail.queue_free()
 
 
 ## A blow wound up over [param ticks]: the heavy swing, timed to connect
