@@ -24709,3 +24709,44 @@ view_test _test_worn: nothing worn, no covering; each of the four kinds its own 
 colour over a vest; taken off, the vest again; a look's worn= word, a known look only, in its
 kind's colour. Client only, protocol unchanged, no new class_name. The sheet of the four on two
 builds follows the coordinator's all-clear.
+
+## 608 amended, dungeon's side: the hidden door's clues, the draft line and the marker
+
+Jeff on the crypt layers: "there should be environmental clues of the
+hidden area, foot prints, a draft, a text saying 'you feel a cool draft
+coming from one of the niches'" and "asking companion to search the room
+for secrets they may walk over to an area." The design (dungeon,
+C:/dev/review/dungeon/hidden_door_clues_design.md, the coordinator's
+approval 2026-10-23) gives every clue the one marker already in the level
+data, the terrain's niche of kind "hidden" written anew by each generation
+(608), so each points at the true niche, moves with it, and none can be
+faked elsewhere; found means its Door is open. Nothing crosses the wire for
+any clue. The sides: art-kit's `prop.footprints` placed by terrain on the
+niche's cell, environment's dust draft from the edge while shut, sound's
+`amb.draft` there till open, companions' search walking her near it, and
+dungeon's, here.
+
+- `World.hidden_niche() -> Dictionary`: the zone's hidden niche as
+  `{cell, edge, open}` (`cell` its floor cell, the one stepped from, kept
+  per zone in `World.niche_cells` beside `niche_edges`; `edge` its door's
+  edge key; `open` the Door's state), `{}` in a zone with none. The
+  companions' search and anything else reads it; the drawn clues read the
+  terrain's own list, as the niche pieces do.
+- `Main.hall_rect(zone_name) -> Rect2i`: the first hall, the "entrance"
+  anchor's rect from `Regen.config_of` (the first anchor unless one is
+  named), `Rect2i()` for a level that does not regenerate. Companions'
+  search uses it for "in the hall"; the line below does.
+- The line: "You feel a cool draft coming from one of the niches." sent to
+  the player alone as a party line (as "The door is shut." is), the first
+  time they step into the hall each generation and only while the hidden
+  door is still shut (`Main._tell_draft` from `_on_entity_moved`; the once
+  is `_draft_told["<id>@<zone>"] = generation`, server memory: a restart
+  says it again, as the door is found again; found, nothing, in that
+  generation or the next).
+- Said once: a player stepping about the hall hears it once; a second
+  player hears their own; a companion's search is her words, not this.
+
+level_test `_test_hidden_niche` grows the two helpers, the line on the
+first step and not the next, none once found even in a new generation,
+again when laid again with the door shut. docs/levels.md. Protocol
+unchanged (a party line); no new class_name.

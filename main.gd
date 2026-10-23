@@ -324,6 +324,9 @@ var _told_closed: Dictionary[int, Vector2i] = {}
 ## Peer -> the burial niche's edge it last pressed on (608), so pressing
 ## on at it says "Only the dead lie here." once.
 var _told_niche: Dictionary[int, Vector3i] = {}
+## "<player id>@<zone>" -> the generation the draft line was said to them in
+## (608 amended, _tell_draft): once a generation; a restart says it again.
+var _draft_told: Dictionary[String, int] = {}
 # Server console: lines from stdin (read on a thread) and from --admin-port.
 var _stdin_thread: Thread
 var _stdin_mutex := Mutex.new()
@@ -3418,6 +3421,7 @@ func load_map(level_name: String) -> bool:
 func _on_entity_moved(entity: GridEntity, _from: Vector2i, to: Vector2i) -> void:
 	if not entity is Player:
 		return
+	_tell_draft(entity, to)
 	_take_link(entity, to)
 
 
@@ -5700,6 +5704,44 @@ func _on_niche_pressed(entity: GridEntity, key: Vector3i) -> void:
 	if _told_niche.get(peer) != key:
 		_told_niche[peer] = key
 		party_log.add("Only the dead lie here.")
+
+
+## The first hall of regenerating level [param zone_name] (608 amended: where
+## the draft is felt, where she searches): the "entrance" anchor's rect from
+## its template (the first anchor unless one is named); Rect2i() for a level
+## that does not regenerate.
+func hall_rect(zone_name: String) -> Rect2i:
+	var config := Regen.config_of(zone_name)
+	var anchors: Array = config.get("anchors", [])
+	if anchors.is_empty():
+		return Rect2i()
+	var entrance: Dictionary = anchors[0]
+	for anchor: Dictionary in anchors:
+		if str(anchor.get("name", "")) == str(config.get("entrance", "")):
+			entrance = anchor
+	return entrance["rect"]
+
+
+## Server: [param player] stepped to [param to]. In the first hall with the
+## hidden door still shut (608 amended; Jeff: "a text saying 'you feel a cool
+## draft coming from one of the niches'"), the line to them alone, once a
+## generation (_draft_told); found, or a generation later, nothing or again.
+func _tell_draft(player: Player, to: Vector2i) -> void:
+	var id: String = _peer_ids.get(player.owner_peer, "")
+	if id.is_empty():
+		return
+	var rect := hall_rect(World.zone.name)
+	if rect == Rect2i() or not rect.has_point(to):
+		return
+	var niche := World.hidden_niche()
+	if niche.is_empty() or niche["open"]:
+		return
+	var key := "%s@%s" % [id, World.zone.name]
+	var generation := generation_of(World.zone.name)
+	if _draft_told.get(key, -1) == generation:
+		return
+	_draft_told[key] = generation
+	Net.broadcast_to([player.owner_peer], "party", {"from": "Server", "text": "You feel a cool draft coming from one of the niches."})
 
 
 ## A player come up into [param zone_name] by its "from_below" spawn point

@@ -545,6 +545,8 @@ var _torches: Dictionary[Vector2i, bool] = {}
 ## Edge key -> the kind of the burial niche cut into it (terrain "niches",
 ## 608): "a" to "d" art-kit's pieces, "hidden" the first hall's hidden door.
 var niche_edges: Dictionary[Vector3i, String] = {}
+## Edge key -> that niche's floor cell (608 amended: the clues' marker, hidden_niche).
+var niche_cells: Dictionary[Vector3i, Vector2i] = {}
 ## Heat and light per cell (Fields).
 var fields := Fields.new()
 ## The level's north, as a cell offset (level.json "north"; up in the
@@ -1394,6 +1396,7 @@ func enter(to: Zone) -> Zone:
 	from.cover_rect = _cover_rect
 	from.torches = _torches
 	from.niche_edges = niche_edges
+	from.niche_cells = niche_cells
 	from.fields = fields
 	from.north = north
 	from.outdoor = outdoor
@@ -1420,6 +1423,7 @@ func enter(to: Zone) -> Zone:
 	_cover_rect = to.cover_rect
 	_torches = to.torches
 	niche_edges = to.niche_edges
+	niche_cells = to.niche_cells
 	fields = to.fields
 	_trampled_here = _trampled_of(fields.level)
 	north = to.north
@@ -1669,8 +1673,10 @@ func _set_terrain(terrain: Dictionary) -> void:
 	for cell: Vector2i in terrain.get("torches", []):
 		_torches[cell] = true
 	niche_edges.clear()
+	niche_cells.clear()
 	for niche: Dictionary in terrain.get("niches", []):
 		niche_edges[niche["edge"]] = str(niche["kind"])
+		niche_cells[niche["edge"]] = niche["cell"]
 	north = terrain.get("north", Vector2i(0, -1))
 	outdoor = bool(terrain.get("outdoor", false))
 	fields.load(terrain)
@@ -1874,6 +1880,17 @@ func bearing_index(offset: Vector2) -> int:
 ## The door on edge [param key], or null.
 func door_on(key: Vector3i) -> Door:
 	return _doors.get(key)
+
+
+## The zone's hidden niche (608 amended: the marker every clue to the hidden
+## door points at): {cell (its floor cell, the one stepped from), edge (its
+## door's edge key), open (the door found: open)}; {} in a zone with none.
+func hidden_niche() -> Dictionary:
+	for key: Vector3i in niche_edges:
+		if niche_edges[key] == "hidden":
+			var door := door_on(key)
+			return {"cell": niche_cells.get(key, Terrain.edge_cells(key)[0]), "edge": key, "open": door != null and door.open}
+	return {}
 
 
 func get_doors() -> Array[Door]:

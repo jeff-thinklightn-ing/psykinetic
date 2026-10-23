@@ -1261,7 +1261,7 @@ func _test_hall_door() -> void:
 ## lie here." once a stand), the true one gives, the stair behind it is
 ## taken, and a climb from below pushes it open from behind.
 func _test_hidden_niche() -> void:
-	print("\n== the hidden door (608): niches pressed, the true one found, the stair behind it, opened from below ==")
+	print("\n== the hidden door (608): niches pressed, the true one found, the stair behind it, opened from below; the draft felt (608 amended) ==")
 	# An 8 x 6 level: a room x 1..6, y 1..4 in the rock, three niches in its
 	# north wall at (2, 1), (4, 1) and (6, 1), the last the hidden one with
 	# its alcove at (6, 0) behind a door edge and the stair link in it.
@@ -1276,7 +1276,8 @@ func _test_hidden_niche() -> void:
 	Level.register("lt_niche", Level.image_from_rows(rows, {Vector2i(3, 3): "start", Vector2i(6, 0): "link"}), null,
 		{"niches": [[2, 1, 0, -1, "a", 1], [4, 1, 0, -1, "c", 2], [6, 1, 0, -1, "hidden", 1]],
 			"links": [{"at": [6, 0], "to_map": "test_room", "to_spawn": "", "hidden": true}],
-			"spawn_points": {"from_below": [6, 1]}})
+			"spawn_points": {"from_below": [6, 1]},
+			"regenerate": {"generator": "labyrinth", "anchors": [{"name": "hall", "rect": [0, 0, 8, 6]}], "entrance": "hall"}})
 	var parsed := Level.load_level("lt_niche")
 	_check(parsed["warnings"].is_empty() and parsed["terrain"]["niches"].size() == 3 and parsed["links"][0]["hidden"],
 		"the level parses: three niches on the north wall, the stair link hidden (%s)" % [parsed["warnings"]])
@@ -1287,6 +1288,23 @@ func _test_hidden_niche() -> void:
 	_check(door != null and not door.open and door.lock == "hidden_niche" and door.body_material == GridEntity.BodyMaterial.STONE
 		and World.niche_edges.size() == 3 and World.niche_edges.get(key) == "hidden" and World.niche_edges.get(Terrain.edge_key(Vector2i(2, 1), Vector2i(0, -1))) == "a",
 		"the hidden niche's door spawns shut, locked with a key nobody holds and stone; World knows the three niche edges (%s)" % [World.niche_edges])
+	# 608 amended: the marker every clue reads, the hall, and the draft line
+	# to the player alone on their first step in the hall, once a generation,
+	# while the door is shut.
+	var heard: Array[String] = []
+	var hear := func(kind: String, data: Dictionary) -> void:
+		if kind == "party":
+			heard.append(str(data.get("text", "")))
+	Net.message_received.connect(hear)
+	var draft := "You feel a cool draft coming from one of the niches."
+	_check(_main.hall_rect("lt_niche") == Rect2i(0, 0, 8, 6) and _main.hall_rect("test_room") == Rect2i(),
+		"the hall is the entrance anchor's rect, none for a level that does not regenerate (%s)" % [_main.hall_rect("lt_niche")])
+	_check(World.hidden_niche() == {"cell": Vector2i(6, 1), "edge": key, "open": false},
+		"World.hidden_niche is the marker: its floor cell, its door's edge, shut (%s)" % [World.hidden_niche()])
+	_check(World.try_move(player, Vector2i(1, 0)) and player.tile == Vector2i(4, 3) and heard.count(draft) == 1,
+		"the first step in the hall says the draft line to the player alone (%s)" % [heard])
+	_wait_for_step(player)
+	_check(World.try_move(player, Vector2i(1, 0)) and heard.count(draft) == 1, "the next step says it no more")
 	_put(player, Vector2i(2, 1))
 	_wait_for_step(player)
 	var line := "Only the dead lie here."
@@ -1307,6 +1325,20 @@ func _test_hidden_niche() -> void:
 	_check(not World.try_move(player, Vector2i(0, -1)) and player.tile == Vector2i(6, 1) and door.open and door.lock.is_empty()
 		and _main.party_log.last(1) == ["The slab swings aside: a stair goes down into the dark."],
 		"a step into the hidden niche finds it: the lock lifted, the door open, and said (%s)" % [_main.party_log.last(1)])
+	_check(World.hidden_niche()["open"], "the marker says open")
+	# 608 amended: found, no draft, not even in a new generation; laid again
+	# with the door shut, it is felt again.
+	_main._regen["lt_niche"] = {"generation": 1, "at_step": 0}
+	_wait_for_step(player)
+	_check(World.try_move(player, Vector2i(-1, 0)) and player.tile == Vector2i(5, 1) and heard.count(draft) == 1,
+		"found, a step in the hall feels no draft (%s)" % [heard])
+	World.hold_door(door, true, "hidden_niche")
+	_wait_for_step(player)
+	_check(not door.open and World.try_move(player, Vector2i(1, 0)) and player.tile == Vector2i(6, 1) and heard.count(draft) == 2,
+		"laid again with the door shut, the draft is felt once more (%s)" % [heard])
+	Net.message_received.disconnect(hear)
+	World.hold_door(door, false, "hidden_niche")
+	door.open = true
 	_wait_for_step(player)
 	_check(World.try_move(player, Vector2i(0, -1)) and player.tile == Vector2i(6, 0), "the alcove behind it is walked into")
 	await get_tree().process_frame
@@ -1323,6 +1355,7 @@ func _test_hidden_niche() -> void:
 	_check(door.open and door.lock.is_empty() and _player().tile == Vector2i(6, 1) and _main.party_log.last(2)[0] == "The slab swings aside from behind.",
 		"come up from below, the slab is pushed open from behind and said; the player stands before it (%s)" % [_main.party_log.last(2)])
 	_main.load_map("test_room")
+	_main._regen.erase("lt_niche")
 	Level.unregister("lt_niche")
 
 

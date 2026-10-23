@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- In the barrow's first hall, the first time you step in each time it is laid again, you feel a cool draft coming from one of the niches, while the hidden door is still shut; the clues to it all point at the true niche (608 amended, dungeon's side).
 - Armour shows on the body: leather a jerkin with bracers and greaves, mail a long shirt, plate its plates, robes to the shins, each in its own colour over the clothes.
 - Fixed: with the low camera on, every body snapped to its tile each frame (the glitchy movement; fights were harder for it), and with it off a monster that had gone far off and come back stood frozen (623's hotfix).
 - Armour now does its work: mail turns a quarter of an arrow's hurt and a fifth of a spear's or dagger's thrust, plate half and nearly a third (at least 1 always gets through), and heavy armour slows your breath: plate recovers stamina a fifth slower (622, combat's side).

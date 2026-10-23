@@ -574,7 +574,18 @@ hides about 2.5 cells behind it). The templates are written from
   not in the snapshot: it is found anew); E at it presses too; a climb
   from below pushes it open from behind. The client draws the true niche
   as art-kit's `wall.crypt.cracked` till found and `wall.crypt.niche_open`
-  after, by the Door's state), the altar room (18 x 14, the
+  after, by the Door's state). The clues to it (608 amended; Jeff: "foot
+  prints, a draft, a text saying 'you feel a cool draft coming from one of
+  the niches'") all read the one marker, the level's hidden niche
+  (`World.hidden_niche()`: `{cell, edge, open}`, `{}` in a zone with none;
+  the hall `Main.hall_rect(zone_name)`, the "entrance" anchor's rect): the
+  line "You feel a cool draft coming from one of the niches." to a player
+  alone the first time they step into the hall each generation while the
+  door is shut (dungeon's; a restart says it again, as the door is found
+  again), art-kit's footprints before it (terrain places them), a dust
+  draft from the edge while shut (environment's), a whisper there (sound's),
+  and a companion asked to search the room walks near it (companions'),
+  the altar room (18 x 14, the
   altar and its two skeleton guards), Pip's niche off its west side (the
   place `barrow/niche`, npc's), and the robbers' camp (10 x 8) with the
   Runner's pack. The robbers (4) are sent near the altar; no dead walk it,

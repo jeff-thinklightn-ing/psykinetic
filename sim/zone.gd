@@ -30,6 +30,8 @@ var cover_rect := Rect2i()
 var torches: Dictionary[Vector2i, bool] = {}
 ## Edge key -> the burial niche's kind cut into it (608; World.niche_edges).
 var niche_edges: Dictionary[Vector3i, String] = {}
+## Edge key -> the niche's floor cell, the one stepped from (608 amended; World.niche_cells).
+var niche_cells: Dictionary[Vector3i, Vector2i] = {}
 ## How many times its terrain has been loaded (a reload, a generation): what
 ## reads its level.json once knows when to read it again (Monster's graves).
 var terrain_loads := 0
