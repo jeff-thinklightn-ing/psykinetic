@@ -36,6 +36,7 @@ func _ready() -> void:
 	_test_plots()
 	_test_visible_work()
 	_test_old_tower()
+	_test_narrow_ways()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -755,6 +756,24 @@ func _test_visible_work() -> void:
 	_check("Builds the towns here have in hand with no building marked for them yet (place one, on a plot first, and set_building it to the use): store: inn, loom." in session._situation(), "the request lists them")
 	session.towns = null
 	_check(session.builds_without_site().is_empty(), "no towns' records: nothing listed")
+
+
+func _test_narrow_ways() -> void:
+	print("\n== no way one cell wide (600 amended): named in the tool's answer ==")
+	_check("a doorway is the one cell allowed" in BuilderSession.system_prompt(), "the prompt says ways are two cells wide")
+	var doc := _doc()
+	for y in range(5, 10):
+		doc.map.set_edge(Terrain.edge_key(Vector2i(10, y), Vector2i.RIGHT), "wall")
+		doc.map.set_edge(Terrain.edge_key(Vector2i(11, y), Vector2i.RIGHT), "wall")
+	var session := BuilderSession.new(doc, Rect2i(0, 0, 40, 30), "test_field", StubClaude.new([]))
+	_check(session.narrow_ways() == [Vector2i(11, 5), Vector2i(11, 6), Vector2i(11, 7), Vector2i(11, 8), Vector2i(11, 9)],
+		"a lane between two walls a cell apart (%s)" % [session.narrow_ways()])
+	_check(session.street_checks().any(func(warning: String) -> bool: return warning.begins_with("a way one cell wide at (11, 5), (11, 6)")), "said in the street checks")
+	_check(BuilderSession.new(doc, Rect2i(20, 0, 20, 30), "test_field", StubClaude.new([])).narrow_ways().is_empty(), "only the area's")
+	for y in range(5, 10):
+		doc.map.set_edge(Terrain.edge_key(Vector2i(11, y), Vector2i.RIGHT), "clear")
+		doc.map.set_edge(Terrain.edge_key(Vector2i(12, y), Vector2i.RIGHT), "wall")
+	_check(BuilderSession.new(doc, Rect2i(0, 0, 40, 30), "test_field", StubClaude.new([])).narrow_ways().is_empty(), "two cells apart: none")
 
 
 func _test_old_tower() -> void:

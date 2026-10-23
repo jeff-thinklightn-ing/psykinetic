@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The level builder says where a way is only one cell wide, so you and a companion can walk everything it builds side by side.
 - The old farmstead in the wilds hides a stash: search the chest in its north hut for the tools and bandages left behind, once each. The hut chests' loose bandaging kits are gone into it.
 - The Old Tower, Snagfin's ruined castle for Held, is ready for the map: a broken tower, fallen walls round a yard, rubble, and the one roofed room where he keeps his counter.
 - Every way between areas is marked where it stands: a gate arch on the roads out of the wilds (stone toward the castle), waystones at the castle's gate, and stairs down and up between the barrow's levels (589).

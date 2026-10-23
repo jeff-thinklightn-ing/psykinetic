@@ -23789,3 +23789,15 @@ two chests stay, empty. On the box a chest's saved slots outlive this
 until it is emptied. level_test: the cache stands with its slots empty
 and no warning, the kits gone. Level only, protocol unchanged, no new
 class_name.
+
+Amended (the coordinator, after the ruin landed): builder says the rule
+for any area. BuilderSession.narrow_ways lists the area's walkable cells
+shut in on both sides, across or along, by a wall edge (a door is open: a
+doorway is the one cell allowed) or a cell no one walks (void, water,
+rock, a solid building's); street_checks names them, the first
+NARROW_SHOWN (8) and how many more ("a way one cell wide at (11, 5), ...:
+players walk with companions, so make it two cells"), so the tool's answer
+says when a change makes one and the proposal carries what is left. The
+prompt says it: every way, corridor and gap at least two cells wide. A
+niche one cell deep is named too: the check is by cell, not by route.
+builder_test _test_narrow_ways.
