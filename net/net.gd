@@ -352,6 +352,9 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## on client and server alike.
 ## 35 (626): a player and a companion replicate tending (SUBCLASS_REPLICATED):
 ## the name of the body it is bandaging, "" when not, for the views' kneel and ruffle.
+## 35 (591 amended): the "clearing" message gains "plots" [{town, kind, use,
+## rect: [x, y, w, h], facing: [dx, dy], size}] (a town's laid plots), and
+## terrain["plots"] the views raise each kind on.
 const PROTOCOL_REVISION := 35
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]

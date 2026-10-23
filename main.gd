@@ -2439,8 +2439,10 @@ func _load_level(level_name: String) -> bool:
 	# Its felled cells (591): the server's own, a client's as told.
 	if Net.is_authority() and World.clearing != null:
 		World.clearing.apply(map_name, _terrain)
-	elif _clearing_told.has(map_name):
-		Clearing.apply_cells(_terrain, _clearing_cells(map_name))
+	else:
+		if _clearing_told.has(map_name):
+			Clearing.apply_cells(_terrain, _clearing_cells(map_name))
+		Clearing.lay_plots(_terrain, _plots_told.get(map_name, []))
 	level_entities.assign(loaded["entities"])
 	_index_keys()
 	player_starts.assign(loaded["starts"])
@@ -2453,6 +2455,55 @@ func _load_level(level_name: String) -> bool:
 
 ## A client's felled cells by zone (591): zone -> cell -> stage, as told.
 var _clearing_told: Dictionary = {}
+
+
+## A client's plots by zone (591 step 2): zone -> [plots, each with the
+## "size" its kind stood at when told].
+var _plots_told: Dictionary = {}
+
+
+## [param town]'s store cell (its stockpile place's), where its plots face.
+func _store_cell(town: String) -> Vector2i:
+	return World.holdings.place(town).get("cell", Vector2i.ZERO)
+
+
+## The size [param town]'s [param kind] stands at on its plot: "large" from
+## its record's level 2 (economy's), else "small".
+func _plot_size(town: String, kind: String) -> String:
+	var level := int(World.towns.building(town, kind).get("level", 1)) if World.towns != null else 1
+	return "large" if level >= 2 else Level.KIND_SIZE
+
+
+## Plot [param plot] as a "clearing" message carries it: plot_wire's with
+## the size its kind stands at now.
+func _plot_told(plot: Dictionary) -> Dictionary:
+	var wire := Clearing.plot_wire(plot)
+	wire["size"] = _plot_size(plot["town"], plot["kind"])
+	return wire
+
+
+## Server: a plot laid in [param zone] (Clearing.plotted): a loaded zone
+## lays its kind's walls at once (open till they are up, 566), the terrain
+## drawn takes it, and everyone in the zone is told.
+func _on_plotted(zone: String, plot: Dictionary) -> void:
+	if not Net.is_authority():
+		return
+	if World.zones.has(zone):
+		var built: Array = []
+		if zone == map_name:
+			Clearing.lay_plots(_terrain, [plot], _plot_size)
+			built = _terrain["plot_buildings"]
+		else:
+			var terrain: Dictionary = Level.load_level(zone)["terrain"].duplicate(true)
+			World.clearing.apply(zone, terrain)
+			built = terrain["plot_buildings"]
+		if not built.is_empty() and (built.back() as Dictionary)["rect"].intersects(plot["rect"]):
+			World.add_plot(zone, built.back(), Level.plot_edges(built.back()))
+		if zone == map_name and _client3d != null:
+			_redraw_clearing([])
+	for peer in World.peers_in(zone):
+		if peer != Net.local_id:
+			Net.message_to(peer, "clearing", {"zone": zone, "cells": [], "plots": [_plot_told(plot)]})
 
 
 ## A zone's told cells as a "clearing" list ([[x, y, stage]]).
@@ -2502,11 +2553,27 @@ func _on_clearing(data: Dictionary) -> void:
 				(_clearing_told[zone] as Dictionary).erase(cell)
 			else:
 				_clearing_told[zone][cell] = str(each[2])
+	# Its plots (591 step 2): the whole list, or one laid.
+	var laid: Array = []
+	for wire: Variant in data.get("plots", []) if data.get("plots") is Array else []:
+		var plot := Clearing.plot_from(wire)
+		if not plot.is_empty():
+			plot["size"] = str(wire.get("size", Level.KIND_SIZE))
+			laid.append(plot)
+	if data.get("whole", false):
+		_plots_told[zone] = laid
+	else:
+		_plots_told[zone] = (_plots_told.get(zone, []) as Array) + laid
 	if zone == map_name and not data.get("whole", false) and not Net.is_authority():
 		var changes := Clearing.apply_cells(_terrain, cells)
 		for each: Array in cells:
 			World.set_floor(Vector2i(int(each[0]), int(each[1])), str(each[2]) != Clearing.TRUNK)
 		World.set_edges(changes)
+		for plot: Dictionary in laid:
+			Clearing.lay_plots(_terrain, [plot])
+			var built: Array = _terrain.get("plot_buildings", [])
+			if not built.is_empty() and (built.back() as Dictionary)["rect"].intersects(plot["rect"]):
+				World.add_plot(zone, built.back(), Level.plot_edges(built.back()))
 		if _client3d != null:
 			_redraw_clearing(cells, changes)
 
@@ -2842,8 +2909,11 @@ func _boot() -> void:
 	World.towns = Towns.new(snapshot.get("towns", {}), World.production)
 	World.towns.herders_from_dict(snapshot.get("herders", {}))  # The hill herders (640).
 	# The forest felled and growing back, as the snapshot left it (591).
-	World.clearing = Clearing.new(snapshot.get("clearing", {}))
+	World.clearing = Clearing.new(snapshot.get("clearing", {}), snapshot.get("plots", {}))
 	World.clearing.changed.connect(_on_clearing_changed)
+	# A town's plots (591 step 2): laid at its kind's size, told as laid.
+	World.clearing.size_of = _plot_size
+	World.clearing.plotted.connect(_on_plotted)
 	World.towns.building_changed.connect(_on_town_building_changed)
 	World.towns.stage_changed.connect(func(town: String) -> void: _on_town_building_changed(town, ""))  # Its stage told (591).
 	# The roofs storms broke and nobody has mended yet (decision 383).
@@ -2916,6 +2986,15 @@ func _boot() -> void:
 		return store
 	if not World.holdings.place_taken.is_connected(_on_place_taken):
 		World.holdings.place_taken.connect(_on_place_taken)
+	# A town's plots (591 step 2), once economy's Towns asks for them: where
+	# its kind's class fits on cleared level ground nearest its store (empty:
+	# not yet), and laid there facing the store.
+	if "plot" in World.towns and "lay" in World.towns:
+		World.towns.set("plot", func(town: String, kind: String) -> Rect2i:
+			return World.clearing.plot_for(town.get_slice("/", 0), str(Level.kinds().get(kind, {}).get("plot", "")), _store_cell(town)))
+		World.towns.set("lay", func(town: String, kind: String, rect: Rect2i) -> void:
+			var plot_class := str(Level.kinds().get(kind, {}).get("plot", ""))
+			World.clearing.lay_plot(town.get_slice("/", 0), town, kind, rect, Clearing.facing_for(rect, plot_class, _store_cell(town))))
 	# Wells and roofs (decision 426): a town's are its level's.
 	World.towns.wells = func(town: String) -> int:
 		var area: Dictionary = _world_map.areas.get(town.get_slice("/", 0), {})
@@ -3211,7 +3290,8 @@ func _show_zone_to(peer: int, zone_name: String, leaving: Array[GridEntity] = []
 		Net.message_to(peer, "terrain", BuilderHost.terrain_message(zone_name))
 	if World.clearing != null:
 		# Before the map: the client lays its felled cells as it loads it (591).
-		Net.message_to(peer, "clearing", {"zone": zone_name, "whole": true, "cells": World.clearing.cells_of(zone_name)})
+		Net.message_to(peer, "clearing", {"zone": zone_name, "whole": true, "cells": World.clearing.cells_of(zone_name),
+			"plots": World.clearing.plots_of(zone_name).map(_plot_told)})
 	Net.message_to(peer, "map", map_message(zone_name))
 	Net.message_to(peer, "sky", sky_message())
 	_send_towns(peer, zone_name)
@@ -4227,6 +4307,7 @@ func _save_state(wait := true) -> void:
 		"towns": World.towns.to_dict() if World.towns != null else {},
 		"herders": World.towns.herders_to_dict() if World.towns != null else {},
 		"clearing": World.clearing.to_dict() if World.clearing != null else {},
+		"plots": World.clearing.plots_to_dict() if World.clearing != null else {},
 		"roofs": World.roofs_damaged.keys(),
 		"trampled": World.trampled_to_dict(),
 		"raid_groups": World.raid_groups.to_dict() if World.raid_groups != null else {},

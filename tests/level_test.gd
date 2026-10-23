@@ -196,6 +196,7 @@ func _test_every_level() -> void:
 	_test_link_cues()
 	_test_clearing()
 	_test_felled_walls()
+	_test_plots()
 	print("
 == the levels connect: WorldMap.problems() (links and spawn points, ways back, reachable) ==")
 	var problems := WorldMap.build().problems()
@@ -450,6 +451,72 @@ func _test_clearing() -> void:
 	var again := Clearing.new(clearing.to_dict())
 	_check(again.felled == clearing.felled, "kept in the snapshot and read back the same (%s)" % [clearing.to_dict()])
 	Level.unregister("clearing_grove")
+
+
+func _test_plots() -> void:
+	print("\n== plots: a class's footprint and ring on cleared level ground nearest the store, two cells apart ==")
+	# 44 x 24 of forest (void) but a field of grass at x 2..11, y 2..21; the
+	# store at (6, 4). Past EDGE the field is 8 across: an S plot's ring.
+	var size := Vector2i(44, 24)
+	var colour := func(meaning: String) -> Color: return Color(str(Level.LEGEND[meaning]))
+	var image := Image.create_empty(size.x * 2 + 1, size.y * 2 + 1, false, Image.FORMAT_RGBA8)
+	image.fill(colour.call("void"))
+	for y in range(2, 22):
+		for x in range(2, 12):
+			image.set_pixel(x * 2, y * 2, colour.call("grass"))
+	image.set_pixel(6 * 2, 3 * 2, colour.call("start"))
+	Level.register("plot_field", image, null, {"name": "Field", "outdoor": true})
+	var store := Vector2i(6, 4)
+	var clearing := Clearing.new()
+	clearing.clock = func() -> int: return 0
+	var floor_of := func(rect: Rect2i) -> bool:
+		var base: Dictionary = clearing._base_of("plot_field")
+		return Level.rect_cells(rect).all(func(cell: Vector2i) -> bool: return base["floor"].has(cell) or clearing.felled.get("plot_field", {}).has(cell))
+	var first := clearing.plot_for("plot_field", "S", store)
+	_check(first.size == Vector2i(8, 8) and floor_of.call(first) and first.position.x == 4, "an S plot: its 6 x 6 and a ring, on the field's grass (%s)" % first)
+	_check(clearing.lay_plot("plot_field", "plot_field/store", "hut", first, Clearing.facing_for(first, "S", store))["facing"].y != 0,
+		"laid, facing the store along the field")
+	var second := clearing.plot_for("plot_field", "S", store)
+	var a := first.grow(-1)
+	var b := second.grow(-1)
+	var gap := maxi(maxi(b.position.x - a.end.x, a.position.x - b.end.x), maxi(b.position.y - a.end.y, a.position.y - b.end.y))
+	_check(second.has_area() and floor_of.call(second) and gap >= Clearing.PLOT_GAP, "a second beside it, two cells between the footprints (%s, gap %d)" % [second, gap])
+	clearing.lay_plot("plot_field", "plot_field/store", "shed", second, Clearing.facing_for(second, "S", store))
+	_check(not clearing.plot_for("plot_field", "S", store).has_area(), "a third: no cleared ground left, none (the forest stands)")
+	# Felled: x 12..21, y 4..19 of the forest, now grass.
+	clearing.felled["plot_field"] = {}
+	for y in range(4, 20):
+		for x in range(12, 22):
+			clearing.felled["plot_field"][Vector2i(x, y)] = [1, 0]
+	var third := clearing.plot_for("plot_field", "S", store)
+	_check(third.has_area() and floor_of.call(third) and third.position.x >= 12, "felled, a third fits on the cleared forest (%s)" % third)
+	var base: Dictionary = clearing._base_of("plot_field")
+	for y in range(4, 20):
+		base["roads"][Vector2i(17, y)] = true
+	_check(not clearing.plot_for("plot_field", "S", store).has_area(), "a road across it: no footprint on the road")
+	base["roads"] = {}
+	base["heights"] = {Vector2i(16, 8): 1}
+	third = clearing.plot_for("plot_field", "S", store)
+	_check(third.has_area() and not third.has_point(Vector2i(16, 8)), "a step in the ground: the plot is laid off it, on one height (%s)" % third)
+	base["heights"] = {}
+	clearing.lay_plot("plot_field", "plot_field/store", "hut", third, Clearing.facing_for(third, "S", store))
+	clearing.daily(Season.season_days * 20)
+	_check(Level.rect_cells(third).all(func(cell: Vector2i) -> bool: return clearing.felled["plot_field"].has(cell)), "its felled cells never grow back")
+	var again := Clearing.new(clearing.to_dict(), clearing.plots_to_dict())
+	_check(again.plots_of("plot_field") == clearing.plots_of("plot_field") and again.plots_of("plot_field").size() == 3,
+		"kept in the snapshot and read back the same (%s)" % [clearing.plots_to_dict()])
+	var terrain: Dictionary = Level.load_level("plot_field")["terrain"].duplicate(true)
+	clearing.apply("plot_field", terrain)
+	var built: Array = terrain.get("plot_buildings", [])
+	var theirs := built.filter(func(each: Dictionary) -> bool: return each["town_id"] == "plot_field/store" and each.get("plot", false))
+	_check(terrain["plots"].size() == 3 and built.size() == 3 and theirs.size() == 3,
+		"applied: listed for the views, each its kind's building, its town's (%s)" % [built.map(func(each: Dictionary) -> Rect2i: return each["rect"])])
+	var house: Dictionary = built[0] if not built.is_empty() else {}
+	var edges: Dictionary = Level.plot_edges(house) if not house.is_empty() else {}
+	_check(not house.is_empty() and first.grow(-1).encloses(house["rect"]) and edges.values().has(Terrain.Edge.DOOR)
+			and edges.keys().all(func(key: Vector3i) -> bool: return terrain["edges"].get(key) == edges[key]),
+		"its walls and door laid in the edges, in the footprint (%s)" % [house.get("rect")])
+	Level.unregister("plot_field")
 
 
 func _test_round_trip() -> void:

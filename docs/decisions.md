@@ -25866,3 +25866,51 @@ view_test _test_clearing: no wall or post round the four felled cells at the bui
 live fell's changed edges drawn again with none round the cell; a live regrowth after a
 build, its trunk's edges the outline again with no wall round it (the last two fail with
 the build's land alone). Client only, protocol unchanged, no new class_name.
+## 591 amended (step 2, maps): a town's plots
+
+The growth loop (591; the coordinator's approval of maps' design
+2026-10-23, with two amendments): a town's new building goes on a plot
+laid on cleared ground, so a town grows as its forest is felled.
+- Clearing.plot_for(zone, plot_class, toward) -> Rect2i: the class's
+  footprint (Level.PLOT_CLASSES) with a ring of a cell round it for its
+  path and footing (the ring's rect), nearest the town's store within
+  PLOT_REACH (64), turned either way. Every cell is floor (the level's, or
+  felled), not water, a building, a link or another plot's footprint, more
+  than EDGE in from the map's edge, all of one height (Relief.LEVEL_M is
+  above WALK_RISE: one height level); the footprint is off roads (a road
+  may touch the ring) and PLOT_GAP (2) cells clear of any other footprint,
+  standing building or wall (612, the coordinator: never a one-cell
+  walkway between). Summed tables make each candidate a few reads. An
+  empty Rect2i when nothing fits: the town fells more first; the woodcut is
+  the only clearer.
+- Clearing.facing_for(rect, plot_class, toward): the kind's +y toward the
+  store, along the axis the footprint's turn allows.
+- Clearing.lay_plot(zone, town, kind, rect, facing, use) keeps {town, kind,
+  use (economy's record key, the kind), rect, facing, day} in the world
+  snapshot's "plots", never the level overlay (the coordinator's rule for
+  the clearing); its cells never grow back; plotted is told.
+- A plot is staked ground, not a building (the coordinator): Clearing.apply
+  lists a zone's plots in terrain["plots"] (plots_of's shape, kept out of
+  level["buildings"]: buildings' 566 raises the kind on it from staked
+  ground through its stages by the record, never finished from being laid),
+  and lays each plot's kind building (Level.plot_building: its box at the
+  footprint's front, across the middle, at the record's size, level 2
+  large) in terrain["plot_buildings"] with its walls and door in the edges
+  (Level.plot_edges); Fields counts it among the town's buildings, so its
+  walls stay open until the record says they are up (566). A plot laid in a
+  loaded zone does the same live (World.add_plot).
+- Main: Towns.plot (town, kind) -> Rect2i and Towns.lay (town, kind, rect),
+  set once economy's Towns has them (economy's side: asked before a kind is
+  planned; empty, the kind waits for the next town tick). The "clearing"
+  message gains "plots" ([{town, kind, use, rect: [x, y, w, h], facing:
+  [dx, dy], size}]): the zone's all with "whole" (before "map"), else the
+  one laid; a client lays them as the server does, at the told size.
+- Known limit: a kind raised from small to large on a loaded zone keeps
+  its small walls until the zone loads again.
+tests: level_test _test_plots, an S plot on the field's grass, a second
+two cells clear, none when the forest stands, one on felled forest, none
+across a road, off a step in the ground, its cells never regrowing, the
+snapshot round trip, applied as buildings with walls and a door.
+PROTOCOL_REVISION 35 (a line under dungeon's, which opened it): the
+"clearing" message's "plots".
+No new class_name.

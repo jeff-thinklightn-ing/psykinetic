@@ -158,7 +158,8 @@ func load(terrain: Dictionary) -> void:
 		link_cells[cell] = true
 	for roof: Dictionary in terrain.get("roofs", []):
 		roofs.append(roof["rect"])
-	for building: Dictionary in terrain.get("buildings", []) + terrain.get("roofs", []):
+	# A town's laid plots' buildings too (591 step 2, Clearing.lay_plots).
+	for building: Dictionary in terrain.get("buildings", []) + terrain.get("roofs", []) + terrain.get("plot_buildings", []):
 		if not str(building.get("use", "")).is_empty() and not str(building.get("town_id", "")).is_empty():
 			# Its outline too: the wall edges that stand only once its walls are up (566).
 			var outline := Level.building_outline(building) if building.has("blocks") else Level.blocks_outline(Level.rect_cells(building["rect"]))

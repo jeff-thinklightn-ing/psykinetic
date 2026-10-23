@@ -1334,6 +1334,30 @@ func open_roofs(level: String) -> void:
 	_open_walls(level, fields_of)
 
 
+## A town's plot laid on loaded [param level] (591 step 2): its kind's
+## [param building] (Level.plot_building) one of its town buildings, its
+## [param edges] (Level.plot_edges) laid where none stand, then open until
+## its walls are up (_open_walls), as a zone load would lay it.
+func add_plot(level: String, building: Dictionary, edges: Dictionary) -> void:
+	var fields_of := _fields_of(level)
+	var zone_of: Zone = zones.get(level)
+	if fields_of == null or fields_of.level != level:
+		return
+	var at: Dictionary = _edges if fields_of == fields else (zone_of.edges if zone_of != null else {})
+	for key: Vector3i in edges:
+		if not at.has(key):
+			at[key] = edges[key]
+	fields_of.town_buildings.append({"rect": building["rect"], "use": building["use"], "town_id": building["town_id"],
+		"outline": Level.building_outline(building)})
+	if fields_of == fields:
+		_grid_rect = Rect2i()
+		_grid_steps = PackedByteArray()
+	elif zone_of != null:
+		zone_of.grid_rect = Rect2i()
+		zone_of.grid_steps = PackedByteArray()
+	_open_walls(level, fields_of)
+
+
 ## [param level]'s town buildings whose walls are not up (Towns.walls_up,
 ## decision 566: below the walls stage, or only planned) with their outline
 ## open both ways: their wall edges taken out of the level's edges (kept in

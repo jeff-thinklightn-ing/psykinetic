@@ -2469,6 +2469,55 @@ static func blocks_outline(cells: Array[Vector2i]) -> Array[Vector3i]:
 	return out
 
 
+## A town's laid plot (Clearing.plot_for, 591 step 2: {town, kind, use,
+## rect (the ring's), facing}) as the parsed building of its kind at
+## [param size], on [param terrain]: its box in the footprint (the ring's
+## rect less a cell round), at the front (+y turned to facing) and across
+## the middle; "use" and "town_id" the plot's, so Fields keeps its walls
+## open until they are up (566). {} when the kind has no such size or it
+## doesn't stand on one height of floor.
+static func plot_building(plot: Dictionary, size: String, terrain: Dictionary) -> Dictionary:
+	var footprint: Rect2i = (plot["rect"] as Rect2i).grow(-1)
+	var facing: Vector2i = plot["facing"]
+	var entry := {"kind": str(plot["kind"]), "size": size, "facing": [facing.x, facing.y], "at": [footprint.position.x, footprint.position.y]}
+	if not kinds().has(entry["kind"]) or kind_size(entry).is_empty():
+		return {}
+	var box: Rect2i = building_rect(entry)
+	var room := footprint.size - box.size
+	if room.x < 0 or room.y < 0:
+		return {}
+	var shift := Vector2i(room.x / 2, room.y / 2)
+	if facing.x != 0:
+		shift.x = room.x if facing.x > 0 else 0
+	else:
+		shift.y = room.y if facing.y > 0 else 0
+	entry["at"] = [footprint.position.x + shift.x, footprint.position.y + shift.y]
+	var warnings: Array[String] = []
+	var parsed := buildings_from({"buildings": [entry]}, terrain, warnings)
+	if parsed.is_empty() or not parsed[0].has("kind"):
+		return {}
+	var building: Dictionary = parsed[0]
+	var town := str(plot["town"])
+	building["use"] = str(plot.get("use", plot["kind"]))
+	building["town_id"] = town
+	building["town"] = town.get_slice("/", 1) if "/" in town else town
+	building["plot"] = true
+	return building
+
+
+## [param building]'s (plot_building's) edges to lay: its outline walls,
+## its doors doors, its open edges left out.
+static func plot_edges(building: Dictionary) -> Dictionary[Vector3i, int]:
+	var out: Dictionary[Vector3i, int] = {}
+	var open: Array = building.get("open", [])
+	var doors: Array = building.get("doors", [])
+	for key: Vector3i in building_outline(building):
+		if key in open:
+			continue
+		out[key] = Terrain.Edge.DOOR if key in doors else Terrain.Edge.WALL
+	return out
+
+
 ## Whether a parsed building has an inside: walked into under a roof (not a
 ## well, a field or a ruin).
 static func has_inside(building: Dictionary) -> bool:

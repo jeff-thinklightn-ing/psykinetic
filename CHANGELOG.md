@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Towns grow on cleared ground: each new building goes on a plot laid nearest the town's store, on level ground the woodcutters have cleared, with room to walk round it; while no cleared ground fits, the town waits and keeps felling.
 - The cool draft at the barrow's hidden niche is easier to see: bigger, paler puffs drifting out along the floor when you hold a light near (608 amended (2), environment's side).
 - Fixed: when someone bandaging is downed, the person they were bandaging can be bandaged again (before, they stayed half-bandaged for good).
 - Capes are hidden under armour, as vests and coats already were.
