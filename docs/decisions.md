@@ -23740,3 +23740,40 @@ the castle's links with their cue; view_test, a waystone either side of the
 castle's gate and its cell clear.
 PROTOCOL_REVISION 32 (a line under it): terrain["link_cues"] and the links'
 "cue" reach the client.
+
+## 600. The Old Tower: Snagfin's ruin in Held as one prefab
+
+Jeff named Snagfin's place in Held the Old Tower: "the ancients' broken-down
+castle", conquered in a battle; "no dead by the tower, the dead are in the
+barrows, the tower is where they lived". Maps' Held sheet puts it across the
+river at about (14..30, 86..102), the bridge road from the east, a ford path
+from the north-east. Builder lays it out; art-kit makes its pieces (600,
+art-kit's side, ae03145a); buildings its room (tower_room, 591's 14b5d667);
+economy its place (fort, 594).
+
+It is one hand-kept prefab, levels/prefabs/old_tower (tools/seed_prefabs.gd),
+17 x 17, stamped by maps with its top-left at Held (14, 86):
+- a curtain wall on the outline of its yard (1..15, 1..15), open at an east
+  gate three cells wide (y 7..9, the road at y 8) and a north-east breach two
+  wide (x 12..13); a ring of dirt round it so its walls are its own;
+- building.tower_ruin (3 x 3) on the north-west corner, solid and doorless;
+- the one room still roofed, a tower_room kind (6 x 6, stone, castle walls)
+  at (3, 3), its door south onto a dirt path to the gate;
+- Snagfin's counter at (5, 4), a chest cell with {"shop": true}, facing the
+  door; he stands behind it at (5, 3) (his home, residents.json, maps' move);
+- fallen stone, solid and doorless: six building.rubble_heap (variants 1..3)
+  against the curtain, a building.fallen_column (2 x 1) in the yard;
+- its place "old_tower", kind fort, held by the town, working for the town
+  whose store is "store" (economy's 594 makes the counter that town's shop).
+
+The three slots join Level.BUILDINGS, SOLID and DOORLESS (their footprints
+art-kit's, which view_test checks). No way in it is one cell wide but its
+doorway (the coordinator's rule, from Jeff's play test of the crypt: players
+walk with companions): the heaps stand against the wall, not a cell off it,
+and builder_test fails on any cell of the yard or room shut in on both sides.
+level_test's every-prefab check lets a prefab's place name its level's town.
+builder_test _test_old_tower: out at the gate and the breach, in at the door,
+the curtain closed with both shut, the solids, the counter, the fort.
+Rejected: a palisade fort (Jeff's tower is stone and old); graves by the
+tower (Jeff: the dead are in the barrows); the room built into the curtain's
+corner (its walls and the curtain's would share edges, drawn twice).

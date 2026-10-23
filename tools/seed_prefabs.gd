@@ -235,6 +235,70 @@ const PREFABS := {
 		],
 		"config": {"buildings": [{"slot": "building.field", "at": [1, 1], "facing": [0, 1]}]},
 	},
+	# The Old Tower (decision 600; Jeff: the ancients' broken-down castle,
+	# Snagfin's in Held): a yard walled round but at its east gate (the
+	# bridge road, y 8) and a breach in the north-east (the ford path); the
+	# broken tower solid on the north-west corner (art-kit's tower_ruin);
+	# the one room still roofed, a stone kind, its door south onto a dirt
+	# path to the gate, Snagfin's counter at its back facing the door;
+	# fallen stone (rubble heaps, a column) solid in the yard, off the path,
+	# each heap against the wall (no way one cell wide: Jeff, 2026-10-22).
+	# A ring of dirt round it so its walls are its own. Its place is a
+	# "fort" working for the town whose store is "store" (economy's 594: a
+	# counter in it is that town's shop); Snagfin's home is behind the
+	# counter, (5, 3) here.
+	"old_tower": {
+		"rows": [
+			"_ _ _ , , , , , , , , , , , , , ,",
+			"      # # # # # # # # #     # #  ",
+			"_ _ _ . . . . . . . . . . . . .#,",
+			"                                 ",
+			"_ _ _ . . . . . . . . . . . . .#,",
+			"      # # # # # #                ",
+			",#. .#_ _ _ _ _ _#. . . . . . .#,",
+			"                                 ",
+			",#. .#_ _ h _ _ _#. . . . . . .#,",
+			"                                 ",
+			",#. .#_ _ _ _ _ _#. . . . . . .#,",
+			"                                 ",
+			",#. .#_ _ _ _ _ _#. . . . . . .#,",
+			"                                 ",
+			",#. .#_ _ _ _ _ _#. . . . . . . ,",
+			"                                 ",
+			",#. .#_ _ _ _ _ _#. , , , , , , ,",
+			"      # # + # # #                ",
+			",#. . . . , , , , , , . . . . . ,",
+			"                                 ",
+			",#. . . . . . . . . . . . . . .#,",
+			"                                 ",
+			",#. . . . . . . . . . . . . . .#,",
+			"                                 ",
+			",#. . . . . . . . . . . . . . .#,",
+			"                                 ",
+			",#. . . . . . . . . . . . . . .#,",
+			"                                 ",
+			",#. . . . . . . . . . . . . . .#,",
+			"                                 ",
+			",#. . . . . . . . . . . . . . .#,",
+			"  # # # # # # # # # # # # # # #  ",
+			", , , , , , , , , , , , , , , , ,",
+		],
+		"config": {
+			"buildings": [
+				{"slot": "building.tower_ruin", "at": [0, 0], "facing": [0, 1]},
+				{"kind": "tower_room", "size": "small", "at": [3, 3], "facing": [0, 1]},
+				{"slot": "building.rubble_heap", "at": [11, 1], "facing": [0, 1]},
+				{"slot": "building.rubble_heap", "at": [15, 6], "facing": [0, 1], "variant": 2},
+				{"slot": "building.rubble_heap", "at": [15, 10], "facing": [0, 1], "variant": 3},
+				{"slot": "building.rubble_heap", "at": [1, 11], "facing": [0, 1], "variant": 2},
+				{"slot": "building.rubble_heap", "at": [15, 13], "facing": [0, 1], "variant": 3},
+				{"slot": "building.rubble_heap", "at": [7, 15], "facing": [0, 1]},
+				{"slot": "building.fallen_column", "at": [9, 11], "facing": [0, 1]},
+			],
+			"entities": [{"at": [5, 4], "facing": [0, 1], "props": {"shop": true}}],
+			"places": {"old_tower": {"at": [8, 8], "kind": "fort", "radius": 7, "holder": "town", "town": "store", "name": "the Old Tower"}},
+		},
+	},
 }
 
 

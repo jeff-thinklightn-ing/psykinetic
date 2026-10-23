@@ -204,9 +204,10 @@ func _test_every_level() -> void:
 		var folder := Prefab.DIR + prefab_name + "/"
 		var image_ok := load(folder + "layout.png") is Image
 		var prefab := Prefab.load_prefab(prefab_name)
-		# A piece of map has no start of its own: that warning is expected.
+		# A piece of map has no start of its own, and its places work for
+		# the level's town (the Old Tower's "store"): those warnings are expected.
 		var warnings: Array = Level.parse(prefab["map"].to_image(), null, prefab["config"])["warnings"].filter(
-				func(warning: String) -> bool: return not warning.begins_with("no player start"))
+				func(warning: String) -> bool: return not warning.begins_with("no player start") and not warning.ends_with("no stockpile place of that key here; it works for none"))
 		_check(image_ok and warnings.is_empty(), "%s: %s cells (%s)" % [prefab_name, prefab["map"].size, warnings])
 
 

@@ -1,0 +1,136 @@
+{
+	"buildings": [
+		{
+			"slot": "building.tower_ruin",
+			"at": [
+				0,
+				0
+			],
+			"facing": [
+				0,
+				1
+			]
+		},
+		{
+			"kind": "tower_room",
+			"size": "small",
+			"at": [
+				3,
+				3
+			],
+			"facing": [
+				0,
+				1
+			]
+		},
+		{
+			"slot": "building.rubble_heap",
+			"at": [
+				11,
+				1
+			],
+			"facing": [
+				0,
+				1
+			]
+		},
+		{
+			"slot": "building.rubble_heap",
+			"at": [
+				15,
+				6
+			],
+			"facing": [
+				0,
+				1
+			],
+			"variant": 2
+		},
+		{
+			"slot": "building.rubble_heap",
+			"at": [
+				15,
+				10
+			],
+			"facing": [
+				0,
+				1
+			],
+			"variant": 3
+		},
+		{
+			"slot": "building.rubble_heap",
+			"at": [
+				1,
+				11
+			],
+			"facing": [
+				0,
+				1
+			],
+			"variant": 2
+		},
+		{
+			"slot": "building.rubble_heap",
+			"at": [
+				15,
+				13
+			],
+			"facing": [
+				0,
+				1
+			],
+			"variant": 3
+		},
+		{
+			"slot": "building.rubble_heap",
+			"at": [
+				7,
+				15
+			],
+			"facing": [
+				0,
+				1
+			]
+		},
+		{
+			"slot": "building.fallen_column",
+			"at": [
+				9,
+				11
+			],
+			"facing": [
+				0,
+				1
+			]
+		}
+	],
+	"entities": [
+		{
+			"at": [
+				5,
+				4
+			],
+			"facing": [
+				0,
+				1
+			],
+			"props": {
+				"shop": true
+			}
+		}
+	],
+	"places": {
+		"old_tower": {
+			"at": [
+				8,
+				8
+			],
+			"kind": "fort",
+			"radius": 7,
+			"holder": "town",
+			"town": "store",
+			"name": "the Old Tower"
+		}
+	}
+}

@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The Old Tower, Snagfin's ruined castle for Held, is ready for the map: a broken tower, fallen walls round a yard, rubble, and the one roofed room where he keeps his counter.
 - Every way between areas is marked where it stands: a gate arch on the roads out of the wilds (stone toward the castle), waystones at the castle's gate, and stairs down and up between the barrow's levels (589).
 - Struck down, you now see it: MORTALLY WOUNDED over the grey with the seconds your blood lasts, a ring that beats with your heart, Slow Heart to hold on (the blessed only, held to fill it) and Bleed Out to go; when all have fallen the screen says so and counts everyone back (587, ui's side; the heart and the return are companions' and economy's).
 - Drawing a bow slides the view a little toward where you aim, so a long shot's mark stays on screen, and it eases back when you let the bow down (617).

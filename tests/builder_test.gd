@@ -35,6 +35,7 @@ func _ready() -> void:
 	_test_solid()
 	_test_plots()
 	_test_visible_work()
+	_test_old_tower()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -754,6 +755,52 @@ func _test_visible_work() -> void:
 	_check("Builds the towns here have in hand with no building marked for them yet (place one, on a plot first, and set_building it to the use): store: inn, loom." in session._situation(), "the request lists them")
 	session.towns = null
 	_check(session.builds_without_site().is_empty(), "no towns' records: nothing listed")
+
+
+func _test_old_tower() -> void:
+	print("\n== the Old Tower (600): ways in at the gate and the breach, the room's door, the counter, the tower and the stone solid ==")
+	var prefab := Prefab.load_prefab("old_tower")
+	_check(prefab["map"].size == Vector2i(17, 17), "17 x 17 (%s)" % [prefab["map"].size])
+	var level := Level.parse(prefab["map"].to_image(), null, prefab["config"])
+	var floor := {}
+	for cell: Vector2i in level["terrain"]["floor"]:
+		floor[cell] = true
+	var edges: Dictionary = level["terrain"]["edges"]
+	# Who can walk where from a cell, through open edges and doors.
+	var reach := func(from: Vector2i, closed: Array) -> Dictionary:
+		var seen := {from: true}
+		var queue: Array[Vector2i] = [from]
+		while not queue.is_empty():
+			var cell: Vector2i = queue.pop_front()
+			for step: Vector2i in [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]:
+				var next := cell + step
+				var key := Terrain.edge_key(cell, step)
+				if floor.has(next) and not seen.has(next) and edges.get(key) != Terrain.Edge.WALL and key not in closed:
+					seen[next] = true
+					queue.append(next)
+		return seen
+	var inside: Dictionary = reach.call(Vector2i(8, 12), [])
+	_check(inside.has(Vector2i(16, 8)) and inside.has(Vector2i(12, 0)) and inside.has(Vector2i(5, 3)),
+		"from the yard: out at the gate, out at the breach, and in at the door to Snagfin's place behind the counter")
+	var gate_shut := [Terrain.edge_key(Vector2i(15, 7), Vector2i.RIGHT), Terrain.edge_key(Vector2i(15, 8), Vector2i.RIGHT),
+		Terrain.edge_key(Vector2i(15, 9), Vector2i.RIGHT), Terrain.edge_key(Vector2i(12, 1), Vector2i.UP), Terrain.edge_key(Vector2i(13, 1), Vector2i.UP)]
+	_check(not reach.call(Vector2i(8, 12), gate_shut).has(Vector2i(16, 12)), "the gate and the breach shut: the curtain holds all round")
+	_check(not floor.has(Vector2i(1, 1)) and not floor.has(Vector2i(9, 11)) and not floor.has(Vector2i(15, 6)), "the tower, the column and the rubble are solid")
+	# No way one cell wide (Jeff, 2026-10-22: players walk with companions):
+	# no cell inside the curtain shut in on both sides, across or along.
+	var shut := func(cell: Vector2i, step: Vector2i) -> bool:
+		return not floor.has(cell + step) or edges.get(Terrain.edge_key(cell, step)) == Terrain.Edge.WALL
+	var narrow: Array[Vector2i] = []
+	for y in range(1, 16):
+		for x in range(1, 16):
+			var cell := Vector2i(x, y)
+			if floor.has(cell) and ((shut.call(cell, Vector2i.LEFT) and shut.call(cell, Vector2i.RIGHT)) or (shut.call(cell, Vector2i.UP) and shut.call(cell, Vector2i.DOWN))):
+				narrow.append(cell)
+	_check(narrow.is_empty(), "no way one cell wide in the yard or the room (%s)" % [narrow])
+	var room: Array = level["buildings"].filter(func(b: Dictionary) -> bool: return b.get("kind") == "tower_room")
+	_check(room.size() == 1 and room[0]["front"] == Vector2i(5, 9), "the roofed room's door opens onto the path (%s)" % [room])
+	_check(level["entities"].any(func(e: Dictionary) -> bool: return e["tile"] == Vector2i(5, 4) and e["script"] == Level.CHEST), "the counter at the room's back")
+	_check(level["places"].has("old_tower") and level["places"]["old_tower"]["kind"] == "fort", "its place, a fort")
 
 
 func _test_relief() -> void:
