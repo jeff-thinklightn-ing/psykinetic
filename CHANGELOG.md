@@ -7,18 +7,22 @@ notes (decision 324).
 
 ## Unreleased
 
+## v0.1.171
+
+- What goes over the network changes, so v0.1.170 and older can't join the server: update through the launcher first.
 - A draugr's rush or axe charge seen by another player used to be drawn at half its pace, the body arriving a second after its blow; it now slides a cell a tick as the server moves it.
-- A bandage that can't be done now says why: your companion tells you in her own words ("Not here. Not with them this close.", "I've nothing to bandage with.") instead of a bare "Fine.", and your own refused bandage tells you the reason. Stepping away while being bandaged breaks it off (decision 625).
 - The draugr walks again while another part of the world is busy: his spin, throw and charge, a wind-up's blow and his taking up his axe now keep his own place's time (603 amended (2)).
 - The draugr's spin, throw and charge warnings can now be drawn as smooth shapes from his body, and they stay honest: you are struck exactly when your feet are inside the shape. His axe throw on a slant now strikes exactly along its drawn band (602 amended).
 - A charge no longer stops short or leaves its runner standing when another part of the world is busy (604 amended): the draugr's charge is run in his own lair only.
-- A charge is slower through a ford, tall grass or uphill, and hits softer there (607 amended): it picks up again on open ground.
 - The draugr now walks to you anywhere in his hall: he used to give up 12 cells from his throne and reach the door end only with his throw and rush (Jeff: "doesn't walk, long reach"); the altar room's guards likewise chase anywhere in their room.
 - Skeletons lying at their graves in the barrow sit up and come for you when you come into their sight, instead of lying on as you pass; after the draugr is laid to rest the dead still lie still.
 - The draugr's Hall door waits up to 5 seconds for your companion while she is coming along behind you (Jeff: it shut in her face); one told to wait, resting or fleeing is not waited for.
+- Furniture for the barrow's Hall of Fallen Souls: a great round stone table with the feast's leavings, high-backed hall chairs round it, broken trestle tables along the walls, and the draugr's stone throne (580).
+- Your companion's loyalty grows in tiers: kindness (gifts, food, days together) brings her to close, trust under pressure (tending her badly hurt, standing by her) takes her near devoted, and only a milestone (a rescue, the draugr's blessing) makes her devoted; blows never cost it and it never fades. Wary, she hesitates before an order; only a devoted companion takes the lead; devoted, she goes for whatever attacks you (621).
+- A bandage that can't be done now says why: your companion tells you in her own words ("Not here. Not with them this close.", "I've nothing to bandage with.") instead of a bare "Fine.", and your own refused bandage tells you the reason. Stepping away while being bandaged breaks it off (decision 625).
+- A charge is slower through a ford, tall grass or uphill, and hits softer there (607 amended): it picks up again on open ground.
 - A sheep fold for the herders in the hills: a fenced pen with a wide gate, trodden earth, straw and a stone water trough (640).
 - Moss and spiderwebs for the barrow's damp lair: moss patches on the floor and along the walls' feet, webs high in corners and across niche mouths (580).
-- Furniture for the barrow's Hall of Fallen Souls: a great round stone table with the feast's leavings, high-backed hall chairs round it, broken trestle tables along the walls, and the draugr's stone throne (580).
 - Faint footprints in the dust before the barrow's hidden niche, and a scuff where its slab swings, a clue to look closer (608 amended).
 - The Ossuary's chests may hold a mail shirt among the dead's goods, and the Hall of Fallen Souls' mail or, rarely, plate armour: the only armour the world gives, grave goods all (622, dungeon's side).
 - In the barrow's first hall, the first time you step in each time it is laid again, you feel a cool draft coming from one of the niches, while the hidden door is still shut; the clues to it all point at the true niche (608 amended, dungeon's side).
@@ -27,7 +31,6 @@ notes (decision 324).
 - By a camp fire you can play knucklebones with your companion (say "let's play knucklebones"): best of three, she keeps the tally and has something to say about winning or losing. After a hard day she may ask you to keep watch while she sleeps: stay by her and she wakes whole and trusts you more; wander off and let something find her, and she won't forget it (621).
 - A companion's lean is named by her focus, as her card's corners are: she leans to fighting, to magic or to stealth (577's words).
 - Your companion notices how you treat her: a day on the roads together, sitting by a fire, a rest in town and fights you win side by side bring her closer; harsh words hurt (twice a day at most, and an apology the same day takes one back), and so does working her like a mule or starting a fight when she has asked to rest first (621).
-- Your companion's loyalty grows in tiers: kindness (gifts, food, days together) brings her to close, trust under pressure (tending her badly hurt, standing by her) takes her near devoted, and only a milestone (a rescue, the draugr's blessing) makes her devoted; blows never cost it and it never fades. Wary, she hesitates before an order; only a devoted companion takes the lead; devoted, she goes for whatever attacks you (621).
 - The archer's aim shows a cone of flight: wide as the draw starts, narrowing the longer you hold, stepping out with each range step and still narrowing at the last; the arrow flies a line inside it (620, ui's side; combat's design).
 - The zone's big map draws each way out as what stands there: an arch or waystones turned the way they face, a dark mouth for a stair down, a light ring for a stair up, a struck dot for a sealed way that names no destination; on the known world a sealed way draws dim and a way down or up ends in the mouth or the ring (589, ui's side).
 - Your companion's card page (C): her name, what she has learned from the lands you crossed and who taught it, in her words, and how she fights drawn as a small chart of fighting, magic and stealth with her lean beside it in her words; how she feels about you, the same word the party line gives with its newest reason; her purse joins the page when she carries your gold (618, ui's side).
