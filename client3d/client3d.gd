@@ -598,11 +598,11 @@ const MOON_BELOW := -1.0
 ## overhead, so noon's are short (Jeff: "shadows in general are too long,
 ## it should be pretty subtle"; 20° flat until 534 amended (2), 14° before
 ## 534 let a house's run 30-40 cells). They are SHADOW_STRENGTH dark (1 is
-## black), and fade out over SHADOW_FADE either side of MOON_BELOW, where
+## black; 0.6 until 534 amended (3), Jeff: "i'll go with 0.8"), and fade out over SHADOW_FADE either side of MOON_BELOW, where
 ## the light swaps to the moon.
 const SHADOW_LOW := 35.0
 const SHADOW_HIGH := 85.0
-const SHADOW_STRENGTH := 0.6
+const SHADOW_STRENGTH := 0.8
 const SHADOW_FADE := 5.0
 ## Away from the sky, each kind of place's ambient light, [colour, energy]
 ## (decision 304), spread as the sim's light is: a room is dim but all of

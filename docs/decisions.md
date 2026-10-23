@@ -16712,6 +16712,15 @@ the ground (terrain's hillshade is its own fixed light and unchanged).
 Before/after at noon, 15:30 and dusk in C:/dev/review/shadows/. Client
 only, protocol unchanged. day_night_test.
 
+Amended (3) 2026-10-23 (Jeff, from the three-column sheet in
+C:/dev/review/shadows/: before, 0.6 and 0.8 at five summer hours: "i'll go
+with 0.8"; the coordinator): SHADOW_STRENGTH 0.8. At 0.6 the short shadows
+were drawn at their lengths but read as none on light ground under the
+sky's fill; at 0.8 the well's, the bodies' and the houses' show as soft
+grey shapes, still far shorter and lighter than before (2). The lengths
+(SHADOW_LOW 35°, SHADOW_HIGH 85°) are unchanged. day_night_test keeps it
+under 1 and at 0.8 or more. Client only.
+
 ## 532, art-kit's side: the castle's walls warm sandstone again
 
 532 lifted the ground's greens; this is its other half in castle-8-final (Jeff,
