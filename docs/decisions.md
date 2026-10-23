@@ -22489,3 +22489,32 @@ send her away as you reach her (agreed with ui, whose bow click reaches
 _talk_to). Protocol revision 32 (release: on an old server the click silently
 does nothing). tests: companion_test (the click yields her, logged, no mind;
 out of reach, or not hers, nothing).
+## 603 amended, combat's side. His own plain blow, and his breath
+
+The coordinator, from the draugr clip's headless runs once he held his axe (the
+arming fix, 8b958f55), on Jeff's draft list:
+
+- His plain blow is a heavy strike: a monster's row may name its own verb for
+  a thing it wields, "blows" (item id to a verb), read through Items.verb_from
+  so it gets a catalog verb's defaults and warnings (items' ask), kept by
+  Monster.read_kinds and set on the monster as Monster.blows; World.blow_verb
+  takes it over the thing's own. The draugr's: battle_axe, knockback force 1.0,
+  damage 1.6, speed 2.2, windup 8. The battle axe keeps its knockdown in anyone
+  else's hands (a player who wins it); only his spin floors (the coordinator's
+  (a); before it every plain blow knocked the player down, every 3.4 s in melee,
+  from combat's own design section 2).
+- His breath: a row's "stamina_regen" is what each breath gives back
+  (GridEntity.stamina_regen_amount; 0 keeps World.stamina_regen, 2). The
+  draugr's: 8 every 7 ticks (was 2 every 4), so in a fight that goes on a second
+  spin comes about a minute after the first (Jeff: "slowly builds back up").
+  Measured headless, a sword player at him without a break: armed, 57 s between
+  spins; disarmed (his fists cost less), 27 s. At 2 every 4 there was no second
+  spin in three minutes: regen waits stamina_regen_delay after each swing, and
+  his swings ate the rest.
+- enemy-ai's side (THROW_NEAR 6, no throw at a target closing in) is its own
+  amendment.
+
+combat_test _test_own_blow; monster_test keeps "stamina_regen" and "blows";
+draugr_fight_test takes his breath and blows from the row. Sim only, protocol
+unchanged, no new class_name.
+

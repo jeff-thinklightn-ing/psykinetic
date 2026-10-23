@@ -2212,10 +2212,13 @@ func holds_in_hands(entity: GridEntity) -> bool:
 
 
 ## The verb [param attacker]'s blow is struck with (decision 338): its
-## wielded weapon's (Items.verb_of), but for a bow, which is no club (its
-## numbers are the shot's); {} for bare hands.
+## wielded weapon's (Items.verb_of), or its kind's own with it (a monster's
+## row's "blows", 603 amended: the draugr's axe), but for a bow, which is
+## no club (its numbers are the shot's); {} for bare hands.
 func blow_verb(attacker: GridEntity) -> Dictionary:
-	var verb := Items.verb_of(wielded(attacker))
+	var id := wielded(attacker)
+	var own: Variant = attacker.blows.get(id) if attacker is Monster and not id.is_empty() else null
+	var verb: Dictionary = own if own is Dictionary else Items.verb_of(id)
 	return {} if verb.get("kind") == "ranged" else verb
 
 
@@ -6629,7 +6632,8 @@ func _regen_stamina() -> void:
 		var delay := winded_regen_delay if entity.winded else stamina_regen_delay
 		if entity.max_stamina > 0 and entity.stamina < entity.max_stamina \
 				and tick - entity.last_exertion_tick() > delay and tick % maxi(1, entity.stamina_regen_every) == 0:
-			entity.stamina = mini(entity.stamina + stamina_regen, entity.max_stamina)
+			var breath := entity.stamina_regen_amount if entity.stamina_regen_amount > 0 else stamina_regen
+			entity.stamina = mini(entity.stamina + breath, entity.max_stamina)
 
 
 func _apply_hazards() -> void:

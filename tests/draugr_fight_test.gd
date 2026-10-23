@@ -8,8 +8,8 @@ extends Node
 ## Every step waits on what the sim does, within a limit, as a play would.
 ##
 ## A test-built draugr has no row's body, so his stamina rules are set by
-## hand as his row gives them (100, swing_stamina, a breath every 4 ticks),
-## and his battle axe put in his hands (a giant axe where items' is not in).
+## hand from his row (100, swing_stamina, his breath, his own blows), and
+## his battle axe put in his hands (a giant axe where items' is not in).
 
 const SPECS := {
 	"P": {"script": "res://sim/player.gd", "shape": "capsule"},
@@ -64,7 +64,10 @@ func _play_through() -> void:
 	draugr.max_stamina = 100
 	draugr.stamina = 100
 	draugr.pays_swings = true
-	draugr.stamina_regen_every = 4
+	var row: Dictionary = Monster.kinds()["draugr"]
+	draugr.stamina_regen_every = int(row.get("stamina_regen_every", 1))
+	draugr.stamina_regen_amount = int(row.get("stamina_regen", 0))
+	draugr.blows = row.get("blows", {})
 	draugr.sight_range = 10
 	draugr.senses.cone_cos = -1.0
 	draugr.slots = Items.tidy(["", "", "", "", "", ""], Items.CARRIED)

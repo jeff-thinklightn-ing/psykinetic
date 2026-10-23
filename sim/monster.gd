@@ -320,6 +320,11 @@ var _blocked_last := -1
 ## fights nobody outside it, and goes after no noise.
 var fearless := false
 var keeps_room := false
+## Its kind's own blow with a thing it wields (its row's "blows", item id
+## to a verb, read through Items.verb_from): the draugr's battle axe a
+## heavy strike in his hands, the knockdown his spin's alone (603 amended);
+## the thing's own verb for anyone else.
+var blows := {}
 ## Whether players can talk to it (npc's offer contract, decision 548: the
 ## draugr): Main's speaker lookup takes it in.
 var talks := false
@@ -463,6 +468,8 @@ func _ready() -> void:
 		keeps_room = bool(row.get("keeps_room", false))
 		pays_swings = bool(row.get("swing_stamina", false))  # Decision 597: off until enemy-ai's design.
 		stamina_regen_every = maxi(1, int(row.get("stamina_regen_every", 1)))  # Decision 603.
+		stamina_regen_amount = maxi(0, int(row.get("stamina_regen", 0)))  # 603 amended.
+		blows = row.get("blows", {})
 		call_reach = int(row.get("call", Senses.NOISE_CALL))
 		if keeps_room:
 			_room = room_of(home)
@@ -1444,7 +1451,25 @@ static func read_kinds(path: String) -> Dictionary:
 			# person_words (the robbers drawn as people), the boss's breath.
 			"person": str(row.get("person", "")), "swing_stamina": bool(row.get("swing_stamina", false)),
 			"stamina_regen_every": maxi(1, int(row.get("stamina_regen_every", 1))),
-			"waves": (row["waves"] as Array).duplicate(true) if row.get("waves") is Array else []}
+			"waves": (row["waves"] as Array).duplicate(true) if row.get("waves") is Array else [],
+			"stamina_regen": maxi(0, int(row.get("stamina_regen", 0))),
+			"blows": _blows(kind, row.get("blows"))}
+	return out
+
+
+## A row's "blows" (603 amended): item id to the kind's own verb with it,
+## each filled in as a catalog verb is (Items.verb_from); an unknown item
+## or a verb of no known kind is left out.
+static func _blows(kind: String, given: Variant) -> Dictionary:
+	var out := {}
+	if not given is Dictionary:
+		return out
+	for id: String in given:
+		var verb := Items.verb_from("%s's blow with %s" % [kind, id], given[id]) if given[id] is Dictionary and Items.exists(id) else {}
+		if verb.is_empty():
+			push_warning("Monster: %s's blow with %s left out" % [kind, id])
+			continue
+		out[id] = verb
 	return out
 
 

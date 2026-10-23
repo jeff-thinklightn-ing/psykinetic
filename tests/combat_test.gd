@@ -37,6 +37,7 @@ func _ready() -> void:
 	_test_spin_broken()
 	_test_throw_and_charge()
 	_test_level_draugr_armed()
+	_test_own_blow()
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -418,3 +419,27 @@ func _test_level_draugr_armed() -> void:
 			"his kind's wields: the battle axe in his right hand (%s)" % slots)
 	_check(draugr.get("home", null) == Vector2i(2, 1) and draugr.get("facing", null) == Vector2i(1, 0) and not draugr.get("idle", {}).is_empty(),
 			"his home, facing and idle from the level, as a Monster's (%s, %s)" % [draugr.get("home", null), draugr.get("facing", null)])
+
+
+## His kind's own blow with his axe (603 amended; the coordinator's (a)):
+## the draugr's row makes his plain battle-axe blow a heavy strike, no
+## knockdown (the spin floors alone); the axe in a player's hands is the
+## catalog's.
+func _test_own_blow() -> void:
+	print("
+== the draugr's own blow: his battle axe a heavy strike in his hands, the catalog's in a player's ==")
+	var own: Dictionary = Monster.kinds()["draugr"].get("blows", {}).get("battle_axe", {})
+	_check(own.get("kind", "") == "knockback" and not own.has("down_ticks") and is_equal_approx(float(own.get("speed", 0.0)), 2.2)
+			and int(own.get("windup", 0)) == 8, "his row's blow, filled in as a catalog verb: %s" % own)
+	var e := _build(["#####", "#PmP#", "#####"])
+	var boss: GridEntity = e["m"][0]
+	_boss(boss)
+	boss.blows = Monster.kinds()["draugr"]["blows"]
+	World.set_slots(boss, Items.tidy(["", "", "", "", "battle_axe", ""], Items.CARRIED))
+	var player: GridEntity = e["P"][0]
+	World.put_item(player, player, Player.RIGHT_HAND, World.items.mint("battle_axe", "built"))
+	_check(World.blow_verb(boss) == own and World.windup_ticks(boss) == 8, "his blow is his row's: %s" % World.blow_verb(boss).get("kind"))
+	_check(World.blow_verb(player) == Items.verb_of("battle_axe"), "a player's is the axe's own (%s)" % World.blow_verb(player).get("kind"))
+	boss.blows = {}
+	World.set_slots(boss, Items.tidy(["", "", "", "", "giant_axe", ""], Items.CARRIED))
+	_check(World.blow_verb(boss) == Items.verb_of("giant_axe"), "a thing his row names no blow for: its own verb")

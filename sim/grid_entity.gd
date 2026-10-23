@@ -204,6 +204,10 @@ var pays_swings := true
 ## Server: stamina comes back only on every this many ticks (decision 603: a
 ## boss's slow breath; its kind's "stamina_regen_every").
 var stamina_regen_every := 1
+## Server: what each of those breaths gives back; 0, World.stamina_regen
+## (603 amended: the draugr's, so a second spin comes a minute into a fight;
+## its kind's "stamina_regen").
+var stamina_regen_amount := 0
 ## Server only: the tick the grace runs out.
 var protected_until_tick := 0
 ## Direction of the last step or attack.

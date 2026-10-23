@@ -1418,9 +1418,10 @@ func _test_kinds_table() -> void:
 	_check(Monster.read_kinds("res://levels/nothing_here.json").is_empty(), "a missing table gives no kinds (with a warning)")
 	_check(str(kinds["robber"]["person"]).contains("headwear=hood") and str(kinds["imp"]["person"]) == "",
 			"a row's person words are kept (the robber's hood), none for an imp")
-	_check(kinds["draugr"]["swing_stamina"] == true and kinds["draugr"]["stamina_regen_every"] == 4
-			and kinds["imp"]["swing_stamina"] == false and kinds["imp"]["stamina_regen_every"] == 1,
-			"and its breath: the draugr pays his swings, regen every 4; an imp neither")
+	_check(kinds["draugr"]["swing_stamina"] == true and kinds["draugr"]["stamina_regen_every"] > 1 and kinds["draugr"]["stamina_regen"] > 0
+			and kinds["imp"]["swing_stamina"] == false and kinds["imp"]["stamina_regen_every"] == 1 and kinds["imp"]["stamina_regen"] == 0,
+			"and its breath: the draugr pays his swings, %d back every %d ticks; an imp neither" % [kinds["draugr"]["stamina_regen"], kinds["draugr"]["stamina_regen_every"]])
+	_check(kinds["draugr"]["blows"].has("battle_axe") and kinds["imp"]["blows"].is_empty(), "and the draugr's own blow with his axe (603 amended); an imp none")
 	var robber := EntityFactory.build({"script": Level.MONSTER, "shape": "capsule", "props": {}, "kind": "robber", "name": "Robber", "tile": Vector2i(1, 1)})
 	_check(Client3D.person_words(robber) == str(kinds["robber"]["person"]), "so the client draws a robber as a person, not a capsule")
 	robber.free()
