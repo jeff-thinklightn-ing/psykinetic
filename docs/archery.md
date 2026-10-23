@@ -15,15 +15,17 @@ design as written. Jeff's words are quoted; the rest is the design.
   does now".
 - Arrows aren't used up or picked up; they "decay over 10 seconds like they do now".
 
-## The buttons (Jeff: "left mouse hold and release to fire could work, right mouse to back-step")
+## The buttons (Jeff: "lets do this with archery, just like shift+LMB to draw back, mouse to move only")
 
-- The draw is the left button held, the hold stepping the range out. Releasing fires; releasing
-  before draw_min cancels.
-- A left click with no hold (a tap, released before draw_min) does what a left click does without a
-  bow, minus the attack: it walks to the ground, talks to a friend, or goes to a chest, the walk
-  starting on release. A tap on a foe does nothing. It is never a quick shot: the first step hits
-  hardest (×1.5), so a free tap would beat holding every time (the coordinator's ruling).
-- The right button is the bow's backstep, combat's (combat-1d's design), no longer the draw.
+- The draw is Shift (the stand key, decision 593) with the left button held, the hold stepping the
+  range out. Letting go of the button fires; letting go before draw_min lowers the bow unshot.
+  Letting go of Shift mid-draw does nothing: the draw lasts until the button comes up (combat).
+- The left button alone with a bow is a plain click, never a draw: walk (and hold to steer), talk
+  to a friend, go to a chest. Whether it attacks a foe is ui's to settle with the coordinator.
+  Neither a click nor a short Shift press is a quick shot: the first step hits hardest (×1.5).
+- With a bow, Shift+LMB draws and never swings; Ctrl's signature is unchanged.
+- The right button stays free for the bow's backstep, combat's, later.
+- Before this (583 amended, v0.1.166) the left button alone drew after a quarter second held.
 
 ## Defaults until Jeff says otherwise (the coordinator's)
 
@@ -51,12 +53,13 @@ design as written. Jeff's words are quoted; the rest is the design.
 
 ## The aim (ui)
 
-- While drawing (the left button held), the cursor is hidden.
+- While drawing (Shift and the left button held), the cursor is hidden.
 - A semicircle on the ground at the current step's radius, jumping outward at each step.
 - An aim marker on the arc where the line from the player to the mouse crosses it.
 - A read of the step's damage beside the marker.
 - `Main.aim_angle` (radians on the ground plane) and `Main.aim_drawn`, set every frame while drawn.
 - On releasing the left button, the angle is sent; releasing before draw_min cancels.
+  The aim is shown only while drawing, so only after Shift+LMB.
 
 ## The client's 3D (pc-character)
 
