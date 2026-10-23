@@ -1467,6 +1467,9 @@ var _door_states: Dictionary[Vector3i, Array] = {}
 ## Entity instance id -> its puppet.
 var _puppets: Dictionary[int, Node3D] = {}
 var _hover: MeshInstance3D
+## The ring at the feet of the body a standing swing would strike
+## (stand_ring; the low-angle fight, combat's (c)).
+var _stand_ring: MeshInstance3D
 ## The channel's ring (544, ui's side), one, on the body being brought back.
 var _channel_ring: MeshInstance3D
 ## The bow's aim while drawn (the archery aim, ui's side; Jeff: "the game
@@ -1864,6 +1867,9 @@ func setup(terrain: Dictionary, centre := Vector2i.ZERO) -> void:
 	_channel_ring = _make_flat(_make_square_outline(HOVER_HALF, HOVER_LINE), Color(UiTheme.color("brass_bright"), 0.9))
 	_channel_ring.visible = false
 	add_child(_channel_ring)
+	_stand_ring = _make_ring_instance(Color(UiTheme.color("brass_bright"), 0.85))
+	_stand_ring.visible = false
+	add_child(_stand_ring)
 	_aim_arc = _make_flat(_make_arc(1.0, AIM_LINE), Color(UiTheme.color("brass_bright"), 0.8))
 	_aim_arc.visible = false
 	add_child(_aim_arc)
@@ -3509,6 +3515,17 @@ func hover(tile: Vector2i, show: bool) -> void:
 ## being brought back, brass_bright, half again as wide at the start and
 ## the cell's own size as [param fraction] (0 to 1) completes, the draw's
 ## language (475); [param show] false hides it.
+## The body a swing from where the player stands would strike (Main's
+## stand_target_now, World.stand_target), ringed at its feet on [param
+## tile] in brass: the swing's reach read on the body, not the cell, since
+## at the low camera's angle a cell behind a body is hidden by it;
+## [param show] false hides it.
+func stand_ring(tile: Vector2i, show := true) -> void:
+	_stand_ring.visible = show
+	if show:
+		_lay_on_ground(_stand_ring, tile, ON_FLOOR * 1.5)
+
+
 func channel_ring(tile: Vector2i, fraction: float, show := true) -> void:
 	_channel_ring.visible = show
 	if show:

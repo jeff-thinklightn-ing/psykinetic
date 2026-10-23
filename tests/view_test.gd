@@ -3558,6 +3558,12 @@ func _test_heights() -> void:
 			and _rig._hover.basis.y.dot(Vector3(up.x, 0.0, up.y)) < 0.0,
 			"the hover outline lies on the ramp, tilted with it (leaning back from its top)")
 	_rig.hover(stair, false)
+	_rig.stand_ring(stair, true)
+	_check(_rig._stand_ring.visible and absf(_rig._stand_ring.position.y - _rig._ground_height(Vector2(stair))) < 0.1
+			and absf(_rig._stand_ring.position.x - stair.x) < 0.05 and absf(_rig._stand_ring.position.z - stair.y) < 0.05,
+			"the stand ring (combat's (c)) lies at the body's feet, tilted with the ramp (%s for %s)" % [_rig._stand_ring.position, stair])
+	_rig.stand_ring(stair, false)
+	_check(not _rig._stand_ring.visible, "and goes when nobody would be struck")
 	_rig.show_builder(Rect2i(stair - Vector2i.ONE, Vector2i(3, 3)), [[stair.x, stair.y, "grass"]])
 	var lowest := INF
 	var highest := -INF

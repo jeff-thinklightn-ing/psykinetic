@@ -602,6 +602,31 @@ func _test_aim() -> void:
 		"the drawn half-angle: the sim's at once from none, else eased toward it over a tick, never past it")
 	var player_body: GridEntity = _main._local_player()
 	_check(player_body == null or Main.spread_now(player_body) >= -1.0, "the sim's spread by name, -1 for none (the arc alone)")
+	# Combat's (c): the body a standing swing would strike, by name, for the ring at its feet.
+	if player_body != null and World.has_method("stand_target"):
+		var beside := Vector2i(player_body.tile) + Vector2i(1, 0)
+		var was := World.get_entity_at(beside)
+		if was != null:
+			World.despawn(was)
+		var imp: GridEntity = _main._spawn({"script": "res://sim/monster.gd", "shape": "capsule", "name": "StandImp", "tile": beside})
+		_check(imp != null and Main.stand_target_now(player_body, Vector2(beside) + Vector2(0.3, 0.2)) == imp,
+			"the stand key's swing toward the cursor: the imp beside is who it would strike (the command's own direction snap)")
+		_check(Main.stand_target_now(player_body, Vector2(player_body.tile)) == null and Main.stand_target_now(player_body, Vector2(player_body.tile) + Vector2(-1, 0)) == null,
+			"the cursor on your own cell, or a way with no one: nobody")
+		_check(Main.stand_target_now(null, Vector2(beside)) == null and Main.stand_target_now(player_body, Vector2(NAN, NAN)) == null, "no player or no ground point: nobody, no error")
+		if imp != null:
+			World.despawn(imp)
+		# Combat's check: the ring never marks another player (can_target reads
+		# owner_peer, which a body takes from its spawn spec's "peer", on a
+		# client's mirror as on the host).
+		var other: GridEntity = _main._spawn({"script": "res://sim/player.gd", "shape": "capsule", "name": "StandOther", "tile": beside, "peer": 4242})
+		_check(other != null and other.owner_peer == 4242 and player_body.owner_peer != 0
+				and Main.stand_target_now(player_body, Vector2(beside) + Vector2(0.3, 0.2)) == null,
+				"another player beside: their peer from the spawn spec, and no ring on them (players don't strike players)")
+		if other != null:
+			World.despawn(other)
+	else:
+		print("  (no local body or no World.stand_target here: the stand ring's target check skipped)")
 	var args := Main.loose_args(angle, Vector2i(16, 6))
 	_check(args.get("at") == [16, 6] and absf(float(args.get("angle")) - angle) < 0.000001, "loose carries the angle and the arc's cell (%s)" % [args])
 	_check(Main.loose_args(NAN, Vector2i(2, 3)) == {"at": [2, 3]}, "no aim: the old cell alone")

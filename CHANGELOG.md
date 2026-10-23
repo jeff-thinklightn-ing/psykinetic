@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Holding Shift with a weapon in hand rings the feet of the body your standing swing would strike, so the swing's reach reads on the body rather than on a cell the body hides at the low camera's angle.
 - The archer's aim ring and cone of flight lie on the ground across a slope, a ridge, a ramp or stairs, where they used to sink into rising ground or float over a dip.
 - Under the low camera (or a deep tilt) the cone of flight's edges stand a hand off the ground and its fill is fuller, so the squashed wedge still reads.
 - Under the low camera a name over a body reads at any distance, the nearest drawn over the farther, and far off only your party's, a foe's and your marked target's names show, so a town's names don't crowd a fight.

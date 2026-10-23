@@ -26156,3 +26156,13 @@ hides the sliver. view_test _test_arc_on_ground, on the hills' steepest slope th
 cliff: every corner and every one-triangle strip's middle on the ground exactly, the ring
 climbing the slope, rebuilt a cell on. A decal fallback (the ground's own depth) was
 weighed and left: bodies share the ground's visual layer and a Decal takes no shader.
+
+## 637: the low-angle fight, combat's (c): a ring under the body a standing swing would strike
+
+Main.stand_target_now(player, cursor) reads World.stand_target by name with the Shift
+swing command's own direction snap (grid_direction, as _point_direction); it reads only
+what a client mirrors (occupancy, slots, terrain, peers). Main._show_stand_ring each hover
+refresh while Keys.held("stand") and no bow is drawn: Client3D.stand_ring lays a brass
+ring (_make_ring_instance) at the body's feet; none, no ring. The reach reads on the body
+rather than a cell the body hides. Combat's check: a player is never ringed (owner_peer
+through EntityFactory). ui_test _test_aim, view_test's stair check.

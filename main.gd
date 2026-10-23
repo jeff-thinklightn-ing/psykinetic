@@ -986,6 +986,7 @@ func _process(delta: float) -> void:
 		_client3d.target(hit)
 		_client3d.hover(lands, not aim_drawn and hit == null)
 		_client3d.draw_look(World.draw_of(player))
+		_client3d.stand_ring(Vector2i.ZERO, false)
 		_draw_shown = true
 	elif _client3d != null:
 		if _draw_shown:
@@ -994,6 +995,7 @@ func _process(delta: float) -> void:
 		var foe: GridEntity = under_mouse if player != null and under_mouse is Monster and World.can_target(player, under_mouse) else null
 		_client3d.target(foe)
 		_client3d.hover(tile, foe == null and World.is_walkable(tile))
+		_show_stand_ring(player)
 	else:
 		cursor.visible = World.is_walkable(tile) and not drawing
 		cursor.position = Iso.tile_to_local(tile)
@@ -8386,6 +8388,33 @@ static func _direction_arg(args: Dictionary) -> Vector2i:
 
 ## The way from [param entity] to a command's "at" ([x, y], a ground point
 ## in grid units, decision 593), snapped to one of the eight; ZERO for none.
+## The body a swing where [param player] stands, toward [param cursor] (a
+## ground point), would strike: World.stand_target by name (it reads only
+## what a client mirrors: the occupancy, the slots, the terrain, the
+## peers), with the direction the Shift swing's command takes
+## (_point_direction); null for none, or before it lands.
+static func stand_target_now(player: GridEntity, cursor: Vector2) -> GridEntity:
+	if player == null or not World.has_method("stand_target") or not cursor.is_finite():
+		return null
+	var direction := grid_direction(cursor - Vector2(player.tile))
+	if direction == Vector2i.ZERO:
+		return null
+	return World.call("stand_target", player, direction) as GridEntity
+
+
+## Combat's (c): while the stand key is held with a weapon to swing (a
+## bow draws instead), the body the swing would strike is ringed at its
+## feet (Client3D.stand_ring); none, no ring.
+func _show_stand_ring(player: Player) -> void:
+	var body: GridEntity = null
+	if player != null and Keys.held("stand") and World.off_hand(player) != "draw":
+		body = stand_target_now(player, _mouse_grid())
+	if body != null:
+		_client3d.stand_ring(body.tile, true)
+	else:
+		_client3d.stand_ring(Vector2i.ZERO, false)
+
+
 static func _point_direction(entity: GridEntity, args: Dictionary) -> Vector2i:
 	var raw: Variant = args.get("at")
 	if raw is not Array or raw.size() != 2:
