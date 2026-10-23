@@ -87,7 +87,7 @@
 			"made": {"by": "tanner", "from": {"leather": 2, "wood": 1}, "steps": 1800}},
 		{"id": "battle_axe", "name": "battle axe", "short": "Battle axe", "color": "5f6266",
 			"art": "item.battle_axe", "kind": "held", "size": [0.7, 1.6, 0.12], "weight": 7.0, "hands": 2,
-			"tags": ["weapon"], "verb": {"kind": "knockdown", "says": "the draugr's own: winds up long, then falls through any guard on three in an arc, knocking them down", "arc": 1, "down_ticks": 15, "speed": 2.2, "damage": 1.6, "windup": 8}},
+			"tags": ["weapon"], "verb": {"kind": "knockback", "says": "the draugr's own: winds up long, then falls heavily on the one in front", "force": 1.0, "speed": 2.2, "damage": 1.6, "windup": 8}},
 		{"id": "giant_axe", "name": "giant axe", "short": "Great axe", "color": "8c9098",
 			"art": "item.giant_axe", "kind": "held", "size": [0.6, 1.4, 0.1], "weight": 5.0, "hands": 2,
 			"tags": ["weapon"], "verb": {"kind": "knockdown", "says": "winds up, then falls through any guard on three in an arc, knocking them down", "arc": 1, "down_ticks": 15, "speed": 2.0, "damage": 1.5, "windup": 8},

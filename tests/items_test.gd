@@ -1372,9 +1372,9 @@ func _test_battle_axe() -> void:
 	print("
 == the draugr's battle axe, left at his feet when he yields (decision 603, items' side) ==")
 	var verb := Items.verb_of("battle_axe")
-	_check(Items.def("battle_axe")["hands"] == 2 and is_equal_approx(Items.def("battle_axe")["weight"], 7.0) and verb["kind"] == "knockdown"
-			and verb["arc"] == 1 and verb["down_ticks"] == 15 and is_equal_approx(verb["damage"], 1.6) and is_equal_approx(verb["speed"], 2.2) and verb["windup"] == 8,
-			"two hands, 7 kg, a knockdown: arc 1, 15 ticks down, x1.6, x2.2 slower, wound up 8 (%s)" % [verb])
+	_check(Items.def("battle_axe")["hands"] == 2 and is_equal_approx(Items.def("battle_axe")["weight"], 7.0) and verb["kind"] == "knockback"
+			and is_equal_approx(verb["force"], 1.0) and not verb.has("down_ticks") and is_equal_approx(verb["damage"], 1.6) and is_equal_approx(verb["speed"], 2.2) and verb["windup"] == 8,
+			"two hands, 7 kg, a plain heavy blow (603 amended: nobody knocked down; a plain blow's push), x1.6, x2.2 slower, wound up 8 (%s)" % [verb])
 	_check(Items.def("battle_axe")["made"].is_empty() and Monster.kinds()["draugr"]["yields"] == [{"item": "battle_axe"}],
 			"nobody makes one; the draugr's row yields it")
 	var host := _player(Net.local_id)

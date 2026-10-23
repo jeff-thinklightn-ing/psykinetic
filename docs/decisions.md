@@ -21687,6 +21687,14 @@ axe that he drops as loot").
   wielded axe stays his ("wields", enemy-ai's), so he rises with his own
   again.
 items_test _test_battle_axe. No protocol change; no new class_name.
+
+603 amended (the coordinator's ruling, a draft on Jeff's list; combat):
+the axe's plain blow knocked the player down every swing, some 3.4 s
+apart in melee. Only the draugr's spin floors anyone now. The axe's verb
+is a plain heavy blow: kind knockback at force 1.0 (a plain blow's push,
+no extra), no arc, no down_ticks; damage 1.6, speed 2.2 and windup 8 as
+before. The spin never read the axe's verb, so it is unchanged. A player
+who wins the axe swings the same blow. Data only.
 ## 582. The barrow's dead, drawn
 
 The coordinator approved art-kit's design (2026-10-22): the barrow's dead are made by hand on the
