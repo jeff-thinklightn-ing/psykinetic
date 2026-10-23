@@ -53,7 +53,9 @@ func _test_reconnect_avoids_hostiles() -> void:
 func _test_respawn_avoids_hostiles() -> void:
 	print("\n== respawning after death: not at a start tile with a hostile near it ==")
 	var imp := _spawn_imp(Vector2i(12, 2))
-	World.damage(_player(), 999)
+	var dying := _player()
+	World.damage(dying, 999)
+	World.damage(dying, dying.hp, null, &"bled")  # Downed first (decision 587): Bleed Out is the death.
 	_check(_player() == null, "player died")
 	for i in _main.RESPAWN_TICKS + 1:
 		World.step()

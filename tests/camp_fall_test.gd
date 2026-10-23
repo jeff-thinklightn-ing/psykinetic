@@ -106,6 +106,15 @@ func _test_retaken() -> void:
 	_check(_main._retake_camps() == 0, "not before rescue.restock_days have passed")
 	World.holdings._since[_camp] = World.holdings.now() - 6 * maxi(DayNight.day_steps, 1)
 	var player := _player()
+	if player == null or World.is_downed(player):
+		# Beaten down by the imps meanwhile (Mortally Wounded): bled out, and back.
+		if player != null:
+			World.damage(player, player.hp, null, &"bled")
+		for i in _main.RESPAWN_TICKS * 4:
+			World.step()
+			if _player() != null:
+				break
+		player = _player()
 	_walk_to(player, CAMP_CELL + Vector2i(1, 0))
 	_check(_main._retake_camps() == 0, "nor with a player standing in it")
 	_walk_to(player, Vector2i(9, 6))

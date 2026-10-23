@@ -370,6 +370,7 @@ func _test_overheard() -> void:
 	_check(not nix_mind.voice_asks.is_empty(), "named, Nix is asked")
 	# The fallen hear, but cannot speak.
 	World.damage(bo, 999)
+	World.damage(bo, bo.hp, null, &"bled")  # Downed first (decision 587): Bleed Out is the death.
 	_check(_player(BO) == null and BO in _main.hearers(host.tile), "Bo, fallen, still hears what is said near where he fell")
 	for pet in [pip, nix]:
 		pet.mind = ScriptedMind.new()

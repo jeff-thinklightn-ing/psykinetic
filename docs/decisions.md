@@ -23301,3 +23301,56 @@ lowered, a container's 25, the migration both ways. companion_test,
 level_test and return_test pass. Server only, protocol unchanged, no new
 class_name.
 
+reset now calls _forget_jobs on each entity it removes. Server sim,
+protocol unchanged, no new class_name.
+
+## 587, companions' side. Mortally Wounded: the down state, the heart, Bleed Out
+
+Jeff (2026-10-22): "when a player is down, the game goes gray like now,
+and the heart beat becomes the dominant sound ... 'Mortally Wounded' two
+buttons, Slow Heart (Hold), Bleed Out (Respawn) - if you bleed out you
+return to the temple ... you can slow down your heart beat to keep
+yourself from bleeding out, until its safe, the companion then has to
+cast resurrect on you when conditions are met ... from 120 to 80 to 40
+bpm. If everyone dies you just automatically respawn a 60-90 seconds
+later but in the temple." The coordinator approved the design
+(C:/dev/review/companions/mortally_wounded_design.md), with the
+unblessed's 10 s last moments.
+
+- Main._downed: every player at 0 hp lies downed: the blessed the field
+  rules' window_s (30 s), the unblessed unblessed_s (10 s, their last
+  moments; nobody brings them back, 573). An unblessed companion dies as
+  ever.
+- The heart: Player.heart (replicated) is heart.beats[0] (120) when they
+  go down. The "slow_heart" {held} command, the blessed only: held, it
+  steps a beat down at once and one each heart.step_s (2 s); let go, a
+  beat back up each step_s. Main._tend_hearts each tick: the blood runs
+  at heart.drain of the beat (1 / 0.5 / 0.2), the window
+  (World.extend_downed: downed_until, the lying and the stun) longer by
+  what a slower heart saves; about 150 s at most held. Up, or gone, the
+  heart is 0.
+- Bleed Out: the "bleed_out" command kills the downed body with cause
+  "bled", as the window's end does; economy's side returns them at once
+  ("Aldous brought you back from near death").
+- Everyone down: Main._all_fallen_tick: every player in the zone downed
+  and each one's companion there downed or gone: "All have fallen.",
+  economy's Main.tell_all_fallen (everyone_s, 20 s: Jeff, "only a 15-20
+  second timer after all have fallen is fine"); when it runs out each
+  bleeds out. One up again calls it off ({all_fallen: 0} to their peers).
+- A revive waits for calm: _start_channel only when World.calm holds for
+  both (nothing hostile within BANDAGE_SAFE, no blow in
+  BANDAGE_CALM_TICKS); a player told "Not while they're fighting near."
+  Never on an unblessed body; her can_revive also needs her player
+  blessed.
+- The other sides: economy-13 the at-once return and everyone_s;
+  enemy-ai-17 no hunt of a downed target and the draugr's pact holding
+  while the challenger lies downed; ui the screen; sound-4d the
+  heartbeat.
+
+companion_test _test_mortally_wounded: the heart at 120, Slow Heart
+stepping to 80 then 40, the blood at a fifth, climbing back on release;
+no revive with a foe beside; all fallen, called off, run out; the
+unblessed's last moments, no Slow Heart, no revive, Bleed Out.
+_test_field_return and _test_death_and_respawn, return_test and
+camp_fall_test follow the downed unblessed. Protocol: revision 32
+(Player.heart, the commands); no new class_name.

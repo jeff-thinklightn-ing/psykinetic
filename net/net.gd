@@ -291,13 +291,17 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## village, town, city).
 ## 32 (594): place kinds "fishing" and "fort" (Level.PLACE_KINDS); a counter
 ## in a fort place naming its town is that town's shop.
+## 32 (587, companions' side): a player carries heart, its beats a minute while
+## downed (0 up); the "slow_heart" {held} and "bleed_out" commands; every
+## player at 0 hp lies downed (the unblessed their last moments); a revive
+## starts only when it is calm.
 const PROTOCOL_REVISION := 32
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]
 ## Every kind of message (message, message_to, broadcast, broadcast_to).
 const MESSAGE_KINDS: Array[String] = ["barter", "builder", "chat", "counter", "death", "grass", "map", "offers", "party", "return", "roofs", "shop", "sky", "speech", "telegraph", "terrain", "town", "world"]
 ## Properties entity subclasses add with replicate().
-const SUBCLASS_REPLICATED: Array[String] = ["activity", "addressing", "ailing", "ailments", "alert", "body", "bond_step", "bond_why", "buffs", "channel_of", "channel_until", "charge_room", "charges", "down_until", "downed_until", "emit_light", "hands", "keeper_peer", "led_by", "led_to", "mending", "move_ticks", "pose", "raised", "raised_tick", "slot_notes", "slots"]
+const SUBCLASS_REPLICATED: Array[String] = ["activity", "addressing", "ailing", "ailments", "alert", "body", "bond_step", "bond_why", "buffs", "channel_of", "channel_until", "charge_room", "charges", "down_until", "downed_until", "emit_light", "hands", "heart", "keeper_peer", "led_by", "led_to", "mending", "move_ticks", "pose", "raised", "raised_tick", "slot_notes", "slots"]
 const SETTINGS_FILE := "settings.cfg"
 ## First launch: half the 3840x2160 base, windowed.
 const DEFAULT_WINDOW_SIZE := Vector2i(1920, 1080)

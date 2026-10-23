@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Mortally Wounded: at 0 HP every player now lies downed; with the draugr's blessing you can hold Slow Heart to stretch the time for a companion or friend to bring you back once it's safe, or Bleed Out to return to the temple at once; the unblessed get a few last moments (587, companions' side).
 - Tidied: the old charge count on a player's record is no longer read or kept by the economy now that the Draugr's Totem holds the charges (573 amended, economy's side).
 - A town that holds a fishing place on the river and has grown to a village gets a fisherman, who walks to the bank and back with fish for the store; the counter in Snagfin's fort across the river is the town's shop (594).
 - Towns now grow through stages, hamlet, village, town and city, rising as they gain people, officials, buildings and gold; the woodcutter's wood will come from the trees he fells once the forest is real, and a cut-bare woodlot still yields a little deadwood (591, economy's side).

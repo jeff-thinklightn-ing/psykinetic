@@ -86,6 +86,7 @@ func _ready() -> void:
 	_test_bond()
 	_test_sickness()
 	_test_field_return()
+	_test_mortally_wounded()
 	_test_capabilities()
 	_test_focus()
 	_test_companion_named()
@@ -1503,6 +1504,80 @@ func _test_focus() -> void:
 	record.companion.erase("focus_day")
 
 
+func _test_mortally_wounded() -> void:
+	print("
+== Mortally Wounded: the heart, Slow Heart, Bleed Out, all fallen (Jeff's down screen) ==")
+	_kill_monsters()
+	var owner := _player()
+	var pet := _companion()
+	_settle(pet)
+	var record: PlayerRecord = _main._records[Net.player_id]
+	var kept_marks := record.marks.duplicate()
+	var kept_barrow := record.barrow.duplicate(true)
+	if not "draugr" in record.marks:
+		record.marks.append("draugr")
+	# A charge or more on their totem (573 amended); its count put back after.
+	var totem: int = World.mint_totem(owner)
+	var kept_charges: int = World.totem_charges(totem)
+	World.totem_add(totem, 5, 999)
+	World.damage(owner, owner.hp, null, &"attack")
+	_check(World.is_downed(owner) and owner.heart == 120, "blessed, at 0 hp: downed, the heart at 120 (%d)" % owner.heart)
+	var step: int = _main._heart_step_ticks()
+	World.command(owner, "slow_heart", {"held": true})
+	World.step()
+	_check(owner.heart == 80, "Slow Heart held: down a beat at once (%d)" % owner.heart)
+	for i in step:
+		World.step()
+	_check(owner.heart == 40, "held on: down to 40 (%d)" % owner.heart)
+	var left: int = owner.downed_until - World.tick
+	for i in 50:
+		World.step()
+	_check(owner.downed_until - World.tick == left - 10, "at 40 the blood runs at a fifth: 50 ticks cost 10 of the window (%d -> %d)" % [left, owner.downed_until - World.tick])
+	World.command(owner, "slow_heart", {"held": false})
+	for i in step + 1:
+		World.step()
+	_check(owner.heart == 80, "let go: the heart climbs back (%d)" % owner.heart)
+	# The revive waits for calm.
+	var imp := _spawn_imp(_main._nearest_free(owner.tile + Vector2i(0, 1)))
+	pet.can_revive = func() -> bool: return false
+	_check(not _main._start_channel(pet, owner), "a foe beside them: no revive till it is safe")
+	if is_instance_valid(imp) and imp.spawned:
+		World.despawn(imp)
+	# All fallen: her down too.
+	World.lay_downed(pet, 300)
+	World.step()
+	var here := World.zone.name
+	_check(_main._all_fallen_at.has(here) and "All have fallen." in _main.party_log.last(5), "she down too, nobody left: all have fallen")
+	World.raise_downed(pet, pet.max_hp)
+	World.step()
+	_check(not _main._all_fallen_at.has(here), "she up again: the wait is off")
+	World.lay_downed(pet, 300)
+	World.step()
+	_main._all_fallen_at[here] = World.tick
+	World.step()
+	_check(not owner.spawned, "the wait out: each bleeds out")
+	World.raise_downed(pet, pet.max_hp)
+	pet.can_revive = func() -> bool: return _main._can_revive(pet, record)
+	_step_until(func() -> bool: return _player() != null, 700)
+	owner = _player()
+	# Unblessed: the last moments, no holding, nobody brings them back; Bleed Out.
+	record.marks.erase("draugr")
+	World.damage(owner, owner.hp, null, &"attack")
+	_check(World.is_downed(owner) and owner.downed_until - World.tick <= 10 * World.TICK_RATE, "unblessed: downed their last moments")
+	World.command(owner, "slow_heart", {"held": true})
+	World.step()
+	World.step()
+	_check(owner.heart == 120, "unblessed: Slow Heart does nothing (%d)" % owner.heart)
+	_check(not _main._start_channel(pet, owner), "unblessed: nobody brings them back")
+	World.command(owner, "bleed_out", {})
+	_check(not owner.spawned, "Bleed Out: gone at once, for the return")
+	_step_until(func() -> bool: return _player() != null, 700)
+	_main._join_companion(record, _player())
+	record.marks.assign(kept_marks)
+	record.barrow = kept_barrow
+	World.items.set_charges(totem, kept_charges)
+
+
 func _test_field_return() -> void:
 	print("
 == the draugr's blessing: downed, not gone, and brought back where they fell (decision 544) ==")
@@ -1513,7 +1588,8 @@ func _test_field_return() -> void:
 	var record: PlayerRecord = _main._records[Net.player_id]
 	var id := record.player_id
 	var whose := "player:" + id
-	_check(_main._downed(owner, null, &"attack") == 0 and _main._downed(pet, null, &"attack") == 0, "unblessed: nobody goes down, they fall as ever")
+	_check(_main._downed(owner, null, &"attack") == 10 * World.TICK_RATE and _main._downed(pet, null, &"attack") == 0,
+		"unblessed: the player lies their last moments (Mortally Wounded), she falls as ever")
 	_put(pet, owner.tile + Vector2i(1, 0))
 	_check(_main.barrow_won([id], "easy") == 1 and "draugr" in record.marks and World.totem_charges(World.totem_of(id)) == 5 and record.barrow.get("best") == "easy",
 		"the draugr laid to rest at the easy deal: the player marked, 5 charges (%s)" % [record.barrow])
@@ -1531,15 +1607,18 @@ func _test_field_return() -> void:
 	_check(owner.spawned and owner.hp == 1 and World.is_downed(owner) and World.is_down(owner), "blessed, beaten to 0: downed at 1 hp, lying (%d)" % owner.hp)
 	World.damage(owner, 5, imp, &"attack")
 	_check(owner.hp == 1 and not imp._nearest_visible_target() == owner, "no blow lands on the downed, and no foe minds them")
-	_step_until(func() -> bool: return not World.is_downed(owner), 120)
+	World.despawn(imp)  # Gone: it is safe, so she may (Mortally Wounded: a revive waits for calm).
+	_step_until(func() -> bool: return not World.is_downed(owner), 120 + World.BANDAGE_CALM_TICKS)
 	_check(not World.is_downed(owner) and owner.spawned and owner.hp == roundi(owner.max_hp * 0.5) and World.totem_charges(World.totem_of(id)) == 9,
 		"she goes to them and brings them back: half their hp, one charge spent (%d hp, %s)" % [owner.hp, record.barrow])
 	# She downed: her player brings her back by holding E on her.
-	World.despawn(imp)
 	_settle(pet)
 	_put(pet, owner.tile + Vector2i(1, 0))
 	World.damage(pet, pet.hp, null, &"attack")
 	_check(pet.spawned and World.is_downed(pet), "she, blessed, is downed too")
+	_check(not _main._start_channel(owner, pet), "the blow just landed: not yet calm, no revive")
+	for i in World.BANDAGE_CALM_TICKS:
+		World.step()
 	_main._on_command(owner, "bandage", {"target": str(pet.get_path())})
 	_check(World.channeler_of(pet) == owner and owner.channel_of == String(pet.name), "held E on her: the channel begins")
 	World.try_move(owner, Vector2i(0, 1))
@@ -2894,6 +2973,7 @@ func _test_death_and_respawn() -> void:
 	pet.errand = {"verb": "bandage", "words": "bandage Player", "patient": owner, "phase": "going", "serial": 0, "until": World.tick + 100}
 	pet._offered[9999] = [{"verb": "bandage", "words": "bandage Player", "patient": owner}]
 	World.damage(owner, 999, null, &"attack")
+	World.damage(owner, owner.hp, null, &"bled")  # Mortally Wounded: unblessed, their last moments; then bled out.
 	# Decision 572: freed at the frame's end, so nothing of hers holds them
 	# (the box's server crashed reading the freed Player through keeper).
 	_check(pet.keeper == null and pet.errand.is_empty() and not pet._offered.has(9999),

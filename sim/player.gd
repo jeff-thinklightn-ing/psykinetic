@@ -42,6 +42,15 @@ var led_to := ""
 ## the server sets both from their record; the client's pack line reads them.
 var charges := 0
 var charge_room := 0
+## Mortally Wounded (Jeff's down screen): the heart while downed, in beats a
+## minute (field rules' heart.beats: 120, 80, 40), 0 when not downed;
+## replicated for the heartbeat and the hold's read. Server only: whether
+## Slow Heart is held, when the heart last stepped, and the window's ticks
+## owed by a slower heart (Main._tend_hearts).
+var heart := 0
+var heart_held := false
+var heart_at := 0
+var heart_debt := 0.0
 
 
 func _init() -> void:
@@ -74,6 +83,7 @@ func _init() -> void:
 	replicate("led_to")
 	replicate("charges")  # Decision 573: the resurrection charges, and the most they may hold.
 	replicate("charge_room")
+	replicate("heart")  # Mortally Wounded: the heart while downed.
 
 
 

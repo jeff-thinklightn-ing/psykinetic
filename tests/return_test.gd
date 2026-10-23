@@ -222,7 +222,7 @@ func _test_main() -> void:
 	for i in 60:
 		World.step()
 	_kill_monsters()
-	World.damage(_player(), 999)
+	_kill(_player())
 	_check(_player() == null, "the player died")
 	var hob := str(World.production.worker(keeper)["name"])
 	_check(_told.size() == 1 and _told[0] == {"by": hob, "where": "healers_hut", "seconds": 0, "near_death": true},
@@ -241,7 +241,7 @@ func _test_main() -> void:
 		if World.production.worker(each)["trades"].any(func(t: String) -> bool: return t in ["priest", "medicine_man"]):
 			World.production.set_away(each, true)
 	_told.clear()
-	World.damage(player, 999)
+	_kill(player)
 	_check(_told == [{"by": "", "where": "", "seconds": _main.RESPAWN_TICKS / World.TICK_RATE}],
 		"told: nobody, coming back in %d s (%s)" % [_main.RESPAWN_TICKS / World.TICK_RATE, _told])
 	for i in _main.RESPAWN_TICKS + 1:
@@ -249,6 +249,14 @@ func _test_main() -> void:
 	player = _player()
 	_check(player != null and World.distance(player.tile, hut) > 2, "with the medicine man away: the old respawn, at a start tile (at %s)"
 		% (player.tile if player else World.NO_CELL))
+
+
+## A player killed: beaten to 0, and, lying their last moments (Mortally
+## Wounded: the unblessed downed a while), bled out.
+func _kill(player: Player) -> void:
+	World.damage(player, 999)
+	if is_instance_valid(player) and World.is_downed(player):
+		World.damage(player, player.hp, null, &"bled")
 
 
 func _kill_monsters() -> void:

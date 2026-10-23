@@ -585,6 +585,8 @@ func _test_player_death() -> void:
 	_rig._process(0.0)
 	var size := _rig._camera.size
 	World.damage(player, 999, null, &"attack")
+	# Downed first (decision 587, Mortally Wounded); Bleed Out is the death.
+	_main._on_command(player, "bleed_out", {})
 	_rig._process(0.0)
 	_check(_rig._mourning, "mourning")
 	await get_tree().create_timer(1.0).timeout

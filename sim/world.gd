@@ -7285,6 +7285,16 @@ func lay_downed(target: GridEntity, ticks: int) -> void:
 	_log("downed: %s lies downed for %d ticks" % [target.name, ticks])
 
 
+## [param body]'s downed window, and its lying and stun with it, longer by
+## [param ticks] (a slowed heart, Mortally Wounded). Server only.
+func extend_downed(body: GridEntity, ticks: int) -> void:
+	if not Net.is_authority() or ticks <= 0 or not is_downed(body):
+		return
+	body.downed_until += ticks
+	body.down_until = maxi(body.down_until, body.downed_until)
+	_stun_for(body, body.downed_until - tick)
+
+
 ## [param body], downed, gets up at [param hp] (a channel done, decision
 ## 544). Server only.
 func raise_downed(body: GridEntity, hp: int) -> void:

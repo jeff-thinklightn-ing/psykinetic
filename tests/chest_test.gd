@@ -198,7 +198,9 @@ func _test_restart() -> void:
 	_check(_main._records[BO_ID].slots == PackedStringArray(["", "", "", "", "", ""]), "and Bo's record is empty")
 	# Dying keeps them too.
 	World.try_transfer(_player(Net.local_id), chest, 0, _player(Net.local_id), 0)
-	World.damage(_player(Net.local_id), 999)
+	var dying := _player(Net.local_id)
+	World.damage(dying, 999)
+	World.damage(dying, dying.hp, null, &"bled")  # Downed first (decision 587): Bleed Out is the death.
 	for i in _main.RESPAWN_TICKS + 1:
 		World.step()
 	var host := _player(Net.local_id)

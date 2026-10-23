@@ -5567,7 +5567,7 @@ func _blessed(entity: GridEntity) -> bool:
 ## Her can_revive: blessed, a charge left on her player's count (573: no
 ## token to carry).
 func _can_revive(pet: Companion, record: PlayerRecord) -> bool:
-	return _blessed(pet) and _uses_left(record) > 0
+	return _blessed(pet) and _uses_left(record) > 0 and (not is_instance_valid(pet.keeper) or _blessed(pet.keeper))
 
 
 ## Charges left on [param record]'s Draugr's Totem (573 amended; the
@@ -5576,38 +5576,146 @@ static func _uses_left(record: PlayerRecord) -> int:
 	return World.totem_charges(World.totem_of(record.player_id)) if record != null else 0
 
 
-## World.downed (decision 544): a blessed body lies downed for the field
-## rules' window, whatever its own player's charges (573: anyone blessed with
-## a charge may bring it back); the unblessed die as ever.
+## World.downed (decision 544; Mortally Wounded): a blessed body lies downed
+## for the field rules' window_s, whatever its own player's charges (573:
+## anyone blessed with a charge may bring it back); an unblessed player lies
+## unblessed_s, their last moments, for Bleed Out (nobody brings them back);
+## an unblessed companion dies as ever.
 func _downed(target: GridEntity, _source: GridEntity, _cause: StringName) -> int:
-	if not (target is Player or target is Companion) or not _blessed(target):
+	if not (target is Player or target is Companion):
 		return 0
 	if target is Player and not _players.has(target.owner_peer):
 		return 0
-	return roundi(float(_field_rules().get("window_s", 30)) * World.TICK_RATE)
+	var blessed := _blessed(target)
+	if not blessed and target is Companion:
+		return 0
+	return roundi(float(_field_rules().get("window_s" if blessed else "unblessed_s", 30 if blessed else 10)) * World.TICK_RATE)
 
 
 ## World.entity_downed: said to the party, and to the fallen.
 func _on_downed(entity: GridEntity, _source: GridEntity, ticks: int) -> void:
 	var seconds := ceili(float(ticks) / World.TICK_RATE)
-	party_log.add("%s is down. A blessed hand beside them can bring them back within %d seconds." % [_display_name(entity), seconds])
+	if not _blessed(entity):
+		party_log.add("%s is mortally wounded." % _display_name(entity))
+	else:
+		party_log.add("%s is down. A blessed hand beside them can bring them back within %d seconds." % [_display_name(entity), seconds])
 	if entity is Player:
-		Net.broadcast_to([entity.owner_peer], "party", {"from": "Server", "text": "You are down. A blessed hand beside you can bring you back within %d seconds; else you are brought back as ever." % seconds})
+		var player := entity as Player
+		# Mortally Wounded: the heart beats at the first of the field rules' beats.
+		player.heart = int((_field_rules().get("heart", {}).get("beats", [120]) as Array)[0])
+		player.heart_held = false
+		player.heart_at = World.tick
+		player.heart_debt = 0.0
+		Net.broadcast_to([entity.owner_peer], "party", {"from": "Server", "text": ("You are mortally wounded. Hold Slow Heart to wait for a blessed hand, or bleed out to be brought back." if _blessed(entity)
+			else "You are mortally wounded, and nobody can bring you back here. Bleed out to be brought back.")})
 	for pet: Companion in _companions.values():
 		if is_instance_valid(pet) and pet.spawned and (pet.keeper == entity or pet == entity):
 			pet.note_downed(entity == pet.keeper)
+
+
+# --- Mortally Wounded (Jeff's down screen) ---------------------------------------
+
+## Zone -> the tick its everyone-down wait ends (_all_fallen_tick).
+var _all_fallen_at: Dictionary[String, int] = {}
+
+
+## The "slow_heart" command: Slow Heart held or let go by the downed
+## [param player]; only the blessed may (the unblessed's button is greyed).
+## Pressed, the heart steps down on the next tick; let go, it climbs back a
+## beat each step_s from then.
+func _slow_heart(player: Player, held: bool) -> void:
+	if not World.is_downed(player) or player.heart <= 0 or not _blessed(player):
+		return
+	if held and not player.heart_held:
+		player.heart_at = World.tick - _heart_step_ticks()
+	elif not held and player.heart_held:
+		player.heart_at = World.tick  # Let go: it climbs a step_s later.
+	player.heart_held = held
+
+
+func _heart_step_ticks() -> int:
+	return maxi(roundi(float(_field_rules().get("heart", {}).get("step_s", 2)) * World.TICK_RATE), 1)
+
+
+## Each tick, this zone's downed players: the heart a beat down each step_s
+## while Slow Heart is held, a beat up while it is not; the blood runs at the
+## beat's drain, the window (World.extend_downed) longer by what a slower
+## heart saves. Up again or gone, the heart is 0.
+func _tend_hearts() -> void:
+	var rules: Dictionary = _field_rules().get("heart", {})
+	var beats: Array = (rules.get("beats", [120, 80, 40]) as Array).map(func(beat: Variant) -> int: return int(beat))  # JSON reads floats.
+	var drain: Array = rules.get("drain", [1.0, 0.5, 0.2])
+	for peer: int in _players:
+		var player: Player = _players[peer]
+		if not is_instance_valid(player) or not player.spawned or player.zone != World.zone.name:
+			continue
+		if not World.is_downed(player):
+			if player.heart != 0:
+				player.heart = 0
+			continue
+		var stage := maxi(beats.find(player.heart), 0)
+		if World.tick - player.heart_at >= _heart_step_ticks():
+			var to := clampi(stage + (1 if player.heart_held else -1), 0, beats.size() - 1)
+			if to != stage:
+				stage = to
+				player.heart = int(beats[stage])
+				player.heart_at = World.tick
+		player.heart_debt += 1.0 - float(drain[mini(stage, drain.size() - 1)])
+		if player.heart_debt >= 1.0:
+			var owed := floori(player.heart_debt)
+			player.heart_debt -= owed
+			World.extend_downed(player, owed)
+
+
+## Each tick, this zone: every player in it downed, and each one's companion
+## there downed or gone, so nobody is left to help: "All have fallen",
+## economy's tell_all_fallen (the "return" message's all_fallen, everyone_s),
+## and when it runs out each bleeds out (the return at once). One up again
+## ends the wait, and they are told ({all_fallen: 0}).
+func _all_fallen_tick() -> void:
+	var here := World.zone.name
+	var peers: Array = []
+	var fallen := true
+	for peer: int in _players:
+		var player: Player = _players[peer]
+		if not is_instance_valid(player) or not player.spawned or player.zone != here:
+			continue
+		peers.append(peer)
+		var pet: Companion = _companions.get(_peer_ids.get(peer, ""))
+		if not World.is_downed(player) or is_instance_valid(pet) and pet.spawned and pet.zone == here and not World.is_downed(pet):
+			fallen = false
+	if peers.is_empty() or not fallen:
+		if _all_fallen_at.has(here):
+			_all_fallen_at.erase(here)
+			for peer: Variant in peers:
+				Net.message_to(int(peer), "return", {"all_fallen": 0})
+		return
+	if not _all_fallen_at.has(here):
+		party_log.add("All have fallen.")
+		_all_fallen_at[here] = World.tick + tell_all_fallen(peers) * World.TICK_RATE
+	elif World.tick >= _all_fallen_at[here]:
+		_all_fallen_at.erase(here)
+		for peer: Variant in peers:
+			var player: Player = _players.get(int(peer))
+			if is_instance_valid(player) and World.is_downed(player):
+				World.damage(player, player.hp, null, &"bled")
 
 
 ## Server: [param by] begins to bring back the downed [param body] (held E
 ## on it, or her REVIVE): [param by] blessed, with a charge left on its
 ## player's count (573: no half to carry). False if it cannot.
 func _start_channel(by: GridEntity, body: GridEntity) -> bool:
-	if not World.is_downed(body) or not _blessed(by):
-		return false
+	if not World.is_downed(body) or not _blessed(by) or not _blessed(body):
+		return false  # The unblessed lie their last moments; nobody brings them back (573).
 	var record := _blessing_record(by)
 	if _uses_left(record) <= 0:
 		if by is Player:
 			Net.broadcast_to([by.owner_peer], "party", {"from": "Server", "text": "You hold no charge. The draugr gives more."})
+		return false
+	if not World.calm(by) or not World.calm(body):
+		# When it is safe (Mortally Wounded): nothing hostile near either, no blow just now.
+		if by is Player:
+			Net.broadcast_to([by.owner_peer], "party", {"from": "Server", "text": "Not while they're fighting near."})
 		return false
 	return World.try_channel(by, body, roundi(float(_field_rules().get("channel_s", 4)) * World.TICK_RATE))
 
@@ -7444,6 +7552,11 @@ func _on_command(entity: GridEntity, command_name: String, args: Dictionary) -> 
 			_start_channel(entity, patient)  # Held E on the downed: the return (decision 544).
 		elif patient != null:
 			World.try_bandage(entity, patient)
+	elif command_name == "slow_heart" and entity is Player:
+		_slow_heart(entity as Player, bool(args.get("held", false)))
+	elif command_name == "bleed_out" and entity is Player:
+		if World.is_downed(entity):
+			World.damage(entity, entity.hp, null, &"bled")  # Bleed Out (Mortally Wounded): the return follows at once.
 	elif command_name == "use" and entity is Player:
 		World.try_use(entity, int(args.get("slot", -1)))
 	elif command_name == "retain" and entity is Player:
@@ -10293,6 +10406,8 @@ func _on_world_ticked(tick: int) -> void:
 		if tick % WORK_CHECK_TICKS == 0:
 			_visible_work_tick()  # The bodies at the work the sim does (decision 566).
 		_respawn_due_players(tick)
+		_tend_hearts()  # Mortally Wounded: the downed's hearts, and all of them fallen.
+		_all_fallen_tick()
 		_check_respawns(tick)
 		t = World.part("respawns", t)
 		if tick % CAMP_CHECK_TICKS == 0:
