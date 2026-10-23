@@ -4197,7 +4197,13 @@ func try_pick_up(by: GridEntity, cell: Vector2i, index := -1) -> bool:
 	if there.is_empty():
 		return false
 	if index < 0:
+		# The top thing not bound to a boss (603 amended): his axe lying on a
+		# pile keeps nobody from the rest of it.
 		index = there.size() - 1
+		while index >= 0 and axe_bound(there[index]):
+			index -= 1
+		if index < 0:
+			return false
 	if index >= there.size():
 		return false
 	var uid := there[index]

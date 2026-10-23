@@ -22527,7 +22527,11 @@ arming fix, 8b958f55), on Jeff's draft list:
   enemy-ai's). World.recall_axe(by) puts it back in his hands when his fight
   ends, won or lost (his mind calls it); the pact's prize stays his row's
   "yields" (items' Monster.yielded). Killed, he is forgotten (_forget_jobs)
-  and the axe lies free as loot.
+  and the axe lies free as loot. On a pile, a pick-up takes the top thing not
+  bound; the refusal line is said only where his axe lies alone. Known gaps
+  (items' review): the bond is World's memory, so a server restart with the
+  axe lying reloads it free; and the client's "F  pick up" hint still names it
+  (the client does not know the bond).
 - enemy-ai's side (THROW_NEAR 6, no throw at a target closing in; the walk back
   to his axe and the recall; the waves deciding the difficulty) is its own
   amendment.

@@ -421,6 +421,10 @@ func _test_bound_axe() -> void:
 	World._relocate(player, cell + Vector2i(0, 1))
 	_check(not World.try_pick_up(player, cell) and World.ground_uids(cell).has(int(axe["uid"])) and player.slots[Player.RIGHT_HAND].is_empty(),
 			"the player beside it cannot pick it up")
+	var purse := World.items.mint("coin_purse", "built")
+	World.zone.ground[cell] = PackedInt32Array([purse, int(axe["uid"])])  # A purse under his axe.
+	_check(World.try_pick_up(player, cell) and player.slots.has("coin_purse") and World.ground_uids(cell) == PackedInt32Array([int(axe["uid"])]),
+			"a purse on the same cell is picked up past it; the axe stays")
 	World._relocate(player, boss.tile + Vector2i(-1, 0))
 	_check(World.try_axe_charge(boss), "he charges for it")
 	for i in 12:
@@ -448,7 +452,7 @@ func _test_bound_axe() -> void:
 	World._forget_jobs(boss)  # As when he is killed and despawned.
 	_check(not World.axe_bound(int(last["uid"])) and World.ground_uids(last["cell"]).has(int(last["uid"])), "he is gone: it lies free, loot")
 	World._relocate(player, last["cell"] + Vector2i(0, 1))
-	_check(World.try_pick_up(player, last["cell"]) and player.slots[Player.RIGHT_HAND] == "battle_axe", "and a player beside it picks it up")
+	_check(World.try_pick_up(player, last["cell"]) and player.slots.has("battle_axe"), "and a player beside it picks it up")
 
 
 ## A draugr a level places is armed, looted and housed as a Monster is

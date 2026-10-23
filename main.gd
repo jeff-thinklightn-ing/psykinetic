@@ -10592,7 +10592,7 @@ func _item_command(player: Player, what: String, args: Dictionary) -> void:
 				if not World.ground_uids(each).is_empty() and World.try_pick_up(player, each):
 					return
 			for each in cells:
-				if Array(World.ground_uids(each)).any(func(uid: int) -> bool: return World.axe_bound(uid)):
+				if Array(World.ground_uids(each)).all(func(uid: int) -> bool: return World.axe_bound(uid)) and not World.ground_uids(each).is_empty():
 					party_log.add(BOUND_AXE_WORDS)  # 603 amended: his, till the pact is won.
 					return
 		"drop":
