@@ -102,6 +102,7 @@ func _ready() -> void:
 	_test_barrow_layers()
 	_test_draugr_mind()
 	_test_draugr_waves()
+	_test_hall_waits()
 	_test_charging()
 	_test_threatens()
 	_test_quieter()
@@ -3027,6 +3028,53 @@ func _test_draugr_waves() -> void:
 	_check(four[0]["at"] == 0.9 and _counts(four) == [2, 4] and four[1]["kinds"] == ["skeleton", "skeleton_guard"] and four[0]["kinds"] == ["skeleton"],
 		"a party of four: per player past the first, earliest wave first, skeletons by default (%s)" % [_counts(four)])
 	_check(_counts(Draugr.plan_waves(party, "normal", 0, 1)) == [0, 1], "alone, the same table: only its base")
+
+
+func _test_hall_waits() -> void:
+	print("
+== his Hall waits for the first one's companion coming along, up to 5 s; never for one told to wait (573 amended) ==")
+	Monster.idling = true
+	var rows: Array[String] = ["###############", "#.............#", "#.....u.......#", "#.............#", "#.............#", "###############"]
+	Level.register("mt_hall", Level.image_from_rows(rows), null, {"regenerate": {"anchors": [{"rect": [1, 1, 8, 4], "name": "lair"}]}})
+	for case in ["coming", "flat", "waits"]:
+		var e := _build(rows, {}, {}, "mt_hall")
+		var draugr := e["u"][0] as Draugr
+		var player := EntityFactory.build(SPECS["P"].merged({"name": "Player1"})) as Player
+		player.player_id = "p1"
+		_room.add_child(player)
+		World.spawn(player, Vector2i(7, 2))
+		var pet := EntityFactory.build({"script": "res://sim/companion.gd", "shape": "capsule", "name": "Garrow",
+			"props": {"max_hp": 10}}) as Companion
+		_room.add_child(pet)
+		World.spawn(pet, Vector2i(12, 3))
+		pet.keeper = player
+		if case == "waits":
+			pet.order = "wait"
+		var doors: Array = []
+		draugr.hall_door.connect(func(open: bool) -> void: doors.append(open))
+		var shut_at := -1
+		var in_at := -1
+		var from := World.tick
+		for i in 70:
+			if case == "coming":
+				_move_to(pet, Vector2i(maxi(12 - i / 3, 8), 3))  # A cell nearer every third tick.
+				if in_at < 0 and pet.tile.x <= 8:
+					in_at = World.tick - from
+			else:
+				_move_to(pet, Vector2i(12, 3))
+			World.step()
+			if shut_at < 0 and draugr.hall_shut:
+				shut_at = World.tick - from
+		match case:
+			"coming":
+				_check(in_at > 0 and shut_at >= in_at and shut_at <= in_at + 2 and doors == [false],
+					"she comes along 4 off: it waits till she is in (in at %d, shut at %d)" % [in_at, shut_at])
+			"flat":
+				_check(shut_at >= Draugr.DOOR_WAIT_TICKS and shut_at <= Draugr.DOOR_WAIT_TICKS + 2,
+					"she stands 4 off, no farther: it waits its 50 ticks, then shuts (%d)" % shut_at)
+			"waits":
+				_check(shut_at >= 0 and shut_at <= 2, "she was told to wait: it shuts at once (%d)" % shut_at)
+	Level.unregister("mt_hall")
 
 
 func _test_draugr_mind() -> void:

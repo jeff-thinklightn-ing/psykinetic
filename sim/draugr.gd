@@ -63,6 +63,13 @@ const WON := "...you have honored the pact, I shall give you the power to cheat 
 const RESPECT := "...warrior, you have my respect."
 ## Ticks between his question and his asking (a pause).
 const ASK_DELAY_TICKS := 30
+## His Hall waits for the first one's companion (573 amended; Jeff: "door
+## closes to quickly companion can't get in"): while she is coming along
+## within DOOR_WAIT_CELLS of his lair, no farther off than COMING_TICKS
+## ago, up to DOOR_WAIT_TICKS, then it shuts whether she is in or not.
+const DOOR_WAIT_CELLS := 6
+const DOOR_WAIT_TICKS := 50
+const COMING_TICKS := 10
 ## His mind in the fight (603, enemy-ai's side; combat's moves, Jeff's
 ## words): drafts. At BACK_OFF_STAMINA or under (after the spin) he backs
 ## off till no longer winded; his dead rise in waves as his hp passes
@@ -136,6 +143,11 @@ var _fist_seen := -1
 var _struck_at: Array[int] = []
 var _asking := ""
 var _ask_at := -1
+## The tick the first one came into his lair while the Hall waits for
+## their companion (-1: not waiting), and each companion's cells from his
+## lair over the last COMING_TICKS (instance id -> {tick: cells}).
+var _door_wait_from := -1
+var _coming := {}
 
 signal offer_spoken(player_id: String, offer: Dictionary)
 signal offer_withdrawn(player_id: String)
@@ -438,21 +450,34 @@ func _speak() -> void:
 
 
 ## His Hall on a visit (573 amended): the first player into his lair while
-## he sits shuts it, is asked why they came, and after ASK_DELAY_TICKS is
+## he sits shuts it (once their companion is in, or not coming, or after
+## DOOR_WAIT_TICKS: _companion_coming), is asked why they came, and after ASK_DELAY_TICKS is
 ## told what he asks of them (his offer's words); it opens again when nobody
 ## living (downed counts as living) is left in his lair.
 func _tend_hall() -> void:
 	if not hall_shut:
 		if state != State.SEATED:
 			return
+		var first: Player = null
 		for entity in World.sought():
 			if entity is Player and entity.hp > 0 and _in_lair(entity):
-				hall_shut = true
-				_asking = (entity as Player).player_id
-				_ask_at = World.tick + ASK_DELAY_TICKS
-				hall_door.emit(false)
-				said.emit(ASKED % entity.name)
-				return
+				first = entity
+				break
+		if first == null:
+			_door_wait_from = -1
+			_coming.clear()
+			return
+		if _door_wait_from < 0:
+			_door_wait_from = World.tick
+		if World.tick - _door_wait_from < DOOR_WAIT_TICKS and _companion_coming(first):
+			return
+		_door_wait_from = -1
+		_coming.clear()
+		hall_shut = true
+		_asking = first.player_id
+		_ask_at = World.tick + ASK_DELAY_TICKS
+		hall_door.emit(false)
+		said.emit(ASKED % first.name)
 		return
 	if _asking != "" and World.tick >= _ask_at:
 		var offers := offers_for(_asking)
@@ -464,6 +489,40 @@ func _tend_hall() -> void:
 		if entity is Player and entity.hp > 0 and entity.spawned and _in_lair(entity):
 			return
 	_open_hall()
+
+
+## Whether [param player]'s companion is on her way into his lair: hers,
+## up, outside it and within DOOR_WAIT_CELLS of it, no farther off than
+## COMING_TICKS ago; not one told to wait or rest, on an errand, pulling
+## back or fleeing (companions' fields, read as they stand).
+func _companion_coming(player: Player) -> bool:
+	var coming := false
+	for entity in World.sought():
+		if not entity is Companion:
+			continue
+		var pet := entity as Companion
+		if pet.keeper != player or pet.hp <= 0 or World.is_downed(pet) or _in_lair(pet) or pet.stays_put() 				or not pet.order.is_empty() or not pet.errand.is_empty() or pet.stance == Companion.Stance.PULL_BACK 				or pet.current_intent == Companion.Intent.RETREAT:
+			continue
+		var cells := _cells_from_lair(pet.tile)
+		var seen: Dictionary = _coming.get(pet.get_instance_id(), {})
+		for at: int in seen.keys():
+			if World.tick - at > COMING_TICKS:
+				seen.erase(at)
+		var was: int = seen[seen.keys().min()] if not seen.is_empty() else cells  # Her cells COMING_TICKS ago, or since first seen.
+		seen[World.tick] = cells
+		_coming[pet.get_instance_id()] = seen
+		if cells <= DOOR_WAIT_CELLS and cells <= was:
+			coming = true
+	return coming
+
+
+## How many cells [param cell] lies outside his lair (0 inside it).
+func _cells_from_lair(cell: Vector2i) -> int:
+	if not _room.has_area():
+		return maxi(0, World.distance(home, cell) - leash)
+	var dx := maxi(maxi(_room.position.x - cell.x, cell.x - (_room.end.x - 1)), 0)
+	var dy := maxi(maxi(_room.position.y - cell.y, cell.y - (_room.end.y - 1)), 0)
+	return maxi(dx, dy)
 
 
 func _open_hall() -> void:

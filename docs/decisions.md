@@ -24852,3 +24852,24 @@ edge): no edge, no leaf, no post in its middle. One piece, no variants: its faci
 water trough flush to the -z fence are the piece's own; nobody lays them, and nothing else
 stands inside, so no lane narrows under the two-cell rule. 5505 tris (budget 5600).
 Art only, protocol unchanged, no new class_name.
+## 573 amended (2): the Hall waits for the companion (enemy-ai's side)
+
+Jeff on v0.1.169: "draugr door closes to quickly companion can't get in". The coordinator's
+ruling: the Hall's door waits for the first player's companion while she comes along.
+
+- `Draugr._tend_hall`: the first living player into his lair while he sits shuts the Hall, as
+  before, unless their companion is coming (`_companion_coming`). Then it waits, at most
+  `DOOR_WAIT_TICKS` (50, 5 s) from that player's coming in, and shuts once she is in, has stopped
+  coming, or the time is up, whether she is in or not. Nobody left in the lair while it waits
+  starts it over.
+- Coming: a Companion whose keeper is that player, up and not downed, outside the lair and within
+  `DOOR_WAIT_CELLS` (6) of it (`_cells_from_lair`, Chebyshev to its room), and no farther off than
+  `COMING_TICKS` (10) ago. "No farther" rather than "nearer" (companions: she trails 2 to 5 cells
+  and a doorway bump or a corner can hold her distance flat for a second). Never one told to wait
+  (`stays_put()`), with an order ("wait", "rest", "watch"), on an errand, pulling back or fleeing
+  (RETREAT): companions' fields, read as they stand, nothing new on her side.
+
+monster_test `_test_hall_waits`: she comes along 4 off and the Hall shuts as she is in; she stands
+4 off and it shuts at 50 ticks; told to wait, it shuts at once. Server only, protocol unchanged,
+no new class_name.
+
