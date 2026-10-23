@@ -25142,3 +25142,38 @@ props, and scrub's tall grass. Live, with no rebuild: grass from a stump;
 a fell (its tree gone at once, the land's at the next build); a regrowth
 (a tree at once). Client only, protocol
 unchanged, no new class_name.
+
+## 580 step 3, terrain's side: a dais drawn as a dais
+
+The coordinator approved dungeon's halls dressed (580 step 3); the Hall of
+Fallen Souls has a dais 12 x 4 one level up, its whole front row stairs
+climbing onto it. Indoors that step was drawn as a cliff's rock face.
+- On an indoor level with no relief given, an edge between two floors
+  exactly one level (0.5 m) apart is art-kit's dais.edge in place of a cliff
+  face (Client3D._is_dais, _add_dais_edge from _add_cliffs; _cliff_edges
+  still lists it). Where the low cell is a stair climbing onto the dais,
+  the piece is dais.steps.
+- Both pieces are in buildings' edge frame: along z, +x the low side, the
+  origin on the low floor at the edge's middle. Each is turned so +x points
+  down off the dais, and carries its slot as meta "slot".
+- A stair onto a dais is not a ramp: _shape_ramps leaves it flat
+  (_dais_stairs) so the ground doesn't poke through the steps piece.
+  _height_in walks it up the steps, flat to their foot (DAIS_STEPS_REACH,
+  0.624 m from the edge) and then up to the dais at the edge.
+- What stays a cliff:
+  - every step outdoors;
+  - a drop of more than one level;
+  - an edge down to void or water;
+  - every step if either piece has no art yet (a placeholder);
+  - every step on a level with a relief.png (the coordinator accepted this
+    narrowing). The reason: the sample is indoor and its relief's one-level
+    steps are rock ledges, not built daises. A built hall that is ever
+    given a relief.png draws its dais as rock. dungeon keeps the Hall on
+    height.png and knows the rule.
+- The outer corners, where two edge pieces meet, are to be checked in the
+  Hall's shots after the all-clear; a corner piece is art-kit's if needed.
+view_test _test_dais: an in-memory stone hall with the dais and its stair
+row. It checks 32 pieces, 12 of them steps on the front, each turned off the
+dais and with no cliff face; the stairs flat and walked up; the same map
+outdoors as cliffs; the sample with no dais. Client only, protocol
+unchanged, no new class_name.

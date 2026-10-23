@@ -290,6 +290,15 @@ const BRIDGE_END := "bridge.wood.end"
 ## found. Each piece 0.5 m thick on its edge, +x toward the room.
 const NICHE_PIECE := "wall.crypt.niche_%s"
 const NICHE_CRACKED := "wall.crypt.cracked"
+## A dais indoors (580 step 3, terrain's side; the Hall of Fallen Souls):
+## an edge between two floors exactly one level apart is art-kit's
+## dais.edge in place of a cliff face, dais.steps where the low cell is a
+## stair climbing onto it (its steps reach DAIS_STEPS_REACH into that cell,
+## drawn flat under them). In buildings' edge frame: along z, +x the low
+## side, its origin on the low floor at the edge's middle.
+const DAIS_EDGE := "dais.edge"
+const DAIS_STEPS := "dais.steps"
+const DAIS_STEPS_REACH := 0.624
 const NICHE_OPEN := "wall.crypt.niche_open"
 const ROCK_SMALL := "rock.small"
 const ROCK_LARGE := "rock.large"
@@ -1531,6 +1540,9 @@ var _corners: Dictionary[Vector2i, PackedFloat32Array] = {}
 ## Corners where a stair's ramp sets them: the stair's high side up to the
 ## cell it climbs to, and the cells round it (_shape_ramps).
 var _ramp_heights: Dictionary[Vector2i, PackedFloat32Array] = {}
+## Stairs up onto a dais (by the way each climbs), flat under dais.steps;
+## _height_in walks them up the steps.
+var _dais_stairs: Dictionary[Vector2i, Vector2i] = {}
 ## The camera's pitch while a ridge would hide the player (_ridge_lift),
 ## eased; 0 when none.
 var _ridge_pitch := 0.0
@@ -2700,6 +2712,10 @@ func _height_in(cell: Vector2i, point: Vector2) -> float:
 			return fine[q] + (fine[q + 1] - fine[q]) * at.x + (fine[q + row] - fine[q]) * at.y
 		return fine[q + row + 1] + (fine[q + row] - fine[q + row + 1]) * (1.0 - at.x) \
 				+ (fine[q + 1] - fine[q + row + 1]) * (1.0 - at.y)
+	if _dais_stairs.has(cell):
+		# Up dais.steps: flat to their foot, then up to the dais at the edge.
+		var along := (at - Vector2(0.5, 0.5)).dot(Vector2(_dais_stairs[cell])) + 0.5
+		return _elevation(cell) + LEVEL_RISE * clampf((along - (1.0 - DAIS_STEPS_REACH)) / DAIS_STEPS_REACH, 0.0, 1.0)
 	var h := _corner_heights(cell)
 	# The quad's two triangles: (0, 1, 2) where x + y <= 1, (1, 3, 2) past it.
 	if at.x + at.y <= 1.0:
@@ -2887,11 +2903,15 @@ func _read_field() -> void:
 ## up beside the ramp would show a ledge the sim does not have.
 func _shape_ramps() -> void:
 	_ramp_heights.clear()
+	_dais_stairs.clear()
 	var stairs: Dictionary = _terrain.get("stairs", {})
 	var around: Array[Vector2i] = [-Vector2i.ONE, Vector2i(0, -1), Vector2i(-1, 0), Vector2i.ZERO]
 	for stair: Vector2i in stairs:
 		var up: Vector2i = stairs[stair]
 		var height := _elevation(stair)
+		if _is_dais(stair + up, stair):
+			_dais_stairs[stair] = up
+			continue
 		# The ramp's top: the cell it climbs to (a level up where there is no
 		# relief, up to Relief.STAIR_RISE where there is).
 		var top := _elevation(stair + up)
@@ -8567,6 +8587,11 @@ func _add_cliffs() -> void:
 			if (top - bottom).length() <= Relief.EPSILON:
 				continue
 			_cliff_edges.append([cell, direction])
+			# A dais's edge indoors: art-kit's piece for the face (580 step 3).
+			if floor_cells.has(next) and _is_dais(cell, next) and absf(top.x - bottom.x - LEVEL_RISE) <= Relief.EPSILON \
+					and absf(top.y - bottom.y - LEVEL_RISE) <= Relief.EPSILON:
+				_add_dais_edge(cell, direction, bottom.x)
+				continue
 			# A ledge's face along its curve stands for this one (585).
 			if _ledge_covers(cell, next):
 				continue
@@ -8600,6 +8625,32 @@ func _add_cliffs() -> void:
 		drawn.mesh = mesh
 		drawn.material_override = material
 		_room.add_child(drawn)
+
+
+## Whether the edge from [param high] down to [param low] is a dais's
+## (580 step 3): indoors on built levels (no relief given: a relief's
+## steps are the land's rock, the sample's), both of them land, [param high]
+## exactly one level up, and art-kit's two pieces drawn (else a cliff).
+func _is_dais(high: Vector2i, low: Vector2i) -> bool:
+	return not _outdoor and not _relief_given and _land.has(high) and _land.has(low) \
+			and absf(_elevation(high) - _elevation(low) - LEVEL_RISE) <= Relief.EPSILON \
+			and _deadwood_drawn(DAIS_EDGE) and _deadwood_drawn(DAIS_STEPS)
+
+
+## A dais's edge on [param cell]'s side toward [param direction] (the low
+## floor, at [param floor_at]): dais.steps where that cell is a stair up
+## onto it, else dais.edge; turned so its +x points down off the dais.
+func _add_dais_edge(cell: Vector2i, direction: Vector2i, floor_at: float) -> void:
+	var low := cell + direction
+	var steps: bool = _dais_stairs.get(low, Vector2i.ZERO) == -direction
+	var slot := DAIS_STEPS if steps else DAIS_EDGE
+	var piece := ArtKit.instance(slot)
+	piece.set_meta(&"slot", slot)
+	piece.name = "Dais_%d_%d_%d_%d" % [cell.x, cell.y, direction.x, direction.y]
+	var middle := Vector2(cell) + Vector2(direction) * 0.5
+	piece.position = Vector3(middle.x, floor_at, middle.y)
+	piece.rotation.y = atan2(-float(direction.y), float(direction.x))
+	_room.add_child(piece)
 
 
 ## One cliff face into [param into] ([positions, normals, colours]): along

@@ -52,6 +52,7 @@ func _ready() -> void:
 	_test_ledge_curves()
 	_test_forest_edge()
 	_test_clearing()
+	_test_dais()
 	_test_solid_ground()
 	_test_roads()
 	_test_water()
@@ -2608,6 +2609,64 @@ func _test_forest_edge() -> void:
 						astray_scatter += 1
 		_check(by_edge > 0 and astray_scatter == 0,
 				"%s: the scatter by the edge on its own side of the curve, the roots within %.1f of it (%d by it; astray: %d)" % [name, Client3D.EDGE_ROOTS, by_edge, astray_scatter])
+	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+
+
+## A dais indoors (580 step 3, terrain's side): a 12 x 4 dais a level up
+## in a stone hall, its front row stairs: art-kit's dais.steps on the
+## front, dais.edge round the rest, each turned with +x off the dais, no
+## cliff face; the stairs flat under the steps, walked up them. The same
+## map outdoors keeps its cliffs, and the sample (its relief's rock) has
+## no dais.
+func _test_dais() -> void:
+	print("\n== a dais indoors: art-kit's edge and steps for the cliff, the stairs flat under them ==")
+	var map := LevelMap.new(Vector2i(16, 12))
+	for y in 12:
+		for x in 16:
+			map.set_cell(Vector2i(x, y), "stone")
+	var dais := Rect2i(2, 2, 12, 4)
+	for y in range(dais.position.y, dais.end.y):
+		for x in range(dais.position.x, dais.end.x):
+			map.heights[Vector2i(x, y)] = 1
+	for x in range(dais.position.x, dais.end.x):
+		map.set_cell(Vector2i(x, dais.end.y), "stair")
+	var config := {"walls": "stone", "floors": "stone"}
+	var terrain: Dictionary = Level.parse(map.to_image(), map.to_height_image(), config)["terrain"]
+	_rig.rebuild(terrain, Vector2i(8, 8))
+	var pieces: Array[Node] = _rig._room.find_children("Dais_*", "", false, false)
+	var steps := 0
+	var turned := true
+	for piece: Node3D in pieces:
+		var parts := String(piece.name).split("_")
+		var direction := Vector2i(int(parts[3]), int(parts[4]))
+		var is_steps: bool = piece.get_meta(&"slot", "") == Client3D.DAIS_STEPS
+		if direction == Vector2i(0, 1):
+			steps += 1
+		turned = turned and piece.transform.basis.x.is_equal_approx(Vector3(direction.x, 0.0, direction.y)) \
+				and piece.position.is_equal_approx(Vector3(int(parts[1]) + direction.x * 0.5, 0.0, int(parts[2]) + direction.y * 0.5))
+		if is_steps != (direction == Vector2i(0, 1)):
+			turned = false
+	var cliffs := _rig._room.find_children("Cliffs_*", "", false, false)
+	_check(pieces.size() == 32 and steps == 12 and turned and cliffs.is_empty(),
+			"%d dais pieces round it (32), dais.steps on its 12 front edges, each +x off the dais on the low floor (%s), no cliff face (%d)" % [pieces.size(), turned, cliffs.size()])
+	var stair := Vector2i(7, dais.end.y)
+	var corners := _rig._corner_heights(stair)
+	_check(Array(corners).all(func(h: float) -> bool: return absf(h) < 0.01) and not _rig._ramp_heights.has(stair) and _rig._dais_stairs.get(stair) == Vector2i(0, -1),
+			"the stairs drawn flat under the steps (%s)" % [corners])
+	var foot := _rig._ground_height(Vector2(stair) + Vector2(0.0, 0.45))
+	var top := _rig._ground_height(Vector2(stair) - Vector2(0.0, 0.5))
+	var dais_top := _rig._ground_height(Vector2(7, 4))
+	_check(foot < 0.01 and absf(top - Client3D.LEVEL_RISE) < 0.01 and absf(dais_top - Client3D.LEVEL_RISE) < 0.01,
+			"walked up the steps: the floor at their foot, the dais at the edge (%.2f, %.2f, %.2f)" % [foot, top, dais_top])
+	config["outdoor"] = true
+	terrain = Level.parse(map.to_image(), map.to_height_image(), config)["terrain"]
+	_rig.rebuild(terrain, Vector2i(8, 8))
+	_check(_rig._room.find_children("Dais_*", "", false, false).is_empty() and not _rig._room.find_children("Cliffs_*", "", false, false).is_empty(),
+			"outdoors the same dais is a cliff")
+	var sample := Level.load_level("sample")
+	_rig.rebuild(sample["terrain"], sample["centre"])
+	_check(_rig._room.find_children("Dais_*", "", false, false).is_empty() and _rig._dais_stairs.is_empty(),
+			"the sample's ledges stay rock (a relief's)")
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
 
