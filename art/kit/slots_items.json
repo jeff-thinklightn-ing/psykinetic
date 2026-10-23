@@ -740,6 +740,25 @@
 			"type": "mesh",
 			"uses": "stamina potion (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
 		},
+		"item.steadying_draught": {
+			"budget": 500,
+			"category": "items",
+			"kind": "held",
+			"size": [
+				0.05,
+				0.11,
+				0.05
+			],
+			"sockets": {
+				"grip": [
+					0,
+					0,
+					0
+				]
+			},
+			"type": "mesh",
+			"uses": "steadying draught (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
+		},
 		"item.sword": {
 			"budget": 500,
 			"category": "items",

@@ -650,9 +650,10 @@ static func has_tag(id: String, tag: String) -> bool:
 ## What a consumed thing's effects may raise, each with its name on the HUD:
 ## mass (food: kg, heavier and harder to shove), aura (magic) and wits
 ## (social time), the last two read by whatever comes to use them
-## (World.buff), and speed (a fraction: steps that much faster,
-## World.step_ticks; decision 562).
-const BUFF_KINDS := {"mass": "Fed", "aura": "Aura", "wits": "Wits", "speed": "Quick"}
+## (World.buff), speed (a fraction: steps that much faster,
+## World.step_ticks; decision 562), and steady (a fraction: a drawn bow's
+## cone that much narrower, World.spread_of; decision 642).
+const BUFF_KINDS := {"mass": "Fed", "aura": "Aura", "wits": "Wits", "speed": "Quick", "steady": "Steady"}
 
 
 ## [param effects] as the catalog gives them, each {kind, amount, ticks},

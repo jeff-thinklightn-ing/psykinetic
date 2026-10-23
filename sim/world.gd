@@ -5043,14 +5043,16 @@ func longest_range(entity: GridEntity) -> int:
 
 ## The half-angle in radians of the cone [param entity]'s drawn bow
 ## looses in now (decision 620; Items.spread_at from its hold, which
-## replicates, so a client's cone is the server's); -1 when not drawing.
+## replicates, so a client's cone is the server's), narrowed by a steady
+## buff (decision 642: buffs replicate too); -1 when not drawing.
 func spread_of(entity: GridEntity) -> float:
 	if not is_instance_valid(entity) or entity.raised != "draw":
 		return -1.0
 	var verb := Items.verb_of(drawn_with(entity))
 	if verb.is_empty():
 		return -1.0
-	return Items.spread_at(verb, float(tick - entity.raised_tick) / maxf(0.01, _draw_quick(entity)))
+	var steady := clampf(buff(entity, "steady"), 0.0, 1.0)
+	return Items.spread_at(verb, float(tick - entity.raised_tick) / maxf(0.01, _draw_quick(entity))) * (1.0 - steady)
 
 
 ## The angle [param by]'s arrow flies at, aimed at [param angle] in a cone

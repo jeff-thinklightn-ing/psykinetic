@@ -25688,5 +25688,33 @@ unchanged, no new class_name.
   the same hold.
 - Both read World.worn_armour from the replicated slots, so a client's
   prediction and the server's roll agree; a v0.1.169 client would not, so a
-  line under PROTOCOL_REVISION 34 (release). items_test _test_armour (leather:
+  line under PROTOCOL_REVISION 35 (release; 34 shipped first). items_test _test_armour (leather:
   19 ticks reach 9 cells, bare 7; plate: 5 at most, however long the hold).
+
+## 642. The steadying draught
+
+The second healer's hut (economy's 641) wanted a potion of its own, with an effect the
+player can feel. The coordinator floated three; one is built.
+
+- **steadying_draught** ("steadying draught", short "Steady"): the medicine man makes it
+  from 2 herbs and an antler in 600 steps, a shelf of 3, stacks of 3 (draft values, built
+  as drafted; the cut's checklist carries a tune line). Drunk, it puts a new buff kind on
+  the drinker, **steady** (Items.BUFF_KINDS, shown "Steady"): amount 0.4 for 18000 ticks
+  (30 minutes), held and renewed like any buff (add_buff).
+- **World.spread_of** multiplies the cone of flight (620) by (1 - steady): the same hold
+  is 40% narrower. Reach, draw time and the steps are unchanged. The factor applies
+  after spread_at's floor, on purpose (pc-character asked): a steadied archer's narrowest
+  cone is the floor times 0.6 (1.2 degrees on the hunting bow), so the draught still helps
+  the one who holds to the settle. Enemy-ai's aim_spread clamp reads the verb's floor. Buffs replicate, so the
+  client's drawn cone and the server's roll agree; a line under PROTOCOL_REVISION 35
+  (release), since an older client would draw the wider cone.
+- **Held**: a night-sight draught. The sim's darkness only steers senses (monsters'
+  dark_sight, is_lit), and players carry a lantern, so what a drinker would see is the 3D
+  view's lighting (environment's). A "sight" buff kind waits until Jeff asks and the
+  lighting side is routed.
+- **Dropped until the cold hurts**: a warming draught. Season.cold_at only turns rain to
+  snow.
+
+Economy lists steadying_draught in the new hut's makes (economy.json
+return.places.healers_hut) once it is on main. items_test _test_steadying_draught. No new
+class_name.

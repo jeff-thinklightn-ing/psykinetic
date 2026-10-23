@@ -496,6 +496,39 @@ func _test_stamina_potion() -> void:
 	_steps(2)
 	_check(not host.buffs.has("speed") and is_equal_approx(World.step_ticks(host, Vector2i.RIGHT), plain), "then it fades: back to the plain pace")
 	host.buffs = had
+	_test_steadying_draught()
+
+
+func _test_steadying_draught() -> void:
+	print("
+== the steadying draught: a narrower cone, not a longer reach (decision 642) ==")
+	var host := _player(Net.local_id)
+	var draught := Items.def("steadying_draught")
+	_check(draught.get("made", {}) == {"by": "medicine_man", "from": {"herbs": 2, "antlers": 1}, "steps": 600, "stock": 3}
+			and Items.effects_of("steadying_draught", draught.get("effects", [])) == [{"kind": "steady", "amount": 0.4, "ticks": 18000}],
+			"made by the medicine man from 2 herbs and an antler, a shelf of 3; 40%% narrower for 30 minutes (%s)" % [draught.get("effects")])
+	var had := host.buffs.duplicate(true)
+	var right := host.slots[Player.RIGHT_HAND]
+	host.buffs = {}
+	if not right.is_empty():
+		World.items.end(World.take_item(host, host, Player.RIGHT_HAND), "gone")
+	_give(host, "bow", Player.RIGHT_HAND)
+	host.raised = "draw"
+	host.raised_tick = World.tick - 5
+	var plain := World.spread_of(host)
+	var range_plain := World.longest_range(host)
+	var slot := host.slots.find("")
+	_give(host, "steadying_draught", slot)
+	_check(World.try_use(host, slot) and host.slots[slot].is_empty(), "drunk from the pack: gone")
+	host.raised = "draw"  # Drinking lowers the bow; drawn again, the same hold.
+	host.raised_tick = World.tick - 5
+	_check(plain > 0.0 and is_equal_approx(World.spread_of(host), plain * 0.6),
+			"the same hold's cone 40%% narrower (%.4f from %.4f)" % [World.spread_of(host), plain])
+	_check(World.longest_range(host) == range_plain, "the reach unchanged (%d cells)" % range_plain)
+	host.raised = ""
+	_check(World.spread_of(host) == -1.0, "not drawing: no cone")
+	World.items.end(World.take_item(host, host, Player.RIGHT_HAND), "gone")
+	host.buffs = had
 
 
 func _test_weapons() -> void:

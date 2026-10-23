@@ -348,6 +348,8 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## herder's fold's sheep at home, to the zone on a change and to a peer arriving.
 ## 35 (622, step 2): a drawn bow's step and draw time read the armour worn
 ## (range_steps caps the step, draw scales the ticks), alike on client and server.
+## 35 (642): buffs may hold "steady", which narrows the cone (World.spread_of)
+## on client and server alike.
 const PROTOCOL_REVISION := 35
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]
