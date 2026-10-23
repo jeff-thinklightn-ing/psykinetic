@@ -956,6 +956,13 @@ const STUMP_EDGE_CHANCE := 0.12
 const DEADWOOD_CHANCE := 0.14
 const LOG_SHARE := 0.4
 const DEAD_TREE_CHANCE := 0.04
+## A felled forest cell by its stage (591, terrain's side; maps' Clearing):
+## a stump on its dirt; grass; scrub, the grass thick and tall
+## (SCATTER_SCRUB) with a bush SCRUB_BUSH of the time; saplings, two or
+## three small trees CLEARING_SAPLING of a tree's height.
+const SCATTER_SCRUB := {"tuft": 6.0, "tall": 2.5, "flower": 0.2, "stone": 0.05}
+const SCRUB_BUSH := 0.6
+const CLEARING_SAPLING := Vector2(0.3, 0.5)
 ## Scatter: how many of each, on average, a cell of each ground has (the
 ## forest's ring is "forest"), and roots more on the land at the forest's
 ## edge; each kind's size range; a flower's colours.
@@ -1665,6 +1672,16 @@ var _wooded: Dictionary[Vector2i, bool] = {}
 var _glimpse := false
 ## The saplings at the forest's edge (_add_sapling), faded as trees are.
 var _saplings: Dictionary[Vector2i, Node3D] = {}
+## The felled cells as drawn (591, terrain's side): cell -> stage; each
+## one's props (a stump, a bush, saplings).
+var _clearing: Dictionary[Vector2i, String] = {}
+var _clearing_props: Dictionary[Vector2i, Array] = {}
+## Each scattered chunk's MultiMeshes, so one chunk is drawn again alone.
+var _scatter_nodes: Dictionary[Vector2i, Array] = {}
+## The ground's kinds texture (a texel a cell) and its image, so one cell's
+## kind changes alone.
+var _kinds_image: Image
+var _kinds_texture: ImageTexture
 ## Each building drawn (_add_buildings): {rect: its footprint, node: the
 ## slot's instance, roof: its "roof" part (null if it has none), off: the
 ## roof hidden as the local player is inside}; which building each
@@ -3666,6 +3683,8 @@ func rebuild(terrain: Dictionary, centre: Vector2i) -> void:
 	_shade_all = true
 	_trees.clear()
 	_saplings.clear()
+	_clearing_props.clear()
+	_scatter_nodes.clear()
 	_border = null
 	_grown = null
 	_grown_trunks.clear()
@@ -3893,6 +3912,7 @@ func _build_room() -> void:
 	_warm_art()
 	var fire: Array[Vector2i] = _terrain["fire"]
 	var kinds: Dictionary = _terrain.get("kinds", {})
+	_clearing.assign(_terrain.get("clearing", {}))
 	# A new set each build, never changed after: the border's worker reads it.
 	_land = {}
 	for cell: Vector2i in _terrain["floor"] + _terrain.get("water", []):
@@ -3952,6 +3972,8 @@ func _build_room() -> void:
 	_add_walls()
 	if _outdoor:
 		_add_forest()
+		for cell: Vector2i in _clearing:
+			_dress_clearing(cell)
 		if not _grown_trunks.is_empty():
 			var ground: Dictionary[Vector2i, bool] = {}
 			for cell: Vector2i in _terrain["floor"]:
@@ -4919,6 +4941,9 @@ func _scatter_build(chunk: Vector2i, kind: String, items: Array) -> void:
 	drawn.material_override = _scatter_material(kind)
 	drawn.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_room.add_child(drawn)
+	if not _scatter_nodes.has(chunk):
+		_scatter_nodes[chunk] = []
+	_scatter_nodes[chunk].append(drawn)
 
 
 ## Where [param chunk]'s scatter goes, by kind: [cell, place, salt, under
@@ -4939,6 +4964,9 @@ func _scatter_plan(chunk: Vector2i) -> Dictionary[String, Array]:
 		var forest := index >= _ground_water_end 				or _ground_kinds[cell] == "grass" and float(roof.get(cell, 0.0)) > SCATTER_ROOF and not _floor_sets.has(cell)
 		var ground := "forest" if forest else _ground_kinds[cell]
 		var density: Dictionary = SCATTER_TALL if _tall.has(cell) else SCATTER_DENSITY.get(ground, {})
+		var scrub: bool = _clearing.get(cell, "") == "scrub"
+		if scrub and not forest:
+			density = SCATTER_SCRUB  # A felled cell grown up (591).
 		# Roots where the land meets the forest; reeds by water.
 		if not forest and _forest_distance.has(cell) and _forest_edge(cell):
 			density = density.duplicate()
@@ -4952,7 +4980,7 @@ func _scatter_plan(chunk: Vector2i) -> Dictionary[String, Array]:
 		# on its own side, the roots on the land within EDGE_ROOTS of it.
 		var sides: Array = [[density, forest, false]]
 		if not _edge_curves.is_empty() and _edge_near_sample.has(cell) and not _tall.has(cell):
-			var land: Dictionary = SCATTER_DENSITY.get(_ground_kinds.get(cell, "grass") if _ground_kinds.get(cell, "") != "forest" else "grass", {}).duplicate()
+			var land: Dictionary = (SCATTER_SCRUB if scrub else SCATTER_DENSITY.get(_ground_kinds.get(cell, "grass") if _ground_kinds.get(cell, "") != "forest" else "grass", {})).duplicate()
 			land["root"] = land.get("root", 0.0) + SCATTER_EDGE_ROOTS
 			if _by_water(cell):
 				land["reeds"] = SCATTER_REEDS
@@ -5796,6 +5824,136 @@ func _add_deadwood(cell: Vector2i, slot: String, distance: Dictionary[Vector2i, 
 	wood.position = _tile_position(cell) + Vector3(at.x, 0.0, at.y)
 	season_dress(wood, false)
 	_room.add_child(wood)
+
+
+## Felled [param cell]'s props for its stage (591, terrain's side;
+## _clearing): a stump; a bush now and then in scrub; two or three
+## saplings. Each turned, sized and placed by the cell; the old ones gone.
+func _dress_clearing(cell: Vector2i) -> void:
+	for prop: Node3D in _clearing_props.get(cell, []):
+		_forget_piece(prop)
+	_clearing_props.erase(cell)
+	var props: Array[Node3D] = []
+	match _clearing.get(cell, ""):
+		"stump":
+			if _deadwood_drawn("tree.stump"):
+				props.append(_clearing_prop(cell, "tree.stump", 0, lerpf(0.8, 1.2, _roll(cell, 71))))
+		"scrub":
+			if _roll(cell, 72) < SCRUB_BUSH and _deadwood_drawn("plant.bush"):
+				props.append(_clearing_prop(cell, "plant.bush", 0, lerpf(0.7, 1.1, _roll(cell, 73))))
+		"saplings":
+			for n in 2 + int(_roll(cell, 74) < 0.5):
+				var sapling := _clearing_prop(cell, "tree.small", n,
+						TREE_HEIGHT * lerpf(CLEARING_SAPLING.x, CLEARING_SAPLING.y, _roll(cell, 75 + n)) / ArtKit.size("tree.small").y)
+				sapling.rotation.x = (_roll(cell, 78 + n) - 0.5) * 2.0 * TREE_LEAN
+				sapling.set_meta(&"fades", true)
+				props.append(sapling)
+	if not props.is_empty():
+		_clearing_props[cell] = props
+	_occluders_built = false
+
+
+## A [param slot] in felled [param cell] (the [param n]th), [param size]
+## times its own: its variant, turn and place in the cell by the cell.
+func _clearing_prop(cell: Vector2i, slot: String, n: int, size: float) -> Node3D:
+	var prop := ArtKit.instance(slot, 1 + int(_roll(cell, 80 + n) * maxi(1, ArtKit.variant_count(slot))))
+	prop.name = "Clearing_%d_%d_%d" % [cell.x, cell.y, n]
+	prop.scale = Vector3.ONE * size
+	prop.rotation.y = _roll(cell, 83 + n) * TAU
+	# Apart in the cell: the nth a third of a turn round its middle.
+	var turn := (_roll(cell, 86) + n / 3.0) * TAU
+	var at := Vector2(cell) + Vector2.from_angle(turn) * (0.15 + 0.2 * _roll(cell, 87 + n) if n > 0 or slot == "tree.small" else 0.2 * _roll(cell, 87))
+	prop.position = Vector3(at.x, _ground_height(at), at.y)
+	season_dress(prop, slot != "tree.stump")
+	_room.add_child(prop)
+	return prop
+
+
+## A piece taken off the room: out of the fade's lists, then freed.
+func _forget_piece(piece: Node3D) -> void:
+	_faded.erase(piece)
+	_hiding.erase(piece)
+	_hid_at.erase(piece)
+	piece.queue_free()
+	_occluders_built = false
+
+
+## The felled cells of a "clearing" message drawn (591, terrain's side;
+## Main calls it with [param terrain] already laid, [param cells] as
+## [[x, y, stage]], "trunk" grown back). A stage that changes on the land
+## swaps the cell's props, its ground's kind and its chunk's scatter, and
+## is done. A fell takes the cell's tree away at once and leaves its
+## stage's props; a regrowth takes the props and puts a tree back; the
+## outline they move (the forest's ring, the edge's curve, the ground) is
+## drawn at the next zone load, never mid-visit (the coordinator: a whole
+## rebuild freezes the view 1 to 3.5 s wherever the player stands).
+func clearing_changed(terrain: Dictionary, cells: Array) -> void:
+	_terrain = terrain
+	if _room == null:
+		return
+	var chunks: Dictionary[Vector2i, bool] = {}
+	for each: Array in cells:
+		var cell := Vector2i(int(each[0]), int(each[1]))
+		var stage := str(each[2])
+		var was: String = _clearing.get(cell, Clearing.TRUNK)
+		if stage == was:
+			continue
+		chunks[Vector2i(floori(cell.x / float(FLOOR_CHUNK)), floori(cell.y / float(FLOOR_CHUNK)))] = true
+		if stage == Clearing.TRUNK:
+			_clearing.erase(cell)
+			_dress_clearing(cell)
+			if not _trees.has(cell):
+				_add_tree(cell, _field(Vector2(cell), FOREST_CLUMP, 40))
+			continue
+		_clearing[cell] = stage
+		if was == Clearing.TRUNK:
+			# Felled: its tree (or a sapling or dead wood on its cell) goes.
+			if _trees.has(cell) and str(_trees[cell].name).begins_with("Tree_"):
+				_forget_piece(_trees[cell])
+				_trees.erase(cell)
+			if _saplings.has(cell):
+				_forget_piece(_saplings[cell])
+				_saplings.erase(cell)
+			var wood := _room.get_node_or_null("Deadwood_%d_%d" % [cell.x, cell.y]) as Node3D
+			if wood != null:
+				_forget_piece(wood)
+		_dress_clearing(cell)
+		_set_ground_kind(cell, Clearing.STAGE_KINDS.get(stage, "grass"))
+	for chunk: Vector2i in chunks:
+		_rescatter(chunk)
+
+
+## Land [param cell]'s ground drawn as [param kind] (a texel of the kinds
+## texture); a cell of the forest's ring keeps its look till the outline
+## is redrawn.
+func _set_ground_kind(cell: Vector2i, kind: String) -> void:
+	var index: int = _grounds.get(cell, -1)
+	if index < 0 or index >= _ground_floor_end or _kinds_image == null or _ground_kinds.get(cell, "") == kind:
+		return
+	_ground_kinds[cell] = kind
+	var at := cell - _mask_origin
+	if at.x < 0 or at.y < 0 or at.x >= _kinds_image.get_width() or at.y >= _kinds_image.get_height():
+		return
+	var texel := Color(0, 0, 0, 0)
+	texel[GROUND_CHANNELS[kind]] = 1.0
+	_kinds_image.set_pixel(at.x, at.y, texel)
+	_kinds_texture.update(_kinds_image)
+
+
+## [param chunk]'s scatter drawn again from its plan, if it was drawn (else
+## when the view comes to it, as ever).
+func _rescatter(chunk: Vector2i) -> void:
+	_scatter_jobs.assign(_scatter_jobs.filter(func(job: Array) -> bool: return job[0] != chunk))
+	if not _scattered.has(chunk):
+		return
+	for drawn: Node in _scatter_nodes.get(chunk, []):
+		drawn.queue_free()
+	_scatter_nodes.erase(chunk)
+	for cell: Vector2i in _tall_where.keys():
+		if Vector2i(floori(cell.x / float(FLOOR_CHUNK)), floori(cell.y / float(FLOOR_CHUNK))) == chunk:
+			_tall_where.erase(cell)
+			_tall_flat.erase(cell)
+	_scatter_chunk(chunk)
 
 
 ## Whether [param slot] (dead wood: tree.stump, tree.log, tree.dead) is
@@ -7777,7 +7935,9 @@ func _ground_material(bytes: PackedByteArray, across: int, down: int, origin: Ve
 	var material := ShaderMaterial.new()
 	material.shader = GROUND_SHADER
 	var image := Image.create_from_data(across, down, false, Image.FORMAT_RGBA8, bytes)
-	material.set_shader_parameter("kinds", ImageTexture.create_from_image(image))
+	_kinds_image = image
+	_kinds_texture = ImageTexture.create_from_image(image)
+	material.set_shader_parameter("kinds", _kinds_texture)
 	material.set_shader_parameter("kinds_origin", Vector2(origin))
 	material.set_shader_parameter("kinds_size", Vector2(across, down))
 	var tiles := Vector4.ONE * 4.0
@@ -9947,6 +10107,10 @@ func _index_occluders() -> void:
 		_occluders.append([post, _bounds(post), false, [post]])
 	for tree: Node3D in _trees.values() + _saplings.values():
 		_occluders.append([tree, _bounds(tree), true, [tree]])
+	for props: Array in _clearing_props.values():
+		for prop: Node3D in props:
+			if prop.has_meta(&"fades"):
+				_occluders.append([prop, _bounds(prop), true, [prop]])
 	# A roof between the camera and a player outside fades as a wall does.
 	for building in _buildings:
 		if building["roof"] != null:

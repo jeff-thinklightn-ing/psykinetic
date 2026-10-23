@@ -25097,3 +25097,48 @@ two-cell rule). A "building_fold" prefab (tools/seed_prefabs.gd) stamps it
 fenced but the gate, facing south. The earth, straw and trough are the
 piece's. level_test _test_fold. Both sides read the slot from Level;
 protocol unchanged, no new class_name.
+## 591, terrain's side: the felled forest drawn
+
+maps' Clearing (591, maps' side) fells a woodlot's edge trunks and grows
+them back a stage a season. This is how the view draws them (the
+coordinator's approval of the design).
+- At a build the felled cells are land (maps lays them in terrain["floor"]
+  before the view is built), so the forest grows round them as it does
+  round any land: no tree on them, and the ring and 575's edge curve follow
+  the new outline. Client3D._clearing holds each cell's stage as drawn
+  (terrain["clearing"]), and _dress_clearing adds its props:
+  - stump: tree.stump on its dirt;
+  - grass: the grass's scatter;
+  - scrub: thick, tall grass (SCATTER_SCRUB), with a plant.bush SCRUB_BUSH
+    of the time;
+  - saplings: two or three tree.small at CLEARING_SAPLING of a tree's
+    height, which fade as trees do.
+  Dead wood and the bush are drawn only once their slots have art
+  (_deadwood_drawn).
+- Live, through Client3D.clearing_changed(terrain, cells), which Main calls
+  when a "clearing" message comes:
+  - A stage changed on the land swaps the cell's props, sets its ground's
+    kind texel (_set_ground_kind, the kinds texture kept) and draws its
+    chunk's scatter again (_rescatter, each chunk's MultiMeshes kept). No
+    rebuild.
+  - A fell takes the cell's tree (or a sapling or dead wood on it) away at
+    once and leaves its stage's props.
+  - A regrowth takes the props away and puts a tree back.
+  - A fell or a regrowth moves the outline (the forest's ring, the edge
+    curve, the ground). That redraws only at a zone load, never mid-visit
+    (the coordinator's ruling, amending its earlier rule of a redraw once
+    no player sees the cell). The reason: the redraw is a whole rebuild,
+    which freezes the view 1 s on the hills and 3.5 s on the wilds wherever
+    the player stands, and the plants round them grow back in after it.
+    Until then a felled edge cell shows its stump on the forest floor.
+    Don't schedule a full rebuild to "fix" this. If the ring ever needs to
+    move while people watch, that is an incremental rebuild (perf's), not
+    a scheduled full one.
+  - A grown forest's trees (467) follow at the redraw, not live: no town
+    stands in the forest level.
+view_test _test_clearing: four edge trunks inside the hills or the wilds, one stage each,
+with no tree on any and each on the land's side of the edge; each stage's
+props, and scrub's tall grass. Live, with no rebuild: grass from a stump;
+a fell (its tree gone at once, the land's at the next build); a regrowth
+(a tree at once). Client only, protocol
+unchanged, no new class_name.

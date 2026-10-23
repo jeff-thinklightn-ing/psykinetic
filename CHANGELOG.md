@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The felled forest is drawn: a stump, grass, scrub and saplings as a woodlot's clearing grows back, the trees going and coming as they are felled and regrow (591).
 - Herders' sheep folds can stand in a level: a 6 x 6 fenced pen open to the sky, its gate two cells wide in the middle of its front; you see over the fence but can't walk through it, and a level editor's "building_fold" stamp lays one.
 ## v0.1.171
 

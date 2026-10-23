@@ -51,6 +51,7 @@ func _ready() -> void:
 	_test_built_water()
 	_test_ledge_curves()
 	_test_forest_edge()
+	_test_clearing()
 	_test_solid_ground()
 	_test_roads()
 	_test_water()
@@ -2607,6 +2608,109 @@ func _test_forest_edge() -> void:
 						astray_scatter += 1
 		_check(by_edge > 0 and astray_scatter == 0,
 				"%s: the scatter by the edge on its own side of the curve, the roots within %.1f of it (%d by it; astray: %d)" % [name, Client3D.EDGE_ROOTS, by_edge, astray_scatter])
+	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+
+
+## The felled forest drawn (591, terrain's side; maps' Clearing): a stage
+## each on four edge trunks of the hills (else the wilds'), no tree on any, the edge's curve
+## round them, each stage's props and scrub's thick grass; live, a stage
+## changed on the land swaps its props and ground with no rebuild, a fell
+## takes its tree at once (its outline the next build's), a regrowth puts
+## the tree back.
+func _test_clearing() -> void:
+	print("\n== the forest felled: a clearing's stages drawn, live changes ==")
+	# Edge trunks: a void cell beside the land, apart from each other, in
+	# from the land's bounds (where Clearing fells none, and the next map's
+	# glimpse lies): the hills', else the wilds'.
+	var level: Dictionary
+	var terrain: Dictionary
+	var trunks: Array[Vector2i] = []
+	for name: String in ["hills", "wilds"]:
+		level = Level.load_level(name)
+		terrain = level["terrain"]
+		var land: Dictionary[Vector2i, bool] = {}
+		for cell: Vector2i in terrain["floor"] + terrain.get("water", []) + terrain.get("solid", []) + terrain.get("rocks", []):
+			land[cell] = true
+		var low := Vector2i(1 << 20, 1 << 20)
+		var high := -low
+		for cell: Vector2i in land:
+			low = low.min(cell)
+			high = high.max(cell)
+		trunks.clear()
+		for cell: Vector2i in terrain["floor"]:
+			if trunks.size() >= 4:
+				break
+			for side: Vector2i in [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]:
+				var trunk := cell + side
+				if trunk.x < low.x + 8 or trunk.y < low.y + 8 or trunk.x > high.x - 8 or trunk.y > high.y - 8 or land.has(trunk) \
+						or trunks.any(func(t: Vector2i) -> bool: return Vector2(t).distance_to(Vector2(trunk)) < 12.0):
+					continue
+				trunks.append(trunk)
+				break
+		if trunks.size() >= 4:
+			break
+	_check(trunks.size() >= 4, "%s: four edge trunks to fell (%s)" % [level["name"], trunks])
+	if trunks.size() < 4:
+		return
+	var stages := ["stump", "grass", "scrub", "saplings"]
+	var cells := []
+	for k in 4:
+		cells.append([trunks[k].x, trunks[k].y, stages[k]])
+	Clearing.apply_cells(terrain, cells)
+	_rig.rebuild(terrain, level["centre"])
+	var treed := []
+	for k in 4:
+		for cell: Vector2i in _rig._trees:
+			var at: Vector3 = _rig._trees[cell].position
+			if cell == trunks[k] or Vector2i(roundi(at.x), roundi(at.z)) == trunks[k]:
+				treed.append(trunks[k])
+	var forested := trunks.slice(0, 4).filter(func(cell: Vector2i) -> bool:
+		var into := _rig._edge_signed(Vector2(cell))
+		return not _rig._wooded.has(cell) or not is_nan(into) and into > 0.0)
+	_check(treed.is_empty() and forested.is_empty(), "%s: no tree on a felled cell (treed: %s), each on the land's side of the edge (forest's: %s)" % [level["name"], treed, forested])
+	var props := func(cell: Vector2i) -> Array: return _rig._clearing_props.get(cell, [])
+	var stump_ok: bool = (props.call(trunks[0]) as Array).size() == (1 if Client3D._deadwood_drawn("tree.stump") else 0)
+	var saplings: Array = props.call(trunks[3])
+	var saplings_ok := saplings.size() >= 2 and saplings.size() <= 3 and saplings.all(func(prop: Node3D) -> bool: return prop.has_meta(&"fades"))
+	_check(stump_ok and (props.call(trunks[1]) as Array).is_empty() and (props.call(trunks[2]) as Array).size() <= 1 and saplings_ok,
+			"%s: a stump on the stump, nothing on the grass, at most a bush in the scrub, %d saplings that fade as trees do" % [level["name"], saplings.size()])
+	var chunk := Vector2i(floori(trunks[2].x / float(Client3D.FLOOR_CHUNK)), floori(trunks[2].y / float(Client3D.FLOOR_CHUNK)))
+	var tall := 0
+	for item: Array in _rig._scatter_plan(chunk).get("tall", []):
+		if item[0] == trunks[2]:
+			tall += 1
+	_check(tall > 0 and _rig._ground_kinds.get(trunks[0], "") == "dirt", "%s: scrub's tall grass (%d clumps), the stump's ground dirt" % [level["name"], tall])
+	# Live: a stage changed on the land, then a fell, then a regrowth.
+	_rig._scatter_all()
+	var room := _rig._room.get_instance_id()
+	var change := [[trunks[0].x, trunks[0].y, "grass"]]
+	Clearing.apply_cells(terrain, change)
+	_rig.clearing_changed(terrain, change)
+	_check(_rig._room.get_instance_id() == room and not _rig._clearing_props.has(trunks[0]) and _rig._ground_kinds.get(trunks[0], "") == "grass" \
+			and _rig._kinds_image.get_pixelv(trunks[0] - _rig._mask_origin).r > 0.9,
+			"live: the stump grown to grass, its stump gone, its ground grass, no rebuild")
+	# An edge tree of its own cell, away from the clearing's four.
+	var felled := Vector2i(-1, -1)
+	for cell: Vector2i in _rig._trees:
+		if _rig._forest_distance.get(cell, 0) == 1 and str(_rig._trees[cell].name).begins_with("Tree_") \
+				and trunks.all(func(t: Vector2i) -> bool: return Vector2(t).distance_to(Vector2(cell)) >= 12.0):
+			felled = cell
+			break
+	var had_tree := _rig._trees.has(felled)
+	change = [[felled.x, felled.y, "stump"]]
+	Clearing.apply_cells(terrain, change)
+	_rig.clearing_changed(terrain, change)
+	_check(had_tree and _rig._room.get_instance_id() == room and not _rig._trees.has(felled) and _rig._clearing.get(felled, "") == "stump",
+			"live: a fell takes its tree at once (had one: %s), no rebuild" % had_tree)
+	_rig.rebuild(terrain, level["centre"])
+	_check(_rig._wooded.has(felled) and not _rig._trees.has(felled) and _rig._clearing.get(felled, "") == "stump",
+			"next build: the felled cell the land's, the outline round it")
+	change = [[felled.x, felled.y, Clearing.TRUNK]]
+	Clearing.apply_cells(terrain, change)
+	room = _rig._room.get_instance_id()
+	_rig.clearing_changed(terrain, change)
+	_check(_rig._room.get_instance_id() == room and _rig._trees.has(felled) and not _rig._clearing.has(felled),
+			"live: grown back, a tree at once, no rebuild")
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
 
