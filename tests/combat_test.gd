@@ -40,6 +40,7 @@ func _ready() -> void:
 	_test_bound_axe()
 	_test_level_draugr_armed()
 	_test_own_blow()
+	_test_other_zone_waits()
 	_test_cone_spread()
 	_test_armour()
 
@@ -393,6 +394,53 @@ func _wear(entity: GridEntity, id: String) -> void:
 		World.items.end(World.take_item(entity, entity, Items.ARMOUR), "gone")
 	if not id.is_empty():
 		World.put_item(entity, entity, Items.ARMOUR, World.items.mint(id, "built"))
+
+## A boss's moves are tended by its own zone's step alone (603 amended;
+## physics' finding, Jeff's "the draugr doesn't walk"): another awake zone,
+## its tick far ahead, neither lands his spin nor strikes his wind-up nor
+## hands him his axe; back in his own zone they go on as ever.
+func _test_other_zone_waits() -> void:
+	print("
+== another zone's step leaves a boss's spin, wind-up and axe to his own ==")
+	var e := _build(["#########", "#...P...#", "#..PmP..#", "#.......#", "#########"])
+	var boss: GridEntity = e["m"][0]
+	_boss(boss)
+	var front: GridEntity = e["P"][1]
+	var hp := front.hp
+	_check(World.try_spin(boss), "he winds up his spin")
+	var elsewhere := World.add_zone("combat_elsewhere")
+	elsewhere.tick = World.tick + 1000
+	var home := World.enter(elsewhere)
+	World._tend_boss_moves()
+	World.enter(home)
+	World.zones.erase("combat_elsewhere")  # (Else step() steps only the zones it holds.)
+	_check(World.boss_busy(boss) and World.telegraphs().size() == 1 and front.hp == hp,
+			"the other zone's step, 1000 ticks on: his spin still winding, nothing struck")
+	for i in 16:
+		World.step()
+	_check(not World.boss_busy(boss) and front.hp < hp, "his own zone's steps: it lands as ever (%d -> %d)" % [hp, front.hp])
+	var e2 := _build(["#######", "#.Pm..#", "#######"])
+	boss = e2["m"][0]
+	_boss(boss)
+	boss.blows = Monster.kinds()["draugr"]["blows"]
+	World.set_slots(boss, Items.tidy(["", "", "", "", "battle_axe", ""], Items.CARRIED))
+	var player: GridEntity = e2["P"][0]
+	hp = player.hp
+	_check(World.try_wind_up(boss, player) and not boss.wind_up.is_empty(), "he winds up a blow")
+	elsewhere = World.add_zone("combat_elsewhere")
+	elsewhere.tick = World.tick + 1000
+	home = World.enter(elsewhere)
+	World._tend_wind_ups()
+	World.enter(home)
+	_check(not boss.wind_up.is_empty() and player.hp == hp, "the other zone's step: still winding, nobody struck")
+	World.cancel_wind_up(boss)
+	World._axes[boss] = {"uid": 0, "cell": boss.tile + Vector2i(1, 0), "disarmed": true}
+	home = World.enter(elsewhere)
+	World._tend_disarmed()
+	World.enter(home)
+	_check(not World.boss_busy(boss) and bool(World._axes[boss]["disarmed"]), "disarmed beside his axe, not busy: the other zone's step does not arm him")
+	World._axes.erase(boss)
+	World.zones.erase("combat_elsewhere")
 
 
 

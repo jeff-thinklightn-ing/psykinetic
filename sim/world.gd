@@ -4220,6 +4220,8 @@ func _tend_boss_moves() -> void:
 		if not _alive(by):
 			_boss_moves.erase(by)
 			continue
+		if by.zone != zone.name:
+			continue  # Another zone's: its own step tends it, on its own tick.
 		var job: Dictionary = _boss_moves[by]
 		if str(job["move"]) == "charge":
 			_tend_charge(by, job)
@@ -4246,8 +4248,8 @@ func _tend_boss_moves() -> void:
 ## anything, it takes it up and is armed again. Its mind walks it there.
 func _tend_disarmed() -> void:
 	for by: GridEntity in _axes.keys():
-		if not bool(_axes[by].get("disarmed", false)) or not _alive(by) or boss_busy(by):
-			continue
+		if not bool(_axes[by].get("disarmed", false)) or not _alive(by) or boss_busy(by) or by.zone != zone.name:
+			continue  # (Another zone's: its own step, its own ground.)
 		var cell: Vector2i = _axes[by]["cell"]
 		if by.tile == cell or distance(by.tile, cell) == 1 and can_melee(by.tile, cell):
 			_take_axe(by)
@@ -5875,6 +5877,8 @@ func _tend_wind_ups() -> void:
 		if not _alive(entity) or entity.wind_up.is_empty():
 			_winders.erase(entity)
 			continue
+		if entity.zone != zone.name:
+			continue  # Another zone's: its own step tends it, on its own tick.
 		if entity.tile != entity.wind_up["from"] or is_stunned(entity) or is_down(entity):
 			cancel_wind_up(entity)
 			continue

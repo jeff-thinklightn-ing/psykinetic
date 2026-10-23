@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The draugr walks again while another part of the world is busy: his spin, throw and charge, a wind-up's blow and his taking up his axe now keep his own place's time (603 amended (2)).
 - The draugr's spin, throw and charge warnings can now be drawn as smooth shapes from his body, and they stay honest: you are struck exactly when your feet are inside the shape. His axe throw on a slant now strikes exactly along its drawn band (602 amended).
 - A charge no longer stops short or leaves its runner standing when another part of the world is busy (604 amended): the draugr's charge is run in his own lair only.
 - A charge is slower through a ford, tall grass or uphill, and hits softer there (607 amended): it picks up again on open ground.

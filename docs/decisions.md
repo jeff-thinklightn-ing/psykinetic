@@ -24995,3 +24995,22 @@ axes, every centre about them inside the outline exactly when it is struck (a ce
 a hundredth of a cell of the drawn edge is let be); a line at 30 degrees in order, banded and
 unbroken. Godot's Geometry2D.is_point_in_polygon misreads some of these fine circles, so the
 test counts crossings itself. Server and pure geometry; protocol unchanged; no new class_name.
+
+## 603 amended (2), combat's side: a boss is tended on its own zone's tick
+
+Jeff's top find on v0.1.170, "the draugr doesn't walk", traced by physics: each zone keeps its
+own tick (World.enter swaps it in), but the draugr's moves (_boss_moves), his axe (_axes) and
+every wind-up (_winders) are held world-wide. With a second zone awake, that zone's step could
+land his spin or throw on its own clock, or arm him from its own ground. His next_move_tick then
+stood on the other zone's clock, and he did not walk again.
+
+- _tend_boss_moves (and _tend_charge, which it calls), _tend_disarmed and _tend_wind_ups now skip
+  a body whose zone is not the zone stepping, as the other world-wide tenders already did
+  (_tend_buffs, _tend_wounds, the downed). Its own zone's step tends it on its own tick.
+- _tend_wind_ups (392) had the same gap for anyone's wind-up, a player's too; it takes the same
+  skip.
+- Physics' _tend_rushes takes the same skip under 604 amended.
+
+combat_test _test_other_zone_waits: another zone 1000 ticks ahead steps; his spin and his
+wind-up do not land and his axe is not handed back; in his own zone the spin lands as ever. It
+fails three checks without the skip. Server only, protocol unchanged, no new class_name.
