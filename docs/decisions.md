@@ -24617,3 +24617,35 @@ loyalty_redraft.md, as his answer reshaped it), on the draft numbers
 tests: companion_test _test_deeds (each deed and drop, the tags, the caps).
 Server only (the voice's tags are the server's prompt and parse), protocol
 unchanged, no new class_name.
+
+## 621 (3): knucklebones, and keeping watch while she sleeps
+
+The last part of 621, from Jeff's list, on draft numbers (companion_traits
+"bond" "game" and "sleep"), through her player's plain words (616's reader),
+so nothing new on the wire:
+
+- Knucklebones: "play knucklebones", "a game of dice" and the like
+  (Companion.ORDER_PLAY, verb "play"; wary, she hesitates first). Only out of
+  a fight with both within fire_cells (2) of a fire; else her voice is told
+  why not. A round every round_ticks (60): each throws two dice, the higher
+  takes it, best_of 3 (rounds_most 9 for ties), each throw a party line. At
+  the end the played signal: Main._bond_played keeps her tally against her
+  player (record "games" {hers, theirs}, saved, for her run summary), says it
+  in the party log and takes the deed "game" (warmth, once a day); her voice is
+  asked how she takes the win or loss, in her own temper. A stake from her
+  purse (614) is for later.
+- Keeping watch: after a hard day (a fight since she last slept, or under
+  hard_hp 0.7), out of a fight with nothing hostile in sight, by a fire with
+  her player, once a game day, she asks "Will you keep watch while I sleep?".
+  Yes (ORDER_YES, read before the orders while she waits) and she sleeps; no
+  (ORDER_NO) and she lets it be; no word, and her player still standing where
+  they were within near (4) after answer_ticks (200), she sleeps too. Asleep
+  (order "watch", Intent.REST, HOLD): sleep_ticks (1200) out with her player
+  within near, she wakes whole and rested (World.restore, hp and stamina full)
+  and the deed "watched" (trust); woken by a fight after her player went past
+  near, she says "You left me sleeping alone?" and is left_alone (-1); gone
+  but nothing came, she just wakes. ui's sleeping pose can follow from
+  Intent.REST; a dedicated sleep intent waits on it.
+
+tests: companion_test _test_game_and_watch. Server only, protocol unchanged,
+no new class_name.

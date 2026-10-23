@@ -95,6 +95,10 @@ const ORDER_WAIT := "\\b(wait|stay(?! (back|close|with|near|by|away|out|clear|be
 const ORDER_REST := "(?<!the )(?<!of )\\b(rest|take a (rest|break|breather|moment|seat)|catch your breath|sit (down|tight)|have a (rest|sit|break|breather)|get some (rest|sleep)|lie down|go to sleep|(take|have) a nap|recover|rest up)\\b(?! of| in peace)"
 const ORDER_CARRY := "\\b(carry|take|hold|keep|stow|pack|have|put)\\b"
 const ORDER_CARRY_THIS := "\\b(carry|hold|keep|stow) (this|these|that|those|it|them)( for (me|a while|now))?\\s*([.!?,]|$)"
+const ORDER_PLAY := "\\b(knucklebones|play (a game|dice|bones|a round)|(a|another) game of (bones|dice)|throw the bones)\\b"
+## Her player's answer when she has asked them to keep watch (decision 621).
+const ORDER_YES := "\\b(yes|yeah|yep|sure|of course|ok|okay|go on|go ahead|i will|i'll watch|i'll keep watch|sleep|get some sleep)\\b"
+const ORDER_NO := "\\b(no|nope|not now|not yet|keep going|later)\\b"
 const ORDER_GIVE_BACK := "\\b(give|hand|pass|return)\\b.*\\b(me|back)\\b"
 ## Words with these are no carry order whatever thing they name ("carry
 ## on", "take cover", "hold the door").
@@ -112,7 +116,7 @@ const REST_LEAVE := 8
 const HESITATE_TICKS := 15
 ## How often she looks over her day for the deeds that move her bond (decision 621).
 const DEED_EVERY := 10
-const ORDER_VERBS: Array[String] = ["wait", "rest", "follow", "bandage", "carry", "give"]
+const ORDER_VERBS: Array[String] = ["wait", "rest", "follow", "bandage", "carry", "give", "play"]
 const INSTRUCTION_LOCK_TICKS := 60
 ## The quick phrases' defaults reach her as what they mean, never quoted.
 const PHRASE_MEANINGS := {
@@ -358,6 +362,9 @@ signal deed(event: String, why: String)
 ## Her voice heard her player's words as meant to hurt her ("hurt") or as
 ## a true apology ("sorry") (decision 621): Main's _bond_felt.
 signal felt(kind: String)
+## A game of knucklebones played out with her player (decision 621): Main
+## keeps the tally and takes the deed.
+signal played(won: bool)
 ## Her card came back written (write_card): card, how_we_met, card_by set.
 signal card_written
 ## What has become true of her changed (grown, decision 294), or the talk
@@ -583,6 +590,15 @@ var _deeds := {"day": -1, "walked": 0, "on_road": 0, "road_done": false, "fire":
 	"warned_heavy": false, "mule_spent": false, "asked_rest": false, "last": Vector2i(-99999, -99999)}
 ## The monsters after her or her player since she asked to rest (decision 621), by instance id.
 var _engaged := {}
+## A game of knucklebones with her player (decision 621): {round, at,
+## hers, theirs}, or {}.
+var _game := {}
+## Keeping watch (decision 621): {asked_at} while she waits for an answer,
+## {until, left} while she sleeps (order "watch"), or {}.
+var _sleeping := {}
+## A fight since she last slept, and the day she last asked for a watch.
+var _hard_day := false
+var _watch_day := -1
 ## Her player's standing plain order (decision 616): "wait" or "rest", else
 ## "". Calm does not undo it; "follow" or another order does.
 var order := ""
@@ -923,6 +939,9 @@ func owner_spoke(text: String, phrase := 0) -> void:
 		_narrate("%s calls out to you. %s" % [keeper_name(), meaning])
 	if PHRASE_STANCES.has(phrase) or not meaning.is_empty():
 		_quarry = _quarry_called() if PHRASE_STANCES.get(phrase, -1) == Stance.PRESS or text.strip_edges() == "Get them!" else null
+	if phrase == 0 and _sleeping.has("asked_at") and _answered_watch(text):
+		_ask_voice("%s just spoke to you." % keeper_name(), heard, false, true)
+		return
 	var read := order_in(text, keeper.slots if _alive(keeper) else ([] as Array[String]), slots) if phrase == 0 else {}
 	if not read.is_empty() and obey(read, text):
 		_ask_voice("%s just spoke to you." % keeper_name(), heard, false, true)
@@ -970,6 +989,8 @@ static func order_in(text: String, held: Array[String] = [], carried: Array[Stri
 				return {"verb": "carry", "item": id}
 		if found.call(ORDER_CARRY_THIS):
 			return {"verb": "carry", "item": ""}
+	if found.call(ORDER_PLAY):
+		return {"verb": "play"}
 	if found.call(ORDER_REST):
 		return {"verb": "rest"}
 	if found.call(ORDER_FOLLOW):
@@ -1043,6 +1064,17 @@ func _carry_out(read: Dictionary, text: String) -> bool:
 			else:
 				_start_errand({"verb": "take", "item": item, "at": keeper.tile, "words": "take the %s from %s to carry" % [Items.name_of(item), keeper_name()]}, _serial)
 				done = "You go to take the %s from %s to carry, as they asked." % [Items.name_of(item), keeper_name()]
+		"play":
+			var rules := _bond_rules("game")
+			if in_fight():
+				done = "%s asked you to play knucklebones, but there is fighting near: after it." % keeper_name()
+			elif not _game.is_empty():
+				done = "You are playing knucklebones with %s already." % keeper_name()
+			elif not (_fire_near(tile, int(rules.get("fire_cells", 2))) and _alive(keeper) and _fire_near(keeper.tile, int(rules.get("fire_cells", 2)))):
+				done = "%s asked you to play knucklebones, but you play by a camp fire, sitting together, not here." % keeper_name()
+			else:
+				_game = {"round": 0, "at": World.tick + int(rules.get("round_ticks", 60)), "hers": 0, "theirs": 0}
+				done = "You sit down by the fire with %s for a game of knucklebones, best of three." % keeper_name()
 		"give":
 			var item := str(read["item"])
 			_start_errand({"verb": "give", "item": item, "at": keeper.tile if _alive(keeper) else tile,
@@ -1121,6 +1153,124 @@ func _watch_deeds() -> void:
 		_say(str(rules.get("rest_ask", "I need to rest before the next fight.")), true)
 
 
+## companion_traits "bond" [param key] ("game", "sleep"; decision 621).
+static func _bond_rules(key: String) -> Dictionary:
+	var rules: Variant = (CompanionCard.tables().get("bond", {}) as Dictionary).get(key, {})
+	return rules if rules is Dictionary else {}
+
+
+## A round of her game of knucklebones each round_ticks (decision 621):
+## each throws, the higher takes it, best of three; broken off by a fight.
+## The end: played (Main's tally and deed), her voice told.
+func _play_on() -> void:
+	if _game.is_empty() or World.tick < int(_game["at"]):
+		return
+	if in_fight() or not _alive(keeper):
+		_game = {}
+		_narrate("Your game of knucklebones is broken off.")
+		return
+	var rules := _bond_rules("game")
+	var hers := randi_range(1, 6) + randi_range(1, 6)
+	var theirs := randi_range(1, 6) + randi_range(1, 6)
+	_game["round"] = int(_game["round"]) + 1
+	_game["at"] = World.tick + int(rules.get("round_ticks", 60))
+	if hers > theirs:
+		_game["hers"] = int(_game["hers"]) + 1
+	elif theirs > hers:
+		_game["theirs"] = int(_game["theirs"]) + 1
+	if party_log != null:
+		party_log.add("%s throws the bones: %d to %s's %d." % [name, hers, keeper_name(), theirs])
+	var need := int(rules.get("best_of", 3)) / 2 + 1
+	if int(_game["hers"]) < need and int(_game["theirs"]) < need and int(_game["round"]) < int(rules.get("rounds_most", 9)):
+		return
+	var won := int(_game["hers"]) > int(_game["theirs"])
+	var score := "%d to %d" % [maxi(_game["hers"], _game["theirs"]), mini(_game["hers"], _game["theirs"])]
+	_game = {}
+	played.emit(won)
+	_ask_voice("You just played knucklebones by the fire with %s, and you %s, %s. Say how you take it, as yourself." % [keeper_name(), "won" if won else "lost", score], "", true)
+
+
+## Her player answered her ask to keep watch (decision 621): yes, she
+## sleeps; no, she lets it be. Whether it was an answer.
+func _answered_watch(text: String) -> bool:
+	var said := " " + text.to_lower().replace(String(name).to_lower(), " ") + " "
+	if RegEx.create_from_string(ORDER_NO).search(said) != null:
+		_sleeping = {}
+		_narrate("%s would rather go on: you do not sleep now." % keeper_name())
+		return true
+	if RegEx.create_from_string(ORDER_YES).search(said) != null:
+		_sleep()
+		return true
+	return false
+
+
+## She lies down to sleep while her player keeps watch (decision 621).
+func _sleep() -> void:
+	_sleeping = {"until": World.tick + int(_bond_rules("sleep").get("sleep_ticks", 1200)), "left": false}
+	order = "watch"
+	_hard_day = false
+	_serial += 1
+	_set_stance(Stance.HOLD, _serial, "order")
+	_narrate("You lie down by the fire to sleep, while %s keeps watch." % keeper_name())
+	_log({"kind": "order", "companion": String(name), "mind": "hands", "trigger": "keep watch", "outcome": "sleeps", "note": ""})
+
+
+## Keeping watch (decision 621), each tick: after a hard day (a fight since
+## she last slept, or under hard_hp), by a fire with her player, once a
+## day, nothing hostile in sight, she asks them to keep watch; an answer
+## (_answered_watch), or her player standing where they were, within near,
+## after answer_ticks, and she sleeps. Asleep:
+## her player going past near is noted; a fight wakes her, and if they had
+## gone she says so (left_line) and is left_alone; slept out sleep_ticks
+## with them by, she wakes whole and rested, and they watched (trust).
+func _keep_watch() -> void:
+	var rules := _bond_rules("sleep")
+	var near := int(rules.get("near", 4))
+	if in_fight():
+		_hard_day = true
+	if order == "watch":
+		if not _alive(keeper) or World.distance(tile, keeper.tile) > near:
+			_sleeping["left"] = true
+		var woke := ""
+		if in_fight():
+			if _sleeping.get("left", false):
+				_say(str(rules.get("left_line", "You left me sleeping alone?")), true)
+				deed.emit("left_alone", "left you sleeping alone")
+			woke = "You wake: monsters came near."
+		elif World.tick >= int(_sleeping.get("until", 0)):
+			if _sleeping.get("left", false):
+				woke = "You wake. %s wandered off while you slept, but nothing came." % keeper_name()
+			else:
+				World.restore(self, max_hp, max_stamina, facing)
+				deed.emit("watched", "kept watch while you slept")
+				woke = "You wake rested and whole: %s kept watch." % keeper_name()
+		if not woke.is_empty():
+			order = ""
+			_sleeping = {}
+			_serial += 1
+			_set_stance(DEFAULT_STANCE, _serial, "order")
+			_narrate(woke)
+		return
+	if World.tick % DEED_EVERY != 0 or not _alive(keeper) or not order.is_empty() or _hostile_within(SIGHT_RANGE):
+		if _sleeping.has("asked_at") and _hostile_within(SIGHT_RANGE):
+			_sleeping = {}  # Something in sight: no sleep now.
+		return
+	if _sleeping.has("asked_at"):
+		if World.tick - int(_sleeping["asked_at"]) >= int(rules.get("answer_ticks", 200)):
+			if World.distance(tile, keeper.tile) <= near and keeper.tile == _sleeping.get("their_tile"):
+				_sleep()  # Settled by her without a word: they stay.
+			else:
+				_sleeping = {}
+		return
+	var day := Townsfolk.day_of(World.steps)
+	var reach := int(rules.get("fire_cells", 2))
+	if _watch_day != day and (_hard_day or hp < max_hp * float(rules.get("hard_hp", 0.7))) \
+			and _fire_near(tile, reach) and _fire_near(keeper.tile, reach):
+		_watch_day = day
+		_sleeping = {"asked_at": World.tick, "their_tile": keeper.tile}
+		_say(str(rules.get("ask", "Will you keep watch while I sleep?")), true)
+
+
 ## Bandaged (decision 621): her ask to rest first is met.
 func tended() -> void:
 	_deeds["asked_rest"] = false
@@ -1170,6 +1320,8 @@ func _keep_order() -> void:
 		_ack_due = -1
 		if _last_speech_tick < _order_tick:
 			_say(ORDER_ACKS[absi(hash(String(name))) % ORDER_ACKS.size()], true)
+	_play_on()
+	_keep_watch()
 	if order != "rest":
 		return
 	var why := ""
@@ -3609,8 +3761,8 @@ func _choose(foe: GridEntity, low: bool) -> void:
 		current_intent = Intent.ERRAND
 	elif guide != null and guide.going():
 		current_intent = Intent.GUIDE  # Leading her player somewhere (decision 551).
-	elif order == "rest" and foe == null:
-		current_intent = Intent.REST  # Asked to rest (decision 616).
+	elif (order == "rest" or order == "watch") and foe == null:
+		current_intent = Intent.REST  # Asked to rest (decision 616), or asleep while her player keeps watch (621).
 	elif bond_at_least("devoted") and stance != Stance.HOLD and stance != Stance.PULL_BACK and _at_keeper() != null:
 		# Devoted (decision 621, Jeff's "protects you aggressively"): she
 		# goes first at whatever is attacking her player.

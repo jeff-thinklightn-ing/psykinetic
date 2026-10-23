@@ -233,6 +233,9 @@ static func from_dict(entry: Variant) -> PlayerRecord:
 		# Her tiers' counts (decision 621): the half point carried, the deeds raised today.
 		if pet.get("bond_carry") is float or pet.get("bond_carry") is int:
 			record.companion["bond_carry"] = float(pet["bond_carry"])
+		var games: Variant = pet.get("games")
+		if games is Dictionary:
+			record.companion["games"] = {"hers": int(games.get("hers", 0)), "theirs": int(games.get("theirs", 0))}
 		var said: Variant = pet.get("bond_said")
 		if said is Dictionary:
 			record.companion["bond_said"] = {"day": int(said.get("day", -1)), "hurt": int(said.get("hurt", 0)), "sorry": int(said.get("sorry", 0))}

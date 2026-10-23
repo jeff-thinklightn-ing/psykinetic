@@ -5039,6 +5039,7 @@ func _join_companion(record: PlayerRecord, player: Player) -> void:
 	# The deeds she sees and her voice feels (decision 621).
 	pet.deed.connect(func(event: String, why: String) -> void: _bond(_record_of(pet), event, why))
 	pet.felt.connect(_bond_felt.bind(pet))
+	pet.played.connect(_bond_played.bind(pet))
 	pet.on_road = _on_road
 	pet.in_town = func(cell: Vector2i) -> bool: return World.holdings != null and not Stockpile.place_at(World.holdings, World.zone.name, cell).is_empty()
 	if int(record.companion.get("hp", 0)) > 0:
@@ -9601,6 +9602,19 @@ func _bond_felt(kind: String, pet: Companion) -> void:
 		Standing.bump(record.companion, record.player_id, -int((CompanionCard.tables().get("bond", {}) as Dictionary).get("drops", {}).get("harsh", -1)),
 			"said sorry for their harsh words", World.steps)
 		_set_mood(record)
+
+
+## A game of knucklebones played out (decision 621): her tally against her
+## player ("games" {hers, theirs}, for her run summary), and the deed.
+func _bond_played(won: bool, pet: Companion) -> void:
+	var record := _record_of(pet)
+	if record == null or record.companion.is_empty():
+		return
+	var games: Dictionary = record.companion.get("games", {"hers": 0, "theirs": 0})
+	games["hers" if won else "theirs"] = int(games.get("hers" if won else "theirs", 0)) + 1
+	record.companion["games"] = games
+	party_log.add("%s %s at knucklebones (%d games to %d)." % [pet.name, "wins" if won else "loses", int(games.get("hers", 0)), int(games.get("theirs", 0))])
+	_bond(record, "game", "played knucklebones with you")
 
 
 ## Whether [param cell] lies on a road of the zone ticking now (decision

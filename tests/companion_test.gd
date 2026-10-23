@@ -85,6 +85,7 @@ func _ready() -> void:
 	_test_record_loads()
 	_test_bond()
 	_test_deeds()
+	_test_game_and_watch()
 	_test_sickness()
 	_test_field_return()
 	_test_mortally_wounded()
@@ -1484,6 +1485,90 @@ func _test_deeds() -> void:
 	pet.in_town = Callable()
 	_settle(pet)
 	for key in ["bond_today", "bond_carry", "bond_best", "bond_said"]:
+		record.companion.erase(key)
+	_bond_as(0, kept)
+
+
+func _test_game_and_watch() -> void:
+	print("\n== knucklebones by the fire, and keeping watch while she sleeps (decision 621) ==")
+	_kill_monsters()
+	var owner := _player()
+	var pet := _companion()
+	_settle(pet)
+	var record: PlayerRecord = _main._records[Net.player_id]
+	var id := record.player_id
+	var kept: Variant = _bond_as(0)
+	record.companion.erase("games")
+	var seen: Array[String] = []
+	var on_deed := func(event: String, _why: String) -> void: seen.append(event)
+	pet.deed.connect(on_deed)
+	var spoken: Array[String] = []
+	var on_said := func(line: String) -> void: spoken.append(line)
+	pet.said.connect(on_said)
+	var game: Dictionary = CompanionCard.tables()["bond"]["game"]
+	var sleep: Dictionary = CompanionCard.tables()["bond"]["sleep"]
+	_check(Companion.order_in("Let's play knucklebones.") == {"verb": "play"} and Companion.order_in("fancy another game of dice?") == {"verb": "play"}
+		and Companion.order_in("I played dice once.").is_empty(), "\"play knucklebones\" read as an order; a story of dice is not")
+	# Away from a fire: not here.
+	_put(owner, Vector2i(9, 6))
+	_put(pet, Vector2i(10, 6))
+	if not pet._fire_near(pet.tile, int(game["fire_cells"])) and not pet._fire_near(owner.tile, int(game["fire_cells"])):
+		_say_to(pet, owner, "Let's play knucklebones.")
+		_check(pet._game.is_empty(), "no fire: no game")
+	# By the fire: best of three, the tally kept, a deed.
+	var fire := Vector2i(10, 7)
+	World._fire[fire] = true
+	_say_to(pet, owner, "Let's play knucklebones.")
+	_check(not pet._game.is_empty(), "by a fire together: the game starts")
+	for i in int(game["round_ticks"]) * int(game["rounds_most"]) + 2:
+		World.step()
+		if pet._game.is_empty():
+			break
+	var games: Dictionary = record.companion.get("games", {})
+	_check(pet._game.is_empty() and int(games.get("hers", 0)) + int(games.get("theirs", 0)) == 1 and is_equal_approx(float(record.companion.get("bond_carry", 0.0)), 0.5),
+		"played out: her tally against her player, and a warm deed (%s)" % [games])
+	var saved := PlayerRecord.from_dict(JSON.parse_string(JSON.stringify(record.to_dict())))
+	_check(saved.companion.get("games", {}) == games, "her tally is kept with her record")
+	# Keeping watch: after a hard day, by the fire, she asks; yes, she sleeps.
+	_kill_monsters()
+	pet._watch_day = -1
+	pet._hard_day = true
+	pet.hp = int(pet.max_hp * 0.5)
+	for i in Companion.DEED_EVERY:
+		World.step()
+	_check(str(sleep["ask"]) in spoken and pet._sleeping.has("asked_at"), "a hard day, by the fire: she asks her player to keep watch (%s)" % [spoken])
+	_say_to(pet, owner, "Yes, get some sleep.")
+	World.step()
+	_check(pet.order == "watch" and pet.current_intent == Companion.Intent.REST, "yes: she lies down to sleep (%s, %s)" % [pet.order, pet.intent_name()])
+	for i in int(sleep["sleep_ticks"]) + 2:
+		World.step()
+	_check(pet.order == "" and pet.hp == pet.max_hp and "watched" in seen and Standing.score(record.companion, id) == 1,
+		"slept out with her player by: whole, and they kept watch, trust (hp %d, %s, %d)" % [pet.hp, seen, Standing.score(record.companion, id)])
+	# Left sleeping, and something comes.
+	_kill_monsters()
+	pet._watch_day = -1
+	pet._hard_day = true
+	for i in Companion.DEED_EVERY:
+		World.step()
+	_say_to(pet, owner, "Sure.")
+	_check(pet.order == "watch", "asked again (another day): she sleeps")
+	var away := _far_cell(pet.tile, int(sleep["near"]) + 2, int(sleep["near"]) + 6)
+	_put(owner, away)
+	World.step()
+	var imp := _spawn_imp(_free_tile_between(pet, 1, 2))
+	imp.acts = false
+	World.step()
+	World.step()
+	_check(str(sleep["left_line"]) in spoken and "left_alone" in seen and pet.order == "", "her player gone and something came: she wakes, says so, and it costs her (%s)" % [seen])
+	World.despawn(imp)
+	World._fire.erase(fire)
+	pet.deed.disconnect(on_deed)
+	pet.said.disconnect(on_said)
+	pet._hard_day = false
+	pet._sleeping = {}
+	pet.hp = pet.max_hp
+	_settle(pet)
+	for key in ["bond_today", "bond_carry", "bond_best", "bond_said", "games"]:
 		record.companion.erase(key)
 	_bond_as(0, kept)
 
