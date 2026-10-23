@@ -25060,3 +25060,27 @@ silent; a player's own refused bandage showed nothing at all.
 tests: companion_test _test_bandage_words (the reasons, no kit and not safe
 said at once and no stock word after, the step breaking it off with "hold
 still"). Server only, protocol unchanged, no new class_name.
+## 646: a joined client paces a one-cell change by its arrival (the draugr's rush drawn at half pace)
+
+The coordinator's check after enemy-ai's draugr leash fix (2026-10-23): does a rush or
+an axe charge draw as a slide on a joined client? It did, never a jump, but at half pace:
+a mirror is told only the tile, so _mirror_tile_changed queued every one-cell change as a
+slide of the body's own step (World.step_ticks, 4.5 ticks for a draugr), a cell a tick
+or not; the next cell could not start until that slide ended (350: a slide is never cut
+short), and _catch_up shortens a late one to half at most (CATCH_UP_SPEED). A draugr's
+8-cell rush (a cell a tick, 604) was drawn over 20 ticks and stood on its last cell 12
+ticks after the server, its blow a second before its body.
+- Now, when a one-cell change arrives and the slide before it would end more than a tick
+  after this arrival (and is not a present push), the server is stepping the body faster
+  than its walk: the slide before is paced to end at this arrival's tick (a queued one
+  takes the gap since its own arrival; the one on screen goes on from where it was drawn
+  at the display clock last drawn, _drawn_shown, never a jump), and this one takes the
+  smaller of its step and that gap, a tick at least.
+- A plain walk, whose steps arrive as the slide before ends, is untouched (the within-a-
+  tick chaining rule keeps it); so is a push (present slides are left alone), and a step
+  that arrives late.
+mirror_test _test_a_rush_is_drawn_as_a_slide (8 cells a cell a tick: every sample moves,
+none faster than a cell a tick, there within the display delay plus two ticks; a 6-tick
+walker whose next step comes three ticks in is hurried to a cell in three, never faster,
+and ends on its tile); the walk, fast-walker, corner, push, overtaken and stall checks
+guard the rest. Client only, protocol unchanged.

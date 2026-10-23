@@ -267,6 +267,9 @@ var _from_tile := Vector2i.ZERO
 var _from_pos := Vector2.ZERO
 var _move_tick := 0.0
 var _move_duration := 0.0
+## Mirrors only: the display clock as of the last frame drawn, where a
+## slide hurried by the next cell's arrival goes on from (_mirror_tile_changed).
+var _drawn_shown := -INF
 ## The facing as shown, an angle in grid space, turning toward the wanted
 ## one at TURN_RATE.
 var _shown_angle := NAN
@@ -506,6 +509,7 @@ func _process(delta: float) -> void:
 			var to := tile
 			if _mirroring:
 				var shown := now - World.display_delay_ticks
+				_drawn_shown = shown
 				# A present push plays out before anything after it, and a
 				# slide on the display clock before the next (decision 350):
 				# one that came due meanwhile starts as it ends, never cutting
@@ -858,10 +862,33 @@ func _mirror_tile_changed(old: Vector2i) -> void:
 	var previous_end := _move_tick + _move_duration
 	if not _slides.is_empty():
 		previous_end = _slides.back()["tick"] + _slides.back()["duration"]
+	var duration := World.step_ticks(self, delta, old) if steps == 1 else float(clampi(steps, 1, 3))
+	var previous_present: bool = _slides.back().get("present", false) if not _slides.is_empty() else _present
 	if steps == 1 and previous_end > start - 1.0 and previous_end < start + 1.0:
 		start = previous_end
-	_slides.append({"from": old, "to": tile, "tick": start,
-		"duration": World.step_ticks(self, delta, old) if steps == 1 else float(clampi(steps, 1, 3))})
+	elif steps == 1 and previous_end > start + 1.0 and not previous_present:
+		# The server moved it a cell faster than its own step takes to draw
+		# (a rush or a charge: a cell a tick, decision 604), so the slide
+		# before this would still be playing when this one is due, and
+		# every cell after would wait its turn, the whole run drawn at half
+		# the body's step at best (_catch_up): a draugr's rush arrived on
+		# screen a second after its blow. Paced by arrival instead
+		# (decision 646): the slide before ends at this arrival's tick
+		# (hurried on from where it is drawn, never a jump), and this one
+		# takes the gap since the last arrival, a tick at least.
+		var previous_tick: float = _slides.back()["tick"] if not _slides.is_empty() else _move_tick
+		var gap := maxf(start - previous_tick, 1.0)
+		if not _slides.is_empty():
+			_slides.back()["duration"] = gap
+			start = previous_tick + gap
+		elif _move_duration > 0.0:
+			var shown := _drawn_shown if is_finite(_drawn_shown) else World.tick + World.tick_alpha - World.display_delay_ticks
+			_from_pos = Iso.local_to_grid(position)
+			_move_duration = maxf(previous_tick + gap - shown, 0.5)
+			_move_tick = shown
+			start = _move_tick + _move_duration
+		duration = minf(duration, gap)
+	_slides.append({"from": old, "to": tile, "tick": start, "duration": duration})
 
 
 ## True while this client is showing its own walk ahead of the server.

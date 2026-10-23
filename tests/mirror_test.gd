@@ -17,6 +17,7 @@ func _ready() -> void:
 
 	_test_a_walk_is_drawn_without_jumps_or_pauses()
 	_test_a_fast_walker_slides_too()
+	_test_a_rush_is_drawn_as_a_slide()
 	_test_turning_a_corner()
 	_test_a_step_starts_after_the_display_delay()
 	_test_the_display_clock_rides_out_late_ticks()
@@ -58,6 +59,54 @@ func _test_a_fast_walker_slides_too() -> void:
 	_check(walking.max() <= per_sample * 1.05 and walking.min() >= per_sample * 0.95,
 			"an even slide, not tile-to-tile hops (%.2f to %.2f px a sample, want %.2f)" % [walking.min(), walking.max(), per_sample])
 	_check(runner.position.is_equal_approx(Iso.tile_to_local(Vector2i(6, 7))), "ending on its tile")
+
+
+## A rush or an axe charge (World.rush, _lunge_cell): the server sets the
+## tile a cell a tick, far faster than the body's own step (a draugr's
+## move_ticks is 4.5). A joined client sees only the tile changes, and
+## paces the slides by their arrival (decision 646): before it, each cell
+## waited for the step-long slide before it, and the run was drawn at
+## half the body's step at best, a draugr's eight cells arriving 12 ticks
+## after the server's.
+func _test_a_rush_is_drawn_as_a_slide() -> void:
+	print("
+== a rush, a cell a tick, is drawn as a slide that keeps up ==")
+	var draugr := _mirror("Draugr", Vector2i(2, 9), 4)
+	var moves: Array[float] = []
+	var cells := 8
+	for i in cells:
+		_run_tick(draugr, moves, Vector2i(1, 0))
+	var arrived_tick := _tick
+	var settled := -1
+	for i in 40:
+		_run_tick(draugr, moves)
+		if settled < 0 and draugr.position.is_equal_approx(Iso.tile_to_local(Vector2i(2 + cells, 9))):
+			settled = _tick
+	var sliding := _trim(moves)
+	var per_sample := _tile_pixels(Vector2i(1, 0)) / float(SAMPLES_PER_TICK)
+	print("  rush of %d cells: server done at tick %d, drawn there at tick %d (%.1f ticks behind, display delay %.1f); samples %d, largest %.2f px (a cell a tick is %.2f a sample)"
+			% [cells, arrived_tick, settled, settled - arrived_tick, World.display_delay_ticks, sliding.size(), sliding.max(), per_sample])
+	_check(sliding.max() <= per_sample * 1.05, "never jumps: at most a cell a tick's worth a sample (largest %.2f, want <= %.2f)" % [sliding.max(), per_sample])
+	_check(sliding.min() > 0.0, "never stops between cells (smallest %.2f)" % sliding.min())
+	_check(settled >= 0 and settled - arrived_tick <= ceili(World.display_delay_ticks) + 2,
+			"and keeps up: there within the display delay of the server (%.1f ticks behind)" % (settled - arrived_tick))
+	_check(sliding.size() >= cells * SAMPLES_PER_TICK * 0.9, "drawn a cell a tick, as the server stepped it (%d samples for %d cells)" % [sliding.size(), cells])
+	# A walker whose next step comes mid-slide, slower than a cell a tick: paced the same, never a jump.
+	var walker := _mirror("Hurried", Vector2i(2, 11), 6)
+	var hurried: Array[float] = []
+	_run_tick(walker, hurried, Vector2i(1, 0))
+	for i in 2:
+		_run_tick(walker, hurried)
+	_run_tick(walker, hurried, Vector2i(1, 0))  # 3 ticks on, mid-slide.
+	for i in 2:
+		_run_tick(walker, hurried)
+	_run_tick(walker, hurried, Vector2i(1, 0))
+	for i in 12:
+		_run_tick(walker, hurried)
+	var three := _tile_pixels(Vector2i(1, 0)) / (3.0 * SAMPLES_PER_TICK)
+	# The step on screen has the display delay's share of its cell still to draw by the next's tick: at most twice the pace, as _catch_up allows.
+	_check(hurried.max() <= three * 2.0 * 1.05, "a step hurried by the next, a cell in three ticks: never a jump, at most twice that pace (largest %.2f px a sample, want <= %.2f)" % [hurried.max(), three * 2.0])
+	_check(walker.position.is_equal_approx(Iso.tile_to_local(Vector2i(5, 11))), "and it ends on its tile (%s)" % Iso.local_to_grid(walker.position))
 
 
 func _test_turning_a_corner() -> void:
