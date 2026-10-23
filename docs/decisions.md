@@ -22175,3 +22175,15 @@ breaks the wind-up and a sword blow does not; the throw strikes the first
 body and lies before it; a charge stopped by a body disarms, a clear one
 re-arms. A two-handed giant axe stands in for items' battle_axe (603,
 items' side). No new class_name.
+
+## 583 amended, pc-character's side. The draw waits a quarter second
+
+Jeff, playing v0.1.165: "for archery, left click move tries to draw back the bow,
+should have slight delay on mouse hold before drawing back. quick click to move".
+With a bow in hand the left button down no longer draws at once: Main waits
+DRAW_HOLD_MSEC (250, a draft) with the button held, then raises the bow
+(_draw_after_hold). Let go sooner and it is a plain click, sent at the release
+(_tap_with_bow: walk, talk, a chest), with no stance sent and no arc shown. Once
+drawn, everything is as before: let go before draw_min is the tap, after it the
+shot. The left button stays the draw (the coordinator): the backstep is combat's,
+later. Client only, protocol unchanged, no new class_name.

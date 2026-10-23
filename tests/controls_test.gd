@@ -39,6 +39,7 @@ func _ready() -> void:
 	_test_middle_drag_axis()
 	_test_schemes_are_inert_outside()
 	_test_click_uses_the_frame_pick()
+	_test_bow_click_walks()
 	_test_friend_click()
 	_test_stand_and_signature()
 	_test_cursor_bandage()
@@ -613,6 +614,43 @@ func _test_click_uses_the_frame_pick() -> void:
 	_check(player.has_move_order and player.move_order == Vector2i(9, 6),
 			"and the click sends the player there (%s)" % player.move_order)
 	player.has_move_order = false
+	Net.controls = saved
+
+
+func _test_bow_click_walks() -> void:
+	print("
+== a bow in hand: a quick left click walks; held DRAW_HOLD_MSEC, the bow draws (Jeff, 2026-10-22) ==")
+	var saved: String = Net.controls
+	Net.controls = "click"
+	var player := _place_player(Vector2i(11, 3))
+	var bow := World.items.mint("bow", "built")
+	var arrows := World.items.mint("arrows", "built")
+	World.put_item(player, player, Player.RIGHT_HAND, bow)
+	World.put_item(player, player, Player.LEFT_HAND, arrows)
+	_check(World.off_hand(player) == "draw", "(a bow and arrows in hand)")
+	_main._pick_grid = Vector2(9.2, 6.1)
+	var click := InputEventMouseButton.new()
+	click.button_index = MOUSE_BUTTON_LEFT
+	click.pressed = true
+	_main._unhandled_input(click)
+	_check(_main._stance == "" and player.raised == "" and not _main.aim_drawn, "the button down: no draw yet, no arc")
+	_main._draw_after_hold(_main._draw_pending_since + _main.DRAW_HOLD_MSEC - 50)
+	_check(_main._stance == "", "still under the hold: no draw")
+	click.pressed = false
+	_main._unhandled_input(click)
+	_check(_main._stance == "" and player.raised == "" and player.has_move_order and player.move_order == Vector2i(9, 6),
+			"let go sooner: a plain click, the walk (%s)" % player.move_order)
+	player.has_move_order = false
+	click.pressed = true
+	_main._unhandled_input(click)
+	_main._draw_after_hold(_main._draw_pending_since + _main.DRAW_HOLD_MSEC)
+	_check(_main._stance == "draw" and player.raised == "draw" and not player.has_move_order, "held past it: the bow drawn, no walk")
+	click.pressed = false
+	_main._unhandled_input(click)
+	_check(_main._stance == "" and _main._draw_pending_since == 0, "let go: the bow lowered (a tap before draw_min, or the shot)")
+	player.has_move_order = false
+	World.items.end(World.take_item(player, player, Player.RIGHT_HAND), "gone")
+	World.items.end(World.take_item(player, player, Player.LEFT_HAND), "gone")
 	Net.controls = saved
 
 

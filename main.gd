@@ -391,6 +391,12 @@ var _e_door: Door
 ## The off hand raised with the right button (World.off_hand): "block",
 ## "draw", or "" (the button shoves and tosses).
 var _stance := ""
+## A bow in hand, the left button down (Jeff, 2026-10-22: "left click move tries to draw back
+## the bow, should have slight delay on mouse hold before drawing back. quick click to move"):
+## the msec it went down, the draw beginning DRAW_HOLD_MSEC after (_draw_after_hold); let go
+## sooner, a plain click (_tap_with_bow), no arc shown. 0 when not waiting.
+var _draw_pending_since := 0
+const DRAW_HOLD_MSEC := 250
 ## The thing on the cursor (decision 593): {kind: "bandage", slot}; while
 ## set, a left click applies it and never attacks. {} for none.
 var _cursor_item := {}
@@ -924,6 +930,7 @@ func _process(delta: float) -> void:
 	_update_pick()
 	_test_hover()
 	_drive_wasd()
+	_draw_after_hold(Time.get_ticks_msec())
 	if not _stance.is_empty() and Net.controls != "wasd" and _local_player() != null:
 		_aim_at_cursor(_local_player())  # A raised shield or a drawn bow turns to the cursor.
 	_check_bandage_hold()
@@ -1175,7 +1182,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		_release_toss(player)
 		return
 	if click.button_index == MOUSE_BUTTON_LEFT and not click.pressed:
-		if _stance == "draw":
+		if _draw_pending_since > 0:
+			_draw_pending_since = 0  # Let go before the hold: a click, the walk at once.
+			_tap_with_bow(player)
+		elif _stance == "draw":
 			var tapped := World.draw_of(player) <= 0.0  # Let go before draw_min: a tap, no shot.
 			_lower_off_hand(player)  # Let go: the shot the aim's way, or a cancel before draw_min.
 			if tapped:
@@ -1203,7 +1213,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	# and bandaging are E's (_press_e). Left: a chest is walked to.
 	if World.off_hand(player) == "draw":
 		if click.button_index == MOUSE_BUTTON_LEFT:
-			_raise_off_hand(player)
+			_draw_pending_since = maxi(Time.get_ticks_msec(), 1)
 		return
 	if click.button_index == MOUSE_BUTTON_RIGHT and _raise_off_hand(player):
 		return
@@ -1513,6 +1523,17 @@ func _update_talk() -> void:
 ## The right button pressed: what the off hand holds is raised (a
 ## "stance" command: a shield's block, a bow's draw), true; false with
 ## nothing for it, and the press shoves as ever.
+## The left button held DRAW_HOLD_MSEC with a bow in hand: the draw begins (_raise_off_hand).
+## A bow no longer in hand, or no player, drops the wait.
+func _draw_after_hold(now: int) -> void:
+	if _draw_pending_since <= 0 or now - _draw_pending_since < DRAW_HOLD_MSEC:
+		return
+	_draw_pending_since = 0
+	var player := _local_player()
+	if player != null and World.off_hand(player) == "draw":
+		_raise_off_hand(player)
+
+
 func _raise_off_hand(player: Player) -> bool:
 	_stance = World.off_hand(player)
 	if _stance.is_empty():
