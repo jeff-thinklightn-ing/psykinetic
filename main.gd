@@ -467,6 +467,9 @@ var compass: HudCompass
 var hint_panel: HintPanel
 ## The options (O): sound volumes; other trees add their sections.
 var options_panel: OptionsPanel
+## The options' own canvas layer, above the HUD (layer 1) and the main menu.
+var _options_layer: CanvasLayer
+const OPTIONS_LAYER := 20
 ## The options were opened from the main menu, which comes back when they close.
 var _options_from_menu := false
 ## Esc's menu (GameMenu; the game never pauses), the main menu (MainMenu) while it shows, and
@@ -7345,7 +7348,14 @@ func _build_talk() -> void:
 	options_panel.hints_changed.connect(func(shown: bool) -> void:
 		if hint_panel != null:
 			hint_panel.visible = shown)
-	add_child(options_panel)  # Over the HUD and the main menu both (Jeff, 2026-10-22: the menu blocked the options screen).
+	# Over the HUD and the main menu both (Jeff, 2026-10-22: the menu blocked the
+	# options screen): on a canvas layer of its own above them (a Control under
+	# Main alone would sit in the world's canvas, scaled by the camera).
+	_options_layer = CanvasLayer.new()
+	_options_layer.name = "OptionsLayer"
+	_options_layer.layer = OPTIONS_LAYER
+	add_child(_options_layer)
+	_options_layer.add_child(options_panel)
 	pack_panel = PackPanel.new()
 	pack_panel.name = "Pack"
 	pack_panel.transfer = _transfer
@@ -11442,9 +11452,12 @@ func _run_test_show(player: Player) -> void:
 					_on_telegraph_started(1, {"id": 1, "kind": "spin", "shape": {"kind": "cone", "origin": [player.tile.x, player.tile.y],
 						"facing": [1, 0], "length": 5, "half_angle": 30}, "cells": cells, "from_tick": World.tick, "lands_tick": World.tick + 30})
 			"aim":
-				# The archery aim, for the shot: the host draws the bow (the server's
-				# stance), the aim fixed north-east of the archer, the arc at the step.
-				if Net.is_authority() and player != null:
+				# The archery aim, for the shot: a bow in the hand and arrows in the
+				# pack, then the host draws (the server's stance), the aim fixed
+				# north-east of the archer, the arc at the step.
+				if Net.is_authority() and player != null and player.slots.size() > Items.RIGHT_HAND:
+					player.slots[Items.RIGHT_HAND] = "bow"
+					player.slots[0] = "arrows"
 					_aim_fixed = Iso.local_to_grid(player.position) + Vector2(6.0, -4.0)
 					World.try_stance(player, "draw")
 			"charges":

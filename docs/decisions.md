@@ -21255,8 +21255,9 @@ first for the power read, Jeff to pick from the shot.
   lands first and the wire changes nothing from ui; before draw_min it
   cancels as before. The hit outline (475) stays on the first body the
   shot would cross to the arc's cell.
-- --test-show=aim: the host draws the bow with the aim fixed north-east,
-  for the shot docs/ui/shots/combat/aim_arc.jpg.
+- --test-show=aim: the host puts a bow in the hand and arrows in the pack,
+  draws with the aim fixed north-east, for the shot
+  docs/ui/shots/combat/aim_arc.jpg.
 
 ui_test _test_aim: the point on the arc at any angle, the axes, the pips,
 the fade, the command's shape, the aim dropped on release. Client only;
@@ -21283,7 +21284,9 @@ half (333 amended): the overhead label is the name alone. Ui's half:
   Talk and Barter (choices, not references).
 
 ui_test and controls_test: the hints with hints=on as before, nothing
-with it off. Client only; protocol unchanged; no new class_name.
+with it off. Shots: docs/ui/shots/hints/hint_before.jpg ("E open" over a
+chest, the HP line) and hint_after.jpg (nothing over it, no HP line).
+Client only; protocol unchanged; no new class_name.
 
 ## 584, ui's side: the healer's care in the barter window
 
@@ -21315,19 +21318,24 @@ drawn", "hidden in the grass", her step, an offer standing, being led,
 downed, channeling, the return), empty when nothing stands; hurt reads
 from the body and the grey, as the charter says; F3 keeps the number. The
 party's bars over heads stay until Jeff says (his call). companion_test's
-top-line check reads the state alone. Client only.
+top-line check reads the state alone. Shot: docs/ui/shots/sim/hud_no_hp.jpg
+(the HUD's corner bare, the pack's charges line below). Client only.
 
 ## 418 amended: the main menu steps aside for Options
 
 Jeff (2026-10-22): "main menu doesn't stays open when you select options
 so that's blocking the options screen". The options panel lived under
 the HUD, which the main menu hides, so the menu's Options showed nothing.
-Now the panel lives over the HUD and the menu both (a child of Main), the
+Now the panel lives over the HUD and the menu both, on a canvas layer of
+its own above them (Main's OptionsLayer; a Control under Main alone sat in
+the world's canvas, scaled by the camera, and drew nowhere, as the first
+shot showed), the
 menu's Options hides the menu and opens them (Main._menu_options), and
 closing them (Esc, O, Main.toggle_options) brings the menu back; in play
-nothing changes. --test-show=menu_options for the shot. ui_test: the
-options on top with the menu aside, Esc bringing it back, the panel's
-place. Client only; no new class_name.
+nothing changes. --test-show=menu_options for the shot
+(docs/ui/shots/menu/menu_before.jpg the menu as it was; menu_options.jpg
+the options over it). ui_test: the options on top with the menu aside,
+Esc bringing it back, the panel's place. Client only; no new class_name.
 
 ## 597, ui's side: "winded" on the HUD's state line
 

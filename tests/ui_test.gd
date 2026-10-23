@@ -531,7 +531,8 @@ func _test_aim() -> void:
 		_check(not _main.options_panel.visible and _main.main_menu.visible, "Esc: the options close and the menu is back")
 		_main.main_menu.visible = false
 		_main.get_node("HUD").visible = hud_was
-		_check(_main.options_panel.get_parent() == _main, "the options live over the HUD and the menu both")
+		var layer := _main.options_panel.get_parent() as CanvasLayer
+		_check(layer != null and layer.get_parent() == _main and layer.layer > 1, "the options live on their own canvas layer over the HUD and the menu")
 	# Jeff (2026-10-22): no HP number on the HUD.
 	World.step()
 	_main._on_world_ticked(World.tick)
