@@ -6896,7 +6896,8 @@ func _fill_slide(result: Dictionary, target: GridEntity, pushed: Array[Dictionar
 
 ## A body moving itself down a line (decision 596): [param entity] lunges
 ## up to [param cells] along [param toward] (any angle, traced a cell at a
-## time as a push is), each cell a step of lunge_ticks_per_cell, so its
+## time as a push is), each cell a step of lunge_ticks_per_cell times the
+## cell's ground_drag (607 amended; its drive is not spent), so its
 ## velocity and momentum are real (body_velocity). Walls, closed doors,
 ## ledges, water, fire and a link's cell stop it as they stop a walk; a
 ## braced spear meets it as it meets a charge. [param opts]: blow ({impulse,
@@ -6918,8 +6919,8 @@ func lunge(entity: GridEntity, toward: Vector2, cells: int, opts := {}) -> Dicti
 		_lunge_cell(state, false)
 	var moved: int = state["moved"]
 	if moved > 0:
-		entity._world_slide_from(state["start"], tick, moved * float(state["ticks"]))
-		entity.next_move_tick = maxf(entity.next_move_tick, tick + moved * float(state["ticks"]))
+		entity._world_slide_from(state["start"], tick, float(state["spent_ticks"]))
+		entity.next_move_tick = maxf(entity.next_move_tick, tick + float(state["spent_ticks"]))
 	var result := _lunge_finish(state)
 	_log("lunge: %s from %s %d cells toward %s, stopped by %s" % [entity.name, state["start"], moved, toward, result["stopped_by"]])
 	lunge_resolved.emit(entity, result)
@@ -6927,7 +6928,7 @@ func lunge(entity: GridEntity, toward: Vector2, cells: int, opts := {}) -> Dicti
 
 
 ## A charge spread over time (decision 604): 596's lunge, a cell each
-## lunge_ticks_per_cell / its speed, from the next tick on (_tend_rushes),
+## lunge_ticks_per_cell / its speed x the cell's ground_drag, from the next tick on (_tend_rushes),
 ## so it can be met and struck on the way. [param opts] as lunge's, and
 ## "to": the cell it runs for (arrived there), else it runs its cells. Its
 ## speed u starts at 1 and is changed by what it meets: every hit on it
@@ -6982,7 +6983,7 @@ func _tend_rushes() -> void:
 		if not str(state["reason"]).is_empty():
 			_end_rush(entity, state["reason"])
 		else:
-			state["due"] = float(tick) + float(state["ticks"])
+			state["due"] = float(tick) + float(state["cell_ticks"])
 			entity.next_move_tick = maxf(entity.next_move_tick, state["due"])
 
 
@@ -7002,7 +7003,7 @@ func _rush_struck(body: GridEntity, way: Vector2) -> void:
 		_end_rush(body, "blow")
 	else:
 		state["ticks"] = maxf(lunge_ticks_per_cell, 0.1) / float(state["u"])
-		body.step_velocity = Vector2(state["line"]) / float(state["ticks"])
+		body.step_velocity = Vector2(state["line"]) / (float(state["ticks"]) * float(state["drag"]))
 
 
 ## [param entity]'s rush ends for [param reason]: rush_ended.
@@ -7035,7 +7036,7 @@ func _lunge_begin(entity: GridEntity, toward: Vector2, cells: int, opts: Diction
 	entity.protected = false
 	return {"entity": entity, "start": entity.tile, "line": line, "cells": cells, "ticks": ticks,
 		"u": line.length() / ticks, "blow": opts.get("blow", {}), "through": bool(opts.get("through", false)),
-		"to": opts.get("to", NO_CELL), "moved": 0, "reason": "", "stopped_by": "", "struck": [], "impact": 0}
+		"to": opts.get("to", NO_CELL), "moved": 0, "drag": 1.0, "cell_ticks": ticks, "spent_ticks": 0.0, "reason": "", "stopped_by": "", "struck": [], "impact": 0}
 
 
 ## One cell of a lunge or a rush ([param timed]: a rush's, drawn as it is
@@ -7055,6 +7056,13 @@ func _lunge_cell(state: Dictionary, timed: bool) -> void:
 		state["reason"] = "wall"
 		state["stopped_by"] = "wall" if _closed_door_across(entity.tile, direction) == null else "a door"
 		return
+	# The ground (607 amended): this cell takes ground_drag times its time, and
+	# the body is at that cell's speed in it (what a spear or a body met
+	# feels); its drive, u, is not spent, so it picks up on open ground.
+	var drag := ground_drag(entity.tile, direction)
+	state["drag"] = drag
+	var cell_ticks := float(state["ticks"]) * drag
+	entity.step_velocity = line / cell_ticks
 	if _meets_brace(entity, next, direction, true):
 		state["reason"] = "brace"
 		state["stopped_by"] = "a braced spear"
@@ -7070,7 +7078,7 @@ func _lunge_cell(state: Dictionary, timed: bool) -> void:
 						"direction": line, "stagger": int(blow.get("stagger", -1))})
 				state["struck"].append({"body": body, "cells": landed["distance"], "impact": landed["impact_damage"]})
 			return
-		var u: float = state["u"]
+		var u: float = float(state["u"]) / drag  # Its speed in this cell.
 		var m1 := pushed_mass(entity)
 		var m2 := pushed_mass(body)
 		var given := (1.0 + restitution) * m1 * u / (m1 + m2)
@@ -7089,9 +7097,11 @@ func _lunge_cell(state: Dictionary, timed: bool) -> void:
 			state["impact"] = int(state["impact"]) + impact
 		state["struck"].append({"body": body, "cells": went, "impact": impact})
 		_log("lunge: %s meets %s at %.2f: it goes %d, the charge goes on at %.2f" % [entity.name, body.name, u, went, kept])
+		kept *= drag  # Back to its drive.
 		state["u"] = kept
 		if kept > 0.0:
 			state["ticks"] = maxf(lunge_ticks_per_cell, 0.1) / kept
+			cell_ticks = float(state["ticks"]) * drag
 		if not _alive(entity) or kept < lunge_min_speed or _occupancy.has(next):
 			state["reason"] = "body"
 			state["stopped_by"] = body.name
@@ -7100,11 +7110,13 @@ func _lunge_cell(state: Dictionary, timed: bool) -> void:
 	_relocate(entity, next)
 	state["moved"] = moved + 1
 	_trample(entity, from)
-	entity.step_velocity = line / float(state["ticks"])
-	entity.step_until = tick + float(state["ticks"])
+	state["cell_ticks"] = cell_ticks
+	state["spent_ticks"] = float(state["spent_ticks"]) + cell_ticks
+	entity.step_velocity = line / cell_ticks
+	entity.step_until = tick + cell_ticks
 	entity.last_step_tick = tick
 	if timed:
-		entity._world_slide_from(from, tick, float(state["ticks"]))
+		entity._world_slide_from(from, tick, cell_ticks)
 	if entity.tile == state["to"]:
 		state["reason"] = "arrived"
 		state["stopped_by"] = "nothing (it arrived)"
@@ -7767,7 +7779,8 @@ func step_ticks(entity: GridEntity, direction: Vector2i, from := NO_CELL) -> flo
 ## time (step_ticks) and a slide's speed spent a cell (_push): uphill
 ## (Relief.pace, decision 525; a stair is not), times a ford's
 ## FORD_TICK_SCALE (wading), else tall grass standing TALL_GRASS_TICK_SCALE;
-## 1 on open level ground. Downhill is no easier yet.
+## 1 on open level ground. Downhill is no easier yet. A lunge's and a rush's
+## cells read it too (607 amended).
 func ground_drag(from: Vector2i, direction: Vector2i) -> float:
 	var to := from + direction
 	var drag := Relief.pace(elevation_at(to) - elevation_at(from), direction.x != 0 and direction.y != 0)

@@ -22812,8 +22812,8 @@ Both of its readers take it:
   slides 40 kg 3 cells on open ground slides it 1 through a ford. An overhead toss's two cells
   are through the air, at 1 each.
 
-Downhill and ice are no easier yet: a later step. Lunges and rushes keep their own pace for
-now. Server sim only; the client's shove guess (predict_push_end) still counts open cells, a
+Downhill and ice are no easier yet: a later step. Lunges and rushes read it too since
+607 amended. Server sim only; the client's shove guess (predict_push_end) still counts open cells, a
 guess corrected by the server as ever. Protocol unchanged.
 
 tests/physics_test: the shove on open ground (3 cells) and through a ford (1), and a step into
@@ -24920,3 +24920,17 @@ only by his throw (6 to 8 cells) and his rush (603): "doesn't walk, long reach".
 
 monster_test `_test_room_leash`: struck from 17 cells off at his hall's far end, his leash 12, he
 walks the whole way without turning back. Server only, protocol unchanged, no new class_name.
+## 607 amended: a lunge and a rush read the ground
+
+Combat's ask before its feel pass, approved by the coordinator (2026-10-22). Each cell of a
+lunge (596) or a rush (604) takes its time (lunge_ticks_per_cell / its drive u) times
+ground_drag for the cell it enters. Its speed in that cell, step_velocity, is that cell's speed,
+the line over that cell's time. A braced spear and a body met in that cell feel the slowed speed:
+a collision's given and kept terms use u / drag. The ground does not spend its drive: u is
+unchanged past the cell, so a charge picks up again on open ground, unlike a slide, which spends
+its speed on the ground for good. Hits on a rush still take from u (604). Open level ground is 1,
+so every existing number stands; a draugr charging through a ford is easier to stop there, which
+combat reads as right. Server sim only, no new rule, protocol unchanged.
+
+tests/physics_test: a 120 kg rush over 7 cells, 2 of them ford, takes 9 ticks, its speed 0.5 in
+the ford and 1 past it.

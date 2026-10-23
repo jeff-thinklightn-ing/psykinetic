@@ -506,6 +506,24 @@ func _test_ground() -> void:
 	_check(is_equal_approx(World.step_ticks(walker, Vector2i.RIGHT, Vector2i(2, 1)), walker.move_ticks * World.FORD_TICK_SCALE),
 			"and a step into it takes its walk twice as long, as before (%s)" % World.step_ticks(walker, Vector2i.RIGHT, Vector2i(2, 1)))
 
+	# A rush (607 amended): a ford's cells take twice the time and halve its
+	# speed in them; its drive comes back on open ground.
+	e = _build(["##############", "#............#", "#.P.......m..#", "#............#", "#............#", "##############"], 120.0)
+	var dummy: GridEntity = e["m"][0]
+	for x in [6, 7]:
+		World._fords[Vector2i(x, 2)] = true
+	World.rush(dummy, Vector2(-1, 0), 8, {"to": Vector2i(3, 2)})
+	var steps := 0
+	var speeds := {}
+	while World.rushing(dummy) and steps < 20:
+		World.step()
+		steps += 1
+		speeds[dummy.tile.x] = snappedf(World.body_velocity(dummy).length(), 0.01)
+	# 7 cells, 2 of them ford: 5 + 2 x 2 = 9 ticks.
+	_check(dummy.tile == Vector2i(3, 2) and steps == 9, "7 cells with 2 of ford take 9 ticks, not 7 (at %s, %d)" % [dummy.tile, steps])
+	_check(speeds.get(7) == 0.5 and speeds.get(6) == 0.5 and speeds.get(5) == 1.0,
+			"its speed 0.5 in the ford, what a spear or a body met there feels, and 1 again past it (%s)" % [speeds])
+
 
 # --- helpers ------------------------------------------------------------------
 
