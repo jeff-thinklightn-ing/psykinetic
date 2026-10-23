@@ -7,6 +7,11 @@ notes (decision 324).
 
 ## Unreleased
 
+## v0.1.170
+
+- A client-only fix to v0.1.169: it joins the same server, so update through the launcher and keep playing.
+- Fixed: with the low camera on, every body snapped to its tile each frame (the glitchy movement; fights were harder for it), and with it off a monster that had gone far off and come back stood frozen (623's hotfix).
+
 ## v0.1.169
 
 - What goes over the network changes, so v0.1.168 and older can't join the server: update through the launcher first.
