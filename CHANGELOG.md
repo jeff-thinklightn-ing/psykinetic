@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Under the low camera a click lands on a monster a thumb's width of screen either side of it however far off it stands, where before the slack was a hand's width of ground that shrank with distance.
 - In a fight, what stands between the camera and a monster coming for you or fighting you fades as it does for you, so a foe behind a wall or a tree at the low camera's angle is seen; an idle one keeps its cover.
 - A second healer keeps a hut in the forest's middle clearing, with his own remedies; the fallen in the forest come back there (641).
 - Herders live in the hills: the herder's hut and the high shieling each have a hut and a fenced sheep fold, and the sheep you see in the fold are the herder's own, fewer when he has driven some to market (640).

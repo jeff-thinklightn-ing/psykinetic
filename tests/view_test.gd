@@ -39,6 +39,7 @@ func _ready() -> void:
 	_test_outdoor()
 	await _test_low_camera()
 	await _test_far_restart()
+	await _test_low_pick()
 	_test_pine_stands()
 	_test_ground_textures()
 	_test_canopy_mask()
@@ -3873,6 +3874,55 @@ func _test_far_restart() -> void:
 	_rig._sync_puppets()
 	_check(is_instance_valid(puppet) and puppet.has_meta("corpse") and not _rig._puppets.has(id), "died out there: its puppet falls as its body goes, not left standing")
 	await _frames(2)
+
+
+## The low-angle fight, 2: under the low camera a click's slack beside a
+## monster is a thumb's width of screen, so a far body is as easy to hit
+## as a near one.
+func _test_low_pick() -> void:
+	print("\n== picking under the low camera: the slack beside a body is screen, not ground ==")
+	var low_was := Net.camera_low
+	_check(_rig.pick_slack_at(_rig._camera.global_position - _rig._camera.global_transform.basis.z * 30.0) == Client3D.PICK_SLACK,
+			"under the ortho camera: PICK_SLACK of ground, wherever the body is")
+	Net.set_camera_low(true, false)
+	var castle := Level.load_level("castle")
+	_rig.rebuild(castle["terrain"], castle["centre"])
+	var ahead: Vector3 = -_rig._camera.global_transform.basis.z
+	var origin: Vector3 = _rig._camera.global_position
+	var at_10 := _rig.pick_slack_at(origin + ahead * 10.0)
+	var at_30 := _rig.pick_slack_at(origin + ahead * 30.0)
+	var wanted_30 := Client3D.PICK_SLACK_SHARE * 2.0 * 30.0 * tan(deg_to_rad(Client3D.LOW_FOV * 0.5))
+	_check(is_equal_approx(at_30, maxf(Client3D.PICK_SLACK, wanted_30)) and at_30 > at_10 and at_10 >= Client3D.PICK_SLACK and wanted_30 > Client3D.PICK_SLACK,
+			"under the low camera: PICK_SLACK_SHARE of the screen's height at the body's depth, in ground units, more the farther, never under PICK_SLACK (%.2f at 10, %.2f at 30)" % [at_10, at_30])
+	# The room's free floor cell deepest in the view (World still holds the test room).
+	var deep := Vector2i(9, 4)
+	var deepest := -INF
+	for cell: Vector2i in _main._terrain["floor"]:
+		var depth: float = (_rig.to_global(_rig._tile_position(cell)) - origin).dot(ahead)
+		if depth > deepest and World.get_entity_at(cell) == null:
+			deepest = depth
+			deep = cell
+	var imp := _spawn_imp(deep, "imp")
+	await _frames(2)
+	_rig._process(0.0)
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+	var puppet: Node3D = _rig._puppets[imp.get_instance_id()]
+	var chest := puppet.global_position + Vector3.UP * 0.6
+	var slack := _rig.pick_slack_at(chest)
+	if slack > Client3D.PICK_SLACK + 0.05:
+		var side := ahead.cross(Vector3.UP).normalized()
+		var off := chest + side * (Client3D.MODEL_RADIUS + (Client3D.PICK_SLACK + slack) * 0.5)
+		var picked: GridEntity = _rig.monster_near_ray(origin, (off - origin).normalized())
+		_check(picked == imp, "a ray past the ground slack but within the screen's picks the imp %.0f units off (slack %.2f)" % [chest.distance_to(origin), slack])
+		var wide := chest + side * (Client3D.MODEL_RADIUS + slack + 0.3)
+		_check(_rig.monster_near_ray(origin, (wide - origin).normalized()) == null, "and one past the screen's slack picks nothing")
+	else:
+		print("  (the imp is too near the camera for the screen's slack to exceed the ground's: %.2f; the ray checks skipped)" % slack)
+	World.despawn(imp)
+	await _frames(2)
+	Net.set_camera_low(low_was, false)
+	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
 
 ## The border's pine stands (PineStands): drawn with the stand-in while the

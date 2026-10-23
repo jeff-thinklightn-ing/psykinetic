@@ -26102,3 +26102,14 @@ lines are nearly flat and a foe behind a wall, a tree or a roof stayed hidden.
 - A building between the camera and the player needed nothing: its walls and roof are
   occluders already.
 view_test _test_fight_fade (helper _wall_to_hide_behind). Client only, protocol unchanged.
+
+## 633: the low-angle fight, 2: a click's slack beside a monster in screen terms
+
+PICK_SLACK (0.45 ground units past a body's pick shape) shrank on screen with distance
+under perspective. Client3D.pick_slack_at(at): under the low camera the slack is
+PICK_SLACK_SHARE (0.025) of the screen's height at the body's depth from the camera, in
+ground units (the frustum's height there is twice the depth by the tangent of half the
+fov), never under PICK_SLACK; the ortho camera keeps PICK_SLACK. A fixed pixel count was
+a hair on a 4K screen, hence the share. monster_near_ray picks the body nearest the ray as
+a share of its own slack, so the ortho behaviour is exactly as before. view_test
+_test_low_pick. Client only.

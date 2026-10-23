@@ -966,6 +966,12 @@ const MODEL_RADIUS := 0.3
 ## click on it: a model is slim, and a click just off one would land on the
 ## ground behind it, a walk round it instead of a hit.
 const PICK_SLACK := 0.45
+## Under the low camera the slack is this share of the screen's height
+## instead (either side; pick_slack_at): under perspective a far body is
+## small on screen and PICK_SLACK of ground beside it a hair, so the slack
+## is a thumb's width of screen whatever its distance and whatever the
+## screen's pixels, never under PICK_SLACK (the low-angle fight, 2).
+const PICK_SLACK_SHARE := 0.025
 ## At most this many pick shapes are looked through (the local player, a
 ## door) for the entity under the cursor.
 const PICK_DEPTH := 8
@@ -3132,12 +3138,24 @@ func entity_under_mouse() -> GridEntity:
 	return monster_near_ray(ray[0], ray[1])
 
 
-## The monster whose body passes within MODEL_RADIUS + PICK_SLACK of the
-## ray from [param origin] along [param direction] (the nearest), or null.
+## The slack beside a body at [param at] (global), in ground units:
+## PICK_SLACK, or under the low camera PICK_SLACK_SHARE of the screen's
+## height at the body's depth from the camera (the frustum's height there
+## is twice the depth by the tangent of half the fov), whichever is more.
+func pick_slack_at(at: Vector3) -> float:
+	if not _low or _camera == null:
+		return PICK_SLACK
+	var depth := maxf((at - _camera.global_position).dot(-_camera.global_transform.basis.z), 0.0)
+	return maxf(PICK_SLACK, PICK_SLACK_SHARE * 2.0 * depth * tan(deg_to_rad(_camera.fov * 0.5)))
+
+
+## The monster whose body passes within MODEL_RADIUS + pick_slack_at of the
+## ray from [param origin] along [param direction] (the nearest, as a share
+## of its own slack), or null.
 func monster_near_ray(origin: Vector3, direction: Vector3) -> GridEntity:
 	var far := origin + direction * CAMERA_DISTANCE * 3.0
 	var best: GridEntity = null
-	var best_off := MODEL_RADIUS + PICK_SLACK
+	var best_share := 1.0
 	for id: int in _puppets:
 		if _far.has(id):
 			continue  # Out of the view (and its reach) altogether.
@@ -3148,10 +3166,10 @@ func monster_near_ray(origin: Vector3, direction: Vector3) -> GridEntity:
 		var feet := puppet.global_position
 		var head := feet + Vector3.UP * float(puppet.get_meta("pick_height", 1.0))
 		var closest := Geometry3D.get_closest_points_between_segments(origin, far, feet, head)
-		var off := closest[0].distance_to(closest[1])
-		if off < best_off:
+		var share := closest[0].distance_to(closest[1]) / (MODEL_RADIUS + pick_slack_at(closest[1]))
+		if share < best_share:
 			best = entity
-			best_off = off
+			best_share = share
 	return best
 
 
