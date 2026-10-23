@@ -236,6 +236,18 @@
 						"town_lands"
 					],
 					"status": "agreed"
+				},
+				{
+					"id": "pip.paid_silence",
+					"text": "Pip knows only enough to do the temple's work; part of his pay is to keep what he sees to himself, with the promise that he will one day become a holy knight of Theus.",
+					"known": "secret",
+					"where": [],
+					"knowers": [
+						"pip"
+					],
+					"tags": [],
+					"source": "Jeff",
+					"status": "agreed"
 				}
 			]
 		},

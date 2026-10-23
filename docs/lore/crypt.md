@@ -356,6 +356,30 @@ known only to the draugr, so no one in town gives the puzzle away:
 
 ---
 
+## Theus and Psyke; what Pip knows (Jeff, 2026-10-22)
+
+Jeff's answers to B3 and to whether the acolyte knows of the old gods, relayed word for word
+by the coordinator:
+
+> "the temple and town follow their god of their home land, named Theus, a monotheistic god, while the god of war, is a tribal polytheistic god, who empowers Draugr, was named Psyke"
+
+> "Pip knows only enough to do the job, and part of his pay is to keep what he sees to himself, and the promise that he will become a holy knight of Theus one day."
+
+| Fact | Known | Status |
+|---|---|---|
+| `theus.followed`: The temple and the town follow Theus, the god of their homeland. | common, the Woodlands | agreed |
+| `theus.one`: The faith of Theus holds to one god alone. | common, the Woodlands | agreed |
+| `old_gods.war` (now): The old gods are a tribe's many forgotten gods; Psyke, their god of war, empowers the draugr, blesses through him, and raises the fallen to send them back to battle. | secret: Aldous, the draugr | agreed |
+| `pip.paid_silence`: Pip knows only enough to do the temple's work; part of his pay is to keep what he sees to himself, with the promise that he will one day become a holy knight of Theus. | secret: Pip | agreed |
+
+So the alms the town gives in Theus's name go down to Psyke and the old gods. Pip is not a
+knower of the old gods; he knows he carries the offering (`crypt.pip_carries`) and no more.
+Psyke is folded into `old_gods.war` rather than a fact of his own, so Aldous's 600-character
+budget still holds `crypt.founders` (resident_test). `temple.whose` (B3) is answered and
+dropped.
+
+---
+
 ## Log
 
 - 2026-10-19: crypt under the temple, delve-again, small boss, gold offering until
@@ -404,3 +428,4 @@ known only to the draugr, so no one in town gives the puzzle away:
   third layer, the Hall of Fallen Souls; the plunder is the grave robbers' (Jeff).
 - 2026-10-22, cont.: the old gods are war gods who power the draugr and send the dead back to battle; angered by the robbers, appeased by gold (Jeff).
 - 2026-10-22, cont.: the draugr's hall as a puzzle: the door shuts behind you, gold returned or his defeat opens it, the Draugr's Totem (Jeff, 573 amended).
+- 2026-10-22: the temple and town follow Theus, the homeland's one god; Psyke, the tribal god of war, empowers the draugr; Pip knows only enough for the job, paid for his silence and promised a holy knighthood of Theus (Jeff, B3).

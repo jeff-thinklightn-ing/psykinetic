@@ -127,12 +127,55 @@
 			]
 		},
 		{
+			"id": "theus",
+			"type": "world",
+			"name": "Theus",
+			"status": "agreed",
+			"source": "Jeff",
+			"summary": "The one god of the homeland, whom the temple and the town follow (Jeff, 2026-10-22; docs/lore/crypt.md).",
+			"relations": [
+				{
+					"to": "temple",
+					"kind": "in"
+				}
+			],
+			"tags": [
+				"return"
+			],
+			"facts": [
+				{
+					"id": "theus.followed",
+					"text": "The temple and the town follow Theus, the god of their homeland.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					],
+					"tags": [
+						"return"
+					],
+					"source": "Jeff",
+					"status": "agreed"
+				},
+				{
+					"id": "theus.one",
+					"text": "The faith of Theus holds to one god alone.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"source": "Jeff",
+					"status": "agreed"
+				}
+			]
+		},
+		{
 			"id": "old_gods",
 			"type": "world",
 			"name": "the old gods",
 			"status": "agreed",
 			"source": "Jeff",
-			"summary": "The forgotten gods of war who give the barrow's draugr his power and send the fallen back to battle; angered by the robbers, appeased by gold that returns what was stolen; known to Aldous and the draugr, not to the temple's goers (Jeff, 2026-10-22; docs/lore/crypt.md).",
+			"summary": "The tribe's many old gods; Psyke, their god of war, gives the barrow's draugr his power and sends the fallen back to battle; angered by the robbers, appeased by gold that returns what was stolen; known to Aldous and the draugr, not to the temple's goers, who follow Theus (Jeff, 2026-10-22; docs/lore/crypt.md).",
 			"relations": [
 				{
 					"to": "crypt",
@@ -146,7 +189,7 @@
 			"facts": [
 				{
 					"id": "old_gods.war",
-					"text": "The old gods are forgotten gods of war; through the draugr they bless, and they raise the fallen to send them back to battle.",
+					"text": "The old gods are a tribe's many forgotten gods; Psyke, their god of war, empowers the draugr, blesses through him, and raises the fallen to send them back to battle.",
 					"known": "secret",
 					"where": [],
 					"knowers": [

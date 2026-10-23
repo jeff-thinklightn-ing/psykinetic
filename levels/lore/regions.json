@@ -218,14 +218,6 @@
 						"return"
 					],
 					"status": "agreed"
-				},
-				{
-					"id": "temple.whose",
-					"text": "Whose temple it is, and which god it serves.",
-					"known": "common",
-					"where": [],
-					"status": "asked",
-					"ask": "B3"
 				}
 			]
 		},

@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The temple and the town follow Theus, the one god of their homeland; Aldous and the draugr know the old gods' war god, Psyke, empowers the draugr, and Pip keeps quiet for his pay and a promised holy knighthood of Theus.
 - Townsfolk know where the smith went: after a rumoured great dwarven forge deep below the castle, with hired guards, until an ambush took him; the goblins have him working weapons for the Blood Rot's raids.
 - Aldous and the draugr know the old gods: forgotten gods of war who send the fallen back to battle, angered by grave robbers and appeased by gold that returns what was stolen.
 - Townsfolk know the Barrow of the Fallen's layers: the wealthy's newer dead on top, the Ossuary below, a damp, dark third layer, and the draugr's Hall of Fallen Souls. Grave robbers, not the town's founders, plundered it.

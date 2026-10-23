@@ -33,16 +33,16 @@ see. Fire burns whoever stands in it.
 
 Raiders can kill, but whoever falls, townsfolk too, can be brought back (Jeff).
 The town has a temple, kept by a priest, and out in the wilds stands a healer's
-hut where a medicine man lives; the fallen are brought back at either. Whose
-temple it is *(asked: B3)*, whether being brought back costs anything or marks
+hut where a medicine man lives; the fallen are brought back at either. The temple
+and the town follow Theus, the one god of their homeland (Jeff, 2026-10-22). Whether being brought back costs anything or marks
 the one brought back, and whether people speak of it are open *(asked: B1)*.
 
 No one has been knighted in ages. Whether there were ever knights in the land,
 and who made them, is open *(asked: A4, H1)*.
 
 How the land is governed and what its laws are *(asked: A3, A4)*, how real magic
-is and what "the gift" is *(asked: B2)*, and which gods are worshipped *(asked:
-B3)* are all open.
+is and what "the gift" is *(asked: B2)* are open. Beside Theus there are the old gods, a tribe's many gods, whose god
+of war Psyke empowers the barrow's draugr; few know it.
 
 ## The Blood Rot's land
 
