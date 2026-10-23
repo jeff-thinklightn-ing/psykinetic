@@ -243,6 +243,7 @@ static func sample_barrow_deep() -> Dictionary:
 	var markers := {DEEP_LINK_UP: "link", DEEP_START: "start", DEEP_LINK_DOWN: "link"}
 	var layout := Level.image_from_rows(_lines(rows), markers, {"legend": BARROW_LEGEND})
 	var config := {"name": "The Ossuary", "outdoor": false, "depth": 2, "walls": "stone", "floors": "stone", "grave_goods": true,
+		"loot": {"chest": "ossuary_grave"},  # Mail shirts among the dead's goods (622, dungeon's side).
 		"starts": [[DEEP_START.x, DEEP_START.y]],
 		"spawn_points": {"from_above": [DEEP_FROM_ABOVE.x, DEEP_FROM_ABOVE.y], "from_below": [DEEP_FROM_BELOW.x, DEEP_FROM_BELOW.y]},
 		"links": [{"at": [DEEP_LINK_UP.x, DEEP_LINK_UP.y], "to_map": "barrow", "to_spawn": "from_below"},
@@ -267,6 +268,7 @@ static func sample_barrow_lair() -> Dictionary:
 	var markers := {LAIR_LINK_UP: "link", LAIR_START: "start", LAIR_SHORTCUT_LINK: "link", LAIR_DRAUGR: "monster_draugr"}
 	var layout := Level.image_from_rows(_lines(rows), markers, {"legend": BARROW_LEGEND})
 	var config := {"name": "Hall of Fallen Souls", "outdoor": false, "depth": 3, "walls": "stone", "floors": "stone", "grave_goods": true,
+		"loot": {"chest": "fallen_grave"},  # Mail, and plate rare, with the oldest dead (622, dungeon's side).
 		"starts": [[LAIR_START.x, LAIR_START.y]],
 		"spawn_points": {"from_above": [LAIR_FROM_ABOVE.x, LAIR_FROM_ABOVE.y], "from_temple": [LAIR_FROM_TEMPLE.x, LAIR_FROM_TEMPLE.y]},
 		"links": [{"at": [LAIR_LINK_UP.x, LAIR_LINK_UP.y], "to_map": "barrow_deep", "to_spawn": "from_below"},

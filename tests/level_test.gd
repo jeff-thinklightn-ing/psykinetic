@@ -1422,6 +1422,43 @@ func _test_barrow_level() -> void:
 		and not made_deep.is_empty() and Regen.connected(LevelMap.from_image(made_deep["layout"], made_deep["config"]), made_deep["anchors"])
 		and not made_dark.is_empty() and Regen.connected(LevelMap.from_image(made_dark["layout"], made_dark["config"]), made_dark["anchors"]),
 		"a generation of each layer is laid and joins every anchor (%d, %d and %d tries)" % [made.get("tries", 0), made_deep.get("tries", 0), made_dark.get("tries", 0)])
+	# Armour as grave goods (622, dungeon's side): the Ossuary's chests roll
+	# mail shirts, the Hall's mail and, rarely, plate; every generated chest's
+	# goods carry the grave mark; nowhere else gives armour. The rolls are
+	# seeded by level and cell, so which generation gives what is fixed.
+	var first_found := {"mail_deep": 0, "mail_lair": 0, "plate_lair": 0}
+	var unmarked := 0
+	var chests_seen := 0
+	for generation in range(1, 13):
+		for pair: Array in [["barrow_deep", "deep"], ["barrow_lair", "lair"]]:
+			var laid := Regen.generate(pair[0], generation)
+			var parsed := Level.parse(laid["layout"], null, laid["config"])
+			for spec: Dictionary in parsed["entities"]:
+				if str(spec.get("script", "")) != Level.CHEST:
+					continue
+				chests_seen += 1
+				var props: Dictionary = spec.get("props", {})
+				if props.get("grave", false) != true:
+					unmarked += 1
+				var slots: Array = props.get("slots", [])
+				if slots.has("mail_armour") and first_found["mail_" + pair[1]] == 0:
+					first_found["mail_" + pair[1]] = generation
+				if slots.has("plate_armour") and first_found["plate_" + pair[1]] == 0:
+					first_found["plate_" + pair[1]] = generation
+		if first_found.values().all(func(g: int) -> bool: return g > 0):
+			break
+	_check(first_found["mail_deep"] > 0 and first_found["mail_lair"] > 0 and first_found["plate_lair"] > 0 and unmarked == 0 and chests_seen >= 9,
+		"a generation places mail in the Ossuary and the Hall and plate in the Hall, every chest's goods grave marked (first in generations %s; %d chests, %d unmarked)" % [first_found, chests_seen, unmarked])
+	var armour_elsewhere: Array[String] = []
+	for table: String in Items.loot_tables():
+		if table in ["ossuary_grave", "fallen_grave"]:
+			continue
+		for row: Dictionary in Items.loot_tables()[table]:
+			if Items.has_tag(str(row["item"]), "armour") and table not in armour_elsewhere:
+				armour_elsewhere.append(table)
+	_check(armour_elsewhere.is_empty() and Level.template_config("barrow_deep").get("loot", {}).get("chest", "") == "ossuary_grave"
+		and Level.template_config("barrow_lair").get("loot", {}).get("chest", "") == "fallen_grave" and not Level.template_config("barrow").has("loot"),
+		"the crypt's chests are the only loot that gives armour: the Ossuary's table and the Hall's, none on the first layer (%s)" % [armour_elsewhere])
 	_check(not Net.regenerate and not Regen.may_write() and not _main._regenerate_if_due("barrow") and not Level.overlaid("barrow"),
 		"off unless the server runs --regenerate: nothing is laid, the barrow stays its template")
 	_check(_main.admin_command("regenerate on") == "regenerate on: the shifting levels are laid again when due" and Net.regenerate, "the console switches it on")

@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The Ossuary's chests may hold a mail shirt among the dead's goods, and the Hall of Fallen Souls' mail or, rarely, plate armour: the only armour the world gives, grave goods all (622, dungeon's side).
 - In the barrow's first hall, the first time you step in each time it is laid again, you feel a cool draft coming from one of the niches, while the hidden door is still shut; the clues to it all point at the true niche (608 amended, dungeon's side).
 - Armour shows on the body: leather a jerkin with bracers and greaves, mail a long shirt, plate its plates, robes to the shins, each in its own colour over the clothes.
 - Fixed: with the low camera on, every body snapped to its tile each frame (the glitchy movement; fights were harder for it), and with it off a monster that had gone far off and come back stood frozen (623's hotfix).

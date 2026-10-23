@@ -24750,3 +24750,40 @@ level_test `_test_hidden_niche` grows the two helpers, the line on the
 first step and not the next, none once found even in a new generation,
 again when laid again with the door shut. docs/levels.md. Protocol
 unchanged (a party line); no new class_name.
+
+
+## 622, dungeon's side: mail and plate as grave goods in the crypt's chests
+
+The coordinator, on items' 622 (armour's slot and kinds): mail shirts as
+grave goods in the crypt's chests, "the only way mail enters the world",
+and plate as a rare row in a deep chest, so plate exists before a town's
+forge at village; data only, the draw odds said here, Jeff tunes in play.
+
+- levels/loot.json `ossuary_grave`: mail_armour 0.25, dagger 0.3; and
+  `fallen_grave`: plate_armour 0.05, mail_armour 0.25, sword 0.2 (the
+  plate row first, so the rare roll is never crowded out of a chest's
+  four slots).
+- The templates (tools/plan_sheet.gd's samples, levels written from
+  them) name them: `"loot": {"chest": "ossuary_grave"}` on barrow_deep
+  and `{"chest": "fallen_grave"}` on barrow_lair, top-level keys
+  `Regen.generated_config` carries into every generation, so each
+  generation's chests roll from them (`Level._stock`, seeded by the
+  level's name and the cell: a generation's chests hold the same every
+  time it is built). The first layer's chests keep no table: the town's
+  recent dead were buried poor.
+- The odds, per generation: the Ossuary lays 5 chests, so a mail shirt
+  lies in at least one in about 76 of 100 generations (mean 1.25); the
+  Hall lays 4, mail in at least one in about 68 of 100 (mean 1), plate in
+  at least one in about 19 of 100 (mean 0.2), so plate turns up in one
+  Hall in five. Every chest's goods are grave goods (555: the level's
+  grave_goods mark), so a companion made to carry them counts it, and
+  Snagfin's night fence (economy's side) is their way to coin.
+- No other loot table names armour: level_test checks it, so a row added
+  elsewhere is a decision, not a slip.
+
+level_test `_test_barrow_level`: over the first generations of the
+Ossuary and the Hall, mail is placed in each and plate in the Hall (the
+seeds fixed, the first generation giving each named in the check's
+words), every generated chest grave marked, and the two tables the only
+ones naming armour; the templates name them. Data and a test; protocol
+unchanged; no new class_name.

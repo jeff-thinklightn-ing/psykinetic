@@ -5,6 +5,9 @@
 	"walls": "stone",
 	"floors": "stone",
 	"grave_goods": true,
+	"loot": {
+		"chest": "fallen_grave"
+	},
 	"starts": [
 		[
 			50,

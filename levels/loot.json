@@ -22,6 +22,15 @@
 		"pockets": [
 			{"item": "ration", "chance": 0.2},
 			{"item": "dagger", "chance": 0.1}
+		],
+		"ossuary_grave": [
+			{"item": "mail_armour", "chance": 0.25},
+			{"item": "dagger", "chance": 0.3}
+		],
+		"fallen_grave": [
+			{"item": "plate_armour", "chance": 0.05},
+			{"item": "mail_armour", "chance": 0.25},
+			{"item": "sword", "chance": 0.2}
 		]
 	}
 }

@@ -5,6 +5,9 @@
 	"walls": "stone",
 	"floors": "stone",
 	"grave_goods": true,
+	"loot": {
+		"chest": "ossuary_grave"
+	},
 	"starts": [
 		[
 			50,
