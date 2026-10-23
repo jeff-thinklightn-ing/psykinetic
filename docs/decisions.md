@@ -23539,3 +23539,60 @@ that never respawns.
   (119, 139).
 Wire: under PROTOCOL_REVISION 31 (with 583). items_test _test_cache. No
 new class_name.
+
+## 584 amended, npc's side: the medicine man's care and the quests behind it
+
+Jeff (2026-10-22, through the coordinator): "5 herbs, 5 antlers or 10 gold
+to bypass the quest, but doing his 1st quest can open up further quests
+such as healing the sick, potion quests, etc." Economy's amended 584
+(d53b2a92) holds the care: who is in it, the way in (gold, herbs, antlers
+or quest; Economy.CARE_QUEST_WAYS counts herbs and quest as his first
+errand done), the retain command, the rule by hut. This is the medicine
+man's side of it: his words, his pleas, the chain.
+
+- **His offers to one not in his care** (Offers._care_offers, from his
+  card and economy's care_via for his hut, Main._care_hut_of): the
+  retainer paid ahead (kind "care", his line "Pay me 10 gold now and I'll
+  see to you after: fall where you will and you wake here, in my care.";
+  accepted, Main._retain_care runs economy's retain command with the two
+  bodies, so the gold, the party line and the barter again are economy's),
+  and his first quest, the herbs (a plea "Bring him herbs": "Bring me 5
+  handfuls of herbs and I'll count you in my care, and there is more you
+  could do for me after."). Gold or antlers open nothing further; the
+  herbs plea stays for one who paid.
+- **The herbs are the quest however they come.** His card counts them by
+  player (care_herbs: by gift, Offers.herbs_taken); at the rule's five,
+  economy's grant_care(player, hut, "quest"), which also upgrades a paid
+  way; his card learns it, the player's standing rises as for one who gave, his
+  open herbs plea closes met with "<name> is in <his name>'s care now:
+  fall where they will, he will see to them." Five herbs handed in
+  economy's window instead (care_via "herbs") close a standing plea met
+  the next time his offers are read. Antlers one by one (care_antlers,
+  Offers.antlers_taken) are a way in at five ("antlers") and no quest.
+- **The chain, one ask at a time, each once** (care_done by player): at a
+  hut a town has built (rule.sick > 0) while someone in the town is sick,
+  "Walk the sick to him" ("There is sickness in the town and I cannot be
+  everywhere. Find one who is sick and walk them to my door."), met in
+  Offers.healed when a townsman is treated by him with that plea standing,
+  no pay of his own ("<player> walked <sick> to <him>, who saw to them.");
+  else "The makings of a brew" ("Bring me 3 handfuls of herbs and a pair
+  of antlers and I'll brew you something for the road; the potion is
+  yours."): gifts of herbs and antlers count toward it over visits
+  (BREW_HERBS 3, BREW_ANTLERS 1); at the count he hands back a
+  stamina_potion (Main._hand_item: minted "made" by him, into a free hand
+  or the pack, else at the player's feet) with "<he> brews what <player>
+  brought and hands them the potion." Then nothing more of his care is
+  asked, for now: later quests hang on the same card keys.
+- **His words.** residents.json "care" (the titles, the lines, "kept",
+  "voice": his prompt knows who is in his care, and "voice_quest" that
+  they gathered his herbs). townsfolk.json greet: the medicine man's own
+  greeting lines, and "care" ("You're in my care; fall where you will,
+  I'll see to you.") said instead to one in the care of his hut
+  (Main._greeted, economy's in_care).
+- **Main's context** for Offers: care_hut, care_rule, care_via, in_care,
+  grant_care, retain, hand_item.
+
+offers_test _test_care (the offers by way in, the retainer in person, the
+herbs one by one and through the window, the chain in order, the potion,
+the antlers, his voice); resident_test _test_greet (his lines and the care
+word). Server only, protocol unchanged, no new class_name.

@@ -1799,6 +1799,8 @@ func _test_greet() -> void:
 		and Resident.greet_word("cook", "stranger", rules, 3) != Resident.greet_word("cook", "stranger", rules, 4), "a stranger gets one of the cook's lines, by the day")
 	_check(Resident.greet_word("cook", "wronged", rules, 3) == "You again." and Resident.greet_word("cook", "trusted", rules, 3) == "Good to see you.", "one the town knows gets the standing's word")
 	_check(Resident.greet_word("weaver", "stranger", rules, 1) in rules["trades"]["default"], "a trade not listed: the default's")
+	_check(str(rules.get("care", "")).begins_with("You're in my care") and Resident.greet_word("medicine_man", "stranger", rules, 2) in rules["trades"]["medicine_man"]
+		and not Resident.greet_word("medicine_man", "stranger", rules, 2).begins_with("You're in my care"), "the medicine man's own lines; the care word only for one in his care, by Main (584 amended, npc's side)")
 	var mind := VoiceMind.new()
 	_main._resident_mind = mind
 	var spoken: Array[String] = []

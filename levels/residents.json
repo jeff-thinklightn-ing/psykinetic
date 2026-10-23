@@ -34,6 +34,23 @@
 	"memory": {"_": "The town memory log (the lawspeaker, phase 1): a belief becomes a candidate for town memory once spread people have held it, held still do, and it is hold_days old; max entries kept per town.", "spread": 3, "held": 2, "hold_days": 3, "max": 200},
 	"standing": {"_": "Decision 443: what a resident thinks of a player, a score moved by events (each key a step), trusted and wronged the words' thresholds, top the last word, most the score's bound, heard what gossip moves it (to heard_most at most), why_kept reasons remembered, decay_days between steps back toward 0.", "trusted": 3, "wronged": -3, "top": 6, "most": 10, "heard_most": 2, "why_kept": 3, "decay_days": 10, "met": 3, "rescue": 4, "lapsed": -2, "errand_lapsed": -1, "kin_home": 4, "loan_quarter": 1, "loan_cleared": 2, "word": 2, "gift": 1, "gift_favourite": 2, "raid": 1, "heard": 1, "fetch": 1, "offering": 3, "runner": 3, "cheated": -4},
 	"offers": {"_": "Decision 435 (amended 2026-10-18, Jeff): what a resident offers when spoken to: at most max fresh offers, per_player open commissions at once, a commission lapses after days. Rule: commissions come from people and what is between them, never 'go get object A from location B'; what the town is short of is talk, and banking it pays on its own; no commission needs accepting (the event completes it, with a notice and the pay).", "max": 3, "per_player": 3, "days": 7,
+		"care": {
+			"_": "Decision 584 amended, npc's side (Jeff: 5 herbs, 5 antlers or 10 gold to bypass the quest; his first quest opens further quests): the medicine man's words for his care and the quests behind it; the sums and counts are economy's care rule. pay takes the retainer, herbs the handfuls still wanted, brew the handfuls, kept the player's name and his, sick_done the player, the sick one and him, brew_done him and the player, voice and voice_quest the player's name (his prompt once they are in his care).",
+			"pay_title": "Pay ahead for his care",
+			"pay": "Pay me %d gold now and I'll see to you after: fall where you will and you wake here, in my care.",
+			"herbs_title": "Bring him herbs",
+			"herbs": "Bring me %d handfuls of herbs and I'll count you in my care, and there is more you could do for me after.",
+			"sick_title": "Walk the sick to him",
+			"sick": "There is sickness in the town and I cannot be everywhere. Find one who is sick and walk them to my door.",
+			"sick_done": "%s walked %s to %s, who saw to them.",
+			"brew_title": "The makings of a brew",
+			"brew": "Bring me %d handfuls of herbs and a pair of antlers and I'll brew you something for the road; the potion is yours.",
+			"brew_done": "%s brews what %s brought and hands them the potion.",
+			"kept": "%s is in %s's care now: fall where they will, he will see to them.",
+			"refuse": "Not now.",
+			"voice": "%s is in your care: if they fall anywhere, they wake at your hut and you see to them. Say so when it fits, briefly.",
+			"voice_quest": "%s gathered your herbs, and you trust them with more."
+		},
 		"_asks": "Decision 536: talk with no panel. A line said to a resident that holds one of these words asks for their wares, work or news (the matching offer's words spoken back, exactly), is a yes or a no to the offer standing (a short line beginning with the word), or says an amount (a number after one of amount, or a bare number).",
 		"asks": {
 			"wares": ["sell", "buy", "wares", "for sale", "have you got", "what do you have", "what have you"],

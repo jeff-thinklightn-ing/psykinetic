@@ -86,6 +86,17 @@ const DEFAULT_PAY := {"dispute": 5, "escort": 8, "healing": 6}
 const RESCUE := "rescue"
 const CAMP := "camp"
 const FETCH := "fetch"
+## The medicine man's care paid ahead (decision 584 amended, npc's side): accept pays economy's retainer.
+const CARE := "care"
+## His pleas' subs (all TAKE): the herbs that are his first quest, then the chain it opens.
+const CARE_HERBS := "care_herbs"
+const CARE_SICK := "care_sick"
+const CARE_BREW := "care_brew"
+## The brew's makings, brought to him over any number of visits.
+const BREW_HERBS := 3
+const BREW_ANTLERS := 1
+## What he hands back for the brew (items.json; his own make).
+const BREW_POTION := "stamina_potion"
 const ERRAND := "errand"
 ## Parts of an offer id ("<worker>|<kind>|<key>"; worker ids hold ":").
 const SEP := "|"
@@ -161,6 +172,8 @@ static func of(worker_id: String, player_id: String, given: Dictionary = ctx) ->
 		for offer: Dictionary in ([job, shop] if trusted else [shop, job]):
 			if not offer.is_empty():
 				fresh.append(offer)
+		for care: Dictionary in _care_offers(worker_id, who, town, player_id, given):
+			fresh.append(care)  # The medicine man's care and the quests behind it, after his counter (584 amended, npc's side).
 		var page := _page_offer(worker_id, who, town, given)
 		if not page.is_empty():
 			fresh.push_front(page)  # The desk is what you came for (decision 491).
@@ -544,6 +557,210 @@ static func _plea_offer(worker_id: String, who: Dictionary, card: Dictionary, to
 	return {}
 
 
+## The medicine man's care (decision 584 amended, npc's side; Jeff: "5 herbs, 5
+## antlers or 10 gold to bypass the quest, but doing his 1st quest can open
+## up further quests"): economy holds who is in his care and the way in
+## (care_via: gold, antlers, herbs or quest; "" for not in care). Here, to one
+## not in care, the retainer paid ahead (CARE; economy's retain); to one whose
+## way in was not the herbs, his first quest, the herbs (a TAKE plea, met when
+## his card's count for the player reaches return.care.herbs, by gift or by
+## economy's window through herbs_taken; antlers likewise through
+## antlers_taken, a way in and no quest). The quest done (via herbs or quest)
+## opens the chain, one ask at a time: a sick townsman walked to his hut
+## (CARE_SICK, met in healed), the brew's makings brought (CARE_BREW, met in
+## gift when BREW_HERBS and BREW_ANTLERS are counted; his potion handed back).
+static func _care_offers(worker_id: String, who: Dictionary, town: String, player_id: String, given: Dictionary) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var hut := _hut_of(worker_id, given)  # His hut's place (economy's _care_hut_of): the care is the hut's.
+	var rule: Variant = _call(given, "care_rule", [hut]) if not hut.is_empty() else null
+	if _trade_of(who) != "medicine_man" or not rule is Dictionary or player_id.is_empty():
+		return out
+	var production: Production = given.get("production")
+	var words: Dictionary = settings().get("care", {})
+	var via := _via(player_id, hut, given)
+	var card := Townsfolk.card_of(production, worker_id)
+	var retainer := int(rule.get("retainer", 0))
+	if via.is_empty() and retainer > 0:
+		out.append(_offer(worker_id, CARE, "care", str(words.get("pay_title", "Pay ahead for his care")),
+			str(words.get("pay", "Pay me %d gold now and I'll see to you after: fall where you will and you wake here, in my care.")) % retainer,
+			{"gold": retainer, "hut": hut}, CARE, retainer))
+	var herbs := int(rule.get("herbs", 0))
+	if not _quest_done(via):
+		var had := int(card.get("care_herbs", {}).get(player_id, 0))
+		if herbs > 0 and had < herbs and not _has_ask(card, player_id, CARE_HERBS):
+			out.append(_offer(worker_id, PLEA, CARE_HERBS, str(words.get("herbs_title", "Bring him herbs")),
+				str(words.get("herbs", "Bring me %d handfuls of herbs and I'll count you in my care, and there is more you could do for me after.")) % (herbs - had),
+				{"sub": CARE_HERBS, "hut": hut, "herbs": herbs}, TAKE))
+		return out
+	# The chain (his first quest done): the sick while someone is sick, else the brew; each once.
+	for ask: Dictionary in card.get("asks", []).duplicate():
+		if str(ask.get("by", "")) == player_id and str(ask.get("sub", "")) == CARE_HERBS:
+			# The herbs came through economy's window (retain, pay herbs) while his plea stood: met all the same.
+			var name := str(production.worker(worker_id).get("name", worker_id))
+			_close(worker_id, ask, "%s brought the herbs." % str(ask.get("by_name", "They")), str(words.get("kept", "%s is in %s's care now: fall where they will, he will see to them.")) % [str(ask.get("by_name", "They")), name], "", 1, given)
+			card = Townsfolk.card_of(production, worker_id)
+	var done: Dictionary = card.get("care_done", {}).get(player_id, {})
+	if int(rule.get("sick", 0)) > 0 and not done.get("sick", false) and not _has_ask(card, player_id, CARE_SICK) and not _sick_in(production, town).is_empty():
+		out.append(_offer(worker_id, PLEA, CARE_SICK, str(words.get("sick_title", "Walk the sick to him")),
+			str(words.get("sick", "There is sickness in the town and I cannot be everywhere. Find one who is sick and walk them to my door.")),
+			{"sub": CARE_SICK, "hut": hut}, TAKE))
+	elif not done.get("brew", false) and not _has_ask(card, player_id, CARE_BREW):
+		out.append(_offer(worker_id, PLEA, CARE_BREW, str(words.get("brew_title", "The makings of a brew")),
+			str(words.get("brew", "Bring me %d handfuls of herbs and a pair of antlers and I'll brew you something for the road; the potion is yours.")) % BREW_HERBS,
+			{"sub": CARE_BREW, "hut": hut, "herbs": BREW_HERBS, "antlers": BREW_ANTLERS}, TAKE))
+	return out
+
+
+## [param player_id]'s way into the care of the hut [param hut] (economy's
+## care_via): "" for not in care.
+static func _via(player_id: String, hut: String, given: Dictionary) -> String:
+	var via: Variant = _call(given, "care_via", [player_id, hut])
+	return str(via) if via is String and via != "<null>" else ""
+
+
+## The medicine man [param worker_id]'s hut (economy's _care_hut_of: his
+## town's healer's hut), "" for none.
+static func _hut_of(worker_id: String, given: Dictionary) -> String:
+	var hut: Variant = _call(given, "care_hut", [worker_id])
+	return str(hut) if hut is String and hut != "<null>" else ""
+
+
+## Whether [param via] says his first quest is done: the herbs, by his plea
+## or economy's window (the same act).
+static func _quest_done(via: String) -> bool:
+	return via in ["herbs", "quest"]
+
+
+## Whether [param card]'s asks hold an open one by [param player_id] with [param sub].
+static func _has_ask(card: Dictionary, player_id: String, sub: String) -> bool:
+	for ask: Dictionary in card.get("asks", []):
+		if str(ask.get("by", "")) == player_id and str(ask.get("sub", "")) == sub:
+			return true
+	return false
+
+
+## The sick of [param town] (its store's id) now, by id; [] with no town.
+static func _sick_in(production: Production, town: String) -> Array[String]:
+	var out: Array[String] = []
+	if town.is_empty() or town == "<null>":
+		return out
+	for id: String in production.worker_ids(town):
+		if Townsfolk.is_sick(production, id):
+			out.append(id)
+	return out
+
+
+## [param player_id] is in the medicine man [param worker_id]'s care from now
+## by [param how] (economy's grant_care of [param hut]: "quest" for his herbs,
+## "antlers" for the pair): his card learns it, the player's standing rises,
+## his open herb pleas to them close met.
+static func _grant_care(worker_id: String, player_id: String, player_name: String, hut: String, how: String, why: String, given: Dictionary) -> void:
+	var production: Production = given.get("production")
+	if production == null:
+		return
+	_call(given, "grant_care", [player_id, hut, how])
+	var name := str(production.worker(worker_id).get("name", worker_id))
+	Townsfolk.learn(production, worker_id, "%s %s; %s is in %s's care now." % [player_name, why, player_name, name])
+	_regard(production, worker_id, player_id, Standing.setting("gave"), why)
+	for ask: Dictionary in Townsfolk.card_of(production, worker_id).get("asks", []).duplicate():
+		if str(ask.get("by", "")) == player_id and str(ask.get("sub", "")) == CARE_HERBS:
+			_close(worker_id, ask, "%s %s." % [player_name, why], str(settings().get("care", {}).get("kept", "%s is in %s's care now: fall where they will, he will see to them.")) % [player_name, name], "", 1, given)
+
+
+## Herbs into the medicine man [param worker_id]'s hands from [param player_id]
+## ([param count] of them, by gift or economy's window), counted on his card:
+## toward his first quest while it is not done (care granted at
+## return.care.herbs, by "quest"), else toward the brew while that ask is
+## open. True when a count was just met.
+static func herbs_taken(player_id: String, player_name: String, worker_id: String, count: int, given: Dictionary = ctx) -> bool:
+	var production: Production = given.get("production")
+	if production == null or player_id.is_empty():
+		return false
+	var who := production.worker(worker_id)
+	if _trade_of(who) != "medicine_man":
+		return false
+	var hut := _hut_of(worker_id, given)
+	var rule: Variant = _call(given, "care_rule", [hut]) if not hut.is_empty() else null
+	if not rule is Dictionary:
+		return false
+	var card := Townsfolk.card_of(production, worker_id)
+	if _quest_done(_via(player_id, hut, given)):
+		return _brew_taken(worker_id, player_id, player_name, card, "herbs", count, given)
+	if int(rule.get("herbs", 0)) <= 0:
+		return false
+	var counts: Dictionary = card.get("care_herbs", {})
+	counts[player_id] = int(counts.get(player_id, 0)) + count
+	card["care_herbs"] = counts
+	production.set_card(worker_id, card)
+	if int(counts[player_id]) < int(rule["herbs"]):
+		return false
+	_grant_care(worker_id, player_id, player_name, hut, "quest", "brought %d handfuls of herbs" % int(counts[player_id]), given)
+	return true
+
+
+## A pair of antlers into his hands from [param player_id]: a way into his
+## care at return.care.antlers (no quest) while not in care; toward the brew
+## once his first quest is done; nothing between.
+static func antlers_taken(player_id: String, player_name: String, worker_id: String, count: int, given: Dictionary = ctx) -> bool:
+	var production: Production = given.get("production")
+	if production == null or player_id.is_empty():
+		return false
+	var who := production.worker(worker_id)
+	if _trade_of(who) != "medicine_man":
+		return false
+	var hut := _hut_of(worker_id, given)
+	var rule: Variant = _call(given, "care_rule", [hut]) if not hut.is_empty() else null
+	if not rule is Dictionary:
+		return false
+	var card := Townsfolk.card_of(production, worker_id)
+	var via := _via(player_id, hut, given)
+	if _quest_done(via):
+		return _brew_taken(worker_id, player_id, player_name, card, "antlers", count, given)
+	if not via.is_empty() or int(rule.get("antlers", 0)) <= 0:
+		return false
+	var counts: Dictionary = card.get("care_antlers", {})
+	counts[player_id] = int(counts.get(player_id, 0)) + count
+	card["care_antlers"] = counts
+	production.set_card(worker_id, card)
+	if int(counts[player_id]) < int(rule["antlers"]):
+		return false
+	_grant_care(worker_id, player_id, player_name, hut, "antlers", "brought %d pairs of antlers" % int(counts[player_id]), given)
+	return true
+
+
+## [param kind] ("herbs" or "antlers") toward the brew, while the player's
+## CARE_BREW ask is open: counted on [param card]; at BREW_HERBS and
+## BREW_ANTLERS the ask is met, his potion handed to them (main's hand_item)
+## and the brew marked done. True when just met.
+static func _brew_taken(worker_id: String, player_id: String, player_name: String, card: Dictionary, kind: String, count: int, given: Dictionary) -> bool:
+	var production: Production = given.get("production")
+	var open: Dictionary = {}
+	for ask: Dictionary in card.get("asks", []):
+		if str(ask.get("by", "")) == player_id and str(ask.get("sub", "")) == CARE_BREW:
+			open = ask
+	if open.is_empty():
+		return false
+	var brews: Dictionary = card.get("care_brew", {})
+	var mine: Dictionary = brews.get(player_id, {"herbs": 0, "antlers": 0})
+	mine[kind] = int(mine.get(kind, 0)) + count
+	brews[player_id] = mine
+	card["care_brew"] = brews
+	production.set_card(worker_id, card)
+	if int(mine.get("herbs", 0)) < BREW_HERBS or int(mine.get("antlers", 0)) < BREW_ANTLERS:
+		return false
+	var name := str(production.worker(worker_id).get("name", worker_id))
+	var done: Dictionary = card.get("care_done", {})
+	var theirs: Dictionary = done.get(player_id, {})
+	theirs["brew"] = true
+	done[player_id] = theirs
+	card["care_done"] = done
+	production.set_card(worker_id, card)
+	_call(given, "hand_item", [player_id, BREW_POTION, name])
+	_close(worker_id, open, "%s brought %s the makings of a brew and took the potion." % [player_name, name],
+		str(settings().get("care", {}).get("brew_done", "%s brews what %s brought and hands them the potion.")) % [name, player_name], "", 1, given, "gave", "brought the makings of a brew")
+	return true
+
+
 ## [param town]'s sitting lawspeaker's id when there is one and rulings are
 ## on (Main's "lawspeaker_of" and "model"; off on a server without the
 ## flag, when quarrels stay as they were); "" otherwise.
@@ -642,6 +859,18 @@ static func accept(worker_id: String, player_id: String, player_name: String, of
 				_notice(player_id, town, "gave:" + str(offer["what"].get("kind", "")), "You gave %d gold toward %s." % [given_gold, kind], "", 1, given)
 				out["line"] = "%s gives %d gold toward %s." % [player_name, given_gold, kind]
 				out["ok"] = true
+		CARE:
+			# The retainer paid ahead (584 amended, npc's side): economy takes it into his purse, or says why not.
+			var took: Variant = _call(given, "retain", [player_id, worker_id, "gold"])
+			if took is Dictionary and bool(took.get("ok", false)):
+				var paid_gold := int(offer["what"].get("gold", 0))
+				Townsfolk.learn(production, worker_id, "%s paid %s %d gold ahead for care; %s is in %s's care now." % [player_name, name, paid_gold, player_name, name])
+				_regard(production, worker_id, player_id, Standing.setting("gave"), "paid %d gold ahead for care" % paid_gold)
+				out["line"] = "%s pays %s %d gold ahead, and is in his care: fall where they will, he will see to them." % [player_name, name, paid_gold]
+				out["ok"] = true
+			else:
+				var why := str(took.get("why", "")) if took is Dictionary else ""
+				out["line"] = why if not why.is_empty() else str(settings().get("care", {}).get("refuse", "Not now."))
 		CARRY:
 			var quarrel: bool = offer["what"].has("law")  # A quarrel for the lawspeaker (486), else a word carried (435).
 			var ask := {"id": offer_id, "kind": ERRAND, "sub": "quarrel" if quarrel else ERRAND, "by": player_id, "by_name": player_name, "step": now,
@@ -723,6 +952,11 @@ static func gift(player_id: String, player_name: String, worker_id: String, item
 	var who := str(production.worker(worker_id).get("name", worker_id))
 	_regard(production, worker_id, player_id, Standing.setting("gift_favourite" if favourite else "gift"), "gave them %s" % Companion._a(name))
 	Townsfolk.learn(production, worker_id, "%s gave %s %s." % [player_name, who, Companion._a(name)])
+	# The medicine man's care and his brew (584 amended, npc's side): herbs and antlers count.
+	if item_id == "herbs" and herbs_taken(player_id, player_name, worker_id, 1, given):
+		return "%s gives %s %s, and that is herbs enough." % [player_name, who, Companion._a(name)]
+	if item_id == "antlers" and antlers_taken(player_id, player_name, worker_id, 1, given):
+		return "%s gives %s %s, and that is what he asked." % [player_name, who, Companion._a(name)]
 	return "%s gives %s %s%s." % [player_name, who, Companion._a(name), ", and it is what they like best" if favourite else ""]
 
 
@@ -1079,6 +1313,25 @@ static func healed(town: String, who_id: String, player_id: String, player_name:
 	if player_id.is_empty() or how in ["died", "recovered"]:
 		return
 	_regard(production, who_id, player_id, Standing.setting("healed"), "saw to them when they were sick")
+	# Walked to the hut and treated there (501's escort): the medicine man's CARE_SICK ask met (584 amended, npc's side).
+	if how == "the healer":
+		var healer := str(_call(given, "healer_of", [town]))
+		if healer.is_empty() or healer == "<null>":
+			return
+		var card := Townsfolk.card_of(production, healer)
+		for ask: Dictionary in card.get("asks", []).duplicate():
+			if str(ask.get("by", "")) != player_id or str(ask.get("sub", "")) != CARE_SICK:
+				continue
+			var done: Dictionary = card.get("care_done", {})
+			var theirs: Dictionary = done.get(player_id, {})
+			theirs["sick"] = true
+			done[player_id] = theirs
+			card["care_done"] = done
+			production.set_card(healer, card)
+			var healer_name := str(production.worker(healer).get("name", healer))
+			_close(healer, ask, "%s walked %s to %s's door, sick." % [by_name, who_name, healer_name],
+				str(settings().get("care", {}).get("sick_done", "%s walked %s to %s, who saw to them.")) % [by_name, who_name, healer_name], "", 1, given, "healed", "walked %s to the hut" % who_name)
+			break
 	if not paid_this:
 		_notice(player_id, town, "healing:" + who_id, "%s saw to %s with %s." % [by_name, who_name, how], "healing", 1, given)
 
@@ -1329,6 +1582,14 @@ static func voice_words(worker_id: String, player_id: String, player_name: Strin
 	if not fresh.is_empty():
 		parts.append("What you can offer %s, if it comes up: %s." % [player_name, "; ".join(fresh)])
 	parts.append_array(open)
+	# One in the medicine man's care (584 amended, npc's side): his voice knows it, and whether they earned it.
+	var production: Production = given.get("production")
+	if production != null and _trade_of(production.worker(worker_id)) == "medicine_man":
+		var via := _via(player_id, _hut_of(worker_id, given), given)
+		if not via.is_empty():
+			parts.append(str(settings().get("care", {}).get("voice", "%s is in your care: if they fall anywhere, they wake at your hut and you see to them. Say so when it fits, briefly.")) % player_name)
+			if _quest_done(via):
+				parts.append(str(settings().get("care", {}).get("voice_quest", "%s gathered your herbs, and you trust them with more.")) % player_name)
 	return " ".join(parts)
 
 

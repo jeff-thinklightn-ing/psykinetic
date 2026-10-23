@@ -6312,6 +6312,14 @@ func _offers_context() -> Dictionary:
 		"holder_of": func(place: String) -> String: return World.holdings.holder(place) if World.holdings != null else "",
 		"value_of": func(kind: String) -> int: return int(World.economy.rules.get("value", {}).get(kind, 0)) if World.economy != null else 0,
 		"healers_hut": func(town: String) -> String: return _healers_hut_of(town),
+		# The medicine man's care (584 amended): economy's rule, retainer and record; the town his hut serves; his brew handed over.
+		"care_hut": func(worker_id: String) -> String: return _care_hut_of(worker_id),
+		"care_rule": func(place_id: String) -> Dictionary: return care_rule(place_id),
+		"retain": func(player_id: String, healer_id: String, pay: String) -> Dictionary: return _retain_care(player_id, healer_id, pay),
+		"grant_care": func(player_id: String, place_id: String, how: String) -> void: grant_care(player_id, place_id, how),
+		"in_care": func(player_id: String, place_id: String) -> bool: return in_care(player_id, place_id),
+		"care_via": func(player_id: String, place_id: String) -> String: return care_via(player_id, place_id),
+		"hand_item": func(player_id: String, item_id: String, from_name: String) -> bool: return _hand_item(player_id, item_id, from_name),
 		"healer_of": func(town: String) -> String:
 			var hut := _healers_hut_of(town)
 			if hut.is_empty() or World.production == null:
@@ -9485,6 +9493,40 @@ func _altar_down(town: String, gold: int) -> void:
 		World.economy.altar_down(town, gold)
 
 
+## Server: the medicine man [param healer_id]'s retainer paid in person
+## (Offers' CARE accept; 584 amended; the client's _retain is ui's button): economy's retain command with the two bodies,
+## which sends the barter again with its why. {"ok"}.
+func _retain_care(player_id: String, healer_id: String, pay: String) -> Dictionary:
+	var player: Player = null
+	for entity in World.get_entities():
+		if entity is Player and entity.spawned and (entity as Player).player_id == player_id:
+			player = entity
+			break
+	if player == null:
+		return {"ok": false, "why": ""}
+	for entity: GridEntity in World.townsfolk():
+		if entity is Resident and (entity as Resident).worker_id == healer_id:
+			return {"ok": not retain(player, {"resident": str(entity.get_path()), "pay": pay}).is_empty(), "why": ""}
+	return {"ok": false, "why": ""}
+
+
+## Server: a made thing [param item_id] from [param from_name] into
+## [param player_id]'s free hand or pack, else on the ground at their feet
+## (the medicine man's brew, 584 amended). False if they are not here.
+func _hand_item(player_id: String, item_id: String, from_name: String) -> bool:
+	if not Net.is_authority() or World.items == null or player_id.is_empty():
+		return false
+	for entity in World.get_entities():
+		if not (entity is Player and entity.spawned and (entity as Player).player_id == player_id):
+			continue
+		var uid := World.items.mint(item_id, "made", from_name, World.zone.name, entity.tile)
+		var slot := World.free_slot_for(entity, item_id)
+		if slot < 0 or not World.put_item(entity, entity, slot, uid):
+			World.put_on_ground(uid, entity.tile)
+		return true
+	return false
+
+
 func _give_gold(player_id: String, gold: int, why: String) -> void:
 	if World.economy != null and gold > 0:
 		World.economy.add_gold(player_id, gold, why)
@@ -9876,6 +9918,8 @@ func _greeted(player: Player, body: Resident) -> void:
 	var now := World.production.now()
 	var day := Townsfolk.day_of(now)
 	var word := Resident.greet_word(body.trade, Standing.words(card, player.player_id) if not card.is_empty() else "stranger", rules, hash(body.worker_id + ":" + str(day)))
+	if body.trade == "medicine_man" and in_care(player.player_id, _care_hut_of(body.worker_id)):
+		word = str(rules.get("care", word))  # One in his care hears it (584 amended, npc's side).
 	_resident_says(body, word, "", player)
 	_hail_now(body, player, Townsfolk.rules().get("hail", {}), now_msec, now, day, _sky_now(), true)
 

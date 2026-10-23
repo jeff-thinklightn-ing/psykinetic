@@ -24,8 +24,10 @@
 		"stop_seconds": 8,
 		"again_seconds": 10,
 		"refuse": "Not now.",
+		"care": "You're in my care; fall where you will, I'll see to you.",
 		"standing": {"wronged": "You again.", "known": "Back again?", "trusted": "Good to see you."},
 		"trades": {
+			"medicine_man": ["What ails you?", "Herbs, if you have any; the town is short of them.", "Sit; let me look at you."],
 			"default": ["What is it?", "Aye?", "Yes?"],
 			"smith": ["What is it? The forge won't wait.", "Aye? Make it quick, the iron's hot."],
 			"cook": ["What is it? The pot's on.", "Hungry, are you?"],

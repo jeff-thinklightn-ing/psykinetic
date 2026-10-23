@@ -49,6 +49,7 @@ func _ready() -> void:
 	_test_quarrel()
 	_test_walk_home()
 	_test_sick_pleas()
+	_test_care()
 	_test_give()
 	_test_asks()
 	_test_lapse()
@@ -539,6 +540,105 @@ func _test_sick_pleas() -> void:
 	_check(_done.size() == 2 and _done[1][3] == 0 and str(_done[1][2]) == "Tam died of the sickness." and Townsfolk.card_of(_work, "o-mara")["asks"].is_empty(),
 		"a death closes the plea with the fact, no pay, no lapse: %s" % [_done[1]])
 	_check(Standing.score(Townsfolk.card_of(_work, "o-mara"), "p1") >= Standing.setting("healed"), "and Mara thinks no worse of Jeff for it")
+	Offers.ctx = _ctx
+
+
+var _care := {}
+var _handed: Array = []
+
+
+## The healer's care (584 amended, npc's side; Jeff: "5 herbs, 5 antlers or 10 gold to bypass the quest, but doing
+## his 1st quest can open up further quests"): economy holds the care (stubbed here: who is in it and the way in);
+## his offers to one not in care, the herbs one by one making his first quest, the chain it opens (the sick walked
+## to him, the brew's makings for his potion), and that gold or antlers open nothing.
+func _test_care() -> void:
+	print("\n== the healer's care: gold, herbs or antlers in; the herbs open the chain (584 amended, npc's side) ==")
+	_setup([["o-mara", "Mara", "smith"], ["o-tam", "Tam", "hauler"], ["o-doc", "Oren", "medicine_man"]])
+	_care = {}
+	_handed = []
+	var rule := {"retainer": 10, "herbs": 5, "antlers": 5, "sick": 1, "word_days": 1}
+	_ctx["care_hut"] = func(worker_id: String) -> String: return "o/hut" if worker_id == "o-doc" else ""
+	_ctx["care_rule"] = func(_hut: String) -> Dictionary: return rule
+	_ctx["care_via"] = func(player_id: String, hut: String) -> String: return str(_care.get(player_id, {}).get(hut, ""))
+	_ctx["in_care"] = func(player_id: String, hut: String) -> bool: return _care.get(player_id, {}).has(hut)
+	_ctx["grant_care"] = func(player_id: String, hut: String, way: String) -> void:
+		var mine: Dictionary = _care.get(player_id, {})
+		mine[hut] = way
+		_care[player_id] = mine
+	_ctx["retain"] = func(player_id: String, _healer: String, pay: String) -> Dictionary:
+		var mine: Dictionary = _care.get(player_id, {})
+		mine["o/hut"] = pay
+		_care[player_id] = mine
+		return {"ok": true}
+	_ctx["hand_item"] = func(player_id: String, item_id: String, _from: String) -> bool:
+		_handed.append([player_id, item_id])
+		return true
+	_ctx["healer_of"] = func(_town: String) -> String: return "o-doc"
+	_ctx["healers_hut"] = func(_town: String) -> String: return "o/hut"
+	_ctx["companion_sick"] = func(_id: String) -> Dictionary: return {}
+	_ctx["set_companion_sick"] = func(_id: String, _r: Dictionary) -> void: pass
+	var subs := func(offers: Array[Dictionary]) -> Array: return offers.map(func(o: Dictionary) -> String: return str(o.get("what", {}).get("sub", o.get("kind", ""))))
+	var mine := _offers("o-doc")
+	_check(subs.call(mine).has(Offers.CARE) and subs.call(mine).has(Offers.CARE_HERBS) and mine.filter(func(o: Dictionary) -> bool: return o["kind"] == Offers.CARE)[0]["what"]["gold"] == 10,
+		"not in his care: pay 10 ahead, or bring him 5 herbs (his first quest): %s" % [subs.call(mine)])
+	# The retainer in person: economy's retain, the way in "gold" (p2).
+	var pay: Dictionary = mine.filter(func(o: Dictionary) -> bool: return o["kind"] == Offers.CARE)[0]
+	var paid := Offers.accept("o-doc", "p2", "Ann", pay["id"], 0, _ctx)
+	_check(paid["ok"] and _care.get("p2", {}).get("o/hut", "") == "gold" and str(paid["line"]).contains("pays Oren 10 gold ahead"), "p2 pays ahead: in his care by gold: %s" % [paid])
+	var theirs := _offers("o-doc", "p2")
+	_check(not subs.call(theirs).has(Offers.CARE) and subs.call(theirs).has(Offers.CARE_HERBS) and not subs.call(theirs).has(Offers.CARE_SICK) and not subs.call(theirs).has(Offers.CARE_BREW),
+		"paid in gold: no retainer twice, no chain; the herbs are still asked: %s" % [subs.call(theirs)])
+	# The herbs one by one (p1): at five, in his care by the quest.
+	for i in 4:
+		Offers.gift("p1", "Jeff", "o-doc", "herbs", _ctx)
+	_check(not _care.has("p1") and int(Townsfolk.card_of(_work, "o-doc").get("care_herbs", {}).get("p1", 0)) == 4, "four herbs counted on his card, not yet in care")
+	var fifth := Offers.gift("p1", "Jeff", "o-doc", "herbs", _ctx)
+	_check(_care.get("p1", {}).get("o/hut", "") == "quest" and fifth.ends_with("and that is herbs enough."), "the fifth: in his care by the quest: %s" % fifth)
+	mine = _offers("o-doc")
+	_check(not subs.call(mine).has(Offers.CARE) and not subs.call(mine).has(Offers.CARE_HERBS) and subs.call(mine).has(Offers.CARE_BREW) and not subs.call(mine).has(Offers.CARE_SICK),
+		"the quest done, nobody sick: the brew is asked: %s" % [subs.call(mine)])
+	# Someone sick: the sick kin walked to his hut comes first.
+	Townsfolk._set_sickness(_work, "o-tam", {"since": 0, "kind": "a cough", "treated": -1, "cured_by": ""})
+	mine = _offers("o-doc")
+	var sick: Array = mine.filter(func(o: Dictionary) -> bool: return o.get("what", {}).get("sub", "") == Offers.CARE_SICK)
+	_check(sick.size() == 1 and not subs.call(mine).has(Offers.CARE_BREW), "Tam sick: walk the sick to him, the brew waits: %s" % [subs.call(mine)])
+	_check(Offers.accept("o-doc", "p1", "Jeff", sick[0]["id"], 0, _ctx)["ok"] if not sick.is_empty() else false, "taken")
+	_done.clear()
+	Offers.healed(TOWN, "o-tam", "p1", "Jeff", "the healer", _ctx)
+	var doc := Townsfolk.card_of(_work, "o-doc")
+	_check(_done.size() == 2 and str(_done[0][2]) == "Jeff walked Tam to Oren, who saw to them." and _done[0][3] == 0 and doc.get("care_done", {}).get("p1", {}).get("sick", false) == true
+		and doc.get("asks", []).is_empty() and str(_done[1][1].get("kind", "")) == "notice", "Tam walked to the hut and treated there meets it with no pay of his own (501's healing notice beside it): %s" % [_done])
+	# The brew: three herbs and a pair of antlers over visits, the potion handed back.
+	mine = _offers("o-doc")
+	var brew: Array = mine.filter(func(o: Dictionary) -> bool: return o.get("what", {}).get("sub", "") == Offers.CARE_BREW)
+	_check(brew.size() == 1 and Offers.accept("o-doc", "p1", "Jeff", brew[0]["id"], 0, _ctx)["ok"], "the sick seen to: the brew asked and taken")
+	Offers.gift("p1", "Jeff", "o-doc", "herbs", _ctx)
+	Offers.gift("p1", "Jeff", "o-doc", "antlers", _ctx)
+	Offers.gift("p1", "Jeff", "o-doc", "herbs", _ctx)
+	_check(_handed.is_empty(), "two herbs and the antlers: not yet")
+	_done.clear()
+	Offers.gift("p1", "Jeff", "o-doc", "herbs", _ctx)
+	doc = Townsfolk.card_of(_work, "o-doc")
+	_check(_handed == [["p1", "stamina_potion"]] and doc.get("care_done", {}).get("p1", {}).get("brew", false) == true and doc.get("asks", []).is_empty()
+		and _done.size() == 1 and str(_done[0][2]) == "Oren brews what Jeff brought and hands them the potion.", "the third herb: the potion handed, the ask met: %s / %s" % [_handed, _done])
+	_check(not subs.call(_offers("o-doc")).any(func(sub: String) -> bool: return sub.begins_with("care")), "the chain done for now: nothing more of his care asked: %s" % [subs.call(_offers("o-doc"))])
+	# Antlers one by one (p3): a way in, no quest.
+	for i in 5:
+		Offers.gift("p3", "Bo", "o-doc", "antlers", _ctx)
+	_check(_care.get("p3", {}).get("o/hut", "") == "antlers" and subs.call(_offers("o-doc", "p3")).has(Offers.CARE_HERBS) and not subs.call(_offers("o-doc", "p3")).has(Offers.CARE), "five antlers: in his care, the herbs still his first quest: %s" % [subs.call(_offers("o-doc", "p3"))])
+	# The herbs through economy's window while his plea stands (p4): care_via "herbs" closes the plea met.
+	var plea: Array = _offers("o-doc", "p4").filter(func(o: Dictionary) -> bool: return o.get("what", {}).get("sub", "") == Offers.CARE_HERBS)
+	_check(plea.size() == 1 and Offers.accept("o-doc", "p4", "Una", plea[0]["id"], 0, _ctx)["ok"] and Townsfolk.card_of(_work, "o-doc").get("asks", []).size() == 1, "Una takes his herbs plea")
+	_care["p4"] = {"o/hut": "herbs"}
+	_done.clear()
+	_offers("o-doc", "p4")  # The read that closes it (the standing ask is listed in that same read).
+	var after: Array = subs.call(_offers("o-doc", "p4"))
+	_check(Townsfolk.card_of(_work, "o-doc").get("asks", []).is_empty() and _done.size() == 1 and str(_done[0][2]).ends_with("Una is in Oren's care now: fall where they will, he will see to them.")
+		and (after.has(Offers.CARE_BREW) or after.has(Offers.CARE_SICK)) and not after.has(Offers.CARE_HERBS), "her five herbs handed in his window: the plea met, the chain open: %s / %s" % [_done, after])
+	# His voice.
+	var voice := Offers.voice_words("o-doc", "p1", "Jeff", _ctx)
+	_check(voice.contains("Jeff is in your care") and voice.contains("Jeff gathered your herbs"), "his prompt knows the care and the quest: %s" % voice)
+	_check(not Offers.voice_words("o-doc", "p2", "Ann", _ctx).contains("gathered your herbs"), "and not the quest for one who paid")
 	Offers.ctx = _ctx
 
 
