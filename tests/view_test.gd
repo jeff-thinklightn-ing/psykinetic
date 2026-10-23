@@ -3763,8 +3763,12 @@ func _test_person_monster() -> void:
 	_check(not row.is_empty(), "the robber's row is there")
 	if row.is_empty():
 		return
+	# The row as read (Monster.read_kinds), not the words set here: a kinds() that dropped "person"
+	# drew the box's robbers as capsules (v0.1.165) while a test that set it passed.
+	var raw: Variant = JSON.parse_string(FileAccess.get_file_as_string(Monster.KINDS_PATH))
+	var written := str((raw as Dictionary).get("robber", {}).get("person", "")) if raw is Dictionary else ""
 	var had: Variant = row.get("person")
-	row["person"] = "headwear=hood garb=none"
+	_check(written != "" and str(had) == written, "the robber's person words read from its row (%s)" % had)
 	var robber := _spawn_imp(Vector2i(9, 6), "robber")
 	_rig._process(0.0)
 	var puppet: Node3D = _rig._puppets[robber.get_instance_id()]
@@ -3777,14 +3781,13 @@ func _test_person_monster() -> void:
 			"a grave robber in the human body (%s), its look's words worn (its hood up: %s), a person's hands" % [scene.scene_file_path.get_file(), hood != null and hood.visible])
 	World.despawn(robber)
 	_rig._process(0.0)
-	if had == null:
-		row.erase("person")
-	else:
-		row["person"] = had
+	row.erase("person")
 	var plain := _spawn_imp(Vector2i(9, 6), "robber")
 	_rig._process(0.0)
 	var plain_scene := (_rig._puppets[plain.get_instance_id()] as Node3D).get_node_or_null("Body/Model") as Node3D
-	_check(had != null or plain_scene == null or not plain_scene.scene_file_path in [Client3D.HUMAN["scene"], Client3D.HUMAN_F["scene"]],
+	if had != null:
+		row["person"] = had
+	_check(plain_scene == null or not plain_scene.scene_file_path in [Client3D.HUMAN["scene"], Client3D.HUMAN_F["scene"]],
 			"without the words, drawn as before")
 	World.despawn(plain)
 	_rig._process(0.0)
