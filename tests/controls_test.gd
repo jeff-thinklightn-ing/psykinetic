@@ -618,8 +618,7 @@ func _test_click_uses_the_frame_pick() -> void:
 
 
 func _test_bow_click_walks() -> void:
-	print("
-== a bow in hand: a quick left click walks; held DRAW_HOLD_MSEC, the bow draws (Jeff, 2026-10-22) ==")
+	print("\n== a bow in hand: a plain left click walks at once; Shift with it draws (Jeff, 2026-10-22) ==")
 	var saved: String = Net.controls
 	Net.controls = "click"
 	var player := _place_player(Vector2i(11, 3))
@@ -633,21 +632,22 @@ func _test_bow_click_walks() -> void:
 	click.button_index = MOUSE_BUTTON_LEFT
 	click.pressed = true
 	_main._unhandled_input(click)
-	_check(_main._stance == "" and player.raised == "" and not _main.aim_drawn, "the button down: no draw yet, no arc")
-	_main._draw_after_hold(_main._draw_pending_since + _main.DRAW_HOLD_MSEC - 50)
-	_check(_main._stance == "", "still under the hold: no draw")
+	_check(_main._stance == "" and player.raised == "" and not _main.aim_drawn and player.has_move_order and player.move_order == Vector2i(9, 6),
+			"a plain press: no draw, the walk at once (%s)" % player.move_order)
 	click.pressed = false
 	_main._unhandled_input(click)
-	_check(_main._stance == "" and player.raised == "" and player.has_move_order and player.move_order == Vector2i(9, 6),
-			"let go sooner: a plain click, the walk (%s)" % player.move_order)
 	player.has_move_order = false
-	click.pressed = true
-	_main._unhandled_input(click)
-	_main._draw_after_hold(_main._draw_pending_since + _main.DRAW_HOLD_MSEC)
-	_check(_main._stance == "draw" and player.raised == "draw" and not player.has_move_order, "held past it: the bow drawn, no walk")
-	click.pressed = false
-	_main._unhandled_input(click)
-	_check(_main._stance == "" and _main._draw_pending_since == 0, "let go: the bow lowered (a tap before draw_min, or the shot)")
+	var shift := InputEventMouseButton.new()
+	shift.button_index = MOUSE_BUTTON_LEFT
+	shift.shift_pressed = true
+	shift.pressed = true
+	_main._unhandled_input(shift)
+	_check(_main._stance == "draw" and player.raised == "draw" and not player.has_move_order, "Shift with the press: the bow drawn, no walk, no stand swing")
+	var let_go := InputEventMouseButton.new()
+	let_go.button_index = MOUSE_BUTTON_LEFT
+	let_go.pressed = false
+	_main._unhandled_input(let_go)
+	_check(_main._stance == "", "let go (Shift up or down): the bow lowered (a cancel before draw_min, or the shot)")
 	player.has_move_order = false
 	World.items.end(World.take_item(player, player, Player.RIGHT_HAND), "gone")
 	World.items.end(World.take_item(player, player, Player.LEFT_HAND), "gone")
@@ -675,7 +675,7 @@ func _test_friend_click() -> void:
 	Net.hints = true
 	_check(_main.context_hint_for(body) == "LMB  interact", "the hint says interact with hints=on (560; %s)" % _main.context_hint_for(body))
 	Net.hints = hints_were
-	_check("Shift+LMB	swing where you stand" in _main.hint_lines(), "the controls list says Shift+LMB swings where you stand")
+	_check("Shift+LMB	swing where you stand (a bow: draw)" in _main.hint_lines(), "the controls list says Shift+LMB swings where you stand, or draws a bow")
 	player.has_move_order = false
 	_left(true)
 	_check(player.action_order == GridEntity.Order.SWING and not player.has_move_order and _main._talk_wanted == null,

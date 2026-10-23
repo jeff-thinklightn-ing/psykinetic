@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Drawing a bow is now Shift and the left button: press to draw, let go to shoot; a plain click with a bow in hand only moves you, talks or opens a chest, never attacks (583 amended (2); Jeff's word).
 - No passage one cell wide in the dungeons (decision 612, Jeff: "the game is a multiplayer game with companions"): the generator widens every single-width way, a tomb is walled and entered by its door with the way outside it full width, and the first hall's bays are two rows tall; a test keeps every dungeon to it.
 - The draugr's waves of the dead set his fight's difficulty and are tuned from his entry: for each wave, when it rises, how many, which kinds, and how many more per extra player (the numbers are unchanged for now).
 - The draugr throws his axe only from 6 cells or more and never at someone closing on him, and once laid to rest he no longer repeats his respect each time he's struck.

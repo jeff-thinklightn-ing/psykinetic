@@ -394,12 +394,6 @@ var _e_door: Door
 ## The off hand raised with the right button (World.off_hand): "block",
 ## "draw", or "" (the button shoves and tosses).
 var _stance := ""
-## A bow in hand, the left button down (Jeff, 2026-10-22: "left click move tries to draw back
-## the bow, should have slight delay on mouse hold before drawing back. quick click to move"):
-## the msec it went down, the draw beginning DRAW_HOLD_MSEC after (_draw_after_hold); let go
-## sooner, a plain click (_tap_with_bow), no arc shown. 0 when not waiting.
-var _draw_pending_since := 0
-const DRAW_HOLD_MSEC := 250
 ## The thing on the cursor (decision 593): {kind: "bandage", slot}; while
 ## set, a left click applies it and never attacks. {} for none.
 var _cursor_item := {}
@@ -934,7 +928,6 @@ func _process(delta: float) -> void:
 	_update_pick()
 	_test_hover()
 	_drive_wasd()
-	_draw_after_hold(Time.get_ticks_msec())
 	if not _stance.is_empty() and Net.controls != "wasd" and _local_player() != null:
 		_aim_at_cursor(_local_player())  # A raised shield or a drawn bow turns to the cursor.
 	_check_bandage_hold()
@@ -1186,14 +1179,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		_release_toss(player)
 		return
 	if click.button_index == MOUSE_BUTTON_LEFT and not click.pressed:
-		if _draw_pending_since > 0:
-			_draw_pending_since = 0  # Let go before the hold: a click, the walk at once.
-			_tap_with_bow(player)
-		elif _stance == "draw":
-			var tapped := World.draw_of(player) <= 0.0  # Let go before draw_min: a tap, no shot.
+		if _stance == "draw":
 			_lower_off_hand(player)  # Let go: the shot the aim's way, or a cancel before draw_min.
-			if tapped:
-				_tap_with_bow(player)
 		_held_target = NONE
 		return
 	if not click.pressed:
@@ -1207,17 +1194,22 @@ func _unhandled_input(event: InputEvent) -> void:
 	var tile := target.tile if target != null else _mouse_tile()
 	if target == null:
 		target = World.get_entity_at(tile)
-	# A bow in hand: the left button held draws it (Jeff, 2026-10-22: "left
-	# mouse hold and release to fire could work, right mouse to back-step");
-	# a tap (let go before draw_min) is the click minus the attack, on the
-	# release (_tap_with_bow; the coordinator's ruling), never a quick shot.
-	# The right button with a bow is combat's backstep to come, so it does
-	# nothing here. Right otherwise: the off hand (decision 329): a shield
-	# raised while held; empty-handed it shoves and tosses (below). Opening
-	# and bandaging are E's (_press_e). Left: a chest is walked to.
+	# A bow in hand (Jeff, 2026-10-22: "just like shift+LMB to draw back,
+	# mouse to move only"): Shift (the stand key) with the left button draws
+	# at once and the release looses; letting go of Shift mid-draw changes
+	# nothing. A plain left click never attacks with a bow: it walks (a
+	# monster as the ground), talks to a friend or opens a chest
+	# (_click_with_bow; the coordinator's ruling). The right button with a
+	# bow is combat's backstep to come, so it does nothing here. Right
+	# otherwise: the off hand (decision 329): a shield raised while held;
+	# empty-handed it shoves and tosses (below). Opening and bandaging are
+	# E's (_press_e). Left: a chest is walked to.
 	if World.off_hand(player) == "draw":
 		if click.button_index == MOUSE_BUTTON_LEFT:
-			_draw_pending_since = maxi(Time.get_ticks_msec(), 1)
+			if Keys.held_in(click, "stand"):
+				_raise_off_hand(player)  # The bow is the weapon: Shift draws, no stand swing.
+			else:
+				_click_with_bow(player)
 		return
 	if click.button_index == MOUSE_BUTTON_RIGHT and _raise_off_hand(player):
 		return
@@ -1260,10 +1252,11 @@ func _unhandled_input(event: InputEvent) -> void:
 				_toss_from = get_global_mouse_position()
 
 
-## A tap with a bow in hand (the left button let go before draw_min): what
-## a left click does, minus the attack: a chest is walked to, a friend
-## talked to, the ground walked to; a foe nothing (the bow is the weapon).
-func _tap_with_bow(player: Player) -> void:
+## A plain left click with a bow in hand: never an attack (Jeff: "mouse to
+## move only"): a chest is walked to, a friend talked to, anything else,
+## a monster as the ground, walked toward; Shift with the button is the
+## only shot.
+func _click_with_bow(player: Player) -> void:
 	var target := _entity_under_mouse()
 	var on_sprite := target != null
 	var tile := target.tile if target != null else _mouse_tile()
@@ -1273,8 +1266,6 @@ func _tap_with_bow(player: Player) -> void:
 		_walk_to_chest(player, target)
 	elif target != null and target != player and is_friend(target):
 		_talk_to(player, target)
-	elif target != null and target != player and target.is_creature():
-		pass  # A foe: no swing with a bow in hand.
 	elif Net.controls == "wasd" and not on_sprite:
 		_wasd_click(player, MOUSE_BUTTON_LEFT)
 	else:
@@ -1527,17 +1518,6 @@ func _update_talk() -> void:
 ## The right button pressed: what the off hand holds is raised (a
 ## "stance" command: a shield's block, a bow's draw), true; false with
 ## nothing for it, and the press shoves as ever.
-## The left button held DRAW_HOLD_MSEC with a bow in hand: the draw begins (_raise_off_hand).
-## A bow no longer in hand, or no player, drops the wait.
-func _draw_after_hold(now: int) -> void:
-	if _draw_pending_since <= 0 or now - _draw_pending_since < DRAW_HOLD_MSEC:
-		return
-	_draw_pending_since = 0
-	var player := _local_player()
-	if player != null and World.off_hand(player) == "draw":
-		_raise_off_hand(player)
-
-
 func _raise_off_hand(player: Player) -> bool:
 	_stance = World.off_hand(player)
 	if _stance.is_empty():
@@ -7678,7 +7658,7 @@ func context_hint_for(thing: Node) -> String:
 		# 560, ui's side (Jeff): the click interacts; they stop and address you.
 		return "LMB  interact   in bed with %s" % ailing if not ailing.is_empty() else "LMB  interact"
 	if thing is Monster and World.can_target(player, thing):
-		return "LMB hold  draw, let go to shoot" if World.off_hand(player) == "draw" else "LMB  attack"
+		return "%s+LMB hold  draw, let go to shoot" % Keys.name_of("stand") if World.off_hand(player) == "draw" else "LMB  attack"
 	if thing is Player and thing != player:
 		return "LMB  talk   E hold  bandage"
 	return ""
@@ -10198,12 +10178,12 @@ func _on_world_ticked(tick: int) -> void:
 func hint_lines() -> Array[String]:
 	var lines: Array[String] = []
 	if Net.controls == "wasd":
-		lines.append_array(["%s\twalk" % Keys.walk_names(), "Mouse\taim", "LMB\tattack (far: walk); a friend: talk", "%s+LMB\tswing where you stand" % Keys.name_of("stand"),
+		lines.append_array(["%s\twalk" % Keys.walk_names(), "Mouse\taim", "LMB\tattack (far: walk); a friend: talk", "%s+LMB\tswing where you stand (a bow: draw)" % Keys.name_of("stand"),
 			"RMB\toff hand; empty: grab (drag to toss)"])
 		if _client3d != null:
 			lines.append_array(["MMB drag\tturn, look up / down", "Wheel\tzoom (MMB click: 1x)"])
 	else:
-		lines.append_array(["LMB\tmove / attack (hold to steer); a friend: talk", "%s+LMB\tswing where you stand" % Keys.name_of("stand"),
+		lines.append_array(["LMB\tmove / attack (hold to steer); a friend: talk", "%s+LMB\tswing where you stand (a bow: draw)" % Keys.name_of("stand"),
 			"RMB\toff hand; empty: shove (drag to toss)"])
 		if _client3d != null:
 			lines.append_array(["%s / %s\ttilt" % [Keys.name_of("forward"), Keys.name_of("back")],

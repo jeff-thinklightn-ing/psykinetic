@@ -21224,17 +21224,21 @@ redesign (583) with items (try_loose by angle, range steps, damage per
 step) and enemy-ai; the coordinator approved ui's side as written, pips
 first for the power read, Jeff to pick from the shot.
 
-- The draw is the left button held with a bow in hand (Jeff, 2026-10-22,
-  via the coordinator: "left mouse hold and release to fire could work,
-  right mouse to back-step"): the press sends the "draw" stance, the
-  release looses by the angle or cancels before draw_min. A tap (let go
-  before draw_min) is the click minus the attack, on the release
-  (Main._tap_with_bow; the coordinator's ruling on pc-character's
-  suggestion): a chest walked to, a friend talked to, the ground walked
-  to, a foe nothing, so click-to-walk stays for a bow in hand and no tap
-  is a quick shot (the first step hits hardest). The greeting bubble's
-  click still opens the bar; the right button with a bow does nothing
-  until combat's backstep; a shield's block stays the right button's.
+- The draw is Shift (the stand key, Keys "stand") with the left button,
+  a bow in hand (583 amended (2); Jeff, 2026-10-22, via the coordinator,
+  after a day on the left button alone and pc-character's quarter-second
+  hold: "lets do this with archery, just like shift+LMB to draw back,
+  mouse to move only"): the press draws at once (the "draw" stance), the
+  release looses by the angle or cancels before draw_min; letting go of
+  Shift mid-draw changes nothing. A plain left click with a bow never
+  attacks (the coordinator's ruling): a chest is walked to, a friend
+  talked to, anything else, a monster as the ground, walked toward
+  (Main._click_with_bow); Shift with the button is the only shot. With a
+  bow Shift draws instead of combat's stand swing (the bow is the
+  weapon; combat's call). The hold wait (DRAW_HOLD_MSEC, 4fe7b404) is
+  gone. The greeting bubble's click still opens the bar; the right
+  button with a bow does nothing until combat's backstep; a shield's
+  block stays the right button's.
 - Drawn (Player.raised "draw"): the OS cursor hides (Input's mouse mode;
   the 2D view's own cursor too) and shows again on release or cancel
   (Main._show_cursor, never headless).
