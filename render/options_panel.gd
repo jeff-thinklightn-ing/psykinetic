@@ -116,6 +116,9 @@ func _ready() -> void:
 	note.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	colours.add_child(note)
 	video.add_child(colours)
+	video.add_child(_choice_row("Camera: low horizon (trial)", "camera", [["off", "Off"], ["on", "On"]],
+		func() -> String: return "on" if Net.camera_low else "off",
+		func(value: String) -> void: Net.set_camera_low(value == "on")))
 	var controls := add_section("Controls")
 	controls.add_child(_choice_row("Move", "controls", [["click", "Click to move"], ["wasd", "WASD and aim"]],
 		func() -> String: return Net.controls, Net.set_controls))

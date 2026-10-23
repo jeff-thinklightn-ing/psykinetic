@@ -83,6 +83,9 @@ extends Node
 ## rebinds an action (Keys.DEFAULTS; the Controls section writes them back).
 ## antialias=off|fxaa|smaa|msaa4 (default smaa) smooths
 ## the 3D view's edges (the options panel's Video section writes it back).
+## camera=low is the low-horizon camera trial (decision 623: outdoors a
+## perspective view 22 degrees up, seeing the sky); anything else, or no
+## line, the ortho view (the Video section writes it back).
 ## phrase1= ... phrase4= are the quick phrases keys 1-4 say (written back,
 ## the defaults where there is none). Any line
 ## the game does not write itself (these, and keys it does not know) is
@@ -153,6 +156,9 @@ const REJECT_GRACE := 0.25
 
 ## Server: a peer is gone, once per peer, before anything else is sent.
 signal peer_left(peer: int)
+## The Options' low-horizon camera toggle (decision 623) changed: the 3D
+## view applies it at once.
+signal camera_low_changed(low: bool)
 ## A peer has sent a good hello and may be given a player. Main spawns
 ## players on this, never on peer_connected.
 signal peer_authenticated(peer: int, player_id: String, player_name: String)
@@ -497,6 +503,8 @@ var camera_yaw := 0.0
 ## The 3D camera's wheel zoom, a factor on its default size, kept with the
 ## yaw.
 var camera_zoom := 1.0
+## The low-horizon camera trial (decision 623): settings.cfg camera=low.
+var camera_low := false
 ## The HUD's list of controls shown (H toggles it); settings.cfg hints=on|off,
 ## off by default since the context hint (ui's step 3) says what the keys do.
 var hints := false
@@ -912,6 +920,7 @@ func _apply_access_settings() -> void:
 		var set := str(settings.get("colours", "normal"))
 		if UiTheme.COLOUR_SETS.has(set):
 			colours = set
+		camera_low = str(settings.get("camera", "")).strip_edges() == "low"
 		hinted_talk = str(settings.get("hinted_talk", "off")) == "on"
 		screenshot_dir = str(settings.get("screenshot_dir", "")).strip_edges()
 		hinted_shot = str(settings.get("hinted_shot", "off")) == "on"
@@ -969,6 +978,19 @@ func set_colours(value: String, save := true) -> void:
 	UiTheme.apply_colours(value)
 	if save:
 		_settings_kept["colours"] = value
+		save_view_settings()
+
+
+## The Options' Camera: the low-horizon trial (decision 623) on or off,
+## applied to the 3D view at once (camera_low_changed) and written as
+## camera=low or camera=high.
+func set_camera_low(value: bool, save := true) -> void:
+	var changed := value != camera_low
+	camera_low = value
+	if changed:
+		camera_low_changed.emit(value)
+	if save:
+		_settings_kept["camera"] = "low" if value else "high"
 		save_view_settings()
 
 

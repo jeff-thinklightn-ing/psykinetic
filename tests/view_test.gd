@@ -36,6 +36,7 @@ func _ready() -> void:
 	_test_ground_colours()
 	await _test_fade()
 	_test_outdoor()
+	_test_low_camera()
 	_test_pine_stands()
 	_test_ground_textures()
 	_test_canopy_mask()
@@ -3282,6 +3283,78 @@ func _test_outdoor() -> void:
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 	_check(not _rig._outdoor and _rig._trees.is_empty() and _rig._environment.background_mode == Environment.BG_COLOR,
 			"and back in the test room, it is under stone again")
+
+
+## The low-horizon camera trial (decision 623): Net.camera_low makes the
+## outdoor view a perspective one, 22 degrees up and half the distance off,
+## seeing the sky through haze; under stone the ortho view stays; off
+## restores it exactly; what is clicked or drawn stays within NEAR_TILES.
+func _test_low_camera() -> void:
+	print("\n== the low-horizon camera (623): outdoors on the toggle, under stone never ==")
+	var low_was := Net.camera_low
+	var pitch_was: float = _rig.pitch
+	var far_was: float = _rig._camera.far
+	Net.set_camera_low(true, false)
+	_check(not _rig.low_camera() and _rig._camera.projection == Camera3D.PROJECTION_ORTHOGONAL and is_equal_approx(_rig.pitch, pitch_was),
+			"the test room is under stone: the toggle leaves it ortho at the usual pitch")
+	var castle := Level.load_level("castle")
+	var terrain: Dictionary = castle["terrain"]
+	_rig.rebuild(terrain, castle["centre"])
+	_check(_rig.low_camera() and _rig._camera.projection == Camera3D.PROJECTION_PERSPECTIVE
+			and is_equal_approx(_rig._camera.fov, Client3D.LOW_FOV) and is_equal_approx(_rig._camera.far, Client3D.LOW_FAR)
+			and is_equal_approx(_rig.pitch, Client3D.LOW_PITCH),
+			"the castle outdoors: perspective, LOW_FOV, LOW_FAR, LOW_PITCH (%s %.0f %.0f %.0f)" % [_rig._camera.projection, _rig._camera.fov, _rig._camera.far, _rig.pitch])
+	_rig._ridge_pitch = 0.0  # The castle's ridge rule (525) lifts it otherwise; the flat's numbers here.
+	var offset: Vector3 = _rig._camera_offset()
+	_check(is_equal_approx(offset.length(), Client3D.CAMERA_DISTANCE * Client3D.LOW_DISTANCE_SHARE)
+			and is_equal_approx(rad_to_deg(asin(offset.normalized().y)), Client3D.LOW_PITCH),
+			"half the distance off, LOW_PITCH above the ground (%.1f, %.1f)" % [offset.length(), rad_to_deg(asin(offset.normalized().y))])
+	var look_fog: float = _rig.canopied_look(_rig.weathered_look(_rig.seasoned_look(_rig._look, Season.at(World.fields.region, DayNight.now())), _rig._weather_view.weather),
+			_rig._canopy_cover * World.fields.canopy_shade / DayNight.CANOPY_SHADE)["fog_density"]
+	_check(is_equal_approx(_rig._environment.fog_density, look_fog + Client3D.LOW_FOG)
+			and is_equal_approx(_rig._environment.fog_aerial_perspective, Client3D.LOW_AERIAL)
+			and _rig._environment.background_mode == Environment.BG_SKY,
+			"LOW_FOG of haze over the look's own, LOW_AERIAL of the sky in it, the day's sky behind (%.4f vs %.4f)" % [_rig._environment.fog_density, look_fog])
+	_check(_rig._sun.directional_shadow_mode == DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
+			and is_equal_approx(_rig._sun.directional_shadow_max_distance, Client3D.LOW_SHADOW_DISTANCE),
+			"the sun's shadows out to LOW_SHADOW_DISTANCE in two splits")
+	_check(is_equal_approx(_rig._view_reach(), World.NEAR_TILES), "the view's reach for shadows and puppets is NEAR_TILES")
+	var aim := Vector2(_rig._camera_target.x, _rig._camera_target.z)
+	var near := aim + Vector2(3.0, 4.0)
+	var far_off := aim + Vector2(60.0, 80.0)
+	var held: Vector2 = _rig.within_near(far_off)
+	_check(_rig.within_near(near) == near and is_equal_approx(held.distance_to(aim), World.NEAR_TILES)
+			and is_equal_approx((held - aim).angle(), (far_off - aim).angle()),
+			"a far click lands NEAR_TILES out along its line; a near one where it is")
+	_rig.zoom = 0.9
+	_rig._apply_size()
+	var zoomed: Vector3 = _rig._camera_offset()
+	_check(is_equal_approx(zoomed.length(), Client3D.CAMERA_DISTANCE * Client3D.LOW_DISTANCE_SHARE * 0.9), "the wheel moves the camera nearer, not the (unused) ortho size")
+	_rig.zoom = 1.0
+	_rig._apply_size()
+	var height := _rig.get_viewport().get_visible_rect().size.y
+	_rig.begin_pan()
+	_rig.pan_by(Vector2(height, 0.0))
+	_check(is_equal_approx(_rig.pan.length(), minf(_rig._view_height(), Client3D.PAN_MAX))
+			and _rig._view_height() < Client3D.CAMERA_DISTANCE,
+			"a drag of the screen's height pans the frustum's height at the aim (%.1f)" % _rig._view_height())
+	_rig.end_pan()
+	_rig.pan = Vector3.ZERO
+	_rig.tilt(-1.0, 10.0)
+	_check(_rig.pitch < Client3D.PITCH_MIN and _rig.pitch >= Client3D.LOW_PITCH_MIN, "S tilts down to LOW_PITCH_MIN, under the ortho floor (%.0f)" % _rig.pitch)
+	_rig.end_tilt()
+	_rig._ease_tilt(10.0)
+	_check(is_equal_approx(_rig.pitch, Client3D.LOW_PITCH), "and let go, back to LOW_PITCH")
+	Net.set_camera_low(false, false)
+	_check(not _rig.low_camera() and _rig._camera.projection == Camera3D.PROJECTION_ORTHOGONAL and is_equal_approx(_rig._camera.far, far_was)
+			and is_equal_approx(_rig.pitch, Client3D.CAMERA_PITCH) and is_equal_approx(_rig._environment.fog_aerial_perspective, 0.0)
+			and is_equal_approx(_rig._environment.fog_density, look_fog)
+			and _rig._sun.directional_shadow_mode == DirectionalLight3D.SHADOW_ORTHOGONAL
+			and is_equal_approx(_rig._sun.directional_shadow_max_distance, Client3D.SHADOW_DISTANCE)
+			and is_equal_approx(_rig._camera_offset().length(), Client3D.CAMERA_DISTANCE),
+			"Off: the ortho view exactly as before (far, pitch, haze, shadows, distance)")
+	Net.set_camera_low(low_was, false)
+	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
 
 ## The border's pine stands (PineStands): drawn with the stand-in while the

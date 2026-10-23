@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- A low-horizon camera to try: Options, Video, "Camera: low horizon (trial)" On puts the outdoor view 22 degrees up and nearer, in perspective, with the sky and the far land in haze; under stone the view is as before; Off restores the old view (decision 623, ui's side).
 - The butcher has greeting words of his own at his block (590, npc's side). Data only.
 - The medicine man takes his herbs and antlers in instalments: the care buttons read "Give herbs (5 to go)", then what is left after each handful, and light up when you hold any; paying in gold is unchanged (584 amended (2), ui's side).
 - The medicine man counts herbs and antlers a handful at a time: hand him what you carry and he says how many more, in the window or as a gift, and the count keeps across a save; the brew's makings the same (decision 584 amended (2); Jeff: the pack holds four).

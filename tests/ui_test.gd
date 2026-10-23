@@ -758,6 +758,22 @@ func _test_access() -> void:
 	_check(normal.keys() == distinct.keys() and apart, "the Distinct set differs in lightness between every pair, not hue alone")
 	(panel.choices["colours"]["buttons"]["normal"] as Button).pressed.emit()
 	_check(UiTheme.color("friend").is_equal_approx(friend_was), "and back")
+	# The low-horizon camera trial (decision 623): a Video row, camera=low in settings.cfg.
+	var low_was := Net.camera_low
+	var told: Array = []
+	var hear := func(low: bool) -> void: told.append(low)
+	Net.camera_low_changed.connect(hear)
+	_check(panel.choices.has("camera"), "a Video row for the low-horizon camera trial")
+	(panel.choices["camera"]["buttons"]["on"] as Button).pressed.emit()
+	_check(Net.camera_low and told == [true] and "camera=low" in FileAccess.get_file_as_string(Net._settings_override),
+		"On: Net.camera_low, the view told once, settings.cfg camera=low")
+	(panel.choices["camera"]["buttons"]["on"] as Button).pressed.emit()
+	_check(told == [true], "pressed again: not told again")
+	(panel.choices["camera"]["buttons"]["off"] as Button).pressed.emit()
+	_check(not Net.camera_low and told == [true, false] and "camera=high" in FileAccess.get_file_as_string(Net._settings_override),
+		"Off: told, and settings.cfg camera=high")
+	Net.camera_low_changed.disconnect(hear)
+	Net.set_camera_low(low_was, false)
 	DirAccess.remove_absolute(Net._settings_override)
 	Net._settings_override = kept[0]
 	Net.player_id = kept[1]

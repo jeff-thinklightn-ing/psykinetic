@@ -24173,3 +24173,48 @@ items_test _test_stacks (pick-up, split, join, a grave herb kept apart, a count
 put down, one taken out, the book saved); return_test (five antlers in one
 slot pay the healer); economy_test (a bought kit joins the stack it finds).
 No new class_name.
+
+## 623. The low-horizon camera, a trial toggle
+
+Jeff (2026-10-22): "drop the camera angle so we can see the sky and the
+land"; he picked persp22 (pitch 22, fov 50) from ui's sheet of four and
+wants it in its own cut, sooner, to play. It is a toggle, off by default,
+so the ortho view he has stays until he says: Options, Video, "Camera:
+low horizon (trial)" Off/On; settings.cfg camera=low|high (Net.camera_low,
+set_camera_low, camera_low_changed; read before the first frame beside the
+colours). Applied at once and on a map change (Client3D._apply_camera_mode
+from _build_camera, rebuild and the signal).
+- Outdoors only (_terrain "outdoor"): under stone, dungeons and rooms, the
+  ortho camera as it is, whatever the toggle. Off restores the ortho view
+  exactly (projection, far, pitch, haze, shadow distance, distance).
+- On, outdoors: a perspective camera (LOW_FOV 50; the sheet he picked from
+  was 50), LOW_PITCH 22 above the ground, LOW_DISTANCE_SHARE half of
+  CAMERA_DISTANCE off (20 units), LOW_FAR 300 (perf: the same read as 600,
+  never under about 250). The wheel, a pitch peek and the mourning pull-back
+  scale that distance (_camera_distance, _size_factor) as they scale the
+  ortho size. The tilt's floor is LOW_PITCH_MIN 15 (pitch_floor), the rest
+  LOW_PITCH (rest_pitch); the ridge rule (525) lifts the pitch as before.
+- The sky is the day's (DayNight's look through _update_sky, as before);
+  LOW_FOG 0.012 of haze is added over the look's fog density and the
+  weather's, with LOW_AERIAL 0.6 of the sky in it (fog_aerial_perspective),
+  so the far land fades into the horizon. Environment's note: a storm's
+  haze is per unit of distance, tuned for a camera 40 off, so at 20 it
+  reads thinner near the aim and, with the added haze, thicker far; the
+  ground fog planes, the rain box and the cloud decal are sized for the
+  ortho footprint and may show seams. Theirs with terrain once Jeff
+  confirms the trial.
+- The sun's shadows reach LOW_SHADOW_DISTANCE 150 in two PSSM splits
+  (environment's advice), so the line where they stop is off the near
+  ground; SHADOW_DISTANCE 70 orthogonal as before when off.
+- What is on screen thinks every tick (238): the view's reach for shadows
+  and puppets is held to World.NEAR_TILES; a body beyond it is not drawn
+  (its puppet hidden, shown again within; all shown when the toggle goes
+  off) and gets no bubble; a click past it lands NEAR_TILES out along its
+  line (within_near, in mouse_grid). Dragging pans the frustum's height at
+  the aim (_view_height), not the ortho size.
+- Nothing on the wire, no new class_name. Perf measures after it lands
+  (its trial: up to +2.4 ms GPU on the road at 22 degrees).
+view_test _test_low_camera (the room stays ortho; the castle goes
+perspective at the numbers; haze, shadows, reach, the far click, the wheel,
+the pan, the tilt floor; off restores exactly); ui_test _test_access (the
+row, the signal once, camera=low|high in settings.cfg).

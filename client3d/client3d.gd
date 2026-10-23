@@ -363,6 +363,28 @@ void fragment() {
 }
 """
 const CAMERA_PITCH := 50.0
+## The low-horizon camera (decision 623, a trial toggle; Jeff: "drop the
+## camera angle so we can see the sky"): outdoors, with Net.camera_low on,
+## a perspective camera LOW_PITCH above the ground at LOW_FOV, half the
+## distance off (LOW_DISTANCE_SHARE of CAMERA_DISTANCE; the wheel, a peek
+## and the mourning pull-back scale that distance, as they do the ortho
+## size), seeing LOW_FAR out under LOW_FOG of haze over the look's own
+## fog with LOW_AERIAL of the sky in it, the sun's shadows out to
+## LOW_SHADOW_DISTANCE in two splits so the edge where they stop is not
+## in the middle of the view. The tilt's floor is LOW_PITCH_MIN; the ridge
+## rule (525) lifts it as before. Under stone, and with the toggle off, the
+## ortho camera exactly as before. What is drawn and known stays within
+## World.NEAR_TILES (decision 238): a body beyond it is not drawn, a click
+## past it lands at its edge on the way (within_near), the view's reach for
+## shadows and puppets is held to it.
+const LOW_PITCH := 22.0
+const LOW_FOV := 50.0
+const LOW_DISTANCE_SHARE := 0.5
+const LOW_FAR := 300.0
+const LOW_FOG := 0.012
+const LOW_AERIAL := 0.6
+const LOW_SHADOW_DISTANCE := 150.0
+const LOW_PITCH_MIN := 15.0
 ## Over hills (decision 525): how far back toward the camera the ground is
 ## looked at, how far under the line to the player (aimed RIDGE_AIM over
 ## their feet) it must stay, and how fast (degrees a second) the pitch
@@ -1412,6 +1434,9 @@ var _hp_bar_shader: Shader
 var _terrain: Dictionary = {}
 var _sun: DirectionalLight3D
 var _outdoor := false
+## The low-horizon camera is on now (decision 623): Net.camera_low and
+## outdoors.
+var _low := false
 ## Fire's drawn lights (decision 523): [light, its energy, its phase, how far
 ## it swings], flickered and faded by day each frame (_flicker_fires), on
 ## the view's own clock (_fire_time, accumulated frame time).
@@ -1709,7 +1734,9 @@ func setup(terrain: Dictionary, centre := Vector2i.ZERO) -> void:
 	# The saved diamond, or --test-yaw exactly, for screenshots.
 	yaw = Net.camera_yaw
 	_yaw_step = nearest_diamond(yaw)
-	pitch = CAMERA_PITCH
+	pitch = rest_pitch()
+	if not Net.camera_low_changed.is_connected(_on_camera_low_changed):
+		Net.camera_low_changed.connect(_on_camera_low_changed)
 	zoom = clampf(Net.camera_zoom, ZOOM_MIN, ZOOM_MAX)
 	_zoom_to = zoom
 	_apply_size()
@@ -1877,7 +1904,7 @@ func _update_sky(delta: float) -> void:
 	_environment.ambient_light_color = look["ambient"]
 	_environment.ambient_light_energy = look["ambient_energy"]
 	_environment.fog_light_color = look["fog"]
-	_environment.fog_density = look["fog_density"]
+	_environment.fog_density = look["fog_density"] + (LOW_FOG if _low else 0.0)  # The low camera's haze (623).
 	_environment.fog_height = look["fog_height"]
 	_environment.fog_height_density = look["fog_height_density"]
 	_sun.light_color = look["light"]
@@ -2003,8 +2030,83 @@ func _build_camera() -> void:
 	_camera.far = CAMERA_DISTANCE * 3.0
 	add_child(_camera)
 	_camera_target = _tile_position(_centre)
+	_apply_camera_mode()
 	_place_camera()
 	_camera.current = true
+
+
+## Whether the low-horizon camera (decision 623) is on now: the toggle, and
+## outdoors.
+func low_camera() -> bool:
+	return _low
+
+
+## The pitch at rest: LOW_PITCH under the low camera, CAMERA_PITCH else.
+func rest_pitch() -> float:
+	return LOW_PITCH if _low else CAMERA_PITCH
+
+
+## The tilt's floor: LOW_PITCH_MIN under the low camera, PITCH_MIN else.
+func pitch_floor() -> float:
+	return LOW_PITCH_MIN if _low else PITCH_MIN
+
+
+## The camera's distance from its target: CAMERA_DISTANCE; under the low
+## camera, LOW_DISTANCE_SHARE of it scaled as the ortho size is (the wheel,
+## a peek, the mourning pull-back).
+func _camera_distance() -> float:
+	return CAMERA_DISTANCE * LOW_DISTANCE_SHARE * _size_factor() if _low else CAMERA_DISTANCE
+
+
+## The low camera on or off as Net.camera_low and the map say (decision
+## 623): the projection, its reach and haze, the sun's shadow distance, and
+## the pitch to its rest. Off restores the ortho view exactly. On a build,
+## a map change, and the toggle.
+func _apply_camera_mode() -> void:
+	if _camera == null:
+		return
+	var low: bool = Net.camera_low and _outdoor
+	var was := _low
+	_low = low
+	if low:
+		_camera.projection = Camera3D.PROJECTION_PERSPECTIVE
+		_camera.fov = LOW_FOV
+		_camera.far = LOW_FAR
+	else:
+		_camera.projection = Camera3D.PROJECTION_ORTHOGONAL
+		_camera.far = CAMERA_DISTANCE * 3.0
+	if _environment != null:
+		_environment.fog_aerial_perspective = LOW_AERIAL if low else 0.0
+	if _sun != null:
+		_sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS if low \
+				else DirectionalLight3D.SHADOW_ORTHOGONAL
+		_sun.directional_shadow_max_distance = LOW_SHADOW_DISTANCE if low else SHADOW_DISTANCE
+	if low != was:
+		pitch = rest_pitch()
+		_tilt_t = 1.0
+		_sky_step = -1  # The look again, with or without the haze.
+		_update_sky(0.0)
+		if not low:
+			for puppet: Node3D in _puppets.values():
+				puppet.visible = true
+	_shadow_key = Vector3i(1 << 30, 0, 0)  # Shadows looked at again for the new reach.
+	_apply_size()
+	_place_camera()
+
+
+func _on_camera_low_changed(_low_now: bool) -> void:
+	_apply_camera_mode()
+
+
+## [param grid] held within World.NEAR_TILES of the camera's aim, along the
+## line to it (decision 238: what is on screen thinks every tick; under the
+## low camera the screen shows further than that).
+func within_near(grid: Vector2) -> Vector2:
+	var aim := Vector2(_camera_target.x, _camera_target.z)
+	var away := grid - aim
+	if away.length() <= World.NEAR_TILES:
+		return grid
+	return aim + away.normalized() * World.NEAR_TILES
 
 
 ## The camera's offset from its target: `pitch` above the ground on the
@@ -2012,8 +2114,9 @@ func _build_camera() -> void:
 ## the 2D view), turned about the vertical by the yaw.
 func _camera_offset() -> Vector3:
 	var tilt := deg_to_rad(maxf(pitch, _ridge_pitch))
-	var horizontal := CAMERA_DISTANCE * cos(tilt)
-	var offset := Vector3(horizontal / sqrt(2.0), CAMERA_DISTANCE * sin(tilt), horizontal / sqrt(2.0))
+	var distance := _camera_distance()
+	var horizontal := distance * cos(tilt)
+	var offset := Vector3(horizontal / sqrt(2.0), distance * sin(tilt), horizontal / sqrt(2.0))
 	return offset.rotated(Vector3.UP, deg_to_rad(yaw))
 
 
@@ -2163,8 +2266,25 @@ func _local_player() -> Player:
 ## The ortho size: CAMERA_SIZE, times the pitch peek's pull back while
 ## there is one (eased as its tilt is).
 func _apply_size() -> void:
-	_camera.size = CAMERA_SIZE * zoom * lerpf(1.0, PEEK_PULL_BACK, smoothstep(0.0, 1.0, _peek)) \
+	_camera.size = CAMERA_SIZE * _size_factor()
+	if _low:
+		_place_camera()  # The wheel, a peek and the pull-back move the camera instead.
+
+
+## The wheel's zoom, a pitch peek's and the mourning's pull-back, as one
+## factor on the ortho size (and under the low camera, on its distance).
+func _size_factor() -> float:
+	return zoom * lerpf(1.0, PEEK_PULL_BACK, smoothstep(0.0, 1.0, _peek)) \
 			* lerpf(1.0, MOURN_PULL_BACK, smoothstep(0.0, 1.0, _mourn))
+
+
+## How tall the view is at the camera's aim (ground units, straight across
+## the screen): the ortho size, or under the low camera the frustum's
+## height at its distance.
+func _view_height() -> float:
+	if _low:
+		return 2.0 * _camera_distance() * tan(deg_to_rad(_camera.fov * 0.5))
+	return _camera.size
 
 
 ## The mouse wheel, [param notches] of it (positive in, nearer the player;
@@ -2189,7 +2309,7 @@ func pan_by(offset: Vector2) -> void:
 	var height := get_viewport().get_visible_rect().size.y
 	if _camera == null or height <= 0.0:
 		return
-	var per_px := _camera.size / height
+	var per_px := _view_height() / height
 	var basis := _camera.global_transform.basis
 	var right := Vector3(basis.x.x, 0.0, basis.x.z).normalized()
 	var ahead := Vector3(-basis.z.x, 0.0, -basis.z.z).normalized()
@@ -2277,7 +2397,7 @@ func tilt(direction: float, delta: float) -> void:
 	if _peeking or direction == 0.0:
 		return
 	_tilt_t = 1.0
-	var limit := PITCH_MAX if direction > 0.0 else PITCH_MIN
+	var limit := PITCH_MAX if direction > 0.0 else pitch_floor()
 	var left := absf(limit - pitch)
 	var speed := TILT_RATE * clampf(left / TILT_EASE_DEGREES, 0.1, 1.0)
 	_set_pitch(move_toward(pitch, limit, speed * delta))
@@ -2294,7 +2414,7 @@ func _ease_tilt(delta: float) -> void:
 	if _tilt_t >= 1.0:
 		return
 	_tilt_t = minf(_tilt_t + delta / TILT_RETURN_SECONDS, 1.0)
-	_set_pitch(lerpf(_tilt_from, CAMERA_PITCH, sin(_tilt_t * PI * 0.5)))
+	_set_pitch(lerpf(_tilt_from, rest_pitch(), sin(_tilt_t * PI * 0.5)))
 
 
 func _set_pitch(degrees: float) -> void:
@@ -2455,8 +2575,16 @@ func _mouse_ray() -> Array[Vector3]:
 
 
 ## Where the cursor's ray meets the ground plane, in grid units; NaN when
-## it does not.
+## it does not. Under the low camera, no further than World.NEAR_TILES from
+## the camera's aim (within_near).
 func mouse_grid() -> Vector2:
+	var hit := _mouse_ground()
+	if _low and not is_nan(hit.x):
+		return within_near(hit)
+	return hit
+
+
+func _mouse_ground() -> Vector2:
 	var ray := _mouse_ray()
 	if absf(ray[1].y) < 0.0001:
 		return Vector2(NAN, NAN)
@@ -3350,7 +3478,7 @@ func bubble_anchor(key: int) -> Variant:
 	if puppet == null or not puppet.is_inside_tree() or _camera == null:
 		return null
 	var at := puppet.global_position + Vector3.UP * float(puppet.get_meta("bubble_height", 1.0))
-	if _camera.is_position_behind(at):
+	if _camera.is_position_behind(at) or (_low and not puppet.visible):
 		return null
 	return _camera.unproject_position(at)
 
@@ -3443,6 +3571,7 @@ func rebuild(terrain: Dictionary, centre: Vector2i) -> void:
 	# A new map: the view starts on the player.
 	pan = Vector3.ZERO
 	_pan_home = false
+	_apply_camera_mode()  # Outdoors or under stone now (623).
 	_start_warm_ups()
 
 
@@ -9464,6 +9593,8 @@ func _cast_shadows(light: OmniLight3D) -> void:
 func _view_reach() -> float:
 	if _camera == null:
 		return INF
+	if _low:
+		return World.NEAR_TILES  # The screen shows further; what is kept up does not (238).
 	var screen := get_viewport().get_visible_rect().size
 	var half_height := _camera.size * 0.5 / maxf(sin(deg_to_rad(pitch)), 0.1)
 	var half_width := _camera.size * 0.5 * screen.x / maxf(screen.y, 1.0)
@@ -9854,6 +9985,10 @@ func _sync_puppets() -> void:
 			_far.erase(id)
 			puppet.remove_meta("last_at")  # Not a run from where it was last drawn.
 			puppet.process_mode = Node.PROCESS_MODE_INHERIT
+		if _low:
+			# The low camera sees past World.NEAR_TILES: a body out there is
+			# not drawn (it would stand still, unthinking, 238).
+			puppet.visible = Vector2(entity.tile).distance_to(aim) <= World.NEAR_TILES
 			entity.set_process(true)
 			entity._display_caught_up()
 		var grid := Iso.local_to_grid(entity.position)
