@@ -5890,10 +5890,10 @@ func _tend_wind_ups() -> void:
 				and _try_hit(entity, aimed as GridEntity, entity.attack_damage, false, Vector2i.ZERO, true):
 			for i in range(first, _hits.size()):
 				_hits[i].crushing = true
-			_log("windup: %s strikes %s" % [entity.name, (aimed as GridEntity).name])
+			_log("windup: %s at %s strikes %s at %s" % [entity.name, entity.tile, (aimed as GridEntity).name, (aimed as GridEntity).tile])
 		else:
 			try_swing(entity, direction, true)
-			_log("windup: %s strikes the air" % entity.name)
+			_log("windup: %s at %s strikes the air" % [entity.name, entity.tile])
 
 
 ## The shield in [param entity]'s left hand, if it can bash (decision 379):
