@@ -85,6 +85,7 @@ func _ready() -> void:
 	_test_building_states()
 	_test_town_walls()
 	await _test_near_miss_picks()
+	await _test_seen_through()
 	await _test_target_marked()
 	await _test_goblin()
 	_test_humans()
@@ -4898,6 +4899,91 @@ func _test_near_miss_picks() -> void:
 	_check(picked == near, "two near: the nearer to the ray wins (%s)" % picked)
 	World.despawn(imp)
 	World.despawn(near)
+	await _frames(2)
+
+
+## The low-angle fight, combat's (b): a foe a nearer body hides, or one
+## inside an active telegraph, wears a rim drawn through the body before
+## it; never through a wall (bodies alone are asked).
+func _test_seen_through() -> void:
+	print("\n== a foe hidden by a nearer body, or inside a telegraph, is outlined through it ==")
+	var far_imp := _spawn_imp(Vector2i(9, 4), "imp")
+	var near_imp := _spawn_imp(Vector2i(10, 3), "imp")
+	await _frames(2)
+	_rig._process(0.0)
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+	var far_id := far_imp.get_instance_id()
+	var far_puppet: Node3D = _rig._puppets[far_id]
+	var near_puppet: Node3D = _rig._puppets[near_imp.get_instance_id()]
+	var meshes := (far_puppet.get_node("Body") as Node3D).find_children("*", "MeshInstance3D", true, false)
+	var rimmed := func() -> bool: return not meshes.is_empty() and meshes.all(func(mesh: MeshInstance3D) -> bool: return mesh.material_overlay == _rig._seen_through)
+	_check(_rig._seen_through != null and _rig._seen_through != _rig._outline and (_rig._seen_through.shader as Shader).code.contains("depth_test_disabled")
+			and not (_rig._outline.shader as Shader).code.contains("depth_test_disabled"),
+			"the seen-through rim is the target's, drawn with no depth test; the target's own keeps its")
+	far_imp.alert = Monster.Alert.HUNTING
+	_rig._update_seen_through()
+	_check(not rimmed.call() and not _rig.hidden_by_body(far_puppet, far_id), "hunting with nothing before it: no rim")
+	# The nearer imp's body put on the line from the camera to the far one's chest.
+	var chest := far_puppet.global_position + Vector3.UP * (float(far_puppet.get_meta("pick_height", 1.0)) * 0.6)
+	var ahead: Vector3 = -_rig._camera.global_transform.basis.z
+	var on_line := chest - ahead * 1.2
+	var near_was := near_puppet.global_position
+	_rig.set_process(false)  # (Else each frame's sync puts the puppet back on its tile.)
+	near_puppet.global_position = on_line - Vector3.UP * (float(near_puppet.get_meta("pick_height", 1.0)) * 0.5)
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+	_check(_rig.hidden_by_body(far_puppet, far_id), "a body on the line from the camera to its chest hides it")
+	_rig._update_seen_through()
+	_check(rimmed.call() and far_puppet.has_meta("seen_through"), "hidden by a nearer body: outlined through it")
+	_check(near_puppet.get_node("Body").find_children("*", "MeshInstance3D", true, false).all(func(mesh: MeshInstance3D) -> bool: return mesh.material_overlay == null), "the body before it: no rim")
+	far_imp.alert = Monster.Alert.IDLE
+	_rig._combat_at.erase(far_id)
+	_rig._update_seen_through()
+	_check(not rimmed.call(), "idle behind the body: no rim (its cover is the sim's to give)")
+	near_puppet.global_position = near_was
+	_rig.set_process(true)
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+	_check(not _rig.hidden_by_body(far_puppet, far_id), "the body moved off the line: not hidden")
+	# Inside an active telegraph: outlined whatever it is doing; gone with the telegraph.
+	_rig.telegraph_show("seen", [far_imp.tile], World.tick, World.tick + 10)
+	_rig._update_seen_through()
+	_check(_rig.in_telegraph(far_imp.tile) and rimmed.call(), "inside an active telegraph: outlined")
+	_rig.telegraph_drop("seen")
+	_rig._update_seen_through()
+	_check(not rimmed.call() and not far_puppet.has_meta("seen_through"), "the telegraph gone: the rim too")
+	# Combat's checks: the rim follows the cells the blow will land on (the
+	# sent cells, walls and their shadows already clipped out), not the
+	# shape; a blow already landed, or a foe already dead, warns of nothing.
+	_rig.telegraph_show("clipped", [far_imp.tile + Vector2i(1, 0), far_imp.tile + Vector2i(0, 1)], World.tick, World.tick + 10)
+	_rig._update_seen_through()
+	_check(not rimmed.call(), "a telegraph whose sent cells leave its cell out (clipped by a wall): no rim")
+	_rig.telegraph_drop("clipped")
+	_rig.telegraph_show("landing", [far_imp.tile], World.tick, World.tick + 10)
+	_rig.telegraph_land("landing", true)
+	_rig._update_seen_through()
+	_check(not rimmed.call(), "a telegraph landed (its flash still showing): no rim")
+	_rig.telegraph_drop("landing")
+	var hp_was := far_imp.hp
+	far_imp.hp = 0
+	_rig.telegraph_show("dead", [far_imp.tile], World.tick, World.tick + 10)
+	_rig._update_seen_through()
+	_check(not rimmed.call(), "dead in a telegraph: no rim")
+	_rig.telegraph_drop("dead")
+	far_imp.hp = hp_was
+	_rig._update_seen_through()
+	# The marked target wears its own rim, not this one.
+	_rig.telegraph_show("seen", [far_imp.tile], World.tick, World.tick + 10)
+	_rig._update_seen_through()
+	_rig.target(far_imp)
+	_rig._update_seen_through()
+	_check(meshes.all(func(mesh: MeshInstance3D) -> bool: return mesh.material_overlay == _rig._outline) and not far_puppet.has_meta("seen_through"), "marked as the target: its own rim, this one forgotten")
+	_rig.target(null)
+	_rig.telegraph_drop("seen")
+	_rig._update_seen_through()
+	World.despawn(far_imp)
+	World.despawn(near_imp)
 	await _frames(2)
 
 

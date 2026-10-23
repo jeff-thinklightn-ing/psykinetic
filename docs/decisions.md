@@ -26166,3 +26166,16 @@ refresh while Keys.held("stand") and no bow is drawn: Client3D.stand_ring lays a
 ring (_make_ring_instance) at the body's feet; none, no ring. The reach reads on the body
 rather than a cell the body hides. Combat's check: a player is never ringed (owner_peer
 through EntityFactory). ui_test _test_aim, view_test's stair check.
+
+## 638: the low-angle fight, combat's (b): a foe seen through what hides it
+
+Behind a 1.5 m body at 22 degrees 3.7 cells of ground are hidden (combat). The
+coordinator's ruling: never through walls or buildings (those fade under N1), and only
+what the sim already sent. Client3D._update_seen_through each frame: a spawned live
+monster, not the marked target, wears _seen_through (the target's eight-pass rim on
+OUTLINE_SHADER with depth_test_disabled, SEEN_OUTLINE pale brass at 0.7) when its tile is
+in an active telegraph (in_telegraph; telegraph_show keeps "cells") or when it is hunting,
+fighting or lately struck and hidden_by_body: a ray from the camera (under ortho from
+CAMERA_DISTANCE * 3 back along the view) to its chest, areas only, meets another spawned
+entity's pick shape first. Walls, doors and the ground are never asked. The marked target
+keeps its own rim. view_test _test_seen_through.

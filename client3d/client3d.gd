@@ -1088,6 +1088,15 @@ const HOVER := Color(1, 1, 1, 0.35)
 ## front of its feet does not hide the rim there; anything further in
 ## front still does.
 const TARGET_OUTLINE := Color(0.93, 0.9, 0.82)
+## A foe seen through what hides it (the low-angle fight, combat's (b)):
+## a monster hunting or fighting (or lately struck) whose chest a nearer
+## body (another's or the player's own) hides from the camera, or any
+## body inside an active telegraph, wears the target's rim in this colour
+## drawn with no depth test (_seen_through, _update_seen_through), so it
+## shows through the body before it. Never through a wall or a building:
+## only bodies are asked (hidden_by_body), and what the sim did not send
+## is not there to outline, so its sight rule still says what you know.
+const SEEN_OUTLINE := Color(0.93, 0.78, 0.52, 0.7)
 const TARGET_PIXELS := 3.0
 const OUTLINE_NEARER := 0.4
 const OUTLINE_STENCIL := 1
@@ -1511,6 +1520,7 @@ var _cell_quad: ArrayMesh
 ## outlined puppet (null: none), and each body material's copy that marks
 ## the stencil, by the material.
 var _outline: ShaderMaterial
+var _seen_through: ShaderMaterial
 var _outlined: Node3D
 var _marking: Dictionary[Material, Material] = {}
 var _toss: MeshInstance3D
@@ -1899,6 +1909,18 @@ func setup(terrain: Dictionary, centre := Vector2i.ZERO) -> void:
 		pass_.next_pass = after
 		after = pass_
 	_outline = after
+	var seen_shader := Shader.new()
+	seen_shader.code = OUTLINE_SHADER.replace("depth_draw_never;", "depth_draw_never, depth_test_disabled;")
+	after = null
+	for way: Vector2i in World.DIRECTIONS:
+		var pass_ := ShaderMaterial.new()
+		pass_.shader = seen_shader
+		pass_.set_shader_parameter("colour", SEEN_OUTLINE)
+		pass_.set_shader_parameter("nudge", Vector2(way).normalized() * TARGET_PIXELS)
+		pass_.set_shader_parameter("nearer", OUTLINE_NEARER)
+		pass_.next_pass = after
+		after = pass_
+	_seen_through = after
 	_toss = _make_flat(_make_arrow(TOSS_LENGTH), TOSS)
 	_toss.visible = false
 	add_child(_toss)
@@ -1940,6 +1962,7 @@ func setup(terrain: Dictionary, centre := Vector2i.ZERO) -> void:
 func _process(delta: float) -> void:
 	_end_warm_ups()
 	_sync_puppets()
+	_update_seen_through()
 	_sync_doors()
 	_ease_yaw(delta)
 	_ease_peek(delta)
@@ -3542,6 +3565,7 @@ func telegraph_show(id: String, cells: Array, from_tick: int, lands_tick: int) -
 	if _cell_quad == null:
 		_cell_quad = _flat_mesh([PackedVector2Array([Vector2(-0.5, -0.5), Vector2(0.5, -0.5), Vector2(0.5, 0.5), Vector2(-0.5, 0.5)])])
 	var quads: Array[MeshInstance3D] = []
+	var struck: Array[Vector2i] = []
 	for each: Variant in cells:
 		var cell := Vector2i(each) if each is Vector2i or each is Vector2 else (Vector2i(int(each[0]), int(each[1])) if each is Array and each.size() >= 2 else Vector2i(-100000, -100000))
 		if cell.x <= -100000:
@@ -3550,7 +3574,8 @@ func telegraph_show(id: String, cells: Array, from_tick: int, lands_tick: int) -
 		_lay_on_ground(quad, cell, ON_FLOOR * 1.5)
 		add_child(quad)
 		quads.append(quad)
-	_telegraphs[id] = {"quads": quads, "from": from_tick, "lands": lands_tick, "landed_at": -1}
+		struck.append(cell)
+	_telegraphs[id] = {"quads": quads, "cells": struck, "from": from_tick, "lands": lands_tick, "landed_at": -1}
 
 
 ## Telegraph [param id] ended: [param landed] true flashes it and lets it
@@ -3833,7 +3858,7 @@ func target(entity: GridEntity) -> void:
 
 ## [param puppet]'s outline shown or hidden: its body's meshes with the
 ## outline's passes over them and marking the stencil, or as they were.
-func _show_outline(puppet: Node3D, show: bool) -> void:
+func _show_outline(puppet: Node3D, show: bool, rim: ShaderMaterial = null) -> void:
 	if puppet == null or not is_instance_valid(puppet):
 		return
 	var body := puppet.get_node_or_null("Body") as Node3D
@@ -3843,8 +3868,73 @@ func _show_outline(puppet: Node3D, show: bool) -> void:
 	if body is MeshInstance3D:
 		meshes.append(body)
 	for source: MeshInstance3D in meshes:
-		source.material_overlay = _outline if show else null
+		source.material_overlay = (rim if rim != null else _outline) if show else null
 		_mark_stencil(source, show)
+
+
+## Each frame: the foes seen through what hides them (SEEN_OUTLINE). The
+## marked target keeps its own rim.
+func _update_seen_through() -> void:
+	if _camera == null:
+		return
+	var now := Time.get_ticks_msec()
+	for id: int in _puppets:
+		var puppet := _puppets[id]
+		var had := puppet.has_meta("seen_through")
+		if puppet == _outlined:
+			if had:
+				puppet.remove_meta("seen_through")  # Its target's rim is on it now (target()).
+			continue
+		var entity := instance_from_id(id) as GridEntity
+		var seen := false
+		if entity is Monster and entity.spawned and entity.hp > 0 and not _far.has(id) and puppet.visible:
+			var alert: Monster.Alert = (entity as Monster).alert
+			var fights: bool = alert == Monster.Alert.FIGHTING or alert == Monster.Alert.HUNTING \
+					or now - _combat_at.get(id, -100000) < COMBAT_SECONDS * 1000.0
+			seen = in_telegraph(entity.tile) or (fights and hidden_by_body(puppet, id))
+		if seen != had:
+			if seen:
+				puppet.set_meta("seen_through", true)
+			else:
+				puppet.remove_meta("seen_through")
+			_show_outline(puppet, seen, _seen_through)
+
+
+## Whether a body (a pick shape with an entity, not [param id]'s own)
+## stands between the camera and [param puppet]'s chest. Walls, doors and
+## the ground are not asked: a wall that hides a foe fades instead.
+func hidden_by_body(puppet: Node3D, id: int) -> bool:
+	var chest := puppet.global_position + Vector3.UP * (float(puppet.get_meta("pick_height", 1.0)) * 0.6)
+	var ahead := -_camera.global_transform.basis.z
+	var origin := _camera.global_position if _camera.projection == Camera3D.PROJECTION_PERSPECTIVE else chest - ahead * CAMERA_DISTANCE * 3.0
+	var query := PhysicsRayQueryParameters3D.create(origin, chest)
+	query.collide_with_areas = true
+	query.collide_with_bodies = false
+	var space := get_world_3d().direct_space_state
+	var exclude: Array[RID] = []
+	for i in PICK_DEPTH:
+		query.exclude = exclude
+		var hit := space.intersect_ray(query)
+		if hit.is_empty():
+			return false
+		var area: Area3D = hit["collider"]
+		if area.has_meta("entity"):
+			var other := int(area.get_meta("entity"))
+			if other == id:
+				return false
+			var body := instance_from_id(other) as GridEntity
+			if body != null and body.spawned:
+				return true
+		exclude.append(hit["rid"])
+	return false
+
+
+## Whether [param tile] lies in an active telegraph (shown, not yet landed).
+func in_telegraph(tile: Vector2i) -> bool:
+	for entry: Dictionary in _telegraphs.values():
+		if int(entry["landed_at"]) < 0 and tile in entry["cells"]:
+			return true
+	return false
 
 
 ## [param source] drawn with its materials' copies that mark the stencil
