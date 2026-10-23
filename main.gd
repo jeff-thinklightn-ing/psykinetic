@@ -6892,7 +6892,16 @@ func _accept_offer(player: Player, offer_id: String, gold: int) -> void:
 	for entity: GridEntity in World.townsfolk():
 		if entity is Resident and (entity as Resident).worker_id == worker_id:
 			body = entity
-	if body == null or World.distance(body.tile, player.tile) > HEARING_RANGE:
+	if body == null:
+		# A talking monster's deal (decision 629): ui's button, the typed path's amount.
+		for monster: GridEntity in World.monsters():
+			if monster.has_method("offers_for") and monster.spawned and monster.zone == player.zone and World.distance(monster.tile, player.tile) <= HEARING_RANGE:
+				for offer: Dictionary in monster.offers_for(player.player_id):
+					if str(offer.get("id", "")) == offer_id:
+						_monster_accepts(monster, player, offer, gold)
+						return
+		return
+	if World.distance(body.tile, player.tile) > HEARING_RANGE:
 		return
 	var result := Offers.accept(worker_id, player.player_id, _display_name(player), offer_id, gold)
 	_standing.erase(player.player_id)  # Taken, or tried: nothing stands (decision 536).
@@ -8239,7 +8248,11 @@ func _on_command(entity: GridEntity, command_name: String, args: Dictionary) -> 
 	if command_name == "guide" and entity is Player:
 		_guide_asked(entity, str(args.get("to", "")))
 	elif command_name == "greet" and entity is Player:
-		_greeted(entity, get_node_or_null(NodePath(str(args.get("resident", "")))) as Resident)  # A click on a townsperson (decision 560, npc's side).
+		var hailed := get_node_or_null(NodePath(str(args.get("resident", ""))))
+		if hailed is Resident:
+			_greeted(entity, hailed as Resident)  # A click on a townsperson (decision 560, npc's side).
+		elif hailed != null and hailed.has_method("offers_for"):
+			_monster_greeted(entity, hailed as GridEntity)  # E on a talking monster (decision 629): his deal, spoken and sent.
 	elif command_name == "make_way" and entity is Player:
 		_make_way(entity, get_node_or_null(NodePath(str(args.get("target", "")))) as Companion)
 	elif command_name == "say" and entity is Player:
@@ -8369,9 +8382,12 @@ func _on_command(entity: GridEntity, command_name: String, args: Dictionary) -> 
 		_send_counter(entity as Player, counter, why)
 	elif command_name == "offers" and entity is Player:
 		# The talk panel opens on a resident (decision 435): their offers.
-		var body := get_node_or_null(NodePath(str(args.get("entity", "")))) as Resident
+		var asked := get_node_or_null(NodePath(str(args.get("entity", ""))))
+		var body := asked as Resident
 		if body != null and body.spawned and World.distance(body.tile, entity.tile) <= HEARING_RANGE:
 			_send_offers(body, (entity as Player).player_id, entity.owner_peer)
+		elif asked != null and asked.has_method("offers_for") and asked.spawned and World.distance(asked.tile, entity.tile) <= HEARING_RANGE:
+			_send_monster_offers(asked as GridEntity, (entity as Player).player_id, entity.owner_peer)  # A talking monster's deals asked again (decision 629).
 	elif command_name == "offer" and entity is Player:
 		_accept_offer(entity as Player, str(args.get("id", "")), int(args.get("gold", 0)))
 	elif command_name == "reset" and entity is Player:
@@ -10375,12 +10391,24 @@ func _monster_said(monster: GridEntity, player: Player, line: String) -> bool:
 		return false
 	var offer: Dictionary = standing.get("offer", {})
 	Transcript.record(name, _display_name(player), line)
-	if amount > World.gold_of(player_id):
+	_monster_accepts(monster, player, offer, amount)
+	return true
+
+
+## Server: [param player] gives [param gold] on talking [param monster]'s
+## [param offer] (the typed path's amount, or ui's button through
+## accept_offer, decision 629): Main's one check, the purse; then his
+## accept_offer, his reply spoken, his line logged, nothing standing on ok,
+## and his offers sent again.
+func _monster_accepts(monster: GridEntity, player: Player, offer: Dictionary, gold: int) -> void:
+	var name := _display_name(monster)
+	var player_id := player.player_id
+	if gold > World.gold_of(player_id):
 		_say_plain(monster, name, "You have but %d gold." % World.gold_of(player_id))
-		return true
-	var result: Variant = monster.accept_offer(player, offer, amount)
+		return
+	var result: Variant = monster.accept_offer(player, offer, gold)
 	if not result is Dictionary:
-		return true
+		return
 	if not str(result.get("say", "")).is_empty():
 		_say_plain(monster, name, str(result["say"]))
 	if not str(result.get("line", "")).is_empty():
@@ -10388,7 +10416,31 @@ func _monster_said(monster: GridEntity, player: Player, line: String) -> bool:
 	if bool(result.get("ok", false)):
 		_standing.erase(player_id)
 	_send_monster_offers(monster, player_id, player.owner_peer)
-	return true
+
+
+## Server: E on talking [param monster] by [param player] (the "greet"
+## command with his path, decision 629; Jeff: "no way to give gold to
+## draugr"): within hearing, his first offer is spoken and stands (the next
+## one each time, as a typed ask for wares does), and the "offers" message
+## carries his deals for ui's buttons; with nothing to offer (a pact on)
+## the message alone, empty.
+func _monster_greeted(player: Player, monster: GridEntity) -> void:
+	if monster == null or player == null or not monster.spawned or monster.zone != player.zone \
+			or World.distance(monster.tile, player.tile) > HEARING_RANGE:
+		return
+	var key := String(monster.get_path())
+	var name := _display_name(monster)
+	var offers: Array = monster.offers_for(player.player_id)
+	Transcript.record(name, _display_name(player), "[greets]")
+	if offers.is_empty():
+		_send_monster_offers(monster, player.player_id, player.owner_peer)
+		return
+	var standing := _standing_for(player.player_id, key)
+	var pick: Dictionary = offers[0]
+	for i in offers.size():
+		if str(offers[i].get("id", "")) == str(standing.get("id", "")):
+			pick = offers[(i + 1) % offers.size()]
+	_speak_offer(monster, key, name, player, pick)
 
 
 ## The "offers" message for a talking monster: its offers_for, under its

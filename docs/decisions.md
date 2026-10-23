@@ -26511,3 +26511,38 @@ discount later is economy's).
 return_test: in his care, his hut over a nearer manned temple; his hut
 unmanned, the temple as before; a manned hut in his care in another zone
 over the temple here. Server only, no wire, no new class_name.
+
+## 629. Gold to a talking monster by E
+
+Jeff, playing v0.1.169 (2026-10-23): "no way to give gold to draugr". His
+gold went only through a typed line in earshot (Main._monster_said: an
+ask for wares or work, his offer spoken, then an amount or a yes); E on him
+did nothing and no window offered his deals. The coordinator's ruling: E
+on a talking monster opens the talk as on a resident, his deals show as
+buttons that call his accept, the typed path stays.
+
+- **Server.** The "greet" command (E on a townsperson, 560) takes a talking
+  monster's path too: within hearing in the player's zone,
+  Main._monster_greeted speaks his first offer and it stands (the next one
+  each further greet, as a typed wares ask), and the "offers" message
+  carries his deals ({id "deal:<n>", kind, title, words, what {offering,
+  least, most, steps}, accept, cost}, the standing one; empty while a pact
+  is on). The "offer" command {id, gold} with a deal id of a talking monster
+  within hearing runs Main._monster_accepts: the purse check ("You have but
+  N gold." spoken), his accept_offer, his reply spoken and his line logged
+  as the typed path does, nothing standing on ok, his offers sent again.
+  The typed path shares that tail. The "offers" request command answers for
+  a talking monster too.
+- **ui's side** (beside this): on E over an entity with offers_for, greet
+  with its path; the window shows the speaker and words and one button per
+  what.steps, enabled when the local purse covers it, sending offer {id,
+  gold: step}.
+- **Wire.** Two existing commands take a monster's path or id and an
+  existing message answers for him; no new kind, key or RPC. Read as no
+  revision bump (release rules).
+
+resident_test _test_monster_talk: E on the talker speaks his deal and it
+stands; the button over the purse is refused by Main; the button with 16
+reaches his accept_offer, the pact struck, nothing standing, his offers
+sent again empty; E with a pact on sends the empty offers. Server only; no
+new class_name.

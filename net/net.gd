@@ -357,6 +357,9 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## terrain["plots"] the views raise each kind on.
 ## 35 (621 amended): Companion.asleep (SUBCLASS_REPLICATED), true while she
 ## sleeps on her player's watch (Intent.SLEEP); her body lies down by it.
+## 35 (629): the "greet" command takes a talking monster's path, the "offer"
+## command routes his deal id to him, and the "offers" request answers for him
+## (his deals in the existing "offers" message); no new kind, key or RPC.
 const PROTOCOL_REVISION := 35
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]

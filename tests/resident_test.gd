@@ -1513,6 +1513,25 @@ func _test_monster_talk() -> void:
 	_check(_main._standing.has(Net.player_id), "asked, he speaks the deal again and it stands")
 	talker.offer_withdrawn.emit(Net.player_id)
 	_check(not _main._standing.has(Net.player_id), "withdrawn from his side: nothing stands")
+	# E on him (decision 629): the greet command with his path speaks his deal and it stands; ui's button is
+	# accept_offer with his deal id and the gold, routed to him with the purse check; nothing standing on ok.
+	var heard: Array[String] = []
+	var ear := func(kind: String, data: Dictionary) -> void:
+		if kind == "offers" and str(data.get("entity", "")) == String(talker.get_path()):
+			heard.append("offers:%d" % (data.get("offers", []) as Array).size())
+	Net.message_received.connect(ear)
+	_main._on_command(player, "greet", {"resident": str(talker.get_path())})
+	_check(_main._standing.get(Net.player_id, {}).get("title", "") == "Face the draugr", "E on him: his deal spoken by the greet command, standing (%s)" % [_main._standing.get(Net.player_id, {}).get("title", "")])
+	var deal_id: String = talker.offers_for(Net.player_id)[0]["id"]
+	talker.got.clear()
+	_main._on_command(player, "offer", {"id": deal_id, "gold": 40})
+	_check(talker.got.is_empty() and _main._standing.has(Net.player_id), "the button over the purse: Main refuses, he is not asked (%s)" % [talker.got])
+	_main._on_command(player, "offer", {"id": deal_id, "gold": 16})
+	_check(talker.got == [16] and talker.pact and not _main._standing.has(Net.player_id) and heard.has("offers:0"), "the button with 16: his accept_offer, the pact struck, nothing stands, his offers sent again empty (%s / %s)" % [talker.got, heard])
+	_main._on_command(player, "greet", {"resident": str(talker.get_path())})
+	_check(not _main._standing.has(Net.player_id) and heard.count("offers:0") >= 2, "E with a pact on: nothing spoken, the empty offers sent (%s)" % [heard])
+	Net.message_received.disconnect(ear)
+	talker.pact = false
 	_main._resident_mind = null
 	World.despawn(talker)
 
