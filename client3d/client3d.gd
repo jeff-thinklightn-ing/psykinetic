@@ -11166,6 +11166,8 @@ func _sync_puppets() -> void:
 			_sync_alert(entity as Monster, puppet)
 			_sync_chatter(entity as Monster, puppet)
 		_sync_down(entity, puppet)
+		if (entity is Player or entity is Companion) and bool(puppet.get_meta("downed", false)) != World.is_downed(entity):
+			puppet.set_meta("downed", World.is_downed(entity))  # Its fall, if it comes, a bleed-out (628).
 		_sync_draw(entity, puppet)
 		_sync_ailments(entity, puppet)
 		_sync_name(entity, puppet, now)
@@ -11493,9 +11495,14 @@ func _fall(puppet: Node3D, data: Dictionary) -> void:
 	var death_slot: String = DEATH_SOUNDS.get(kind, "sfx.goblin_death")
 	if kind == "monster":
 		death_slot = SoundKit.death(str(puppet.get_meta("creature", "")))
-	sfx.play(death_slot, puppet.position + Vector3.UP * 0.5)
+	# A player or companion who lay downed (Mortally Wounded) and bled out
+	# breathes their last (628, Jeff: "the scream on bleed out is not a good
+	# fit"); a sudden death keeps the blow and the cry.
+	var bled: bool = kind in ["player", "companion"] and bool(puppet.get_meta("downed", false))
+	if not bled:
+		sfx.play(death_slot, puppet.position + Vector3.UP * 0.5)
 	# Their body's voice (decision 388), kept on the puppet: the entity may be gone.
-	var voice := "voice.death_%s" % puppet.get_meta("body", "male" if kind == "player" else "female") if kind in ["player", "companion"] else ""
+	var voice := "voice.%s_%s" % ["last_breath" if bled else "death", puppet.get_meta("body", "male" if kind == "player" else "female")] if kind in ["player", "companion"] else ""
 	if voice != "":
 		sfx.play(voice, puppet.position + Vector3.UP * 1.5)
 	_play_later("sfx.bodyfall", puppet.position, FALL_SECONDS * 0.75)

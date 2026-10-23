@@ -1017,6 +1017,14 @@
 			"volume_db": 0.0,
 			"uses": "a male death cry; a male-bodied person's death (Client3D._fall)"
 		},
+		"voice.last_breath_male": {
+			"category": "voices",
+			"type": "oneshot",
+			"bus": "voice",
+			"noise": "fight",
+			"volume_db": 0.0,
+			"uses": "a male last breath, bleeding out (628); a male-bodied player's or companion's fall while downed, in place of the cry (Client3D._fall)"
+		},
 		"voice.effort_swing_female": {
 			"category": "voices",
 			"type": "oneshot",
@@ -1049,6 +1057,14 @@
 			"noise": "fight",
 			"volume_db": 0.0,
 			"uses": "a female death cry; a female-bodied person's death (Client3D._fall)"
+		},
+		"voice.last_breath_female": {
+			"category": "voices",
+			"type": "oneshot",
+			"bus": "voice",
+			"noise": "fight",
+			"volume_db": 0.0,
+			"uses": "a female last breath, bleeding out (628); a female-bodied player's or companion's fall while downed, in place of the cry (Client3D._fall)"
 		},
 		"ui.click": {
 			"category": "ui",

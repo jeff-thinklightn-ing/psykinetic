@@ -786,7 +786,8 @@ func _test_companion_death() -> void:
 	var puppet: Node3D = _rig._puppets[pet.get_instance_id()]
 	var lantern := puppet.get_node_or_null("Lantern") as OmniLight3D
 	var heard := _heard(func() -> void: World.damage(pet, 999, null, &"attack"); _rig._process(0.0))
-	_check("sfx.death_companion" in heard, "her death sound (%s)" % [heard])
+	_check("sfx.death_companion" in heard and not heard.any(func(slot: String) -> bool: return slot.begins_with("voice.last_breath")),
+			"her death sound, a sudden death's, no last breath (%s)" % [heard])
 	var words: String = _main.bubbles.text_of(puppet.get_instance_id())
 	_check(words in Main.COMPANION_DEATH_LINES, "a last line, in a bubble over her body: %s" % words)
 	_check(lantern != null and lantern.get_parent() == _rig, "her lantern is dropped, off the body")
@@ -820,8 +821,11 @@ func _test_player_death() -> void:
 	var size := _rig._camera.size
 	World.damage(player, 999, null, &"attack")
 	# Downed first (decision 587, Mortally Wounded); Bleed Out is the death.
-	_main._on_command(player, "bleed_out", {})
 	_rig._process(0.0)
+	var body := str(_rig._puppets[player.get_instance_id()].get_meta("body", "male"))
+	var heard := _heard(func() -> void: _main._on_command(player, "bleed_out", {}); _rig._process(0.0))
+	_check(("voice.last_breath_%s" % body) in heard and not ("voice.death_%s" % body) in heard and not "sfx.death_player" in heard,
+			"bled out: a last breath, not the cry or the blow (628; %s)" % [heard])
 	_check(_rig._mourning, "mourning")
 	await get_tree().create_timer(1.0).timeout
 	_check(_rig._camera.size > size and _rig._environment.adjustment_saturation < 1.0,

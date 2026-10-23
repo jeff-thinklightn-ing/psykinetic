@@ -1870,6 +1870,28 @@
 				"url": "https://freesound.org/people/F.M.Audio/sounds/695380/",
 				"license": "CC BY 4.0"
 			}
+		],
+		"voice.last_breath_female": [
+			{
+				"file": "voice.last_breath_female.ogg",
+				"from": "freesound",
+				"original": "freesound 386031: DeathGroan002",
+				"sha256": "ad70c42d337b926ddbd3e0fddb7954e3040a194e8937b57a1379ac9839057486",
+				"by": "TaraMG",
+				"url": "https://freesound.org/people/TaraMG/sounds/386031/",
+				"license": "CC BY 3.0"
+			}
+		],
+		"voice.last_breath_male": [
+			{
+				"file": "voice.last_breath_male.ogg",
+				"from": "freesound",
+				"original": "freesound 843573: Dying breath (from 0 s for 3 s)",
+				"sha256": "b9bb55e54da6365e8fdeb9ff4b4e62256c2c05d0ea17d7ca49ad8122ccbe8137",
+				"by": "randbsoundbites",
+				"url": "https://freesound.org/people/randbsoundbites/sounds/843573/",
+				"license": "CC0 1.0"
+			}
 		]
 	}
 }

@@ -26419,3 +26419,29 @@ behaviour.
   ended softly when done and short when broken off, and read from a
   roster by tending only (a patient's mending alone is not heard), soft
   or cut by that patient's mending.
+
+## 628. A last breath at bleed out, not the death cry
+
+Jeff on v0.1.169: "The scream on bleed out is not a good fit." A player or
+companion who dies while lying downed (Mortally Wounded, 587: Bleed Out,
+the window run out, or a blow while down) now breathes their last instead
+of crying out.
+
+- Two slots, voice.last_breath_male and voice.last_breath_female, on the
+  Voice bus and heard as far as the death cry (the fight's noise).
+- Client3D keeps whether each player's and companion's puppet lies downed
+  (World.is_downed, from the replicated downed_until), as a "downed" meta
+  set each frame it changes, since the entity may be gone by the fall.
+  Client3D._fall then plays the last breath for the body's voice in place
+  of voice.death_<body>, and drops the death_player / death_companion
+  blow. A sudden death keeps both, as before. The local player's
+  heartbeat (587) already gives its last beat as the heart stops.
+- Takes, Jeff's picks from two sheets (C:/dev/review/sound/bleed_out/):
+  male freesound 843573, randbsoundbites, "Dying breath", CC0 1.0 (the
+  first 3 s, raised to peak -3 dB); female freesound 386031, TaraMG,
+  "DeathGroan002", CC BY 3.0 (whole, peak -3 dB), credited in
+  THIRD_PARTY.md. The first sheet's female sighs and slow breathing were
+  rejected ("intimate sounds"); the second went for a gasp, choke or groan.
+- view_test: the local player bled out gives the last breath and neither
+  the cry nor the blow; a companion's sudden death keeps the cry and no
+  breath.
