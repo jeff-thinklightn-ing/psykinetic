@@ -86,6 +86,8 @@ func _ready() -> void:
 	_test_town_walls()
 	await _test_near_miss_picks()
 	await _test_seen_through()
+	_test_telegraph_smooth()
+	_test_telegraph_fill_honest()
 	await _test_target_marked()
 	await _test_goblin()
 	_test_humans()
@@ -4985,6 +4987,129 @@ func _test_seen_through() -> void:
 	World.despawn(far_imp)
 	World.despawn(near_imp)
 	await _frames(2)
+## The low-angle fight, combat's (a): a telegraph with a shape is drawn as
+## combat's outline cut to the sent cells, with a curtain along its edge
+## drawn through bodies; one without a shape as the cells, as before.
+func _test_telegraph_smooth() -> void:
+	print("\n== a telegraph drawn smooth: the outline's fill cut to the sent cells, a curtain on its edge ==")
+	var shape := {"kind": "cone", "origin": [9, 4], "facing": [1, 0], "length": 2, "half_angle": 60}
+	var outline := Client3D.telegraph_outline(shape)
+	var all_cells: Array = Main.telegraph_cells(shape)
+	if outline.is_empty() or all_cells.size() < 2:
+		print("  (no Telegraph.outline here: the smooth telegraph checks skipped)")
+		return
+	_check(outline.size() > 10 and outline[outline.size() - 1] == Vector2.ZERO, "combat's outline for a cone: an arc then the origin (%d points)" % outline.size())
+	var left_out: Variant = all_cells[all_cells.size() - 1]  # (As a wall's clip would leave one out.)
+	var cells: Array = all_cells.slice(0, all_cells.size() - 1)
+	_rig.telegraph_show("smooth", cells, World.tick, World.tick + 10, shape)
+	var entry: Dictionary = _rig._telegraphs["smooth"]
+	var fill: MeshInstance3D = entry["quads"][0]
+	var curtain: MeshInstance3D = entry["curtain"]
+	_check(entry["quads"].size() == 1 and curtain != null, "one fill mesh and a curtain, not a quad a cell")
+	var struck: Array[Vector2i] = []
+	for cell in cells:
+		struck.append(Vector2i(cell))
+	var inside := func(point: Vector3) -> bool:
+		for cell in struck:
+			if absf(point.x - cell.x) <= 0.51 and absf(point.z - cell.y) <= 0.51:
+				return true
+		return false
+	var fill_faces := (fill.mesh as ArrayMesh).get_faces()
+	var out_cell := Vector2i(left_out)
+	var stray := 0
+	var in_left_out := 0
+	for vertex in fill_faces:
+		if not inside.call(vertex):
+			stray += 1
+		if absf(vertex.x - out_cell.x) < 0.49 and absf(vertex.z - out_cell.y) < 0.49:
+			in_left_out += 1
+	_check(fill_faces.size() >= 3 and stray == 0 and in_left_out == 0, "the fill lies within the sent cells only, none in the cell left out (%d vertices, %d stray)" % [fill_faces.size(), stray])
+	var curtain_faces := (curtain.mesh as ArrayMesh).get_faces()
+	var lowest := INF
+	var highest := -INF
+	for vertex in curtain_faces:
+		lowest = minf(lowest, vertex.y)
+		highest = maxf(highest, vertex.y)
+	var material := curtain.material_override as StandardMaterial3D
+	_check(curtain_faces.size() >= 6 and absf((highest - lowest) - Client3D.TELEGRAPH_CURTAIN) < 0.2 and material != null and material.no_depth_test
+			and material.cull_mode == BaseMaterial3D.CULL_DISABLED,
+			"the curtain stands TELEGRAPH_CURTAIN tall on the edge, drawn with no depth test, both faces (%d vertices, %.2f tall)" % [curtain_faces.size(), highest - lowest])
+	var segments := Client3D.telegraph_curtain_segments(outline, Vector2(9, 4), struck)
+	var outside := 0
+	for segment in segments:
+		var middle: Vector2 = (segment[0] + segment[1]) * 0.5
+		if not inside.call(Vector3(middle.x, 0.0, middle.y)):
+			outside += 1
+	_check(segments.size() > 0 and outside == 0, "every curtain piece stands over a sent cell (%d pieces)" % segments.size())
+	_rig.telegraph_tick(World.tick)
+	var fill_alpha := (fill.material_override as StandardMaterial3D).albedo_color.a
+	_check(is_equal_approx(material.albedo_color.a, _rig.curtain_alpha(fill_alpha)) and material.albedo_color.a > fill_alpha,
+			"the tick tints the curtain brighter than the fill (%.2f over %.2f)" % [material.albedo_color.a, fill_alpha])
+	_rig.telegraph_drop("smooth")
+	_check(not _rig._telegraphs.has("smooth"), "dropped: gone, curtain and all")
+	_rig.telegraph_show("plain", cells, World.tick, World.tick + 10)
+	_check(_rig._telegraphs["plain"]["quads"].size() == cells.size() and _rig._telegraphs["plain"]["curtain"] == null, "a message without a shape: a quad a cell, no curtain, as before")
+	_rig.telegraph_drop("plain")
+
+## Combat's check on the smooth telegraph's fill (602 amended's rule): a
+## body is struck exactly when its cell's centre is inside what is drawn.
+## Over the draugr's spin, throw and charge at several aims, with cells clipped
+## out as a wall would leave them, every sent cell's centre is under the fill
+## and no other centre is (one within a hundredth of a cell of an edge let be).
+func _test_telegraph_fill_honest() -> void:
+	print("
+== the smooth telegraph's fill: under it exactly the cells the blow lands on ==")
+	var shapes: Array[Dictionary] = []
+	for turn in 16:
+		var facing := Vector2.from_angle(turn * TAU / 16.0 + 0.07)
+		shapes.append(Telegraph.cone(Vector2i(20, 20), facing, 2.0, 150.0))
+		shapes.append(Telegraph.line(Vector2i(20, 20), facing, 8.0))
+		shapes.append(Telegraph.line(Vector2i(20, 20), facing, 12.0))
+	var wrong := []
+	var pieces := 0
+	for shape in shapes:
+		var origin := Vector2(Telegraph.origin_of(shape))
+		var outline := Client3D.telegraph_outline(shape)
+		for clip in [false, true]:
+			var struck: Array[Vector2i] = []
+			for cell in Telegraph.cells(shape):
+				if not clip or cell.x < 22:  # As a wall at x = 22 would cut it.
+					struck.append(cell)
+			var fill := Client3D.telegraph_fill_polygons(outline, origin, struck)
+			pieces += fill.size()
+			var reach := ceili(float(shape["length"])) + 2
+			for y in range(20 - reach, 21 + reach):
+				for x in range(20 - reach, 21 + reach):
+					var centre := Vector2(x, y)
+					var near := false
+					var under := false
+					for piece in fill:
+						near = near or _near_edge(piece, centre, 0.01)
+						under = under or _crossed(piece, centre)
+					if not near and under != struck.has(Vector2i(x, y)) and wrong.size() < 4:
+						wrong.append([shape["kind"], shape["facing"], clip, Vector2i(x, y), under])
+	_check(wrong.is_empty() and pieces > 0,
+			"%d shapes, whole and clipped: under the fill exactly the sent cells' centres (%d pieces) %s" % [shapes.size(), pieces, wrong])
+
+
+## Whether [param point] is inside [param polygon] by the even-odd rule.
+func _crossed(polygon: PackedVector2Array, point: Vector2) -> bool:
+	var inside := false
+	for i in polygon.size():
+		var a := polygon[i]
+		var b := polygon[(i + 1) % polygon.size()]
+		if (a.y > point.y) != (b.y > point.y) and point.x < (b.x - a.x) * (point.y - a.y) / (b.y - a.y) + a.x:
+			inside = not inside
+	return inside
+
+
+## Whether [param point] lies within [param slack] of [param polygon]'s edge.
+func _near_edge(polygon: PackedVector2Array, point: Vector2, slack: float) -> bool:
+	for i in polygon.size():
+		if Geometry2D.get_closest_point_to_segment(point, polygon[i], polygon[(i + 1) % polygon.size()]).distance_to(point) < slack:
+			return true
+	return false
+
 
 
 func _test_target_marked() -> void:

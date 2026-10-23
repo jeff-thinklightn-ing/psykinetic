@@ -26179,3 +26179,34 @@ fighting or lately struck and hidden_by_body: a ray from the camera (under ortho
 CAMERA_DISTANCE * 3 back along the view) to its chest, areas only, meets another spawned
 entity's pick shape first. Walls, doors and the ground are never asked. The marked target
 keeps its own rim. view_test _test_seen_through.
+## 602 amended, ui's side: the smooth telegraph drawn, with a curtain on its edge
+
+Combat's 602 amended gives every telegraph its drawn shape (Telegraph.outline: a cone's
+sector, a ring's annulus, a line's band, points in order round the origin cell's centre)
+and the rule it keeps: a body is struck exactly when its cell's centre is inside it.
+Jeff: "draugr abilities should be in a smooth pattern like a cone similar to archery, not
+blocky tiles"; the coordinator's ruling, ui draws it as 623's (a): at 22 degrees a flat
+patch behind the boss's own body is hidden by it.
+- Client3D.telegraph_show takes the message's shape beside its cells (Main passes
+  data["shape"] when it is a Dictionary). With an outline the client knows
+  (telegraph_outline reads Telegraph by name, so a client older than the server draws the
+  cells as before), the fill is one mesh of the outline's polygon cut to the sent cells
+  (telegraph_fill_polygons: the outline intersected with each struck cell's square, so a
+  wall's clip on the server cuts the drawing too, and no cell the blow will not reach is
+  painted), and along the outline stands a curtain TELEGRAPH_CURTAIN (0.4 m) tall
+  (telegraph_curtain_segments: each outline segment whose midpoint lies within a struck
+  cell; a full ring's two seam segments skipped), drawn after bodies with no depth test,
+  both faces, so its far rim shows past the boss at the low angle (_curtain_mesh;
+  no_depth_test, CULL_DISABLED, render priority 20).
+- The curtain's alpha is the fill's times TELEGRAPH_CURTAIN_ALPHA (1.4), and
+  TELEGRAPH_LOW_BOOST (1.5) more under a pitch below TELEGRAPH_LOW_PITCH (30 degrees, the
+  cone's low-pitch degrees, 636): curtain_alpha. telegraph_tick tints fill and curtain
+  alike, telegraph_drop frees both; the entry keeps the sent cells for 638's in_telegraph.
+- A message without a shape, or with one whose outline is not known here, draws its cells
+  as quads as before (the ortho view's telegraph, 602's ui side, unchanged in look).
+view_test _test_telegraph_smooth (a spin cone: one fill mesh under exactly the sent cells'
+centres, the curtain's pieces each over a sent cell, the low-pitch boost, the landed tint,
+the drop; a shapeless message's quads), and combat's _test_telegraph_fill_honest (its
+e3cff507): the draugr's spin, 8-cell throw and 12-cell charge at 16 aims each, whole and
+with every cell at x >= 22 clipped out as a wall would leave it, every sent cell's centre
+under the fill and no other (1,052 pieces). Client only, protocol unchanged.

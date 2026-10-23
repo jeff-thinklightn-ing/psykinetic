@@ -8802,7 +8802,8 @@ func _on_telegraph_started(id: Variant, data: Dictionary) -> void:
 		var shape: Variant = data.get("shape", {})
 		cells = telegraph_cells(shape if shape is Dictionary else {})
 	var from_tick := int(data.get("from_tick", World.tick))
-	_client3d.telegraph_show(str(id), cells, from_tick, int(data.get("lands_tick", from_tick)))
+	var drawn: Variant = data.get("shape", {})
+	_client3d.telegraph_show(str(id), cells, from_tick, int(data.get("lands_tick", from_tick)), drawn if drawn is Dictionary else {})
 
 
 ## A telegraph ends: landed, it flashes and goes; called off, it goes at once.

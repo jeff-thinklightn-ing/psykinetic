@@ -1164,6 +1164,20 @@ const TELEGRAPH_FAINT := 0.18
 const TELEGRAPH_FULL := 0.6
 const TELEGRAPH_FLASH := 0.95
 const TELEGRAPH_FLASH_MSEC := 300
+## A telegraph drawn smooth (combat's 602 amended, Telegraph.outline; the
+## low-angle fight, combat's (a)): its fill is the outline's polygon cut to
+## the sent cells (so a wall's clip cuts it too), and along the outline's
+## edge stands a curtain this tall (m), drawn after bodies with no depth
+## test, so the far rim shows past the boss's own body at 22 degrees. The
+## curtain's alpha is the fill's times TELEGRAPH_CURTAIN_ALPHA, and
+## TELEGRAPH_LOW_BOOST more under a pitch below TELEGRAPH_LOW_PITCH (the
+## cone's low-pitch rule, 636, at the same degrees). A message without a
+## shape, or one whose outline is not known here, draws the cells as
+## before.
+const TELEGRAPH_CURTAIN := 0.4
+const TELEGRAPH_LOW_PITCH := 30.0
+const TELEGRAPH_CURTAIN_ALPHA := 1.4
+const TELEGRAPH_LOW_BOOST := 1.5
 const TOSS := Color(1.0, 0.85, 0.4, 0.85)
 const TOSS_LENGTH := 1.3
 ## A speech bubble's tail sits this far over a creature's head (just
@@ -3560,7 +3574,7 @@ func channel_ring(tile: Vector2i, fraction: float, show := true) -> void:
 ## A telegraph [param id] shown on [param cells] (combat's Telegraph.cells:
 ## the cells that will be hit), from [param from_tick] to [param
 ## lands_tick] (world ticks); shown again replaces it.
-func telegraph_show(id: String, cells: Array, from_tick: int, lands_tick: int) -> void:
+func telegraph_show(id: String, cells: Array, from_tick: int, lands_tick: int, shape: Dictionary = {}) -> void:
 	telegraph_drop(id)
 	if _cell_quad == null:
 		_cell_quad = _flat_mesh([PackedVector2Array([Vector2(-0.5, -0.5), Vector2(0.5, -0.5), Vector2(0.5, 0.5), Vector2(-0.5, 0.5)])])
@@ -3570,12 +3584,118 @@ func telegraph_show(id: String, cells: Array, from_tick: int, lands_tick: int) -
 		var cell := Vector2i(each) if each is Vector2i or each is Vector2 else (Vector2i(int(each[0]), int(each[1])) if each is Array and each.size() >= 2 else Vector2i(-100000, -100000))
 		if cell.x <= -100000:
 			continue
-		var quad := _make_flat(_cell_quad, Color(UiTheme.color("alarm"), TELEGRAPH_FAINT))
-		_lay_on_ground(quad, cell, ON_FLOOR * 1.5)
-		add_child(quad)
-		quads.append(quad)
 		struck.append(cell)
-	_telegraphs[id] = {"quads": quads, "cells": struck, "from": from_tick, "lands": lands_tick, "landed_at": -1}
+	var outline := telegraph_outline(shape)
+	var curtain: MeshInstance3D = null
+	if outline.is_empty() or struck.is_empty():
+		for cell in struck:
+			var quad := _make_flat(_cell_quad, Color(UiTheme.color("alarm"), TELEGRAPH_FAINT))
+			_lay_on_ground(quad, cell, ON_FLOOR * 1.5)
+			add_child(quad)
+			quads.append(quad)
+	else:
+		var origin := Vector2(float(shape["origin"][0]), float(shape["origin"][1]))
+		var fill := _make_flat(_ground_polygons_mesh(telegraph_fill_polygons(outline, origin, struck)), Color(UiTheme.color("alarm"), TELEGRAPH_FAINT))
+		add_child(fill)
+		quads.append(fill)
+		curtain = _make_flat(_curtain_mesh(telegraph_curtain_segments(outline, origin, struck)), Color(UiTheme.color("alarm"), TELEGRAPH_FAINT * TELEGRAPH_CURTAIN_ALPHA))
+		var material := curtain.material_override as StandardMaterial3D
+		if material != null:
+			material.no_depth_test = true
+			material.cull_mode = BaseMaterial3D.CULL_DISABLED
+			material.render_priority = 20
+		add_child(curtain)
+	_telegraphs[id] = {"quads": quads, "curtain": curtain, "cells": struck, "from": from_tick, "lands": lands_tick, "landed_at": -1}
+
+
+## Combat's Telegraph.outline for [param shape]: the drawn shape as a
+## polygon about the origin cell's centre, in cells, in order round it;
+## [] without the class (found by name, so this parses before combat's
+## side lands) or a shape that does not read.
+static func telegraph_outline(shape: Dictionary) -> PackedVector2Array:
+	if shape.is_empty() or not shape.has("origin"):
+		return PackedVector2Array()
+	for entry: Dictionary in ProjectSettings.get_global_class_list():
+		if str(entry.get("class", "")) == "Telegraph":
+			var script: Variant = load(str(entry.get("path", "")))
+			if script is GDScript and (script as GDScript).has_method("outline"):
+				var out: Variant = (script as GDScript).call("outline", shape)
+				return out if out is PackedVector2Array else PackedVector2Array()
+	return PackedVector2Array()
+
+
+## The fill: [param outline] (about [param origin], the origin cell) cut to
+## each of the [param struck] cells' squares, as polygons in grid units.
+## Nothing outside the cells the blow lands on (a wall's clip).
+static func telegraph_fill_polygons(outline: PackedVector2Array, origin: Vector2, struck: Array[Vector2i]) -> Array[PackedVector2Array]:
+	var out: Array[PackedVector2Array] = []
+	for cell in struck:
+		var at := Vector2(cell) - origin
+		var square := PackedVector2Array([at + Vector2(-0.5, -0.5), at + Vector2(0.5, -0.5), at + Vector2(0.5, 0.5), at + Vector2(-0.5, 0.5)])
+		for piece: PackedVector2Array in Geometry2D.intersect_polygons(outline, square):
+			if piece.size() < 3 or Geometry2D.is_polygon_clockwise(piece):
+				continue
+			var shifted := PackedVector2Array()
+			for point in piece:
+				shifted.append(point + origin)
+			out.append(shifted)
+	return out
+
+
+## The curtain's pieces: each segment of [param outline] (closed) whose
+## middle lies in a [param struck] cell, as [a, b] in grid units; a full
+## ring's two seam segments (between its rims at one angle) are left out.
+static func telegraph_curtain_segments(outline: PackedVector2Array, origin: Vector2, struck: Array[Vector2i]) -> Array[PackedVector2Array]:
+	var out: Array[PackedVector2Array] = []
+	if outline.size() < 2:
+		return out
+	for i in outline.size():
+		var a := outline[i]
+		var b := outline[(i + 1) % outline.size()]
+		if a.is_equal_approx(b):
+			continue
+		if a.length() > 0.01 and b.length() > 0.01 and absf(angle_difference(a.angle(), b.angle())) < 0.0001 and absf(a.length() - b.length()) > 0.01:
+			continue  # A seam between a ring's rims.
+		var middle := (a + b) * 0.5 + origin
+		var inside := false
+		for cell in struck:
+			if absf(middle.x - cell.x) <= 0.51 and absf(middle.y - cell.y) <= 0.51:
+				inside = true
+				break
+		if inside:
+			out.append(PackedVector2Array([a + origin, b + origin]))
+	return out
+
+
+## [param polygons] (grid units) as one mesh on the ground, each vertex at
+## the ground's height under it plus a hair.
+func _ground_polygons_mesh(polygons: Array[PackedVector2Array]) -> ArrayMesh:
+	var surface := SurfaceTool.new()
+	surface.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for polygon in polygons:
+		var indices := Geometry2D.triangulate_polygon(polygon)
+		for index in indices:
+			var point := polygon[index]
+			surface.set_normal(Vector3.UP)
+			surface.add_vertex(Vector3(point.x, _height_in(Vector2i(point.round()), point) + ON_FLOOR * 1.5, point.y))
+	return surface.commit()
+
+
+## [param segments] ([a, b] each, grid units) as a curtain TELEGRAPH_CURTAIN
+## tall standing on the ground along them.
+func _curtain_mesh(segments: Array[PackedVector2Array]) -> ArrayMesh:
+	var surface := SurfaceTool.new()
+	surface.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for segment in segments:
+		var a := segment[0]
+		var b := segment[1]
+		var foot_a := Vector3(a.x, _height_in(Vector2i(a.round()), a) + ON_FLOOR * 1.5, a.y)
+		var foot_b := Vector3(b.x, _height_in(Vector2i(b.round()), b) + ON_FLOOR * 1.5, b.y)
+		var quad: Array[Vector3] = [foot_a, foot_b, foot_b + Vector3.UP * TELEGRAPH_CURTAIN, foot_a + Vector3.UP * TELEGRAPH_CURTAIN]
+		for j: int in [0, 1, 2, 0, 2, 3]:
+			surface.set_normal(Vector3.UP)
+			surface.add_vertex(quad[j])
+	return surface.commit()
 
 
 ## Telegraph [param id] ended: [param landed] true flashes it and lets it
@@ -3594,6 +3714,9 @@ func telegraph_drop(id: String) -> void:
 		return
 	for quad: MeshInstance3D in _telegraphs[id]["quads"]:
 		quad.queue_free()
+	var curtain: MeshInstance3D = _telegraphs[id].get("curtain")
+	if curtain != null:
+		curtain.queue_free()
 	_telegraphs.erase(id)
 
 
@@ -3615,6 +3738,15 @@ func telegraph_tick(tick: int) -> void:
 			var material := quad.material_override as StandardMaterial3D
 			if material != null:
 				material.albedo_color = Color(UiTheme.color("alarm"), alpha)
+		var curtain: MeshInstance3D = entry.get("curtain")
+		if curtain != null and curtain.material_override is StandardMaterial3D:
+			(curtain.material_override as StandardMaterial3D).albedo_color = Color(UiTheme.color("alarm"), curtain_alpha(alpha))
+
+
+## The curtain's alpha for the fill's [param alpha]: TELEGRAPH_CURTAIN_ALPHA
+## times it, TELEGRAPH_LOW_BOOST more under a pitch below TELEGRAPH_LOW_PITCH.
+func curtain_alpha(alpha: float) -> float:
+	return clampf(alpha * TELEGRAPH_CURTAIN_ALPHA * (TELEGRAPH_LOW_BOOST if pitch < TELEGRAPH_LOW_PITCH else 1.0), 0.0, 1.0)
 
 
 ## How far a telegraph has run (0 to 1) from [param from_tick] to [param

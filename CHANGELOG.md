@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- A boss's telegraph is drawn as its smooth shape, cut to the cells the blow will reach, with a low curtain standing on its edge that shows past the boss's own body at the low camera's angle.
 - A foe coming for you that a nearer body hides from the camera (another's, or your own) wears a pale rim drawn through it, as does any body inside a boss's telegraph; never through a wall.
 - Holding Shift with a weapon in hand rings the feet of the body your standing swing would strike, so the swing's reach reads on the body rather than on a cell the body hides at the low camera's angle.
 - The archer's aim ring and cone of flight lie on the ground across a slope, a ridge, a ramp or stairs, where they used to sink into rising ground or float over a dip.
