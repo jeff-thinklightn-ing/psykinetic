@@ -26,6 +26,22 @@
 		"bond": {"wary": -1, "fond": 0, "close": 1, "devoted": 2},
 		"company": 1
 	},
+	"bandage_says": {
+		"_note": "What she says when she won't or can't bandage (decision 625, Jeff: 'Pip seems lazy at bandaging ... just says fine'), at once, no model, by World.bandage_refusal's reason or bandage_broke_why; a key with _self is for her own wound. Drafts for Jeff.",
+		"not_safe": "Not here. Not with them this close.",
+		"hurt_now": "Give it a breath. We're still bleeding from that.",
+		"no_kit": "I've nothing to bandage with.",
+		"no_wound": "There's nothing to bandage.",
+		"no_wound_self": "I'm not hurt.",
+		"mending": "It's bound already. Give it time.",
+		"patient_moved": "Hold still, or I can't bind it.",
+		"moved": "I had to move. Let me start again.",
+		"hurt": "That broke it off. Let me start again.",
+		"not_beside": "I can't reach you from here.",
+		"busy": "My hands are full.",
+		"low": "Not now. I have to get clear of it first.",
+		"broken": "It came loose."
+	},
 	"loyalty": {
 		"_note": "Her loyalty shown in what she does, and the warning signs before leaving (decision 555; drafts for Jeff). Her bond's step with her player from her Standing score: devoted and close at Standing's top and trusted, wary at its wronged (residents.json 'standing'), cooling, sullen and apart at steps; else fond. heel_start: how far her player gets before she sets off (Heel.START 3 otherwise). Wary or colder she fights only what is at her or after them, never presses, and pulls back under retreat_below of her hp; devoted she stands over her downed player. At grave_superstition or more (her 442 leaning) she won't touch grave goods below close. Sullen or colder she takes only food and a gift (gear into a free slot). Decision 621 (Jeff: 'wary hesitates and refuses risky orders; close follows; devoted takes the lead when asked and protects you aggressively'): only devoted leads; wary or colder says a hesitate line and acts on a plain order Companion.HESITATE_TICKS later; devoted goes first at whatever is attacking her player. words: what her voice is told of her step (%s her player); guide_words: whether she leads.",
 		"steps": {"cooling": -1, "sullen": -5, "apart": -7},

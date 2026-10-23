@@ -861,6 +861,7 @@ func _go_online() -> void:
 		World.item_grew.connect(_card_grew)
 		# Her bond with her player (decision 444).
 		World.bandage_changed.connect(_bond_bandaged)
+		World.bandage_changed.connect(_tell_bandage_broke)  # decision 625.
 		World.entity_died.connect(_bond_stood_by)
 		World.entity_damaged.connect(_bond_blow)  # Fights won together (decision 621).
 		World.entity_died.connect(_bond_won)
@@ -4581,6 +4582,34 @@ func _on_gold_changed(id: String, gold: int) -> void:
 			Net.message_to(peer, "shop", {"gold": gold})
 
 
+## A player's bandaging of [param patient] could not begin (decision 625):
+## why, to that player alone as a Server line (BANDAGE_REFUSED).
+func _tell_bandage_refused(player: GridEntity, patient: GridEntity) -> void:
+	var why := World.bandage_refusal(player, patient)
+	var line := str(BANDAGE_REFUSED.get(why, ""))
+	if line.is_empty() or (player as Player).owner_peer == 0:
+		return
+	var whom := "yourself" if patient == player else _display_name(patient)
+	Net.broadcast_to([(player as Player).owner_peer], "party", {"from": "Server", "text": line % whom})
+
+
+## A player's bandaging broken off (decision 625): why, to them alone.
+func _tell_bandage_broke(by: GridEntity, patient: GridEntity, state: StringName) -> void:
+	if state != &"interrupted" or not by is Player or (by as Player).owner_peer == 0:
+		return
+	var why: String = {"patient_moved": "%s moved" % _display_name(patient), "moved": "you moved", "hurt": "someone was hurt",
+		"not_safe": "a monster came near"}.get(World.bandage_broke_why, "")
+	if not why.is_empty():
+		Net.broadcast_to([(by as Player).owner_peer], "party", {"from": "Server", "text": "Your bandaging broke off: %s." % why})
+
+
+## Why a player's own bandage could not begin (decision 625), %s whom.
+const BANDAGE_REFUSED := {"not_beside": "You can't bandage %s: stand beside them.", "no_wound": "You can't bandage %s: there's no wound to bind.",
+	"mending": "You can't bandage %s: the wound is bound already.", "busy": "You can't bandage %s: your hands are busy.",
+	"no_kit": "You can't bandage %s: you have no bandaging kit.", "hurt_now": "You can't bandage %s: give it a breath after that blow.",
+	"not_safe": "You can't bandage %s: a monster is too near."}
+
+
 ## Server: [param by] traded at [param shop], or was refused ([param why]):
 ## they are sent the shop again, and the refusal.
 ## Server: a move refused for the armour slot's rule (decision 622): its
@@ -7917,8 +7946,8 @@ func _on_command(entity: GridEntity, command_name: String, args: Dictionary) -> 
 		var patient := get_node_or_null(NodePath(str(args.get("target", "")))) as GridEntity
 		if patient != null and World.is_downed(patient):
 			_start_channel(entity, patient)  # Held E on the downed: the return (decision 544).
-		elif patient != null:
-			World.try_bandage(entity, patient)
+		elif patient != null and not World.try_bandage(entity, patient):
+			_tell_bandage_refused(entity, patient)
 	elif command_name == "slow_heart" and entity is Player:
 		_slow_heart(entity as Player, bool(args.get("held", false)))
 	elif command_name == "bleed_out" and entity is Player:
@@ -7950,8 +7979,8 @@ func _on_command(entity: GridEntity, command_name: String, args: Dictionary) -> 
 		if on != null and slot >= 0 and slot < entity.slots.size() and Items.def(entity.slots[slot]).get("use") == "bandage":
 			if World.is_downed(on):
 				_start_channel(entity, on)
-			else:
-				World.try_bandage(entity, on)
+			elif not World.try_bandage(entity, on):
+				_tell_bandage_refused(entity, on)
 	elif command_name == "loose" and entity is Player:
 		# Its "angle" (radians on the grid; decision 583), else the
 		# angle to its "at" cell.

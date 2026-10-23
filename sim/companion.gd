@@ -1045,10 +1045,12 @@ func _carry_out(read: Dictionary, text: String) -> bool:
 			if read["patient"] == "" and _alive(keeper) and keeper.hp >= keeper.max_hp:
 				patient = self  # Not said whom: her player if hurt, else herself.
 			var whom := "yourself" if patient == self else keeper_name()
-			if World.bandage_kit(self) < 0:
-				done = "%s asked you to bandage %s, but you have no bandaging kit." % [keeper_name(), whom]
-			elif patient.hp >= patient.max_hp:
-				done = "%s asked you to bandage %s, but there is no wound to bandage." % [keeper_name(), whom]
+			var no := World.bandage_refusal(self, patient)
+			if no in ["no_kit", "no_wound", "mending", "hurt_now", "not_safe"]:
+				# Why not, at once and in her own words (decision 625): no
+				# model waited on, and no stock word after it.
+				_say_bandage(no, patient)
+				done = "%s asked you to bandage %s, but you did not: %s." % [keeper_name(), whom, BANDAGE_WHY[no]]
 			else:
 				_start_errand({"verb": "bandage", "patient": patient, "at": patient.tile,
 					"words": "bandage your own wounds" if patient == self else "bandage %s's wounds" % keeper_name()}, _serial)
@@ -3755,6 +3757,8 @@ func _choose(foe: GridEntity, low: bool) -> void:
 	var mending_self: bool = str(errand.get("verb", "")) == "bandage" and errand.get("patient") == self and foe == null
 	if low and not mending_self:
 		if not errand.is_empty():
+			if str(errand.get("verb", "")) == "bandage":
+				_say_bandage("low", errand.get("patient"))  # Said, not only narrated (decision 625; the box's one undone bandage).
 			_end_errand("you are badly hurt", false)
 		current_intent = Intent.RETREAT
 	elif _on_errand():
@@ -4571,6 +4575,26 @@ func _errand_walk() -> bool:
 			return _step_toward(errand["cell"], true)
 
 
+## Why a bandage was not begun or was broken off (World.bandage_refusal,
+## bandage_broke_why), for her voice's narration (decision 625).
+const BANDAGE_WHY := {"gone": "they were gone", "not_beside": "you could not reach them", "no_wound": "there was no wound to bandage",
+	"mending": "the wound was bound already", "busy": "your hands were full", "no_kit": "you had no bandaging kit",
+	"hurt_now": "someone was hurt a moment ago", "not_safe": "a monster was too close", "patient_moved": "they moved",
+	"moved": "you moved", "hurt": "someone was hurt", "broken": "it came loose"}
+
+
+## Says why she won't or can't bandage [param patient] now, in her own
+## words (companion_traits "bandage_says" by [param why]; "_self" for her
+## own wound), at once (decision 625, Jeff: "Pip seems lazy at bandaging").
+func _say_bandage(why: String, patient: GridEntity) -> void:
+	var says: Dictionary = CompanionCard.tables().get("bandage_says", {})
+	var line := str(says.get(why + "_self", "")) if patient == self else ""
+	if line.is_empty():
+		line = str(says.get(why, says.get("broken", "")))
+	if not line.is_empty():
+		_say(line, true)
+
+
 ## There: the door opened or closed, the chest looked in, the thing taken
 ## from the chest (then taken to her player) or handed over, the bandaging
 ## begun (then waited on: done, mending, or broken off), or the place
@@ -4584,20 +4608,17 @@ func _errand_do() -> void:
 				if patient.mending == 2:
 					_report_errand("You bandaged %s; the wounds are mending." % ("your wounds" if patient == self else "%s's wounds" % keeper_name()))
 				elif patient.mending == 0:
-					_end_errand("the bandaging was broken off", true)
-			elif not _alive(patient):
-				_end_errand("%s was gone" % whom, true)
-			elif patient.hp >= patient.max_hp:
-				_end_errand("there was no wound to bandage", true)
-			elif World.bandage_kit(self) < 0:
-				_end_errand("you had no bandaging kit", true)
-			elif not World.calm(self) or not World.calm(patient):
-				_end_errand("it was not safe to bandage", true)
+					var why := World.bandage_broke_why if not World.bandage_broke_why.is_empty() else "broken"
+					_say_bandage(why, patient)
+					_end_errand("the bandaging was broken off: %s" % BANDAGE_WHY.get(why, "it came loose"), false)
 			elif World.try_bandage(self, patient):
 				errand["started"] = true
 				errand["until"] = World.tick + World.BANDAGE_TICKS + ERRAND_TICKS
 			else:
-				_end_errand("the bandaging could not be begun", true)
+				# Why not, in her own words (decision 625), the voice told only.
+				var no := World.bandage_refusal(self, patient)
+				_say_bandage(no, patient)
+				_end_errand(BANDAGE_WHY.get(no, "the bandaging could not be begun"), false)
 		"fetch":
 			var chest: Chest = errand["chest"]
 			var item: String = errand["item"]

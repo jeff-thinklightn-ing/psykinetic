@@ -100,6 +100,7 @@ func _ready() -> void:
 	_test_out_of_reach()
 	_test_knows_level()
 	_test_wild()
+	_test_bandage_words()
 	_test_plain_orders()  # Late: its many lines fill the capped party log and Tab panel.
 	_test_last_words()  # She dies in it: keep it last of those that need her.
 	_test_old_record_gets_a_companion()
@@ -2863,6 +2864,65 @@ func _test_plain_orders() -> void:
 	pet.mind = ScriptedMind.new()
 
 
+func _test_bandage_words() -> void:
+	print("\n== a bandage she won't or can't do, said in her words; the patient's step breaks it off (decision 625) ==")
+	_kill_monsters()
+	var owner := _player()
+	var pet := _companion()
+	_settle(pet)
+	pet.mind = OllamaMind.new("http://10.255.255.1:9/api/chat", "stub", _main)  # A voice that never answers.
+	var says: Dictionary = CompanionCard.tables()["bandage_says"]
+	var spoken: Array[String] = []
+	var on_said := func(line: String) -> void: spoken.append(line)
+	pet.said.connect(on_said)
+	_put(owner, Vector2i(9, 6))
+	_put(pet, Vector2i(10, 6))
+	var slots_were := pet.slots.duplicate()
+	World.set_slots(pet, [])
+	owner.hp = owner.max_hp - 4
+	owner.mending = 0
+	_check(World.bandage_refusal(pet, owner) == "no_kit" and World.bandage_refusal(pet, pet) == "no_wound", "the reasons, in try_bandage's order: no kit; no wound")
+	_say_to(pet, owner, "Bandage me.")
+	for i in Companion.ORDER_ACK_TICKS + 2:
+		World.step()
+	_check(spoken == [str(says["no_kit"])], "no kit: she says so at once, and no stock word after (%s)" % [spoken])
+	spoken.clear()
+	World.set_slots(pet, ["bandaging_kit"])
+	var imp := _spawn_imp(_free_tile_between(pet, 3, 4))
+	imp.acts = false
+	_check(World.bandage_refusal(pet, owner) == "not_safe", "a monster near: not safe")
+	_say_to(pet, owner, "Bandage me.")
+	_check(spoken == [str(says["not_safe"])] and pet.errand.is_empty(), "not safe: said at once, no errand (%s)" % [spoken])
+	World.despawn(imp)
+	spoken.clear()
+	owner.hurt_tick = World.tick
+	_check(World.bandage_refusal(pet, owner) == "hurt_now", "hurt a moment ago: give it a breath")
+	owner.hurt_tick = World.tick - World.BANDAGE_CALM_TICKS - 1
+	pet.hurt_tick = World.tick - World.BANDAGE_CALM_TICKS - 1
+	_check(World.bandage_refusal(pet, owner) == "", "beside, a kit, a wound, calm: nothing in the way")
+	# Begun, then her player steps off: broken off, and she says so.
+	_say_to(pet, owner, "Bandage me.")
+	_step_until(func() -> bool: return owner.mending == 1, 40)
+	_check(owner.mending == 1, "the bandage begun on her player")
+	var off := owner.tile + Vector2i(0, 1)
+	if not World.is_free(off):
+		off = owner.tile + Vector2i(0, -1)
+	_put(owner, off)
+	_step_until(func() -> bool: return pet.errand.is_empty(), 20)
+	_check(owner.mending == 0 and World.bandage_broke_why == "patient_moved" and str(says["patient_moved"]) in spoken,
+		"her player's first step: broken off, and \"hold still\" (%s, %s)" % [World.bandage_broke_why, spoken])
+	# A player's own bandage, refused: the reason worded for them.
+	pet.hp = pet.max_hp
+	_check(World.bandage_refusal(owner, pet) == "not_beside" or World.bandage_refusal(owner, pet) == "no_wound", "a player's own: refused with a reason")
+	_main._tell_bandage_refused(owner, pet)  # To their peer alone; nothing breaks without one.
+	pet.said.disconnect(on_said)
+	pet.mind = ScriptedMind.new()
+	World.set_slots(pet, slots_were)
+	owner.hp = owner.max_hp
+	owner.mending = 0
+	_settle(pet)
+
+
 ## [param owner] says [param text] in chat, to [param pet] (the rate limit cleared).
 func _say_to(pet: Companion, owner: Player, text: String) -> void:
 	_main._chat_tick.clear()
@@ -4280,6 +4340,9 @@ func _settle(pet: Companion) -> void:
 	pet.stance = Companion.Stance.GUARD
 	pet._instruction = ""
 	pet._yield_until = -1
+	pet._hard_day = false  # No keep-watch ask (621) unless a check wants one.
+	pet._sleeping = {}
+	pet._watch_day = Townsfolk.day_of(World.steps)
 
 
 ## Moves [param entity] to [param tile] (a test's set-up, not a move).

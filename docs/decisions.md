@@ -25014,3 +25014,49 @@ stood on the other zone's clock, and he did not walk again.
 combat_test _test_other_zone_waits: another zone 1000 ticks ahead steps; his spin and his
 wind-up do not land and his axe is not handed back; in his own zone the spin lands as ever. It
 fails three checks without the skip. Server only, protocol unchanged, no new class_name.
+## 625: a bandage refused says why; the patient's step breaks it off
+
+Jeff, playing v0.1.169: "I can't bandage Pip, Pip seems lazy at bandaging.
+Check play test dialogue. Just says "fine". ... If target moves it
+interrupts." The finding: "Fine." is 616's stock word (ORDER_ACKS, picked by
+her name's hash: Pip's and Nix's is "Fine."), said when her voice has not
+answered within ORDER_ACK_TICKS of a plain order. The bandage then failed
+(most often World.calm: a monster within BANDAGE_SAFE, or either hurt within
+BANDAGE_CALM_TICKS) and the reason went only to her voice, which was slow or
+silent; a player's own refused bandage showed nothing at all.
+
+- World.bandage_refusal(by, patient): try_bandage's checks in its order as a
+  reason, "" if none: gone, not_beside, no_wound, mending, busy, no_kit,
+  hurt_now (calm's hurt half), not_safe (its monster half).
+- Her words, at once, no model (companion_traits "bandage_says", drafts; a
+  "_self" key for her own wound): Companion._say_bandage. 616's obey checks
+  the reasons when it reads the order (no_kit, no_wound, mending, hurt_now,
+  not_safe), so the line comes before the stock word could; at the patient
+  (_errand_do) a try_bandage that fails, and a bandage broken off, say theirs
+  too. Her voice is told as narration only (no second ask), so she does not
+  speak twice. The stock word stays for every other order; a refused bandage
+  is no longer covered by it.
+- A player's own: "bandage" and "apply_item" (593) that fail send
+  Main._tell_bandage_refused, the reason worded for them (BANDAGE_REFUSED,
+  "You can't bandage Pip: a monster is too near."), to that player alone as a
+  Server party line (the channel of 622's slot refusals); a bandaging of theirs
+  broken off, "Your bandaging broke off: Pip moved." (_tell_bandage_broke).
+- The patient's first step off their cell breaks it off (Jeff's rule):
+  try_bandage keeps "patient_tile", _tend_wounds breaks on a change, for
+  players and companions alike, through the same broken-off branch as every
+  other break (so pc-character's tending clears there too).
+  World.bandage_broke_why names the cause for both sayings: patient_moved,
+  moved, hurt, not_safe, gone.
+- Badly hurt with a foe at her (the reflex), a bandage errand she drops is
+  said too ("low": "Not now. I have to get clear of it first.").
+- The box's day (release's grep, counts and wording only): 3 plain bandage
+  orders, all done; 11 bandage errands, 10 done, 1 dropped "you are badly hurt"
+  (said nothing: now "low"); 7 bandages begun, all finished; one "Fine." all
+  day, the stock word. A player's own refused bandage leaves no line at all,
+  which is where "can't bandage Pip" went. Her voice answered in a median
+  456 ms and said 72 of 97 lines: errand reports are not shortened to "fine",
+  so the errand prompt is left as it is.
+
+tests: companion_test _test_bandage_words (the reasons, no kit and not safe
+said at once and no stock word after, the step breaking it off with "hold
+still"). Server only, protocol unchanged, no new class_name.
