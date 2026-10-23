@@ -209,14 +209,30 @@ func _test_main() -> void:
 	_check(_main.retain(_player(), {"resident": str(healer.get_path()), "pay": "gold"}) == "gold" and _main.in_care(me, id) and _main.care_via(me, id) == "gold"
 		and World.gold_of(me) == 0 and int(World.production.worker(keeper)["purse"]) == purse + 10, "10 gold: in his care, the gold his")
 	_check(_main.retain(_player(), {"resident": str(healer.get_path()), "pay": "gold"}) == "", "not twice")
-	# Five antlers from the pack, into his hut's store.
+	# Five herbs, two then three (584 amended (2): the pack holds four): counted on the record's tally, a save
+	# between, in his care at five, the herbs in his hut's store.
 	_main._records[me].care.clear()
-	for slot in 5:
-		World.put_item(_player(), _player(), slot, World.items.mint("antlers", "found", "test"))
 	var store := str(World.production.worker(keeper).get("town", ""))
+	for slot in 2:
+		World.put_item(_player(), _player(), slot, World.items.mint("herbs", "found", "test"))
+	_check(_main.retain(_player(), {"resident": str(healer.get_path()), "pay": "herbs"}) == "" and not _main.in_care(me, id)
+		and _main.care_given(me, id) == {"herbs": 2} and not Array(_player().slots).has("herbs"), "two herbs: counted, not yet in care (%s)" % [_main.care_given(me, id)])
+	_main._records[me] = PlayerRecord.from_dict(_main._records[me].to_dict())
+	_check(_main.care_given(me, id) == {"herbs": 2}, "the tally survives a save")
+	for slot in 3:
+		World.put_item(_player(), _player(), slot, World.items.mint("herbs", "found", "test"))
+	_check(_main.retain(_player(), {"resident": str(healer.get_path()), "pay": "herbs"}) == "herbs" and _main.care_via(me, id) == "herbs"
+		and _main.care_given(me, id).is_empty() and (store.is_empty() or World.stockpile.count(store, "herbs") + World.stockpile.item_ids(store).count("herbs") >= 5),
+		"three more: in his care by the herbs, the tally cleared, the herbs in his hut's store (%s)" % [store])
+	# Five antlers the same, into his hut's store as themselves.
+	_main._records[me].care.clear()
+	for slot in 4:
+		World.put_item(_player(), _player(), slot, World.items.mint("antlers", "found", "test"))
+	_check(_main.retain(_player(), {"resident": str(healer.get_path()), "pay": "antlers"}) == "" and _main.care_given(me, id) == {"antlers": 4}, "four antlers: counted")
+	World.put_item(_player(), _player(), 0, World.items.mint("antlers", "found", "test"))
 	_check(_main.retain(_player(), {"resident": str(healer.get_path()), "pay": "antlers"}) == "antlers" and _main.care_via(me, id) == "antlers"
 		and not Array(_player().slots).has("antlers") and (store.is_empty() or World.stockpile.item_ids(store).count("antlers") == 5),
-		"five antlers: in his care, the antlers in his hut's store (%s)" % [store])
+		"the fifth: in his care, the five antlers in his hut's store (%s)" % [store])
 	_check(_main.grant_care(me, id, "quest") and _main.care_via(me, id) == "quest" and not _main.grant_care(me, id, "antlers"), "his errand done after: the way in is the errand's; nothing replaces it")
 	World.order_move(_player(), Vector2i(12, 6))
 	for i in 60:

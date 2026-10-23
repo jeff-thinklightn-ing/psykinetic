@@ -544,6 +544,7 @@ func _test_sick_pleas() -> void:
 
 
 var _care := {}
+var _tally := {}
 var _handed: Array = []
 
 
@@ -555,6 +556,7 @@ func _test_care() -> void:
 	print("\n== the healer's care: gold, herbs or antlers in; the herbs open the chain (584 amended, npc's side) ==")
 	_setup([["o-mara", "Mara", "smith"], ["o-tam", "Tam", "hauler"], ["o-doc", "Oren", "medicine_man"]])
 	_care = {}
+	_tally = {}
 	_handed = []
 	var rule := {"retainer": 10, "herbs": 5, "antlers": 5, "sick": 1, "word_days": 1}
 	_ctx["care_hut"] = func(worker_id: String) -> String: return "o/hut" if worker_id == "o-doc" else ""
@@ -565,6 +567,20 @@ func _test_care() -> void:
 		var mine: Dictionary = _care.get(player_id, {})
 		mine[hut] = way
 		_care[player_id] = mine
+		for key in (["antlers", "herbs"] if way in ["herbs", "quest"] else ["antlers"]):  # As Main clears the tally (584 amended (2)).
+			_tally.get(player_id, {}).get(hut, {}).erase(key)
+	# The tally in the record (584 amended (2)), stubbed: [player][hut] = {key: n}.
+	_ctx["care_given"] = func(player_id: String, hut: String) -> Dictionary: return _tally.get(player_id, {}).get(hut, {}).duplicate()
+	_ctx["care_give"] = func(player_id: String, hut: String, key: String, count: int) -> int:
+		var theirs: Dictionary = _tally.get(player_id, {})
+		var tally: Dictionary = theirs.get(hut, {})
+		tally[key] = int(tally.get(key, 0)) + count
+		theirs[hut] = tally
+		_tally[player_id] = theirs
+		return int(tally[key])
+	_ctx["care_clear"] = func(player_id: String, hut: String, keys: Array) -> void:
+		for key in keys:
+			_tally.get(player_id, {}).get(hut, {}).erase(str(key))
 	_ctx["retain"] = func(player_id: String, _healer: String, pay: String) -> Dictionary:
 		var mine: Dictionary = _care.get(player_id, {})
 		mine["o/hut"] = pay
@@ -589,11 +605,14 @@ func _test_care() -> void:
 	_check(not subs.call(theirs).has(Offers.CARE) and subs.call(theirs).has(Offers.CARE_HERBS) and not subs.call(theirs).has(Offers.CARE_SICK) and not subs.call(theirs).has(Offers.CARE_BREW),
 		"paid in gold: no retainer twice, no chain; the herbs are still asked: %s" % [subs.call(theirs)])
 	# The herbs one by one (p1): at five, in his care by the quest.
+	var fourth := ""
 	for i in 4:
-		Offers.gift("p1", "Jeff", "o-doc", "herbs", _ctx)
-	_check(not _care.has("p1") and int(Townsfolk.card_of(_work, "o-doc").get("care_herbs", {}).get("p1", 0)) == 4, "four herbs counted on his card, not yet in care")
+		fourth = Offers.gift("p1", "Jeff", "o-doc", "herbs", _ctx)
+	_check(not _care.has("p1") and int(_tally.get("p1", {}).get("o/hut", {}).get("herbs", 0)) == 4 and fourth.ends_with("\"That's 4. 1 more and you're in my care.\""),
+		"four herbs counted on the record's tally, not yet in care; he says how many more (584 amended (2)): %s" % fourth)
 	var fifth := Offers.gift("p1", "Jeff", "o-doc", "herbs", _ctx)
-	_check(_care.get("p1", {}).get("o/hut", "") == "quest" and fifth.ends_with("and that is herbs enough."), "the fifth: in his care by the quest: %s" % fifth)
+	_check(_care.get("p1", {}).get("o/hut", "") == "quest" and fifth.ends_with("and that is herbs enough.") and not _tally["p1"]["o/hut"].has("herbs"),
+		"the fifth: in his care by the quest, the tally cleared: %s" % fifth)
 	mine = _offers("o-doc")
 	_check(not subs.call(mine).has(Offers.CARE) and not subs.call(mine).has(Offers.CARE_HERBS) and subs.call(mine).has(Offers.CARE_BREW) and not subs.call(mine).has(Offers.CARE_SICK),
 		"the quest done, nobody sick: the brew is asked: %s" % [subs.call(mine)])
@@ -614,12 +633,13 @@ func _test_care() -> void:
 	_check(brew.size() == 1 and Offers.accept("o-doc", "p1", "Jeff", brew[0]["id"], 0, _ctx)["ok"], "the sick seen to: the brew asked and taken")
 	Offers.gift("p1", "Jeff", "o-doc", "herbs", _ctx)
 	Offers.gift("p1", "Jeff", "o-doc", "antlers", _ctx)
-	Offers.gift("p1", "Jeff", "o-doc", "herbs", _ctx)
-	_check(_handed.is_empty(), "two herbs and the antlers: not yet")
+	var second := Offers.gift("p1", "Jeff", "o-doc", "herbs", _ctx)
+	_check(_handed.is_empty() and second.ends_with("\"That's 2 of the herbs and 1 of the antlers; bring me the rest.\"") and _tally["p1"]["o/hut"].get("brew_herbs", 0) == 2,
+		"two herbs and the antlers: not yet, counted on the tally: %s" % second)
 	_done.clear()
 	Offers.gift("p1", "Jeff", "o-doc", "herbs", _ctx)
 	doc = Townsfolk.card_of(_work, "o-doc")
-	_check(_handed == [["p1", "stamina_potion"]] and doc.get("care_done", {}).get("p1", {}).get("brew", false) == true and doc.get("asks", []).is_empty()
+	_check(_handed == [["p1", "stamina_potion"]] and doc.get("care_done", {}).get("p1", {}).get("brew", false) == true and doc.get("asks", []).is_empty() and not _tally["p1"]["o/hut"].has("brew_herbs")
 		and _done.size() == 1 and str(_done[0][2]) == "Oren brews what Jeff brought and hands them the potion.", "the third herb: the potion handed, the ask met: %s / %s" % [_handed, _done])
 	_check(not subs.call(_offers("o-doc")).any(func(sub: String) -> bool: return sub.begins_with("care")), "the chain done for now: nothing more of his care asked: %s" % [subs.call(_offers("o-doc"))])
 	# Antlers one by one (p3): a way in, no quest.

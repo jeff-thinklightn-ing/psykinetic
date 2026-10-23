@@ -97,6 +97,10 @@ const BREW_HERBS := 3
 const BREW_ANTLERS := 1
 ## What he hands back for the brew (items.json; his own make).
 const BREW_POTION := "stamina_potion"
+## The last count short of its number (584 amended (2)): {"n", "left"} for a
+## way in, {"brew": true, "herbs", "antlers"} for the brew; {} when the
+## last hand-over counted nothing or met its number. gift reads it.
+static var counted := {}
 const ERRAND := "errand"
 ## Parts of an offer id ("<worker>|<kind>|<key>"; worker ids hold ":").
 const SEP := "|"
@@ -607,7 +611,7 @@ static func _care_offers(worker_id: String, who: Dictionary, town: String, playe
 			{"gold": retainer, "hut": hut}, CARE, retainer))
 	var herbs := int(rule.get("herbs", 0))
 	if not _quest_done(via):
-		var had := int(card.get("care_herbs", {}).get(player_id, 0))
+		var had := int(_given(player_id, hut, given).get("herbs", 0))
 		if herbs > 0 and had < herbs and not _has_ask(card, player_id, CARE_HERBS):
 			out.append(_offer(worker_id, PLEA, CARE_HERBS, str(words.get("herbs_title", "Bring him herbs")),
 				str(words.get("herbs", "Bring me %d handfuls of herbs and I'll count you in my care, and there is more you could do for me after.")) % (herbs - had),
@@ -637,6 +641,13 @@ static func _care_offers(worker_id: String, who: Dictionary, town: String, playe
 static func _via(player_id: String, hut: String, given: Dictionary) -> String:
 	var via: Variant = _call(given, "care_via", [player_id, hut])
 	return str(via) if via is String and via != "<null>" else ""
+
+
+## The tally toward the care of [param hut] (Main.care_given; 584 amended
+## (2)): what [param player_id] has handed so far, {} for nothing.
+static func _given(player_id: String, hut: String, given: Dictionary) -> Dictionary:
+	var tally: Variant = _call(given, "care_given", [player_id, hut])
+	return tally if tally is Dictionary else {}
 
 
 ## The medicine man [param worker_id]'s hut (economy's _care_hut_of: his
@@ -706,16 +717,14 @@ static func herbs_taken(player_id: String, player_name: String, worker_id: Strin
 		return false
 	var card := Townsfolk.card_of(production, worker_id)
 	if _quest_done(_via(player_id, hut, given)):
-		return _brew_taken(worker_id, player_id, player_name, card, "herbs", count, given)
+		return _brew_taken(worker_id, player_id, player_name, card, hut, "herbs", count, given)
 	if int(rule.get("herbs", 0)) <= 0:
 		return false
-	var counts: Dictionary = card.get("care_herbs", {})
-	counts[player_id] = int(counts.get(player_id, 0)) + count
-	card["care_herbs"] = counts
-	production.set_card(worker_id, card)
-	if int(counts[player_id]) < int(rule["herbs"]):
+	var total := int(_call(given, "care_give", [player_id, hut, "herbs", count]))  # The record's tally (584 amended (2)).
+	if total < int(rule["herbs"]):
+		counted = {"n": total, "left": int(rule["herbs"]) - total}
 		return false
-	_grant_care(worker_id, player_id, player_name, hut, "quest", "brought %d handfuls of herbs" % int(counts[player_id]), given)
+	_grant_care(worker_id, player_id, player_name, hut, "quest", "brought %d handfuls of herbs" % total, given)
 	return true
 
 
@@ -736,24 +745,23 @@ static func antlers_taken(player_id: String, player_name: String, worker_id: Str
 	var card := Townsfolk.card_of(production, worker_id)
 	var via := _via(player_id, hut, given)
 	if _quest_done(via):
-		return _brew_taken(worker_id, player_id, player_name, card, "antlers", count, given)
+		return _brew_taken(worker_id, player_id, player_name, card, hut, "antlers", count, given)
 	if not via.is_empty() or int(rule.get("antlers", 0)) <= 0:
 		return false
-	var counts: Dictionary = card.get("care_antlers", {})
-	counts[player_id] = int(counts.get(player_id, 0)) + count
-	card["care_antlers"] = counts
-	production.set_card(worker_id, card)
-	if int(counts[player_id]) < int(rule["antlers"]):
+	var total := int(_call(given, "care_give", [player_id, hut, "antlers", count]))  # The record's tally (584 amended (2)).
+	if total < int(rule["antlers"]):
+		counted = {"n": total, "left": int(rule["antlers"]) - total}
 		return false
-	_grant_care(worker_id, player_id, player_name, hut, "antlers", "brought %d pairs of antlers" % int(counts[player_id]), given)
+	_grant_care(worker_id, player_id, player_name, hut, "antlers", "brought %d pairs of antlers" % total, given)
 	return true
 
 
 ## [param kind] ("herbs" or "antlers") toward the brew, while the player's
-## CARE_BREW ask is open: counted on [param card]; at BREW_HERBS and
-## BREW_ANTLERS the ask is met, his potion handed to them (main's hand_item)
-## and the brew marked done. True when just met.
-static func _brew_taken(worker_id: String, player_id: String, player_name: String, card: Dictionary, kind: String, count: int, given: Dictionary) -> bool:
+## CARE_BREW ask is open: counted on their record's tally for [param hut]
+## (brew_herbs, brew_antlers; 584 amended (2)); at BREW_HERBS and
+## BREW_ANTLERS the ask is met, his potion handed to them (main's hand_item),
+## the brew marked done and the tally cleared. True when just met.
+static func _brew_taken(worker_id: String, player_id: String, player_name: String, card: Dictionary, hut: String, kind: String, count: int, given: Dictionary) -> bool:
 	var production: Production = given.get("production")
 	var open: Dictionary = {}
 	for ask: Dictionary in card.get("asks", []):
@@ -761,14 +769,14 @@ static func _brew_taken(worker_id: String, player_id: String, player_name: Strin
 			open = ask
 	if open.is_empty():
 		return false
-	var brews: Dictionary = card.get("care_brew", {})
-	var mine: Dictionary = brews.get(player_id, {"herbs": 0, "antlers": 0})
-	mine[kind] = int(mine.get(kind, 0)) + count
-	brews[player_id] = mine
-	card["care_brew"] = brews
-	production.set_card(worker_id, card)
-	if int(mine.get("herbs", 0)) < BREW_HERBS or int(mine.get("antlers", 0)) < BREW_ANTLERS:
+	_call(given, "care_give", [player_id, hut, "brew_" + kind, count])
+	var mine := _given(player_id, hut, given)
+	var herbs_now := int(mine.get("brew_herbs", 0))
+	var antlers_now := int(mine.get("brew_antlers", 0))
+	if herbs_now < BREW_HERBS or antlers_now < BREW_ANTLERS:
+		counted = {"brew": true, "herbs": herbs_now, "antlers": antlers_now}
 		return false
+	_call(given, "care_clear", [player_id, hut, ["brew_herbs", "brew_antlers"]])
 	var name := str(production.worker(worker_id).get("name", worker_id))
 	var done: Dictionary = card.get("care_done", {})
 	var theirs: Dictionary = done.get(player_id, {})
@@ -973,11 +981,18 @@ static func gift(player_id: String, player_name: String, worker_id: String, item
 	var who := str(production.worker(worker_id).get("name", worker_id))
 	_regard(production, worker_id, player_id, Standing.setting("gift_favourite" if favourite else "gift"), "gave them %s" % Companion._a(name))
 	Townsfolk.learn(production, worker_id, "%s gave %s %s." % [player_name, who, Companion._a(name)])
-	# The medicine man's care and his brew (584 amended, npc's side): herbs and antlers count.
+	# The medicine man's care and his brew (584 amended, npc's side): herbs and antlers count, one at a time
+	# (584 amended (2)): short of his number he says how many more.
+	counted = {}
 	if item_id == "herbs" and herbs_taken(player_id, player_name, worker_id, 1, given):
 		return "%s gives %s %s, and that is herbs enough." % [player_name, who, Companion._a(name)]
 	if item_id == "antlers" and antlers_taken(player_id, player_name, worker_id, 1, given):
 		return "%s gives %s %s, and that is what he asked." % [player_name, who, Companion._a(name)]
+	if not counted.is_empty():
+		var words: Dictionary = settings().get("care", {})
+		var said := str(words.get("counted_brew", "That's %d of the herbs and %d of the antlers; bring me the rest.")) % [int(counted.get("herbs", 0)), int(counted.get("antlers", 0))] \
+				if bool(counted.get("brew", false)) else str(words.get("counted", "That's %d. %d more and you're in my care.")) % [int(counted.get("n", 0)), int(counted.get("left", 0))]
+		return "%s gives %s %s. \"%s\"" % [player_name, who, Companion._a(name), said]
 	return "%s gives %s %s%s." % [player_name, who, Companion._a(name), ", and it is what they like best" if favourite else ""]
 
 

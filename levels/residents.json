@@ -59,6 +59,8 @@
 			"brew": "Bring me %d handfuls of herbs and a pair of antlers and I'll brew you something for the road; the potion is yours.",
 			"brew_done": "%s brews what %s brought and hands them the potion.",
 			"kept": "%s is in %s's care now: fall where they will, he will see to them.",
+			"counted": "That's %d. %d more and you're in my care.",
+			"counted_brew": "That's %d of the herbs and %d of the antlers; bring me the rest.",
 			"refuse": "Not now.",
 			"voice": "%s is in your care: if they fall anywhere, they wake at your hut and you see to them. Say so when it fits, briefly.",
 			"voice_quest": "%s gathered your herbs, and you trust them with more."

@@ -4606,8 +4606,10 @@ func _send_barter(player: Player, shop: GridEntity, why := "", maker := "") -> v
 		if not hut.is_empty():
 			# The healer's care (584 amended): what his hut takes, and whether and how you are in it.
 			var rule := care_rule(hut)
+			var given := care_given(player.player_id, hut)
 			data["care"] = {"gold": rule["retainer"], "herbs": rule["herbs"], "antlers": rule["antlers"],
-				"in_care": in_care(player.player_id, hut), "by": care_via(player.player_id, hut)}
+				"in_care": in_care(player.player_id, hut), "by": care_via(player.player_id, hut),
+				"given": {"herbs": int(given.get("herbs", 0)), "antlers": int(given.get("antlers", 0))}}  # 584 amended (2).
 	elif not place.is_empty() and World.economy != null:
 		data["goods"] = World.economy.goods(place, data["fence"])
 		data["buys"] = World.economy.buys(place, Array(player.slots))
@@ -4673,17 +4675,55 @@ func grant_care(player_id: String, place_id: String, way: String) -> bool:
 		return false
 	record.care[place_id] = kept
 	print("[economy] %s is in the care of %s (%s)" % [record.name, place_id, kept])
+	# The way in met: its tally goes (584 amended (2)); the herbs' only once his first errand counts as done.
+	care_clear(player_id, place_id, ["antlers", "herbs"] if kept in Economy.CARE_QUEST_WAYS else ["antlers"])
 	return true
+
+
+## The tally toward the care of the hut [param place_id] (584 amended (2)):
+## what [param player_id] has handed so far, {herbs, antlers, brew_herbs,
+## brew_antlers} as present; {} for none.
+func care_given(player_id: String, place_id: String) -> Dictionary:
+	var record: PlayerRecord = _records.get(player_id)
+	if record == null:
+		return {}
+	return (record.care_given.get(place_id, {}) as Dictionary).duplicate()
+
+
+## [param count] more of [param key] handed toward the care of
+## [param place_id]: the new total (0 with no record).
+func care_give(player_id: String, place_id: String, key: String, count: int) -> int:
+	var record: PlayerRecord = _records.get(player_id)
+	if record == null or place_id.is_empty() or count <= 0:
+		return 0
+	var mine: Dictionary = record.care_given.get(place_id, {})
+	mine[key] = int(mine.get(key, 0)) + count
+	record.care_given[place_id] = mine
+	return int(mine[key])
+
+
+## The tally's [param keys] toward [param place_id] cleared, a count met.
+func care_clear(player_id: String, place_id: String, keys: Array) -> void:
+	var record: PlayerRecord = _records.get(player_id)
+	if record == null or not record.care_given.has(place_id):
+		return
+	var mine: Dictionary = record.care_given[place_id]
+	for key: Variant in keys:
+		mine.erase(str(key))
+	if mine.is_empty():
+		record.care_given.erase(place_id)
 
 
 ## Server: the "retain" command (584 amended) {resident: the medicine
 ## man's path, pay: "gold" | "herbs" | "antlers", gold if left out}: the
-## player hands him care_rule's retainer gold (into his purse) or that many
-## herbs or antlers from their pack (into his hut's store: herbs as the
-## resource, antlers as themselves; no sale), and is in his hut's care at
-## once. The barter is sent again, its why on a refusal: too far away,
-## already in his care, not enough gold (10), 5 herbs needed (3). The way
-## in, "" if refused.
+## player hands him care_rule's retainer gold (into his purse), or the herbs
+## or antlers they hold (into his hut's store: herbs as the resource,
+## antlers as themselves; no sale), counted toward care_rule's number on
+## their record's tally (584 amended (2): the pack holds four): short of it
+## he says how many more; at it they are in his hut's care. The barter is
+## sent again, its why on a refusal: too far away, already in his care,
+## not enough gold (10), no herbs in your pack. The way in once met, ""
+## before that or refused.
 func retain(player: Player, args: Dictionary) -> String:
 	var body := get_node_or_null(NodePath(str(args.get("resident", "")))) as Resident
 	if body == null or World.production == null or World.economy == null:
@@ -4705,26 +4745,35 @@ func retain(player: Player, args: Dictionary) -> String:
 		why = "not enough gold (%d)" % int(rule["retainer"])
 	var slots: Array[int] = []
 	if why.is_empty() and pay != "gold":
+		var left := int(rule[pay]) - int(care_given(me, hut).get(pay, 0))
 		for slot in player.slots.size():
-			if player.slots[slot] == pay and slots.size() < int(rule[pay]):
+			if player.slots[slot] == pay and slots.size() < left:
 				slots.append(slot)
-		if slots.size() < int(rule[pay]):
-			why = "%d %s needed (%d)" % [int(rule[pay]), pay, slots.size()]
+		if slots.is_empty():
+			why = "no %s in your pack" % pay
+	var met := false
 	if why.is_empty():
+		var name := str(World.production.worker(body.worker_id).get("name", "The healer"))
 		if pay == "gold":
 			World.add_gold(me, -int(rule["retainer"]), "the healer's retainer")
 			World.production.pay(body.worker_id, int(rule["retainer"]), "a retainer")
+			met = true
 		else:
 			var store := str(World.production.worker(body.worker_id).get("town", ""))
 			for slot: int in slots:
 				var uid := World._take_out(player, slot)
 				if uid != 0 and not store.is_empty():
 					World._bank_thing(store, uid, _display_name(player), _display_name(player), player.zone, player.tile)
-		grant_care(me, hut, pay)
-		Net.broadcast_to([player.owner_peer], "party", {"from": "Server",
-			"text": "%s takes you into his care." % str(World.production.worker(body.worker_id).get("name", "The healer"))})
+			var total := care_give(me, hut, pay, slots.size())
+			met = total >= int(rule[pay])
+			if not met:
+				Net.broadcast_to([player.owner_peer], "party", {"from": name,
+					"text": str(Offers.settings().get("care", {}).get("counted", "That's %d. %d more and you're in my care.")) % [total, int(rule[pay]) - total]})
+		if met:
+			grant_care(me, hut, pay)
+			Net.broadcast_to([player.owner_peer], "party", {"from": "Server", "text": "%s takes you into his care." % name})
 	_send_barter(player, body, why, body.worker_id)
-	return pay if why.is_empty() else ""
+	return pay if why.is_empty() and met else ""
 
 
 ## Server: whether [param player] can barter at [param shop] (decision
@@ -6550,6 +6599,9 @@ func _offers_context() -> Dictionary:
 		"grant_care": func(player_id: String, place_id: String, how: String) -> void: grant_care(player_id, place_id, how),
 		"in_care": func(player_id: String, place_id: String) -> bool: return in_care(player_id, place_id),
 		"care_via": func(player_id: String, place_id: String) -> String: return care_via(player_id, place_id),
+		"care_given": func(player_id: String, place_id: String) -> Dictionary: return care_given(player_id, place_id),
+		"care_give": func(player_id: String, place_id: String, key: String, count: int) -> int: return care_give(player_id, place_id, key, count),
+		"care_clear": func(player_id: String, place_id: String, keys: Array) -> void: care_clear(player_id, place_id, keys),
 		"hand_item": func(player_id: String, item_id: String, from_name: String) -> bool: return _hand_item(player_id, item_id, from_name),
 		# The word the town sent out (decision 613, npc's side): who is sought and where they were seen, for the officials.
 		"sought_words": func(town: String) -> Array[String]: return _sought_words(town),

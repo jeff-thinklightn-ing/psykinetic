@@ -24051,3 +24051,45 @@ ui lands the joined-client check beside it (net_test: a resident spawned
 on the host reaches the client with trade and person; ui_test _barters on
 such a body). resident_test and protocol_test alone here. Wire change;
 no new class_name.
+## 584 amended (2): the care counted a handful at a time
+
+Jeff, playing v0.1.168 (2026-10-23): "you cant hold 5, theres only 4
+inventory slots haha". The pack is four slots and nothing but gold
+stacks, so "give 5 herbs", "give 5 antlers" and the brew's three and one
+could not be handed over at once. The coordinator's fix, npc's on the
+server side with economy's agreement (their rules kept: the goods go into
+his hut's store through _take_out and _bank_thing, nothing minted or
+destroyed; the gold way stays whole; the counts come from economy.json
+return.care).
+
+- **The tally.** PlayerRecord.care_given: hut place id -> {herbs,
+  antlers: handed so far toward that way in; brew_herbs, brew_antlers:
+  toward npc's brew}, saved and loaded beside care. Main.care_given(player,
+  hut), care_give(player, hut, key, count) -> the new total,
+  care_clear(player, hut, keys). grant_care clears the antlers' count, and
+  the herbs' when the way in counts as his first errand done
+  (Economy.CARE_QUEST_WAYS); the brew's two clear when the potion is
+  handed.
+- **The window.** Main.retain with pay herbs or antlers takes what the
+  player holds of it, up to what is left of the rule's number, into his
+  hut's store, and counts it. Short of the number he says "That's 3. 2
+  more and you're in my care." (residents.json care.counted, his own
+  party line) and the barter comes again; at it, care as before. With
+  none in the pack the why is "no herbs in your pack". The way in is
+  returned only once met.
+- **Gifts count the same.** Offers.herbs_taken and antlers_taken count
+  into the record's tally (Main's care_given / care_give through the
+  offers context) instead of his card, so a gift and the window add up;
+  the brew's makings too (brew_herbs, brew_antlers). Short of the number
+  his gift line carries the count: "That's 2 of the herbs and 1 of the
+  antlers; bring me the rest." (care.counted_brew). Offers.counted holds
+  the last short count for gift's words.
+- **Wire.** The barter message's "care" gains "given": {herbs, antlers},
+  the player's tally toward that hut; ui words the two buttons from it
+  (ui's side, beside this). A line under revision 33.
+
+return_test: two herbs then three with a save between (the tally kept,
+cleared at five, the herbs in his store); four antlers then one; no
+herbs refused. offers_test _test_care: the fourth herb's count in his
+line, the tally cleared at the fifth, the brew's count and its clearing.
+Server and the barter message's key; no new class_name.

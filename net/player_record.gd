@@ -66,6 +66,11 @@ var barrow: Dictionary = {}
 ## "quest": his first errand, npc's). A hut brings back only a player in
 ## its care.
 var care: Dictionary = {}
+## The tally toward that care (584 amended (2); the pack holds four and
+## nothing stacks): hut place id -> {herbs, antlers: handed so far toward
+## the way in; brew_herbs, brew_antlers: toward npc's brew}, each cleared
+## when its count is met.
+var care_given: Dictionary = {}
 ## The caches they have searched (decision 599: Chest.cache, a loot
 ## table's name): each gives a player its find once.
 var caches: Array[String] = []
@@ -108,6 +113,7 @@ func to_dict() -> Dictionary:
 		"marks": marks.duplicate(),
 		"barrow": barrow.duplicate(),
 		"care": care.duplicate(),
+		"care_given": care_given.duplicate(true),
 		"caches": caches.duplicate(),
 	}
 
@@ -148,6 +154,16 @@ static func from_dict(entry: Variant) -> PlayerRecord:
 		for place: Variant in cared:
 			if str(cared[place]) in Economy.CARE_WAYS:
 				record.care[str(place)] = str(cared[place])
+	var tallies: Variant = entry.get("care_given", {})
+	if tallies is Dictionary:
+		for place: Variant in tallies:
+			if tallies[place] is Dictionary:
+				var mine := {}
+				for key: Variant in tallies[place]:
+					if int(tallies[place][key]) > 0:
+						mine[str(key)] = int(tallies[place][key])
+				if not mine.is_empty():
+					record.care_given[str(place)] = mine
 	var seen: Variant = entry.get("seen_generation", {})
 	if seen is Dictionary:
 		for area: Variant in seen:

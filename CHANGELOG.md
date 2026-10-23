@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The medicine man counts herbs and antlers a handful at a time: hand him what you carry and he says how many more, in the window or as a gift, and the count keeps across a save; the brew's makings the same (decision 584 amended (2); Jeff: the pack holds four).
 - Fixed: on a joined client a townsperson's talk bar offered only Talk (the merchant's trade and every name never reached the client; a host saw it right); now trade and person replicate (562 amended (4)).
 - Your companion's purse is told to your game whenever it changes, ready for her card page (614, companions' side).
 - Gold can be given to another player standing beside you, or to your own companion and taken back from her; it moves from one purse to the other, and both of you are told (614).

@@ -322,6 +322,8 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## {companion, gold}: what is in her purse, for her keeper's card.
 ## 33 (562 amended (4)): a Resident replicates trade and person (SUBCLASS_REPLICATED),
 ## so a joined client's talk bar and card know who they are.
+## 33 (584 amended (2)): the "barter" message's "care" gains "given" {herbs, antlers},
+## the player's tally toward that hut; "retain" with herbs or antlers takes what is held.
 const PROTOCOL_REVISION := 33
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]
