@@ -25238,3 +25238,14 @@ once the slot is in (ArtKit.has). The CHANGELOG bullet is art-kit's, since
 it already says what a player sees.
 view_test _test_niches: the footprints on the hidden niche's cell, +x toward
 its wall. Client only, protocol unchanged, no new class_name.
+
+## 608 amended, environment's side: the hidden niche's draft
+
+Jeff wanted the barrow's hidden door to leave clues: "you feel a cool draft coming from one of the niches". Dungeon leads 608 amended (the server's party line from the hidden entry, sound's whisper, art-kit's footprints); this is the draft you see. Approved by the coordinator as designed with dungeon.
+
+- Client3D._add_hidden_niche gives the hidden niche's holder a "Draft" (_make_draft): one GPUParticles3D in the holder's own frame, +x into the room as the wall pieces are placed, so it moves with the niche each generation and nothing elsewhere can fake it. DRAFT_PUFFS (7) faint puffs DRAFT_SIZE (0.7) across rise from a thin box along the cracked wall's foot, no higher than DRAFT_LOW (0.45 m): a draft hugs the floor. They drift DRAFT_SPEED (0.22 to 0.34 m/s) into the room, sinking a little with a slow waver along the wall, swell and fade over DRAFT_SECONDS (4 s), about a cell and a half.
+- Lit, not unshaded (the falls' mist's material, now Client3D._soft_puff for both): on a dark barrow layer it shows only where a lantern or torch lights it, so you find it by holding your light to the niches; it never glows across the room to give the door away. No shadows cast.
+- _show_hidden_niche: while the niche's Door is shut the cracked wall and the draft; once open the open niche and the draft stops (its last puffs fade as they go); shut again, it comes back. _sync_doors calls it from the Door's replicated open state.
+- No Fields cold spot: dungeon's party line comes from the hidden entry on the server, the same for everyone.
+
+view_test checks the draft is lit, low and drifts out into its room while shut, stops when the door opens and comes back when it shuts. Client only: protocol unchanged, no new class_name.

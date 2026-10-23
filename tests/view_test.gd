@@ -2348,6 +2348,21 @@ func _test_niches() -> void:
 				toward = Vector2(prints.global_transform.basis.x.x, prints.global_transform.basis.x.z)
 			_check(prints != null and toward.dot(-Vector2(door_out)) > 0.9 and absf(prints.position.x - door_cell.x) < 0.01,
 					"the hidden niche's footprints on its cell, toward the wall (%s)" % toward)
+		# Its draft (608 amended, environment's side): low, drifting into the
+		# room, lit, while shut; off once open, back if it shuts.
+		var draft := hidden.get_node_or_null("Draft") as GPUParticles3D if hidden != null else null
+		var process := draft.process_material as ParticleProcessMaterial if draft != null else null
+		var into := draft.global_transform.basis * process.direction if process != null else Vector3.ZERO
+		var lit := draft != null and (draft.draw_pass_1.surface_get_material(0) as StandardMaterial3D).shading_mode != BaseMaterial3D.SHADING_MODE_UNSHADED
+		_check(draft != null and draft.emitting and lit and draft.position.y + process.emission_box_extents.y <= Client3D.DRAFT_LOW
+				and Vector2(into.x, into.z).normalized().dot(Vector2(door_out)) > 0.9,
+				"the hidden niche's draft: lit, low, drifting out into its room while shut")
+		if draft != null:
+			_rig._show_hidden_niche(door_key, true)
+			var off := not draft.emitting and (hidden.get_node("Open") as Node3D).visible
+			_rig._show_hidden_niche(door_key, false)
+			_check(off and draft.emitting and (hidden.get_node("Cracked") as Node3D).visible,
+					"the draft stops when the niche's door opens and comes back when it shuts")
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
 

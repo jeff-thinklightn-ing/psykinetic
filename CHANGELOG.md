@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- A faint cool draft drifts low out of the barrow's hidden niche into the room while its door is shut; hold a light near the niches to see it (608 amended, environment's side).
 - The barrow's damp lair looks it: darker and colder, a faint haze, and your lantern's light only reaches a few steps (580, terrain's side).
 - Nothing grows indoors any more: no grass or flowers on dungeon floors, only loose stones (580).
 - A raised dais indoors is built stone with steps up its front, no longer a rock cliff, as in the Hall of Fallen Souls (580).

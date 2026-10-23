@@ -272,6 +272,17 @@ const EDGE_ROOTS := 0.7
 const MIST_SIZE := 1.1
 const MIST_SECONDS := 2.6
 const MIST_FULL := 6.0
+## The hidden niche's draft (608 amended, environment's side; Jeff: "you
+## feel a cool draft coming from one of the niches"): DRAFT_PUFFS faint
+## puffs DRAFT_SIZE across from the cracked wall's foot, DRAFT_LOW high at
+## most, drifting DRAFT_SPEED (m/s, a range) into the room and fading over
+## DRAFT_SECONDS: about a cell and a half. Lit as the scene is, so in the
+## barrow's dark only a light held near shows it.
+const DRAFT_PUFFS := 7
+const DRAFT_SIZE := 0.7
+const DRAFT_LOW := 0.45
+const DRAFT_SPEED := Vector2(0.22, 0.34)
+const DRAFT_SECONDS := 4.0
 const FALL_LEAST := 0.25
 ## A bridge's pieces stand this far over the banks' height, so the water
 ## drawn under (WATER_LIFT up) never shows through the deck.
@@ -1623,7 +1634,7 @@ var _edge_near_also: Dictionary[Vector2i, Array] = {}
 var _edge_mask: ImageTexture
 ## The barrow's niches by their wall edge (608, terrain's side, terrain
 ## "niches"): {cell, out, kind, variant}; the hidden niches' door pieces by
-## their edge: [cracked, open].
+## their edge: [cracked, open, its draft].
 var _niche_at: Dictionary[Vector3i, Dictionary] = {}
 var _hidden_niches: Dictionary[Vector3i, Array] = {}
 ## The ledges as curves (585, terrain's side, maps' terrain "ledges"): each
@@ -7431,31 +7442,7 @@ func _build_mists() -> void:
 		fade_texture.gradient = fade
 		process.color_ramp = fade_texture
 		mist.process_material = process
-		var puff := QuadMesh.new()
-		puff.size = Vector2(MIST_SIZE, MIST_SIZE)
-		var material := StandardMaterial3D.new()
-		# Lit as the scene is (unshaded it glowed at dusk), soft all round.
-		material.diffuse_mode = BaseMaterial3D.DIFFUSE_LAMBERT_WRAP
-		material.specular_mode = BaseMaterial3D.SPECULAR_DISABLED
-		material.roughness = 1.0
-		material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-		material.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
-		material.vertex_color_use_as_albedo = true
-		material.proximity_fade_enabled = true
-		material.proximity_fade_distance = 0.6
-		var soft := Gradient.new()
-		soft.set_color(0, Color(0.92, 0.95, 0.97, 1.0))
-		soft.set_color(1, Color(0.92, 0.95, 0.97, 0.0))
-		var round_texture := GradientTexture2D.new()
-		round_texture.gradient = soft
-		round_texture.fill = GradientTexture2D.FILL_RADIAL
-		round_texture.fill_from = Vector2(0.5, 0.5)
-		round_texture.fill_to = Vector2(0.5, 0.0)
-		round_texture.width = 64
-		round_texture.height = 64
-		material.albedo_texture = round_texture
-		puff.material = material
-		mist.draw_pass_1 = puff
+		mist.draw_pass_1 = _soft_puff(MIST_SIZE)
 		# Its frame: x across the foot, z down the stream, y up.
 		var at: Vector3 = foot["at"]
 		mist.transform = Transform3D(Basis(-across, Vector3.UP, down), at + Vector3.UP * 0.1 + down * 0.15)
@@ -8476,7 +8463,8 @@ func _read_niches() -> void:
 
 ## The hidden niche's door edge (608, terrain's side): no doorway, no leaf,
 ## but the wall: wall.crypt.cracked while its Door is shut, wall.crypt.
-## niche_open once it opens (_sync_doors), +x toward the room.
+## niche_open once it opens (_sync_doors), +x toward the room; and its
+## draft while shut (608 amended, environment's side, _make_draft).
 func _add_hidden_niche(key: Vector3i) -> void:
 	var niche: Dictionary = _niche_at[key]
 	var out: Vector2i = niche["out"]
@@ -8491,9 +8479,11 @@ func _add_hidden_niche(key: Vector3i) -> void:
 	found.name = "Open"
 	found.visible = false
 	holder.add_child(found)
+	var draft := _make_draft()
+	holder.add_child(draft)
 	_room.add_child(holder)
 	_walls[key] = holder
-	_hidden_niches[key] = [shut, found]
+	_hidden_niches[key] = [shut, found, draft]
 	_doors_due[key] = true
 	# Its footprints (608 amended): on the entry cell, going to the wall
 	# (+x along -out) and one back, on the floor; there whether found or not.
@@ -8504,6 +8494,95 @@ func _add_hidden_niche(key: Vector3i) -> void:
 		prints.position = Vector3(cell.x, _height_in(cell, Vector2(cell)), cell.y)
 		prints.rotation.y = atan2(float(out.y), -float(out.x))
 		_room.add_child(prints)
+
+
+## The hidden niche on [param key] shut or [param opened]: the cracked wall
+## and its draft, or the open niche (its last puffs fade as they go).
+func _show_hidden_niche(key: Vector3i, opened: bool) -> void:
+	(_hidden_niches[key][0] as Node3D).visible = not opened
+	(_hidden_niches[key][1] as Node3D).visible = opened
+	(_hidden_niches[key][2] as GPUParticles3D).emitting = not opened
+
+
+## The draft out of a hidden niche (608 amended, environment's side): in
+## its holder's frame (+x into the room, z along the wall), faint puffs
+## from along the cracked wall's foot drifting low into the room, sinking a
+## little, swelling and fading (DRAFT_*). Lit as the mists are.
+func _make_draft() -> GPUParticles3D:
+	var draft := GPUParticles3D.new()
+	draft.name = "Draft"
+	draft.amount = DRAFT_PUFFS
+	draft.lifetime = DRAFT_SECONDS
+	draft.preprocess = DRAFT_SECONDS
+	draft.local_coords = true
+	draft.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	draft.transform_align = GPUParticles3D.TRANSFORM_ALIGN_Z_BILLBOARD
+	draft.visibility_aabb = AABB(Vector3(-0.5, -0.5, -1.0), Vector3(2.5, 1.5, 2.0))
+	draft.position = Vector3(0.1, DRAFT_LOW * 0.5, 0.0)
+	var process := ParticleProcessMaterial.new()
+	process.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_BOX
+	process.emission_box_extents = Vector3(0.05, DRAFT_LOW * 0.4, 0.4)
+	process.direction = Vector3(1.0, -0.08, 0.0)
+	process.spread = 12.0
+	process.initial_velocity_min = DRAFT_SPEED.x
+	process.initial_velocity_max = DRAFT_SPEED.y
+	process.gravity = Vector3(0.0, -0.01, 0.0)
+	process.damping_min = 0.02
+	process.damping_max = 0.05
+	# A slow waver across the wall's run.
+	process.turbulence_enabled = true
+	process.turbulence_noise_strength = 0.15
+	process.turbulence_noise_speed_random = 0.1
+	process.turbulence_influence_min = 0.02
+	process.turbulence_influence_max = 0.05
+	process.scale_min = 0.6
+	process.scale_max = 1.0
+	var swell := Curve.new()
+	swell.add_point(Vector2(0.0, 0.5))
+	swell.add_point(Vector2(1.0, 1.2))
+	var swell_texture := CurveTexture.new()
+	swell_texture.curve = swell
+	process.scale_curve = swell_texture
+	var fade := Gradient.new()
+	fade.set_color(0, Color(1.0, 1.0, 1.0, 0.0))
+	fade.set_color(1, Color(1.0, 1.0, 1.0, 0.0))
+	fade.add_point(0.3, Color(1.0, 1.0, 1.0, 0.18))
+	var fade_texture := GradientTexture1D.new()
+	fade_texture.gradient = fade
+	process.color_ramp = fade_texture
+	draft.process_material = process
+	draft.draw_pass_1 = _soft_puff(DRAFT_SIZE)
+	return draft
+
+
+## A soft round puff [param size] across for a particle pass: lit as the
+## scene is (unshaded it glowed at dusk), soft all round, coloured by the
+## particle's colour ramp.
+static func _soft_puff(size: float) -> QuadMesh:
+	var puff := QuadMesh.new()
+	puff.size = Vector2(size, size)
+	var material := StandardMaterial3D.new()
+	material.diffuse_mode = BaseMaterial3D.DIFFUSE_LAMBERT_WRAP
+	material.specular_mode = BaseMaterial3D.SPECULAR_DISABLED
+	material.roughness = 1.0
+	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	material.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	material.vertex_color_use_as_albedo = true
+	material.proximity_fade_enabled = true
+	material.proximity_fade_distance = 0.6
+	var soft := Gradient.new()
+	soft.set_color(0, Color(0.92, 0.95, 0.97, 1.0))
+	soft.set_color(1, Color(0.92, 0.95, 0.97, 0.0))
+	var round_texture := GradientTexture2D.new()
+	round_texture.gradient = soft
+	round_texture.fill = GradientTexture2D.FILL_RADIAL
+	round_texture.fill_from = Vector2(0.5, 0.5)
+	round_texture.fill_to = Vector2(0.5, 0.0)
+	round_texture.width = 64
+	round_texture.height = 64
+	material.albedo_texture = round_texture
+	puff.material = material
+	return puff
 
 
 ## The rocks (terrain "rocks", decision 513, terrain's side): rock_plan's
@@ -12965,9 +13044,7 @@ func _sync_doors() -> void:
 		# leaf to swing, no wood to sound.
 		if _hidden_niches.has(key):
 			if door != null:
-				var opened := door.is_open()
-				(_hidden_niches[key][0] as Node3D).visible = not opened
-				(_hidden_niches[key][1] as Node3D).visible = opened
+				_show_hidden_niche(key, door.is_open())
 			_doors_due.erase(key)
 			continue
 		var doorway: Node3D = _doorways.get(key)
