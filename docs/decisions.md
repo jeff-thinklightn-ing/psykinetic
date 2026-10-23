@@ -25297,3 +25297,51 @@ has it:
   651541 has no clicks (0.04/s), a soft 1.5 kHz whistle 5 dB proud, and
   over 4 kHz it sits 23 dB under its whole and never steady (0% of its
   seconds within 10 dB; Jeff's crickets, 578, were 88-100%).
+
+
+## 580 step 3, dungeon's side: the halls dressed, the furniture as building kinds, the dais raised (3a)
+
+580's step 3 (design C:/dev/review/dungeon/halls_dressed_design.md, the
+coordinator's approval 2026-10-23, with one rule: 612 applies to the
+furniture as to walls, and the width test must see the dressed halls, the
+draugr's spin and waves needing the room). The furniture stands in the
+templates as building kinds, kept verbatim by every generation, and the
+dais is a height level. Nothing new in the sim's rules: what was rock is a
+solid building (its cells out of the floor and in terrain "solid", sight
+stopped, routes round), and the dais is a height step with stairs, as the
+wilds' ledges and flights are.
+
+- `Level.BUILDINGS` gains `building.burial_table` (3 x 2) and
+  `building.crypt_pillar` (2 x 2), art-kit's footprints (view_test holds
+  every kind to its slot's), both in `Level.SOLID` and `Level.DOORLESS`.
+  A comment line under PROTOCOL_REVISION names them (566 amended's
+  rule: a client without them would walk through their cells); 34 shipped in
+  v0.1.171 before this landed, so the line opens ## 35 with the bump (release's rule
+  at the rebase).
+- The templates (tools/plan_sheet.gd's samples, the levels written from
+  them by build/write_levels.gd, now height.png too): the first hall's
+  table a building at HALL_TABLE (38, 8) on floor, the Hall's six pillars
+  buildings at LAIR_PILLARS; the round table stays rock till 3b.
+- The dais: LAIR_DAIS 12 x 4 at (44, 62), one level up in
+  levels/barrow_lair/height.png, its back row against the hall's south
+  wall (the design had it a row forward, which left a strip one cell wide
+  behind it between its ledge and the wall: the coordinator's rule), the
+  row before it (y 61) twelve stair cells climbing south, its sides
+  ledges; level.json carries its "ledges" traced from the heights (585,
+  the writer traces them as MapDoc.save does), and the generated level.json
+  keeps them with the anchor's heights. The draugr's cell, the "from_temple" spawn and the shortcut's
+  sealed end move one row south with it ((49, 63), (49, 64), (49, 65)),
+  still the throne's row, behind it, and the back row.
+- `Level.narrow_runs` sees heights: a step is open only at one height or
+  up or down a stair climbing that way, so a dais's ledge closes a way as
+  a wall does, and level_test's width check on every template and on a
+  generation of the barrow and the Hall counts the furniture and the dais.
+- 3b (the round table, eight hall chairs, four broken tables, the throne)
+  follows art-kit's four slots, under the same label (3b; release: no new number).
+
+level_test `_test_barrow_level`: the table and pillars solid (their cells
+out of the floor, 6 and 24), the dais's heights and twelve stairs, the
+moved cells, no way one cell wide in the dressed halls, and a generation
+of each keeping all of it with no warning. view_test's footprint check
+covers the two kinds. docs/levels.md. Level data and the templates;
+protocol: the line opens ## 35 with the bump; no new class_name.

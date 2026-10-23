@@ -5,6 +5,15 @@
 	"walls": "stone",
 	"floors": "stone",
 	"grave_goods": true,
+	"buildings": [
+		{
+			"slot": "building.burial_table",
+			"at": [
+				38,
+				8
+			]
+		}
+	],
 	"starts": [
 		[
 			39,

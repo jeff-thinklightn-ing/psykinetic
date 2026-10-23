@@ -405,7 +405,9 @@ All of it is optional.
   are the map's own edges round it, drawn in the layout as any wall, so a
   building changes no rule: it says where the roof, the inside floor and
   the trim are drawn (art-kit's `building.*` slots), and what counts as
-  inside. A well stands on a water cell instead (`Level.ON_WATER`): the
+  inside. The crypt's burial table (3 x 2) and pillars (2 x 2) are solid
+  and doorless too (580 step 3): rock blocks a level says by their slot.
+  A well stands on a water cell instead (`Level.ON_WATER`): the
   water stops walkers and lets sight pass, it has no walls and no inside,
   and its water is drawn as ground under its rim. A solid building
   (`Level.SOLID`, decision 550: building.mound 5 x 5, a barrow) has no
@@ -527,7 +529,8 @@ any part a wall or a failed way left apart, through no wall); a doorway
 is a door edge in a room's wall, the one cell allowed (a way that runs
 through a walled room gets one each side), with the way outside
 it as wide as any; a dead end a cell deep (a tomb's alcove, a niche, the
-hidden door's stair cell) may be one. `Level.narrow_runs` (and
+hidden door's stair cell) may be one; a solid building's cells and a
+ledge (a height step with no stair) close a way as a wall does. `Level.narrow_runs` (and
 `Tools.narrow_runs` on a LevelMap) is the check: a cell with no open side
 across its axis joined to another such cell along it; labyrinth_test runs
 it on every generated style and layer, level_test on every regenerating
@@ -557,7 +560,8 @@ hides about 2.5 cells behind it). The templates are written from
   the town's newer tombs, square chambers with doors and torches): four
   anchors kept through every generation: the first hall under the mound's
   door (26 x 16: the link up to the wilds' "from_barrow", the spawn point
-  "from_wilds", the burial table a block of rock at its centre, seven
+  "from_wilds", the burial table at its centre (art-kit's
+  `building.burial_table`, 3 x 2, a solid doorless building; 580 step 3), seven
   niches a side cut into its east and west walls holding the town's dead
   (`"niches"` below: arches and hollows, a sealed slab now and then), a bay
   two rows tall each side where the ways come in (612), and the stair down to the Ossuary
@@ -605,9 +609,12 @@ hides about 2.5 cells behind it). The templates are written from
   near total, environment's sim and terrain's look): the oldest
   dead (6 skeletons) and, kept whole as the anchor `lair` (548's room he
   keeps), the hall itself, 32 x 22, walled all round but for one door cell
-  in its north wall: six pillars 2 x 2 in two rows and the round table at
-  its middle (rock in step 1; art-kit's pieces, chairs and broken tables in
-  step 3), the dais at the far end with the draugr on his throne, and the
+  in its north wall: six pillars 2 x 2 in two rows (art-kit's
+  `building.crypt_pillar`, solid doorless buildings; 580 step 3) and the
+  round table at its middle (rock till art-kit's piece, with the chairs and
+  broken tables, step 3b), the dais 12 x 4 at the far end one height level
+  up (the template's height.png; its front row twelve stairs, its sides
+  ledges, its back against the south wall) with the draugr on his throne, and the
   hidden exit behind the throne, the temple's sealed shortcut's end (540,
   `draugr`, the spawn point "from_temple"); its one door, in the north wall,
   shuts and locks behind the first player in while he sits (573 amended,

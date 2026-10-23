@@ -113,7 +113,8 @@ const BUILDINGS := {"building.hut": Vector2i(3, 3), "building.house": Vector2i(4
 	"building.field": Vector2i(4, 4), "building.fold": Vector2i(6, 6), "building.mound": Vector2i(12, 12),
 	"building.great_tree": Vector2i(3, 3), "building.cairn": Vector2i(2, 2), "building.standing_stone": Vector2i(1, 1),
 	"building.waystone": Vector2i(1, 1), "building.chopping_block": Vector2i(1, 1), "building.woodpile": Vector2i(1, 1),
-	"building.tower_ruin": Vector2i(3, 3), "building.rubble_heap": Vector2i(1, 1), "building.fallen_column": Vector2i(2, 1)}
+	"building.tower_ruin": Vector2i(3, 3), "building.rubble_heap": Vector2i(1, 1), "building.fallen_column": Vector2i(2, 1),
+	"building.burial_table": Vector2i(3, 2), "building.crypt_pillar": Vector2i(2, 2)}
 ## The buildings that stand on water, not floor: no inside, no walls (a
 ## well: its water is what stops walkers, and sight passes over it).
 const ON_WATER: Array[String] = ["building.well"]
@@ -129,13 +130,16 @@ const OPEN_AIR: Array[String] = ["building.field", "building.fold"]
 ## as a wall does; their outline has no walls (the slot's mesh is the
 ## mound), none expected.
 const SOLID: Array[String] = ["building.mound", "building.great_tree", "building.cairn", "building.standing_stone", "building.waystone",
-	"building.chopping_block", "building.woodpile", "building.tower_ruin", "building.rubble_heap", "building.fallen_column"]
+	"building.chopping_block", "building.woodpile", "building.tower_ruin", "building.rubble_heap", "building.fallen_column",
+	"building.burial_table", "building.crypt_pillar"]
 ## The solid buildings with no door (decision 567: the wilds' landmarks; 566
 ## amended: the work props, a chopping block and a woodpile a body stands
-## beside; 600: the Old Tower's broken tower and fallen stone): every cell
+## beside; 600: the Old Tower's broken tower and fallen stone; 580 step 3: the
+## crypt's burial table and pillars, the rock blocks they were): every cell
 ## of theirs out of the floor, none walked onto or into.
 const DOORLESS: Array[String] = ["building.great_tree", "building.cairn", "building.standing_stone", "building.waystone",
-	"building.chopping_block", "building.woodpile", "building.tower_ruin", "building.rubble_heap", "building.fallen_column"]
+	"building.chopping_block", "building.woodpile", "building.tower_ruin", "building.rubble_heap", "building.fallen_column",
+	"building.burial_table", "building.crypt_pillar"]
 ## solid_door_of's answer for a DOORLESS building.
 const NO_DOOR := Vector2i(-1, -1)
 ## A bridge (decision 505): a building entry {slot: "bridge", at, facing,
@@ -1344,8 +1348,17 @@ static func narrow_runs(terrain: Dictionary) -> Array[Vector2i]:
 		floor[cell] = true
 		cells.append(cell)
 	var edges: Dictionary = terrain.get("edges", {})
+	var heights: Dictionary = terrain.get("heights", {})
+	var stairs: Dictionary = terrain.get("stairs", {})
+	# A step is open across no wall edge and no ledge: the same height, or a
+	# stair climbing that way (580 step 3: a raised dais's sides are ledges).
 	var open := func(cell: Vector2i, direction: Vector2i) -> bool:
-		return floor.has(cell + direction) and int(edges.get(Terrain.edge_key(cell, direction), Terrain.Edge.OPEN)) != Terrain.Edge.WALL
+		var next := cell + direction
+		if not floor.has(next) or int(edges.get(Terrain.edge_key(cell, direction), Terrain.Edge.OPEN)) == Terrain.Edge.WALL:
+			return false
+		if int(heights.get(cell, 0)) == int(heights.get(next, 0)):
+			return true
+		return stairs.get(cell) == direction or stairs.get(next) == -direction
 	var out: Array[Vector2i] = []
 	out.assign(narrow_runs_by(cells, open).keys())
 	out.sort()

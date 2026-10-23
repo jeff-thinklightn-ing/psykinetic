@@ -1445,6 +1445,30 @@ func _test_barrow_level() -> void:
 		"every spawn point the stairs and the wilds come in by is floor; the wilds' sealed shortcut leads to the draugr's hall")
 	_check(Level.template_config("barrow_lair").get("stills", []) == ["barrow_deep", "barrow"] and Regen.config_of("barrow_lair")["anchors"][1]["name"] == "lair",
 		"the draugr's hall is his lair anchor, and the level names the Ossuary whose dead he stills (enemy-ai's)")
+	# The halls dressed (580 step 3): the burial table and the pillars are
+	# solid doorless buildings (their cells out of the floor, sight stopped),
+	# the dais one level up with its front row stairs and its sides ledges,
+	# and no way in the dressed halls is one cell wide (612, heights seen).
+	var king_table: Array = barrow["buildings"].filter(func(b: Dictionary) -> bool: return b["slot"] == "building.burial_table")
+	var pillars: Array = lair["buildings"].filter(func(b: Dictionary) -> bool: return b["slot"] == "building.crypt_pillar")
+	_check(king_table.size() == 1 and king_table[0]["rect"] == Rect2i(38, 8, 3, 2) and barrow["terrain"]["solid"].size() == 6
+		and not barrow["terrain"]["floor"].has(Vector2i(39, 8)) and pillars.size() == 6 and lair["terrain"]["solid"].size() == 24
+		and not lair["terrain"]["floor"].has(Vector2i(49, 48)) and lair["terrain"]["floor"].has(Vector2i(48, 50)),
+		"the burial table (3 x 2) and the six pillars (2 x 2) stand as solid buildings, their cells out of the floor (%d, %d solid)" % [barrow["terrain"]["solid"].size(), lair["terrain"]["solid"].size()])
+	var dais_ok := true
+	for cell in Level.rect_cells(Rect2i(44, 62, 12, 4)):
+		if int(lair["terrain"]["heights"].get(cell, 0)) != 1:
+			dais_ok = false
+	var stairs: Dictionary = lair["terrain"]["stairs"]
+	var stairs_ok := stairs.size() == 12
+	for x in range(44, 56):
+		if stairs.get(Vector2i(x, 61)) != Vector2i(0, 1):
+			stairs_ok = false
+	_check(dais_ok and stairs_ok and int(lair["terrain"]["heights"].get(Vector2i(43, 63), 0)) == 0 and int(lair["terrain"]["heights"].get(Vector2i(49, 61), 0)) == 0
+		and lair["spawn_points"]["from_temple"] == Vector2i(49, 64) and lair["links"][1]["tile"] == Vector2i(49, 65),
+		"the dais is one level up, its front row twelve stairs climbing south, its back row against the wall, the shortcut's end behind the throne (%d stairs)" % stairs.size())
+	_check(Level.narrow_runs(barrow["terrain"]).is_empty() and Level.narrow_runs(lair["terrain"]).is_empty(),
+		"no way in the dressed halls is one cell wide, the table, the pillars and the dais's ledges seen (%s)" % [Level.narrow_runs(lair["terrain"]).slice(0, 8)])
 	var made := Regen.generate("barrow", 1)
 	var made_deep := Regen.generate("barrow_deep", 1)
 	var made_dark := Regen.generate("barrow_lair", 1)
@@ -1452,6 +1476,12 @@ func _test_barrow_level() -> void:
 		and not made_deep.is_empty() and Regen.connected(LevelMap.from_image(made_deep["layout"], made_deep["config"]), made_deep["anchors"])
 		and not made_dark.is_empty() and Regen.connected(LevelMap.from_image(made_dark["layout"], made_dark["config"]), made_dark["anchors"]),
 		"a generation of each layer is laid and joins every anchor (%d, %d and %d tries)" % [made.get("tries", 0), made_deep.get("tries", 0), made_dark.get("tries", 0)])
+	var gen_barrow := Level.parse(made["layout"], made["height"], made["config"])
+	var gen_lair := Level.parse(made_dark["layout"], made_dark["height"], made_dark["config"])
+	_check(gen_barrow["warnings"].is_empty() and gen_lair["warnings"].is_empty() and gen_barrow["terrain"]["solid"].size() == 6 and gen_lair["terrain"]["solid"].size() == 24
+		and gen_lair["terrain"]["stairs"].size() == 12 and int(gen_lair["terrain"]["heights"].get(Vector2i(49, 63), 0)) == 1 and made_dark["height"] != null
+		and Level.narrow_runs(gen_barrow["terrain"]).is_empty() and Level.narrow_runs(gen_lair["terrain"]).is_empty(),
+		"a generation keeps the dressed halls: the table and pillars solid, the dais raised with its stairs, and no way one cell wide (%s %s)" % [gen_barrow["warnings"], gen_lair["warnings"]])
 	# Armour as grave goods (622, dungeon's side): the Ossuary's chests roll
 	# mail shirts, the Hall's mail and, rarely, plate; every generated chest's
 	# goods carry the grave mark; nowhere else gives armour. The rolls are

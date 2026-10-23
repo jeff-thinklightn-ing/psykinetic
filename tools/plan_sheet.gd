@@ -88,13 +88,17 @@ const LAIR_DOOR := Vector2i(49, 44)
 const LAIR_PILLARS: Array[Rect2i] = [Rect2i(39, 48, 2, 2), Rect2i(49, 48, 2, 2), Rect2i(59, 48, 2, 2),
 	Rect2i(39, 58, 2, 2), Rect2i(49, 58, 2, 2), Rect2i(59, 58, 2, 2)]
 const LAIR_TABLE := Rect2i(48, 52, 3, 3)
-const LAIR_DAIS := Rect2i(44, 61, 12, 4)
+## The dais (580 step 3): one height level up, its back row against the
+## hall's south wall (no strip a cell wide behind it: 612), the row before it
+## twelve stair cells, its sides ledges.
+const LAIR_DAIS := Rect2i(44, 62, 12, 4)
+const LAIR_STAIR_ROW := 61
 const LAIR_LINK_UP := Vector2i(49, 1)
 const LAIR_START := Vector2i(50, 2)
 const LAIR_FROM_ABOVE := Vector2i(49, 2)
-const LAIR_DRAUGR := Vector2i(49, 62)
-const LAIR_FROM_TEMPLE := Vector2i(49, 63)
-const LAIR_SHORTCUT_LINK := Vector2i(49, 64)
+const LAIR_DRAUGR := Vector2i(49, 63)
+const LAIR_FROM_TEMPLE := Vector2i(49, 64)
+const LAIR_SHORTCUT_LINK := Vector2i(49, 65)
 ## The barrow's legend: enemy-ai's kinds (547, 548), the barrow's own level.json
 ## colours, never Level.LEGEND's.
 const BARROW_LEGEND := {"monster_skeleton": "#d8d0b0", "monster_skeleton_guard": "#988c64", "monster_robber": "#8a5a2a", "monster_draugr": "#5a4636"}
@@ -193,7 +197,6 @@ static func sample_barrow() -> Dictionary:
 	_edge(rows, BARROW_FROM_BELOW, "east", "+")
 	for side: String in ["north", "south", "east"]:
 		_edge(rows, BARROW_STAIR, side, "#")
-	_rock_rect(rows, HALL_TABLE)
 	var markers := {BARROW_LINK: "link", BARROW_START: "start", BARROW_STAIR: "link", BARROW_ALTAR: "chest", BARROW_PACK: "chest"}
 	for guard: Vector2i in BARROW_GUARDS:
 		markers[guard] = "monster_skeleton_guard"
@@ -201,6 +204,7 @@ static func sample_barrow() -> Dictionary:
 		markers[torch] = "torch"
 	var layout := Level.image_from_rows(_lines(rows), markers, {"legend": BARROW_LEGEND})
 	var config := {"name": "The Barrow", "outdoor": false, "depth": 1, "walls": "stone", "floors": "stone", "grave_goods": true,
+		"buildings": [{"slot": "building.burial_table", "at": [HALL_TABLE.position.x, HALL_TABLE.position.y]}],  # The old king's table (580 step 3).
 		"starts": [[BARROW_START.x, BARROW_START.y]],
 		"spawn_points": {"from_wilds": [BARROW_FROM_WILDS.x, BARROW_FROM_WILDS.y], "from_below": [BARROW_FROM_BELOW.x, BARROW_FROM_BELOW.y]},
 		"links": [{"at": [BARROW_LINK.x, BARROW_LINK.y], "to_map": "wilds", "to_spawn": "from_barrow"},
@@ -262,13 +266,20 @@ static func sample_barrow_lair() -> Dictionary:
 	var rows := _blank_rows(LAIR_SIZE)
 	_lay_anchors(rows, LAIR_ANCHORS)
 	_edge(rows, LAIR_DOOR, "north", "+")  # The hall's one door, where the way comes in (held shut behind the first player in, 573 amended).
-	for pillar in LAIR_PILLARS:
-		_rock_rect(rows, pillar)
-	_rock_rect(rows, LAIR_TABLE)
+	_rock_rect(rows, LAIR_TABLE)  # The round table, rock till art-kit's piece (580 step 3b).
 	var markers := {LAIR_LINK_UP: "link", LAIR_START: "start", LAIR_SHORTCUT_LINK: "link", LAIR_DRAUGR: "monster_draugr"}
+	var heights := {}
+	for cell in Level.rect_cells(LAIR_DAIS):
+		heights[cell] = 1
+	for x in range(LAIR_DAIS.position.x, LAIR_DAIS.end.x):
+		markers[Vector2i(x, LAIR_STAIR_ROW)] = "stair"
 	var layout := Level.image_from_rows(_lines(rows), markers, {"legend": BARROW_LEGEND})
+	var pillars: Array = []
+	for pillar in LAIR_PILLARS:
+		pillars.append({"slot": "building.crypt_pillar", "at": [pillar.position.x, pillar.position.y]})
 	var config := {"name": "Hall of Fallen Souls", "outdoor": false, "depth": 3, "walls": "stone", "floors": "stone", "grave_goods": true,
 		"loot": {"chest": "fallen_grave"},  # Mail, and plate rare, with the oldest dead (622, dungeon's side).
+		"buildings": pillars,  # The six pillars (580 step 3).
 		"starts": [[LAIR_START.x, LAIR_START.y]],
 		"spawn_points": {"from_above": [LAIR_FROM_ABOVE.x, LAIR_FROM_ABOVE.y], "from_temple": [LAIR_FROM_TEMPLE.x, LAIR_FROM_TEMPLE.y]},
 		"links": [{"at": [LAIR_LINK_UP.x, LAIR_LINK_UP.y], "to_map": "barrow_deep", "to_spawn": "from_below"},
@@ -280,7 +291,7 @@ static func sample_barrow_lair() -> Dictionary:
 		"stills": ["barrow_deep", "barrow"], "dead": {"temper": "bold", "sees_in_dark": true, "graves": false},
 		"damp": true, "ambient": 0.03,
 		"legend": BARROW_LEGEND, "respawn_s": {"skeleton": 600}}
-	return {"layout": layout, "config": config}
+	return {"layout": layout, "height": Level.height_image(layout, heights), "config": config}
 
 
 func _ready() -> void:

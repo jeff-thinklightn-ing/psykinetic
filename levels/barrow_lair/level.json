@@ -8,6 +8,50 @@
 	"loot": {
 		"chest": "fallen_grave"
 	},
+	"buildings": [
+		{
+			"slot": "building.crypt_pillar",
+			"at": [
+				39,
+				48
+			]
+		},
+		{
+			"slot": "building.crypt_pillar",
+			"at": [
+				49,
+				48
+			]
+		},
+		{
+			"slot": "building.crypt_pillar",
+			"at": [
+				59,
+				48
+			]
+		},
+		{
+			"slot": "building.crypt_pillar",
+			"at": [
+				39,
+				58
+			]
+		},
+		{
+			"slot": "building.crypt_pillar",
+			"at": [
+				49,
+				58
+			]
+		},
+		{
+			"slot": "building.crypt_pillar",
+			"at": [
+				59,
+				58
+			]
+		}
+	],
 	"starts": [
 		[
 			50,
@@ -21,7 +65,7 @@
 		],
 		"from_temple": [
 			49,
-			63
+			64
 		]
 	},
 	"links": [
@@ -36,7 +80,7 @@
 		{
 			"at": [
 				49,
-				64
+				65
 			],
 			"to_map": "wilds",
 			"to_spawn": "from_barrow_shortcut",
@@ -47,7 +91,7 @@
 		{
 			"at": [
 				49,
-				62
+				63
 			],
 			"name": "Draugr"
 		}
@@ -120,5 +164,61 @@
 	},
 	"respawn_s": {
 		"skeleton": 600
-	}
+	},
+	"ledges": [
+		{
+			"points": [
+				[
+					43.5,
+					65.5,
+					0.25,
+					0.25
+				],
+				[
+					43.5,
+					65.0,
+					0.5,
+					0.0
+				],
+				[
+					43.5,
+					62.0,
+					0.5,
+					0.0
+				],
+				[
+					44.0,
+					61.5,
+					0.5,
+					0.0
+				],
+				[
+					55.0,
+					61.5,
+					0.5,
+					0.0
+				],
+				[
+					55.5,
+					62.0,
+					0.5,
+					0.0
+				],
+				[
+					55.5,
+					65.0,
+					0.5,
+					0.0
+				],
+				[
+					55.5,
+					65.5,
+					0.25,
+					0.25
+				]
+			],
+			"up": "right",
+			"closed": false
+		}
+	]
 }

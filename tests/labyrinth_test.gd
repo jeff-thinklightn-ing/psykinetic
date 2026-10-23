@@ -20,7 +20,7 @@ func _ready() -> void:
 	Net.port = preload("res://tests/test_ports.gd").of(17861)
 	for style in ["dwarven", "old", "barrow", "barrow_deep", "barrow_lair"]:
 		var sample := Sheet.sample_halls(style)
-		Level.register("lab_" + style, sample["layout"], null, sample["config"])
+		Level.register("lab_" + style, sample["layout"], sample.get("height"), sample["config"])  # The lair's dais heights (580 step 3).
 	_test_block()
 	_test_style("dwarven")
 	_test_style("old")
@@ -157,8 +157,8 @@ func _test_barrow() -> void:
 			hall_floor += 1
 			if cell.x == Sheet.HALL.position.x or cell.x == Sheet.HALL.end.x - 1:
 				in_walls += 1
-	_check(hall_floor == 24 * 16 - 6 + 5 and in_walls == 5 and not a.walkable(Vector2i(39, 8)),
-		"the first hall: 24 x 16 of floor less the table's six cells, a bay two rows tall each side and the hidden niche's alcove in the walls (%d floor, %d in the walls)" % [hall_floor, in_walls])
+	_check(hall_floor == 24 * 16 + 5 and in_walls == 5 and a.walkable(Vector2i(39, 8)),
+		"the first hall: 24 x 16 of floor (the table a building on it, 580 step 3), a bay two rows tall each side and the hidden niche's alcove in the walls (%d floor, %d in the walls)" % [hall_floor, in_walls])
 	var level := Level.parse(first["layout"], null, config)
 	var doors := 0
 	for key: Vector3i in level["terrain"]["edges"]:
@@ -333,7 +333,7 @@ func _test_barrow() -> void:
 	_check(Regen.connected(a, anchors) and Regen.connected(b, anchors) and _cut_off(a, Sheet.LAIR_FROM_ABOVE).is_empty() and _cut_off(b, Sheet.LAIR_FROM_ABOVE).is_empty(),
 		"the hall is reached from the stair foot in both, nothing cut off (%s; %s)" % [_cut_off(a, Sheet.LAIR_FROM_ABOVE).slice(0, 6), _cut_off(b, Sheet.LAIR_FROM_ABOVE).slice(0, 6)])
 	_check(Tools.narrow_runs(a).is_empty() and Tools.narrow_runs(b).is_empty(), "no passage is one cell wide in the dark below either (%s; %s)" % [Tools.sorted_cells(Tools.narrow_runs(a)).slice(0, 8), Tools.sorted_cells(Tools.narrow_runs(b)).slice(0, 8)])
-	level = Level.parse(dark["layout"], null, config)
+	level = Level.parse(dark["layout"], dark["height"], config)
 	doors = 0
 	for key: Vector3i in level["terrain"]["edges"]:
 		if level["terrain"]["edges"][key] == Terrain.Edge.DOOR:
@@ -346,8 +346,10 @@ func _test_barrow() -> void:
 	for spec: Dictionary in level["entities"]:
 		if Sheet.LAIR_HALL.has_point(spec["tile"]) and str(spec.get("kind", "")) != "draugr":
 			in_hall += 1
-	_check(in_hall == 0 and not a.walkable(Vector2i(49, 53)) and not a.walkable(Vector2i(39, 48)) and a.walkable(Vector2i(49, 44)) and a.walkable(Vector2i(49, 43)) == a.walkable(Vector2i(49, 43)),
-		"nothing is laid in his hall; the round table and the pillars are rock; the door cell in the north wall is floor")
+	var pillars: Array = config.get("buildings", []).filter(func(b: Dictionary) -> bool: return b.get("slot", "") == "building.crypt_pillar")
+	_check(in_hall == 0 and not a.walkable(Vector2i(49, 53)) and a.walkable(Vector2i(39, 48)) and pillars.size() == 6 and a.walkable(Vector2i(49, 44))
+		and level["terrain"]["solid"].size() == 24 and level["terrain"]["stairs"].size() == 12,
+		"nothing is laid in his hall; the round table is rock, the six pillars buildings on floor (their cells solid once parsed), the dais's twelve stairs kept, the door cell in the north wall floor (%d pillars)" % pillars.size())
 	_check(level["links"].size() == 2 and level["links"][1]["sealed"] == "draugr" and level["links"][1]["tile"] == Sheet.LAIR_SHORTCUT_LINK and Sheet.LAIR_DAIS.has_point(level["links"][1]["tile"]),
 		"the sealed shortcut's end lies on the dais behind the throne")
 	_check(Regen.generate("lab_barrow_lair", 1)["layout"].get_data() == dark["layout"].get_data(), "the same seed gives the same dark")
