@@ -19971,7 +19971,8 @@ one piece: items' side has the potion, the "speed" buff and the remedy's
 maker fix; npc's side is a check; this side is the medicine man's trade.
 It is the first case of 560's phase 2, a maker who sells their own make
 and buys their trade's materials from their own purse. The numbers are
-drafts for Jeff.
+drafts for Jeff. (The stamina potion, its run speed, duration and herb
+price, accepted by Jeff 2026-10-23: no longer a draft.)
 - Production: Hob's hut is a holding of its own, in the defend tier, whose
   wants never named a medical thing. So economy.json always_want gains
   "medical", and the remedy and the potion are made whatever the tier.
@@ -25544,3 +25545,32 @@ ui's town status sheet (624) asks the server how a town is doing; economy answer
 
 economy_test _test_town_sheet. Wire: a new command and message kind
 (MESSAGE_KINDS), a line under PROTOCOL_REVISION 34. No new class_name.
+## 622, economy's side: where armour comes from
+
+The armour design, section 5 (C:/dev/review/armour/design.md; the
+coordinator approved it; Jeff's draft values, which he tunes in play).
+
+- Leather armour is made by the tanner from leather 2 (value 22). Robes are made
+  by the weaver from cloth 3 (12). These are plain items.json "made" rows on
+  items' 622 rows, made by the makers already there; each has stock 2 so a
+  shelf doesn't drain the inn's leather or the loom's cloth.
+- Plate is made by the smith from ore 8 (value 80, stock 1), and only once his
+  town stands a forge and is a village or more. This is a new optional recipe field,
+  made.needs {kind, stage}:
+  - Items keeps it, and made_problem checks the kind is a building kind
+    (Level.kinds) and the stage one of Level.STAGES.
+  - Production's recipe filter skips a recipe with needs unless
+    Production.town_has (town, needs) says yes; without it set, never.
+  - Towns sets town_has to Towns.has_for_make: the kind standing (_stands)
+    and the town's stage at or past the needed one, in rules' "stages" order.
+  - The field is general, so the next gated make reuses it.
+  - Before then plate comes only as loot (dungeon's rows).
+- Mail is never made and nothing makes it appear. It has no recipe and no
+  market sells it. A shirt reaches a shelf only fenced by Snagfin by night
+  (586), and it is then sold by day at day_markup. It stays on the town's
+  shelf, at every counter; "only at Snagfin's" waits for Jeff.
+- Weight: World._weigh already counts it.
+
+production_test _test_made_needs and _test_mail_never_made (twenty days' work
+on the real catalog: no mail, no plate). Server only, protocol unchanged, no
+new class_name.

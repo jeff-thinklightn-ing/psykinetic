@@ -61,6 +61,8 @@ func _ready() -> void:
 	_test_world_tick()
 	_test_sites()
 	_test_fisherman()
+	_test_made_needs()
+	_test_mail_never_made()
 
 	Level.unregister(TOWN)
 	print("")
@@ -86,7 +88,7 @@ func _register_town() -> void:
 
 ## A fresh town at step 0 with [param resources] banked: Bram the smith at
 ## the forge, Dag the carpenter at the bench, Cora the cook at the kitchen.
-func _fresh(resources: Dictionary, rules := RULES) -> void:
+func _fresh(resources: Dictionary, rules := RULES, catalog := CATALOG) -> void:
 	_now = 0
 	var clock := func() -> int: return _now
 	_holdings = Holdings.new(WorldMap.build(_strings([TOWN])), null, {}, clock)
@@ -94,7 +96,7 @@ func _fresh(resources: Dictionary, rules := RULES) -> void:
 	_stock = Stockpile.new({}, clock, _book)
 	for what: String in resources:
 		_stock.deposit(STORE, what, int(resources[what]), "test")
-	_work = Production.new({}, _stock, _holdings, clock, rules, func() -> Dictionary: return CATALOG)
+	_work = Production.new({}, _stock, _holdings, clock, rules, func() -> Dictionary: return catalog)
 	_work.add_worker("bram", "Bram", ["smith"], STORE)
 	_work.add_worker("dag", "Dag", ["carpenter"], STORE)
 	_work.add_worker("cora", "Cora", ["cook"], STORE)
@@ -420,3 +422,61 @@ func _test_sites() -> void:
 	_check(not at_site.is_empty() and at_site.all(func(id: String) -> bool: return id == "pt_town/grounds"),
 		"the hunter hunts at the town's hunting ground (%s)" % [at_site])
 
+
+
+## A recipe's made.needs (622, economy's side): plate at the smith only once
+## the town stands a forge and is a village (Towns.has_for_make through
+## Production.town_has); before, the smith never starts it.
+func _test_made_needs() -> void:
+	print("
+== plate: a village's forge first ==")
+	var catalog := CATALOG.duplicate(true)
+	catalog["plate"] = {"id": "plate", "tags": ["weapon"], "made": {"by": "smith", "from": {"ore": 8}, "steps": 600, "needs": {"kind": "forge", "stage": "village"}}}
+	var rules := RULES.duplicate(true)
+	rules["stages"] = Production.read_rules()["stages"]
+	_fresh({"gold": 100, "ore": 40}, rules, catalog)
+	_check(_job_at("forge").is_empty(), "no town to ask yet")
+	_at(0)
+	_check(_job_at("forge").is_empty(), "with no town_has, the smith never starts plate (%s)" % [_job_at("forge")])
+	var towns := Towns.new({}, _work, rules, func() -> int: return _now)
+	towns._town(STORE)["stage"] = "hamlet"
+	towns._town(STORE)["buildings"]["forge"] = {"kind": "forge", "level": 1, "state": Towns.STANDING, "since": 0, "job": 0}
+	_at(300)
+	_at(600)
+	_check(_job_at("forge").is_empty() and not towns.has_for_make(STORE, {"kind": "forge", "stage": "village"}),
+		"a hamlet with a forge: no plate (%s)" % [_job_at("forge")])
+	towns._town(STORE)["stage"] = "village"
+	_at(900)
+	_check(towns.has_for_make(STORE, {"kind": "forge", "stage": "village"}) and _job_at("forge").get("recipe") == "plate",
+		"a village with its forge: the smith starts plate (%s)" % [_job_at("forge")])
+	towns._town(STORE)["buildings"].erase("forge")
+	_check(not towns.has_for_make(STORE, {"kind": "forge", "stage": "village"}), "a village without a forge has not what plate needs")
+	_check(Items.made_problem({"by": "smith", "from": {"ore": 8}, "steps": 600, "needs": {"kind": "forge", "stage": "village"}}, {}) == ""
+		and Items.made_problem({"by": "smith", "from": {"ore": 8}, "steps": 600, "needs": {"kind": "forge", "stage": "hamlet town"}}, {}) != ""
+		and Items.made_problem({"by": "smith", "from": {"ore": 8}, "steps": 600, "needs": {"kind": "no_such", "stage": "village"}}, {}) != "",
+		"Items checks a needs' kind and stage")
+
+
+## Mail is never made (622, economy's side; "nothing appearing in stock
+## from nowhere"): no recipe in the real catalog makes it and no market
+## sells it, so over days of work with every resource to hand, no shop
+## shows a mail shirt; plate, its town no village with a forge, neither.
+func _test_mail_never_made() -> void:
+	print("
+== mail never made, plate not before its forge ==")
+	var catalog := Production.items_catalog()
+	var file := Production.read_rules()
+	_check(not catalog.has("mail_armour") and catalog.get("plate_armour", {}).get("made", {}).get("needs", {}) == {"kind": "forge", "stage": "village"},
+		"the real catalog: no recipe for mail; plate's needs a village's forge")
+	var markets: Dictionary = file.get("trade", {}).get("markets", {})
+	_check(not markets.is_empty() and not markets.values().any(func(market: Dictionary) -> bool: return "mail_armour" in market.get("sells", []) or "plate_armour" in market.get("sells", [])),
+		"no market sells mail or plate")
+	_fresh({"gold": 500, "ore": 200, "wood": 200, "cloth": 100, "food": 100, "leather": 50}, RULES, catalog)
+	var seen := {}
+	for day in 20:
+		for tick in 10:
+			_at(_now + 600)
+		for id in _shop_ids():
+			seen[id] = true
+		_stock.deposit(STORE, "ore", 40, "test")
+	_check(not seen.has("mail_armour") and not seen.has("plate_armour"), "twenty days' work: no mail, no plate in the shop (%s)" % [seen.keys()])

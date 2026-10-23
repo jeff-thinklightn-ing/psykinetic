@@ -120,7 +120,9 @@ static func read(text: String) -> Dictionary:
 ## (every id), or "" if nothing: "by" a trade (TRADES), "steps" over 0, and
 ## either "from" (stockpile resources or item ids, each a count over 0) or
 ## "rework" (an item id); an optional "stock", over 0, the most a seller's
-## shelf keeps (economy's Production, decision 562; shop_cap without it).
+## shelf keeps (economy's Production, decision 562; shop_cap without it);
+## an optional "needs" {kind (a building kind), stage (Level.STAGES)}, what
+## the maker's town must have first (622, economy's side).
 static func made_problem(made: Dictionary, definitions: Dictionary) -> String:
 	if made.is_empty():
 		return ""
@@ -130,6 +132,12 @@ static func made_problem(made: Dictionary, definitions: Dictionary) -> String:
 		return "takes no steps"
 	if made.has("stock") and int(made["stock"]) <= 0:
 		return "keeps a shelf of %s" % made["stock"]
+	if made.has("needs"):
+		var needs: Dictionary = made["needs"]
+		if not Level.kinds().has(str(needs.get("kind", ""))):
+			return "needs a %s, no building kind" % needs.get("kind")
+		if str(needs.get("stage", "")) not in Level.STAGES:
+			return "needs stage %s, none of %s" % [needs.get("stage"), ", ".join(Level.STAGES)]
 	if made.has("rework"):
 		return "" if definitions.has(str(made["rework"])) else "reworks %s, no item" % made["rework"]
 	var from: Variant = made.get("from")
@@ -256,6 +264,9 @@ static func _made(value: Variant) -> Dictionary:
 		made["first"] = true  # Its trade tries it before the rest (decision 405).
 	if value.has("stock"):
 		made["stock"] = int(value["stock"])  # Its shelf's cap (decision 562).
+	if value.get("needs") is Dictionary:
+		# What the maker's town must have first (622, economy's side: plate at a village's forge).
+		made["needs"] = {"kind": str(value["needs"].get("kind", "")), "stage": str(value["needs"].get("stage", ""))}
 	if value.has("rework"):
 		made["rework"] = str(value["rework"])
 	elif value.get("from") is Dictionary:

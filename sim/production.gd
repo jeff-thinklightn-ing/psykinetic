@@ -64,6 +64,10 @@ var workshop_open := Callable()
 var workshop_level := Callable()
 ## (town, building id) -> void: a "build" job is done (Towns sets it).
 var on_built := Callable()
+## (town, needs {kind, stage}) -> bool: whether a town has what a recipe's
+## made.needs asks (622, economy's side: plate at a village's forge;
+## Towns sets it). Without it no recipe with needs is made.
+var town_has := Callable()
 ## (town, building id, worker_id, fee) -> int: what players gave toward a
 ## build pays its fee first, the rest kept by the town (Economy.settle_fund,
 ## decision 499); the gold it paid. Unset, the treasury pays it all.
@@ -1435,7 +1439,8 @@ func _bid(shop: Dictionary, wants: Array[String], signals: Dictionary, cat: Dict
 	if first_build != 0:
 		return _order_bid(shop, first_build, starved)
 	var recipes: Array = cat.values().filter(func(entry: Dictionary) -> bool:
-		return _recipe_ok(entry) and entry["made"]["by"] == shop["trade"])
+		return _recipe_ok(entry) and entry["made"]["by"] == shop["trade"] \
+				and (not entry["made"].has("needs") or town_has.is_valid() and bool(town_has.call(shop["town"], entry["made"]["needs"]))))
 	# The remedy first while anyone is sick (562: rules' first_when_sick).
 	var when_sick: Array = rules.get("first_when_sick", [])
 	var sick := recipes.any(func(entry: Dictionary) -> bool: return entry["id"] in when_sick) 			and _workers.keys().any(func(id: String) -> bool: return not id.begins_with(Townsfolk.COMPANION) and Townsfolk.is_sick(self, id))

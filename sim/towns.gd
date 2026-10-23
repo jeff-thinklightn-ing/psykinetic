@@ -130,6 +130,7 @@ func _init(saved := {}, with_production: Production = null, with_rules := {}, wi
 	production.workshop_open = allows
 	production.workshop_level = level_for
 	production.on_built = _built
+	production.town_has = has_for_make
 	production.work_rate = _work_rate
 	production.hunted.connect(_on_hunted)
 	production.work_done.connect(_on_work_done)
@@ -1667,6 +1668,15 @@ func _stage_turn(town: String) -> void:
 	record["stage"] = names[at + 1]
 	_note(town, "%s is a %s now" % [town, names[at + 1]])
 	stage_changed.emit(town)
+
+
+## Whether [param town] has what a recipe's made.needs asks (622, economy's
+## side; Production.town_has): its building [param needs] kind standing,
+## and the town at or past its stage (rules' "stages" order).
+func has_for_make(town: String, needs: Dictionary) -> bool:
+	var names: Array = rules.get("stages", []).map(func(each: Variant) -> String: return str(each.get("name", "")) if each is Dictionary else "")
+	var wanted := names.find(str(needs.get("stage", "")))
+	return _stands(town, str(needs.get("kind", ""))) and (str(needs.get("stage", "")).is_empty() or wanted >= 0 and names.find(stage(town)) >= wanted)
 
 
 ## Whether [param town] meets stage [param need]'s needs.
