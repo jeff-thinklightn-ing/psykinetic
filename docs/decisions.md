@@ -23976,3 +23976,41 @@ fact's text. Jeff: "part of his pay is to keep what he sees to himself".
 resident_test: Pip's body, the runner, trusted by the asker: no kept fact
 in his words, the stance line in their place, nothing told. Server only,
 protocol unchanged, no new class_name.
+## 614. Giving gold
+
+Jeff (2026-10-22, on the robbers' purses): "dropping purses of coins
+isn't ideal, there no way to trade gold in game either. that should be
+economies concern first. consolidate gold coins to being stackable in the
+inventory but not taking up a pack slot." Gold is never an item: it stays
+the record's count (Economy's purses), shown as one stack outside the pack
+(ui), and lies on the ground as a count (items' 601 amended). This is
+economy's side, the trade; the coordinator approved it 2026-10-22.
+
+- **The command.** "give_gold" {to: path, amount} gives the player's gold
+  to another player or to their own companion; {from: her path, amount}
+  takes it back from their companion, keeper only. The other must be in the
+  zone, standing, within World.COMPANION_REACH and in sight. Main.give_gold
+  checks it, and each refusal is a party line to the giver alone: too far,
+  only to a player or your own companion, say how much, you have only N.
+- **The transfer.** Economy.give_gold(from, to, amount, from_name,
+  to_name) moves the gold between two records, so none leaves the world
+  (Jeff's rule: player gold is lost only through spending). Each log names
+  the other ("gave to Bo", "given by Ann"). World.give_gold emits
+  gold_changed for both, so each player's gold line updates through the
+  "shop" message as before.
+- **Words.** "Ann gives Bo 7 gold." / "Ann takes 3 gold from Wren." go to
+  both players as a party line, from "Server".
+- **The companion's purse.** It is kept as "companion:<keeper id>"
+  (Economy.companion_purse), saved with the purses. companions show it on
+  her card. What she does with it waits on Jeff's open question, whether
+  companions are paid.
+- No two-sided trade window: gold beside a hand-over (the "transfer"
+  command) is the trade for now.
+
+ui draws "Give gold" on the bar under another player's bubble, and "Give
+gold" and "Take gold" on the companion's pack row, with one amount box.
+economy_test _test_give_gold (the transfer, the logs, the refusals, her
+purse saved) and _test_give_in_town (Main: 7 gold to a second player
+beside the host; not more than the host has, never taken from a player,
+not out of reach). A new command, so a line under the open protocol
+revision; no new class_name.

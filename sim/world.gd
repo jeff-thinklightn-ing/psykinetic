@@ -3012,6 +3012,18 @@ func add_gold(player_id: String, amount: int, why := "") -> int:
 	return now_gold
 
 
+## [param from_id] gives [param to_id] [param amount] gold (614,
+## Economy.give_gold): gold_changed for both. The amount given, 0 if none.
+func give_gold(from_id: String, to_id: String, amount: int, from_name := "", to_name := "") -> int:
+	if economy == null:
+		return 0
+	var given := economy.give_gold(from_id, to_id, amount, from_name, to_name)
+	if given > 0:
+		gold_changed.emit(from_id, economy.gold(from_id))
+		gold_changed.emit(to_id, economy.gold(to_id))
+	return given
+
+
 ## Player [param player_id]'s gold (0 on a client).
 func gold_of(player_id: String) -> int:
 	return economy.gold(player_id) if economy != null else 0

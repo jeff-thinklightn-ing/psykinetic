@@ -50,6 +50,7 @@ func _ready() -> void:
 	_test_barrow_charges()
 	_test_robbers_band()
 	_test_restart()
+	_test_give_gold()
 	await _test_in_town()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -412,6 +413,7 @@ func _test_in_town() -> void:
 	_check(Snapshot.load(Net.state_path)["economy"]["purses"].get(me) == 18, "the snapshot keeps the host's 18 gold")
 	await _test_barter_in_town(host, counter)
 	_test_robber_falls(host)
+	await _test_give_in_town(host)
 	remove_child(_main)
 	_main.free()
 	World.clear_zones()
@@ -510,3 +512,50 @@ func _check(ok: bool, label: String) -> void:
 	if not ok:
 		_failures += 1
 	print("  %s  %s" % ["PASS" if ok else "FAIL", label])
+
+
+## Giving gold (decision 614): a transfer between records, both logs naming
+## the other; nothing for too much, none, or to oneself; a companion's purse.
+func _test_give_gold() -> void:
+	print("
+== giving gold ==")
+	var economy := _fresh()
+	economy.add_gold("a", 30, "test")
+	_check(economy.give_gold("a", "b", 12, "Ann", "Bo") == 12 and economy.gold("a") == 18 and economy.gold("b") == 12,
+		"12 gold from Ann to Bo, no more and no less in the world")
+	_check(economy.gold_log("a").back()["why"] == "gave to Bo" and economy.gold_log("b").back()["why"] == "given by Ann", "each log names the other")
+	_check(economy.give_gold("a", "b", 19) == 0 and economy.give_gold("a", "b", 0) == 0 and economy.give_gold("a", "a", 5) == 0 and economy.gold("a") == 18,
+		"nothing for more than she has, for none, or to herself")
+	var pet := Economy.companion_purse("a")
+	_check(pet == "companion:a" and economy.give_gold("a", pet, 8) == 8 and economy.give_gold(pet, "a", 3) == 3 and economy.gold(pet) == 5,
+		"a companion's purse, given to and taken from")
+	var again := Economy.new(economy.to_dict(), economy.stockpile, economy.production, economy.clock, RULES, func() -> Dictionary: return CATALOG)
+	_check(again.gold(pet) == 5, "her purse saved")
+
+
+## The "give_gold" command (614) in Main: to a second player beside the
+## host, both told; refused out of reach, over the purse, to a resident.
+func _test_give_in_town(host: Player) -> void:
+	print("
+== the give_gold command ==")
+	_main._admit(4242, "11111111-0000-4000-8000-000000004242", "Bo")
+	await get_tree().process_frame
+	var bo: Player = null
+	for entity in World.get_entities():
+		if entity is Player and entity != host:
+			bo = entity
+	_check(bo != null, "a second player")
+	if bo == null:
+		return
+	World._relocate(host, Vector2i(5, 3))
+	World._relocate(bo, Vector2i(6, 3))
+	var me := host.player_id
+	World.add_gold(me, 20, "test")
+	var had := World.gold_of(me)
+	var bo_had := World.gold_of(bo.player_id)
+	_check(_main.give_gold(host, {"to": str(bo.get_path()), "amount": 7}) == 7 and World.gold_of(me) == had - 7 and World.gold_of(bo.player_id) == bo_had + 7,
+		"7 gold to Bo beside the host")
+	_check(_main.give_gold(host, {"to": str(bo.get_path()), "amount": had + 1}) == 0 and World.gold_of(me) == had - 7, "not more than the host has")
+	_check(_main.give_gold(host, {"from": str(bo.get_path()), "amount": 1}) == 0, "never taken from another player")
+	World._relocate(bo, Vector2i(5 + World.COMPANION_REACH + 2, 3))
+	_check(_main.give_gold(host, {"to": str(bo.get_path()), "amount": 1}) == 0 and World.gold_of(bo.player_id) == bo_had + 7, "nor out of reach")

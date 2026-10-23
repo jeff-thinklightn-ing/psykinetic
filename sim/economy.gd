@@ -231,6 +231,25 @@ func add_gold(player_id: String, amount: int, why := "") -> int:
 	return now_gold
 
 
+## [param from_id] gives [param to_id] [param amount] gold (decision 614,
+## Jeff: gold is traded in game, never an item): a transfer between the two
+## records, so no gold leaves the world; each log names the other
+## ([param from_name], [param to_name]). A purse may be a companion's,
+## "companion:<keeper id>". The amount given: 0, and nothing moves, for
+## an amount under 1, over what [param from_id] has, or to themselves.
+func give_gold(from_id: String, to_id: String, amount: int, from_name := "", to_name := "") -> int:
+	if from_id.is_empty() or to_id.is_empty() or from_id == to_id or amount < 1 or amount > gold(from_id):
+		return 0
+	add_gold(from_id, -amount, "gave to %s" % (to_name if not to_name.is_empty() else to_id))
+	add_gold(to_id, amount, "given by %s" % (from_name if not from_name.is_empty() else from_id))
+	return amount
+
+
+## The purse id of [param keeper_id]'s companion (614).
+static func companion_purse(keeper_id: String) -> String:
+	return "companion:%s" % keeper_id
+
+
 ## [param player_id]'s last changes of gold, oldest first.
 func gold_log(player_id: String) -> Array:
 	return _log.get(player_id, []).duplicate(true)

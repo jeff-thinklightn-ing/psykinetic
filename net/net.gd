@@ -316,7 +316,9 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## 32 (591): message "clearing" {zone, whole?, cells: [[x, y, stage]]} (a
 ## felled cell's stage, "trunk" grown back), sent before "map" whole, and
 ## terrain["clearing"] (cell -> stage) the views draw.
-const PROTOCOL_REVISION := 32
+## 33 (614): new command "give_gold" {to: a player's or your companion's path,
+## amount} or {from: your companion's path, amount}: gold from purse to purse.
+const PROTOCOL_REVISION := 33
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]
 ## Every kind of message (message, message_to, broadcast, broadcast_to).

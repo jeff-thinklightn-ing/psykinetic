@@ -7794,6 +7794,8 @@ func _on_command(entity: GridEntity, command_name: String, args: Dictionary) -> 
 		World.try_use(entity, int(args.get("slot", -1)))
 	elif command_name == "retain" and entity is Player:
 		retain(entity as Player, args)
+	elif command_name == "give_gold" and entity is Player:
+		give_gold(entity as Player, args)
 	elif command_name == "stance" and entity is Player:
 		var stance := str(args.get("kind", ""))
 		var toward := _point_direction(entity, args)
@@ -8765,6 +8767,54 @@ func _on_message(kind: String, data: Dictionary) -> void:
 
 ## A name for the party log: players by record name, residents by the label
 ## over their head ("Bram [smith]"), everything else by its node name.
+## Server: the "give_gold" command (decision 614; Jeff: gold traded in
+## game, never an item). {to: path, amount}: [param player]'s gold to
+## another player or to their own companion; {from: her path, amount}: the
+## keeper takes it back from their companion's purse
+## (Economy.companion_purse). The other must be in the zone, standing,
+## within World.COMPANION_REACH and in sight. Both are told by a party
+## line; a refusal goes to the giver alone. The gold given.
+func give_gold(player: Player, args: Dictionary) -> int:
+	var taking := args.has("from")
+	var other := get_node_or_null(NodePath(str(args.get("from" if taking else "to", "")))) as GridEntity
+	var amount := int(args.get("amount", 0))
+	var mine := str(_peer_ids.get(player.owner_peer, ""))
+	var why := ""
+	var other_id := ""
+	var other_name := ""
+	if other == null or other == player or not other.spawned or other.zone != player.zone or other.hp <= 0 			or World.distance(player.tile, other.tile) > World.COMPANION_REACH or not World.has_line_of_sight(player.tile, other.tile):
+		why = "They are too far away."
+	elif other is Companion and (other as Companion).keeper_id == mine:
+		other_id = Economy.companion_purse(mine)
+		other_name = str(_records[mine].companion.get("name", "your companion")) if _records.has(mine) else "your companion"
+	elif other is Player and not taking:
+		other_id = str(_peer_ids.get(other.owner_peer, ""))
+		other_name = _display_name(other)
+	else:
+		why = "You can only give gold to another player or your own companion."
+	if why.is_empty() and other_id.is_empty():
+		why = "They are too far away."
+	if why.is_empty() and amount < 1:
+		why = "Say how much."
+	var from_id := other_id if taking else mine
+	if why.is_empty() and amount > World.gold_of(from_id):
+		why = "%s %d gold." % ["She has only" if taking else "You have only", World.gold_of(from_id)]
+	var given := 0
+	if why.is_empty():
+		var my_name := _display_name(player)
+		given = World.give_gold(from_id, mine if taking else other_id, amount, other_name if taking else my_name, my_name if taking else other_name)
+	if given <= 0:
+		Net.broadcast_to([player.owner_peer], "party", {"from": "Server", "text": why if not why.is_empty() else "No gold changes hands."})
+		return 0
+	var line := "%s takes %d gold from %s." % [_display_name(player), given, other_name] if taking 		else "%s gives %s %d gold." % [_display_name(player), other_name, given]
+	var peers: Array[int] = [player.owner_peer]
+	if other is Player and other.owner_peer != player.owner_peer:
+		peers.append(other.owner_peer)
+	Net.broadcast_to(peers, "party", {"from": "Server", "text": line})
+	print("[economy] %s" % line)
+	return given
+
+
 func _display_name(entity: GridEntity) -> String:
 	if entity is Player:
 		var record: PlayerRecord = _records.get(_peer_ids.get(entity.owner_peer, ""))
