@@ -346,6 +346,8 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## new "town_sheet" message (Main.town_sheet's keys, or {town, why}).
 ## 35 (640, economy's side): the "folds" message {counts: {place id: sheep}}, a
 ## herder's fold's sheep at home, to the zone on a change and to a peer arriving.
+## 35 (622, step 2): a drawn bow's step and draw time read the armour worn
+## (range_steps caps the step, draw scales the ticks), alike on client and server.
 const PROTOCOL_REVISION := 35
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]

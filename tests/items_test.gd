@@ -1712,6 +1712,24 @@ func _test_armour() -> void:
 	_check(World.try_transfer(host, host, packed, host, Items.ARMOUR) and host.worn == "leather_armour"
 			and is_equal_approx(host.mass - bare, Items.weight_of("leather_armour")), "worn: its slot, worn says so, its weight carried")
 	_check(World.worn_armour(host).get("look") == "leather" and float(World.worn_armour(host)["draw"]) == 0.9, "worn_armour reads its stats")
+	# The bow under armour (decision 622, step 2): light draws quicker, heavy caps the reach.
+	_give(host, "bow", Player.RIGHT_HAND)
+	_give(host, "arrows", Player.LEFT_HAND)
+	_check(World.try_stance(host, "draw"), "drawn in leather")
+	host.raised_tick = World.tick - 19
+	_check(World.range_of(host) == 9 and is_equal_approx(World.draw_quick(host), 0.9),
+			"in leather, 19 ticks reach 9 cells (bare, 7): its draw is 0.9 of the ticks (%d)" % World.range_of(host))
+	host.raised = ""
+	var plate := World.items.mint("plate_armour", "made")
+	_check(World.try_transfer(host, host, Items.ARMOUR, host, 2) and World.put_item(host, host, Items.ARMOUR, plate) and host.worn == "plate_armour",
+			"the leather off, plate on")
+	World.try_stance(host, "draw")
+	host.raised_tick = World.tick - 100
+	_check(World.range_of(host) == 5 and World.longest_range(host) == 5 and World.draw_step(host) == 1 and is_equal_approx(World.draw_of(host), 1.0),
+			"in plate a bow reaches 5 cells at most, however long it is held, its pull full there (%d)" % World.range_of(host))
+	host.raised = ""
+	World.try_transfer(host, host, Items.ARMOUR, host, 3)
+	World.try_transfer(host, host, 2, host, Items.ARMOUR)
 	var knife := World.items.mint("knife", "made")
 	World.put_item(host, host, 0, knife)
 	said.clear()

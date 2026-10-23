@@ -11437,9 +11437,9 @@ static func bow_pull(entity: GridEntity) -> float:
 	var verb := Items.verb_of(World.drawn_with(entity))
 	if verb.is_empty() or entity.raised != "draw":
 		return 0.0
-	var quick := float(Items.strength_value(World.slot_strength(entity, World.drawn_slot(entity)), "draw", 1.0))
+	var quick := World.draw_quick(entity)  # A quick bow's, and the armour's (decision 622, step 2).
 	var least := roundi(int(verb.get("draw_min", 0)) * quick)
-	var full := maxf(1.0, float(verb.get("draw_full", 1)) * quick)
+	var full := World.draw_full_ticks(entity)
 	var drawn := World.tick - entity.raised_tick
 	var progress := World.draw_of(entity)
 	if progress <= 0.0:

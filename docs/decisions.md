@@ -25673,3 +25673,20 @@ What is new:
 production_test _test_workshop_makes; return_test (a second hut far off:
 a second healer, another name, the remedy alone). Server only, protocol
 unchanged, no new class_name.
+### 622, step 2, items' side: the bow under armour
+
+- **range_steps** caps the step a drawn bow reaches: the last of its verb's
+  steps at or under the armour's range_steps, at least the first
+  (World.step_cap). With the hunting bow's [3, 5, 7, 9]: mail (7) holds at 7,
+  plate (5) at 5, leather and robes (9) reach them all. draw_step,
+  range_of and longest_range keep to it, so a monster or a view reading
+  them sees the same reach, and the pull's pose is full at that step
+  (World.draw_full_ticks).
+- **draw** scales the bow's draw ticks beside a quick bow's strength
+  (_draw_quick, now public as World.draw_quick, which Client3D's pull reads):
+  leather 0.9 draws quicker, plate 1.1 slower. The cone (620) narrows with
+  the same hold.
+- Both read World.worn_armour from the replicated slots, so a client's
+  prediction and the server's roll agree; a v0.1.169 client would not, so a
+  line under PROTOCOL_REVISION 34 (release). items_test _test_armour (leather:
+  19 ticks reach 9 cells, bare 7; plate: 5 at most, however long the hold).

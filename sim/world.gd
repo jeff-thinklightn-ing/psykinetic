@@ -4970,17 +4970,51 @@ func draw_of(entity: GridEntity) -> float:
 	var quick := _draw_quick(entity)
 	if drawn < roundi(int(verb["draw_min"]) * quick):
 		return 0.0
-	return clampf(float(drawn) / maxf(1.0, float(verb["draw_full"]) * quick), 0.0, 1.0)
+	return clampf(float(drawn) / draw_full_ticks(entity), 0.0, 1.0)
 
 
-## A quick bow (decision 365) draws in less time: its ticks' multiple.
+## A quick bow (decision 365) draws in less time, and so does one drawn in
+## light armour, a heavy one in more (decision 622, step 2: the armour's "draw"):
+## its ticks' multiple.
 func _draw_quick(entity: GridEntity) -> float:
-	return float(Items.strength_value(slot_strength(entity, drawn_slot(entity)), "draw", 1.0))
+	return float(Items.strength_value(slot_strength(entity, drawn_slot(entity)), "draw", 1.0)) \
+		* float(worn_armour(entity).get("draw", 1.0))
+
+
+## The multiple of its bow's draw ticks [param entity] draws in (_draw_quick):
+## the views' pull reads it as the sim does.
+func draw_quick(entity: GridEntity) -> float:
+	return _draw_quick(entity)
+
+
+## The last of its bow's steps [param entity] can reach in the armour it
+## wears (decision 622, step 2: the armour's "range_steps", the most cells it lets a
+## bow reach, the step at or under it, at least the first); the bow's last
+## step with none.
+func step_cap(entity: GridEntity) -> int:
+	var steps: Array = Items.verb_of(drawn_with(entity)).get("steps", [])
+	var cap := steps.size() - 1
+	var most: Variant = worn_armour(entity).get("range_steps")
+	if most == null or cap < 0:
+		return cap
+	while cap > 0 and int(steps[cap]) > int(most):
+		cap -= 1
+	return cap
+
+
+## The ticks [param entity]'s bow takes to its last reachable step
+## (step_cap), quickness counted: where the pull is full.
+func draw_full_ticks(entity: GridEntity) -> float:
+	var verb := Items.verb_of(drawn_with(entity))
+	if verb.is_empty():
+		return 1.0
+	return maxf(1.0, (int(verb["draw_min"]) + int(verb["draw_step"]) * maxi(step_cap(entity), 0)) * _draw_quick(entity))
 
 
 ## The step [param entity]'s drawn bow has reached (decision 583): 0,
 ## the verb's first, at draw_min ticks, one more every draw_step, held at
-## the last; -1 before draw_min or when not drawing.
+## the last its armour lets it reach (step_cap; decision 622, step 2); -1 before
+## draw_min or when not drawing.
 func draw_step(entity: GridEntity) -> int:
 	if not is_instance_valid(entity) or entity.raised != "draw":
 		return -1
@@ -4991,7 +5025,7 @@ func draw_step(entity: GridEntity) -> int:
 	var past := tick - entity.raised_tick - roundi(int(verb["draw_min"]) * quick)
 	if past < 0:
 		return -1
-	return mini(floori(past / maxf(1.0, float(verb["draw_step"]) * quick)), (verb["steps"] as Array).size() - 1)
+	return mini(floori(past / maxf(1.0, float(verb["draw_step"]) * quick)), step_cap(entity))
 
 
 ## The cells [param entity]'s drawn bow reaches now (its step's; decision
@@ -5001,10 +5035,13 @@ func range_of(entity: GridEntity) -> int:
 	return 0 if step < 0 else int(Items.verb_of(drawn_with(entity))["steps"][step])
 
 
-## The cells the bow in [param entity]'s hands reaches at its longest step;
-## 0 with none.
+## The cells the bow in [param entity]'s hands reaches at its longest step
+## its armour lets it reach (step_cap; decision 622, step 2); 0 with none.
 func longest_range(entity: GridEntity) -> int:
-	return int(Items.verb_of(drawn_with(entity)).get("cells", 0))
+	var verb := Items.verb_of(drawn_with(entity))
+	if verb.is_empty() or (verb.get("steps", []) as Array).is_empty():
+		return int(verb.get("cells", 0))
+	return int(verb["steps"][step_cap(entity)])
 
 
 ## The half-angle in radians of the cone [param entity]'s drawn bow

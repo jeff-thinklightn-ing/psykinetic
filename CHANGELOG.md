@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- A bow drawn in armour (622, step 2): in leather it draws quicker; in a mail shirt it reaches 7 cells at most, in plate 5, however long you hold; robes change nothing.
 - There can be more than one healer's hut, each with its own healer and its own potions: Hob's hut still makes the remedy and the stamina potion, and any other hut the remedy and potions of its own (641).
 - Herders live out in the hills, at the herder's hut and the shieling, each keeping a few sheep in a fold; every few days they walk a drove down to a town with a butchery and sell it, and you can see the fold thin while they are gone (640, economy's side).
 - Armour is made in town: the tanner makes leather armour from leather, the weaver robes from cloth, and the smith plate from ore, but only once his town is a village with a forge; mail is never made, only found in the crypt and sold on by Snagfin (622, economy's side).
