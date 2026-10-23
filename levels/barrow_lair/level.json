@@ -50,6 +50,156 @@
 				59,
 				58
 			]
+		},
+		{
+			"slot": "building.round_table",
+			"at": [
+				48,
+				52
+			]
+		},
+		{
+			"slot": "building.hall_chair",
+			"at": [
+				48,
+				51
+			],
+			"facing": [
+				0,
+				1
+			]
+		},
+		{
+			"slot": "building.hall_chair",
+			"at": [
+				50,
+				51
+			],
+			"facing": [
+				0,
+				1
+			]
+		},
+		{
+			"slot": "building.hall_chair",
+			"at": [
+				48,
+				55
+			],
+			"facing": [
+				0,
+				-1
+			]
+		},
+		{
+			"slot": "building.hall_chair",
+			"at": [
+				50,
+				55
+			],
+			"facing": [
+				0,
+				-1
+			]
+		},
+		{
+			"slot": "building.hall_chair",
+			"at": [
+				47,
+				52
+			],
+			"facing": [
+				1,
+				0
+			]
+		},
+		{
+			"slot": "building.hall_chair",
+			"at": [
+				47,
+				54
+			],
+			"facing": [
+				1,
+				0
+			]
+		},
+		{
+			"slot": "building.hall_chair",
+			"at": [
+				51,
+				52
+			],
+			"facing": [
+				-1,
+				0
+			]
+		},
+		{
+			"slot": "building.hall_chair",
+			"at": [
+				51,
+				54
+			],
+			"facing": [
+				-1,
+				0
+			]
+		},
+		{
+			"slot": "building.broken_table",
+			"at": [
+				34,
+				52
+			],
+			"facing": [
+				1,
+				0
+			]
+		},
+		{
+			"slot": "building.broken_table",
+			"at": [
+				34,
+				55
+			],
+			"facing": [
+				1,
+				0
+			]
+		},
+		{
+			"slot": "building.broken_table",
+			"at": [
+				65,
+				52
+			],
+			"facing": [
+				-1,
+				0
+			]
+		},
+		{
+			"slot": "building.broken_table",
+			"at": [
+				65,
+				55
+			],
+			"facing": [
+				-1,
+				0
+			]
+		},
+		{
+			"slot": "building.throne",
+			"at": [
+				49,
+				63
+			],
+			"facing": [
+				0,
+				-1
+			]
 		}
 	],
 	"starts": [

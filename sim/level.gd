@@ -114,15 +114,19 @@ const BUILDINGS := {"building.hut": Vector2i(3, 3), "building.house": Vector2i(4
 	"building.great_tree": Vector2i(3, 3), "building.cairn": Vector2i(2, 2), "building.standing_stone": Vector2i(1, 1),
 	"building.waystone": Vector2i(1, 1), "building.chopping_block": Vector2i(1, 1), "building.woodpile": Vector2i(1, 1),
 	"building.tower_ruin": Vector2i(3, 3), "building.rubble_heap": Vector2i(1, 1), "building.fallen_column": Vector2i(2, 1),
-	"building.burial_table": Vector2i(3, 2), "building.crypt_pillar": Vector2i(2, 2)}
+	"building.burial_table": Vector2i(3, 2), "building.crypt_pillar": Vector2i(2, 2),
+	"building.round_table": Vector2i(3, 3), "building.hall_chair": Vector2i(1, 1), "building.broken_table": Vector2i(2, 1),
+	"building.throne": Vector2i(1, 1)}
 ## The buildings that stand on water, not floor: no inside, no walls (a
 ## well: its water is what stops walkers, and sight passes over it).
 const ON_WATER: Array[String] = ["building.well"]
 ## The buildings on floor with no inside (decision 452): open to the sky,
 ## nothing roofed, walked into as ground. Their outline's walls are a fence
 ## (the slot's own mesh draws it): they stop walkers, not sight, and are
-## not drawn as walls; a gap in it is an open edge.
-const OPEN_AIR: Array[String] = ["building.field", "building.fold"]
+## not drawn as walls; a gap in it is an open edge. The feast hall's chairs
+## and the draugr's throne (580 step 3) are walked onto too: a seat is a
+## floor cell with a piece on it, no wall round it.
+const OPEN_AIR: Array[String] = ["building.field", "building.fold", "building.hall_chair", "building.throne"]
 ## The buildings that are solid (decision 550): no inside and no floor but
 ## their door, the front row's middle cell (a barrow's mound: its link is
 ## there). Their other cells are taken out of the floor (nobody walks onto
@@ -131,7 +135,7 @@ const OPEN_AIR: Array[String] = ["building.field", "building.fold"]
 ## mound), none expected.
 const SOLID: Array[String] = ["building.mound", "building.great_tree", "building.cairn", "building.standing_stone", "building.waystone",
 	"building.chopping_block", "building.woodpile", "building.tower_ruin", "building.rubble_heap", "building.fallen_column",
-	"building.burial_table", "building.crypt_pillar"]
+	"building.burial_table", "building.crypt_pillar", "building.round_table", "building.broken_table"]
 ## The solid buildings with no door (decision 567: the wilds' landmarks; 566
 ## amended: the work props, a chopping block and a woodpile a body stands
 ## beside; 600: the Old Tower's broken tower and fallen stone; 580 step 3: the
@@ -139,7 +143,7 @@ const SOLID: Array[String] = ["building.mound", "building.great_tree", "building
 ## of theirs out of the floor, none walked onto or into.
 const DOORLESS: Array[String] = ["building.great_tree", "building.cairn", "building.standing_stone", "building.waystone",
 	"building.chopping_block", "building.woodpile", "building.tower_ruin", "building.rubble_heap", "building.fallen_column",
-	"building.burial_table", "building.crypt_pillar"]
+	"building.burial_table", "building.crypt_pillar", "building.round_table", "building.broken_table"]
 ## solid_door_of's answer for a DOORLESS building.
 const NO_DOOR := Vector2i(-1, -1)
 ## A bridge (decision 505): a building entry {slot: "bridge", at, facing,

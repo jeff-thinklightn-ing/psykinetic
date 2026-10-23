@@ -339,8 +339,9 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## 34 (622): a seventh carried slot, the armour worn (Items.ARMOUR = 6, CARRIED 7):
 ## Player's and Companion's slots replicate seven; Player.worn and Companion.worn
 ## (SUBCLASS_REPLICATED), the armour's id.
-## 35 (580 step 3, dungeon's side): building.burial_table and building.crypt_pillar are solid
-## (Level.SOLID): a client without them would walk through their cells.
+## 35 (580 step 3, dungeon's side): building.burial_table, building.crypt_pillar,
+## building.round_table and building.broken_table are solid (Level.SOLID): a client
+## without them would walk through their cells.
 const PROTOCOL_REVISION := 35
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]

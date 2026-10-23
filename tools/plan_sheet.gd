@@ -88,6 +88,15 @@ const LAIR_DOOR := Vector2i(49, 44)
 const LAIR_PILLARS: Array[Rect2i] = [Rect2i(39, 48, 2, 2), Rect2i(49, 48, 2, 2), Rect2i(59, 48, 2, 2),
 	Rect2i(39, 58, 2, 2), Rect2i(49, 58, 2, 2), Rect2i(59, 58, 2, 2)]
 const LAIR_TABLE := Rect2i(48, 52, 3, 3)
+## The feast (580 step 3b): eight chairs on the ring round the table facing
+## in, four broken tables against the east and west walls between the
+## pillar rows (their long side along the wall, never a cell off it: 612).
+const LAIR_CHAIRS: Array = [[Vector2i(48, 51), Vector2i(0, 1)], [Vector2i(50, 51), Vector2i(0, 1)],
+	[Vector2i(48, 55), Vector2i(0, -1)], [Vector2i(50, 55), Vector2i(0, -1)],
+	[Vector2i(47, 52), Vector2i(1, 0)], [Vector2i(47, 54), Vector2i(1, 0)],
+	[Vector2i(51, 52), Vector2i(-1, 0)], [Vector2i(51, 54), Vector2i(-1, 0)]]
+const LAIR_BROKEN_TABLES: Array = [[Vector2i(34, 52), Vector2i(1, 0)], [Vector2i(34, 55), Vector2i(1, 0)],
+	[Vector2i(65, 52), Vector2i(-1, 0)], [Vector2i(65, 55), Vector2i(-1, 0)]]
 ## The dais (580 step 3): one height level up, its back row against the
 ## hall's south wall (no strip a cell wide behind it: 612), the row before it
 ## twelve stair cells, its sides ledges.
@@ -266,7 +275,6 @@ static func sample_barrow_lair() -> Dictionary:
 	var rows := _blank_rows(LAIR_SIZE)
 	_lay_anchors(rows, LAIR_ANCHORS)
 	_edge(rows, LAIR_DOOR, "north", "+")  # The hall's one door, where the way comes in (held shut behind the first player in, 573 amended).
-	_rock_rect(rows, LAIR_TABLE)  # The round table, rock till art-kit's piece (580 step 3b).
 	var markers := {LAIR_LINK_UP: "link", LAIR_START: "start", LAIR_SHORTCUT_LINK: "link", LAIR_DRAUGR: "monster_draugr"}
 	var heights := {}
 	for cell in Level.rect_cells(LAIR_DAIS):
@@ -277,9 +285,18 @@ static func sample_barrow_lair() -> Dictionary:
 	var pillars: Array = []
 	for pillar in LAIR_PILLARS:
 		pillars.append({"slot": "building.crypt_pillar", "at": [pillar.position.x, pillar.position.y]})
+	# The feast (3b): the round table in place of its rock block, the chairs
+	# round it, the broken tables against the walls, the throne at his cell
+	# facing the hall.
+	pillars.append({"slot": "building.round_table", "at": [LAIR_TABLE.position.x, LAIR_TABLE.position.y]})
+	for chair: Array in LAIR_CHAIRS:
+		pillars.append({"slot": "building.hall_chair", "at": [chair[0].x, chair[0].y], "facing": [chair[1].x, chair[1].y]})
+	for table: Array in LAIR_BROKEN_TABLES:
+		pillars.append({"slot": "building.broken_table", "at": [table[0].x, table[0].y], "facing": [table[1].x, table[1].y]})
+	pillars.append({"slot": "building.throne", "at": [LAIR_DRAUGR.x, LAIR_DRAUGR.y], "facing": [0, -1]})
 	var config := {"name": "Hall of Fallen Souls", "outdoor": false, "depth": 3, "walls": "stone", "floors": "stone", "grave_goods": true,
 		"loot": {"chest": "fallen_grave"},  # Mail, and plate rare, with the oldest dead (622, dungeon's side).
-		"buildings": pillars,  # The six pillars (580 step 3).
+		"buildings": pillars,  # The six pillars and the feast (580 step 3).
 		"starts": [[LAIR_START.x, LAIR_START.y]],
 		"spawn_points": {"from_above": [LAIR_FROM_ABOVE.x, LAIR_FROM_ABOVE.y], "from_temple": [LAIR_FROM_TEMPLE.x, LAIR_FROM_TEMPLE.y]},
 		"links": [{"at": [LAIR_LINK_UP.x, LAIR_LINK_UP.y], "to_map": "barrow_deep", "to_spawn": "from_below"},

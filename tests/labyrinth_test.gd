@@ -354,9 +354,9 @@ func _test_barrow() -> void:
 		if Sheet.LAIR_HALL.has_point(spec["tile"]) and str(spec.get("kind", "")) != "draugr":
 			in_hall += 1
 	var pillars: Array = config.get("buildings", []).filter(func(b: Dictionary) -> bool: return b.get("slot", "") == "building.crypt_pillar")
-	_check(in_hall == 0 and not a.walkable(Vector2i(49, 53)) and a.walkable(Vector2i(39, 48)) and pillars.size() == 6 and a.walkable(Vector2i(49, 44))
-		and level["terrain"]["solid"].size() == 24 and level["terrain"]["stairs"].size() == 12,
-		"nothing is laid in his hall; the round table is rock, the six pillars buildings on floor (their cells solid once parsed), the dais's twelve stairs kept, the door cell in the north wall floor (%d pillars)" % pillars.size())
+	_check(in_hall == 0 and a.walkable(Vector2i(49, 53)) and a.walkable(Vector2i(39, 48)) and pillars.size() == 6 and a.walkable(Vector2i(49, 44))
+		and level["terrain"]["solid"].size() == 24 + 9 + 8 and level["terrain"]["stairs"].size() == 12 and level["buildings"].size() == 20,
+		"nothing is laid in his hall; the pillars, the round table and the broken tables buildings on floor (their cells solid once parsed), the chairs and throne walked onto, the dais's twelve stairs kept, the door cell in the north wall floor (%d pillars, %d solid)" % [pillars.size(), level["terrain"]["solid"].size()])
 	_check(level["links"].size() == 2 and level["links"][1]["sealed"] == "draugr" and level["links"][1]["tile"] == Sheet.LAIR_SHORTCUT_LINK and Sheet.LAIR_DAIS.has_point(level["links"][1]["tile"]),
 		"the sealed shortcut's end lies on the dais behind the throne")
 	_check(Regen.generate("lab_barrow_lair", 1)["layout"].get_data() == dark["layout"].get_data(), "the same seed gives the same dark")

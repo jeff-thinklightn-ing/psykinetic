@@ -25379,3 +25379,34 @@ labyrinth_test (the Ossuary sample: fourteen laid, at least three in each
 band by the generator's own measure; the grave goods still deeper than the
 mean). docs/levels.md. Generator and template data; protocol unchanged; no
 new class_name.
+
+
+## 580 step 3, dungeon's side (3b): the feast pieces in the Hall of Fallen Souls
+
+The second landing of the halls dressed (3a above), on art-kit's four feast
+pieces (215c69cf) and the throne's stand point (8c2c67fb, "580 step 3,
+art-kit's side"). The coordinator's rule from 3a holds: 612 applies to the
+furniture, and the width test sees it.
+
+- `Level.BUILDINGS` gains `building.round_table` (3 x 3) and
+  `building.broken_table` (2 x 1), both solid and doorless, and
+  `building.hall_chair` and `building.throne` (1 x 1), both `OPEN_AIR`:
+  walked onto, no wall on their outline expected, so a ghost warrior sits
+  on a chair (step 4) and the draugr stands in his throne's cell (at its
+  slot's "stand" point, enemy-ai's read in the client). The ## 35 comment
+  line (3a's, 34 having shipped) names the two new solid kinds beside the first two.
+- The Hall's template: the round table in place of its rock block at
+  LAIR_TABLE (48, 52); eight chairs on the ring round it, two a side,
+  facing in (LAIR_CHAIRS); four broken tables against the east and west
+  walls between the pillar rows, facing [1, 0] and [-1, 0] so their long
+  side lies along the wall, never a cell off it (LAIR_BROKEN_TABLES); the
+  throne at the draugr's cell (49, 63) facing north into the hall. The
+  draugr's cell moved to (49, 63) with the dais in 3a: enemy-ai reads the
+  new one.
+
+level_test (the chairs and throne walked onto, the throne at his cell
+facing the hall over the draugr's entity, the round table solid, the
+broken tables two cells along the walls, 41 solid cells, no way one cell
+wide), labyrinth_test (the hall's twenty buildings kept by a generation),
+view_test's footprint check. docs/levels.md. Level data and templates;
+protocol: the ## 35 line, no further bump; no new class_name.

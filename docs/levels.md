@@ -612,11 +612,15 @@ hides about 2.5 cells behind it). The templates are written from
   dead (6 skeletons) and, kept whole as the anchor `lair` (548's room he
   keeps), the hall itself, 32 x 22, walled all round but for one door cell
   in its north wall: six pillars 2 x 2 in two rows (art-kit's
-  `building.crypt_pillar`, solid doorless buildings; 580 step 3) and the
-  round table at its middle (rock till art-kit's piece, with the chairs and
-  broken tables, step 3b), the dais 12 x 4 at the far end one height level
+  `building.crypt_pillar`, solid doorless buildings; 580 step 3), the
+  round table at its middle (`building.round_table`, 3 x 3, solid) with
+  eight chairs round it (`building.hall_chair`, walked onto, `Level.OPEN_AIR`,
+  so a ghost sits and a player passes) and four broken tables along the
+  east and west walls (`building.broken_table`, 2 x 1 turned along the
+  wall, solid), the dais 12 x 4 at the far end one height level
   up (the template's height.png; its front row twelve stairs, its sides
-  ledges, its back against the south wall) with the draugr on his throne, and the
+  ledges, its back against the south wall) with the draugr on his throne
+  (`building.throne`, walked onto, at his cell facing the hall), and the
   hidden exit behind the throne, the temple's sealed shortcut's end (540,
   `draugr`, the spawn point "from_temple"); its one door, in the north wall,
   shuts and locks behind the first player in while he sits (573 amended,
