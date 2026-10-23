@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- A battle axe won from the draugr knocks foes down again in your hands; his own blows with it stay slow, heavy hits, and only his spin floors you. He gets his breath back faster, so a long fight sees a second spin about a minute after the first (drafts for Jeff).
 - A left click on your own companion beside you makes her step out of your way at once, as walking into her does; from afar it walks you to her, in a corridor at her so you change places (611).
 - Drawing a bow is now Shift and the left button: press to draw, let go to shoot; a plain click with a bow in hand only moves you, talks or opens a chest, never attacks (583 amended (2); Jeff's word).
 - No passage one cell wide in the dungeons (decision 612, Jeff: "the game is a multiplayer game with companions"): the generator widens every single-width way, a tomb is walled and entered by its door with the way outside it full width, and the first hall's bays are two rows tall; a test keeps every dungeon to it.
@@ -15,7 +16,6 @@ notes (decision 324).
 - Disarmed, the draugr walks back for his axe (after a few blows of his fists if you stay beside him), and it returns to his hands when his fight ends.
 - The barrow's burial niches are cut into its walls, and the hidden one shows as a cracked wall until found, then stands open (608, terrain's side).
 - The barrow's hidden door (580 step 2, decision 608): the first hall's dead lie in niches cut into its walls, and the stair down to the Ossuary hides behind one of them, picked anew each generation; walk into the niches to find it ("Only the dead lie here." till the slab gives), and a climb from below pushes it open from behind. The Ossuary's galleries get niches of their own.
-- The draugr's plain axe blows no longer knock you down, only his spin does; the battle axe still knocks down in a player's hands. He gets his breath back faster, so a long fight sees a second spin about a minute after the first (drafts for Jeff).
 ## v0.1.167
 
 - What goes over the network is unchanged, so v0.1.165 and v0.1.166 still join, but the server updates too: the barrow's draugr now fights armed on the live server. Update through the launcher to hear the arrows and see the new pieces.

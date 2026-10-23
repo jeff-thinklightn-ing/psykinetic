@@ -2217,7 +2217,7 @@ func holds_in_hands(entity: GridEntity) -> bool:
 ## no club (its numbers are the shot's); {} for bare hands.
 func blow_verb(attacker: GridEntity) -> Dictionary:
 	var id := wielded(attacker)
-	var own: Variant = attacker.blows.get(id) if attacker is Monster and not id.is_empty() else null
+	var own: Variant = (attacker as Monster).blows.get(id) if attacker is Monster and not id.is_empty() else null
 	var verb: Dictionary = own if own is Dictionary else Items.verb_of(id)
 	return {} if verb.get("kind") == "ranged" else verb
 

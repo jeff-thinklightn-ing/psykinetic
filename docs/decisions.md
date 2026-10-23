@@ -22502,7 +22502,11 @@ arming fix, 8b958f55), on Jeff's draft list:
   damage 1.6, speed 2.2, windup 8. The battle axe keeps its knockdown in anyone
   else's hands (a player who wins it); only his spin floors (the coordinator's
   (a); before it every plain blow knocked the player down, every 3.4 s in melee,
-  from combat's own design section 2).
+  from combat's own design section 2). This replaces items' interim 603
+  amendment (0e32727b, v0.1.167: the axe's own verb made a plain blow for
+  everyone): the battle_axe row is the knockdown again. The spin is its own move: its push
+  still follows the axe's catalog verb and weight (physics' swing_impulse,
+  605), not his plain blow's, on purpose (items' review).
 - His breath: a row's "stamina_regen" is what each breath gives back
   (GridEntity.stamina_regen_amount; 0 keeps World.stamina_regen, 2). The
   draugr's: 8 every 7 ticks (was 2 every 4), so in a fight that goes on a second
