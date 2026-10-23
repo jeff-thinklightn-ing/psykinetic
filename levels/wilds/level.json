@@ -541,6 +541,36 @@
 			"town": "store",
 			"radius": 4,
 			"name": "the woodlot"
+		},
+		"far_bank": {
+			"at": [
+				58,
+				40
+			],
+			"kind": "refuge",
+			"where": "wilds",
+			"radius": 3,
+			"name": "the far bank upriver"
+		},
+		"old_farmstead": {
+			"at": [
+				118,
+				150
+			],
+			"kind": "refuge",
+			"where": "wilds",
+			"radius": 3,
+			"name": "the old farmstead"
+		},
+		"ruined_barn": {
+			"at": [
+				75,
+				143
+			],
+			"kind": "refuge",
+			"where": "wilds",
+			"radius": 3,
+			"name": "a ruined barn"
 		}
 	},
 	"waters": [

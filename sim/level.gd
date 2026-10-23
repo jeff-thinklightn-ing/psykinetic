@@ -96,7 +96,11 @@ const SIDES := {"north": Vector2i(0, -1), "east": Vector2i(1, 0), "south": Vecto
 const OPPOSITE := {"north": "south", "east": "west", "south": "north", "west": "east"}
 ## What a place (level.json "places", Holdings) can be.
 const PLACE_KINDS: Array[String] = ["camp", "keep", "farm", "gate", "mine", "stockpile", "temple", "healers_hut",
-	"woodlot", "hunting_ground", "quarry", "fishing", "fort", "other"]
+	"woodlot", "hunting_ground", "quarry", "fishing", "fort", "refuge", "other"]
+## Where a refuge (decision 613 amended: where a sought newcomer is found,
+## one place a story, its key the story's tag) is: the where-word economy
+## and npc say it by.
+const REFUGE_WHERE: Array[String] = ["wilds", "hills", "forest", "woods", "castle_dungeon"]
 ## The buildings that make a place of their own where they stand
 ## (building_places, decision 372): where the fallen come back.
 const BUILDING_PLACES := {"building.temple": "temple", "building.healers_hut": "healers_hut"}
@@ -1023,6 +1027,13 @@ static func places_from(config: Dictionary, warnings: Array[String]) -> Dictiona
 			warnings.append("the place %s has a radius under 1: it is 1" % [key])
 		out[str(key)] = {"key": str(key), "cell": at, "name": str(entry.get("name", str(key).capitalize())), "kind": kind,
 			"radius": maxi(radius, 1), "worth": maxi(int(entry.get("worth", 1)), 0), "holder": str(entry.get("holder", "nobody"))}
+		# A refuge's where (613 amended): one of REFUGE_WHERE, else warned and left out.
+		if kind == "refuge":
+			var where := str(entry.get("where", ""))
+			if where in REFUGE_WHERE:
+				out[str(key)]["where"] = where
+			else:
+				warnings.append("the refuge %s has no \"where\" of %s" % [key, ", ".join(REFUGE_WHERE)])
 		# A camp's captives from the start (decision 518, npc's): holds [{town, resident, name, trade}], kept when well-formed.
 		var holds: Variant = entry.get("holds")
 		if holds is Array:

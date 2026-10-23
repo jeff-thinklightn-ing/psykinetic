@@ -2995,6 +2995,10 @@ func _boot() -> void:
 		World.towns.set("lay", func(town: String, kind: String, rect: Rect2i) -> void:
 			var plot_class := str(Level.kinds().get(kind, {}).get("plot", ""))
 			World.clearing.lay_plot(town.get_slice("/", 0), town, kind, rect, Clearing.facing_for(rect, plot_class, _store_cell(town))))
+	# The sought (613 amended): where a story's newcomer waits, once economy's
+	# rules carry the stories (sought.trades; economy's to turn on).
+	if World.towns.rules.get("sought", {}).has("trades"):
+		World.towns.place_sought = _place_sought
 	# Wells and roofs (decision 426): a town's are its level's.
 	World.towns.wells = func(town: String) -> int:
 		var area: Dictionary = _world_map.areas.get(town.get_slice("/", 0), {})
@@ -9915,6 +9919,24 @@ func _camp_lets_back(spec: Dictionary) -> bool:
 		if _within(spec["tile"], place["cell"], int(place["radius"])):
 			return false
 	return true
+
+
+## The sought (613 amended, economy's Towns.place_sought): where [param
+## variant]'s story ({place: its tag, where, holder, story}) waits for
+## [param town]'s newcomer of [param trade]: the refuge keyed by the tag in
+## any level, {place: its id, where}; "" while none is laid (economy tries
+## the next variant, then the next day).
+func _place_sought(_town: String, _trade: String, variant: Variant, _id: String) -> Variant:
+	var tag := str(variant.get("place", "")) if variant is Dictionary else ""
+	if tag.is_empty():
+		return ""
+	var areas: Array = _world_map.areas.keys()
+	areas.sort()
+	for area: String in areas:
+		var place: Dictionary = _world_map.areas[area].get("places", {}).get(tag, {})
+		if place.get("kind") == "refuge":
+			return {"place": "%s/%s" % [area, tag], "where": str(place.get("where", ""))}
+	return ""
 
 
 ## A place changed hands (Holdings.place_taken): a camp's fall frees who it

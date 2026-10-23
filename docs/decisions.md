@@ -25678,6 +25678,39 @@ What is new:
 
 production_test _test_workshop_makes; return_test (a second hut far off:
 a second healer, another name, the remedy alone). Server only, protocol
+## 613 amended, maps' side: each story's own place
+
+Jeff: "every npc has their own place and story of how they got there"; the
+coordinator's 613 amended (no refuge pools), economy's lookup contract
+(2026-10-23).
+- A place kind "refuge" (Level.PLACE_KINDS): where one sought story's
+  newcomer waits, its key the story's tag, its cell where they stand, a
+  "where" of Level.REFUGE_WHERE (wilds, hills, forest, woods,
+  castle_dungeon; else warned and left out), radius 3, held by nobody.
+- Eleven laid from lore's stories (docs/lore/sought.md, draft):
+  - wilds: far_bank (58, 40), the west bank upriver, across from the
+    town; old_farmstead (118, 150), in the farmstead's south hut, apart
+    from the cache in its north hut (599); ruined_barn (75, 143), a bare
+    patch west of the river.
+  - hills: herders_hut (12, 25), the high west pasture; hill_cave
+    (23, 56), in the lee of the rocks; hill_shieling (72, 25), up on the
+    eastern height, apart from the herder's hut.
+  - forest: hunters_lean_to (42, 72), the south clearing at the road's
+    end; boar_path (44, 60), beside that road; woodcutters_lean_to
+    (75, 15), deep in the north-east; thick_wood (25, 66), among the
+    densest trunks; fletchers_tree (80, 40), by the east clearing (the
+    forest has no river: lore's story now takes shafts and feathers from it).
+  No building marks them yet: a lean-to, hut or ruin is builder's and
+  art-kit's to stand there.
+- Main._place_sought(town, trade, variant, id), economy's
+  Towns.place_sought: variant.place is the tag, resolved to the refuge of
+  that key in any level, {place: its id, where}; "" when none is laid
+  (economy tries the next variant, then the next day). Main sets it only
+  once economy's rules carry sought.trades, so a town's newcomers walk in
+  as before until economy's 613 amended lands.
+tests: level_test _test_refuges, each refuge walked to from its level's
+start, eleven laid, every place economy.json's sought.trades names laid
+(none named until economy's table lands). Level and server, protocol
 unchanged, no new class_name.
 ### 622, step 2, items' side: the bow under armour
 

@@ -197,6 +197,7 @@ func _test_every_level() -> void:
 	_test_clearing()
 	_test_felled_walls()
 	_test_plots()
+	_test_refuges()
 	print("
 == the levels connect: WorldMap.problems() (links and spawn points, ways back, reachable) ==")
 	var problems := WorldMap.build().problems()
@@ -517,6 +518,37 @@ func _test_plots() -> void:
 			and edges.keys().all(func(key: Vector3i) -> bool: return terrain["edges"].get(key) == edges[key]),
 		"its walls and door laid in the edges, in the footprint (%s)" % [house.get("rect")])
 	Level.unregister("plot_field")
+
+
+## The sought's refuges (613 amended): one place a story, keyed by its tag,
+## of kind "refuge" with its where, each walked to from its level's start;
+## every story's tag in economy.json (sought.trades, when there) laid.
+func _test_refuges() -> void:
+	print("\n== refuges: each story's place, walked to from the level's start ==")
+	var tags := {}
+	for zone: String in ["wilds", "hills", "forest"]:
+		var level := Level.load_level(zone)
+		_check(_main.load_map(zone), "%s loads" % zone)
+		var start: Vector2i = level["starts"][0]
+		for key: String in level["places"]:
+			var place: Dictionary = level["places"][key]
+			if place["kind"] != "refuge":
+				continue
+			tags[key] = zone
+			var path := World.find_path(start, place["cell"], true)
+			_check(place.get("where", "") == zone and not path.is_empty(),
+				"%s's %s (%s): where %s, walked to in %d steps" % [zone, key, place["cell"], place.get("where", ""), path.size()])
+	_check(tags.size() == 11, "eleven refuges laid (%s)" % [tags.keys()])
+	var rules: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://levels/economy.json"))
+	var trades: Dictionary = rules.get("sought", {}).get("trades", {})
+	var wanted := []
+	for trade: String in trades:
+		for variant: Variant in [trades[trade], trades[trade].get("alt")]:
+			if variant is Dictionary and str(variant.get("place", "camp")) not in ["camp", "dwarven_forge"]:
+				wanted.append(str(variant["place"]))
+	var missing := wanted.filter(func(tag: String) -> bool: return not tags.has(tag))
+	_check(missing.is_empty(), "every story's place economy names is laid (%d named; missing %s)" % [wanted.size(), missing])
+	_main.load_map("test_room")
 
 
 func _test_round_trip() -> void:

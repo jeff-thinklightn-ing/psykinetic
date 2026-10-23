@@ -1013,5 +1013,37 @@
 			"up": "left",
 			"closed": false
 		}
-	]
+	],
+	"places": {
+		"herders_hut": {
+			"at": [
+				12,
+				25
+			],
+			"kind": "refuge",
+			"where": "hills",
+			"radius": 3,
+			"name": "an empty herder's hut"
+		},
+		"hill_cave": {
+			"at": [
+				23,
+				56
+			],
+			"kind": "refuge",
+			"where": "hills",
+			"radius": 3,
+			"name": "a hill cave"
+		},
+		"hill_shieling": {
+			"at": [
+				72,
+				25
+			],
+			"kind": "refuge",
+			"where": "hills",
+			"radius": 3,
+			"name": "a shieling high on the hill"
+		}
+	}
 }
