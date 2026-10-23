@@ -23456,6 +23456,19 @@ minute while downed, 0 otherwise); this is what the local player hears.
   once on UI, the pace at 120 and after a step to 40, the duck on SFX and
   not UI, no last beat on a revive, a last beat then silence then the mix
   back on bleed out.
+## 617. The archer's aim lead
+
+Jeff (2026-10-22, his words): "archers should be able to zoom out further..
+most animals end up being just off screen". The view's reach is held to
+World.NEAR_TILES (ZOOM_MAX 1.1, decision 238) with the player mid-screen,
+so a long shot's mark lands off screen. Perf's numbers: at zoom 1.1 the
+reach is 14.6 cells on 16:9 (16.2 peeking) and 17.6 on 21:9 (20.1
+peeking); one more wheel notch plus a lead would pass 22 on 21:9, so the
+lead comes alone and the extra notch stays a question for Jeff beside a
+NEAR_TILES 25 estimate (under a millisecond of server tick). The
+coordinator's approval, with one rule: the lead starts with the draw, never
+on a plain click, so walking with a bow does not tug the view.
+
 - While the bow is drawn (Main.aim_drawn), the view slides off the archer
   toward the aim's angle: Client3D.aim_lead sets a target
   AIM_LEAD_CELLS (4) the aim's way, eased each frame at ZOOM_RATE like the
@@ -23463,9 +23476,10 @@ minute while downed, 0 otherwise); this is what the local player hears.
   (Client3D.lead_offset: the lean alone, as ever, when no lead is on). The
   bow lowered or put away, the lead eases back to nothing. No zoom change;
   the pan and the peek unchanged; the 2D view unchanged.
-- ui_test: lead_offset's three cases. A sheet of the lead at the longest
-  range step for Jeff follows docs-only. Client only; protocol unchanged;
-  no new class_name.
+- ui_test: lead_offset's three cases. Shot: docs/ui/shots/combat/
+  aim_lead.jpg, the view led toward the aim at the longest step, the
+  archer off-centre with the arc's marker in frame. Client only; protocol
+  unchanged; no new class_name.
 
 ## 584 amended, ui's side: the three ways into the healer's care
 

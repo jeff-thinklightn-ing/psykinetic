@@ -1854,6 +1854,7 @@ func _update_aim(player: Player, drawing: bool) -> void:
 			_show_cursor(true)
 			if _client3d != null:
 				_client3d.aim_arc(Vector2.ZERO, 0.0, 0.0, 0.0, 0, false)
+				_client3d.aim_lead(Vector2.ZERO, false)  # 617: the view eases back onto the archer.
 			if _aim_line != null:
 				_aim_line.visible = false
 		return
@@ -1878,6 +1879,7 @@ func _update_aim(player: Player, drawing: bool) -> void:
 	var pips := aim_pips(radius, range_steps(player))
 	if _client3d != null:
 		_client3d.aim_arc(origin, aim_angle, float(radius), alpha, pips, radius > 0)
+		_client3d.aim_lead(Vector2.from_angle(aim_angle), true)  # 617: the view leads toward the aim while drawn.
 	else:
 		_update_aim_line(origin, float(radius), alpha)
 

@@ -1018,6 +1018,9 @@ const AIM_PIP := 0.13
 const AIM_PIP_GAP := 0.32
 const AIM_PIPS_MOST := 4
 const AIM_SEGMENTS := 48
+## The most the view leads the archer by, the WASD lean counted (perf, 617:
+## the view's reach stays inside World.NEAR_TILES on every aspect).
+const AIM_LEAD_CELLS := 4.0
 ## A telegraph's fill: faint at its start, full as it lands; the landing
 ## flash's alpha and length.
 const TELEGRAPH_FAINT := 0.18
@@ -1308,6 +1311,12 @@ var _aim_arc: MeshInstance3D
 var _aim_mark: MeshInstance3D
 var _aim_pips: Array[MeshInstance3D] = []
 var _aim_arc_radius := -1.0
+## The archer's aim lead (decision 617; Jeff: "archers should be able to
+## zoom out further"): while the bow is drawn the view slides off the
+## archer toward the aim, eased like the pan, held with the WASD lean to
+## AIM_LEAD_CELLS in all; back onto the archer when the bow lowers.
+var _aim_lead := Vector3.ZERO
+var _aim_lead_to := Vector3.ZERO
 var _aim_arc_angle := -1000.0
 ## The bosses' ground telegraphs (combat's 602, ui's side; Jeff: "a small
 ## red cone on the ground indicates the area"): id -> {quads, from, lands,
@@ -2043,7 +2052,10 @@ func _follow(delta: float) -> void:
 	_local_name = String(player.name)
 	sfx.listener = player.tile  # Sounds are heard from here, as a monster there would.
 	_lead = Main.camera_lean(_lead, get_viewport(), yaw, delta)
-	_camera_target = _camera_ease.follow(puppet.position, delta) + Vector3(_lead.x, 0.0, _lead.y) + pan
+	_aim_lead = _aim_lead.lerp(_aim_lead_to, 1.0 - exp(-ZOOM_RATE * delta))
+	if _aim_lead_to == Vector3.ZERO and _aim_lead.length() < 0.001:
+		_aim_lead = Vector3.ZERO
+	_camera_target = _camera_ease.follow(puppet.position, delta) + lead_offset(_lead, _aim_lead) + pan
 	_ridge_pitch = move_toward(_ridge_pitch, ridge_pitch(puppet.position), RIDGE_EASE * delta)
 	_place_camera()
 	_update_sight(puppet.position, delta)
@@ -3152,6 +3164,22 @@ static func telegraph_fill(from_tick: int, lands_tick: int, tick: int) -> float:
 ## The telegraphs shown (tests).
 func telegraphs_shown() -> int:
 	return _telegraphs.size()
+
+
+## The aim lead on or off: [param way] the aim's direction on the grid
+## (unit), the target AIM_LEAD_CELLS that way while [param on].
+func aim_lead(way: Vector2, on: bool) -> void:
+	_aim_lead_to = Vector3(way.x, 0.0, way.y) * AIM_LEAD_CELLS if on and way.length() > 0.0 else Vector3.ZERO
+
+
+## The view's offset from the archer: the WASD lean plus the aim lead, the
+## two together held to AIM_LEAD_CELLS once the lead is on (the lean alone
+## as ever when it is not).
+static func lead_offset(lean: Vector2, aim: Vector3) -> Vector3:
+	var lean3 := Vector3(lean.x, 0.0, lean.y)
+	if aim == Vector3.ZERO:
+		return lean3
+	return (lean3 + aim).limit_length(AIM_LEAD_CELLS)
 
 
 ## The bow's aim while drawn: the arc round [param origin] (the archer's

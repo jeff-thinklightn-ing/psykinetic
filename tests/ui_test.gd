@@ -528,6 +528,12 @@ func _test_aim() -> void:
 		_check(absf(_main.aim_angle - Vector2(-4.0, 6.0).angle()) < 0.001 and _main.aim_drawn, "a fixed aim point sets the angle (%.3f)" % _main.aim_angle)
 		_main._aim_fixed = Vector2(NAN, NAN)
 		_main._update_aim(own, false)
+	# 617: the view's offset from the archer: the lean alone without a lead; lean and lead held to the most together.
+	_check(Client3D.lead_offset(Vector2(3.0, 0.0), Vector3.ZERO) == Vector3(3.0, 0.0, 0.0), "no lead: the WASD lean alone, as ever")
+	var led := Client3D.lead_offset(Vector2(3.0, 0.0), Vector3(4.0, 0.0, 0.0))
+	_check(absf(led.length() - Client3D.AIM_LEAD_CELLS) < 0.001 and led.x > 0.0, "lean and lead the same way: held to the most (%s)" % [led])
+	var across := Client3D.lead_offset(Vector2(0.0, 1.0), Vector3(0.0, 0.0, -1.0))
+	_check(across == Vector3.ZERO, "lean and lead opposed: they cancel")
 	# Jeff (2026-10-22): the menu blocked the options screen. Now it steps aside and comes back.
 	if _main.options_panel != null:
 		var hud_was: bool = _main.get_node("HUD").visible
