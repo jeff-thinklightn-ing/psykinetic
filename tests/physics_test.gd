@@ -42,6 +42,7 @@ func _ready() -> void:
 	_test_sweep()
 	_test_hurl()
 	_test_pack_throw()
+	_test_ground()
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -482,6 +483,28 @@ func _test_pack_throw() -> void:
 	World.try_throw(player, Player.RIGHT_HAND, Vector2i(4, 1))
 	_check(heavy.tile == Vector2i(2, 1) and World.is_stunned(heavy) and not World.ground_uids(Vector2i(1, 1)).is_empty(),
 			"at 80 kg beside the thrower: not moved (0.25), staggered, the sack at the thrower's feet (%s)" % heavy.tile)
+
+
+func _test_ground() -> void:
+	print("
+== the ground in one place: a ford slows a walk and shortens a slide alike (607) ==")
+	# A shove gives 40 kg speed 2: 3 cells of open ground.
+	var e := _build(["##########", "#Pm......#", "##########"], 40.0)
+	World.order_shove(e["P"][0], e["m"][0])
+	World.step()
+	_check(e["m"][0].tile == Vector2i(5, 1), "on open ground the shove slides it 3 cells (at %s)" % e["m"][0].tile)
+
+	e = _build(["##########", "#Pm......#", "##########"], 40.0)
+	for x in range(3, 9):
+		World._fords[Vector2i(x, 1)] = true
+	_check(is_equal_approx(World.ground_drag(Vector2i(2, 1), Vector2i.RIGHT), World.FORD_TICK_SCALE), "a ford's drag is its wading scale, 2")
+	World.order_shove(e["P"][0], e["m"][0])
+	World.step()
+	# 3 cells' worth of ground at 2 a ford cell: 1 cell, then spent.
+	_check(e["m"][0].tile == Vector2i(3, 1), "through a ford the same shove slides it 1 cell (at %s)" % e["m"][0].tile)
+	var walker: GridEntity = e["P"][0]
+	_check(is_equal_approx(World.step_ticks(walker, Vector2i.RIGHT, Vector2i(2, 1)), walker.move_ticks * World.FORD_TICK_SCALE),
+			"and a step into it takes its walk twice as long, as before (%s)" % World.step_ticks(walker, Vector2i.RIGHT, Vector2i(2, 1)))
 
 
 # --- helpers ------------------------------------------------------------------

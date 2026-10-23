@@ -6045,7 +6045,11 @@ func _push(mover: GridEntity, first: GridEntity, way: Vector2, force: float, tos
 		# An exhausted or downed body counts as less mass (pushed_mass).
 		var body_mass := pushed_mass(body)
 		# Less than a tile's worth of speed moves nothing and hurts nothing.
-		var max_tiles: int = mini(floori(u * slide_per_speed + 0.001), max_travel)
+		# The ground it can cross: open cells' worth, each cell costing its
+		# ground_drag (607), so a ford or grass or a slope up shortens it.
+		var reach := u * slide_per_speed + 0.001
+		var spent := 0.0
+		var max_tiles: int = mini(floori(reach), max_travel)
 		if max_tiles == 0:
 			if _logs_for(mover):
 				_log("push: %s -> %s blocked: too heavy (mass %s, speed %.2f)" % [mover.name, body.name, body_mass, u])
@@ -6072,6 +6076,7 @@ func _push(mover: GridEntity, first: GridEntity, way: Vector2, force: float, tos
 				body._world_note_moved(tick)
 				_relocate(body, landing)
 				tiles = 2
+				spent = 2.0  # Through the air.
 				if is_burning(landing) and body.is_creature():
 					stopped = true
 					stopped_by = "fire"
@@ -6081,6 +6086,9 @@ func _push(mover: GridEntity, first: GridEntity, way: Vector2, force: float, tos
 		while tiles < max_tiles:
 			var next: Vector2i = start + Vector2i((line * (tiles + 1)).round())
 			direction = next - body.tile
+			var cost := ground_drag(body.tile, direction)
+			if spent + cost > reach:
+				break  # Its speed spent on the ground before this cell.
 			if is_water(next) and not edge_blocks(body.tile, direction):
 				# The water's edge: it stops there, unhurt.
 				stopped = true
@@ -6107,6 +6115,7 @@ func _push(mover: GridEntity, first: GridEntity, way: Vector2, force: float, tos
 				break
 			_relocate(body, next)
 			tiles += 1
+			spent += cost
 			if drop > 0:
 				# Off a ledge: it falls, and the fall is what hurts.
 				fall = drop
@@ -6125,7 +6134,7 @@ func _push(mover: GridEntity, first: GridEntity, way: Vector2, force: float, tos
 		# Speed spent on travel; what is left is what hits.
 		var remaining := 0.0
 		if stopped and fall == 0:
-			remaining = maxf(u - tiles / slide_per_speed, 0.0)
+			remaining = maxf(u - spent / slide_per_speed, 0.0)
 		var impact := 0
 		var passed := 0.0
 		var blocker_impact := 0
@@ -7111,15 +7120,24 @@ func step_ticks(entity: GridEntity, direction: Vector2i, from := NO_CELL) -> flo
 	var ticks := entity.move_ticks * (DIAGONAL_TICK_SCALE if direction.x != 0 and direction.y != 0 else 1.0)
 	if from == NO_CELL:
 		from = entity.tile
-	var to := from + direction
-	# Uphill is slower (Relief.pace, decision 525); a stair is not.
-	ticks *= Relief.pace(elevation_at(to) - elevation_at(from), direction.x != 0 and direction.y != 0)
 	if entity.winded:
 		ticks *= winded_move_scale  # Decision 597; winded replicates, so a client's prediction agrees.
 	ticks /= 1.0 + buff(entity, "speed")  # A stamina potion (decision 562); buffs replicate, so a client's prediction agrees.
+	return ticks * ground_drag(from, direction)  # The ground (607), as a slide meets it.
+
+
+## How hard the ground is to cross from [param from] the way
+## [param direction] points (decision 607), one multiple for a walk's step
+## time (step_ticks) and a slide's speed spent a cell (_push): uphill
+## (Relief.pace, decision 525; a stair is not), times a ford's
+## FORD_TICK_SCALE (wading), else tall grass standing TALL_GRASS_TICK_SCALE;
+## 1 on open level ground. Downhill is no easier yet.
+func ground_drag(from: Vector2i, direction: Vector2i) -> float:
+	var to := from + direction
+	var drag := Relief.pace(elevation_at(to) - elevation_at(from), direction.x != 0 and direction.y != 0)
 	if _fords.has(to):
-		return ticks * FORD_TICK_SCALE
-	return ticks * TALL_GRASS_TICK_SCALE if cover_at(to) > 0.0 else ticks
+		return drag * FORD_TICK_SCALE
+	return drag * TALL_GRASS_TICK_SCALE if cover_at(to) > 0.0 else drag
 
 
 func are_adjacent(a: Vector2i, b: Vector2i) -> bool:

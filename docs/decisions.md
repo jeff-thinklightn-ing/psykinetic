@@ -22623,3 +22623,28 @@ impact_damage are gone. hurl's result also carries "thrown" and "impact".
 tests/physics_test: the sack on 25 kg (1 cell, 2 hp, fallen at the thrower's feet) and on
 80 kg beside the thrower (unmoved, staggered); items_test's and stockpile_test's throws pass
 as they were.
+
+## 607: the ground in one place (physics step 2d)
+
+Physics step 2's last part (step2_design.md, the coordinator's approval). World.ground_drag(from,
+direction) is one multiple for how hard the ground is to cross:
+- uphill, Relief.pace (decision 525; a stair is not);
+- times a ford's FORD_TICK_SCALE (2, wading), else tall grass standing, TALL_GRASS_TICK_SCALE
+  (1.25);
+- 1 on open level ground.
+
+Both of its readers take it:
+- **A walk:** step_ticks is its move_ticks, the diagonal's 1.5, winded (597) and the speed
+  buff, times ground_drag. Walking is unchanged (the same factors, now in one place).
+- **A slide:** 592's _push gives a pushed body slide_per_speed x its speed of ground to cross,
+  and each cell spends its ground_drag of it. A slide through a ford, grass or up a slope is
+  shorter, and the speed left at a wall is what the ground left it: the same shove that
+  slides 40 kg 3 cells on open ground slides it 1 through a ford. An overhead toss's two cells
+  are through the air, at 1 each.
+
+Downhill and ice are no easier yet: a later step. Lunges and rushes keep their own pace for
+now. Server sim only; the client's shove guess (predict_push_end) still counts open cells, a
+guess corrected by the server as ever. Protocol unchanged.
+
+tests/physics_test: the shove on open ground (3 cells) and through a ford (1), and a step into
+the ford twice as long as before.
