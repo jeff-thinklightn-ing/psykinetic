@@ -1089,6 +1089,36 @@ func lore_budget() -> int:
 	return int(Townsfolk.days().get("lore_chars", {}).get(hidden_type(), LORE_CHARS))
 
 
+## What a kept secret becomes in the prompt (615, npc's side; lore's kept_by; Jeff: "part of his pay is to keep
+## what he sees to himself"): the deflection in the speaker's own words and never the fact's text, so no slip of
+## the model can leak what it holds back.
+const KEPT_LINE := "Some of what you see in your work you keep to yourself, as you are paid to: if asked about it, say only that you keep what you see to yourself, and say no more of it."
+
+
+## Lore's facts for this body (615, npc's side): its trade's knower, and for
+## the runner (his card's mark; Pip) the person knower of his own name when
+## lore lists one, merged by id, a fact kept in either copy kept. Anyone
+## else speaks by the trade alone, as before.
+func _facts_known() -> Array[Dictionary]:
+	var facts := Lore.known_by(Lore.knower_for(trade), PackedStringArray(), "agreed", hidden_type())
+	var own := person.to_lower()
+	if own.is_empty() or own == Lore.knower_for(trade) or not Lore.knowers().has(own) or World.production == null \
+			or not bool(Townsfolk.card_of(World.production, worker_id).get("runner", false)):
+		return facts
+	var by_id := {}
+	for fact: Dictionary in facts:
+		by_id[str(fact.get("id", ""))] = fact
+	for fact: Dictionary in Lore.known_by(own, PackedStringArray(), "agreed", hidden_type()):
+		var id := str(fact.get("id", ""))
+		if by_id.has(id):
+			if bool(fact.get("kept", false)):
+				(by_id[id] as Dictionary)["kept"] = true
+		else:
+			facts.append(fact)
+			by_id[id] = fact
+	return facts
+
+
 ## Lore's agreed facts it knows (Lore.knower_for its trade, by its domain),
 ## a sentence each, weightiest first (a superstitious role's rumours before
 ## the rest: it repeats what is said), within LORE_CHARS; a rumour as what
@@ -1097,7 +1127,8 @@ func world_facts() -> Array[String]:
 	var out: Array[String] = []
 	if not player_id.is_empty():
 		return out
-	var facts := Lore.known_by(Lore.knower_for(trade), PackedStringArray(), "agreed", hidden_type())
+	var facts := _facts_known()
+	var kept := false
 	var superstitious := leaning("superstition") >= HIGH
 	# A secret (decision 546, npc's side, part 3) is told past the standing tier: to a player it trusts, and
 	# to nobody else; Main hears which (ctx "secret_told", for Aldous's crypt secrets).
@@ -1113,6 +1144,9 @@ func world_facts() -> Array[String]:
 		return float(a["weight"]) > float(b["weight"]))
 	var length := 0
 	for fact in facts:
+		if bool(fact.get("kept", false)):
+			kept = true  # Held back (615): never in the words, to anyone, trusted or not; the stance below in its place.
+			continue
 		if bool(fact.get("secret", false)) and not trusted:
 			continue
 		var text := str(fact["text"]).strip_edges()
@@ -1125,6 +1159,8 @@ func world_facts() -> Array[String]:
 		if bool(fact.get("secret", false)):
 			# Told only once it is in the words (546 amended: lore found a secret cut by the budget reported as told).
 			Offers._call(Offers.ctx, "secret_told", [asked_by, str(fact.get("id", ""))])
+	if kept:
+		out.append(KEPT_LINE)  # Outside the budget: a stance, not a fact (615, npc's side).
 	# What the town remembers (447, ruled on by the lawspeaker, 448): as
 	# memory, not fact, after lore's facts, within the same budget.
 	var log: Variant = Offers._call(Offers.ctx, "memory", [town]) if not town.is_empty() else null

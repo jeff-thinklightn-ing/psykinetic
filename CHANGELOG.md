@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Pip keeps what he is paid to keep: a secret lore marks as kept by him never enters his words, even for a friend; asked, he says only that he keeps what he sees to himself (decision 615, npc's side).
 - The sought (613, npc's side): a town's wanted newcomer has a body at the refuge economy placed them at, lost or held; a word frees the lost, and the held only when none of their holders can see them (a beast never counts); they follow you home across zones, become the town's at its store, and the officials say who is sought and where they were seen. The smith's lines agreed with lore. Server only.
 ## v0.1.168
 

@@ -1335,6 +1335,29 @@ func _test_crypt_secrets() -> void:
 	voice.asked_by = "p-friend"
 	var facts := voice.world_facts()
 	_check(founders in facts and told.any(func(t: Array) -> bool: return t[0] == "p-friend" and t[1] == "crypt.founders"), "one he trusts is told, and Main hears which: %s / %s" % [told, facts])
+	# A kept secret (615, npc's side; lore's kept_by ["pip"] on pip.paid_silence and crypt.pip_carries): Pip's
+	# body, an acolyte by trade and the runner by his card, speaks by the person knower too; what is kept never
+	# enters his words, even to one he trusts; the stance line stands in its place; Main hears nothing told.
+	var runner := "runner:" + STORE
+	if World.production.worker(runner).is_empty():
+		World.production.add_worker(runner, "Pip", ["acolyte"], STORE, "settled")
+	var pip_card := Townsfolk.card_of(World.production, runner)
+	pip_card["runner"] = true
+	Standing.bump(pip_card, "p-friend", Standing.setting("trusted"), "brought the sick home", World.production.now())
+	World.production.set_card(runner, pip_card)
+	var pip := Resident.new()
+	pip.worker_id = runner
+	pip.person = "Pip"
+	pip.trade = "acolyte"
+	pip.town = STORE
+	pip.asked_by = "p-friend"
+	told.clear()
+	var pip_facts := pip.world_facts()
+	var leaked := pip_facts.any(func(line: String) -> bool: return line.contains("Pip carries the temple's offering") or line.contains("keep what he sees to himself") or line.contains("holy knight"))
+	_check(not leaked and Resident.KEPT_LINE in pip_facts and not told.any(func(t: Array) -> bool: return t[1] in ["crypt.pip_carries", "pip.paid_silence"]),
+		"Pip keeps what he is paid to keep: no kept fact in his words, the stance line in their place, nothing told: %s / %s" % [pip_facts, told])
+	pip.free()
+	World.production.remove_worker(runner)  # Not a resident of this town for the tests after.
 	# A secret the budget cuts is not reported told (546 amended; lore's old gods filled his budget).
 	var days: Dictionary = Townsfolk.days()
 	var had_chars: Variant = days.get("lore_chars")

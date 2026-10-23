@@ -23922,3 +23922,30 @@ and `crypt.pip_carries`. npc's side (after this lands): `Resident.world_facts` n
 fact to any player and calls no `secret_told` for it; the prompt gives the deflection in his own
 words instead of the fact (the coordinator's ask), so a model slip can't leak it. Server only,
 protocol unchanged.
+
+## 615, npc's side: a kept secret in a resident's words
+
+Lore's 615 (7d86cb80): a fact may carry kept_by, the people paid to hold
+it back; Lore.known_by returns "kept" on every fact. The coordinator's
+ruling: Pip's prompt gives his deflection in his own words, never the
+fact's text. Jeff: "part of his pay is to keep what he sees to himself".
+
+- **Never in the words.** Resident.world_facts skips a kept fact outright,
+  before the trust check: not to a stranger, not to one he trusts, and
+  never reported told (546 amended's secret_told is not called for it).
+- **The stance in its place.** When any fact was held back, one line is
+  appended outside the budget, Resident.KEPT_LINE: "Some of what you see
+  in your work you keep to yourself, as you are paid to: if asked about
+  it, say only that you keep what you see to yourself, and say no more of
+  it." A stance, not a fact, so no slip of the model can leak what he
+  holds; the line is the same for every keeper and names nothing.
+- **Who speaks as Pip.** A body spoke by its trade's knower alone
+  (Lore.knower_for), so Pip's body, an acolyte by trade, never saw the
+  facts lore keys on the person "pip". Resident._facts_known merges the
+  person knower of the body's own name (lower-cased) when lore lists one
+  and the body is the runner by its card ("runner"): facts by id, a fact
+  kept in either copy kept. Anyone else speaks by the trade, as before.
+
+resident_test: Pip's body, the runner, trusted by the asker: no kept fact
+in his words, the stance line in their place, nothing told. Server only,
+protocol unchanged, no new class_name.
