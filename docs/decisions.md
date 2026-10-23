@@ -19740,7 +19740,7 @@ end with it. Nothing travels from builder; protocol unchanged.
 
 Jeff, through economy (barter, phase 2): "hob can have a stamina potion that
 improves run speed and trades for herbs". Economy leads 562; this is the
-item and its buff. The numbers are drafts for Jeff.
+item and its buff. The numbers were drafts for Jeff; accepted by Jeff 2026-10-23 (economy relayed).
 - Item stamina_potion, "stamina potion" (art item.stamina_potion, a small
   stoppered flask; size [0.05, 0.11, 0.05], 0.25 kg; tags medical and
   drink). Made by the medicine man from 3 herbs over 600 steps, with
