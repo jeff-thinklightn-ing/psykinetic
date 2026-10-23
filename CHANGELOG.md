@@ -7,6 +7,9 @@ notes (decision 324).
 
 ## Unreleased
 
+## v0.1.169
+
+- What goes over the network changes, so v0.1.168 and older can't join the server: update through the launcher first.
 - A low-horizon camera to try: Options, Video, "Camera: low horizon (trial)" On puts the outdoor view 22 degrees up and nearer, in perspective, with the sky and the far land in haze; under stone the view is as before; Off restores the old view (decision 623, ui's side).
 - The butcher has greeting words of his own at his block (590, npc's side). Data only.
 - The medicine man takes his herbs and antlers in instalments: the care buttons read "Give herbs (5 to go)", then what is left after each handful, and light up when you hold any; paying in gold is unchanged (584 amended (2), ui's side).
@@ -18,6 +21,7 @@ notes (decision 324).
 - A hidden way (a door nobody has found yet) no longer shows on the zone's big map or the known world, nor names where it leads (589 amended, ui's side).
 - Pip keeps what he is paid to keep: a secret lore marks as kept by him never enters his words, even for a friend; asked, he says only that he keeps what he sees to himself (decision 615, npc's side).
 - The sought (613, npc's side): a town's wanted newcomer has a body at the refuge economy placed them at, lost or held; a word frees the lost, and the held only when none of their holders can see them (a beast never counts); they follow you home across zones, become the town's at its store, and the officials say who is sought and where they were seen. The smith's lines agreed with lore. Server only.
+
 ## v0.1.168
 
 - What goes over the network changes, so v0.1.167 and older can't join the server: update through the launcher first.
