@@ -25206,8 +25206,21 @@ quenches torches, lanterns and fire on it), the look terrain's.
   as the ground does; outdoors (the sky lights the plants) and in glimpses
   none. Stones and roots (a plain material) are as before.
 - No flames to hide: the level holds none once Level quenches them.
+- No live plants indoors. Jeff, answering the damp-lair ask: "moss and
+  spiderwebs for decor, no live plants". The coordinator: plants are gone
+  from dungeons altogether, not just unlit. Terrain's scatter was the only
+  thing growing there (grass tufts on stone, flowers and tall grass on an
+  indoor grass cell). Indoors it now lays only SCATTER_INDOORS (stones)
+  on every ground but grass, each kind's rolls unchanged so the stones
+  stand where they did. The coordinator kept the stones: a barrow floor
+  with a few reads better than bare. Grass indoors keeps its plants,
+  because a level only has it when laid on purpose: every dungeon floor is
+  stone, and the sample's yard is grass and tall grass. This covers every
+  indoor level, damp or not. The barrow's decor is moss and
+  spiderwebs: art-kit makes the pieces and dungeon places them.
 
 view_test _test_damp_look: the barrow made damp: the ambient a share of
 the zone's, a haze, its lanterns at 3 m; not damp, 6 m and no haze;
-indoors the scatter's floor shade each cell's as drawn, outdoors none.
+indoors the scatter's floor shade each cell's as drawn, outdoors none;
+indoors no plant in the scatter, outdoors the tufts as before.
 Client only, protocol unchanged, no new class_name.

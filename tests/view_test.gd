@@ -2914,8 +2914,22 @@ func _test_damp_look() -> void:
 			matched += 1
 		else:
 			differ.append(cell)
+	# No live plants indoors (Jeff: "moss and spiderwebs for decor, no live
+	# plants"): of the scatter, stones alone.
+	var grown := {}
+	for chunk: Vector2i in _rig._scatter_chunks:
+		for kind: String in _rig._scatter_plan(chunk):
+			if not Client3D.SCATTER_INDOORS.has(kind):
+				grown[kind] = true
+	_check(not _rig._scatter_chunks.is_empty() and grown.is_empty(), "indoors no plant in the scatter (grown: %s)" % [grown.keys()])
 	var hills := Level.load_level("hills")
 	_rig.rebuild(hills["terrain"], hills["centre"])
+	var tufts := 0
+	for chunk: Vector2i in _rig._scatter_chunks:
+		tufts += (_rig._scatter_plan(chunk).get("tuft", []) as Array).size()
+		if tufts > 0:
+			break
+	_check(tufts > 0, "outdoors the grass's tufts as before")
 	var outdoors := _rig._shade_texture == null
 	_check(indoors and matched > 0 and differ.is_empty() and outdoors,
 			"indoors the scatter's floor shade is each cell's as drawn (%d cells; differ: %s); outdoors none" % [matched, differ.slice(0, 3)])

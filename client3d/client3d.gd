@@ -993,6 +993,10 @@ const SCATTER_DENSITY := {
 	"forest": {"tuft": 1.4, "root": 0.25, "stone": 0.1, "flower": 0.04},
 }
 const SCATTER_EDGE_ROOTS := 0.3
+## Indoors nothing grows but on grass ground laid there on purpose (Jeff
+## on the barrow: "moss and spiderwebs for decor, no live plants"; the
+## sample's yard keeps its grass): elsewhere indoors only these kinds.
+const SCATTER_INDOORS: Array[String] = ["stone"]
 ## A grass cell under a canopy this thick or more takes the forest's
 ## scatter (decision 467: ground.gdshader turns it to needles from 0.45).
 const SCATTER_ROOF := 0.6
@@ -5074,6 +5078,8 @@ func _scatter_plan(chunk: Vector2i) -> Dictionary[String, Array]:
 				salt += 500
 			for kind: String in offered:
 				salt += 10
+				if not _outdoor and not SCATTER_INDOORS.has(kind) and _ground_kinds.get(cell, "") != "grass":
+					continue  # No live plants on a floor under stone.
 				var count := floori(offered[kind] + _roll(cell, 100 + salt))
 				for n in count:
 					var at := Vector2(cell) + Vector2(_roll(cell, 101 + salt + n * 7), _roll(cell, 102 + salt + n * 7)) - Vector2(0.5, 0.5)
