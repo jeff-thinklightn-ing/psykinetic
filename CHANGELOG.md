@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The armour slot on the pack panel: the seventh box beside the hands, marked A, takes armour by a drag as a hand takes a weapon; hovering a piece of armour reads what it does (622, ui's side).
 - The town sheet: N, or a click on a town's row in the known world, opens a sheet saying how the town is doing in words: its name and stage, who holds it, its buildings standing, building, damaged and planned, the people seen on its ground by trade, the dole line, the season and day; economy's rows (treasury, officials, fed and hungry, needs, the sought, the next stage) join as they are sent (decision 624, ui's side).
 - A boss's telegraph is drawn as its smooth shape, cut to the cells the blow will reach, with a low curtain standing on its edge that shows past the boss's own body at the low camera's angle.
 - A foe coming for you that a nearer body hides from the camera (another's, or your own) wears a pale rim drawn through it, as does any body inside a boss's telegraph; never through a wall.

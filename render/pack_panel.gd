@@ -13,7 +13,11 @@ extends PanelContainer
 ## sounds like opening (SoundKit.opening: a chest's thud, a crate's, a pack's leather), once a
 ## frame. A player's or a companion's boxes after the pack are their hands
 ## (Items.RIGHT_HAND, LEFT_HAND), edged in brass and marked R and L, and
-## the armour worn (Items.ARMOUR, decision 622), marked A.
+## the armour worn (Items.ARMOUR, decision 622), marked A: armour is put on
+## by dragging it there and taken off by dragging it out, as a weapon moves
+## into a hand (no click verb); the server refuses anything else there, or
+## armour in a hand, with a party line (World.slot_refused), and the hover
+## reads the kind's note (ItemTip, the catalog's "about").
 ## Sizes in the HUD's 3840 x 2160 units, its look the shared theme's
 ## (UiTheme, docs/ui_style.md): the panel's box, a slot the Inset
 ## variation, a hand's HandSlot. Hover a slot for what its thing is

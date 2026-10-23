@@ -42,6 +42,11 @@ static func lines_for(id: String, note: String) -> Array[Dictionary]:
 	var catalog := Items.name_of(id)
 	var rows := note.split("\n", false)
 	var head := rows[0] if rows.size() > 0 else ""
+	# A note from before 622's ui side ended ". <about>" (World.item_note);
+	# the tip owns the about now (below), so the head sheds it, once.
+	var about_text := str(Items.def(id).get("about", "")).strip_edges()
+	if not about_text.is_empty() and head.ends_with(". " + about_text):
+		head = head.trim_suffix(". " + about_text)
 	# The head: the title (a named thing's "Wren's dagger (quiet, ill-starred)"
 	# or the catalog name), then the condition and the growth marks after commas.
 	var marks: Array[String] = []
@@ -80,6 +85,10 @@ static func lines_for(id: String, note: String) -> Array[Dictionary]:
 		about.append("%s kg" % str(snappedf(float(def["weight"]), 0.1)))
 	if not about.is_empty():
 		out.append({"text": "; ".join(about), "style": "kind"})
+	# The kind's own note (items.json "about": armour's "Worn in the armour
+	# slot, not held. Turns some of an arrow..."; 622, ui's side), under it.
+	if not str(def.get("about", "")).strip_edges().is_empty():
+		out.append({"text": str(def["about"]).strip_edges(), "style": "kind"})
 	for strength in strengths:
 		if strength == World.KEPT_MARK:
 			out.append({"text": "%s: kept from the one it is named for" % strength, "style": "warn"})

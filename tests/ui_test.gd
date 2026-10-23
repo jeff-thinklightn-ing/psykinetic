@@ -213,6 +213,23 @@ func _test_stacks_ui() -> void:
 	print("== stacks on the interface (619, ui's side): the corner count, one unit by shift, the pile's words ==")
 	_check(PackPanel.count_words(5) == "5" and PackPanel.count_words(1) == "" and PackPanel.count_words(0) == "",
 		"the corner badge: the number above one, nothing for one or none")
+	# The armour slot (622, ui's side): the seventh box beside the hands, brass-edged and marked A, a drag's target.
+	var pack_for_armour: PackPanel = _main.pack_panel
+	if pack_for_armour != null:
+		for mine: bool in [true, false]:
+			var row: HBoxContainer = pack_for_armour._player_row if mine else pack_for_armour._other_row
+			var armour_box: PackPanel.SlotBox = row.get_child(Items.ARMOUR)
+			var marks: Array[String] = []
+			for child in armour_box.get_children():
+				if child is Label and child != armour_box.label and child != armour_box.count:
+					marks.append((child as Label).text)
+			_check(row.get_child_count() >= Items.CARRIED and armour_box.index == Items.ARMOUR and armour_box.theme_type_variation == &"HandSlot" and marks == ["A"],
+				"%s row: the seventh box is the armour worn, edged like the hands, marked A" % ["the player's" if mine else "the other"])
+		var right_box: PackPanel.SlotBox = pack_for_armour._player_row.get_child(Items.RIGHT_HAND)
+		var armour_data := {"slots_of": _main._local_player(), "slot": 0, "count": 0}
+		_check(_main._local_player() == null or (pack_for_armour._player_row.get_child(Items.ARMOUR) as PackPanel.SlotBox)._can_drop_data(Vector2.ZERO, armour_data)
+				and right_box._can_drop_data(Vector2.ZERO, armour_data),
+			"a drag lands on the armour box or a hand alike: the server decides and words a refusal (World.slot_refused)")
 	_check(Main.pile_words(PackedStringArray(["herbs", "herbs", "herbs", "herbs", "herbs"])) == "5 herbs"
 			and Main.pile_words(PackedStringArray(["herbs", "herbs", "dagger"])) == "2 herbs and 1 more"
 			and Main.pile_words(PackedStringArray(["herbs", "dagger", "rope"])) == "herbs and 2 more"
@@ -306,6 +323,19 @@ story: carried by Wren for 3 days; named at the ford" % World.KEPT_MARK
 	_check(plain.size() >= 1 and plain[0]["text"] == Items.name_of(dagger) and plain[0]["style"] == "title"
 			and plain.size() == 2 and "one hand" in plain[1]["text"] and "kg" in plain[1]["text"],
 		"a plain thing: the catalog name and what it is (%s)" % [plain])
+	# The armour slot (622, ui's side): the hover reads the kind's note.
+	var mail := ItemTip.lines_for("mail_armour", "")
+	var mail_texts: Array[String] = []
+	for row in mail:
+		mail_texts.append(row["text"])
+	_check(mail.size() >= 3 and mail[0]["text"] == Items.name_of("mail_armour") and str(Items.def("mail_armour").get("about", "")) in mail_texts
+			and mail_texts[mail_texts.find(str(Items.def("mail_armour")["about"]))].begins_with("Worn in the armour slot"),
+		"armour: the catalog name, what it weighs, and the kind's own note from items.json about (%s)" % [mail_texts])
+	var noted := ItemTip.lines_for("mail_armour", "mail shirt. %s" % Items.def("mail_armour")["about"])
+	var noted_texts: Array[String] = []
+	for row in noted:
+		noted_texts.append(row["text"])
+	_check(noted_texts == mail_texts and noted[0]["style"] == "title", "a slot note that still ends with the about (an older server): the tip reads it once, the title clean (%s)" % [noted_texts])
 	var arrows := ItemTip.lines_for("arrows", "bundle of arrows, 6 of 10")
 	_check(arrows.size() >= 2 and arrows[0]["style"] == "title" and arrows.back()["text"] == "6 of 10",
 		"a condition after the comma is a mark (%s)" % [arrows])

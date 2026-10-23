@@ -26260,3 +26260,31 @@ player them, nothing stubbed.
 ui_test _test_town_sheet (the words; N on a told town, the people from the
 bodies here, the ask and its throttle, Esc; an untold town; the map's row
 from elsewhere; economy's message filling rows at once).
+## 622, ui's side: the armour slot on the pack panel
+
+Items' 622 (178cba96): Items.ARMOUR = 6, CARRIED 7, on players and
+companions; World.slot_refused words a refused move ("Only armour is worn
+there.", "Armour is worn, not held.") as a party line; Player.worn and
+Companion.worn replicate; each kind's "about" in items.json. The
+coordinator's assignment for ui: the slot beside the hands with the hands'
+brass edge and a small "A" like the R and L, equip by a drag with no click
+verb, the refusal words, the hover reading the kind's note, no body
+picture.
+- The box: the pack panel's row loops Player.SLOTS, so the seventh box
+  stands after the hands, HandSlot-edged and marked "A" (items drew the
+  mark with its slot; ui keeps it: beside the hands is where Jeff asked
+  for it, "an armor slot next to the weapon slot"). Both rows, the
+  player's and a companion's.
+- Equipping: a drag into it, as a weapon into a hand, through the same
+  transfer command; taking it off is a drag out. No click verb (Jeff's to
+  ask). The client lets any drag land there or on a hand and the server
+  decides and words the refusal, so a client and a host read the same
+  words and the rule lives in one place.
+- The hover: ItemTip adds the kind's own note (items.json "about") under
+  what it is and weighs, for armour ("Worn in the armour slot, not held.
+  Turns some of an arrow and a thrust; a bow worn with it reaches less far")
+  and any other kind that has one (the draugr's totem).
+- No body picture; pc-character's coverings on the body in the world are
+  theirs. Client only, protocol unchanged, no new class_name.
+ui_test _test_stacks_ui (the seventh box in both rows, edged and marked, a
+drag's target) and _test_item_tip (the note on hover).
