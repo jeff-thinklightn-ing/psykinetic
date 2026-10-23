@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- With the low camera on, the weather fits the wider view: rain and snow fall out to the distance, ground fog and cloud shadows no longer show square edges, a storm's haze hides the far hills while the ground near you stays as clear as in the usual view, and the sky's horizon fades into the haze (623, environment's side).
 - A faint cool draft drifts low out of the barrow's hidden niche into the room while its door is shut; hold a light near the niches to see it (608 amended, environment's side).
 - The barrow's damp lair looks it: darker and colder, a faint haze, and your lantern's light only reaches a few steps (580, terrain's side).
 - Nothing grows indoors any more: no grass or flowers on dungeon floors, only loose stones (580).

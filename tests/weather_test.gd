@@ -27,6 +27,7 @@ func _ready() -> void:
 	_test_in_the_field()
 	_test_climates_file()
 	_test_view()
+	_test_low_view()
 	_test_between()
 	_test_roofs()
 	_test_canopy()
@@ -198,6 +199,64 @@ func _test_view() -> void:
 	var a := WeatherView.cloud_middle(Vector2(10.0, 0.0), Vector2(35.9, 0.0))
 	var b := WeatherView.cloud_middle(Vector2(10.0, 0.0), Vector2(36.1, 0.0))
 	_check(absf(a.x - b.x) < 0.5, "the drift wrapping a period moves it smoothly (%.2f to %.2f)" % [a.x, b.x])
+
+
+## The low camera (623, environment's side): the haze scaled so the aim
+## reads as in ortho, the horizon toward the haze's colour, the rain, fog
+## and clouds sized for the view; ortho exactly as before.
+func _test_low_view() -> void:
+	print("\n== under the low camera ==")
+	var noon := Client3D.sky_look(60.0)
+	var storm := Client3D.weathered_look(noon, Weather.KINDS["storm"])
+	var base := float(storm["fog_density"]) - float(storm["fog_weather"])
+	var weather := float(storm["fog_weather"])
+	var near := Client3D.CAMERA_DISTANCE * Client3D.LOW_DISTANCE_SHARE
+	var low := Client3D.hazed_density(base, weather, true, near)
+	_check(is_equal_approx(Client3D.hazed_density(base, weather, false, near), storm["fog_density"]) and weather > 0.0,
+			"ortho's haze is the look's, as ever")
+	# Through the weather's share alone, the aim as far off as ortho's.
+	_check(is_equal_approx((low - base - Client3D.LOW_FOG) * near, weather * Client3D.CAMERA_DISTANCE),
+			"under the low camera the storm's haze to the aim reads as ortho's (%.4f over %.0f, %.4f over %.0f)" % [low - base - Client3D.LOW_FOG, near, weather, Client3D.CAMERA_DISTANCE])
+	var clear := Client3D.weathered_look(noon, Weather.KINDS["clear"])
+	_check(is_equal_approx(Client3D.hazed_density(clear["fog_density"], clear["fog_weather"], true, near), float(clear["fog_density"]) + Client3D.LOW_FOG),
+			"clear air: only the low camera's own haze added")
+	var grey := Client3D.hazed_horizon(storm, Weather.KINDS["storm"])
+	_check(Client3D.hazed_horizon(clear, Weather.KINDS["clear"]) == clear["horizon"] and grey.is_equal_approx(storm["fog"]),
+			"the horizon: the sky's in clear air, the haze's colour in a storm")
+	var view := WeatherView.new()
+	add_child(view)
+	view.set_outdoor(true)
+	for i in 30:
+		view.ease_toward(Weather.KINDS["storm"], 0.1)
+	var rain := view._rain
+	var ortho_box := view._rain_process.emission_box_extents
+	var ortho_drops := rain.amount
+	var ortho_size := (view._fog[0].mesh as PlaneMesh).size
+	var ortho_clouds := view._clouds.size
+	var target := Vector3(100.0, 0.0, 100.0)
+	view.set_view(true, Vector3(100.0, 8.0, 120.0), Vector2(0.0, -1.0))
+	view.place(target, 0.1, Color.GRAY, 1.0, func(way: Vector3) -> Vector3: return way)
+	var box := view._rain_process.emission_box_extents * 2.0
+	var middle := rain.global_position
+	var deep := rain.global_transform.basis.z
+	_check(box.z > box.x and box.z >= WeatherView.LOW_BOX.z and rain.amount <= roundi(WeatherView.RAIN_DROPS * WeatherView.LOW_DROPS) and rain.amount > ortho_drops,
+			"the rain's box runs deep along the view, its drops more but at most %.1f times" % WeatherView.LOW_DROPS)
+	_check(absf(deep.dot(Vector3(0.0, 0.0, -1.0))) > 0.99 and middle.z < 120.0 - WeatherView.LOW_BOX.z * 0.4 and absf(middle.x - 100.0) < 0.01,
+			"from the camera out ahead (its middle at %.0f, %.0f)" % [middle.x, middle.z])
+	var plane := (view._fog[0].mesh as PlaneMesh).size
+	var fog_at := view._fog[0].global_position
+	_check(plane.x >= ortho_size.x * WeatherView.LOW_FOG_WIDE - 0.01 and fog_at.z < target.z - 10.0
+			and view._fog_material[0].get_shader_parameter("rim") == 1.0,
+			"the fog's layers %.0f m wide, ahead of the aim, faded to their rims" % plane.x)
+	_check(view._clouds.size.x == WeatherView.CLOUD_PERIOD * WeatherView.LOW_CLOUD_TILES and (view._clouds.texture_albedo as ImageTexture).get_width() == 128 * WeatherView.LOW_CLOUD_TILES,
+			"the clouds' decal %.0f m wide" % view._clouds.size.x)
+	view.set_view(false, Vector3(100.0, 30.0, 130.0), Vector2(-0.7, -0.7))
+	view.place(target, 0.1, Color.GRAY, 1.0, func(way: Vector3) -> Vector3: return way)
+	_check(view._rain_process.emission_box_extents == ortho_box and rain.amount == ortho_drops and rain.global_basis.is_equal_approx(Basis.IDENTITY)
+			and (view._fog[0].mesh as PlaneMesh).size == ortho_size and view._fog_material[0].get_shader_parameter("rim") == 0.0
+			and view._fog[0].global_position.x == target.x and view._clouds.size == ortho_clouds and view._roofs.follow_camera_enabled,
+			"back in ortho, all as it was")
+	view.free()
 
 
 func _test_between() -> void:

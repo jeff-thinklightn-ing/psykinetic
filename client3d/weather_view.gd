@@ -54,6 +54,19 @@ const CLOUD_PERIOD := 36.0
 const CLOUD_TILES := 3
 const CLOUD_DARK := 0.3
 const CLOUD_DRIFT := 3.0
+## Under the low camera (623, environment's side; set_view): the rain and
+## snow fall in a LOW_BOX (across, -, deep) from the camera out along the
+## view, their drops LOW_DROPS times as many at most; the fog's layers
+## LOW_FOG_WIDE times as wide, centred LOW_FOG_AHEAD of FOG_SIZE ahead of
+## the aim and faded to their rims; the clouds' decal LOW_CLOUD_TILES
+## periods wide, its edge out where the haze has the land (not Decal's
+## distance fade: it dims the whole decal by its centre's distance, so every
+## cloud shadow near the view would fade with it).
+const LOW_BOX := Vector3(34.0, 0.0, 70.0)
+const LOW_DROPS := 1.5
+const LOW_FOG_WIDE := 3.0
+const LOW_FOG_AHEAD := 0.75
+const LOW_CLOUD_TILES := 9
 ## What drifts fog and clouds even in still air (m/s).
 const CALM_DRIFT := 0.4
 
@@ -65,8 +78,12 @@ uniform vec3 colour : source_color = vec3(0.7);
 uniform float amount = 0.0;
 uniform vec2 drift = vec2(0.0);
 uniform float layer = 0.0;
+// Faded to the rim under the low camera (rim 1), whole in ortho (0).
+uniform float rim = 0.0;
+uniform float half_size = 36.0;
 
 varying vec3 world;
+varying vec2 local;
 
 float hash(vec2 p) {
 	return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
@@ -93,6 +110,7 @@ float fbm(vec2 p) {
 
 void vertex() {
 	world = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
+	local = VERTEX.xz;
 }
 
 void fragment() {
@@ -102,6 +120,7 @@ void fragment() {
 	float edge = mix(0.85, 0.15, amount);
 	ALBEDO = colour;
 	ALPHA = smoothstep(edge, edge + 0.25, wisp) * amount * 0.45;
+	ALPHA *= 1.0 - rim * smoothstep(0.6, 1.0, length(local) / half_size);
 }
 """
 
@@ -147,6 +166,16 @@ var _roofs: GPUParticlesCollisionHeightField3D
 var _fog: Array[MeshInstance3D] = []
 var _fog_material: Array[ShaderMaterial] = []
 var _clouds: Decal
+## The low camera's view (set_view): on, the camera's place, and the way it
+## looks along the ground (unit, world xz).
+var low := false
+var _camera_at := Vector3.ZERO
+var _ahead := Vector2(0.0, -1.0)
+## The fog's planes, ortho's and the low camera's; the clouds' one tile
+## and its decal textures by tiles across.
+var _fog_planes: Array[PlaneMesh] = []
+var _cloud_tile: Image
+var _cloud_textures: Dictionary[int, ImageTexture] = {}
 
 
 func _ready() -> void:
@@ -173,6 +202,40 @@ func set_outdoor(value: bool) -> void:
 		weather = {"cloud": 0.0, "rain": 0.0, "snow": 0.0, "fog": 0.0, "wind": 0.0, "wind_dir": Vector2.RIGHT}
 		RenderingServer.global_shader_parameter_set("wind", Vector4.ZERO)
 		RenderingServer.global_shader_parameter_set("season", Vector4(1.0, 0.0, 0.0, 0.0))
+
+
+## The view the weather is drawn for (623, environment's side): the low
+## camera [param is_low] or ortho, the [param camera]'s place and the way
+## it looks along the ground ([param ahead], world xz). Turning the low
+## camera on or off sizes the rain, snow, fog and clouds for it; off, all is
+## as ortho always drew it.
+func set_view(is_low: bool, camera: Vector3, ahead: Vector2) -> void:
+	_camera_at = camera
+	if ahead.length_squared() > 0.0001:
+		_ahead = ahead.normalized()
+	if is_low == low:
+		return
+	low = is_low
+	var box := LOW_BOX if low else RAIN_BOX
+	var drops := LOW_DROPS if low else 1.0
+	_rain.amount = roundi(RAIN_DROPS * drops)
+	_snow.amount = roundi(SNOW_FLAKES * drops)
+	_rain_process.emission_box_extents = box * 0.5
+	_snow_process.emission_box_extents = box * 0.5
+	_rain.visibility_aabb = AABB(Vector3(-box.x, -RAIN_HEIGHT - 6.0, -box.z), Vector3(box.x * 2.0, RAIN_HEIGHT + 8.0, box.z * 2.0))
+	_snow.visibility_aabb = AABB(Vector3(-box.x, -RAIN_HEIGHT, -box.z), Vector3(box.x * 2.0, RAIN_HEIGHT + 4.0, box.z * 2.0))
+	# The roofs round the box, turned any way along the view, not the camera.
+	_roofs.follow_camera_enabled = not low
+	_roofs.size = Vector3(LOW_BOX.z + 8.0, 40.0, LOW_BOX.z + 8.0) if low else Vector3(RAIN_BOX.x + 8.0, 40.0, RAIN_BOX.z + 8.0)
+	_roofs.resolution = GPUParticlesCollisionHeightField3D.RESOLUTION_512 if low else GPUParticlesCollisionHeightField3D.RESOLUTION_256
+	var plane := _fog_planes[1 if low else 0]
+	for i in _fog.size():
+		_fog[i].mesh = plane
+		_fog_material[i].set_shader_parameter("rim", 1.0 if low else 0.0)
+		_fog_material[i].set_shader_parameter("half_size", plane.size.x * 0.5)
+	var tiles := LOW_CLOUD_TILES if low else CLOUD_TILES
+	_clouds.texture_albedo = _cloud_texture(tiles)
+	_clouds.size = Vector3(CLOUD_PERIOD * tiles, 40.0, CLOUD_PERIOD * tiles)
 
 
 ## The season's land for terrain and scatter (Season.at's green, turn and
@@ -221,29 +284,42 @@ func place(target: Vector3, delta: float, fog_colour: Color, daylight: float, to
 	var wind: float = weather["wind"]
 	RenderingServer.global_shader_parameter_set("wind", Vector4(way.x, way.y, wind, 0.0))
 	_drift += way * (CALM_DRIFT + CLOUD_DRIFT * wind) * delta
+	# Under the low camera the rain's and snow's box runs from the camera out
+	# along the view (its z), the roofs' heightfield over it; in ortho, over
+	# the aim.
+	var frame := Basis.IDENTITY
+	var over := target
+	if low:
+		frame = Basis(Vector3.UP, atan2(_ahead.x, _ahead.y))
+		over = Vector3(_camera_at.x + _ahead.x * LOW_BOX.z * 0.5, target.y, _camera_at.z + _ahead.y * LOW_BOX.z * 0.5)
+		_roofs.global_position = over
 	# Rain: the box over the view, the drops slanted downwind.
 	var rain: float = weather["rain"]
 	var through := rain * (1.0 - canopy)
 	_rain.emitting = through > 0.02
 	_rain.amount_ratio = clampf(through, 0.0, 1.0)
-	_rain.global_position = target + Vector3(0.0, RAIN_HEIGHT, 0.0)
-	_rain_process.direction = Vector3(way.x * RAIN_SLANT * wind, -1.0, way.y * RAIN_SLANT * wind).normalized()
+	_rain.global_transform = Transform3D(frame, over + Vector3(0.0, RAIN_HEIGHT, 0.0))
+	_rain_process.direction = frame.inverse() * Vector3(way.x * RAIN_SLANT * wind, -1.0, way.y * RAIN_SLANT * wind).normalized()
 	# Snow: slow flakes, carried by the wind.
 	var snow: float = weather["snow"]
 	snow *= lerpf(1.0, CANOPY_SNOW, canopy)
 	_snow.emitting = snow > 0.02
 	_snow.amount_ratio = clampf(snow, 0.0, 1.0)
-	_snow.global_position = target + Vector3(0.0, RAIN_HEIGHT * 0.6, 0.0)
+	_snow.global_transform = Transform3D(frame, over + Vector3(0.0, RAIN_HEIGHT * 0.6, 0.0))
 	_snow_process.gravity = Vector3(way.x * SNOW_DRIFT * wind, -0.3, way.y * SNOW_DRIFT * wind)
 	# Drips: big slow drops from under the crowns, straight down.
 	_drips.emitting = drip > 0.02
 	_drips.amount_ratio = drip
 	_drips.global_position = target + Vector3(0.0, DRIP_HEIGHT, 0.0)
-	# Fog: layers centred on the view, their noise drifting.
+	# Fog: layers centred on the view (under the low camera, ahead of the
+	# aim), their noise drifting.
 	var fog: float = minf(weather["fog"] * (1.0 + CANOPY_FOG * canopy), 1.0)
+	var middle_at := target
+	if low:
+		middle_at += Vector3(_ahead.x, 0.0, _ahead.y) * FOG_SIZE * LOW_FOG_AHEAD
 	for i in _fog.size():
 		_fog[i].visible = fog > 0.02
-		_fog[i].global_position = Vector3(target.x, target.y + FOG_LAYERS[i], target.z)
+		_fog[i].global_position = Vector3(middle_at.x, target.y + FOG_LAYERS[i], middle_at.z)
 		_fog_material[i].set_shader_parameter("amount", fog)
 		_fog_material[i].set_shader_parameter("drift", _drift)
 		_fog_material[i].set_shader_parameter("colour", fog_colour)
@@ -385,10 +461,14 @@ func _build_fog() -> void:
 	shader.code = FOG_SHADER
 	var plane := PlaneMesh.new()
 	plane.size = Vector2(FOG_SIZE, FOG_SIZE)
+	var wide := PlaneMesh.new()
+	wide.size = plane.size * LOW_FOG_WIDE
+	_fog_planes = [plane, wide]
 	for i in FOG_LAYERS.size():
 		var material := ShaderMaterial.new()
 		material.shader = shader
 		material.set_shader_parameter("layer", float(i))
+		material.set_shader_parameter("half_size", FOG_SIZE * 0.5)
 		var layer := MeshInstance3D.new()
 		layer.name = "Fog%d" % i
 		layer.mesh = plane
@@ -399,6 +479,20 @@ func _build_fog() -> void:
 		add_child(layer)
 		_fog.append(layer)
 		_fog_material.append(material)
+
+
+## The clouds' decal texture [param tiles] periods across (made once a
+## size): the tile repeated tiles by tiles, so the decal can jump a period
+## and look the same.
+func _cloud_texture(tiles: int) -> ImageTexture:
+	if not _cloud_textures.has(tiles):
+		var size := _cloud_tile.get_width()
+		var image := Image.create(size * tiles, size * tiles, false, Image.FORMAT_RGBA8)
+		for ty in tiles:
+			for tx in tiles:
+				image.blit_rect(_cloud_tile, Rect2i(0, 0, size, size), Vector2i(size * tx, size * ty))
+		_cloud_textures[tiles] = ImageTexture.create_from_image(image)
+	return _cloud_textures[tiles]
 
 
 ## Where the cloud decal's middle goes for the view's [param target]
@@ -418,20 +512,14 @@ func _build_clouds() -> void:
 	noise.seed = 7
 	var size := 128
 	var tile := noise.get_seamless_image(size, size)
-	# CLOUD_TILES by CLOUD_TILES, so the decal can jump a period and look
-	# the same.
-	var image := Image.create(size * CLOUD_TILES, size * CLOUD_TILES, false, Image.FORMAT_RGBA8)
+	_cloud_tile = Image.create(size, size, false, Image.FORMAT_RGBA8)
 	for y in size:
 		for x in size:
-			var shade := smoothstep(0.45, 0.62, tile.get_pixel(x, y).r)
-			var colour := Color(0.0, 0.0, 0.0, shade)
-			for ty in CLOUD_TILES:
-				for tx in CLOUD_TILES:
-					image.set_pixel(x + size * tx, y + size * ty, colour)
+			_cloud_tile.set_pixel(x, y, Color(0.0, 0.0, 0.0, smoothstep(0.45, 0.62, tile.get_pixel(x, y).r)))
 	_clouds = Decal.new()
 	_clouds.name = "CloudShadow"
 	_clouds.size = Vector3(CLOUD_PERIOD * CLOUD_TILES, 40.0, CLOUD_PERIOD * CLOUD_TILES)
-	_clouds.texture_albedo = ImageTexture.create_from_image(image)
+	_clouds.texture_albedo = _cloud_texture(CLOUD_TILES)
 	_clouds.albedo_mix = 1.0
 	_clouds.upper_fade = 0.0
 	_clouds.lower_fade = 0.0

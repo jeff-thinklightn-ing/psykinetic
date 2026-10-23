@@ -1534,6 +1534,8 @@ var _sky_step := -1
 ## by day there (0..1); the weather drawn (decision 309).
 var _look := {}
 var _look_daylight := 0.0
+## The haze's density (look's own, the weather's share), for _set_haze.
+var _haze := Vector2.ZERO
 var _weather_view: WeatherView
 ## The canopy's cover round the view, eased (0..1), the way to the sun in
 ## the view's directions, and the shafts (null where there is no canopy).
@@ -2021,7 +2023,11 @@ func _update_sky(delta: float) -> void:
 	var season := Season.at(World.fields.region, DayNight.now())
 	_weather_view.set_season(season)
 	var covered := _ease_canopy(delta)
+	if _camera != null:
+		var ahead := -_camera.global_transform.basis.z
+		_weather_view.set_view(_low, _camera.global_position, Vector2(ahead.x, ahead.z))
 	_weather_view.place(_camera_target, delta, _look.get("weather_fog", SKY_HORIZON), _look_daylight, _level_direction)
+	_set_haze()
 	if _shafts != null:
 		_shafts.place(_camera_target, _toward_sun, LightShafts.strength_for(_look_daylight, _weather_view.weather))
 	if step == _sky_step and not weathered and not covered:
@@ -2047,11 +2053,12 @@ func _update_sky(delta: float) -> void:
 			_canopy_cover * World.fields.canopy_shade / DayNight.CANOPY_SHADE)
 	_look["weather_fog"] = look["fog"]
 	_sky_material.sky_top_color = look["top"]
-	_sky_material.sky_horizon_color = look["horizon"]
+	_sky_material.sky_horizon_color = hazed_horizon(look, _weather_view.weather) if _low else look["horizon"]
 	_environment.ambient_light_color = look["ambient"]
 	_environment.ambient_light_energy = look["ambient_energy"]
 	_environment.fog_light_color = look["fog"]
-	_environment.fog_density = look["fog_density"] + (LOW_FOG if _low else 0.0)  # The low camera's haze (623).
+	_haze = Vector2(float(look["fog_density"]) - float(look["fog_weather"]), look["fog_weather"])
+	_set_haze()
 	_environment.fog_height = look["fog_height"]
 	_environment.fog_height_density = look["fog_height_density"]
 	_sun.light_color = look["light"]
@@ -2064,6 +2071,33 @@ func _update_sky(delta: float) -> void:
 	var roof := DayNight.NIGHT + (day - DayNight.NIGHT) * share * (1.0 - World.fields.canopy_shade)
 	var lit := bool(_terrain.get("daylight", false))
 	_set_sky_floor(floor_brightness(light) if lit else 0.0, floor_brightness(roof) if lit else 0.0)
+
+
+## The haze's density (623, environment's side): the look's own [param base]
+## and the [param weather]'s share (weathered_look's fog_weather, per unit,
+## tuned for a camera CAMERA_DISTANCE off); under the [param low] camera
+## [param distance] off, the weather's share scaled so the aim reads as in
+## ortho (a storm then hides the hills) and LOW_FOG over it. Ortho: as ever.
+static func hazed_density(base: float, weather: float, low: bool, distance: float) -> float:
+	if not low:
+		return base + weather
+	return base + weather * CAMERA_DISTANCE / maxf(distance, 1.0) + LOW_FOG
+
+
+## The sky's horizon under the low camera (623, environment's side): the
+## [param look]'s, drawn toward its haze's colour as the [param weather]
+## (Weather.at's amounts) thickens, so the land fades into the sky with no
+## band: grey under overcast, the fog's in fog.
+static func hazed_horizon(look: Dictionary, weather: Dictionary) -> Color:
+	var thick := clampf(maxf(maxf(float(weather.get("fog", 0.0)), float(weather.get("rain", 0.0))),
+			0.6 * float(weather.get("cloud", 0.0))), 0.0, 1.0)
+	return (look["horizon"] as Color).lerp(look["fog"], thick)
+
+
+## The haze as it stands: hazed_density of the look's last (_haze), for the
+## camera's distance now (the wheel moves it under the low camera).
+func _set_haze() -> void:
+	_environment.fog_density = hazed_density(_haze.x, _haze.y, _low, _camera_distance())
 
 
 ## The height (degrees) shadows are cast from for a light [param elevation]
@@ -2106,7 +2140,8 @@ static func weathered_look(look: Dictionary, weather: Dictionary) -> Dictionary:
 	out["light"] = grey.call(look["light"], 0.25 * cloud)
 	out["energy"] = float(look["energy"]) * (1.0 - CLOUD_SUN * cloud)
 	out["fog"] = grey.call(look["fog"], maxf(0.6 * cloud, 0.8 * fog))
-	out["fog_density"] = float(look["fog_density"]) + FOG_DENSITY * fog + RAIN_FOG_DENSITY * rain
+	out["fog_weather"] = FOG_DENSITY * fog + RAIN_FOG_DENSITY * rain
+	out["fog_density"] = float(look["fog_density"]) + float(out["fog_weather"])
 	out["fog_height"] = FOG_HEIGHT
 	out["fog_height_density"] = FOG_HEIGHT_DENSITY * fog
 	return out

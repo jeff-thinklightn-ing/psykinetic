@@ -25249,3 +25249,17 @@ Jeff wanted the barrow's hidden door to leave clues: "you feel a cool draft comi
 - No Fields cold spot: dungeon's party line comes from the hidden entry on the server, the same for everyone.
 
 view_test checks the draft is lit, low and drifts out into its room while shut, stops when the door opens and comes back when it shuts. Client only: protocol unchanged, no new class_name.
+
+## 623, environment's side: the weather and the horizon under the low camera
+
+Jeff on the low camera (623, ui's side): "amazing... well worth the change". Ui's entry left the seams it showed to environment with terrain: the storm's haze per unit, the fog planes' edges, the rain box and the cloud decal's edge, and the sky under the haze. Designed here and approved by the coordinator; under the ortho camera everything stays as it was.
+
+- The haze: weathered_look now gives the weather's share of the fog density on its own (fog_weather). Client3D.hazed_density scales that share by CAMERA_DISTANCE / the camera's distance under the low camera, with LOW_FOG on top. The aim then reads as clear or as hazy as in ortho (the share was tuned for a camera 40 off; at 20 it read thinner near), and a storm hides the hills while clear air shows them. It is set every frame (_set_haze), since the wheel moves the camera.
+- The sky: under the low camera, Client3D.hazed_horizon draws the sky's horizon toward the haze's colour as fog, rain or cloud thicken (cloud at 0.6), so the land fades into the sky with no band: grey under overcast, the fog's in fog. The sky's top is the day's as ever.
+- WeatherView.set_view(low, the camera's place, the way it looks along the ground) sizes the weather for the view when the camera mode turns:
+  - Rain and snow fall in a box LOW_BOX (34 across, 70 deep) from the camera out along the view, turned to it. Their drops are LOW_DROPS (1.5) times as many at most, not by the area (2 times). The roofs' heightfield covers that box (78 square at 512) instead of following the camera.
+  - The fog's three layers are LOW_FOG_WIDE (3) times as wide (216 m), centred LOW_FOG_AHEAD of FOG_SIZE (54 m) ahead of the aim. Their shader fades them to the rim (rim 1), so no edge shows; in ortho rim is 0 and they are whole, as before.
+  - The clouds' decal is LOW_CLOUD_TILES (9) periods wide (324 m) instead of 3, its texture built once a size from the one tile (_cloud_texture, blitted). Its edge is then at least 144 m from the aim, where the haze has the land. The design said a distance fade; Godot's decal fade dims the whole decal by its centre's distance, not by the pixel's, so it would have dimmed every cloud shadow near the view. The wider decal does the same work.
+- The sun's shadows under the low camera (LOW_SHADOW_DISTANCE 150 in two splits, ui's) stay until perf has measured them against ortho's 70; a change, if any, follows as an amendment.
+
+weather_test _test_low_view: ortho's haze is the look's; under the low camera the storm's haze to the aim matches ortho's; clear air gets only LOW_FOG; the horizon is the sky's in clear air and the haze's in a storm; the rain's box runs deep from the camera ahead with at most 1.5 times the drops; the fog's layers are 216 m wide, ahead of the aim, faded to their rims; the clouds' decal is 324 m; back in ortho everything is as it was. Client only: protocol unchanged, no new class_name.
