@@ -25947,3 +25947,54 @@ snapshot round trip, applied as buildings with walls and a door.
 PROTOCOL_REVISION 35 (a line under dungeon's, which opened it): the
 "clearing" message's "plots".
 No new class_name.
+
+## 640, maps' side: the herders' holdings in the hills
+
+Jeff: "herders exist as people". The coordinator's ruling: the hills'
+herders_hut and hill_shieling refuges (613 amended) become lived-in
+herders' holdings, each with a herder, a fold and a few beasts, and the
+butcher's and weaver's stories wait "at the herder's" (lore rewords
+them). Economy's side (640, economy's side) makes the herder trade: its
+herder.places names the two tags, the herder's store is keyed by the
+place's id (held by nobody, no stockpile place), and the herder never
+reads the place's holder, so the sought's "sought:<id>" holder stays as
+it is. Art-kit's building.fold is the fold.
+- The places keep their keys and kind (refuge, where hills). Laid by
+  tools/make_hills.gd (HERDERS), which now writes the hills' places too,
+  so a rerun keeps them (the refuges were hand-added before):
+  - herders_hut: fold (11, 18) gate south, hut (13, 26) door north, the
+    place's cell (14, 25) before the door; renamed "the herder's hut".
+  - hill_shieling: fold (68, 23) gate east, hut (76, 25) door west, the
+    place's cell (75, 26), on the plateau's flat top.
+  Each fold and hut on one levelled pad (Relief.lay keep_flat): the only
+  flat ground the hills have is the plateau's, and no 6 x 6 lay flat near
+  (12, 25). The pads change the relief only round them; the ledges and
+  the cliff edges are as before (97).
+- building.fold (6 x 6; Level.BUILDINGS and OPEN_AIR are buildings' side, 3ab84595): its
+  outline is wall edges (a fence that stops walkers and beasts, not
+  sight, drawn by the slot's own mesh), its gate the front row's middle
+  two edges, left open, turned by its facing (the gate's way) toward the
+  hut's door across a 2-cell way (612), with open ground two cells round
+  both. A building.hut (3 x 3) beside it, its door on the side toward
+  the fold.
+- Level.fold_near(buildings, cell): the fold nearest a holding's place
+  cell, within FOLD_REACH (6) cells of its rect.
+- Drawing (client): economy's message "folds" {counts: {place id: sheep}}
+  (to the zone on each change, to a peer arriving) is kept in
+  Main.fold_counts; Main.fold_view pairs each count on this map with its
+  fold (Level.fold_near from the place's cell) and hands Client3D.set_folds
+  [{rect, facing, count}], again after each rebuild. Client3D draws
+  min(count, FOLD_SHEEP_MOST = 6) creature.sheep (every fourth the ram,
+  variant 2; half of them grazing, the rest idle) at FOLD_SPOTS, inside
+  the fence and off the trough's strip at the back (Client3D.fold_spots),
+  scenery under the room, not entities: a drove walked off shows fewer at
+  once. The town pasture can join the same map later as
+  "<town>:pasture".
+tests: level_test _test_herders (each place a hills refuge, its fold by
+it, the fence shut but its two gate edges, the hut's door on the place,
+open ground two cells round, walked to from the start and into the fold
+through the gate); view_test _test_folds (six spots of nine inside the
+fence and off the trough for each gate side, none for none, six drawn of
+nine, two at once after a drove leaves). Level data and client; the
+"folds" message is economy's (MESSAGE_KINDS, a line under 34, by
+whichever side lands first): a wire change. No new class_name.

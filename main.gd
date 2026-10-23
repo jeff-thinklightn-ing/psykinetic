@@ -447,6 +447,9 @@ var town_states := {}
 ## Town id -> {map building code: awake} as the server last told ("town"
 ## "awake", decision 566), for the window light; the view's set_awake.
 var town_awake := {}
+## Holdings place id -> the sheep its fold holds, as the server last told
+## (economy's "folds" message, 640), for the beasts the view draws there.
+var fold_counts := {}
 ## The telegraphs showing on this client (decision 602): id -> their data.
 var telegraphs := {}
 ## Each level's damaged roofs (their indices) as this client was last told
@@ -2824,6 +2827,28 @@ func _on_terrain(data: Dictionary) -> void:
 		print("[zone] %s changed" % level_name)
 
 
+## This zone's folds as the view draws them (640): [{rect, facing, count}],
+## each told count (fold_counts) whose place is on this map, at the fold
+## nearest its cell (Level.fold_near); a count with no fold there is left out.
+func fold_view() -> Array:
+	var out := []
+	for id: String in fold_counts:
+		if id.get_slice("/", 0) != map_name:
+			continue
+		var place: Variant = level.get("places", {}).get(id.get_slice("/", 1))
+		if not place is Dictionary:
+			continue
+		var fold := Level.fold_near(_terrain.get("buildings", []), place["cell"])
+		if not fold.is_empty():
+			out.append({"rect": fold["rect"], "facing": fold["facing"], "count": int(fold_counts[id])})
+	return out
+
+
+func _show_folds() -> void:
+	if _client3d != null:
+		_client3d.set_folds(fold_view())
+
+
 ## Draws the terrain afresh in both views (a map loaded live).
 func _repaint() -> void:
 	_paint_level()
@@ -2833,6 +2858,7 @@ func _repaint() -> void:
 	if _client3d != null:
 		_client3d.rebuild(_terrain, level_centre)
 		_show_towns()
+		_show_folds()
 
 
 # --- Zones (server) -------------------------------------------------------------
@@ -9093,6 +9119,13 @@ func _on_message(kind: String, data: Dictionary) -> void:
 		return
 	if kind == "clearing":
 		_on_clearing(data)
+		return
+	if kind == "folds":
+		var counts: Variant = data.get("counts", {})
+		if counts is Dictionary:
+			for id: Variant in counts:
+				fold_counts[str(id)] = int(counts[id])
+			_show_folds()
 		return
 	if kind == "town":
 		var town := str(data.get("town", ""))

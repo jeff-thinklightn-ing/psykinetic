@@ -533,6 +533,54 @@
 			],
 			"length": 3,
 			"code": "B1"
+		},
+		{
+			"slot": "building.fold",
+			"at": [
+				11,
+				18
+			],
+			"facing": [
+				0,
+				1
+			],
+			"code": "F1"
+		},
+		{
+			"slot": "building.hut",
+			"at": [
+				13,
+				26
+			],
+			"facing": [
+				0,
+				-1
+			],
+			"code": "H1"
+		},
+		{
+			"slot": "building.fold",
+			"at": [
+				68,
+				23
+			],
+			"facing": [
+				1,
+				0
+			],
+			"code": "F2"
+		},
+		{
+			"slot": "building.hut",
+			"at": [
+				76,
+				25
+			],
+			"facing": [
+				-1,
+				0
+			],
+			"code": "H2"
 		}
 	],
 	"roads": [
@@ -697,8 +745,42 @@
 			"kind": "dirt"
 		}
 	],
+	"places": {
+		"hill_cave": {
+			"at": [
+				23,
+				56
+			],
+			"kind": "refuge",
+			"where": "hills",
+			"radius": 3,
+			"name": "a hill cave"
+		},
+		"herders_hut": {
+			"at": [
+				14,
+				25
+			],
+			"kind": "refuge",
+			"where": "hills",
+			"radius": 3,
+			"name": "the herder's hut"
+		},
+		"hill_shieling": {
+			"at": [
+				75,
+				26
+			],
+			"kind": "refuge",
+			"where": "hills",
+			"radius": 3,
+			"name": "a shieling high on the hill"
+		}
+	},
 	"building_codes": {
-		"B": 1
+		"B": 1,
+		"F": 2,
+		"H": 2
 	},
 	"ledges": [
 		{
@@ -1013,37 +1095,5 @@
 			"up": "left",
 			"closed": false
 		}
-	],
-	"places": {
-		"herders_hut": {
-			"at": [
-				12,
-				25
-			],
-			"kind": "refuge",
-			"where": "hills",
-			"radius": 3,
-			"name": "an empty herder's hut"
-		},
-		"hill_cave": {
-			"at": [
-				23,
-				56
-			],
-			"kind": "refuge",
-			"where": "hills",
-			"radius": 3,
-			"name": "a hill cave"
-		},
-		"hill_shieling": {
-			"at": [
-				72,
-				25
-			],
-			"kind": "refuge",
-			"where": "hills",
-			"radius": 3,
-			"name": "a shieling high on the hill"
-		}
-	}
+	]
 }

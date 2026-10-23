@@ -31,8 +31,10 @@ extends Node
 ## - the faces (the escarpments', the plateau's cliff) along curves that
 ##   wander WANDER cells either way of their lines, and level.json's
 ##   "ledges" traced from them (decision 585: MapDoc.save traces them).
-## No monsters, no buildings but the bridge. The same seed makes the same
-## map.
+## - the sought's refuges (613 amended), two of them herders' holdings
+##   (640, maps' side): a hut and a fold on a levelled pad (HERDERS).
+## No monsters, no buildings but the bridge and the herders'. The same seed
+## makes the same map.
 
 const SIZE := Vector2i(96, 96)
 const SEED := 525
@@ -100,6 +102,20 @@ const FORD_FREE := 4
 ## The low wall: its column (the edge east of it) and rows.
 const WALL_X := 55
 const WALL_ROWS := Vector2i(34, 42)
+## The sought's refuges here (613 amended: one place a story, its key the
+## story's tag), each {at, name}.
+const REFUGES := {"hill_cave": {"at": Vector2i(23, 56), "name": "a hill cave"}}
+## The herders' holdings (640, maps' side; Jeff: "herders exist as people"):
+## refuges economy's herder.places names, each a building.fold (6 x 6, its
+## gate the front row's middle two edges, open) whose gate looks across a
+## 2-cell way at a building.hut's door, both on one levelled pad, the
+## place's cell the way's cell before the door. Each {key, name, fold (its
+## rect), gate (the way it opens)}.
+const HERDERS: Array[Dictionary] = [
+	{"key": "herders_hut", "name": "the herder's hut", "fold": Rect2i(11, 18, 6, 6), "gate": Vector2i(0, 1)},
+	{"key": "hill_shieling", "name": "a shieling high on the hill", "fold": Rect2i(68, 23, 6, 6), "gate": Vector2i(1, 0)}]
+## The way between a fold's gate and its hut's door, in cells.
+const HERDER_WAY := 2
 
 var map := LevelMap.new(SIZE)
 var config := {"name": "The Hills", "outdoor": true, "zone": "outdoors", "region": "town_lands", "border": "forest", "walls": "stone", "floors": "cave"}
@@ -127,7 +143,7 @@ func _ready() -> void:
 		"slope": 0.3, "steep_bands": 0.3, "rock_step": Relief.MAX_M, "dirt_step": 0.33,
 		"valleys": [VALLEY], "valley_depth": 4.5, "valley_floor": RIVER_FLOOR, "valley_fall": 5.0, "valley_width": 30.0, "kinds": true, "min_flow": 30,
 		"plateaus": [{"rect": Rect2i(CLIFF_X, 0, SIZE.x - CLIFF_X, FOOT), "height": PLATEAU_HEIGHT, "faces": ["west"], "spur": 0.25, "wander": WANDER, "wander_seed": PLATEAU_WANDER_SEED, "still": [FALL_LIP]}],
-		"keep_flat": [Rect2i(arrival - Vector2i(2, 3), Vector2i(4, 7))],
+		"keep_flat": [Rect2i(arrival - Vector2i(2, 3), Vector2i(4, 7))] + _herder_pads(),
 		"streams": 0, "keep_clear": {},
 		"rivers": [{"line": VALLEY, "wavelength": RIVER_WAVELENGTH, "amplitude": RIVER_AMPLITUDE, "width": RIVER_WIDTH, "seed": RIVER_SEED},
 			{"line": FALL_STREAM, "wavelength": 14.0, "amplitude": 2.0, "width": [1.4, 2.2]}]})
@@ -159,6 +175,7 @@ func _ready() -> void:
 	_knoll()
 	_wall()
 	_road(arrival)
+	_places()
 	# Boulders and crates by the rim, to push off.
 	for at in [Vector2i(CLIFF_X + 1, 24), Vector2i(CLIFF_X + 2, 40)]:
 		map.set_cell(at, "boulder")
@@ -368,6 +385,65 @@ func _along(line: Array[Vector2i], fraction: float) -> Vector2:
 			return Vector2(line[i - 1]).lerp(Vector2(line[i]), left / span)
 		left -= span
 	return Vector2(line[-1])
+
+
+## A herder's hut (HERDERS): 3 x 3, HERDER_WAY cells out from the fold's
+## gate, its door's cell in line with the gate's second cell.
+static func _herder_hut(herder: Dictionary) -> Rect2i:
+	var fold: Rect2i = herder["fold"]
+	match herder["gate"]:
+		Vector2i(0, 1):
+			return Rect2i(fold.position.x + 2, fold.end.y + HERDER_WAY, 3, 3)
+		Vector2i(0, -1):
+			return Rect2i(fold.position.x + 2, fold.position.y - HERDER_WAY - 3, 3, 3)
+		Vector2i(1, 0):
+			return Rect2i(fold.end.x + HERDER_WAY, fold.position.y + 2, 3, 3)
+	return Rect2i(fold.position.x - HERDER_WAY - 3, fold.position.y + 2, 3, 3)
+
+
+## Each herder's pad: its fold, its hut and the way between.
+static func _herder_pads() -> Array[Rect2i]:
+	var out: Array[Rect2i] = []
+	for herder in HERDERS:
+		out.append((herder["fold"] as Rect2i).merge(_herder_hut(herder)))
+	return out
+
+
+## The refuges and the herders' holdings (HERDERS): each fold's outline a
+## fence (wall edges) but its gate, each hut's walls but its door facing
+## the fold, both in "buildings"; the places in "places".
+func _places() -> void:
+	var places := {}
+	for key: String in REFUGES:
+		var at: Vector2i = REFUGES[key]["at"]
+		places[key] = {"at": [at.x, at.y], "kind": "refuge", "where": "hills", "radius": 3, "name": REFUGES[key]["name"]}
+	for herder in HERDERS:
+		var fold: Rect2i = herder["fold"]
+		var gate: Vector2i = herder["gate"]
+		var hut := _herder_hut(herder)
+		var door := hut.position + Vector2i(1, 1) - gate  # The hut's front middle cell.
+		var gates: Array[Vector3i] = []
+		for i in [2, 3]:
+			var cell := fold.position + (Vector2i(i, fold.size.y - 1) if gate.y > 0 else Vector2i(i, 0) if gate.y < 0
+				else Vector2i(fold.size.x - 1, i) if gate.x > 0 else Vector2i(0, i))
+			gates.append(Terrain.edge_key(cell, gate))
+		for key in Level.blocks_outline(_cells_of(fold)):
+			map.set_edge(key, "clear" if key in gates else "wall")
+		for key in Level.blocks_outline(_cells_of(hut)):
+			map.set_edge(key, "door" if key == Terrain.edge_key(door, -gate) else "wall")
+		config["buildings"].append({"slot": "building.fold", "at": [fold.position.x, fold.position.y], "facing": [gate.x, gate.y]})
+		config["buildings"].append({"slot": "building.hut", "at": [hut.position.x, hut.position.y], "facing": [-gate.x, -gate.y]})
+		var stand := door - gate
+		places[herder["key"]] = {"at": [stand.x, stand.y], "kind": "refuge", "where": "hills", "radius": 3, "name": herder["name"]}
+	config["places"] = places
+
+
+static func _cells_of(rect: Rect2i) -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	for y in range(rect.position.y, rect.end.y):
+		for x in range(rect.position.x, rect.end.x):
+			out.append(Vector2i(x, y))
+	return out
 
 
 ## The low wall below the cliff: the edges east of WALL_X over WALL_ROWS.

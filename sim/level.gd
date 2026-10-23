@@ -131,6 +131,10 @@ const ON_WATER: Array[String] = ["building.well"]
 ## and the draugr's throne (580 step 3) are walked onto too: a seat is a
 ## floor cell with a piece on it, no wall round it.
 const OPEN_AIR: Array[String] = ["building.field", "building.fold", "building.hall_chair", "building.throne"]
+## A herder's fold (640), and how far from its holding's place cell it may
+## stand (fold_near).
+const FOLD := "building.fold"
+const FOLD_REACH := 6
 ## The buildings that are solid (decision 550): no inside and no floor but
 ## their door, the front row's middle cell (a barrow's mound: its link is
 ## there). Their other cells are taken out of the floor (nobody walks onto
@@ -2464,6 +2468,23 @@ static func relay_outline(terrain: Dictionary, cells: Array) -> Dictionary[Vecto
 				outline.erase(key)
 				changes[key] = Terrain.Edge.OPEN
 	return changes
+
+
+## The fold of a herder's holding (640, maps' side) whose place stands at
+## [param cell]: the building.fold of [param buildings] (parsed) nearest it,
+## within FOLD_REACH cells of its rect; {} if there is none.
+static func fold_near(buildings: Array, cell: Vector2i) -> Dictionary:
+	var best := {}
+	var nearest := FOLD_REACH + 1
+	for building: Dictionary in buildings:
+		if str(building.get("slot", "")) != FOLD:
+			continue
+		var rect: Rect2i = building["rect"]
+		var gap := maxi(maxi(rect.position.x - cell.x, cell.x - (rect.end.x - 1)), maxi(rect.position.y - cell.y, cell.y - (rect.end.y - 1)))
+		if maxi(gap, 0) < nearest:
+			nearest = maxi(gap, 0)
+			best = building
+	return best
 
 
 ## The edges round [param cells] (Terrain edge keys): each side of a cell

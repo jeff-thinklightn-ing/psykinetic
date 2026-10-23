@@ -1374,6 +1374,19 @@ var _glows: Array[Array] = []
 ## Each town's buildings awake ({code: bool}, set_awake: economy's "town"
 ## message, npc's flag); a code not in it is lit by the hour.
 var _awake: Dictionary[String, Dictionary] = {}
+## The folds' beasts (640, set_folds): what to draw, and the node they are
+## drawn under (in the room, so a rebuild frees them).
+var _folds: Array = []
+var _fold_sheep: Node3D
+## A fold's beasts: the art, the most drawn whatever the count, where each
+## stands ((across from the middle, in from the gate's fence) in metres:
+## clear of the fence and the trough along the back) and how each is
+## turned from the gate's way.
+const FOLD_SHEEP := "creature.sheep"
+const FOLD_SHEEP_MOST := 6
+const FOLD_SPOTS: Array[Vector2] = [Vector2(-1.2, 2.0), Vector2(1.3, 2.6), Vector2(-0.3, 3.7), Vector2(1.9, 4.3),
+	Vector2(-1.9, 4.1), Vector2(0.5, 1.3)]
+const FOLD_YAWS: Array[float] = [0.4, 2.2, -1.1, 3.0, 1.2, -2.4]
 ## Seconds since the window lights were last looked at (LAMP_CHECK).
 var _lamp_clock := 0.0
 var _town_wall_sets: Array[Vector3i] = []
@@ -4745,6 +4758,60 @@ func _unbuilt(key: Vector3i) -> bool:
 func set_awake(town: String, awake: Dictionary) -> void:
 	_awake[town] = awake
 	_update_lamps()
+
+
+## The beasts drawn in this zone's folds (640, maps' side; economy's
+## "folds" message, Main.fold_view): [{rect, facing, count}], each fold's
+## rect and facing (its gate's way) and the sheep its holding has, drawn as
+## min(count, FOLD_SHEEP_MOST) creature.sheep standing in it, scenery, not
+## entities; drawn again whole on each call and after a rebuild.
+func set_folds(folds: Array) -> void:
+	_folds = folds
+	_draw_folds()
+
+
+func _draw_folds() -> void:
+	if is_instance_valid(_fold_sheep):
+		_fold_sheep.free()
+	_fold_sheep = null
+	if _room == null or _folds.is_empty() or not ArtKit.has(FOLD_SHEEP):
+		return
+	_fold_sheep = Node3D.new()
+	_fold_sheep.name = "FoldSheep"
+	_room.add_child(_fold_sheep)
+	for fold: Dictionary in _folds:
+		var spots := fold_spots(fold["rect"], fold["facing"], int(fold["count"]))
+		for i in spots.size():
+			var at: Vector2 = spots[i]
+			var pose := Node3D.new()
+			# Every fourth a ram (the slot's variant 2), each turned its own way.
+			var art := ArtKit.instance(FOLD_SHEEP, 2 if i % 4 == 3 else 1)
+			pose.add_child(art)
+			pose.position = Vector3(at.x, _elevation(Vector2i(roundi(at.x), roundi(at.y))), at.y)
+			pose.rotation.y = FOLD_YAWS[i % FOLD_YAWS.size()] + atan2(float(fold["facing"].x), float(fold["facing"].y))
+			_fold_sheep.add_child(pose)
+			var view := CreatureView.new(FOLD_SHEEP, art, pose)
+			pose.add_child(view)
+			var graze := view.resolve("graze")
+			if graze != "" and view.rig != null and i % 2 == 0:
+				view.rig.loop(graze)
+
+
+## Where [param count] sheep stand in a fold of [param rect] whose gate
+## looks [param facing] (min(count, FOLD_SHEEP_MOST) of FOLD_SPOTS, each
+## turned from the fold's own frame to the map's), in cells: inside the
+## fence, off the trough's strip along the back.
+static func fold_spots(rect: Rect2i, facing: Vector2i, count: int) -> Array[Vector2]:
+	var out: Array[Vector2] = []
+	var front := Vector2(facing)
+	var across := Vector2(-front.y, front.x)
+	var middle := Vector2(rect.position) + Vector2(rect.size - Vector2i.ONE) * 0.5
+	var half := float(rect.size.y if facing.y != 0 else rect.size.x) * 0.5
+	for i in mini(maxi(count, 0), FOLD_SHEEP_MOST):
+		var spot: Vector2 = FOLD_SPOTS[i]
+		# spot.x across from the middle, spot.y in from the gate's fence.
+		out.append(middle + front * (half - spot.y) + across * spot.x)
+	return out
 
 
 ## Each window light lit or out (lamp_lit), as its building's town says

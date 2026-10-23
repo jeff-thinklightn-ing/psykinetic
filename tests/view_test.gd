@@ -73,6 +73,7 @@ func _ready() -> void:
 	_test_wall_heights()
 	await _test_double_doors()
 	_test_field()
+	_test_folds()
 	_test_kinds()
 	_test_roof_damage()
 	_test_building_states()
@@ -1390,6 +1391,36 @@ func _test_field() -> void:
 	_rig.set_town("crop_town", {"field": {"state": Towns.STANDING, "crop": "weeds"}})
 	_check(shown.call().is_empty(), "a crop the slot has no state for: bare")
 	_rig.town_states.erase("crop_town")
+
+
+## A herder's fold (640, maps' side): min(count, 6) sheep drawn standing
+## inside its fence, off the trough's strip at its back; a count dropping
+## shows fewer at once; none for none.
+func _test_folds() -> void:
+	print("\n== a fold: its holding's sheep drawn in it, min(count, 6), fewer at once when a drove leaves (640) ==")
+	var rect := Rect2i(2, 2, 6, 6)
+	var drawn := func() -> int:
+		return _rig._fold_sheep.get_child_count() if is_instance_valid(_rig._fold_sheep) else 0
+	for facing: Vector2i in [Vector2i(0, 1), Vector2i(1, 0), Vector2i(0, -1), Vector2i(-1, 0)]:
+		var spots := Client3D.fold_spots(rect, facing, 9)
+		var back := Vector2(rect.position) + Vector2(rect.size - Vector2i.ONE) * 0.5 - Vector2(facing) * 3.0
+		var inside := true
+		var off_trough := true
+		for at: Vector2 in spots:
+			# Cell centres: the fence 0.5 out from the outer cells' middles.
+			inside = inside and at.x > rect.position.x - 0.2 and at.y > rect.position.y - 0.2 and at.x < rect.end.x - 0.8 and at.y < rect.end.y - 0.8
+			off_trough = off_trough and absf((at - back).dot(Vector2(facing))) > 0.7
+		_check(spots.size() == 6 and inside and off_trough, "gate %s: six spots of nine, all inside the fence, off the trough (%s)" % [facing, spots])
+	_check(Client3D.fold_spots(rect, Vector2i(0, 1), 0).is_empty(), "none for none")
+	if not ArtKit.has(Client3D.FOLD_SHEEP):
+		print("  (no creature.sheep art here: the drawing checks skipped)")
+		return
+	_rig.set_folds([{"rect": rect, "facing": Vector2i(0, 1), "count": 9}])
+	_check(drawn.call() == 6, "nine sheep: six drawn (%d)" % drawn.call())
+	_rig.set_folds([{"rect": rect, "facing": Vector2i(0, 1), "count": 2}])
+	_check(drawn.call() == 2, "a drove of seven walked off: two drawn at once (%d)" % drawn.call())
+	_rig.set_folds([])
+	_check(drawn.call() == 0, "no fold told: none drawn")
 
 
 ## A building of a kind (decision 488): an L-house's roof a gable over

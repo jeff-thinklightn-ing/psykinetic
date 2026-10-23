@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Herders live in the hills: the herder's hut and the high shieling each have a hut and a fenced sheep fold, and the sheep you see in the fold are the herder's own, fewer when he has driven some to market (640).
 - Eleven places in the wilds, the hills and the forest where a lost townsfolk may be found waiting: a far river bank, the old farmstead, a ruined barn, a herder's hut, a hill cave, a shieling, the hunters' and woodcutters' lean-tos, the thickest wood, the boar path and the fletcher's tree.
 - Towns grow on cleared ground: each new building goes on a plot laid nearest the town's store, on level ground the woodcutters have cleared, with room to walk round it; while no cleared ground fits, the town waits and keeps felling.
 - The cool draft at the barrow's hidden niche is easier to see: bigger, paler puffs drifting out along the floor when you hold a light near (608 amended (2), environment's side).

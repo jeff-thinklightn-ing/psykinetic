@@ -198,6 +198,7 @@ func _test_every_level() -> void:
 	_test_felled_walls()
 	_test_plots()
 	_test_refuges()
+	_test_herders()
 	print("
 == the levels connect: WorldMap.problems() (links and spawn points, ways back, reachable) ==")
 	var problems := WorldMap.build().problems()
@@ -548,6 +549,64 @@ func _test_refuges() -> void:
 				wanted.append(str(variant["place"]))
 	var missing := wanted.filter(func(tag: String) -> bool: return not tags.has(tag))
 	_check(missing.is_empty(), "every story's place economy names is laid (%d named; missing %s)" % [wanted.size(), missing])
+	_main.load_map("test_room")
+
+
+func _test_herders() -> void:
+	print("\n== herders: each holding's hut and fold, its gate and door, walked into ==")
+	var level := Level.load_level("hills")
+	_check(_main.load_map("hills"), "hills loads")
+	var edges: Dictionary = level["terrain"]["edges"]
+	var floor := {}
+	for cell: Vector2i in level["terrain"]["floor"]:
+		floor[cell] = true
+	var rules: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://levels/economy.json"))
+	var named: Array = rules.get("herder", {}).get("places", ["herders_hut", "hill_shieling"])
+	_check(named.size() == 2, "economy names two herders' places (%s)" % [named])
+	for key: Variant in named:
+		var place: Dictionary = level["places"].get(str(key), {})
+		_check(place.get("kind", "") == "refuge" and place.get("where", "") == "hills", "%s: a hills refuge (%s)" % [key, place.get("cell")])
+		if place.is_empty():
+			continue
+		var stand: Vector2i = place["cell"]
+		var fold := Level.fold_near(level["buildings"], stand)
+		_check(not fold.is_empty(), "%s: its fold stands by it (%s)" % [key, fold.get("rect")])
+		if fold.is_empty():
+			continue
+		var rect: Rect2i = fold["rect"]
+		var facing: Vector2i = fold["facing"]
+		var cells: Array[Vector2i] = []
+		for y in range(rect.position.y, rect.end.y):
+			for x in range(rect.position.x, rect.end.x):
+				cells.append(Vector2i(x, y))
+		var open := Level.blocks_outline(cells).filter(func(edge: Vector3i) -> bool: return not edges.has(edge))
+		var front := true
+		for edge: Vector3i in open:
+			var a := Vector2i(edge.x, edge.y)
+			var b := a + (Vector2i(1, 0) if edge.z == Terrain.EAST else Vector2i(0, 1))
+			var outward := b - a if rect.has_point(a) else a - b
+			front = front and outward == facing
+		_check(open.size() == 2 and front, "%s: the fold's fence is shut but its gate, two edges on its %s side (%s)" % [key, facing, open])
+		var huts: Array = level["buildings"].filter(func(b: Dictionary) -> bool: return b["slot"] == "building.hut" and b["facing"] == -facing)
+		var door := stand + facing  # The hut's door cell, beyond the stand from the fold.
+		var hut_ok := huts.any(func(b: Dictionary) -> bool: return (b["rect"] as Rect2i).has_point(door))
+		_check(hut_ok and int(edges.get(Terrain.edge_key(door, -facing), -1)) == Terrain.Edge.DOOR,
+			"%s: a hut's door opens on its place, toward the fold" % key)
+		var pad := rect.grow(2)
+		for b: Dictionary in huts:
+			if (b["rect"] as Rect2i).has_point(door):
+				pad = rect.merge(b["rect"]).grow(2)
+		var blocked := []
+		for y in range(pad.position.y, pad.end.y):
+			for x in range(pad.position.x, pad.end.x):
+				var cell := Vector2i(x, y)
+				if not floor.has(cell) and not huts.any(func(b: Dictionary) -> bool: return (b["rect"] as Rect2i).has_point(cell)):
+					blocked.append(cell)
+		_check(blocked.is_empty(), "%s: open ground two cells round the hut and the fold (blocked %s)" % [key, blocked.slice(0, 4)])
+		var inside := Vector2i(rect.get_center())
+		var path := World.find_path(level["starts"][0], stand, true)
+		var into := World.find_path(stand, inside, true)
+		_check(not path.is_empty() and not into.is_empty(), "%s: walked to from the start (%d steps) and into the fold through its gate (%d)" % [key, path.size(), into.size()])
 	_main.load_map("test_room")
 
 
