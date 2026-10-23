@@ -294,9 +294,13 @@ const BRIDGE_END := "bridge.wood.end"
 ## Rocks (decision 513, terrain's side): art-kit's rock.large over each 2x2
 ## clump of rock cells, rock.small on every other one; each turned, sized
 ## and sunk by its cell (sizes and sinks: these ranges).
-## A burial niche's piece (542 amended, terrain's side): art-kit's, its +z
-## out of the wall into the room.
-const BURIAL_NICHE := "prop.burial_niche"
+## The barrow's niches as wall edges (608, terrain's side): a niche of
+## kind k is art-kit's wall.crypt.niche_<k> in its wall run; the hidden one,
+## a door edge, wall.crypt.cracked while shut and wall.crypt.niche_open once
+## found. Each piece 0.5 m thick on its edge, +x toward the room.
+const NICHE_PIECE := "wall.crypt.niche_%s"
+const NICHE_CRACKED := "wall.crypt.cracked"
+const NICHE_OPEN := "wall.crypt.niche_open"
 const ROCK_SMALL := "rock.small"
 const ROCK_LARGE := "rock.large"
 const ROCK_SMALL_SIZES := Vector2(0.9, 1.3)
@@ -1507,6 +1511,11 @@ var _edge_curves: Array[Dictionary] = []
 var _edge_near_sample: Dictionary[Vector2i, Vector2i] = {}
 var _edge_near_also: Dictionary[Vector2i, Array] = {}
 var _edge_mask: ImageTexture
+## The barrow's niches by their wall edge (608, terrain's side, terrain
+## "niches"): {cell, out, kind, variant}; the hidden niches' door pieces by
+## their edge: [cracked, open].
+var _niche_at: Dictionary[Vector3i, Dictionary] = {}
+var _hidden_niches: Dictionary[Vector3i, Array] = {}
 var _road_image: Image
 var _road_mask: ImageTexture
 ## The ground relaxed (decision 558, _relax): each moved corner's offset
@@ -3669,7 +3678,6 @@ func _build_room() -> void:
 	_build_water()
 	_add_cliffs()
 	_add_rocks()
-	_add_niches()
 	for cell: Vector2i in _terrain.get("torches", []):
 		_add_torch(cell)
 	for cell: Vector2i in _terrain.get("lanterns", []):
@@ -3712,6 +3720,7 @@ func _build_room() -> void:
 ## outdoor map's outline, which is the forest's edge, nor round an open-air
 ## building (Level.OPEN_AIR), whose slot draws its fence.
 func _add_walls() -> void:
+	_read_niches()
 	var edges: Dictionary = _terrain["edges"]
 	var kind_at := func(key: Vector3i) -> int: return edges.get(key, Terrain.Edge.OPEN)
 	var vertices: Dictionary[Vector2i, bool] = {}
@@ -3739,7 +3748,10 @@ func _add_walls() -> void:
 				else:
 					wall_keys.append(key)
 			Terrain.Edge.DOOR:
-				if not key in seconds:
+				# The hidden niche's door is no doorway but its wall (608).
+				if _niche_at.has(key) and str(_niche_at[key]["kind"]) == "hidden":
+					_add_hidden_niche(key)
+				elif not key in seconds:
 					_add_doorway(key, doubles.get(key, key))
 			_:
 				continue
@@ -7980,43 +7992,41 @@ func _rock_edge(key: Vector3i) -> bool:
 	return Terrain.edge_cells(key).any(func(cell: Vector2i) -> bool: return _rocks.has(cell))
 
 
-## The barrow's burial niches (terrain "niches"; 542 amended, terrain's
-## side): art-kit's prop.burial_niche on each niche's cell, at its
-## middle and height, its +z turned out of the wall (the niche's way out),
-## the niche's variant; its "lid" part with it (a part is one of the
-## slot's meshes, placed where the slot has it). One MultiMesh a variant
-## and mesh under "Niches", casting shadows.
-func _add_niches() -> void:
-	var niches: Array = _terrain.get("niches", [])
-	if niches.is_empty() or not ArtKit.has(BURIAL_NICHE):
-		return
-	var pieces: Dictionary[int, Array] = {}
-	for niche: Dictionary in niches:
+## The barrow's niches by their wall edge (608, terrain's side): terrain
+## "niches", each {cell (the room's floor cell), out (the step out of the
+## wall into the room), edge, kind, variant}; an older level's without edge
+## or kind, the edge behind its cell and kind "a".
+func _read_niches() -> void:
+	_niche_at.clear()
+	_hidden_niches.clear()
+	for niche: Dictionary in _terrain.get("niches", []):
 		var cell: Vector2i = niche["cell"]
-		pieces.get_or_add(int(niche["variant"]), []).append(
-				Transform3D(_turned_to(niche["out"]), Vector3(cell.x, _height_in(cell, Vector2(cell)), cell.y)))
+		var out: Vector2i = niche["out"]
+		var edge: Vector3i = niche.get("edge", Terrain.edge_key(cell, -out))
+		_niche_at[edge] = {"cell": cell, "out": out, "kind": str(niche.get("kind", "a")), "variant": int(niche.get("variant", 1))}
+
+
+## The hidden niche's door edge (608, terrain's side): no doorway, no leaf,
+## but the wall: wall.crypt.cracked while its Door is shut, wall.crypt.
+## niche_open once it opens (_sync_doors), +x toward the room.
+func _add_hidden_niche(key: Vector3i) -> void:
+	var niche: Dictionary = _niche_at[key]
+	var out: Vector2i = niche["out"]
 	var holder := Node3D.new()
-	holder.name = "Niches"
-	for variant: int in pieces:
-		var made := ArtKit.instance(BURIAL_NICHE, variant)
-		var meshes := made.find_children("*", "MeshInstance3D", true, false)
-		for m in meshes.size():
-			var drawn := meshes[m] as MeshInstance3D
-			var local := ArtKit._place_in(drawn, made)
-			var multimesh := MultiMesh.new()
-			multimesh.transform_format = MultiMesh.TRANSFORM_3D
-			multimesh.mesh = drawn.mesh
-			multimesh.instance_count = pieces[variant].size()
-			for i in pieces[variant].size():
-				multimesh.set_instance_transform(i, pieces[variant][i] * local)
-			var many := MultiMeshInstance3D.new()
-			many.name = "niche_%d_%d" % [variant, m]
-			many.multimesh = multimesh
-			many.material_override = drawn.material_override if drawn.material_override != null else drawn.get_active_material(0)
-			many.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
-			holder.add_child(many)
-		made.free()
+	holder.name = "HiddenNiche_%d_%d_%s" % [key.x, key.y, "e" if key.z == Terrain.EAST else "s"]
+	holder.position = _edge_midpoint(key) + Vector3(0.0, _edge_base(key), 0.0)
+	holder.rotation.y = atan2(-float(out.y), float(out.x))
+	var shut := ArtKit.instance(NICHE_CRACKED)
+	shut.name = "Cracked"
+	holder.add_child(shut)
+	var found := ArtKit.instance(NICHE_OPEN)
+	found.name = "Open"
+	found.visible = false
+	holder.add_child(found)
 	_room.add_child(holder)
+	_walls[key] = holder
+	_hidden_niches[key] = [shut, found]
+	_doors_due[key] = true
 
 
 ## The rocks (terrain "rocks", decision 513, terrain's side): rock_plan's
@@ -8646,6 +8656,8 @@ func _add_wall_run(run: Array[Vector3i]) -> void:
 			piece = "wall.%s.straight_ruined" % set_name
 		elif states[k] == WALL_WHOLE and _wall_states.get(run[k]) == "window":
 			piece = "wall.%s.window" % set_name
+		elif states[k] == WALL_WHOLE and _niche_at.has(run[k]) and str(_niche_at[run[k]]["kind"]) != "hidden":
+			piece = NICHE_PIECE % _niche_at[run[k]]["kind"]
 		if piece != "" and ArtKit.has(piece) and ArtKit.filled_by(piece) != "placeholder":
 			pieces[k] = piece
 	for k: int in pieces:
@@ -8697,11 +8709,17 @@ func _add_wall_run(run: Array[Vector3i]) -> void:
 	holder.rotation.y = 0.0 if east else PI * 0.5
 	holder.name = "Wall_%d_%d_%s" % [first.x, first.y, "e" if east else "s"]
 	for k: int in pieces:
-		var made := ArtKit.instance(pieces[k])
+		var niche: Dictionary = _niche_at.get(run[k], {})
+		var made := ArtKit.instance(pieces[k], int(niche.get("variant", 1)))
 		made.name = "Piece_%d" % k
 		made.position = Vector3(0.0, 0.0, k + 0.5)
 		if _wall_states.get(run[k]) == "window":
 			_dress_window(made, run[k])
+		if not niche.is_empty():
+			# Its +x toward the niche's room: the run's +x is east (an east
+			# run) or north (a south run, turned a quarter).
+			var across := Vector2i(1, 0) if east else Vector2i(0, -1)
+			made.rotation.y = 0.0 if (niche["out"] as Vector2i) == across else PI
 		holder.add_child(made)
 	if _plinths.has(first):
 		_add_plinth(holder, run, base, wall_set["half"])
@@ -12199,6 +12217,15 @@ func _on_door_shown(door: Door) -> void:
 func _sync_doors() -> void:
 	for key: Vector3i in _doors_due.keys():
 		var door := World.door_on(key)
+		# The hidden niche (608): cracked while shut, open once found; no
+		# leaf to swing, no wood to sound.
+		if _hidden_niches.has(key):
+			if door != null:
+				var opened := door.is_open()
+				(_hidden_niches[key][0] as Node3D).visible = not opened
+				(_hidden_niches[key][1] as Node3D).visible = opened
+			_doors_due.erase(key)
+			continue
 		var doorway: Node3D = _doorways.get(key)
 		if door == null or doorway == null:
 			_doors_due.erase(key)

@@ -2169,21 +2169,49 @@ func _test_niches() -> void:
 	var niches: Array = level["terrain"].get("niches", [])
 	_check(not niches.is_empty() and niches.all(func(n: Dictionary) -> bool: return level["terrain"]["floor"].has(n["cell"])),
 			"a generated barrow's niches reach the terrain, each on floor (%d)" % niches.size())
-	_rig.rebuild(level["terrain"], level["centre"])
-	var holder := _rig._room.get_node_or_null("Niches") as Node3D
-	var by_variant: Dictionary = {}
-	for n: Dictionary in niches:
-		by_variant[n["variant"]] = by_variant.get(n["variant"], 0) + 1
-	var drawn: Dictionary = {}
-	var meshes_a_variant: Dictionary = {}
-	if holder != null:
-		for many: MultiMeshInstance3D in holder.find_children("*", "MultiMeshInstance3D", false, false):
-			var variant := int(String(many.name).get_slice("_", 1))
-			meshes_a_variant[variant] = meshes_a_variant.get(variant, 0) + 1
-			if String(many.name).get_slice("_", 2) == "0":
-				drawn[variant] = many.multimesh.instance_count
-	_check(holder != null and drawn == by_variant and meshes_a_variant.values().all(func(c: int) -> bool: return c >= 2),
-			"prop.burial_niche on each niche, a MultiMesh a variant and mesh, the lid with it (%s; meshes %s)" % [drawn, meshes_a_variant])
+	# Drawn as wall edges (608, terrain's side): each niche's edge, behind
+	# its cell, art-kit's wall.crypt.niche_<kind> in its wall run, +x toward
+	# the room; no niche prop left in the cells.
+	var terrain: Dictionary = level["terrain"].duplicate()
+	# A hidden niche on one of its doors: the cracked wall, no doorway.
+	var door_key := Vector3i.MAX
+	var door_cell := Vector2i.ZERO
+	var door_out := Vector2i.ZERO
+	for key: Vector3i in terrain["edges"]:
+		if terrain["edges"][key] != Terrain.Edge.DOOR:
+			continue
+		var sides := Terrain.edge_cells(key)
+		if (terrain["floor"] as Array).has(sides[0]):
+			door_key = key
+			door_cell = sides[0]
+			door_out = Vector2i(-1, 0) if key.z == Terrain.EAST else Vector2i(0, -1)
+			break
+	if door_key != Vector3i.MAX:
+		terrain["niches"] = niches + [{"cell": door_cell, "out": door_out, "edge": door_key, "kind": "hidden", "variant": 1}]
+	_rig.rebuild(terrain, level["centre"])
+	var placed := 0
+	var turned := 0
+	for niche: Dictionary in niches:
+		var edge := Terrain.edge_key(niche["cell"], -(niche["out"] as Vector2i))
+		var holder: Node3D = _rig._walls.get(edge)
+		if holder == null:
+			continue
+		var k := (edge.y if edge.z == Terrain.EAST else edge.x) - (holder.name.get_slice("_", 2).to_int() if edge.z == Terrain.EAST else holder.name.get_slice("_", 1).to_int())
+		var piece := holder.get_node_or_null("Piece_%d" % k) as Node3D
+		if piece == null:
+			continue
+		placed += 1
+		# Its +x in the world toward the niche's cell.
+		var x_axis := piece.global_transform.basis.x
+		if Vector2(x_axis.x, x_axis.z).dot(Vector2(niche["out"])) > 0.9:
+			turned += 1
+	_check(not niches.is_empty() and placed == niches.size() and turned == placed and _rig._room.get_node_or_null("Niches") == null,
+			"each niche a wall piece on its edge, +x toward its room (%d of %d placed, %d turned); no niche props" % [placed, niches.size(), turned])
+	if door_key != Vector3i.MAX:
+		var hidden := _rig._room.get_node_or_null("HiddenNiche_%d_%d_%s" % [door_key.x, door_key.y, "e" if door_key.z == Terrain.EAST else "s"]) as Node3D
+		var doorway := _rig._doorways.has(door_key)
+		_check(hidden != null and not doorway and (hidden.get_node("Cracked") as Node3D).visible and not (hidden.get_node("Open") as Node3D).visible,
+				"the hidden niche's door edge: the cracked wall, no doorway, the open niche hidden till found")
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
 

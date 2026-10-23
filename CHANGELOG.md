@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The barrow's burial niches are cut into its walls, and the hidden one shows as a cracked wall until found, then stands open (608, terrain's side).
 - The barrow's hidden door (580 step 2, decision 608): the first hall's dead lie in niches cut into its walls, and the stair down to the Ossuary hides behind one of them, picked anew each generation; walk into the niches to find it ("Only the dead lie here." till the slab gives), and a climb from below pushes it open from behind. The Ossuary's galleries get niches of their own.
 ## v0.1.167
 

@@ -22352,3 +22352,31 @@ the press that finds it and the stair taken, locked again and opened from
 below; the templates' hidden stair and 14 niches), view_test (the parse).
 Level data both sides read: ships in a full cut; protocol unchanged; no
 new class_name.
+
+## 608, terrain's side: niches and the hidden door drawn as walls
+
+Dungeon's 608 (the hidden door; design C:/dev/review/dungeon/hidden_door_design.md)
+makes the barrow's niches wall edges (terrain "niches": {cell, out, edge,
+kind, variant}) and the true one a locked stone door; art-kit's pieces
+(wall.crypt.niche_a to _d, cracked, niche_open; 0.5 m thick on the edge,
+the room on +x) are their look.
+
+- A niche edge (kinds a to d) is its wall.crypt.niche_<kind> (its
+  variant) in its wall run, where the run's swept wall would be, as a
+  window is (_add_wall_run's WALL_PIECE), turned so its +x faces the
+  niche's room (the run's +x is east, or north for a south run).
+- The hidden niche's edge is a Door edge with no doorway and no leaf
+  (_add_hidden_niche): wall.crypt.cracked while its Door is shut,
+  wall.crypt.niche_open once it opens, swapped in _sync_doors with no
+  wood sound (the slab's grind is sound's). It fades with the walls.
+- The old drawing goes: prop.burial_niche MultiMeshes in the alcove
+  cells (542 amended, terrain's side).
+- _read_niches keys them by edge; a niche without edge or kind (an older
+  level's) takes the edge behind its cell and kind "a".
+
+view_test _test_niches: a generated deep's niches each a piece on its
+edge, its +x toward its room, no niche props; a hidden niche on a door:
+the cracked wall, no doorway, the open piece hidden till found. The
+barrow's first hall checked by hand: 14 niches, 13 pieces in their runs,
+the south-east one hidden. Shots: dungeon's of the first hall. Client
+only, protocol unchanged, no new class_name.
