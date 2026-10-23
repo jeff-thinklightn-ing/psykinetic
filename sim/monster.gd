@@ -1321,8 +1321,12 @@ func _bash() -> bool:
 	return true
 
 
-## More than LEASH from where it took up the chase.
+## More than LEASH from where it took up the chase; a room keeper's leash
+## is its room (out of it, not how far it came: the draugr, taking up his
+## fight at his throne, gave up 12 cells into his 32-cell hall).
 func _beyond_leash() -> bool:
+	if keeps_room and _room.has_area():
+		return not _room.has_point(tile)
 	return _post != NO_TILE and World.distance(tile, _post) > leash
 
 

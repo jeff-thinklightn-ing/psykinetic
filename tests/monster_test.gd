@@ -103,6 +103,7 @@ func _ready() -> void:
 	_test_draugr_mind()
 	_test_draugr_waves()
 	_test_hall_waits()
+	_test_room_leash()
 	_test_charging()
 	_test_threatens()
 	_test_quieter()
@@ -3055,6 +3056,34 @@ func _test_draugr_waves() -> void:
 	_check(four[0]["at"] == 0.9 and _counts(four) == [2, 4] and four[1]["kinds"] == ["skeleton", "skeleton_guard"] and four[0]["kinds"] == ["skeleton"],
 		"a party of four: per player past the first, earliest wave first, skeletons by default (%s)" % [_counts(four)])
 	_check(_counts(Draugr.plan_waves(party, "normal", 0, 1)) == [0, 1], "alone, the same table: only its base")
+
+
+func _test_room_leash() -> void:
+	print("
+== a room keeper's leash is its room: the draugr walks to one 17 off at his hall's far end (decision 645; Jeff: \"draugr no longer walks\") ==")
+	Monster.idling = true
+	var rows: Array[String] = ["######################", "#....................#", "#.u..................#", "#....................#", "######################"]
+	Level.register("mt_long", Level.image_from_rows(rows), null, {"regenerate": {"anchors": [{"rect": [1, 1, 20, 3], "name": "lair"}]}})
+	var e := _build(rows, {}, {}, "mt_long")
+	var draugr := e["u"][0] as Draugr
+	draugr.sight_range = 20
+	draugr.senses.cone_cos = -1.0
+	var player := EntityFactory.build(SPECS["P"].merged({"name": "Player1"})) as Player
+	player.player_id = "p1"
+	_room.add_child(player)
+	World.spawn(player, Vector2i(19, 2))
+	World.damage(draugr, 1, player)  # Struck unasked, from his hall's far end.
+	var reached := -1
+	var gave_up := false
+	for i in 200:
+		World.step()
+		gave_up = gave_up or draugr._returning
+		if World.are_adjacent(draugr.tile, player.tile):
+			reached = i
+			break
+	_check(draugr.leash < 17 and reached > 0 and not gave_up,
+		"his leash %d, the player 17 off in his room: he walks the whole way, never turning back (beside them at tick %d)" % [draugr.leash, reached])
+	Level.unregister("mt_long")
 
 
 func _test_hall_waits() -> void:

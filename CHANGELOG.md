@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The draugr now walks to you anywhere in his hall: he used to give up 12 cells from his throne and reach the door end only with his throw and rush (Jeff: "doesn't walk, long reach"); the altar room's guards likewise chase anywhere in their room.
 - Skeletons lying at their graves in the barrow sit up and come for you when you come into their sight, instead of lying on as you pass; after the draugr is laid to rest the dead still lie still.
 - The draugr's Hall door waits up to 5 seconds for your companion while she is coming along behind you (Jeff: it shut in her face); one told to wait, resting or fleeing is not waited for.
 - A sheep fold for the herders in the hills: a fenced pen with a wide gate, trodden earth, straw and a stone water trough (640).

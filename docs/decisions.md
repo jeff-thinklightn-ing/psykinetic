@@ -24897,3 +24897,26 @@ enemy-ai's rule for the lie.
 monster_test `_test_homeward`: one lying with a foe past its sight lies on; under the draugr's
 rest with one beside it, it lies on; with one within its sight, it gets up, guards its grave and
 goes for them. Server only, protocol unchanged, no new class_name.
+
+## 645. A room keeper's leash is its room
+
+Jeff on v0.1.169 and again on v0.1.170: "draugr no longer walks but has a long reach", "lair
+didn't seem like it changed at all". Found by enemy-ai's repro on a freshly generated
+barrow_lair, the draugr's real spec on his throne cell, and a player walking in and striking, or
+keeping 2 to 4 cells off. He took plain steps after a moving player, so physics' chain did not
+root him. But his leash (his row's 8, 12 for a bold one) is measured from where he took up the
+fight (`Monster._post`), his throne at the back of a 32 x 22 hall. Past 12 cells he gave up and
+turned home, the pact or the blow set him on again, and he hovered about 12 cells out. The hall's
+door is about 18 cells from the throne, so a player near it was never walked to and was reached
+only by his throw (6 to 8 cells) and his rush (603): "doesn't walk, long reach".
+
+- `Monster._beyond_leash`: a room keeper (`keeps_room`, with a room: its level's anchor round
+  its home, `room_of`) is beyond its leash only once out of its room, however far it came. A
+  monster with no room keeps the distance from where it took up the chase, unchanged.
+- Every room keeper: the draugr in his Hall and the barrow's altar guards alike. Its room already
+  bounded whom it sees and threatens (`threatens`, `_nearest_visible_target`); now it bounds how
+  far it chases too.
+- It showed up in 603's fight (the draugr's), where the hall outgrew his leash.
+
+monster_test `_test_room_leash`: struck from 17 cells off at his hall's far end, his leash 12, he
+walks the whole way without turning back. Server only, protocol unchanged, no new class_name.
