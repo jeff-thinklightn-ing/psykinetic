@@ -300,6 +300,9 @@ const DAIS_EDGE := "dais.edge"
 const DAIS_STEPS := "dais.steps"
 const DAIS_STEPS_REACH := 0.624
 const NICHE_OPEN := "wall.crypt.niche_open"
+## The hidden niche's footprints (608 amended, terrain's side): art-kit's
+## flat dust mesh on its entry cell, +x toward the wall; left when found.
+const NICHE_FOOTPRINTS := "prop.footprints"
 const ROCK_SMALL := "rock.small"
 const ROCK_LARGE := "rock.large"
 const ROCK_SMALL_SIZES := Vector2(0.9, 1.3)
@@ -8492,6 +8495,15 @@ func _add_hidden_niche(key: Vector3i) -> void:
 	_walls[key] = holder
 	_hidden_niches[key] = [shut, found]
 	_doors_due[key] = true
+	# Its footprints (608 amended): on the entry cell, going to the wall
+	# (+x along -out) and one back, on the floor; there whether found or not.
+	if ArtKit.has(NICHE_FOOTPRINTS):
+		var cell: Vector2i = niche["cell"]
+		var prints := ArtKit.instance(NICHE_FOOTPRINTS)
+		prints.name = "Footprints_%d_%d" % [cell.x, cell.y]
+		prints.position = Vector3(cell.x, _height_in(cell, Vector2(cell)), cell.y)
+		prints.rotation.y = atan2(float(out.y), -float(out.x))
+		_room.add_child(prints)
 
 
 ## The rocks (terrain "rocks", decision 513, terrain's side): rock_plan's

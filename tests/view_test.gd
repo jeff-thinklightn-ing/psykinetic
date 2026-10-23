@@ -2339,6 +2339,15 @@ func _test_niches() -> void:
 		var doorway := _rig._doorways.has(door_key)
 		_check(hidden != null and not doorway and (hidden.get_node("Cracked") as Node3D).visible and not (hidden.get_node("Open") as Node3D).visible,
 				"the hidden niche's door edge: the cracked wall, no doorway, the open niche hidden till found")
+		# Its footprints (608 amended), once art-kit's prop.footprints is in:
+		# on its cell, +x toward the wall.
+		if ArtKit.has(Client3D.NICHE_FOOTPRINTS):
+			var prints := _rig._room.get_node_or_null("Footprints_%d_%d" % [door_cell.x, door_cell.y]) as Node3D
+			var toward := Vector2.ZERO
+			if prints != null:
+				toward = Vector2(prints.global_transform.basis.x.x, prints.global_transform.basis.x.z)
+			_check(prints != null and toward.dot(-Vector2(door_out)) > 0.9 and absf(prints.position.x - door_cell.x) < 0.01,
+					"the hidden niche's footprints on its cell, toward the wall (%s)" % toward)
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
 

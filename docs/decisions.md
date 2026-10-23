@@ -25224,3 +25224,17 @@ the zone's, a haze, its lanterns at 3 m; not damp, 6 m and no haze;
 indoors the scatter's floor shade each cell's as drawn, outdoors none;
 indoors no plant in the scatter, outdoors the tufts as before.
 Client only, protocol unchanged, no new class_name.
+
+## 608 amended, terrain's side: the hidden niche's footprints
+
+Jeff's clues to the hidden door (dungeon's 608 amended: the draft; sound:
+the whisper; environment: the draft's look). Art-kit's prop.footprints
+(e4259dab) is a flat patch of dust with boot prints going in and one coming
+back, and the scuff where the slab swings. Client3D._add_hidden_niche puts
+it on the hidden niche's entry cell (its "cell"), on the floor, turned so
+its +x runs along -out, toward the wall. It is not solid. It stays once the
+niche is found, because the prints are what was walked. It is drawn only
+once the slot is in (ArtKit.has). The CHANGELOG bullet is art-kit's, since
+it already says what a player sees.
+view_test _test_niches: the footprints on the hidden niche's cell, +x toward
+its wall. Client only, protocol unchanged, no new class_name.
