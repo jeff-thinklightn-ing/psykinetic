@@ -930,6 +930,19 @@ func _test_barter() -> void:
 		Net.hints = false
 		_check(_main.context_hint_for(oda) == "", "hints off: nothing over a townsperson (Jeff, 2026-10-22)")
 		Net.hints = hints_on
+	# A joined client's bar (Jeff on v0.1.168: "barter must not be in the game yet, it just says talk"):
+	# a resident's trade and person are set on the server after the spawn and the spec carries neither,
+	# so a client's bar reads them only if Resident replicates them from its spawn on (npc's fix).
+	var sync := oda.get_node_or_null("Sync") as MultiplayerSynchronizer
+	var config: SceneReplicationConfig = sync.replication_config if sync != null else null
+	_check(config != null and config.has_property(NodePath(".:trade")) and config.property_get_spawn(NodePath(".:trade"))
+		and config.has_property(NodePath(".:person")) and config.property_get_spawn(NodePath(".:person")),
+		"a resident's trade and person replicate from the spawn on, so a joined client's bar can read them (the medicine man's Barter)")
+	oda.trade = "medicine_man"
+	_check(_main._barters(oda), "the medicine man barters (his care and his goods)")
+	oda.trade = ""
+	_check(not _main._barters(oda), "a body with no trade told (a joined client before the fix): Talk only, the bug Jeff saw")
+	oda.trade = "cook"
 	_main._open_bar(oda)
 	_check(_main._bar_name.text == "Oda" and _main._bar_barter.visible, "the bar names them; Barter for a maker (a cook, 562)")
 	oda.trade = "farmer"
