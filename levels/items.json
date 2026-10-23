@@ -103,7 +103,7 @@
 			"made": {"by": "smith", "from": {"ore": 1}, "steps": 1200}},
 		{"id": "bow", "name": "hunting bow", "short": "Bow", "color": "8a6038",
 			"art": "item.bow", "kind": "held", "size": [0.06, 1.3, 0.25], "weight": 1.0, "hands": 1,
-			"tags": ["weapon", "ranged"], "verb": {"kind": "ranged", "says": "drawn with arrows in the other hand; held longer it reaches farther, and a shorter shot strikes harder", "steps": [3, 5, 7, 9], "damage_at": [1.5, 1.2, 1.0, 0.8], "draw_min": 5, "draw_step": 5, "damage": 2.0},
+			"tags": ["weapon", "ranged"], "verb": {"kind": "ranged", "says": "drawn with arrows in the other hand; held longer it reaches farther, and a shorter shot strikes harder", "steps": [3, 5, 7, 9], "damage_at": [1.5, 1.2, 1.0, 0.8], "draw_min": 5, "draw_step": 5, "spread": [25, 16, 10, 6], "spread_floor": 2, "spread_settle": 40, "damage": 2.0},
 			"made": {"by": "smith", "from": {"wood": 2, "cloth": 1}, "steps": 2400}},
 		{"id": "meat", "name": "cut of meat", "short": "Meat", "color": "a8483c",
 			"art": "item.meat", "kind": "held", "size": [0.2, 0.08, 0.14], "weight": 2.0, "hands": 1, "stack": 5,

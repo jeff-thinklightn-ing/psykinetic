@@ -354,6 +354,10 @@ const COMBAT_RULES := "res://levels/combat.json"
 ## A swing costs ceil(swing_base + swing_per_kg x the weapon's weight x
 ## ref_mass / the wielder's own mass) stamina (swing_cost); one that
 ## strikes nobody whiff_scale times that.
+## The server's own salt for the arrow's roll in its cone (decision 620;
+## scatter): drawn at boot and never sent, so a client can't foresee where
+## a shot goes. Tests set it.
+var shot_salt := randi()
 var swing_base := 3.0
 var swing_per_kg := 2.0
 var ref_mass := 70.0
@@ -4913,20 +4917,48 @@ func longest_range(entity: GridEntity) -> int:
 	return int(Items.verb_of(drawn_with(entity)).get("cells", 0))
 
 
+## The half-angle in radians of the cone [param entity]'s drawn bow
+## looses in now (decision 620; Items.spread_at from its hold, which
+## replicates, so a client's cone is the server's); -1 when not drawing.
+func spread_of(entity: GridEntity) -> float:
+	if not is_instance_valid(entity) or entity.raised != "draw":
+		return -1.0
+	var verb := Items.verb_of(drawn_with(entity))
+	if verb.is_empty():
+		return -1.0
+	return Items.spread_at(verb, float(tick - entity.raised_tick) / maxf(0.01, _draw_quick(entity)))
+
+
+## The angle [param by]'s arrow flies at, aimed at [param angle] in a cone
+## of half-angle [param spread] (decision 620): the aim plus spread times
+## half the sum of two rolls in -1..1 (most near the aim, the edge rare),
+## seeded by shot_salt, its name and the tick. No spread, the aim.
+func scatter(by: GridEntity, angle: float, spread: float) -> float:
+	if spread <= 0.0 or not is_instance_valid(by):
+		return angle
+	var roll := RandomNumberGenerator.new()
+	roll.seed = hash("%d/%s/%d" % [shot_salt, by.name, tick])
+	return angle + spread * (roll.randf_range(-1.0, 1.0) + roll.randf_range(-1.0, 1.0)) / 2.0
+
+
 ## [param by] lets its drawn bow go at [param angle] (radians on the grid,
 ## Vector2.angle(): 0 east, PI / 2 south; the right button released):
-## loosed is emitted with its step (draw_step), and it shoots (shoot);
-## before the first step, nothing. The stance ends either way.
+## loosed is emitted with its step (draw_step) and the aim, and it shoots
+## (shoot) along a line rolled in its cone (scatter, spread_of; decision
+## 620), facing the aim; before the first step, nothing. The stance ends
+## either way.
 func try_loose(by: GridEntity, angle: float) -> bool:
 	if not Net.is_authority() or not is_instance_valid(by) or by.raised != "draw" or not is_finite(angle):
 		return false
 	var step := draw_step(by)
+	var spread := spread_of(by)  # Before the stance ends: after it, none.
 	by.raised = ""
 	if step < 0:
 		return false
-	_log("loose: %s at %.2f rad, step %d" % [by.name, angle, step])
+	var flown := scatter(by, angle, spread)
+	_log("loose: %s at %.2f rad, flies %.2f (cone %.2f), step %d" % [by.name, angle, flown, spread, step])
 	loosed.emit(by, angle, step)
-	shoot(by, angle, step)
+	shoot(by, flown, step, angle)
 	return true
 
 
@@ -4938,10 +4970,10 @@ func try_loose(by: GridEntity, angle: float) -> bool:
 ## friend it spares (spares) stops it unharmed. Damage is its blow
 ## (attack_damage) times the bow's damage times the step's damage_at (the
 ## shortest hardest), at least 1, cause &"shot"; no push. It faces the
-## shot, is heard NOISE_BOW about it, and the views draw the arrow's flight
-## to where it stopped and what stopped it (GridEntity.shot). The body
-## struck, or null.
-func shoot(by: GridEntity, angle: float, step: int) -> GridEntity:
+## shot (or [param aimed], where it aimed, when its arrow strayed), is heard
+## NOISE_BOW about it, and the views draw the arrow's flight to where it
+## stopped and what stopped it (GridEntity.shot). The body struck, or null.
+func shoot(by: GridEntity, angle: float, step: int, aimed := NAN) -> GridEntity:
 	if not Net.is_authority() or not is_instance_valid(by) or step < 0 or not is_finite(angle):
 		return null
 	var verb := Items.verb_of(drawn_with(by))
@@ -4950,7 +4982,7 @@ func shoot(by: GridEntity, angle: float, step: int) -> GridEntity:
 	step = mini(step, (verb["steps"] as Array).size() - 1)
 	var aim := shot_aim(by, angle, int(verb["steps"][step]))
 	var hit: GridEntity = aim["hit"]
-	var way := Vector2.from_angle(angle)
+	var way := Vector2.from_angle(angle if is_nan(aimed) else aimed)
 	by._world_set_facing(Vector2i(roundi(way.x), roundi(way.y)))
 	by._world_shot(aim["end"], aim["struck"])
 	noise(by.tile, NOISE_BOW, &"bow", by)

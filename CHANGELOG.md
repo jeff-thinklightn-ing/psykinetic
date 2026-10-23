@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- A drawn bow's arrow now flies inside a cone that narrows the longer you hold: wide on a snap shot, tight after a few seconds; every bow and archer alike.
 - Arrows fly from the bow as real arrows: a shot that runs out of range drops past its mark and sticks in the ground, an arrow sticks in a closed door, glances off stone to lie at the wall's foot, and arrows left lying go after 10 seconds.
 ## v0.1.169
 

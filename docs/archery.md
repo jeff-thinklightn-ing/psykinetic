@@ -94,3 +94,16 @@ design as written. Jeff's words are quoted; the rest is the design.
   ground, the map's end) or ground.
 - Walking drawn: the step's ticks × `World.DRAWN_TICK_SCALE` (2.0), and the draw is kept.
 - Wire: PROTOCOL_REVISION 31.
+
+## The cone of flight (decision 620)
+
+Jeff: "a cone of flight that narrows the longer the aim, extends out to each level the final level
+continues to narrow down the longer held". Combat's design; pc-character's sim.
+
+- `Items.spread_at(verb, held)` (static) and `World.spread_of(entity)`: the cone's half-angle in
+  radians, from the verb's `spread` [25, 16, 10, 6]° at the steps, lerped between, then down to
+  `spread_floor` 2° over `spread_settle` 40 ticks past the last.
+- `World.scatter(by, angle, spread)`: the line flown, rolled in the cone (triangular) from the
+  server's `shot_salt`, the archer's name and the tick.
+- try_loose shoots the rolled line; loosed carries the aim, and the archer faces the aim.
+- ui draws the cone from spread_of; enemy-ai's archers wait for their `aim_spread`.

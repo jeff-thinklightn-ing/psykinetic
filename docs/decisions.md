@@ -24249,3 +24249,52 @@ its tail (unlit, alpha 0.3, no shadow; it marks the line, it isn't a comet).
 Both go as it comes to rest (_rest_arrow), so an arrow standing in the ground,
 stuck in wood or lying under a wall is its true size. No art-kit change; a
 chunkier fx.arrow is the next step if Jeff still can't see it in play.
+## 620. The cone of flight
+
+Jeff, on v0.1.168: "I'm wondering if we can have an cone of flight that narrows the longer the
+aim, extends out to each level the final level continues to narrow down the longer held?"
+Combat's design, approved by the coordinator (C:/dev/review/combat/archery_cone/design.md);
+pc-character built the sim, and items reviews the diff on try_loose and shoot.
+
+- **The cone** (`Items.spread_at(verb, held)`, static and pure; `World.spread_of(entity)` wraps it,
+  -1 when not drawing): the half-angle a drawn bow looses in narrows along one curve over the
+  hold. It is the verb's `spread` first value (25°) until the first step, each step's value as it
+  is reached ([25, 16, 10, 6]° at 0.5, 1, 1.5 and 2 s), lerped straight between them, then down
+  to `spread_floor` (2°) over `spread_settle` (40 ticks) past the last step, so the floor comes at
+  6 s. A quick bow scales the ticks as it scales the steps. It reads only the hold, which
+  replicates, so ui's cone on a client is the server's.
+- **The roll** (`World.scatter(by, angle, spread)`): the arrow flies the aim plus the half-angle
+  times half the sum of two rolls in -1..1 (triangular: most near the aim, the edge rare), seeded
+  by `World.shot_salt`, the archer's name and the tick. The salt is drawn at the server's boot and
+  never sent, so a client can't foresee the line; tests set it.
+- **try_loose** reads the cone before it lowers the bow, then shoots the rolled line;
+  `loosed` keeps the aim, and the archer faces the aim (`shoot`'s new `aimed`), so only the arrow
+  strays. shot_aim and shot_ray are unchanged: the aim preview and a monster's clear-shot check
+  read the centre line.
+- **Every bow alike:** one model, the bow verb's fields in items.json; a verb without `spread`
+  shoots straight as before. Monster archers loose through the same try_loose; enemy-ai sets each
+  kind's wait (`aim_spread`, at least the floor, and `aim_hold_max`) in its own change.
+- **Monsters' strays** (items, reviewing): until enemy-ai's wait lands, an archer looses as soon as
+  its step covers the target, often at 25° or 16°. Its clear-shot check reads only the aimed line,
+  and a monster's arrow spares no one (456), so a stray can hit a fellow monster beside the line.
+  Kept (the coordinator): one cone for every bow, and 456's arrow spares no one. Enemy-ai's wait
+  change makes it rarer and folds in a clear-shot check of the cone's two edges, so an archer holds
+  while a friend is inside its cone.
+- Damage by step is unchanged (damage_at). Walking drawn doesn't widen it in this step.
+
+What a hold buys (combat's table, 40,000 rolls each; the miss is how far from the aimed line the
+arrow lands at the step's range, a target one cell wide dead on the aim):
+
+| hold | reach | half-angle | mean miss | hits |
+|---|---|---|---|---|
+| 1 s | 5 cells | 16° | 0.46 cells | 59% |
+| 3 s | 9 cells | 5° | 0.26 cells | 87% |
+| 6 s | 9 cells | 2° (the floor) | 0.11 cells | 100% |
+
+The numbers are data in the bow's verb, for Jeff to tune by feel.
+
+items_test: the cone at each hold (25, 21.4 between, 16, 10, 6, 4, 2, 2), 200 rolls inside it,
+the same line for the same salt and none without a cone, and a loose flying the rolled line read
+before the bow is lowered. monster_test's archer checks shoot straight (they test its standing off,
+not its aim). Combat adds the mean-miss test. Wire: no new message; PROTOCOL_REVISION 34 (the
+first wire change after v0.1.169) records that a client's and the server's bow fields go together. No new class_name.

@@ -2394,6 +2394,9 @@ func _test_charging() -> void:
 func _test_archer() -> void:
 	print("\n== an archer stands off, draws and shoots; holds while someone is in the way; steps back from one close ==")
 	Monster.idling = false
+	var verb := Items.verb_of("bow")
+	var spread: Array = verb["spread"]
+	verb["spread"] = []  # Straight, as before the cone (decision 620): these check its standing off and drawing, not its aim.
 	var e := _build(["##############", "#............#", "#.P......a...#", "#............#", "##############"])
 	var archer: Monster = e["a"][0]
 	var player: GridEntity = e["P"][0]
@@ -2459,6 +2462,7 @@ func _test_archer() -> void:
 		closed = closed or World.are_adjacent(archer.tile, player.tile)
 	_check(closed and archer.raised != "draw", "it comes on to fight hand to hand")
 	Monster.idling = true
+	verb["spread"] = spread
 
 
 func _test_worn_bundles() -> void:

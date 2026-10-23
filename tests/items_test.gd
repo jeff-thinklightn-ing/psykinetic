@@ -553,9 +553,36 @@ func _test_weapons() -> void:
 			"range by the hold, in steps (decision 583): 3 cells at draw_min, 5, 7, 9 every 5 ticks after, held at 9 (%s)" % [reached])
 	host.raised_tick = World.tick - 10
 	_check(is_equal_approx(World.draw_of(host), 0.5), "drawn 10 ticks of 20: half the pull's pose (%.2f)" % World.draw_of(host))
+	var cones := []
+	for drawn in [0, 5, 7, 10, 15, 20, 40, 60, 100]:
+		host.raised_tick = World.tick - drawn
+		cones.append(snappedf(rad_to_deg(World.spread_of(host)), 0.1))
+	var cones_ok := true
+	for i in cones.size():
+		cones_ok = cones_ok and is_equal_approx(cones[i], [25.0, 25.0, 21.4, 16.0, 10.0, 6.0, 4.0, 2.0, 2.0][i])
+	_check(cones_ok, "the cone narrows with the hold (decision 620): 25 degrees till the first step, 16, 10, 6 at the next, lerped between, down to the floor of 2 over 40 ticks past the last (%s)" % [cones])
 	host.raised_tick = World.tick - 40
+	var cone := World.spread_of(host)
+	var strayed := true
+	var salt := World.shot_salt
+	for each in 200:
+		World.shot_salt = each
+		var flies := World.scatter(host, 0.5, cone)
+		strayed = strayed and absf(flies - 0.5) <= cone + 0.0001
+	World.shot_salt = 12345
+	var flown := World.scatter(host, 0.5, cone)
+	_check(strayed and flown != 0.5 and is_equal_approx(World.scatter(host, 0.5, cone), flown) and World.scatter(host, 0.5, 0.0) == 0.5,
+			"the arrow's line is rolled in the cone, the same for the same salt, name and tick; no cone, the aim (%.3f of 0.5, cone %.3f)" % [flown, cone])
+	var flew := []
+	var landed := func(to: Vector2, _struck: StringName) -> void: flew.append(to)
+	host.shot.connect(landed)
 	_check(World.try_loose(host, 0.5) and shots.size() == 1 and shots[0] == [host, 0.5, 3] and host.raised == "",
 			"held past the last step: loosed at the angle, at its longest step, for combat to shoot (%s)" % [shots])
+	_check(flew.size() == 1 and is_equal_approx(snappedf((flew[0] - Vector2(host.tile)).angle(), 0.001), snappedf(flown, 0.001)),
+			"it flies the rolled line, read in the cone before the bow is lowered (%s, %.3f)" % [flew, flown])
+	host.shot.disconnect(landed)
+	World.shot_salt = salt
+	_check(World.spread_of(host) == -1.0, "not drawing: no cone")
 	_check(not World.try_stance(host, "block"), "a bow is no shield")
 	World.loosed.disconnect(shot)
 	print("\n== the bow shoots along a ray at any angle: the first body, shortest steps hardest (decisions 335, 583) ==")

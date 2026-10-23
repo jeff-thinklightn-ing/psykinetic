@@ -330,7 +330,10 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## so a joined client's talk bar and card know who they are.
 ## 33 (584 amended (2)): the "barter" message's "care" gains "given" {herbs, antlers},
 ## the player's tally toward that hut; "retain" with herbs or antlers takes what is held.
-const PROTOCOL_REVISION := 33
+## 34 (620): a bow's verb has spread, spread_floor and spread_settle (the
+## cone of flight, Items.spread_at), read alike by a client's cone and the
+## server's roll; the arrow flies a line rolled in it, not the aim.
+const PROTOCOL_REVISION := 34
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]
 ## Every kind of message (message, message_to, broadcast, broadcast_to).
