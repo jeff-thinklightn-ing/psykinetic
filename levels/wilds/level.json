@@ -95,30 +95,12 @@
 	"entities": [
 		{
 			"at": [
-				122.0,
-				138.0
+				119.0,
+				139.0
 			],
 			"props": {
-				"slots": [
-					"bandaging_kit",
-					"",
-					"",
-					""
-				]
-			}
-		},
-		{
-			"at": [
-				120.0,
-				152.0
-			],
-			"props": {
-				"slots": [
-					"bandaging_kit",
-					"",
-					"",
-					""
-				]
+				"cache": "farmstead_cache",
+				"cache_place": "the old farmstead"
 			}
 		},
 		{

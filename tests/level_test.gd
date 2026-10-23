@@ -596,6 +596,14 @@ func _test_solid() -> void:
 			held.append_array(Array(spec.get("props", {}).get("slots", [])))
 	_check(["sword", "spear", "hammer", "shield", "giant_axe", "dagger", "buckler"].all(func(id: String) -> bool: return id in held),
 			"the town chest's two beside it hold a sword, a spear, a hammer, a shield, a giant axe, a dagger and a buckler (%s)" % [held])
+	# 599, maps' side: the old farmstead's cache in the north hut, the hut's kits moved into it.
+	var cache: Array = wilds["entities"].filter(func(spec: Dictionary) -> bool: return spec["tile"] == Vector2i(119, 139))
+	var props: Dictionary = cache[0].get("props", {}) if cache.size() == 1 else {}
+	var kits: Array = wilds["entities"].filter(func(spec: Dictionary) -> bool:
+			return spec["tile"] in [Vector2i(122, 138), Vector2i(120, 152)] and "bandaging_kit" in Array(spec.get("props", {}).get("slots", [])))
+	_check(props.get("cache") == "farmstead_cache" and props.get("cache_place") == "the old farmstead" and Array(props.get("slots", [])).all(func(id: String) -> bool: return id.is_empty())
+			and kits.is_empty() and not wilds["warnings"].any(func(w: String) -> bool: return "119, 139" in w),
+			"the farmstead's cache stands at (119, 139), its slots empty, the hut chests' kits gone (%s)" % [props])
 
 
 ## [param prefab_name] stamped onto [param map] at [param at], turned

@@ -23777,3 +23777,15 @@ the curtain closed with both shut, the solids, the counter, the fort.
 Rejected: a palisade fort (Jeff's tower is stone and old); graves by the
 tower (Jeff: the dead are in the barrows); the room built into the curtain's
 corner (its walls and the curtain's would share edges, drawn twice).
+## 599, maps' side. The old farmstead's cache
+
+The wilds' north farmstead hut gets items' cache (599, items' side): a
+chest marker at (119, 139) (layout pixel (238, 278)) whose level.json
+entry is props {"cache": "farmstead_cache", "cache_place": "the old
+farmstead"}, no "loot" and no slots. The two kits laid loose in the hut
+chests at (122, 138) and (120, 152) go (their entries only held them),
+so the farmstead's bandages are the cache's, found once per player; the
+two chests stay, empty. On the box a chest's saved slots outlive this
+until it is emptied. level_test: the cache stands with its slots empty
+and no warning, the kits gone. Level only, protocol unchanged, no new
+class_name.
