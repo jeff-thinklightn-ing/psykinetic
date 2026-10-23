@@ -65,11 +65,19 @@ mkdir -p "$DIR/appdata"
 started=$(date +%s)
 # Waits on lines, not times: beside the suite a client took over 6 s to join
 # (perf's first landing of this). The server's own exit bounds the run.
-APPDATA="$(cygpath -w "$DIR/appdata")" timeout 120 "$BIN/server.console.exe" --headless --server --bind=127.0.0.1 "--port=$PORT" "--admin-port=$ADMIN" \
-	"--status-port=$STATUS" "--state=$(cygpath -w "$DIR/world.json")" --token=boottest --test-exit-after=45 </dev/null >"$DIR/server.log" 2>&1 &
+# The client starts once the server is ready, not once it listens: it listens
+# before its _boot loads the wilds, and beside the suite that load ran some
+# 30 s past the client's own 25 (economy's and items' landings, 2026-10-23:
+# "connecting", never seen, final tick=0). The admin console opens after the
+# boot. The server stops when the client is done (--test-exit-on), bounded
+# by --test-exit-after.
+STOP="$DIR/stop"
+APPDATA="$(cygpath -w "$DIR/appdata")" timeout 180 "$BIN/server.console.exe" --headless --server --bind=127.0.0.1 "--port=$PORT" "--admin-port=$ADMIN" \
+	"--status-port=$STATUS" "--state=$(cygpath -w "$DIR/world.json")" --token=boottest "--test-exit-on=$(cygpath -w "$STOP")" --test-exit-after=150 \
+	</dev/null >"$DIR/server.log" 2>&1 &
 server=$!
-for _ in $(seq 1 120); do
-	grep -q "server listening" "$DIR/server.log" 2>/dev/null && break
+for _ in $(seq 1 480); do
+	grep -q "\[admin\] console on" "$DIR/server.log" 2>/dev/null && break
 	kill -0 "$server" 2>/dev/null || break
 	sleep 0.25
 done
@@ -79,6 +87,7 @@ APPDATA="$(cygpath -w "$DIR/appdata")" timeout 60 "$GODOT" --headless --path . -
 	--name=BootTest --player-id=b0070000-0000-4000-8000-000000000001 --test-exit-after=25 </dev/null >"$DIR/client.log" 2>&1 &
 client=$!
 wait "$client"
+touch "$STOP"
 wait "$server"
 code=$?
 [ "$code" -eq 0 ] || fail "the exported server exited $code"
