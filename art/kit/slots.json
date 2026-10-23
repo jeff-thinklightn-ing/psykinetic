@@ -1191,6 +1191,62 @@
 				{"at": [-0.136, 0.008, 0.002], "size": [0.774, 0.004, 0.806]}
 			]
 		},
+		"prop.moss_patch": {
+			"category": "props",
+			"type": "mesh",
+			"kind": "cell",
+			"size": [0.77, 0.024, 0.76],
+			"tolerance": 0.2,
+			"variants": 3,
+			"budget": 150,
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-23", "notes": "C:/dev/review/damp580/decor/make_damp.py patch1..3: ragged clumps of moss flat on the floor, 6 to 8 mm up, dark green-grey (2c4224, 4c4a3b, a little 4f6a35), six round the edge and one in the middle, three low cushions to 3 cm; matte; 122 tris each"},
+			"uses": "the damp lair's decor (Jeff: \"moss and spiderwebs for decor, no live plants\"; the coordinator's nod; dungeon places it): a patch of moss on a floor cell, any facing; not solid",
+			"grey": [
+				{"at": [0, 0.012, 0], "size": [0.77, 0.024, 0.76]}
+			]
+		},
+		"prop.moss_strip": {
+			"category": "props",
+			"type": "mesh",
+			"kind": "edge",
+			"size": [0.22, 0.25, 0.98],
+			"middle": [0.36, 0, 0],
+			"variants": 2,
+			"budget": 200,
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-23", "notes": "C:/dev/review/damp580/decor/make_damp.py strip1..2: moss along a wall's foot, ragged clumps on the floor out to 0.3 m from the face and up the face to 0.3 m, a dark fold between; 140 tris each"},
+			"uses": "the damp lair's decor (Jeff: \"moss and spiderwebs for decor, no live plants\"; the coordinator's nod; dungeon places it): in the stone runs' edge frame (1 m along z, origin the edge's middle on the floor, the room on +x, the wall's face at x 0.25), on a wall edge's room side; not solid",
+			"grey": [
+				{"at": [0.36, 0.125, 0], "size": [0.22, 0.25, 0.98]}
+			]
+		},
+		"prop.web_corner": {
+			"category": "props",
+			"type": "mesh",
+			"kind": "cell",
+			"size": [0.761, 1.059, 0.761],
+			"middle": [0.121, 0, 0.121],
+			"base": 1.9,
+			"budget": 250,
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-23", "notes": "C:/dev/review/damp580/decor/make_damp.py web_corner: a spider's web cutting the cell's -x/-z corner, anchored on the two walls' faces (x -0.25, z -0.25) from 1.9 m to the top chord at 2.95 m, radials and a sagging spiral with gaps, two loose threads; strands 2 to 2.6 cm wide (read at the lair's 0.4 ambient from the game's camera), pale (f4efe6, b0aea6), every face both windings (decision 261: geometry, no alpha); 244 tris"},
+			"uses": "the damp lair's decor (Jeff: \"moss and spiderwebs for decor, no live plants\"; the coordinator's nod; dungeon places it): on a cell whose -x and -z edges are walls, the web in that corner, turned by facing to the corner wanted; not solid, above head height",
+			"grey": [
+				{"at": [0.121, 2.43, 0.121], "size": [0.761, 1.059, 0.761]}
+			]
+		},
+		"prop.web_niche": {
+			"category": "props",
+			"type": "mesh",
+			"kind": "edge",
+			"size": [0.03, 0.918, 0.804],
+			"middle": [0.285, 0, -0.005],
+			"base": 0.707,
+			"budget": 250,
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-23", "notes": "C:/dev/review/damp580/decor/make_damp.py web_niche: a spider's web across a niche's mouth, ten anchors round the opening just proud of the wall's face (x 0.27), the hub bellied out to 0.3, four spiral rings with broken gaps; strands 2 to 2.6 cm, pale, both windings (decision 261); 188 tris"},
+			"uses": "the damp lair's decor (Jeff: \"moss and spiderwebs for decor, no live plants\"; the coordinator's nod; dungeon places it): on a niche edge (wall.crypt.niche_a, its arch 0.6 x 0.75 at 0.85 to 1.6 m, or niche_c, its hollow 0.74 x 0.85 at 0.7 to 1.55 m), in the edge frame, the room on +x; not on a sealed variant or the open door; not solid",
+			"grey": [
+				{"at": [0.285, 1.166, -0.005], "size": [0.03, 0.918, 0.804]}
+			]
+		},
 		"dais.edge": {
 			"category": "buildings",
 			"type": "mesh",

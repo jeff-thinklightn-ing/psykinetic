@@ -24824,3 +24824,16 @@ at the piece's stand point, the throne slot's "stand": [x, y up, z] in the piece
 and enemy-ai read that one number from the slot, turned by the piece's facing, never a
 hand offset; a slot with no "stand" is stood in at its cell's centre, as before.
 Art only, protocol unchanged, no new class_name.
+
+## 580, art-kit's side: the damp lair's decor
+
+Jeff: "moss and spiderwebs for decor, no live plants" (the coordinator's nod; release: under 580).
+Four prop slots by hand in the palette (C:/dev/review/damp580/decor/make_damp.py), none solid,
+dungeon places them: prop.moss_patch (cell, 3 variants, flat on the floor), prop.moss_strip
+(edge, 2 variants, at a wall's foot in the stone runs' edge frame, the room on +x),
+prop.web_corner (cell, the web in the cell's -x/-z corner from 1.9 to 2.95 m, turned by
+facing; "base" 1.9) and prop.web_niche (edge, across niche_a's or niche_c's open mouth at
+x 0.27; "base" 0.707). Decision 261 keeps a kit glb to the palette with no images, so the
+webs are geometry, not an alpha-cut card: pale strands 2 to 2.6 cm wide (read at the lair's
+0.4 ambient from the game's camera), each face in both windings so palette.tres's back-face
+culling never hides one. Art only, protocol unchanged, no new class_name.

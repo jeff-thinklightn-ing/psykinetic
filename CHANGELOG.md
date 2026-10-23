@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Moss and spiderwebs for the barrow's damp lair: moss patches on the floor and along the walls' feet, webs high in corners and across niche mouths (580).
 - Furniture for the barrow's Hall of Fallen Souls: a great round stone table with the feast's leavings, high-backed hall chairs round it, broken trestle tables along the walls, and the draugr's stone throne (580).
 - Faint footprints in the dust before the barrow's hidden niche, and a scuff where its slab swings, a clue to look closer (608 amended).
 - The Ossuary's chests may hold a mail shirt among the dead's goods, and the Hall of Fallen Souls' mail or, rarely, plate armour: the only armour the world gives, grave goods all (622, dungeon's side).
