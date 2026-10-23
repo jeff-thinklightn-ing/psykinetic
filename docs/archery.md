@@ -21,7 +21,7 @@ design as written. Jeff's words are quoted; the rest is the design.
   range out. Letting go of the button fires; letting go before draw_min lowers the bow unshot.
   Letting go of Shift mid-draw does nothing: the draw lasts until the button comes up (combat).
 - The left button alone with a bow is a plain click, never a draw: walk (and hold to steer), talk
-  to a friend, go to a chest. Whether it attacks a foe is ui's to settle with the coordinator.
+  to a friend, go to a chest. It never attacks: on a monster it walks there (the coordinator).
   Neither a click nor a short Shift press is a quick shot: the first step hits hardest (×1.5).
 - With a bow, Shift+LMB draws and never swings; Ctrl's signature is unchanged.
 - The right button stays free for the bow's backstep, combat's, later.
