@@ -191,6 +191,7 @@ func _test_every_level() -> void:
 			_check(narrow.is_empty(), "%s: no passage one cell wide in its arrangement (%s)" % [folder, narrow.slice(0, 8)])
 	_test_built_water()
 	_test_ledges()
+	_test_link_cues()
 	print("
 == the levels connect: WorldMap.problems() (links and spawn points, ways back, reachable) ==")
 	var problems := WorldMap.build().problems()
@@ -324,6 +325,30 @@ func _test_ledges() -> void:
 		_check(astray <= LEDGE_BOUND and (edges.is_empty() or unled <= LEDGE_BOUND),
 				"%s: every ledge point within %.2f of a cliff edge (worst %.2f), every cliff edge of a ledge (worst %.2f)" % [folder, LEDGE_BOUND, astray, unled if not edges.is_empty() else 0.0])
 	_check(traced_any > 0, "the levels with relief have ledges (%d)" % traced_any)
+
+
+## Decision 589: every link shows where it leads, picked from where it goes.
+func _test_link_cues() -> void:
+	print("
+== link cues: an arch overland, stairs between depths, a slab where sealed, nothing on a door ==")
+	var cue_of := func(level_name: String, at: Vector2i) -> Dictionary:
+		for cue: Dictionary in Level.load_level(level_name)["terrain"]["link_cues"]:
+			if cue["tile"] == at:
+				return cue
+		return {}
+	var castle_way: Dictionary = cue_of.call("wilds", Vector2i(128, 20))
+	_check(castle_way.get("cue") == "arch" and castle_way.get("facing") == Vector2i(0, -1) and castle_way.get("variant") == 2,
+			"the wilds' way to the castle: a stone arch facing north, out to it (%s)" % [castle_way])
+	var gate: Dictionary = cue_of.call("castle", Vector2i(16, 23))
+	_check(gate.get("cue") == "waystones" and gate.get("facing") == Vector2i(0, 1), "the castle's way out at its edge: waystones (%s)" % [gate])
+	_check(cue_of.call("barrow_deep", Vector2i(70, 43)).get("cue") == "down" and cue_of.call("barrow_deep", Vector2i(49, 1)).get("cue") == "up",
+			"the barrow's layers: a stair down to the deeper, up to the shallower")
+	_check(cue_of.call("wilds", Vector2i(170, 180)).get("cue") == "none" and cue_of.call("wilds", Vector2i(217, 193)).get("cue") == "sealed",
+			"the mound's door is its own cue; the sealed shortcut its slab")
+	var wilds := Level.load_level("wilds")
+	_check(wilds["links"].all(func(link: Dictionary) -> bool: return str(link.get("cue", "")) in Level.CUES),
+			"each link carries its cue for the big map")
+	_check(Level.CUE_SLOTS.values().all(func(slot: String) -> bool: return ArtKit.has(slot)), "each cue's piece is in the kit (%s)" % [Level.CUE_SLOTS])
 
 
 func _test_round_trip() -> void:
@@ -1354,8 +1379,8 @@ func _test_castle() -> void:
 	_check(not castle.is_empty() and castle["display_name"] == "The Castle" and castle["warnings"].is_empty(),
 			"levels/castle is \"The Castle\" and loads cleanly (%s)" % [castle.get("warnings", "missing")])
 	_check(load("res://levels/castle/layout.png") is Image, "its layout.png is imported as an Image")
-	_check(str(castle["links"]) == str([{"tile": Vector2i(27, 12), "to_map": "test_room", "to_spawn": "from_castle", "one_way": false, "closed": false, "sealed": "", "hidden": false},
-			{"tile": Vector2i(16, 23), "to_map": "wilds", "to_spawn": "from_castle", "one_way": false, "closed": false, "sealed": "", "hidden": false}]),
+	_check(str(castle["links"]) == str([{"tile": Vector2i(27, 12), "to_map": "test_room", "to_spawn": "from_castle", "one_way": false, "closed": false, "sealed": "", "hidden": false, "cue": "none"},
+			{"tile": Vector2i(16, 23), "to_map": "wilds", "to_spawn": "from_castle", "one_way": false, "closed": false, "sealed": "", "hidden": false, "cue": "waystones"}]),
 			"its link at (27, 12) goes to the test room, at the foot of its road to the wilds (%s)" % [castle["links"]])
 	var room := Level.load_level("test_room")
 	var back: Array = (room["links"] as Array).filter(func(link: Dictionary) -> bool: return link["to_map"] == "castle")

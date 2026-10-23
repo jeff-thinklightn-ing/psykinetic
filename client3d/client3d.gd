@@ -3719,6 +3719,7 @@ func _build_room() -> void:
 		for plan: Dictionary in _glimpse_plans:
 			_add_glimpse(plan)
 	_add_buildings()
+	_add_link_cues()
 	_add_roofs()
 	_add_town_walls()
 	# Every door's leaf set once; from then on those that change.
@@ -3776,6 +3777,29 @@ func _add_walls() -> void:
 	for vertex in vertices:
 		if _needs_post(vertex, kind_at) or _sets_meet(vertex):
 			_add_post(vertex)
+
+
+## Each link's cue (decision 589: Level.link_cues): art-kit's piece on its
+## cell, its front (+Z) the way out: a gate arch over it, a waystone either
+## side of it (the cells beside, as scenery), a stair down or up; nothing for
+## "sealed" (its own slab) or "none". Drawn only: the cell is walked on.
+func _add_link_cues() -> void:
+	for cue: Dictionary in _terrain.get("link_cues", []):
+		var slot := str(Level.CUE_SLOTS.get(cue["cue"], ""))
+		if slot.is_empty() or not ArtKit.has(slot):
+			continue
+		var at: Vector2i = cue["tile"]
+		var facing: Vector2i = cue["facing"]
+		var places: Array[Vector2i] = [at]
+		if cue["cue"] == "waystones":
+			var across := Vector2i(facing.y, facing.x)
+			places = [at + across, at - across]
+		for cell in places:
+			var node := ArtKit.instance(slot, int(cue["variant"]))
+			node.name = "Cue_%d_%d" % [cell.x, cell.y]
+			node.position = Vector3(cell.x, _elevation(cell), cell.y)
+			node.rotation.y = atan2(float(facing.x), float(facing.y))
+			_room.add_child(node)
 
 
 ## The terrain's buildings (Level.buildings_from): art-kit's slot over each
@@ -5200,6 +5224,7 @@ func _draw_glimpse(terrain: Dictionary) -> void:
 	_add_cliffs()
 	_add_walls()
 	_add_buildings()
+	_add_link_cues()
 	_add_roofs()
 
 

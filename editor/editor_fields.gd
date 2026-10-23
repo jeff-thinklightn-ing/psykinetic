@@ -36,6 +36,7 @@ const KINDS := {
 		{"key": "damp", "label": "too damp to light", "type": "bool"},
 		{"key": "walls", "label": "wall set", "type": "string"},
 		{"key": "floors", "label": "floor set", "type": "string"},
+		{"key": "depth", "label": "depth (stairs down to deeper)", "type": "int", "min": 0, "max": 9},
 		{"key": "canopy/kind", "label": "canopy", "type": "enum", "choices": ["", "evergreen", "broadleaf"]},
 		{"key": "neighbours/north", "label": "north neighbour", "type": "level"},
 		{"key": "neighbours/east", "label": "east neighbour", "type": "level"},

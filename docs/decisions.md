@@ -23701,3 +23701,42 @@ near_death: true for the at-once return.
 ui_test _test_down_screen: the words, the fill, the states, the hold's
 two commands, Bleed Out, everyone's count, the at-once line. Client only;
 protocol unchanged on this side; new class_name DownScreen.
+
+## 589. Zone transitions with built cues
+
+Jeff: "there needs to be strong visual cues of where the zone transition
+is, descending/ascending steps, arches, etc." (he couldn't find the
+castle's link). Every link shows where it leads by a piece at its cell,
+picked from where it goes, so a new link gets one with no work. Approved by
+the coordinator with art-kit, dungeon and ui; maps leads.
+- Level.link_cues -> terrain["link_cues"] [{tile, cue, facing, variant}],
+  and each level link's "cue" (ui's big-map mark). The cue (Level.CUES):
+  - a link's own "cue" in level.json wins;
+  - hidden: "none" (not given away); sealed or closed: "sealed" (its own
+    slab, no piece here); on a solid building's door: "none" (the barrow's
+    mound is its own cue);
+  - to a deeper level (level.json "depth", 0 if not said; dungeon's barrow
+    layers 1, 2, 3): "down", a stair down with a dark mouth; to a shallower
+    one: "up", a stair up or a climb;
+  - between two outdoor levels: "arch", a gate arch over it, or "waystones"
+    (a pair either side) where it stands within two cells of the map's
+    edge, an arch hanging off it otherwise; facing out to the nearest edge;
+  - else "none" (an indoor door between rooms of a level's depth).
+  A stair faces away from the open ground it is walked into from.
+  "variant" as the link says, 1 if not: art-kit's 1 is a timber arch and
+  stone stairs, 2 a stone arch, a timber stair or ladder, the arrowed
+  waystone. The castle's two links take 2 (a stone arch in the wilds,
+  arrowed waystones at the castle's gate). level.json "depth" has its row in
+  the level editor.
+- Client3D._add_link_cues places art-kit's slot (Level.CUE_SLOTS:
+  building.link_arch, building.waystone, building.stair_down,
+  building.stair_up) on the cell, its front (+Z) the way out; waystones on
+  the cells either side. Drawn only: the cell stays walked on (571), the
+  arch's posts scenery.
+tests: level_test, the wilds' castle link a stone arch facing north, the
+castle's gate waystones, the barrow's stairs down and up, the mound's door
+and the sealed shortcut, every link's cue, every cue's piece in the kit;
+the castle's links with their cue; view_test, a waystone either side of the
+castle's gate and its cell clear.
+PROTOCOL_REVISION 32 (a line under it): terrain["link_cues"] and the links'
+"cue" reach the client.

@@ -658,6 +658,7 @@ static func parse(layout: Image, height: Image, config: Dictionary, relief: Imag
 	level["buildings"] = buildings_from(config, level["terrain"], warnings)
 	_lay_bridges(level)
 	_lay_solid(level)
+	level["terrain"]["link_cues"] = link_cues(level, config)
 	var derived := _lay_curves(level["terrain"], config, warnings)
 	level["terrain"]["streams"] = streams_from(derived, level["terrain"], warnings)
 	level["terrain"]["niches"] = niches_from(config, level["terrain"], warnings)
@@ -1643,6 +1644,99 @@ static func _check_fords(terrain: Dictionary, warnings: Array[String]) -> void:
 			beside = beside or wet.has(cell + direction)
 		if not beside:
 			warnings.append("the ford at %s is beside no water: in no stream" % [cell])
+
+
+## The cues a link's piece may be (decision 589): "arch" (a gate arch over
+## it), "waystones" (a pair either side), "down" (a stair down, a dark
+## mouth), "up" (a stair up, or a climb), "sealed" (shut), "none".
+const CUES: Array[String] = ["arch", "waystones", "down", "up", "sealed", "none"]
+## Each cue's art-kit slot (waystones: two, either side of the link).
+const CUE_SLOTS := {"arch": "building.link_arch", "waystones": "building.waystone", "down": "building.stair_down", "up": "building.stair_up"}
+
+
+## The pieces that show where each of [param level]'s links leads (decision
+## 589; Jeff: "strong visual cues of where the zone transition is,
+## descending/ascending steps, arches"), drawn only (the cell stays clear,
+## 571): [{tile, cue, facing, variant}]. A link's own "cue" wins; else a
+## hidden one shows nothing and a sealed one "sealed"; one on a solid
+## building's door none (the building is the cue: the barrow's mound); to
+## a deeper level (level.json "depth", 0 if not said) "down", a shallower
+## "up"; between two outdoor levels an "arch", "waystones" where it stands
+## at the map's edge (an arch would hang off it); else none. Facing the
+## way out: toward the edge it is on, or away from the open ground it is
+## walked into from (an arch's or waystones': toward the map's nearest
+## edge). "variant" as the link says (1: a timber arch, a stone
+## stair; 2: a stone arch, a timber stair or a ladder).
+static func link_cues(level: Dictionary, config: Dictionary) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var size: Vector2i = level["size"]
+	var depth := int(config.get("depth", 0))
+	var outdoor := zone_of(config) == "outdoors"
+	var doors := {}
+	for building: Dictionary in level.get("buildings", []):
+		var door := solid_door_of(building)
+		if door != NO_DOOR:
+			doors[door] = true
+	var floor := {}
+	for cell: Vector2i in level["terrain"]["floor"]:
+		floor[cell] = true
+	var entries := {}
+	for entry: Variant in config.get("links", []):
+		if entry is Dictionary and _tile(entry.get("at")) != null:
+			entries[_tile(entry.get("at"))] = entry
+	for link: Dictionary in level["links"]:
+		var at: Vector2i = link["tile"]
+		var entry: Dictionary = entries.get(at, {})
+		var far := template_config(str(link["to_map"]))
+		var cue := "none"
+		if str(entry.get("cue", "")) in CUES:
+			cue = str(entry["cue"])
+		elif link["hidden"]:
+			cue = "none"
+		elif link["sealed"] != "" or link["closed"]:
+			cue = "sealed"
+		elif doors.has(at):
+			cue = "none"
+		elif int(far.get("depth", 0)) > depth:
+			cue = "down"
+		elif int(far.get("depth", 0)) < depth:
+			cue = "up"
+		elif outdoor and zone_of(far) == "outdoors":
+			cue = "waystones" if _edge_way(at, size) != Vector2i.ZERO else "arch"
+		var facing := _edge_way(at, size)
+		if cue in ["arch", "waystones"]:
+			# An overland way: out toward the map's nearest edge.
+			var gaps := {Vector2i(-1, 0): at.x, Vector2i(1, 0): size.x - 1 - at.x, Vector2i(0, -1): at.y, Vector2i(0, 1): size.y - 1 - at.y}
+			facing = Vector2i(-1, 0)
+			for way: Vector2i in gaps:
+				if gaps[way] < gaps[facing]:
+					facing = way
+		elif facing == Vector2i.ZERO:
+			# Away from the open ground it is walked into from.
+			var from := Vector2i.ZERO
+			for step: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+				if floor.has(at + step):
+					from += step
+			facing = -from.clamp(-Vector2i.ONE, Vector2i.ONE) if from != Vector2i.ZERO else Vector2i(0, 1)
+			if facing.x != 0 and facing.y != 0:
+				facing.y = 0
+		link["cue"] = cue  # The big map marks it (ui).
+		out.append({"tile": at, "cue": cue, "facing": facing, "variant": maxi(1, int(entry.get("variant", 1)))})
+	return out
+
+
+## The way to the map's edge from [param at] if it stands within two cells
+## of one ([param size] cells), else (0, 0).
+static func _edge_way(at: Vector2i, size: Vector2i) -> Vector2i:
+	if at.x <= 1:
+		return Vector2i(-1, 0)
+	if at.x >= size.x - 2:
+		return Vector2i(1, 0)
+	if at.y <= 1:
+		return Vector2i(0, -1)
+	if at.y >= size.y - 2:
+		return Vector2i(0, 1)
+	return Vector2i.ZERO
 
 
 ## A solid building's door, given its entry or its parsed record: the front

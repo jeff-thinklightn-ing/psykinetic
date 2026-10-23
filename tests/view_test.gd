@@ -3150,6 +3150,9 @@ func _test_outdoor() -> void:
 				bed = minf(bed, point.y)
 		# A body drawn by its cells, or (568 amended: the castle's ponds are
 		# curves) a curve's surface.
+		# The castle's way out (589): a waystone either side of its link.
+		_check(_rig._room.get_node_or_null("Cue_17_23") != null and _rig._room.get_node_or_null("Cue_15_23") != null
+				and _rig._room.get_node_or_null("Cue_16_23") == null, "a waystone either side of the castle's way out, its cell clear")
 		var drawn: MeshInstance3D = _rig._water_bodies[0] if not _rig._water_bodies.is_empty() else _rig._room.get_node("Water_curve_0")
 		var surface: float = (drawn.mesh as ArrayMesh).surface_get_arrays(0)[Mesh.ARRAY_VERTEX][0].y
 		var forest_floor := _rig._room.get_node("ForestFloor") as Node3D

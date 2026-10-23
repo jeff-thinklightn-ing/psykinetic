@@ -5,7 +5,7 @@
 	"markets": {"castle": {"at": [16, 9], "name": "the castle market"}},
 	"links": [
 		{"at": [27, 12], "to_map": "test_room", "to_spawn": "from_castle"},
-		{"at": [16, 23], "to_map": "wilds", "to_spawn": "from_castle"}
+		{"at": [16, 23], "to_map": "wilds", "to_spawn": "from_castle", "variant": 2}
 	],
 	"waters": [
 		{

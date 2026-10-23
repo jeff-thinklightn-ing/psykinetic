@@ -55,7 +55,8 @@
 				20.0
 			],
 			"to_map": "castle",
-			"to_spawn": "from_wilds"
+			"to_spawn": "from_wilds",
+			"variant": 2
 		},
 		{
 			"at": [
