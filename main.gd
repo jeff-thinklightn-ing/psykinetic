@@ -8203,12 +8203,16 @@ static func hidden_words_due(cover: float, still: int, carries_light: bool, ligh
 
 
 ## What a ground pile's hint calls what lies there (decision 515): the
-## first thing's short name in lower case, "and N more" for the rest.
+## first thing's short name in lower case, counted when more of its kind
+## lie there ("5 herbs", 619 ui's side), "and N more" for the rest.
 static func pile_words(ids: PackedStringArray, gold := 0) -> String:
 	var things := ""
 	if not ids.is_empty():
 		var first := Items.short_of(ids[0]).to_lower()
-		things = first if ids.size() == 1 else "%s and %d more" % [first, ids.size() - 1]
+		var same := ids.count(ids[0])
+		if same > 1:
+			first = "%d %s" % [same, first]
+		things = first if ids.size() == same else "%s and %d more" % [first, ids.size() - same]
 	if gold <= 0:
 		return things
 	# Its gold first, a count (601 amended): "12 gold", "12 gold and herbs".
@@ -11461,13 +11465,16 @@ func _on_ground_changed(_zone_name: String, cell: Vector2i, thrown_from: Vector2
 	Net.interest.add(spawner.spawn(spec))
 
 
-## The pack panel's drop: a command, so the server decides (World.try_transfer).
-func _transfer(from: GridEntity, from_slot: int, to: GridEntity, to_slot: int) -> void:
+## The pack panel's drop: a command, so the server decides (World.try_transfer);
+## [param count] units of a stack (a shift-drag's one), 0 for the whole slot (619).
+func _transfer(from: GridEntity, from_slot: int, to: GridEntity, to_slot: int, count := 0) -> void:
 	var player := _local_player()
 	if player == null:
 		return
-	World.command(player, "transfer", {"from": str(from.get_path()), "from_slot": from_slot,
-		"to": str(to.get_path()), "to_slot": to_slot})
+	var args := {"from": str(from.get_path()), "from_slot": from_slot, "to": str(to.get_path()), "to_slot": to_slot}
+	if count > 0:
+		args["count"] = count
+	World.command(player, "transfer", args)
 
 
 ## Server: a player's or a companion's pack changed: their record has it at

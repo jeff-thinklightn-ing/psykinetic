@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Stacks on the interface: a slot holding more than one shows the count in its corner, Shift-drag moves one unit, in a barter a click gives the whole stack and Shift-click one at a time with the hover reading "3 of 5 to give", a pile's hint counts its kind ("5 herbs") and lies as one heap per kind (619, ui's side).
 - Monster archers hold their draw by kind before loosing (620, enemy-ai's side): a brute or imp snaps off a wide shot, robbers and sneaks wait longer, skeletons wait for a narrow cone (monsters.json aim_spread, aim_hold_max; drafts); an archer holds while a fellow monster stands on an edge of its cone, and lowers the bow if one stands inside even its narrowest.
 - A drawn bow's arrow now flies inside a cone that narrows the longer you hold: wide on a snap shot, tight after a few seconds; every bow and archer alike.
 - Arrows fly from the bow as real arrows: a shot that runs out of range drops past its mark and sticks in the ground, an arrow sticks in a closed door, glances off stone to lie at the wall's foot, and arrows left lying go after 10 seconds.

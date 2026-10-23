@@ -1626,7 +1626,8 @@ func _test_stacks() -> void:
 	_check(slot >= 0 and World.slot_count(host, slot) == 3 and host.slots.count("herbs") == 1,
 			"one slot holds the three (%s, %s)" % [Array(host.slots), host.slot_counts])
 	_check(host.slot_counts.size() == host.slots.size() and host.slot_counts[slot] == 3, "its count replicated (%s)" % host.slot_counts)
-	_check(host.slot_notes[slot].begins_with("3 × "), "its note says so (%s)" % host.slot_notes[slot])
+	_check(host.slot_notes.size() <= slot or not host.slot_notes[slot].begins_with("3 × "),
+			"its note does not say so: the slot draws the count from slot_counts (619, ui's side)")
 	_check(is_equal_approx(host.mass - bare_mass, 3 * Items.weight_of("herbs")), "weighed a unit at a time (%.2f)" % (host.mass - bare_mass))
 	for each in herbs:
 		_check(World.items.history(each)["holder"] == World.holder_key(host), "herb %d carried by them, its own history" % each)

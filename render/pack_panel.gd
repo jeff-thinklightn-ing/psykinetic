@@ -122,6 +122,8 @@ class SlotBox:
 	var icon: TextureRect
 	## The slot's note (World._show_notes), for the tip.
 	var note := ""
+	## The stack's count in the corner (619, ui's side): "5", nothing alone.
+	var count: Label
 
 	func _ready() -> void:
 		mouse_entered.connect(func() -> void:
@@ -136,12 +138,24 @@ class SlotBox:
 	func owner_entity() -> GridEntity:
 		return panel.player if mine else panel.other
 
-	func _get_drag_data(_at: Vector2) -> Variant:
+	## What a drag from this box carries: {slots_of, slot, count} (count 1
+	## for one unit of a stack with Shift held, 619; 0 for the whole slot),
+	## null for nothing to drag.
+	func drag_payload() -> Variant:
 		var entity := owner_entity()
 		if not is_instance_valid(entity) or index >= entity.slots.size() or entity.slots[index].is_empty():
 			return null
 		if mine and panel.selected.has(index):
 			return null  # Selected for barter (560): it stays put until unselected.
+		# Shift held: one unit off the stack (619, ui's side); else the whole slot.
+		var one := PackPanel.shift_down() and World.slot_count(entity, index) > 1
+		return {"slots_of": entity, "slot": index, "count": 1 if one else 0}
+
+	func _get_drag_data(_at: Vector2) -> Variant:
+		var data: Variant = drag_payload()
+		if data == null:
+			return null
+		var entity := owner_entity()
 		if icon.texture != null:
 			var picture := TextureRect.new()
 			picture.texture = icon.texture
@@ -155,13 +169,13 @@ class SlotBox:
 			preview.text = Items.short_of(entity.slots[index])
 			preview.add_theme_font_size_override("font_size", PackPanel.FONT_SIZE)
 			set_drag_preview(preview)
-		return {"slots_of": entity, "slot": index}
+		return data
 
 	func _gui_input(event: InputEvent) -> void:
 		var click := event as InputEventMouseButton
 		# The barter window open (560): a left click selects the thing to give.
 		if click != null and click.pressed and click.button_index == MOUSE_BUTTON_LEFT and panel.select_hook.is_valid() \
-				and panel.select_hook.call(mine, index):
+				and panel.select_hook.call(mine, index, click.shift_pressed):
 			accept_event()
 			return
 		if click == null or not click.pressed or click.button_index != MOUSE_BUTTON_RIGHT or not mine:
@@ -175,7 +189,7 @@ class SlotBox:
 		return data is Dictionary and data.has("slots_of") and is_instance_valid(owner_entity())
 
 	func _drop_data(_at: Vector2, data: Variant) -> void:
-		panel.drop(data["slots_of"], int(data["slot"]), owner_entity(), index)
+		panel.drop(data["slots_of"], int(data["slot"]), owner_entity(), index, int(data.get("count", 0)))
 
 
 ## "Jeff's Pack"; a chest is "Chest".
@@ -300,6 +314,20 @@ func _row(mine: bool) -> HBoxContainer:
 		label.add_theme_font_size_override("font_size", FONT_SIZE)
 		box.label = label
 		box.add_child(label)
+		# The stack's count, small in brass in the bottom-right corner (619,
+		# ui's side), over the caption's end.
+		var count := Label.new()
+		count.theme_type_variation = &"Small"
+		count.add_theme_color_override("font_color", UiTheme.color("brass"))
+		count.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+		count.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+		count.grow_vertical = Control.GROW_DIRECTION_BEGIN
+		count.offset_right = -6
+		count.offset_bottom = -2
+		count.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		count.visible = false
+		box.count = count
+		box.add_child(count)
 		row.add_child(box)
 	return row
 
@@ -330,6 +358,7 @@ func _signature() -> Array:
 		if entity != null:
 			sig.append(entity.slots.duplicate())
 			sig.append(entity.slot_notes.duplicate())
+			sig.append(entity.slot_counts.duplicate())  # The badges (619, ui's side).
 	return sig
 
 
@@ -341,10 +370,31 @@ func open(opened: GridEntity) -> void:
 	_refresh()
 
 
-## Moves an item, by way of transfer.
-func drop(from: GridEntity, from_slot: int, to: GridEntity, to_slot: int) -> void:
+## Moves an item, by way of transfer; [param count] units of a stack, 0 for
+## all of them (619).
+func drop(from: GridEntity, from_slot: int, to: GridEntity, to_slot: int, count := 0) -> void:
 	if transfer.is_valid() and is_instance_valid(from) and is_instance_valid(to):
-		transfer.call(from, from_slot, to, to_slot)
+		transfer.call(from, from_slot, to, to_slot, count)
+
+
+## The corner badge's words for a slot holding [param count] things (619,
+## ui's side): the number above one, nothing for one or none (a lone thing
+## shows no number, as before).
+static func count_words(count: int) -> String:
+	return str(count) if count > 1 else ""
+
+
+## Whether Shift is held, for a one-unit drag; tests set test_shift.
+static var test_shift := false
+static func shift_down() -> bool:
+	return test_shift or Input.is_key_pressed(KEY_SHIFT)
+
+
+## The badge box [param index] of the open row or the player's shows (tests).
+func count_in(mine: bool, index: int) -> String:
+	var row := _player_row if mine else _other_row
+	var box := row.get_child(index) as SlotBox
+	return box.count.text if box.count.visible else ""
 
 
 ## What box [param index] of the open row ([param mine] false) or the
@@ -445,6 +495,8 @@ func _refresh() -> void:
 			var named := noted and not entity.slot_notes[box.index].begins_with(Items.name_of(item))
 			var kept := named and World.KEPT_MARK in entity.slot_notes[box.index]
 			box.label.add_theme_color_override("font_color", KEPT_COLOR if kept else NAMED_COLOR if named else Items.color_of(item))
+			box.count.text = count_words(World.slot_count(entity, box.index)) if has and not item.is_empty() else ""
+			box.count.visible = not box.count.text.is_empty()
 			_show_icon(box, icons.icon(item) if icons != null and not item.is_empty() else null)
 	if landed != null and sound.is_valid():
 		sound.call(SoundKit.opening(landed), landed)

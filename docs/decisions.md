@@ -24328,3 +24328,41 @@ monster_test `_test_archer_hold`: the rows read, a spread under the floor raised
 hold looses at 5 ticks, 16° at 10, 6° at 20, the floor capped at 25 at the cap; a crate on the
 cone's edge holds the draw past a cap of 12 and it looses at 14 as the cone clears it, the crate
 unstruck. Server only, protocol unchanged, no new class_name.
+
+## 619, ui's side: a stack on the interface
+
+Items' 619 (28573df8): a slot holds a stack of one kind; slot_counts
+replicated, "transfer" and "drop" take a count, the barter's pack entries
+carry the stack's uids and count, GroundPile.ids keeps repeats. The
+interface's side, approved by the coordinator 2026-10-23:
+- **The count on the slot.** A slot holding more than one shows the number
+  small in brass in its bottom-right corner (PackPanel.count_words; the
+  box's count label), nothing for one, so a lone thing looks as it did. It
+  reads World.slot_count (slot_counts on a client), on the host and on a
+  companion's, a chest's or a cart's row alike, and the panel's signature
+  includes slot_counts so the badge follows a split. The slot's note no
+  longer begins "5 × " (World._show_notes, the stop-gap items left for
+  this): the tip reads the thing, the badge the count.
+- **One unit by Shift.** A drag moves the whole slot (count 0, as before);
+  Shift held when it begins (PackPanel.shift_down) drags one unit, the drag
+  data's count 1, passed through PackPanel.drop and Main._transfer as the
+  command's "count". Dropping onto an empty slot splits that one off, onto
+  a stack of its kind joins it (items' try_transfer).
+- **The barter.** A click on a stacked box gives the whole stack, unit by
+  unit as far as the merchant takes (toggle_give's "won't buy" and "the
+  town has enough of that" stop it, and the hover says), or unselects it
+  all; a Shift-click gives one more unit, or takes one back when all are
+  given (_select_mine's third argument from the box's click). The hover
+  adds "3 of 5 to give" over a part-given stack (stack_words); pack_entry
+  finds an entry by any of its units, so the frames and the sum's words
+  hold. The care buttons for herbs and antlers already light on holding any
+  (584 amended (2)).
+- **The ground.** A pile's hint counts the first kind lying there: "5
+  herbs", "2 herbs and 1 more", "12 gold and 2 herbs" (Main.pile_words).
+  The heap is drawn with one model per kind (Client3D._on_pile_shown), so
+  five herbs lie as one plant with the ring under it, not five.
+- Client only, nothing on the wire, no new class_name.
+ui_test _test_stacks_ui (the words, the units, the shift-click and the plain
+click with the town's cap, a real stack's badge and drag counts on the
+host); items_test _test_stacks (the note no longer prefixed); view_test
+_test_piles as before (two kinds, two models).

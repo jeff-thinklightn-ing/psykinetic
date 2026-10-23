@@ -23,6 +23,7 @@ func _ready() -> void:
 	await _test_escape()
 	_test_options_choices()
 	_test_item_tip()
+	_test_stacks_ui()
 	await _test_talk_panel()
 	_test_context_and_place()
 	_test_talk_no_panel()
@@ -202,6 +203,81 @@ func _test_options_choices() -> void:
 	Net.controls = kept[3]
 	Net.hints = kept[4]
 	Net.window_size = kept[5]
+
+
+## A stack on the interface (619, ui's side): the count in the slot's corner,
+## a shift-drag's one unit, the barter's shift-click, the pile's words.
+func _test_stacks_ui() -> void:
+	print("== stacks on the interface (619, ui's side): the corner count, one unit by shift, the pile's words ==")
+	_check(PackPanel.count_words(5) == "5" and PackPanel.count_words(1) == "" and PackPanel.count_words(0) == "",
+		"the corner badge: the number above one, nothing for one or none")
+	_check(Main.pile_words(PackedStringArray(["herbs", "herbs", "herbs", "herbs", "herbs"])) == "5 herbs"
+			and Main.pile_words(PackedStringArray(["herbs", "herbs", "dagger"])) == "2 herbs and 1 more"
+			and Main.pile_words(PackedStringArray(["herbs", "dagger", "rope"])) == "herbs and 2 more"
+			and Main.pile_words(PackedStringArray(["herbs", "herbs"]), 12) == "12 gold and 2 herbs",
+		"the pile's words count the first kind: 5 herbs; 2 herbs and 1 more; 12 gold and 2 herbs")
+	_check(BarterPanel.stack_words(3, 5) == "3 of 5 to give" and BarterPanel.stack_words(0, 5) == "" and BarterPanel.stack_words(1, 1) == "",
+		"the barter hover's stack words: 3 of 5 to give; nothing for none selected or a lone thing")
+	_check(BarterPanel.stack_units({"slot": 0, "uid": 401, "id": "herbs", "uids": [401, 402, 403], "count": 3}) == [401, 402, 403]
+			and BarterPanel.stack_units({"slot": 0, "uid": 401, "id": "herbs"}) == [401],
+		"a stack's units from the entry's uids; a lone thing's its uid")
+	var panel: BarterPanel = _main.barter_panel
+	var pack: PackPanel = _main.pack_panel
+	if panel != null and pack != null:
+		panel.open(null, "Snagfin")
+		panel.show_barter({"shop": "", "gold": 12, "goods": [], "buys": {"herbs": {"gold": 2, "up_to": 10}}, "fenced": {},
+			"pack": [{"slot": 0, "uid": 401, "id": "herbs", "uids": [401, 402, 403], "count": 3}, {"slot": 1, "uid": 404, "id": "dagger"}], "why": ""})
+		_check(panel.pack_entry(402).get("slot", -1) == 0 and panel.pack_entry(403).get("slot", -1) == 0, "any unit of the stack finds its entry")
+		_check(panel._select_mine(true, 0, true) and panel.give.keys() == [401], "a shift-click gives one unit")
+		panel._hover_mine(true, 0)
+		_check(panel.hover_shown() == "pays 2 gold, 1 of 3 to give", "the hover: pays 2 gold, 1 of 3 to give (%s)" % panel.hover_shown())
+		_check(panel._select_mine(true, 0, true) and panel.give.keys() == [401, 402], "another shift-click: two")
+		_check(panel._select_mine(true, 0, true) and panel.give.size() == 3 and panel._select_mine(true, 0, true) and panel.give.keys() == [401, 402],
+			"all three given, a shift-click takes one back")
+		_check(panel._select_mine(true, 0, false) and panel.give.is_empty(), "a plain click on a part-given stack unselects it all")
+		_check(panel._select_mine(true, 0, false) and panel.give.size() == 3 and panel.gives_shown() == ["herbs", "herbs", "herbs"],
+			"a plain click on an unselected stack gives it whole, a uid per unit")
+		panel.show_barter({"shop": "", "gold": 12, "goods": [], "buys": {"herbs": {"gold": 2, "up_to": 2}}, "fenced": {},
+			"pack": [{"slot": 0, "uid": 401, "id": "herbs", "uids": [401, 402, 403], "count": 3}], "why": ""})
+		for uid: int in [401, 402, 403]:
+			panel.give.erase(uid)
+		_check(panel._select_mine(true, 0, false) and panel.give.size() == 2 and panel.hover_shown() == "the town has enough of that",
+			"the town takes two: a plain click gives two and the hover says why not the third")
+		panel.close()
+		# A real stack in the host's pack: the badge reads its count, a shift-drag carries count 1.
+		var player: GridEntity = _main._local_player()
+		var free := player.slots.find("") if player != null and World.items != null else -1
+		if free >= 0:
+			var herbs: Array[int] = []
+			for i in 3:
+				herbs.append(World.items.mint("herbs", "gathered"))
+				World.put_on_ground(herbs[i], player.tile)
+			World.try_pick_up(player, player.tile)
+			var slot := World.slot_of_unit(player, herbs[0])
+			pack._refresh()
+			_check(slot >= 0 and World.slot_count(player, slot) == 3 and pack.count_in(true, slot) == "3",
+				"three herbs picked up: the slot's corner reads 3 (%s)" % pack.count_in(true, slot))
+			var box: PackPanel.SlotBox = pack._player_row.get_child(slot)
+			var whole: Variant = box.drag_payload()
+			PackPanel.test_shift = true
+			var one: Variant = box.drag_payload()
+			PackPanel.test_shift = false
+			_check(whole is Dictionary and int(whole.get("count", -1)) == 0 and one is Dictionary and int(one.get("count", -1)) == 1,
+				"a drag carries the whole slot, a shift-drag one unit")
+			var sent: Array = []
+			var kept_transfer: Callable = pack.transfer
+			pack.transfer = func(from: GridEntity, from_slot: int, to: GridEntity, to_slot: int, count: int) -> void:
+				sent.append(count)
+			pack.drop(player, slot, player, free if free != slot else player.slots.find(""), 1)
+			pack.drop(player, slot, player, slot)
+			pack.transfer = kept_transfer
+			_check(sent == [1, 0], "the panel's drop passes the count on to the transfer (%s)" % [sent])
+			while World.slot_count(player, slot) > 0:
+				World.items.end(World.take_item(player, player, slot), "gone")
+			pack._refresh()
+			_check(pack.count_in(true, slot) == "", "emptied: no badge")
+		else:
+			print("  (no host player with a free slot here: the badge's live checks skipped)")
 
 
 func _test_item_tip() -> void:

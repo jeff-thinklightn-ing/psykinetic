@@ -2830,10 +2830,10 @@ func _show_notes(entity: GridEntity) -> void:
 	for slot in mini(entity.slots.size(), entity.slot_items.size()):
 		if entity.slot_items[slot] != 0:
 			names[slot] = item_note(entity.slot_items[slot])
-			# The tally (decision 415) and the story (decision 421), each on a
-			# line of its own under the thing's name, found by its first word.
-			if slot_count(entity, slot) > 1:
-				names[slot] = "%d × %s" % [slot_count(entity, slot), names[slot] if not names[slot].is_empty() else Items.name_of(entity.slots[slot])]  # Decision 619.
+			# A stack's count is drawn on its slot from slot_counts (619, ui's
+			# side), not said in the note. The tally (decision 415) and the
+			# story (decision 421), each on a line of its own under the
+			# thing's name, found by its first word.
 			for line in [kills_line(entity.slot_items[slot]), story_line(entity.slot_items[slot])]:
 				if not line.is_empty():
 					names[slot] = "%s\n%s" % [names[slot] if not names[slot].is_empty() else Items.name_of(entity.slots[slot]), line]

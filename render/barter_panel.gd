@@ -242,12 +242,40 @@ func goods_entry(uid: int) -> Dictionary:
 	return {}
 
 
-## The player's pack entry {slot, uid, id} for [param uid], {} for none.
+## The player's pack entry {slot, uid, id, uids, count} for [param uid]
+## (its first unit, or any of its stack's; 619), {} for none.
 func pack_entry(uid: int) -> Dictionary:
 	for each: Variant in data.get("pack", []):
-		if each is Dictionary and int(each.get("uid", 0)) == uid:
+		if each is Dictionary and (int(each.get("uid", 0)) == uid or stack_units(each).has(uid)):
 			return each
 	return {}
+
+
+## The units in [param entry]'s slot (619: its "uids", every unit; the one
+## uid for an entry before stacks, or a lone thing).
+static func stack_units(entry: Dictionary) -> Array:
+	var uids: Variant = entry.get("uids", [])
+	if uids is Array and not uids.is_empty():
+		var out := []
+		for each: Variant in uids:
+			out.append(int(each))
+		return out
+	return [int(entry.get("uid", 0))] if entry.has("uid") else []
+
+
+## How many of [param entry]'s units are selected to give.
+func given_of(entry: Dictionary) -> int:
+	var n := 0
+	for uid: int in stack_units(entry):
+		if give.has(uid):
+			n += 1
+	return n
+
+
+## The hover's stack words (619, ui's side): "3 of 5 to give" over a stack
+## with some selected, "" over a lone thing or none selected.
+static func stack_words(given: int, count: int) -> String:
+	return "%d of %d to give" % [given, count] if count > 1 and given > 0 else ""
 
 
 ## The player's pack entry at [param slot], {} for an empty one.
@@ -488,14 +516,38 @@ func _confirm() -> void:
 
 
 ## PackPanel's select hook: a left click on one of the player's boxes while
-## the window is open selects it (true: the click is taken, no drag).
-func _select_mine(mine: bool, index: int) -> bool:
+## the window is open selects it (true: the click is taken, no drag). A
+## stack (619, ui's side): a click gives the whole stack, as far as the
+## merchant takes, or unselects it all; a shift-click one more unit, or one
+## fewer when all are given.
+func _select_mine(mine: bool, index: int, shift := false) -> bool:
 	if not _open or not mine:
 		return false
 	var entry := pack_entry_at(index)
 	if entry.is_empty():
 		return false
-	toggle_give(int(entry.get("uid", 0)))
+	var units := stack_units(entry)
+	if units.size() <= 1:
+		toggle_give(int(entry.get("uid", 0)))
+		return true
+	var given := given_of(entry)
+	if shift:
+		if given >= units.size():
+			give.erase(units[given - 1])
+			_rebuild()
+		else:
+			toggle_give(units[given])
+		return true
+	if given > 0:
+		for uid: int in units:
+			give.erase(uid)
+		_rebuild()
+		return true
+	for uid: int in units:
+		var before := give.size()
+		toggle_give(uid)
+		if give.size() == before:
+			break  # Won't buy, or the town has enough: the hover says.
 	return true
 
 
@@ -513,6 +565,9 @@ func _hover_mine(mine: bool, index: int) -> void:
 		return
 	var uid := int(entry.get("uid", 0))
 	_hover_words = hover_words(false, 0, pays_for(uid), is_fenced(uid))
+	var stacked := stack_words(given_of(entry), stack_units(entry).size())
+	if not stacked.is_empty():
+		_hover_words += ", " + stacked
 	_show_words()
 
 

@@ -5521,8 +5521,14 @@ func _on_pile_shown(pile: GroundPile) -> void:
 	ring.position.y = 0.01
 	heap.add_child(ring)
 	var growing := growing_slot(pile.ids)
-	for i in pile.ids.size():
-		var slot := growing if not growing.is_empty() else str(Items.def(pile.ids[i]).get("art", ""))
+	# One model per kind (619, ui's side): five herbs lie as one, the hint
+	# counts them; the ring keeps a small heap readable from afar.
+	var kinds := PackedStringArray()
+	for id in pile.ids:
+		if not kinds.has(id):
+			kinds.append(id)
+	for i in kinds.size():
+		var slot := growing if not growing.is_empty() else str(Items.def(kinds[i]).get("art", ""))
 		if not ArtKit.has(slot):
 			continue
 		var thing := ArtKit.instance(slot)
@@ -5539,7 +5545,7 @@ func _on_pile_shown(pile: GroundPile) -> void:
 			thing.position = Vector3(cos(i * 2.4) * 0.18 * mini(i, 1), ArtKit.size(slot).z * 0.5,
 					sin(i * 2.4) * 0.18 * mini(i, 1))
 		heap.add_child(thing)
-		if i == pile.ids.size() - 1 and pile.thrown_from != World.NO_CELL and World.tick - pile.thrown_tick < THROWN_SHOWN_TICKS:
+		if i == kinds.size() - 1 and pile.thrown_from != World.NO_CELL and World.tick - pile.thrown_tick < THROWN_SHOWN_TICKS:
 			_fly(thing, _tile_position(pile.thrown_from) - heap.position + Vector3.UP * 1.2, thing.position)
 	if pile.gold > 0 and ArtKit.has(Items.GOLD_ART):
 		# Its gold (601 amended: a count, never a thing): one coin purse on its
