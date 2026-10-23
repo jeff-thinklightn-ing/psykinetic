@@ -196,6 +196,12 @@ const NOISE_WORDS := {
 ## of where she looked.
 const LOOKS_OFFERED := 2
 const ACTIONS_MAX := 6
+## A search for secrets (608 amended): how near a hidden niche she must be
+## and see its floor cell, how near it she stops (never on it), and how far
+## she wanders when there is none.
+const SEARCH_RANGE := 8
+const SEARCH_NEAR := 2
+const SEARCH_WANDER := 3
 const ERRAND_TICKS := 200
 const ERRAND_BREAK := 4
 const ERRAND_BACK := 2
@@ -4368,10 +4374,17 @@ func can_do() -> Array[Dictionary]:
 		actions.assign(actions.filter(func(each: Dictionary) -> bool: return each not in stanch))
 		for each: Dictionary in stanch:
 			actions.push_front(each)
-	actions.resize(mini(actions.size(), ACTIONS_MAX - LOOKS_OFFERED))
+	# A search for secrets (608 amended): near a hidden niche it keeps a
+	# place of its own; a plain search about takes one of the looks'.
+	var search := _search_here()
+	var pointer := search.has("found")
+	actions.resize(mini(actions.size(), ACTIONS_MAX - LOOKS_OFFERED - (1 if pointer else 0)))
+	if not search.is_empty():
+		actions.append(search)
+	var looks := LOOKS_OFFERED - (1 if not search.is_empty() and not pointer else 0)
 	var ways: Dictionary[int, bool] = {}
 	for cell in _cells_within(SIGHT_RANGE):
-		if ways.size() >= LOOKS_OFFERED:
+		if ways.size() >= looks:
 			break
 		if cell == tile or not World.is_walkable(cell) or _sees(cell):
 			continue
@@ -4383,6 +4396,47 @@ func can_do() -> Array[Dictionary]:
 		actions.append({"verb": "look", "cell": cell, "at": cell,
 			"words": "go and look %s, where it is %s, and come back" % [_paces_toward(Vector2(cell)), why]})
 	return actions
+
+
+## A search of the room for secrets (608 amended, companions' side; Jeff:
+## "asking companion to search the room for secrets they may walk over to
+## an area"), out of a fight: with a hidden niche not yet found
+## (World.niche_edges "hidden", its door shut and locked) within
+## SEARCH_RANGE and its floor cell in her sight, to a free cell within
+## SEARCH_NEAR of that cell, never onto it (a pointer, not the opening);
+## else a few paces about, to a cell she sees. {} in a fight or with nowhere
+## to go.
+func _search_here() -> Dictionary:
+	if not World.calm(self):
+		return {}
+	for key: Vector3i in World.niche_edges:
+		if World.niche_edges[key] != "hidden":
+			continue
+		var door := World.door_on(key)
+		if door == null or door.is_open() or door.lock.is_empty():
+			continue  # Found already.
+		var floor_cell := _niche_floor(key)
+		if World.distance(tile, floor_cell) > SEARCH_RANGE or not _sees(floor_cell):
+			continue
+		var best := NONE
+		for cell in _cells_within(SEARCH_RANGE + SEARCH_NEAR):
+			if cell == floor_cell or World.distance(cell, floor_cell) > SEARCH_NEAR or not World.is_walkable(cell) \
+					or (cell != tile and not World.is_free(cell)):
+				continue
+			if best == NONE or World.distance(tile, cell) < World.distance(tile, best):
+				best = cell
+		if best != NONE:
+			return {"verb": "search", "cell": best, "at": best, "found": key, "words": "search about here for anything hidden"}
+	for cell in _cells_within(SEARCH_WANDER):
+		if World.distance(tile, cell) == SEARCH_WANDER and World.is_walkable(cell) and World.is_free(cell) and _sees(cell):
+			return {"verb": "search", "cell": cell, "at": cell, "words": "search about here for anything hidden"}
+	return {}
+
+
+## The hall's floor cell before hidden niche edge [param key].
+static func _niche_floor(key: Vector3i) -> Vector2i:
+	var sides := Terrain.edge_cells(key)
+	return sides[0] if World.is_walkable(sides[0]) else sides[1]
 
 
 ## The errands (can_do's verbs) a sentence, lower case, speaks of doing.
@@ -4399,7 +4453,12 @@ static func _errand_verbs(text: String) -> Array[String]:
 		verbs.append("close")
 	# A building named: a look round inside it (decision 391), not a look off somewhere.
 	var building: bool = has.call("\\b(hut|house|shed|temple|forge|kitchen|store|building|room|inside|in here)\\b")
-	if not chest and building and has.call("\\b(look|check|search|see|peek|loot)"):
+	# Secrets: a search for anything hidden (608 amended), not a look round.
+	var secret: bool = not chest and has.call("\\b(secrets?|hidden|concealed|passages?|drafts?|draughts?)\\b") \
+			and has.call("\\b(search|look|check|find|feel|seek|hunt)")
+	if secret:
+		verbs.append("search")
+	elif not chest and building and has.call("\\b(look|check|search|see|peek|loot)"):
 		verbs.append("look_inside")
 	elif not chest and not door and has.call("\\b(look|check|scout|see|peek)") \
 			and has.call(COMPASS_WORD + "|\\b(dark|there|ahead|around|corner)\\b"):
@@ -4552,6 +4611,8 @@ func _errand_there() -> bool:
 			return patient == self or _alive(patient) and World.can_melee(tile, patient.tile)
 		"look_inside":
 			return World.distance(tile, errand["cell"]) <= 1
+		"search":
+			return tile == errand["cell"] or World.distance(tile, errand["cell"]) == 1 and not World.is_free(errand["cell"])
 		_:
 			return _sees(errand["cell"])
 
@@ -4688,6 +4749,14 @@ func _errand_do() -> void:
 			if held != "nothing":
 				note_fact("%s found %s in a chest in %s." % [_name_of(self), held, _place_words()])
 			_report_errand("You looked in the chest %s: it holds %s." % [_paces_toward(Vector2(chest.tile)), held])
+		"search":
+			var key: Variant = errand.get("found")
+			var door := World.door_on(key) if key is Vector3i else null
+			if door != null and not door.is_open() and not door.lock.is_empty():
+				note_fact("%s felt cool air from a niche in %s." % [_name_of(self), _place_words()])
+				_report_errand("You searched about and stopped near the niche %s: cool air moves from the wall there, as if there were a way behind it." % _paces_toward(Vector2(_niche_floor(key))))
+			else:
+				_report_errand("You searched about here and found nothing hidden.")
 		"look_inside":
 			var building: Dictionary = errand["building"]
 			var seen := _found_in(Level.building_cells(building))

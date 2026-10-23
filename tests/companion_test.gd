@@ -912,6 +912,38 @@ func _test_errands() -> void:
 		"sent anyway, she says it is locked (%s)" % [mind.triggers("voice")])
 	door.lock = ""
 
+	# A search for secrets (608 amended, companions' side): this door made
+	# the hidden niche's, shut and locked; she walks near it, never onto it.
+	print("\n== asked to search for secrets, she walks near the hidden niche ==")
+	_check("search" in Companion._errand_verbs("i'll search the room for secrets.") and "look_inside" not in Companion._errand_verbs("i'll search the room for secrets.")
+		and "search" in Companion._errand_verbs("let me look for anything hidden."), "searching for secrets is her search, not a look round")
+	var niches_kept := World.niche_edges.duplicate()
+	World.niche_edges[door.key] = "hidden"
+	door.lock = "test_hidden"
+	for i in 21:
+		World.step()
+	var niche := Companion._niche_floor(door.key)
+	var search_at := _offer(pet.can_do(), "search")
+	var search: Dictionary = pet.can_do()[search_at] if search_at >= 0 else {}
+	_check(not search.is_empty() and search.get("found") == door.key and search["cell"] != niche and World.distance(search["cell"], niche) <= Companion.SEARCH_NEAR,
+		"offered: a cell near the niche's, not on it (%s, niche %s)" % [search.get("cell"), niche])
+	mind.clear()
+	if not search.is_empty():
+		pet._start_errand(search, pet._serial)
+	_step_until(func() -> bool: return pet.errand.is_empty(), 60)
+	_check(pet.tile != niche and World.distance(pet.tile, niche) <= Companion.SEARCH_NEAR + 1 and door.state() == "locked",
+		"she walks there and stops, the niche still shut (at %s)" % pet.tile)
+	_check(mind.triggers("voice").size() == 1 and "cool air" in mind.triggers("voice")[0], "her voice is told of the air moving: %s" % [mind.triggers("voice")])
+	door.lock = ""  # Found: nothing hidden here now.
+	search_at = _offer(pet.can_do(), "search")
+	_check(search_at >= 0 and not pet.can_do()[search_at].has("found"), "found, a search is a few paces about")
+	mind.clear()
+	if search_at >= 0:
+		pet._start_errand(pet.can_do()[search_at], pet._serial)
+	_step_until(func() -> bool: return pet.errand.is_empty(), 60)
+	_check(mind.triggers("voice").size() == 1 and "found nothing hidden" in mind.triggers("voice")[0], "and she finds nothing: %s" % [mind.triggers("voice")])
+	World.niche_edges.assign(niches_kept)
+
 	_put(owner, Vector2i(11, 6))
 	_put(pet, Vector2i(10, 6))
 	for i in 21:

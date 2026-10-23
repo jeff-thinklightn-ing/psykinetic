@@ -25718,3 +25718,23 @@ player can feel. The coordinator floated three; one is built.
 Economy lists steadying_draught in the new hut's makes (economy.json
 return.places.healers_hut) once it is on main. items_test _test_steadying_draught. No new
 class_name.
+
+## 608 amended, companions' side: she searches the room for secrets
+
+Jeff: "asking companion to search the room for secrets they may walk over to
+an area". A new errand, "search", in can_do (Companion._search_here), out of
+a fight. With a hidden niche not yet found (World.niche_edges "hidden", its
+Door shut and locked) within SEARCH_RANGE (8) and its hall floor cell in her
+sight, she is offered a free cell within SEARCH_NEAR (2) of that cell, never
+the cell itself, so she points and does not open it; there her voice is told
+cool air moves from the wall by the niche, and she says so in her own words
+(and keeps it as a fact). Elsewhere, or once it is found, the search is a few
+paces about (SEARCH_WANDER) and she finds nothing hidden. Her words for it:
+"secret", "hidden", "concealed", "passage", "draft" with "search", "look",
+"find", "feel" and the like (Companion._errand_verbs), ahead of a look round
+a room. The search near a niche keeps its own place among her offers; the
+plain one takes one of the two looks', so nothing else she could do is
+crowded out. Read from dungeon's marker on main, no cell hard-coded (agreed
+with dungeon; its World.hidden_niche() is a convenience this needn't wait
+for). Server only, protocol unchanged. tests: companion_test (the words; near
+the niche, not on it, the air told; found, nothing hidden).
