@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Your companion now does plain orders at once, whatever her voice says: "wait here", "follow me", "rest", "bandage me" or "patch yourself up", "carry my dagger" and "give it back", "lead the way"; resting, she mends and gets up when whole or when a fight starts (616).
 - Cliffs and terraces follow smooth curves instead of the tiles' edges, their faces winding along the ledge and the ground meeting them on the curve (585, terrain's side).
 - Built water (wells and basins, which no curve lays) is drawn square and still with a crisp edge, not as a rounded pond; natural water stays on its curves (595).
 - The first unsquaring's cell smoothing is withdrawn (Jeff's veto): ledge rims and jittered ground facets are gone, and cliffs stand on their tiles' edges until ledges are drawn from curves (556 amended, 558 amended).

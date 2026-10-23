@@ -4861,6 +4861,8 @@ func _guide_said(player: Player, pet: Companion, line: String) -> bool:
 		return false
 	var known := Guide.destinations(record.companion, World.holdings, _world_map)
 	var to := Guide.named_in(line, known)
+	if to.is_empty() and RegEx.create_from_string("(?i)\\b(to|towards?)\\b").search(line) == null:
+		to = _nearest_known(pet, known)  # Not said where (decision 616): the nearest place she knows.
 	if to.is_empty():
 		pet.guide_note = "%s asks you to lead them somewhere you have not been with them: you do not know the way there." % record.name
 		return true
@@ -4869,6 +4871,17 @@ func _guide_said(player: Player, pet: Companion, line: String) -> bool:
 		return true
 	_start_guide(pet, player, to)
 	return true
+
+
+## Of [param known] (Guide.destinations), the place nearest [param pet] in
+## her own area, else the first she knows; {} if none.
+func _nearest_known(pet: Companion, known: Array[Dictionary]) -> Dictionary:
+	var best := {}
+	for each: Dictionary in known:
+		if each["kind"] == "place" and each["area"] == pet.zone and (best.is_empty()
+				or World.distance(pet.tile, each["cell"]) < World.distance(pet.tile, best["cell"])):
+			best = each
+	return best if not best.is_empty() else (known[0] if not known.is_empty() else {})
 
 
 ## [param pet] sets off leading [param player] to [param to] (Guide's

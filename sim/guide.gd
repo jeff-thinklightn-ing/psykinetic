@@ -249,7 +249,7 @@ static func _plain(text: String) -> String:
 
 ## The words that ask her to lead the way to somewhere named, or ("" for
 ## the place) to take a stopped walk up again.
-const ASK := "(?i)\\b(take|lead|guide|show|bring|walk)\\s+(me|us)\\b.*\\b(to|towards?)\\b|\\b(lead|show)\\s+(me\\s+|us\\s+)?the\\s+way\\b|\\bwhich\\s+way\\s+to\\b"
+const ASK := "(?i)\\b(take|lead|guide|show|bring|walk)\\s+(me|us)\\b.*\\b(to|towards?)\\b|\\b(lead|show)\\s+(me\\s+|us\\s+)?the\\s+way\\b|\\bwhich\\s+way\\s+to\\b|\\b(you\\s+lead|take\\s+the\\s+lead|lead\\s+(us|me|on\\s+to))\\b"
 const RESUME := "(?i)^\\W*(lead on|go on|lead the way|carry on|keep going|onwards?)\\W*$"
 
 

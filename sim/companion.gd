@@ -28,10 +28,10 @@ extends GridEntity
 ## her player said in the last ECHO_TICKS, or her own last SAID_REMEMBERED, are
 ## dropped.
 
-enum Intent { FOLLOW, HOLD, ATTACK, SHOVE, RETREAT, IDLE, YIELD, ERRAND, REVIVE, GUIDE }
+enum Intent { FOLLOW, HOLD, ATTACK, SHOVE, RETREAT, IDLE, YIELD, ERRAND, REVIVE, GUIDE, REST }
 enum Stance { STAY_CLOSE, HOLD, PRESS, GUARD, PULL_BACK }
 
-const INTENT_NAMES: Array[String] = ["FOLLOW", "HOLD", "ATTACK", "SHOVE", "RETREAT", "IDLE", "YIELD", "ERRAND", "REVIVE", "GUIDE"]
+const INTENT_NAMES: Array[String] = ["FOLLOW", "HOLD", "ATTACK", "SHOVE", "RETREAT", "IDLE", "YIELD", "ERRAND", "REVIVE", "GUIDE", "REST"]
 const STANCE_NAMES: Array[String] = ["STAY_CLOSE", "HOLD", "PRESS", "GUARD", "PULL_BACK"]
 const DEFAULT_STANCE := Stance.GUARD
 ## A bump this soon after the last one is the same bump (a held key).
@@ -82,6 +82,31 @@ const SILENCE_TICKS := 100
 ## it only an hp threshold asks the hands. Anything else they say, a warning
 ## or an exclamation, is just speech.
 const INSTRUCTION_TICKS := 600
+## Her player's plain orders (decision 616, the hands' reader; Jeff:
+## "reliable plain-language commands for the core verbs (bandage, carry,
+## wait, rest, take the lead) come before combat polish"): read from the
+## words with no model, done at once; her voice only says it. Each verb's
+## words, lower case, apostrophes plain; a negation ahead of one ("don't
+## wait", "no need to bandage") is no order.
+const ORDER_NOT := "\\b(don'?t|do not|no need to|never|can'?t|cannot|won'?t|not)\\s+(\\w+\\s+)?$"
+const ORDER_BANDAGE := "\\b(bandage (me|yourself|you|us|him|her|them|my|your|our|it|those|these|that|this|the)\\b|bandage up|patch (me|yourself|you|us|him|her|them) up|dress (\\w+ )?wounds?|heal (me|yourself|up|us)|tend (to )?(your|my|our|the) wounds?|first aid|stop (the|your|my) bleeding|see to (your|my) wounds?)"
+const ORDER_FOLLOW := "\\b(follow (me|us|along)|come (on|here|with me|along|back|over)|with me|let'?s (go|move)|stay (close|with me|near|by me)|keep up|catch up|this way|on me|heel|move out)\\b"
+const ORDER_WAIT := "\\b(wait|stay(?! (back|close|with|near|by|away|out|clear|behind|alive|sharp|calm))|hold on|hold (it|up|here|there|position|still)|stop( (there|here|now|moving))?(?=\\s*([.!?,]|$))|don'?t move|stand (still|here|there|fast|guard here)|halt|keep (still|here)|remain (here|there))\\b"
+const ORDER_REST := "(?<!the )(?<!of )\\b(rest|take a (rest|break|breather|moment|seat)|catch your breath|sit (down|tight)|have a (rest|sit|break|breather)|get some (rest|sleep)|lie down|go to sleep|(take|have) a nap|recover|rest up)\\b(?! of| in peace)"
+const ORDER_CARRY := "\\b(carry|take|hold|keep|stow|pack|have|put)\\b"
+const ORDER_CARRY_THIS := "\\b(carry|hold|keep|stow) (this|these|that|those|it|them)( for (me|a while|now))?\\s*([.!?,]|$)"
+const ORDER_GIVE_BACK := "\\b(give|hand|pass|return)\\b.*\\b(me|back)\\b"
+## Words with these are no carry order whatever thing they name ("carry
+## on", "take cover", "hold the door").
+const ORDER_CARRY_NOT := "\\b((i|i'll|i will|let me|we|we'll)\\s+(\\w+\\s+)?(take|carry|hold|keep|have|put)|carry on|take (cover|us|me|a (rest|break|breather|look)|the lead|them out|aim)|hold (on|the door|still|position|back)|keep (going|up|still|watch|an eye))\\b"
+## How long a plain order keeps her voice from asking her elsewhere, and how
+## long before a quiet voice is covered by a word of her own (ORDER_ACKS).
+const ORDER_ACK_TICKS := 40
+const ORDER_ACKS: Array[String] = ["On it.", "All right.", "As you say.", "Right.", "Fine."]
+## Resting (decision 616): an hp back every REST_HEAL_TICKS; she gets up
+## when whole, when a fight starts, or her player goes past REST_LEAVE.
+const REST_HEAL_TICKS := 20
+const REST_LEAVE := 8
 const INSTRUCTION_LOCK_TICKS := 60
 ## The quick phrases' defaults reach her as what they mean, never quoted.
 const PHRASE_MEANINGS := {
@@ -527,6 +552,12 @@ var _stalked: GridEntity = null
 ## offered for each voice ask out, by serial; the asks that are her report
 ## of an errand (cleaned as an answer: what she tells is new).
 var errand := {}
+## Her player's standing plain order (decision 616): "wait" or "rest", else
+## "". Calm does not undo it; "follow" or another order does.
+var order := ""
+var _order_tick := -1
+var _ack_due := -1
+var _rest_heal_at := -1
 var _offering: Array[Dictionary] = []
 var _offered: Dictionary[int, Array] = {}
 var _report_serials: Dictionary[int, bool] = {}
@@ -859,6 +890,10 @@ func owner_spoke(text: String, phrase := 0) -> void:
 		_narrate("%s calls out to you. %s" % [keeper_name(), meaning])
 	if PHRASE_STANCES.has(phrase) or not meaning.is_empty():
 		_quarry = _quarry_called() if PHRASE_STANCES.get(phrase, -1) == Stance.PRESS or text.strip_edges() == "Get them!" else null
+	var read := order_in(text, keeper.slots if _alive(keeper) else ([] as Array[String]), slots) if phrase == 0 else {}
+	if not read.is_empty() and obey(read, text):
+		_ask_voice("%s just spoke to you." % keeper_name(), heard, false, true)
+		return
 	if PHRASE_STANCES.has(phrase):
 		_serial += 1
 		var wanted: int = PHRASE_STANCES[phrase]
@@ -870,6 +905,137 @@ func owner_spoke(text: String, phrase := 0) -> void:
 		_log({"kind": "stance", "companion": String(name), "mind": "phrase", "trigger": "quick phrase %d: %s" % [phrase, text],
 			"stance": STANCE_NAMES[wanted], "outcome": "applied", "note": "a quick phrase: its stance at once, standing as the instruction"})
 	_ask_voice("%s just spoke to you." % keeper_name(), heard, false, PHRASE_STANCES.has(phrase))
+
+
+## The plain order in her player's [param text] (decision 616), read with
+## no model: {verb: "bandage" (patient "self" or "keeper"), "give" or
+## "carry" (item, or "" for "carry this"), "rest", "follow", "wait"}, or {}.
+## An ask to lead the way is Main's (Guide.asks, decision 551), read before.
+## [param held] and [param carried]: her player's things and hers, for
+## which thing is named.
+static func order_in(text: String, held: Array[String] = [], carried: Array[String] = []) -> Dictionary:
+	var said := " " + text.to_lower().replace("’", "'").replace("‘", "'") + " "
+	if Guide.asks(said) or Guide.asks_resume(text):
+		return {}
+	var found := func(pattern: String) -> bool:
+		var at := RegEx.create_from_string(pattern).search(said)
+		if at == null:
+			return false
+		var before := said.substr(0, at.get_start())
+		return RegEx.create_from_string(ORDER_NOT).search(before) == null
+	if found.call(ORDER_BANDAGE):
+		var own := RegEx.create_from_string("\\b(yourself|your (own )?wounds?|you up|your (cut|bleeding|leg|arm))").search(said) != null
+		var mine := RegEx.create_from_string("\\b(me|my|us|our)\\b").search(said) != null
+		return {"verb": "bandage", "patient": "self" if own else "keeper" if mine else ""}
+	if found.call(ORDER_GIVE_BACK):
+		for id: String in carried:
+			if not id.is_empty() and _item_words(id).search(said) != null:
+				return {"verb": "give", "item": id}
+	if RegEx.create_from_string(ORDER_CARRY_NOT).search(said) == null and found.call(ORDER_CARRY):
+		for id: String in held:
+			if not id.is_empty() and _item_words(id).search(said) != null:
+				return {"verb": "carry", "item": id}
+		if found.call(ORDER_CARRY_THIS):
+			return {"verb": "carry", "item": ""}
+	if found.call(ORDER_REST):
+		return {"verb": "rest"}
+	if found.call(ORDER_FOLLOW):
+		return {"verb": "follow"}
+	if found.call(ORDER_WAIT):
+		return {"verb": "wait"}
+	return {}
+
+
+## Does what [param read] (order_in) asks at once, the hands, no model
+## asked (decision 616): true if it was an order she took (done, set off,
+## or answered why not, all told to her voice as narration). [param text]
+## stands as the instruction.
+func obey(read: Dictionary, text: String) -> bool:
+	_serial += 1
+	_called_off(_serial)
+	_order_tick = World.tick
+	_ack_due = World.tick + ORDER_ACK_TICKS
+	var verb := str(read["verb"])
+	var done := ""
+	match verb:
+		"wait", "rest", "follow":
+			if verb == "rest" and in_fight():
+				_narrate("%s asked you to rest, but there is fighting near: you will rest after it." % keeper_name())
+				_log({"kind": "order", "companion": String(name), "mind": "hands", "trigger": text, "outcome": "not now", "note": "a fight near"})
+				return true
+			order = "" if verb == "follow" else verb
+			_rest_heal_at = World.tick + REST_HEAL_TICKS
+			var wanted := Stance.STAY_CLOSE if verb == "follow" else Stance.HOLD
+			_set_stance(wanted, _serial, "order")
+			_instruction = "%s told you: \"%s\"" % [keeper_name(), text]
+			_instruction_tick = World.tick
+			_instruction_stance = STANCE_NAMES[wanted]
+			done = {"wait": "You stay where you are, as %s asked, till they call you on.",
+				"rest": "You sit down to rest, as %s asked, and get your breath back.",
+				"follow": "You come along with %s, as they asked."}[verb] % keeper_name()
+		"bandage":
+			var patient: GridEntity = self if read["patient"] == "self" or not _alive(keeper) else keeper
+			if read["patient"] == "" and _alive(keeper) and keeper.hp >= keeper.max_hp:
+				patient = self  # Not said whom: her player if hurt, else herself.
+			var whom := "yourself" if patient == self else keeper_name()
+			if World.bandage_kit(self) < 0:
+				done = "%s asked you to bandage %s, but you have no bandaging kit." % [keeper_name(), whom]
+			elif patient.hp >= patient.max_hp:
+				done = "%s asked you to bandage %s, but there is no wound to bandage." % [keeper_name(), whom]
+			else:
+				_start_errand({"verb": "bandage", "patient": patient, "at": patient.tile,
+					"words": "bandage your own wounds" if patient == self else "bandage %s's wounds" % keeper_name()}, _serial)
+				done = "You set about bandaging %s, as %s asked." % ["your wounds" if patient == self else keeper_name(), keeper_name()]
+		"carry":
+			var item := str(read["item"])
+			if item.is_empty():
+				done = "%s asked you to carry something but did not say what; ask them which thing." % keeper_name()
+			elif not _alive(keeper) or keeper.slots.find(item) == -1:
+				done = "%s asked you to carry the %s, but they do not have it." % [keeper_name(), Items.name_of(item)]
+			elif World.free_slot_for(self, item) == -1:
+				done = "%s asked you to carry the %s, but you have no room for it." % [keeper_name(), Items.name_of(item)]
+			else:
+				_start_errand({"verb": "take", "item": item, "at": keeper.tile, "words": "take the %s from %s to carry" % [Items.name_of(item), keeper_name()]}, _serial)
+				done = "You go to take the %s from %s to carry, as they asked." % [Items.name_of(item), keeper_name()]
+		"give":
+			var item := str(read["item"])
+			_start_errand({"verb": "give", "item": item, "at": keeper.tile if _alive(keeper) else tile,
+				"words": "give %s your %s" % [keeper_name(), Items.name_of(item)]}, _serial)
+			done = "You go to give %s the %s, as they asked." % [keeper_name(), Items.name_of(item)]
+		_:
+			return false
+	_narrate(done)
+	_log({"kind": "order", "companion": String(name), "mind": "hands", "trigger": text, "outcome": "done", "note": done})
+	return true
+
+
+## Her standing order kept (decision 616), each tick: resting she mends,
+## and gets up when whole, when a fight starts, or when her player walks
+## off; a voice quiet past ORDER_ACK_TICKS is covered by a word of her own.
+func _keep_order() -> void:
+	if _ack_due >= 0 and World.tick >= _ack_due:
+		_ack_due = -1
+		if _last_speech_tick < _order_tick:
+			_say(ORDER_ACKS[absi(hash(String(name))) % ORDER_ACKS.size()], true)
+	if order != "rest":
+		return
+	var why := ""
+	if in_fight():
+		why = "monsters came near"
+	elif _alive(keeper) and World.distance(tile, keeper.tile) > REST_LEAVE:
+		why = "%s walked on" % keeper_name()
+	elif hp >= max_hp:
+		why = "you are rested and whole again"
+	if why.is_empty():
+		if World.tick >= _rest_heal_at:
+			_rest_heal_at = World.tick + REST_HEAL_TICKS
+			World.heal(self, 1)
+		return
+	order = ""
+	_instruction = ""
+	_serial += 1
+	_set_stance(DEFAULT_STANCE, _serial, "order")
+	_narrate("You get up from your rest: %s." % why)
 
 
 ## A creature died in her sight (Main): an event for the hands, told to
@@ -1152,6 +1318,7 @@ func _sim_tick() -> void:
 	_grow()
 	if World.tick % MEMORY_EVERY == 0:
 		_remember_sights()
+	_keep_order()
 	_calm()
 	_act()
 	_execute()
@@ -1378,7 +1545,7 @@ func heard_words() -> String:
 ## standing instruction: she guards, following her player, without asking
 ## anyone.
 func _calm() -> void:
-	if in_fight() or not standing_instruction().is_empty():
+	if in_fight() or not standing_instruction().is_empty() or not order.is_empty():
 		return
 	if stance != Stance.GUARD:
 		_serial += 1
@@ -2037,6 +2204,8 @@ func doing() -> String:
 			action = "stepping out of %s's way" % keeper_name()
 		Intent.IDLE:
 			action = "waiting"
+		Intent.REST:
+			action = "resting, as %s asked" % keeper_name()
 		Intent.ERRAND:
 			action = "on your way to %s" % errand.get("words", "do what you were asked")
 		Intent.GUIDE:
@@ -3279,6 +3448,8 @@ func _choose(foe: GridEntity, low: bool) -> void:
 		current_intent = Intent.ERRAND
 	elif guide != null and guide.going():
 		current_intent = Intent.GUIDE  # Leading her player somewhere (decision 551).
+	elif order == "rest" and foe == null:
+		current_intent = Intent.REST  # Asked to rest (decision 616).
 	elif _holds_door(foe):
 		pass
 	elif hangs_back() and (stance == Stance.GUARD or stance == Stance.PRESS):
@@ -4036,7 +4207,7 @@ func _errand_there() -> bool:
 			return World.distance(tile, errand["chest"].tile) == 1
 		"fetch":
 			return World.reaches(self, errand["chest"])
-		"give":
+		"give", "take":
 			return World.reaches(self, keeper)
 		"bandage":
 			var patient: GridEntity = errand["patient"]
@@ -4058,7 +4229,7 @@ func _errand_walk() -> bool:
 			return false
 		"open_chest", "fetch":
 			return _alive(errand["chest"]) and _step_toward(errand["chest"].tile, true)
-		"give":
+		"give", "take":
 			return _alive(keeper) and _step_toward(keeper.tile, true)
 		"bandage":
 			return _alive(errand["patient"]) and _step_toward(errand["patient"].tile, true)
@@ -4119,6 +4290,19 @@ func _errand_do() -> void:
 			elif World.try_transfer(self, self, from, keeper, into):
 				_report_errand("You %s %s the %s%s." % ["brought" if errand.get("fetched", false) else "gave", keeper_name(),
 					Items.name_of(item), " from the chest" if errand.get("fetched", false) else ""])
+			else:
+				_end_errand("it could not be handed over", true)
+		"take":
+			# Her player's thing, to carry (decision 616), handed over by them.
+			var item: String = errand["item"]
+			var from := keeper.slots.find(item) if _alive(keeper) else -1
+			var into := World.free_slot_for(self, item)
+			if from == -1:
+				_end_errand("%s no longer had it" % keeper_name(), true)
+			elif into == -1:
+				_end_errand("you had no room to carry it", true)
+			elif World.try_transfer(keeper, keeper, from, self, into):
+				_report_errand("You took the %s from %s and carry it now." % [Items.name_of(item), keeper_name()])
 			else:
 				_end_errand("it could not be handed over", true)
 		"open", "close":

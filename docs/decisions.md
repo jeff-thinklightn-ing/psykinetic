@@ -22893,3 +22893,45 @@ alternated twice against the withdrawal (eb6cce15): rebuild hills 966/914
 ms before, 989/942 after (about +25 ms); the wilds 3869/3488 before,
 3578/3531 after (noise); frame medians 0.93 to 1.14 ms either way. Client
 only, protocol unchanged (maps' 585 opens 32), no new class_name.
+## 616. Plain orders, read with no model (the hands' reader)
+
+Jeff (the Dire play test; his "wow" moments were Nix bandaging when told and
+carrying gear): "reliable plain-language commands for the core verbs
+(bandage, carry, wait, rest, take the lead) come before combat polish". Until
+now a line reached her acts only through the model: her voice's reply
+carried a stance or [DO: n], so a slow or wrong model meant no act, or a
+reply saying "I'll wait" while she followed.
+
+Companion.order_in reads her player's own line (regular expressions, lower
+case, a negation ahead of the verb voiding it) for six orders: bandage (me,
+yourself, or unsaid: her player if hurt, else herself), carry (a thing her
+player holds, named; "carry this" unnamed and she asks which) and give it
+back, rest, follow, wait. Companion.obey does it on the same tick: wait and
+rest set HOLD and a standing order (Companion.order) that calm does not undo,
+past the instruction's 600 ticks, till "follow" or another order; follow sets
+STAY_CLOSE; bandage and carry start errands (carry is the new "take": she
+goes to her player, who hands it over). Her voice is still asked, told as
+narration what she is doing, but as for a quick phrase its stance and [DO]
+are not taken, so a reply never undoes the order. A voice quiet past
+ORDER_ACK_TICKS (4 s) is covered by a word of her own (ORDER_ACKS). Lines the
+reader does not take go to the model as before.
+
+Resting (Intent.REST): out of a fight she stays and mends an hp every
+REST_HEAL_TICKS (2 s), and gets up when whole, when a fight starts, or when
+her player goes past REST_LEAVE (8); asked in a fight she says she will rest
+after it. Take the lead stays 551's (Main._guide_said, read before her);
+Guide.ASK also reads "you lead", "take the lead", "lead us"; asked with no
+place, she leads to the nearest place she knows in her area
+(Main._nearest_known), with "to" and an unknown place, as before, she says
+she doesn't know the way.
+
+Tier gates (wary refusing risky orders, devoted leading anywhere) wait on
+Jeff's tier answer. tests: companion_test _test_plain_orders: ten phrasings
+of each verb read (60), five near-misses each that are no order (30), and each
+phrasing through the chat doing its act on the tick (wait holds past the
+instruction's time; follow calls her on; rest mends and gets up whole;
+bandage the one meant; carry takes the dagger, and gives it back); a voice
+that never answers covered by her word; a voice answering PRESS to "wait
+here" leaves her waiting. Lines in older tests that are now orders were
+reworded to keep testing the model's path. Server only, protocol unchanged,
+no new class_name.
