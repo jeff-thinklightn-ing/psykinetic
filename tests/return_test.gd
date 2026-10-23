@@ -227,6 +227,36 @@ func _test_main() -> void:
 	_check(_main.retain(_player(), {"resident": str(healer.get_path()), "pay": "gold"}) == "gold" and _main.in_care(me, id) and _main.care_via(me, id) == "gold"
 		and World.gold_of(me) == 0 and int(World.production.worker(keeper)["purse"]) == purse + 10, "10 gold: in his care, the gold his")
 	_check(_main.retain(_player(), {"resident": str(healer.get_path()), "pay": "gold"}) == "", "not twice")
+	# In his care, his hut first (decision 630): a nearer manned temple does not take them; his hut unmanned,
+	# the nearest manned place as before; a hut in care in another zone counts when none nearer is manned.
+	var open_was: Callable = World.production.workshop_open
+	World.production.workshop_open = Callable()  # The fixture's temple has no town and no building: open by default.
+	var tcell: Vector2i = _player().tile  # Walkable for sure: the ranking routes to a place's cell.
+	var temple := "%s/temple@%d,%d" % [World.zone.name, tcell.x, tcell.y]
+	World.holdings._places[temple] = {"id": temple, "area": World.zone.name, "key": "temple@%d,%d" % [tcell.x, tcell.y], "cell": tcell, "name": "the temple",
+		"kind": "temple", "radius": 2, "worth": 0, "start": Factions.NOBODY}
+	World.holdings._holder[temple] = Factions.NOBODY
+	World.production.add_workshop(temple, "priest", "")
+	World.production.add_worker("priest:" + temple, "Aldous", ["priest"], "", "settled")
+	World.production.assign(temple, "priest:" + temple)
+	_check(World.production.manned(temple), "(the temple is manned)")
+	_check(_main._return_place(_player().tile).get("place", "") == temple, "(a manned temple nearer than the hut: others come back there: %s)" % [_main._return_place(_player().tile)])
+	_check(_main._return_place(_player().tile, me).get("place", "") == id, "in his care: his hut first, over the nearer temple")
+	World.production.set_away(keeper, true)
+	_check(_main._return_place(_player().tile, me).get("place", "") == temple, "his hut unmanned: the nearest manned place, the temple, as before")
+	var far_hut := "elsewhere/healers_hut@2,2"
+	World.holdings._places[far_hut] = {"id": far_hut, "area": "elsewhere", "key": "healers_hut@2,2", "cell": Vector2i(2, 2), "name": "a far_hut hut",
+		"kind": "healers_hut", "radius": 2, "worth": 0, "start": Factions.NOBODY}
+	World.holdings._holder[far_hut] = Factions.NOBODY
+	World.production.add_workshop(far_hut, "medicine_man", "")
+	World.production.add_worker("medicine_man:" + far_hut, "Far Hob", ["medicine_man"], "", "settled")
+	World.production.assign(far_hut, "medicine_man:" + far_hut)
+	_main._records[me].care[far_hut] = "gold"
+	_check(_main._return_place(_player().tile, me).get("place", "") == far_hut, "a manned hut in his care in another zone: it, over the temple here (the return travels)")
+	_main._records[me].care.erase(far_hut)
+	World.production.set_away(keeper, false)
+	_check(_main._return_place(_player().tile, me).get("place", "") == id, "(his hut manned again: his hut)")
+	World.production.workshop_open = open_was
 	# Five herbs, two then three (584 amended (2): the pack holds four): counted on the record's tally, a save
 	# between, in his care at five, the herbs in his hut's store.
 	_main._records[me].care.clear()

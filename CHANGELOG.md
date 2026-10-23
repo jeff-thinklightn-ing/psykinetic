@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- In the medicine man's care you now come back at his hut when he is there, even with a temple nearer; only when he is away does the nearest place take you, as before (decision 630).
 - A companion asleep on the night watch lies on her side by the fire, facing it, breathing slowly, and stands up when she wakes.
 - Pieces for the Dwarven Halls under the castle: the great dwarven forge with its hearth, chimney, bellows and anvils, a rack of goblin blades, the smith's fallen guards with their broken shields, and a plain dwarven pillar (613).
 - Bleeding out no longer ends in a scream: a player or companion who dies while lying Mortally Wounded breathes a last breath instead; a sudden death still cries out (628).

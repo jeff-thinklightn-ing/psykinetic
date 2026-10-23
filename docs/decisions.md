@@ -26485,3 +26485,29 @@ view_test _test_asleep: asleep, Sleep_Side as her work, her front to a fire a ce
 diagonally, a 4 s loop; no fire, her own facing; awake, standing again. Client only (the clip in
 goblin.res), protocol unchanged, no new class_name. A still of her by the fire follows release's
 bench slot.
+## 630. In care, the carer's hut brings you back first
+
+Jeff, playing v0.1.169 (2026-10-23): "Hob's quest was glitchy, I didn't
+respawn at him even though I'm in his care. Aldous charged me 8 gold to
+revive." Main._return_place took the nearest manned place of any kind and
+only skipped a hut whose care the player lacked, so a nearer manned temple
+beat Hob's hut, and Hob away or asleep fell through to the temple. The
+coordinator's ruling, agreed with economy: in care, the carer's hut first
+when manned, wherever it stands; else the nearest as now. The 8 gold is
+546's offering, by design, unchanged (waived for the blessed; any care
+discount later is economy's).
+
+- Main._return_place with a player: when their record names huts in care,
+  the nearest manned one by the same ranking as before (routed, across
+  zones when routes are known) brings them back; failing that, the first
+  manned hut in their care wherever it stands (the return already travels,
+  Main._on_returned); only then the nearest manned place of any kind, huts
+  not in care still skipped. A hut in care gets no more than that ranking
+  gives any place (no holder test there today), as economy asked.
+- The instalment tally (584 amended (2)) writes record.care on both paths
+  (a gift's fifth herb through Main.grant_care, the window's through
+  retain's met branch), checked and left as is.
+
+return_test: in his care, his hut over a nearer manned temple; his hut
+unmanned, the temple as before; a manned hut in his care in another zone
+over the temple here. Server only, no wire, no new class_name.

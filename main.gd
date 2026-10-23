@@ -11370,8 +11370,24 @@ func _return_place(cell: Vector2i, player_id := "") -> Dictionary:
 	var kinds: Array[String] = []
 	kinds.assign(World.production.rules.get("return", {}).get("places", {}).keys())
 	var routes: WorldRoutes = World.raid_groups.routes if World.raid_groups != null else null
+	var ranked := World.holdings.ranked(kinds, World.zone.name, cell, routes)
+	# In care, the carer's hut first (decision 630; Jeff came back at the temple in Hob's care): the nearest
+	# manned hut in their care by the same ranking (routed across zones when routes are known), else the first
+	# manned one in their care wherever it stands (the return travels: _on_returned); only then the rest.
+	var record: PlayerRecord = _records.get(player_id) if not player_id.is_empty() else null
+	if record != null and not record.care.is_empty():
+		for id: String in ranked:
+			if record.care.has(id):
+				var shop := _return_workshop(id)
+				if not shop.is_empty() and World.production.manned(shop):
+					return {"place": id, "workshop": shop}
+		for id: String in record.care:
+			if not World.holdings.place(id).is_empty():
+				var shop := _return_workshop(id)
+				if not shop.is_empty() and World.production.manned(shop):
+					return {"place": id, "workshop": shop}
 	# The nearest that is manned, of any kind, routed once (decision 503).
-	for id: String in World.holdings.ranked(kinds, World.zone.name, cell, routes):
+	for id: String in ranked:
 		var shop := _return_workshop(id)
 		if not player_id.is_empty() and World.holdings.place(id).get("kind") == "healers_hut" and not in_care(player_id, id):
 			continue  # A healer's hut brings back only a player in its care (584 amended).
