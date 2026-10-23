@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The world now keeps felled forest and grows it back over the seasons, stump to grass to scrub to saplings to tree, ready for the woodcutters to clear the land (591).
 - The level builder says where a way is only one cell wide, so you and a companion can walk everything it builds side by side.
 - The old farmstead in the wilds hides a stash: search the chest in its north hut for the tools and bandages left behind, once each. The hut chests' loose bandaging kits are gone into it.
 - The Old Tower, Snagfin's ruined castle for Held, is ready for the map: a broken tower, fallen walls round a yard, rubble, and the one roofed room where he keeps his counter.

@@ -638,6 +638,8 @@ var herds: Herds = null
 ## laid by the world tick's first slice; made by Main at boot. Null on a
 ## client.
 var forage: Forage = null
+## The forest felled and growing back (decision 591; Main makes it).
+var clearing: Clearing = null
 ## Raid groups on the world map (decision 328), server only; null on a client.
 var raid_groups: WorldRaids = null
 ## Trade routes and their caravans (decision 504), server only; null on a
@@ -907,6 +909,9 @@ func world_tick(slice := -1) -> void:
 	if forage != null and slice <= 0:
 		forage.tick()
 		t = part("forage", t)
+	if clearing != null and slice <= 0:
+		clearing.tick()
+		t = part("clearing", t)
 	if slice <= 0:
 		_regrow()  # Trampled tall grass stands again (decision 508).
 	var was := zone
@@ -1613,6 +1618,19 @@ static func record_tile(record: Dictionary) -> Vector2i:
 static func _record_chunk(record: Dictionary) -> Vector2i:
 	var tile := record_tile(record)
 	return Vector2i(floori(float(tile.x) / RECORD_CHUNK), floori(float(tile.y) / RECORD_CHUNK))
+
+
+## A cell of the zone World is in felled to floor or grown back to a trunk
+## (Clearing, decision 591): [param on] floor or not, the walk's caches
+## dropped and the fields round it marked to be worked out again.
+func set_floor(cell: Vector2i, on: bool) -> void:
+	if on:
+		_floor[cell] = true
+	else:
+		_floor.erase(cell)
+	_grid_rect = Rect2i()
+	_grid_steps = PackedByteArray()
+	fields_changed([cell])
 
 
 ## [param terrain] is what Terrain.parse returns.

@@ -313,11 +313,14 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## read alike on both sides.
 ## 32 (589): terrain["link_cues"] [{tile, cue, facing, variant}] the views
 ## place a piece by, and each level link's "cue" (the big map's mark).
+## 32 (591): message "clearing" {zone, whole?, cells: [[x, y, stage]]} (a
+## felled cell's stage, "trunk" grown back), sent before "map" whole, and
+## terrain["clearing"] (cell -> stage) the views draw.
 const PROTOCOL_REVISION := 32
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]
 ## Every kind of message (message, message_to, broadcast, broadcast_to).
-const MESSAGE_KINDS: Array[String] = ["barter", "builder", "chat", "counter", "death", "grass", "map", "offers", "party", "return", "roofs", "shop", "sky", "speech", "telegraph", "terrain", "town", "world"]
+const MESSAGE_KINDS: Array[String] = ["barter", "builder", "chat", "clearing", "counter", "death", "grass", "map", "offers", "party", "return", "roofs", "shop", "sky", "speech", "telegraph", "terrain", "town", "world"]
 ## Properties entity subclasses add with replicate().
 const SUBCLASS_REPLICATED: Array[String] = ["activity", "addressing", "ailing", "ailments", "alert", "body", "bond_step", "bond_why", "buffs", "channel_of", "channel_until", "charge_room", "charges", "down_until", "downed_until", "emit_light", "hands", "heart", "keeper_peer", "led_by", "led_to", "mending", "move_ticks", "pose", "raised", "raised_tick", "slot_notes", "slots"]
 const SETTINGS_FILE := "settings.cfg"

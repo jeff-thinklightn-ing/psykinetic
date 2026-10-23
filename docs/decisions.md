@@ -23801,3 +23801,50 @@ says when a change makes one and the proposal carries what is left. The
 prompt says it: every way, corridor and gap at least two cells wide. A
 niche one cell deep is named too: the check is by cell, not by route.
 builder_test _test_narrow_ways.
+## 591, maps' side: the forest felled and growing back
+
+Jeff: "i eventually want held to be in its own map that leaves room to
+grow, forests to chop down, town and city growing and becoming something is
+one of the major gameplay components", and "the server has to stay
+persistent once you set a worker to harvest they keep working, but forests
+can regenerate too if not built over". The Held growth loop (591, one
+number: economy's Towns.stage and the woodcut's fell calls, buildings'
+stages, classes and market kind as their sides); this is the clearing.
+- Clearing (sim/clearing.gd; World.clearing, made by Main at boot from the
+  snapshot's "clearing", moved on by the world tick's first slice whether
+  or not anyone is in a zone). A tree is a trunk: a level's void cell inside
+  its land, more than EDGE (4) cells in from the map's edge.
+  - fell(zone, site, toward, wanted) -> trunks felled: the standing edge
+    trunks (floor beside them, the level's or felled) within REACH (6) of
+    the woodlot's site, nearest the town's store first; each a stump. None
+    within reach: 0. economy's Towns.fell(town, site_id, wanted) wraps it
+    from Main once both are on main.
+  - step_site(zone, site) -> the floor cell beside the standing edge trunk
+    nearest a bare site (within STEP_REACH 40): where the woodlot steps out
+    to, keeping its id (economy moves the place).
+  - Regrowth (drafts): stump, grass, scrub, saplings, each a season
+    (Season.season_days, 14 days), twice that with no standing trunk
+    beside it (a clearing closes from its edges); past saplings the level's
+    own trunk again, leaving no trace (the coordinator), unless something
+    stands or lies on it (it waits) or it is built over (a building's or a
+    road's cell: never).
+- Kept in the world snapshot, never the level overlay (the coordinator's
+  refinement: builder's overlay reloads a zone a change, and is builder's to
+  export): zone -> "x,y" -> [stage, day].
+- Applied: Main._load_level lays a zone's felled cells on its terrain
+  before World loads it (Clearing.apply: floor of the stage's kind, a stump
+  dirt, the rest grass; terrain["clearing"] cell -> stage). A change in a
+  loaded zone: World.set_floor for each cell (the walk at once), and the
+  message "clearing" {zone, cells: [[x, y, stage]]} ("trunk" grown back) to
+  everyone in it; a joining client gets {zone, whole: true, cells} before
+  "map", and lays it as it loads the level (Clearing.apply_cells). The
+  views redraw through Client3D.clearing_changed(terrain, cells) once
+  terrain has it (its side: a stump, scrub, saplings, the edge retraced
+  locally), else the whole zone.
+tests: level_test, a woodcut fells the grove's edge nearest the town, the
+far site fells nothing and steps beside the nearest trunk, applied as
+floor, regrown a season a stage from the edge, a built-over cell never,
+read back from the snapshot.
+PROTOCOL_REVISION 32 (a line under it): message "clearing", terrain
+["clearing"]. New class_name Clearing. The forest on the box is felled and
+grows back over time once economy's woodcut calls it.

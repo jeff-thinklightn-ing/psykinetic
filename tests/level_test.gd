@@ -192,6 +192,7 @@ func _test_every_level() -> void:
 	_test_built_water()
 	_test_ledges()
 	_test_link_cues()
+	_test_clearing()
 	print("
 == the levels connect: WorldMap.problems() (links and spawn points, ways back, reachable) ==")
 	var problems := WorldMap.build().problems()
@@ -350,6 +351,58 @@ func _test_link_cues() -> void:
 	_check(wilds["links"].all(func(link: Dictionary) -> bool: return str(link.get("cue", "")) in Level.CUES),
 			"each link carries its cue for the big map")
 	_check(Level.CUE_SLOTS.values().all(func(slot: String) -> bool: return ArtKit.has(slot)), "each cue's piece is in the kit (%s)" % [Level.CUE_SLOTS])
+
+
+## Decision 591: a woodcut fells the grove's edge nearest the town, the
+## cells regrow a stage a season from the edge in, back to the level's trunk;
+## built over, never; kept in the snapshot.
+func _test_clearing() -> void:
+	print("
+== clearing: felled at the edge nearest the town, regrown a season a stage, back to the trunk ==")
+	# 24 x 14 of grass, a grove of trunks (void) at x 9..15, y 4..9.
+	var size := Vector2i(24, 14)
+	var colour := func(meaning: String) -> Color: return Color(str(Level.LEGEND[meaning]))
+	var image := Image.create_empty(size.x * 2 + 1, size.y * 2 + 1, false, Image.FORMAT_RGBA8)
+	image.fill(colour.call("grass"))
+	for y in range(4, 10):
+		for x in range(9, 16):
+			image.set_pixel(x * 2, y * 2, colour.call("void"))
+	image.set_pixel(2, 2, colour.call("start"))
+	Level.register("clearing_grove", image, null, {"name": "Grove", "outdoor": true})
+	var day := [0]
+	var clearing := Clearing.new()
+	clearing.clock = func() -> int: return day[0]
+	var told: Array = []
+	clearing.changed.connect(func(zone: String, cells: Array) -> void: told.append_array(cells))
+	_check(clearing.fell("clearing_grove", Vector2i(8, 6), Vector2i(1, 6), 3) == 3, "a woodcut fells three trunks")
+	var cells: Array = clearing.felled["clearing_grove"].keys()
+	_check(cells.all(func(cell: Vector2i) -> bool: return cell.x == 9) and told.size() == 3 and told.all(func(each: Array) -> bool: return each[2] == "stump"),
+			"the grove's west edge, nearest the town, each a stump, told (%s)" % [cells])
+	var terrain: Dictionary = Level.load_level("clearing_grove")["terrain"]
+	clearing.apply("clearing_grove", terrain)
+	_check(cells.all(func(cell: Vector2i) -> bool: return cell in terrain["floor"] and terrain["kinds"][cell] == "dirt" and terrain["clearing"][cell] == "stump"),
+			"applied: floor, bare dirt, terrain[\"clearing\"] their stage")
+	_check(clearing.fell("clearing_grove", Vector2i(2, 12), Vector2i(1, 12), 2) == 0, "no trunk within reach of a far site: nothing felled")
+	var stepped := clearing.step_site("clearing_grove", Vector2i(2, 12))
+	_check(stepped != World.NO_CELL and not stepped in terrain.get("water", []) and Vector2(stepped - Vector2i(9, 9)).length() <= 2.0,
+			"the lot steps out beside the nearest standing trunk (%s)" % stepped)
+	# Built over: a felled cell under something built never grows back.
+	var built: Vector2i = cells[0]
+	clearing._base_of("clearing_grove")["built"][built] = true
+	told.clear()
+	var stage_days := Season.season_days
+	day[0] = stage_days
+	clearing.daily(day[0])
+	_check(told.size() == 2 and told.all(func(each: Array) -> bool: return each[2] == "grass"), "a season on: the two beside standing trunks are grass (%s)" % [told])
+	for season in range(2, 12):
+		day[0] = stage_days * season
+		clearing.daily(day[0])
+	var left: Dictionary = clearing.felled["clearing_grove"]
+	_check(left.size() == 1 and left.has(built) and told.filter(func(each: Array) -> bool: return each[2] == Clearing.TRUNK).size() == 2,
+			"grown back: trunks again, the level's own; the built-over one stays felled (%s)" % [left])
+	var again := Clearing.new(clearing.to_dict())
+	_check(again.felled == clearing.felled, "kept in the snapshot and read back the same (%s)" % [clearing.to_dict()])
+	Level.unregister("clearing_grove")
 
 
 func _test_round_trip() -> void:

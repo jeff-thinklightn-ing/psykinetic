@@ -2416,6 +2416,11 @@ func _load_level(level_name: String) -> bool:
 	map_name = str(loaded["name"])
 	Companion.know_level(map_name, loaded)
 	_terrain = loaded["terrain"]
+	# Its felled cells (591): the server's own, a client's as told.
+	if Net.is_authority() and World.clearing != null:
+		World.clearing.apply(map_name, _terrain)
+	elif _clearing_told.has(map_name):
+		Clearing.apply_cells(_terrain, _clearing_cells(map_name))
 	level_entities.assign(loaded["entities"])
 	_index_keys()
 	player_starts.assign(loaded["starts"])
@@ -2424,6 +2429,69 @@ func _load_level(level_name: String) -> bool:
 	print("[level] %s: %d cells, %d entities, %d starts, %d links" % [map_name, _terrain["floor"].size(),
 		level_entities.size(), player_starts.size(), loaded["links"].size()])
 	return true
+
+
+## A client's felled cells by zone (591): zone -> cell -> stage, as told.
+var _clearing_told: Dictionary = {}
+
+
+## A zone's told cells as a "clearing" list ([[x, y, stage]]).
+func _clearing_cells(zone: String) -> Array:
+	var out := []
+	var cells: Dictionary = _clearing_told.get(zone, {})
+	for cell: Vector2i in cells:
+		out.append([cell.x, cell.y, cells[cell]])
+	return out
+
+
+## Server: zone [param zone]'s cells felled or grown on (Clearing.changed):
+## a loaded zone's walk follows at once, and everyone in it is told.
+func _on_clearing_changed(zone: String, cells: Array) -> void:
+	if not Net.is_authority():
+		return
+	if World.zones.has(zone):
+		var was := World.enter_named(zone)
+		for each: Array in cells:
+			World.set_floor(Vector2i(int(each[0]), int(each[1])), str(each[2]) != Clearing.TRUNK)
+		World.enter(was)
+		if zone == map_name:
+			Clearing.apply_cells(_terrain, cells)
+			if _client3d != null:
+				_redraw_clearing(cells)
+	for peer in World.peers_in(zone):
+		if peer != Net.local_id:
+			Net.message_to(peer, "clearing", {"zone": zone, "cells": cells})
+
+
+## Client: a "clearing" message (591): kept by zone ("whole" replaces the
+## zone's), laid on the terrain drawn if it is that zone's, and drawn.
+func _on_clearing(data: Dictionary) -> void:
+	var zone := str(data.get("zone", ""))
+	var cells: Variant = data.get("cells", [])
+	if zone.is_empty() or not cells is Array:
+		return
+	if data.get("whole", false) or not _clearing_told.has(zone):
+		_clearing_told[zone] = {}
+	for each: Variant in cells:
+		if each is Array and (each as Array).size() == 3:
+			var cell := Vector2i(int(each[0]), int(each[1]))
+			if str(each[2]) == Clearing.TRUNK:
+				(_clearing_told[zone] as Dictionary).erase(cell)
+			else:
+				_clearing_told[zone][cell] = str(each[2])
+	if zone == map_name and not data.get("whole", false) and not Net.is_authority():
+		Clearing.apply_cells(_terrain, cells)
+		if _client3d != null:
+			_redraw_clearing(cells)
+
+
+## The view drawn again where [param cells] changed: terrain's own redraw of
+## them if it has one (585's way: a few chunks), else the whole zone.
+func _redraw_clearing(cells: Array) -> void:
+	if _client3d.has_method("clearing_changed"):
+		_client3d.call("clearing_changed", _terrain, cells)
+	else:
+		_view_zone = ""
 
 
 ## Server: zone [param zone_name] read again from its level (edited in the
@@ -2741,6 +2809,9 @@ func _boot() -> void:
 	World.production = Production.new(snapshot.get("production", {}), World.stockpile, World.holdings, World.steps_now)
 	# How each town grows: its experience, residents and buildings.
 	World.towns = Towns.new(snapshot.get("towns", {}), World.production)
+	# The forest felled and growing back, as the snapshot left it (591).
+	World.clearing = Clearing.new(snapshot.get("clearing", {}))
+	World.clearing.changed.connect(_on_clearing_changed)
 	World.towns.building_changed.connect(_on_town_building_changed)
 	World.towns.stage_changed.connect(func(town: String) -> void: _on_town_building_changed(town, ""))  # Its stage told (591).
 	# The roofs storms broke and nobody has mended yet (decision 383).
@@ -3101,6 +3172,9 @@ func _show_zone_to(peer: int, zone_name: String, leaving: Array[GridEntity] = []
 	if Level.overlaid(zone_name):
 		# Edited in the game: the client's own copy (its pck's) is not it.
 		Net.message_to(peer, "terrain", BuilderHost.terrain_message(zone_name))
+	if World.clearing != null:
+		# Before the map: the client lays its felled cells as it loads it (591).
+		Net.message_to(peer, "clearing", {"zone": zone_name, "whole": true, "cells": World.clearing.cells_of(zone_name)})
 	Net.message_to(peer, "map", map_message(zone_name))
 	Net.message_to(peer, "sky", sky_message())
 	_send_towns(peer, zone_name)
@@ -4113,6 +4187,7 @@ func _save_state(wait := true) -> void:
 		"stockpile": World.stockpile.to_dict() if World.stockpile != null else {},
 		"production": World.production.to_dict() if World.production != null else {},
 		"towns": World.towns.to_dict() if World.towns != null else {},
+		"clearing": World.clearing.to_dict() if World.clearing != null else {},
 		"roofs": World.roofs_damaged.keys(),
 		"trampled": World.trampled_to_dict(),
 		"raid_groups": World.raid_groups.to_dict() if World.raid_groups != null else {},
@@ -8433,6 +8508,9 @@ func _on_message(kind: String, data: Dictionary) -> void:
 		return
 	if kind == "telegraph":
 		_on_telegraph(data)
+		return
+	if kind == "clearing":
+		_on_clearing(data)
 		return
 	if kind == "town":
 		var town := str(data.get("town", ""))
