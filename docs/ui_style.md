@@ -92,7 +92,7 @@ Base unit 8. Panel padding 24; between rows 12; between sections 24; a slot 132 
 | bottom right | the pack, with the open chest or companion above it; the gold over its corner; a shop to its left |
 | bottom left | the talk box: what was said, fading unless pinned (Tab), the chat box inside it |
 | top middle | builder mode's status and box |
-| middle | the options (O), the big map (M), her card page (C), the game menu (Esc; the game never pauses), the connect screen and the main menu |
+| middle | the options (O), the big map (M), her card page (C), the town sheet (N), the game menu (Esc; the game never pauses), the connect screen and the main menu |
 
 Controls: a button is a flat `edge`-bordered box in `backing_deep` that goes `brass` at the
 border when hovered or focused; a slider's track is `edge`, its grabber `brass`; a text

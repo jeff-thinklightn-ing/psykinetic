@@ -87,6 +87,11 @@ const GUIDE_MARK := 5.0
 ## A click on the ask box or Enter: ask her to lead the player to [param to]
 ## (Main sends the "guide" command, 551).
 signal guide_asked(to: String)
+## A click on a town's row (624, ui's side): Main opens its sheet.
+signal town_clicked(id: String)
+## The towns the client has been told (Main.town_states' keys): their rows
+## open the town sheet on a click.
+var towns: Dictionary = {}
 
 
 func _init() -> void:
@@ -429,6 +434,8 @@ func _clicked(at: Vector2) -> void:
 	var row := row_at(at)
 	_ask = row if knows_way(row) else ""
 	queue_redraw()
+	if towns.has(row):
+		town_clicked.emit(row)  # 624, ui's side: the town's sheet (the ask box stays under it).
 
 
 ## The ask box's yes: guide_asked with the place, the box gone (Main sends

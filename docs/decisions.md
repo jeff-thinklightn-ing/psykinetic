@@ -26210,3 +26210,53 @@ the drop; a shapeless message's quads), and combat's _test_telegraph_fill_honest
 e3cff507): the draugr's spin, 8-cell throw and 12-cell charge at 16 aims each, whole and
 with every cell at x >= 22 clipped out as a wall would leave it, every sent cell's centre
 under the fill and no other (1,052 pieces). Client only, protocol unchanged.
+## 624. The town status sheet
+
+Jeff (2026-10-22): "a town status sheet... the population, the faction,
+the needs, hunger etc."; the coordinator's assignment 2026-10-23, the
+sheet's shape and economy's half settled earlier (economy-13), approved as
+written: words not bars, numbers only where the sim already tells the
+player them, nothing stubbed.
+- **Where.** N (Keys "town", rebindable, in the Options' key rows and the
+  controls list) opens it in the middle of the screen for the town whose
+  ground the player stands on (Main.town_here: the first town told for the
+  zone); a click on a town's row in the known world (WorldMapPanel
+  town_clicked; the ask box stays under it) opens it for that town; Esc or
+  N closes it. render/town_sheet.gd, class_name TownSheet; Main feeds it
+  (_refresh_town) on open, on every "town" and "town_sheet" message and on
+  the world message.
+- **Today's facts, by key name (ui's side).** The heading "Held, a village"
+  from the "town" message's "stage" (591; "Held" before it); "Held by the
+  Blood Rot." from world_state "holdings" in the known world's own faction
+  words; the buildings from the "town" message: "Standing: the forge, the
+  kitchen. Building: the temple, half built. Damaged: the walls. Planned:
+  the well." (a job's "progress" as begun / half built / nearly done); the
+  people from the Resident bodies the client sees while on the town's
+  ground, counted by their replicated trade ("12 people: 4 farmers, 2
+  hunters, a priest."; "No one is about."), and "You haven't seen who lives
+  here." from elsewhere (a resident's town is not replicated, so the zone's
+  bodies stand for the town's; a zone with two towns counts both until
+  economy's message names its own); the dole line as the town said it
+  (Main.town_notes, 353); "Summer, day 14." as the HUD knows them. An
+  untold town: "No town".
+- **Economy's rows (624, economy's side), each only when its key is there**
+  (TownSheet.economy_lines; the "town_sheet" message, or rows on the "town"
+  message, economy's choice, with its wire line): a "why" alone ("You don't
+  know that town"); "Held is uneasy." from "name" and the "mood" stand-in
+  (safe, uneasy, on guard; no player-town standing exists yet); "Treasury:
+  150 gold."; "Officials: Hob the priest, Tam the guard (unpaid)."; "3 fed
+  by the town, 2 hungry, 1 sick."; "Needs: wood, badly (bring 20); herbs, a
+  little (bring 4)." (short as a word past a third and two thirds, bring in
+  the resource's units); "Held seeks a smith and a healer." ("sought"
+  [{trade}]); "To be a village: 3 more people, a priest and 40 more gold."
+  ("next_stage" {stage, needs: [{what, have, need}]}). As the sheet opens
+  the client asks for them, economy's "town_sheet" command {town} (its
+  0c25ea12, wire line 35; Main._ask_town_sheet), once per TOWN_SHEET_ASK_MSEC
+  (5 s) a town; the host answers itself (a message to its own peer goes
+  nowhere); its answer refreshes the sheet. A town the sim has no record
+  of shows the why line. The sheet's node is Main.town_panel: economy's
+  Main.town_sheet() took the plain name.
+- Client only, protocol unchanged on ui's side, new class_name TownSheet.
+ui_test _test_town_sheet (the words; N on a told town, the people from the
+bodies here, the ask and its throttle, Esc; an untold town; the map's row
+from elsewhere; economy's message filling rows at once).

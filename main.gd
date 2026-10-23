@@ -577,6 +577,16 @@ var standing_title := ""
 var world_map_panel: WorldMapPanel
 ## Her card page (618, ui's side): C; what she has learned and how she fights, from world_state.
 var card_page: CardPage
+## The town status sheet (624, ui's side), and economy's "town_sheet"
+## messages by town id (624, economy's side; {} for a town till one comes).
+var town_panel: TownSheet
+var town_sheets: Dictionary = {}
+## When (msec) each town's rows were last asked for (_ask_town_sheet).
+var _town_sheet_asked: Dictionary = {}
+## A town's rows are asked for again no sooner than this after the last ask (ms).
+const TOWN_SHEET_ASK_MSEC := 5000
+## Each town's stage as its "town" message last said (591; "" before).
+var town_stages: Dictionary = {}
 ## The counter screen beside the pack (CounterPanel; economy's job, 438).
 var counter_panel: CounterPanel
 ## The player's pack, and an open chest or companion's pack (I; a right
@@ -1137,6 +1147,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if Keys.pressed(event, "card"):
 		toggle_card()  # 618, ui's side: her card page.
+		return
+	if Keys.pressed(event, "town"):
+		toggle_town()  # 624, ui's side: the town sheet.
 		return
 	if Keys.pressed(event, "reset"):
 		# A command like any other, so it works from a client too; the
@@ -8567,6 +8580,11 @@ func _build_talk() -> void:
 	$HUD.add_child(card_page)
 	if has_signal("world_changed"):
 		connect("world_changed", _refresh_card)  # 618: her page follows the world message while open.
+	town_panel = TownSheet.new()
+	$HUD.add_child(town_panel)
+	world_map_panel.town_clicked.connect(open_town)  # 624: a town's row on the map opens its sheet.
+	if has_signal("world_changed"):
+		connect("world_changed", _refresh_town)  # 624: the sheet follows the world message while open.
 	_context_hint = Label.new()
 	_context_hint.name = "ContextHint"
 	_context_hint.theme_type_variation = &"Outlined"
@@ -9170,6 +9188,16 @@ func _on_message(kind: String, data: Dictionary) -> void:
 			World.open_roofs(town.get_slice("/", 0))
 			if _client3d != null:
 				_client3d.set_town(town, buildings)
+		if not town.is_empty() and data.has("stage"):
+			town_stages[town] = str(data["stage"])  # 591; the sheet's heading (624).
+		_refresh_town()
+		return
+	if kind == "town_sheet":
+		# Economy's rows for the sheet (624, economy's side), kept by town.
+		var for_town := str(data.get("town", ""))
+		if not for_town.is_empty():
+			town_sheets[for_town] = data
+			_refresh_town()
 		return
 	if kind == "grass":
 		if not Net.is_authority() and not str(data.get("level", "")).is_empty():
@@ -9318,7 +9346,7 @@ func give_gold(player: Player, args: Dictionary) -> int:
 
 ## Server: the "town_sheet" command (decision 624, economy's side; ui's
 ## town status sheet) {town}: [param player] is answered "town_sheet"
-## (town_sheet) for a town in their zone or among their known places, else
+## (town_panel) for a town in their zone or among their known places, else
 ## {town, why}. The answer sent.
 func ask_town_sheet(player: Player, args: Dictionary) -> Dictionary:
 	var town := str(args.get("town", ""))
@@ -11631,6 +11659,7 @@ func hint_lines() -> Array[String]:
 	lines.append_array(["%s+LMB\tyour weapon's own move (a shield bashes)" % Keys.name_of("signature"), "RMB, shield\tblock toward the cursor while held","RMB, bow\tdraw; let go to shoot at the cursor",
 		"%s\topen a chest, crate, cart, door; your companion's pack" % Keys.name_of("open"), "%s\tyour pack" % Keys.name_of("pack"),
 		"%s\tyour companion's card" % Keys.name_of("card"),
+		"%s\tthe town sheet" % Keys.name_of("town"),
 		"%s\tpick up" % Keys.name_of("pick_up"), "%s\tput down (hand, else pack)" % Keys.name_of("drop"), "%s\tthrow at the cursor" % Keys.name_of("throw"),
 		"%s\ta bandage on the cursor: click yourself or an ally beside you (a kit, out of combat)" % Keys.name_of("bandage"),
 		"%s hold\tbandage an ally beside you, else yourself" % Keys.name_of("open"),
@@ -11673,6 +11702,7 @@ func _refresh_world_map() -> void:
 	world_map_panel.own_cell = player.tile if player != null else Vector2i(-1, -1)
 	world_map_panel.led = {"by": player.led_by if player != null else "", "to": led_to_of(player)}  # 551, ui's side.
 	world_map_panel.notes = town_notes
+	world_map_panel.towns = town_states  # 624: a town's row opens its sheet.
 	var here: Array[Dictionary] = []
 	for entity in World.get_entities():
 		if entity is Player and entity != player and entity.spawned:
@@ -11789,6 +11819,8 @@ func escape() -> void:
 		close_other()
 	elif card_page != null and card_page.visible:
 		card_page.visible = false  # 618: her card page.
+	elif town_panel != null and town_panel.visible:
+		town_panel.visible = false  # 624: the town sheet.
 	elif world_map_panel != null and world_map_panel.visible:
 		world_map_panel.close()
 	elif game_menu != null and game_menu.visible:
@@ -11806,6 +11838,88 @@ func escape() -> void:
 			game_menu.quit_pressed.connect(_quit_game)
 			$HUD.add_child(game_menu)
 		game_menu.open(true, str(level.get("display_name", level.get("name", ""))))
+
+
+## N: the town sheet (624, ui's side) shown or hidden, for the town whose
+## ground the player stands on (town_here).
+func toggle_town() -> void:
+	if town_panel == null:
+		return
+	if town_panel.visible:
+		town_panel.visible = false
+		return
+	open_town(town_here())
+
+
+## The sheet for town [param id] (one told in a "town" message; the known
+## world's row click, 624): "" or an untold town shows "No town".
+func open_town(id: String) -> void:
+	if town_panel == null:
+		return
+	town_panel.town = id
+	town_panel.visible = true
+	_ask_town_sheet(id)
+	_refresh_town()
+
+
+## Economy's rows for town [param id] asked of the server as the sheet
+## opens: the "town_sheet" command {town} (624, economy's side), answered
+## by its "town_sheet" message (town_sheets, the sheet refreshed); once per
+## TOWN_SHEET_ASK_MSEC a town. The host answers itself (a message to its
+## own peer goes nowhere).
+func _ask_town_sheet(id: String) -> void:
+	var player := _local_player()
+	if id.is_empty() or player == null:
+		return
+	var now := Time.get_ticks_msec()
+	if now - int(_town_sheet_asked.get(id, -TOWN_SHEET_ASK_MSEC)) < TOWN_SHEET_ASK_MSEC:
+		return
+	_town_sheet_asked[id] = now
+	if Net.is_authority():
+		town_sheets[id] = ask_town_sheet(player, {"town": id})
+	else:
+		World.command(player, "town_sheet", {"town": id})
+
+
+## The first town told for the zone the player is in, "" for none.
+func town_here() -> String:
+	var zone := zone_name_here()
+	for id: String in town_states:
+		if id.begins_with(zone + "/"):
+			return id
+	return ""
+
+
+## The sheet's facts gathered from what the client has (624, ui's side):
+## the "town" message's stage and buildings, world_state "holdings" in the
+## known world's words, the Resident bodies seen while on the town's ground
+## (their trades; null from elsewhere), the dole line (353), the season and
+## day, and economy's "town_sheet" message when it has come.
+func _refresh_town() -> void:
+	if town_panel == null or not town_panel.visible:
+		return
+	var id := town_panel.town
+	if id.is_empty() or not town_states.has(id):
+		town_panel.show_town("", "", "", "", {}, null, "", "", 0)
+		return
+	var zone := id.get_slice("/", 0)
+	var trades: Variant = null
+	if zone == zone_name_here():
+		var seen: Array = []
+		for entity in World.entities():
+			if entity is Resident and entity.spawned:
+				seen.append(str((entity as Resident).trade))
+		trades = seen
+	var holder := ""
+	var holdings: Variant = world_state.get("holdings", {})
+	var held: Variant = holdings.get(id) if holdings is Dictionary else null
+	if held is Array and not (held as Array).is_empty() and world_map_panel != null:
+		holder = str(world_map_panel.faction_look(str(held[0]))["name"])
+	var town_name := world_map_panel.place_words(id) if world_map_panel != null else id
+	if town_name == id or town_name == id.get_slice("/", 1) or town_name.is_empty():
+		town_name = id.get_slice("/", 1).replace("_", " ").capitalize()  # No place of that key known: its key as a name.
+	town_panel.show_town(id, town_name, str(town_stages.get(id, "")), holder, town_states[id], trades,
+		str(town_notes.get(zone, "")), Season.name_at(World.steps), Townsfolk.day_of(World.steps), town_sheets.get(id, {}))
 
 
 ## C: her card page shown or hidden (618, ui's side), fed world_state's

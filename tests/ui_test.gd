@@ -36,6 +36,7 @@ func _ready() -> void:
 	_test_card_page()
 	_test_counter_panel()
 	_test_world_map()
+	_test_town_sheet()  # After the map's test: the sheet's names build the map's graph (place_words).
 	_test_access()
 	_test_keys()
 	_test_barter()
@@ -722,6 +723,89 @@ func _test_down_screen() -> void:
 	_main._return_told = {}
 
 
+## The town status sheet (624, ui's side): the words from today's keys, N
+## and the map's row, Esc, economy's rows by key.
+func _test_town_sheet() -> void:
+	print("== the town status sheet (624, ui's side): today's facts in words, N, the map's row, economy's rows by key ==")
+	_check(TownSheet.title_words("Held", "village") == "Held, a village" and TownSheet.title_words("Held", "") == "Held"
+			and TownSheet.title_words("Oakford", "inn town") == "Oakford, an inn town",
+		"the heading: the name and its stage, bare before the stages")
+	_check(TownSheet.held_words("the Blood Rot") == "Held by the Blood Rot." and TownSheet.held_words("") == "", "who holds it, in the map's words; nothing for nobody")
+	_check(TownSheet.people_words(["farmer", "farmer", "hunter", "priest"]) == "4 people: 2 farmers, a hunter, a priest."
+			and TownSheet.people_words(["innkeeper"]) == "1 person: an innkeeper." and TownSheet.people_words([]) == "No one is about."
+			and TownSheet.people_words(null) == "You haven't seen who lives here.",
+		"the people from the bodies seen, counted by trade; none about; away words from elsewhere")
+	_check(TownSheet.buildings_words({"well": {"state": "planned"}, "forge": {"state": "standing"}, "temple": {"state": "planned", "progress": 0.5},
+			"walls": {"state": "damaged"}, "inn": {"state": "planned", "progress": 0.1}, "kitchen": {"state": "standing"}})
+			== "Standing: the forge, the kitchen. Building: the inn, begun, the temple, half built. Damaged: the walls. Planned: the well."
+			and TownSheet.buildings_words({}) == "" and TownSheet.progress_words(0.9) == "nearly done",
+		"the buildings: standing, building with a word of progress, damaged, planned")
+	_check(TownSheet.when_words("summer", 14) == "Summer, day 14." and TownSheet.when_words("", 3) == "Day 3.", "the season and the day")
+	_check(TownSheet.economy_lines({}).is_empty() and TownSheet.economy_lines({"why": "you don't know that town"}) == ["You don't know that town"],
+		"economy's rows: none before its message; a why alone")
+	var rows := TownSheet.economy_lines({"town": "wilds/held", "name": "Held", "mood": "uneasy", "treasury": 150,
+		"officials": [{"name": "Hob", "trade": "priest", "paid": true}, {"name": "Tam", "trade": "guard", "paid": false}],
+		"dole": 3, "hungry": 2, "sick": 1, "needs": [{"id": "wood", "short": 0.8, "bring": 20}, {"id": "herbs", "short": 0.2, "bring": 4}],
+		"sought": [{"trade": "smith"}, {"trade": "healer"}], "next_stage": {"stage": "village", "needs": [{"what": "people", "have": 5, "need": 8}, {"what": "priest", "have": 0, "need": 1}, {"what": "gold", "have": 110, "need": 150}]}})
+	_check(rows == ["Held is uneasy.", "Treasury: 150 gold.", "Officials: Hob the priest, Tam the guard (unpaid).", "3 fed by the town, 2 hungry, 1 sick.",
+			"Needs: wood, badly (bring 20); herbs, a little (bring 4).", "Held seeks a smith and a healer.", "To be a village: 3 more people, a priest and 40 more gold."],
+		"economy's rows by key: the mood, the treasury, the officials with unpaid, fed and hungry, needs worst first, the sought, the next stage (%s)" % [rows])
+	_check(TownSheet.join_and(["a smith"]) == "a smith" and TownSheet.join_and(["a", "b", "c"]) == "a, b and c"
+			and TownSheet.need_words({"what": "standing:walls", "have": 0, "need": 1}) == "the walls standing" and TownSheet.need_words({"what": "guard", "have": 0, "need": 2}) == "2 guards",
+		"the joins and a next stage's need in words")
+	_check(Keys.DEFAULTS["town"] == KEY_N and Keys.WORDS.has("town"), "N opens the sheet by default, in the Options' key rows")
+	var sheet: TownSheet = _main.town_panel
+	if sheet == null:
+		print("  (no town sheet in this scene: its checks skipped)")
+		return
+	var zone: String = _main.zone_name_here()
+	var id := "%s/oakford" % zone
+	var states_was: Dictionary = _main.town_states.duplicate()
+	var stages_was: Dictionary = _main.town_stages.duplicate()
+	_main.town_states[id] = {"forge": {"state": "standing"}, "temple": {"state": "planned", "progress": 0.5}}
+	_main.town_stages[id] = "hamlet"
+	_main.toggle_town()
+	var lines := sheet.lines_shown()
+	_check(sheet.visible and sheet.town == id and lines[0] == "Oakford, a hamlet", "N: the sheet for the town whose ground the player stands on, its name and stage (%s)" % lines[0])
+	var asked_at: int = _main._town_sheet_asked.get(id, -1)
+	_check(asked_at >= 0 and _main.town_sheets.has(id) and str(_main.town_sheets[id].get("why", "")) == "you don't know that town"
+			and "You don't know that town" in lines,
+		"opening it asks economy for its rows (the host answers itself): a town the sim has no record of gets its why line (%s)" % [lines])
+	_main.open_town(id)
+	_check(int(_main._town_sheet_asked.get(id, -1)) == asked_at, "opened again at once: not asked again within TOWN_SHEET_ASK_MSEC")
+	lines = sheet.lines_shown()
+	var residents := 0
+	for entity in World.entities():
+		if entity is Resident and entity.spawned:
+			residents += 1
+	_check((residents == 0 and "No one is about." in lines) or (residents > 0 and lines[1].begins_with("%d p" % residents)),
+		"the people counted from the bodies seen on this ground (%d: %s)" % [residents, lines[1]])
+	_check("Standing: the forge. Building: the temple, half built." in lines and lines[lines.size() - 1].ends_with("day %d." % Townsfolk.day_of(World.steps)),
+		"the buildings in words, the season and day last (%s)" % [lines])
+	_main.escape()
+	_check(not sheet.visible, "Esc closes it")
+	_main.open_town("%s/nowhere" % zone)
+	_check(sheet.visible and sheet.lines_shown()[0] == "No town" and TownSheet.none_words() in sheet.lines_shown(), "an untold town: No town")
+	_main.town_states["elsewhere/mill"] = {"kitchen": {"state": "standing"}}
+	_main.world_map_panel.towns = _main.town_states
+	_main.world_map_panel.town_clicked.emit("elsewhere/mill")
+	lines = sheet.lines_shown()
+	_check(sheet.visible and sheet.town == "elsewhere/mill" and lines[0] == "Mill" and TownSheet.away_words() in lines,
+		"the map's town row opens its sheet; from elsewhere the people are unseen (%s)" % [lines])
+	_main._on_message("town_sheet", {"town": "elsewhere/mill", "name": "Mill", "treasury": 40, "mood": "safe"})
+	lines = sheet.lines_shown()
+	_check("Mill is safe." in lines and "Treasury: 40 gold." in lines, "economy's message for it fills its rows at once (%s)" % [lines])
+	_main.toggle_town()
+	_check(not sheet.visible, "N again closes it")
+	_main.town_states = states_was
+	_main.town_stages = stages_was
+	_main.town_sheets.erase("elsewhere/mill")
+	_main.town_sheets.erase(id)
+	_main.town_sheets.erase("%s/nowhere" % zone)
+	_main._town_sheet_asked.clear()
+	_main.world_map_panel.towns = _main.town_states
+
+
 func _test_card_page() -> void:
 	print("== her card page (618, ui's side): the words, the chart, the state read, C and Esc ==")
 	_check(CardPage.held_words({"id": "draugr", "words": "the draugr's blessing", "teacher": "the draugr"}) == "I hold the draugr's blessing; the draugr taught it to me."
@@ -990,7 +1074,7 @@ func _test_keys() -> void:
 		"talk_log": KEY_TAB, "map": KEY_M, "lantern": KEY_L, "reset": KEY_R, "options": KEY_O, "hints": KEY_H,
 		"debug": KEY_F3, "fullscreen": KEY_F11, "builder": KEY_K, "phrase_1": KEY_1, "phrase_2": KEY_2,
 		"phrase_3": KEY_3, "phrase_4": KEY_4, "stand": KEY_SHIFT, "signature": KEY_CTRL, "bandage": KEY_B, "screenshot": KEY_F12, "yes": KEY_Y,
-		"card": KEY_C}
+		"card": KEY_C, "town": KEY_N}
 	var same := Keys.DEFAULTS.size() == today.size()
 	for action: String in today:
 		same = same and int(Keys.DEFAULTS.get(action, -1)) == int(today[action])
