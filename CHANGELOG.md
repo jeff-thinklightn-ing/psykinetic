@@ -7,9 +7,14 @@ notes (decision 324).
 
 ## Unreleased
 
+## v0.1.166
+
+- A client-only fix for v0.1.165's play test: the server is unchanged, so v0.1.165 still joins, but update through the launcher to get the fixes. The draugr tiring after his spin comes with the next server update.
+- Fixed: Options from the main menu showed nothing; the options panel now draws on its own layer above the HUD and the menu (418 amended).
 - A quick left click with a bow in hand walks again: the bow is drawn only after the button is held a quarter second (583 amended; Jeff: "quick click to move").
 - Grave robbers draw as hooded people instead of capsules (fixed in the client now); the draugr tiring from his own swings and getting his breath back slowly takes effect when the server is next deployed.
 - Fixed: clicking another player or your companion no longer opens the chat window with their name; the click walks you to them, and clicking anyone's speech bubble opens the bar with Talk (and Barter for a merchant or maker) (560, ui's side).
+
 ## v0.1.165
 
 - This version changes what goes over the network, so v0.1.164 and older can't join the server: update through the launcher first.
