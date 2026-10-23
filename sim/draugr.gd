@@ -69,15 +69,18 @@ const ASK_DELAY_TICKS := 30
 ## off till no longer winded; his dead rise in waves as his hp passes
 ## WAVES (and one at each back-off); he spins at 2 or more foes the sweep
 ## would catch, or 1 that struck him twice within STRUCK_TWICE_TICKS; he
-## throws at a foe THROW_NEAR to THROW_FAR off with none beside him; he
-## charges to his thrown axe; disarmed, his fists.
+## throws at a foe THROW_NEAR to THROW_FAR off with none beside him, never
+## at one closing on him (nearer within CLOSING_TICKS, the coordinator's
+## ruling: a thrown axe always leaves a real charge to make); he charges to
+## his thrown axe; disarmed, his fists.
 const BACK_OFF_STAMINA := 10
 const WAVES: Array[float] = [0.75, 0.5, 0.25]
 const SPIN_EVERY_TICKS := 60
 const THROW_EVERY_TICKS := 100
-const THROW_NEAR := 4
+const THROW_NEAR := 6
 const THROW_FAR := 8
 const STRUCK_TWICE_TICKS := 30
+const CLOSING_TICKS := 10
 const TITLE := "Face the draugr"
 
 var state := State.SEATED
@@ -104,6 +107,10 @@ var _risen_left := 0
 var _waves_passed := 0
 var _next_spin := 0
 var _next_throw := 0
+## His target's last cell, and till when it counts as closing on him.
+var _target_was := Vector2i.ZERO
+var _target_was_of: GridEntity = null
+var _closing_until := 0
 var backing_off := false
 var _struck_at: Array[int] = []
 var _asking := ""
@@ -188,12 +195,15 @@ func _nearest_visible_target() -> GridEntity:
 	return _provoked
 
 
-## Beaten to 1 hp or less: he yields, never dies.
+## Beaten to 1 hp or less: he yields, never dies. Laid to rest, he has
+## yielded already: struck on, he lies at 1, silent (combat's clip had him
+## giving his respect over and over).
 func _world_damaged(amount: int, cause: StringName) -> void:
 	if Net.is_authority() and hp <= 1:
 		hp = 1
 		super(amount, cause)
-		_yield()
+		if state != State.AT_REST:
+			_yield()
 		return
 	super(amount, cause)
 	if Net.is_authority() and amount > 0:
@@ -239,8 +249,13 @@ func _special_tick() -> bool:
 	if str(axe.get("where", "")) == "ground" and not bool(World.call("is_disarmed", self)):
 		if bool(World.call("try_axe_charge", self)):
 			return true
-	if str(axe.get("where", "")) == "hand" and not winded and World.tick >= _next_throw and not _foe_beside():
-		var d := World.distance(tile, target.tile)
+	var d := World.distance(tile, target.tile)
+	# Its own step nearer him (his toward it is not its closing).
+	if _target_was_of == target and target.tile != _target_was and d < World.distance(tile, _target_was):
+		_closing_until = World.tick + CLOSING_TICKS
+	_target_was = target.tile
+	_target_was_of = target
+	if str(axe.get("where", "")) == "hand" and not winded and World.tick >= _next_throw and not _foe_beside() and World.tick >= _closing_until:
 		if d >= THROW_NEAR and d <= THROW_FAR and World.call("axe_line_hit", self, target.tile) == target:
 			if bool(World.call("try_axe_throw", self, target.tile)):
 				_next_throw = World.tick + THROW_EVERY_TICKS
@@ -416,6 +431,8 @@ func start_pact(player: Player, level: String) -> void:
 	_waves_passed = 0
 	_next_spin = World.tick
 	_next_throw = World.tick
+	_target_was_of = null
+	_closing_until = 0
 	backing_off = false
 	_struck_at.clear()
 

@@ -2344,6 +2344,13 @@ func _test_draugr() -> void:
 	_check(draugr.blessed_last.is_empty() and draugr.state == Draugr.State.AT_REST and draugr.hp == 30 and said.back() == Draugr.RESPECT
 		and doors.back() == true and skeleton.laid,
 		"beaten unpaid, his \"death\": his respect, no blessing, laid to rest with the dead stilled, his Hall open")
+	var words_were := said.size()
+	var rest_was := draugr.rests_until
+	World.damage(draugr, 999, player)
+	World.damage(draugr, 999, player)
+	_check(said.size() == words_were and draugr.hp == 1 and draugr.state == Draugr.State.AT_REST and draugr.rests_until == rest_was,
+		"struck on at rest, he lies at 1, silent, his rest as it was (said %d more)" % (said.size() - words_were))
+	draugr.hp = draugr.max_hp
 	draugr.living_came(player)
 	_check(draugr.hp == 30, "seated, the living's coming gives him nothing")
 	_check(Draugr.deal_for(500)["name"] == "hard" and Draugr.deal_for(99)["name"] == "normal" and Draugr.deal_for(20)["name"] == "easy" and Draugr.deal_for(19).is_empty(),
@@ -2980,10 +2987,19 @@ func _test_draugr_mind() -> void:
 	a = EntityFactory.build(SPECS["P"].merged({"name": "PlayerA"})) as Player
 	a.player_id = "pa"
 	_room.add_child(a)
+	_move_to(draugr, Vector2i(5, 3))
 	World.spawn(a, Vector2i(12, 3))
 	draugr.accept_offer(a, draugr.offers_for("pa")[0], 20)
 	draugr.target = a
+	draugr.next_move_tick = World.tick + 1000  # He holds his ground while it closes.
+	World.step()
+	_move_to(a, Vector2i(11, 3))
 	var threw := false
+	for i in Draugr.CLOSING_TICKS:
+		World.step()
+		threw = threw or World.boss_busy(draugr)
+	_check(not threw, "one closing on him, 7 off to 6: no throw (the coordinator's ruling)")
+	draugr.next_move_tick = World.tick
 	for i in 10:
 		World.step()
 		if World.boss_busy(draugr) and draugr._next_throw > World.tick:

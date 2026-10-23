@@ -21879,8 +21879,13 @@ is_disarmed, boss_busy).
   3. **Charge** to his axe when it lies on the ground and he is not
      disarmed.
   4. **Throw** with the axe in hand, not winded, no foe beside him, his
-     target THROW_NEAR to THROW_FAR (4 to 8) cells off and first on the
-     line (axe_line_hit); at most every THROW_EVERY_TICKS (10 s).
+     target THROW_NEAR to THROW_FAR (6 to 8; 4 to 8 at first) cells off and
+     first on the line (axe_line_hit); at most every THROW_EVERY_TICKS
+     (10 s). Never at a target closing on him: its own step nearer within
+     CLOSING_TICKS (1 s), his steps toward it not counted (the coordinator,
+     for the morning cut: a thrown axe always leaves a real charge to make).
+     Struck on at rest after yielding, he lies at 1 hp, silent (he gave his
+     respect at each beating).
   5. Else he closes and strikes as any monster; disarmed, with his fists
      (combat's).
   Nothing is chosen while a move runs (boss_busy), and nothing at all
