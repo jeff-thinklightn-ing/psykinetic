@@ -24,11 +24,13 @@ func _ready() -> void:
 func _test_picture() -> void:
 	print("== the picture is the zone's Level data ==")
 	# Three cells by three: a wall between (0, 0) and (1, 0); water at (2, 1);
-	# a start at (0, 1); a link at (1, 2) to test_room; (2, 2) no floor.
+	# a start at (0, 1); a link at (1, 2) to test_room; (2, 2) no floor; a
+	# hidden link at (0, 2) (608), which the map must not give away.
 	var rows: Array[String] = [".#...", ".....", ".....", ".....", "....."]
-	var image := Level.image_from_rows(rows, {Vector2i(2, 1): "water", Vector2i(0, 1): "start", Vector2i(1, 2): "link"})
+	var image := Level.image_from_rows(rows, {Vector2i(2, 1): "water", Vector2i(0, 1): "start", Vector2i(1, 2): "link", Vector2i(0, 2): "link"})
 	image.set_pixel(4, 4, Color(0, 0, 0, 0))
-	Level.register("mm_room", image, null, {"name": "The Little Room", "links": [{"at": [1, 2], "to_map": "test_room"}],
+	Level.register("mm_room", image, null, {"name": "The Little Room",
+		"links": [{"at": [1, 2], "to_map": "test_room"}, {"at": [0, 2], "to_map": "test_room", "to_spawn": "", "hidden": true}],
 		"places": {"well": {"at": [2, 0], "kind": "other", "name": "the well"}}})
 	var level := Level.load_level("mm_room")
 	var map := Minimap.new()
@@ -46,6 +48,8 @@ func _test_picture() -> void:
 	_check(map.starts.has(Vector2i(0, 1)), "it marks the start cells (%s)" % [map.starts])
 	_check(map.ways_out.any(func(way: Dictionary) -> bool: return way["cell"] == Vector2i(1, 2) and way["label"] == "test_room"),
 		"and the ways out, named for where they go (%s)" % [map.ways_out])
+	_check(level["links"].size() == 2 and map.ways_out.size() == 1 and not map.ways_out.any(func(way: Dictionary) -> bool: return way["cell"] == Vector2i(0, 2)),
+		"a hidden link is no way out on the map: not marked, not named (589 amended; %s)" % [map.ways_out])
 	_check(map.places.any(func(place: Dictionary) -> bool: return place["name"] == "the well"), "and the zone's places")
 	var wilds := Level.load_level("wilds")
 	var started := Time.get_ticks_usec()

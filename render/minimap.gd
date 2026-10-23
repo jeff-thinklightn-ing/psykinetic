@@ -5,7 +5,9 @@ extends Control
 ## glimpses), one pixel a cell, the ground in the palette's swatches, water,
 ## walls and doors; over it you (pointing where the camera looks), your
 ## companion, the other players, the start cells, the ways out and the
-## level's places. No monsters: finding them is the game. North-up.
+## level's places. No monsters: finding them is the game. North-up. A
+## hidden link (608: behind a door nobody has found) is no way out here
+## until it is found: not marked, not named (589 amended, ui's side).
 ##
 ## Two views: a corner map, always on, centred on you and never showing past
 ## the zone's edge; and the big map (M), the whole zone fitted to most of the
@@ -156,6 +158,8 @@ func rebuild(level: Dictionary) -> void:
 	starts.assign(level.get("starts", []))
 	ways_out.clear()
 	for link: Dictionary in level.get("links", []):
+		if bool(link.get("hidden", false)):
+			continue  # Not given away (608; 589 amended).
 		ways_out.append({"cell": link["tile"], "label": str(link["to_map"])})
 	var neighbours: Dictionary = level.get("neighbours", {})
 	for side: String in neighbours:

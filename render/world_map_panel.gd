@@ -8,6 +8,7 @@ extends Control
 ## holding as a coloured edge on a place with the faction's name (phase B,
 ## from maps' "world" message; phase A colours nothing). M after the zone's
 ## big map opens it (Main), Esc closes it; the wheel zooms, a drag pans.
+## A hidden link (608) is drawn nowhere here (ways_drawn; 589 amended).
 ## Built on the client from WorldMap.build (the levels the client ships),
 ## the editor's box positions (levels/world_map.json "positions", read and
 ## never written) where an area has one, the rest laid out from the edge
@@ -201,6 +202,18 @@ func boxes() -> Dictionary:
 	var out := {}
 	for area in positions:
 		out[area] = Rect2(positions[area], sizes.get(area, BOX))
+	return out
+
+
+## The ways the map draws: every way but a hidden link's (608: behind a
+## door nobody has found; the map must not say where it leads; 589 amended).
+func ways_drawn() -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	if world == null:
+		return out
+	for way: Dictionary in world.ways:
+		if not bool(way.get("hidden", false)):
+			out.append(way)
 	return out
 
 
@@ -532,7 +545,7 @@ func _draw() -> void:
 	var heading := UiTheme.size("heading")
 	var caption := UiTheme.size("caption")
 	# The ways first, under the boxes.
-	for way: Dictionary in world.ways:
+	for way: Dictionary in ways_drawn():
 		var from := str(way.get("from", ""))
 		var to := str(way.get("to", ""))
 		if not positions.has(from) or not positions.has(to):

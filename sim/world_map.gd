@@ -125,7 +125,10 @@ func _parse_area(area_name: String, layout: Image, height: Image, config: Dictio
 			"to_spawn": link["to_spawn"], "one_way": link["one_way"],
 			# A sealed link (decision 540) is closed to the map and routes, and so is
 			# a hidden one (608, maps' side: behind a door nobody has found): no group walks it.
-			"closed": bool(link.get("closed", false)) or not str(link.get("sealed", "")).is_empty() or bool(link.get("hidden", false))})
+			"closed": bool(link.get("closed", false)) or not str(link.get("sealed", "")).is_empty() or bool(link.get("hidden", false)),
+			# Its built cue (589, Level.link_cues) and whether it is hidden, for the maps (ui): a
+			# hidden link is drawn nowhere and named nowhere (589 amended).
+			"cue": str(link.get("cue", "none")), "hidden": bool(link.get("hidden", false))})
 	var neighbours: Dictionary[String, String] = level["neighbours"]
 	for side: String in neighbours:
 		ways.append({"from": area_name, "to": neighbours[side], "kind": "edge", "at": Vector2i.ZERO, "side": side,

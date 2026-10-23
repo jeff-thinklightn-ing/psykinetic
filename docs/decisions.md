@@ -23741,6 +23741,33 @@ castle's gate and its cell clear.
 PROTOCOL_REVISION 32 (a line under it): terrain["link_cues"] and the links'
 "cue" reach the client.
 
+## 589 amended, ui's side: hidden links off both maps
+
+On v0.1.168 the zone's big map (M, Minimap) marked every link at its cell
+with "to <area>", and the known world (WorldMapPanel) drew every link's
+line and far-end dot: a hidden link (608, behind a door nobody has found)
+was given away by name. The coordinator split this out of ui's cue marks
+(below) to land first. Hidden links stay off both maps:
+- `WorldMap`'s way dict carries two more keys beside "closed" (maps' yes,
+  the fields are theirs under 589): "cue", the link's built cue
+  (Level.link_cues, "none" if unset), and "hidden", the link's flag. A
+  hidden link reads its own level.json "cue" if it names one, so hidden is
+  tested first, never inferred from the cue.
+- `Minimap.rebuild` leaves a hidden link out of `ways_out`: not marked on
+  the corner map or the big map, not named. `WorldMapPanel.ways_drawn`
+  leaves a hidden link's way out of the drawing; the layout still places
+  its far area (the box stands on its own, gated by known_areas as ever).
+- Found is maps' and dungeon's call: when the door is found the level's
+  link stops being hidden (608) and both maps show it on the next rebuild.
+- The rest of ui's 589 side (a glyph per cue on the zone map: arch,
+  waystones, a dark mouth down, a light ring up, a struck dot and "a sealed
+  way" with no destination; on the known world sealed dim and the mouth or
+  ring at a down or up link's end) follows as its own change.
+tests: minimap_test (a hidden link in the little room is no way out),
+world_map_test (the way dict's cue and hidden), ui_test (the barrow's
+hidden link drawn nowhere on the known world). Client only, protocol
+unchanged, no new class_name.
+
 ## 600. The Old Tower: Snagfin's ruin in Held as one prefab
 
 Jeff named Snagfin's place in Held the Old Tower: "the ancients' broken-down

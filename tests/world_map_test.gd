@@ -441,7 +441,7 @@ func _test_closed() -> void:
 	print("closed links")
 	Level.register("wm_gate", _strip(3, [Vector2i(0, 0), Vector2i(2, 0)]), null, {"spawn_points": {"in": [1, 0]},
 		"links": [{"at": [2, 0], "to_map": "wm_beyond", "to_spawn": "", "closed": true},
-			{"at": [0, 0], "to_map": "wm_yard", "to_spawn": "", "closed": true}]})
+			{"at": [0, 0], "to_map": "wm_yard", "to_spawn": "", "closed": true, "hidden": true}]})
 	Level.register("wm_yard", _strip(3, [Vector2i(0, 0)]), null, {"links": [{"at": [0, 0], "to_map": "wm_gate", "to_spawn": "in"}]})
 	var gate := Level.load_level("wm_gate")
 	_check(gate["links"].all(func(link: Dictionary) -> bool: return link["closed"] == true)
@@ -453,6 +453,11 @@ func _test_closed() -> void:
 	_check(not problems.any(func(problem: String) -> bool: return problem.begins_with("wm_gate:") and "link" in problem),
 		"no problem for a closed link to no level yet, nor one with no way back (%s)" % [problems])
 	_check(world_map.ways.filter(func(way: Dictionary) -> bool: return way["closed"]).size() == 2, "the ways say closed")
+	var gate_ways := world_map.ways_from("wm_gate")
+	_check(gate_ways.size() == 2 and gate_ways.filter(func(way: Dictionary) -> bool: return way["hidden"]).size() == 1
+		and gate_ways.all(func(way: Dictionary) -> bool: return way["cue"] in Level.CUES)
+		and world_map.ways_from("wm_yard").all(func(way: Dictionary) -> bool: return not way["hidden"]),
+		"each way carries its link's cue and whether it is hidden (589 amended; %s)" % [gate_ways])
 	var routes := WorldRoutes.new(world_map, false, false)
 	_check(routes.route("wm_gate", Vector2i(1, 0), "wm_yard", Vector2i(1, 0)).is_empty(), "no route through a closed link")
 	_check(not routes.route("wm_yard", Vector2i(1, 0), "wm_gate", Vector2i(1, 0)).is_empty(), "the open way back still routes")

@@ -675,6 +675,10 @@ func _test_world_map() -> void:
 			if (boxes[names[i]] as Rect2).intersects(boxes[names[j]]):
 				apart = false
 	_check(apart, "no two areas' boxes overlap")
+	var hidden_ways := panel.world.ways.filter(func(way: Dictionary) -> bool: return bool(way.get("hidden", false)))
+	_check(not hidden_ways.is_empty() and panel.ways_drawn().size() == panel.world.ways.size() - hidden_ways.size()
+		and panel.ways_drawn().all(func(way: Dictionary) -> bool: return not bool(way.get("hidden", false))),
+		"a hidden link (the barrow's, 608) is drawn nowhere on the known world (589 amended; %d hidden of %d)" % [hidden_ways.size(), panel.world.ways.size()])
 	_check(panel.own_area == World.zone.name, "the player's area is the zone (%s)" % panel.own_area)
 	_check(panel.faction_look("goblins")["name"] == "the Blood Rot" and panel.faction_look("nobody")["name"] == "nobody",
 		"a faction's name and colour from levels/factions.json")
