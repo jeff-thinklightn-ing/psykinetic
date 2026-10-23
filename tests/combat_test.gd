@@ -39,6 +39,7 @@ func _ready() -> void:
 	_test_bound_axe()
 	_test_level_draugr_armed()
 	_test_own_blow()
+	_test_cone_spread()
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -214,6 +215,51 @@ func _test_telegraph_lifecycle() -> void:
 	_check(World.telegraph(e["P"][0], "spin", {"kind": "cone"}, 15) == 0, "a shape that does not read: no telegraph")
 	World.telegraph_started.disconnect(on_start)
 	World.telegraph_ended.disconnect(on_end)
+
+## The cone of flight (decision 620; combat's design): what a hold buys,
+## 400 rolls at each of 1, 3 and 6 s held. The miss is how far the line
+## flown passes from the aimed line at the step's range, in cells; the
+## design's table, from 40,000 rolls of the same curve: 0.46, 0.26, 0.11.
+func _test_cone_spread() -> void:
+	print("
+== the cone of flight: a snap shot scattered, a patient one true (decision 620) ==")
+	var e := _build(["#####", "#.P.#", "#####"])
+	var host: GridEntity = e["P"][0]
+	_give(host, "bow")
+	World.put_item(host, host, Player.LEFT_HAND, World.items.mint("arrows", "built"))
+	_check(World.try_stance(host, "draw"), "a bow drawn")
+	var salt := World.shot_salt
+	var means := []
+	var inside := true
+	var centred := true
+	for held in [10, 30, 60]:
+		host.raised_tick = World.tick - held
+		var cone := World.spread_of(host)
+		var cells := World.range_of(host)
+		var miss := 0.0
+		var signed := 0.0
+		for each in 400:
+			World.shot_salt = each
+			var off := World.scatter(host, 0.5, cone) - 0.5
+			inside = inside and absf(off) <= cone + 0.0001
+			miss += absf(cells * sin(off))
+			signed += off
+		means.append(snappedf(miss / 400.0, 0.01))
+		centred = centred and absf(signed / 400.0) < cone * 0.1
+	World.shot_salt = salt
+	var table := [0.46, 0.26, 0.11]
+	var near := true
+	for i in 3:
+		near = near and absf(means[i] - table[i]) <= 0.05
+	_check(near and means[0] > means[1] and means[1] > means[2],
+			"the mean miss at 1, 3 and 6 s held, within 0.05 cells of the design's 0.46, 0.26, 0.11 and falling (%s)" % [means])
+	_check(inside and centred, "every roll inside the cone, centred on the aim")
+	var plain := Items.verb_of("bow").duplicate()
+	plain.erase("spread")
+	_check(is_zero_approx(Items.spread_at(plain, 60.0)) and World.scatter(host, 0.5, 0.0) == 0.5,
+			"a bow verb without a spread: no cone, the aim flown")
+	host.raised = ""
+
 
 
 func _build(rows: Array[String]) -> Dictionary:
