@@ -7,28 +7,32 @@ notes (decision 324).
 
 ## Unreleased
 
+## v0.1.165
+
+- This version changes what goes over the network, so v0.1.164 and older can't join the server: update through the launcher first.
+- The live world changes with this update: the barrow is laid out again as three levels under a bigger mound, which now stands in the open between the wilds' town and the waystone (anyone saved where it now stands comes back at the nearest floor), and two chests of melee weapons stand beside the wilds town's chest.
+- The barrow is three levels now (580, Jeff: "crypt is still too cramped"): the first hall under the mound with its burial table and the town's dead in the wall niches, the altar room and the town's tombs off it, and the robbers' camp; a stair down to the Ossuary, the ancient dead's tombs; and below that the dark caverns of the oldest dead and the Hall of Fallen Souls, where the draugr sits his throne with the temple's hidden way out behind it. Every way is five cells clear and the rooms are bigger (Jeff: "halls need to be at least 2 tiles wider than the walls"). The hidden door, the hall's furnishings, the dark and the ghostly warriors follow in their own steps; the box takes the new shape at the deploy.
+- The draugr's hall is a puzzle now (573 amended, Jeff's words): its door shuts and locks behind the first one in while he sits, and his gold, his death or your own are the ways out; he asks why you have entered his hall and tells you to return the gold your people stole, and says no more; under 20 gold he attacks and, slain, opens the door with his respect; the right amounts buy the pact and the charges, and the first win gives the Draugr's Totem that holds them, bound to you for good (his lines, the fight and the totem land on their own sides).
+- The draugr's Hall shuts behind you: he asks why you came and to return the stolen gold, and says no more; hand him too little and he fights you, and beaten so he gives you his respect and the door opens (573 amended).
 - The draugr fights with his battle axe (603): when you crowd him he spins, a slow sweep marked by a red cone that throws everyone in it down and leaves him spent; spent, he backs off while his dead cover him, and his dead rise in waves as he weakens; at one who stands off he throws his axe down a long marked line, then charges to fetch it: stand in his way or knock him off course and he fights on with his fists.
-- Melee weapons to try: two chests beside the wilds town's chest hold a sword, a spear, a hammer, a shield, a giant axe, a dagger and a buckler.
 - A boss's heavy blow shows where it will land before it does: the cells it will hit glow on the ground, brightening as it comes, with a flash as it lands (602, ui's side; the draugr's spin and throw are combat's).
+- Danger areas on the ground (602): a boss's big moves can now be marked on the ground before they land, and exactly the marked cells are struck. The draugr will be the first to use them.
+- The barrow's dead have bodies of their own: the skeleton, the barrow guard in helm, mail and shield, the crowned draugr, and a ghost whose see-through shroud casts no shadow.
+- Grave robbers are drawn as people, in the same varied human bodies as townsfolk, hooded.
+- The Draugr's Totem holds your resurrection charges; it stays with you and can't be traded, dropped or sold (573 amended).
+- The draugr's battle axe: a two-handed knockdown weapon he leaves at his feet when you win his pact (603).
+- The draugr's battle axe and the Draugr's Totem have their own look: a great bearded iron axe with runes on its blade, and a little crowned, bearded carved figure.
+- Humanoid enemies drop gold: a goblin or a kobold leaves a purse of 1 to 3 gold where it falls, an orc 4 to 10; animals and the undead drop none (601).
+- Melee weapons to try: two chests beside the wilds town's chest hold a sword, a spear, a hammer, a shield, a giant axe, a dagger and a buckler.
 - A held weapon can be thrown down a line (606), the motion behind the draugr's coming axe throw: it knocks back the first body it hits by weight and lands at their feet to be picked up again; its flight is sent to the views (a protocol change).
 - A weapon can sweep through a cone (605), the motion behind the draugr's coming axe sweep: everyone in front of him is knocked outward along their own line, by their weight and the axe's.
 - A charge can now be stopped on the way (604), the motion behind the draugr's coming charge for his axe: blows from the front slow it and enough of them stop it (three sword hits, one hammer), a heavy blow knocks him off his line, a braced spear or someone standing in his path stops him, and blows from behind do nothing.
 - A body can be thrown along a line by weight (598), the motion behind the staff's coming grab and throw: light bodies fly far, heavy ones a little, and one thrown into another knocks it on.
 - A body can lunge down a line (596), the motion behind the coming shield bash and spear charge: a bash stops at the first body and its blow lands with the lunge's momentum; a charge goes through, knocking a goblin on but stopped dead by something as heavy as an ogre.
-- The draugr's battle axe and the Draugr's Totem have their own look: a great bearded iron axe with runes on its blade, and a little crowned, bearded carved figure.
-- Danger areas on the ground (602): a boss's big moves can now be marked on the ground before they land, and exactly the marked cells are struck. The draugr will be the first to use them.
-- The draugr's Hall shuts behind you: he asks why you came and to return the stolen gold, and says no more; hand him too little and he fights you, and beaten so he gives you his respect and the door opens (573 amended).
 - A monster no longer hunts round you when you fall: it goes back to what it was doing, so a companion can come and raise you; and the draugr's pact holds while you lie downed in his lair, so being raised mid-fight still wins it (587).
 - In the barrow's new layers, the draugr laid to rest stills the dead on every layer, and they rise again on time even with nobody near; the oldest dead round his hall are angry, have no graves and see you in the dark without a lantern; his raised dead come up round him where he can see them, and grave robbers chase up to 14 cells from home in the bigger halls (580).
 - The draugr's offer now speaks of the old gods of war: your gold returns what the robbers stole, and their blessing raises you to fight again (lore's old gods, wording a draft for Jeff).
 - The Runner's pack is found in the robbers' camp under the mound, as the barrow's layers now have it (580, npc's side). Server only, text.
-- Grave robbers are drawn as people, in the same varied human bodies as townsfolk, hooded.
-- The barrow's dead have bodies of their own: the skeleton, the barrow guard in helm, mail and shield, the crowned draugr, and a ghost whose see-through shroud casts no shadow.
-- The Draugr's Totem holds your resurrection charges; it stays with you and can't be traded, dropped or sold (573 amended).
-- The draugr's battle axe: a two-handed knockdown weapon he leaves at his feet when you win his pact (603).
-- Humanoid enemies drop gold: a goblin or a kobold leaves a purse of 1 to 3 gold where it falls, an orc 4 to 10; animals and the undead drop none (601).
-- The draugr's hall is a puzzle now (573 amended, Jeff's words): its door shuts and locks behind the first one in while he sits, and his gold, his death or your own are the ways out; he asks why you have entered his hall and tells you to return the gold your people stole, and says no more; under 20 gold he attacks and, slain, opens the door with his respect; the right amounts buy the pact and the charges, and the first win gives the Draugr's Totem that holds them, bound to you for good (his lines, the fight and the totem land on their own sides).
-- The barrow is three levels now (580, Jeff: "crypt is still too cramped"): the first hall under the mound with its burial table and the town's dead in the wall niches, the altar room and the town's tombs off it, and the robbers' camp; a stair down to the Ossuary, the ancient dead's tombs; and below that the dark caverns of the oldest dead and the Hall of Fallen Souls, where the draugr sits his throne with the temple's hidden way out behind it. Every way is five cells clear and the rooms are bigger (Jeff: "halls need to be at least 2 tiles wider than the walls"). The hidden door, the hall's furnishings, the dark and the ghostly warriors follow in their own steps; the box takes the new shape at the deploy.
 - Swinging tires you (597): every swing costs stamina, more for heavier weapons and for lighter builds, more still when it hits nothing; run out and you are winded until you have caught your breath: slower on your feet, blows at half damage and pushing weakly, no shield bash. Monsters don't tire yet.
 - Out of breath after too many swings, the top line says "winded" until you have some wind back; no bar, the body and the breath say the rest (597, ui's side; the stamina costs are combat's).
 - The HP number is gone from the top of the screen: how hurt you are reads from your body and the grey, as the no-bars rule says; F3 still has the number (401 amended).
@@ -55,6 +59,7 @@ notes (decision 324).
 - A building being built is seen going up (566): a staked plot and a woodpile, then its frame, its walls rising, rafters and the roof going on, with scaffold while a level is raised or it is repaired. Windows glow at night while the people inside are awake.
 - Building kinds' roofs default to shingle; a kind may name thatch, now dressed in a ridge roll and ragged eaves; cottages, huts, barns, longhouses, stables and lean-to houses are thatched. Corner posts no longer poke through a lean-to's roof.
 - Fixed: the server could crash when someone who had eaten, or was being bandaged or brought back, died or left for another place (572 amended).
+
 ## v0.1.164
 
 - This version changes what goes over the network, so v0.1.163 and older can't join the server: update through the launcher first.
