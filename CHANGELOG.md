@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Bandaging someone, you kneel beside them, turned to them, until it is done or broken off; bandaging yourself, you kneel where you stand.
 - A companion pushed to the bottom of her bond (or let bleed out while she sulks) now leaves you: she says so, leaves you what was yours, and goes home to live and work in her town, keeping all she earned; never an enemy (581).
 - Ask your companion to search for secrets and, in the barrow's first hall, she walks over near the hidden niche and tells you she feels air moving from the wall; elsewhere she looks about and finds nothing (608 amended).
 - A new potion, the steadying draught (642): the medicine man brews it from two herbs and an antler; drunk, your bow's cone of flight is 40% narrower for half an hour, the reach unchanged. Draft numbers; the second healer's hut will sell it.

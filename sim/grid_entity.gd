@@ -130,6 +130,10 @@ var down_until := 0
 var downed_until := 0
 var channel_of := ""
 var channel_until := 0
+## A bandager's (World.try_bandage; the bandage kneel): the name of the body
+## it is bandaging (its own for itself), "" when not. A player's and a
+## companion's replicate, for the views (its kneel, sound's ruffle).
+var tending := ""
 ## Server: its last step's velocity in cells a tick (World.try_move), for
 ## the momentum it carries into a blow (World.body_velocity, decision 592).
 var step_velocity := Vector2.ZERO

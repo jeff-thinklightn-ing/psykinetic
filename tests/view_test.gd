@@ -5099,6 +5099,35 @@ func _test_visible_work() -> void:
 	_check(on_throne == at and body.position == Vector3.ZERO, "standing on its cell he is drawn at it (%s); off it, the cell's middle again" % on_throne)
 	_rig._stand_at.erase(throne_cell)
 	resident.free()
+	# The bandage kneel: a player tending a body beside it kneels, turned to it,
+	# leant in; walking, it walks; done, it stands.
+	var patient: GridEntity = null
+	for other in World.get_entities():
+		if other != player and other.spawned and other.tile != player.tile and patient == null:
+			patient = other
+	_check(patient != null, "a body to tend")
+	if patient != null:
+		player.tending = String(patient.name)
+		_rig._sync_work(player, puppet)
+		_rig._animate(puppet)
+		var toward := -Vector2(patient.tile - player.tile).angle()
+		var yaw := Client3D._tending_yaw(player, 0.0)
+		_rig._lay(puppet, body, yaw)
+		var leant := body.position.length()
+		_check(rig.base_clip() == "Fixing_Kneeling" and patient.tile != player.tile and is_equal_approx(yaw, toward)
+				and absf(leant - 0.3 * float(puppet.get_meta("model_scale", 1.0))) < 0.001,
+				"tending a body: kneeling (%s), turned to it, leant in %.2f m" % [rig.base_clip(), leant])
+		puppet.set_meta("speed", 3.0)
+		_rig._animate(puppet)
+		_rig._lay(puppet, body, yaw)
+		_check(rig.base_clip() != "Fixing_Kneeling" and body.position == Vector3.ZERO, "moving (shoved): it walks, not leant (%s)" % rig.base_clip())
+		puppet.set_meta("speed", 0.0)
+		player.tending = ""
+		_rig._sync_work(player, puppet)
+		_rig._animate(puppet)
+		_rig._lay(puppet, body, yaw)
+		_check(rig.base_clip() != "Fixing_Kneeling" and body.position == Vector3.ZERO and Client3D._tending_yaw(player, 1.0) == 1.0,
+				"done or broken off: standing again, its own facing (%s)" % rig.base_clip())
 	_rig._sync_held(player, puppet)
 	puppet.set_meta("work", "")
 	_rig._animate(puppet)

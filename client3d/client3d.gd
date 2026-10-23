@@ -10586,7 +10586,7 @@ func _sync_puppets() -> void:
 		var at := Vector3(grid.x, _ground_height(grid), grid.y)
 		if puppet.position != at:
 			puppet.position = at
-		var yaw := _aimed_yaw(entity, -entity.shown_facing().angle())
+		var yaw := _tending_yaw(entity, _aimed_yaw(entity, -entity.shown_facing().angle()))
 		var facing := puppet.get_node_or_null("Facing") as Node3D
 		# (Angles kept as float32: compared near enough, not ==.)
 		if facing != null:
@@ -10599,6 +10599,8 @@ func _sync_puppets() -> void:
 		if entity is Resident:
 			_sync_addressing(entity as Resident, puppet)
 			_sync_work(entity as Resident, puppet)
+		elif entity is Player or entity is Companion:
+			_sync_work(entity, puppet)  # Its bandaging (the kneel).
 		_sync_bow(entity, puppet)
 		if entity is Player:
 			var lantern := puppet.get_node_or_null("Lantern") as Node3D
@@ -12038,6 +12040,10 @@ const ACTIVITIES := {
 	"hammer": {"clip": "Hammer", "right": "tool.hammer"},
 	"carry_log": {"upper": "Carry_Shoulder", "shoulder": "carry.log"},
 	"sleep": {"clip": "Lie", "lying": true},
+	# The bandage kneel (Jeff: "a kneeling next to the target animation"): a
+	# player's or a companion's while it tends (GridEntity.tending), turned to
+	# the patient and leant toward it this far (metres), hands at its work.
+	"bandage": {"clip": "Fixing_Kneeling", "toward": 0.3},
 }
 ## A hand's id that names an art slot, not an item (a work's tool).
 const ART_ID := "art:"
@@ -12048,16 +12054,37 @@ static func _grip(tool: Node3D, work: Dictionary) -> void:
 	tool.position = Vector3(0.0, -float(work.get("grip", 0.0)), 0.0)
 
 
-## [param entity]'s work as ACTIVITIES has it ({} for none).
+## [param entity]'s work as ACTIVITIES has it ({} for none): a resident's
+## activity, anyone's bandaging (tending).
 static func work_of(entity: GridEntity) -> Dictionary:
-	return ACTIVITIES.get((entity as Resident).activity, {}) if entity is Resident else {}
+	return ACTIVITIES.get(work_word(entity), {})
+
+
+## The ACTIVITIES word of [param entity]'s work: a resident's activity,
+## "bandage" while it tends; "" for none.
+static func work_word(entity: GridEntity) -> String:
+	if entity is Resident and ACTIVITIES.has((entity as Resident).activity):
+		return (entity as Resident).activity
+	return "bandage" if not entity.tending.is_empty() else ""
+
+
+## A bandager's facing (the bandage kneel): toward the body it tends;
+## [param yaw] while it tends none, or itself.
+static func _tending_yaw(entity: GridEntity, yaw: float) -> float:
+	if entity.tending.is_empty() or entity.tending == String(entity.name):
+		return yaw
+	for other in World.get_entities():
+		if String(other.name) == entity.tending:
+			var way := Vector2(other.tile - entity.tile)
+			return yaw if way == Vector2.ZERO else -way.angle()
+	return yaw
 
 
 ## The work kept on the puppet ("work", read by _animate and _lay), and its
 ## upper layer: the work's, else let go of if it was a work's.
-func _sync_work(resident: Resident, puppet: Node3D) -> void:
-	var work := work_of(resident)
-	puppet.set_meta("work", resident.activity if not work.is_empty() else "")
+func _sync_work(entity: GridEntity, puppet: Node3D) -> void:
+	var work := work_of(entity)
+	puppet.set_meta("work", work_word(entity) if not work.is_empty() else "")
 	if not puppet.has_meta("rig"):
 		return
 	var rig := puppet.get_meta("rig") as AnimRig
@@ -12202,8 +12229,12 @@ static func stand_offset(slot: String, rect: Rect2i, yaw: float, cell: Vector2i)
 ## stands there, until step 4's seated idle replaces it.
 const LIE_MIDDLE := 0.46
 func _lay(puppet: Node3D, body: Node3D, yaw: float, cell := Vector2i(-1, -1)) -> void:
-	var lying := bool((ACTIVITIES.get(str(puppet.get_meta("work", "")), {}) as Dictionary).get("lying", false))
+	var work: Dictionary = ACTIVITIES.get(str(puppet.get_meta("work", "")), {})
+	var lying := bool(work.get("lying", false))
 	var offset: Vector3 = _stand_at.get(cell, Vector3.ZERO)
+	if work.has("toward") and float(puppet.get_meta("speed", 0.0)) <= WALKING:
+		# Leant in to its work (the bandage kneel), only while it is still: walking, as it stands.
+		offset += Vector3(cos(yaw), 0.0, -sin(yaw)) * float(work["toward"]) * float(puppet.get_meta("model_scale", 1.0))
 	if lying:
 		var ahead := Vector3(cos(yaw), 0.0, -sin(yaw))
 		offset = -ahead * LIE_MIDDLE * float(puppet.get_meta("model_scale", 1.0))

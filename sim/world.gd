@@ -5478,6 +5478,7 @@ func try_bandage(by: GridEntity, patient: GridEntity) -> bool:
 	_bandaging[by] = {"patient": patient, "until": tick + BANDAGE_TICKS, "from": tick, "tile": by.tile,
 		"patient_tile": patient.tile, "exerted": by.last_exertion_tick()}
 	patient.mending = 1
+	by.tending = String(patient.name)  # The views' kneel and ruffle.
 	cure(patient, "bleed")  # A bandage stops bleeding at once (decision 375).
 	_log("bandage: %s starts on %s" % [by.name, patient.name])
 	bandage_changed.emit(by, patient, &"started")
@@ -5553,6 +5554,8 @@ func _tend_wounds() -> void:
 			broken = true  # The patient's first step off their cell (decision 625, Jeff: "if target moves it interrupts").
 		if broken:
 			_bandaging.erase(by)
+			if is_instance_valid(by):
+				by.tending = ""
 			if _alive(patient):
 				patient.mending = 0
 			bandage_broke_why = "gone" if not _alive(by) or not _alive(patient) else "patient_moved" if patient != by and patient.tile != job.get("patient_tile", patient.tile) \
@@ -5562,6 +5565,7 @@ func _tend_wounds() -> void:
 			bandage_changed.emit(by, patient, &"interrupted")
 		elif tick >= int(job["until"]):
 			_bandaging.erase(by)
+			by.tending = ""
 			patient.mending = 2
 			_mending[patient] = {"left": BANDAGE_HEAL, "next": tick + BANDAGE_REGEN_TICKS, "from": tick}
 			_log("bandage: %s bandaged %s" % [by.name, patient.name])
@@ -5698,6 +5702,8 @@ func _forget_jobs(entity: GridEntity) -> void:
 	for i in keys.size():
 		var patient: Variant = jobs[i]["patient"]
 		if not is_instance_valid(keys[i]) or not is_instance_valid(patient):
+			if is_instance_valid(keys[i]):
+				keys[i].tending = ""
 			continue
 		if keys[i] == entity or patient == entity:
 			broken.append([keys[i], patient])
@@ -5705,6 +5711,7 @@ func _forget_jobs(entity: GridEntity) -> void:
 			kept[keys[i]] = jobs[i]
 	_bandaging = kept
 	for pair: Array in broken:
+		pair[0].tending = ""
 		if pair[1] != entity and _alive(pair[1]):
 			pair[1].mending = 0
 		bandage_changed.emit(pair[0], pair[1], &"interrupted")
@@ -7981,6 +7988,7 @@ func lay_downed(target: GridEntity, ticks: int) -> void:
 	target.raised = ""
 	_stun_for(target, ticks)
 	_bandaging.erase(target)
+	target.tending = ""
 	if _channels.has(target):
 		_end_channel(target, &"broken")
 	_downed[target] = true

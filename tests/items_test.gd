@@ -2452,8 +2452,10 @@ func _test_bandage() -> void:
 	_main._check_bandage_hold()
 	_check(host.mending == 1 and not _main._e_held, "a while later the host holds E, no one under the cursor: bandages themselves")
 	_check(not World.try_bandage(host, host), "not twice at once")
+	_check(host.tending == String(host.name), "tending itself, for the views' kneel (%s)" % host.tending)
 	_steps(World.BANDAGE_TICKS)
 	_check(host.mending == 2 and World._mending[host]["left"] == World.BANDAGE_HEAL, "bandaged: mending now (%d hp to come)" % World.BANDAGE_HEAL)
+	_check(host.tending == "", "done: tending no one")
 	World._relocate(host, _open_line(host, 1))
 	_steps(World.BANDAGE_REGEN_TICKS * 3)
 	_check(host.mending == 2 and World._mending[host]["left"] == World.BANDAGE_HEAL - 3 and host.hp >= hurt + 3,
@@ -2466,18 +2468,19 @@ func _test_bandage() -> void:
 	World.try_bandage(host, host)
 	World._relocate(host, _open_line(host, 1))
 	_steps(1)
-	_check(host.mending == 0, "moving while bandaging breaks it off")
+	_check(host.mending == 0 and host.tending == "", "moving while bandaging breaks it off, tending no one")
 	if pet != null and pet.spawned:
 		World.try_transfer(host, host, 2, pet, 0)
 		World._relocate(pet, _open_line(host, 1))
 		World.damage(host, 5)
 		_steps(World.BANDAGE_CALM_TICKS)
-		_check(World.try_bandage(pet, host) and host.mending == 1, "%s, with the kit, bandages the host beside her" % pet.name)
+		_check(World.try_bandage(pet, host) and host.mending == 1 and pet.tending == String(host.name),
+				"%s, with the kit, bandages the host beside her, tending them" % pet.name)
 		if imp != null:
 			var was := imp.tile
 			World._relocate(imp, _free_near(host, 3))
 			_steps(1)
-			_check(host.mending == 0, "an imp comes within %d cells: broken off" % World.BANDAGE_SAFE)
+			_check(host.mending == 0 and pet.tending == "", "an imp comes within %d cells: broken off, tending no one" % World.BANDAGE_SAFE)
 			_check(not World.try_bandage(pet, host), "and it cannot start with the imp near")
 			World._relocate(imp, was)
 		World.try_transfer(host, pet, 0, host, 2)

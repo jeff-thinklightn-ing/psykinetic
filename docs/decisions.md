@@ -25780,3 +25780,27 @@ lesser wrong; the bottom step; at a calm moment she says so and sets off,
 her player's arrows put down for them; gone home as a resident with
 "left"; she no longer joins her player. Server sim, protocol unchanged,
 no new class_name.
+## 626. The bandage kneel
+
+Jeff (playing v0.1.169): "Bandages should have a ruffling sound and a kneeling next to the target
+animation. If target moves it interrupts." The coordinator approved pc-character's design; the
+interruption is companions' (the patient's step), the ruffle sound's.
+
+- **Who is bandaging, on every peer:** World's bandaging was the server's alone (bandage_changed
+  never reaches a joined client; only the patient's mending replicated). `GridEntity.tending` is
+  the name of the body it is bandaging (its own for itself), "" when not; a player's and a
+  companion's replicate. try_bandage sets it; it is cleared when the bandaging is done, broken off
+  (_tend_wounds), when either body goes (the removal path) and when the bandager is downed.
+  Sound's ruffle reads it too.
+- **The kneel** (Client3D): ACTIVITIES' "bandage" (Fixing_Kneeling, looped: the hands at work low
+  in front), anyone's work while it tends (work_word), so the same _animate and _lay as a
+  resident's work: it plays only while the body is still, any gait wins, so a shove or a step
+  never fights it. Turned to the patient's cell (_tending_yaw) and leant 0.3 m toward it (the
+  work's "toward", only while still), its hands at the patient's legs and middle; bandaging
+  itself, the kneel as it faces. The patient stands as before.
+
+items_test: tending set on starting (itself, a companion on the host), cleared when done, by a
+move and by a hostile near. view_test: tending a body, kneeling turned to it and leant in; moving,
+it walks, not leant; cleared, it stands with its own facing. Wire: a line under revision 35
+(open, unshipped), no bump. No new class_name. A shot of the pose follows the coordinator's
+all-clear.
