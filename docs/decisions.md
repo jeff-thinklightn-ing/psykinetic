@@ -21265,9 +21265,14 @@ first for the power read, Jeff to pick from the shot.
   lands first and the wire changes nothing from ui; before draw_min it
   cancels as before. The hit outline (475) stays on the first body the
   shot would cross to the arc's cell.
-- --test-show=aim: the host puts a bow in the hand and arrows in the pack,
-  draws with the aim fixed north-east, for the shot
-  docs/ui/shots/combat/aim_arc.jpg.
+- --test-show=aim: the host puts a bow in the right hand and arrows in the
+  left, draws with the aim fixed down the screen, for the shot
+  docs/ui/shots/combat/aim_arc.jpg: the arc round the archer at the full
+  draw's step and "bow drawn" on the HUD; its middle, with the marker and
+  pips, lies above the frame in every sample tried whatever the fixed
+  point, so the sample's steering of the view is still to be understood
+  (the headless check passes); the marker and pips were enlarged for the
+  camera's height.
 
 ui_test _test_aim: the point on the arc at any angle, the axes, the pips,
 the fade, the command's shape, the aim dropped on release. Client only;

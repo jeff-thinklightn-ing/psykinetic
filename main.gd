@@ -1861,6 +1861,8 @@ func _update_aim(player: Player, drawing: bool) -> void:
 	if not aim_drawn:
 		aim_drawn = true
 		_show_cursor(false)
+		if is_finite(_aim_fixed.x):
+			print("[test] aim fixed: origin %s toward %s angle %.3f" % [origin, _aim_fixed, (_aim_fixed - origin).angle()])  # The shot's sample.
 	var toward := toward_point - origin
 	if toward.length() > 0.05:
 		aim_angle = toward.angle()
@@ -11584,13 +11586,14 @@ func _run_test_show(player: Player) -> void:
 					_on_telegraph_started(1, {"id": 1, "kind": "spin", "shape": {"kind": "cone", "origin": [player.tile.x, player.tile.y],
 						"facing": [1, 0], "length": 5, "half_angle": 30}, "cells": cells, "from_tick": World.tick, "lands_tick": World.tick + 30})
 			"aim":
-				# The archery aim, for the shot: a bow in the hand and arrows in the
-				# pack, then the host draws (the server's stance), the aim fixed
-				# north-east of the archer, the arc at the step.
-				if Net.is_authority() and player != null and player.slots.size() > Items.RIGHT_HAND:
+				# The archery aim, for the shot: a bow in the right hand and arrows in
+				# the left (the quiver check wants them in hand, as controls_test puts
+				# them), then the host draws (the server's stance), the aim fixed
+				# down the screen from the archer, the arc at the step.
+				if Net.is_authority() and player != null and player.slots.size() > Items.LEFT_HAND:
 					player.slots[Items.RIGHT_HAND] = "bow"
-					player.slots[0] = "arrows"
-					_aim_fixed = Iso.local_to_grid(player.position) + Vector2(6.0, -4.0)
+					player.slots[Items.LEFT_HAND] = "arrows"
+					_aim_fixed = Iso.local_to_grid(player.position) + Vector2(-4.0, 6.0)  # Down the screen, clear of the pack.
 					World.try_stance(player, "draw")
 			"charges":
 				# 573, ui's side: the pack's charges line, for the shot (the host sets the

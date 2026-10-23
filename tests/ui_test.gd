@@ -521,6 +521,13 @@ func _test_aim() -> void:
 		_main._update_aim(own, false)
 		_check(not _main.aim_drawn and _main._aim_since == 0, "the bow let go: the aim is dropped")
 		_check(Main.range_now(own) == 0, "no bow drawn: no range step")
+		# The shot state's fixed aim point steers the angle (the mouse is off-screen in a shot).
+		var aim_origin := Iso.local_to_grid(own.position)
+		_main._aim_fixed = aim_origin + Vector2(-4.0, 6.0)
+		_main._update_aim(own, true)
+		_check(absf(_main.aim_angle - Vector2(-4.0, 6.0).angle()) < 0.001 and _main.aim_drawn, "a fixed aim point sets the angle (%.3f)" % _main.aim_angle)
+		_main._aim_fixed = Vector2(NAN, NAN)
+		_main._update_aim(own, false)
 	# Jeff (2026-10-22): the menu blocked the options screen. Now it steps aside and comes back.
 	if _main.options_panel != null:
 		var hud_was: bool = _main.get_node("HUD").visible

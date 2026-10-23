@@ -1016,9 +1016,9 @@ const HOVER_LINE := 0.05
 ## The aim's arc: its line's width (ground units), the marker's radius, a
 ## pip's radius and spacing, the most pips (the shortest step's).
 const AIM_LINE := 0.08
-const AIM_MARK := 0.16
-const AIM_PIP := 0.05
-const AIM_PIP_GAP := 0.16
+const AIM_MARK := 0.22
+const AIM_PIP := 0.09
+const AIM_PIP_GAP := 0.24
 const AIM_PIPS_MOST := 4
 const AIM_SEGMENTS := 48
 ## A telegraph's fill: faint at its start, full as it lands; the landing
