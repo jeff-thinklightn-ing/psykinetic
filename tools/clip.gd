@@ -68,6 +68,9 @@ extends Node
 ##     (the long cone), steps into his charge to the axe and disarms him,
 ##     and fights his fists with a sword till he yields. The log line a tick:
 ##     both sides, his stamina and axe, the telegraphs showing.
+##   draugr_walkback: as draugr, but after the disarm the player stands off
+##     till he walks back to his axe and takes it up (603 amended,
+##     enemy-ai's walk), then fights him to the yield.
 ##   items_pickup: monsters take up weapons (decision 347): a dagger is
 ##     dropped by an imp; it takes it up (its AI's call, made here by
 ##     item_pick: World.try_pick_up_weapon), heavier by it, and fights
@@ -266,7 +269,7 @@ func _ready() -> void:
 			_boar()
 		"melee_audit":
 			_melee_audit()
-		"draugr":
+		"draugr", "draugr_walkback":
 			_draugr()
 		_:
 			push_error("unknown scenario %s" % scenario)
@@ -704,11 +707,25 @@ func _draugr_step(tick: int) -> bool:
 				_caption.text = "He roars and charges for his axe: stand in his way."
 			if World.is_disarmed(draugr):
 				_caption.text = "The charge stopped on you: he is disarmed, fists only."
-				_next_part(tick, 1500)
+				if scenario == "draugr_walkback":
+					_part = 4  # The walk back first (part 5), then the fight (part 4).
+				_next_part(tick, 1500 if scenario == "draugr" else 300)
 			elif str(World.axe_state(draugr)["where"]) == "hand":
 				_caption.text = "He got his axe back."
 				print("[clip] draugr: he reached his axe at tick %d" % tick)
 				return true
+		5:
+			# Stand off: disarmed, he walks back for his axe and takes it up.
+			_player.action_order = GridEntity.Order.NONE
+			_player.action_target = null
+			_walk(_stand_off(draugr, 4))
+			if World.is_disarmed(draugr):
+				_caption.text = "Stand off: disarmed, he walks back for his axe."
+			else:
+				_caption.text = "He has his axe again."
+				print("[clip] draugr: armed again at tick %d" % tick)
+				_part = 3
+				_next_part(tick, 1500)
 		4:
 			# His fists against the sword, till he yields.
 			draugr.target = _player
@@ -1937,7 +1954,7 @@ func _log(tick: int) -> void:
 			them.append(side.call(entity))
 		print("[clip] tick %d: %s; %s" % [tick, side.call(_player), ", ".join(them)])
 		return
-	if scenario == "draugr" and _monster is Draugr:
+	if scenario.begins_with("draugr") and _monster is Draugr:
 		var draugr := _monster as Draugr
 		var showing: Array = World.telegraphs().values().map(func(data: Dictionary) -> String: return str(data["kind"]))
 		print("[clip] tick %d: part %d; player %s hp %d/%d st %d; draugr %s hp %d/%d st %d%s%s axe %s %s; telegraphs %s" % [tick, _part,
