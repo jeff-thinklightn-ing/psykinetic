@@ -24649,3 +24649,34 @@ so nothing new on the wire:
 
 tests: companion_test _test_game_and_watch. Server only, protocol unchanged,
 no new class_name.
+## 622, combat's side: armour turns arrows and thrusts, and weighs on the breath
+
+Jeff's draft values from items' design (C:/dev/review/armour/design.md, section 4), the
+coordinator's step 2. Combat reads the worn kind's stats through items' World.worn_armour.
+
+- **Arrows.** World.shoot, after a raised shield's guard: World.armour_turns(target,
+  amount, "deflect_shot") turns that share of the shot's damage, rounded, and lets at
+  least 1 through. Mail 0.25, plate 0.5.
+- **Thrusts.** A blow whose verb is a backstab (the dagger) or a reach (the spear) is
+  marked pierce on its Hit. In _resolve_hits, after the guard, its damage goes through
+  armour_turns with "deflect_pierce": mail 0.2, plate 0.3. A cut, a knockback or a
+  knockdown is not turned.
+- **Breath.** _regen_stamina gives a breath times World.armour_breath(entity), which is
+  1 − the armour's kg / 100: leather 0.94, mail 0.9, plate 0.8, robes 0.98. The fraction
+  is carried by the breath's count, with no new state: floor(rate × (n + 1)) −
+  floor(rate × n) for the nth breath, so plate's 1.6 a tick gives 1, 2, 2, 1, 2 and so on.
+  It is the server's alone (stamina replicates; no client predicts regen).
+- **Not yet.** Robes' aura waits for the staff kit. range_steps and draw are items'.
+
+Headless numbers (combat_test _test_armour):
+
+| worn | 10-point shot | 10-point thrust | breath, 30 ticks from empty |
+|---|---|---|---|
+| none | 10 | 10 | 60 |
+| leather, robes | 10 | 10 | (0.94, 0.98 of bare) |
+| mail | 7 | 8 | 54 |
+| plate | 5 | 7 | 48 |
+
+A 1-point shot still does 1 in plate. A spear's 10-point thrust does 7 in plate; a
+sword's cut does 10. All numbers are drafts for Jeff to tune in levels/items.json.
+Server only, protocol unchanged, no new class_name.

@@ -40,6 +40,7 @@ func _ready() -> void:
 	_test_level_draugr_armed()
 	_test_own_blow()
 	_test_cone_spread()
+	_test_armour()
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -259,6 +260,63 @@ func _test_cone_spread() -> void:
 	_check(is_zero_approx(Items.spread_at(plain, 60.0)) and World.scatter(host, 0.5, 0.0) == 0.5,
 			"a bow verb without a spread: no cone, the aim flown")
 	host.raised = ""
+
+## Armour, combat's side (decision 622): the worn kind's deflect_shot after
+## a shield, deflect_pierce on a backstab's or a reach verb's blow after
+## the guard (at least 1 through), and breath at 1 - its kg / 100.
+func _test_armour() -> void:
+	print("
+== armour turns arrows and thrusts, and plate breathes slower (decision 622, combat's side) ==")
+	var e := _build(["######", "#mP..#", "######"])
+	var dummy: GridEntity = e["m"][0]
+	var host: GridEntity = e["P"][0]
+	var through := {}
+	for worn in ["", "leather_armour", "mail_armour", "plate_armour", "robes"]:
+		_wear(host, worn)
+		through[worn if not worn.is_empty() else "none"] = [World.armour_turns(host, 10, "deflect_shot"),
+				World.armour_turns(host, 10, "deflect_pierce"), World.armour_turns(host, 1, "deflect_shot")]
+	_check(through == {"none": [10, 10, 1], "leather_armour": [10, 10, 1], "mail_armour": [7, 8, 1],
+			"plate_armour": [5, 7, 1], "robes": [10, 10, 1]},
+			"of a 10-point shot and thrust: mail lets 7 and 8 through, plate 5 and 7, the rest all; a 1-point shot still 1 (%s)" % [through])
+	dummy.slots = Items.tidy([], Items.CARRIED)  # Hands to hold it.
+	World.set_slots(dummy, Items.tidy(["", "", "", "", "spear", ""], Items.CARRIED))
+	dummy.attack_damage = 10
+	host.max_hp = 500
+	host.hp = 500
+	_wear(host, "")
+	var bare := _blow_damage(dummy, host)
+	_wear(host, "plate_armour")
+	var plated := _blow_damage(dummy, host)
+	World.set_slots(dummy, Items.tidy(["", "", "", "", "sword", ""], Items.CARRIED))
+	_wear(host, "")
+	var cut := _blow_damage(dummy, host)
+	_wear(host, "plate_armour")
+	var cut_plated := _blow_damage(dummy, host)
+	_check(plated == bare - roundi(bare * 0.3) and plated < bare and cut_plated == cut,
+			"a spear's thrust in plate: %d of %d; a sword's cut is not a thrust: %d of %d" % [plated, bare, cut_plated, cut])
+	var gained := {}
+	for worn in ["", "mail_armour", "plate_armour"]:
+		_wear(host, worn)
+		host.stamina = 0
+		host.winded = false
+		host._world_note_exertion(World.tick - 100)
+		var start := World.tick
+		for i in 30:
+			World.tick += 1
+			World._regen_stamina()
+		gained[worn if not worn.is_empty() else "none"] = host.stamina
+		World.tick = start
+	_check(gained == {"none": 60, "mail_armour": 54, "plate_armour": 48},
+			"30 ticks' breath from empty: 60 bare, mail (10 kg) 54, plate (20 kg) 48 (%s)" % [gained])
+	_wear(host, "")
+
+
+## [param id] worn in [param entity]'s armour slot ("" takes it off).
+func _wear(entity: GridEntity, id: String) -> void:
+	if not entity.slots[Items.ARMOUR].is_empty():
+		World.items.end(World.take_item(entity, entity, Items.ARMOUR), "gone")
+	if not id.is_empty():
+		World.put_item(entity, entity, Items.ARMOUR, World.items.mint(id, "built"))
 
 
 

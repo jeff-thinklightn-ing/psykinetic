@@ -706,6 +706,9 @@ class Hit:
 	var bash := 0
 	## A wound-up blow's (decision 392): it breaks any guard it meets.
 	var crushing := false
+	## A piercing blow's (a backstab or a reach verb's): worn armour's
+	## deflect_pierce turns some of it (armour, combat's side).
+	var pierce := false
 	var target: GridEntity
 	var source_id := 0
 	var source_name := ""
@@ -2199,6 +2202,27 @@ func worn_armour(entity: GridEntity) -> Dictionary:
 	if not is_instance_valid(entity) or entity.slots.size() <= Items.ARMOUR:
 		return {}
 	return Items.armour_of(entity.slots[Items.ARMOUR])
+
+
+## [param amount] of a blow on [param target] after its worn armour's
+## [param stat] (decision 622, combat's side: "deflect_shot" for a shot,
+## after a shield; "deflect_pierce" for a backstab or a reach verb's blow,
+## after the guard): that share turned, rounded, at least 1 through. 0
+## stays 0; no armour, the amount.
+func armour_turns(target: GridEntity, amount: int, stat: String) -> int:
+	var share := clampf(float(worn_armour(target).get(stat, 0.0)), 0.0, 1.0)
+	if amount <= 0 or share <= 0.0:
+		return amount
+	return maxi(1, amount - roundi(amount * share))
+
+
+## The share of its breath [param entity]'s worn armour leaves it (decision
+## 622, combat's side): 1 - the armour's kg / 100, so plate's 20 kg
+## recovers 0.8 as fast; 1 with none.
+func armour_breath(entity: GridEntity) -> float:
+	if worn_armour(entity).is_empty():
+		return 1.0
+	return clampf(1.0 - Items.weight_of(entity.slots[Items.ARMOUR]) / 100.0, 0.0, 1.0)
 
 
 ## A weapon (a thing with a verb) lying on [param monster]'s cell or a
@@ -5040,6 +5064,7 @@ func shoot(by: GridEntity, angle: float, step: int, aimed := NAN) -> GridEntity:
 	var met: Variant = _meet_guard(hit, by, amount, 0.0, true)
 	if met != null:
 		amount = met[0]
+	amount = armour_turns(hit, amount, "deflect_shot")
 	_log("shot: %s hits %s at %s for %d, step %d" % [by.name, hit.name, hit.tile, amount, step])
 	if amount > 0:
 		var creature := hit.is_creature()
@@ -6525,6 +6550,7 @@ func _try_hit(attacker: GridEntity, target: GridEntity, hit_damage: int, is_shov
 	_queue_hit(attacker, target, aim, push_direction, hit_damage, force, raw_force, is_shove, down)
 	_hits[-1].push_way = push_way
 	_hits[-1].deed = deed
+	_hits[-1].pierce = verb.get("kind") in ["backstab", "reach"]
 	if down > 0 and aim in DIRECTIONS:
 		# A giant axe's arc (decision 343): the cells either side of the
 		# one struck, a step of 45 degrees each, take the same blow.
@@ -6580,6 +6606,8 @@ func _resolve_hits() -> void:
 			if met != null:
 				hit.damage = met[0]
 				hit.force = met[1] if met[1] >= knockback_min_force else 0.0
+		if hit.pierce:
+			hit.damage = armour_turns(hit.target, hit.damage, "deflect_pierce")
 		if hit.damage > 0:
 			var creature := hit.target.is_creature()
 			damage(hit.target, hit.damage, hit.source, &"attack")
@@ -7263,9 +7291,16 @@ func _regen_stamina() -> void:
 		elif entity.winded and (entity.stamina >= mini(recover_at, entity.max_stamina) or not entity.pays_swings):
 			entity.winded = false
 		var delay := winded_regen_delay if entity.winded else stamina_regen_delay
+		var every := maxi(1, entity.stamina_regen_every)
 		if entity.max_stamina > 0 and entity.stamina < entity.max_stamina \
-				and tick - entity.last_exertion_tick() > delay and tick % maxi(1, entity.stamina_regen_every) == 0:
+				and tick - entity.last_exertion_tick() > delay and tick % every == 0:
 			var breath := entity.stamina_regen_amount if entity.stamina_regen_amount > 0 else stamina_regen
+			var rate := breath * armour_breath(entity)
+			if rate < breath:
+				# The fraction carried by the breath's count: plate's 1.6 a
+				# breath gives 1, 2, 2, 1, 2..., with no state kept.
+				var n := tick / every
+				breath = floori(rate * (n + 1)) - floori(rate * n)
 			entity.stamina = mini(entity.stamina + breath, entity.max_stamina)
 
 

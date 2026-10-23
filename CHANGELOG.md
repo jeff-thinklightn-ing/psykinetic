@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Armour now does its work: mail turns a quarter of an arrow's hurt and a fifth of a spear's or dagger's thrust, plate half and nearly a third (at least 1 always gets through), and heavy armour slows your breath: plate recovers stamina a fifth slower (622, combat's side).
 - By a camp fire you can play knucklebones with your companion (say "let's play knucklebones"): best of three, she keeps the tally and has something to say about winning or losing. After a hard day she may ask you to keep watch while she sleeps: stay by her and she wakes whole and trusts you more; wander off and let something find her, and she won't forget it (621).
 - A companion's lean is named by her focus, as her card's corners are: she leans to fighting, to magic or to stealth (577's words).
 - Your companion notices how you treat her: a day on the roads together, sitting by a fire, a rest in town and fights you win side by side bring her closer; harsh words hurt (twice a day at most, and an apology the same day takes one back), and so does working her like a mule or starting a fight when she has asked to rest first (621).
