@@ -26288,3 +26288,12 @@ picture.
   theirs. Client only, protocol unchanged, no new class_name.
 ui_test _test_stacks_ui (the seventh box in both rows, edged and marked, a
 drag's target) and _test_item_tip (the note on hover).
+
+## 639: Mortally Wounded: the view drains while downed
+
+Jeff, v0.1.169: "The mortally wounded screen doesn't go gray like it was meant to."
+DownScreen (587) sits over the view's grey, but Client3D desaturated only on _mourning
+(the local player dead). Client3D._down eases beside _mourn in _update_mourning: toward 1
+over MOURN_SECONDS while World.is_downed(local player), back over MOURN_RETURN_SECONDS;
+the saturation drains to MOURN_SATURATION by the larger of the two; the pull-back stays
+death's. view_test _test_down_grey.

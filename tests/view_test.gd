@@ -31,6 +31,7 @@ func _ready() -> void:
 	await _test_bow_sounds()
 	await _test_monster_death()
 	await _test_companion_death()
+	await _test_down_grey()
 	await _test_player_death()
 	_test_settings()
 	_test_ground_colours()
@@ -718,6 +719,25 @@ func _test_companion_death() -> void:
 	_check(lantern != null and lantern.get_parent() == _rig, "her lantern is dropped, off the body")
 	await get_tree().create_timer(Client3D.LANTERN_OUT_SECONDS + 0.2).timeout
 	_check(not is_instance_valid(lantern), "and goes out")
+
+
+## Mortally Wounded (587): the colour drains while the local player lies
+## downed, the camera where it was; back when they are up again.
+func _test_down_grey() -> void:
+	print("\n== the local player downed: the colour drains under the Mortally Wounded screen, the camera stays ==")
+	var player := _player()
+	_rig._process(0.0)
+	var size := _rig._camera.size
+	World.damage(player, 999, null, &"attack")
+	_rig._process(0.0)
+	_check(World.is_downed(player) and not _rig._mourning, "downed first (587), not dead: no mourning")
+	await get_tree().create_timer(1.0).timeout
+	_check(_rig._down > 0.0 and _rig._environment.adjustment_saturation < 1.0 and is_equal_approx(_rig._camera.size, size),
+			"after a second: paler (saturation %.2f), the camera not pulled back (%.1f)" % [_rig._environment.adjustment_saturation, _rig._camera.size])
+	player.downed_until = World.tick  # Up again (a revival's end state).
+	await get_tree().create_timer(Client3D.MOURN_RETURN_SECONDS + 0.3).timeout
+	_check(not World.is_downed(player) and is_equal_approx(_rig._environment.adjustment_saturation, 1.0) and is_zero_approx(_rig._down),
+			"up again: the colour back (%.2f)" % _rig._environment.adjustment_saturation)
 
 
 func _test_player_death() -> void:

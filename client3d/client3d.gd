@@ -1603,6 +1603,11 @@ var _local_name := ""
 ## The local player's death: 0 alive .. 1 fully mourned.
 var _mourning := false
 var _mourn := 0.0
+## The local player lying downed (Mortally Wounded, 587): the colour
+## drains as in mourning, over the same times, and the camera stays
+## (_update_mourning). Jeff, v0.1.169: "the mortally wounded screen
+## doesn't go gray like it was meant to."
+var _down := 0.0
 var _environment: Environment
 var _listener: AudioListener3D
 var sfx: Sfx
@@ -11724,9 +11729,12 @@ func _update_mourning(delta: float) -> void:
 	var seconds := MOURN_SECONDS if _mourning else MOURN_RETURN_SECONDS
 	var before := _mourn
 	_mourn = move_toward(_mourn, target, delta / seconds)
-	if is_equal_approx(before, _mourn) and _mourn == 0.0:
+	var downed := _local_player() != null and World.is_downed(_local_player())
+	var down_before := _down
+	_down = move_toward(_down, 1.0 if downed else 0.0, delta / (MOURN_SECONDS if downed else MOURN_RETURN_SECONDS))
+	if is_equal_approx(before, _mourn) and _mourn == 0.0 and is_equal_approx(down_before, _down) and _down == 0.0:
 		return
-	_environment.adjustment_saturation = lerpf(1.0, MOURN_SATURATION, smoothstep(0.0, 1.0, _mourn))
+	_environment.adjustment_saturation = lerpf(1.0, MOURN_SATURATION, smoothstep(0.0, 1.0, maxf(_mourn, _down)))
 	_apply_size()
 
 
