@@ -107,6 +107,10 @@ const ORDER_ACKS: Array[String] = ["On it.", "All right.", "As you say.", "Right
 ## when whole, when a fight starts, or her player goes past REST_LEAVE.
 const REST_HEAL_TICKS := 20
 const REST_LEAVE := 8
+## Wary or colder, how long she hesitates over a plain order (decision 621),
+## and the orders she hesitates over.
+const HESITATE_TICKS := 15
+const ORDER_VERBS: Array[String] = ["wait", "rest", "follow", "bandage", "carry", "give"]
 const INSTRUCTION_LOCK_TICKS := 60
 ## The quick phrases' defaults reach her as what they mean, never quoted.
 const PHRASE_MEANINGS := {
@@ -556,6 +560,8 @@ var _stalked: GridEntity = null
 ## offered for each voice ask out, by serial; the asks that are her report
 ## of an errand (cleaned as an answer: what she tells is new).
 var errand := {}
+## A plain order she hesitates over (decision 621): {read, text, at}, or {}.
+var _hesitant := {}
 ## Her player's standing plain order (decision 616): "wait" or "rest", else
 ## "". Calm does not undo it; "follow" or another order does.
 var order := ""
@@ -957,6 +963,19 @@ static func order_in(text: String, held: Array[String] = [], carried: Array[Stri
 ## or answered why not, all told to her voice as narration). [param text]
 ## stands as the instruction.
 func obey(read: Dictionary, text: String) -> bool:
+	if hangs_back() and _hesitant.is_empty() and str(read.get("verb", "")) in ORDER_VERBS:
+		# Wary or colder (decision 621, Jeff's "wary hesitates"): a doubting
+		# word, and the order done HESITATE_TICKS later.
+		_hesitant = {"read": read, "text": text, "at": World.tick + HESITATE_TICKS}
+		var lines: Array = loyalty().get("hesitate", ["Must I?"])
+		_say(str(lines[absi(hash(String(name) + text)) % lines.size()]), true)
+		_log({"kind": "order", "companion": String(name), "mind": "hands", "trigger": text, "outcome": "hesitates", "note": bond_step})
+		return true
+	return _carry_out(read, text)
+
+
+## [param read] (order_in's) done now, for [param text]: obey's work.
+func _carry_out(read: Dictionary, text: String) -> bool:
 	_serial += 1
 	_called_off(_serial)
 	_order_tick = World.tick
@@ -1019,6 +1038,10 @@ func obey(read: Dictionary, text: String) -> bool:
 ## and gets up when whole, when a fight starts, or when her player walks
 ## off; a voice quiet past ORDER_ACK_TICKS is covered by a word of her own.
 func _keep_order() -> void:
+	if not _hesitant.is_empty() and World.tick >= int(_hesitant["at"]):
+		var held := _hesitant
+		_hesitant = {}
+		_carry_out(held["read"], str(held["text"]))
 	if _ack_due >= 0 and World.tick >= _ack_due:
 		_ack_due = -1
 		if _last_speech_tick < _order_tick:
@@ -3456,6 +3479,10 @@ func _choose(foe: GridEntity, low: bool) -> void:
 		current_intent = Intent.GUIDE  # Leading her player somewhere (decision 551).
 	elif order == "rest" and foe == null:
 		current_intent = Intent.REST  # Asked to rest (decision 616).
+	elif bond_at_least("devoted") and stance != Stance.HOLD and stance != Stance.PULL_BACK and _at_keeper() != null:
+		# Devoted (decision 621, Jeff's "protects you aggressively"): she
+		# goes first at whatever is attacking her player.
+		_fight_or(_at_keeper(), Intent.FOLLOW)
 	elif _holds_door(foe):
 		pass
 	elif hangs_back() and (stance == Stance.GUARD or stance == Stance.PRESS):
@@ -3540,6 +3567,23 @@ func _retreat_below() -> float:
 func _stands_over() -> bool:
 	return bond_at_least("devoted") and is_instance_valid(keeper) and keeper.spawned and World.is_downed(keeper) \
 		and World.distance(tile, keeper.tile) <= 2
+
+
+## The nearest hostile in sight going for her player; null for none.
+func _at_keeper() -> GridEntity:
+	if not _alive(keeper):
+		return null
+	var best: GridEntity = null
+	var best_distance := SIGHT_RANGE + 1
+	for entity in World.get_entities():
+		var monster := entity as Monster
+		if monster == null or monster.target != keeper or not _hostile(monster) or _out_of_reach(monster):
+			continue
+		var distance := World.distance(tile, monster.tile)
+		if distance < best_distance:
+			best = monster
+			best_distance = distance
+	return best
 
 
 ## The nearest hostile in sight going for her or her player; null for none.

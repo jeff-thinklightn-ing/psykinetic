@@ -90,8 +90,10 @@ func _ready() -> void:
 	_test_capabilities()
 	_test_focus()
 	_test_companion_named()
+	var kept_bond: Variant = _bond_as(6)  # Devoted: only devoted leads (decision 621).
 	await _test_guide()
 	_test_guide_refuses()
+	_bond_as(0, kept_bond)
 	_test_loyalty()
 	_test_out_of_reach()
 	_test_knows_level()
@@ -1314,46 +1316,81 @@ func _test_record_loads() -> void:
 		"a record from before them gains nothing")
 func _test_bond() -> void:
 	print("
-== her bond with her player, moved by their deeds, told in one line (decision 444, on Standing 443) ==")
+== her bond with her player, moved by their deeds, told in one line (decision 444, on Standing 443; tiered, 621) ==")
 	var owner := _player()
 	var pet := _companion()
 	var record: PlayerRecord = _main._records[Net.player_id]
 	var id := record.player_id
-	record.companion.erase("standing")
-	record.companion.erase("bond_day")
-	record.companion.erase("struck_day")
+	var steps_were := World.steps
+	for key in ["standing", "bond_day", "bond_today", "bond_carry", "bond_best"]:
+		record.companion.erase(key)
 	Standing.met(record.companion, id, World.steps)
+	var score := func() -> int: return Standing.score(record.companion, id)
+	var next_day := func() -> void: World.steps += DayNight.day_steps
 	_check(Standing.words(record.companion, id, Standing.COMPANION) == "fond" and ("You are fond of %s." % record.name) in pet.voice_prompt("test"),
 		"from the first she is fond of her player, and her voice is told so")
+	# Warmth: half a step a deed, once a day each, up to close.
 	_main._bond_bandaged(owner, pet, &"started")
-	_check(Standing.score(record.companion, id) == 1 and ("You are fond of %s: they bandaged your wounds." % record.name) in pet.voice_prompt("test"),
-		"bandaged by them: a step closer, and why (%s)" % Standing.fact(record.companion, id, record.name, Standing.COMPANION))
+	_check(score.call() == 0 and is_equal_approx(float(record.companion["bond_carry"]), 0.5)
+		and ("You are fond of %s: they bandaged your wounds." % record.name) in pet.voice_prompt("test"),
+		"bandaged by them: warmth, half a step carried, and why told (%d)" % score.call())
+	_main._bond_bandaged(owner, pet, &"started")
 	_main._bond_bandaged(null, pet, &"started")
-	_check(Standing.score(record.companion, id) == 1, "bandaged by no one of hers: nothing")
-	_main._bond(record, "rescued", "carried you out of the raiders' camp")
-	_check(Standing.words(record.companion, id, Standing.COMPANION) == "close"
-		and ("You are close to %s: they carried you out of the raiders' camp." % record.name) in pet.voice_prompt("test"), "freed from the raiders by them: close")
-	_main._bond_struck(pet, 2, owner, &"melee")
-	_main._bond_struck(pet, 2, owner, &"melee")
-	_check(Standing.score(record.companion, id) == 4, "struck by them: a step back, once a day (%d)" % Standing.score(record.companion, id))
+	_check(is_equal_approx(float(record.companion["bond_carry"]), 0.5), "bandaged again the same day, or by no one of hers: nothing")
+	_main._bond(record, "gift", "gave you a knife")
+	_main._bond(record, "fed", "shared food with you")
+	_main._tend_bonds()
+	_check(score.call() == 2, "a gift, food and a day together: two steps in all (%d)" % score.call())
+	_main._bond(record, "struck", "struck you")
+	_check(score.call() == 2, "a blow is nothing to her bond now (Jeff: damage never costs it)")
+	for day in 3:
+		next_day.call()
+		for deed in ["gift", "fed", "day", "bandaged"]:
+			_main._bond(record, deed, "was kind")
+	_check(score.call() == 3 and pet.bond_step == "close", "warmth brings her to close and no further (%d, %s)" % [score.call(), pet.bond_step])
+	# Trust: a step a deed, up to one short of devoted.
 	_main._bond_stood_by(owner, &"melee")
-	_check(Standing.score(record.companion, id) == 5, "they fell with her beside them: loyalty")
-	var before := Standing.score(record.companion, id)
-	_main._tend_bonds()
-	_check(Standing.score(record.companion, id) == before, "close already: a day together moves her no further; devotion is earned")
-	record.companion["standing"][id]["score"] = 1
-	record.companion.erase("bond_day")
-	_main._tend_bonds()
-	_main._tend_bonds()
-	_check(Standing.score(record.companion, id) == 2, "a day together, below close: once a day")
+	pet.hp = maxi(1, int(pet.max_hp * 0.25))
+	_main._bond_bandaged(owner, pet, &"started")
+	pet.hp = pet.max_hp
+	_check(score.call() == 5 and "badly hurt" in Main.mood_why_of(record.companion, id, "you"), "stood by and tended badly hurt: trust, to 5 (%d)" % score.call())
+	next_day.call()
+	_main._bond(record, "earned", "learned the rot ward with you")
+	_check(score.call() == 5 and pet.bond_step == "close", "trust stops one short of devoted: devotion needs a milestone (%d)" % score.call())
+	# A milestone: devoted.
+	_main._bond(record, "rescued", "carried you out of the raiders' camp")
+	_check(score.call() == 7 and pet.bond_step == "devoted" and int(record.companion["bond_best"]) == 7, "a rescue: devoted (%d)" % score.call())
+	# Hurt, then repaired within her step only.
+	_main._bond(record, "let_bleed", "let you bleed out")
+	_main._bond(record, "left_alone", "left you to fall alone")
+	_check(score.call() == 4 and pet.bond_step == "close", "let bleed and left alone: back to close (%d)" % score.call())
+	next_day.call()
+	for deed in ["gift", "fed", "day", "bandaged"]:
+		_main._bond(record, deed, "was kind")
+	_check(score.call() == 5, "warmth repairs to her best, but not past close's top (%d)" % score.call())
+	_check(Main.bond_cap(record.companion, id, "warmth") == 5 and Main.bond_cap(record.companion, id, "milestone") == 10, "the caps there: warmth 5, a milestone the most")
+	var before: int = score.call()
 	record.companion["standing"][id]["since"] = World.steps - 100 * DayNight.day_steps
 	_main._tend_bonds()
-	_check(Standing.score(record.companion, id) == 2, "together, her bond never fades")
+	_check(score.call() == before, "her bond never fades")
 	var saved := PlayerRecord.from_dict(JSON.parse_string(JSON.stringify(record.to_dict())))
-	_check(Standing.score(saved.companion, id) == 2, "her bond is saved with her record")
-	record.companion.erase("standing")
-	record.companion.erase("bond_day")
-	record.companion.erase("struck_day")
+	_check(Standing.score(saved.companion, id) == before and int(saved.companion.get("bond_best", 0)) == 7
+		and saved.companion.get("bond_today", {}).get("deeds", []).size() == 2 and saved.companion.has("bond_carry"),
+		"her bond, her best, today's deeds and the half step carried are saved with her record")
+	World.steps = steps_were
+	for key in ["standing", "bond_day", "bond_today", "bond_carry", "bond_best"]:
+		record.companion.erase(key)
+	_main._set_mood(record)
+
+
+## Her bond with the host's player set to [param score] (or [param kept], a
+## standing to put back), her step with it: the standing it replaced.
+func _bond_as(score: int, kept: Variant = null) -> Variant:
+	var record: PlayerRecord = _main._records[Net.player_id]
+	var was: Variant = record.companion.get("standing", {}).duplicate(true)
+	record.companion["standing"] = kept if kept != null else {Net.player_id: {"score": score, "why": [], "since": World.steps}}
+	_main._set_mood(record)
+	return was
 
 
 func _test_sickness() -> void:
@@ -1999,7 +2036,7 @@ func _test_loyalty() -> void:
 	# A hurt is told her voice as it happens, even just after she spoke.
 	pet._last_speech_tick = World.tick
 	var asked := pet._serial
-	_main._bond(record, "struck", "struck you")
+	_main._bond(record, "kept_from", "kept a knife from you")
 	_check(pet._serial > asked, "a drop told her voice at once, past the rate limit")
 	record.companion["standing"] = {Net.player_id: {"score": 0, "why": [], "since": World.steps}}
 	var near_tile := owner.tile
@@ -2032,6 +2069,53 @@ func _test_loyalty() -> void:
 		_check(score.call() == -3 and "cleared" in newest.call(), "a camp cleared with her here (%s)" % newest.call())
 		_main._bond_cleared(camp, Factions.NOBODY, "goblins")
 		_check(score.call() == -3, "taken by the Blood Rot: no credit")
+	# Her step in what she does (decision 621, Jeff's): below devoted she
+	# follows and does not lead; wary she hesitates; devoted she protects.
+	record.companion["standing"] = {Net.player_id: {"score": 3, "why": [], "since": World.steps}}
+	_main._set_mood(record)
+	_main._guides.clear()
+	pet.guide = null
+	_main._start_guide(pet, owner, {"key": "test/x", "kind": "place", "name": "the corner", "area": String(World.zone.name), "cell": owner.tile + Vector2i(5, 0)})
+	_check(pet.guide == null and "do not trust yourself to take the lead" in pet.guide_note, "close: she follows, and does not take the lead (%s)" % pet.guide_note)
+	record.companion["standing"] = {Net.player_id: {"score": -3, "why": [], "since": World.steps}}
+	_main._set_mood(record)
+	_settle(pet)
+	var spoken: Array[String] = []
+	var on_said := func(line: String) -> void: spoken.append(line)
+	pet.said.connect(on_said)
+	pet.obey(Companion.order_in("Wait here."), "Wait here.")
+	_check(pet.order == "" and spoken.size() == 1 and spoken[0] in Companion.loyalty()["hesitate"], "wary: a doubting word, and not yet (%s, %s)" % [pet.order, spoken])
+	for i in Companion.HESITATE_TICKS + 1:
+		World.step()
+	_check(pet.order == "wait" and pet.stance == Companion.Stance.HOLD, "and then she waits (%s)" % pet.order)
+	pet.said.disconnect(on_said)
+	pet.obey(Companion.order_in("Follow me."), "Follow me.")
+	for i in Companion.HESITATE_TICKS + 1:
+		World.step()
+	_check(pet.order == "" and pet.stance == Companion.Stance.STAY_CLOSE, "called on, after her beat, she comes")
+	var aside := _far_cell(owner.tile, 4, 6)
+	var at_them := Vector2i(-1, -1)
+	for step: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+		if at_them == Vector2i(-1, -1) and World.is_walkable(owner.tile + step) and World.is_free(owner.tile + step):
+			at_them = owner.tile + step
+	if aside == Vector2i(-1, -1) or at_them == Vector2i(-1, -1):
+		_check(false, "cells for the protecting check")
+	else:
+		_put(pet, aside)
+		pet.stance = Companion.Stance.STAY_CLOSE
+		var raider := _spawn_imp(at_them)
+		raider.acts = false
+		raider.target = owner
+		record.companion["standing"] = {Net.player_id: {"score": 0, "why": [], "since": World.steps}}
+		_main._set_mood(record)
+		World.step()
+		_check(pet.intent_target != raider, "fond, staying close: a monster at her player across the room is not hers to go for (%s)" % pet.intent_name())
+		record.companion["standing"] = {Net.player_id: {"score": 6, "why": [], "since": World.steps}}
+		_main._set_mood(record)
+		World.step()
+		_check(pet.intent_target == raider, "devoted: she goes at whatever is attacking her player (%s)" % pet.intent_name())
+		World.despawn(raider)
+		_settle(pet)
 	record.companion["standing"] = kept_standing
 	_main._set_mood(record)
 

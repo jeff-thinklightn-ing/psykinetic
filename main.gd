@@ -858,7 +858,6 @@ func _go_online() -> void:
 		World.item_grew.connect(_card_grew)
 		# Her bond with her player (decision 444).
 		World.bandage_changed.connect(_bond_bandaged)
-		World.entity_damaged.connect(_bond_struck)
 		World.entity_died.connect(_bond_stood_by)
 		World.bundle_swapped.connect(_narrate_swap)
 		World.shield_bashed.connect(_narrate_bash)
@@ -5018,7 +5017,6 @@ func _join_companion(record: PlayerRecord, player: Player) -> void:
 	if not record.companion.get("focus") is Dictionary or (record.companion["focus"] as Dictionary).is_empty():
 		record.companion["focus"] = CompanionCard.roll_focus(record.companion.get("traits", {}))
 	pet.focus = record.companion["focus"]
-	_set_mood(record)
 	pet.talk.assign(record.companion.get("talk", []))
 	pet.facts_changed.connect(_on_facts_changed.bind(pet, record))
 	pet.restore_said(record.companion.get("said", []))
@@ -5039,6 +5037,7 @@ func _join_companion(record: PlayerRecord, player: Player) -> void:
 	if int(record.companion.get("hp", 0)) > 0:
 		World.restore(pet, int(record.companion["hp"]), int(record.companion.get("stamina", pet.max_stamina)), pet.facing)
 	_companions[record.player_id] = pet
+	_set_mood(record)  # Once she is hers: before it, her step never reached her (fond after every join).
 	print("[net] %s's companion %s is at %s%s" % [
 		record.name, pet.name, tile, " (new)" if is_new else ""])
 	_tell_sickness(pet, record, true)
@@ -5080,10 +5079,11 @@ func _roads_words(record: PlayerRecord, pet: Companion) -> String:
 	var names: Array[String] = []
 	for each: Dictionary in known.slice(0, int(Guide.setting("places_told", 5.0))):
 		names.append(str(each["name"]))
-	# Close, she offers; fond, she waits to be asked; wary, she leads only
-	# when asked; sullen, not at all (decision 555).
+	# Devoted, she offers; below it she follows; sullen, she leads nowhere
+	# (decisions 555, 621).
 	var offer: String = (Companion.loyalty().get("guide_words", {}) as Dictionary).get(pet.bond_step, "")
-	return ("You know the way to %s, having been there with %s, and can lead them there. %s" % [", ".join(names), record.name, offer]).strip_edges()
+	var can := ", and can lead them there" if pet.bond_at_least("devoted") else ""
+	return ("You know the way to %s, having been there with %s%s. %s" % [", ".join(names), record.name, can, offer]).strip_edges()
 
 
 ## Her player's map told what she knows the way to (decision 551): the
@@ -5164,10 +5164,12 @@ func _nearest_known(pet: Companion, known: Array[Dictionary]) -> Dictionary:
 ## destination), her voice told so once; unless the road there is not safe
 ## (551 phase 2), or she refused it earlier today: her voice told why.
 func _start_guide(pet: Companion, player: Player, to: Dictionary) -> void:
-	if not pet.bond_at_least("wary"):
-		# Sullen or colder (decision 555): she leads nowhere.
-		pet.guide_note = "%s asked you to lead them to %s, but you will not lead them anywhere now: you are unhappy with them." % [
-			_display_name(player), to["name"]]
+	if not pet.bond_at_least("devoted"):
+		# Only devoted, she takes the lead (decision 621, Jeff's); sullen
+		# or colder, she is unhappy with them (555).
+		var why := "you will not lead them anywhere now: you are unhappy with them" if not pet.bond_at_least("wary") \
+			else "you follow them, and do not trust yourself to take the lead yet"
+		pet.guide_note = "%s asked you to lead them to %s, but %s." % [_display_name(player), to["name"], why]
 		party_log.add("%s won't lead the way." % pet.name)
 		return
 	var day := Townsfolk.day_of(World.steps)
@@ -8994,14 +8996,21 @@ func _card_given(from: GridEntity, to: GridEntity, uid: int) -> void:
 ## Her bond with her player (decision 444, on npc's Standing, 443: her
 ## record holds "standing", the COMPANION ladder) moved by [param event]
 ## (companion_traits.json "bond") for [param why], what they did, without
-## their name ("bandaged your wounds"); logged.
+## their name ("bandaged your wounds"); logged. A raise (its "deeds" tier,
+## decision 621) goes through _bond_raise; a drop costs what "drops" says.
 func _bond(record: PlayerRecord, event: String, why: String) -> void:
 	if record == null or record.companion.is_empty():
 		return
-	var delta := int(CompanionCard.tables().get("bond", {}).get(event, 0))
-	if delta == 0:
+	var table: Dictionary = CompanionCard.tables().get("bond", {})
+	var tier := str((table.get("deeds", {}) as Dictionary).get(event, ""))
+	var delta := int((table.get("drops", {}) as Dictionary).get(event, 0))
+	if not tier.is_empty():
+		if not _bond_raise(record, event, tier, why):
+			return
+	elif delta == 0:
 		return
-	Standing.bump(record.companion, record.player_id, delta, why, World.steps)
+	else:
+		Standing.bump(record.companion, record.player_id, delta, why, World.steps)
 	_set_mood(record)
 	# A hurt she says so of, as it happens (decision 555): told her voice once.
 	var pet: Companion = _companions.get(record.player_id)
@@ -9012,15 +9021,55 @@ func _bond(record: PlayerRecord, event: String, why: String) -> void:
 			Standing.score(record.companion, record.player_id)]})
 
 
+## A raise of her bond by [param event] of [param tier] (decision 621):
+## once a game day each deed, the tier's "each" (halves carried on her
+## record, bond_carry), never past bond_cap. Whether it counted.
+func _bond_raise(record: PlayerRecord, event: String, tier: String, why: String) -> bool:
+	var card := record.companion
+	var id := record.player_id
+	var day := int(World.steps / maxi(DayNight.day_steps, 1))
+	var today: Dictionary = card.get("bond_today", {})
+	if int(today.get("day", -1)) != day:
+		today = {"day": day, "deeds": []}
+	var score := Standing.score(card, id)
+	var cap := bond_cap(card, id, tier)
+	if event in today["deeds"] or score >= cap:
+		return false
+	today["deeds"].append(event)
+	card["bond_today"] = today
+	var each := float((((CompanionCard.tables().get("bond", {}) as Dictionary).get("tiers", {}) as Dictionary).get(tier, {}) as Dictionary).get("each", 1))
+	var carry := float(card.get("bond_carry", 0.0)) + each
+	var whole := mini(floori(carry), cap - score)
+	card["bond_carry"] = carry - floori(carry) if whole == floori(carry) else 0.0
+	Standing.bump(card, id, whole, why, World.steps)
+	card["bond_best"] = maxi(int(card.get("bond_best", 0)), Standing.score(card, id))
+	return true
+
+
+## The most a deed of [param tier] raises her bond to (decision 621): the
+## tier's up_to, or, repairing, her best (bond_best) but never past the top
+## of the step she is at (one short of close, or of devoted; devoted, the
+## ladder's most).
+static func bond_cap(card: Dictionary, player_id: String, tier: String) -> int:
+	var tiers: Dictionary = (CompanionCard.tables().get("bond", {}) as Dictionary).get("tiers", {})
+	var own := int((tiers.get(tier, {}) as Dictionary).get("up_to", 0))
+	var score := Standing.score(card, player_id)
+	var here := Standing.setting("trusted") - 1
+	if score >= Standing.setting("top"):
+		here = Standing.setting("most")
+	elif score >= Standing.setting("trusted"):
+		here = Standing.setting("top") - 1
+	return maxi(own, mini(maxi(int(card.get("bond_best", 0)), score), here))
+
+
 ## The record of the player whose companion [param pet] is; null for none.
 func _record_of(pet: Companion) -> PlayerRecord:
 	return _records.get(pet.keeper_id) if is_instance_valid(pet) else null
 
 
 ## Her bond's slow changes (decision 444), once a world tick: a day
-## travelling together counts once a day, only up to close (devotion is
-## earned by deeds); apart from her player (resting in town, held by
-## raiders) it fades as Standing.decay says, and only then.
+## travelling together counts once a day, a deed of warmth (decision 621:
+## it stops at close). Apart from her player it stands: no decay (Jeff).
 func _tend_bonds() -> void:
 	var day := int(World.steps / maxi(DayNight.day_steps, 1))
 	for player_id: String in _records:
@@ -9028,33 +9077,22 @@ func _tend_bonds() -> void:
 		if record.companion.is_empty() or not record.companion.get("alive", true):
 			continue
 		var pet: Companion = _companions.get(player_id)
-		var together := is_instance_valid(pet) and pet.spawned and is_instance_valid(pet.keeper)
-		if not together:
-			if not record.companion.get("resident", {}).is_empty() or record.companion.has("taken"):
-				if not Standing.decay(record.companion, World.steps).is_empty():
-					_set_mood(record)
+		if not (is_instance_valid(pet) and pet.spawned and is_instance_valid(pet.keeper)):
 			continue
 		if int(record.companion.get("bond_day", -1)) == day:
 			continue
 		record.companion["bond_day"] = day
-		if Standing.score(record.companion, player_id) < Standing.setting("trusted"):
-			_bond(record, "day", "kept you company for days")
+		_bond(record, "day", "kept you company for days")
 
 
+## Bandaged by her player: warmth, or, under a third of her hp, tending
+## her badly hurt, trust (decision 621).
 func _bond_bandaged(by: GridEntity, patient: GridEntity, state: StringName) -> void:
 	if state == &"started" and patient is Companion and by != null and by == (patient as Companion).keeper:
-		_bond(_record_of(patient), "bandaged", "bandaged your wounds")
-
-
-func _bond_struck(entity: GridEntity, amount: int, source: GridEntity, _cause: StringName) -> void:
-	if amount <= 0 or not entity is Companion or source == null or source != (entity as Companion).keeper:
-		return
-	var record := _record_of(entity)
-	var day := int(World.steps / maxi(DayNight.day_steps, 1))
-	if record == null or int(record.companion.get("struck_day", -1)) == day:
-		return
-	record.companion["struck_day"] = day
-	_bond(record, "struck", "struck you")
+		if patient.hp * 3 < patient.max_hp:
+			_bond(_record_of(patient), "tended", "tended your wounds when you were badly hurt")
+		else:
+			_bond(_record_of(patient), "bandaged", "bandaged your wounds")
 
 
 ## Her player fell with her beside them (within her hearing, she standing):

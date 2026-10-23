@@ -24525,3 +24525,56 @@ items_test _test_armour (the slot, a six-slot record, pick-up into the pack, a
 hand refused and said, worn and weighed, a knife refused, taken off); the
 tests that counted six slots count seven. Wire: a line under PROTOCOL_REVISION 34
 (opened by 620), the seventh slot and worn. No new class_name.
+
+## 621: her loyalty in tiers (Jeff's redraft answer)
+
+Jeff: "Slower. Each tier has its own deeds; the deeds that got you to a tier
+can't raise you further. Fond to close: everyday warmth ... Close to devoted:
+trust under pressure ... Devoted: a milestone only ... Lower-tier deeds can
+repair lost points but can't raise past the current tier. No decay over time.
+Tiers change her behaviour, not just a number: wary hesitates and refuses
+risky orders; close follows; devoted takes the lead when asked and protects
+you aggressively. Damage never costs loyalty." And (10:xx, 2026-10-23): "i
+can't take decisions that i dont even have the base function in game yet",
+so it is built on the draft numbers and tuned from the cut checklist. The
+coordinator settled the two readings from his words: only devoted takes the
+lead, and crossing into devoted needs a milestone (trust stops one short).
+
+- companion_traits.json "bond" is now tables: "deeds" names each raise's tier,
+  "tiers" what one deed adds (each) and the score it raises her to at most
+  (up_to): warmth 0.5 up to close (3): gift, fed, a day together, plain
+  bandaging; trust 1 up to 5: tended (bandaged by her player under a third of
+  her hp), stood_by, cleared, earned (576's draft abilities); milestone 2 up to
+  Standing's most: rescued, blessed (the draugr's, the barrow's reward), reward
+  (for areas' rewards to come). "drops" the hurts at any step: kept_from,
+  left_alone, let_bleed, grave, warned. "struck" is gone (no blow costs her
+  bond; _bond_struck and its signal removed).
+- Main._bond: a drop bumps Standing as before; a raise goes through
+  _bond_raise: once a game day per deed (record.companion "bond_today"
+  {day, deeds}), the tier's each with halves carried ("bond_carry"), never past
+  Main.bond_cap: the tier's up_to, or repairing, her best ("bond_best") but not
+  past the top of the step she is at (2 below close, 5 at close, the most at
+  devoted). The reason is remembered even when the half step moves nothing.
+  All three keys are kept through a save (PlayerRecord).
+- No decay: _tend_bonds no longer calls Standing.decay while she rests in town
+  or is taken; a day together is warmth (its own cap, not a check).
+- Behaviour: only devoted leads (Main._start_guide; below it her voice is told
+  she follows and does not trust herself to take the lead yet; sullen keeps its
+  555 line), the roads sentence says "can lead them there" only at devoted,
+  guide_words reworded. Wary or colder, a plain order (616's reader) gets a
+  hesitate line (loyalty "hesitate") and is done Companion.HESITATE_TICKS (15)
+  later (Companion._hesitant, _carry_out from _keep_order). Devoted, unless
+  told to hold or pull back, she goes first at the nearest hostile whose target
+  is her player (Companion._at_keeper, ahead of doors and stances in _choose).
+  Refusing risky orders stays 555's (wary never presses).
+- Fixed on the way: _join_companion set her mood before she was in
+  _companions, so after every join (a zone change) her bond_step read "fond"
+  until her bond next moved; _set_mood now runs once she is registered.
+
+The new deeds (fire, roads, town rest, fights won, an area finished, harsh
+words, the pack, pressing on hurt) follow as their own change, then the game
+and the watch. tests: companion_test _test_bond (warmth, trust, milestone,
+repair, no decay, save), _test_loyalty (close does not lead, wary hesitates,
+devoted protects), the guide tests run devoted. Server only: bond_step's
+words and range are as before, so the client reads it as it did (no protocol
+line); no new class_name.

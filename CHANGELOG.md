@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Your companion's loyalty grows in tiers: kindness (gifts, food, days together) brings her to close, trust under pressure (tending her badly hurt, standing by her) takes her near devoted, and only a milestone (a rescue, the draugr's blessing) makes her devoted; blows never cost it and it never fades. Wary, she hesitates before an order; only a devoted companion takes the lead; devoted, she goes for whatever attacks you (621).
 - The archer's aim shows a cone of flight: wide as the draw starts, narrowing the longer you hold, stepping out with each range step and still narrowing at the last; the arrow flies a line inside it (620, ui's side; combat's design).
 - The zone's big map draws each way out as what stands there: an arch or waystones turned the way they face, a dark mouth for a stair down, a light ring for a stair up, a struck dot for a sealed way that names no destination; on the known world a sealed way draws dim and a way down or up ends in the mouth or the ring (589, ui's side).
 - Your companion's card page (C): her name, what she has learned from the lands you crossed and who taught it, in her words, and how she fights drawn as a small chart of fighting, magic and stealth with her lean beside it in her words; how she feels about you, the same word the party line gives with its newest reason; her purse joins the page when she carries your gold (618, ui's side).

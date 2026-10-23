@@ -227,9 +227,15 @@ static func from_dict(entry: Variant) -> PlayerRecord:
 		var standing: Variant = pet.get("standing")
 		if standing is Dictionary and not standing.is_empty():
 			record.companion["standing"] = standing.duplicate(true)
-		for key: String in ["bond_day", "struck_day"]:
+		for key: String in ["bond_day", "bond_best"]:
 			if pet.get(key) is float or pet.get(key) is int:
 				record.companion[key] = int(pet[key])
+		# Her tiers' counts (decision 621): the half point carried, the deeds raised today.
+		if pet.get("bond_carry") is float or pet.get("bond_carry") is int:
+			record.companion["bond_carry"] = float(pet["bond_carry"])
+		var today: Variant = pet.get("bond_today")
+		if today is Dictionary:
+			record.companion["bond_today"] = {"day": int(today.get("day", -1)), "deeds": Array(_strings(today.get("deeds", [])))}
 		# Her sickness (decision 501, npc's Townsfolk) and one ended, still to be told.
 		# Her marks (decision 544: "draugr", the draugr's blessing), as a player's.
 		var her_marks := _strings(pet.get("marks", []))
