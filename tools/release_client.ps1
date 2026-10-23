@@ -20,9 +20,15 @@
 # (the perf worktree's branch, say): its commit goes to origin's main as a
 # fast-forward, so rebase onto origin/main first; a release another session
 # pushed meanwhile makes the push fail, not overwrite.
+# -Hotfix (Jeff, 2026-10-23: v0.1.170, a client-only fix while main ran a
+# protocol ahead of the box): a release from a branch off the last release's
+# tag, not from main. It skips the origin/main check, and its commit goes to
+# origin's hotfix/<tag> branch, not main; main takes the CHANGELOG section
+# and version.txt afterwards, so its next release is numbered past it.
 # Nothing in the zip carries a token or address.
 param(
-	[string]$Version = ''
+	[string]$Version = '',
+	[switch]$Hotfix
 )
 $ErrorActionPreference = 'Stop'
 
@@ -62,8 +68,10 @@ if (git status --porcelain) {
 $ErrorActionPreference = 'Continue'
 git fetch -q origin main --tags
 if ($LASTEXITCODE -ne 0) { Fail 'git fetch origin failed' }
-git merge-base --is-ancestor origin/main HEAD
-if ($LASTEXITCODE -ne 0) { Fail 'this commit does not have origin/main in it: rebase onto origin/main first' }
+if (-not $Hotfix) {
+	git merge-base --is-ancestor origin/main HEAD
+	if ($LASTEXITCODE -ne 0) { Fail 'this commit does not have origin/main in it: rebase onto origin/main first' }
+}
 $ErrorActionPreference = 'Stop'
 $current = (Get-Content version.txt -Raw).Trim()
 if ($Version -eq '') {
@@ -162,8 +170,13 @@ if (Get-Command gh -ErrorAction SilentlyContinue) {
 	# git and gh report progress on stderr; under 'Stop' that would abort a
 	# push that succeeded. Only the exit codes matter here.
 	$ErrorActionPreference = 'Continue'
-	git push origin HEAD:main
-	if ($LASTEXITCODE -ne 0) { Fail 'git push origin HEAD:main failed (main moved on? rebase onto origin/main and release again)' }
+	if ($Hotfix) {
+		git push origin "HEAD:refs/heads/hotfix/$tag"
+		if ($LASTEXITCODE -ne 0) { Fail "git push origin HEAD:hotfix/$tag failed" }
+	} else {
+		git push origin HEAD:main
+		if ($LASTEXITCODE -ne 0) { Fail 'git push origin HEAD:main failed (main moved on? rebase onto origin/main and release again)' }
+	}
 	git push origin $tag
 	if ($LASTEXITCODE -ne 0) { Fail "git push origin $tag failed" }
 	gh release create $tag $zip --title $tag --notes-file $notes
