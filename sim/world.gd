@@ -296,8 +296,8 @@ const GROUND_SPILL := 3
 ## No cell: what put_on_ground gives when there is nowhere to put a thing.
 const NO_CELL := Vector2i(-99999, -99999)
 ## Throwing (try_throw): reach is THROW_PER_STRENGTH x strength / the square
-## root of the weight, 1 to THROW_MAX cells; a body hit takes force weight x
-## THROW_FORCE_PER_KG (impact_damage at the thing's mass over its).
+## root of the weight, 1 to THROW_MAX cells; the thing flies as a hurl at
+## throw_speed (606 amended).
 const THROW_MAX := 6
 ## Bandaging (try_bandage): BANDAGE_TICKS to bandage, out of combat (no
 ## hostile within BANDAGE_SAFE cells, not hurt for BANDAGE_CALM_TICKS);
@@ -311,7 +311,6 @@ const THROW_PER_STRENGTH := 0.5
 ## A thing put down or landing makes a thud monsters hear (Senses), a heavy
 ## one from THUD_HEAVY_KG.
 const THUD_HEAVY_KG := 5.0
-const THROW_FORCE_PER_KG := 0.3
 ## A bow loosed is heard this far (World.shoot): a soft twang, the shooter's
 ## own cell its source.
 const NOISE_BOW := 3
@@ -338,10 +337,6 @@ const BRACE_DAMAGE_FACTOR := 2.0
 const EXHAUSTED_MASS_FACTOR := 0.5
 
 # Exported vars, not consts: GDScript cannot export constants.
-## A thing thrown into a body (try_throw): impact per unit of its force,
-## scaled by mass_ratio. The one push left outside decision 592's model,
-## till thrown things move what they hit.
-@export var impact_per_force := 2
 ## The knockback model (decision 592): every value from PHYSICS_RULES,
 ## read at start (load_physics_rules), so combat and Jeff tune them there.
 ## A "force" is the speed a push gives its body, in cells a tick over
@@ -408,6 +403,9 @@ var moves := {
 ## A swing's own weight in its impulse (swing_impulse, decision 605): the
 ## thing's kilos times this.
 @export var swing_speed := 20.0
+## The pack's throw (try_throw, 606 amended): the thing's speed, cells a
+## tick, its weight times this the impulse on a body it strikes.
+@export var throw_speed := 2.0
 ## SHOVE_COST_BASE and SHOVE_COST_SCALE: a shove costs
 ## base + force x target_mass x scale stamina.
 @export var shove_cost_base := 5.0
@@ -3493,7 +3491,7 @@ func load_physics_rules(text: String) -> void:
 		var given: Variant = data[key]
 		if not field in ["shove_scale", "knockback_min_force", "slide_per_speed", "max_travel", "momentum_scale",
 				"momentum_ticks", "restitution", "impact_per_energy", "brace_restitution", "stun_ticks_base",
-				"stun_ticks_per_force", "knockback_stun_ticks", "lunge_ticks_per_cell", "lunge_min_speed", "rush_stop_speed", "swing_speed"]:
+				"stun_ticks_per_force", "knockback_stun_ticks", "lunge_ticks_per_cell", "lunge_min_speed", "rush_stop_speed", "swing_speed", "throw_speed"]:
 			push_warning("World: %s's %s is not a physics rule" % [PHYSICS_RULES, key])
 		elif (given is int or given is float) and float(given) >= 0.0:
 			set(field, int(given) if get(field) is int else float(given))
@@ -4296,52 +4294,23 @@ func take_from_ground(cell: Vector2i, index: int) -> int:
 
 
 ## [param by] throws what is in one of its hands ([param slot]) toward
-## [param target]: it flies a cell at a time (a step toward the target
-## each, so diagonals first) as far as throw_reach, over water and
-## ledges, until a wall or a closed door stops it or it hits a body; the
-## body takes an impact from its weight (impact_damage, through _impact,
-## as a push's collision does) and is stunned. It lands on the last cell
-## it reached (off water). False, and nothing moves, if it cannot.
+## [param target]: a hurl (606 amended) along the line to it, as far as
+## throw_reach, over water, until a wall, a closed door or higher ground
+## stops it or it hits a body; the body is launched at the thing's weight x
+## throw_speed (by mass: a 10 kg rock moves a 25 kg imp a cell), staggered,
+## and hurt by the thing's energy. It lands on the last dry cell it reached,
+## before a body it hit. False, and nothing moves, if it cannot.
 func try_throw(by: GridEntity, slot: int, target: Vector2i) -> bool:
 	if not Net.is_authority() or not _can_handle(by) or is_stunned(by):
 		return false
 	if not has_hands(by) or slot not in [Items.RIGHT_HAND, Items.LEFT_HAND] or by.slots[slot].is_empty() or target == by.tile:
 		return false
-	var id := by.slots[slot]
-	var reach := throw_reach(by, id)
-	var cell := by.tile
-	var dry := by.tile
-	var hit: GridEntity = null
-	for i in reach:
-		if cell == target:
-			break
-		var step := Vector2i(signi(target.x - cell.x), signi(target.y - cell.y))
-		if _terrain_blocks_step(cell, step, false, false) and not is_water(cell + step):
-			break
-		if edge_blocks(cell, step):
-			break
-		var body: GridEntity = _occupancy.get(cell + step)
-		if body != null and body != by:
-			hit = body
-			break
-		cell += step
-		if not is_water(cell):
-			dry = cell
-	var uid := take_item(by, by, slot)
-	if uid == 0:
-		return false
-	_put_down_by[uid] = _label_of(by)
-	var landed := put_on_ground(uid, dry, by.tile)
-	_thud(landed, id, by)
-	_log("throw: %s threw %s from %s to %s%s" % [by.name, id, by.tile, landed, "" if hit == null else ", hitting %s" % hit.name])
-	if hit != null:
-		var force := Items.weight_of(id) * THROW_FORCE_PER_KG
-		var impact := impact_damage(force, mass_ratio(Items.weight_of(id), pushed_mass(hit)))
-		items.note(uid, "thrown", "at %s by %s" % [_label_of(hit), _label_of(by)], zone.name, hit.tile)
-		_stun(hit, force)
-		if impact > 0:
-			_impact(hit, impact, by, &"body")
-	return true
+	# A hurl (606 amended) toward the cell aimed at, as far as the arm sends
+	# the thing, at throw_speed: a body hit is launched by mass, staggered,
+	# and hurt by the thing's energy; the thing falls before it.
+	var reach := mini(throw_reach(by, by.slots[slot]), distance(by.tile, target))
+	var out := hurl(by, slot, Vector2(target - by.tile), reach, throw_speed, {"lands": "before", "hurts": true})
+	return out["thrown"]
 
 
 ## A thud where [param id] came down at [param cell] (put down or thrown
@@ -6577,7 +6546,8 @@ func swing_impulse(wielder: GridEntity, item: String) -> float:
 	return blow_impulse(wielder, Items.verb_of(item)) + Items.weight_of(item) * swing_speed
 
 
-## A thing thrown down a line (decision 606): what [param by] holds in
+## A thing thrown down a line (decision 606; 606 amended, its options):
+## what [param by] holds in
 ## [param slot] leaves its hand and flies along [param toward] (any angle,
 ## traced a cell at a time), at most [param cells]; a wall, a closed door or
 ## higher ground stops it before. The first body on the line is launched
@@ -6586,11 +6556,17 @@ func swing_impulse(wielder: GridEntity, item: String) -> float:
 ## on), else where its flight ended, on dry ground (put_on_ground, spilling
 ## if the cell is full), for anyone to pick up. Its flight is told to the
 ## views (GridEntity.hurled). The damage of the hit is the caller's (combat).
-## Server only, at once. {landed (a cell, NO_CELL if it found no ground),
-## hit (the body, or null), hit_result (launch's, {} for none)}; emitted as
-## hurled.
-func hurl(by: GridEntity, slot: int, toward: Vector2, cells: int, speed: float) -> Dictionary:
-	var out := {"landed": NO_CELL, "hit": null, "hit_result": {}}
+## A body struck and not moved still staggers by the hit's speed (_stun).
+## [param opts]: lands ("feet", the default; "before": the cell before the
+## body, the thrower's own if it stood beside it, as the pack's throw has
+## it), hurts (the body takes impact_per_energy x 1/2 x the thing's weight
+## x [param speed]^2, its energy: the pack's throw, at a real speed; a
+## caller dealing the hit's damage itself, as combat's axe does, leaves it
+## off). Server only, at once. {thrown, landed (a cell, NO_CELL if it found
+## no ground), hit (the body, or null), hit_result (launch's, {} for none),
+## impact}; emitted as hurled.
+func hurl(by: GridEntity, slot: int, toward: Vector2, cells: int, speed: float, opts := {}) -> Dictionary:
+	var out := {"thrown": false, "landed": NO_CELL, "hit": null, "hit_result": {}, "impact": 0}
 	if not Net.is_authority() or not _alive(by) or is_stunned(by) or not holds_in_hands(by) \
 			or slot not in [Items.RIGHT_HAND, Items.LEFT_HAND] or by.slots[slot].is_empty() or toward == Vector2.ZERO or cells <= 0:
 		return out
@@ -6616,11 +6592,19 @@ func hurl(by: GridEntity, slot: int, toward: Vector2, cells: int, speed: float) 
 	if uid == 0:
 		return out
 	_put_down_by[uid] = _label_of(by)
-	var feet := at if hit != null else dry
+	var feet := at if hit != null and str(opts.get("lands", "feet")) == "feet" else dry
+	out["thrown"] = true
 	if hit != null:
 		items.note(uid, "thrown", "at %s by %s" % [_label_of(hit), _label_of(by)], zone.name, hit.tile)
 		out["hit"] = hit
-		out["hit_result"] = launch(by, hit, line, Items.weight_of(id) * speed)
+		var weight := Items.weight_of(id)
+		out["hit_result"] = launch(by, hit, line, weight * speed)
+		if _alive(hit) and not out["hit_result"].get("moved", false):
+			_stun(hit, float(out["hit_result"].get("speed", 0.0)))  # Struck where it stands: it staggers.
+		if bool(opts.get("hurts", false)) and _alive(hit):
+			out["impact"] = roundi(impact_per_energy * 0.5 * weight * speed * speed)
+			if out["impact"] > 0:
+				_impact(hit, out["impact"], by, &"body")
 	var landed := put_on_ground(uid, feet, by.tile)
 	out["landed"] = landed
 	_thud(landed, id, by)
@@ -7156,10 +7140,6 @@ func can_melee(from: Vector2i, to: Vector2i) -> bool:
 	return are_adjacent(from, to) and not _terrain_blocks_step(from, to - from)
 
 
-func mass_ratio(mover_mass: float, target_mass: float) -> float:
-	return clampf(mover_mass / maxf(target_mass, 0.001), MASS_RATIO_MIN, MASS_RATIO_MAX)
-
-
 ## Stunned entities cannot move, attack or shove, and skip their turn.
 func is_stunned(entity: GridEntity) -> bool:
 	return tick < entity.stunned_until_tick
@@ -7401,10 +7381,6 @@ func momentum_push(attacker: GridEntity, target: GridEntity, way: Vector2) -> Ve
 ## Stamina a shove of [param force] on [param target] costs.
 func shove_cost(force: float, target: GridEntity) -> int:
 	return roundi(shove_cost_base + force * pushed_mass(target) * shove_cost_scale)
-
-
-func impact_damage(remaining_force: float, ratio: float) -> int:
-	return roundi(remaining_force * impact_per_force * ratio)
 
 
 func blocks_sight(at: Vector2i) -> bool:

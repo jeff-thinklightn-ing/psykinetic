@@ -14,5 +14,6 @@
 	"lunge_ticks_per_cell": 1.0,
 	"lunge_min_speed": 0.5,
 	"rush_stop_speed": 0.1,
-	"swing_speed": 20.0
+	"swing_speed": 20.0,
+	"throw_speed": 2.0
 }

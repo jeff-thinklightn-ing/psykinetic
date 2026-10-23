@@ -41,6 +41,7 @@ func _ready() -> void:
 	_test_rush()
 	_test_sweep()
 	_test_hurl()
+	_test_pack_throw()
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -458,6 +459,29 @@ func _test_hurl() -> void:
 	# 5 kg x 20 = 100 on the 80 kg player: 1.25, 1 cell.
 	_check(out["hit"] == player and player.tile == Vector2i(2, 1) and out["landed"] == Vector2i(3, 1),
 			"a monster throws its 5 kg axe: the player knocked 1 cell, the axe at their feet (%s, %s)" % [player.tile, out["landed"]])
+
+
+func _test_pack_throw() -> void:
+	print("
+== the pack's throw is a hurl: a thing thrown moves what it hits by mass (606 amended) ==")
+	# A 10 kg sack carries a cell (throw_reach): the imp stands beside the thrower.
+	var e := _build(["##############", "#Pm..........#", "##############"], 25.0)
+	var player: GridEntity = e["P"][0]
+	var imp: GridEntity = e["m"][0]
+	_give(player, "ore_sack")
+	var hp := imp.hp
+	_check(World.try_throw(player, Player.RIGHT_HAND, Vector2i(4, 1)), "a 10 kg sack thrown at a 25 kg body")
+	# 10 x 2 = 20 on 25 kg: 0.8, 1 cell; its energy 0.075 x 1/2 x 10 x 2^2 = 1.5, 2 hp.
+	_check(imp.tile == Vector2i(3, 1) and hp - imp.hp == 2, "it is knocked 1 cell and hurt 2 (at %s, %d)" % [imp.tile, hp - imp.hp])
+	_check(not World.ground_uids(Vector2i(1, 1)).is_empty(), "and the sack fell before it, at the thrower's feet")
+
+	e = _build(["##############", "#Pm..........#", "##############"], 80.0)
+	player = e["P"][0]
+	var heavy: GridEntity = e["m"][0]
+	_give(player, "ore_sack")
+	World.try_throw(player, Player.RIGHT_HAND, Vector2i(4, 1))
+	_check(heavy.tile == Vector2i(2, 1) and World.is_stunned(heavy) and not World.ground_uids(Vector2i(1, 1)).is_empty(),
+			"at 80 kg beside the thrower: not moved (0.25), staggered, the sack at the thrower's feet (%s)" % heavy.tile)
 
 
 # --- helpers ------------------------------------------------------------------

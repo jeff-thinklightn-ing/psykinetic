@@ -22600,3 +22600,26 @@ maps asked with the default kinds; placed, freed, lost, placed elsewhere
 after restock_days, saved, home a resident with experience; held at a
 camp and home with its fall; answered by another). Server only; protocol
 unchanged; no new class_name.
+## 606 amended: the pack's throw is a hurl (the rest of physics step 2c)
+
+The last push outside 592's model is retired. World.try_throw (a thing thrown from a hand
+toward a cell) is now a hurl toward it, as far as throw_reach, at throw_speed (2 cells a
+tick, physics.json), with two of hurl's new options:
+
+- `lands`: "feet" (the default, the draugr's axe at the struck body's feet) or "before"
+  (the cell before the body, the thrower's own if it stood beside it, as the pack's throw has
+  always had it).
+- `hurts`: the struck body takes impact_per_energy x 1/2 x the thing's weight x speed^2, its
+  energy, at a real speed. The pack's throw sets it; a caller dealing the hit's damage itself
+  (combat's axe, whose speed is a tuning multiple, not a real speed) leaves it off.
+
+In every hurl, a struck body that is not moved still staggers by the hit's speed. The body
+is launched at weight x throw_speed by mass: a 10 kg sack moves a 25 kg imp a cell and hurts
+it 2; an 80 kg player is not moved (0.25), but staggered and hurt 2 (was 3 by the old rule).
+The flight is hurl's line to the cell (Bresenham), not the old diagonal-first steps; a cell
+in reach is landed on as before. THROW_FORCE_PER_KG, impact_per_force, mass_ratio and
+impact_damage are gone. hurl's result also carries "thrown" and "impact".
+
+tests/physics_test: the sack on 25 kg (1 cell, 2 hp, fallen at the thrower's feet) and on
+80 kg beside the thrower (unmoved, staggered); items_test's and stockpile_test's throws pass
+as they were.

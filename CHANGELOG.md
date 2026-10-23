@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- A thrown thing now knocks back what it hits by weight (606 amended): a heavy sack sends a small creature back a cell, a light thing only staggers; a thrown sack hurts a little less than before (2, was 3).
 - A town's newcomers no longer walk in: once maps places them, each is found somewhere out in the land, held at a camp or under the castle, or lost in the hills or forest, and joins the town when a player brings them home (613, economy's side).
 - The draugr's thrown axe is bound to him: nobody can pick it up mid-fight (only a won pact gives you an axe), and once his charge is stopped he fights with his fists only until he walks back to it.
 - A battle axe won from the draugr knocks foes down again in your hands; his own blows with it stay slow, heavy hits, and only his spin floors you. He gets his breath back faster, so a long fight sees a second spin about a minute after the first (drafts for Jeff).
