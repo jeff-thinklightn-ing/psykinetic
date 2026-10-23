@@ -24028,3 +24028,26 @@ What she does with it waits on Jeff's companions-paid question. tests:
 companion_test (given gold and taken back, her player is told each time).
 A world message field: a line under protocol revision 33 (economy's 614
 opened it); no new class_name.
+## 562 amended (4): a resident's trade and person reach a joined client
+
+Jeff, playing v0.1.168 (2026-10-23): Hob's talk bar showed Talk only.
+The cause (ui, from the code): Main._spawn_resident's spawn spec carries
+script, shape, name, label, tile, look and kind; trade, person, worker_id
+and town are set on the server after the spawn, and Resident replicated
+only ailing, addressing and activity. So on a joined client every
+resident's trade was "", Main._barters was false for all of them, the
+merchant included, and the bar had no verbs but Talk. A host saw it work,
+which is how 562 passed by hand; broken for joined clients since 562
+(ab0fcf59, v0.1.163).
+
+- Resident replicates trade and person (GridEntity.replicate: on the
+  spawn and on change), so the values set after the spawn reach the
+  client on the next sync; both listed in net.gd SUBCLASS_REPLICATED
+  (protocol_test). worker_id and town stay the server's.
+- Wire: a line under revision 33 (opened by economy's 614). A bug fix,
+  no new decision number (release).
+
+ui lands the joined-client check beside it (net_test: a resident spawned
+on the host reaches the client with trade and person; ui_test _barters on
+such a body). resident_test and protocol_test alone here. Wire change;
+no new class_name.

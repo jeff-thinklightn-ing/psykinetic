@@ -309,6 +309,10 @@ func _init() -> void:
 	replicate("ailing")
 	replicate("addressing")
 	replicate("activity")
+	# Who they are reaches a joined client too (562 amended (4)): the talk bar's verbs read trade (Main._barters),
+	# the card and the hail read person; set on the server after the spawn, so on change carries them.
+	replicate("trade")
+	replicate("person")
 	move_ticks = 3.0
 	senses = Senses.new(self, SIGHT_RANGE, -1.0)
 
