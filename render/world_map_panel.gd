@@ -8,7 +8,9 @@ extends Control
 ## holding as a coloured edge on a place with the faction's name (phase B,
 ## from maps' "world" message; phase A colours nothing). M after the zone's
 ## big map opens it (Main), Esc closes it; the wheel zooms, a drag pans.
-## A hidden link (608) is drawn nowhere here (ways_drawn; 589 amended).
+## A hidden link (608) is drawn nowhere here (ways_drawn; 589 amended); a
+## sealed one draws dim, and a link down or up ends in a dark mouth or a
+## light ring instead of the brass dot (end_mark; 589, ui's side).
 ## Built on the client from WorldMap.build (the levels the client ships),
 ## the editor's box positions (levels/world_map.json "positions", read and
 ## never written) where an area has one, the rest laid out from the edge
@@ -203,6 +205,37 @@ func boxes() -> Dictionary:
 	for area in positions:
 		out[area] = Rect2(positions[area], sizes.get(area, BOX))
 	return out
+
+
+## A link's mark at the far end of its line, by its built cue (589): "mouth"
+## for a way down, "ring" for a way up, "sealed" for a sealed or closed
+## way (dim), "dot" otherwise; "" for an edge way (no mark).
+static func end_mark(way: Dictionary) -> String:
+	if str(way.get("kind", "")) == "edge":
+		return ""
+	var cue := str(way.get("cue", "none"))
+	if cue == "sealed" or (bool(way.get("closed", false)) and not bool(way.get("hidden", false))):
+		return "sealed"
+	match cue:
+		"down":
+			return "mouth"
+		"up":
+			return "ring"
+	return "dot"
+
+
+func _draw_end_mark(at: Vector2, mark: String, radius: float) -> void:
+	match mark:
+		"mouth":
+			draw_circle(at, radius * 1.3, UiTheme.color("backing_deep"))
+			draw_arc(at, radius * 1.3, 0.0, TAU, 32, UiTheme.color("brass"), 2.0, true)
+		"ring":
+			draw_arc(at, radius * 1.3, 0.0, TAU, 32, UiTheme.color("brass"), 2.0, true)
+			draw_circle(at, radius * 0.5, UiTheme.color("text"))
+		"sealed":
+			draw_circle(at, radius, Color(UiTheme.color("text_dim"), 0.5))
+		_:
+			draw_circle(at, radius, UiTheme.color("brass"))
 
 
 ## The ways the map draws: every way but a hidden link's (608: behind a
@@ -553,9 +586,11 @@ func _draw() -> void:
 		var a := (positions[from] + sizes[from] * 0.5) * scale + pan
 		var b := (positions[to] + sizes[to] * 0.5) * scale + pan
 		var edge := str(way.get("kind", "")) == "edge"
-		draw_line(a, b, Color(UiTheme.color("edge"), 0.9 if edge else 0.6), LINE_WIDTH * scale, true)
+		var mark := end_mark(way)
+		var line_colour := Color(UiTheme.color("text_dim"), 0.5) if mark == "sealed" else Color(UiTheme.color("edge"), 0.9 if edge else 0.6)
+		draw_line(a, b, line_colour, LINE_WIDTH * scale, true)
 		if not edge:
-			draw_circle(b, 6.0 * scale, UiTheme.color("brass"))
+			_draw_end_mark(b, mark, 6.0 * scale)
 	_draw_trade(scale)
 	_rows.clear()
 	_party_rows.clear()

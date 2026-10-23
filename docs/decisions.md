@@ -23770,6 +23770,38 @@ world_map_test (the way dict's cue and hidden), ui_test (the barrow's
 hidden link drawn nowhere on the known world). Client only, protocol
 unchanged, no new class_name.
 
+## 589, ui's side: the cue marks on the maps
+
+Jeff: "strong visual cues of where the zone transition is". The maps show
+the same cue the land does (maps' Level.link_cues), so a player who saw an
+arch in the world finds the arch on the map. Approved by the coordinator
+and maps (2026-10-23); nothing on the wire, the client parses the levels
+it ships.
+- `Minimap.rebuild` gives each way out its built cue and facing
+  (terrain["link_cues"] matched by tile; a link with no entry keeps its
+  own "cue" or "none", facing south; a neighbour's side is cue "edge",
+  facing out). On the big map (`_draw_cue`, in the way-out colour, about
+  three times the dot) a cue draws as: arch, two posts and a bow toward
+  the facing; waystones, two short bars either side of the way; down, a
+  dark mouth (a wall-dark disc ringed); up, a ring with a light centre;
+  sealed, a struck dot in text_dim, its words "a sealed way" with no
+  destination (`label_of`: where it leads is learned by opening it); none
+  (a door between rooms, the mound's own door) and a neighbour's side,
+  today's dot and "to <area>". Hidden tested first (589 amended). The
+  corner map keeps the plain dot (a glyph is two pixels there), the sealed
+  one dim.
+- `WorldMapPanel.end_mark`: a link's far-end mark by its cue: "mouth" for
+  down (a backing-dark disc ringed in brass), "ring" for up (a brass ring
+  round a light centre), "sealed" for a sealed or closed way (the line and
+  the dot in text_dim at half alpha), the brass dot otherwise.
+- Not here: a cue's variant (the kit's timber or stone) makes no
+  difference on a map.
+tests: minimap_test (every way out carries a cue and a facing, the wilds'
+castle link an arch facing north, a sealed way's words), ui_test
+(end_mark by cue, the barrow's way down a mouth). Shot
+docs/ui/shots/sim/big_map_cues.jpg after the coordinator's all-clear
+(docs-only). Client only, protocol unchanged, no new class_name.
+
 ## 600. The Old Tower: Snagfin's ruin in Held as one prefab
 
 Jeff named Snagfin's place in Held the Old Tower: "the ancients' broken-down

@@ -834,6 +834,14 @@ func _test_world_map() -> void:
 	_check(not hidden_ways.is_empty() and panel.ways_drawn().size() == panel.world.ways.size() - hidden_ways.size()
 		and panel.ways_drawn().all(func(way: Dictionary) -> bool: return not bool(way.get("hidden", false))),
 		"a hidden link (the barrow's, 608) is drawn nowhere on the known world (589 amended; %d hidden of %d)" % [hidden_ways.size(), panel.world.ways.size()])
+	_check(WorldMapPanel.end_mark({"kind": "edge"}) == "" and WorldMapPanel.end_mark({"kind": "link", "cue": "down", "closed": false, "hidden": false}) == "mouth"
+		and WorldMapPanel.end_mark({"kind": "link", "cue": "up", "closed": false, "hidden": false}) == "ring"
+		and WorldMapPanel.end_mark({"kind": "link", "cue": "sealed", "closed": true, "hidden": false}) == "sealed"
+		and WorldMapPanel.end_mark({"kind": "link", "cue": "none", "closed": true, "hidden": false}) == "sealed"
+		and WorldMapPanel.end_mark({"kind": "link", "cue": "arch", "closed": false, "hidden": false}) == "dot",
+		"a link's end mark on the known world by its cue: a dark mouth down, a light ring up, dim when sealed, the dot otherwise (589, ui's side)")
+	_check(panel.ways_drawn().any(func(way: Dictionary) -> bool: return WorldMapPanel.end_mark(way) == "mouth"),
+		"the barrow's way down ends in a mouth")
 	_check(panel.own_area == World.zone.name, "the player's area is the zone (%s)" % panel.own_area)
 	_check(panel.faction_look("goblins")["name"] == "the Blood Rot" and panel.faction_look("nobody")["name"] == "nobody",
 		"a faction's name and colour from levels/factions.json")

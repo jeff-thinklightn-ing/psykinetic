@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The zone's big map draws each way out as what stands there: an arch or waystones turned the way they face, a dark mouth for a stair down, a light ring for a stair up, a struck dot for a sealed way that names no destination; on the known world a sealed way draws dim and a way down or up ends in the mouth or the ring (589, ui's side).
 - Your companion's card page (C): her name, what she has learned from the lands you crossed and who taught it, in her words, and how she fights drawn as a small chart of fighting, magic and stealth with her lean beside it in her words; how she feels about you, the same word the party line gives with its newest reason; her purse joins the page when she carries your gold (618, ui's side).
 - Stacks on the interface: a slot holding more than one shows the count in its corner, Shift-drag moves one unit, in a barter a click gives the whole stack and Shift-click one at a time with the hover reading "3 of 5 to give", a pile's hint counts its kind ("5 herbs") and lies as one heap per kind (619, ui's side).
 - Monster archers hold their draw by kind before loosing (620, enemy-ai's side): a brute or imp snaps off a wide shot, robbers and sneaks wait longer, skeletons wait for a narrow cone (monsters.json aim_spread, aim_hold_max; drafts); an archer holds while a fellow monster stands on an edge of its cone, and lowers the bow if one stands inside even its narrowest.

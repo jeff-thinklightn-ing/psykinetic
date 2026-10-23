@@ -50,6 +50,10 @@ func _test_picture() -> void:
 		"and the ways out, named for where they go (%s)" % [map.ways_out])
 	_check(level["links"].size() == 2 and map.ways_out.size() == 1 and not map.ways_out.any(func(way: Dictionary) -> bool: return way["cell"] == Vector2i(0, 2)),
 		"a hidden link is no way out on the map: not marked, not named (589 amended; %s)" % [map.ways_out])
+	_check(map.ways_out.all(func(way: Dictionary) -> bool: return (way["cue"] in Level.CUES or way["cue"] == "edge") and way["facing"] is Vector2i),
+		"each way out carries its built cue and the way it faces (589, ui's side)")
+	_check(Minimap.label_of("sealed", "barrow_deep") == "a sealed way" and Minimap.label_of("arch", "castle") == "to castle",
+		"a sealed way's words name no destination; the rest say where they go")
 	_check(map.places.any(func(place: Dictionary) -> bool: return place["name"] == "the well"), "and the zone's places")
 	var wilds := Level.load_level("wilds")
 	var started := Time.get_ticks_usec()
@@ -58,6 +62,9 @@ func _test_picture() -> void:
 	_check(map.image.get_size() == Vector2i(wilds["size"]) and map.places.any(func(place: Dictionary) -> bool: return place["kind"] == "stockpile")
 		and map.ways_out.any(func(way: Dictionary) -> bool: return way["label"] == "castle"),
 		"the wilds: the town's store and the way to the castle are on it")
+	var castle_ways := map.ways_out.filter(func(way: Dictionary) -> bool: return way["label"] == "castle")
+	_check(castle_ways.size() == 1 and castle_ways[0]["cue"] == "arch" and castle_ways[0]["facing"] == Vector2i(0, -1),
+		"the wilds' castle link is an arch facing north on the big map (589; %s)" % [castle_ways])
 	map.queue_free()
 
 

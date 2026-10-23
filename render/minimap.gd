@@ -7,7 +7,12 @@ extends Control
 ## companion, the other players, the start cells, the ways out and the
 ## level's places. No monsters: finding them is the game. North-up. A
 ## hidden link (608: behind a door nobody has found) is no way out here
-## until it is found: not marked, not named (589 amended, ui's side).
+## until it is found: not marked, not named (589 amended, ui's side). On
+## the big map each way out is drawn as its built cue (589, ui's side;
+## maps' Level.link_cues): an arch or a pair of waystones turned the way
+## they stand, a dark mouth for a stair down, a light ring for a stair up,
+## a struck dot for a sealed way that names no destination, the plain dot
+## for a door between rooms and for a neighbour's side.
 ##
 ## Two views: a corner map, always on, centred on you and never showing past
 ## the zone's edge; and the big map (M), the whole zone fitted to most of the
@@ -36,6 +41,9 @@ static var DOOR: Color = UiTheme.color("brass")
 static var FRAME: Color = UiTheme.color("backing")
 static var START: Color = UiTheme.color("text")
 static var WAY_OUT: Color = UiTheme.color("party")
+static var SEALED: Color = UiTheme.color("text_dim")
+## The cues drawn as a glyph on the big map; the rest are the dot.
+const GLYPH_CUES: Array[String] = ["arch", "waystones", "down", "up", "sealed"]
 static var PLACE: Color = UiTheme.color("brass_bright")
 static var YOU: Color = UiTheme.color("text")
 
@@ -50,7 +58,9 @@ var image: Image
 var cells := Vector2i.ZERO
 var title := ""
 var starts: Array[Vector2i] = []
-## {cell, label}: links at their marker, neighbours at the middle of their side.
+## {cell, label, cue, facing}: links at their marker with their built cue
+## (Level.CUES) and the way it faces (a grid direction); neighbours at the
+## middle of their side, cue "edge", facing out.
 var ways_out: Array[Dictionary] = []
 ## {cell, name, kind}: the level's places.
 var places: Array[Dictionary] = []
@@ -157,16 +167,23 @@ func rebuild(level: Dictionary) -> void:
 	texture = ImageTexture.create_from_image(image)
 	starts.assign(level.get("starts", []))
 	ways_out.clear()
+	var cues := {}  # tile -> {cue, facing, variant} (Level.link_cues, 589).
+	for entry: Variant in terrain.get("link_cues", []):
+		if entry is Dictionary and entry.get("tile") is Vector2i:
+			cues[entry["tile"]] = entry
 	for link: Dictionary in level.get("links", []):
 		if bool(link.get("hidden", false)):
 			continue  # Not given away (608; 589 amended).
-		ways_out.append({"cell": link["tile"], "label": str(link["to_map"])})
+		var built: Dictionary = cues.get(link["tile"], {})
+		ways_out.append({"cell": link["tile"], "label": str(link["to_map"]), "cue": str(built.get("cue", link.get("cue", "none"))),
+			"facing": built.get("facing", Vector2i(0, 1)) if built.get("facing") is Vector2i else Vector2i(0, 1)})
 	var neighbours: Dictionary = level.get("neighbours", {})
+	var outward := {"north": Vector2i(0, -1), "south": Vector2i(0, 1), "west": Vector2i(-1, 0), "east": Vector2i(1, 0)}
 	for side: String in neighbours:
 		var middle := Vector2i(cells.x / 2, cells.y / 2)
 		var cell: Vector2i = {"north": Vector2i(middle.x, 0), "south": Vector2i(middle.x, cells.y - 1),
 			"west": Vector2i(0, middle.y), "east": Vector2i(cells.x - 1, middle.y)}.get(side, middle)
-		ways_out.append({"cell": cell, "label": str(neighbours[side])})
+		ways_out.append({"cell": cell, "label": str(neighbours[side]), "cue": "edge", "facing": outward.get(side, Vector2i(0, 1))})
 	places.clear()
 	var listed: Dictionary = level.get("places", {})
 	for key: String in listed:
@@ -285,9 +302,16 @@ func _draw() -> void:
 	for way: Dictionary in ways_out:
 		var at := to_screen(Vector2(way["cell"]), shown)
 		_mark(at, dest, func(p: Vector2) -> void:
-			draw_circle(p, dot + 1.5, WAY_OUT)
+			var cue := str(way.get("cue", "none"))
+			var colour := SEALED if cue == "sealed" else WAY_OUT
+			var glyph := big and cue in GLYPH_CUES
+			var reach := maxf(3.0 * dot, 7.0 * ui) if glyph else dot
+			if glyph:
+				_draw_cue(p, cue, on_screen(Vector2(way.get("facing", Vector2i(0, 1))), shown), reach)
+			else:
+				draw_circle(p, dot + 1.5, colour)
 			if big:
-				draw_string(font, p + Vector2(dot + 4, 5), "to " + str(way["label"]), HORIZONTAL_ALIGNMENT_LEFT, -1, label_size, WAY_OUT))
+				draw_string(font, p + Vector2(reach + 4, 5), label_of(cue, str(way["label"])), HORIZONTAL_ALIGNMENT_LEFT, -1, label_size, colour))
 	for place: Dictionary in places:
 		var at := to_screen(Vector2(place["cell"]), shown)
 		_mark(at, dest, func(p: Vector2) -> void:
@@ -326,3 +350,37 @@ func _draw() -> void:
 func _mark(at: Vector2, dest: Rect2, draw: Callable) -> void:
 	if dest.has_point(at):
 		draw.call(at)
+
+
+## A way out's words on the big map: where it leads, or for a sealed way
+## nothing of that (where it leads is learned by opening it).
+static func label_of(cue: String, to_map: String) -> String:
+	return "a sealed way" if cue == "sealed" else "to " + to_map
+
+
+## The glyph for [param cue] at [param p], [param facing] the way it stands
+## on screen (a unit vector), [param reach] its half size: an arch (two posts
+## and a bow toward the facing), a pair of waystones either side of the way,
+## a dark mouth (down), a light ring (up), a struck dot (sealed).
+func _draw_cue(p: Vector2, cue: String, facing: Vector2, reach: float) -> void:
+	var f := facing.normalized() if facing.length() > 0.001 else Vector2.DOWN
+	var r := f.rotated(PI / 2.0)
+	match cue:
+		"arch":
+			draw_circle(p - r * reach, reach * 0.3, WAY_OUT)
+			draw_circle(p + r * reach, reach * 0.3, WAY_OUT)
+			draw_arc(p, reach, (-r).angle(), (-r).angle() + PI, 24, WAY_OUT, 2.5, true)
+		"waystones":
+			for side: float in [-1.0, 1.0]:
+				draw_line(p + r * reach * side - f * reach * 0.6, p + r * reach * side + f * reach * 0.6, WAY_OUT, 3.0, true)
+		"down":
+			draw_circle(p, reach, WALL)
+			draw_arc(p, reach, 0.0, TAU, 32, WAY_OUT, 2.0, true)
+		"up":
+			draw_arc(p, reach, 0.0, TAU, 32, WAY_OUT, 2.0, true)
+			draw_circle(p, reach * 0.45, YOU)
+		"sealed":
+			draw_circle(p, reach * 0.5, SEALED)
+			draw_line(p - r * reach, p + r * reach, SEALED, 3.0, true)
+		_:
+			draw_circle(p, reach * 0.5, WAY_OUT)
