@@ -58,6 +58,10 @@ const WOODLOT := "wilds/soak_woodlot"
 ## start of that day (npc's Production.retrain, as Pip turns acolyte),
 ## leaving their bench for economy's 552 newcomer.
 var _retrain := {}
+## --rescue-after=DAYS: newcomers are sought (613): each is placed at a
+## stand-in refuge and brought home DAYS days after the word went out, a
+## player's rescue stood in for, so the measure still grows trades.
+var _rescue_after := -1.0
 const QUESTIONS := ["Who are you?", "What is new in the town?", "What do you need?", "What do you think of %s?", "Is it true that %s"]
 var _prev := {}  # Main's own context callbacks, put back before the quit.
 ## Hails (554), the mood (555) and the road's knowledge (551 phase 2), the
@@ -114,6 +118,8 @@ func _run() -> void:
 			var parts := arg.trim_prefix("--retrain=").split(":")
 			if parts.size() == 3:
 				_retrain = {"name": parts[0], "trade": parts[1], "day": int(parts[2])}
+		elif arg.begins_with("--rescue-after="):
+			_rescue_after = maxf(float(arg.trim_prefix("--rescue-after=")), 0.0)
 		elif arg.begins_with("--woodlot-taken="):
 			_woodlot_taken = int(arg.trim_prefix("--woodlot-taken="))
 	if _out.is_empty() or _out.begins_with("/var/lib/psykinetic") or _out.begins_with("user://"):
@@ -177,6 +183,9 @@ func _run() -> void:
 	World.production.set_away(WREN, false)
 	if _hail_day:
 		_seed_hail_day()
+	if _rescue_after >= 0.0:
+		World.towns.place_sought = func(_town: String, _trade: String, _kinds: Array, _id: String) -> Dictionary:
+			return {"place": "soak_refuge", "where": "wilds"}
 	if _woodlot != Vector2i(-99999, -99999):
 		# A place the level doesn't have, for the measure only: put straight into Holdings.
 		var store: Dictionary = World.holdings.place(TOWN)
@@ -316,6 +325,13 @@ func _hourly() -> void:
 	if hour == 0 and day == _woodlot_taken and World.holdings.place(WOODLOT).size() > 0:
 		World.holdings.take(WOODLOT, "goblins")
 		print("SOAK day %d: goblins take the woodlot" % day)
+	if _rescue_after >= 0.0:
+		for entry: Dictionary in World.towns.sought(TOWN):
+			if World.steps - int(entry["since"]) >= int(_rescue_after * DayNight.day_steps) and not str(entry["place"]).is_empty():
+				World.towns.free_sought(str(entry["id"]), "soak")
+				World.towns.sought_home(str(entry["id"]))
+				_count("sought_home")
+				print("SOAK day %d: %s the %s is found and brought home" % [day, entry["name"], entry["trade"]])
 	if hour == 0 and not _retrain.is_empty() and day == int(_retrain["day"]):
 		for who in World.towns.residents(TOWN):
 			if str(World.production.worker(who).get("name", "")) == _retrain["name"]:

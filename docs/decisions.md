@@ -22540,3 +22540,63 @@ combat_test _test_own_blow, _test_bound_axe; monster_test keeps "stamina_regen" 
 draugr_fight_test takes his breath and blows from the row. Sim only, protocol
 unchanged, no new class_name.
 
+## 613. The sought: a town's newcomer is found, rescued and brought home (economy's side)
+
+Jeff (2026-10-22, through the coordinator): "npcs for the town are found
+in the wilds, the hills, or forest, or under the castle in the dungeons.
+rescue and return to town, like the original black smith quest. black
+smith could be a castle npc." The town's need spawns a person to find,
+not an arrival, for every newcomer trade from now on. One number with each
+tree's side under it (as 580): economy's here; maps' refuges and
+place_sought, npc's body, lines and escort, enemy-ai's guards and the
+follower downed but not killed, dungeon's castle cells follow. Approved by
+the coordinator 2026-10-22 with npc's sight rule alone deciding when a held
+one may follow (no holder_fell); Jeff may veto the specifics.
+
+- **The need.** Every arrival (the farmer, the shepherd, the weaver, the
+  woodcutter, 552's makers, and later trades through Towns._arrive) is
+  sought instead of moved in once Towns.place_sought is set and rules'
+  "sought" is given; unset, newcomers walk in as before (so this lands
+  changing nothing in play until maps sets it).
+- **The entry.** Towns._seek makes them a worker of the town at once,
+  away, origin "sought" (npc's ask: their card, body and talk come free):
+  no work, meals, rent or wage, not a resident, not in the room count; the
+  town's record keeps sought {id: {id, name, trade, place, where, holder,
+  since, next_try, freed_by}}, saved. A sought trade counts as had
+  (_has_trade), so no second one is wanted.
+- **Placed.** Towns._sought_turn each tick: an unplaced entry past
+  next_try asks place_sought(town, trade, where_kinds, id) with the
+  trade's kinds (rules' sought.where, else sought.default) less "camp";
+  maps answers a refuge's place id or {place, where}, or "". Else, for
+  "camp", a hostile camp whose freed go home to the town holds them as a
+  captive (518's path), its fall bringing them home (note_rescue →
+  sought_home). Else tried again a day on. A refuge whose where has a
+  sought.guards row is held by that faction (enemy-ai stands its guards
+  there, picking their kinds and count); otherwise nobody: the lost.
+- **Freed, lost, home.** free_sought(id, player) when the escort starts
+  (npc), out of a camp's held; sought_lost(id) back to unplaced, tried
+  again after sought.restock_days (5) somewhere else; sought_home(id)
+  when they reach the town: a resident at work, rescue experience,
+  rescued(town, id, "sought:<place>"), what the trade brings (the
+  shepherd's flock, now Towns._arrived on either path). sought_changed
+  (town, id) on each change. A town that gets one of the trade another
+  way (a camp's stranger) drops an entry nobody is leading home.
+- **Words.** Towns.where_words(where) ("in the hills", "under the
+  castle", "held at a camp") for the log and npc's officials: "word is
+  Edda the farmer was seen in the hills".
+- **Soak.** town_soak --rescue-after=DAYS stands a rescuer in: a stand-in
+  refuge, each sought brought home DAYS after the word went out.
+- economy.json "sought": where {smith: [castle_dungeon, camp], butcher:
+  [hills, forest, camp], fisherman: [wilds, camp]}, default [wilds,
+  forest, hills, camp], guards {castle_dungeon: {faction goblins, band: imp x3, brute x1
+  (enemy-ai's pick, counts not yet confirmed)}}, restock_days 5.
+  Jeff on the smith: "heard rumors of a great dwarven forge deep below -
+  he brought a expedition of hired guards ... they got ambushed and he
+  was captured, forced to work goblin weapons that supply the blood rot
+  raids": held by the goblins at dungeon's great dwarven forge.
+
+farm_test _test_sought (a farmer sought not walked in, a worker away;
+maps asked with the default kinds; placed, freed, lost, placed elsewhere
+after restock_days, saved, home a resident with experience; held at a
+camp and home with its fall; answered by another). Server only; protocol
+unchanged; no new class_name.

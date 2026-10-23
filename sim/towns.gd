@@ -65,6 +65,9 @@ signal resident_died(town: String, who_id: String, name: String, why: String)
 ## A building of [param town]'s changed state or level (unlocked, built,
 ## raised, damaged, repaired): the views redraw it (buildings_of).
 signal building_changed(town: String, kind: String)
+## [param town]'s sought entry [param id] was made, placed, freed, lost or
+## came home (decision 613): npc's bodies and maps' holders read sought().
+signal sought_changed(town: String, id: String)
 
 var rules := {}
 var production: Production
@@ -92,6 +95,10 @@ var companion_of := Callable()
 ## freed go home to (the nearest held store by routes).
 var camps := Callable()
 var home_of := Callable()
+## The sought (decision 613; maps sets it from Main): (town, trade,
+## where_kinds, id) -> a refuge's place id, or {place, where}, or "" for
+## none today. Unset, a town's newcomers walk in as before.
+var place_sought := Callable()
 var wells := Callable()
 ## (town, from, to) -> [{id, strength}]: the storms over the town between
 ## two steps that count (strength at least its climate's storm_min; Main:
@@ -295,6 +302,8 @@ func note_rescue(town: String, who_id: String, name: String, trade: String, orig
 	var record := _town(town)
 	if who_id in record["residents"]:
 		return false
+	if record.get("sought", {}).has(who_id):
+		return sought_home(who_id)  # Sought, held at a camp that fell (613).
 	var held: Array = record["captives"].filter(func(each: Dictionary) -> bool: return each["id"] == who_id)
 	if not held.is_empty() and who_id.begins_with("companion:"):
 		# A companion (decision 314): Main frees her into this town, a
@@ -449,6 +458,7 @@ func tick() -> void:
 		_woodcut(town)
 		_woodcutter_comes(town)
 		_maker_comes(town)
+		_sought_turn(town)
 		# One build at a time, unless the one in hand has stalled on its
 		# materials (decision 522).
 		if production.building_in(town) and not production.builds_stalled(town):
@@ -1074,9 +1084,8 @@ func _farmer_comes(town: String) -> void:
 	var house := building(town, "field")
 	if int(house.get("level", 0)) < 1 or house.get("state") != STANDING:
 		return
-	for who in residents(town):
-		if "farmer" in production.worker(who).get("trades", []):
-			return
+	if _has_trade(town, "farmer"):
+		return
 	var rule: Dictionary = rules.get("crop", {})
 	var record := _town(town)
 	var waiting_since := int(record.get("farmer_wanted", -1))
@@ -1091,10 +1100,7 @@ func _farmer_comes(town: String) -> void:
 	var names: Array = rule.get("names", ["Tam"])
 	var name := _free_name(town, names, absi(hash("%s/%d" % [town, count])))
 	var id := "farmer_%s_%d" % [town.replace("/", "_"), count]
-	if production.add_worker(id, name, ["farmer"], town, "growth"):
-		record["residents"].append(id)
-		_note(town, "%s the farmer comes to work the field" % name)
-		_seat(town)
+	_arrive(town, id, name, "farmer", "%s the farmer comes to work the field" % name)
 
 
 # --- Sheep and wool (decision 500) ---------------------------------------------------
@@ -1169,11 +1175,7 @@ func _stands(town: String, kind: String) -> bool:
 func _shepherd_comes(town: String) -> void:
 	var rule: Dictionary = rules.get("flock", {})
 	var wanted: bool = not rule.is_empty() and _stands(town, "pasture")
-	if _comes(town, str(rule.get("trade", "shepherd")), wanted, float(rule.get("growth_days", 3)), rule.get("names", ["Wat"]), "shepherd"):
-		var record := _town(town)
-		if not record.has("flock"):
-			record["flock"] = {"count": float(rule.get("start", 6)), "season": Season.name_at(now()), "sheared": false, "worked": 0, "at": now()}
-			_note(town, "the shepherd brings a flock of %d" % int(rule.get("start", 6)))
+	_comes(town, str(rule.get("trade", "shepherd")), wanted, float(rule.get("growth_days", 3)), rule.get("names", ["Wat"]), "shepherd")
 
 
 ## A town whose loom stands (built once the store holds flock.weaver.wool
@@ -1192,7 +1194,7 @@ func _weaver_comes(town: String) -> void:
 ## the tick one comes.
 func _comes(town: String, trade: String, wanted: bool, days: float, names: Array, key: String) -> bool:
 	var record := _town(town)
-	if not wanted or residents(town).any(func(who: String) -> bool: return trade in production.worker(who).get("trades", [])):
+	if not wanted or _has_trade(town, trade):
 		record.erase("%s_wanted" % key)
 		return false
 	var waiting_since := int(record.get("%s_wanted" % key, -1))
@@ -1206,12 +1208,7 @@ func _comes(town: String, trade: String, wanted: bool, days: float, names: Array
 	record.erase("%s_wanted" % key)
 	var name := _free_name(town, names, absi(hash("%s/%s/%d" % [town, key, count]))) if not names.is_empty() else trade.capitalize()
 	var id := "%s_%s_%d" % [key, town.replace("/", "_"), count]
-	if not production.add_worker(id, name, [trade], town, "growth"):
-		return false
-	record["residents"].append(id)
-	_note(town, "%s the %s comes to %s" % [name, trade, town])
-	_seat(town)
-	return true
+	return _arrive(town, id, name, trade, "%s the %s comes to %s" % [name, trade, town])
 
 
 ## A town with a workshop of a maker's trade (Items.TRADES) or of a
@@ -1238,6 +1235,231 @@ func _maker_comes(town: String) -> void:
 	for trade: String in names:
 		# _comes forgets the wait once one of the trade is there.
 		_comes(town, trade, true, float(rule.get("growth_days", 3)), rule.get("names", []), "%s_newcomer" % trade)
+
+
+# --- The sought (decision 613) -------------------------------------------------------
+
+## Whether [param town] has someone of [param trade]: a resident, or one
+## sought for it (613: the town waits for them to be found).
+func _has_trade(town: String, trade: String) -> bool:
+	for each: Dictionary in _town(town).get("sought", {}).values():
+		if str(each["trade"]) == trade:
+			return true
+	return residents(town).any(func(who: String) -> bool: return trade in production.worker(who).get("trades", []))
+
+
+## Whether newcomers are found rather than walk in (613, Jeff: "npcs for
+## the town are found in the wilds, the hills, or forest, or under the
+## castle in the dungeons. rescue and return to town"): rules' sought and
+## maps' place_sought set.
+func _seeking() -> bool:
+	return not rules.get("sought", {}).is_empty() and place_sought.is_valid()
+
+
+## A newcomer [param id] ([param name], of [param trade]) for
+## [param town]: sought (613) when the town's newcomers are found, else
+## moved in by growth as before, the log saying [param line]. True when
+## they are in town now.
+func _arrive(town: String, id: String, name: String, trade: String, line: String) -> bool:
+	if _seeking():
+		_seek(town, id, name, trade)
+		return false
+	if not production.add_worker(id, name, [trade], town, "growth"):
+		return false
+	_town(town)["residents"].append(id)
+	_note(town, line)
+	_seat(town)
+	_arrived(town, trade)
+	return true
+
+
+## What a newcomer of [param trade] brings to [param town] on coming:
+## the shepherd his flock (500).
+func _arrived(town: String, trade: String) -> void:
+	var rule: Dictionary = rules.get("flock", {})
+	var record := _town(town)
+	if not rule.is_empty() and trade == str(rule.get("trade", "shepherd")) and not record.has("flock"):
+		record["flock"] = {"count": float(rule.get("start", 6)), "season": Season.name_at(now()), "sheared": false, "worked": 0, "at": now()}
+		_note(town, "the shepherd brings a flock of %d" % int(rule.get("start", 6)))
+
+
+## [param town] wants one of [param trade]: [param id] ([param name]) is
+## made a worker of the town away from day one (origin "sought": no work,
+## meals, rent or wage, not a resident) and an entry kept until they are
+## found and brought home (sought_home). Placed by _sought_turn.
+func _seek(town: String, id: String, name: String, trade: String) -> void:
+	if not production.add_worker(id, name, [trade], town, "sought"):
+		return
+	production.set_away(id, true)
+	var record := _town(town)
+	record["sought"] = record.get("sought", {})
+	record["sought"][id] = {"id": id, "name": name, "trade": trade, "place": "", "where": "", "holder": "",
+		"since": now(), "next_try": now(), "freed_by": ""}
+	_note(town, "%s has no %s: word goes out for one" % [town, trade.replace("_", " ")])
+	sought_changed.emit(town, id)
+
+
+## [param town]'s sought entries: [{id, name, trade, place ("" not yet
+## placed), where (the place's where-word: wilds, hills, forest,
+## castle_dungeon, camp), holder (the faction holding them: a camp's, or
+## rules' sought.guards for the where, whose guards enemy-ai stands at the
+## place; "" lost), since, next_try, freed_by (the player leading them home, "")}].
+func sought(town: String) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var record: Dictionary = _towns.get(town, {}).get("sought", {})
+	var ids: Array = record.keys()
+	ids.sort()
+	for id: String in ids:
+		out.append((record[id] as Dictionary).duplicate())
+	return out
+
+
+## The sought entry [param id] with its "town", {} if none.
+func sought_entry(id: String) -> Dictionary:
+	for town: String in _towns:
+		var record: Dictionary = _towns[town].get("sought", {})
+		if record.has(id):
+			var out: Dictionary = (record[id] as Dictionary).duplicate()
+			out["town"] = town
+			return out
+	return {}
+
+
+## Each turn for [param town]: an entry whose trade a resident now has (a
+## stranger freed from a camp, say) and nobody leads home is dropped; an
+## unplaced one past its next_try is placed: maps' refuge of one of its
+## where-kinds (rules' sought.where for the trade, else sought.default),
+## else for "camp" a hostile camp whose freed go home here (518's path:
+## a captive held there, freed with the camp). None: tried again a day on.
+func _sought_turn(town: String) -> void:
+	var record := _town(town)
+	if not record.has("sought"):
+		return
+	var rule: Dictionary = rules.get("sought", {})
+	var ids: Array = record["sought"].keys()
+	ids.sort()
+	for id: String in ids:
+		var entry: Dictionary = record["sought"][id]
+		var trade := str(entry["trade"])
+		if str(entry["freed_by"]).is_empty() and residents(town).any(func(who: String) -> bool: return trade in production.worker(who).get("trades", [])):
+			_unhold(town, id)
+			record["sought"].erase(id)
+			production.remove_worker(id)
+			_note(town, "%s has a %s again: the word for one is called off" % [town, trade.replace("_", " ")])
+			sought_changed.emit(town, id)
+			continue
+		if not str(entry["place"]).is_empty() or now() < int(entry["next_try"]):
+			continue
+		var kinds: Array = rule.get("where", {}).get(trade, rule.get("default", []))
+		var refuges: Array = kinds.filter(func(kind: Variant) -> bool: return str(kind) != "camp")
+		var found: Variant = place_sought.call(town, trade, refuges, id) if place_sought.is_valid() and not refuges.is_empty() else ""
+		if found is Dictionary and not str(found.get("place", "")).is_empty():
+			entry["place"] = str(found["place"])
+			entry["where"] = str(found.get("where", ""))
+		elif found is String and not found.is_empty():
+			entry["place"] = found
+		if not str(entry["place"]).is_empty():
+			entry["holder"] = str(rule.get("guards", {}).get(str(entry["where"]), {}).get("faction", ""))
+		elif "camp" in kinds and camps.is_valid():
+			for camp: Dictionary in camps.call():
+				var id_camp := str(camp["id"])
+				if home_of.is_valid() and str(home_of.call(id_camp)) != town:
+					continue
+				entry["place"] = id_camp
+				entry["where"] = "camp"
+				entry["holder"] = str(camp["faction"])
+				record["captives"].append({"id": id, "name": entry["name"], "trade": trade, "origin": "sought:%s" % id_camp,
+					"purse": 0, "taken_at": now(), "by": entry["holder"], "held_by": id_camp})
+				break
+		if str(entry["place"]).is_empty():
+			entry["next_try"] = now() + maxi(DayNight.day_steps, 1)
+			continue
+		_note(town, "word is %s the %s was seen %s" % [entry["name"], trade.replace("_", " "), where_words(str(entry["where"]))])
+		sought_changed.emit(town, id)
+
+
+## The words for a sought's [param where] ("in the hills", "under the
+## castle"), for the log and npc's officials.
+static func where_words(where: String) -> String:
+	match where:
+		"camp":
+			return "held at a camp"
+		"castle_dungeon":
+			return "under the castle"
+		"wilds":
+			return "in the wilds"
+		"":
+			return "somewhere out there"
+	return "in the %s" % where.replace("_", " ")
+
+
+## Sought [param id] is freed by player [param by] (npc: a word to the
+## lost, or to the held when no holder sees them) and follows them home:
+## out of a camp's held so its fall doesn't bring them too. False if not
+## placed or led already.
+func free_sought(id: String, by: String) -> bool:
+	var entry := sought_entry(id)
+	if entry.is_empty() or str(entry["place"]).is_empty() or not str(entry["freed_by"]).is_empty():
+		return false
+	var town := str(entry["town"])
+	_unhold(town, id)
+	_town(town)["sought"][id]["freed_by"] = by
+	_note(town, "%s the %s is found and led home" % [entry["name"], str(entry["trade"]).replace("_", " ")])
+	sought_changed.emit(town, id)
+	return true
+
+
+## Sought [param id] lost on the way (left, or downed and not roused, by
+## npc's word): back to unplaced, tried again after rules'
+## sought.restock_days, somewhere else. False for no such entry.
+func sought_lost(id: String) -> bool:
+	var entry := sought_entry(id)
+	if entry.is_empty():
+		return false
+	var town := str(entry["town"])
+	_unhold(town, id)
+	var kept: Dictionary = _town(town)["sought"][id]
+	kept["place"] = ""
+	kept["where"] = ""
+	kept["holder"] = ""
+	kept["freed_by"] = ""
+	kept["next_try"] = now() + int(float(rules.get("sought", {}).get("restock_days", 5)) * maxi(DayNight.day_steps, 1))
+	_note(town, "%s the %s was lost on the way" % [entry["name"], str(entry["trade"]).replace("_", " ")])
+	sought_changed.emit(town, id)
+	return true
+
+
+## Sought [param id] reached their town (npc's came_home): a resident of
+## their trade from now, at work if the town has the building, rescue
+## experience, the rescued signal with by "sought:<place>", and what their
+## trade brings (the shepherd's flock). Also how a camp's fall brings a
+## held one (note_rescue). False for no such entry.
+func sought_home(id: String) -> bool:
+	var entry := sought_entry(id)
+	if entry.is_empty():
+		return false
+	var town := str(entry["town"])
+	var record := _town(town)
+	_unhold(town, id)
+	record["sought"].erase(id)
+	production.set_away(id, false)
+	if id not in record["residents"]:
+		record["residents"].append(id)
+	_note(town, "%s the %s, found %s, comes home to %s" % [entry["name"], str(entry["trade"]).replace("_", " "), where_words(str(entry["where"])), town])
+	add_xp(town, int(rules.get("xp", {}).get("rescue", 10)), "%s found" % entry["name"])
+	_seat(town)
+	_arrived(town, str(entry["trade"]))
+	rescued.emit(town, id, "sought:%s" % entry["place"])
+	sought_changed.emit(town, id)
+	return true
+
+
+## Sought [param id] no longer a captive held at a camp (518's path).
+func _unhold(town: String, id: String) -> void:
+	var record := _town(town)
+	for held: Dictionary in record["captives"].duplicate():
+		if held["id"] == id:
+			record["captives"].erase(held)
 
 
 # --- Woodcutters (decision 497) --------------------------------------------------
@@ -1293,8 +1515,7 @@ func _woodcutter_comes(town: String) -> void:
 		var job := production.job(int(house.get("job", 0))) if int(house.get("job", 0)) != 0 else {}
 		if house.get("state") == PLANNED and int(job.get("cost", {}).get("wood", 0)) > production.stockpile.count(town, "wood"):
 			short = true
-	var has_one := residents(town).any(func(who: String) -> bool: return trade in production.worker(who).get("trades", []))
-	if trade.is_empty() or not short or has_one:
+	if trade.is_empty() or not short or _has_trade(town, trade):
 		record.erase("woodcutter_wanted")
 		return
 	var waiting_since := int(record.get("woodcutter_wanted", -1))
@@ -1309,10 +1530,7 @@ func _woodcutter_comes(town: String) -> void:
 	var names: Array = rule.get("names", ["Bran"])
 	var name := _free_name(town, names, absi(hash("%s/wood/%d" % [town, count])))
 	var id := "woodcutter_%s_%d" % [town.replace("/", "_"), count]
-	if production.add_worker(id, name, [trade], town, "growth"):
-		record["residents"].append(id)
-		_note(town, "%s the woodcutter comes: the town has building to do and no wood" % name)
-		_seat(town)
+	_arrive(town, id, name, trade, "%s the woodcutter comes: the town has building to do and no wood" % name)
 
 
 # --- Wells and roofs (decision 426) -------------------------------------------------
@@ -1634,6 +1852,8 @@ func _free_name(town: String, names: Array, pick: int) -> String:
 		used[str(production.worker(who).get("name", ""))] = true
 	for each: Dictionary in record["captives"]:
 		used[str(each.get("name", ""))] = true
+	for each: Dictionary in record.get("sought", {}).values():
+		used[str(each.get("name", ""))] = true
 	for name: Variant in record.get("dead_names", []):
 		used[str(name)] = true
 	for i in names.size():
@@ -1737,6 +1957,16 @@ func from_dict(saved: Dictionary) -> void:
 			for camp: Variant in restock:
 				record["restock"][str(camp)] = int(restock[camp])
 		record["strangers_made"] = maxi(int(entry.get("strangers_made", 0)), 0)
+		var sought_saved: Variant = entry.get("sought", {})
+		if sought_saved is Dictionary:
+			for id: Variant in sought_saved:
+				var each: Variant = sought_saved[id]
+				# A sought is a worker (613): one whose worker is gone is dropped.
+				if each is Dictionary and not production.worker(str(id)).is_empty():
+					record["sought"] = record.get("sought", {})
+					record["sought"][str(id)] = {"id": str(id), "name": str(each.get("name", "")), "trade": str(each.get("trade", "")),
+						"place": str(each.get("place", "")), "where": str(each.get("where", "")), "holder": str(each.get("holder", "")),
+						"since": int(each.get("since", 0)), "next_try": int(each.get("next_try", 0)), "freed_by": str(each.get("freed_by", ""))}
 		var crop_saved: Variant = entry.get("crop", {})
 		if crop_saved is Dictionary and not crop_saved.is_empty():
 			record["crop"] = {"stage": str(crop_saved.get("stage", "")), "growth": maxf(float(crop_saved.get("growth", 0.0)), 0.0),

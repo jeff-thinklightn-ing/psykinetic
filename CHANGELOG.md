@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- A town's newcomers no longer walk in: once maps places them, each is found somewhere out in the land, held at a camp or under the castle, or lost in the hills or forest, and joins the town when a player brings them home (613, economy's side).
 - The draugr's thrown axe is bound to him: nobody can pick it up mid-fight (only a won pact gives you an axe), and once his charge is stopped he fights with his fists only until he walks back to it.
 - A battle axe won from the draugr knocks foes down again in your hands; his own blows with it stay slow, heavy hits, and only his spin floors you. He gets his breath back faster, so a long fight sees a second spin about a minute after the first (drafts for Jeff).
 - A left click on your own companion beside you makes her step out of your way at once, as walking into her does; from afar it walks you to her, in a corridor at her so you change places (611).
