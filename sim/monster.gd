@@ -1443,7 +1443,8 @@ static func read_kinds(path: String) -> Dictionary:
 			# Kept, or a peer reading the row never sees them: the client's
 			# person_words (the robbers drawn as people), the boss's breath.
 			"person": str(row.get("person", "")), "swing_stamina": bool(row.get("swing_stamina", false)),
-			"stamina_regen_every": maxi(1, int(row.get("stamina_regen_every", 1)))}
+			"stamina_regen_every": maxi(1, int(row.get("stamina_regen_every", 1))),
+			"waves": (row["waves"] as Array).duplicate(true) if row.get("waves") is Array else []}
 	return out
 
 

@@ -21895,6 +21895,18 @@ is_disarmed, boss_busy).
   (his hp past 75%, 50%, 25%) and at each back-off, the rest at the last.
   Till then (the coordinator: the waves are one of Jeff's drafts, riding
   with the fight) they all rise at the start, as before.
+- **The waves are the difficulty (603 amended; Jeff: "the waves are what
+  determines the difficulty of the encounter").** Not his blow or his
+  health: his row's "waves" in monsters.json, one entry a wave, `{"at":
+  hp share, "count": {deal: n}, "kinds": [kinds risen in turn],
+  "per_player": n more per player past the first in his lair at the
+  pact's start}` (rounded). Draugr.plan_waves builds the pact's waves from
+  it; DEFAULT_WAVES (and the row as landed) are today's numbers: normal's
+  one at 75%, hard's at 75% and 50%, per_player 0, skeletons. The
+  charges' extra dead (CHARGES_PER_RISEN, MOST_MORE_RISEN) go each to the
+  wave with fewest, earliest first, which splits them as the pool did. A
+  back-off raises the next wave early, and it does not come again.
+  RETINUE is gone. Tuning for a party is editing the row.
 - **Landed inert.** This side landed before combat's 602/603 (the cut
   before the fight): every choice is behind World.has_method("try_spin"),
   and monster_test `_test_draugr_mind` skips till then. Its CHANGELOG

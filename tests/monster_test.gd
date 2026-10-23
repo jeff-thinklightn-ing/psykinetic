@@ -101,6 +101,7 @@ func _ready() -> void:
 	_test_draugr()
 	_test_barrow_layers()
 	_test_draugr_mind()
+	_test_draugr_waves()
 	_test_charging()
 	_test_threatens()
 	_test_quieter()
@@ -2918,6 +2919,32 @@ func _test_quieter() -> void:
 			and e["x"][0].leash == 14,
 		"the barrow's kinds see 5 cells; a robber goes 14 from home (580; 10 in 561)")
 	Monster.idling = true
+
+
+## The counts of [param waves], in order.
+func _counts(waves: Array[Dictionary]) -> Array:
+	return waves.map(func(w: Dictionary) -> int: return int(w["count"]))
+
+
+func _test_draugr_waves() -> void:
+	print("
+== his waves of the dead, the fight's difficulty (603 amended, Jeff): his row's table, today's numbers by default ==")
+	var row: Array = Monster.kinds()["draugr"]["waves"]
+	_check(row.size() == 3 and float(row[0]["at"]) == 0.75, "his row's waves are read (%d)" % row.size())
+	var normal := Draugr.plan_waves(row, "normal", 0, 1)
+	var hard := Draugr.plan_waves(row, "hard", 0, 1)
+	_check(_counts(normal) == [1, 0, 0] and _counts(hard) == [1, 1, 0] and _counts(Draugr.plan_waves(row, "easy", 0, 1)) == [0, 0, 0],
+		"alone: normal's one at three quarters, hard's at three quarters and a half, easy's none (%s, %s)" % [_counts(normal), _counts(hard)])
+	_check(_counts(Draugr.plan_waves(row, "normal", 1, 1)) == [1, 1, 0] and _counts(Draugr.plan_waves(row, "normal", 3, 1)) == [2, 1, 1]
+		and _counts(Draugr.plan_waves(row, "hard", 3, 1)) == [2, 2, 1],
+		"the charges' extra dead each to the wave with fewest, as the pool split them")
+	_check(Draugr.plan_waves(row, "hard", 0, 1) == Draugr.plan_waves(Draugr.DEFAULT_WAVES, "hard", 0, 1), "the row's table is the default one")
+	var party := [{"at": 0.5, "count": {"normal": 1}, "kinds": ["skeleton", "skeleton_guard"], "per_player": 1},
+		{"at": 0.9, "count": {"normal": 0}, "per_player": 0.5}]
+	var four := Draugr.plan_waves(party, "normal", 0, 4)
+	_check(four[0]["at"] == 0.9 and _counts(four) == [2, 4] and four[1]["kinds"] == ["skeleton", "skeleton_guard"] and four[0]["kinds"] == ["skeleton"],
+		"a party of four: per player past the first, earliest wave first, skeletons by default (%s)" % [_counts(four)])
+	_check(_counts(Draugr.plan_waves(party, "normal", 0, 1)) == [0, 1], "alone, the same table: only its base")
 
 
 func _test_draugr_mind() -> void:

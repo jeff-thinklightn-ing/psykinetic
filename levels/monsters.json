@@ -124,6 +124,11 @@
 		"wields": {"right": "battle_axe"},
 		"yields": [{"item": "battle_axe"}],
 		"swing_stamina": true,
-		"stamina_regen_every": 4
+		"stamina_regen_every": 4,
+		"waves": [
+			{"at": 0.75, "count": {"easy": 0, "normal": 1, "hard": 1}, "kinds": ["skeleton"], "per_player": 0},
+			{"at": 0.5, "count": {"easy": 0, "normal": 0, "hard": 1}, "kinds": ["skeleton"], "per_player": 0},
+			{"at": 0.25, "count": {"easy": 0, "normal": 0, "hard": 0}, "kinds": ["skeleton"], "per_player": 0}
+		]
 	}
 }

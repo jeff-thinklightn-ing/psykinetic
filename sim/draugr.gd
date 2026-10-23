@@ -31,10 +31,9 @@ enum State { SEATED, PACT, AT_REST }
 ## reaches taken; their names are Main's barrow_won's.
 const DEALS: Array[Dictionary] = [{"name": "easy", "gold": 20, "charges": 5},
 	{"name": "normal", "gold": 50, "charges": 10}, {"name": "hard", "gold": 100, "charges": 15}]
-## His hp and blows at each deal, times his kind's; and the dead he raises
-## in his lair to fight beside him (0, 1 or 2 since decision 561).
+## His hp and blows at each deal, times his kind's (the dead he raises
+## beside him: his waves, DEFAULT_WAVES).
 const SCALE := {"easy": 1.0, "normal": 1.5, "hard": 2.0}
-const RETINUE := {"easy": 0, "normal": 1, "hard": 2}
 ## His level past the deal's (573, enemy-ai's side; drafts for Jeff): each
 ## charge held in his zone at a pact's start adds CHARGE_SCALE to his hp and
 ## blows, and each CHARGES_PER_RISEN one more of the dead, MOST_MORE_RISEN
@@ -67,14 +66,26 @@ const ASK_DELAY_TICKS := 30
 ## His mind in the fight (603, enemy-ai's side; combat's moves, Jeff's
 ## words): drafts. At BACK_OFF_STAMINA or under (after the spin) he backs
 ## off till no longer winded; his dead rise in waves as his hp passes
-## WAVES (and one at each back-off); he spins at 2 or more foes the sweep
+## each wave's "at" (and the next wave early at a back-off); he spins at 2 or more foes the sweep
 ## would catch, or 1 that struck him twice within STRUCK_TWICE_TICKS; he
 ## throws at a foe THROW_NEAR to THROW_FAR off with none beside him, never
 ## at one closing on him (nearer within CLOSING_TICKS, the coordinator's
 ## ruling: a thrown axe always leaves a real charge to make); he charges to
 ## his thrown axe; disarmed, his fists.
 const BACK_OFF_STAMINA := 10
-const WAVES: Array[float] = [0.75, 0.5, 0.25]
+## His waves of the dead, the fight's difficulty (Jeff: "the waves are what
+## determines the difficulty of the encounter"): his row's "waves", one
+## entry a wave, each {"at": his hp share it comes at, "count": {deal: how
+## many}, "kinds": the kinds that rise (in turn), "per_player": how many
+## more for each player past the first in his lair at the pact's start}.
+## Without the row's, DEFAULT_WAVES: today's numbers (normal's one dead at
+## three quarters, hard's two at three quarters and a half). The charges'
+## extra dead (CHARGES_PER_RISEN) go each to the wave with fewest, the
+## earliest first.
+const DEFAULT_WAVES: Array[Dictionary] = [
+	{"at": 0.75, "count": {"easy": 0, "normal": 1, "hard": 1}, "kinds": ["skeleton"], "per_player": 0},
+	{"at": 0.5, "count": {"easy": 0, "normal": 0, "hard": 1}, "kinds": ["skeleton"], "per_player": 0},
+	{"at": 0.25, "count": {"easy": 0, "normal": 0, "hard": 0}, "kinds": ["skeleton"], "per_player": 0}]
 const SPIN_EVERY_TICKS := 60
 const THROW_EVERY_TICKS := 100
 const THROW_NEAR := 6
@@ -103,6 +114,8 @@ var _stilled_tick := -100000
 var hall_shut := false
 ## The fight (603): the dead still to rise, the waves passed, when he may
 ## spin or throw next, whether he is backing off, when he was struck.
+## The dead still to rise in this pact: each wave's {"at", "count", "kinds"}.
+var _waves: Array[Dictionary] = []
 var _risen_left := 0
 var _waves_passed := 0
 var _next_spin := 0
@@ -271,25 +284,49 @@ func _foe_beside() -> bool:
 	return false
 
 
-## A wave due: his hp past the next of WAVES raises its share of the dead
-## still to rise.
+## A wave due: his hp past the next wave's "at" raises it.
 func _wave_due() -> void:
 	if state != State.PACT:
 		return
-	while _waves_passed < WAVES.size() and float(hp) <= float(max_hp) * WAVES[_waves_passed]:
-		_waves_passed += 1
+	while _waves_passed < _waves.size() and float(hp) <= float(max_hp) * float(_waves[_waves_passed]["at"]):
 		_raise_wave()
 
 
-## The next of his dead: their share of those left over the waves to come
-## (all left at the last), at least one while any are left.
+## The next of his waves risen (at its hp, or early when he backs off, when
+## it then does not come again); nothing once all have.
 func _raise_wave() -> void:
-	if _risen_left <= 0:
+	if _waves_passed >= _waves.size():
 		return
-	var waves_left := maxi(WAVES.size() - _waves_passed + 1, 1)
-	var count := mini(ceili(float(_risen_left) / waves_left), _risen_left)
-	_risen_left -= count
-	_raise_retinue(count)
+	var wave := _waves[_waves_passed]
+	_waves_passed += 1
+	_risen_left -= int(wave["count"])
+	_raise_retinue(int(wave["count"]), wave["kinds"])
+
+
+## This pact's waves from [param table] (his row's "waves") at [param level]
+## with [param extra] more dead (the charges') and [param players] in his lair.
+static func plan_waves(table: Array, level: String, extra: int, players: int) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for entry: Variant in table:
+		if not entry is Dictionary:
+			continue
+		var counts: Variant = entry.get("count", {})
+		var count := int(counts.get(level, 0)) if counts is Dictionary else 0
+		count += roundi(float(entry.get("per_player", 0)) * maxi(players - 1, 0))
+		var kinds: Array = []
+		for kind: Variant in (entry.get("kinds", []) as Array if entry.get("kinds") is Array else []):
+			kinds.append(str(kind))
+		if kinds.is_empty():
+			kinds = ["skeleton"]
+		out.append({"at": clampf(float(entry.get("at", 0.0)), 0.0, 1.0), "count": maxi(count, 0), "kinds": kinds})
+	out.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a["at"] > b["at"])
+	for i in (extra if not out.is_empty() else 0):
+		var fewest := 0
+		for w in out.size():
+			if out[w]["count"] < out[fewest]["count"]:
+				fewest = w
+		out[fewest]["count"] += 1
+	return out
 
 
 # --- Talk (npc's offer contract) ------------------------------------------------------
@@ -424,11 +461,21 @@ func start_pact(player: Player, level: String) -> void:
 	# His dead rise in waves through the fight (603), not all at once; all
 	# at once till combat's moves are in (the waves, a draft for Jeff, ride
 	# with the fight).
-	_risen_left = int(RETINUE.get(level, 0)) + mini(charges_met / CHARGES_PER_RISEN, MOST_MORE_RISEN)
-	if not World.has_method("try_spin"):
-		_raise_retinue(_risen_left)
-		_risen_left = 0
+	var row: Dictionary = Monster.kinds().get(str(spawn_spec.get("kind", "draugr")), {})
+	var table: Variant = row.get("waves")
+	var players := 0
+	for each in World.sought():
+		if each is Player and each.hp > 0 and _in_lair(each):
+			players += 1
+	_waves = plan_waves(table if table is Array and not (table as Array).is_empty() else DEFAULT_WAVES, level,
+		mini(charges_met / CHARGES_PER_RISEN, MOST_MORE_RISEN), players)
+	_risen_left = 0
+	for wave in _waves:
+		_risen_left += int(wave["count"])
 	_waves_passed = 0
+	if not World.has_method("try_spin"):
+		while _waves_passed < _waves.size():
+			_raise_wave()
 	_next_spin = World.tick
 	_next_throw = World.tick
 	_target_was_of = null
@@ -562,8 +609,9 @@ func _rest_zones() -> Array[String]:
 	return out
 
 
-## [param count] of the dead raised round him in his lair (World.spawn_spec).
-func _raise_retinue(count: int) -> void:
+## [param count] of the dead raised round him in his lair (World.spawn_spec),
+## of [param kinds] in turn.
+func _raise_retinue(count: int, kinds: Array = ["skeleton"]) -> void:
 	if count <= 0 or not World.spawn_spec.is_valid():
 		return
 	var spots: Array[Vector2i] = []
@@ -574,7 +622,7 @@ func _raise_retinue(count: int) -> void:
 				spots.append(at)
 	spots.sort_custom(func(a: Vector2i, b: Vector2i) -> bool: return World.distance(tile, a) < World.distance(tile, b))
 	for i in mini(count, spots.size()):
-		var spec := Level._spec_for("monster_skeleton", Level.MONSTER_TYPES)
+		var spec := Level._spec_for("monster_" + str(kinds[i % kinds.size()]), Level.MONSTER_TYPES)
 		if spec.is_empty():
 			return
 		spec["name"] = "%sRisen%d" % [name, _retinue.size() + 1]
