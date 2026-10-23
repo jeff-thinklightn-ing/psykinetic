@@ -174,13 +174,65 @@ static func parse(response: Dictionary) -> Array:
 	var end := text.rfind("}")
 	if start < 0 or end <= start:
 		return []
-	var data: Variant = JSON.parse_string(text.substr(start, end - start + 1))
+	var json := JSON.new()  # The instance reports a failed parse without the engine's ERROR line (a cut-off answer is expected).
+	var data: Variant = json.data if json.parse(text.substr(start, end - start + 1)) == OK else null
 	if not data is Dictionary or not data.get("rulings") is Array:
-		return []
+		# Cut off at max_tokens (the box, 2026-10-23: a twelve-candidate answer ended mid-array and the round
+		# gave nothing): the whole rulings are kept and the rest wait for the next round.
+		var whole := _whole_rulings(text)
+		if whole.is_empty():
+			return []
+		print("[lawspeaker] the answer was cut off: %d whole rulings kept" % whole.size())
+		data = {"rulings": whole}
 	var out := []
 	for ruling: Variant in data["rulings"]:
 		if ruling is Dictionary and str(ruling.get("ruling", "")) in RULINGS and not str(ruling.get("candidate", "")).is_empty():
 			out.append(ruling)
+	return out
+
+
+## The complete objects of a "rulings" array cut off mid-way in [param text]
+## (an answer that hit max_tokens): each top-level {...} after the array's
+## "[", its braces balanced outside strings, parsed one by one; the open
+## last one is dropped, and so is anything after the array's "]".
+static func _whole_rulings(text: String) -> Array:
+	var out := []
+	var at := text.find("\"rulings\"")
+	if at < 0:
+		return out
+	at = text.find("[", at)
+	if at < 0:
+		return out
+	var json := JSON.new()
+	var depth := 0
+	var in_string := false
+	var escaped := false
+	var open := -1
+	for i in range(at + 1, text.length()):
+		var c := text[i]
+		if in_string:
+			if escaped:
+				escaped = false
+			elif c == "\\":
+				escaped = true
+			elif c == "\"":
+				in_string = false
+			continue
+		if c == "\"":
+			in_string = true
+		elif c == "{":
+			if depth == 0:
+				open = i
+			depth += 1
+		elif c == "}":
+			depth -= 1
+			if depth == 0 and open >= 0:
+				var one: Variant = json.data if json.parse(text.substr(open, i - open + 1)) == OK else null
+				if one is Dictionary:
+					out.append(one)
+				open = -1
+		elif c == "]" and depth == 0:
+			break
 	return out
 
 

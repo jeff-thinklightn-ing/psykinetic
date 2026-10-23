@@ -144,6 +144,11 @@ func _test_request() -> void:
 		and Lawspeaker.parse({"content": [{"type": "text", "text": "I cannot say."}]}).is_empty() and Lawspeaker.parse({"error": "x"}).is_empty()
 		and Lawspeaker.parse({"content": [{"type": "text", "text": "{\"rulings\": [{\"candidate\": \"tm.1\", \"ruling\": \"burn\"}]}"}]}).is_empty(),
 		"the answer parsed: fenced JSON, words, an error, an unknown ruling")
+	# Cut off at max_tokens (the box, 2026-10-23): the whole rulings kept, the open last one dropped, a string
+	# holding braces and an escaped quote read as a string.
+	var cut := Lawspeaker.parse({"content": [{"type": "text", "text": "{\"rulings\": [{\"candidate\": \"tm.1\", \"ruling\": \"accept\", \"because\": \"a } and a \\\" quote\"}, {\"candidate\": \"tm.2\", \"ruling\": \"leave\"}, {\"candidate\": \"tm.3\", \"ruling\": \"acc"}]})
+	_check(cut.size() == 2 and cut[0]["candidate"] == "tm.1" and cut[1]["candidate"] == "tm.2", "an answer cut off mid-array: the whole rulings kept, the rest wait (%s)" % [cut])
+	_check(Lawspeaker.parse({"content": [{"type": "text", "text": "{\"rulings\": [{\"candidate\": \"tm.1\", \"ruling\": \"acc"}]}).is_empty(), "cut off in the first ruling: nothing")
 
 
 func _test_apply() -> void:
