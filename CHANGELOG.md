@@ -7,6 +7,10 @@ notes (decision 324).
 
 ## Unreleased
 
+## v0.1.168
+
+- What goes over the network changes, so v0.1.167 and older can't join the server: update through the launcher first.
+- The live world changes with this update: the barrow's three levels are laid out afresh (burial niches and the hidden door, no way one cell wide); a new cache chest stands in the wilds' old farmstead hut; the hills' and the wilds' cliffs and ledges move onto their new curves, and anyone saved on a cell that changed comes back on the nearest floor; coin purses carried become gold.
 - The world now keeps felled forest and grows it back over the seasons, stump to grass to scrub to saplings to tree, ready for the woodcutters to clear the land (591).
 - The level builder says where a way is only one cell wide, so you and a companion can walk everything it builds side by side.
 - The old farmstead in the wilds hides a stash: search the chest in its north hut for the tools and bandages left behind, once each. The hut chests' loose bandaging kits are gone into it.
