@@ -36,6 +36,7 @@ func _ready() -> void:
 	_test_spin()
 	_test_spin_broken()
 	_test_throw_and_charge()
+	_test_bound_axe()
 	_test_level_draugr_armed()
 	_test_own_blow()
 
@@ -396,6 +397,58 @@ func _test_throw_and_charge() -> void:
 	for i in 20:
 		World.step()
 	_check(World.axe_state(boss)["where"] == "hand" and not World.is_disarmed(boss), "he reached it: the axe in his hands again")
+
+
+## His thrown axe bound to him while it lies (603 amended; Jeff: "player
+## can't pick up the axe mid fight, its magically bound to him"): nobody
+## picks it up; disarmed, he is armed again once he walks back to it; his
+## fight over, it comes back to his hands; gone, it is free.
+func _test_bound_axe() -> void:
+	print("
+== his axe bound to him: nobody takes it up; disarmed till he walks back to it; recalled; free once he is gone ==")
+	var e := _build(["###########", "#.P...m...#", "#.........#", "###########"])
+	var boss: GridEntity = e["m"][0]
+	_boss(boss)
+	World.set_slots(boss, Items.tidy(["", "", "", "", "battle_axe", ""], Items.CARRIED))
+	var player: GridEntity = e["P"][0]
+	_check(World.try_axe_throw(boss, Vector2i(1, 1)), "he throws down the row")
+	World._relocate(player, Vector2i(2, 2))  # Out of its line.
+	for i in 13:
+		World.step()
+	var axe := World.axe_state(boss)
+	var cell: Vector2i = axe["cell"]
+	_check(axe["where"] == "ground" and World.axe_bound(int(axe["uid"])), "it lies at %s, bound to him" % cell)
+	World._relocate(player, cell + Vector2i(0, 1))
+	_check(not World.try_pick_up(player, cell) and World.ground_uids(cell).has(int(axe["uid"])) and player.slots[Player.RIGHT_HAND].is_empty(),
+			"the player beside it cannot pick it up")
+	World._relocate(player, boss.tile + Vector2i(-1, 0))
+	_check(World.try_axe_charge(boss), "he charges for it")
+	for i in 12:
+		World.step()
+	_check(World.is_disarmed(boss), "the player in his way: disarmed")
+	World._relocate(player, Vector2i(9, 2))
+	for i in 3:
+		World.step()
+	_check(World.is_disarmed(boss) and World.axe_state(boss)["where"] == "ground", "away from it, he stays disarmed")
+	World._relocate(boss, cell + Vector2i(1, 0))
+	World.step()
+	_check(not World.is_disarmed(boss) and World.axe_state(boss)["where"] == "hand", "walked back beside it: he takes it up, armed again")
+	boss.stamina = 100
+	boss.winded = false
+	_check(World.try_axe_throw(boss, Vector2i(1, 1)), "thrown once more")
+	for i in 13:
+		World.step()
+	World.recall_axe(boss)
+	_check(World.axe_state(boss)["where"] == "hand" and not World.axe_bound(int(axe["uid"])), "his fight over: recalled to his hands")
+	boss.stamina = 100
+	_check(World.try_axe_throw(boss, Vector2i(1, 1)), "and thrown again")
+	for i in 13:
+		World.step()
+	var last := World.axe_state(boss)
+	World._forget_jobs(boss)  # As when he is killed and despawned.
+	_check(not World.axe_bound(int(last["uid"])) and World.ground_uids(last["cell"]).has(int(last["uid"])), "he is gone: it lies free, loot")
+	World._relocate(player, last["cell"] + Vector2i(0, 1))
+	_check(World.try_pick_up(player, last["cell"]) and player.slots[Player.RIGHT_HAND] == "battle_axe", "and a player beside it picks it up")
 
 
 ## A draugr a level places is armed, looted and housed as a Monster is

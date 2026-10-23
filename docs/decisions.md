@@ -22515,10 +22515,24 @@ arming fix, 8b958f55), on Jeff's draft list:
   spins; disarmed (his fists cost less), 27 s. At 2 every 4 there was no second
   spin in three minutes: regen waits stamina_regen_delay after each swing, and
   his swings ate the rest.
-- enemy-ai's side (THROW_NEAR 6, no throw at a target closing in) is its own
+- His axe bound to him (Jeff, answering the draft: "player can't pick up the
+  axe mid fight, its magically bound to him, only fulfilling the pact lets you
+  take the axe"): a thrown axe lying is World.axe_bound while its boss lives;
+  try_pick_up refuses it (Main says BOUND_AXE_WORDS, "The axe will not leave
+  his hall.", a draft), a monster's try_pick_up_weapon passes it over and the
+  stockpile does not bank it. Not items' soulbound, which binds to a player's
+  id. So the disarm is the stopped charge alone, and it lasts till he walks
+  back to his axe: World._tend_disarmed arms him again once he stands on its
+  cell or in reach of it, not mid anything (his mind walks him there,
+  enemy-ai's). World.recall_axe(by) puts it back in his hands when his fight
+  ends, won or lost (his mind calls it); the pact's prize stays his row's
+  "yields" (items' Monster.yielded). Killed, he is forgotten (_forget_jobs)
+  and the axe lies free as loot.
+- enemy-ai's side (THROW_NEAR 6, no throw at a target closing in; the walk back
+  to his axe and the recall; the waves deciding the difficulty) is its own
   amendment.
 
-combat_test _test_own_blow; monster_test keeps "stamina_regen" and "blows";
+combat_test _test_own_blow, _test_bound_axe; monster_test keeps "stamina_regen" and "blows";
 draugr_fight_test takes his breath and blows from the row. Sim only, protocol
 unchanged, no new class_name.
 

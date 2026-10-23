@@ -394,6 +394,9 @@ var _e_door: Door
 ## The off hand raised with the right button (World.off_hand): "block",
 ## "draw", or "" (the button shoves and tosses).
 var _stance := ""
+## Said when a player reaches for a boss's thrown axe (603 amended, a draft
+## for Jeff: it is bound to him till the pact is won).
+const BOUND_AXE_WORDS := "The axe will not leave his hall."
 ## The thing on the cursor (decision 593): {kind: "bandage", slot}; while
 ## set, a left click applies it and never attacks. {} for none.
 var _cursor_item := {}
@@ -10587,6 +10590,10 @@ func _item_command(player: Player, what: String, args: Dictionary) -> void:
 				cells.append(player.tile + direction)
 			for each in cells:
 				if not World.ground_uids(each).is_empty() and World.try_pick_up(player, each):
+					return
+			for each in cells:
+				if Array(World.ground_uids(each)).any(func(uid: int) -> bool: return World.axe_bound(uid)):
+					party_log.add(BOUND_AXE_WORDS)  # 603 amended: his, till the pact is won.
 					return
 		"drop":
 			var slot := held

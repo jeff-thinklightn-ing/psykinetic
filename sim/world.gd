@@ -2135,8 +2135,9 @@ func weapon_near(monster: GridEntity) -> Vector2i:
 ## free hand for, by its index there; -1 for none.
 func _weapon_index(monster: GridEntity, cell: Vector2i) -> int:
 	var ids := ground_at(cell)
+	var uids := ground_uids(cell)
 	for i in ids.size():
-		if not Items.verb_of(ids[i]).is_empty() and _free_hand(monster, ids[i]) >= 0:
+		if not Items.verb_of(ids[i]).is_empty() and _free_hand(monster, ids[i]) >= 0 and not axe_bound(uids[i]):
 			return i
 	return -1
 
@@ -3765,9 +3766,43 @@ func axe_state(by: GridEntity) -> Dictionary:
 
 
 ## Whether [param by]'s charge to its weapon was stopped (decision 603): it
-## fights without it.
+## fights without it till it walks back to it (603 amended:
+## _tend_disarmed).
 func is_disarmed(by: GridEntity) -> bool:
 	return bool(_axes.get(by, {}).get("disarmed", false))
+
+
+## Whether [param uid] is a boss's thrown weapon, bound to it while it lies
+## (603 amended; Jeff: "player can't pick up the axe mid fight, its
+## magically bound to him, only fulfilling the pact lets you take the
+## axe"): only he takes it up (_take_axe); nobody picks it up, arms with
+## it or banks it. Free once he is gone (_forget_jobs: killed, it lies as
+## loot); taken back to his hands when his fight ends (recall_axe).
+func axe_bound(uid: int) -> bool:
+	for by: GridEntity in _axes:
+		if int(_axes[by]["uid"]) == uid:
+			return true
+	return false
+
+
+## [param by]'s thrown weapon back in its hands from wherever it lies (603
+## amended: his fight over, won or lost, the bound axe goes home with him;
+## the pact's prize is his row's "yields"). Nothing when none lies.
+func recall_axe(by: GridEntity) -> void:
+	if not _axes.has(by):
+		return
+	_boss_moves.erase(by)
+	var axe: Dictionary = _axes[by]
+	var cell: Vector2i = axe["cell"]
+	var index := ground_uids(cell).find(int(axe["uid"]))
+	if index < 0 or _axe_slot(by) >= 0:
+		_axes.erase(by)
+		return
+	var uid := take_from_ground(cell, index)
+	if uid != 0:
+		_hand_set(by, Items.RIGHT_HAND, uid)
+	_axes.erase(by)
+	_log("axe: %s's weapon comes back to it" % by.name)
 
 
 ## Whether [param by] is in the middle of something (decision 603): a move
@@ -3833,6 +3868,19 @@ func _tend_boss_moves() -> void:
 			_spin_lands(by, job["shape"])
 		else:
 			_throw_lands(by, job["shape"])
+	_tend_disarmed()
+
+
+## A disarmed boss come back to its weapon (603 amended: "fists until he
+## reaches the axe"): standing on its cell or beside it (in reach), not mid
+## anything, it takes it up and is armed again. Its mind walks it there.
+func _tend_disarmed() -> void:
+	for by: GridEntity in _axes.keys():
+		if not bool(_axes[by].get("disarmed", false)) or not _alive(by) or boss_busy(by):
+			continue
+		var cell: Vector2i = _axes[by]["cell"]
+		if by.tile == cell or distance(by.tile, cell) == 1 and can_melee(by.tile, cell):
+			_take_axe(by)
 
 
 ## The spin's sweep (decision 603): every body in its cells struck, guard
@@ -4080,6 +4128,8 @@ func _bank_ground(zone_name: String, cell: Vector2i) -> void:
 	var uids := ground_uids(cell)
 	for index in range(uids.size() - 1, -1, -1):
 		var uid := uids[index]
+		if axe_bound(uid):
+			continue  # A boss's, while it lies (603 amended).
 		var yields := Items.yield_of(items.id_of(uid))
 		if yields.keys().any(func(what: Variant) -> bool: return str(what) not in Stockpile.RESOURCES):
 			continue  # A yield the stockpile has no count for: it stays where it is.
@@ -4151,6 +4201,8 @@ func try_pick_up(by: GridEntity, cell: Vector2i, index := -1) -> bool:
 	if index >= there.size():
 		return false
 	var uid := there[index]
+	if axe_bound(uid):
+		return false  # Bound to its boss while it lies (603 amended).
 	if _swap_bundle(by, cell, index):
 		return true
 	var slot := free_slot_for(by, items.id_of(uid))
