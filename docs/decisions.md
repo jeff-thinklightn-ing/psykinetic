@@ -24806,3 +24806,21 @@ must read the box's, its sound store must match the tag's takes.json (no take mo
 is published), and it runs land.sh like any cut. Anything server-side waits for main's next
 cut. Main stays the only line of development: the hotfix commit is a cherry-pick of one that
 landed on main first.
+
+## 580 step 3, art-kit's side: the feast hall's pieces, the throne's stand point
+
+Dungeon's halls dressed (C:/dev/review/dungeon/halls_dressed_design.md, the coordinator's
+nod) names four pieces for the Hall of Fallen Souls; art-kit makes them by hand in the
+barrow's palette (C:/dev/review/crypt/make_feast.py), cell slots with the design's
+footprints: building.round_table 3 x 3 (round, any facing), building.hall_chair 1 x 1
+(front +z, faced in to the table; seat 0.45 m, back 1.15 m, so a seated ghost's head
+shows), building.broken_table 2 x 1 (long side along x, collapsed toward +x, set against
+the wall) and building.throne 1 x 1 (front +z, back to -z). Dungeon lists the table and
+broken table SOLID and DOORLESS, the chair and throne OPEN_AIR (its 3b).
+The throne's seat block (0.44 m up) fills the middle of its cell, so the draugr standing
+at the cell's centre would sink into it. Ruled by the coordinator (2026-10-23): he stands
+at the piece's stand point, the throne slot's "stand": [x, y up, z] in the piece's frame,
+[0, 0.1, 0.4] (the plinth's front), until step 4 gives him a seated idle there. Dungeon
+and enemy-ai read that one number from the slot, turned by the piece's facing, never a
+hand offset; a slot with no "stand" is stood in at its cell's centre, as before.
+Art only, protocol unchanged, no new class_name.

@@ -1642,7 +1642,8 @@
 			"size": [0.947, 1.925, 0.93],
 			"budget": 1200,
 			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-23", "notes": "C:/dev/review/crypt/make_feast.py throne: the draugr's stone throne, a low plinth the whole cell, a seat block open to the front, low arms (0.68 m), a tall back with a stepped crown, a carved border and an old bronze sun disc with verdigris on its face; 1006 tris"},
-			"uses": "the draugr's throne on the dais (580 step 3, dungeon's halls dressed; the coordinator's nod), 1 x 1 at his cell, front +z (into the hall), back to -z; walked onto (Level.OPEN_AIR): he stands in its cell; the seat block is 0.44 m up in the cell's middle",
+			"uses": "the draugr's throne on the dais (580 step 3, dungeon's halls dressed; the coordinator's nod), 1 x 1 at his cell, front +z (into the hall), back to -z; walked onto (Level.OPEN_AIR): he stands in its cell at its stand point (\"stand\": [x, y up, z] in the piece's frame: the plinth's front, 0.4 toward +z, 0.1 up, clear of the seat block 0.44 m up in the cell's middle) until step 4's seated idle (the coordinator, 2026-10-23)",
+			"stand": [0, 0.1, 0.4],
 			"grey": [
 				{"at": [0, 0.963, 0], "size": [0.947, 1.925, 0.93]}
 			]
