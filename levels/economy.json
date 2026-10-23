@@ -88,7 +88,8 @@
 			"capacity_step": 25},
 		"places": {
 			"temple": {"trade": "priest", "names": ["Aldous", "Brother Cuth", "Osric", "Wendel"]},
-			"healers_hut": {"trade": "medicine_man", "outside": true, "names": ["Ned", "Old Tam", "Hob", "Gile"]}
+			"healers_hut": {"trade": "medicine_man", "outside": true, "names": ["Ned", "Old Tam", "Hob", "Gile"],
+				"makes": {"_": "Decision 641: what each healer's hut makes, by its place key or else its area; a hut not listed makes _default.", "_default": ["remedy"], "wilds": ["remedy", "stamina_potion"], "forest": ["remedy", "steadying_draught"]}}
 		}
 	},
 	"forage": {

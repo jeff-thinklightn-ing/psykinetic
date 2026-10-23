@@ -25636,3 +25636,40 @@ farm_test _test_herders (the coming, the drove down, a part sold, the
 unsold home, saved); economy_test _test_drove (the treasury's limit, never
 owed, the food bought back). Wire: the "folds" message kind, a line under
 PROTOCOL_REVISION 34. No new class_name.
+
+## 641. Several healers' huts, each with its own potions
+
+Jeff: "medicine man doesnt get lost, but there would be more than one, there
+could be multiple huts that offer different potions". The coordinator
+approved it.
+
+Most of it already held:
+- Main._seat_healers gives every Holdings place of kind healers_hut a
+  medicine man of its own, a holding with its own purse, shelf and herb buying.
+- Care (584) is per hut (PlayerRecord.care), and npc's fix returns a player
+  to the hut whose care they hold.
+- The medicine man has no sought row, so he is never lost.
+
+What is new:
+- Each hut makes its own list. economy.json return.places.healers_hut.makes
+  is looked up by the place's key, else its area, else "_default". The area
+  is there because a hut a building makes carries its cell in its key.
+  - "_default" is the remedy alone; the sick need it anywhere.
+  - The wilds (Hob's hut) make the remedy and the stamina potion.
+  - The forest makes the remedy and items' steadying draught (642). That
+    hut is maps' forest/healers_hut@45,31 (641, maps' side); until 642
+    lands, the draught has no recipe and the hut makes the remedy alone.
+  - Production.workshop_makes (workshop id) -> Array, which Main sets to
+    _workshop_makes, gates the recipe filter through Production.makes:
+    [] or unset means every recipe of the workshop's trade.
+  - Economy.maker_materials reads the same list, so a hut buys only the
+    herbs its own recipes use.
+- Distinct names: _seat_healers walks the places in id order. Each takes the
+  first name from its hash's place on that's no other of the trade's. Hob
+  keeps his, since a seated healer is never renamed.
+- Care stays per hut, at return.care's one price. A per-hut price would be
+  a later step.
+
+production_test _test_workshop_makes; return_test (a second hut far off:
+a second healer, another name, the remedy alone). Server only, protocol
+unchanged, no new class_name.

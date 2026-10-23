@@ -2953,6 +2953,8 @@ func _boot() -> void:
 	World.economy.shortfall = World.towns.shortfall
 	# The hill herders' droves, bought by the town (640).
 	World.towns.drove = World.economy.buy_drove
+	# Each healer's hut its own potions (641).
+	World.production.workshop_makes = _workshop_makes
 	World.towns.folds_changed.connect(_on_folds_changed)
 	World.production.build_lacks = func(town: String) -> Dictionary: return World.towns.shortfall(town).get("needs", {})
 	World.production.town_pays = World.economy.owe_or_pay
@@ -10953,15 +10955,38 @@ func _seat_healers() -> void:
 			continue
 		var trade := str(rule.get("trade", ""))
 		var names: Array = rule.get("names", [])
-		for id: String in World.holdings.all_places():
+		var ids := World.holdings.all_places()
+		ids.sort()
+		for id: String in ids:
 			if World.holdings.place(id).get("kind") != kind or not World.production.workshop(id).is_empty():
 				continue
 			var who := "%s:%s" % [trade, id]
-			var name := str(names[absi(hash(id)) % names.size()]) if not names.is_empty() else trade.capitalize()
+			# A name no other of the trade has (641: two huts, two healers).
+			var taken: Array = World.production.worker_ids().map(func(other: String) -> String:
+				return str(World.production.worker(other).get("name", "")) if trade in World.production.worker(other).get("trades", []) else "")
+			var name := trade.capitalize()
+			for k in names.size():
+				var pick := str(names[(absi(hash(id)) + k) % names.size()])
+				if pick not in taken:
+					name = pick
+					break
 			World.production.add_worker(who, name, [trade], id, "wilds")
 			World.production.add_workshop(id, trade, id)
 			World.production.assign(id, who)
 			print("[return] %s the %s keeps %s" % [name, trade.replace("_", " "), id])
+
+
+## What workshop [param workshop_id] makes (Production.workshop_makes,
+## 641): for a place of a return.places kind with "makes" (the healer's
+## hut), the list under the place's key, else its area's (a hut a building
+## makes has its cell in its key), else "_default"; [] (every recipe of its
+## trade) for any other.
+func _workshop_makes(workshop_id: String) -> Array:
+	var place := World.holdings.place(workshop_id) if World.holdings != null else {}
+	var makes: Variant = World.production.rules.get("return", {}).get("places", {}).get(str(place.get("kind", "")), {}).get("makes")
+	if place.is_empty() or not makes is Dictionary:
+		return []
+	return makes.get(str(place.get("key", "")), makes.get(str(place.get("area", "")), makes.get("_default", [])))
 
 
 ## The workshop of Holdings place [param id] where the fallen are brought

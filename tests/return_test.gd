@@ -178,6 +178,24 @@ func _test_main() -> void:
 		"the hut has its medicine man (%s)" % World.production.worker(keeper).get("name", "?"))
 	_main._seat_healers()
 	_check(World.production.worker_ids(id).size() == 1, "only one")
+	# Several huts (641): a second, far off, seated with a name of its own;
+	# each makes its own list (by key, else area, else _default).
+	var far := "farhills/healers_hut@9,9"
+	World.holdings._places[far] = {"id": far, "area": "farhills", "key": "healers_hut@9,9", "cell": Vector2i(9, 9), "name": "the far hut",
+		"kind": "healers_hut", "radius": 2, "worth": 0, "start": Factions.NOBODY}
+	World.holdings._holder[far] = Factions.NOBODY
+	_main._seat_healers()
+	var far_keeper := "medicine_man:" + far
+	var makes: Dictionary = World.production.rules["return"]["places"]["healers_hut"]["makes"]
+	_check(not World.production.worker(far_keeper).is_empty() and World.production.worker(far_keeper)["name"] != World.production.worker(keeper)["name"],
+		"a second hut, a second healer, another name (%s, %s)" % [World.production.worker(keeper)["name"], World.production.worker(far_keeper).get("name", "?")])
+	_check(_main._workshop_makes(far) == makes["_default"] and _main._workshop_makes(id) == makes.get(World.zone.name, makes["_default"])
+		and not World.production.makes(far, "stamina_potion") and World.production.makes(far, "remedy") and World.production.makes("nowhere:kitchen", "roast"),
+		"each hut its own list: the far one the remedy alone; any other workshop everything (%s)" % [_main._workshop_makes(far)])
+	World.production.remove_worker(far_keeper)
+	World.production._workshops.erase(far)
+	World.holdings._places.erase(far)
+	World.holdings._holder.erase(far)
 	var player := _player()
 	World.order_move(player, Vector2i(12, 6))
 	for i in 60:

@@ -503,10 +503,11 @@ func maker_materials(worker_id: String, cat := {}) -> Dictionary:
 	if cat.is_empty():
 		cat = catalog.call()
 	var trades: Array = production.worker(worker_id).get("trades", [])
+	var at := production.workshop_of(worker_id)
 	var out := {}
 	for id: String in cat:
 		var made: Variant = cat[id].get("made", {})
-		if not made is Dictionary or str(made.get("by", "")) not in trades:
+		if not made is Dictionary or str(made.get("by", "")) not in trades or not production.makes(at, id):
 			continue
 		var shelf := int(made.get("stock", rules.get("shop_cap", 6)))
 		var from: Dictionary = made.get("from", {})

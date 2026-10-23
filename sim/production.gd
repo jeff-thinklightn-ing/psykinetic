@@ -68,6 +68,10 @@ var on_built := Callable()
 ## made.needs asks (622, economy's side: plate at a village's forge;
 ## Towns sets it). Without it no recipe with needs is made.
 var town_has := Callable()
+## (workshop id) -> Array: the item ids a workshop makes (641: each healer's
+## hut its own potions; Main sets it from economy.json); [] or unset: every
+## recipe of its trade.
+var workshop_makes := Callable()
 ## (town, building id, worker_id, fee) -> int: what players gave toward a
 ## build pays its fee first, the rest kept by the town (Economy.settle_fund,
 ## decision 499); the gold it paid. Unset, the treasury pays it all.
@@ -1444,7 +1448,7 @@ func _bid(shop: Dictionary, wants: Array[String], signals: Dictionary, cat: Dict
 		return _order_bid(shop, first_build, starved)
 	var recipes: Array = cat.values().filter(func(entry: Dictionary) -> bool:
 		return _recipe_ok(entry) and entry["made"]["by"] == shop["trade"] \
-				and (not entry["made"].has("needs") or town_has.is_valid() and bool(town_has.call(shop["town"], entry["made"]["needs"]))))
+				and (not entry["made"].has("needs") or town_has.is_valid() and bool(town_has.call(shop["town"], entry["made"]["needs"]))) 				and makes(str(shop["id"]), str(entry["id"])))
 	# The remedy first while anyone is sick (562: rules' first_when_sick).
 	var when_sick: Array = rules.get("first_when_sick", [])
 	var sick := recipes.any(func(entry: Dictionary) -> bool: return entry["id"] in when_sick) 			and _workers.keys().any(func(id: String) -> bool: return not id.begins_with(Townsfolk.COMPANION) and Townsfolk.is_sick(self, id))
@@ -1506,6 +1510,13 @@ func _mends(shop: Dictionary, by: String) -> bool:
 		return false
 	return not worker_ids(shop["town"]).any(func(id: String) -> bool:
 		return by in _workers[id]["trades"] and not off_work(_workers[id]))
+
+
+## Whether workshop [param workshop_id] makes item [param id] (641:
+## workshop_makes' list, every recipe of its trade without one).
+func makes(workshop_id: String, id: String) -> bool:
+	var listed: Array = workshop_makes.call(workshop_id) if workshop_makes.is_valid() else []
+	return listed.is_empty() or id in listed
 
 
 func _recipe_ok(entry: Dictionary) -> bool:

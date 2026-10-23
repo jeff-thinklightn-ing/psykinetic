@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- There can be more than one healer's hut, each with its own healer and its own potions: Hob's hut still makes the remedy and the stamina potion, and any other hut the remedy and potions of its own (641).
 - Herders live out in the hills, at the herder's hut and the shieling, each keeping a few sheep in a fold; every few days they walk a drove down to a town with a butchery and sell it, and you can see the fold thin while they are gone (640, economy's side).
 - Armour is made in town: the tanner makes leather armour from leather, the weaver robes from cloth, and the smith plate from ore, but only once his town is a village with a forge; mail is never made, only found in the crypt and sold on by Snagfin (622, economy's side).
 - The server can now tell you how a town is doing: its people and trades, its treasury, whether its officials are paid, who is fed by the town or going hungry, who is sick, what it is short of and how much to bring, what is being built, who it seeks, and what it still lacks for its next stage (624, economy's side; ui's sheet shows it).

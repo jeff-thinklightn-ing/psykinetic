@@ -63,6 +63,7 @@ func _ready() -> void:
 	_test_fisherman()
 	_test_made_needs()
 	_test_mail_never_made()
+	_test_workshop_makes()
 
 	Level.unregister(TOWN)
 	print("")
@@ -480,3 +481,16 @@ func _test_mail_never_made() -> void:
 			seen[id] = true
 		_stock.deposit(STORE, "ore", 40, "test")
 	_check(not seen.has("mail_armour") and not seen.has("plate_armour"), "twenty days' work: no mail, no plate in the shop (%s)" % [seen.keys()])
+
+
+## A workshop's own list (641: each healer's hut its own potions): with
+## workshop_makes naming only the meal, the cook never starts a bandage
+## roll, though the town wants bandages first.
+func _test_workshop_makes() -> void:
+	print("
+== a workshop makes its own list ==")
+	_fresh({"gold": 100, "cloth": 10, "food": 10})
+	_work.workshop_makes = func(workshop_id: String) -> Array: return ["meal"] if workshop_id == "kitchen" else []
+	_at(0)
+	_check(_job_at("kitchen").get("recipe") == "meal" and not _work.makes("kitchen", "bandage_roll") and _work.makes("forge", "sword"),
+		"the kitchen makes the meal alone (%s)" % [_job_at("kitchen")])
