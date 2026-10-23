@@ -103,6 +103,11 @@ func _test_facts() -> void:
 				ok = ok and fact.get("knowers") is Array and not fact["knowers"].is_empty()
 			for knower in fact.get("knowers", []):
 				ok = ok and _knowers.has(knower)
+			# kept_by names the knowers who hold a secret back (Pip, paid for his silence).
+			if fact.has("kept_by"):
+				ok = ok and known == "secret" and fact["kept_by"] is Array and not fact["kept_by"].is_empty()
+				for keeper in fact.get("kept_by", []):
+					ok = ok and keeper in fact.get("knowers", [])
 			# A line to say would be quoted speech, or spoken in the first or second person.
 			ok = ok and not String(fact.get("text", "")).contains("\"") and not _personal(String(fact.get("text", ""))) \
 					and (not fact.has("weight") or (fact["weight"] is float and fact["weight"] > 0.0))
@@ -191,6 +196,7 @@ func _test_known_by() -> void:
 			{"id": "a.old", "text": "old", "known": "common", "where": ["far"], "tags": ["history"]},
 			{"id": "a.said", "text": "said", "known": "rumour", "where": ["near"], "true": false},
 			{"id": "a.hid", "text": "hid", "known": "secret", "where": [], "knowers": ["sage"]},
+			{"id": "a.kept", "text": "kept", "known": "secret", "where": [], "knowers": ["wren", "folk"], "kept_by": ["wren"]},
 			{"id": "a.mine", "text": "mine", "known": "lived", "where": [], "knowers": ["wren"]},
 			{"id": "a.draft", "text": "draft", "known": "common", "where": [], "status": "draft"},
 			{"id": "a.asked", "text": "asked", "known": "common", "where": [], "status": "asked", "ask": "X"},
@@ -208,7 +214,11 @@ func _test_known_by() -> void:
 	Lore.use(entries, knowers)
 	var ids := func(knower: String, least := "agreed") -> Array:
 		return Lore.known_by(knower, PackedStringArray(), least).map(func(fact: Dictionary) -> String: return fact["id"])
-	_check(ids.call("folk") == ["a.here", "a.all", "a.said"], "folk know their own region's facts and rumours and what everyone knows, not another region's %s" % [ids.call("folk")])
+	var kept := func(knower: String) -> bool:
+		return Lore.known_by(knower).filter(func(fact: Dictionary) -> bool: return fact["id"] == "a.kept")[0]["kept"]
+	_check(kept.call("wren") and not kept.call("folk") and not Lore.known_by("sage").any(func(fact: Dictionary) -> bool: return fact["kept"]),
+			"a secret is kept by the knowers its kept_by names, told by its other knowers")
+	_check(ids.call("folk") == ["a.here", "a.all", "a.said", "a.kept"], "folk know their own region's facts and rumours and what everyone knows, not another region's %s" % [ids.call("folk")])
 	_check(ids.call("sage") == ["a.all", "a.old", "a.hid"], "a sage knows what shares its tag wherever it is, and the secret it is named in %s" % [ids.call("sage")])
 	_check("a.mine" in ids.call("wren") and not "a.mine" in ids.call("folk"), "a lived fact is known to the one who lived it only")
 	var said: Dictionary = Lore.known_by("folk").filter(func(fact: Dictionary) -> bool: return fact["id"] == "a.said")[0]

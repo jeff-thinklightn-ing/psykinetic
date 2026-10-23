@@ -98,8 +98,9 @@ static func use(entry_list: Array, knower_list: Array, form_list := [], thing_li
 
 
 ## What [param knower] knows, in file order: [{id, text, hearsay, memory,
-## where, weight}] (where: the fact's region ids; weight: its own, else
-## DEFAULT_WEIGHT). [param about], when given, keeps the facts on any of
+## secret, kept, where, weight}] (kept: a secret the knower is named in the
+## fact's kept_by for, which it acts on and never tells; where: the fact's region
+## ids; weight: its own, else DEFAULT_WEIGHT). [param about], when given, keeps the facts on any of
 ## those topics (_about). [param least] is "agreed" (what code uses) or
 ## "draft" (to preview drafts).
 static func known_by(knower: String, about := PackedStringArray(), least := "agreed", type := "") -> Array[Dictionary]:
@@ -130,6 +131,7 @@ static func known_by(knower: String, about := PackedStringArray(), least := "agr
 			if knows and (about.is_empty() or _about(fact, entry, about)):
 				out.append({"id": fact.get("id", ""), "text": fact.get("text", ""),
 						"hearsay": known == "rumour", "memory": known == "lived", "secret": known == "secret",
+						"kept": known == "secret" and knower in fact.get("kept_by", []),
 						"where": fact.get("where", []).duplicate(), "weight": float(fact.get("weight", DEFAULT_WEIGHT))})
 	return out
 

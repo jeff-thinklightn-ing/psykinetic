@@ -245,6 +245,9 @@
 					"knowers": [
 						"pip"
 					],
+					"kept_by": [
+						"pip"
+					],
 					"tags": [],
 					"source": "Jeff",
 					"status": "agreed"

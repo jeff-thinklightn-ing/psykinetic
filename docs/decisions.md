@@ -23911,3 +23911,14 @@ freed_by. This side is the person.
   only); the hail's news cue on sought_changed; per-story lines and the
   wandering off (613 amended, economy's, after the morning landings).
   Server only; no wire change; no new class_name.
+## 615: kept secrets (kept_by), lore's side
+
+Jeff (2026-10-22): "Pip knows only enough to do the job, and part of his pay is to keep what he
+sees to himself". A secret fact may name, in `kept_by`, the knowers who hold it back: each must
+be one of its `knowers` (lore_test). `Lore.known_by(knower)` returns `kept` true on such a fact
+for those knowers only, so a fact can be kept by one knower and told by another: Aldous may tell
+a trusted player `crypt.pip_carries`, Pip never does. `kept_by ["pip"]` is on `pip.paid_silence`
+and `crypt.pip_carries`. npc's side (after this lands): `Resident.world_facts` never speaks a kept
+fact to any player and calls no `secret_told` for it; the prompt gives the deflection in his own
+words instead of the fact (the coordinator's ask), so a model slip can't leak it. Server only,
+protocol unchanged.
