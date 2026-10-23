@@ -1178,6 +1178,19 @@
 				{"at": [0.56, 0.923, 0.021], "size": [0.524, 1.846, 0.422]}
 			]
 		},
+		"prop.footprints": {
+			"category": "props",
+			"type": "mesh",
+			"kind": "cell",
+			"size": [0.774, 0.004, 0.806],
+			"middle": [-0.136, 0, 0.002],
+			"budget": 100,
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-22", "notes": "C:/dev/review/crypt_walls/make_footprints.py: flat, a hair above the floor (6 to 10 mm, over wall.crypt.cracked's own dust): an irregular patch of dust a shade lighter than floor.stone (row 1's #77766f on its #686661), boot prints pressed darker in it (#545049), three going in toward the wall and one coming back out, and a thin scuffed arc where wall.crypt.niche_open's slab swings out about its hinge; all short of the wall's face at x 0.25 (an edge piece takes half of wall.stone's 0.5 in the cell); 50 tris"},
+			"uses": "the hidden door's clue (decision 608 amended; Jeff's clues to the hidden door): on the floor cell before the true niche, +x toward its wall (terrain places it from the level's hidden niche entry, +x along -out), not solid; it stays on the open look (the prints are what was walked)",
+			"grey": [
+				{"at": [-0.136, 0.008, 0.002], "size": [0.774, 0.004, 0.806]}
+			]
+		},
 		"dais.edge": {
 			"category": "buildings",
 			"type": "mesh",
