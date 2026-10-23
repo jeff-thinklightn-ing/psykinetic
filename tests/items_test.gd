@@ -1513,8 +1513,9 @@ func _test_totem() -> void:
 			"charges up to its capacity: 3 of 5 taken, the rest spill; full, none more")
 	_check(World.totem_spend(uid) and World.totem_charges(uid) == 2, "one spent: 2 left")
 	var note := World.item_note(uid)
-	_check(note.begins_with("Draugr's Totem") and "2 charges" in note and note.ends_with("Carrying this totem allows you to receive another chance to fight."),
-			"its note: its charges and Jeff's words (%s)" % note)
+	_check(note.begins_with("Draugr's Totem") and "2 charges" in note and not "Carrying" in note
+			and str(Items.def(World.TOTEM)["about"]).ends_with("Carrying this totem allows you to receive another chance to fight."),
+			"its note: its charges; Jeff's words its about, which the tip shows (%s)" % note)
 	var chest := _chest()
 	var host_at := host.tile
 	_beside(host, chest)

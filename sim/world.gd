@@ -2961,10 +2961,7 @@ func item_note(uid: int) -> String:
 		more.append("blessed")  # Decision 424.
 	if not more.is_empty():
 		note = "%s, %s" % [note if not note.is_empty() else Items.name_of(items.id_of(uid)), ", ".join(more)]
-	var about := str(Items.def(items.id_of(uid)).get("about", ""))
-	if not about.is_empty():
-		note = "%s. %s" % [note if not note.is_empty() else Items.name_of(items.id_of(uid)), about]  # What it is for, in plain words.
-	return note
+	return note  # A kind's "about" is the tip's (ui's ItemTip), not the note's.
 
 
 ## What [param uid] has felled, as its slot's note shows it (decision 415):
