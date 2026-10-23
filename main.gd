@@ -4598,7 +4598,9 @@ func _send_barter(player: Player, shop: GridEntity, why := "", maker := "") -> v
 	var uids := World.slot_uids(player)
 	for slot in player.slots.size():
 		if not player.slots[slot].is_empty():
-			data["pack"].append({"slot": slot, "uid": uids[slot], "id": player.slots[slot]})
+			# A stack's every unit (decision 619): the barter gives that many of its uids.
+			data["pack"].append({"slot": slot, "uid": uids[slot], "id": player.slots[slot], "uids": World.slot_units(player, slot),
+				"count": World.slot_count(player, slot)})
 	if not maker.is_empty() and World.economy != null:
 		data["goods"] = World.economy.maker_goods(maker)
 		data["buys"] = World.economy.maker_buys(maker, Array(player.slots))
@@ -4743,13 +4745,11 @@ func retain(player: Player, args: Dictionary) -> String:
 		why = "he takes gold, herbs or antlers"
 	elif pay == "gold" and World.gold_of(me) < int(rule["retainer"]):
 		why = "not enough gold (%d)" % int(rule["retainer"])
-	var slots: Array[int] = []
+	var paid: Array[int] = []
 	if why.is_empty() and pay != "gold":
 		var left := int(rule[pay]) - int(care_given(me, hut).get(pay, 0))
-		for slot in player.slots.size():
-			if player.slots[slot] == pay and slots.size() < left:
-				slots.append(slot)
-		if slots.is_empty():
+		paid = World.units(player, pay).slice(0, maxi(left, 0))  # Unit by unit, stacks too (decision 619).
+		if paid.is_empty():
 			why = "no %s in your pack" % pay
 	var met := false
 	if why.is_empty():
@@ -4760,11 +4760,11 @@ func retain(player: Player, args: Dictionary) -> String:
 			met = true
 		else:
 			var store := str(World.production.worker(body.worker_id).get("town", ""))
-			for slot: int in slots:
-				var uid := World._take_out(player, slot)
-				if uid != 0 and not store.is_empty():
+			var taken := World.take_units(player, paid)
+			for uid: int in taken:
+				if not store.is_empty():
 					World._bank_thing(store, uid, _display_name(player), _display_name(player), player.zone, player.tile)
-			var total := care_give(me, hut, pay, slots.size())
+			var total := care_give(me, hut, pay, taken.size())
 			met = total >= int(rule[pay])
 			if not met:
 				Net.broadcast_to([player.owner_peer], "party", {"from": name,
@@ -6723,14 +6723,7 @@ func _on_handed(by: GridEntity, to: GridEntity, item: String, uid: int) -> void:
 func _out_of_hands(body: Resident, slot: int) -> int:
 	if slot < 0 or slot >= body.slots.size() or body.slots[slot].is_empty():
 		return 0
-	var uid := World.slot_uid(body, slot)
-	var kept := body.slots.duplicate()
-	var kept_uids := body.slot_items.duplicate()
-	kept[slot] = ""
-	kept_uids[slot] = 0
-	World.set_slots(body, kept, kept_uids)
-	World.items.place(uid, "")
-	return uid
+	return World._take_out(body, slot)  # One unit of a stack handed him (decision 619).
 
 
 ## The lawspeaker's client (decision 448): the builder's ClaudeClient when
@@ -7909,7 +7902,7 @@ func _on_command(entity: GridEntity, command_name: String, args: Dictionary) -> 
 		var from := get_node_or_null(NodePath(str(args.get("from", "")))) as GridEntity
 		var to := get_node_or_null(NodePath(str(args.get("to", "")))) as GridEntity
 		if from != null and to != null:
-			World.try_transfer(entity, from, int(args.get("from_slot", -1)), to, int(args.get("to_slot", -1)))
+			World.try_transfer(entity, from, int(args.get("from_slot", -1)), to, int(args.get("to_slot", -1)), int(args.get("count", 0)))
 	elif command_name == "door":
 		var edge: Variant = args.get("edge")
 		if edge is Array and edge.size() == 3:
@@ -9903,7 +9896,7 @@ func _hand_item(player_id: String, item_id: String, from_name: String) -> bool:
 		if not (entity is Player and entity.spawned and (entity as Player).player_id == player_id):
 			continue
 		var uid := World.items.mint(item_id, "made", from_name, World.zone.name, entity.tile)
-		var slot := World.free_slot_for(entity, item_id)
+		var slot := World.room_for(entity, uid)  # Onto a stack of its kind first (decision 619).
 		if slot < 0 or not World.put_item(entity, entity, slot, uid):
 			World.put_on_ground(uid, entity.tile)
 		return true
@@ -11236,7 +11229,7 @@ func search(player: Player, chest: Chest) -> bool:
 		var uid := World.items.mint(id, "cached", place, chest.zone, chest.tile)
 		if Items.condition_max(id) > 1:
 			World.items.set_condition(uid, maxi(1, Items.condition_max(id) / 2))
-		var slot := World.free_slot_for(player, id)
+		var slot := World.room_for(player, uid)  # Onto a stack of its kind first (decision 619).
 		if slot < 0 or not World.put_item(player, player, slot, uid):
 			World.put_on_ground(uid, player.tile)
 		counts[id] = int(counts.get(id, 0)) + 1
@@ -11391,7 +11384,7 @@ func _item_command(player: Player, what: String, args: Dictionary) -> void:
 					if not player.slots[i].is_empty():
 						slot = i
 			if slot >= 0:
-				World.try_drop(player, slot)
+				World.try_drop(player, slot, null, int(args.get("count", 0)))  # A count of a stack (decision 619).
 		"throw":
 			if cell != null:
 				World.try_throw(player, held, cell)

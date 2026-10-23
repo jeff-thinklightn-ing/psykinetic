@@ -224,10 +224,11 @@ func _test_main() -> void:
 	_check(_main.retain(_player(), {"resident": str(healer.get_path()), "pay": "herbs"}) == "herbs" and _main.care_via(me, id) == "herbs"
 		and _main.care_given(me, id).is_empty() and (store.is_empty() or World.stockpile.count(store, "herbs") + World.stockpile.item_ids(store).count("herbs") >= 5),
 		"three more: in his care by the herbs, the tally cleared, the herbs in his hut's store (%s)" % [store])
-	# Five antlers the same, into his hut's store as themselves.
+	# Five antlers the same, into his hut's store as themselves; four of them one stack in one slot (decision 619).
 	_main._records[me].care.clear()
-	for slot in 4:
-		World.put_item(_player(), _player(), slot, World.items.mint("antlers", "found", "test"))
+	for i in 4:
+		World.put_item(_player(), _player(), 0, World.items.mint("antlers", "found", "test"))
+	_check(World.slot_count(_player(), 0) == 4, "four antlers in one slot (%s)" % [_player().slot_counts])
 	_check(_main.retain(_player(), {"resident": str(healer.get_path()), "pay": "antlers"}) == "" and _main.care_given(me, id) == {"antlers": 4}, "four antlers: counted")
 	World.put_item(_player(), _player(), 0, World.items.mint("antlers", "found", "test"))
 	_check(_main.retain(_player(), {"resident": str(healer.get_path()), "pay": "antlers"}) == "antlers" and _main.care_via(me, id) == "antlers"

@@ -71,6 +71,28 @@ func has(uid: int) -> bool:
 	return _book.has(uid)
 
 
+## The further units stacked with [param uid] in one slot (decision 619):
+## each its own instance, of the same kind; empty for a thing alone. Kept on
+## the slot's first unit, so they go where it goes and save with the book.
+func stack_of(uid: int) -> PackedInt32Array:
+	var more := PackedInt32Array()
+	if _book.has(uid):
+		for each: Variant in _book[uid].get("stack", []):
+			if _book.has(int(each)) and int(each) != uid:
+				more.append(int(each))
+	return more
+
+
+## [param uid]'s further units are [param more] now (none: it is alone).
+func set_stack(uid: int, more: PackedInt32Array) -> void:
+	if not _book.has(uid):
+		return
+	if more.is_empty():
+		_book[uid].erase("stack")
+	else:
+		_book[uid]["stack"] = Array(more)
+
+
 ## [param uid]'s make ("dwarven", "dark elven"; decision 474); "" for none.
 func style_of(uid: int) -> String:
 	return str(_book[uid].get("style", "")) if _book.has(uid) else ""
@@ -552,6 +574,8 @@ func orphans(known: Array) -> Array[int]:
 	var seen := {}
 	for uid: Variant in known:
 		seen[int(uid)] = true
+		for more in stack_of(int(uid)):
+			seen[more] = true  # Stacked with a known one (decision 619).
 	var lost: Array[int] = []
 	for uid: int in _book:
 		if not seen.has(uid):
@@ -609,6 +633,8 @@ static func from_dict(data: Variant, steps: Callable = Callable()) -> ItemBook:
 				items._book[int(key)]["bound"] = entry["bound"]
 			if entry.get("gold") is float or entry.get("gold") is int:
 				items._book[int(key)]["gold"] = maxi(int(entry["gold"]), 0)  # An old purse's (601), for its migration.
+			if entry.get("stack") is Array and not entry["stack"].is_empty():
+				items._book[int(key)]["stack"] = entry["stack"].map(func(each: Variant) -> int: return int(each))  # Decision 619.
 			if entry.get("charges") is float or entry.get("charges") is int:
 				items._book[int(key)]["charges"] = maxi(int(entry["charges"]), 0)  # Decision 573 amended.
 			if entry.get("bane") is String and not entry["bane"].is_empty():

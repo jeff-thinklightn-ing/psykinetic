@@ -39,6 +39,7 @@ func _init() -> void:
 	slots = Items.tidy([], SLOTS)
 	replicate("slots")
 	replicate("slot_notes")
+	replicate("slot_counts")
 
 
 ## Its slots cut or padded to SLOTS, after a spawn spec's props set them

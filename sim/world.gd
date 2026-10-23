@@ -1986,7 +1986,11 @@ func _hit_door(door: Door, amount: int, by: GridEntity) -> void:
 ## alike. Each instance moves with its id and its history is written: a
 ## new carrier, "found" the first time anyone carries it, "given" from one
 ## carrier to another. False, and nothing moves, otherwise.
-func try_transfer(by: GridEntity, from: GridEntity, from_slot: int, to: GridEntity, to_slot: int) -> bool:
+## A stack (decision 619) moves whole, or [param count] of its units (0:
+## all): onto an empty slot that many split off, onto a stack they join (as
+## many as it has room for), onto anything else the stacks swap whole. A
+## depot or a shop takes that many, one by one; the priest one.
+func try_transfer(by: GridEntity, from: GridEntity, from_slot: int, to: GridEntity, to_slot: int, count := 0) -> bool:
 	if not Net.is_authority():
 		return false
 	if not _can_handle(by) or not reaches(by, from) or not reaches(by, to):
@@ -2006,9 +2010,9 @@ func try_transfer(by: GridEntity, from: GridEntity, from_slot: int, to: GridEnti
 	if to is Chest and (to as Chest).temple:
 		return _hand_to_priest(by, from, from_slot, to)
 	if to is Chest and (to as Chest).depot:
-		return _bank(by, from, from_slot, to)
+		return _each_unit(from, from_slot, count, func() -> bool: return _bank(by, from, from_slot, to))
 	if to is Chest and (to as Chest).shop:
-		return _sell(by, from, from_slot, to)
+		return _each_unit(from, from_slot, count, func() -> bool: return _sell(by, from, from_slot, to))
 	var uid := slot_uid(from, from_slot)
 	var other_uid := slot_uid(to, to_slot)
 	if from != to and (soulbound(uid) or soulbound(other_uid)):
@@ -2017,6 +2021,11 @@ func try_transfer(by: GridEntity, from: GridEntity, from_slot: int, to: GridEnti
 	# bond gone sullen); she says why.
 	if from != to and to.has_method("turns_down") and not str(to.call("turns_down", by, uid, other_uid)).is_empty():
 		return false
+	# A split onto an empty slot, or units joining a stack (decision 619).
+	var all := slot_count(from, from_slot)
+	var some := all if count <= 0 else mini(count, all)
+	if other_uid != 0 and stacks_onto(other_uid, uid, 1, false) or other_uid == 0 and some < all:
+		return _move_units(by, from, from_slot, to, to_slot, some) > 0
 	_fit_uids(from)
 	_fit_uids(to)
 	# New arrays, so each synchronizer sees a change.
@@ -2043,11 +2052,13 @@ func try_transfer(by: GridEntity, from: GridEntity, from_slot: int, to: GridEnti
 		from.slot_items = taken_uids
 		to.slots = given
 		to.slot_items = given_uids
-		_moved_item(uid, from, to)
-		if to is Resident and by is Player and from != to:
-			handed.emit(by, to, item, uid)  # A gift to one of the town's people (decision 443).
-		if other_uid != 0:
-			_moved_item(other_uid, to, from)
+		# Each unit of a stack goes with its first (decision 619).
+		for each in [uid] + Array(items.stack_of(uid)):
+			_moved_item(each, from, to)
+			if to is Resident and by is Player and from != to:
+				handed.emit(by, to, item, each)  # A gift to one of the town's people (decision 443).
+		for each in ([other_uid] + Array(items.stack_of(other_uid))) if other_uid != 0 else []:
+			_moved_item(each, to, from)
 		if from is Chest and (from as Chest).temple and towns != null:
 			towns.release_held(temple_town(from), owner_of(by), uid)
 	_log("slots: %s moved %s from %s %d to %s %d%s" % [by.name, item, from.name, from_slot, to.name, to_slot,
@@ -2077,33 +2088,39 @@ func take_item(by: GridEntity, from: GridEntity, slot: int) -> int:
 
 ## The thing in [param from]'s slot [param slot] out of its slots, no
 ## questions asked (take_item's after its rules; hurl's): its uid, the slot
-## empty, nowhere till its new holder says (items.place).
+## empty, nowhere till its new holder says (items.place). Of a stack
+## (decision 619), one unit, the rest staying.
 func _take_out(from: GridEntity, slot: int) -> int:
 	if slot < 0 or slot >= from.slots.size() or from.slots[slot].is_empty():
 		return 0
-	var uid := slot_uid(from, slot)
-	if soulbound(uid):
+	if soulbound(slot_uid(from, slot)):
 		return 0  # Not dropped, thrown, eaten or banked (decision 573 amended).
-	var taken := from.slots.duplicate()
-	var taken_uids := from.slot_items.duplicate()
-	taken[slot] = ""
-	taken_uids[slot] = 0
-	from.slots = taken
-	from.slot_items = taken_uids
+	var uid := _unit_out(from, slot)
 	items.place(uid, "")
 	_slots_changed(from)
 	return uid
 
 
 ## [param by] puts the instance [param uid] (from the stockpile...) into
-## [param to]'s empty slot [param slot]. False, and nothing moves, if it
-## cannot (try_transfer's rules; an unknown uid; a full slot).
+## [param to]'s empty slot [param slot], or onto the stack there it joins
+## (decision 619). False, and nothing moves, if it cannot (try_transfer's
+## rules; an unknown uid; a full slot).
 func put_item(by: GridEntity, to: GridEntity, slot: int, uid: int) -> bool:
 	if not Net.is_authority() or not _can_handle(by) or not reaches(by, to):
 		return false
 	var id := items.id_of(uid)
-	if id.is_empty() or not Items.exists(id) or slot < 0 or slot >= to.slots.size() or not to.slots[slot].is_empty():
+	if id.is_empty() or not Items.exists(id) or slot < 0 or slot >= to.slots.size():
 		return false
+	if not to.slots[slot].is_empty():
+		if not stacks_onto(slot_uid(to, slot), uid):
+			return false
+		_join(to, slot, uid)
+		var holder := _carrier_of(to)
+		items.place(uid, holder_key(to), holder[0], holder[1])
+		_taken(uid, to, "")
+		_log("slots: %s put %s onto %s %d (%d)" % [by.name, id, to.name, slot, slot_count(to, slot)])
+		_slots_changed(to)
+		return true
 	_fit_uids(to)
 	var given := to.slots.duplicate()
 	var given_uids := to.slot_items.duplicate()
@@ -2261,6 +2278,7 @@ func is_behind(attacker: GridEntity, target: GridEntity) -> bool:
 ## base_mass and the things' weights), a stance whose thing left the hand
 ## ends, and slots_changed is emitted.
 func _slots_changed(entity: GridEntity) -> void:
+	_show_counts(entity)
 	_weigh(entity)
 	if not entity.raised.is_empty() and off_hand(entity) != entity.raised:
 		entity.raised = ""  # What it needed left the hand.
@@ -2275,9 +2293,8 @@ func _weigh(entity: GridEntity) -> void:
 		entity.base_mass = entity.mass
 	var carried := 0.0
 	if not entity is Chest:
-		for id in entity.slots:
-			if not id.is_empty():
-				carried += Items.weight_of(id)
+		for slot in entity.slots.size():
+			carried += Items.weight_of(entity.slots[slot]) * slot_count(entity, slot)  # Each unit (decision 619).
 	entity.mass = entity.base_mass + carried + buff(entity, "mass")
 
 
@@ -2291,8 +2308,11 @@ func empty_container(container: GridEntity) -> Array[int]:
 	for slot in container.slots.size():
 		var uid := slot_uid(container, slot)
 		if uid != 0:
-			items.place(uid, "")
-			uids.append(uid)
+			var more := items.stack_of(uid)
+			items.set_stack(uid, PackedInt32Array())
+			for each in [uid] + Array(more):
+				items.place(each, "")
+				uids.append(each)
 	if uids.is_empty():
 		return uids
 	var empty := PackedStringArray()
@@ -2345,6 +2365,205 @@ func slot_uids(entity: GridEntity) -> PackedInt32Array:
 	for slot in entity.slots.size():
 		slot_uid(entity, slot)
 	return entity.slot_items.duplicate()
+
+
+# --- Stacks (decision 619) ------------------------------------------------------
+
+## Every unit in [param entity]'s [param slot] (decision 619): its first
+## (slot_uid) and those stacked with it; none for an empty slot.
+func slot_units(entity: GridEntity, slot: int) -> Array[int]:
+	var units: Array[int] = []
+	var first := slot_uid(entity, slot)
+	if first != 0:
+		units.append(first)
+		units.append_array(Array(items.stack_of(first)))
+	return units
+
+
+## How many things [param entity]'s [param slot] holds: 0 empty, 1 alone,
+## more for a stack (decision 619). Any peer: a client reads slot_counts.
+func slot_count(entity: GridEntity, slot: int) -> int:
+	if slot < 0 or slot >= entity.slots.size() or entity.slots[slot].is_empty():
+		return 0
+	if not Net.is_authority() or items == null:
+		return entity.slot_counts[slot] if slot < entity.slot_counts.size() else 1
+	var first := entity.slot_items[slot] if slot < entity.slot_items.size() else 0
+	return 1 + (items.stack_of(first).size() if first != 0 else 0)
+
+
+## [param entity]'s units of [param id] (decision 619), slot by slot:
+## what a price in things (the healer's 5 herbs) is paid from.
+func units(entity: GridEntity, id: String) -> Array[int]:
+	var found: Array[int] = []
+	for slot in entity.slots.size():
+		if entity.slots[slot] == id:
+			found.append_array(slot_units(entity, slot))
+	return found
+
+
+## How many [param id] [param entity] carries, stacks counted unit by unit.
+func count_of(entity: GridEntity, id: String) -> int:
+	var count := 0
+	for slot in entity.slots.size():
+		if entity.slots[slot] == id:
+			count += slot_count(entity, slot)
+	return count
+
+
+## The slot of [param entity]'s that unit [param uid] is in, first or
+## stacked; -1 for none.
+func slot_of_unit(entity: GridEntity, uid: int) -> int:
+	if uid == 0:
+		return -1
+	for slot in entity.slots.size():
+		if uid in slot_units(entity, slot):
+			return slot
+	return -1
+
+
+## Takes [param uids], each one of [param entity]'s units (units), out of
+## its slots: those taken, nowhere till their new holder says.
+func take_units(entity: GridEntity, uids: Array[int]) -> Array[int]:
+	var taken: Array[int] = []
+	for uid in uids:
+		var slot := slot_of_unit(entity, uid)
+		if slot >= 0 and not soulbound(uid) and _unit_out(entity, slot, uid) == uid:
+			items.place(uid, "")
+			taken.append(uid)
+	if not taken.is_empty():
+		_slots_changed(entity)
+	return taken
+
+
+## Whether the instance [param uid] may join the stack [param first] heads
+## (decision 619): the same kind, one that stacks, both clean alike (no
+## name, binding, curse, blessing or mark, the same style and grave), and,
+## if [param room], [param more] more fit.
+func stacks_onto(first: int, uid: int, more := 1, room := true) -> bool:
+	if first == 0 or uid == 0 or first == uid or not items.has(first) or not items.has(uid):
+		return false
+	var id := items.id_of(first)
+	if id != items.id_of(uid) or Items.stack_of(id) <= 1:
+		return false
+	if not _plain(first) or not _plain(uid) or items.style_of(first) != items.style_of(uid) \
+			or items.grave_of(first) != items.grave_of(uid):
+		return false
+	return not room or 1 + items.stack_of(first).size() + more <= Items.stack_of(id)
+
+
+## Whether [param uid] has nothing of its own a stack would hide.
+func _plain(uid: int) -> bool:
+	return items.name_of(uid).is_empty() and items.bound_to(uid).is_empty() and items.kept_from(uid).is_empty() \
+		and items.blessed_for(uid).is_empty() and items.bane_of(uid).is_empty() and items.grudge_of(uid).is_empty() \
+		and items.short_of(uid) >= 1.0 and items.condition_of(uid) < 0
+
+
+## [param uid] joins the stack in [param entity]'s [param slot] (stacks_onto
+## said it may); the caller places it and says the slots changed.
+func _join(entity: GridEntity, slot: int, uid: int) -> void:
+	var first := slot_uid(entity, slot)
+	var more := items.stack_of(first)
+	more.append(uid)
+	items.set_stack(first, more)
+
+
+## One unit out of [param entity]'s [param slot] (decision 619): [param uid]
+## if given, else the stack's last; the slot empty once its last unit goes,
+## its next the first when the first goes. Its uid (0: nothing there); the
+## caller places it and says the slots changed.
+func _unit_out(entity: GridEntity, slot: int, uid := 0) -> int:
+	var first := slot_uid(entity, slot)
+	if first == 0:
+		return 0
+	var more := items.stack_of(first)
+	if uid == 0:
+		uid = more[more.size() - 1] if not more.is_empty() else first
+	if uid != first:
+		var at := more.find(uid)
+		if at < 0:
+			return 0
+		more.remove_at(at)
+		items.set_stack(first, more)
+		return uid
+	var left := entity.slots.duplicate()
+	var left_uids := entity.slot_items.duplicate()
+	items.set_stack(first, PackedInt32Array())
+	if more.is_empty():
+		left[slot] = ""
+		left_uids[slot] = 0
+	else:
+		left_uids[slot] = more[0]
+		items.set_stack(more[0], more.slice(1))
+	entity.slots = left
+	entity.slot_items = left_uids
+	return first
+
+
+## [param some] units from [param from]'s [param from_slot] into [param to]'s
+## [param to_slot], empty or a stack they join, while there is room: how
+## many moved (try_transfer's split and join).
+func _move_units(by: GridEntity, from: GridEntity, from_slot: int, to: GridEntity, to_slot: int, some: int) -> int:
+	var id := from.slots[from_slot]
+	if to.slots[to_slot].is_empty():
+		var trial := to.slots.duplicate()
+		trial[to_slot] = id
+		if not hands_allow(to, trial):
+			return 0
+	var moved := 0
+	while moved < some and slot_count(from, from_slot) > 0:
+		var uid := slot_uid(from, from_slot)
+		var more := items.stack_of(uid)
+		uid = more[more.size() - 1] if not more.is_empty() else uid
+		if not to.slots[to_slot].is_empty() and not stacks_onto(slot_uid(to, to_slot), uid):
+			break
+		_unit_out(from, from_slot, uid)
+		if to.slots[to_slot].is_empty():
+			var given := to.slots.duplicate()
+			var given_uids := to.slot_items.duplicate()
+			given[to_slot] = id
+			given_uids[to_slot] = uid
+			to.slots = given
+			to.slot_items = given_uids
+		else:
+			_join(to, to_slot, uid)
+		if from != to:
+			_moved_item(uid, from, to)
+			if to is Resident and by is Player:
+				handed.emit(by, to, id, uid)  # Decision 443, a unit at a time.
+		moved += 1
+	if moved == 0:
+		return 0
+	_log("slots: %s moved %d %s from %s %d to %s %d" % [by.name, moved, id, from.name, from_slot, to.name, to_slot])
+	_slots_changed(from)
+	if to != from:
+		_slots_changed(to)
+	return moved
+
+
+## Does [param one] (a counter's take of one unit) up to [param count] times
+## (0: the whole stack) while [param from]'s [param from_slot] holds some:
+## whether any was done.
+func _each_unit(from: GridEntity, from_slot: int, count: int, one: Callable) -> bool:
+	var some := slot_count(from, from_slot) if count <= 0 else mini(count, slot_count(from, from_slot))
+	var done := 0
+	while done < some and slot_count(from, from_slot) > 0 and bool(one.call()):
+		done += 1
+	return done > 0
+
+
+## [param entity]'s slot_counts (replicated) follow its stacks: empty while
+## no slot holds more than one (decision 619).
+func _show_counts(entity: GridEntity) -> void:
+	var counts := PackedInt32Array()
+	counts.resize(entity.slots.size())
+	var any := false
+	for slot in entity.slots.size():
+		counts[slot] = slot_count(entity, slot)
+		any = any or counts[slot] > 1
+	if not any:
+		counts = PackedInt32Array()
+	if counts != entity.slot_counts:
+		entity.slot_counts = counts
 
 
 ## A new [param id] bound for life to [param owner] (a holder_key; decision
@@ -2609,6 +2828,8 @@ func _show_notes(entity: GridEntity) -> void:
 			names[slot] = item_note(entity.slot_items[slot])
 			# The tally (decision 415) and the story (decision 421), each on a
 			# line of its own under the thing's name, found by its first word.
+			if slot_count(entity, slot) > 1:
+				names[slot] = "%d × %s" % [slot_count(entity, slot), names[slot] if not names[slot].is_empty() else Items.name_of(entity.slots[slot])]  # Decision 619.
 			for line in [kills_line(entity.slot_items[slot]), story_line(entity.slot_items[slot])]:
 				if not line.is_empty():
 					names[slot] = "%s\n%s" % [names[slot] if not names[slot].is_empty() else Items.name_of(entity.slots[slot]), line]
@@ -2968,12 +3189,7 @@ func _bank(by: GridEntity, from: GridEntity, from_slot: int, depot: GridEntity) 
 	if not yields.is_empty() and items.is_grave(uid) and owner_of(by).begins_with("player:"):
 		_log("slots: %s refused %s: grave goods, only the fence takes them" % [depot.name, item])  # 586.
 		return false
-	var taken := from.slots.duplicate()
-	var taken_uids := from.slot_items.duplicate()
-	taken[from_slot] = ""
-	taken_uids[from_slot] = 0
-	from.slots = taken
-	from.slot_items = taken_uids
+	uid = _unit_out(from, from_slot)  # One of a stack (decision 619).
 	_bank_thing(place, uid, _label_of(by), _label_of(from), depot.zone, depot.tile, owner_of(by))
 	_log("slots: %s banked %s from %s %d at %s" % [by.name, item, from.name, from_slot, place])
 	_slots_changed(from)
@@ -3302,13 +3518,7 @@ func _hand_to_priest(by: GridEntity, from: GridEntity, from_slot: int, counter: 
 		_counter_why = "the offering is %d gold" % offering
 		traded.emit(by, counter, _counter_why)
 		return false
-	var uid := slot_uid(from, from_slot)
-	var taken := from.slots.duplicate()
-	var taken_uids := from.slot_items.duplicate()
-	taken[from_slot] = ""
-	taken_uids[from_slot] = 0
-	from.slots = taken
-	from.slot_items = taken_uids
+	var uid := _unit_out(from, from_slot)  # One of a stack (decision 619).
 	economy.add_gold(who, -offering, "an offering at %s's temple" % town)
 	stockpile.deposit(town, "gold", offering, "offering:%s" % who, "an offering for a blessing")
 	production.open_work(workshop, uid, "bless", owner)
@@ -3394,12 +3604,7 @@ func _sell(by: GridEntity, from: GridEntity, from_slot: int, shop: GridEntity) -
 func _sold(by: GridEntity, from: GridEntity, from_slot: int, uid: int, place: String, who: String, paid: int,
 		shop: GridEntity) -> void:
 	var item := from.slots[from_slot]
-	var taken := from.slots.duplicate()
-	var taken_uids := from.slot_items.duplicate()
-	taken[from_slot] = ""
-	taken_uids[from_slot] = 0
-	from.slots = taken
-	from.slot_items = taken_uids
+	_unit_out(from, from_slot, uid)  # That unit, of a stack (decision 619).
 	if Items.yield_of(item).is_empty():
 		items.place(uid, "")
 		items.note(uid, "sold", "to %s by %s for %d gold" % [place, who, paid])
@@ -3473,10 +3678,12 @@ func try_barter(by: GridEntity, shop: GridEntity, give: Array, take: Array, bala
 	var uids := slot_uids(by)
 	var gives: Array = []
 	var from_slots: Array[int] = []
+	var handing: Array[int] = []
 	for uid: int in give:
-		var slot := uids.find(uid)
-		if uid == 0 or slot < 0 or slot in from_slots:
+		var slot := slot_of_unit(by, uid)  # A unit of a stack too (decision 619).
+		if uid == 0 or slot < 0 or uid in handing:
 			return "that is no longer in your pack"
+		handing.append(uid)
 		from_slots.append(slot)
 		gives.append({"id": by.slots[slot], "fenced": items.is_grave(uid)})
 	var quote := economy.barter_quote(place, who, gives, take, fence_state(shop)) if maker.is_empty() else economy.maker_quote(maker, who, gives, take)
@@ -3484,15 +3691,25 @@ func try_barter(by: GridEntity, shop: GridEntity, give: Array, take: Array, bala
 		return str(quote["why"])
 	if int(quote["balance"]) != balance:
 		return "the prices have moved"
-	# Room for the takes once the gives are out.
+	# Room for the takes once the gives are out: a stack of the kind with
+	# room first (decision 619), else an empty slot.
 	var after := by.slots.duplicate()
+	var counts: Array[int] = []
+	for i in after.size():
+		counts.append(slot_count(by, i))
 	for slot in from_slots:
-		after[slot] = ""
+		counts[slot] -= 1
+		if counts[slot] <= 0:
+			after[slot] = ""
 	var to_slots: Array[int] = []
 	for uid: int in take:
 		var id := items.id_of(uid)
 		var slot := -1
 		for i in after.size():
+			if after[i] == id and counts[i] < Items.stack_of(id) and stacks_onto(slot_uid(by, i), uid, 1, false):
+				slot = i
+				break
+		for i in (after.size() if slot < 0 else 0):
 			if after[i].is_empty():
 				var given := after.duplicate()
 				given[i] = id
@@ -3502,6 +3719,7 @@ func try_barter(by: GridEntity, shop: GridEntity, give: Array, take: Array, bala
 		if slot < 0:
 			return "no room to carry it"
 		after[slot] = id
+		counts[slot] = maxi(counts[slot], 0) + 1
 		to_slots.append(slot)
 	for i in from_slots.size():
 		if not maker.is_empty():
@@ -3514,7 +3732,10 @@ func try_barter(by: GridEntity, shop: GridEntity, give: Array, take: Array, bala
 	for i in take.size():
 		var deal := economy.buy(who, place, int(take[i]), int(quote["takes"][i]))
 		if deal["ok"]:
-			put_item(by, by, to_slots[i], int(take[i]))
+			var into := to_slots[i]
+			if not by.slots[into].is_empty() and not stacks_onto(slot_uid(by, into), int(take[i])):
+				into = room_for(by, int(take[i]))  # The stack it was to join was given away whole.
+			put_item(by, by, into, int(take[i]))
 			_log("shop: %s bought %s at %s for %d gold" % [by.name, deal["id"], place, deal["price"]])
 	gold_changed.emit(who, economy.gold(who))
 	return ""
@@ -4223,22 +4444,28 @@ func reaches_cell(by: GridEntity, cell: Vector2i) -> bool:
 
 
 ## [param by] puts what is in its slot [param slot] down on [param at] (its
-## own cell if null; one it reaches). A full cell (GROUND_PER_CELL) spills
-## to the nearest with room. False, and nothing moves, if it cannot.
-func try_drop(by: GridEntity, slot: int, at: Variant = null) -> bool:
+## own cell if null; one it reaches): a stack whole, or [param count] of its
+## units (decision 619). A full cell (GROUND_PER_CELL) spills to the nearest
+## with room. False, and nothing moves, if it cannot.
+func try_drop(by: GridEntity, slot: int, at: Variant = null, count := 0) -> bool:
 	if not Net.is_authority() or not _can_handle(by):
 		return false
 	var cell: Vector2i = by.tile if at == null else at
 	if not reaches_cell(by, cell) or slot < 0 or slot >= by.slots.size() or by.slots[slot].is_empty():
 		return false
-	if _ground_room(cell) == NO_CELL:
-		return false
 	var id := by.slots[slot]
-	var uid := take_item(by, by, slot)
-	if uid == 0:
+	var some := slot_count(by, slot) if count <= 0 else mini(count, slot_count(by, slot))
+	var landed := NO_CELL
+	for i in some:
+		if _ground_room(cell, slot_uid(by, slot)) == NO_CELL:
+			break
+		var uid := take_item(by, by, slot)
+		if uid == 0:
+			break
+		_put_down_by[uid] = _label_of(by)
+		landed = put_on_ground(uid, cell)
+	if landed == NO_CELL:
 		return false
-	_put_down_by[uid] = _label_of(by)
-	var landed := put_on_ground(uid, cell)
 	_log("ground: %s put %s down at %s" % [by.name, id, landed])
 	_thud(landed, id, by)
 	return true
@@ -4268,7 +4495,25 @@ func try_pick_up(by: GridEntity, cell: Vector2i, index := -1) -> bool:
 		return false  # Bound to its boss while it lies (603 amended).
 	if _swap_bundle(by, cell, index):
 		return true
-	var slot := free_slot_for(by, items.id_of(uid))
+	if not _pick_unit(by, cell, index):
+		return false
+	# The rest of its kind lying there, as many as there is room for
+	# (decision 619): a bunch of herbs is picked up all at once.
+	var id := items.id_of(uid)
+	var i := ground_uids(cell).size() - 1
+	while Items.stack_of(id) > 1 and i >= 0:
+		var each := ground_uids(cell)[i]
+		if items.id_of(each) == id and not axe_bound(each):
+			_pick_unit(by, cell, i)
+		i -= 1
+	return true
+
+
+## [param by] picks up the thing at [param index] on [param cell] into the
+## slot it has room for (room_for): false, nothing moved, if none.
+func _pick_unit(by: GridEntity, cell: Vector2i, index: int) -> bool:
+	var uid := ground_uids(cell)[index]
+	var slot := room_for(by, uid)
 	if slot < 0:
 		return false
 	take_from_ground(cell, index)
@@ -4301,6 +4546,17 @@ func _swap_bundle(by: GridEntity, cell: Vector2i, index: int) -> bool:
 	return true
 
 
+## The slot [param entity] would take the instance [param uid] into: a
+## stack it joins (decision 619; the hands, then the pack), else
+## free_slot_for's; -1 for none.
+func room_for(entity: GridEntity, uid: int) -> int:
+	var order: Array = [Items.RIGHT_HAND, Items.LEFT_HAND] + range(Items.PACK) if has_hands(entity) else range(entity.slots.size())
+	for slot: int in order:
+		if slot < entity.slots.size() and stacks_onto(slot_uid(entity, slot), uid):
+			return slot
+	return free_slot_for(entity, items.id_of(uid))
+
+
 ## The slot [param entity] would take [param id] into: a free hand that
 ## can hold it (the right first; a two-handed thing both hands free), else
 ## the first free pack slot; -1 for none.
@@ -4323,11 +4579,16 @@ func free_slot_for(entity: GridEntity, id: String) -> int:
 ## GROUND_SPILL: where it went, NO_CELL if nowhere (it stays where it was).
 ## For whatever lays things down: a drop, a throw, later loot.
 func put_on_ground(uid: int, cell: Vector2i, thrown_from := NO_CELL) -> Vector2i:
-	var landed := _ground_room(cell)
+	var landed := _ground_room(cell, uid)
 	if landed == NO_CELL or not items.has(uid):
 		return NO_CELL
 	var there: PackedInt32Array = zone.ground.get(landed, PackedInt32Array()).duplicate()
 	there.append(uid)
+	# A stack laid down whole (a body's, decision 619) lies as its units.
+	for more in items.stack_of(uid):
+		there.append(more)
+		items.place(more, "%s@%d,%d" % [zone.name, landed.x, landed.y])
+	items.set_stack(uid, PackedInt32Array())
 	zone.ground[landed] = there
 	items.place(uid, "%s@%d,%d" % [zone.name, landed.x, landed.y])
 	ground_changed.emit(zone.name, landed, thrown_from)
@@ -5002,7 +5263,7 @@ func throw_reach(by: GridEntity, id: String) -> int:
 
 ## [param cell] if it has room for one more thing, else the nearest that
 ## does, within GROUND_SPILL (dry floor); NO_CELL if none.
-func _ground_room(cell: Vector2i) -> Vector2i:
+func _ground_room(cell: Vector2i, uid := 0) -> Vector2i:
 	for radius in GROUND_SPILL + 1:
 		for dy in range(-radius, radius + 1):
 			for dx in range(-radius, radius + 1):
@@ -5011,9 +5272,26 @@ func _ground_room(cell: Vector2i) -> Vector2i:
 				var each := cell + Vector2i(dx, dy)
 				# Nothing put down on a level link's cell (decision 571).
 				if is_walkable(each) and not is_water(each) and not is_link_cell(each) \
-						and zone.ground.get(each, PackedInt32Array()).size() < GROUND_PER_CELL:
+						and _ground_takes(zone.ground.get(each, PackedInt32Array()), uid):
 					return each
 	return NO_CELL
+
+
+## Whether a cell holding [param there] has room for [param uid] (0: for
+## anything): fewer than GROUND_PER_CELL heaps, a stackable kind's units
+## a heap up to its stack (decision 619), or a heap of its kind with room.
+func _ground_takes(there: PackedInt32Array, uid := 0) -> bool:
+	var of_kind := {}
+	for each in there:
+		var id := items.id_of(each)
+		of_kind[id] = int(of_kind.get(id, 0)) + 1
+	var heaps := 0
+	for id: String in of_kind:
+		heaps += ceili(float(of_kind[id]) / Items.stack_of(id))
+	if heaps < GROUND_PER_CELL:
+		return true
+	var mine := items.id_of(uid) if uid != 0 else ""
+	return not mine.is_empty() and int(of_kind.get(mine, 0)) % Items.stack_of(mine) != 0
 
 
 ## [param by] (a player or a companion, alive, not stunned, carrying a

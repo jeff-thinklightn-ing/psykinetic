@@ -24114,3 +24114,60 @@ their side: 0). The gold way stays whole.
 ui_test _test_barter: the words at 0, 3 and 5 given, the tally with and
 without the key, the herb button lit with one in the pack, the antlers dim
 with none. Client only, protocol unchanged on this side, no new class_name.
+## 619. Small things stack in a slot, each its own
+
+Jeff on v0.1.168: "you cant hold 5, theres only 4 inventory slots haha" (Hob's
+5 herbs). Items' design (C:/dev/review/stacking/design.md), approved by the
+coordinator 2026-10-23.
+
+- **A stack of instances.** A slot holds a stack of things of one kind, and every
+  thing in it stays one ItemBook uid with its own history. The slot's first
+  unit is its slot_items uid; the rest are kept on that first unit's book entry
+  (ItemBook.stack_of / set_stack, saved with the book), so they go wherever it
+  goes and old saves are stacks of 1 with nothing to convert. The stockpile,
+  the shop's shelf, the ledger, banking, selling and the fence keep working on
+  uids, one thing each: selling 5 herbs is 5 uids sold.
+- **What stacks.** items.json "stack": N (1 when left out, as before). A thing
+  with a condition, a weapon, shield, token or soulbound thing, or one used for
+  anything but eating or bandaging never stacks (Items.stack_problem warns and
+  keeps it at 1). Herbs, tusks and silver rings 10; meat, hide, leather,
+  antlers, rations, roasts, remedies, bandaging kits and spice 5; stamina
+  potions and wine 3. Economy may retune these without a decision. Arrows stay
+  bundles: a bundle's condition is already its count of shots, and bundles do
+  not stack with each other. Gold stays a count (601 amended).
+- **Clean stacks.** A unit joins a stack only of the same id and style and the
+  same grave mark, both with no name, binding, keeping, blessing, bane, grudge,
+  short measure or condition (World.stacks_onto): a fenced or grave-marked
+  herb never hides in a clean one.
+- **The verbs.** F picks up every unit of the top kind on the cell that fits,
+  filling a stack of its kind (hands, then pack) before a free slot
+  (World.room_for). try_transfer takes a count (0: all): onto an empty slot it
+  splits, onto a stack of the kind it joins as many as fit, onto anything else
+  the stacks swap whole, each unit's history written. try_drop takes a count.
+  Taking out (take_item, eating, throwing, banking, selling, the priest) takes
+  one unit; a depot or shop takes a dragged stack unit by unit. World.units,
+  count_of, slot_units, slot_count, slot_of_unit and take_units read and take
+  by unit: the healer's "5 herbs" is paid from one slot. handed fires once per
+  unit given to a resident, so npc's tally counts units. A barter's give is
+  still a uid per unit; the barter message's pack entries carry the stack's
+  uids and its count, and takes join a stack of their kind first. The cache's
+  find and the healer's brew go onto a stack of their kind first.
+- **Weight per unit.** _weigh adds each unit's weight, so carried weight (and
+  so the loyalty pack-weight check and the "worked like a mule" draft that
+  read it) stays honest: five antlers weigh fifteen kilograms in one slot as
+  in five.
+- **The ground.** zone.ground stays a uid list per cell. GROUND_PER_CELL
+  counts heaps: a stackable kind's units are one heap up to its stack size.
+  GroundPile replicates ids, repeats and all; the views group them. A stack
+  laid down whole lies as its units.
+- **The wire** (revision 33's line): slot_counts, replicated on Player,
+  Companion, Chest and Cargo, empty while no slot holds more than one;
+  "transfer" and "drop" carry an optional "count". Until ui draws the count,
+  a stack's slot note begins "5 × ".
+- Companions' turns_down sees a moved stack's first uid; a clean stack's
+  first stands for the rest.
+
+items_test _test_stacks (pick-up, split, join, a grave herb kept apart, a count
+put down, one taken out, the book saved); return_test (five antlers in one
+slot pay the healer); economy_test (a bought kit joins the stack it finds).
+No new class_name.

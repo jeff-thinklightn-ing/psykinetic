@@ -34,7 +34,9 @@ const RIGHT_HAND := 4
 const LEFT_HAND := 5
 const CARRIED := 6
 const FIELDS := ["id", "name", "short", "color", "art", "kind", "size", "weight", "hands", "tags", "effects", "use", "yield", "verb", "made",
-	"opens", "value", "blunt", "ammo", "condition", "mend", "about"]
+	"opens", "value", "blunt", "ammo", "condition", "mend", "about", "stack"]
+## Tags whose things never stack (decision 619): each is its own.
+const UNSTACKED_TAGS: Array[String] = ["weapon", "shield", "token", "soulbound"]
 ## Who makes things (made's "by"), as economy's production has them.
 const TRADES: Array[String] = ["smith", "cook", "carpenter", "tanner", "fletcher", "weaver", "medicine_man"]
 
@@ -83,6 +85,11 @@ static func read(text: String) -> Dictionary:
 			if key not in FIELDS:
 				push_warning("Items: %s has an unknown field %s" % [id, key])
 		definitions[id] = _definition(id, entry)
+		if int(definitions[id]["stack"]) > 1:
+			var why := stack_problem(definitions[id])
+			if not why.is_empty():
+				push_warning("Items: %s stacks %d but %s; 1" % [id, definitions[id]["stack"], why])
+				definitions[id]["stack"] = 1
 		if entry.has("value") and (entry["value"] is not float and entry["value"] is not int or float(entry["value"]) < 0.0):
 			push_warning("Items: %s's value %s is not a count of gold; none" % [id, entry["value"]])
 	for id: String in definitions:
@@ -162,7 +169,28 @@ static func _definition(id: String, entry: Dictionary) -> Dictionary:
 		"ammo": _ammo(entry["ammo"]) if entry.get("ammo") is Dictionary else {},
 		"condition": maxi(int(entry.get("condition", 0)), 0) if entry.get("condition") is float or entry.get("condition") is int else 0,
 		"about": str(entry.get("about", "")),
+		"stack": maxi(int(entry.get("stack", 1)), 1) if entry.get("stack") is float or entry.get("stack") is int else 1,
 	}
+
+
+## Why definition [param definition] may not stack (decision 619), or "":
+## a thing with a condition, gear (weapon, shield), a token or soulbound
+## thing, or a use other than eating or bandaging.
+static func stack_problem(definition: Dictionary) -> String:
+	if int(definition.get("condition", 0)) > 0:
+		return "has a condition"
+	for tag: String in definition.get("tags", []):
+		if tag in UNSTACKED_TAGS:
+			return "is a %s" % tag
+	if str(definition.get("use", "")) not in ["", "eat", "bandage"]:
+		return "is used to %s" % definition["use"]
+	return ""
+
+
+## How many of [param id] one slot holds (decision 619; items.json "stack",
+## 1 for a thing that does not stack).
+static func stack_of(id: String) -> int:
+	return int(def(id).get("stack", 1)) if not id.is_empty() else 1
 
 
 ## An ammo field as read (decision 375): {effect ("", burn, bleed), ticks,

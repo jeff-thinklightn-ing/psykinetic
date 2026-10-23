@@ -65,6 +65,7 @@ func _ready() -> void:
 	_test_totem()
 	_test_battle_axe()
 	_test_cache()
+	_test_stacks()
 	_test_story()
 	_test_bless()
 	_test_reforge()
@@ -291,7 +292,7 @@ func _test_ground() -> void:
 	World.try_drop(host, Player.RIGHT_HAND)
 	var kits: Array[int] = []
 	for i in 4:
-		var uid := World.items.mint(KIT, "built")
+		var uid := World.items.mint("knife", "built")  # Things that don't stack (decision 619).
 		kits.append(uid)
 		World.put_on_ground(uid, cell)
 	_check(World.ground_at(cell).size() == World.GROUND_PER_CELL, "four things on one cell (%s)" % [World.ground_at(cell)])
@@ -1392,6 +1393,14 @@ func _test_gold_drop() -> void:
 
 ## A free floor cell 3 or more from [param entity], not a level link's (gold
 ## put down there would land beside it, and a body stood there leaves).
+## Every unit [param entity] carries, stacks too (decision 619).
+func _units_of(entity: GridEntity) -> Array[int]:
+	var units: Array[int] = []
+	for slot in entity.slots.size():
+		units.append_array(World.slot_units(entity, slot))
+	return units
+
+
 func _plain_cell(entity: GridEntity) -> Vector2i:
 	for cell: Vector2i in _main._terrain["floor"]:
 		if World.distance(cell, entity.tile) >= 3 and World.is_free(cell) and not World.is_link_cell(cell) and not World.is_water(cell):
@@ -1519,12 +1528,12 @@ func _test_cache() -> void:
 	chest.cache_place = "the old farmstead"
 	var host_at := host.tile
 	_beside(host, chest)
-	var had := host.slot_items.duplicate()
+	var had := _units_of(host)
 	var ground_before := World.ground_uids(host.tile)
 	_check(_main.search(host, chest), "searched: something found")
 	var got: Array[int] = []
-	for uid in host.slot_items:
-		if uid != 0 and not uid in had:
+	for uid in _units_of(host):
+		if not uid in had:
 			got.append(uid)
 	for uid in World.ground_uids(host.tile):
 		if not uid in ground_before:
@@ -1540,11 +1549,11 @@ func _test_cache() -> void:
 			"once per player: searched again, nothing more; the chest's own slots untouched")
 	_check(PlayerRecord.from_dict(record.to_dict()).caches == record.caches, "the record keeps it through a save")
 	record.caches.erase("farmstead_cache")  # As another player's record, who has not searched it.
-	var held_now := host.slot_items.duplicate()
+	var held_now := _units_of(host)
 	var ground_now := World.ground_uids(host.tile)
 	_check(_main.search(host, chest), "a player who has not searched it finds theirs")
-	for uid in host.slot_items:
-		if uid != 0 and not uid in held_now:
+	for uid in _units_of(host):
+		if not uid in held_now:
 			got.append(uid)
 	for uid in World.ground_uids(host.tile):
 		if not uid in ground_now:
@@ -1553,10 +1562,9 @@ func _test_cache() -> void:
 		var events: Array = World.items.history(uid).get("events", [])
 		if events.is_empty() or events[0]["kind"] != "cached":
 			continue
-		var slot := host.slot_items.find(uid)
 		var at := World.items.at_of(uid)
-		if slot >= 0:
-			World.take_item(host, host, slot)
+		if World.slot_of_unit(host, uid) >= 0:
+			World.take_units(host, [uid])
 		elif at.contains("@"):
 			var xy := at.get_slice("@", 1).split(",")
 			var cell := Vector2i(int(xy[0]), int(xy[1]))
@@ -1566,6 +1574,83 @@ func _test_cache() -> void:
 	World._relocate(host, host_at)
 	chest.cache = ""
 	chest.cache_place = ""
+
+
+func _test_stacks() -> void:
+	print("\n== stacks: small things share a slot, each its own (decision 619) ==")
+	_check(Items.stack_of("herbs") == 10 and Items.stack_of("antlers") == 5 and Items.stack_of("knife") == 1 and Items.stack_of("arrows") == 1,
+			"herbs stack 10, antlers 5; a knife and a bundle of arrows alone")
+	var odd := Items.read('{"items": [{"id": "blade", "tags": ["weapon"], "stack": 5}, {"id": "seed", "stack": 20}]}')
+	_check(int(odd["blade"]["stack"]) == 1 and int(odd["seed"]["stack"]) == 20, "a weapon that says it stacks is held alone (warned)")
+	var host := _player(Net.local_id)
+	var had_slots := host.slots.duplicate()
+	var had_uids := World.slot_uids(host)
+	World.set_slots(host, Items.tidy([], Player.SLOTS), [])
+	var cell := _plain_cell(host)
+	World._relocate(host, cell)
+	var bare_mass := host.mass
+	var herbs: Array[int] = []
+	for i in 3:
+		herbs.append(World.items.mint("herbs", "gathered"))
+		World.put_on_ground(herbs[i], cell)
+	_check(World._ground_takes(PackedInt32Array()), "a bare cell takes anything")
+	_check(World.try_pick_up(host, cell) and World.ground_at(cell).is_empty(), "F picks up the three herbs at once")
+	var slot := World.slot_of_unit(host, herbs[0])
+	_check(slot >= 0 and World.slot_count(host, slot) == 3 and host.slots.count("herbs") == 1,
+			"one slot holds the three (%s, %s)" % [Array(host.slots), host.slot_counts])
+	_check(host.slot_counts.size() == host.slots.size() and host.slot_counts[slot] == 3, "its count replicated (%s)" % host.slot_counts)
+	_check(host.slot_notes[slot].begins_with("3 × "), "its note says so (%s)" % host.slot_notes[slot])
+	_check(is_equal_approx(host.mass - bare_mass, 3 * Items.weight_of("herbs")), "weighed a unit at a time (%.2f)" % (host.mass - bare_mass))
+	for each in herbs:
+		_check(World.items.history(each)["holder"] == World.holder_key(host), "herb %d carried by them, its own history" % each)
+	for i in 9:
+		var more := World.items.mint("herbs", "gathered")
+		herbs.append(more)
+		World.put_on_ground(more, cell)
+	World.try_pick_up(host, cell)
+	var second := -1
+	for i in host.slots.size():
+		if host.slots[i] == "herbs" and i != slot:
+			second = i
+	_check(World.slot_count(host, slot) == 10 and second >= 0 and World.slot_count(host, second) == 2 and World.count_of(host, "herbs") == 12,
+			"twelve: a full stack of ten and two beside it (%s)" % host.slot_counts)
+	# A split, and a join.
+	var free := host.slots.find("")
+	_check(World.try_transfer(host, host, slot, host, free, 4) and World.slot_count(host, slot) == 6 and World.slot_count(host, free) == 4,
+			"four split off onto an empty slot (%s)" % host.slot_counts)
+	_check(World.try_transfer(host, host, free, host, second) and World.slot_count(host, second) == 6 and host.slots[free].is_empty(),
+			"and joined onto the two (%s)" % host.slot_counts)
+	_check(World.count_of(host, "herbs") == 12 and World.units(host, "herbs").size() == 12, "still twelve, each one its own")
+	# A grave-marked herb keeps a slot of its own.
+	var marked := World.items.mint("herbs", "gathered")
+	World.items.mark_grave(marked, "a barrow")
+	_check(not World.stacks_onto(World.slot_uid(host, slot), marked) and World.room_for(host, marked) != slot and World.room_for(host, marked) != second,
+			"a grave-marked herb never hides in a clean stack")
+	World.items.end(marked, "gone")
+	# Put down a count.
+	_check(World.try_drop(host, second, null, 3) and World.slot_count(host, second) == 3 and World.ground_at(cell).count("herbs") == 3,
+			"three of six put down (%s)" % [World.ground_at(cell)])
+	_check(World._ground_takes(World.ground_uids(cell)) and World.ground_uids(cell).size() == 3, "three herbs on a cell are one heap")
+	World.try_pick_up(host, cell)
+	_check(World.count_of(host, "herbs") == 12, "picked up again")
+	# One at a time out (eaten, banked, sold).
+	var before := World.slot_count(host, slot)
+	var one := World.take_item(host, host, slot)
+	_check(one in herbs and World.slot_count(host, slot) == before - 1 and World.items.at_of(one).is_empty(), "taken out: one unit, the rest stay")
+	World.items.end(one, "gone")
+	var first := World.slot_uid(host, slot)
+	_check(World.take_units(host, [first]).size() == 1 and World.slot_count(host, slot) == before - 2 and World.slot_uid(host, slot) != first
+			and World.slot_uid(host, slot) in herbs, "the first taken: the next stands for the stack")
+	World.items.end(first, "gone")
+	var copy := ItemBook.from_dict(JSON.parse_string(JSON.stringify(World.items.to_dict())))
+	var head := World.slot_uid(host, slot)
+	_check(copy.stack_of(head) == World.items.stack_of(head) and copy.stack_of(head).size() == before - 3, "a stack is saved with the book")
+	# Put back as it was.
+	for uid in _units_of(host):
+		World.take_units(host, [uid])
+		World.items.end(uid, "gone")
+	World.set_slots(host, had_slots, had_uids)
+	_check(World.items.orphans(_all_uids()).is_empty(), "and all put back, nothing in the book nobody holds (%s)" % [World.items.orphans(_all_uids())])
 
 
 func _test_grave() -> void:

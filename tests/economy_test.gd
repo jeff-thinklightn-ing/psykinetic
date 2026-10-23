@@ -467,7 +467,7 @@ func _test_barter_in_town(host: Player, counter: Chest) -> void:
 		"a stale sum: refused, nothing moved (%s)" % _main.barter_data.get("why"))
 	World.command(host, "trade", {"shop": str(counter.get_path()), "give": [ore], "take": [kit], "gold": fenced - asks})
 	_check(_main.barter_data.get("why") == "" and World.gold_of(host.player_id) == gold + fenced - asks
-		and kit in World.slot_uids(host) and ore not in World.slot_uids(host) and kit not in World.stockpile.shop(STORE),
+		and World.slot_of_unit(host, kit) >= 0 and ore not in World.slot_uids(host) and kit not in World.stockpile.shop(STORE),
 		"traded: the sack banked, the kit in the pack, %d gold (%s, %d)" % [gold + fenced - asks, Array(host.slots), World.gold_of(host.player_id)])
 	while DayNight.daylight(World.steps) < DayNight.DARK_LIGHT:
 		World.steps += 600

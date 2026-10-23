@@ -232,6 +232,10 @@ var slot_items := PackedInt32Array()
 ## decision 375), "" for a plain thing; empty when no slot has one.
 ## Replicated beside slots; written only by World (_show_notes).
 var slot_notes := PackedStringArray()
+## How many each slot holds (decision 619): empty while none holds more
+## than one, else a count per slot (a stack's units). Replicated beside
+## slots; written only by World (_show_counts).
+var slot_counts := PackedInt32Array()
 ## What ails it (decision 375): kind ("burn", "bleed") -> [the tick it
 ## ends, every so many ticks, the hp each time]. Reassigned whole on every
 ## change, so a player's, a companion's and a monster's replicate, for the
