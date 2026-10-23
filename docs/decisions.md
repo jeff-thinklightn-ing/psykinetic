@@ -23666,3 +23666,38 @@ _test_open_kinds; level_test the stages and classes.
 Rejected: plot classes with the ring inside (maps found the large sizes
 did not fit; the finder adds it once); a stage per size (a kind grows on
 its plot by its level instead).
+## 587, ui's side: the down screen
+
+Companions' Mortally Wounded (587; Jeff's design, the coordinator's
+approval of ui's layout as written 2026-10-22; Jeff's 20 s for everyone's
+wait): every player at 0 hp lies downed, the blessed for the window, the
+unblessed for ten seconds and able only to bleed out; Player.heart
+replicates the beats a minute (120, 80, 40; 0 up); "slow_heart" {held}
+on press and release steps the heart down a beat at once and one every
+two seconds while held; "bleed_out" {} goes at once; the "return" message
+carries {all_fallen: seconds} for everyone's wait (0 calls it off) and
+near_death: true for the at-once return.
+
+- DownScreen (render/down_screen.gd, new class_name), on the HUD over the
+  view's grey (the mourn drain as before, nothing new): MORTALLY WOUNDED
+  in the display face with the seconds under it, the way the downed line
+  reads (count_words), a bone ring behind them that swells on each beat at
+  the heart's pace and settles between (RingControl, Player.heart read by
+  name), and two buttons: Slow Heart (Hold), filling over each two-second
+  step while the mouse holds it (hold_fill) and sending slow_heart on
+  press and release, dim for the unblessed (Player.charge_room 0) with
+  "only the draugr's blessed can hold on" under it; Bleed Out (Respawn),
+  sending bleed_out. ALL HAVE FALLEN with "all come back in n s" replaces
+  the title while everyone's wait stands (Main.all_fallen_left, counted on
+  the client's clock from the message). No bar, no number beyond the
+  seconds. Esc does nothing to it; the screen goes when the body is up.
+- Dead after bleeding out, the HUD's return line reads "<by> brought you
+  back from near death" (near_death), or "all have fallen: all come back
+  in n s" while that wait stands, else as 396 amended.
+- --test-show=downed (unblessed), downed_blessed and all_fallen lay the
+  three states for the shots docs/ui/shots/sim/down_unblessed.jpg,
+  down_blessed.jpg, all_fallen.jpg (docs-only after the code).
+
+ui_test _test_down_screen: the words, the fill, the states, the hold's
+two commands, Bleed Out, everyone's count, the at-once line. Client only;
+protocol unchanged on this side; new class_name DownScreen.

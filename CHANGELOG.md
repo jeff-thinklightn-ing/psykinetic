@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Struck down, you now see it: MORTALLY WOUNDED over the grey with the seconds your blood lasts, a ring that beats with your heart, Slow Heart to hold on (the blessed only, held to fill it) and Bleed Out to go; when all have fallen the screen says so and counts everyone back (587, ui's side; the heart and the return are companions' and economy's).
 - Drawing a bow slides the view a little toward where you aim, so a long shot's mark stays on screen, and it eases back when you let the bow down (617).
 - Building kinds belong to a town's stage, from hamlet to city, and each fits a plot size a growing town lays out; a new market hall stands open on posts, and the forge's open front stands on posts too; the Old Tower's last roofed room is a building kind for Held.
 - Two new building kinds: a stone forge, open-fronted under a lean-to with its chimney, and a butchery with a back room.

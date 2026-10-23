@@ -539,6 +539,12 @@ var town_notes: Dictionary = {}
 ## came, for the countdown; {} once they are back.
 var _return_told: Dictionary = {}
 var _return_at := 0.0
+## The down screen (587, ui's side) and everyone's wait as the return
+## message last said it ({all_fallen: seconds}; 0 calls it off), with the
+## client's clock when it came.
+var down_screen: DownScreen
+var _fallen_wait := 0
+var _fallen_wait_at := 0.0
 ## The bow's aim while drawn (the archery aim, ui's side): the angle from
 ## the archer to the mouse on the grid (radians, Vector2.angle(), x as 0),
 ## set every frame while aim_drawn; pc-character turns the body from them.
@@ -7787,6 +7793,11 @@ func _build_talk() -> void:
 	$HUD.add_child(barter_panel)
 	if has_signal("barter_told"):
 		connect("barter_told", _on_barter_told)
+	down_screen = DownScreen.new()
+	down_screen.name = "DownScreen"
+	down_screen.slow_heart.connect(_ask_slow_heart)
+	down_screen.bleed_out.connect(_ask_bleed_out)
+	$HUD.add_child(down_screen)
 	# Combat's ground telegraphs (602, ui's side), connected by name so either side lands first.
 	if has_signal("telegraph_started"):
 		connect("telegraph_started", _on_telegraph_started)
@@ -8129,6 +8140,28 @@ static func return_place_words(where: String) -> String:
 	return "a holy place"
 
 
+## Everyone's wait now (587): the seconds the return message gave, counted
+## down on the client's clock; 0 when none stands.
+func all_fallen_left() -> int:
+	if _fallen_wait <= 0:
+		return 0
+	return maxi(ceili(_fallen_wait - (Time.get_ticks_msec() / 1000.0 - _fallen_wait_at)), 0)
+
+
+## The down screen's hold: companions' "slow_heart" {held}, on press and
+## release; its Bleed Out: "bleed_out".
+func _ask_slow_heart(held: bool) -> void:
+	var player := _local_player()
+	if player != null:
+		World.command(player, "slow_heart", {"held": held})
+
+
+func _ask_bleed_out() -> void:
+	var player := _local_player()
+	if player != null:
+		World.command(player, "bleed_out", {})
+
+
 ## The return line now: the message's seconds counted down on the client's
 ## clock since it came; past zero, "soon" (the keeper may have stepped
 ## away). "" with no message.
@@ -8140,6 +8173,11 @@ func return_shown() -> String:
 		seconds = ceili(seconds - (Time.get_ticks_msec() / 1000.0 - _return_at))
 		if seconds <= 0:
 			seconds = -1
+	if bool(_return_told.get("near_death", false)) and not str(_return_told.get("by", "")).is_empty():
+		return "%s brought you back from near death" % _return_told["by"]  # 587: the at-once return.
+	var fallen := all_fallen_left()
+	if fallen > 0:
+		return "all have fallen: all come back in %d s" % fallen
 	return return_words(str(_return_told.get("by", "")), str(_return_told.get("where", "")), seconds)
 
 
@@ -8436,6 +8474,11 @@ func _on_message(kind: String, data: Dictionary) -> void:
 			_builder_ui.on_message(data)
 		return
 	if kind == "return":
+		if data.has("all_fallen"):
+			# 587: everyone is down and all come back in so many seconds; 0 calls the wait off.
+			_fallen_wait = int(data["all_fallen"])
+			_fallen_wait_at = Time.get_ticks_msec() / 1000.0
+			return
 		# 396 amended, ui's side: who brings the dead player back, where, in how long.
 		_return_told = data
 		_return_at = Time.get_ticks_msec() / 1000.0
@@ -10518,6 +10561,13 @@ func _on_world_ticked(tick: int) -> void:
 			var body := _entity_named(player.channel_of)
 			hp_text += "   " + channel_words(_display_name(body) if body != null else player.channel_of,
 					ceili((player.channel_until - tick) * World.TICK_DT))
+	if down_screen != null:
+		# 587, ui's side: the screen while downed; the heart and the blessing read by name.
+		var downed := player != null and World.is_downed(player)
+		var heart: Variant = player.get("heart") if downed else null
+		var room: Variant = player.get("charge_room") if downed else null
+		down_screen.show_state(downed, ceili((player.downed_until - tick) * World.TICK_DT) if downed else 0,
+				int(heart) if heart is int else 0, room is int and int(room) > 0, all_fallen_left())
 	_hud_tick = tick
 	hud.text = hp_text.strip_edges()
 	if player != null and _connect_joining and connect_screen != null:
@@ -12162,6 +12212,15 @@ func _run_test_show(player: Player) -> void:
 			"downed":
 				if Net.is_authority():
 					World.lay_downed(player, 30 * World.TICK_RATE)  # 544, ui's side: the countdown on the HUD.
+					player.set("heart", 120)  # 587: the screen's pulse, as the server would set it.
+			"downed_blessed", "all_fallen":
+				# 587, ui's side: the screen for the blessed (the hold theirs), and everyone's wait.
+				if Net.is_authority():
+					World.lay_downed(player, 30 * World.TICK_RATE)
+					player.set("heart", 80)
+					player.set("charge_room", 50)
+					if what == "all_fallen":
+						_on_message("return", {"all_fallen": 20})
 			"return":
 				# 396 amended, ui's side: the dead player's line. The sample stands
 				# until economy's own message comes; the host's death path then runs.

@@ -31,6 +31,7 @@ func _ready() -> void:
 	_test_revive_reads()
 	_test_screenshot_key()
 	_test_aim()
+	_test_down_screen()
 	_test_counter_panel()
 	_test_world_map()
 	_test_access()
@@ -565,6 +566,46 @@ func _test_aim() -> void:
 		winded_body.set("winded", true)
 		_check(Main.is_winded(winded_body), "the flag set: winded")
 	winded_body.free()
+
+
+func _test_down_screen() -> void:
+	print("== the down screen (587, ui's side): the words, the hold's fill, the state ==")
+	_check(DownScreen.title_words(false) == "MORTALLY WOUNDED" and DownScreen.title_words(true) == "ALL HAVE FALLEN", "the title, and everyone's fall")
+	_check(DownScreen.count_words(12, 0) == "12 s" and DownScreen.count_words(-3, 0) == "0 s" and DownScreen.count_words(12, 20) == "all come back in 20 s",
+		"the count: the blood's seconds, or everyone's wait")
+	_check(DownScreen.hold_fill(0.0) == 0.0 and absf(DownScreen.hold_fill(1.0) - 0.5) < 0.001 and absf(DownScreen.hold_fill(2.5) - 0.25) < 0.001,
+		"the hold fills over each two-second step of the heart")
+	var screen: DownScreen = _main.down_screen
+	if screen == null:
+		print("  (no down screen in this scene: its checks skipped)")
+		return
+	var holds: Array = []
+	screen.slow_heart.connect(func(held: bool) -> void: holds.append(held))
+	var bled := [0]
+	screen.bleed_out.connect(func() -> void: bled[0] += 1)
+	screen.show_state(true, 25, 120, false, 0)
+	_check(screen.visible and screen._hold.disabled and screen._why.text == DownScreen.UNBLESSED_WHY and screen._title.text == "MORTALLY WOUNDED" and screen._count.text == "25 s",
+		"downed and unblessed: the screen, the hold dim with its reason")
+	screen.show_state(true, 25, 80, true, 0)
+	_check(not screen._hold.disabled and not screen._why.visible, "blessed: the hold is theirs")
+	screen._hold_down()
+	_check(screen.is_held() and holds == [true], "the hold pressed: slow_heart held")
+	screen._hold_up()
+	_check(not screen.is_held() and holds == [true, false], "let go: slow_heart released")
+	screen.show_state(true, 25, 40, true, 20)
+	_check(screen._title.text == "ALL HAVE FALLEN" and screen._count.text == "all come back in 20 s", "everyone down: the title and the wait")
+	screen._bleed.pressed.emit()
+	_check(bled[0] == 1, "Bleed Out asks to go")
+	screen.show_state(false, 0, 0, false, 0)
+	_check(not screen.visible, "up again: the screen goes")
+	_main._on_message("return", {"all_fallen": 20})
+	_check(_main.all_fallen_left() == 20, "the return message's all_fallen starts the count (%d)" % _main.all_fallen_left())
+	_main._on_message("return", {"all_fallen": 0})
+	_check(_main.all_fallen_left() == 0, "all_fallen 0 calls it off")
+	_main._return_told = {"by": "Aldous", "where": "temple", "seconds": 0, "near_death": true}
+	_main._return_at = Time.get_ticks_msec() / 1000.0
+	_check(_main.return_shown() == "Aldous brought you back from near death", "the at-once return's line")
+	_main._return_told = {}
 
 
 func _test_revive_reads() -> void:
