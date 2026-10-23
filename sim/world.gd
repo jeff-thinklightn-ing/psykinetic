@@ -5082,7 +5082,8 @@ func shot_aim(by: GridEntity, angle: float, cells := -1) -> Dictionary:
 ## exactly through a corner, both cells beside it too (a supercover: no
 ## slipping between two bodies), end: the point it stops at, struck: what
 ## stopped it, &"wood" (a closed door), &"stone" (a wall, higher ground,
-## the map's end) or &"ground" (its range spent: it comes down past end)}.
+## the map's end) or &"ground" (its range spent: it comes down past end);
+## &"body" is shot_aim's, a body on the way}.
 ## A wall edge or a closed door is crossed as sight is
 ## (_sight_crosses_edge); over relief (decision 525) the arrow flies from
 ## the eye toward the aim height over the range's end, and ground above
