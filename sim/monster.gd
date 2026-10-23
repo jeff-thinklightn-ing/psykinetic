@@ -325,6 +325,12 @@ var keeps_room := false
 ## heavy strike in his hands, the knockdown his spin's alone (603 amended);
 ## the thing's own verb for anyone else.
 var blows := {}
+## An archer's hold before it looses (decision 620, enemy-ai's side): it
+## waits till its cone (World.spread_of) has closed to aim_spread degrees,
+## or it has held aim_hold_max ticks; its kind's row. 0 for both, it looses
+## as soon as its draw reaches (a goblin snaps, the patient dead wait).
+var aim_spread := 0.0
+var aim_hold_max := 0
 ## Whether players can talk to it (npc's offer contract, decision 548: the
 ## draugr): Main's speaker lookup takes it in.
 var talks := false
@@ -470,6 +476,8 @@ func _ready() -> void:
 		stamina_regen_every = maxi(1, int(row.get("stamina_regen_every", 1)))  # Decision 603.
 		stamina_regen_amount = maxi(0, int(row.get("stamina_regen", 0)))  # 603 amended.
 		blows = row.get("blows", {})
+		aim_spread = float(row.get("aim_spread", 0.0))
+		aim_hold_max = int(row.get("aim_hold_max", 0))
 		call_reach = int(row.get("call", Senses.NOISE_CALL))
 		if keeps_room:
 			_room = room_of(home)
@@ -706,8 +714,37 @@ func _shoot_tick() -> bool:
 	World.face(self, Senses.way_toward(tile, target.tile))
 	if raised != "draw":
 		World.try_stance(self, "draw")
-	elif World.range_of(self) >= mini(d, World.longest_range(self)):
+	elif World.range_of(self) >= mini(d, World.longest_range(self)) and _aimed() 			and _cone_clear(World.spread_of(self)):
 		World.try_loose(self, Vector2(target.tile - tile).angle())
+	return true
+
+
+## Whether its draw has been held long enough to loose (decision 620,
+## enemy-ai's side): its cone at or under aim_spread, or held aim_hold_max
+## ticks; always, for a kind with neither.
+func _aimed() -> bool:
+	if aim_spread <= 0.0 and aim_hold_max <= 0:
+		return true
+	var spread := World.spread_of(self)
+	if spread < 0.0:
+		return false  # Not drawing yet.
+	if aim_spread > 0.0 and spread <= deg_to_rad(aim_spread) + 1e-6:
+		return true
+	return aim_hold_max > 0 and World.tick - raised_tick >= aim_hold_max
+
+
+## Whether a cone of half-angle [param spread] (radians) toward its target
+## has nobody else on either edge as far as the target (decision 620,
+## enemy-ai's side): its arrow can fly anywhere in it.
+func _cone_clear(spread: float) -> bool:
+	if spread <= 0.0:
+		return true
+	var aim := Vector2(target.tile - tile).angle()
+	var d := World.distance(tile, target.tile)
+	for edge in [aim - spread, aim + spread]:
+		var hit: Variant = World.shot_aim(self, edge, d).get("hit")
+		if hit != null and hit != target:
+			return false
 	return true
 
 
@@ -803,7 +840,10 @@ func _clear_shot() -> bool:
 			cells = int(verb["cells"])
 	if World.distance(tile, target.tile) > cells or target.tile == tile:
 		return false
-	return World.shot_aim(self, Vector2(target.tile - tile).angle(), cells).get("hit") == target
+	if World.shot_aim(self, Vector2(target.tile - tile).angle(), cells).get("hit") != target:
+		return false
+	# A friend inside even its narrowest cone (decision 620): no shot from here.
+	return _cone_clear(deg_to_rad(float(Items.verb_of(World.drawn_with(self)).get("spread_floor", 0.0))))
 
 
 ## A step away from its target, to the free neighbouring cell farthest from
@@ -1452,8 +1492,22 @@ static func read_kinds(path: String) -> Dictionary:
 			"stamina_regen_every": maxi(1, int(row.get("stamina_regen_every", 1))),
 			"waves": (row["waves"] as Array).duplicate(true) if row.get("waves") is Array else [],
 			"stamina_regen": maxi(0, int(row.get("stamina_regen", 0))),
-			"blows": _blows(kind, row.get("blows"))}
+			"blows": _blows(kind, row.get("blows")),
+			"aim_spread": _aim_spread(path, kind, row.get("aim_spread", 0.0)),
+			"aim_hold_max": maxi(0, int(row.get("aim_hold_max", 0)))}
 	return out
+
+
+## A row's "aim_spread" (decision 620, enemy-ai's side): degrees, raised to
+## the bow's spread_floor with a warning (under it, it would loose only on
+## its hold cap); 0 for none. Every archer kind arms "bow" today.
+static func _aim_spread(path: String, kind: String, value: Variant) -> float:
+	var spread := maxf(0.0, float(value)) if value is float or value is int else 0.0
+	var floor_at := float(Items.verb_of("bow").get("spread_floor", 0.0))
+	if spread > 0.0 and spread < floor_at:
+		push_warning("[monsters] %s: %s's aim_spread %s is under the bow's floor %s: raised" % [path, kind, spread, floor_at])
+		spread = floor_at
+	return spread
 
 
 ## A row's "blows" (603 amended): item id to the kind's own verb with it,

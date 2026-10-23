@@ -24298,3 +24298,33 @@ the same line for the same salt and none without a cone, and a loose flying the 
 before the bow is lowered. monster_test's archer checks shoot straight (they test its standing off,
 not its aim). Combat adds the mean-miss test. Wire: no new message; PROTOCOL_REVISION 34 (the
 first wire change after v0.1.169) records that a client's and the server's bow fields go together. No new class_name.
+
+## 620, enemy-ai's side: an archer's hold, and the cone's edges
+
+The coordinator approved enemy-ai's design (2026-10-23): a monster archer looses through the
+same cone as a player (620), and each kind says how long it holds first. A goblin snaps off a
+wide shot, the patient dead wait for the cone to close.
+
+- **The hold** (`Monster._aimed`): a kind's row in monsters.json may carry `aim_spread`
+  (degrees) and `aim_hold_max` (ticks). An archer looses once its draw's step covers the target
+  (as before) and either its cone (`World.spread_of`, radians, -1 when not drawing) is at or under
+  `aim_spread`, or it has held `aim_hold_max` ticks. A row with neither looses as soon as the step
+  covers it, as before 620.
+- **The floor:** `Monster.read_kinds` keeps both keys and raises an `aim_spread` under the bow's
+  `spread_floor` (items.json, 2°) to it with a warning; under it an archer would loose only on its
+  cap. Every archer kind arms "bow" today, so the floor is read from that verb.
+- **The edges** (`Monster._cone_clear`): an archer looses only when both edges of its cone
+  (`World.shot_aim` at the aim plus and minus the spread, as far as the target) meet no body but
+  the target, so it holds its draw while a friend is inside the cone, the cap not firing; the cone
+  narrows and it looses once the friend is outside it. `_clear_shot` checks the edges at the floor
+  as well as the aimed line: a friend inside even the narrowest cone is no clear shot, and it
+  lowers the bow and moves for one as it does with a body on the line.
+- **The numbers** (drafts for Jeff, at 10 ticks a second; the bow's cone is 25, 16, 10, 6° at 5,
+  10, 15, 20 ticks of draw): brute 25° / 8 (a snap shot), imp 16° / 12 (about 1 s), sneak 10° / 20,
+  robber 10° / 25, skeleton and skeleton_guard 6° / 30 (about 2 s). None for beasts or the draugr
+  (he throws).
+
+monster_test `_test_archer_hold`: the rows read, a spread under the floor raised; three off, no
+hold looses at 5 ticks, 16° at 10, 6° at 20, the floor capped at 25 at the cap; a crate on the
+cone's edge holds the draw past a cap of 12 and it looses at 14 as the cone clears it, the crate
+unstruck. Server only, protocol unchanged, no new class_name.

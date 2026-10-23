@@ -107,6 +107,7 @@ func _ready() -> void:
 	_test_quieter()
 	_test_wolf_pack_bold()
 	_test_archer()
+	_test_archer_hold()
 	_test_worn_bundles()
 	_test_shield()
 	_test_monster_bash()
@@ -2463,6 +2464,71 @@ func _test_archer() -> void:
 	_check(closed and archer.raised != "draw", "it comes on to fight hand to hand")
 	Monster.idling = true
 	verb["spread"] = spread
+
+
+## Ticks an archer held its draw when it loosed, and whether its arrow
+## struck [param avoid] (decision 620, enemy-ai's side); -1 for no loose.
+func _held_at_loose(e: Dictionary, archer: Monster, ticks: int, avoid: GridEntity = null) -> Array:
+	var held := [-1]
+	var on_loose := func(by: GridEntity, _angle: float, _step: int) -> void:
+		if by == archer and held[0] < 0:
+			held[0] = World.tick - archer.raised_tick
+	World.loosed.connect(on_loose)
+	var struck := false
+	for i in ticks:
+		World.step()
+		struck = struck or (avoid != null and _damage_log.any(func(hit: Dictionary) -> bool: return hit["entity"] == avoid))
+		if held[0] >= 0:
+			break
+	World.loosed.disconnect(on_loose)
+	return [held[0], struck]
+
+
+func _test_archer_hold() -> void:
+	print("
+== an archer holds its draw till its cone closes to its kind's aim_spread, or its hold cap; a friend on an edge holds it (decision 620) ==")
+	Monster.idling = false
+	var kinds := Monster.kinds()
+	_check(is_equal_approx(float(kinds["imp"]["aim_spread"]), 16.0) and int(kinds["imp"]["aim_hold_max"]) == 12
+			and is_equal_approx(float(kinds["skeleton"]["aim_spread"]), 6.0) and float(kinds["wolf"]["aim_spread"]) == 0.0,
+			"the rows' holds read: imp 16/12, skeleton 6/30, none for a wolf")
+	var folder: String = preload("res://tests/test_ports.gd").scratch("monster_test/")
+	DirAccess.make_dir_recursive_absolute(folder)
+	var path := folder + "aim_kinds.json"
+	var file := FileAccess.open(path, FileAccess.WRITE)
+	file.store_string(JSON.stringify({"steady": {"aim_spread": 0.5, "aim_hold_max": 40}}))
+	file.close()
+	var read := Monster.read_kinds(path)
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
+	_check(is_equal_approx(float(read["steady"]["aim_spread"]), float(Items.verb_of("bow")["spread_floor"])),
+			"an aim_spread under the bow's floor is raised to it, with a warning (%s)" % read["steady"]["aim_spread"])
+	# Three off, its first step reaches: the draw's cone says when it looses.
+	for hold: Array in [[0.0, 0, 5, "no hold: as soon as the draw reaches, 5 ticks"], [16.0, 0, 10, "16 degrees: the second step, 10 ticks"],
+			[6.0, 0, 20, "6 degrees: the last step, 20 ticks"], [2.0, 25, 25, "the floor, capped at 25: at the cap, 25 ticks"]]:
+		var e := _build(["##########", "#........#", "#..P..a..#", "#........#", "##########"])
+		var archer: Monster = e["a"][0]
+		_bold(archer)
+		archer.reaction_ticks = 0
+		archer.slots = PackedStringArray(["", "", "", "", "bow", "arrows"])
+		archer.aim_spread = hold[0]
+		archer.aim_hold_max = hold[1]
+		var held: int = _held_at_loose(e, archer, 60)[0]
+		_check(held == hold[2], "%s (held %d)" % [hold[3], held])
+	# Five off, a crate beside its line two cells out, inside its cone at the
+	# second step (16 degrees): it holds past its cap (12, not firing while
+	# blocked) till the cone clears it (about 11 degrees, 14 ticks).
+	var e := _build(["#############", "#...........#", "#....P....a.#", "#.......c...#", "#############"])
+	var archer: Monster = e["a"][0]
+	var crate: GridEntity = e["c"][0]
+	_bold(archer)
+	archer.reaction_ticks = 0
+	archer.slots = PackedStringArray(["", "", "", "", "bow", "arrows"])
+	archer.aim_spread = 16.0
+	archer.aim_hold_max = 12
+	var r := _held_at_loose(e, archer, 80, crate)
+	_check(int(r[0]) > archer.aim_hold_max, "a crate on its cone's edge: it holds past its cap (held %d)" % r[0])
+	_check(int(r[0]) >= 0 and not r[1], "then looses once the cone clears it, the crate unstruck")
+	Monster.idling = true
 
 
 func _test_worn_bundles() -> void:
