@@ -509,7 +509,8 @@ first unless named, as a share of the map's farthest reach: the shallow
 third the town's square tombs with doors, torches and burial niches, an
 alcove cell off the walls; the middle third narrow passage graves with
 crooked ways and niches, no doors; the deepest the old caverns; chests in
-the deepest niches first, monsters deepest first unless `"near": {kind:
+the deepest niches first, the dead a third in each depth band (deepest
+first within a band; a layer with one band deepest first), monsters otherwise deepest first unless `"near": {kind:
 anchor}` sends a kind to an anchor, the robbers to the altar; its ways are
 three cells wide, a brush along the path right up to a shallow tomb's
 wall, the tomb walled where the way touches it and entered by its one door
@@ -595,7 +596,8 @@ hides about 2.5 cells behind it). The templates are written from
   Runner's pack. The robbers (4) are sent near the altar; no dead walk it,
   and the generated level.json lists no graves and no niches for it.
 - `levels/barrow_deep`, "The Ossuary", 100 x 80, `"layer": 2` (the tombs
-  by depth): the ancient dead the town moved down, walking home (6
+  by depth): the ancient dead the town moved down, walking home (14, a
+  draft number Jeff tunes, spread a third to each depth band; decision 631;
   skeletons) through the galleries, the graves as before and the niches
   cut along the galleries' walls (608: shelves and columbarium cells, a
   hollow here and there, about one wall cell in six, rock behind each; no

@@ -37,7 +37,9 @@ extends RefCounted
 ## along the ways, burial niches (an alcove cell) off the walls. Middle:
 ## passage graves, narrow and long, crooked ways in, no doors, niches
 ## along them. Deep: the old caverns round the lair, no doors, no torches.
-## Chests go in the deepest niches first, monsters deepest first unless
+## Chests go in the deepest niches first; the dead a third in each depth
+## band, deepest first within a band (decision 631; layers with one band
+## deepest first), monsters otherwise deepest first unless
 ## "near" sends a kind to an anchor (the robbers to the altar). Its ways
 ## are three cells wide (541 amended, Jeff: "way too cramped"), a brush
 ## along the path, narrowing to the one door cell into a shallow tomb;
@@ -757,8 +759,10 @@ static func _markers(map: LevelMap, anchors: Array, rooms: Array[Dictionary], co
 	Tools.shuffle(corners, rng)
 	Tools.shuffle(corridor_cells, rng)
 	# Barrow: the grave goods lie deepest (the niches deepest first, then
-	# the deepest corners); the dead walk deepest first too, unless "near"
-	# sends a kind to an anchor (the robbers to the altar).
+	# the deepest corners); the dead are spread a third to each depth band,
+	# deepest first within a band (decision 631: six at the far end left the
+	# Ossuary's first half empty), unless "near" sends a kind to an anchor
+	# (the robbers to the altar) or the layer has one band (580: layers 1 and 3).
 	if barrow:
 		corners = _deepest_first(depth, corners)
 		room_cells = _deepest_first(depth, room_cells)
@@ -783,24 +787,47 @@ static func _markers(map: LevelMap, anchors: Array, rooms: Array[Dictionary], co
 		if kind == "brute":
 			spots.append_array(hall_cells)
 		spots.append_array(everywhere)
-		if barrow and near is Dictionary and near.has(kind):
+		var sent: bool = barrow and near is Dictionary and near.has(kind)
+		if sent:
 			for anchor: Dictionary in anchors:
 				if str(anchor.get("name", "")) == str(near[kind]):
 					var rect: Rect2i = anchor["rect"]
 					spots = _nearest_first(rect.position + rect.size / 2, spots)
-		_lay(map, anchors, "monster_" + kind, int(counts[kind]), spots)
+		var count := int(counts[kind])
+		if barrow and not sent and int(depth.get("fixed_band", -1)) < 0:
+			count -= _lay_by_band(map, anchors, "monster_" + kind, count, spots, depth)
+		_lay(map, anchors, "monster_" + kind, count, spots)
 
 
 ## [param count] markers [param marker] on the first free floor cells of
-## [param spots] (in their order), none beside an anchor.
-static func _lay(map: LevelMap, anchors: Array, marker: String, count: int, spots: Array[Vector2i]) -> void:
+## [param spots] (in their order), none beside an anchor; how many were laid.
+static func _lay(map: LevelMap, anchors: Array, marker: String, count: int, spots: Array[Vector2i]) -> int:
 	if count <= 0 or not map.colours.has(marker):
-		return
+		return 0
 	var laid := 0
 	for cell in spots:
 		if laid >= count:
-			return
+			return laid
 		if map.cell(cell) != FLOOR or _beside_anchor(anchors, cell):
 			continue
 		map.set_cell(cell, marker)
 		laid += 1
+	return laid
+
+
+## The dead spread over the depth bands (decision 631): [param count]
+## markers [param marker] a third to each of Regen.BANDS' three bands, the
+## deeper bands taking the odd ones, each band's [param spots] deepest
+## first; how many were laid (a band short of free cells lays fewer, and
+## the caller lays the rest deepest first).
+static func _lay_by_band(map: LevelMap, anchors: Array, marker: String, count: int, spots: Array[Vector2i], depth: Dictionary) -> int:
+	var by_band: Array[Array] = [[], [], []]
+	for cell in spots:
+		by_band[_band_of(depth, cell)].append(cell)
+	var laid := 0
+	for band in 3:
+		var share := count / 3 + (1 if band >= 3 - count % 3 else 0)
+		var cells: Array[Vector2i] = []
+		cells.assign(by_band[band])
+		laid += _lay(map, anchors, marker, share, _deepest_first(depth, cells))
+	return laid

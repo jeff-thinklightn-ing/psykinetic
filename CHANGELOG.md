@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The Ossuary holds fourteen of the ancient dead (a draft number) spread through its depths, the first met a few rooms in and more the deeper you go, instead of six at its far end (decision 631).
 - The barrow's first hall has its burial table and the Hall of Fallen Souls its six pillars as art-kit's pieces in place of blocks of rock, and the draugr's dais stands a step up with a flight of stairs along its front (580 step 3, dungeon's side).
 - In the barrow's first hall, a faint cool draft breathes from one niche: the hidden door's. Stand close to hear it; it stops once the door is opened (608 amended, sound's side).
 - Shadows are a little darker again (0.8 instead of 0.6), so the short shadows show without the long dark ones coming back (534 amended (3)).

@@ -255,7 +255,7 @@ static func sample_barrow_deep() -> Dictionary:
 		"entities": [],
 		"regenerate": {"generator": "labyrinth", "style": "barrow", "layer": 2, "ways": 5, "every_days": 3, "anchors": DEEP_ANCHORS,
 			"entrance": "entrance", "rooms": {"count": [10, 14], "size": [[8, 7], [16, 12]]}, "loops": 0.15,
-			"monsters": {"skeleton": 6}, "chests": 5},
+			"monsters": {"skeleton": 14}, "chests": 5},  # 14 a draft (decision 631; Jeff: not enough skeletons), spread by band.
 		"legend": BARROW_LEGEND, "respawn_s": {"skeleton": 600}}
 	return {"layout": layout, "config": config}
 

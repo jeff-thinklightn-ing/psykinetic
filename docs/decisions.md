@@ -25345,3 +25345,37 @@ moved cells, no way one cell wide in the dressed halls, and a generation
 of each keeping all of it with no warning. view_test's footprint check
 covers the two kinds. docs/levels.md. Level data and the templates;
 protocol: the line opens ## 35 with the bump; no new class_name.
+protocol: a line under 34, no bump; no new class_name.
+
+
+## 631. The Ossuary's dead: fourteen, spread over the depth bands
+
+Jeff on v0.1.169: "not enough skeletons in the ossuary and the ones that
+are are lying down or stuck in their niches." What the data said:
+barrow_deep spawned 6 skeletons for 100 x 80, and the barrow style laid
+its monsters deepest first (every spot sorted by depth), so all six sat at
+the far end and the first half of the layer was empty; each then walked up
+to a grave (a dead-end floor cell, `Regen.graves_of`: one open neighbour,
+outside the anchors) and lay there (enemy-ai's HOMEWARD, 6000 ticks a
+lie). None is boxed in: a grave's one neighbour always opens two ways, so
+the "stuck in their niches" look is the lying, enemy-ai's rest (the
+coordinator passed it the finding and dungeon's favoured answer, rising
+when a living one comes in sight); 608's niches are wall edges and hold
+no one. Approved by the coordinator 2026-10-23.
+
+- barrow_deep's "monsters": {"skeleton": 14}, about one a room (its rooms
+  roll 10 to 14), a draft number: the cut checklist carries a tune line.
+  The Hall of Fallen Souls keeps its 6 (one band, the dark below).
+- The barrow style lays its dead a third to each of Regen.BANDS' bands,
+  deepest first within a band (`Labyrinth._lay_by_band`: the deeper bands
+  take the odd ones; a band short of free cells lays fewer and the rest go
+  deepest first as before), unless "near" sends the kind to an anchor
+  (the robbers to the altar) or the layer has one fixed band (580: layers
+  1 and 3). `_lay` says how many it laid. So a player meets the first dead
+  a few rooms in and the pack thickens going down.
+- Graves stay the dead's homes: the walk-up is the crypt's conceit.
+
+labyrinth_test (the Ossuary sample: fourteen laid, at least three in each
+band by the generator's own measure; the grave goods still deeper than the
+mean). docs/levels.md. Generator and template data; protocol unchanged; no
+new class_name.

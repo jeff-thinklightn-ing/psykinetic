@@ -262,18 +262,25 @@ func _test_barrow() -> void:
 	mean_floor /= floor_cells.size()
 	kinds = _kinds(level)
 	var chest_depth := 0.0
-	var skeleton_depth := 0.0
+	var dead_by_band := [0, 0, 0]
 	for spec: Dictionary in level["entities"]:
 		var kind := str(spec.get("kind", spec["name"].rstrip("0123456789").to_lower()))
 		if kind == "chest":
 			chest_depth += depth.call(spec["tile"])
 		elif kind == "skeleton":
-			skeleton_depth += depth.call(spec["tile"])
-	_check(kinds.get("skeleton", 0) == 6 and kinds.get("chest", 0) == 5 and kinds.get("robber", 0) == 0 and not kinds.has("altar"),
-		"six skeletons and five chests laid; no robbers, no altar (%s)" % [kinds])
-	if kinds.get("skeleton", 0) == 6 and kinds.get("chest", 0) == 5:
-		_check(chest_depth / 5.0 > mean_floor and skeleton_depth / 6.0 > mean_floor,
-			"the grave goods and the dead lie deeper than the floor's mean depth (%.1f, %.1f over %.1f)" % [chest_depth / 5.0, skeleton_depth / 6.0, mean_floor])
+			# The generator's measure: the distance over the farthest the map reaches from the entrance.
+			var far := 1
+			for corner: Vector2i in [Vector2i.ZERO, Vector2i(level["size"].x - 1, 0), Vector2i(0, level["size"].y - 1), level["size"] - Vector2i.ONE]:
+				far = maxi(far, depth.call(corner))
+			var d := float(depth.call(spec["tile"])) / float(far)
+			dead_by_band[0 if d < Regen.BANDS[0] else (1 if d < Regen.BANDS[1] else 2)] += 1
+	_check(kinds.get("skeleton", 0) == 14 and kinds.get("chest", 0) == 5 and kinds.get("robber", 0) == 0 and not kinds.has("altar"),
+		"fourteen skeletons (a draft number) and five chests laid; no robbers, no altar (%s)" % [kinds])
+	if kinds.get("skeleton", 0) == 14 and kinds.get("chest", 0) == 5:
+		# The dead a third to each band (decision 631): the shallow band's share
+		# shows up a few rooms in, not only at the far end.
+		_check(chest_depth / 5.0 > mean_floor and dead_by_band[0] >= 3 and dead_by_band[1] >= 3 and dead_by_band[2] >= 3,
+			"the grave goods lie deeper than the floor's mean depth (%.1f over %.1f); the dead are spread a third to each band (%s)" % [chest_depth / 5.0, mean_floor, dead_by_band])
 	_check(level["warnings"].is_empty() and level["links"].size() == 2 and level["links"][0]["to_map"] == "barrow" and level["links"][1]["to_map"] == "barrow_lair"
 		and level["spawn_points"].size() == 2, "no warnings; the stairs up and down and the spawn points (%s)" % [level["warnings"]])
 	_check(Regen.generate("lab_barrow_deep", 1)["layout"].get_data() == deep["layout"].get_data(), "the same seed gives the same Ossuary")
