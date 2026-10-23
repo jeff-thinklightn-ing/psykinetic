@@ -21357,11 +21357,15 @@ first for the power read, Jeff to pick from the shot.
 - --test-show=aim: the host puts a bow in the right hand and arrows in the
   left, draws with the aim fixed down the screen, for the shot
   docs/ui/shots/combat/aim_arc.jpg: the arc round the archer at the full
-  draw's step and "bow drawn" on the HUD; its middle, with the marker and
-  pips, lies above the frame in every sample tried whatever the fixed
-  point, so the sample's steering of the view is still to be understood
-  (the headless check passes); the marker and pips were enlarged for the
-  camera's height.
+  draw's step, the marker and pips on it, "bow drawn" on the HUD. (The
+  sample's origin comes from the player's tile: the body's 2D position is
+  not yet placed when the state runs, so the first samples aimed at the
+  map's corner and put the arc's middle above the frame. The mesh now
+  carries the angle itself, the marker's own arithmetic, so the band and
+  the marker can never disagree; a difference of the shot against the same
+  scene without an arc shows the band on the marker's side, where a road's
+  edge in the scene had read to the eye as a ring over the top.) The
+  marker and pips were enlarged for the camera's height.
 
 ui_test _test_aim: the point on the arc at any angle, the axes, the pips,
 the fade, the command's shape, the aim dropped on release. Client only;
@@ -21434,7 +21438,10 @@ Now the panel lives over the HUD and the menu both, on a canvas layer of
 its own above them (Main's OptionsLayer; a Control under Main alone sat in
 the world's canvas, scaled by the camera, and drew nowhere, as the first
 shot showed), the
-menu's Options hides the menu and opens them (Main._menu_options), and
+menu's Options hides the menu's front (its title, buttons and version;
+MainMenu.show_front) while its dark backdrop stays, so the world and its
+nameplates never show through the options' dim (the coordinator's check
+of the first shot), and opens them (Main._menu_options), and
 closing them (Esc, O, Main.toggle_options) brings the menu back; in play
 nothing changes. --test-show=menu_options for the shot
 (docs/ui/shots/menu/menu_before.jpg the menu as it was; menu_options.jpg

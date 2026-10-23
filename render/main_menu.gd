@@ -10,6 +10,11 @@ extends CanvasLayer
 signal play_pressed
 signal options_pressed
 signal quit_pressed
+## The dark backdrop, kept while the options show over it (418 amended: the
+## world and its nameplates showed through the options' dim); the front
+## is the title, the buttons and the version.
+var backdrop: ColorRect
+var column: VBoxContainer
 
 const BUTTON_WIDTH := 560.0
 
@@ -27,11 +32,11 @@ func _init() -> void:
 
 
 func _ready() -> void:
-	var backdrop := ColorRect.new()
+	backdrop = ColorRect.new()
 	backdrop.color = Color(UiTheme.color("outline"), 0.97)
 	backdrop.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(backdrop)
-	var column := VBoxContainer.new()
+	column = VBoxContainer.new()
 	column.set_anchors_preset(Control.PRESET_CENTER)
 	column.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	column.grow_vertical = Control.GROW_DIRECTION_BOTH
@@ -67,6 +72,17 @@ func _ready() -> void:
 	version.offset_bottom = -UiTheme.constant("margin")
 	add_child(version)
 	play.grab_focus()
+
+
+## The front (the title, buttons, status and version) shown or hidden; the
+## backdrop stays.
+func show_front(shown: bool) -> void:
+	column.visible = shown
+	version.visible = shown
+
+
+func front_shown() -> bool:
+	return column.visible
 
 
 ## "online, v0.1.150, 3 players" under the buttons; "" for none.

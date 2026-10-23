@@ -1013,8 +1013,8 @@ const HOVER_LINE := 0.05
 ## pip's radius and spacing, the most pips (the shortest step's).
 const AIM_LINE := 0.08
 const AIM_MARK := 0.22
-const AIM_PIP := 0.09
-const AIM_PIP_GAP := 0.24
+const AIM_PIP := 0.13
+const AIM_PIP_GAP := 0.32
 const AIM_PIPS_MOST := 4
 const AIM_SEGMENTS := 48
 ## A telegraph's fill: faint at its start, full as it lands; the landing
@@ -1307,6 +1307,7 @@ var _aim_arc: MeshInstance3D
 var _aim_mark: MeshInstance3D
 var _aim_pips: Array[MeshInstance3D] = []
 var _aim_arc_radius := -1.0
+var _aim_arc_angle := -1000.0
 ## The bosses' ground telegraphs (combat's 602, ui's side; Jeff: "a small
 ## red cone on the ground indicates the area"): id -> {quads, from, lands,
 ## landed_at}; one flat quad per cell that will be hit, filling toward
@@ -2823,15 +2824,17 @@ func _make_ring(inner: float, outer: float) -> ArrayMesh:
 
 
 ## A semicircle's band in the ground plane, [param radius] to its middle
-## and [param line] wide, from -90 to +90 degrees about +x (the aim's way).
-static func _make_arc(radius: float, line: float) -> ArrayMesh:
+## and [param line] wide, from -90 to +90 degrees about [param angle] (the
+## aim's way, radians on the grid: x along world x, y along world z, the
+## marker's own arithmetic, so no turn of the node is needed).
+static func _make_arc(radius: float, line: float, angle := 0.0) -> ArrayMesh:
 	var surface := SurfaceTool.new()
 	surface.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var inner := radius - line * 0.5
 	var outer := radius + line * 0.5
 	for i in AIM_SEGMENTS:
-		var a0 := -PI * 0.5 + PI * i / AIM_SEGMENTS
-		var a1 := -PI * 0.5 + PI * (i + 1) / AIM_SEGMENTS
+		var a0 := angle - PI * 0.5 + PI * i / AIM_SEGMENTS
+		var a1 := angle - PI * 0.5 + PI * (i + 1) / AIM_SEGMENTS
 		var i0 := Vector3(cos(a0) * inner, 0.0, sin(a0) * inner)
 		var i1 := Vector3(cos(a1) * inner, 0.0, sin(a1) * inner)
 		var o0 := Vector3(cos(a0) * outer, 0.0, sin(a0) * outer)
@@ -3156,13 +3159,14 @@ func aim_arc(origin: Vector2, angle: float, radius: float, alpha: float, pips: i
 		_aim_pips[i].visible = _aim_arc.visible and i < pips
 	if not _aim_arc.visible:
 		return
-	if absf(radius - _aim_arc_radius) > 0.01:
+	if absf(radius - _aim_arc_radius) > 0.01 or absf(angle - _aim_arc_angle) > 0.002:
 		_aim_arc_radius = radius
-		_aim_arc.mesh = _make_arc(radius, AIM_LINE)
+		_aim_arc_angle = angle
+		_aim_arc.mesh = _make_arc(radius, AIM_LINE, angle)
 	var cell := Vector2i(origin.round())
 	var centre := Vector3(origin.x, _height_in(cell, origin) + ON_FLOOR * 2.0, origin.y)
 	_aim_arc.position = centre
-	_aim_arc.rotation = Vector3(0.0, -angle, 0.0)
+	_aim_arc.rotation = Vector3.ZERO  # The mesh carries the angle (_make_arc).
 	_tint_aim(_aim_arc, alpha * 0.8)
 	var way := Vector2.from_angle(angle)
 	var point := origin + way * radius

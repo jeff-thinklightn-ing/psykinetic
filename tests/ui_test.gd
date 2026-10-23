@@ -533,9 +533,10 @@ func _test_aim() -> void:
 		var hud_was: bool = _main.get_node("HUD").visible
 		_main._show_menu()
 		_main._menu_options()
-		_check(_main.options_panel.visible and not _main.main_menu.visible, "the main menu's Options: the options on top, the menu aside")
+		_check(_main.options_panel.visible and _main.main_menu.visible and not _main.main_menu.front_shown(),
+			"the main menu's Options: the options on top, the menu's front aside, its backdrop kept")
 		_main.escape()
-		_check(not _main.options_panel.visible and _main.main_menu.visible, "Esc: the options close and the menu is back")
+		_check(not _main.options_panel.visible and _main.main_menu.front_shown(), "Esc: the options close and the menu's front is back")
 		_main.main_menu.visible = false
 		_main.get_node("HUD").visible = hud_was
 		var layer := _main.options_panel.get_parent() as CanvasLayer

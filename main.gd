@@ -475,7 +475,7 @@ var hint_panel: HintPanel
 var options_panel: OptionsPanel
 ## The options' own canvas layer, above the HUD (layer 1) and the main menu.
 var _options_layer: CanvasLayer
-const OPTIONS_LAYER := 20
+const OPTIONS_LAYER := 30  # Above the main menu's own layer (20) as well as the HUD's.
 ## The options were opened from the main menu, which comes back when they close.
 var _options_from_menu := false
 ## Esc's menu (GameMenu; the game never pauses), the main menu (MainMenu) while it shows, and
@@ -1862,8 +1862,6 @@ func _update_aim(player: Player, drawing: bool) -> void:
 	if not aim_drawn:
 		aim_drawn = true
 		_show_cursor(false)
-		if is_finite(_aim_fixed.x):
-			print("[test] aim fixed: origin %s toward %s angle %.3f" % [origin, _aim_fixed, (_aim_fixed - origin).angle()])  # The shot's sample.
 	var toward := toward_point - origin
 	if toward.length() > 0.05:
 		aim_angle = toward.angle()
@@ -10462,7 +10460,7 @@ func toggle_options() -> void:
 	if closing and _options_from_menu:
 		_options_from_menu = false
 		if main_menu != null:
-			main_menu.visible = true
+			main_menu.show_front(true)
 
 
 ## The main menu's Options: the menu steps aside, the options on top; Esc
@@ -10472,7 +10470,7 @@ func _menu_options() -> void:
 		return
 	_options_from_menu = true
 	if main_menu != null:
-		main_menu.visible = false
+		main_menu.show_front(false)  # The backdrop stays: the world and its names never show through the options' dim.
 	if not options_panel.visible:
 		options_panel.toggle()
 
@@ -11651,7 +11649,9 @@ func _run_test_show(player: Player) -> void:
 				if Net.is_authority() and player != null and player.slots.size() > Items.LEFT_HAND:
 					player.slots[Items.RIGHT_HAND] = "bow"
 					player.slots[Items.LEFT_HAND] = "arrows"
-					_aim_fixed = Iso.local_to_grid(player.position) + Vector2(-4.0, 6.0)  # Down the screen, clear of the pack.
+					# From the tile: the body's 2D position is not yet placed at spawn (it read (0, 0)
+					# and aimed the sample at the map's corner).
+					_aim_fixed = Vector2(player.tile) + Vector2(-4.0, 6.0)  # Down the screen, clear of the pack.
 					World.try_stance(player, "draw")
 			"charges":
 				# 573, ui's side: the pack's charges line, for the shot (the host sets the
