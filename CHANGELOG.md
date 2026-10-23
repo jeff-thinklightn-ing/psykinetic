@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- A companion's lean is named by her focus, as her card's corners are: she leans to fighting, to magic or to stealth (577's words).
 - Your companion notices how you treat her: a day on the roads together, sitting by a fire, a rest in town and fights you win side by side bring her closer; harsh words hurt (twice a day at most, and an apology the same day takes one back), and so does working her like a mule or starting a fight when she has asked to rest first (621).
 - Your companion's loyalty grows in tiers: kindness (gifts, food, days together) brings her to close, trust under pressure (tending her badly hurt, standing by her) takes her near devoted, and only a milestone (a rescue, the draugr's blessing) makes her devoted; blows never cost it and it never fades. Wary, she hesitates before an order; only a devoted companion takes the lead; devoted, she goes for whatever attacks you (621).
 - The archer's aim shows a cone of flight: wide as the draw starts, narrowing the longer you hold, stepping out with each range step and still narrowing at the last; the arrow flies a line inside it (620, ui's side; combat's design).

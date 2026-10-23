@@ -59,9 +59,9 @@
 		"legacy": {"Wren": {"fight": 40, "magic": 20, "stealth": 40}, "Nix": {"fight": 25, "magic": 45, "stealth": 30}, "Pip": {"fight": 30, "magic": 20, "stealth": 50}},
 		"grow": {"ate": ["fight", 0.3], "struck": ["fight", 0.1], "killed": ["fight", 0.5], "shot": ["stealth", 0.2]},
 		"words": {
-			"fight": "You lean to strength: in a fight you trust your arm.",
-			"stealth": "You lean to dexterity: quick and quiet, best with a bow.",
-			"magic": "You lean to the quiet arts: charms and stillness.",
+			"fight": "You lean to fighting: in a fight you trust your arm.",
+			"stealth": "You lean to stealth: quick and quiet, best with a bow.",
+			"magic": "You lean to magic: charms and stillness.",
 			"": "You are as handy one way in a fight as another."
 		},
 		"taken_to": {"fight": "{her} has come to trust strength of arm in a fight.", "stealth": "{her} has taken to the bow and quiet feet.", "magic": "{her} has taken to charms and stillness."}
