@@ -6960,7 +6960,8 @@ func rushing(entity: GridEntity) -> bool:
 
 
 ## Each rush's cell when due, in id order (the zone's step, before the act
-## phase).
+## phase): only this zone's rushers (604 amended), since each zone keeps its
+## own tick, terrain and occupancy.
 func _tend_rushes() -> void:
 	if _rushers.is_empty():
 		return
@@ -6974,6 +6975,8 @@ func _tend_rushes() -> void:
 		if not _alive(entity):
 			_rushers.erase(entity)
 			continue
+		if entity.zone != zone.name:
+			continue  # Another zone's, on its own clock and ground (604 amended).
 		if is_stunned(entity):
 			_end_rush(entity, "stunned")
 			continue

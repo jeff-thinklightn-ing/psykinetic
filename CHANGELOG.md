@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- A charge no longer stops short or leaves its runner standing when another part of the world is busy (604 amended): the draugr's charge is run in his own lair only.
 - A charge is slower through a ford, tall grass or uphill, and hits softer there (607 amended): it picks up again on open ground.
 - The draugr now walks to you anywhere in his hall: he used to give up 12 cells from his throne and reach the door end only with his throw and rush (Jeff: "doesn't walk, long reach"); the altar room's guards likewise chase anywhere in their room.
 - Skeletons lying at their graves in the barrow sit up and come for you when you come into their sight, instead of lying on as you pass; after the draugr is laid to rest the dead still lie still.

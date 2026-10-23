@@ -24934,3 +24934,18 @@ combat reads as right. Server sim only, no new rule, protocol unchanged.
 
 tests/physics_test: a 120 kg rush over 7 cells, 2 of them ford, takes 9 ticks, its speed 0.5 in
 the ford and 1 past it.
+
+## 604 amended: a rush is tended only in its own zone
+
+The draugr standing still in the live lair (Jeff, v0.1.170), approved by the coordinator. World.step
+runs _step_zone for each awake zone, and each zone keeps its own tick, terrain and occupancy
+(enter swaps them), but 604's _rushers is one dictionary for the world. Every awake zone's step
+tended every rush, so a rush's cell could be taken under another zone's step: read against that
+zone's walls (it ended "wall" there), with its next_move_tick set on that zone's clock (hours
+ahead of a lair asleep since boot, so the monster could not step again). _tend_rushes now skips
+a rusher whose zone is not zone.name, as the other zone-wide tenders do; combat's boss tenders
+take the same skip (603 amended (2)). Server sim only, protocol unchanged.
+
+tests/physics_test: two zones awake with a player each, the other 5000 ticks ahead; a 120 kg rush
+in the lair runs its 5 cells on the lair's clock and arrives, its next step never on the other's
+clock. Before the fix it ended "wall" after 1 cell, at the other zone's tick 5001.

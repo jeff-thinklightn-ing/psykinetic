@@ -43,6 +43,7 @@ func _ready() -> void:
 	_test_hurl()
 	_test_pack_throw()
 	_test_ground()
+	_test_rush_in_its_zone()
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -523,6 +524,40 @@ func _test_ground() -> void:
 	_check(dummy.tile == Vector2i(3, 2) and steps == 9, "7 cells with 2 of ford take 9 ticks, not 7 (at %s, %d)" % [dummy.tile, steps])
 	_check(speeds.get(7) == 0.5 and speeds.get(6) == 0.5 and speeds.get(5) == 1.0,
 			"its speed 0.5 in the ford, what a spear or a body met there feels, and 1 again past it (%s)" % [speeds])
+
+
+
+func _test_rush_in_its_zone() -> void:
+	print("
+== a rush is tended in its own zone, on its own clock (604 amended) ==")
+	# Two zones awake, each with a player: a lair at tick 0 with a 120 kg
+	# rusher, and another far ahead of it (the box's overworld, awake since
+	# boot). The other zone's step must not take the rush's cells.
+	World.clear_zones()
+	var lair := World.add_zone("lair")
+	var other := World.add_zone("other")
+	World.enter(other)
+	World.load_terrain(Terrain.parse(Terrain.expand(["#####", "#...#", "#####"])))
+	var away := EntityFactory.build({"script": "res://sim/player.gd", "shape": "capsule", "name": "Away"})
+	var away_room := Node2D.new()  # Not _room, which _build frees.
+	add_child(away_room)
+	away_room.add_child(away)
+	World.spawn(away, Vector2i(1, 1))
+	World.tick = 5000
+	World.enter(lair)
+	var e := _build(["##############", "#............#", "#.P.......m..#", "#............#", "#............#", "##############"], 120.0)
+	var dummy: GridEntity = e["m"][0]
+	World.rush(dummy, Vector2(-1, 0), 8, {"to": Vector2i(5, 2)})
+	var highest := 0.0
+	for i in 8:
+		World.step()
+		highest = maxf(highest, dummy.next_move_tick)
+	_check(other.awake and lair.awake, "both zones awake")
+	_check(dummy.tile == Vector2i(5, 2) and not World.rushing(dummy), "its 5 cells on the lair's clock, arrived (at %s)" % dummy.tile)
+	_check(highest <= World.tick + 1, "its next step never on the other zone's clock (at most %.0f, the lair at %d, the other at %d)" % [highest, World.tick, other.tick])
+	_check(not other.occupancy.values().has(dummy), "and never put down in the other zone")
+	World.clear_zones()
+	away_room.free()
 
 
 # --- helpers ------------------------------------------------------------------
