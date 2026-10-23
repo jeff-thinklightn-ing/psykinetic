@@ -42,6 +42,7 @@ func _run() -> void:
 	_test_an_old_snapshot_by_slots(path, saved)
 	_test_stock_tops_up_once(path, saved)
 	_test_became(path, saved)
+	_test_a_moved_marker(path, saved)
 	DirAccess.remove_absolute(path)
 	Net.state_path = ""
 	Level.unregister(LEVEL)
@@ -51,11 +52,15 @@ func _run() -> void:
 
 
 ## The level, as saved or with GAINED (a chest, props {"temple": true}),
-## or without the marker at [param lost].
-func _register(gained: bool, lost := Vector2i(-1, -1), stock: Array = [], became := {}) -> void:
+## or without the marker at [param lost], or with [param moved]'s markers
+## (from -> to) moved.
+func _register(gained: bool, lost := Vector2i(-1, -1), stock: Array = [], became := {}, moved := {}) -> void:
 	Level.unregister(LEVEL)
 	var markers := MARKERS.duplicate()
 	markers.erase(lost)
+	for from: Vector2i in moved:
+		markers[moved[from]] = markers[from]
+		markers.erase(from)
 	for key: String in became:
 		markers.erase(Vector2i(int(key.get_slice(",", 0)), int(key.get_slice(",", 1))))
 	var entries: Array = []
@@ -250,3 +255,21 @@ func _check(ok: bool, label: String) -> void:
 	if not ok:
 		_failures += 1
 	print("  %s  %s" % ["PASS" if ok else "FAIL", label])
+
+
+func _test_a_moved_marker(path: String, data: Dictionary) -> void:
+	print("
+== a marker moved a cell: its saved entity comes back on it as itself (decision 610) ==")
+	_write(path, data)
+	# The chest a cell over and down; Crate2 three cells over, past the reach.
+	_register(false, Vector2i(-1, -1), [], {}, {Vector2i(6, 2): Vector2i(7, 3), Vector2i(12, 2): Vector2i(15, 2)})
+	_main._load_level(LEVEL)
+	_main._start_level(true)
+	var at := _by_tile()
+	var chests := at.values().filter(func(entity: GridEntity) -> bool: return entity is Chest)
+	var chest: Variant = at.get(Vector2i(7, 3))
+	_check(chests.size() == 1 and chest is Chest and chest.spawn_spec["spawn_key"] == "7,3" and _main._alive_slots.get(_slot_keyed("7,3")) == chest,
+			"one chest, on the moved marker's slot and tile, not a stray beside a new one (%s)" % [_names(at)])
+	var crate: Variant = at.get(Vector2i(12, 4))
+	_check(crate is Pushable and not crate.spawn_spec.has("spawn_key") and at.get(Vector2i(15, 2)) is Pushable,
+			"a marker moved past the reach: the saved one as saved, a new one on the marker (%s)" % [_names(at)])

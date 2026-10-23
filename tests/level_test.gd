@@ -492,7 +492,7 @@ func _test_solid() -> void:
 	# Jeff: "add some of the melee weapons to the town chest for testing": two chests beside it.
 	var held := []
 	for spec: Dictionary in wilds["entities"]:
-		if spec["tile"] in [Vector2i(220, 226), Vector2i(219, 225)] and str(spec.get("script", "")).ends_with("chest.gd"):
+		if spec["tile"] in [Vector2i(219, 226), Vector2i(219, 225)] and str(spec.get("script", "")).ends_with("chest.gd"):
 			held.append_array(Array(spec.get("props", {}).get("slots", [])))
 	_check(["sword", "spear", "hammer", "shield", "giant_axe", "dagger", "buckler"].all(func(id: String) -> bool: return id in held),
 			"the town chest's two beside it hold a sword, a spear, a hammer, a shield, a giant axe, a dagger and a buckler (%s)" % [held])

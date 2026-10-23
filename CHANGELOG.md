@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The sword, spear, hammer and shield chest stands outside Snagfin's tower now, against its west wall beside the other weapon chest, so his doorway is clear (610).
 - The barrow's draugr holds his battle axe again: a monster with a class of its own was spawned by a level with empty hands, no loot table and no home, so he never threw his axe or charged for it, and spun with his fists (Level._own_class; combat_test).
 - Arrows are heard where they land, out to past a bow's reach (they were silent beyond 4-6 cells): a thud in a body, a knock in a door or a tree, a crack and skitter off stone, a soft thump in the ground, a plip in water, and an arrow whistles as it flies past you (609; Jeff: "arrow impact needs sounds"). Client only.
 

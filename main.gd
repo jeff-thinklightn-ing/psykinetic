@@ -3553,6 +3553,16 @@ func _spawn_saved(section: Dictionary) -> bool:
 		if slot >= 0 and str(record["entry"].get("spawn_key", "")).is_empty():
 			record["entry"]["spawn_key"] = _key_of(slot)
 	var recorded := _recorded_slots()
+	# Every key the snapshot names (decision 610): a marker one of them names
+	# is no moved marker for another.
+	_saved_keys = {}
+	for entry: Dictionary in saved:
+		_saved_keys[str(entry["spec"].get("spawn_key", ""))] = true
+	for record in World.record_list():
+		_saved_keys[str(record["entry"].get("spawn_key", ""))] = true
+	for respawn: Dictionary in section.get("respawns", []):
+		_saved_keys[str(respawn.get("spawn_key", ""))] = true
+	_saved_keys.erase("")
 	for entry: Dictionary in saved:
 		var spec := _level_spec_for(entry["spec"])
 		var entity := _spawn(spec)
@@ -3823,6 +3833,35 @@ func _top_up(entity: GridEntity, saved_spec: Dictionary) -> void:
 		print("[state] %s topped up: %s" % [entity.name, ", ".join(given)])
 
 
+## The keys the snapshot being loaded names (_spawn_saved; decision 610).
+var _saved_keys := {}
+
+
+## The slot of the marker [param saved] (a saved level entity whose key
+## [param key] the level no longer has) was moved to (decision 610,
+## extending 433's keys): the nearest marker within MOVED_MARKER_REACH cells
+## of its old cell with the same script and the same slots, held by no
+## living entity and named by nothing the snapshot saved; -1 if none. A
+## moved chest comes back as itself, its things and all, not as a stray
+## beside a new one.
+func _moved_marker(saved: Dictionary, key: String) -> int:
+	var was := Vector2i(int(key.get_slice(",", 0)), int(key.get_slice(",", 1)))
+	var props: Dictionary = saved.get("props", {}) if saved.get("props") is Dictionary else {}
+	var best := -1
+	for slot in level_entities.size():
+		var marker: Dictionary = level_entities[slot]
+		var at: Vector2i = marker["tile"]
+		var off := at - was
+		if maxi(absi(off.x), absi(off.y)) > MOVED_MARKER_REACH or _alive_slots.has(slot) or _saved_keys.has(_key_of(slot)):
+			continue
+		var marker_props: Dictionary = marker.get("props", {}) if marker.get("props") is Dictionary else {}
+		if str(marker.get("script", "")) != str(saved.get("script", "")) or str(marker_props.get("slots", [])) != str(props.get("slots", [])):
+			continue
+		if best < 0 or Vector2(off).length() < Vector2(Vector2i(level_entities[best]["tile"]) - was).length():
+			best = slot
+	return best
+
+
 ## The spawn slots the zone's records hold.
 func _recorded_slots() -> Dictionary:
 	var slots := {}
@@ -3848,6 +3887,14 @@ func _level_spec_for(saved: Dictionary) -> Dictionary:
 			if level_entities[i]["name"] == saved.get("name") and not _alive_slots.has(i):
 				slot = i
 				break
+	if slot == -1 and not key.is_empty():
+		# Its marker moved (decision 610): the marker it was, within reach.
+		slot = _moved_marker(saved, key)
+		if slot >= 0:
+			_saved_keys[_key_of(slot)] = true
+			var moved := _slot_spec(slot)
+			moved["tile"] = level_entities[slot]["tile"]
+			return moved
 	if slot == -1 or _alive_slots.has(slot):
 		# No level entity now (its marker gone), or its slot taken: as saved,
 		# holding no slot.
@@ -3880,6 +3927,9 @@ func _slot_spec(slot: int) -> Dictionary:
 ## made once as the level is read (_index_keys) and swapped with the zone.
 var _slot_keys := PackedStringArray()
 var _key_slots: Dictionary[String, int] = {}
+## How far (cells, either way) a level entity's marker may move and its saved
+## entity still find it (decision 610).
+const MOVED_MARKER_REACH := 2
 
 
 func _index_keys() -> void:

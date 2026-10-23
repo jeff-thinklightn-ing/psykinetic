@@ -22249,3 +22249,33 @@ cells (a body's hit within 5, the fight noise), while a bow shoots 8
 - The hook stays Client3D._on_shot's arrival, as before. Pc-character's
   583 flight is not on main; when it lands, its landing point is where
   these play.
+
+## 610. A moved marker keeps its saved entity
+
+Jeff, after v0.1.166: "i need the snagin tower to be bigger or the chests
+outside for the weapons". Moving a level entity's marker broke its tie to a
+saved world: decision 433 keys each saved level entity by its marker's cell
+("x,y"), so a moved marker's saved entity found no slot, came back "as
+saved, holding no slot", and the marker spawned a second, fresh one beside
+it (a second set of free weapons in the box's world). Extending 433:
+- main._level_spec_for: a saved level entity whose key the level no longer
+  has adopts the marker it was moved to (_moved_marker): the nearest within
+  MOVED_MARKER_REACH (2) cells either way of its old cell with the same
+  script and the same slots, held by no living entity and named by nothing
+  the snapshot saved (_saved_keys: its entities', records' and dead timers'
+  keys, gathered before the load). It takes that slot and key and the
+  marker's tile (a moved marker moves its entity; a keyed one otherwise
+  comes back where it was left), its things restored onto it as ever. Past
+  the reach, or with no match, it comes back as saved, holding no slot, as
+  before. Held's migration (moving the town's markers) leans on it.
+- The first use: the wilds' weapon chest {sword, spear, hammer, shield},
+  inside Snagfin's 2 x 2 tower on its doorway's inside cell (220, 226),
+  moves to (219, 226), outside against the tower's west wall beside the
+  other weapon chest (219, 225); the doorway clear, both reached from open
+  ground. Its entry is unchanged but "at" (items-4f); the layout's marker
+  moved with it. On the box its saved chest, things and all, comes back on
+  the new marker: no stray.
+tests: spawn_key_test, a marker moved a cell brings its saved chest back on
+it, alone; one moved three cells does not (the saved one as saved, a new one
+on the marker); level_test's weapon chests by their new tile.
+Server only, level data; protocol unchanged.
