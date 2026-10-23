@@ -411,6 +411,44 @@
 			"type": "mesh",
 			"uses": "piece of leather (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
 		},
+		"item.leather_armour": {
+			"budget": 500,
+			"category": "items",
+			"kind": "held",
+			"size": [
+				0.5,
+				0.6,
+				0.15
+			],
+			"sockets": {
+				"grip": [
+					0,
+					0,
+					0
+				]
+			},
+			"type": "mesh",
+			"uses": "leather armour (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
+		},
+		"item.mail_armour": {
+			"budget": 500,
+			"category": "items",
+			"kind": "held",
+			"size": [
+				0.5,
+				0.7,
+				0.15
+			],
+			"sockets": {
+				"grip": [
+					0,
+					0,
+					0
+				]
+			},
+			"type": "mesh",
+			"uses": "mail shirt (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
+		},
 		"item.meat": {
 			"budget": 500,
 			"category": "items",
@@ -492,6 +530,25 @@
 			"type": "mesh",
 			"uses": "pick (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
 		},
+		"item.plate_armour": {
+			"budget": 500,
+			"category": "items",
+			"kind": "held",
+			"size": [
+				0.55,
+				0.7,
+				0.3
+			],
+			"sockets": {
+				"grip": [
+					0,
+					0,
+					0
+				]
+			},
+			"type": "mesh",
+			"uses": "plate armour (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
+		},
 		"item.ration": {
 			"budget": 500,
 			"category": "items",
@@ -567,6 +624,25 @@
 			},
 			"type": "mesh",
 			"uses": "roast meat (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
+		},
+		"item.robes": {
+			"budget": 500,
+			"category": "items",
+			"kind": "held",
+			"size": [
+				0.5,
+				0.8,
+				0.1
+			],
+			"sockets": {
+				"grip": [
+					0,
+					0,
+					0
+				]
+			},
+			"type": "mesh",
+			"uses": "robes (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
 		},
 		"item.shield": {
 			"budget": 500,

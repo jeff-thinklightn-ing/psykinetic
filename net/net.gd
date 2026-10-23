@@ -330,16 +330,22 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## so a joined client's talk bar and card know who they are.
 ## 33 (584 amended (2)): the "barter" message's "care" gains "given" {herbs, antlers},
 ## the player's tally toward that hut; "retain" with herbs or antlers takes what is held.
+## 33 (619): slot stacks: replicated slot_counts on Player, Companion, Chest and
+## Cargo (empty while no slot holds more than one); "transfer" and "drop" take
+## an optional "count"; the barter message's pack entries carry "uids" and "count".
 ## 34 (620): a bow's verb has spread, spread_floor and spread_settle (the
 ## cone of flight, Items.spread_at), read alike by a client's cone and the
 ## server's roll; the arrow flies a line rolled in it, not the aim.
+## 34 (622): a seventh carried slot, the armour worn (Items.ARMOUR = 6, CARRIED 7):
+## Player's and Companion's slots replicate seven; Player.worn and Companion.worn
+## (SUBCLASS_REPLICATED), the armour's id.
 const PROTOCOL_REVISION := 34
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]
 ## Every kind of message (message, message_to, broadcast, broadcast_to).
 const MESSAGE_KINDS: Array[String] = ["barter", "builder", "chat", "clearing", "counter", "death", "grass", "map", "offers", "party", "return", "roofs", "shop", "sky", "speech", "telegraph", "terrain", "town", "world"]
 ## Properties entity subclasses add with replicate().
-const SUBCLASS_REPLICATED: Array[String] = ["activity", "addressing", "ailing", "ailments", "alert", "body", "bond_step", "bond_why", "buffs", "channel_of", "channel_until", "charge_room", "charges", "down_until", "downed_until", "emit_light", "hands", "heart", "keeper_peer", "led_by", "led_to", "mending", "move_ticks", "person", "pose", "raised", "raised_tick", "slot_counts", "slot_notes", "slots", "trade"]
+const SUBCLASS_REPLICATED: Array[String] = ["activity", "addressing", "ailing", "ailments", "alert", "body", "bond_step", "bond_why", "buffs", "channel_of", "channel_until", "charge_room", "charges", "down_until", "downed_until", "emit_light", "hands", "heart", "keeper_peer", "led_by", "led_to", "mending", "move_ticks", "person", "pose", "raised", "raised_tick", "slot_counts", "slot_notes", "slots", "trade", "worn"]
 const SETTINGS_FILE := "settings.cfg"
 ## First launch: half the 3840x2160 base, windowed.
 const DEFAULT_WINDOW_SIZE := Vector2i(1920, 1080)

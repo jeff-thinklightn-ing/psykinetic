@@ -10,8 +10,9 @@ extends GridEntity
 ## whatever is on it, if World allows. WASD steps (queued_steps) are taken
 ## one per free tick, in order, and win over everything else.
 
-## Slots a player has for things (Items): the pack and two hands
-## (Items.RIGHT_HAND, LEFT_HAND), from the start, empty.
+## Slots a player has for things (Items): the pack, two hands
+## (Items.RIGHT_HAND, LEFT_HAND) and the armour worn (Items.ARMOUR; decision
+## 622), from the start, empty.
 const SLOTS := Items.CARRIED
 const RIGHT_HAND := Items.RIGHT_HAND
 const LEFT_HAND := Items.LEFT_HAND
@@ -19,6 +20,10 @@ const LEFT_HAND := Items.LEFT_HAND
 const LANTERN := 0.9
 
 ## WASD steps waiting for the movement timer: {direction, predicted}.
+## The armour it wears (decision 622): the Items id in its armour slot
+## (Items.ARMOUR), "" for none. Replicated, for the views' covering (read
+## Items.armour_of); written only by World as its slots change.
+var worn := ""
 var queued_steps: Array[Dictionary] = []
 ## How many of this player's predicted WASD steps have been refused. A
 ## step its client sent before hearing of the latest refusal carries an
@@ -68,6 +73,7 @@ func _init() -> void:
 	replicate("slots")
 	replicate("slot_notes")
 	replicate("slot_counts")
+	replicate("worn")
 	replicate("mending")
 	replicate("buffs")
 	replicate("ailments")

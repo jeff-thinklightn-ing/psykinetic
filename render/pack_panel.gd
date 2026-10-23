@@ -11,8 +11,9 @@ extends PanelContainer
 ## opening a chest or a companion's pack shows it with that row. When an
 ## item lands in a row on show, sound plays there what that container
 ## sounds like opening (SoundKit.opening: a chest's thud, a crate's, a pack's leather), once a
-## frame. A player's or a companion's last two boxes are their hands
-## (Items.RIGHT_HAND, LEFT_HAND), edged in brass and marked R and L.
+## frame. A player's or a companion's boxes after the pack are their hands
+## (Items.RIGHT_HAND, LEFT_HAND), edged in brass and marked R and L, and
+## the armour worn (Items.ARMOUR, decision 622), marked A.
 ## Sizes in the HUD's 3840 x 2160 units, its look the shared theme's
 ## (UiTheme, docs/ui_style.md): the panel's box, a slot the Inset
 ## variation, a hand's HandSlot. Hover a slot for what its thing is
@@ -288,7 +289,7 @@ func _row(mine: bool) -> HBoxContainer:
 		box.theme_type_variation = &"HandSlot" if hand else &"Inset"
 		if hand:
 			var mark := Label.new()
-			mark.text = "R" if i == Items.RIGHT_HAND else "L"
+			mark.text = "R" if i == Items.RIGHT_HAND else "L" if i == Items.LEFT_HAND else "A"  # The armour worn (622).
 			mark.theme_type_variation = &"Small"
 			mark.add_theme_color_override("font_color", UiTheme.color("brass"))
 			mark.position = Vector2(10, 4)

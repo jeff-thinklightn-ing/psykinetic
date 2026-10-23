@@ -891,6 +891,7 @@ func _go_online() -> void:
 		World.ground_changed.connect(_on_ground_changed)
 		World.gold_changed.connect(_on_gold_changed)
 		World.traded.connect(_on_traded)
+		World.slot_refused.connect(_on_slot_refused)
 		BuilderHost.warn_overlays()
 		if BuilderHost.available():
 			_builder = BuilderHost.new()
@@ -4577,6 +4578,14 @@ func _on_gold_changed(id: String, gold: int) -> void:
 
 ## Server: [param by] traded at [param shop], or was refused ([param why]):
 ## they are sent the shop again, and the refusal.
+## Server: a move refused for the armour slot's rule (decision 622): its
+## why to the player who moved it (a companion's, to her keeper).
+func _on_slot_refused(by: GridEntity, why: String) -> void:
+	var peer := by.owner_peer if by is Player else by.keeper_peer
+	if peer != 0:
+		Net.broadcast_to([peer], "party", {"from": "Server", "text": why[0].to_upper() + why.substr(1) + "."})
+
+
 func _on_traded(by: GridEntity, shop: GridEntity, why: String) -> void:
 	if by is Player and by.owner_peer != 0 and is_instance_valid(shop):
 		_send_shop(by as Player, shop, why)

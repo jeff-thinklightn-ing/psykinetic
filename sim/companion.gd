@@ -349,6 +349,10 @@ signal card_written
 signal facts_changed
 
 ## The player_id this companion belongs to.
+## The armour she wears (decision 622): the Items id in her armour slot
+## (Items.ARMOUR), "" for none. Replicated, for the views' covering (read
+## Items.armour_of); written only by World as its slots change.
+var worn := ""
 var keeper_id := ""
 ## Her player's live entity while they are online; null while away.
 var keeper: GridEntity
@@ -578,8 +582,8 @@ var works_as := ""
 var home: Dictionary = {}
 
 
-## Her slots (Items): a pack and two hands, as a player's, empty at first;
-## her player can get at them.
+## Her slots (Items): a pack, two hands and the armour worn, as a
+## player's, empty at first; her player can get at them.
 const SLOTS := Items.CARRIED
 
 
@@ -589,6 +593,7 @@ func _init() -> void:
 	replicate("slots")
 	replicate("slot_notes")
 	replicate("slot_counts")
+	replicate("worn")
 	replicate("mending")
 	replicate("buffs")
 	replicate("ailments")

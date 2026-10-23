@@ -24476,3 +24476,52 @@ angle:
   half-circle it was. Nothing on the wire from ui; the 617 lead unchanged.
 ui_test: the far end's points, the easing, spread_now. Client only, no new
 class_name.
+## 622. Armour: one slot, one piece, four kinds (step 1)
+
+Jeff: "just have an armor slot next to the weapon slot ... the armor is just one
+piece that covers the chest, arms, legs ... leather, plate, robes and others
+change appearances". Items' design (C:/dev/review/armour/design.md), approved by
+the coordinator; built with the draft values as they stand (Jeff, 2026-10-23: "i
+can't take decisions that i dont even have the base function in game yet"), to be
+tuned from the cut checklist.
+
+- **The slot.** A seventh carried slot: Items.ARMOUR = 6, CARRIED = 7 (the pack
+  0-3, the right hand 4, the left 5, the armour worn 6), for players and
+  companions alike. A record saved before it holds six slots and is padded with
+  the armour slot empty (Items.tidy), so nothing moves and nothing is misread.
+  Monsters armed by a level before it have six slots and keep them:
+  Items.HANDED (6) is what having hands needs (has_hands, the monster's
+  replicated hands).
+- **The rule.** Only armour is worn there, and armour is worn or packed, never
+  held (its catalog hands 0 says so too). World.worn_refusal says why a set of
+  slots breaks it; hands_allow keeps to it, so every move (a drag, a pick-up, a
+  barter's take) does. A drag refused for it emits World.slot_refused, and Main
+  says the why to the player who moved it ("Only armour is worn there.",
+  "Armour is worn, not held."). Putting it on or off is a drag between your
+  own slots; it takes no time yet (don_ticks later, if wanted).
+- **The kinds.** A catalog field "armour": {look, stats}, read as
+  Items.armour_of(id) ({} for a thing not worn; an unknown look warned and not
+  armour). Looks: Items.ARMOUR_LOOKS, leather, mail, plate, robes. The four
+  kinds (draft numbers): leather_armour 6 kg, value 22; mail_armour 10 kg, 45;
+  plate_armour 20 kg, 80; robes 2 kg, 12. Stats: deflect_shot (0, 0.25, 0.5,
+  0), deflect_pierce (0, 0.2, 0.3, 0), range_steps (9, 7, 5, 9), draw (0.9,
+  1.0, 1.1, 1.0), robes' aura 2. Their art slots are placeholders.
+- **Its weight is its mass.** Worn armour weighs as any carried thing does
+  (World._weigh): plate's 20 kg make its wearer heavier to push and pushing
+  harder, by the same rule as a hammer in the hand; no separate mass stat.
+- **worn.** Player.worn and Companion.worn hold the armour slot's id ("" for
+  none), set by World as the slots change and replicated, so the views draw
+  the covering (pc-character) from Items.armour_of(worn).
+  World.worn_armour(entity) is what reads a stat (combat's deflections and
+  regen, the bow's range_steps and draw at step 2).
+- The pack panel marks the slot "A" beside R and L; ui places and styles it.
+- **Later steps.** Step 2: the stats read (items: range_steps, draw; combat:
+  deflect_shot, deflect_pierce, aura, stamina from the weight). Step 3: where
+  they come from (economy's tanner, weaver and smith; dungeon's mail rows; the
+  fence). Until then no armour comes into the world but by a test or the
+  console.
+
+items_test _test_armour (the slot, a six-slot record, pick-up into the pack, a
+hand refused and said, worn and weighed, a knife refused, taken off); the
+tests that counted six slots count seven. Wire: a line under PROTOCOL_REVISION 34
+(opened by 620), the seventh slot and worn. No new class_name.

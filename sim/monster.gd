@@ -415,16 +415,16 @@ var hands := PackedStringArray():
 		hands = value
 		if value.size() != 2:
 			return
-		if slots.size() == Items.CARRIED and slots[Items.RIGHT_HAND] == value[0] and slots[Items.LEFT_HAND] == value[1]:
+		if slots.size() >= Items.HANDED and slots[Items.RIGHT_HAND] == value[0] and slots[Items.LEFT_HAND] == value[1]:
 			return
-		var held := slots.duplicate() if slots.size() == Items.CARRIED else Items.tidy([], Items.CARRIED)
+		var held := slots.duplicate() if slots.size() >= Items.HANDED else Items.tidy([], Items.CARRIED)
 		held[Items.RIGHT_HAND] = value[0]
 		held[Items.LEFT_HAND] = value[1]
 		slots = held
 
 
 func _slots_set() -> void:
-	var now := PackedStringArray([slots[Items.RIGHT_HAND], slots[Items.LEFT_HAND]]) if slots.size() == Items.CARRIED else PackedStringArray()
+	var now := PackedStringArray([slots[Items.RIGHT_HAND], slots[Items.LEFT_HAND]]) if slots.size() >= Items.HANDED else PackedStringArray()
 	if now != hands:
 		hands = now
 

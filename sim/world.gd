@@ -87,6 +87,9 @@ signal gold_changed(player_id: String, gold: int)
 ## A player put a thing into a resident's hands (try_transfer): a gift (decision 443).
 signal handed(by: GridEntity, to: GridEntity, item: String, uid: int)
 signal traded(by: GridEntity, shop: GridEntity, why: String)
+## A move of things between slots refused for the armour slot's rule
+## (decision 622): [param why] is said to whoever moved them (Main).
+signal slot_refused(by: GridEntity, why: String)
 ## A GroundPile came, changed or went, for the views (any peer).
 signal pile_shown(pile: GroundPile)
 ## Bandaging (try_bandage): [param by] began on [param patient] (state
@@ -2042,7 +2045,7 @@ func try_transfer(by: GridEntity, from: GridEntity, from_slot: int, to: GridEnti
 		taken[to_slot] = item
 		taken_uids[to_slot] = uid
 		if not hands_allow(from, taken):
-			return false
+			return _refused(by, from, taken)
 		from.slots = taken
 		from.slot_items = taken_uids
 	else:
@@ -2050,8 +2053,10 @@ func try_transfer(by: GridEntity, from: GridEntity, from_slot: int, to: GridEnti
 		var given_uids := to.slot_items.duplicate()
 		given[to_slot] = item
 		given_uids[to_slot] = uid
-		if not hands_allow(from, taken) or not hands_allow(to, given):
-			return false
+		if not hands_allow(from, taken):
+			return _refused(by, from, taken)
+		if not hands_allow(to, given):
+			return _refused(by, to, given)
 		from.slots = taken
 		from.slot_items = taken_uids
 		to.slots = given
@@ -2145,10 +2150,13 @@ func put_item(by: GridEntity, to: GridEntity, slot: int, uid: int) -> bool:
 ## Whether [param slots] (what [param entity]'s would be) keep to the
 ## hands: in a carrier's hands (Items.RIGHT_HAND, LEFT_HAND) only things
 ## that can be held; a two-handed one only in the right hand, the left
-## then empty. Anything else (a chest) has no hands.
+## then empty; and to the armour slot (worn_refusal). Anything else (a
+## chest) has no hands.
 func hands_allow(entity: GridEntity, slots: PackedStringArray) -> bool:
-	if not has_hands(entity) or slots.size() < Items.CARRIED:
+	if not has_hands(entity) or slots.size() < Items.HANDED:
 		return true
+	if not worn_refusal(entity, slots).is_empty():
+		return false
 	var right := slots[Items.RIGHT_HAND]
 	var left := slots[Items.LEFT_HAND]
 	for held in [right, left]:
@@ -2157,6 +2165,40 @@ func hands_allow(entity: GridEntity, slots: PackedStringArray) -> bool:
 	if not left.is_empty() and int(Items.def(left)["hands"]) == 2:
 		return false
 	return right.is_empty() or int(Items.def(right)["hands"]) < 2 or left.is_empty()
+
+
+## Why [param slots] (what [param entity]'s would be) break the armour
+## slot's rule (decision 622): only armour in it ("only armour is worn
+## there"), and armour never in a hand ("armour is worn, not held"; its
+## catalog hands 0 says so too); "" if they keep to it, or for anything
+## without hands.
+func worn_refusal(entity: GridEntity, slots: PackedStringArray) -> String:
+	if not has_hands(entity) or slots.size() < Items.CARRIED:
+		return ""  # No armour slot: nothing worn to keep to.
+	if not slots[Items.ARMOUR].is_empty() and Items.armour_of(slots[Items.ARMOUR]).is_empty():
+		return "only armour is worn there"
+	for hand in [Items.RIGHT_HAND, Items.LEFT_HAND]:
+		if not slots[hand].is_empty() and not Items.armour_of(slots[hand]).is_empty():
+			return "armour is worn, not held"
+	return ""
+
+
+## False, a move refused: [param by] is told why if it broke the armour
+## slot's rule for [param entity]'s [param slots] (slot_refused).
+func _refused(by: GridEntity, entity: GridEntity, slots: PackedStringArray) -> bool:
+	var why := worn_refusal(entity, slots)
+	if not why.is_empty():
+		slot_refused.emit(by, why)
+	return false
+
+
+## The armour [param entity] wears (decision 622): Items.armour_of its
+## armour slot's thing, {look, stats}; {} for none. What reads a stat
+## (combat's deflections, the bow's range_steps and draw) reads this.
+func worn_armour(entity: GridEntity) -> Dictionary:
+	if not is_instance_valid(entity) or entity.slots.size() <= Items.ARMOUR:
+		return {}
+	return Items.armour_of(entity.slots[Items.ARMOUR])
 
 
 ## A weapon (a thing with a verb) lying on [param monster]'s cell or a
@@ -2192,8 +2234,8 @@ func _free_hand(entity: GridEntity, id: String) -> int:
 	var hands := int(Items.def(id).get("hands", 0))
 	if hands == 0:
 		return -1
-	var right := entity.slots[Items.RIGHT_HAND] if entity.slots.size() == Items.CARRIED else ""
-	var left := entity.slots[Items.LEFT_HAND] if entity.slots.size() == Items.CARRIED else ""
+	var right := entity.slots[Items.RIGHT_HAND] if entity.slots.size() >= Items.HANDED else ""
+	var left := entity.slots[Items.LEFT_HAND] if entity.slots.size() >= Items.HANDED else ""
 	if not right.is_empty() and int(Items.def(right).get("hands", 1)) == 2:
 		return -1
 	if hands == 2:
@@ -2242,9 +2284,9 @@ func try_pick_up_weapon(monster: GridEntity) -> bool:
 	return true
 
 
-## A player or a companion: something with hands (Items.CARRIED slots).
+## A player or a companion: something with hands (Items.HANDED slots or more).
 func has_hands(entity: GridEntity) -> bool:
-	return (entity is Player or entity.keeper_peer != 0) and entity.slots.size() == Items.CARRIED
+	return (entity is Player or entity.keeper_peer != 0) and entity.slots.size() >= Items.HANDED
 
 
 ## Whether [param entity] fights with what is in its hands: one with hands
@@ -2252,7 +2294,7 @@ func has_hands(entity: GridEntity) -> bool:
 ## "wields", Level; decision 338). Only for fighting: a monster's hands are
 ## not a carrier's (nobody hands it things or bandages it).
 func holds_in_hands(entity: GridEntity) -> bool:
-	return has_hands(entity) or entity is Monster and entity.slots.size() == Items.CARRIED
+	return has_hands(entity) or entity is Monster and entity.slots.size() >= Items.HANDED
 
 
 ## The verb [param attacker]'s blow is struck with (decision 338): its
@@ -2283,6 +2325,11 @@ func is_behind(attacker: GridEntity, target: GridEntity) -> bool:
 ## ends, and slots_changed is emitted.
 func _slots_changed(entity: GridEntity) -> void:
 	_show_counts(entity)
+	var worn: Variant = entity.get("worn")
+	if worn is String:
+		var now := entity.slots[Items.ARMOUR] if entity.slots.size() > Items.ARMOUR else ""
+		if now != worn:
+			entity.set("worn", now)  # The armour worn, replicated for the views (decision 622).
 	_weigh(entity)
 	if not entity.raised.is_empty() and off_hand(entity) != entity.raised:
 		entity.raised = ""  # What it needed left the hand.

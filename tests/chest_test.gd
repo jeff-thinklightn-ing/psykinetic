@@ -52,7 +52,7 @@ func _test_the_chest() -> void:
 	var host := _player(Net.local_id)
 	_check(chest != null and chest.tile == Vector2i(10, 3), "a chest at (10, 3)")
 	_check(chest != null and Array(chest.slots) == [KIT, "", "", ""], "with a bandaging kit in it (%s)" % [Array(chest.slots) if chest else []])
-	_check(host != null and Array(host.slots) == ["", "", "", "", "", ""], "the player has 4 empty pack slots and two empty hands (%s)" % [Array(host.slots) if host else []])
+	_check(host != null and Array(host.slots) == ["", "", "", "", "", "", ""], "the player has 4 empty pack slots, two empty hands and no armour (%s)" % [Array(host.slots) if host else []])
 	_check(not chest.pushable and not chest.is_breakable() and not chest.is_creature(), "a chest is not pushed, broken or fought")
 	var level := Level.load_level("test_room")
 	_check(level["warnings"].is_empty(), "the level loads cleanly (%s)" % [level["warnings"]])
@@ -87,7 +87,7 @@ func _test_there_and_back() -> void:
 			"titled Chest, and %s's Pack below it" % Net.player_name)
 	_main.sounds.clear()
 	panel.drop(chest, 0, host, 0)
-	_check(Array(host.slots) == [KIT, "", "", "", "", ""] and Array(chest.slots) == ["", "", "", ""],
+	_check(Array(host.slots) == [KIT, "", "", "", "", "", ""] and Array(chest.slots) == ["", "", "", ""],
 			"dragged to the player's first slot: theirs now, the chest empty (%s, %s)" % [Array(host.slots), Array(chest.slots)])
 	await get_tree().process_frame
 	_check(panel.shown_in(true, 0) == "Bandages" and panel.shown_in(false, 0) == "", "the panel shows it moved")
@@ -95,12 +95,12 @@ func _test_there_and_back() -> void:
 	await get_tree().process_frame
 	_check(_main.sounds.size() == 1, "once only (%s)" % [_main.sounds])
 	panel.drop(host, 0, host, 3)
-	_check(Array(host.slots) == ["", "", "", KIT, "", ""], "moved along the player's own slots (%s)" % [Array(host.slots)])
+	_check(Array(host.slots) == ["", "", "", KIT, "", "", ""], "moved along the player's own slots (%s)" % [Array(host.slots)])
 	_main.sounds.clear()
 	panel.drop(host, 3, chest, 2)
 	await get_tree().process_frame
 	_check(_main.sounds == ["sfx.chest_open Chest1"], "into the chest, with the chest's thud (%s)" % [_main.sounds])
-	_check(Array(host.slots) == ["", "", "", "", "", ""] and Array(chest.slots) == ["", "", KIT, ""],
+	_check(Array(host.slots) == ["", "", "", "", "", "", ""] and Array(chest.slots) == ["", "", KIT, ""],
 			"and back into the chest, its third slot (%s, %s)" % [Array(host.slots), Array(chest.slots)])
 	World.try_transfer(host, chest, 2, chest, 0)
 	_check(Array(chest.slots) == [KIT, "", "", ""], "and to its first again (%s)" % [Array(chest.slots)])
@@ -122,7 +122,7 @@ func _test_refused() -> void:
 		if entity.name == "Crate1":
 			crate = entity
 	_check(not World.reaches(host, crate), "a crate has no slots to reach")
-	_check(Array(chest.slots) == [KIT, "", "", ""] and Array(host.slots) == ["", "", "", "", "", ""], "nothing moved (%s, %s)" % [Array(chest.slots), Array(host.slots)])
+	_check(Array(chest.slots) == [KIT, "", "", ""] and Array(host.slots) == ["", "", "", "", "", "", ""], "nothing moved (%s, %s)" % [Array(chest.slots), Array(host.slots)])
 
 
 func _test_two_players() -> void:
@@ -136,15 +136,15 @@ func _test_two_players() -> void:
 	_check(not World.reaches(bo, host), "but Bo cannot get at the host's slots")
 	# Bo's drag, as it reaches the server: a command from Bo.
 	World.command(bo, "transfer", {"from": str(chest.get_path()), "from_slot": 0, "to": str(bo.get_path()), "to_slot": 1})
-	_check(Array(bo.slots) == ["", KIT, "", "", "", ""] and Array(chest.slots) == ["", "", "", ""], "Bo takes the kit (%s)" % [Array(bo.slots)])
+	_check(Array(bo.slots) == ["", KIT, "", "", "", "", ""] and Array(chest.slots) == ["", "", "", ""], "Bo takes the kit (%s)" % [Array(bo.slots)])
 	_main._process(0.0)
 	_check(_main.pack_panel.other == chest and _main.pack_panel.shown_in(false, 0) == "", "the host's open chest shows it gone")
 	World.command(host, "transfer", {"from": str(bo.get_path()), "from_slot": 1, "to": str(host.get_path()), "to_slot": 0})
-	_check(Array(bo.slots) == ["", KIT, "", "", "", ""], "the host cannot take it from Bo's slots")
+	_check(Array(bo.slots) == ["", KIT, "", "", "", "", ""], "the host cannot take it from Bo's slots")
 	World.command(bo, "transfer", {"from": str(bo.get_path()), "from_slot": 1, "to": str(chest.get_path()), "to_slot": 3})
 	_check(Array(chest.slots) == ["", "", "", KIT], "Bo puts it back, in the last slot (%s)" % [Array(chest.slots)])
 	World.command(host, "transfer", {"from": str(chest.get_path()), "from_slot": 3, "to": str(host.get_path()), "to_slot": 2})
-	_check(Array(host.slots) == ["", "", KIT, "", "", ""] and _main._records[Net.player_id].slots[2] == KIT,
+	_check(Array(host.slots) == ["", "", KIT, "", "", "", ""] and _main._records[Net.player_id].slots[2] == KIT,
 			"the host takes it, and their record has it at once (%s)" % [Array(host.slots)])
 	# Bo walks off: the server keeps their (empty) slots in the record.
 	_main._leave(BO, bo, BO_ID)
@@ -159,7 +159,7 @@ func _test_restart() -> void:
 	World.try_transfer(_player(BO), chest, 0, _player(BO), 0)  # Nothing there: refused.
 	World.try_transfer(_player(Net.local_id), _player(Net.local_id), 1, chest, 0)
 	World.try_transfer(_player(BO), chest, 0, _player(BO), 3)
-	_check(Array(_player(BO).slots) == ["", "", "", KIT, "", ""] and Array(chest.slots) == ["", "", "", ""], "Bo holds the kit, in slot 4")
+	_check(Array(_player(BO).slots) == ["", "", "", KIT, "", "", ""] and Array(chest.slots) == ["", "", "", ""], "Bo holds the kit, in slot 4")
 	_main._save_state()
 	var snapshot := Snapshot.load(Net.state_path)
 	var saved: Array = snapshot["zones"]["test_room"]["entities"]
@@ -168,7 +168,7 @@ func _test_restart() -> void:
 	var kept := {}
 	for record: PlayerRecord in snapshot["players"]:
 		kept[record.name] = Array(record.slots)
-	_check(kept.get("Bo") == ["", "", "", KIT, "", ""] and kept.get(Net.player_name) == ["", "", "", "", "", ""],
+	_check(kept.get("Bo") == ["", "", "", KIT, "", "", ""] and kept.get(Net.player_name) == ["", "", "", "", "", "", ""],
 			"and each player's slots (%s)" % [kept])
 	remove_child(_main)
 	_main.free()
@@ -181,8 +181,8 @@ func _test_restart() -> void:
 	_check(chest != null and Array(chest.slots) == ["", "", "", ""], "after the restart the chest is still empty (%s)" % [Array(chest.slots) if chest else []])
 	_main._admit(BO, BO_ID, "Bo")
 	var bo := _player(BO)
-	_check(bo != null and Array(bo.slots) == ["", "", "", KIT, "", ""], "Bo comes back with the kit (%s)" % [Array(bo.slots) if bo else []])
-	_check(Array(_player(Net.local_id).slots) == ["", "", "", "", "", ""], "the host with nothing")
+	_check(bo != null and Array(bo.slots) == ["", "", "", KIT, "", "", ""], "Bo comes back with the kit (%s)" % [Array(bo.slots) if bo else []])
+	_check(Array(_player(Net.local_id).slots) == ["", "", "", "", "", "", ""], "the host with nothing")
 	World._relocate(bo, Vector2i(9, 3))
 	_check(World.try_transfer(bo, bo, 3, chest, 0) and Array(chest.slots) == [KIT, "", "", ""], "Bo puts it back in the chest")
 	_main._save_state()
@@ -195,7 +195,7 @@ func _test_restart() -> void:
 	await get_tree().process_frame
 	chest = _chest()
 	_check(chest != null and Array(chest.slots) == [KIT, "", "", ""], "and after another restart it is there (%s)" % [Array(chest.slots) if chest else []])
-	_check(_main._records[BO_ID].slots == PackedStringArray(["", "", "", "", "", ""]), "and Bo's record is empty")
+	_check(_main._records[BO_ID].slots == PackedStringArray(["", "", "", "", "", "", ""]), "and Bo's record is empty")
 	# Dying keeps them too.
 	World.try_transfer(_player(Net.local_id), chest, 0, _player(Net.local_id), 0)
 	var dying := _player(Net.local_id)
@@ -204,7 +204,7 @@ func _test_restart() -> void:
 	for i in _main.RESPAWN_TICKS + 1:
 		World.step()
 	var host := _player(Net.local_id)
-	_check(host != null and Array(host.slots) == [KIT, "", "", "", "", ""], "a player who dies comes back with their slots (%s)" % [Array(host.slots) if host else []])
+	_check(host != null and Array(host.slots) == [KIT, "", "", "", "", "", ""], "a player who dies comes back with their slots (%s)" % [Array(host.slots) if host else []])
 
 
 func _test_click_from_afar() -> void:
@@ -250,7 +250,7 @@ func _test_new_in_the_level() -> void:
 	_check(chest != null and chest.tile == Vector2i(10, 3) and Array(chest.slots) == [KIT, "", "", ""],
 			"the chest is at (10, 3) with the kit (%s)" % [Array(chest.slots) if chest else "none"])
 	_check(not _main._dead_since.has(chest.spawn_spec.get("spawn", -1)) if chest else false, "not waiting to respawn")
-	_check(Array(_player(Net.local_id).slots) == ["", "", "", "", "", ""], "a record from before slots has them all empty")
+	_check(Array(_player(Net.local_id).slots) == ["", "", "", "", "", "", ""], "a record from before slots has them all empty")
 
 
 func _test_companion_pack() -> void:
@@ -261,7 +261,7 @@ func _test_companion_pack() -> void:
 	var record: PlayerRecord = _main._records[Net.player_id]
 	_main._join_companion(record, host)
 	var pet: Companion = _main._companions.get(Net.player_id)
-	_check(pet != null and Array(pet.slots) == ["", "", "", "", "", ""], "she has a pack of 4 and two hands, empty")
+	_check(pet != null and Array(pet.slots) == ["", "", "", "", "", "", ""], "she has a pack of 4, two hands and the armour slot, empty")
 	_check(World.reaches(host, pet), "her player, %d away, reaches it" % World.distance(host.tile, pet.tile))
 	_main._admit(BO, BO_ID, "Bo")
 	var bo := _player(BO)
@@ -275,7 +275,7 @@ func _test_companion_pack() -> void:
 	_check(panel.other == pet and panel.title_shown(false) == "%s's Pack" % pet.name, "a right click on her opens %s's Pack" % pet.name)
 	var held := Array(host.slots).find(KIT)
 	panel.drop(host, held, pet, 0)
-	_check(Array(pet.slots) == [KIT, "", "", "", "", ""] and Array(record.companion["slots"]) == [KIT, "", "", "", "", ""],
+	_check(Array(pet.slots) == [KIT, "", "", "", "", "", ""] and Array(record.companion["slots"]) == [KIT, "", "", "", "", "", ""],
 			"the kit goes into her pack, and her player's record has it (%s)" % [Array(pet.slots)])
 	_check("in your pack a bandaging kit" in pet.carried(), "she knows she carries it: %s" % pet.carried())
 	World.command(bo, "transfer", {"from": str(pet.get_path()), "from_slot": 0, "to": str(bo.get_path()), "to_slot": 0})
@@ -290,7 +290,7 @@ func _test_companion_pack() -> void:
 	add_child(_main)
 	await get_tree().process_frame
 	pet = _main._companions.get(Net.player_id)
-	_check(pet != null and Array(pet.slots) == [KIT, "", "", "", "", ""], "after a restart she still has it (%s)" % [Array(pet.slots) if pet else "no companion"])
+	_check(pet != null and Array(pet.slots) == [KIT, "", "", "", "", "", ""], "after a restart she still has it (%s)" % [Array(pet.slots) if pet else "no companion"])
 	host = _player(Net.local_id)
 	World._relocate(pet, host.tile + Vector2i(-4, 0) if World.is_free(host.tile + Vector2i(-4, 0)) else host.tile + Vector2i(-5, 0))
 	_check(not World.reaches(host, pet), "4 cells off, out of reach")

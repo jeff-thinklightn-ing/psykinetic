@@ -26,15 +26,23 @@ const LOOT := "res://levels/loot.json"
 const ART_SLOTS := "res://art/kit/slots_items.json"
 const ART_BUDGET := 500
 ## A carrier's slots (a player's, a companion's): the pack first, then two
-## hands, right and left. A thing in a hand is held (hands 1 or 2; a
-## two-handed one in the right hand with the left empty); World keeps to it.
-## A save from before hands had the pack alone: tidy pads the hands.
+## hands, right and left, then the armour worn (decision 622). A thing in a
+## hand is held (hands 1 or 2; a two-handed one in the right hand with the
+## left empty); only armour is worn, and armour is worn or packed, never
+## held; World keeps to it. A save from before hands had the pack alone,
+## one from before armour six slots: tidy pads the rest empty.
 const PACK := 4
 const RIGHT_HAND := 4
 const LEFT_HAND := 5
-const CARRIED := 6
+const ARMOUR := 6
+const CARRIED := 7
+## Slots enough to have hands (the pack and both): a monster armed by a
+## level before armour (decision 622) has six, and still holds what it holds.
+const HANDED := LEFT_HAND + 1
+## How a worn armour looks (decision 622): the covering the views draw.
+const ARMOUR_LOOKS: Array[String] = ["leather", "mail", "plate", "robes"]
 const FIELDS := ["id", "name", "short", "color", "art", "kind", "size", "weight", "hands", "tags", "effects", "use", "yield", "verb", "made",
-	"opens", "value", "blunt", "ammo", "condition", "mend", "about", "stack"]
+	"opens", "value", "blunt", "ammo", "condition", "mend", "about", "stack", "armour"]
 ## Tags whose things never stack (decision 619): each is its own.
 const UNSTACKED_TAGS: Array[String] = ["weapon", "shield", "token", "soulbound"]
 ## Who makes things (made's "by"), as economy's production has them.
@@ -170,7 +178,28 @@ static func _definition(id: String, entry: Dictionary) -> Dictionary:
 		"condition": maxi(int(entry.get("condition", 0)), 0) if entry.get("condition") is float or entry.get("condition") is int else 0,
 		"about": str(entry.get("about", "")),
 		"stack": maxi(int(entry.get("stack", 1)), 1) if entry.get("stack") is float or entry.get("stack") is int else 1,
+		"armour": _armour(id, entry["armour"]) if entry.get("armour") is Dictionary else {},
 	}
+
+
+## An armour field as read (decision 622): {look (one of ARMOUR_LOOKS),
+## and its stats as given, numbers}; {} (not armour) for an unknown look.
+static func _armour(id: String, value: Dictionary) -> Dictionary:
+	var look := str(value.get("look", ""))
+	if look not in ARMOUR_LOOKS:
+		push_warning("Items: %s's armour look %s is not one of %s; not armour" % [id, look, ", ".join(ARMOUR_LOOKS)])
+		return {}
+	var out := {"look": look}
+	for key: Variant in value:
+		if key != "look" and (value[key] is float or value[key] is int):
+			out[str(key)] = float(value[key])
+	return out
+
+
+## [param id]'s armour (decision 622): {look, its stats}; {} for a thing
+## that is not worn.
+static func armour_of(id: String) -> Dictionary:
+	return def(id).get("armour", {}) if not id.is_empty() else {}
 
 
 ## Why definition [param definition] may not stack (decision 619), or "":

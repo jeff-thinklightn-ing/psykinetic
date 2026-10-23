@@ -66,6 +66,7 @@ func _ready() -> void:
 	_test_battle_axe()
 	_test_cache()
 	_test_stacks()
+	_test_armour()
 	_test_story()
 	_test_bless()
 	_test_reforge()
@@ -215,7 +216,7 @@ func _test_given() -> void:
 	_check(World.try_transfer(host, host, 0, pet, 1), "the host gives the kit to %s" % pet.name)
 	var events: Array = World.items.history(uid)["events"]
 	_check(events[-1]["kind"] == "given" and pet.name in str(events[-1]["what"]), "given, to her (%s)" % [events[-1]])
-	_check(Array(record.companion.get("items", [])) == [0, uid, 0, 0, 0, 0], "her player's record has its instance")
+	_check(Array(record.companion.get("items", [])) == [0, uid, 0, 0, 0, 0, 0], "her player's record has its instance")
 	World.steps += 20
 	_check(World.try_transfer(pet, pet, 1, host, 3), "she hands it back herself")
 	_check(World.items.held_by(uid, World.holder_key(pet)) == 20 and host.slot_items[3] == uid, "she held it 20 steps; the host has it")
@@ -241,7 +242,7 @@ func _test_hands() -> void:
 	print("\n== two hands: what can be held, and how; what is carried weighs ==")
 	var host := _player(Net.local_id)
 	var base := host.mass if host.base_mass < 0.0 else host.base_mass
-	_check(host.slots[1] == KIT and host.slots.size() == 6, "a pack of 4 and two hands; the kit in the pack")
+	_check(host.slots[1] == KIT and host.slots.size() == Player.SLOTS, "a pack of 4, two hands and the armour slot; the kit in the pack")
 	_check(World.try_transfer(host, host, 1, host, Player.RIGHT_HAND), "the kit goes into the right hand")
 	_check(World.try_transfer(host, host, Player.RIGHT_HAND, host, Player.LEFT_HAND) and host.slots[Player.LEFT_HAND] == KIT,
 			"and from one hand to the other")
@@ -735,7 +736,7 @@ func _test_blows() -> void:
 	var by_tile := {}
 	for spec: Dictionary in level["entities"]:
 		by_tile[spec["tile"]] = spec["props"].get("slots", PackedStringArray())
-	_check(by_tile[Vector2i(1, 1)] == PackedStringArray(["", "", "", "", "spear", "shield"]), "an entry's wields: spear and shield in the hands (%s)" % by_tile[Vector2i(1, 1)])
+	_check(by_tile[Vector2i(1, 1)] == PackedStringArray(["", "", "", "", "spear", "shield", ""]), "an entry's wields: spear and shield in the hands (%s)" % by_tile[Vector2i(1, 1)])
 	_check(by_tile[Vector2i(2, 1)][Items.RIGHT_HAND] == "giant_axe" and by_tile[Vector2i(2, 1)][Items.LEFT_HAND] == ""
 			and level["warnings"].any(func(w: String) -> bool: return "no left hand" in w), "a giant axe takes both: the shield left out, and said")
 	imp.acts = true
@@ -1679,6 +1680,49 @@ func _test_stacks() -> void:
 		World.items.end(uid, "gone")
 	World.set_slots(host, had_slots, had_uids)
 	_check(World.items.orphans(_all_uids()).is_empty(), "and all put back, nothing in the book nobody holds (%s)" % [World.items.orphans(_all_uids())])
+
+
+func _test_armour() -> void:
+	print("\n== armour: one slot, worn, never held (decision 622) ==")
+	_check(Items.CARRIED == 7 and Items.ARMOUR == 6 and Player.SLOTS == 7 and Companion.SLOTS == 7, "a seventh carried slot, the armour worn")
+	_check(Items.armour_of("mail_armour").get("look") == "mail" and Items.armour_of("robes").get("look") == "robes"
+			and Items.armour_of("knife").is_empty() and float(Items.armour_of("plate_armour")["range_steps"]) == 5.0,
+			"four kinds, each with its look and stats; a knife is not armour")
+	var odd := Items.read('{"items": [{"id": "cloak", "armour": {"look": "fur"}}]}')
+	_check(odd["cloak"]["armour"].is_empty(), "an unknown look is no armour (warned)")
+	var old := PlayerRecord.from_dict({"player_id": "old", "tile": [1, 1], "slots": ["knife", "", "", "", "sword", ""], "items": [0, 0, 0, 0, 0, 0]})
+	_check(old != null and old.slots.size() == Player.SLOTS and old.slots[Items.RIGHT_HAND] == "sword" and old.slots[Items.ARMOUR] == "",
+			"a six-slot record from before armour: the hands where they were, the armour slot empty (%s)" % [Array(old.slots)])
+	var host := _player(Net.local_id)
+	var had_slots := host.slots.duplicate()
+	var had_uids := World.slot_uids(host)
+	World.set_slots(host, Items.tidy([], Player.SLOTS), [])
+	var said: Array[String] = []
+	var hear := func(_by: GridEntity, why: String) -> void: said.append(why)
+	World.slot_refused.connect(hear)
+	var bare := host.mass
+	var leather := World.items.mint("leather_armour", "made")
+	var cell := _plain_cell(host)
+	World._relocate(host, cell)
+	World.put_on_ground(leather, cell)
+	_check(World.try_pick_up(host, cell) and World.slot_of_unit(host, leather) < Items.PACK, "picked up: into the pack, not a hand")
+	var packed := World.slot_of_unit(host, leather)
+	_check(not World.try_transfer(host, host, packed, host, Items.RIGHT_HAND) and said == ["armour is worn, not held"],
+			"into a hand: refused, and they are told (%s)" % [said])
+	_check(World.try_transfer(host, host, packed, host, Items.ARMOUR) and host.worn == "leather_armour"
+			and is_equal_approx(host.mass - bare, Items.weight_of("leather_armour")), "worn: its slot, worn says so, its weight carried")
+	_check(World.worn_armour(host).get("look") == "leather" and float(World.worn_armour(host)["draw"]) == 0.9, "worn_armour reads its stats")
+	var knife := World.items.mint("knife", "made")
+	World.put_item(host, host, 0, knife)
+	said.clear()
+	_check(not World.try_transfer(host, host, 0, host, Items.ARMOUR) and said == ["only armour is worn there"] and host.worn == "leather_armour",
+			"a knife onto the armour slot: refused, said (%s)" % [said])
+	_check(World.try_transfer(host, host, Items.ARMOUR, host, 1) and host.worn == "", "taken off into the pack: nothing worn")
+	World.slot_refused.disconnect(hear)
+	for uid in _units_of(host):
+		World.take_units(host, [uid])
+		World.items.end(uid, "gone")
+	World.set_slots(host, had_slots, had_uids)
 
 
 func _test_grave() -> void:

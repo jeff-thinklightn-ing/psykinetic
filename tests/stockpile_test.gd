@@ -121,7 +121,7 @@ func _test_pickup_banks_nothing() -> void:
 	var host := _player(Net.local_id)
 	World._relocate(host, Vector2i(9, 4))
 	_check(World.try_transfer(host, _entity("Chest1"), 0, host, 0), "the host takes the kit from Chest1")
-	_check(Array(host.slots) == [KIT, "", "", "", "", ""], "it's in the host's pack (%s)" % [Array(host.slots)])
+	_check(Array(host.slots) == [KIT, "", "", "", "", "", ""], "it's in the host's pack (%s)" % [Array(host.slots)])
 	_check(World.stockpile.count(STORE, KIT) == 0 and _only_founded(), "and the stockpile has nothing but its starting gold and food")
 
 
@@ -134,7 +134,7 @@ func _test_banking() -> void:
 	var uid := World.slot_uid(host, 0)
 	var who := World._label_of(host)
 	_check(World.try_transfer(host, host, 0, depot, 2), "the host puts the kit in the depot")
-	_check(Array(host.slots) == ["", "", "", "", "", ""] and Array(depot.slots) == ["", "", "", ""],
+	_check(Array(host.slots) == ["", "", "", "", "", "", ""] and Array(depot.slots) == ["", "", "", ""],
 		"the pack's slot is empty, and so is the depot (%s, %s)" % [Array(host.slots), Array(depot.slots)])
 	_check(World.stockpile.count(STORE, KIT) == 1 and World.stockpile.items(STORE) == _ints([uid])
 		and World.stockpile.item_ids(STORE) == _strings([KIT]), "the store holds the kit, by its uid #%d (%s)" % [uid, World.stockpile.items(STORE)])
@@ -155,11 +155,11 @@ func _test_refused() -> void:
 	World.set_slots(host, [KIT, "", "", ""])
 	World._relocate(host, Vector2i(9, 3))
 	_check(not World.try_transfer(host, host, 0, _entity("StrayDepot"), 0), "the stray depot refuses the kit")
-	_check(Array(host.slots) == [KIT, "", "", "", "", ""] and World.stockpile.count(STORE, KIT) == 1, "it stays in the pack (%s)" % [Array(host.slots)])
+	_check(Array(host.slots) == [KIT, "", "", "", "", "", ""] and World.stockpile.count(STORE, KIT) == 1, "it stays in the pack (%s)" % [Array(host.slots)])
 	World._relocate(host, Vector2i(5, 3))
 	World.holdings.take(STORE, "goblins")
 	_check(not World.try_transfer(host, host, 0, _entity("Depot1"), 0), "with the goblins holding the store, its depot refuses")
-	_check(Array(host.slots) == [KIT, "", "", "", "", ""] and World.stockpile.count(STORE, KIT) == 1, "the kit stays, the store keeps its one")
+	_check(Array(host.slots) == [KIT, "", "", "", "", "", ""] and World.stockpile.count(STORE, KIT) == 1, "the kit stays, the store keeps its one")
 	World.holdings.take(STORE, "town")
 	_check(World.try_transfer(host, host, 0, _entity("Depot1"), 0), "the town takes it back: the depot banks again")
 	_check(World.stockpile.count(STORE, KIT) == 2, "two kits now (%d)" % World.stockpile.count(STORE, KIT))
@@ -215,11 +215,11 @@ func _test_hauling() -> void:
 	var ore := stock.count(STORE, "ore")
 	var kits := stock.count(STORE, KIT)
 	World._relocate(host, Vector2i(9, 5))
-	World.set_slots(host, ["ore_sack", KIT, "", "", "", ""])
+	World.set_slots(host, ["ore_sack", KIT, "", "", "", "", ""])
 	World._relocate(host, Vector2i(5, 4))
 	await get_tree().process_frame
 	_check(Stockpile.place_at(World.holdings, TOWN, host.tile) == STORE, "the host walks onto the store's ground at %s" % host.tile)
-	_check(stock.count(STORE, "ore") == ore and stock.count(STORE, KIT) == kits and Array(host.slots) == ["ore_sack", KIT, "", "", "", ""],
+	_check(stock.count(STORE, "ore") == ore and stock.count(STORE, KIT) == kits and Array(host.slots) == ["ore_sack", KIT, "", "", "", "", ""],
 		"carrying a sack and a kit in banks nothing (%s)" % [Array(host.slots)])
 	var sack := World.slot_uid(host, 0)
 	_check(World.try_drop(host, 0), "the host puts the sack down")
@@ -236,13 +236,13 @@ func _test_hauling() -> void:
 		"the kit put down is banked as itself (#%d)" % kit)
 
 	World._relocate(host, Vector2i(8, 3))
-	World.set_slots(host, ["", "", "", "", "ore_sack", ""])
+	World.set_slots(host, ["", "", "", "", "ore_sack", "", ""])
 	_check(Stockpile.place_at(World.holdings, TOWN, host.tile).is_empty(), "from %s, off the store's ground" % host.tile)
 	_check(World.try_throw(host, Items.RIGHT_HAND, Vector2i(5, 3)), "the host throws a sack toward the store")
 	await get_tree().process_frame
 	_check(stock.count(STORE, "ore") == ore + 10, "it lands on the store's ground and is banked (%d ore)" % stock.count(STORE, "ore"))
 
-	World.set_slots(host, ["ore_sack", "", "", "", "", ""])
+	World.set_slots(host, ["ore_sack", "", "", "", "", "", ""])
 	World._relocate(host, Vector2i(10, 6))
 	World.try_drop(host, 0)
 	await get_tree().process_frame
