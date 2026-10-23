@@ -24837,3 +24837,18 @@ x 0.27; "base" 0.707). Decision 261 keeps a kit glb to the palette with no image
 webs are geometry, not an alpha-cut card: pale strands 2 to 2.6 cm wide (read at the lair's
 0.4 ambient from the game's camera), each face in both windings so palette.tres's back-face
 culling never hides one. Art only, protocol unchanged, no new class_name.
+
+## 640, art-kit's side: the sheep fold
+
+The herders' fold in the hills (Jeff: "herders exist as people"; the coordinator's nod; maps
+lays it beside a building.hut and draws sheep inside; buildings registers it). building.fold:
+a cell slot, footprint 6 x 6, open to the sky as building.field (Level.OPEN_AIR, buildings'
+side). Its fence is prop.fence's and prop.fence_post's own meshes placed by
+C:/dev/review/fold/make_fold.py (22 sections, 23 posts), not remodelled, so a fold matches
+every fence in the world; the line is inset to the footprint's outer 0.15 m. The gate is a
+2-cell gap centred on the +z side, local x -1 to +1 (local cells 2 and 3 of 0..5 on the front
+edge): no edge, no leaf, no post in its middle. One piece, no variants: its facing
+(Level.BUILDING_FACING, front +z) turns the gate side. The trodden earth, straw and a stone
+water trough flush to the -z fence are the piece's own; nobody lays them, and nothing else
+stands inside, so no lane narrows under the two-cell rule. 5505 tris (budget 5600).
+Art only, protocol unchanged, no new class_name.

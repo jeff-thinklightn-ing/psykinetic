@@ -1545,6 +1545,19 @@
 				}
 			]
 		},
+		"building.fold": {
+			"category": "buildings",
+			"type": "mesh",
+			"kind": "cell",
+			"footprint": [6, 6],
+			"size": [6.0, 1.1, 6.0],
+			"budget": 5600,
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-23", "notes": "C:/dev/review/fold/make_fold.py: prop.fence's own mesh 22 times and prop.fence_post's 23 times (the kit's blends, not remodelled) round the outline, inset to the outer 0.15 m; inside, trodden earth in row 3's browns, darker by the gate and the trough, straw tufts by the fence, a stone water trough against the -z fence; 5505 tris"},
+			"uses": "the herders' sheep fold in the hills (Jeff: \"herders exist as people\"; the coordinator's nod; maps lays it beside a building.hut and draws sheep inside), 6 x 6 cells, open to the sky (Level.OPEN_AIR, as building.field): a fence about 1.1 m high round the footprint, its posts and rails within the outer 0.15 m, a gate gap two cells wide centred on the +z side from local x -1 to +1 m (an open gap, no edge, no leaf, no post in its middle; buildings' prefab puts the map's WALL edges round the rest, as for the field). One piece: the gate side is turned by its facing, front +z (Level.BUILDING_FACING), no variants. The trodden earth, the straw and the trough are the piece's own (nobody lays them); the trough stands flush to the -z fence, 1.4 x 0.48 m, nothing else on the floor, so no lane narrows. Origin the footprint's middle, base at 0",
+			"grey": [
+				{"at": [0, 0.55, 0], "size": [6.0, 1.1, 6.0]}
+			]
+		},
 		"building.well": {
 			"category": "buildings",
 			"type": "mesh",
