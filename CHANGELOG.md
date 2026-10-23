@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The barrow's damp lair looks it: darker and colder, a faint haze, and your lantern's light only reaches a few steps (580, terrain's side).
 - A raised dais indoors is built stone with steps up its front, no longer a rock cliff, as in the Hall of Fallen Souls (580).
 - The felled forest is drawn: a stump, grass, scrub and saplings as a woodlot's clearing grows back, the trees going and coming as they are felled and regrow (591).
 - Herders' sheep folds can stand in a level: a 6 x 6 fenced pen open to the sky, its gate two cells wide in the middle of its front; you see over the fence but can't walk through it, and a level editor's "building_fold" stamp lays one.

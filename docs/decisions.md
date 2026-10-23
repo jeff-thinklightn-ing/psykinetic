@@ -25177,3 +25177,37 @@ row. It checks 32 pieces, 12 of them steps on the front, each turned off the
 dais and with no cliff face; the stairs flat and walked up; the same map
 outdoors as cliffs; the sample with no dais. Client only, protocol
 unchanged, no new class_name.
+## 580, terrain's side: the damp level's look
+
+Jeff on the barrow's third layer: "damp and dark, human eyesight barely
+lights it up, its too moist to light lamps". The coordinator's ruling: the
+level key "damp" (level.json; dungeon sets it on barrow_lair), the sim
+environment's (a286f09d: Fields.carried_reach halved, two cells; Level
+quenches torches, lanterns and fire on it), the look terrain's.
+
+- Under "damp" (_apply_sky, indoors): the zone's ambient DAMP_AMBIENT
+  (0.4) of itself and lerped toward DAMP_COLD; a faint cold exponential
+  haze (DAMP_FOG, DAMP_FOG_DENSITY 0.02) all but black, so it darkens with
+  distance (a lighter fog lifted the dark to a flat blue-grey in the first
+  shots), only what a lantern lights showing through it.
+- Each carried lantern (player, companion) at the sim's reach:
+  PLAYER_LIGHT_RANGE times Fields.carried_reach(damp) over CARRIED_REACH
+  (6 m, 3 m when damp), at DAMP_LANTERN (0.75) of its energy; set as a
+  puppet's lantern is made and again for every puppet when a level is
+  built (_size_lantern), so walking down into the lair shrinks it.
+- The floor darkens by the sim's light already (floor_brightness on
+  Fields), so it follows environment's rule with nothing more. The soft
+  scatter (tufts, flowers, reeds) did not: it kept full light, green
+  against the near-black floor (the coordinator, on the first shots). Now
+  indoors each cell's brightness as the floor draws it is an L8 image over
+  the mask's cells (_publish_floor_shade, written by _shade_floor), the
+  global shader uniform "floor_shade" with "floor_shade_rect"
+  (project.godot's shader_globals), and scatter.gdshaderinc darkens by it
+  as the ground does; outdoors (the sky lights the plants) and in glimpses
+  none. Stones and roots (a plain material) are as before.
+- No flames to hide: the level holds none once Level quenches them.
+
+view_test _test_damp_look: the barrow made damp: the ambient a share of
+the zone's, a haze, its lanterns at 3 m; not damp, 6 m and no haze;
+indoors the scatter's floor shade each cell's as drawn, outdoors none.
+Client only, protocol unchanged, no new class_name.

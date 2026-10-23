@@ -70,3 +70,11 @@ wind={
 "type": "vec4",
 "value": Vector4(0, 0, 0, 0)
 }
+floor_shade={
+"type": "sampler2D",
+"value": ""
+}
+floor_shade_rect={
+"type": "vec4",
+"value": Vector4(0, 0, 0, 0)
+}

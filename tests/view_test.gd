@@ -50,6 +50,7 @@ func _ready() -> void:
 	_test_curves_meet()
 	_test_built_water()
 	_test_ledge_curves()
+	_test_damp_look()
 	_test_forest_edge()
 	_test_clearing()
 	_test_dais()
@@ -2871,6 +2872,53 @@ func _test_built_water() -> void:
 	var hills := Level.load_level("hills")
 	_rig.rebuild(hills["terrain"], hills["centre"])
 	_check(_rig._built_water.is_empty(), "hills: all its water natural, from its curves (built: %s)" % [_rig._built_water.keys().slice(0, 3)])
+	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+
+
+## A damp level's look (580, terrain's side): the barrow with "damp": its
+## ambient a share of the zone's, colder, a faint haze; each carried
+## lantern at the sim's reach (Fields.carried_reach: half); back as it was
+## on a level not damp.
+func _test_damp_look() -> void:
+	print("
+== a damp level: darker, colder, a haze, the lanterns at half reach ==")
+	var barrow := Level.load_level("barrow")
+	var plain: Dictionary = barrow["terrain"]
+	var damp: Dictionary = plain.duplicate()
+	damp["damp"] = true
+	_rig.rebuild(plain, barrow["centre"])
+	var dry_energy := _rig._environment.ambient_light_energy
+	_rig.rebuild(damp, barrow["centre"])
+	var lanterns := _rig._puppets.values().map(func(puppet: Node3D) -> OmniLight3D: return puppet.get_node_or_null("Lantern") as OmniLight3D).filter(func(light: OmniLight3D) -> bool: return light != null)
+	var reach := Client3D.PLAYER_LIGHT_RANGE * Fields.carried_reach(true) / float(Fields.CARRIED_REACH)
+	var short := lanterns.all(func(light: OmniLight3D) -> bool: return is_equal_approx(light.omni_range, reach))
+	_check(not lanterns.is_empty() and short and _rig._environment.fog_enabled
+			and is_equal_approx(_rig._environment.ambient_light_energy, dry_energy * Client3D.DAMP_AMBIENT),
+			"damp: ambient %.2f of %.2f, a haze, %d lanterns at %.1f m" % [_rig._environment.ambient_light_energy, dry_energy, lanterns.size(), reach])
+	_rig.rebuild(plain, barrow["centre"])
+	var back := lanterns.all(func(light: OmniLight3D) -> bool: return is_equal_approx(light.omni_range, Client3D.PLAYER_LIGHT_RANGE))
+	_check(back and not _rig._environment.fog_enabled and is_equal_approx(_rig._environment.ambient_light_energy, dry_energy),
+			"not damp: the lanterns at %.1f m again, no haze" % Client3D.PLAYER_LIGHT_RANGE)
+	# The soft scatter darkens with the floor indoors (the global floor_shade,
+	# each cell's brightness as the floor draws it); outdoors none.
+	_rig._shade_floor()
+	var indoors := _rig._shade_texture != null and _rig._shade_image != null
+	var matched := 0
+	var differ := []
+	for cell: Vector2i in _rig._ground_shades:
+		var at := cell - _rig._mask_origin
+		if at.x < 0 or at.y < 0 or at.x >= _rig._mask_size.x or at.y >= _rig._mask_size.y:
+			continue
+		var drawn := _rig._shade_image.get_pixel(at.x, at.y).r if indoors else -1.0
+		if absf(drawn - minf((_rig._ground_shades[cell] as Vector2).x, 1.0)) < 0.01:
+			matched += 1
+		else:
+			differ.append(cell)
+	var hills := Level.load_level("hills")
+	_rig.rebuild(hills["terrain"], hills["centre"])
+	var outdoors := _rig._shade_texture == null
+	_check(indoors and matched > 0 and differ.is_empty() and outdoors,
+			"indoors the scatter's floor shade is each cell's as drawn (%d cells; differ: %s); outdoors none" % [matched, differ.slice(0, 3)])
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
 

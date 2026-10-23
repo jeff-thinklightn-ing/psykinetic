@@ -458,6 +458,16 @@ const PEEK_DRAG_PX := 300.0
 const PEEK_PULL_BACK := 1.2
 const PEEK_RETURN_SECONDS := 0.25
 const PLAYER_LIGHT_RANGE := 6.0
+## A damp level (580, terrain's side; level.json "damp", Jeff: "damp and
+## dark, human eyesight barely lights it up, its too moist to light
+## lamps"): its ambient this share of the zone's, toward DAMP_COLD; a faint
+## cold haze (DAMP_FOG, DAMP_FOG_DENSITY); a carried lantern at the sim's
+## reach (Fields.carried_reach) and DAMP_LANTERN of its energy.
+const DAMP_AMBIENT := 0.4
+const DAMP_COLD := Color(0.42, 0.5, 0.58)
+const DAMP_FOG := Color(0.025, 0.03, 0.04)
+const DAMP_FOG_DENSITY := 0.02
+const DAMP_LANTERN := 0.75
 ## A light casts shadows only while its reach overlaps the ground the camera
 ## shows, give or take this (cells); checked when the view moves a cell or
 ## changes size, and every SHADOW_RECHECK seconds for lights that move.
@@ -1246,6 +1256,12 @@ var _ground_kinds: Dictionary[Vector2i, String] = {}
 var _ground_shades: Dictionary[Vector2i, Vector2] = {}
 ## A cell's shade by index, as drawn: bright, warm, a byte each.
 var _cell_shades := PackedByteArray()
+## Indoors, each cell's brightness (as _cell_shades') over the mask's
+## cells, for the soft scatter (the global "floor_shade", its rect
+## "floor_shade_rect"): the plants darken with the floor under them (580,
+## terrain's side: they kept full light in the dark lair).
+var _shade_image: Image
+var _shade_texture: ImageTexture
 ## The corners: a vertex in the ground's meshes is a corner of one chunk at
 ## one height. For each, its chunk, its shade's byte in _ground_bytes, and
 ## the (up to 4, else -1) cells around it at its height, whose shades it
@@ -1903,6 +1919,50 @@ func _apply_sky() -> void:
 		_environment.ambient_light_energy = look[1]
 		_sun.light_color = SUN
 		_sun.light_energy = SUN_ENERGY
+		# A damp level (580, terrain's side): darker and colder, a faint
+		# haze in the lanterns' light.
+		if bool(_terrain.get("damp", false)):
+			_environment.ambient_light_color = (look[0] as Color).lerp(DAMP_COLD, 0.6)
+			_environment.ambient_light_energy = float(look[1]) * DAMP_AMBIENT
+			_environment.fog_enabled = true
+			_environment.fog_mode = Environment.FOG_MODE_EXPONENTIAL
+			_environment.fog_light_color = DAMP_FOG
+			_environment.fog_density = DAMP_FOG_DENSITY
+			_environment.fog_sky_affect = 0.0
+	# The carried lanterns at this level's reach (580).
+	for puppet: Node3D in _puppets.values():
+		var lantern := puppet.get_node_or_null("Lantern") as OmniLight3D
+		if lantern != null:
+			_size_lantern(lantern)
+
+
+## A carried lantern's light as this level has it (580, terrain's side):
+## its reach the sim's (Fields.carried_reach: half on a damp level) over
+## PLAYER_LIGHT_RANGE, dimmer when damp.
+func _size_lantern(light: OmniLight3D) -> void:
+	var damp := bool(_terrain.get("damp", false))
+	light.omni_range = PLAYER_LIGHT_RANGE * Fields.carried_reach(damp) / float(Fields.CARRIED_REACH)
+	light.light_energy = 1.2 * (DAMP_LANTERN if damp else 1.0)
+
+
+## The cells' brightness for the soft scatter (580, terrain's side): an L8
+## image over the mask's cells, full until _shade_floor writes each one,
+## published as the global "floor_shade" with its rect (origin, size in
+## cells) indoors by the main view; outdoors (the sky lights the plants)
+## or in a glimpse, none (the rect's size 0).
+func _publish_floor_shade() -> void:
+	_shade_image = null
+	_shade_texture = null
+	if _glimpse:
+		return
+	if _outdoor or _mask_size.x <= 0 or _mask_size.y <= 0:
+		RenderingServer.global_shader_parameter_set("floor_shade_rect", Vector4.ZERO)
+		return
+	_shade_image = Image.create(_mask_size.x, _mask_size.y, false, Image.FORMAT_L8)
+	_shade_image.fill(Color.WHITE)
+	_shade_texture = ImageTexture.create_from_image(_shade_image)
+	RenderingServer.global_shader_parameter_set("floor_shade", _shade_texture)
+	RenderingServer.global_shader_parameter_set("floor_shade_rect", Vector4(_mask_origin.x, _mask_origin.y, _mask_size.x, _mask_size.y))
 
 
 ## The floor's brightness, a share of its colour, for [param light] on it
@@ -6231,6 +6291,7 @@ func _build_ground(kinds: Dictionary) -> void:
 	_floor_mask = ImageTexture.create_from_image(Image.create_from_data(across, down, false, Image.FORMAT_R8, _floor_bytes))
 	_mask_origin = origin
 	_mask_size = Vector2i(across, down)
+	_publish_floor_shade()
 	canopy_texture = canopy_mask(_terrain.get("canopy", {}), origin, _mask_size)
 	canopy_origin = origin
 	var material := _ground_material(kind_bytes, across, down, origin)
@@ -8755,6 +8816,7 @@ func _shade_floor() -> void:
 	var carried := World.fields.any_carried_heat(World)
 	var dirty := PackedInt32Array()
 	var marked: Dictionary[int, bool] = {}
+	var shades_moved := false
 	for cell: Vector2i in cells:
 		var index: int = _grounds.get(cell, -1)
 		if index < 0:
@@ -8769,11 +8831,18 @@ func _shade_floor() -> void:
 		_ground_shades[cell] = shade
 		_cell_shades[index * 2] = roundi(minf(shade.x, 1.0) * 255.0)
 		_cell_shades[index * 2 + 1] = roundi(shade.y * 255.0)
+		if _shade_image != null:
+			var at := cell - _mask_origin
+			if at.x >= 0 and at.y >= 0 and at.x < _mask_size.x and at.y < _mask_size.y:
+				_shade_image.set_pixel(at.x, at.y, Color(minf(shade.x, 1.0), 0.0, 0.0))
+				shades_moved = true
 		for k in range(_cell_vertex_start[index], _cell_vertex_start[index + 1]):
 			var vertex := _cell_vertices[k]
 			if not marked.has(vertex):
 				marked[vertex] = true
 				dirty.append(vertex)
+	if shades_moved:
+		_shade_texture.update(_shade_image)
 	if dirty.is_empty():
 		return
 	# Each chunk's changed span of shade bytes [first, last].
@@ -12473,8 +12542,7 @@ func _make_puppet(entity: GridEntity) -> Node3D:
 		var light := OmniLight3D.new()
 		light.name = "Lantern"
 		light.light_color = PLAYER_LIGHT
-		light.light_energy = 1.2
-		light.omni_range = PLAYER_LIGHT_RANGE
+		_size_lantern(light)
 		_cast_shadows(light)
 		# Above the head: inside the body it would light the body from within
 		# and leave its outside in its own shadow.

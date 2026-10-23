@@ -22,6 +22,11 @@ render_mode cull_disabled, shadows_disabled;
 #endif
 
 global uniform vec4 wind;
+// Indoors, each cell's brightness as the floor draws it (580, terrain's
+// side, Client3D._publish_floor_shade): the plants darken with the floor
+// under them; the rect's size 0 (outdoors) leaves them as they were.
+global uniform sampler2D floor_shade : filter_linear, repeat_disable;
+global uniform vec4 floor_shade_rect;
 // The season (decision 362): x green, y turn (autumn), z snow cover.
 global uniform vec4 season;
 varying float up;
@@ -105,6 +110,10 @@ void fragment() {
 	colour *= 1.0 - trodden * 0.15;
 	colour = mix(colour, vec3(0.78, 0.4, 0.12) * (0.6 + grey), season.y * 0.55);
 	colour = mix(colour, vec3(0.9, 0.93, 0.97), season.z * smoothstep(0.45, 0.95, up) * SNOW_TIPS * snow_cover);
+	if (floor_shade_rect.z > 0.0) {
+		float shade = texture(floor_shade, (world.xz - floor_shade_rect.xy + 0.5) / floor_shade_rect.zw).r;
+		colour *= pow(shade, 2.2);
+	}
 	ALBEDO = colour;
 	ROUGHNESS = 1.0;
 	SPECULAR = 0.5;
