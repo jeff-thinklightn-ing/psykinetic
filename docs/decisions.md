@@ -22848,3 +22848,48 @@ view_test _test_built_water: the wilds' wells built, each body over its own
 cells, no shore field round them; the hills' water all natural.
 _test_shore skips built water. Client only, protocol unchanged, no new
 class_name.
+
+## 585, terrain's side: ledges drawn along their curves
+
+Jeff (2026-10-22): "terrain needs to have smooth edges for ledges and
+terraces as well. it should not conform to tiles either. see stream
+examples". maps' 585 traces every ledge from the relief's cliff edges into
+terrain["ledges"] (curves sampled with tops and feet, "up", shared ends,
+taper points, a point at each fall), within 0.45 of the cliff edges
+(level_test checks both ways); cliff steps under 1 m are softened (the
+coordinator's ruling: what reads as a slope is climbable). This draws
+them. The sim's walk keeps the cells' cliffs (cliff_between).
+
+- _read_ledges: each ledge's curve and a nearest-sample map, as the
+  waters' (_stamp_near); _ledge_near: how far past the curve on its high
+  side (negative on its low side), which ledge, where along it.
+- The cells a curve crosses are split along it (_plan_ledge_splits): the
+  square cut by the curve's high side (a polygon from its run through the
+  cell), each part labelled by a point inside it (a sharp turn can fold
+  the polygon; past an open end the cell's own ground holds). Each part is
+  drawn at its side's ground (_ledge_cell): its own cell's corners' plane,
+  or the plane of the cell across the curve carried on to it, so the high
+  ground ends on the curve at the face's top and the low ground runs to
+  its foot. A square corner is keyed as the whole cells' are, joining them.
+- The faces (_add_ledge_faces) run along the curve's samples, from the
+  high side's ground down to the low side's, facing the low side, faceted
+  and coloured as cliffs are (_cliff_strip), under the cliffs' material:
+  the sight cut-out (549) and the night darkening as before. Nothing where
+  the two grounds meet (a taper's end).
+- A cell edge's own face is left to a ledge (_ledge_covers) only where the
+  curve runs along it (within half a cell of its middle) and drops there
+  at least half the edge's drop: a bank (water on one side, which the
+  ledges leave out) and a taper's end keep their cell faces. (The first
+  shots showed a bank by the fall's lip with neither face: bare dirt.)
+- The scatter leaves a split cell's other side alone.
+- 556's caps (withdrawn) are not back: the curve is the level's data.
+
+Shots in C:/dev/review/ledges585 (the hills' plateau faces, the fall's
+lip, the escarpments, the wilds' ridge; before is the withdrawal with
+cell-edge faces). view_test _test_ledge_curves (hills, wilds): every split
+cell's parts fill it, each on its own side; the faces' top on the high
+ground and foot on the low; cell edges left to the curves. map_bench,
+alternated twice against the withdrawal (eb6cce15): rebuild hills 966/914
+ms before, 989/942 after (about +25 ms); the wilds 3869/3488 before,
+3578/3531 after (noise); frame medians 0.93 to 1.14 ms either way. Client
+only, protocol unchanged (maps' 585 opens 32), no new class_name.

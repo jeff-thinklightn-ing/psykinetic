@@ -1512,6 +1512,16 @@ var _edge_mask: ImageTexture
 ## their edge: [cracked, open].
 var _niche_at: Dictionary[Vector3i, Dictionary] = {}
 var _hidden_niches: Dictionary[Vector3i, Array] = {}
+## The ledges as curves (585, terrain's side, maps' terrain "ledges"): each
+## {curve: Curves' sample with tops and feet, closed, up: 1 if its high side
+## is right of its way (y down), else -1}; each cell near one -> (which, its
+## nearest sample) and the others'; each cell the curve splits ->
+## {up: whether its own middle is the high side's, across: the cell whose
+## plane draws its other side, parts: [[polygon, own], ...]}.
+var _ledge_curves: Array[Dictionary] = []
+var _ledge_near_sample: Dictionary[Vector2i, Vector2i] = {}
+var _ledge_near_also: Dictionary[Vector2i, Array] = {}
+var _ledge_split: Dictionary[Vector2i, Dictionary] = {}
 var _road_image: Image
 var _road_mask: ImageTexture
 var _stream_ribbons: Array[MeshInstance3D] = []
@@ -4649,6 +4659,8 @@ func _scatter_plan(chunk: Vector2i) -> Dictionary[String, Array]:
 					var at := Vector2(cell) + Vector2(_roll(cell, 101 + salt + n * 7), _roll(cell, 102 + salt + n * 7)) - Vector2(0.5, 0.5)
 					if not _road_curves.is_empty() and _road_near(at).x > -0.1:
 						continue  # On a road (563, terrain's side).
+					if _ledge_split.has(cell) and _ledge_other_side(cell, at):
+						continue  # Past a ledge's curve, the other ground's (585).
 					if by_curve:
 						var into := _edge_signed(at)
 						if not is_nan(into) and ((into > 0.0) != on_forest or kind == "root" and not on_forest and into < -EDGE_ROOTS):
@@ -5582,6 +5594,8 @@ func _build_ground(kinds: Dictionary) -> void:
 	_read_curves()
 	# The roads as curves (563, terrain's side).
 	_read_roads()
+	# The ledges as curves (585, terrain's side).
+	_read_ledges()
 	for cell: Vector2i in _curve_cells:
 		_stream_cells[cell] = true
 	# Built water (decision 595): Jeff's curve rule is for natural water
@@ -5734,6 +5748,9 @@ func _build_ground(kinds: Dictionary) -> void:
 	var ends := PackedInt32Array([0, 0, 0, 0])
 	# The shore's cells drawn finer, SHORE_RES a side (decision 553).
 	_shore_heights = _shore_band(cells, floor_count, water_end)
+	# The cells a ledge's curve splits (585, terrain's side): each side drawn
+	# at its own ground, meeting the face on the curve.
+	_plan_ledge_splits(cells, floor_count)
 	# A chunk's vertex for each corner (or a shore cell's finer point, in
 	# SHORE_RES units) and height (mm): one a side of a cliff.
 	var local: Dictionary[Vector3i, int] = {}
@@ -5757,6 +5774,9 @@ func _build_ground(kinds: Dictionary) -> void:
 				finer.append(indices.size())
 				_shore_cell(cell, positions, indices, feet, tops, local, chunk_index, byte_start, pair_cell, pair_vertex)
 				finer.append(indices.size())
+				continue
+			if _ledge_split.has(cell):
+				_ledge_cell(cell, positions, indices, feet, tops, local, chunk_index, byte_start, pair_cell, pair_vertex)
 				continue
 			for c in 4:
 				var corner := cell + GROUND_CORNERS[c]
@@ -6869,6 +6889,299 @@ func _build_mists() -> void:
 		_mists.append(mist)
 
 
+## The level's ledges as curves (585, terrain's side; Jeff: "terrain needs
+## to have smooth edges for ledges and terraces as well. it should not
+## conform to tiles"): maps' terrain "ledges", each traced from the relief's
+## cliff edges and within 0.45 of them (level_test). The sim's walk keeps the
+## cells' cliffs (cliff_between); only the drawing follows the curve.
+func _read_ledges() -> void:
+	_ledge_curves.clear()
+	_ledge_near_sample.clear()
+	_ledge_near_also.clear()
+	_ledge_split.clear()
+	if _glimpse or not _relief_given:
+		return
+	for ledge: Dictionary in _terrain.get("ledges", []):
+		var curve: Dictionary = ledge["curve"]
+		if (curve["points"] as PackedVector2Array).size() < 2:
+			continue
+		if not curve.has("widths"):
+			# No width to a ledge: its reach is CURVE_REACH from the line.
+			curve = curve.duplicate()
+			var none := PackedFloat32Array()
+			none.resize((curve["points"] as PackedVector2Array).size())
+			curve["widths"] = none
+		var closed := bool(ledge.get("closed", false))
+		_stamp_near(curve, closed, _ledge_curves.size(), _ledge_near_sample, _ledge_near_also)
+		_ledge_curves.append({"curve": curve, "closed": closed, "up": 1 if str(ledge.get("up", "right")) == "right" else -1})
+
+
+## Where [param point] is to the nearest ledge's curve near it (585): x how
+## far past it on its high side (negative on its low side), y which ledge,
+## z the sample index (fractional) along it; y -1 with none near.
+func _ledge_near(point: Vector2) -> Vector3:
+	var cell := Vector2i(roundi(point.x), roundi(point.y))
+	if not _ledge_near_sample.has(cell):
+		return Vector3(0.0, -1.0, 0.0)
+	var best := INF
+	var out := Vector3(0.0, -1.0, 0.0)
+	for near: Vector2i in [_ledge_near_sample[cell]] + _ledge_near_also.get(cell, []):
+		var ledge: Dictionary = _ledge_curves[near.x]
+		var points: PackedVector2Array = ledge["curve"]["points"]
+		var closed: bool = ledge["closed"]
+		var n := points.size()
+		for j in range(near.y - CURVE_SEARCH, near.y + CURVE_SEARCH):
+			if not closed and (j < 0 or j + 1 >= n):
+				continue
+			var a := points[posmod(j, n)]
+			var b := points[posmod(j + 1, n)]
+			var way := b - a
+			if way.length_squared() < 0.0025:
+				continue
+			var on := Geometry2D.get_closest_point_to_segment(point, a, b)
+			var gap := point.distance_to(on)
+			if gap < best:
+				best = gap
+				var cross := way.x * (point.y - a.y) - way.y * (point.x - a.x)
+				var right := cross > 0.0
+				var high := right == (int(ledge["up"]) > 0)
+				out = Vector3(gap if high else -gap, near.x, posmod(j, n) + a.distance_to(on) / maxf(way.length(), 0.0001))
+	return out
+
+
+## The cells each ledge's curve crosses (585), split along it: each with its
+## own middle's side, the cell beside it (a side, across the curve) whose
+## plane draws its other side, and its square cut in two along the curve,
+## the parts as polygons. A cell with no neighbour across, or the curve not
+## through it, is drawn whole as before.
+func _plan_ledge_splits(cells: Array, floor_count: int) -> void:
+	_ledge_split.clear()
+	if _ledge_curves.is_empty():
+		return
+	var sides: Array[Vector2i] = [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]
+	for i in floor_count:
+		var cell: Vector2i = cells[i]
+		if not _ledge_near_sample.has(cell) or _shore_heights.has(cell) or _rocks.has(cell) or _ramp_heights.has(cell):
+			continue
+		var middle := _ledge_near(Vector2(cell))
+		if middle.y < 0.0 or absf(middle.x) > 0.75:
+			continue
+		var ledge: Dictionary = _ledge_curves[int(middle.y)]
+		var own_high := middle.x > 0.0
+		# The curve through the cell: a corner on the other side.
+		var square := PackedVector2Array([Vector2(cell) + Vector2(-0.5, -0.5), Vector2(cell) + Vector2(0.5, -0.5),
+				Vector2(cell) + Vector2(0.5, 0.5), Vector2(cell) + Vector2(-0.5, 0.5)])
+		var crossed := false
+		for corner in square:
+			var at := _ledge_near(corner.lerp(Vector2(cell), 0.02))
+			crossed = crossed or (at.y == middle.y and (at.x > 0.0) != own_high)
+		if not crossed:
+			continue
+		# The cell across: a side whose middle is on the other side of it,
+		# the nearer to the curve.
+		var across := Vector2i(1 << 20, 0)
+		var nearest := INF
+		for side in sides:
+			var next := cell + side
+			var index: int = _grounds.get(next, -1)
+			if index < 0 or index >= floor_count:
+				continue
+			var at := _ledge_near(Vector2(next))
+			if at.y != middle.y or (at.x > 0.0) == own_high:
+				continue
+			if absf(at.x) < nearest:
+				nearest = absf(at.x)
+				across = next
+		if across.x == 1 << 20:
+			continue
+		# The high side as a polygon: the curve's run through here, closed
+		# three cells out on its high side.
+		var points: PackedVector2Array = ledge["curve"]["points"]
+		var tangents: PackedVector2Array = ledge["curve"]["tangents"]
+		var n := points.size()
+		var k := int(middle.z)
+		var run := PackedVector2Array()
+		var from := k - 8
+		var to := k + 9
+		if not bool(ledge["closed"]):
+			from = maxi(from, 0)
+			to = mini(to, n - 1)
+		for j in range(from, to + 1):
+			run.append(points[posmod(j, n)])
+		var first_t := tangents[posmod(from, n)]
+		var last_t := tangents[posmod(to, n)]
+		var up := float(ledge["up"])
+		var high_first := Vector2(-first_t.y, first_t.x) * up
+		var high_last := Vector2(-last_t.y, last_t.x) * up
+		# Run on past its ends, so the polygon spans the cell.
+		run.insert(0, run[0] - first_t * 2.0)
+		run.append(run[run.size() - 1] + last_t * 2.0)
+		var high_side := PackedVector2Array(run)
+		high_side.append(run[run.size() - 1] + high_last * 3.0)
+		high_side.append(run[0] + high_first * 3.0)
+		var parts: Array = []
+		# Each part with whether it is the high side's, by where a point
+		# inside it is (a sharp turn can fold the side polygon); past the
+		# curve's open end there is no face, and the cell's own ground holds.
+		var pieces: Array[PackedVector2Array] = []
+		pieces.append_array(Geometry2D.intersect_polygons(square, high_side))
+		pieces.append_array(Geometry2D.clip_polygons(square, high_side))
+		for polygon in pieces:
+			var inside := _inside_point(polygon)
+			var at := _ledge_near(inside)
+			var high := own_high
+			if at.y == middle.y and (bool(ledge["closed"]) or at.z > 0.5 and at.z < n - 1.5):
+				high = at.x > 0.0
+			parts.append([polygon, high])
+		if parts.all(func(part: Array) -> bool: return bool(part[1]) == own_high):
+			continue
+		if parts.size() < 2:
+			continue
+		_ledge_split[cell] = {"high": own_high, "across": across, "parts": parts, "ledge": int(middle.y)}
+
+
+## A point inside [param polygon]: its first triangle's middle.
+static func _inside_point(polygon: PackedVector2Array) -> Vector2:
+	var triangles := Geometry2D.triangulate_polygon(polygon)
+	if triangles.size() < 3:
+		return polygon[0]
+	return (polygon[triangles[0]] + polygon[triangles[1]] + polygon[triangles[2]]) / 3.0
+
+
+## Whether [param point] in split [param cell] is past its ledge's curve,
+## on the other ground's side (585).
+func _ledge_other_side(cell: Vector2i, point: Vector2) -> bool:
+	var split: Dictionary = _ledge_split[cell]
+	var at := _ledge_near(point)
+	return at.y == float(split["ledge"]) and (at.x > 0.0) != bool(split["high"])
+
+
+## The plane of [param cell]'s drawn corners (bilinear) at [param point],
+## inside the cell or a little past it (585: a split cell's other side drawn
+## as the cell across's ground carried on to the curve).
+func _cell_plane(cell: Vector2i, point: Vector2) -> float:
+	var h := _corner_heights(cell)
+	var at := point - Vector2(cell) + Vector2(0.5, 0.5)
+	return lerpf(lerpf(h[0], h[1], at.x), lerpf(h[2], h[3], at.x), at.y)
+
+
+## The ground on the high or low side ([param high]) of the ledge near
+## [param point] (585): the plane of the cell there on that side, else the
+## one beside it on that side nearest.
+func _ledge_ground(point: Vector2, high: bool) -> float:
+	var cell := Vector2i(roundi(point.x), roundi(point.y))
+	var best := cell
+	var gap := INF
+	for y in range(-1, 2):
+		for x in range(-1, 2):
+			var near := cell + Vector2i(x, y)
+			if not _corners.has(near):
+				continue
+			var at := _ledge_near(Vector2(near))
+			if at.y < 0.0 or (at.x > 0.0) != high:
+				continue
+			var d := Vector2(near).distance_to(point)
+			if d < gap:
+				gap = d
+				best = near
+	return _cell_plane(best, point)
+
+
+## Whether the cliff between [param cell] and [param next] is a ledge's,
+## drawn along its curve (585): their middles either side of one ledge's
+## curve near them.
+func _ledge_covers(cell: Vector2i, next: Vector2i) -> bool:
+	if _ledge_curves.is_empty() or not _ledge_near_sample.has(cell):
+		return false
+	var a := _ledge_near(Vector2(cell))
+	var b := _ledge_near(Vector2(next))
+	if a.y < 0.0 or a.y != b.y or (a.x > 0.0) == (b.x > 0.0):
+		return false
+	# The curve runs along this edge (within half a cell of its middle) and
+	# its face there drops: else (a bank the ledges leave out, a taper's end)
+	# the cell edge keeps its own face.
+	var middle := (Vector2(cell) + Vector2(next)) / 2.0
+	var at := _ledge_near(middle)
+	if at.y != a.y or absf(at.x) > 0.5:
+		return false
+	var points: PackedVector2Array = _ledge_curves[int(at.y)]["curve"]["points"]
+	var on := points[clampi(roundi(at.z), 0, points.size() - 1)]
+	var drop := _ledge_ground(on, true) - _ledge_ground(on, false)
+	return drop >= absf(_elevation(cell) - _elevation(next)) * 0.5
+
+
+## The ledges' faces (585, terrain's side) into [param faces] (by chunk, as
+## _add_cliffs'): along each curve's samples, from the high side's ground
+## there down to the low side's, facing the low side; nothing where they
+## meet (a taper's end, a slope).
+func _add_ledge_faces(faces: Dictionary) -> void:
+	for ledge: Dictionary in _ledge_curves:
+		var points: PackedVector2Array = ledge["curve"]["points"]
+		var tangents: PackedVector2Array = ledge["curve"]["tangents"]
+		var up := float(ledge["up"])
+		var count := points.size() - (0 if ledge["closed"] else 1)
+		var tops := PackedFloat32Array()
+		var feet := PackedFloat32Array()
+		for point in points:
+			tops.append(_ledge_ground(point, true))
+			feet.append(_ledge_ground(point, false))
+		for k in count:
+			var j := (k + 1) % points.size()
+			var top := Vector2(tops[k], tops[j])
+			var foot := Vector2(minf(feet[k], tops[k]), minf(feet[j], tops[j]))
+			if top.x - foot.x <= Relief.EPSILON and top.y - foot.y <= Relief.EPSILON:
+				continue
+			var middle := (points[k] + points[j]) / 2.0
+			var cell := Vector2i(roundi(middle.x), roundi(middle.y))
+			var chunk := Vector2i(floori(cell.x / float(FLOOR_CHUNK)), floori(cell.y / float(FLOOR_CHUNK)))
+			if not faces.has(chunk):
+				faces[chunk] = [PackedVector3Array(), PackedVector3Array(), PackedColorArray()]
+			var t := (tangents[k] + tangents[j]).normalized()
+			var low := Vector2(t.y, -t.x) * up
+			_cliff_strip(faces[chunk], points[k], points[j], top, foot, Vector3(low.x, 0.0, low.y), 1)
+
+
+## A split cell's two grounds into a chunk's arrays (585): each part of its
+## square triangulated, its own side at its own corners' plane, the other at
+## the cell across's, so each meets the face on the curve; a square corner
+## keyed as the whole cells' are, so it joins them.
+func _ledge_cell(cell: Vector2i, positions: PackedVector3Array, indices: PackedInt32Array,
+		feet: PackedByteArray, tops: PackedByteArray, local: Dictionary, chunk_index: int, byte_start: int,
+		pair_cell: PackedInt32Array, pair_vertex: PackedInt32Array) -> void:
+	var split: Dictionary = _ledge_split[cell]
+	var across: Vector2i = split["across"]
+	for part: Array in split["parts"]:
+		var polygon: PackedVector2Array = part[0]
+		var own := bool(part[1]) == bool(split["high"])
+		var drawn := cell if own else across
+		var lit: int = _grounds.get(drawn, -1)
+		var triangles := Geometry2D.triangulate_polygon(polygon)
+		var made := PackedInt32Array()
+		for point in polygon:
+			var level := _cell_plane(drawn, point)
+			var corner := Vector2i(roundi(point.x + 0.5), roundi(point.y + 0.5))
+			var on_corner := (point - (Vector2(corner) - Vector2(0.5, 0.5))).length() < 0.0001
+			var key := Vector3i(corner.x * SHORE_RES, corner.y * SHORE_RES, roundi(level * 1000.0))
+			var vertex: int = local.get(key, -1) if on_corner else -1
+			if vertex < 0:
+				vertex = positions.size()
+				if on_corner:
+					local[key] = vertex
+				positions.append(Vector3(point.x, level, point.y))
+				var global := _vertex_chunk.size()
+				_vertex_chunk.append(chunk_index)
+				_vertex_byte.append(byte_start + vertex * _ground_stride + _ground_custom)
+				_vertex_cells.append_array([lit, -1, -1, -1])
+				if lit >= 0:
+					pair_cell.append(lit)
+					pair_vertex.append(global)
+				feet.append(roundi(_concavity(corner, level) * 255.0))
+				tops.append(roundi(_crest(corner, level) * 255.0))
+			made.append(vertex)
+		for t in triangles:
+			indices.append(made[t])
+
+
 ## The two quads joining a ribbon's last row of three points (ending at
 ## [param size]) to the row before it, into [param indices].
 static func _ribbon_quads(size: int, indices: PackedInt32Array) -> void:
@@ -7768,12 +8081,16 @@ func _add_cliffs() -> void:
 			if (top - bottom).length() <= Relief.EPSILON:
 				continue
 			_cliff_edges.append([cell, direction])
+			# A ledge's face along its curve stands for this one (585).
+			if _ledge_covers(cell, next):
+				continue
 			var chunk := Vector2i(floori(cell.x / float(FLOOR_CHUNK)), floori(cell.y / float(FLOOR_CHUNK)))
 			if not faces.has(chunk):
 				faces[chunk] = [PackedVector3Array(), PackedVector3Array(), PackedColorArray()]
 			var from := Vector2(cell + GROUND_CORNERS[mine[0]]) - Vector2(0.5, 0.5)
 			var to := Vector2(cell + GROUND_CORNERS[mine[1]]) - Vector2(0.5, 0.5)
 			_cliff_strip(faces[chunk], from, to, top, bottom, Vector3(direction.x, 0.0, direction.y))
+	_add_ledge_faces(faces)
 	# Their vertex colours, rough, both sides, under the sky's light as the
 	# ground (513 amended); seen through where they hide the player
 	# (cliff.gdshader, decision 549).

@@ -47,6 +47,7 @@ func _ready() -> void:
 	_test_shore()
 	_test_curves_meet()
 	_test_built_water()
+	_test_ledge_curves()
 	_test_forest_edge()
 	_test_solid_ground()
 	_test_roads()
@@ -2477,6 +2478,72 @@ func _test_forest_edge() -> void:
 						astray_scatter += 1
 		_check(by_edge > 0 and astray_scatter == 0,
 				"%s: the scatter by the edge on its own side of the curve, the roots within %.1f of it (%d by it; astray: %d)" % [name, Client3D.EDGE_ROOTS, by_edge, astray_scatter])
+	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+
+
+## The ledges drawn from their curves (585, terrain's side): each cell a
+## ledge's curve crosses split along it, its two parts filling its square,
+## each part on its own side; each part at the ground of its side, so the
+## high ground meets the face's top on the curve and the low its foot; a
+## face down every stretch of a ledge that drops; the cell edges a ledge
+## covers left to it.
+func _test_ledge_curves() -> void:
+	print("\n== ledges drawn from their curves: split cells, faces along the curve ==")
+	for name: String in ["hills", "wilds"]:
+		var level := Level.load_level(name)
+		_rig.rebuild(level["terrain"], level["centre"])
+		if _rig._ledge_curves.is_empty():
+			_check(not (level["terrain"] as Dictionary).has("ledges") or (level["terrain"]["ledges"] as Array).is_empty(),
+					"%s: no ledges laid, none drawn" % name)
+			continue
+		var short := []
+		var astray := []
+		for cell: Vector2i in _rig._ledge_split:
+			var split: Dictionary = _rig._ledge_split[cell]
+			var area := 0.0
+			for part: Array in split["parts"]:
+				var polygon: PackedVector2Array = part[0]
+				var twice := 0.0
+				for k in polygon.size():
+					twice += polygon[k].cross(polygon[(k + 1) % polygon.size()])
+				area += absf(twice) / 2.0
+				var middle := Client3D._inside_point(polygon)
+				# A part's middle on its own side of its ledge's curve (well inside
+				# it; where two ledges meet, or past an open end, no side to say).
+				var at := _rig._ledge_near(middle)
+				if at.y == float(split["ledge"]) and absf(at.x) > 0.05 and (at.x > 0.0) != bool(part[1]) 						and at.z > 0.5 and at.z < (_rig._ledge_curves[int(at.y)]["curve"]["points"] as PackedVector2Array).size() - 1.5:
+					astray.append(cell)
+			if absf(area - 1.0) > 0.01:
+				short.append([cell, snappedf(area, 0.001)])
+		_check(not _rig._ledge_split.is_empty() and short.is_empty() and astray.is_empty(),
+				"%s: %d cells split along %d ledges, their parts filling them (short: %s), each on its side (astray: %s)" % [name, _rig._ledge_split.size(), _rig._ledge_curves.size(), short.slice(0, 3), astray.slice(0, 3)])
+		# Each face's top is the high ground there, its foot the low, and a
+		# stretch that drops has one.
+		var stretches := 0
+		var faced := 0
+		var unmet := []
+		for ledge: Dictionary in _rig._ledge_curves:
+			var points: PackedVector2Array = ledge["curve"]["points"]
+			for k in range(0, points.size(), 4):
+				var high := _rig._ledge_ground(points[k], true)
+				var low := _rig._ledge_ground(points[k], false)
+				if high - low <= Relief.EPSILON:
+					continue
+				stretches += 1
+				# The drawn ground just past the curve either side meets it.
+				var t: Vector2 = (ledge["curve"]["tangents"] as PackedVector2Array)[k]
+				var up := Vector2(-t.y, t.x) * float(ledge["up"])
+				var above := _rig._ledge_ground(points[k] + up * 0.02, true)
+				var below := _rig._ledge_ground(points[k] - up * 0.02, false)
+				if absf(above - high) > 0.05 or absf(below - low) > 0.05:
+					unmet.append(points[k])
+				faced += 1
+		_check(stretches > 0 and unmet.is_empty(),
+				"%s: the faces along the curves, top on the high ground, foot on the low (%d stretches; unmet: %s)" % [name, stretches, unmet.slice(0, 3)])
+		var covered := 0
+		for edge: Array in _rig._cliff_edges:
+			covered += 1 if _rig._ledge_covers(edge[0], edge[0] + edge[1]) else 0
+		_check(covered > 0, "%s: %d cell-edge faces left to the ledges' curves" % [name, covered])
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
 

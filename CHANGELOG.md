@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Cliffs and terraces follow smooth curves instead of the tiles' edges, their faces winding along the ledge and the ground meeting them on the curve (585, terrain's side).
 - Built water (wells and basins, which no curve lays) is drawn square and still with a crisp edge, not as a rounded pond; natural water stays on its curves (595).
 - The first unsquaring's cell smoothing is withdrawn (Jeff's veto): ledge rims and jittered ground facets are gone, and cliffs stand on their tiles' edges until ledges are drawn from curves (556 amended, 558 amended).
 - Cliffs and ledges run along smooth, wandering lines rather than straight down the grid: the hills' escarpments and the plateau's cliff, and the wilds' ridge (585).
