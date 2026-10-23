@@ -1595,6 +1595,58 @@
 				{"at": [0, 1.502, 0], "size": [2.04, 3.004, 1.731]}
 			]
 		},
+		"building.round_table": {
+			"category": "buildings",
+			"type": "mesh",
+			"kind": "cell",
+			"footprint": [3, 3],
+			"size": [2.861, 1.194, 2.833],
+			"budget": 1100,
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-23", "notes": "C:/dev/review/crypt/make_feast.py round_table: a heavy round slab with a chipped rim and a carved ring, on a drum and a low footing (row 1's greys); on it the feast's leavings: three bronze platters (bones on one, a loaf gone to stone on another), cups (one fallen), a clay jug, bones strewn; 936 tris"},
+			"uses": "the round table at the centre of the Hall of Fallen Souls (580 step 3, dungeon's halls dressed; the coordinator's nod), 3 x 3 cells, a doorless solid building in place of the rock block; round, so any facing; the hall chairs stand on the ring of cells round it",
+			"grey": [
+				{"at": [0, 0.597, 0], "size": [2.861, 1.194, 2.833]}
+			]
+		},
+		"building.hall_chair": {
+			"category": "buildings",
+			"type": "mesh",
+			"kind": "cell",
+			"footprint": [1, 1],
+			"size": [0.591, 1.22, 0.554],
+			"budget": 1000,
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-23", "notes": "C:/dev/review/crypt/make_feast.py hall_chair: a high-backed wooden hall chair, dark old wood, finials on its back posts, a top rail and three slats, stretchers, a rotted fur over the seat; seat 0.45 m up, back 1.15 m so a seated ghost's head shows over it; 844 tris"},
+			"uses": "the feast hall's chairs round the round table (580 step 3, dungeon's halls dressed; the coordinator's nod), 1 x 1, front +z the way it faces (in, to the table); walked onto (Level.OPEN_AIR), not solid: a ghost warrior sits on it (step 4), a player or companion passes through",
+			"grey": [
+				{"at": [0, 0.61, 0], "size": [0.591, 1.22, 0.554]}
+			]
+		},
+		"building.broken_table": {
+			"category": "buildings",
+			"type": "mesh",
+			"kind": "cell",
+			"footprint": [2, 1],
+			"size": [1.891, 0.774, 0.968],
+			"budget": 800,
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-23", "notes": "C:/dev/review/crypt/make_feast.py broken_table: a trestle table collapsed at its +x end: the -x trestle standing (an A of two legs on a foot beam), the three-plank top pivoted on it down to the floor, one plank broken short with its end lying by it, the +x trestle's legs flat on the floor, a bronze bowl and a cup spilled, a bone; 598 tris"},
+			"uses": "the feast hall's broken tables along its east and west walls (580 step 3, dungeon's halls dressed; the coordinator's nod), 2 x 1 cells, long side along x, set against the wall (612: never a cell off it), a doorless solid building",
+			"grey": [
+				{"at": [0, 0.387, 0], "size": [1.891, 0.774, 0.968]}
+			]
+		},
+		"building.throne": {
+			"category": "buildings",
+			"type": "mesh",
+			"kind": "cell",
+			"footprint": [1, 1],
+			"size": [0.947, 1.925, 0.93],
+			"budget": 1200,
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-23", "notes": "C:/dev/review/crypt/make_feast.py throne: the draugr's stone throne, a low plinth the whole cell, a seat block open to the front, low arms (0.68 m), a tall back with a stepped crown, a carved border and an old bronze sun disc with verdigris on its face; 1006 tris"},
+			"uses": "the draugr's throne on the dais (580 step 3, dungeon's halls dressed; the coordinator's nod), 1 x 1 at his cell, front +z (into the hall), back to -z; walked onto (Level.OPEN_AIR): he stands in its cell; the seat block is 0.44 m up in the cell's middle",
+			"grey": [
+				{"at": [0, 0.963, 0], "size": [0.947, 1.925, 0.93]}
+			]
+		},
 		"building.link_arch": {
 			"category": "buildings",
 			"type": "mesh",
