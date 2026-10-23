@@ -276,7 +276,8 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## line): its Items id and the cell it came down on, for the views' flight.
 ## 31 (602): the "telegraph" message, to a zone: {id, source, kind, shape,
 ## cells, from_tick, lands_tick, zone} shown, {id, landed} over.
-const PROTOCOL_REVISION := 31
+## 32 (611): new command "make_way" {target}: your own companion beside you steps aside.
+const PROTOCOL_REVISION := 32
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]
 ## Every kind of message (message, message_to, broadcast, broadcast_to).

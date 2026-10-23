@@ -22468,3 +22468,24 @@ labyrinth_test (no run in either generation of dwarven, old, and the
 barrow's three layers; the hall's floor count with the bays), level_test
 (every regenerating template; the hidden niche at (51, 16)). Level data
 and generator, no wire change, no new class_name.
+
+## 611. A click on your own companion makes way
+
+Jeff on v0.1.166, body-blocked by Pip: "with weapons LMB on companion is no
+longer telling them to move and unblock". His way had been the click opening
+the chat box addressed to her and typing "move"; 560 amended made a click on a
+companion within reach do nothing, and in a corridor the click's walk beside
+her found no cell, so nothing moved her but the bar's Talk. The coordinator's
+design: a left click (or a bow's tap) on your own companion within melee reach
+(World.can_melee) sends a new command "make_way" {target}; the server
+(Main._make_way) checks she is the player's and in reach and calls
+Companion.bumped with the direction from the player to her: the hands, no
+mind asked, the bump's party-log line and its repeat guard, so a click held
+or repeated is one step aside. From afar the click walks beside her as
+before; where _beside finds nothing (a corridor) it walks at her tile, and the
+bump swaps them. Another's companion and players: unchanged. The hook is in
+Main._talk_to, not _open_talk, which also runs on arriving from afar and would
+send her away as you reach her (agreed with ui, whose bow click reaches
+_talk_to). Protocol revision 32 (release: on an old server the click silently
+does nothing). tests: companion_test (the click yields her, logged, no mind;
+out of reach, or not hers, nothing).

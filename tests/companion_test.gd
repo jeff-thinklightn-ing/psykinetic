@@ -2300,6 +2300,28 @@ func _test_yields_when_bumped() -> void:
 	World.order_step(owner, Vector2i(1, 0), owner.refusals, false)
 	World.step()
 	_check(owner.tile == Vector2i(10, 6), "and they walk on through (%s)" % owner.tile)
+	print("\n== a left click on her beside you: she makes way, as for a bump ==")
+	_settle(pet)
+	_put(owner, Vector2i(9, 6))
+	_put(pet, Vector2i(10, 6))
+	mind.clear()
+	log_size = _main.party_log.size()
+	_main._talk_to(owner, pet)  # The client's click path, the host's own: "make_way".
+	_check(pet.current_intent == Companion.Intent.YIELD and mind.stance_asks.is_empty() and mind.voice_asks.is_empty(),
+			"the click yields her, no mind asked (%s)" % pet.intent_name())
+	_check(_main.party_log.size() > log_size and "bumped into %s" % pet.name in _main.party_log.last(1)[0],
+			"the party log says so as for a bump (%s)" % [_main.party_log.last(1)])
+	_settle(pet)
+	_put(owner, Vector2i(9, 6))
+	_put(pet, Vector2i(12, 6))
+	_main._on_command(owner, "make_way", {"target": str(pet.get_path())})
+	_check(pet.current_intent != Companion.Intent.YIELD, "out of reach, the command does nothing (%s)" % pet.intent_name())
+	_put(pet, Vector2i(10, 6))
+	var keeper := pet.keeper
+	pet.keeper = null  # Another's companion.
+	_main._on_command(owner, "make_way", {"target": str(pet.get_path())})
+	_check(pet.current_intent != Companion.Intent.YIELD, "not hers to ask: nothing (%s)" % pet.intent_name())
+	pet.keeper = keeper
 	pet.mind = ScriptedMind.new()
 
 

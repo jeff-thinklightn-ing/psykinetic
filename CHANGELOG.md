@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- A left click on your own companion beside you makes her step out of your way at once, as walking into her does; from afar it walks you to her, in a corridor at her so you change places (611).
 - Drawing a bow is now Shift and the left button: press to draw, let go to shoot; a plain click with a bow in hand only moves you, talks or opens a chest, never attacks (583 amended (2); Jeff's word).
 - No passage one cell wide in the dungeons (decision 612, Jeff: "the game is a multiplayer game with companions"): the generator widens every single-width way, a tomb is walled and entered by its door with the way outside it full width, and the first hall's bays are two rows tall; a test keeps every dungeon to it.
 - The draugr's waves of the dead set his fight's difficulty and are tuned from his entry: for each wave, when it rises, how many, which kinds, and how many more per extra player (the numbers are unchanged for now).

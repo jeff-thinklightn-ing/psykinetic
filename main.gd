@@ -1284,10 +1284,17 @@ func is_friend(entity: GridEntity) -> bool:
 ## it opens on arrival (_update_talk). Holding the button does not steer
 ## this walk away.
 func _talk_to(player: Player, friend: GridEntity) -> void:
+	# Your own companion beside you: she makes way (the hands, as a bump;
+	# the server's "make_way"). Jeff on v0.1.166, body-blocked by Pip.
+	if _is_own_companion(friend) and World.can_melee(player.tile, friend.tile):
+		World.command(player, "make_way", {"target": str(friend.get_path())})
+		return
 	if World.distance(player.tile, friend.tile) <= TALK_REACH:
 		_open_talk(friend)
 		return
 	var beside := _beside(friend.tile, player.tile)
+	if beside == NONE and _is_own_companion(friend):
+		beside = friend.tile  # A corridor: walk at her, and the bump swaps you.
 	if beside == NONE:
 		return
 	_move_click(player, beside)
@@ -7281,6 +7288,8 @@ func _on_command(entity: GridEntity, command_name: String, args: Dictionary) -> 
 		_guide_asked(entity, str(args.get("to", "")))
 	elif command_name == "greet" and entity is Player:
 		_greeted(entity, get_node_or_null(NodePath(str(args.get("resident", "")))) as Resident)  # A click on a townsperson (decision 560, npc's side).
+	elif command_name == "make_way" and entity is Player:
+		_make_way(entity, get_node_or_null(NodePath(str(args.get("target", "")))) as Companion)
 	elif command_name == "say" and entity is Player:
 		_player_said(entity, str(args.get("text", "")), int(args.get("phrase", 0)))
 	elif command_name == "party" and entity is Player:
@@ -7954,6 +7963,17 @@ func _on_bumped(mover: GridEntity, occupant: GridEntity, direction: Vector2i) ->
 	if pet.bumped(direction):
 		party_log.add("%s bumped into %s." % [_display_name(mover), pet.name])
 		print("[mind] %s bumped into %s going %s" % [_display_name(mover), pet.name, direction])
+
+
+## Server: [param player] clicked their own companion beside them (the
+## "make_way" command): she steps aside at once, as for a bump, no mind
+## asked. Another's companion, or one out of reach: nothing.
+func _make_way(player: Player, pet: Companion) -> void:
+	if pet == null or pet.keeper != player or not World.can_melee(player.tile, pet.tile):
+		return
+	var way := pet.tile - player.tile
+	if pet.bumped(Vector2i(signi(way.x), signi(way.y))):
+		party_log.add("%s bumped into %s." % [_display_name(player), pet.name])
 
 
 ## Server: [param player] said [param text] (the chat box). At most
