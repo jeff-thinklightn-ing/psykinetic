@@ -859,6 +859,8 @@ func _go_online() -> void:
 		# Her bond with her player (decision 444).
 		World.bandage_changed.connect(_bond_bandaged)
 		World.entity_died.connect(_bond_stood_by)
+		World.entity_damaged.connect(_bond_blow)  # Fights won together (decision 621).
+		World.entity_died.connect(_bond_won)
 		World.bundle_swapped.connect(_narrate_swap)
 		World.shield_bashed.connect(_narrate_bash)
 		World.entity_bumped.connect(_on_bumped)
@@ -5034,6 +5036,11 @@ func _join_companion(record: PlayerRecord, player: Player) -> void:
 	pet.mind.warm()  # The model loads now, not on her first ask.
 	pet.write_card()  # Once: a plain card stands until it is written.
 	pet.said.connect(_on_companion_said.bind(pet))
+	# The deeds she sees and her voice feels (decision 621).
+	pet.deed.connect(func(event: String, why: String) -> void: _bond(_record_of(pet), event, why))
+	pet.felt.connect(_bond_felt.bind(pet))
+	pet.on_road = _on_road
+	pet.in_town = func(cell: Vector2i) -> bool: return World.holdings != null and not Stockpile.place_at(World.holdings, World.zone.name, cell).is_empty()
 	if int(record.companion.get("hp", 0)) > 0:
 		World.restore(pet, int(record.companion["hp"]), int(record.companion.get("stamina", pet.max_stamina)), pet.facing)
 	_companions[record.player_id] = pet
@@ -9093,6 +9100,7 @@ func _bond_bandaged(by: GridEntity, patient: GridEntity, state: StringName) -> v
 			_bond(_record_of(patient), "tended", "tended your wounds when you were badly hurt")
 		else:
 			_bond(_record_of(patient), "bandaged", "bandaged your wounds")
+		(patient as Companion).tended()
 
 
 ## Her player fell with her beside them (within her hearing, she standing):
@@ -9526,6 +9534,90 @@ func _bond_cleared(id: String, from: String, to: String) -> void:
 		if is_instance_valid(pet) and pet.spawned and pet.zone == str(place.get("area", "")) and is_instance_valid(pet.keeper) \
 				and pet.keeper.zone == pet.zone:
 			_bond(_record_of(pet), "cleared", "cleared %s with you" % str(place.get("name", "the camp")))
+			if _area_freed(pet.zone):
+				_bond(_record_of(pet), "finished", "freed this whole place of its camps with you")
+
+
+## Whether no place in [param area] is held by a faction hostile to the
+## towns (decision 621: an area finished together).
+func _area_freed(area: String) -> bool:
+	var factions := World.holdings.factions if World.holdings != null else null
+	if factions == null:
+		return false
+	for id: String in World.holdings.places_in(area):
+		if factions.hostile(World.holdings.holder(id), "town"):
+			return false
+	return true
+
+
+## Who has landed a blow on each monster, by its instance id (decision 621).
+var _blows: Dictionary = {}
+
+
+## A blow on a monster: who landed it, kept till it dies.
+func _bond_blow(entity: GridEntity, amount: int, source: GridEntity, _cause: StringName) -> void:
+	if amount > 0 and entity is Monster and source != null and (source is Player or source is Companion):
+		var hitters: Dictionary = _blows.get_or_add(entity.get_instance_id(), {})
+		if hitters.is_empty() and source is Player:
+			# Her player's first blow on it: a fight they started, if it
+			# was not already after them (Companion.struck_first).
+			for pet: Companion in _companions.values():
+				if is_instance_valid(pet) and pet.spawned and pet.keeper == source:
+					pet.struck_first(entity)
+		hitters[source.get_instance_id()] = true
+
+
+## A monster died: a fight won together for each companion who landed a
+## blow on it as her player did (decision 621).
+func _bond_won(entity: GridEntity, _cause: StringName) -> void:
+	if not entity is Monster:
+		return
+	var hitters: Dictionary = _blows.get(entity.get_instance_id(), {})
+	_blows.erase(entity.get_instance_id())
+	for pet: Companion in _companions.values():
+		if is_instance_valid(pet) and is_instance_valid(pet.keeper) and hitters.has(pet.get_instance_id()) \
+				and hitters.has(pet.keeper.get_instance_id()):
+			_bond(_record_of(pet), "fought", "won a fight beside you")
+
+
+## Her voice felt her player's words (decision 621): "hurt", harsh words,
+## a drop at most harsh_a_day times a game day; "sorry", the same day,
+## takes one back.
+func _bond_felt(kind: String, pet: Companion) -> void:
+	var record := _record_of(pet)
+	if record == null or record.companion.is_empty():
+		return
+	var day := int(World.steps / maxi(DayNight.day_steps, 1))
+	var said: Dictionary = record.companion.get("bond_said", {})
+	if int(said.get("day", -1)) != day:
+		said = {"day": day, "hurt": 0, "sorry": 0}
+	record.companion["bond_said"] = said
+	var most := int((CompanionCard.tables().get("bond", {}) as Dictionary).get("harsh_a_day", 2))
+	if kind == "hurt" and int(said["hurt"]) < most:
+		said["hurt"] = int(said["hurt"]) + 1
+		_bond(record, "harsh", "spoke harshly to you")
+	elif kind == "sorry" and int(said["sorry"]) < int(said["hurt"]):
+		said["sorry"] = int(said["sorry"]) + 1
+		Standing.bump(record.companion, record.player_id, -int((CompanionCard.tables().get("bond", {}) as Dictionary).get("drops", {}).get("harsh", -1)),
+			"said sorry for their harsh words", World.steps)
+		_set_mood(record)
+
+
+## Whether [param cell] lies on a road of the zone ticking now (decision
+## 621, her days on the roads): its terrain's "roads" curves' cells.
+func _on_road(cell: Vector2i) -> bool:
+	var zone := String(World.zone.name)
+	if not _road_cells.has(zone):
+		var cells := {}
+		for road: Dictionary in (World.zone.main.get("terrain", {}) as Dictionary).get("roads", []):
+			for each: Vector2i in Curves.cells(road["curve"], false):
+				cells[each] = true
+		_road_cells[zone] = cells
+	return (_road_cells[zone] as Dictionary).has(cell)
+
+
+## Each zone's road cells, as _on_road found them.
+var _road_cells: Dictionary = {}
 
 
 ## She went down, or died (555 amended): with her player nowhere near

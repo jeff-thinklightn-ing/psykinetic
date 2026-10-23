@@ -24578,3 +24578,42 @@ repair, no decay, save), _test_loyalty (close does not lead, wary hesitates,
 devoted protects), the guide tests run devoted. Server only: bond_step's
 words and range are as before, so the client reads it as it did (no protocol
 line); no new class_name.
+
+## 621 (2): the deeds that move her bond
+
+The second part of 621, the deeds from Jeff's list (C:/dev/review/companions/
+loyalty_redraft.md, as his answer reshaped it), on the draft numbers
+(companion_traits.json "bond" "watch"):
+
+- Seen by her, Companion._watch_deeds every DEED_EVERY (10) ticks, each one
+  the deed signal Main's _bond takes: road (300 cells walked with her player
+  within 4 in a game day, 60% of them on the zone's road curves: Main._on_road
+  from terrain "roads"), fire (both within 2 cells of a fire, out of a fight,
+  1800 ticks), leisure (her player in a town, Stockpile.place_at, no fight, no
+  errand of hers, 6000 ticks): warmth. mule (her slots more than 3/4 full for
+  400 cells walked; "This pack is breaking my back." at half; once until she
+  rests, Intent.REST clearing it) and pressed: drops, -1. Pressed is the
+  coordinator's reading of Jeff's "pressing into a new fight", the player's
+  choice: under a third of her hp out of a fight she says "I need to rest
+  before the next fight."; then her player's first blow on a monster not
+  already after either of them (Companion._note_engaged keeps those, each
+  tick, while she has asked; Main._bond_blow calls Companion.struck_first) is
+  pressed, once; a fight that finds them never counts. Resting, bandaging
+  (Companion.tended) or mending past a third clears her ask. Walking into a
+  camp she warned of is 555's warned.
+- Main: fought (trust): a monster dies on which both she and her player landed
+  a blow (World.entity_damaged kept per monster in _blows, World.entity_died).
+  finished (milestone): a camp cleared with her that leaves no place in the
+  area held by a faction hostile to the towns (_area_freed).
+- Harsh words, read by her voice, never a word list: spoken to by her player
+  (addressed "her"), the voice prompt asks for a [HURT] line if the words were
+  meant to hurt (swearing, mocking, threatening) or [SORRY] for a true
+  apology (VOICE_FELT); OllamaMind.parse_voice takes the tag off as "felt";
+  Companion._take_result signals felt for her player's words; Main._bond_felt:
+  "harsh" -1 at most harsh_a_day (2) a game day, a sorry the same day takes
+  one back (record.companion "bond_said" {day, hurt, sorry}, kept through a
+  save).
+
+tests: companion_test _test_deeds (each deed and drop, the tags, the caps).
+Server only (the voice's tags are the server's prompt and parse), protocol
+unchanged, no new class_name.

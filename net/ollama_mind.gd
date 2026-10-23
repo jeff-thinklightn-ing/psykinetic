@@ -212,6 +212,13 @@ static func parse_voice(content: String, speaker := "") -> Dictionary:
 	if found != null:
 		act = found.get_string(1)
 		text = do_tag.sub(text, "", true)
+	# Her player's words felt (decision 621): [HURT] or [SORRY].
+	var felt := ""
+	var felt_tag := RegEx.create_from_string("(?i)\\[\\s*(HURT|SORRY)\\s*\\]")
+	found = felt_tag.search(text)
+	if found != null:
+		felt = found.get_string(1).to_lower()
+		text = felt_tag.sub(text, "", true)
 	text = text.strip_edges()
 	if not speaker.is_empty() and text.begins_with(speaker + ":"):
 		text = text.substr(speaker.length() + 1).strip_edges()
@@ -219,7 +226,12 @@ static func parse_voice(content: String, speaker := "") -> Dictionary:
 		text = text.substr(1, text.length() - 2).strip_edges()
 	if text.replace(".", "").replace("…", "").strip_edges().is_empty():
 		text = ""
-	return {"say": text, "stance": stance, "do": act} if not act.is_empty() else {"say": text, "stance": stance}
+	var out := {"say": text, "stance": stance}
+	if not act.is_empty():
+		out["do"] = act
+	if not felt.is_empty():
+		out["felt"] = felt
+	return out
 
 
 ## Requests that came back since last asked (see CompanionMind).

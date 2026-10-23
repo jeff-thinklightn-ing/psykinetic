@@ -110,6 +110,8 @@ const REST_LEAVE := 8
 ## Wary or colder, how long she hesitates over a plain order (decision 621),
 ## and the orders she hesitates over.
 const HESITATE_TICKS := 15
+## How often she looks over her day for the deeds that move her bond (decision 621).
+const DEED_EVERY := 10
 const ORDER_VERBS: Array[String] = ["wait", "rest", "follow", "bandage", "carry", "give"]
 const INSTRUCTION_LOCK_TICKS := 60
 ## The quick phrases' defaults reach her as what they mean, never quoted.
@@ -292,6 +294,9 @@ what you will do, exactly one of:
 [STANCE: PULL_BACK] get away to safety
 If %s asked nothing of you, leave that line out. If %s asked you to do something that is neither one of these nor on
 a list of what you can do here, say plainly that you cannot do it; never say you will."""
+## Her player's words to her that hurt, or say sorry (decision 621): read
+## by her voice, not a word list.
+const VOICE_FELT := """If %s's words to you were meant to hurt you (swearing at you, mocking or threatening you), add one more line: [HURT]. If %s is truly saying sorry to you, add one more line: [SORRY]. Otherwise leave both out."""
 ## What she can do now, by number, after VOICE_ASKED.
 const VOICE_CAN_DO := """These you can do here and now:
 %s
@@ -346,6 +351,13 @@ const STANCE_WORDS: Array[String] = [
 
 ## Emitted with a line she says, once the rate limit and the echo check pass.
 signal said(text: String)
+## A deed of her player's that moves her bond, seen by her (decision 621):
+## Main's _bond takes [param event] ("fire", "road", "leisure", "mule",
+## "pressed"; companion_traits "bond") for [param why].
+signal deed(event: String, why: String)
+## Her voice heard her player's words as meant to hurt her ("hurt") or as
+## a true apology ("sorry") (decision 621): Main's _bond_felt.
+signal felt(kind: String)
 ## Her card came back written (write_card): card, how_we_met, card_by set.
 signal card_written
 ## What has become true of her changed (grown, decision 294), or the talk
@@ -562,6 +574,15 @@ var _stalked: GridEntity = null
 var errand := {}
 ## A plain order she hesitates over (decision 621): {read, text, at}, or {}.
 var _hesitant := {}
+## Main's (decision 621): whether a cell of her zone is on a road, and in a
+## town; unset, never.
+var on_road := Callable()
+var in_town := Callable()
+## What _watch_deeds counts toward each deed (decision 621).
+var _deeds := {"day": -1, "walked": 0, "on_road": 0, "road_done": false, "fire": 0, "town": 0, "heavy": 0,
+	"warned_heavy": false, "mule_spent": false, "asked_rest": false, "last": Vector2i(-99999, -99999)}
+## The monsters after her or her player since she asked to rest (decision 621), by instance id.
+var _engaged := {}
 ## Her player's standing plain order (decision 616): "wait" or "rest", else
 ## "". Calm does not undo it; "follow" or another order does.
 var order := ""
@@ -1034,6 +1055,109 @@ func _carry_out(read: Dictionary, text: String) -> bool:
 	return true
 
 
+## Her day with her player watched for the deeds that move her bond
+## (decision 621; companion_traits "bond" "watch", drafts), every
+## DEED_EVERY ticks, each said as a deed for Main's _bond: road (road_cells
+## walked together in a game day, road_share of them on roads), fire (both
+## within fire_cells of a fire, out of a fight, fire_ticks), leisure (her
+## player in a town, no fight, no errand of hers, town_ticks), mule (her
+## pack over heavy_share of her slots for heavy_cells walked, warned at
+## half; once until she rests); under low_hp out of a fight she asks to
+## rest first (rest or bandaging clears it), and her player striking a
+## monster not already after them is pressed (struck_first).
+func _watch_deeds() -> void:
+	if World.tick % DEED_EVERY != 0 or not _alive(keeper):
+		return
+	var rules: Dictionary = (CompanionCard.tables().get("bond", {}) as Dictionary).get("watch", {})
+	var fight := in_fight()
+	var day := Townsfolk.day_of(World.steps)
+	if int(_deeds["day"]) != day:
+		_deeds.merge({"day": day, "walked": 0, "on_road": 0, "road_done": false}, true)
+	var moved := 0 if _deeds["last"] == Vector2i(-99999, -99999) else mini(World.distance(tile, _deeds["last"]), 4)  # A jump is no walk.
+	_deeds["last"] = tile
+	if moved > 0 and World.distance(tile, keeper.tile) <= int(rules.get("near", 4)):
+		_deeds["walked"] += moved
+		if on_road.is_valid() and bool(on_road.call(tile)):
+			_deeds["on_road"] += moved
+		if not _deeds["road_done"] and int(_deeds["walked"]) >= int(rules.get("road_cells", 300)) \
+				and float(_deeds["on_road"]) >= float(_deeds["walked"]) * float(rules.get("road_share", 0.6)):
+			_deeds["road_done"] = true
+			deed.emit("road", "walked the roads with you")
+	var reach := int(rules.get("fire_cells", 2))
+	if not fight and _fire_near(tile, reach) and _fire_near(keeper.tile, reach):
+		_deeds["fire"] += DEED_EVERY
+		if int(_deeds["fire"]) >= int(rules.get("fire_ticks", 1800)):
+			_deeds["fire"] = 0
+			deed.emit("fire", "sat by the fire with you")
+	else:
+		_deeds["fire"] = 0
+	if in_town.is_valid() and bool(in_town.call(keeper.tile)) and not fight and errand.is_empty():
+		_deeds["town"] += DEED_EVERY
+		if int(_deeds["town"]) >= int(rules.get("town_ticks", 6000)):
+			_deeds["town"] = 0
+			deed.emit("leisure", "rested in town with you")
+	else:
+		_deeds["town"] = 0
+	if current_intent == Intent.REST:
+		_deeds.merge({"heavy": 0, "warned_heavy": false, "mule_spent": false, "asked_rest": false}, true)
+	var filled := slots.size() - slots.count("")
+	if slots.is_empty() or float(filled) <= slots.size() * float(rules.get("heavy_share", 0.75)):
+		_deeds.merge({"heavy": 0, "warned_heavy": false}, true)
+	elif moved > 0 and not _deeds["mule_spent"]:
+		_deeds["heavy"] += moved
+		var heavy := int(rules.get("heavy_cells", 400))
+		if int(_deeds["heavy"]) * 2 >= heavy and not _deeds["warned_heavy"]:
+			_deeds["warned_heavy"] = true
+			_say(str(rules.get("heavy_warn", "This pack is breaking my back.")), true)
+		if int(_deeds["heavy"]) >= heavy:
+			_deeds["mule_spent"] = true
+			deed.emit("mule", "worked you like a mule")
+	var low := hp < max_hp * float(rules.get("low_hp", 0.334))
+	if not low:
+		_deeds["asked_rest"] = false
+	elif not fight and not _deeds["asked_rest"]:
+		_deeds["asked_rest"] = true
+		_engaged.clear()
+		_say(str(rules.get("rest_ask", "I need to rest before the next fight.")), true)
+
+
+## Bandaged (decision 621): her ask to rest first is met.
+func tended() -> void:
+	_deeds["asked_rest"] = false
+
+
+## While she has asked to rest (decision 621), each tick: the monsters
+## already after her or her player, which a blow of her player's on does
+## not start a fight.
+func _note_engaged() -> void:
+	if not _deeds["asked_rest"]:
+		return
+	for entity in World.get_entities():
+		var monster := entity as Monster
+		if monster != null and monster.target != null and (monster.target == self or monster.target == keeper):
+			_engaged[monster.get_instance_id()] = true
+
+
+## Her player's blow on [param monster] (Main's, decision 621, the
+## coordinator's reading of Jeff's "pressing into a new fight"): one not
+## already after them while she is under low_hp and has asked to rest is a
+## fight they started: pressed, once, and her ask is spent.
+func struck_first(monster: GridEntity) -> void:
+	if not _deeds["asked_rest"] or _engaged.has(monster.get_instance_id()):
+		return
+	_deeds["asked_rest"] = false
+	deed.emit("pressed", "pressed on into a fight when you were badly hurt")
+
+
+## Whether a fire burns within [param reach] cells of [param cell].
+func _fire_near(cell: Vector2i, reach: int) -> bool:
+	for dy in range(-reach, reach + 1):
+		for dx in range(-reach, reach + 1):
+			if World.is_fire(cell + Vector2i(dx, dy)):
+				return true
+	return false
+
+
 ## Her standing order kept (decision 616), each tick: resting she mends,
 ## and gets up when whole, when a fight starts, or when her player walks
 ## off; a voice quiet past ORDER_ACK_TICKS is covered by a word of her own.
@@ -1348,6 +1472,8 @@ func _sim_tick() -> void:
 	if World.tick % MEMORY_EVERY == 0:
 		_remember_sights()
 	_keep_order()
+	_watch_deeds()
+	_note_engaged()
 	_calm()
 	_act()
 	_execute()
@@ -2155,6 +2281,8 @@ func voice_messages(asked := false, heard := "") -> Array[Dictionary]:
 			system += "\nWhat you know of what %s mentioned: %s" % [who, knowledge_of(kinds)]
 		if addressed != "other":
 			system += "\n" + VOICE_ASKED % [who, who, who, who, who]
+			if addressed == "her":
+				system += "\n" + VOICE_FELT % [who, who]
 			_offering = can_do()
 			if not _offering.is_empty():
 				var listed: Array[String] = []
@@ -3038,6 +3166,10 @@ func _take_result(result: Dictionary) -> void:
 		return
 	# The voice: to her player's words its stance is theirs to keep.
 	var spoken_to: bool = result.get("spoken_to", false)
+	var hurt := str(answer.get("felt", ""))
+	if spoken_to and hurt in ["hurt", "sorry"]:
+		entry["felt"] = hurt
+		felt.emit(hurt)  # Harsh words, or sorry for them (decision 621): Main's.
 	var asked: bool = result.get("asked", false)
 	if _phrase_serials.get(serial, false):
 		asked = false  # A quick phrase's stance is set already.

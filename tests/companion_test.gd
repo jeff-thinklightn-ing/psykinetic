@@ -84,6 +84,7 @@ func _ready() -> void:
 	_test_card_things()
 	_test_record_loads()
 	_test_bond()
+	_test_deeds()
 	_test_sickness()
 	_test_field_return()
 	_test_mortally_wounded()
@@ -1381,6 +1382,110 @@ func _test_bond() -> void:
 	for key in ["standing", "bond_day", "bond_today", "bond_carry", "bond_best"]:
 		record.companion.erase(key)
 	_main._set_mood(record)
+
+
+func _test_deeds() -> void:
+	print("\n== the deeds she sees, and words that hurt (decision 621) ==")
+	_kill_monsters()
+	var owner := _player()
+	var pet := _companion()
+	_settle(pet)
+	var record: PlayerRecord = _main._records[Net.player_id]
+	var id := record.player_id
+	var kept: Variant = _bond_as(0)
+	var watch: Dictionary = CompanionCard.tables()["bond"]["watch"]
+	var seen: Array[String] = []
+	var on_deed := func(event: String, _why: String) -> void: seen.append(event)
+	pet.deed.connect(on_deed)
+	var spoken: Array[String] = []
+	var on_said := func(line: String) -> void: spoken.append(line)
+	pet.said.connect(on_said)
+	var tick_on := func() -> void:
+		for i in Companion.DEED_EVERY:
+			World.step()
+	# Her voice's tags.
+	_check(OllamaMind.parse_voice("Leave me be.\n[HURT]") == {"say": "Leave me be.", "stance": "", "felt": "hurt"}
+		and OllamaMind.parse_voice("It's all right.\n[SORRY]")["felt"] == "sorry" and not OllamaMind.parse_voice("Fine.").has("felt"),
+		"her voice's [HURT] and [SORRY] read off her line")
+	_check("[HURT]" in pet.voice_prompt("", "%s: %s, you useless lump" % [record.name, pet.name]), "her voice is asked whether her player's words to her hurt")
+	# Harsh words: twice a day at most; sorry takes one back the same day.
+	for i in 3:
+		_main._bond_felt("hurt", pet)
+	_check(Standing.score(record.companion, id) == -2, "harsh words three times: two drops, no more (%d)" % Standing.score(record.companion, id))
+	for i in 3:
+		_main._bond_felt("sorry", pet)
+	_check(Standing.score(record.companion, id) == 0, "and sorry takes them back, no further (%d)" % Standing.score(record.companion, id))
+	# A fight won together: both landed a blow.
+	var foe := _spawn_imp(_free_tile_between(pet, 3, 4))
+	_main._bond_blow(foe, 1, owner, &"melee")
+	_main._bond_won(foe, &"melee")
+	_check(Standing.score(record.companion, id) == 0, "a kill of her player's alone: nothing")
+	var other := _spawn_imp(_free_tile_between(pet, 3, 4))
+	_main._bond_blow(other, 1, owner, &"melee")
+	_main._bond_blow(other, 1, pet, &"melee")
+	_main._bond_won(other, &"melee")
+	_check(Standing.score(record.companion, id) == 1 and "won a fight beside" in Main.mood_why_of(record.companion, id, "you"),
+		"both landed a blow and it died: a fight won together, trust (%d)" % Standing.score(record.companion, id))
+	World.despawn(foe)
+	World.despawn(other)
+	# By the fire, in town, on the roads.
+	var fire := pet.tile + Vector2i(1, 0)
+	World._fire[fire] = true
+	pet._deeds["fire"] = int(watch["fire_ticks"]) - Companion.DEED_EVERY
+	tick_on.call()
+	World._fire.erase(fire)
+	_check("fire" in seen, "by the fire together long enough: a deed (%s)" % [seen])
+	pet.in_town = func(_cell: Vector2i) -> bool: return true
+	pet._deeds["town"] = int(watch["town_ticks"]) - Companion.DEED_EVERY
+	tick_on.call()
+	_check("leisure" in seen, "a long rest in town: a deed (%s)" % [seen])
+	pet.on_road = func(_cell: Vector2i) -> bool: return true
+	pet._deeds.merge({"day": Townsfolk.day_of(World.steps), "walked": int(watch["road_cells"]) - 1, "on_road": int(watch["road_cells"]) - 1, "road_done": false,
+		"last": pet.tile + Vector2i(0, 1)}, true)
+	tick_on.call()
+	_check("road" in seen, "the day's walk together, on the roads: a deed (%s)" % [seen])
+	# Worked like a mule: warned at half, then once until she rests.
+	var slots_were := pet.slots.duplicate()
+	World.set_slots(pet, ["ration", "ration", "ration", "ration", "ration", "ration", "ration", "ration"].slice(0, pet.slots.size()))
+	pet._deeds.merge({"heavy": int(watch["heavy_cells"]) / 2 - 1, "warned_heavy": false, "mule_spent": false, "last": pet.tile + Vector2i(0, 1)}, true)
+	tick_on.call()
+	_check(str(watch["heavy_warn"]) in spoken and not "mule" in seen, "a heavy pack walked: she warns first (%s)" % [spoken])
+	pet._deeds.merge({"heavy": int(watch["heavy_cells"]) - 1, "last": pet.tile + Vector2i(0, 1)}, true)
+	tick_on.call()
+	pet._deeds.merge({"last": pet.tile + Vector2i(0, 1)}, true)
+	tick_on.call()
+	_check(seen.count("mule") == 1, "and then a drop, once until she rests (%s)" % [seen])
+	World.set_slots(pet, slots_were)
+	# Pressed on hurt: she asks to rest; a new fight then costs her.
+	pet.hp = maxi(1, int(pet.max_hp * 0.2))
+	tick_on.call()
+	_check(str(watch["rest_ask"]) in spoken, "badly hurt, out of a fight: she asks to rest (%s)" % [spoken])
+	var ambush := _spawn_imp(_free_tile_between(pet, 2, 3))
+	ambush.acts = false
+	ambush.target = owner
+	tick_on.call()
+	_main._bond_blow(ambush, 1, owner, &"melee")
+	_check(not "pressed" in seen, "a fight that finds them (it came for her player first): never pressed (%s)" % [seen])
+	World.despawn(ambush)
+	_main._blows.clear()
+	var imp := _spawn_imp(_free_tile_between(pet, 3, 4))
+	imp.acts = false
+	tick_on.call()
+	_main._bond_blow(imp, 1, owner, &"melee")
+	_check(seen.count("pressed") == 1, "her player strikes first at one not after them: pressed (%s)" % [seen])
+	_main._bond_blow(imp, 1, owner, &"melee")
+	_check(seen.count("pressed") == 1, "once, her ask spent")
+	World.despawn(imp)
+	_main._blows.clear()
+	pet.hp = pet.max_hp
+	pet.deed.disconnect(on_deed)
+	pet.said.disconnect(on_said)
+	pet.on_road = _main._on_road
+	pet.in_town = Callable()
+	_settle(pet)
+	for key in ["bond_today", "bond_carry", "bond_best", "bond_said"]:
+		record.companion.erase(key)
+	_bond_as(0, kept)
 
 
 ## Her bond with the host's player set to [param score] (or [param kept], a
