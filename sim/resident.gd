@@ -73,6 +73,13 @@ var doing := Doing.SQUARE
 ## someone walks them home; escort_of is the player they follow (whoever
 ## spoke to them last), at heel (companions' Heel, decision 485).
 var strayed := false
+## The sought entry this body is (decision 613, npc's side; economy's Towns.sought): its worker id while it
+## stands at its refuge, lost or held, or follows the player leading it home; "" for a townsman. With it strayed
+## is true (the stray's stand-and-follow tick serves), holder the faction holding it ("" lost) and where
+## economy's where-word for the refuge.
+var sought := ""
+var holder := ""
+var where := ""
 var escort_of := ""
 ## What they lie abed with (decision 501 amended, ui's ask): the sickness's
 ## kind ("a fever", "a cough"), "" when well. Replicated, so a client can
@@ -421,6 +428,22 @@ func _escort_leader() -> GridEntity:
 func start_escort(player_id: String, player_name: String) -> void:
 	escort_of = player_id
 	escort_name = player_name
+
+
+## Whether one of a faction's people can see it now (decision 613, npc's
+## side; the coordinator's ruling with enemy-ai: a held one follows only
+## when no holder sees them, and a brute beside the imps counts the same
+## with no allies read): any monster that is not a beast, within
+## SIGHT_RANGE with a line of sight. A beast never holds anyone.
+func watched() -> bool:
+	if senses == null:
+		return false
+	for entity in World.monsters():
+		if entity is Animal or not entity.spawned or not entity is Monster:
+			continue
+		if World.distance(tile, entity.tile) <= SIGHT_RANGE and senses.sees(entity, -1, false):
+			return true
+	return false
 
 
 ## Whether no player or companion is within FAR_TILES.
@@ -836,7 +859,18 @@ func facts_now() -> Array[String]:
 			out.append("Nobody has seen to you yet. You would be glad of the medicine man, or of being walked to the healer's hut, or of a remedy.")
 	if not visit.is_empty():
 		out.append("You are on your way to %s's bedside, to see to %s." % [visit.get("name", "a neighbour"), visit.get("name", "them")])
-	if strayed:
+	if not sought.is_empty():
+		# The sought (decision 613, npc's side): who sent for it, where it is and why it follows, or will not yet.
+		var town_word := str(World.holdings.place(town).get("name", town)) if World.holdings != null else town
+		var trade_word := trade.replace("_", " ")
+		var where_word := Towns.where_words(where)
+		if not escort_of.is_empty() and not escort_name.is_empty():
+			out.append("%s found you %s and is leading you to %s, whose people sent word for a %s; you will live and work there as its %s, and you follow close." % [escort_name, where_word, town_word, trade_word, trade_word])
+		elif holder.is_empty():
+			out.append("You set out for %s, whose people sent word for a %s, and lost your way %s. You have not been there yet and know nobody in it. You would follow whoever speaks to you, and ask nothing else." % [town_word, trade_word, where_word])
+		else:
+			out.append("You are held %s by the %s and made to work for them. You will follow nobody while one of them can see you, and you say so plainly; when none of them watches, a word from whoever speaks to you and you go. You set out for %s, whose people sent word for a %s, and have never been there." % [where_word, holder.replace("_", " "), town_word, trade_word])
+	elif strayed:
 		# Lost beyond the walls (decision 487): where home lies, and that it follows whoever speaks to it.
 		var square: Rect2i = places.get("square", Rect2i())
 		var toward := ""

@@ -111,6 +111,22 @@ static var ctx: Dictionary = {}
 static var _settings := {}
 
 
+## residents.json "sought" (decision 613, npc's side): the sought's set lines by trade (the story's id once
+## economy's amendment carries one), "_" the fallback: freed (said when the escort starts) and arrival (at the
+## town's store); held and lost are the thought's words (Resident.facts_now).
+static var _sought_words: Dictionary = {}
+static func sought_words(trade: String) -> Dictionary:
+	if _sought_words.is_empty():
+		var data: Variant = JSON.parse_string(FileAccess.get_file_as_string(FILE)) if FileAccess.file_exists(FILE) else null
+		_sought_words = data.get("sought", {}).duplicate(true) if data is Dictionary and data.get("sought") is Dictionary else {}
+		if not _sought_words.get("default") is Dictionary:
+			_sought_words["default"] = {"freed": "Lead on.", "arrival": "I am the %s you sent for."}
+	var out: Dictionary = (_sought_words["default"] as Dictionary).duplicate()
+	if _sought_words.get(trade) is Dictionary:
+		out.merge(_sought_words[trade], true)
+	return out
+
+
 static func settings() -> Dictionary:
 	if _settings.is_empty():
 		var data: Variant = JSON.parse_string(FileAccess.get_file_as_string(FILE)) if FileAccess.file_exists(FILE) else null
@@ -421,6 +437,11 @@ static func _rumour_offer(worker_id: String, who: Dictionary, given: Dictionary)
 	var type := str(who.get("type", ""))
 	# An official's, or a scholar's (decision 440), is the weightiest lore
 	# fact it knows, never hearsay.
+	if Lore.binding(trade, type) == "official":
+		# The word the town sent out (decision 613, npc's side): an official says who is sought and where they were seen, before his lore.
+		var sought: Variant = _call(given, "sought_words", [str(who.get("town", ""))])
+		if sought is Array and not sought.is_empty():
+			return _offer(worker_id, RUMOUR, "sought", "The word the town sent out", str(sought[0]), {"sought": true}, "")
 	if Lore.binding(trade, type) == "official" or type == SCHOLAR:
 		var facts := Lore.known_by(Lore.knower_for(trade), PackedStringArray(), "agreed", type)
 		facts.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return float(a.get("weight", 0)) > float(b.get("weight", 0)))

@@ -13,6 +13,7 @@ extends Node
 const TOWN := "rs_town"
 const ROAD := "rs_road"
 const STORE := "rs_town/store"
+const NICHE := "rs_town/niche"  # The refuge of the sought's test (613).
 ## The shed (decision 391): its inside, and its door's pixel in the layout.
 const SHED := Rect2i(13, 1, 2, 3)
 const SHED_DOOR_PIXEL := Vector2i(26, 7)
@@ -47,6 +48,7 @@ func _ready() -> void:
 	_test_settled_goblin()
 	_test_lawspeaker_mid_rounds()
 	_test_strayed_body()
+	_test_sought_body()
 	_test_what_is_true()
 	_test_two_sentences()
 	_test_sick_body()
@@ -526,6 +528,58 @@ func _test_strayed_body() -> void:
 	World.production.set_away("rs-folk02", true)
 	World.production.set_away("rs-folk03", true)
 	Townsfolk.use_rules({})
+	_sync()
+
+
+## The sought (decision 613, npc's side): a wanted newcomer's body at the refuge economy placed them at, held
+## and watched, then freed by a word when nobody watches, led home, a resident.
+func _test_sought_body() -> void:
+	print("\n== the sought (613, npc's side): a body at the refuge, a watcher, a word, led home ==")
+	for i in 14:
+		World.production.set_away("rs-folk%02d" % i, true)
+	World.production.set_away("rs-bram", true)
+	World.production.set_away("rs-snag", true)
+	World.production.set_away("rs-law", true)
+	World.towns._seek(STORE, "rs-sought", "Wat", "butcher")  # The town wants a butcher: a worker away from day one.
+	var entry: Dictionary = World.towns._town(STORE)["sought"]["rs-sought"]
+	entry["place"] = NICHE  # Placed (maps' refuge; here the test zone's niche), held by goblins in the hills.
+	entry["where"] = "hills"
+	entry["holder"] = "goblins"
+	_check(World.production.worker("rs-sought").get("away", false) == true and "rs-sought" not in World.towns.residents(STORE), "(sought: a worker of the town, away, not a resident)")
+	DayNight.set_hour(10.0)
+	_sync()
+	var found := _body("rs-sought")
+	_check(found != null and found.sought == "rs-sought" and found.strayed and found.doing == Resident.Doing.STRAYED and found.has_meta("sought_waiting")
+		and World.distance(found.tile, Vector2i(14, 10)) <= 1, "a body at the refuge's cell, waiting (the meta enemy-ai reads)")
+	if found == null:
+		return
+	_check(found.facts_now().any(func(f: String) -> bool: return f.begins_with("You are held in the hills by the goblins")), "its thought: held, by whom, where, and that it will not follow while watched")
+	var words: Array = _main._sought_words(STORE)
+	_check(words.size() == 1 and words[0].contains("Wat the butcher was seen in the hills"), "the town's word for the officials: %s" % [words])
+	var player := _player()
+	_check(player != null, "(a player to speak to them)")
+	var imp := _main._spawn({"script": "res://sim/monster.gd", "shape": "capsule", "name": "SoughtWatcher%d" % World.tick, "tile": _main._nearest_free(found.tile + Vector2i(2, 0))}) as Monster
+	_check(imp != null and found.watched(), "a goblin two cells off has them in sight")
+	_main._ask_resident(found, "Jeff", "Come with me.", player)
+	_check(found.escort_of.is_empty() and found.has_meta("sought_waiting") and str(World.towns.sought_entry("rs-sought").get("freed_by", "")).is_empty(),
+		"held and watched: a word frees nobody")
+	if imp != null:
+		World.despawn(imp)
+	_check(not found.watched(), "the watcher gone")
+	_main._ask_resident(found, "Jeff", "Come with me.", player)
+	_check(found.escort_of == player.player_id and not found.has_meta("sought_waiting") and str(World.towns.sought_entry("rs-sought").get("freed_by", "")) == player.player_id,
+		"nobody watching: freed by the word, following, economy's entry led")
+	_check(found.facts_now().any(func(f: String) -> bool: return f.begins_with("Jeff found you in the hills and is leading you to")), "its thought: led home")
+	_sync()
+	_check(_body("rs-sought") == found and found.escort_of == player.player_id, "the sync keeps the led body beside its leader")
+	_put(found, _town_cell(Vector2i(-1, -1)))
+	_sync()
+	_check(World.towns.sought_entry("rs-sought").is_empty() and "rs-sought" in World.towns.residents(STORE) and World.production.worker("rs-sought").get("away", true) == false,
+		"at the town's ground: home, a resident of the town, the entry gone")
+	var home := _body("rs-sought")
+	_check(home != null and home.sought.is_empty() and not home.strayed and home.escort_of.is_empty(), "the body is one of the town's")
+	_check(str(Townsfolk.card_of(World.production, "rs-sought").get("facts", [{}]).back().get("text", "")).contains(" brought you to "), "the card: who brought them")
+	World.production.set_away("rs-sought", true)
 	_sync()
 
 

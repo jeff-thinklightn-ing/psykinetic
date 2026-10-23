@@ -23848,3 +23848,66 @@ read back from the snapshot.
 PROTOCOL_REVISION 32 (a line under it): message "clearing", terrain
 ["clearing"]. New class_name Clearing. The forest on the box is felled and
 grows back over time once economy's woodcut calls it.
+
+## 613, npc's side: the sought's body, word and way home
+
+Jeff (2026-10-22): "npcs for the town are found in the wilds, the hills, or
+forest, or under the castle in the dungeons. rescue and return to town,
+like the original black smith quest. black smith could be a castle npc."
+Economy's side (874ad53b) makes the newcomer a sought entry: a worker of
+the town away from day one, placed at a refuge of maps' choosing or a
+camp, with a holder (the faction, "" for the lost), a where-word and
+freed_by. This side is the person.
+
+- The body (Main._sought_here, in _sync_residents after the strays): a
+  placed entry whose refuge is in this zone and a player near it has a
+  Resident at the refuge's nearest free cell, as a stray stands at its
+  cell (strayed true: the stray's stand-and-follow tick serves), with
+  sought (the entry id), holder and where on it, and the meta
+  "sought_waiting" enemy-ai's monsters read to leave a waiting one alone.
+  Its thought (Resident.facts_now) says who sent for it, where it is, that
+  it has never been to the town, and why it follows or will not yet.
+- Freeing (Main._sought_spoken, the talk's branch before the stray's): a
+  word frees the lost. A held one follows only when no holder can see it
+  (Resident.watched: any monster that is not a beast within SIGHT_RANGE
+  with a line of sight; the coordinator's ruling with enemy-ai, a brute
+  beside the imps counting the same with no allies read; a roaming hall
+  skeleton counts too, which only refuses more). Then Towns.free_sought,
+  start_escort, the meta erased, the card's fact, and the set "freed" line
+  said. Watched, it stays, and its thought says so to the model.
+- The way home across zones needs no record of its own: a freed entry's
+  freed_by is the state. _sought_here puts the led body beside that
+  player in whatever zone they stand in; a body not wanted is despawned as
+  any other, so leaving the zone leaves nobody behind and a player who
+  logs out finds them beside them again. At the town's ground
+  (_sought_home) economy's sought_home makes them a resident (the xp, the
+  rescued signal), the card learns who brought them, and the set
+  "arrival" line is said to their leader. Beaten down on the way
+  (_resident_taken), they are lost (Towns.sought_lost) and sought again.
+- The word (Main._sought_words, ctx "sought_words"; Offers._rumour_offer):
+  an official's rumour is the word the town sent out before his lore
+  ("We have no butcher. Word is Wat the butcher was seen in the hills.";
+  led: "is found in the hills and is being led here"), from economy's
+  where_words. Townsfolk say where one went and that they were taken,
+  never where they are held or what they are made to do there (lore's
+  secrets stay with their knowers).
+- The lines (residents.json "sought", Offers.sought_words, by trade until
+  economy's amendment carries a story id per entry, then by story): the
+  smith's were agreed with lore against their facts (C3: the forge
+  rumour, the expedition, the ambush and capture, the forced work; the
+  guards' remains left out while draft): held "Not while they watch. They
+  keep me at this forge, working their weapons for the raids."; asked
+  more, the expedition and the ambush; freed "Lead on. I have worked
+  enough iron for them."; the walk; the arrival "taken below the castle,
+  and brought back."; the town's word ending "and has not come back",
+  with no sighting the facts do not give. His name and hammer are Jeff's
+  (lore's E3), set in when they come.
+- resident_test _test_sought_body: the body at the refuge with the meta,
+  the thought, the town's word, a goblin in sight refusing the word, the
+  watcher gone and the word freeing (economy's entry led), the led body
+  kept by the sync, the homecoming (a resident, the entry gone, the card).
+- Not yet: the walk's line through the model only; a daily lapse for a
+  leader long gone (economy's sought_lost is called on a body beaten down
+  only); the hail's news cue on sought_changed; per-story lines and the
+  wandering off (613 amended, economy's, after the morning landings).
+  Server only; no wire change; no new class_name.

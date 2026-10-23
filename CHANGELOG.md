@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The sought (613, npc's side): a town's wanted newcomer has a body at the refuge economy placed them at, lost or held; a word frees the lost, and the held only when none of their holders can see them (a beast never counts); they follow you home across zones, become the town's at its store, and the officials say who is sought and where they were seen. The smith's lines agreed with lore. Server only.
 ## v0.1.168
 
 - What goes over the network changes, so v0.1.167 and older can't join the server: update through the launcher first.

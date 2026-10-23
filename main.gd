@@ -5926,6 +5926,8 @@ func _on_entity_taken(entity: GridEntity, by: String) -> void:
 func _resident_taken(body: Resident, by: String) -> void:
 	if not body.player_id.is_empty():
 		_companion_taken_in_town(body, by)
+	elif not body.sought.is_empty() and World.towns != null:
+		World.towns.sought_lost(body.sought)  # Lost on the way (613): sought again, somewhere else, after economy's days.
 	elif World.towns != null:
 		World.towns.resident_taken(body.town, body.worker_id, by)
 	party_log.add("Raiders beat %s down and carried them off." % _display_name(body))
@@ -6058,10 +6060,20 @@ func _sync_residents() -> void:
 			wanted[who] = {"key": who, "name": str(World.production.worker(who).get("name", who)), "trade": str(trades[0]) if not trades.is_empty() else "",
 				"player": "", "town": place_id, "type": str(World.production.worker(who).get("type", "")), "strayed": true,
 				"places": {"strayed": Rect2i(cell, Vector2i.ONE), "square": Rect2i(store - Vector2i(2, 2), Vector2i(5, 5))}}
+	# The sought (decision 613, npc's side; economy's entry, maps' refuge): a town's wanted newcomer stands at the
+	# refuge they were placed at, lost or held, while a player is near it (as a stray); freed, they stand beside the
+	# player leading them, in whatever zone that player is (the entry's freed_by is the state, no record of its own:
+	# a body not wanted is despawned as any other); at their town's ground they are home (_sought_home).
+	for each: Dictionary in _sought_here():
+		if wanted.size() >= RESIDENTS_MAX:
+			break
+		wanted[str(each["key"])] = each
 	var have := {}
 	for entity: GridEntity in World.townsfolk().duplicate():
 		var body := entity as Resident
-		if body.strayed and not body.escort_of.is_empty() and _at_towns_ground(body):
+		if not body.sought.is_empty() and not body.escort_of.is_empty() and _at_towns_ground(body):
+			_sought_home(body)
+		elif body.strayed and not body.escort_of.is_empty() and _at_towns_ground(body):
 			_came_home(body)
 		elif not body.escort_of.is_empty() and Townsfolk.is_sick(World.production, body.worker_id) and _at_healers_hut(body):
 			# Walked to the healer (decision 501): the healer sees to them.
@@ -6086,6 +6098,124 @@ func _sync_residents() -> void:
 	for who: String in wanted:
 		if not have.has(who):
 			_spawn_resident(wanted[who])
+
+
+## The sought wanted in this zone (decision 613, npc's side): _sync_residents'
+## entries for every town's placed sought whose refuge is here (economy's
+## entry, its place a holdings place with a cell), and for every freed one
+## whose leader stands here, beside them.
+func _sought_here() -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	if World.towns == null or World.production == null or World.holdings == null:
+		return out
+	var origins := World._tier_origins()
+	for town_id: String in World.holdings.all_places():
+		var town_place := World.holdings.place(town_id)
+		if town_place.get("kind") != "stockpile":
+			continue
+		for entry: Dictionary in World.towns.sought(town_id):
+			var id := str(entry.get("id", ""))
+			var place_id := str(entry.get("place", ""))
+			if id.is_empty() or place_id.is_empty() or World.production.worker(id).is_empty():
+				continue
+			var store: Vector2i = town_place.get("cell", Vector2i.ZERO)
+			var freed_by := str(entry.get("freed_by", ""))
+			var spec := {"key": id, "name": str(entry.get("name", id)), "trade": str(entry.get("trade", "")), "player": "", "town": town_id,
+				"type": str(World.production.worker(id).get("type", "")), "strayed": true, "sought": id,
+				"holder": str(entry.get("holder", "")), "where": str(entry.get("where", ""))}
+			var cell: Vector2i
+			if freed_by.is_empty():
+				var refuge := World.holdings.place(place_id)
+				if refuge.is_empty() or str(refuge.get("area", "")) != World.zone.name:
+					continue
+				cell = _nearest_free(refuge.get("cell", Vector2i.ZERO))
+				if not origins.is_empty() and _nearest_of(cell, origins) > recall_tiles:
+					continue
+			else:
+				var leader := _player_body(freed_by)
+				if leader == null:
+					continue
+				cell = _nearest_free(leader.tile)
+				spec["escort"] = freed_by
+				spec["escort_name"] = _display_name(leader)
+			spec["places"] = {"strayed": Rect2i(cell, Vector2i.ONE), "square": Rect2i(store - Vector2i(2, 2), Vector2i(5, 5))}
+			out.append(spec)
+	return out
+
+
+## The spawned player [param player_id] in this zone, null for none.
+func _player_body(player_id: String) -> Player:
+	if player_id.is_empty():
+		return null
+	for entity in World.get_entities():
+		if entity is Player and entity.spawned and (entity as Player).player_id == player_id:
+			return entity as Player
+	return null
+
+
+## Server: [param player] ([param player_id], [param speaker]) spoke to the
+## sought [param body] (decision 613, npc's side): held and watched, it
+## stays (its thought says why); else economy frees it (Towns.free_sought)
+## and it follows them home, its set line said.
+func _sought_spoken(body: Resident, player_id: String, speaker: String, player: Player) -> void:
+	if not body.escort_of.is_empty() or World.towns == null:
+		return
+	if not body.holder.is_empty() and body.watched():
+		print("[sought] %s will not follow %s: the %s watch" % [body.person, speaker, body.holder.replace("_", " ")])
+		return
+	if not World.towns.free_sought(body.sought, player_id):
+		return
+	body.start_escort(player_id, speaker)
+	body.holder = ""
+	if body.has_meta("sought_waiting"):
+		body.remove_meta("sought_waiting")
+	var town_word := str(World.holdings.place(body.town).get("name", body.town))
+	Townsfolk.learn(World.production, body.sought, "%s found you %s and is leading you to %s." % [speaker, Towns.where_words(body.where), town_word])
+	print("[sought] %s the %s is freed by %s %s, led to %s" % [body.person, body.trade.replace("_", " "), speaker, Towns.where_words(body.where), body.town])
+	if player != null:
+		_resident_says(body, str(Offers.sought_words(body.trade).get("freed", "Lead on.")), "", player)
+
+
+## The sought [param body] at its town's ground, led there (decision 613,
+## npc's side): economy's sought_home (a resident, the xp, the rescued
+## signal), the card's fact, its arrival said to the one who led it; the
+## body is one of the town's from the next sync.
+func _sought_home(body: Resident) -> void:
+	var by := str(Offers._call(Offers.ctx, "name_of", [body.escort_of]))
+	if by.is_empty() or by == "<null>":
+		by = body.escort_name
+	var id := body.sought
+	var trade := body.trade
+	var town_word := str(World.holdings.place(body.town).get("name", body.town))
+	if World.towns.sought_home(id):
+		Townsfolk.learn(World.production, id, "%s brought you to %s, where you live and work now." % [by, town_word])
+		print("[sought] %s the %s is home in %s, brought by %s" % [body.person, trade.replace("_", " "), body.town, by])
+		var leader := _player_body(body.escort_of)
+		if leader != null:
+			var line := str(Offers.sought_words(trade).get("arrival", "I am the %s you sent for."))
+			_resident_says(body, line % trade.replace("_", " ") if line.contains("%s") else line, "", leader)
+	body.strayed = false
+	body.sought = ""
+	body.holder = ""
+	body.escort_of = ""
+	body.escort_name = ""
+
+
+## The word [param town] sent out (decision 613, npc's side): one line per
+## sought with a place, for the officials and the rumour.
+func _sought_words(town: String) -> Array[String]:
+	var out: Array[String] = []
+	if World.towns == null:
+		return out
+	for entry: Dictionary in World.towns.sought(town):
+		if str(entry.get("place", "")).is_empty():
+			continue
+		var trade := str(entry.get("trade", "")).replace("_", " ")
+		if str(entry.get("freed_by", "")).is_empty():
+			out.append("We have no %s. Word is %s the %s was seen %s." % [trade, entry.get("name", "someone"), trade, Towns.where_words(str(entry.get("where", "")))])
+		else:
+			out.append("%s the %s is found %s and is being led here." % [entry.get("name", "Someone"), trade, Towns.where_words(str(entry.get("where", "")))])
+	return out
 
 
 ## Where the lost of the town at [param place] stand (decision 487): a
@@ -6236,7 +6366,9 @@ func _ask_resident(body: Resident, speaker: String, line: String, player: Player
 	var player_id := player.player_id if player != null else ""
 	if not player_id.is_empty():
 		Offers.spoke_to(player_id, body.worker_id)  # An errand to them is done by speaking (decision 435).
-		if body.strayed:
+		if not body.sought.is_empty():
+			_sought_spoken(body, player_id, speaker, player)  # The sought: freed by a word when no holder sees them (decision 613).
+		elif body.strayed:
 			body.start_escort(player_id, speaker)  # Lost beyond the walls: a word, and they follow you home (decision 487).
 		elif Townsfolk.is_sick(World.production, body.worker_id) and int(Townsfolk.sickness_of(World.production, body.worker_id).get("treated", -1)) < 0 \
 				and not _healers_hut_of(body.town).is_empty():
@@ -6403,6 +6535,8 @@ func _offers_context() -> Dictionary:
 		"in_care": func(player_id: String, place_id: String) -> bool: return in_care(player_id, place_id),
 		"care_via": func(player_id: String, place_id: String) -> String: return care_via(player_id, place_id),
 		"hand_item": func(player_id: String, item_id: String, from_name: String) -> bool: return _hand_item(player_id, item_id, from_name),
+		# The word the town sent out (decision 613, npc's side): who is sought and where they were seen, for the officials.
+		"sought_words": func(town: String) -> Array[String]: return _sought_words(town),
 		"healer_of": func(town: String) -> String:
 			var hut := _healers_hut_of(town)
 			if hut.is_empty() or World.production == null:
@@ -7290,6 +7424,14 @@ func _spawn_resident(each: Dictionary) -> Resident:
 	body.places = places
 	body.doing = doing
 	body.strayed = bool(each.get("strayed", false))
+	body.sought = str(each.get("sought", ""))
+	body.holder = str(each.get("holder", ""))
+	body.where = str(each.get("where", ""))
+	if not body.sought.is_empty():
+		if each.has("escort"):
+			body.start_escort(str(each["escort"]), str(each.get("escort_name", "")))  # Led home: beside its leader, following (613).
+		else:
+			body.set_meta("sought_waiting", true)  # Waiting to be found: enemy-ai's monsters leave it alone (613).
 	return body
 
 
