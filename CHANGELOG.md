@@ -7,16 +7,20 @@ notes (decision 324).
 
 ## Unreleased
 
+## v0.1.167
+
+- What goes over the network is unchanged, so v0.1.165 and v0.1.166 still join, but the server updates too: the barrow's draugr now fights armed on the live server. Update through the launcher to hear the arrows and see the new pieces.
+- The live world changes with this update: the wilds weapon chest of swords, spears, hammers and shields moves out of Snagfin's tower doorway to stand outside against its west wall, with everything that was in it.
+- The barrow's draugr holds his battle axe again: a monster with a class of its own was spawned by a level with empty hands, no loot table and no home, so he never threw his axe or charged for it, and spun with his fists (Level._own_class; combat_test).
 - The draugr's battle axe no longer knocks you down with every swing: its plain blow is a slow, heavy hit, and only his spin floors you (603 amended).
 - The sword, spear, hammer and shield chest stands outside Snagfin's tower now, against its west wall beside the other weapon chest, so his doorway is clear (610).
-- The barrow's draugr holds his battle axe again: a monster with a class of its own was spawned by a level with empty hands, no loot table and no home, so he never threw his axe or charged for it, and spun with his fists (Level._own_class; combat_test).
 - Arrows are heard where they land, out to past a bow's reach (they were silent beyond 4-6 cells): a thud in a body, a knock in a door or a tree, a crack and skitter off stone, a soft thump in the ground, a plip in water, and an arrow whistles as it flies past you (609; Jeff: "arrow impact needs sounds"). Client only.
-
+- The castle's ponds are round-shored curves now, not squares of water, as every river, stream and pond in the world is (568 amended).
 - Burial niches cut into the barrow's walls in four styles mixed along a wall: arched niches, carved hollows, bone shelves and urn cells, some sealed, plus the cracked tell and the found hidden door (580).
 - A second waystone, carved with a gate mark and arrows pointing the way out, to stand in pairs where a road leaves the map (589).
 - Stairs for zone crossings: a stair down into the dark (stone, or timber for a mine or cellar) and a stair up (stone steps, or a ladder on a rock face for a climb) (589).
 - Pieces for Held's Old Tower, the ancients' broken-down castle: the broken keep, rubble heaps and a fallen column (600).
-- The castle's ponds are round-shored curves now, not squares of water, as every river, stream and pond in the world is (568 amended).
+
 ## v0.1.166
 
 - A client-only fix for v0.1.165's play test: the server is unchanged, so v0.1.165 still joins, but update through the launcher to get the fixes. The draugr tiring after his spin comes with the next server update.
