@@ -139,6 +139,7 @@
 		"walls_from": 0.5
 	},
 	"buildings": {
+		"camp": {"built_by": "", "cost": {"wood": 2, "cloth": 1}, "steps": 1, "xp": 0, "max_level": 1, "upkeep": {}},
 		"forge": {"trade": "smith", "built_by": "carpenter", "xp": 20, "cost": {"wood": 10, "ore": 5}, "steps": 6000, "max_level": 3},
 		"kitchen": {"trade": "cook", "built_by": "carpenter", "xp": 10, "cost": {"wood": 6}, "steps": 3000, "max_level": 3},
 		"inn": {"built_by": "carpenter", "xp": 30, "cost": {"wood": 15, "leather": 5}, "steps": 9000, "max_level": 3},

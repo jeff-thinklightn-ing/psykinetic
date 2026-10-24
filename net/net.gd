@@ -372,6 +372,8 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## 35 (649, terrain's side): a "clearing" cell's "trunk" may stand on the level's
 ## own floor (a ruin's ground grown back), so a client keeps it and makes the cell
 ## void on a reload; one that forgot it would show floor there.
+## 35 (649, buildings' side): a level may carry the "camp" kind, open all round
+## and roofless, read alike on both sides.
 const PROTOCOL_REVISION := 35
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]

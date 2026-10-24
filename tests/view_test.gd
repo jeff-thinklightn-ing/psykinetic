@@ -1563,6 +1563,8 @@ func _test_kinds() -> void:
 	_test_plinth()
 	_test_open_kinds()
 	_test_plots()
+	_test_camp()
+	_test_decline()
 
 
 ## A building being built (decision 566): its stages by its town record's
@@ -1790,6 +1792,56 @@ func _test_plots() -> void:
 	_check(again != shed and again.get("plot", false) and not again.get("dropped", false) and (again["node"] as Node3D).visible,
 			"laid again there: drawn anew")
 	_rig.town_states.erase(town)
+
+
+## A settlement's camp (649): tents and a fire ring, no roof, no posts.
+func _test_camp() -> void:
+	print("\n== a camp: its tents and fire ring, open to the sky (649) ==")
+	var level := _kinds_level([["building_camp_small", Vector2i(1, 1), false], ["building_camp_large", Vector2i(10, 1), false]])
+	var small := BuildingComposer.compose(level["buildings"][0], Client3D.KIND_ROOF)
+	var large := BuildingComposer.compose(level["buildings"][1], Client3D.KIND_ROOF)
+	var named := func(node: Node3D, prefix: String) -> int:
+		return node.get_node("parts").get_children().filter(func(each: Node) -> bool: return each.name.begins_with(prefix)).size()
+	var art := ArtKit.has("prop.tent") and ArtKit.has("prop.campfire")
+	_check(not small.has_node("roof") and not large.has_node("roof") and named.call(small, "OpenPost") == 0,
+			"no roof over a camp, nor posts round it")
+	_check(not art or named.call(small, "Tent") == 1 and named.call(large, "Tent") == 2 and named.call(small, "Campfire") == 1,
+			"a small camp's one tent, a large one's two, each a fire ring (%d, %d)" % [named.call(small, "Tent"), named.call(large, "Tent")])
+	small.free()
+	large.free()
+
+
+## A building in decline (649): disrepair worn, a ruin's rubble, gone hidden,
+## and built again whole.
+func _test_decline() -> void:
+	print("\n== a building in decline: worn, a ruin, gone, built again (649) ==")
+	var level := _kinds_level([["building_house_small", Vector2i(2, 2), false]])
+	_rig.rebuild(level["terrain"], Vector2i(4, 14))
+	var house: Dictionary = _rig._buildings[0]
+	house["use"] = "house"
+	house["town_id"] = "decline_town"
+	var outline: Array = house["outline"]
+	var node: Node3D = house["node"]
+	var walls := outline.filter(func(key: Vector3i) -> bool: return _rig._terrain["edges"].get(key) == Terrain.Edge.WALL)
+	var states := func(state: String) -> int:
+		return walls.filter(func(key: Vector3i) -> bool: return _rig._wall_states.get(key, "") == state).size()
+	var lit := func() -> bool:
+		return walls.any(func(key: Vector3i) -> bool: return _rig._window_code.has(key) and bool(_rig._window_code[key][2]))
+	_rig.set_town("decline_town", {"house": {"state": Towns.DISREPAIR, "level": 1}})
+	_check(house["damaged"] and house["decline"] == Towns.DISREPAIR and node.visible and not lit.call()
+			and (not ArtKit.has("scatter.tuft") or is_instance_valid(house.get("weeds"))),
+			"in disrepair: worn as damaged, its lamps out, weeds at its foot")
+	_rig.set_town("decline_town", {"house": {"state": Towns.RUIN, "level": 0, "walls": false}})
+	_check(node.visible and house["roof"] == null and states.call("rubble") == walls.size() and not (node.get_node("parts") as Node3D).visible,
+			"a ruin: its walls a bank of rubble (%d of %d), no roof" % [states.call("rubble"), walls.size()])
+	_rig.set_town("decline_town", {"house": {"state": "gone", "level": 0, "walls": false}})
+	_check(not node.visible and states.call("plot") == walls.size() and not is_instance_valid(house.get("weeds")),
+			"gone: nothing of it drawn (%d of %d walls none)" % [states.call("plot"), walls.size()])
+	_rig.set_town("decline_town", {"house": {"state": Towns.STANDING, "level": 1}})
+	_check(node.visible and house["roof"] != null and house["decline"] == "" and not house["damaged"]
+			and states.call("plot") == 0 and states.call("rubble") == 0 and states.call("broken") == 0 and not is_instance_valid(house.get("weeds")),
+			"built again: whole, roofed, its walls up")
+	_rig.town_states.erase("decline_town")
 
 
 ## BuildingComposer (decision 489): a wing's walls drawn to its own lower

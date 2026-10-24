@@ -141,8 +141,8 @@ func load(terrain: Dictionary) -> void:
 			continue
 		if str(building.get("slot", "")) in Level.SPANS_WATER:
 			continue  # A bridge is open to the sky (decision 505); its railings below.
-		if building.get("ruined", false):
-			continue  # A ruin has no roof (decision 488).
+		if Level.roofless(building):
+			continue  # A ruin has no roof (decision 488), nor a camp (649).
 		for cell in Level.building_cells(building):
 			_roofed_whole[cell] = true
 	for key: Vector3i in terrain.get("railings", []):

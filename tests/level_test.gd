@@ -1440,6 +1440,29 @@ func _test_kinds() -> void:
 			and not "market" in Level.kinds_at("town") and Level.kinds_at("city").size() == Level.kinds().size() - 1
 			and not "tower_room" in Level.kinds_at("city") and Level.kinds_at("ruin").is_empty(),
 			"each kind a stage and a plot class it fits (591): a hamlet's %d kinds (its inn and temple), a city every one but the set piece's room (unfit %s)" % [hamlet.size(), unfit])
+	# A settlement raises its camp alone (649): open all round, no roof, no inside.
+	var narrow: Array[String] = []
+	for kind: String in Level.kinds():
+		for size: String in Level.kinds()[kind]["sizes"]:
+			if not Level.narrow_joins(Level.kinds()[kind]["sizes"][size]).is_empty():
+				narrow.append("%s %s" % [kind, size])
+	var pinched := Level.narrow_joins({"blocks": [[0, 0, 5, 5, "main"], [5, 4, 3, 3, "wing"]]})
+	var small_classes := Level.PLOT_CLASSES.keys().filter(func(each: String) -> bool:
+		return mini(Level.PLOT_CLASSES[each].x, Level.PLOT_CLASSES[each].y) < Level.MIN_ROOM)
+	_check(narrow.is_empty() and pinched.size() == 1 and small_classes.is_empty(),
+			"no kind's blocks meet across one cell (a pinched pair found: %s; narrow %s), no plot class under %d (%s)" % [pinched, narrow, Level.MIN_ROOM, small_classes])
+	var camp_map := LevelMap.new(Vector2i(9, 9))
+	for y in 9:
+		for x in 9:
+			camp_map.set_cell(Vector2i(x, y), "grass")
+	camp_map.set_cell(Vector2i(0, 0), "start")
+	var camp_level := Level.parse(camp_map.to_image(), null, {"outdoor": true, "buildings": [{"kind": "camp", "size": "large", "at": [1, 1], "facing": [0, 1]}]})
+	var camps := (camp_level["buildings"] as Array).filter(func(each: Dictionary) -> bool: return each.get("kind", "") == "camp")
+	var camp: Dictionary = camps[0] if camps.size() == 1 else {}
+	var walled := Level.building_outline(camp).filter(func(key: Vector3i) -> bool: return camp_level["terrain"]["edges"].has(key)) if not camp.is_empty() else []
+	_check(Level.kinds_at("settlement") == ["camp"] and "camp" in Level.kinds_at("hamlet") and not camp.is_empty()
+			and Level.roofless(camp) and not Level.has_inside(camp) and walled.is_empty() and Level.plot_of("camp") == Level.PLOT_CLASSES["S"],
+			"a settlement's one kind the camp (649): roofless, no inside, no wall round it (%s, %s)" % [Level.kinds_at("settlement"), walled])
 	var unsaid: Array[String] = []
 	for prefab_name in Prefab.kind_names():
 		for turns in 4:

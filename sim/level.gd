@@ -180,6 +180,10 @@ const KIND_SIZE := "small"
 ## shacks"): its walls are the edges round it, so all of it is floor. A
 ## wing, a bay or an outshot may be less. kinds() says so of any under it.
 const MIN_ROOM := 5
+## The fewest cells two blocks of a kind meet across (narrow_joins).
+const MIN_JOIN := 2
+## A kind's "roof" for none over its plot (649: a camp, its tents its own).
+const ROOFLESS := "none"
 ## A town's stages (economy's Towns.stage, rising and falling back: the
 ## growth loop, decision 591; the settlement of tents first, 649): a kind
 ## names the first it may be built at
@@ -2285,6 +2289,9 @@ static func kinds() -> Dictionary:
 		if not parsed is Dictionary:
 			push_error("Level: %s does not read as JSON: no building kinds" % KINDS_FILE)
 		_kinds = parsed.get("kinds", {}) if parsed is Dictionary else {}
+		for plot_class: String in PLOT_CLASSES:
+			if mini(PLOT_CLASSES[plot_class].x, PLOT_CLASSES[plot_class].y) < MIN_ROOM:
+				push_error("Level: plot class %s is %s, under MIN_ROOM %d each way" % [plot_class, PLOT_CLASSES[plot_class], MIN_ROOM])
 		for kind: String in _kinds:
 			for size: String in _kinds[kind].get("sizes", {}):
 				var main := main_block(_kinds[kind]["sizes"][size])
@@ -2294,6 +2301,10 @@ static func kinds() -> Dictionary:
 				var frame := _frame(_kinds[kind]["sizes"][size])
 				if frame.x > plot.x or frame.y > plot.y:
 					push_error("Level: kind %s %s (%s) does not fit its plot class \"%s\" (%s)" % [kind, size, frame, _kinds[kind].get("plot", ""), plot])
+			for size: String in _kinds[kind].get("sizes", {}):
+				var narrow := narrow_joins(_kinds[kind]["sizes"][size])
+				if not narrow.is_empty():
+					push_error("Level: kind %s %s's blocks meet across less than %d cells (%s): no way one cell wide" % [kind, size, MIN_JOIN, narrow])
 			var stage := str(_kinds[kind].get("stage", ""))
 			if not stage in STAGES and stage != SET_STAGE:
 				push_error("Level: kind %s names no stage of %s, nor \"%s\"" % [kind, STAGES, SET_STAGE])
@@ -2316,6 +2327,29 @@ static func kinds_at(stage: String) -> Array[String]:
 ## by deep, front +y; ZERO for a kind of none.
 static func plot_of(kind: String) -> Vector2i:
 	return PLOT_CLASSES.get(str(kinds().get(kind, {}).get("plot", "")), Vector2i.ZERO)
+
+
+## Where a kind size's ({blocks}) blocks meet across fewer than MIN_JOIN
+## cells (Jeff, 2026-10-22: no way one cell wide where a player walks with
+## a companion): each such pair's blocks, in its own frame. A block one cell
+## deep along its whole side (a round hut's bay) widens its room, no way.
+static func narrow_joins(spec: Dictionary) -> Array:
+	var rects: Array[Rect2i] = []
+	for block: Array in spec.get("blocks", []):
+		rects.append(Rect2i(int(block[0]), int(block[1]), int(block[2]), int(block[3])))
+	var out := []
+	for i in rects.size():
+		for j in range(i + 1, rects.size()):
+			var a := rects[i]
+			var b := rects[j]
+			var shared := 0
+			if a.end.x == b.position.x or b.end.x == a.position.x:
+				shared = mini(a.end.y, b.end.y) - maxi(a.position.y, b.position.y)
+			elif a.end.y == b.position.y or b.end.y == a.position.y:
+				shared = mini(a.end.x, b.end.x) - maxi(a.position.x, b.position.x)
+			if shared > 0 and shared < MIN_JOIN:
+				out.append([a, b])
+	return out
 
 
 ## A kind size's main block ({blocks}: the one whose role is "main", else
@@ -2625,11 +2659,17 @@ static func plot_edges(building: Dictionary) -> Dictionary[Vector3i, int]:
 
 
 ## Whether a parsed building has an inside: walked into under a roof (not a
-## well, a field or a ruin).
+## well, a field, a ruin or a camp).
 static func has_inside(building: Dictionary) -> bool:
 	return not str(building.get("slot", "")) in ON_WATER and not str(building.get("slot", "")) in OPEN_AIR \
 			and not str(building.get("slot", "")) in SOLID \
-			and not str(building.get("slot", "")) in SPANS_WATER and not building.get("ruined", false)
+			and not str(building.get("slot", "")) in SPANS_WATER and not roofless(building)
+
+
+## Whether a parsed building has no roof over it: a ruin (488), or a kind
+## of roof ROOFLESS (649: a camp).
+static func roofless(building: Dictionary) -> bool:
+	return building.get("ruined", false) or str(building.get("roof", "")) == ROOFLESS
 
 
 ## Each cell inside [param buildings] (has_inside) -> that building's index:

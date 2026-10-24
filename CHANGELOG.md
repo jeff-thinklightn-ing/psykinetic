@@ -7,6 +7,8 @@ notes (decision 324).
 
 ## Unreleased
 
+- A new settlement starts with camps: a tent or two round a fire ring, open to the sky, pitched by anyone for a little wood and cloth.
+- Buildings a town no longer keeps up show it: in disrepair the roof breaks, the walls crack, the lamps go out and weeds grow at the foot; a ruin is a low bank of rubble you can walk over, and once it's gone nothing is left.
 - Towns can now decline as well as grow: a new town starts as a settlement of tents and builds up to hamlet and village, but a town that loses people, goes hungry, leaves officials unpaid or has residents carried off falls back a stage, and buildings that go unkept (starting at the edge) fall into disrepair, then ruin, and the wild takes the ground back (649)
 - Held weapons' grips mid-handle and the shield's arm sockets (451 amended and 451 amended (2), art-kit's sides; Jeff: "shield should be carried on the outside of arm"): the sword and battle axe meshes lowered so the grip is mid-hilt, the great axe's and battle axe's second-hand grip on the haft (the great axe's lay in its head), item.shield's "strap" and "handle" sockets for pc-character's carry
 

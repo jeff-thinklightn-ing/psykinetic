@@ -60,6 +60,13 @@ const WINDOW_ODDS := 0.3
 ## a plain post's side where art-kit has none.
 const OPEN_POST_EVERY := 2
 const OPEN_POST := 0.22
+## The kind drawn as a camp (649): tents and a fire ring, no roof (Level.ROOFLESS).
+const CAMP := "camp"
+## A camp's fire, cells from its middle toward its front; its tents, cells
+## behind its middle, and apart from each other when two.
+const CAMP_FIRE_OUT := 0.8
+const CAMP_TENT_BACK := 1.0
+const CAMP_TENT_APART := 1.4
 ## The roles of blocks roofed with a single slope.
 const LEANING: Array[String] = ["leanto", "outshot", "bay"]
 ## The stream salt for what is the building's own, not a block's.
@@ -187,8 +194,12 @@ static func _build(building: Dictionary, roof_set: String) -> Node3D:
 	out.add_child(parts)
 	var main: Rect2i = blocks[_main_of(blocks)]
 	var ruined: bool = building.get("ruined", false)
-	_open_posts(building, parts)
-	if not ruined:
+	var roofless := Level.roofless(building)
+	if not roofless:
+		_open_posts(building, parts)
+	if building["kind"] == CAMP:
+		_camp(building, parts)
+	if not roofless:
 		var roof := Node3D.new()
 		roof.name = "roof"
 		roof.rotation = Vector3(rng.randf_range(-TILT, TILT), 0.0, rng.randf_range(-TILT, TILT))
@@ -204,9 +215,9 @@ static func _build(building: Dictionary, roof_set: String) -> Node3D:
 				piece.name = "Roof_%d" % index
 				roof.add_child(piece)
 	var odds := float(CHIMNEYS.get(str(building["kind"]), 0.0)) * (0.6 if ruined else 1.0)
-	if rng.randf() < odds and str(building.get("roof", "gable")) != "round":
+	if rng.randf() < odds and str(building.get("roof", "gable")) != "round" and str(building.get("roof", "")) != Level.ROOFLESS:
 		parts.add_child(_chimney(building, main, rect, eaves, rng))
-	if not ruined and rng.randf() < float(PORCHES.get(str(building["kind"]), 0.0)):
+	if not roofless and rng.randf() < float(PORCHES.get(str(building["kind"]), 0.0)):
 		var porch := porch_of(building)
 		if porch != null:
 			parts.add_child(porch)
@@ -735,6 +746,36 @@ static func _open_posts(building: Dictionary, parts: Node3D) -> void:
 			post = _timber(Vector3(OPEN_POST, height, OPEN_POST), at + Vector3(0.0, height * 0.5, 0.0), wood)
 		post.name = "OpenPost_%d_%d" % [vertex.x, vertex.y]
 		parts.add_child(post)
+
+
+## A camp's (649) fire ring and tents in [param parts]: art-kit's
+## prop.campfire a little in from its middle toward its front, its
+## prop.tent behind (two side by side on a camp six across), each turned to
+## the fire; a piece art-kit has not is left out.
+static func _camp(building: Dictionary, parts: Node3D) -> void:
+	var rect: Rect2i = building["rect"]
+	var facing: Vector2i = building["facing"]
+	var front := Vector2(facing)
+	var side := Vector2(-facing.y, facing.x)
+	var middle := Vector2(rect.size - Vector2i.ONE) * 0.5
+	var fire := middle + front * CAMP_FIRE_OUT
+	if ArtKit.has("prop.campfire"):
+		var ring := ArtKit.instance("prop.campfire")
+		ring.name = "Campfire"
+		ring.position = Vector3(fire.x, 0.0, fire.y)
+		parts.add_child(ring)
+	if not ArtKit.has("prop.tent"):
+		return
+	var tents := 2 if mini(rect.size.x, rect.size.y) >= 6 else 1
+	for index in tents:
+		var at := middle - front * CAMP_TENT_BACK
+		if tents > 1:
+			at += side * CAMP_TENT_APART * (index * 2 - 1)
+		var tent := ArtKit.instance("prop.tent")
+		tent.name = "Tent_%d" % index
+		tent.position = Vector3(at.x, 0.0, at.y)
+		tent.rotation.y = atan2(fire.x - at.x, fire.y - at.y)
+		parts.add_child(tent)
 
 
 static func _timber(size: Vector3, at: Vector3, wood: Material) -> MeshInstance3D:

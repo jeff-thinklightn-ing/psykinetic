@@ -1850,6 +1850,15 @@ var _buildings: Array[Dictionary] = []
 ## The laid plots drawn (591 amended (step 2)), by their rect's corner:
 ## what _sync_plots adds or drops.
 var _plots_drawn: Dictionary[Vector2i, bool] = {}
+## A building's record states in decline (649, economy's Towns.buildings_of):
+## out of use, a ruin, gone (the ruin over: its piece no more).
+const DECLINE_GONE := "gone"
+const DECLINES: Array[String] = [Towns.DISREPAIR, Towns.RUIN, DECLINE_GONE]
+## Weeds at a building's foot in decline: one an outline edge in this many.
+const WEED_EVERY := 2
+## Weeds this far from an edge's middle (out of a building in disrepair,
+## into a ruin's footprint).
+const WEED_OUT := 0.35
 var _building_at: Dictionary[Vector2i, int] = {}
 ## Where a body stands on a cell whose piece has a stand point (580 step 3:
 ## the throne's "stand", [x, y up, z] in the piece's frame, turned by its
@@ -5080,9 +5089,9 @@ func set_town(town: String, buildings: Dictionary) -> void:
 
 ## [param building] drawn as its town has it: damaged, the slot's
 ## roof_damaged in its roof's place and its state_damaged (rubble) shown;
-## until a slot has a roof_damaged, its roof sags (ROOF_SAG); else as
-## built. Planned, being built and standing all draw standing for now, as
-## does a building no town has a record of.
+## until a slot has a roof_damaged, its roof sags (ROOF_SAG); a kind at its
+## stage (566); in decline (649: DECLINES) as _show_decline draws it; else
+## as built, as is a building no town has a record of.
 func _show_state(building: Dictionary) -> void:
 	if building.get("dropped", false):
 		return  # A dropped plot (649): no more of its town's looks.
@@ -5091,15 +5100,28 @@ func _show_state(building: Dictionary) -> void:
 		state = str(town_states.get(building["town_id"], {}).get(building["use"], {}).get("state", Towns.STANDING))
 	if building.get("open_air", false):
 		_show_crop(building)
+	var damaged := state == Towns.DAMAGED or state == Towns.DISREPAIR
+	var decline := state if state in DECLINES else ""
+	if decline != building.get("decline", "") and not str(building.get("decline", "")).is_empty():
+		# Out of its decline (built again): its looks put back, then drawn
+		# afresh as its stage and damage have it.
+		_undo_decline(building)
+		building["stage"] = -1
+		building["damaged"] = not damaged
 	if building.has("kind"):
 		var record: Dictionary = {}
 		if not str(building["use"]).is_empty():
 			record = town_states.get(building["town_id"], {}).get(building["use"], {})
 		var at := BuildingComposer.plot_stage(record) if building.get("plot", false) else BuildingComposer.stage(record)
 		_show_stage(building, at, BuildingComposer.scaffolded(record))
-	var damaged := state == Towns.DAMAGED
-	if damaged == building["damaged"]:
-		return
+	if damaged != building["damaged"]:
+		_show_damage(building, damaged)
+	if decline != building.get("decline", ""):
+		_show_decline(building, decline)
+
+
+## [param building] damaged or not (_show_state): a disrepair's too (649).
+func _show_damage(building: Dictionary, damaged: bool) -> void:
 	building["damaged"] = damaged
 	var node: Node3D = building["node"]
 	var whole: Node3D = node.get_node_or_null("roof")
@@ -5134,6 +5156,119 @@ func _show_state(building: Dictionary) -> void:
 	_occluders_built = false
 	if _camera != null and building["off"]:
 		_update_fade(true)
+
+
+## [param building] in decline (649; one look for every building, slot or
+## kind, from its record's state, never a piece of its own): "disrepair"
+## damaged (_show_damage: its roof broken or sagging, its walls broken here
+## and there), its lamps out, weeds at its foot; "ruin" its walls a low
+## bank of rubble (wall.<set>.rubble: the sim's walls are down, walked
+## over), no roof, door or parts, weeds in its footprint; "gone" none of it
+## drawn, no wall, post or door (terrain grows its floor back).
+func _show_decline(building: Dictionary, decline: String) -> void:
+	building["decline"] = decline
+	var node: Node3D = building["node"]
+	var down := decline == Towns.RUIN or decline == DECLINE_GONE
+	node.visible = decline != DECLINE_GONE
+	if down:
+		for name: String in ["roof", "roof_damaged"]:
+			var cover := node.get_node_or_null(name) as Node3D
+			if cover != null:
+				cover.visible = false
+		var was: Node3D = building["roof"]
+		if was != null:
+			_set_near(was, false)
+			_faded.erase(was)
+			_hid_at.erase(was)
+			_hiding.erase(was)
+		building["roof"] = null
+		var parts := node.get_node_or_null("parts") as Node3D
+		if parts != null:
+			parts.visible = false
+	var changed: Array[Vector3i] = []
+	for key: Vector3i in building.get("outline", Level.outline(building["rect"])) if not building.get("open_air", false) else []:
+		match _terrain["edges"].get(key, Terrain.Edge.OPEN):
+			Terrain.Edge.WALL:
+				if _window_code.has(key):
+					_window_code[key][2] = false
+				if down:
+					_set_wall_state(key, "rubble" if decline == Towns.RUIN else "plot")
+					changed.append(key)
+			Terrain.Edge.DOOR:
+				if down:
+					_set_wall_state(key, "plot")
+					if _doorways.has(key):
+						(_doorways[key] as Node3D).visible = false
+					changed.append(key)
+	_weeds(building, decline != DECLINE_GONE)
+	if not changed.is_empty():
+		rebuild_walls(changed)
+	_occluders_built = false
+
+
+## [param building]'s decline (649) put back (_show_state then draws its
+## stage and damage afresh): seen, roofed and its parts as built, its walls'
+## and door's looks cleared, its lamps as a standing one's, no weeds.
+func _undo_decline(building: Dictionary) -> void:
+	building["decline"] = ""
+	var node: Node3D = building["node"]
+	node.visible = true
+	var whole := node.get_node_or_null("roof") as Node3D
+	if whole != null:
+		whole.visible = true
+		building["roof"] = whole
+	var broken := node.get_node_or_null("roof_damaged") as Node3D
+	if broken != null:
+		broken.visible = false
+	var parts := node.get_node_or_null("parts") as Node3D
+	if parts != null:
+		parts.visible = true
+	var changed: Array[Vector3i] = []
+	for key: Vector3i in building.get("outline", Level.outline(building["rect"])) if not building.get("open_air", false) else []:
+		if _window_code.has(key):
+			_window_code[key][2] = true
+		if _wall_states.get(key, "") in ["rubble", "plot", "broken"]:
+			_set_wall_state(key, "window" if key in building.get("windows", []) else "")
+			changed.append(key)
+		if _doorways.has(key):
+			(_doorways[key] as Node3D).visible = true
+	_weeds(building, false)
+	if not changed.is_empty():
+		rebuild_walls(changed)
+
+
+## Weeds (art-kit's scatter.tuft, a plant.fern now and then) at
+## [param building]'s foot in decline (649): by one outline edge in
+## WEED_EVERY (by its hash), out of its walls, or into a ruin's footprint;
+## taken away when [param on] is false. Held in the room, by the building.
+func _weeds(building: Dictionary, on: bool) -> void:
+	var had: Variant = building.get("weeds")
+	if had is Node3D and is_instance_valid(had):
+		(had as Node3D).queue_free()
+	building.erase("weeds")
+	if not on or _room == null or not ArtKit.has("scatter.tuft"):
+		return
+	var rect: Rect2i = building["rect"]
+	var holder := Node3D.new()
+	holder.name = "Weeds_%d_%d" % [rect.position.x, rect.position.y]
+	var ruin: bool = building.get("decline", "") == Towns.RUIN
+	for key: Vector3i in building.get("outline", Level.outline(rect)):
+		var hash := (key.x * 73856093) ^ (key.y * 19349663) ^ (key.z * 83492791)
+		if posmod(hash, WEED_EVERY) != 0:
+			continue
+		var sides := Terrain.edge_cells(key)
+		var within: Vector2i = sides[0] if rect.has_point(sides[0]) else sides[1]
+		var beyond: Vector2i = sides[1] if within == sides[0] else sides[0]
+		var middle := (Vector2(sides[0]) + Vector2(sides[1])) * 0.5
+		var cell: Vector2i = within if ruin else beyond
+		var at := middle + Vector2(cell - (beyond if ruin else within)) * WEED_OUT
+		var slot := "plant.fern" if posmod(hash >> 4, 5) == 0 and ArtKit.has("plant.fern") else "scatter.tuft"
+		var weed := ArtKit.instance(slot)
+		weed.position = Vector3(at.x, _elevation(cell), at.y)
+		weed.rotation.y = float(posmod(hash >> 8, 628)) * 0.01
+		holder.add_child(weed)
+	_room.add_child(holder)
+	building["weeds"] = holder
 
 
 ## A kind [param building] drawn at stage [param at] (decision 566,

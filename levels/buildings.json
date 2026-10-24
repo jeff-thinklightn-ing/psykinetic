@@ -1,6 +1,9 @@
 {
 	"_about": "Building kinds (decision 488): each kind's sizes as blocks of cells in its own frame, x across, y deep, its front the +y side (the last row's south edges), doors as [x, y, side] on its outline (side N, S, E or W of that cell); a size's \"open\" lists outline edges the same way, left open, no wall and no door (a forge's front). A kind's main block is at least Level.MIN_ROOM cells each way. A kind may name its roof_set (thatch, shingle; Client3D.KIND_ROOF when none). A level.json building entry {kind, size, at, facing, seed, ruined, use, town} stands its blocks there, turned to its facing. The cells are the sim's rules (walls and doors are the map's edges round the blocks' union); what is drawn need not show them (BuildingComposer).",
 	"kinds": {
+		"camp": {"stage": "settlement", "plot": "S", "words": "a camp", "wall_set": "wood", "floor_set": "", "roof": "none", "sizes": {
+			"small": {"blocks": [[0, 0, 5, 5, "main"]], "doors": [], "open": [[0, 4, "S"], [1, 4, "S"], [2, 4, "S"], [3, 4, "S"], [4, 4, "S"], [0, 0, "W"], [0, 1, "W"], [0, 2, "W"], [0, 3, "W"], [0, 4, "W"], [4, 0, "E"], [4, 1, "E"], [4, 2, "E"], [4, 3, "E"], [4, 4, "E"], [0, 0, "N"], [1, 0, "N"], [2, 0, "N"], [3, 0, "N"], [4, 0, "N"]]},
+			"large": {"blocks": [[0, 0, 6, 6, "main"]], "doors": [], "open": [[0, 5, "S"], [1, 5, "S"], [2, 5, "S"], [3, 5, "S"], [4, 5, "S"], [5, 5, "S"], [0, 0, "W"], [0, 1, "W"], [0, 2, "W"], [0, 3, "W"], [0, 4, "W"], [0, 5, "W"], [5, 0, "E"], [5, 1, "E"], [5, 2, "E"], [5, 3, "E"], [5, 4, "E"], [5, 5, "E"], [0, 0, "N"], [1, 0, "N"], [2, 0, "N"], [3, 0, "N"], [4, 0, "N"], [5, 0, "N"]]}}},
 		"hut": {"stage": "hamlet", "plot": "S", "roof_set": "thatch", "words": "a small hut", "wall_set": "wood", "floor_set": "wood", "sizes": {
 			"small": {"blocks": [[0, 0, 5, 5, "main"]], "doors": [[2, 4, "S"]]},
 			"large": {"blocks": [[0, 0, 6, 6, "main"]], "doors": [[2, 5, "S"]]}}},

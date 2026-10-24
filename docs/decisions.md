@@ -27043,3 +27043,41 @@ floor and walled by the outline; the snapshot read back the same; a client's ter
 from the cells the same; a woodcut fells one, kept again; build takes them, grass, never
 growing, kept; a ruin over a plot drops the plot, then its cells. Protocol changed (35's line), no new
 class_name.
+
+## 649, buildings' side: a settlement's camp, and one look for a building in decline
+
+Economy's 649 (towns fall as well as rise; the coordinator's approval):
+
+- The "camp" kind (levels/buildings.json), a settlement's one building
+  beside its stockpile: stage "settlement", plot S, 5 x 5 small and 6 x 6
+  large, its outline all open edges (no wall, no door), roof "none"
+  (Level.ROOFLESS). Level.roofless (a ruin's or a roofless kind's) keeps it
+  out of Level.has_inside and Fields' roofed cells, as a ruin is. Its tents
+  and fire ring are BuildingComposer parts (_camp: art-kit's prop.campfire
+  a little in from its middle toward its front, prop.tent behind, two side
+  by side on a large one, each turned to the fire); a roofless kind gets no
+  roof, posts under its open edges, chimney or porch. Its economy.json row
+  (649, buildings' side, economy's wording): built by anyone (built_by ""),
+  wood 2 and cloth 1, one step, one level, upkeep {} (a settlement never
+  rots).
+- A building in decline, one look for every building, slot or kind, from
+  its record's state (Towns.buildings_of), never a piece of its own
+  (Client3D._show_decline): "disrepair" drawn damaged (its roof broken or
+  sagging, its walls broken here and there; its walls still block), its
+  lamps out, weeds at its foot (scatter.tuft, a plant.fern now and then:
+  _weeds); "ruin" its walls a low bank of rubble (the "rubble" wall state,
+  wall.<set>.rubble: the sim's walls are down, walked over), no roof, door
+  or parts, weeds in its footprint; "gone" nothing of it drawn, no wall,
+  post or door, so terrain's regrowth shows. Built again, its looks are put
+  back (_undo_decline) and its stage and damage drawn afresh. Walls leaning
+  in disrepair were left out: a wall run is one mesh along its line;
+  art-kit may give the sets a leaning piece later.
+- Two load checks in Level.kinds() (the coordinator, Jeff's two-cell rule
+  of 2026-10-22; builder's ask): a kind size whose blocks meet across fewer
+  than MIN_JOIN (2) cells (Level.narrow_joins; a bay open along its whole
+  side widens its room, no way), and a plot class under MIN_ROOM, each a
+  push_error.
+
+level_test the camp, the joins and the classes; view_test _test_camp and
+_test_decline; builder_test's uses with the camp. A line under revision
+35 (the camp read alike on both sides); no new class_name.
