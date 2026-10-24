@@ -482,7 +482,7 @@ func tick() -> void:
 	_stock_camps()
 	_herders_turn()
 	var towns: Array[String] = []
-	towns.assign(_towns.keys())
+	towns.assign(_towns.keys().filter(is_town))
 	towns.sort()
 	for town in towns:
 		_spread(town)
@@ -1226,6 +1226,7 @@ func _herders_turn() -> void:
 			if at < int(herd["back"]):
 				continue
 			production.set_away(who, false)
+			herd.erase("buyer")
 			if int(herd["unsold"]) > 0:
 				stock.deposit(id, "sheep", int(herd["unsold"]), str(production.worker(who)["name"]), "home unsold")
 				herd["unsold"] = 0
@@ -1251,10 +1252,22 @@ func _herders_turn() -> void:
 		stock.take(id, "sheep", count, "driven to %s" % buyer)
 		var sold := int(drove.call(buyer, who, count, int(rule.get("food", 2))))
 		herd["unsold"] = count - sold
+		herd["buyer"] = buyer  # Where they are while away (npc's body stands at its store).
 		herd["back"] = at + int(rule.get("walk_steps", 3000))
 		production.set_away(who, true)
 		print("[towns] %s drives %d sheep to %s, sells %d" % [production.worker(who)["name"], count, buyer, sold])
 		folds_changed.emit(id)
+
+
+## Whether [param id] is a town and not a holding with workers of its own
+## (a herder's fold, a healer's hut: their workers' "town" is the place,
+## so a record may be made for it): any id Holdings doesn't know (a test's
+## town), or one it knows as a stockpile.
+func is_town(id: String) -> bool:
+	if production.holdings == null:
+		return true
+	var place := production.holdings.place(id)
+	return place.is_empty() or str(place.get("kind", "")) == "stockpile"
 
 
 ## The town herder place [param id]'s drove goes to: one whose butchery
@@ -1264,7 +1277,7 @@ func drove_town(id: String) -> String:
 	var area := str(production.holdings.place(id).get("area", "")) if production.holdings != null else ""
 	var under := int(rules.get("butcher", {}).get("from", 8))
 	var towns: Array = _towns.keys().filter(func(town: String) -> bool:
-		return _stands(town, "butchery") and production.stockpile.count(town, "sheep") < under)
+		return is_town(town) and _stands(town, "butchery") and production.stockpile.count(town, "sheep") < under)
 	towns.sort_custom(func(a: String, b: String) -> bool:
 		var near_a := str(production.holdings.place(a).get("area", "")) == area if production.holdings != null else false
 		var near_b := str(production.holdings.place(b).get("area", "")) == area if production.holdings != null else false
@@ -2625,6 +2638,8 @@ func herders_from_dict(saved: Dictionary) -> void:
 			_herders[str(id)] = {"since": int(herd.get("since", 0)), "season": str(herd.get("season", "")),
 				"lambs": float(herd.get("lambs", 0.0)), "next": int(herd.get("next", 0)), "back": int(herd.get("back", 0)),
 				"unsold": maxi(int(herd.get("unsold", 0)), 0)}
+			if herd.has("buyer"):
+				_herders[str(id)]["buyer"] = str(herd["buyer"])
 
 
 ## to_dict's [param saved] over what is here (after Production). Anything

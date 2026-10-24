@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- A herder away on a drove now shows at the town they drove to, and a herder's fold or healer's hut is no longer run as a town of its own (no "is a settlement now" for a fold).
 - A body taken out of the world from another zone (a player leaving, say) is taken out of its own zone, so no freed body is left behind to throw errors when someone comes straight back through a link (657).
 - A note pinned to a door can be read: stand on the cell outside the door, or face it, and press E for a small sheet with its words; the cursor says "a note" over the cell; Esc or walking off puts it back (643, ui's side).
 - A newcomer the town sent for leaves a note on their shop's or the inn's door saying where they went, and townsfolk you greet pass the rumour on once a day; the note comes down when they are home (decision 643).

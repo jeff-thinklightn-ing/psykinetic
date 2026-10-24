@@ -27365,3 +27365,6 @@ entities and cell; back, through the link and back in one frame; no zone
 holds a freed body in its entities or cells, and _nearest_free there reads
 none. Before: 2 FAIL and 2 SCRIPT ERRORs ("sample", "sample (1, 4)").
 Server sim only; protocol unchanged; no new class_name.
+## 640 amended, economy's side: where a herder is, and which places are towns
+
+npc's report. A herder away on a drove keeps the town it went to as `herd["buyer"]` (saved with the herders, cleared when they are home), so npc's body stands at that town's store instead of the fold. A holding with workers of its own (a fold, a healer's hut) is where those workers live, so Production made a town record for it and Towns ticked it as a town (stages, decline, "is a settlement now"). `Towns.is_town(id)`: an id Holdings doesn't know (a test's town) or one it knows as a stockpile; tick and drove_town skip the rest. farm_test checks both.

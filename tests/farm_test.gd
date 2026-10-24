@@ -723,8 +723,12 @@ func _test_herders() -> void:
 	tick_to.call(_now + int(rule["every"]) * day + World.WORLD_TICK_STEPS)
 	_check(sold.size() == 1 and sold[0] == [STORE, who, 2, 1] and stock.count(HUT, "sheep") == 2 and bool(work.worker(who)["away"]),
 		"he drives 2 down (all but 2), the town pays for 1, the fold shows 2 while he walks (%s)" % [sold])
+	_check(towns.herders_to_dict()[HUT].get("buyer") == STORE, "away: the town he drove to kept (npc's body stands there)")
 	tick_to.call(_now + int(rule["walk_steps"]) + World.WORLD_TICK_STEPS)
 	_check(not bool(work.worker(who)["away"]) and stock.count(HUT, "sheep") == 3, "home with the unsold one: 3 (%d)" % stock.count(HUT, "sheep"))
+	_check(not towns.herders_to_dict()[HUT].has("buyer"), "home: no buyer")
+	_check(not towns.is_town(HUT) and towns.is_town(STORE) and towns.stage(HUT) == "" and not towns.drove_town(HUT) == HUT,
+		"the fold is no town: never staged, never a buyer (%s)" % towns.stage(HUT))
 	var saved := Towns.new({}, work, _rules, clock)
 	saved.herders_from_dict(JSON.parse_string(JSON.stringify(towns.herders_to_dict())))
 	_check(saved.herders_to_dict()[HUT]["next"] == towns.herders_to_dict()[HUT]["next"], "saved and loaded")
