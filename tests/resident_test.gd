@@ -49,6 +49,7 @@ func _ready() -> void:
 	_test_lawspeaker_mid_rounds()
 	_test_strayed_body()
 	_test_sought_body()
+	_test_sought_band()
 	_test_what_is_true()
 	_test_two_sentences()
 	_test_sick_body()
@@ -580,6 +581,100 @@ func _test_sought_body() -> void:
 	_check(home != null and home.sought.is_empty() and not home.strayed and home.escort_of.is_empty(), "the body is one of the town's")
 	_check(str(Townsfolk.card_of(World.production, "rs-sought").get("facts", [{}]).back().get("text", "")).contains(" brought you to "), "the card: who brought them")
 	World.production.set_away("rs-sought", true)
+	_sync()
+
+
+## The sought's band (613, enemy-ai's side): stood about the place once for
+## a placing, topped up when placed again and never doubled; it leaves the
+## waiting one alone; the one led home is beaten down, not killed, gets up
+## at a word, and bleeding out unroused is lost on the way.
+func _test_sought_band() -> void:
+	print("
+== the sought's band (613, enemy-ai's side): stood once, topped up, the waiting left alone, the led downed ==")
+	var row := [{"kind": "imp", "count": 3}, {"kind": "brute", "count": 1}]
+	var amended := {"trades": {"smith": {"place": "dwarven_forge", "where": "castle_dungeon", "holder": "goblins", "band": row,
+		"alt": {"place": "camp", "where": "camp", "holder": ""}}}}
+	_check(_main.band_of(amended, {"trade": "smith", "where": "castle_dungeon"}) == row and _main.band_of(amended, {"trade": "smith", "where": "camp"}).is_empty()
+		and _main.band_of(amended, {"trade": "butcher", "where": "hills"}).is_empty(), "band_of: the trade's row at its where, none at its alt's camp or for a trade without a row")
+	var first := {"guards": {"castle_dungeon": {"faction": "goblins", "band": row}}}
+	_check(_main.band_of(first, {"trade": "smith", "where": "castle_dungeon"}) == row and _main.band_of(first, {"trade": "smith", "where": "hills"}).is_empty(),
+		"band_of: sought.guards[where] as first landed")
+	var rules_was: Variant = World.towns.rules.get("sought")
+	World.towns.rules["sought"] = first
+	World.towns._seek(STORE, "rs-band", "Hob", "smith")
+	var entry: Dictionary = World.towns._town(STORE)["sought"]["rs-band"]
+	entry["place"] = NICHE
+	entry["where"] = "castle_dungeon"
+	entry["holder"] = "goblins"
+	var at: Vector2i = World.holdings.place(NICHE)["cell"]
+	_main._sync_bands()
+	var band := _band("rs-band")
+	_check(band.size() == 4 and band.filter(func(m: Monster) -> bool: return World.kind_of(m) == "imp").size() == 3
+		and band.filter(func(m: Monster) -> bool: return World.kind_of(m) == "brute").size() == 1, "the band stood: 3 imps and a brute (%d)" % band.size())
+	var placed := true
+	for m in band:
+		placed = placed and m.keeps_room and m.idle == Monster.Idle.GUARD and m.home == m.tile 			and World.distance(m.tile, at) > 1 and World.distance(m.tile, at) <= 1 + _main.BAND_REACH
+	_check(placed, "each guards its cell, keeps the room, off the place's cell and beside it, within reach")
+	_main._sync_bands()
+	_check(_band("rs-band").size() == 4, "synced again: never doubled")
+	World.despawn(band[0])
+	_main._sync_bands()
+	_check(_band("rs-band").size() == 3, "one killed stays dead while the placing holds")
+	World.towns.sought_lost("rs-band")
+	_main._sync_bands()
+	_check(not _main._sought_bands.has("rs-band"), "lost: the placing forgotten")
+	entry = World.towns._town(STORE)["sought"]["rs-band"]
+	entry["place"] = NICHE
+	entry["where"] = "castle_dungeon"
+	entry["holder"] = "goblins"
+	_main._sync_bands()
+	_check(_band("rs-band").size() == 4, "placed again: topped up to its count, not a second band")
+	var player := _player()
+	DayNight.set_hour(10.0)
+	_sync()
+	var smith := _body("rs-band")
+	_check(smith != null and smith.has_meta("sought_waiting") and Monster.waiting(smith), "(the smith's body at the place, waiting)")
+	if smith == null or player == null:
+		_end_band(rules_was)
+		return
+	_check(_band("rs-band").all(func(m: Monster) -> bool: return not m.threatens(smith) and not m._may_fight(smith)), "the band leaves the waiting one alone")
+	for guard in _band("rs-band"):
+		World.despawn(guard)
+	_main._ask_resident(smith, "Jeff", "Come with me.", player)
+	_check(smith.escort_of == player.player_id and not Monster.waiting(smith), "(nobody watching: freed and led)")
+	World.damage(smith, smith.hp, null)
+	_check(is_instance_valid(smith) and smith.spawned and World.is_downed(smith) and smith.hp == 1, "the led one beaten down: downed, not killed")
+	_main._ask_resident(smith, "Jeff", "Up, quick.", player)
+	_check(not World.is_downed(smith) and smith.hp >= 1, "a word and they get up")
+	World.damage(smith, smith.hp, null)
+	smith.downed_until = World.tick + 1
+	World.step()
+	World.step()
+	_check(not is_instance_valid(smith) or not smith.spawned, "(unroused, the time runs out: they bleed out)")
+	_check(str(World.towns.sought_entry("rs-band").get("place", "x")).is_empty() and str(World.towns.sought_entry("rs-band").get("freed_by", "x")).is_empty(),
+		"bled out on the way: lost, sought again later")
+	_end_band(rules_was)
+
+
+## The zone's living guards of sought [param id]'s band.
+func _band(id: String) -> Array[Monster]:
+	var out: Array[Monster] = []
+	for entity in World.monsters():
+		if entity.spawned and entity.hp > 0 and str(entity.spawn_spec.get("props", {}).get("sought", "")) == id:
+			out.append(entity as Monster)
+	return out
+
+
+func _end_band(rules_was: Variant) -> void:
+	for guard in _band("rs-band"):
+		World.despawn(guard)
+	World.towns._town(STORE)["sought"].erase("rs-band")
+	World.production.remove_worker("rs-band")
+	_main._sought_bands.erase("rs-band")
+	if rules_was == null:
+		World.towns.rules.erase("sought")
+	else:
+		World.towns.rules["sought"] = rules_was
 	_sync()
 
 
@@ -1476,6 +1571,13 @@ func _test_offer_words() -> void:
 ## first words stand unasked, an amount said takes them, a bare yes does not.
 func _test_monster_talk() -> void:
 	print("\n== a monster that talks: the deal spoken unasked and standing, taken by an amount said, never by a bare yes (decision 546, npc's side) ==")
+	# The town's folk away while he talks: a resident sync falling on one of
+	# these steps would put one in earshot, and the line would go to them.
+	var homed: Array[String] = []
+	for who: String in World.towns.residents(STORE):
+		if not bool(World.production.worker(who).get("away", false)):
+			World.production.set_away(who, true)
+			homed.append(who)
 	for body: GridEntity in World.townsfolk().duplicate():
 		World.despawn(body)
 	var player := _player()
@@ -1561,6 +1663,8 @@ func _test_monster_talk() -> void:
 	talker.pact = false
 	_main._resident_mind = null
 	World.despawn(talker)
+	for who in homed:
+		World.production.set_away(who, false)
 
 
 ## Pip's alms run (decision 546, npc's side): seated as the priest's

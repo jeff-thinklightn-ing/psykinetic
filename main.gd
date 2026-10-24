@@ -216,6 +216,13 @@ var _regen: Dictionary = {}
 ## A level-placed captive (decision 518): camp place id -> the worker ids it
 ## holds from the level, placed once; saved ("placed_captives").
 var _placed_captives: Dictionary = {}
+## The sought's bands (613, enemy-ai's side): sought id -> {place (the place
+## it was placed at), stood (its band stood there for that placing)}; saved
+## ("sought_bands"), so a band killed is not stood again on a restart.
+var _sought_bands: Dictionary = {}
+## How far beyond a sought's place its band may stand (cells): the place's
+## radius and this, inside the place's room (_stand_band).
+const BAND_REACH := 2
 ## The alms runs (decision 546, npc's side): town -> {who, gold, started,
 ## at_altar, back_at, rolled, lost}, Pip's run down with the altar's gold;
 ## saved ("alms_runs"). And the players who have learned Aldous's secret
@@ -2923,6 +2930,7 @@ func _boot() -> void:
 				World.dead_rest[str(zone_name)] = (rests[zone_name] as Dictionary).duplicate()
 	# A level-placed captive (decision 518): the camps whose holds are placed already, so each is placed once.
 	_placed_captives = snapshot.get("placed_captives", {}).duplicate(true) if snapshot.get("placed_captives") is Dictionary else {}
+	_sought_bands = snapshot.get("sought_bands", {}).duplicate(true) if snapshot.get("sought_bands") is Dictionary else {}
 	_alms_runs = snapshot.get("alms_runs", {}).duplicate(true) if snapshot.get("alms_runs") is Dictionary else {}
 	_crypt_told = snapshot.get("crypt_told", {}).duplicate(true) if snapshot.get("crypt_told") is Dictionary else {}
 	_runner_out = snapshot.get("runner_out", {}).duplicate(true) if snapshot.get("runner_out") is Dictionary else {}
@@ -4374,6 +4382,7 @@ func _save_state(wait := true) -> void:
 		"raid_groups": World.raid_groups.to_dict() if World.raid_groups != null else {},
 		"trade": World.trade.to_dict() if World.trade != null else {},
 		"placed_captives": _placed_captives.duplicate(true),
+		"sought_bands": _sought_bands.duplicate(true),
 		"alms_runs": _alms_runs.duplicate(true),
 		"crypt_told": _crypt_told.duplicate(true),
 		"runner_out": _runner_out.duplicate(true),
@@ -6157,6 +6166,9 @@ static func _uses_left(record: PlayerRecord) -> int:
 ## unblessed_s, their last moments, for Bleed Out (nobody brings them back);
 ## an unblessed companion dies as ever.
 func _downed(target: GridEntity, _source: GridEntity, _cause: StringName) -> int:
+	if target is Resident and not (target as Resident).sought.is_empty() and not (target as Resident).escort_of.is_empty():
+		# A sought one led home (613, enemy-ai's side): beaten down, not killed; a word gets them up (_sought_spoken).
+		return roundi(float(_field_rules().get("window_s", 30)) * World.TICK_RATE)
 	if not (target is Player or target is Companion):
 		return 0
 	if target is Player and not _players.has(target.owner_peer):
@@ -6637,6 +6649,117 @@ func _sought_here() -> Array[Dictionary]:
 	return out
 
 
+## The sought's bands (613, enemy-ai's side): each town's sought placed
+## with a holder at a place in this zone has its band (band_of) stood about
+## the place once for that placing (_stand_band); the zone's living guards
+## tagged with the entry are counted first, so a band is topped up, never
+## doubled. A band killed stays dead until the sought is placed again (lost
+## on the way, or wandered back from town); freed, home or called off, the
+## entry is forgotten and its living guards stay as they are.
+func _sync_bands() -> void:
+	if World.towns == null or World.holdings == null or World.zone == null:
+		return
+	var rule: Dictionary = World.towns.rules.get("sought", {})
+	var seen := {}
+	for town_id: String in World.holdings.all_places():
+		if World.holdings.place(town_id).get("kind") != "stockpile":
+			continue
+		for entry: Dictionary in World.towns.sought(town_id):
+			var id := str(entry.get("id", ""))
+			var place_id := str(entry.get("place", ""))
+			if id.is_empty() or place_id.is_empty() or not str(entry.get("freed_by", "")).is_empty() 					or str(entry.get("holder", "")).is_empty():
+				continue  # Not placed, led home, or lost (no holder): no band.
+			seen[id] = true
+			var band: Dictionary = _sought_bands.get(id, {})
+			if str(band.get("place", "")) != place_id:
+				band = {"place": place_id, "stood": false}
+				_sought_bands[id] = band
+			var refuge := World.holdings.place(place_id)
+			if bool(band["stood"]) or refuge.is_empty() or str(refuge.get("area", "")) != World.zone.name:
+				continue
+			var made := _stand_band(id, band_of(rule, entry), refuge)
+			band["stood"] = true
+			print("[sought] %s's band at %s: %d stood for the %s" % [id, place_id, made, str(entry.get("holder", "")).replace("_", " ")])
+	for id: String in _sought_bands.keys():
+		if not seen.has(id):
+			_sought_bands.erase(id)
+
+
+## The band holding sought [param entry] (613; economy's rules' sought as
+## [param rule]): its trade's row's band where the entry was placed at that
+## row's where (613 amended: sought.trades[trade]; its alt, a camp, has
+## none), else sought.guards[where].band (613 as first landed); [{kind,
+## count}], [] for none.
+static func band_of(rule: Dictionary, entry: Dictionary) -> Array:
+	var where := str(entry.get("where", ""))
+	var trades: Variant = rule.get("trades")
+	if trades is Dictionary and trades.get(str(entry.get("trade", ""))) is Dictionary:
+		var row: Dictionary = trades[str(entry.get("trade", ""))]
+		return (row["band"] as Array).duplicate(true) if row.get("band") is Array and str(row.get("where", "")) == where else []
+	var guards: Variant = rule.get("guards", {})
+	var guard: Variant = guards.get(where) if guards is Dictionary else null
+	return (guard["band"] as Array).duplicate(true) if guard is Dictionary and guard.get("band") is Array else []
+
+
+## Stands sought [param id]'s [param band] about [param refuge] (a
+## holdings place in this zone): each kind's count less its living guards
+## tagged with [param id], on the free cells nearest the place's cell
+## within its radius and BAND_REACH, inside its room when it has one
+## (Monster.room_of), never on the cell or beside it, where the sought
+## stands. Each guards that cell facing the place and keeps the room
+## (props keeps_room; its props' "sought" the tag, both saved). How many.
+func _stand_band(id: String, band: Array, refuge: Dictionary) -> int:
+	if band.is_empty():
+		return 0
+	var at: Vector2i = refuge.get("cell", Vector2i.ZERO)
+	var room := Monster.room_of(at)
+	var reach := maxi(int(refuge.get("radius", 0)), 1) + BAND_REACH
+	var standing := {}
+	for entity in World.monsters():
+		var props: Variant = entity.spawn_spec.get("props", {})
+		if entity.spawned and entity.hp > 0 and props is Dictionary and str(props.get("sought", "")) == id:
+			var kind := World.kind_of(entity)
+			standing[kind] = int(standing.get(kind, 0)) + 1
+	var spots: Array[Vector2i] = []
+	for dy in range(-reach, reach + 1):
+		for dx in range(-reach, reach + 1):
+			var cell := at + Vector2i(dx, dy)
+			if World.distance(cell, at) > 1 and (not room.has_area() or room.has_point(cell)) and World.is_free(cell):
+				spots.append(cell)
+	spots.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
+		var da := World.distance(a, at)
+		var db := World.distance(b, at)
+		return da < db if da != db else (a.y < b.y if a.y != b.y else a.x < b.x))
+	var made := 0
+	for row: Variant in band:
+		if not row is Dictionary:
+			continue
+		var kind := str(row.get("kind", ""))
+		for i in int(row.get("count", 0)) - int(standing.get(kind, 0)):
+			if spots.is_empty():
+				push_warning("[sought] no room for %s's band at %s" % [id, refuge.get("id", "")])
+				return made
+			var spec := Level._spec_for("monster_" + kind, Level.MONSTER_TYPES)
+			if spec.is_empty():
+				push_warning("[sought] %s's band names no monster kind %s" % [id, kind])
+				break
+			var cell: Vector2i = spots.pop_front()
+			spec["name"] = ("Band_%s_%s_%d_%d" % [id, kind, World.tick, i + 1]).validate_node_name()
+			spec["tile"] = cell
+			spec["home"] = cell
+			var toward := Senses.way_toward(cell, at)
+			if toward != Vector2i.ZERO:
+				spec["facing"] = toward
+			spec["idle"] = {"mode": "guard"}
+			var props: Dictionary = (spec["props"] as Dictionary).duplicate(true) if spec.get("props") is Dictionary else {}
+			props["sought"] = id
+			props["keeps_room"] = true
+			spec["props"] = props
+			if _spawn(spec) != null:
+				made += 1
+	return made
+
+
 ## The spawned player [param player_id] in this zone, null for none.
 func _player_body(player_id: String) -> Player:
 	if player_id.is_empty():
@@ -6652,6 +6775,10 @@ func _player_body(player_id: String) -> Player:
 ## stays (its thought says why); else economy frees it (Towns.free_sought)
 ## and it follows them home, its set line said.
 func _sought_spoken(body: Resident, player_id: String, speaker: String, player: Player) -> void:
+	if World.is_downed(body):
+		World.raise_downed(body, 1)  # Beaten down on the way home (613, enemy-ai's side): a word, and they get up.
+		print("[sought] %s the %s gets up at %s's word" % [body.person, body.trade.replace("_", " "), speaker])
+		return
 	if not body.escort_of.is_empty() or World.towns == null:
 		return
 	if not body.holder.is_empty() and body.watched():
@@ -9034,6 +9161,9 @@ func _on_entity_died(entity: GridEntity, cause: StringName) -> void:
 				and (entity == pet.keeper or pet.witnessed(entity)):
 			pet.note_death(_display_name(entity), entity == pet.keeper, entity,
 				_blow_source if _blow_target == entity and is_instance_valid(_blow_source) else null)
+	if entity is Resident and not (entity as Resident).sought.is_empty() and World.towns != null:
+		# A sought one dead (bled out unroused on the way home, 613): lost, sought again somewhere after economy's days.
+		World.towns.sought_lost((entity as Resident).sought)
 	var line := ""
 	if entity is Companion:
 		# Always said: last words never wait on the speech rate limit.
@@ -11657,6 +11787,7 @@ func _on_world_ticked(tick: int) -> void:
 		t = World.part("camps, lawspeaker", t)
 		if tick % RESIDENT_SYNC_TICKS == 0:
 			_sync_residents()
+			_sync_bands()
 		t = World.part("residents", t)
 		if tick % World.WORLD_TICK_STEPS == 0 and World.zone == World.home():
 			_tend_bonds()

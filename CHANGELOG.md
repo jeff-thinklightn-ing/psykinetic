@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- A captive held by a band waits under guard: the goblins who hold the smith at the great dwarven forge stand about him (three imps and a brute) and keep to the forge room; no monster attacks the one waiting to be found, and one you lead home who is beaten down lies downed rather than dying, getting up when you speak to them.
 - A left click on the seated draugr now walks you over to talk instead of striking him; Shift+click still swings at him, and once he fights, clicks attack as before (648).
 - Saying yes or a sum to the draugr with no deal standing now gets his answer: a sum takes his deal, a bare yes is asked for the sum and his deal is put to you, and with a pact on he says nothing stands, never silence (decision 629 amended).
 - You can now give gold to the draugr without typing: press E on him for his deal and choose the sum from the buttons; what you type still works (decision 629).

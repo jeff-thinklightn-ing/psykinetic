@@ -479,7 +479,9 @@ func _ready() -> void:
 		door_force = int(row.get("door_force", 1))
 		picks_up = bool(row.get("picks_up", false))
 		fearless = bool(row.get("fearless", false))
-		keeps_room = bool(row.get("keeps_room", false))
+		# A sought's guard keeps its room too (613, enemy-ai's side; Main._stand_band's props).
+		var props: Variant = spawn_spec.get("props", {})
+		keeps_room = bool(row.get("keeps_room", false)) or props is Dictionary and bool(props.get("keeps_room", false))
 		pays_swings = bool(row.get("swing_stamina", false))  # Decision 597: off until enemy-ai's design.
 		stamina_regen_every = maxi(1, int(row.get("stamina_regen_every", 1)))  # Decision 603.
 		stamina_regen_amount = maxi(0, int(row.get("stamina_regen", 0)))  # 603 amended.
@@ -1047,6 +1049,8 @@ func _nearest_visible_target() -> GridEntity:
 		# A raider goes for the town's folk too (decision 333): they run, and
 		# beaten down they are taken (Raids._spared).
 		for entity in World.townsfolk():
+			if waiting(entity):
+				continue
 			var d := World.distance(tile, entity.tile)
 			if d <= sight_range and d < nearest_distance and senses.sees(entity, d, entity != target):
 				if entity == target:
@@ -1064,6 +1068,8 @@ func _nearest_visible_target() -> GridEntity:
 			if entity != self and not entity is Animal and factions.of_kind(World.kind_of(entity)) in foes:
 				others.append(entity)
 		for entity in others:
+			if waiting(entity):
+				continue
 			var d := World.distance(tile, entity.tile)
 			if d <= sight_range and d < nearest_distance and not entity.protected \
 					and (not keeps_room or _room.has_point(entity.tile)) and senses.sees(entity, d, entity != target):
@@ -1989,7 +1995,7 @@ func _may_fight(other: GridEntity) -> bool:
 	if other is Player or (other is Companion and (other as Companion).keeper != null):
 		return true
 	if other is Resident:
-		return "town" in foes
+		return "town" in foes and not waiting(other)
 	return other is Monster and not other is Animal and _factions().of_kind(World.kind_of(other)) in foes
 
 
@@ -2013,10 +2019,18 @@ func threatens(entity: GridEntity) -> bool:
 
 
 ## Whether either of it and [param entity] is out of any fight: gone, dead,
-## lying in its grave, downed or in its spawn grace (threatens).
+## lying in its grave, downed or in its spawn grace (threatens); nor a
+## sought one waiting to be found (waiting).
 func _may_threaten(entity: GridEntity) -> bool:
 	return spawned and hp > 0 and not laid and entity != null and is_instance_valid(entity) and entity != self \
-			and entity.spawned and entity.hp > 0 and not entity.protected and not World.is_downed(entity)
+			and entity.spawned and entity.hp > 0 and not entity.protected and not World.is_downed(entity) and not waiting(entity)
+
+
+## Whether [param entity] is a sought newcomer waiting to be found (613,
+## enemy-ai's side; npc's meta "sought_waiting", set from their body's spawn
+## till the escort starts): no monster or beast minds them, holder or not.
+static func waiting(entity: GridEntity) -> bool:
+	return entity.has_meta("sought_waiting")
 
 
 ## HOMEWARD's target: the one in its way (_blocker) or that struck it, while

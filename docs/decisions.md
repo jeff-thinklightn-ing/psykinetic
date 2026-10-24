@@ -26598,3 +26598,57 @@ controls_test _test_peaceable_click: a peaceable talker, where a plain click wal
 talk with no attack; Shift+click swings; peaceable false, a click attacks; a monster that does
 not talk is attacked whatever its flag. Client only (the flag's wire line is npc's, under 35); no
 new class_name.
+
+## 613, enemy-ai's side: the sought's band, the waiting left alone, the led downed
+
+Economy's 613 holds a sought newcomer at a place by a holder, whose band
+enemy-ai stands there; npc's body waits at the place (meta
+`sought_waiting`) and is led home by a word when no holder's monster sees
+it. The behaviour agreed with the coordinator (2026-10-18, sent again
+before landing); the label from release.
+
+- **The band**: Main._sync_bands, beside the resident sync in each zone's
+  tick: each town's sought entry placed (a place, not freed, holder not
+  "") remembers its placing in `_sought_bands` (id -> {place, stood};
+  saved as the snapshot's "sought_bands", a server-save key, no wire
+  change). The first time the place's zone ticks after a placing, the
+  band (Main.band_of: economy's 613 amended `sought.trades[trade].band`
+  when the entry stands at that row's where, its camp alt none; else 613's
+  `sought.guards[where].band`) is stood by Main._stand_band: each kind's
+  count less the zone's living guards tagged with the entry (props
+  `"sought"`), so it is topped up and never doubled, on the free cells
+  nearest the place's cell within its radius and BAND_REACH (2), inside its
+  room (Monster.room_of: the forge anchor) and never on the place's cell or
+  beside it, where the sought stands. Each guards its cell facing the
+  place (idle guard, home its cell) and keeps the room (props
+  `"keeps_room"`, read by Monster beside the row's; 645's leash is the
+  room, so the forge band never chases up the halls). Props and home are
+  saved with the entity, so the band lives through a restart and the
+  forge anchor keeps it through a regeneration.
+- **Killed stays dead**: a band killed is not stood again while that
+  placing holds; lost on the way or wandered back from town (economy's
+  leave_days), the entry is placed again and the band topped up to its
+  count. Freed, home or called off, the remembered placing is dropped and
+  its living guards stay as they are. A holder of "" (lost in the wilds)
+  and a camp (the camp's own folk hold it) stand no band.
+- **The waiting are left alone**: Monster.waiting (npc's meta) keeps a
+  waiting sought out of every monster's targets (the raider's and the
+  foes' lists, _may_fight) and out of _may_threaten, so beasts and
+  companions' guide read it too, holder or not.
+- **The led are downed, not killed**: Main._downed gives a sought being
+  led home the field rules' window_s (30 s, the blessed's) at 0 hp
+  (decision 544's downed state: 1 hp, lying, no blow lands, no foe minds
+  it); any player's word (_sought_spoken) gets them up at 1 hp. Bled out
+  unroused, their death is Towns.sought_lost (economy's lost on the way,
+  sought again after restock_days); before this a dead led body came back
+  beside its leader on the next sync.
+- The halls' own goblins are the level's (dungeon's "monsters": {"imp": 5,
+  "brute": 1}, enemy-ai's count); tuning both after a play of the halls.
+- Tests: resident_test `_test_sought_band` (band_of in both shapes; stood
+  3 imps and a brute about the place, each guarding, keeping the room, off
+  the place and beside it; not doubled; one killed stays dead; lost and
+  placed again, topped up to four; the waiting smith left alone; led,
+  beaten down, up at a word; bled out, lost). `_test_monster_talk` holds
+  the town's residents away while it runs: a resident sync falling on its
+  steps put one in earshot (it held by tick parity). Server only, protocol
+  unchanged, no new class_name.
