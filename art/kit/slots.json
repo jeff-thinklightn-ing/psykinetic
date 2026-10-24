@@ -3329,7 +3329,7 @@
 			"grey": [{"at": [-0.05, 0.022, 0], "size": [0.762, 0.43, 0.405]}]
 		},
 		"carry.game": {
-			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-24", "notes": "C:/dev/review/tools/make_work.py game: a doe, reworked after the coordinator's read of the first cut (\"a smooth tan crescent across the shoulders, more a horn or a bow than a deer\"): a lumpy body with the withers' hump and the haunch's round, a dark back over fawn flanks and a pale belly, her neck and a clear head hanging over the right side (ears hanging down, dark muzzle and eyes), a pale tail over the left, the four dark legs forward to meet before the chest at [0.25, -0.15, -0.2] from the origin, bound there with a cord, dark hooves past it; 716 tris"},
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-24", "notes": "C:/dev/review/tools/make_work.py game: a doe, reworked after the coordinator's read of the first cut (\"a smooth tan crescent across the shoulders, more a horn or a bow than a deer\"): a lumpy body with the withers' hump and the haunch's round, a near-black back over deep fawn flanks (darker after the in-game still read pale pink-orange, the tunic's colour) and a pale belly, her neck and a clear head hanging over the right side (ears hanging down, dark muzzle and eyes), a pale tail over the left, the four dark legs forward to meet before the chest at [0.25, -0.15, -0.2] from the origin, bound there with a cord, dark hooves past it; 716 tris"},
 			"category": "items",
 			"type": "mesh",
 			"kind": "held",

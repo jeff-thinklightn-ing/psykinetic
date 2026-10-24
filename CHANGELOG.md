@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The doe carried across the shoulders has a near-black back over deeper fawn sides, so it stands apart from the bearer's tunic at a distance.
 - Hovering a building outside builder mode no longer shows its builder code: a town's building shows its name and how far it is built, and pillars, tables and other scenery show nothing.
 - A held-key walk pauses for a moment when the server has fallen three steps behind it, instead of walking on and then sliding back several tiles when the server dropped the extra steps (543 amended, ui's side); a server keeping up never pauses it.
 - Townsfolk show more work: a hunter crouched with a bow, game and sacks carried on the shoulder, hoeing a row, leaning on a crook among the flock, kneeling to shear.
