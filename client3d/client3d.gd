@@ -7229,18 +7229,41 @@ func _ground_fields(input: Dictionary) -> Dictionary:
 	var floor_bytes := PackedByteArray()
 	floor_bytes.resize(across * down)
 	var chunks: Dictionary[Vector2i, PackedInt32Array] = {}
+	# Each cell's place first: a water cell's bed takes its kind from the
+	# land round it (_bed_kind), whichever slice has it.
+	for i in cells.size():
+		grounds[cells[i]] = i
+	# Each cell's kind and corners, in slices side by side (_run_slices),
+	# each with its own memo of the curve searches; then put in place in
+	# the cells' order.
+	var look_job := func(from: int, to: int) -> Array:
+		var kept: Dictionary[Vector4i, PackedInt32Array] = {}
+		var slice_kinds := PackedStringArray()
+		var slice_heights := PackedFloat32Array()
+		for i in range(from, to):
+			var cell: Vector2i = cells[i]
+			var kind := str(kinds.get(cell, "stone")) if i < floor_size else _bed_kind(cell, kinds, floor_size, grounds) if i < water_end else "grass"
+			# A road's cell drawn as the ground round it: the road is drawn
+			# from its curve (563, terrain's side), never as its cells.
+			if i < floor_size and _road_cells.has(cell):
+				kind = _road_kind_round(cell, kinds)
+			if not GROUND_CHANNELS.has(kind):
+				kind = "stone"
+			slice_kinds.append(kind)
+			slice_heights.append_array(_ground_corners(cell, kept))
+		return [slice_kinds, slice_heights, kept]
+	var looked: Array = []
+	for slice: Array in _run_slices(cells.size(), look_job):
+		curve_kept.merge(slice[2])
+		var slice_kinds: PackedStringArray = slice[0]
+		var slice_heights: PackedFloat32Array = slice[1]
+		for k in slice_kinds.size():
+			looked.append([slice_kinds[k], slice_heights.slice(k * 4, k * 4 + 4)])
 	for i in cells.size():
 		var cell: Vector2i = cells[i]
-		var kind := str(kinds.get(cell, "stone")) if i < floor_size else _bed_kind(cell, kinds, floor_size, grounds) if i < water_end else "grass"
-		# A road's cell drawn as the ground round it: the road is drawn from
-		# its curve (563, terrain's side), never as its cells.
-		if i < floor_size and _road_cells.has(cell):
-			kind = _road_kind_round(cell, kinds)
-		if not GROUND_CHANNELS.has(kind):
-			kind = "stone"
-		grounds[cell] = i
+		var kind: String = looked[i][0]
 		ground_kinds[cell] = kind
-		var corner_heights := _ground_corners(cell, curve_kept)
+		var corner_heights: PackedFloat32Array = looked[i][1]
 		corners[cell] = corner_heights
 		for c in 4:
 			heights[i * 4 + c] = corner_heights[c]
@@ -7280,18 +7303,40 @@ func _ground_fields(input: Dictionary) -> Dictionary:
 		return not (stream.get("path", []) as Array).all(func(cell: Vector2i) -> bool: return _curve_cells.has(cell)))
 	var size := Vector2i(across, down)
 	var fine := size * SHORE_RES
-	# The fields, each from the cells alone, each with its own memo.
+	# The fields, each from the cells alone: the shore and depth, the
+	# road's, and the water curves' and the forest edge's texels in slices
+	# (each with its own memo), side by side; then put together in order.
 	var shore_job := func() -> Array:
 		var shore := shore_image(cell_streams, by_cells, origin, size)
-		var depth := _water_depth(by_cells, origin, shore.get_size())
-		_curve_field(shore, depth, origin, curve_kept)
-		return [shore, depth]
+		return [shore, _water_depth(by_cells, origin, shore.get_size())]
 	var road_job := func() -> Image:
 		return _road_field(origin, fine, road_kept)
-	var edge_job := func() -> Image:
-		return _edge_field(origin, fine, edge_kept) if not _edge_curves.is_empty() else null
-	var made := _run_fields([shore_job, road_job, edge_job])
+	var curve_cells: Array = _curve_near_sample.keys()
+	var edge_cells: Array = _edge_near_sample.keys() if not _edge_curves.is_empty() else []
+	var curve_slices := _slices(curve_cells.size())
+	var edge_slices := _slices(edge_cells.size())
+	var jobs: Array = [shore_job, road_job]
+	for span: Vector2i in curve_slices:
+		jobs.append(_curve_texels.bind(curve_cells, span.x, span.y, origin, fine))
+	for span: Vector2i in edge_slices:
+		jobs.append(_edge_texels.bind(edge_cells, span.x, span.y, origin, fine, edge_kept))
+	var made := _run_fields(jobs)
 	var shore_image_made: Image = made[0][0]
+	var depth_made: Image = made[0][1]
+	for k in curve_slices.size():
+		var texels: Array = made[2 + k]
+		curve_kept.merge(texels[2])
+		_put_curve_texels(shore_image_made, depth_made, texels)
+	var edge_made: Image = null
+	if not _edge_curves.is_empty():
+		edge_made = Image.create(fine.x, fine.y, false, Image.FORMAT_RG8)
+		for k in edge_slices.size():
+			var texels: Array = made[2 + curve_slices.size() + k]
+			edge_kept.merge(texels[2])
+			var points: PackedInt32Array = texels[0]
+			var values: PackedFloat32Array = texels[1]
+			for t in values.size():
+				edge_made.set_pixel(points[t * 2], points[t * 2 + 1], Color(values[t], 1.0, 0.0))
 	var g := {"grounds": grounds, "corners": corners, "floor_bytes": floor_bytes, "origin": origin, "size": size,
 		"shore_image": shore_image_made, "floor_end": floor_count, "water_end": water_end, "curve_kept": curve_kept}
 	# The shore's cells drawn finer, SHORE_RES a side (decision 553).
@@ -7299,15 +7344,48 @@ func _ground_fields(input: Dictionary) -> Dictionary:
 	return {"cells": cells, "floor_count": floor_count, "water_end": water_end, "across": across, "down": down,
 		"origin": origin, "at": at, "heights": heights, "kind_bytes": kind_bytes, "water_bytes": water_bytes,
 		"floor_bytes": floor_bytes, "chunks": chunks, "grounds": grounds, "ground_kinds": ground_kinds,
-		"corners": corners, "top": top, "bottom": bottom, "shore_image": shore_image_made, "depth_image": made[0][1],
-		"road_image": made[1], "edge_image": made[2], "shore_heights": shore_heights,
+		"corners": corners, "top": top, "bottom": bottom, "shore_image": shore_image_made, "depth_image": depth_made,
+		"road_image": made[1], "edge_image": edge_made, "shore_heights": shore_heights,
 		"curve_kept": curve_kept, "road_kept": road_kept, "edge_kept": edge_kept}
 
 
 ## How many threads _ground_fields' fields run on (_run_fields): 1 each in
-## turn on the calling thread, 0 the pool's own count (perf's arrival sets
-## it for a small machine, decision 660).
+## turn on the calling thread, 0 FIELD_THREADS_MOST or the machine's cores
+## if fewer (perf's arrival sets it for a small machine, decision 660).
 static var field_threads := 0
+## Past this many the fields' threads gain nothing and then lose: they
+## contend for what they share (the curves they all read; 660 step 2 A2,
+## the wilds' curve field 317 ms on one thread, 130 on four, 200 on 16).
+const FIELD_THREADS_MOST := 4
+
+
+## The threads _ground_fields runs on (field_threads).
+static func _field_threads() -> int:
+	return field_threads if field_threads > 0 else mini(FIELD_THREADS_MOST, OS.get_processor_count())
+
+
+## [param count] items cut in a slice a thread (field_threads; one with
+## 1, or with too few): each slice's [from, to).
+func _slices(count: int) -> Array[Vector2i]:
+	var n := _field_threads()
+	n = clampi(n, 1, maxi(1, floori(count / float(SLICE_LEAST))))
+	var out: Array[Vector2i] = []
+	for k in n:
+		out.append(Vector2i(floori(count * k / float(n)), floori(count * (k + 1) / float(n))))
+	return out
+
+
+## The fewest items worth a slice of their own.
+const SLICE_LEAST := 64
+
+
+## [param job] (from, to) run on each of [param count]'s slices (_slices),
+## side by side, their results in order.
+func _run_slices(count: int, job: Callable) -> Array:
+	var jobs: Array = []
+	for span: Vector2i in _slices(count):
+		jobs.append(job.bind(span.x, span.y))
+	return _run_fields(jobs)
 
 
 ## Each of [param jobs] (Callables) run, side by side on WorkerThreadPool
@@ -7320,7 +7398,7 @@ func _run_fields(jobs: Array) -> Array:
 			out[i] = (jobs[i] as Callable).call()
 		return out
 	var group := WorkerThreadPool.add_group_task(func(i: int) -> void: out[i] = (jobs[i] as Callable).call(),
-			jobs.size(), field_threads if field_threads > 0 else -1, true, "ground fields")
+			jobs.size(), _field_threads(), true, "ground fields")
 	WorkerThreadPool.wait_for_group_task_completion(group)
 	return out
 
@@ -7548,62 +7626,98 @@ func _shore_band(cells: Array, floor_count: int, water_end: int, g: Dictionary) 
 	var grounds: Dictionary = g["grounds"]
 	var heights: Dictionary = g["corners"]
 	var origin: Vector2i = g["origin"]
-	var picked: Dictionary[Vector2i, bool] = {}
-	for i in water_end:
-		var cell: Vector2i = cells[i]
-		if _rocks.has(cell) or _ramp_heights.has(cell) or _floor_bytes_at(cell, g["floor_bytes"], origin, g["size"]) != 0:
-			continue
-		var water := false
-		var land := false
-		for y in range(-1, 2):
-			for x in range(-1, 2):
-				var near := cell + Vector2i(x, y)
-				var index: int = grounds.get(near, -1)
-				if index < 0 or index >= water_end:
-					continue
-				if (_wet.has(near) and not _built_water.has(near)) or _bed_levels.has(near):
-					water = true
-				else:
-					land = true
-		if not (water and land) and not _curve_cells.has(cell):
-			continue
-		var own: PackedFloat32Array = heights[cell]
-		var cliff := false
-		for side in sides:
-			var next := cell + side
-			if not heights.has(next):
+	# Each phase in slices side by side (_run_slices, 660 step 2 A2), put
+	# together in order before the next: the cells picked, their corners,
+	# their finer heights.
+	var pick_job := func(from: int, to: int) -> PackedVector2Array:
+		var found := PackedVector2Array()
+		for i in range(from, to):
+			var cell: Vector2i = cells[i]
+			if _rocks.has(cell) or _ramp_heights.has(cell) or _floor_bytes_at(cell, g["floor_bytes"], origin, g["size"]) != 0:
 				continue
-			var theirs: PackedFloat32Array = heights[next]
-			for c in 4:
-				var k := GROUND_CORNERS.find(cell + GROUND_CORNERS[c] - next)
-				if k >= 0 and absf(theirs[k] - own[c]) > Relief.EPSILON:
-					cliff = true
-		if not cliff:
-			picked[cell] = true
-	var corners: Dictionary[Vector2i, Vector2] = {}
-	for cell: Vector2i in picked:
+			var water := false
+			var land := false
+			for y in range(-1, 2):
+				for x in range(-1, 2):
+					var near := cell + Vector2i(x, y)
+					var index: int = grounds.get(near, -1)
+					if index < 0 or index >= water_end:
+						continue
+					if (_wet.has(near) and not _built_water.has(near)) or _bed_levels.has(near):
+						water = true
+					else:
+						land = true
+			if not (water and land) and not _curve_cells.has(cell):
+				continue
+			var own: PackedFloat32Array = heights[cell]
+			var cliff := false
+			for side in sides:
+				var next := cell + side
+				if not heights.has(next):
+					continue
+				var theirs: PackedFloat32Array = heights[next]
+				for c in 4:
+					var k := GROUND_CORNERS.find(cell + GROUND_CORNERS[c] - next)
+					if k >= 0 and absf(theirs[k] - own[c]) > Relief.EPSILON:
+						cliff = true
+			if not cliff:
+				found.append(cell)
+		return found
+	var picked: Dictionary[Vector2i, bool] = {}
+	for found: PackedVector2Array in _run_slices(water_end, pick_job):
+		for cell: Vector2 in found:
+			picked[Vector2i(cell)] = true
+	var picked_cells: Array = picked.keys()
+	var corner_list: Array[Vector2i] = []
+	var listed: Dictionary[Vector2i, bool] = {}
+	for cell: Vector2i in picked_cells:
 		for c in 4:
 			var corner := cell + GROUND_CORNERS[c]
-			if not corners.has(corner):
-				corners[corner] = _shore_corner(corner, picked, floor_count, water_end, grounds, heights)
+			if not listed.has(corner):
+				listed[corner] = true
+				corner_list.append(corner)
+	var corner_job := func(from: int, to: int) -> PackedVector2Array:
+		var ends := PackedVector2Array()
+		for i in range(from, to):
+			ends.append(_shore_corner(corner_list[i], picked, floor_count, water_end, grounds, heights))
+		return ends
+	var corners: Dictionary[Vector2i, Vector2] = {}
+	var i := 0
+	for ends: PackedVector2Array in _run_slices(corner_list.size(), corner_job):
+		for end: Vector2 in ends:
+			corners[corner_list[i]] = end
+			i += 1
 	var row := SHORE_RES + 1
-	for cell: Vector2i in picked:
-		if _curve_band(cell):
-			band[cell] = _curve_fine(cell, picked, g)
-			continue
-		var ends: Array[Vector2] = []
-		for c in 4:
-			ends.append(corners[cell + GROUND_CORNERS[c]])
-		var fine := PackedFloat32Array()
-		fine.resize(row * row)
-		for y in row:
-			for x in row:
-				var u := x / float(SHORE_RES)
-				var v := y / float(SHORE_RES)
-				var mixed := ends[0].lerp(ends[1], u).lerp(ends[2].lerp(ends[3], u), v)
-				var m := shore_at(Vector2(cell) + Vector2(u - 0.5, v - 0.5), image, origin)
-				fine[y * row + x] = lerpf(mixed.y, mixed.x, smoothstep(0.3, 0.5, m))
-		band[cell] = fine
+	var band_job := func(from: int, to: int) -> Array:
+		var mine := g.duplicate()
+		mine["curve_kept"] = {}
+		var fines: Array[PackedFloat32Array] = []
+		for k in range(from, to):
+			var cell: Vector2i = picked_cells[k]
+			if _curve_band(cell):
+				fines.append(_curve_fine(cell, picked, mine))
+				continue
+			var ends: Array[Vector2] = []
+			for c in 4:
+				ends.append(corners[cell + GROUND_CORNERS[c]])
+			var fine := PackedFloat32Array()
+			fine.resize(row * row)
+			for y in row:
+				for x in row:
+					var u := x / float(SHORE_RES)
+					var v := y / float(SHORE_RES)
+					var mixed := ends[0].lerp(ends[1], u).lerp(ends[2].lerp(ends[3], u), v)
+					var m := shore_at(Vector2(cell) + Vector2(u - 0.5, v - 0.5), image, origin)
+					fine[y * row + x] = lerpf(mixed.y, mixed.x, smoothstep(0.3, 0.5, m))
+			fines.append(fine)
+		return [fines, mine["curve_kept"]]
+	var kept: Dictionary = g["curve_kept"]
+	i = 0
+	for slice: Array in _run_slices(picked_cells.size(), band_job):
+		kept.merge(slice[1])
+		for fine: PackedFloat32Array in slice[0]:
+			band[picked_cells[i]] = fine
+			i += 1
 	for cell: Vector2i in band:
 		var fine: PackedFloat32Array = band[cell]
 		heights[cell] = PackedFloat32Array([fine[0], fine[SHORE_RES], fine[SHORE_RES * row], fine[row * row - 1]])
@@ -8102,8 +8216,21 @@ func _curve_surface(point: Vector2, kept: Dictionary = _curve_kept) -> float:
 ## into it (out to two cells); the larger kept where a water without a
 ## curve's is there too.
 func _curve_field(image: Image, depth: Image, origin: Vector2i, kept: Dictionary = _curve_kept) -> void:
-	var size := image.get_size()
-	for cell: Vector2i in _curve_near_sample:
+	var cells: Array = _curve_near_sample.keys()
+	var texels := _curve_texels(cells, 0, cells.size(), origin, image.get_size())
+	kept.merge(texels[2])
+	_put_curve_texels(image, depth, texels)
+
+
+## The curve field's texels from [param cells][from, to) (660 step 2 A2:
+## a slice's, made apart from the images, each texel of one cell alone):
+## [their x, y pairs, signed distances, the curve searches' memo].
+func _curve_texels(cells: Array, from: int, to: int, origin: Vector2i, size: Vector2i) -> Array:
+	var kept: Dictionary[Vector4i, PackedInt32Array] = {}
+	var points := PackedInt32Array()
+	var values := PackedFloat32Array()
+	for i in range(from, to):
+		var cell: Vector2i = cells[i]
 		var at := cell - origin
 		if at.x < 0 or at.y < 0 or at.x * SHORE_RES >= size.x or at.y * SHORE_RES >= size.y:
 			continue
@@ -8113,9 +8240,20 @@ func _curve_field(image: Image, depth: Image, origin: Vector2i, kept: Dictionary
 				var signed := _curve_near(point, kept).x
 				if signed == -INF:
 					continue
-				var texel := Vector2i(at.x * SHORE_RES + u, at.y * SHORE_RES + v)
-				image.set_pixelv(texel, Color(maxf(image.get_pixelv(texel).r, clampf(0.5 + signed, 0.0, 1.0)), 0.0, 0.0))
-				depth.set_pixelv(texel, Color(maxf(depth.get_pixelv(texel).r, clampf(signed * 0.5, 0.0, 1.0)), 0.0, 0.0))
+				points.append_array([at.x * SHORE_RES + u, at.y * SHORE_RES + v])
+				values.append(signed)
+	return [points, values, kept]
+
+
+## _curve_texels' [param texels] into [param image] and [param depth].
+static func _put_curve_texels(image: Image, depth: Image, texels: Array) -> void:
+	var points: PackedInt32Array = texels[0]
+	var values: PackedFloat32Array = texels[1]
+	for t in values.size():
+		var texel := Vector2i(points[t * 2], points[t * 2 + 1])
+		var signed := values[t]
+		image.set_pixelv(texel, Color(maxf(image.get_pixelv(texel).r, clampf(0.5 + signed, 0.0, 1.0)), 0.0, 0.0))
+		depth.set_pixelv(texel, Color(maxf(depth.get_pixelv(texel).r, clampf(signed * 0.5, 0.0, 1.0)), 0.0, 0.0))
 
 
 ## Each river curve's water as a ribbon (559, terrain's side, 557 on the curve):
@@ -8446,14 +8584,32 @@ func _edge_segments(cell: Vector2i) -> PackedVector2Array:
 ## edge); the ground reads the cells' forest mask elsewhere.
 func _edge_field(origin: Vector2i, size: Vector2i, kept: Dictionary = _edge_kept) -> Image:
 	var image := Image.create(size.x, size.y, false, Image.FORMAT_RG8)
-	for cell: Vector2i in _edge_near_sample:
+	var cells: Array = _edge_near_sample.keys()
+	var texels := _edge_texels(cells, 0, cells.size(), origin, size, kept)
+	kept.merge(texels[2])
+	var points: PackedInt32Array = texels[0]
+	var values: PackedFloat32Array = texels[1]
+	for t in values.size():
+		image.set_pixel(points[t * 2], points[t * 2 + 1], Color(values[t], 1.0, 0.0))
+	return image
+
+
+## The forest edge field's texels from [param cells][from, to) (660 step 2
+## A2, as _curve_texels): [their x, y pairs, values, the segments' memo
+## by cell: [param kept]'s where it has them, else found here].
+func _edge_texels(cells: Array, from: int, to: int, origin: Vector2i, size: Vector2i, kept: Dictionary = {}) -> Array:
+	var found: Dictionary[Vector2i, PackedVector2Array] = {}
+	var points := PackedInt32Array()
+	var values := PackedFloat32Array()
+	for i in range(from, to):
+		var cell: Vector2i = cells[i]
 		var at := cell - origin
 		if at.x < 0 or at.y < 0 or at.x * SHORE_RES >= size.x or at.y * SHORE_RES >= size.y:
 			continue
 		# Every texel's point rounds to this cell: its segments, once.
+		var ends: PackedVector2Array = kept[cell] if kept.has(cell) else _edge_segments(cell)
 		if not kept.has(cell):
-			kept[cell] = _edge_segments(cell)
-		var ends: PackedVector2Array = kept[cell]
+			found[cell] = ends
 		if ends.is_empty():
 			continue
 		for v in SHORE_RES:
@@ -8462,8 +8618,9 @@ func _edge_field(origin: Vector2i, size: Vector2i, kept: Dictionary = _edge_kept
 				var signed := _edge_signed_on(point, ends)
 				if is_nan(signed):
 					continue
-				image.set_pixelv(Vector2i(at.x * SHORE_RES + u, at.y * SHORE_RES + v), Color(clampf(0.5 + signed, 0.0, 1.0), 1.0, 0.0))
-	return image
+				points.append_array([at.x * SHORE_RES + u, at.y * SHORE_RES + v])
+				values.append(clampf(0.5 + signed, 0.0, 1.0))
+	return [points, values, found]
 
 
 ## Mist at each tall fall's foot (570 amended, terrain's side; the

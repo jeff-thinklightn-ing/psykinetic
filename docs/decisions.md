@@ -27497,11 +27497,15 @@ noon, a 12-tile walk, three interleaved rounds). At the wilds square, reach 38 /
 GPU 1.4 / 1.6 / 1.9 / 2.3 ms a frame and the CPU 1.1 / 1.1 / 1.2 / 1.2 ms. A full build
 from nothing took about 250 ms, about 2 s of fill at the 2 ms budget. On the hills every
 reach was the same: the map is small enough that 38 covers it. 90 is the furthest within
-the +0.5 ms line, and it answers "load in earlier" best. **60 is the named fallback**
-should a laptop play test show the cost: a laptop GPU likely sees 2-3x the difference.
+the +0.5 ms line, and it answers "load in earlier" best. (60 was named the fallback
+should a laptop play test show the cost; Jeff's ruling below settles it.)
 SCATTER_KEEP 16 holds what stays drawn after a walk to about 1.3x the full build, and
 that band past the reach is shrunk to nothing, so it costs vertex work but no pixels.
 view_test _test_low_scatter. Protocol unchanged, no new class_name.
+
+**Jeff's ruling, on v0.1.172** (2026-10-24, through the coordinator): "grass load in is
+just about right - at that distance it just feels that the load in is natural visual
+distance". The reach stays 90; the 60 fallback is dropped.
 
 ## 649 amended, buildings' side: the decline looks, from their review shots
 
@@ -28258,3 +28262,37 @@ the same byte for byte as main's (d0ff03f9), with one thread and with the pool.
 view_test _test_ground_fields (Held: its river's shore, roads and forest edge):
 _ground_fields leaves the members as they were; one thread and the pool make the same
 bytes. Protocol unchanged, no new class_name.
+
+
+## 660 step 2 A2, terrain's side: the ground's fields in slices
+
+Perf's first numbers on 660 step 2 A (the ground's fields apart from the members, run on
+a worker as a crossing begins): the fields were 1.8 s of the wilds' 2.7-3.0 s to the card
+lifting, with the corner pass and the shore's finer cells (_shore_band) run one after
+the other round a three-way fan-out that gave little. The coordinator approved cutting
+them into slices across threads (with perf's per-zone field cache beside it).
+
+- **The corner pass in slices.** Each cell's place first (grounds, a quick pass: a
+  water cell's bed takes its kind from the land round it, _bed_kind, whichever slice has
+  it), then each cell's kind and corners in slices side by side (_run_slices), each with
+  its own memo of the curve searches, then put in place in the cells' order.
+- **_shore_band in its three phases**: the cells picked, their corners (_shore_corner,
+  the corners listed in the order the one pass met them), their finer heights
+  (_curve_fine with a slice's own memo, or the shore field), each in slices put together
+  in order before the next; the four corners written back last, as before.
+- **The water curves' and the forest edge's fields as texels**: _curve_texels and
+  _edge_texels make a slice of cells' texels apart from the images (each texel is one
+  cell's alone), and they run beside the shore and depth and the road's in one fan-out,
+  put into the images in order after. _curve_field and _edge_field do the same on one
+  thread for any other caller.
+- **Four threads at most** (FIELD_THREADS_MOST; Client3D.field_threads still sets it,
+  1 each in turn on the calling thread). Past four the threads lose: they contend for
+  what they all read. On this machine the wilds' curve field took 317 ms on one thread,
+  130 on four and 200 on 16; sixteen of the road's whole field at once took 2998 ms
+  against 250 for one.
+
+The same digest as A's (every ground member, image and texture on hills, wilds, castle,
+barrow, held and forest) matches main's byte for byte, at one thread and at four. The
+fields alone, headless beside economy's soak: the wilds 2.06 s on one thread, 0.78 s on
+four; the hills 0.52 and 0.22; Held 0.89 and 0.34. view_test's _test_ground_fields (A's)
+covers it. Protocol unchanged, no new class_name.
