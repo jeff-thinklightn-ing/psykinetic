@@ -11,6 +11,7 @@ const Tools := preload("res://sim/level_gen/gen_tools.gd")
 ## tests/run.ps1 or tests/run.sh.
 
 const Sheet := preload("res://tools/plan_sheet.gd")
+const Labyrinth := preload("res://sim/level_gen/labyrinth.gd")
 
 var _failures := 0
 
@@ -212,6 +213,22 @@ func _test_barrow() -> void:
 			if str(n[4]) == "hidden":
 				picks[Vector2i(int(n[0]), int(n[1]))] = true
 	_check(picks.size() >= 2, "the pick moves between generations (%d different over six)" % picks.size())
+	# Moss and webs (647): the hall's own webs kept, the rest rolled, dry
+	# on the first layer; a web on no slab, no shelf and never the hidden
+	# niche; the parse keeps every one; none on a way's path.
+	var decor := _decor_report(config, level, a, anchors)
+	_check(decor["kept_hand"] == 3 and decor["parsed"] and decor["webs_open"] and decor["off_markers"] and decor["strip_share"] >= 0.01 and decor["strip_share"] <= 0.12,
+		"the first hall's two webs and its strip of moss are kept; the tombs get a little moss (%.2f of their wall feet) and webs in corners and open niches only, never the hidden one; the parse keeps every one (%s)" % [decor["strip_share"], decor["counts"]])
+	_check(Regen.generate("lab_barrow", 1)["config"]["decor"] == config["decor"] and second["config"]["decor"] != config["decor"],
+		"the same seed rolls the same decor, another generation another")
+	var regen_warnings: Array[String] = []
+	var regen_config := Level.regenerate_from(Level.template("lab_barrow")["config"], regen_warnings)
+	regen_config["niches"] = Level.template("lab_barrow")["config"].get("niches", [])
+	var raw: LevelMap = Labyrinth.generate(template, regen_config, Regen.seed_for("lab_barrow", 1))
+	var paths: Dictionary = raw.extras.get("paths", {})
+	var rolled: Array = Regen.decor_of(raw, anchors, regen_config, {"niches": [], "spawn_points": {}, "decor": []}, Regen.seed_for("lab_barrow", 1), false)
+	var on_path := rolled.filter(func(d: Array) -> bool: return paths.has(Vector2i(int(d[0]), int(d[1]))))
+	_check(paths.size() > 50 and rolled.size() > 0 and on_path.is_empty(), "the generator records the ways' cells on the map and the roll keeps off them (%d path cells, %d rolled, %d on a path)" % [paths.size(), rolled.size(), on_path.size()])
 	_check(level["warnings"].is_empty() and level["links"].size() == 2 and level["links"][1]["to_map"] == "barrow_deep" and level["spawn_points"].size() == 2 and level["places"].has("niche"),
 		"no warnings; the way up and the stair down kept, the spawn points, Pip's niche place (%s)" % [level["warnings"]])
 	_check(_broad(a, floor_cells) * 10 >= floor_cells.size() * 8, "the ways are five wide: most floor cells have floor on two opposite sides (%d of %d)" % [_broad(a, floor_cells), floor_cells.size()])
@@ -322,6 +339,10 @@ func _test_barrow() -> void:
 		cells_used[cell] = true
 	_check(deep_niches_ok and deep_kinds.has("b") and deep_kinds.has("d") and level["terrain"]["niches"].size() == niches.size(),
 		"the Ossuary's niches are cut into its walls with rock behind, one a cell, shelves and columbarium cells with hollows among them, none in an anchor, and the parse keeps every one (%d: %s)" % [niches.size(), deep_kinds])
+	decor = _decor_report(config, level, a, anchors)
+	_check(decor["kept_hand"] == 0 and decor["parsed"] and decor["webs_open"] and decor["off_markers"] and decor["strip_share"] >= 0.08 and decor["strip_share"] <= 0.25
+		and int(decor["counts"].get("moss_patch", 0)) > 0 and int(decor["counts"].get("web_corner", 0)) > 0,
+		"the Ossuary's moss is rolled over its galleries (%.2f of the wall feet), patches on the floor, webs in corners and across open hollows only, nothing in the anchors; the parse keeps every one (%s)" % [decor["strip_share"], decor["counts"]])
 	_check(_broad(a, floor_cells) * 10 >= floor_cells.size() * 8, "the ways are five wide: most floor cells have floor on two opposite sides (%d of %d)" % [_broad(a, floor_cells), floor_cells.size()])
 	# Layer 3: the dark below, every room deep, and the Hall of Fallen Souls kept whole.
 	var dark := Regen.generate("lab_barrow_lair", 1)
@@ -347,6 +368,10 @@ func _test_barrow() -> void:
 			doors += 1
 	kinds = _kinds(level)
 	_check(doors == 1 and level["terrain"]["torches"].is_empty() and config.get("niches", []).is_empty(), "the dark below: no door but the hall's own, no torches, no niches, every room a cavern (%d doors, %d torches)" % [doors, level["terrain"]["torches"].size()])
+	decor = _decor_report(config, level, a, anchors)
+	_check(decor["kept_hand"] == Sheet.LAIR_DECOR.size() and decor["parsed"] and decor["off_markers"] and decor["strip_share"] >= 0.25 and decor["strip_share"] <= 0.45
+		and int(decor["counts"].get("web_niche", 0)) == 0,
+		"the damp hall keeps its own moss and cobwebbed corners (%d), the caverns grow moss thick (%.2f of the wall feet), no niche to web; the parse keeps every one (%s)" % [decor["kept_hand"], decor["strip_share"], decor["counts"]])
 	_check(kinds.get("skeleton", 0) == 6 and kinds.get("chest", 0) == 4 and kinds.get("draugr", 0) == 1 and kinds.get("robber", 0) == 0,
 		"six of the oldest dead and four chests laid; the draugr kept on his throne (%s)" % [kinds])
 	var in_hall := 0
@@ -451,6 +476,52 @@ func _cut_off(map: LevelMap, start: Vector2i) -> Array[Vector2i]:
 			if map.walkable(cell) and not seen.has(cell):
 				out.append(cell)
 	return out
+
+
+## The decor (647) of a generated [param config] against its parse
+## [param level] and map [param a]: {counts: by kind, kept_hand: entries
+## inside the anchors (the template's own), parsed: the parse keeps every
+## listed one, webs_open: every web_niche hangs on a listed niche of kind
+## "a" or "c" with variant 1, off_markers: none on a cell that is not plain
+## floor (a link, a chest, a spawn point's cell), strip_share: moss strips
+## outside the anchors over the floor cells outside them with rock beside}.
+func _decor_report(config: Dictionary, level: Dictionary, a: LevelMap, anchors: Array) -> Dictionary:
+	var counts := {}
+	var kept_hand := 0
+	var webs_open := true
+	var off_markers := true
+	var strips := 0
+	var open_niches := {}
+	for niche: Array in config.get("niches", []):
+		if str(niche[4]) in ["a", "c"] and int(niche[5]) == 1:
+			open_niches[Terrain.edge_key(Vector2i(int(niche[0]), int(niche[1])), Vector2i(int(niche[2]), int(niche[3])))] = true
+	var spawns := {}
+	for at: Variant in config.get("spawn_points", {}).values():
+		spawns[Vector2i(int(at[0]), int(at[1]))] = true
+	var listed: Array = config.get("decor", [])
+	for entry: Array in listed:
+		var cell := Vector2i(int(entry[0]), int(entry[1]))
+		var step := Vector2i(int(entry[2]), int(entry[3]))
+		var kind := str(entry[4])
+		counts[kind] = int(counts.get(kind, 0)) + 1
+		if Level.in_anchors(anchors, cell) and kind != "web_niche":
+			kept_hand += 1
+		elif kind == "moss_strip":
+			strips += 1
+		if kind == "web_niche" and not open_niches.has(Terrain.edge_key(cell, step)):
+			webs_open = false
+		if a.cell(cell) not in Level.GROUNDS or spawns.has(cell):
+			off_markers = false
+	var wall_feet := 0
+	for cell: Vector2i in a.cells:
+		if not a.walkable(cell) or Level.in_anchors(anchors, cell):
+			continue
+		for direction: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+			if not a.walkable(cell + direction):
+				wall_feet += 1
+				break
+	return {"counts": counts, "kept_hand": kept_hand, "parsed": level["terrain"]["decor"].size() == listed.size(), "webs_open": webs_open,
+		"off_markers": off_markers, "strip_share": float(strips) / float(maxi(wall_feet, 1))}
 
 
 func _check(ok: bool, label: String) -> void:

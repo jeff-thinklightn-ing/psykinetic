@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The barrow grows moss on its walls and floors, thickest in the damp Hall of Fallen Souls, and spiders have webbed its corners and the open burial niches; the shifting halls roll theirs afresh each generation (decision 647, dungeon's side; terrain draws them).
 - The Hall of Fallen Souls is set for its feast: the round table with eight chairs round it, broken tables along the walls, and the draugr's throne on his dais (580 step 3, dungeon's side, 3b).
 - The Ossuary holds fourteen of the ancient dead (a draft number) spread through its depths, the first met a few rooms in and more the deeper you go, instead of six at its far end (decision 631).
 - The barrow's first hall has its burial table and the Hall of Fallen Souls its six pillars as art-kit's pieces in place of blocks of rock, and the draugr's dais stands a step up with a flight of stairs along its front (580 step 3, dungeon's side).

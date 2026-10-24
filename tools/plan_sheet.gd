@@ -110,6 +110,21 @@ const LAIR_FROM_TEMPLE := Vector2i(49, 64)
 const LAIR_SHORTCUT_LINK := Vector2i(49, 65)
 ## The barrow's legend: enemy-ai's kinds (547, 548), the barrow's own level.json
 ## colours, never Level.LEGEND's.
+## The first hall's own decor (647): webs in the two corners by the way
+## in, where nobody walks, and a strip of moss at the south wall's foot.
+const BARROW_DECOR: Array = [[28, 1, -1, -1, "web_corner", 1], [51, 1, 1, -1, "web_corner", 2], [33, 16, 0, 1, "moss_strip", 1]]
+## The Hall of Fallen Souls' own decor (647; the damp hall): moss along
+## its walls' feet between the furniture, patches on its floor off the
+## ways, webs in its four corners.
+const LAIR_DECOR: Array = [
+	[34, 44, -1, -1, "web_corner", 1], [65, 44, 1, -1, "web_corner", 2], [34, 65, -1, 1, "web_corner", 2], [65, 65, 1, 1, "web_corner", 1],
+	[34, 46, -1, 0, "moss_strip", 1], [34, 49, -1, 0, "moss_strip", 2], [34, 58, -1, 0, "moss_strip", 1], [34, 61, -1, 0, "moss_strip", 2],
+	[65, 47, 1, 0, "moss_strip", 2], [65, 50, 1, 0, "moss_strip", 1], [65, 59, 1, 0, "moss_strip", 2], [65, 62, 1, 0, "moss_strip", 1],
+	[37, 44, 0, -1, "moss_strip", 1], [43, 44, 0, -1, "moss_strip", 2], [56, 44, 0, -1, "moss_strip", 1], [62, 44, 0, -1, "moss_strip", 2],
+	[37, 65, 0, 1, "moss_strip", 2], [41, 65, 0, 1, "moss_strip", 1], [58, 65, 0, 1, "moss_strip", 1], [62, 65, 0, 1, "moss_strip", 2],
+	[37, 47, 0, 0, "moss_patch", 1], [44, 50, 0, 0, "moss_patch", 2], [55, 50, 0, 0, "moss_patch", 3], [62, 47, 0, 0, "moss_patch", 1],
+	[38, 58, 0, 0, "moss_patch", 2], [61, 58, 0, 0, "moss_patch", 3], [45, 57, 0, 0, "moss_patch", 1], [54, 57, 0, 0, "moss_patch", 2],
+	[40, 63, 0, 0, "moss_patch", 3], [59, 63, 0, 0, "moss_patch", 1]]
 const BARROW_LEGEND := {"monster_skeleton": "#d8d0b0", "monster_skeleton_guard": "#988c64", "monster_robber": "#8a5a2a", "monster_draugr": "#5a4636"}
 
 
@@ -219,6 +234,7 @@ static func sample_barrow() -> Dictionary:
 		"links": [{"at": [BARROW_LINK.x, BARROW_LINK.y], "to_map": "wilds", "to_spawn": "from_barrow"},
 			{"at": [BARROW_STAIR.x, BARROW_STAIR.y], "to_map": "barrow_deep", "to_spawn": "from_above", "hidden": true}],
 		"niches": barrow_niches(),
+		"decor": BARROW_DECOR,  # Webs in the entry corners, moss at the south wall (647).
 		"places": {"niche": {"at": [BARROW_NICHE.x, BARROW_NICHE.y], "kind": "other", "radius": 1, "name": "a niche in the wall"}},
 		"entities": [{"at": [BARROW_ALTAR.x, BARROW_ALTAR.y], "name": "Altar", "props": {"slots": ["", "", "", ""]}},
 			{"at": [BARROW_PACK.x, BARROW_PACK.y], "name": "Runner's pack", "props": {"grave": false, "slots": ["", "", "", ""]}}],
@@ -307,6 +323,7 @@ static func sample_barrow_lair() -> Dictionary:
 			"monsters": {"skeleton": 6}, "chests": 4},
 		"stills": ["barrow_deep", "barrow"], "dead": {"temper": "bold", "sees_in_dark": true, "graves": false},
 		"damp": true, "ambient": 0.03,
+		"decor": LAIR_DECOR,  # The damp hall's moss and its cobwebbed corners (647).
 		"legend": BARROW_LEGEND, "respawn_s": {"skeleton": 600}}
 	return {"layout": layout, "height": Level.height_image(layout, heights), "config": config}
 

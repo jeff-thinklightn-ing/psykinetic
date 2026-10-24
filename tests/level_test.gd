@@ -58,6 +58,7 @@ func _ready() -> void:
 	_test_barrow_won()
 	await _test_hall_door()
 	await _test_hidden_niche()
+	_test_decor()
 	_test_barrow_level()
 	await _test_edge_links()
 	_test_console()
@@ -1399,6 +1400,12 @@ func _test_barrow_level() -> void:
 	_check(deep["display_name"] == "The Ossuary" and deep["size"] == Vector2i(100, 80) and deep["warnings"].is_empty()
 		and lair["display_name"] == "Hall of Fallen Souls" and lair["size"] == Vector2i(100, 80) and lair["warnings"].is_empty(),
 		"the Ossuary and the Hall of Fallen Souls, 100 x 80 each, parse with no warning (%s %s)" % [deep["warnings"], lair["warnings"]])
+	# Moss and webs (647): the templates' own, the rest rolled by a generation.
+	var corner_webs := func(level: Dictionary) -> int:
+		return level["terrain"]["decor"].filter(func(d: Dictionary) -> bool: return d["kind"] == "web_corner").size()
+	_check(barrow["terrain"]["decor"].size() == 3 and corner_webs.call(barrow) == 2 and deep["terrain"]["decor"].is_empty()
+		and lair["terrain"]["decor"].size() == 30 and corner_webs.call(lair) == 4,
+		"the first hall holds two cobwebbed corners and a strip of moss, the Ossuary nothing of its own, the Hall of Fallen Souls its moss and four webbed corners (%d, %d, %d)" % [barrow["terrain"]["decor"].size(), deep["terrain"]["decor"].size(), lair["terrain"]["decor"].size()])
 	_check(Regen.marked("barrow") and Regen.config_of("barrow")["anchors"].size() == 4 and int(Regen.config_of("barrow").get("layer", 0)) == 1
 		and Regen.marked("barrow_deep") and Regen.config_of("barrow_deep")["anchors"].size() == 2 and int(Regen.config_of("barrow_deep").get("layer", 0)) == 2
 		and Regen.marked("barrow_lair") and Regen.config_of("barrow_lair")["anchors"].size() == 2 and int(Regen.config_of("barrow_lair").get("layer", 0)) == 3
@@ -1544,6 +1551,43 @@ func _test_barrow_level() -> void:
 	_check(_main.admin_command("regenerate now barrow") == "regenerate now: refused in a test run on the shared overlay" and not Level.overlaid("barrow"),
 		"regenerate now (541 amended) is refused in a test run on the shared overlay: the barrow stays its template")
 	_check(_main.admin_command("regenerate now castle").begins_with("regenerate now: castle is no shifting level"), "and names a level that does not shift")
+
+
+## Moss and webs (647): level.json's "decor" read by Level.decor_from,
+## each kind held to its place, the bad ones said and left out.
+func _test_decor() -> void:
+	print("\n== moss and webs (647): a patch on the floor, a strip at a wall's foot, a web in a corner or across an open niche; the misplaced left out ==")
+	# The hidden door's 8 x 6 room again: three niches in its north wall,
+	# the east one hidden with its alcove behind a door edge.
+	var rows: Array[String] = []
+	for py in 6 * 2 - 1:
+		var row := ""
+		for px in 8 * 2 - 1:
+			var cell := Vector2i(px / 2, py / 2)
+			var floor_here := px % 2 == 0 and py % 2 == 0 and (cell.x >= 1 and cell.x <= 6 and cell.y >= 1 and cell.y <= 4 or cell == Vector2i(6, 0))
+			row += "+" if px == 12 and py == 1 else ("." if floor_here else " ")
+		rows.append(row)
+	Level.register("lt_decor", Level.image_from_rows(rows, {Vector2i(3, 3): "start", Vector2i(6, 0): "link"}), null,
+		{"niches": [[2, 1, 0, -1, "a", 1], [4, 1, 0, -1, "c", 2], [6, 1, 0, -1, "hidden", 1]],
+			"links": [{"at": [6, 0], "to_map": "test_room", "to_spawn": "", "hidden": true}],
+			"decor": [[3, 3, 0, 0, "moss_patch", 3], [2, 4, 0, 1, "moss_strip", 2], [1, 1, -1, -1, "web_corner", 1], [2, 1, 0, -1, "web_niche", 2],
+				[4, 1, 0, -1, "web_niche", 1], [6, 1, 0, -1, "web_niche", 1], [3, 2, 1, 0, "moss_strip", 1], [3, 3, 1, 0, "moss_patch", 1],
+				[3, 3, 1, 1, "web_corner", 1], [3, 2, 0, 0, "moss_patch", 4], [3, 3, 0, 0, "moss_patch", 1], [5, 5, 0, 0, "moss_patch", 1], [1, 1, "x"]]})
+	var parsed := Level.load_level("lt_decor")
+	var decor: Array = parsed["terrain"]["decor"]
+	var kinds := decor.map(func(d: Dictionary) -> String: return d["kind"])
+	_check(decor.size() == 4 and kinds == ["moss_patch", "moss_strip", "web_corner", "web_niche"],
+		"the four well placed are read in order: a patch, a strip, a corner web, a niche web (%s)" % [kinds])
+	_check(decor.size() == 4 and decor[0]["out"] == Vector2i.ZERO and not decor[0].has("edge") and decor[0]["variant"] == 3
+		and decor[1]["edge"] == Terrain.edge_key(Vector2i(2, 4), Vector2i(0, 1)) and decor[1]["out"] == Vector2i(0, 1)
+		and decor[2]["out"] == Vector2i(-1, -1) and not decor[2].has("edge")
+		and decor[3]["edge"] == parsed["terrain"]["niches"][0]["edge"] and decor[3]["out"] == Vector2i(0, -1) and decor[3]["variant"] == 2,
+		"each as terrain reads it: the patch with no edge, the strip and the niche web with theirs, the corner web with its diagonal (%s)" % [decor])
+	var warnings: Array = parsed["warnings"].filter(func(w: String) -> bool: return w.begins_with("decor "))
+	_check(warnings.size() == 9 and parsed["warnings"].size() == 9,
+		"the nine misplaced are said and left out: a web on a sealed niche, on the hidden one, a strip on an open edge, a patch with a step, a corner with no wall, a variant the kind has not, a second patch on the cell, one in the rock, one malformed (%s)" % [warnings])
+	Level.register("lt_decor_bad", Level.image_from_rows(rows, {Vector2i(3, 3): "start"}), null, {"decor": {"moss": 1}})
+	_check(Level.load_level("lt_decor_bad")["warnings"] == ["\"decor\" in level.json is not a list"], "a \"decor\" that is no list is said")
 
 
 func _test_edge_links() -> void:

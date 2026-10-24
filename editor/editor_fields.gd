@@ -97,7 +97,7 @@ const KINDS := {
 ## level.json keys Level reads that the panel does not offer (painted, laid
 ## by other tools, or not hand-edited): the every-key check's other half.
 const NOT_OFFERED: Array[String] = ["legend", "became", "loot", "clearings", "roofs", "town_walls", "item_style", "grave_goods", "monsters", "centre",
-	"herds", "dead_ground", "building_codes", "niches", "plots"]
+	"herds", "dead_ground", "building_codes", "niches", "plots", "decor"]
 const FACINGS := {"north": [0, -1], "east": [1, 0], "south": [0, 1], "west": [-1, 0]}
 
 

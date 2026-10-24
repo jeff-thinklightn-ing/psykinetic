@@ -20,6 +20,11 @@ var cells: Dictionary[Vector2i, String] = {}
 var edges: Dictionary[Vector3i, String] = {}
 ## height.png: cell -> level 1..Level.MAX_HEIGHT (0 is left out).
 var heights: Dictionary[Vector2i, int] = {}
+## What a generator records about the map beyond its cells and edges, for
+## Regen to read after a generation (647: Labyrinth's "paths", the cells
+## the ways run through, so the decor roll keeps off them). Never in the
+## images; copy() takes it along.
+var extras: Dictionary = {}
 ## relief.png (decision 525): the ground's elevation in metres, row by row
 ## over [member size]; empty for a map that has none (its heights are its
 ## ground).
@@ -85,6 +90,7 @@ func copy() -> LevelMap:
 	out.edges = edges.duplicate()
 	out.heights = heights.duplicate()
 	out.relief = relief.duplicate()
+	out.extras = extras.duplicate(true)
 	return out
 
 

@@ -60,7 +60,8 @@ extends RefCounted
 ## way is carved, 3 (the default) or 5, an odd number of cells; "niches"
 ## (608, layer 1; Regen passes the template's top-level list): the first
 ## hall's niche edges, re-rolled and one of them made the hidden door each
-## generation (niche_plan).
+## generation (niche_plan). The map returned carries the ways' cells in
+## its extras as "paths" (647: Regen's decor roll keeps off them).
 
 const Tools := preload("res://sim/level_gen/gen_tools.gd")
 const DIRECTIONS: Array[Vector2i] = [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]
@@ -130,6 +131,7 @@ static func generate(template: LevelMap, config: Dictionary, seed: int) -> Level
 	if not old:
 		_torches(map, anchors, rooms, corridors, depth)
 	_markers(map, anchors, rooms, corridors, ends, config, rng, depth)
+	map.extras["paths"] = paths
 	return map
 
 

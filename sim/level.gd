@@ -672,6 +672,7 @@ static func parse(layout: Image, height: Image, config: Dictionary, relief: Imag
 	var derived := _lay_curves(level["terrain"], config, warnings)
 	level["terrain"]["streams"] = streams_from(derived, level["terrain"], warnings)
 	level["terrain"]["niches"] = niches_from(config, level["terrain"], warnings)
+	level["terrain"]["decor"] = decor_from(config, level["terrain"], warnings)
 	_check_fords(level["terrain"], warnings)
 	_check_water(level["terrain"], warnings)
 	level["terrain"]["ledges"] = _ledges(level["terrain"], config, warnings)
@@ -1415,6 +1416,82 @@ static func niches_from(config: Dictionary, terrain: Dictionary, warnings: Array
 			warnings.append("niche %d at %s (step %s) is on no wall with rock behind it%s: left out" % [index, cell, way, " (the hidden one: a door with its alcove behind)" if hidden else ""])
 			continue
 		out.append({"cell": cell, "out": -way, "edge": key, "kind": kind, "variant": variant})
+	return out
+
+
+## The decor a damp place grows (647; Jeff: "moss and spiderwebs for
+## decor, no live plants"): kind -> how many variants art-kit's prop slot
+## of that name has. "moss_patch" lies flat on a floor cell, "moss_strip"
+## along a wall's foot, "web_corner" in a cell's corner where two walls
+## meet, "web_niche" across an open burial niche's mouth.
+const DECOR_VARIANTS: Dictionary[String, int] = {"moss_patch": 3, "moss_strip": 2, "web_corner": 2, "web_niche": 2}
+
+
+## level.json's "decor" (647): [[x, y, dx, dy, kind, variant], ...], the
+## niches' shape: (x, y) a floor cell, (dx, dy) where the piece sits on it
+## ((0, 0) for a moss_patch, flat on the cell; a side for a moss_strip, the
+## wall edge it lies along, and for a web_niche, the niche's own step onto
+## its wall; a diagonal for a web_corner, the corner whose two walls meet
+## there), kind one of DECOR_VARIANTS, variant 1 up to the kind's count; as
+## [{cell, out: the step as given, edge: the Terrain edge key (a strip and
+## a niche web only), kind, variant}] for terrain to draw art-kit's
+## prop.<kind> on. One that is no floor, whose step fits not its kind,
+## whose strip lies on no wall, whose corner lacks a wall, or whose web
+## hangs on no open niche of kind "a" or "c" (never the hidden door's, nor
+## a sealed one: variant 2) is said in [param warnings] and left out, as is
+## a second of a kind on the same cell and step.
+static func decor_from(config: Dictionary, terrain: Dictionary, warnings: Array[String]) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var listed: Variant = config.get("decor", [])
+	if not listed is Array:
+		warnings.append("\"decor\" in level.json is not a list")
+		return out
+	var floor := {}
+	for cell: Vector2i in terrain.get("floor", []):
+		floor[cell] = true
+	var edges: Dictionary = terrain.get("edges", {})
+	var open_niches := {}
+	for niche: Dictionary in terrain.get("niches", []):
+		if niche["kind"] in ["a", "c"] and int(niche["variant"]) == 1:
+			open_niches[niche["edge"]] = true
+	var walled := func(cell: Vector2i, way: Vector2i) -> bool:
+		return int(edges.get(Terrain.edge_key(cell, way), Terrain.Edge.OPEN)) == Terrain.Edge.WALL
+	var taken := {}
+	for index in (listed as Array).size():
+		var entry: Variant = listed[index]
+		if not entry is Array or (entry as Array).size() != 6:
+			warnings.append("decor %d is not [x, y, dx, dy, kind, variant]: left out" % index)
+			continue
+		var cell := Vector2i(int(entry[0]), int(entry[1]))
+		var way := Vector2i(int(entry[2]), int(entry[3]))
+		var kind := str(entry[4])
+		var variant := int(entry[5])
+		if not floor.has(cell) or not DECOR_VARIANTS.has(kind) or variant < 1 or variant > DECOR_VARIANTS[kind]:
+			warnings.append("decor %d at %s (%s %d) is on no floor, no kind or no variant: left out" % [index, cell, kind, variant])
+			continue
+		var side := absi(way.x) + absi(way.y) == 1
+		var fits := false
+		var piece := {"cell": cell, "out": way, "kind": kind, "variant": variant}
+		match kind:
+			"moss_patch":
+				fits = way == Vector2i.ZERO
+			"moss_strip":
+				fits = side and walled.call(cell, way)
+				piece["edge"] = Terrain.edge_key(cell, way)
+			"web_corner":
+				fits = absi(way.x) == 1 and absi(way.y) == 1 and walled.call(cell, Vector2i(way.x, 0)) and walled.call(cell, Vector2i(0, way.y))
+			"web_niche":
+				piece["edge"] = Terrain.edge_key(cell, way) if side else Vector3i.ZERO
+				fits = side and open_niches.has(piece["edge"])
+		if not fits:
+			warnings.append("decor %d at %s (step %s) fits no %s there: left out" % [index, cell, way, kind])
+			continue
+		var slot := "%s %s %s" % [cell, way, kind]
+		if taken.has(slot):
+			warnings.append("decor %d at %s (step %s) doubles a %s: left out" % [index, cell, way, kind])
+			continue
+		taken[slot] = true
+		out.append(piece)
 	return out
 
 

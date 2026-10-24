@@ -25410,3 +25410,53 @@ broken tables two cells along the walls, 41 solid cells, no way one cell
 wide), labyrinth_test (the hall's twenty buildings kept by a generation),
 view_test's footprint check. docs/levels.md. Level data and templates;
 protocol: the ## 35 line, no further bump; no new class_name.
+protocol: the 34 line, no bump; no new class_name.
+
+
+## 647. Moss and webs in the barrow
+
+Jeff on the dressed halls: "moss and spiderwebs for decor, no live plants".
+The coordinator approved the shape; art-kit's four slots (678fe3a4:
+prop.moss_patch with three variants, prop.moss_strip, prop.web_corner and
+prop.web_niche with two each) came first; terrain draws them ("647,
+terrain's side", with no scatter sown in a level that is not outdoor).
+
+- Level data, the niches' shape: level.json `"decor"` lists `[x, y, dx, dy,
+  kind, variant]` entries; `Level.decor_from` reads them into terrain
+  `"decor"` as `{cell, out, edge, kind, variant}` and holds each kind to its
+  place: a patch flat on a floor cell, a strip along a wall edge, a corner
+  web where two wall edges meet, a niche web across an open niche of kind
+  "a" or "c" only (variant 1: never the hidden door's mouth, whose draft is
+  its tell and a web there would lie; never a sealed slab, which has no
+  mouth). The misplaced are said and left out, as a bad niche is.
+- The templates hold a few by hand (plan_sheet's BARROW_DECOR and
+  LAIR_DECOR: the first hall's two entry corners and a strip of moss at its
+  south wall; the damp hall's moss along its walls between the furniture,
+  patches off the ways and its four corners webbed), and
+  `Regen.generated_config` keeps them inside the anchors as it keeps the
+  buildings, a niche web excepted (the niches are re-rolled each
+  generation, so the roll hangs that generation's own).
+- `Regen.decor_of` rolls the rest by the generation's seed (its own salt,
+  the layout's rng untouched, as the niche rolls do) over the floor outside
+  the anchors in a set order: moss strips on a share of the wall feet by
+  the level's damp (`"damp": true` 0.35, the Ossuary 0.15, the first hall
+  0.05; the deep band half as much again, the low rooms), patches on open
+  floor at 0.4 of the moss share, webs in 0.3 of the corners and across
+  0.25 of the open niches; never a link's, a marker's or a spawn point's
+  cell, and never a cell the ways run through: `Labyrinth.generate` records
+  its paths dict on the map it returns (`LevelMap.extras`, a generator's
+  notes for Regen, never in the images, taken along by `copy()`), the one
+  new thing on the editor's class.
+- `Regen.depth_frame`, `band_at` and `entrance_of` are the graves' band
+  measure factored out, shared with the roll; `graves_of` unchanged in
+  what it writes.
+- No plant is laid: the barrow grows moss on stone and webs in the dark, and
+  nothing green.
+
+labyrinth_test (the shares by layer against the wall feet outside the
+anchors, the hall's own kept, webs on open niches only and never the hidden
+one, none on a marker or spawn cell, the parse keeping every one, the same
+seed the same decor, the generator's path record and the roll off it),
+level_test (`Level.decor_from`: the four kinds read and nine misplacements
+said; the real templates' own counts). docs/levels.md. Level data and
+generator; protocol unchanged; no new class_name.

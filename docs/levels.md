@@ -692,6 +692,33 @@ three skeleton guards in the altar room, the draugr in his lair), Pip's niche
 (a 2 x 2 anchor off the altar room with the place `barrow/niche`) and the
 runner's pack (a chest in the lair's corner), npc's.
 
+Moss and webs (decision 647; Jeff: "moss and spiderwebs for decor, no live
+plants"): `"decor": [[x, y, dx, dy, kind, variant], ...]`, the niches' shape,
+one entry a piece: `"moss_patch"` flat on floor cell `(x, y)` (`(dx, dy)`
+`(0, 0)`), `"moss_strip"` along the wall edge the step onto `(dx, dy)` names,
+`"web_corner"` in the cell's corner the diagonal `(dx, dy)` names (both its
+walls wall edges), `"web_niche"` across the mouth of the open burial niche
+(kind `"a"` or `"c"`, variant 1: never the hidden one, never a sealed slab)
+whose cell and step those are; `variant` 1 up to the count art-kit's
+`prop.<kind>` slot has (`Level.DECOR_VARIANTS`: 3, 2, 2, 2).
+`Level.decor_from` reads them into terrain `"decor"` as `[{cell, out, edge,
+kind, variant}]` (`out` the step as given; `edge` the Terrain edge key, a
+strip's and a niche web's only) for terrain's draw; one on no floor, misfit
+to its kind or place, or doubling another is said and left out. The
+templates hold a few by hand (`tools/plan_sheet.BARROW_DECOR`: webs in the
+first hall's corners by the way in and a strip of moss at its south wall;
+`LAIR_DECOR`: the damp hall's moss along its walls and floor and its four
+cobwebbed corners), kept by every generation; the rest `Regen.decor_of`
+rolls by the generation's seed over the floor outside the anchors, never a
+cell the ways run through (the generator's record, `LevelMap.extras`
+`"paths"`), a link's, a marker's or a spawn point's: moss strips on a share
+of the wall feet by the level's damp (`"damp": true` 0.35, the Ossuary
+0.15, the first hall 0.05, half as much again in the deep band), moss
+patches on open floor at 0.4 of that, webs in 0.3 of the corners and across
+0.25 of the open niches (the first hall's included, since they are
+re-rolled; a template's own niche web is dropped for the same reason). The
+generator lays no plant anywhere; the decor is stone-grown.
+
 What the draugr gives (decision 573, Jeff's resurrection charges; 544's
 blessing before it): laid to rest in a pact, he blesses every player standing
 alive in his lair and their companion in the zone (the mark `draugr`, 540,

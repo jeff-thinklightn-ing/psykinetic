@@ -180,6 +180,10 @@ static func generate(level_name: String, generation: int) -> Dictionary:
 			_lay_hidden(generated, generator.niche_plan(config, seed))
 		elif barrow and layer == 2:
 			generated["niches"] = niches_of(map, anchors, seed)
+		# Moss and webs (647): the template's own kept inside the anchors
+		# (generated_config), the rest rolled over the generation.
+		if barrow:
+			generated["decor"].append_array(decor_of(map, anchors, config, generated, seed, bool(made["config"].get("damp", false))))
 		return {"layout": map.to_image(), "height": height, "config": generated, "seed": seed, "tries": attempt + 1, "anchors": anchors}
 	push_warning("[regen] %s: no map of %d tries joined every anchor; the last one stands" % [level_name, TRIES])
 	return {}
@@ -203,11 +207,7 @@ static func graves_of(map: LevelMap, config: Dictionary) -> Array:
 	for anchor: Dictionary in anchors:
 		if str(anchor.get("name", "")) == str(config.get("entrance", "")):
 			entrance = anchor
-	var rect: Rect2i = entrance["rect"]
-	var centre := rect.position + rect.size / 2
-	var far := 1
-	for corner: Vector2i in [Vector2i.ZERO, Vector2i(map.size.x - 1, 0), Vector2i(0, map.size.y - 1), map.size - Vector2i.ONE]:
-		far = maxi(far, absi(centre.x - corner.x) + absi(centre.y - corner.y))
+	var frame := depth_frame(map, entrance)
 	for y in map.size.y:
 		for x in map.size.x:
 			var cell := Vector2i(x, y)
@@ -220,9 +220,41 @@ static func graves_of(map: LevelMap, config: Dictionary) -> Array:
 					open += 1
 			if open != 1:
 				continue
-			var depth := clampf(float(absi(centre.x - x) + absi(centre.y - y)) / float(far), 0.0, 1.0)
-			out.append([x, y, 0 if depth < BANDS[0] else (1 if depth < BANDS[1] else 2)])
+			out.append([x, y, band_at(frame, cell)])
 	return out
+
+
+## The depth measure the graves and the decor share: {centre: the
+## [param entrance] anchor's centre, far: the farthest a corner of
+## [param map] lies from it, in cells}.
+static func depth_frame(map: LevelMap, entrance: Dictionary) -> Dictionary:
+	var rect: Rect2i = entrance["rect"]
+	var centre := rect.position + rect.size / 2
+	var far := 1
+	for corner: Vector2i in [Vector2i.ZERO, Vector2i(map.size.x - 1, 0), Vector2i(0, map.size.y - 1), map.size - Vector2i.ONE]:
+		far = maxi(far, absi(centre.x - corner.x) + absi(centre.y - corner.y))
+	return {"centre": centre, "far": far}
+
+
+## The band, 0, 1 or 2 (BANDS), [param cell] lies in by [param frame]
+## (depth_frame).
+static func band_at(frame: Dictionary, cell: Vector2i) -> int:
+	var centre: Vector2i = frame["centre"]
+	var depth := clampf(float(absi(centre.x - cell.x) + absi(centre.y - cell.y)) / float(frame["far"]), 0.0, 1.0)
+	return 0 if depth < BANDS[0] else (1 if depth < BANDS[1] else 2)
+
+
+## The entrance anchor of [param config]: the one named "entrance", else
+## the first; {} with none.
+static func entrance_of(config: Dictionary) -> Dictionary:
+	var anchors: Array = config.get("anchors", [])
+	if anchors.is_empty():
+		return {}
+	var entrance: Dictionary = anchors[0]
+	for anchor: Dictionary in anchors:
+		if str(anchor.get("name", "")) == str(config.get("entrance", "")):
+			entrance = anchor
+	return entrance
 
 
 ## The first hall's niches and its hidden door laid into [param generated]
@@ -285,6 +317,95 @@ static func niches_of(map: LevelMap, anchors: Array, seed: int) -> Array:
 	return out
 
 
+## 647: the decor roll's seed salt; the share of the wall-foot edges that
+## get moss in a damp level ("damp": true, the Hall of Fallen Souls), on
+## the barrow's second layer (the Ossuary) and its first (the town's
+## tombs); the deep band's share is MOSS_DEEP times that (the low rooms);
+## the share of eligible floor cells that get a moss patch, of the moss
+## share; the share of corners that get a web, and of open niche mouths.
+const DECOR_SALT := 0x6d055
+const MOSS_DAMP := 0.35
+const MOSS_DEEP_LAYER := 0.15
+const MOSS_FIRST_LAYER := 0.05
+const MOSS_DEEP := 1.5
+const MOSS_PATCH := 0.4
+const WEB_CORNER := 0.3
+const WEB_NICHE := 0.25
+
+## The barrow's moss and webs for a generation (647; Jeff: "moss and
+## spiderwebs for decor, no live plants"): [[x, y, dx, dy, kind, variant],
+## ...] (Level.decor_from's shape) rolled by an rng of [param seed] and
+## DECOR_SALT over [param map]'s floor cells outside [param anchors] in a
+## set order, never a cell the ways run through (the map's extras "paths"),
+## a link's, a marker's or a spawn point's cell, nor one [param generated]
+## already decorates: "moss_strip" along a wall edge with rock behind it
+## (never a door) with the moss share (MOSS_DAMP when [param damp], else
+## MOSS_FIRST_LAYER on layer 1 and MOSS_DEEP_LAYER on layer 2, MOSS_DEEP
+## times that in the deep band), one a cell; "web_corner" in a corner where
+## two such walls meet, WEB_CORNER of them, one a cell; "moss_patch" on a
+## floor cell with no wall beside it, MOSS_PATCH of the moss share; and
+## "web_niche" across WEB_NICHE of [param generated]'s open niches of kind
+## "a" or "c" (variant 1; never the hidden one, never a sealed slab),
+## inside the anchors too, since the first hall's niches are re-rolled each
+## generation. Variants by the roll. Written into the generated level.json
+## as "decor" after the template's own.
+static func decor_of(map: LevelMap, anchors: Array, config: Dictionary, generated: Dictionary, seed: int, damp: bool) -> Array:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed ^ DECOR_SALT
+	var out: Array = []
+	var layer := int(config.get("layer", 2))
+	var moss := MOSS_DAMP if damp else (MOSS_FIRST_LAYER if layer == 1 else MOSS_DEEP_LAYER)
+	var entrance := entrance_of(config)
+	var frame := depth_frame(map, entrance) if not entrance.is_empty() else {}
+	var paths: Dictionary = map.extras.get("paths", {})
+	var kept := {}
+	var taken := {}
+	for entry: Variant in generated.get("decor", []):
+		if entry is Array and (entry as Array).size() == 6:
+			kept[Vector2i(int(entry[0]), int(entry[1]))] = true
+	for value: Variant in generated.get("spawn_points", {}).values():
+		var at: Variant = Level._tile(value)
+		if at != null:
+			taken[at] = true
+	var cells: Array = map.cells.keys()
+	cells.sort_custom(func(a: Vector2i, b: Vector2i) -> bool: return a.y < b.y or a.y == b.y and a.x < b.x)
+	for cell: Vector2i in cells:
+		if not map.walkable(cell) or map.cell(cell) not in Level.GROUNDS or Level.in_anchors(anchors, cell) \
+				or paths.has(cell) or taken.has(cell) or kept.has(cell):
+			continue
+		var share := moss
+		if not frame.is_empty() and band_at(frame, cell) == 2:
+			share = minf(moss * MOSS_DEEP, 1.0)
+		var sides: Array[Vector2i] = []
+		for direction: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+			var far := cell + direction
+			if map.in_bounds(far) and not map.walkable(far) and map.edge(Terrain.edge_key(cell, direction)) != "door":
+				sides.append(direction)
+		if sides.is_empty():
+			if rng.randf() < share * MOSS_PATCH:
+				out.append([cell.x, cell.y, 0, 0, "moss_patch", rng.randi_range(1, Level.DECOR_VARIANTS["moss_patch"])])
+			continue
+		var corners: Array[Vector2i] = []
+		for side in sides:
+			for other in sides:
+				if side.x != 0 and other.y != 0:
+					corners.append(side + other)
+		if not corners.is_empty() and rng.randf() < WEB_CORNER:
+			var corner: Vector2i = corners[rng.randi_range(0, corners.size() - 1)]
+			out.append([cell.x, cell.y, corner.x, corner.y, "web_corner", rng.randi_range(1, Level.DECOR_VARIANTS["web_corner"])])
+		if rng.randf() < share:
+			var side: Vector2i = sides[rng.randi_range(0, sides.size() - 1)]
+			out.append([cell.x, cell.y, side.x, side.y, "moss_strip", rng.randi_range(1, Level.DECOR_VARIANTS["moss_strip"])])
+	for niche: Variant in generated.get("niches", []):
+		if not niche is Array or (niche as Array).size() != 6 or str(niche[4]) not in ["a", "c"] or int(niche[5]) != 1:
+			continue
+		var cell := Vector2i(int(niche[0]), int(niche[1]))
+		if kept.has(cell) or rng.randf() >= WEB_NICHE:
+			continue
+		out.append([cell.x, cell.y, int(niche[2]), int(niche[3]), "web_niche", rng.randi_range(1, Level.DECOR_VARIANTS["web_niche"])])
+	return out
+
+
 ## Whether every anchor's floor reaches every other's on [param map], on
 ## foot through open and door edges (an anchor with no floor is let be).
 static func connected(map: LevelMap, anchors: Array) -> bool:
@@ -316,8 +437,8 @@ static func connected(map: LevelMap, anchors: Array) -> bool:
 
 ## The generated level's level.json: [param template_config] with what
 ## lies outside [param anchors] left out (entities, starts, places,
-## buildings, town walls, roofs; links and spawn points are kept, as Level
-## warns of any outside), and "generation" written in for the record.
+## buildings, decor, town walls, roofs; links and spawn points are kept, as
+## Level warns of any outside), and "generation" written in for the record.
 static func generated_config(template_config: Dictionary, anchors: Array, generation: int) -> Dictionary:
 	var config := template_config.duplicate(true)
 	var inside := func(value: Variant) -> bool:
@@ -338,6 +459,14 @@ static func generated_config(template_config: Dictionary, anchors: Array, genera
 	if config.get("buildings") is Array:
 		config["buildings"] = config["buildings"].filter(func(entry: Variant) -> bool:
 			return entry is Dictionary and inside.call(entry.get("at")))
+	# The template's moss and webs (647) inside the anchors; a web on a
+	# niche goes too, since the niches are re-rolled (Level.decor_from would
+	# say so otherwise): the roll hangs the generation's own.
+	var decor: Array = []
+	if config.get("decor") is Array:
+		decor = config["decor"].filter(func(entry: Variant) -> bool:
+			return entry is Array and entry.size() == 6 and str(entry[4]) != "web_niche" and inside.call([entry[0], entry[1]]))
+	config["decor"] = decor
 	for key: String in ["town_walls", "roofs"]:
 		if config.get(key) is Array:
 			config[key] = config[key].filter(func(entry: Variant) -> bool:
