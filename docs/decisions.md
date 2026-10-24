@@ -28112,6 +28112,8 @@ The coordinator's ruling ((1) plus (c), as a general rule):
 - Topped up once, the first time the town has residents (Towns._larder, run from _spread; "larder" on the record till then, saved).
 - Why not stock to next year's harvest (960 food): a hamlet's store becomes a granary and hides the strain that rise and fall exist to show. Why not keep this year's harvest: it leaves the day-9 hunger, against Jeff's ask that a fresh town not fall before its first crop.
 
+The re-soak (38 days, per_head_day 1): 140 at founding and 245 topped up for 11 people (385). Strain stayed at 0 till day 22, then hunger, and one fall to a settlement on day 33 (back to a hamlet the next tick; a village on day 35). The roots dug on day 35 gave 60 food for 14. The town ate about 1.4 a head a day: newcomers (11 to 14), and the cook turning about 9 store food a day into rations that residents bought and carried out. The coordinator's call: founding.per_head_day 1.5, a draft on the checklist's tune line, and the cook's draw on the larder as a follow-up design (the cook takes from the store only above what the residents need till the next crop, as Production.keep_for does for builds), after which per_head_day can come back toward 1.
+
 larder_test: the first-crop days from spring and summer, the top-up once. A tune line for the founding food goes on the next cut's checklist.
 
 ## 566 amended, economy's side: the hunter's catch on the trip, and the field's work window
