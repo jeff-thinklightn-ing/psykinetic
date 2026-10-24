@@ -394,6 +394,9 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## 36 (548 amended): the "offers" message may carry a talking monster's free deal
 ## (kind "deal", cost 0, no what.steps: the draugr's "again" for one who paid);
 ## an old client's panel skips it, and only the typed yes reaches it.
+## 36 (649 amended (3), economy's side): the "town_sheet" message's strain may
+## carry settling {days, of}: since a fall, the calm days in a row toward rising
+## again.
 const PROTOCOL_REVISION := 36
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]

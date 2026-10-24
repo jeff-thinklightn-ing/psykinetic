@@ -28753,3 +28753,13 @@ in a walled test room, turn it off. view_test _test_indoor_camera (in,
 room to room, a doorway within the hold, out past it, S indoors, the low
 camera's own); controls_test's rig and view_test's turn it off. Client
 only; no wire change; no new class_name.
+## 649 amended (3), economy's side: a fallen town settles before it rises
+
+In 652's re-soak a town fell to a settlement for hunger and was a hamlet again on the very next tick. Players would see "falls back to a settlement" and "is a hamlet now" minutes apart. The coordinator's approval:
+- On a fall the town's record gets "settling": 0. Each day of _strain_turn counts a calm day (nothing strains it at its stage; at a settlement, nothing at all) and a strained day sets it back to 0.
+- _stage_turn won't raise a town that is settling until settling reaches decline.rise_after_days (draft 7, on the next checklist's tune line). The rise clears it. A town that has never fallen rises as before. Saved with the decline's keys.
+- The town sheet's strain carries settling {days, of} while it waits, so ui's strain line can say "settling, 3 of 7 days calm" (649 amended (3), ui's side).
+
+Wire: "settling" in the town_sheet message's strain changes what an existing message carries, so it needs revision 36 (release: 35 shipped in v0.1.172; 36 was already open on main, from 661), with its line under ## 36.
+
+farm_test _test_settle: fallen, settling 0 of 7; the hamlet's needs met but 3 calm days still a settlement; a hungry day restarts the count; 6 calm days still settling and saved; the 7th a hamlet with settling gone. No new class_name.

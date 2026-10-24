@@ -2050,7 +2050,8 @@ func stage(town: String) -> String:
 
 ## Raises [param town] to the next of rules' "stages" when it meets all of
 ## that stage's needs: residents, standing kinds, trades counted among its
-## residents, gold in the treasury, wood in the store. Logged.
+## residents, gold in the treasury, wood in the store; after a fall, only
+## once it has settled (649 amended (3)). Logged.
 func _stage_turn(town: String) -> void:
 	var stages: Array = rules.get("stages", [])
 	var record := _town(town)
@@ -2058,6 +2059,11 @@ func _stage_turn(town: String) -> void:
 	var at := names.find(stage(town))
 	if at + 1 >= stages.size() or not stages[at + 1] is Dictionary or not _meets(town, stages[at + 1]):
 		return
+	# A town that fell rises only after decline.rise_after_days calm days in a
+	# row (649 amended (3), the coordinator's: no fall and rise ticks apart).
+	if record.has("settling") and int(record["settling"]) < int(rules.get("decline", {}).get("rise_after_days", 0)):
+		return
+	record.erase("settling")
 	record["stage"] = names[at + 1]
 	_note(town, "%s is a %s now" % [town, names[at + 1]])
 	stage_changed.emit(town)
@@ -2220,6 +2226,10 @@ func _strain_turn(town: String, rule: Dictionary) -> void:
 	var stages: Array = rules.get("stages", [])
 	var names: Array = stages.map(func(each: Variant) -> String: return str(each.get("name", "")) if each is Dictionary else "")
 	var at := names.find(stage(town))
+	# After a fall, its calm days in a row toward rising again (649 amended (3)).
+	if record.has("settling"):
+		var calm: bool = at < 0 or not stages[at] is Dictionary or _falling(town, stages[at], rule).is_empty()
+		record["settling"] = int(record["settling"]) + 1 if calm else 0
 	if at <= 0 or not stages[at] is Dictionary:
 		record.erase("strain")
 		record.erase("falling")
@@ -2236,6 +2246,7 @@ func _strain_turn(town: String, rule: Dictionary) -> void:
 		return
 	record["stage"] = names[at - 1]
 	record["strain"] = 0
+	record["settling"] = 0
 	_note(town, "%s falls back to a %s: %s" % [town, names[at - 1], why])
 	stage_changed.emit(town)
 
@@ -2274,10 +2285,15 @@ func _captive_strain(record: Dictionary) -> void:
 
 
 ## [param town]'s strain toward falling (the town sheet, 649): {days, of,
-## why}; days 0 and why "" when nothing strains it.
+## why}; days 0 and why "" when nothing strains it. Since a fall, also
+## settling: {days (calm in a row), of (decline.rise_after_days)} till it
+## rises again (649 amended (3)).
 func strain(town: String) -> Dictionary:
 	var record: Dictionary = _towns.get(town, {})
-	return {"days": int(record.get("strain", 0)), "of": int(rules.get("decline", {}).get("strain_days", 10)), "why": str(record.get("falling", ""))}
+	var out := {"days": int(record.get("strain", 0)), "of": int(rules.get("decline", {}).get("strain_days", 10)), "why": str(record.get("falling", ""))}
+	if record.has("settling"):  # Since a fall: calm days toward rising again (649 amended (3)).
+		out["settling"] = {"days": int(record["settling"]), "of": int(rules.get("decline", {}).get("rise_after_days", 0))}
+	return out
 
 
 ## Whether [param town] has what a recipe's made.needs asks (622, economy's
@@ -2796,7 +2812,7 @@ func from_dict(saved: Dictionary) -> void:
 			record["lawspeaker"] = (entry["lawspeaker"] as Dictionary).duplicate(true)
 		if entry.has("stage"):
 			record["stage"] = str(entry["stage"])
-		for key: String in ["strain", "decline_day", "upkeep_day"]:  # Its decline (649).
+		for key: String in ["strain", "decline_day", "upkeep_day", "settling"]:  # Its decline (649; settling, 649 amended (3)).
 			if entry.has(key):
 				record[key] = int(entry[key])
 		if entry.has("falling"):

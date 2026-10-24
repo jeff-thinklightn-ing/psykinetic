@@ -45,6 +45,7 @@ func _ready() -> void:
 	_test_felling()
 	_test_stages()
 	_test_decline()
+	_test_settle()
 	_test_ruin_regrows()
 	_test_flock()
 	_test_butcher()
@@ -328,6 +329,50 @@ func _test_stages() -> void:
 ## unkept_days later it is in disrepair (out of use), a level lost a season,
 ## a ruin, then gone: ruined told with its cells, never seeded again; all
 ## saved.
+## After a fall a town settles before it rises (649 amended (3), the
+## coordinator's: no fall and rise a tick apart): decline.rise_after_days
+## calm days in a row, a strain day starting them again; on the sheet's
+## strain as settling; saved.
+func _test_settle() -> void:
+	print("
+== a fallen town settles before it rises ==")
+	var rule: Dictionary = _full["decline"]
+	var calm := int(rule["rise_after_days"])
+	var towns := _towns(1, false, _full)
+	towns._town(TOWN)["stage"] = "hamlet"
+	for day in int(rule["strain_days"]):
+		towns._strain_turn(TOWN, rule)
+	_check(towns.stage(TOWN) == "settlement" and towns.strain(TOWN).get("settling") == {"days": 0, "of": calm},
+		"fallen: settling, 0 of %d calm days (%s)" % [calm, towns.strain(TOWN)])
+	for i in 4:
+		towns.production.add_worker("s%d" % i, "S%d" % i, ["hauler"], TOWN, "test")
+		towns._town(TOWN)["residents"].append("s%d" % i)
+	var store := towns.production.stockpile
+	store.deposit(TOWN, "wood", 20, "test")
+	store.deposit(TOWN, "food", 50, "test")
+	for day in 3:
+		towns._strain_turn(TOWN, rule)
+		towns._stage_turn(TOWN)
+	_check(towns.stage(TOWN) == "settlement" and towns.strain(TOWN)["settling"]["days"] == 3, "the hamlet's needs met, 3 calm days: still a settlement")
+	for id: String in ["s0", "s1", "s2"]:
+		towns.production._workers[id]["fed"] = "hungry"
+	store.take(TOWN, "food", store.count(TOWN, "food"), "test")
+	towns._strain_turn(TOWN, rule)
+	_check(towns.strain(TOWN)["settling"]["days"] == 0, "a hungry day: the count starts again (%s)" % [towns.strain(TOWN)])
+	for id: String in ["s0", "s1", "s2"]:
+		towns.production._workers[id]["fed"] = ""
+	store.deposit(TOWN, "food", 50, "test")
+	for day in calm - 1:
+		towns._strain_turn(TOWN, rule)
+		towns._stage_turn(TOWN)
+	var again := Towns.new(JSON.parse_string(JSON.stringify(towns.to_dict())), towns.production, _full, func() -> int: return _now)
+	_check(towns.stage(TOWN) == "settlement" and again.strain(TOWN).get("settling") == {"days": calm - 1, "of": calm},
+		"%d calm days: still settling, and saved (%s)" % [calm - 1, again.strain(TOWN)])
+	towns._strain_turn(TOWN, rule)
+	towns._stage_turn(TOWN)
+	_check(towns.stage(TOWN) == "hamlet" and not towns.strain(TOWN).has("settling"), "the %dth: a hamlet again, settled (%s)" % [calm, towns.stage(TOWN)])
+
+
 func _test_decline() -> void:
 	print("
 == towns fall as well as rise ==")
