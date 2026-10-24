@@ -28132,3 +28132,7 @@ The 652 amended re-soak showed the leak behind the founding food: the cook turne
 - Limited to the founding stretch, where the soak showed it. After the first crop the cook's rations are the town's business, as before.
 
 larder_test _test_larder_reserve: no ration from a store at its larder, rations again once nothing is kept; Towns' larder before and after the first crop.
+
+Soaks (38 days, one player, the default world):
+- At per_head_day 1 with the reserve, the cook made 25 rations in 38 days, against 192 without it. Strain held at 0 till day 24. Newcomers (11 at the founding count, 15 by day 37) still ate the larder by day 25, and the town fell for a tick on day 34.
+- The coordinator's call: per_head_day stays 1.5 ("people come"), with the reserve. Stocked 210 + 368 = 578. No hunger day and no fall through day 38, a village on day 30. Roots dug on day 35 (60 food) with about 20 food left in the store by the ledger (579 banked, 559 meals). A thin margin; the tune line stands.
