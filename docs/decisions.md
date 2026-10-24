@@ -24724,6 +24724,10 @@ colour over a vest; taken off, the vest again; a look's worn= word, a known look
 kind's colour. Client only, protocol unchanged, no new class_name. The sheet of the four on two
 builds follows the coordinator's all-clear.
 
+Amended (the coordinator's ruling on the sheet, C:/dev/review/armour/armour_sheet.png): the cape
+hides under armour too (GARB_UNDER_ARMOUR). Over a covering, cut at the shoulders, it read as a
+shawl stuck on the breastplate. Client only.
+
 ## 608 amended, dungeon's side: the hidden door's clues, the draft line and the marker
 
 Jeff on the crypt layers: "there should be environmental clues of the
@@ -25804,6 +25808,13 @@ move and by a hostile near. view_test: tending a body, kneeling turned to it and
 it walks, not leant; cleared, it stands with its own facing. Wire: a line under revision 35
 (open, unshipped), no bump. No new class_name. A shot of the pose follows the coordinator's
 all-clear.
+
+Amended (sound's find, reading tending for 627): a bandager downed (lay_downed, decision 544)
+dropped its bandaging without breaking it off, so the patient kept mending 1 with no bandaging
+behind it, and try_bandage refused it for good (live since 544). lay_downed now breaks it off as
+_tend_wounds does: the patient's mending back to 0, bandage_broke_why "hurt" (the player's line and
+the companion's words for being hurt), bandage_changed "interrupted". items_test: a bandager
+downed mid-bandage, the patient free again. Server only, protocol unchanged.
 ## 591 amended (2): felled ground re-walls by the outline rule
 
 A felled trunk's cell (591) turned floor, but the WALL edge the parse's outline rule had

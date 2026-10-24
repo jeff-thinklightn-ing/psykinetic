@@ -8004,7 +8004,15 @@ func lay_downed(target: GridEntity, ticks: int) -> void:
 	target.down_until = maxi(target.down_until, target.downed_until)
 	target.raised = ""
 	_stun_for(target, ticks)
-	_bandaging.erase(target)
+	if _bandaging.has(target):
+		# Broken off as _tend_wounds would: the patient free to be bandaged again.
+		var patient: GridEntity = _bandaging[target]["patient"]
+		_bandaging.erase(target)
+		if _alive(patient):
+			patient.mending = 0
+		bandage_broke_why = "hurt"
+		_log("bandage: %s's bandaging of %s broken off (downed)" % [target.name, patient.name])
+		bandage_changed.emit(target, patient, &"interrupted")
 	target.tending = ""
 	if _channels.has(target):
 		_end_channel(target, &"broken")

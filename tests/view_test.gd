@@ -5928,27 +5928,29 @@ func _test_worn() -> void:
 	_check(model != null and shown.call().is_empty() and player.worn == "", "nothing worn: no covering")
 	if model == null:
 		return
-	look.parts.append("Vest")  # A vest, to be covered.
+	look.parts.append_array(["Vest", "Cape"])  # A vest and a cape, to be covered.
 	look.apply(model, puppet.get_meta("tint", Color.WHITE))
 	var vest := model.find_child("Vest", true, false) as MeshInstance3D
+	var cape := model.find_child("Cape", true, false) as MeshInstance3D
 	var each := []
 	for id: String in ["leather_armour", "mail_armour", "plate_armour", "robes"]:
 		player.worn = id
 		_rig._process(0.0)
 		var part := str(PersonLook.ARMOUR_PARTS[Items.armour_of(id)["look"]])
 		var mesh := model.find_child(part, true, false) as MeshInstance3D
-		each.append([id, shown.call(), mesh != null and mesh.get_instance_shader_parameter("tunic") == Items.color_of(id), vest.visible])
+		each.append([id, shown.call(), mesh != null and mesh.get_instance_shader_parameter("tunic") == Items.color_of(id), vest.visible or cape.visible])
 	_check(each.all(func(e: Array) -> bool: return e[1].size() == 1 and e[2] and not e[3]),
-			"each armour its own covering, in its colour, over the vest (%s)" % [each])
+			"each armour its own covering, in its colour, over the vest and the cape (%s)" % [each])
 	player.worn = ""
 	_rig._process(0.0)
-	_check(shown.call().is_empty() and vest.visible, "taken off: no covering, the vest again")
+	_check(shown.call().is_empty() and vest.visible and cape.visible, "taken off: no covering, the vest and the cape again")
 	var said := PersonLook.make("seed=7 worn=robes")
 	_check(said.worn == "robes" and PersonLook.make("seed=7 worn=gown").worn == "", "a look's worn= word (a resident's), a known look only")
 	said.wear(model, "")
 	_check(shown.call() == ["Armour_Robes"] and (model.find_child("Armour_Robes", true, false) as MeshInstance3D).get_instance_shader_parameter("tunic")
 			== Items.color_of(PersonLook.armour_kind("robes")), "a worn= word: that look, in its kind's colour")
 	look.parts.erase("Vest")
+	look.parts.erase("Cape")
 	look.apply(model, puppet.get_meta("tint", Color.WHITE))
 	model.set_meta("worn", "")
 

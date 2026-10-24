@@ -56,9 +56,9 @@ const HEADWEAR_PARTS := {"none": "", "hood": "Hood", "hat": "Hat_Brimmed", "cap"
 const GARB_PARTS := {"none": "", "vest": "Vest", "coat": "Coat", "cape": "Cape", "rolled": "Sleeves_Rolled"}
 ## Armour (items' 622): each look's covering, by Items.armour_of's look
 ## (body_gen's Armour_* parts); worn, it is shown in place of the garb
-## under it (GARB_UNDER_ARMOUR), and hair, headwear and the cape stay.
+## under it (GARB_UNDER_ARMOUR, the cape too), and hair and headwear stay.
 const ARMOUR_PARTS := {"leather": "Armour_Leather", "mail": "Armour_Mail", "plate": "Armour_Plate", "robes": "Armour_Robes"}
-const GARB_UNDER_ARMOUR: Array[String] = ["Vest", "Coat", "Apron", "Sleeves_Rolled"]
+const GARB_UNDER_ARMOUR: Array[String] = ["Vest", "Coat", "Apron", "Sleeves_Rolled", "Cape"]
 ## How likely a person with no garb said and no trade to dress them wears
 ## some, and which (one of these, alike).
 const GARB_CHANCE := 0.3

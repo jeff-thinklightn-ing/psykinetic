@@ -7,6 +7,8 @@ notes (decision 324).
 
 ## Unreleased
 
+- Fixed: when someone bandaging is downed, the person they were bandaging can be bandaged again (before, they stayed half-bandaged for good).
+- Capes are hidden under armour, as vests and coats already were.
 - Felled forest can be walked into: no wall left standing along the forest's old edge where trunks were cut (591 amended (2)).
 - Bandaging someone, you kneel beside them, turned to them, until it is done or broken off; bandaging yourself, you kneel where you stand.
 - A companion pushed to the bottom of her bond (or let bleed out while she sulks) now leaves you: she says so, leaves you what was yours, and goes home to live and work in her town, keeping all she earned; never an enemy (581).

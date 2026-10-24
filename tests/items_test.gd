@@ -2469,6 +2469,11 @@ func _test_bandage() -> void:
 	World._relocate(host, _open_line(host, 1))
 	_steps(1)
 	_check(host.mending == 0 and host.tending == "", "moving while bandaging breaks it off, tending no one")
+	_check(World.try_bandage(host, host) and host.mending == 1, "bandaging again")
+	World.lay_downed(host, 1)
+	_check(host.mending == 0 and host.tending == "" and World.bandage_broke_why == "hurt",
+			"downed while bandaging: broken off, the patient free to be bandaged again (%d, %s)" % [host.mending, World.bandage_broke_why])
+	World.raise_downed(host, host.hp)  # Up again (a downed body whose time runs out bleeds to death).
 	if pet != null and pet.spawned:
 		World.try_transfer(host, host, 2, pet, 0)
 		World._relocate(pet, _open_line(host, 1))
