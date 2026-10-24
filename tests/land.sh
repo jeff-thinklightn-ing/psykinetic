@@ -30,8 +30,14 @@ trap 'rm -rf "$LOGS"' EXIT
 jobs_at_once="$(test_jobs)"
 suite_jobs=$(( jobs_at_once - 2 ))
 [ "$suite_jobs" -lt 2 ] && suite_jobs=2
+lean=""
+if [ "${HEAVY_JOB_KIND:-}" = suite_lean ]; then
+	# The gate ran it lean (394 amended (9)): memory was short, fewer at once.
+	[ "$suite_jobs" -gt 3 ] && suite_jobs=3
+	lean=", lean"
+fi
 started=$(date +%s)
-echo "landing tests: the suite ($suite_jobs at once), net_test, state_test and server_boot_test together"
+echo "landing tests: the suite ($suite_jobs at once$lean), net_test, state_test and server_boot_test together"
 
 part() {
 	name="$1"

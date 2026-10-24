@@ -34,6 +34,8 @@ $logs = Join-Path ([IO.Path]::GetTempPath()) ('psykinetic-land-' + [Guid]::NewGu
 New-Item -ItemType Directory -Force $logs | Out-Null
 
 $suiteJobs = [Math]::Max(2, (Get-TestJobs $root) - 2)
+# The gate ran it lean (394 amended (9)): memory was short, fewer at once.
+if ($env:HEAVY_JOB_KIND -eq 'suite_lean') { $suiteJobs = [Math]::Min($suiteJobs, 3) }
 Write-Output "landing tests: the suite ($suiteJobs at once), net_test, state_test and server_boot_test together"
 $started = Get-Date
 $gateTest = & python -B (Join-Path $root 'tests\heavy_job_test.py') 2>&1

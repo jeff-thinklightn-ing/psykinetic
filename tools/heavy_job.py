@@ -56,6 +56,15 @@ slot 10 h on 2026-10-17 and 7.6 h on 2026-10-18 with landings behind it.
 A soak meant to run for hours says so with --expect; the soak kind's limit
 is its max_minutes (180) whatever its runs took (fixed_limit).
 
+A suite out of reach (memory held outside the gate) for LEAN_AFTER_SECONDS
+runs lean (394 amended (9)): fewer scenes at once (land.sh reads
+HEAVY_JOB_KIND, suite_lean, and runs LEAN_SUITE_JOBS), under suite_lean's
+own estimate, when that one is in reach. It is still a suite in running/
+(its caps and exclusions, and an older heavy_job.py's, hold), marked
+"estimate": suite_lean, whose row its peak and time update. Maps' suite
+waited 23 minutes at 18 GB free for 14.6 + 8 on 2026-10-24, about twenty
+sessions, a browser and Jeff's Ableton holding the rest.
+
 State and log live outside the repo, in STATE_DIR (HEAVY_JOBS_DIR to put
 them elsewhere, as the test does): running/ and queue/ hold a file a job,
 kinds.json the estimates and caps (edit a kind's max_running there to
@@ -96,6 +105,11 @@ MAX_RUNNING = 3
 LONG_HOLD_SECONDS = 3600
 ## Set by `run` for its command: the name of its running entry.
 HELD_ENV = "HEAVY_JOB_HELD"
+## Set by `run` for its command: the kind whose estimate it runs under
+## (suite_lean for a lean suite, 394 amended (9)).
+KIND_ENV = "HEAVY_JOB_KIND"
+## A job out of reach this long runs as its kind's lean variant, if any.
+LEAN_AFTER_SECONDS = 5 * 60
 MAX_GPU_RUNNING = 1
 POLL_SECONDS = 5.0
 WATCH_SECONDS = 2.0
@@ -126,7 +140,11 @@ STOPPED_CODE = 5
 KINDS = {
     "trellis_mesh": {"ram_gb": 9.0, "gpu_gb": 12.0, "gpu": True},
     "comfy_batch": {"ram_gb": 6.0, "gpu_gb": 10.0, "gpu": True},
-    "suite": {"ram_gb": 6.5, "gpu_gb": 0.0, "gpu": False, "max_running": 1, "excludes": ["bench"], "max_minutes": 90},  # tests/land.sh: 6.3 GB measured
+    "suite": {"ram_gb": 6.5, "gpu_gb": 0.0, "gpu": False, "max_running": 1, "excludes": ["bench"], "max_minutes": 90,
+        "lean": "suite_lean"},  # tests/land.sh: 6.3 GB measured
+    # A suite run lean (394 amended (9)): its estimate and runs only; it
+    # runs as a suite (lean_row), never as a kind of its own.
+    "suite_lean": {"ram_gb": 9.0, "gpu_gb": 0.0, "gpu": False, "max_minutes": 90, "variant_of": "suite"},
     "bench": {"ram_gb": 3.0, "gpu_gb": 0.0, "gpu": False, "max_running": 1, "excludes": ["suite", "soak"], "max_minutes": 90},
     "godot_import": {"ram_gb": 2.0, "gpu_gb": 0.0, "gpu": False, "max_minutes": 90},
     "godot_export": {"ram_gb": 3.0, "gpu_gb": 0.0, "gpu": False, "max_minutes": 90},
@@ -188,6 +206,29 @@ def decide(job, running, head, free_ram_gb, free_gpu_gb, free_commit_gb=None):
     if job["gpu"] and free_gpu_gb is not None and free_gpu_gb < job["gpu_gb"]:
         return False, "%.1f GB GPU free, %.1f GB wanted" % (free_gpu_gb, job["gpu_gb"])
     return True, ""
+
+
+def lean_row(table, kind):
+    """[kind]'s lean variant (394 amended (9)) from the kinds [table]: its
+    row (caps, exclusions) with its variant's estimates and runs, and
+    "estimate" naming the variant; None when it has none."""
+    variant = table[kind].get("lean")
+    if not variant or variant not in table:
+        return None
+    measured = table[variant]
+    row = dict(table[kind], kind=kind, ram_gb=measured["ram_gb"], commit_gb=commit_of(measured),
+        runs_s=measured.get("runs_s", []), estimate=variant)
+    row.pop("lean", None)
+    return row
+
+
+def goes_lean(row, lean, waited_s, running, free_ram_gb, free_commit_gb=None):
+    """Whether a job of [row] waiting [waited_s] runs as [lean] (its lean
+    variant, or None): out of reach that long, and the lean one in reach.
+    A wait on the queue, or on its own kind, never makes it lean."""
+    return (lean is not None and waited_s >= LEAN_AFTER_SECONDS
+        and out_of_reach(row, running, free_ram_gb, free_commit_gb)
+        and not out_of_reach(lean, running, free_ram_gb, free_commit_gb))
 
 
 def kind_blocked(job, running):
@@ -651,8 +692,10 @@ def log(event, tree, kind, detail=""):
 
 def wait_turn(tree, kind, pid, watched):
     """Queues, waits to be at the head with room, then moves to running.
-    Returns the running entry's file name."""
+    Returns the running entry's file name and the kind whose estimate it
+    holds: [kind], or its lean variant (goes_lean)."""
     row = dict(kinds()[kind], kind=kind)
+    estimate = kind
     total = total_ram_gb()
     if total is not None and row["ram_gb"] + MARGIN_GB > total:
         print("heavy_job: %s %s wants %.1f + %.0f GB, more than this machine's %.0f GB of RAM: it could never start; "
@@ -686,6 +729,18 @@ def wait_turn(tree, kind, pid, watched):
             # kind alone (may_pass): an import is not held behind a suite
             # waiting for a suite.
             free_ram, free_commit = _memory()
+            if estimate == kind and goes_lean(row, lean_row(kinds(), kind) if row.get("lean") else None,
+                    time.time() - queued, running, free_ram, free_commit):
+                row = lean_row(kinds(), kind)
+                estimate = row["estimate"]
+                entry = _read(_path("queue", ticket))
+                if entry is not None:
+                    entry["estimate"] = estimate
+                    _write(_path("queue", ticket), entry)
+                log("lean", tree, kind, "out of reach %.0f s at %.1f GB free: runs as %s, %.1f GB" % (
+                    time.time() - queued, free_ram, estimate, row["ram_gb"]))
+                print("heavy_job: %s %s out of reach (memory held outside the gate): runs lean, as %s (%.1f + %.0f GB)" % (
+                    tree, kind, estimate, row["ram_gb"], MARGIN_GB), file=sys.stderr)
             head = may_pass(row, ahead, running, free_ram, free_commit)
             ok, why = decide(row, running, head, free_ram, free_gpu, free_commit)
             if not ok and head and out_of_reach(row, running, free_ram, free_commit):
@@ -714,12 +769,13 @@ def wait_turn(tree, kind, pid, watched):
                 name = "%s-%s-%s.json" % (tree, kind, pid or os.getpid())
                 _write(_path("running", name), {"tree": tree, "kind": kind, "pid": pid, "pid_since": started_at(pid), "queued": queued,
                     "started": time.time(), "ram_gb": row["ram_gb"], "commit_gb": commit_of(row), "gpu": row["gpu"], "using_gb": 0.0,
-                    "using_commit_gb": 0.0, "watched": watched})
+                    "using_commit_gb": 0.0, "watched": watched, "estimate": estimate})
                 waited = time.time() - queued
-                log("start", tree, kind, "waited %.0f s" % waited if waited >= POLL_SECONDS else "")
+                lean = ", lean" if estimate != kind else ""
+                log("start", tree, kind, ("waited %.0f s" % waited if waited >= POLL_SECONDS else "") + lean)
                 if waited >= POLL_SECONDS:
-                    print("heavy_job: %s %s starts after waiting %.0f s" % (tree, kind, waited), file=sys.stderr)
-                return name
+                    print("heavy_job: %s %s starts after waiting %.0f s%s" % (tree, kind, waited, lean), file=sys.stderr)
+                return name, estimate
         waited = time.time() - queued
         if time.time() - said >= 60.0:
             said = time.time()
@@ -737,7 +793,8 @@ def _ordinal(n):
 
 def _adopt_take(tree, kind):
     """The file name of [tree]'s take of [kind] in running/, marked adopted
-    by this wrapper (it does not age out while this lives), or None."""
+    by this wrapper (it does not age out while this lives), and the kind
+    whose estimate it holds; or (None, None)."""
     with StateLock():
         for entry in _entries("running"):
             if entry["tree"] == tree and entry["kind"] == kind and not entry.get("watched"):
@@ -745,8 +802,8 @@ def _adopt_take(tree, kind):
                 entry["adopted_by"] = os.getpid()
                 entry["adopted_since"] = started_at(os.getpid())
                 _write(_path("running", name), entry)
-                return name
-    return None
+                return name, entry.get("estimate", kind)
+    return None, None
 
 
 def _outer_run():
@@ -775,18 +832,18 @@ def run(tree, kind, command, expect_minutes=None):
         return shell_code(subprocess.call(command))
     restarts = 0
     while True:
-        adopted = _adopt_take(tree, kind)
+        adopted, estimate = _adopt_take(tree, kind)
         if adopted is not None:
             name = adopted
             print("heavy_job: %s %s inside this tree's take, measured as a run" % (tree, kind), file=sys.stderr)
         else:
-            name = wait_turn(tree, kind, os.getpid(), True)
+            name, estimate = wait_turn(tree, kind, os.getpid(), True)
         started = time.time()
-        row = kinds()[kind]
+        row = kinds()[kind] if estimate == kind else (lean_row(kinds(), kind) or kinds()[kind])
         # A soak below normal priority, and what it starts with it (Windows
         # gives a below-normal process's children its class).
         flags = getattr(subprocess, "BELOW_NORMAL_PRIORITY_CLASS", 0) if row.get("below_normal") else 0
-        child = subprocess.Popen(command, env=dict(os.environ, **{HELD_ENV: name}), creationflags=flags)
+        child = subprocess.Popen(command, env=dict(os.environ, **{HELD_ENV: name, KIND_ENV: estimate}), creationflags=flags)
         job = Job(child)
         peak, low, stopped, long_logged = 0.0, 0, False, False
         gpu_peak, commit_peak = 0.0, 0.0
@@ -863,7 +920,7 @@ def run(tree, kind, command, expect_minutes=None):
                     _write(_path("running", name), entry)
             if not stopped and ended is None and (peak > 0.0 or commit_peak > 0.0 or code == 0):
                 table = _read(_path("kinds.json")) or {}
-                saved = dict(kinds()[kind])
+                saved = dict(kinds()[estimate])
                 if peak > 0.0:
                     saved["ram_gb"] = updated_estimate(saved["ram_gb"], peak)
                     if saved["gpu"] and gpu_peak > 0.0:
@@ -875,7 +932,7 @@ def run(tree, kind, command, expect_minutes=None):
                 if code == 0 and expect_minutes is None:
                     # Clean runs only, and no declared soak, set the limit.
                     saved["runs_s"] = (saved.get("runs_s", []) + [round(duration, 1)])[-RUN_HISTORY:]
-                table[kind] = saved
+                table[estimate] = saved
                 _write(_path("kinds.json"), table)
         if ended is not None:
             log(ended[0], tree, kind, "stopped after %.0f min, %s; peak %.1f GB" % (duration / 60, ended[1], peak))
@@ -883,7 +940,8 @@ def run(tree, kind, command, expect_minutes=None):
                 "(heavy_job run %s %s --expect MIN -- ...)" % (tree, kind, duration / 60, ended[1], tree, kind), file=sys.stderr)
             return STOPPED_CODE
         if not stopped:
-            log("done", tree, kind, "exit %s, %.0f s, peak %.1f GB, commit %.1f GB" % (code, duration, peak, commit_peak))
+            log("done", tree, kind, "exit %s, %.0f s, peak %.1f GB, commit %.1f GB%s" % (code, duration, peak, commit_peak,
+                ", lean" if estimate != kind else ""))
             return shell_code(code)
         restarts += 1
         log("stopped", tree, kind, "free RAM under %.0f GB after %.0f s (peak %.1f GB); restart %d of %d" % (
@@ -899,8 +957,8 @@ def take(tree, kind, pid):
         print("heavy_job: %s %s inside %s's %s run, which holds it; nothing taken" % (
             tree, kind, outer["tree"], outer["kind"]))
         return 0
-    wait_turn(tree, kind, pid, False)
-    print("heavy_job: %s %s taken" % (tree, kind))
+    _, estimate = wait_turn(tree, kind, pid, False)
+    print("heavy_job: %s %s taken%s" % (tree, kind, " (lean, as %s)" % estimate if estimate != kind else ""))
     return 0
 
 
@@ -950,9 +1008,11 @@ def status():
             flag = "  LONG: held %.0f min, is it stuck?" % (held / 60)
         print("running %s %s, %s, using %.1f of %.1f GB%s%s" % (entry["tree"], entry["kind"],
             "held %.0f of %.0f min" % (held / 60, limit / 60) if limit is not None else "%.0f s" % held,
-            entry.get("using_gb", 0.0), entry["ram_gb"], "" if entry.get("watched") else " (taken)", flag))
+            entry.get("using_gb", 0.0), entry["ram_gb"], ("" if entry.get("watched") else " (taken)")
+            + (" (lean)" if entry.get("estimate", entry["kind"]) != entry["kind"] else ""), flag))
     for place, entry in enumerate(queue, 1):
-        print("queued %s %s, %.0f s (%s)" % (entry["tree"], entry["kind"], time.time() - entry["queued"], _ordinal(place)))
+        print("queued %s %s, %.0f s (%s)%s" % (entry["tree"], entry["kind"], time.time() - entry["queued"], _ordinal(place),
+            ", lean" if entry.get("estimate", entry["kind"]) != entry["kind"] else ""))
     if not running and not queue:
         print("no heavy jobs")
     return 0
@@ -1021,7 +1081,8 @@ def main(args):
         print(__doc__)
         return 0
     command = args[0]
-    if command in ("run", "take", "release", "holds") and (len(args) < 3 or args[2] not in kinds()):
+    if command in ("run", "take", "release", "holds") and (len(args) < 3 or args[2] not in kinds()
+            or kinds()[args[2]].get("variant_of")):
         print("heavy_job: %s <tree> <kind>, a kind of: %s" % (command, ", ".join(sorted(kinds()))), file=sys.stderr)
         return 2
     if command == "run":

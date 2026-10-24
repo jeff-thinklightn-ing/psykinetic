@@ -8889,6 +8889,32 @@ Amended an eighth time (2026-10-21, the coordinator): two changes.
 heavy_job_test covers the reused id, the reused waiter, the entry from
 before a boot, the soak's exclusions, its limit and its priority.
 
+Amended a ninth time (2026-10-24, release and perf): a suite out of reach
+runs lean. Maps' suite waited 23 minutes at 18.3 GB free for 14.6 + 8 GB.
+The only heavy job was a 0.7 GB soak; about twenty sessions, a browser,
+Steam and Jeff's Ableton held the rest. The 14.6 GB was no outlier (the
+day's 30 suites peaked at 12.1 to 14.9 GB: up to six scenes at once beside
+net_test, state_test and the server boot), and the 8 GB margin is the
+machine's, not the soak's, so neither was lowered.
+- A suite out of reach (out_of_reach: not even with every gated job done)
+  for LEAN_AFTER_SECONDS (5 minutes), whose lean variant is in reach, runs
+  lean (goes_lean). A wait on the queue or on another suite never makes it
+  lean.
+- It is still a suite in running/: its cap of one and its exclusions hold,
+  and an older heavy_job.py that knows nothing of lean ones sees a suite.
+  The entry's "estimate" names suite_lean, whose kinds.json row holds the
+  estimate it is charged (9 GB to start) and is updated from its peak and
+  time; the full suite's row is left alone. suite_lean is no kind to run or
+  take itself.
+- `run` tells its command HEAVY_JOB_KIND (suite or suite_lean), and a run
+  inside a take tells the take's. land.sh and land.ps1 then run at most 3
+  scenes at once, beside the other parts as before; a landing takes about
+  half as long again. `take` says "taken (lean, as suite_lean)", status says
+  "(lean)", the log has a "lean" line and ", lean" on its start and done.
+- The --expect and idle rules are unchanged.
+heavy_job_test covers the lean row, when a suite goes lean and when not,
+its exclusions, and a take and a run going lean through a state folder.
+
 
 ## 395. UI sounds
 

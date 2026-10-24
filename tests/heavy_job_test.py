@@ -278,6 +278,59 @@ with open(gate._path("heavy_jobs.log")) as log:
 check(adopted and float(adopted[0].split("peak ")[1].split(" GB")[0]) >= 0.15, "the run inside the take was measured: %s" % (
     adopted[0].strip() if adopted else "no line"))
 
+print("== a suite out of reach runs lean (394 amended (9)) ==")
+full = dict(gate.KINDS["suite"], kind="suite", ram_gb=14.6, commit_gb=12.2)
+table = {"suite": full, "suite_lean": dict(gate.KINDS["suite_lean"], ram_gb=8.0, runs_s=[600.0])}
+lean = gate.lean_row(table, "suite")
+check(lean["kind"] == "suite" and lean["estimate"] == "suite_lean" and lean["ram_gb"] == 8.0 and "lean" not in lean
+    and lean["max_running"] == 1 and "bench" in lean["excludes"] and lean["runs_s"] == [600.0],
+    "the lean row: a suite's caps and exclusions, the variant's estimate and runs")
+check(gate.lean_row(dict(table, bench=dict(gate.KINDS["bench"])), "bench") is None, "a kind with no variant has no lean row")
+saved_margins = gate.MARGIN_GB, gate.COMMIT_MARGIN_GB
+gate.MARGIN_GB, gate.COMMIT_MARGIN_GB = 8.0, 8.0
+after = gate.LEAN_AFTER_SECONDS
+check(gate.goes_lean(full, lean, after, [], 18.3, 20.2), "maps' wait: 18.3 GB free, 14.6 + 8 out of reach, 8 + 8 in: lean")
+check(not gate.goes_lean(full, lean, after - 1, [], 18.3, 20.2), "not before LEAN_AFTER_SECONDS")
+check(not gate.goes_lean(full, lean, after, [], 30.0, 30.0), "nor when the full suite is in reach")
+check(not gate.goes_lean(full, lean, after, [dict(running(14.6, 10.0), kind="suite")], 18.3, 20.2),
+    "nor while a suite running will give its memory back (a wait on the gate, not outside it)")
+check(not gate.goes_lean(full, lean, after, [], 12.0, 20.2), "nor when the lean one is out of reach too")
+check(not gate.goes_lean(full, None, after, [], 18.3, 20.2), "nor with no lean variant")
+check(not gate.decide(lean, [dict(running(1, 1), kind="bench")], True, 60.0, None)[0]
+    and not gate.decide(lean, [dict(running(1, 1), kind="suite")], True, 60.0, None)[0],
+    "a lean suite still never beside a bench or another suite")
+gate.MARGIN_GB, gate.COMMIT_MARGIN_GB = saved_margins
+# Through a take and a run, the full suite never in reach.
+gate.total_ram_gb = lambda: None
+saved_table = gate._read(gate._path("kinds.json"))
+gate._write(gate._path("kinds.json"), {"suite": dict(gate.KINDS["suite"], ram_gb=1e12, commit_gb=1e12)})
+gate.LEAN_AFTER_SECONDS = 0
+check(gate.take("thin", "suite", os.getpid()) == 0, "a take of a suite out of reach")
+entries = gate._entries("running")
+check(len(entries) == 1 and entries[0]["kind"] == "suite" and entries[0]["estimate"] == "suite_lean"
+    and entries[0]["ram_gb"] == gate.KINDS["suite_lean"]["ram_gb"], "holds a suite, lean, at suite_lean's estimate: %s" % entries)
+check(gate.holds("thin", "suite"), "the tree holds a suite")
+told = os.path.join(STATE, "kind.txt")
+code = gate.run("thin", "suite", [sys.executable, "-c", "import os; open(%r, 'w').write(os.environ.get(%r, ''))" % (told, gate.KIND_ENV)])
+check(code == 0 and open(told).read() == "suite_lean", "a run inside the lean take tells its command HEAVY_JOB_KIND=suite_lean")
+check(gate.release("thin", "suite") == 0 and not gate._entries("running"), "released as a suite")
+code = gate.run("thin2", "suite", [sys.executable, "-c", "import os; open(%r, 'w').write(os.environ.get(%r, ''))" % (told, gate.KIND_ENV)])
+saved = gate._read(gate._path("kinds.json"))
+check(code == 0 and open(told).read() == "suite_lean", "a run of a suite out of reach runs lean")
+check(len(saved.get("suite_lean", {}).get("runs_s", [])) == 2 and saved["suite"]["ram_gb"] == 1e12 and not saved["suite"].get("runs_s"),
+    "its time goes to suite_lean's row, the full suite's left alone: %s" % saved)
+with open(gate._path("heavy_jobs.log")) as log:
+    text = log.read()
+check("\tlean\tthin2\tsuite\t" in text and ", lean" in text.split("\tdone\tthin2\tsuite\t")[1].split("\n")[0],
+    "the log says it went lean, and its done line")
+check(gate.main(["take", "x", "suite_lean"]) == 2, "suite_lean is no kind to take or run itself")
+gate.LEAN_AFTER_SECONDS = after
+gate.total_ram_gb = real_total
+if saved_table is None:
+    os.remove(gate._path("kinds.json"))
+else:
+    gate._write(gate._path("kinds.json"), saved_table)
+
 print("== the state lock denied a moment ==")
 # Windows answers PermissionError, not FileExistsError, while the lock is
 # being deleted by its holder: economy's waiter died of it and lost its place.
