@@ -59,8 +59,13 @@ wait
 code=0
 failed=""
 for name in heavy_job_test changelog_check_test changelog_resolve_test suite net_test state_test server_boot_test; do
-	read -r status took <"$LOGS/$name.status"
-	if [ "$status" -ne 0 ]; then
+	# A part killed before it wrote its status (no file, or empty) fails: an
+	# empty status passed the test once, and economy's landing pushed over a
+	# suite killed mid-run (2026-10-23). Only a status of exactly 0 passes.
+	status=""
+	[ -f "$LOGS/$name.status" ] && read -r status took <"$LOGS/$name.status"
+	if [ "$status" != "0" ]; then
+		[ -n "$status" ] || echo "FAIL  $name: killed before it finished (no exit status)"
 		code=1
 		failed="$failed $name"
 	fi

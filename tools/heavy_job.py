@@ -238,6 +238,21 @@ def should_stop(me, running, free_ram_gb):
     return all(each["started"] <= me["started"] for each in running)
 
 
+def shell_code(code):
+    """A child's exit code as a shell sees it: 0 to 255, and never 0 when it
+    failed. A Git Bash process killed by a signal hands Windows its wait
+    status (signal 9: 2304, 9 << 8), which a shell takes modulo 256 as 0:
+    economy's landing pushed 7504160b over a suite killed mid-run
+    (2026-10-23). Such a status becomes 128 + the signal; any other code out
+    of range (a negative NTSTATUS, a multiple of 256) becomes 1."""
+    if 0 <= code <= 255:
+        return code
+    signal = (code >> 8) & 0x7F
+    if code > 0 and code & 0xFF == 0 and 0 < signal < 65:
+        return 128 + signal
+    return code & 0xFF or 1
+
+
 def limit_seconds(row, expect_minutes=None):
     """How long a run of [row]'s kind may hold the gate: [expect_minutes]
     when given, else OVERRUN_FACTOR times the median of its recorded runs
@@ -747,7 +762,7 @@ def run(tree, kind, command, expect_minutes=None):
         print("heavy_job: %s %s inside %s's %s run, which holds and measures it; not queued again" % (
             tree, kind, outer["tree"], outer["kind"]), file=sys.stderr)
         log("nested", tree, kind, "inside %s %s" % (outer["tree"], outer["kind"]))
-        return subprocess.call(command)
+        return shell_code(subprocess.call(command))
     restarts = 0
     while True:
         adopted = _adopt_take(tree, kind)
@@ -859,7 +874,7 @@ def run(tree, kind, command, expect_minutes=None):
             return STOPPED_CODE
         if not stopped:
             log("done", tree, kind, "exit %s, %.0f s, peak %.1f GB, commit %.1f GB" % (code, duration, peak, commit_peak))
-            return code
+            return shell_code(code)
         restarts += 1
         log("stopped", tree, kind, "free RAM under %.0f GB after %.0f s (peak %.1f GB); restart %d of %d" % (
             MARGIN_GB, duration, peak, restarts, MAX_RESTARTS))

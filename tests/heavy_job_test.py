@@ -387,6 +387,16 @@ with contextlib.redirect_stdout(shown):
 check("launch crashes by top frame: main+40d4d61 2" in shown.getvalue() and "3 launch" in shown.getvalue()
     and "backtrace:" not in shown.getvalue(), "crashes grouped by top frame, the backtrace kept to the log: %s" % shown.getvalue().splitlines()[-1])
 
+print("== a child's exit code as a shell sees it ==")
+# A killed Git Bash hands Windows its wait status (signal 9: 2304), which a
+# shell reads modulo 256 as 0: economy's landing pushed over a killed suite
+# (2026-10-23). run returns 128 + the signal, never 0 for a failure.
+check([gate.shell_code(c) for c in (0, 1, 5, 137, 255)] == [0, 1, 5, 137, 255], "0 to 255 as they are")
+check(gate.shell_code(2304) == 137 and gate.shell_code(15 << 8) == 143, "a signal's wait status: 128 + the signal")
+check(all(gate.shell_code(c) != 0 for c in (256, 512, -1073741510, -1)), "any other out of range: never 0")
+code = gate.run("killed", "suite", [sys.executable, "-c", "import sys; sys.exit(2304)"])
+check(code == 137, "run hands on 137 for a child that exited 2304 (%s)" % code)
+
 shutil.rmtree(STATE, ignore_errors=True)
 print("\nRESULT: %s" % ("PASS" if failed == 0 else "FAIL (%d failed)" % failed))
 sys.exit(1 if failed else 0)
