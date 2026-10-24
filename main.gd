@@ -597,6 +597,10 @@ var _return_at := 0.0
 ## message last said it ({all_fallen: seconds}; 0 calls it off), with the
 ## client's clock when it came.
 var down_screen: DownScreen
+## The zone arrival card (660, ui's side): perf's phased arrival calls
+## begin(zone_display_name()) as a crossing starts and finish() when the
+## rebuild is done.
+var arrival_card: ArrivalCard
 var _fallen_wait := 0
 var _fallen_wait_at := 0.0
 ## The bow's aim while drawn (the archery aim, ui's side): the angle from
@@ -2450,6 +2454,12 @@ func zone_name_here() -> String:
 	if World.zone != null and not World.zone.name.is_empty():
 		return World.zone.name
 	return map_name
+
+
+## 660, ui's side: the zone's name as the map and compass show it (the
+## level's display name), "" when it has none; never a level id.
+func zone_display_name() -> String:
+	return str(level.get("display_name", "")).strip_edges()
 
 
 ## The player this peer's input controls, or null (dedicated server, dead,
@@ -9070,6 +9080,8 @@ func _build_talk() -> void:
 	down_screen.slow_heart.connect(_ask_slow_heart)
 	down_screen.bleed_out.connect(_ask_bleed_out)
 	$HUD.add_child(down_screen)
+	arrival_card = ArrivalCard.new()  # 660, ui's side.
+	$HUD.add_child(arrival_card)
 	# Combat's ground telegraphs (602, ui's side), connected by name so either side lands first.
 	if has_signal("telegraph_started"):
 		connect("telegraph_started", _on_telegraph_started)

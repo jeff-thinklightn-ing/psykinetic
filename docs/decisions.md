@@ -28426,3 +28426,33 @@ added to the saved player record (paid_deals). resident_test
 _test_monster_talk: the yes and the sum take the free deal with no gold;
 the hooks, the zone remap, an unknown level refused, the save and load, a
 bad saved entry dropped, the win erasing it.
+
+## 660, ui's side. The zone arrival card
+
+Beside perf's 660 (the phased zone arrival: Client3D.rebuild's builders run
+over frames behind a fade instead of freezing the frame, 4.2 s into the
+wilds today). Perf asked ui for the fade and the zone-name card; the
+coordinator approved the design. render/arrival_card.gd (ArrivalCard, a
+Control over the whole HUD above every panel, mouse ignored: perf's side
+holds input), held as Main.arrival_card. begin(zone, line) as a crossing
+starts (perf's _repaint, with Main.zone_display_name: the level's display
+name as the map and compass show it, "" when it has none, never a level
+id): the dark, the theme's outline colour #1a1410 at 0.92, never pure
+black (the art rule), comes in over 0.2 s, and the zone's name with it,
+Alegreya at the title size, bone, with the text outline and no box, a
+third of the way down; an optional line under it, dim (none for now: the
+coordinator decides its source when lore or maps give a zone-to-region
+map). While the build runs a short bone rule under the name breathes (0.5
+to 0.9 over 1.6 s): a sign the frame is alive, no spinner and no bar
+(Jeff's no-bars rule, and nothing to count down). finish() when
+Client3D.building turns false: the dark lifts over 0.3 s, so the world is
+back as soon as the rebuild is, and the name stays over the world until
+1.5 s from begin or 0.3 s after finish, whichever is later, then fades
+over 0.4 s: a sub-second crossing (perf's step 2 goal) still shows a
+readable name, and the world stays in view meanwhile. Nothing lengthens
+the crossing. begin() while the card is up (a link straight back, a death
+mid-arrival) restarts the name from the dark's current alpha, no flash to
+clear and back (the coordinator's note). The card advances itself each
+frame, so it moves between the rebuild's phases. ui_test _test_arrival_card
+steps its clock by hand. Client only; no wire change; new class_name
+ArrivalCard.

@@ -39,6 +39,7 @@ func _ready() -> void:
 	_test_town_sheet()  # After the map's test: the sheet's names build the map's graph (place_words).
 	await _test_deal_window()
 	_test_door_note()
+	_test_arrival_card()
 	_test_access()
 	_test_keys()
 	_test_barter()
@@ -826,6 +827,64 @@ func _test_deal_window() -> void:
 
 
 ## A note on a door, read (643, ui's side; npc's "notes" message).
+## The zone arrival card (660, ui's side), its clock stepped by hand.
+func _test_arrival_card() -> void:
+	print("== the zone arrival card (660, ui's side): the dark in and out, the name's while, a restart mid-arrival ==")
+	var card: ArrivalCard = _main.arrival_card
+	if card == null:
+		_check(false, "the arrival card exists")
+		return
+	card.set_process(false)  # The test's clock, not the frames'.
+	_check(_main.zone_display_name() == str(_main.level.get("display_name", "")).strip_edges() and not _main.zone_display_name().contains("/"),
+			"the name shown is the level's display name, as the map shows it (%s), never an id" % _main.zone_display_name())
+	card.begin("The Wilds")
+	_check(card.showing and card.visible and card.zone_name == "The Wilds" and card._dark == 0.0 and card._name.text == "The Wilds" and not card._line.visible,
+			"begin: the card up, the dark from clear, the name set, no line without one")
+	card.advance(0.1)
+	var halfway := card._dark
+	card.advance(0.15)
+	_check(halfway > 0.3 and halfway < 0.6 and is_equal_approx(card._dark, ArrivalCard.DARK_ALPHA) and card.name_alpha() == 1.0 and card._dark_rect.color.a < 0.95,
+			"the dark in over 0.2 s to %.2f, never black (%.2f at 0.1 s); the name with it" % [card._dark, halfway])
+	card.advance(0.25)
+	card.finish()
+	card.advance(0.15)
+	var lifting := card._dark
+	card.advance(0.2)
+	_check(lifting > 0.0 and lifting < ArrivalCard.DARK_ALPHA and card._dark == 0.0 and card.showing and card.name_alpha() == 1.0,
+			"finish at 0.5 s: the dark lifts over 0.3 s (%.2f at 0.15 s), the name stays over the world" % lifting)
+	card.advance(0.55)
+	var held := card.name_alpha()
+	card.advance(0.3)
+	var leaving := card.name_alpha()
+	card.advance(0.3)
+	_check(held == 1.0 and leaving > 0.3 and leaving < 0.7 and not card.showing and not card.visible,
+			"the name readable until 1.5 s from begin (%.2f at 1.4 s), fading over 0.4 s (%.2f at 1.7 s), the card gone by 2 s" % [held, leaving])
+	card.begin("The Hills", "Where the goats go.")
+	card.advance(0.1)
+	var dark_before := card._dark
+	card.begin("The Dwarven Halls")
+	_check(is_equal_approx(card._dark, dark_before) and card.zone_name == "The Dwarven Halls" and card.showing and not card._line.visible,
+			"begin while up: the dark goes on from where it is (%.2f), the name restarts, the old line goes" % dark_before)
+	card.advance(0.1)
+	_check(card._dark > dark_before, "and keeps coming in")
+	card.finish()
+	card.advance(2.5)
+	_check(not card.showing, "then it ends as any")
+	card.begin("The Wilds", "A line.")
+	_check(card._line.visible and card._line.text == "A line.", "a line given shows under the name")
+	card.advance(3.0)
+	var long_build := card.name_alpha()
+	card.finish()
+	card.advance(0.2)
+	var after_long := card.name_alpha()
+	card.advance(0.5)
+	_check(long_build == 1.0 and after_long == 1.0 and card.name_alpha() == 0.0 and not card.showing,
+			"a long build: the name holds through it and leaves 0.3 s after finish (%.2f, %.2f)" % [long_build, after_long])
+	_check(ArrivalCard.breath_at(0.0) > 0.69 and ArrivalCard.breath_at(0.0) < 0.71 and ArrivalCard.breath_at(ArrivalCard.BREATH_PERIOD / 4.0) > 0.89,
+			"the rule breathes between 0.5 and 0.9")
+	card.set_process(true)
+
+
 func _test_door_note() -> void:
 	print("== a note on the door (643, ui's side): npc's notes by zone, E on or facing the cell reads it, Esc or moving off puts it back ==")
 	var sheet: NoteSheet = _main.note_sheet
