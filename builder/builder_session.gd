@@ -441,12 +441,15 @@ func _situation() -> String:
 	if not coded.is_empty():
 		text += "\n\nBuildings in this level, by code (the player may name one so; it is the same entry's \"code\" in the settings): " + ", ".join(coded) + "."
 	var plots := PackedStringArray()
-	for plot: Dictionary in plots_from(doc.config):
+	var laid := PackedStringArray()
+	for plot: Dictionary in plots_from(doc.config) + laid_plots(doc.config):
 		var rect: Rect2i = plot["rect"]
 		if area.grow(MARGIN).intersects(rect):
-			plots.append("%s at (%d, %d), %d x %d, its street to the %s" % [plot["key"], rect.position.x, rect.position.y, rect.size.x, rect.size.y, side_name(plot["facing"])])
+			(laid if plot.has("laid") else plots).append("%s at (%d, %d), %d x %d, its street to the %s" % [plot["key"], rect.position.x, rect.position.y, rect.size.x, rect.size.y, side_name(plot["facing"])])
 	if not plots.is_empty():
 		text += "\n\nPlots here (ground the town keeps for new buildings): " + ", ".join(plots) + "."
+	if not laid.is_empty():
+		text += "\n\nPlots the towns laid here themselves as they grew (their buildings rise there on their own): " + ", ".join(laid) + "."
 	var unsited := builds_without_site()
 	if not unsited.is_empty():
 		text += "\n\nBuilds the towns here have in hand with no building marked for them yet (place one, on a plot first, and set_building it to the use): " + "; ".join(unsited) + "."
@@ -1545,6 +1548,21 @@ static func plots_from(config: Dictionary) -> Array[Dictionary]:
 	return out
 
 
+## The plots the towns laid themselves in the level's zone as they grow
+## (591 amended: World.clearing.plots_of, kept in the snapshot, never in
+## level.json), in plots_from's shape with "laid" the town: the rect its
+## footprint (the laid rect less its ring of a cell), the key "<use> (laid
+## by <town>)". None without World.clearing.
+static func laid_plots(config: Dictionary) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	if World.clearing == null:
+		return out
+	for plot: Dictionary in World.clearing.plots_of(Level.zone_of(config)):
+		out.append({"key": "%s (laid by %s)" % [plot["use"], plot["town"]], "rect": (plot["rect"] as Rect2i).grow(-1),
+			"facing": plot["facing"], "laid": plot["town"]})
+	return out
+
+
 ## Each building in the area on a plot that does not face the plot's street, and, in a
 ## level with roads (level.json's "roads", decision 559), each other
 ## building serving a town whose door does not open onto a street: no road
@@ -1552,7 +1570,7 @@ static func plots_from(config: Dictionary) -> Array[Dictionary]:
 ## door leads under it, not to a street: left out.
 func street_checks() -> Array[String]:
 	var out: Array[String] = []
-	var plots := plots_from(working.config)
+	var plots := plots_from(working.config) + laid_plots(working.config)
 	for plot: Dictionary in plots:
 		var room: Rect2i = plot["rect"]
 		if area.intersects(room) and mini(room.size.x, room.size.y) < Level.MIN_ROOM:

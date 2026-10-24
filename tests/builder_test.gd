@@ -720,6 +720,24 @@ func _test_plots() -> void:
 	var moved := LevelMap.moved_config(doc.config, func(cell: Vector2i) -> Vector2i: return Vector2i(29 - cell.y, cell.x), 1)
 	var plot: Dictionary = moved["plots"][0]
 	_check(plot["rect"] == [20, 4, 6, 6] and plot["facing"] == [-1, 0], "a quarter turn moves a plot and turns its street side (%s)" % [plot])
+	# The towns' laid plots (591 amended), from a stand-in World.clearing.
+	var kept_clearing := World.clearing
+	World.clearing = Clearing.new()
+	World.clearing.lay_plot(Level.zone_of(doc.config), "store", "forge", Rect2i(2, 18, 7, 7), Vector2i(0, 1))
+	World.clearing.lay_plot("hills", "store", "inn", Rect2i(10, 18, 7, 7), Vector2i(0, 1))
+	(doc.config["plots"] as Array).pop_back()
+	(doc.config["buildings"] as Array).append({"slot": "building.hut", "at": [4, 20], "facing": [0, -1]})
+	Level.fill_codes(doc.config)
+	var laid := BuilderSession.new(doc, Rect2i(0, 0, 40, 30), "test_field", StubClaude.new([]))
+	_check(BuilderSession.laid_plots(doc.config).size() == 1 and BuilderSession.laid_plots(doc.config)[0]["rect"] == Rect2i(3, 19, 5, 5),
+		"a laid plot of this zone, its footprint inside the ring; another zone's not")
+	_check(laid.street_checks().any(func(said: String) -> bool: return "on the plot forge (laid by store) faces north, but the plot's street is to the south" in said),
+		"a hut turned from a laid plot's street: said (%s)" % [laid.street_checks()])
+	_check("Plots the towns laid here themselves as they grew (their buildings rise there on their own): forge (laid by store) at (3, 19), 5 x 5, its street to the south." in laid._situation(),
+		"the request lists the laid plots apart")
+	World.clearing.lay_plot(Level.zone_of(doc.config), "store", "barn", Rect2i(30, 20, 5, 6), Vector2i(0, 1))
+	_check(laid.street_checks().any(func(said: String) -> bool: return "the plot barn (laid by store) is 3 x 4: too small" in said), "a laid plot under Level.MIN_ROOM: said")
+	World.clearing = kept_clearing
 
 
 func _test_visible_work() -> void:

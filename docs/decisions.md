@@ -25948,6 +25948,23 @@ PROTOCOL_REVISION 35 (a line under dungeon's, which opened it): the
 "clearing" message's "plots".
 No new class_name.
 
+## 591 amended (step 2), builder's side: the towns' laid plots in builder mode
+
+The coordinator asked, through maps, that the builder's plot checks (564,
+488 amended) see the plots a town lays as it grows, not only level.json's.
+- BuilderSession.laid_plots(config): World.clearing.plots_of for the
+  level's zone, in plots_from's shape. The rect is the footprint, the laid
+  rect less its ring of a cell; the key "<use> (laid by <town>)"; "laid"
+  the town. None without World.clearing.
+- street_checks reads both: a laid plot under Level.MIN_ROOM is said, and a
+  building on one that does not face its street is told to turn.
+- The request lists them apart from level.json's plots: "Plots the towns
+  laid here themselves as they grew (their buildings rise there on their
+  own)". They live in the snapshot, so the builder never writes them.
+tests: builder_test _test_plots, with a stand-in World.clearing (a plot in
+the zone, one in another, a small one).
+Builder only, protocol unchanged, no new class_name.
+
 ## 640, maps' side: the herders' holdings in the hills
 
 Jeff: "herders exist as people". The coordinator's ruling: the hills'
