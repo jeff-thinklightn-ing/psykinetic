@@ -330,10 +330,17 @@ static func overlay_names() -> Array[String]:
 	return out
 
 
+## How sure a world plane place or region is: agreed with Jeff, or a draft
+## for him to move.
+const PLANE_STATUSES: Array[String] = ["agreed", "draft"]
+
+
 ## The world plane (decision 650): levels/world_plane.json read, {zones:
 ## {level: {origin: Vector2i (the world cell of its (0, 0)), height
 ## (metres added to its ground)}}, landmarks: [{id, slot, at: Vector2i (a
-## world cell), base (metres), facing: Vector2i}], warnings: [String]};
+## world cell), base (metres), facing: Vector2i}], places and regions:
+## [{id, name, rect: Rect2i, status ("agreed" or "draft"), and the
+## entry's other keys}], warnings: [String]};
 ## an entry it cannot read is left out and said. Terrain's far layer (650,
 ## terrain's side) draws the landmarks from where a level lies on it.
 static func world_plane() -> Dictionary:
@@ -359,7 +366,31 @@ static func world_plane() -> Dictionary:
 			continue
 		out["landmarks"].append({"id": str(entry.get("id", "")), "slot": str(entry["slot"]), "at": at,
 			"base": float(entry.get("base", 0.0)), "facing": facing if facing != null else Vector2i(0, 1)})
+	# The places lore names that no level holds yet, and the named lands
+	# (650 amended): each a rect on the plane, "agreed" or "draft".
+	for section: String in ["places", "regions"]:
+		out[section] = []
+		var listed: Variant = data.get(section, [])
+		for entry: Variant in listed if listed is Array else []:
+			var rect: Variant = _plane_rect(entry.get("rect")) if entry is Dictionary else null
+			if rect == null or str(entry.get("id", "")).is_empty() or str(entry.get("name", "")).is_empty():
+				out["warnings"].append("a world plane %s entry (%s) has no id, name or rect [x, y, w, h]: left out" % [section, entry.get("id", "?") if entry is Dictionary else entry])
+				continue
+			var status := str(entry.get("status", "draft"))
+			if not status in PLANE_STATUSES:
+				out["warnings"].append("the world plane's %s has status %s, not one of %s" % [entry["id"], status, PLANE_STATUSES])
+			var read: Dictionary = (entry as Dictionary).duplicate(true)
+			read.merge({"id": str(entry["id"]), "name": str(entry["name"]), "rect": rect, "status": status}, true)
+			out[section].append(read)
 	return out
+
+
+## A [x, y, w, h] list as a Rect2i of positive size, or null.
+static func _plane_rect(value: Variant) -> Variant:
+	if not value is Array or (value as Array).size() != 4:
+		return null
+	var rect := Rect2i(int(value[0]), int(value[1]), int(value[2]), int(value[3]))
+	return rect if rect.size.x > 0 and rect.size.y > 0 else null
 
 
 ## [param cell] of [param level_name] on the world plane [param plane]

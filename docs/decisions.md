@@ -26808,3 +26808,41 @@ level_test _test_held (the link both ways, the fort a fort for no town, no
 houses, the store's pad, the tower's room walked to over the bridge and,
 the bridge gone, over the ford); the world plane test lays it. No wire
 change, no new class_name.
+## 650 amended: the lands, one truth for where everything lies
+
+Jeff (2026-10-24): "might as well draw out a map of the "lands" while
+we're at it and make it consistent across trees". The coordinator gave it
+to maps.
+
+- **levels/world_plane.json is the one truth** of where everything in the
+  region lies: every outdoor level's origin (zones), every landmark, and
+  now every place lore names that no level holds yet (**places**) and the
+  named lands (**regions**), each {id, name, rect [x, y, w, h] on the
+  plane, status "agreed" or "draft" (Level.PLANE_STATUSES), about, and any
+  key of its own (a place's "kind")}. A tree that places anything outdoors
+  adds it there; lore's directions and distances follow it, never the
+  other way; terrain's far landmarks, the big map's known world and the
+  sought ones' "where" read it. Level.world_plane() reads the two new
+  lists and says an entry it cannot read.
+- The first entries, from lore's list (lore-2e, 2026-10-24): the mine
+  (agreed, under the tower landmark), the dead land round it (a ring, its
+  radius a draft), the stronghold the forest's closed link leads to (a
+  draft, unnamed: Jeff's E1), the mountain behind the castle (a draft, his
+  "perhaps"), the falls the river comes down above Held (a draft); the
+  lands "the Blood Rot's land" (agreed: the whole region, its own name his
+  A1) and "the Woodlands" (a draft: Held, the wilds, the hills, the
+  forest). The raiders' camps have no set spots (economy's camps stand for
+  them); the homeland and the regions beyond lie off the plane, their way
+  open.
+- **tools/lands_map.py** (python -I) draws the plane to
+  C:/dev/review/lands/lands.png: each built level stamped at its origin
+  from its layout, its name on it; links between them as dots, ways down
+  to a level with no place on the plane (the barrows, a test room, the
+  closed stronghold) as named squares; places as outlines (solid agreed,
+  dashed draft; a ring as a circle); landmarks as triangles; the lands as
+  faint outlines; a scale and the compass; and a README.md from the same
+  data (each thing's origin and size). Run after any change to the plane.
+
+level_test's world plane check: the places and lands each their own id,
+agreed or a draft, none on a built level's ground. No wire change, no new
+class_name.

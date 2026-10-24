@@ -818,6 +818,21 @@ func _test_world_plane() -> void:
 		ids[mark["id"]] = true
 	_check(ids.has("castle") and ids.has("tower_over_the_mine") and ids.size() == plane["landmarks"].size(),
 		"the castle and the tower over the mine are landmarks, each its own id (%s)" % [ids.keys()])
+	# 650 amended: the places no level holds yet and the named lands, each
+	# its own id, agreed or a draft; no place on a built level's ground.
+	var listed: Array = plane["places"] + plane["regions"]
+	var place_ids := {}
+	for entry: Dictionary in listed:
+		place_ids[entry["id"]] = true
+	var on_levels := []
+	for place: Dictionary in plane["places"]:
+		for level_name: String in rects:
+			if (place["rect"] as Rect2i).intersects(rects[level_name]):
+				on_levels.append([place["id"], level_name])
+	_check(place_ids.size() == listed.size() and place_ids.has("mine") and place_ids.has("stronghold")
+			and listed.all(func(entry: Dictionary) -> bool: return entry["status"] in Level.PLANE_STATUSES),
+		"the places and lands each their own id, agreed or a draft (%s)" % [place_ids.keys()])
+	_check(on_levels.is_empty(), "no place lore names lies on a built level's ground (%s)" % [on_levels])
 
 
 func _ground(level: Dictionary, cell: Vector2i) -> float:
