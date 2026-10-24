@@ -114,6 +114,39 @@ brought home). The first draft's raid on a farmstead is gone: the event is now
 
 ---
 
+## The Dwarven Halls (castle_halls, 613; draft, 2026-10-23)
+
+Dungeon's level under the castle's gatehouse (C:/dev/review/dungeon/castle_halls_design.md),
+on Jeff's smith answer (above, "The smith below the castle"). The name line is done: "The
+Dwarven Halls, deep below the castle, where rumour tells of a great dwarven forge." The rest
+is **[proposal]** until Jeff checks the wording. It is set dressing, so nobody speaks it: the
+aftermath is stated plainly and found, never shown.
+
+### The ambush (a third of the way down)
+
+- **[proposal]** The smith's wagon lies on its side across the hall, its crates broken open and
+  its sacks slit, emptied of anything worth carrying.
+- **[proposal]** His hired guards lie where they fell around it, two or three of them, one with
+  his shield split. The goblins took their weapons and left the dead where they lay.
+- **[proposal]** No one has come down to bury them.
+- (smith.guards_fallen, draft: "The hired guards' remains and gear lie on the way down to the
+  great dwarven forge." The gear left is what the goblins did not want.)
+
+### The goblins' forge work (the deepest hall)
+
+- **[Jeff]** The smith is forced to work goblin weapons that supply the Blood Rot's raids
+  (smith.forced, agreed).
+- **[proposal]** The goblins keep the great forge's hearth burning and work its bellows, and
+  carry the iron to it; the shaping is the smith's, since none of them has the craft.
+- **[proposal]** Racks of new blades and spearheads stand beside the forge, waiting to be
+  carried up to the Blood Rot's raiders.
+- **[proposal]** The dwarves' own tools still hang at the forge, too heavy and too fine for
+  goblin hands.
+- Open: where the iron comes from (the mine's blighted ore would touch D3, so it is not
+  said).
+
+---
+
 ## Log
 
 - Session 2: castle returns as dwarven-built cover over the labyrinths, treasure
@@ -122,3 +155,4 @@ brought home). The first draft's raid on a farmstead is gone: the event is now
 - Session 2, cont.: dwarven artifacts come from the dungeons below (Jeff).
 - 2026-10-22: the smith went below after a rumoured great dwarven forge with hired guards, was ambushed and captured, and works goblin weapons for the Blood Rot's raids (Jeff, C3).
 - 2026-10-23: the castle shows on the horizon, perhaps under a mountain (Jeff, the sky view).
+- 2026-10-23: the Dwarven Halls' ambush and the goblins' forge work drafted as set dressing (613, dungeon's castle_halls).
