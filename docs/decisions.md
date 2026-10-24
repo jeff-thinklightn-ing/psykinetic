@@ -25544,7 +25544,7 @@ ui's town status sheet (624) asks the server how a town is doing; economy answer
   list, so the sheet says what the stage turn checks.
 
 economy_test _test_town_sheet. Wire: a new command and message kind
-(MESSAGE_KINDS), a line under PROTOCOL_REVISION 34. No new class_name.
+(MESSAGE_KINDS), a line under PROTOCOL_REVISION 35. No new class_name.
 ## 622, economy's side: where armour comes from
 
 The armour design, section 5 (C:/dev/review/armour/design.md; the
@@ -25635,7 +25635,7 @@ built as drafted; the cut that ships them carries a tune line.
 farm_test _test_herders (the coming, the drove down, a part sold, the
 unsold home, saved); economy_test _test_drove (the treasury's limit, never
 owed, the food bought back). Wire: the "folds" message kind, a line under
-PROTOCOL_REVISION 34. No new class_name.
+PROTOCOL_REVISION 35. No new class_name.
 
 ## 641. Several healers' huts, each with its own potions
 
