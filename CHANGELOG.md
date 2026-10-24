@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Townsfolk show more work: a hunter crouched with a bow, game and sacks carried on the shoulder, hoeing a row, leaning on a crook among the flock, kneeling to shear.
 - Standing ready with a great axe, the haft is laid forward at the chest, so the left hand no longer covers the face.
 - A ruin's stone footing is broken too, crumbling to uneven heights with stones fallen beside it, and no grey stone shows where its floorboards are missing.
 - The third fallen guard in the Dwarven Halls' ambush lies face down toward the west wall instead of a rolled pose that read as kneeling from the usual camera; every hand-laid body now has a facing (613 amended (2), dungeon's side).

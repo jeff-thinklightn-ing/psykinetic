@@ -466,6 +466,49 @@ CLIPS["Carry_Shoulder_Loop"] = {"loop": True, "keys": [
 	(2.0, P("Idle_Loop", 0.0, SHOULDERED)),
 ]}
 
+# Townsfolk at their work (566 amended, pc-character's side; npc's activities: hoe, herd,
+# carry_game; the coordinator's approval). Hoeing a row (the upper layer, so it walks the row
+# too): both hands on art-kit's tool.hoe (its origin at the butt, the blade at the top, 1.45 m up,
+# reaching toward the piece's +x), the right HOE_GRIP up it (Client3D's "grip"), the left HOE_BACK
+# below it near the butt, both well ahead of the trunk, the haft across the body (its butt
+# outside the left hip); the blade raised ahead to chest height, then struck ahead and low, the
+# trunk bowing into it, its low point kept clear of the ground (a field's edge runs higher, 653).
+HOE_BACK = 0.42
+HOE_UP = chop((0.48, -0.08, 0.0), (0.55, 0.6, 0.6), (0.0, -1.0, -0.4), grip=-HOE_BACK) + [("spine_02", LIFT, 4.0)]
+HOE_DOWN = chop((0.55, -0.08, -0.6), (0.5, 0.4, -0.85), (0.0, 0.3, -1.0), ((-1.0, 0.3, -0.5), (0.5, -1.0, -0.3)), grip=-HOE_BACK) + [
+	("spine_01", LIFT, -20.0), ("spine_02", LIFT, -12.0), ("Head", LIFT, 12.0)]
+# Between them, each hand solved (blended, the butt swung into the hip and the left left the haft).
+HOE_LEVEL = chop((0.52, -0.08, -0.22), (0.62, 0.6, 0.05), (0.0, -0.3, -1.0), grip=-HOE_BACK) + [("spine_01", LIFT, -5.0)]
+CLIPS["Hoe_Loop"] = {"loop": True, "keys": [
+	(0.0, P("Idle_Loop", 0.0, HOE_UP)),
+	(0.25, P("Idle_Loop", 0.25, HOE_LEVEL)),
+	(0.45, P("Idle_Loop", 0.45, HOE_DOWN, move=(0.0, -0.02, -0.02))),
+	(0.7, P("Idle_Loop", 0.7, HOE_DOWN)),
+	(0.95, P("Idle_Loop", 0.95, HOE_LEVEL)),
+	(1.2, P("Idle_Loop", 0.0, HOE_UP)),
+]}
+# Herding: leaning on art-kit's tool.crook (its origin the grip, 1.0 m up from its foot, the hook
+# at the top toward +x) planted ahead and to the right, the right hand on it, the left resting over
+# the right, a little weight forward onto it; the head looking slowly about the flock.
+LEANED = right_arm(0.3, 0.1, -0.32, (-0.3, 0.2, -1.0)) + [("hand_r", ((0.0, -0.15, 1.0), (0.0, -1.0, 0.0)), GRASP),
+	("upperarm_l", ([("hand_r", (0.0, 0.0, 0.07), 1.0)], (1.0, 0.2, -0.6)), REACH), ("hand_l", Vector((-0.6, -0.3, -0.7)), AIM),
+	("spine_01", LIFT, -5.0), ("spine_02", TURN, -6.0)]
+CLIPS["Herd_Loop"] = {"loop": True, "keys": [
+	(0.0, P("Idle_Loop", 0.0, LEANED + [("Head", TURN, 18.0)])),
+	(2.0, P("Idle_Loop", 2.0, LEANED + [("Head", TURN, -14.0), ("Head", LIFT, -4.0)])),
+	(4.0, P("Idle_Loop", 0.0, LEANED + [("Head", TURN, 18.0)])),
+]}
+# Carrying game: a doe across the shoulders (art-kit's carry.game on the "shoulder" socket), both
+# hands up before the upper chest holding its feet, the head a little forward under it (the upper
+# layer, so it walks).
+GAME_HELD = right_arm(0.24, -0.1, -0.12, (0.2, 0.0, -1.0)) + left_arm(0.24, -0.1, -0.12, (-0.2, 0.0, -1.0)) + [
+	("hand_r", Vector((-0.3, -0.2, 1.0)), AIM), ("hand_l", Vector((0.3, -0.2, 1.0)), AIM), ("Head", LIFT, 6.0)]
+CLIPS["Carry_Game_Loop"] = {"loop": True, "keys": [
+	(0.0, P("Idle_Loop", 0.0, GAME_HELD)),
+	(1.0, P("Idle_Loop", 1.0, GAME_HELD + [("spine_02", LIFT, -2.0)])),
+	(2.0, P("Idle_Loop", 0.0, GAME_HELD)),
+]}
+
 
 def args() -> list:
 	return sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []

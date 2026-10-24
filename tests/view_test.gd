@@ -5857,6 +5857,17 @@ func _test_visible_work() -> void:
 	var log_piece := (sockets["shoulder"] as Node3D).get_node_or_null("Load")
 	_check(log_piece != null and rig.upper_clip() == "Carry_Shoulder" and held[0] == "",
 			"carrying a log: on the shoulder, the hand up to it (%s), the axe put away" % rig.upper_clip())
+	# Townsfolk at work (566 amended, pc-character's side): each word its clip (or upper-layer clip
+	# over the stand and walk) and its pieces, the right hand's, the left's (a hunter's bow), the
+	# shoulder's.
+	var works := {}
+	for word: String in ["stalk", "carry_game", "carry_sack", "hoe", "herd", "shear"]:
+		show.call(word)
+		works[word] = [rig.base_clip() if not Client3D.ACTIVITIES[word].has("upper") else rig.upper_clip(), held[0], held[1]]
+	_check(works == {"stalk": ["Crouch_Idle", "", "art:item.bow"], "carry_game": ["Carry_Game", "", ""],
+			"carry_sack": ["Carry_Shoulder", "", ""], "hoe": ["Hoe", "art:tool.hoe", ""], "herd": ["Herd", "art:tool.crook", ""],
+			"shear": ["Fixing_Kneeling", "art:tool.shears", ""]},
+			"stalking with a bow, carrying game and a sack, hoeing, herding, shearing: each its clip and pieces (%s)" % works)
 	show.call("sleep")
 	_rig._lay(puppet, puppet.get_node("Body"), 0.0)
 	var body := puppet.get_node("Body") as Node3D

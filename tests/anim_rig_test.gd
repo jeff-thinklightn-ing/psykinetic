@@ -260,6 +260,9 @@ func _test_work_clear() -> void:
 		["woman", "res://art/models/characters/human_f.glb", {}]]
 	var moments := [["Chop", "chop", [0.0, 0.3, 0.45, 0.55, 0.62, 0.8, 1.3]], ["Saw", "saw", [0.0, 0.2, 0.4, 0.6]],
 		["Hammer", "hammer", [0.0, 0.22, 0.5]]]
+	if ArtKit.has("tool.hoe"):  # Art-kit's (566 amended), once its slot is in.
+		moments.append(["Hoe", "hoe", [0.0, 0.25, 0.45, 0.7, 1.0]])
+	var lowest := 9.0  # The hoe's blade, its lowest through the stroke (metres above the feet).
 	var found: Array[String] = []
 	var off_haft: Array[String] = []
 	for build: Array in builds:
@@ -283,6 +286,8 @@ func _test_work_clear() -> void:
 				for i in 3:
 					rig.upper_at(moment[0], at)
 					await get_tree().process_frame
+				if moment[1] == "hoe":
+					lowest = minf(lowest, (tool.global_transform * Vector3(0.0, ArtKit.size("tool.hoe").y, 0.0)).y)
 				var counts := _bow_inside(model, tool)
 				if counts != Vector3i.ZERO:
 					found.append("%s %s %.2f: tool %d, left forearm %d, right arm %d" % [build[0], moment[0], at, counts.x, counts.y, counts.z])
@@ -299,7 +304,11 @@ func _test_work_clear() -> void:
 				model.queue_free()
 				holder.free()
 	_check(found.is_empty(), "no tool nor arm inside the body, five builds, chopping, sawing, hammering (%s)" % ", ".join(found))
-	_check(off_haft.is_empty(), "chopping, the left hand on the haft by its butt, five builds (%s)" % ", ".join(off_haft))
+	_check(off_haft.is_empty(), "chopping and hoeing, the left hand on the haft by its butt, five builds (%s)" % ", ".join(off_haft))
+	# Hoeing a row (566 amended): the blade's low point clear of the ground, so a field's edge
+	# running higher (653) doesn't take it under.
+	_check(not ArtKit.has("tool.hoe") or lowest > 0.15, "hoeing: the blade's lowest %s" % (
+			"%.2f m above the feet" % lowest if ArtKit.has("tool.hoe") else "unmeasured (no tool.hoe yet)"))
 	# The blow lands on art-kit's chopping block (building.chopping_block): its log's top 0.79 m up,
 	# about 1 m ahead of the body on the next cell, in line with it.
 	var chopper := (load("res://art/models/characters/human_m.glb") as PackedScene).instantiate() as Node3D

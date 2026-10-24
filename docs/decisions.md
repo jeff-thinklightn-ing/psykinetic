@@ -27857,3 +27857,33 @@ the head's end; the right barely drops, and measured by it the lowered ready's r
 blow, 0.88 s): 0.42 s, inside the blow (0.40 to 0.48), HUMANOID_MOVES' giant axe and pick. The
 server's hit moment is unchanged (the clip is timed to it). view_test _test_two_hands: standing
 ready, the left hand more than 0.05 m below the neck. Client only, no new number (451 amended (2)).
+## 566 amended, pc-character's side: townsfolk at their work
+
+npc's 566 amended names six more works in Resident.activity (stalk, carry_game, carry_sack, hoe,
+herd, shear); unknown words stand idle until drawn. The coordinator approved the design, with the
+hunter's bow over a spear ("a hunter crouched with a bow reads as hunting at a glance") and the
+hoe's low point clear of a field edge's higher ground (653). Art-kit makes the pieces on the frames
+agreed: tool.hoe (its origin at the butt), tool.crook (the grip 1.0 m up its foot), tool.shears,
+carry.sack and carry.game (a doe across the shoulders, on the "shoulder" socket).
+
+- **ACTIVITIES** gains the six rows, and a "left" key: a work's piece in the left hand while it is
+  empty, as "right" is in the right (Client3D._sync_held). stalk: Crouch_Idle, item.bow in the
+  left, not drawn. carry_sack: Carry_Shoulder with carry.sack. shear: Fixing_Kneeling (the bandage
+  kneel) with tool.shears. hoe, herd, carry_game: new clips.
+- **Hoe_Loop** (the upper layer, so it walks a row): both hands on the haft (chop(), the left
+  HOE_BACK, 0.42 m, below the right toward the butt; the right 0.75 up it, ACTIVITIES' "grip"),
+  both well ahead of the trunk and the haft across the body, its butt passing outside the left hip
+  (with art-kit's tool.hoe in, the left forearm and the butt measured inside the trunk with the
+  hands closer in); the blade raised ahead to chest height, swung through a level key, struck ahead
+  and low, the trunk bowing, and back through the level key (each solved: blended, the butt swung
+  into the hip and the left hand left the haft); the blade's low point about 0.3 m above the
+  feet, 0.67 m ahead, clear of up to about a 20° rise.
+- **Herd_Loop** (the whole body, the legs Idle's): the crook planted ahead and to the right, the
+  right hand on it, the left over the right, a little lean; the head looking slowly about (4 s).
+- **Carry_Game_Loop** (the upper layer): both hands up before the upper chest holding the doe's
+  feet, the head a little forward.
+
+view_test _test_visible_work: each word its clip (or upper clip) and pieces. anim_rig_test: Hoe
+among the tool clips once tool.hoe is in (nothing inside the body, five builds; the left hand on
+the haft by its butt; the blade's lowest above 0.15 m). Client only, protocol unchanged, no new
+class_name.

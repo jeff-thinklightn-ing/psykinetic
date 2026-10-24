@@ -12381,6 +12381,8 @@ func _sync_held(entity: GridEntity, puppet: Node3D) -> void:
 	var work := work_of(entity)
 	if work.has("right") and ids[0] == "":
 		ids[0] = ART_ID + str(work["right"])
+	if work.has("left") and ids[1] == "":
+		ids[1] = ART_ID + str(work["left"])
 	_sync_load(puppet, sockets, str(work.get("shoulder", "")))
 	var quiver := ""
 	if World.drawn_with(entity) != "" and ARROW_VARIANTS.has(ids[0]):
@@ -13130,7 +13132,8 @@ static func _sitting(puppet: Node3D) -> bool:
 ## constructed building, sleeping at night"): npc's Resident.activity, a word,
 ## as the body shows it: the clip it plays standing at the work ("clip"; walking,
 ## its gait), the tool in its right hand while that hand is empty ("right", an
-## art slot: art-kit's tool.*), the load on its shoulder ("shoulder": carry.*),
+## art slot: art-kit's tool.*) and in its left ("left": a hunter's bow), the
+## load on its shoulder ("shoulder": carry.*),
 ## an upper-layer clip over its walk and stand ("upper"), lying ("lying"), the
 ## tool slid down the hand by "grip" metres along its length (its +y; the axe's
 ## origin is its butt: two-handed, the right hand holds it up the haft and the
@@ -13153,6 +13156,17 @@ const ACTIVITIES := {
 	# her side, knees drawn up, a slow breath (humanoid_clips' Sleep_Side_Loop),
 	# her front to the fire (_sleeping_yaw).
 	"sleep_side": {"clip": "Sleep_Side", "lying": true},
+	# Townsfolk at work (566 amended, pc-character's side; npc's words, the
+	# coordinator's approval): a hunter crouched with a bow, not drawn (stalk);
+	# game and sacks carried on the shoulder; a hoe's strokes, walking a row too
+	# (the upper layer; humanoid_clips' Hoe_Loop, the right hand this far up
+	# the haft from its butt); leaning on a crook; shearing, knelt.
+	"stalk": {"clip": "Crouch_Idle", "left": "item.bow"},
+	"carry_game": {"upper": "Carry_Game", "shoulder": "carry.game"},
+	"carry_sack": {"upper": "Carry_Shoulder", "shoulder": "carry.sack"},
+	"hoe": {"upper": "Hoe", "right": "tool.hoe", "grip": 0.75},
+	"herd": {"clip": "Herd", "right": "tool.crook"},
+	"shear": {"clip": "Fixing_Kneeling", "right": "tool.shears"},
 }
 ## A hand's id that names an art slot, not an item (a work's tool).
 const ART_ID := "art:"
