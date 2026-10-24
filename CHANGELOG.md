@@ -8,7 +8,7 @@ notes (decision 324).
 ## Unreleased
 
 - Until its first crop is in, a new town's cook no longer turns the food its people need into travel rations that get carried away.
-- A new town's first stores now last until the first crop it can actually reap (often the winter roots when its field goes up after spring), at 1.5 food a head a day plus 3 days' margin for the people it really has, so a fresh town no longer goes hungry or falls back before its first crop (tune: economy.json founding per_head_day 1.5, margin_days 3; the last soak had about a day and a half of food left when the roots came in).
+- A new town's first stores now last until the first crop it can actually reap (often the winter roots when its field goes up after spring), at 1.5 food a head a day plus 3 days' margin for the people it really has, so a fresh town no longer goes hungry or falls back before its first crop (tune: economy.json founding per_head_day 1.5, margin_days 3; the last soak had about a day and a half of food left when the roots came in; known: one to three residents still run short of coin and go on the dole for a few days before the first crop).
 - A hunter now knows what they caught when they set out (the catch is decided at the trip's start, same odds), so the town can show game carried home only when there is some; the town also says when its farmer is sowing or harvesting.
 - The labyrinth generator learns a tower style: small rooms and two-wide ways inside an octagonal footprint, a shaft anchor lining the stairs floor to floor, with a sample tower in memory, its tests and a floor-row plan sheet (no tower is placed yet).
 - Going back into a zone you have already visited no longer logs "Signal 'impacted' is already connected" twice for its breakables.
