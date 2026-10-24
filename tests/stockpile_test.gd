@@ -110,6 +110,8 @@ func _only_founded() -> bool:
 			# A founded town's first stores (decision 449 amended), or none;
 			# its starting gold is in its residents' purses or still waiting.
 			var allowed := [0, gold] if what == "gold" else [0, food] if what == "food" else [0]
+			if what == "food" and int(counts[what]) >= food:
+				continue  # Its people's food to the first autumn, if more (652).
 			if int(counts[what]) not in allowed:
 				return false
 		if not World.stockpile.items(place).is_empty() or not World.stockpile.shop(place).is_empty():

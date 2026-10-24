@@ -150,25 +150,49 @@ func _test_fletcher() -> void:
 		_check(shop == expect, "%s: mended at %s" % ["a fletcher in town" if with_fletcher else "no fletcher", shop])
 
 
-## A town of official_from residents of its own gets its lawspeaker (npc's
-## 459, economy's side): appointed once, paid as an official.
+## The officials come with the stages (652, the coordinator's ruling;
+## npc's 459 lawspeaker, economy's side): the lawspeaker is appointed
+## once the town reaches its stage, never before, paid as an official; a
+## hamlet pays its guard but no priest or lawspeaker, nor owes them.
 func _test_lawspeaker() -> void:
 	print("
-== the lawspeaker ==")
+== the lawspeaker; the officials by stage ==")
 	var towns := _towns()
-	var from := int(_rules["official"]["lawspeaker"]["from"])
-	for i in from - 2:
+	var rule: Dictionary = _rules["official"]["lawspeaker"]
+	for i in 8:
 		towns.note_rescue(TOWN, "f%d" % i, "Folk%d" % i, "hauler")
+	var record := towns._town(TOWN)
+	record["stage"] = "village"
 	towns.tick()
 	var lawspeakers := func() -> Array: return towns.residents(TOWN).filter(func(who: String) -> bool: return "lawspeaker" in towns.production.worker(who)["trades"])
-	_check(lawspeakers.call().is_empty() and towns.residents(TOWN).size() == from - 1, "%d residents: none yet" % towns.residents(TOWN).size())
-	towns.note_rescue(TOWN, "f9", "Folk9", "hauler")
+	_check(lawspeakers.call().is_empty(), "a village of %d: no lawspeaker yet" % towns.residents(TOWN).size())
+	record["stage"] = str(rule["stage"])
 	towns.tick()
 	towns.tick()
 	var appointed: Array = lawspeakers.call()
 	_check(appointed.size() == 1 and towns.production.worker(appointed[0])["origin"] == "appointed"
-		and str(towns.production.worker(appointed[0])["name"]) in _rules["official"]["lawspeaker"]["names"], "%d: one is appointed (%s)" % [from, appointed])
-	_check(_rules["official"]["lawspeaker"]["wage"] == _rules["official"]["priest"]["wage"], "paid as the priest")
+		and str(towns.production.worker(appointed[0])["name"]) in rule["names"], "at the %s stage: one is appointed (%s)" % [rule["stage"], appointed])
+	_check(rule["wage"] == _rules["official"]["priest"]["wage"], "paid as the priest")
+	# A hamlet: its guard paid, its priest and lawspeaker neither paid nor owed.
+	var work := towns.production
+	work.add_worker("g1", "Gar", ["guard"], TOWN, "test", "steady")
+	work.add_worker("pr", "Aldous", ["priest"], TOWN, "test", "steady")
+	work.stockpile.deposit(TOWN, "gold", 100)
+	record["stage"] = "hamlet"
+	var every := int(_rules["official"]["guard"]["every"])
+	var law := str(appointed[0]) if not appointed.is_empty() else ""
+	var law_purse := int(work.worker(law).get("purse", 0))
+	work._official_wages(_now)
+	work._official_wages(_now + every)
+	_check(int(work.worker("g1")["purse"]) == int(_rules["official"]["guard"]["wage"]), "a hamlet pays its guard (%d)" % int(work.worker("g1")["purse"]))
+	_check(int(work.worker("pr")["purse"]) == 0 and int(work.worker("pr").get("owed", 0)) == 0
+		and int(work.worker(law).get("purse", 0)) == law_purse and int(work.worker(law).get("owed", 0)) == 0, "but no priest or lawspeaker, nor owes them")
+	record["stage"] = "settlement"
+	work._official_wages(_now + 2 * every)
+	_check(int(work.worker("g1")["purse"]) == int(_rules["official"]["guard"]["wage"]) and int(work.worker("g1").get("owed", 0)) == 0, "a settlement pays no guard")
+	record["stage"] = "village"
+	work._official_wages(_now + 3 * every)
+	_check(int(work.worker("pr")["purse"]) == int(_rules["official"]["priest"]["wage"]), "a village pays its priest")
 
 
 ## Someone the town remembers moves in (decision 460's economy side).

@@ -27368,3 +27368,17 @@ Server sim only; protocol unchanged; no new class_name.
 ## 640 amended, economy's side: where a herder is, and which places are towns
 
 npc's report. A herder away on a drove keeps the town it went to as `herd["buyer"]` (saved with the herders, cleared when they are home), so npc's body stands at that town's store instead of the fold. A holding with workers of its own (a fold, a healer's hut) is where those workers live, so Production made a town record for it and Towns ticked it as a town (stages, decline, "is a settlement now"). `Towns.is_town(id)`: an id Holdings doesn't know (a test's town) or one it knows as a stockpile; tick and drove_town skip the rest. farm_test checks both.
+
+## 652. The founding larder, and the officials by stage
+
+The coordinator's ruling on economy's gold and food note (649's soaks: a fresh world sold its first stores on day 0 and went hungry before its first harvest; a poor treasury owed its officials from the start).
+
+Food (ruling (a)):
+- A raw good's comfort is the most of rules' comfort and comfort_per_head x the town's workers (Production.comfort; food 2 a head), used wherever the store's comfort was (prices, buying, caravans, the "full" tier).
+- A town's first stores (Towns._found) are the most of start_food and founding.per_head_day x its residents (at least founding.heads) x the days to the first autumn it can sow for (Towns.founding_food: this year's while spring has more than a day left, else next year's).
+- Till its first harvest is in (Towns.before_harvest; a "harvests" count on the town's record, 1 for a town saved before 652 that was founded) a caravan keeps founding.keep_days x per_head_day food a head (Economy.before_harvest, set by Main).
+- Old numbers: start_food 120 and comfort food 20 alone, so the caravan could sell everything over 20 on day 0. Now start_food 120 is the least; per_head_day 1, heads 4, keep_days 30, comfort_per_head food 2.
+
+Officials (ruling (b)): they come with the stages. official.<trade>.stage: the guard from hamlet, the priest from village, the lawspeaker from town (a settlement pays none). Below its stage an official is neither paid nor owed (Production.official_paid = Towns.official_paid). The lawspeaker is appointed on reaching the town stage (official "appoint"), no longer at 6 residents of its own; the town stage no longer needs a lawspeaker among its residents, which would have deadlocked. The priest still comes when the temple stands (396). A lawspeaker already seated in a town below that stage stays, unpaid. The wage rule (a share of tax and rent) waits for the 3-player soak.
+
+Tests: larder_test (first stores, the founding caravan), rescue_test (the lawspeaker at the town stage; a hamlet pays its guard, no priest or lawspeaker, nor owes them). Server only; protocol unchanged; no new class_name.

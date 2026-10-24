@@ -62,6 +62,10 @@ var building_stands := Callable()
 ## (town) -> {kind, job, steps, needs}: what the town's next build lacks
 ## (Towns.shortfall, set by Main; decision 499). {} while unset.
 var shortfall := Callable()
+## (town) -> bool: whether a town's first harvest is still to come
+## (Towns.before_harvest, set by Main; 652): its caravans keep
+## founding.keep_days of food a head till then. Never while unset.
+var before_harvest := Callable()
 ## (town) -> [{id, market, eta (world ticks), risk (0..1)}]: the trade
 ## routes from the town to a market (maps' TradeRoutes, set by Main;
 ## decision 504). None while unset.
@@ -293,10 +297,9 @@ func short_of(town: String, id: String, cat := {}) -> float:
 	var def: Dictionary = cat.get(id, {})
 	var yields: Variant = def.get("yield", {})
 	if yields is Dictionary and not yields.is_empty():
-		var comfort: Dictionary = rules.get("comfort", {})
 		var most := -1.0
 		for what: String in yields:
-			most = maxf(most, _short(stockpile.count(town, what), int(comfort.get(what, 0))))
+			most = maxf(most, _short(stockpile.count(town, what), production.comfort(town, what)))
 		return most
 	var wants: Dictionary = rules.get("wants", {})
 	var extra: Dictionary = rules.get("uneasy_extra", {}) if production.tier(town) == Production.DEFEND else {}
@@ -433,9 +436,8 @@ func up_to(town: String, id: String, cat := {}) -> int:
 	var most := 1
 	var yields: Variant = def.get("yield", {})
 	if yields is Dictionary and not yields.is_empty():
-		var comfort: Dictionary = rules.get("comfort", {})
 		for what: String in yields:
-			var room := int(comfort.get(what, 0)) - stockpile.count(town, what)
+			var room := production.comfort(town, what) - stockpile.count(town, what)
 			if room > 0 and int(yields[what]) > 0:
 				most = maxi(most, ceili(float(room) / int(yields[what])))
 		return most
@@ -824,7 +826,7 @@ func buy_drove(town: String, herder_id: String, count: int, food := 0) -> int:
 ## [param what]: its value, scaled by how short of comfort the town is.
 func raw_price(town: String, what: String) -> int:
 	var value := float(rules.get("value", {}).get(what, 1))
-	var short := _short(stockpile.count(town, what), int(rules.get("comfort", {}).get(what, 0)))
+	var short := _short(stockpile.count(town, what), production.comfort(town, what))
 	return maxi(roundi(value * factor(short)), 1)
 
 
@@ -1803,7 +1805,11 @@ func _send_caravan(town: String, way: Dictionary) -> bool:
 	var worth := 0.0
 	var fetch := 0
 	for what: String in kinds:
-		var keep := maxi(int(rules.get("comfort", {}).get(what, 0)), int(rule.get("keep", 5))) + int(held.get(what, 0))
+		var keep := maxi(production.comfort(town, what), int(rule.get("keep", 5))) + int(held.get(what, 0))
+		if what == "food" and before_harvest.is_valid() and before_harvest.call(town):
+			# A month's food a head till the first harvest is in (652).
+			var founding: Dictionary = rules.get("founding", {})
+			keep = maxi(keep, ceili(float(founding.get("keep_days", 0)) * float(founding.get("per_head_day", 1)) * production.worker_ids(town).size()))
 		var spare := mini(stockpile.count(town, what) - keep, room)
 		if spare <= 0 or float(wants[what]) <= 0.0:
 			continue
@@ -1887,8 +1893,8 @@ func caravan_arrived(id: String, route_id: String, at_end: String, cargo: Dictio
 	for what: String in sells:
 		if is_luxury(what):
 			continue
-		var need := float(stockpile.count(town, what)) / maxf(float(rules.get("comfort", {}).get(what, 1)), 1.0)
-		if shortest.is_empty() or need < float(stockpile.count(town, shortest)) / maxf(float(rules.get("comfort", {}).get(shortest, 1)), 1.0):
+		var need := float(stockpile.count(town, what)) / maxf(float(production.comfort(town, what)), 1.0)
+		if shortest.is_empty() or need < float(stockpile.count(town, shortest)) / maxf(float(production.comfort(town, shortest)), 1.0):
 			shortest = what
 	if not shortest.is_empty() and budget > 0 and rest > 0:
 		var unit := float(rules.get("value", {}).get(shortest, 1)) * float(rule.get("sell", 1.2))

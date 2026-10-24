@@ -3217,6 +3217,7 @@ func _boot() -> void:
 	World.economy.owed_paid.connect(func(player_id: String, gold: int) -> void: World.gold_changed.emit(player_id, gold))
 	# Players' contributions toward the next build (decision 499).
 	World.economy.shortfall = World.towns.shortfall
+	World.economy.before_harvest = World.towns.before_harvest
 	# The hill herders' droves, bought by the town (640).
 	World.towns.drove = World.economy.buy_drove
 	# Each healer's hut its own potions (641).

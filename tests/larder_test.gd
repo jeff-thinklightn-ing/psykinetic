@@ -43,6 +43,7 @@ func _ready() -> void:
 	_test_apprentice()
 	_test_contribute()
 	_test_caravan()
+	_test_founding_caravan()
 	_test_luxury()
 	_test_head_first()
 	_test_account()
@@ -338,7 +339,24 @@ func _test_first_stores() -> void:
 	var work := _work()
 	var towns := Towns.new({}, work, _rules, func() -> int: return _now)
 	towns._found(TOWN)  # Its store first seen (seed_from).
-	_check(work.stockpile.count(TOWN, "food") == int(_rules["start_food"]), "founded with start_food in the store (%d)" % work.stockpile.count(TOWN, "food"))
+	var first := maxi(int(_rules["start_food"]), towns.founding_food(TOWN))
+	_check(work.stockpile.count(TOWN, "food") == first, "founded with start_food or its people's food to the first autumn in the store (%d)" % work.stockpile.count(TOWN, "food"))
+	# The days to the first autumn it can sow for (652): this year's in early
+	# spring, next year's once spring is past.
+	var founding: Dictionary = _rules["founding"]
+	var heads := int(founding["heads"])
+	var phase := Season.year_phase
+	var anchor := Season.year_anchor
+	Season.year_anchor = _now
+	Season.year_phase = 0.0
+	var spring := towns.founding_food(TOWN)
+	Season.year_phase = 0.25
+	var summer := towns.founding_food(TOWN)
+	Season.year_phase = phase
+	Season.year_anchor = anchor
+	_check(spring == ceili(float(founding["per_head_day"]) * heads * 2 * Season.season_days)
+		and summer == ceili(float(founding["per_head_day"]) * heads * 5 * Season.season_days),
+		"founded at spring's start: food for two seasons a head (%d); at summer's, for five, the next autumn's (%d)" % [spring, summer])
 	var rules := _rules.duplicate(true)
 	_now = 0
 	var clock := func() -> int: return _now
@@ -618,6 +636,52 @@ func _test_contribute() -> void:
 	economy._drop_funds()
 	_check(shed == 5 and economy.fund(TOWN, "woodshed") == 0 and stock.count(TOWN, "gold") == treasury + 5 and economy.gold("p1") == 100 - expect - 5,
 		"the plan dropped: what was given is the town's, the player's gold not returned")
+
+## A founding town's caravan keeps its stores (652, the coordinator's
+## ruling): food's comfort is comfort_per_head x its people, and till the
+## first harvest is in it keeps founding.keep_days of food a head; after,
+## the surplus over comfort may go.
+func _test_founding_caravan() -> void:
+	print("
+== a founding town's caravan keeps its food ==")
+	_now = 0
+	var clock := func() -> int: return _now
+	var stock := Stockpile.new({}, clock, ItemBook.new(clock))
+	var work := Production.new({}, stock, null, clock, _rules)
+	var economy := Economy.new({}, stock, work, clock, _rules)
+	var towns := Towns.new({}, work, _rules, clock)
+	economy.before_harvest = towns.before_harvest
+	var way := {"id": "r1", "market": "market:castle", "eta": 20, "risk": 0.0}
+	economy.trade_routes = func(_town: String) -> Array: return [way]
+	var sent: Array = []
+	economy.send_caravan = func(_route_id: String, cargo: Dictionary, _from_end: String) -> String:
+		sent.append(cargo.duplicate(true))
+		return "c%d" % sent.size()
+	for i in 12:
+		work.add_worker("w%d" % i, "Folk%d" % i, ["hauler"], TOWN, "test", "steady")
+	_check(work.comfort(TOWN, "food") == maxi(int(_rules["comfort"]["food"]), ceili(float(_rules["comfort_per_head"]["food"]) * 12)),
+		"food's comfort scales with its people (%d for 12)" % work.comfort(TOWN, "food"))
+	towns._found(TOWN)
+	var food := stock.count(TOWN, "food")
+	_now = DayNight.day_steps
+	economy._trade_turn([TOWN])
+	var keep := int(_rules["founding"]["keep_days"]) * 12
+	_check(sent.all(func(cargo: Dictionary) -> bool: return not cargo["goods"].has("food")) or stock.count(TOWN, "food") >= keep,
+		"day 0 of a founding town: no food sold under a month's a head (%d of %d left, %s)" % [stock.count(TOWN, "food"), food, sent])
+	stock.deposit(TOWN, "food", keep + 30 - stock.count(TOWN, "food"))
+	sent.clear()
+	for id in work.worker_ids(TOWN):
+		work.set_away(id, false)
+	economy._send_caravan(TOWN, way)
+	_check(stock.count(TOWN, "food") >= keep, "before the first harvest a caravan leaves %d food (%d)" % [keep, stock.count(TOWN, "food")])
+	towns._town(TOWN)["harvests"] = 1
+	_check(not towns.before_harvest(TOWN), "the first harvest in")
+	sent.clear()
+	for id in work.worker_ids(TOWN):
+		work.set_away(id, false)
+	economy._send_caravan(TOWN, way)
+	_check(sent.size() == 1 and sent[0]["goods"].has("food"), "after it, the food over comfort may go (%s)" % [sent])
+
 
 ## Caravans to market (decision 504, economy's side): the surplus the
 ## market wants most goes with a hauler when it pays; sold whole to the

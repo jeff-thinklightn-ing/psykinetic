@@ -161,6 +161,7 @@ func _init(saved := {}, with_production: Production = null, with_rules := {}, wi
 	production.on_built = _built
 	production.town_has = has_for_make
 	production.keep_for = upkeep_due
+	production.official_paid = official_paid
 	production.work_rate = _work_rate
 	production.hunted.connect(_on_hunted)
 	production.work_done.connect(_on_work_done)
@@ -540,19 +541,20 @@ func _appoint(town: String) -> void:
 		record["residents"].append(who)
 		_note(town, "%s comes to be the town's %s" % [name, trade.replace("_", " ")])
 		_seat(town)
-	# An official the town grows into (rules' official "from": residents of
-	# its own; the lawspeaker, npc's 459): one, named from its names, with
-	# no building (his work place is npc's: the square).
+	# An official the town grows into (rules' official "appoint", at its
+	# "stage", and "from": residents of its own; the lawspeaker, npc's 459,
+	# with the town stage since 652): one, named from its names, with no
+	# building (their work place is npc's: the square).
 	var official: Dictionary = rules.get("official", {})
 	var names_of: Array = official.keys()
 	names_of.sort()
 	for trade: String in names_of:
 		var rule: Dictionary = official[trade]
-		if not rule.has("from"):
+		if not rule.has("from") and not bool(rule.get("appoint", false)) or not reached(town, str(rule.get("stage", ""))):
 			continue
 		var own: Array = record["residents"].filter(func(who: String) -> bool:
 			return not who.begins_with("companion:") and not str(production.worker(who).get("origin", "")).begins_with("companion:"))
-		if own.size() < int(rule["from"]) or record["residents"].any(func(who: String) -> bool: return trade in production.worker(who).get("trades", [])):
+		if own.size() < int(rule.get("from", 0)) or record["residents"].any(func(who: String) -> bool: return trade in production.worker(who).get("trades", [])):
 			continue
 		var who := "%s:%s" % [trade, town]
 		var names: Array = rule.get("names", [])
@@ -736,13 +738,35 @@ func _found(town: String) -> void:
 		return
 	record["founded"] = true
 	record["to_spread"] = maxi(int(rules.get("start_gold", 0)), 0)
-	# Its first stores (rules' start_food, Jeff's to tune): enough to reach
-	# its first harvest (decision 449 amended).
-	var food := maxi(int(rules.get("start_food", 0)), 0)
+	# Its first stores: enough to reach its first harvest (decision 449
+	# amended), rules' start_food or its people's food to the first autumn
+	# it can sow for (652), whichever is more.
+	var food := maxi(int(rules.get("start_food", 0)), founding_food(town))
 	if food > 0:
 		production.stockpile.deposit(town, "food", food, "founding", "the town's first stores")
 	_note(town, "founded")
 	_spread(town)
+
+
+## The food [param town]'s people eat before its first harvest (652, the
+## coordinator's ruling): rules' founding.per_head_day x its residents (at
+## least founding.heads) x the days from now to the first autumn it can sow
+## for (this year's while spring has more than a day left, else next
+## year's). 0 without a founding rule.
+func founding_food(town: String) -> int:
+	var rule: Dictionary = rules.get("founding", {})
+	if rule.is_empty():
+		return 0
+	var heads := maxi(residents(town).size(), int(rule.get("heads", 0)))
+	var place := Season.year_fraction(float(now())) * 4.0  # Seasons into the year: spring 0, autumn 2.
+	var seasons := 2.0 - place if place < 1.0 - 1.0 / maxi(Season.season_days, 1) else 6.0 - place
+	return ceili(float(rule.get("per_head_day", 1)) * heads * seasons * Season.season_days)
+
+
+## Whether [param town]'s first harvest is still to come (652:
+## Economy.before_harvest, its caravans keep its food till then).
+func before_harvest(town: String) -> bool:
+	return int(_towns.get(town, {}).get("harvests", 0)) == 0
 
 
 ## [param town]'s founding gold, if it waits and the town has residents of
@@ -1123,6 +1147,7 @@ func _crop(town: String) -> void:
 					crop_now["stage"] = "harvested"
 					crop_now["worked"] = 0
 					_note(town, "the harvest is in: %d food" % food)
+					record["harvests"] = int(record.get("harvests", 0)) + 1
 		"winter":
 			if not bool(crop_now["roots"]) and farming:
 				var roots := roundi(float(rule.get("roots", 20)) * season_scale()) * level
@@ -1947,6 +1972,22 @@ func _fisherman_comes(town: String) -> void:
 	_comes(town, trade, wanted, float(rule.get("growth_days", 3)), rule.get("names", ["Finn"]), "fisherman")
 
 
+## Whether [param town] has reached stage [param name] of rules' "stages"
+## (or one past it); "" or a name not among them is reached by any town.
+func reached(town: String, name: String) -> bool:
+	var names: Array = rules.get("stages", []).map(func(each: Variant) -> String: return str(each.get("name", "")) if each is Dictionary else "")
+	return name.is_empty() or name not in names or names.find(stage(town)) >= names.find(name)
+
+
+## Whether [param town] pays its [param trade] official yet (652, the
+## coordinator's ruling: "the officials come with the stages"; a
+## settlement has none, the guard with the hamlet, the priest with the
+## village, the lawspeaker with the town): rules' official.<trade>.stage
+## reached (Production.official_paid).
+func official_paid(town: String, trade: String) -> bool:
+	return reached(town, str(rules.get("official", {}).get(trade, {}).get("stage", "")))
+
+
 ## [param town]'s stage toward a city (591, economy's side): the name of the
 ## highest of rules' "stages" it has reached, "" for none. Raised by
 ## _stage_turn, one step at a time; lowered by _decline (649).
@@ -2653,6 +2694,8 @@ func from_dict(saved: Dictionary) -> void:
 		var record := _town(str(town))
 		record["xp"] = maxi(int(entry.get("xp", 0)), 0)
 		record["founded"] = bool(entry.get("founded", false))
+		# Its harvests in (652); a town founded before has had its first.
+		record["harvests"] = maxi(int(entry.get("harvests", 1 if record["founded"] else 0)), 0)
 		record["to_spread"] = maxi(int(entry.get("to_spread", 0)), 0)
 		record["spent"] = clampi(int(entry.get("spent", 0)), 0, record["xp"])
 		for who: Variant in entry.get("residents", []):

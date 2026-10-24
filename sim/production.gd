@@ -73,6 +73,10 @@ var town_has := Callable()
 ## building never leaves the town unable to keep what stands; a repair or a
 ## roof may use it.
 var keep_for := Callable()
+## (town, trade) -> bool: whether a town pays an official of that trade
+## yet (652: rules' official "stage", Towns sets it); unset: always. One it
+## doesn't pay is neither paid nor owed.
+var official_paid := Callable()
 ## (workshop id) -> Array: the item ids a workshop makes (641: each healer's
 ## hut its own potions; Main sets it from economy.json); [] or unset: every
 ## recipe of its trade.
@@ -402,6 +406,14 @@ func set_loan(worker_id: String, owed: float, working_off := false) -> void:
 
 ## How many of [param town]'s workers (not away) the town fed, or who went
 ## hungry, at their last meal: the dole, which makes food its first want.
+## How much of raw good [param what] [param town]'s store is comfortable
+## with: the most of rules' comfort and comfort_per_head x its workers (652:
+## food scales with its people, so a founding town keeps its stores).
+func comfort(town: String, what: String) -> int:
+	var per_head := float(rules.get("comfort_per_head", {}).get(what, 0))
+	return maxi(int(rules.get("comfort", {}).get(what, 0)), ceili(per_head * worker_ids(town).size()))
+
+
 func on_dole(town: String) -> int:
 	var count := 0
 	for id in worker_ids(town):
@@ -1112,7 +1124,7 @@ func _official_wages(at: int) -> void:
 		worker_record["wage_due"] = at + every
 		var wage := int(official[trade].get("wage", 0))
 		var town: String = worker_record["town"]
-		if wage <= 0:
+		if wage <= 0 or official_paid.is_valid() and not official_paid.call(town, trade):
 			continue
 		# The alms first, for the priest (decision 546).
 		var from_alms := clampi(int(wage_from.call(town, id, trade, wage)), 0, wage) if wage_from.is_valid() else 0
@@ -1158,9 +1170,8 @@ func signals_of(town: String, cat: Dictionary) -> Dictionary:
 	if dole > 0 and wants.has("food"):
 		short["food"] = 1.0
 	var full := true
-	var comfort: Dictionary = rules.get("comfort", {})
-	for what: String in comfort:
-		if stockpile.count(town, what) < int(comfort[what]):
+	for what: String in rules.get("comfort", {}):
+		if stockpile.count(town, what) < comfort(town, what):
 			full = false
 	var lines := stockpile.ledger(town).filter(func(line: Dictionary) -> bool: return int(line["step"]) >= at - window).size()
 	lines += _jobs.values().filter(func(each: Dictionary) -> bool: return each["town"] == town).size()
