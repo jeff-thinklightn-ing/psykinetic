@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Each newcomer to a town has a place and story of their own, held under the castle, at a camp or lost in the hills, forest or wilds; a resident left hungry or unpaid for days wanders back there, to be found again (613 amended).
 - The draugr's battle axe's upper grip moved down to 0.45 m above the lower, as the two-handed clips hold the hands, so pc-character's left hand reaches it (451 amended (2), art-kit's side; corrects 451 amended's 0.87)
 - The pauper's graves' pieces (654, art-kit's side; Jeff: "the poor are in pauper's graves outside"): building.grave (1 x 2, a low earth mound, four variants: plank, split stake, stone, sunken), prop.grave_fence (a low broken fence, three variants), building.grave_sealed (the draugr's sealed way out among them: a stone-lined grave, its capstone cracked and banded with iron); maps lays them on Held
 - Bodies round their corners as they walk: the path bends through each cell's centre and the body turns across the bend instead of snapping its heading at every step, so a walk that mixes straight and diagonal steps reads as one walk under the tilted camera; arrival times are unchanged (655).

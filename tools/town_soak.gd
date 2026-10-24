@@ -59,8 +59,10 @@ const WOODLOT := "wilds/soak_woodlot"
 ## leaving their bench for economy's 552 newcomer.
 var _retrain := {}
 ## --rescue-after=DAYS: newcomers are sought (613): each is placed at a
-## stand-in refuge and brought home DAYS days after the word went out, a
-## player's rescue stood in for, so the measure still grows trades.
+## stand-in for its story's place and brought home DAYS days after the word
+## went out, a player's rescue stood in for, so the measure still grows
+## trades; residents low too long wander off (613 amended) and come back
+## the same way, counted as "wandered".
 var _rescue_after := -1.0
 const QUESTIONS := ["Who are you?", "What is new in the town?", "What do you need?", "What do you think of %s?", "Is it true that %s"]
 var _prev := {}  # Main's own context callbacks, put back before the quit.
@@ -184,8 +186,11 @@ func _run() -> void:
 	if _hail_day:
 		_seed_hail_day()
 	if _rescue_after >= 0.0:
-		World.towns.place_sought = func(_town: String, _trade: String, _kinds: Array, _id: String) -> Dictionary:
-			return {"place": "soak_refuge", "where": "wilds"}
+		World.towns.place_sought = func(_town: String, _trade: String, variant: Dictionary, _id: String) -> Dictionary:
+			return {"place": "soak_%s" % variant.get("place", "refuge"), "where": str(variant.get("where", "wilds"))}
+		World.towns.wandered.connect(func(_town: String, who: String) -> void:
+			_count("wandered")
+			print("SOAK %s wandered off, low too long" % World.production.worker(who).get("name", who)))
 	if _woodlot != Vector2i(-99999, -99999):
 		# A place the level doesn't have, for the measure only: put straight into Holdings.
 		var store: Dictionary = World.holdings.place(TOWN)

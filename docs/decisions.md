@@ -27170,3 +27170,88 @@ hands: about 0.45 m apart along the haft. Pc-character's step 4, the left hand o
 the draugr's left arm (0.52 m) 0.3 m short in every pose. The upper wrap moves down to 0.45 above
 the grip, matching the giant axe, with the bronze ring between the wraps (make_draugr_items.py),
 and grip_2 follows in the slots.json override and the blend's empty. No clip of its own is needed.
+## 613 amended: one place and story per trade, and wandering off (economy's side)
+
+Jeff answered the sought's draft (2026-10-22, through the coordinator): "i
+think every npc has their own place and story of how they got there...
+for replayablity sake they may wander off (get re-captured) if they run
+low on resources or funds". The coordinator approved the amended design.
+Lore wrote the stories (docs/lore/sought.md, drafts pending Jeff's
+wording check except the smith's). Maps lays each outdoor place under its
+key, and dungeon lays the dwarven forge as a fixed anchor of the castle's
+halls.
+
+- **The data.** economy.json sought.trades replaces 613's where, default
+  and guards. Each trade has one row: {place (maps' or dungeon's place
+  key, or "camp"), where, holder (a faction, "" lost), band (enemy-ai's),
+  story (lore's id), alt (a second variant)}.
+  - smith: dwarven_forge, castle_dungeon, held by the goblins.
+  - butcher: herders_hut, hills.
+  - fisherman: far_bank, wilds.
+  - woodcutter: woodcutters_lean_to, forest.
+  - farmer: old_farmstead, wilds.
+  - shepherd: hill_cave, hills.
+  - weaver: hill_shieling, hills.
+  - carpenter: ruined_barn, wilds.
+  - cook: thick_wood, forest.
+  - tanner: boar_path, forest.
+  - fletcher: fletchers_tree, forest.
+  - Each has the alt <trade>.camp, at a hostile camp.
+  - The medicine man has no row until Jeff says whether he is Hob or
+    another. A trade without a row walks in meanwhile, as an interim only
+    (the coordinator), told to the coordinator as each trade turns on.
+- **Placed by story.** Towns._story(trade). The first time out uses the
+  row's own place; later times use the variants in turn (the town's
+  sought_tries per trade), and a variant that can't be placed now gives
+  way to the next (Towns._place_variant). place_sought is now (town,
+  trade, variant, id) -> {place, where} for the variant's key, or ""
+  while it isn't laid. "camp" stays 518's path. The entry carries story
+  and tries.
+- **Wandering off.** Towns._wander_turn, each tick, covers a resident of a
+  trade with a row. Never a companion, and never one away (a captive or
+  one being led home).
+  - The resident is low (Towns._low) while hungry and not on the dole,
+    while owed unpaid wages, or while seated with work queued at their
+    workshop and none of it going (waiting on stock).
+  - Past sought.leave_days (10) low, they go: out of the residents, away,
+    sought again as themselves (the same worker, card and purse;
+    _seek(..., wandered)), placed by their story's next variant.
+  - The log says "<name> the <trade> has gone, low too long; they say back
+    where they were found". The signal Towns.wandered(town, id) is npc's,
+    for the officials' word.
+  - At most one a town each sought.wander_every_days (7). Saved: low,
+    wandered_at, sought_tries.
+  - Tuned from 5 days and one a town a day after the 20-day soak (one
+    player, the wilds on 649): 10 wanderings in 20 days, one a day from
+    day 9, every core trade twice (woodcutter, farmer, cook, smith,
+    tanner). The town's low was the same poverty as economy's gold and
+    food note: the treasury at its floor, the founding food gone by day 8.
+    A town shouldn't lose a trade a day even when poor (the coordinator's
+    ruling). Draft numbers, Jeff's to tune; a re-soak follows 652 (the
+    founding larder).
+  - A wandered one whose trade the town fills another way comes back to
+    the town out of work, not removed.
+- **Soak.** town_soak --rescue-after stands in for the trade's place and
+  brings wanderers home the same way, counting "wandered".
+
+farm_test _test_sought:
+- the farmer waiting while his farmstead isn't laid, maps asked with his
+  story, placed there, his story's id
+- lost, then placed by the camp variant after restock_days; saved
+- the camp's fall bringing him home
+- owed too long: he wanders off as himself and is sought again, while a
+  hunter (no story) stays; found again and home
+- answered by another
+- the smith at the dwarven forge, held by the goblins
+- the medicine man without a story
+
+The note (Jeff: each one leaves "a small note saying where they went" on
+their "door or shop"; the coordinator's ruling):
+- A wanderer's entry carries "door": the workshop they kept
+  (Production.workshop_of), else "inn", their bed's.
+- A newcomer who never came has door ""; their word is rumour only.
+- npc writes the note from lore's per-story notes (entry.story) and
+  where_words(entry.where), and ui reads it with E on the door.
+- It comes down when the entry ends (sought_changed).
+
+Server only; protocol unchanged; no new class_name.
