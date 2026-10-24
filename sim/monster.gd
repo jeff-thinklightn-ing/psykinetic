@@ -174,17 +174,14 @@ const PICK_UP_EVERY := 10
 ## no kind, as monsters were).
 ## MARCH (a raider, Raids): along its route once, to the last waypoint, and
 ## stands there.
-## HOMEWARD (the barrow's dead, decision 547): up to its grave, a niche of
-## a shallower band from its level's "graves", and there it lies down still
-## (laid) till the curse renews (rise).
+## HOMEWARD (the barrow's dead, decision 547; 631 amended): back to its
+## grave, the cell it was laid on (its home), and there it rests standing
+## still (laid) till a foe is seen or the curse renews (rise).
 enum Idle { NONE, GUARD, WANDER, PATROL, GATHER, MARCH, HOMEWARD }
 const IDLE_MODES := {"none": Idle.NONE, "guard": Idle.GUARD, "wander": Idle.WANDER, "patrol": Idle.PATROL,
 	"gather": Idle.GATHER, "march": Idle.MARCH, "homeward": Idle.HOMEWARD}
-## HOMEWARD: how far it searches for its way (a barrow's breadth), and how
-## long it lies down at a time (renewed before it would get up).
+## HOMEWARD: how far it searches for its way (a barrow's breadth).
 const HOMEWARD_SEARCH_TILES := 2000
-const LAID_HOLD_TICKS := 6000
-const LAID_RENEW_TICKS := 600
 ## Idling it walks this much slower than it chases (its step time times this).
 const IDLE_PACE := 1.6
 ## GUARD: a glance aside every so often (ticks), up to GLANCE_STEPS_MAX
@@ -560,9 +557,8 @@ func _sim_tick() -> void:
 	if laid:
 		var woke_by := _waking_foe()
 		if woke_by == null:
-			_lie_still()  # Struck or not, it stays down (decision 547).
-			return
-		rise()  # A foe in sight: it sits up, turned to them, and keeps its grave (GUARD).
+			return  # Struck or not, it stands still (decision 547; 631 amended: standing, not lying).
+		rise()  # A foe in sight: it turns to them and keeps its grave (GUARD).
 		World.face(self, Senses.way_toward(tile, woke_by.tile))
 	if not noticing:
 		_unnoticing()
@@ -1912,69 +1908,18 @@ func _step_aside(blocker: GridEntity) -> void:
 			return
 
 
-## Whether it has a grave, choosing one the first time (choose_grave, kept
-## in its props); with none in its level it wanders where it stands.
+## Whether it has a grave: the cell it was laid on, its home (631 amended,
+## Jeff: "skeletons still spawning in niches and lying down on ground,
+## clipping through walls"; dungeon lays it on open floor). With none it
+## wanders where it stands.
 func _settle_grave() -> bool:
 	if grave != NO_TILE:
 		return true
-	# Every other one of the zone's dead takes the free grave nearest it, a
-	# few steps off, and lies there; the rest walk home (decision 561: of the barrow's four,
-	# two lie and two walk).
-	var settled := 0
-	for other in World.monsters():
-		if other != self and other is Monster and (other as Monster).grave != NO_TILE:
-			settled += 1
-	grave = choose_grave(settled % 2 == 1)
+	grave = home
 	if grave == NO_TILE:
 		idle = Idle.WANDER
 		return false
-	_keep_prop("grave", grave)
 	return true
-
-
-## A grave for it (decision 547): one of its level's "graves" ([x, y, band]
-## each, band 0 shallowest) in a band shallower than the grave nearest where
-## it stands (the old dead walk up, home), else one no deeper, else any;
-## none another of the zone's monsters has; of those, one by its name.
-## With [param nearest], the free one nearest it (decision 561). NO_TILE
-## when there are none.
-func choose_grave(nearest_one := false) -> Vector2i:
-	var graves := zone_graves()
-	if graves.is_empty():
-		return NO_TILE
-	var taken: Dictionary[Vector2i, bool] = {}
-	for other in World.monsters():
-		if other != self and other is Monster and (other as Monster).grave != NO_TILE:
-			taken[(other as Monster).grave] = true
-	var mine := 0
-	var nearest := -1
-	for each: Vector3i in graves:
-		var d := World.distance(tile, Vector2i(each.x, each.y))
-		if nearest < 0 or d < nearest:
-			nearest = d
-			mine = each.z
-	var shallower: Array[Vector2i] = []
-	var no_deeper: Array[Vector2i] = []
-	var free: Array[Vector2i] = []
-	for each: Vector3i in graves:
-		var at := Vector2i(each.x, each.y)
-		if taken.has(at):
-			continue
-		free.append(at)
-		if each.z <= mine:
-			no_deeper.append(at)
-		if each.z < mine:
-			shallower.append(at)
-	if nearest_one and not free.is_empty():
-		var best := free[0]
-		for at in free:
-			if World.distance(tile, at) < World.distance(tile, best):
-				best = at
-		return best
-	var pick := shallower if not shallower.is_empty() else (no_deeper if not no_deeper.is_empty() else free)
-	if pick.is_empty():
-		return NO_TILE
-	return pick[absi(hash(String(name) + "/grave")) % pick.size()]
 
 
 ## Whoever stands in its way home: beside it, on a cell nearer its grave, one
@@ -2064,9 +2009,11 @@ func _struck_by() -> GridEntity:
 	return null
 
 
-## Down at its grave, or stilled (the draugr laid to rest, step 3): it lies
-## still (down_until, which the views draw) till rise, kept in its props so
-## a restart finds it lying.
+## At rest at its grave, or stilled (the draugr laid to rest, step 3): it
+## stands still, turned its home's way, till rise, kept in its props so a
+## restart finds it resting. Standing, not lying (631 amended): its
+## down_until is left alone, so the views draw it at its idle, inside its
+## cell, and it wakes with no getting up.
 func lay_down() -> void:
 	laid = true
 	target = null
@@ -2074,7 +2021,8 @@ func lay_down() -> void:
 	alert = Alert.IDLE
 	_drop_windup()
 	_keep_prop("laid", true)
-	_lie_still()
+	if tile == grave or tile == home:
+		World.face(self, home_facing)
 
 
 ## The foe of its side one lying at its grave sees and gets up for, or null
@@ -2104,7 +2052,6 @@ func rise() -> void:
 	if stilled:
 		stilled = false
 		_keep_prop("stilled", false)
-	down_until = World.tick
 	_keep_prop("laid", false)
 	if idle == Idle.HOMEWARD and grave != NO_TILE and tile == grave:
 		idle = Idle.GUARD
@@ -2135,11 +2082,6 @@ func _under_rest() -> bool:
 			and _factions().same_side(_factions().of_kind(World.kind_of(self)), str(rest.get("side", "")))
 
 
-func _lie_still() -> void:
-	if down_until - World.tick < LAID_RENEW_TICKS:
-		down_until = World.tick + LAID_HOLD_TICKS
-
-
 ## [param key] set to [param value] in its spawn spec's props, which a save
 ## keeps (Snapshot): the spec copied first, never the level's own.
 func _keep_prop(key: String, value: Variant) -> void:
@@ -2161,19 +2103,6 @@ static func respawn_ticks(kind: String, otherwise: int) -> int:
 	if given is float or given is int:
 		return maxi(0, roundi(float(given) * World.TICK_RATE))
 	return otherwise
-
-
-## The graves of the zone's level (its level.json "graves", [x, y, band]
-## each, as Regen writes them for the barrow), read once a zone.
-static func zone_graves() -> Array[Vector3i]:
-	var config := _zone_config()
-	var out: Array[Vector3i] = []
-	var listed: Variant = config.get("graves", [])
-	if listed is Array:
-		for each: Variant in listed:
-			if each is Array and each.size() >= 2:
-				out.append(Vector3i(int(each[0]), int(each[1]), int(each[2]) if each.size() > 2 else 0))
-	return out
 
 
 ## The room round [param cell]: the anchor of the zone's level it lies in,

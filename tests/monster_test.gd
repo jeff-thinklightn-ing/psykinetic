@@ -2133,12 +2133,13 @@ func _test_sides_on_sight() -> void:
 
 func _test_homeward() -> void:
 	print("
-== the barrow's dead walk home to a shallower grave and lie down there; they fight only who is in the way, or strikes them (decision 547) ==")
+== the barrow's dead rest standing on the cell they were laid on and walk back to it; they fight only who is in the way, or strikes them (decision 547; 631 amended) ==")
 	Monster.idling = true
 	var rows: Array[String] = ["###############", "#.............#", "#.k...........#", "#.............#", "###############"]
-	Level.register("mt_barrow", Level.image_from_rows(rows), null, {"graves": [[3, 3, 2], [12, 1, 0], [12, 3, 1]]})
+	Level.register("mt_barrow", Level.image_from_rows(rows), null, {"graves": [[3, 3, 2], [12, 1, 0], [12, 3, 1]]})  # Listed, no longer read.
 	var e := _build(rows, {}, {}, "mt_barrow")
 	var walker: Monster = e["k"][0]
+	var laid_on := walker.tile
 	_check(walker.idle == Monster.Idle.HOMEWARD and walker.fearless and not walker._should_flee(), "a skeleton walks home and never flees")
 	walker.hp = 1
 	_check(not walker._should_flee(), "not even at 1 hp")
@@ -2147,34 +2148,39 @@ func _test_homeward() -> void:
 		World.step()
 		if walker.laid:
 			break
-	_check(walker.grave in [Vector2i(12, 1), Vector2i(12, 3)], "its grave is a shallower one than the deep niche beside it (%s)" % [walker.grave])
-	_check(walker.laid and walker.tile == walker.grave and World.is_down(walker), "home, it lies down (%s at %s)" % [walker.tile, walker.grave])
+	_check(walker.laid and walker.grave == laid_on and walker.tile == laid_on, "its grave is the cell it was laid on, not a listed one, and it rests there at once (%s)" % [walker.grave])
+	_check(not World.is_down(walker) and walker.down_until <= World.tick and walker.facing == walker.home_facing, "resting, it stands: never knocked down, turned its home's way")
 	var props: Dictionary = walker.spawn_spec["props"]
-	_check(props.get("laid") == true and props.get("grave") == walker.grave, "a save keeps it lying at its grave (%s)" % [props])
+	_check(props.get("laid") == true and not props.get("grave") is Vector2i, "a save keeps it resting, and no grave cell in its props (555's grave goods keep the key) (%s)" % [props])
 	World.damage(walker, 1, null)
 	for i in 5:
 		World.step()
-	_check(walker.laid and walker.tile == walker.grave, "struck, it stays down")
-	walker.down_until = World.tick + 10
-	World.step()
-	_check(World.is_down(walker) and walker.down_until - World.tick > Monster.LAID_RENEW_TICKS, "and never gets up of itself")
+	_check(walker.laid and walker.tile == laid_on and not World.is_down(walker), "struck, it stands still")
 	walker.rise()
-	_check(not walker.laid and walker.idle == Monster.Idle.GUARD and walker.home == walker.grave, "risen, it guards its grave")
+	_check(not walker.laid and walker.idle == Monster.Idle.GUARD and walker.home == laid_on and walker.down_until <= World.tick, "risen, it guards its cell, with no getting up")
+	# Led away and left (631 amended; the coordinator): back to its laid cell, standing.
+	walker.idle = Monster.Idle.HOMEWARD
+	_move_to(walker, Vector2i(12, 3))
+	for i in 400:
+		World.step()
+		if walker.laid:
+			break
+	_check(walker.laid and walker.tile == laid_on and not World.is_down(walker), "led away and left, it walks back to the cell it was laid on and stands there (%s)" % [walker.tile])
 	# A foe in sight (580 amended): it sits up as one passes; stilled by the
 	# draugr's rest, never.
 	var passer := EntityFactory.build(SPECS["P"].merged({"name": "Passer"})) as Player
 	passer.player_id = "pp"
 	_room.add_child(passer)
-	World.spawn(passer, Vector2i(2, 1))
+	World.spawn(passer, Vector2i(13, 1))
 	walker.lay_down()
 	walker.sight_range = 5
 	walker.senses.dark_sight = true
 	World.step()
-	_check(walker.laid, "one 10 off, past its sight: it lies on")
-	_move_to(passer, Vector2i(9, 2))
+	_check(walker.laid, "one 11 off, past its sight: it rests on")
+	_move_to(passer, Vector2i(5, 2))
 	World.dead_rest["mt_barrow"] = {"until": World.steps + 100, "side": walker._factions().of_kind(World.kind_of(walker))}
 	World.step()
-	_check(walker.laid, "stilled by the draugr's rest, it lies on with one beside it")
+	_check(walker.laid, "stilled by the draugr's rest, it rests on with one near")
 	World.dead_rest.clear()
 	World.step()  # His rest over: it gets up of itself.
 	walker.lay_down()
@@ -2184,14 +2190,15 @@ func _test_homeward() -> void:
 		World.step()
 		went = went or walker.target == passer
 	_check(not walker.laid and walker.idle == Monster.Idle.GUARD and went,
-		"lying at its grave, one within its sight: it gets up and goes for them (target %s)" % [walker.target])
+		"resting at its grave, one within its sight: it wakes and goes for them (target %s)" % [walker.target])
 	passer.queue_free()
 	World.despawn(passer)
 
 	rows = ["###########", "#k.....P..#", "###########"]
-	Level.register("mt_barrow", Level.image_from_rows(rows), null, {"graves": [[9, 1, 0]]})
+	Level.register("mt_barrow", Level.image_from_rows(rows), null, {})
 	e = _build(rows, {}, {}, "mt_barrow")
 	walker = e["k"][0]
+	walker.home = Vector2i(9, 1)  # Its laid cell down the way: led off it.
 	var player: GridEntity = e["P"][0]
 	walker.sight_range = 7
 	walker.senses.cone_cos = -1.0
@@ -2204,9 +2211,10 @@ func _test_homeward() -> void:
 	_check(met and World.distance(walker.tile, player.tile) == 1, "one standing in its way it fights (%s)" % [walker.tile])
 
 	rows = ["#############", "#.....P.....#", "#k..........#", "#...........#", "#############"]
-	Level.register("mt_barrow", Level.image_from_rows(rows), null, {"graves": [[11, 2, 0]]})
+	Level.register("mt_barrow", Level.image_from_rows(rows), null, {})
 	e = _build(rows, {}, {}, "mt_barrow")
 	walker = e["k"][0]
+	walker.home = Vector2i(11, 2)
 	player = e["P"][0]
 	walker.sight_range = 7
 	walker.senses.cone_cos = -1.0
@@ -2216,7 +2224,7 @@ func _test_homeward() -> void:
 		bothered = bothered or walker.target != null
 		if walker.laid:
 			break
-	_check(walker.laid and not bothered, "one standing beside its way it passes by, and lies down at home (laid %s, bothered %s, at %s, grave %s)" % [walker.laid, bothered, walker.tile, walker.grave])
+	_check(walker.laid and not bothered, "one standing beside its way it passes by, and rests at home (laid %s, bothered %s, at %s, grave %s)" % [walker.laid, bothered, walker.tile, walker.grave])
 	walker.rise()
 	walker.idle = Monster.Idle.HOMEWARD
 	walker.grave = Vector2i(1, 2)
@@ -2229,11 +2237,12 @@ func _test_homeward() -> void:
 	_check(not e["k"][0]._may_fight(e["k"][1]) and e["k"][0]._may_fight(e["x"][0]) and e["k"][0]._may_fight(e["P"][0]),
 		"a fellow of its side in its way it waits behind; a robber it fights, as a player")
 	rows = ["###############", "#k............#", "###############"]
-	Level.register("mt_barrow", Level.image_from_rows(rows), null, {"graves": [[13, 1, 0]]})
+	Level.register("mt_barrow", Level.image_from_rows(rows), null, {})
 	e = _build(rows, {}, {}, "mt_barrow")
 	walker = e["k"][0]
+	walker.home = Vector2i(13, 1)
 	walker._world_tick(60.0)
-	_check(walker.laid and walker.tile == Vector2i(13, 1), "far from everyone, it walks home all the same and lies down (%s)" % [walker.tile])
+	_check(walker.laid and walker.tile == Vector2i(13, 1) and not World.is_down(walker), "far from everyone, it walks home all the same and rests standing (%s)" % [walker.tile])
 	Level.unregister("mt_barrow")
 
 
@@ -2970,7 +2979,7 @@ func _test_threatens() -> void:
 
 func _test_quieter() -> void:
 	print("
-== the barrow made quieter (decision 561): half the dead lie at once, a blocked one waits, nearer sight and calls, longer respawns ==")
+== the barrow made quieter (decision 561; 631 amended): the dead rest at once where they were laid, a blocked one waits, nearer sight and calls, longer respawns ==")
 	Monster.idling = true
 	Monster._read_factions = null
 	var rows: Array[String] = ["###############", "#k.k.k.k......#", "#.............#", "#.............#", "###############"]
@@ -2979,11 +2988,8 @@ func _test_quieter() -> void:
 	var e := _build(rows, {}, {}, "mt_quiet")
 	for i in 400:
 		World.step()
-	var bands := {0: 0, 2: 0}
-	for each: Monster in e["k"]:
-		bands[2 if each.grave.x < 10 else 0] += 1
-	_check(bands[0] == 2 and bands[2] == 2, "of four, two take the deep grave beside them and two walk home (%s)" % [bands])
-	_check(e["k"].all(func(each: Monster) -> bool: return each.laid and each.tile == each.grave), "and all four lie in their graves")
+	_check(e["k"].all(func(each: Monster) -> bool: return each.laid and each.tile == each.grave and each.grave == each.home),
+		"all four rest at once on the cells they were laid on (631 amended: none walks to a listed grave)")
 	_check(Monster.respawn_ticks("skeleton", 600) == 6000 and Monster.respawn_ticks("robber", 600) == 3000 and Monster.respawn_ticks("imp", 600) == 600,
 		"the level's respawn_s by kind, in ticks; a kind it does not name waits as ever")
 	Level.unregister("mt_quiet")
@@ -2993,9 +2999,10 @@ func _test_quieter() -> void:
 	Level.unregister("mt_quiet")
 
 	rows = ["###########", "#k.....P..#", "###########"]
-	Level.register("mt_quiet", Level.image_from_rows(rows), null, {"graves": [[9, 1, 0]]})
+	Level.register("mt_quiet", Level.image_from_rows(rows), null, {})
 	e = _build(rows, {}, {}, "mt_quiet")
 	var walker: Monster = e["k"][0]
+	walker.home = Vector2i(9, 1)  # Its laid cell down the way: led off it.
 	var player: GridEntity = e["P"][0]
 	walker.sight_range = 7
 	walker.senses.cone_cos = -1.0

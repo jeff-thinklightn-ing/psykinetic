@@ -28882,3 +28882,44 @@ keys gone), level_test (`_test_barrow_level` for two depths, the rooms, the reti
 seal in `_test_hall_door`: held, lifted, entry only, waiting, under the challenge's lock; the
 retired move; the link cues), regen_test (the marked list), view_test (`_test_lair` reads the
 Ossuary). docs/levels.md. Protocol unchanged; no new class_name.
+## 631 amended, enemy-ai's side: the dead rest standing on the cell they were laid on
+
+Jeff on v0.1.172 in the Ossuary: "skeletons still spawning in niches and
+lying down on ground, clipping through walls" (the second time; v0.1.169:
+"lying down or stuck in their niches"). The coordinator's ruling: the grave
+lie is gone. Dungeon's side lays every generated dead one on open floor.
+
+- **Why they lay**: a resting dead one (Monster.laid: at its grave, or
+  stilled by the draugr's rest) pushed GridEntity.down_until ten minutes
+  ahead, which the client draws as a knockdown, the body tipped flat along
+  the floor and into the wall beside it; waking pulled it back, the sit-up.
+- **Standing rest**: lay_down no longer touches down_until (LAID_HOLD_TICKS
+  and LAID_RENEW_TICKS and Monster._lie_still go; the draugr keeps his own
+  for his at-rest lie). A resting one stands still on its cell at its idle,
+  turned its home's way; rise no longer sets down_until either, so it wakes
+  straight into the turn to the foe, no getting up. Waking on sight (580
+  amended) and the stilled holding whatever comes are unchanged; struck, it
+  stands still (547's "stays down"). A real knockdown (343) lies and gets
+  up as ever.
+- **The home**: the home of a dead one is the cell it was laid on (its
+  spawn marker, the same after a respawn): it rests there standing and
+  walks back there after a chase; the level's "graves" list is no longer
+  read for it. The cell is dungeon's to lay (open floor, eight floor
+  neighbours, no wall or door edge), the rest on it enemy-ai's.
+  Monster._settle_grave takes home; choose_grave and zone_graves go, and
+  with them 561's split (two of four lay down at the nearest grave, two
+  walked up a band): all rest at their markers from spawn. A grave cell is
+  no longer written into the props, where it took 555's grave-goods key
+  ("grave": true) from a dead one carrying things.
+- **Wire**: nothing on the wire carries the rest; the client lies a body
+  only by down_until, whose meaning is unchanged (knocked down). laid and
+  stilled are server-side. Protocol unchanged; the next cut regenerates the
+  barrow layers (dungeon's side).
+- Tests: monster_test _test_homeward (rests at once on its laid cell, not a
+  listed grave; standing, never down, turned its home's way; no grave cell
+  in its props; struck, still; risen with no getting up; led away and left,
+  back to its laid cell, standing; the passer and the rest as before),
+  _test_quieter (all four rest at once where they were laid); view_test
+  _test_barrow_dead (the skeleton and its guard at rest at all eight
+  facings: not tipped, every posed joint with REST_FLESH inside the cell).
+  No new class_name.

@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The barrow's dead no longer lie on the floor or sink into walls: a resting skeleton stands still on its own cell, turns straight to you when it sees you (no getting up), and after a chase walks back to the cell it was laid on and stands there.
 - The Hall of Fallen Souls keeps its reward: one chest on the dais beside the draugr's throne, rolling the old Hall's goods (rare plate, mail, a sword), reached only past the dead's seal and the draugr; its goods are rolled anew each time the Ossuary shifts.
 - The barrow is two depths now: the Hall of Fallen Souls is a great room at the far end of the Ossuary, sealed until the Ossuary's dead are all down, and the dark level below it is gone (anyone saved there wakes at the Ossuary's stair foot).
 - Tune: the Ossuary holds twelve skeletons and two grave guards, the guards by the Hall's door (drafts).

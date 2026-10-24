@@ -671,6 +671,18 @@ func _restore() -> void:
 	_retinue.clear()
 
 
+## At rest, he lies still (down_until, which the views draw), renewed
+## before he would get up; his own, since the dead stand at rest (631
+## amended).
+const LAID_HOLD_TICKS := 6000
+const LAID_RENEW_TICKS := 600
+
+
+func _lie_still() -> void:
+	if down_until - World.tick < LAID_RENEW_TICKS:
+		down_until = World.tick + LAID_HOLD_TICKS
+
+
 ## His rest over: the curse renews, and the dead rise.
 func _rise_again() -> void:
 	rests_until = -1

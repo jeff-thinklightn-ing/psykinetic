@@ -5370,9 +5370,41 @@ func _test_barrow_dead() -> void:
 		shadows[own.resource_name if own != null else ""] = mesh.cast_shadow != GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_check(shadows.get(Client3D.GHOST_MATERIAL) == false and shadows.get(ArtKit.PALETTE_NAME) == true,
 			"the ghost's shroud casts no shadow, its bones do (%s)" % shadows)
+	# At rest (631 amended; Jeff: "lying down on ground, clipping through walls"): the skeleton and its
+	# guard stand on their cell at their idle, not tipped over, and every joint of the posed body (with a
+	# hand's breadth of flesh) stays inside the cell at all eight facings, so none crosses a wall edge.
+	for entity: Monster in [dead[0], dead[1]]:
+		entity.lay_down()
+		var puppet: Node3D = _rig._puppets[entity.get_instance_id()]
+		var worst := 0.0
+		var tipped := false
+		for way: Vector2i in Monster.AROUND:
+			World.face(entity, way)
+			for i in 10:
+				_rig._process(0.05)
+			var rig := puppet.get_meta("rig") as AnimRig
+			if rig.tree != null:
+				rig.tree.advance(0.5)
+			tipped = tipped or bool(puppet.get_meta("lying", false)) or not is_zero_approx((puppet.get_node("Body") as Node3D).rotation.x)
+			var skeleton: Skeleton3D = null
+			for each: Skeleton3D in puppet.find_children("*", "Skeleton3D", true, false):
+				skeleton = each
+			if skeleton == null:
+				worst = INF
+				continue
+			var middle := puppet.global_position
+			for bone in skeleton.get_bone_count():
+				var joint := skeleton.global_transform * skeleton.get_bone_global_pose(bone).origin
+				worst = maxf(worst, maxf(absf(joint.x - middle.x), absf(joint.z - middle.z)) + REST_FLESH)
+		_check(entity.laid and not World.is_down(entity) and not tipped and worst <= 0.5,
+				"a %s at rest stands on its cell at every facing: not lying, its farthest joint %.2f of a cell's half 0.5" % [World.kind_of(entity), worst])
 	for entity: Monster in dead:
 		World.despawn(entity)
 	_rig._process(0.0)
+
+
+## A hand's breadth of flesh round a joint (the rest check of the barrow's dead).
+const REST_FLESH := 0.08
 
 
 func _test_goblins_differ() -> void:
