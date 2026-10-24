@@ -27002,3 +27002,44 @@ saved). The other
 farm_test towns run without decline. production_test reads a settlement
 first. Wire: new stage and state values and the sheet's strain, a line
 under PROTOCOL_REVISION 35. No new class_name.
+## 649, terrain's side: a ruin's ground back to the forest
+
+Economy's rise and fall (649; Jeff: "buildings at the edge fall into disrepair and the
+forest overtakes"; the coordinator's approval): a building that reaches RUIN stands as
+rubble for a season, then its record drops and Main hands its footprint to Clearing.
+Terrain's side is the two calls Main makes, as agreed with economy and maps.
+
+- **Clearing.unbuild(zone, cells, day)** fells the cells at a stump from that day; they
+  grow on as any felled cell (a season a stage, twice that with no trunk beside). It
+  returns how many it took and tells changed, so Main's _on_clearing_changed carries them
+  as it does a woodcut: World.set_floor, apply_cells with maps' outline relay,
+  World.set_edges, the "clearing" message, the view's clearing_walls.
+- **A kept trunk.** Until now a cell grown back was erased, so it was the level's own
+  cell again: right for a felled trunk, wrong for a ruin's cell, which is the level's
+  floor. A cell of the level's floor given back is kept as [stage, day, 1]; past
+  saplings it becomes [4, day, 1], a trunk that stays: apply takes it out of the floor,
+  cells_of names it "trunk", daily leaves it, _is_floor counts it void, and a woodcut
+  fells it as any edge trunk (its entry keeps the 1, so it grows back kept again).
+- **Built cells kept in the snapshot.** base["built"] (the level's buildings and roads)
+  is read from the level every boot, so a change to it must be saved: the zone's entry
+  gains "built" (cells build took) and "unbuilt" (the level's own built cells a ruin
+  gave back), lists of "x,y". An older build reads the 2-entry cells and skips the rest.
+- **Clearing.build(zone, cells)** takes cells for a building planned on them: built
+  over (never growing), a kept trunk or a standing trunk grass again, a felled cell held
+  at its stage; told changed for the cells that changed.
+- **A plot under a ruin is dropped first.** A laid plot's cells never grow back (591
+  step 2), so unbuild drops any plot whose rect (its ring's) holds one of the cells,
+  the whole of it, through maps' Clearing.plot_at and unplot (649, maps' side: its
+  building and edges off the walk, the terrain and the clients through unplotted),
+  then fells the cells.
+- **A client keeps "trunk".** _on_clearing used to forget a cell told "trunk"; over the
+  level's floor that cell would come back as floor on the next load. It keeps "trunk"
+  in _clearing_told now, and apply_cells makes the cell void. A changed meaning of an
+  existing message: a line under PROTOCOL_REVISION 35 (open, unshipped).
+
+level_test _test_unbuild: three cells unbuilt (one the level's building's, given back),
+a trunk not; grown back, three kept trunks, "trunk" in the zone's cells; applied, no
+floor and walled by the outline; the snapshot read back the same; a client's terrain
+from the cells the same; a woodcut fells one, kept again; build takes them, grass, never
+growing, kept; a ruin over a plot drops the plot, then its cells. Protocol changed (35's line), no new
+class_name.

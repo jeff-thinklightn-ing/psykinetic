@@ -2500,7 +2500,9 @@ func _load_level(level_name: String) -> bool:
 	return true
 
 
-## A client's felled cells by zone (591): zone -> cell -> stage, as told.
+## A client's felled cells by zone (591): zone -> cell -> stage, as told
+## ("trunk" kept: a regrown cell is void again on a reload, the level's
+## floor too where a ruin's ground grew back, 649).
 var _clearing_told: Dictionary = {}
 
 
@@ -2612,11 +2614,9 @@ func _on_clearing(data: Dictionary) -> void:
 		_clearing_told[zone] = {}
 	for each: Variant in cells:
 		if each is Array and (each as Array).size() == 3:
-			var cell := Vector2i(int(each[0]), int(each[1]))
-			if str(each[2]) == Clearing.TRUNK:
-				(_clearing_told[zone] as Dictionary).erase(cell)
-			else:
-				_clearing_told[zone][cell] = str(each[2])
+			# A trunk is kept too (649): over the level's own floor (a ruin's
+			# ground grown back) it is what makes the cell void on a reload.
+			_clearing_told[zone][Vector2i(int(each[0]), int(each[1]))] = str(each[2])
 	# Its plots (591 step 2): the whole list, or one laid.
 	var laid: Array = []
 	for wire: Variant in data.get("plots", []) if data.get("plots") is Array else []:

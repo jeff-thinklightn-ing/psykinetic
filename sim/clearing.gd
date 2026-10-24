@@ -32,6 +32,17 @@ extends RefCounted
 ## buildings' 566 raises the kind on it through its stages by economy's
 ## record (its "use"). The sim lays its kind's walls (Level.plot_building)
 ## as for a town's own buildings, open until the record says they are up.
+##
+## A town falls back too (649, economy's rise and fall; Jeff: "buildings at
+## the edge fall into disrepair and the forest overtakes"): unbuild gives a
+## ruin's footprint back to the forest, its cells felled at a stump from the
+## day given, growing on as any felled cell. A cell of the level's own floor
+## so given back grows past saplings to a trunk that stays (kept: [4, day,
+## 1], "trunk" to the views, out of the floor), the level floor no more;
+## build takes cells back for a building planned on them (a kept trunk to
+## grass, held while built). Both are kept in the snapshot (the level's own
+## buildings and roads are read from it each boot): "built" the cells build
+## took, "unbuilt" the level's built cells a ruin gave back.
 
 ## What each stage is, in order, and the floor kind it is.
 const STAGES: Array[String] = ["stump", "grass", "scrub", "saplings"]
@@ -50,8 +61,14 @@ const PLOT_GAP := 2
 ## How far from the store a plot is looked for (cells).
 const PLOT_REACH := 64
 
-## zone -> cell -> [stage index, the day the stage began].
+## zone -> cell -> [stage index, the day the stage began], and a third 1 for
+## a cell of the level's own floor (a ruin's, unbuild): STAGES.size() its
+## stage once grown back, a trunk kept.
 var felled: Dictionary = {}
+## zone -> cell -> true: built over by build (a building planned on them).
+var built_over: Dictionary = {}
+## zone -> cell -> true: the level's own built cells a ruin gave back (unbuild).
+var given_back: Dictionary = {}
 ## zone -> {size, floor (cell -> true), built (cell -> true)}: the level as
 ## made, read once a zone.
 var _base: Dictionary = {}
@@ -89,20 +106,42 @@ func _init(saved := {}, saved_plots := {}) -> void:
 		if listed is Dictionary:
 			for key: String in listed:
 				var entry: Variant = listed[key]
-				if entry is Array and (entry as Array).size() == 2:
-					cells[Vector2i(int(key.get_slice(",", 0)), int(key.get_slice(",", 1)))] = [int(entry[0]), int(entry[1])]
+				if key == "built" or key == "unbuilt":
+					var into: Dictionary = {}
+					for each: Variant in entry if entry is Array else []:
+						into[_cell_of(str(each))] = true
+					(built_over if key == "built" else given_back)[zone] = into
+				elif entry is Array and ((entry as Array).size() == 2 or (entry as Array).size() == 3):
+					cells[_cell_of(key)] = (entry as Array).map(func(n: Variant) -> int: return int(n))
 		felled[zone] = cells
 
 
 func to_dict() -> Dictionary:
 	var out := {}
-	for zone: String in felled:
+	for zone: String in _zones():
 		var cells := {}
-		for cell: Vector2i in felled[zone]:
+		for cell: Vector2i in felled.get(zone, {}):
 			cells["%d,%d" % [cell.x, cell.y]] = (felled[zone][cell] as Array).duplicate()
+		for key: String in ["built", "unbuilt"]:
+			var listed: Dictionary = (built_over if key == "built" else given_back).get(zone, {})
+			if not listed.is_empty():
+				cells[key] = listed.keys().map(func(cell: Vector2i) -> String: return "%d,%d" % [cell.x, cell.y])
 		if not cells.is_empty():
 			out[zone] = cells
 	return out
+
+
+## Every zone with felled, built or given back cells.
+func _zones() -> Array:
+	var zones := {}
+	for each: Dictionary in [felled, built_over, given_back]:
+		for zone: String in each:
+			zones[zone] = true
+	return zones.keys()
+
+
+static func _cell_of(key: String) -> Vector2i:
+	return Vector2i(int(key.get_slice(",", 0)), int(key.get_slice(",", 1)))
 
 
 ## The plots, for the snapshot's "plots": zone -> [wire plots with "day"].
@@ -132,14 +171,20 @@ func today() -> int:
 ## terrain.
 func apply(zone: String, terrain: Dictionary) -> void:
 	var stages: Dictionary[Vector2i, String] = {}
+	var cells: Array[Vector2i] = []
 	for cell: Vector2i in felled.get(zone, {}):
+		cells.append(cell)
+		if _kept(zone, cell):
+			terrain["floor"].erase(cell)  # A ruin's ground grown back (649): a trunk.
+			terrain["kinds"].erase(cell)
+			continue
 		var stage: String = STAGES[int(felled[zone][cell][0])]
 		stages[cell] = stage
 		if not cell in terrain["floor"]:
 			terrain["floor"].append(cell)
 		terrain["kinds"][cell] = STAGE_KINDS[stage]
 	terrain["clearing"] = stages
-	Level.relay_outline(terrain, stages.keys())
+	Level.relay_outline(terrain, cells)
 	lay_plots(terrain, plots_of(zone), size_of)
 
 
@@ -270,7 +315,6 @@ func plot_for(zone: String, plot_class: String, toward: Vector2i) -> Rect2i:
 	var base := _base_of(zone)
 	var size: Vector2i = base["size"]
 	var map := Rect2i(Vector2i.ZERO, size)
-	var mine: Dictionary = felled.get(zone, {})
 	var footed: Dictionary = (base["buildings"] as Dictionary).merged(base["solid"])
 	for plot: Dictionary in plots.get(zone, []):
 		for cell in Level.rect_cells((plot["rect"] as Rect2i).grow(-1)):
@@ -289,7 +333,7 @@ func plot_for(zone: String, plot_class: String, toward: Vector2i) -> Rect2i:
 			stop[i] = 1 if footed.has(cell) or base["walls"].has(cell) else 0
 			road[i] = 1 if base["roads"].has(cell) else 0
 			var usable: bool = x >= EDGE and y >= EDGE and x < size.x - EDGE and y < size.y - EDGE and not footed.has(cell) \
-				and (base["floor"].has(cell) or mine.has(cell)) and not base["water"].has(cell) and not base["links"].has(cell)
+				and _is_floor(zone, base, cell) and not base["water"].has(cell) and not base["links"].has(cell)
 			ring_bad[i] = 0 if usable else 1
 	var ring_sum := _summed(ring_bad, size)
 	var stop_sum := _summed(stop, size)
@@ -400,7 +444,7 @@ static func _sum_in(summed: PackedInt32Array, size: Vector2i, rect: Rect2i) -> i
 func cells_of(zone: String) -> Array:
 	var out := []
 	for cell: Vector2i in felled.get(zone, {}):
-		out.append([cell.x, cell.y, STAGES[int(felled[zone][cell][0])]])
+		out.append([cell.x, cell.y, TRUNK if _kept(zone, cell) else STAGES[int(felled[zone][cell][0])]])
 	return out
 
 
@@ -418,11 +462,74 @@ func fell(zone: String, site: Vector2i, toward: Vector2i, wanted: int) -> int:
 			break
 		if not felled.has(zone):
 			felled[zone] = {}
-		felled[zone][trunk] = [0, today()]
+		felled[zone][trunk] = [0, today(), 1] if _base_of(zone)["floor"].has(trunk) else [0, today()]
 		taken.append([trunk.x, trunk.y, STAGES[0]])
 	if not taken.is_empty():
 		changed.emit(zone, taken)
 	return taken.size()
+
+
+## A ruin's footprint given back to the forest (649; Main, at economy's
+## ruin dropped): [param cells] of [param zone] felled at a stump from
+## [param day], built over no more, growing on as any felled cell (a cell of
+## the level's own floor to a trunk kept). A laid plot under any of them is
+## dropped first, the whole of it (unplot, maps' 649 side: its building and
+## edges off with it). Told changed; how many were given back.
+func unbuild(zone: String, cells: Array[Vector2i], day: int) -> int:
+	if not Level.exists(zone):
+		return 0
+	var base := _base_of(zone)
+	var size: Vector2i = base["size"]
+	for cell in cells:
+		var plot := plot_at(zone, cell)
+		if not plot.is_empty():
+			unplot(zone, plot["rect"])
+	var given := []
+	for cell in cells:
+		if cell.x < 0 or cell.y < 0 or cell.x >= size.x or cell.y >= size.y or base["water"].has(cell):
+			continue
+		if not _is_floor(zone, base, cell) and not _is_built(zone, base, cell):
+			continue  # A trunk already: nothing built there to fall.
+		(built_over.get(zone, {}) as Dictionary).erase(cell)
+		if base["built"].has(cell):
+			if not given_back.has(zone):
+				given_back[zone] = {}
+			given_back[zone][cell] = true
+		if not felled.has(zone):
+			felled[zone] = {}
+		# The level's own ground (its floor, or a building's cell): kept once
+		# grown back, never the level's cell again.
+		felled[zone][cell] = [0, day, 1] if base["floor"].has(cell) or base["built"].has(cell) else [0, day]
+		given.append([cell.x, cell.y, STAGES[0]])
+	if not given.is_empty():
+		changed.emit(zone, given)
+	return given.size()
+
+
+## [param cells] of [param zone] taken for a building planned on them (649;
+## Main, as economy plans one on ground the forest took back): built over
+## (kept so, never growing), each floor: a kept trunk grass again, a felled
+## cell held at its stage, a standing trunk of the level grass. Told changed
+## for the cells that changed.
+func build(zone: String, cells: Array[Vector2i]) -> void:
+	if not Level.exists(zone):
+		return
+	var base := _base_of(zone)
+	var size: Vector2i = base["size"]
+	if not built_over.has(zone):
+		built_over[zone] = {}
+	if not felled.has(zone):
+		felled[zone] = {}
+	var taken := []
+	for cell in cells:
+		if cell.x < 0 or cell.y < 0 or cell.x >= size.x or cell.y >= size.y or base["water"].has(cell):
+			continue
+		built_over[zone][cell] = true
+		if _kept(zone, cell) or not _is_floor(zone, base, cell):
+			felled[zone][cell] = [1, today(), 1] if base["floor"].has(cell) else [1, today()]
+			taken.append([cell.x, cell.y, STAGES[1]])
+	if not taken.is_empty():
+		changed.emit(zone, taken)
 
 
 ## Where a woodlot bare of trunks within REACH of [param site] steps out to:
@@ -459,17 +566,22 @@ func daily(day: int) -> void:
 		var base := _base_of(zone)
 		var grown := []
 		for cell: Vector2i in (felled[zone] as Dictionary).keys():
-			if base["built"].has(cell) or _plotted(zone).has(cell):
+			if _is_built(zone, base, cell) or _plotted(zone).has(cell) or _kept(zone, cell):
 				continue
 			var entry: Array = felled[zone][cell]
 			var needed := stage_days if _beside_trunk(zone, base, cell) else stage_days * 2
 			if day - int(entry[1]) < needed:
 				continue
+			var floor_cell := entry.size() > 2
 			if int(entry[0]) + 1 < STAGES.size():
-				felled[zone][cell] = [int(entry[0]) + 1, day]
+				felled[zone][cell] = [int(entry[0]) + 1, day, 1] if floor_cell else [int(entry[0]) + 1, day]
 				grown.append([cell.x, cell.y, STAGES[int(entry[0]) + 1]])
 			elif not _occupied(zone, cell):
-				(felled[zone] as Dictionary).erase(cell)
+				# The level's own trunk again; a ruin's floor cell a trunk kept.
+				if floor_cell:
+					felled[zone][cell] = [STAGES.size(), day, 1]
+				else:
+					(felled[zone] as Dictionary).erase(cell)
 				grown.append([cell.x, cell.y, TRUNK])
 		if not grown.is_empty():
 			changed.emit(zone, grown)
@@ -487,7 +599,7 @@ func _nearest_edge(zone: String, site: Vector2i, reach: int, toward: Vector2i) -
 			var cell := Vector2i(x, y)
 			if x < EDGE or y < EDGE or x >= size.x - EDGE or y >= size.y - EDGE or Vector2(cell - site).length() > reach:
 				continue
-			if base["floor"].has(cell) or felled.get(zone, {}).has(cell) or base["built"].has(cell) or base["water"].has(cell):
+			if _is_floor(zone, base, cell) or _is_built(zone, base, cell) or base["water"].has(cell):
 				continue
 			var edge := false
 			for step: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
@@ -498,7 +610,24 @@ func _nearest_edge(zone: String, site: Vector2i, reach: int, toward: Vector2i) -
 
 
 func _is_floor(zone: String, base: Dictionary, cell: Vector2i) -> bool:
-	return base["floor"].has(cell) or felled.get(zone, {}).has(cell)
+	if felled.get(zone, {}).has(cell):
+		return not _kept(zone, cell)
+	return base["floor"].has(cell)
+
+
+## Whether [param cell] of [param zone] is a ruin's floor cell grown back to
+## a trunk (649).
+func _kept(zone: String, cell: Vector2i) -> bool:
+	var entry: Variant = felled.get(zone, {}).get(cell)
+	return entry != null and int(entry[0]) >= STAGES.size()
+
+
+## Whether [param cell] is built over: the level's building or road (unless a
+## ruin gave it back), or build's.
+func _is_built(zone: String, base: Dictionary, cell: Vector2i) -> bool:
+	if built_over.get(zone, {}).has(cell):
+		return true
+	return base["built"].has(cell) and not given_back.get(zone, {}).has(cell)
 
 
 ## Zone [param zone]'s plots' cells, rings and all (never growing back).

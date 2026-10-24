@@ -196,6 +196,7 @@ func _test_every_level() -> void:
 	_test_ledges()
 	_test_link_cues()
 	_test_clearing()
+	_test_unbuild()
 	_test_felled_walls()
 	_test_plots()
 	_test_unplot()
@@ -458,6 +459,86 @@ func _test_clearing() -> void:
 	var again := Clearing.new(clearing.to_dict())
 	_check(again.felled == clearing.felled, "kept in the snapshot and read back the same (%s)" % [clearing.to_dict()])
 	Level.unregister("clearing_grove")
+
+
+## 649, terrain's side: a ruin's footprint given back to the forest
+## (Clearing.unbuild), its level floor grown to trunks that stay, kept over a
+## reload; a woodcut fells one as any trunk; build takes cells back.
+func _test_unbuild() -> void:
+	print("\n== unbuild: a ruin's ground back to the forest, kept trunks, built again ==")
+	var size := Vector2i(24, 14)
+	var colour := func(meaning: String) -> Color: return Color(str(Level.LEGEND[meaning]))
+	var image := Image.create_empty(size.x * 2 + 1, size.y * 2 + 1, false, Image.FORMAT_RGBA8)
+	image.fill(colour.call("grass"))
+	for y in range(4, 10):
+		for x in range(9, 16):
+			image.set_pixel(x * 2, y * 2, colour.call("void"))
+	image.set_pixel(2, 2, colour.call("start"))
+	Level.register("ruin_grove", image, null, {"name": "Ruin Grove", "outdoor": true})
+	var zone := "ruin_grove"
+	var day := [0]
+	var clearing := Clearing.new()
+	clearing.clock = func() -> int: return day[0]
+	var told: Array = []
+	clearing.changed.connect(func(_zone: String, cells: Array) -> void: told.append_array(cells))
+	# The ruin: three grass cells by the grove, one of them the level's own
+	# building's (built over as made).
+	var ruin: Array[Vector2i] = [Vector2i(6, 6), Vector2i(7, 6), Vector2i(8, 6)]
+	clearing._base_of(zone)["built"][ruin[0]] = true
+	_check(clearing.unbuild(zone, ruin, 0) == 3 and told.size() == 3 and told.all(func(each: Array) -> bool: return each[2] == "stump")
+			and clearing.given_back[zone].has(ruin[0]) and ruin.all(func(cell: Vector2i) -> bool: return (clearing.felled[zone][cell] as Array).size() == 3),
+			"unbuilt: three stumps from the day given, told; the level's building's cell given back")
+	_check(clearing.unbuild(zone, [Vector2i(12, 6)], 0) == 0, "a standing trunk: nothing to unbuild")
+	told.clear()
+	for season in range(1, 12):
+		day[0] = Season.season_days * season
+		clearing.daily(day[0])
+	var trunks := told.filter(func(each: Array) -> bool: return each[2] == Clearing.TRUNK)
+	_check(trunks.size() == 3 and ruin.all(func(cell: Vector2i) -> bool: return clearing._kept(zone, cell))
+			and clearing.cells_of(zone).filter(func(each: Array) -> bool: return each[2] == Clearing.TRUNK).size() == 3,
+			"grown back: the level's own floor three trunks kept, \"trunk\" in the zone's cells (%s)" % [clearing.felled[zone]])
+	var terrain: Dictionary = Level.load_level(zone)["terrain"]
+	clearing.apply(zone, terrain)
+	_check(ruin.all(func(cell: Vector2i) -> bool: return not cell in terrain["floor"] and not terrain["clearing"].has(cell)),
+			"applied: the kept trunks are no floor, no stage")
+	var walled := ruin.all(func(cell: Vector2i) -> bool:
+		return int(terrain["edges"].get(Terrain.edge_key(cell, Vector2i(0, 1)), Terrain.Edge.OPEN)) == Terrain.Edge.WALL)
+	_check(walled, "the outline walled round them, the floor's edge south of them")
+	var again := Clearing.new(clearing.to_dict())
+	_check(again.felled == clearing.felled and again.given_back == clearing.given_back and ruin.all(func(cell: Vector2i) -> bool: return again._kept(zone, cell)),
+			"kept in the snapshot and read back the same (%s)" % [clearing.to_dict()[zone]])
+	# Told a client: "trunk" kept, the level's floor made void on a reload.
+	var client: Dictionary = Level.load_level(zone)["terrain"]
+	Clearing.apply_cells(client, clearing.cells_of(zone))
+	_check(ruin.all(func(cell: Vector2i) -> bool: return not cell in client["floor"]), "a client's terrain from the zone's cells: the same trunks")
+	# A woodcut takes one as any edge trunk; it grows back kept again.
+	told.clear()
+	_check(clearing.fell(zone, Vector2i(7, 8), Vector2i(7, 8), 1) == 1 and told.size() == 1, "a woodcut fells one of them")
+	var cut := Vector2i(int(told[0][0]), int(told[0][1]))
+	_check(ruin.has(cut) and (clearing.felled[zone][cut] as Array).size() == 3 and not clearing._kept(zone, cut),
+			"felled at a stump, still the level's floor's (%s)" % [clearing.felled[zone][cut]])
+	# Built again: the cells grass, held, never growing back.
+	told.clear()
+	clearing.build(zone, ruin)
+	_check(told.size() == 2 and told.all(func(each: Array) -> bool: return each[2] == "grass" and Vector2i(int(each[0]), int(each[1])) != cut)
+			and ruin.all(func(cell: Vector2i) -> bool: return clearing.built_over[zone].has(cell)),
+			"built: the two kept trunks grass, the felled one held at its stage, all three built over (%s)" % [told])
+	told.clear()
+	for season in range(12, 20):
+		day[0] = Season.season_days * season
+		clearing.daily(day[0])
+	_check(told.is_empty() and Clearing.new(clearing.to_dict()).built_over == clearing.built_over, "built over: they never grow, kept in the snapshot")
+	# A ruin over a laid plot: the whole plot dropped first (maps' unplot),
+	# then its cells the forest's.
+	var plot := clearing.lay_plot(zone, "town", "hut", Rect2i(2, 9, 4, 4), Vector2i(0, 1))
+	var dropped: Array = []
+	clearing.unplotted.connect(func(_zone: String, gone: Dictionary) -> void: dropped.append(gone))
+	told.clear()
+	_check(not plot.is_empty() and clearing.unbuild(zone, [Vector2i(3, 10), Vector2i(4, 11)], day[0]) == 2 and dropped.size() == 1
+			and dropped[0]["rect"] == plot["rect"] and clearing.plots_of(zone).is_empty() and not clearing._plotted(zone).has(Vector2i(2, 9))
+			and told.size() == 2,
+			"a ruin over a plot: the plot dropped, its ring and all, then the two cells stumps (%s)" % [told])
+	Level.unregister(zone)
 
 
 func _test_plots() -> void:
