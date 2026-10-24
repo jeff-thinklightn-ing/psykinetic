@@ -82,13 +82,15 @@ uniform sampler2D canopy : hint_default_black, filter_linear, repeat_disable;
 uniform float sky_floor_roof = 0.0;
 // The floor sets (Client3D._floor_sets, decision 285), a byte a cell like
 // kinds but read cell by cell, so a floor ends at the walls' line: 0 the
-// ground's own look, 1 wood (planks), 2 stone (flagstones), 3 cave (rock).
-// Each in its swatch, or its floor.<set> texture (4 m a tile) once it has
-// one.
+// ground's own look, 1 wood (planks), 2 stone (flagstones), 3 cave (rock),
+// 4 dark (the dark tower's polished flags; stone's texture darkened, no
+// texture of its own). Each in its swatch, or its floor.<set> texture (4 m
+// a tile) once it has one.
 uniform sampler2D floors : filter_nearest, repeat_disable;
 uniform vec3 floor_wood : source_color = vec3(0.54, 0.42, 0.28);
 uniform vec3 floor_stone : source_color = vec3(0.59, 0.58, 0.55);
 uniform vec3 floor_cave : source_color = vec3(0.42, 0.4, 0.38);
+uniform vec3 floor_dark : source_color = vec3(0.13, 0.23, 0.27);
 uniform sampler2D floor_wood_tex : source_color, filter_linear_mipmap, repeat_enable;
 uniform sampler2D floor_stone_tex : source_color, filter_linear_mipmap, repeat_enable;
 uniform sampler2D floor_cave_tex : source_color, filter_linear_mipmap, repeat_enable;
@@ -221,7 +223,7 @@ vec3 tiled(sampler2D tex, vec2 at, float tile, vec2 dx, vec2 dy, float salt) {
 	return textureGrad(tex, at / tile, dx / tile, dy / tile).rgb * (0.86 + 0.28 * fbm(at * 0.18 + salt));
 }
 
-vec3 floor_look(int floor_set, vec2 at, float fine) {
+vec3 floor_look(int floor_set, vec2 at, float fine, vec2 pixel) {
 	if (floor_set == 1) {
 		if (floor_wood_own) {
 			return texture(floor_wood_tex, at / 4.0).rgb;
@@ -237,6 +239,32 @@ vec3 floor_look(int floor_set, vec2 at, float fine) {
 		vec2 slab = boards(mat2(vec2(0.0, 1.0), vec2(-1.0, 0.0)) * at, 0.7, 0.9);
 		vec3 here = floor_stone * (0.84 + 0.22 * slab.y) * (0.92 + 0.16 * fbm(at * 1.3 + slab.y * 9.0)) * (0.95 + 0.1 * fine);
 		return here * mix(0.58, 1.0, smoothstep(0.012, 0.04, slab.x));
+	}
+	if (floor_set == 4) {
+		// The dark tower's polished floor (659, art-kit's side): stone's own
+		// texture (or its look) for the grain, brought down to floor_dark;
+		// flags 2 x 2 cells on the cells' lines with tight dark joints; on
+		// about one flag edge in four a thin pale inlay.
+		float grain = floor_stone_own ? dot(texture(floor_stone_tex, at / 4.0).rgb, vec3(0.333))
+				: 0.55 + 0.12 * fbm(at * 1.3 + 40.0);
+		vec2 flags = (at + 0.5) / 2.0;
+		vec2 flag = floor(flags);
+		vec2 from_edge = fract(flags) * 2.0;
+		vec2 seed = hash2(flag + vec2(31.0, 17.0));
+		vec3 here = floor_dark * (0.7 + 0.6 * grain) * (0.92 + 0.16 * seed.x);
+		float joint = min(min(from_edge.x, 2.0 - from_edge.x), min(from_edge.y, 2.0 - from_edge.y));
+		// The joints and the inlay are under a pixel far off: widened by the
+		// pixel's own size ([param pixel], the ground's metres a pixel, x and
+		// y: from_edge runs as at does), so they fade there rather than crawl.
+		here *= mix(0.55, 1.0, smoothstep(0.006, 0.016 + max(pixel.x, pixel.y), joint));
+		// The inlay sits a hand in from a flag's low x or low y edge.
+		float wide_x = 0.01 + pixel.x;
+		float wide_y = 0.01 + pixel.y;
+		float inlay_x = step(0.75, seed.y) * (1.0 - smoothstep(wide_x * 0.6, wide_x, abs(from_edge.x - 0.12)));
+		float inlay_y = step(0.75, hash2(flag + vec2(5.0, 61.0)).x) * (1.0 - smoothstep(wide_y * 0.6, wide_y, abs(from_edge.y - 0.12)));
+		// Its colour halfway from the pale (0.56, 0.7, 0.69) to floor_dark (the
+		// coordinator, on the in-game still: the pale read nearly white).
+		return mix(here, vec3(0.345, 0.465, 0.48), max(inlay_x, inlay_y) * 0.85);
 	}
 	if (floor_cave_own) {
 		return texture(floor_cave_tex, at / 4.0).rgb;
@@ -346,7 +374,7 @@ void fragment() {
 	ivec2 cell = ivec2(floor(at - kinds_origin + 0.5));
 	int floor_set = int(round(texelFetch(floors, clamp(cell, ivec2(0), ivec2(kinds_size) - 1), 0).r * 255.0));
 	if (floor_set > 0) {
-		colour = floor_look(floor_set, at, fine);
+		colour = floor_look(floor_set, at, fine, abs(dx) + abs(dy));
 	}
 
 	colour *= mix(1.0, 0.5, relief.x) * (1.0 + 0.14 * relief.y);

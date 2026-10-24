@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The dark elven tower's look is ready for its floors: blue-black polished walls and floor flags with faint inlay lines, fluted pillars, cold lamps, an iron-banded sealed hatch, faint runes along the walls' feet and dark stairs up and down (659, art-kit's side).
 - Arriving in a new area through a way or over an edge, you and your companion can't be targeted or hurt while the view loads, for up to 6 s, until you move, attack or use anything; crossing back within 30 s gives only the usual short spawn grace (661).
 - The town by the barrow is called Umbrage (Jeff: "the town that is near the barrows and has the curse is called Umbrage, even if it moves"): the new map west of the wilds now shows the name Umbrage, not Held.
 - The town is now called Umbrage, and its folk say it is cursed; some say why: the grave robbers, and an economy that runs off the barrow's gold.

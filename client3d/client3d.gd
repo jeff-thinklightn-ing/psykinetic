@@ -139,8 +139,11 @@ const WALL_LOOKS := {
 }
 ## The floor sets the ground draws (ground.gdshader's floors texture, a
 ## byte a cell: 0 the ground's own look), and their colours: swatches.
-const FLOOR_SETS := {"castle": 0, "wood": 1, "stone": 2, "cave": 3}
-const FLOOR_SWATCHES := {"wood": Vector2i(2, 2), "stone": Vector2i(1, 2), "cave": Vector2i(1, 5)}
+## The dark tower's floor (659) has no floor.dark texture of its own: the
+## shader darkens stone's (FLOOR_UNTEXTURED).
+const FLOOR_SETS := {"castle": 0, "wood": 1, "stone": 2, "cave": 3, "dark": 4}
+const FLOOR_SWATCHES := {"wood": Vector2i(2, 2), "stone": Vector2i(1, 2), "cave": Vector2i(1, 5), "dark": Vector2i(8, 5)}
+const FLOOR_UNTEXTURED := ["dark"]
 ## What an edge of a run is drawn as.
 ## (WALL_PIECE: an art-kit piece in its place, wall.<set>.straight_ruined
 ## or .rubble, when the set has its art.)
@@ -9275,6 +9278,8 @@ func _ground_material(bytes: PackedByteArray, across: int, down: int, origin: Ve
 	for floor_set: String in FLOOR_SWATCHES:
 		var at: Vector2i = FLOOR_SWATCHES[floor_set]
 		material.set_shader_parameter("floor_" + floor_set, swatch(at.x, at.y))
+		if floor_set in FLOOR_UNTEXTURED:
+			continue
 		var own := ArtKit.texture("floor." + floor_set)
 		material.set_shader_parameter("floor_%s_tex" % floor_set, own)
 		material.set_shader_parameter("floor_%s_own" % floor_set, own != null)

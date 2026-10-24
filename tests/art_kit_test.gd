@@ -208,7 +208,7 @@ func _test_profile() -> void:
 		for key: String in ["sway", "broken", "gap", "lean", "jitter", "sag"]:
 			tunable = tunable and (variation.get(key) is float or variation.get(key) is int)
 		_check(inside and cap > 0.0 and cap < top and str(entry.get("material", "")) == "material.wall." + set_name
-				and ArtKit.has("material.wall." + set_name) and ArtKit.has("floor." + set_name) and tunable,
+				and ArtKit.has("material.wall." + set_name) and (ArtKit.has("floor." + set_name) or set_name in Client3D.FLOOR_UNTEXTURED) and tunable,
 				"%s: %d points in x [-%.2f, %.2f], cap %s, top %.2f, %s and floor.%s, variation %s" % [
 				slot, points.size(), half, half, entry.get("cap_y", "none"), top, entry.get("material"), set_name, variation])
 	_check(sets.size() >= 4 and "castle" in sets, "the wall sets: %s" % [sets])

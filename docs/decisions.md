@@ -28296,3 +28296,32 @@ barrow, held and forest) matches main's byte for byte, at one thread and at four
 fields alone, headless beside economy's soak: the wilds 2.06 s on one thread, 0.78 s on
 four; the hills 0.52 and 0.22; Held 0.89 and 0.34. view_test's _test_ground_fields (A's)
 covers it. Protocol unchanged, no new class_name.
+## 659, art-kit's side: the dark elven tower's set and pieces
+
+Dungeon's tower style (659) wants a look of its own for the tower's inside (tower_style_design.md
+section 4); the coordinator approved the list, and dungeon and art-kit agreed the frames.
+
+- **A wall set, dark**, as data (decision 287): wall.dark.profile, straight 0.5 m with a small
+  chamfer at the cap, all its variation 0 (polished, never broken); material.wall.dark, blue-black
+  stone with no joints and a pale inlay line. A run's v is its height over WALL_TILE (2 m), so a
+  line in the texture repeats: it is put at 0.8 m and 2.8 m, a dado line and one under the cap,
+  and wall.dark.post and .end carry the two round them. No _tall or _low pieces: a level's walls
+  are one height.
+- **A floor set, dark, byte 4** (FLOOR_SETS, swatch row 8 col 5), drawn in the ground shader's
+  floor_look with no texture of its own: the ground shader has 16 samplers already, so the branch
+  takes stone's texture (or its look) for grain, brought down to the swatch, laid in 2 x 2-cell
+  flags with tight joints and a pale inlay on about one flag edge in four (Client3D.FLOOR_UNTEXTURED
+  skips the _tex parameters; art_kit_test takes such a set without a floor.<set> slot). The shader
+  is terrain's: terrain reviewed the branch, and its joints and inlay widen by the ground's metres a
+  pixel (floor_look's pixel, fragment()'s dx and dy) so they fade far off rather than crawl.
+  The inlay's colour sits halfway from the pale (0.56, 0.7, 0.69) to floor_dark: in the in-game
+  still the pale read nearly white (the coordinator).
+- **Pieces**: building.dark_pillar 1 x 1 (crypt_pillar is 2 x 2), building.hatch_sealed 1 x 1 flat
+  over the mine's sealed link (a sealed cue draws nothing, as the grave's, 654), prop.dark_lamp
+  (lamp_cold's piece; its flame socket read by Flames.at_socket as a torch post's, the cold light
+  environment's), prop.rune_strip (a wall decor kind, 658, in moss_strip's edge frame, two
+  variants), and building.stair_up / stair_down variant 3 (1 and 2 exist; dungeon's links name 3).
+  The Level rows (BUILDINGS, SOLID, the decor kind) are dungeon's next step.
+
+view_test _test_dark_set: a "dark" level's cell writes byte 4, floor_dark its own swatch. Client
+only, protocol unchanged, no new class_name.

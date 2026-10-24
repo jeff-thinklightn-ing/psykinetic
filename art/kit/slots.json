@@ -680,6 +680,43 @@
 			"uses": "the hidden door found (decision 580): the niche Door's look when open, keyed by the Door's state; the level's link does the moving; the barrow's niche walls in wall.stone's runs (Jeff: \"i like all the crypt walls, mix and match\"; dungeon's 580 step 2 picks a piece per niche edge by layer, its rock always behind)",
 			"grey": [{"at": [0, 1.5, 0], "size": [0.5, 3, 1]}, {"at": [0.5, 0.925, 0], "size": [0.5, 1.85, 0.07]}]
 		},
+		"wall.dark.profile": {
+			"category": "walls",
+			"type": "profile",
+			"kind": "edge",
+			"size": [0.5, 3, 1],
+			"uses": "the dark elven tower's inside (659, art-kit's side; dungeon's tower style, tower_style_design.md section 4): the dark set: polished blue-black stone, true-cut, no joints, a level cap above cap_y, never broken. A wall set's runs (decision 287); its variation is what terrain's sweep varies per run, tuned here without code: sway (a fraction of the height), broken (a share of the cap broken), gap (a share of breaches), lean (degrees per run at most), jitter (metres), sag (metres, post to post)",
+			"points": [[-0.25, 0], [0.25, 0], [0.25, 2.94], [0.22, 3], [-0.22, 3], [-0.25, 2.94]],
+			"cap_y": 2.8,
+			"material": "material.wall.dark",
+			"variation": {"sway": 0, "broken": 0, "gap": 0, "lean": 0, "jitter": 0, "sag": 0}
+		},
+		"material.wall.dark": {
+			"category": "materials",
+			"type": "texture",
+			"tile_m": 2.0,
+			"pixels": 512,
+			"source": {"by": "art-kit, by hand", "tool": "python, numpy", "license": "own", "date": "2026-10-24", "notes": "C:/dev/review/tower/make_dark_wall.py: seamless (frequency-filtered noise): palette row 8's blue-black, a touch lifted (mean #192931), soft slow clouding and a few long pale veins, no joints; a 2 cm pale inlay line (row 8 col 1) with a dark groove each side at row 0.4 of the tile, so on every run at 0.8 m and 2.8 m up (v is metres up / 2)"},
+			"uses": "the polished stone of swept wall.dark runs (wall.dark.profile), the dark elven tower's inside (659, art-kit's side; dungeon's tower style, tower_style_design.md section 4): u is metres along the run, v metres up"
+		},
+		"wall.dark.post": {
+			"category": "walls",
+			"type": "mesh",
+			"kind": "vertex",
+			"size": [0.5, 3, 0.5],
+			"budget": 300,
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-24", "notes": "C:/dev/review/tower/make_tower.py post: a square pier with its corners cut, a plinth course and a cap of the lit stone, the runs' pale inlay lines carried round it at 0.8 and 2.8 m; 196 tris"},
+			"uses": "where dark walls meet at an angle or a wall ends (Client3D._add_post), the dark elven tower's inside (659, art-kit's side; dungeon's tower style, tower_style_design.md section 4)"
+		},
+		"wall.dark.end": {
+			"category": "walls",
+			"type": "mesh",
+			"kind": "vertex",
+			"size": [0.6, 3.1, 0.6],
+			"budget": 300,
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-24", "notes": "C:/dev/review/tower/make_tower.py end: the post's pier at 0.6 x 3.1; 196 tris"},
+			"uses": "the stop of a dark wall where the set has no post (Client3D._add_post reads .post first), the dark elven tower's inside (659, art-kit's side; dungeon's tower style, tower_style_design.md section 4)"
+		},
 		"wall.stone.profile": {
 			"category": "walls",
 			"type": "profile",
@@ -1867,6 +1904,54 @@
 				{"at": [0, 0.285, 0], "size": [1.997, 0.57, 0.797]}
 			]
 		},
+		"building.dark_pillar": {
+			"category": "buildings",
+			"type": "mesh",
+			"kind": "cell",
+			"footprint": [1, 1],
+			"size": [0.6, 3.0, 0.6],
+			"budget": 400,
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-24", "notes": "C:/dev/review/tower/make_tower.py pillar: a slender fluted column (sixteen sides, eight flutes, 0.38 across narrowing to 0.32) on a stepped plinth (a square course, an octagon), a pale inlay ring under a flared octagonal capital and a square abacus, 3 m; 280 tris"},
+			"uses": "the dark elven tower's inside (659, art-kit's side; dungeon's tower style, tower_style_design.md section 4): a column for the top chamber and the larger rooms, 1 x 1, solid and doorless (dungeon's Level rows)",
+			"grey": [{"at": [0, 1.5, 0], "size": [0.6, 3.0, 0.6]}]
+		},
+		"building.hatch_sealed": {
+			"category": "buildings",
+			"type": "mesh",
+			"kind": "cell",
+			"footprint": [1, 1],
+			"size": [0.92, 0.064, 0.92],
+			"budget": 500,
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-24", "notes": "C:/dev/review/tower/make_tower.py hatch: a square stone slab a little proud of the floor in a pale-inlaid kerb, two iron bands across and a strap along, riveted, an iron seal plate at the crossing with a cold teal stone in it (the mark's place), a ring lying flat in its staple; 372 tris"},
+			"uses": "the dark elven tower's inside (659, art-kit's side; dungeon's tower style, tower_style_design.md section 4): the mine's sealed way down, 1 x 1, not solid, laid over the sealed link's cell (a sealed cue draws nothing), as maps lays the grave's (654)",
+			"grey": [{"at": [0, 0.032, 0], "size": [0.92, 0.064, 0.92]}]
+		},
+		"prop.dark_lamp": {
+			"category": "props",
+			"type": "mesh",
+			"kind": "cell",
+			"size": [0.24, 1.65, 0.24],
+			"budget": 400,
+			"materials": 1,
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-24", "notes": "C:/dev/review/tower/make_tower.py lamp: a round stone foot, a slender iron stand with a collar, a cup and three prongs cradling a cold teal lamp (row 7 col 6), an iron finial; the flame empty in the lamp's heart; 264 tris"},
+			"uses": "the dark elven tower's inside (659, art-kit's side; dungeon's tower style, tower_style_design.md section 4): the lamp_cold marker's piece, standing free in its cell's middle, not solid; its light burns at its flame socket as a torch post's (Flames.at_socket, decision 523), the cold colour environment's",
+			"sockets": {"flame": [0, 1.52, 0]},
+			"grey": [{"at": [0, 0.825, 0], "size": [0.24, 1.65, 0.24]}]
+		},
+		"prop.rune_strip": {
+			"category": "props",
+			"type": "mesh",
+			"kind": "edge",
+			"size": [0.008, 0.255, 0.98],
+			"middle": [0.254, 0, 0],
+			"base": 0.06,
+			"tolerance": 0.3,
+			"variants": 2,
+			"budget": 300,
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-24", "notes": "C:/dev/review/tower/make_tower.py runes1, runes2: a pale inlay line along the wall's foot (0.06 to 0.075 m) and faint glyphs above it (row 8 col 2), strokes 6 mm proud of the face: variant 1 five glyphs, 144 tris; variant 2 six, one worn, 216 tris"},
+			"uses": "the dark elven tower's inside (659, art-kit's side; dungeon's tower style, tower_style_design.md section 4): a wall decor kind (658; dungeon registers it), faint runes at a wall's foot, in the stone runs' edge frame (1 m along z, origin the edge's middle on the floor, the room on +x, the wall's face at x 0.25), on a wall edge's room side; not solid",
+			"grey": [{"at": [0.254, 0.1875, 0], "size": [0.008, 0.255, 0.98]}]
+		},
 		"building.stair_down": {
 			"category": "buildings",
 			"type": "mesh",
@@ -1875,10 +1960,10 @@
 			"size": [1.0, 0.85, 0.97],
 			"middle": [0.002, 0, 0.02],
 			"tolerance": 0.3,
-			"variants": 2,
+			"variants": 3,
 			"budget": 500,
-			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-22", "notes": "C:/dev/review/transitions/make_stairs.py down and down_timber: variant 1 a rough stone surround, low side walls, a back sill and a heavy lintel stone over the far end, four step bands going down toward the way out, each darker, the last black, a black face under the lintel (64 tris); variant 2 the same well lined with planks, two posts and a cap beam over the far end, a mine's or a cellar's head (136 tris); nothing below the ground, the depth drawn dark"},
-			"uses": "a stair down at a zone link to a level below (decision 589, maps' zone-transition cues), 1 x 1 cell on the link's cell, scenery only (placed by maps' loader from the link's data); front +z the way out, the steps going down toward it under the far end's lintel; variant 1 stone, 2 timber (a mine or a cellar)",
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-22", "notes": "C:/dev/review/transitions/make_stairs.py down and down_timber: variant 1 a rough stone surround, low side walls, a back sill and a heavy lintel stone over the far end, four step bands going down toward the way out, each darker, the last black, a black face under the lintel (64 tris); variant 2 the same well lined with planks, two posts and a cap beam over the far end, a mine's or a cellar's head (136 tris); nothing below the ground, the depth drawn dark; variant 3 (659): make_stairs.py down_dark / up_dark, the same shapes true-cut in palette row 8, noses row 8 col 1"},
+			"uses": "a stair down at a zone link to a level below (decision 589, maps' zone-transition cues), 1 x 1 cell on the link's cell, scenery only (placed by maps' loader from the link's data); front +z the way out, the steps going down toward it under the far end's lintel; variant 1 stone, 2 timber (a mine or a cellar); 3 the dark elven tower's (659), down's shape in the tower's polished stone, the steps' noses inlaid pale",
 			"grey": [
 				{"at": [0.002, 0.425, 0.02], "size": [1.0, 0.85, 0.97]}
 			]
@@ -1891,10 +1976,10 @@
 			"size": [0.97, 1.75, 0.85],
 			"middle": [0.015, 0, 0.07],
 			"tolerance": 0.3,
-			"variants": 2,
+			"variants": 3,
 			"budget": 600,
-			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-22", "notes": "C:/dev/review/transitions/make_stairs.py up and up_ladder: variant 1 five rough stone steps rising toward the way out to a landing at 1.1 m between low stepped side walls, a black band beyond the landing's far edge (182 tris); variant 2 a lumpy rock face across the far edge and a wooden ladder leaning on it, its rungs lashed (356 tris)"},
-			"uses": "a stair up or a climb at a zone link to a level above (decision 589, maps' zone-transition cues), 1 x 1 cell on the link's cell, scenery only (placed by maps' loader from the link's data); front +z the way out, the steps rising toward it; variant 1 stone steps, 2 a ladder on a rock face (a climb)",
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-22", "notes": "C:/dev/review/transitions/make_stairs.py up and up_ladder: variant 1 five rough stone steps rising toward the way out to a landing at 1.1 m between low stepped side walls, a black band beyond the landing's far edge (182 tris); variant 2 a lumpy rock face across the far edge and a wooden ladder leaning on it, its rungs lashed (356 tris); variant 3 (659): make_stairs.py down_dark / up_dark, the same shapes true-cut in palette row 8, noses row 8 col 1"},
+			"uses": "a stair up or a climb at a zone link to a level above (decision 589, maps' zone-transition cues), 1 x 1 cell on the link's cell, scenery only (placed by maps' loader from the link's data); front +z the way out, the steps rising toward it; variant 1 stone steps, 2 a ladder on a rock face (a climb); 3 the dark elven tower's (659), up's flight in the tower's polished stone, true-cut, the steps' noses inlaid pale",
 			"grey": [
 				{"at": [0.015, 0.875, 0.07], "size": [0.97, 1.75, 0.85]}
 			]

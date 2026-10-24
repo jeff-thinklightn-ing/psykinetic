@@ -63,6 +63,7 @@ func _ready() -> void:
 	_test_forest_edge()
 	_test_clearing()
 	_test_dais()
+	_test_dark_set()
 	_test_lair()
 	_test_faced_decor()
 	_test_solid_ground()
@@ -3112,6 +3113,38 @@ func _test_dais() -> void:
 	_check(_rig._room.find_children("Dais_*", "", false, false).is_empty() and _rig._dais_stairs.is_empty(),
 			"the sample's ledges stay rock (a relief's)")
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+
+
+## The dark tower's set (659, art-kit's side): a level naming "dark" walls
+## and floors has them (art-kit's wall.dark.profile makes the set known);
+## its floor cells write byte 4, drawn in the ground shader from stone's
+## look (no floor.dark texture: FLOOR_UNTEXTURED), its colour the swatch.
+func _test_dark_set() -> void:
+	print("\n== the dark tower's set: dark walls, a dark floor a cell, byte 4 ==")
+	var map := LevelMap.new(Vector2i(8, 8))
+	for y in 8:
+		for x in 8:
+			map.set_cell(Vector2i(x, y), "stone")
+	var terrain: Dictionary = Level.parse(map.to_image(), map.to_height_image(), {"walls": "dark", "floors": "dark"})["terrain"]
+	_rig.rebuild(terrain, Vector2i(4, 4))
+	var cell := Vector2i(3, 3)
+	var place := (cell.y - _rig._mask_origin.y) * _rig._mask_size.x + cell.x - _rig._mask_origin.x
+	var material := _rig._ground_shader_material
+	_check(_rig._walls_set == "dark" and _rig._floor_set(cell, "stone") == "dark" and Client3D.FLOOR_SETS["dark"] == 4
+			and _rig._floor_bytes[place] == 4,
+			"the walls and the floor are the dark set, its cell's floor byte 4 (%s, %s, %d)" % [_rig._walls_set, _rig._floor_set(cell, "stone"), _rig._floor_bytes[place]])
+	var at: Vector2i = Client3D.FLOOR_SWATCHES["dark"]
+	_check(material != null and (material.get_shader_parameter("floor_dark") as Color).is_equal_approx(Client3D.swatch(at.x, at.y))
+			and not _swatch_shared(at),
+			"the shader's floor_dark is its own swatch %s, no other set's" % [at])
+	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+
+
+static func _swatch_shared(at: Vector2i) -> bool:
+	for floor_set: String in Client3D.FLOOR_SWATCHES:
+		if floor_set != "dark" and Client3D.FLOOR_SWATCHES[floor_set] == at:
+			return true
+	return false
 
 
 ## The Hall of Fallen Souls (dungeon's 580 step 3 and 647, terrain's sides):
