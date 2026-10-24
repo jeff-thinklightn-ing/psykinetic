@@ -78,6 +78,7 @@ func _ready() -> void:
 	await _test_wall_runs()
 	_test_cave_walls()
 	_test_scatter()
+	_test_ground_fields()
 	_test_buildings()
 	_test_roofs()
 	_test_wall_heights()
@@ -878,6 +879,47 @@ func _test_player_death() -> void:
 	await get_tree().create_timer(Client3D.MOURN_RETURN_SECONDS + 0.2).timeout
 	_check(is_equal_approx(_rig._environment.adjustment_saturation, 1.0) and is_equal_approx(_rig._camera.size, size),
 			"colour and size as they were (%.2f, %.1f)" % [_rig._environment.adjustment_saturation, _rig._camera.size])
+
+
+## The ground's fields apart from the members (660 step 2 A): _ground_fields
+## writes none (what it makes it returns, put in place by
+## _apply_ground_fields), and makes the same bytes on one thread as on the
+## pool's (Client3D.field_threads), so perf's arrival can run it on a
+## worker. (That it makes what the build made before is the refactor's
+## digest, on every level: decision 660.)
+func _test_ground_fields() -> void:
+	print("\n== the ground's fields (660 step 2 A): no member written, the same on one thread or many ==")
+	var held := Level.load_level("held")
+	var kinds: Dictionary = held["terrain"]["kinds"]
+	_rig.rebuild(held["terrain"], held["centre"])
+	var threads_was := Client3D.field_threads
+	var made: Array[Dictionary] = []
+	var untouched := true
+	for threads: int in [1, 0]:
+		Client3D.field_threads = threads
+		var input: Dictionary = _rig._ground_input(kinds)
+		var before := [_rig._corners.duplicate(), _rig._grounds.duplicate(), _rig._ground_kinds.duplicate(), _rig._floor_bytes,
+			_rig._curve_kept.size(), _rig._road_kept.size(), _rig._edge_kept.size(), _rig._shore_heights.duplicate(), _rig._shore_image]
+		made.append(_rig._ground_fields(input))
+		var after := [_rig._corners, _rig._grounds, _rig._ground_kinds, _rig._floor_bytes,
+			_rig._curve_kept.size(), _rig._road_kept.size(), _rig._edge_kept.size(), _rig._shore_heights, _rig._shore_image]
+		for k in before.size():
+			untouched = untouched and var_to_bytes(before[k]) == var_to_bytes(after[k]) if not before[k] is Image else before[k] == after[k]
+	Client3D.field_threads = threads_was
+	_rig._apply_ground_fields(made[-1])
+	var differ: Array[String] = []
+	for key: String in made[0]:
+		var a: Variant = made[0][key]
+		var b: Variant = made[1][key]
+		if a is Image:
+			a = (a as Image).get_data()
+			b = (b as Image).get_data() if b != null else null
+		if var_to_bytes(a) != var_to_bytes(b):
+			differ.append(key)
+	_check(untouched, "_ground_fields leaves the members as they were (corners, grounds, kinds, floor bytes, memos, shore)")
+	_check(differ.is_empty() and made[0]["shore_heights"].size() > 0 and made[0]["road_image"] != null and made[0]["edge_image"] != null,
+			"one thread and the pool make the same bytes, Held's shore, roads and forest edge among them (differ: %s)" % [differ])
+	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
 
 func _test_scatter() -> void:

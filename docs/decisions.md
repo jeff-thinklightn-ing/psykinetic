@@ -28218,3 +28218,43 @@ client never sends it, and its shelter runs the 6 s. zone_test _test_arrival_she
 - 60 ticks end it;
 - use, search and a step each end his at once, and hers with it.
 No new class_name.
+## 660 step 2 A, terrain's side: the ground's fields apart from the members
+
+Perf's phased zone arrival (660, the coordinator's approval): a crossing froze for the
+whole view rebuild (the wilds about 4.3 s). Step 2 runs the ground's fields on worker
+threads while frames go round (A, this) and builds the chunk meshes and cliffs nearest
+first (B, perf's, on top). A changes no output: a throwaway digest of every ground
+member, image and texture (grounds, kinds, corners, shore heights, floor bytes, the
+shore, depth, road, forest-edge, water, floor and kinds masks, ground bytes, vertex
+pairs, ledge splits, the edge memo) on hills, wilds, castle, barrow, held and forest is
+the same byte for byte as main's (d0ff03f9), with one thread and with the pool.
+
+- **_build_ground in four.** _ground_input(kinds) on the main thread (the waters,
+  roads and ledges read as curves, the cells in order, the members the build remakes
+  cleared; {} with no cells). _ground_fields(input), which writes no member and makes
+  no node or texture: the corner pass (each cell's place, kind, corners and floor byte,
+  the masks' bytes, the cells by chunk), then the shore field (shore_image,
+  _water_depth, _curve_field), the road field and the forest edge's side by side, then
+  the shore's finer cells (_shore_band). _apply_ground_fields(fields) on the main
+  thread: the members assigned, every ImageTexture made there. _build_ground_meshes
+  (fields): the material and a mesh a chunk, as before.
+- **What it reads, unchanged while it runs**, listed in its doc comment: the relief,
+  the waters' and roads' and the forest edge's curves and samples, _wet, _bed_levels,
+  _fords, _ramp_heights, _rocks, _road_cells, _stream_cells, _built_water, the floor
+  sets. Perf's arrival holds what writes them.
+- **Its own memos.** The curve searches' memos (_curve_kept, _road_kept, _edge_kept:
+  _near_segments' and _edge_segments' results by cell) were filled as they went, from
+  whichever thread asked; a worker filling one while the main thread asks is a race.
+  The chain passes its own (copies of the members', from the input) down through
+  _ground_corners, _shore_bed, _curve_surface, _curve_near, _road_near, _curve_field,
+  _road_field and _edge_field (each a parameter defaulting to the member, so every other
+  caller is as before), and _apply_ground_fields puts them in place. _bed_kind,
+  _floor_bytes_at, shore_at and _shore_corner take the fields under way the same way;
+  _curve_fine and _shore_band take them as one dictionary.
+- **Threads.** _run_fields runs the three fields with WorkerThreadPool.add_group_task
+  and waits; Client3D.field_threads (static, 0 the pool's count, 1 each in turn on the
+  calling thread) is perf's, for a small machine.
+
+view_test _test_ground_fields (Held: its river's shore, roads and forest edge):
+_ground_fields leaves the members as they were; one thread and the pool make the same
+bytes. Protocol unchanged, no new class_name.
