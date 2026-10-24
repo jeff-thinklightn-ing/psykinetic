@@ -105,6 +105,10 @@ const CLOSING_TICKS := 10
 ## fight).
 const FISTS_BEFORE_AXE := 3
 const TITLE := "Face the draugr"
+## A payer's again (548 amended, npc's record; Jeff: "as long as you paid
+## once you get unlimited attempts"): the offer's title and his words.
+const AGAIN_TITLE := "Face the draugr again"
+const AGAIN_WORDS := "Your gold is paid. Come, then."
 
 var state := State.SEATED
 ## At rest he is gone (573 amended (4); Jeff: "he is otherworldly, he
@@ -423,6 +427,13 @@ func offers_for(player_id: String) -> Array[Dictionary]:
 		return out  # A pact is on (theirs or another's): no more words.
 	if state == State.AT_REST:
 		return out  # At rest no pact is bought (573 amended (3)); a click hears rest_words.
+	var paid := _paid(player_id)
+	if not paid.is_empty():
+		# Paid once (548 amended): the fight again at the level paid for, no gold; no gold
+		# deal while it stands, so none pays twice.
+		out.append({"id": "deal:%d:again" % id, "kind": "deal", "title": AGAIN_TITLE, "words": AGAIN_WORDS,
+			"what": {"level": str(paid["level"]), "steps": []}, "accept": "take", "cost": 0})
+		return out
 	var steps: Array = deals().map(func(each: Dictionary) -> int: return int(each["gold"]))
 	out.append({"id": "deal:%d" % id, "kind": "deal", "title": TITLE, "words": WORDS,
 		"what": {"offering": steps[0], "least": steps[0], "most": steps[-1], "steps": steps},
@@ -441,6 +452,14 @@ func accept_offer(player: Player, offer: Dictionary, gold: int) -> Dictionary:
 		return {"ok": false, "say": "", "line": rest_words()}
 	if not str(offer.get("id", "")).begins_with("deal:"):
 		return {"ok": false, "say": "", "line": ""}
+	var paid := _paid(player.player_id)
+	if str(offer.get("id", "")).ends_with(":again"):
+		if paid.is_empty() or not SCALE.has(str(paid.get("level", ""))):
+			return {"ok": false, "say": "", "line": ""}
+		start_pact(player, str(paid["level"]))  # Paid once (548 amended): no gold.
+		return {"ok": true, "say": "", "line": "%s takes up the draugr's pact again." % player.name}
+	if not paid.is_empty():
+		return {"ok": false, "say": AGAIN_WORDS, "line": ""}  # A gold deal while one is paid: never twice.
 	if gold <= 0:
 		return {"ok": false, "say": "", "line": ""}
 	if gold > World.gold_of(player.player_id):
@@ -453,7 +472,27 @@ func accept_offer(player: Player, offer: Dictionary, gold: int) -> Dictionary:
 		target = player
 		return {"ok": true, "say": "", "line": "%s gives the draugr %d gold, too little: he attacks." % [player.name, gold]}
 	start_pact(player, str(deal["name"]))
+	_deal_paid(player.player_id, str(deal["name"]))  # Paid once: every fight after at this level (548 amended).
 	return {"ok": true, "say": "", "line": "%s gives the draugr %d gold and takes up his pact for %d risings." % [player.name, gold, int(deal["charges"])]}
+
+
+## [param player_id]'s paid deal for his zone (548 amended, npc's
+## PlayerRecord.paid_deals through Main's World.paid_deal): {"level",
+## "paid_step"}, {} for none or without the hook.
+func _paid(player_id: String) -> Dictionary:
+	var hook: Variant = World.get("paid_deal")
+	if not hook is Callable or not (hook as Callable).is_valid() or player_id.is_empty():
+		return {}
+	var paid: Variant = (hook as Callable).call(player_id, zone if zone != "" else World.zone.name)
+	return paid if paid is Dictionary else {}
+
+
+## Records [param player_id]'s paid deal at [param level] for his zone, or
+## erases it ("") (548 amended, Main's World.deal_paid; nothing without it).
+func _deal_paid(player_id: String, level: String) -> void:
+	var hook: Variant = World.get("deal_paid")
+	if hook is Callable and (hook as Callable).is_valid():
+		(hook as Callable).call(player_id, zone if zone != "" else World.zone.name, level)
 
 
 ## His deals, least first (economy.json return.field.deals, 573; DEALS when
@@ -666,6 +705,9 @@ func _yield() -> void:
 			if entity is Player and _in_lair(entity) and entity.hp > 0:
 				ids.append((entity as Player).player_id)
 		blessed_last = ids
+		for each_id: String in ids:
+			if not _paid(each_id).is_empty():
+				_deal_paid(each_id, "")  # Won: the paid deal is spent (548 amended).
 		print("[draugr] %s: won, %d blessed" % [zone if zone != "" else World.zone.name, ids.size()])
 		said.emit(WON)
 		# His battle axe for the winners, at his feet (603: his row's

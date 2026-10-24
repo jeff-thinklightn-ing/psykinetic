@@ -100,6 +100,7 @@ func _ready() -> void:
 	_test_homeward()
 	_test_room_guard()
 	_test_draugr()
+	_test_draugr_paid()
 	_test_barrow_layers()
 	_test_draugr_mind()
 	_test_draugr_waves()
@@ -2305,6 +2306,64 @@ func _test_room_guard() -> void:
 	_check(guard.target == null and not left, "gone out of the room, it is let go, and the guard never left the room")
 	Level.unregister("mt_altar")
 	Monster.idling = true
+
+
+## Paid once, fought again (548 amended; Jeff: "as long as you paid once you
+## get unlimited attempts"): npc's record through World.paid_deal and
+## World.deal_paid, stubbed here.
+func _test_draugr_paid() -> void:
+	print("\n== the draugr: paid once, a payer fights him again for no gold till won (548 amended) ==")
+	if not "paid_deal" in World:
+		print("  (skipped: npc's World.paid_deal and deal_paid are not in yet)")
+		return
+	Monster.idling = true
+	var rows: Array[String] = ["#############", "#...........#", "#.....u.....#", "#...........#", "#...........#", "#############"]
+	Level.register("mt_paidlair", Level.image_from_rows(rows), null, {"regenerate": {"anchors": [{"rect": [1, 1, 8, 4], "name": "lair"}]}})
+	var e := _build(rows, {}, {}, "mt_paidlair")
+	var draugr := e["u"][0] as Draugr
+	var player := EntityFactory.build(SPECS["P"].merged({"name": "Payer"})) as Player
+	player.player_id = "p1"
+	_room.add_child(player)
+	World.spawn(player, Vector2i(7, 2))
+	var was_economy := World.economy
+	World.economy = Economy.new({"purses": {"p1": 200, "p2": 200}})
+	var book := {}
+	World.set("paid_deal", func(player_id: String, zone_name: String) -> Dictionary:
+		return book.get("%s|%s" % [player_id, zone_name], {}))
+	World.set("deal_paid", func(player_id: String, zone_name: String, level: String) -> void:
+		if level.is_empty():
+			book.erase("%s|%s" % [player_id, zone_name])
+		else:
+			book["%s|%s" % [player_id, zone_name]] = {"level": level, "paid_step": World.steps})
+	var taken := draugr.accept_offer(player, draugr.offers_for("p1")[0], 60)
+	_check(taken["ok"] and draugr.state == Draugr.State.PACT and book.get("p1|mt_paidlair", {}).get("level") == "normal",
+		"60 gold buys the normal pact, and the payer's deal is kept (%s)" % [book])
+	_move_to(player, Vector2i(11, 2))
+	World.step()
+	var offers := draugr.offers_for("p1")
+	_check(draugr.state == Draugr.State.SEATED and book.has("p1|mt_paidlair") and offers.size() == 1
+		and offers[0]["id"] == "deal:%d:again" % draugr.id and offers[0]["cost"] == 0 and offers[0]["what"]["level"] == "normal"
+		and offers[0]["words"] == Draugr.AGAIN_WORDS,
+		"the pact lost, the gold forfeit: his deal kept, and to the payer he offers the fight again, no gold (%s)" % [offers])
+	_check(draugr.offers_for("p2")[0]["cost"] == 20, "to one who never paid, his gold deal as ever")
+	var gold_was := World.gold_of("p1")
+	var twice := draugr.accept_offer(player, {"id": "deal:%d" % draugr.id}, 50)
+	_check(not twice["ok"] and World.gold_of("p1") == gold_was and draugr.state == Draugr.State.SEATED,
+		"the payer never pays twice: a gold deal is refused, the gold kept")
+	_move_to(player, Vector2i(7, 2))
+	var again := draugr.accept_offer(player, offers[0], 0)
+	_check(again["ok"] and draugr.state == Draugr.State.PACT and draugr.difficulty == "normal" and World.gold_of("p1") == gold_was,
+		"the fight again, at the level paid for, for no gold (%s)" % again)
+	World.damage(draugr, 9999, player)
+	_check(draugr.state == Draugr.State.AT_REST and draugr.blessed_last == ["p1"] and not book.has("p1|mt_paidlair"),
+		"won: blessed, and the paid deal is spent (%s)" % [book])
+	World.set("paid_deal", Callable())
+	World.set("deal_paid", Callable())
+	World.dead_rest.clear()
+	World.economy = was_economy
+	World.despawn(draugr)
+	World.despawn(player)
+	Level.unregister("mt_paidlair")
 
 
 func _test_draugr() -> void:

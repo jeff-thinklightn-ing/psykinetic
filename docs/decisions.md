@@ -29608,3 +29608,30 @@ companion_test _test_dodge: a ring telegraphed over her; not before it
 nears and her reaction; clear of it before it lands; into none of it while
 it shows; nothing once it lands. Server only, protocol unchanged, no new
 class_name.
+## 548 amended, enemy-ai's side: paid once, a payer fights the draugr again for no gold till won
+
+Jeff picked (b): "as long as you paid once you get unlimited attempts". The
+coordinator approved npc's and enemy-ai's shape; npc's side holds the record
+(PlayerRecord.paid_deals, saved, outliving a restart) and sets
+World.paid_deal and World.deal_paid from it.
+
+- Draugr reads the record through World.paid_deal(player_id, zone) and
+  writes it through World.deal_paid(player_id, zone, level or "" to erase),
+  each by name and only when valid (as charges_in): no hook, no record.
+- A pact bought with gold records the deal's level for the payer.
+- A pact lost keeps it (the gold is forfeit, as ever).
+- A win erases it for every blessed player in his lair who holds one.
+- While a payer's record stands, offers_for gives them one offer only:
+  "deal:N:again", cost 0, "Face the draugr again", his words "Your gold is
+  paid. Come, then.", what {level, steps: []}. accept_offer takes it with
+  no gold and starts the pact at the level paid for.
+- A gold deal from a payer is refused, the gold kept, so none pays twice.
+  There is no buying up to a harder level till Jeff asks.
+- At rest he still offers nothing.
+- One draugr a zone is the record's key; two in one zone would add his
+  spawn index (npc's).
+- Tests: monster_test _test_draugr_paid (bought, kept; lost, the again
+  offer at no gold, a stranger's gold deal as ever; a second gold deal
+  refused; fought again at the level paid; won, spent), with stub hooks,
+  skipped until npc's World.paid_deal is in.
+- Wire: none (the "offers" message carries any offer). No new class_name.
