@@ -5084,6 +5084,20 @@ func _test_visible_work() -> void:
 	_check(rig.upper_clip() == "" and (sockets["shoulder"] as Node3D).get_node_or_null("Load") == null and body.position == Vector3.ZERO
 			and is_equal_approx(model.rotation.y, float(puppet.get_meta("faces"))) and rig.base_clip() != "Lie",
 			"a word it doesn't know: standing as before, nothing carried (%s)" % rig.base_clip())
+	# On the throne (580 step 3): a body on a cell whose piece has a stand
+	# point stands there, turned by the piece's facing (north here: its
+	# front 0.4 toward -z, 0.1 up); elsewhere at the cell's middle.
+	var throne_cell := Vector2i(5, 5)
+	var north := atan2(0.0, -1.0)
+	var at := Client3D.stand_offset("building.throne", Rect2i(throne_cell, Vector2i.ONE), north, throne_cell)
+	_check(at.distance_to(Vector3(0.0, 0.1, -0.4)) < 0.001 and Client3D.stand_offset("building.link_arch", Rect2i(throne_cell, Vector2i.ONE), north, throne_cell) == Vector3.ZERO,
+		"the throne's stand point, faced north: 0.4 toward its front, 0.1 up (%s); a piece without one, the middle" % at)
+	_rig._stand_at[throne_cell] = at
+	_rig._lay(puppet, body, 0.0, throne_cell)
+	var on_throne := body.position
+	_rig._lay(puppet, body, 0.0, throne_cell + Vector2i.RIGHT)
+	_check(on_throne == at and body.position == Vector3.ZERO, "standing on its cell he is drawn at it (%s); off it, the cell's middle again" % on_throne)
+	_rig._stand_at.erase(throne_cell)
 	resident.free()
 	_rig._sync_held(player, puppet)
 	puppet.set_meta("work", "")

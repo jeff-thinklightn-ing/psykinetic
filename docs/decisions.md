@@ -25488,3 +25488,25 @@ view_test _test_lair, on the Hall of Fallen Souls:
 - each decor entry drawn in its frame (30 of 30);
 - each web's variant 2 a mesh of its own.
 Client only, protocol unchanged, no new class_name.
+## 580 step 3, enemy-ai's side: he stands at the throne's stand point
+
+Art-kit's building.throne (8c2c67fb) has a seat block 0.44 m up in the middle of its cell, so a
+body drawn at the cell's middle sank into it; dungeon's 3b (7e813d5b) seats it on his cell
+(49, 63), facing north. The coordinator's ruling (2026-10-23): the sim keeps him on the cell;
+the client draws him at the slot's "stand" point ([x, y up, z] in the piece's frame), turned by
+the piece's facing, with no hand offset; a slot without one is stood in at the cell's middle.
+
+- One place in Client3D: `_stand_at` (cell to offset), filled in `_add_buildings` for every
+  piece whose slot has "stand" (`Client3D.stand_offset(slot, rect, yaw, cell)`: the point
+  turned by the piece's yaw, less the cell's middle), cleared with the buildings. `_lay`, which
+  already moves a rigged body for a sleeper (566), starts from that offset for the body's cell,
+  so anyone standing on such a cell stands at its point; lying still wins.
+- Step 4's seated idle replaces exactly this offset (pc-character's, as the sleeper and the
+  bandage kneel lean bodies the same way). The offset follows his tile, so stepping off the
+  throne he is drawn at the next cell's middle at once (a 0.4 m shift).
+- Checked with the dais: from (49, 63), one level up, he walks down its stairs to a player 15
+  cells off in the hall (a headless repro on a generated barrow_lair, 77 ticks; 645 leash).
+
+view_test: the throne's stand point faced north (0.4 toward -z, 0.1 up), none for a piece without
+one; a body on its cell drawn there, off it at the middle. Client only, protocol unchanged, no
+new class_name.

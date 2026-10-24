@@ -1744,6 +1744,10 @@ var _kinds_texture: ImageTexture
 ## footprint cell is in; the roofs off now and when each was last wanted off.
 var _buildings: Array[Dictionary] = []
 var _building_at: Dictionary[Vector2i, int] = {}
+## Where a body stands on a cell whose piece has a stand point (580 step 3:
+## the throne's "stand", [x, y up, z] in the piece's frame, turned by its
+## yaw): the offset from the cell's middle; a cell not in it, its middle.
+var _stand_at: Dictionary[Vector2i, Vector3] = {}
 var _roofs_off: Dictionary[int, float] = {}
 ## Town id -> {kind: {state, level}}, as Main was told (set_town).
 var town_states := {}
@@ -3832,6 +3836,7 @@ func rebuild(terrain: Dictionary, centre: Vector2i) -> void:
 	_glimpses.clear()
 	_buildings.clear()
 	_building_at.clear()
+	_stand_at.clear()
 	_roofs_off.clear()
 	_runs.clear()
 	_water_bodies.clear()
@@ -4252,6 +4257,9 @@ func _add_buildings() -> void:
 			"use": str(building.get("use", "")), "town_id": str(building.get("town_id", "")), "damaged": false,
 			"open_air": slot in Level.OPEN_AIR, "crop": ""})
 		_show_state(_buildings[index])
+		if ArtKit.spec(slot).get("stand") is Array:
+			for cell in Level.rect_cells(rect):
+				_stand_at[cell] = stand_offset(slot, rect, node.rotation.y, cell)
 		if slot in Level.ON_WATER or slot in Level.OPEN_AIR or _glimpse:
 			continue  # Nobody stands in a well, a field is open (or a glimpse): no inside.
 		# The rain stops on its roof even while the roof is cut away
@@ -10604,7 +10612,7 @@ func _sync_puppets() -> void:
 		_sync_ailments(entity, puppet)
 		if puppet.has_meta("rig"):
 			var body := puppet.get_node("Body") as Node3D
-			_lay(puppet, body, yaw)
+			_lay(puppet, body, yaw, entity.tile)
 			if not is_equal_approx(body.rotation.y, yaw):
 				body.rotation.y = yaw
 			(puppet.get_meta("rig") as AnimRig).every = _pose_every(puppet)
@@ -12172,16 +12180,30 @@ static func _shoulder_socket(skeleton: Skeleton3D, hand: float) -> Array:
 	return ["UpperChest", Transform3D(rest.basis.orthonormalized().inverse() * SHOULDER_LEVEL, rest.affine_inverse() * at)]
 
 
+## Where on [param cell] a body stands in [param slot]'s piece over [param
+## rect], turned by [param yaw] (580 step 3): its "stand" point less the
+## cell's middle; none (zero) without one.
+static func stand_offset(slot: String, rect: Rect2i, yaw: float, cell: Vector2i) -> Vector3:
+	var stand: Variant = ArtKit.spec(slot).get("stand")
+	if not stand is Array or (stand as Array).size() != 3:
+		return Vector3.ZERO
+	var middle := Vector2(rect.position) + Vector2(rect.size - Vector2i.ONE) * 0.5
+	var point := Basis(Vector3.UP, yaw) * Vector3(float(stand[0]), float(stand[1]), float(stand[2]))
+	return Vector3(middle.x - cell.x, 0.0, middle.y - cell.y) + point
+
+
 ## A sleeper lies on its bed cell (566): the Lie clip falls back from the feet,
 ## its head behind them, so the model turns half round to put the head toward
 ## the facing (the sim's: to the wall) and the body moves back by the lying
 ## body's middle (LIE_MIDDLE, measured: the head 1.14 m behind the feet' 0.23
 ## ahead) so it lies on the cell, not beside it. Else as it stands. [param yaw]
-## the facing's, turned by the caller.
+## the facing's, turned by the caller. Standing on a cell whose piece has a
+## stand point (_stand_at: the draugr on his throne, 580 step 3), the body
+## stands there, until step 4's seated idle replaces it.
 const LIE_MIDDLE := 0.46
-func _lay(puppet: Node3D, body: Node3D, yaw: float) -> void:
+func _lay(puppet: Node3D, body: Node3D, yaw: float, cell := Vector2i(-1, -1)) -> void:
 	var lying := bool((ACTIVITIES.get(str(puppet.get_meta("work", "")), {}) as Dictionary).get("lying", false))
-	var offset := Vector3.ZERO
+	var offset: Vector3 = _stand_at.get(cell, Vector3.ZERO)
 	if lying:
 		var ahead := Vector3(cos(yaw), 0.0, -sin(yaw))
 		offset = -ahead * LIE_MIDDLE * float(puppet.get_meta("model_scale", 1.0))
