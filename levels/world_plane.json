@@ -4,7 +4,8 @@
 		"wilds": {"origin": [0, 0], "height": 0.0},
 		"castle": {"origin": [112, -24], "height": 5.19},
 		"hills": {"origin": [-96, 58], "height": -3.3},
-		"forest": {"origin": [256, 80], "height": 6.08}
+		"forest": {"origin": [256, 80], "height": 6.08},
+		"held": {"origin": [-192, 156], "height": 0.22}
 	},
 	"landmarks": [
 		{"id": "castle", "slot": "far.castle", "at": [128, -12], "base": 5.19, "facing": [0, 1]},

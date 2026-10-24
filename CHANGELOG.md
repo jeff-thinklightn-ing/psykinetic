@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Held has its own map: from the wilds' south-west corner (west edge) a way leads into a forest clearing with a river, a ford and a bridge, and the Old Tower's ruin across it, empty for now; the town moves there later.
 - A town's new building plots show as staked ground until the town starts building, then rise through their stages like any other building; a plot laid while you watch appears at once, and one the town gives up disappears.
 - The level builder sees the plots a town has laid as it grows: it lists them apart, and warns of a building on one turned from its street.
 - Weapons are held edge-first: the great axe, battle axe, sword, dagger, knife, spear, hammer and pick no longer sit sideways in the hand (players, companions, townsfolk and the draugr).

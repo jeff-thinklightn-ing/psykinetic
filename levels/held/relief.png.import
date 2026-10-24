@@ -1,0 +1,14 @@
+[remap]
+
+importer="image"
+type="Image"
+uid="uid://dbtcq2hau6u6k"
+path="res://.godot/imported/relief.png-41856952a0da406b1ded00fa5bdf1780.image"
+
+[deps]
+
+source_file="res://levels/held/relief.png"
+dest_files=["res://.godot/imported/relief.png-41856952a0da406b1ded00fa5bdf1780.image"]
+
+[params]
+

@@ -26769,3 +26769,42 @@ Wire: a line under PROTOCOL_REVISION 35 (the "clearing" message's "gone").
 level_test _test_unplot (laid, dropped, off the terrain, grown back; live
 off the walk and the town buildings; a client told it laid, then gone).
 No new class_name.
+## 651. Held on its own map, step 1
+
+Jeff approved Held as a map of its own (C:/dev/review/held/held_jeff.png,
+192 x 192). Step 1 builds the land, the town still in the wilds; step 2
+(its own design, after buildings names the camp kind) moves the town with
+the settlement layout (the coordinator's approval).
+
+- **tools/make_held.gd** (a scene, make_held.tscn) writes levels/held:
+  forest round everything (void); clearings for the core, the farms and
+  pasture, the neck to the link, the fort, the fishing spot and the lanes
+  between; a river down the west (Relief.lay "rivers", its banks cleared
+  through the forest, wavering) crossed by a ford near row 75 and a bridge
+  near row 95; gentle relief; rough dirt round the core's edge; two dirt
+  roads as curves (Relief.road): the gate road from the link over the
+  bridge to the Old Tower's gate, and the ford path from its breach to the
+  core. The same seed makes the same map.
+- **The Old Tower** (600): the old_tower prefab stamped at (14, 86) on a
+  levelled pad; its place "old_tower" (fort) works for no town yet (its
+  "town" dropped: the town and its store are the wilds'; step 2 gives it
+  back), and Snagfin stays at his stall in the wilds, so the tower stands
+  empty.
+- **The core**: cleared ground, the store's cell (100, 96) reserved on a
+  levelled 9 x 9 pad with nothing on it, no houses: the town's settlement
+  is laid there at the move.
+- **The link**: Held's east edge, row 80, to the wilds' west edge, row 236
+  (to_spawn from_held / from_wilds), written into the wilds' layout pixel
+  and level.json's text (the hand-edited wilds is not saved whole). On the
+  world plane (650) Held lies west of the wilds under the hills, origin
+  (-192, 156), height 0.22: its link is on its east edge and the hills
+  take the space above, so the link sits on row 80, not Jeff's 95..101
+  (the wilds' west edge has no land further south), and meets the wilds in
+  its south-west, not its south-east (the coordinator: accepted).
+- Nothing moves: the town, its people, the barrow and Snagfin stay in the
+  wilds; the box gains a zone and the wilds a link.
+
+level_test _test_held (the link both ways, the fort a fort for no town, no
+houses, the store's pad, the tower's room walked to over the bridge and,
+the bridge gone, over the ford); the world plane test lays it. No wire
+change, no new class_name.

@@ -46,6 +46,10 @@
 		"from_barrow_shortcut": [
 			217,
 			192
+		],
+		"from_held": [
+			18,
+			236
 		]
 	},
 	"links": [
@@ -90,6 +94,14 @@
 			"to_map": "barrow_lair",
 			"to_spawn": "from_temple",
 			"sealed": "draugr"
+		},
+		{
+			"at": [
+				16,
+				236
+			],
+			"to_map": "held",
+			"to_spawn": "from_wilds"
 		}
 	],
 	"entities": [

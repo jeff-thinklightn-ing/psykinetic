@@ -200,6 +200,7 @@ func _test_every_level() -> void:
 	_test_plots()
 	_test_unplot()
 	_test_refuges()
+	_test_held()
 	_test_herders()
 	_test_forest_healer()
 	_test_world_plane()
@@ -599,6 +600,49 @@ func _test_unplot() -> void:
 	_main._clearing_told.erase("unplot_field")
 	_main.load_map("test_room")
 	Level.unregister("unplot_field")
+
+
+## Held on its own map (651, step 1): its link to the wilds both ways,
+## the Old Tower stamped (its door reached over the bridge, and over the
+## ford with the bridge gone), the store's cell reserved on a level pad,
+## no town yet (no houses, the fort working for no town).
+func _test_held() -> void:
+	print("
+== Held, step 1 (651): its own map, the Old Tower stamped, the store's cell reserved, no town yet ==")
+	var level := Level.load_level("held")
+	_check(level["size"] == Vector2i(192, 192) and level.get("warnings", []).is_empty(), "levels/held loads, 192 x 192, clean (%s)" % [level.get("warnings", [])])
+	var links: Array = level["links"]
+	var to_wilds: Array = links.filter(func(link: Dictionary) -> bool: return link["to_map"] == "wilds")
+	var wilds := Level.load_level("wilds")
+	var back: Array = wilds["links"].filter(func(link: Dictionary) -> bool: return link["to_map"] == "held")
+	_check(to_wilds.size() == 1 and (to_wilds[0]["tile"] as Vector2i).x == 191 and back.size() == 1 and (back[0]["tile"] as Vector2i).x <= 20
+			and level["spawn_points"].has("from_wilds") and wilds["spawn_points"].has("from_held"),
+		"its east edge links to the wilds' west edge and back (%s, %s)" % [to_wilds.map(func(link: Dictionary) -> Vector2i: return link["tile"]), back.map(func(link: Dictionary) -> Vector2i: return link["tile"])])
+	var fort: Dictionary = level["places"].get("old_tower", {})
+	_check(fort.get("kind") == "fort" and not fort.has("town"), "the Old Tower's place: a fort, working for no town yet (%s)" % [fort])
+	var kinds: Array = level["buildings"].filter(func(building: Dictionary) -> bool: return building.has("kind"))
+	_check(kinds.size() == 1 and kinds[0]["kind"] == "tower_room", "no houses: the only kind building the tower's room (%s)" % [kinds.map(func(building: Dictionary) -> String: return building["kind"])])
+	var store := Vector2i(100, 96)
+	var height := _ground(level, store)
+	var pad := Level.rect_cells(Rect2i(store - Vector2i(4, 4), Vector2i(9, 9)))
+	var covered: Array = level["buildings"].filter(func(building: Dictionary) -> bool: return (building["rect"] as Rect2i).has_point(store))
+	_check(store in level["terrain"]["floor"] and covered.is_empty() and pad.all(func(cell: Vector2i) -> bool: return absf(_ground(level, cell) - height) < 0.01),
+		"the store's cell reserved: open floor, nothing on it, its 9 x 9 pad level")
+	_check(_main.load_map("held"), "Held loads")
+	var start: Vector2i = level["starts"][0]
+	var room := Vector2i(19, 92)
+	var way := World.find_path(start, room, true)
+	_check(not way.is_empty(), "the tower's room walked to from the link, over the bridge (%d steps)" % way.size())
+	var bridge: Dictionary = level["buildings"].filter(func(building: Dictionary) -> bool: return building.get("slot") == "bridge")[0]
+	var spans := Level.rect_cells(bridge["rect"])
+	spans.append_array(Array(level["terrain"]["bridged"]))
+	for cell in spans:
+		World.set_floor(cell, false)
+	way = World.find_path(start, room, true)
+	var fords: Array = Array(level["terrain"]["fords"])
+	_check(not way.is_empty() and not way.any(func(cell: Vector2i) -> bool: return cell in spans) and way.any(func(cell: Vector2i) -> bool: return cell in fords),
+		"and with the bridge gone, over the ford (%d steps, %d ford cells)" % [way.size(), fords.size()])
+	_main.load_map("test_room")
 
 
 ## The sought's refuges (613 amended): one place a story, keyed by its tag,
