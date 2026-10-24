@@ -120,6 +120,7 @@ func _ready() -> void:
 	_test_ambience_runs()
 	_test_heartbeat()
 	_test_bandaging()
+	_test_title_music()
 	_test_options_panel()
 
 	# Every sound stopped and let go before quitting: the audio server lets
@@ -306,6 +307,39 @@ func _test_heartbeat() -> void:
 
 ## Bandaging heard: a cloth ruffle from the bandager while it runs, soft
 ## when the patient mends, short when broken off.
+func _test_title_music() -> void:
+	print("
+== the title screen: music.title faded in with the main menu, out as the world loads (656) ==")
+	var hud_was: bool = _main.get_node("HUD").visible
+	var went_online: bool = _main._went_online
+	_main._went_online = true  # Play goes on as the host already in, never online again.
+	_main._show_menu()
+	var title: Node = _main.title_music
+	var player: AudioStreamPlayer = title.player if title != null else null
+	_check(player != null and player.playing and player.bus == "Music" and player.stream.resource_path.ends_with("music.title/music.title.ogg"),
+		"the menu shows: music.title plays on the Music bus, Jeff's own take")
+	_check(player != null and (player.stream as AudioStreamOggVorbis).loop and is_equal_approx(player.volume_db, title.SILENT_DB),
+		"looped, and it starts silent")
+	title._tween.custom_step(title.FADE_IN)
+	_check(player != null and is_equal_approx(player.volume_db, SoundKit.volume_db("music.title")), "faded in over %.1f s to the slot's level" % title.FADE_IN)
+	_main._show_menu()
+	_check(_main.title_music == title, "the menu again: the same title, not a second")
+	_main._play()
+	_check(_main.title_music == null and title.stopping and not title.playing() and not _main.main_menu.visible, "a host's Play: its world is here, the title fades out")
+	title._tween.custom_step(title.FADE_OUT + 0.01)
+	_check(title.is_queued_for_deletion() and player.volume_db <= title.SILENT_DB + 0.01,
+		"faded out over %.1f s, then gone (%.1f dB, %s)" % [title.FADE_OUT, player.volume_db, title.is_queued_for_deletion()])
+	# A client holds it through the connect screen till its first "map", the world loading.
+	_main._show_menu()
+	var again: Node = _main.title_music
+	_check(again != null and again != title and again.playing(), "the menu once more: a new title")
+	_main._on_message("map", {"name": _main.map_name, "generation": _main.map_generation, "server": Net.server_version})
+	_check(_main.title_music == null and again.stopping, "the server's \"map\" (the world loading): the title fades out")
+	_main.main_menu.visible = false
+	_main._went_online = went_online
+	_main.get_node("HUD").visible = hud_was
+
+
 func _test_bandaging() -> void:
 	print("
 == bandaging: a cloth ruffle while it runs, faded when done, cut when broken off ==")

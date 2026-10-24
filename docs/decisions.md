@@ -27687,3 +27687,38 @@ socket test, before the goblins' test kills the player): the reach on with the g
 ready stance standing, the left hand within 0.04 m of grip_2 and its fist along the haft (> 0.95)
 standing and in Axe_Overhead at 0 and 0.55 s; with a shield in the left, no reach and no stance.
 Client only, no new number (release's label).
+## 656. Jeff's first-harmony as music.title on the main menu
+
+Jeff (2026-10-24, by way of the coordinator), of his first track: "try this one for
+the title screen".
+
+- **A slot, music.title**: music, type loop, the Music bus, flat, 0 dB. Its take is
+  Jeff's own, in the repo at art/audio/music/music.title/music.title.ogg, named in the
+  slot's "source" (by Jeff, Ableton Live, licence "own", 2026-10-24) the way an own take
+  is: takes.json lists third-party takes only, and THIRD_PARTY.md's generated block names
+  own takes only when someone other than Jeff made them, so it gains no line.
+- **The take**: his master (48 kHz 24-bit stereo WAV, 11.29 s: 4 bars at 85 bpm, cut on
+  the bar) as Ogg Vorbis quality 7, pulled 1 dB down for headroom (peak -1.2 dBFS),
+  the same 542118 frames; its import loops at the file's end (loop=true, no bpm). 223 KB.
+  The master stays in his music folder, copied, never moved or edited.
+- **The seam, by measure (not by ear)**: the wrap from the last frame to the first was
+  measured against the track's own three bar lines: the same 2 ms high-frequency burst
+  at each (-27.3 dB), a step at the wrap (0.065) within theirs (0.034 to 0.072), and the
+  tail before it quieter than theirs (-27.5 dB rms over 10 ms, against -20.5 to -23.8).
+  So it wraps as the music crosses its own bars. A click heard there goes back to Jeff
+  for a re-export, not an edit here.
+- **Played from Main**: client3d/title_music.gd (Main.TitleMusic, a preload, no
+  class_name), made by Main._show_menu with the menu, the take on the Music bus faded in
+  from -60 dB over FADE_IN 1 s to the slot's level. It plays on through the connect
+  screen, still the menu (the coordinator: a first run would otherwise cut it after one
+  click), and Main._end_title_music fades it out over FADE_OUT 1 s as the world starts
+  loading: a client's first "map" message from the server, or Play for a host, whose
+  world is already there; then it frees itself, before the view's own Music begins. It
+  applies the buses' volumes itself (Sfx.apply_volumes), since the menu comes before
+  any view. ui's render/main_menu.gd is untouched.
+
+view_test _test_title_music: the menu starts music.title on the Music bus from Jeff's
+take, looped, silent at first, at the slot's level after the fade; the menu again keeps
+the one; a host's Play fades it out and it is gone; a new menu's title fades out on the
+server's "map". Client only, protocol unchanged, no new
+class_name.

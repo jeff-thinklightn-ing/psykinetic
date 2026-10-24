@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The title screen plays music: Jeff's first track, first-harmony, fades in with the main menu, plays on through the connect screen and fades out as the world loads (656).
 - A great axe is held in both hands: the left hand grips the haft above the right, standing ready and through the overhead swing.
 - Raising a shield brings it across in front of the chest, its face to the foe, instead of holding it out to the side.
 - A shield is strapped on the outside of the left forearm, its face out, instead of held out of the fist.

@@ -503,6 +503,9 @@ var _options_from_menu := false
 var game_menu: GameMenu
 var main_menu: MainMenu
 var connect_screen: ConnectScreen
+## The title screen's music while the main menu shows (656), let go on Play; null otherwise.
+const TitleMusic := preload("res://client3d/title_music.gd")
+var title_music: TitleMusic
 ## _go_online was called (Play once; Change server reconnects instead).
 var _went_online := false
 ## The connect screen shows the join in progress: it goes once the player is in.
@@ -742,6 +745,8 @@ func _ready() -> void:
 func _play() -> void:
 	if main_menu != null:
 		main_menu.visible = false
+	if Net.is_authority():
+		_end_title_music()  # A host's world is already here; a client's waits for its "map".
 	$HUD.visible = true
 	if Net.needs_setup:
 		# An exported client with no settings.cfg yet: ask once, then join.
@@ -755,6 +760,14 @@ func _play() -> void:
 		_go_online()
 
 
+## The title screen's music faded out and let go (656): on Play for a host, on its first
+## "map" for a client, so it plays on through the connect screen until the world loads.
+func _end_title_music() -> void:
+	if title_music != null:
+		title_music.stop()
+		title_music = null
+
+
 ## The main menu over everything (MainMenu), made the first time.
 func _show_menu() -> void:
 	if main_menu == null:
@@ -764,6 +777,9 @@ func _show_menu() -> void:
 		main_menu.quit_pressed.connect(_quit_game)
 		add_child(main_menu)
 	main_menu.visible = true
+	if title_music == null:
+		title_music = TitleMusic.new()
+		add_child(title_music)
 	$HUD.visible = false
 	if connect_screen != null:
 		connect_screen.visible = false
@@ -9733,6 +9749,7 @@ func _on_message(kind: String, data: Dictionary) -> void:
 	if kind == "map":
 		# The zone this client's player is in: it draws and predicts on that
 		# map, and its entities arrive under that zone's node.
+		_end_title_music()  # The world starts loading: the title screen's music goes (656).
 		var wanted := str(data.get("name", ""))
 		Net.server_version = str(data.get("server", Net.server_version))
 		map_generation = int(data.get("generation", 0))

@@ -1349,6 +1349,21 @@
 			"volume_db": -6.0,
 			"uses": "a stinger: a hostile near you routs (Music)"
 		},
+		"music.title": {
+			"category": "music",
+			"type": "loop",
+			"bus": "music",
+			"positional": false,
+			"volume_db": 0.0,
+			"uses": "the main menu (title screen): faded in over about 1 s as the menu opens, on through the connect screen, out over about 1 s as the world starts loading (client3d/title_music.gd, from Main; decision 656)",
+			"source": {
+				"by": "Jeff",
+				"tool": "Ableton Live",
+				"license": "own",
+				"date": "2026-10-24",
+				"notes": "Jeff's first track, \"first-harmony\" (his master: 48 kHz 24-bit stereo WAV, 11.29 s, 4 bars at 85 bpm, a loop cut on the bar; kept in his music folder, not the repo); Ogg Vorbis q7, 1 dB down for headroom (peak -1.2 dBFS); Jeff, 2026-10-24, by way of the coordinator: \"try this one for the title screen\""
+			}
+		},
 		"amb.torch_fire": {
 			"category": "ambience",
 			"type": "loop",
