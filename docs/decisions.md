@@ -28778,3 +28778,32 @@ short of food. Settling, 0 of 7 days calm."), so the one line tells both
 what the town is waiting out and what set it back. Nothing without the
 key, as before. ui_test (the strain checks). Client only: the wire change
 is economy's (PROTOCOL_REVISION 36, its push); no new class_name.
+## 631 amended, dungeon's side: the dead stand on open floor
+
+Jeff on v0.1.172, in the Ossuary: "skeletons still spawning in niches and lying down on ground,
+clipping through walls." The generator's half (the coordinator's brief, 2026-10-24; the lying
+and the clipping are enemy-ai's half, "631 amended, enemy-ai's side"; the two land together):
+
+- **Open floor only.** In the barrow style every generated monster marker (the Ossuary's
+  skeletons, the lair's oldest dead, layer 1's robbers) is laid on open floor: a cell with floor on
+  all eight sides and no wall or door edge of its own (`Labyrinth._open_floor`; `_markers` filters
+  the rooms' and ways' cells through it before 631's band spread and "near" sorting). That takes
+  out by construction every alcove and niche cell (one open neighbour), every grave (a dead end),
+  every cell along a room's wall or a passage's side, and any way under three wide; the Ossuary's
+  passages are three wide, so their centre lines and the tombs' interiors remain, and the lair's
+  caverns their middles. A band short of open cells lays fewer and the rest go deepest first, as
+  631 does. Chests and crates keep their corners and niches. Other styles are unchanged (the
+  halls' imps stand in two-wide ways as before).
+- **The home cell.** Agreed with enemy-ai (the coordinator: "its home must be the open cell you
+  laid it on"): the home of a dead one is the cell it was laid on (its spawn marker, the same after
+  a respawn); it rests there standing and walks back there after a chase; the level's "graves"
+  list is no longer read for it. The cell is dungeon's to lay (open floor, eight floor neighbours,
+  no wall or door edge), the rest on it enemy-ai's. The generated "graves" list (542 amended) is
+  still written: a map of the dead ends for the tests and any later reader, no monster's.
+- **Tests.** labyrinth_test `_dead_at_walls`: on every layer of the sample barrow, generations 1
+  and 2, every generated monster marker outside the anchors has floor on all eight sides and no
+  wall or door edge; the counts (4 robbers, 14, 6) and 631's band spread hold. docs/levels.md.
+- **After the deploy** the next cut regenerates barrow, barrow_deep and barrow_lair (release's
+  list): a laid level keeps its old markers until it is laid again.
+
+Generator only, protocol unchanged, no new class_name.

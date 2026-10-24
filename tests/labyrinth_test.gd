@@ -180,6 +180,8 @@ func _test_barrow() -> void:
 	_check(kinds.get("robber", 0) == 4 and kinds.get("chest", 0) == 3 and kinds.get("altar", 0) == 1 and kinds.get("skeleton_guard", 0) == 2
 		and kinds.get("runner's pack", 0) == 1 and kinds.get("skeleton", 0) == 0,
 		"four robbers and three chests laid; the altar, its two guards and the Runner's pack kept; no dead walk (%s)" % [kinds])
+	_check(_dead_at_walls(a, anchors).is_empty() and _dead_at_walls(b, anchors).is_empty(),
+		"layer 1's robbers stand on open floor in both generations, floor all round and no wall edge (631 amended; %s)" % [_dead_at_walls(a, anchors) + _dead_at_walls(b, anchors)])
 	var altar := Sheet.BARROW_ALTAR
 	var robber_to_altar := 0.0
 	var all_to_altar := 0.0
@@ -302,6 +304,8 @@ func _test_barrow() -> void:
 			dead_by_band[0 if d < Regen.BANDS[0] else (1 if d < Regen.BANDS[1] else 2)] += 1
 	_check(kinds.get("skeleton", 0) == 14 and kinds.get("chest", 0) == 5 and kinds.get("robber", 0) == 0 and not kinds.has("altar"),
 		"fourteen skeletons (a draft number) and five chests laid; no robbers, no altar (%s)" % [kinds])
+	_check(_dead_at_walls(a, anchors).is_empty() and _dead_at_walls(b, anchors).is_empty(),
+		"the Ossuary's dead stand on open floor in both generations: never a niche, a grave or a wall's foot (631 amended; %s)" % [_dead_at_walls(a, anchors) + _dead_at_walls(b, anchors)])
 	if kinds.get("skeleton", 0) == 14 and kinds.get("chest", 0) == 5:
 		# The dead a third to each band (decision 631): the shallow band's share
 		# shows up a few rooms in, not only at the far end.
@@ -383,6 +387,8 @@ func _test_barrow() -> void:
 		"the damp hall keeps its own moss and cobwebbed corners (%d), the caverns grow moss thick (%.2f of the wall feet), no niche to web; the parse keeps every one (%s)" % [decor["kept_hand"], decor["strip_share"], decor["counts"]])
 	_check(kinds.get("skeleton", 0) == 6 and kinds.get("chest", 0) == 4 and kinds.get("draugr", 0) == 1 and kinds.get("robber", 0) == 0,
 		"six of the oldest dead and four chests laid; the draugr kept on his throne (%s)" % [kinds])
+	_check(_dead_at_walls(a, anchors).is_empty() and _dead_at_walls(b, anchors).is_empty(),
+		"the oldest dead stand in the caverns' open floor in both generations (631 amended; %s)" % [_dead_at_walls(a, anchors) + _dead_at_walls(b, anchors)])
 	var in_hall := 0
 	for spec: Dictionary in level["entities"]:
 		if Sheet.LAIR_HALL.has_point(spec["tile"]) and str(spec.get("kind", "")) != "draugr":
@@ -606,6 +612,29 @@ func _test_sheet() -> void:
 	var one := (Sheet.TOWER_ACROSS * 2 - 1) * 4
 	_check(image != null and image.get_size() == Vector2i(one * 4 + 8 * 3, one), "a PNG four floors wide with a strip between (%s)" % [image.get_size() if image else null])
 	DirAccess.remove_absolute(out)
+
+
+## The generated monster markers of [param map] (outside [param anchors])
+## not on open floor (631 amended, dungeon's side): a cell with floor on all
+## eight sides and no wall or door edge of its own.
+func _dead_at_walls(map: LevelMap, anchors: Array) -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	for y in map.size.y:
+		for x in map.size.x:
+			var cell := Vector2i(x, y)
+			if not map.cell(cell).begins_with("monster_") or Level.in_anchors(anchors, cell):
+				continue
+			var open := true
+			for dy in range(-1, 2):
+				for dx in range(-1, 2):
+					if not map.walkable(cell + Vector2i(dx, dy)):
+						open = false
+			for direction: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+				if map.edge(Terrain.edge_key(cell, direction)) != "clear":
+					open = false
+			if not open:
+				out.append(cell)
+	return out
 
 
 ## The walkable cells of [param map] no walk from [param start] reaches

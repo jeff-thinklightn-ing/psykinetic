@@ -38,7 +38,9 @@ extends RefCounted
 ## along the ways, burial niches (an alcove cell) off the walls. Middle:
 ## passage graves, narrow and long, crooked ways in, no doors, niches
 ## along them. Deep: the old caverns round the lair, no doors, no torches.
-## Chests go in the deepest niches first; the dead a third in each depth
+## Chests go in the deepest niches first; the dead, on open floor only (a
+## cell with floor all round it and no wall edge of its own: never an
+## alcove, a grave or a wall's foot; 631 amended), a third in each depth
 ## band, deepest first within a band (decision 631; layers with one band
 ## deepest first), monsters otherwise deepest first unless
 ## "near" sends a kind to an anchor (the robbers to the altar). Its ways
@@ -847,7 +849,10 @@ static func _markers(map: LevelMap, anchors: Array, rooms: Array[Dictionary], co
 	everywhere.append_array(corridor_cells)
 	Tools.shuffle(everywhere, rng)
 	if barrow:
-		everywhere = _deepest_first(depth, everywhere)
+		# The dead stand on open floor alone (631 amended, dungeon's side;
+		# Jeff on v0.1.172: "skeletons still spawning in niches"): never an
+		# alcove, a grave or a cell along a wall.
+		everywhere = _deepest_first(depth, everywhere.filter(func(cell: Vector2i) -> bool: return _open_floor(map, cell)))
 	var counts: Variant = config.get("monsters", {})
 	if not counts is Dictionary:
 		return
@@ -869,6 +874,23 @@ static func _markers(map: LevelMap, anchors: Array, rooms: Array[Dictionary], co
 		if barrow and not sent and int(depth.get("fixed_band", -1)) < 0:
 			count -= _lay_by_band(map, anchors, "monster_" + kind, count, spots, depth)
 		_lay(map, anchors, "monster_" + kind, count, spots)
+
+
+## Whether [param cell] is open floor (631 amended, dungeon's side): floor
+## with floor on all eight sides and no wall or door on its own four edges,
+## so a body laid there stands clear of every wall, niche and grave.
+static func _open_floor(map: LevelMap, cell: Vector2i) -> bool:
+	if map.cell(cell) != FLOOR:
+		return false
+	for dy in range(-1, 2):
+		for dx in range(-1, 2):
+			var near := cell + Vector2i(dx, dy)
+			if near != cell and not map.walkable(near):
+				return false
+	for direction in DIRECTIONS:
+		if map.edge(Terrain.edge_key(cell, direction)) != "clear":
+			return false
+	return true
 
 
 ## [param count] markers [param marker] on the first free floor cells of

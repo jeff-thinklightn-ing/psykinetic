@@ -596,9 +596,14 @@ hides about 2.5 cells behind it). The templates are written from
   Runner's pack. The robbers (4) are sent near the altar; no dead walk it,
   and the generated level.json lists no graves and no niches for it.
 - `levels/barrow_deep`, "The Ossuary", 100 x 80, `"layer": 2` (the tombs
-  by depth): the ancient dead the town moved down, walking home (14, a
-  draft number Jeff tunes, spread a third to each depth band; decision 631;
-  skeletons) through the galleries, the graves as before and the niches
+  by depth): the ancient dead the town moved down (14, a draft number
+  Jeff tunes, spread a third to each depth band; decision 631; skeletons),
+  each standing on open floor in the galleries (631 amended, dungeon's
+  side, Jeff on v0.1.172: "skeletons still spawning in niches": a cell with
+  floor on all eight sides and no wall or door edge of its own, never an
+  alcove, a grave or a wall's foot; `Labyrinth._open_floor`, every
+  generated monster of the barrow style), its laid cell its home (enemy-ai's
+  side: it rests there standing and walks back after a chase), and the niches
   cut along the galleries' walls (608: shelves and columbarium cells, a
   hollow here and there, about one wall cell in six, rock behind each; no
   door among them). Two
@@ -741,8 +746,9 @@ A generated level.json also carries (decision 542 amended) `"graves":
 [[x, y, band], ...]`, one per dead-end floor cell outside the anchors (the
 tomb niches and the blind ways' ends), none with a chest on it, the band 0,
 1 or 2 by its depth from the `"entrance"` anchor (`Regen.BANDS`, the barrow
-style's own bands), so enemy-ai's walking skeletons are each given a grave
-in a shallower band to go home to; and `"niches": [[x, y, dx, dy, kind,
+style's own bands); since 631 amended no monster reads it (a dead one's home
+is the cell it was laid on), it is kept as a map of the dead ends for the
+tests and whoever wants it; and `"niches": [[x, y, dx, dy, kind,
 variant], ...]` (608; 542 amended's alcove cells before), the burial niches
 cut into wall edges: `(x, y)` the room's floor cell before one, `(dx, dy)` the
 step onto its wall (a wall edge with rock behind it; for kind `"hidden"` a
