@@ -28060,3 +28060,22 @@ generator, a sample in memory, tests, a plan sheet; no real level, link or zone.
   enemy-ai's foes, a real `<tower>_1..N` written from the sample.
 
 Generator and tools only, protocol unchanged, no new class_name.
+
+## 667. The land lock: one landing at a time, stale after 25 minutes
+
+The land lock (tools/land_lock.sh, from d005aaf9 on 2026-10-14, after items lost three
+landing races, never written up here till now) is one atomic-mkdir lock folder,
+`/c/dev/land.lock`, with tools/bench_lock.sh's mechanics: a tree takes it for its final
+fetch, rebase, retest and push, so nobody lands between its retest and its push, and releases
+it right after. The resource gate's suite take comes first and is never waited on while the
+lock is held (394). A take that finds it held exits 1 and names the holder; the tree keeps
+working and tries again.
+
+A lock older than its stale limit may be taken over. That limit was 15 minutes (900 s), when a
+landing took under 10. It is now 25 minutes (PSYKINETIC_LOCK_STALE=1500, release, 2026-10-24):
+a lean landing (394 amended (10): memory short, the suite alone and then net_test, state_test
+and server_boot_test) takes about 16.5 minutes of tests, and perf's held the lock about 17
+with its rebase and import, so another tree could have taken over mid-landing. CLAUDE.md's
+"older than 15" line is the coordinator's to change.
+
+Tools only, protocol unchanged, no new class_name.
