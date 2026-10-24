@@ -31,13 +31,20 @@ jobs_at_once="$(test_jobs)"
 suite_jobs=$(( jobs_at_once - 2 ))
 [ "$suite_jobs" -lt 2 ] && suite_jobs=2
 lean=""
-if [ "${HEAVY_JOB_KIND:-}" = suite_lean ]; then
-	# The gate ran it lean (394 amended (9)): memory was short, fewer at once.
+case "${HEAVY_JOB_KIND:-}" in
+suite_lean*)
+	# The gate ran it lean (394 amended (9), (10)): memory was short, fewer
+	# at once, and the other parts after the suite, not beside it.
 	[ "$suite_jobs" -gt 3 ] && suite_jobs=3
-	lean=", lean"
-fi
+	lean=1
+	;;
+esac
 started=$(date +%s)
-echo "landing tests: the suite ($suite_jobs at once$lean), net_test, state_test and server_boot_test together"
+if [ -n "$lean" ]; then
+	echo "landing tests: the suite ($suite_jobs at once, lean), then net_test, state_test and server_boot_test together"
+else
+	echo "landing tests: the suite ($suite_jobs at once), net_test, state_test and server_boot_test together"
+fi
 
 part() {
 	name="$1"
@@ -53,8 +60,12 @@ part changelog_check_test python -B tests/changelog_check_test.py
 part changelog_resolve_test python -B tests/changelog_resolve_test.py
 # Started a little apart, as the suite starts its scenes (decision 530: Godots
 # launched in the same instant died at launch).
-part suite env PSYKINETIC_TEST_JOBS="$suite_jobs" bash tests/run.sh &
-sleep 0.3
+if [ -n "$lean" ]; then
+	part suite env PSYKINETIC_TEST_JOBS="$suite_jobs" bash tests/run.sh
+else
+	part suite env PSYKINETIC_TEST_JOBS="$suite_jobs" bash tests/run.sh &
+	sleep 0.3
+fi
 part net_test bash tests/net_test.sh &
 sleep 0.3
 part state_test bash tests/state_test.sh &

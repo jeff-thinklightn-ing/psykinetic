@@ -57,11 +57,14 @@ A soak meant to run for hours says so with --expect; the soak kind's limit
 is its max_minutes (180) whatever its runs took (fixed_limit).
 
 A suite out of reach (memory held outside the gate) for LEAN_AFTER_SECONDS
-runs lean (394 amended (9)): fewer scenes at once (land.sh reads
-HEAVY_JOB_KIND, suite_lean, and runs LEAN_SUITE_JOBS), under suite_lean's
-own estimate, when that one is in reach. It is still a suite in running/
-(its caps and exclusions, and an older heavy_job.py's, hold), marked
-"estimate": suite_lean, whose row its peak and time update. Maps' suite
+runs lean (394 amended (9), (10)): land.sh reads HEAVY_JOB_KIND,
+suite_lean2, and runs fewer scenes at once and its other parts (net_test,
+state_test, server_boot_test) after the suite, not beside it; under
+suite_lean2's own estimate, when that one is in reach. It is still a suite
+in running/ (its caps and exclusions, and an older heavy_job.py's, hold),
+marked "estimate": suite_lean2, whose row its peak and time update. (The
+first lean shape, fewer scenes alone, peaked at 13.8 GB, recorded as
+suite_lean: a new name so the new shape starts from a seed.) Maps' suite
 waited 23 minutes at 18 GB free for 14.6 + 8 on 2026-10-24, about twenty
 sessions, a browser and Jeff's Ableton holding the rest.
 
@@ -106,10 +109,15 @@ LONG_HOLD_SECONDS = 3600
 ## Set by `run` for its command: the name of its running entry.
 HELD_ENV = "HEAVY_JOB_HELD"
 ## Set by `run` for its command: the kind whose estimate it runs under
-## (suite_lean for a lean suite, 394 amended (9)).
+## (suite_lean2 for a lean suite, 394 amended (9), (10)).
 KIND_ENV = "HEAVY_JOB_KIND"
 ## A job out of reach this long runs as its kind's lean variant, if any.
 LEAN_AFTER_SECONDS = 5 * 60
+## A run's processes are listed (memory, command line) when its commit
+## passes the last listing's by this much, at most this often (394 amended
+## (10)): what held the memory at its peak, printed and kept in peaks/.
+PEAK_LIST_STEP_GB = 0.25
+PEAK_LIST_SECONDS = 15.0
 MAX_GPU_RUNNING = 1
 POLL_SECONDS = 5.0
 WATCH_SECONDS = 2.0
@@ -141,10 +149,10 @@ KINDS = {
     "trellis_mesh": {"ram_gb": 9.0, "gpu_gb": 12.0, "gpu": True},
     "comfy_batch": {"ram_gb": 6.0, "gpu_gb": 10.0, "gpu": True},
     "suite": {"ram_gb": 6.5, "gpu_gb": 0.0, "gpu": False, "max_running": 1, "excludes": ["bench"], "max_minutes": 90,
-        "lean": "suite_lean"},  # tests/land.sh: 6.3 GB measured
-    # A suite run lean (394 amended (9)): its estimate and runs only; it
-    # runs as a suite (lean_row), never as a kind of its own.
-    "suite_lean": {"ram_gb": 9.0, "gpu_gb": 0.0, "gpu": False, "max_minutes": 90, "variant_of": "suite"},
+        "lean": "suite_lean2"},  # tests/land.sh: 6.3 GB measured
+    # A suite run lean (394 amended (9), (10)): its estimate and runs only;
+    # it runs as a suite (lean_row), never as a kind of its own.
+    "suite_lean2": {"ram_gb": 9.0, "gpu_gb": 0.0, "gpu": False, "max_minutes": 90, "variant_of": "suite"},
     "bench": {"ram_gb": 3.0, "gpu_gb": 0.0, "gpu": False, "max_running": 1, "excludes": ["suite", "soak"], "max_minutes": 90},
     "godot_import": {"ram_gb": 2.0, "gpu_gb": 0.0, "gpu": False, "max_minutes": 90},
     "godot_export": {"ram_gb": 3.0, "gpu_gb": 0.0, "gpu": False, "max_minutes": 90},
@@ -325,6 +333,20 @@ def hung(samples, now, started):
     return share < HUNG_CPU, share
 
 
+def short_command(command):
+    """A process's command line for the peak listing: the program's name,
+    not its path; a Godot's arguments less --path and its log file; at most
+    160 characters."""
+    words = command.split('"')
+    if command.startswith('"') and len(words) > 2:
+        program, rest = words[1], '"'.join(words[2:])
+    else:
+        program, _, rest = command.partition(" ")
+    program = re.split(r"[\\/]", program)[-1]
+    rest = re.sub(r'--log-file\s+("[^"]*"|\S+)\s*|--path\s+\S+\s*', "", rest).strip()
+    return ("%s %s" % (program, rest)).strip()[:160]
+
+
 def updated_estimate(old_gb, peak_gb):
     """A kind's estimate after a run that peaked at [peak_gb]: up to it at
     once, down toward it slowly."""
@@ -470,6 +492,44 @@ class Job:
         """How many of the job's processes still run."""
         return len(self._ids())
 
+    def listing(self):
+        """The job's live processes now, biggest first: (private commit GB,
+        working set GB, command line) each (394 amended (10))."""
+        ids = self._ids()
+        if not ids:
+            return []
+        kernel = ctypes.windll.kernel32
+        sizes = {}
+        for pid in ids:
+            process = kernel.OpenProcess(0x1000 | 0x0010, False, pid)
+            if not process:
+                continue
+            counters = self._Counters()
+            counters.cb = ctypes.sizeof(counters)
+            if kernel.K32GetProcessMemoryInfo(ctypes.c_void_p(process), ctypes.byref(counters), counters.cb):
+                sizes[pid] = (counters.pagefile / GB, counters.working_set / GB)
+            kernel.CloseHandle(ctypes.c_void_p(process))
+        lines = {}
+        try:
+            found = subprocess.run(["powershell.exe", "-NoProfile", "-Command",
+                "Get-CimInstance Win32_Process -Filter '%s' | ForEach-Object { \"$($_.ProcessId)`t$($_.CommandLine)\" }"
+                % " OR ".join("ProcessId=%d" % pid for pid in sizes)], capture_output=True, text=True, timeout=20)
+            for line in found.stdout.splitlines():
+                pid, _, command = line.partition("\t")
+                if pid.strip().isdigit():
+                    lines[int(pid)] = command.strip()
+        except (OSError, subprocess.SubprocessError):
+            pass
+        return sorted(((private, working, short_command(lines.get(pid, "pid %d" % pid)))
+            for pid, (private, working) in sizes.items()), reverse=True)
+
+    class _Counters(ctypes.Structure):
+        _fields_ = [("cb", ctypes.c_ulong), ("faults", ctypes.c_ulong),
+            ("peak_working_set", ctypes.c_size_t), ("working_set", ctypes.c_size_t),
+            ("quota_peak_paged", ctypes.c_size_t), ("quota_paged", ctypes.c_size_t),
+            ("quota_peak_nonpaged", ctypes.c_size_t), ("quota_nonpaged", ctypes.c_size_t),
+            ("pagefile", ctypes.c_size_t), ("peak_pagefile", ctypes.c_size_t)]
+
     def using_gb(self):
         """The working set of the job's processes now."""
         return self.memory()[0]
@@ -482,13 +542,7 @@ class Job:
         if self.handle is None:
             return 0.0, 0.0, 0.0
         kernel = ctypes.windll.kernel32
-
-        class Counters(ctypes.Structure):
-            _fields_ = [("cb", ctypes.c_ulong), ("faults", ctypes.c_ulong),
-                ("peak_working_set", ctypes.c_size_t), ("working_set", ctypes.c_size_t),
-                ("quota_peak_paged", ctypes.c_size_t), ("quota_paged", ctypes.c_size_t),
-                ("quota_peak_nonpaged", ctypes.c_size_t), ("quota_nonpaged", ctypes.c_size_t),
-                ("pagefile", ctypes.c_size_t), ("peak_pagefile", ctypes.c_size_t)]
+        Counters = self._Counters
         kernel.OpenProcess.restype = ctypes.c_void_p
         total, commit, peaks = 0, 0, 0
         for pid in self._ids():
@@ -846,13 +900,19 @@ def run(tree, kind, command, expect_minutes=None):
         child = subprocess.Popen(command, env=dict(os.environ, **{HELD_ENV: name, KIND_ENV: estimate}), creationflags=flags)
         job = Job(child)
         peak, low, stopped, long_logged = 0.0, 0, False, False
-        gpu_peak, commit_peak = 0.0, 0.0
+        gpu_peak, commit_peak, at_once = 0.0, 0.0, 0.0
+        # What held the memory at its peak (394 amended (10)): the listing
+        # taken when the commit last rose past the one before.
+        listed, listed_gb, listed_at = [], 0.0, 0.0
         limit = limit_seconds(row, expect_minutes)
         samples, ended = [(started, job.cpu_seconds())], None
         while child.poll() is None:
             time.sleep(WATCH_SECONDS)
             using, committed, peaks = job.memory()
             peak = max(peak, using, peaks)
+            at_once = max(at_once, using)
+            if os.name == "nt" and committed >= listed_gb + PEAK_LIST_STEP_GB and time.time() - listed_at >= PEAK_LIST_SECONDS:
+                listed, listed_gb, listed_at = job.listing(), committed, time.time()
             commit_peak = max(commit_peak, committed, job.peak_gb())
             if row["gpu"]:
                 _, used = gpu_gb()
@@ -940,8 +1000,9 @@ def run(tree, kind, command, expect_minutes=None):
                 "(heavy_job run %s %s --expect MIN -- ...)" % (tree, kind, duration / 60, ended[1], tree, kind), file=sys.stderr)
             return STOPPED_CODE
         if not stopped:
-            log("done", tree, kind, "exit %s, %.0f s, peak %.1f GB, commit %.1f GB%s" % (code, duration, peak, commit_peak,
-                ", lean" if estimate != kind else ""))
+            log("done", tree, kind, "exit %s, %.0f s, peak %.1f GB, commit %.1f GB, working set at once %.1f GB%s" % (
+                code, duration, peak, commit_peak, at_once, ", lean" if estimate != kind else ""))
+            keep_listing(tree, kind, listed, listed_gb, commit_peak)
             return shell_code(code)
         restarts += 1
         log("stopped", tree, kind, "free RAM under %.0f GB after %.0f s (peak %.1f GB); restart %d of %d" % (
@@ -949,6 +1010,20 @@ def run(tree, kind, command, expect_minutes=None):
         print("heavy_job: %s %s stopped: free RAM under %.0f GB, the newest job; queued again" % (tree, kind, MARGIN_GB), file=sys.stderr)
         if restarts > MAX_RESTARTS:
             return 75
+
+
+def keep_listing(tree, kind, listed, listed_gb, commit_peak):
+    """Prints a run's processes at its commit peak (394 amended (10)) and
+    keeps them in peaks/<tree>-<kind>.txt, the last run's."""
+    if not listed:
+        return
+    lines = ["heavy_job: %s %s at its commit peak (listed at %.1f GB of %.1f GB), private / working set GB:" % (
+        tree, kind, listed_gb, commit_peak)]
+    lines += ["  %5.2f %5.2f  %s" % each for each in listed if each[0] >= 0.05]
+    print("\n".join(lines), file=sys.stderr)
+    os.makedirs(_path("peaks"), exist_ok=True)
+    with open(_path("peaks", "%s-%s.txt" % (tree, kind)), "w") as handle:
+        handle.write("%s\n%s\n" % (datetime.datetime.now().isoformat(timespec="seconds"), "\n".join(lines)))
 
 
 def take(tree, kind, pid):

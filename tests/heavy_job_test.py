@@ -278,11 +278,11 @@ with open(gate._path("heavy_jobs.log")) as log:
 check(adopted and float(adopted[0].split("peak ")[1].split(" GB")[0]) >= 0.15, "the run inside the take was measured: %s" % (
     adopted[0].strip() if adopted else "no line"))
 
-print("== a suite out of reach runs lean (394 amended (9)) ==")
+print("== a suite out of reach runs lean (394 amended (9), (10)) ==")
 full = dict(gate.KINDS["suite"], kind="suite", ram_gb=14.6, commit_gb=12.2)
-table = {"suite": full, "suite_lean": dict(gate.KINDS["suite_lean"], ram_gb=8.0, runs_s=[600.0])}
+table = {"suite": full, "suite_lean2": dict(gate.KINDS["suite_lean2"], ram_gb=8.0, runs_s=[600.0])}
 lean = gate.lean_row(table, "suite")
-check(lean["kind"] == "suite" and lean["estimate"] == "suite_lean" and lean["ram_gb"] == 8.0 and "lean" not in lean
+check(lean["kind"] == "suite" and lean["estimate"] == "suite_lean2" and lean["ram_gb"] == 8.0 and "lean" not in lean
     and lean["max_running"] == 1 and "bench" in lean["excludes"] and lean["runs_s"] == [600.0],
     "the lean row: a suite's caps and exclusions, the variant's estimate and runs")
 check(gate.lean_row(dict(table, bench=dict(gate.KINDS["bench"])), "bench") is None, "a kind with no variant has no lean row")
@@ -307,23 +307,38 @@ gate._write(gate._path("kinds.json"), {"suite": dict(gate.KINDS["suite"], ram_gb
 gate.LEAN_AFTER_SECONDS = 0
 check(gate.take("thin", "suite", os.getpid()) == 0, "a take of a suite out of reach")
 entries = gate._entries("running")
-check(len(entries) == 1 and entries[0]["kind"] == "suite" and entries[0]["estimate"] == "suite_lean"
-    and entries[0]["ram_gb"] == gate.KINDS["suite_lean"]["ram_gb"], "holds a suite, lean, at suite_lean's estimate: %s" % entries)
+check(len(entries) == 1 and entries[0]["kind"] == "suite" and entries[0]["estimate"] == "suite_lean2"
+    and entries[0]["ram_gb"] == gate.KINDS["suite_lean2"]["ram_gb"], "holds a suite, lean, at suite_lean2's estimate: %s" % entries)
 check(gate.holds("thin", "suite"), "the tree holds a suite")
 told = os.path.join(STATE, "kind.txt")
 code = gate.run("thin", "suite", [sys.executable, "-c", "import os; open(%r, 'w').write(os.environ.get(%r, ''))" % (told, gate.KIND_ENV)])
-check(code == 0 and open(told).read() == "suite_lean", "a run inside the lean take tells its command HEAVY_JOB_KIND=suite_lean")
+check(code == 0 and open(told).read() == "suite_lean2", "a run inside the lean take tells its command HEAVY_JOB_KIND=suite_lean2")
 check(gate.release("thin", "suite") == 0 and not gate._entries("running"), "released as a suite")
 code = gate.run("thin2", "suite", [sys.executable, "-c", "import os; open(%r, 'w').write(os.environ.get(%r, ''))" % (told, gate.KIND_ENV)])
 saved = gate._read(gate._path("kinds.json"))
-check(code == 0 and open(told).read() == "suite_lean", "a run of a suite out of reach runs lean")
-check(len(saved.get("suite_lean", {}).get("runs_s", [])) == 2 and saved["suite"]["ram_gb"] == 1e12 and not saved["suite"].get("runs_s"),
-    "its time goes to suite_lean's row, the full suite's left alone: %s" % saved)
+check(code == 0 and open(told).read() == "suite_lean2", "a run of a suite out of reach runs lean")
+check(len(saved.get("suite_lean2", {}).get("runs_s", [])) == 2 and saved["suite"]["ram_gb"] == 1e12 and not saved["suite"].get("runs_s"),
+    "its time goes to suite_lean2's row, the full suite's left alone: %s" % saved)
 with open(gate._path("heavy_jobs.log")) as log:
     text = log.read()
 check("\tlean\tthin2\tsuite\t" in text and ", lean" in text.split("\tdone\tthin2\tsuite\t")[1].split("\n")[0],
     "the log says it went lean, and its done line")
-check(gate.main(["take", "x", "suite_lean"]) == 2, "suite_lean is no kind to take or run itself")
+check(gate.main(["take", "x", "suite_lean2"]) == 2, "suite_lean2 is no kind to take or run itself")
+# 394 amended (10): what held the memory at the peak, and the working set
+# at once beside the sum of each process's own peak.
+check(gate.short_command('"C:\\Users\\x\\Godot_console.exe" --log-file "C:\\a b\\x.log" --headless --path . --scene res://tests/view_test.tscn')
+    == "Godot_console.exe --headless --scene res://tests/view_test.tscn", "a Godot's command line, short: %s" % gate.short_command(
+    '"C:\\Users\\x\\Godot_console.exe" --log-file "C:\\a b\\x.log" --headless --path . --scene res://tests/view_test.tscn'))
+if os.name == "nt":
+    gate.PEAK_LIST_SECONDS = 0.0
+    code = gate.run("lister", "bench", [sys.executable, "-c", "x = bytearray(300 * 1024 * 1024); import time; time.sleep(3)"])
+    with open(gate._path("heavy_jobs.log")) as log:
+        done = [line for line in log if "\tdone\tlister\tbench\t" in line]
+    check(code == 0 and done and "working set at once" in done[0], "the done line has the working set at once: %s" % (done[0].strip() if done else "none"))
+    kept = gate._path("peaks", "lister-bench.txt")
+    text = open(kept).read() if os.path.exists(kept) else ""
+    check("python" in text.lower() and "bytearray" in text, "the processes at the commit peak kept in peaks/: %s" % text.splitlines()[-1:])
+    gate.PEAK_LIST_SECONDS = 15.0
 gate.LEAN_AFTER_SECONDS = after
 gate.total_ram_gb = real_total
 if saved_table is None:

@@ -8915,6 +8915,26 @@ machine's, not the soak's, so neither was lowered.
 heavy_job_test covers the lean row, when a suite goes lean and when not,
 its exclusions, and a take and a run going lean through a state folder.
 
+Amended a tenth time (2026-10-24, release and perf): a lean landing runs its
+other parts after the suite. The first lean landing (312ac1a8's own, 3
+scenes at once) peaked at 13.8 GB, commit 11.7, against the full suite's
+14.6 and 12.2: the scenes were not where the memory went.
+- In a lean landing land.sh (and land.ps1) runs the suite alone, 3 scenes at
+  once, and then net_test, state_test and server_boot_test together.
+- The lean estimate is a new row, suite_lean2, seeded at 9 GB: suite_lean
+  had recorded 13.8, so a lean run could never start to measure itself
+  lower. land.sh takes any HEAVY_JOB_KIND starting suite_lean as lean.
+- What held the memory is measured. Every run's done line has the working
+  set at once (the largest sum of its processes' working sets at one watch)
+  beside the peak, which sums each live process's own peak and so adds
+  short load spikes together. And when a run's commit passes its last
+  listing's by PEAK_LIST_STEP_GB (0.25), at most every PEAK_LIST_SECONDS
+  (15), its processes are listed with their private commit, working set and
+  command line (short_command: no paths, no --log-file); the last listing
+  is printed when the run ends and kept in heavy_jobs/peaks/<tree>-<kind>.txt.
+heavy_job_test covers the short command line, the done line's working set
+at once and the kept listing.
+
 
 ## 395. UI sounds
 

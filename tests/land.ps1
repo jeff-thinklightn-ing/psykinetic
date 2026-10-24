@@ -34,8 +34,10 @@ $logs = Join-Path ([IO.Path]::GetTempPath()) ('psykinetic-land-' + [Guid]::NewGu
 New-Item -ItemType Directory -Force $logs | Out-Null
 
 $suiteJobs = [Math]::Max(2, (Get-TestJobs $root) - 2)
-# The gate ran it lean (394 amended (9)): memory was short, fewer at once.
-if ($env:HEAVY_JOB_KIND -eq 'suite_lean') { $suiteJobs = [Math]::Min($suiteJobs, 3) }
+# The gate ran it lean (394 amended (9), (10)): memory was short, fewer at
+# once, and the other parts after the suite, not beside it.
+$lean = "$env:HEAVY_JOB_KIND" -like 'suite_lean*'
+if ($lean) { $suiteJobs = [Math]::Min($suiteJobs, 3) }
 Write-Output "landing tests: the suite ($suiteJobs at once), net_test, state_test and server_boot_test together"
 $started = Get-Date
 $gateTest = & python -B (Join-Path $root 'tests\heavy_job_test.py') 2>&1
@@ -57,6 +59,7 @@ try {
 			-RedirectStandardOutput (Join-Path $logs "$name.out") -RedirectStandardError (Join-Path $logs "$name.err")
 		$null = $process.Handle  # Without it Windows PowerShell may lose the exit code.
 		$running[$name] = @{ Process = $process; Started = Get-Date }
+		if ($lean -and $name -eq 'suite') { $process.WaitForExit() }
 		Start-Sleep -Milliseconds 300  # A little apart (decision 530), as the suite starts its scenes.
 	}
 } finally {
