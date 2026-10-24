@@ -5899,9 +5899,12 @@ func _test_attach_points() -> void:
 		var fist: Vector3 = (bone.call("RightIndexProximal").origin - bone.call("RightLittleProximal").origin).normalized()
 		var knuckles: Vector3 = (bone.call("RightIndexProximal").origin + bone.call("RightLittleProximal").origin) * 0.5
 		var scale: float = skeleton.global_transform.basis.get_scale().y
-		_check(grip.basis.y.normalized().dot(fist) > 0.9 and grip.origin.distance_to(knuckles) * scale < 0.06,
-				"its grip in the fist (%.3f m from the knuckles), its length along the fist's axis (%.2f)" % [
-				grip.origin.distance_to(knuckles) * scale, grip.basis.y.normalized().dot(fist)])
+		# In the palm (the mitten's middle), not out at the knuckle line (Jeff: "sword hilt is at the end of hand").
+		var wrist: Transform3D = bone.call("RightHand")
+		var out: float = (grip.origin - wrist.origin).dot(wrist.basis.y.normalized()) * scale
+		_check(grip.basis.y.normalized().dot(fist) > 0.9 and out > 0.055 and out < 0.085 and grip.origin.distance_to(knuckles) * scale > 0.02,
+				"its grip in the palm, %.3f m out from the wrist (%.3f m short of the knuckles), its length along the fist's axis (%.2f)" % [
+				out, grip.origin.distance_to(knuckles) * scale, grip.basis.y.normalized().dot(fist)])
 		_check(absf((skeleton.global_transform.basis * grip.basis).get_scale().y - 1.0) < 0.02,
 				"at its own size, whatever the person's stature")
 		# Its edge (+x) along the fingers toward the knuckles, not out of the palm (Jeff: "held sideways").

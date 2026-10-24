@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- A held weapon or tool sits in the middle of the hand, not out at the end of it.
 ## v0.1.172
 
 - What goes over the network changes, so v0.1.171 and older can't join the server: update through the launcher first.

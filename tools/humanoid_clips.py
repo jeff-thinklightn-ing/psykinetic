@@ -321,9 +321,12 @@ CHOP_GRIP = 0.18
 # out in front, the left forearm clear of the chest.
 SQUARED = [("spine_02", TURN, 18.0), ("spine_03", TURN, 14.0)]
 # Where a hand holds a thing, from its wrist in its own bone's axes here: Client3D's hand socket,
-# (0, HAND_GRIP 0.10, HAND_PALM 0.03) in Godot's, whose bone axes are these turned (x there is z
-# here, z there is -x here); a thing held lies along the socket's +y, the right bone's +z here, the
-# left's -z.
+# (0, HAND_GRIP, HAND_PALM) in Godot's, whose bone axes are these turned (x there is z here, z there
+# is -x here); a thing held lies along the socket's +y, the right bone's +z here, the left's -z.
+# Chop_Loop was authored with the socket at (0, 0.10, 0.03), as here. The socket moved into the
+# mitten's middle, (0, 0.07, 0.005) (451 amended (2)), and the shipped clip still keeps the left hand
+# on the haft by anim_rig_test's measure. Authored again with the new hold, the left forearm went 6 cm
+# into the chest at 0.55 s, so a new hold here needs CHOP_* re-posed too.
 HOLD_AT = (-0.03, 0.10, 0.0)
 
 

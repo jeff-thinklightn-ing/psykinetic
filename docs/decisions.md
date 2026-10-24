@@ -27593,3 +27593,34 @@ facing, the stand cell floor, the three guards with their facings inside the anc
 markers as before); labyrinth_test `_test_castle_halls` (the forge and rack kept and solid in
 generation 1, the guards kept in generations 1 and 2 with the moss roll off their cells);
 view_test's footprint check covers both kinds. docs/levels.md, CHANGELOG. No new class_name.
+## 451 amended (2): the hand pass (Jeff: the sword's grip, the shield's side, the block)
+
+Jeff (2026-10-24 02:10): "sword and shield also need graphical fix, sword hilt is at the end of
+hand, not in palm. shield should be carried on the outside of arm, not inside. shield block
+graphic should be raising shield in front of body, not sideways out." With the great axe's left
+hand off its haft (art-kit's stills after 451 amended), the coordinator approved four client steps:
+the grip, the shield, the block and two hands. Each lands on its own.
+
+### Step 1: the grip in the palm
+
+The bodies' hands are mittens: body_gen weights each hand's mesh to its hand bone, so the
+fingers' curl (Idle's and Sword_Idle's alike, about 78 degrees) never bends it. Posed in Blender
+(build/hand/measure.py, the Body's vertices weighted most to the right hand or its fingers), the
+mitten runs 0.017 to 0.13 m out from the wrist along the hand's +Y. Its middle is at 0.069 (the
+woman's 0.065), and it sits 0.005 to the palm's side of the bone and 5 cm thick. The socket was
+at the knuckle line tools/grip_sockets.gd measured from the finger bones: 0.10 out and 0.03 to the
+palm, so on a mitten a hilt sat three quarters of the way to its tip, at the palm's surface.
+
+- **The socket:** HAND_GRIP 0.07 and HAND_PALM 0.005 put a held piece's grip (its origin) through
+  the mitten's middle, for both hands and every body (each times its hand size). A finger-curl
+  modifier was the first design, dropped: with mitten hands it changes nothing.
+- **The chop:** Chop_Loop was authored with the old hold (humanoid_clips' HOLD_AT, kept with a
+  note). The shipped clip keeps the left hand on the haft with the new socket, by anim_rig_test's
+  measure. Authored again with the new hold, the left forearm went 6 cm into the chest at 0.55 s,
+  so the clip stays as it is.
+- **The unread "stance":** HUMANOID_MOVES' "stance" (Sword_Idle) is read by nothing, and the hand
+  pass doesn't use it. A held weapon plays the same idle, walk and swings as before.
+
+view_test _test_attach_points: a held sword's grip 0.055 to 0.085 m out from the wrist (reads
+0.069), short of the knuckles, along the fist's axis. Client only, protocol unchanged, no new
+class_name.

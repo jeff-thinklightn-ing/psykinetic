@@ -738,12 +738,17 @@ const HUMANOID_MOVES := {
 ## along the fingers, +X toward the right hand's index and the left's little
 ## finger, +Z out of the palm; the trunk's +X its left, +Z its front), as
 ## {socket: [bone, transform in the bone's frame]}. A held piece (art_style:
-## its origin the grip, its length along +Y) sits at a hand's socket inside
-## the closed fist, its length out of the thumb's side; tools/grip_sockets.gd
-## measured these from the bodies' finger bones (the goblin, without them,
-## takes the human hand's frame scaled to its hand's length, 0.69).
-const HAND_GRIP := 0.10
-const HAND_PALM := 0.03
+## its origin the grip, its length along +Y) sits at a hand's socket in the
+## middle of the hand, its length out of the thumb's side. The bodies' hands
+## are mittens (their fingers don't bend the mesh), so the grip is the
+## mitten's middle, not the knuckle line tools/grip_sockets.gd measured from
+## the finger bones; there it sat at the hand's end (Jeff: "sword hilt is at
+## the end of hand, not in palm"). The mitten, posed, from the wrist: 0.017
+## to 0.13 along +Y, its middle 0.069 (the woman's 0.065), 0.005 to the palm's
+## side of the bone (build/hand/measure.py). The goblin takes the human hand's
+## frame scaled to its hand's length, 0.69.
+const HAND_GRIP := 0.07
+const HAND_PALM := 0.005
 static func _sockets(hand: float, hip: float, back: float, chest: float) -> Dictionary:
 	return {
 		"hand_r": ["RightHand", Transform3D(Basis(Vector3(0, 0, 1), Vector3(1, 0, 0), Vector3(0, 1, 0)),
