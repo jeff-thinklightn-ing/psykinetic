@@ -27161,3 +27161,12 @@ approved three pieces, palette only and restrained. Art-gen's prop.grave (a head
 
 Scripts and renders are in C:/dev/review/graves. art_kit_test passes. Client art only, protocol
 unchanged, no new class_name.
+
+## 451 amended (2), art-kit's side: the battle axe's hands
+
+For pc-character's step 4 of the hand pass; it corrects the 0.87 in 451 amended, art-kit's side.
+The battle axe's grip_2 at 0.87 (its upper wrap) was wider than the two-handed clips hold the
+hands: about 0.45 m apart along the haft. Pc-character's step 4, the left hand on grip_2, left
+the draugr's left arm (0.52 m) 0.3 m short in every pose. The upper wrap moves down to 0.45 above
+the grip, matching the giant axe, with the bronze ring between the wraps (make_draugr_items.py),
+and grip_2 follows in the slots.json override and the blend's empty. No clip of its own is needed.
