@@ -28923,3 +28923,56 @@ lie is gone. Dungeon's side lays every generated dead one on open floor.
   _test_barrow_dead (the skeleton and its guard at rest at all eight
   facings: not tipped, every posed joint with REST_FLESH inside the cell).
   No new class_name.
+
+## 573 amended (3), enemy-ai's side: the draugr at rest stands silent, and his rest is kept
+
+Jeff on v0.1.172 (the coordinator's report, release's journal): "Draugr was
+asking for more coin. As a result Draugr is lying on ground full health."
+The trace: Pip opened an unpaid fight (companions' fault, theirs to fix);
+beaten to 1, the draugr yielded unblessed (573 amended's "death"), was laid
+to rest three days, healed to full and lay still (his own down_until hold),
+and at rest he still spoke his deal; Jeff's room reset at 09:48:29 put him
+back from the level's table without his rest, seated and fightable. None of
+it was in the journal. The coordinator's approval of (a), (i), (ii), (iii);
+the label from release.
+
+- **(a) Silent at rest**: offers_for gives nothing while he rests,
+  accept_offer refuses (no gold taken: a pact can't be bought while he
+  rests; before this a pact raised him from it), and _speak (the deal
+  spoken first, the hall's door and ask) does not run. Draugr.resting and
+  Draugr.rest_words ("He rests. Come back in N days.", at least one): a
+  click or E on him (Main._monster_greeted) tells the one who asked, as a
+  Server line; a deal button or a sum said hears it as the refusal's line.
+  So that a click talks rather than strikes, Monster.peaceable is true at
+  rest too (its meaning on the wire: "a click or E talks" now also while he
+  rests; an older client simply opens the talk).
+- **(i) Standing, never lying**: _lie_still (the down_until hold) goes;
+  Draugr._rest_still walks him back to his seat (home, the throne's cell,
+  drawn at its stand point, 580 step 3) and stands him there turned its
+  way; pc-character's seated idle (580 step 4) will sit him on it. Struck
+  on at rest he stands at 1, silent. _rise_again no longer touches
+  down_until.
+- **(ii) The rest kept**: World.dead_rest (580, saved by Main) already holds
+  his rest over his zone; Main._start_level (a room reset, a regeneration's
+  rebuild, the boot's first start) now keeps every zone's rests across
+  World.reset, which cleared them all, and Draugr._ready, put back from the
+  level's table whose props never had his rests_until, takes it from his
+  zone's dead_rest for his side. So a reset, a restart and a regeneration
+  leave him and his dead at rest.
+- **(iii) Journaled**: "[draugr] <zone>: pact taken, <level>", "pact lost",
+  "won, N blessed", "respect (unpaid, beaten)", "at rest till step N", "his
+  rest is over": no names.
+- Also (631 amended's): a resting dead one come home mid-step turns its
+  home's way once its step is done (World.face waits for it).
+- A spin, throw or charge he began before yielding landed after (World's
+  _boss_moves had no call to drop one): Draugr._drop_moves, in _yield and
+  _end_pact before _recall_axe, calls combat's World.drop_boss_move (603
+  amended (3), combat's side, approved by the coordinator) by name; until
+  it lands, nothing.
+- Tests: monster_test _test_draugr (at rest standing, peaceable, no offer,
+  his rest's words; no pact bought, the gold kept; silent to one come in,
+  no hall shut; back to his seat, turned its way; struck on, at 1; put back
+  without his props, at rest by his zone's rest); resident_test
+  _test_reset_keeps_rests (a room reset keeps this room's rest and
+  another's). Wire: peaceable's meaning (a line under the next revision,
+  per release); no new class_name.

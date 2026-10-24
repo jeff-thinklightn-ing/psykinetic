@@ -71,6 +71,7 @@ func _ready() -> void:
 	_test_visible_work()
 	_test_field_work()
 	_test_bodies_only_near()  # Last: its resident would answer the voice tests.
+	_test_reset_keeps_rests()  # After it: a room reset puts the town back.
 
 	Production.type_of = Townsfolk.roll_type
 	remove_child(_main)
@@ -783,6 +784,20 @@ func _end_band(rules_was: Variant) -> void:
 	else:
 		World.towns.rules["sought"] = rules_was
 	_sync()
+
+
+## A room reset (573 amended (3)): the draugr's rests over every zone are
+## kept (World.reset clears them; Main._start_level puts them back), so he
+## and his dead rest on when his room is put back from the level's table.
+func _test_reset_keeps_rests() -> void:
+	print("
+== a room reset keeps the draugr's rests (573 amended (3)) ==")
+	World.dead_rest["rs_lair"] = {"until": World.steps + 500, "side": "dead"}
+	World.dead_rest[TOWN] = {"until": World.steps + 300, "side": "dead"}
+	_main._start_level()
+	_check(World.dead_rest.get("rs_lair", {}).get("until") == World.steps + 500 and World.dead_rest.get(TOWN, {}).get("until") == World.steps + 300,
+		"after the reset both rests stand, this room's and another's (%s)" % [World.dead_rest])
+	World.dead_rest.clear()
 
 
 ## The scholar keeps the chronicle and the lawspeaker says so (decision 491).

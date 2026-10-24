@@ -168,17 +168,26 @@ func _ready() -> void:
 	_base_hp = max_hp
 	_base_damage = attack_damage
 	var kept: Variant = spawn_spec.get("props", {}).get("rests_until") if spawn_spec.get("props") is Dictionary else null
+	if kept == null or int(kept) <= World.steps:
+		# His rest as World.dead_rest holds it over his zone (saved; 573 amended (3)): a room reset, a
+		# restart or a regeneration puts him back from the level's table, whose props never had it.
+		var rest: Dictionary = World.dead_rest.get(zone if zone != "" else World.zone.name, {})
+		if not rest.is_empty() and str(rest.get("side", "")) == _factions().of_kind(str(spawn_spec.get("kind", "draugr"))):
+			kept = int(rest.get("until", 0))
 	if kept != null and int(kept) > World.steps:
 		rests_until = int(kept)
+		_keep_prop("rests_until", rests_until)
 		state = State.AT_REST
-	peaceable = state == State.SEATED  # What a client may read of him (648, npc's side): seated at his spawn, a click talks.
+	# What a client may read of him (648, npc's side): seated at his spawn, or at rest, a click talks.
+	peaceable = state == State.SEATED or state == State.AT_REST
 
 
 func _sim_tick() -> void:
-	# What a client may read of him (648, npc's side): seated and unprovoked, a click or E talks; in a pact,
-	# struck or provoked, or at rest, it strikes.
-	peaceable = state == State.SEATED and _provoked == null and _struck_by() == null
-	_speak()
+	# What a client may read of him (648, npc's side): seated and unprovoked, or at rest (573 amended (3):
+	# his rest words), a click or E talks; in a pact, struck or provoked, it strikes.
+	peaceable = state == State.SEATED and _provoked == null and _struck_by() == null or state == State.AT_REST
+	if state != State.AT_REST:
+		_speak()  # At rest he is silent (573 amended (3)): no offer, no hall ask.
 	match state:
 		State.PACT:
 			if not _pact_holds():
@@ -189,7 +198,7 @@ func _sim_tick() -> void:
 			elif World.tick - _stilled_tick >= STILL_EVERY_TICKS:
 				_still_the_dead()
 	if state == State.AT_REST:
-		_lie_still()  # Laid to rest: he lies still till a pact wakes him, struck or not.
+		_rest_still()  # Laid to rest: he stands still at his seat till his rest runs out, struck or not.
 		return
 	super()
 
@@ -385,6 +394,8 @@ func offers_for(player_id: String) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	if state == State.PACT:
 		return out  # A pact is on (theirs or another's): no more words.
+	if state == State.AT_REST:
+		return out  # At rest no pact is bought (573 amended (3)); a click hears rest_words.
 	var steps: Array = deals().map(func(each: Dictionary) -> int: return int(each["gold"]))
 	out.append({"id": "deal:%d" % id, "kind": "deal", "title": TITLE, "words": WORDS,
 		"what": {"offering": steps[0], "least": steps[0], "most": steps[-1], "steps": steps},
@@ -399,6 +410,8 @@ func accept_offer(player: Player, offer: Dictionary, gold: int) -> Dictionary:
 	var deal := deal_for(gold)
 	if state == State.PACT:
 		return {"ok": false, "say": "I am bound in another's pact. Wait.", "line": ""}
+	if state == State.AT_REST:
+		return {"ok": false, "say": "", "line": rest_words()}
 	if not str(offer.get("id", "")).begins_with("deal:"):
 		return {"ok": false, "say": "", "line": ""}
 	if gold <= 0:
@@ -541,6 +554,7 @@ func _open_hall() -> void:
 ## The pact begins with [param player] at [param level]: he rises (from his
 ## rest too), grows to it, and raises its dead beside him.
 func start_pact(player: Player, level: String) -> void:
+	print("[draugr] %s: pact taken, %s" % [zone if zone != "" else World.zone.name, level])
 	state = State.PACT
 	peaceable = false  # The same tick, for the client (648, npc's side).
 	challenger_id = player.player_id
@@ -600,6 +614,8 @@ func _pact_holds() -> bool:
 ## The pact lost (the challenger fallen, or gone): he heals, keeps the gold,
 ## and sits again (or rests on, if he was resting).
 func _end_pact() -> void:
+	print("[draugr] %s: pact lost" % (zone if zone != "" else World.zone.name))
+	_drop_moves()
 	_recall_axe()
 	challenger_id = ""
 	difficulty = ""
@@ -615,6 +631,7 @@ func _yield() -> void:
 	target = null
 	_provoked = null
 	_drop_windup()
+	_drop_moves()
 	_recall_axe()
 	if state == State.PACT:
 		var ids: Array = []
@@ -622,6 +639,7 @@ func _yield() -> void:
 			if entity is Player and _in_lair(entity) and entity.hp > 0:
 				ids.append((entity as Player).player_id)
 		blessed_last = ids
+		print("[draugr] %s: won, %d blessed" % [zone if zone != "" else World.zone.name, ids.size()])
 		said.emit(WON)
 		# His battle axe for the winners, at his feet (603: his row's
 		# "yields", items' Monster.yielded); never on a lost or unpaid fight.
@@ -635,6 +653,7 @@ func _yield() -> void:
 	else:
 		# Unpaid (573 amended): his "death". He yields as ever, blesses
 		# nobody, gives his respect and is laid to rest.
+		print("[draugr] %s: respect (unpaid, beaten)" % (zone if zone != "" else World.zone.name))
 		said.emit(RESPECT)
 	if rests_until <= World.steps:
 		rests_until = World.steps + RISE_DAYS * DayNight.day_steps
@@ -644,10 +663,20 @@ func _yield() -> void:
 	_restore()
 	if rests_until > World.steps:
 		state = State.AT_REST
-		_lie_still()
+		peaceable = true
+		print("[draugr] %s: at rest till step %d" % [zone if zone != "" else World.zone.name, rests_until])
 		_still_the_dead()
 	else:
 		state = State.SEATED
+
+
+## His fight over (yielded, or the pact lost): a spin, throw or charge under
+## way called off, its telegraph ended unlanded, no blow after it (combat's
+## World.drop_boss_move, 603 amended (3); before it, nothing). Before
+## _recall_axe, which clears a dropped charge's disarmed mark.
+func _drop_moves() -> void:
+	if World.has_method("drop_boss_move"):
+		World.call("drop_boss_move", self)
 
 
 ## His fight over (yielded, or the pact lost): a thrown axe, bound to him,
@@ -671,16 +700,29 @@ func _restore() -> void:
 	_retinue.clear()
 
 
-## At rest, he lies still (down_until, which the views draw), renewed
-## before he would get up; his own, since the dead stand at rest (631
-## amended).
-const LAID_HOLD_TICKS := 6000
-const LAID_RENEW_TICKS := 600
+## At rest (573 amended (3); Jeff on v0.1.172: "Draugr is lying on ground
+## full health"): he stands, never lying, back to his seat (home: the
+## throne's cell, its stand point drawn) and still there, turned its way;
+## his seated idle, when pc-character's 580 step 4 lands, sits him on it.
+func _rest_still() -> void:
+	target = null
+	if home != NO_TILE and tile != home:
+		move_ticks = _pace * IDLE_PACE
+		_idle_step(home)
+	elif facing != home_facing:
+		World.face(self, home_facing)
 
 
-func _lie_still() -> void:
-	if down_until - World.tick < LAID_RENEW_TICKS:
-		down_until = World.tick + LAID_HOLD_TICKS
+## Whether he rests (573 amended (3)): laid to rest, silent, no pact.
+func resting() -> bool:
+	return state == State.AT_REST
+
+
+## What a click or E on him hears while he rests (573 amended (3)): his
+## rest's days left, at least one.
+func rest_words() -> String:
+	var days := maxi(1, ceili(float(rests_until - World.steps) / maxf(DayNight.day_steps, 1.0)))
+	return "He rests. Come back in %d day%s." % [days, "" if days == 1 else "s"]
 
 
 ## His rest over: the curse renews, and the dead rise.
@@ -691,7 +733,7 @@ func _rise_again() -> void:
 		World.dead_rest.erase(zone_name)
 	if state == State.AT_REST:
 		state = State.SEATED
-		down_until = World.tick
+		print("[draugr] %s: his rest is over" % (zone if zone != "" else World.zone.name))
 	for entity in World.monsters():
 		if entity != self and entity is Monster and _is_dead(entity):
 			(entity as Monster).rise()

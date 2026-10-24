@@ -4041,7 +4041,9 @@ func _start_level(from_snapshot := false, whole := true, with_saved := {}) -> vo
 		var pet: Companion = _companions[id]
 		if not is_instance_valid(pet) or pet.zone == here:
 			_companions.erase(id)
+	var rests := World.dead_rest.duplicate(true)  # The draugr's rests (580; 573 amended (3)): every zone's, not this room's to lose.
 	World.reset()
+	World.dead_rest = rests
 	for child in entities.get_children():
 		entities.remove_child(child)
 		child.queue_free()
@@ -11256,6 +11258,9 @@ func _monster_greeted(player: Player, monster: GridEntity) -> void:
 	var offers: Array = monster.offers_for(player.player_id)
 	Transcript.record(name, _display_name(player), "[greets]")
 	if offers.is_empty():
+		if monster.has_method("resting") and monster.call("resting"):
+			# The draugr at rest (573 amended (3)): silent; the one who asked is told how long.
+			Net.broadcast_to([player.owner_peer], "party", {"from": "Server", "text": str(monster.call("rest_words"))})
 		_send_monster_offers(monster, player.player_id, player.owner_peer)
 		return
 	var standing := _standing_for(player.player_id, key)
