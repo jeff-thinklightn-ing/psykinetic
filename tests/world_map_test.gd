@@ -665,11 +665,15 @@ func _test_level_routes() -> void:
 	var built := Time.get_ticks_usec()
 	var routes := world_map.routes()
 	var routed := Time.get_ticks_usec()
+	# Handed to the pool: a task queued when routes() returns (counted, not
+	# timed, so a soak or a suite beside it does not fail it).
+	var queued: bool = routes._threaded and not routes._tasks.is_empty()
 	routes.wait()
 	print("    WorldMap.build %.0f ms; routes %.0f ms on this thread, then distance fields on the pool in %.0f ms (%s)" % [
 		(built - started) / 1000.0, (routed - built) / 1000.0, (Time.get_ticks_usec() - routed) / 1000.0,
 		", ".join(routes.build_ms.keys().map(func(area: String) -> String: return "%s %.0f ms" % [area, routes.build_ms[area]]))])
-	_check((routed - built) / 1000.0 < 50.0, "making the routes leaves the distance fields to the pool: under 50 ms here")
+	_check(queued and (routed - built) / 1000.0 < 500.0,
+		"making the routes leaves the distance fields to the pool: a task queued, back in %.0f ms (under 500 even beside a soak)" % [(routed - built) / 1000.0])
 	_check(routes.gaps.is_empty(), "every way on the levels has its portals (%s)" % [routes.gaps])
 	# The worst a pair of portals can cost: a walk that floods the whole area.
 	for area_name: String in world_map.areas:
