@@ -27722,3 +27722,57 @@ take, looped, silent at first, at the slot's level after the fade; the menu agai
 the one; a host's Play fades it out and it is gone; a new menu's title fades out on the
 server's "map". Client only, protocol unchanged, no new
 class_name.
+
+## 655 amended. The own held walk bends too, and the cut is capped
+
+655 left the own body's held-key walk straight: Main._drive_wasd appends
+the next step only as the one on screen ends (MovePrediction.ready_for_step),
+so at a step's tail no step followed to bend toward, and the clip pair
+(2026-10-24) showed companions and other players bending while the player's
+own body turned at the centre. Jeff's complaint was about his own walk. The
+coordinator approved: the hint, only where no planned step follows; the
+cut capped at a quarter cell; a refused step sliding back, never snapping.
+
+The hint: Main._drive_wasd tells the prediction the direction the keys hold
+each frame (GridEntity.hint_step, MovePrediction.hint; ZERO for none). As a
+step's tail begins (_bent, where the bend is settled) with no planned step
+after it, no move order and a hint under HINT_FRESH_TICKS old that the
+replicated world would not refuse (_blocked), the bend is toward the cell
+the hint points at. When the step comes (step()), it starts on that bend
+(bend_prev), as a planned step does; the key changed in the last half step,
+it starts straight from the bend's end to its centre, as a mirror's
+catch-up slide does, and the step after bends again. Main reads the keys
+after the bodies are drawn, so the step comes later in the frame the one
+before ends in: with the key held a frame ago the body is drawn on along
+the hinted bend meanwhile (position, as the step to come would draw it,
+COAST_MAX of it at most), and the step joins it without a jump; a fixed
+rest at the apex showed a two-frame jump instead. No step by the next
+frame, or the key let go, the body slides from where it is to the centre
+over SETTLE_TICKS (a settle Step, eased; ready_for_step is true through it,
+and a step or order under way starts from where the body is drawn). A walk
+that ended within the tick is continued from the cell's centre, on the
+line, rather than from the body's last drawn point a frame short of it,
+and a rest point within the projection's rounding of a centre counts as
+the centre (_drawn), so a held walk's steps are all between centres and
+bend. A hint into a wall or into someone bends
+nothing: the body reaches the centre and stops there. A step the server
+refuses is corrected as before, rebase blending from the drawn point, now
+on the bend, to the server's cell: a slide, not a snap. The host's own body
+(no prediction) walks straight as before.
+
+The cap (GridEntity.capped_reach, in bent_position and bent_tangent so the
+timing matches): the apex is reach / 4 of the turn (the step out less the
+step in) from the centre, 0.18 cells at a right angle and 0.25 at a
+reversal at the half-step reach, but 0.35 at a diagonal reversal, where the
+body left its cell; the reach is cut to 1 / |turn| so no corner is cut by
+more than a quarter cell. Mirrors share it.
+
+prediction_test _test_hinted_walk: a held zigzag against the scripted
+server (every step starting on the bend the one before settled toward it,
+the first corner cut by under a quarter cell, no frame jump over a frame
+and a half's walk, the key let go settling the body to the centre); a key
+held into a wall (no bend, the body on the centre); a third step the server
+refuses (one correction, a slide back from the bend, no jump). view_test
+_test_bent_walk: a reversal cut exactly 0.25, a diagonal reversal capped
+to it, the capped bend still starting on the straight line at its moment.
+Client only; no wire change; no new class_name.

@@ -807,6 +807,8 @@ static func bent_position(prev: Vector2i, from: Vector2i, to: Vector2i, next: Ve
 		reach_in := BEND_REACH, reach_out := BEND_REACH) -> Vector2:
 	var a := Vector2(from)
 	var b := Vector2(to)
+	reach_in = capped_reach(Vector2(prev), a, b, reach_in) if prev != UNKNOWN_TILE else 0.0
+	reach_out = capped_reach(a, b, Vector2(next), reach_out) if next != UNKNOWN_TILE else 0.0
 	if prev != UNKNOWN_TILE and reach_in > 0.0 and t < reach_in:
 		return _bend_point(Vector2(prev), a, b, reach_in, 0.5 + t / (2.0 * reach_in))
 	if next != UNKNOWN_TILE and reach_out > 0.0 and t > 1.0 - reach_out:
@@ -821,11 +823,26 @@ static func bent_tangent(prev: Vector2i, from: Vector2i, to: Vector2i, next: Vec
 	var a := Vector2(from)
 	var b := Vector2(to)
 	var tangent := b - a
+	reach_in = capped_reach(Vector2(prev), a, b, reach_in) if prev != UNKNOWN_TILE else 0.0
+	reach_out = capped_reach(a, b, Vector2(next), reach_out) if next != UNKNOWN_TILE else 0.0
 	if prev != UNKNOWN_TILE and reach_in > 0.0 and t < reach_in:
 		tangent = _bend_slope(Vector2(prev), a, b, reach_in, 0.5 + t / (2.0 * reach_in))
 	elif next != UNKNOWN_TILE and reach_out > 0.0 and t > 1.0 - reach_out:
 		tangent = _bend_slope(a, b, Vector2(next), reach_out, (t - 1.0 + reach_out) / (2.0 * reach_out))
 	return tangent.normalized() if not tangent.is_zero_approx() else (b - a).normalized()
+
+
+## 655 amended: [param reach] round [param centre], coming from
+## [param before] and going on to [param after], cut so the corner is never
+## cut by more than a quarter cell. The bend's apex lies reach / 4 of the
+## turn (the step out less the step in) from the centre: 0.18 cells at a
+## right angle and 0.25 at a reversal with the half-step reach, but 0.35
+## at a diagonal reversal, where the body left its cell.
+static func capped_reach(before: Vector2, centre: Vector2, after: Vector2, reach: float) -> float:
+	var turn := (after - centre) - (centre - before)
+	if turn.length_squared() < 0.0001:
+		return reach
+	return minf(reach, 1.0 / turn.length())
 
 
 ## The quadratic round [param centre], from [param reach] of the way back
@@ -1055,6 +1072,13 @@ func predict_step(direction: Vector2i) -> bool:
 	if _prediction == null:
 		return false
 	return _prediction.step(direction)
+
+
+## 655 amended: WASD, each frame: the direction the keys hold now (ZERO
+## for none), so the walk shown bends toward the step that will follow.
+func hint_step(direction: Vector2i) -> void:
+	if _prediction != null:
+		_prediction.hint(direction)
 
 
 ## Whether the local player's walk is ready for its next WASD step: the

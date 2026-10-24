@@ -8,8 +8,11 @@ extends Node
 ## server takes 5 ticks late (a backlog of over a step) is corrected at most
 ## once and catches up, and so does one 12 ticks late, past the wait, its
 ## queued steps shown again from the server's tile; over a slow link (a
-## 300 ms round trip) the walk is neither corrected nor slowed. Run it with
-## tests/run.ps1 or tests/run.sh.
+## 300 ms round trip) the walk is neither corrected nor slowed. 655
+## amended: a held key's hint bends the walk shown toward the step to
+## come, the key let go settles the body to the centre, a hint into a wall
+## bends nothing, and a step the server refuses slides back from the bend.
+## Run it with tests/run.ps1 or tests/run.sh.
 
 const SIZE := 40
 const FRAME := 1.0 / 60.0
@@ -38,6 +41,7 @@ func _ready() -> void:
 	_check(long["behind"] <= long["step"] * 1.01, "and caught up (%.2f ticks behind at the end)" % long["behind"])
 	var slow := _walk(3.0, 0.0, 20)
 	_check(slow["corrections"] == 0 and slow["stretched"] == 0, "a 300 ms round trip: none corrected (%d), none slower (%d)" % [slow["corrections"], slow["stretched"]])
+	_test_hinted_walk()
 	Net.test_lag = 0.0
 	Level.unregister("pt_field")
 	_main.load_map(Level.DEFAULT_MAP)
@@ -46,12 +50,135 @@ func _ready() -> void:
 	get_tree().quit(1 if _failures > 0 else 0)
 
 
-## An open stone field, the start at (2, 20).
+## An open stone field, the start at (2, 20), one wall cell at (2, 18).
 static func _layout() -> Image:
 	var rows: Array[String] = []
 	for y in 2 * SIZE - 1:
 		rows.append(".".repeat(2 * SIZE - 1))
+	rows[36] = rows[36].substr(0, 4) + "#" + rows[36].substr(5)
 	return Level.image_from_rows(rows, {Vector2i(2, 20): "start"})
+
+
+## 655 amended: the own walk's bends from the held key.
+func _test_hinted_walk() -> void:
+	print("\n== the own walk bends toward the held key's next step (655 amended) ==")
+	Net.test_lag = 0.4 * World.TICK_DT  # The server keeping up (40 ms), as the first walk is.
+	var zigzag := _drive([Vector2i(1, 0), Vector2i(1, 0), Vector2i(0, 1), Vector2i(-1, 1), Vector2i(-1, 0)], true)
+	_check(zigzag["corrections"] == 0, "a held zigzag, the server keeping up: no corrections (%d)" % zigzag["corrections"])
+	_check(zigzag["bends"] == 4, "each step's end bent toward the step the held key then brought, which starts on that bend (%d of 4)" % zigzag["bends"])
+	_check(zigzag["cut"] >= 0.12 and zigzag["cut"] <= 0.26, "at the first corner the body is off the centre, on the bend, by under a quarter cell (%.3f)" % zigzag["cut"])
+	_check(zigzag["jump"] <= zigzag["frame"] * 1.5, "no frame jumps: at most a frame and a half's walk between frames (%.3f cells, a frame's walk %.3f)" % [zigzag["jump"], zigzag["frame"]])
+	_check(zigzag["settled"] and zigzag["rest"].distance_to(Vector2(zigzag["end"])) < 0.02 and not zigzag["active"],
+			"the key held past the last step's tail then let go: the body settles to the last cell's centre and the walk ends (%s, %s)" % [zigzag["rest"], zigzag["end"]])
+	var wall := _drive([Vector2i(0, -1), Vector2i(0, -1)], true)
+	_check(wall["bends"] == 0 and not wall["settled"] and not wall["active"] and wall["rest"].distance_to(Vector2(wall["end"])) < 0.1 and wall["end"] == Vector2i(2, 19),
+			"a key held into a wall: no bend toward it, the body stops on the cell's centre (%s, %s)" % [wall["rest"], wall["end"]])
+	var refused := _drive([Vector2i(1, 0), Vector2i(1, 0), Vector2i(0, 1)], true, 2)
+	_check(refused["corrections"] == 1 and refused["bends"] == 2, "a third step the server refuses: one correction, the two before it bent (%d, %d)" % [refused["corrections"], refused["bends"]])
+	_check(refused["jump"] <= refused["frame"] * 1.5 and not refused["active"] and refused["rest"].distance_to(Vector2(refused["end"])) < 0.02 and refused["end"] == Vector2i(4, 20),
+			"the body slides back from the bend to the server's cell, no jump (%.3f cells a frame at most; rest %s, server %s)" % [refused["jump"], refused["rest"], refused["end"]])
+
+
+## [param dirs] WASD steps held from (2, 20), one after another as each shown
+## step ends, the key read each frame (the hint): the next direction, the
+## last one again after them while [param hold_on], else none. The scripted
+## server as _walk's, keeping up, refusing the step at [param refuse_at]
+## (and emptying its queue, as the real one does). {corrections, bends
+## (steps that started on the bend the step before settled toward them),
+## cut (how far off the centre the body is as the first turn's corner
+## moment passes), jump (the most the body moved between frames, cells),
+## frame (a straight step's walk in a frame), settled (a settle was shown),
+## active (the prediction still active at the end), rest (where the body
+## was last drawn), end (the server's tile at the end)}.
+func _drive(dirs: Array, hold_on: bool, refuse_at := -1) -> Dictionary:
+	var player := _player()
+	World._relocate(player, Vector2i(2, 20))
+	for other in World.get_entities():
+		if other != player and other.spawned:
+			World._relocate(other, Vector2i(2, 35))
+	player.position = Iso.grid_to_local(Vector2(player.tile))
+	var shown := MovePrediction.new(player)
+	var pace := World.step_ticks(player, Vector2i(1, 0))
+	var one_way := Net.test_lag / World.TICK_DT / 2.0
+	var clock := 0.0
+	var sent: Array = []  # [arrives at the server, direction]
+	var told: Array = []  # [reaches the client, tile, refused]
+	var server_tile := player.tile
+	var server_due := 0.0
+	var server_tick := 0
+	var server_took := 0
+	var sent_count := 0
+	var corrections := 0
+	var bends := 0
+	var cut := -1.0
+	var jump := 0.0
+	var settled := false
+	var last_pos := Vector2(player.tile)
+	var total := 0.0
+	for direction: Vector2i in dirs:
+		total += World.step_ticks(player, direction)
+	while clock < total + 30.0:
+		clock += FRAME * World.TICK_RATE
+		if shown.advance(FRAME):
+			corrections += 1
+			shown.rebase(player.tile, 2.0)
+		# The frame's draw, as GridEntity._process: the body where the prediction has it.
+		if shown.is_active():
+			var pos := Iso.local_to_grid(shown.position())
+			if pos.distance_to(last_pos) > FRAME * World.TICK_RATE / pace * 1.5:
+				var current: MovePrediction.Step = shown._current()
+				print("    jump at %.2f: %s -> %s on %s->%s t %.2f (ease %s, settle %s, %d steps, bend %s/%s)" % [clock, last_pos, pos,
+						current.from, current.to, (clock - current.start) / current.duration, current.ease, current.settle, shown._steps.size(), current.bend_prev, current.bend_next])
+			jump = maxf(jump, pos.distance_to(last_pos))
+			last_pos = pos
+			player.position = shown.position()
+			if shown._steps.back().settle:
+				settled = true
+		# Main._drive_wasd: the key held told each frame; the step as the one shown ends.
+		var held: Vector2i = Vector2i.ZERO
+		if sent_count < dirs.size():
+			held = dirs[sent_count]
+		elif hold_on:
+			held = dirs.back()
+		shown.hint(held)
+		if sent_count < dirs.size() and shown.ready_for_step():
+			var before: MovePrediction.Step = shown._steps.back() if shown.is_active() else null
+			if shown.step(held):
+				var step: MovePrediction.Step = shown._steps.back()
+				if before != null and before.bend_next == step.to and step.bend_prev == before.from:
+					bends += 1
+					if cut < 0.0 and step.to - step.from != before.to - before.from:
+						cut = Iso.local_to_grid(shown.position()).distance_to(Vector2(step.from))
+				sent.append([clock + one_way, held])
+			sent_count += 1
+		while server_tick <= floori(clock):
+			if not sent.is_empty() and sent[0][0] <= server_tick and server_tick >= server_due:
+				var direction: Vector2i = sent.pop_front()[1]
+				var start := float(server_tick)
+				if server_tick - server_due < 1.0:
+					start = server_due  # Its clock kept within a tick, as World.try_move keeps it.
+				server_due = start + pace
+				var refuse := server_took == refuse_at
+				if refuse:
+					sent.clear()
+				else:
+					server_tile += direction
+				server_took += 1
+				told.append([server_tick + one_way, server_tile, refuse])
+			server_tick += 1
+		while not told.is_empty() and told[0][0] <= clock:
+			var reply: Array = told.pop_front()
+			World._relocate(player, reply[1])
+			if reply[2]:
+				# As GridEntity._step_refused: the queue gone, the walk rebased.
+				corrections += 1
+				shown.server_dropped_queue()
+				shown.rebase(reply[1], 2.0)
+			elif shown.is_active() and not shown.reconcile(reply[1]):
+				corrections += 1
+				shown.rebase(reply[1], 2.0)
+	return {"corrections": corrections, "bends": bends, "cut": cut, "jump": jump, "frame": FRAME * World.TICK_RATE / pace,
+			"settled": settled, "active": shown.is_active(), "rest": last_pos, "end": server_tile}
 
 
 ## [param steps] WASD steps east held from (2, 20), a round trip of

@@ -1964,6 +1964,7 @@ func _drive_wasd() -> void:
 		_client3d.set_frozen(not keys.is_empty())
 	var direction := wasd_direction(key_vector(keys), _view_yaw())
 	_record_walk(player)
+	player.hint_step(direction)  # 655 amended: the walk shown bends toward the step to come.
 	if direction == Vector2i.ZERO:
 		_aim_at_cursor(player)
 		return

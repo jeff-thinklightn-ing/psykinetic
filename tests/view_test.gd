@@ -7135,6 +7135,16 @@ func _test_bent_walk() -> void:
 	_check(inside and onward, "the bend stays within the two cells of each step and always moves on")
 	var tangent := GridEntity.bent_tangent(a, b, c, none, 0.0, r, 0.0)
 	_check(tangent.is_equal_approx(Vector2(1, 1).normalized()), "at the corner's moment the body points between the two ways (%s)" % tangent)
+	# 655 amended: the cut capped at a quarter cell.
+	var back := GridEntity.bent_position(a, b, a, none, 0.0, r, 0.0).distance_to(Vector2(b))
+	var diagonal_back := GridEntity.bent_position(a, c, a, none, 0.0, r, 0.0).distance_to(Vector2(c))
+	var uncapped := GridEntity._bend_point(Vector2(a), Vector2(c), Vector2(a), r, 0.5).distance_to(Vector2(c))
+	_check(is_equal_approx(back, 0.25) and is_equal_approx(diagonal_back, 0.25) and uncapped > 0.3,
+			"a reversal cuts its corner by a quarter cell exactly, and a diagonal reversal (%.3f unchecked) is capped to the same (%.3f, %.3f)" % [uncapped, back, diagonal_back])
+	var capped := GridEntity.capped_reach(Vector2(a), Vector2(c), Vector2(a), r)
+	var capped_in := GridEntity.bent_position(none, a, c, a, 1.0 - capped + 0.001, 0.0, r)
+	_check(capped_in.distance_to(Vector2(c).lerp(Vector2(a), capped)) < 0.002,
+			"the capped bend still starts on the straight line at the straight line's moment (%s)" % capped_in)
 	var narrow := GridEntity.BEND_REACH_NARROW
 	var narrow_in := GridEntity.bent_position(none, a, b, c, 1.0 - narrow, 0.0, narrow)
 	var narrow_corner := GridEntity.bent_position(none, a, b, c, 1.0, 0.0, narrow)

@@ -33,6 +33,8 @@ extends RefCounted
 ## WASD walks are predicted step by step (step()): each one starts where
 ## the last ends, so the walk is one steady motion, and is sent to the
 ## server as it starts; the server takes them in order on its own timer.
+## The key held is told each frame (hint, 655 amended), so the step shown
+## bends toward the one to come before that one is shown.
 ##
 ## The prediction gives its target up when the server evidently has: a step
 ## into the target tile itself refused, or a shown step that no reply
@@ -53,6 +55,16 @@ const CATCH_UP_STRETCH := 0.5
 const CATCH_UP_WAIT_STEPS := 2.0
 ## Ticks a step toward a target that came within reach is eased back over.
 const REACH_SETTLE_TICKS := 1.5
+## 655 amended: a walk ended on a bend toward the held key's next step, and
+## that step never came (the key let go): the body slides from where it is
+## to the cell's centre over this long.
+const SETTLE_TICKS := 1.5
+## How far along the step hinted at the body may be drawn on (position) past
+## the end of the step before it, waiting the frame for that step to come.
+const COAST_MAX := 0.5
+## A held key's hint older than this (no frame has read the keys since) is
+## not bent toward.
+const HINT_FRESH_TICKS := 1.0
 
 
 class Step:
@@ -77,6 +89,9 @@ class Step:
 	var bend_prev := GridEntity.UNKNOWN_TILE
 	var bend_next := GridEntity.UNKNOWN_TILE
 	var bend_decided := false
+	## 655 amended: the slide from a bend's apex back to the cell's centre
+	## after a walk that ended bent toward a step that never came.
+	var settle := false
 
 
 var _entity: GridEntity
@@ -93,6 +108,17 @@ var epoch := 0
 ## When the last shown walk ended, on the clock, kept after its steps are
 ## dropped: a WASD step held on from it starts there, not a frame late.
 var _ended_at := -INF
+## Where it ended (655 amended): a step held on from there starts from the
+## cell's centre, on the line, not from the body's last drawn point.
+var _ended_tile := GridEntity.UNKNOWN_TILE
+## 655 amended: the direction the WASD keys hold now, as last told (hint),
+## and when on the clock.
+var _hint := Vector2i.ZERO
+var _hint_clock := -INF
+## The shown walk has ended bent toward the held key's step and been given
+## the frame for that step to come, drawn on along the bend meanwhile
+## (advance, position); the frame over, the settle starts.
+var _coasting := false
 ## Closing in to strike: the one struck at, whose replicated tile the walk
 ## is planned to again as it moves, as the server re-paths each step.
 var _following: WeakRef = null
@@ -138,11 +164,18 @@ func order(target: Vector2i, into_goal := true) -> Array[Vector2i]:
 	var at: Vector2i = _entity.tile
 	var start := _clock
 	var drawn := Vector2.INF
+	_coasting = false
+	if is_active() and _steps.back().settle:
+		# 655 amended: sliding back from a bend: from where the body is, now.
+		drawn = Iso.local_to_grid(position())
+		_steps.pop_back()
 	if is_active():
 		var last: Step = _steps.back()
 		at = last.to
 		start = maxf(_clock, last.start + last.duration)
-	else:
+		if drawn == Vector2.INF and start == _clock and last.bend_next != GridEntity.UNKNOWN_TILE:
+			drawn = Iso.local_to_grid(position())  # 655 amended: ended on a bend: from its point, now.
+	elif drawn == Vector2.INF:
 		drawn = _drawn()
 	_append_path(at, start, drawn)
 	return unconfirmed()
@@ -188,26 +221,55 @@ func is_walking_to_target() -> bool:
 func step(direction: Vector2i) -> bool:
 	_has_target = false
 	cancel_unstarted()
+	_coasting = false
 	var at: Vector2i = _entity.tile
+	var last: Step = null
+	var drawn_now := Vector2.INF
+	var settling := false
+	if is_active():
+		drawn_now = Iso.local_to_grid(position())
+		last = _steps.back()
+		if last.settle:
+			# 655 amended: sliding back from a bend (the settle, confirmed
+			# and done with): the step goes from where the body is, now.
+			settling = true
+			last = _steps[_steps.size() - 2]
+		at = last.to
+	if _blocked(at, direction):
+		return false
+	if settling:
+		_steps.pop_back()
 	# Straight on from the last step if it has only just ended, so a held
 	# key makes one steady walk; after a pause, from now.
 	var start := _ended_at
-	var from_grid := Vector2(at)
-	if is_active():
-		var last: Step = _steps.back()
-		at = last.to
+	var from_grid := Vector2.INF
+	var bend_prev := GridEntity.UNKNOWN_TILE
+	if last != null:
 		start = last.start + last.duration
+		from_grid = Vector2(at)
+		if settling or (last.bend_decided and last.bend_next != GridEntity.UNKNOWN_TILE and last.bend_next != at + direction):
+			# 655 amended: sliding back, or bent toward another step (the
+			# key changed in the last half step): straight from where the
+			# body is drawn, now, to the next centre, as a mirror's catch-up
+			# is; the step after bends again.
+			from_grid = drawn_now
+			start = _clock
+		elif last.bend_decided and last.bend_next == at + direction:
+			bend_prev = last.from  # 655: on from the bend the last ends on.
+	elif start >= _clock - 1.0 and at == _ended_tile:
+		# 655 amended: a walk ended here within the tick: on from the cell's
+		# centre, on the line (the body drawn a frame short of it at most),
+		# so the step bends as any other.
 		from_grid = Vector2(at)
 	else:
 		from_grid = _drawn()
 	if start < _clock - 1.0:
 		start = _clock
-	if _blocked(at, direction):
-		return false
 	var next := Step.new()
 	next.from = at
 	next.to = at + direction
 	next.from_grid = from_grid
+	next.bend_prev = bend_prev
 	next.to_grid = Vector2(next.to)
 	next.start = start
 	next.duration = World.step_ticks(_entity, direction, at)
@@ -242,7 +304,7 @@ func ready_for_step() -> bool:
 	if not is_active():
 		return true
 	var last: Step = _steps.back()
-	return _clock >= last.start + last.duration
+	return last.settle or _clock >= last.start + last.duration
 
 
 ## Drops predicted steps that have not started showing (the order changed),
@@ -258,6 +320,7 @@ func cancel_unstarted() -> void:
 func clear() -> void:
 	_steps.clear()
 	_has_target = false
+	_coasting = false
 
 
 func target() -> Vector2i:
@@ -280,6 +343,7 @@ func rebase(server_tile: Vector2i, blend_ticks: float) -> void:
 	var from_grid := Iso.local_to_grid(position() if is_active() else _entity.position)
 	_taken(server_tile)
 	_steps.clear()
+	_coasting = false
 	var blend := Step.new()
 	blend.from = server_tile
 	blend.to = server_tile
@@ -362,8 +426,33 @@ func advance(delta: float) -> bool:
 				break  # The ones after it wait on it too.
 			return true
 	var last: Step = _steps.back()
-	if all_confirmed and _clock >= last.start + last.duration:
+	if _clock >= last.start + last.duration and last.bend_next != GridEntity.UNKNOWN_TILE and not last.settle:
+		# 655 amended: ended bent toward the held key's step, which has not
+		# come. The key held a frame ago, its step comes this frame (Main
+		# reads the keys after the bodies are drawn): the body is drawn on
+		# along the bend meanwhile (position) and the step joins it. No
+		# step by the next frame, or the key let go: the body slides from
+		# where it is to the centre; it never snaps there.
+		if not _coasting and _hint != Vector2i.ZERO and _clock - _hint_clock <= HINT_FRESH_TICKS:
+			_coasting = true
+		else:
+			var settle := Step.new()
+			settle.from = last.to
+			settle.to = last.to
+			settle.from_grid = Iso.local_to_grid(position())
+			settle.to_grid = Vector2(last.to)
+			settle.start = _clock
+			settle.duration = SETTLE_TICKS
+			settle.ease = true
+			settle.started = true
+			settle.confirmed = true
+			settle.settle = true
+			_steps.append(settle)
+			_coasting = false
+			last = settle
+	if all_confirmed and _clock >= last.start + last.duration and not _coasting:
 		_ended_at = last.start + last.duration
+		_ended_tile = last.to
 		_steps.clear()
 	return false
 
@@ -386,6 +475,15 @@ func _server_behind(step: Step) -> bool:
 ## _take_queued_step): none of the steps sent is coming.
 func server_dropped_queue() -> void:
 	_sent.clear()
+
+
+## 655 amended: WASD, each frame (Main._drive_wasd): the direction the keys
+## hold now, ZERO for none, which the step after the one shown will take
+## as that one ends. A step's bend at its end is settled toward it when no
+## planned step follows (_bent); nothing is shown or sent for it.
+func hint(direction: Vector2i) -> void:
+	_hint = direction
+	_hint_clock = _clock
 
 
 ## The server is on [param server_tile]: the sent steps that took it there,
@@ -438,7 +536,11 @@ func facing() -> Vector2i:
 ## Where the sprite is shown now, projected at the current azimuth.
 func position() -> Vector2:
 	var step := _current()
-	var t := clampf((_clock - step.start) / step.duration, 0.0, 1.0)
+	var t := (_clock - step.start) / step.duration
+	if _coasts(step, t):
+		return Iso.grid_to_local(GridEntity.bent_position(step.from, step.to, step.bend_next, GridEntity.UNKNOWN_TILE,
+				_coast_t(step, t), GridEntity.bend_reach(step.to), 0.0))
+	t = clampf(t, 0.0, 1.0)
 	if step.ease:
 		t = 1.0 - (1.0 - t) * (1.0 - t)
 	return Iso.grid_to_local(_bent(step, t))
@@ -448,11 +550,30 @@ func position() -> Vector2:
 ## along its bend, else along the step.
 func shown_direction() -> Vector2:
 	var step := _current()
-	var t := clampf((_clock - step.start) / step.duration, 0.0, 1.0)
+	var t := (_clock - step.start) / step.duration
+	if _coasts(step, t):
+		return GridEntity.bent_tangent(step.from, step.to, step.bend_next, GridEntity.UNKNOWN_TILE,
+				_coast_t(step, t), GridEntity.bend_reach(step.to), 0.0)
+	t = clampf(t, 0.0, 1.0)
 	if not _bends(step):
 		return Vector2(step.to - step.from)
 	var reach_in := GridEntity.bend_reach(step.from) if step.bend_prev != GridEntity.UNKNOWN_TILE else 0.0
 	return GridEntity.bent_tangent(step.bend_prev, step.from, step.to, step.bend_next, t, reach_in, GridEntity.bend_reach(step.to))
+
+
+## 655 amended: [param step], the last shown, has ended ([param t] past 1)
+## bent toward the held key's step, which has not come yet: the body is
+## drawn on along that bend as that step would draw it (_coast_t), so the
+## step joins it without a jump when it comes within the frame.
+func _coasts(step: Step, t: float) -> bool:
+	return t > 1.0 and step == _steps.back() and not step.settle and step.bend_next != GridEntity.UNKNOWN_TILE
+
+
+## Where on the step hinted at (0..COAST_MAX of its own time) the body is,
+## [param t] of [param step]'s time past its end.
+func _coast_t(step: Step, t: float) -> float:
+	var on := step.bend_next - step.to
+	return minf((t - 1.0) * step.duration / World.step_ticks(_entity, on, step.to), COAST_MAX)
 
 
 ## 655: [param step]'s drawn point at [param t], its corners rounded as the
@@ -471,6 +592,13 @@ func _bent(step: Step, t: float) -> Vector2:
 			if _bends(after) and after.from == step.to and is_equal_approx(after.start, step.start + step.duration):
 				step.bend_next = after.to
 				after.bend_prev = step.from
+		elif i == _steps.size() - 1 and not _has_target and _hint != Vector2i.ZERO \
+				and _clock - _hint_clock <= HINT_FRESH_TICKS and not _blocked(step.to, _hint):
+			# 655 amended: no step planned after it, but a key held: the
+			# step to come goes that way as this one ends (Main._drive_wasd),
+			# so the bend is toward it; step() joins it, or the settle
+			# (advance) brings the body back when the key is let go first.
+			step.bend_next = step.to + _hint
 	var reach_in := GridEntity.bend_reach(step.from) if step.bend_prev != GridEntity.UNKNOWN_TILE else 0.0
 	return GridEntity.bent_position(step.bend_prev, step.from, step.to, step.bend_next, t, reach_in, reach_out)
 
@@ -497,7 +625,10 @@ func _current() -> Step:
 ## a correction's, decision 339) has not reached; from the tile it would
 ## jump back to it first.
 func _drawn() -> Vector2:
-	return Iso.local_to_grid(_entity.position)
+	var drawn := Iso.local_to_grid(_entity.position)
+	# At rest on a centre (within the projection's rounding): the centre
+	# itself, so the step from it is between centres and bends (655).
+	return drawn.round() if drawn.distance_squared_to(drawn.round()) < 0.000001 else drawn
 
 
 ## Appends the predicted steps from [param at] toward the target, the first
