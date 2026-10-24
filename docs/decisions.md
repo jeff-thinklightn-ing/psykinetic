@@ -28325,3 +28325,30 @@ section 4); the coordinator approved the list, and dungeon and art-kit agreed th
 
 view_test _test_dark_set: a "dark" level's cell writes byte 4, floor_dark its own swatch. Client
 only, protocol unchanged, no new class_name.
+
+## 649 amended (6), buildings' side: a ruin's boards weathered, its walls fallen
+
+The coordinator, on ruin_close_4: closer, but two things still said "new".
+First, the boards a ruin keeps looked freshly planed: bright, even and in
+two clean rectangles. Second, the footing still ran mostly whole along two
+sides, with the low log course riding over the places where the stone was
+gone.
+
+- A ruin's kept floor cells (_floor_worn) are written into the floor mask as
+  their set's byte plus FLOOR_WORN (8, past every set's own byte: 659's
+  dark is 4), through Client3D._floor_byte, the
+  one writer of _floor_bytes. ground.gdshaderinc draws such a cell as its
+  set greyed toward its own grey (floor_worn_grey 0.6) and darkened
+  (floor_worn_dark 0.62). Where a slow two-scale noise falls under
+  floor_worn_holes (0.38), it is rotted through to the ground under it, with
+  a darker rim round each hole. A material parameter, no art. The mask and
+  _floor_worn are the client's alone: no floor byte reaches the wire, and
+  the protocol is unchanged.
+- RUIN_PLINTH_MISSING goes to 0.34, about 1 in 3.
+- A wall piece (Piece_k) over its plinth's gone half edges falls with it.
+  Over both halves it drops PLINTH_HEIGHT to the ground; over one, it tips
+  down at that end, its middle RUIN_FALL_TIP (0.35) of PLINTH_HEIGHT lower.
+
+Built again, the boards are new (the plain set's byte) and every piece
+stands. view_test _test_decline (every kept cell worn, fallen pieces, none
+worn after a rebuild). Client only, protocol unchanged, no new class_name.

@@ -1443,6 +1443,8 @@ var _floor_sets: Dictionary[Vector2i, String] = {}
 var _floors_set := DEFAULT_SET
 var _floor_bytes := PackedByteArray()
 var _floor_mask: ImageTexture
+## A ruin's kept floor cells (649): drawn weathered (_floor_byte, FLOOR_WORN).
+var _floor_worn: Dictionary[Vector2i, bool] = {}
 ## The edges in _wall_sets and cells in _floor_sets that are there for a
 ## building, and the cells in _dry_water that are there for a well.
 var _building_walls: Array[Vector3i] = []
@@ -1910,7 +1912,15 @@ const RUIN_LITTER_EVERY := 3
 ## stone spilled off it to one side, this far out from its face.
 const RUIN_PLINTH_LOW := 0.05
 const RUIN_PLINTH_HIGH := 0.9
-const RUIN_PLINTH_MISSING := 0.25
+const RUIN_PLINTH_MISSING := 0.34
+## A ruin's wall piece over its plinth's gone half edges falls with it: over
+## both, down PLINTH_HEIGHT to the ground; over one, tipped down at that
+## end, its middle RUIN_FALL_TIP of PLINTH_HEIGHT lower.
+const RUIN_FALL_TIP := 0.35
+## A ruin's floor (649): its kept boards drawn weathered (FLOOR_WORN added to
+## their set's byte, past every set's own, ground.gdshaderinc greys and
+## darkens them and rots holes through).
+const FLOOR_WORN := 8
 const RUIN_PLINTH_CORNER := 0.75
 const RUIN_SPILL_EVERY := 3
 const RUIN_SPILL_OUT := 0.35
@@ -4445,6 +4455,7 @@ func _build_room() -> void:
 	_pad_cell.clear()
 	_plinths.clear()
 	_ruin_edges.clear()
+	_floor_worn.clear()
 	# A damaged building's and a town wall's looks: the last map's out.
 	for key in _state_walls:
 		_wall_states.erase(key)
@@ -5339,16 +5350,24 @@ func _floor_gone(building: Dictionary, decline: String) -> void:
 	var grounds: Dictionary = building.get("ground_was", {})
 	var cells: Array[Vector2i] = []
 	if decline.is_empty():
+		for cell in Level.rect_cells(building["rect"]):
+			if _floor_worn.erase(cell) and not cells.has(cell):
+				cells.append(cell)
 		for cell: Vector2i in grounds:
 			_set_ground_kind(cell, grounds[cell])
 		for cell: Vector2i in was:
 			_floor_sets[cell] = was[cell]
-		cells.assign(was.keys())
+		for cell: Vector2i in was:
+			if not cells.has(cell):
+				cells.append(cell)
 		building.erase("floor_was")
 		building.erase("ground_was")
 	else:
 		for cell in Level.rect_cells(building["rect"]):
 			var kept := decline == Towns.RUIN and posmod(_cell_hash(cell), RUIN_BOARDS_KEPT) == 0
+			if kept and _floor_sets.has(cell):
+				_floor_worn[cell] = true
+				cells.append(cell)
 			if _floor_sets.has(cell) and not kept:
 				was[cell] = _floor_sets[cell]
 				_floor_sets.erase(cell)
@@ -5367,7 +5386,7 @@ func _floor_gone(building: Dictionary, decline: String) -> void:
 		var at := cell - _mask_origin
 		if at.x < 0 or at.y < 0 or at.x >= _mask_size.x or at.y >= _mask_size.y:
 			continue
-		_floor_bytes[at.y * _mask_size.x + at.x] = FLOOR_SETS.get(_floor_set(cell, str(_ground_kinds.get(cell, "stone"))), 0)
+		_floor_bytes[at.y * _mask_size.x + at.x] = _floor_byte(cell, str(_ground_kinds.get(cell, "stone")))
 	_floor_mask.update(Image.create_from_data(_mask_size.x, _mask_size.y, false, Image.FORMAT_R8, _floor_bytes))
 
 
@@ -7276,7 +7295,7 @@ func _ground_fields(input: Dictionary) -> Dictionary:
 		at[place] = i
 		kind_bytes[place * 4 + GROUND_CHANNELS[kind]] = 255
 		if i < floor_count:
-			floor_bytes[place] = FLOOR_SETS.get(_floor_set(cell, kind), 0)
+			floor_bytes[place] = _floor_byte(cell, kind)
 		if i >= water_end:
 			water_bytes[place * 4 + 1] = 255
 		elif i >= floor_count or _fords.has(cell):
@@ -10462,6 +10481,11 @@ static func _profile_for(points: PackedVector2Array, cap: float, top: float, tal
 
 ## The set a floor cell is drawn in: its own (_floor_sets), else the map's
 ## on its stone ground, else the ground's own look.
+func _floor_byte(cell: Vector2i, kind: String) -> int:
+	var byte: int = FLOOR_SETS.get(_floor_set(cell, kind), 0)
+	return byte + FLOOR_WORN if byte > 0 and _floor_worn.has(cell) else byte
+
+
 func _floor_set(cell: Vector2i, kind: String) -> String:
 	if _floor_sets.has(cell):
 		return _floor_sets[cell]
@@ -10631,8 +10655,9 @@ func _add_wall_run(run: Array[Vector3i]) -> void:
 ## half its width on past a corner, not into a door or the next plinth's run.
 ## A ruin's (649, _ruin_edges) is broken off: by half edges, each its own
 ## height (RUIN_PLINTH_LOW..HIGH) or gone (RUIN_PLINTH_MISSING), its end
-## halves standing (RUIN_PLINTH_CORNER..whole), a stone spilled off one
-## edge in RUIN_SPILL_EVERY; its gaps have none, being no run.
+## halves standing (RUIN_PLINTH_CORNER..whole), the wall piece over a gone
+## half fallen with it (RUIN_FALL_TIP), a stone spilled off one edge in
+## RUIN_SPILL_EVERY; its gaps have none, being no run.
 func _add_plinth(holder: Node3D, run: Array[Vector3i], base: float, half: float) -> void:
 	var out := half + PLINTH_PROUD
 	var low := 0.0
@@ -10654,14 +10679,23 @@ func _add_plinth(holder: Node3D, run: Array[Vector3i], base: float, half: float)
 		blocks.clear()
 		for k in run.size():
 			var key := run[k]
+			var gone: Array[bool] = [false, false]
 			for part in 2:
 				var roll := _roll(Vector2i(key.x, key.y), 60 + key.z * 2 + part)
 				var end := k == 0 and part == 0 or k == run.size() - 1 and part == 1
 				if not end and _roll(Vector2i(key.x, key.y), 70 + key.z * 2 + part) < RUIN_PLINTH_MISSING:
+					gone[part] = true
 					continue
 				var top := PLINTH_HEIGHT * (lerpf(RUIN_PLINTH_CORNER, 1.0, roll) if end else lerpf(RUIN_PLINTH_LOW, RUIN_PLINTH_HIGH, roll))
 				blocks.append(Vector3(from if k == 0 and part == 0 else k + part * 0.5,
 						to if k == run.size() - 1 and part == 1 else k + 0.5 + part * 0.5, top))
+			# The wall piece over a gone half falls with it.
+			var piece := holder.get_node_or_null("Piece_%d" % k) as Node3D
+			if piece != null and gone[0] and gone[1]:
+				piece.position.y -= PLINTH_HEIGHT
+			elif piece != null and (gone[0] or gone[1]):
+				piece.position.y -= PLINTH_HEIGHT * RUIN_FALL_TIP
+				piece.rotation.x = atan2(PLINTH_HEIGHT * RUIN_FALL_TIP * 2.0, 1.0) * (1.0 if gone[1] else -1.0)
 			if posmod(_edge_hash(key), RUIN_SPILL_EVERY) == 0 and ArtKit.has("scatter.stone"):
 				var stone := ArtKit.instance("scatter.stone")
 				var side := 1.0 if _roll(Vector2i(key.x, key.y), 64 + key.z) < 0.5 else -1.0

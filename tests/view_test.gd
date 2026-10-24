@@ -1967,6 +1967,17 @@ func _test_decline() -> void:
 	_check(floored.call() > 0 and floored.call() < cells and dirt.call() >= cells - floored.call()
 			and (not ArtKit.has("scatter.tuft") or litter > walls.size() / Client3D.WEED_EVERY / 2),
 			"a ruin's floor: boards on %d of %d cells, the rest bare ground; %d weeds and litter in it" % [floored.call(), cells, litter])
+	var worn_byte: int = Client3D.FLOOR_SETS["wood"] + Client3D.FLOOR_WORN
+	var bytes_of := func(byte: int) -> int:
+		return Level.rect_cells(house["rect"]).filter(func(cell: Vector2i) -> bool: return _rig._floor_bytes_at(cell) == byte).size()
+	_check(bytes_of.call(worn_byte) == floored.call(), "a ruin's boards weathered: %d of its %d kept cells drawn worn" % [bytes_of.call(worn_byte), floored.call()])
+	# The wall pieces over its plinth's gone halves fallen with it.
+	var fallen := 0
+	for key: Vector3i in walls:
+		var run: Node3D = _rig._walls.get(key)
+		for piece: Node in run.get_children() if is_instance_valid(run) else []:
+			fallen += 1 if piece.name.begins_with("Piece_") and (piece as Node3D).position.y < -0.01 else 0
+	_check(plinths.is_empty() or fallen > 0, "a ruin's wall pieces over its gone plinth fallen with it (%d)" % fallen)
 	_rig.set_town("decline_town", {"house": {"state": "gone", "level": 0, "walls": false}})
 	_check(not node.visible and states.call("plot") == walls.size() and not is_instance_valid(house.get("weeds")) and floored.call() == 0
 			and dirt.call() == cells,
@@ -1979,6 +1990,8 @@ func _test_decline() -> void:
 	var whole: Array = plinth_tops.call()
 	_check(plinths.is_empty() or whole[0] == snappedf(Client3D.PLINTH_HEIGHT, 0.01) and whole[1] == whole[0] and whole[2] >= plinths.size(),
 			"built again: its plinth whole (%d edges, tops %.2f to %.2f m, %.1f m)" % [plinths.size(), whole[0], whole[1], whole[2]])
+	_check(bytes_of.call(worn_byte) == 0 and bytes_of.call(Client3D.FLOOR_SETS["wood"]) == cells,
+			"built again: its boards new (%d worn, %d of %d plain)" % [bytes_of.call(worn_byte), bytes_of.call(Client3D.FLOOR_SETS["wood"]), cells])
 	_rig.town_states.erase("decline_town")
 
 

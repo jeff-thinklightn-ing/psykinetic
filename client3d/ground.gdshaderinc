@@ -97,6 +97,13 @@ uniform sampler2D floor_cave_tex : source_color, filter_linear_mipmap, repeat_en
 uniform bool floor_wood_own = false;
 uniform bool floor_stone_own = false;
 uniform bool floor_cave_own = false;
+// A ruin's kept boards (649; Client3D.FLOOR_WORN, 8, added to their
+// set's byte): greyed by floor_worn_grey toward their own grey, darkened to
+// floor_worn_dark, and rotted through to the ground under them where a
+// slow noise falls under floor_worn_holes, a darker rim round each hole.
+uniform float floor_worn_grey = 0.6;
+uniform float floor_worn_dark = 0.62;
+uniform float floor_worn_holes = 0.38;
 
 varying vec3 world;
 // The season (decision 362): x green, y turn (autumn), z snow cover. Grass
@@ -373,7 +380,17 @@ void fragment() {
 
 	ivec2 cell = ivec2(floor(at - kinds_origin + 0.5));
 	int floor_set = int(round(texelFetch(floors, clamp(cell, ivec2(0), ivec2(kinds_size) - 1), 0).r * 255.0));
-	if (floor_set > 0) {
+	if (floor_set >= 8) {
+		floor_set -= 8;
+		float rot = noise(at * 1.6 + 31.0) * 0.7 + noise(at * 5.0 + 7.0) * 0.3;
+		if (rot < floor_worn_holes) {
+			floor_set = 0;
+		} else {
+			vec3 boards = floor_look(floor_set, at, fine, abs(dx) + abs(dy));
+			vec3 grey = vec3(dot(boards, vec3(0.3, 0.59, 0.11)));
+			colour = mix(boards, grey, floor_worn_grey) * floor_worn_dark * mix(0.6, 1.0, smoothstep(floor_worn_holes, floor_worn_holes + 0.06, rot));
+		}
+	} else if (floor_set > 0) {
 		colour = floor_look(floor_set, at, fine, abs(dx) + abs(dy));
 	}
 
