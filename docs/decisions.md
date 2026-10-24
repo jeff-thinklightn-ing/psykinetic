@@ -13382,6 +13382,20 @@ to human_m's head and fitted by pc-character on the five builds with no
 scaling (0.6 to 4 cm off the head at the band, nothing through). Nothing
 draws it until pc-character's socket and npc's "hat=bard" land; client art
 only, protocol unchanged.
+
+Amended (2026-10-24, the bard's hat, npc's side; Jeff: "bard could wear a
+hat yes"): the bard's body wears art-kit's gear.hat, a red felt cap with a
+feather, on pc-character's new "head" socket (people only, measured per
+build). npc's side is the word: ResidentCard.look_spec takes the worker's
+hidden type (Main._spawn_resident passes it) and puts "hat=bard" into the
+bard's look spec, before the apron word; Client3D.HATS maps the word to the
+piece, a word it does not know or a build without the piece wears nothing
+new, and an old client ignores the key, so the wire is unchanged (a line
+under PROTOCOL_REVISION 35, the open one, records the new look word). The type stays
+hidden: the hat says bard to anyone who knows bards wear them, which is
+the point of a bard. resident_card_test: the hat in his look and in nobody
+else's.
+
 ## 492, economy's side (npc's scoundrel, on 393: the coordinator's approval)
 
 The hooks npc's scoundrel calls; the numbers are npc's drafts, Jeff's to
@@ -18457,7 +18471,8 @@ greetings on a first day is a chorus, so greetings by standing are
 capped at hail.greetings_a_day (3) a player a day from the whole town,
 the first three residents met (Main._hail_greetings; hail_cue's
 greeting_ok), the other cues under their own limits as before: a
-newcomer is greeted, not mobbed. What the day
+newcomer is greeted, not mobbed. Jeff accepted the cap as built (2026-10-22, his draft
+deleted): three a player a day from the whole town is his ruling now. What the day
 also showed, left as it is and told to the coordinator: the news, the
 ruling and the plea come back as her own echo of the cue, flat but true;
 the greeting and the sky are paraphrased, and the sky's lines are the

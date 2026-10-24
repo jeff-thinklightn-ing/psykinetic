@@ -102,7 +102,7 @@ static func _roll_look(table: Dictionary, rng: RandomNumberGenerator, pronoun: S
 ## trade itself last (pc-character's decision 480: garb for a trade the
 ## look names none for; left out for a card marked "outcast", 471's
 ## Snagfin, who stays as drawn). "" for a card with no look.
-static func look_spec(card: Dictionary, trade := "") -> String:
+static func look_spec(card: Dictionary, trade := "", type := "") -> String:
 	var look: Dictionary = card.get("look", {})
 	if look.is_empty():
 		return ""
@@ -117,6 +117,8 @@ static func look_spec(card: Dictionary, trade := "") -> String:
 		if key == "hair" and word == "bound up":
 			word = "bound"
 		parts.append("%s=%s" % [key, word])
+	if type == Townsfolk.BARD:
+		parts.append("hat=bard")  # The bard's felt cap (490 amended; art-kit's gear.hat on pc-character's head socket).
 	parts.append("apron=%s" % ("yes" if trade in APRON_TRADES else "no"))
 	if not trade.is_empty() and not bool(card.get("outcast", false)):
 		parts.append("trade=" + trade)

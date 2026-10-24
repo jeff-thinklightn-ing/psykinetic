@@ -380,6 +380,9 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## 35 (643): new message "notes" {zone, notes: [{tile: [x, y], text}]}: the
 ## sought's door notes of a zone, whole, with the map and when they change;
 ## the client reads one with E on the cell outside the door.
+## 35 (490 amended, npc's side): a resident's look spec may carry "hat=<word>"
+## (the bard's "bard"), a piece on pc-character's head socket; a client that does
+## not know the word wears nothing new.
 const PROTOCOL_REVISION := 35
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]

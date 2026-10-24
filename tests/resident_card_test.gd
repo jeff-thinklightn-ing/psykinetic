@@ -159,6 +159,8 @@ func _test_plain_card() -> void:
 	_check(their.contains("hair=bound ") and not their.contains("body=") and not their.contains("headwear=") and not their.contains("trade="),
 		"'bound up' is written bound, 'they' leaves body to the seed, an old card without headwear leaves it out, no trade no word: %s" % their)
 	_check(ResidentCard.look_spec({}, "smith").is_empty(), "no look, no string")
+	_check(ResidentCard.look_spec(card, "hauler", "bard").contains("hat=bard") and not ResidentCard.look_spec(card, "hauler", "thief").contains("hat="),
+		"the bard's hat in his look, nobody else's (490 amended)")
 	_check(ResidentCard.words(card) == words, "words() is the plain card while nothing is written")
 	_check(not ResidentCard.take_written(card, "Too short.") and not ResidentCard.take_written(card, "He says \"hello\" and this is long enough to pass the length test but has speech in it, so no."),
 		"a short paragraph or one with speech is not taken")

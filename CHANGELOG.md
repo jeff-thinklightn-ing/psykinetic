@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The bard wears a red felt cap with a feather (490 amended, npc's side: the word in his look; art-kit's piece, pc-character's head socket). Server spec, drawn as is.
 - The Dwarven Halls dressed (613 amended, dungeon's side; 658): the great forge stands solid against the forge room's south wall facing into it, the anvils along its front and the smith's stand cell before them, in place of the block of rock; the goblins' weapon rack stands solid against the wall east of it; three of the smith's guards lie where they fell in the ambush, one toward his cart, one face down, one as he fell. Decor kinds now say how a piece sits (flat with a facing, on a wall's foot, on any edge indoors or out, in a corner, across a niche), so a fence can run along open ground: maps' grave fence on Held follows. Two new solid building kinds, both sides alike.
 - The goblins' weapon rack in the Dwarven Halls is a solid building (building.weapon_rack, 2 x 1; was prop.weapon_rack), so nobody stands inside its blades in a fight (613 amended, art-kit's side)
 - The hill herder is a person: at his fold by day and his hut by night while you are near, at the buyer's square when he drives his sheep to market, a herder's greeting, and his word of a newcomer sheltering at his fold (decision 640, npc's side).

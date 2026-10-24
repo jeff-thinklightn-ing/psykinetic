@@ -8307,7 +8307,7 @@ func _spawn_resident(each: Dictionary) -> Resident:
 	# rest from their card (made now if need be, 398).
 	var record: PlayerRecord = _records.get(str(each.get("player", "")))
 	var look := CompanionCard.look_of(record.companion.get("traits", {}), record.player_id) \
-			if record != null and not record.companion.is_empty() else ResidentCard.look_spec(Townsfolk.card_of(World.production, who), trade)
+			if record != null and not record.companion.is_empty() else ResidentCard.look_spec(Townsfolk.card_of(World.production, who), trade, str(each.get("type", "")))
 	var spec := {"script": RESIDENT, "shape": "capsule", "name": ("Resident_" + who).validate_node_name(), "label": label, "tile": at, "look": look}
 	if not str(each.get("kind", "")).is_empty():
 		spec["kind"] = str(each["kind"])  # A goblin among them (decision 471): the client draws the kind's model.
