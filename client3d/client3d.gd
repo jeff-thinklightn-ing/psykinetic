@@ -314,6 +314,14 @@ const NICHE_OPEN := "wall.crypt.niche_open"
 ## The hidden niche's footprints (608 amended, terrain's side): art-kit's
 ## flat dust mesh on its entry cell, +x toward the wall; left when found.
 const NICHE_FOOTPRINTS := "prop.footprints"
+## A damp place's decor (647, terrain's side; Jeff: "moss and spiderwebs
+## for decor, no live plants"): terrain "decor"'s entries as art-kit's
+## prop.<kind>, by kind's frame: moss_patch flat on its cell at a yaw of its
+## own; moss_strip and web_niche on their edge (+x the room, along -out);
+## web_corner in its cell's corner out names (the piece's own the -x/-z
+## one, DECOR_CORNER, turned to it).
+const DECOR_SLOT := "prop.%s"
+const DECOR_CORNER := Vector2i(-1, -1)
 const ROCK_SMALL := "rock.small"
 const ROCK_LARGE := "rock.large"
 const ROCK_SMALL_SIZES := Vector2(0.9, 1.3)
@@ -4103,6 +4111,7 @@ func _build_room() -> void:
 		World.fields_changed_signal.connect(_on_fields_changed)
 	_on_fields_changed()
 	_add_walls()
+	_add_decor()
 	if _outdoor:
 		_add_forest()
 		for cell: Vector2i in _clearing:
@@ -8494,6 +8503,38 @@ func _read_niches() -> void:
 		var out: Vector2i = niche["out"]
 		var edge: Vector3i = niche.get("edge", Terrain.edge_key(cell, -out))
 		_niche_at[edge] = {"cell": cell, "out": out, "kind": str(niche.get("kind", "a")), "variant": int(niche.get("variant", 1))}
+
+
+## Each of terrain "decor"'s entries (647) as its piece, once its slot is
+## drawn (no grey box): see DECOR_SLOT.
+func _add_decor() -> void:
+	for entry: Dictionary in _terrain.get("decor", []):
+		var kind := str(entry["kind"])
+		var slot := DECOR_SLOT % kind
+		if not _deadwood_drawn(slot):
+			continue
+		var cell: Vector2i = entry["cell"]
+		var out: Vector2i = entry["out"]
+		# A variant art-kit has not made yet is its first (variant_count).
+		var piece := ArtKit.instance(slot, clampi(int(entry.get("variant", 1)), 1, maxi(1, ArtKit.variant_count(slot))))
+		piece.name = "Decor_%d_%d_%s_%d_%d" % [cell.x, cell.y, kind, out.x, out.y]
+		var at := Vector2(cell)
+		match kind:
+			"moss_patch":
+				piece.rotation.y = _roll(cell, 70) * TAU
+			"web_corner":
+				piece.rotation.y = _yaw_of(Vector2(out)) - _yaw_of(Vector2(DECOR_CORNER))
+			_:
+				# On its edge, the room on +x: +x along -out.
+				at += Vector2(out) * 0.5
+				piece.rotation.y = _yaw_of(-Vector2(out))
+		piece.position = Vector3(at.x, _height_in(cell, Vector2(cell)), at.y)
+		_room.add_child(piece)
+
+
+## The turn about y that takes +x to [param way] (x, z on the ground).
+static func _yaw_of(way: Vector2) -> float:
+	return atan2(-way.y, way.x)
 
 
 ## The hidden niche's door edge (608, terrain's side): no doorway, no leaf,

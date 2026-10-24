@@ -25460,3 +25460,31 @@ seed the same decor, the generator's path record and the roll off it),
 level_test (`Level.decor_from`: the four kinds read and nine misplacements
 said; the real templates' own counts). docs/levels.md. Level data and
 generator; protocol unchanged; no new class_name.
+
+## 647, terrain's side: the barrow's moss and webs drawn
+
+Jeff: "moss and spiderwebs for decor, no live plants". Dungeon places the
+entries (647: level.json "decor", Level.decor_from into terrain "decor",
+templates by hand and Regen's rolls), and art-kit makes the props.
+Client3D._add_decor draws each entry as prop.<kind> (DECOR_SLOT), once
+the slot has art:
+- moss_patch: flat on its cell's middle, at a yaw of its own (_roll).
+- moss_strip and web_niche: on their edge, at the cell plus half its out
+  (out always points to the wall). The piece's +x runs along -out, into
+  the room, in the stone runs' edge frame.
+- web_corner: on its cell, turned so the piece's own -x/-z corner
+  (DECOR_CORNER, art-kit's default facing) goes to the corner out names
+  (_yaw_of).
+- Each node is named Decor_x_y_kind_dx_dy, since two strips can share a
+  cell.
+- A variant art-kit hasn't made yet draws as the slot's first
+  (ArtKit.variant_count). Every rolled variant has a mesh now (art-kit's
+  ea3b1b52 added the webs' second ones), and the rule stays for the next
+  slot.
+The CHANGELOG bullet is dungeon's, since it already says terrain draws
+them.
+view_test _test_lair, on the Hall of Fallen Souls:
+- its dais as 580 step 3 draws it, 20 pieces with the front's 12 steps;
+- each decor entry drawn in its frame (30 of 30);
+- each web's variant 2 a mesh of its own.
+Client only, protocol unchanged, no new class_name.

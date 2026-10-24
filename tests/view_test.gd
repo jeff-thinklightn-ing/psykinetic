@@ -54,6 +54,7 @@ func _ready() -> void:
 	_test_forest_edge()
 	_test_clearing()
 	_test_dais()
+	_test_lair()
 	_test_solid_ground()
 	_test_roads()
 	_test_water()
@@ -2721,6 +2722,65 @@ func _test_dais() -> void:
 	_rig.rebuild(sample["terrain"], sample["centre"])
 	_check(_rig._room.find_children("Dais_*", "", false, false).is_empty() and _rig._dais_stairs.is_empty(),
 			"the sample's ledges stay rock (a relief's)")
+	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+
+
+## The Hall of Fallen Souls (dungeon's 580 step 3 and 647, terrain's sides):
+## its dais drawn with art-kit's pieces (the sides and front, the back on
+## the wall), and each decor entry as its prop in its frame: a moss patch
+## on its cell, a strip and a niche web on their edge facing the room, a
+## corner web turned to its corner.
+func _test_lair() -> void:
+	print("
+== the Hall of Fallen Souls: its dais, its moss and webs ==")
+	var lair := Level.load_level("barrow_lair")
+	var terrain: Dictionary = lair["terrain"]
+	_rig.rebuild(terrain, lair["centre"])
+	var pieces: Array[Node] = _rig._room.find_children("Dais_*", "", false, false)
+	var steps := pieces.filter(func(piece: Node) -> bool: return piece.get_meta(&"slot", "") == Client3D.DAIS_STEPS)
+	_check(pieces.size() == 20 and steps.size() == 12, "the dais: %d pieces (its two sides' 8 and the front's 12 steps), %d steps" % [pieces.size(), steps.size()])
+	var decor: Array = terrain.get("decor", [])
+	var drawn := 0
+	var wrong := []
+	for entry: Dictionary in decor:
+		var kind := str(entry["kind"])
+		if not Client3D._deadwood_drawn(Client3D.DECOR_SLOT % kind):
+			continue
+		var cell: Vector2i = entry["cell"]
+		var out: Vector2i = entry["out"]
+		var piece := _rig._room.get_node_or_null("Decor_%d_%d_%s_%d_%d" % [cell.x, cell.y, kind, out.x, out.y]) as Node3D
+		if piece == null:
+			wrong.append([cell, kind, "missing"])
+			continue
+		drawn += 1
+		var flat := Vector2(piece.position.x, piece.position.z)
+		var ok := true
+		match kind:
+			"moss_patch":
+				ok = flat.is_equal_approx(Vector2(cell))
+			"web_corner":
+				var corner: Vector3 = piece.transform.basis * Vector3(-1.0, 0.0, -1.0)
+				ok = flat.is_equal_approx(Vector2(cell)) and Vector2(corner.x, corner.z).normalized().is_equal_approx(Vector2(out).normalized())
+			_:
+				var x := piece.transform.basis.x
+				ok = flat.is_equal_approx(Vector2(cell) + Vector2(out) * 0.5) and Vector2(x.x, x.z).is_equal_approx(-Vector2(out))
+		if not ok:
+			wrong.append([cell, kind, out])
+	_check(not decor.is_empty() and drawn > 0 and wrong.is_empty(),
+			"%d of %d decor entries drawn as art-kit's props, each in its frame (wrong: %s)" % [drawn, decor.size(), wrong.slice(0, 3)])
+	# Each web's two variants their own meshes (art-kit's ea3b1b52).
+	var mesh_of := func(node: Node3D) -> Mesh:
+		var found := node.find_children("*", "MeshInstance3D", true, false)
+		var mesh: Mesh = (found[0] as MeshInstance3D).mesh if not found.is_empty() else null
+		node.free()
+		return mesh
+	var both := true
+	for kind: String in ["web_corner", "web_niche"]:
+		var slot := Client3D.DECOR_SLOT % kind
+		var first: Mesh = mesh_of.call(ArtKit.instance(slot, 1))
+		var second: Mesh = mesh_of.call(ArtKit.instance(slot, 2))
+		both = both and ArtKit.variant_count(slot) >= 2 and first != null and second != null and first != second
+	_check(both, "each web's variant 2 is a mesh of its own")
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
 
