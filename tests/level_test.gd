@@ -6,6 +6,7 @@ extends Node
 ## and quits with exit code 1 if any assertion failed, 0 otherwise.
 
 const LEGACY := preload("res://tests/legacy_test_room.gd")
+const Sheet := preload("res://tools/plan_sheet.gd")
 ## The floor kinds a pond would lie in (Level.GROUNDS but stone, the paving).
 const NATURAL_GROUND: Array[String] = ["grass", "dirt"]
 ## Levels whose cell water is a test's fixture: the sample's pool and stream
@@ -61,6 +62,7 @@ func _ready() -> void:
 	_test_decor()
 	_test_barrow_level()
 	_test_castle_halls_level()
+	_test_tower_levels()
 	await _test_edge_links()
 	_test_console()
 	await _test_castle()
@@ -2328,6 +2330,57 @@ func _wait_for_step(entity: GridEntity) -> void:
 		if World.tick >= entity.next_move_tick and not World.is_stunned(entity):
 			return
 		World.step()
+
+
+## The tower's floors (659): the sample tower in memory, each floor parsing
+## clean, the stairs linking floor to floor both ways with their cues up and
+## down, the foot's door out an arch and its way down to the mine sealed.
+func _test_tower_levels() -> void:
+	print("
+== the tower's floors (659): stairs both ways, the door and the sealed hatch at the foot ==")
+	var floors := Sheet.TOWER_FLOORS
+	for floor in range(1, floors + 1):
+		var sample := Sheet.sample_tower(floor, floors, "lt_tower")
+		Level.register("lt_tower_%d" % floor, sample["layout"], null, sample["config"])
+	var c := Sheet.TOWER_ACROSS / 2
+	var cue_at := func(level: Dictionary, at: Vector2i) -> String:
+		for cue: Dictionary in level["terrain"]["link_cues"]:
+			if cue["tile"] == at:
+				return str(cue["cue"])
+		return ""
+	var link_at := func(level: Dictionary, at: Vector2i) -> Dictionary:
+		for link: Dictionary in level["links"]:
+			if link["tile"] == at:
+				return link
+		return {}
+	for floor in range(1, floors + 1):
+		var level := Level.load_level("lt_tower_%d" % floor)
+		_check(not level.is_empty() and level["warnings"].is_empty() and level["size"] == Vector2i(Sheet.TOWER_ACROSS, Sheet.TOWER_ACROSS)
+			and Regen.marked("lt_tower_%d" % floor) and Regen.config_of("lt_tower_%d" % floor).get("style") == "tower",
+			"floor %d parses with no warning, marked to regenerate in the tower style (%s)" % [floor, level.get("warnings")])
+		if floor < floors:
+			var above := Level.load_level("lt_tower_%d" % (floor + 1))
+			var up: Dictionary = link_at.call(level, Vector2i(c + 1, c))
+			_check(up.get("to_map") == "lt_tower_%d" % (floor + 1) and up.get("to_spawn") == "from_below" and cue_at.call(level, Vector2i(c + 1, c)) == "up"
+				and above["spawn_points"].get("from_below") == Vector2i(c - 1, c + 1) and above["terrain"]["floor"].has(Vector2i(c - 1, c + 1)),
+				"floor %d's stair up (cue up) leads to floor %d's from_below, a floor cell beside its stair down (%s)" % [floor, floor + 1, up])
+		else:
+			_check(link_at.call(level, Vector2i(c + 1, c)).is_empty(), "the top floor has no stair up")
+		if floor > 1:
+			var below := Level.load_level("lt_tower_%d" % (floor - 1))
+			var down: Dictionary = link_at.call(level, Vector2i(c - 1, c))
+			_check(down.get("to_map") == "lt_tower_%d" % (floor - 1) and down.get("to_spawn") == "from_above" and cue_at.call(level, Vector2i(c - 1, c)) == "down"
+				and below["spawn_points"].get("from_above") == Vector2i(c + 1, c + 1) and below["terrain"]["floor"].has(Vector2i(c + 1, c + 1)),
+				"floor %d's stair down (cue down) leads to floor %d's from_above, a floor cell beside its stair up (%s)" % [floor, floor - 1, down])
+		else:
+			_check(link_at.call(level, Vector2i(c - 1, c)).is_empty(), "the foot has no stair down")
+			var door: Dictionary = link_at.call(level, Vector2i(c, Sheet.TOWER_ACROSS - 2))
+			_check(door.get("to_map") == "lt_tower_outside" and cue_at.call(level, Vector2i(c, Sheet.TOWER_ACROSS - 2)) == "arch"
+				and level["spawn_points"].get("from_outside") == Vector2i(c, Sheet.TOWER_ACROSS - 3),
+				"the foot's door out at the south edge is an arch with from_outside inside it (%s)" % [door])
+			var hatch: Dictionary = link_at.call(level, Vector2i(c, 2))
+			_check(hatch.get("to_map") == "lt_tower_mine" and hatch.get("sealed") == "tower_mine" and cue_at.call(level, Vector2i(c, 2)) == "sealed",
+				"the mine's way down under the north wall is a sealed link (%s)" % [hatch])
 
 
 func _check(ok: bool, label: String) -> void:

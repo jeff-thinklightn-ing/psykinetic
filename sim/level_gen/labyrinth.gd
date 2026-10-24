@@ -46,8 +46,20 @@ extends RefCounted
 ## along the path, narrowing to the one door cell into a shallow tomb;
 ## the torches stand by the walls; the deep blind ways are short.
 ##
+## "tower" (decision 659, the tower's inside; Jeff: "The tower's inside
+## shifts too"): a floor of a tower, each floor a small level of its own
+## joined to the next by stair links kept in a shaft anchor at the same
+## cells on every floor. The dwarven rules with no great halls: small
+## square-cut rooms, ways two wide, a door where a way meets a room,
+## torches (the cold lamps come with art-kit's piece), an alcove off some
+## rooms; and a footprint: the block's "footprint" ("octagon" or "round",
+## inscribed in the level's size, which is the template's; "square", the
+## default, is the whole map) names the cells the generator may carve, and
+## nothing is ever carved outside it (Tools.rock reads it from the map's
+## extras), so the floor's outline is the tower's wall.
+##
 ## The block's own keys (Level.regenerate_from passes them): "style"
-## ("dwarven" unless "old" or "barrow"), "rooms": {"count": [lo, hi],
+## ("dwarven" unless "old", "barrow" or "tower"), "rooms": {"count": [lo, hi],
 ## "size": [[w, h] least, [w, h] most]}, "loops": the extra ways as a share
 ## of the nodes (0.2), "monsters": {kind: count} (brutes in the halls
 ## first, the rest in rooms and corridors), "chests": n (alcoves and blind
@@ -103,6 +115,11 @@ static func generate(template: LevelMap, config: Dictionary, seed: int) -> Level
 	var old := style == "old"
 	var map := template.copy()
 	Tools.clear_outside(map, anchors)
+	if style == "tower":
+		# The tower's outline (659): the generator carves inside it alone.
+		var inside := footprint(map.size, str(config.get("footprint", "square")))
+		if not inside.is_empty():
+			map.extras["footprint"] = inside
 	_move_hidden(map, niche_plan(config, seed))
 	var depth := _depth_setup(map, anchors, config) if style == "barrow" else {}
 	var carved: Dictionary[Vector2i, bool] = {}
@@ -138,6 +155,46 @@ static func generate(template: LevelMap, config: Dictionary, seed: int) -> Level
 	_markers(map, anchors, rooms, corridors, ends, config, rng, depth)
 	map.extras["paths"] = paths
 	return map
+
+
+## The cells inside a tower's outline (659) for a level [param size] cells:
+## "octagon", the map's rect with a cell of rim kept and each corner cut
+## off along a diagonal about 0.29 of the shorter side in (a regular
+## octagon's corner); "round", a disc of the shorter side's half less a
+## cell about the middle; anything else {}, meaning the whole map. Nothing
+## here assumes a size: the template's says it.
+static func footprint(size: Vector2i, kind: String) -> Dictionary[Vector2i, bool]:
+	var out: Dictionary[Vector2i, bool] = {}
+	if kind != "octagon" and kind != "round":
+		return out
+	var side := mini(size.x, size.y)
+	var cut := roundi(0.29 * side)
+	var centre := Vector2(size - Vector2i.ONE) * 0.5
+	var radius := side * 0.5 - 1.0
+	for y in range(1, size.y - 1):
+		for x in range(1, size.x - 1):
+			var inside: bool
+			if kind == "octagon":
+				var u := mini(x, size.x - 1 - x)
+				var v := mini(y, size.y - 1 - y)
+				inside = u + v >= cut + 1
+			else:
+				inside = Vector2(x, y).distance_to(centre) <= radius
+			if inside:
+				out[Vector2i(x, y)] = true
+	return out
+
+
+## Whether every cell of [param rect] lies inside the map's footprint (659),
+## or the map has none.
+static func _in_footprint(map: LevelMap, rect: Rect2i) -> bool:
+	if not map.extras.has("footprint"):
+		return true
+	var inside: Dictionary = map.extras["footprint"]
+	for cell in Level.rect_cells(rect):
+		if not inside.has(cell):
+			return false
+	return true
 
 
 # --- The hidden door (608) --------------------------------------------------------------
@@ -312,7 +369,8 @@ static func _place_rooms(map: LevelMap, anchors: Array, config: Dictionary, old:
 		taken.append((anchor["rect"] as Rect2i).grow(ROOM_GAP))
 	var rooms: Array[Dictionary] = []
 	var barrow := not depth.is_empty()
-	var halls_wanted := HALLS if not old and not barrow and count >= 4 else 0
+	var tower := str(config.get("style", "")) == "tower"  # 659: small rooms only, no great hall in a tower's floor.
+	var halls_wanted := HALLS if not old and not barrow and not tower and count >= 4 else 0
 	for attempt in count * 40:
 		if rooms.size() >= count:
 			break
@@ -341,6 +399,8 @@ static func _place_rooms(map: LevelMap, anchors: Array, config: Dictionary, old:
 		var centre := rect.position + rect.size / 2
 		if barrow and _band_of(depth, centre) != band:
 			continue  # Fell in another band than it was shaped for.
+		if not _in_footprint(map, rect):
+			continue  # Outside the tower's outline (659).
 		var clear := true
 		for other in taken:
 			if rect.intersects(other):

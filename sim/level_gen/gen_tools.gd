@@ -23,10 +23,13 @@ static func clear_outside(map: LevelMap, anchors: Array) -> void:
 			map.edges.erase(key)
 
 
-## Whether [param at] may be carved: in bounds and in no anchor (rock, or
-## carved already).
+## Whether [param at] may be carved: in bounds, in no anchor (rock, or
+## carved already) and, when the map carries a footprint (659, the tower:
+## extras "footprint", the cells inside the tower's outline), inside it.
 static func rock(map: LevelMap, anchors: Array, at: Vector2i) -> bool:
-	return map.in_bounds(at) and not Level.in_anchors(anchors, at)
+	if not map.in_bounds(at) or Level.in_anchors(anchors, at):
+		return false
+	return not map.extras.has("footprint") or (map.extras["footprint"] as Dictionary).has(at)
 
 
 ## [param at] is floor now (a marker already there is left), and counted
@@ -219,7 +222,7 @@ static func path_through(map: LevelMap, anchors: Array, from: Vector2i, to: Vect
 			return path
 		for direction: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
 			var next := at + direction
-			if came.has(next) or not map.in_bounds(next) or (next != to and Level.in_anchors(anchors, next)) 					or map.edge(Terrain.edge_key(at, direction)) == "wall":
+			if came.has(next) or not map.in_bounds(next) or (next != to and not rock(map, anchors, next)) or map.edge(Terrain.edge_key(at, direction)) == "wall":
 				continue
 			came[next] = at
 			queue.append(next)
@@ -271,7 +274,7 @@ static func path_around(map: LevelMap, anchors: Array, from: Vector2i, to: Vecto
 			var next := at + direction
 			if closed.has(next) or not map.in_bounds(next):
 				continue
-			if next != to and Level.in_anchors(anchors, next):
+			if next != to and not rock(map, anchors, next):
 				continue
 			var step := 1.0 if rng == null else 1.0 + rng.randf()
 			var through := cost[at] + step

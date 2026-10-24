@@ -6,6 +6,7 @@ extends Node
 ## each anchor outlined in blue. Headless:
 ##   godot --headless --path <repo> --scene res://tools/plan_sheet.tscn -- --level=<name> --generation=<n> --out=<png> [--scale=8]
 ##   godot --headless --path <repo> --scene res://tools/plan_sheet.tscn -- --sample=dwarven|old|barrow --generation=<n> --out=<png>
+##   godot --headless --path <repo> --scene res://tools/plan_sheet.tscn -- --tower=<floors> --generation=<n> --out=<png>
 ## --level names a level under levels/ (or the overlay) marked "regenerate";
 ## --sample draws the built-in sample halls (sample_halls) in that style,
 ## a 48 x 40 floor with a gatehouse, two halls and a deepest chamber for
@@ -167,6 +168,73 @@ const HALLS_RACK := Vector2i(50, 67)
 ## rolled yaw ran his body toward the usual camera and read as kneeling);
 ## none on a marker's cell or in the ways in.
 const HALLS_GUARDS: Array = [[23, 30, 1, 0, "fallen_guard", 1], [26, 31, 0, -1, "fallen_guard", 2], [21, 29, -1, 0, "fallen_guard", 2]]
+
+
+## The tower's inside (659; Jeff: "The tower's inside shifts too"): a tower
+## of TOWER_FLOORS floors, each a small level of its own, TOWER_ACROSS cells
+## square with an octagonal footprint, laid by the labyrinth's tower style
+## and joined to the floors above and below by stair links kept in the
+## shaft anchor at the same cells on every floor (the stair down west of
+## the middle, the stair up east, the arriving spawns beside them, two
+## clear cells round each whatever the floor rolls). The foot has the door
+## out at its south edge and the mine's way down under the north wall, a
+## sealed link; the top floor's shaft opens into the chamber. A sample in
+## memory for the tests and the sheet: no real tower until Jeff places it.
+const TOWER_FLOORS := 4
+const TOWER_ACROSS := 22
+
+
+## Floor [param floor] (1 the foot, [param floors] the top) of a sample
+## tower [param across] cells square, its floors named "<prefix>_<floor>",
+## the door out to "<prefix>_outside" and the sealed way down to
+## "<prefix>_mine": {layout, config}.
+static func sample_tower(floor: int, floors: int, prefix := "lab_tower", across := TOWER_ACROSS) -> Dictionary:
+	var size := Vector2i(across, across)
+	var c := across / 2
+	var anchors: Array = [{"rect": [c - 3, c - 2, 7, 6], "name": "shaft"}]
+	if floor == 1:
+		anchors.append({"rect": [c - 2, across - 4, 5, 3], "name": "door", "walled": ["east", "west"]})
+		anchors.append({"rect": [c - 1, 1, 3, 3], "name": "hatch", "walled": ["north", "east", "west"]})
+	if floor == floors:
+		anchors.append({"rect": [c - 5, 2, 10, c - 4], "name": "chamber", "walled": ["north", "east", "west", "south"]})
+	var rows := _blank_rows(size)
+	_lay_anchors(rows, anchors)
+	if floor == floors:
+		for x in range(c - 3, c + 4):
+			_edge(rows, Vector2i(x, c - 3), "south", " ")  # The chamber opens onto the shaft below it.
+	var down := Vector2i(c - 1, c)
+	var up := Vector2i(c + 1, c)
+	var markers := {}
+	var links: Array = []
+	var spawns := {}
+	var start := Vector2i(c, c - 1)
+	if floor < floors:
+		markers[up] = "link"
+		links.append({"at": [up.x, up.y], "to_map": "%s_%d" % [prefix, floor + 1], "to_spawn": "from_below", "cue": "up", "variant": 3})
+		spawns["from_above"] = [c + 1, c + 1]
+	if floor > 1:
+		markers[down] = "link"
+		links.append({"at": [down.x, down.y], "to_map": "%s_%d" % [prefix, floor - 1], "to_spawn": "from_above", "cue": "down", "variant": 3})
+		spawns["from_below"] = [c - 1, c + 1]
+	if floor == 1:
+		var door := Vector2i(c, across - 2)
+		markers[door] = "link"
+		links.append({"at": [door.x, door.y], "to_map": "%s_outside" % prefix, "to_spawn": "", "cue": "arch"})
+		spawns["from_outside"] = [c, across - 3]
+		start = Vector2i(c + 1, across - 3)
+		var hatch := Vector2i(c, 2)
+		markers[hatch] = "link"
+		links.append({"at": [hatch.x, hatch.y], "to_map": "%s_mine" % prefix, "to_spawn": "", "sealed": "tower_mine", "cue": "sealed"})
+	if floor == floors:
+		markers[Vector2i(c - 4, 3)] = "torch"
+		markers[Vector2i(c + 3, 3)] = "torch"
+	markers[start] = "start"
+	var layout := Level.image_from_rows(_lines(rows), markers)
+	var config := {"name": "Sample tower, floor %d of %d" % [floor, floors], "outdoor": false, "walls": "stone", "floors": "stone",
+		"starts": [[start.x, start.y]], "spawn_points": spawns, "links": links,
+		"regenerate": {"generator": "labyrinth", "style": "tower", "footprint": "octagon", "every_days": 3, "anchors": anchors,
+			"rooms": {"count": [4, 7], "size": [[3, 3], [7, 6]]}, "loops": 0.15, "chests": 1}}
+	return {"layout": layout, "config": config}
 
 
 ## Blank rows (void) for a level [param size] cells across, two pixels a cell.
@@ -372,6 +440,7 @@ static func sample_barrow_lair() -> Dictionary:
 func _ready() -> void:
 	var level := ""
 	var sample := ""
+	var tower := 0
 	var generation := 1
 	var out := ""
 	var scale := 8
@@ -380,12 +449,21 @@ func _ready() -> void:
 			level = arg.trim_prefix("--level=")
 		elif arg.begins_with("--sample="):
 			sample = arg.trim_prefix("--sample=")
+		elif arg.begins_with("--tower="):
+			tower = arg.trim_prefix("--tower=").to_int()
 		elif arg.begins_with("--generation="):
 			generation = arg.trim_prefix("--generation=").to_int()
 		elif arg.begins_with("--out="):
 			out = arg.trim_prefix("--out=")
 		elif arg.begins_with("--scale="):
 			scale = arg.trim_prefix("--scale=").to_int()
+	if tower > 0:
+		# The sample tower's floors in a row (659), the foot at the left.
+		for floor in range(1, tower + 1):
+			var made := sample_tower(floor, tower)
+			Level.register("sample_tower_%d" % floor, made["layout"], null, made["config"])
+		get_tree().quit(write_tower_sheet("sample_tower", tower, generation, out, scale))
+		return
 	if not sample.is_empty():
 		var made := sample_halls(sample)
 		level = "sample_halls_" + sample
@@ -417,21 +495,7 @@ static func write_sheet(level_name: String, generation: int, out: String, scale 
 		var anchors: Array = Level.regenerate_from({"regenerate": {"anchors": template["config"].get("anchors", [])}}, warnings)["anchors"]
 		made = {"layout": template["layout"], "config": template["config"], "anchors": anchors, "seed": 0, "tries": 0}
 	var layout: Image = made["layout"]
-	var sheet := Image.create_empty(layout.get_width() * scale, layout.get_height() * scale, false, Image.FORMAT_RGBA8)
-	sheet.fill(Color.BLACK)
-	var big := layout.duplicate() as Image
-	big.convert(Image.FORMAT_RGBA8)  # A layout saved without alpha blends onto the sheet all the same.
-	big.resize(layout.get_width() * scale, layout.get_height() * scale, Image.INTERPOLATE_NEAREST)
-	sheet.blend_rect(big, Rect2i(Vector2i.ZERO, big.get_size()), Vector2i.ZERO)
-	for anchor: Dictionary in made["anchors"]:
-		var rect: Rect2i = anchor["rect"]
-		var px := Rect2i(rect.position * 2 * scale - Vector2i.ONE * (scale / 2), (rect.size * 2 - Vector2i.ONE) * scale + Vector2i.ONE * scale)
-		px = px.intersection(Rect2i(Vector2i.ZERO, sheet.get_size()))
-		var line := maxi(scale / 4, 1)
-		sheet.fill_rect(Rect2i(px.position, Vector2i(px.size.x, line)), OUTLINE)
-		sheet.fill_rect(Rect2i(Vector2i(px.position.x, px.end.y - line), Vector2i(px.size.x, line)), OUTLINE)
-		sheet.fill_rect(Rect2i(px.position, Vector2i(line, px.size.y)), OUTLINE)
-		sheet.fill_rect(Rect2i(Vector2i(px.end.x - line, px.position.y), Vector2i(line, px.size.y)), OUTLINE)
+	var sheet := sheet_image(made, scale)
 	var error := sheet.save_png(ProjectSettings.globalize_path(out) if out.begins_with("user://") or out.begins_with("res://") else out)
 	if error != OK:
 		printerr("plan_sheet: could not write %s (%s)" % [out, error_string(error)])
@@ -449,6 +513,62 @@ static func write_sheet(level_name: String, generation: int, out: String, scale 
 	print("plan_sheet: %s generation %d (seed %d, %d of %d tries): %d floor cells, %d doors, %d torches, %s; anchors: %s -> %s" % [
 		level_name, maxi(generation, 1), made["seed"], made["tries"], Regen.TRIES, level["terrain"]["floor"].size(), doors,
 		level["terrain"]["torches"].size(), kinds, ", ".join(names), out])
+	return 0
+
+
+## A generation [param made] (Regen.generate's shape: layout, anchors) drawn
+## at [param scale] pixels a layout pixel, each anchor outlined.
+static func sheet_image(made: Dictionary, scale: int) -> Image:
+	var layout: Image = made["layout"]
+	var sheet := Image.create_empty(layout.get_width() * scale, layout.get_height() * scale, false, Image.FORMAT_RGBA8)
+	sheet.fill(Color.BLACK)
+	var big := layout.duplicate() as Image
+	big.convert(Image.FORMAT_RGBA8)  # A layout saved without alpha blends onto the sheet all the same.
+	big.resize(layout.get_width() * scale, layout.get_height() * scale, Image.INTERPOLATE_NEAREST)
+	sheet.blend_rect(big, Rect2i(Vector2i.ZERO, big.get_size()), Vector2i.ZERO)
+	for anchor: Dictionary in made["anchors"]:
+		var rect: Rect2i = anchor["rect"]
+		var px := Rect2i(rect.position * 2 * scale - Vector2i.ONE * (scale / 2), (rect.size * 2 - Vector2i.ONE) * scale + Vector2i.ONE * scale)
+		px = px.intersection(Rect2i(Vector2i.ZERO, sheet.get_size()))
+		var line := maxi(scale / 4, 1)
+		sheet.fill_rect(Rect2i(px.position, Vector2i(px.size.x, line)), OUTLINE)
+		sheet.fill_rect(Rect2i(Vector2i(px.position.x, px.end.y - line), Vector2i(px.size.x, line)), OUTLINE)
+		sheet.fill_rect(Rect2i(px.position, Vector2i(line, px.size.y)), OUTLINE)
+		sheet.fill_rect(Rect2i(Vector2i(px.end.x - line, px.position.y), Vector2i(line, px.size.y)), OUTLINE)
+	return sheet
+
+
+## A tower's floors (659) as one sheet, the foot at the left and the top
+## at the right, a strip of black between: generation [param generation]
+## of each of the [param floors] levels "<prefix>_<floor>" (registered
+## already) at [param scale], written to [param out]; 0 when written, 1
+## when a floor could not be laid or the file not written.
+static func write_tower_sheet(prefix: String, floors: int, generation: int, out: String, scale := 8) -> int:
+	var images: Array[Image] = []
+	var width := 0
+	var height := 0
+	for floor in range(1, floors + 1):
+		var name := "%s_%d" % [prefix, floor]
+		var made := Regen.generate(name, maxi(generation, 1))
+		if made.is_empty():
+			printerr("plan_sheet: no map of %s joined every anchor" % name)
+			return 1
+		var image := sheet_image(made, scale)
+		images.append(image)
+		width += image.get_width() + (scale * 2 if floor > 1 else 0)
+		height = maxi(height, image.get_height())
+		print("plan_sheet: %s generation %d (seed %d, %d of %d tries)" % [name, maxi(generation, 1), made["seed"], made["tries"], Regen.TRIES])
+	var sheet := Image.create_empty(width, height, false, Image.FORMAT_RGBA8)
+	sheet.fill(Color.BLACK)
+	var x := 0
+	for image in images:
+		sheet.blit_rect(image, Rect2i(Vector2i.ZERO, image.get_size()), Vector2i(x, 0))
+		x += image.get_width() + scale * 2
+	var error := sheet.save_png(ProjectSettings.globalize_path(out) if out.begins_with("user://") or out.begins_with("res://") else out)
+	if error != OK:
+		printerr("plan_sheet: could not write %s (%s)" % [out, error_string(error)])
+		return 1
+	print("plan_sheet: %s, %d floors -> %s" % [prefix, floors, out])
 	return 0
 
 

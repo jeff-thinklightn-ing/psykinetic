@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The labyrinth generator learns a tower style: small rooms and two-wide ways inside an octagonal footprint, a shaft anchor lining the stairs floor to floor, with a sample tower in memory, its tests and a floor-row plan sheet (no tower is placed yet).
 - Going back into a zone you have already visited no longer logs "Signal 'impacted' is already connected" twice for its breakables.
 - A ruin's stone footing now crumbles nearly to the ground in places and breaks open between its corners, instead of still ringing the ruin.
 - The doe carried across the shoulders has a near-black back over deeper fawn sides, so it stands apart from the bearer's tunic at a distance.

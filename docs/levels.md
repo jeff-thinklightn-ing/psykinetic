@@ -683,6 +683,33 @@ plan sheet draws it as the barrow's (`--level=castle_halls`);
 `tools/plan_sheet`'s `sample_castle_halls` is the template's twin, and the
 template is written from it, as the barrow's are.
 
+The tower's inside (decision 659; Jeff: "The tower's inside shifts too";
+the dark elven tower over the mine, world_plane's `far_tower`, is a far
+landmark until he places it): a tower of N floors is N regenerating
+levels, `<tower>_1` the foot up to `<tower>_N` the top, each a small
+square level (the sample 22 cells across; the size is the template's) laid
+in the labyrinth's `"tower"` style: the dwarven rules with no great hall
+(rooms `[3, 3]` to `[7, 6]`, four to seven a floor, ways two wide, a door
+where a way meets a room, torches along the ways until art-kit's cold
+lamp), inside a footprint the block names (`"footprint": "octagon"` or
+`"round"`, inscribed in the level's size; `Labyrinth.footprint`), outside
+which nothing is ever carved: the floor's outline is the tower's wall. The
+stairs line up because the shaft is an anchor on every floor at the same
+cells, 7 x 6 about the middle and open on every side, the stair down west
+of the middle (a link to the floor below, spawn `from_above`, cue `down`)
+and the stair up east of it (to the floor above, spawn `from_below`, cue
+`up`), the arriving spawns beside them, two clear cells round each stair
+and spawn whatever the floor rolls. The foot has the door out at its south
+edge (cue `arch`, spawn `from_outside`) and the mine's way down under the
+north wall, a sealed link (cue `sealed`; the mark that opens it is lore's
+to name); the top floor's shaft opens into the chamber, 10 x 7 against the
+north wall, bare but for two torches. No real tower yet: the sample lives
+in `tools/plan_sheet.sample_tower(floor, floors, prefix, across)`,
+labyrinth_test lays it at two sizes (`_test_tower`), level_test walks its
+links (`_test_tower_levels`), and `write_tower_sheet` draws the floors in
+a row, the foot at the left (C:/dev/review/tower). Art-kit's dark set, the
+cold lamp, the dark pillar and the sealed hatch come with step 2.
+
 Levels regenerate only on a server started with `--regenerate` (as raid
 groups with `--raids`, decision 328) or after the console's `regenerate on`
 (`regenerate` alone lists the marked levels and their generations); the

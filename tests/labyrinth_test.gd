@@ -12,6 +12,8 @@ const Tools := preload("res://sim/level_gen/gen_tools.gd")
 
 const Sheet := preload("res://tools/plan_sheet.gd")
 const Labyrinth := preload("res://sim/level_gen/labyrinth.gd")
+## The sample towers (659): [prefix, floors, across].
+const TOWERS: Array = [["lab_tower", 4, 22], ["lab_wide", 2, 30]]
 
 var _failures := 0
 
@@ -22,11 +24,17 @@ func _ready() -> void:
 	for style in ["dwarven", "old", "barrow", "barrow_deep", "barrow_lair", "castle_halls"]:
 		var sample := Sheet.sample_halls(style)
 		Level.register("lab_" + style, sample["layout"], sample.get("height"), sample["config"])  # The lair's dais heights (580 step 3).
+	# The tower (659): four floors at the sample's size and two at 30 across.
+	for set: Array in TOWERS:
+		for floor in range(1, int(set[1]) + 1):
+			var sample := Sheet.sample_tower(floor, int(set[1]), str(set[0]), int(set[2]))
+			Level.register("%s_%d" % [set[0], floor], sample["layout"], null, sample["config"])
 	_test_block()
 	_test_style("dwarven")
 	_test_style("old")
 	_test_barrow()
 	_test_castle_halls()
+	_test_tower()
 	_test_sheet()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -483,6 +491,91 @@ func _test_castle_halls() -> void:
 		"four dwarven pillars (crypt_pillar, variant 2) stand in the forge room (%d)" % pillars.size())
 
 
+## The tower style (659): each floor of the two sample towers laid twice:
+## the anchors kept and inside the octagon, every anchor reached, no
+## one-wide way, nothing carved outside the footprint, the stairs at the
+## same cells on every floor with two clear cells round each stair and
+## spawn, the sealed way down on the foot alone, the top chamber bare but
+## for its two torches, a chest a floor.
+func _test_tower() -> void:
+	print("\n== the tower style (659): floors in an octagon, the shaft lining the stairs ==")
+	for set: Array in TOWERS:
+		var prefix := str(set[0])
+		var floors := int(set[1])
+		var across := int(set[2])
+		var size := Vector2i(across, across)
+		var inside := Labyrinth.footprint(size, "octagon")
+		var c := across / 2
+		var stairs := {}
+		for floor in range(1, floors + 1):
+			var name := "%s_%d" % [prefix, floor]
+			var first := Regen.generate(name, 1)
+			var second := Regen.generate(name, 2)
+			_check(not first.is_empty() and not second.is_empty(), "%s: generations 1 and 2 are made (%d and %d tries)" % [name, first.get("tries", 0), second.get("tries", 0)])
+			if first.is_empty() or second.is_empty():
+				continue
+			var config: Dictionary = first["config"]
+			var anchors: Array = first["anchors"]
+			var template := LevelMap.from_image(Level.template(name)["layout"], config)
+			var a := LevelMap.from_image(first["layout"], config)
+			var b := LevelMap.from_image(second["layout"], config)
+			var kept := _anchors_kept(template, a, b, anchors, size, func(_cell: Vector2i) -> bool: return false)
+			_check(kept["same"] and kept["differ"] > 20, "%s: the anchors are the template's in both, the floor between differs (%d cells)" % [name, kept["differ"]])
+			_check(Regen.connected(a, anchors) and Regen.connected(b, anchors), "%s: every anchor reaches every other in both" % name)
+			var cut_off := _cut_off(a, Vector2i(c, c)) + _cut_off(b, Vector2i(c, c))
+			_check(cut_off.is_empty(), "%s: every floor cell is walked to from the shaft in both, no room cut off (%s)" % [name, cut_off.slice(0, 8)])
+			_check(Tools.narrow_runs(a).is_empty() and Tools.narrow_runs(b).is_empty(), "%s: no way is one cell wide in either (%s)" % [name, Tools.sorted_cells(Tools.narrow_runs(a)).slice(0, 6)])
+			var floor_a := _floor_of(a, size)
+			var outside := floor_a.filter(func(cell: Vector2i) -> bool: return not inside.has(cell)).size() \
+				+ _floor_of(b, size).filter(func(cell: Vector2i) -> bool: return not inside.has(cell)).size()
+			var anchors_in := anchors.all(func(anchor: Dictionary) -> bool:
+				return Level.rect_cells(anchor["rect"]).all(func(cell: Vector2i) -> bool: return inside.has(cell)))
+			_check(outside == 0 and anchors_in and floor_a.size() * 3 >= inside.size(),
+				"%s: nothing is carved outside the octagon, the anchors lie inside it, the floor fills a good share of it (%d outside, %d of %d)" % [name, outside, floor_a.size(), inside.size()])
+			var level := Level.parse(first["layout"], null, config)
+			_check(level["warnings"].is_empty(), "%s: generation 1 parses with no warning (%s)" % [name, level["warnings"]])
+			var doors := 0
+			for key: Vector3i in level["terrain"]["edges"]:
+				if level["terrain"]["edges"][key] == Terrain.Edge.DOOR:
+					doors += 1
+			_check(doors >= 3 and level["terrain"]["torches"].size() >= 3 and _kinds(level).get("chest", 0) == 1,
+				"%s: doors where the ways meet the rooms, torches along them, one chest (%d doors, %d torches, %s)" % [name, doors, level["terrain"]["torches"].size(), _kinds(level)])
+			# The stairs and the spawns beside them: the same cells on every
+			# floor, two clear cells round each, whatever the floor rolled.
+			var up_down := {}
+			for cue: Dictionary in level["terrain"]["link_cues"]:
+				if cue["cue"] in ["up", "down"]:
+					up_down[cue["cue"]] = cue["tile"]
+			_check((floor < floors) == up_down.has("up") and (floor > 1) == up_down.has("down")
+				and up_down.get("up", Vector2i(c + 1, c)) == Vector2i(c + 1, c) and up_down.get("down", Vector2i(c - 1, c)) == Vector2i(c - 1, c),
+				"%s: the stair up east of the middle and the stair down west, none up from the top or down from the foot (%s)" % [name, up_down])
+			for cue: String in up_down:
+				stairs[cue] = stairs.get(cue, up_down[cue])
+				_check(stairs[cue] == up_down[cue], "%s: the stair %s is where it is on every floor (%s)" % [name, cue, up_down[cue]])
+			var round_cells: Array[Vector2i] = []
+			round_cells.append_array(up_down.values())
+			for spawn: String in ["from_above", "from_below"]:
+				if level["spawn_points"].has(spawn):
+					round_cells.append(level["spawn_points"][spawn])
+			var crowded := []
+			for at in round_cells:
+				for dy in range(-2, 3):
+					for dx in range(-2, 3):
+						var near := at + Vector2i(dx, dy)
+						if not a.walkable(near) or not b.walkable(near):
+							crowded.append(near)
+			_check(round_cells.size() >= 2 and crowded.is_empty(), "%s: two clear cells round every stair and the spawns beside them in both generations (%s)" % [name, crowded.slice(0, 6)])
+			var sealed: Array = level["terrain"]["link_cues"].filter(func(cue: Dictionary) -> bool: return cue["cue"] == "sealed")
+			_check((sealed.size() == 1 and sealed[0]["tile"] == Vector2i(c, 2) and level["links"].any(func(link: Dictionary) -> bool: return link["tile"] == Vector2i(c, 2) and link["sealed"] == "tower_mine")) if floor == 1 else sealed.is_empty(),
+				"%s: the mine's way down is a sealed link under the north wall on the foot alone (%s)" % [name, sealed])
+			if floor == floors:
+				var chamber: Rect2i = anchors.filter(func(anchor: Dictionary) -> bool: return anchor["name"] == "chamber")[0]["rect"]
+				var lit: int = level["terrain"]["torches"].filter(func(cell: Vector2i) -> bool: return chamber.has_point(cell)).size()
+				var things: int = level["entities"].filter(func(spec: Dictionary) -> bool: return chamber.has_point(spec["tile"])).size()
+				_check(lit == 2 and things == 0 and a.walkable(Vector2i(c, c - 3)) and a.edge(Terrain.edge_key(Vector2i(c, c - 3), Vector2i(0, 1))) != "wall",
+					"%s: the top chamber holds its two torches and nothing else, open onto the shaft (%d lit, %d things)" % [name, lit, things])
+
+
 ## How many of [param floor_cells] have floor on two opposite sides: the
 ## ways' width (541 amended).
 func _broad(map: LevelMap, floor_cells: Array[Vector2i]) -> int:
@@ -506,6 +599,12 @@ func _test_sheet() -> void:
 	_check(grey != null and grey.is_equal_approx(Color("#9a9a9a")), "the gatehouse's floor at (4, 3) is stone grey on it (%s)" % [grey.to_html(false) if grey else null])
 	_check(Sheet.write_sheet("lab_old", 1, "", 4) == 2 and Sheet.write_sheet("no_such_level", 1, out, 4) == 2, "no out, or a level there is not: refused")
 	_check(Sheet.write_sheet("castle", 1, out, 4) == 0, "a level that does not regenerate is drawn as it stands (580)")
+	DirAccess.remove_absolute(out)
+	# The tower's floors in a row (659): the foot at the left.
+	_check(Sheet.write_tower_sheet("lab_tower", 4, 1, out, 4) == 0, "the sample tower's four floors are drawn in a row")
+	image = Image.load_from_file(out) if FileAccess.file_exists(out) else null
+	var one := (Sheet.TOWER_ACROSS * 2 - 1) * 4
+	_check(image != null and image.get_size() == Vector2i(one * 4 + 8 * 3, one), "a PNG four floors wide with a strip between (%s)" % [image.get_size() if image else null])
 	DirAccess.remove_absolute(out)
 
 

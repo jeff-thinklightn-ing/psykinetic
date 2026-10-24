@@ -27961,3 +27961,56 @@ a footing lasts longest at a corner, and the plot's shape stays readable.
 view_test _test_decline reads the plinth's top faces: in the ruin, tops from
 under a fifth of its height to at most whole, covering under 0.8 m an edge;
 built again, all whole. Client only, protocol unchanged, no new class_name.
+
+## 659. The tower style: floors in a footprint, a shaft that lines the stairs
+
+Jeff: "The tower's inside shifts too." The dark elven tower over the mine (650's `far_tower`) is a
+far landmark until he places it; its zone, link and lore come then. Dungeon builds the
+infrastructure first (the coordinator's brief, 2026-10-24, the design in
+C:/dev/review/dungeon/tower_style_design.md approved): a "tower" style for the labyrinth
+generator, a sample in memory, tests, a plan sheet; no real level, link or zone.
+
+- **One level a floor.** A tower of N floors is N regenerating levels (`<tower>_1` the foot to
+  `<tower>_N` the top), as the barrow's layers are: the engine's zone, sleep and regenerate rules
+  are per level and a link joins levels. Each floor is laid again on its own period while its zone
+  sleeps, so a player on floor 3 never has floor 2 change under them, only behind them.
+- **The footprint is the template's.** The block's `"footprint"` ("octagon": the map's rect with
+  a cell of rim and each corner cut along a diagonal about 0.29 of the shorter side; "round": a
+  disc of half the shorter side less a cell; else the whole map) names the cells the generator may
+  carve (`Labyrinth.footprint(size, kind)`, kept in the map's extras as "footprint"); `Tools.rock`
+  reads it, so carving, the path search (`path_through`, `path_around`) and room placement
+  (`_in_footprint`) never leave it, and the floor's outline is the tower's wall. Nothing in the
+  generator assumes a size: the test lays the sample at 22 and 30 across.
+- **The style.** The dwarven rules with no great hall: rooms `[3, 3]` to `[7, 6]`, four to seven
+  a floor, ways two wide, a door where a way meets a room, blind ways and alcoves, torches along
+  the ways (the "torch" marker stands in for art-kit's cold lamp until step 2), `loops` 0.15.
+- **The shaft lines the stairs.** A 7 x 6 anchor about the middle of every floor, open on all four
+  sides so every floor's ways meet at it, holds the stair down west of the middle (a link to the
+  floor below, spawn `from_above`, cue `down`, variant 3 for the dark stair) and the stair up east
+  of it (to the floor above, spawn `from_below`, cue `up`), the arriving spawns on the row below
+  them; the foot has no stair down and the top no stair up. Two clear cells round each stair cell
+  and spawn on every floor whatever the floor rolled, checked explicitly in `_test_tower`.
+- **The foot and the top.** Floor 1: the door anchor at the south edge (5 x 3, walled east and
+  west, the link out with cue `arch`, spawn `from_outside`, the start) and the mine's way down
+  against the north wall (3 x 3, walled north, east and west, a sealed link with cue `sealed`,
+  `"sealed": "tower_mine"` a placeholder until lore names the mark). Floor N: the chamber (10 x 7,
+  walled all round but its south over the shaft's span), bare but for two torches; what stands in
+  it is lore's and art-kit's later. Floors between hold the shaft alone.
+- **The sample and the sheet.** `tools/plan_sheet.sample_tower(floor, floors, prefix, across)`
+  lays a floor's template; `write_tower_sheet(prefix, floors, generation, out, scale)` draws the
+  floors in a row, the foot at the left (`write_sheet`'s drawing moved into `sheet_image`).
+  labyrinth_test `_test_tower` (two generations a floor at 22 and 30 across: anchors kept and
+  inside the octagon, every floor cell walked to from the shaft (the coordinator, on the sheet:
+  "not only every anchor"), no one-wide way, nothing outside the footprint, doors, torches, a
+  chest, the stairs at the same cells on every floor with their clear cells, the sealed link on
+  the foot alone, the top chamber bare but lit) and `_test_sheet`'s row; level_test
+  `_test_tower_levels` (each floor parses clean, the links both ways with cues up and down, the
+  foot's arch and sealed hatch). docs/levels.md.
+- **Deferred.** Windows in the ring (a level's walls take no window edges; the tower's outside is
+  a landmark, not yet a piece with an inside). Step 2, on art-kit's "659, art-kit's side": the
+  dark wall and floor set, the cold lamp marker and environment's light, `building.dark_pillar`
+  (solid, doorless; a protocol line), `prop.rune_strip` as a "wall" decor kind, the hatch piece
+  over the sealed link. Step 3 when Jeff places the tower: maps' zone and links, lore's names,
+  enemy-ai's foes, a real `<tower>_1..N` written from the sample.
+
+Generator and tools only, protocol unchanged, no new class_name.
