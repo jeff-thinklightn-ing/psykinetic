@@ -27081,3 +27081,17 @@ Economy's 649 (towns fall as well as rise; the coordinator's approval):
 level_test the camp, the joins and the classes; view_test _test_camp and
 _test_decline; builder_test's uses with the camp. A line under revision
 35 (the camp read alike on both sides); no new class_name.
+## 649, ui's side. The town sheet's strain line
+
+Beside economy's 649 (towns fall as well as rise; the coordinator: one
+"strain" line under next_stage). The "town_sheet" message's "strain"
+{days, of, why} (Towns.strain: the days of strain so far, strain_days, and
+the reason recorded, "" for none) becomes one line at the sheet's end,
+TownSheet.strain_words: "Strained 4 days of 10: hunger, the store short of
+food." Economy's reason is kept as it names it ("too few people (3 of 8)",
+"the forge out of use"), hunger alone spelled out with the store, since
+that is the rule; the days alone when no reason is recorded (a resident
+carried off adds days without one); nothing at 0 days, so an unstrained
+town's sheet reads as before. No bar, no colour: a town falling is said in
+words like the rest of the sheet. ui_test's economy rows cover it. Client
+only; no wire change; no new class_name.

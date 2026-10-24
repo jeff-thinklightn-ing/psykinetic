@@ -296,7 +296,27 @@ static func economy_lines(sheet: Dictionary) -> Array[String]:
 				wants.append(need_words(each))
 		if not stage.is_empty() and not wants.is_empty():
 			out.append("To be %s %s: %s." % ["an" if stage[0] in "aeiou" else "a", stage, join_and(wants)])
+	if sheet.get("strain") is Dictionary:
+		var strained := strain_words(sheet["strain"])
+		if not strained.is_empty():
+			out.append(strained)
 	return out
+
+
+## The strain line (649, ui's side; economy's "strain" {days, of, why}):
+## "Strained 4 days of 10: hunger, the store short of food."; the days
+## alone when no reason is recorded (a captive carried off adds days
+## without one); nothing while the town is not strained.
+static func strain_words(strain: Dictionary) -> String:
+	var days := int(strain.get("days", 0))
+	if days <= 0:
+		return ""
+	var of := int(strain.get("of", 0))
+	var head := "Strained %d %s of %d" % [days, "day" if days == 1 else "days", of] if of > 0 else "Strained %d %s" % [days, "day" if days == 1 else "days"]
+	var why := str(strain.get("why", ""))
+	if why == "hunger":
+		why = "hunger, the store short of food"
+	return "%s: %s." % [head, why] if not why.is_empty() else "%s." % head
 
 
 ## A next-stage need {what, have, need} in words: "3 more people", "a

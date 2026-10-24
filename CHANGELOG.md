@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The town status sheet (N) ends with a strain line while a town is slipping: how many days of its ten it has run and why, in economy's words; nothing while it stands well (649, ui's side).
 - A new settlement starts with camps: a tent or two round a fire ring, open to the sky, pitched by anyone for a little wood and cloth.
 - Buildings a town no longer keeps up show it: in disrepair the roof breaks, the walls crack, the lamps go out and weeds grow at the foot; a ruin is a low bank of rubble you can walk over, and once it's gone nothing is left.
 - Towns can now decline as well as grow: a new town starts as a settlement of tents and builds up to hamlet and village, but a town that loses people, goes hungry, leaves officials unpaid or has residents carried off falls back a stage, and buildings that go unkept (starting at the edge) fall into disrepair, then ruin, and the wild takes the ground back (649)
