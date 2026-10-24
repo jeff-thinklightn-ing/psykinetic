@@ -12,6 +12,9 @@ render_mode cull_disabled;
 // outdoor floor as a brightness, worked in sRGB as the ground works it; 1
 // indoors, where the ground is lit by the cell's own lights alone.
 uniform float sky_floor = 1.0;
+// A chunk's faces built in sight after the arrival card lifted dither in,
+// 0..1 (decision 660).
+instance uniform float appear = 1.0;
 
 varying vec3 world;
 
@@ -21,6 +24,9 @@ void vertex() {
 
 void fragment() {
 	if (sight_cut_here(world, FRAGCOORD.xy)) {
+		discard;
+	}
+	if (appear < 1.0 && sight_dither(FRAGCOORD.xy) >= appear) {
 		discard;
 	}
 	ALBEDO = COLOR.rgb * pow(sky_floor, 2.2);

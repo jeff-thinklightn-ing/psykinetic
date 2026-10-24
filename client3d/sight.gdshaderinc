@@ -18,6 +18,17 @@ const float SIGHT_RADIUS = 1.3;
 const float SIGHT_ABOVE = 0.4;
 const float SIGHT_KEEP = 0.3;
 
+// A 4x4 ordered dither's threshold at screen pixel [pixel], 0..1: an even
+// screen-door, no noise crawling (the sight cut's, and a chunk's appearing,
+// decision 660).
+float sight_dither(vec2 pixel) {
+	int x = int(mod(pixel.x, 4.0));
+	int y = int(mod(pixel.y, 4.0));
+	int index = x + y * 4;
+	float bayer[16] = float[16](0.0, 8.0, 2.0, 10.0, 12.0, 4.0, 14.0, 6.0, 3.0, 11.0, 1.0, 9.0, 15.0, 7.0, 13.0, 5.0);
+	return (bayer[index] + 0.5) / 16.0;
+}
+
 // Whether the fragment at [world] (its screen pixel [pixel]) is cut away.
 bool sight_cut_here(vec3 world, vec2 pixel) {
 	if (sight_cut <= 0.0 || world.y < sight_focus.w + SIGHT_ABOVE) {
@@ -30,11 +41,5 @@ bool sight_cut_here(vec3 world, vec2 pixel) {
 	}
 	float across = length(off - sight_toward.xyz * along);
 	float inside = (1.0 - smoothstep(SIGHT_RADIUS * 0.6, SIGHT_RADIUS, across)) * sight_cut;
-	// A 4x4 ordered dither: an even screen-door, no noise crawling.
-	int x = int(mod(pixel.x, 4.0));
-	int y = int(mod(pixel.y, 4.0));
-	int index = x + y * 4;
-	float bayer[16] = float[16](0.0, 8.0, 2.0, 10.0, 12.0, 4.0, 14.0, 6.0, 3.0, 11.0, 1.0, 9.0, 15.0, 7.0, 13.0, 5.0);
-	float threshold = (bayer[index] + 0.5) / 16.0;
-	return threshold < inside * (1.0 - SIGHT_KEEP);
+	return sight_dither(pixel) < inside * (1.0 - SIGHT_KEEP);
 }

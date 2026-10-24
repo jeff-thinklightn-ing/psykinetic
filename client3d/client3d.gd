@@ -1384,6 +1384,50 @@ var _peek_t := 1.0
 ## WASD: the camera's lean toward the cursor, in grid units (Main.camera_lean).
 var _lead := Vector2.ZERO
 var _room: Node3D
+## The room is being built over frames (decision 660): the view's _process
+## waits, and Main holds the player's input and shows the arrival card.
+var building_room := false
+## Told when a rebuild's room is whole.
+signal room_built
+## A rebuild's number: a phase of an older one stops (decision 660).
+var _build_generation := 0
+## The grown trees' data, read in _phase_land, built in _phase_grown.
+var _grown_data := {}
+## Decision 660 step 2: the ground's fields on a worker (WorkerThreadPool's
+## task id, -1 none), its result; the ground's and cliffs' chunks still to
+## build after the card lifts ([member ground_filling] till the last), each
+## a [kind, chunk] job, kind "ground" or "cliff"; their shared starts; the
+## chunks drawn, by chunk; rooms of earlier builds, freed a slice a frame.
+var _fields_task := -1
+var _fields_result := {}
+var ground_filling := false
+## Told when a crossing's ground and cliffs are all built (decision 660).
+signal room_filled
+## Told when the ground's fields are in place: the terrain may change again.
+signal fields_done
+var _fill_jobs: Array[Array] = []
+var _fill_ground := {}
+var _fill_cliffs := {}
+var _ground_drawn: Dictionary[Vector2i, MeshInstance3D] = {}
+var _cliffs_drawn: Dictionary[Vector2i, MeshInstance3D] = {}
+var _old_rooms: Array[Node3D] = []
+## The ground's material while a chunk dithers in (the SIGHT variant, whose
+## appear it reads), made when the first one starts.
+var _ground_appear: ShaderMaterial
+## Over frames (decision 660), every ground cell's shade worked out before
+## its chunks are built (_seed_shades), so each chunk is built shaded: the
+## floor's shade itself waits for the last chunk's pairs (ground_filling),
+## and a chunk drawn at full light till then would darken when it came.
+var _shades_seeded := false
+## A frame's time for the chunks: under the card (all dark anyway), after.
+const CARD_BUDGET_USEC := 14000
+const FILL_BUDGET_USEC := 4000
+## How long a chunk built in sight after the lift takes to dither in.
+const APPEAR_SECONDS := 0.4
+## A chunk's height range for whether the camera sees it (m): lower than any
+## bed, higher than any hill's top.
+const CHUNK_LOW := -6.0
+const CHUNK_HIGH := 40.0
 ## Where the camera first looks (the level's centre).
 var _centre := Vector2i.ZERO
 ## The ground (_build_ground). Each floor cell's index, its kind, and the
@@ -2076,6 +2120,8 @@ func setup(terrain: Dictionary, centre := Vector2i.ZERO) -> void:
 
 
 func _process(delta: float) -> void:
+	if building_room:
+		return  # Half a room (decision 660): nothing to ease, fade or grow yet.
 	_end_warm_ups()
 	_sync_puppets()
 	_update_seen_through()
@@ -2634,6 +2680,8 @@ func _aim_hillshade() -> void:
 		return
 	_hillshade_yaw = yaw
 	_ground_look.set_shader_parameter("relief_light", hillshade_light(yaw))
+	if _ground_appear != null:
+		_ground_appear.set_shader_parameter("relief_light", hillshade_light(yaw))
 
 
 ## The relief light (decision 525 amended, terrain's side), toward it: from
@@ -4305,12 +4353,36 @@ func _stair(cell: Vector2i) -> Vector2i:
 	return _terrain.get("stairs", {}).get(cell, Vector2i.ZERO)
 
 
-## The room drawn afresh for [param terrain] (a map loaded live).
-func rebuild(terrain: Dictionary, centre: Vector2i) -> void:
+## The room drawn afresh for [param terrain] (a map loaded live), all in
+## this frame; [param over_frames] (Main's crossings, decision 660) builds
+## it a builder a frame, [member building_room] true till the last. A
+## rebuild started while one is still building ends the first: its next
+## phase finds a newer generation and stops, what it made freed with its room.
+func rebuild(terrain: Dictionary, centre: Vector2i, over_frames := false) -> void:
+	_build_generation += 1
+	_end_fields_task()
+	_shades_seeded = false
+	_fill_jobs.clear()
+	_fill_ground = {}
+	_fill_cliffs = {}
+	ground_filling = false
+	_ground_drawn.clear()
+	_cliffs_drawn.clear()
 	_terrain = terrain
 	_centre = centre
-	if _room != null:
+	if _room != null and over_frames:
+		# Freed a slice a frame once the new room is up (0.2 s at once on the wilds).
+		_room.visible = false
+		_room.process_mode = Node.PROCESS_MODE_DISABLED
+		_room.name = "OldRoom_%d" % _build_generation
+		_old_rooms.append(_room)
+	elif _room != null:
 		_room.free()
+	if not over_frames:
+		for old in _old_rooms:
+			if is_instance_valid(old):
+				old.free()
+		_old_rooms.clear()
 	_pile_nodes.clear()
 	_walls.clear()
 	_wall_breaches.clear()
@@ -4352,14 +4424,272 @@ func rebuild(terrain: Dictionary, centre: Vector2i) -> void:
 	_hid_at.clear()
 	_fade_key = ""
 	_apply_sky()
-	_build_room()
-	_classify_walls()
 	_camera_target = _tile_position(_centre)
 	# A new map: the view starts on the player.
 	pan = Vector3.ZERO
 	_pan_home = false
+	if over_frames:
+		_build_room_over_frames(_build_generation)
+	else:
+		_build_room()
+		_room_built()
+		# Whatever waited on a build over frames this one ended goes on.
+		fields_done.emit()
+		room_filled.emit()
+
+
+## What a rebuild does once its room is whole.
+func _room_built() -> void:
+	_classify_walls()
 	_apply_camera_mode()  # Outdoors or under stone now (623).
 	_start_warm_ups()
+	building_room = false
+	room_built.emit()
+
+
+## The room's builders a frame apart (decision 660), each whole but the
+## ground's and the cliffs': the ground's fields on a worker while frames go
+## round, then those chunks the camera sees under the card, the rest after it
+## lifts (_fill_step). Stopped by a newer rebuild (another
+## [member _build_generation]).
+func _build_room_over_frames(generation: int) -> void:
+	building_room = true
+	# The view where the card will lift: what it sees is built first.
+	_apply_camera_mode()
+	_place_camera()
+	for phase: Callable in _room_phases():
+		if phase == _phase_ground:
+			if not await _phase_ground_over_frames(generation):
+				return
+		elif phase == _add_cliffs:
+			_fill_cliffs = _cliffs_start()
+			for chunk: Vector2i in _fill_cliffs["chunks"]:
+				_fill_jobs.append(["cliff", chunk])
+		else:
+			phase.call()
+		await get_tree().process_frame
+		if generation != _build_generation or not is_inside_tree():
+			return
+	# Everything the camera sees, under the card.
+	while _fill_step(CARD_BUDGET_USEC, true):
+		await get_tree().process_frame
+		if generation != _build_generation or not is_inside_tree():
+			return
+	_room_built()
+	# The rest at a few ms a frame, in sight and nearest first, dithering in.
+	while _fill_step(FILL_BUDGET_USEC, false):
+		await get_tree().process_frame
+		if generation != _build_generation or not is_inside_tree():
+			return
+	_fill_finished()
+
+
+## The ground over frames (decision 660): its fields on a worker while the
+## frames go round, put in place, its fires; its chunks queued. False when a
+## newer rebuild took over.
+func _phase_ground_over_frames(generation: int) -> bool:
+	var input := _ground_input(_terrain.get("kinds", {}))
+	if input.is_empty():
+		return true
+	var key := _fields_key()
+	var fields := _kept_fields(key)
+	if fields.is_empty():
+		var result := {}
+		var task := WorkerThreadPool.add_task(func() -> void: result["fields"] = _ground_fields(input), true, "ground fields")
+		_fields_task = task
+		while _fields_task == task and not WorkerThreadPool.is_task_completed(task):
+			await get_tree().process_frame
+		if _fields_task != task:
+			return false  # A newer rebuild waited for it and took over.
+		WorkerThreadPool.wait_for_task_completion(task)
+		_fields_task = -1
+		if generation != _build_generation or not is_inside_tree():
+			return false
+		fields = result["fields"]
+		_keep_fields(key, fields)
+	_apply_ground_fields(fields)
+	fields_done.emit()
+	_fill_ground = _ground_meshes_start(fields)
+	_seed_shades()  # After the start, which makes the indoor shade image.
+	for chunk: Vector2i in fields["chunks"]:
+		_fill_jobs.append(["ground", chunk])
+	ground_filling = true  # The shade waits from here: the lights' phase asks for it.
+	_fire_lights.clear()
+	var fire: Array[Vector2i] = _terrain["fire"]
+	for cell: Vector2i in fire:
+		if _grounds.has(cell):
+			_add_fire(cell)
+	return true
+
+
+## A zone's ground fields kept for its next arrival (decision 660 (a)), by
+## _fields_key: the zone's terrain hashed whole, so any change to it at all
+## (a woodcut, regrowth, a plot, a ruin, a regenerate, a builder's edit)
+## misses and works them out afresh. FIELDS_KEPT zones, the least recently
+## arrived at dropped; each [key, fields], the latest last.
+const FIELDS_KEPT := 3
+var _fields_kept: Array[Array] = []
+## How many arrivals found their fields kept (tests, benches).
+var fields_hits := 0
+
+
+## The key the ground's fields are kept by: the level, a glimpse or not, and
+## the terrain's hash (8 ms on the wilds).
+func _fields_key() -> String:
+	return "%s|%s|%d" % [_terrain.get("level", ""), _glimpse, _terrain.hash()]
+
+
+## The fields kept under [param key], a copy of them (the build makes its
+## members of them and changes those after), else {}.
+func _kept_fields(key: String) -> Dictionary:
+	for i in _fields_kept.size():
+		if _fields_kept[i][0] == key:
+			var kept: Array = _fields_kept.pop_at(i)
+			_fields_kept.append(kept)
+			fields_hits += 1
+			return _fields_copy(kept[1])
+	return {}
+
+
+## [param fields] kept under [param key] (a copy), the oldest dropped past
+## FIELDS_KEPT.
+func _keep_fields(key: String, fields: Dictionary) -> void:
+	for i in _fields_kept.size():
+		if _fields_kept[i][0] == key:
+			_fields_kept.remove_at(i)
+			break
+	_fields_kept.append([key, _fields_copy(fields)])
+	while _fields_kept.size() > FIELDS_KEPT:
+		_fields_kept.pop_front()
+
+
+## [param fields] copied all through, its images too.
+static func _fields_copy(fields: Dictionary) -> Dictionary:
+	var copy := fields.duplicate(true)
+	for name: Variant in copy:
+		if copy[name] is Image:
+			copy[name] = (copy[name] as Image).duplicate()
+	return copy
+
+
+## Waits for a running fields task (a rebuild, the view leaving): it reads
+## the members the next build remakes.
+func _end_fields_task() -> void:
+	if _fields_task != -1:
+		WorkerThreadPool.wait_for_task_completion(_fields_task)
+		_fields_task = -1
+
+
+## Whether the ground's fields are being worked out on a worker: the terrain
+## they read waits (Main holds a clearing till fields_done).
+func fields_running() -> bool:
+	return _fields_task != -1
+
+
+func _exit_tree() -> void:
+	_end_fields_task()
+
+
+## Builds chunks for up to [param budget] µs, those the camera sees first and
+## then the nearest; [param seen_only]: only those it sees (under the card).
+## True while there is more to do this way. A chunk built in sight after the
+## card has lifted dithers in; earlier rooms are freed a slice a frame after.
+func _fill_step(budget: int, seen_only: bool) -> bool:
+	var started := Time.get_ticks_usec()
+	if _fill_jobs.is_empty():
+		return _free_old_rooms(started, budget)
+	var frustum := _camera.get_frustum() if _camera != null else []
+	var aim := Vector2(_camera_target.x, _camera_target.z)
+	var order: Array[Array] = []
+	for job: Array in _fill_jobs:
+		var seen := _chunk_seen(job[1], frustum)
+		if seen_only and not seen:
+			continue
+		var middle := Vector2(job[1] * FLOOR_CHUNK) + Vector2.ONE * (FLOOR_CHUNK * 0.5)
+		order.append([0 if seen else 1, middle.distance_squared_to(aim), job, seen])
+	if order.is_empty():
+		return false
+	order.sort_custom(func(a: Array, b: Array) -> bool: return a[0] < b[0] or a[0] == b[0] and a[1] < b[1])
+	for each: Array in order:
+		if Time.get_ticks_usec() - started >= budget:
+			break
+		var job: Array = each[2]
+		_fill_jobs.erase(job)
+		if job[0] == "ground":
+			_ground_mesh_chunk(_fill_ground, job[1])
+		else:
+			_cliff_chunk(_fill_cliffs, job[1])
+		if each[3] and not building_room:
+			_appear(job[0], job[1])
+	return true
+
+
+## Whether the camera sees [param chunk] (its column CHUNK_LOW to CHUNK_HIGH
+## against [param frustum]'s planes, Camera3D.get_frustum: out is +normal).
+func _chunk_seen(chunk: Vector2i, frustum: Array) -> bool:
+	if frustum.is_empty():
+		return true
+	var low := Vector3(chunk.x * FLOOR_CHUNK - 0.5, CHUNK_LOW, chunk.y * FLOOR_CHUNK - 0.5)
+	var high := low + Vector3(FLOOR_CHUNK, CHUNK_HIGH - CHUNK_LOW, FLOOR_CHUNK)
+	for plane: Plane in frustum:
+		# The box's corner furthest inside: outside the plane, the box is too.
+		var inner := Vector3(low.x if plane.normal.x > 0.0 else high.x, low.y if plane.normal.y > 0.0 else high.y,
+				low.z if plane.normal.z > 0.0 else high.z)
+		if plane.is_point_over(inner):
+			return false
+	return true
+
+
+## [param kind]'s chunk [param chunk], just built in sight, dithering in over
+## APPEAR_SECONDS (decision 660): the ground through its SIGHT variant (which
+## reads appear) till it is whole, then its own material again.
+func _appear(kind: String, chunk: Vector2i) -> void:
+	var drawn: MeshInstance3D = (_ground_drawn if kind == "ground" else _cliffs_drawn).get(chunk)
+	if drawn == null:
+		return
+	if kind == "ground":
+		if _ground_appear == null or _ground_appear.get_meta("look", null) != _ground_look:
+			_ground_appear = _ground_look.duplicate() as ShaderMaterial
+			_ground_appear.shader = GROUND_SIGHT_SHADER
+			_ground_appear.set_meta("look", _ground_look)
+		drawn.material_override = _ground_appear
+	drawn.set_instance_shader_parameter("appear", 0.0)
+	var tween := drawn.create_tween()
+	tween.tween_method(func(v: float) -> void: drawn.set_instance_shader_parameter("appear", v), 0.0, 1.0, APPEAR_SECONDS)
+	if kind == "ground":
+		tween.tween_callback(func() -> void: drawn.material_override = _ground_look)
+
+
+## Frees what is left of earlier builds' rooms within [param budget] µs
+## from [param started]; true while some are left.
+func _free_old_rooms(started: int, budget: int) -> bool:
+	while not _old_rooms.is_empty():
+		var old := _old_rooms[0]
+		if not is_instance_valid(old):
+			_old_rooms.pop_front()
+			continue
+		if old.get_child_count() == 0:
+			_old_rooms.pop_front()
+			old.free()
+			continue
+		if Time.get_ticks_usec() - started >= budget:
+			return true
+		old.get_child(old.get_child_count() - 1).free()
+	return false
+
+
+## The ground's and cliffs' chunks all built (decision 660): the shade's
+## pairs gathered, the shade worked out afresh, told.
+func _fill_finished() -> void:
+	if not _fill_ground.is_empty():
+		_ground_meshes_finish(_fill_ground)
+	_fill_ground = {}
+	_fill_cliffs = {}
+	ground_filling = false
+	_shade_all = true
+	_shade_due = false
+	_on_fields_changed()
+	room_filled.emit()
 
 
 ## The depth pass every near material draws first (_make_near).
@@ -4465,7 +4795,20 @@ func _descendants(node: Node) -> Array[Node]:
 	return out
 
 
+## The room's builders in order (decision 660): run in one go by
+## _build_room, a frame apart by _build_room_over_frames.
+func _room_phases() -> Array[Callable]:
+	return [_phase_sets, _phase_land, _phase_ground, _build_water, _add_cliffs, _phase_lights,
+		_add_walls, _add_decor, _phase_forest, _phase_grown, _phase_border, _phase_glimpses,
+		_add_buildings, _phase_roofs, _phase_doors]
+
+
 func _build_room() -> void:
+	for phase: Callable in _room_phases():
+		phase.call()
+
+
+func _phase_sets() -> void:
 	_room = Node3D.new()
 	_room.name = "Room"
 	add_child(_room)
@@ -4504,8 +4847,9 @@ func _build_room() -> void:
 	for building: Dictionary in _drawn_buildings():
 		_building_sets(building)
 	_warm_art()
-	var fire: Array[Vector2i] = _terrain["fire"]
-	var kinds: Dictionary = _terrain.get("kinds", {})
+
+
+func _phase_land() -> void:
 	_clearing.assign(_terrain.get("clearing", {}))
 	_grown_back.clear()
 	# A new set each build, never changed after: the border's worker reads it.
@@ -4532,10 +4876,10 @@ func _build_room() -> void:
 		for plan: Dictionary in _glimpse_plans:
 			for cell: Vector2i in plan["cells"]:
 				_wooded[cell] = true
-	var grown := {}
+	_grown_data = {}
 	if _outdoor and str(_terrain.get("canopy_kind", "")) != "":
-		grown = GrownTrees.data_for(str(_terrain.get("level", "")))
-		_grown_trunks = GrownTrees.trunk_cells(grown, _land)
+		_grown_data = GrownTrees.data_for(str(_terrain.get("level", "")))
+		_grown_trunks = GrownTrees.trunk_cells(_grown_data, _land)
 		if not _grown_trunks.is_empty():
 			_wooded = _wooded.duplicate()
 			_wooded.merge(_grown_trunks)
@@ -4549,13 +4893,18 @@ func _build_room() -> void:
 	_corners.clear()
 	_wet.clear()
 	_shape_ramps()
-	_build_ground(kinds)
+
+
+func _phase_ground() -> void:
+	_build_ground(_terrain.get("kinds", {}))
 	_fire_lights.clear()
+	var fire: Array[Vector2i] = _terrain["fire"]
 	for cell: Vector2i in fire:
 		if _grounds.has(cell):
 			_add_fire(cell)
-	_build_water()
-	_add_cliffs()
+
+
+func _phase_lights() -> void:
 	_add_rocks()
 	for cell: Vector2i in _terrain.get("torches", []):
 		_add_torch(cell)
@@ -4564,31 +4913,51 @@ func _build_room() -> void:
 	if not World.fields_changed_signal.is_connected(_on_fields_changed):
 		World.fields_changed_signal.connect(_on_fields_changed)
 	_on_fields_changed()
-	_add_walls()
-	_add_decor()
-	if _outdoor:
-		_add_forest()
-		for cell: Vector2i in _clearing:
-			_dress_clearing(cell)
-		if not _grown_trunks.is_empty():
-			var ground: Dictionary[Vector2i, bool] = {}
-			for cell: Vector2i in _terrain["floor"]:
-				ground[cell] = true
-			_grown = GrownTrees.new()
-			_grown.name = "GrownTrees"
-			_room.add_child(_grown)
-			_grown.build(grown, _land, ground, _elevations(), 1.0, str(_terrain["canopy_kind"]) == "broadleaf")
-		if str(_terrain.get("border", "forest")) != "none":
-			_border = TerrainBorder.new()
-			_border.name = "Border"
-			_room.add_child(_border)
-			_border.build(_wooded, _elevations(), 1.0, _forest_floor_colour(), FOREST_FLOOR_DEPTH, true, PineStands.drawn())
-		for plan: Dictionary in _glimpse_plans:
-			_add_glimpse(plan)
-	_add_buildings()
+
+
+func _phase_forest() -> void:
+	if not _outdoor:
+		return
+	_add_forest()
+	for cell: Vector2i in _clearing:
+		_dress_clearing(cell)
+
+
+func _phase_grown() -> void:
+	if not _outdoor or _grown_trunks.is_empty():
+		return
+	var ground: Dictionary[Vector2i, bool] = {}
+	for cell: Vector2i in _terrain["floor"]:
+		ground[cell] = true
+	_grown = GrownTrees.new()
+	_grown.name = "GrownTrees"
+	_room.add_child(_grown)
+	_grown.build(_grown_data, _land, ground, _elevations(), 1.0, str(_terrain["canopy_kind"]) == "broadleaf")
+
+
+func _phase_border() -> void:
+	if not _outdoor or str(_terrain.get("border", "forest")) == "none":
+		return
+	_border = TerrainBorder.new()
+	_border.name = "Border"
+	_room.add_child(_border)
+	_border.build(_wooded, _elevations(), 1.0, _forest_floor_colour(), FOREST_FLOOR_DEPTH, true, PineStands.drawn())
+
+
+func _phase_glimpses() -> void:
+	if not _outdoor:
+		return
+	for plan: Dictionary in _glimpse_plans:
+		_add_glimpse(plan)
+
+
+func _phase_roofs() -> void:
 	_add_link_cues()
 	_add_roofs()
 	_add_town_walls()
+
+
+func _phase_doors() -> void:
 	# Every door's leaf set once; from then on those that change.
 	if not World.door_shown.is_connected(_on_door_shown):
 		World.door_shown.connect(_on_door_shown)
@@ -7490,16 +7859,22 @@ func _apply_ground_fields(fields: Dictionary) -> void:
 ## The ground drawn from its [param fields] (_ground_fields', put in place):
 ## its material, then a mesh a chunk.
 func _build_ground_meshes(fields: Dictionary) -> void:
+	var state := _ground_meshes_start(fields)
+	for chunk: Vector2i in fields["chunks"]:
+		_ground_mesh_chunk(state, chunk)
+	_ground_meshes_finish(state)
+
+
+## The ground's chunks' shared start (decision 660: then each chunk, in any
+## order, _ground_mesh_chunk; then _ground_meshes_finish): the material, and
+## what the chunks gather into.
+func _ground_meshes_start(fields: Dictionary) -> Dictionary:
 	var cells: Array = fields["cells"]
 	var floor_count: int = fields["floor_count"]
-	var water_end: int = fields["water_end"]
 	var across: int = fields["across"]
 	var down: int = fields["down"]
 	var origin: Vector2i = fields["origin"]
-	var at: PackedInt32Array = fields["at"]
-	var heights: PackedFloat32Array = fields["heights"]
 	var kind_bytes: PackedByteArray = fields["kind_bytes"]
-	var chunks: Dictionary[Vector2i, PackedInt32Array] = fields["chunks"]
 	var format := Mesh.ARRAY_FORMAT_VERTEX | Mesh.ARRAY_FORMAT_NORMAL | Mesh.ARRAY_FORMAT_INDEX \
 			| Mesh.ARRAY_FORMAT_CUSTOM0 | (Mesh.ARRAY_CUSTOM_RGBA8_UNORM << Mesh.ARRAY_FORMAT_CUSTOM0_SHIFT)
 	_ground_stride = RenderingServer.mesh_surface_get_format_attribute_stride(format, 1)
@@ -7517,128 +7892,177 @@ func _build_ground_meshes(fields: Dictionary) -> void:
 	_aim_hillshade()
 	material.set_shader_parameter("canopy", canopy_texture)
 	_build_shafts()
-	# Each (cell, vertex) the cell's shade reaches, gathered by cell after.
-	var pair_cell := PackedInt32Array()
-	var pair_vertex := PackedInt32Array()
-	# The cells round a corner, and which of their corners it is.
-	var around: Array[Vector2i] = [-Vector2i.ONE, Vector2i(0, -1), Vector2i(-1, 0), Vector2i.ZERO]
-	var ends := PackedInt32Array([0, 0, 0, 0])
 	# The cells a ledge's curve splits (585, terrain's side): each side drawn
 	# at its own ground, meeting the face on the curve.
 	_plan_ledge_splits(cells, floor_count)
-	# A chunk's vertex for each corner (or a shore cell's finer point, in
-	# SHORE_RES units) and height (mm): one a side of a cliff.
-	var local: Dictionary[Vector3i, int] = {}
-	for chunk: Vector2i in chunks:
-		var chunk_index := _ground_meshes.size()
-		var base := chunk * FLOOR_CHUNK
-		var byte_start := _ground_bytes.size()
-		_chunk_byte_start.append(byte_start)
-		local.clear()
-		var positions := PackedVector3Array()
-		var indices := PackedInt32Array()
-		# Each corner's relief, a byte each: at the foot of a drop (shaded),
-		# at its top (lit a little).
-		var feet := PackedByteArray()
-		var tops := PackedByteArray()
-		# The shore cells' finer triangles, as spans of indices [from, to).
-		var finer := PackedInt32Array()
-		for i in chunks[chunk]:
-			var cell: Vector2i = cells[i]
-			if _shore_heights.has(cell):
-				finer.append(indices.size())
-				_shore_cell(cell, positions, indices, feet, tops, local, chunk_index, byte_start, pair_cell, pair_vertex)
-				finer.append(indices.size())
+	# Each (cell, vertex) the cell's shade reaches, gathered by cell after
+	# ("pair_cell", "pair_vertex"); a chunk's vertex for each corner (or a
+	# shore cell's finer point, in SHORE_RES units) and height (mm), one a
+	# side of a cliff ("local").
+	return {"fields": fields, "material": material, "pair_cell": PackedInt32Array(),
+		"pair_vertex": PackedInt32Array(), "local": {} as Dictionary[Vector3i, int]}
+
+
+## The ground's [param chunk] built and drawn (its index the next in
+## _ground_meshes, its bytes the next in _ground_bytes).
+func _ground_mesh_chunk(state: Dictionary, chunk: Vector2i) -> void:
+	var fields: Dictionary = state["fields"]
+	var cells: Array = fields["cells"]
+	var floor_count: int = fields["floor_count"]
+	var water_end: int = fields["water_end"]
+	var across: int = fields["across"]
+	var origin: Vector2i = fields["origin"]
+	var at: PackedInt32Array = fields["at"]
+	var heights: PackedFloat32Array = fields["heights"]
+	var chunks: Dictionary[Vector2i, PackedInt32Array] = fields["chunks"]
+	var material: Material = state["material"]
+	var pair_cell: PackedInt32Array = state["pair_cell"]
+	var pair_vertex: PackedInt32Array = state["pair_vertex"]
+	var local: Dictionary[Vector3i, int] = state["local"]
+	# The cells round a corner, and which of their corners it is.
+	var around: Array[Vector2i] = [-Vector2i.ONE, Vector2i(0, -1), Vector2i(-1, 0), Vector2i.ZERO]
+	var ends := PackedInt32Array([0, 0, 0, 0])
+	var chunk_index := _ground_meshes.size()
+	var base := chunk * FLOOR_CHUNK
+	var first_vertex := _vertex_chunk.size()
+	var byte_start := _ground_bytes.size()
+	_chunk_byte_start.append(byte_start)
+	local.clear()
+	var positions := PackedVector3Array()
+	var indices := PackedInt32Array()
+	# Each corner's relief, a byte each: at the foot of a drop (shaded),
+	# at its top (lit a little).
+	var feet := PackedByteArray()
+	var tops := PackedByteArray()
+	# The shore cells' finer triangles, as spans of indices [from, to).
+	var finer := PackedInt32Array()
+	for i in chunks[chunk]:
+		var cell: Vector2i = cells[i]
+		if _shore_heights.has(cell):
+			finer.append(indices.size())
+			_shore_cell(cell, positions, indices, feet, tops, local, chunk_index, byte_start, pair_cell, pair_vertex)
+			finer.append(indices.size())
+			continue
+		if _ledge_split.has(cell):
+			_ledge_cell(cell, positions, indices, feet, tops, local, chunk_index, byte_start, pair_cell, pair_vertex)
+			continue
+		for c in 4:
+			var corner := cell + GROUND_CORNERS[c]
+			var level := heights[i * 4 + c]
+			var key := Vector3i(corner.x * SHORE_RES, corner.y * SHORE_RES, roundi(level * 1000.0))
+			var vertex: int = local.get(key, -1)
+			if vertex < 0:
+				vertex = positions.size()
+				local[key] = vertex
+				var sunk := true
+				for a in 4:
+					var next := corner + around[a]
+					var other := at[(next.y - origin.y) * across + next.x - origin.x]
+					sunk = sunk and other >= floor_count and other < water_end
+				positions.append(Vector3(corner.x - 0.5, level - (WATER_BED_DEPTH if sunk else 0.0), corner.y - 0.5))
+				var global := _vertex_chunk.size()
+				_vertex_chunk.append(chunk_index)
+				_vertex_byte.append(byte_start + vertex * _ground_stride + _ground_custom)
+				var foot := false
+				var top := false
+				for a in 4:
+					var next := corner + around[a]
+					var other := at[(next.y - origin.y) * across + next.x - origin.x]
+					# This corner is the other cell's corner 3 - a.
+					var theirs := heights[other * 4 + 3 - a] if other >= 0 else 0.0
+					foot = foot or theirs > level + Relief.EPSILON
+					top = top or theirs < level - Relief.EPSILON
+					if other >= 0 and absf(theirs - level) > Relief.EPSILON:
+						other = -1
+					_vertex_cells.append(other)
+					if other >= 0:
+						pair_cell.append(other)
+						pair_vertex.append(global)
+				feet.append(255 if foot else roundi(_concavity(corner, level) * 255.0))
+				tops.append(255 if top else roundi(_crest(corner, level) * 255.0))
+			ends[c] = vertex
+		indices.append_array([ends[0], ends[1], ends[2], ends[1], ends[3], ends[2]])
+	var custom := PackedByteArray()
+	custom.resize(positions.size() * 4)
+	_ground_bytes.resize(byte_start + positions.size() * _ground_stride)
+	for v in positions.size():
+		var byte := byte_start + v * _ground_stride + _ground_custom
+		# (A glimpse's own light is none: the sky's alone, sky_floor.)
+		custom[v * 4] = 0 if _glimpse else 255
+		custom[v * 4 + 2] = feet[v]
+		custom[v * 4 + 3] = tops[v]
+		_ground_bytes[byte] = 0 if _glimpse else 255
+		_ground_bytes[byte + 2] = feet[v]
+		_ground_bytes[byte + 3] = tops[v]
+	if _shades_seeded and not _glimpse:
+		# Each corner as _shade_floor will shade it: its cells' average.
+		for vertex in range(first_vertex, _vertex_chunk.size()):
+			var bright := 0
+			var warm := 0
+			var count := 0
+			for k in range(vertex * 4, vertex * 4 + 4):
+				var cell := _vertex_cells[k]
+				if cell >= 0:
+					bright += _cell_shades[cell * 2]
+					warm += _cell_shades[cell * 2 + 1]
+					count += 1
+			if count == 0:
 				continue
-			if _ledge_split.has(cell):
-				_ledge_cell(cell, positions, indices, feet, tops, local, chunk_index, byte_start, pair_cell, pair_vertex)
-				continue
-			for c in 4:
-				var corner := cell + GROUND_CORNERS[c]
-				var level := heights[i * 4 + c]
-				var key := Vector3i(corner.x * SHORE_RES, corner.y * SHORE_RES, roundi(level * 1000.0))
-				var vertex: int = local.get(key, -1)
-				if vertex < 0:
-					vertex = positions.size()
-					local[key] = vertex
-					var sunk := true
-					for a in 4:
-						var next := corner + around[a]
-						var other := at[(next.y - origin.y) * across + next.x - origin.x]
-						sunk = sunk and other >= floor_count and other < water_end
-					positions.append(Vector3(corner.x - 0.5, level - (WATER_BED_DEPTH if sunk else 0.0), corner.y - 0.5))
-					var global := _vertex_chunk.size()
-					_vertex_chunk.append(chunk_index)
-					_vertex_byte.append(byte_start + vertex * _ground_stride + _ground_custom)
-					var foot := false
-					var top := false
-					for a in 4:
-						var next := corner + around[a]
-						var other := at[(next.y - origin.y) * across + next.x - origin.x]
-						# This corner is the other cell's corner 3 - a.
-						var theirs := heights[other * 4 + 3 - a] if other >= 0 else 0.0
-						foot = foot or theirs > level + Relief.EPSILON
-						top = top or theirs < level - Relief.EPSILON
-						if other >= 0 and absf(theirs - level) > Relief.EPSILON:
-							other = -1
-						_vertex_cells.append(other)
-						if other >= 0:
-							pair_cell.append(other)
-							pair_vertex.append(global)
-					feet.append(255 if foot else roundi(_concavity(corner, level) * 255.0))
-					tops.append(255 if top else roundi(_crest(corner, level) * 255.0))
-				ends[c] = vertex
-			indices.append_array([ends[0], ends[1], ends[2], ends[1], ends[3], ends[2]])
-		var custom := PackedByteArray()
-		custom.resize(positions.size() * 4)
-		_ground_bytes.resize(byte_start + positions.size() * _ground_stride)
-		for v in positions.size():
-			var byte := byte_start + v * _ground_stride + _ground_custom
-			# (A glimpse's own light is none: the sky's alone, sky_floor.)
-			custom[v * 4] = 0 if _glimpse else 255
-			custom[v * 4 + 2] = feet[v]
-			custom[v * 4 + 3] = tops[v]
-			_ground_bytes[byte] = 0 if _glimpse else 255
-			_ground_bytes[byte + 2] = feet[v]
-			_ground_bytes[byte + 3] = tops[v]
-		# Up, but tilted on and beside a ramp: each corner the sum of the
-		# faces round it. A shore cell's finer triangle counts as the whole
-		# cell's it stands for (SHORE_RES squared its area), so a corner it
-		# shares with a cell drawn whole leans as much its way as before
-		# (else the bank's slope stops at the band, a light seam).
-		var normals := PackedVector3Array()
-		normals.resize(positions.size())
-		normals.fill(Vector3.ZERO)
-		var span := 0
-		for t in range(0, indices.size(), 3):
-			while span < finer.size() and t >= finer[span + 1]:
-				span += 2
-			var weight := float(SHORE_RES * SHORE_RES) if span < finer.size() and t >= finer[span] else 1.0
-			var face := (positions[indices[t + 2]] - positions[indices[t]]).cross(positions[indices[t + 1]] - positions[indices[t]]) * weight
-			for k in 3:
-				normals[indices[t + k]] += face
-		for v in normals.size():
-			normals[v] = normals[v].normalized()
-		var arrays := []
-		arrays.resize(Mesh.ARRAY_MAX)
-		arrays[Mesh.ARRAY_VERTEX] = positions
-		arrays[Mesh.ARRAY_NORMAL] = normals
-		arrays[Mesh.ARRAY_CUSTOM0] = custom
-		arrays[Mesh.ARRAY_INDEX] = indices
-		var mesh := ArrayMesh.new()
-		mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays, [], {},
-				Mesh.ARRAY_CUSTOM_RGBA8_UNORM << Mesh.ARRAY_FORMAT_CUSTOM0_SHIFT)
-		_ground_meshes.append(mesh)
-		var drawn := MeshInstance3D.new()
-		drawn.name = "Ground_%d_%d" % [chunk.x, chunk.y]
-		drawn.mesh = mesh
-		drawn.material_override = material
-		# On relief the ground casts (the hills' cues sheet): an escarpment's
-		# back and a way throw their shadow across the valley at a low sun,
-		# no longer than shadow_elevation lets any shadow be.
-		drawn.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if _relief_given \
-				else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		_room.add_child(drawn)
+			var byte := _vertex_byte[vertex]
+			var v := (byte - byte_start - _ground_custom) / _ground_stride
+			custom[v * 4] = roundi(bright / float(count))
+			custom[v * 4 + 1] = roundi(warm / float(count))
+			_ground_bytes[byte] = custom[v * 4]
+			_ground_bytes[byte + 1] = custom[v * 4 + 1]
+	# Up, but tilted on and beside a ramp: each corner the sum of the
+	# faces round it. A shore cell's finer triangle counts as the whole
+	# cell's it stands for (SHORE_RES squared its area), so a corner it
+	# shares with a cell drawn whole leans as much its way as before
+	# (else the bank's slope stops at the band, a light seam).
+	var normals := PackedVector3Array()
+	normals.resize(positions.size())
+	normals.fill(Vector3.ZERO)
+	var span := 0
+	for t in range(0, indices.size(), 3):
+		while span < finer.size() and t >= finer[span + 1]:
+			span += 2
+		var weight := float(SHORE_RES * SHORE_RES) if span < finer.size() and t >= finer[span] else 1.0
+		var face := (positions[indices[t + 2]] - positions[indices[t]]).cross(positions[indices[t + 1]] - positions[indices[t]]) * weight
+		for k in 3:
+			normals[indices[t + k]] += face
+	for v in normals.size():
+		normals[v] = normals[v].normalized()
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = positions
+	arrays[Mesh.ARRAY_NORMAL] = normals
+	arrays[Mesh.ARRAY_CUSTOM0] = custom
+	arrays[Mesh.ARRAY_INDEX] = indices
+	var mesh := ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays, [], {},
+			Mesh.ARRAY_CUSTOM_RGBA8_UNORM << Mesh.ARRAY_FORMAT_CUSTOM0_SHIFT)
+	_ground_meshes.append(mesh)
+	var drawn := MeshInstance3D.new()
+	drawn.name = "Ground_%d_%d" % [chunk.x, chunk.y]
+	drawn.mesh = mesh
+	drawn.material_override = material
+	# On relief the ground casts (the hills' cues sheet): an escarpment's
+	# back and a way throw their shadow across the valley at a low sun,
+	# no longer than shadow_elevation lets any shadow be.
+	drawn.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if _relief_given \
+			else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_room.add_child(drawn)
+	_ground_drawn[chunk] = drawn
+	# The packed arrays are values: written back for the next chunk.
+	state["pair_cell"] = pair_cell
+	state["pair_vertex"] = pair_vertex
+
+
+## The ground's chunks all built: the pairs gathered by cell.
+func _ground_meshes_finish(state: Dictionary) -> void:
+	var cells: Array = state["fields"]["cells"]
+	var pair_cell: PackedInt32Array = state["pair_cell"]
+	var pair_vertex: PackedInt32Array = state["pair_vertex"]
 	_chunk_byte_start.append(_ground_bytes.size())
 	# The pairs gathered by cell.
 	_cell_vertex_start.resize(cells.size() + 1)
@@ -10019,6 +10443,15 @@ func _water_material() -> ShaderMaterial:
 ## it (so faces meet without gaps) and still at the top and bottom (so they
 ## meet the ground), one mesh a chunk.
 func _add_cliffs() -> void:
+	var state := _cliffs_start()
+	for chunk: Vector2i in state["chunks"]:
+		_cliff_chunk(state, chunk)
+
+
+## The cliffs' shared start (decision 660: then each chunk, in any order,
+## _cliff_chunk): the cells by chunk, the water, the ledges' faces by chunk,
+## the material.
+func _cliffs_start() -> Dictionary:
 	var floor_cells: Dictionary[Vector2i, bool] = {}
 	for cell: Vector2i in _terrain["floor"]:
 		if not _bed_levels.has(cell):
@@ -10037,9 +10470,35 @@ func _add_cliffs() -> void:
 		Vector2i(1, 0): [[1, 3], [0, 2]], Vector2i(-1, 0): [[2, 0], [3, 1]],
 		Vector2i(0, 1): [[3, 2], [1, 0]], Vector2i(0, -1): [[0, 1], [2, 3]],
 	}
-	var faces: Dictionary[Vector2i, Array] = {}
 	_cliff_edges.clear()
+	var by_chunk: Dictionary[Vector2i, Array] = {}
 	for cell: Vector2i in floor_cells:
+		var chunk := Vector2i(floori(cell.x / float(FLOOR_CHUNK)), floori(cell.y / float(FLOOR_CHUNK)))
+		if not by_chunk.has(chunk):
+			by_chunk[chunk] = []
+		by_chunk[chunk].append(cell)
+	var ledges: Dictionary[Vector2i, Array] = {}
+	_add_ledge_faces(ledges)
+	for chunk: Vector2i in ledges:
+		if not by_chunk.has(chunk):
+			by_chunk[chunk] = []
+	# Their vertex colours, rough, both sides, under the sky's light as the
+	# ground (513 amended); seen through where they hide the player
+	# (cliff.gdshader, decision 549).
+	var material := ShaderMaterial.new()
+	material.shader = CLIFF_SHADER
+	material.set_shader_parameter("sky_floor", cliff_sky(_sky_floor))
+	_cliff_material = material
+	return {"floor_cells": floor_cells, "water": water, "sides": sides, "chunks": by_chunk, "ledges": ledges}
+
+
+## The cliffs' faces of [param chunk]'s cells, then the ledges' in it, one mesh.
+func _cliff_chunk(state: Dictionary, chunk_at: Vector2i) -> void:
+	var floor_cells: Dictionary[Vector2i, bool] = state["floor_cells"]
+	var water: Dictionary[Vector2i, bool] = state["water"]
+	var sides: Dictionary = state["sides"]
+	var faces: Dictionary[Vector2i, Array] = {}
+	for cell: Vector2i in state["chunks"][chunk_at]:
 		var own := _corner_heights(cell)
 		if maxf(maxf(own[0], own[1]), maxf(own[2], own[3])) <= _ground_bottom + Relief.EPSILON:
 			continue
@@ -10074,14 +10533,15 @@ func _add_cliffs() -> void:
 			var from := Vector2(cell + GROUND_CORNERS[mine[0]]) - Vector2(0.5, 0.5)
 			var to := Vector2(cell + GROUND_CORNERS[mine[1]]) - Vector2(0.5, 0.5)
 			_cliff_strip(faces[chunk], from, to, top, bottom, Vector3(direction.x, 0.0, direction.y))
-	_add_ledge_faces(faces)
-	# Their vertex colours, rough, both sides, under the sky's light as the
-	# ground (513 amended); seen through where they hide the player
-	# (cliff.gdshader, decision 549).
-	var material := ShaderMaterial.new()
-	material.shader = CLIFF_SHADER
-	material.set_shader_parameter("sky_floor", cliff_sky(_sky_floor))
-	_cliff_material = material
+	var ledge: Array = state["ledges"].get(chunk_at, [])
+	if not ledge.is_empty():
+		if not faces.has(chunk_at):
+			faces[chunk_at] = [PackedVector3Array(), PackedVector3Array(), PackedColorArray()]
+		for k in 3:
+			var joined: Variant = faces[chunk_at][k]  # A packed array: a value, written back.
+			joined.append_array(ledge[k])
+			faces[chunk_at][k] = joined
+	var material := _cliff_material
 	for chunk: Vector2i in faces:
 		# A rim with nothing to drop from (565: the wilds' relief has some).
 		if (faces[chunk][0] as PackedVector3Array).is_empty():
@@ -10098,6 +10558,7 @@ func _add_cliffs() -> void:
 		drawn.mesh = mesh
 		drawn.material_override = material
 		_room.add_child(drawn)
+		_cliffs_drawn[chunk] = drawn
 
 
 ## Whether the edge from [param high] down to [param low] is a dais's
@@ -10217,6 +10678,8 @@ func _on_fields_changed() -> void:
 ## has them, and each chunk with a changed corner is sent once, the span
 ## that changed.
 func _shade_floor() -> void:
+	if ground_filling:
+		return  # Its pairs are gathered once the chunks are all built (decision 660).
 	_shade_due = false
 	if _grounds.is_empty():
 		return
@@ -10233,11 +10696,7 @@ func _shade_floor() -> void:
 		var index: int = _grounds.get(cell, -1)
 		if index < 0:
 			continue
-		# The sky's light outdoors is the sun's to draw, not the floor's.
-		var light := World.light_at(cell, false, false)
-		var heat := World.heat_at(cell) if carried else World.fields.map_heat_at(World, cell)
-		var warmth := clampf((heat - 1.0) / (World.HEAT_BURN - 1.0), 0.0, 1.0)
-		var shade := Vector2(snappedf(floor_brightness(light), 0.1), snappedf(warmth * WARM_MOST, 0.05))
+		var shade := _floor_shade(cell, carried)
 		if _ground_shades.get(cell) == shade:
 			continue
 		_ground_shades[cell] = shade
@@ -10280,6 +10739,37 @@ func _shade_floor() -> void:
 		var last := spans[chunk].y - _ground_custom + _ground_stride
 		_ground_meshes[chunk].surface_update_attribute_region(0, first - _chunk_byte_start[chunk],
 				_ground_bytes.slice(first, last))
+
+
+## [param cell]'s floor shade: (brightness, warmth), each snapped as the
+## floor's bytes hold it; [param carried]: whether anyone carries heat.
+func _floor_shade(cell: Vector2i, carried: bool) -> Vector2:
+	# The sky's light outdoors is the sun's to draw, not the floor's.
+	var light := World.light_at(cell, false, false)
+	var heat := World.heat_at(cell) if carried else World.fields.map_heat_at(World, cell)
+	var warmth := clampf((heat - 1.0) / (World.HEAT_BURN - 1.0), 0.0, 1.0)
+	return Vector2(snappedf(floor_brightness(light), 0.1), snappedf(warmth * WARM_MOST, 0.05))
+
+
+## Over frames (decision 660): every ground cell's shade bytes worked out
+## before its chunks are built, so each is built shaded. Only the bytes:
+## the floor's own shade, once every chunk is in, works them out again
+## (_ground_shades left empty) and finds nothing to change unless the
+## light moved meanwhile.
+func _seed_shades() -> void:
+	var carried := World.fields.any_carried_heat(World)
+	for cell: Vector2i in _grounds:
+		var index: int = _grounds[cell]
+		var shade := _floor_shade(cell, carried)
+		_cell_shades[index * 2] = roundi(minf(shade.x, 1.0) * 255.0)
+		_cell_shades[index * 2 + 1] = roundi(shade.y * 255.0)
+		if _shade_image != null:  # Indoors, the soft scatter's too.
+			var at := cell - _mask_origin
+			if at.x >= 0 and at.y >= 0 and at.x < _mask_size.x and at.y < _mask_size.y:
+				_shade_image.set_pixel(at.x, at.y, Color(minf(shade.x, 1.0), 0.0, 0.0))
+	if _shade_image != null:
+		_shade_texture.update(_shade_image)
+	_shades_seeded = true
 
 
 ## A lantern hung on a short post, and its pale light.

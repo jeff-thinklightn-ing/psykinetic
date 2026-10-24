@@ -28542,3 +28542,84 @@ back with the ease and its turn back, the peek's commit both ways, the
 keys through Main. view_test: the low camera's overhead and back; the
 chunk index at eight views. Client only; no wire change; no new
 class_name.
+## 660. A zone's room built over frames behind the arrival card
+
+perf's arrival probe (2026-10-24): every crossing froze one frame for the whole 3D rebuild, about
+4.2 s into the wilds and 1.3 s into the hills, the same at every visit, on a host
+(Main._show_home_zone) and a box client (_client_zone) alike, both through Main._repaint. The
+coordinator approved three steps: (1) the rebuild's builders a frame apart behind ui's arrival
+card, (2) the near ring first by chunk and the builders cut, the goal the card lifting in under
+1 s on the wilds on this card, (3) one zone's view kept, a later question of its own. Combat's
+arrival shelter (661) keeps the player safe meanwhile; the client ends it with view_ready.
+
+Step 1:
+
+- **Client3D._room_phases** lists the room's builders in order, each whole as before:
+  _phase_sets (the room node, the sets, _warm_art), _phase_land (land, rocks, solid cells,
+  glimpse plans, grown trunks, forest distance, _read_edges, _read_field, _shape_ramps),
+  _phase_ground (_build_ground, fires), _build_water, _add_cliffs, _phase_lights (_add_rocks,
+  torches, lanterns, the fields), _add_walls, _add_decor, _phase_forest, _phase_grown,
+  _phase_border, _phase_glimpses, _add_buildings, _phase_roofs (link cues, roofs, town walls),
+  _phase_doors (doors due, piles). _build_room runs them in one go (setup, a rebuild by default:
+  tests and benches unchanged).
+- **rebuild(terrain, centre, over_frames)**: Main's _repaint passes true. _build_room_over_frames
+  runs one phase, awaits the next frame, and goes on while its generation is still the latest:
+  a rebuild started mid-build (a death mid-arrival, a link straight back, a zone message twice)
+  bumps _build_generation, frees the room the first was building into, and the first stops at its
+  next phase. _room_built (_classify_walls, the camera mode, the warm-ups) ends it,
+  building_room false, the room_built signal.
+- **While building_room**: Client3D._process waits (puppets, doors, fades, scatter, shadows all
+  after); Main holds the player's input (_arriving: _unhandled_input, _drive_wasd).
+- **Main._repaint(crossing)**: true from the crossings (_show_home_zone, _client_zone), which
+  begin Main.arrival_card (ui's side of 660) with zone_display_name() and rebuild over frames; the
+  zone's own terrain again (_on_terrain's same-zone refresh, _drop_zone_entities) rebuilds at once
+  with no card, as before (ui: a refresh mid-play must not dim the screen); **Main._on_room_built** (room_built) shows the towns and folds on the whole room,
+  finishes the card, and tells the server view_ready (combat's 661, Main.tell_view_ready with
+  map_name, the level shown: a client's World.zone is a mirror with no name, which the server's
+  zone check would have ignored, leaving the shelter its full 6 s). ui's card (42fc1927) landed
+  just before this; ui's say() after a crossing's _repaint adds nothing over the name begin()
+  already shows.
+
+view_test _test_phased_build: over frames, then whole and told once; the same room as built at
+once (scatter, which grows after, not counted); a second rebuild two frames in: the first's room
+gone, told once, the same room, no orphan nodes. Client only; the view_ready command is combat's.
+
+Step 2 B (perf's side, on terrain's A and A2 above):
+
+- **The ground's fields on a worker.** _phase_ground_over_frames hands terrain's
+  _ground_fields(input) to a WorkerThreadPool task and awaits frames until it is done (A2's slices
+  start and wait inside that task); a newer rebuild, or the view leaving (_exit_tree), waits for
+  it first (_end_fields_task), since it reads what the next build remakes. While it runs
+  (fields_running) Main holds a clearing change to the zone shown and replays it on fields_done.
+- **The ground's and cliffs' chunks in sight first.** _ground_meshes_start / _ground_mesh_chunk /
+  _ground_meshes_finish and _cliffs_start / _cliff_chunk split the two builders by chunk, each
+  chunk's mesh as the whole build made it. After the other phases, _fill_step builds the chunks the
+  camera's frustum holds (_chunk_seen: a chunk's column CHUNK_LOW to CHUNK_HIGH) under the card at
+  CARD_BUDGET_USEC (14 ms) a frame; then the card lifts (_room_built) and the rest come at
+  FILL_BUDGET_USEC (4 ms) a frame, in sight and nearest first. ground_filling is true till the last
+  (room_filled): the floor's shade (_shade_floor) waits for every chunk's pairs and is worked out
+  once at the end, and Main holds a clearing redraw till then. So that no chunk shows at full
+  light till then and darkens when the last comes (terrain's review: a pop at night or in a
+  dungeon), _seed_shades works out every ground cell's shade once the fields and the indoor shade
+  image are in, and each chunk is built with its corners' shade bytes already (and the soft
+  scatter's shade image indoors); the shade at the end finds them right unless the light moved.
+- **No pop-in.** A chunk built in sight after the lift dithers in over APPEAR_SECONDS (0.4 s): the
+  ground through its SIGHT variant (the only one with a discard, so the plain ground keeps its
+  early depth test), the cliffs' own shader, both reading an instance uniform `appear` against
+  sight.gdshaderinc's sight_dither; the ground goes back to its own material when whole. The
+  appearing material's relief_light follows the camera's yaw with the ground's (_aim_hillshade).
+- **The old room hidden, freed a slice a frame** after the new one's chunks (0.2 s at once on the
+  wilds).
+
+Step 2 (a): a zone's fields kept. _kept_fields / _keep_fields hold the last FIELDS_KEPT (3)
+zones' ground fields, by level, glimpse and the terrain's hash (7.8 ms on the wilds), most recent
+first; any terrain change makes another key, so a changed zone is worked out afresh. A crossing
+back into a kept zone skips the fields entirely (fields_hits counts it).
+
+view_test _test_phased_build also checks every chunk job done and every old room freed, each
+ground and cliff chunk's mesh (its arrays and the ground's shade bytes, by node path) the same as
+built at once, and the chunks drawn when the card lifts already as shaded as at the end (it fails
+without _seed_shades);
+_test_kept_fields: a second arrival is a hit with the same fields (corners, shore heights, the
+shore, depth, road and kinds images), a changed kind a miss whose room matches one built at once,
+and at most three kept. Client only, protocol unchanged, no new class_name.

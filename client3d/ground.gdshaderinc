@@ -20,6 +20,9 @@ render_mode blend_mix, depth_draw_opaque, cull_back, diffuse_burley, specular_sc
 
 #ifdef SIGHT
 #include "res://client3d/sight.gdshaderinc"
+// A chunk built in sight after the arrival card lifted dithers in, 0..1
+// (decision 660: Client3D gives it this variant while it appears).
+instance uniform float appear = 1.0;
 #endif
 
 uniform sampler2D kinds : filter_linear, repeat_disable;
@@ -319,6 +322,9 @@ void fragment() {
 	// Seen through where it hides the player (decision 549).
 #ifdef SIGHT
 	if (sight_cut_here(world, FRAGCOORD.xy)) {
+		discard;
+	}
+	if (appear < 1.0 && sight_dither(FRAGCOORD.xy) >= appear) {
 		discard;
 	}
 #endif

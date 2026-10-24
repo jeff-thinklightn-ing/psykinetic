@@ -509,6 +509,10 @@ var spawner: MultiplayerSpawner
 ## The zone the views draw (a host's own player's), and the travel under way
 ## (a despawn that is no death).
 var _view_zone := ""
+## Decision 660: clearings held while the view's ground fields read the
+## terrain on a worker, and their redraws while its room is being built.
+var _held_clearings: Array[Callable] = []
+var _held_redraws: Array[Callable] = []
 var _travelling := false
 ## Where each fallen player fell (peer -> cell), till they rise: they hear
 ## from there.
@@ -1182,6 +1186,8 @@ func _process(delta: float) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	var key := event as InputEventKey
 	if is_typing():
+		return
+	if _arriving():
 		return
 	if _builder_ui != null and _builder_ui.handle_input(event):
 		get_viewport().set_input_as_handled()
@@ -1870,6 +1876,9 @@ func _show_3d() -> void:
 		node.visible = false
 	_client3d = preload("res://client3d/client3d.tscn").instantiate()
 	add_child(_client3d)
+	_client3d.room_built.connect(_on_room_built)
+	_client3d.fields_done.connect(_replay.bind(_held_clearings))
+	_client3d.room_filled.connect(_replay.bind(_held_redraws))
 	_client3d.setup(_terrain, level_centre)
 	_client3d.bubbles = bubbles
 	_show_towns()
@@ -2008,7 +2017,7 @@ func _view_yaw() -> float:
 ## the body faces the cursor.
 func _drive_wasd() -> void:
 	var player := _local_player()
-	if player == null or Net.controls != "wasd":
+	if player == null or Net.controls != "wasd" or _arriving():
 		if _client3d != null:
 			_client3d.set_frozen(false)
 		if player != null:
@@ -2741,6 +2750,11 @@ func _clearing_cells(zone: String) -> Array:
 func _on_clearing_changed(zone: String, cells: Array) -> void:
 	if not Net.is_authority():
 		return
+	if zone == map_name and _client3d != null and _client3d.fields_running():
+		# The view's ground fields read this terrain on a worker (decision
+		# 660): laid once they are in place, a moment on.
+		_held_clearings.append(_on_clearing_changed.bind(zone, cells))
+		return
 	if World.zones.has(zone):
 		var was := World.enter_named(zone)
 		for each: Array in cells:
@@ -2761,6 +2775,9 @@ func _on_clearing_changed(zone: String, cells: Array) -> void:
 func _on_clearing(data: Dictionary) -> void:
 	var zone := str(data.get("zone", ""))
 	var cells: Variant = data.get("cells", [])
+	if zone == map_name and _client3d != null and _client3d.fields_running():
+		_held_clearings.append(_on_clearing.bind(data))  # As the server's (decision 660).
+		return
 	if zone.is_empty() or not cells is Array:
 		return
 	if data.get("whole", false) or not _clearing_told.has(zone):
@@ -2816,6 +2833,10 @@ func _on_clearing(data: Dictionary) -> void:
 ## kind, already in the terrain's "edges") by terrain's clearing_walls when
 ## the view has it, else the zone drawn again.
 func _redraw_clearing(cells: Array, edges: Dictionary = {}) -> void:
+	if _client3d.building_room or _client3d.ground_filling:
+		# Drawn once the crossing's room is all built (decision 660).
+		_held_redraws.append(_redraw_clearing.bind(cells, edges))
+		return
 	if not _client3d.has_method("clearing_changed") or not edges.is_empty() and not _client3d.has_method("clearing_walls"):
 		_view_zone = ""
 		return
@@ -3078,16 +3099,46 @@ func _show_folds() -> void:
 		_client3d.set_folds(fold_view())
 
 
-## Draws the terrain afresh in both views (a map loaded live).
-func _repaint() -> void:
+## Draws the terrain afresh in both views (a map loaded live). A
+## [param crossing] (the view into another zone) builds the 3D room over
+## frames behind the arrival card (decision 660); the zone's own terrain
+## again (a building raised, a ruin) builds it at once, as it always has.
+func _repaint(crossing := false) -> void:
 	_paint_level()
 	if minimap != null:
 		_door_marks_at = -1  # A new level: its doors.
 		minimap.rebuild(level)
 	if _client3d != null:
-		_client3d.rebuild(_terrain, level_centre)
-		_show_towns()
-		_show_folds()
+		# The towns and folds go on the room once it is whole (_on_room_built).
+		if crossing and arrival_card != null:
+			arrival_card.begin(zone_display_name())
+		_client3d.rebuild(_terrain, level_centre, crossing)
+
+
+## The 3D room is whole (decision 660): what is drawn over it, the card
+## lifted, the player's hands given back.
+func _on_room_built() -> void:
+	_show_towns()
+	_show_folds()
+	if arrival_card != null:
+		arrival_card.finish()
+	# The server's arrival shelter ends (combat's 661): the zone by the level
+	# shown, as the player's zone names it (a client's World.zone is a mirror
+	# with no name).
+	tell_view_ready(map_name)
+
+
+## What waited on the view's build (decision 660), done now, in order.
+func _replay(held: Array[Callable]) -> void:
+	var calls := held.duplicate()
+	held.clear()
+	for each: Callable in calls:
+		each.call()
+
+
+## The 3D room is still being built (decision 660): the player's input waits.
+func _arriving() -> bool:
+	return _client3d != null and _client3d.building_room
 
 
 # --- Zones (server) -------------------------------------------------------------
@@ -3498,7 +3549,7 @@ func _show_home_zone() -> void:
 	World.enter(World.home())
 	if World.zone.name != _view_zone:
 		_view_zone = World.zone.name
-		_repaint()
+		_repaint(true)
 		camera.position = Iso.tile_to_local(level_centre)
 		if arrival_card != null:
 			arrival_card.say(zone_display_name())  # 665, ui's side: every crossing says the zone.
@@ -3520,7 +3571,7 @@ func _client_zone(zone_name: String) -> void:
 	_load_level(zone_name)
 	_zone_nodes(zone_name)
 	World.mirror_terrain(_terrain)
-	_repaint()
+	_repaint(true)
 	if arrival_card != null:
 		arrival_card.say(zone_display_name())  # 665, ui's side: every crossing says the zone (not again over the card's).
 	print("[zone] now in %s" % zone_name)

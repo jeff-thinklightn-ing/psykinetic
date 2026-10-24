@@ -117,6 +117,8 @@ func _ready() -> void:
 	await _test_door_states()
 	_test_art_puppets()
 	_test_breakable_hooked_once()
+	await _test_phased_build()
+	await _test_kept_fields()
 	await _test_creature_puppets()
 	_test_piles()
 	_test_heard_as_monsters_hear()
@@ -6742,6 +6744,138 @@ func _test_art_puppets() -> void:
 	ArtKit._variants["prop.crate"] = 0
 	_check(Client3D.art_slot_for(crate) == "", "and back to its cube when the art is gone")
 	ArtKit.forget("prop.crate")
+
+
+## Decision 660: a crossing's room built a builder a frame ends as the room
+## built at once; a rebuild started mid-build stops the first, nothing of it
+## left over.
+func _test_phased_build() -> void:
+	print("
+== a room built over frames is the room built at once; a second rebuild mid-build ends the first cleanly ==")
+	var castle := Level.load_level("castle")
+	var terrain: Dictionary = castle["terrain"]
+	# The scatter grows after, a step a frame, as the view comes near: not counted.
+	var drawn := func() -> int:
+		return _rig._room.find_children("*", "", true, false).filter(
+				func(node: Node) -> bool: return not String(node.name).begins_with("Scatter_")).size()
+	# Each ground and cliff chunk's mesh by name (built in another order over
+	# frames): its arrays, the ground's shade bytes from the CPU copy the
+	# floor's shade writes (_ground_bytes), and how many vertices in all.
+	var meshes := func() -> Dictionary:
+		var out := {}
+		var vertices := 0
+		var starts: PackedInt32Array = _rig._chunk_byte_start
+		for node: Node in _rig._room.find_children("*", "MeshInstance3D", true, false):
+			var name := String(node.name)
+			if not (name.begins_with("Ground_") or name.begins_with("Cliffs_")):
+				continue
+			var mesh: Mesh = (node as MeshInstance3D).mesh
+			var arrays: Array = mesh.surface_get_arrays(0)
+			vertices += (arrays[Mesh.ARRAY_VERTEX] as PackedVector3Array).size()
+			var i := _rig._ground_meshes.find(mesh)
+			if i >= 0:
+				arrays[Mesh.ARRAY_CUSTOM0] = null
+				arrays.append(_rig._ground_bytes.slice(starts[i], starts[i + 1] if i + 1 < starts.size() else _rig._ground_bytes.size()))
+			# By its path: a glimpse's own ground chunks share the room's names.
+			out[str(_rig._room.get_path_to(node))] = arrays.hash()
+		out["vertices"] = vertices
+		return out
+	var built := [0]
+	var lifted := [{}]
+	var count_built := func() -> void:
+		built[0] += 1
+		if _rig.ground_filling:  # Over frames: the chunks drawn when the card lifts.
+			lifted[0] = meshes.call()
+	_rig.room_built.connect(count_built)
+	# Twice at once: the second without the first's warm-ups.
+	_rig.rebuild(terrain, castle["centre"])
+	_rig.rebuild(terrain, castle["centre"])
+	await _frames(Client3D.WARM_FRAMES + 2)
+	var at_once: int = drawn.call()
+	var once: Dictionary = meshes.call()
+	var orphans := Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT)
+	built[0] = 0
+	_rig.rebuild(terrain, castle["centre"], true)
+	var phasing := _rig.building_room
+	var frames := 0
+	while (_rig.building_room or _rig.ground_filling) and frames < 400:
+		await get_tree().process_frame
+		frames += 1
+	_check(phasing and not _rig.building_room and not _rig.ground_filling and _rig._fill_jobs.is_empty()
+			and frames >= _rig._room_phases().size() - 1 and built[0] == 1 and _rig._old_rooms.is_empty(),
+			"building over %d frames, then whole, told once (%d), the last room freed" % [frames, built[0]])
+	await _frames(Client3D.WARM_FRAMES + 2)
+	_check(drawn.call() == at_once, "the same room as built at once (%d nodes, %d)" % [drawn.call(), at_once])
+	var phased: Dictionary = meshes.call()
+	_check(once["vertices"] > 0 and phased == once, "each ground and cliff chunk the same mesh and shade as built at once (%d chunks, %d vertices)" % [
+		once.size() - 1, once["vertices"]])
+	# Terrain's review: a chunk drawn by the lift is drawn shaded, not at
+	# full light till the last chunk is in (a pop in the dark).
+	var seen := 0
+	var same := true
+	for name: String in lifted[0]:
+		if name != "vertices":
+			seen += 1
+			same = same and lifted[0][name] == phased[name]
+	_check(seen > 0 and same, "the %d chunks drawn when the card lifts already as shaded as at the end" % seen)
+	built[0] = 0
+	_rig.rebuild(terrain, castle["centre"], true)
+	await _frames(2)
+	var first_room: Node3D = _rig._room
+	_rig.rebuild(terrain, castle["centre"], true)
+	frames = 0
+	while (_rig.building_room or _rig.ground_filling) and frames < 400:
+		await get_tree().process_frame
+		frames += 1
+	await _frames(Client3D.WARM_FRAMES + 2)
+	_check(not is_instance_valid(first_room) and built[0] == 1 and drawn.call() == at_once,
+			"a rebuild mid-build: the first's room gone, told once, the same room (%d nodes)" % drawn.call())
+	_check(Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT) == orphans,
+			"no orphan nodes left by the stopped build (%d, %d)" % [Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT), orphans])
+	_rig.room_built.disconnect(count_built)
+	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+
+
+## Decision 660 (a): a zone's ground fields kept for its next arrival, the
+## same ground as worked out afresh; its terrain changed behind them (here a
+## cell's kind), the next arrival works them out again, as a build at once
+## of the changed terrain draws it.
+func _test_kept_fields() -> void:
+	print("
+== a zone's ground fields kept for its next arrival; its terrain changed, worked out again ==")
+	var terrain: Dictionary = Level.load_level("castle")["terrain"].duplicate(true)
+	var centre: Vector2i = Level.load_level("castle")["centre"]
+	var digest := func() -> int:
+		# The fields' own (the chunks' bytes follow the order they were built in).
+		return [_rig._corners, _rig._shore_heights, _rig._shore_image.get_data(),
+			_rig._depth_image.get_data(), _rig._road_image.get_data(), _rig._kinds_image.get_data()].hash()
+	var arrive := func() -> void:
+		_rig.rebuild(terrain, centre, true)
+		var frames := 0
+		while (_rig.building_room or _rig.ground_filling) and frames < 400:
+			await get_tree().process_frame
+			frames += 1
+	_rig._fields_kept.clear()
+	var hits: int = _rig.fields_hits
+	await arrive.call()
+	var first: int = digest.call()
+	await arrive.call()
+	_check(_rig.fields_hits == hits + 1 and digest.call() == first,
+			"the second arrival finds them kept, the same ground (%d hits)" % (_rig.fields_hits - hits))
+	var cell: Vector2i = terrain["floor"][terrain["floor"].size() / 2]
+	terrain["kinds"][cell] = "sand" if str(terrain["kinds"].get(cell, "")) != "sand" else "grass"
+	await arrive.call()
+	var changed: int = digest.call()
+	_rig.rebuild(terrain, centre)
+	_check(_rig.fields_hits == hits + 1 and changed == digest.call() and changed != first,
+			"its terrain changed: worked out again, as built at once from the change (%d hits, %s, %s)" % [
+			_rig.fields_hits - hits, changed == digest.call(), changed != first])
+	for i in Client3D.FIELDS_KEPT + 1:
+		terrain["kinds"][cell] = Client3D.GROUND_CHANNELS.keys()[i % Client3D.GROUND_CHANNELS.size()]
+		await arrive.call()
+	_check(_rig._fields_kept.size() == Client3D.FIELDS_KEPT, "no more than %d zones kept (%d)" % [Client3D.FIELDS_KEPT, _rig._fields_kept.size()])
+	_rig._fields_kept.clear()
+	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
 
 ## A zone entered again builds its puppets again (Main._repaint): a
