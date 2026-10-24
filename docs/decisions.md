@@ -27421,3 +27421,26 @@ should a laptop play test show the cost: a laptop GPU likely sees 2-3x the diffe
 SCATTER_KEEP 16 holds what stays drawn after a walk to about 1.3x the full build, and
 that band past the reach is shrunk to nothing, so it costs vertex work but no pixels.
 view_test _test_low_scatter. Protocol unchanged, no new class_name.
+
+## 649 amended, buildings' side: the decline looks, from their review shots
+
+The first shots of the camp and the decline states (C:/dev/review/buildings)
+showed four things, each mended:
+
+- A kind's roof in disrepair (or damaged) sagged by ROOF_SAG, a turn about
+  its building's corner on the ground: a kind's far end dropped through its
+  walls, their top courses lying on the roof. A kind's roof now sags by
+  _kind_sag: KIND_SAG (0.05 rad) about its own middle at the eaves, let down
+  KIND_SAG_DROP (0.05 m). A slot's roof keeps ROOF_SAG.
+- A ruin's corners kept posts of a storey's height over its rubble bank: no
+  post now stands for a wall in the "rubble" state, nor does one hold a post
+  up (a town wall's rubble at level 0 likewise).
+- A gone building's floor set stayed drawn: its cells' floor sets now leave
+  the ground's floor mask (_floor_gone, the mask updated in place), so
+  terrain's regrowth shows; built again, they come back.
+- A large camp's two tents, each turned to the fire, swung into each other:
+  they now face the camp's front, CAMP_TENT_APART (1.6) to either side, the
+  fire CAMP_FIRE_OUT (1.0) toward the front.
+
+view_test _test_camp and _test_decline. Client only, protocol unchanged,
+no new class_name.

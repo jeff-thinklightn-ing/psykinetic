@@ -63,10 +63,10 @@ const OPEN_POST := 0.22
 ## The kind drawn as a camp (649): tents and a fire ring, no roof (Level.ROOFLESS).
 const CAMP := "camp"
 ## A camp's fire, cells from its middle toward its front; its tents, cells
-## behind its middle, and apart from each other when two.
-const CAMP_FIRE_OUT := 0.8
-const CAMP_TENT_BACK := 1.0
-const CAMP_TENT_APART := 1.4
+## behind its middle, and each this far to a side of it when two.
+const CAMP_FIRE_OUT := 1.0
+const CAMP_TENT_BACK := 0.9
+const CAMP_TENT_APART := 1.6
 ## The roles of blocks roofed with a single slope.
 const LEANING: Array[String] = ["leanto", "outshot", "bay"]
 ## The stream salt for what is the building's own, not a block's.
@@ -749,9 +749,9 @@ static func _open_posts(building: Dictionary, parts: Node3D) -> void:
 
 
 ## A camp's (649) fire ring and tents in [param parts]: art-kit's
-## prop.campfire a little in from its middle toward its front, its
-## prop.tent behind (two side by side on a camp six across), each turned to
-## the fire; a piece art-kit has not is left out.
+## prop.campfire in from its middle toward its front, its prop.tent behind
+## (two side by side on a camp six across), each facing the camp's front;
+## a piece art-kit has not is left out.
 static func _camp(building: Dictionary, parts: Node3D) -> void:
 	var rect: Rect2i = building["rect"]
 	var facing: Vector2i = building["facing"]
@@ -774,7 +774,7 @@ static func _camp(building: Dictionary, parts: Node3D) -> void:
 		var tent := ArtKit.instance("prop.tent")
 		tent.name = "Tent_%d" % index
 		tent.position = Vector3(at.x, 0.0, at.y)
-		tent.rotation.y = atan2(fire.x - at.x, fire.y - at.y)
+		tent.rotation.y = atan2(front.x, front.y)
 		parts.add_child(tent)
 
 

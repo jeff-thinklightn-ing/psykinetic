@@ -1809,6 +1809,9 @@ func _test_camp() -> void:
 			"no roof over a camp, nor posts round it")
 	_check(not art or named.call(small, "Tent") == 1 and named.call(large, "Tent") == 2 and named.call(small, "Campfire") == 1,
 			"a small camp's one tent, a large one's two, each a fire ring (%d, %d)" % [named.call(small, "Tent"), named.call(large, "Tent")])
+	if art:
+		var apart := ((large.get_node("parts/Tent_0") as Node3D).position - (large.get_node("parts/Tent_1") as Node3D).position).length()
+		_check(apart >= 3.0, "the large camp's two tents well apart, not into each other (%.1f)" % apart)
 	small.free()
 	large.free()
 
@@ -1834,15 +1837,27 @@ func _test_decline() -> void:
 			and (not ArtKit.has("scatter.tuft") or is_instance_valid(house.get("weeds"))),
 			"in disrepair: worn as damaged, its lamps out, weeds at its foot")
 	_rig.set_town("decline_town", {"house": {"state": Towns.RUIN, "level": 0, "walls": false}})
-	_check(node.visible and house["roof"] == null and states.call("rubble") == walls.size() and not (node.get_node("parts") as Node3D).visible,
-			"a ruin: its walls a bank of rubble (%d of %d), no roof" % [states.call("rubble"), walls.size()])
+	var posts := func() -> Array:
+		var out := []
+		for key: Vector3i in outline:
+			for end in 2:
+				var vertex := WallEdge.vertex_at(key, end)
+				if _rig._posts.has(vertex) and not out.has(vertex):
+					out.append(vertex)
+		return out
+	_check(node.visible and house["roof"] == null and states.call("rubble") == walls.size() and not (node.get_node("parts") as Node3D).visible
+			and posts.call().is_empty(),
+			"a ruin: its walls a bank of rubble (%d of %d), no roof, no post standing over it (%s)" % [states.call("rubble"), walls.size(), posts.call()])
 	_rig.set_town("decline_town", {"house": {"state": "gone", "level": 0, "walls": false}})
-	_check(not node.visible and states.call("plot") == walls.size() and not is_instance_valid(house.get("weeds")),
-			"gone: nothing of it drawn (%d of %d walls none)" % [states.call("plot"), walls.size()])
+	var floored := func() -> int:
+		return Level.rect_cells(house["rect"]).filter(func(cell: Vector2i) -> bool: return _rig._floor_sets.has(cell)).size()
+	_check(not node.visible and states.call("plot") == walls.size() and not is_instance_valid(house.get("weeds")) and floored.call() == 0,
+			"gone: nothing of it drawn, its floor its ground's (%d of %d walls none, %d floor cells)" % [states.call("plot"), walls.size(), floored.call()])
 	_rig.set_town("decline_town", {"house": {"state": Towns.STANDING, "level": 1}})
 	_check(node.visible and house["roof"] != null and house["decline"] == "" and not house["damaged"]
-			and states.call("plot") == 0 and states.call("rubble") == 0 and states.call("broken") == 0 and not is_instance_valid(house.get("weeds")),
-			"built again: whole, roofed, its walls up")
+			and states.call("plot") == 0 and states.call("rubble") == 0 and states.call("broken") == 0 and not is_instance_valid(house.get("weeds"))
+			and floored.call() > 0 and not posts.call().is_empty(),
+			"built again: whole, roofed, its walls, posts and floor back")
 	_rig.town_states.erase("decline_town")
 
 

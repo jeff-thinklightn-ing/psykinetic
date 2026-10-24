@@ -681,6 +681,9 @@ const FIGHT_TILES := 6.0
 ## A damaged building's roof until its slot has a roof_damaged part: tipped
 ## and dropped at its eaves, caved in at a glance (_show_state).
 const ROOF_SAG := Transform3D(Basis(Vector3.RIGHT, 0.18), Vector3(0.0, -0.45, 0.0))
+## A kind's roof sagging (_kind_sag): its tilt (radians) about its middle, and how far it is let down.
+const KIND_SAG := 0.05
+const KIND_SAG_DROP := 0.05
 ## A roof set's shape until roof.<set>.profile says (decision 364): metres
 ## it rises a cell in from the eave, its thickness, how far it reaches past
 ## the walls; and its colour until material.roof.<set> has a texture.
@@ -5158,7 +5161,7 @@ func _show_damage(building: Dictionary, damaged: bool) -> void:
 		broken.visible = damaged
 		building["roof"] = broken if damaged else whole
 	elif whole != null:
-		whole.transform = building["roof_at"] * ROOF_SAG if damaged else building["roof_at"]
+		whole.transform = building["roof_at"] * (_kind_sag(building) if building.has("kind") else ROOF_SAG) if damaged else building["roof_at"]
 	var heaps := node.find_child("state_damaged", true, false) as Node3D
 	if heaps != null:
 		heaps.visible = damaged
@@ -5220,6 +5223,8 @@ func _show_decline(building: Dictionary, decline: String) -> void:
 						(_doorways[key] as Node3D).visible = false
 					changed.append(key)
 	_weeds(building, decline != DECLINE_GONE)
+	if decline == DECLINE_GONE:
+		_floor_gone(building, true)
 	if not changed.is_empty():
 		rebuild_walls(changed)
 	_occluders_built = false
@@ -5252,8 +5257,45 @@ func _undo_decline(building: Dictionary) -> void:
 		if _doorways.has(key):
 			(_doorways[key] as Node3D).visible = true
 	_weeds(building, false)
+	_floor_gone(building, false)
 	if not changed.is_empty():
 		rebuild_walls(changed)
+
+
+## A kind's roof sagging, damaged or in disrepair (649): tilted KIND_SAG
+## about its own middle at the eaves and let down KIND_SAG_DROP, so its
+## walls stay under it (ROOF_SAG turns a roof about its building's corner
+## on the ground, which drops a kind's far end through its walls).
+func _kind_sag(building: Dictionary) -> Transform3D:
+	var rect: Rect2i = building["rect"]
+	var middle := Vector3((rect.size.x - 1) * 0.5, float(building["kind"]["eaves"]), (rect.size.y - 1) * 0.5)
+	var turn := Transform3D(Basis(Vector3.RIGHT, KIND_SAG), Vector3.ZERO)
+	return Transform3D(Basis.IDENTITY, middle + Vector3(0.0, -KIND_SAG_DROP, 0.0)) * turn * Transform3D(Basis.IDENTITY, -middle)
+
+
+## [param building]'s floor set (_floor_sets) taken out of the ground's
+## floor mask when it is gone (649: its cells drawn as their ground, for
+## terrain's regrowth), or put back; kept by the building meanwhile.
+func _floor_gone(building: Dictionary, gone: bool) -> void:
+	var was: Dictionary = building.get("floor_was", {})
+	if gone:
+		for cell in Level.rect_cells(building["rect"]):
+			if _floor_sets.has(cell):
+				was[cell] = _floor_sets[cell]
+				_floor_sets.erase(cell)
+		building["floor_was"] = was
+	else:
+		for cell: Vector2i in was:
+			_floor_sets[cell] = was[cell]
+		building.erase("floor_was")
+	if was.is_empty() or _floor_mask == null:
+		return
+	for cell: Vector2i in was:
+		var at := cell - _mask_origin
+		if at.x < 0 or at.y < 0 or at.x >= _mask_size.x or at.y >= _mask_size.y:
+			continue
+		_floor_bytes[at.y * _mask_size.x + at.x] = FLOOR_SETS.get(_floor_set(cell, str(_ground_kinds.get(cell, "stone"))), 0)
+	_floor_mask.update(Image.create_from_data(_mask_size.x, _mask_size.y, false, Image.FORMAT_R8, _floor_bytes))
 
 
 ## Weeds (art-kit's scatter.tuft, a plant.fern now and then) at
@@ -9963,9 +10005,10 @@ func rebuild_walls(edges: Array[Vector3i]) -> void:
 		_hid_at.erase(piece)
 	_free_later(old.keys())
 	_add_wall_runs(keys)
-	# A plot's edges (566) are none: no post stands on them.
+	# A plot's edges (566) are none: no post stands on them; nor on a bank of
+	# rubble (a ruin's, 649; a town wall's at level 0), low as it is.
 	var kind_at := func(key: Vector3i) -> int:
-		return Terrain.Edge.OPEN if _wall_states.get(key) == "plot" else _terrain["edges"].get(key, Terrain.Edge.OPEN)
+		return Terrain.Edge.OPEN if _wall_states.get(key) in ["plot", "rubble"] else _terrain["edges"].get(key, Terrain.Edge.OPEN)
 	for vertex in vertices:
 		var built := WallEdge.edges_at_vertex(vertex).any(func(entry: Array) -> bool:
 				return kind_at.call(entry[0]) != Terrain.Edge.OPEN and _edge_drawn(entry[0], fences))
@@ -10849,7 +10892,7 @@ func _add_post(vertex: Vector2i) -> void:
 	# than a storey (a lean-to's, decision 489), so it stands no higher.
 	var tall := 0.0
 	for entry: Array in WallEdge.edges_at_vertex(vertex):
-		if _terrain["edges"].get(entry[0], Terrain.Edge.OPEN) != Terrain.Edge.OPEN and _wall_states.get(entry[0]) != "plot":
+		if _terrain["edges"].get(entry[0], Terrain.Edge.OPEN) != Terrain.Edge.OPEN and not _wall_states.get(entry[0]) in ["plot", "rubble"]:
 			tall = maxf(tall, _height_of(entry[0]))
 	if tall <= 0.0:
 		tall = WALL_HEIGHT
