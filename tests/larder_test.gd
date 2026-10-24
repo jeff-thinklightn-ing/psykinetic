@@ -37,6 +37,7 @@ func _ready() -> void:
 	_test_offers()
 	_test_merchant()
 	_test_first_stores()
+	_test_larder_reserve()
 	_test_thief_hooks()
 	_test_scoundrel_hooks()
 	_test_delivery()
@@ -99,6 +100,31 @@ func _test_cook() -> void:
 	_check(not made.is_empty() and made[0] == "roast", "with meat in the store, a roast first (%s)" % [made])
 	_check(made.size() >= 2 and made[1] == "ration", "the meat gone, rations again (%s)" % [made])
 	_check(work.stockpile.count(TOWN, "meat") == 0, "the meat was used")
+
+
+## The founding larder (652 amended (2), the coordinator's ruling): a cook
+## makes nothing from food that would leave the store under the town's
+## larder_for (Towns: its people's food to the first crop, before it; none
+## after), though the meals still come from it.
+func _test_larder_reserve() -> void:
+	print("
+== the cook leaves the founding larder ==")
+	var work := _work()
+	var larder := [10]
+	work.larder_for = func(_town: String) -> int: return larder[0]
+	work.stockpile.deposit(TOWN, "food", 10)
+	work.add_worker("c1", "Mags", ["cook"], TOWN)
+	work.add_workshop(TOWN + ":kitchen", "cook", TOWN)
+	work.assign(TOWN + ":kitchen", "c1")
+	_check(_started(work, 4000).is_empty() and work.stockpile.count(TOWN, "food") == 10, "the store at its larder: no ration made from it")
+	larder[0] = 0
+	_check("ration" in _started(work, 4000), "nothing kept: rations again")
+	var towns := Towns.new({}, Production.new({}, Stockpile.new({}, func() -> int: return _now, ItemBook.new(func() -> int: return _now)), null, func() -> int: return _now, _rules), _rules, func() -> int: return _now)
+	towns._found(TOWN)
+	_check(towns.larder_for(TOWN) == towns.founding_food(TOWN) and towns.larder_for(TOWN) > 0 and towns.production.larder_for.is_valid(),
+		"Towns: before the first crop, its people's food to it (%d)" % towns.larder_for(TOWN))
+	towns._town(TOWN)["harvests"] = 1
+	_check(towns.larder_for(TOWN) == 0, "after it, none")
 
 
 func _test_tanner() -> void:

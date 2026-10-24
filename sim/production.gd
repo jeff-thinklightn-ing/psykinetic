@@ -77,6 +77,11 @@ var keep_for := Callable()
 ## yet (652: rules' official "stage", Towns sets it); unset: always. One it
 ## doesn't pay is neither paid nor owed.
 var official_paid := Callable()
+## (town) -> int: the food a town's store keeps from its workshops' makes
+## (652 amended (2): the founding larder, Towns.larder_for), so a cook never
+## turns its people's food till the first crop into rations carried away;
+## their meals still come from it. Unset: none kept.
+var larder_for := Callable()
 ## (workshop id) -> Array: the item ids a workshop makes (641: each healer's
 ## hut its own potions; Main sets it from economy.json); [] or unset: every
 ## recipe of its trade.
@@ -1510,7 +1515,7 @@ func _bid(shop: Dictionary, wants: Array[String], signals: Dictionary, cat: Dict
 					continue
 			elif want == "repair" or not _serves(shop["town"], entry, want, cat):
 				continue
-			if not _affords(shop["town"], entry["made"], rework != 0):
+			if not _affords(shop["town"], entry["made"], rework != 0) or not _spares_larder(shop["town"], entry["made"], rework != 0):
 				continue
 			return {"workshop": shop["id"], "recipe": entry["id"], "kind": "rework" if rework != 0 else "make",
 				"want": want, "job": 0, "rework": rework,
@@ -1627,6 +1632,13 @@ func _affords(town: String, made: Dictionary, rework: bool) -> bool:
 		if have < int(_needs(made, rework)[what]):
 			return false
 	return true
+
+
+## Whether making [param made] leaves [param town]'s store its larder_for
+## food (652 amended (2)); always for a make that takes no food.
+func _spares_larder(town: String, made: Dictionary, rework: bool) -> bool:
+	var food := int(_needs(made, rework).get("food", 0))
+	return food <= 0 or not larder_for.is_valid() or stockpile.count(town, "food") - food >= int(larder_for.call(town))
 
 
 ## Whether build job [param each] leaves [param town]'s store its keep_for

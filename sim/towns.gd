@@ -162,6 +162,7 @@ func _init(saved := {}, with_production: Production = null, with_rules := {}, wi
 	production.town_has = has_for_make
 	production.keep_for = upkeep_due
 	production.official_paid = official_paid
+	production.larder_for = larder_for
 	production.work_rate = _work_rate
 	production.hunted.connect(_on_hunted)
 	production.work_done.connect(_on_work_done)
@@ -770,7 +771,16 @@ func founding_food(town: String) -> int:
 	return ceili(float(rule.get("per_head_day", 1)) * heads * (minf(harvest, roots) - place) * days)
 
 
-## Whether [param town]'s first harvest is still to come (652:
+## The food [param town]'s store keeps from its workshops (652 amended (2),
+## the coordinator's ruling: the cook draws on the founding larder only
+## above what its people eat till the first crop): founding_food from now
+## before its first harvest, 0 after (Production.larder_for).
+func larder_for(town: String) -> int:
+	return founding_food(town) if before_harvest(town) else 0
+
+
+## Whether [param town]'s first crop (a harvest or the winter's roots) is
+## still to come (652:
 ## Economy.before_harvest, its caravans keep its food till then).
 func before_harvest(town: String) -> bool:
 	return int(_towns.get(town, {}).get("harvests", 0)) == 0
@@ -1195,6 +1205,7 @@ func _crop(town: String) -> void:
 				production.deliver_to(town, production.worker_at("%s:field" % town), "food", roots, "roots", "roots dug in winter")
 				crop_now["roots"] = true
 				_note(town, "roots dug: %d food" % roots)
+				record["harvests"] = int(record.get("harvests", 0)) + 1  # A crop too (652 amended): the first may be the roots.
 
 
 ## When [param town]'s field's look changed, building_changed for it: Main

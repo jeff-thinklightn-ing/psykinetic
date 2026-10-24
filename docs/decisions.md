@@ -28123,3 +28123,12 @@ npc's bodies show the hunt, the fields and the flock (566 amended; the coordinat
 - Towns.field_work(town): whether the farmer's work counts toward the crop now. That is spring with the crop unsown (or a new year's crop not yet cleared) and autumn with it sown, the field standing or building, the farm manned and its site held, as _crop works it. npc's hoe reads it instead of keeping a copy.
 
 production_test (the catch rolled once at the start, kept in the save, landing at BACK), farm_test _test_field_work (true exactly while the work counts, over a year; never without a farmer). Server only; protocol unchanged; no new class_name.
+
+## 652 amended (2). The founding larder: the cook draws only above it
+
+The 652 amended re-soak showed the leak behind the founding food: the cook turned about 9 of the store's food a day into rations and roasts, which residents bought and carried out, while the town went hungry before its first crop. The coordinator's approval:
+- Production.larder_for, (town) -> int, set by Towns: a workshop make that takes food from the store (the cook's ration and roast, any recipe with food in made.from) starts only if the store keeps at least that much food after its cost (Production._spares_larder). It is the same check as keep_for for builds (649), for food alone. The residents' meals still come from the store as before.
+- Towns.larder_for: founding_food from now while the town's first crop is still to come, else 0. The winter's roots now count as a crop ("harvests" on the record), for the caravan's keep too, since the first crop may be the roots.
+- Limited to the founding stretch, where the soak showed it. After the first crop the cook's rations are the town's business, as before.
+
+larder_test _test_larder_reserve: no ration from a store at its larder, rations again once nothing is kept; Towns' larder before and after the first crop.
