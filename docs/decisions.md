@@ -27499,3 +27499,82 @@ buildings, "footprint": [2, 1], with the same mesh, long side along x and front 
 to art/kit/buildings/. Dungeon's step 2 adds its Level.BUILDINGS row with SOLID and DOORLESS,
 which view_test checks against this footprint. The fallen guards stay prop.fallen_guard (decor,
 658). art_kit_test, view_test pass. Client art only, protocol unchanged, no new class_name.
+## 658. Decor kinds: the ways a piece sits
+
+647 gave a level `"decor"`: `[[x, y, dx, dy, kind, variant], ...]`, four kinds of moss and web
+each with its own fit in `Level.decor_from`, and a table of variant counts. The Dwarven Halls'
+step 2 (613 amended) wants the smith's fallen guards lying with a facing, and maps wants
+art-kit's `prop.grave_fence` (654) along the pauper's graves on Held, an edge piece on open grass.
+The coordinator's rulings: no new level.json key, the decor list grows kinds that take a facing;
+and an edge piece must work on an outdoor level too, as 647's strip does along a wall edge.
+
+- **One table, how a kind sits.** `Level.DECOR_VARIANTS` becomes `Level.DECOR_KINDS`, kind ->
+  `{sits, variants, faced}`. Five ways of sitting: `flat` on the cell (`(0, 0)`: the yaw rolled by
+  the cell; a side: the way the piece's +z faces, for a kind marked `faced`); `wall` along a wall
+  edge's foot with rock behind it; `edge` on any edge of the cell, wall, open or a fence's, indoors
+  or out, seen from the cell; `corner` where two walls meet; `niche` across an open burial niche.
+  The moss and webs keep their fits (`moss_patch` flat and not faced, `moss_strip` wall,
+  `web_corner` corner, `web_niche` niche); `fallen_guard` is flat and faced with two variants,
+  `grave_fence` edge with three. `decor_from` matches on the way of sitting, not the kind; the
+  warnings are the same, and a flat piece on a diagonal or an edge piece with no step is said.
+- **Edge, not wall loosened.** A strip needs rock behind it; a fence stands between two grass
+  cells, or on a town wall's edge, or on the map's own edge, and must be allowed there. Outdoors
+  the terrain's `"edges"` is sparse (open edges absent); `edge` reads that as fine. The entry
+  carries the Terrain edge key as a strip's does.
+- **Drawn, never solid.** Decor stays dressing: the server parses it into terrain `"decor"`, the
+  client draws `prop.<kind>` when its kit has the slot and skips it when not, nothing on the wire
+  changes its meaning. A thing that must stop walkers is a building (the rack, below).
+- **The frame.** `Client3D._add_decor`: a flat piece sits on its cell, its yaw the cell's roll or,
+  faced, `atan2(out.x, out.y)` so its +z turns the way its step names; every edge-borne piece
+  (wall, edge, niche) sits at the edge's midpoint with +x toward the cell and z along the edge,
+  the stone runs' frame the strip already used, its height read at the midpoint. Along a straight
+  run laid from one side every section's +z end is the same end, so `prop.grave_fence`'s one post
+  (at +z, art-kit's 654) is shared between neighbours; a run laid from both sides would double a
+  post, so maps lays each run from one side (`docs/levels.md`).
+- **Regeneration.** Unchanged: a template's entries inside the anchors are kept through every
+  generation (`Regen.generated_config`), and `Regen.decor_of` keeps its moss and webs off the
+  cells they hold.
+
+Tests: level_test `_test_decor` (a faced guard and a rolled one, a fence on a wall edge and on an
+open one, a guard on a diagonal and a fence without a step said; an outdoor level with a fence
+along open grass edges and the map's edge and a body on the grass, nothing said); view_test
+`_test_faced_decor` (the guard's +z turned east, the fence at its open edge's midpoint facing the
+cell). Client and sim alike; nothing on the wire.
+
+## 613 amended, dungeon's side: the forge, the rack and the fallen guards
+
+Step 2 of the Dwarven Halls (613, dungeon's side; the design
+C:/dev/review/dungeon/castle_halls_step2.md, approved by the coordinator with one change: the
+rack solid), on art-kit's pieces (613, art-kit's side, 40245998, and the rack's rename to a
+building): the kept rooms dressed.
+
+- **The forge is a building.** The block of rock over x 42..47, y 65..67 goes; the template's
+  `"buildings"` gains `{"slot": "building.dwarven_forge", "at": [42, 65], "facing": [0, -1]}`,
+  6 across and 3 deep, its front north into the room, the anvils along that edge and the stand
+  cell (43, 64) with the refuge place `dwarven_forge` before them. `Level.BUILDINGS` gains
+  `Vector2i(6, 3)` for it and the kind joins `SOLID` and `DOORLESS` (every cell out of the floor,
+  sight stopped, no door: the smith stands before it as a woodcutter by his block, 566 amended).
+  Its hearth glows on art-kit's "glow" material as the pillars' torches do; a light at the hearth
+  is environment's, later.
+- **The rack is a building too.** The coordinator: "building.weapon_rack, SOLID, 2 x 1, along the
+  south wall, the same as the barrow's broken tables, so a fight in the forge room never stands
+  bodies inside the blades". `{"slot": "building.weapon_rack", "at": [50, 67], "facing": [0, -1]}`
+  east of the forge against the south wall, `Vector2i(2, 1)`, `SOLID`, `DOORLESS`; floor either
+  side, the way past it five clear (612). Art-kit renames its slot `prop.weapon_rack` to
+  `building.weapon_rack` with `"footprint": [2, 1]` (view_test checks the row against it), so
+  this lands after that rename.
+- **The guards are decor.** Three `"fallen_guard"` entries by hand in the ambush
+  (`tools/plan_sheet.HALLS_GUARDS`, kept through every generation): (23, 30) facing east, variant
+  1, on his side toward the cart he guarded; (26, 31) facing north, variant 2, face down, running;
+  (21, 29) rolled, variant 1. None on the cart's, a crate's or a torch's cell, none in the rows the
+  ways enter through, so no body lies in a doorway.
+- **Two solid kinds on the wire.** Both sides take the footprints out of the floor, as 566 amended,
+  600 and 3a each took a protocol line for: a line under the open revision names both kinds.
+- **Loot** waits: economy builds the chest table "dwarven_hoard" with items after 649; the
+  template's `"loot": {"chest": "dwarven_hoard"}` lands as a one-line amendment then.
+
+Tests: level_test `_test_castle_halls_level` (the forge and rack solid with their rects and
+facing, the stand cell floor, the three guards with their facings inside the anchors, the five
+markers as before); labyrinth_test `_test_castle_halls` (the forge and rack kept and solid in
+generation 1, the guards kept in generations 1 and 2 with the moss roll off their cells);
+view_test's footprint check covers both kinds. docs/levels.md, CHANGELOG. No new class_name.

@@ -655,13 +655,17 @@ beside it. Three anchors are kept through every generation: the stair
 foot (10 x 8 at the top: the link up, the spawn, the start, two torches;
 the anchor depth is counted from), the ambush a third of the way down
 (14 x 10, walled north and south, where the smith's guards fell: his cart
-and two crates as markers; the fallen guards and the goblins' weapon rack
-are art-kit's props, step 2), and the great forge at the deepest point
-(20 x 14, walled but for its north side): the forge 6 x 3 against its
-south wall (art-kit's `building.dwarven_forge`, facing into the room; a
-block of rock until it lands), four pillars 2 x 2 in two rows (art-kit's
-`building.crypt_pillar` `"variant": 2`, the dwarven band), a chest in each
-back corner, torches, and between the forge's anvils the place
+and two crates as markers, and three of the guards where they fell, decor
+`"fallen_guard"` with a facing, 613 amended: one on his side toward the
+cart, one face down running north, one as he fell), and the great forge at
+the deepest point (20 x 14, walled but for its north side): the forge 6 x 3
+against its south wall (`building.dwarven_forge`, solid and doorless,
+facing north into the room, the anvils along its front), the goblins'
+weapon rack against the south wall east of it (`building.weapon_rack`,
+2 x 1, solid: no fight stands a body in the blades), four pillars 2 x 2 in
+two rows (art-kit's `building.crypt_pillar` `"variant": 2`, the dwarven
+band), a chest in each back corner, torches, and between the forge's
+anvils the place
 `dwarven_forge` (`"kind": "refuge"`, `"where": "castle_dungeon"`, radius 3;
 maps' kind and where, economy's 613): the sought smith is held there,
 npc's body at its nearest free cell when a player is near, and the
@@ -729,19 +733,30 @@ three skeleton guards in the altar room, the draugr in his lair), Pip's niche
 (a 2 x 2 anchor off the altar room with the place `barrow/niche`) and the
 runner's pack (a chest in the lair's corner), npc's.
 
-Moss and webs (decision 647; Jeff: "moss and spiderwebs for decor, no live
-plants"): `"decor": [[x, y, dx, dy, kind, variant], ...]`, the niches' shape,
-one entry a piece: `"moss_patch"` flat on floor cell `(x, y)` (`(dx, dy)`
-`(0, 0)`), `"moss_strip"` along the wall edge the step onto `(dx, dy)` names,
-`"web_corner"` in the cell's corner the diagonal `(dx, dy)` names (both its
-walls wall edges), `"web_niche"` across the mouth of the open burial niche
-(kind `"a"` or `"c"`, variant 1: never the hidden one, never a sealed slab)
-whose cell and step those are; `variant` 1 up to the count art-kit's
-`prop.<kind>` slot has (`Level.DECOR_VARIANTS`: 3, 2, 2, 2).
+Decor (decision 647, moss and webs; Jeff: "moss and spiderwebs for decor, no
+live plants"; 658, the kinds and how each sits): `"decor": [[x, y, dx, dy,
+kind, variant], ...]`, the niches' shape, one entry a piece of art-kit's
+`prop.<kind>`, drawn and never solid, never on the wire's meaning (a client
+without the slot skips it). `Level.DECOR_KINDS` says how each kind sits on
+its floor cell `(x, y)` and how many variants it has: `flat` on the cell,
+`(dx, dy)` `(0, 0)` for a yaw rolled by the cell (`"moss_patch"`, 3), or a
+side for the way the piece's front turns when the kind is faced
+(`"fallen_guard"`, 2, either); `wall` along the wall edge the step names,
+rock behind it (`"moss_strip"`, 2); `edge` on any edge of the cell the step
+names, wall, open or a fence's, indoors or out of doors, seen from the cell
+(`"grave_fence"`, 3: maps' fence round the pauper's graves on Held, 654; its
+one post stands at the piece's +z end, so a run is laid from one side and
+neighbours share the post); `corner` in the cell's corner the diagonal names
+(both its walls wall edges: `"web_corner"`, 2); `niche` across the mouth of
+the open burial niche (kind `"a"` or `"c"`, variant 1: never the hidden one,
+never a sealed slab) whose cell and step those are (`"web_niche"`, 2).
 `Level.decor_from` reads them into terrain `"decor"` as `[{cell, out, edge,
 kind, variant}]` (`out` the step as given; `edge` the Terrain edge key, a
-strip's and a niche web's only) for terrain's draw; one on no floor, misfit
-to its kind or place, or doubling another is said and left out. The
+wall, edge and niche piece's) for terrain's draw (`Client3D._add_decor`: a
+flat piece on its cell, turned by the roll or its facing; an edge-borne one
+at the edge's midpoint, +x toward the cell, z along the edge); one on no
+floor, misfit to its kind or place, or doubling another is said and left
+out. The
 templates hold a few by hand (`tools/plan_sheet.BARROW_DECOR`: webs in the
 first hall's corners by the way in and a strip of moss at its south wall;
 `LAIR_DECOR`: the damp hall's moss along its walls and floor and its four

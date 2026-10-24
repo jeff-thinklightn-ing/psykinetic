@@ -123,7 +123,8 @@ const BUILDINGS := {"building.hut": Vector2i(3, 3), "building.house": Vector2i(4
 	"building.tower_ruin": Vector2i(3, 3), "building.rubble_heap": Vector2i(1, 1), "building.fallen_column": Vector2i(2, 1),
 	"building.burial_table": Vector2i(3, 2), "building.crypt_pillar": Vector2i(2, 2),
 	"building.round_table": Vector2i(3, 3), "building.hall_chair": Vector2i(1, 1), "building.broken_table": Vector2i(2, 1),
-	"building.throne": Vector2i(1, 1)}
+	"building.throne": Vector2i(1, 1),
+	"building.dwarven_forge": Vector2i(6, 3), "building.weapon_rack": Vector2i(2, 1)}
 ## The buildings that stand on water, not floor: no inside, no walls (a
 ## well: its water is what stops walkers, and sight passes over it).
 const ON_WATER: Array[String] = ["building.well"]
@@ -146,15 +147,19 @@ const FOLD_REACH := 6
 ## mound), none expected.
 const SOLID: Array[String] = ["building.mound", "building.great_tree", "building.cairn", "building.standing_stone", "building.waystone",
 	"building.chopping_block", "building.woodpile", "building.tower_ruin", "building.rubble_heap", "building.fallen_column",
-	"building.burial_table", "building.crypt_pillar", "building.round_table", "building.broken_table"]
+	"building.burial_table", "building.crypt_pillar", "building.round_table", "building.broken_table",
+	"building.dwarven_forge", "building.weapon_rack"]
 ## The solid buildings with no door (decision 567: the wilds' landmarks; 566
 ## amended: the work props, a chopping block and a woodpile a body stands
 ## beside; 600: the Old Tower's broken tower and fallen stone; 580 step 3: the
-## crypt's burial table and pillars, the rock blocks they were): every cell
-## of theirs out of the floor, none walked onto or into.
+## crypt's burial table and pillars, the rock blocks they were; 613 amended:
+## the Dwarven Halls' great forge the smith stands before and the goblins'
+## weapon rack, so no fight stands a body in the blades): every cell of
+## theirs out of the floor, none walked onto or into.
 const DOORLESS: Array[String] = ["building.great_tree", "building.cairn", "building.standing_stone", "building.waystone",
 	"building.chopping_block", "building.woodpile", "building.tower_ruin", "building.rubble_heap", "building.fallen_column",
-	"building.burial_table", "building.crypt_pillar", "building.round_table", "building.broken_table"]
+	"building.burial_table", "building.crypt_pillar", "building.round_table", "building.broken_table",
+	"building.dwarven_forge", "building.weapon_rack"]
 ## solid_door_of's answer for a DOORLESS building.
 const NO_DOOR := Vector2i(-1, -1)
 ## A bridge (decision 505): a building entry {slot: "bridge", at, facing,
@@ -1517,27 +1522,42 @@ static func niches_from(config: Dictionary, terrain: Dictionary, warnings: Array
 	return out
 
 
-## The decor a damp place grows (647; Jeff: "moss and spiderwebs for
-## decor, no live plants"): kind -> how many variants art-kit's prop slot
-## of that name has. "moss_patch" lies flat on a floor cell, "moss_strip"
-## along a wall's foot, "web_corner" in a cell's corner where two walls
-## meet, "web_niche" across an open burial niche's mouth.
-const DECOR_VARIANTS: Dictionary[String, int] = {"moss_patch": 3, "moss_strip": 2, "web_corner": 2, "web_niche": 2}
+## The decor kinds (647; 658): kind -> {sits, variants, faced}: how a piece
+## of art-kit's prop.<kind> sits on its floor cell, how many variants the
+## slot has, and (a flat piece) whether its step may name the way its front
+## faces. "flat" lies on the cell ((0, 0): a moss_patch's yaw rolled by the
+## cell, a fallen guard's too; a side: the way the piece's +z faces, a
+## fallen guard's only); "wall" along a wall edge's foot, rock behind it
+## (a moss_strip); "edge" on any edge of the cell, wall, open or a fence's,
+## indoors or out, seen from the cell (a grave_fence, 654: maps lays each
+## run from one side, so the piece's one post is shared along it);
+## "corner" in a cell's corner where two walls meet (a web_corner);
+## "niche" across an open burial niche's mouth (a web_niche). Decor is
+## drawn, never solid, never on the wire's meaning: a client without the
+## slot skips the piece.
+const DECOR_KINDS: Dictionary[String, Dictionary] = {
+	"moss_patch": {"sits": "flat", "variants": 3, "faced": false},
+	"moss_strip": {"sits": "wall", "variants": 2},
+	"web_corner": {"sits": "corner", "variants": 2},
+	"web_niche": {"sits": "niche", "variants": 2},
+	"fallen_guard": {"sits": "flat", "variants": 2, "faced": true},
+	"grave_fence": {"sits": "edge", "variants": 3}}
 
 
-## level.json's "decor" (647): [[x, y, dx, dy, kind, variant], ...], the
-## niches' shape: (x, y) a floor cell, (dx, dy) where the piece sits on it
-## ((0, 0) for a moss_patch, flat on the cell; a side for a moss_strip, the
-## wall edge it lies along, and for a web_niche, the niche's own step onto
-## its wall; a diagonal for a web_corner, the corner whose two walls meet
-## there), kind one of DECOR_VARIANTS, variant 1 up to the kind's count; as
-## [{cell, out: the step as given, edge: the Terrain edge key (a strip and
-## a niche web only), kind, variant}] for terrain to draw art-kit's
-## prop.<kind> on. One that is no floor, whose step fits not its kind,
-## whose strip lies on no wall, whose corner lacks a wall, or whose web
-## hangs on no open niche of kind "a" or "c" (never the hidden door's, nor
-## a sealed one: variant 2) is said in [param warnings] and left out, as is
-## a second of a kind on the same cell and step.
+## level.json's "decor" (647; 658): [[x, y, dx, dy, kind, variant], ...],
+## the niches' shape: (x, y) a floor cell, (dx, dy) where the piece sits on
+## it by its kind's way of sitting (DECOR_KINDS): (0, 0) for a flat piece,
+## or a side for a faced one, the way its front turns; a side for a wall or
+## edge piece, the edge it lies along, and for a web_niche, the niche's own
+## step onto its wall; a diagonal for a web_corner, the corner whose two
+## walls meet there; kind one of DECOR_KINDS, variant 1 up to the kind's
+## count; as [{cell, out: the step as given, edge: the Terrain edge key (a
+## wall, edge and niche piece only), kind, variant}] for terrain to draw
+## art-kit's prop.<kind> on. One that is no floor, whose step fits not its
+## kind, whose strip lies on no wall, whose corner lacks a wall, or whose
+## web hangs on no open niche of kind "a" or "c" (never the hidden door's,
+## nor a sealed one: variant 2) is said in [param warnings] and left out,
+## as is a second of a kind on the same cell and step.
 static func decor_from(config: Dictionary, terrain: Dictionary, warnings: Array[String]) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	var listed: Variant = config.get("decor", [])
@@ -1564,21 +1584,25 @@ static func decor_from(config: Dictionary, terrain: Dictionary, warnings: Array[
 		var way := Vector2i(int(entry[2]), int(entry[3]))
 		var kind := str(entry[4])
 		var variant := int(entry[5])
-		if not floor.has(cell) or not DECOR_VARIANTS.has(kind) or variant < 1 or variant > DECOR_VARIANTS[kind]:
+		if not floor.has(cell) or not DECOR_KINDS.has(kind) or variant < 1 or variant > int(DECOR_KINDS[kind]["variants"]):
 			warnings.append("decor %d at %s (%s %d) is on no floor, no kind or no variant: left out" % [index, cell, kind, variant])
 			continue
 		var side := absi(way.x) + absi(way.y) == 1
 		var fits := false
 		var piece := {"cell": cell, "out": way, "kind": kind, "variant": variant}
-		match kind:
-			"moss_patch":
-				fits = way == Vector2i.ZERO
-			"moss_strip":
+		match str(DECOR_KINDS[kind]["sits"]):
+			"flat":
+				fits = way == Vector2i.ZERO or side and bool(DECOR_KINDS[kind].get("faced", false))
+			"wall":
 				fits = side and walled.call(cell, way)
 				piece["edge"] = Terrain.edge_key(cell, way)
-			"web_corner":
+			"edge":
+				fits = side
+				if side:
+					piece["edge"] = Terrain.edge_key(cell, way)
+			"corner":
 				fits = absi(way.x) == 1 and absi(way.y) == 1 and walled.call(cell, Vector2i(way.x, 0)) and walled.call(cell, Vector2i(0, way.y))
-			"web_niche":
+			"niche":
 				piece["edge"] = Terrain.edge_key(cell, way) if side else Vector3i.ZERO
 				fits = side and open_niches.has(piece["edge"])
 		if not fits:

@@ -132,12 +132,15 @@ const BARROW_LEGEND := {"monster_skeleton": "#d8d0b0", "monster_skeleton_guard":
 ## rooms kept through every generation. The stair foot under the gatehouse
 ## (the link up to the castle's "from_halls", the spawn "from_castle"), the
 ## ambush a third of the way down (the smith's wagon and baggage where his
-## guards fell: markers; the fallen guards are art-kit's prop, step 2), and
-## the great forge at the deepest point: the forge 6 x 3 against its south
-## wall (art-kit's building.dwarven_forge, a block of rock till it lands),
-## the stand cell between its anvils the refuge place "dwarven_forge" the
+## guards fell: markers, and three of the guards where they fell, art-kit's
+## prop.fallen_guard as decor with a facing, 613 amended), and the great
+## forge at the deepest point: the forge 6 x 3 against its south wall
+## (art-kit's building.dwarven_forge, solid, facing into the room), the
+## stand cell between its anvils the refuge place "dwarven_forge" the
 ## sought smith is held at (economy's 613; its "where" is castle_dungeon,
-## the goblins' band stands there: enemy-ai's), four pillars in two rows,
+## the goblins' band stands there: enemy-ai's), the goblins' weapon rack
+## against the south wall east of the forge (building.weapon_rack, 2 x 1,
+## solid: no fight stands a body in the blades), four pillars in two rows,
 ## a chest in each back corner, torches. Every way five cells clear, every
 ## piece of furniture with a two-cell way round it (612).
 const HALLS_SIZE := Vector2i(90, 70)
@@ -155,6 +158,13 @@ const HALLS_CHESTS: Array[Vector2i] = [Vector2i(36, 66), Vector2i(53, 66)]
 const HALLS_TORCHES: Array[Vector2i] = [Vector2i(41, 2), Vector2i(48, 2), Vector2i(36, 55), Vector2i(53, 55), Vector2i(36, 63), Vector2i(53, 63)]
 const HALLS_CART := Vector2i(24, 30)
 const HALLS_CRATES: Array[Vector2i] = [Vector2i(22, 31), Vector2i(27, 29)]
+## The goblins' weapon rack (613 amended): its west cell, its back to the
+## forge room's south wall, east of the forge.
+const HALLS_RACK := Vector2i(50, 67)
+## The smith's fallen guards (613 amended): [x, y, dx, dy, "fallen_guard",
+## variant]; one on his side facing the cart he guarded, one face down
+## running north, one rolled; none on a marker's cell or in the ways in.
+const HALLS_GUARDS: Array = [[23, 30, 1, 0, "fallen_guard", 1], [26, 31, 0, -1, "fallen_guard", 2], [21, 29, 0, 0, "fallen_guard", 1]]
 
 
 ## Blank rows (void) for a level [param size] cells across, two pixels a cell.
@@ -444,7 +454,6 @@ static func write_sheet(level_name: String, generation: int, out: String, scale 
 static func sample_castle_halls() -> Dictionary:
 	var rows := _blank_rows(HALLS_SIZE)
 	_lay_anchors(rows, HALLS_ANCHORS)
-	_rock_rect(rows, HALLS_FORGE)  # The forge, a block of rock till art-kit's building.dwarven_forge lands.
 	var markers := {HALLS_LINK_UP: "link", HALLS_START: "start", HALLS_CART: "cart"}
 	for chest: Vector2i in HALLS_CHESTS:
 		markers[chest] = "chest"
@@ -456,8 +465,13 @@ static func sample_castle_halls() -> Dictionary:
 	var pillars: Array = []
 	for pillar in HALLS_PILLARS:
 		pillars.append({"slot": "building.crypt_pillar", "at": [pillar.position.x, pillar.position.y], "variant": 2})  # The dwarven band (art-kit's variant 2).
+	# The forge against the south wall, its front north into the room, the stand cell before its anvils; the rack east of it (613 amended).
+	var buildings: Array = [{"slot": "building.dwarven_forge", "at": [HALLS_FORGE.position.x, HALLS_FORGE.position.y], "facing": [0, -1]},
+		{"slot": "building.weapon_rack", "at": [HALLS_RACK.x, HALLS_RACK.y], "facing": [0, -1]}]
+	buildings.append_array(pillars)
 	var config := {"name": "The Dwarven Halls", "outdoor": false, "depth": 1, "walls": "stone", "floors": "stone",
-		"buildings": pillars,
+		"buildings": buildings,
+		"decor": HALLS_GUARDS.duplicate(true),
 		"starts": [[HALLS_START.x, HALLS_START.y]],
 		"spawn_points": {"from_castle": [HALLS_FROM_CASTLE.x, HALLS_FROM_CASTLE.y]},
 		"links": [{"at": [HALLS_LINK_UP.x, HALLS_LINK_UP.y], "to_map": "castle", "to_spawn": "from_halls"}],

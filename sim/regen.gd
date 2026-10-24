@@ -383,7 +383,7 @@ static func decor_of(map: LevelMap, anchors: Array, config: Dictionary, generate
 				sides.append(direction)
 		if sides.is_empty():
 			if rng.randf() < share * MOSS_PATCH:
-				out.append([cell.x, cell.y, 0, 0, "moss_patch", rng.randi_range(1, Level.DECOR_VARIANTS["moss_patch"])])
+				out.append([cell.x, cell.y, 0, 0, "moss_patch", rng.randi_range(1, int(Level.DECOR_KINDS["moss_patch"]["variants"]))])
 			continue
 		var corners: Array[Vector2i] = []
 		for side in sides:
@@ -392,17 +392,17 @@ static func decor_of(map: LevelMap, anchors: Array, config: Dictionary, generate
 					corners.append(side + other)
 		if not corners.is_empty() and rng.randf() < WEB_CORNER:
 			var corner: Vector2i = corners[rng.randi_range(0, corners.size() - 1)]
-			out.append([cell.x, cell.y, corner.x, corner.y, "web_corner", rng.randi_range(1, Level.DECOR_VARIANTS["web_corner"])])
+			out.append([cell.x, cell.y, corner.x, corner.y, "web_corner", rng.randi_range(1, int(Level.DECOR_KINDS["web_corner"]["variants"]))])
 		if rng.randf() < share:
 			var side: Vector2i = sides[rng.randi_range(0, sides.size() - 1)]
-			out.append([cell.x, cell.y, side.x, side.y, "moss_strip", rng.randi_range(1, Level.DECOR_VARIANTS["moss_strip"])])
+			out.append([cell.x, cell.y, side.x, side.y, "moss_strip", rng.randi_range(1, int(Level.DECOR_KINDS["moss_strip"]["variants"]))])
 	for niche: Variant in generated.get("niches", []):
 		if not niche is Array or (niche as Array).size() != 6 or str(niche[4]) not in ["a", "c"] or int(niche[5]) != 1:
 			continue
 		var cell := Vector2i(int(niche[0]), int(niche[1]))
 		if kept.has(cell) or rng.randf() >= WEB_NICHE:
 			continue
-		out.append([cell.x, cell.y, int(niche[2]), int(niche[3]), "web_niche", rng.randi_range(1, Level.DECOR_VARIANTS["web_niche"])])
+		out.append([cell.x, cell.y, int(niche[2]), int(niche[3]), "web_niche", rng.randi_range(1, int(Level.DECOR_KINDS["web_niche"]["variants"]))])
 	return out
 
 

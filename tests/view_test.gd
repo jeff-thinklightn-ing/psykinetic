@@ -64,6 +64,7 @@ func _ready() -> void:
 	_test_clearing()
 	_test_dais()
 	_test_lair()
+	_test_faced_decor()
 	_test_solid_ground()
 	_test_roads()
 	_test_water()
@@ -3060,6 +3061,38 @@ func _test_lair() -> void:
 		both = both and ArtKit.variant_count(slot) >= 2 and first != null and second != null and first != second
 	_check(both, "each web's variant 2 is a mesh of its own")
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+
+
+## Decor with a facing and on an open edge (658): a fallen guard turned the
+## way his step names, a fence section at an open edge's midpoint facing
+## its cell, as a strip faces the room.
+func _test_faced_decor() -> void:
+	print("
+== decor kinds (658): a faced guard, a fence on an open edge ==")
+	var rows: Array[String] = []
+	for py in 4 * 2 - 1:
+		var row := ""
+		for px in 5 * 2 - 1:
+			row += "." if px % 2 == 0 and py % 2 == 0 else " "
+		rows.append(row)
+	Level.register("vt_decor_faced", Level.image_from_rows(rows, {Vector2i(0, 0): "start"}), null,
+		{"decor": [[2, 1, 1, 0, "fallen_guard", 1], [1, 2, 0, -1, "grave_fence", 1]]})
+	var level := Level.load_level("vt_decor_faced")
+	var decor: Array = level["terrain"]["decor"]
+	_check(level["warnings"].is_empty() and decor.size() == 2, "the guard and the fence section are read (%s)" % [level["warnings"]])
+	var slots_drawn := Client3D._deadwood_drawn(Client3D.DECOR_SLOT % "fallen_guard") and Client3D._deadwood_drawn(Client3D.DECOR_SLOT % "grave_fence")
+	if not slots_drawn:
+		print("  (art-kit's prop.fallen_guard or prop.grave_fence is not drawn here: the frames are not checked)")
+		return
+	_rig.rebuild(level["terrain"], level["centre"])
+	var guard := _rig._room.get_node_or_null("Decor_2_1_fallen_guard_1_0") as Node3D
+	var fence := _rig._room.get_node_or_null("Decor_1_2_grave_fence_0_-1") as Node3D
+	var guard_front := guard.transform.basis.z if guard != null else Vector3.ZERO
+	_check(guard != null and Vector2(guard.position.x, guard.position.z).is_equal_approx(Vector2(2, 1)) and Vector2(guard_front.x, guard_front.z).is_equal_approx(Vector2(1, 0)),
+		"the guard lies on his cell, his front turned east as his step names (%s)" % [guard_front])
+	var fence_x := fence.transform.basis.x if fence != null else Vector3.ZERO
+	_check(fence != null and Vector2(fence.position.x, fence.position.z).is_equal_approx(Vector2(1, 1.5)) and Vector2(fence_x.x, fence_x.z).is_equal_approx(Vector2(0, 1)),
+		"the fence section stands at its open edge's midpoint, +x toward its cell, z along the edge (%s, %s)" % [fence.position if fence else null, fence_x])
 
 
 ## The felled forest drawn (591, terrain's side; maps' Clearing): a stage

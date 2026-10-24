@@ -6,6 +6,28 @@
 	"floors": "stone",
 	"buildings": [
 		{
+			"slot": "building.dwarven_forge",
+			"at": [
+				42,
+				65
+			],
+			"facing": [
+				0,
+				-1
+			]
+		},
+		{
+			"slot": "building.weapon_rack",
+			"at": [
+				50,
+				67
+			],
+			"facing": [
+				0,
+				-1
+			]
+		},
+		{
 			"slot": "building.crypt_pillar",
 			"at": [
 				38,
@@ -37,6 +59,32 @@
 			],
 			"variant": 2
 		}
+	],
+	"decor": [
+		[
+			23,
+			30,
+			1,
+			0,
+			"fallen_guard",
+			1
+		],
+		[
+			26,
+			31,
+			0,
+			-1,
+			"fallen_guard",
+			2
+		],
+		[
+			21,
+			29,
+			0,
+			0,
+			"fallen_guard",
+			1
+		]
 	],
 	"starts": [
 		[

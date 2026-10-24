@@ -9390,16 +9390,19 @@ func _add_decor() -> void:
 		var piece := ArtKit.instance(slot, clampi(int(entry.get("variant", 1)), 1, maxi(1, ArtKit.variant_count(slot))))
 		piece.name = "Decor_%d_%d_%s_%d_%d" % [cell.x, cell.y, kind, out.x, out.y]
 		var at := Vector2(cell)
-		match kind:
-			"moss_patch":
-				piece.rotation.y = _roll(cell, 70) * TAU
-			"web_corner":
+		match str(Level.DECOR_KINDS.get(kind, {}).get("sits", "edge")):
+			"flat":
+				# Its yaw rolled by the cell, or (658: a faced piece, a fallen
+				# guard) its front, +z, turned the way its step names.
+				piece.rotation.y = _roll(cell, 70) * TAU if out == Vector2i.ZERO else atan2(float(out.x), float(out.y))
+			"corner":
 				piece.rotation.y = _yaw_of(Vector2(out)) - _yaw_of(Vector2(DECOR_CORNER))
 			_:
-				# On its edge, the room on +x: +x along -out.
+				# On its edge (a wall's foot, a niche's mouth, or any edge out
+				# of doors, 658), the cell on +x: +x along -out, z along the edge.
 				at += Vector2(out) * 0.5
 				piece.rotation.y = _yaw_of(-Vector2(out))
-		piece.position = Vector3(at.x, _height_in(cell, Vector2(cell)), at.y)
+		piece.position = Vector3(at.x, _height_in(cell, at), at.y)
 		_room.add_child(piece)
 
 

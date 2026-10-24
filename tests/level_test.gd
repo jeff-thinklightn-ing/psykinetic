@@ -2109,22 +2109,43 @@ func _test_decor() -> void:
 			"links": [{"at": [6, 0], "to_map": "test_room", "to_spawn": "", "hidden": true}],
 			"decor": [[3, 3, 0, 0, "moss_patch", 3], [2, 4, 0, 1, "moss_strip", 2], [1, 1, -1, -1, "web_corner", 1], [2, 1, 0, -1, "web_niche", 2],
 				[4, 1, 0, -1, "web_niche", 1], [6, 1, 0, -1, "web_niche", 1], [3, 2, 1, 0, "moss_strip", 1], [3, 3, 1, 0, "moss_patch", 1],
-				[3, 3, 1, 1, "web_corner", 1], [3, 2, 0, 0, "moss_patch", 4], [3, 3, 0, 0, "moss_patch", 1], [5, 5, 0, 0, "moss_patch", 1], [1, 1, "x"]]})
+				[3, 3, 1, 1, "web_corner", 1], [3, 2, 0, 0, "moss_patch", 4], [3, 3, 0, 0, "moss_patch", 1], [5, 5, 0, 0, "moss_patch", 1], [1, 1, "x"],
+				# 658: a faced flat piece and a rolled one, an edge piece on a wall edge and on an open one; a flat piece on a diagonal and an edge piece with no step are not.
+				[5, 2, 1, 0, "fallen_guard", 2], [5, 3, 0, 0, "fallen_guard", 1], [1, 2, -1, 0, "grave_fence", 3], [4, 3, 0, -1, "grave_fence", 1],
+				[5, 4, 1, 1, "fallen_guard", 1], [4, 4, 0, 0, "grave_fence", 1]]})
 	var parsed := Level.load_level("lt_decor")
 	var decor: Array = parsed["terrain"]["decor"]
 	var kinds := decor.map(func(d: Dictionary) -> String: return d["kind"])
-	_check(decor.size() == 4 and kinds == ["moss_patch", "moss_strip", "web_corner", "web_niche"],
-		"the four well placed are read in order: a patch, a strip, a corner web, a niche web (%s)" % [kinds])
-	_check(decor.size() == 4 and decor[0]["out"] == Vector2i.ZERO and not decor[0].has("edge") and decor[0]["variant"] == 3
+	_check(decor.size() == 8 and kinds == ["moss_patch", "moss_strip", "web_corner", "web_niche", "fallen_guard", "fallen_guard", "grave_fence", "grave_fence"],
+		"the eight well placed are read in order: a patch, a strip, a corner web, a niche web, two fallen guards, two fence sections (%s)" % [kinds])
+	_check(decor.size() == 8 and decor[0]["out"] == Vector2i.ZERO and not decor[0].has("edge") and decor[0]["variant"] == 3
 		and decor[1]["edge"] == Terrain.edge_key(Vector2i(2, 4), Vector2i(0, 1)) and decor[1]["out"] == Vector2i(0, 1)
 		and decor[2]["out"] == Vector2i(-1, -1) and not decor[2].has("edge")
 		and decor[3]["edge"] == parsed["terrain"]["niches"][0]["edge"] and decor[3]["out"] == Vector2i(0, -1) and decor[3]["variant"] == 2,
 		"each as terrain reads it: the patch with no edge, the strip and the niche web with theirs, the corner web with its diagonal (%s)" % [decor])
+	_check(decor.size() == 8 and decor[4]["out"] == Vector2i(1, 0) and not decor[4].has("edge") and decor[4]["variant"] == 2 and decor[5]["out"] == Vector2i.ZERO
+		and decor[6]["edge"] == Terrain.edge_key(Vector2i(1, 2), Vector2i(-1, 0)) and decor[7]["edge"] == Terrain.edge_key(Vector2i(4, 3), Vector2i(0, -1))
+		and int(parsed["terrain"]["edges"].get(decor[7]["edge"], Terrain.Edge.OPEN)) == Terrain.Edge.OPEN,
+		"658: the faced guard keeps his facing and no edge, the rolled one his (0, 0); the fence sections carry their edge, the wall's and the open one's alike (%s)" % [decor.slice(4)])
 	var warnings: Array = parsed["warnings"].filter(func(w: String) -> bool: return w.begins_with("decor "))
-	_check(warnings.size() == 9 and parsed["warnings"].size() == 9,
-		"the nine misplaced are said and left out: a web on a sealed niche, on the hidden one, a strip on an open edge, a patch with a step, a corner with no wall, a variant the kind has not, a second patch on the cell, one in the rock, one malformed (%s)" % [warnings])
+	_check(warnings.size() == 11 and parsed["warnings"].size() == 11,
+		"the eleven misplaced are said and left out: a web on a sealed niche, on the hidden one, a strip on an open edge, a patch with a step, a corner with no wall, a variant the kind has not, a second patch on the cell, one in the rock, one malformed, a guard on a diagonal, a fence with no step (%s)" % [warnings])
 	Level.register("lt_decor_bad", Level.image_from_rows(rows, {Vector2i(3, 3): "start"}), null, {"decor": {"moss": 1}})
 	_check(Level.load_level("lt_decor_bad")["warnings"] == ["\"decor\" in level.json is not a list"], "a \"decor\" that is no list is said")
+	# Out of doors (658; maps' grave fence on Held, 654): an edge piece on an
+	# open grass edge and on the map's own edge, a flat piece on grass, read
+	# in with nothing said.
+	var grass := Image.create_empty(6 * 2 + 1, 4 * 2 + 1, false, Image.FORMAT_RGBA8)
+	grass.fill(Color(str(Level.LEGEND["grass"])))
+	grass.set_pixel(2, 2, Color(str(Level.LEGEND["start"])))
+	Level.register("lt_decor_out", grass, null, {"name": "Fenced", "outdoor": true,
+		"decor": [[2, 1, 0, 1, "grave_fence", 2], [3, 1, 0, 1, "grave_fence", 1], [0, 0, -1, 0, "grave_fence", 3], [4, 2, -1, 0, "fallen_guard", 1]]})
+	var out := Level.load_level("lt_decor_out")
+	var fence: Array = out["terrain"]["decor"]
+	_check(out["warnings"].is_empty() and fence.size() == 4 and fence[0]["edge"] == Terrain.edge_key(Vector2i(2, 1), Vector2i(0, 1))
+		and fence[1]["edge"] == Terrain.edge_key(Vector2i(3, 1), Vector2i(0, 1)) and fence[2]["edge"] == Terrain.edge_key(Vector2i(0, 0), Vector2i(-1, 0))
+		and fence[3]["kind"] == "fallen_guard" and fence[3]["out"] == Vector2i(-1, 0),
+		"out of doors a fence runs along two open grass edges and the map's edge, a body lies on the grass facing west, nothing said (%s; %s)" % [out["warnings"], fence])
 
 
 ## The Dwarven Halls under the castle (613, dungeon's side): the template,
@@ -2156,9 +2177,23 @@ func _test_castle_halls_level() -> void:
 	_check(place.get("cell") == Vector2i(43, 64) and place.get("kind") == "refuge" and place.get("radius") == 3 and place.get("where") == "castle_dungeon",
 		"the smith's refuge, dwarven_forge, stands between the forge's anvils, a refuge under the castle (%s)" % [place])
 	var pillars: Array = halls["buildings"].filter(func(building: Dictionary) -> bool: return building["slot"] == "building.crypt_pillar")
-	_check(pillars.size() == 4 and pillars.all(func(building: Dictionary) -> bool: return int(building.get("variant", 1)) == 2)
-		and not halls["terrain"]["floor"].has(Vector2i(42, 65)) and not halls["terrain"]["floor"].has(Vector2i(47, 67)) and halls["terrain"]["floor"].has(Vector2i(43, 64)),
-		"four dwarven pillars, the forge's footprint rock till art-kit's building lands, the stand cell floor")
+	_check(pillars.size() == 4 and pillars.all(func(building: Dictionary) -> bool: return int(building.get("variant", 1)) == 2),
+		"four dwarven pillars (crypt_pillar, variant 2)")
+	# 613 amended: the forge and the rack stand solid, the guards lie where they fell.
+	var forge: Array = halls["buildings"].filter(func(building: Dictionary) -> bool: return building["slot"] == "building.dwarven_forge")
+	var rack: Array = halls["buildings"].filter(func(building: Dictionary) -> bool: return building["slot"] == "building.weapon_rack")
+	_check(forge.size() == 1 and forge[0]["rect"] == Rect2i(42, 65, 6, 3) and forge[0]["facing"] == Vector2i(0, -1)
+		and not halls["terrain"]["floor"].has(Vector2i(42, 65)) and not halls["terrain"]["floor"].has(Vector2i(47, 67)) and halls["terrain"]["solid"].has(Vector2i(44, 66))
+		and halls["terrain"]["floor"].has(Vector2i(43, 64)),
+		"the great forge stands 6 x 3 against the south wall facing north, solid, the stand cell before its anvils floor (%s)" % [forge])
+	_check(rack.size() == 1 and rack[0]["rect"] == Rect2i(50, 67, 2, 1) and rack[0]["facing"] == Vector2i(0, -1)
+		and not halls["terrain"]["floor"].has(Vector2i(50, 67)) and not halls["terrain"]["floor"].has(Vector2i(51, 67)) and halls["terrain"]["floor"].has(Vector2i(49, 67)) and halls["terrain"]["floor"].has(Vector2i(52, 67)),
+		"the goblins' weapon rack stands 2 x 1 against the south wall east of the forge, solid, floor either side (%s)" % [rack])
+	var guards: Array = halls["terrain"]["decor"].filter(func(d: Dictionary) -> bool: return d["kind"] == "fallen_guard")
+	_check(halls["terrain"]["decor"].size() == 3 and guards.size() == 3 and guards[0]["cell"] == Vector2i(23, 30) and guards[0]["out"] == Vector2i(1, 0)
+		and guards[1]["out"] == Vector2i(0, -1) and guards[1]["variant"] == 2 and guards[2]["out"] == Vector2i.ZERO
+		and guards.all(func(d: Dictionary) -> bool: return Level.in_anchors(Regen.config_of("castle_halls")["anchors"], d["cell"])),
+		"three of the smith's guards lie in the ambush: one on his side facing the cart, one face down running north, one as he fell (%s)" % [guards])
 	_check(halls["entities"].size() == 5 and halls["links"][0]["cue"] == "up" and down[0]["cue"] == "down",
 		"the template's five markers alone stand in the halls (the cart, two crates, two chests); the stairs cue up and down (%d, %s, %s)" % [halls["entities"].size(), halls["links"][0]["cue"], down[0]["cue"]])
 

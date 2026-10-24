@@ -448,14 +448,26 @@ func _test_castle_halls() -> void:
 	var b := LevelMap.from_image(second["layout"], config)
 	var kept := _anchors_kept(template, a, b, anchors, Sheet.HALLS_SIZE, func(_cell: Vector2i) -> bool: return false)
 	var floor_cells := _floor_of(a, Sheet.HALLS_SIZE)
-	_check(kept["same"], "inside the three anchors both generations are the template: the stair foot, the ambush, the forge room with its block")
+	_check(kept["same"], "inside the three anchors both generations are the template: the stair foot, the ambush, the forge room")
 	_check(kept["differ"] > 50 and floor_cells.size() > 1200, "the halls between differ (%d cells) and fill the rock (%d floor cells)" % [kept["differ"], floor_cells.size()])
 	_check(Regen.connected(a, anchors) and Regen.connected(b, anchors), "every anchor reaches every other in both")
 	_check(Tools.narrow_runs(a).is_empty() and Tools.narrow_runs(b).is_empty(), "no passage is one cell wide in either, the great halls' pillar blocks included (%s; %s)" % [Tools.sorted_cells(Tools.narrow_runs(a)).slice(0, 8), Tools.sorted_cells(Tools.narrow_runs(b)).slice(0, 8)])
 	_check(_broad(a, floor_cells) * 10 >= floor_cells.size() * 8, "the ways are five wide: most floor cells have floor on two opposite sides (%d of %d)" % [_broad(a, floor_cells), floor_cells.size()])
-	_check(not a.walkable(Sheet.HALLS_FORGE.position) and not a.walkable(Sheet.HALLS_FORGE.end - Vector2i.ONE) and a.walkable(Sheet.HALLS_STAND),
-		"the forge's footprint is rock (art-kit's building to come) and the stand cell between its anvils floor")
 	var level := Level.parse(first["layout"], null, config)
+	var solid: Array = level["buildings"].filter(func(building: Dictionary) -> bool: return building["slot"] in ["building.dwarven_forge", "building.weapon_rack"])
+	_check(solid.size() == 2 and not level["terrain"]["floor"].has(Sheet.HALLS_FORGE.position) and not level["terrain"]["floor"].has(Sheet.HALLS_FORGE.end - Vector2i.ONE)
+		and not level["terrain"]["floor"].has(Sheet.HALLS_RACK) and level["terrain"]["floor"].has(Sheet.HALLS_STAND) and level["warnings"].is_empty(),
+		"the forge and the rack are kept and stand solid (613 amended), the stand cell between the anvils floor, nothing said (%s)" % [level["warnings"]])
+	var guards := func(made: Dictionary) -> Array:
+		return made["config"].get("decor", []).filter(func(entry: Variant) -> bool: return entry is Array and entry.size() == 6 and str(entry[4]) == "fallen_guard")
+	var guard_cells := {}
+	for entry: Array in Sheet.HALLS_GUARDS:
+		guard_cells[Vector2i(int(entry[0]), int(entry[1]))] = true
+	var over_guards := func(made: Dictionary) -> int:
+		return made["config"].get("decor", []).filter(func(entry: Variant) -> bool: return entry is Array and entry.size() == 6 and str(entry[4]) != "fallen_guard" and guard_cells.has(Vector2i(int(entry[0]), int(entry[1])))).size()
+	_check(guards.call(first) == Sheet.HALLS_GUARDS and guards.call(second) == Sheet.HALLS_GUARDS and over_guards.call(first) == 0 and over_guards.call(second) == 0
+		and level["terrain"]["decor"].filter(func(d: Dictionary) -> bool: return d["kind"] == "fallen_guard").size() == 3,
+		"the three fallen guards lie in the ambush in both generations, with their facings, and the moss roll keeps off their cells (%s)" % [guards.call(first)])
 	var doors := 0
 	for key: Vector3i in level["terrain"]["edges"]:
 		if level["terrain"]["edges"][key] == Terrain.Edge.DOOR:
