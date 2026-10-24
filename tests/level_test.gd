@@ -195,6 +195,7 @@ func _test_every_level() -> void:
 	_test_ledges()
 	_test_link_cues()
 	_test_clearing()
+	_test_felled_walls()
 	print("
 == the levels connect: WorldMap.problems() (links and spawn points, ways back, reachable) ==")
 	var problems := WorldMap.build().problems()
@@ -358,6 +359,50 @@ func _test_link_cues() -> void:
 ## Decision 591: a woodcut fells the grove's edge nearest the town, the
 ## cells regrow a stage a season from the edge in, back to the level's trunk;
 ## built over, never; kept in the snapshot.
+## 591 amended (terrain's find): a felled trunk's cell is floor like any,
+## its outline walls to the floor beside it gone (in the terrain the views
+## draw and in the walk), walls to the trunks still standing made, and all
+## back as they were when it grows back to a trunk.
+func _test_felled_walls() -> void:
+	print("\n== felled cells: their outline walls open to the floor beside them, walked into; back when regrown ==")
+	var size := Vector2i(16, 10)
+	var colour := func(meaning: String) -> Color: return Color(str(Level.LEGEND[meaning]))
+	var image := Image.create_empty(size.x * 2 + 1, size.y * 2 + 1, false, Image.FORMAT_RGBA8)
+	image.fill(colour.call("grass"))
+	for y in range(3, 7):
+		for x in range(8, 12):
+			image.set_pixel(x * 2, y * 2, colour.call("void"))
+	# An authored wall between the grove's (8, 3) and the grass west of it.
+	image.set_pixel(7 * 2 + 1, 3 * 2, colour.call("wall"))
+	image.set_pixel(2, 2, colour.call("start"))
+	Level.register("felled_walls", image, null, {"name": "Felled", "outdoor": true})
+	var terrain: Dictionary = Level.load_level("felled_walls")["terrain"]
+	var edge := func(cell: Vector2i, way: Vector2i) -> int: return int(terrain["edges"].get(Terrain.edge_key(cell, way), Terrain.Edge.OPEN))
+	_check(edge.call(Vector2i(8, 4), Vector2i(-1, 0)) == Terrain.Edge.WALL and terrain["outline"].has(Terrain.edge_key(Vector2i(8, 4), Vector2i(-1, 0)))
+			and not terrain["outline"].has(Terrain.edge_key(Vector2i(8, 3), Vector2i(-1, 0))),
+			"parsed: the grove's edge walled by the outline rule, the wall pixel's not counted as outline")
+	var felled := [[8, 3, "stump"], [8, 4, "stump"], [8, 5, "grass"]]
+	var changes := Clearing.apply_cells(terrain, felled)
+	_check(edge.call(Vector2i(8, 4), Vector2i(-1, 0)) == Terrain.Edge.OPEN and edge.call(Vector2i(8, 5), Vector2i(-1, 0)) == Terrain.Edge.OPEN
+			and edge.call(Vector2i(8, 4), Vector2i(0, -1)) == Terrain.Edge.OPEN,
+			"felled: open to the grass and to each other (%d edges changed)" % changes.size())
+	_check(edge.call(Vector2i(8, 4), Vector2i(1, 0)) == Terrain.Edge.WALL and edge.call(Vector2i(8, 5), Vector2i(0, 1)) == Terrain.Edge.WALL,
+			"walled to the trunks still standing east and south of them")
+	_check(edge.call(Vector2i(8, 3), Vector2i(-1, 0)) == Terrain.Edge.WALL, "the authored wall stays")
+	# The walk: the server's own change, a loaded zone's.
+	_check(_main.load_map("felled_walls"), "the grove loads")
+	_check(World.find_path(Vector2i(2, 4), Vector2i(8, 4), true).is_empty(), "before: no way into the grove")
+	_main._on_clearing_changed("felled_walls", felled)
+	var into := World.find_path(Vector2i(2, 4), Vector2i(8, 4), true)
+	_check(not into.is_empty() and not World.find_path(Vector2i(2, 4), Vector2i(8, 5), true).is_empty(),
+			"felled: walked into from the grass (%d steps)" % into.size())
+	_main._on_clearing_changed("felled_walls", [[8, 3, Clearing.TRUNK], [8, 4, Clearing.TRUNK], [8, 5, Clearing.TRUNK]])
+	var walled := int(_main._terrain["edges"].get(Terrain.edge_key(Vector2i(8, 4), Vector2i(-1, 0)), Terrain.Edge.OPEN)) == Terrain.Edge.WALL
+	_check(World.find_path(Vector2i(2, 4), Vector2i(8, 4), true).is_empty() and walled,
+			"regrown to trunks: walled again, no way in")
+	_main.load_map("test_room")
+
+
 func _test_clearing() -> void:
 	print("
 == clearing: felled at the edge nearest the town, regrown a season a stage, back to the trunk ==")

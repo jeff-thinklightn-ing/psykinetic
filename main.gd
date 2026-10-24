@@ -2465,7 +2465,9 @@ func _clearing_cells(zone: String) -> Array:
 
 
 ## Server: zone [param zone]'s cells felled or grown on (Clearing.changed):
-## a loaded zone's walk follows at once, and everyone in it is told.
+## a loaded zone's terrain and walk follow at once, the outline's walls round
+## them with them (591 amended: a felled cell walked into, a regrown trunk
+## walled), and everyone in it is told.
 func _on_clearing_changed(zone: String, cells: Array) -> void:
 	if not Net.is_authority():
 		return
@@ -2473,11 +2475,12 @@ func _on_clearing_changed(zone: String, cells: Array) -> void:
 		var was := World.enter_named(zone)
 		for each: Array in cells:
 			World.set_floor(Vector2i(int(each[0]), int(each[1])), str(each[2]) != Clearing.TRUNK)
+		# Main's _terrain is the zone's while World is in it.
+		var changes := Clearing.apply_cells(_terrain, cells)
+		World.set_edges(changes)
 		World.enter(was)
-		if zone == map_name:
-			Clearing.apply_cells(_terrain, cells)
-			if _client3d != null:
-				_redraw_clearing(cells)
+		if zone == map_name and _client3d != null:
+			_redraw_clearing(cells, changes)
 	for peer in World.peers_in(zone):
 		if peer != Net.local_id:
 			Net.message_to(peer, "clearing", {"zone": zone, "cells": cells})
@@ -2500,18 +2503,26 @@ func _on_clearing(data: Dictionary) -> void:
 			else:
 				_clearing_told[zone][cell] = str(each[2])
 	if zone == map_name and not data.get("whole", false) and not Net.is_authority():
-		Clearing.apply_cells(_terrain, cells)
+		var changes := Clearing.apply_cells(_terrain, cells)
+		for each: Array in cells:
+			World.set_floor(Vector2i(int(each[0]), int(each[1])), str(each[2]) != Clearing.TRUNK)
+		World.set_edges(changes)
 		if _client3d != null:
-			_redraw_clearing(cells)
+			_redraw_clearing(cells, changes)
 
 
 ## The view drawn again where [param cells] changed: terrain's own redraw of
-## them if it has one (585's way: a few chunks), else the whole zone.
-func _redraw_clearing(cells: Array) -> void:
-	if _client3d.has_method("clearing_changed"):
-		_client3d.call("clearing_changed", _terrain, cells)
-	else:
+## them if it has one (585's way: a few chunks), else the whole zone; the
+## walls on [param edges] (591 amended: the outline's, opened or made, key ->
+## kind, already in the terrain's "edges") by terrain's clearing_walls when
+## the view has it, else the zone drawn again.
+func _redraw_clearing(cells: Array, edges: Dictionary = {}) -> void:
+	if not _client3d.has_method("clearing_changed") or not edges.is_empty() and not _client3d.has_method("clearing_walls"):
 		_view_zone = ""
+		return
+	_client3d.call("clearing_changed", _terrain, cells)
+	if not edges.is_empty():
+		_client3d.call("clearing_walls", edges)
 
 
 ## Server: zone [param zone_name] read again from its level (edited in the

@@ -78,8 +78,10 @@ func today() -> int:
 
 
 ## [param terrain] (a level's as parsed, zone [param zone]'s) with its
-## felled cells floor of their stage's kind and terrain["clearing"] (cell ->
-## stage) for the views. Main applies it before World loads the terrain.
+## felled cells floor of their stage's kind, their edges open to the floor
+## round them (Level.relay_outline, 591 amended) and terrain["clearing"]
+## (cell -> stage) for the views. Main applies it before World loads the
+## terrain.
 func apply(zone: String, terrain: Dictionary) -> void:
 	var stages: Dictionary[Vector2i, String] = {}
 	for cell: Vector2i in felled.get(zone, {}):
@@ -89,12 +91,18 @@ func apply(zone: String, terrain: Dictionary) -> void:
 			terrain["floor"].append(cell)
 		terrain["kinds"][cell] = STAGE_KINDS[stage]
 	terrain["clearing"] = stages
+	Level.relay_outline(terrain, stages.keys())
 
 
-## [param cells] ([[x, y, stage]], a "clearing" message's) laid on a
-## client's [param terrain]: felled cells floor, grown ones void again.
-static func apply_cells(terrain: Dictionary, cells: Array) -> void:
+## [param cells] ([[x, y, stage]], a "clearing" message's or the server's
+## own change) laid on [param terrain]: felled cells floor, grown ones void
+## again, the outline's walls round them made again (Level.relay_outline:
+## a felled cell open to the floor beside it, a regrown trunk walled).
+## Returns the edges changed (key -> kind) for World.set_edges and the
+## views' walls.
+static func apply_cells(terrain: Dictionary, cells: Array) -> Dictionary[Vector3i, int]:
 	var stages: Dictionary = terrain.get("clearing", {})
+	var changed: Array[Vector2i] = []
 	for each: Array in cells:
 		var cell := Vector2i(int(each[0]), int(each[1]))
 		var stage := str(each[2])
@@ -107,7 +115,9 @@ static func apply_cells(terrain: Dictionary, cells: Array) -> void:
 			if not cell in terrain["floor"]:
 				terrain["floor"].append(cell)
 			terrain["kinds"][cell] = STAGE_KINDS.get(stage, "grass")
+		changed.append(cell)
 	terrain["clearing"] = stages
+	return Level.relay_outline(terrain, changed)
 
 
 ## A zone's felled cells as a message's list ([[x, y, stage]]).

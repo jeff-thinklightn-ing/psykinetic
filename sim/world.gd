@@ -1647,6 +1647,23 @@ func set_floor(cell: Vector2i, on: bool) -> void:
 	fields_changed([cell])
 
 
+## Edges [param changes] (key -> Terrain.Edge, OPEN taking one away) set in
+## the walk (591 amended: Level.relay_outline's, a felled cell's walls gone).
+func set_edges(changes: Dictionary) -> void:
+	if changes.is_empty():
+		return
+	var near: Array[Vector2i] = []
+	for key: Vector3i in changes:
+		if int(changes[key]) == Terrain.Edge.OPEN:
+			_edges.erase(key)
+		else:
+			_edges[key] = int(changes[key])
+		near.append(Vector2i(key.x, key.y))
+	_grid_rect = Rect2i()
+	_grid_steps = PackedByteArray()
+	fields_changed(near)
+
+
 ## [param terrain] is what Terrain.parse returns.
 func load_terrain(terrain: Dictionary) -> void:
 	if not Net.is_authority():

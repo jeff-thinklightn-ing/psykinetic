@@ -548,6 +548,10 @@ static func parse(layout: Image, height: Image, config: Dictionary, relief: Imag
 				walks[(y + 1) * across + x + 1] = 1
 	# Edges: from -1, as in Terrain, so the outline along the top and left is there.
 	var edges: Dictionary[Vector3i, int] = {}
+	# The walls the outline rule alone made (no wall pixel: walkable ground
+	# against ground that is not), which relay_outline makes again as cells
+	# turn floor or not (591 amended: a felled trunk).
+	var outline: Dictionary[Vector3i, bool] = {}
 	for y in range(-1, cells.y):
 		for x in range(-1, cells.x):
 			var here := (y + 1) * across + x + 1
@@ -579,6 +583,7 @@ static func parse(layout: Image, height: Image, config: Dictionary, relief: Imag
 					kind = Terrain.Edge.WALL
 				elif walks[here] != walks[there] and wet[here] == 0 and wet[there] == 0:
 					kind = Terrain.Edge.WALL
+					outline[Vector3i(x, y, Terrain.EAST if east else Terrain.SOUTH)] = true
 				if kind != Terrain.Edge.OPEN:
 					edges[Vector3i(x, y, Terrain.EAST if east else Terrain.SOUTH)] = kind
 	# Heights and stairs.
@@ -634,7 +639,7 @@ static func parse(layout: Image, height: Image, config: Dictionary, relief: Imag
 		warnings.append("\"zone\" in level.json is %s: one of %s; it is %s" % [config["zone"], ", ".join(DayNight.ZONES), zone])
 	var level := {
 		"terrain": {
-			"floor": floor_tiles, "fire": fire, "edges": edges, "kinds": kinds, "water": water, "fords": fords,
+			"floor": floor_tiles, "fire": fire, "edges": edges, "outline": outline, "kinds": kinds, "water": water, "fords": fords,
 			"tall_grass": tall_grass, "slopes": slopes, "rocks": rocks,
 			"heights": heights, "stairs": stairs, "torches": torches, "lanterns": lanterns,
 			"relief": field, "relief_size": cells, "relief_given": given,
@@ -2409,6 +2414,45 @@ static func building_cells(building: Dictionary) -> Array[Vector2i]:
 ## A parsed building's outline: the edges round its blocks' union.
 static func building_outline(building: Dictionary) -> Array[Vector3i]:
 	return blocks_outline(building_cells(building))
+
+
+## The outline's walls round [param cells] of [param terrain] made again
+## after they turned floor or not (591 amended: a felled trunk floor, a
+## regrown one void; economy's ruins the same way): each of their four
+## edges the outline rule made (terrain "outline") or that has none is a
+## wall where floor meets ground that is not (water aside), else open; a
+## wall a pixel or a building laid is left as it is. terrain's "edges" and
+## "outline" changed in place; returns the edges changed, key -> kind
+## (Terrain.Edge.OPEN for one taken away), for World.set_edges and the
+## views' walls.
+static func relay_outline(terrain: Dictionary, cells: Array) -> Dictionary[Vector3i, int]:
+	var changes: Dictionary[Vector3i, int] = {}
+	var edges: Dictionary = terrain["edges"]
+	if not terrain.has("outline"):
+		terrain["outline"] = {}
+	var outline: Dictionary = terrain["outline"]
+	var floor := {}
+	for cell: Vector2i in terrain["floor"]:
+		floor[cell] = true
+	var wet := {}
+	for cell: Vector2i in terrain.get("water", []):
+		wet[cell] = true
+	for cell: Vector2i in cells:
+		for way: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+			var key := Terrain.edge_key(cell, way)
+			if edges.has(key) and not outline.has(key):
+				continue
+			var next: Vector2i = cell + way
+			if floor.has(cell) != floor.has(next) and not wet.has(cell) and not wet.has(next):
+				if int(edges.get(key, Terrain.Edge.OPEN)) != Terrain.Edge.WALL:
+					changes[key] = Terrain.Edge.WALL
+				edges[key] = Terrain.Edge.WALL
+				outline[key] = true
+			elif edges.has(key):
+				edges.erase(key)
+				outline.erase(key)
+				changes[key] = Terrain.Edge.OPEN
+	return changes
 
 
 ## The edges round [param cells] (Terrain edge keys): each side of a cell

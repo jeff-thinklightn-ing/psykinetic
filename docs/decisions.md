@@ -25804,3 +25804,27 @@ move and by a hostile near. view_test: tending a body, kneeling turned to it and
 it walks, not leant; cleared, it stands with its own facing. Wire: a line under revision 35
 (open, unshipped), no bump. No new class_name. A shot of the pose follows the coordinator's
 all-clear.
+## 591 amended (2): felled ground re-walls by the outline rule
+
+A felled trunk's cell (591) turned floor, but the WALL edge the parse's outline rule had
+put between floor and void stayed, in the walk and the view: a felled row couldn't be
+stepped into and drew a brick strip along the old forest edge (terrain's find, live since
+v0.1.168).
+
+- **Level.parse** records which walls the outline rule alone made (terrain "outline",
+  Dictionary[Vector3i, bool]); a wall with a wall pixel is authored and not in it.
+- **Level.relay_outline(terrain, cells)** re-derives only outline walls and missing
+  edges round the changed cells: WALL where floor meets non-floor (water aside), else
+  OPEN. Authored walls are never touched. It updates terrain in place and returns the
+  changed keys (OPEN meaning removed).
+- **Clearing.apply** and **apply_cells** call it; apply_cells returns the changes.
+  **World.set_edges(changes)** applies them to the walk (grid caches reset, fields
+  told). Main applies them on the server inside the zone and on each client.
+- The view takes them through **Client3D.clearing_walls(edges)** (terrain's half, to
+  follow); until that method exists Main redraws the zone. rebuild_walls isn't used: it
+  redraws whole lines without _add_walls' fence and rock skips.
+- Economy's ruins (649) take the same path: change terrain["floor"], relay_outline,
+  set_edges.
+
+No wire change: the outline is parsed from the shipped level on both sides. level_test
+_test_felled_walls (fell a row, step in, regrow, walled again). No new class_name.
