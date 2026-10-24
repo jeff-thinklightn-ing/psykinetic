@@ -133,6 +133,16 @@ const SPAWN_SAFE_DISTANCE := 5
 ## Ticks a newly spawned player is ignored by monsters, unless it moves or
 ## attacks first.
 const SPAWN_GRACE_TICKS := 30
+## A player arriving through a link or over an edge is sheltered this long at
+## most (decision 661): no monster targets them and nothing harms them till
+## their client's "view_ready", an act of theirs, or this.
+const ARRIVAL_SHELTER_TICKS := 60
+## A player sheltered on arriving is not sheltered again for this long
+## (decision 661): crossing back and forth gets spawn grace alone.
+const SHELTER_COOLDOWN_MSEC := 30000
+## Commands that keep an arrival's shelter (decision 661): talk and looking.
+## Any other ends it at once, so nobody stands untouchable doing things.
+const SHELTER_KEEPS: Array[String] = ["say", "party", "face", "greet", "town_sheet", "view_ready"]
 ## A client that loses the server it played on tries again this often, for
 ## this long (decision 240).
 const RECONNECT_EVERY := 2.0
@@ -329,6 +339,9 @@ var _woken: Dictionary[String, bool] = {}
 ## Peer -> the tick its player was last put down (a join, a zone entered, a
 ## respawn): the wider no-respawn radius while RESPAWN_ARRIVAL_TICKS last.
 var _arrived_at: Dictionary[int, int] = {}
+## Server: when (Time.get_ticks_msec) each player id was last sheltered on
+## arriving (decision 661); zones' ticks differ, so the clock is the machine's.
+var _sheltered_at: Dictionary[String, int] = {}
 ## Camp place id -> the tick it was first seen undefended with a player in
 ## it (decision 429); not saved, so a restart starts the clock again.
 var _camp_clear_since: Dictionary[String, int] = {}
@@ -3699,12 +3712,51 @@ func travel(peer: int, to_map: String, to_spawn := "", edge := {}, at := World.N
 		record.companion["tile"] = null  # Beside their player.
 	_show_zone_to(peer, to_map, leaving)
 	_join_player(peer, id, record.name)
+	_shelter_arrival(peer, id)
 	if to_spawn == "from_below":
 		_reveal_from_below(to_map)  # The hidden door pushed open from behind (608).
 	print("[zone] %s went from %s to %s" % [record.name, from_name, to_map])
 	party_log.add("%s went to %s." % [record.name, str(level.get("display_name", to_map))])
 	World.enter(World.home())
 	return true
+
+
+## Server: [param peer]'s player just arrived by travel (World in their new
+## zone): sheltered while their view builds (decision 661), their companion
+## with them, unless sheltered on arriving within SHELTER_COOLDOWN_MSEC.
+func _shelter_arrival(peer: int, id: String) -> void:
+	var player: Player = _players.get(peer)
+	if not is_instance_valid(player) or not player.spawned:
+		return
+	var now := Time.get_ticks_msec()
+	if _sheltered_at.has(id) and now - _sheltered_at[id] < SHELTER_COOLDOWN_MSEC:
+		return  # Spawn grace alone (_join_player's).
+	_sheltered_at[id] = now
+	World.shelter(player, ARRIVAL_SHELTER_TICKS)
+	var pet: Companion = _companions.get(id)
+	if is_instance_valid(pet) and pet.spawned and pet.zone == player.zone:
+		World.shelter(pet, ARRIVAL_SHELTER_TICKS, player)
+
+
+## Server: the "view_ready" command (decision 661): [param player]'s client
+## has built the view of zone [param zone_name]; their shelter, and their
+## companion's, gives way to plain spawn grace. One naming another zone (a
+## stale one) does nothing.
+func _view_ready(player: Player, zone_name: String) -> void:
+	if zone_name != player.zone:
+		return
+	World.unshelter(player, SPAWN_GRACE_TICKS)
+	var pet: Companion = _companions.get(_peer_ids.get(player.owner_peer, ""))
+	if is_instance_valid(pet) and pet.shelter_lead == player:
+		World.unshelter(pet, SPAWN_GRACE_TICKS)
+
+
+## Client: this view of zone [param zone_name] is built (decision 661; perf's
+## view build calls it): the server ends this player's arrival shelter.
+func tell_view_ready(zone_name: String) -> void:
+	var player := _local_player()
+	if player != null:
+		World.command(player, "view_ready", {"zone": zone_name})
 
 
 ## Tests and the eval: the host's player into zone [param level_name], the
@@ -8680,7 +8732,12 @@ func _on_command(entity: GridEntity, command_name: String, args: Dictionary) -> 
 		var walk: Guide = _guides.get(_peer_ids.get(entity.owner_peer, ""))
 		if walk != null and walk.going() and is_instance_valid(walk.pet):
 			_guide_done(walk.pet, "moved")
-	if command_name == "guide" and entity is Player:
+	# Arriving (decision 661): anything but talk and looking ends the shelter.
+	if entity is Player and command_name not in SHELTER_KEEPS and World.is_sheltered(entity):
+		entity.protected = false
+	if command_name == "view_ready" and entity is Player:
+		_view_ready(entity as Player, str(args.get("zone", "")))
+	elif command_name == "guide" and entity is Player:
 		_guide_asked(entity, str(args.get("to", "")))
 	elif command_name == "greet" and entity is Player:
 		var hailed := get_node_or_null(NodePath(str(args.get("resident", ""))))

@@ -383,7 +383,10 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## 35 (490 amended, npc's side): a resident's look spec may carry "hat=<word>"
 ## (the bard's "bard"), a piece on pc-character's head socket; a client that does
 ## not know the word wears nothing new.
-const PROTOCOL_REVISION := 35
+## 36 (661): new command "view_ready" {zone}, a client's view of the zone built
+## (Main.tell_view_ready); the server ends that player's arrival shelter. An old
+## client never sends it, and the shelter runs its 6 s.
+const PROTOCOL_REVISION := 36
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]
 ## Every kind of message (message, message_to, broadcast, broadcast_to).

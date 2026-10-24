@@ -36,6 +36,7 @@ func _ready() -> void:
 	_test_overheard()
 	_test_stats_with_nobody_on()
 	_test_slow_tick_line()
+	_test_arrival_shelter()
 
 	DirAccess.remove_absolute(Net.state_path)
 	Net.state_path = ""
@@ -415,6 +416,99 @@ func _test_overheard() -> void:
 
 
 # --- Helpers ---------------------------------------------------------------------
+
+## Decision 661: a player arriving by travel, and the companion with them, is
+## sheltered (no harm of any kind, no push, stun or knock-down) till their
+## client's view_ready for that zone, an act of theirs, or 60 ticks; talk keeps
+## it; a crossing inside the cooldown gets spawn grace alone.
+func _test_arrival_shelter() -> void:
+	print("
+== an arrival is sheltered till its view is built (decision 661) ==")
+	_main._sheltered_at.clear()
+	_check(_main.travel(BO, "test_room", "from_sample"), "Bo goes to the test room")
+	var bo := _player(BO)
+	var pet: Companion = _main._companions.get(BO_ID)
+	var was := World.enter_named("test_room")
+	_check(World.is_sheltered(bo) and bo.protected, "Bo arrives sheltered, and protected (drawn faded)")
+	_check(pet != null and World.is_sheltered(pet), "his companion with him")
+	var hp := bo.hp
+	World.damage(bo, 5, _player(Net.local_id), &"attack")
+	World.damage(bo, 5, null, &"fire")
+	World.damage(pet, 5, null, &"shot")
+	_check(bo.hp == hp and pet.hp == pet.max_hp, "a blow (a player's too), fire and a shot land on neither (%d/%d, %d)" % [bo.hp, hp, pet.hp])
+	World._stun_for(bo, 10)
+	World.knock_down(bo, null, 10)
+	_check(not World.is_stunned(bo) and bo.down_until <= World.tick, "not stunned, not knocked down")
+	var at := bo.tile
+	World._push(pet, bo, Vector2(1, 0), 20.0)
+	World._push(pet, bo, Vector2(0, 1), 20.0)
+	_check(bo.tile == at, "a push moves him nowhere (%s, %s)" % [bo.tile, at])
+	var host := _player(Net.local_id)
+	var host_at := host.tile
+	var met: Array[Dictionary] = []
+	for way: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+		if met.is_empty() and World.is_walkable(at - way * 2) and World.get_entity_at(at - way * 2) == null 				and World.get_entity_at(at - way) == null and World.is_walkable(at - way):
+			World._relocate(host, at - way * 2)
+			met = World._push(pet, host, Vector2(way), 4.0)
+	_check(met.size() == 1 and str(met[0]["stopped_by"]).ends_with("(sheltered)") and int(met[0]["impact"]) > 0 and bo.tile == at,
+		"a body knocked into him stops as at a wall, its hurt a wall's, and nothing goes on (%s)" % [met])
+	World._relocate(host, host_at)
+	World.afflict(bo, "bleed", 50, 5, 2)
+	_check(not bo.ailments.has("bleed"), "no ailment takes hold")
+	var stepped := false
+	for i in 4:
+		World.step()
+		for way: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+			if not stepped and World.try_move(pet, way):
+				stepped = true
+	_check(stepped and World.is_sheltered(pet), "her own step keeps hers (stepped %s)" % stepped)
+	_main._on_command(bo, "say", {"text": ""})
+	_check(World.is_sheltered(bo), "talk keeps his")
+	_main._on_command(bo, "view_ready", {"zone": "sample"})
+	_check(World.is_sheltered(bo), "a view_ready for the zone he left does nothing")
+	_main._on_command(bo, "view_ready", {"zone": "test_room"})
+	_check(not World.is_sheltered(bo) and bo.protected and bo.protected_until_tick == World.tick + _main.SPAWN_GRACE_TICKS,
+		"his view built: the shelter over, spawn grace from now")
+	_check(not World.is_sheltered(pet) and pet.protected, "hers too, into spawn grace")
+	World.damage(bo, 5, null, &"attack")
+	_check(bo.hp == hp - 5, "a blow lands now (%d)" % bo.hp)
+	World.enter(was)
+
+	_check(_main.travel(BO, "sample") and _main.travel(BO, "test_room", "from_sample"), "Bo crosses there and back")
+	bo = _player(BO)
+	_check(not World.is_sheltered(bo) and bo.protected, "inside the cooldown: spawn grace alone")
+
+	_main._sheltered_at.clear()
+	_main.travel(BO, "sample")
+	bo = _player(BO)
+	was = World.enter_named("sample")
+	_check(World.is_sheltered(bo), "past the cooldown, sheltered again")
+	World.enter(was)
+	for i in _main.ARRIVAL_SHELTER_TICKS + 1:
+		World.step()
+	_check(not World.is_sheltered(bo) and not bo.sheltered and not bo.protected, "%d ticks end it with no view_ready" % _main.ARRIVAL_SHELTER_TICKS)
+
+	for act: String in ["use", "search", "step"]:
+		_main._sheltered_at.clear()
+		_main.travel(BO, "test_room" if bo.zone == "sample" else "sample", "from_sample" if bo.zone == "sample" else "")
+		bo = _player(BO)
+		pet = _main._companions.get(BO_ID)
+		was = World.enter_named(bo.zone)
+		var sheltered := World.is_sheltered(bo) and World.is_sheltered(pet)
+		if act == "step":
+			for i in 4:
+				World.step()
+				for way: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+					if World.is_sheltered(bo) and World.try_move(bo, way):
+						break
+		else:
+			_main._on_command(bo, act, {"slot": 0, "target": ""})
+		_check(sheltered and not World.is_sheltered(bo) and not bo.protected and not World.is_sheltered(pet),
+			"%s ends his shelter at once, and hers" % act)
+		World.step()
+		_check(not pet.sheltered and not pet.protected, "hers cleared on the next tick (%s)" % act)
+		World.enter(was)
+
 
 func _kinds(heard: Array[Dictionary], kind: String) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []

@@ -1025,6 +1025,13 @@ func _step_zone() -> void:
 	for entity in _entities:
 		if entity.protected and tick >= entity.protected_until_tick:
 			entity.protected = false
+		if entity.sheltered and not is_sheltered(entity):
+			# Its grace ended by an act, or a companion's player's shelter
+			# over: hers goes with it (decision 661).
+			entity.sheltered = false
+			if entity.shelter_lead != null:
+				entity.protected = false
+			entity.shelter_lead = null
 	# 1. Act, in ascending id: those that have a turn (a crate has none). The
 	# roster is made anew when the entities change, so one despawned
 	# mid-tick leaves this one as it was.
@@ -4950,8 +4957,8 @@ func _wear_bundle(entity: GridEntity) -> void:
 ## a new one replaces a shorter. Burning is for what fire hurts (FLESH,
 ## WOOD), bleeding for creatures.
 func afflict(entity: GridEntity, kind: String, ticks: int, every: int, amount: int) -> void:
-	if not Net.is_authority() or not _alive(entity) or ticks <= 0 or amount <= 0:
-		return
+	if not Net.is_authority() or not _alive(entity) or ticks <= 0 or amount <= 0 or is_sheltered(entity):
+		return  # (Arriving, decision 661: nothing takes hold.)
 	if kind == "bleed" and not entity.is_creature() or kind == "burn" and not entity.is_breakable():
 		return
 	var until := tick + ticks
@@ -5194,7 +5201,7 @@ func shoot(by: GridEntity, angle: float, step: int, aimed := NAN) -> GridEntity:
 		amount = met[0]
 	amount = armour_turns(hit, amount, "deflect_shot")
 	_log("shot: %s hits %s at %s for %d, step %d" % [by.name, hit.name, hit.tile, amount, step])
-	if amount > 0:
+	if amount > 0 and not is_sheltered(hit):  # (Arriving, 661: no harm, no credit.)
 		var creature := hit.is_creature()
 		var ammo := Items.ammo_of(by.slots[bundle_slot(by)]) if bundle_slot(by) >= 0 else {}
 		damage(hit, amount, by, &"shot")
@@ -5245,8 +5252,8 @@ func guarding(target: GridEntity, source: GridEntity) -> Dictionary:
 func _meet_guard(target: GridEntity, source: GridEntity, amount: int, force: float, shot := false,
 		crushing := false) -> Variant:
 	var verb := guarding(target, source)
-	if verb.is_empty():
-		return null
+	if verb.is_empty() or is_sheltered(target):
+		return null  # (Arriving, decision 661: nothing reaches its guard.)
 	var weight := amount + force
 	var slot := Items.LEFT_HAND if target.raised == "block" else Items.RIGHT_HAND  # As guarding found it.
 	var steady := float(Items.strength_value(slot_strength(target, slot), "guard_stamina", 1.0))
@@ -5820,6 +5827,43 @@ func protect(entity: GridEntity, ticks: int) -> void:
 		return
 	entity.protected = true
 	entity.protected_until_tick = tick + ticks
+	entity.sheltered = false
+	entity.shelter_lead = null
+
+
+## Arrival shelter (decision 661; a zone's view takes seconds to build, the
+## sim does not wait): spawn grace for [param ticks] that also keeps every
+## harm off [param entity] (damage of any cause but bleeding, a push, a stun,
+## a knock-down), from monsters and players alike. It ends as the grace does
+## (time, a step, an attack) or by unshelter (the client's view built). A
+## companion's, with [param lead] her player, lasts while his does, and her
+## own steps do not end it.
+func shelter(entity: GridEntity, ticks: int, lead: GridEntity = null) -> void:
+	protect(entity, ticks)
+	if entity.protected:
+		entity.sheltered = true
+		entity.shelter_lead = lead
+
+
+## Whether [param entity] is sheltered now (decision 661): its grace on and
+## not ended, and a companion's player sheltered too.
+func is_sheltered(entity: GridEntity) -> bool:
+	if not entity.sheltered or not entity.protected:
+		return false
+	if entity.shelter_lead != null:
+		return is_instance_valid(entity.shelter_lead) and is_sheltered(entity.shelter_lead)
+	return true
+
+
+## [param entity]'s shelter over, its view built (decision 661): harm can
+## land again at once, and plain spawn grace runs [param grace] ticks from
+## now. Nothing when it is not sheltered.
+func unshelter(entity: GridEntity, grace: int) -> void:
+	if not Net.is_authority() or not is_sheltered(entity):
+		return
+	entity.sheltered = false
+	entity.shelter_lead = null
+	entity.protected_until_tick = tick + grace
 
 
 ## Puts back state read from a snapshot, right after spawn. Values are clamped
@@ -5893,7 +5937,8 @@ func try_move(entity: GridEntity, direction: Vector2i) -> bool:
 	entity.last_step_tick = tick  # (A braced spear stands still: braced.)
 	_trample(entity, entity.tile - direction)
 	entity._world_set_facing(direction)
-	entity.protected = false  # Moving ends spawn grace.
+	if entity.shelter_lead == null or not is_sheltered(entity):
+		entity.protected = false  # Moving ends spawn grace (a companion's shelter: her player's act does, 661).
 	if entity is Player or entity is Companion:
 		noise(entity.tile, Senses.step_radius(entity), &"step", entity)
 	return true
@@ -6145,6 +6190,8 @@ func damage(target: GridEntity, amount: int, source: GridEntity = null,
 		return
 	if is_downed(target) and cause != &"bled":
 		return  # Downed (decision 544): no blow lands on the fallen.
+	if is_sheltered(target) and cause != &"bled":
+		return  # Arriving, its view not built (decision 661): nothing lands.
 	var lost := mini(amount, target.hp)
 	target.hp -= lost
 	target.hurt_tick = tick
@@ -6789,7 +6836,7 @@ func _resolve_hits() -> void:
 				hit.force = met[1] if met[1] >= knockback_min_force else 0.0
 		if hit.pierce:
 			hit.damage = armour_turns(hit.target, hit.damage, "deflect_pierce")
-		if hit.damage > 0:
+		if hit.damage > 0 and not is_sheltered(hit.target):  # (Arriving, 661: no harm, wear or credit.)
 			var creature := hit.target.is_creature()
 			damage(hit.target, hit.damage, hit.source, &"attack")
 			if hit.down_ticks > 0 and _alive(hit.target) and hit.target.is_creature():
@@ -6805,7 +6852,7 @@ func _resolve_hits() -> void:
 		var way := hit.push_way if hit.push_way != Vector2.ZERO else Vector2(hit.push_direction)
 		if hit.force > 0.0 and _alive(hit.target):
 			_push(hit.source, hit.target, way, hit.force, hit.push_direction != hit.direction)
-		if _alive(hit.target):
+		if _alive(hit.target) and not is_sheltered(hit.target):
 			_rush_struck(hit.target, way.normalized() * hit.raw_force)  # A rush slowed or stopped (604).
 
 
@@ -6833,6 +6880,11 @@ func _push(mover: GridEntity, first: GridEntity, way: Vector2, force: float, tos
 	var body: GridEntity = first
 	var u: float = force
 	while body != null and u > 0.0:
+		if is_sheltered(body):
+			# Arriving (decision 661): it does not give, and the push ends.
+			if _logs_for(mover):
+				_log("push: %s -> %s blocked: sheltered on arrival" % [mover.name, body.name])
+			return out
 		# An exhausted or downed body counts as less mass (pushed_mass).
 		var body_mass := pushed_mass(body)
 		# Less than a tile's worth of speed moves nothing and hurts nothing.
@@ -6929,7 +6981,13 @@ func _push(mover: GridEntity, first: GridEntity, way: Vector2, force: float, tos
 		var impact := 0
 		var passed := 0.0
 		var blocker_impact := 0
-		if blocker != null:
+		var wall_body := blocker != null and is_sheltered(blocker)
+		if wall_body:
+			# Arriving (decision 661): it does not give, so it is met as a
+			# wall is, and nothing goes on.
+			stopped_by = "%s (sheltered)" % blocker.name
+			impact = roundi(impact_per_energy * 0.5 * body_mass * remaining * remaining)
+		elif blocker != null:
 			# A collision along the line: the one met takes up the speed.
 			var blocker_mass := pushed_mass(blocker)
 			passed = (1.0 + restitution) * body_mass * remaining / (body_mass + blocker_mass)
@@ -6966,7 +7024,7 @@ func _push(mover: GridEntity, first: GridEntity, way: Vector2, force: float, tos
 			_stun(body, remaining)
 		if tiles > 0 and fall == 0:
 			_stun_for(body, push_slide_ticks(tiles) + (knockback_stun_ticks if stagger < 0 else stagger))
-		if blocker != null:
+		if blocker != null and not wall_body:
 			_stun(blocker, remaining)
 			note = " (%s takes %d, goes on at %.2f)" % [blocker.name, blocker_impact, passed]
 			if blocker_impact > 0:
@@ -7007,7 +7065,8 @@ func apply_blow(source: GridEntity, target: GridEntity, blow: Dictionary) -> Dic
 	result["speed"] = way.length()
 	if way.length() >= knockback_min_force:
 		_fill_slide(result, target, _push(source, target, way, way.length(), false, int(blow.get("stagger", -1))))
-	_rush_struck(target, way)  # A rush slowed or stopped (604).
+	if not is_sheltered(target):
+		_rush_struck(target, way)  # A rush slowed or stopped (604).
 	result["knocked_down"] = is_down(target)
 	blow_resolved.emit(source, target, result)
 	return result
@@ -7462,7 +7521,7 @@ func _stun(entity: GridEntity, remaining_force: float) -> void:
 
 ## Stuns [param entity] for [param ticks] from now, if that is longer.
 func _stun_for(entity: GridEntity, ticks: int) -> void:
-	if not _alive(entity) or not entity.is_creature():
+	if not _alive(entity) or not entity.is_creature() or is_sheltered(entity):
 		return
 	if tick + ticks > entity.stunned_until_tick:
 		entity._world_stunned(tick + ticks, ticks)
@@ -8184,8 +8243,8 @@ func is_down(entity: GridEntity) -> bool:
 ## act (a stun as long), lowers what it raised, and is pushed as if
 ## DOWN_MASS_FACTOR of its mass.
 func knock_down(target: GridEntity, source: GridEntity, ticks: int) -> void:
-	if not Net.is_authority() or ticks <= 0:
-		return
+	if not Net.is_authority() or ticks <= 0 or is_sheltered(target):
+		return  # (Arriving, decision 661: not knocked down.)
 	target.down_until = maxi(target.down_until, tick + ticks)
 	target.raised = ""
 	_wear_bundle(target)

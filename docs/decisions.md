@@ -28156,3 +28156,65 @@ larder_test _test_larder_reserve: no ration from a store at its larder, rations 
 Soaks (38 days, one player, the default world):
 - At per_head_day 1 with the reserve, the cook made 25 rations in 38 days, against 192 without it. Strain held at 0 till day 24. Newcomers (11 at the founding count, 15 by day 37) still ate the larder by day 25, and the town fell for a tick on day 34.
 - The coordinator's call: per_head_day stays 1.5 ("people come"), with the reserve. Stocked 210 + 368 = 578. No hunger day and no fall through day 38, a village on day 30. Roots dug on day 35 (60 food) with about 20 food left in the store by the ledger (579 banked, 559 meals). A thin margin. The coordinator's call: founding.margin_days 3 (a draft on the tune line), three days' more food for the founding heads, for a wetter year or a mouth more; checked to day 38 before landing.
+
+## 661. Arrival shelter: no harm while a zone's view builds
+
+Perf found that every zone crossing freezes the client while it builds the 3D view, about 4 s
+into the wilds and 1.3 s into the hills, on the box too. The sim doesn't wait, so an arriving
+player could be struck while they couldn't see. Perf's 660 turns the wait into a fade and
+shortens it. This decision covers the server side, as the coordinator approved it.
+
+- **Shelter on arrival.** Main.travel (a link, an edge, the hidden door from below) ends with
+  Main._shelter_arrival. It calls World.shelter(player, ARRIVAL_SHELTER_TICKS 60), which is
+  World.protect's spawn grace plus GridEntity.sheltered (server only).
+  - Being protected means no monster targets the body, which is drawn faded to everyone: that
+    fade is the tell.
+  - While World.is_sheltered, nothing harms it, from monsters, players or the ground alike:
+    World.damage skips every cause but bleeding, and _stun_for, knock_down and afflict (no
+    ailment takes hold, so none ticks on after) pass it by. _push treats it as a body that won't
+    give: pushed directly, nothing moves; met by a pushed body, it is a wall to that body (a
+    wall's stop and hurt, nothing goes on, logged "<name> (sheltered)"). No guard is spent
+    (_meet_guard), and a blow or shot on it neither wears its bundle, credits the striker, nor
+    slows a rush. A telegraph still draws over it and strikes nobody there. (Physics checked
+    this side.)
+  - Respawns and first joins keep the plain spawn grace (Main.SPAWN_GRACE_TICKS).
+- **How it ends:**
+  - The client's new "view_ready" command {zone} (Main.tell_view_ready, sent by perf's view
+    build). Main._view_ready ends the shelter with World.unshelter, and plain spawn grace runs
+    from that moment, so the player gets a respawn's first seconds once they can see. A
+    view_ready naming another zone (a stale one) does nothing.
+  - The 60 ticks.
+  - Any act that already ends spawn grace: a step, an attack, a shove, a bash, a wind-up or a
+    lunge.
+  - Any command except talk and looking (Main.SHELTER_KEEPS: say, party, face, greet,
+    town_sheet, view_ready). So use, search, bandage, a stance and the rest end it at once:
+    nobody hops a link to stand untouchable doing things.
+- **Cooldown.** A player sheltered on arriving isn't sheltered again for
+  SHELTER_COOLDOWN_MSEC (30 s). Main._sheltered_at is keyed by player id, not peer, and timed
+  by the machine's clock because zones' ticks differ. A crossing inside the cooldown gets spawn
+  grace alone, so crossing back and forth never chains shelters.
+- **Companion.** A companion arriving with her player is sheltered with him
+  (GridEntity.shelter_lead): hers lasts while his does, and her own steps (following him) don't
+  end it. His view_ready moves hers into spawn grace with his. His act ends hers, and her own
+  attack ends hers alone.
+- **Chasers.** No monster crosses a zone after a player today: animals flee off an edge and
+  raids enter on their own. So in practice this rule covers the arrival zone's own monsters:
+  they can't target the sheltered body, and a wind-up begun before the arrival lands on nobody
+  sheltered. If pursuit across a link is ever built (enemy-ai), its chasers arrive under the
+  same rule and wait until the shelter ends.
+- **Never saved.** sheltered, shelter_lead and the cooldown live only in memory. A world saved
+  during a shelter loads without it: it is a 6-second state, and nobody logs back in sheltered.
+
+Wire: PROTOCOL_REVISION 36 (35 shipped in v0.1.172), for the new "view_ready" command. An old
+client never sends it, and its shelter runs the 6 s. zone_test _test_arrival_shelter:
+- he and his companion arrive sheltered;
+- a blow (a player's too), fire and a shot land on neither;
+- no stun, no knock-down, no ailment, and a push moves him nowhere;
+- a body knocked into him stops as at a wall, with a wall's hurt;
+- her own step keeps hers, and talk keeps his;
+- a stale view_ready does nothing, and the right one moves both into spawn grace, after which a
+  blow lands;
+- a second crossing inside the cooldown gets spawn grace alone;
+- 60 ticks end it;
+- use, search and a step each end his at once, and hers with it.
+No new class_name.

@@ -226,6 +226,11 @@ var stamina_regen_every := 1
 var stamina_regen_amount := 0
 ## Server only: the tick the grace runs out.
 var protected_until_tick := 0
+## Server only: an arrival's shelter (decision 661, World.shelter): while
+## protected too, nothing harms it. Never saved: a 6-second state.
+var sheltered := false
+## Server only: a companion's player, whose shelter hers lasts with (661).
+var shelter_lead: GridEntity = null
 ## Direction of the last step or attack.
 var facing := Vector2i(0, 1)
 ## What it holds, a slot each: Items ids, "" for empty. None for most
