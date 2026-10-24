@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Your companion no longer attacks a seated draugr you haven't challenged (back in his hall after a lost pact, or while you talk with him) or one at rest; in a pact you bought she still fights beside you.
 - Drawing and putting away weapons is heard: a blade slides from or into its scabbard, a shield, spear or axe is stowed or taken up with a soft knock, quiet enough that a town of guards is not noisy (662, sound's side).
 - Out of a fight, an archer carries the bow on the back with the quiver laid over it, both hands free; it is back in hand the moment they draw or a fight comes near.
 - Out of a fight, people rest what they hold: a great axe or battle axe set head down on the ground before them with both hands on the butt, a spear grounded upright beside them, a hammer or pick hanging at their side; they take it up again when a fight comes near.

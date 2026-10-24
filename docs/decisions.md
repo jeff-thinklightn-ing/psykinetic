@@ -29543,3 +29543,27 @@ three, pc-character a fourth for taking gear back up.
 sound_kit_test: stow_slot for a sword, dagger, knife, shield, spear, battle axe; the four
 slots in the manifest, positional. Client only, protocol unchanged, no new class_name.
 
+## 551 amended (2), companions' side: a seated boss she leaves be
+
+Jeff's draugr fight on v0.1.172: "We came back to room and Pip aggroed
+immediately." His pact had been lost when he died (Draugr._end_pact: seated
+again); on their return Pip, guarding, struck the seated draugr and he
+fought. Companion._hostile counted every Monster but harmless game her foe,
+and GUARD's _guard_target (and _adjacent_hostile) took the nearest in range;
+it never asked the monster.
+
+- Companion._hostile: a monster that talks (Monster.talks: the draugr) is
+  her foe only while it would fight her or her player (_threatens, reading
+  enemy-ai's Monster.threatens; Draugr.threatens: false at rest, false seated
+  unless that one struck or provoked him, true in a pact for the
+  challenger's party). Every other monster as before.
+- So: seated and unchallenged (a player talking with him, or back after a
+  lost pact) or at rest, she leaves him be; in a pact her player bought she
+  fights beside them at once (the coordinator: as now, not put to Jeff);
+  struck or underpaid by her player, she joins.
+- Every reader of _hostile follows: GUARD and PRESS targets, in_fight, the
+  watch ask, deeds.
+
+companion_test _test_seated_boss: seated near her under GUARD, no foe and
+no blow; a pact, her foe; the pact lost, let be; at rest, let be. Server
+only, protocol unchanged, no new class_name.

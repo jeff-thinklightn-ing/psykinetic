@@ -1904,9 +1904,13 @@ func _explain_lapse() -> void:
 
 ## Whether [param entity] is her foe (decision 332): a monster, but of the
 ## wild only a wolf, a boar going for someone, or the quarry she was set on.
+## A monster that talks (the draugr) only while it would fight her or her
+## player (551 amended (2): seated unchallenged or at rest, she leaves him be).
 func _hostile(entity: GridEntity) -> bool:
 	if not entity is Monster or not entity.spawned:
 		return false
+	if (entity as Monster).talks:
+		return _threatens(entity)
 	return entity == _quarry or not harmless(entity)
 
 

@@ -101,6 +101,7 @@ func _ready() -> void:
 	_test_out_of_reach()
 	_test_knows_level()
 	_test_wild()
+	_test_seated_boss()
 	_test_bandage_words()
 	_test_plain_orders()  # Late: its many lines fill the capped party log and Tab panel.
 	_test_last_words()  # She dies in it: keep it last of those that need her.
@@ -2943,6 +2944,33 @@ func _test_plain_orders() -> void:
 	_check(pet.stance == Companion.Stance.HOLD and pet.order == "wait", "a voice answering PRESS to \"wait here\": she still waits (%s)" % pet.stance_name())
 	_say_to(pet, owner, "Follow me.")
 	pet.mind = ScriptedMind.new()
+
+
+func _test_seated_boss() -> void:
+	print("\n== a seated boss her player has not challenged she leaves be (551 amended (2); Jeff's draugr) ==")
+	_kill_monsters()
+	var owner := _player()
+	var pet := _companion()
+	_settle(pet)
+	var at := _free_tile_between(pet, 2, 3)
+	var draugr := _main._spawn({"script": "res://sim/draugr.gd", "shape": "capsule", "name": "TestDraugr%d" % World.tick,
+		"tile": at, "props": Level.MONSTER_TYPES["draugr"].duplicate()}) as Draugr
+	draugr.acts = false
+	_check(draugr.talks and draugr.state == Draugr.State.SEATED, "a draugr seated near her")
+	_check(not pet._hostile(draugr) and pet._guard_target() != draugr, "seated, unchallenged: no foe of hers, guarding or not")
+	for i in 5:
+		World.step()
+	_check(pet.intent_target != draugr and draugr.hp == draugr.max_hp, "she does not strike him (%s)" % pet.intent_name())
+	draugr.start_pact(owner, "easy")
+	_check(pet._hostile(draugr), "a pact her player bought: her foe, and she joins at once")
+	draugr._end_pact()
+	_check(draugr.state == Draugr.State.SEATED and not pet._hostile(draugr), "the pact lost, seated again: let be")
+	draugr.state = Draugr.State.AT_REST
+	draugr.rests_until = World.steps + 100000
+	_check(not pet._hostile(draugr), "at rest: let be")
+	World.despawn(draugr)
+	_kill_monsters()
+	_settle(pet)
 
 
 func _test_bandage_words() -> void:
