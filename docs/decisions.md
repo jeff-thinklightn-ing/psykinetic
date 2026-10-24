@@ -27469,3 +27469,23 @@ mended in the client:
 view_test _test_decline (the ruin's mix of walls, its half floor and litter;
 gone all dirt; built again all floor). Client only, protocol unchanged, no
 new class_name.
+## 640, npc's side. The hill herder as a person
+
+Economy's 640 seats a herder at each hills' refuge place keyed in
+economy.json herder.places (herders_hut, hill_shieling), with sheep, and
+walks him to a town with a butchery every few days (away walk_steps). The
+coordinator's pick, (b): no new verb or number; he is a person as the
+medicine man is (404). Main._sync_residents's hut block takes a place
+keyed one of herder.places as it takes the healer's hut: a body while a
+player is near, the slot "building.<key>" for his hut when the map has
+one, else the 3x3 about the place's cell; his work the fold (the place's
+ground by its radius) and his home the hut, residents.json "herder" (the
+fold 6 to 20, the hut at night). On his drove (worker away, the record's
+"back" ahead), a body at the buyer's store square (the record's "buyer"
+when economy keeps it, else Towns.drove_town now) while a player is near
+that town, as its folk; the walk home, none. townsfolk.json greet.trades
+"herder" (the drove, the hills, the weather). A sought one placed at his
+fold (the entry's place his place id, nobody leading them home) gets his
+word after the greeting, residents.json sought "shelter" by story, else
+trade, else default (lore's by story after Jeff's check); never the mishap.
+resident_test _test_herder.

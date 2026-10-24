@@ -37,7 +37,8 @@
 			"hunter": ["Quiet, you'll scare the game. What?", "Aye?"],
 			"butcher": ["Mind the block. What?", "Meat's hung; what is it?", "Wipe your feet, there's blood about."],
 			"farmer": ["What is it? The field won't hoe itself.", "Aye?"],
-			"hauler": ["What? I've a load to shift.", "Aye?"]
+			"hauler": ["What? I've a load to shift.", "Aye?"],
+			"herder": ["Up from the hills with the drove. What is it?", "Mind the sheep. Aye?", "The weather holds, for now. What?"]
 		}
 	}
 }

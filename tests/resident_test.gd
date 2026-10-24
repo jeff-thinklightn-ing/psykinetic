@@ -45,6 +45,7 @@ func _ready() -> void:
 	_test_taken_by_raiders()
 	_test_bodies_in_town()
 	_test_healer_at_hut()
+	_test_herder()
 	_test_settled_goblin()
 	_test_lawspeaker_mid_rounds()
 	_test_strayed_body()
@@ -419,6 +420,84 @@ func _test_healer_at_hut() -> void:
 	_sync()
 	_check(_body("medicine_man:" + hut_place) != null, "back, his body again")
 	World.production.set_away("medicine_man:" + hut_place, true)
+	_sync()
+
+
+## The hill herder (640, npc's side): a body at his fold by day and his hut
+## by night while near; on his drove, at the buyer's square; a herder's
+## greeting; the sheltering word for a sought one placed at his fold.
+func _test_herder() -> void:
+	print("\n== the hill herder: a body at his fold and hut, at the buyer's square on his drove, his greeting, the sheltering word (640, npc's side) ==")
+	var fold_cell := Vector2i(7, 8)
+	var place := "%s/herders_hut@%d,%d" % [TOWN, fold_cell.x, fold_cell.y]
+	World.holdings._places[place] = {"id": place, "area": TOWN, "key": "herders_hut", "cell": fold_cell, "name": "the herder's hut",
+		"kind": "other", "radius": 2, "worth": 0, "start": Factions.NOBODY}
+	World.holdings._holder[place] = Factions.NOBODY
+	World.holdings._strength[place] = 0
+	World.holdings._since[place] = World.holdings.now()  # The save reads every holding's three (to_dict).
+	var who := "herder:" + place
+	DayNight.set_hour(12.0)
+	_check(World.production.add_worker(who, "Grim", ["herder"], place, TOWN), "(Grim seated at the fold, as economy does)")
+	_sync()
+	var grim := _body(who)
+	var hut := Rect2i(fold_cell - Vector2i.ONE, Vector2i(3, 3))
+	var fold := Rect2i(fold_cell - Vector2i(2, 2), Vector2i(5, 5))
+	_check(grim != null and grim.town == place and grim.trade == "herder" and grim.places["work"] == fold and grim.places["home"] == hut,
+		"a body, his town the fold's place, the fold his work and the hut his home (%s)" % [grim.places if grim != null else null])
+	if grim == null:
+		return
+	_step_until(func() -> bool: return grim.doing == Resident.Doing.WORK and World.distance(grim.tile, fold_cell) <= 3, 60)
+	_check(grim.doing == Resident.Doing.WORK and World.distance(grim.tile, fold_cell) <= 3, "midday: at the fold (at %s)" % grim.tile)
+	DayNight.set_hour(23.0)
+	_step_until(func() -> bool: return grim.doing == Resident.Doing.HOME and World.distance(grim.tile, fold_cell) <= 3, 60)
+	_check(grim.doing == Resident.Doing.HOME and World.distance(grim.tile, fold_cell) <= 3, "night: home in the hut (at %s)" % grim.tile)
+	# With maps' buildings (640, maps' side: a building.hut beside the place, a building.fold within FOLD_REACH):
+	# the fold his work and the hut his home, in place of the ground and the 3x3.
+	var buildings: Array = _main._world_map.areas[TOWN]["buildings"]
+	var pen := {"slot": "building.fold", "rect": Rect2i(5, 6, 4, 2), "facing": Vector2i(0, 1), "town": "", "use": ""}
+	var hut_house := {"slot": "building.hut", "rect": Rect2i(6, 9, 3, 2), "facing": Vector2i(0, -1), "town": "", "use": ""}
+	buildings.append(pen)
+	buildings.append(hut_house)
+	_sync()
+	_check(grim.places["work"] == pen["rect"] and grim.places["home"] == hut_house["rect"] and grim.places["square"] == pen["rect"],
+		"with the map's fold and hut: the fold his work, the hut his home (%s)" % [grim.places])
+	buildings.erase(pen)
+	buildings.erase(hut_house)
+	_sync()
+	var rules: Dictionary = Townsfolk.rules().get("greet", {})
+	var lines: Array = rules.get("trades", {}).get("herder", [])
+	_check(lines.size() == 3 and lines.has(Resident.greet_word("herder", "stranger", rules, 7)), "his greeting is a herder's (%s)" % Resident.greet_word("herder", "stranger", rules, 7))
+	# The sheltering word: a sought one of the town placed at his fold, nobody leading them home.
+	_check(_main._shelter_words(place).is_empty(), "nobody sheltering: no word")
+	var town_record := World.towns._town(STORE)
+	town_record["sought"] = town_record.get("sought", {})  # Made on the first sought (Towns.seek).
+	town_record["sought"]["rs-hilde"] = {"id": "rs-hilde", "name": "Hilde", "trade": "carpenter", "place": place, "where": "hills", "holder": "",
+		"story": "", "since": 0, "next_try": 0, "freed_by": "", "tries": 0, "wandered": false, "door": ""}
+	_check(_main._shelter_words(place) == "Hilde the carpenter is up at my fold, sheltering with me. Take them home if you can.", "a sought one at his fold: his word (%s)" % _main._shelter_words(place))
+	town_record["sought"]["rs-hilde"]["freed_by"] = "p1"
+	_check(_main._shelter_words(place).is_empty(), "being led home: no word")
+	town_record["sought"].erase("rs-hilde")
+	# His drove: away until the record's back, the buyer's butchery standing: a body at the buyer's square.
+	DayNight.set_hour(12.0)
+	World.towns._town(STORE)["buildings"]["butchery"] = {"kind": "butchery", "level": 1, "state": Towns.STANDING, "since": World.towns.now(), "job": 0}
+	_check(World.towns.drove_town(place) == STORE, "(the test town buys his sheep: %s)" % World.towns.drove_town(place))
+	World.production.set_away(who, true)
+	World.towns._herders[place] = {"since": 0, "season": "", "lambs": 0.0, "next": 0, "back": World.production.now() + 100000, "unsold": 0, "buyer": STORE}  # The buyer kept while away (640 amended, economy's side).
+	_sync()
+	grim = _body(who)
+	var square := Rect2i(3, 1, 5, 5)
+	_check(grim != null and grim.town == STORE and grim.places["square"] == square and grim.places["home"] == square,
+		"on his drove: a body at the buyer's square, its town the buyer's (%s)" % [grim.places if grim != null else null])
+	World.towns._herders[place]["back"] = 0
+	_sync()
+	_check(_body(who) == null, "the walk home: no body till he is back")
+	World.production.set_away(who, false)
+	_sync()
+	grim = _body(who)
+	_check(grim != null and grim.town == place, "home: at his fold again")
+	World.production.set_away(who, true)
+	World.towns._herders.erase(place)
+	World.towns._town(STORE)["buildings"].erase("butchery")
 	_sync()
 
 

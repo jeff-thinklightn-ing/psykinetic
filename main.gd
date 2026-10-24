@@ -6637,16 +6637,33 @@ func _sync_residents() -> void:
 		# The healer's hut (decision 404): whoever economy seats there (the
 		# medicine man, a worker whose town is the hut's place id) has a body
 		# at the hut as a town's folk have theirs, only while someone is near.
+		# And the hill herder's (640, npc's side; Jeff: "herders exist as people"): a place keyed one of
+		# economy.json herder.places (herders_hut, hill_shieling) the same way, his fold (the place's ground) his
+		# work by day and his hut his home by night; on his drove, the loop after this one.
+		var herder_rule: Dictionary = World.production.rules.get("herder", {})
+		var herder_keys: Array = herder_rule.get("places", [])
 		for place_id: String in World.holdings.places_in(World.zone.name):
 			var place := World.holdings.place(place_id)
-			if place.get("kind") != "healers_hut" or not _town_near(place_id, place):
+			var fold_place: bool = str(place.get("key", "")) in herder_keys
+			if (place.get("kind") != "healers_hut" and not fold_place) or not _town_near(place_id, place):
 				continue
 			var cell: Vector2i = place.get("cell", Vector2i.ZERO)
 			var hut := Rect2i(cell - Vector2i.ONE, Vector2i(3, 3))
+			# His hut: the building.hut beside the place (maps' 640: hills/herders_hut, hill_shieling), or one named
+			# after the key; the healer's, its own slot.
+			var slots: Array[String] = ["building.healers_hut"]
+			if fold_place:
+				slots = ["building.hut", "building." + str(place.get("key", ""))]
 			for building: Dictionary in area.get("buildings", []):
 				var rect: Rect2i = building.get("rect", Rect2i())
-				if str(building.get("slot", "")) == "building.healers_hut" and rect.grow(1).has_point(cell):
+				if str(building.get("slot", "")) in slots and rect.grow(1).has_point(cell):
 					hut = rect
+			var radius := int(place.get("radius", 2)) if fold_place else 2
+			var ground := Rect2i(cell - Vector2i(radius, radius), Vector2i(radius * 2 + 1, radius * 2 + 1))
+			if fold_place:
+				var fold: Dictionary = Level.fold_near(area.get("buildings", []), cell)  # The fold within FOLD_REACH (maps' 640).
+				if not fold.is_empty():
+					ground = fold["rect"]
 			var ids := World.production.worker_ids(place_id).filter(func(who: String) -> bool:
 				return not who.begins_with("companion:") and not bool(World.production.worker(who).get("away", false)))
 			for who: String in ids:
@@ -6656,7 +6673,31 @@ func _sync_residents() -> void:
 				wanted[who] = {"key": who, "name": str(World.production.worker(who).get("name", who)),
 					"trade": str(trades[0]) if not trades.is_empty() else "", "player": "", "town": place_id,
 					"type": str(World.production.worker(who).get("type", "")),
-					"places": {"work": hut, "home": hut, "square": Rect2i(cell - Vector2i(2, 2), Vector2i(5, 5))}}
+					"places": {"work": ground if fold_place else hut, "home": hut, "square": ground}}
+		# The herder on his drove (640, npc's side): away from his fold with his sheep until the record's "back",
+		# he stands at the buyer's store square (the record's "buyer" when economy keeps it, else Towns.drove_town
+		# now) while a player is near that town, as its folk do; home again, the fold's body as above.
+		var herder_trade := str(herder_rule.get("trade", "herder"))
+		var herders: Dictionary = World.towns.herders_to_dict()
+		for id: String in herders:
+			var who := "%s:%s" % [herder_trade, id]
+			var worker := World.production.worker(who)
+			if worker.is_empty() or not bool(worker.get("away", false)) or int(herders[id].get("back", 0)) <= World.production.now():
+				continue
+			var buyer := str(herders[id].get("buyer", ""))
+			if buyer.is_empty():
+				buyer = World.towns.drove_town(id)
+			var market := World.holdings.place(buyer)
+			if market.is_empty() or str(market.get("area", "")) != World.zone.name or not _town_near(buyer, market):
+				continue
+			if wanted.size() >= RESIDENTS_MAX or wanted.has(who):
+				continue
+			var store: Vector2i = market.get("cell", Vector2i.ZERO)
+			var square := Rect2i(store - Vector2i(2, 2), Vector2i(5, 5))
+			var trades: Array = worker.get("trades", [])
+			wanted[who] = {"key": who, "name": str(worker.get("name", who)), "trade": str(trades[0]) if not trades.is_empty() else "",
+				"player": "", "town": buyer, "type": str(worker.get("type", "")),
+				"places": {"work": square, "home": square, "square": square}}
 	# The lost (decision 487): a town's people beyond the walls stand at their
 	# cell of this zone, chosen once here (far from the store, off held
 	# ground, reachable), while a player is near that cell; a walked one home
@@ -6713,6 +6754,10 @@ func _sync_residents() -> void:
 			var trade := str(wanted[body.worker_id].get("trade", ""))
 			if not trade.is_empty() and body.trade != trade:
 				body.trade = trade
+			# The herder's body follows him to market and home (640, npc's side): its town the entry's.
+			var town := str(wanted[body.worker_id].get("town", ""))
+			if not town.is_empty() and body.town != town:
+				body.town = town
 		else:
 			_travelling = true
 			World.despawn(body)
@@ -6937,6 +6982,28 @@ func _sought_home(body: Resident) -> void:
 	body.holder = ""
 	body.escort_of = ""
 	body.escort_name = ""
+
+
+## The hill herder's word of a sought one at his fold (640, npc's side):
+## the first sought entry of any town placed at [param place_id] (his
+## holding, the hills' refuge) with nobody leading them home, in
+## residents.json sought's "shelter" (by story, else trade, else default;
+## the name and the trade); "" for none. Lore's wording by story comes
+## after Jeff's check; the default carries it till then.
+func _shelter_words(place_id: String) -> String:
+	if World.towns == null or place_id.is_empty():
+		return ""
+	var table: Dictionary = Townsfolk.days().get("sought", {})
+	var fallback: Dictionary = table.get("default", {})
+	for town: String in World.towns.to_dict():
+		for entry: Dictionary in World.towns.sought(town):
+			if str(entry.get("place", "")) != place_id or not str(entry.get("freed_by", "")).is_empty():
+				continue
+			var trade := str(entry.get("trade", ""))
+			var by: Dictionary = table.get(str(entry.get("story", "")), table.get(trade, fallback))
+			var line := str(by.get("shelter", fallback.get("shelter", "")))
+			return line % [str(entry.get("name", "someone")), trade.replace("_", " ")] if not line.is_empty() else ""
+	return ""
 
 
 ## The word [param town] sent out (decision 613, npc's side): one line per
@@ -11461,6 +11528,10 @@ func _greeted(player: Player, body: Resident) -> void:
 	var rumour := _rumour_for(body.town, player.player_id, day)
 	if not rumour.is_empty():
 		_resident_says(body, rumour, "", player)  # The town's word of its sought, once a day (decision 643).
+	if body.trade == str(World.production.rules.get("herder", {}).get("trade", "herder")):
+		var shelter := _shelter_words(str(World.production.worker(body.worker_id).get("town", "")))
+		if not shelter.is_empty():
+			_resident_says(body, shelter, "", player)  # A sought one sheltering at his fold (640, npc's side).
 	_hail_now(body, player, Townsfolk.rules().get("hail", {}), now_msec, now, day, _sky_now(), true)
 
 

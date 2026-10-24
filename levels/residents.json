@@ -13,6 +13,7 @@
 	"merchant": {"stints": [{"from": 6, "to": 7, "at": "square"}, {"from": 7, "to": 12, "at": "work"}, {"from": 12, "to": 13, "at": "inn"}, {"from": 13, "to": 18, "at": "work"}, {"from": 18, "to": 19, "at": "inn"}, {"from": 19, "to": 6, "at": "home"}]},
 	"farmer": {"stints": [{"from": 5, "to": 6, "at": "well"}, {"from": 6, "to": 16, "at": "work"}, {"from": 16, "to": 18, "at": "square"}, {"from": 18, "to": 19, "at": "inn"}, {"from": 19, "to": 5, "at": "home"}]},
 	"medicine_man": {"stints": [{"from": 6, "to": 7, "at": "square"}, {"from": 7, "to": 21, "at": "work"}, {"from": 21, "to": 6, "at": "home"}]},
+	"herder": {"stints": [{"from": 6, "to": 20, "at": "work"}, {"from": 20, "to": 6, "at": "home"}]},
 	"offset_hours": 0.75,
 	"types": {
 		"bard": [{"from": 18, "to": 23, "at": "inn"}],
@@ -36,7 +37,7 @@
 	"notes": {"_": "The sought's door note and the town's rumour (decision 643, npc's side; Jeff: a small note saying where they went), by story (sought.<trade>, sought.camp, economy's entry.story) over default: note takes the where-words (one %s), rumour the name, the trade and the where-words (three). Lore's lines by story come after Jeff's wording check; the defaults carry the mechanism till then.", "default": {"note": "Away %s. Back when I can.", "rumour": "%s the %s has gone off, %s they say."}},
 	"sought": {
 		"_": "Decision 613, npc's side (Jeff: newcomers are found in the wilds, the hills, the forest or under the castle, rescued and brought home): the sought's set lines by trade (economy's amendment keys them by the story id when it lands), _ the fallback. freed is said when the escort starts, arrival (one %s, the trade) at the town's store; held, lost and the walk are the thought's words (Resident.facts_now) through the model, bound to lore's facts. The smith's lines were agreed with lore against C3 (2026-10-22): forge_rumour, expedition, ambush.captured, forced; guards_fallen is left out while it is draft.",
-		"default": {"freed": "Lead on.", "arrival": "I am the %s you sent for."},
+		"default": {"freed": "Lead on.", "arrival": "I am the %s you sent for.", "shelter": "%s the %s is up at my fold, sheltering with me. Take them home if you can."},
 		"smith": {
 			"held": "Not while they watch. They keep me at this forge, working their weapons for the raids.",
 			"more": "I came down after the great dwarven forge, with hired guards to keep me and carry out what we found. We were ambushed below the castle, and they took me.",
