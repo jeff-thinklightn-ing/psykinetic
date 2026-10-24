@@ -26846,3 +26846,30 @@ to maps.
 level_test's world plane check: the places and lands each their own id,
 agreed or a draft, none on a built level's ground. No wire change, no new
 class_name.
+
+## 451 amended, art-kit's side: grips mid-handle
+
+Jeff (2026-10-24, through the coordinator): "shield should be carried on the outside of arm, not
+inside", and the great axe's stills. Pc-character places a held piece by its grip socket, so
+each grip should be where the fist closes. Art-kit measured every held weapon's mesh.
+
+- **Grips:** item.sword's origin sat at the pommel's top and item.battle_axe's at the butt end.
+  Both meshes are lowered, 0.07 and 0.09, so the origin (the grip) is mid-hilt and mid the butt
+  wrap. The dagger, knife, hammer and spear were within 2 cm, the spear a quarter up its shaft.
+- **grip_2:** the generated 0.6 of the length put the great axe's second hand inside its head
+  (bits 0.6 to 1.3). slots.json overrides it to 0.45 on the haft, and the battle axe's to its
+  upper wrap at 0.87; the blends' empties match.
+
+art_kit_test, view_test, items_test pass. Client only, protocol unchanged, no new class_name.
+
+## 451 amended (2), art-kit's side: the shield's strap and handle
+
+For pc-character's hand pass (451 amended (2): the shield on the outside of the arm, raised in
+front to block), from the same measuring.
+
+item.shield (a 0.6 disc, face +z, back face z -0.03, origin centre) gains "strap"
+[0, -0.06, -0.075], the forearm's axis at mid-forearm behind the back face, and "handle"
+[0, 0.12, -0.065], the fist toward the rim, as overrides and empties. The forearm runs along the
+shield's +y (wrist toward +y), the face's outward normal is +z, and "grip" stays the centre.
+Pc-character's placement puts +z away from the body. art_kit_test passes (it checks each socket
+has its empty).

@@ -6,6 +6,7 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+- Held weapons' grips mid-handle and the shield's arm sockets (451 amended and 451 amended (2), art-kit's sides; Jeff: "shield should be carried on the outside of arm"): the sword and battle axe meshes lowered so the grip is mid-hilt, the great axe's and battle axe's second-hand grip on the haft (the great axe's lay in its head), item.shield's "strap" and "handle" sockets for pc-character's carry
 
 - Held has its own map: from the wilds' south-west corner (west edge) a way leads into a forest clearing with a river, a ford and a bridge, and the Old Tower's ruin across it, empty for now; the town moves there later.
 - A town's new building plots show as staked ground until the town starts building, then rise through their stages like any other building; a plot laid while you watch appears at once, and one the town gives up disappears.
