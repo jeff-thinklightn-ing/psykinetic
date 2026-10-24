@@ -657,6 +657,14 @@ func _test_codes() -> void:
 	_check(BuilderUI.build_state(hut, states) == "" and BuilderUI.build_state(hut, {}) == "", "standing, or no record: nothing said")
 	states[hut["town_id"]]["inn"] = {"state": Towns.DAMAGED, "level": 1}
 	_check(BuilderUI.build_state(hut, states) == "damaged" and BuilderUI.build_state(parsed["buildings"][0], states) == "", "damaged; a building with no use: nothing")
+	# The cursor hint: the code only in builder mode (the coordinator's fix to 537).
+	var landmark := hut.duplicate()
+	landmark["slot"] = "building.tower_ruin"
+	_check(BuilderUI.hint_words(hut, states, true) == "H2 hut, damaged" and BuilderUI.hint_words(parsed["buildings"][0], states, true) == "H1 hut"
+		and BuilderUI.hint_words(landmark, states, true).begins_with("H2 "), "builder mode: every building by its code")
+	_check(BuilderUI.hint_words(hut, states, false) == "hut, damaged", "outside it: a town's building by its plain name and state (%s)" % BuilderUI.hint_words(hut, states, false))
+	_check(BuilderUI.hint_words(parsed["buildings"][0], states, false) == "" and BuilderUI.hint_words(landmark, states, false) == "",
+		"outside it: a building serving no town, or a solid doorless one, says nothing")
 	_check(BuilderUI.building_at(parsed["buildings"], Vector2i(13, 7)) == hut and BuilderUI.building_at(parsed["buildings"], Vector2i(30, 20)).is_empty(), "the building under a cell")
 	_check(BuilderUI.coords_text(Vector2i(212, 207), Vector2i(210, 205), Vector2i(-1, -1)) == "212, 207      you 210, 205", "the coordinates line")
 	var front: Vector2i = preload("res://main.gd").front_of(hut)

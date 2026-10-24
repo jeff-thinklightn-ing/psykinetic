@@ -105,10 +105,32 @@ static func building_at(buildings: Array, tile: Vector2i) -> Dictionary:
 
 ## A building's code and name, the cursor hint's and the label's: "H3 house".
 static func building_words(building: Dictionary) -> String:
+	return ("%s %s" % [building.get("code", ""), plain_name(building)]).strip_edges()
+
+
+## A building's name without its code: "house", "dwarven forge".
+static func plain_name(building: Dictionary) -> String:
 	var name := str(building.get("kind", ""))
 	if name.is_empty():
 		name = str(building.get("slot", "building")).trim_prefix("building.")
-	return ("%s %s" % [building.get("code", ""), name.replace("_", " ")]).strip_edges()
+	return name.replace("_", " ")
+
+
+## The cursor hint over a building (decision 537; the coordinator's fix,
+## 2026-10-24): in builder mode ([param builder]) its code, name and build
+## state, "H3 house, being built 40%"; else a town's building (a use and a
+## town, not solid or doorless) by its plain name and state, "house, being
+## built 40%", and nothing for one that serves no town (a pillar, a table,
+## the Halls' forge): the codes are the builder's.
+static func hint_words(building: Dictionary, states: Dictionary, builder: bool) -> String:
+	var state := build_state(building, states)
+	var name := building_words(building)
+	if not builder:
+		var slot := str(building.get("slot", ""))
+		if str(building.get("use", "")).is_empty() or str(building.get("town_id", "")).is_empty() or slot in Level.SOLID or slot in Level.DOORLESS:
+			return ""
+		name = plain_name(building)
+	return name + (", " + state if not state.is_empty() else "")
 
 
 ## How far a building's town has built it (decision 566), from the town's

@@ -1107,12 +1107,12 @@ func _process(delta: float) -> void:
 				if _hint_words.is_empty() and Net.hints and player != null and (not World.ground_at(tile).is_empty() or World.ground_gold(tile) > 0):
 					_hint_words = "%s  pick up %s" % [Keys.name_of("pick_up"), pile_words(World.ground_at(tile), World.ground_gold(tile))]  # Behind hints=on (Jeff, 2026-10-22).
 				if _hint_words.is_empty() and tile != NONE:
-					# The building under the cursor by its code (decision 537): "H3 house",
-					# and how far its town has built it (566): "H3 house, being built 40%".
+					# The building under the cursor (decision 537) and how far its town has
+					# built it (566): "H3 house, being built 40%" in builder mode, else a
+					# town's building by its plain name, "house, being built 40%".
 					var building := BuilderUI.building_at(level.get("buildings", []), tile)
 					if not building.is_empty():
-						var state := BuilderUI.build_state(building, town_states)
-						_hint_words = BuilderUI.building_words(building) + (", " + state if not state.is_empty() else "")
+						_hint_words = BuilderUI.hint_words(building, town_states, _builder_ui != null and _builder_ui.active)
 		var words := _hint_words
 		if is_instance_valid(_test_hint_thing) and _client3d != null:
 			# --test-show=hint: the hint as the cursor on that thing would show it.

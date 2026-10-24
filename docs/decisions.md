@@ -27931,3 +27931,18 @@ server keeping up (never paused), an 800 ms round trip with the server
 keeping up (never paused); the scripted server now queues three and drops
 a fourth as the real one does. The held zigzag check also asserts no pause.
 Client only; no wire change; no new class_name.
+## 537 amended: the building codes only in builder mode
+
+The cursor hint named the building under it by its builder code in every
+mode and level, so a player in the Dwarven Halls read "B1 dwarven forge"
+and "C3 crypt pillar" (dungeon found it in a still; the coordinator's fix,
+2026-10-24). BuilderUI.hint_words(building, states, builder): in builder
+mode, as before, the code, the name and the build state ("H3 house, being
+built 40%"); outside it, a town's building (a use and a town, not in
+Level.SOLID or Level.DOORLESS) by its plain name and state ("house, being
+built 40%"), and nothing for a building that serves no town: a pillar, a
+table or the Halls' forge has no hint, as other scenery has none (the
+choice between nothing and a plain name, nothing reads better: a hint
+says what can be done or what is happening). BuilderUI.plain_name is the
+name without its code. builder_test: both modes. Client only, protocol
+unchanged, no new class_name.
