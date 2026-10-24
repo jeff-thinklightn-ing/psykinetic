@@ -26546,3 +26546,31 @@ stands; the button over the purse is refused by Main; the button with 16
 reaches his accept_offer, the pact struck, nothing standing, his offers
 sent again empty; E with a pact on sends the empty offers. Server only; no
 new class_name.
+
+## 629 amended. A yes or a sum with nothing standing gets his words
+
+Jeff, playing v0.1.169 (2026-10-23): "yes didn't do anything". A yes word
+or a sum said to a talking monster with no offer standing fell through
+Main._monster_said as not handled, and he said nothing. Now, within his
+hearing: a sum goes to his first offer as the deal (Main._monster_accepts,
+the purse check and his accept_offer as when it stands); a bare yes is
+asked for the sum (Main.YES_TO_WHAT, "Yes to what? Name your gold.") and
+his first offer is spoken and stands, so the next sum takes it; with
+nothing to offer (a pact on) his word that nothing stands
+(Main.NOTHING_STANDS). Never silence. The typed path with an offer standing
+is as before (546). resident_test _test_monster_talk covers the three.
+
+## 648, npc's side. Monster.peaceable
+
+Combat's 648 ("click talks to a peaceable monster"; Jeff: "earlier i
+struck the draugr because left clicking attacked") needs the client to know
+a talking monster is not fighting; his state and provocation are server
+only. One property, Monster.peaceable (replicated, SUBCLASS_REPLICATED, a
+line under revision 35), set by the talking kind on the server: the draugr
+true while seated with nobody having provoked or struck him
+(Draugr._sim_tick each tick, and at his spawn), false the tick a pact starts
+(start_pact), once struck or provoked, and at rest. A kind that never sets
+it is false, so a click strikes it as ever. Combat's click (its paragraph of
+648) reads it typed on a Monster that talks; ui's window opens only while
+it is true and closes when it turns. draugr_fight_test: seated, true; the
+pact on, false.

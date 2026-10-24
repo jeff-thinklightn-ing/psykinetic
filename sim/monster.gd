@@ -334,6 +334,13 @@ var aim_hold_max := 0
 ## Whether players can talk to it (npc's offer contract, decision 548: the
 ## draugr): Main's speaker lookup takes it in.
 var talks := false
+## What a client may read of a talking monster (decision 648, npc's side; Jeff
+## struck the draugr by clicking): true while it sits unprovoked and a click
+## or E talks (combat's click, ui's window), false once it fights, is struck
+## or provoked, or rests. Replicated; the talking kind sets it on the server
+## (the draugr: Draugr._sim_tick, start_pact). A kind that never sets it is
+## false, and a click strikes as ever.
+var peaceable := false
 var _room := Rect2i()
 var _alert_until := 0
 var _lead := NO_TILE
@@ -446,6 +453,7 @@ func _init() -> void:
 	replicate("alert")
 	replicate("down_until")
 	replicate("ailments")
+	replicate("peaceable")
 	# Its bow drawn, its guard up: the tell a player steps out of the line by
 	# (decision 455).
 	replicate("raised")

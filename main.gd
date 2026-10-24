@@ -291,6 +291,11 @@ var party_log := PartyLog.new()
 ## lines reach the players within it, and a companion hears her player's
 ## words only from this close.
 const HEARING_RANGE := Companion.HEARING_RANGE
+## A talking monster's words for a yes or a sum said with no offer standing
+## (629 amended; Jeff: "yes didn't do anything"): asked for the sum, and with
+## nothing to offer (a pact on).
+const YES_TO_WHAT := "Yes to what? Name your gold."
+const NOTHING_STANDS := "There is nothing between us to say yes to."
 ## A chat line that starts with this is party chat: to every player on the
 ## server, whatever their zone; no companion hears it.
 const PARTY_PREFIX := "/p "
@@ -10387,10 +10392,23 @@ func _monster_said(monster: GridEntity, player: Player, line: String) -> bool:
 		Transcript.record(name, _display_name(player), line)
 		_send_monster_offers(monster, player_id, player.owner_peer)
 		return true
-	if standing.is_empty() or not (ask == "yes" or amount > 0):
+	if not (ask == "yes" or amount > 0):
 		return false
-	var offer: Dictionary = standing.get("offer", {})
 	Transcript.record(name, _display_name(player), line)
+	if standing.is_empty():
+		# Nothing standing (629 amended; Jeff: "yes didn't do anything"): words back, never silence. A sum goes
+		# to his first offer as the deal; a bare yes is asked for the sum and his offer stands; with nothing to
+		# offer (a pact on), his word that nothing stands.
+		var offers: Array = monster.offers_for(player_id)
+		if offers.is_empty():
+			_say_plain(monster, name, NOTHING_STANDS)
+		elif amount > 0:
+			_monster_accepts(monster, player, offers[0], amount)
+		else:
+			_say_plain(monster, name, YES_TO_WHAT)
+			_speak_offer(monster, key, name, player, offers[0])
+		return true
+	var offer: Dictionary = standing.get("offer", {})
 	_monster_accepts(monster, player, offer, amount)
 	return true
 

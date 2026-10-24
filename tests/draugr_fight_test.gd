@@ -64,6 +64,7 @@ func _play_through() -> void:
 	draugr.max_stamina = 100
 	draugr.stamina = 100
 	draugr.pays_swings = true
+	_check(draugr.peaceable, "seated at his spawn: peaceable, a click talks (648, npc's side)")
 	var row: Dictionary = Monster.kinds()["draugr"]
 	draugr.stamina_regen_every = int(row.get("stamina_regen_every", 1))
 	draugr.stamina_regen_amount = int(row.get("stamina_regen", 0))
@@ -90,7 +91,7 @@ func _play_through() -> void:
 	# 1. The pact: 20 gold, the easy deal.
 	var offers := draugr.offers_for("p1")
 	var taken := draugr.accept_offer(player, offers[0], 20)
-	_check(taken.get("ok", false) and draugr.state == Draugr.State.PACT and draugr.difficulty == "easy" and World.gold_of("p1") == 180,
+	_check(taken.get("ok", false) and draugr.state == Draugr.State.PACT and draugr.difficulty == "easy" and World.gold_of("p1") == 180 and not draugr.peaceable,
 			"20 gold paid: the pact is on at the easy deal (%s gold left)" % World.gold_of("p1"))
 	draugr.target = player
 

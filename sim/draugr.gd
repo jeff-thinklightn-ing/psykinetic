@@ -171,9 +171,13 @@ func _ready() -> void:
 	if kept != null and int(kept) > World.steps:
 		rests_until = int(kept)
 		state = State.AT_REST
+	peaceable = state == State.SEATED  # What a client may read of him (648, npc's side): seated at his spawn, a click talks.
 
 
 func _sim_tick() -> void:
+	# What a client may read of him (648, npc's side): seated and unprovoked, a click or E talks; in a pact,
+	# struck or provoked, or at rest, it strikes.
+	peaceable = state == State.SEATED and _provoked == null and _struck_by() == null
 	_speak()
 	match state:
 		State.PACT:
@@ -538,6 +542,7 @@ func _open_hall() -> void:
 ## rest too), grows to it, and raises its dead beside him.
 func start_pact(player: Player, level: String) -> void:
 	state = State.PACT
+	peaceable = false  # The same tick, for the client (648, npc's side).
 	challenger_id = player.player_id
 	difficulty = level
 	_provoked = null

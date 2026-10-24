@@ -1530,6 +1530,33 @@ func _test_monster_talk() -> void:
 	_check(talker.got == [16] and talker.pact and not _main._standing.has(Net.player_id) and heard.has("offers:0"), "the button with 16: his accept_offer, the pact struck, nothing stands, his offers sent again empty (%s / %s)" % [talker.got, heard])
 	_main._on_command(player, "greet", {"resident": str(talker.get_path())})
 	_check(not _main._standing.has(Net.player_id) and heard.count("offers:0") >= 2, "E with a pact on: nothing spoken, the empty offers sent (%s)" % [heard])
+	# Nothing standing (629 amended; Jeff: "yes didn't do anything"): a bare yes is asked for the sum and his
+	# deal stands; a sum goes to his first deal; a pact on, his words that nothing stands; never silence.
+	var spoken: Array[String] = []
+	var mouth := func(kind: String, data: Dictionary) -> void:
+		if kind == "speech" and str(data.get("entity", "")) == String(talker.get_path()):
+			spoken.append(str(data.get("text", "")))
+	Net.message_received.connect(mouth)
+	_main._chat_tick.clear()
+	_main._player_said(player, "yes")
+	World.step()
+	_check(spoken.has(Main.NOTHING_STANDS) and not _main._standing.has(Net.player_id), "a pact on, a yes with nothing standing: his words, nothing stands (%s)" % [spoken])
+	talker.pact = false
+	for body: GridEntity in World.townsfolk().duplicate():
+		World.despawn(body)  # The sync spawned a townsperson meanwhile, who would be addressed first.
+	spoken.clear()
+	_main._chat_tick.clear()
+	_main._player_said(player, "Yes.")  # Unnamed: a yes is read only at the line's start; he is the only one in earshot.
+	World.step()
+	_check(spoken.has(Main.YES_TO_WHAT) and str(_main._standing.get(Net.player_id, {}).get("title", "")) == "Face the draugr" and mind.asks.is_empty(),
+		"a bare yes with nothing standing: asked for the sum, his deal standing, no mind asked (%s)" % [spoken])
+	_main._standing.erase(Net.player_id)
+	talker.got.clear()
+	_main._chat_tick.clear()
+	_main._player_said(player, "Draugr, here is 16")
+	World.step()
+	_check(talker.got == [16] and talker.pact and not _main._standing.has(Net.player_id), "a sum with nothing standing: his first deal taken with it (%s)" % [talker.got])
+	Net.message_received.disconnect(mouth)
 	Net.message_received.disconnect(ear)
 	talker.pact = false
 	_main._resident_mind = null

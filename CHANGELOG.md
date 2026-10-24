@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Saying yes or a sum to the draugr with no deal standing now gets his answer: a sum takes his deal, a bare yes is asked for the sum and his deal is put to you, and with a pact on he says nothing stands, never silence (decision 629 amended).
 - You can now give gold to the draugr without typing: press E on him for his deal and choose the sum from the buttons; what you type still works (decision 629).
 - The lawspeaker keeps the rulings that arrived whole when the mind's answer is cut off at its length limit, instead of dropping the whole round (seen on the box 2026-10-23: a twelve-candidate answer ended mid-list and the town waited a day).
 - In the medicine man's care you now come back at his hut when he is there, even with a temple nearer; only when he is away does the nearest place take you, as before (decision 630).
