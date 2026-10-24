@@ -5732,10 +5732,18 @@ func spawn(entity: GridEntity, at: Vector2i) -> bool:
 	return true
 
 
+## [param entity] out of the world and freed, from its own zone (657): one in
+## another zone than World is in is taken out there (World enters it and
+## comes back), never left in its zone's entities and occupancy, freed.
 func despawn(entity: GridEntity) -> void:
 	if not Net.is_authority():
 		return
 	if not entity.spawned:
+		return
+	if entity.zone != zone.name and zones.has(entity.zone):
+		var was := enter(zones[entity.zone])
+		despawn(entity)
+		enter(was)
 		return
 	_let_go_things(entity)
 	_forget_jobs(entity)

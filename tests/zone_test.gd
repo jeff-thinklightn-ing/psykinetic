@@ -30,6 +30,7 @@ func _ready() -> void:
 	_test_companion_follows()
 	_test_empty_zone_sleeps()
 	await _test_restart()
+	await _test_bounce_back()
 	_test_console()
 	_test_speech_by_zone()
 	_test_overheard()
@@ -222,6 +223,43 @@ func _test_restart() -> void:
 	_main._admit(BO, BO_ID, "Bo")
 	var bo := _player(BO)
 	_check(bo != null and bo.zone == "sample", "Bo comes back in the sample (%s)" % [bo.zone if bo else "-"])
+
+
+## A player who leaves while World is in another zone, comes back and goes
+## through a link and back, all before a frame passes (maps' find): the body
+## is taken out of its own zone, so no zone keeps one that was freed and
+## whatever goes through its entities (Fields' carried heat,
+## Main._nearest_free) finds none.
+func _test_bounce_back() -> void:
+	print("\n== left from another zone, back, through a link and back in one frame: no freed body kept ==")
+	var bo := _player(BO)
+	var bo_tile := bo.tile
+	_check(World.zone.name == "test_room" and bo.zone == "sample", "Bo in the sample, World in the test room")
+	_main._leave(BO, bo, BO_ID)
+	var sample: Zone = World.zones["sample"]
+	_check(bo not in sample.entities and not sample.occupancy.has(bo_tile),
+		"Bo's body out of the sample's entities and its cell %s" % [bo_tile])
+	_main._admit(BO, BO_ID, "Bo")
+	_check(_main.travel(BO, "test_room", "from_sample"), "Bo goes to the test room")
+	_check(_main.travel(BO, "sample"), "and straight back, in the same frame")
+	await get_tree().process_frame
+	await get_tree().process_frame
+	World.step()
+	var stale: Array[String] = []
+	for each: Zone in World.zones.values():
+		for entity: Variant in each.entities:
+			if not is_instance_valid(entity):
+				stale.append(each.name)
+		for cell: Vector2i in each.occupancy:
+			if not is_instance_valid(each.occupancy[cell]):
+				stale.append("%s %s" % [each.name, cell])
+	bo = _player(BO)
+	_check(stale.is_empty(), "no zone holds a freed body in its entities or cells (%s)" % [stale])
+	_check(bo != null and bo.zone == "sample", "Bo is in the sample (%s)" % [bo.zone if bo else "-"])
+	var was := World.enter_named("sample")
+	var free_cell: Vector2i = _main._nearest_free(bo.tile if bo else Vector2i.ZERO)
+	World.enter(was)
+	_check(free_cell != World.NO_CELL, "the nearest free cell found there with no freed body read (%s)" % [free_cell])
 
 
 func _test_console() -> void:

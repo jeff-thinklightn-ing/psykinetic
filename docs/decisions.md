@@ -27339,3 +27339,29 @@ cursor word before, and a note is the first thing on a bare cell worth
 one). No command back, no RPC; a zone's notes for a zone not entered are
 kept and unused. ui_test _test_door_note. Client only; no wire change;
 new class_name NoteSheet.
+
+## 657. A despawn takes the body out of its own zone
+
+Maps' find (zone_test, through the coordinator): a player who left while
+World was in another zone, then came back and went through a link and back
+in the same frame, left freed-instance errors in Fields.any_carried_heat
+(through Main._nearest_free) and in World._step_zone. The cause was
+World.despawn: it took the body out of the entities and occupancy of the
+zone World was in, not of the body's own. Main._leave run with World in the
+test room freed Bo's body while the sample still listed it and held its
+cell, and erased the test room's occupancy at that cell in its place.
+
+World.despawn now enters the entity's zone when that differs from the zone
+World is in (and is loaded), despawns it there and comes back, so its
+entity_despawned listeners also run in its zone. One fix at the source
+rather than is_instance_valid guards in each reader. The box's disconnect
+path, travel and the raids' despawn already entered the body's zone first,
+so this mostly closes a path for any other despawn made from elsewhere (a
+companion or resident sent away from another zone's tick).
+
+zone_test _test_bounce_back runs right after _test_restart, not at the end:
+Bo leaves with World in the test room, his body out of the sample's
+entities and cell; back, through the link and back in one frame; no zone
+holds a freed body in its entities or cells, and _nearest_free there reads
+none. Before: 2 FAIL and 2 SCRIPT ERRORs ("sample", "sample (1, 4)").
+Server sim only; protocol unchanged; no new class_name.

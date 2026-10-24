@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- A body taken out of the world from another zone (a player leaving, say) is taken out of its own zone, so no freed body is left behind to throw errors when someone comes straight back through a link (657).
 - A note pinned to a door can be read: stand on the cell outside the door, or face it, and press E for a small sheet with its words; the cursor says "a note" over the cell; Esc or walking off puts it back (643, ui's side).
 - A newcomer the town sent for leaves a note on their shop's or the inn's door saying where they went, and townsfolk you greet pass the rumour on once a day; the note comes down when they are home (decision 643).
 - A town's ruined building, once gone, gives its ground back to the forest: stumps, then grass and scrub, then trees over the seasons; if the town builds there again, the ground is cleared for it (649)
