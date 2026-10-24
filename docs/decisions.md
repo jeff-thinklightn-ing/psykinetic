@@ -29918,3 +29918,32 @@ prop.draugr_remains: him gone, his things left, no bones and no body (the coordi
 - Made by hand (C:/dev/review/draugr_remains/make_remains.py), the draugr's own swatches.
 
 Art and slots only: client only, protocol unchanged, no new class_name.
+## 670. Nine items' grey boxes replaced, and the mail's budget
+
+pc-character's rest stills showed item.pick as a flat grey slab: it had never had art, so the game
+drew its slot's box. The coordinator then asked for every slot still "placeholder" that a player
+can see; of the twenty, eleven draw as grey boxes. The temple and the healer's hut wait on
+buildings' answer (composed kinds or slot art); the nine held items are made here, in the
+coordinator's order: item.pick, leather, roast, buckler, mail_armour, plate_armour,
+leather_armour, robes, steadying_draught.
+
+- **By hand, palette only**, each fitted to the slot items.json gives it (art_kit_test's 5% on each
+  axis): the bottom on y 0 and the grip at the origin, the buckler centred (its "origin":
+  "centre"), front +z. The pick's head is a narrow iron bar across the haft's top, a point one side
+  and a chisel the other, with grip_2's empty 0.54 m up as the slot has it. Sources:
+  C:/dev/review/pick/make_pick.py and C:/dev/review/items_batch/make_items.py; the sheet in
+  C:/dev/review/items_batch.
+- **Their source and one budget go in slots.json's "overrides"**: slots_items.json is generated
+  from the catalog (tools/items_art_slots.gd) and gives every item a budget of 500.
+- **item.mail_armour's budget is 800** (716 tris). At game distance the mail read the same as the
+  plate; the coordinator asked for a fine sheen of rows of rings, not stripes. The palette has no
+  grey close enough to its light one to band it by colour (the warm row-1 greys turned it olive),
+  so the light makes the rows: rings every 2 cm up the body, every other ring 1.5 mm proud, so the
+  faces between catch the light in turn. Thirty bands at 8 sides is about 500 tris on the body
+  alone; 800 covers it with the sleeves, collar and slit.
+- **The robe is the palette's one purple** (7a4fb0), brighter than the item's 5a4a7a; the
+  coordinator kept it.
+
+Worn armour is still person_look's Armour_* parts, tinted by the item's colour: these are the
+pieces held, dropped, in a chest or in the pack. Art and slots only: client only, protocol
+unchanged, no new class_name.
