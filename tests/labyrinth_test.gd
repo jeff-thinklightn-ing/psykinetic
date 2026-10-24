@@ -19,13 +19,14 @@ var _failures := 0
 func _ready() -> void:
 	World.set_process(false)
 	Net.port = preload("res://tests/test_ports.gd").of(17861)
-	for style in ["dwarven", "old", "barrow", "barrow_deep", "barrow_lair"]:
+	for style in ["dwarven", "old", "barrow", "barrow_deep", "barrow_lair", "castle_halls"]:
 		var sample := Sheet.sample_halls(style)
 		Level.register("lab_" + style, sample["layout"], sample.get("height"), sample["config"])  # The lair's dais heights (580 step 3).
 	_test_block()
 	_test_style("dwarven")
 	_test_style("old")
 	_test_barrow()
+	_test_castle_halls()
 	_test_sheet()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -428,6 +429,46 @@ func _kinds(level: Dictionary) -> Dictionary:
 		var kind := str(spec.get("kind", spec["name"].rstrip("0123456789").to_lower()))
 		kinds[kind] = int(kinds.get(kind, 0)) + 1
 	return kinds
+
+
+## The Dwarven Halls (613, dungeon's side): the template's generations in
+## the dwarven style under the width rule (ways five wide, pillar blocks),
+## the three anchors and the smith's place kept through them.
+func _test_castle_halls() -> void:
+	print("\n== the Dwarven Halls (613): dwarven, five wide, the forge kept ==")
+	var first := Regen.generate("lab_castle_halls", 1)
+	var second := Regen.generate("lab_castle_halls", 2)
+	_check(not first.is_empty() and not second.is_empty(), "generations 1 and 2 are made (%d and %d tries)" % [first.get("tries", 0), second.get("tries", 0)])
+	if first.is_empty() or second.is_empty():
+		return
+	var config: Dictionary = first["config"]
+	var anchors: Array = first["anchors"]
+	var template := LevelMap.from_image(Level.template("lab_castle_halls")["layout"], config)
+	var a := LevelMap.from_image(first["layout"], config)
+	var b := LevelMap.from_image(second["layout"], config)
+	var kept := _anchors_kept(template, a, b, anchors, Sheet.HALLS_SIZE, func(_cell: Vector2i) -> bool: return false)
+	var floor_cells := _floor_of(a, Sheet.HALLS_SIZE)
+	_check(kept["same"], "inside the three anchors both generations are the template: the stair foot, the ambush, the forge room with its block")
+	_check(kept["differ"] > 50 and floor_cells.size() > 1200, "the halls between differ (%d cells) and fill the rock (%d floor cells)" % [kept["differ"], floor_cells.size()])
+	_check(Regen.connected(a, anchors) and Regen.connected(b, anchors), "every anchor reaches every other in both")
+	_check(Tools.narrow_runs(a).is_empty() and Tools.narrow_runs(b).is_empty(), "no passage is one cell wide in either, the great halls' pillar blocks included (%s; %s)" % [Tools.sorted_cells(Tools.narrow_runs(a)).slice(0, 8), Tools.sorted_cells(Tools.narrow_runs(b)).slice(0, 8)])
+	_check(_broad(a, floor_cells) * 10 >= floor_cells.size() * 8, "the ways are five wide: most floor cells have floor on two opposite sides (%d of %d)" % [_broad(a, floor_cells), floor_cells.size()])
+	_check(not a.walkable(Sheet.HALLS_FORGE.position) and not a.walkable(Sheet.HALLS_FORGE.end - Vector2i.ONE) and a.walkable(Sheet.HALLS_STAND),
+		"the forge's footprint is rock (art-kit's building to come) and the stand cell between its anvils floor")
+	var level := Level.parse(first["layout"], null, config)
+	var doors := 0
+	for key: Vector3i in level["terrain"]["edges"]:
+		if level["terrain"]["edges"][key] == Terrain.Edge.DOOR:
+			doors += 1
+	var kinds := _kinds(level)
+	_check(doors >= 4 and level["terrain"]["torches"].size() >= 8, "doors where the ways meet the rooms and torches along them (%d doors, %d torches)" % [doors, level["terrain"]["torches"].size()])
+	_check(kinds.get("imp", 0) == 5 and kinds.get("brute", 0) == 1 and kinds.get("chest", 0) == 5 and kinds.get("cart", 0) == 1 and kinds.get("crate", 0) == 2,
+		"five imps and a brute laid, three chests beside the forge room's two, the ambush's cart and crates kept (%s)" % [kinds])
+	_check(level["places"].has("dwarven_forge") and level["places"]["dwarven_forge"]["cell"] == Sheet.HALLS_STAND and level["places"]["dwarven_forge"]["radius"] == 3,
+		"the smith's place, dwarven_forge, is kept at the stand cell (%s)" % [level["places"].get("dwarven_forge")])
+	var pillars: Array = level["buildings"].filter(func(building: Dictionary) -> bool: return building["slot"] == "building.crypt_pillar")
+	_check(pillars.size() == 4 and pillars.all(func(building: Dictionary) -> bool: return int(building.get("variant", 1)) == 2),
+		"four dwarven pillars (crypt_pillar, variant 2) stand in the forge room (%d)" % pillars.size())
 
 
 ## How many of [param floor_cells] have floor on two opposite sides: the

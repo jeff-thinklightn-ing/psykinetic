@@ -1,0 +1,138 @@
+{
+	"name": "The Dwarven Halls",
+	"outdoor": false,
+	"depth": 1,
+	"walls": "stone",
+	"floors": "stone",
+	"buildings": [
+		{
+			"slot": "building.crypt_pillar",
+			"at": [
+				38,
+				57
+			],
+			"variant": 2
+		},
+		{
+			"slot": "building.crypt_pillar",
+			"at": [
+				50,
+				57
+			],
+			"variant": 2
+		},
+		{
+			"slot": "building.crypt_pillar",
+			"at": [
+				38,
+				61
+			],
+			"variant": 2
+		},
+		{
+			"slot": "building.crypt_pillar",
+			"at": [
+				50,
+				61
+			],
+			"variant": 2
+		}
+	],
+	"starts": [
+		[
+			45,
+			2
+		]
+	],
+	"spawn_points": {
+		"from_castle": [
+			44,
+			2
+		]
+	},
+	"links": [
+		{
+			"at": [
+				44,
+				1
+			],
+			"to_map": "castle",
+			"to_spawn": "from_halls"
+		}
+	],
+	"places": {
+		"dwarven_forge": {
+			"at": [
+				43,
+				64
+			],
+			"kind": "refuge",
+			"where": "castle_dungeon",
+			"radius": 3,
+			"name": "the great dwarven forge"
+		}
+	},
+	"entities": [],
+	"regenerate": {
+		"generator": "labyrinth",
+		"style": "dwarven",
+		"ways": 5,
+		"every_days": 3,
+		"anchors": [
+			{
+				"rect": [
+					40,
+					1,
+					10,
+					8
+				],
+				"name": "stair_foot"
+			},
+			{
+				"rect": [
+					18,
+					26,
+					14,
+					10
+				],
+				"name": "ambush"
+			},
+			{
+				"rect": [
+					35,
+					54,
+					20,
+					14
+				],
+				"name": "forge"
+			}
+		],
+		"entrance": "stair_foot",
+		"rooms": {
+			"count": [
+				8,
+				11
+			],
+			"size": [
+				[
+					8,
+					7
+				],
+				[
+					16,
+					12
+				]
+			]
+		},
+		"loops": 0.2,
+		"monsters": {
+			"imp": 5,
+			"brute": 1
+		},
+		"chests": 3
+	},
+	"respawn_s": {
+		"imp": 600,
+		"brute": 600
+	}
+}

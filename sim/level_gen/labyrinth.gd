@@ -8,7 +8,8 @@ extends RefCounted
 ## "dwarven" (the halls under the castle's gatehouse: plain, heavy, built
 ## to last): rooms square-cut, a couple of great halls with a row of
 ## pillars, corridors straight with one bend, two cells wide between halls
-## and anchors, a door where a corridor meets a room, torches along the
+## and anchors (or "ways" wide when the level says: five under the castle,
+## 613), a door where a corridor meets a room, torches along the
 ## ways and inside the doors, alcoves off the rooms. "old" (the older
 ## labyrinths below, lore's third style): caverns grown from a seed cell,
 ## crooked ways by a walk biased toward where they go, blind ways wandering
@@ -72,6 +73,8 @@ const DEFAULT_MOST := Vector2i(7, 7)
 const DEFAULT_LOOPS := 0.2
 ## Great halls a dwarven level gets, when it has rooms enough.
 const HALLS := 2
+## A great hall's pillar blocks (2 x 2) sit this many cells apart (612: three clear between).
+const PILLAR_PITCH := 5
 ## A torch every so many corridor cells, dwarven.
 const TORCH_EVERY := 8
 ## How far a crooked way leans toward where it goes.
@@ -114,7 +117,9 @@ static func generate(template: LevelMap, config: Dictionary, seed: int) -> Level
 	# Barrow: the brush carves the way right up to a tomb's wall (612: no
 	# ring narrows it to the door); _wall_rooms keeps the tomb shut but
 	# for its door.
-	var brush := _brush_of(config)
+	# Dwarven (613, the Dwarven Halls): the same brush when the level names
+	# "ways"; unsaid, its ways stay two wide as before.
+	var brush := _brush_of(config) if style == "barrow" or config.has("ways") else 0
 	var paths: Dictionary[Vector2i, bool] = {}
 	for way in _ways(nodes, config, rng):
 		_carve_way(map, template, anchors, nodes[way[0]], nodes[way[1]], old, rng, carved, corridors, paths, depth, [], brush)
@@ -361,14 +366,17 @@ static func _place_rooms(map: LevelMap, anchors: Array, config: Dictionary, old:
 	return rooms
 
 
-## Whether [param cell] of a great hall [param rect] is a pillar: inside
-## its border ring, every other cell both ways (a row of pillars down a
-## hall two cells deep inside, a grid in a wider one).
+## Whether [param cell] of a great hall [param rect] is a pillar: blocks
+## two cells square on a grid five apart, two cells in from every wall
+## (a row down a hall, a grid in a wider one), so no gap between them or
+## to a wall is under two cells (612; before it, single cells every other
+## cell left one-wide ways all through a hall).
 static func _pillar(rect: Rect2i, cell: Vector2i) -> bool:
-	var offset := cell - rect.position
-	if offset.x == 0 or offset.y == 0 or offset.x == rect.size.x - 1 or offset.y == rect.size.y - 1:
+	var offset := cell - rect.position - Vector2i(2, 2)
+	if offset.x < 0 or offset.y < 0 or offset.x % PILLAR_PITCH > 1 or offset.y % PILLAR_PITCH > 1:
 		return false
-	return offset.x % 2 == 0 and offset.y % 2 == 0
+	var block := offset - Vector2i(offset.x % PILLAR_PITCH, offset.y % PILLAR_PITCH) + Vector2i(2, 2)  # The block's near corner, from the room's.
+	return block.x + 1 <= rect.size.x - 3 and block.y + 1 <= rect.size.y - 3
 
 
 ## A cavern grown from [param rect]'s middle: cells added beside cells it
@@ -438,7 +446,8 @@ static func _ways(nodes: Array[Dictionary], config: Dictionary, rng: RandomNumbe
 ## wide when neither end is a plain room) or a crooked walk (old), carved
 ## through the rock, never through an anchor. Dwarven rooms get a door on
 ## the edge the corridor comes in by, and remember the cell inside it.
-## Barrow (541 amended): the way is three cells wide, a 3 x 3 brush along
+## Barrow (541 amended), and dwarven with "ways" (613): the way is three
+## (or "ways") cells wide, a brush along
 ## the path (which also rounds a crooked walk's kinks), except inside
 ## [param tomb_rings], the ring round each shallow tomb, so a tomb is
 ## entered by its one door cell; the path's own cells alone are
@@ -463,7 +472,8 @@ static func _carve_way(map: LevelMap, template: LevelMap, anchors: Array, a: Dic
 		path = Tools.l_path(from, to, rng.randf() < 0.5)
 		if path.any(func(cell: Vector2i) -> bool: return Level.in_anchors(anchors, cell)):
 			path = Tools.path_around(map, anchors, from, to)  # Round a walled anchor in the way.
-	var wide: bool = not old and not barrow  # 612: two wide into a plain room too.
+	var brushed: bool = barrow or (not old and brush > 0)  # The brush: barrow, or dwarven with "ways" (613).
+	var wide: bool = not old and not barrow and not brushed  # 612: two wide into a plain room too.
 	var last := from
 	for cell in path:
 		paths[cell] = true  # Every cell it runs through, a room's too (612: a door there).
@@ -473,7 +483,7 @@ static func _carve_way(map: LevelMap, template: LevelMap, anchors: Array, a: Dic
 			var step := cell - last
 			var beside := cell + (Vector2i(0, 1) if step.x != 0 else Vector2i(1, 0))
 			_carve_corridor(map, anchors, beside, carved, corridors)
-		if barrow:
+		if brushed:
 			_carve_brush(map, anchors, cell, carved, tomb_rings, brush)
 		last = cell
 	if not crooked:

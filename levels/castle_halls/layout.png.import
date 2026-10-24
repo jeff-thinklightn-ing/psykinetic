@@ -1,0 +1,14 @@
+[remap]
+
+importer="image"
+type="Image"
+uid="uid://d3sj27tvxwbxy"
+path="res://.godot/imported/layout.png-0030abb16c748cf9caab188a5502fc8e.image"
+
+[deps]
+
+source_file="res://levels/castle_halls/layout.png"
+dest_files=["res://.godot/imported/layout.png-0030abb16c748cf9caab188a5502fc8e.image"]
+
+[params]
+

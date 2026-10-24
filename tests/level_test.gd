@@ -60,6 +60,7 @@ func _ready() -> void:
 	await _test_hidden_niche()
 	_test_decor()
 	_test_barrow_level()
+	_test_castle_halls_level()
 	await _test_edge_links()
 	_test_console()
 	await _test_castle()
@@ -529,7 +530,7 @@ func _test_plots() -> void:
 func _test_refuges() -> void:
 	print("\n== refuges: each story's place, walked to from the level's start ==")
 	var tags := {}
-	for zone: String in ["wilds", "hills", "forest"]:
+	for zone: String in ["wilds", "hills", "forest", "castle_halls"]:
 		var level := Level.load_level(zone)
 		_check(_main.load_map(zone), "%s loads" % zone)
 		var start: Vector2i = level["starts"][0]
@@ -539,15 +540,20 @@ func _test_refuges() -> void:
 				continue
 			tags[key] = zone
 			var path := World.find_path(start, place["cell"], true)
-			_check(place.get("where", "") == zone and not path.is_empty(),
+			# A regenerating level's template keeps its anchors in the rock
+			# (the forge under the castle, 613): the generator joins them,
+			# labyrinth_test walks a generation; its where is the sought's.
+			var walked := not path.is_empty() or Regen.marked(zone)
+			var where_wanted := "castle_dungeon" if zone == "castle_halls" else zone
+			_check(place.get("where", "") == where_wanted and walked,
 				"%s's %s (%s): where %s, walked to in %d steps" % [zone, key, place["cell"], place.get("where", ""), path.size()])
-	_check(tags.size() == 11, "eleven refuges laid (%s)" % [tags.keys()])
+	_check(tags.size() == 12, "twelve refuges laid, the smith's forge under the castle among them (%s)" % [tags.keys()])
 	var rules: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://levels/economy.json"))
 	var trades: Dictionary = rules.get("sought", {}).get("trades", {})
 	var wanted := []
 	for trade: String in trades:
 		for variant: Variant in [trades[trade], trades[trade].get("alt")]:
-			if variant is Dictionary and str(variant.get("place", "camp")) not in ["camp", "dwarven_forge"]:
+			if variant is Dictionary and str(variant.get("place", "camp")) != "camp":
 				wanted.append(str(variant["place"]))
 	var missing := wanted.filter(func(tag: String) -> bool: return not tags.has(tag))
 	_check(missing.is_empty(), "every story's place economy names is laid (%d named; missing %s)" % [wanted.size(), missing])
@@ -1881,6 +1887,42 @@ func _test_decor() -> void:
 	_check(Level.load_level("lt_decor_bad")["warnings"] == ["\"decor\" in level.json is not a list"], "a \"decor\" that is no list is said")
 
 
+## The Dwarven Halls under the castle (613, dungeon's side): the template,
+## its stair both ways with the castle's guardroom (maps' side), the
+## smith's place between the forge's anvils.
+func _test_castle_halls_level() -> void:
+	print("\n== levels/castle_halls (613): the Dwarven Halls and the castle's guardroom stair ==")
+	var halls := Level.load_level("castle_halls")
+	var castle := Level.load_level("castle")
+	_check(halls["display_name"] == "The Dwarven Halls" and halls["size"] == Vector2i(90, 70) and halls["warnings"].is_empty()
+		and int(Level.template("castle_halls")["config"].get("depth", 0)) == 1,
+		"The Dwarven Halls, 90 x 70, depth 1, parse with no warning (%s)" % [halls["warnings"]])
+	var block := Regen.config_of("castle_halls")
+	_check(Regen.marked("castle_halls") and block.get("style") == "dwarven" and int(block.get("ways", 0)) == 5 and block["anchors"].size() == 3 and block.get("entrance") == "stair_foot"
+		and block.get("monsters") == {"imp": 5, "brute": 1},
+		"marked to regenerate in the dwarven style, ways five wide, three anchors, depth from the stair foot, enemy-ai's five imps and a brute (%s)" % [block.keys()])
+	_check(halls["links"].size() == 1 and halls["links"][0]["tile"] == Vector2i(44, 1) and halls["links"][0]["to_map"] == "castle" and halls["links"][0]["to_spawn"] == "from_halls"
+		and halls["spawn_points"].get("from_castle") == Vector2i(44, 2) and halls["terrain"]["floor"].has(Vector2i(44, 2)),
+		"the stair up in the stair foot's north wall leads to the castle's from_halls; from_castle on the floor beside it")
+	var down: Array = castle["links"].filter(func(link: Dictionary) -> bool: return link["to_map"] == "castle_halls")
+	_check(down.size() == 1 and down[0]["tile"] == Vector2i(11, 18) and down[0]["to_spawn"] == "from_castle" and castle["spawn_points"].get("from_halls") == Vector2i(12, 18)
+		and castle["terrain"]["floor"].has(Vector2i(12, 18)) and castle["terrain"]["floor"].has(Vector2i(11, 18)),
+		"the castle's stair down stands in the guardroom at (11, 18), from_halls beside it on the floor (613, maps' side)")
+	_check(castle["terrain"]["edges"].get(Terrain.edge_key(Vector2i(13, 19), Vector2i(1, 0))) == Terrain.Edge.DOOR
+		and castle["terrain"]["edges"].get(Terrain.edge_key(Vector2i(11, 17), Vector2i(0, -1))) == Terrain.Edge.WALL
+		and castle["terrain"]["edges"].get(Terrain.edge_key(Vector2i(11, 18), Vector2i(-1, 0))) == Terrain.Edge.WALL,
+		"the guardroom's door opens onto the gate passage's west jamb; its north and west sides are walled")
+	var place: Dictionary = halls["places"].get("dwarven_forge", {})
+	_check(place.get("cell") == Vector2i(43, 64) and place.get("kind") == "refuge" and place.get("radius") == 3 and place.get("where") == "castle_dungeon",
+		"the smith's refuge, dwarven_forge, stands between the forge's anvils, a refuge under the castle (%s)" % [place])
+	var pillars: Array = halls["buildings"].filter(func(building: Dictionary) -> bool: return building["slot"] == "building.crypt_pillar")
+	_check(pillars.size() == 4 and pillars.all(func(building: Dictionary) -> bool: return int(building.get("variant", 1)) == 2)
+		and not halls["terrain"]["floor"].has(Vector2i(42, 65)) and not halls["terrain"]["floor"].has(Vector2i(47, 67)) and halls["terrain"]["floor"].has(Vector2i(43, 64)),
+		"four dwarven pillars, the forge's footprint rock till art-kit's building lands, the stand cell floor")
+	_check(halls["entities"].size() == 5 and halls["links"][0]["cue"] == "up" and down[0]["cue"] == "down",
+		"the template's five markers alone stand in the halls (the cart, two crates, two chests); the stairs cue up and down (%d, %s, %s)" % [halls["entities"].size(), halls["links"][0]["cue"], down[0]["cue"]])
+
+
 func _test_edge_links() -> void:
 	print("
 == edge links: walk off one map's edge, arrive at the next one's ==")
@@ -1919,9 +1961,10 @@ func _test_castle() -> void:
 	_check(not castle.is_empty() and castle["display_name"] == "The Castle" and castle["warnings"].is_empty(),
 			"levels/castle is \"The Castle\" and loads cleanly (%s)" % [castle.get("warnings", "missing")])
 	_check(load("res://levels/castle/layout.png") is Image, "its layout.png is imported as an Image")
-	_check(str(castle["links"]) == str([{"tile": Vector2i(27, 12), "to_map": "test_room", "to_spawn": "from_castle", "one_way": false, "closed": false, "sealed": "", "hidden": false, "cue": "none"},
-			{"tile": Vector2i(16, 23), "to_map": "wilds", "to_spawn": "from_castle", "one_way": false, "closed": false, "sealed": "", "hidden": false, "cue": "waystones"}]),
-			"its link at (27, 12) goes to the test room, at the foot of its road to the wilds (%s)" % [castle["links"]])
+	_check(castle["links"].size() == 3 and str(castle["links"].slice(0, 2)) == str([{"tile": Vector2i(27, 12), "to_map": "test_room", "to_spawn": "from_castle", "one_way": false, "closed": false, "sealed": "", "hidden": false, "cue": "none"},
+			{"tile": Vector2i(16, 23), "to_map": "wilds", "to_spawn": "from_castle", "one_way": false, "closed": false, "sealed": "", "hidden": false, "cue": "waystones"}])
+			and castle["links"][2]["tile"] == Vector2i(11, 18) and castle["links"][2]["to_map"] == "castle_halls" and castle["links"][2]["to_spawn"] == "from_castle",
+			"its link at (27, 12) goes to the test room, at the foot of its road to the wilds, and from the guardroom down to the Dwarven Halls (613) (%s)" % [castle["links"]])
 	var room := Level.load_level("test_room")
 	var back: Array = (room["links"] as Array).filter(func(link: Dictionary) -> bool: return link["to_map"] == "castle")
 	_check(back.size() == 1 and back[0]["tile"] == Vector2i(30, 34) and back[0]["to_spawn"] == "from_test_room",

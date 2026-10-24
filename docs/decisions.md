@@ -26318,3 +26318,70 @@ companion_test _test_game_and_watch: asleep with SLEEP on "yes", cleared
 when slept out and when a fight wakes her. protocol_test. Wire, revision
 35 (one line under ## 35 in net/net.gd); the server takes it with the
 next cut. No new class_name.
+## 613, dungeon's side: the Dwarven Halls under the castle
+
+Jeff (2026-10-22, through the coordinator): the smith sought a great dwarven
+forge deep below the castle; his hired guards were ambushed; he is captured,
+forging goblin weapons for the Blood Rot raids. The coordinator's rulings:
+no generic refuge cells, each sought trade has its own authored place (613
+amended); the halls are open from day one, nothing seals until a smith is
+sought; one level, the design C:/dev/review/dungeon/castle_halls_design.md
+approved as written 2026-10-23. Jeff's charter for the tree: the castle
+stays persistent as the entrance marker, the halls below it regenerate.
+
+- **One level**, `castle_halls`, "The Dwarven Halls" (lore's line: "deep
+  below the castle, where rumour tells of a great dwarven forge"), 90 x 70,
+  `"depth": 1`, the labyrinth's dwarven style, `"ways": 5`, laid again
+  every 3 days; written from `tools/plan_sheet.sample_castle_halls`, its
+  twin, as the barrow's three are.
+- **The dwarven style under the width rule.** The brush of 541 amended now
+  carves a dwarven level's ways too when its block names `"ways"` (the
+  sample halls, naming none, keep their two-wide ways and their tests), and
+  a great hall's pillars are blocks two cells square on a grid five apart,
+  two in from every wall (`Labyrinth.PILLAR_PITCH`), where single cells
+  every other cell had left one-wide ways all through a hall (612's check
+  never saw it: no level used the style). Nothing else in the generator
+  moves.
+- **Three anchors kept**: the stair foot at the top (the link up to the
+  castle's "from_halls", the spawn "from_castle", the start, two torches;
+  `"entrance"`), the ambush a third of the way down (walled north and
+  south, a hall the ways pass through: the smith's cart and two crates as
+  markers), the great forge at the deepest point (walled but for its north
+  side: the forge footprint 6 x 3 against the south wall as rock until
+  art-kit's `building.dwarven_forge` lands, four `building.crypt_pillar`
+  `"variant": 2`, two chests, four torches).
+- **The smith's refuge** is the template place `dwarven_forge` at the stand
+  cell between the forge's anvils, `"kind": "refuge"`, `"where":
+  "castle_dungeon"`, radius 3, inside the forge anchor, so
+  `Regen.generated_config` keeps it through every generation and its id
+  `castle_halls/dwarven_forge` is what maps' place_sought answers for a
+  town's smith. The kind and the where are maps' side of 613, landed
+  before this; the body at the place is npc's; the goblins' band at it
+  while he is held (rules' `sought.guards.castle_dungeon`: 3 imps and a
+  brute, faction goblins, kept to the room) is enemy-ai's.
+- **The halls' own goblins**: the block's `"monsters": {"imp": 5, "brute":
+  1}` (enemy-ai's first count: the brute holds a post, the imps wander),
+  `"respawn_s"` 600 as the barrow's dead; `"chests": 3`; the chests' loot
+  the default table until economy's `dwarven_hoard` row with items' plate.
+- **The castle's side (613, maps' side, carried here)**: a 3 x 3 guardroom
+  walled off the south gate passage's west jamb in levels/castle/layout.png
+  (maps' 1e0db8d9: floor x 11..13, rows 17..19, its door onto the gate's
+  way, the lantern at (11, 19) inside), the stair link pixel at (11, 18),
+  the link `{at: [11, 18], to_map: castle_halls, to_spawn: from_castle}`
+  and the spawn `from_halls` at (12, 18). Either half alone fails
+  level_test, so both come in one commit. The box's edited-level overlay
+  may hold a castle of its own that would shadow the marker: release
+  checks at the deploy, by status and counts only.
+- **Steps**: 1 this (the level, the generator's two changes, the castle's
+  side, docs, tests, plan sheets and shots to C:/dev/review/castle_halls);
+  2 the furniture (art-kit's forge, weapon rack and fallen guards placed:
+  a prop on a cell with a facing needs a level.json key, designed then),
+  the loot row, enemy-ai's tuning; 3 shots of the dressed forge, the box
+  by `regenerate now castle_halls` after the deploy.
+- Tests: labyrinth_test `_test_castle_halls` (the template's generations:
+  anchors kept, every anchor reached, no one-wide passage, the ways five
+  wide, the counts, the place and pillars kept); level_test
+  `_test_castle_halls_level` (the template parses clean, its stair both
+  ways with the castle, the guardroom's door and wall, the place) and
+  `_test_castle` (three links now); regen_test lists the halls among the
+  marked levels beside the barrow's three. No wire change, no new class_name.

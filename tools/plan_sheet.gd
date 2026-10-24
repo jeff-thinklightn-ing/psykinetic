@@ -126,6 +126,35 @@ const LAIR_DECOR: Array = [
 	[38, 58, 0, 0, "moss_patch", 2], [61, 58, 0, 0, "moss_patch", 3], [45, 57, 0, 0, "moss_patch", 1], [54, 57, 0, 0, "moss_patch", 2],
 	[40, 63, 0, 0, "moss_patch", 3], [59, 63, 0, 0, "moss_patch", 1]]
 const BARROW_LEGEND := {"monster_skeleton": "#d8d0b0", "monster_skeleton_guard": "#988c64", "monster_robber": "#8a5a2a", "monster_draugr": "#5a4636"}
+## The Dwarven Halls under the castle (613, dungeon's side; Jeff: the smith
+## sought a great dwarven forge deep below, his guards were ambushed, he is
+## held there forging goblin weapons): one level in the dwarven style, three
+## rooms kept through every generation. The stair foot under the gatehouse
+## (the link up to the castle's "from_halls", the spawn "from_castle"), the
+## ambush a third of the way down (the smith's wagon and baggage where his
+## guards fell: markers; the fallen guards are art-kit's prop, step 2), and
+## the great forge at the deepest point: the forge 6 x 3 against its south
+## wall (art-kit's building.dwarven_forge, a block of rock till it lands),
+## the stand cell between its anvils the refuge place "dwarven_forge" the
+## sought smith is held at (economy's 613; its "where" is castle_dungeon,
+## the goblins' band stands there: enemy-ai's), four pillars in two rows,
+## a chest in each back corner, torches. Every way five cells clear, every
+## piece of furniture with a two-cell way round it (612).
+const HALLS_SIZE := Vector2i(90, 70)
+const HALLS_ANCHORS := [
+	{"rect": [40, 1, 10, 8], "name": "stair_foot", "walled": ["north", "east", "west"]},
+	{"rect": [18, 26, 14, 10], "name": "ambush", "walled": ["north", "south"]},
+	{"rect": [35, 54, 20, 14], "name": "forge", "walled": ["east", "south", "west"]}]
+const HALLS_LINK_UP := Vector2i(44, 1)
+const HALLS_START := Vector2i(45, 2)
+const HALLS_FROM_CASTLE := Vector2i(44, 2)
+const HALLS_FORGE := Rect2i(42, 65, 6, 3)
+const HALLS_STAND := Vector2i(43, 64)  # Between the two anvils along the forge's front (art-kit: it faces [0, -1], into the room).
+const HALLS_PILLARS: Array[Rect2i] = [Rect2i(38, 57, 2, 2), Rect2i(50, 57, 2, 2), Rect2i(38, 61, 2, 2), Rect2i(50, 61, 2, 2)]
+const HALLS_CHESTS: Array[Vector2i] = [Vector2i(36, 66), Vector2i(53, 66)]
+const HALLS_TORCHES: Array[Vector2i] = [Vector2i(41, 2), Vector2i(48, 2), Vector2i(36, 55), Vector2i(53, 55), Vector2i(36, 63), Vector2i(53, 63)]
+const HALLS_CART := Vector2i(24, 30)
+const HALLS_CRATES: Array[Vector2i] = [Vector2i(22, 31), Vector2i(27, 29)]
 
 
 ## Blank rows (void) for a level [param size] cells across, two pixels a cell.
@@ -379,6 +408,7 @@ static func write_sheet(level_name: String, generation: int, out: String, scale 
 	var sheet := Image.create_empty(layout.get_width() * scale, layout.get_height() * scale, false, Image.FORMAT_RGBA8)
 	sheet.fill(Color.BLACK)
 	var big := layout.duplicate() as Image
+	big.convert(Image.FORMAT_RGBA8)  # A layout saved without alpha blends onto the sheet all the same.
 	big.resize(layout.get_width() * scale, layout.get_height() * scale, Image.INTERPOLATE_NEAREST)
 	sheet.blend_rect(big, Rect2i(Vector2i.ZERO, big.get_size()), Vector2i.ZERO)
 	for anchor: Dictionary in made["anchors"]:
@@ -410,6 +440,37 @@ static func write_sheet(level_name: String, generation: int, out: String, scale 
 	return 0
 
 
+## The Dwarven Halls: {layout, config}, HALLS_SIZE cells (613, dungeon's side).
+static func sample_castle_halls() -> Dictionary:
+	var rows := _blank_rows(HALLS_SIZE)
+	_lay_anchors(rows, HALLS_ANCHORS)
+	_rock_rect(rows, HALLS_FORGE)  # The forge, a block of rock till art-kit's building.dwarven_forge lands.
+	var markers := {HALLS_LINK_UP: "link", HALLS_START: "start", HALLS_CART: "cart"}
+	for chest: Vector2i in HALLS_CHESTS:
+		markers[chest] = "chest"
+	for torch: Vector2i in HALLS_TORCHES:
+		markers[torch] = "torch"
+	for crate: Vector2i in HALLS_CRATES:
+		markers[crate] = "crate"
+	var layout := Level.image_from_rows(_lines(rows), markers)
+	var pillars: Array = []
+	for pillar in HALLS_PILLARS:
+		pillars.append({"slot": "building.crypt_pillar", "at": [pillar.position.x, pillar.position.y], "variant": 2})  # The dwarven band (art-kit's variant 2).
+	var config := {"name": "The Dwarven Halls", "outdoor": false, "depth": 1, "walls": "stone", "floors": "stone",
+		"buildings": pillars,
+		"starts": [[HALLS_START.x, HALLS_START.y]],
+		"spawn_points": {"from_castle": [HALLS_FROM_CASTLE.x, HALLS_FROM_CASTLE.y]},
+		"links": [{"at": [HALLS_LINK_UP.x, HALLS_LINK_UP.y], "to_map": "castle", "to_spawn": "from_halls"}],
+		"places": {"dwarven_forge": {"at": [HALLS_STAND.x, HALLS_STAND.y], "kind": "refuge", "where": "castle_dungeon", "radius": 3,
+			"name": "the great dwarven forge"}},  # The sought smith's refuge (613): maps' kind and where.
+		"entities": [],
+		"regenerate": {"generator": "labyrinth", "style": "dwarven", "ways": 5, "every_days": 3, "anchors": HALLS_ANCHORS,
+			"entrance": "stair_foot", "rooms": {"count": [8, 11], "size": [[8, 7], [16, 12]]}, "loops": 0.2,
+			"monsters": {"imp": 5, "brute": 1}, "chests": 3},  # Enemy-ai's first count: the brute holds a post, the imps wander.
+		"respawn_s": {"imp": 600, "brute": 600}}
+	return {"layout": layout, "config": config}
+
+
 ## The sample halls in [param style] ("dwarven" or "old"): {layout, config},
 ## SIZE cells, its four anchors bare floor, a link and spawn point in the
 ## gatehouse and in the deepest chamber. "barrow" gives sample_barrow.
@@ -420,6 +481,8 @@ static func sample_halls(style: String) -> Dictionary:
 		return sample_barrow_deep()
 	if style == "barrow_lair":
 		return sample_barrow_lair()
+	if style == "castle_halls":
+		return sample_castle_halls()
 	var rects: Array[Rect2i] = []
 	for anchor: Dictionary in ANCHORS:
 		rects.append(Level.town_wall_rect(anchor))

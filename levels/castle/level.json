@@ -1,11 +1,12 @@
 {
 	"name": "The Castle",
 	"outdoor": true,
-	"spawn_points": {"from_test_room": [26, 13], "from_wilds": [16, 22]},
+	"spawn_points": {"from_test_room": [26, 13], "from_wilds": [16, 22], "from_halls": [12, 18]},
 	"markets": {"castle": {"at": [16, 9], "name": "the castle market"}},
 	"links": [
 		{"at": [27, 12], "to_map": "test_room", "to_spawn": "from_castle"},
-		{"at": [16, 23], "to_map": "wilds", "to_spawn": "from_castle", "variant": 2}
+		{"at": [16, 23], "to_map": "wilds", "to_spawn": "from_castle", "variant": 2},
+		{"at": [11, 18], "to_map": "castle_halls", "to_spawn": "from_castle"}
 	],
 	"waters": [
 		{

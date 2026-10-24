@@ -640,6 +640,43 @@ only carved beside one already floor nearer in (a wider brush once left
 cells cut off behind a tomb's ring). The wilds hold the mound's door and
 the shortcut's other end (maps' side of 542; the shortcut's `to_map` is
 `barrow_lair`).
+The halls under the castle (613, dungeon's side; Jeff: the smith sought a
+great dwarven forge deep below, his hired guards were ambushed, and he is
+held there forging goblin weapons): `levels/castle_halls`, "The Dwarven
+Halls", 90 x 70, `"depth": 1`, the labyrinth's dwarven style with `"ways":
+5` (the brush of 541 amended carves its ways too when a level names the
+width; unsaid, a dwarven level's ways stay two wide) and its great halls'
+pillars as blocks two cells square five apart, two in from every wall
+(612), laid again every 3 days. The way in is a stair in the castle's south
+gatehouse: a 3 x 3 guardroom off the gate passage's west jamb (maps' side:
+floor x 11..13, rows 17..19, its door onto the gate's way), the link at
+(11, 18) to "from_castle", the castle's spawn "from_halls" at (12, 18)
+beside it. Three anchors are kept through every generation: the stair
+foot (10 x 8 at the top: the link up, the spawn, the start, two torches;
+the anchor depth is counted from), the ambush a third of the way down
+(14 x 10, walled north and south, where the smith's guards fell: his cart
+and two crates as markers; the fallen guards and the goblins' weapon rack
+are art-kit's props, step 2), and the great forge at the deepest point
+(20 x 14, walled but for its north side): the forge 6 x 3 against its
+south wall (art-kit's `building.dwarven_forge`, facing into the room; a
+block of rock until it lands), four pillars 2 x 2 in two rows (art-kit's
+`building.crypt_pillar` `"variant": 2`, the dwarven band), a chest in each
+back corner, torches, and between the forge's anvils the place
+`dwarven_forge` (`"kind": "refuge"`, `"where": "castle_dungeon"`, radius 3;
+maps' kind and where, economy's 613): the sought smith is held there,
+npc's body at its nearest free cell when a player is near, and the
+goblins' band (rules' `sought.guards.castle_dungeon`, 3 imps and a brute)
+stands at it while he is held (enemy-ai's side, kept to the room). Regen
+keeps the place through every generation (`generated_config` keeps places
+inside anchors). The halls' own goblins are the block's `"monsters"`
+(5 imps wandering the ways, a brute holding a post; enemy-ai's first
+count), `"chests": 3` in the alcoves beside the forge's two, the chests'
+loot the default table until economy's `dwarven_hoard` row. The halls are
+open from day one, smith or no smith: the forge is a place to find. The
+plan sheet draws it as the barrow's (`--level=castle_halls`);
+`tools/plan_sheet`'s `sample_castle_halls` is the template's twin, and the
+template is written from it, as the barrow's are.
+
 Levels regenerate only on a server started with `--regenerate` (as raid
 groups with `--raids`, decision 328) or after the console's `regenerate on`
 (`regenerate` alone lists the marked levels and their generations); the
