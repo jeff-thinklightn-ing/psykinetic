@@ -41,6 +41,7 @@ func _ready() -> void:
 	_test_outdoor()
 	await _test_low_camera()
 	_test_indoor_camera()
+	_test_draw_pull()
 	_test_low_scatter()
 	await _test_far_restart()
 	await _test_low_pick()
@@ -4428,6 +4429,57 @@ func _test_indoor_camera() -> void:
 	_rig.indoor_view = false
 
 
+## The draw's pull-back (decision 669; Jeff: "the camera should start to
+## zoom out as the bow range goes up"): a reach that would leave the screen
+## widens the view till its point is DRAW_PULL_MARGIN inside, from the high
+## camera and the low; a short one leaves the player's zoom; never nearer;
+## let go, back to it.
+func _test_draw_pull() -> void:
+	print("
+== the bow's reach kept on screen: the view widens as it grows, from the high camera and the low (decision 669) ==")
+	var low_was := Net.camera_low
+	var zoom_was: float = _rig.zoom
+	for low: bool in [false, true]:
+		Net.set_camera_low(low, false)
+		if low:
+			var castle := Level.load_level("castle")
+			_rig.rebuild(castle["terrain"], castle["centre"])
+			_rig._ridge_pitch = 0.0
+		var label := "the low camera" if low else "the high camera"
+		var kept := true
+		var widened := 0
+		for way: Vector2 in [Vector2.RIGHT, Vector2.UP, Vector2.DOWN, Vector2(1, 1).normalized(), Vector2(-1, -1).normalized()]:
+			_rig._reach_pull = 1.0
+			_rig._reach_pull_to = 1.0
+			_rig._apply_size()
+			_rig._place_camera()
+			_rig.aim_lead(way, true)
+			_rig._aim_lead = _rig._aim_lead_to
+			_rig.aim_reach(15.0, way)
+			_rig._ease_reach_pull(10.0)
+			_rig._apply_size()
+			_rig._place_camera()
+			if _rig._reach_pull > 1.0:
+				widened += 1
+			var target: Vector3 = _rig._camera_target
+			var far := target + Vector3(way.x * 15.0, 0.0, way.y * 15.0) - _rig._aim_lead
+			var at: Vector2 = _rig._camera.unproject_position(far)
+			var screen: Vector2 = _rig.get_viewport().get_visible_rect().size
+			kept = kept and at.x >= 0.0 and at.y >= 0.0 and at.x <= screen.x and at.y <= screen.y
+		_check(kept and widened > 0, "%s: 15 cells out kept on screen every way, the view widened for %d of 5 ways" % [label, widened])
+		_rig.aim_lead(Vector2.RIGHT, true)
+		_rig.aim_reach(5.0, Vector2.RIGHT)
+		_check(is_equal_approx(_rig._reach_pull_to, 1.0), "%s: a reach of 5 leaves the player's own zoom" % label)
+		_rig.aim_reach(0.0, Vector2.ZERO)
+		_rig.aim_lead(Vector2.ZERO, false)
+		_rig._ease_reach_pull(10.0)
+		_rig._apply_size()
+		_check(is_equal_approx(_rig._reach_pull, 1.0) and is_equal_approx(_rig.zoom, zoom_was), "%s: let go, back to the player's zoom" % label)
+	_rig._aim_lead = Vector3.ZERO
+	Net.set_camera_low(low_was, false)
+	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+
+
 ## The low camera's scatter reach (decision 653): built out to
 ## LOW_SCATTER_REACH of the aim, not NEAR_TILES (which still bounds the
 ## rest), shrinking into the ground over its last SCATTER_FADE, the kinds
@@ -6402,18 +6454,18 @@ func _test_bow() -> void:
 	_check((on_string != null and on_string.is_visible_in_tree()) or not ArtKit.has("fx.arrow"),
 			"an arrow on the string, shown (Jeff: \"the arrow doesn't load into the bow with drawing\")")
 	# Scrubbed by the sim's draw (bow_pull): the nock by the ticks to draw_min,
-	# then the pull by draw_of (0.5 at 10 of the bow's 20 ticks: a third of the
-	# way from draw_min's 0.25 to 1).
+	# then the pull by draw_of (0.5 at 6 of the bow's 12 ticks to full draw,
+	# decision 669: a third of the way from draw_min's 0.25 to 1).
 	var alpha := World.tick_alpha
 	World.tick_alpha = 0.0
 	var length := rig.length("Bow_Draw")
 	var poses := []
-	for drawn: int in [3, 10, 15]:
+	for drawn: int in [2, 6, 9]:
 		player.raised_tick = World.tick - drawn
 		_rig._process(0.0)
 		poses.append(rig.upper_position() / length)
 	World.tick_alpha = alpha
-	var expected := [Client3D.BOW_NOCK_END * 3.0 / 5.0, Client3D.BOW_NOCK_END + (1.0 - Client3D.BOW_NOCK_END) / 3.0,
+	var expected := [Client3D.BOW_NOCK_END * 2.0 / 3.0, Client3D.BOW_NOCK_END + (1.0 - Client3D.BOW_NOCK_END) / 3.0,
 			Client3D.BOW_NOCK_END + (1.0 - Client3D.BOW_NOCK_END) * 2.0 / 3.0]
 	_check(range(3).all(func(i: int) -> bool: return absf(poses[i] - expected[i]) < 0.02) and rig.upper_speed() == 0.0,
 			"the pose scrubbed by the draw: nocking before draw_min, then drawn back as draw_of grows (%s of the clip, expected %s)" % [poses, expected])

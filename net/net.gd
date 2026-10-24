@@ -403,6 +403,10 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## (SUBCLASS_REPLICATED): at rest he is gone (no body, holding no cell, nothing
 ## strikes him) and his remains lie at pile_at turned pile_facing; a click or E
 ## there talks to him. GridEntity.holds_cell follows gone on both sides.
+## 36 (669): a bow's verb reads steps, damage_at, full, draw_min and draw_steps
+## (no draw_step, no spread_settle), and a client works its step, reach, cone and
+## full-strength edge from them and raised_tick (World.draw_step, range_of,
+## spread_of, full_range_of) as the server does; an old client draws the wrong aim.
 const PROTOCOL_REVISION := 36
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]

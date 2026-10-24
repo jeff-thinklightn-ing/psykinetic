@@ -203,7 +203,7 @@
 			"type": "oneshot",
 			"bus": "sfx",
 			"noise": null,
-			"range": 12,
+			"range": 18,
 			"volume_db": -2.0,
 			"uses": "an arrow striking a body: a thud (Client3D._on_struck, cause shot, as the arrow arrives)",
 			"fallback": "sfx.hit_flesh"
@@ -213,7 +213,7 @@
 			"type": "oneshot",
 			"bus": "sfx",
 			"noise": null,
-			"range": 12,
+			"range": 18,
 			"volume_db": -4.0,
 			"uses": "an arrow stopped by a closed door or a tree: a knock (Client3D._arrow_landed)",
 			"fallback": "sfx.hit_wood"
@@ -223,7 +223,7 @@
 			"type": "oneshot",
 			"bus": "sfx",
 			"noise": null,
-			"range": 12,
+			"range": 18,
 			"volume_db": -4.0,
 			"uses": "an arrow stopped by a wall or higher ground: a crack and skitter (Client3D._arrow_landed)",
 			"fallback": "sfx.hit_stone"
@@ -242,7 +242,7 @@
 			"type": "oneshot",
 			"bus": "sfx",
 			"noise": null,
-			"range": 12,
+			"range": 18,
 			"volume_db": -6.0,
 			"uses": "an arrow that hit nothing coming down in the ground at its range's end: a soft thump (Client3D._arrow_landed)",
 			"fallback": "sfx.thrown_land_light"
@@ -252,7 +252,7 @@
 			"type": "oneshot",
 			"bus": "sfx",
 			"noise": null,
-			"range": 12,
+			"range": 18,
 			"volume_db": -6.0,
 			"uses": "an arrow coming down in water: a plip (Client3D._arrow_landed)",
 			"fallback": "sfx.splash"

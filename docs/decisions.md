@@ -23656,6 +23656,9 @@ coordinator's approval). This is the sim's shot.
 - Arrows are not used up or picked up, as before.
 Wire: PROTOCOL_REVISION 31. items_test, monster_test, cliff_test,
 relief_test and view_test follow. No new class_name.
+
+Changed by 669: the steps, their damage (now rising to full draw, then by distance band) and their times are 669's.
+
 ## 599, items' side. A cache: each player's find, once
 
 Jeff, through the coordinator: "old farmstead in the wilds - abandoned,
@@ -24440,6 +24443,8 @@ the same line for the same salt and none without a cone, and a loose flying the 
 before the bow is lowered. monster_test's archer checks shoot straight (they test its standing off,
 not its aim). Combat adds the mean-miss test. Wire: no new message; PROTOCOL_REVISION 34 (the
 first wire change after v0.1.169) records that a client's and the server's bow fields go together. No new class_name.
+
+Changed by 669: the cone's widths follow 669's steps, held at full draw's past it; the settle to the floor is gone.
 
 ## 620, enemy-ai's side: an archer's hold, and the cone's edges
 
@@ -29105,3 +29110,83 @@ move under way. The coordinator approved enemy-ai's ask.
 combat_test _test_dropped_moves: a spin dropped sweeps nobody; a throw dropped strikes nobody,
 the axe kept; a charge dropped in its roar never runs, and dropped under way stops where it
 was. Server only, protocol unchanged, no new class_name.
+
+## 669. The bow's draw: damage, reach and stamina over the hold
+
+Jeff on the bow: "it takes full pull back to get damage maxed", "holding at max nock narrowest
+accuracy starts draining stamina", and "full damage at current max range, but held longer goes
+out further at the expense of diminishing damage, maybe only if the target is in the range does
+it take 4 dmg, but if its beyond that it gets slightly less damage". The coordinator approved
+combat's design; the numbers are drafts for Jeff. This changes 583 (shorter shots had hit
+harder: 1.5/1.2/1.0/0.8 at 3/5/7/9 cells) and 620 (the cone settled to 2° over 4 s).
+
+- **Drawing up**, three steps (the bow's verb: steps, damage_at, full, draw_min, draw_steps):
+
+  | Step | Reached at | Strength | damage_at | Reach | Cone |
+  |---|---|---|---|---|---|
+  | 1 | 0.3 s | 2 | 0.8 | 5 cells | 20° |
+  | 2 | 0.7 s | 3 | 1.2 | 7 cells | 10° |
+  | 3, full draw | 1.2 s | 4 | 1.6 | 9 cells | 4° |
+
+  Each step takes longer than the last. The cone is lerped between steps over each step's ticks.
+  A quick bow and armour's draw multiple scale the times as before.
+- **Held past full draw**, the reach grows in bands of +2 cells: 11 at 1.8 s, 13 at 2.5 s, 15
+  at 3.3 s. The damage goes by the struck body's distance (World.distance), not the hold:
+  - within 9 cells, 1.6;
+  - 9 to 11 cells, 1.2;
+  - 11 to 13 cells, 0.8;
+  - 13 to 15 cells, 0.4.
+
+  That is Items.damage_for: before full draw, the step's; at or past it, the band the body
+  stands in, out to the step drawn. An arrow flies no farther than its step's reach. The cone
+  stays at full draw's 4° (no shaking), so the longer lob strays farther in cells only because
+  it flies farther.
+- **Stamina** (World._tend_draws): at or past full draw, the bow's drain, 2 a tick, comes off
+  the holder's stamina as an exertion, so none comes back while held. A full bar of 100 lasts
+  5 s past full draw. At 0 the arms give out: the bow is let down with the arrow kept and
+  nothing loosed (World.draw_given_up; the archer is told "Your arms give out."), and the 0
+  winds them (597). Lowering resets the draw as ever. A body that pays no stamina never drains.
+- **Armour caps the reach, not the strength** (622 step 2's range_steps): the draw still comes
+  to full draw (World.step_cap never stops short of it), and the reach is cut to the cap
+  (World.reach_cap, reach_at). Mail stops at 7 cells, plate at 5, with no bands past that,
+  and full strength within.
+- **The aim** (ui's marker, read on the client from the replicated raised_tick, so it is the
+  server's):
+  - the arc at range_of;
+  - the cone from spread_of;
+  - the pips beside the marker are now the shot's strength at the aim's reach (Main.aim_pips:
+    2, 3, 4 drawing up, 3, 2, 1 in the bands);
+  - past full draw, a ring on the aim at full_range_of, where full strength ends
+    (Client3D._aim_full_mark).
+- **The camera pulls back with the reach** (Jeff: "for hunting.. you want to have distance, the
+  camera should start to zoom out as the bow range goes up"):
+  - Client3D.aim_reach, which Main calls beside 617's aim_lead each frame while drawn, eases a
+    pull-back factor in _size_factor over the player's zoom.
+  - The factor is the least that keeps the point DRAW_PULL_MARGIN (1.5 cells) past the reach,
+    the aim lead counted, on screen. It's found by halves through the camera itself
+    (reach_fits: the ortho size under the high camera, the eye's distance under the low).
+  - It's never under 1, so the view never zooms nearer than the player's own setting.
+  - It's at most DRAW_PULL_MOST, 1.8, and under the high camera within World.NEAR_TILES as the
+    wheel's ZOOM_MAX is.
+  - It eases at DRAW_PULL_RATE (7.5 a second: most of the way in about 0.4 s), out as the reach
+    grows and back when the bow is let go. Client only.
+  - view_test _test_draw_pull: from the high camera and the low, 15 cells out is kept on screen
+    every way, a reach of 5 leaves the zoom, and let go it is back.
+- **The mean miss** (combat_test _test_cone_spread, 400 rolls each), in cells at the step's
+  range: 0.43 at 0.5 s (5 cells), 0.21 at full draw (9), 0.35 at the last band (15).
+
+The arrow's landing and hit sounds (art/audio/slots.json: arrow_hit_flesh, _wood, _stone,
+arrow_land, arrow_water) now carry 18 cells, past the bow's new 15, keeping the +3 margin they
+had over its old 9 (sound_kit_test checks they carry past the reach).
+
+Monster archers loose on their kind's aim_spread and hold cap, as 620 enemy-ai's side has it.
+They now loose the first step at 0.8, where they had loosed at 1.5; enemy-ai tunes them later.
+Wire: a line under 36, since the client reads the steps, reaches and cone from the verb and
+raised_tick. Tests:
+- items_test: range by the hold, the edge, the cone, damage_for by band, strengths by step,
+  plate full at 5;
+- combat_test _test_draw_held: full strength within 9 at the last band, the least at 14, short
+  of it at 13's band; no drain below full draw, 2 a tick at it, none back; at 0 let down,
+  nothing loosed, winded;
+- monster_test, ui_test and view_test: the new numbers.
+No new class_name.

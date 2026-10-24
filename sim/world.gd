@@ -105,6 +105,9 @@ signal buff_changed(entity: GridEntity, kind: String, state: StringName)
 ## [param by] let its drawn bow go at [param angle] (radians on the grid)
 ## with its draw at [param step] (the verb's steps; decision 583).
 signal loosed(by: GridEntity, angle: float, step: int)
+## A bow held at full draw till the holder's stamina ran out (decision 669):
+## let down, nothing loosed.
+signal draw_given_up(by: GridEntity)
 signal pile_gone(pile: GroundPile)
 ## [param target]'s guard met a blow or a shot from [param source]
 ## (decision 340): taken on it, or [param broken] by it.
@@ -1066,6 +1069,7 @@ func _step_zone() -> void:
 	# 2. Hits (attacks and shoves) queued during the act phase.
 	_tend_wind_ups()  # Wound-up blows struck when due (decision 392).
 	_tend_boss_moves()  # A boss's spin, throw and charge (decision 603).
+	_tend_draws()  # A bow held at full draw tires the arms (decision 669).
 	_resolve_hits()
 	t = part("hits", t)
 	# 3. Hazard tiles; what ails (burning, bleeding; decision 375).
@@ -4287,6 +4291,27 @@ func drop_boss_move(by: GridEntity) -> void:
 			end_telegraph(id, false)
 
 
+## Each tick, each bow held at or past full draw (decision 669; Jeff:
+## "holding at max nock .. starts draining stamina"): its verb's drain off
+## the holder's stamina, an exertion (so none comes back while held); at 0
+## the arms give out: the bow is let down, the arrow kept, nothing loosed
+## (draw_given_up; winded, 597, follows from the 0). Only for those who pay
+## for their swings; another zone's on its own tick.
+func _tend_draws() -> void:
+	for entity in _entities:
+		if entity.raised != "draw" or entity.max_stamina <= 0 or not entity.pays_swings or not _alive(entity):
+			continue
+		var verb := Items.verb_of(drawn_with(entity))
+		if verb.is_empty() or int(verb.get("drain", 0)) <= 0 or draw_step(entity) < int(verb.get("full", 0)):
+			continue
+		entity.stamina = maxi(0, entity.stamina - int(verb["drain"]))
+		entity._world_note_exertion(tick)
+		if entity.stamina == 0:
+			entity.raised = ""
+			_log("draw: %s's arms give out; the bow let down" % entity.name)
+			draw_given_up.emit(entity)
+
+
 ## Whether [param by] is in the middle of something (decision 603): a move
 ## winding up, a charge under way, a heavy wind-up (392), stunned or lying.
 func boss_busy(by: GridEntity) -> bool:
@@ -5085,6 +5110,13 @@ func draw_of(entity: GridEntity) -> float:
 	return clampf(float(drawn) / draw_full_ticks(entity), 0.0, 1.0)
 
 
+## The most cells [param entity]'s armour lets a bow reach (decision 622,
+## step 2: its "range_steps"); a big number with none.
+func reach_cap(entity: GridEntity) -> int:
+	var most: Variant = worn_armour(entity).get("range_steps")
+	return 1 << 20 if most == null else int(most)
+
+
 ## A quick bow (decision 365) draws in less time, and so does one drawn in
 ## light armour, a heavy one in more (decision 622, step 2: the armour's "draw"):
 ## its ticks' multiple.
@@ -5100,32 +5132,34 @@ func draw_quick(entity: GridEntity) -> float:
 
 
 ## The last of its bow's steps [param entity] can reach in the armour it
-## wears (decision 622, step 2: the armour's "range_steps", the most cells it lets a
-## bow reach, the step at or under it, at least the first); the bow's last
-## step with none.
+## wears (decisions 622 step 2, 669): the last whose cells its armour lets
+## a bow reach (reach_cap), but never short of full draw: armour caps the
+## reach, not the strength (a bow in mail still comes to full draw, its
+## reach cut to the cap); the bow's last step with none.
 func step_cap(entity: GridEntity) -> int:
-	var steps: Array = Items.verb_of(drawn_with(entity)).get("steps", [])
+	var verb := Items.verb_of(drawn_with(entity))
+	var steps: Array = verb.get("steps", [])
 	var cap := steps.size() - 1
-	var most: Variant = worn_armour(entity).get("range_steps")
-	if most == null or cap < 0:
-		return cap
-	while cap > 0 and int(steps[cap]) > int(most):
+	var most := reach_cap(entity)
+	var full := int(verb.get("full", 0))
+	while cap > full and int(steps[cap]) > most:
 		cap -= 1
 	return cap
 
 
-## The ticks [param entity]'s bow takes to its last reachable step
-## (step_cap), quickness counted: where the pull is full.
+## The ticks [param entity]'s bow takes to full draw (decision 669: its
+## verb's full step), quickness counted: where the pull is full.
 func draw_full_ticks(entity: GridEntity) -> float:
 	var verb := Items.verb_of(drawn_with(entity))
 	if verb.is_empty():
 		return 1.0
-	return maxf(1.0, (int(verb["draw_min"]) + int(verb["draw_step"]) * maxi(step_cap(entity), 0)) * _draw_quick(entity))
+	return maxf(1.0, Items.step_ticks(verb, int(verb["full"])) * _draw_quick(entity))
 
 
-## The step [param entity]'s drawn bow has reached (decision 583): 0,
-## the verb's first, at draw_min ticks, one more every draw_step, held at
-## the last its armour lets it reach (step_cap; decision 622, step 2); -1 before
+## The step [param entity]'s drawn bow has reached (decisions 583, 669;
+## Items.step_at over its ticks drawn, quickness counted): 0, the verb's
+## first, at draw_min ticks, one more as each of its draw_steps passes,
+## held at the last its armour lets it reach (step_cap); -1 before
 ## draw_min or when not drawing.
 func draw_step(entity: GridEntity) -> int:
 	if not is_instance_valid(entity) or entity.raised != "draw":
@@ -5133,27 +5167,53 @@ func draw_step(entity: GridEntity) -> int:
 	var verb := Items.verb_of(drawn_with(entity))
 	if verb.is_empty():
 		return -1
-	var quick := _draw_quick(entity)
-	var past := tick - entity.raised_tick - roundi(int(verb["draw_min"]) * quick)
-	if past < 0:
-		return -1
-	return mini(floori(past / maxf(1.0, float(verb["draw_step"]) * quick)), step_cap(entity))
+	var step := Items.step_at(verb, float(tick - entity.raised_tick) / maxf(0.01, _draw_quick(entity)))
+	return -1 if step < 0 else mini(step, step_cap(entity))
 
 
-## The cells [param entity]'s drawn bow reaches now (its step's; decision
-## 583); 0 before draw_min or when not drawing. What the views show.
+## The cells a shot from [param entity]'s bow drawn to [param step]
+## reaches (decision 669): that step's, cut to its armour's cap
+## (reach_cap); 0 for no step.
+func reach_at(entity: GridEntity, step: int) -> int:
+	var steps: Array = Items.verb_of(drawn_with(entity)).get("steps", [])
+	if step < 0 or steps.is_empty():
+		return 0
+	return mini(int(steps[mini(step, steps.size() - 1)]), reach_cap(entity))
+
+
+## The cells [param entity]'s drawn bow reaches now (its step's, its
+## armour's cap counted; decisions 583, 669); 0 before draw_min or when
+## not drawing. What the views show.
 func range_of(entity: GridEntity) -> int:
-	var step := draw_step(entity)
-	return 0 if step < 0 else int(Items.verb_of(drawn_with(entity))["steps"][step])
+	return reach_at(entity, draw_step(entity))
+
+
+## The cells within which [param entity]'s drawn bow strikes at full
+## strength (decision 669): full draw's reach (its armour's cap counted),
+## shown on the aim once it is drawn past full draw; 0 before full draw or
+## when not drawing.
+func full_range_of(entity: GridEntity) -> int:
+	var verb := Items.verb_of(drawn_with(entity))
+	if verb.is_empty() or draw_step(entity) < int(verb.get("full", 0)):
+		return 0
+	return reach_at(entity, int(verb["full"]))
+
+
+## The damage multiple of a shot from [param entity]'s bow drawn to
+## [param step] striking a body [param away] cells off (Items.damage_for;
+## decision 669).
+func shot_strength(entity: GridEntity, step: int, away: int) -> float:
+	return Items.damage_for(Items.verb_of(drawn_with(entity)), step, away)
 
 
 ## The cells the bow in [param entity]'s hands reaches at its longest step
-## its armour lets it reach (step_cap; decision 622, step 2); 0 with none.
+## its armour lets it reach (step_cap, reach_cap; decisions 622 step 2,
+## 669); 0 with none.
 func longest_range(entity: GridEntity) -> int:
 	var verb := Items.verb_of(drawn_with(entity))
 	if verb.is_empty() or (verb.get("steps", []) as Array).is_empty():
 		return int(verb.get("cells", 0))
-	return int(verb["steps"][step_cap(entity)])
+	return reach_at(entity, step_cap(entity))
 
 
 ## The half-angle in radians of the cone [param entity]'s drawn bow
@@ -5209,8 +5269,9 @@ func try_loose(by: GridEntity, angle: float) -> bool:
 ## wall, a closed door, higher ground or the map's end stops it first, and
 ## past its range it comes down. A body it may not attack (can_target) or a
 ## friend it spares (spares) stops it unharmed. Damage is its blow
-## (attack_damage) times the bow's damage times the step's damage_at (the
-## shortest hardest), at least 1, cause &"shot"; no push. It faces the
+## (attack_damage) times the bow's damage times its damage_for (decision
+## 669: the step's up to full draw, past it the band the body stands in),
+## at least 1, cause &"shot"; no push. It faces the
 ## shot (or [param aimed], where it aimed, when its arrow strayed), is heard
 ## NOISE_BOW about it, and the views draw the arrow's flight to where it
 ## stopped and what stopped it (GridEntity.shot). The body struck, or null.
@@ -5221,7 +5282,7 @@ func shoot(by: GridEntity, angle: float, step: int, aimed := NAN) -> GridEntity:
 	if verb.is_empty():
 		return null
 	step = mini(step, (verb["steps"] as Array).size() - 1)
-	var aim := shot_aim(by, angle, int(verb["steps"][step]))
+	var aim := shot_aim(by, angle, reach_at(by, step))
 	var hit: GridEntity = aim["hit"]
 	var way := Vector2.from_angle(angle if is_nan(aimed) else aimed)
 	by._world_set_facing(Vector2i(roundi(way.x), roundi(way.y)))
@@ -5235,7 +5296,7 @@ func shoot(by: GridEntity, angle: float, step: int, aimed := NAN) -> GridEntity:
 	if hit == null or not can_target(by, hit) or spares(by, hit) or not hit.is_breakable():
 		_log("shot: %s at %.2f rad, step %d, %s" % [by.name, angle, step, "nothing hit (%s at %s)" % [aim["struck"], aim["end"]] if hit == null else "stopped by %s" % hit.name])
 		return null
-	var amount := maxi(1, roundi(by.attack_damage * float(verb["damage"]) * float(verb["damage_at"][step])))
+	var amount := maxi(1, roundi(by.attack_damage * float(verb["damage"]) * Items.damage_for(verb, step, distance(by.tile, hit.tile))))
 	var met: Variant = _meet_guard(hit, by, amount, 0.0, true)
 	if met != null:
 		amount = met[0]

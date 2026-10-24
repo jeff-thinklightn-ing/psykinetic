@@ -529,16 +529,19 @@ static func weight_of(id: String) -> float:
 ##   knockdown (giant axe): arc, down_ticks (prone, can't act or resist).
 ##   reach (spear): cells (how far it hits), brace (stops a charge).
 ##   backstab (dagger): behind (damage multiple from behind, by facing).
-##   ranged (bow; decision 583): steps, the cells each step of the draw
-##     reaches, shortest first; damage_at, each step's damage multiple
-##     (the shortest hardest: Jeff, "you can aim shorter for higher
-##     damage"); draw_min, the ticks to the first step, and draw_step,
-##     the ticks to each next one. Filled in from those: cells, the
-##     longest step, and draw_full, the ticks to it. The cone of flight
-##     (decision 620): spread, the half-angle in degrees as each step is
-##     reached (one per step, each over 0; none, [], shoots straight), spread_floor,
-##     the narrowest it comes to, spread_settle, the ticks past the last
-##     step to come down to it (spread_at).
+##   ranged (bow; decisions 583, 669): steps, the cells each step of the
+##     draw reaches, shortest first; full, the index of full draw (the
+##     steps after it, held past full draw, are its bands); damage_at, each
+##     step's damage multiple (669, Jeff: "it takes full pull back to get
+##     damage maxed": rising to full, then by the struck body's distance,
+##     falling band by band, damage_for); draw_min, the ticks to the first
+##     step, draw_steps, the ticks from each step to the next (one fewer
+##     than steps); drain, the stamina a tick held at or past full draw
+##     (World._tend_draws). Filled in from those: cells, the longest step,
+##     and draw_full, the ticks to full draw. The cone of flight (decision
+##     620): spread, the half-angle in degrees as each step is reached (one
+##     per step, each over 0; none, [], shoots straight), spread_floor, the
+##     narrowest it comes to (spread_at).
 const VERBS := {
 	"knockback": {"force": 3.0},
 	"block": {"arc": 1, "absorb": 1.0, "stamina": 8, "breaks_at": 2.0,
@@ -546,8 +549,8 @@ const VERBS := {
 	"knockdown": {"arc": 1, "down_ticks": 15},
 	"reach": {"cells": 2, "brace": true},
 	"backstab": {"behind": 2.0},
-	"ranged": {"steps": [3, 5, 7, 9], "damage_at": [1.5, 1.2, 1.0, 0.8], "draw_min": 5, "draw_step": 5,
-		"cells": 9, "draw_full": 20, "spread": [], "spread_floor": 2.0, "spread_settle": 40},
+	"ranged": {"steps": [5, 7, 9, 11, 13, 15], "damage_at": [0.8, 1.2, 1.6, 1.2, 0.8, 0.4], "full": 2, "draw_min": 3,
+		"draw_steps": [4, 5, 6, 7, 8], "drain": 0, "cells": 15, "draw_full": 12, "spread": [], "spread_floor": 4.0},
 }
 ## Every verb's: speed (a multiple of the wielder's attack time: under 1
 ## quicker), damage and force (multiples of the wielder's blow); windup, the
@@ -593,33 +596,84 @@ static func verb_from(id: String, verb: Dictionary) -> Dictionary:
 		if not out["spread"].is_empty() and out["spread"].size() != out["steps"].size():
 			push_warning("Items: %s's verb has %d steps and %d spread; it shoots straight" % [id, out["steps"].size(), out["spread"].size()])
 			out["spread"] = []
-		# The longest step's reach and draw, for what reads a bow's whole range (an archer's band, the pull's pose).
+		if out["draw_steps"].size() != out["steps"].size() - 1:
+			push_warning("Items: %s's verb has %d steps and %d draw_steps; each 5" % [id, out["steps"].size(), out["draw_steps"].size()])
+			var each: Array[int] = []
+			each.resize(maxi(out["steps"].size() - 1, 0))
+			each.fill(5)
+			out["draw_steps"] = each
+		out["full"] = clampi(int(out["full"]), 0, maxi(out["steps"].size() - 1, 0))
+		# The longest step's reach, and the ticks to full draw (the pull's pose).
 		out["cells"] = int(out["steps"].max())
-		out["draw_full"] = int(out["draw_min"]) + int(out["draw_step"]) * (out["steps"].size() - 1)
+		out["draw_full"] = roundi(step_ticks(out, int(out["full"])))
 	return out
+
+
+## The ticks into its draw (divided by its quickness) that a bow of
+## [param verb] (ranged) reaches its step [param step] (decision 669):
+## draw_min, then each of draw_steps before it.
+static func step_ticks(verb: Dictionary, step: int) -> float:
+	var ticks := float(verb.get("draw_min", 0))
+	var each: Array = verb.get("draw_steps", [])
+	for i in mini(step, each.size()):
+		ticks += float(each[i])
+	return ticks
+
+
+## The step a bow of [param verb] (ranged) has reached [param held] ticks
+## into its draw (divided by its quickness; decision 669): -1 before
+## draw_min, then 0, one more as each of draw_steps passes, the last held.
+static func step_at(verb: Dictionary, held: float) -> int:
+	if verb.is_empty() or held < float(verb.get("draw_min", 0)):
+		return -1
+	var steps: Array = verb.get("steps", [])
+	var step := 0
+	while step < steps.size() - 1 and held >= step_ticks(verb, step + 1):
+		step += 1
+	return step
+
+
+## The damage multiple of a shot from a bow of [param verb] (ranged) drawn
+## to [param step] that strikes a body [param away] cells off (World.distance;
+## decision 669): before full draw, its step's; at full draw or past it, the
+## band the body stands in, full draw's within its reach, then each band's
+## out to the step drawn (Jeff: "only if the target is in the range does it
+## take 4 dmg, but if its beyond that it gets slightly less damage").
+static func damage_for(verb: Dictionary, step: int, away: int) -> float:
+	var damage_at: Array = verb.get("damage_at", [])
+	var steps: Array = verb.get("steps", [])
+	if damage_at.is_empty():
+		return 1.0
+	step = clampi(step, 0, damage_at.size() - 1)
+	var full := int(verb.get("full", 0))
+	if step <= full:
+		return float(damage_at[step])
+	var band := full
+	while band < step and away > int(steps[band]):
+		band += 1
+	return float(damage_at[band])
 
 
 ## The half-angle in radians of the cone a bow of [param verb] (ranged)
 ## looses in, [param held] ticks into its draw (divided by its quickness;
-## decision 620): its spread's first before the first step, each step's
-## as it is reached, lerped straight to the next between them, then down
-## to spread_floor over spread_settle ticks past the last; 0 with no
-## spread. The server's roll (World.scatter) and the views' cone read it.
+## decisions 620, 669): its spread's first before the first step, each
+## step's as it is reached, lerped straight to the next between them (over
+## that step's draw_steps), the last's held after; never under
+## spread_floor; 0 with no spread. Held past full draw it stays at full
+## draw's (669, Jeff: "max nock narrowest accuracy"; no shaking). The
+## server's roll (World.scatter) and the views' cone read it.
 static func spread_at(verb: Dictionary, held: float) -> float:
 	var spread: Array = verb.get("spread", [])
 	if spread.is_empty():
 		return 0.0
 	var floor_at := float(verb["spread_floor"])
-	var each := maxf(1.0, float(verb["draw_step"]))
-	var past := (held - float(verb["draw_min"])) / each  # Steps past the first.
-	var last := spread.size() - 1
 	var degrees := float(spread[0])
-	if past >= last:
-		var settle := (held - float(verb["draw_min"]) - last * each) / maxf(1.0, float(verb["spread_settle"]))
-		degrees = lerpf(float(spread[last]), floor_at, clampf(settle, 0.0, 1.0))
-	elif past > 0.0:
-		var at := floori(past)
-		degrees = lerpf(float(spread[at]), float(spread[at + 1]), past - at)
+	var step := step_at(verb, held)
+	if step >= spread.size() - 1:
+		degrees = float(spread[-1])
+	elif step >= 0:
+		var each := maxf(1.0, float(verb["draw_steps"][step]))
+		degrees = lerpf(float(spread[step]), float(spread[step + 1]), clampf((held - step_ticks(verb, step)) / each, 0.0, 1.0))
 	return deg_to_rad(maxf(degrees, floor_at))
 
 

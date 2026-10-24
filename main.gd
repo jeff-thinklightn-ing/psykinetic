@@ -954,6 +954,7 @@ func _go_online() -> void:
 		World.entity_damaged.connect(_narrate_damage)
 		World.guard_met.connect(_narrate_guard)
 		World.knocked_down.connect(_narrate_down)
+		World.draw_given_up.connect(_tell_arms_gave)
 		World.braced_against.connect(_narrate_brace)
 		World.item_named.connect(_narrate_named)
 		World.item_kept.connect(_narrate_kept)
@@ -2089,6 +2090,7 @@ func _update_aim(player: Player, drawing: bool) -> void:
 			if _client3d != null:
 				_client3d.aim_arc(Vector2.ZERO, 0.0, 0.0, 0.0, 0, false)
 				_client3d.aim_lead(Vector2.ZERO, false)  # 617: the view eases back onto the archer.
+				_client3d.aim_reach(0.0, Vector2.ZERO)  # 669: and back to the player's own zoom.
 			if _aim_line != null:
 				_aim_line.visible = false
 		return
@@ -2110,10 +2112,12 @@ func _update_aim(player: Player, drawing: bool) -> void:
 	var alpha := aim_fade(Time.get_ticks_msec() - _aim_since) if _aim_since > 0 else 0.0
 	var point := aim_point(origin, aim_angle, float(radius))
 	_aim_mark_cell = Vector2i(point.round())
-	var pips := aim_pips(radius, range_steps(player))
+	var pips := aim_pips(Items.verb_of(World.drawn_with(player)), World.draw_step(player), radius)
 	if _client3d != null:
-		_client3d.aim_arc(origin, aim_angle, float(radius), alpha, pips, radius > 0, spread_now(player))
+		_client3d.aim_arc(origin, aim_angle, float(radius), alpha, pips, radius > 0, spread_now(player),
+				float(World.full_range_of(player)))
 		_client3d.aim_lead(Vector2.from_angle(aim_angle), true)  # 617: the view leads toward the aim while drawn.
+		_client3d.aim_reach(float(radius), Vector2.from_angle(aim_angle))  # 669: and widens to keep the reach on screen.
 	else:
 		_update_aim_line(origin, float(radius), alpha)
 
@@ -2144,11 +2148,17 @@ static func range_steps(player: GridEntity) -> Array:
 	return steps if steps is Array else []
 
 
-## The pips beside the marker: the most at the shortest step (the hardest
-## shot), one at the longest; none when the steps are not known.
-static func aim_pips(radius: int, steps: Array) -> int:
-	var index := steps.find(radius)
-	return steps.size() - index if index >= 0 else 0
+## The pips beside the marker (decision 669): the shot's strength at the
+## aim's reach, [param radius] cells, from a bow of [param verb] drawn to
+## [param step], in AIM_PIPS (full strength all of them; 2, 3, 4 up to
+## full draw, then 3, 2, 1 in the bands past it); none before the draw counts.
+const AIM_PIPS := 4
+static func aim_pips(verb: Dictionary, step: int, radius: int) -> int:
+	var damage_at: Array = verb.get("damage_at", [])
+	if step < 0 or radius <= 0 or damage_at.is_empty():
+		return 0
+	var most := float(damage_at.max())
+	return clampi(roundi(AIM_PIPS * Items.damage_for(verb, step, radius) / maxf(most, 0.001)), 1, AIM_PIPS)
 
 
 ## Where the aim lands on the arc: [param origin] plus [param radius] the
@@ -10509,6 +10519,13 @@ func _narrate_kept(entity: GridEntity, uid: int, kept: bool) -> void:
 ## decision 375): what was taken and what was left, with their condition.
 func _narrate_swap(by: GridEntity, taken: int, left: int) -> void:
 	party_log.add("%s takes up %s and puts down %s." % [_display_name(by), World.item_note(taken), World.item_note(left)])
+
+
+## A bow held at full draw till their stamina ran out (World.draw_given_up,
+## decision 669): let down, nothing loosed; the archer told.
+func _tell_arms_gave(by: GridEntity) -> void:
+	if by is Player and (by as Player).owner_peer != 0:
+		Net.broadcast_to([(by as Player).owner_peer], "party", {"from": "Server", "text": "Your arms give out."})
 
 
 ## A blow that knocked someone down (World.knocked_down).

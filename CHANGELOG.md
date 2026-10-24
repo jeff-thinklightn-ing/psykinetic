@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The bow now builds up as you draw: 2, 3, then full strength 4 at full draw (1.2 s, 9 cells); held past it the shot reaches farther (11, 13, 15 cells) but hits a target out there for less, and holding at full draw drains stamina until your arms give out and the bow lowers; the pips show the strength, a ring marks where full strength ends, and the camera eases out so the reach stays on screen (669).
 - When the draugr yields or is laid to rest, a spin, axe throw or charge he had begun is called off: nothing lands after he gives up (603 amended (3)).
 - Animals come back to the wilds: a herd's animals that vanished without being killed (a room reset, a restart) are counted back into the herd each day instead of being lost for good, and the server logs each area's herd numbers daily; an arrow that misses now lands with a thud, so game near where it falls runs off.
 - The draugr at rest no longer lies on the floor or asks for gold: beaten, he is gone, leaving his cloak, crown and axe where he fell (drawn once art-kit's piece lands); a click or E there tells you "He rests. Come back in N days.", no pact can be bought until he rises, and resetting the room no longer cuts his rest short. When his rest is over he stands again at his seat (or beside it if someone is standing on it).

@@ -43,6 +43,7 @@ func _ready() -> void:
 	_test_own_blow()
 	_test_other_zone_waits()
 	_test_cone_spread()
+	_test_draw_held()
 	_test_armour()
 
 	print("")
@@ -295,13 +296,15 @@ func _test_telegraph_lifecycle() -> void:
 	World.telegraph_started.disconnect(on_start)
 	World.telegraph_ended.disconnect(on_end)
 
-## The cone of flight (decision 620; combat's design): what a hold buys,
-## 400 rolls at each of 1, 3 and 6 s held. The miss is how far the line
-## flown passes from the aimed line at the step's range, in cells; the
-## design's table, from 40,000 rolls of the same curve: 0.46, 0.26, 0.11.
+## The cone of flight (decisions 620, 669; combat's design): what a hold
+## buys, 400 rolls at each of 0.5 s (the first step, 5 cells), 1.2 s (full
+## draw, 9) and 3.3 s (the last band, 15) held. The miss is how far the line
+## flown passes from the aimed line at the step's range, in cells (a third
+## of the cone's half-angle times the range): 0.43, 0.21, then 0.35, the
+## cone held at full draw's but the range longer.
 func _test_cone_spread() -> void:
 	print("
-== the cone of flight: a snap shot scattered, a patient one true (decision 620) ==")
+== the cone of flight: a snap shot scattered, full draw true, a long lob strays farther out (decisions 620, 669) ==")
 	var e := _build(["#####", "#.P.#", "#####"])
 	var host: GridEntity = e["P"][0]
 	_give(host, "bow")
@@ -311,7 +314,7 @@ func _test_cone_spread() -> void:
 	var means := []
 	var inside := true
 	var centred := true
-	for held in [10, 30, 60]:
+	for held in [5, 12, 33]:
 		host.raised_tick = World.tick - held
 		var cone := World.spread_of(host)
 		var cells := World.range_of(host)
@@ -326,18 +329,71 @@ func _test_cone_spread() -> void:
 		means.append(snappedf(miss / 400.0, 0.01))
 		centred = centred and absf(signed / 400.0) < cone * 0.1
 	World.shot_salt = salt
-	var table := [0.46, 0.26, 0.11]
+	var table := [0.43, 0.21, 0.35]
 	var near := true
 	for i in 3:
 		near = near and absf(means[i] - table[i]) <= 0.05
-	_check(near and means[0] > means[1] and means[1] > means[2],
-			"the mean miss at 1, 3 and 6 s held, within 0.05 cells of the design's 0.46, 0.26, 0.11 and falling (%s)" % [means])
+	_check(near and means[0] > means[1] and means[2] > means[1],
+			"the mean miss at 0.5, 1.2 and 3.3 s held, within 0.05 cells of the design's 0.43, 0.21, 0.35: least at full draw (%s)" % [means])
 	_check(inside and centred, "every roll inside the cone, centred on the aim")
 	var plain := Items.verb_of("bow").duplicate()
 	plain.erase("spread")
 	_check(is_zero_approx(Items.spread_at(plain, 60.0)) and World.scatter(host, 0.5, 0.0) == 0.5,
 			"a bow verb without a spread: no cone, the aim flown")
 	host.raised = ""
+
+## The bow held (decision 669): at full draw or past it the holder's
+## stamina drains, none coming back, and at 0 the arms give out (the bow let
+## down, nothing loosed); below full draw nothing drains; the damage by the
+## struck body's band past full draw.
+func _test_draw_held() -> void:
+	print("
+== a bow held at full draw tires the arms; past it the reach grows, weaker the farther out (decision 669) ==")
+	var e := _build(["####################", "#P.......m.....m...#", "####################"])
+	var host: GridEntity = e["P"][0]
+	var near: GridEntity = e["m"][0]  # 8 cells off.
+	var far: GridEntity = e["m"][1]  # 14 cells off.
+	_give(host, "bow")
+	World.put_item(host, host, Player.LEFT_HAND, World.items.mint("arrows", "built"))
+	var blow := host.attack_damage * float(Items.verb_of("bow")["damage"])
+	near.max_hp = 100
+	near.hp = 100
+	far.max_hp = 100
+	far.hp = 100
+	World.shoot(host, 0.0, 5)
+	_check(near.hp == 100 - roundi(blow * 1.6), "drawn to the last band, a body within 9 cells takes full strength (%d)" % (100 - near.hp))
+	World.despawn(near)
+	World.shoot(host, 0.0, 5)
+	_check(far.hp == 100 - roundi(blow * 0.4), "one 14 cells out, in the last band, takes the least (%d)" % (100 - far.hp))
+	far.hp = 100
+	World.shoot(host, 0.0, 4)
+	_check(far.hp == 100, "drawn only to the second band (13 cells), the arrow falls short of it")
+	_check(World.try_stance(host, "draw"), "drawn")
+	host.stamina = 50
+	for i in 5:
+		World.step()
+	_check(host.raised == "draw" and host.stamina >= 50, "below full draw nothing drains (%d)" % host.stamina)
+	host.raised_tick = World.tick - 12
+	var given := []
+	var shots := []
+	var on_given := func(by: GridEntity) -> void: given.append(by)
+	var on_loose := func(by: GridEntity, _angle: float, _step: int) -> void: shots.append(by)
+	World.draw_given_up.connect(on_given)
+	World.loosed.connect(on_loose)
+	host.stamina = 10
+	World.step()
+	_check(host.stamina == 8 and host.raised == "draw", "at full draw, 2 a tick (%d)" % host.stamina)
+	for i in 3:
+		World.step()
+	_check(host.stamina == 2 and host.raised == "draw", "none comes back while held (%d)" % host.stamina)
+	World.step()
+	_check(host.stamina == 0 and host.raised == "" and given == [host] and shots.is_empty(),
+			"at 0 the arms give out: the bow let down, nothing loosed (%s)" % [given])
+	World.step()
+	_check(host.winded, "and winded")
+	World.draw_given_up.disconnect(on_given)
+	World.loosed.disconnect(on_loose)
+
 
 ## Armour, combat's side (decision 622): the worn kind's deflect_shot after
 ## a shield, deflect_pierce on a backstab's or a reach verb's blow after

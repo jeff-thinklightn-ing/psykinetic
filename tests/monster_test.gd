@@ -2536,7 +2536,7 @@ func _test_archer() -> void:
 			break
 	_check(drawn and not shot.is_empty() and shot["entity"] == player and archer.tile == from,
 			"it draws where it stands and shoots the player 7 off (%s)" % [shot])
-	_check(not shot.is_empty() and int(shot["tick"]) >= 15, "once its draw's step reaches it, 7 cells, 15 ticks (decision 583; tick %s)" % shot.get("tick"))
+	_check(not shot.is_empty() and int(shot["tick"]) >= 7, "once its draw's step reaches it, 7 cells, 7 ticks (decisions 583, 669; tick %s)" % shot.get("tick"))
 	# Struck as it draws: the draw starts again.
 	for i in 12:
 		World.step()
@@ -2622,8 +2622,8 @@ func _test_archer_hold() -> void:
 	_check(is_equal_approx(float(read["steady"]["aim_spread"]), float(Items.verb_of("bow")["spread_floor"])),
 			"an aim_spread under the bow's floor is raised to it, with a warning (%s)" % read["steady"]["aim_spread"])
 	# Three off, its first step reaches: the draw's cone says when it looses.
-	for hold: Array in [[0.0, 0, 5, "no hold: as soon as the draw reaches, 5 ticks"], [16.0, 0, 10, "16 degrees: the second step, 10 ticks"],
-			[6.0, 0, 20, "6 degrees: the last step, 20 ticks"], [2.0, 25, 25, "the floor, capped at 25: at the cap, 25 ticks"]]:
+	for hold: Array in [[0.0, 0, 3, "no hold: as soon as the draw reaches, 3 ticks"], [16.0, 0, 5, "16 degrees: on the way to the second step, 5 ticks"],
+			[6.0, 0, 11, "6 degrees: on the way to full draw, 11 ticks"], [2.0, 25, 25, "under the floor, capped at 25: at the cap, 25 ticks"]]:
 		var e := _build(["##########", "#........#", "#..P..a..#", "#........#", "##########"])
 		var archer: Monster = e["a"][0]
 		_bold(archer)
@@ -2633,9 +2633,9 @@ func _test_archer_hold() -> void:
 		archer.aim_hold_max = hold[1]
 		var held: int = _held_at_loose(e, archer, 60)[0]
 		_check(held == hold[2], "%s (held %d)" % [hold[3], held])
-	# Five off, a crate beside its line two cells out, inside its cone at the
-	# second step (16 degrees): it holds past its cap (12, not firing while
-	# blocked) till the cone clears it (about 11 degrees, 14 ticks).
+	# Five off, a crate beside its line two cells out, inside its cone as it
+	# draws: it holds past its cap (4, not firing while blocked) till the
+	# cone clears it (about 11 degrees, 7 ticks; decision 669's draw).
 	var e := _build(["#############", "#...........#", "#....P....a.#", "#.......c...#", "#############"])
 	var archer: Monster = e["a"][0]
 	var crate: GridEntity = e["c"][0]
@@ -2643,7 +2643,7 @@ func _test_archer_hold() -> void:
 	archer.reaction_ticks = 0
 	archer.slots = PackedStringArray(["", "", "", "", "bow", "arrows"])
 	archer.aim_spread = 16.0
-	archer.aim_hold_max = 12
+	archer.aim_hold_max = 4
 	var r := _held_at_loose(e, archer, 80, crate)
 	_check(int(r[0]) > archer.aim_hold_max, "a crate on its cone's edge: it holds past its cap (held %d)" % r[0])
 	_check(int(r[0]) >= 0 and not r[1], "then looses once the cone clears it, the crate unstruck")

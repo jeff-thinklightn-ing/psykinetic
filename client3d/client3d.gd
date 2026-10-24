@@ -1194,6 +1194,9 @@ const HOVER_LINE := 0.05
 ## pip's radius and spacing, the most pips (the shortest step's).
 const AIM_LINE := 0.08
 const AIM_MARK := 0.22
+## The full-strength edge's ring: its inner and outer radius (decision 669).
+const AIM_FULL_INNER := 0.12
+const AIM_FULL_OUTER := 0.2
 const AIM_PIP := 0.13
 const AIM_PIP_GAP := 0.32
 const AIM_PIPS_MOST := 4
@@ -1223,6 +1226,16 @@ const AIM_CONE_FILL_LOW := 0.32
 ## The most the view leads the archer by, the WASD lean counted (perf, 617:
 ## the view's reach stays inside World.NEAR_TILES on every aspect).
 const AIM_LEAD_CELLS := 4.0
+## The draw's pull-back (decision 669; Jeff: "for hunting.. you want to have
+## distance, the camera should start to zoom out as the bow range goes up"):
+## while drawn, the view widens so the bow's reach, DRAW_PULL_MARGIN cells
+## past it, stays on screen; never nearer than the player's own zoom, at most
+## DRAW_PULL_MOST (and within World.NEAR_TILES, as the wheel's ZOOM_MAX is),
+## eased out and back at DRAW_PULL_RATE (an exponential rate a second: most
+## of the way in about 0.4 s).
+const DRAW_PULL_MARGIN := 1.5
+const DRAW_PULL_MOST := 1.8
+const DRAW_PULL_RATE := 7.5
 ## A telegraph's fill: faint at its start, full as it lands; the landing
 ## flash's alpha and length.
 const TELEGRAPH_FAINT := 0.18
@@ -1391,6 +1404,10 @@ var pitch := CAMERA_PITCH
 ## The wheel's zoom now and where it is easing to.
 var zoom := 1.0
 var _zoom_to := 1.0
+## The draw's pull-back now and where it is easing to (decision 669; 1 for
+## none): a factor on the view's size over the wheel's zoom.
+var _reach_pull := 1.0
+var _reach_pull_to := 1.0
 ## The click scheme's pan: how far the view is off the player (ground
 ## units), what it was when this drag began, and whether it is easing home.
 var pan := Vector3.ZERO
@@ -1623,9 +1640,14 @@ var _channel_ring: MeshInstance3D
 ## draws a semi circle for distance... the aim can move along at many
 ## degrees"): a flat semicircle on the ground round the archer, its middle
 ## on the aim, its radius the range step; the marker on it at the aim's
-## angle; pips beside the marker, more at the short steps (harder).
+## angle; pips beside the marker, the shot's strength there (decision 669:
+## 2, 3, 4 up to full draw, then 3, 2, 1 in the bands past it); past full
+## draw, a ring on the aim where full strength ends (_aim_full_mark).
 var _aim_arc: MeshInstance3D
 var _aim_mark: MeshInstance3D
+## The full-strength edge on the aim (decision 669): drawn past full draw,
+## where the bow's full draw reaches, so what lies beyond takes less.
+var _aim_full_mark: MeshInstance3D
 var _aim_pips: Array[MeshInstance3D] = []
 var _aim_arc_radius := -1.0
 ## The cone of flight (combat's design, ui's side): a flat wedge from the
@@ -2099,6 +2121,9 @@ func setup(terrain: Dictionary, centre := Vector2i.ZERO) -> void:
 	_aim_mark = _make_flat(_make_ring(0.0, AIM_MARK), Color(UiTheme.color("brass_bright"), 0.95))
 	_aim_mark.visible = false
 	add_child(_aim_mark)
+	_aim_full_mark = _make_flat(_make_ring(AIM_FULL_INNER, AIM_FULL_OUTER), Color(UiTheme.color("brass_bright"), 0.8))
+	_aim_full_mark.visible = false
+	add_child(_aim_full_mark)
 	for i in AIM_PIPS_MOST:
 		var pip := _make_flat(_make_ring(0.0, AIM_PIP), Color(UiTheme.color("brass_bright"), 0.95))
 		pip.visible = false
@@ -2185,6 +2210,7 @@ func _process(delta: float) -> void:
 	_update_indoors()
 	_ease_tilt(delta)
 	_ease_zoom(delta)
+	_ease_reach_pull(delta)
 	_ease_pan(delta)
 	_follow(delta)
 	_fade_clock += delta
@@ -2820,7 +2846,7 @@ func _apply_size() -> void:
 ## factor on the ortho size (and under the low camera, on its distance).
 func _size_factor() -> float:
 	return zoom * lerpf(1.0, PEEK_PULL_BACK, smoothstep(0.0, 1.0, _peek)) \
-			* lerpf(1.0, MOURN_PULL_BACK, smoothstep(0.0, 1.0, _mourn))
+			* lerpf(1.0, MOURN_PULL_BACK, smoothstep(0.0, 1.0, _mourn)) * _reach_pull
 
 
 ## How tall the view is at the camera's aim (ground units, straight across
@@ -2879,6 +2905,67 @@ func _ease_pan(delta: float) -> void:
 func _save_zoom() -> void:
 	Net.camera_zoom = _zoom_to
 	Net.save_view_settings()
+
+
+## The bow drawn to [param cells] the way of [param way] (Main, beside
+## aim_lead; 0 when not drawn; decision 669): the pull-back eased toward the
+## least that keeps the point DRAW_PULL_MARGIN past that reach, the aim lead
+## counted, on screen (reach_fits, by halves between 1 and the most), high
+## camera or low.
+func aim_reach(cells: float, way: Vector2) -> void:
+	if cells <= 0.0 or _camera == null or way.length() < 0.001:
+		_reach_pull_to = 1.0
+		return
+	var ground := way.normalized() * (cells + DRAW_PULL_MARGIN) - Vector2(_aim_lead_to.x, _aim_lead_to.z)
+	var point := Vector3(ground.x, 0.0, ground.y)
+	var most := DRAW_PULL_MOST
+	if not _low:
+		most = minf(most, World.NEAR_TILES / maxf(_view_reach() / maxf(_reach_pull, 0.001), 0.001))
+	most = maxf(most, 1.0)
+	if reach_fits(point, 1.0):
+		_reach_pull_to = 1.0
+		return
+	if not reach_fits(point, most):
+		_reach_pull_to = most
+		return
+	var low_end := 1.0
+	var high_end := most
+	for i in 16:
+		var mid := (low_end + high_end) * 0.5
+		if reach_fits(point, mid):
+			high_end = mid
+		else:
+			low_end = mid
+	_reach_pull_to = high_end
+
+
+## Whether [param point] (relative to the view's centre, on the ground) is on
+## screen with the pull-back at [param pull] (decision 669): the camera as it
+## stands, its size (ortho) or its distance (the low camera) over the
+## player's zoom times [param pull].
+func reach_fits(point: Vector3, pull: float) -> bool:
+	var screen := get_viewport().get_visible_rect().size
+	var aspect := screen.x / maxf(screen.y, 1.0)
+	var scale := pull / maxf(_reach_pull, 0.001)
+	var basis := _camera.global_transform.basis
+	if not _low:
+		var local := basis.inverse() * point
+		var half := _camera.size * scale * 0.5
+		return absf(local.x) <= half * aspect and absf(local.y) <= half
+	var eye := _camera_offset() * scale
+	var local := basis.inverse() * (point - eye)
+	if local.z >= -0.01:
+		return false  # Behind the eye.
+	var tan_v := tan(deg_to_rad(_camera.fov * 0.5))
+	return absf(local.x) <= -local.z * tan_v * aspect and absf(local.y) <= -local.z * tan_v
+
+
+func _ease_reach_pull(delta: float) -> void:
+	if is_equal_approx(_reach_pull, _reach_pull_to):
+		return
+	_reach_pull = lerpf(_reach_pull, _reach_pull_to, 1.0 - exp(-DRAW_PULL_RATE * delta))
+	if absf(_reach_pull - _reach_pull_to) < 0.0005:
+		_reach_pull = _reach_pull_to
 
 
 func _ease_zoom(delta: float) -> void:
@@ -4031,9 +4118,11 @@ static func lead_offset(lean: Vector2, aim: Vector3) -> Vector3:
 ## half-angle, radians; below 0 for none) the arc is the far end of the
 ## cone of flight, a wedge from the archer that long and that wide, its
 ## drawn half-angle eased toward the sim's over a tick.
-func aim_arc(origin: Vector2, angle: float, radius: float, alpha: float, pips: int, show: bool, spread := -1.0) -> void:
+func aim_arc(origin: Vector2, angle: float, radius: float, alpha: float, pips: int, show: bool, spread := -1.0,
+		full := -1.0) -> void:
 	_aim_arc.visible = show and radius > 0.0
 	_aim_mark.visible = _aim_arc.visible
+	_aim_full_mark.visible = _aim_arc.visible and full > 0.0 and full < radius
 	for i in _aim_pips.size():
 		_aim_pips[i].visible = _aim_arc.visible and i < pips
 	var cone := _aim_arc.visible and spread >= 0.0
@@ -4073,6 +4162,10 @@ func aim_arc(origin: Vector2, angle: float, radius: float, alpha: float, pips: i
 	var at := Vector3(point.x, _height_in(Vector2i(point.round()), point) + ON_FLOOR * 3.0, point.y)
 	_aim_mark.position = at
 	_tint_aim(_aim_mark, alpha * 0.95)
+	if _aim_full_mark.visible:
+		var edge := origin + way * full
+		_aim_full_mark.position = Vector3(edge.x, _height_in(Vector2i(edge.round()), edge) + ON_FLOOR * 3.0, edge.y)
+		_tint_aim(_aim_full_mark, alpha * 0.8)
 	# The pips in a row across the aim, just past the marker, centred on it.
 	var across := Vector2(-way.y, way.x)
 	for i in pips:

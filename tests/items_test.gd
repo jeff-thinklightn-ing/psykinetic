@@ -575,26 +575,36 @@ func _test_weapons() -> void:
 	var shot := func(by: GridEntity, angle: float, step: int) -> void: shots.append([by, angle, step])
 	World.loosed.connect(shot)
 	_check(World.off_hand(host) == "draw" and World.try_stance(host, "draw") and host.raised == "draw", "a bow, and a bundle of arrows in the other hand: the right button draws it")
-	host.raised_tick = World.tick - 3
+	host.raised_tick = World.tick - 2
 	_check(World.range_of(host) == 0 and World.draw_step(host) == -1 and not World.try_loose(host, 0.0) and shots.is_empty() and host.raised == "",
-			"let go before draw_min (5 ticks): no shot, the bow lowered")
+			"let go before draw_min (3 ticks): no shot, the bow lowered")
 	World.try_stance(host, "draw")
 	var reached := []
-	for drawn in [5, 9, 10, 15, 20, 40]:
+	var stepped_to := []
+	for drawn in [3, 6, 7, 11, 12, 17, 18, 24, 25, 32, 33, 60]:
 		host.raised_tick = World.tick - drawn
 		reached.append(World.range_of(host))
-	_check(reached == [3, 3, 5, 7, 9, 9] and World.longest_range(host) == 9,
-			"range by the hold, in steps (decision 583): 3 cells at draw_min, 5, 7, 9 every 5 ticks after, held at 9 (%s)" % [reached])
-	host.raised_tick = World.tick - 10
-	_check(is_equal_approx(World.draw_of(host), 0.5), "drawn 10 ticks of 20: half the pull's pose (%.2f)" % World.draw_of(host))
+		stepped_to.append(World.full_range_of(host))
+	_check(reached == [5, 5, 7, 7, 9, 9, 11, 11, 13, 13, 15, 15] and World.longest_range(host) == 15,
+			"range by the hold (decision 669): 5 cells at 3 ticks, 7 at 7, full draw's 9 at 12, then the bands, 11 at 18, 13 at 25, 15 at 33, held there (%s)" % [reached])
+	_check(stepped_to == [0, 0, 0, 0, 9, 9, 9, 9, 9, 9, 9, 9], "the full-strength edge shown from full draw on, at 9 cells (%s)" % [stepped_to])
+	host.raised_tick = World.tick - 6
+	_check(is_equal_approx(World.draw_of(host), 0.5), "drawn 6 ticks of full draw's 12: half the pull's pose (%.2f)" % World.draw_of(host))
 	var cones := []
-	for drawn in [0, 5, 7, 10, 15, 20, 40, 60, 100]:
+	for drawn in [0, 3, 5, 7, 9, 12, 18, 60]:
 		host.raised_tick = World.tick - drawn
 		cones.append(snappedf(rad_to_deg(World.spread_of(host)), 0.1))
 	var cones_ok := true
 	for i in cones.size():
-		cones_ok = cones_ok and is_equal_approx(cones[i], [25.0, 25.0, 21.4, 16.0, 10.0, 6.0, 4.0, 2.0, 2.0][i])
-	_check(cones_ok, "the cone narrows with the hold (decision 620): 25 degrees till the first step, 16, 10, 6 at the next, lerped between, down to the floor of 2 over 40 ticks past the last (%s)" % [cones])
+		cones_ok = cones_ok and is_equal_approx(cones[i], [20.0, 20.0, 15.0, 10.0, 7.6, 4.0, 4.0, 4.0][i])
+	_check(cones_ok, "the cone narrows with the draw (decisions 620, 669): 20 degrees till the first step, 10 at the second, 4 at full draw, lerped between, held at 4 past it (%s)" % [cones])
+	var bow_verb := Items.verb_of("bow")
+	var by_distance := []
+	for away in [1, 9, 10, 11, 12, 13, 14, 15]:
+		by_distance.append(Items.damage_for(bow_verb, 5, away))
+	_check(by_distance == [1.6, 1.6, 1.2, 1.2, 0.8, 0.8, 0.4, 0.4] and Items.damage_for(bow_verb, 0, 3) == 0.8 and Items.damage_for(bow_verb, 1, 6) == 1.2
+			and Items.damage_for(bow_verb, 3, 14) == 1.2,
+			"strength by the draw, then by the struck body's band past full draw: 0.8, 1.2, 1.6 drawing up; 1.6 within 9 cells, 1.2, 0.8, 0.4 in the bands out (%s)" % [by_distance])
 	host.raised_tick = World.tick - 40
 	var cone := World.spread_of(host)
 	var strayed := true
@@ -610,8 +620,8 @@ func _test_weapons() -> void:
 	var flew := []
 	var landed := func(to: Vector2, _struck: StringName) -> void: flew.append(to)
 	host.shot.connect(landed)
-	_check(World.try_loose(host, 0.5) and shots.size() == 1 and shots[0] == [host, 0.5, 3] and host.raised == "",
-			"held past the last step: loosed at the angle, at its longest step, for combat to shoot (%s)" % [shots])
+	_check(World.try_loose(host, 0.5) and shots.size() == 1 and shots[0] == [host, 0.5, 5] and host.raised == "",
+			"held past the last band: loosed at the angle, at its longest step, for combat to shoot (%s)" % [shots])
 	_check(flew.size() == 1 and is_equal_approx(snappedf((flew[0] - Vector2(host.tile)).angle(), 0.001), snappedf(flown, 0.001)),
 			"it flies the rolled line, read in the cone before the bow is lowered (%s, %.3f)" % [flew, flown])
 	host.shot.disconnect(landed)
@@ -619,7 +629,7 @@ func _test_weapons() -> void:
 	_check(World.spread_of(host) == -1.0, "not drawing: no cone")
 	_check(not World.try_stance(host, "block"), "a bow is no shield")
 	World.loosed.disconnect(shot)
-	print("\n== the bow shoots along a ray at any angle: the first body, shortest steps hardest (decisions 335, 583) ==")
+	print("\n== the bow shoots along a ray at any angle: the first body, full draw hardest (decisions 335, 583, 669) ==")
 	var imp: GridEntity = null
 	for monster in World.monsters():
 		imp = monster
@@ -650,9 +660,9 @@ func _test_weapons() -> void:
 		var seen := func(to: Vector2, struck: StringName) -> void: ends.append([to, struck])
 		host.shot.connect(seen)
 		var hp := imp.hp
-		_check(World.shoot(host, toward, 2) == imp and imp.hp == hp - 4 and ends.size() == 1
+		_check(World.shoot(host, toward, 2) == imp and imp.hp == hp - 6 and ends.size() == 1
 				and ends[0][0].is_equal_approx(Vector2(mark)) and ends[0][1] == &"body",
-				"the third step (7 cells, x1.0): the imp, the first body, hit for 4 (a blow of 2, the bow's 2) (%d -> %d); the arrow ends at it (%s)" % [hp, imp.hp, ends])
+				"full draw (9 cells, x1.6): the imp, the first body, hit for 6 (a blow of 2, the bow's 2) (%d -> %d); the arrow ends at it (%s)" % [hp, imp.hp, ends])
 		var aim := World.shot_aim(host, toward, 7)
 		_check(aim["hit"] == imp and aim["cell"] == mark and aim["struck"] == &"body",
 				"the aim while drawing reads the same ray: the imp outlined, where the arrow ends")
@@ -661,12 +671,12 @@ func _test_weapons() -> void:
 		_check(World.shoot(host, toward, 1) == imp and imp.hp == hp - 5, "the second step (x1.2): 5 (%d -> %d)" % [hp, imp.hp])
 		imp.hp = imp.max_hp
 		hp = imp.hp
-		_check(World.shoot(host, toward, 3) == imp and imp.hp == hp - 3, "the longest (x0.8): 3 (%d -> %d)" % [hp, imp.hp])
+		_check(World.shoot(host, toward, 0) == imp and imp.hp == hp - 3, "the first step (x0.8): 3 (%d -> %d)" % [hp, imp.hp])
 		imp.hp = imp.max_hp
 		hp = imp.hp
-		_check(World.shoot(host, toward, 0) == null and imp.hp == hp and ends.back()[1] == &"ground"
-				and ends.back()[0].is_equal_approx(Vector2(host.tile) + Vector2(mark - host.tile) * 0.75),
-				"the shortest step reaches 3 cells: short of the imp at 4, it comes down (%s)" % [ends.back()])
+		_check(World.shoot(host, toward, 5) == imp and imp.hp == hp - 6, "the last band, the imp within full draw's 9 cells: full strength, 6 (%d -> %d)" % [hp, imp.hp])
+		imp.hp = imp.max_hp
+		hp = imp.hp
 		var friend := Resident.new()
 		friend.name = "Tam"
 		World._relocate(imp, _far_cell(host))
@@ -694,7 +704,7 @@ func _test_weapons() -> void:
 		host.raised = ""
 		var plain_ticks := World.step_ticks(host, Vector2i(1, 0))
 		host.raised = "draw"
-		_check(stepped and host.raised == "draw" and host.raised_tick == drawn_from and World.range_of(host) == 9
+		_check(stepped and host.raised == "draw" and host.raised_tick == drawn_from and World.range_of(host) == 13
 				and is_equal_approx(drawn_ticks, plain_ticks * World.DRAWN_TICK_SCALE),
 				"a step while drawn: the draw kept, at half pace (%.2f ticks a step, %.2f not drawn)" % [drawn_ticks, plain_ticks])
 		World.try_stance(host, "")
@@ -1750,17 +1760,18 @@ func _test_armour() -> void:
 	_give(host, "bow", Player.RIGHT_HAND)
 	_give(host, "arrows", Player.LEFT_HAND)
 	_check(World.try_stance(host, "draw"), "drawn in leather")
-	host.raised_tick = World.tick - 19
+	host.raised_tick = World.tick - 11
 	_check(World.range_of(host) == 9 and is_equal_approx(World.draw_quick(host), 0.9),
-			"in leather, 19 ticks reach 9 cells (bare, 7): its draw is 0.9 of the ticks (%d)" % World.range_of(host))
+			"in leather, 11 ticks reach full draw's 9 cells (bare, 7): its draw is 0.9 of the ticks (%d)" % World.range_of(host))
 	host.raised = ""
 	var plate := World.items.mint("plate_armour", "made")
 	_check(World.try_transfer(host, host, Items.ARMOUR, host, 2) and World.put_item(host, host, Items.ARMOUR, plate) and host.worn == "plate_armour",
 			"the leather off, plate on")
 	World.try_stance(host, "draw")
 	host.raised_tick = World.tick - 100
-	_check(World.range_of(host) == 5 and World.longest_range(host) == 5 and World.draw_step(host) == 1 and is_equal_approx(World.draw_of(host), 1.0),
-			"in plate a bow reaches 5 cells at most, however long it is held, its pull full there (%d)" % World.range_of(host))
+	_check(World.range_of(host) == 5 and World.longest_range(host) == 5 and World.draw_step(host) == 2 and is_equal_approx(World.draw_of(host), 1.0)
+			and Items.damage_for(Items.verb_of("bow"), World.draw_step(host), 5) == 1.6,
+			"in plate a bow reaches 5 cells at most, however long it is held, but comes to full draw, full strength within them (decision 669) (%d)" % World.range_of(host))
 	host.raised = ""
 	World.try_transfer(host, host, Items.ARMOUR, host, 3)
 	World.try_transfer(host, host, 2, host, Items.ARMOUR)
