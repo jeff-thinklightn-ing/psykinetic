@@ -38,7 +38,7 @@
 			"name": "the Woodlands",
 			"status": "draft",
 			"source": "Jeff",
-			"summary": "The Woodlands, where Held sits, with the farmsteads and fields around it, far from the mine (Jeff, 2026-10-22: \"Held sit in the Woodlands\").",
+			"summary": "The Woodlands, where Umbrage sits, with the farmsteads and fields around it, far from the mine (Jeff, 2026-10-22: \"Held sit in the Woodlands\"; the town renamed Umbrage, Jeff 2026-10-24).",
 			"relations": [
 				{
 					"to": "blood_rot_lands",
@@ -49,7 +49,7 @@
 			"facts": [
 				{
 					"id": "town_lands.woodlands",
-					"text": "Held sits in the Woodlands.",
+					"text": "Umbrage sits in the Woodlands.",
 					"known": "common",
 					"where": [],
 					"tags": [],
@@ -122,7 +122,7 @@
 			"name": "the Old Tower",
 			"status": "draft",
 			"source": "Jeff",
-			"summary": "The Old Tower across the river from Held: a broken-down castle the ancients lived in, conquered in the battle; its fallen warriors were buried before the people moved on, and nothing is known of them since. Snagfin keeps his counter there (Jeff, 2026-10-22).",
+			"summary": "The Old Tower across the river from Umbrage: a broken-down castle the ancients lived in, conquered in the battle; its fallen warriors were buried before the people moved on, and nothing is known of them since. Snagfin keeps his counter there (Jeff, 2026-10-22).",
 			"place_kind": "keep",
 			"relations": [
 				{
@@ -136,7 +136,7 @@
 			"facts": [
 				{
 					"id": "old_tower.ancients",
-					"text": "The Old Tower, across the river from Held, is a broken-down castle the ancients lived in.",
+					"text": "The Old Tower, across the river from Umbrage, is a broken-down castle the ancients lived in.",
 					"known": "common",
 					"where": [
 						"town_lands"

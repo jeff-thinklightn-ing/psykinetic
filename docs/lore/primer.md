@@ -55,10 +55,13 @@ beyond.
 
 ## The town
 
-The town is where the players and their companions belong. It is named Held
-(Jeff, 2026-10-18: "town named Held"). It lies in the Blood Rot's land, at a distance from the mine.
+The town is where the players and their companions belong. It is named Umbrage
+(Jeff, 2026-10-24: "i want to change the name of the village to Umbrage, it actually fits,
+the town is cursed because of the grave robbers and the economy that runs off the barrows
+gold"; it was named Held, 2026-10-18). Umbrage is cursed: everyone says so, and some say
+why, the grave robbers and an economy that runs off the barrow's gold. It lies in the Blood Rot's land, at a distance from the mine.
 
-In draft until Jeff checks the wording (2026-10-22): Held sits in the Woodlands. Across the
+In draft until Jeff checks the wording (2026-10-22): Umbrage sits in the Woodlands. Across the
 river stands the Old Tower, a broken-down castle the ancients lived in. It was conquered in
 the battle, and its fallen warriors were buried (in the Barrow of the Fallen) before the
 people moved on; nothing is known of them since. Snagfin the goblin keeps his counter

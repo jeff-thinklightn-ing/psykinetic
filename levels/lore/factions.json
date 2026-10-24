@@ -22,9 +22,32 @@
 			"facts": [
 				{
 					"id": "town.name",
-					"text": "The town is named Held.",
+					"text": "The town is named Umbrage.",
 					"known": "common",
 					"where": [],
+					"source": "Jeff",
+					"status": "agreed"
+				},
+				{
+					"id": "town.cursed",
+					"text": "Umbrage is cursed.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"source": "Jeff",
+					"status": "agreed"
+				},
+				{
+					"id": "town.curse_why",
+					"text": "Umbrage is cursed because of the grave robbers, and because its economy runs off the barrow's gold.",
+					"known": "rumour",
+					"true": true,
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
 					"source": "Jeff",
 					"status": "agreed"
 				},
