@@ -3281,6 +3281,65 @@
 			"uses": "a hand saw in a townsman's hand (decision 566, art-kit's side; Jeff, 2026-10-21: \"building a half constructed building\"): not an item, held on hand_r for the saw activity (pc-character's clip); its origin the grip in the handle's hole, the blade along +y, its teeth toward +x",
 			"grey": [{"at": [0.0, -0.03, 0], "size": [0.135, 0.13, 0.027]}, {"at": [0.03, 0.3, 0], "size": [0.07, 0.56, 0.006]}]
 		},
+		"tool.hoe": {
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-24", "notes": "C:/dev/review/tools/make_work.py hoe: an ash haft 1.45 m, an iron socket at its top, a short neck and a blade 0.18 wide across z off it toward +x, tilted a little down toward the butt, its bright edge at the +x end; 128 tris"},
+			"category": "items",
+			"type": "mesh",
+			"kind": "held",
+			"size": [0.194, 1.46, 0.18],
+			"budget": 300,
+			"sockets": {"grip": [0, 0, 0]},
+			"uses": "a hoe in a townsman's hands (566 amended, art-kit's side; npc's townsfolk shown at their work, the coordinator's ask): not an item, held on hand_r for the hoe activity (pc-character's clip); its origin the butt, ACTIVITIES' \"grip\" sliding the right hand up the haft and the left at the butt, as tool.axe; the haft along +y, the blade at the top, its edge toward +x",
+			"grey": [{"at": [0.0, 0.73, 0], "size": [0.04, 1.46, 0.04]}, {"at": [0.11, 1.43, 0], "size": [0.13, 0.02, 0.18]}]
+		},
+		"tool.crook": {
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-24", "notes": "C:/dev/review/tools/make_work.py crook: a dark wooden staff, a little crooked, an iron ferrule at its foot, the hook at its top curling toward +x and open downward; 192 tris"},
+			"category": "items",
+			"type": "mesh",
+			"kind": "held",
+			"size": [0.182, 1.749, 0.036],
+			"base": -1.0,
+			"budget": 300,
+			"sockets": {"grip": [0, 0, 0]},
+			"uses": "a shepherd's crook in a herder's hand (566 amended, art-kit's side; npc's townsfolk shown at their work, the coordinator's ask): not an item, held on hand_r for the herd activity (pc-character's clip); its origin the grip 1.0 m up from its foot, so it stands on the ground beside the hand; the staff along +y, the hook at the top toward +x",
+			"grey": [{"at": [0.0, -0.1255, 0], "size": [0.036, 1.749, 0.036]}, {"at": [0.073, 0.68, 0], "size": [0.182, 0.14, 0.03]}]
+		},
+		"tool.shears": {
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-24", "notes": "C:/dev/review/tools/make_work.py shears: hand sheep shears, a dark iron spring bow at the foot, two arms up to two flat bright-edged blades meeting at their points 0.3 m up, a cord wrapped round both arms where the hand closes; 190 tris"},
+			"category": "items",
+			"type": "mesh",
+			"kind": "held",
+			"size": [0.055, 0.393, 0.025],
+			"base": -0.093,
+			"budget": 300,
+			"sockets": {"grip": [0, 0, 0]},
+			"uses": "sheep shears in a herder's hand (566 amended, art-kit's side; npc's townsfolk shown at their work, the coordinator's ask): not an item, held on hand_r for the shear activity (pc-character's clip, its hand squeezing them; no moving part); its origin where the fist closes on the arms over the bow, the blades up +y",
+			"grey": [{"at": [0.0, 0.104, 0], "size": [0.055, 0.393, 0.025]}]
+		},
+		"carry.sack": {
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-24", "notes": "C:/dev/review/tools/make_work.py sack: a full grain sack of pale sacking slumped over the shoulder in an arch, fatter down the back, its neck gathered and tied with cord at the chest end; 152 tris"},
+			"category": "items",
+			"type": "mesh",
+			"kind": "held",
+			"size": [0.762, 0.43, 0.405],
+			"base": -0.193,
+			"budget": 250,
+			"sockets": {"grip": [0, 0, 0]},
+			"uses": "a sack carried on the shoulder (566 amended, art-kit's side; npc's townsfolk shown at their work, the coordinator's ask), for the carry_sack activity on pc-character's \"shoulder\" socket (+x forward, +y up, as carry.log): its origin where it rests on the shoulder's top, its underside there; fore and aft along x, the tied neck at the front (+x), more of it down the back",
+			"grey": [{"at": [-0.05, 0.022, 0], "size": [0.762, 0.43, 0.405]}]
+		},
+		"carry.game": {
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-24", "notes": "C:/dev/review/tools/make_work.py game: a doe, reworked after the coordinator's read of the first cut (\"a smooth tan crescent across the shoulders, more a horn or a bow than a deer\"): a lumpy body with the withers' hump and the haunch's round, a dark back over fawn flanks and a pale belly, her neck and a clear head hanging over the right side (ears hanging down, dark muzzle and eyes), a pale tail over the left, the four dark legs forward to meet before the chest at [0.25, -0.15, -0.2] from the origin, bound there with a cord, dark hooves past it; 716 tris"},
+			"category": "items",
+			"type": "mesh",
+			"kind": "held",
+			"size": [0.467, 0.748, 1.312],
+			"base": -0.452,
+			"budget": 800,
+			"sockets": {"grip": [0, 0, 0], "feet": [0.25, -0.15, -0.2]},
+			"uses": "a doe carried across the shoulders (566 amended, art-kit's side; npc's townsfolk shown at their work: the hunter home from the stalk, the coordinator's ask), for the carry_game activity on pc-character's \"shoulder\" socket (+x forward, +y up, +z out past the right shoulder): its origin on the right shoulder's top, its underside there; her body along z behind the neck, centred 0.2 toward -z and a little behind, the head over the right side, the rump over the left; the four feet meet before the chest at the \"feet\" socket, where both hands hold them",
+			"grey": [{"at": [0.041, -0.078, -0.105], "size": [0.467, 0.748, 1.312]}]
+		},
 		"ground.needles": {
 			"category": "ground",
 			"type": "texture",

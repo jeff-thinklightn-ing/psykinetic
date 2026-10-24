@@ -27788,3 +27788,28 @@ left forearm kept forward at the waist; its contact, measured, 0.42 s. HUMANOID_
 strikes with it; the giant axe and the pick (hands 2) keep Axe_Overhead. No other one-handed weapon
 used it. view_test _test_two_hands: no one-handed weapon's strike is a two-handed clip. Client
 only, no new number (451 amended (2)).
+
+## 566 amended, art-kit's side: the townsfolk's work pieces
+
+The coordinator's ask for npc's 566 amended (townsfolk shown at their work). Pc-character's clips
+hold the pieces (stalk, carry_game, hoe, carry_sack, herd, shear), and the frames were agreed with
+it. They are made as tool.* and carry.* were in 566: held slots, palette only, low poly, closed
+pieces wound outward, not items (no edge turn, 451 amended).
+
+- **tool.hoe:** an ash haft 1.45 m up +y with an iron blade at its top at right angles, reaching
+  toward +x, 0.18 wide across z, its edge at the +x end. The origin is the butt; ACTIVITIES'
+  "grip" slides the right hand up the haft and the left takes the butt, as tool.axe.
+- **tool.crook:** a shepherd's staff, the hook at its top curling toward +x and open downward. The
+  origin is the grip, 1.0 m up from the foot (base -1.0).
+- **tool.shears:** hand sheep shears, a spring bow at the foot and two blades up +y to their points
+  at 0.3 m. The origin is where the fist closes over the bow; no moving part, the clip's hand
+  squeezes.
+- **carry.sack:** on the "shoulder" socket (+x forward, +y up, as carry.log), a full sack slumped
+  over the shoulder, its underside at the origin, its tied neck at the front, more down the back.
+- **carry.game:** on the "shoulder" socket (+z out past the right shoulder), a doe across the
+  shoulders behind the neck, centred 0.2 toward -z. The head hangs over the right side and the
+  rump over the left, and the four feet meet before the chest at the slot's "feet" socket
+  [0.25, -0.15, -0.2], where pc-character's both-hands hold puts the wrists.
+
+Scripts in C:/dev/review/tools/make_work.py. art_kit_test passes. Client art only, protocol
+unchanged, no new class_name.
