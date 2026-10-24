@@ -131,8 +131,8 @@ are stated plainly and found as aftermath, not depicted.
 
 - **[Jeff]** The starter town is in this region, well away from the mine.
 - **[Jeff]** A tower stands over the mine: orc-built, to dark elven designs.
-- **[proposal]** The tower is visible across the region, including from town: the
-  landmark that says where the threat lives.
+- **[Jeff]** The tower is visible across the region, including from town: the
+  landmark that says where the threat lives. Jeff (2026-10-23): "i think the sky view is going to pay off big time, now we can have the castle show on the horizon, perhaps under a mountain. the dark elven tower standing off in the distance".
 - **[Jeff]** The tower's inside shifts (a delve-again place), while the overworld
   stays consistent.
 - **[proposal]** Fixed anchors inside the shifting tower: the entrance, the way down
@@ -225,3 +225,4 @@ All ranks and names are **[proposal]**; high priests are **[Jeff]**.
   its own file, castle.md.
 - Session 2, cont.: dark elven artifacts come from the tower (Jeff).
 - Synced with decisions.md: allies agreed (416).
+- 2026-10-23: the tower seen across the region, from town too, is Jeff's (the sky view).

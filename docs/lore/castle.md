@@ -28,6 +28,9 @@ Companion file: `blood_rot.md` (the region's main faction and the tower).
   something in. The dwarves knew which; no one now does.
 - **[proposal]** Open: where did the dwarves go?
 
+- **[Jeff]** The castle shows on the horizon (2026-10-23, the sky view): "i think the sky view is going to pay off big time, now we can have the castle show on the horizon, perhaps under a mountain. the dark elven tower standing off in the distance".
+- **[Jeff]**, his "perhaps", draft until a sheet: the castle stands under a mountain.
+
 ### The labyrinths
 
 - **[Jeff]** The maps of the labyrinths were lost long ago.
@@ -118,3 +121,4 @@ brought home). The first draft's raid on a farmstead is gone: the event is now
   interior shift, perhaps by magic; adventurers still come (Jeff).
 - Session 2, cont.: dwarven artifacts come from the dungeons below (Jeff).
 - 2026-10-22: the smith went below after a rumoured great dwarven forge with hired guards, was ambushed and captured, and works goblin weapons for the Blood Rot's raids (Jeff, C3).
+- 2026-10-23: the castle shows on the horizon, perhaps under a mountain (Jeff, the sky view).
