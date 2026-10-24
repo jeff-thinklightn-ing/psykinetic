@@ -1562,6 +1562,7 @@ func _test_kinds() -> void:
 	_test_stages()
 	_test_plinth()
 	_test_open_kinds()
+	_test_plots()
 
 
 ## A building being built (decision 566): its stages by its town record's
@@ -1728,6 +1729,67 @@ func _test_open_kinds() -> void:
 			"the forge's open front on %d posts, under its lean-to's low eave" % front_posts.size())
 	hall.free()
 	smithy.free()
+
+
+## A town's laid plots (591 amended, maps' Level.plot_building) drawn as
+## their kinds, raised by their records' stages (566): staked with no
+## record, never standing for being laid; one laid live drawn at once;
+## one dropped (649) gone.
+func _test_plots() -> void:
+	print("
+== a town's laid plots: staked till its record raises it, one laid live drawn (591 amended) ==")
+	var level := _kinds_level([])
+	var terrain: Dictionary = level["terrain"]
+	var town := "plot_zone/plot_town"
+	var house_rect := Rect2i(Vector2i(1, 1), Level.plot_of("house") + Vector2i(2, 2))
+	Clearing.lay_plots(terrain, [{"town": town, "kind": "house", "use": "house", "rect": house_rect, "facing": Vector2i(0, 1), "size": "small"}])
+	_check((terrain["plot_buildings"] as Array).size() == 1, "the house's plot is laid as its kind (%s)" % [terrain.get("plot_buildings")])
+	_rig.rebuild(terrain, Vector2i(5, 18))
+	var plots := _rig._buildings.filter(func(each: Dictionary) -> bool: return each.get("plot", false))
+	var house: Dictionary = plots[0] if plots.size() == 1 else {}
+	var walls_at := func(entry: Dictionary) -> Array:
+		return (entry["outline"] as Array).filter(func(key: Vector3i) -> bool: return _rig._walls.has(key))
+	_check(not house.is_empty() and house["stage"] == BuildingComposer.PLOT and walls_at.call(house).is_empty()
+			and (house["node"] as Node3D).find_child("Stake", true, false) != null,
+			"no record yet: its plot staked, no wall (%s)" % [house.get("stage")])
+	_rig.set_town(town, {"house": {"state": Towns.PLANNED, "level": 0, "progress": 0.0}})
+	_check(house["stage"] == BuildingComposer.PLOT, "planned: still staked")
+	_rig.set_town(town, {"house": {"state": Towns.BUILDING, "level": 0, "progress": 0.5}})
+	_check(house["stage"] > BuildingComposer.FRAME and house["stage"] < BuildingComposer.STANDING and walls_at.call(house).size() > 6,
+			"half built: its walls going up (%d)" % walls_at.call(house).size())
+	_rig.set_town(town, {"house": {"state": Towns.STANDING, "level": 1}})
+	_check(house["stage"] == BuildingComposer.STANDING and house["roof"] != null, "standing: whole, roofed")
+	# One laid while the view is up (Main: Clearing.lay_plots, then clearing_changed).
+	var shed_rect := Rect2i(Vector2i(13, 1), Level.plot_of("shed") + Vector2i(2, 2))
+	Clearing.lay_plots(_rig._terrain, [{"town": town, "kind": "shed", "use": "shed", "rect": shed_rect, "facing": Vector2i(0, 1), "size": "small"}])
+	var before := _rig._buildings.size()
+	_rig.clearing_changed(_rig._terrain, [])
+	var shed: Dictionary = _rig._buildings.back() if _rig._buildings.size() == before + 1 else {}
+	_check(not shed.is_empty() and shed.get("plot", false) and shed["stage"] == BuildingComposer.PLOT
+			and shed_rect.encloses(shed["rect"]) and walls_at.call(shed).is_empty(),
+			"a plot laid live: drawn at once, staked (%d buildings, was %d)" % [_rig._buildings.size(), before])
+	_rig.clearing_changed(_rig._terrain, [])
+	_check(_rig._buildings.size() == before + 1, "and drawn once")
+	_rig.set_town(town, {"house": {"state": Towns.STANDING, "level": 1}, "shed": {"state": Towns.STANDING, "level": 1}})
+	_check(shed["stage"] == BuildingComposer.STANDING and walls_at.call(shed).size() > 6, "its record standing: its walls up (%d)" % walls_at.call(shed).size())
+	# Dropped (649; Main: Clearing.unlay_plot takes its building and edges out, then clearing_changed).
+	var shed_built: Dictionary = (_rig._terrain["plot_buildings"] as Array).back()
+	(_rig._terrain["plot_buildings"] as Array).erase(shed_built)
+	for key: Vector3i in Level.building_outline(shed_built):
+		(_rig._terrain["edges"] as Dictionary).erase(key)
+	_rig.clearing_changed(_rig._terrain, [])
+	var inside_left := (shed["inside"] as Dictionary).keys().any(func(cell: Vector2i) -> bool: return _rig._building_at.has(cell))
+	_check(shed.get("dropped", false) and not (shed["node"] as Node3D).visible and walls_at.call(shed).is_empty() and not inside_left,
+			"a plot dropped: its building gone, no wall, no inside (%d walls)" % walls_at.call(shed).size())
+	_rig.set_town(town, {"house": {"state": Towns.STANDING, "level": 1}, "shed": {"state": Towns.BUILDING, "level": 0, "progress": 0.5}})
+	_check(not (shed["node"] as Node3D).visible and walls_at.call(shed).is_empty() and house["stage"] == BuildingComposer.STANDING,
+			"and its town's record raises nothing of it; the house stands")
+	Clearing.lay_plots(_rig._terrain, [{"town": town, "kind": "shed", "use": "shed", "rect": shed_rect, "facing": Vector2i(0, 1), "size": "small"}])
+	_rig.clearing_changed(_rig._terrain, [])
+	var again: Dictionary = _rig._buildings.back()
+	_check(again != shed and again.get("plot", false) and not again.get("dropped", false) and (again["node"] as Node3D).visible,
+			"laid again there: drawn anew")
+	_rig.town_states.erase(town)
 
 
 ## BuildingComposer (decision 489): a wing's walls drawn to its own lower

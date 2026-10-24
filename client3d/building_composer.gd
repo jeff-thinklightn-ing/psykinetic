@@ -568,6 +568,16 @@ static func stage(record: Dictionary) -> int:
 	return at
 
 
+## A laid plot's stage from its town's [param record] (591 amended, the
+## coordinator's ruling: a plot is not a building): staked (PLOT) with no
+## record yet or one only planned, else as stage has it; never standing
+## for being laid.
+static func plot_stage(record: Dictionary) -> int:
+	if record.is_empty() or str(record.get("state", "")) == Towns.PLANNED:
+		return PLOT
+	return stage(record)
+
+
 ## Whether [param record]'s building stands in scaffold: a level being
 ## raised, or a repair under way (damaged, with a job's progress).
 static func scaffolded(record: Dictionary) -> bool:

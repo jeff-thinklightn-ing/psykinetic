@@ -26714,3 +26714,22 @@ view_test _test_attach_points: a held sword's edge along the right hand's finger
 monster_test passes. Client only, protocol unchanged, no new class_name. Art-kit takes the held
 stills (player and draugr, two yaws). The left hand's reach to grip_2 on a two-handed piece is a
 separate step if those show it off the haft.
+## 591 amended (step 2), buildings' side: a town's laid plots drawn, staked till raised
+
+Maps' laid plots (591 amended, step 2) come to the view as
+terrain["plot_buildings"] (Level.plot_building: the kind parsed at its
+size, "plot" true, its walls and door already in the terrain's edges).
+Client3D draws them down the kind path with the level's buildings
+(_drawn_buildings: the sets, the composer, codes, double doors), not in
+a glimpse. A plot is not a building (the coordinator's ruling): its stage
+is BuildingComposer.plot_stage, staked (PLOT) with no record or one only
+planned, else 566's stage from its record (through its "use"), so it is
+never drawn standing for being laid, at a zone load as when laid. One laid
+while the view is up (Main lays it, then clearing_changed) is drawn at
+once (_sync_plots: its sets, its kind, its walls), once; its floor set
+waits for the next build of the room. One dropped (649, maps' Clearing
+.unlay_plot, then clearing_changed) is taken down: its building hidden and
+marked "dropped" (no stage, roof or inside after), its outline's sets out,
+its walls drawn again from the edges left; laid again, it is drawn anew. The per-building sets are
+_building_sets, shared by the room's build and a live plot. view_test
+_test_plots. Client only, protocol unchanged, no new class_name.

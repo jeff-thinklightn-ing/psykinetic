@@ -1847,6 +1847,9 @@ var _kinds_texture: ImageTexture
 ## roof hidden as the local player is inside}; which building each
 ## footprint cell is in; the roofs off now and when each was last wanted off.
 var _buildings: Array[Dictionary] = []
+## The laid plots drawn (591 amended (step 2)), by their rect's corner:
+## what _sync_plots adds or drops.
+var _plots_drawn: Dictionary[Vector2i, bool] = {}
 var _building_at: Dictionary[Vector2i, int] = {}
 ## Where a body stands on a cell whose piece has a stand point (580 step 3:
 ## the throne's "stand", [x, y up, z] in the piece's frame, turned by its
@@ -3538,7 +3541,7 @@ func show_building_codes(on: bool) -> void:
 	_code_labels = Node3D.new()
 	_code_labels.name = "BuildingCodes"
 	add_child(_code_labels)
-	for building: Dictionary in _terrain.get("buildings", []):
+	for building: Dictionary in _drawn_buildings():
 		var rect: Rect2i = building["rect"]
 		var middle := Vector2(rect.position) + Vector2(rect.size - Vector2i.ONE) * 0.5
 		var label := _label("Code_%s" % building.get("code", ""), BuilderUI.building_words(building), BUILDING_CODE, 0.0)
@@ -4392,64 +4395,8 @@ func _build_room() -> void:
 	for cell in _building_dry:
 		_dry_water.erase(cell)
 	_building_dry.clear()
-	for building: Dictionary in _terrain.get("buildings", []):
-		if building["slot"] in Level.ON_WATER:
-			for cell in Level.rect_cells(building["rect"]):
-				if not _dry_water.has(cell):
-					_building_dry.append(cell)
-					_dry_water[cell] = true
-			continue
-		if building["slot"] in Level.OPEN_AIR or building["slot"] in Level.SPANS_WATER:
-			continue  # Its fence (a bridge's railings) is its slot's mesh; a bridge's water stays.
-		# A kind (decision 488) names its sets and eaves; a slot's spec does.
-		var spec: Dictionary = {"wall_set": building["wall_set"], "wall_height": building["eaves"], "floor_set": building["floor_set"]} \
-				if building.has("kind") else ArtKit.spec(str(building["slot"]))
-		if str(spec.get("floor_set", "")).is_empty():
-			spec.erase("floor_set")
-		var wall_set := _known_set(str(spec.get("wall_set", _walls_set)))
-		var wall_height := float(spec.get("wall_height", WALL_HEIGHT))
-		# A kind's walls each to its block's eaves (BuildingComposer, 489).
-		var heights: Dictionary[Vector3i, float] = {}
-		var windows: Array[Vector3i] = []
-		var cells: Dictionary[Vector2i, bool] = {}
-		var pad := Vector2i.ZERO
-		if building.has("kind"):
-			heights = BuildingComposer.wall_heights(building)
-			windows = BuildingComposer.windows(building, _terrain["edges"])
-			for cell in Level.building_cells(building):
-				cells[cell] = true
-			pad = cells.keys()[0]
-		for key in Level.building_outline(building):
-			if not _wall_sets.has(key):
-				_building_walls.append(key)
-				_wall_sets[key] = wall_set
-				var tall: float = heights.get(key, wall_height)
-				if not is_equal_approx(tall, WALL_HEIGHT):
-					_wall_heights[key] = tall
-				if building.has("kind"):
-					_pad_cell[key] = pad
-					if wall_set == "wood":
-						_plinths[key] = true
-			# A kind's windows (489 amended), its wood walls of a storey's height:
-			# art-kit's window there, turned so its shutters open outward.
-			if building.has("kind") and wall_set == "wood" and key in windows \
-					and absf(_height_of(key) - WALL_HEIGHT) <= WINDOW_STRETCH:
-				_set_wall_state(key, "window")
-				_window_code[key] = [str(building.get("town_id", "")), str(building.get("code", "")), true]
-				var sides := Terrain.edge_cells(key)
-				# A run's +x is east for an east edge, north (its first cell) for a south one.
-				var outside_first := not cells.has(sides[0])
-				_window_flipped[key] = outside_first if key.z == Terrain.EAST else not outside_first
-			# A ruin's walls broken here and there before they are drawn (489).
-			if building.get("ruined", false) and _terrain["edges"].get(key) == Terrain.Edge.WALL \
-					and _roll(Vector2i(key.x, key.y), 40 + key.z) < RUIN_BROKEN:
-				_set_wall_state(key, "broken")
-		if spec.has("floor_set"):
-			var floor_set := _known_set(str(spec["floor_set"]))
-			for cell in Level.building_cells(building):
-				if not _floor_sets.has(cell):
-					_building_floors.append(cell)
-					_floor_sets[cell] = floor_set
+	for building: Dictionary in _drawn_buildings():
+		_building_sets(building)
 	_warm_art()
 	var fire: Array[Vector2i] = _terrain["fire"]
 	var kinds: Dictionary = _terrain.get("kinds", {})
@@ -4638,7 +4585,10 @@ func _add_link_cues() -> void:
 func _add_buildings() -> void:
 	if _codes_on:
 		show_building_codes.call_deferred(true)
-	for building: Dictionary in _terrain.get("buildings", []):
+	_plots_drawn.clear()
+	for building: Dictionary in _drawn_buildings():
+		if building.get("plot", false):
+			_plots_drawn[(building["rect"] as Rect2i).position] = true
 		if building.has("kind"):
 			_add_kind(building)
 			continue
@@ -4684,6 +4634,130 @@ func _add_buildings() -> void:
 			_building_at[cell] = index
 
 
+## The buildings drawn: the level's, and its towns' laid plots' (591
+## amended, Level.plot_building), raised by their records' stages (566).
+func _drawn_buildings() -> Array:
+	return _terrain.get("buildings", []) + _terrain.get("plot_buildings", [])
+
+
+## [param building]'s walls and floor in its sets (decision 285): its
+## outline's wall sets and heights, a kind's pad and plinth, windows and a
+## ruin's breaks, its floor set; a well's water dry under it.
+func _building_sets(building: Dictionary) -> void:
+	if building["slot"] in Level.ON_WATER:
+		for cell in Level.rect_cells(building["rect"]):
+			if not _dry_water.has(cell):
+				_building_dry.append(cell)
+				_dry_water[cell] = true
+		return
+	if building["slot"] in Level.OPEN_AIR or building["slot"] in Level.SPANS_WATER:
+		return  # Its fence (a bridge's railings) is its slot's mesh; a bridge's water stays.
+	# A kind (decision 488) names its sets and eaves; a slot's spec does.
+	var spec: Dictionary = {"wall_set": building["wall_set"], "wall_height": building["eaves"], "floor_set": building["floor_set"]} \
+			if building.has("kind") else ArtKit.spec(str(building["slot"]))
+	if str(spec.get("floor_set", "")).is_empty():
+		spec.erase("floor_set")
+	var wall_set := _known_set(str(spec.get("wall_set", _walls_set)))
+	var wall_height := float(spec.get("wall_height", WALL_HEIGHT))
+	# A kind's walls each to its block's eaves (BuildingComposer, 489).
+	var heights: Dictionary[Vector3i, float] = {}
+	var windows: Array[Vector3i] = []
+	var cells: Dictionary[Vector2i, bool] = {}
+	var pad := Vector2i.ZERO
+	if building.has("kind"):
+		heights = BuildingComposer.wall_heights(building)
+		windows = BuildingComposer.windows(building, _terrain["edges"])
+		for cell in Level.building_cells(building):
+			cells[cell] = true
+		pad = cells.keys()[0]
+	for key in Level.building_outline(building):
+		if not _wall_sets.has(key):
+			_building_walls.append(key)
+			_wall_sets[key] = wall_set
+			var tall: float = heights.get(key, wall_height)
+			if not is_equal_approx(tall, WALL_HEIGHT):
+				_wall_heights[key] = tall
+			if building.has("kind"):
+				_pad_cell[key] = pad
+				if wall_set == "wood":
+					_plinths[key] = true
+		# A kind's windows (489 amended), its wood walls of a storey's height:
+		# art-kit's window there, turned so its shutters open outward.
+		if building.has("kind") and wall_set == "wood" and key in windows \
+				and absf(_height_of(key) - WALL_HEIGHT) <= WINDOW_STRETCH:
+			_set_wall_state(key, "window")
+			_window_code[key] = [str(building.get("town_id", "")), str(building.get("code", "")), true]
+			var sides := Terrain.edge_cells(key)
+			# A run's +x is east for an east edge, north (its first cell) for a south one.
+			var outside_first := not cells.has(sides[0])
+			_window_flipped[key] = outside_first if key.z == Terrain.EAST else not outside_first
+		# A ruin's walls broken here and there before they are drawn (489).
+		if building.get("ruined", false) and _terrain["edges"].get(key) == Terrain.Edge.WALL \
+				and _roll(Vector2i(key.x, key.y), 40 + key.z) < RUIN_BROKEN:
+			_set_wall_state(key, "broken")
+	if spec.has("floor_set"):
+		var floor_set := _known_set(str(spec["floor_set"]))
+		for cell in Level.building_cells(building):
+			if not _floor_sets.has(cell):
+				_building_floors.append(cell)
+				_floor_sets[cell] = floor_set
+
+
+## A town's plots laid or dropped since the room was built (591 amended
+## (step 2), 649; Main lays them in the terrain, Clearing.lay_plots, or
+## takes them out, Clearing.unlay_plot, then calls clearing_changed): a
+## laid one's sets, its kind drawn at its record's stage, its walls drawn
+## (its floor set waits for the next build of the room); a dropped one's
+## building hidden, its sets out, its walls drawn again from the edges left.
+func _sync_plots() -> void:
+	var walls: Array[Vector3i] = []
+	var laid: Dictionary[Vector2i, bool] = {}
+	for building: Dictionary in _terrain.get("plot_buildings", []):
+		var at: Vector2i = (building["rect"] as Rect2i).position
+		laid[at] = true
+		if _plots_drawn.has(at):
+			continue
+		_plots_drawn[at] = true
+		_building_sets(building)
+		_add_kind(building)
+		walls.append_array(Level.building_outline(building))
+	for at: Vector2i in _plots_drawn.keys():
+		if not laid.has(at):
+			_plots_drawn.erase(at)
+			walls.append_array(_drop_plot(at))
+	if not walls.is_empty():
+		rebuild_walls(walls)
+
+
+## The drawn plot whose rect's corner is [param at] taken down: its
+## building hidden and done with ("dropped": no stage, roof or inside), its
+## outline's sets and looks out. Its outline, to draw again.
+func _drop_plot(at: Vector2i) -> Array[Vector3i]:
+	var out: Array[Vector3i] = []
+	for index in _buildings.size():
+		var entry := _buildings[index]
+		if not entry.get("plot", false) or entry.get("dropped", false) or (entry["rect"] as Rect2i).position != at:
+			continue
+		entry["dropped"] = true
+		(entry["node"] as Node3D).visible = false
+		entry["roof"] = null
+		for cell: Vector2i in entry["inside"]:
+			if _building_at.get(cell, -1) == index:
+				_building_at.erase(cell)
+		for key: Vector3i in entry["outline"]:
+			_wall_sets.erase(key)
+			_wall_heights.erase(key)
+			_pad_cell.erase(key)
+			_plinths.erase(key)
+			_window_code.erase(key)
+			_window_flipped.erase(key)
+			if _wall_states.has(key):
+				_wall_states.erase(key)
+			_building_walls.erase(key)
+			out.append(key)
+	return out
+
+
 ## A building of a kind (Level.kinds, decision 488): its walls and floor are
 ## the map's, in its kind's sets (_build_room), each wall to its block's
 ## eaves; what stands over them is BuildingComposer's (decision 489): its
@@ -4711,7 +4785,8 @@ func _add_kind(building: Dictionary) -> void:
 	_buildings.append({"rect": rect, "node": node, "roof": roof, "off": false, "roof_at": roof.transform if roof != null else Transform3D(),
 		"use": str(building.get("use", "")), "town_id": str(building.get("town_id", "")), "damaged": false,
 		"open_air": false, "crop": "", "inside": inside, "outline": Level.building_outline(building),
-		"kind": building, "stage": BuildingComposer.STANDING, "scaffold": false, "heights": {}, "windows": []})
+		"kind": building, "stage": BuildingComposer.STANDING, "scaffold": false, "heights": {}, "windows": [],
+		"plot": building.get("plot", false)})
 	# Its walls as built (566): what a stage cuts down and puts back.
 	for key: Vector3i in _buildings[index]["outline"]:
 		_buildings[index]["heights"][key] = _height_of(key)
@@ -5009,6 +5084,8 @@ func set_town(town: String, buildings: Dictionary) -> void:
 ## built. Planned, being built and standing all draw standing for now, as
 ## does a building no town has a record of.
 func _show_state(building: Dictionary) -> void:
+	if building.get("dropped", false):
+		return  # A dropped plot (649): no more of its town's looks.
 	var state := Towns.STANDING
 	if not str(building["use"]).is_empty():
 		state = str(town_states.get(building["town_id"], {}).get(building["use"], {}).get("state", Towns.STANDING))
@@ -5018,7 +5095,8 @@ func _show_state(building: Dictionary) -> void:
 		var record: Dictionary = {}
 		if not str(building["use"]).is_empty():
 			record = town_states.get(building["town_id"], {}).get(building["use"], {})
-		_show_stage(building, BuildingComposer.stage(record), BuildingComposer.scaffolded(record))
+		var at := BuildingComposer.plot_stage(record) if building.get("plot", false) else BuildingComposer.stage(record)
+		_show_stage(building, at, BuildingComposer.scaffolded(record))
 	var damaged := state == Towns.DAMAGED
 	if damaged == building["damaged"]:
 		return
@@ -6545,6 +6623,7 @@ func clearing_changed(terrain: Dictionary, cells: Array) -> void:
 		_set_ground_kind(cell, Clearing.STAGE_KINDS.get(stage, "grass"))
 	for chunk: Vector2i in chunks:
 		_rescatter(chunk)
+	_sync_plots()
 
 
 ## Land [param cell]'s ground drawn as [param kind] (a texel of the kinds
@@ -10481,7 +10560,7 @@ func _add_doorway(key: Vector3i, pair := key) -> void:
 func _double_doors() -> Dictionary[Vector3i, Vector3i]:
 	var edges: Dictionary = _terrain["edges"]
 	var out: Dictionary[Vector3i, Vector3i] = {}
-	for building: Dictionary in _terrain.get("buildings", []):
+	for building: Dictionary in _drawn_buildings():
 		var outline := Level.building_outline(building)
 		var door := func(key: Vector3i) -> bool: return key in outline and edges.get(key, Terrain.Edge.OPEN) == Terrain.Edge.DOOR
 		for key in outline:

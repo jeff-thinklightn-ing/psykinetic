@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- A town's new building plots show as staked ground until the town starts building, then rise through their stages like any other building; a plot laid while you watch appears at once, and one the town gives up disappears.
 - The level builder sees the plots a town has laid as it grows: it lists them apart, and warns of a building on one turned from its street.
 - Weapons are held edge-first: the great axe, battle axe, sword, dagger, knife, spear, hammer and pick no longer sit sideways in the hand (players, companions, townsfolk and the draugr).
 - Press E on the seated draugr for a small window with his words and a button for each sum his deal takes; the ones your purse covers can be pressed, and his answer is spoken as if you had named the sum (629, ui's side).
