@@ -26574,3 +26574,27 @@ it is false, so a click strikes it as ever. Combat's click (its paragraph of
 648) reads it typed on a Monster that talks; ui's window opens only while
 it is true and closes when it turns. draugr_fight_test: seated, true; the
 pact on, false.
+
+## 648. A click talks to a peaceable monster
+
+Jeff, on the draugr: "earlier i struck the draugr because left clicking attacked.. yes didn't do
+anything". The coordinator's ruling: a left click on a talking monster that is not fighting
+talks to it, as a click on a resident does (454); striking it takes a deliberate act.
+
+- **Main.talks_on_click(entity):** a friend (is_friend, 454), or a Monster that talks
+  (Monster.talks) and is peaceable now (Monster.peaceable, npc's side of 648 above: the
+  server's, replicated, the draugr true seated and unprovoked, false in a pact, struck,
+  provoked or at rest). Both left-click paths read it, the plain one and a bow's
+  (_click_with_bow), so a plain click goes to _talk_to: beside him it opens talk, from afar
+  the player walks beside him and it opens on arrival.
+- **A strike is deliberate:** Shift's swing where you stand and Ctrl's signature come before
+  the friend test, so they still strike him. A blow provokes him, so peaceable goes false and
+  clicks attack as ever.
+- **Talk opens through Main._open_talk,** where ui's 629 window adds the monster's branch (the
+  "greet" command, the offers' step buttons). A kind that never sets peaceable is struck by a
+  click as before.
+
+controls_test _test_peaceable_click: a peaceable talker, where a plain click walks beside it to
+talk with no attack; Shift+click swings; peaceable false, a click attacks; a monster that does
+not talk is attacked whatever its flag. Client only (the flag's wire line is npc's, under 35); no
+new class_name.

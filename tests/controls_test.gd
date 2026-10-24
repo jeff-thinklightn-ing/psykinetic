@@ -41,6 +41,7 @@ func _ready() -> void:
 	_test_click_uses_the_frame_pick()
 	_test_bow_click_walks()
 	_test_friend_click()
+	_test_peaceable_click()
 	_test_stand_and_signature()
 	_test_cursor_bandage()
 	_test_telegraph_message()
@@ -693,6 +694,50 @@ func _test_friend_click() -> void:
 	player.action_order = GridEntity.Order.NONE
 	World.despawn(body)
 	Net.controls = saved
+
+## A plain left click on a talking monster at peace talks, as on a friend
+## (decision 648; Jeff: "earlier i struck the draugr because left clicking
+## attacked"); Shift's swing still strikes it; at war, a click attacks.
+func _test_peaceable_click() -> void:
+	print("
+== a left click on a peaceable talker talks; Shift's swing strikes it; at war a click attacks (decision 648) ==")
+	var saved: String = Net.controls
+	Net.controls = "click"
+	var player := _place_player(Vector2i(11, 3))
+	var occupant := World.get_entity_at(Vector2i(9, 6))
+	if occupant != null:
+		World.despawn(occupant)
+	var talker := EntityFactory.build({"script": "res://sim/monster.gd", "shape": "capsule", "name": "Talker", "tile": Vector2i(9, 6)}) as Monster
+	talker.sight_range = 0
+	talker.talks = true
+	talker.peaceable = true
+	_main.add_child(talker)
+	_check(World.spawn(talker, Vector2i(9, 6)), "(a talking monster at peace stands at 9,6)")
+	_main._pick_grid = Vector2(9.1, 6.1)
+	_left(false)
+	_check(player.action_order != GridEntity.Order.ATTACK and player.has_move_order
+			and World.distance(player.move_order, talker.tile) == 1 and _main._talk_wanted == talker,
+			"a plain click walks beside it to talk, no attack (%s)" % player.move_order)
+	player.has_move_order = false
+	_main._talk_wanted = null
+	_left(true)
+	_check(player.action_order == GridEntity.Order.SWING and _main._talk_wanted == null, "Shift+click: a swing where you stand, deliberate")
+	player.action_order = GridEntity.Order.NONE
+	talker.peaceable = false
+	_left(false)
+	_check(player.action_order == GridEntity.Order.ATTACK and _main._talk_wanted == null, "at war (peaceable false): a plain click attacks as ever")
+	player.action_order = GridEntity.Order.NONE
+	player.has_move_order = false
+	talker.talks = false
+	talker.peaceable = true
+	_left(false)
+	_check(player.action_order == GridEntity.Order.ATTACK, "a monster that does not talk: a click attacks, whatever its flag")
+	player.action_order = GridEntity.Order.NONE
+	player.has_move_order = false
+	World.despawn(talker)
+	talker.queue_free()
+	Net.controls = saved
+
 
 
 func _left(shift: bool, ctrl := false) -> void:

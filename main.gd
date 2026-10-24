@@ -1272,10 +1272,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		_walk_to_chest(player, target)
 		return
 	var targetable := target != null and target != player and World.can_target(player, target)
-	# Left on a friend (a resident, a companion, another player), both
-	# schemes: talk, never an attack (decision 454); Shift's swing (above)
-	# strikes one.
-	if click.button_index == MOUSE_BUTTON_LEFT and target != player and is_friend(target):
+	# Left on a friend (a resident, a companion, another player) or a
+	# peaceable monster that talks, both schemes: talk, never an attack
+	# (decisions 454, 648); Shift's swing (above) strikes one.
+	if click.button_index == MOUSE_BUTTON_LEFT and target != player and talks_on_click(target):
 		_talk_to(player, target)
 		return
 	if Net.controls == "wasd" and not on_sprite:
@@ -1310,7 +1310,7 @@ func _click_with_bow(player: Player) -> void:
 		target = World.get_entity_at(tile)
 	if target is Chest:
 		_walk_to_chest(player, target)
-	elif target != null and target != player and is_friend(target):
+	elif target != null and target != player and talks_on_click(target):
 		_talk_to(player, target)
 	elif Net.controls == "wasd" and not on_sprite:
 		_wasd_click(player, MOUSE_BUTTON_LEFT)
@@ -1323,6 +1323,17 @@ func _click_with_bow(player: Player) -> void:
 ## Shift+click attacks.
 func is_friend(entity: GridEntity) -> bool:
 	return entity is Resident or entity is Companion or entity is Player
+
+
+## Whether a plain left click on [param entity] talks rather than strikes
+## (decision 648; Jeff: "earlier i struck the draugr because left
+## clicking attacked"): a friend, or a monster that talks and is peaceable
+## now (Monster.peaceable, the server's, replicated: the draugr seated and
+## unprovoked; false on a kind that never sets it).
+## Shift's swing and the signature still strike it; once it fights, a click
+## attacks as ever.
+func talks_on_click(entity: GridEntity) -> bool:
+	return is_friend(entity) or entity is Monster and (entity as Monster).talks and (entity as Monster).peaceable
 
 
 ## A left click on [param friend] (decision 454): within TALK_REACH, talk
