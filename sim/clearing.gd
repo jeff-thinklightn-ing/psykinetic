@@ -70,6 +70,8 @@ var clock := Callable()
 signal changed(zone: String, cells: Array)
 ## Told when a plot is laid: (zone, plot), plots_of's shape.
 signal plotted(zone: String, plot: Dictionary)
+## Told when a plot is dropped (unplot): (zone, plot), plots_of's shape.
+signal unplotted(zone: String, plot: Dictionary)
 
 
 func _init(saved := {}, saved_plots := {}) -> void:
@@ -189,11 +191,37 @@ static func lay_plots(terrain: Dictionary, listed: Array, sizes := Callable()) -
 			continue
 		built.append(building)
 		var edges := Level.plot_edges(building)
+		var laid: Array[Vector3i] = []
 		for key: Vector3i in edges:
 			if not terrain["edges"].has(key):
 				terrain["edges"][key] = edges[key]
+				laid.append(key)
+		building["laid"] = laid  # The edges it added, for unlay_plot.
 	terrain["plots"] = kept
 	terrain["plot_buildings"] = built
+
+
+## The plot on [param rect] taken off [param terrain] (649, maps'
+## side; lay_plots' reverse): out of terrain["plots"], its building out of
+## terrain["plot_buildings"] and the edges it laid out of the edges (any
+## changed since kept). Returns its building, {} if none.
+static func unlay_plot(terrain: Dictionary, rect: Rect2i) -> Dictionary:
+	var kept: Array = terrain.get("plots", [])
+	for i in range(kept.size() - 1, -1, -1):
+		if (kept[i] as Dictionary)["rect"] == rect:
+			kept.remove_at(i)
+	var built: Array = terrain.get("plot_buildings", [])
+	for i in range(built.size() - 1, -1, -1):
+		var building: Dictionary = built[i]
+		if not building.get("plot", false) or not rect.encloses(building["rect"]):
+			continue
+		built.remove_at(i)
+		var edges := Level.plot_edges(building)
+		for key: Vector3i in building.get("laid", []):
+			if terrain["edges"].get(key) == edges.get(key):
+				terrain["edges"].erase(key)
+		return building
+	return {}
 
 
 ## A plot as a message and the snapshot carry it: {town, kind, use, rect:
@@ -317,6 +345,35 @@ func lay_plot(zone: String, town: String, kind: String, rect: Rect2i, facing: Ve
 	var told: Dictionary = plots_of(zone).back()
 	plotted.emit(zone, told)
 	return told
+
+
+## Drops zone [param zone]'s plot on [param rect] (649, maps'
+## side: economy's, when a ruin's record is dropped after its season, and
+## terrain's unbuild over a plot's cells): its cells no longer kept from
+## growing back, so a felled one grows back as any does and a level floor
+## one once unbuild hands it to the regrowth; unplotted told. The plot
+## dropped, plots_of's shape; {} if none is laid on [param rect].
+func unplot(zone: String, rect: Rect2i) -> Dictionary:
+	var listed: Array = plots.get(zone, [])
+	for i in listed.size():
+		var plot: Dictionary = listed[i]
+		if plot["rect"] != rect:
+			continue
+		listed.remove_at(i)
+		_plot_cells.erase(zone)
+		var told := {"town": plot["town"], "kind": plot["kind"], "use": plot["use"], "rect": plot["rect"], "facing": plot["facing"]}
+		unplotted.emit(zone, told)
+		return told
+	return {}
+
+
+## Zone [param zone]'s plot whose rect (its ring's) holds [param cell],
+## plots_of's shape; {} if none.
+func plot_at(zone: String, cell: Vector2i) -> Dictionary:
+	for plot: Dictionary in plots.get(zone, []):
+		if (plot["rect"] as Rect2i).has_point(cell):
+			return {"town": plot["town"], "kind": plot["kind"], "use": plot["use"], "rect": plot["rect"], "facing": plot["facing"]}
+	return {}
 
 
 ## A summed table of [param values] (size.x by size.y), a row and a column

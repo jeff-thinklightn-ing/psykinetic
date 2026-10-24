@@ -198,6 +198,7 @@ func _test_every_level() -> void:
 	_test_clearing()
 	_test_felled_walls()
 	_test_plots()
+	_test_unplot()
 	_test_refuges()
 	_test_herders()
 	_test_forest_healer()
@@ -522,6 +523,82 @@ func _test_plots() -> void:
 			and edges.keys().all(func(key: Vector3i) -> bool: return terrain["edges"].get(key) == edges[key]),
 		"its walls and door laid in the edges, in the footprint (%s)" % [house.get("rect")])
 	Level.unregister("plot_field")
+
+
+## A plot dropped (649, maps' side): its building and the edges it laid off
+## the terrain, its cells growing back; live, off the walk as well, and a
+## client told it is gone.
+func _test_unplot() -> void:
+	print("
+== unplot: a plot dropped, its building and edges off, its cells growing back, the clients told ==")
+	var size := Vector2i(30, 20)
+	var colour := func(meaning: String) -> Color: return Color(str(Level.LEGEND[meaning]))
+	var image := Image.create_empty(size.x * 2 + 1, size.y * 2 + 1, false, Image.FORMAT_RGBA8)
+	image.fill(colour.call("void"))
+	for y in range(2, 18):
+		for x in range(2, 12):
+			image.set_pixel(x * 2, y * 2, colour.call("grass"))
+	image.set_pixel(6 * 2, 3 * 2, colour.call("start"))
+	Level.register("unplot_field", image, null, {"name": "Field", "outdoor": true})
+	# The forest felled east of the field, x 12..21, y 4..15; the plot on it.
+	var felled := {}
+	for y in range(4, 16):
+		for x in range(12, 22):
+			felled[Vector2i(x, y)] = [1, 0]
+	var rect := Rect2i(13, 5, 8, 8)
+	var clearing := Clearing.new()
+	clearing.clock = func() -> int: return 0
+	clearing.felled["unplot_field"] = felled.duplicate(true)
+	var heard := []
+	clearing.unplotted.connect(func(_zone: String, plot: Dictionary) -> void: heard.append(plot))
+	clearing.lay_plot("unplot_field", "unplot_field/store", "hut", rect, Vector2i(0, 1))
+	var terrain: Dictionary = Level.load_level("unplot_field")["terrain"].duplicate(true)
+	clearing.apply("unplot_field", terrain)
+	var built: Array = terrain.get("plot_buildings", [])
+	var laid: Array = (built[0] as Dictionary).get("laid", []) if not built.is_empty() else []
+	_check(built.size() == 1 and not laid.is_empty() and laid.all(func(key: Vector3i) -> bool: return terrain["edges"].has(key)),
+		"laid: its building, and the %d edges it laid" % laid.size())
+	var dropped := clearing.unplot("unplot_field", rect)
+	_check(dropped.get("rect") == rect and heard.size() == 1 and clearing.plots_of("unplot_field").is_empty() and clearing.plot_at("unplot_field", Vector2i(15, 8)).is_empty(),
+		"dropped: told, no plot left there")
+	_check(clearing.unplot("unplot_field", rect).is_empty() and heard.size() == 1, "dropped again: nothing, nothing told")
+	var building := Clearing.unlay_plot(terrain, rect)
+	_check(not building.is_empty() and terrain["plot_buildings"].is_empty() and terrain["plots"].is_empty()
+			and laid.all(func(key: Vector3i) -> bool: return not terrain["edges"].has(key)),
+		"taken off the terrain: its building and its edges")
+	for step in range(1, 60):
+		clearing.daily(step * Season.season_days * 2)
+	var back := Level.rect_cells(rect).filter(func(cell: Vector2i) -> bool: return not clearing.felled.get("unplot_field", {}).has(cell))
+	_check(back.size() == rect.get_area(), "its cells grown back to forest (%d of %d)" % [back.size(), rect.get_area()])
+	# Live: the zone loaded, the main clearing's plot laid and dropped.
+	if World.clearing == null:
+		_check(false, "World.clearing is set")
+		Level.unregister("unplot_field")
+		return
+	World.clearing.felled["unplot_field"] = felled.duplicate(true)
+	_check(_main.load_map("unplot_field"), "the field loads")
+	World.clearing.lay_plot("unplot_field", "unplot_field/store", "hut", rect, Vector2i(0, 1))
+	var walk: Dictionary = World._edges
+	var on_walk := laid.filter(func(key: Vector3i) -> bool: return walk.has(key))
+	var town_built: Array = World.fields.town_buildings.filter(func(each: Dictionary) -> bool: return each.get("plot", false))
+	_check(on_walk.size() == laid.size() and town_built.size() == 1, "live: its edges on the walk (%d of %d), its building a town building" % [on_walk.size(), laid.size()])
+	World.clearing.unplot("unplot_field", rect)
+	on_walk = laid.filter(func(key: Vector3i) -> bool: return World._edges.has(key))
+	town_built = World.fields.town_buildings.filter(func(each: Dictionary) -> bool: return each.get("plot", false))
+	_check(on_walk.is_empty() and town_built.is_empty() and (_main._terrain.get("plot_buildings", []) as Array).is_empty(),
+		"live, dropped: off the walk, the town buildings and the terrain drawn")
+	# A client told it laid, then gone.
+	var wire := Clearing.plot_wire({"town": "unplot_field/store", "kind": "hut", "use": "hut", "rect": rect, "facing": Vector2i(0, 1)})
+	_main._on_clearing({"zone": "unplot_field", "cells": [], "plots": [wire]})
+	var told: int = (_main._plots_told.get("unplot_field", []) as Array).size()
+	_main._on_clearing({"zone": "unplot_field", "cells": [], "gone": [wire]})
+	_check(told == 1 and (_main._plots_told.get("unplot_field", []) as Array).is_empty(), "a client: told it laid, then gone")
+	World.clearing.felled.erase("unplot_field")
+	World.clearing.plots.erase("unplot_field")
+	_main._plots_told.erase("unplot_field")
+	_main._clearing_told.erase("unplot_field")
+	_main.load_map("test_room")
+	Level.unregister("unplot_field")
 
 
 ## The sought's refuges (613 amended): one place a story, keyed by its tag,

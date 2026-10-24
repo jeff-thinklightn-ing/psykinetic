@@ -1344,11 +1344,43 @@ func add_plot(level: String, building: Dictionary, edges: Dictionary) -> void:
 	if fields_of == null or fields_of.level != level:
 		return
 	var at: Dictionary = _edges if fields_of == fields else (zone_of.edges if zone_of != null else {})
+	var laid: Array[Vector3i] = []
 	for key: Vector3i in edges:
 		if not at.has(key):
 			at[key] = edges[key]
+			laid.append(key)
 	fields_of.town_buildings.append({"rect": building["rect"], "use": building["use"], "town_id": building["town_id"],
-		"outline": Level.building_outline(building)})
+		"outline": Level.building_outline(building), "plot": true, "laid": laid, "edges": edges})
+	if fields_of == fields:
+		_grid_rect = Rect2i()
+		_grid_steps = PackedByteArray()
+	elif zone_of != null:
+		zone_of.grid_rect = Rect2i()
+		zone_of.grid_steps = PackedByteArray()
+	_open_walls(level, fields_of)
+
+
+## A town's plot on [param rect] dropped from loaded [param level] (649,
+## maps' side; add_plot's reverse): its building no longer one of the
+## town buildings, the edges it laid taken out (any changed since kept),
+## whether standing or held down while its walls were not up.
+func unplot(level: String, rect: Rect2i) -> void:
+	var fields_of := _fields_of(level)
+	var zone_of: Zone = zones.get(level)
+	if fields_of == null or fields_of.level != level:
+		return
+	var at: Dictionary = _edges if fields_of == fields else (zone_of.edges if zone_of != null else {})
+	var down: Dictionary = _walls_down.get_or_add(level, {})
+	for i in range(fields_of.town_buildings.size() - 1, -1, -1):
+		var building: Dictionary = fields_of.town_buildings[i]
+		if not building.get("plot", false) or not rect.encloses(building["rect"]):
+			continue
+		fields_of.town_buildings.remove_at(i)
+		var edges: Dictionary = building["edges"]
+		for key: Vector3i in building["laid"]:
+			down.erase(key)
+			if at.get(key) == edges[key]:
+				at.erase(key)
 	if fields_of == fields:
 		_grid_rect = Rect2i()
 		_grid_steps = PackedByteArray()

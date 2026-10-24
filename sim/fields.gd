@@ -163,7 +163,12 @@ func load(terrain: Dictionary) -> void:
 		if not str(building.get("use", "")).is_empty() and not str(building.get("town_id", "")).is_empty():
 			# Its outline too: the wall edges that stand only once its walls are up (566).
 			var outline := Level.building_outline(building) if building.has("blocks") else Level.blocks_outline(Level.rect_cells(building["rect"]))
-			town_buildings.append({"rect": building["rect"], "use": building["use"], "town_id": building["town_id"], "outline": outline})
+			var entry := {"rect": building["rect"], "use": building["use"], "town_id": building["town_id"], "outline": outline}
+			if building.get("plot", false):
+				# A plot's, with the edges it laid (Clearing.lay_plots), so
+				# World.unplot can take them off again (649, maps' side).
+				entry.merge({"plot": true, "laid": building.get("laid", []), "edges": Level.plot_edges(building)})
+			town_buildings.append(entry)
 	_roofed = _roofed_whole.duplicate()
 	_source_list = []
 	mark_dirty()

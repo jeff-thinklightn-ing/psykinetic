@@ -2553,6 +2553,23 @@ func _on_plotted(zone: String, plot: Dictionary) -> void:
 			Net.message_to(peer, "clearing", {"zone": zone, "cells": [], "plots": [_plot_told(plot)]})
 
 
+## Server: a plot dropped in [param zone] (Clearing.unplotted, 649, maps'
+## side): a loaded zone takes its building and the edges it laid off the
+## walk and the terrain drawn, and everyone in the zone is told it is gone.
+func _on_unplotted(zone: String, plot: Dictionary) -> void:
+	if not Net.is_authority():
+		return
+	if World.zones.has(zone):
+		if zone == map_name:
+			Clearing.unlay_plot(_terrain, plot["rect"])
+		World.unplot(zone, plot["rect"])
+		if zone == map_name and _client3d != null:
+			_redraw_clearing([])
+	for peer in World.peers_in(zone):
+		if peer != Net.local_id:
+			Net.message_to(peer, "clearing", {"zone": zone, "cells": [], "gone": [Clearing.plot_wire(plot)]})
+
+
 ## A zone's told cells as a "clearing" list ([[x, y, stage]]).
 func _clearing_cells(zone: String) -> Array:
 	var out := []
@@ -2611,6 +2628,18 @@ func _on_clearing(data: Dictionary) -> void:
 		_plots_told[zone] = laid
 	else:
 		_plots_told[zone] = (_plots_told.get(zone, []) as Array) + laid
+	# Plots dropped (649, maps' side): by their rect.
+	var gone: Array[Rect2i] = []
+	for wire: Variant in data.get("gone", []) if data.get("gone") is Array else []:
+		var plot := Clearing.plot_from(wire)
+		if not plot.is_empty():
+			gone.append(plot["rect"])
+	if not gone.is_empty():
+		var kept: Array = []
+		for plot: Dictionary in _plots_told.get(zone, []):
+			if not plot["rect"] in gone:
+				kept.append(plot)
+		_plots_told[zone] = kept
 	if zone == map_name and not data.get("whole", false) and not Net.is_authority():
 		var changes := Clearing.apply_cells(_terrain, cells)
 		for each: Array in cells:
@@ -2621,6 +2650,9 @@ func _on_clearing(data: Dictionary) -> void:
 			var built: Array = _terrain.get("plot_buildings", [])
 			if not built.is_empty() and (built.back() as Dictionary)["rect"].intersects(plot["rect"]):
 				World.add_plot(zone, built.back(), Level.plot_edges(built.back()))
+		for rect in gone:
+			Clearing.unlay_plot(_terrain, rect)
+			World.unplot(zone, rect)
 		if _client3d != null:
 			_redraw_clearing(cells, changes)
 
@@ -2985,6 +3017,7 @@ func _boot() -> void:
 	# A town's plots (591 step 2): laid at its kind's size, told as laid.
 	World.clearing.size_of = _plot_size
 	World.clearing.plotted.connect(_on_plotted)
+	World.clearing.unplotted.connect(_on_unplotted)  # A plot dropped (649, maps' side).
 	World.towns.building_changed.connect(_on_town_building_changed)
 	World.towns.stage_changed.connect(func(town: String) -> void: _on_town_building_changed(town, ""))  # Its stage told (591).
 	# The roofs storms broke and nobody has mended yet (decision 383).

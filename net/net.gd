@@ -363,6 +363,9 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## 35 (648, npc's side): Monster.peaceable (SUBCLASS_REPLICATED), true while a
 ## talking monster sits unprovoked (the draugr sets it); a client's click or E
 ## talks to him then and strikes otherwise.
+## 35 (649, maps' side): the "clearing" message gains "gone" [plots, as
+## "plots" carries them, without size]: a town's plots dropped, their
+## buildings and edges taken off.
 const PROTOCOL_REVISION := 35
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]

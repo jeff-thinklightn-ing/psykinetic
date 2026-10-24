@@ -26733,3 +26733,39 @@ marked "dropped" (no stage, roof or inside after), its outline's sets out,
 its walls drawn again from the edges left; laid again, it is drawn anew. The per-building sets are
 _building_sets, shared by the room's build and a live plot. view_test
 _test_plots. Client only, protocol unchanged, no new class_name.
+## 649, maps' side: a plot dropped, so the forest takes it back
+
+Jeff's "the forest overtakes": a ruin standing on a laid plot never grew
+back, since a plot's cells never regrow (591 amended) and terrain's
+unbuild (649, terrain's side) leaves a plot's cells alone. Maps owns the
+plot, so maps drops it (the coordinator).
+
+- **Clearing.unplot(zone, rect)**: the plot laid on rect (its ring's, as
+  plot_for and lay_plot have it) dropped from Clearing.plots (and the
+  snapshot's "plots"), its cells no longer kept from growing back, and
+  **unplotted(zone, plot)** told; returns the plot, {} if none is laid
+  there. A felled cell then grows back as any does; a level floor cell
+  once terrain's unbuild hands it to the regrowth. **Clearing.plot_at(zone,
+  cell)** finds the plot whose rect holds a cell, for unbuild.
+- What a plot laid is kept so it can be taken off exactly:
+  Clearing.lay_plots records the edges it added in its building's "laid";
+  **Clearing.unlay_plot(terrain, rect)** takes the plot out of
+  terrain["plots"], its building out of terrain["plot_buildings"] and those
+  edges out (any changed since kept). World.add_plot records the same in
+  its town building ("plot", "laid", "edges"), as Fields does for a plot
+  building read at a zone's load; **World.unplot(level, rect)** drops the
+  town building and its edges, standing or held down while its walls were
+  not up (_walls_down), and resets the paths' step cache.
+- Main._on_unplotted (the server): a loaded zone takes it off its walk and,
+  if drawn, its terrain; the zone's peers get the "clearing" message with
+  **"gone"** [plots, plot_wire's shape]. A client drops them from its told
+  plots and, in that zone, off its terrain and walk; the view is drawn
+  again as for a plot laid (buildings drops the plot's building on it).
+- Who calls it: economy, when a ruin's record is dropped after its season;
+  terrain's unbuild, for a plot whose rect its cells fall in, before it
+  hands the cells to the regrowth.
+
+Wire: a line under PROTOCOL_REVISION 35 (the "clearing" message's "gone").
+level_test _test_unplot (laid, dropped, off the terrain, grown back; live
+off the walk and the town buildings; a client told it laid, then gone).
+No new class_name.
