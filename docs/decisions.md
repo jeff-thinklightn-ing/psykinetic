@@ -27316,3 +27316,26 @@ inn standing: one note at the cell outside the inn's door with the where;
 the rumour names them and the where once a day per player; the inn not
 standing, no note; home, the note comes down and the rumour stops. Server
 side only; no new class_name.
+
+## 643, ui's side. A note on the door, read
+
+Beside npc's 643 (the sought's door note; Jeff: "a small note saying where
+they went"). npc's "notes" message {zone, notes: [{tile: [x, y], text}]}
+comes whole on a zone join (after "map") and again whenever the zone's
+list changes; Main._on_notes_message keeps it by zone id (Main.zone_notes),
+an empty list clearing the zone, an empty text no note. The tile is the
+cell just outside the building's door where a player stands to read it
+(npc's: the front cell of a solid building, across the door edge for a
+kind with door edges), so the client reads cells, never Door entities. E
+(Main._tap_e, after the door under the cursor) on that cell, or facing it
+(Main.note_cell_by: the player's cell first, then the one its facing
+points at), opens NoteSheet (render/note_sheet.gd, the shared theme): the
+heading "A note on the door", the text as it travels, a dim "Esc puts it
+back." It closes by Esc (first in the escape chain after the deal window),
+when the player is neither on the cell nor facing it, or when the note is
+taken down (Main._update_note each frame). Over a note's cell the cursor
+carries the word "a note" (a Caption label beside it; the game had no
+cursor word before, and a note is the first thing on a bare cell worth
+one). No command back, no RPC; a zone's notes for a zone not entered are
+kept and unused. ui_test _test_door_note. Client only; no wire change;
+new class_name NoteSheet.

@@ -38,6 +38,7 @@ func _ready() -> void:
 	_test_world_map()
 	_test_town_sheet()  # After the map's test: the sheet's names build the map's graph (place_words).
 	await _test_deal_window()
+	_test_door_note()
 	_test_access()
 	_test_keys()
 	_test_barter()
@@ -822,6 +823,45 @@ func _test_deal_window() -> void:
 	World.despawn(draugr)
 	await get_tree().process_frame
 	await get_tree().process_frame
+
+
+## A note on a door, read (643, ui's side; npc's "notes" message).
+func _test_door_note() -> void:
+	print("== a note on the door (643, ui's side): npc's notes by zone, E on or facing the cell reads it, Esc or moving off puts it back ==")
+	var sheet: NoteSheet = _main.note_sheet
+	var player: GridEntity = _main._local_player()
+	if sheet == null or player == null:
+		_check(false, "the note sheet and a local player exist")
+		return
+	var zone: String = _main.zone_name_here()
+	var here: Vector2i = player.tile
+	var ahead: Vector2i = player.tile + player.facing
+	var text := "Away in the hills. Back when I can."
+	_main._on_message("notes", {"zone": "elsewhere/nowhere", "notes": [{"tile": [here.x, here.y], "text": "Not here."}]})
+	_check(_main.note_at(here).is_empty() and _main.note_cell_by(player) == _main.NONE, "another zone's notes are not read here")
+	_main._on_message("notes", {"zone": zone, "notes": [{"tile": [ahead.x, ahead.y], "text": text}, {"tile": [0, 0], "text": ""}]})
+	_check(_main.note_at(ahead) == text and _main.note_at(Vector2i(0, 0)).is_empty() and _main.note_cell_by(player) == ahead,
+			"the zone's notes by cell (an empty text is no note); the cell faced has one (%s)" % [_main.note_cell_by(player)])
+	_main._tap_e(player)
+	_check(sheet.visible and sheet.tile == ahead and sheet.text == text and sheet._words.text == text and sheet._title.text == NoteSheet.TITLE,
+			"E facing the note: the sheet shows its text under its title (%s)" % sheet.visible)
+	_main._update_note()
+	_check(sheet.visible, "still facing it: the sheet stays")
+	_main.escape()
+	_check(not sheet.visible and sheet.text.is_empty(), "Esc puts the note back")
+	_main._on_message("notes", {"zone": zone, "notes": [{"tile": [here.x, here.y], "text": text}]})
+	_check(_main.note_at(ahead).is_empty() and _main.note_cell_by(player) == here, "the list replaced whole: the note is on the player's own cell now")
+	_main._tap_e(player)
+	_check(sheet.visible and sheet.tile == here, "E on the cell reads it")
+	_main._on_message("notes", {"zone": zone, "notes": []})
+	_main._update_note()
+	_check(not sheet.visible and _main.note_at(here).is_empty() and not _main.zone_notes.has(zone), "an empty list clears the zone's notes and closes the sheet")
+	_main._on_message("notes", {"zone": zone, "notes": [{"tile": [here.x + 5, here.y + 5], "text": text}]})
+	_main._tap_e(player)
+	_check(not sheet.visible, "a note five cells off is not read from here")
+	_main._on_message("notes", {"zone": zone, "notes": []})
+	_check(_main._note_hover != null and not _main._note_hover.visible and _main._note_hover.text == NoteSheet.HOVER_WORD,
+			"the hover word at the cursor reads \"%s\", hidden off a note's cell" % NoteSheet.HOVER_WORD)
 
 
 func _test_town_sheet() -> void:

@@ -600,6 +600,13 @@ var _town_sheet_asked: Dictionary = {}
 ## A talking monster's deals as buttons (629, ui's side): opened by his
 ## "offers" message after E on him, watched by _update_deal.
 var deal_panel: DealPanel
+## The notes pinned to doors (643, ui's side; npc's "notes" message): by
+## zone id, {tile: text}; a zone's list arrives whole and an empty one
+## clears it. The sheet one is read on, and the word at the cursor over
+## a note's cell.
+var zone_notes: Dictionary = {}
+var note_sheet: NoteSheet
+var _note_hover: Label
 ## A town's rows are asked for again no sooner than this after the last ask (ms).
 const TOWN_SHEET_ASK_MSEC := 5000
 ## Each town's stage as its "town" message last said (591; "" before).
@@ -1035,6 +1042,7 @@ func _process(delta: float) -> void:
 	_update_pack()
 	_update_talk()
 	_update_deal()
+	_update_note()
 	_update_bar()
 	var hud_began := Time.get_ticks_usec()
 	if compass != null:
@@ -1691,6 +1699,64 @@ func _tap_e(player: Player) -> void:
 	var door := _e_door
 	if is_instance_valid(door) and player.tile in Terrain.edge_cells(door.key):
 		World.command(player, "door", {"edge": [door.key.x, door.key.y, door.key.z]})
+		return
+	# 643, ui's side: a note on the door, from its cell or the cell faced.
+	var at := note_cell_by(player)
+	if at != NONE and note_sheet != null:
+		note_sheet.show_note(at, note_at(at))
+
+
+## 643, ui's side: the cell with a note that [param player] stands on, else
+## the one it faces, else NONE.
+func note_cell_by(player: Player) -> Vector2i:
+	if not note_at(player.tile).is_empty():
+		return player.tile
+	if not note_at(player.tile + player.facing).is_empty():
+		return player.tile + player.facing
+	return NONE
+
+
+## 643, ui's side: the note pinned at [param tile] in this zone, "" for none.
+func note_at(tile: Vector2i) -> String:
+	var notes: Variant = zone_notes.get(zone_name_here(), {})
+	return str(notes.get(tile, "")) if notes is Dictionary else ""
+
+
+## npc's "notes" message (643): a zone's notes, whole; empty clears.
+func _on_notes_message(data: Dictionary) -> void:
+	var zone := str(data.get("zone", ""))
+	if zone.is_empty():
+		return
+	var notes: Dictionary = {}
+	if data.get("notes") is Array:
+		for each: Variant in data["notes"]:
+			if each is Dictionary and each.get("tile") is Array and (each["tile"] as Array).size() == 2:
+				var text := str(each.get("text", ""))
+				if not text.is_empty():
+					notes[Vector2i(int(each["tile"][0]), int(each["tile"][1]))] = text
+	if notes.is_empty():
+		zone_notes.erase(zone)
+	else:
+		zone_notes[zone] = notes
+
+
+## 643, ui's side, each frame: the sheet closes when its note is taken
+## down or the player is neither on its cell nor facing it; the word at
+## the cursor shows over a note's cell.
+func _update_note() -> void:
+	if note_sheet == null:
+		return
+	var player := _local_player()
+	if note_sheet.visible:
+		if player == null or note_at(note_sheet.tile) != note_sheet.text \
+				or (player.tile != note_sheet.tile and player.tile + player.facing != note_sheet.tile):
+			note_sheet.close()
+	if _note_hover == null:
+		return
+	var over := _mouse_tile() if player != null and not zone_notes.is_empty() else NONE
+	_note_hover.visible = over != NONE and not note_at(over).is_empty()
+	if _note_hover.visible:
+		_note_hover.position = get_viewport().get_mouse_position() + Vector2(16.0, 18.0)
 
 
 ## E held BANDAGE_HOLD_MSEC: a bandage command, on the player or companion
@@ -8885,6 +8951,15 @@ func _build_talk() -> void:
 	deal_panel = DealPanel.new()
 	$HUD.add_child(deal_panel)
 	deal_panel.offered.connect(_offer_deal)  # 629, ui's side: a button sends his deal's id with its sum.
+	note_sheet = NoteSheet.new()  # 643, ui's side: a note on a door, read.
+	$HUD.add_child(note_sheet)
+	_note_hover = Label.new()
+	_note_hover.name = "NoteHover"
+	_note_hover.theme_type_variation = &"Caption"
+	_note_hover.text = NoteSheet.HOVER_WORD
+	_note_hover.visible = false
+	_note_hover.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	$HUD.add_child(_note_hover)
 	world_map_panel.town_clicked.connect(open_town)  # 624: a town's row on the map opens its sheet.
 	if has_signal("world_changed"):
 		connect("world_changed", _refresh_town)  # 624: the sheet follows the world message while open.
@@ -9634,6 +9709,9 @@ func _on_message(kind: String, data: Dictionary) -> void:
 			bubbles.show_line(entity.get_instance_id(), str(data.get("text", "")))
 	if kind == "offers":
 		_on_offers_message(data)
+		return
+	if kind == "notes":
+		_on_notes_message(data)  # 643, ui's side.
 
 
 ## A name for the party log: players by record name, residents by the label
@@ -12265,6 +12343,8 @@ func escape() -> void:
 		close_other()
 	elif deal_panel != null and deal_panel.visible:
 		deal_panel.close()  # 629, ui's side: the deal window.
+	elif note_sheet != null and note_sheet.visible:
+		note_sheet.close()  # 643, ui's side: the note put back.
 	elif card_page != null and card_page.visible:
 		card_page.visible = false  # 618: her card page.
 	elif town_panel != null and town_panel.visible:
