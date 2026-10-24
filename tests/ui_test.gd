@@ -1113,6 +1113,12 @@ func _test_town_sheet() -> void:
 			and TownSheet.strain_words({"days": 7, "of": 10, "why": "the forge out of use"}) == "Strained 7 days of 10: the forge out of use."
 			and TownSheet.economy_lines({"town": "wilds/held", "name": "Umbrage", "strain": {"days": 0, "of": 10, "why": ""}}).is_empty(),
 		"the strain line (649, ui's side): none unstrained, the days alone without a reason (captives), economy's reason as it names it")
+	_check(TownSheet.strain_words({"days": 0, "of": 10, "why": "", "settling": {"days": 3, "of": 7}}) == "Settling, 3 of 7 days calm."
+			and TownSheet.strain_words({"days": 0, "of": 10, "why": "", "settling": {"days": 0, "of": 7}}) == "Settling, 0 of 7 days calm."
+			and TownSheet.strain_words({"days": 1, "of": 10, "why": "hunger", "settling": {"days": 0, "of": 7}}) == "Strained 1 day of 10: hunger, the store short of food. Settling, 0 of 7 days calm."
+			and TownSheet.economy_lines({"town": "wilds/held", "name": "Held", "strain": {"days": 0, "of": 10, "why": "", "settling": {"days": 6, "of": 7}}}) == ["Settling, 6 of 7 days calm."]
+			and TownSheet.strain_words({"days": 0, "of": 10, "why": ""}) == "",
+		"after a fall (649 amended (3), ui's side): the calm days of the wait to rise, after the strain sentence on a strained day, nothing without the key")
 	_check(TownSheet.join_and(["a smith"]) == "a smith" and TownSheet.join_and(["a", "b", "c"]) == "a, b and c"
 			and TownSheet.need_words({"what": "standing:walls", "have": 0, "need": 1}) == "the walls standing" and TownSheet.need_words({"what": "guard", "have": 0, "need": 2}) == "2 guards",
 		"the joins and a next stage's need in words")

@@ -28763,3 +28763,18 @@ In 652's re-soak a town fell to a settlement for hunger and was a hamlet again o
 Wire: "settling" in the town_sheet message's strain changes what an existing message carries, so it needs revision 36 (release: 35 shipped in v0.1.172; 36 was already open on main, from 661), with its line under ## 36.
 
 farm_test _test_settle: fallen, settling 0 of 7; the hamlet's needs met but 3 calm days still a settlement; a hungry day restarts the count; 6 calm days still settling and saved; the 7th a hamlet with settling gone. No new class_name.
+## 649 amended (3), ui's side. The town sheet says a fallen town is settling
+
+Beside economy's 649 amended (3) (the coordinator: the strain line to say
+"settling, 3 of 7 days calm"). After a fall, economy's "town_sheet"
+message's strain dict carries "settling": {"days": calm days in a row,
+"of": the days of calm the town needs to rise again (decline's
+rise_after_days, 7)} while the town is waiting to rise, and no key
+otherwise; a strained day puts days back to 0. TownSheet.strain_words
+adds the sentence "Settling, 3 of 7 days calm." to the strain line: alone
+while the town is calm (the strain days are 0 then), after the strain
+sentence on a strained day ("Strained 1 day of 10: hunger, the store
+short of food. Settling, 0 of 7 days calm."), so the one line tells both
+what the town is waiting out and what set it back. Nothing without the
+key, as before. ui_test (the strain checks). Client only: the wire change
+is economy's (PROTOCOL_REVISION 36, its push); no new class_name.

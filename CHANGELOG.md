@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The town sheet's strain line says when a fallen town is settling and how many calm days of the wait to rise again it has had, "Settling, 3 of 7 days calm." (649 amended (3), ui's side).
 - A town that falls back a stage now has to stay calm for a week before it can rise again, instead of flickering back up a moment later; its town sheet says how many calm days it has had.
 - Inside any walled space (a house, a castle room, a ruin, anywhere underground) the camera eases to a top-down view, and back once you have been outside half a second, so doorways don't bob it (671).
 - Admins get an in-game admin panel on F10: the server console's commands with a filter and a typed line, and buttons to go to a zone, reset your quests (all, or one quest giver's, such as Hob's brew), reset or regenerate the level, and set the hour and weather; the server lists who is an admin (672).

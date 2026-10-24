@@ -306,17 +306,27 @@ static func economy_lines(sheet: Dictionary) -> Array[String]:
 ## The strain line (649, ui's side; economy's "strain" {days, of, why}):
 ## "Strained 4 days of 10: hunger, the store short of food."; the days
 ## alone when no reason is recorded (a captive carried off adds days
-## without one); nothing while the town is not strained.
+## without one); nothing while the town is not strained. After a fall
+## (649 amended (3), ui's side; economy's "settling" {days, of} in the
+## dict while the town waits to rise again): "Settling, 3 of 7 days
+## calm.", after the strain sentence when there is one (a strained day
+## puts the calm days back to 0).
 static func strain_words(strain: Dictionary) -> String:
+	var out: Array[String] = []
 	var days := int(strain.get("days", 0))
-	if days <= 0:
-		return ""
-	var of := int(strain.get("of", 0))
-	var head := "Strained %d %s of %d" % [days, "day" if days == 1 else "days", of] if of > 0 else "Strained %d %s" % [days, "day" if days == 1 else "days"]
-	var why := str(strain.get("why", ""))
-	if why == "hunger":
-		why = "hunger, the store short of food"
-	return "%s: %s." % [head, why] if not why.is_empty() else "%s." % head
+	if days > 0:
+		var of := int(strain.get("of", 0))
+		var head := "Strained %d %s of %d" % [days, "day" if days == 1 else "days", of] if of > 0 else "Strained %d %s" % [days, "day" if days == 1 else "days"]
+		var why := str(strain.get("why", ""))
+		if why == "hunger":
+			why = "hunger, the store short of food"
+		out.append("%s: %s." % [head, why] if not why.is_empty() else "%s." % head)
+	if strain.get("settling") is Dictionary:
+		var settling: Dictionary = strain["settling"]
+		var calm := int(settling.get("days", 0))
+		var needed := int(settling.get("of", 0))
+		out.append("Settling, %d of %d days calm." % [calm, needed] if needed > 0 else "Settling, %d %s calm." % [calm, "day" if calm == 1 else "days"])
+	return " ".join(out)
 
 
 ## A next-stage need {what, have, need} in words: "3 more people", "a
