@@ -28367,3 +28367,34 @@ gone.
 Built again, the boards are new (the plain set's byte) and every piece
 stands. view_test _test_decline (every kept cell worn, fallen pieces, none
 worn after a rebuild). Client only, protocol unchanged, no new class_name.
+## 566 amended, npc's side (phase 2). The hunter, the farmer and the shepherd seen at their work
+
+The coordinator's phase 2 of visible work (566), after the woodcutter and
+the builds: words from the sim's state, the clips pc-character's, the game
+art-kit's. Main._task_for by trade (economy.json's names), a task {kind,
+cell, face, walking} as before. The hunter (_hunter_task): on economy's
+trip (Production.trip; its "catch" is the kind rolled when he set out, ""
+for none, the coordinator's (b): the body carries what the sim already
+decided), the outbound half "stalk" at the hunting ground's spot
+(_stalk_spot: the walkable cell within the radius farthest from the store,
+facing on away from it; kept by site), the turn by the walk home as the
+woodcutter's; the return half "carry_game" walked to the store's side
+(_store_side) only with a catch, else nothing, a plain walk home. The
+farmer (_farmer_task): while economy's Towns.field_work(town) says his work
+counts toward the crop (spring with it unsown, autumn with it sown, the farm
+his and worked), "hoe" along the field's rows cell by cell (_row_cells, a
+furrow each way; _rows keeps his place), shown once he is in the field
+(walking true there); the crop brought in (crop.stage "harvested"), one
+"carry_sack" to the store first, once a harvest (_sacks by stage, gone when
+it turns). The shepherd (_herd_task): "herd", a slow round of the pasture
+(a cell by the body and the HERD_DWELL-step spell, 60, facing its middle),
+and in spring or autumn with the flock unshorn (Towns.flock: season,
+sheared; SHEARING_SEASONS) "shear" at the pasture's middle; the hill
+herder (640) herds at his fold the same, nothing on his drove. The field
+and the pasture are the standing building of the trade's kind in the town
+here (_use_rect). Six words, strings in the existing activity: protocol
+unchanged; a client draws the ones it knows and shows nothing for the rest
+until the clips land. resident_test _test_field_work (the hunter's spot and
+facing, no catch no load, the catch carried; the rows, the hoe shown in the
+field only, the sack once; the herd's cells turning, the shearing by
+season), _test_herder (his fold, nothing at the buyer's).

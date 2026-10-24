@@ -69,6 +69,7 @@ func _ready() -> void:
 	_test_houses()
 	_test_companion_hearsay()
 	_test_visible_work()
+	_test_field_work()
 	_test_bodies_only_near()  # Last: its resident would answer the voice tests.
 
 	Production.type_of = Townsfolk.roll_type
@@ -448,6 +449,12 @@ func _test_herder() -> void:
 		return
 	_step_until(func() -> bool: return grim.doing == Resident.Doing.WORK and World.distance(grim.tile, fold_cell) <= 3, 60)
 	_check(grim.doing == Resident.Doing.WORK and World.distance(grim.tile, fold_cell) <= 3, "midday: at the fold (at %s)" % grim.tile)
+	# At his fold he herds (566 amended, phase 2): a cell of it, facing its middle, shown there.
+	var herding: Dictionary = _main._task_for(grim)
+	_check(herding.get("kind") == "herd" and fold.has_point(herding.get("cell", Vector2i(-1, -1))) and herding.get("face") == fold.get_center(),
+		"at his fold he herds: a cell of it, facing its middle (%s)" % [herding])
+	_step_until(func() -> bool: return grim.activity == "herd", 400)
+	_check(grim.activity == "herd" and fold.has_point(grim.tile), "shown there (%s at %s)" % [grim.activity, grim.tile])
 	DayNight.set_hour(23.0)
 	_step_until(func() -> bool: return grim.doing == Resident.Doing.HOME and World.distance(grim.tile, fold_cell) <= 3, 60)
 	_check(grim.doing == Resident.Doing.HOME and World.distance(grim.tile, fold_cell) <= 3, "night: home in the hut (at %s)" % grim.tile)
@@ -488,6 +495,7 @@ func _test_herder() -> void:
 	var square := Rect2i(3, 1, 5, 5)
 	_check(grim != null and grim.town == STORE and grim.places["square"] == square and grim.places["home"] == square,
 		"on his drove: a body at the buyer's square, its town the buyer's (%s)" % [grim.places if grim != null else null])
+	_check(grim != null and _main._task_for(grim).is_empty(), "on his drove he herds nothing at the buyer's")
 	World.towns._herders[place]["back"] = 0
 	_sync()
 	_check(_body(who) == null, "the walk home: no body till he is back")
@@ -1634,6 +1642,12 @@ func _test_offer_words() -> void:
 	if body == null or player == null or hut.is_empty() or plea.is_empty():
 		return
 	_put(player, _main._nearest_free(body.tile + Vector2i(1, 0)))
+	# A hail due to the player standing by (HAIL_CHECK_TICKS) lands before the mind is made and the ask put: after
+	# it, the hail's plea went to the mind and the ask fell (566 amended, phase 2: nineteen steps more in an
+	# earlier case moved the hail tick past the ask).
+	for i in Main.HAIL_CHECK_TICKS + 1:
+		World.step()
+	_put(player, _main._nearest_free(body.tile + Vector2i(1, 0)))
 	var mind := VoiceMind.new()
 	_main._resident_mind = mind
 	_main._chat_tick.clear()
@@ -2356,6 +2370,168 @@ func _test_visible_work() -> void:
 	_main._build_stub["rs-mara"] = {"use": "no_such_use", "progress": 0.5}
 	_check(_main._task_for(mara).is_empty(), "a build with no map building here: nothing to stand at")
 	_main._build_stub.erase("rs-mara")
+	mara.task = {}
+	World.despawn(mara)
+
+
+## The hunter, the farmer and the shepherd at their work (566 amended, phase
+## 2, npc's side): the hunter stalks at the ground's far end and carries game
+## home only with a catch; the farmer hoes the field's rows while economy's
+## field work counts and carries one sack a harvest; the shepherd herds about
+## the pasture and shears in a shearing season.
+func _test_field_work() -> void:
+	print("\n== the hunter's stalk and game, the farmer's hoe and sack, the shepherd's herding and shearing (566 amended, phase 2, npc's side) ==")
+	for body: GridEntity in World.townsfolk().duplicate():
+		World.despawn(body)
+	DayNight.set_hour(10.0)
+	_sync()
+	var mara := _body("rs-mara")
+	_check(mara != null, "(Mara stands in the town)")
+	if mara == null:
+		return
+	var store: Dictionary = World.holdings.place(STORE)
+	var store_cell: Vector2i = store["cell"]
+	# The hunter: a hunting ground by the store, economy's trip stood in for, its catch rolled at the start.
+	var ground := STORE.get_slice("/", 0) + "/test_ground"
+	var centre: Vector2i = _main._nearest_free(store_cell + Vector2i(8, 8))
+	World.holdings._places[ground] = {"id": ground, "area": store["area"], "key": "test_ground", "cell": centre, "name": "the test ground", "kind": "hunting_ground",
+		"radius": 2, "worth": 1, "start": "town", "town": STORE}
+	World.holdings._holder[ground] = "town"
+	World.holdings._strength[ground] = 1
+	World.holdings._since[ground] = World.steps
+	World.production.retrain("rs-mara", "hunter")
+	_sync()
+	_check(mara.trade == "hunter" and World.production.site_of(STORE, "hunter").get("id") == ground, "(a hunter; economy's site_of finds the ground)")
+	var now := World.production.now()
+	_main._trip_stub["rs-mara"] = {"site": ground, "from": now, "back_at": now + 40000, "catch": ""}
+	var task: Dictionary = _main._task_for(mara)
+	var spot: Dictionary = _main._stalk_spot(World.holdings.place(ground), store_cell)
+	_check(task.get("kind") == "stalk" and task.get("cell") == spot["cell"] and task.get("face") == spot["face"] and not bool(task.get("walking", true)),
+		"outbound: stalking at the ground's spot (%s)" % [task])
+	var farther := false
+	for dy in range(-2, 3):
+		for dx in range(-2, 3):
+			var cell := centre + Vector2i(dx, dy)
+			if World.is_walkable(cell) and (cell - store_cell).length_squared() > (spot["cell"] - store_cell).length_squared():
+				farther = true
+	var away: Vector2i = spot["cell"] - store_cell
+	_check(not farther and World.is_walkable(spot["cell"]) and absi(spot["cell"].x - centre.x) <= 2 and absi(spot["cell"].y - centre.y) <= 2
+		and spot["face"] == spot["cell"] + Vector2i(signi(away.x), signi(away.y)),
+		"the spot is the ground's walkable cell farthest from the store, facing on away from it (%s, centre %s)" % [spot, centre])
+	for i in 600:
+		World.step()
+		if mara.tile == spot["cell"]:
+			break
+	for i in Resident.FAR_EVERY + 2:
+		World.step()
+	_check(mara.tile == spot["cell"] and mara.activity == "stalk" and mara.facing == mara._toward(spot["face"]),
+		"she walks to the spot and stalks there, facing away from the town (%s at %s, %s)" % [mara.activity, mara.tile, mara.facing])
+	now = World.production.now()
+	_main._trip_stub["rs-mara"] = {"site": ground, "from": now - 40000, "back_at": now + 5, "catch": ""}
+	_check(_main._task_for(mara).is_empty(), "the return half with no catch: nothing carried, a plain walk home")
+	_main._trip_stub["rs-mara"] = {"site": ground, "from": now - 40000, "back_at": now + 5, "catch": "deer"}
+	task = _main._task_for(mara)
+	_check(task.get("kind") == "carry_game" and bool(task.get("walking", false)) and World.distance(task.get("cell", spot["cell"]), store_cell) <= 1,
+		"with a catch: the game carried to the store (%s)" % [task])
+	for i in Main.WORK_CHECK_TICKS + Resident.FAR_EVERY + 2:
+		World.step()
+	_check(mara.activity == "carry_game", "shown on the way home (%s at %s)" % [mara.activity, mara.tile])
+	_main._trip_stub.erase("rs-mara")
+	World.holdings._places.erase(ground)
+	World.holdings._holder.erase(ground)
+	World.holdings._strength.erase(ground)
+	World.holdings._since.erase(ground)
+	_main._site_spots.clear()
+	# The farmer: a field standing in the town, the crop's stage, economy's field_work stood in for.
+	DayNight.set_hour(10.0)
+	var buildings: Array = _main._world_map.areas[TOWN]["buildings"]
+	var field := Rect2i(4, 6, 5, 3)  # The test town is 15 x 10 cells: below the square, east of the healer's hut.
+	var field_house := {"slot": "building.field", "rect": field, "facing": Vector2i(0, 1), "town": "store", "use": "field", "code": ""}
+	buildings.append(field_house)
+	var town_record := World.towns._town(STORE)
+	town_record["buildings"]["field"] = {"kind": "field", "level": 1, "state": Towns.STANDING, "since": World.towns.now(), "job": 0}
+	now = World.production.now()
+	town_record["crop"] = {"stage": "", "growth": 0.0, "worked": 0, "season": Season.name_at(now), "roots": false, "at": now, "flattened": -1}
+	World.production.retrain("rs-mara", "farmer")
+	_sync()
+	_check(mara.trade == "farmer" and mara.places["work"] == field and _main._use_rect(STORE, "field") == field, "(a farmer, the field her work: %s)" % [mara.places["work"]])
+	_main._field_work_stub[STORE] = false
+	_check(_main._task_for(mara).is_empty(), "her work not counting (economy's field_work false): nothing to show")
+	_main._field_work_stub[STORE] = true
+	var rows: Array[Vector2i] = _main._row_cells(field)
+	_check(rows.size() == 15 and rows[0] == field.position and rows[4] == field.position + Vector2i(4, 0) and rows[5] == field.position + Vector2i(4, 1)
+		and rows[9] == field.position + Vector2i(0, 1) and rows[10] == field.position + Vector2i(0, 2), "the rows run to and fro (%s)" % [rows.slice(0, 11)])
+	task = _main._task_for(mara)
+	_check(task.get("kind") == "hoe" and task.get("cell") == rows[0] and not bool(task.get("walking", true)),
+		"her work counting: hoeing from the field's first cell, nothing shown till she is in it (%s)" % [task])
+	var seen := {}
+	for i in 1500:
+		World.step()
+		if field.has_point(mara.tile) and mara.activity == "hoe":
+			seen[mara.tile] = true
+		if seen.size() >= 4:
+			break
+	_check(seen.size() >= 4, "in the field she hoes along the rows, cell by cell (%d cells seen, at %s)" % [seen.size(), mara.tile])
+	_check(not _main._task_for(mara).is_empty() and _main._task_for(mara).get("kind") == "hoe" and bool(_main._task_for(mara).get("walking", false)), "in the field, shown between the cells")
+	# The crop brought in: one sack to the store, once a harvest.
+	town_record["crop"]["stage"] = "harvested"
+	_main._field_work_stub[STORE] = false
+	task = _main._task_for(mara)
+	_check(task.get("kind") == "carry_sack" and bool(task.get("walking", false)) and World.distance(task.get("cell", field.position), store_cell) <= 1,
+		"the crop brought in: a sack carried to the store (%s)" % [task])
+	for i in 900:
+		World.step()
+		if World.distance(mara.tile, store_cell) <= 1:
+			break
+	_check(World.distance(mara.tile, store_cell) <= 1 and mara.activity == "carry_sack", "(she reaches the store with it: %s at %s)" % [mara.activity, mara.tile])
+	_check(_main._task_for(mara).is_empty() and str(_main._sacks.get("rs-mara", "")) == "harvested", "set down: nothing more this harvest")
+	town_record["crop"]["stage"] = ""
+	_main._task_for(mara)
+	_check(not _main._sacks.has("rs-mara"), "the stage turned: the next harvest gets its sack")
+	buildings.erase(field_house)
+	town_record["buildings"].erase("field")
+	town_record.erase("crop")
+	_main._field_work_stub.erase(STORE)
+	_main._rows.erase("rs-mara")
+	# The shepherd: a pasture standing, the flock by the season (Season's year set and put back).
+	var year := Season.to_dict()
+	Season.set_season("summer")
+	DayNight.set_hour(10.0)
+	var pasture := Rect2i(9, 1, 3, 4)  # North of the hut, west of the shed's walls.
+	var pasture_house := {"slot": "building.pasture", "rect": pasture, "facing": Vector2i(0, 1), "town": "store", "use": "pasture", "code": ""}
+	buildings.append(pasture_house)
+	town_record["buildings"]["pasture"] = {"kind": "pasture", "level": 1, "state": Towns.STANDING, "since": World.towns.now(), "job": 0}
+	town_record["flock"] = {"count": 6.0, "season": "summer", "sheared": false, "worked": 0, "at": World.towns.now()}
+	World.production.retrain("rs-mara", "shepherd")
+	_sync()
+	_check(mara.trade == "shepherd" and mara.places["work"] == pasture, "(a shepherd, the pasture her work: %s)" % [mara.places["work"]])
+	task = _main._task_for(mara)
+	_check(task.get("kind") == "herd" and pasture.has_point(task.get("cell", Vector2i(-1, -1))) and task.get("face") == pasture.get_center() and not bool(task.get("walking", true)),
+		"summer: herding, a cell of the pasture facing its middle (%s)" % [task])
+	var first: Vector2i = task.get("cell", Vector2i(-1, -1))
+	for i in Main.HERD_DWELL + 1:
+		World.step()
+	var later: Vector2i = _main._task_for(mara).get("cell", first)
+	_check(later != first and pasture.has_point(later), "a spell later, another cell of it (%s then %s)" % [first, later])
+	_step_until(func() -> bool: return mara.activity == "herd", 600)
+	_check(mara.activity == "herd" and pasture.has_point(mara.tile), "shown in the pasture (%s at %s)" % [mara.activity, mara.tile])
+	Season.set_season("spring")
+	_step_until(func() -> bool: return World.towns.flock(STORE).get("season") == "spring", 600)  # The towns' tick (every so many steps) sees the season.
+	var flock: Dictionary = World.towns.flock(STORE)
+	_check(flock.get("season") == "spring" and not bool(flock.get("sheared", true)), "(spring: the flock unshorn: %s)" % [flock])
+	task = _main._task_for(mara)
+	_check(task.get("kind") == "shear" and task.get("cell") == pasture.get_center() and task.get("face") == Resident.NO_CELL, "spring, the flock unshorn: shearing at the pasture's middle (%s)" % [task])
+	_step_until(func() -> bool: return mara.activity == "shear", 600)
+	_check(mara.activity == "shear" and mara.tile == pasture.get_center(), "shown there (%s at %s)" % [mara.activity, mara.tile])
+	town_record["flock"]["sheared"] = true
+	_check(_main._task_for(mara).get("kind") == "herd", "sheared: herding again")
+	Season.from_dict(year)
+	buildings.erase(pasture_house)
+	town_record["buildings"].erase("pasture")
+	town_record.erase("flock")
+	_main._site_spots.clear()
+	World.production.retrain("rs-mara", "cook")
+	_sync()
 	mara.task = {}
 	World.despawn(mara)
 

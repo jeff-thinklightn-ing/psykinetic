@@ -107,7 +107,8 @@ var _address_until := -1
 const ADDRESS_REACH := 2
 ## Visible work (decision 566, npc's side): what the body is doing where it
 ## stands, replicated for pc-character's clip with the tool in hand ("chop",
-## "carry_log", "saw", "hammer", "sleep"; "" idle), set from [member task]
+## "carry_log", "saw", "hammer", "sleep"; 566 amended, phase 2: "stalk",
+## "carry_game", "hoe", "carry_sack", "herd", "shear"; "" idle), set from [member task]
 ## (Main's, from the sim's state: {kind, cell, face, walking}) while the
 ## routine says work, and "sleep" at home in the sleep hours. The sim's
 ## yields and clocks never read it: a body is the visible version of work

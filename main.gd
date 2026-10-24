@@ -90,6 +90,11 @@ const WOODPILE_REACH := 4
 ## the body's pace (grass, slopes and diagonals slow it), so it is home
 ## when the yield lands (521 amended).
 const WALK_HOME_SLACK := 1.3
+## Steps a shepherd or herder stands at one spot of the ground before the next
+## (566 amended, phase 2: a slow round of the pasture or the fold).
+const HERD_DWELL := 60
+## The seasons the flock is sheared in (economy's _flock_turn: once each).
+const SHEARING_SEASONS: Array[String] = ["spring", "autumn"]
 ## A town's homes: the map's huts and houses linked to nothing within so
 ## many cells of its store, each with room for so many.
 const HOME_TILES := 24
@@ -272,6 +277,15 @@ var _site_spots: Dictionary = {}
 var _awake_sent: Dictionary = {}
 var _trip_stub: Dictionary = {}
 var _build_stub: Dictionary = {}
+## The tests' stand-in for economy's Towns.field_work (566 amended, phase 2):
+## town -> whether the farmer's field work counts now.
+var _field_work_stub: Dictionary = {}
+## The farmer's one sack a harvest (566 amended, phase 2): worker id -> the
+## crop stage it was carried for ("harvested"); gone when the stage turns.
+var _sacks: Dictionary = {}
+## The hoeing's place along the field's rows: worker id -> the index of the
+## cell worked next (_row_cells).
+var _rows: Dictionary = {}
 ## Talk with no panel (decision 536): the offer standing for each player,
 ## player id -> {worker, id, title, at, zone}: what a resident last spoke to
 ## them, taken by a yes, a name or an amount said back; one per player, not
@@ -11351,8 +11365,12 @@ func _visible_work_tick() -> void:
 ## 521's trip (economy's Production.trip: the outbound half to the woodlot's
 ## spot, chopping; the return half home with a log), a carpenter whose
 ## build job is working (at the woodpile sawing in the pad stage, inside
-## hammering after, by Towns.build_progress); {} when the routine's work
-## place is the place. Only a site or a building in the body's own area.
+## hammering after, by Towns.build_progress); and 566 amended, phase 2: a
+## hunter on their hunt (_hunter_task), a farmer at the field (_farmer_task),
+## a shepherd at the pasture or the hill herder at the fold (_herd_task); {}
+## when the routine's work place is the place. Only a site or a building in
+## the body's own area. The words are the sim's; a client draws the ones it
+## knows (Client3D.ACTIVITIES) and shows nothing for the rest.
 func _task_for(body: Resident) -> Dictionary:
 	if body.trade == "woodcutter":
 		var site: Dictionary = World.production.site_of(body.town, body.trade)
@@ -11373,6 +11391,13 @@ func _task_for(body: Resident) -> Dictionary:
 			return {"kind": "chop", "cell": spot["cell"], "face": spot["face"], "walking": false}
 		var pile := _pile_spot(body.town, store_cell)
 		return {"kind": "carry_log", "cell": pile.get("cell", _nearest_free(store_cell)), "face": pile.get("face", Resident.NO_CELL), "walking": true}
+	# The trades by their names in economy.json (hunter.trade, buildings' field and pasture trades, herder.trade).
+	if body.trade == "hunter":
+		return _hunter_task(body)
+	if body.trade == "farmer":
+		return _farmer_task(body)
+	if body.trade == "shepherd" or body.trade == "herder":
+		return _herd_task(body)
 	var build := _build_of(body)
 	if not build.is_empty():
 		return _build_task(build["building"], float(build["progress"]))
@@ -11398,6 +11423,168 @@ func _trip_of(worker_id: String) -> Dictionary:
 	if _trip_stub.has(worker_id):
 		return _trip_stub[worker_id]
 	return World.production.trip(worker_id)
+
+
+## The hunter's hunt (566 amended, phase 2; economy's trip, its "catch" the
+## kind rolled when it set out, "" for none): the outbound half stalking at
+## the hunting ground's spot (_stalk_spot), the turn by the walk home as the
+## woodcutter's; the return half, with a catch, the game carried to the
+## store; without one nothing, a plain walk home. {} off a trip, or with the
+## ground elsewhere.
+func _hunter_task(body: Resident) -> Dictionary:
+	var site: Dictionary = World.production.site_of(body.town, body.trade)
+	if site.is_empty() or str(site.get("area", "")) != World.zone.name:
+		return {}
+	var trip := _trip_of(body.worker_id)
+	if trip.is_empty():
+		return {}
+	var now := World.production.now()
+	var from := int(trip.get("from", -1))
+	var back_at := int(trip.get("back_at", -1))
+	var store_cell: Vector2i = World.holdings.place(body.town).get("cell", body.tile)
+	var spot := _stalk_spot(site, store_cell)
+	if from < 0 or back_at < 0 or now < back_at - _walk_home(body, spot["cell"], store_cell):
+		return {"kind": "stalk", "cell": spot["cell"], "face": spot["face"], "walking": false}
+	if str(trip.get("catch", "")).is_empty():
+		return {}
+	return {"kind": "carry_game", "cell": _store_side(body.town, store_cell), "face": Resident.NO_CELL, "walking": true}
+
+
+## Where a hunter stalks at [param site] (a Holdings place with a radius):
+## the walkable cell within the radius farthest from [param store] (the deep
+## end of the ground, its game beyond), facing on away from the store; the
+## site's own cell when none can be walked. Kept by site id.
+func _stalk_spot(site: Dictionary, store: Vector2i) -> Dictionary:
+	var key := "stalk:" + str(site.get("id", ""))
+	if _site_spots.has(key):
+		return _site_spots[key]
+	var centre: Vector2i = site.get("cell", Vector2i.ZERO)
+	var radius := int(site.get("radius", 2))
+	var best := centre
+	var best_d := -1
+	for dy in range(-radius, radius + 1):
+		for dx in range(-radius, radius + 1):
+			var cell := centre + Vector2i(dx, dy)
+			if not World.is_walkable(cell):
+				continue
+			var d := (cell - store).length_squared()
+			if d > best_d:
+				best_d = d
+				best = cell
+	var away := best - store
+	var face: Vector2i = best + Vector2i(signi(away.x), signi(away.y)) if away != Vector2i.ZERO else Resident.NO_CELL
+	_site_spots[key] = {"cell": best, "face": face}
+	return _site_spots[key]
+
+
+## Where a load is set down at [param town]'s store (566 amended, phase 2:
+## the hunter's game, the farmer's sack): the store's cell when it can be
+## walked, else the nearest that can. Kept by town, so a body standing on
+## it is still there.
+func _store_side(town: String, store_cell: Vector2i) -> Vector2i:
+	var key := "side:" + town
+	if not _site_spots.has(key):
+		_site_spots[key] = store_cell if World.is_walkable(store_cell) else _nearest_free(store_cell)
+	return _site_spots[key]
+
+
+## The farmer's field (566 amended, phase 2): while economy's Towns.field_work
+## says his work counts toward the crop (spring unsown, autumn sown, the farm
+## his and worked), hoeing along the field's rows cell by cell (_row_cells,
+## _rows), shown once he is in the field; the crop brought in (crop.stage
+## "harvested"), one sack carried to the store first (_sacks, once a
+## harvest, gone when the stage turns); else {}, the routine's place. The
+## field is the standing building of his trade's kind in his town here.
+func _farmer_task(body: Resident) -> Dictionary:
+	var field := _use_rect(body.town, World.towns.kind_for(body.trade))
+	if field.size == Vector2i.ZERO:
+		return {}
+	var stage := str(World.towns.crop(body.town).get("stage", ""))
+	if stage != "harvested":
+		_sacks.erase(body.worker_id)
+	elif str(_sacks.get(body.worker_id, "")) != stage:
+		var store_cell: Vector2i = World.holdings.place(body.town).get("cell", body.tile)
+		var at := _store_side(body.town, store_cell)
+		if World.distance(body.tile, at) <= 1:
+			_sacks[body.worker_id] = stage
+		else:
+			return {"kind": "carry_sack", "cell": at, "face": Resident.NO_CELL, "walking": true}
+	if not _field_work(body.town):
+		return {}
+	var cells := _row_cells(field)
+	if cells.is_empty():
+		return {}
+	var i := int(_rows.get(body.worker_id, 0)) % cells.size()
+	if body.tile == cells[i]:
+		i = (i + 1) % cells.size()
+	_rows[body.worker_id] = i
+	return {"kind": "hoe", "cell": cells[i], "face": Resident.NO_CELL, "walking": field.has_point(body.tile)}
+
+
+## Whether [param town]'s farmer's work counts toward the crop now (economy's
+## Towns.field_work), or the tests' stand-in.
+func _field_work(town: String) -> bool:
+	if _field_work_stub.has(town):
+		return bool(_field_work_stub[town])
+	return World.towns.field_work(town)
+
+
+## The shepherd's pasture and the hill herder's fold (566 amended, phase 2):
+## herding, a slow round of the ground (one of its cells by the body and
+## the HERD_DWELL-step spell, facing its middle); the shepherd in a shearing
+## season with the flock unshorn (economy's flock: season, sheared) shears at
+## the pasture's middle instead. The pasture is the standing building of
+## his trade's kind in his town here; the fold the herder's work place
+## (640), and in a town (on his drove) he herds nothing. {} with neither.
+func _herd_task(body: Resident) -> Dictionary:
+	var ground := Rect2i()
+	var shearing := false
+	if body.trade == "herder":
+		if World.towns.is_town(body.town):
+			return {}
+		ground = body.places.get("work", Rect2i())
+	else:
+		ground = _use_rect(body.town, World.towns.kind_for(body.trade))
+		var flock: Dictionary = World.towns.flock(body.town)
+		shearing = not flock.is_empty() and str(flock.get("season", "")) in SHEARING_SEASONS and not bool(flock.get("sheared", false))
+	if ground.size == Vector2i.ZERO:
+		return {}
+	var cells := _row_cells(ground)
+	if cells.is_empty():
+		return {}
+	var middle := ground.get_center()
+	if shearing:
+		return {"kind": "shear", "cell": middle if World.is_walkable(middle) else cells[0], "face": Resident.NO_CELL, "walking": false}
+	var turn := int(float(World.production.now()) / float(HERD_DWELL))
+	var cell: Vector2i = cells[posmod(turn * 7 + body.worker_id.hash(), cells.size())]
+	return {"kind": "herd", "cell": cell, "face": middle, "walking": false}
+
+
+## The inside of [param town]'s standing building of [param use] in this zone
+## (its world-map record by the town's key; Rect2i(), size zero, for none):
+## the farmer's field, the shepherd's pasture.
+func _use_rect(town: String, use: String) -> Rect2i:
+	if use.is_empty() or str(World.towns.building(town, use).get("state", "")) != Towns.STANDING:
+		return Rect2i()
+	var key := str(World.holdings.place(town).get("key", ""))
+	for building: Dictionary in _world_map.areas.get(World.zone.name, {}).get("buildings", []):
+		if str(building.get("town", "")) == key and str(building.get("use", "")) == use and building.get("rect") is Rect2i:
+			return building["rect"]
+	return Rect2i()
+
+
+## [param ground]'s walkable cells row by row, each row the other way from
+## the last (the hoeing's furrows, the herding's round).
+func _row_cells(ground: Rect2i) -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	for y in range(ground.position.y, ground.end.y):
+		var xs: Array = range(ground.position.x, ground.end.x)
+		if (y - ground.position.y) % 2 == 1:
+			xs.reverse()
+		for x: int in xs:
+			if World.is_walkable(Vector2i(x, y)):
+				out.append(Vector2i(x, y))
+	return out
 
 
 ## Where a body works [param site] (a Holdings place with a radius): beside
