@@ -27946,3 +27946,18 @@ choice between nothing and a plain name, nothing reads better: a hint
 says what can be done or what is happening). BuilderUI.plain_name is the
 name without its code. builder_test: both modes. Client only, protocol
 unchanged, no new class_name.
+
+## 649 amended (5), buildings' side: a ruin's plinth broken open
+
+The coordinator, on ruin_close_3: from the game's height the stepped plinth
+of 649 amended (4) (tops 0.33 to 0.53 m) still read as one grey band round
+the ruin. Now each half edge's top lies between RUIN_PLINTH_LOW (0.05) and
+RUIN_PLINTH_HIGH (0.9) of PLINTH_HEIGHT, nearly to the ground at the low
+end. A half edge whose roll is under RUIN_PLINTH_MISSING (0.25) is gone,
+so the band opens between the stubs. A run's end halves (its corners,
+mostly) never go, standing between RUIN_PLINTH_CORNER (0.75) and whole:
+a footing lasts longest at a corner, and the plot's shape stays readable.
+
+view_test _test_decline reads the plinth's top faces: in the ruin, tops from
+under a fifth of its height to at most whole, covering under 0.8 m an edge;
+built again, all whole. Client only, protocol unchanged, no new class_name.

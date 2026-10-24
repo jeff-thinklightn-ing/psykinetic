@@ -1881,18 +1881,35 @@ func _test_decline() -> void:
 				if _rig._posts.has(vertex) and not out.has(vertex):
 					out.append(vertex)
 		return out
-	# The plinth's tops along the house's walls: broken off in a ruin.
+	# The plinth along the house's walls, from its top faces: [lowest top,
+	# highest top, metres of run it covers]. Broken off and open in a ruin.
 	var plinth_tops := func() -> Array:
-		var tops := []
+		var seen := []
+		var low := INF
+		var high := 0.0
+		var covered := 0.0
 		for key: Vector3i in walls:
 			var run: Node3D = _rig._walls.get(key)
 			var band := run.get_node_or_null("Plinth") as MeshInstance3D if is_instance_valid(run) else null
-			if band != null and not tops.has(snappedf(band.mesh.get_aabb().end.y, 0.01)):
-				tops.append(snappedf(band.mesh.get_aabb().end.y, 0.01))
-		return tops
+			if band == null or seen.has(band):
+				continue
+			seen.append(band)
+			var arrays := band.mesh.surface_get_arrays(0)
+			var points: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+			var normals: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL]
+			for i in range(0, points.size(), 4):
+				if normals[i].y < 0.9:
+					continue
+				low = minf(low, points[i].y)
+				high = maxf(high, points[i].y)
+				var zs := [points[i].z, points[i + 1].z, points[i + 2].z, points[i + 3].z]
+				covered += zs.max() - zs.min()
+		return [snappedf(low, 0.01), snappedf(high, 0.01), snappedf(covered, 0.1)]
 	var plinths: Array = walls.filter(func(key: Vector3i) -> bool: return _rig._plinths.has(key))
-	_check(plinths.is_empty() or (plinth_tops.call() as Array).all(func(top: float) -> bool: return top < Client3D.PLINTH_HEIGHT - 0.01),
-			"a ruin's plinth broken off: its runs' tops %s, under its whole height %.2f" % [plinth_tops.call(), Client3D.PLINTH_HEIGHT])
+	var ruined: Array = plinth_tops.call()
+	_check(plinths.is_empty() or ruined[0] < Client3D.PLINTH_HEIGHT * 0.2 and ruined[1] <= Client3D.PLINTH_HEIGHT + 0.01
+			and ruined[2] < plinths.size() * 0.8,
+			"a ruin's plinth broken off and open: tops %.2f to %.2f m (whole %.2f), %.1f m of its %d edges" % [ruined[0], ruined[1], Client3D.PLINTH_HEIGHT, ruined[2], plinths.size()])
 	var floored := func() -> int:
 		return Level.rect_cells(house["rect"]).filter(func(cell: Vector2i) -> bool: return _rig._floor_sets.has(cell)).size()
 	var cells: int = Level.rect_cells(house["rect"]).size()
@@ -1915,8 +1932,9 @@ func _test_decline() -> void:
 			and states.call("plot") == 0 and states.call("rubble") == 0 and states.call("broken") == 0 and not is_instance_valid(house.get("weeds"))
 			and floored.call() == cells and dirt.call() < cells and not posts.call().is_empty(),
 			"built again: whole, roofed, its walls, posts, floor and ground back (%d floor, %d dirt of %d)" % [floored.call(), dirt.call(), cells])
-	_check(plinths.is_empty() or plinth_tops.call() == [snappedf(Client3D.PLINTH_HEIGHT, 0.01)],
-			"built again: its plinth whole (%d edges, tops %s)" % [plinths.size(), plinth_tops.call()])
+	var whole: Array = plinth_tops.call()
+	_check(plinths.is_empty() or whole[0] == snappedf(Client3D.PLINTH_HEIGHT, 0.01) and whole[1] == whole[0] and whole[2] >= plinths.size(),
+			"built again: its plinth whole (%d edges, tops %.2f to %.2f m, %.1f m)" % [plinths.size(), whole[0], whole[1], whole[2]])
 	_rig.town_states.erase("decline_town")
 
 

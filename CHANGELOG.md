@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- A ruin's stone footing now crumbles nearly to the ground in places and breaks open between its corners, instead of still ringing the ruin.
 - The doe carried across the shoulders has a near-black back over deeper fawn sides, so it stands apart from the bearer's tunic at a distance.
 - Hovering a building outside builder mode no longer shows its builder code: a town's building shows its name and how far it is built, and pillars, tables and other scenery show nothing.
 - A held-key walk pauses for a moment when the server has fallen three steps behind it, instead of walking on and then sliding back several tiles when the server dropped the extra steps (543 amended, ui's side); a server keeping up never pauses it.

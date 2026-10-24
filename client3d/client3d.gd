@@ -1901,10 +1901,14 @@ const RUIN_BOARDS_KEPT := 2
 ## heap, fallen planks, a stone, a weed through the floor, in turn.
 const RUIN_LITTER_EVERY := 3
 ## A ruin's plinth (489 amended) broken off: each half edge's top between
-## these shares of PLINTH_HEIGHT, by its roll; one edge in RUIN_SPILL_EVERY
-## has a stone spilled off it to one side, this far out from its face.
-const RUIN_PLINTH_LOW := 0.25
+## these shares of PLINTH_HEIGHT, by its roll, or gone (a roll under
+## RUIN_PLINTH_MISSING); a run's end halves (its corners, mostly) stand,
+## between RUIN_PLINTH_CORNER and whole. One edge in RUIN_SPILL_EVERY has a
+## stone spilled off it to one side, this far out from its face.
+const RUIN_PLINTH_LOW := 0.05
 const RUIN_PLINTH_HIGH := 0.9
+const RUIN_PLINTH_MISSING := 0.25
+const RUIN_PLINTH_CORNER := 0.75
 const RUIN_SPILL_EVERY := 3
 const RUIN_SPILL_OUT := 0.35
 ## A ruin's wall edges (649): no post stands for them.
@@ -10328,8 +10332,9 @@ func _add_wall_run(run: Array[Vector3i]) -> void:
 ## footing downhill rather than a gap under the timber), its ends reaching
 ## half its width on past a corner, not into a door or the next plinth's run.
 ## A ruin's (649, _ruin_edges) is broken off: by half edges, each its own
-## height (RUIN_PLINTH_LOW..HIGH), a stone spilled off one edge in
-## RUIN_SPILL_EVERY; its gaps have none, being no run.
+## height (RUIN_PLINTH_LOW..HIGH) or gone (RUIN_PLINTH_MISSING), its end
+## halves standing (RUIN_PLINTH_CORNER..whole), a stone spilled off one
+## edge in RUIN_SPILL_EVERY; its gaps have none, being no run.
 func _add_plinth(holder: Node3D, run: Array[Vector3i], base: float, half: float) -> void:
 	var out := half + PLINTH_PROUD
 	var low := 0.0
@@ -10352,7 +10357,11 @@ func _add_plinth(holder: Node3D, run: Array[Vector3i], base: float, half: float)
 		for k in run.size():
 			var key := run[k]
 			for part in 2:
-				var top := PLINTH_HEIGHT * lerpf(RUIN_PLINTH_LOW, RUIN_PLINTH_HIGH, _roll(Vector2i(key.x, key.y), 60 + key.z * 2 + part))
+				var roll := _roll(Vector2i(key.x, key.y), 60 + key.z * 2 + part)
+				var end := k == 0 and part == 0 or k == run.size() - 1 and part == 1
+				if not end and _roll(Vector2i(key.x, key.y), 70 + key.z * 2 + part) < RUIN_PLINTH_MISSING:
+					continue
+				var top := PLINTH_HEIGHT * (lerpf(RUIN_PLINTH_CORNER, 1.0, roll) if end else lerpf(RUIN_PLINTH_LOW, RUIN_PLINTH_HIGH, roll))
 				blocks.append(Vector3(from if k == 0 and part == 0 else k + part * 0.5,
 						to if k == run.size() - 1 and part == 1 else k + 0.5 + part * 0.5, top))
 			if posmod(_edge_hash(key), RUIN_SPILL_EVERY) == 0 and ArtKit.has("scatter.stone"):
