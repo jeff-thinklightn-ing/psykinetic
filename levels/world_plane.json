@@ -16,10 +16,10 @@
 		{"id": "dead_land", "name": "the dead land", "rect": [440, 480, 240, 240], "status": "draft", "kind": "ring", "about": "Round the mine nothing lives: no crops, no beasts. Agreed as lore; its radius (120 here) a draft. Toward the town, fields and forest come back."},
 		{"id": "stronghold", "name": "the stronghold", "rect": [352, 92, 96, 64], "status": "draft", "kind": "hold", "about": "What the forest's closed east link (forest (89, 44)) leads to. Unnamed: what it is, is Jeff's (lore's options E1)."},
 		{"id": "mountain", "name": "the mountain", "rect": [40, -220, 200, 150], "status": "draft", "kind": "mountain", "about": "Behind the castle as seen from the town (Jeff's \"perhaps\"): beyond the castle, away from the wilds."},
-		{"id": "falls", "name": "the falls", "rect": [-180, 104, 24, 24], "status": "draft", "kind": "falls", "about": "Where the river comes down over cliffs (Jeff's barrow sketch), above Held: its river enters Held's north edge at about world (-152, 156). The fisherman's far bank is upriver."}
+		{"id": "falls", "name": "the falls", "rect": [-180, 104, 24, 24], "status": "draft", "kind": "falls", "about": "Where the river comes down over cliffs (Jeff's barrow sketch), above Umbrage: its river enters Umbrage's map (held) at its north edge at about world (-152, 156). The fisherman's far bank is upriver."}
 	],
 	"regions": [
 		{"id": "blood_rots_land", "name": "the Blood Rot's land", "rect": [-200, -230, 900, 960], "status": "agreed", "about": "The whole region (lore). Its own name is Jeff's open A1."},
-		{"id": "woodlands", "name": "the Woodlands", "rect": [-192, 0, 544, 348], "status": "draft", "about": "Where Held sits (Jeff: \"Held sit in the Woodlands\"; draft until his wording check): Held, the wilds, the hills and the forest."}
+		{"id": "woodlands", "name": "the Woodlands", "rect": [-192, 0, 544, 348], "status": "draft", "about": "Where Umbrage sits (Jeff: \"Held sit in the Woodlands\", before he named the town Umbrage; draft until his wording check): Umbrage's map (held), the wilds, the hills and the forest."}
 	]
 }

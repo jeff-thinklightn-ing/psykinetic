@@ -1,5 +1,6 @@
 extends Node
-## Writes levels/held, the town Held's own map (decision 651, step 1; Jeff's
+## Writes levels/held, the map of the town Umbrage (named "Held" until Jeff
+## named the town, 2026-10-24: the id stays held; decision 651, step 1; Jeff's
 ## layout, C:/dev/review/held/held_jeff.png), and its link from the wilds:
 ##   Godot --headless --path . res://tools/make_held.tscn
 ## (a scene, not a --script run: saving parses the level, which needs the
@@ -71,7 +72,7 @@ const CORE_SMOOTH := 0.6
 const ROAD_WIDTH := 2.0
 
 var map := LevelMap.new(SIZE)
-var config := {"name": "Held", "outdoor": true, "zone": "outdoors", "region": "town_lands", "border": "forest"}
+var config := {"name": "Umbrage", "outdoor": true, "zone": "outdoors", "region": "town_lands", "border": "forest"}
 var _ford_row := -100
 var _faces: Dictionary = {}
 

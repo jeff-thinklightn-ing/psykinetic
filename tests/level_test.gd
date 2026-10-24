@@ -694,6 +694,7 @@ func _test_held() -> void:
 == Held, step 1 (651): its own map, the Old Tower stamped, the store's cell reserved, no town yet ==")
 	var level := Level.load_level("held")
 	_check(level["size"] == Vector2i(192, 192) and level.get("warnings", []).is_empty(), "levels/held loads, 192 x 192, clean (%s)" % [level.get("warnings", [])])
+	_check(level["display_name"] == "Umbrage", "its name is the town's, Umbrage (Jeff; the id stays held: %s)" % level["display_name"])
 	var links: Array = level["links"]
 	var to_wilds: Array = links.filter(func(link: Dictionary) -> bool: return link["to_map"] == "wilds")
 	var wilds := Level.load_level("wilds")
