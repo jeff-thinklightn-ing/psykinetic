@@ -80,6 +80,9 @@ signal stage_changed(town: String)
 ## [param town]'s ruined [param kind] is gone (649): its record dropped, its
 ## [param cells] in [param zone] (placed's) for the forest to take back.
 signal ruined(town: String, kind: String, zone: String, cells: Array[Vector2i])
+## [param town] builds its gone [param kind] again (649 amended): its
+## [param cells] in [param zone] (placed's) to be cleared and built over.
+signal reclaimed(town: String, kind: String, zone: String, cells: Array[Vector2i])
 
 var rules := {}
 var production: Production
@@ -646,7 +649,13 @@ func unlock(town: String, kind: String) -> bool:
 	var entry: Dictionary = record["buildings"].get(kind, {"kind": kind, "level": 0, "state": PLANNED, "since": now(), "job": 0})
 	entry["state"] = BUILDING if int(entry["level"]) >= 1 else PLANNED
 	record["buildings"][kind] = entry
-	record.get("gone", []).erase(kind)  # Built again (649).
+	if kind in record.get("gone", []):  # Built again (649): its ground taken back from the forest.
+		record["gone"].erase(kind)
+		var where: Dictionary = placed.call(town, kind) if placed.is_valid() else {}
+		var cells: Array[Vector2i] = []
+		cells.assign(where.get("cells", []))
+		if not cells.is_empty():
+			reclaimed.emit(town, kind, str(where.get("zone", "")), cells)
 	_note(town, "%d experience spent on a %s, level %d" % [price, kind, level])
 	building_changed.emit(town, kind)
 	var by := str(spec.get("built_by", ""))

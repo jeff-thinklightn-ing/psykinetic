@@ -44,6 +44,7 @@ func _ready() -> void:
 	_test_felling()
 	_test_stages()
 	_test_decline()
+	_test_ruin_regrows()
 	_test_flock()
 	_test_butcher()
 	_test_season_scale()
@@ -396,6 +397,45 @@ func _test_decline() -> void:
 	saved_stage._town(TOWN)["stage"] = "village"
 	saved_stage.seed_from(mapped)
 	_check(saved_stage.stage(TOWN) == "village", "a saved stage kept")
+
+
+## A ruin's ground through the real Clearing (649 amended): the town's ruin
+## gone, Towns.ruined handed to Clearing.unbuild as Main does: its cells
+## stumps from that day, grown back over seasons to kept trunks; the kind
+## built again, Towns.reclaimed to Clearing.build: built over, never growing.
+func _test_ruin_regrows() -> void:
+	print("
+== a ruin's ground back to the forest, and built again ==")
+	var size := Vector2i(24, 14)
+	var colour := func(meaning: String) -> Color: return Color(str(Level.LEGEND[meaning]))
+	var image := Image.create_empty(size.x * 2 + 1, size.y * 2 + 1, false, Image.FORMAT_RGBA8)
+	image.fill(colour.call("grass"))
+	image.set_pixel(2, 2, colour.call("start"))
+	const ZONE := "fm_ruin"
+	Level.register(ZONE, image, null, {"name": "Ruin Farm", "outdoor": true})
+	var day := [0]
+	var clearing := Clearing.new()
+	clearing.clock = func() -> int: return day[0]
+	var rule: Dictionary = _full["decline"]
+	var towns := _towns(1, false, _full)
+	var cells: Array[Vector2i] = [Vector2i(6, 6), Vector2i(7, 6), Vector2i(8, 6)]
+	towns.placed = func(_town: String, _kind: String) -> Dictionary: return {"zone": ZONE, "cells": cells, "distance": 5.0}
+	# As Main._on_town_ruined and _on_town_reclaimed do.
+	towns.ruined.connect(func(_town: String, _kind: String, zone: String, given: Array[Vector2i]) -> void: clearing.unbuild(zone, given, day[0]))
+	towns.reclaimed.connect(func(_town: String, _kind: String, zone: String, taken: Array[Vector2i]) -> void: clearing.build(zone, taken))
+	towns._town(TOWN)["buildings"]["inn"] = {"kind": "inn", "level": 0, "state": Towns.RUIN, "since": 0, "job": 0, "ruin": 0}
+	day[0] = Season.season_days
+	towns._neglect_turn(TOWN, rule, day[0])
+	_check(towns.building(TOWN, "inn").is_empty() and cells.all(func(cell: Vector2i) -> bool: return clearing.felled.get(ZONE, {}).has(cell) and int(clearing.felled[ZONE][cell][0]) == 0),
+		"the ruin gone: its cells stumps in the real Clearing")
+	for season in range(2, 14):
+		day[0] = Season.season_days * season
+		clearing.daily(day[0])
+	_check(cells.all(func(cell: Vector2i) -> bool: return clearing._kept(ZONE, cell)), "seasons on: the forest has it, kept trunks")
+	towns._town(TOWN)["xp"] = 1000
+	_check(towns.unlock(TOWN, "inn") and cells.all(func(cell: Vector2i) -> bool: return clearing.built_over.get(ZONE, {}).has(cell) and not clearing._kept(ZONE, cell)),
+		"the inn built again: its ground cleared and built over")
+	Level.unregister(ZONE)
 
 
 func _check(ok: bool, what: String) -> void:

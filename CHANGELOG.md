@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- A town's ruined building, once gone, gives its ground back to the forest: stumps, then grass and scrub, then trees over the seasons; if the town builds there again, the ground is cleared for it (649)
 - Each newcomer to a town has a place and story of their own, held under the castle, at a camp or lost in the hills, forest or wilds; a resident left hungry or unpaid for days wanders back there, to be found again (613 amended).
 - The draugr's battle axe's upper grip moved down to 0.45 m above the lower, as the two-handed clips hold the hands, so pc-character's left hand reaches it (451 amended (2), art-kit's side; corrects 451 amended's 0.87)
 - The pauper's graves' pieces (654, art-kit's side; Jeff: "the poor are in pauper's graves outside"): building.grave (1 x 2, a low earth mound, four variants: plank, split stake, stone, sunken), prop.grave_fence (a low broken fence, three variants), building.grave_sealed (the draugr's sealed way out among them: a stone-lined grave, its capstone cracked and banded with iron); maps lays them on Held

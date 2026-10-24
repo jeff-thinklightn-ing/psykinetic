@@ -3158,6 +3158,8 @@ func _boot() -> void:
 	World.towns.placed = _town_placed
 	if not World.towns.ruined.is_connected(_on_town_ruined):
 		World.towns.ruined.connect(_on_town_ruined)
+	if not World.towns.reclaimed.is_connected(_on_town_reclaimed):
+		World.towns.reclaimed.connect(_on_town_reclaimed)
 	World.towns.folds_changed.connect(_on_folds_changed)
 	World.production.build_lacks = func(town: String) -> Dictionary: return World.towns.shortfall(town).get("needs", {})
 	World.production.town_pays = World.economy.owe_or_pay
@@ -11662,10 +11664,17 @@ func _town_placed(town: String, kind: String) -> Dictionary:
 
 
 ## A town's ruin is gone (649): its ground given back to the forest
-## (terrain's Clearing.unbuild, once it has it), from stumps.
+## (terrain's Clearing.unbuild: a plot under it dropped, stumps from today).
 func _on_town_ruined(_town: String, _kind: String, zone: String, cells: Array[Vector2i]) -> void:
-	if World.clearing != null and not zone.is_empty() and not cells.is_empty() and World.clearing.has_method("unbuild"):
-		World.clearing.call("unbuild", zone, cells, World.towns.now() / maxi(DayNight.day_steps, 1))
+	if World.clearing != null and not zone.is_empty() and not cells.is_empty():
+		World.clearing.unbuild(zone, cells, World.towns.now() / maxi(DayNight.day_steps, 1))
+
+
+## A town builds a gone kind again (649 amended): its ground taken back
+## from the forest (Clearing.build: built over, never growing).
+func _on_town_reclaimed(_town: String, _kind: String, zone: String, cells: Array[Vector2i]) -> void:
+	if World.clearing != null and not zone.is_empty() and not cells.is_empty():
+		World.clearing.build(zone, cells)
 
 
 ## The workshop of Holdings place [param id] where the fallen are brought

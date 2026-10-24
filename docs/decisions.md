@@ -27002,6 +27002,21 @@ saved). The other
 farm_test towns run without decline. production_test reads a settlement
 first. Wire: new stage and state values and the sheet's strain, a line
 under PROTOCOL_REVISION 35. No new class_name.
+
+649 amended, economy's side (2026-10-24; terrain's Clearing.unbuild and
+build on main as 5749cd8c):
+- Main._on_town_ruined now calls Clearing.unbuild directly; it used to go
+  through has_method, before terrain's call existed. unbuild drops a laid
+  plot under the cells first (maps' unplot) and starts the cells at
+  stumps.
+- Towns.reclaimed(town, kind, zone, cells) is told when unlock builds a
+  "gone" kind again. Main._on_town_reclaimed hands the cells to
+  Clearing.build, so they are built over and never grow, and a kept trunk
+  there becomes grass again.
+- farm_test _test_ruin_regrows runs the real Clearing: the ruin goes, its
+  cells become stumps, they grow back to kept trunks over the seasons, and
+  the inn built again clears them.
+
 ## 649, terrain's side: a ruin's ground back to the forest
 
 Economy's rise and fall (649; Jeff: "buildings at the edge fall into disrepair and the
