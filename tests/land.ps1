@@ -10,7 +10,9 @@
 # this checkout's take of suite if it holds one (see tests/land.sh);
 # heavy_job_test first.
 $root = Split-Path $PSScriptRoot -Parent
-$tree = Split-Path $root -Leaf
+# PSYKINETIC_TREE, else the folder's name; a take under another name is still
+# adopted by its process (394 amended (11)).
+$tree = if ($env:PSYKINETIC_TREE) { $env:PSYKINETIC_TREE } else { Split-Path $root -Leaf }
 $gate = Join-Path $root 'tools\heavy_job.py'
 if (-not $env:HEAVY_JOB_INSIDE) {
 	# The CHANGELOG first, no Godot, before any wait at the gate (decision

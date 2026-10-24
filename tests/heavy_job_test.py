@@ -346,6 +346,28 @@ if saved_table is None:
 else:
     gate._write(gate._path("kinds.json"), saved_table)
 
+print("== a run adopts its own ancestor's take, whatever the names (394 amended (11)) ==")
+# Maps landed from a side worktree, wt-umbrage, under a take as "maps":
+# land.sh, named for its folder, queued behind its own take 29.6 minutes.
+check(gate.ancestors(os.getpid())[0] == os.getpid(), "a process is first among its own ancestors")
+import subprocess
+sibling = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"])
+gate.take("other", "suite", sibling.pid)
+check(gate._adopt_take("wt-umbrage", "suite") == (None, None), "a take another process holds, under another name: not adopted")
+gate.release("other", "suite")
+sibling.kill()
+sibling.wait()
+gate.take("maps", "suite", os.getpid())
+child = subprocess.run([sys.executable, "-c", "import sys; sys.dont_write_bytecode = True; sys.path.insert(0, %r); import heavy_job as gate; "
+    "gate.POLL_SECONDS = 0.05; gate.WATCH_SECONDS = 0.2; "
+    "sys.exit(gate.run('wt-umbrage', 'suite', [sys.executable, '-c', 'pass']))" % os.path.dirname(os.path.abspath(gate.__file__))],
+    env=dict(os.environ), timeout=60, capture_output=True, text=True)
+check(child.returncode == 0 and "inside this tree's take" in child.stderr,
+    "a run in a child process, as wt-umbrage, adopts the parent's take as maps: %s" % child.stderr.strip()[-200:])
+entries = gate._entries("running")
+check(len(entries) == 1 and entries[0]["tree"] == "maps", "the take is still maps', its holder's to release")
+gate.release("maps", "suite")
+
 print("== the state lock denied a moment ==")
 # Windows answers PermissionError, not FileExistsError, while the lock is
 # being deleted by its holder: economy's waiter died of it and lost its place.

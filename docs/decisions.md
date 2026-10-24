@@ -8935,6 +8935,26 @@ scenes at once) peaked at 13.8 GB, commit 11.7, against the full suite's
 heavy_job_test covers the short command line, the done line's working set
 at once and the kept listing.
 
+Amended an eleventh time (2026-10-24, release and perf): a run adopts a take
+its own ancestor holds, whatever the names. Maps landed from a side
+worktree, wt-umbrage, under a take as "maps". land.sh names its gate run
+after its folder, so its run as wt-umbrage didn't see the take as its own,
+queued behind it (one suite at a time) for 29.6 minutes, and held the land
+lock 40 minutes in all: the nested-take stall in a new shape.
+- `run` adopts a take of its kind held by its own tree, as before, or held
+  by any process among its ancestors (ancestors: the parent chain from a
+  Toolhelp snapshot, a parent counted only if created before its child, so
+  a reused id is none). A landing script's take with --pid (its Windows
+  pid) is adopted by the land.sh under it, however either is named.
+- land.sh and land.ps1 name the tree PSYKINETIC_TREE when set, else the
+  folder, as before.
+- A run or take under HEAVY_JOB_HELD already passed through whatever the
+  names (394 amended (4)); a take sets no HEAVY_JOB_HELD, which is why the
+  process check is needed.
+heavy_job_test covers a take another process holds under another name (not
+adopted) and a run in a child process adopting its parent's take under
+another name.
+
 
 ## 395. UI sounds
 

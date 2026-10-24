@@ -37,8 +37,12 @@ one else's process: never kill by name, never another session's) and puts
 it back in the queue, MAX_RESTARTS times at most. Each kind's estimate is
 updated from the peak `run` measures (the whole process tree's working
 set), rising at once and falling slowly. A `run` by a tree that already
-holds a take of the kind (land.sh under its landing's take) adopts the
-take instead of queueing: it measures the take's entry, so what it is owed
+holds a take of the kind (land.sh under its landing's take), or whose
+take's holder is this run's own ancestor process whatever the tree's name
+(394 amended (11): maps landed from a side worktree, wt-umbrage, under a
+take as "maps", and land.sh, named for its folder, queued behind its own
+take 29.6 minutes holding the land lock), adopts the take instead of
+queueing: it measures the take's entry, so what it is owed
 shrinks as it really uses memory, and it is never stopped (its landing
 holds the land lock, which must never wait on the gate). A run gives its
 command HEAVY_JOB_HELD (its entry's name): a run, take or release started
@@ -450,6 +454,49 @@ def started_at(pid):
     return times[0].value if ok else None
 
 
+def ancestors(pid):
+    """[pid] and its ancestors' ids, nearest first (394 amended (11)). A
+    parent counts only if it was created before its child: a dead parent's
+    id given to a newer process is no ancestor. Windows (a Toolhelp
+    snapshot) or /proc; elsewhere [pid] alone."""
+    parents = {}
+    if os.name == "nt":
+        class Entry(ctypes.Structure):
+            _fields_ = [("size", ctypes.c_ulong), ("usage", ctypes.c_ulong), ("pid", ctypes.c_ulong),
+                ("heap", ctypes.c_size_t), ("module", ctypes.c_ulong), ("threads", ctypes.c_ulong),
+                ("parent", ctypes.c_ulong), ("priority", ctypes.c_long), ("flags", ctypes.c_ulong),
+                ("exe", ctypes.c_wchar * 260)]
+        kernel = ctypes.windll.kernel32
+        kernel.CreateToolhelp32Snapshot.restype = ctypes.c_void_p
+        snapshot = kernel.CreateToolhelp32Snapshot(0x2, 0)  # TH32CS_SNAPPROCESS
+        if snapshot and snapshot != ctypes.c_void_p(-1).value:
+            entry = Entry()
+            entry.size = ctypes.sizeof(Entry)
+            more = kernel.Process32FirstW(ctypes.c_void_p(snapshot), ctypes.byref(entry))
+            while more:
+                parents[entry.pid] = entry.parent
+                more = kernel.Process32NextW(ctypes.c_void_p(snapshot), ctypes.byref(entry))
+            kernel.CloseHandle(ctypes.c_void_p(snapshot))
+    out = [int(pid)]
+    while len(out) < 64:
+        child = out[-1]
+        if os.name == "nt":
+            parent = parents.get(child)
+        else:
+            try:
+                with open("/proc/%d/stat" % child) as stat:
+                    parent = int(stat.read().rsplit(")", 1)[1].split()[1])
+            except (OSError, ValueError, IndexError):
+                parent = None
+        if not parent or parent in out:
+            break
+        born, parent_born = started_at(child), started_at(parent)
+        if born is not None and (parent_born is None or parent_born > born):
+            break
+        out.append(parent)
+    return out
+
+
 def boot_time():
     """When this machine last started (time.time() seconds), or 0.0 where
     not known: an entry queued before it is from before a reboot."""
@@ -846,17 +893,26 @@ def _ordinal(n):
 
 
 def _adopt_take(tree, kind):
-    """The file name of [tree]'s take of [kind] in running/, marked adopted
-    by this wrapper (it does not age out while this lives), and the kind
-    whose estimate it holds; or (None, None)."""
+    """The file name of [tree]'s take of [kind] in running/, or of a take
+    of [kind] held by this process's own ancestor whatever its tree (394
+    amended (11)), marked adopted by this wrapper (it does not age out
+    while this lives), and the kind whose estimate it holds; or (None,
+    None)."""
+    mine = None
     with StateLock():
         for entry in _entries("running"):
-            if entry["tree"] == tree and entry["kind"] == kind and not entry.get("watched"):
-                name = entry.pop("file")
-                entry["adopted_by"] = os.getpid()
-                entry["adopted_since"] = started_at(os.getpid())
-                _write(_path("running", name), entry)
-                return name, entry.get("estimate", kind)
+            if entry["kind"] != kind or entry.get("watched"):
+                continue
+            if entry["tree"] != tree:
+                if mine is None:
+                    mine = set(ancestors(os.getpid()))
+                if not entry.get("pid") or int(entry["pid"]) not in mine:
+                    continue
+            name = entry.pop("file")
+            entry["adopted_by"] = os.getpid()
+            entry["adopted_since"] = started_at(os.getpid())
+            _write(_path("running", name), entry)
+            return name, entry.get("estimate", kind)
     return None, None
 
 

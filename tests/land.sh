@@ -15,7 +15,10 @@
 # first, alone.
 set -u
 cd "$(dirname "$0")/.."
-tree="$(basename "$(pwd)")"
+# The tree the gate knows it by: PSYKINETIC_TREE, else the folder's name. A
+# landing's take under another name (a side worktree's) is still adopted by
+# its process, not its name (394 amended (11)).
+tree="${PSYKINETIC_TREE:-$(basename "$(pwd)")}"
 if [ -z "${HEAVY_JOB_INSIDE:-}" ]; then
 	# The CHANGELOG first, no Godot, before any wait at the gate (decision
 	# 539): released sections as tagged, no bullet both unreleased and released.
