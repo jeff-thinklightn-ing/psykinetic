@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- With the low camera on, the dark band under the skyline is gone: the forest runs on into the haze to a soft ridge, and far meadows past the scattered grass show patches and speckle rather than plain green (623).
 - Deer and other wild animals keep away from towns, fires and fighting (740): they no longer graze around a town, and one that wanders into the noise walks back out of it; wolves still come for you.
 - The barrow's niche sits in the wall again (741): the next generation carves no single-file passage round it, only up to its mouth.
 

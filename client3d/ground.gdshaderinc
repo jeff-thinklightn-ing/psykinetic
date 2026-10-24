@@ -47,6 +47,15 @@ uniform bool stone_own = false;
 uniform bool sand_own = false;
 uniform vec4 kind_tiles = vec4(4.0);
 uniform sampler2D noise_tex : filter_linear_mipmap, repeat_enable;
+// The far meadow under the low camera (623, terrain's side): past
+// far_from metres from far_centre (the camera's aim) the grass mottled in
+// patches and a fine speckle read from noise_tex (mipmapped, so it doesn't
+// shimmer as the camera's distance changes), faded in over far_fade;
+// far_meadow 0 is off.
+uniform float far_meadow = 0.0;
+uniform vec2 far_centre = vec2(0.0);
+uniform float far_from = 22.0;
+uniform float far_fade = 8.0;
 // Where the water is, a texel a cell like kinds (Client3D._build_ground):
 // the bed and the shore beside it darker, wet.
 uniform sampler2D water : hint_default_black, filter_linear, repeat_disable;
@@ -360,6 +369,13 @@ void fragment() {
 	if (weights.r > 0.0) {
 		vec3 here = grass_own ? tiled(grass_tex, at, kind_tiles.r, dx, dy, 0.0)
 				: grass * (0.82 + 0.36 * fbm(at * 0.18)) * (0.92 + 0.16 * fine);
+		if (far_meadow > 0.0) {
+			float far_share = far_meadow * smoothstep(far_from - far_fade * 0.5, far_from + far_fade * 0.5, distance(at, far_centre));
+			float meadow_patch = fbm(at * 0.07 + 120.0);
+			float speck = textureGrad(noise_tex, at / 1.7, dx / 1.7, dy / 1.7).r;
+			here *= mix(1.0, 0.8 + 0.4 * meadow_patch, far_share);
+			here = mix(here, here * vec3(1.18, 1.14, 0.82), far_share * 0.6 * smoothstep(0.5, 0.72, speck));
+		}
 		here = mix(here, here * vec3(1.12, 1.05, 0.7), smoothstep(0.55, 0.75, noise(at * 0.31 + 3.0)));
 		float grey = clamp(dot(here, vec3(0.3, 0.55, 0.15)) * 3.0, 0.6, 1.3);
 		here = mix(here, vec3(0.3, 0.25, 0.1) * grey, (1.0 - season.x) * 0.5);

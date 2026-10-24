@@ -46,6 +46,7 @@ func _ready() -> void:
 	_test_camera_feel()
 	_test_draw_pull()
 	_test_low_scatter()
+	_test_horizon()
 	await _test_far_restart()
 	await _test_low_pick()
 	await _test_reach_ease()
@@ -4963,6 +4964,59 @@ func _test_outdoor() -> void:
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 	_check(not _rig._outdoor and _rig._trees.is_empty() and _rig._environment.background_mode == Environment.BG_COLOR,
 			"and back in the test room, it is under stone again")
+
+
+## The horizon under the low camera (623, terrain's side): the hills with
+## the camera low have a skirt round the forest's bounds, under the crowns
+## at its inner edge and up to the treetops and a ridge beyond, shown only
+## while the camera is low; the ground's far meadow on with it; off, both
+## gone; under stone, no skirt.
+func _test_horizon() -> void:
+	print("\n== the horizon under the low camera: the forest's skirt, the far meadow ==")
+	var low_was := Net.camera_low
+	Net.set_camera_low(true, false)
+	var hills := Level.load_level("hills")
+	_rig.rebuild(hills["terrain"], hills["centre"])
+	var skirt: MeshInstance3D = _rig._skirt
+	var bounds := AABB()
+	var inner := INF
+	var outer := -INF
+	if skirt != null:
+		bounds = skirt.mesh.get_aabb()
+		var points: PackedVector3Array = skirt.mesh.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]
+		var rows := Client3D.SKIRT_ROWS.size()
+		for i in range(0, points.size(), rows):
+			inner = minf(inner, points[i].y)
+			outer = maxf(outer, points[i + rows - 1].y)
+	var forest := Rect2()
+	var first := true
+	for cell: Vector2i in _rig._forest_distance:
+		if first:
+			forest = Rect2(Vector2(cell), Vector2.ZERO)
+			first = false
+		forest = forest.expand(Vector2(cell))
+	_check(skirt != null and skirt.visible and skirt.get_parent() == _rig._room and skirt.cast_shadow == GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			and bounds.position.x < forest.position.x - Client3D.SKIRT_WIDE + 1.0 and bounds.end.x > forest.end.x + Client3D.SKIRT_WIDE - 1.0
+			and inner < _rig._ground_bottom and outer > Client3D.SKIRT_TOP - Client3D.SKIRT_BUMPS,
+			"a skirt round the forest out SKIRT_WIDE, from under the crowns (%.1f) up past the treetops (%.1f), no shadows" % [inner, outer])
+	_check(is_equal_approx(float(_rig._ground_look.get_shader_parameter("far_meadow")), 1.0)
+			and is_equal_approx(float(_rig._ground_look.get_shader_parameter("far_from")), _rig.scatter_reach_low - Client3D.FAR_MEADOW_FADE * 0.5),
+			"the far meadow on, from the scatter's reach")
+	var sky: ProceduralSkyMaterial = _rig._sky_material
+	_check(sky != null and sky.ground_horizon_color == sky.sky_horizon_color and sky.ground_bottom_color == Client3D.FOREST_FLOOR
+			and is_equal_approx(sky.ground_curve, Client3D.LOW_SKY_GROUND_CURVE),
+			"the sky just below the horizon the haze's colour (no forest floor band under the skyline), the rest the forest floor")
+	Net.set_camera_low(false, false)
+	_rig._apply_camera_mode()
+	_check(skirt != null and not skirt.visible and is_equal_approx(float(_rig._ground_look.get_shader_parameter("far_meadow")), 0.0)
+			and sky.ground_horizon_color == Client3D.FOREST_FLOOR.lightened(0.2) and is_equal_approx(sky.ground_curve, Client3D.SKY_GROUND_CURVE),
+			"the camera high: the skirt hidden, the far meadow off, the sky's ground the forest floor's again")
+	Net.set_camera_low(true, false)
+	var barrow := Level.load_level("barrow")
+	_rig.rebuild(barrow["terrain"], barrow["centre"])
+	_check(_rig._skirt == null and _rig._room.get_node_or_null("Skirt") == null, "under stone no skirt")
+	Net.set_camera_low(low_was, false)
+	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
 
 ## The low-horizon camera trial (decision 623): Net.camera_low makes the

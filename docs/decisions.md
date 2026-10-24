@@ -35788,3 +35788,79 @@ doe grazing in it walks out and grazes past its edge, never fleeing; a
 player's din keeps prey off but not a wolf, who heeds a town's; a fight's
 din, gone after fight_seconds; a fire's, heeded by both. Server only,
 protocol unchanged, no new class_name.
+## 623, terrain's side: the horizon under the low camera
+
+Jeff on the low camera: "the hills are readable the landmarks visible.
+amazing... well worth the change". Under it, the border forest ended in a
+hard line against the sky, and the far meadows read plain green past the
+scatter's reach. The coordinator approved both parts as a trial behind
+623's own switch (Net.camera_low, outdoors). The ortho view and indoors
+are unchanged.
+- The skirt (Client3D._add_skirt). The forest was drawn only FOREST_REACH
+  cells past the land (glimpses included), with nothing beyond it. Now one
+  mesh runs round the forest's bounds: a column every SKIRT_STEP along
+  each side, a fan at each corner, rows out to SKIRT_WIDE (120 m).
+  - It starts SKIRT_IN inside the bounds, below the forest floor and
+    under the real crowns, then rises over SKIRT_RISE to SKIRT_TOP.
+  - Treetop bumps (SKIRT_BUMPS, at about 6 m) and a far ridge (up to
+    SKIRT_RIDGE, at about 70 m, rising with distance) make a soft
+    silhouette.
+  - It is vertex-coloured between SKIRT_DARK and SKIRT_GREEN and drawn
+    in season as leaves (season_material).
+  - It casts no shadows (environment: sun shadows end at 150 m). It sits
+    on the default layer, so the haze, the aerial perspective, the cloud
+    decal and the rain's roof all take it.
+  - It is made the first time the low camera is on in a build, and shown
+    only while it is.
+  - The bounds are a rectangle. Where the land is concave, the bare forest
+    floor between the band and the skirt shows as before.
+- The far meadow (ground.gdshaderinc, grass only). Past the scatter's
+  reach under the low camera (scatter_reach_low, decision 653's 90) from
+  the camera's aim ("far_centre", set as the camera is placed), faded in
+  over FAR_MEADOW_FADE centred half of it inside the reach, where the
+  scatter shrinks away (written for NEAR_TILES, the reach before 653
+  landed; moved with it at the rebase):
+  - a low patch mottle at about 14 m;
+  - a fine lighter speckle read from the ground's noise texture with its
+    gradients.
+  The texture is mipmapped, so the speckle averages out as the wheel
+  changes the camera's distance, rather than shimmering (the coordinator's
+  note). It is off ("far_meadow" 0) with the camera high.
+- Build cost (perf, headless, 41fc3abb against 0cfc3cf8, three interleaved
+  rounds): _add_skirt alone takes 33 to 40 ms on the wilds (8,610 vertices)
+  and 15 to 17 ms on the hills (3,690). The rebuild with the low camera on
+  shows no change outside its noise (wilds 4.2 to 5.5 s on both sides),
+  and with it off none at all. It is built once, a hitch of about 40 ms as
+  the toggle turns on.
+- The sky below the horizon. The first review shots showed a dark olive
+  band under the skyline in every low frame, on main as well (environment's
+  low-camera sheet found it too). It was the sky's own ground half,
+  ProceduralSkyMaterial's ground colours FOREST_FLOOR: past LOW_FAR no land
+  is drawn, and the fog never reaches the sky (fog_sky_affect 0). Under the
+  low camera the ground's horizon colour now takes the sky's (hazed) horizon
+  colour, so the far land fades into haze, not into a band. Only a sliver:
+  ground_curve LOW_SKY_GROUND_CURVE (0.14, against Godot's 0.02) keeps the
+  few degrees below the horizon that show past LOW_FAR about 70% haze and
+  turns the rest back to FOREST_FLOOR. The sky's lower half lights every
+  surface's reflections (ambient light is a colour, but reflections read
+  the sky): the whole of it hazed, in the second shots, washed the land out
+  (the foreground about +10 red and green, +20 blue at noon, bluer at
+  dusk); with the sliver the foreground matches main's (135, 157, 117
+  against 134, 156, 114) and the band stays haze. With the camera high the
+  ground is as before (ortho never sees it).
+- Frame cost (perf, windowed off-screen, low camera, 1600 x 900, noon,
+  three interleaved rounds of 300 frames, alone in the bench slot; render
+  median ms CPU / GPU, 0cfc3cf8 against 41fc3abb, the same code as this
+  less the sky's ground): wilds square 1.30 / 3.14 against 1.29 / 3.15,
+  wilds road 0.84 / 3.98 against 0.88 / 3.97, hills edge 0.41 / 2.31
+  against 0.41 / 2.31; GPU p95 within 0.1 ms. Nothing measurable.
+- Shots: C:/dev/review/horizon623 (before and after, day and dusk, hills
+  and wilds, two yaws each), through Main's own view off-screen.
+view_test _test_horizon checks:
+- the hills' skirt round the forest out SKIRT_WIDE, from under the crowns
+  to past the treetops, with no shadows;
+- the far meadow on from the scatter's reach;
+- the sky below the horizon the haze's colour;
+- with the camera high, all three as before;
+- under stone, no skirt.
+Client only, protocol unchanged, no new class_name.

@@ -464,6 +464,13 @@ const LOW_DISTANCE_SHARE := 0.5
 const LOW_FAR := 300.0
 const LOW_FOG := 0.012
 const LOW_AERIAL := 0.6
+## How far below the horizon the sky's ground stays the haze's colour under
+## the low camera (ProceduralSkyMaterial.ground_curve): the sliver past
+## LOW_FAR, a few degrees, about 70% haze; the rest the forest floor, so the
+## reflections it lights stay as with the camera high (SKY_GROUND_CURVE,
+## Godot's default).
+const LOW_SKY_GROUND_CURVE := 0.14
+const SKY_GROUND_CURVE := 0.02
 const LOW_SHADOW_DISTANCE := 150.0
 ## The scatter's own reach under the low camera (decision 653; Jeff:
 ## "clipping of ground details they should load in earlier"): it is built
@@ -480,6 +487,30 @@ const SCATTER_FADE := 16.0
 const SCATTER_KEEP := 16.0
 const SCATTER_BACKLOG := 8
 const SCATTER_BUDGET_USEC := 2000
+## The horizon under the low camera (623, terrain's side; a trial behind its
+## switch). The border forest runs on into the haze: a skirt, one mesh of
+## treetop bumps round the forest's bounds, from SKIRT_IN inside them (under
+## the real crowns) out SKIRT_WIDE, rising over SKIRT_RISE to SKIRT_TOP,
+## bumped SKIRT_BUMPS and lifted toward its far edge by up to SKIRT_RIDGE
+## (a soft ridge line), in the forest's greens and the season as leaves
+## take it; made the first time the low camera is on, shown only then. Its
+## rows out from the bounds (metres), closer near the trees, its columns
+## SKIRT_STEP apart along them. The far meadow: past the scatter's reach
+## (scatter_reach_low from the camera's aim, decision 653) the grass mottled
+## in patches and a fine speckle of the noise texture (mipmapped, so it
+## doesn't shimmer as the wheel moves the camera), faded in over
+## FAR_MEADOW_FADE where the scatter shrinks away.
+const SKIRT_IN := 3.0
+const SKIRT_WIDE := 120.0
+const SKIRT_RISE := 5.0
+const SKIRT_TOP := 4.5
+const SKIRT_BUMPS := 1.6
+const SKIRT_RIDGE := 14.0
+const SKIRT_STEP := 2.0
+const SKIRT_ROWS: PackedFloat32Array = [-3.0, -1.0, 1.0, 3.0, 5.0, 8.0, 12.0, 17.0, 24.0, 33.0, 45.0, 60.0, 80.0, 100.0, 120.0]
+const SKIRT_GREEN := Color("2e4a2a")
+const SKIRT_DARK := Color("1b2d1c")
+const FAR_MEADOW_FADE := 8.0
 ## Over hills (decision 525): how far back toward the camera the ground is
 ## looked at, how far under the line to the player (aimed RIDGE_AIM over
 ## their feet) it must stay, and how fast (degrees a second) the pitch
@@ -2192,6 +2223,8 @@ var _clearing_props: Dictionary[Vector2i, Array] = {}
 var _grown_back: Dictionary[Vector2i, bool] = {}
 ## Each scattered chunk's MultiMeshes, so one chunk is drawn again alone.
 var _scatter_nodes: Dictionary[Vector2i, Array] = {}
+## The low camera's forest skirt (623, terrain's side), once made this build.
+var _skirt: MeshInstance3D
 ## The ground's kinds texture (a texel a cell) and its image, so one cell's
 ## kind changes alone.
 var _kinds_image: Image
@@ -2613,6 +2646,14 @@ func _update_sky(delta: float) -> void:
 	_look["weather_fog"] = look["fog"]
 	_sky_material.sky_top_color = look["top"]
 	_sky_material.sky_horizon_color = hazed_horizon(look, _weather_view.weather) if _low else look["horizon"]
+	# Under the low camera the sky shows below the horizon past LOW_FAR, and
+	# the fog never reaches it: the haze's colour there, not the forest floor's
+	# band under the skyline (623, terrain's side). Only that sliver: the ground
+	# half turns back to the forest floor within LOW_SKY_GROUND_CURVE, as the
+	# sky's lower half lights everything's reflections, and all of it hazed
+	# washed the land out.
+	_sky_material.ground_horizon_color = _sky_material.sky_horizon_color if _low else FOREST_FLOOR.lightened(0.2)
+	_sky_material.ground_curve = LOW_SKY_GROUND_CURVE if _low else SKY_GROUND_CURVE
 	_environment.ambient_light_color = look["ambient"]
 	_environment.ambient_light_energy = look["ambient_energy"]
 	_environment.fog_light_color = look["fog"]
@@ -2854,6 +2895,15 @@ func _apply_camera_mode() -> void:
 		_camera.far = CAMERA_DISTANCE * 3.0
 	if _environment != null:
 		_environment.fog_aerial_perspective = LOW_AERIAL if low else 0.0
+	# The horizon (623, terrain's side): the skirt made on first need.
+	if low and _skirt == null and _room != null and not _forest_distance.is_empty():
+		_add_skirt()
+	if _skirt != null:
+		_skirt.visible = low
+	if _ground_look != null:
+		_ground_look.set_shader_parameter("far_meadow", 1.0 if low else 0.0)
+		_ground_look.set_shader_parameter("far_from", scatter_reach_low - FAR_MEADOW_FADE * 0.5)
+		_ground_look.set_shader_parameter("far_fade", FAR_MEADOW_FADE)
 	if _sun != null:
 		_sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS if low \
 				else DirectionalLight3D.SHADOW_ORTHOGONAL
@@ -2919,6 +2969,8 @@ func _place_camera() -> void:
 	_aim_hillshade()
 	_camera.position = _camera_target + _camera_offset()
 	_camera.look_at(_camera_target, Vector3.UP)
+	if _low and _ground_look != null:
+		_ground_look.set_shader_parameter("far_centre", Vector2(_camera_target.x, _camera_target.z))
 	if _listener != null:
 		# On the ground under the camera's aim (less any pan: the ears stay
 		# with the player), turned as the camera is, so left and right in
@@ -4853,6 +4905,7 @@ func rebuild(terrain: Dictionary, centre: Vector2i, over_frames := false) -> voi
 	_trees.clear()
 	_saplings.clear()
 	_clearing_props.clear()
+	_skirt = null
 	_scatter_nodes.clear()
 	_border = null
 	_grown = null
@@ -6888,6 +6941,80 @@ func _add_forest_edge() -> void:
 		forest_floor.material_override = season_material(material, false, false)
 	forest_floor.position = Vector3((low.x + high.x) * 0.5, -FOREST_FLOOR_DEPTH, (low.y + high.y) * 0.5)
 	_room.add_child(forest_floor)
+
+
+## The low camera's skirt (623, terrain's side): round the forest's bounds
+## (its cells, glimpses' included), a column every SKIRT_STEP along each side
+## and a fan at each corner, each out along its normal through SKIRT_ROWS;
+## a point's height its rise from under the crowns to SKIRT_TOP, the
+## treetop bumps, and the far ridge. Vertex colours between the greens by
+## the bumps; no shadows; drawn in season as leaves.
+func _add_skirt() -> void:
+	var low := Vector2(INF, INF)
+	var high := -low
+	for cell: Vector2i in _forest_distance:
+		low = low.min(Vector2(cell))
+		high = high.max(Vector2(cell))
+	low -= Vector2.ONE * 0.5
+	high += Vector2.ONE * 0.5
+	# The bounds' outline, anticlockwise from the north-west corner seen
+	# from above (x east, y south): each point and its outward normal.
+	var ring: Array[Array] = []
+	var corners: Array[Vector2] = [low, Vector2(low.x, high.y), high, Vector2(high.x, low.y)]
+	var normals: Array[Vector2] = [Vector2(-1, 0), Vector2(0, 1), Vector2(1, 0), Vector2(0, -1)]
+	for side in 4:
+		var from := corners[side]
+		var to := corners[(side + 1) % 4]
+		var steps := maxi(1, ceili(from.distance_to(to) / SKIRT_STEP))
+		for i in steps:
+			ring.append([from.lerp(to, i / float(steps)), normals[side]])
+		# The corner's fan, from this side's normal round to the next's.
+		for k in range(1, 6):
+			ring.append([to, normals[side].slerp(normals[(side + 1) % 4], k / 6.0).normalized()])
+	var floor_y := _ground_bottom - FOREST_FLOOR_DEPTH
+	var points := PackedVector3Array()
+	var colours := PackedColorArray()
+	var rows := SKIRT_ROWS.size()
+	for entry: Array in ring:
+		var base: Vector2 = entry[0]
+		var out: Vector2 = entry[1]
+		for d: float in SKIRT_ROWS:
+			var at := base + out * d
+			var bump := _field(at, 6.0, 90)
+			var rise := clampf((d + SKIRT_IN) / (SKIRT_RISE + SKIRT_IN), 0.0, 1.0)
+			var ridge := SKIRT_RIDGE * _field(at, 70.0, 91) * smoothstep(20.0, SKIRT_WIDE, d)
+			var height := lerpf(floor_y - 1.0, SKIRT_TOP + SKIRT_BUMPS * (bump - 0.5) + ridge, rise)
+			points.append(Vector3(at.x, height, at.y))
+			colours.append(SKIRT_DARK.lerp(SKIRT_GREEN, bump))
+	var indices := PackedInt32Array()
+	var count := ring.size()
+	for i in count:
+		var j := (i + 1) % count
+		for k in rows - 1:
+			var a := i * rows + k
+			var b := j * rows + k
+			if points[a].is_equal_approx(points[b]) and points[a + 1].is_equal_approx(points[b + 1]):
+				continue  # A corner's fan at its own point.
+			indices.append_array([a, a + 1, b, b, a + 1, b + 1])
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = points
+	arrays[Mesh.ARRAY_COLOR] = colours
+	arrays[Mesh.ARRAY_INDEX] = indices
+	var mesh := ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	var tool := SurfaceTool.new()
+	tool.create_from(mesh, 0)
+	tool.generate_normals()
+	var material := StandardMaterial3D.new()
+	material.vertex_color_use_as_albedo = true
+	material.roughness = 1.0
+	_skirt = MeshInstance3D.new()
+	_skirt.name = "Skirt"
+	_skirt.mesh = tool.commit()
+	_skirt.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_skirt.material_override = season_material(material, true, false)
+	_room.add_child(_skirt)
 
 
 ## Scatter: grass tufts, flowers, small stones and roots on the ground,
