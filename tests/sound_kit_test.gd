@@ -123,6 +123,16 @@ func _test_noises_are_the_sims() -> void:
 			"a guard: a shield's knock, else a parry")
 	_check(SoundKit.swing("giant_axe") == "sfx.swing_heavy" and SoundKit.swing("sword") == "sfx.swing" and SoundKit.swing("") == "sfx.swing"
 			and SoundKit.swing("bow") == "sfx.swing", "a two-handed weapon swings heavy; a bow is no club")
+	# 662: a blade drawn and sheathed, any other piece taken up and stowed; every slot real.
+	_check(SoundKit.stow_slot("sword", true) == "sfx.blade_draw" and SoundKit.stow_slot("dagger", false) == "sfx.blade_sheathe"
+			and SoundKit.stow_slot("knife", true) == "sfx.blade_draw", "a sword, dagger or knife: the blade's draw and sheathe")
+	_check(SoundKit.stow_slot("shield", false) == "sfx.gear_stow" and SoundKit.stow_slot("spear", true) == "sfx.gear_draw"
+			and SoundKit.stow_slot("battle_axe", false) == "sfx.gear_stow", "a shield, spear or axe: gear's stow and draw")
+	var stowed := true
+	for id: String in ["sword", "shield"]:
+		for drawing: bool in [true, false]:
+			stowed = stowed and SoundKit.has(SoundKit.stow_slot(id, drawing)) and bool(SoundKit.spec(SoundKit.stow_slot(id, drawing)).get("positional", true))
+	_check(stowed, "the four rest slots are in the manifest, positional")
 	var light := ""
 	var heavy := ""
 	for id: String in Items.ids():

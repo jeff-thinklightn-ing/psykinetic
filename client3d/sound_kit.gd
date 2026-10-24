@@ -288,6 +288,19 @@ static func swing(id: String) -> String:
 	return "sfx.swing_heavy" if id != "" and int(Items.def(id).get("hands", 1)) >= 2 and not Items.verb_of(id).is_empty() 			and str(Items.verb_of(id).get("kind", "")) != "ranged" else "sfx.swing"
 
 
+## Items whose rest is a scabbard: their drawing and sheathing are a blade's.
+const BLADES: Array[String] = ["knife", "dagger", "sword"]
+
+
+## The slot for item [param id] going to its rest or, [param drawing], taken up
+## from it (662, pc-character's rest poses): a blade's draw or sheathe, else
+## gear's (a shield, spear, axe ...) draw or stow.
+static func stow_slot(id: String, drawing: bool) -> String:
+	if id in BLADES:
+		return "sfx.blade_draw" if drawing else "sfx.blade_sheathe"
+	return "sfx.gear_draw" if drawing else "sfx.gear_stow"
+
+
 ## A person's voice slot for [param what] (effort_swing, effort_hurt,
 ## effort_lift, death), by its body (Player.body, Companion.body: male or
 ## female; decision 388); "" for anyone else.

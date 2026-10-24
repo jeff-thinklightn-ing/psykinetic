@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Drawing and putting away weapons is heard: a blade slides from or into its scabbard, a shield, spear or axe is stowed or taken up with a soft knock, quiet enough that a town of guards is not noisy (662, sound's side).
 - Out of a fight, an archer carries the bow on the back with the quiver laid over it, both hands free; it is back in hand the moment they draw or a fight comes near.
 - Out of a fight, people rest what they hold: a great axe or battle axe set head down on the ground before them with both hands on the butt, a spear grounded upright beside them, a hammer or pick hanging at their side; they take it up again when a fight comes near.
 - People holding a weapon or a shield no longer scratch their head, drink, brush a sleeve, cross their arms, shrug or wave their hands while talking: with something in hand they only shift their weight, look back, crouch or kneel, so no blade comes near the body or the face.

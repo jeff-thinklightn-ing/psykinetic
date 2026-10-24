@@ -29507,3 +29507,39 @@ draw, staying in hand when the draw is let go, calm again on the back, in hand o
 and gone from the back when unequipped. Walking in a fight is as before (462 amended (3)); the bow
 turned curve up in the hand is held unless Jeff asks for it. Client only, protocol unchanged, no
 new class_name.
+## 662, sound's side: drawing and stowing heard
+
+pc-character's held-weapon rest poses (Jeff: held weapons rest properly, a sword sheathed)
+play a sound at the clip's moment the piece changes socket. The coordinator asked for
+three, pc-character a fourth for taking gear back up.
+
+- **Four slots**, one-shots on the SFX bus, positional, heard 2 cells, no sim noise
+  (monsters do not hear them), quieter than a pickup since townsfolk and guards stow too:
+  sfx.blade_draw (-8 dB), a dry leather-and-steel slide out of the scabbard, no ring;
+  sfx.blade_sheathe (-8 dB), the reverse, ending in a soft seat; sfx.gear_stow (-9 dB), a
+  shield onto the back, a spear grounded, an axe set down; sfx.gear_draw (-12 dB), the
+  same taken up, quieter and shorter.
+- **SoundKit.stow_slot(id, drawing)** picks one: an item in SoundKit.BLADES (knife,
+  dagger, sword) draws or sheathes as a blade, anything else as gear. pc-character's
+  Client3D calls view.sfx.play(that slot, the puppet's position) once a change. Gear's
+  kinds share takes picked at random: the piece is seen, the sound only says put down or
+  taken up.
+- **Takes**, Freesound, chosen by measure over louder or ringing ones (a draw's tail whose
+  1-12 kHz peak stands 25 dB or more over its mean reads as a ring: Qat's 107589,
+  Streety's 30244 and 30246, colorsCrimsonTears' 545695 left out):
+  blade_draw: 666581 xkeril "Sword drawing" CC0 (0.52 s for 0.5 s); 175953 freefire66
+  "dagger_drawn2.wav" CC0 (0.06 s for 0.4 s).
+  blade_sheathe: 180838 and 180829 32cheeseman32 "SwordSheath03" / "SwordSheath01"
+  CC BY 4.0 (0.04 s for 0.7 s; 0.32 s for 0.4 s), credited in THIRD_PARTY.md.
+  gear_stow: 388819 nioczkus "Holster Pistol" CC0 (0.04 s for 0.5 s, leather into its
+  seat); 774269 loganzsound "wooden_rod_drop" CC0 (its first strike, 0.36 s: a shaft
+  grounded); 707791 TheGreenEyedGhost "Pulling_pistol_from_holster_and_securing_it_back_again_1"
+  CC0 (its securing, 0.44 s for 0.22 s).
+  gear_draw: 707791 again (its pull, 0.12 s for 0.32 s); 171611 Pjkasinski3 "Bersa
+  Holster 2.mp3" CC0 (0.04 s for 0.46 s).
+  AardsReal's 842179 and 842189 were cut too and dropped: their quiet sources trimmed to
+  a clipped 0.09 s and 0.17 s.
+
+sound_kit_test: stow_slot for a sword, dagger, knife, shield, spear, battle axe; the four
+slots in the manifest, positional. Client only, protocol unchanged, no new class_name.
+

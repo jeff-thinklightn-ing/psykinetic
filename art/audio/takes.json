@@ -529,6 +529,46 @@
 				"license": "CC0 1.0"
 			}
 		],
+		"sfx.blade_draw": [
+			{
+				"file": "sfx.blade_draw.ogg",
+				"from": "freesound",
+				"original": "freesound 666581: Sword drawing (from 0.52 s for 0.5 s)",
+				"sha256": "d73ccf4dc3445ee970579a146503e8b656f1e2e57534ada49ee60f677d8eebee",
+				"by": "xkeril",
+				"url": "https://freesound.org/people/xkeril/sounds/666581/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.blade_draw.2.ogg",
+				"from": "freesound",
+				"original": "freesound 175953: dagger_drawn2.wav (from 0.06 s for 0.4 s)",
+				"sha256": "da0caf1a7bf5502ffcd120e9b1d5c508adbd3ca1a8c9fcad267f07db2bfb4a1d",
+				"by": "freefire66",
+				"url": "https://freesound.org/people/freefire66/sounds/175953/",
+				"license": "CC0 1.0"
+			}
+		],
+		"sfx.blade_sheathe": [
+			{
+				"file": "sfx.blade_sheathe.ogg",
+				"from": "freesound",
+				"original": "freesound 180838: SwordSheath03 (from 0.04 s for 0.7 s)",
+				"sha256": "8645c8c1f479f31abebfe49a0a716152c1236d5d7ab0f8aa6389ba6d7041a585",
+				"by": "32cheeseman32",
+				"url": "https://freesound.org/people/32cheeseman32/sounds/180838/",
+				"license": "CC BY 4.0"
+			},
+			{
+				"file": "sfx.blade_sheathe.2.ogg",
+				"from": "freesound",
+				"original": "freesound 180829: SwordSheath01 (from 0.32 s for 0.4 s)",
+				"sha256": "107651f68780da937bbf468d0f03a4c28b768f6cdbdb224dca607436d17796b5",
+				"by": "32cheeseman32",
+				"url": "https://freesound.org/people/32cheeseman32/sounds/180829/",
+				"license": "CC BY 4.0"
+			}
+		],
 		"sfx.block_shield": [
 			{
 				"file": "sfx.block_shield.ogg",
@@ -1174,6 +1214,55 @@
 				"sha256": "c22402c64bf1cd7d98e310d2ce87549046f0466ae5d528b3fac4f0bc0a7823ff",
 				"by": "ChristopherJngs",
 				"url": "https://freesound.org/people/ChristopherJngs/sounds/861369/",
+				"license": "CC0 1.0"
+			}
+		],
+		"sfx.gear_draw": [
+			{
+				"file": "sfx.gear_draw.ogg",
+				"from": "freesound",
+				"original": "freesound 707791: Pulling_pistol_from_holster_and_securing_it_back_again_1 (from 0.12 s for 0.32 s)",
+				"sha256": "12d5448051f2a6745119d068154d563e09b56b37306a6af5198c2689517c1e29",
+				"by": "TheGreenEyedGhost",
+				"url": "https://freesound.org/people/TheGreenEyedGhost/sounds/707791/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.gear_draw.2.ogg",
+				"from": "freesound",
+				"original": "freesound 171611: Bersa Holster 2.mp3 (from 0.04 s for 0.46 s)",
+				"sha256": "536da743329fd452321a64416aa972e7de44aa200e8b4fe99e85d955d6d92e2d",
+				"by": "Pjkasinski3",
+				"url": "https://freesound.org/people/Pjkasinski3/sounds/171611/",
+				"license": "CC0 1.0"
+			}
+		],
+		"sfx.gear_stow": [
+			{
+				"file": "sfx.gear_stow.ogg",
+				"from": "freesound",
+				"original": "freesound 388819: Holster Pistol (from 0.04 s for 0.5 s)",
+				"sha256": "87bcfb26976b6a5cb06ffd3a6c7392ecd09f613f9614a9f59c5fa81b09661b58",
+				"by": "nioczkus",
+				"url": "https://freesound.org/people/nioczkus/sounds/388819/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.gear_stow.2.ogg",
+				"from": "freesound",
+				"original": "freesound 774269: wooden_rod_drop (from 0 s for 0.36 s)",
+				"sha256": "c71d2f7623c40c9cd97a5af596e9f12b7b87e81d3f54e4d1f67430d01557fbaf",
+				"by": "loganzsound",
+				"url": "https://freesound.org/people/loganzsound/sounds/774269/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.gear_stow.3.ogg",
+				"from": "freesound",
+				"original": "freesound 707791: Pulling_pistol_from_holster_and_securing_it_back_again_1 (from 0.44 s for 0.22 s)",
+				"sha256": "240a75b1327edf89a662840aadb3884958cf0d461fd98297fb1633b1f684a2ad",
+				"by": "TheGreenEyedGhost",
+				"url": "https://freesound.org/people/TheGreenEyedGhost/sounds/707791/",
 				"license": "CC0 1.0"
 			}
 		],

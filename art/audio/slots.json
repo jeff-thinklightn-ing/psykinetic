@@ -189,6 +189,42 @@
 			"uses": "the bow's creak while it is held drawn, its pitch and level rising with World.draw_of (Client3D._sync_draw)",
 			"fallback": "sfx.bow_draw"
 		},
+		"sfx.blade_draw": {
+			"category": "sfx",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": null,
+			"range": 2,
+			"volume_db": -8.0,
+			"uses": "a sword, dagger or knife drawn from its scabbard: a dry leather-and-steel slide, no ring; at the clip's moment the blade leaves its rest (662, pc-character's rest poses; SoundKit.stow_slot)"
+		},
+		"sfx.blade_sheathe": {
+			"category": "sfx",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": null,
+			"range": 2,
+			"volume_db": -8.0,
+			"uses": "a sword, dagger or knife put back in its scabbard, ending in a soft seat; at the clip's moment it reaches its rest (662; SoundKit.stow_slot)"
+		},
+		"sfx.gear_stow": {
+			"category": "sfx",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": null,
+			"range": 2,
+			"volume_db": -9.0,
+			"uses": "a shield onto the back, a spear's butt grounded, an axe set down: anything not a blade put to its rest, soft (662; SoundKit.stow_slot)"
+		},
+		"sfx.gear_draw": {
+			"category": "sfx",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": null,
+			"range": 2,
+			"volume_db": -12.0,
+			"uses": "a shield taken off the back, a spear lifted, an axe hefted: anything not a blade taken up from its rest, quieter and shorter than its stowing (662; SoundKit.stow_slot)"
+		},
 		"sfx.bow_loose": {
 			"category": "combat",
 			"type": "oneshot",
