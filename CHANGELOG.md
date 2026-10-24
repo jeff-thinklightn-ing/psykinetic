@@ -7,6 +7,9 @@ notes (decision 324).
 
 ## Unreleased
 
+## v0.1.172
+
+- What goes over the network changes, so v0.1.171 and older can't join the server: update through the launcher first.
 - The bard wears a red felt cap with a feather (490 amended, npc's side: the word in his look; art-kit's piece, pc-character's head socket). Server spec, drawn as is.
 - The Dwarven Halls dressed (613 amended, dungeon's side; 658): the great forge stands solid against the forge room's south wall facing into it, the anvils along its front and the smith's stand cell before them, in place of the block of rock; the goblins' weapon rack stands solid against the wall east of it; three of the smith's guards lie where they fell in the ambush, one toward his cart, one face down, one as he fell. Decor kinds now say how a piece sits (flat with a facing, on a wall's foot, on any edge indoors or out, in a corner, across a niche), so a fence can run along open ground: maps' grave fence on Held follows. Two new solid building kinds, both sides alike.
 - The goblins' weapon rack in the Dwarven Halls is a solid building (building.weapon_rack, 2 x 1; was prop.weapon_rack), so nobody stands inside its blades in a fight (613 amended, art-kit's side)
@@ -29,7 +32,6 @@ notes (decision 324).
 - Buildings a town no longer keeps up show it: in disrepair the roof breaks, the walls crack, the lamps go out and weeds grow at the foot; a ruin is a low bank of rubble you can walk over, and once it's gone nothing is left.
 - Towns can now decline as well as grow: a new town starts as a settlement of tents and builds up to hamlet and village, but a town that loses people, goes hungry, leaves officials unpaid or has residents carried off falls back a stage, and buildings that go unkept (starting at the edge) fall into disrepair, then ruin, and the wild takes the ground back (649)
 - Held weapons' grips mid-handle and the shield's arm sockets (451 amended and 451 amended (2), art-kit's sides; Jeff: "shield should be carried on the outside of arm"): the sword and battle axe meshes lowered so the grip is mid-hilt, the great axe's and battle axe's second-hand grip on the haft (the great axe's lay in its head), item.shield's "strap" and "handle" sockets for pc-character's carry
-
 - Held has its own map: from the wilds' south-west corner (west edge) a way leads into a forest clearing with a river, a ford and a bridge, and the Old Tower's ruin across it, empty for now; the town moves there later.
 - A town's new building plots show as staked ground until the town starts building, then rise through their stages like any other building; a plot laid while you watch appears at once, and one the town gives up disappears.
 - The level builder sees the plots a town has laid as it grows: it lists them apart, and warns of a building on one turned from its street.
@@ -90,6 +92,7 @@ notes (decision 324).
 - A raised dais indoors is built stone with steps up its front, no longer a rock cliff, as in the Hall of Fallen Souls (580).
 - The felled forest is drawn: a stump, grass, scrub and saplings as a woodlot's clearing grows back, the trees going and coming as they are felled and regrow (591).
 - Herders' sheep folds can stand in a level: a 6 x 6 fenced pen open to the sky, its gate two cells wide in the middle of its front; you see over the fence but can't walk through it, and a level editor's "building_fold" stamp lays one.
+
 ## v0.1.171
 
 - What goes over the network changes, so v0.1.170 and older can't join the server: update through the launcher first.
