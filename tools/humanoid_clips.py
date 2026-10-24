@@ -144,7 +144,7 @@ CLIPS = {
 	]},
 }
 ## Each strike's striking bone, whose reach forward gives its contact.
-STRIKES = {"Axe_Overhead": "hand_r", "Mace_Overhead": "hand_r", "Dagger_Stab": "hand_r", "Spear_Thrust": "hand_r", "Shield_Bash": "hand_l",
+STRIKES = {"Axe_Overhead": "hand_l", "Mace_Overhead": "hand_r", "Dagger_Stab": "hand_r", "Spear_Thrust": "hand_r", "Shield_Bash": "hand_l",
 	"Sword_Attack": "hand_r", "Sword_Attack_Standing": "hand_r", "Punch_Jab": "hand_l", "Punch_Cross": "hand_r",
 	"Kick": "foot_r"}
 CONTACT = {}
@@ -379,7 +379,7 @@ CLIPS["Chop_Loop"] = {"loop": True, "keys": [
 # body, raised over the right shoulder, swung through high ahead, brought down ahead and low, the
 # trunk bowing into it. Every hold keeps the left wrist within reach of its shoulder (0.52 m).
 GREAT_GRIP = 0.45
-AXE_READY = chop((0.2, 0.0, -0.2), (0.45, -0.45, 0.77), (0.0, -1.0, 0.0), grip=GREAT_GRIP)
+AXE_READY = chop((0.16, -0.06, -0.43), (0.57, -0.4, 0.66), (0.0, -1.0, 0.0), grip=GREAT_GRIP)
 AXE_UP = chop((0.2, 0.0, 0.0), (-0.3, -0.3, 0.9), (0.0, -1.0, 0.45), grip=GREAT_GRIP) + [
 	("spine_02", LIFT, 10.0), ("spine_03", LIFT, 5.0)]
 AXE_SWING = chop((0.22, 0.0, -0.12), (0.4, -0.35, 0.85), (0.0, -1.0, 0.0), grip=GREAT_GRIP) + [("spine_02", LIFT, 2.0)]

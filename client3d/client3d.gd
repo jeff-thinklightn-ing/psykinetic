@@ -718,9 +718,9 @@ const HUMANOID_MOVES := {
 	"strikes": {
 		"": [["Punch_Jab", 0.17], ["Punch_Cross", 0.21]],
 		"sword": [["Sword_Attack", 0.38], ["Sword_Attack_Standing", 0.38]],
-		"giant_axe": [["Axe_Overhead", 0.38]],
+		"giant_axe": [["Axe_Overhead", 0.42]],
 		"hammer": [["Mace_Overhead", 0.42]],  # One-handed: Axe_Overhead's left hand would grip nothing.
-		"pick": [["Axe_Overhead", 0.38]],  # A miner's swing, two-handed (items' 479; the kobold's, 478).
+		"pick": [["Axe_Overhead", 0.42]],  # A miner's swing, two-handed (items' 479; the kobold's, 478).
 		"dagger": [["Dagger_Stab", 0.17]],
 		"spear": [["Spear_Thrust", 0.29]],
 		"shield": [["Shield_Bash", 0.17]],

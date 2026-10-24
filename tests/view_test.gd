@@ -6019,6 +6019,12 @@ func _test_two_hands() -> void:
 			var along := left.global_basis.y.normalized().dot(axe.global_basis.y.normalized())
 			_check(off < 0.04 and along > 0.95, "%s: the left hand on its grip_2, %.3f m off, its fist along the haft (%.2f)" % [
 					"standing ready" if at < 0.0 else "Axe_Overhead at %.2f s" % at, off, along])
+			if at < 0.0:
+				# Ready, the haft laid forward: the left hand at the chest, not across the face (the coordinator,
+				# on art-kit's stills: "a fist across the face in the ready pose").
+				var skeleton := puppet.find_children("*", "Skeleton3D", true, false)[0] as Skeleton3D
+				var neck := skeleton.global_transform * skeleton.get_bone_global_pose(skeleton.find_bone("Neck")).origin
+				_check(left.global_position.y < neck.y - 0.05, "standing ready: the left hand %.2f m below the neck" % (neck.y - left.global_position.y))
 	# A one-handed weapon never swings a two-handed clip (the war hammer did: its left hand came up
 	# beside the haft holding nothing).
 	var two_handed_clips := ["Axe_Overhead"]

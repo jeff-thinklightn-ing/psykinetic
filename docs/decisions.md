@@ -27845,3 +27845,15 @@ boards showing at the edges of the bare cells.
 
 view_test _test_decline (the ruin's plinth tops all under PLINTH_HEIGHT,
 built again whole). Client only, protocol unchanged, no new class_name.
+### The ready hold laid forward
+
+The coordinator, on art-kit's stills (C:/dev/review/hand_pass/axe_ready_yaw-35.png): standing
+ready, the haft near upright put the left hand on grip_2 across the face. AXE_READY now lays the
+haft at about 45° ahead, the right hand lower and in toward the body's middle: the left hand rests
+at the chest, 0.13 m below the neck on the man (0.19 on the draugr) and 0.39 m ahead of it, on its
+grip_2 (0.014 m; the draugr's battle axe, 0). Axe_Ready and Axe_Overhead's first and last keys
+share it. Axe_Overhead's contact is now measured by the left hand (STRIKES: it leads the blow, at
+the head's end; the right barely drops, and measured by it the lowered ready's recovery read as the
+blow, 0.88 s): 0.42 s, inside the blow (0.40 to 0.48), HUMANOID_MOVES' giant axe and pick. The
+server's hit moment is unchanged (the clip is timed to it). view_test _test_two_hands: standing
+ready, the left hand more than 0.05 m below the neck. Client only, no new number (451 amended (2)).
