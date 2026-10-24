@@ -133,6 +133,10 @@ var _server_done := -INF
 ## queue as this client has it (decision 543). A correction shows them again
 ## from the server's tile, for the server walks them still.
 var _sent: Array[Vector2i] = []
+## When each of _sent's steps was sent, on the clock (543 amended, ui's
+## side): a step unseen past the round trip and the grace is one the
+## server has not taken yet.
+var _sent_at: Array[float] = []
 ## The server's tile as last heard, where _sent's steps go on from.
 var _server_at := Vector2i.ZERO
 
@@ -157,6 +161,7 @@ func is_active() -> bool:
 func order(target: Vector2i, into_goal := true) -> Array[Vector2i]:
 	_following = null
 	_sent.clear()  # The server's queue goes with a move order (World.order_move).
+	_sent_at.clear()
 	_has_target = true
 	_target = target
 	_into_goal = into_goal
@@ -295,16 +300,33 @@ func step(direction: Vector2i) -> bool:
 	if _sent.is_empty():
 		_server_at = _entity.tile
 	_sent.append(direction)
+	_sent_at.append(_clock)
 	return true
 
 
 ## WASD: the shown walk has (nearly) run out, so the next held step should
-## go now. True with nothing showing.
+## go now. True with nothing showing. False while the server holds as many
+## steps as it will queue (543 amended, ui's side): World.MAX_QUEUED_STEPS
+## sent and not seen taken, the oldest unseen past the round trip and the
+## grace, so the server has it and has not walked it; a step sent now would
+## be dropped unheard (World.order_step) and the walk shown would part from
+## the server's, a correction of several tiles later. The held walk pauses
+## at its shown end instead and goes on as the server takes them. A server
+## keeping up never has three unseen that long, whatever the round trip:
+## each is seen a round trip after it is sent.
 func ready_for_step() -> bool:
+	if _sent.size() >= World.MAX_QUEUED_STEPS and _clock - _sent_at[0] > Net.rtt_ticks() + RECONCILE_GRACE_TICKS:
+		return false
 	if not is_active():
 		return true
 	var last: Step = _steps.back()
 	return last.settle or _clock >= last.start + last.duration
+
+
+## 543 amended, ui's side: whether the held walk is paused on the server
+## (ready_for_step's first rule), for the owner's say.
+func waiting_on_server() -> bool:
+	return _sent.size() >= World.MAX_QUEUED_STEPS and _clock - _sent_at[0] > Net.rtt_ticks() + RECONCILE_GRACE_TICKS
 
 
 ## Drops predicted steps that have not started showing (the order changed),
@@ -475,6 +497,7 @@ func _server_behind(step: Step) -> bool:
 ## _take_queued_step): none of the steps sent is coming.
 func server_dropped_queue() -> void:
 	_sent.clear()
+	_sent_at.clear()
 
 
 ## 655 amended: WASD, each frame (Main._drive_wasd): the direction the keys
@@ -497,9 +520,11 @@ func _taken(server_tile: Vector2i) -> void:
 		at += _sent[i]
 		if at == server_tile:
 			_sent = _sent.slice(i + 1)
+			_sent_at = _sent_at.slice(i + 1)
 			_server_at = server_tile
 			return
 	_sent.clear()
+	_sent_at.clear()
 	_server_at = server_tile
 
 

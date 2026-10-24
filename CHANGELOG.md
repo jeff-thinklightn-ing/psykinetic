@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- A held-key walk pauses for a moment when the server has fallen three steps behind it, instead of walking on and then sliding back several tiles when the server dropped the extra steps (543 amended, ui's side); a server keeping up never pauses it.
 - Townsfolk show more work: a hunter crouched with a bow, game and sacks carried on the shoulder, hoeing a row, leaning on a crook among the flock, kneeling to shear.
 - Standing ready with a great axe, the haft is laid forward at the chest, so the left hand no longer covers the face.
 - A ruin's stone footing is broken too, crumbling to uneven heights with stones fallen beside it, and no grey stone shows where its floorboards are missing.

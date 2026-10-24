@@ -27887,3 +27887,47 @@ view_test _test_visible_work: each word its clip (or upper clip) and pieces. ani
 among the tool clips once tool.hoe is in (nothing inside the body, five builds; the left hand on
 the haft by its butt; the blade's lowest above 0.15 m). Client only, protocol unchanged, no new
 class_name.
+## 543 amended, ui's side. The held walk pauses while the server holds three steps
+
+Found in 655 amended's clip pair (2026-10-24): the player's own body slid 3
+to 5 tiles three times in each 35-second held walk. The recording starved
+the loopback server to about 58% of real time (its log ends at tick 400
+after 69 s of sim) while both clients' clocks ran real time, so each held
+walk sent steps faster than the server took them. The server keeps at most
+World.MAX_QUEUED_STEPS (3) queued WASD steps and World.order_step drops a
+fourth unheard; once a client was four steps ahead its next directions
+vanished, the server walked later directions from an earlier tile, its
+path parted from the one shown, and the client saw "the server moved it
+elsewhere" and slid there. The sim never repositions a walking player:
+every server move was one cell along a sent direction. The setup made it
+common; on the box a server stall of about a second under a held key (four
+steps' worth) would do the same, rarely, and a player would see it. The
+coordinator: pause the body at three unconfirmed steps; a short stall looks
+like a stumble, not a teleport; a normal walk on a healthy server must
+never pause.
+
+MovePrediction keeps when each step in _sent was sent (_sent_at).
+ready_for_step is false while MAX_QUEUED_STEPS steps are sent and not
+seen taken and the oldest was sent more than a round trip plus
+RECONCILE_GRACE_TICKS ago: the server has it and has not walked it, so a
+step sent now could be the one dropped. The held walk then pauses at its
+shown end (Main._drive_wasd sends nothing; the hinted bend's settle brings
+the body to the centre) and goes on as the server takes them, every step
+sent still walked. A server keeping up never has three unseen that long,
+whatever the round trip, since each step is seen a round trip after it is
+sent: three in flight at once (an 800 ms trip) pause nothing.
+waiting_on_server says when it is paused. Decision 543's own rules stay:
+a step overdue by CATCH_UP_WAIT_STEPS is still a correction (the stalled
+server's one correction in the test, the body sliding back to its tile
+before the queued steps are shown again), and the catch-up stretch still
+drains a backlog of a step or two. No wire change; the server's cap and
+silent drop are untouched (the client now never reaches them under a
+stall, and a deliberate flood is still dropped).
+
+prediction_test _test_paused_walk: a server at 60% of the pace (28 frames
+paused, nothing dropped, every step walked, no correction off the path), a
+server stalled 15 ticks (paused, nothing dropped, every step walked), the
+server keeping up (never paused), an 800 ms round trip with the server
+keeping up (never paused); the scripted server now queues three and drops
+a fourth as the real one does. The held zigzag check also asserts no pause.
+Client only; no wire change; no new class_name.

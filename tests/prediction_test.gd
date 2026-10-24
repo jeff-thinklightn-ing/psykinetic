@@ -12,7 +12,10 @@ extends Node
 ## amended: a held key's hint bends the walk shown toward the step to
 ## come, the key let go settles the body to the centre, a hint into a wall
 ## bends nothing, and a step the server refuses slides back from the bend.
-## Run it with tests/run.ps1 or tests/run.sh.
+## 543 amended, ui's side: a held walk pauses while the server holds three
+## of its steps unseen, so a slowed or stalled server never drops a step
+## unheard and the server's path never parts from the shown one; a server
+## keeping up never pauses it. Run it with tests/run.ps1 or tests/run.sh.
 
 const SIZE := 40
 const FRAME := 1.0 / 60.0
@@ -64,7 +67,7 @@ func _test_hinted_walk() -> void:
 	print("\n== the own walk bends toward the held key's next step (655 amended) ==")
 	Net.test_lag = 0.4 * World.TICK_DT  # The server keeping up (40 ms), as the first walk is.
 	var zigzag := _drive([Vector2i(1, 0), Vector2i(1, 0), Vector2i(0, 1), Vector2i(-1, 1), Vector2i(-1, 0)], true)
-	_check(zigzag["corrections"] == 0, "a held zigzag, the server keeping up: no corrections (%d)" % zigzag["corrections"])
+	_check(zigzag["corrections"] == 0 and zigzag["paused"] == 0, "a held zigzag, the server keeping up: no corrections, never paused (%d, %d)" % [zigzag["corrections"], zigzag["paused"]])
 	_check(zigzag["bends"] == 4, "each step's end bent toward the step the held key then brought, which starts on that bend (%d of 4)" % zigzag["bends"])
 	_check(zigzag["cut"] >= 0.12 and zigzag["cut"] <= 0.26, "at the first corner the body is off the centre, on the bend, by under a quarter cell (%.3f)" % zigzag["cut"])
 	_check(zigzag["jump"] <= zigzag["frame"] * 1.5, "no frame jumps: at most a frame and a half's walk between frames (%.3f cells, a frame's walk %.3f)" % [zigzag["jump"], zigzag["frame"]])
@@ -73,24 +76,53 @@ func _test_hinted_walk() -> void:
 	var wall := _drive([Vector2i(0, -1), Vector2i(0, -1)], true)
 	_check(wall["bends"] == 0 and not wall["settled"] and not wall["active"] and wall["rest"].distance_to(Vector2(wall["end"])) < 0.1 and wall["end"] == Vector2i(2, 19),
 			"a key held into a wall: no bend toward it, the body stops on the cell's centre (%s, %s)" % [wall["rest"], wall["end"]])
+	_test_paused_walk()
 	var refused := _drive([Vector2i(1, 0), Vector2i(1, 0), Vector2i(0, 1)], true, 2)
 	_check(refused["corrections"] == 1 and refused["bends"] == 2, "a third step the server refuses: one correction, the two before it bent (%d, %d)" % [refused["corrections"], refused["bends"]])
 	_check(refused["jump"] <= refused["frame"] * 1.5 and not refused["active"] and refused["rest"].distance_to(Vector2(refused["end"])) < 0.02 and refused["end"] == Vector2i(4, 20),
 			"the body slides back from the bend to the server's cell, no jump (%.3f cells a frame at most; rest %s, server %s)" % [refused["jump"], refused["rest"], refused["end"]])
 
 
+## 543 amended, ui's side: the held walk against a server that cannot keep
+## up, which keeps three queued steps and drops a fourth unheard
+## (World.order_step).
+func _test_paused_walk() -> void:
+	print("\n== the held walk pauses while the server holds three steps (543 amended, ui's side) ==")
+	var east: Array = []
+	for i in 12:
+		east.append(Vector2i(1, 0))
+	var slow := _drive(east, false, -1, 0.6)
+	_check(slow["dropped"] == 0 and slow["paused"] > 0 and slow["end"] == Vector2i(14, 20),
+			"a server walking at 60%% of the pace: the walk pauses (%d frames) rather than send a step it would drop (%d dropped); every step walked, to %s" % [slow["paused"], slow["dropped"], slow["end"]])
+	_check(slow["elsewhere"] == 0, "and the server's path never parts from the shown one (%d corrections, none 'elsewhere')" % slow["corrections"])
+	var stalled := _drive(east.slice(0, 8), false, -1, 1.0, 15.0)
+	_check(stalled["dropped"] == 0 and stalled["paused"] > 0 and stalled["end"] == Vector2i(10, 20) and stalled["elsewhere"] == 0,
+			"a server stalled 15 ticks: the walk pauses (%d frames), nothing dropped, the server walks every step to %s (%d corrections)" % [stalled["paused"], stalled["end"], stalled["corrections"]])
+	var steady := _drive(east, false)
+	_check(steady["paused"] == 0 and steady["dropped"] == 0 and steady["corrections"] == 0, "the server keeping up: never paused, nothing dropped, no corrections")
+	Net.test_lag = 8.0 * World.TICK_DT  # A long way to the server: three steps in flight at once.
+	var far := _drive(east, false)
+	_check(far["paused"] == 0 and far["dropped"] == 0 and far["corrections"] == 0, "an 800 ms round trip, the server keeping up: never paused either (%d, %d, %d)" % [far["paused"], far["dropped"], far["corrections"]])
+	Net.test_lag = 0.4 * World.TICK_DT
+
+
 ## [param dirs] WASD steps held from (2, 20), one after another as each shown
 ## step ends, the key read each frame (the hint): the next direction, the
 ## last one again after them while [param hold_on], else none. The scripted
 ## server as _walk's, keeping up, refusing the step at [param refuse_at]
-## (and emptying its queue, as the real one does). {corrections, bends
+## (and emptying its queue, as the real one does); walking at [param slow]
+## of the pace (its step takes pace / slow), taking nothing before tick
+## [param hold_until]; holding World.MAX_QUEUED_STEPS steps and dropping a
+## further one unheard, as World.order_step does. {corrections, elsewhere
+## (corrections where the server's tile was off the shown path), bends
 ## (steps that started on the bend the step before settled toward them),
 ## cut (how far off the centre the body is as the first turn's corner
 ## moment passes), jump (the most the body moved between frames, cells),
 ## frame (a straight step's walk in a frame), settled (a settle was shown),
 ## active (the prediction still active at the end), rest (where the body
-## was last drawn), end (the server's tile at the end)}.
-func _drive(dirs: Array, hold_on: bool, refuse_at := -1) -> Dictionary:
+## was last drawn), end (the server's tile at the end), paused (frames the
+## walk waited on the server), dropped (steps the server dropped)}.
+func _drive(dirs: Array, hold_on: bool, refuse_at := -1, slow := 1.0, hold_until := 0.0) -> Dictionary:
 	var player := _player()
 	World._relocate(player, Vector2i(2, 20))
 	for other in World.get_entities():
@@ -107,6 +139,10 @@ func _drive(dirs: Array, hold_on: bool, refuse_at := -1) -> Dictionary:
 	var server_due := 0.0
 	var server_tick := 0
 	var server_took := 0
+	var queue: Array[Vector2i] = []  # Arrived at the server, not taken: its queued_steps.
+	var dropped := 0
+	var paused := 0
+	var elsewhere := 0
 	var sent_count := 0
 	var corrections := 0
 	var bends := 0
@@ -117,7 +153,7 @@ func _drive(dirs: Array, hold_on: bool, refuse_at := -1) -> Dictionary:
 	var total := 0.0
 	for direction: Vector2i in dirs:
 		total += World.step_ticks(player, direction)
-	while clock < total + 30.0:
+	while clock < total / slow + hold_until + 30.0:
 		clock += FRAME * World.TICK_RATE
 		if shown.advance(FRAME):
 			corrections += 1
@@ -125,8 +161,8 @@ func _drive(dirs: Array, hold_on: bool, refuse_at := -1) -> Dictionary:
 		# The frame's draw, as GridEntity._process: the body where the prediction has it.
 		if shown.is_active():
 			var pos := Iso.local_to_grid(shown.position())
-			if pos.distance_to(last_pos) > FRAME * World.TICK_RATE / pace * 1.5:
-				var current: MovePrediction.Step = shown._current()
+			if pos.distance_to(last_pos) > FRAME * World.TICK_RATE / pace * 1.5 and not shown._current().ease:
+				var current: MovePrediction.Step = shown._current()  # (A correction's blend is a known fast slide.)
 				print("    jump at %.2f: %s -> %s on %s->%s t %.2f (ease %s, settle %s, %d steps, bend %s/%s)" % [clock, last_pos, pos,
 						current.from, current.to, (clock - current.start) / current.duration, current.ease, current.settle, shown._steps.size(), current.bend_prev, current.bend_next])
 			jump = maxf(jump, pos.distance_to(last_pos))
@@ -141,6 +177,8 @@ func _drive(dirs: Array, hold_on: bool, refuse_at := -1) -> Dictionary:
 		elif hold_on:
 			held = dirs.back()
 		shown.hint(held)
+		if sent_count < dirs.size() and shown.waiting_on_server():
+			paused += 1
 		if sent_count < dirs.size() and shown.ready_for_step():
 			var before: MovePrediction.Step = shown._steps.back() if shown.is_active() else null
 			if shown.step(held):
@@ -152,15 +190,22 @@ func _drive(dirs: Array, hold_on: bool, refuse_at := -1) -> Dictionary:
 				sent.append([clock + one_way, held])
 			sent_count += 1
 		while server_tick <= floori(clock):
-			if not sent.is_empty() and sent[0][0] <= server_tick and server_tick >= server_due:
-				var direction: Vector2i = sent.pop_front()[1]
+			while not sent.is_empty() and sent[0][0] <= server_tick:
+				var arrived: Array = sent.pop_front()
+				if queue.size() >= World.MAX_QUEUED_STEPS:
+					dropped += 1  # As World.order_step: a fourth queued step is dropped unheard.
+				else:
+					queue.append(arrived[1])
+			if not queue.is_empty() and server_tick >= server_due and server_tick >= hold_until:
+				var direction: Vector2i = queue.pop_front()
 				var start := float(server_tick)
 				if server_tick - server_due < 1.0:
 					start = server_due  # Its clock kept within a tick, as World.try_move keeps it.
-				server_due = start + pace
+				server_due = start + pace / slow
 				var refuse := server_took == refuse_at
 				if refuse:
 					sent.clear()
+					queue.clear()
 				else:
 					server_tile += direction
 				server_took += 1
@@ -176,9 +221,15 @@ func _drive(dirs: Array, hold_on: bool, refuse_at := -1) -> Dictionary:
 				shown.rebase(reply[1], 2.0)
 			elif shown.is_active() and not shown.reconcile(reply[1]):
 				corrections += 1
+				var on_path := false
+				for step in shown._steps:
+					if step.to == reply[1] or step.from == reply[1]:
+						on_path = true
+				if not on_path:
+					elsewhere += 1
 				shown.rebase(reply[1], 2.0)
-	return {"corrections": corrections, "bends": bends, "cut": cut, "jump": jump, "frame": FRAME * World.TICK_RATE / pace,
-			"settled": settled, "active": shown.is_active(), "rest": last_pos, "end": server_tile}
+	return {"corrections": corrections, "elsewhere": elsewhere, "bends": bends, "cut": cut, "jump": jump, "frame": FRAME * World.TICK_RATE / pace,
+			"settled": settled, "active": shown.is_active(), "rest": last_pos, "end": server_tile, "paused": paused, "dropped": dropped}
 
 
 ## [param steps] WASD steps east held from (2, 20), a round trip of
