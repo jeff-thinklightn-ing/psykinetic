@@ -5667,6 +5667,10 @@ func _test_attach_points() -> void:
 				grip.origin.distance_to(knuckles) * scale, grip.basis.y.normalized().dot(fist)])
 		_check(absf((skeleton.global_transform.basis * grip.basis).get_scale().y - 1.0) < 0.02,
 				"at its own size, whatever the person's stature")
+		# Its edge (+x) along the fingers toward the knuckles, not out of the palm (Jeff: "held sideways").
+		var edge: Vector3 = (grip.basis * sword.transform.basis).x.normalized()
+		var fingers: Vector3 = (bone.call("RightHand") as Transform3D).basis.y.normalized()
+		_check(edge.dot(fingers) > 0.9, "its edge along the fingers, toward the knuckles (%.2f)" % edge.dot(fingers))
 	if shield != null:
 		_check((sockets["hand_l"] as Node3D).global_basis.x.normalized().dot(shield.global_basis.z.normalized()) > 0.99,
 				"the shield's face (+z) out of the back of the hand")

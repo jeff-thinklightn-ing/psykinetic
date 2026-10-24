@@ -11914,6 +11914,17 @@ static func _attach_sockets(scene: Node3D, sizes: Dictionary, model_scale: float
 ## fill, or a grey box sized as the slot is until it has art), swapped when
 ## the slot changes, gone when the hand empties. An archer's arrows aren't in
 ## its hand but in a quiver on its back (decision 462 amended (3)).
+## A held weapon (art_style: its length +y, its edge, head or point's
+## striking side +x, thin in z) is turned a quarter about its grip
+## (HELD_EDGE_TURN): the hand socket puts a piece's +x out of the palm, so
+## each edge faced across the body and the flat into the swing (Jeff: "great
+## axe ... held sideways by player and draugr"); turned, +x lies along the
+## fingers toward the knuckles, the way the hand swings. A shield keeps its
+## own turn, the bow none; a work's tool is turned by its clip (GRASP).
+const HELD_EDGE_TURN := Basis(Vector3.UP, -PI * 0.5)
+static func _edge_first(id: String) -> bool:
+	var tags: Array = Items.def(id).get("tags", [])
+	return "weapon" in tags and not "ranged" in tags and not "shield" in tags
 func _sync_held(entity: GridEntity, puppet: Node3D) -> void:
 	if not puppet.has_meta("sockets"):
 		return
@@ -11964,6 +11975,8 @@ func _sync_held(entity: GridEntity, puppet: Node3D) -> void:
 				# grip's axis turns it out of the back of the hand, its thin side
 				# across the forearm.
 				thing.basis = Basis(Vector3.UP, PI * 0.5)
+			elif not own and _edge_first(id):
+				thing.basis = HELD_EDGE_TURN
 			if own and hand == 0:
 				_grip(thing, work)
 			socket.add_child(thing)

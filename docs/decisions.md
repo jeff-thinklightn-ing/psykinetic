@@ -26674,3 +26674,26 @@ offers (a pact on) close it; Esc closes it first. No panel for residents
 and buttons from a fed message, and the live path on the host (a seated
 draugr, E, the least sum, his pact, the window closed). Client only; no
 wire change; new class_name DealPanel.
+
+## 451 amended: a held weapon's edge toward the knuckles
+
+Jeff (2026-10-24): "great axe model attachment needs fixing, it held sideways by player and
+draugr". Art-kit found that every held weapon is modelled alike: its length along +y, its edge,
+head or point's striking side along +x, thin in z. The hand socket (decision 451) puts a piece's
++x on the hand bone's +Z, out of the palm, so each edge faced across the body and the flat went
+into the swing; the long great axe showed it most.
+
+- **The turn:** _sync_held turns a held item tagged "weapon" (not "ranged", not a shield) a
+  quarter about its grip (HELD_EDGE_TURN, Basis(UP, -PI/2)). Its +x then lies along the hand
+  bone's +Y, the fingers, toward the knuckles: the way the hand swings. The sign matters for
+  the battle axe (single-bitted, its blade on +x); the others are even across. The shield keeps
+  its own quarter turn, and the bow none. A work's tool (an ART_ID piece) is not turned: its
+  clip already turns the hand so the tool's +x faces its work (humanoid_clips' GRASP side).
+- **Who:** every body with hand sockets: players, companions, residents and the draugr
+  (DRAUGR_SOCKETS from the same _sockets). Meshes and icons are unchanged (item_icons draws the
+  piece unturned).
+
+view_test _test_attach_points: a held sword's edge along the right hand's fingers (dot 1.00).
+monster_test passes. Client only, protocol unchanged, no new class_name. Art-kit takes the held
+stills (player and draugr, two yaws). The left hand's reach to grip_2 on a two-handed piece is a
+separate step if those show it off the haft.

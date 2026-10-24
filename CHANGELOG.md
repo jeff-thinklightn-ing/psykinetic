@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Weapons are held edge-first: the great axe, battle axe, sword, dagger, knife, spear, hammer and pick no longer sit sideways in the hand (players, companions, townsfolk and the draugr).
 - Press E on the seated draugr for a small window with his words and a button for each sum his deal takes; the ones your purse covers can be pressed, and his answer is spoken as if you had named the sum (629, ui's side).
 - A captive held by a band waits under guard: the goblins who hold the smith at the great dwarven forge stand about him (three imps and a brute) and keep to the forge room; no monster attacks the one waiting to be found, and one you lead home who is beaten down lies downed rather than dying, getting up when you speak to them.
 - A left click on the seated draugr now walks you over to talk instead of striking him; Shift+click still swings at him, and once he fights, clicks attack as before (648).
