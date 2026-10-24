@@ -25264,6 +25264,8 @@ Jeff wanted the barrow's hidden door to leave clues: "you feel a cool draft comi
 
 view_test checks the draft is lit, low and drifts out into its room while shut, stops when the door opens and comes back when it shuts. Client only: protocol unchanged, no new class_name.
 
+Amended (2) 2026-10-23 (the coordinator, on the review still in C:/dev/review/draft/: Jeff's "you feel a cool draft" means noticeable with a light held near, not subtle): the first review still, from the normal camera height with a lantern beside the niche, showed no puffs at all at 0.7 across and 0.18 opaque. Now DRAFT_SIZE 0.9 and DRAFT_ALPHA 0.35 (the colour ramp's peak, a constant now); the count, height, speed, lifetime, lit material and the door's on and off as before. Reviewed as a short clip, closer in, since a drift reads in motion. Client only.
+
 ## 623, environment's side: the weather and the horizon under the low camera
 
 Jeff on the low camera (623, ui's side): "amazing... well worth the change". Ui's entry left the seams it showed to environment with terrain: the storm's haze per unit, the fog planes' edges, the rain box and the cloud decal's edge, and the sky under the haze. Designed here and approved by the coordinator; under the ortho camera everything stays as it was.

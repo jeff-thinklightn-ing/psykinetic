@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The cool draft at the barrow's hidden niche is easier to see: bigger, paler puffs drifting out along the floor when you hold a light near (608 amended (2), environment's side).
 - Fixed: when someone bandaging is downed, the person they were bandaging can be bandaged again (before, they stayed half-bandaged for good).
 - Capes are hidden under armour, as vests and coats already were.
 - Felled forest can be walked into: no wall left standing along the forest's old edge where trunks were cut (591 amended (2)).

@@ -273,13 +273,16 @@ const MIST_SIZE := 1.1
 const MIST_SECONDS := 2.6
 const MIST_FULL := 6.0
 ## The hidden niche's draft (608 amended, environment's side; Jeff: "you
-## feel a cool draft coming from one of the niches"): DRAFT_PUFFS faint
-## puffs DRAFT_SIZE across from the cracked wall's foot, DRAFT_LOW high at
-## most, drifting DRAFT_SPEED (m/s, a range) into the room and fading over
-## DRAFT_SECONDS: about a cell and a half. Lit as the scene is, so in the
-## barrow's dark only a light held near shows it.
+## feel a cool draft coming from one of the niches"): DRAFT_PUFFS puffs
+## DRAFT_SIZE across, at most DRAFT_ALPHA opaque, from the cracked wall's
+## foot, DRAFT_LOW high at most, drifting DRAFT_SPEED (m/s, a range) into
+## the room and fading over DRAFT_SECONDS: about a cell and a half. Lit as
+## the scene is, so in the barrow's dark only a light held near shows it;
+## noticeable then, not subtle (0.7 across at 0.18 until 608 amended (2)
+## read as nothing in a still).
 const DRAFT_PUFFS := 7
-const DRAFT_SIZE := 0.7
+const DRAFT_SIZE := 0.9
+const DRAFT_ALPHA := 0.35
 const DRAFT_LOW := 0.45
 const DRAFT_SPEED := Vector2(0.22, 0.34)
 const DRAFT_SECONDS := 4.0
@@ -8656,7 +8659,7 @@ func _make_draft() -> GPUParticles3D:
 	var fade := Gradient.new()
 	fade.set_color(0, Color(1.0, 1.0, 1.0, 0.0))
 	fade.set_color(1, Color(1.0, 1.0, 1.0, 0.0))
-	fade.add_point(0.3, Color(1.0, 1.0, 1.0, 0.18))
+	fade.add_point(0.3, Color(1.0, 1.0, 1.0, DRAFT_ALPHA))
 	var fade_texture := GradientTexture1D.new()
 	fade_texture.gradient = fade
 	process.color_ramp = fade_texture
