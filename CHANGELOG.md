@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Pieces for the Dwarven Halls under the castle: the great dwarven forge with its hearth, chimney, bellows and anvils, a rack of goblin blades, the smith's fallen guards with their broken shields, and a plain dwarven pillar (613).
 - Bleeding out no longer ends in a scream: a player or companion who dies while lying Mortally Wounded breathes a last breath instead; a sudden death still cries out (628).
 - Bandaging now sounds like it: a soft rustle of cloth while the bandage is wound, for players and companions alike; it fades out when the bandage is done and stops short if the bandaging is broken off (627).
 - The Dwarven Halls lie under the castle: a stair in a small guardroom off the south gate's passage leads down to shifting dwarven halls, laid again every three days, with wide ways and pillared great halls; a third of the way down the smith's wagon lies where his guards fell, and at the deepest point stands the great dwarven forge where goblins hold him at work (the smith a town seeks is found and freed there); the forge itself and the fallen guards are drawn in a following change, goblins walk the halls (613, dungeon's and maps' sides).

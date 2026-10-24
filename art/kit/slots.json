@@ -1191,6 +1191,33 @@
 				{"at": [-0.136, 0.008, 0.002], "size": [0.774, 0.004, 0.806]}
 			]
 		},
+		"prop.weapon_rack": {
+			"category": "props",
+			"type": "mesh",
+			"kind": "cell",
+			"size": [1.94, 1.58, 0.7],
+			"budget": 400,
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-23", "notes": "C:/dev/review/castle_halls/make_halls.py rack: a timber rack of two posts on feet and three rails, five crude goblin blades hung from the top rail (rusty and dark iron, notched, hooked, leather-wrapped grips), a spear and a jagged cleaver leant at its front; 212 tris"},
+			"uses": "the goblins' weapon rack beside the great forge (613, art-kit's side; dungeon's castle_halls, the coordinator's nod), 2 x 1 cells, long side along x, front +z; dungeon places it against the wall (612: never a cell off it)",
+			"grey": [
+				{"at": [0, 0.79, 0], "size": [1.94, 1.58, 0.7]}
+			]
+		},
+		"prop.fallen_guard": {
+			"category": "props",
+			"type": "mesh",
+			"kind": "cell",
+			"size": [1.3, 0.32, 1.45],
+			"middle": [0, 0, 0.1],
+			"tolerance": 0.25,
+			"variants": 2,
+			"budget": 400,
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-23", "notes": "C:/dev/review/castle_halls/make_halls.py guard1 / guard2: one of the smith's hired guards fallen in the ambush, plainly: a mail shirt over a brown tunic, breeches, boots, his helmet on; his round painted shield split in two beside him, his spear dropped; 1 on his side along the cell's diagonal, a knee drawn up; 2 face down, stretched, an arm flung past his helmet; nothing gory; 356 tris each"},
+			"uses": "the smith's guards at the ambush (613, art-kit's side; dungeon's castle_halls, the coordinator's nod), two or three of them: on a floor cell, any facing, not solid; lying across the cell's diagonal, so a body reaches a little into the cells beside (1.3 x 1.45 m), drawn over the floor",
+			"grey": [
+				{"at": [0, 0.16, 0.1], "size": [1.3, 0.32, 1.45]}
+			]
+		},
 		"prop.moss_patch": {
 			"category": "props",
 			"type": "mesh",
@@ -1658,12 +1685,28 @@
 			"kind": "cell",
 			"footprint": [2, 2],
 			"size": [2.04, 3.004, 1.731],
+			"variants": 2,
 			"budget": 1500,
 			"materials": 2,
-			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-22", "notes": "C:/dev/review/crypt/make_crypt.py pillar: three dressed drums laid each a little off the last with dark joints, on a stepped base under a two-step capital; iron torch brackets on its +-x faces, each torch's flame two crossed diamonds on its own warm emissive material \"glow\" (1, 0.55, 0.2) at energy 1; 1476 tris"},
-			"uses": "the draugr's hall's pillars (decision 580), 2 x 2 cells, a doorless solid building that blocks sight, 3 m to the cave walls' height; its torches on its two side faces (+-x) light the look, no light nodes",
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-22", "notes": "C:/dev/review/crypt/make_crypt.py pillar: three dressed drums laid each a little off the last with dark joints, on a stepped base under a two-step capital; iron torch brackets on its +-x faces, each torch's flame two crossed diamonds on its own warm emissive material \"glow\" (1, 0.55, 0.2) at energy 1; 1476 tris; variant 2 (C:/dev/review/castle_halls/make_halls.py pillar2): the Dwarven Halls' pillar, plain square-cut, three dressed blocks on a two-step base under a square capital, a carved straight-line band at each joint, the same torches; 436 tris"},
+			"uses": "the draugr's hall's pillars (decision 580), 2 x 2 cells, a doorless solid building that blocks sight, 3 m to the cave walls' height; its torches on its two side faces (+-x) light the look, no light nodes; variant 2 the dwarven pillar for the Dwarven Halls (613, art-kit's side), asked by \"variant\": 2, so the barrow keeps 1",
 			"grey": [
 				{"at": [0, 1.502, 0], "size": [2.04, 3.004, 1.731]}
+			]
+		},
+		"building.dwarven_forge": {
+			"category": "buildings",
+			"type": "mesh",
+			"kind": "cell",
+			"footprint": [6, 3],
+			"size": [5.855, 3.002, 2.658],
+			"middle": [-0.025, 0, -0.124],
+			"budget": 1200,
+			"materials": 2,
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-23", "notes": "C:/dev/review/castle_halls/make_halls.py forge: dwarven work, plain, heavy, square-cut: the hearth across the west half, its fire-mouth to the front with coals on the glow material (\"glow\", as the crypt pillar's torches), a carved lintel line; a square chimney stack to the walls' 3 m, stepping in once; leather bellows on a timber stand, its nozzle into the fire; two anvils on stone blocks along the front edge; a quench trough with tools hung over it against the back; 754 tris"},
+			"uses": "the great dwarven forge in the Dwarven Halls under the castle (613, art-kit's side; dungeon's castle_halls, the coordinator's nod), 6 x 3 cells against the forge room's back wall, a doorless solid building (Level.SOLID, dungeon's side), front +z (south, into the room); the anvils along its front edge, so the place's stand cell (the smith's, before the anvils) is the cell in front of the footprint; Jeff's story: the smith captured, forging goblin weapons here",
+			"grey": [
+				{"at": [-0.025, 1.501, -0.124], "size": [5.855, 3.002, 2.658]}
 			]
 		},
 		"building.round_table": {

@@ -26445,3 +26445,19 @@ of crying out.
 - view_test: the local player bled out gives the last breath and neither
   the cry nor the blow; a companion's sudden death keeps the cry and no
   breath.
+## 613, art-kit's side: the Dwarven Halls' pieces
+
+Dungeon's castle_halls (C:/dev/review/dungeon/castle_halls_design.md, the coordinator's nod;
+release: under 613). By hand in the palette (C:/dev/review/castle_halls/make_halls.py), dwarven
+work plain, heavy and square-cut beside the goblins' crude iron:
+building.dwarven_forge, footprint 6 x 3, front +z (south), solid and doorless (dungeon's
+Level.SOLID): the hearth with coals on the crypt pillar's "glow" material, a chimney stack to
+the walls' 3 m, bellows, two anvils along the front edge, a quench trough at the back. The anvils
+stand at the footprint's front, so the place's stand cell (the smith's) is the cell before them,
+outside the footprint. prop.weapon_rack, 2 x 1 (long side along x), goblin blades; against a
+wall (612). prop.fallen_guard, a cell prop with 2 variants (on his side, face down), his shield
+split in two, his spear dropped, plainly; not solid; a body lies across its cell's diagonal and
+reaches a little into the cells beside (1.3 x 1.45 m), drawn over the floor. The dwarven pillar
+is building.crypt_pillar's variant 2 (the same 2 x 2 box and torches), not a new kind, so
+dungeon asks for it with "variant": 2 and the barrow's pillars keep variant 1.
+Art only, protocol unchanged, no new class_name.
