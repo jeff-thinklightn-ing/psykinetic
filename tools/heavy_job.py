@@ -566,14 +566,20 @@ def _write(path, data):
     temp = path + ".tmp"
     with open(temp, "w") as handle:
         json.dump(data, handle)
+    _retried(os.replace, temp, path)
+
+
+def _retried(action, *paths):
+    """[action] (os.replace, os.remove) on [paths], tried again for a second
+    while Windows says the file is in use: something (a scanner, a reader)
+    has it open a moment. A waiter's rename to the back of the queue failed
+    so once and ended the waiter (ui's landing, 2026-10-24)."""
     for attempt in range(20):
         try:
-            os.replace(temp, path)
-            return
+            return action(*paths)
         except PermissionError:
-            # Windows: something (a scanner, a reader) has it open a moment.
             time.sleep(0.05)
-    os.replace(temp, path)
+    return action(*paths)
 
 
 def kinds():
@@ -690,9 +696,13 @@ def wait_turn(tree, kind, pid, watched):
                     # rule above and would hold behind it (107 minutes,
                     # 2026-10-18). Its turn comes again as the queue drains.
                     aside = "%019d-%s-%s.json" % (time.time_ns(), tree, pid or os.getpid())
-                    os.replace(_path("queue", ticket), _path("queue", aside))
-                    ticket = aside
-                    log("aside", tree, kind, "out of reach; to the back of %d" % len(queue))
+                    try:
+                        _retried(os.replace, _path("queue", ticket), _path("queue", aside))
+                    except PermissionError:
+                        aside = None  # Still in use: tried again at the next look.
+                    if aside is not None:
+                        ticket = aside
+                        log("aside", tree, kind, "out of reach; to the back of %d" % len(queue))
             if not head and queue and queue[0]["file"] != ticket:
                 first = queue[0]
                 first_row = dict(kinds().get(first["kind"], row), kind=first["kind"])
@@ -700,7 +710,7 @@ def wait_turn(tree, kind, pid, watched):
                 _, first_why = decide(first_row, running, True, free_ram, first_gpu, free_commit)
                 why = "the head, %s %s, waits on: %s" % (first["tree"], first["kind"], first_why or "its next look")
             if ok:
-                os.remove(_path("queue", ticket))
+                _retried(os.remove, _path("queue", ticket))
                 name = "%s-%s-%s.json" % (tree, kind, pid or os.getpid())
                 _write(_path("running", name), {"tree": tree, "kind": kind, "pid": pid, "pid_since": started_at(pid), "queued": queued,
                     "started": time.time(), "ram_gb": row["ram_gb"], "commit_gb": commit_of(row), "gpu": row["gpu"], "using_gb": 0.0,

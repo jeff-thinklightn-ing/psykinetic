@@ -244,9 +244,16 @@ def stepped_aside():
         return "\taside\tart\ttrellis_mesh\t" in log.read()
 big.start()
 wait_for(lambda: queue_order() == ["art"])
+# Its queue file held open a moment as it steps aside (a reader, a scanner):
+# Windows refuses the rename, and the waiter tries again rather than ending
+# (it ended once, in ui's landing, 2026-10-24).
+held = open(gate._path("queue", gate._entries("queue")[0]["file"]))
 gate._write(gate._path("queue", "%019d-old-1.json" % time.time_ns()), {"tree": "old", "kind": "suite", "pid": None,
     "waiter": os.getpid(), "queued": time.time()})
+time.sleep(0.4)
+held.close()
 wait_for(lambda: queue_order() == ["old", "art"] and stepped_aside())
+check(big.is_alive(), "the waiter lived through its file being held open")
 order = queue_order()
 check(order == ["old", "art"], "the job behind goes first in the queue's own order: %s" % order)
 for each in gate._entries("queue"):
