@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The pauper's graves' pieces (654, art-kit's side; Jeff: "the poor are in pauper's graves outside"): building.grave (1 x 2, a low earth mound, four variants: plank, split stake, stone, sunken), prop.grave_fence (a low broken fence, three variants), building.grave_sealed (the draugr's sealed way out among them: a stone-lined grave, its capstone cracked and banded with iron); maps lays them on Held
 - Bodies round their corners as they walk: the path bends through each cell's centre and the body turns across the bend instead of snapping its heading at every step, so a walk that mixes straight and diagonal steps reads as one walk under the tilted camera; arrival times are unchanged (655).
 - The town status sheet (N) ends with a strain line while a town is slipping: how many days of its ten it has run and why, in economy's words; nothing while it stands well (649, ui's side).
 - A new settlement starts with camps: a tent or two round a fire ring, open to the sky, pitched by anyone for a little wood and cloth.

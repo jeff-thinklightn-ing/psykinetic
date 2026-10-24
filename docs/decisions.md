@@ -27139,3 +27139,25 @@ straight moments, the two steps meeting on the bend, within the cells and
 moving on, the tangent between the ways, the narrow reach, the reach read
 off the map, a mirror's slide bending toward the queued slide and not toward
 a late or present one. Client only; no wire change; no new class_name.
+## 654, art-kit's side: the pauper's graves
+
+Jeff (through the coordinator): "only the wealthy get the barrow, the poor are in pauper's graves
+outside". Maps lays them on Held (654, Held step 2) in rows with two-cell ways. The coordinator
+approved three pieces, palette only and restrained. Art-gen's prop.grave (a headstone and mound,
+0.6 x 0.9 x 1.4) stays as it is for the wilds; the paupers' are slots of their own.
+
+- **building.grave:** 1 x 2 cells, front +z, the head and its marker at -z. A low earth mound,
+  0.39 high with its marker (0.22 to 0.55 across the variants), walked over (OPEN_AIR, maps' list),
+  not solid. Four variants: 1 a rough plank, 2 a split stake bound with cord (these two for most),
+  3 a plain low stone (a few), 4 sunken with a rotted stub.
+- **prop.grave_fence:** an edge piece like prop.fence, 1 m along z and 0.55 high, with one post
+  at the section's +z end so sections in a line share it. Three variants: whole, the top rail
+  down, a gap with a leaning post.
+- **building.grave_sealed:** the draugr's sealed way out of barrow_lair, where it comes up among
+  the graves. A "sealed" link draws no cue (Client3D._add_link_cues), so on open ground maps lays
+  this piece over the link's cell. It is 1 x 2, front +z, not solid: an older grave lined with kerb
+  stones, its capstone cracked and banded with iron, earth heaped over its ends. Jeff's pick on
+  whether the way out sits among the graves is still open; the piece fits either answer.
+
+Scripts and renders are in C:/dev/review/graves. art_kit_test passes. Client art only, protocol
+unchanged, no new class_name.

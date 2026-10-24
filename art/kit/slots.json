@@ -1587,6 +1587,50 @@
 				{"at": [0, 0.55, 0], "size": [6.0, 1.1, 6.0]}
 			]
 		},
+		"building.grave": {
+			"category": "buildings",
+			"type": "mesh",
+			"kind": "cell",
+			"footprint": [1, 2],
+			"size": [0.81, 0.39, 1.8],
+			"middle": [0.005, 0, -0.02],
+			"tolerance": 0.42,
+			"variants": 4,
+			"budget": 400,
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-24", "notes": "C:/dev/review/graves/make_graves.py grave1..4: a low earth mound in row 3's dark browns, ragged, a few blades of grass grown back at its foot; at its head (-z) a rough plank leaning back (1), a split stake bound with cord (2), a plain low stone (3), or, sunken in the middle, a rotted stub and two field stones (4); 174 to 282 tris"},
+			"uses": "the pauper's graves outside the barrow on Held (654; Jeff: \"only the wealthy get the barrow, the poor are in pauper's graves outside\"; the coordinator's nod; maps lays them in rows with two-cell ways), 1 x 2 cells, front +z, the head and its marker at -z; walked over (Level.OPEN_AIR), not solid, knee-high at most; variants 1 and 2 wooden markers (most), 3 a stone (a few), 4 bare and sunken",
+			"grey": [
+				{"at": [0, 0.195, 0], "size": [0.81, 0.39, 1.8]}
+			]
+		},
+		"building.grave_sealed": {
+			"category": "buildings",
+			"type": "mesh",
+			"kind": "cell",
+			"footprint": [1, 2],
+			"size": [1.0, 0.315, 1.95],
+			"middle": [0, 0, 0.024],
+			"budget": 1200,
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-24", "notes": "C:/dev/review/graves/make_graves.py sealed: rough grey kerb stones round the grave, a capstone cracked across, its foot half sunk and tipped, two iron bands over it (the foot's rusted) pinned down at the kerb, earth heaped over both ends; 1092 tris"},
+			"uses": "the draugr's sealed way out of barrow_lair among the pauper's graves (654; the coordinator's nod; maps lays it over the sealed link's cell, which draws no cue of its own): 1 x 2 cells, front +z, an older stone-lined grave, shut and wrong among the paupers'; walked over (Level.OPEN_AIR), not solid",
+			"grey": [
+				{"at": [0, 0.157, 0], "size": [1.0, 0.315, 1.95]}
+			]
+		},
+		"prop.grave_fence": {
+			"category": "props",
+			"type": "mesh",
+			"kind": "edge",
+			"size": [0.07, 0.55, 1.0],
+			"tolerance": 0.15,
+			"variants": 3,
+			"budget": 150,
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-24", "notes": "C:/dev/review/graves/make_graves.py fence1..3: one dark post at the section's +z end (sections in a line share it) and two rails, the lower weathered grey: whole (1), the top rail fallen to the ground (2), the post leaning over with half its lower rail, the other half lying in the grass (3); 24 to 36 tris"},
+			"uses": "the low broken fence on two sides of the pauper's graves (654; the coordinator's nod; maps lays it as prop.fence), 1 m along z on a cell edge, 0.55 high; variants 1 whole, 2 a rail down, 3 a gap; not solid",
+			"grey": [
+				{"at": [0, 0.275, 0], "size": [0.07, 0.55, 1.0]}
+			]
+		},
 		"building.well": {
 			"category": "buildings",
 			"type": "mesh",
