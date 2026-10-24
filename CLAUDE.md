@@ -43,8 +43,8 @@ which worktree owns each step, and the design rules not to break without asking 
   "$GODOT_PATH" --headless --path . --import`, and a plain test run just calls land.sh,
   which gates itself. If the lock is held, keep working and try again in a
   few minutes; never push while another tree holds it. Don't hold it for anything else
-  (record clips and run benches before taking it): a landing takes under 10 minutes, and
-  a land lock older than 15 is stale and may be taken over. If taking it fails, stop: a
+  (record clips and run benches before taking it): a landing takes under 20 minutes (a
+  lean one about 16), and a land lock older than 25 is stale and may be taken over (667). If taking it fails, stop: a
   script must never push after a failed take.
 - Releases are batched (Jeff, 2026-10-14): worktrees don't run `tools/release_client.ps1`.
   A tested change lands on `main` straight away, with its bullets added under
