@@ -29883,3 +29883,22 @@ clip takes its place in the lab only. Step 3: two bodies side by side, the foot-
 and the gait paces into feel.json for the tuning panel. Nothing the lab shows reaches the game
 but through pc-character's usual pipeline ("Copy to review" routed by the coordinator). Client
 only, protocol unchanged, new class_name CharacterLab.
+## 662, art-kit's side: the scabbard and the sheath
+
+pc-character's held-weapon rest poses (662) put a sword or a knife away at the hip, never resting it
+against the head or the body (Jeff: "sheathing sword, definitely not scratching head or anything
+that sword goes near body"); step (c) seats the item in a sheath, which is art-kit's.
+
+- **gear.scabbard** (the sword's, 0.088 x 0.64 x 0.067, 152 tris): a leather sleeve with an iron
+  locket at the throat, an iron band and an iron chape, a strap and frog up its back to the belt
+  loop. **gear.sheath** (the dagger's and the knife's, 0.055 x 0.22 x 0.045, the same make smaller).
+  Category items, kind held, by hand (C:/dev/review/scabbard/make_scabbard.py).
+- **Their frame, agreed with pc-character**: each stands upright in its own frame, the origin at
+  the belt loop's top (grip), +y up, the sleeve hanging down -y ("base" its length below), the
+  blade's flat across x, z out from the hip. The sheathed item seats with its grip at the "mouth"
+  socket ([0, 0.16, 0] and [0, 0.07, 0], an empty in each piece), turned 180 degrees about z (blade
+  down), its guard's lower face on the throat; item.sword's tip then sits at -0.59, item.dagger's at
+  -0.19 and item.knife's at -0.15, inside. pc-character turns the piece at the hip (about 25 degrees,
+  the bottom back) with a Hips socket of its own; the hang is its.
+
+Art and slots only: client only, protocol unchanged, no new class_name.

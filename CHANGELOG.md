@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- A sword now has a leather scabbard and a dagger or knife a sheath, ready for the weapon to be put away at the hip (662, art-kit's side; drawn once pc-character's rest poses use them).
 - The admin panel (F10) and the tuning panel (F7) are larger, so the admin panel's command list and replies and each tuning row's name, slider and value have room; the admin panel's command list shows each command and its arguments, the whole line on hover and in the replies when picked (672, 673).
 - The Character Lab, for working on the player's body and its clips: one person on a grid under the game's views, any build, look, held thing and armour, any clip at any speed, paused, scrubbed or stepped, and a treadmill at the gait's pace (run it with C:/dev/review/character_lab/lab.cmd; local only).
 - The camera's feel (zoom speed, the peek and mourning pull-backs, the overhead and indoor pitches and their eases, the aim lead, the telegraph and hit flashes) is now read from art/kit/feel.json and listed in the F7 tuning panel's Camera group, so it can be tuned live in the practice hall (673).

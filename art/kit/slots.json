@@ -3304,6 +3304,30 @@
 				{"at": [0.006, 0.0015, 0], "size": [0.451, 0.153, 0.268]}
 			]
 		},
+		"gear.scabbard": {
+			"category": "items",
+			"type": "mesh",
+			"kind": "held",
+			"size": [0.088, 0.64, 0.067],
+			"base": -0.64,
+			"budget": 300,
+			"sockets": {"grip": [0, 0, 0], "mouth": [0, 0.16, 0]},
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-24", "notes": "C:/dev/review/scabbard/make_scabbard.py scabbard: a leather sleeve 0.08 across and 0.045 deep from the throat at -0.03 to the chape's end at -0.64, a dark iron locket at the throat, an iron band at -0.3, an iron chape; a strap and frog up the back (-z) to the loop at 0; 152 tris"},
+			"uses": "the sword's scabbard at the hip (Jeff: \"sheathing sword, definitely not scratching head or anything that sword goes near body\"; pc-character's design, the coordinator's nod; frames agreed with pc-character): upright in its own frame, pc-character turning it (about 25 degrees, the bottom back, the hilt forward) with a Hips socket of its own: the origin at the belt loop's top, +y up, the sleeve hanging down -y, the blade's flat across x, z out from the hip; the sheathed item's own mesh seated with its grip at the \"mouth\" socket, turned 180 degrees about z (blade down), its guard's lower face on the throat; item.sword's tip at -0.59",
+			"grey": [{"at": [0, -0.32, -0.008], "size": [0.088, 0.64, 0.067]}]
+		},
+		"gear.sheath": {
+			"category": "items",
+			"type": "mesh",
+			"kind": "held",
+			"size": [0.055, 0.22, 0.045],
+			"base": -0.22,
+			"budget": 300,
+			"sockets": {"grip": [0, 0, 0], "mouth": [0, 0.07, 0]},
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-24", "notes": "C:/dev/review/scabbard/make_scabbard.py sheath: the scabbard's make at 0.05 across and 0.026 deep, the throat at -0.02, the end at -0.22; 152 tris"},
+			"uses": "the dagger's and the knife's sheath at the hip (Jeff: \"sheathing sword, definitely not scratching head or anything that sword goes near body\"; pc-character's design, the coordinator's nod; frames agreed with pc-character): upright in its own frame, pc-character turning it (about 25 degrees, the bottom back, the hilt forward) with a Hips socket of its own: the origin at the belt loop's top, +y up, the sleeve hanging down -y, the blade's flat across x, z out from the hip; the sheathed item's own mesh seated with its grip at the \"mouth\" socket, turned 180 degrees about z (blade down), its guard's lower face on the throat; item.dagger's tip at -0.19, item.knife's at -0.15",
+			"grey": [{"at": [0, -0.11, -0.007], "size": [0.055, 0.22, 0.045]}]
+		},
 		"gear.quiver": {
 			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-21", "notes": "C:/dev/review/quiver/make_quiver.py (Jeff, 2026-10-21: \"arrows should just be a quiver on the back\"): an 8-sided leather tube, a darker cup at its foot, two bands where the strap is sewn, a rolled rim, the strap down the body side toward the shoulder; six arrows' ends out of the mouth, a shaft and three double-sided vanes each; variant 1 cream fletching, 2 a banner-red cord under the rim, 3 dark fletching; 352 tris"},
 			"category": "items",
