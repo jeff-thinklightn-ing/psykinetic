@@ -968,6 +968,7 @@ static func _place(level: Dictionary, markers: Array[Dictionary], config: Dictio
 	var centre: Variant = _tile(config.get("centre"))
 	level["neighbours"] = neighbours_from(config, warnings)
 	level["places"] = places_from(config, warnings)
+	level["rooms"] = rooms_from(config, warnings)
 	level["markets"] = markets_from(config, warnings)
 	level["became"] = became_from(config, warnings)
 	level["entities"] = entities
@@ -1083,6 +1084,68 @@ static func neighbours_from(config: Dictionary, warnings: Array[String]) -> Dict
 		if not to.is_empty():
 			out[str(side)] = to
 	return out
+
+
+## level.json's "rooms" (decision 665, ui's side; Jeff: "when you enter the
+## room, it says in the mid screen"), key -> {key, name, rects: Array[Rect2i]}:
+## the named rooms whose name is said mid-screen as the player walks in,
+## read on the client (the level files are its own; nothing on the wire).
+## An entry gives "name" and "rect" [x, y, w, h], or "rects" [[x, y, w, h],
+## ...], or "cells" [[x, y], ...] (each a cell of its own); one with no
+## name or no extent is said in [param warnings] and left out. A room is
+## named only where a regeneration cannot move it (an anchored room, or one
+## the template fixes); a corridor or a stair has no entry.
+static func rooms_from(config: Dictionary, warnings: Array[String]) -> Dictionary[String, Dictionary]:
+	var out: Dictionary[String, Dictionary] = {}
+	var listed: Variant = config.get("rooms", {})
+	if not listed is Dictionary:
+		warnings.append("\"rooms\" in level.json is not an object")
+		return out
+	for key: Variant in listed:
+		var entry: Variant = listed[key]
+		if not entry is Dictionary:
+			warnings.append("the room %s is not an object" % [key])
+			continue
+		var room_name := str(entry.get("name", "")).strip_edges()
+		if room_name.is_empty():
+			warnings.append("the room %s has no \"name\"" % [key])
+			continue
+		var rects: Array[Rect2i] = []
+		var given: Array = []
+		if entry.get("rect") is Array:
+			given.append(entry["rect"])
+		if entry.get("rects") is Array:
+			given.append_array(entry["rects"])
+		for rect: Variant in given:
+			if rect is Array and (rect as Array).size() == 4 and int(rect[2]) > 0 and int(rect[3]) > 0:
+				rects.append(Rect2i(int(rect[0]), int(rect[1]), int(rect[2]), int(rect[3])))
+			else:
+				warnings.append("the room %s has a rect that is not [x, y, w, h] with a size: %s" % [key, rect])
+		if entry.get("cells") is Array:
+			for cell: Variant in entry["cells"]:
+				var at: Variant = _tile(cell)
+				if at == null:
+					warnings.append("the room %s has a cell that is not [x, y]: %s" % [key, cell])
+				else:
+					rects.append(Rect2i(at, Vector2i.ONE))
+		if rects.is_empty():
+			warnings.append("the room %s has no \"rect\", \"rects\" or \"cells\"" % [key])
+			continue
+		out[str(key)] = {"key": str(key), "name": room_name, "rects": rects}
+	return out
+
+
+## The key of [param level]'s named room that holds [param cell], "" for
+## none (decision 665, ui's side).
+static func room_at(level: Dictionary, cell: Vector2i) -> String:
+	var rooms: Variant = level.get("rooms", {})
+	if not rooms is Dictionary:
+		return ""
+	for key: String in rooms:
+		for rect: Rect2i in rooms[key]["rects"]:
+			if rect.has_point(cell):
+				return key
+	return ""
 
 
 ## level.json's "places", key -> {key, cell, name, kind (PLACE_KINDS), radius

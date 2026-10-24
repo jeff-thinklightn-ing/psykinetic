@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Walking into a named room says its name mid-screen, and every zone crossing says the zone's name the same way; a level names its rooms in level.json (665, ui's side; the barrow's rooms come with dungeon's redesign).
 - Crossing into a zone shows an arrival card: the view dims to near-dark and the place's name is said while the zone builds, then the world comes back and the name lingers a moment (660, ui's side; perf's phased arrival drives it when it lands).
 - Once you have paid the draugr, his deal holds until you beat him: die or leave and come back, and he lets you fight again at the level you paid for without asking for more gold; say yes to him or press "Face him again" (decision 548 amended, npc's side; the draugr's and the panel's sides follow).
 - The hunter stalks at the far end of the hunting ground and carries game home when the hunt caught something, the farmer hoes the field's rows in sowing and harvest time and carries a sack to the store when the crop is in, the shepherd walks the pasture and shears in spring and autumn, and the hill herder keeps his fold; the sim's words, the clips to follow (decision 566 amended, npc's side, phase 2).

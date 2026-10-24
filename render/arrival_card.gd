@@ -16,7 +16,11 @@ extends Control
 ## (a link straight back, a death mid-arrival) restarts the name from the
 ## dark's current alpha, no flash. Input is held by perf's side; the card
 ## ignores the mouse. It advances itself each frame (advance); nothing
-## lengthens the crossing. Presentation only.
+## lengthens the crossing. Presentation only. say(name) shows a name the
+## same way with no dark and no rule (a named room entered, a zone crossed
+## with no phased rebuild; decision 665, ui's side): at once when nothing
+## shows, else after the name showing has left, never over it; a name
+## already showing is not said again.
 
 const DARK_ALPHA := 0.92
 const DARK_IN := 0.2
@@ -38,6 +42,8 @@ var _dark := 0.0
 ## Seconds since begin, and since-time of finish (-1 while building).
 var _since := 0.0
 var _finished_at := -1.0
+## A name to say once the one showing has left (say).
+var _next := ""
 
 var _dark_rect: ColorRect
 var _column: VBoxContainer
@@ -106,11 +112,37 @@ func begin(zone: String, line := "") -> void:
 	_building = true
 	_since = 0.0
 	_finished_at = -1.0
+	_next = ""
 	visible = true
 	if _name != null:
 		_name.text = zone_name
 		_line.text = line.strip_edges()
 		_line.visible = not _line.text.is_empty()
+	_apply()
+
+
+## [param text] said mid-screen as a zone's name is, with no dark: now if
+## nothing shows, else once the name showing has left; nothing for "" or
+## for the name showing already.
+func say(text: String) -> void:
+	var said := text.strip_edges()
+	if said.is_empty():
+		return
+	if showing:
+		if said != zone_name:
+			_next = said
+		return
+	zone_name = said
+	showing = true
+	_building = false
+	_since = 0.0
+	_finished_at = 0.0
+	_dark = 0.0
+	visible = true
+	if _name != null:
+		_name.text = zone_name
+		_line.text = ""
+		_line.visible = false
 	_apply()
 
 
@@ -134,6 +166,11 @@ func advance(delta: float) -> void:
 	if not _building and _dark <= 0.0 and name_alpha() <= 0.0:
 		showing = false
 		visible = false
+		if not _next.is_empty():
+			var next := _next
+			_next = ""
+			say(next)
+			return
 	_apply()
 
 

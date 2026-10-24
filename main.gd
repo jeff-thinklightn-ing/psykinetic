@@ -601,6 +601,12 @@ var down_screen: DownScreen
 ## begin(zone_display_name()) as a crossing starts and finish() when the
 ## rebuild is done.
 var arrival_card: ArrivalCard
+## The named room the local player's shown cell is in (665, ui's side;
+## Level.room_at), and when each room was last left (msec), so stepping
+## out and back within ROOM_AGAIN_MSEC says nothing.
+var _room_here := ""
+var _room_left_at: Dictionary = {}
+const ROOM_AGAIN_MSEC := 10000
 var _fallen_wait := 0
 var _fallen_wait_at := 0.0
 ## The bow's aim while drawn (the archery aim, ui's side): the angle from
@@ -1094,6 +1100,7 @@ func _process(delta: float) -> void:
 	_update_talk()
 	_update_deal()
 	_update_note()
+	_update_room()
 	_update_bar()
 	var hud_began := Time.get_ticks_usec()
 	if compass != null:
@@ -1789,6 +1796,26 @@ func _on_notes_message(data: Dictionary) -> void:
 		zone_notes.erase(zone)
 	else:
 		zone_notes[zone] = notes
+
+
+## 665, ui's side, each frame: the local player's shown cell entering a
+## named room it has not just left says the room's name mid-screen
+## (ArrivalCard.say: after the zone's name on a crossing, never over it).
+func _update_room() -> void:
+	if arrival_card == null:
+		return
+	var player := _local_player()
+	if player == null:
+		return
+	var key := Level.room_at(level, player.shown_tile())
+	if key == _room_here:
+		return
+	var now := Time.get_ticks_msec()
+	if not _room_here.is_empty():
+		_room_left_at[_room_here] = now
+	_room_here = key
+	if not key.is_empty() and now - int(_room_left_at.get(key, -ROOM_AGAIN_MSEC)) >= ROOM_AGAIN_MSEC:
+		arrival_card.say(str(level["rooms"][key]["name"]))
 
 
 ## 643, ui's side, each frame: the sheet closes when its note is taken
@@ -2607,6 +2634,8 @@ func _load_level(level_name: String) -> bool:
 		return false
 	level = loaded
 	map_name = str(loaded["name"])
+	_room_here = ""  # 665, ui's side: a new level, its rooms unvisited.
+	_room_left_at.clear()
 	Companion.know_level(map_name, loaded)
 	_terrain = loaded["terrain"]
 	# Its felled cells (591): the server's own, a client's as told.
@@ -3473,6 +3502,8 @@ func _show_home_zone() -> void:
 		_view_zone = World.zone.name
 		_repaint()
 		camera.position = Iso.tile_to_local(level_centre)
+		if arrival_card != null:
+			arrival_card.say(zone_display_name())  # 665, ui's side: every crossing says the zone.
 	for each: Zone in World.zones.values():
 		var holder: Node2D = entities if each == World.zone else each.main.get("entities")
 		if holder != null:
@@ -3492,6 +3523,8 @@ func _client_zone(zone_name: String) -> void:
 	_zone_nodes(zone_name)
 	World.mirror_terrain(_terrain)
 	_repaint()
+	if arrival_card != null:
+		arrival_card.say(zone_display_name())  # 665, ui's side: every crossing says the zone (not again over the card's).
 	print("[zone] now in %s" % zone_name)
 
 

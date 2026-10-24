@@ -40,6 +40,7 @@ func _ready() -> void:
 	await _test_deal_window()
 	_test_door_note()
 	_test_arrival_card()
+	_test_room_names()
 	_test_access()
 	_test_keys()
 	_test_barter()
@@ -882,6 +883,83 @@ func _test_arrival_card() -> void:
 			"a long build: the name holds through it and leaves 0.3 s after finish (%.2f, %.2f)" % [long_build, after_long])
 	_check(ArrivalCard.breath_at(0.0) > 0.69 and ArrivalCard.breath_at(0.0) < 0.71 and ArrivalCard.breath_at(ArrivalCard.BREATH_PERIOD / 4.0) > 0.89,
 			"the rule breathes between 0.5 and 0.9")
+	card.set_process(true)
+
+
+## Room names mid-screen (665, ui's side): the level's rooms, the card's
+## say, the player walking in.
+func _test_room_names() -> void:
+	print("== room names mid-screen (665, ui's side): level.json rooms, say() after the zone's name, in and out ==")
+	var warnings: Array[String] = []
+	var rooms := Level.rooms_from({"rooms": {"hall": {"name": "The Hall of Urns", "rect": [10, 10, 4, 3]},
+		"crypts": {"name": "The Crypts", "rects": [[20, 10, 2, 2], [22, 12, 2, 2]], "cells": [[30, 30]]},
+		"nameless": {"rect": [0, 0, 2, 2]}, "nowhere": {"name": "Nowhere"}, "flat": {"name": "Flat", "rect": [1, 1, 0, 3]}}}, warnings)
+	_check(rooms.size() == 2 and rooms["hall"]["name"] == "The Hall of Urns" and (rooms["crypts"]["rects"] as Array).size() == 3 and warnings.size() == 4,
+			"rooms read: a rect, several rects and cells; no name, no extent or a flat rect left out with a warning each (%d read, %d warnings)" % [rooms.size(), warnings.size()])
+	var made := {"rooms": rooms}
+	_check(Level.room_at(made, Vector2i(13, 12)) == "hall" and Level.room_at(made, Vector2i(14, 12)) == "" and Level.room_at(made, Vector2i(23, 13)) == "crypts"
+			and Level.room_at(made, Vector2i(30, 30)) == "crypts" and Level.room_at(made, Vector2i(5, 5)) == "" and Level.room_at({}, Vector2i.ZERO) == "",
+			"the room at a cell: inside its rect (the far edge outside), any of its rects or cells, none elsewhere")
+	var card: ArrivalCard = _main.arrival_card
+	var player: GridEntity = _main._local_player()
+	if card == null or player == null:
+		_check(false, "the arrival card and a local player exist")
+		return
+	card.set_process(false)
+	card.say("")
+	_check(not card.showing, "say(\"\") shows nothing")
+	card.say("The Hall of Urns")
+	card.advance(0.25)
+	_check(card.showing and card.zone_name == "The Hall of Urns" and card._dark == 0.0 and card._dark_rect.color.a == 0.0 and card.name_alpha() == 1.0 and not card._line.visible,
+			"say: the name mid-screen as a zone's, no dark, no line")
+	card.say("The Hall of Urns")
+	_check(card._next.is_empty() and card._since > 0.2, "the name showing already is not said again")
+	card.advance(2.0)
+	_check(not card.showing, "and leaves as a zone's name does (1.5 s hold, 0.4 s fade)")
+	card.begin("The Ossuary")
+	card.advance(0.3)
+	card.say("The Hall of Urns")
+	_check(card.zone_name == "The Ossuary" and card._next == "The Hall of Urns", "a room said during a crossing waits for the zone's name")
+	card.finish()
+	card.advance(1.4)
+	_check(card.showing and card.zone_name == "The Ossuary", "the zone's name holds its while (%.2f)" % card._since)
+	card.advance(0.5)
+	_check(card.showing and card.zone_name == "The Hall of Urns" and card._dark == 0.0 and card._next.is_empty(), "then the room's name follows, no dark (%s)" % card.zone_name)
+	card.begin("The Deep")
+	card.say("The Crypts")
+	card.begin("The Hall of Fallen Souls")
+	_check(card.zone_name == "The Hall of Fallen Souls" and card._next.is_empty(), "a crossing drops a room name still waiting")
+	card.finish()
+	card.advance(3.0)
+	_check(not card.showing, "and ends")
+	# The player walking in: the level's rooms set round its cell.
+	var here: Vector2i = player.tile
+	var kept: Variant = _main.level.get("rooms")
+	_main.level["rooms"] = Level.rooms_from({"rooms": {"here": {"name": "The Hall of Urns", "rect": [here.x, here.y, 1, 1]}}}, warnings)
+	_main._room_here = ""
+	_main._room_left_at.clear()
+	_main._update_room()
+	_check(card.showing and card.zone_name == "The Hall of Urns" and _main._room_here == "here", "stepping into a named room says its name (%s)" % card.zone_name)
+	card.finish()
+	card.advance(3.0)
+	_main.level["rooms"] = {}
+	_main._update_room()
+	_check(_main._room_here.is_empty() and _main._room_left_at.has("here") and not card.showing, "stepping out says nothing and notes the leaving")
+	_main.level["rooms"] = Level.rooms_from({"rooms": {"here": {"name": "The Hall of Urns", "rect": [here.x, here.y, 1, 1]}}}, warnings)
+	_main._update_room()
+	_check(not card.showing and _main._room_here == "here", "back within 10 s: nothing said (no nagging at a doorway)")
+	_main._room_here = ""
+	_main._room_left_at["here"] = Time.get_ticks_msec() - Main.ROOM_AGAIN_MSEC - 1
+	_main._update_room()
+	_check(card.showing and card.zone_name == "The Hall of Urns", "back after 10 s: said again")
+	card.finish()
+	card.advance(3.0)
+	if kept == null:
+		_main.level.erase("rooms")
+	else:
+		_main.level["rooms"] = kept
+	_main._room_here = ""
+	_main._room_left_at.clear()
 	card.set_process(true)
 
 

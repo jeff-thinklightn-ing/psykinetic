@@ -28456,3 +28456,41 @@ clear and back (the coordinator's note). The card advances itself each
 frame, so it moves between the rebuild's phases. ui_test _test_arrival_card
 steps its clock by hand. Client only; no wire change; new class_name
 ArrivalCard.
+
+## 665. Room names mid-screen
+
+Jeff: "when you enter the room, it says in the mid screen. same for
+entering zones". The coordinator approved ui's design; it lands before
+dungeon's barrow redesign, which writes the barrow's entries.
+
+The data: a "rooms" section in level.json, key -> {name, rect [x, y, w, h]
+or rects [[x, y, w, h], ...] or cells [[x, y], ...]} (Level.rooms_from,
+beside "places"; an entry with no name or no extent is warned and left
+out), read on the client as the level files are its own: nothing on the
+wire and nothing for the server. Only a room a regeneration cannot move is
+named (anchored, or fixed by the template), so a name never drifts off its
+room; a corridor or a stair has no entry. Level.room_at says which room a
+cell is in. The editor's properties panel does not offer the section yet
+(EditorFields.NOT_OFFERED): its entries are written into level.json by
+hand, by the tree that lays the room. Today the Hall of Fallen Souls and the Ossuary are each a whole
+level, which the zone's name covers.
+
+The showing: ArrivalCard.say(name) shows a name exactly as a zone's is
+shown (660, ui's side: the title face, the outline, a third down, 0.2 s
+in, held 1.5 s, 0.4 s out) with no dark and no rule: at once when nothing
+shows, else after the name showing has left, never over it; a name already
+showing is not said again, and a crossing (begin) drops a room name still
+waiting. Main._update_room, each frame: the local player's shown cell
+(GridEntity.shown_tile) entering a named room it has not just left says
+the room's name; a room left and re-entered within ROOM_AGAIN_MSEC (10 s)
+says nothing, so a doorway does not nag; a level load forgets the rooms
+visited. Every crossing says the zone's name, with or without perf's
+phased rebuild (660): Main._client_zone (a client's crossing: a link
+inside a dungeon, a walk-over edge between outdoor zones, the join) and
+_show_home_zone (the host's view moving zone) call say(zone_display_name())
+after the repaint; when perf's begin() has already put the name up with
+the dark, say() sees it showing and adds nothing. On a crossing whose
+arrival cell is in a named room, the room's name follows the zone's.
+ui_test _test_room_names: the section read with its warnings, room_at,
+say's cases, the player walking in, out and back. Client only; no wire
+change; no new class_name.
