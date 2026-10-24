@@ -26873,3 +26873,132 @@ item.shield (a 0.6 disc, face +z, back face z -0.03, origin centre) gains "strap
 shield's +y (wrist toward +y), the face's outward normal is +z, and "grip" stays the centre.
 Pc-character's placement puts +z away from the body. art_kit_test passes (it checks each socket
 has its empty).
+
+## 649. Towns fall as well as rise (economy's side)
+
+Jeff, answering draft-held-growth.md: "I would actually have towns be able
+to "regress" not just make progress. say the population falls, the
+resources can't keep up, the town is raided, the people captured..
+buildings at the edge fall into disrepair and the forest overtakes, towns
+start as a settlement with tents, everything needs to be built up to inn,
+temple, smith, farms, livestock". The coordinator approved economy's design
+with amendments. The other trees' parts land as "649, <tree>'s side":
+buildings (the settlement's camp plot kind, disrepair and ruin looks),
+terrain (Clearing.unbuild and build), maps (the settlement layout, a
+fresh-world start), ui (the sheet's strain), lore (words).
+
+Stages (Level.STAGES, economy.json stages):
+- "settlement" comes first, below hamlet: tents and nothing standing. A
+  town's first _stage_turn makes it one.
+- Hamlet needs 4 residents, the field standing and wood 10.
+- Village needs 8 residents, the temple, inn, forge and pasture (the
+  town's livestock; its map piece is buildings' fold) standing, and a
+  priest.
+- _stage_turn still only raises. The fall is decline's.
+- A town that seed_from gives the map's buildings and that has no stage
+  yet starts at hamlet (the coordinator: not tents with a temple
+  standing), and goes higher at once while it meets each next stage
+  (Towns._seeded_stage). A saved stage is kept. Only a town with nothing
+  seeded (a "start": "tents" world, or no map buildings) begins as a
+  settlement.
+
+Decline (economy.json "decline", Towns._decline, once a day per town):
+- Strain: a town past the first stage gains a day of strain on a day it is
+  - short of its stage's residents,
+  - missing a needed standing kind because it is in disrepair or a ruin (a
+    needed kind never built doesn't count, so a need added after a town
+    reached its stage never drops it),
+  - more than hungry_share (0.5) of its residents hungry while the hungry
+    outnumber the food, meat and fish in the store.
+  This is Jeff's list: the people fall, the resources can't keep up, raids
+  and captives. The second soak showed why the store must be counted: the
+  wilds town had food, but its treasury sat at the floor, so the dole
+  couldn't feed people. Hunger with food in the store is a purse problem,
+  not the town's. An unpaid official is gold, not one of Jeff's words, so
+  it was dropped as a strain (coordinator's ruling).
+  A resident carried off (Towns._take, _take_companion) adds captive_strain
+  (3). A day with none of these takes a day off. At strain_days (10) the
+  town falls one stage, never below the settlement, with a note naming
+  why, and its strain starts again.
+- Upkeep: every upkeep.every (14) days each building standing, damaged or in
+  disrepair pays (the first time that many days after decline first sees
+  the town, so a fresh world owes nothing before its first gathering) upkeep.cost (wood 1) times its level from the store. A
+  building row's own "upkeep" overrides the cost, and {} wants none, so
+  the settlement's camp keeps itself and no trade it can't have is needed.
+  Upkeep is taken from the store by the town as a whole, not by a
+  carpenter. Buildings pay nearest the store first (Towns.placed's
+  distance), so when wood is short the edge goes owing first. Wood is
+  gathered and paid for as ever; no gold is lost.
+- The build reserve: a new build or raise starts only if the store keeps
+  a round of upkeep after its cost (Production.keep_for, set to
+  Towns.upkeep_due: each building's cost times its level). A repair or a
+  roof may use the reserve. Without it, the first soak's wilds town
+  (upkeep every 7 days, a hamlet's wood 20) put all its wood into
+  building: it never became a hamlet, and the forge, kitchen, tannery and
+  temple fell into disrepair by day 28. The woodcutter's 60 or so wood a
+  month is the town's whole income (before 649 too), so the numbers were
+  tuned (every 14, hamlet wood 10) and the reserve added, not the rule
+  taken out.
+- Disrepair: a building is neglected when its upkeep is owed, it is
+  damaged, or none of its trade lives in town. After unkept_days (14)
+  neglected days running it falls into disrepair (DISREPAIR). It is out of
+  use: not standing, so no workshop and no stage credit. While in
+  disrepair it loses a level each season (Season.season_days). At level 0
+  it becomes a ruin (RUIN). _repair mends disrepair as it does damage,
+  share 0.5 of the cost at its level.
+- A ruin is kept for a season. Then its record goes, its kind is added to
+  the town's "gone" list (seed_from never seeds the map's piece again; a
+  new build takes it off), and Towns.ruined(town, kind, zone, cells) is
+  told. Main gives the cells to terrain's Clearing.unbuild(zone, cells,
+  day) once it exists, so they regrow from stumps to trunks.
+- Towns.placed (Main._town_placed) gives a kind's world-map building of
+  that use: its zone, its rect's cells, and its distance from the store.
+  A building the map doesn't place counts as nearest and gives back no
+  ground.
+- Nothing falls on load: strain starts at 0, and saved states, owing,
+  neglect, decay, ruin days, strain and "gone" are all kept.
+- A fresh world: economy.json "start": "tents" makes seed_from seed no map
+  buildings, so each is built up from the settlement. The flag is absent
+  today, so worlds are seeded as the map has it, the box's wilds town too,
+  until maps' settlement layout lands.
+
+Walls: a building in disrepair keeps its walls up. A ruin (level 0) has
+its walls down (Towns.walls_up), and so does a "gone" one (buildings_of
+walls false), so 566's World._open_walls takes the level piece's outline
+out of the edges on the server and, through the "town" message, on
+clients: a ruin is walked over and blocks no one. Clearing.unbuild leaves
+authored walls alone (terrain).
+
+Views: buildings_of carries the new states ("disrepair", "ruin", and "gone"
+for a ruin's map piece that is no more). The town sheet (624) gains strain
+{days, of, why} (Towns.strain).
+
+Soaks (the default world, 30 days, one player):
+1. Upkeep every 7 days, hamlet wood 20, no reserve. The town stayed a
+   settlement (it wasn't yet seeded at hamlet). From day 11 its buildings
+   owed upkeep, and by day 28 the forge, kitchen, tannery and temple were
+   in disrepair.
+2. Upkeep every 14 days, hamlet wood 10, the reserve, seeded at hamlet.
+   Nothing went unkept. But "hunger" (fed by nobody, with the treasury at
+   its floor) gave strain from day 6, and the town fell on day 16. Food
+   sat in the store, so the trigger was changed and "officials unpaid"
+   was dropped.
+3. With the trigger counting the store's food. Nothing went unkept. Strain
+   came from hunger from day 7 to 15 (9 days); the town fell to a
+   settlement on day 16, strain was 0 from day 17, it was a village again
+   on day 26, and it had at most 1 day of strain after that.
+A fresh world falls once before its first harvest. That is Jeff's rule
+doing its job on a gap that predates 649: start_food is meant to reach the
+first harvest and doesn't, and a caravan sells 10 food on day 0. That gap
+goes to economy's gold and food note (with the treasury at its floor), not
+into 649. The box's town is past founding: its stage and buildings are
+kept, its strain starts at 0, and its upkeep is covered.
+
+farm_test _test_stages (settlement, hamlet, village) and _test_decline
+(strain to a fall, captive strain, hunger only when the store can't feed,
+the reserve, the edge owing first, disrepair, a level a season, a ruin's
+walls down, gone with its cells, never seeded again, a seeded town a hamlet,
+saved). The other
+farm_test towns run without decline. production_test reads a settlement
+first. Wire: new stage and state values and the sheet's strain, a line
+under PROTOCOL_REVISION 35. No new class_name.

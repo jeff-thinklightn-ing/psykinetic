@@ -38,11 +38,15 @@ extends RefCounted
 ## camps say of a town; Holdings' safety until they do.
 
 ## Building id ("forge") -> state: planned (unlocked, not yet built),
-## building (being built or raised a level), standing, damaged.
+## building (being built or raised a level), standing, damaged; out of
+## use for want of keep (disrepair, losing a level a season) and at last a
+## ruin, kept a season and then gone (649).
 const PLANNED := "planned"
 const BUILDING := "building"
 const STANDING := "standing"
 const DAMAGED := "damaged"
+const DISREPAIR := "disrepair"
+const RUIN := "ruin"
 const LOG_SIZE := 50
 ## A repair job's building id: REPAIR + the kind.
 const REPAIR := "repair:"
@@ -70,6 +74,9 @@ signal building_changed(town: String, kind: String)
 signal sought_changed(town: String, id: String)
 ## [param town] rose a stage toward a city (591): Towns.stage.
 signal stage_changed(town: String)
+## [param town]'s ruined [param kind] is gone (649): its record dropped, its
+## [param cells] in [param zone] (placed's) for the forest to take back.
+signal ruined(town: String, kind: String, zone: String, cells: Array[Vector2i])
 
 var rules := {}
 var production: Production
@@ -116,6 +123,10 @@ var mend_roof := Callable()
 ## (town, herder id, count, food) -> int: the sheep [param town] buys of a
 ## herder's drove (640; Main: Economy.buy_drove); unset, no drove is sold.
 var drove := Callable()
+## (town, kind) -> {zone, cells: Array[Vector2i], distance} (649; Main, from
+## the world map's building of that use): where it stands and how far from
+## its store; {} unknown (as near as can be, nothing to give back).
+var placed := Callable()
 ## A herder's fold changed its count (640): [param place_id]'s sheep, for
 ## the "folds" message the views draw it by.
 signal folds_changed(place_id: String)
@@ -142,6 +153,7 @@ func _init(saved := {}, with_production: Production = null, with_rules := {}, wi
 	production.workshop_level = level_for
 	production.on_built = _built
 	production.town_has = has_for_make
+	production.keep_for = upkeep_due
 	production.work_rate = _work_rate
 	production.hunted.connect(_on_hunted)
 	production.work_done.connect(_on_work_done)
@@ -189,6 +201,8 @@ func buildings_of(town: String) -> Dictionary:
 		if progress >= 0.0:
 			out[kind]["progress"] = progress
 		out[kind]["walls"] = walls_up(town, kind)  # Whether its walls block (566; maps' open_walls).
+	for kind: Variant in _towns.get(town, {}).get("gone", []):
+		out[str(kind)] = {"state": "gone", "level": 0, "walls": false}  # A ruin gone (649): the map's piece no more.
 	if out.has("field"):
 		out["field"]["crop"] = crop_look(town)  # The field's look (decision 457).
 	return out
@@ -481,6 +495,7 @@ func tick() -> void:
 		_fish(town)
 		_fisherman_comes(town)
 		_stage_turn(town)
+		_decline(town)
 		_maker_comes(town)
 		_sought_turn(town)
 		# One build at a time, unless the one in hand has stalled on its
@@ -627,6 +642,7 @@ func unlock(town: String, kind: String) -> bool:
 	var entry: Dictionary = record["buildings"].get(kind, {"kind": kind, "level": 0, "state": PLANNED, "since": now(), "job": 0})
 	entry["state"] = BUILDING if int(entry["level"]) >= 1 else PLANNED
 	record["buildings"][kind] = entry
+	record.get("gone", []).erase(kind)  # Built again (649).
 	_note(town, "%d experience spent on a %s, level %d" % [price, kind, level])
 	building_changed.emit(town, kind)
 	var by := str(spec.get("built_by", ""))
@@ -655,6 +671,10 @@ func seed_from(world_map: WorldMap) -> Array[String]:
 		for key: String in keys:
 			if places[key].get("kind") == "stockpile" and places[key].get("holder") == Stockpile.TOWN:
 				_found("%s/%s" % [area_name, key])
+	# A world that starts at tents (649: rules' start "tents") seeds no
+	# building: each is built up from the settlement.
+	if str(rules.get("start", "")) == "tents":
+		return out
 	for area_name: String in world_map.areas:
 		for house: Dictionary in world_map.areas[area_name].get("buildings", []):
 			var kind := str(house.get("use", ""))
@@ -662,7 +682,7 @@ func seed_from(world_map: WorldMap) -> Array[String]:
 				continue
 			var town := "%s/%s" % [area_name, house["town"]]
 			var record := _town(town)
-			if record["buildings"].has(kind):
+			if record["buildings"].has(kind) or kind in record.get("gone", []):
 				continue
 			record["buildings"][kind] = {"kind": kind, "level": 1, "state": STANDING, "since": now(), "job": 0}
 			_note(town, "the %s stands, level 1, as the map has it" % kind)
@@ -670,7 +690,26 @@ func seed_from(world_map: WorldMap) -> Array[String]:
 			_seat(town)
 			out.append("%s/%s" % [town, kind])
 	out.sort()
+	for town: String in _towns:
+		if stage(town).is_empty() and not _towns[town]["buildings"].is_empty():
+			_seeded_stage(town)
 	return out
+
+
+## A town given the map's buildings with no stage yet (649): not a
+## settlement of tents, but at least the second stage (a hamlet), and as
+## far up as it meets each next stage's needs. A saved stage is kept.
+func _seeded_stage(town: String) -> void:
+	var stages: Array = rules.get("stages", [])
+	var names: Array = stages.map(func(each: Variant) -> String: return str(each.get("name", "")) if each is Dictionary else "")
+	if names.size() < 2:
+		return
+	var at := 1
+	while at + 1 < stages.size() and stages[at + 1] is Dictionary and _meets(town, stages[at + 1]):
+		at += 1
+	_town(town)["stage"] = names[at]
+	_note(town, "%s is a %s, as the map has it" % [town, names[at]])
+	stage_changed.emit(town)
 
 
 ## A town is founded once, the first time its store is seen (a save from
@@ -779,7 +818,7 @@ func _repair(town: String) -> bool:
 	names.sort()
 	for kind: String in names:
 		var entry: Dictionary = record["buildings"][kind]
-		if entry["state"] != DAMAGED or int(entry["job"]) != 0 or not kinds.has(kind):
+		if not entry["state"] in [DAMAGED, DISREPAIR] or int(entry["job"]) != 0 or not kinds.has(kind):
 			continue
 		var spec: Dictionary = kinds[kind]
 		var level := maxi(int(entry["level"]), 1)
@@ -1760,7 +1799,7 @@ func _fisherman_comes(town: String) -> void:
 
 ## [param town]'s stage toward a city (591, economy's side): the name of the
 ## highest of rules' "stages" it has reached, "" for none. Raised by
-## _stage_turn, one step at a time, never lowered.
+## _stage_turn, one step at a time; lowered by _decline (649).
 func stage(town: String) -> String:
 	return str(_towns.get(town, {}).get("stage", ""))
 
@@ -1778,6 +1817,223 @@ func _stage_turn(town: String) -> void:
 	record["stage"] = names[at + 1]
 	_note(town, "%s is a %s now" % [town, names[at + 1]])
 	stage_changed.emit(town)
+
+
+# --- Decline (649: towns fall as well as rise) ----------------------------------------
+
+## Once a day: each building's keep (_upkeep_turn, _neglect_turn), then the
+## town's strain toward falling a stage (_strain_turn). rules' "decline".
+func _decline(town: String) -> void:
+	var rule: Dictionary = rules.get("decline", {})
+	if rule.is_empty():
+		return
+	var record := _town(town)
+	var day := now() / maxi(DayNight.day_steps, 1)
+	if record.has("decline_day") and int(record["decline_day"]) >= day:
+		return
+	record["decline_day"] = day
+	_upkeep_turn(town, rule, day)
+	_neglect_turn(town, rule, day)
+	_strain_turn(town, rule)
+
+
+## Each decline.upkeep.every days (the first that many after the town is
+## first seen, so a fresh world pays nothing before its first gathering) a
+## building in use or out of it pays its keep from the store (a kind's own "upkeep", else decline.upkeep.cost,
+## times its level; {} for none: a camp wants none, 649), the nearest to
+## the store first, so the edge goes short first: one that can't is
+## "owed" from that day till it pays.
+func _upkeep_turn(town: String, rule: Dictionary, day: int) -> void:
+	var upkeep: Dictionary = rule.get("upkeep", {})
+	var record := _town(town)
+	var every := maxi(int(upkeep.get("every", 7)), 1)
+	if not record.has("upkeep_day"):
+		record["upkeep_day"] = day + every
+	if day < int(record["upkeep_day"]):
+		return
+	record["upkeep_day"] = day + every
+	var houses: Dictionary = record["buildings"]
+	var kinds: Dictionary = rules.get("buildings", {})
+	for kind: String in _inner_first(town):
+		var entry: Dictionary = houses[kind]
+		if not entry["state"] in [STANDING, DAMAGED, DISREPAIR] or int(entry["level"]) < 1:
+			continue
+		var cost: Dictionary = kinds.get(kind, {}).get("upkeep", upkeep.get("cost", {}))
+		var paid := true
+		for what: String in cost:
+			if production.stockpile.count(town, what) < int(cost[what]) * int(entry["level"]):
+				paid = false
+		if paid:
+			for what: String in cost:
+				if int(cost[what]) > 0:
+					production.stockpile.take(town, what, int(cost[what]) * int(entry["level"]), "the %s's upkeep" % kind)
+			entry.erase("owed")
+		elif not entry.has("owed"):
+			entry["owed"] = day
+
+
+## A round of [param town]'s upkeep (649; Production.keep_for, kept back
+## from a new build): each building in use or out of it, its cost times its
+## level; {} without decline.
+func upkeep_due(town: String) -> Dictionary:
+	var upkeep: Dictionary = rules.get("decline", {}).get("upkeep", {})
+	var kinds: Dictionary = rules.get("buildings", {})
+	var out := {}
+	if upkeep.is_empty():
+		return out
+	var houses: Dictionary = _towns.get(town, {}).get("buildings", {})
+	for kind: String in houses:
+		var entry: Dictionary = houses[kind]
+		if not entry["state"] in [STANDING, DAMAGED, DISREPAIR] or int(entry["level"]) < 1:
+			continue
+		var cost: Dictionary = kinds.get(kind, {}).get("upkeep", upkeep.get("cost", {}))
+		for what: String in cost:
+			out[what] = int(out.get(what, 0)) + int(cost[what]) * int(entry["level"])
+	return out
+
+
+## [param town]'s building kinds, the nearest its store first (placed's
+## distance; unknown ones nearest), then by name.
+func _inner_first(town: String) -> Array[String]:
+	var out: Array[String] = []
+	out.assign(_town(town)["buildings"].keys())
+	var far := {}
+	for kind in out:
+		far[kind] = float(placed.call(town, kind).get("distance", 0.0)) if placed.is_valid() else 0.0
+	out.sort_custom(func(a: String, b: String) -> bool: return far[a] < far[b] or far[a] == far[b] and a < b)
+	return out
+
+
+## A building neglected (its keep owed, damaged, or none of its trade among
+## the residents) decline.unkept_days days running falls into disrepair: out
+## of use (not standing; repaired as a damaged one is). In disrepair it
+## loses a level each season (Season.season_days), and at none it is a
+## ruin; a ruin is kept a season, then its record goes and ruined is told.
+func _neglect_turn(town: String, rule: Dictionary, day: int) -> void:
+	var record := _town(town)
+	var houses: Dictionary = record["buildings"]
+	var kinds: Dictionary = rules.get("buildings", {})
+	var season := maxi(Season.season_days, 1)
+	var trades := {}
+	for who: String in record["residents"]:
+		for trade: Variant in production.worker(who).get("trades", []):
+			trades[str(trade)] = true
+	var names: Array = houses.keys()
+	names.sort()
+	for kind: String in names:
+		var entry: Dictionary = houses[kind]
+		if entry["state"] == RUIN:
+			if day - int(entry.get("ruin", day)) >= season:
+				var where: Dictionary = placed.call(town, kind) if placed.is_valid() else {}
+				houses.erase(kind)
+				if not kind in record.get_or_add("gone", []):
+					record["gone"].append(kind)  # The map's piece is not seeded again.
+				_note(town, "the ruin of the %s is gone; the wild takes the ground back" % kind)
+				building_changed.emit(town, kind)
+				var cells: Array[Vector2i] = []
+				cells.assign(where.get("cells", []))
+				ruined.emit(town, kind, str(where.get("zone", "")), cells)
+			continue
+		if not entry["state"] in [STANDING, DAMAGED, DISREPAIR] or int(entry["level"]) < 1:
+			continue
+		if entry["state"] == DISREPAIR:
+			if int(entry["job"]) != 0 or day - int(entry.get("decay", day)) < season:
+				continue
+			entry["decay"] = day
+			entry["level"] = int(entry["level"]) - 1
+			if int(entry["level"]) <= 0:
+				entry["state"] = RUIN
+				entry["ruin"] = day
+				entry.erase("decay")
+				_note(town, "the %s is a ruin" % kind)
+			else:
+				_note(town, "the %s, in disrepair, is down to level %d" % [kind, entry["level"]])
+			building_changed.emit(town, kind)
+			continue
+		var trade := str(kinds.get(kind, {}).get("trade", ""))
+		var neglected: bool = entry.has("owed") or entry["state"] == DAMAGED or not trade.is_empty() and not trades.has(trade)
+		if not neglected:
+			entry.erase("neglect")
+			continue
+		if not entry.has("neglect"):
+			entry["neglect"] = day
+		if day - int(entry["neglect"]) >= int(rule.get("unkept_days", 14)) and int(entry["job"]) == 0:
+			entry["state"] = DISREPAIR
+			entry["decay"] = day
+			entry.erase("neglect")
+			_note(town, "the %s has fallen into disrepair" % kind)
+			building_changed.emit(town, kind)
+
+
+## A day's strain on [param town] (649, Jeff's list: the people fall, the
+## resources can't keep up, raids and captives): its stage short of the
+## residents it needs, a standing kind it needs out of use (disrepair, a
+## ruin), or more than decline.hungry_share of its residents hungry with
+## the store unable to feed them adds a day; a day with none takes one off. At decline.strain_days it falls a
+## stage (never below the first) and starts again.
+func _strain_turn(town: String, rule: Dictionary) -> void:
+	var record := _town(town)
+	var stages: Array = rules.get("stages", [])
+	var names: Array = stages.map(func(each: Variant) -> String: return str(each.get("name", "")) if each is Dictionary else "")
+	var at := names.find(stage(town))
+	if at <= 0 or not stages[at] is Dictionary:
+		record.erase("strain")
+		record.erase("falling")
+		return
+	var why := _falling(town, stages[at], rule)
+	if why.is_empty():
+		record["strain"] = maxi(int(record.get("strain", 0)) - 1, 0)
+		if int(record["strain"]) == 0:
+			record.erase("falling")
+		return
+	record["falling"] = why
+	record["strain"] = int(record.get("strain", 0)) + 1
+	if int(record["strain"]) < int(rule.get("strain_days", 10)):
+		return
+	record["stage"] = names[at - 1]
+	record["strain"] = 0
+	_note(town, "%s falls back to a %s: %s" % [town, names[at - 1], why])
+	stage_changed.emit(town)
+
+
+## What strains [param town] at stage [param need] today, "" for nothing:
+## the first of too few residents, a needed kind out of use, hunger the
+## store can't feed (the hungry more than its food, meat and fish: hunger
+## with food in the store is a purse's, not the town's). A needed kind
+## never built doesn't count: a stage is
+## lost for what goes, not for a need added after it was reached.
+func _falling(town: String, need: Dictionary, rule: Dictionary) -> String:
+	var people := residents(town)
+	if people.size() < int(need.get("residents", 0)):
+		return "too few people (%d of %d)" % [people.size(), int(need["residents"])]
+	for kind: Variant in need.get("standing", []):
+		if building(town, str(kind)).get("state") in [DISREPAIR, RUIN]:
+			return "the %s out of use" % kind
+	var hungry := 0
+	for who in people:
+		var worker := production.worker(who)
+		if str(worker.get("fed", "")) == "hungry" and not bool(worker.get("away", false)):
+			hungry += 1
+	var food := 0
+	for what: String in ["food", "meat", "fish"]:
+		food += production.stockpile.count(town, what)
+	if not people.is_empty() and hungry > float(rule.get("hungry_share", 0.5)) * people.size() and hungry > food:
+		return "hunger"
+	return ""
+
+
+## A resident carried off adds decline.captive_strain days of strain (649).
+func _captive_strain(record: Dictionary) -> void:
+	var add := int(rules.get("decline", {}).get("captive_strain", 0))
+	if add > 0 and not str(record.get("stage", "")).is_empty():
+		record["strain"] = int(record.get("strain", 0)) + add
+
+
+## [param town]'s strain toward falling (the town sheet, 649): {days, of,
+## why}; days 0 and why "" when nothing strains it.
+func strain(town: String) -> Dictionary:
+	var record: Dictionary = _towns.get(town, {})
+	return {"days": int(record.get("strain", 0)), "of": int(rules.get("decline", {}).get("strain_days", 10)), "why": str(record.get("falling", ""))}
 
 
 ## Whether [param town] has what a recipe's made.needs asks (622, economy's
@@ -2118,6 +2374,7 @@ func _take(town: String, who: String, faction: String, by: String) -> void:
 	record["captives"].append({"id": who, "name": worker["name"], "trade": worker["trades"][0],
 		"origin": worker["origin"], "purse": worker["purse"], "taken_at": now(), "by": faction, "held_by": by})
 	record["taken"][who] = int(record["taken"].get(who, 0)) + 1
+	_captive_strain(record)
 
 
 ## Companion resident [param who] taken by her player's id, Main told;
@@ -2133,6 +2390,7 @@ func _take_companion(town: String, who: String, faction: String, by: String) -> 
 	record["captives"].append({"id": origin, "name": worker["name"], "trade": worker["trades"][0],
 		"origin": origin, "purse": 0, "taken_at": now(), "by": faction, "held_by": by})
 	record["taken"][who] = int(record["taken"].get(who, 0)) + 1
+	_captive_strain(record)
 	if companion_taken.is_valid():
 		companion_taken.call(origin.trim_prefix("companion:"), by)
 	return true
@@ -2252,9 +2510,12 @@ func from_dict(saved: Dictionary) -> void:
 		if buildings is Dictionary:
 			for kind: String in buildings:
 				var house: Variant = buildings[kind]
-				if house is Dictionary and str(house.get("state", "")) in [PLANNED, BUILDING, STANDING, DAMAGED]:
+				if house is Dictionary and str(house.get("state", "")) in [PLANNED, BUILDING, STANDING, DAMAGED, DISREPAIR, RUIN]:
 					record["buildings"][kind] = {"kind": kind, "level": maxi(int(house.get("level", 0)), 0),
 						"state": str(house["state"]), "since": int(house.get("since", 0)), "job": int(house.get("job", 0))}
+					for day_key: String in ["owed", "neglect", "decay", "ruin"]:  # Its keep (649).
+						if house.has(day_key):
+							record["buildings"][kind][day_key] = int(house[day_key])
 		for done: Variant in entry.get("objectives", []):
 			record["objectives"].append(str(done))
 		var taken: Variant = entry.get("taken", {})
@@ -2285,6 +2546,13 @@ func from_dict(saved: Dictionary) -> void:
 			record["lawspeaker"] = (entry["lawspeaker"] as Dictionary).duplicate(true)
 		if entry.has("stage"):
 			record["stage"] = str(entry["stage"])
+		for key: String in ["strain", "decline_day", "upkeep_day"]:  # Its decline (649).
+			if entry.has(key):
+				record[key] = int(entry[key])
+		if entry.has("falling"):
+			record["falling"] = str(entry["falling"])
+		if entry.get("gone") is Array:
+			record["gone"] = (entry["gone"] as Array).map(func(kind: Variant) -> String: return str(kind))
 		if entry.has("lot_walk"):
 			record["lot_walk"] = int(entry["lot_walk"])
 		record["lot_bare"] = bool(entry.get("lot_bare", false))

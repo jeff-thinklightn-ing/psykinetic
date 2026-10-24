@@ -68,6 +68,11 @@ var on_built := Callable()
 ## made.needs asks (622, economy's side: plate at a village's forge;
 ## Towns sets it). Without it no recipe with needs is made.
 var town_has := Callable()
+## (town) -> {resource: count}: what a town's store keeps back from a new
+## build or raise (649: a round of its buildings' upkeep, Towns sets it), so
+## building never leaves the town unable to keep what stands; a repair or a
+## roof may use it.
+var keep_for := Callable()
 ## (workshop id) -> Array: the item ids a workshop makes (641: each healer's
 ## hut its own potions; Main sets it from economy.json); [] or unset: every
 ## recipe of its trade.
@@ -1439,7 +1444,7 @@ func _bid(shop: Dictionary, wants: Array[String], signals: Dictionary, cat: Dict
 				and each["town"] == shop["town"]
 		if each["state"] != "queued" or not (each["workshop"] == shop["id"] or builds_here):
 			continue
-		if builds_here and not _affords(shop["town"], {"from": each.get("cost", {})}, false):
+		if builds_here and not (_affords(shop["town"], {"from": each.get("cost", {})}, false) and _keeps(shop["town"], each)):
 			if first_build == 0:
 				first_build = id
 			continue
@@ -1593,6 +1598,20 @@ func _affords(town: String, made: Dictionary, rework: bool) -> bool:
 	for what: String in _needs(made, rework):
 		var have := stockpile.count(town, what)
 		if have < int(_needs(made, rework)[what]):
+			return false
+	return true
+
+
+## Whether build job [param each] leaves [param town]'s store its keep_for
+## (649); always for a repair or a roof.
+func _keeps(town: String, each: Dictionary) -> bool:
+	var recipe := str(each.get("recipe", ""))
+	if not keep_for.is_valid() or recipe.begins_with(Towns.REPAIR) or recipe.begins_with(Towns.ROOF):
+		return true
+	var keep: Dictionary = keep_for.call(town)
+	var cost: Dictionary = each.get("cost", {})
+	for what: String in keep:
+		if stockpile.count(town, what) - int(cost.get(what, 0)) < int(keep[what]):
 			return false
 	return true
 

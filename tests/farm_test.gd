@@ -20,6 +20,9 @@ const DAY := 54000
 var _failures := 0
 var _now := 0
 var _rules := {}
+## The rules with decline (649); _rules has none, so the other tests' towns
+## never fall into disrepair for want of wood.
+var _full := {}
 var _rain := 0.11
 var _storm := false
 
@@ -30,7 +33,9 @@ func _ready() -> void:
 	Season.season_days = 7
 	Season.year_phase = 0.0
 	Season.year_anchor = 0
-	_rules = Production.read_rules()
+	_full = Production.read_rules()
+	_rules = _full.duplicate(true)
+	_rules.erase("decline")
 	_test_years()
 	_test_missed()
 	_test_farmer_comes()
@@ -38,6 +43,7 @@ func _ready() -> void:
 	_test_woodcutter()
 	_test_felling()
 	_test_stages()
+	_test_decline()
 	_test_flock()
 	_test_butcher()
 	_test_season_scale()
@@ -242,33 +248,154 @@ func _test_felling() -> void:
 	_check(plain.production.stockpile.count(TOWN, "wood") > 0, "no fell set: a cut brings its wood as before")
 
 
-## Stages toward a city (591, economy's side): a hamlet from the start, a
-## village with 8 residents, a temple and an inn and its priest; never
-## falling.
+## Stages toward a city (591, economy's side; 649): a settlement from the
+## start, a hamlet with 4 residents, a field and wood 20, a village with 8
+## residents, a temple, an inn, a forge, a pasture and its priest; never
+## lowered by _stage_turn (only decline lowers it).
 func _test_stages() -> void:
 	print("
-== hamlet, village, town, city ==")
+== settlement, hamlet, village, town, city ==")
 	var towns := _towns(1, false)
 	var rose: Array = []
 	towns.stage_changed.connect(func(town: String) -> void: rose.append(town))
 	towns._stage_turn(TOWN)
-	_check(towns.stage(TOWN) == "hamlet" and rose == [TOWN], "a hamlet from the start")
+	_check(towns.stage(TOWN) == "settlement" and rose == [TOWN], "a settlement from the start")
+	for i in 4:
+		towns.production.add_worker("v%d" % i, "V%d" % i, ["hauler"], TOWN, "test")
+		towns._town(TOWN)["residents"].append("v%d" % i)
 	towns._stage_turn(TOWN)
-	_check(towns.stage(TOWN) == "hamlet", "not yet a village")
-	for i in 7:
+	_check(towns.stage(TOWN) == "settlement", "4 and a field, no wood: not yet a hamlet")
+	towns.production.stockpile.deposit(TOWN, "wood", 20, "test")
+	towns._stage_turn(TOWN)
+	_check(towns.stage(TOWN) == "hamlet" and rose.size() == 2, "wood 20: a hamlet (%s)" % towns.stage(TOWN))
+	for i in range(4, 7):
 		towns.production.add_worker("v%d" % i, "V%d" % i, ["hauler"], TOWN, "test")
 		towns._town(TOWN)["residents"].append("v%d" % i)
 	towns.production.add_worker("pr", "Osric", ["priest"], TOWN, "appointed")
 	towns._town(TOWN)["residents"].append("pr")
-	for kind: String in ["temple", "inn"]:
+	for kind: String in ["temple", "inn", "forge"]:
 		towns._town(TOWN)["buildings"][kind] = {"kind": kind, "level": 1, "state": Towns.STANDING, "since": 0, "job": 0}
 	towns._stage_turn(TOWN)
-	_check(towns.stage(TOWN) == "village" and rose.size() == 2, "8 residents, temple, inn, priest: a village (%s)" % towns.stage(TOWN))
+	_check(towns.stage(TOWN) == "hamlet", "no pasture: not yet a village")
+	towns._town(TOWN)["buildings"]["pasture"] = {"kind": "pasture", "level": 1, "state": Towns.STANDING, "since": 0, "job": 0}
+	towns._stage_turn(TOWN)
+	_check(towns.stage(TOWN) == "village" and rose.size() == 3, "8 residents, temple, inn, forge, pasture, priest: a village (%s)" % towns.stage(TOWN))
 	towns._town(TOWN)["buildings"]["inn"]["state"] = Towns.DAMAGED
 	towns._stage_turn(TOWN)
-	_check(towns.stage(TOWN) == "village", "the inn damaged: still a village, never falling")
+	_check(towns.stage(TOWN) == "village", "the inn damaged: _stage_turn never lowers")
 	var saved := Towns.new(JSON.parse_string(JSON.stringify(towns.to_dict())), towns.production, _rules, func() -> int: return _now)
 	_check(saved.stage(TOWN) == "village", "the stage saved")
+
+
+## Towns fall as well as rise (649): a hamlet short of residents gains a
+## day of strain a day and falls back at strain_days; a captive adds
+## captive_strain; a day with nothing short takes one off. Upkeep paid
+## nearest the store first: a short store leaves the furthest owing, and
+## unkept_days later it is in disrepair (out of use), a level lost a season,
+## a ruin, then gone: ruined told with its cells, never seeded again; all
+## saved.
+func _test_decline() -> void:
+	print("
+== towns fall as well as rise ==")
+	var rule: Dictionary = _full["decline"]
+	var towns := _towns(1, false, _full)
+	towns._town(TOWN)["stage"] = "hamlet"
+	var fell: Array = []
+	towns.stage_changed.connect(func(town: String) -> void: fell.append(town))
+	var days := int(rule["strain_days"])
+	for day in days - 1:
+		towns._strain_turn(TOWN, rule)
+	_check(towns.stage(TOWN) == "hamlet" and towns.strain(TOWN)["days"] == days - 1 and towns.strain(TOWN)["why"].begins_with("too few people"),
+		"no people: %d days of strain, still a hamlet (%s)" % [days - 1, towns.strain(TOWN)])
+	towns._strain_turn(TOWN, rule)
+	_check(towns.stage(TOWN) == "settlement" and fell == [TOWN] and towns.strain(TOWN)["days"] == 0,
+		"the %dth day: back to a settlement (%s)" % [days, towns.stage(TOWN)])
+	towns._strain_turn(TOWN, rule)
+	_check(towns.stage(TOWN) == "settlement" and towns.strain(TOWN)["days"] == 0, "a settlement never falls further")
+	towns._town(TOWN)["stage"] = "hamlet"
+	for i in 4:
+		towns.production.add_worker("h%d" % i, "H%d" % i, ["hauler"], TOWN, "test")
+		towns._town(TOWN)["residents"].append("h%d" % i)
+	towns._town(TOWN)["strain"] = 2
+	towns._strain_turn(TOWN, rule)
+	_check(towns.strain(TOWN)["days"] == 1, "a day with nothing short: a day off")
+	towns._take(TOWN, "h3", "goblins", "")
+	_check(towns.strain(TOWN)["days"] == 1 + int(rule["captive_strain"]), "a captive: %d days more" % rule["captive_strain"])
+	# Hunger: three of the four hungry; food in the store, a purse's problem.
+	towns.note_rescue(TOWN, "h4", "H4", "hauler")
+	for id: String in ["h0", "h1", "h2"]:
+		towns.production._workers[id]["fed"] = "hungry"
+	var larder := towns.production.stockpile
+	larder.take(TOWN, "food", larder.count(TOWN, "food"), "test")
+	larder.deposit(TOWN, "food", 3, "test")
+	towns._town(TOWN)["strain"] = 0
+	towns._strain_turn(TOWN, rule)
+	_check(towns.strain(TOWN)["days"] == 0, "hungry with food in the store: no strain (%s)" % [towns.strain(TOWN)])
+	larder.take(TOWN, "food", 1, "test")
+	towns._strain_turn(TOWN, rule)
+	_check(towns.strain(TOWN)["days"] == 1 and towns.strain(TOWN)["why"] == "hunger", "the hungry more than the store's food: hunger (%s)" % [towns.strain(TOWN)])
+	towns.production.set_owed("h4", 5)
+	for id: String in ["h0", "h1", "h2"]:
+		towns.production._workers[id]["fed"] = ""
+	towns._strain_turn(TOWN, rule)
+	_check(towns.strain(TOWN)["days"] == 0, "fed again: a day off; an unpaid resident is no strain")
+	# Upkeep: the field near, the inn far; wood for one of them.
+	var far := {"field": 2.0, "inn": 30.0}
+	var told: Array = []
+	towns.placed = func(_town: String, kind: String) -> Dictionary: return {"zone": "fm", "cells": [Vector2i(1, 1), Vector2i(2, 1)], "distance": far.get(kind, 0.0)}
+	towns.ruined.connect(func(town: String, kind: String, zone: String, cells: Array[Vector2i]) -> void: told.append([town, kind, zone, cells.size()]))
+	towns._town(TOWN)["buildings"]["inn"] = {"kind": "inn", "level": 2, "state": Towns.STANDING, "since": 0, "job": 0}
+	towns.note_rescue(TOWN, "f1", "Tam", "farmer")  # The field's trade at home.
+	var store := towns.production.stockpile
+	store.take(TOWN, "wood", store.count(TOWN, "wood"), "test")
+	store.deposit(TOWN, "wood", int(rule["upkeep"]["cost"]["wood"]), "test")
+	var every := int(rule["upkeep"]["every"])
+	var round := int(rule["upkeep"]["cost"]["wood"]) * 3
+	_check(towns.upkeep_due(TOWN) == {"wood": round}, "a round of upkeep: the field 1 and the inn 2 levels (%s)" % [towns.upkeep_due(TOWN)])
+	store.deposit(TOWN, "wood", round + 3, "test")  # With the 1 there: a round and 4.
+	_check(towns.production._keeps(TOWN, {"recipe": "forge", "cost": {"wood": 4}}) and not towns.production._keeps(TOWN, {"recipe": "forge", "cost": {"wood": 5}})
+		and towns.production._keeps(TOWN, {"recipe": Towns.REPAIR + "inn", "cost": {"wood": 99}}),
+		"a new build keeps a round of upkeep in the store; a repair may use it")
+	store.take(TOWN, "wood", round + 3, "test")
+	towns._upkeep_turn(TOWN, rule, 0)
+	_check(not towns.building(TOWN, "inn").has("owed") and store.count(TOWN, "wood") == 1, "first seen: nothing paid yet, nothing owed")
+	towns._upkeep_turn(TOWN, rule, every)
+	_check(not towns.building(TOWN, "field").has("owed") and towns.building(TOWN, "inn").get("owed") == every and store.count(TOWN, "wood") == 0,
+		"wood for one: the field (nearest) kept, the inn (the edge) owing")
+	var unkept := int(rule["unkept_days"])
+	for day in range(every, every + unkept + 1):
+		towns._neglect_turn(TOWN, rule, day)
+	_check(towns.building(TOWN, "inn")["state"] == Towns.DISREPAIR and not towns._stands(TOWN, "inn") and towns.building(TOWN, "field")["state"] == Towns.STANDING,
+		"%d days owing: the inn in disrepair, the field standing" % unkept)
+	var season := Season.season_days
+	var day := every + unkept
+	towns._neglect_turn(TOWN, rule, day + season)
+	_check(towns.building(TOWN, "inn")["level"] == 1 and towns.building(TOWN, "inn")["state"] == Towns.DISREPAIR, "a season on: down a level")
+	towns._neglect_turn(TOWN, rule, day + 2 * season)
+	_check(towns.building(TOWN, "inn")["state"] == Towns.RUIN and not towns.walls_up(TOWN, "inn"), "another: a ruin, its walls down (walked over)")
+	var again := Towns.new(JSON.parse_string(JSON.stringify(towns.to_dict())), towns.production, _full, func() -> int: return _now)
+	_check(again.building(TOWN, "inn")["state"] == Towns.RUIN and again.building(TOWN, "inn").has("ruin") and again.strain(TOWN)["days"] == towns.strain(TOWN)["days"],
+		"the ruin and the strain saved")
+	towns._neglect_turn(TOWN, rule, day + 3 * season)
+	_check(towns.building(TOWN, "inn").is_empty() and told == [[TOWN, "inn", "fm", 2]] and towns.buildings_of(TOWN).get("inn", {}).get("state") == "gone" and towns.buildings_of(TOWN)["inn"]["walls"] == false,
+		"a season a ruin: gone, its cells given back (%s)" % [told])
+	var world_map := WorldMap.new()
+	world_map.areas["fm"] = {"places": {}, "buildings": [{"use": "inn", "town": "store"}]}
+	towns.seed_from(world_map)
+	_check(towns.building(TOWN, "inn").is_empty(), "gone: the map's inn not seeded again")
+	# A fresh town given the map's buildings starts at a hamlet, not tents.
+	var fresh := _towns(1, false, _full)
+	fresh._town(TOWN)["buildings"].clear()
+	var mapped := WorldMap.new()
+	mapped.areas["fm"] = {"places": {}, "buildings": [{"use": "inn", "town": "store"}, {"use": "temple", "town": "store"}]}
+	fresh.seed_from(mapped)
+	_check(fresh.stage(TOWN) == "hamlet", "a town seeded with the map's inn and temple: a hamlet from the start (%s)" % fresh.stage(TOWN))
+	fresh._stage_turn(TOWN)
+	_check(fresh.stage(TOWN) == "hamlet", "and never back to a settlement by _stage_turn")
+	var saved_stage := _towns(1, false, _full)
+	saved_stage._town(TOWN)["stage"] = "village"
+	saved_stage.seed_from(mapped)
+	_check(saved_stage.stage(TOWN) == "village", "a saved stage kept")
 
 
 func _check(ok: bool, what: String) -> void:

@@ -6,6 +6,8 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+
+- Towns can now decline as well as grow: a new town starts as a settlement of tents and builds up to hamlet and village, but a town that loses people, goes hungry, leaves officials unpaid or has residents carried off falls back a stage, and buildings that go unkept (starting at the edge) fall into disrepair, then ruin, and the wild takes the ground back (649)
 - Held weapons' grips mid-handle and the shield's arm sockets (451 amended and 451 amended (2), art-kit's sides; Jeff: "shield should be carried on the outside of arm"): the sword and battle axe meshes lowered so the grip is mid-hilt, the great axe's and battle axe's second-hand grip on the haft (the great axe's lay in its head), item.shield's "strap" and "handle" sockets for pc-character's carry
 
 - Held has its own map: from the wilds' south-west corner (west edge) a way leads into a forest clearing with a river, a ford and a bridge, and the Old Tower's ruin across it, empty for now; the town moves there later.

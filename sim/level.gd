@@ -180,11 +180,12 @@ const KIND_SIZE := "small"
 ## shacks"): its walls are the edges round it, so all of it is floor. A
 ## wing, a bay or an outshot may be less. kinds() says so of any under it.
 const MIN_ROOM := 5
-## A town's stages (economy's Towns.stage, only ever rising; the growth
-## loop, decision 591): a kind names the first it may be built at
+## A town's stages (economy's Towns.stage, rising and falling back: the
+## growth loop, decision 591; the settlement of tents first, 649): a kind
+## names the first it may be built at
 ## ("stage"), so a town at a stage may build that stage's kinds and every
 ## earlier one's.
-const STAGES: Array[String] = ["hamlet", "village", "town", "city"]
+const STAGES: Array[String] = ["settlement", "hamlet", "village", "town", "city"]
 ## The "stage" of a kind no town builds: one a set piece stands by hand
 ## (the Old Tower's room). Never among kinds_at's.
 const SET_STAGE := "set"

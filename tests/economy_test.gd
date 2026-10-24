@@ -556,6 +556,7 @@ func _test_town_sheet(host: Player) -> void:
 	_check(not next.is_empty() and next["needs"] == World.towns.stage_short(STORE, World.economy.rules["stages"][World.economy.rules["stages"].map(func(each: Dictionary) -> String: return each["name"]).find(next["stage"])]),
 		"the next stage and what it lacks (%s)" % [next])
 	_check(sheet["mood"] in ["safe", "uneasy", "on guard"] and sheet["season"] != "" and sheet["sought"] is Array, "the mood, season and sought")
+	_check(sheet["strain"] == World.towns.strain(STORE) and sheet["strain"].has("days") and sheet["strain"].has("why"), "its strain toward falling (649): %s" % [sheet["strain"]])
 	_check(_main.ask_town_sheet(host, {"town": "nowhere/store"}).get("why") == "you don't know that town", "a town they don't know: refused")
 
 

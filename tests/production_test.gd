@@ -351,10 +351,10 @@ func _test_fisherman() -> void:
 	var towns := Towns.new({}, _work, rules, func() -> int: return _now)
 	towns._town(STORE)
 	towns.tick()
-	_check(towns.stage(STORE) == "hamlet", "a hamlet")
+	_check(towns.stage(STORE) == "settlement", "a settlement")
 	_now += 4 * DayNight.day_steps
 	towns.tick()
-	_check(not towns.residents(STORE).any(func(id: String) -> bool: return "fisherman" in _work.worker(id)["trades"]), "a hamlet: no fisherman yet")
+	_check(not towns.residents(STORE).any(func(id: String) -> bool: return "fisherman" in _work.worker(id)["trades"]), "a settlement: no fisherman yet")
 	towns._town(STORE)["stage"] = "village"
 	towns.tick()
 	_now += 4 * DayNight.day_steps

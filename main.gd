@@ -3153,6 +3153,11 @@ func _boot() -> void:
 	World.towns.drove = World.economy.buy_drove
 	# Each healer's hut its own potions (641).
 	World.production.workshop_makes = _workshop_makes
+	# Where a town's building stands, for decline's edge and the ground a
+	# ruin gives back to the forest (649).
+	World.towns.placed = _town_placed
+	if not World.towns.ruined.is_connected(_on_town_ruined):
+		World.towns.ruined.connect(_on_town_ruined)
 	World.towns.folds_changed.connect(_on_folds_changed)
 	World.production.build_lacks = func(town: String) -> Dictionary: return World.towns.shortfall(town).get("needs", {})
 	World.production.town_pays = World.economy.owe_or_pay
@@ -9605,7 +9610,8 @@ func ask_town_sheet(player: Player, args: Dictionary) -> Dictionary:
 ## meal), sick, needs [{id, short 0..1, bring}] (raw goods under comfort,
 ## worst first), builds [{kind, progress}], season, day, stage, faction
 ## {name}, mood (its safety: "safe", "uneasy", "on guard"), sought
-## [{trade, where}] (613), next_stage (Towns.next_stage)}.
+## [{trade, where}] (613), next_stage (Towns.next_stage), strain {days,
+## of, why} (Towns.strain: toward falling back a stage, 649)}.
 func town_sheet(town: String) -> Dictionary:
 	var production := World.production
 	var people := World.towns.residents(town)
@@ -9649,7 +9655,7 @@ func town_sheet(town: String) -> Dictionary:
 		"faction": {"name": World.holdings.factions.display_name(holder) if World.holdings != null else "the town"},
 		"mood": {Production.SAFE: "safe", Production.UNEASY: "uneasy"}.get(safety, "on guard"),
 		"sought": World.towns.sought(town).map(func(entry: Dictionary) -> Dictionary: return {"trade": entry["trade"], "where": entry.get("where", "")}),
-		"next_stage": World.towns.next_stage(town)}
+		"next_stage": World.towns.next_stage(town), "strain": World.towns.strain(town)}
 
 
 func _display_name(entity: GridEntity) -> String:
@@ -11633,6 +11639,33 @@ func _workshop_makes(workshop_id: String) -> Array:
 	if place.is_empty() or not makes is Dictionary:
 		return []
 	return makes.get(str(place.get("key", "")), makes.get(str(place.get("area", "")), makes.get("_default", [])))
+
+
+## Towns.placed (649): [param town]'s [param kind] on the world map (the
+## building of that use linked to the town): {zone, cells (its rect's),
+## distance (its rect's centre from the town's store)}; {} if the map has none.
+func _town_placed(town: String, kind: String) -> Dictionary:
+	var area := town.get_slice("/", 0)
+	if _world_map == null or not _world_map.areas.has(area):
+		return {}
+	for house: Dictionary in _world_map.areas[area].get("buildings", []):
+		if str(house.get("use", "")) != kind or "%s/%s" % [area, house.get("town", "")] != town or not house.get("rect") is Rect2i:
+			continue
+		var rect: Rect2i = house["rect"]
+		var cells: Array[Vector2i] = []
+		for x in range(rect.position.x, rect.end.x):
+			for y in range(rect.position.y, rect.end.y):
+				cells.append(Vector2i(x, y))
+		var store: Vector2i = World.holdings.place(town).get("cell", rect.get_center()) if World.holdings != null else rect.get_center()
+		return {"zone": area, "cells": cells, "distance": float(World.distance(rect.get_center(), store))}
+	return {}
+
+
+## A town's ruin is gone (649): its ground given back to the forest
+## (terrain's Clearing.unbuild, once it has it), from stumps.
+func _on_town_ruined(_town: String, _kind: String, zone: String, cells: Array[Vector2i]) -> void:
+	if World.clearing != null and not zone.is_empty() and not cells.is_empty() and World.clearing.has_method("unbuild"):
+		World.clearing.call("unbuild", zone, cells, World.towns.now() / maxi(DayNight.day_steps, 1))
 
 
 ## The workshop of Holdings place [param id] where the fallen are brought

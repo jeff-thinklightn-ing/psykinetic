@@ -363,6 +363,11 @@ func _hourly() -> void:
 	if hour == 0:
 		print("SOAK day %d: treasury %d, residents %d, bodies %d, inn %s" % [day, World.stockpile.count(TOWN, "gold"), World.towns.residents(TOWN).size(),
 			World.townsfolk().size(), "standing" if inn.size != Vector2i.ZERO else "none"])
+		# Decline (649): the stage, its strain, and the buildings owing upkeep or out of use.
+		var houses: Dictionary = World.towns.to_dict().get(TOWN, {}).get("buildings", {})
+		var owing := houses.keys().filter(func(kind: String) -> bool: return houses[kind].has("owed") or houses[kind].has("neglect"))
+		var unkept := houses.keys().filter(func(kind: String) -> bool: return houses[kind]["state"] in [Towns.DISREPAIR, Towns.RUIN])
+		print("SOAK decline day %d: stage %s, strain %s, owing %s, unkept %s" % [day, World.towns.stage(TOWN), World.towns.strain(TOWN), owing, unkept])
 
 
 ## Whether one of the soak's players stands on [param cell].

@@ -366,6 +366,9 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## 35 (649, maps' side): the "clearing" message gains "gone" [plots, as
 ## "plots" carries them, without size]: a town's plots dropped, their
 ## buildings and edges taken off.
+## 35 (649, economy's side): a town's stage may be "settlement" and may fall; a
+## building's state in the towns' buildings may be "disrepair", "ruin" or "gone";
+## the "town_sheet" message carries strain {days, of, why}.
 const PROTOCOL_REVISION := 35
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]
