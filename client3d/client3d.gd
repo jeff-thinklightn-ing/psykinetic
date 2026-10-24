@@ -1732,6 +1732,9 @@ var _saplings: Dictionary[Vector2i, Node3D] = {}
 ## one's props (a stump, a bush, saplings).
 var _clearing: Dictionary[Vector2i, String] = {}
 var _clearing_props: Dictionary[Vector2i, Array] = {}
+## Cells felled at the build that have grown back to trunks since: the void
+## again, though _land (fixed for the build) still holds them.
+var _grown_back: Dictionary[Vector2i, bool] = {}
 ## Each scattered chunk's MultiMeshes, so one chunk is drawn again alone.
 var _scatter_nodes: Dictionary[Vector2i, Array] = {}
 ## The ground's kinds texture (a texel a cell) and its image, so one cell's
@@ -4059,6 +4062,7 @@ func _build_room() -> void:
 	var fire: Array[Vector2i] = _terrain["fire"]
 	var kinds: Dictionary = _terrain.get("kinds", {})
 	_clearing.assign(_terrain.get("clearing", {}))
+	_grown_back.clear()
 	# A new set each build, never changed after: the border's worker reads it.
 	_land = {}
 	for cell: Vector2i in _terrain["floor"] + _terrain.get("water", []):
@@ -4161,20 +4165,10 @@ func _add_walls() -> void:
 	var wall_keys: Array[Vector3i] = []
 	var doubles := _double_doors()
 	var seconds := doubles.values()
-	var fences: Dictionary[Vector3i, bool] = {}
-	for building: Dictionary in _terrain.get("buildings", []):
-		if building["slot"] in Level.OPEN_AIR:
-			for key in Level.building_outline(building):
-				fences[key] = true
-	for key: Vector3i in _terrain.get("railings", []):
-		fences[key] = true  # A bridge's railings (decision 505): its slot draws them.
+	var fences := _fence_keys()
 	for key: Vector3i in edges:
-		if _outdoor and _is_outline(key):
-			continue  # The forest's edge, not a wall (_add_forest).
-		if fences.has(key) and edges[key] == Terrain.Edge.WALL:
+		if not _edge_drawn(key, fences):
 			continue
-		if edges[key] == Terrain.Edge.WALL and _rock_edge(key):
-			continue  # A rock's own (decision 513): the rock is drawn, not a wall round it.
 		match edges[key]:
 			Terrain.Edge.WALL:
 				if BOX_WALLS:
@@ -4195,6 +4189,31 @@ func _add_walls() -> void:
 	for vertex in vertices:
 		if _needs_post(vertex, kind_at) or _sets_meet(vertex):
 			_add_post(vertex)
+
+
+## The edges that are a fence, not a wall: an open-air building's outline
+## (Level.OPEN_AIR, its slot draws the fence) and a bridge's railings
+## (decision 505, its slot draws them).
+func _fence_keys() -> Dictionary[Vector3i, bool]:
+	var fences: Dictionary[Vector3i, bool] = {}
+	for building: Dictionary in _terrain.get("buildings", []):
+		if building["slot"] in Level.OPEN_AIR:
+			for key in Level.building_outline(building):
+				fences[key] = true
+	for key: Vector3i in _terrain.get("railings", []):
+		fences[key] = true
+	return fences
+
+
+## Whether edge [param key] is drawn as what it is: not outdoors on the
+## outline (the forest's edge, _add_forest), nor a wall that is a fence
+## ([param fences], _fence_keys) or a rock's own (decision 513: the rock is
+## drawn, not a wall round it).
+func _edge_drawn(key: Vector3i, fences: Dictionary[Vector3i, bool]) -> bool:
+	var kind: int = _terrain["edges"].get(key, Terrain.Edge.OPEN)
+	if kind == Terrain.Edge.OPEN or _outdoor and _is_outline(key):
+		return false
+	return kind != Terrain.Edge.WALL or not fences.has(key) and not _rock_edge(key)
 
 
 ## Each link's cue (decision 589: Level.link_cues): art-kit's piece on its
@@ -4926,10 +4945,15 @@ func _end_warm_ups() -> void:
 	_warming.clear()
 
 
-## An edge between the land and the void: the map's outline.
+## An edge between the land and the void: the map's outline, as the forest
+## stands now (a cell felled since the build is land, one grown back void).
 func _is_outline(key: Vector3i) -> bool:
 	var sides := Terrain.edge_cells(key)
-	return _land.has(sides[0]) != _land.has(sides[1])
+	return _on_land(sides[0]) != _on_land(sides[1])
+
+
+func _on_land(cell: Vector2i) -> bool:
+	return _clearing.has(cell) or _land.has(cell) and not _grown_back.has(cell)
 
 
 ## Trees on the void around the land, and the forest floor under them.
@@ -6053,11 +6077,13 @@ func clearing_changed(terrain: Dictionary, cells: Array) -> void:
 		chunks[Vector2i(floori(cell.x / float(FLOOR_CHUNK)), floori(cell.y / float(FLOOR_CHUNK)))] = true
 		if stage == Clearing.TRUNK:
 			_clearing.erase(cell)
+			_grown_back[cell] = true
 			_dress_clearing(cell)
 			if not _trees.has(cell):
 				_add_tree(cell, _field(Vector2(cell), FOREST_CLUMP, 40))
 			continue
 		_clearing[cell] = stage
+		_grown_back.erase(cell)
 		if was == Clearing.TRUNK:
 			# Felled: its tree (or a sapling or dead wood on its cell) goes.
 			if _trees.has(cell) and str(_trees[cell].name).begins_with("Tree_"):
@@ -9184,14 +9210,19 @@ func rebuild_walls(edges: Array[Vector3i]) -> void:
 	_wall_breaches = _wall_breaches.filter(func(key: Vector3i) -> bool: return not lines.has(_line_of(key)))
 	var keys: Array[Vector3i] = []
 	var vertices: Dictionary[Vector2i, bool] = {}
+	# The edges given stand their posts again too, even one now open (a
+	# felled cell's: clearing_walls).
+	for key in edges:
+		for end in 2:
+			vertices[WallEdge.vertex_at(key, end)] = true
+	var fences := _fence_keys()
 	for key: Vector3i in _terrain["edges"]:
-		if not lines.has(_line_of(key)) or _outdoor and _is_outline(key):
+		if not lines.has(_line_of(key)) or not _edge_drawn(key, fences):
 			continue
 		if _terrain["edges"][key] == Terrain.Edge.WALL:
 			keys.append(key)
-		if _terrain["edges"][key] != Terrain.Edge.OPEN:
-			for end in 2:
-				vertices[WallEdge.vertex_at(key, end)] = true
+		for end in 2:
+			vertices[WallEdge.vertex_at(key, end)] = true
 	for vertex in vertices:
 		if _posts.has(vertex):
 			old[_posts[vertex]] = true
@@ -9207,11 +9238,25 @@ func rebuild_walls(edges: Array[Vector3i]) -> void:
 	var kind_at := func(key: Vector3i) -> int:
 		return Terrain.Edge.OPEN if _wall_states.get(key) == "plot" else _terrain["edges"].get(key, Terrain.Edge.OPEN)
 	for vertex in vertices:
-		var built := WallEdge.edges_at_vertex(vertex).any(func(entry: Array) -> bool: return kind_at.call(entry[0]) != Terrain.Edge.OPEN)
+		var built := WallEdge.edges_at_vertex(vertex).any(func(entry: Array) -> bool:
+				return kind_at.call(entry[0]) != Terrain.Edge.OPEN and _edge_drawn(entry[0], fences))
 		if built and (_needs_post(vertex, kind_at) or _sets_meet(vertex)):
 			_add_post(vertex)
 	_occluders_built = false
 	_update_fade()
+
+
+## The walls on [param edges] drawn again after the forest was felled or grew
+## back there (591 amended, terrain's side; maps' Level.relay_outline: key ->
+## its Terrain.Edge now, OPEN where the outline's wall went): Main calls it
+## after clearing_changed, with the terrain's edges already changed. A felled
+## row's walls against the land go, and its posts; the forest's new edge is
+## the outline, drawn as trees, not walls.
+func clearing_walls(edges: Dictionary) -> void:
+	var keys: Array[Vector3i] = []
+	keys.assign(edges.keys())
+	if not keys.is_empty():
+		rebuild_walls(keys)
 
 
 ## Frees [param pieces] two frames from now, if a rebuild has not already.

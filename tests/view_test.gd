@@ -2841,6 +2841,20 @@ func _test_clearing() -> void:
 		var into := _rig._edge_signed(Vector2(cell))
 		return not _rig._wooded.has(cell) or not is_nan(into) and into > 0.0)
 	_check(treed.is_empty() and forested.is_empty(), "%s: no tree on a felled cell (treed: %s), each on the land's side of the edge (forest's: %s)" % [level["name"], treed, forested])
+	# Walls or posts drawn round a cell (591 amended: a felled cell's are none,
+	# open to the land, the forest's edge beyond it trees).
+	var walled := func(cell: Vector2i) -> Array:
+		var found := []
+		for way: Vector2i in [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]:
+			var key := Terrain.edge_key(cell, way)
+			if _rig._walls.has(key):
+				found.append(key)
+			for end in 2:
+				if _rig._posts.has(WallEdge.vertex_at(key, end)):
+					found.append(WallEdge.vertex_at(key, end))
+		return found
+	var round_four := trunks.slice(0, 4).map(func(cell: Vector2i) -> Array: return walled.call(cell)).filter(func(found: Array) -> bool: return not found.is_empty())
+	_check(round_four.is_empty(), "%s: no wall or post round a felled cell (%s)" % [level["name"], round_four])
 	var props := func(cell: Vector2i) -> Array: return _rig._clearing_props.get(cell, [])
 	var stump_ok: bool = (props.call(trunks[0]) as Array).size() == (1 if Client3D._deadwood_drawn("tree.stump") else 0)
 	var saplings: Array = props.call(trunks[3])
@@ -2871,19 +2885,27 @@ func _test_clearing() -> void:
 			break
 	var had_tree := _rig._trees.has(felled)
 	change = [[felled.x, felled.y, "stump"]]
-	Clearing.apply_cells(terrain, change)
+	var walls_changed: Dictionary = Clearing.apply_cells(terrain, change)
 	_rig.clearing_changed(terrain, change)
+	_rig.clearing_walls(walls_changed)
 	_check(had_tree and _rig._room.get_instance_id() == room and not _rig._trees.has(felled) and _rig._clearing.get(felled, "") == "stump",
 			"live: a fell takes its tree at once (had one: %s), no rebuild" % had_tree)
+	_check(not walls_changed.is_empty() and (walled.call(felled) as Array).is_empty(),
+			"live: the felled cell's walls drawn again (%d edges changed), none round it" % walls_changed.size())
 	_rig.rebuild(terrain, level["centre"])
 	_check(_rig._wooded.has(felled) and not _rig._trees.has(felled) and _rig._clearing.get(felled, "") == "stump",
 			"next build: the felled cell the land's, the outline round it")
 	change = [[felled.x, felled.y, Clearing.TRUNK]]
-	Clearing.apply_cells(terrain, change)
+	walls_changed = Clearing.apply_cells(terrain, change)
 	room = _rig._room.get_instance_id()
 	_rig.clearing_changed(terrain, change)
+	_rig.clearing_walls(walls_changed)
 	_check(_rig._room.get_instance_id() == room and _rig._trees.has(felled) and not _rig._clearing.has(felled),
 			"live: grown back, a tree at once, no rebuild")
+	# The build's land still holds the cell: grown back, it is the void again,
+	# its edges the outline (trees), no wall.
+	_check(not walls_changed.is_empty() and _rig._grown_back.has(felled) and (walled.call(felled) as Array).is_empty(),
+			"live: the regrown trunk's edges the outline again, no wall round it")
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
 

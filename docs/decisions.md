@@ -25828,3 +25828,28 @@ v0.1.168).
 
 No wire change: the outline is parsed from the shipped level on both sides. level_test
 _test_felled_walls (fell a row, step in, regrow, walled again). No new class_name.
+
+## 591 amended (2), terrain's side: the felled ground's walls drawn again
+
+Maps' half re-walls felled ground by the outline rule and hands the changed edges to the
+view (Main calls Client3D.clearing_walls(edges) after clearing_changed, if the method is
+there; till now it redrew the whole zone).
+
+- **clearing_walls(edges)** draws the walls on those keys again through rebuild_walls,
+  the rest of the room untouched. A felled row's walls against the land go; the forest's
+  new edge round it is the outline, drawn as trees, never a wall.
+- **rebuild_walls** now takes _add_walls' own skips (one rule, _edge_drawn: the outline
+  outdoors, a fence's or a railing's edge, a rock's), so a redraw never puts back a wall
+  the build left out. It stands the posts at the given keys' ends again too, even where
+  the key is now open (a felled cell's), and puts a post only where a drawn edge meets it.
+  Buildings' broken and rubble town walls, its other caller, keep their look: their
+  keys are none of the skipped.
+- **The outline as the forest stands now.** The build's land (_land) is fixed for the
+  build, since the border's worker reads it, so _is_outline reads _on_land: a cell felled
+  since the build (_clearing) is land, and one grown back to a trunk since (_grown_back,
+  cleared each build) is the void, though _land still holds it.
+
+view_test _test_clearing: no wall or post round the four felled cells at the build; a
+live fell's changed edges drawn again with none round the cell; a live regrowth after a
+build, its trunk's edges the outline again with no wall round it (the last two fail with
+the build's land alone). Client only, protocol unchanged, no new class_name.
