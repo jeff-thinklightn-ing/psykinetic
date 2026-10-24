@@ -28,10 +28,10 @@ extends GridEntity
 ## her player said in the last ECHO_TICKS, or her own last SAID_REMEMBERED, are
 ## dropped.
 
-enum Intent { FOLLOW, HOLD, ATTACK, SHOVE, RETREAT, IDLE, YIELD, ERRAND, REVIVE, GUIDE, REST, SLEEP }
+enum Intent { FOLLOW, HOLD, ATTACK, SHOVE, RETREAT, IDLE, YIELD, ERRAND, REVIVE, GUIDE, REST, SLEEP, DODGE }
 enum Stance { STAY_CLOSE, HOLD, PRESS, GUARD, PULL_BACK }
 
-const INTENT_NAMES: Array[String] = ["FOLLOW", "HOLD", "ATTACK", "SHOVE", "RETREAT", "IDLE", "YIELD", "ERRAND", "REVIVE", "GUIDE", "REST", "SLEEP"]
+const INTENT_NAMES: Array[String] = ["FOLLOW", "HOLD", "ATTACK", "SHOVE", "RETREAT", "IDLE", "YIELD", "ERRAND", "REVIVE", "GUIDE", "REST", "SLEEP", "DODGE"]
 const STANCE_NAMES: Array[String] = ["STAY_CLOSE", "HOLD", "PRESS", "GUARD", "PULL_BACK"]
 const DEFAULT_STANCE := Stance.GUARD
 ## A bump this soon after the last one is the same bump (a held key).
@@ -610,6 +610,21 @@ var _sleeping := {}
 ## Asleep by the fire while her player keeps watch (621 amended: her intent
 ## SLEEP), replicated so her body lies down on their client.
 var asleep := false
+## A boss's telegraph (decision 663, drafts for Jeff): one whose source she
+## sees and that lands within DODGE_LOOK ticks, her cell in it, she steps
+## clear of after DODGE_REACT ticks (DODGE_WARY more, wary or worse) to a
+## free floor cell within DODGE_REACH outside every telegraph showing.
+const DODGE_LOOK := 12
+const DODGE_REACT := 2
+const DODGE_WARY := 2
+const DODGE_REACH := 3
+## Telegraph id -> the tick she first saw it; the cells of those she sees
+## (she steps into none while they show); where she dodges to; whose and
+## what it was, for her narration.
+var _dodge_seen := {}
+var _danger: Dictionary[Vector2i, bool] = {}
+var _dodge_to := Vector2i(-99999, -99999)
+var _dodge_from := ""
 ## A fight since she last slept, and the day she last asked for a watch.
 var _hard_day := false
 var _watch_day := -1
@@ -2546,6 +2561,8 @@ func doing() -> String:
 			action = "resting, as %s asked" % keeper_name()
 		Intent.SLEEP:
 			action = "asleep by the fire, while %s keeps watch" % keeper_name()
+		Intent.DODGE:
+			action = "leaping clear of %s" % _dodge_from
 		Intent.ERRAND:
 			action = "on your way to %s" % errand.get("words", "do what you were asked")
 		Intent.GUIDE:
@@ -3761,7 +3778,16 @@ func _act() -> void:
 	_door_hold = NONE
 	if guide != null and guide.going() and (foe != null or low):
 		_guide_ends("danger" if foe != null else "hurt")
-	if _reviving():
+	var dodge := _read_telegraphs(before_target)
+	if dodge != NONE and not _stands_over():
+		# A blow coming down on her cell (decision 663): clear of it first.
+		# Devoted over her downed player she stays and takes it.
+		_dodge_to = dodge
+		current_intent = Intent.DODGE
+		intent_target = before_target
+		if before != Intent.DODGE:
+			_narrate("You leap clear of %s." % _dodge_from)
+	elif _reviving():
 		# Her player downed (decision 544): a foe at her fought off, then to them.
 		_fight_or(foe, Intent.REVIVE)
 	elif _stands_over():
@@ -3997,6 +4023,12 @@ func _execute() -> void:
 	if current_intent != Intent.RETREAT:
 		_retreat_goal = NONE
 		_retreat_at = NONE
+	if not _danger.is_empty() and current_intent != Intent.DODGE and current_intent != Intent.RETREAT:
+		# A telegraph showing (decision 663): she steps into none of it; she
+		# strikes from where she stands if she can, else waits it out.
+		if current_intent == Intent.ATTACK and _alive(intent_target) and World.can_melee(tile, intent_target.tile):
+			World.try_attack(self, intent_target)
+		return
 	match current_intent:
 		Intent.FOLLOW:
 			_follow()
@@ -4025,8 +4057,60 @@ func _execute() -> void:
 			var why := guide.step(guide_routes.call() if guide_routes.is_valid() else null, _threatens)
 			if not why.is_empty():
 				_guide_ends(why)
+		Intent.DODGE:
+			if tile != _dodge_to:
+				_step_toward(_dodge_to, false)
 		Intent.IDLE, Intent.SHOVE:
 			pass
+
+
+## The telegraphs showing in her zone whose source she sees (decision 663),
+## each tick: their cells into _danger; the cell to dodge to when one
+## landing within DODGE_LOOK covers hers and she has had her reaction's
+## ticks since first seeing it, else NONE. Nearest first; of those as near,
+## one still beside [param fighting], else one farther from the blow's source.
+func _read_telegraphs(fighting: GridEntity) -> Vector2i:
+	_danger = {}
+	var shown := World.telegraphs()
+	for id: int in _dodge_seen.keys():
+		if not shown.has(id):
+			_dodge_seen.erase(id)
+	if shown.is_empty():
+		return NONE
+	var react := DODGE_REACT + (DODGE_WARY if hangs_back() else 0)
+	var from: GridEntity = null
+	for id: int in shown:
+		var data: Dictionary = shown[id]
+		if str(data.get("zone", "")) != zone:
+			continue
+		var source := get_node_or_null(NodePath(str(data.get("source", "")))) as GridEntity
+		if not source is Monster or World.distance(tile, source.tile) > SIGHT_RANGE \
+				or not World.has_line_of_sight(tile, source.tile):
+			continue
+		if not _dodge_seen.has(id):
+			_dodge_seen[id] = World.tick
+		var mine := false
+		for cell: Array in data.get("cells", []):
+			var at := Vector2i(int(cell[0]), int(cell[1]))
+			_danger[at] = true
+			mine = mine or at == tile
+		if mine and World.tick - int(_dodge_seen[id]) >= react and int(data.get("lands_tick", 0)) - World.tick <= DODGE_LOOK:
+			from = source
+			_dodge_from = "%s's %s" % [source.name, str(data.get("kind", "blow"))]
+	if from == null:
+		return NONE
+	var best := NONE
+	var best_score := 99999.0
+	for cell in _cells_within(DODGE_REACH):
+		if _danger.has(cell) or not World.is_walkable(cell) or (cell != tile and not World.is_free(cell)):
+			continue
+		var score := World.distance(tile, cell) * 100.0 - World.distance(from.tile, cell)
+		if _alive(fighting) and World.can_melee(cell, fighting.tile):
+			score -= 50.0
+		if score < best_score:
+			best = cell
+			best_score = score
+	return best
 
 
 ## Her walk (decision 551) stops, or is at a way out, for [param why]:

@@ -29567,3 +29567,32 @@ it never asked the monster.
 companion_test _test_seated_boss: seated near her under GUARD, no foe and
 no blow; a pact, her foe; the pact lost, let be; at rest, let be. Server
 only, protocol unchanged, no new class_name.
+
+## 663. She steps clear of a boss's telegraph
+
+Jeff's draugr fight on v0.1.172: "Pip didn't attempt to dodge the swing
+and died." A companion never read World.telegraphs() (decision 602), so she
+stood in a spin or a charge till it landed. The coordinator's approval;
+the numbers are drafts for Jeff.
+
+- Each choice (Companion._act, _read_telegraphs): the telegraphs showing in
+  her zone whose source (a Monster) she has a line to within SIGHT_RANGE.
+  Their cells are her danger. One covering her cell that lands within
+  DODGE_LOOK (12) ticks, once she has seen it DODGE_REACT (2) ticks
+  (DODGE_WARY 2 more when wary or worse: hangs_back), and she dodges:
+  Intent.DODGE (server only) to the nearest free floor cell within
+  DODGE_REACH (3) outside every telegraph showing; of those as near, one
+  still beside whom she fought, else one farther from the source. Her
+  voice is told "You leap clear of <source>'s <kind>."
+- While any telegraph she sees shows she steps into none of it: whatever
+  her intent (but a dodge or a retreat) she strikes from where she stands
+  if she can reach, else waits it out.
+- Devoted and standing over her downed player (_stands_over) she does not
+  dodge: she takes the blow for them (approved).
+- A telegraph she cannot see (no line to its source) she does not dodge;
+  a dodge too far for the ticks left still tries, and the blow lands.
+
+companion_test _test_dodge: a ring telegraphed over her; not before it
+nears and her reaction; clear of it before it lands; into none of it while
+it shows; nothing once it lands. Server only, protocol unchanged, no new
+class_name.

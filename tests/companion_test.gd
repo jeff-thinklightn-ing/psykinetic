@@ -102,6 +102,7 @@ func _ready() -> void:
 	_test_knows_level()
 	_test_wild()
 	_test_seated_boss()
+	_test_dodge()
 	_test_bandage_words()
 	_test_plain_orders()  # Late: its many lines fill the capped party log and Tab panel.
 	_test_last_words()  # She dies in it: keep it last of those that need her.
@@ -2969,6 +2970,39 @@ func _test_seated_boss() -> void:
 	draugr.rests_until = World.steps + 100000
 	_check(not pet._hostile(draugr), "at rest: let be")
 	World.despawn(draugr)
+	_kill_monsters()
+	_settle(pet)
+
+
+func _test_dodge() -> void:
+	print("\n== a boss's telegraph over her she steps clear of (decision 663; Jeff's draugr) ==")
+	_kill_monsters()
+	var owner := _player()
+	var pet := _companion()
+	_settle(pet)
+	_put(owner, Vector2i(4, 4))
+	_put(pet, Vector2i(10, 6))
+	var imp := _spawn_imp(pet.tile + Vector2i(1, 0))
+	imp.acts = false
+	var shape := {"kind": "ring", "origin": [imp.tile.x, imp.tile.y], "facing": [1, 0], "length": 2}
+	var id := World.telegraph(imp, "spin", shape, Companion.DODGE_LOOK + 6)
+	var cells := World.telegraph_cells(shape)
+	_check(id > 0 and pet.tile in cells, "a spin telegraphed over her cell")
+	World.step()
+	_check(pet.tile in cells and pet.current_intent != Companion.Intent.DODGE, "not yet: it lands later than she looks, and she reacts after a breath")
+	var dodged := false
+	for i in Companion.DODGE_LOOK + 4:
+		World.step()
+		dodged = dodged or pet.current_intent == Companion.Intent.DODGE
+	_check(dodged and not pet.tile in cells and pet._dodge_from.ends_with("'s spin"),
+		"before it lands she has dodged clear of it (%s at %s, %s)" % [pet.intent_name(), pet.tile, pet._dodge_from])
+	for i in 6:
+		World.step()
+	_check(not pet.tile in cells, "while it shows she steps into none of it (%s)" % pet.tile)
+	World.end_telegraph(id, true)
+	World.step()
+	_check(pet._danger.is_empty(), "landed: nothing showing for her")
+	World.despawn(imp)
 	_kill_monsters()
 	_settle(pet)
 
