@@ -606,7 +606,8 @@ var roofs_damaged: Dictionary[String, bool] = {}
 ## The draugr laid to rest (decisions 548, 580): zone name -> {"until":
 ## World.steps, "side": a faction}; that side's monsters in that zone lie
 ## still till then (Monster._mind_the_rest), asleep or awake, his own zone or
-## one his level "stills". Main saves it ("dead_rest").
+## one his level "stills". Kept through a room reset (Main._start_level),
+## never saved: a restart ends every rest (573 amended (4), Jeff's).
 var dead_rest: Dictionary[String, Dictionary] = {}
 ## A roof of [param level] was damaged or mended (Main tells the peers).
 signal roof_changed(level: String)
@@ -5762,7 +5763,8 @@ func despawn(entity: GridEntity) -> void:
 		return
 	_let_go_things(entity)
 	_forget_jobs(entity)
-	_occupancy.erase(entity.tile)
+	if _occupancy.get(entity.tile) == entity:
+		_occupancy.erase(entity.tile)  # Not one that holds no cell (vacate): another may stand there.
 	_entities.erase(entity)
 	_roster_changed()
 	zone.comings += 1
@@ -6196,6 +6198,8 @@ func damage(target: GridEntity, amount: int, source: GridEntity = null,
 		return
 	if not target.spawned or amount <= 0 or not target.is_breakable():
 		return
+	if not target.holds_cell:
+		return  # Gone (573 amended (4), the draugr at rest): nothing there to hurt.
 	if is_downed(target) and cause != &"bled":
 		return  # Downed (decision 544): no blow lands on the fallen.
 	if is_sheltered(target) and cause != &"bled":
@@ -6711,7 +6715,8 @@ func mirror_changed() -> void:
 		return
 	_occupancy.clear()
 	for entity in _entities:
-		_occupancy[entity.tile] = entity
+		if entity.holds_cell:
+			_occupancy[entity.tile] = entity
 
 
 func _try_hit(attacker: GridEntity, target: GridEntity, hit_damage: int, is_shove: bool,
@@ -7646,7 +7651,8 @@ func swap_places(a: GridEntity, b: GridEntity, duration: float) -> bool:
 
 func _relocate(entity: GridEntity, to: Vector2i) -> void:
 	var from: Vector2i = entity.tile
-	_occupancy.erase(from)
+	if _occupancy.get(from) == entity:
+		_occupancy.erase(from)
 	_occupancy[to] = entity
 	entity._world_set_tile(to)
 	entity._world_note_moved(tick)
@@ -8032,7 +8038,49 @@ func are_adjacent(a: Vector2i, b: Vector2i) -> bool:
 ## push code itself still treats every body alike, so a player can be caught
 ## by a crate or monster that someone else sent flying.
 func can_target(attacker: GridEntity, target: GridEntity) -> bool:
-	return attacker.owner_peer == 0 or target.owner_peer == 0
+	return target.holds_cell and (attacker.owner_peer == 0 or target.owner_peer == 0)
+
+
+## [param entity] out of everyone's way (573 amended (4): the draugr gone at
+## rest): kept in the zone's entities, its tile [param at] (where it is
+## saved), but it holds no cell, so another may stand there, and nothing
+## strikes it (can_target). hold_cell takes one again. Server only.
+func vacate(entity: GridEntity, at: Vector2i) -> void:
+	if not Net.is_authority():
+		return
+	if _occupancy.get(entity.tile) == entity:
+		_occupancy.erase(entity.tile)
+	entity.holds_cell = false
+	if entity.tile != at:
+		var from := entity.tile
+		entity._world_set_tile(at)
+		entity_moved.emit(entity, from, at)
+
+
+## [param entity], vacated, holding a cell again: [param at] if free, else
+## the first free one beside it (a step, no wall edge between); false, and
+## still vacated, with none (it waits). Server only.
+func hold_cell(entity: GridEntity, at: Vector2i) -> bool:
+	if not Net.is_authority():
+		return false
+	if entity.holds_cell:
+		return true
+	var cell := at
+	if not is_free(at):
+		cell = NO_CELL
+		for way in Relief.FOUR:
+			if is_free(at + way) and not _terrain_blocks_step(at, way):
+				cell = at + way
+				break
+		if cell == NO_CELL:
+			return false
+	_occupancy[cell] = entity
+	entity.holds_cell = true
+	if entity.tile != cell:
+		var from := entity.tile
+		entity._world_set_tile(cell)
+		entity_moved.emit(entity, from, cell)
+	return true
 
 
 ## Adjacent, with no wall or closed door between: nothing hits through a wall
@@ -8253,6 +8301,15 @@ func is_down(entity: GridEntity) -> bool:
 func knock_down(target: GridEntity, source: GridEntity, ticks: int) -> void:
 	if not Net.is_authority() or ticks <= 0 or is_sheltered(target):
 		return  # (Arriving, decision 661: not knocked down.)
+	if target is Monster and (target as Monster).never_lies:
+		# Never on the floor (573 amended (4), the draugr; approved by the
+		# coordinator, combat's file): a stagger, the stun alone. No
+		# knocked_down, so the party log tells no knockdown (Main._narrate_down).
+		target.raised = ""
+		_wear_bundle(target)
+		_stun_for(target, ticks)
+		_log("staggered: %s by %s for %d ticks (never lies)" % [target.name, source.name if is_instance_valid(source) else "?", ticks])
+		return
 	target.down_until = maxi(target.down_until, tick + ticks)
 	target.raised = ""
 	_wear_bundle(target)

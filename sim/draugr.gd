@@ -107,6 +107,18 @@ const FISTS_BEFORE_AXE := 3
 const TITLE := "Face the draugr"
 
 var state := State.SEATED
+## At rest he is gone (573 amended (4); Jeff: "he is otherworldly, he
+## probably leaves a pile of his clothes, his crown, his axe on the ground"):
+## no body, holding no cell (World.vacate), touched by nothing; his remains
+## (art-kit's prop.draugr_remains) lie at pile_at, turned pile_facing (a
+## prop's facing, Client3D's), and a click or E there hears his rest words.
+## He comes back at his seat when his rest is over. Replicated, all three.
+var gone := false:
+	set(value):
+		gone = value
+		holds_cell = not value
+var pile_at := NO_TILE
+var pile_facing := Vector2i(0, 1)
 ## The pact's: whose it is (a player id), at what deal (its name), and the
 ## charges held in his zone when it began.
 var challenger_id := ""
@@ -163,6 +175,9 @@ signal said(text: String)
 func _ready() -> void:
 	super()
 	talks = true
+	replicate("gone")
+	replicate("pile_at")
+	replicate("pile_facing")
 	if not Net.is_authority():
 		return
 	_base_hp = max_hp
@@ -174,10 +189,20 @@ func _ready() -> void:
 		var rest: Dictionary = World.dead_rest.get(zone if zone != "" else World.zone.name, {})
 		if not rest.is_empty() and str(rest.get("side", "")) == _factions().of_kind(str(spawn_spec.get("kind", "draugr"))):
 			kept = int(rest.get("until", 0))
+			if rest.has("pile"):
+				_keep_prop("pile", rest["pile"])  # His remains where he fell (573 amended (4)).
+				_keep_prop("pile_facing", rest.get("pile_facing", [0, 1]))
 	if kept != null and int(kept) > World.steps:
 		rests_until = int(kept)
 		_keep_prop("rests_until", rests_until)
 		state = State.AT_REST
+		# Gone, his remains where he fell (573 amended (4)); an old rest
+		# without them leaves them at his seat. He holds no cell from his
+		# first tick (_stay_gone: World.spawn gives him his seat's).
+		var props: Dictionary = spawn_spec.get("props", {})
+		pile_at = _cell(props.get("pile"), home if home != NO_TILE else tile)
+		pile_facing = _cell(props.get("pile_facing"), Vector2i(0, 1))
+		gone = true
 	# What a client may read of him (648, npc's side): seated at his spawn, or at rest, a click talks.
 	peaceable = state == State.SEATED or state == State.AT_REST
 
@@ -186,6 +211,8 @@ func _sim_tick() -> void:
 	# What a client may read of him (648, npc's side): seated and unprovoked, or at rest (573 amended (3):
 	# his rest words), a click or E talks; in a pact, struck or provoked, it strikes.
 	peaceable = state == State.SEATED and _provoked == null and _struck_by() == null or state == State.AT_REST
+	if gone and state != State.AT_REST and not _come_back():
+		return  # His rest over, someone on his seat and every cell beside it: he waits, gone.
 	if state != State.AT_REST:
 		_speak()  # At rest he is silent (573 amended (3)): no offer, no hall ask.
 	match state:
@@ -198,7 +225,7 @@ func _sim_tick() -> void:
 			elif World.tick - _stilled_tick >= STILL_EVERY_TICKS:
 				_still_the_dead()
 	if state == State.AT_REST:
-		_rest_still()  # Laid to rest: he stands still at his seat till his rest runs out, struck or not.
+		_stay_gone()  # At rest he is gone till his rest runs out (573 amended (4)).
 		return
 	super()
 
@@ -658,6 +685,8 @@ func _yield() -> void:
 	if rests_until <= World.steps:
 		rests_until = World.steps + RISE_DAYS * DayNight.day_steps
 		_keep_prop("rests_until", rests_until)
+	if rests_until > World.steps:
+		_vanish()
 	_rest_over(rests_until)
 	_open_hall()
 	_restore()
@@ -700,17 +729,70 @@ func _restore() -> void:
 	_retinue.clear()
 
 
-## At rest (573 amended (3); Jeff on v0.1.172: "Draugr is lying on ground
-## full health"): he stands, never lying, back to his seat (home: the
-## throne's cell, its stand point drawn) and still there, turned its way;
-## his seated idle, when pc-character's 580 step 4 lands, sits him on it.
-func _rest_still() -> void:
+## Beaten (573 amended (4); Jeff: "when draugr falls i think he should not
+## lie down"): he is gone, his remains on the cell he fell on, turned the
+## first way (his own first, then on round) whose two side cells, where the
+## axe's ends lie (art-kit's measure), are floor with no wall edge between;
+## his own way if none is. He is kept at his seat, holding no cell.
+func _vanish() -> void:
+	pile_at = tile
+	pile_facing = _pile_way(tile)
+	_keep_prop("pile", [pile_at.x, pile_at.y])
+	_keep_prop("pile_facing", [pile_facing.x, pile_facing.y])
+	gone = true
+	World.vacate(self, home if home != NO_TILE else tile)
+	print("[draugr] %s: gone, his remains left" % (zone if zone != "" else World.zone.name))
+
+
+## The way his remains lie at [param cell] (_vanish): a prop's facing, its
+## local +x (the axe head's side) (facing.y, -facing.x).
+func _pile_way(cell: Vector2i) -> Vector2i:
+	var own := Vector2i(signi(facing.x), 0) if absi(facing.x) >= absi(facing.y) else Vector2i(0, signi(facing.y))
+	if own == Vector2i.ZERO:
+		own = Vector2i(0, 1)
+	var way := own
+	for i in 4:
+		var side := Vector2i(way.y, -way.x)
+		if World.is_walkable(cell + side) and World.is_walkable(cell - side) \
+				and World.can_melee(cell, cell + side) and World.can_melee(cell, cell - side):
+			return way
+		way = Vector2i(-way.y, way.x)
+	return own
+
+
+## At rest: gone, kept at his seat holding no cell (a respawn from the
+## level's table put him on it).
+func _stay_gone() -> void:
 	target = null
-	if home != NO_TILE and tile != home:
-		move_ticks = _pace * IDLE_PACE
-		_idle_step(home)
-	elif facing != home_facing:
+	if not gone:
+		gone = true
+	var seat := home if home != NO_TILE else tile
+	if holds_cell or tile != seat:
+		World.vacate(self, seat)
+
+
+## His rest over: back at his seat, or the first free cell beside it (the
+## coordinator's), his remains gone; false while every one is taken.
+func _come_back() -> bool:
+	if not World.hold_cell(self, home if home != NO_TILE else tile):
+		return false
+	gone = false
+	pile_at = NO_TILE
+	_keep_prop("pile", null)
+	_keep_prop("pile_facing", null)
+	if home_facing != Vector2i.ZERO:
 		World.face(self, home_facing)
+	print("[draugr] %s: he stands again" % (zone if zone != "" else World.zone.name))
+	return true
+
+
+## A saved cell ([x, y], or a Vector2i) read back; [param otherwise] if it is neither.
+static func _cell(value: Variant, otherwise: Vector2i) -> Vector2i:
+	if value is Vector2i:
+		return value
+	if value is Array and (value as Array).size() == 2:
+		return Vector2i(int(value[0]), int(value[1]))
+	return otherwise
 
 
 ## Whether he rests (573 amended (3)): laid to rest, silent, no pact.
@@ -734,6 +816,8 @@ func _rise_again() -> void:
 	if state == State.AT_REST:
 		state = State.SEATED
 		print("[draugr] %s: his rest is over" % (zone if zone != "" else World.zone.name))
+	if gone:
+		_come_back()  # Else each tick tries again (_sim_tick).
 	for entity in World.monsters():
 		if entity != self and entity is Monster and _is_dead(entity):
 			(entity as Monster).rise()
@@ -751,11 +835,16 @@ func _still_the_dead() -> void:
 
 ## His rest, till World.steps [param until], laid over his side's dead in
 ## his own zone and each his level "stills" (World.dead_rest, decision 580;
-## saved, so it holds in a zone asleep, unloaded or after a restart).
+## kept through a zone asleep or unloaded and a room reset, not a restart).
 func _rest_over(until: int) -> void:
 	var side := _factions().of_kind(World.kind_of(self))
+	var own := zone if zone != "" else World.zone.name
 	for zone_name in _rest_zones():
 		World.dead_rest[zone_name] = {"until": until, "side": side}
+		if zone_name == own and pile_at != NO_TILE:
+			# His remains, so a reset or restart lays them again (573 amended (4)).
+			World.dead_rest[zone_name]["pile"] = [pile_at.x, pile_at.y]
+			World.dead_rest[zone_name]["pile_facing"] = [pile_facing.x, pile_facing.y]
 
 
 ## His own zone and those his level's "stills" names.

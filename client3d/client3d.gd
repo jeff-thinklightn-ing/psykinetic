@@ -3465,7 +3465,7 @@ func entity_under_mouse() -> GridEntity:
 		if not area.has_meta("entity"):
 			return null
 		var entity := instance_from_id(area.get_meta("entity")) as GridEntity
-		if entity != null and entity.spawned and entity != own:
+		if entity != null and entity.spawned and entity != own and entity.holds_cell:  # Not one gone (573 amended (4)).
 			return entity
 		exclude.append(hit["rid"])
 	return monster_near_ray(ray[0], ray[1])
@@ -12673,11 +12673,18 @@ func _sync_puppets() -> void:
 			puppet.process_mode = Node.PROCESS_MODE_INHERIT
 			entity.set_process(true)
 			entity._display_caught_up()
-		if _low:
+		if not entity.holds_cell:
+			# Gone (573 amended (4), the draugr at rest): not drawn at once;
+			# back, he eases in (REACH_EASE) where he stands again.
+			puppet.set_meta("reach_in", false)
+			puppet.remove_meta("reach_at")
+			puppet.visible = false
+			continue
+		if _low or puppet.has_meta("reach_in"):
 			# The low camera sees past World.NEAR_TILES: a body out there is
 			# not drawn (it would stand still, unthinking, 238); one crossing
-			# the edge eases in or out (REACH_EASE).
-			_ease_reach(puppet, Vector2(entity.tile).distance_to(aim) <= World.NEAR_TILES, made, now)
+			# the edge eases in or out (REACH_EASE), as does one come back.
+			_ease_reach(puppet, not _low or Vector2(entity.tile).distance_to(aim) <= World.NEAR_TILES, made, now)
 		var grid := Iso.local_to_grid(entity.position)
 		var at := Vector3(grid.x, _ground_height(grid), grid.y)
 		if puppet.position != at:

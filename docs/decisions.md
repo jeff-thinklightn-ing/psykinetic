@@ -28976,3 +28976,63 @@ the label from release.
   _test_reset_keeps_rests (a room reset keeps this room's rest and
   another's). Wire: peaceable's meaning (a line under the next revision,
   per release); no new class_name.
+
+## 573 amended (4), enemy-ai's side: beaten, the draugr is gone and leaves his remains; a restart resets him
+
+Jeff, after 573 amended (3): "when draugr falls i think he should not lie
+down, he is otherworldly, he probably leaves a pile of his clothes, his
+crown, his axe on the ground", and "why does his health and status not
+reset on server restart". The coordinator's shape, approved with the seat
+cell freed; art-kit's prop.draugr_remains and its axe's reach. Replaces
+573 amended (3)'s (i) (standing at his seat at rest).
+
+- **Gone**: when he yields (paid or unpaid) into his rest, Draugr._vanish
+  sets gone and leaves his remains at pile_at, the cell he fell on, turned
+  pile_facing. World.vacate keeps him in the zone's entities at his seat
+  (home, where a snapshot saves him) but holding no cell
+  (GridEntity.holds_cell false): anyone may stand on the dais. Nothing
+  strikes or hurts him (World.can_target and World.damage skip a body that
+  holds no cell; Monster._may_fight too). Replicated: gone, pile_at,
+  pile_facing (SUBCLASS_REPLICATED, a line under 36); a client sets
+  holds_cell from gone, so its occupancy (mirror_changed) and picking skip
+  him, and Client3D hides his body at once.
+- **His remains**: art-kit's prop.draugr_remains, drawn by Client3D at
+  pile_at once it lands (until then, nothing there). It is not an entity
+  and blocks nothing; it cannot be looted. A click or E on its cell
+  (Main.remains_at) talks to him; Main.talk_cell measures the reach from
+  the remains, so the asker hears his rest words there. Its facing (a
+  prop's: rotation.y = atan2(f.x, f.y)) is the first of his own way and
+  then round whose two side cells (f.y, -f.x) and its opposite, where the
+  axe's head and butt lie (art-kit's measure, 0.21 m past each side edge),
+  are floor with no wall edge between (World.can_melee); his own way if
+  none is.
+- **Back**: when his rest is over (_rise_again), World.hold_cell takes his
+  seat again, or the first free cell beside it (a step, no wall edge
+  between); with every one taken he waits, gone, and tries each tick. His
+  remains go; Client3D eases his body in (REACH_EASE, the low camera's
+  ease) where he stands. The mist and a sound are for later.
+- **Kept**: World.dead_rest's entry for his own zone carries "pile" and
+  "pile_facing", so a room reset puts him back gone with his remains where
+  they were (Draugr._ready, through his props); an old rest without them
+  lays them at his seat.
+- **Never lying**: his kinds row has "never_lies" (Monster.never_lies, read
+  by read_kinds); World.knock_down gives such a body the stun alone (its
+  raised lowered, its bundle worn), down_until untouched, and no
+  knocked_down signal, so the party log (Main._narrate_down) tells no
+  knockdown (combat's note; the coordinator's approval of the line in
+  combat's file).
+- **A restart resets him** (Jeff): World.dead_rest is no longer saved or
+  read at boot, so after a restart he sits whole, no pact or rest, and his
+  dead are awake; a room reset still keeps every rest (573 amended (3)'s
+  (ii) for resets only). A saved zone's draugr is restored at his full hp,
+  not the saved hp. A per-payer deal, once it exists, will outlive a
+  restart on its own record.
+- Tests: monster_test _test_draugr (a knockdown staggers him, never down;
+  beaten, gone: his remains where he fell, his seat free and not his,
+  struck by nothing, talked to at his remains; a stray blow finds nothing;
+  rested, back beside his seat when a player stands on it, his remains
+  gone; put back from the table by his zone's rest, gone again with his
+  remains where they were); resident_test _test_reset_keeps_rests (the
+  remains kept with the rest); view_test _test_barrow_dead (one holding no
+  cell is not drawn; back, it eases in). Wire: gone, pile_at, pile_facing
+  under 36; no new class_name.

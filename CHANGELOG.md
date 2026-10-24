@@ -7,7 +7,8 @@ notes (decision 324).
 
 ## Unreleased
 
-- The draugr at rest no longer lies on the floor or asks for gold: he goes back to his seat and stands there silent, a click or E tells you "He rests. Come back in N days.", no pact can be bought until he rises, and resetting the room or restarting the server no longer cuts his rest short.
+- The draugr at rest no longer lies on the floor or asks for gold: beaten, he is gone, leaving his cloak, crown and axe where he fell (drawn once art-kit's piece lands); a click or E there tells you "He rests. Come back in N days.", no pact can be bought until he rises, and resetting the room no longer cuts his rest short. When his rest is over he stands again at his seat (or beside it if someone is standing on it).
+- The draugr is never knocked to the floor: a knockdown only staggers him. A server restart resets him: seated, whole, no pact or rest.
 - The barrow's dead no longer lie on the floor or sink into walls: a resting skeleton stands still on its own cell, turns straight to you when it sees you (no getting up), and after a chase walks back to the cell it was laid on and stands there.
 - The Hall of Fallen Souls keeps its reward: one chest on the dais beside the draugr's throne, rolling the old Hall's goods (rare plate, mail, a sword), reached only past the dead's seal and the draugr; its goods are rolled anew each time the Ossuary shifts.
 - The barrow is two depths now: the Hall of Fallen Souls is a great room at the far end of the Ossuary, sealed until the Ossuary's dead are all down, and the dark level below it is gone (anyone saved there wakes at the Ossuary's stair foot).

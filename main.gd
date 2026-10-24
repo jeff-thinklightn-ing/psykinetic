@@ -1335,6 +1335,8 @@ func _unhandled_input(event: InputEvent) -> void:
 	var tile := target.tile if target != null else _mouse_tile()
 	if target == null:
 		target = World.get_entity_at(tile)
+	if target == null:
+		target = remains_at(tile)  # A gone draugr's remains: a click talks to him (573 amended (4)).
 	# A bow in hand (Jeff, 2026-10-22: "just like shift+LMB to draw back,
 	# mouse to move only"): Shift (the stand key) with the left button draws
 	# at once and the release looses; letting go of Shift mid-draw changes
@@ -1403,6 +1405,8 @@ func _click_with_bow(player: Player) -> void:
 	var tile := target.tile if target != null else _mouse_tile()
 	if target == null:
 		target = World.get_entity_at(tile)
+	if target == null:
+		target = remains_at(tile)
 	if target is Chest:
 		_walk_to_chest(player, target)
 	elif target != null and target != player and talks_on_click(target):
@@ -1441,10 +1445,10 @@ func _talk_to(player: Player, friend: GridEntity) -> void:
 	if _is_own_companion(friend) and World.can_melee(player.tile, friend.tile):
 		World.command(player, "make_way", {"target": str(friend.get_path())})
 		return
-	if World.distance(player.tile, friend.tile) <= TALK_REACH:
+	if World.distance(player.tile, talk_cell(friend)) <= TALK_REACH:
 		_open_talk(friend)
 		return
-	var beside := _beside(friend.tile, player.tile)
+	var beside := _beside(talk_cell(friend), player.tile)
 	if beside == NONE and _is_own_companion(friend):
 		beside = friend.tile  # A corridor: walk at her, and the bump swaps you.
 	if beside == NONE:
@@ -1672,7 +1676,7 @@ func _update_talk() -> void:
 			or Time.get_ticks_msec() > _talk_until:
 		_talk_wanted = null
 		return
-	if World.distance(player.tile, _talk_wanted.tile) <= TALK_REACH:
+	if World.distance(player.tile, talk_cell(_talk_wanted)) <= TALK_REACH:
 		_open_talk(_talk_wanted)
 
 
@@ -1746,6 +1750,8 @@ func _press_e() -> void:
 	_e_target = _entity_under_mouse()
 	if _e_target == null:
 		_e_target = World.get_entity_at(_mouse_tile())
+	if _e_target == null:
+		_e_target = remains_at(_mouse_tile())
 	_e_door = _door_under_mouse()
 
 
@@ -1767,7 +1773,7 @@ func _tap_e(player: Player) -> void:
 		_open_pack(player, target)
 		return
 	if is_instance_valid(target) and target.spawned and (target is Resident or talks_peaceably(target)) \
-			and World.distance(player.tile, target.tile) <= HEARING_RANGE:
+			and World.distance(player.tile, talk_cell(target)) <= HEARING_RANGE:
 		_open_talk(target)  # A resident (560), or a peaceable talking monster (629, ui's side).
 		return
 	var door := _e_door
@@ -3173,13 +3179,10 @@ func _boot() -> void:
 	World.steps = snapshot.get("steps", 0)
 	# Each regenerating level's generation (decision 465), before any zone opens.
 	_regen = Regen.states_from(snapshot.get("regen", {}))
-	# The draugr's rest over the barrow's dead, by zone (decision 580).
+	# The draugr's rest over the barrow's dead (decision 580): none after a restart (573 amended (4);
+	# Jeff: "why does his health and status not reset on server restart"): he is back seated, whole,
+	# his dead awake. A room reset keeps it (_start_level); it is not saved.
 	World.dead_rest.clear()
-	var rests: Variant = snapshot.get("dead_rest", {})
-	if rests is Dictionary:
-		for zone_name: Variant in rests:
-			if rests[zone_name] is Dictionary:
-				World.dead_rest[str(zone_name)] = (rests[zone_name] as Dictionary).duplicate()
 	# A level-placed captive (decision 518): the camps whose holds are placed already, so each is placed once.
 	_placed_captives = snapshot.get("placed_captives", {}).duplicate(true) if snapshot.get("placed_captives") is Dictionary else {}
 	_sought_bands = snapshot.get("sought_bands", {}).duplicate(true) if snapshot.get("sought_bands") is Dictionary else {}
@@ -4184,7 +4187,8 @@ func _spawn_saved(section: Dictionary) -> bool:
 		var entity := _spawn(spec)
 		if entity == null:
 			continue
-		World.restore(entity, entry["hp"], entry["stamina"], entry["facing"])
+		# The draugr whole again from a saved zone (573 amended (4), Jeff: a restart resets him).
+		World.restore(entity, entity.max_hp if entity is Draugr else entry["hp"], entry["stamina"], entry["facing"])
 		if entry.get("slots") != null:
 			World.set_slots(entity, entry["slots"], entry.get("items", []))
 		_top_up(entity, entry["spec"])
@@ -4728,7 +4732,6 @@ func _save_state(wait := true) -> void:
 		"herds": World.herds.to_dict() if World.herds != null else {},
 		"items": World.items.to_dict(),
 		"regen": _regen,
-		"dead_rest": World.dead_rest,
 		"sky": _sky_saved()}).duplicate(true)  # Its own: the sim goes on meanwhile.
 	_finish_saving()
 	_saver = Thread.new()
@@ -9124,7 +9127,7 @@ func _on_command(entity: GridEntity, command_name: String, args: Dictionary) -> 
 		var body := asked as Resident
 		if body != null and body.spawned and World.distance(body.tile, entity.tile) <= HEARING_RANGE:
 			_send_offers(body, (entity as Player).player_id, entity.owner_peer)
-		elif asked != null and asked.has_method("offers_for") and asked.spawned and World.distance(asked.tile, entity.tile) <= HEARING_RANGE:
+		elif asked != null and asked.has_method("offers_for") and asked.spawned and World.distance(talk_cell(asked), entity.tile) <= HEARING_RANGE:
 			_send_monster_offers(asked as GridEntity, (entity as Player).player_id, entity.owner_peer)  # A talking monster's deals asked again (decision 629).
 	elif command_name == "offer" and entity is Player:
 		_accept_offer(entity as Player, str(args.get("id", "")), int(args.get("gold", 0)))
@@ -9589,6 +9592,23 @@ func talks_peaceably(entity: GridEntity) -> bool:
 	return entity is Monster and (entity as Monster).talks and (entity as Monster).peaceable
 
 
+## Where one is talked to from (573 amended (4)): a gone draugr at his
+## remains (Draugr.pile_at), anyone else where they stand.
+static func talk_cell(entity: GridEntity) -> Vector2i:
+	if entity is Draugr and (entity as Draugr).gone and (entity as Draugr).pile_at != Draugr.NO_TILE:
+		return (entity as Draugr).pile_at
+	return entity.tile
+
+
+## The gone draugr whose remains lie at [param cell] (573 amended (4)), for
+## a click or E there; null if none.
+func remains_at(cell: Vector2i) -> GridEntity:
+	for entity in World.entities():
+		if entity is Draugr and entity.spawned and (entity as Draugr).gone and (entity as Draugr).pile_at == cell:
+			return entity
+	return null
+
+
 ## A deal button pressed (629, ui's side): the "offer" command with his
 ## deal's [param id] and [param amount] of gold, as a typed sum would send.
 func _offer_deal(id: String, amount: int) -> void:
@@ -9605,7 +9625,7 @@ func _update_deal() -> void:
 	var who := instance_from_id(deal_panel.entity_id) as GridEntity
 	var player := _local_player()
 	if who == null or not is_instance_valid(who) or not who.spawned or not talks_peaceably(who) \
-			or player == null or World.distance(player.tile, who.tile) > HEARING_RANGE:
+			or player == null or World.distance(player.tile, talk_cell(who)) > HEARING_RANGE:
 		deal_panel.close()
 	elif deal_panel.purse != gold:
 		deal_panel.set_purse(gold)
@@ -11251,7 +11271,7 @@ func _monster_accepts(monster: GridEntity, player: Player, offer: Dictionary, go
 ## the message alone, empty.
 func _monster_greeted(player: Player, monster: GridEntity) -> void:
 	if monster == null or player == null or not monster.spawned or monster.zone != player.zone \
-			or World.distance(monster.tile, player.tile) > HEARING_RANGE:
+			or World.distance(talk_cell(monster), player.tile) > HEARING_RANGE:
 		return
 	var key := String(monster.get_path())
 	var name := _display_name(monster)

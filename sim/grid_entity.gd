@@ -157,6 +157,11 @@ var hurt_tick := -100000
 ## Can be shoved along by something walking into it. Force pushes ignore this.
 @export var pushable := false
 @export var blocks_sight := false
+## Whether it holds its cell (573 amended (4)): false, it is in the zone's
+## entities but in nobody's way and touched by nothing (World.vacate; the
+## draugr gone at rest); World.hold_cell takes one again. Each side sets it
+## (the draugr from his replicated gone), so a client's occupancy skips it.
+var holds_cell := true
 ## The zone (World.zones) this entity is in; its spawn spec says, and
 ## World.spawn makes sure. "" on a client, which has one.
 var zone := ""

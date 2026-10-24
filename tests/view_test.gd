@@ -5370,6 +5370,16 @@ func _test_barrow_dead() -> void:
 		shadows[own.resource_name if own != null else ""] = mesh.cast_shadow != GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_check(shadows.get(Client3D.GHOST_MATERIAL) == false and shadows.get(ArtKit.PALETTE_NAME) == true,
 			"the ghost's shroud casts no shadow, its bones do (%s)" % shadows)
+	# Gone (573 amended (4); Jeff: the draugr "should not lie down, he is otherworldly"): one holding
+	# no cell is not drawn, at once; back, it eases in (REACH_EASE) where it stands again.
+	var draugr_puppet: Node3D = _rig._puppets[dead[2].get_instance_id()]
+	dead[2].holds_cell = false
+	_rig._process(0.0)
+	var hidden := not draugr_puppet.visible
+	dead[2].holds_cell = true
+	_rig._process(0.0)
+	_check(hidden and draugr_puppet.visible and draugr_puppet.has_meta("reach_at"),
+			"gone, the draugr's body is not drawn; back, it eases in (hidden %s, shown %s)" % [hidden, draugr_puppet.visible])
 	# At rest (631 amended; Jeff: "lying down on ground, clipping through walls"): the skeleton and its
 	# guard stand on their cell at their idle, not tipped over, and every joint of the posed body (with a
 	# hand's breadth of flesh) stays inside the cell at all eight facings, so none crosses a wall edge.

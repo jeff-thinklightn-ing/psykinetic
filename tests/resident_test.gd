@@ -791,12 +791,14 @@ func _end_band(rules_was: Variant) -> void:
 ## and his dead rest on when his room is put back from the level's table.
 func _test_reset_keeps_rests() -> void:
 	print("
-== a room reset keeps the draugr's rests (573 amended (3)) ==")
-	World.dead_rest["rs_lair"] = {"until": World.steps + 500, "side": "dead"}
+== a room reset keeps the draugr's rests and his remains (573 amended (3), (4)) ==")
+	World.dead_rest["rs_lair"] = {"until": World.steps + 500, "side": "dead", "pile": [4, 2], "pile_facing": [1, 0]}
 	World.dead_rest[TOWN] = {"until": World.steps + 300, "side": "dead"}
 	_main._start_level()
 	_check(World.dead_rest.get("rs_lair", {}).get("until") == World.steps + 500 and World.dead_rest.get(TOWN, {}).get("until") == World.steps + 300,
 		"after the reset both rests stand, this room's and another's (%s)" % [World.dead_rest])
+	_check(World.dead_rest.get("rs_lair", {}).get("pile") == [4, 2] and World.dead_rest["rs_lair"].get("pile_facing") == [1, 0],
+		"and his remains with his rest, so the reset lays them again")
 	World.dead_rest.clear()
 
 

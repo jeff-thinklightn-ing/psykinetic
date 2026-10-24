@@ -123,6 +123,7 @@
 	"draugr": {
 		"label": "Draugr",
 		"script": "res://sim/draugr.gd",
+		"never_lies": true,
 		"body": {"mass": 120.0, "move_ticks": 4.5, "max_hp": 30, "attack_ticks": 14, "attack_damage": 3, "sight_range": 5, "max_stamina": 100},
 		"tactic": "heavy",
 		"idle": "guard",

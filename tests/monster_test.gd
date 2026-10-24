@@ -2358,6 +2358,10 @@ func _test_draugr() -> void:
 			fought = true
 			break
 	_check(fought, "he fights his challenger")
+	World.knock_down(draugr, player, 10)
+	_check(not World.is_down(draugr) and draugr.down_until <= World.tick and World.is_stunned(draugr),
+		"knocked down, he only staggers: never on the floor (573 amended (4))")
+	var fell := draugr.tile
 	World.damage(draugr, 999, player)
 	_check(draugr.spawned and draugr.hp == draugr.max_hp and draugr.max_hp == 30 and draugr.blessed_last == ["p1"],
 		"beaten, he yields, never dies: the players in his lair are blessed (%s)" % [draugr.blessed_last])
@@ -2365,6 +2369,12 @@ func _test_draugr() -> void:
 	_check(draugr.state == Draugr.State.AT_REST and draugr.rests_until == World.steps + Draugr.RISE_DAYS * DayNight.day_steps
 		and draugr.spawn_spec["props"].get("rests_until") == draugr.rests_until and not World.is_down(draugr),
 		"and rests three days, standing (573 amended (3): never lying), kept in his props")
+	_check(draugr.gone and not draugr.holds_cell and draugr.pile_at == fell and draugr.tile == draugr.home
+		and World.get_entity_at(draugr.home) != draugr and World.get_entity_at(fell) != draugr and not World.can_target(player, draugr)
+		and draugr.pile_facing in [Vector2i(0, 1), Vector2i(1, 0), Vector2i(0, -1), Vector2i(-1, 0)]
+		and draugr.spawn_spec["props"].get("pile") == [fell.x, fell.y],
+		"beaten, he is gone (573 amended (4)): his remains where he fell (%s, facing %s), he at his seat holding no cell, struck by nothing" % [draugr.pile_at, draugr.pile_facing])
+	_check(Main.talk_cell(draugr) == fell, "the one who would talk to him talks at his remains")
 	_check(draugr.peaceable and draugr.resting() and draugr.offers_for("p1").is_empty() and draugr.rest_words() == "He rests. Come back in 3 days.",
 		"at rest a click talks, he offers nothing, and the one who asks hears how long (%s)" % draugr.rest_words())
 	_check(spawned.all(func(r: GridEntity) -> bool: return not r.spawned) and skeleton.laid, "his risen gone, the barrow's dead lie still")
@@ -2381,15 +2391,17 @@ func _test_draugr() -> void:
 		World.step()
 	_check(spoken.size() == heard and not draugr.hall_shut, "at rest he is silent: no deal spoken to one come in, no hall shut")
 	draugr.home = Vector2i(2, 2)
-	for i in 80:
-		World.step()
-		if draugr.tile == draugr.home and draugr.facing == draugr.home_facing:
-			break
-	_check(draugr.tile == draugr.home and draugr.facing == draugr.home_facing and not World.is_down(draugr) and draugr.state == Draugr.State.AT_REST,
-		"at rest he walks back to his seat and stands there, turned its way (%s, facing %s of %s, down %s)" % [draugr.tile, draugr.facing, draugr.home_facing, World.is_down(draugr)])
+	World.step()
+	_check(draugr.tile == draugr.home and draugr.gone and World.get_entity_at(draugr.home) == null and draugr.state == Draugr.State.AT_REST,
+		"at rest he is kept at his seat, holding no cell (%s)" % draugr.tile)
+	_move_to(player, draugr.home)
+	_check(player.tile == draugr.home, "his seat is free to stand on while he is gone")
 	World.steps = draugr.rests_until
 	World.step()
 	_check(draugr.state == Draugr.State.SEATED and not skeleton.laid and draugr.rests_until == -1, "rested, he rises, and the dead stir")
+	_check(not draugr.gone and draugr.holds_cell and World.get_entity_at(draugr.tile) == draugr and World.distance(draugr.tile, draugr.home) == 1
+		and draugr.pile_at == Draugr.NO_TILE and draugr.spawn_spec["props"].get("pile") == null,
+		"back, his seat taken: he stands beside it, his remains gone (%s)" % draugr.tile)
 	draugr.blessed_last = []
 	_move_to(player, Vector2i(7, 2))
 	for i in Draugr.ASK_DELAY_TICKS + 2:
@@ -2407,8 +2419,8 @@ func _test_draugr() -> void:
 	var rest_was := draugr.rests_until
 	World.damage(draugr, 999, player)
 	World.damage(draugr, 999, player)
-	_check(said.size() == words_were and draugr.hp == 1 and draugr.state == Draugr.State.AT_REST and draugr.rests_until == rest_was,
-		"struck on at rest, he stands at 1, silent, his rest as it was (said %d more)" % (said.size() - words_were))
+	_check(said.size() == words_were and draugr.hp == 30 and draugr.state == Draugr.State.AT_REST and draugr.rests_until == rest_was,
+		"a stray blow at rest finds nothing: gone, silent, his rest as it was (said %d more, %d hp)" % [said.size() - words_were, draugr.hp])
 	draugr.hp = draugr.max_hp
 	draugr.living_came(player)
 	_check(draugr.hp == 30, "seated, the living's coming gives him nothing")
@@ -2416,11 +2428,13 @@ func _test_draugr() -> void:
 		"a hundred or more, hard; between steps, the lower")
 	# Put back from the level's table (a room reset, a restart, a regeneration: its props never had his
 	# rest), he rests on by World.dead_rest, which Main saves (573 amended (3)).
-	draugr.hp = 1
-	World.damage(draugr, 1, player)
 	var rest_left := draugr.rests_until
+	var pile := draugr.pile_at
+	var pile_way := draugr.pile_facing
+	_check(World.dead_rest.get("mt_lair", {}).get("pile") == [pile.x, pile.y], "his remains kept in his zone's rest (%s)" % [World.dead_rest.get("mt_lair")])
 	var spec := draugr.spawn_spec.duplicate(true)
-	(spec["props"] as Dictionary).erase("rests_until")
+	for key in ["rests_until", "pile", "pile_facing"]:
+		(spec["props"] as Dictionary).erase(key)
 	spec["name"] = "DraugrAgain"
 	var at := draugr.tile
 	World.despawn(draugr)
@@ -2429,6 +2443,9 @@ func _test_draugr() -> void:
 	World.spawn(again, at)
 	_check(again.state == Draugr.State.AT_REST and again.rests_until == rest_left and again.peaceable and again.offers_for("p1").is_empty(),
 		"put back without his props, he rests on by his zone's rest (till %d)" % again.rests_until)
+	World.step()
+	_check(again.gone and not again.holds_cell and again.pile_at == pile and again.pile_facing == pile_way and World.get_entity_at(at) == null,
+		"and is gone again, his remains laid where they were (%s)" % again.pile_at)
 	World.dead_rest.clear()
 	World.despawn(again)
 	World.economy = was_economy

@@ -317,6 +317,9 @@ var _blocked_last := -1
 ## fights nobody outside it, and goes after no noise.
 var fearless := false
 var keeps_room := false
+## Its kind's "never_lies" (573 amended (4); Jeff: the draugr "should not lie
+## down, he is otherworldly"): World.knock_down only staggers it.
+var never_lies := false
 ## Its kind's own blow with a thing it wields (its row's "blows", item id
 ## to a verb, read through Items.verb_from): the draugr's battle axe a
 ## heavy strike in his hands, the knockdown his spin's alone (603 amended);
@@ -477,6 +480,7 @@ func _ready() -> void:
 		door_force = int(row.get("door_force", 1))
 		picks_up = bool(row.get("picks_up", false))
 		fearless = bool(row.get("fearless", false))
+		never_lies = bool(row.get("never_lies", false))
 		# A sought's guard keeps its room too (613, enemy-ai's side; Main._stand_band's props).
 		var props: Variant = spawn_spec.get("props", {})
 		keeps_room = bool(row.get("keeps_room", false)) or props is Dictionary and bool(props.get("keeps_room", false))
@@ -1505,6 +1509,7 @@ static func read_kinds(path: String) -> Dictionary:
 			"wields": (row["wields"] as Dictionary).duplicate() if row.get("wields") is Dictionary else {},
 			"picks_up": bool(row.get("picks_up", false)), "art": str(row.get("art", "")),
 			"label": str(row.get("label", "")), "fearless": bool(row.get("fearless", false)),
+			"never_lies": bool(row.get("never_lies", false)),
 			"keeps_room": bool(row.get("keeps_room", false)), "script": str(row.get("script", "")),
 			"call": int(row.get("call", Senses.NOISE_CALL)),
 			# Kept, or a peer reading the row never sees them: the client's
@@ -1940,6 +1945,8 @@ func _blocker() -> GridEntity:
 ## player, a kept companion, a resident when its side fights the town, a
 ## monster of its foes. Never one of its own side.
 func _may_fight(other: GridEntity) -> bool:
+	if not other.holds_cell:
+		return false  # Gone (573 amended (4)): nothing there to fight.
 	if other is Player or (other is Companion and (other as Companion).keeper != null):
 		return true
 	if other is Resident:
