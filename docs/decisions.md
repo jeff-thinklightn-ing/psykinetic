@@ -26021,3 +26021,66 @@ tests: level_test _test_forest_healer (one hut and its place, no
 warnings, open ground two cells round, its door walked to from the start
 and in); forage_test and resident_test pass with it. Level only,
 protocol unchanged, no new class_name.
+- **steadying_draught** ("steadying draught", short "Steady"): the medicine man makes it
+  from 2 herbs and an antler in 600 steps, a shelf of 3, stacks of 3 (draft values, built
+  as drafted; the cut's checklist carries a tune line). Drunk, it puts a new buff kind on
+  the drinker, **steady** (Items.BUFF_KINDS, shown "Steady"): amount 0.4 for 18000 ticks
+  (30 minutes), held and renewed like any buff (add_buff).
+- **World.spread_of** multiplies the cone of flight (620) by (1 - steady): the same hold
+  is 40% narrower. Reach, draw time and the steps are unchanged. The factor applies
+  after spread_at's floor, on purpose (pc-character asked): a steadied archer's narrowest
+  cone is the floor times 0.6 (1.2 degrees on the hunting bow), so the draught still helps
+  the one who holds to the settle. Enemy-ai's aim_spread clamp reads the verb's floor. Buffs replicate, so the
+  client's drawn cone and the server's roll agree; a line under PROTOCOL_REVISION 35
+  (release), since an older client would draw the wider cone.
+- **Held**: a night-sight draught. The sim's darkness only steers senses (monsters'
+  dark_sight, is_lit), and players carry a lantern, so what a drinker would see is the 3D
+  view's lighting (environment's). A "sight" buff kind waits until Jeff asks and the
+  lighting side is routed.
+- **Dropped until the cold hurts**: a warming draught. Season.cold_at only turns rain to
+  snow.
+
+Economy lists steadying_draught in the new hut's makes (economy.json
+return.places.healers_hut) once it is on main. items_test _test_steadying_draught. No new
+class_name.
+
+## 650. Far landmarks: the world plane
+
+Jeff: "now we can have the castle show on the horizon, perhaps under a
+mountain. the dark elven tower standing off in the distance". Terrain's
+far layer draws what lies beyond a level's edge; the coordinator approved
+terrain's answer on its data: world cells on one plane, not bearings, so
+a landmark shifts against the land as you walk and lines up between
+zones. This is the data (maps); terrain's drawing is "650, terrain's
+side".
+- levels/world_plane.json, read by Level.world_plane() (WORLD_PLANE):
+  - zones: each outdoor level's origin, the world cell of its cell
+    (0, 0), a cell a metre, and its height, the metres added to its own
+    ground. The wilds at (0, 0); the castle (112, -24), its south row
+    against the wilds' north edge, its link (16, 23) at world x 128 with
+    the wilds' (128, 20); the hills (-96, 58), against the wilds' west
+    edge, its link's row (70) the wilds' link row (128); the forest
+    (256, 80), against the east edge, its link's row (48) the same 128.
+    The levels' grounds were made apart (the hills 3.3 m above the wilds
+    at their links, the forest 6.08 m and the castle 5.19 m below), so
+    each zone's height puts its link's ground on the wilds' there.
+    Indoor levels (barrows, lair, rooms) have none. Held joins when its
+    level is laid.
+  - landmarks: {id, slot (art-kit's far piece: far.castle, far.tower, later far.mountain, in art/kit/far/), at (a world cell), base
+    (the world height it stands on, metres), facing}. The castle
+    (far.castle at its yard's middle, (128, -12), facing south) and the
+    tower over the mine (far.tower at (560, 600), facing west): no level
+    holds the mine and lore says only that it lies far from the town, so
+    it stands far to the south-east, away from the castle (north), the
+    hills (west) and the forest's way on to the stronghold (east), across
+    the region from every level; moved by its "at" alone. A mountain
+    behind the castle comes later as one more entry.
+- Level.world_cell(plane, level, cell): a level's cell on the plane, null
+  for a level with no origin.
+tests: level_test _test_world_plane (the file reads clean, every outdoor
+level has an origin and nothing else does, none overlap, each link
+between two outdoor levels meets edge to edge, its two cells in line
+across the edge and level in height, the castle and the tower each a
+landmark of its own id). Data the client reads; protocol unchanged, no
+new class_name, no CHANGELOG line (nothing a player sees until terrain's
+side).

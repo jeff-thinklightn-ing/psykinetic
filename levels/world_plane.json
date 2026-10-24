@@ -1,0 +1,13 @@
+{
+	"_about": "Decision 650, the world plane: every outdoor level laid on one flat world of cells (a cell a metre), so what lies beyond a level's edge stands where it is from every level and shifts against the land as you walk. zones: each outdoor level's origin (the world cell of its cell (0, 0)) and height (metres added to its own ground to put it on the world's: the levels' grounds were made apart, so a link's two ends meet in height too). Indoor levels (barrows, lair, rooms) have none. landmarks: what is seen far off (terrain's far layer, 650 terrain's side): id, slot (art-kit's far piece), at (a world cell), base (the world height in metres it stands on) and facing (its front's way, north up). The tower over the mine stands where the mine is laid, though no level holds it yet; a mountain behind the castle comes later as one more entry.",
+	"zones": {
+		"wilds": {"origin": [0, 0], "height": 0.0},
+		"castle": {"origin": [112, -24], "height": 5.19},
+		"hills": {"origin": [-96, 58], "height": -3.3},
+		"forest": {"origin": [256, 80], "height": 6.08}
+	},
+	"landmarks": [
+		{"id": "castle", "slot": "far.castle", "at": [128, -12], "base": 5.19, "facing": [0, 1]},
+		{"id": "tower_over_the_mine", "slot": "far.tower", "at": [560, 600], "base": 5.0, "facing": [-1, 0]}
+	]
+}

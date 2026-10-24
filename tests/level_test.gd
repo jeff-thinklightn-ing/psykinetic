@@ -200,6 +200,7 @@ func _test_every_level() -> void:
 	_test_refuges()
 	_test_herders()
 	_test_forest_healer()
+	_test_world_plane()
 	print("
 == the levels connect: WorldMap.problems() (links and spawn points, ways back, reachable) ==")
 	var problems := WorldMap.build().problems()
@@ -638,6 +639,63 @@ func _test_forest_healer() -> void:
 	var into := World.find_path(front, inside, true)
 	_check(not path.is_empty() and not into.is_empty(), "its door walked to from the start (%d steps) and in (%d)" % [path.size(), into.size()])
 	_main.load_map("test_room")
+
+
+func _test_world_plane() -> void:
+	print("\n== the world plane (650): every outdoor level laid on it, the links' ends meeting ==")
+	var plane := Level.world_plane()
+	_check(plane["warnings"].is_empty(), "levels/world_plane.json reads clean (%s)" % [plane["warnings"]])
+	var zones: Dictionary = plane["zones"]
+	var levels := {}
+	for folder in ResourceLoader.list_directory(Level.DIR):
+		var level_name := folder.trim_suffix("/")
+		if folder.ends_with("/") and level_name != "prefabs" and ResourceLoader.exists(Level.DIR + level_name + "/layout.png"):
+			levels[level_name] = Level.load_level(level_name)
+	var outdoor := levels.keys().filter(func(level_name: String) -> bool: return Level.zone_of(Level.template_config(level_name)) == "outdoors")
+	var missing := outdoor.filter(func(level_name: String) -> bool: return not zones.has(level_name))
+	var indoor_laid := zones.keys().filter(func(level_name: String) -> bool: return not level_name in outdoor)
+	_check(missing.is_empty() and indoor_laid.is_empty(), "every outdoor level has an origin, nothing else does (%s; missing %s, not outdoor %s)" % [outdoor, missing, indoor_laid])
+	var rects := {}
+	for level_name: String in zones:
+		if levels.has(level_name):
+			rects[level_name] = Rect2i(zones[level_name]["origin"], levels[level_name]["size"])
+	var overlaps := []
+	var names: Array = rects.keys()
+	for i in names.size():
+		for j in range(i + 1, names.size()):
+			if (rects[names[i]] as Rect2i).intersects(rects[names[j]]):
+				overlaps.append([names[i], names[j]])
+	_check(overlaps.is_empty(), "no two outdoor levels overlap on it (%s)" % [overlaps])
+	for level_name: String in rects:
+		var level: Dictionary = levels[level_name]
+		for link: Dictionary in level["links"]:
+			var far := str(link["to_map"])
+			if not rects.has(far) or far < level_name:
+				continue
+			var a: Rect2i = rects[level_name]
+			var b: Rect2i = rects[far]
+			var back: Array = levels[far]["links"].filter(func(each: Dictionary) -> bool: return str(each["to_map"]) == level_name)
+			if back.is_empty():
+				_check(false, "%s's link to %s has a way back" % [level_name, far])
+				continue
+			var here: Vector2i = a.position + (link["tile"] as Vector2i)
+			var there: Vector2i = b.position + (back[0]["tile"] as Vector2i)
+			# They touch along one side: across it the two link cells line up.
+			var side_by_side := a.end.x == b.position.x or b.end.x == a.position.x
+			var above_below := a.end.y == b.position.y or b.end.y == a.position.y
+			var lined := (side_by_side and here.y == there.y) or (above_below and here.x == there.x)
+			var rise := absf(_ground(level, link["tile"]) + float(zones[level_name]["height"]) - _ground(levels[far], back[0]["tile"]) - float(zones[far]["height"]))
+			_check(lined and rise <= 0.05, "%s and %s meet edge to edge, the link at %s across from %s, %.2f m apart in height" % [level_name, far, here, there, rise])
+	var ids := {}
+	for mark: Dictionary in plane["landmarks"]:
+		ids[mark["id"]] = true
+	_check(ids.has("castle") and ids.has("tower_over_the_mine") and ids.size() == plane["landmarks"].size(),
+		"the castle and the tower over the mine are landmarks, each its own id (%s)" % [ids.keys()])
+
+
+func _ground(level: Dictionary, cell: Vector2i) -> float:
+	var terrain: Dictionary = level["terrain"]
+	return Relief.at(terrain["relief"], terrain["relief_size"], cell) if terrain.has("relief") else 0.0
 
 
 func _test_round_trip() -> void:

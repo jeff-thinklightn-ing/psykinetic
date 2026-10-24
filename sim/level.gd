@@ -42,6 +42,9 @@ extends RefCounted
 ## level["buildings"], for the views).
 
 const DIR := "res://levels/"
+## Where every outdoor level lies on one world, and the landmarks seen far
+## off (decision 650, world_plane).
+const WORLD_PLANE := "res://levels/world_plane.json"
 ## Levels edited in the running game (builder mode) are saved here, and a
 ## level here wins over the same level in DIR: an exported server's res://
 ## is its read-only pck. Tests point it elsewhere.
@@ -325,6 +328,45 @@ static func overlay_names() -> Array[String]:
 				out.append(level_name)
 	out.sort()
 	return out
+
+
+## The world plane (decision 650): levels/world_plane.json read, {zones:
+## {level: {origin: Vector2i (the world cell of its (0, 0)), height
+## (metres added to its ground)}}, landmarks: [{id, slot, at: Vector2i (a
+## world cell), base (metres), facing: Vector2i}], warnings: [String]};
+## an entry it cannot read is left out and said. Terrain's far layer (650,
+## terrain's side) draws the landmarks from where a level lies on it.
+static func world_plane() -> Dictionary:
+	var out := {"zones": {}, "landmarks": [], "warnings": []}
+	var data: Variant = JSON.parse_string(FileAccess.get_file_as_string(WORLD_PLANE)) if FileAccess.file_exists(WORLD_PLANE) else null
+	if not data is Dictionary:
+		out["warnings"].append("%s is missing or not a JSON object" % WORLD_PLANE)
+		return out
+	var zones: Variant = data.get("zones", {})
+	for level_name: Variant in zones if zones is Dictionary else {}:
+		var entry: Variant = zones[level_name]
+		var origin: Variant = _tile(entry.get("origin")) if entry is Dictionary else null
+		if origin == null:
+			out["warnings"].append("the world plane's %s has no origin [x, y]: left out" % level_name)
+			continue
+		out["zones"][str(level_name)] = {"origin": origin, "height": float(entry.get("height", 0.0))}
+	var marks: Variant = data.get("landmarks", [])
+	for entry: Variant in marks if marks is Array else []:
+		var at: Variant = _tile(entry.get("at")) if entry is Dictionary else null
+		var facing: Variant = facing_from(entry.get("facing")) if entry is Dictionary else null
+		if at == null or str(entry.get("slot", "")).is_empty():
+			out["warnings"].append("a world plane landmark (%s) has no slot or no at [x, y]: left out" % [entry.get("id", "?") if entry is Dictionary else entry])
+			continue
+		out["landmarks"].append({"id": str(entry.get("id", "")), "slot": str(entry["slot"]), "at": at,
+			"base": float(entry.get("base", 0.0)), "facing": facing if facing != null else Vector2i(0, 1)})
+	return out
+
+
+## [param cell] of [param level_name] on the world plane [param plane]
+## (world_plane's), or null when the level has no origin there.
+static func world_cell(plane: Dictionary, level_name: String, cell: Vector2i) -> Variant:
+	var zone: Variant = plane.get("zones", {}).get(level_name)
+	return null if zone == null else (zone["origin"] as Vector2i) + cell
 
 
 ## Every level in the game: the folders under levels/ with a layout.png
