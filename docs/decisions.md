@@ -27825,3 +27825,23 @@ flat rule), so his pose was whatever the roll gave. Now every guard has a facing
 hand-laid body: give it a facing, so it reads the same from the usual camera in every generation;
 the rolled yaw stays for moss. level_test `_test_castle_halls_level`; docs/levels.md. Template
 only, nothing on the wire, no new class_name.
+## 649 amended (4), buildings' side: a ruin's plinth broken, its floor all dirt
+
+The coordinator, on ruin_close_2: two things still read as built. Art-kit
+found the first was not wall.wood.rubble (its plank heaps read well) but the
+kind's stone plinth (489 amended, _add_plinth), drawn whole under a ruin's
+walls whatever its state. The second was the stone ground under the kept
+boards showing at the edges of the bare cells.
+
+- A ruin's plinth (a run with an edge in _ruin_edges) is drawn by half
+  edges, each top its own share of PLINTH_HEIGHT between RUIN_PLINTH_LOW
+  (0.25) and RUIN_PLINTH_HIGH (0.9) by its roll. One edge in RUIN_SPILL_EVERY
+  (3) has a scatter.stone spilled off it, RUIN_SPILL_OUT (0.35) out from
+  either face. Its gaps already had none: a "plot" edge is no run. Disrepair
+  and every standing building keep the whole band.
+- In a ruin, _floor_gone draws every cell's ground as dirt, the kept
+  boards' too (their stone bled through at the bare cells' edges); only the
+  boards' floor sets stay.
+
+view_test _test_decline (the ruin's plinth tops all under PLINTH_HEIGHT,
+built again whole). Client only, protocol unchanged, no new class_name.

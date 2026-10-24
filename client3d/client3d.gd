@@ -1900,6 +1900,13 @@ const RUIN_BOARDS_KEPT := 2
 ## A ruin's litter, by a cell's hash, one in RUIN_LITTER_EVERY: a rubble
 ## heap, fallen planks, a stone, a weed through the floor, in turn.
 const RUIN_LITTER_EVERY := 3
+## A ruin's plinth (489 amended) broken off: each half edge's top between
+## these shares of PLINTH_HEIGHT, by its roll; one edge in RUIN_SPILL_EVERY
+## has a stone spilled off it to one side, this far out from its face.
+const RUIN_PLINTH_LOW := 0.25
+const RUIN_PLINTH_HIGH := 0.9
+const RUIN_SPILL_EVERY := 3
+const RUIN_SPILL_OUT := 0.35
 ## A ruin's wall edges (649): no post stands for them.
 var _ruin_edges: Dictionary[Vector3i, bool] = {}
 var _building_at: Dictionary[Vector2i, int] = {}
@@ -5317,8 +5324,9 @@ static func _cell_hash(cell: Vector2i) -> int:
 
 ## [param building]'s floor bared in [param decline] (649): gone, every
 ## cell of its plot; a ruin, all but one in RUIN_BOARDS_KEPT by its hash:
-## its floor set (_floor_sets) out of the ground's floor mask and its ground
-## drawn as dirt, both kept by the building; "" puts them back.
+## its floor set (_floor_sets) out of the ground's floor mask; every cell's
+## ground drawn as dirt (a kept board's too, or its stone shows at the
+## edges of the bare cells), both kept by the building; "" puts them back.
 func _floor_gone(building: Dictionary, decline: String) -> void:
 	var was: Dictionary = building.get("floor_was", {})
 	var grounds: Dictionary = building.get("ground_was", {})
@@ -5333,9 +5341,8 @@ func _floor_gone(building: Dictionary, decline: String) -> void:
 		building.erase("ground_was")
 	else:
 		for cell in Level.rect_cells(building["rect"]):
-			if decline == Towns.RUIN and posmod(_cell_hash(cell), RUIN_BOARDS_KEPT) == 0:
-				continue
-			if _floor_sets.has(cell):
+			var kept := decline == Towns.RUIN and posmod(_cell_hash(cell), RUIN_BOARDS_KEPT) == 0
+			if _floor_sets.has(cell) and not kept:
 				was[cell] = _floor_sets[cell]
 				_floor_sets.erase(cell)
 				cells.append(cell)
@@ -10320,6 +10327,9 @@ func _add_wall_run(run: Array[Vector3i]) -> void:
 ## its foot down to the lowest ground beside the run (on a slope, a taller
 ## footing downhill rather than a gap under the timber), its ends reaching
 ## half its width on past a corner, not into a door or the next plinth's run.
+## A ruin's (649, _ruin_edges) is broken off: by half edges, each its own
+## height (RUIN_PLINTH_LOW..HIGH), a stone spilled off one edge in
+## RUIN_SPILL_EVERY; its gaps have none, being no run.
 func _add_plinth(holder: Node3D, run: Array[Vector3i], base: float, half: float) -> void:
 	var out := half + PLINTH_PROUD
 	var low := 0.0
@@ -10335,16 +10345,35 @@ func _add_plinth(holder: Node3D, run: Array[Vector3i], base: float, half: float)
 	var step := Vector3i(0, 1, 0) if first.z == Terrain.EAST else Vector3i(1, 0, 0)
 	var from: float = -reach.call(first - step)
 	var to: float = run.size() + reach.call(last + step)
+	# Its blocks [from, to, top]: one whole band, or a ruin's broken one.
+	var blocks: Array[Vector3] = [Vector3(from, to, PLINTH_HEIGHT)]
+	if run.any(func(key: Vector3i) -> bool: return _ruin_edges.has(key)):
+		blocks.clear()
+		for k in run.size():
+			var key := run[k]
+			for part in 2:
+				var top := PLINTH_HEIGHT * lerpf(RUIN_PLINTH_LOW, RUIN_PLINTH_HIGH, _roll(Vector2i(key.x, key.y), 60 + key.z * 2 + part))
+				blocks.append(Vector3(from if k == 0 and part == 0 else k + part * 0.5,
+						to if k == run.size() - 1 and part == 1 else k + 0.5 + part * 0.5, top))
+			if posmod(_edge_hash(key), RUIN_SPILL_EVERY) == 0 and ArtKit.has("scatter.stone"):
+				var stone := ArtKit.instance("scatter.stone")
+				var side := 1.0 if _roll(Vector2i(key.x, key.y), 64 + key.z) < 0.5 else -1.0
+				stone.position = Vector3(side * (out + RUIN_SPILL_OUT), 0.0, k + _roll(Vector2i(key.x, key.y), 66 + key.z))
+				stone.rotation.y = _roll(Vector2i(key.x, key.y), 68 + key.z) * TAU
+				stone.name = "Spill_%d" % k
+				holder.add_child(stone)
 	var mesh := [PackedVector3Array(), PackedVector3Array(), PackedVector2Array(), PackedInt32Array()]
-	for side: float in [-1.0, 1.0]:
-		var x := side * out
-		_wall_quad(mesh, Vector3(x, low, from), Vector3(x, PLINTH_HEIGHT, from), Vector3(x, PLINTH_HEIGHT, to), Vector3(x, low, to),
-				Vector3(side, 0.0, 0.0), false)
-	_wall_quad(mesh, Vector3(-out, PLINTH_HEIGHT, from), Vector3(out, PLINTH_HEIGHT, from), Vector3(out, PLINTH_HEIGHT, to),
-			Vector3(-out, PLINTH_HEIGHT, to), Vector3.UP, true)
-	for end: float in [from, to]:
-		_wall_quad(mesh, Vector3(-out, low, end), Vector3(out, low, end), Vector3(out, PLINTH_HEIGHT, end), Vector3(-out, PLINTH_HEIGHT, end),
-				Vector3(0.0, 0.0, -1.0 if end == from else 1.0), false)
+	for block in blocks:
+		var top := block.z
+		for side: float in [-1.0, 1.0]:
+			var x := side * out
+			_wall_quad(mesh, Vector3(x, low, block.x), Vector3(x, top, block.x), Vector3(x, top, block.y), Vector3(x, low, block.y),
+					Vector3(side, 0.0, 0.0), false)
+		_wall_quad(mesh, Vector3(-out, top, block.x), Vector3(out, top, block.x), Vector3(out, top, block.y),
+				Vector3(-out, top, block.y), Vector3.UP, true)
+		for end: float in [block.x, block.y]:
+			_wall_quad(mesh, Vector3(-out, low, end), Vector3(out, low, end), Vector3(out, top, end), Vector3(-out, top, end),
+					Vector3(0.0, 0.0, -1.0 if end == block.x else 1.0), false)
 	var arrays := []
 	arrays.resize(Mesh.ARRAY_MAX)
 	arrays[Mesh.ARRAY_VERTEX] = mesh[0]

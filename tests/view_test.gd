@@ -1881,6 +1881,18 @@ func _test_decline() -> void:
 				if _rig._posts.has(vertex) and not out.has(vertex):
 					out.append(vertex)
 		return out
+	# The plinth's tops along the house's walls: broken off in a ruin.
+	var plinth_tops := func() -> Array:
+		var tops := []
+		for key: Vector3i in walls:
+			var run: Node3D = _rig._walls.get(key)
+			var band := run.get_node_or_null("Plinth") as MeshInstance3D if is_instance_valid(run) else null
+			if band != null and not tops.has(snappedf(band.mesh.get_aabb().end.y, 0.01)):
+				tops.append(snappedf(band.mesh.get_aabb().end.y, 0.01))
+		return tops
+	var plinths: Array = walls.filter(func(key: Vector3i) -> bool: return _rig._plinths.has(key))
+	_check(plinths.is_empty() or (plinth_tops.call() as Array).all(func(top: float) -> bool: return top < Client3D.PLINTH_HEIGHT - 0.01),
+			"a ruin's plinth broken off: its runs' tops %s, under its whole height %.2f" % [plinth_tops.call(), Client3D.PLINTH_HEIGHT])
 	var floored := func() -> int:
 		return Level.rect_cells(house["rect"]).filter(func(cell: Vector2i) -> bool: return _rig._floor_sets.has(cell)).size()
 	var cells: int = Level.rect_cells(house["rect"]).size()
@@ -1903,6 +1915,8 @@ func _test_decline() -> void:
 			and states.call("plot") == 0 and states.call("rubble") == 0 and states.call("broken") == 0 and not is_instance_valid(house.get("weeds"))
 			and floored.call() == cells and dirt.call() < cells and not posts.call().is_empty(),
 			"built again: whole, roofed, its walls, posts, floor and ground back (%d floor, %d dirt of %d)" % [floored.call(), dirt.call(), cells])
+	_check(plinths.is_empty() or plinth_tops.call() == [snappedf(Client3D.PLINTH_HEIGHT, 0.01)],
+			"built again: its plinth whole (%d edges, tops %s)" % [plinths.size(), plinth_tops.call()])
 	_rig.town_states.erase("decline_town")
 
 
