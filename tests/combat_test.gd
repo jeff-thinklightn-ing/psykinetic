@@ -36,6 +36,7 @@ func _ready() -> void:
 	_test_telegraph_lifecycle()
 	_test_spin()
 	_test_spin_broken()
+	_test_dropped_moves()
 	_test_throw_and_charge()
 	_test_bound_axe()
 	_test_level_draugr_armed()
@@ -583,6 +584,63 @@ func _test_spin_broken() -> void:
 		World.step()
 	_check(World.telegraphs().is_empty() and bearer.hp == hp and boss.stamina > 10,
 			"the spin given up: nobody struck, not spent (%d)" % boss.stamina)
+
+
+## 603 amended (3): a boss's move under way dropped (he yields or rests):
+## nothing of it lands, its telegraph gone, his axe where it was.
+func _test_dropped_moves() -> void:
+	print("
+== a move dropped as he yields: the spin, the throw and the charge land nothing (603 amended (3)) ==")
+	var e := _build(["##############", "#P....m......#", "#.....P......#", "##############"])
+	var boss: GridEntity = e["m"][0]
+	_boss(boss)
+	var far: GridEntity = e["P"][0]  # (1,1), down his row.
+	var near: GridEntity = e["P"][1]  # (6,2), beside him.
+	var hp := [far.hp, near.hp]
+	boss._world_set_facing(Vector2i(0, 1))
+	_check(World.try_spin(boss) and World.telegraphs().size() == 1, "he winds up the spin")
+	World.step()
+	World.drop_boss_move(boss)
+	_check(not World.boss_busy(boss) and World.telegraphs().is_empty(), "dropped: not busy, its telegraph gone")
+	for i in 20:
+		World.step()
+	_check(near.hp == hp[1] and not World.is_down(near), "nobody swept (%d)" % near.hp)
+	boss.stamina = 100
+	boss.winded = false
+	boss.next_move_tick = 0
+	_check(World.try_axe_throw(boss, far.tile), "he winds up the throw")
+	World.drop_boss_move(boss)
+	for i in 20:
+		World.step()
+	_check(far.hp == hp[0] and World.axe_state(boss)["where"] == "hand" and World.telegraphs().is_empty(),
+			"dropped: nobody struck, the axe still in his hands")
+	# A charge, roaring and then under way, dropped.
+	World._relocate(near, Vector2i(7, 2))  # Out of the row.
+	_check(World.try_axe_throw(boss, Vector2i(1, 1)), "thrown down the row")
+	for i in 13:
+		World.step()
+	_check(World.axe_state(boss)["where"] == "ground", "it lies at %s" % World.axe_state(boss)["cell"])
+	_check(World.try_axe_charge(boss), "he roars")
+	World.drop_boss_move(boss)
+	_check(not World.boss_busy(boss) and World.telegraphs().is_empty(), "dropped in the roar: not busy, no telegraph")
+	var at := boss.tile
+	for i in 10:
+		World.step()
+	_check(boss.tile == at, "and he does not run (%s)" % boss.tile)
+	World._axes[boss]["disarmed"] = false
+	_check(World.try_axe_charge(boss), "he roars again")
+	var ran := false
+	for i in 30:
+		World.step()
+		if boss.tile != at:
+			ran = true
+			break
+	at = boss.tile
+	World.drop_boss_move(boss)
+	_check(ran and not World.boss_busy(boss) and not World._rushers.has(boss), "dropped under way: the rush over, not busy")
+	for i in 10:
+		World.step()
+	_check(boss.tile == at and World.axe_state(boss)["where"] == "ground", "he stops where he was, the axe still lying (%s)" % boss.tile)
 
 
 func _test_throw_and_charge() -> void:

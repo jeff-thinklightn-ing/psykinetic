@@ -29082,3 +29082,26 @@ while World is elsewhere), the zone's entities for another open one, null for no
 caught at the next day's turn, as before. herds_test _test_leaks turns the day instead of
 recalling, and checks a zone not open (all out back, spare again) and the unset bodies;
 _test_taken's two bodies out are in the room.
+## 603 amended (3), combat's side: a move under way is dropped when he yields or rests
+
+In Jeff's fight, and in enemy-ai's monster_test, the draugr began a spin, yielded, and the spin
+still swept a few ticks later and knocked the player down while he rested. Draugr._yield and
+_end_pact dropped his own wind-up and recalled his axe, but World had no way to drop a boss's
+move under way. The coordinator approved enemy-ai's ask.
+
+- **World.drop_boss_move(by):** the move he has under way is given up at once, and nothing of
+  it lands.
+  - A spin or a throw: its telegraph ends unlanded and his wind-up is shown over. A throw
+    dropped before it lands leaves the axe in his hands.
+  - A charge, still roaring or already running (physics' rush): it stops as a body in its way
+    stops it (_end_rush, then _charge_over "stopped"). He stands where he is, and the axe stays
+    where it lies until his recall.
+  - Any other telegraph of his ends unlanded too.
+  - Nothing happens when no move is under way.
+- **Who calls it:** enemy-ai's Draugr._yield and _end_pact, beside _drop_windup and
+  _recall_axe (573 amended (3), enemy-ai's side). Any other boss mind that ends a fight calls
+  it too.
+
+combat_test _test_dropped_moves: a spin dropped sweeps nobody; a throw dropped strikes nobody,
+the axe kept; a charge dropped in its roar never runs, and dropped under way stops where it
+was. Server only, protocol unchanged, no new class_name.

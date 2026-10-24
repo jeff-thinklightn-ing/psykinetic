@@ -4261,6 +4261,32 @@ func recall_axe(by: GridEntity) -> void:
 	_log("axe: %s's weapon comes back to it" % by.name)
 
 
+## [param by]'s move under way given up at once, nothing of it landing
+## (603 amended (3); Jeff's fight: the draugr's spin swept after he yielded):
+## a spin's or a throw's telegraph ended unlanded and its wind-up shown over;
+## a charge stopped as a body in its way stops it (its rush ended,
+## _charge_over "stopped"); any other telegraph of his ended unlanded too.
+## His mind calls it as he yields or goes to rest. Nothing when none is under way.
+func drop_boss_move(by: GridEntity) -> void:
+	if not Net.is_authority():
+		return
+	if _boss_moves.has(by):
+		var job: Dictionary = _boss_moves[by]
+		if str(job["move"]) == "charge":
+			_end_rush(by, "stopped")  # Under way: _on_rush_ended ends the charge.
+			if _boss_moves.has(by):
+				_charge_over(by, job, "stopped")  # Still roaring: no rush yet.
+		else:
+			_boss_moves.erase(by)
+			end_telegraph(int(job["telegraph"]), false)
+			if is_instance_valid(by):
+				by._world_winding(by.facing, 0)
+			_log("%s: %s gives it up (dropped)" % [job["move"], by.name])
+	for id: int in _telegraphs.keys():
+		if _telegraphs.has(id) and _telegraphs[id]["source"] == by:
+			end_telegraph(id, false)
+
+
 ## Whether [param by] is in the middle of something (decision 603): a move
 ## winding up, a charge under way, a heavy wind-up (392), stunned or lying.
 func boss_busy(by: GridEntity) -> bool:
