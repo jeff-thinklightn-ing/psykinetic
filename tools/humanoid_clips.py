@@ -113,18 +113,6 @@ CLIPS = {
 			("upperarm_l", LIFT, -35.0), ("upperarm_r", LIFT, -35.0)], move=(0.0, -0.06, -0.02))),
 		(0.5, P("Idle_Loop", 0.5)),
 	]},
-	# The axe overhead, both hands: raised up and back over the head, the body leaning
-	# back, then brought down in front, the body bowing into it.
-	"Axe_Overhead": {"keys": [
-		(0.0, P("Sword_Idle", 0.0, HOLD)),
-		(0.38, P("Sword_Idle", 0.0, [("upperarm_l", Vector((0.15, 0.25, 1.0)), AIM), ("lowerarm_l", Vector((-0.3, 0.6, 0.7)), AIM),
-			("upperarm_r", Vector((-0.15, 0.25, 1.0)), AIM), ("lowerarm_r", Vector((0.3, 0.6, 0.7)), AIM),
-			("spine_02", LIFT, 12.0), ("spine_03", LIFT, 6.0)])),
-		(0.52, P("Sword_Idle", 0.0, [("upperarm_l", LIFT, 55.0), ("upperarm_l", TURN, -25.0), ("lowerarm_l", LIFT, 5.0),
-			("upperarm_r", LIFT, 55.0), ("upperarm_r", TURN, 20.0), ("lowerarm_r", LIFT, 5.0),
-			("spine_01", LIFT, -18.0), ("spine_02", LIFT, -14.0), ("Head", LIFT, 15.0)], move=(0.0, -0.06, -0.06))),
-		(1.0, P("Sword_Idle", 0.0, HOLD)),
-	]},
 	# The dagger: the hand drawn back to the hip, then stabbed forward, the right shoulder
 	# turned in behind it.
 	"Dagger_Stab": {"keys": [
@@ -351,16 +339,17 @@ def holding(length: Vector, side: Vector) -> Vector:
 	return x * HOLD_AT[0] + y * HOLD_AT[1]
 
 
-def chop(right: tuple, haft: tuple, edge: tuple, poles: tuple = ((-1.0, 0.3, -0.5), (0.8, -0.6, -0.4))) -> list:
+def chop(right: tuple, haft: tuple, edge: tuple, poles: tuple = ((-1.0, 0.3, -0.5), (0.8, -0.6, -0.4)), grip: float = -CHOP_GRIP) -> list:
 	"""The right wrist at [right] = (ahead, out to its right, up) of the right shoulder; the haft
-	along [haft] = (ahead, to the right, up) from the left hand's hold, CHOP_GRIP back down it from
-	the right's, each hand turned along it (GRASP), the left wrist placed for its hold from the
-	right wrist as posed (the base turns the shoulders: the right one sat 0.12 m back of the left)."""
+	along [haft] = (ahead, to the right, up) from the butt toward the head, the left hand's hold
+	[grip] up it from the right's (CHOP_GRIP back down it, a woodcutter's), each hand turned along
+	it (GRASP), the left wrist placed for its hold from the right wrist as posed (the base turns the
+	shoulders: the right one sat 0.12 m back of the left)."""
 	length = Vector((-haft[1], -haft[0], haft[2])).normalized()
 	e = Vector(edge)
 	e = (e - length * e.dot(length)).normalized()
 	# Both hands wrapping the haft from the same side (the left's turned end for end, its side too).
-	left = holding(length, e) - length * CHOP_GRIP - holding(-length, -e)
+	left = holding(length, e) + length * grip - holding(-length, -e)
 	return SQUARED + right_arm(right[0], right[1], right[2], poles[0]) + [
 		("upperarm_l", ([("hand_r", tuple(left), 1.0)], poles[1]), REACH),
 		("hand_r", (tuple(length), tuple(e)), GRASP), ("hand_l", (tuple(-length), tuple(-e)), GRASP)]
@@ -382,6 +371,34 @@ CLIPS["Chop_Loop"] = {"loop": True, "keys": [
 	(0.8, P("Idle_Loop", 0.8, CHOP_DOWN)),
 	(1.3, P("Idle_Loop", 1.3, CHOP_READY + [("spine_02", LIFT, 2.0)])),
 	(1.6, P("Idle_Loop", 0.0, CHOP_READY)),
+]}
+# The axe overhead, both hands (451 amended (2), step 4; Jeff: "great axe model attachment needs
+# fixing, it held sideways by player and draugr"): each hand turned along the haft (GRASP), the
+# left one GREAT_GRIP up it from the right, at the giant axe's grip_2 (art-kit's), so Client3D's
+# HandReach has only a little left to bring it onto the haft; ready with the head up before the
+# body, raised over the right shoulder, swung through high ahead, brought down ahead and low, the
+# trunk bowing into it. Every hold keeps the left wrist within reach of its shoulder (0.52 m).
+GREAT_GRIP = 0.45
+AXE_READY = chop((0.2, 0.0, -0.2), (0.45, -0.45, 0.77), (0.0, -1.0, 0.0), grip=GREAT_GRIP)
+AXE_UP = chop((0.2, 0.0, 0.0), (-0.3, -0.3, 0.9), (0.0, -1.0, 0.45), grip=GREAT_GRIP) + [
+	("spine_02", LIFT, 10.0), ("spine_03", LIFT, 5.0)]
+AXE_SWING = chop((0.22, 0.0, -0.12), (0.4, -0.35, 0.85), (0.0, -1.0, 0.0), grip=GREAT_GRIP) + [("spine_02", LIFT, 2.0)]
+AXE_DOWN = chop((0.0, -0.05, 0.02), (0.6, -0.4, -0.55), (0.0, 0.0, -1.0), grip=GREAT_GRIP) + [
+	("spine_01", LIFT, -16.0), ("spine_02", LIFT, -12.0), ("Head", LIFT, 14.0)]
+# Standing ready with it, both hands on the haft (Client3D plays it on the upper layer while
+# HandReach holds the left hand there, so the left arm isn't stretched for it).
+CLIPS["Axe_Ready_Loop"] = {"loop": True, "keys": [
+	(0.0, P("Idle_Loop", 0.0, AXE_READY)),
+	(1.25, P("Idle_Loop", 1.25, AXE_READY + [("spine_02", LIFT, -2.0)])),
+	(2.5, P("Idle_Loop", 0.0, AXE_READY)),
+]}
+CLIPS["Axe_Overhead"] = {"keys": [
+	(0.0, P("Idle_Loop", 0.0, AXE_READY)),
+	(0.3, P("Idle_Loop", 0.0, AXE_UP)),
+	(0.4, P("Idle_Loop", 0.0, AXE_SWING)),
+	(0.48, P("Idle_Loop", 0.0, AXE_DOWN, move=(0.0, -0.06, -0.06))),
+	(0.62, P("Idle_Loop", 0.0, AXE_DOWN, move=(0.0, -0.06, -0.06))),
+	(1.0, P("Idle_Loop", 0.0, AXE_READY)),
 ]}
 # Sawing at the woodpile: bent over the log, the left hand pressing it down ahead to the left,
 # the saw in the right hand pushed and drawn ahead and down, the blade sloping into the cut, the

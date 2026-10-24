@@ -718,9 +718,9 @@ const HUMANOID_MOVES := {
 	"strikes": {
 		"": [["Punch_Jab", 0.17], ["Punch_Cross", 0.21]],
 		"sword": [["Sword_Attack", 0.38], ["Sword_Attack_Standing", 0.38]],
-		"giant_axe": [["Axe_Overhead", 0.42]],
-		"hammer": [["Axe_Overhead", 0.42]],
-		"pick": [["Axe_Overhead", 0.42]],  # A miner's swing, two-handed (items' 479; the kobold's, 478).
+		"giant_axe": [["Axe_Overhead", 0.38]],
+		"hammer": [["Axe_Overhead", 0.38]],
+		"pick": [["Axe_Overhead", 0.38]],  # A miner's swing, two-handed (items' 479; the kobold's, 478).
 		"dagger": [["Dagger_Stab", 0.17]],
 		"spear": [["Spear_Thrust", 0.29]],
 		"shield": [["Shield_Bash", 0.17]],
@@ -730,7 +730,7 @@ const HUMANOID_MOVES := {
 	# A blow taken, by the side it came from (each a list to pick from without repeats).
 	"hits": {"front": ["Hit_Chest", "Hit_Head"], "left": ["Hit_Shoulder_L"], "right": ["Hit_Shoulder_R"], "back": ["Hit_Back"]},
 	"deaths": ["Death01", "Death02"], "bow_draw": "Bow_Draw", "bow_aim": "Bow_Hold", "bow_shoot": "Bow_Loose", "bow_idle": "Bow_Idle",
-	"dodges": ["Dodge_Left", "Dodge_Right"], "stance": "Sword_Idle",
+	"dodges": ["Dodge_Left", "Dodge_Right"], "stance": "Sword_Idle", "ready": "Axe_Ready",
 }
 ## Attach points (decision 451): where a humanoid holds and hangs things, on
 ## its skeleton's bones (the retargeted SkeletonProfileHumanoid's names, so
@@ -12315,6 +12315,9 @@ static func _attach_sockets(scene: Node3D, sizes: Dictionary, model_scale: float
 		made[name] = socket
 	puppet.set_meta("sockets", made)
 	puppet.set_meta("held", ["", ""])
+	if made.has("hand_r") and made.has("hand_l") and skeleton.find_bone("LeftUpperArm") >= 0 and skeleton.find_bone("LeftLowerArm") >= 0:
+		# The left hand on a two-handed piece's second grip (451 amended (2), step 4), off till one is held.
+		puppet.set_meta("reach", HandReach.make(skeleton, (made["hand_r"] as Node3D).transform, (made["hand_l"] as Node3D).transform))
 
 
 ## What [param entity] holds in each hand drawn at its puppet's hand sockets
@@ -12366,11 +12369,13 @@ func _sync_held(entity: GridEntity, puppet: Node3D) -> void:
 				var piece := ArtKit.instance(QUIVER, int(ARROW_VARIANTS[quiver]))
 				piece.name = "Quiver"
 				back.add_child(piece)
+	var changed := false
 	for hand in 2:
 		var id: String = ids[hand]
 		if id == held[hand]:
 			continue
 		held[hand] = id
+		changed = true
 		var socket := sockets.get("hand_r" if hand == 0 else "hand_l") as Node3D
 		if socket == null:
 			continue
@@ -12403,6 +12408,29 @@ func _sync_held(entity: GridEntity, puppet: Node3D) -> void:
 			if own and hand == 0:
 				_grip(thing, work)
 			socket.add_child(thing)
+	if changed and puppet.has_meta("reach"):
+		_sync_reach(puppet.get_meta("reach") as HandReach, sockets, ids)
+
+
+## The left hand brought to the right hand's piece's second grip (HandReach;
+## 451 amended (2), step 4) while the left hand is empty, the piece takes two
+## hands and its art has one ("grip_2", art-kit's sockets: the giant axe's and
+## the battle axe's, 0.45 m up) within REACH_SPAN of its grip: the two-handed
+## clips (Axe_Ready, Axe_Overhead) hold the hands humanoid_clips' GREAT_GRIP
+## (0.45 m) apart, and farther the left arm can't reach it from them (0.3 m
+## short at 0.87), so a wider grip keeps the clip's left hand.
+## A work's own tool keeps its clip's hands (humanoid_clips authors both).
+const REACH_SPAN := 0.6
+static func _sync_reach(reach: HandReach, sockets: Dictionary, ids: Array) -> void:
+	var held := (sockets["hand_r"] as Node3D).get_node_or_null("Held") as Node3D
+	var id := str(ids[0])
+	var second: Variant = null
+	if held != null and str(ids[1]) == "" and id != "" and not id.begins_with(ART_ID) and int(Items.def(id).get("hands", 1)) == 2:
+		second = ArtKit.spec(str(Items.def(id).get("art", "item." + id))).get("sockets", {}).get("grip_2")
+	if second is Array and (second as Array).size() == 3 and Vector3(second[0], second[1], second[2]).length() <= REACH_SPAN:
+		reach.reach(true, held.transform, Vector3(second[0], second[1], second[2]))
+	else:
+		reach.reach(false)
 
 
 ## The armour [param entity] wears (items' 622; a player's and a
@@ -12500,6 +12528,9 @@ static func bow_pull(entity: GridEntity) -> float:
 ## raised shield ("block") holds the guard (Block_Idle) on the upper layer.
 ## Walking or running with the bow down ("carry", 462 amended (3)) the upper
 ## layer lets go: both arms swing with the gait, the bow in the left hand.
+## Standing with a two-handed piece the left hand is on (HandReach, 451
+## amended (2), step 4), its ready stance ("ready", Axe_Ready) on the upper
+## layer, both hands before the body on the haft (standing idle only).
 ## While drawn the drawing hand shows one arrow (fx.arrow, its kind's
 ## variant) on the bow's string, the string pulled back to that hand.
 func _sync_bow(entity: GridEntity, puppet: Node3D) -> void:
@@ -12523,6 +12554,8 @@ func _sync_bow(entity: GridEntity, puppet: Node3D) -> void:
 		if want == "idle" and (puppet.get_meta("gaits", GAITS) as Array).any(
 				func(gait: Array) -> bool: return gait[0] == rig.base_clip()):
 			want = "carry"
+	elif puppet.has_meta("reach") and (puppet.get_meta("reach") as HandReach).active and rig.base_clip() == CLIP_IDLE:
+		want = "ready"  # Standing only: not over a gait, a lying body or a kneel.
 	if want == "draw":
 		var clip := str(moves.get("bow_draw", ""))
 		rig.upper_at(clip, bow_pull(entity) * rig.length(clip))
@@ -12534,6 +12567,8 @@ func _sync_bow(entity: GridEntity, puppet: Node3D) -> void:
 				rig.upper(str(moves.get("bow_idle", "")))
 			"block":
 				rig.upper(str(moves.get("block", "")))
+			"ready":
+				rig.upper(str(moves.get("ready", "")))
 			"", "carry":
 				rig.upper_off()
 	puppet.set_meta("bow_state", want)
@@ -13514,7 +13549,8 @@ func _animate(puppet: Node3D) -> void:
 		rig.loop(CLIP_TALKING, tempo)
 		return
 	var idle := _idle_clip(puppet)
-	if idle == CLIP_IDLE and calm and puppet.has_meta("rng") and now >= int(puppet.get_meta("fidget_at", 0)):
+	var both_hands := puppet.has_meta("reach") and (puppet.get_meta("reach") as HandReach).active  # Ready with a two-hander: no fidgets.
+	if idle == CLIP_IDLE and calm and not both_hands and puppet.has_meta("rng") and now >= int(puppet.get_meta("fidget_at", 0)):
 		var rng: RandomNumberGenerator = puppet.get_meta("fidget_rng", puppet.get_meta("rng"))
 		puppet.set_meta("fidget_at", now + int(rng.randf_range(FIDGET_SECONDS_MIN, FIDGET_SECONDS_MAX) * 1000.0))
 		var fidget := _pick_fidget(puppet, rig)

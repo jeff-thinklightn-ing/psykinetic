@@ -27655,3 +27655,35 @@ a little forward. One clip for players and companions (both play Block_Idle on t
 view_test _test_attach_points: with a shield raised, after 0.6 s of the guard, the shield's face
 along the body's front (0.95), its centre 0.33 m ahead of the chest and within 0.3 m of its height.
 Client only, no new number (release's label).
+
+### Step 4: two hands on a two-handed piece
+
+Jeff: "great axe model attachment needs fixing, it held sideways by player and draugr." The edge
+turn (451 amended) stood the head upright; the left hand was still loose of the haft.
+
+- **HandReach** (client3d/hand_reach.gd, new class_name): three modifiers on a humanoid's skeleton,
+  made with its sockets (Client3D._attach_sockets), off until wanted. HandReach (PLACE) puts a
+  target where the left hand bone must be, from the right hand as this frame's pose has it (not
+  the BoneAttachment3D's, a frame late): the right hand's socket moved up the piece to its grip_2,
+  less the left socket's place in its hand, so the left hand wraps the haft as the right one does,
+  both thumbs up it; and the elbow's pole below and out to the left. A TwoBoneIK3D reaches the
+  left arm to it. HandReach again (TURN) turns the left hand to the target's turn.
+- **When:** Client3D._sync_reach, as the held pieces change: an Items piece of hands 2 in the
+  right hand, the left empty, its art's "grip_2" socket (art-kit's) within REACH_SPAN (0.6 m) of
+  its grip: past it the left arm can't reach from the clips (0.3 m short at 0.87, the battle
+  axe's first grip_2; art-kit moved it to 0.45, the giant axe's, so the draugr's axe has it). A work's own
+  tool (the woodcutter's) keeps its authored hands.
+- **The clips:** Axe_Overhead re-authored from humanoid_clips' chop() (given a grip: the left hand
+  GREAT_GRIP, 0.45 m, up the haft from the right), both hands turned along the haft, every hold
+  within the left arm's reach: ready, raised over the right shoulder, swung through high ahead,
+  down ahead and low. Its contact, measured, 0.38 s (HUMANOID_MOVES' giant axe, hammer and pick).
+  Axe_Ready (new, a loop) is that ready hold: _sync_bow's upper-layer states gain "ready", standing
+  with the reach on (moves "ready") and the base Idle; walking, running or lying the upper layer lets go.
+  Plain Idle held the haft forward, out of the left arm's reach (0.2 m short). No fidgets while
+  the reach is on (a fidget plays on the base and would drop the stance; arms crossed round an axe).
+
+view_test _test_two_hands (real frames, so the sockets follow the modified pose; after the head
+socket test, before the goblins' test kills the player): the reach on with the giant axe, the
+ready stance standing, the left hand within 0.04 m of grip_2 and its fist along the haft (> 0.95)
+standing and in Axe_Overhead at 0 and 0.55 s; with a shield in the left, no reach and no stance.
+Client only, no new number (release's label).

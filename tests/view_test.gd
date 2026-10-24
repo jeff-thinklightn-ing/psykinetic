@@ -104,6 +104,7 @@ func _ready() -> void:
 	_test_standing_turn()
 	_test_visible_work()
 	_test_head_socket()
+	await _test_two_hands()  # It lets frames run (the pose the modifiers leave): after the tests that read a pose unrun.
 	_test_goblins_differ()
 	_test_allies()
 	_test_barrow_dead()
@@ -5932,6 +5933,50 @@ func _test_attach_points() -> void:
 	var held: Node3D = (goblin.get_meta("sockets", {}) as Dictionary).get("hand_r")
 	_check(held != null and held.get_node_or_null("Held") != null, "a goblin's dagger is in its hand")
 	World.despawn(imp)
+	_rig._process(0.0)
+
+
+## A two-handed piece (451 amended (2), step 4; Jeff: the great axe "held sideways by player and
+## draugr"): the left hand on its second grip (art-kit's grip_2), turned along the haft as the right
+## one is (HandReach), standing ready (Axe_Ready) and through the overhead swing; off with a shield
+## in the left. Real frames: the sockets follow the pose the modifiers leave.
+func _test_two_hands() -> void:
+	print("
+== two hands on a two-handed piece: the left on its grip_2 ==")
+	var player := _player()
+	var slots := player.slots
+	while slots.size() < Items.CARRIED:
+		slots.append("")
+	var was := slots.duplicate()
+	slots[Items.RIGHT_HAND] = "giant_axe"
+	slots[Items.LEFT_HAND] = ""
+	player.slots = slots
+	player.raised = ""
+	_rig._process(0.0)
+	var puppet: Node3D = _rig._puppets[player.get_instance_id()]
+	var sockets: Dictionary = puppet.get_meta("sockets")
+	var rig := puppet.get_meta("rig") as AnimRig
+	var reach := puppet.get_meta("reach") as HandReach if puppet.has_meta("reach") else null
+	_check(reach != null and reach.active, "a two-handed axe: the left hand reaches for it")
+	_check(rig.upper_clip() == "Axe_Ready", "standing with it: the ready stance (%s)" % rig.upper_clip())
+	if reach != null:
+		var axe := (sockets["hand_r"] as Node3D).get_node("Held") as Node3D
+		for at: float in [-1.0, 0.0, 0.55]:
+			if at >= 0.0:
+				rig.upper_at("Axe_Overhead", at)
+			for i in 3:
+				await get_tree().process_frame
+			var left := sockets["hand_l"] as Node3D
+			var off := left.global_position.distance_to(axe.global_transform * reach.grip)
+			var along := left.global_basis.y.normalized().dot(axe.global_basis.y.normalized())
+			_check(off < 0.04 and along > 0.95, "%s: the left hand on its grip_2, %.3f m off, its fist along the haft (%.2f)" % [
+					"standing ready" if at < 0.0 else "Axe_Overhead at %.2f s" % at, off, along])
+	slots[Items.LEFT_HAND] = "shield"
+	player.slots = slots
+	_rig._process(0.0)
+	_check(reach == null or not reach.active, "a shield in the left: no reach")
+	_check(rig.upper_clip() == "", "nor the ready stance (%s)" % rig.upper_clip())
+	player.slots = was
 	_rig._process(0.0)
 
 

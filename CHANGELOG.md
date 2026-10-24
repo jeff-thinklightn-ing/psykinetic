@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- A great axe is held in both hands: the left hand grips the haft above the right, standing ready and through the overhead swing.
 - Raising a shield brings it across in front of the chest, its face to the foe, instead of holding it out to the side.
 - A shield is strapped on the outside of the left forearm, its face out, instead of held out of the fist.
 - A held weapon or tool sits in the middle of the hand, not out at the end of it.
