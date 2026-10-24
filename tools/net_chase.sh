@@ -26,20 +26,21 @@ case "$PROFILE" in
 esac
 LINK="${NET_CHASE_PROXY:-$LINK}"
 cd "$(dirname "$0")/.."
+. tests/godot_log.sh  # Its logs in build/logs (decision 664).
 . tests/test_ports.sh
 PORT=$((17975 + PORT_OFFSET))
 PROXY=$((17976 + PORT_OFFSET))
 LOGS="$(mktemp -d)"
 mkdir -p "$LOGS/appdata"
 export APPDATA="$(cygpath -w "$LOGS/appdata" 2>/dev/null || echo "$LOGS/appdata")"
-"$GODOT" --headless --path . --server --map=wilds --token=chase "--port=$PORT" --no-companions --test-wait-players=1 \
+"$GODOT" --log-file "$(godot_log chase_server)" --headless --path . --server --map=wilds --token=chase "--port=$PORT" --no-companions --test-wait-players=1 \
 	--test-exit-after=$((SECONDS_RUN + 60)) </dev/null >"$LOGS/server.log" 2>&1 &
 server=$!
-"$GODOT" --headless --script res://tools/net_proxy.gd -- "--listen=$PROXY" "--server=$PORT" $LINK --seed=7 \
+"$GODOT" --log-file "$(godot_log chase_proxy)" --headless --script res://tools/net_proxy.gd -- "--listen=$PROXY" "--server=$PORT" $LINK --seed=7 \
 	"--seconds=$((SECONDS_RUN + 40))" </dev/null >"$LOGS/proxy.log" 2>&1 &
 proxy=$!
 sleep 5
-"$GODOT" --headless --path . --client --address=127.0.0.1 "--port=$PROXY" --token=chase --no-companions \
+"$GODOT" --log-file "$(godot_log chase_client)" --headless --path . --client --address=127.0.0.1 "--port=$PROXY" --token=chase --no-companions \
 	--player-id=c4a5e000-0000-4000-8000-00000000000a --name=Chaser --controls=click \
 	"--test-chase=$SECONDS_RUN" --test-smooth "--test-exit-after=$((SECONDS_RUN + 5))" </dev/null >"$LOGS/chaser.log" 2>&1 &
 client=$!

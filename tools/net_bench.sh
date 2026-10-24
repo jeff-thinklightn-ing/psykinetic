@@ -29,6 +29,7 @@ CLIENTS="${1:-1}"
 SIZE="${2:-256}"
 MONSTERS="${3:-2}"
 cd "$(dirname "$0")/.."
+. tests/godot_log.sh  # Its logs in build/logs (decision 664).
 . tests/test_ports.sh
 PORT=$((17950 + PORT_OFFSET))
 ADMIN=$((17951 + PORT_OFFSET))
@@ -38,13 +39,13 @@ LOGS="$(mktemp -d)"
 SHARED="$APPDATA/Godot/app_userdata/Psykinetic/levels/netbench"
 mkdir -p "$LOGS/appdata"
 export APPDATA="$(cygpath -w "$LOGS/appdata" 2>/dev/null || echo "$LOGS/appdata")"
-"$GODOT" --headless --path . --scene res://tools/net_bench_map.tscn -- "--size=$SIZE" "--monsters=$MONSTERS" 2>&1 | grep "\[net bench\]"
+"$GODOT" --log-file "$(godot_log net_bench_map)" --headless --path . --scene res://tools/net_bench_map.tscn -- "--size=$SIZE" "--monsters=$MONSTERS" 2>&1 | grep "\[net bench\]"
 if [ -e "$SHARED" ]; then
 	echo "the bench's level went to the shared user data ($SHARED): removed, stopping"
 	rm -rf "$SHARED" "$LOGS"
 	exit 1
 fi
-"$GODOT" --headless --path . --server --map=netbench --no-companions --token=bench "--port=$PORT" "--admin-port=$ADMIN" "--max-players=$CLIENTS" ${NET_BENCH_SERVER_ARGS:-} \
+"$GODOT" --log-file "$(godot_log net_bench_server)" --headless --path . --server --map=netbench --no-companions --token=bench "--port=$PORT" "--admin-port=$ADMIN" "--max-players=$CLIENTS" ${NET_BENCH_SERVER_ARGS:-} \
 	--test-exit-after=200 </dev/null >"$LOGS/server.log" 2>&1 &
 sleep 8
 ask() {
@@ -60,7 +61,7 @@ for i in $(seq 1 "$CLIENTS"); do
 	if [ -n "${NET_BENCH_WALK:-}" ]; then
 		WALK="--test-walk=$(echo $WAYS | cut -d' ' -f$(( (i - 1) % 8 + 1 ))):$NET_BENCH_WALK"
 	fi
-	"$GODOT" --headless --path . --client $WALK --address=127.0.0.1 "--port=$PORT" --token=bench "--name=Bench$i" \
+	"$GODOT" --log-file "$(godot_log "net_bench_client_$i")" --headless --path . --client $WALK --address=127.0.0.1 "--port=$PORT" --token=bench "--name=Bench$i" \
 		"--player-id=be0c0000-0000-4000-8000-0000000000$(printf %02d "$i")" --test-exit-after=190 \
 		</dev/null >"$LOGS/client$i.log" 2>&1 &
 	sleep 0.5

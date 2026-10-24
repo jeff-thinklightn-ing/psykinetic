@@ -39,9 +39,10 @@ if ($Preview) {
 	$evalArgs += @("--llm-url=http://127.0.0.1:$LocalPort/api/chat", "--llm-model=$Model")
 }
 
+. (Join-Path $PSScriptRoot '..\tests\godot_log.ps1')  # Its logs in build/logs (decision 664).
 Push-Location (Split-Path $PSScriptRoot -Parent)
 try {
-	& $godot --headless --path . --scene tests/perception_eval.tscn -- @evalArgs
+	& $godot --log-file (Get-GodotLog 'perception_eval') --headless --path . --scene tests/perception_eval.tscn -- @evalArgs
 	$code = $LASTEXITCODE
 } finally {
 	Pop-Location

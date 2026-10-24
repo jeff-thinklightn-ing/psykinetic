@@ -33,6 +33,7 @@ param(
 $ErrorActionPreference = 'Stop'
 
 $root = Split-Path $PSScriptRoot -Parent
+. (Join-Path $PSScriptRoot '..\tests\godot_log.ps1')  # Its logs in build/logs (decision 664).
 Set-Location $root
 
 function Fail($message) {
@@ -110,7 +111,7 @@ try {
 	& python $gate take $tree godot_export --pid $PID
 	if ($LASTEXITCODE -ne 0) { $ErrorActionPreference = 'Stop'; throw 'the heavy-job gate refused the export' }
 	try {
-		& $godot --headless --path $root --export-release 'Windows Client' (Join-Path $out 'psykinetic.exe') 2>&1 |
+		& $godot --log-file (Get-GodotLog 'release_export') --headless --path $root --export-release 'Windows Client' (Join-Path $out 'psykinetic.exe') 2>&1 |
 			ForEach-Object { "$_" } | Where-Object { $_ -match 'ERROR|WARNING' } | Write-Output
 		$exported = $LASTEXITCODE
 	} finally {

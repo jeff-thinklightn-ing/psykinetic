@@ -14,6 +14,7 @@ if ($godot -match '\.exe$' -and $godot -notmatch '_console\.exe$') {
 }
 
 $root = Split-Path $PSScriptRoot -Parent
+. (Join-Path $PSScriptRoot 'godot_log.ps1')  # Its logs in build/logs (decision 664).
 # A folder per checkout, so worktrees can run this at the same time.
 $logs = if ($Logs) { $Logs } else { Join-Path ([IO.Path]::GetTempPath()) ('psykinetic-net-test-' + (Split-Path $root -Leaf)) }
 . (Join-Path $PSScriptRoot 'test_ports.ps1')
@@ -54,7 +55,7 @@ $script:clients = @()
 $script:server = ''
 function Start-Instance($name, $modeArgs, $backstop) {
 	$done = Join-Path $logs "$name.done"
-	$arguments = @('--headless', '--path', "`"$root`"") + $modeArgs + @("--port=$phasePort", "--test-exit-on=`"$done`"", "--test-exit-after=$backstop")
+	$arguments = @('--log-file', "`"$(Get-GodotLog "net_$name")`"", '--headless', '--path', "`"$root`"") + $modeArgs + @("--port=$phasePort", "--test-exit-on=`"$done`"", "--test-exit-after=$backstop")
 	$script:instances[$name] = Start-Process -FilePath $godot -ArgumentList $arguments -NoNewWindow -PassThru `
 		-RedirectStandardInput $noStdin `
 		-RedirectStandardOutput (Join-Path $logs "$name.log") `

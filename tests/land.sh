@@ -20,6 +20,9 @@ if [ -z "${HEAVY_JOB_INSIDE:-}" ]; then
 	# The CHANGELOG first, no Godot, before any wait at the gate (decision
 	# 539): released sections as tagged, no bullet both unreleased and released.
 	python -B tools/changelog_check.py || { echo "LANDING TESTS: FAIL (CHANGELOG.md, decision 539: fix it as above)"; exit 1; }
+	# Every Godot the tooling starts writes its own log in build/logs, never
+	# the shared user:// logs folder (decision 664).
+	python -B tools/godot_log_check.py || { echo "LANDING TESTS: FAIL (a Godot launch without --log-file, decision 664: fix it as above)"; exit 1; }
 	echo "landing tests: through the heavy-job gate as $tree suite (decision 394)"
 	HEAVY_JOB_INSIDE=1 exec python tools/heavy_job.py run "$tree" suite -- bash tests/land.sh
 fi

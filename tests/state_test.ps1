@@ -11,6 +11,7 @@ if ($godot -match '\.exe$' -and $godot -notmatch '_console\.exe$') {
 }
 
 $root = Split-Path $PSScriptRoot -Parent
+. (Join-Path $PSScriptRoot 'godot_log.ps1')  # Its logs in build/logs (decision 664).
 # A folder per checkout, so worktrees can run this at the same time.
 $dir = Join-Path ([IO.Path]::GetTempPath()) ('psykinetic-state-test-' + (Split-Path $root -Leaf))
 . (Join-Path $PSScriptRoot 'test_ports.ps1')
@@ -22,7 +23,7 @@ $noStdin = Join-Path $dir 'stdin.empty'
 Set-Content $noStdin '' -NoNewline
 
 function Run-Host($name, $extra) {
-	$arguments = @('--headless', '--path', "`"$root`"", '--host', '--still-monsters', '--no-companions', '--map=test_room', "--port=$port", "--state=`"$state`"") + $extra
+	$arguments = @('--log-file', "`"$(Get-GodotLog "state_$name")`"", '--headless', '--path', "`"$root`"", '--host', '--still-monsters', '--no-companions', '--map=test_room', "--port=$port", "--state=`"$state`"") + $extra
 	$p = Start-Process -FilePath $godot -ArgumentList $arguments -NoNewWindow -PassThru -Wait `
 		-RedirectStandardInput $noStdin -RedirectStandardOutput (Join-Path $dir "$name.log") -RedirectStandardError (Join-Path $dir "$name.err")
 	@(Get-Content (Join-Path $dir "$name.log"))

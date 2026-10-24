@@ -24,6 +24,7 @@ param(
 $ErrorActionPreference = 'Stop'
 
 $root = Split-Path $PSScriptRoot -Parent
+. (Join-Path $PSScriptRoot '..\tests\godot_log.ps1')  # Its logs in build/logs (decision 664).
 $external = Join-Path $root 'art\audio\external'
 
 function Fail($message) {
@@ -114,7 +115,7 @@ if ($changed -and -not $Check -and -not $NoImport) {
 		if (Test-Path $console) { $godot = $console }
 	}
 	$ErrorActionPreference = 'Continue'
-	& $godot --headless --path $root --import 2>&1 | Out-Null
+	& $godot --log-file (Get-GodotLog 'sound_sync_import') --headless --path $root --import 2>&1 | Out-Null
 	$ErrorActionPreference = 'Stop'
 	if ($LASTEXITCODE -ne 0) { Fail "Godot's import failed after copying (exit $LASTEXITCODE)" }
 	Write-Output 'sound_sync: imported'

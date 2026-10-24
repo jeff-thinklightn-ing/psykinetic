@@ -27,6 +27,7 @@ case "$GODOT" in
 esac
 
 cd "$(dirname "$0")/.."
+. tests/godot_log.sh  # Its logs in build/logs (decision 664).
 . tests/test_ports.sh
 PORT=$((17892 + PORT_OFFSET))
 ADMIN=$((PORT + 1))
@@ -51,7 +52,7 @@ templates="${APPDATA:-}/Godot/export_templates/$version"
 [ -f "$templates/windows_release_x86_64.exe" ] || fail "no Windows release template for $version in $templates (the editor's Export > Manage Export Templates)"
 
 started=$(date +%s)
-"$GODOT" --headless --path . --export-pack "Linux Server" "$(cygpath -w "$DIR/server.pck")" </dev/null >"$DIR/export.log" 2>&1 \
+"$GODOT" --log-file "$(godot_log server_boot_export)" --headless --path . --export-pack "Linux Server" "$(cygpath -w "$DIR/server.pck")" </dev/null >"$DIR/export.log" 2>&1 \
 	|| fail "the Linux Server pack did not export"
 [ -s "$DIR/server.pck" ] || fail "the export made no pack"
 echo "PASS  the Linux Server pack exported ($(( $(date +%s) - started )) s, $(du -k "$DIR/server.pck" | cut -f1) KB)"
@@ -83,7 +84,7 @@ for _ in $(seq 1 480); do
 done
 # Where it listens, while it runs: 127.0.0.1, not every address.
 netstat -an -p UDP 2>/dev/null | grep -E "[:.]($PORT|$STATUS)[[:space:]]" >"$DIR/bound.txt"
-APPDATA="$(cygpath -w "$DIR/appdata")" timeout 60 "$GODOT" --headless --path . --client --address=127.0.0.1 "--port=$PORT" --token=boottest \
+APPDATA="$(cygpath -w "$DIR/appdata")" timeout 60 "$GODOT" --log-file "$(godot_log server_boot_client)" --headless --path . --client --address=127.0.0.1 "--port=$PORT" --token=boottest \
 	--name=BootTest --player-id=b0070000-0000-4000-8000-000000000001 --test-exit-after=25 </dev/null >"$DIR/client.log" 2>&1 &
 client=$!
 wait "$client"

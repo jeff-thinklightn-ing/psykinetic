@@ -20,6 +20,13 @@ if (-not $env:HEAVY_JOB_INSIDE) {
 		Write-Output "LANDING TESTS: FAIL (CHANGELOG.md, decision 539: fix it as above)"
 		exit 1
 	}
+	# Every Godot the tooling starts writes its own log in build/logs, never
+	# the shared user:// logs folder (decision 664).
+	& python -B (Join-Path $root 'tools\godot_log_check.py')
+	if ($LASTEXITCODE -ne 0) {
+		Write-Output "LANDING TESTS: FAIL (a Godot launch without --log-file, decision 664: fix it as above)"
+		exit 1
+	}
 	Write-Output "landing tests: through the heavy-job gate as $tree suite (decision 394)"
 	$env:HEAVY_JOB_INSIDE = '1'
 	try {

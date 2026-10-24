@@ -15,6 +15,7 @@ case "$GODOT" in
 esac
 
 cd "$(dirname "$0")/.."
+. tests/godot_log.sh  # Its logs in build/logs (decision 664).
 DIR="$(mktemp -d)"
 STATE="$DIR/world.json"
 . tests/test_ports.sh
@@ -23,7 +24,7 @@ PORT=$((17781 + PORT_OFFSET))
 run_host() {
 	name="$1"
 	shift
-	"$GODOT" --headless --path . --host --still-monsters --no-companions --map=test_room "--port=$PORT" "--state=$STATE" "$@" </dev/null >"$DIR/$name.log" 2>"$DIR/$name.err"
+	"$GODOT" --log-file "$(godot_log "state_$name")" --headless --path . --host --still-monsters --no-companions --map=test_room "--port=$PORT" "--state=$STATE" "$@" </dev/null >"$DIR/$name.log" 2>"$DIR/$name.err"
 }
 
 failures=0

@@ -20,7 +20,10 @@ func _init() -> void:
 	# The art status report counts these slots too: written again, by a
 	# fresh run (ArtKit reads its manifest once).
 	var output := []
-	var code := OS.execute(OS.get_executable_path(), ["--headless", "--path", ProjectSettings.globalize_path("res://"),
+	# Its log in the checkout's build/logs (decision 664).
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("res://build/logs"))
+	var code := OS.execute(OS.get_executable_path(), ["--log-file", ProjectSettings.globalize_path("res://build/logs/art_status.log"),
+		"--headless", "--path", ProjectSettings.globalize_path("res://"),
 		"--script", "res://tools/art_status.gd"], output, true)
 	print("".join(output).strip_edges())
 	quit(code)

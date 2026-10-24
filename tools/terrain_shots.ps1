@@ -16,6 +16,7 @@ param(
 $ErrorActionPreference = "Stop"
 if (-not $env:GODOT_PATH) { throw "GODOT_PATH is not set" }
 $root = Split-Path -Parent $PSScriptRoot
+. (Join-Path $PSScriptRoot '..\tests\godot_log.ps1')  # Its logs in build/logs (decision 664).
 . (Join-Path $root "tests/test_ports.ps1")
 $offset = $portOffset
 $checkout = Split-Path -Leaf $root
@@ -28,7 +29,7 @@ $port = 7700 + $offset
 foreach ($map in $Maps) {
 	$png = Join-Path (Resolve-Path $Out) "$map-$Tag.png"
 	$env:APPDATA = $appdata
-	& $env:GODOT_PATH --path $root --host --map=$map --port=$port --no-companions `
+	& $env:GODOT_PATH --log-file (Get-GodotLog "terrain_shots_$map") --path $root --host --map=$map --port=$port --no-companions `
 		--settings=$settings --test-yaw=$Yaw --test-exit-after=$Seconds --screenshot=$png @Extra | Out-Null
 	Write-Output $png
 }

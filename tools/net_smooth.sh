@@ -27,6 +27,7 @@ case "$PROFILE" in
 esac
 LINK="${NET_SMOOTH_PROXY:-$LINK}"
 cd "$(dirname "$0")/.."
+. tests/godot_log.sh  # Its logs in build/logs (decision 664).
 . tests/test_ports.sh
 PORT=$((17970 + PORT_OFFSET))
 PROXY=$((17971 + PORT_OFFSET))
@@ -34,19 +35,19 @@ LOGS="$(mktemp -d)"
 mkdir -p "$LOGS/appdata"
 export APPDATA="$(cygpath -w "$LOGS/appdata" 2>/dev/null || echo "$LOGS/appdata")"
 pids=""
-"$GODOT" --headless --path . --server --map=castle --token=smooth "--port=$PORT" --test-wait-players=2 \
+"$GODOT" --log-file "$(godot_log smooth_server)" --headless --path . --server --map=castle --token=smooth "--port=$PORT" --test-wait-players=2 \
 	--test-exit-after=$((SECONDS_RUN + 60)) </dev/null >"$LOGS/server.log" 2>&1 &
 server=$!
-"$GODOT" --headless --script res://tools/net_proxy.gd -- "--listen=$PROXY" "--server=$PORT" $LINK --seed=7 \
+"$GODOT" --log-file "$(godot_log smooth_proxy)" --headless --script res://tools/net_proxy.gd -- "--listen=$PROXY" "--server=$PORT" $LINK --seed=7 \
 	"--seconds=$((SECONDS_RUN + 40))" </dev/null >"$LOGS/proxy.log" 2>&1 &
 proxy=$!
 sleep 3
 WALK="w:2,d:2,s:2,a:2,wd:1.5,sa:1.5,w:2,d:2,s:2,a:2,wd:1.5,sa:1.5,w:2,d:2,s:2,a:2,wd:1.5,sa:1.5,w:2,d:2,s:2,a:2,wd:1.5,sa:1.5"
-"$GODOT" --headless --path . --client --address=127.0.0.1 "--port=$PROXY" --token=smooth --no-companions \
+"$GODOT" --log-file "$(godot_log smooth_client_a)" --headless --path . --client --address=127.0.0.1 "--port=$PROXY" --token=smooth --no-companions \
 	--player-id=5300e000-0000-4000-8000-00000000000a --name=Steer --controls=click \
 	--test-steer=1.5 --test-fight=3 --test-smooth "--test-exit-after=$SECONDS_RUN" </dev/null >"$LOGS/steer.log" 2>&1 &
 a=$!
-"$GODOT" --headless --path . --client --address=127.0.0.1 "--port=$PROXY" --token=smooth --no-companions \
+"$GODOT" --log-file "$(godot_log smooth_client_b)" --headless --path . --client --address=127.0.0.1 "--port=$PROXY" --token=smooth --no-companions \
 	--player-id=5300e000-0000-4000-8000-00000000000b --name=Keys --controls=wasd \
 	"--test-walk=$WALK" --test-smooth "--test-exit-after=$SECONDS_RUN" </dev/null >"$LOGS/keys.log" 2>&1 &
 b=$!

@@ -16,6 +16,7 @@ case "$GODOT" in
 esac
 
 cd "$(dirname "$0")/.."
+. tests/godot_log.sh  # Its logs in build/logs (decision 664).
 LOGS="$(mktemp -d)"
 . tests/test_ports.sh
 # The phases run at once (decision 279), each group on ports of its own:
@@ -38,7 +39,7 @@ ID_R=5e5e5e5e-0000-4000-8000-00000000000e
 start() {
 	name="$1"
 	shift
-	"$GODOT" --headless --path . "$@" "--port=$P" "--test-exit-on=$LOGS/$name.done" \
+	"$GODOT" --log-file "$(godot_log "net_$name")" --headless --path . "$@" "--port=$P" "--test-exit-on=$LOGS/$name.done" \
 		</dev/null >"$LOGS/$name.log" 2>"$LOGS/$name.err" &
 	eval "pid_$name=$! started_$name=$SECONDS"
 }

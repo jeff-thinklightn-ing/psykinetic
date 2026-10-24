@@ -13,6 +13,7 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
+. (Join-Path $PSScriptRoot '..\tests\godot_log.ps1')  # Its logs in build/logs (decision 664).
 
 $godot = if ($env:GODOT_PATH) { $env:GODOT_PATH } else { 'godot' }
 if ($godot -match '\.exe$' -and $godot -notmatch '_console\.exe$') {
@@ -62,12 +63,12 @@ if ($extension -eq '.blend') {
 
 Push-Location $root
 try {
-	& $godot --headless --path . --import 2>&1 | Out-Null
-	& $godot --headless --path . --script tools/art_check.gd -- $Slot 2>&1 | ForEach-Object { "$_" } |
+	& $godot --log-file (Get-GodotLog 'art_drop_import') --headless --path . --import 2>&1 | Out-Null
+	& $godot --log-file (Get-GodotLog 'art_check') --headless --path . --script tools/art_check.gd -- $Slot 2>&1 | ForEach-Object { "$_" } |
 		Where-Object { "$_" -match '^(ok|error|warning|\d+ error)|: (error|warning):|SCRIPT ERROR|^ERROR' } | ForEach-Object { Write-Output "$_" }
 	$checked = $LASTEXITCODE
 	# What each slot is drawn from now: docs/art_status.md and THIRD_PARTY.md.
-	& $godot --headless --path . --script tools/art_status.gd 2>&1 | ForEach-Object { "$_" } |
+	& $godot --log-file (Get-GodotLog 'art_status') --headless --path . --script tools/art_status.gd 2>&1 | ForEach-Object { "$_" } |
 		Where-Object { "$_" -match '^wrote|SCRIPT ERROR|^ERROR' } | ForEach-Object { Write-Output "$_" }
 	exit $checked
 } finally {

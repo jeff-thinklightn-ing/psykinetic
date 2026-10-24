@@ -28079,3 +28079,27 @@ with its rebase and import, so another tree could have taken over mid-landing. C
 "older than 15" line is the coordinator's to change.
 
 Tools only, protocol unchanged, no new class_name.
+
+## 664. Every Godot the tooling starts writes its own log, in its checkout's build/logs
+
+Godot writes `user://logs/godot.log` unless told otherwise, and that folder is shared by every
+worktree and by Jeff's own client (all one `user://`). It keeps the last five logs. A suite
+starts dozens of Godots, so within minutes of a landing the log of Jeff's client was rotated
+out (the coordinator, 2026-10-24: a draugr fight he wanted read was gone).
+
+- Every Godot launch in tests/ and tools/ passes `--log-file` into its checkout's
+  `build/logs/<name>.log` (build/ is gitignored), each Godot running at the same time with a
+  name of its own: a scene by its basename (`_again` for run.sh's retry), net_test's and
+  state_test's by phase, server_boot's export and client, the benches' server, proxy and
+  clients. Helpers: `tests/godot_log.sh` (`godot_log NAME`, sourced after the script's cd)
+  and `tests/godot_log.ps1` (`Get-GodotLog NAME`). A GDScript tool that starts one
+  (items_art_slots) passes it too.
+- `tools/godot_log_check.py` fails any launch line in tests/ or tools/ (sh `"$GODOT" -...`,
+  ps1 `& $godot` / `-FilePath $godot`, gd `OS.execute(OS.get_executable_path()`) with no
+  `--log-file` within three lines, `--version` aside. land.sh and land.ps1 run it before
+  the gate, beside the CHANGELOG check, so a new launch without one fails the landing at
+  once. It reads the scripts, not the logs folder: other trees and Jeff's client write
+  there too, so a check on the folder would fail for what others do.
+- A server the box runs, and the game itself, keep the default log.
+
+Tools only, protocol unchanged, no new class_name.

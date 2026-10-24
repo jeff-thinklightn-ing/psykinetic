@@ -31,6 +31,7 @@ if (-not $Godot) { throw "No Godot: pass -Godot <path to the Godot exe> or set G
 $console = $Godot -replace '\.exe$', '_console.exe'
 if (Test-Path $console) { $Godot = $console }
 $root = Split-Path -Parent $PSScriptRoot
+. (Join-Path $PSScriptRoot '..\tests\godot_log.ps1')  # Its logs in build/logs (decision 664).
 $work = Join-Path ([IO.Path]::GetTempPath()) "psykinetic-frame-budget"
 $appdata = Join-Path $work "appdata"
 New-Item -ItemType Directory -Force $appdata | Out-Null
@@ -39,11 +40,11 @@ $culture = [Globalization.CultureInfo]::InvariantCulture
 Set-Content -Encoding utf8 $settings ("window_width={0}`nwindow_height={1}`nwindow_mode=windowed`nhints=off`ncamera_zoom={2}`nantialias={3}" -f $Width, $Height, $Zoom.ToString($culture), $AA)
 $env:APPDATA = $appdata
 $town = Join-Path $work "town.json"
-& $Godot --headless --path $root res://tools/town_state.tscn -- "--out=$town" | Out-Null
+& $Godot --log-file (Get-GodotLog 'frame_budget_town') --headless --path $root res://tools/town_state.tscn -- "--out=$town" | Out-Null
 if (-not (Test-Path $town)) { throw "tools/town_state made no town ($town)" }
 $state = Join-Path $work "world.json"
 Copy-Item -Force $town $state
-$bench = @("--path", $root, "--scene", "res://tools/map_bench.tscn", "--",
+$bench = @("--log-file", (Get-GodotLog "frame_budget"), "--path", $root, "--scene", "res://tools/map_bench.tscn", "--",
 	"--map=wilds", "--bench-state=$state", "--test-herds=$Herds", "--players=$Players",
 	"--ticks=60", "--settle=0", "--seconds=$Seconds", "--host", "--settings=$settings")
 if ($Clear) { $bench += @("--weather=clear", "--hour=12") } else { $bench += @("--weather=storm", "--hour=23", "--test-minimap") }

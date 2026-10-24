@@ -33,6 +33,7 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
+. (Join-Path $PSScriptRoot '..\tests\godot_log.ps1')  # Its logs in build/logs (decision 664).
 
 function Fail($message) {
 	[Console]::Error.WriteLine("sound_take: $message")
@@ -129,7 +130,7 @@ if ($godot -match '\.exe$' -and $godot -notmatch '_console\.exe$') {
 	if (Test-Path $console) { $godot = $console }
 }
 $ErrorActionPreference = 'Continue'
-& $godot --headless --path $root --scene res://tools/sound_take.tscn -- "--slot=$Slot" "--file=$file" "--from=$From" "--original=$Original" "--sha256=$hash" "--by=$By" "--url=$Url" "--license=$License" 2>&1 |
+& $godot --log-file (Get-GodotLog 'sound_take') --headless --path $root --scene res://tools/sound_take.tscn -- "--slot=$Slot" "--file=$file" "--from=$From" "--original=$Original" "--sha256=$hash" "--by=$By" "--url=$Url" "--license=$License" 2>&1 |
 	ForEach-Object { "$_" } | Where-Object { $_ -match '^sound_take|ERROR' }
 $listed = $LASTEXITCODE
 $ErrorActionPreference = 'Stop'

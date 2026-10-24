@@ -26,6 +26,7 @@ if ($godot -match '\.exe$' -and $godot -notmatch '_console\.exe$') {
 $timeout = if ($env:TEST_TIMEOUT) { [int]$env:TEST_TIMEOUT } else { 300 }
 
 $root = Split-Path $PSScriptRoot -Parent
+. (Join-Path $PSScriptRoot 'godot_log.ps1')  # Its logs in build/logs (decision 664).
 . (Join-Path $PSScriptRoot 'jobs.ps1')
 $durations = Join-Path $root '.godot\test_durations.txt'
 # Logs of this run's own: other worktrees may be running the suite too.
@@ -124,7 +125,7 @@ try {
 		while ($queue.Count -gt 0 -and $running.Count -lt $jobs) {
 			$scene = $queue.Dequeue()
 			$log = Join-Path $logs "$(Get-Name $scene).log"
-			$process = Start-Process -FilePath $godot -ArgumentList '--headless', '--path', '.', '--scene', $scene `
+			$process = Start-Process -FilePath $godot -ArgumentList '--log-file', "`"$(Get-GodotLog (Get-Name $scene))`"", '--headless', '--path', '.', '--scene', $scene `
 				-RedirectStandardOutput "$log.out" -RedirectStandardError "$log.err" -NoNewWindow -PassThru
 			$null = $process.Handle  # Without it Windows PowerShell may lose the exit code.
 			$running[$scene] = @{ Process = $process; Started = Get-Date }

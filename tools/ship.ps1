@@ -35,6 +35,7 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
+. (Join-Path $PSScriptRoot '..\tests\godot_log.ps1')  # Its logs in build/logs (decision 664).
 Set-Location $root
 
 function Fail($text) {
@@ -67,7 +68,7 @@ if ($godot -match '\.exe$' -and $godot -notmatch '_console\.exe$') {
 	if (Test-Path $console) { $godot = $console }
 }
 Write-Output '--- import'
-& $godot --headless --path $root --import 2>&1 | Out-Null
+& $godot --log-file (Get-GodotLog 'ship_import') --headless --path $root --import 2>&1 | Out-Null
 $scripts = @(git ls-files --cached --others --exclude-standard -- '*.gd' '*.gdshader')
 $known = @(git ls-files --cached --others --exclude-standard -- '*.uid')
 $missing = @($scripts | Where-Object { $known -notcontains "$_.uid" })

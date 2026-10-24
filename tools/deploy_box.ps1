@@ -20,6 +20,7 @@
 param([switch]$Now)
 $ErrorActionPreference = 'Continue'
 $root = Split-Path $PSScriptRoot -Parent
+. (Join-Path $PSScriptRoot '..\tests\godot_log.ps1')  # Its logs in build/logs (decision 664).
 $box = if ($env:PSYKINETIC_BOX) { $env:PSYKINETIC_BOX } else { 'jequig@100.78.120.114' }
 $godot = if ($env:GODOT_PATH) { $env:GODOT_PATH } else { 'godot' }
 if ($godot -match '\.exe$' -and $godot -notmatch '_console\.exe$') {
@@ -36,7 +37,7 @@ $ssh = @('-o', 'BatchMode=yes', '-o', 'ConnectTimeout=15', $box)
 git -C $root fetch -q origin
 $head = (git -C $root rev-parse HEAD).Trim()
 $main = (git -C $root rev-parse origin/main).Trim()
-$ours = & $godot --headless --path $root -- --print-protocol 2>$null | Select-String '^PROTOCOL' | Select-Object -First 1
+$ours = & $godot --log-file (Get-GodotLog 'deploy_protocol') --headless --path $root -- --print-protocol 2>$null | Select-String '^PROTOCOL' | Select-Object -First 1
 $running = (ssh @ssh '~/psykinetic/server/admin.sh version' 2>&1 | ForEach-Object { "$_" }) -join ' '
 Write-Output "box runs:     $running"
 Write-Output "origin/main:  $(if ($ours) { $ours.Line -replace '^PROTOCOL ', '' } else { 'unknown (no --print-protocol)' })$(if ($head -ne $main) { ' (this checkout is not at origin/main; the box builds origin/main)' })"

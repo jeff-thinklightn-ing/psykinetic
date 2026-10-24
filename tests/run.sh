@@ -31,6 +31,7 @@ esac
 TIMEOUT="${TEST_TIMEOUT:-300}"
 
 cd "$(dirname "$0")/.."
+. tests/godot_log.sh  # Its logs in build/logs (decision 664).
 . tests/jobs.sh
 SERIAL=0
 [ "${1:-}" = "--serial" ] && SERIAL=1
@@ -57,7 +58,7 @@ run_scene() {
 	started=$(date +%s)
 	# The marker names this run's process of this scene, for the kill below.
 	marker="psykinetic-run-$$-$name"
-	timeout --kill-after=10 "$TIMEOUT" "$GODOT" --headless --path . --scene "$scene" -- "--run-marker=$marker" </dev/null >"$log" 2>&1
+	timeout --kill-after=10 "$TIMEOUT" "$GODOT" --log-file "$(godot_log "$(basename "$scene" .tscn)")" --headless --path . --scene "$scene" -- "--run-marker=$marker" </dev/null >"$log" 2>&1
 	status=$?
 	retried=""
 	if launch_failed "$status" "$started" "$log"; then
@@ -68,7 +69,7 @@ run_scene() {
 		retried="${retried%%; backtrace:*}"  # The whole one is in the gate's log.
 		sleep 2
 		again=$(date +%s)
-		timeout --kill-after=10 "$TIMEOUT" "$GODOT" --headless --path . --scene "$scene" -- "--run-marker=$marker" </dev/null >"$log" 2>&1
+		timeout --kill-after=10 "$TIMEOUT" "$GODOT" --log-file "$(godot_log "$(basename "$scene" .tscn)_again")" --headless --path . --scene "$scene" -- "--run-marker=$marker" </dev/null >"$log" 2>&1
 		status=$?
 		if launch_failed "$status" "$again" "$log"; then
 			again_note="$(launch_note "$name" "$status" "$log")"
