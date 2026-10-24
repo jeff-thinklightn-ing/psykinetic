@@ -28103,3 +28103,21 @@ out (the coordinator, 2026-10-24: a draugr fight he wanted read was gone).
 - A server the box runs, and the game itself, keep the default log.
 
 Tools only, protocol unchanged, no new class_name.
+## 652 amended. The founding food lasts to the first crop it can reap
+
+The 652 soak (25 days, one player, the default world) sold no food on day 0, but two gaps showed. The town was founded at step 0, before its people were counted, so it was stocked for the four-head floor (120 food for 12 residents). Its field stood only on day 8, after spring's sowing, so "the first autumn it can sow for" was next year's. Hunger strain began on day 9 and reached 7 of 10.
+
+The coordinator's ruling ((1) plus (c), as a general rule):
+- A town's first stores last to the first crop of any kind it can reap, counted from when its field can stand: now if it stands, else founding.field_days (8) on. That crop is the autumn harvest if the field stands with more than a day of spring left, else the winter's roots, whichever comes first (Towns.founding_food). In the soak that is the roots, about 35 days, 420 food for 12. A later season table that puts a sown harvest before the roots is picked up by the same rule.
+- Topped up once, the first time the town has residents (Towns._larder, run from _spread; "larder" on the record till then, saved).
+- Why not stock to next year's harvest (960 food): a hamlet's store becomes a granary and hides the strain that rise and fall exist to show. Why not keep this year's harvest: it leaves the day-9 hunger, against Jeff's ask that a fresh town not fall before its first crop.
+
+larder_test: the first-crop days from spring and summer, the top-up once. A tune line for the founding food goes on the next cut's checklist.
+
+## 566 amended, economy's side: the hunter's catch on the trip, and the field's work window
+
+npc's bodies show the hunt, the fields and the flock (566 amended; the coordinator's asks).
+- A hunter's catch, the monster kind from the hunt_at or hunt hook, is rolled as the trip sets out instead of at BACK, with the same odds and yield. It is kept on the trip (Production._trip_catch, saved as "trip_catch"), shown as Production.trip(id)["catch"] ("" for none, or for another trade), and its drops land at BACK as before. A lost or blocked trip drops it.
+- Towns.field_work(town): whether the farmer's work counts toward the crop now. That is spring with the crop unsown (or a new year's crop not yet cleared) and autumn with it sown, the field standing or building, the farm manned and its site held, as _crop works it. npc's hoe reads it instead of keeping a copy.
+
+production_test (the catch rolled once at the start, kept in the save, landing at BACK), farm_test _test_field_work (true exactly while the work counts, over a year; never without a farmer). Server only; protocol unchanged; no new class_name.

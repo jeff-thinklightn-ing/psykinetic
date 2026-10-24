@@ -118,6 +118,10 @@ var town_pays := Callable()
 var _trips: Dictionary = {}
 ## When each trip set out: worker id -> step (visible work: its outbound half).
 var _trip_from: Dictionary = {}
+## A hunter's catch, rolled as the trip sets out (566 amended: the body
+## carries game home only when there is some): worker id -> monster kind,
+## "" for none; its drops land when they are BACK.
+var _trip_catch: Dictionary = {}
 ## Each site's last state said (decision 521): site id -> why ("" worked).
 var _site_said: Dictionary = {}
 ## (town, worker_id, what, count, why) -> bool: a gatherer's delivery to
@@ -1079,12 +1083,14 @@ func _hunts(at: int) -> void:
 		var town: String = worker_record["town"]
 		var trip := site_turn(town, id, trade)
 		if trip == WALKING:
+			if not _trip_catch.has(id):
+				_trip_catch[id] = _hunt_roll(town, trade)  # At the trip's start (566 amended).
 			continue
 		worker_record["hunt_due"] = at + every
 		if trip == BLOCKED:
 			continue
-		var site := site_of(town, trade)
-		var kind := str(hunt_at.call(town, site)) if not site.is_empty() and hunt_at.is_valid() else str(hunt.call(town))
+		var kind := str(_trip_catch[id]) if _trip_catch.has(id) else _hunt_roll(town, trade)
+		_trip_catch.erase(id)
 		var by := "hunter:%s" % id
 		for drop: Variant in Monster.kinds().get(kind, {}).get("drops", []):
 			var item := str(drop.get("item", "")) if drop is Dictionary else ""
@@ -1270,6 +1276,7 @@ func site_turn(town: String, id: String, trade: String) -> String:
 	if site.is_empty():
 		_trips.erase(id)
 		_trip_from.erase(id)
+		_trip_catch.erase(id)
 		return NO_SITE
 	var why := site_blocked(town, site)
 	if why != str(_site_said.get(site["id"], "")):
@@ -1282,6 +1289,7 @@ func site_turn(town: String, id: String, trade: String) -> String:
 	if not why.is_empty():
 		_trips.erase(id)
 		_trip_from.erase(id)
+		_trip_catch.erase(id)  # Home with nothing.
 		return BLOCKED
 	if not _trips.has(id):
 		var walk := site_walk(town, site)
@@ -1297,10 +1305,18 @@ func site_turn(town: String, id: String, trade: String) -> String:
 	return BACK
 
 
+## The monster kind a hunt of [param town]'s [param trade] brings home: the
+## hunt_at hook's at its site, else the hunt hook's; "" for none.
+func _hunt_roll(town: String, trade: String) -> String:
+	var site := site_of(town, trade)
+	return str(hunt_at.call(town, site)) if not site.is_empty() and hunt_at.is_valid() else str(hunt.call(town))
+
+
 ## Worker [param worker_id]'s trip to their trade's site (visible work: the
 ## body goes there and back): {site (the Holdings place), from (the step it
-## set out), back_at (the step it is home, its yield then)}; {} when not on
-## one. Its span is the walk there and back and sites.work_steps at the
+## set out), back_at (the step it is home, its yield then), catch (a
+## hunter's, the monster kind rolled as it set out, "" for none or another
+## trade; 566 amended)}; {} when not on one. Its span is the walk there and back and sites.work_steps at the
 ## site between (521 amended).
 func trip(worker_id: String) -> Dictionary:
 	if not _trips.has(worker_id):
@@ -1313,7 +1329,7 @@ func trip(worker_id: String) -> Dictionary:
 			break
 	var back_at := int(_trips[worker_id])
 	var from := int(_trip_from.get(worker_id, back_at - site_walk(str(worker_record.get("town", "")), site) if not site.is_empty() else back_at))
-	return {"site": site, "from": from, "back_at": back_at}
+	return {"site": site, "from": from, "back_at": back_at, "catch": str(_trip_catch.get(worker_id, ""))}
 
 
 ## Whether [param town]'s [param trade] may work its site now: no site, or
@@ -1790,7 +1806,7 @@ func to_dict() -> Dictionary:
 		var window := int(rules.get("window", 6000))
 		state["sales"] = state["sales"].filter(func(sale: Dictionary) -> bool: return int(sale["step"]) >= now() - window)
 		towns[town] = state
-	return {"earned": _earned.duplicate(), "trips": _trips.duplicate(), "trip_from": _trip_from.duplicate(), "workers": _workers.duplicate(true), "workshops": _workshops.duplicate(true), "jobs": saved_jobs,
+	return {"earned": _earned.duplicate(), "trips": _trips.duplicate(), "trip_from": _trip_from.duplicate(), "trip_catch": _trip_catch.duplicate(), "workers": _workers.duplicate(true), "workshops": _workshops.duplicate(true), "jobs": saved_jobs,
 		"next_job": _next_job, "towns": towns}
 
 
@@ -1877,6 +1893,11 @@ func from_dict(saved: Dictionary) -> void:
 		for id: Variant in trip_from:
 			if _trips.has(str(id)):
 				_trip_from[str(id)] = int(trip_from[id])
+	var trip_catch: Variant = saved.get("trip_catch", {})
+	if trip_catch is Dictionary:
+		for id: Variant in trip_catch:
+			if _trips.has(str(id)):
+				_trip_catch[str(id)] = str(trip_catch[id])
 	var saved_jobs: Variant = saved.get("jobs", {})
 	if saved_jobs is Dictionary:
 		for key: Variant in saved_jobs:

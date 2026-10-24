@@ -422,6 +422,31 @@ func _test_sites() -> void:
 		_at(_now + 100)
 	_check(not at_site.is_empty() and at_site.all(func(id: String) -> bool: return id == "pt_town/grounds"),
 		"the hunter hunts at the town's hunting ground (%s)" % [at_site])
+	# The catch is rolled as the trip sets out and kept on it (566 amended,
+	# npc's game carried home); its drops land BACK, never rolled again.
+	for i in 50:
+		if _work.trip("hn").is_empty():
+			break
+		_at(_now + 100)
+	var rolls := [0]
+	_work.hunt_at = func(_town: String, _site: Dictionary) -> String:
+		rolls[0] += 1
+		return "rabbit"
+	var hunted: Array = []
+	_work.hunted.connect(func(_town: String, _id: String, kind: String) -> void: hunted.append(kind))
+	for i in 50:
+		if not _work.trip("hn").is_empty():
+			break
+		_at(_now + 100)
+	_check(rolls[0] == 1 and _work.trip("hn").get("catch") == "rabbit" and hunted.is_empty(),
+		"the trip sets out with its catch rolled: rabbit (%s)" % [_work.trip("hn")])
+	_check(Production.new(_work.to_dict(), _stock, null, func() -> int: return _now, _work.rules).trip("hn").get("catch") == "rabbit", "kept in the save")
+	for i in 50:
+		if _work.trip("hn").is_empty():
+			break
+		_at(_now + 100)
+	_check(rolls[0] == 1 and hunted == ["rabbit"], "home: the rabbit's drops land, nothing rolled again (%d rolls, %s)" % [rolls[0], hunted])
+	_check(_work.trip("wc").get("catch", "") == "", "another trade's trip carries no catch")
 
 
 

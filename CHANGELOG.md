@@ -7,6 +7,8 @@ notes (decision 324).
 
 ## Unreleased
 
+- A new town's first stores now last until its first crop it can actually reap (often the winter roots when its field goes up after spring), counted for the people it really has, so a fresh town no longer goes hungry in its second week.
+- A hunter now knows what they caught when they set out (the catch is decided at the trip's start, same odds), so the town can show game carried home only when there is some; the town also says when its farmer is sowing or harvesting.
 - The labyrinth generator learns a tower style: small rooms and two-wide ways inside an octagonal footprint, a shaft anchor lining the stairs floor to floor, with a sample tower in memory, its tests and a floor-row plan sheet (no tower is placed yet).
 - Going back into a zone you have already visited no longer logs "Signal 'impacted' is already connected" twice for its breakables.
 - A ruin's stone footing now crumbles nearly to the ground in places and breaks open between its corners, instead of still ringing the ruin.

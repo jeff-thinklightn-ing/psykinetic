@@ -37,6 +37,7 @@ func _ready() -> void:
 	_rules = _full.duplicate(true)
 	_rules.erase("decline")
 	_test_years()
+	_test_field_work()
 	_test_missed()
 	_test_farmer_comes()
 	_test_look()
@@ -81,6 +82,38 @@ func _year(towns: Towns, days := 28) -> int:
 		towns.tick()
 		towns.production.tick()
 	return towns.production.stockpile.count(TOWN, "food") - before
+
+
+## The farmer's work window (566 amended, npc's hoe): Towns.field_work true
+## exactly while the work counts toward the crop, spring unsown and autumn
+## sown with the farm manned; never with no farmer.
+func _test_field_work() -> void:
+	print("
+== the field's work window ==")
+	_rain = 0.11
+	_storm = false
+	var towns := _towns()
+	var seen := {}
+	var wrong: Array = []
+	var until := _now + 28 * DAY
+	while _now < until:
+		_now += World.WORLD_TICK_STEPS
+		towns.tick()
+		towns.production.tick()
+		var season := Season.name_at(_now)
+		var stage := str(towns.crop(TOWN).get("stage", ""))
+		var working := towns.field_work(TOWN)
+		var counts := (season == "spring" and stage == "" or season == "autumn" and stage == "sown") and towns.production.manned("%s:field" % TOWN)
+		if working != counts and wrong.size() < 3:
+			wrong.append([_now, season, stage, working])
+		seen["%s %s" % [season, working]] = true
+	_check(wrong.is_empty(), "true exactly while the farmer's work counts (%s)" % [wrong])
+	_check(seen.has("spring true") and seen.has("spring false") and seen.has("autumn true") and seen.has("autumn false")
+		and not seen.has("summer true") and not seen.has("winter true"), "sowing in spring, harvest in autumn, then done (%s)" % [seen.keys()])
+	var idle := _towns(1, false)
+	_now += World.WORLD_TICK_STEPS
+	idle.tick()
+	_check(not idle.field_work(TOWN), "no farmer: no field work")
 
 
 func _test_years() -> void:

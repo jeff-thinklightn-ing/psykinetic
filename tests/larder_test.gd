@@ -341,8 +341,9 @@ func _test_first_stores() -> void:
 	towns._found(TOWN)  # Its store first seen (seed_from).
 	var first := maxi(int(_rules["start_food"]), towns.founding_food(TOWN))
 	_check(work.stockpile.count(TOWN, "food") == first, "founded with start_food or its people's food to the first autumn in the store (%d)" % work.stockpile.count(TOWN, "food"))
-	# The days to the first autumn it can sow for (652): this year's in early
-	# spring, next year's once spring is past.
+	# The days to its first crop of any kind (652 amended), from when its
+	# field can stand (field_days on, none standing): this autumn's harvest
+	# from spring's start, the winter's roots from summer's.
 	var founding: Dictionary = _rules["founding"]
 	var heads := int(founding["heads"])
 	var phase := Season.year_phase
@@ -355,8 +356,17 @@ func _test_first_stores() -> void:
 	Season.year_phase = phase
 	Season.year_anchor = anchor
 	_check(spring == ceili(float(founding["per_head_day"]) * heads * 2 * Season.season_days)
-		and summer == ceili(float(founding["per_head_day"]) * heads * 5 * Season.season_days),
-		"founded at spring's start: food for two seasons a head (%d); at summer's, for five, the next autumn's (%d)" % [spring, summer])
+		and summer == ceili(float(founding["per_head_day"]) * heads * 2 * Season.season_days),
+		"founded at spring's start: food for two seasons a head, to the autumn (%d); at summer's, two, to the winter's roots (%d)" % [spring, summer])
+	# Founded before its people are counted: topped up once they are here.
+	var had := work.stockpile.count(TOWN, "food")
+	for i in heads + 4:
+		towns.note_rescue(TOWN, "fl%d" % i, "Folk%d" % i, "hauler")
+	towns._spread(TOWN)
+	var topped := work.stockpile.count(TOWN, "food") - had
+	_check(topped == maxi(towns.founding_food(TOWN) - first, 0) and topped > 0, "its people counted: the stores topped up by %d" % topped)
+	towns._spread(TOWN)
+	_check(work.stockpile.count(TOWN, "food") == had + topped, "once")
 	var rules := _rules.duplicate(true)
 	_now = 0
 	var clock := func() -> int: return _now

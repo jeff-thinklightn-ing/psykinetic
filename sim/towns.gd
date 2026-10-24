@@ -744,23 +744,30 @@ func _found(town: String) -> void:
 	var food := maxi(int(rules.get("start_food", 0)), founding_food(town))
 	if food > 0:
 		production.stockpile.deposit(town, "food", food, "founding", "the town's first stores")
+	record["larder"] = food  # Topped up for its people once they are here (_larder).
 	_note(town, "founded")
 	_spread(town)
 
 
-## The food [param town]'s people eat before its first harvest (652, the
-## coordinator's ruling): rules' founding.per_head_day x its residents (at
-## least founding.heads) x the days from now to the first autumn it can sow
-## for (this year's while spring has more than a day left, else next
-## year's). 0 without a founding rule.
+## The food [param town]'s people eat before its first crop (652 amended,
+## the coordinator's ruling): rules' founding.per_head_day x its residents
+## (at least founding.heads) x the days from now to the first crop of any
+## kind it can reap, counted from when its field can stand (now if it
+## stands, else founding.field_days on): the autumn harvest if spring has
+## more than a day left then (else next year's), or the winter's roots,
+## whichever comes first. 0 without a founding rule.
 func founding_food(town: String) -> int:
 	var rule: Dictionary = rules.get("founding", {})
 	if rule.is_empty():
 		return 0
 	var heads := maxi(residents(town).size(), int(rule.get("heads", 0)))
-	var place := Season.year_fraction(float(now())) * 4.0  # Seasons into the year: spring 0, autumn 2.
-	var seasons := 2.0 - place if place < 1.0 - 1.0 / maxi(Season.season_days, 1) else 6.0 - place
-	return ceili(float(rule.get("per_head_day", 1)) * heads * seasons * Season.season_days)
+	var days := float(maxi(Season.season_days, 1))
+	var place := Season.year_fraction(float(now())) * 4.0  # Seasons into the year: spring 0, autumn 2, winter 3.
+	var field := place if _stands(town, "field") else place + float(rule.get("field_days", 0)) / days
+	var year := floorf(field / 4.0) * 4.0
+	var harvest := year + 2.0 if field - year < 1.0 - 1.0 / days else year + 6.0
+	var roots := year + 3.0 if field - year < 3.0 else field
+	return ceili(float(rule.get("per_head_day", 1)) * heads * (minf(harvest, roots) - place) * days)
 
 
 ## Whether [param town]'s first harvest is still to come (652:
@@ -769,11 +776,25 @@ func before_harvest(town: String) -> bool:
 	return int(_towns.get(town, {}).get("harvests", 0)) == 0
 
 
+## A founded town's first stores topped up, once, the first time it has
+## residents (652 amended: founded before its people are counted, it was
+## stocked for founding.heads): to founding_food for them, if more.
+func _larder(town: String) -> void:
+	var record := _town(town)
+	if not record.has("larder") or residents(town).is_empty():
+		return
+	var more := founding_food(town) - int(record["larder"])
+	record.erase("larder")
+	if more > 0:
+		production.stockpile.deposit(town, "food", more, "founding", "the first stores, for its people")
+
+
 ## [param town]'s founding gold, if it waits and the town has residents of
 ## its own (not companions): split evenly, the first by id a coin more
 ## for what doesn't divide.
 func _spread(town: String) -> void:
 	var record := _town(town)
+	_larder(town)
 	var gold := int(record["to_spread"])
 	if gold <= 0:
 		return
@@ -1090,6 +1111,26 @@ func crop_look(town: String) -> String:
 		"autumn":
 			return "ripe"
 	return ""
+
+
+## Whether [param town]'s farmer's work counts toward its crop now (566
+## amended, npc's hoe): its field standing (or building), the farm manned
+## and its site held, and spring with the crop unsown or autumn with it
+## sown, as _crop works it.
+func field_work(town: String) -> bool:
+	if int(building(town, "field").get("level", 0)) < 1 or building(town, "field").get("state") not in [STANDING, BUILDING]:
+		return false
+	if not production.manned("%s:field" % town) or not production.site_works(town, "farmer"):
+		return false
+	var crop_now: Dictionary = _towns.get(town, {}).get("crop", {})
+	var season := Season.name_at(now())
+	var stage := str(crop_now.get("stage", ""))
+	match season:
+		"spring":
+			return stage == "" or str(crop_now.get("season", "")) != season  # A new year's, before _crop clears last year's.
+		"autumn":
+			return stage == "sown"
+	return false
 
 
 ## The year's crop moved on to now (Season.name_at): sown in spring by the
@@ -2694,6 +2735,8 @@ func from_dict(saved: Dictionary) -> void:
 		var record := _town(str(town))
 		record["xp"] = maxi(int(entry.get("xp", 0)), 0)
 		record["founded"] = bool(entry.get("founded", false))
+		if entry.has("larder"):
+			record["larder"] = int(entry["larder"])
 		# Its harvests in (652); a town founded before has had its first.
 		record["harvests"] = maxi(int(entry.get("harvests", 1 if record["founded"] else 0)), 0)
 		record["to_spread"] = maxi(int(entry.get("to_spread", 0)), 0)
