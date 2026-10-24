@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- A companion asleep on the night watch lies on her side by the fire, facing it, breathing slowly, and stands up when she wakes.
 - Pieces for the Dwarven Halls under the castle: the great dwarven forge with its hearth, chimney, bellows and anvils, a rack of goblin blades, the smith's fallen guards with their broken shields, and a plain dwarven pillar (613).
 - Bleeding out no longer ends in a scream: a player or companion who dies while lying Mortally Wounded breathes a last breath instead; a sudden death still cries out (628).
 - Bandaging now sounds like it: a soft rustle of cloth while the bandage is wound, for players and companions alike; it fades out when the bandage is done and stops short if the bandaging is broken off (627).

@@ -93,6 +93,7 @@ func _ready() -> void:
 	await _test_goblin()
 	_test_humans()
 	_test_worn()
+	_test_asleep()
 	_test_person_looks()
 	_test_person_garb()
 	_test_attach_points()
@@ -6429,6 +6430,56 @@ func _test_worn() -> void:
 	look.parts.erase("Cape")
 	look.apply(model, puppet.get_meta("tint", Color.WHITE))
 	model.set_meta("worn", "")
+
+
+
+func _test_asleep() -> void:
+	print("
+== a companion asleep on the watch (621 amended): on her side, her front to the fire, a slow breath; awake, standing ==")
+	# A companion's sleep drawn on the player's puppet (as _test_visible_work draws a resident's work).
+	var player := _player()
+	_rig._process(0.0)
+	var puppet: Node3D = _rig._puppets[player.get_instance_id()]
+	var rig := puppet.get_meta("rig") as AnimRig
+	var body := puppet.get_node("Body") as Node3D
+	var model := body.get_node("Model") as Node3D
+	var her := Companion.new()
+	her.name = "SleepTestCompanion"
+	her.tile = player.tile
+	puppet.set_meta("speed", 0.0)
+	puppet.set_meta("shuffle_until", 0)
+	var fire := her.tile + Vector2i(1, 1)
+	var had := World.is_fire(fire)
+	World._fire[fire] = true
+	var draw := func() -> float:
+		_rig._sync_work(her, puppet)
+		_rig._animate(puppet)
+		var yaw := Client3D._sleeping_yaw(her, 0.0)
+		_rig._lay(puppet, body, yaw)
+		body.rotation.y = yaw
+		return yaw
+	her.asleep = true
+	var yaw: float = draw.call()
+	# Her front: the model's +X (Sleep_Side lies on her left side, her front where her left hand was), flat.
+	var front := model.global_transform.basis.x
+	front = Vector3(front.x, 0.0, front.z).normalized()
+	var to_fire := Vector3(fire.x - her.tile.x, 0.0, fire.y - her.tile.y).normalized()
+	_check(rig.base_clip() == "Sleep_Side" and str(puppet.get_meta("work", "")) == "sleep_side",
+			"asleep: Sleep_Side, as her work (%s, %s)" % [rig.base_clip(), puppet.get_meta("work", "")])
+	_check(front.dot(to_fire) > 0.99, "her front to the fire a cell off diagonally (%s, %s; yaw %.2f)" % [front, to_fire, yaw])
+	var clip := rig.player.get_animation(rig._name("Sleep_Side")) if rig.has("Sleep_Side") else null
+	_check(clip != null and absf(clip.length - 4.0) < 0.05 and clip.loop_mode != Animation.LOOP_NONE, "the breath slow: a 4 s loop")
+	World._fire.erase(fire)
+	_check(is_equal_approx(Client3D._sleeping_yaw(her, 0.5), 0.5), "no fire near: her own facing")
+	her.asleep = false
+	draw.call()
+	_check(rig.base_clip() != "Sleep_Side" and str(puppet.get_meta("work", "")) == "" and body.position == Vector3.ZERO
+			and is_equal_approx(model.rotation.y, float(puppet.get_meta("faces"))), "awake: standing again (%s)" % rig.base_clip())
+	if had:
+		World._fire[fire] = true
+	her.free()
+	_rig._sync_work(player, puppet)
+	_rig._process(0.0)
 
 
 func _player() -> Player:

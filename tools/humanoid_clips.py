@@ -61,6 +61,15 @@ GUARD = [("upperarm_l", LIFT, 75.0), ("upperarm_l", TURN, -35.0), ("lowerarm_l",
 HOLD = [("upperarm_l", LIFT, 40.0), ("lowerarm_l", LIFT, 45.0), ("upperarm_l", TURN, -20.0),
 	("upperarm_r", LIFT, 30.0), ("lowerarm_r", LIFT, 50.0)]
 
+# Lying on the left side from Death01's lying on the back (head +Y, feet -Y): the pelvis
+# rolled about the body's length so the front faces +X, then each part in those same axes.
+SIDE_SLEEP = [("pelvis", TILT, 90.0), ("spine_02", TURN, 8.0), ("Head", TURN, 12.0),
+	("thigh_l", Vector((0.75, -0.65, -0.12)), AIM), ("calf_l", Vector((-0.45, -0.9, -0.05)), AIM),
+	("thigh_r", Vector((0.85, -0.5, -0.2)), AIM), ("calf_r", Vector((-0.35, -0.9, -0.15)), AIM),
+	("upperarm_l", Vector((1.0, 0.2, 0.0)), AIM), ("lowerarm_l", Vector((-0.83, 0.55, 0.0)), AIM),
+	("upperarm_r", Vector((0.6, -0.2, -0.8)), AIM), ("lowerarm_r", Vector((1.0, 0.1, -0.3)), AIM)]
+SIDE_LIFT = (0.0, 0.0, 0.15)
+
 CLIPS = {
 	"Block_Idle_Loop": {"loop": True, "keys": [
 		(0.0, P("Idle_Loop", 0.0, GUARD)),
@@ -73,6 +82,14 @@ CLIPS = {
 		(0.0, P("Death01", 2.4)),
 		(1.0, P("Death01", 2.4, [("spine_02", LIFT, 3.0), ("spine_03", LIFT, 2.0)])),
 		(2.0, P("Death01", 2.4)),
+	]},
+	# Asleep on her side (621 amended: a companion asleep by the fire): Death01's lying, rolled
+	# onto the left side, front to its left (+X), knees drawn up, the left forearm under the
+	# head, the right arm over in front; a slow breath (4 s), the chest swelling forward.
+	"Sleep_Side_Loop": {"loop": True, "keys": [
+		(0.0, P("Death01", 2.4, SIDE_SLEEP, move=SIDE_LIFT)),
+		(2.0, P("Death01", 2.4, SIDE_SLEEP + [("spine_02", TURN, 3.0), ("spine_03", TURN, 2.0)], move=SIDE_LIFT)),
+		(4.0, P("Death01", 2.4, SIDE_SLEEP, move=SIDE_LIFT)),
 	]},
 	"Get_Up": {"keys": [
 		(0.0, P("Death01", 2.4)),

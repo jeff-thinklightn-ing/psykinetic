@@ -26461,3 +26461,27 @@ reaches a little into the cells beside (1.3 x 1.45 m), drawn over the floor. The
 is building.crypt_pillar's variant 2 (the same 2 x 2 box and torches), not a new kind, so
 dungeon asks for it with "variant": 2 and the barrow's pillars keep variant 1.
 Art only, protocol unchanged, no new class_name.
+
+## 621 amended, pc-character's side: her sleep drawn
+
+The coordinator: "her body lying on her side by the fire with a slow breath while asleep, standing
+again when it clears, like your tending read". Companions' Companion.asleep (replicated) is what
+the views read.
+
+- **The clip:** Sleep_Side (humanoid_clips.py's Sleep_Side_Loop, in goblin.res beside 399's
+  authored clips). It starts from Death01's lying on the back (as Lie does), with the pelvis
+  rolled onto the left side so the front faces the body's left (SIDE_SLEEP). The knees are drawn
+  up, the left forearm is under the head and the right arm lies over in front. A 4 s breath swells
+  the chest forward, where Lie's takes 2 s. The UAL has no side-lying clip.
+- **Her work** (Client3D): ACTIVITIES "sleep_side" (lying) is her work while asleep (work_word).
+  So the same _animate and _lay draw it as a resident's "sleep": lying at its middle, any gait wins.
+- **To the fire:** _sleeping_yaw lays her facing so her front is to the nearest fire within 2
+  cells (SLEEP_FIRE_REACH, the watch rule's fire_cells; World.is_fire is the level's, on every
+  peer). The clip's front is the model's +X; _lay turns a lying model round, which leaves it a
+  quarter turn clockwise of the facing (SLEEP_FRONT). With no fire found she keeps her facing.
+  Asleep, she is laid down at once, not turned with the standing shuffle.
+
+view_test _test_asleep: asleep, Sleep_Side as her work, her front to a fire a cell off
+diagonally, a 4 s loop; no fire, her own facing; awake, standing again. Client only (the clip in
+goblin.res), protocol unchanged, no new class_name. A still of her by the fire follows release's
+bench slot.

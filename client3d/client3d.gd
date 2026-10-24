@@ -11142,11 +11142,11 @@ func _sync_puppets() -> void:
 		var at := Vector3(grid.x, _ground_height(grid), grid.y)
 		if puppet.position != at:
 			puppet.position = at
-		var yaw := _tending_yaw(entity, _aimed_yaw(entity, -entity.shown_facing().angle()))
+		var yaw := _sleeping_yaw(entity, _tending_yaw(entity, _aimed_yaw(entity, -entity.shown_facing().angle())))
 		var facing := puppet.get_node_or_null("Facing") as Node3D
 		# (Angles kept as float32: compared near enough, not ==.)
 		if facing != null:
-			if not entity is Monster:
+			if not entity is Monster and work_word(entity) != "sleep_side":  # Asleep, laid down at once.
 				yaw = _standing_turn(puppet, facing.rotation.y, yaw)
 			if not is_equal_approx(facing.rotation.y, yaw):
 				facing.rotation.y = yaw
@@ -11156,7 +11156,7 @@ func _sync_puppets() -> void:
 			_sync_addressing(entity as Resident, puppet)
 			_sync_work(entity as Resident, puppet)
 		elif entity is Player or entity is Companion:
-			_sync_work(entity, puppet)  # Its bandaging (the kneel).
+			_sync_work(entity, puppet)  # Its bandaging (the kneel); a companion's sleep.
 		_sync_bow(entity, puppet)
 		if entity is Player:
 			var lantern := puppet.get_node_or_null("Lantern") as Node3D
@@ -12649,6 +12649,10 @@ const ACTIVITIES := {
 	# player's or a companion's while it tends (GridEntity.tending), turned to
 	# the patient and leant toward it this far (metres), hands at its work.
 	"bandage": {"clip": "Fixing_Kneeling", "toward": 0.3},
+	# A companion asleep on the night watch (621 amended, Companion.asleep): on
+	# her side, knees drawn up, a slow breath (humanoid_clips' Sleep_Side_Loop),
+	# her front to the fire (_sleeping_yaw).
+	"sleep_side": {"clip": "Sleep_Side", "lying": true},
 }
 ## A hand's id that names an art slot, not an item (a work's tool).
 const ART_ID := "art:"
@@ -12666,10 +12670,12 @@ static func work_of(entity: GridEntity) -> Dictionary:
 
 
 ## The ACTIVITIES word of [param entity]'s work: a resident's activity,
-## "bandage" while it tends; "" for none.
+## "sleep_side" for a companion asleep, "bandage" while it tends; "" for none.
 static func work_word(entity: GridEntity) -> String:
 	if entity is Resident and ACTIVITIES.has((entity as Resident).activity):
 		return (entity as Resident).activity
+	if entity is Companion and (entity as Companion).asleep:
+		return "sleep_side"
 	return "bandage" if not entity.tending.is_empty() else ""
 
 
@@ -12683,6 +12689,33 @@ static func _tending_yaw(entity: GridEntity, yaw: float) -> float:
 			var way := Vector2(other.tile - entity.tile)
 			return yaw if way == Vector2.ZERO else -way.angle()
 	return yaw
+
+
+## How far a sleeper's front is turned from its facing: Sleep_Side lies on its
+## left side, its front where its left hand was (the model's +X), and _lay
+## turns a lying model round (faces + PI), which puts that front on the body's
+## +Z, a quarter turn clockwise of its facing seen from above.
+const SLEEP_FRONT := -PI / 2.0
+## How far round a sleeper a fire is looked for: Companion's watch rule
+## (rules' fire_cells, 2).
+const SLEEP_FIRE_REACH := 2
+
+
+## A companion asleep (621 amended): her facing laid so her front is to the
+## nearest fire within SLEEP_FIRE_REACH cells; [param yaw] while awake or with
+## no fire found.
+static func _sleeping_yaw(entity: GridEntity, yaw: float) -> float:
+	if not entity is Companion or not (entity as Companion).asleep:
+		return yaw
+	var best := Vector2i.ZERO
+	var found := false
+	for dy in range(-SLEEP_FIRE_REACH, SLEEP_FIRE_REACH + 1):
+		for dx in range(-SLEEP_FIRE_REACH, SLEEP_FIRE_REACH + 1):
+			var way := Vector2i(dx, dy)
+			if way != Vector2i.ZERO and World.is_fire(entity.tile + way) and (not found or Vector2(way).length() < Vector2(best).length()):
+				best = way
+				found = true
+	return -Vector2(best).angle() - SLEEP_FRONT if found else yaw
 
 
 ## The work kept on the puppet ("work", read by _animate and _lay), and its
