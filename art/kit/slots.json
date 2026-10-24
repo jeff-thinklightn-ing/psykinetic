@@ -1191,14 +1191,15 @@
 				{"at": [-0.136, 0.008, 0.002], "size": [0.774, 0.004, 0.806]}
 			]
 		},
-		"prop.weapon_rack": {
-			"category": "props",
+		"building.weapon_rack": {
+			"category": "buildings",
 			"type": "mesh",
 			"kind": "cell",
+			"footprint": [2, 1],
 			"size": [1.94, 1.58, 0.7],
 			"budget": 400,
 			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-23", "notes": "C:/dev/review/castle_halls/make_halls.py rack: a timber rack of two posts on feet and three rails, five crude goblin blades hung from the top rail (rusty and dark iron, notched, hooked, leather-wrapped grips), a spear and a jagged cleaver leant at its front; 212 tris"},
-			"uses": "the goblins' weapon rack beside the great forge (613, art-kit's side; dungeon's castle_halls, the coordinator's nod), 2 x 1 cells, long side along x, front +z; dungeon places it against the wall (612: never a cell off it)",
+			"uses": "the goblins' weapon rack beside the great forge (613, art-kit's side; dungeon's castle_halls, the coordinator's nod), 2 x 1 cells, long side along x, front +z; dungeon places it against the wall (612: never a cell off it); a solid building (Level.SOLID, DOORLESS: dungeon's), as the barrow's broken tables, so a fight in the forge room never stands bodies inside the blades (the coordinator; it was prop.weapon_rack)",
 			"grey": [
 				{"at": [0, 0.79, 0], "size": [1.94, 1.58, 0.7]}
 			]

@@ -27489,3 +27489,13 @@ fold (the entry's place his place id, nobody leading them home) gets his
 word after the greeting, residents.json sought "shelter" by story, else
 trade, else default (lore's by story after Jeff's check); never the mishap.
 resident_test _test_herder.
+
+## 613 amended, art-kit's side: the weapon rack is a building
+
+The coordinator, approving dungeon's castle_halls step 2 (613 amended, dungeon's side): the
+goblins' rack is solid, "the same as the barrow's broken tables, so a fight in the forge room
+never stands bodies inside the blades". prop.weapon_rack becomes building.weapon_rack, category
+buildings, "footprint": [2, 1], with the same mesh, long side along x and front +z, its files moved
+to art/kit/buildings/. Dungeon's step 2 adds its Level.BUILDINGS row with SOLID and DOORLESS,
+which view_test checks against this footprint. The fallen guards stay prop.fallen_guard (decor,
+658). art_kit_test, view_test pass. Client art only, protocol unchanged, no new class_name.

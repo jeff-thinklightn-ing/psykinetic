@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The goblins' weapon rack in the Dwarven Halls is a solid building (building.weapon_rack, 2 x 1; was prop.weapon_rack), so nobody stands inside its blades in a fight (613 amended, art-kit's side)
 - The hill herder is a person: at his fold by day and his hut by night while you are near, at the buyer's square when he drives his sheep to market, a herder's greeting, and his word of a newcomer sheltering at his fold (decision 640, npc's side).
 - Ruins look ruined: their walls are broken stubs, low rubble and gaps, half the floorboards are gone to bare earth with rubble, planks and weeds lying about, and a building that is gone leaves bare ground instead of flagstones.
 - Neglected buildings look right: a roof in disrepair sags gently instead of sinking through its walls, a ruin's rubble no longer has tall posts at its corners, a gone building leaves no floor behind, and a large camp's two tents stand side by side. A town wall knocked down to rubble also loses its posts.

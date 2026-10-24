@@ -70,6 +70,7 @@ Drawn as a grey box (a texture slot: terrain's procedural colour).
 | `building.throne` | 1 | art-kit, by hand | own | 2026-10-23 |
 | `building.tower_ruin` | 1 | art-kit, by hand | own | 2026-10-22 |
 | `building.waystone` | 2 | art-kit, by hand | own | 2026-10-21 |
+| `building.weapon_rack` | 1 | art-kit, by hand | own | 2026-10-23 |
 | `building.well` | 1 | art-kit, by hand | own | 2026-10-19 |
 | `building.woodpile` | 3 | art-kit, by hand | own | 2026-10-22 |
 | `carry.log` | 1 | art-kit, by hand | own | 2026-10-21 |
@@ -191,7 +192,6 @@ Drawn as a grey box (a texture slot: terrain's procedural colour).
 | `prop.torch` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
 | `prop.torch_post` | 1 | art-kit, by hand | own | 2026-10-19 |
 | `prop.wall_crack` | 1 | art-kit, by hand | own | 2026-10-22 |
-| `prop.weapon_rack` | 1 | art-kit, by hand | own | 2026-10-23 |
 | `prop.web_corner` | 2 | art-kit, by hand | own | 2026-10-23 |
 | `prop.web_niche` | 2 | art-kit, by hand | own | 2026-10-23 |
 | `prop.woodpile` | 1 | art-kit, by hand | own | 2026-10-21 |

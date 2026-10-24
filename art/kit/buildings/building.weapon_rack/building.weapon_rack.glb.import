@@ -3,13 +3,13 @@
 importer="scene"
 importer_version=1
 type="PackedScene"
-uid="uid://bo0ceg8vh4v6v"
-path="res://.godot/imported/prop.weapon_rack.glb-7fee3e5f3c169295af9a279f98596f06.scn"
+uid="uid://b8m7jk2xn2ar7"
+path="res://.godot/imported/building.weapon_rack.glb-bb9234aa8d2b3ff3005e637e5ed1f11d.scn"
 
 [deps]
 
-source_file="res://art/kit/props/prop.weapon_rack/prop.weapon_rack.glb"
-dest_files=["res://.godot/imported/prop.weapon_rack.glb-7fee3e5f3c169295af9a279f98596f06.scn"]
+source_file="res://art/kit/buildings/building.weapon_rack/building.weapon_rack.glb"
+dest_files=["res://.godot/imported/building.weapon_rack.glb-bb9234aa8d2b3ff3005e637e5ed1f11d.scn"]
 
 [params]
 
