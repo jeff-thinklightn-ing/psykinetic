@@ -27270,3 +27270,49 @@ their "door or shop"; the coordinator's ruling):
 - It comes down when the entry ends (sought_changed).
 
 Server only; protocol unchanged; no new class_name.
+
+## 643. The sought's door note and the town's rumour
+
+Jeff (2026-10-23, on the sought of 613): "town knows rumors - they leave a
+message posted on their door or shop - a small note saying where they
+went." The coordinator's ruling: npc builds the words and the note, ui
+reads it with E on the door (643, ui's side), economy's 613 amended gives
+the data (a sought entry's "door": the workshop they kept, "<town>:<kind>",
+or "inn" where their bed was, or "" for a newcomer who never came, while
+a workshop that is a Holdings place, an id with no colon, posts no note; and
+"story", "sought.<trade>" / "sought.camp"). The medicine man is never the
+sought one (economy); a newcomer who never came gets rumour only.
+
+- **The note (Main._sought_notes).** For each sought entry of a town in
+  the zone with a door, the cell just outside that building's door while
+  it stands or is damaged (its world-map record by the town's key and the
+  use, the kind of the workshop id or "inn"; across the first door edge of
+  a kind with doors, else the front cell: a solid building's door is
+  terrain, so there is no Door entity to read), and the story's note with
+  the where-words (Offers.note_words). One note a cell. The list is rebuilt
+  from Towns.sought each turn (_notes_tick after _sync_residents), so an
+  ended entry (home, answered by another, dropped: Towns.sought_changed)
+  takes its note down with no bookkeeping of its own.
+- **Wire.** A new message "notes" {zone, notes: [{tile: [x, y], text}]},
+  whole, to a peer on a zone join (after "map", before "sky") and to the
+  zone's peers when it changes; an empty list clears. MESSAGE_KINDS gains
+  "notes"; no RPC, no replicated property. Its line goes under revision 35
+  (open and unshipped at the landing: release's rule, no further bump).
+  The text travels ready-made, so the client needs no words file.
+- **The rumour (Main._rumour_for).** A greeting (560) by a townsperson of
+  a town with a sought entry that has a where and nobody leading them
+  home says, after the greeting word, the story's rumour line with the
+  name, the trade and the where only, never the mishap (lore's rule);
+  once a day per player and town. 613's _sought_words (the officials'
+  word) is unchanged.
+- **Words.** residents.json "notes", by story over "default" (note: one %s,
+  the where-words; rumour: three, name, trade, where-words). Lore's lines by
+  story come in after Jeff's wording check; the plain defaults ("Away in
+  the hills. Back when I can." / "Wat the butcher has gone off, in the
+  hills they say.") carry the mechanism till then.
+
+resident_test (the sought's test): the entry given a door and a story, the
+inn standing: one note at the cell outside the inn's door with the where;
+the rumour names them and the where once a day per player; the inn not
+standing, no note; home, the note comes down and the rumour stops. Server
+side only; no new class_name.

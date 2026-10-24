@@ -252,6 +252,8 @@ var _mind_last_ticks := 0
 var _hail_tried: Dictionary = {}
 var _hail_heard: Dictionary = {}  # player id -> {cue text: day}: no two residents tell one player the same thing in a day
 var _hail_greetings: Dictionary = {}  # player id -> {day, n}: greetings by standing a player heard today, capped at hail.greetings_a_day
+var _notes: Dictionary = {}  # zone -> the "notes" list last sent (decision 643): the sought's door notes.
+var _rumour_said: Dictionary = {}  # "town|player id|day" -> true: the sought rumour told on a greeting (decision 643).
 var _greet_at: Dictionary = {}  # "worker id|player id" -> msec of the last click greeting (560): one a greet.again_seconds
 ## Visible work (decision 566): a site's spot for a body (site id -> {cell, face}),
 ## what was last told of each house's waking (building code -> bool), and
@@ -3408,6 +3410,7 @@ func _show_zone_to(peer: int, zone_name: String, leaving: Array[GridEntity] = []
 		Net.message_to(peer, "clearing", {"zone": zone_name, "whole": true, "cells": World.clearing.cells_of(zone_name),
 			"plots": World.clearing.plots_of(zone_name).map(_plot_told)})
 	Net.message_to(peer, "map", map_message(zone_name))
+	Net.message_to(peer, "notes", {"zone": zone_name, "notes": _sought_notes(zone_name)})  # The sought's door notes (decision 643).
 	Net.message_to(peer, "sky", sky_message())
 	_send_towns(peer, zone_name)
 	Net.message_to(peer, "roofs", {"level": zone_name, "damaged": World.damaged_roofs(zone_name)})
@@ -6650,6 +6653,7 @@ func _sync_residents() -> void:
 	for who: String in wanted:
 		if not have.has(who):
 			_spawn_resident(wanted[who])
+	_notes_tick()
 
 
 ## The sought wanted in this zone (decision 613, npc's side): _sync_residents'
@@ -6883,6 +6887,97 @@ func _sought_words(town: String) -> Array[String]:
 		else:
 			out.append("%s the %s is found %s and is being led here." % [entry.get("name", "Someone"), trade, Towns.where_words(str(entry.get("where", "")))])
 	return out
+
+
+## The notes on doors in zone [param zone_name] (decision 643; Jeff: "a
+## small note saying where they went"): for each sought entry of a town
+## here with a "door" (economy's 613 amended: the workshop they kept,
+## "<town>:<kind>", or "inn"; a Holdings place id, no colon, posts none:
+## no sought trade works at one), the cell just outside that building's door
+## while it stands, and the story's note with the where (Offers.note_words):
+## [{tile: [x, y], text}], one a cell, rebuilt from Towns.sought each turn,
+## so an ended entry (home, answered, dropped) takes its note down with it.
+func _sought_notes(zone_name: String) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	if World.towns == null or World.holdings == null or _world_map == null:
+		return out
+	var taken := {}
+	for town_id: String in World.holdings.all_places():
+		var town_place := World.holdings.place(town_id)
+		if town_place.get("kind") != "stockpile" or str(town_place.get("area", "")) != zone_name:
+			continue
+		for entry: Dictionary in World.towns.sought(town_id):
+			var door := str(entry.get("door", ""))
+			if door.is_empty() or (door != "inn" and not door.begins_with(town_id + ":")):
+				continue  # Never came, or a workshop that is a Holdings place (economy: a healer's hut's id has no colon).
+			var use := "inn" if door == "inn" else door.trim_prefix(town_id + ":")
+			var cell: Variant = _note_cell(zone_name, town_id, str(town_place.get("key", "")), use)
+			if cell == null or taken.has(cell):
+				continue
+			taken[cell] = true
+			var text := str(Offers.note_words(str(entry.get("story", ""))).get("note", "Away %s. Back when I can."))
+			if text.contains("%s"):
+				text = text % Towns.where_words(str(entry.get("where", "")))
+			out.append({"tile": [cell.x, cell.y], "text": text})
+	return out
+
+
+## The cell just outside the door of [param town_id]'s standing (or damaged)
+## building of [param use] in [param zone_name], its world-map record by
+## the town's [param key]: across the first door edge of a kind with doors,
+## else the front cell (a solid building's door is terrain); null for none
+## (decision 643).
+func _note_cell(zone_name: String, town_id: String, key: String, use: String) -> Variant:
+	if str(World.towns.building(town_id, use).get("state", "")) not in [Towns.STANDING, Towns.DAMAGED]:
+		return null
+	for building: Dictionary in _world_map.areas.get(zone_name, {}).get("buildings", []):
+		if str(building.get("town", "")) != key or str(building.get("use", "")) != use:
+			continue
+		var rect: Rect2i = building.get("rect", Rect2i())
+		if not (building.get("doors", []) as Array).is_empty():
+			var doors := Level.kind_doors(building)
+			if not doors.is_empty():
+				for cell: Vector2i in Terrain.edge_cells(doors[0]):
+					if not rect.has_point(cell):
+						return cell
+		return Level.front_cell(rect, building.get("facing", Vector2i(0, 1)))
+	return null
+
+
+## Each turn (decision 643): this zone's door notes to its peers when they
+## change (the "notes" message, whole; a joining peer gets them with the map).
+func _notes_tick() -> void:
+	var zone_name := World.zone.name
+	var notes := _sought_notes(zone_name)
+	var packed := var_to_str(notes)
+	if str(_notes.get(zone_name, "")) == packed:
+		return
+	_notes[zone_name] = packed
+	Net.broadcast_to(World.peers_in(zone_name), "notes", {"zone": zone_name, "notes": notes})
+
+
+## The rumour a townsperson of [param town] tells [param player_id] on a
+## greeting on [param day] (decision 643): the first sought entry with a
+## where and nobody leading them home, its story's rumour line
+## (Offers.note_words) with the name, the trade and the where only, never
+## the mishap (lore's rule); once a day per player and town, "" after.
+func _rumour_for(town: String, player_id: String, day: int) -> String:
+	if World.towns == null:
+		return ""
+	if int(_rumour_said.get("_day", -1)) != day:
+		_rumour_said = {"_day": day}
+	for entry: Dictionary in World.towns.sought(town):
+		if str(entry.get("where", "")).is_empty() or not str(entry.get("freed_by", "")).is_empty():
+			continue
+		var key := "%s|%s" % [town, player_id]
+		if _rumour_said.has(key):
+			return ""
+		_rumour_said[key] = true
+		var line := str(Offers.note_words(str(entry.get("story", ""))).get("rumour", "%s the %s has gone off, %s they say."))
+		if line.count("%s") == 3:
+			line = line % [entry.get("name", "Someone"), str(entry.get("trade", "")).replace("_", " "), Towns.where_words(str(entry.get("where", "")))]
+		return line
+	return ""
 
 
 ## Where the lost of the town at [param place] stand (decision 487): a
@@ -11284,6 +11379,9 @@ func _greeted(player: Player, body: Resident) -> void:
 	if body.trade == "medicine_man" and in_care(player.player_id, _care_hut_of(body.worker_id)):
 		word = str(rules.get("care", word))  # One in his care hears it (584 amended, npc's side).
 	_resident_says(body, word, "", player)
+	var rumour := _rumour_for(body.town, player.player_id, day)
+	if not rumour.is_empty():
+		_resident_says(body, rumour, "", player)  # The town's word of its sought, once a day (decision 643).
 	_hail_now(body, player, Townsfolk.rules().get("hail", {}), now_msec, now, day, _sky_now(), true)
 
 

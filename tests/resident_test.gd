@@ -557,6 +557,23 @@ func _test_sought_body() -> void:
 	_check(found.facts_now().any(func(f: String) -> bool: return f.begins_with("You are held in the hills by the goblins")), "its thought: held, by whom, where, and that it will not follow while watched")
 	var words: Array = _main._sought_words(STORE)
 	_check(words.size() == 1 and words[0].contains("Wat the butcher was seen in the hills"), "the town's word for the officials: %s" % [words])
+	# The note on their door and the town's rumour (decision 643): economy's door and story on the entry, the
+	# inn's standing record and its building by hand; the note at the cell outside the inn's door with the where;
+	# the rumour once a day per player; the note gone with the entry (below).
+	entry["door"] = "inn"
+	entry["story"] = "sought.butcher"
+	World.towns._town(STORE)["buildings"]["inn"] = {"kind": "inn", "level": 1, "state": Towns.STANDING, "since": World.towns.now(), "job": 0}
+	var inn := {"slot": "building.shed", "rect": Rect2i(13, 1, 2, 2), "facing": Vector2i(0, 1), "town": STORE.get_slice("/", 1), "use": "inn"}
+	(_main._world_map.areas[TOWN]["buildings"] as Array).append(inn)
+	var notes: Array = _main._sought_notes(TOWN)
+	var front := Level.front_cell(inn["rect"], inn["facing"])
+	_check(notes.size() == 1 and notes[0]["tile"] == [front.x, front.y] and str(notes[0]["text"]).contains("hills"), "a note at the cell outside the inn's door, saying where (%s)" % [notes])
+	var rumour: String = _main._rumour_for(STORE, "p1", 3)
+	_check(rumour.contains("Wat the butcher") and rumour.contains("hills") and _main._rumour_for(STORE, "p1", 3).is_empty() and not _main._rumour_for(STORE, "p2", 3).is_empty(),
+		"the rumour names them and the where, once a day per player (%s)" % rumour)
+	World.towns._town(STORE)["buildings"]["inn"]["state"] = Towns.PLANNED
+	_check(_main._sought_notes(TOWN).is_empty(), "the inn not standing: no door, no note")
+	World.towns._town(STORE)["buildings"]["inn"]["state"] = Towns.STANDING
 	var player := _player()
 	_check(player != null, "(a player to speak to them)")
 	var imp := _main._spawn({"script": "res://sim/monster.gd", "shape": "capsule", "name": "SoughtWatcher%d" % World.tick, "tile": _main._nearest_free(found.tile + Vector2i(2, 0))}) as Monster
@@ -577,6 +594,9 @@ func _test_sought_body() -> void:
 	_sync()
 	_check(World.towns.sought_entry("rs-sought").is_empty() and "rs-sought" in World.towns.residents(STORE) and World.production.worker("rs-sought").get("away", true) == false,
 		"at the town's ground: home, a resident of the town, the entry gone")
+	_check(_main._sought_notes(TOWN).is_empty() and _main._rumour_for(STORE, "p3", 3).is_empty(), "home: the note comes down and the rumour stops (decision 643)")
+	(_main._world_map.areas[TOWN]["buildings"] as Array).erase(inn)
+	World.towns._town(STORE)["buildings"].erase("inn")
 	var home := _body("rs-sought")
 	_check(home != null and home.sought.is_empty() and not home.strayed and home.escort_of.is_empty(), "the body is one of the town's")
 	_check(str(Townsfolk.card_of(World.production, "rs-sought").get("facts", [{}]).back().get("text", "")).contains(" brought you to "), "the card: who brought them")

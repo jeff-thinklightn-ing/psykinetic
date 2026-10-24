@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- A newcomer the town sent for leaves a note on their shop's or the inn's door saying where they went (nothing shows in this build yet: the client's sheet that reads it with E on the cell outside the door follows), and townsfolk you greet pass the rumour on once a day; the note comes down when they are home (decision 643).
 - A town's ruined building, once gone, gives its ground back to the forest: stumps, then grass and scrub, then trees over the seasons; if the town builds there again, the ground is cleared for it (649)
 - Each newcomer to a town has a place and story of their own, held under the castle, at a camp or lost in the hills, forest or wilds; a resident left hungry or unpaid for days wanders back there, to be found again (613 amended).
 - The draugr's battle axe's upper grip moved down to 0.45 m above the lower, as the two-handed clips hold the hands, so pc-character's left hand reaches it (451 amended (2), art-kit's side; corrects 451 amended's 0.87)

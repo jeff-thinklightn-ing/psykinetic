@@ -119,6 +119,24 @@ static var _settings := {}
 ## economy's amendment carries one), "_" the fallback: freed (said when the escort starts) and arrival (at the
 ## town's store); held and lost are the thought's words (Resident.facts_now).
 static var _sought_words: Dictionary = {}
+static var _note_words: Dictionary = {}
+## The words of a sought's door note and the town's rumour for [param story]
+## ("sought.<trade>" / "sought.camp", economy's entry.story; decision 643):
+## the words file's "notes" by story over its "default", {note (with the
+## where), rumour (name, trade, where)}; lore's lines by story land after
+## Jeff's wording check, the defaults carry the mechanism till then.
+static func note_words(story: String) -> Dictionary:
+	if _note_words.is_empty():
+		var data: Variant = JSON.parse_string(FileAccess.get_file_as_string(FILE)) if FileAccess.file_exists(FILE) else null
+		_note_words = data.get("notes", {}).duplicate(true) if data is Dictionary and data.get("notes") is Dictionary else {}
+		if not _note_words.get("default") is Dictionary:
+			_note_words["default"] = {"note": "Away %s. Back when I can.", "rumour": "%s the %s has gone off, %s they say."}
+	var out: Dictionary = (_note_words["default"] as Dictionary).duplicate()
+	if _note_words.get(story) is Dictionary:
+		out.merge(_note_words[story], true)
+	return out
+
+
 static func sought_words(trade: String) -> Dictionary:
 	if _sought_words.is_empty():
 		var data: Variant = JSON.parse_string(FileAccess.get_file_as_string(FILE)) if FileAccess.file_exists(FILE) else null
