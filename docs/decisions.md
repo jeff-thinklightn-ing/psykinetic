@@ -27095,3 +27095,47 @@ carried off adds days without one); nothing at 0 days, so an unstrained
 town's sheet reads as before. No bar, no colour: a town falling is said in
 words like the rest of the sheet. ui_test's economy rows cover it. Client
 only; no wire change; no new class_name.
+## 655. The shown walk bends through the cell centre
+
+Jeff, on the tilted camera (v0.1.171): "moving along tiles is now more
+unnatural ... diagonal movements stand out". Every body moved on a straight
+line from cell centre to cell centre and changed heading at once at each
+centre; the top-down view hid it because a sprite has no heading to see,
+and a 3D body jerking its yaw every step, worst where straight and diagonal
+steps alternate, does not read as walking. The coordinator approved ui's
+design: the client's drawing changes, nothing in the sim or on the wire.
+
+A step is drawn as a bend round each corner (GridEntity.bent_position): a
+quadratic from the reach point on the step before, through the cell's
+centre as its control point, to the reach point on the step after, with the
+reach BEND_REACH (half a step: midpoint to midpoint; the corner cut by 0.18
+cells at a right angle, 0.25 at a reversal, never more) or BEND_REACH_NARROW
+(a quarter) round a cell with a wall on any side, so a body in a 1-cell door
+edge keeps nearer its cell. The bend is timed on each step's own time, so
+every reach point is crossed when the straight line would cross it: arrival
+times, hearing, the moment a tile counts, stay the server's, and a straight
+run is the straight line at the straight pace. The shown facing is the
+bend's tangent (bent_tangent), so the yaw turns across the bend (the half
+step before and after the corner) instead of at the centre; TURN_RATE stays
+as the clamp for everything else (aim, a standing turn, a slide taken over).
+The 3D puppet takes its yaw from the shown facing as before, the rig
+untouched (pc-character's).
+
+Where the next cell is known: a mirror's queued slides (_slides, usually
+holding the next step by the time one starts, drawn display_delay_ticks
+behind) and the own predicted body's planned steps (MovePrediction._steps).
+The bend at a step's end is settled as its tail begins (the next slide
+queued by then, joining straight on at the display clock, one cell, not a
+push) and never changes under way; the step after starts on that bend, else
+straight from the centre: the body never jumps onto or off a bend. A push, a
+slide from off the centre (a catch-up), a jump of more than a cell, a
+correction's ease and a walk from rest are drawn straight as before. The
+host's own body (its next step unknown to the client code, a held key read
+tick by tick) walks straight and turns at the centre as now: known, left.
+DIAGONAL_TICK_SCALE 1.5 (a diagonal 6% slower than its length) is physics'
+and the pathfinder's and stays; with the corner rounded the dip falls inside
+the bend. view_test _test_bent_walk: the straight run, the midpoints at the
+straight moments, the two steps meeting on the bend, within the cells and
+moving on, the tangent between the ways, the narrow reach, the reach read
+off the map, a mirror's slide bending toward the queued slide and not toward
+a late or present one. Client only; no wire change; no new class_name.

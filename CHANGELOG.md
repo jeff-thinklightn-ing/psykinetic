@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Bodies round their corners as they walk: the path bends through each cell's centre and the body turns across the bend instead of snapping its heading at every step, so a walk that mixes straight and diagonal steps reads as one walk under the tilted camera; arrival times are unchanged (655).
 - The town status sheet (N) ends with a strain line while a town is slipping: how many days of its ten it has run and why, in economy's words; nothing while it stands well (649, ui's side).
 - A new settlement starts with camps: a tent or two round a fire ring, open to the sky, pitched by anyone for a little wood and cloth.
 - Buildings a town no longer keeps up show it: in disrepair the roof breaks, the walls crack, the lamps go out and weeds grow at the foot; a ruin is a low bank of rubble you can walk over, and once it's gone nothing is left.

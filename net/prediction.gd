@@ -71,6 +71,12 @@ class Step:
 	var deadline := 0.0
 	var started := false
 	var confirmed := false
+	## 655: the corners rounded (GridEntity.bent_position): the tile the step
+	## before came from when this one starts on its bend; the tile this one
+	## bends toward at its end, settled as its tail begins.
+	var bend_prev := GridEntity.UNKNOWN_TILE
+	var bend_next := GridEntity.UNKNOWN_TILE
+	var bend_decided := false
 
 
 var _entity: GridEntity
@@ -435,7 +441,46 @@ func position() -> Vector2:
 	var t := clampf((_clock - step.start) / step.duration, 0.0, 1.0)
 	if step.ease:
 		t = 1.0 - (1.0 - t) * (1.0 - t)
-	return Iso.grid_to_local(step.from_grid.lerp(step.to_grid, t))
+	return Iso.grid_to_local(_bent(step, t))
+
+
+## 655: the way the body points as drawn, a unit vector in grid units:
+## along its bend, else along the step.
+func shown_direction() -> Vector2:
+	var step := _current()
+	var t := clampf((_clock - step.start) / step.duration, 0.0, 1.0)
+	if not _bends(step):
+		return Vector2(step.to - step.from)
+	var reach_in := GridEntity.bend_reach(step.from) if step.bend_prev != GridEntity.UNKNOWN_TILE else 0.0
+	return GridEntity.bent_tangent(step.bend_prev, step.from, step.to, step.bend_next, t, reach_in, GridEntity.bend_reach(step.to))
+
+
+## 655: [param step]'s drawn point at [param t], its corners rounded as the
+## mirrors' are (GridEntity._bent_step): the bend at its end settled as its
+## tail begins, from the step after when that one is planned by then and
+## joins straight on, and handed to that step as the bend it starts on.
+func _bent(step: Step, t: float) -> Vector2:
+	if not _bends(step):
+		return step.from_grid.lerp(step.to_grid, t)
+	var reach_out := GridEntity.bend_reach(step.to)
+	if t > 1.0 - reach_out and not step.bend_decided:
+		step.bend_decided = true
+		var i := _steps.find(step)
+		if i >= 0 and i + 1 < _steps.size():
+			var after: Step = _steps[i + 1]
+			if _bends(after) and after.from == step.to and is_equal_approx(after.start, step.start + step.duration):
+				step.bend_next = after.to
+				after.bend_prev = step.from
+	var reach_in := GridEntity.bend_reach(step.from) if step.bend_prev != GridEntity.UNKNOWN_TILE else 0.0
+	return GridEntity.bent_position(step.bend_prev, step.from, step.to, step.bend_next, t, reach_in, reach_out)
+
+
+## 655: whether [param step] may be drawn on a bend: a step of one cell
+## between two centres, not a correction's ease or a walk from rest.
+static func _bends(step: Step) -> bool:
+	var delta := step.to - step.from
+	return not step.ease and maxi(absi(delta.x), absi(delta.y)) == 1 \
+			and step.from_grid == Vector2(step.from) and step.to_grid == Vector2(step.to)
 
 
 ## The latest step that has started; the first one if none has yet.

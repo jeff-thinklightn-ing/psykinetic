@@ -45,6 +45,7 @@ func _ready() -> void:
 	await _test_low_names()
 	_test_cone_lift()
 	_test_arc_on_ground()
+	_test_bent_walk()
 	_test_pine_stands()
 	_test_ground_textures()
 	_test_canopy_mask()
@@ -6864,3 +6865,87 @@ func _test_cone_lift() -> void:
 	_check(same_ground, "lifted, the cone's sides stand over the same ground (%d vertices): its spread is the sim's at either pitch" % flat_faces.size())
 	_check(is_equal_approx(_rig._aim_arc.position.y, flat_y), "and back at the ortho pitch, on the ground again")
 	_rig.aim_arc(origin, 0.0, 5.0, 1.0, 0, false)
+
+
+## The shown walk bends through the cell centre (decision 655).
+func _test_bent_walk() -> void:
+	print("\n== the shown walk bends through the cell centre (655) ==")
+	var none := GridEntity.UNKNOWN_TILE
+	var r := GridEntity.BEND_REACH
+	var a := Vector2i(0, 0)
+	var b := Vector2i(1, 0)
+	var c := Vector2i(1, 1)
+	var straight := true
+	for i in 5:
+		var t := i / 4.0
+		straight = straight and GridEntity.bent_position(a, b, Vector2i(2, 0), Vector2i(3, 0), t, r, r).is_equal_approx(Vector2(1.0 + t, 0.0)) \
+				and GridEntity.bent_tangent(a, b, Vector2i(2, 0), Vector2i(3, 0), t, r, r).is_equal_approx(Vector2.RIGHT)
+	_check(straight, "a straight run is the straight line at the straight pace, pointing along it")
+	# A right-angle corner at b: east, then south.
+	var into := GridEntity.bent_position(none, a, b, c, 1.0 - r, 0.0, r)
+	var out := GridEntity.bent_position(a, b, c, none, r, r, 0.0)
+	_check(into.is_equal_approx(Vector2(0.5, 0.0)) and out.is_equal_approx(Vector2(1.0, 0.5)),
+			"the bend starts and ends on the straight line's midpoints, at the straight line's moments (%s, %s)" % [into, out])
+	var corner_in := GridEntity.bent_position(none, a, b, c, 1.0, 0.0, r)
+	var corner_out := GridEntity.bent_position(a, b, c, none, 0.0, r, 0.0)
+	_check(corner_in.is_equal_approx(corner_out) and corner_in.is_equal_approx(Vector2(0.875, 0.125)),
+			"at the corner's moment the two steps meet on the bend, the corner cut by under a quarter cell (%s)" % corner_in)
+	var inside := true
+	var onward := true
+	var last := -1.0
+	for k in 21:
+		var at := GridEntity.bent_position(none, a, b, c, 1.0 - r + r * k / 20.0, 0.0, r)
+		inside = inside and at.x >= -0.5 and at.x <= 1.5 and at.y >= -0.5 and at.y <= 0.5
+		onward = onward and at.x + at.y > last
+		last = at.x + at.y
+	for k in range(1, 21):
+		var at := GridEntity.bent_position(a, b, c, none, r * k / 20.0, r, 0.0)
+		inside = inside and at.x >= 0.5 and at.x <= 1.5 and at.y >= -0.5 and at.y <= 1.5
+		onward = onward and at.x + at.y > last
+		last = at.x + at.y
+	_check(inside and onward, "the bend stays within the two cells of each step and always moves on")
+	var tangent := GridEntity.bent_tangent(a, b, c, none, 0.0, r, 0.0)
+	_check(tangent.is_equal_approx(Vector2(1, 1).normalized()), "at the corner's moment the body points between the two ways (%s)" % tangent)
+	var narrow := GridEntity.BEND_REACH_NARROW
+	var narrow_in := GridEntity.bent_position(none, a, b, c, 1.0 - narrow, 0.0, narrow)
+	var narrow_corner := GridEntity.bent_position(none, a, b, c, 1.0, 0.0, narrow)
+	_check(narrow_in.is_equal_approx(Vector2(0.75, 0.0)) and narrow_corner.distance_to(Vector2(b)) < corner_in.distance_to(Vector2(b)),
+			"a narrow way's bend reaches a quarter step and cuts the corner less (%s)" % narrow_corner)
+	# The reach read off the map: a cell walled on a side is narrow, one open all round is not.
+	var open := none
+	var walled := none
+	for cell: Vector2i in World.floor_cells():
+		var walls := 0
+		for side: Vector2i in [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]:
+			if not World.is_walkable(cell + side):
+				walls += 1
+		if walls == 0 and open == none:
+			open = cell
+		elif walls > 0 and walled == none:
+			walled = cell
+		if open != none and walled != none:
+			break
+	_check(open != none and walled != none and GridEntity.bend_reach(open) == r and GridEntity.bend_reach(walled) == narrow,
+			"the reach read off the map: a cell with a wall beside it bends the short way (%s), one open all round the full (%s)" % [walled, open])
+	# A mirror's slide: the bend at its end settled from the queue as its tail begins.
+	var body := GridEntity.new()
+	body._from_tile = open
+	body._from_pos = Vector2(open)
+	body._to_tile = open + Vector2i.RIGHT
+	body._move_tick = 100.0
+	body._move_duration = 2.0
+	body._slides.assign([{"from": open + Vector2i.RIGHT, "to": open + Vector2i.RIGHT + Vector2i.DOWN, "tick": 102.0, "duration": 2.0}])
+	var early := body._bent_step(body._to_tile, 0.3)
+	var late := body._bent_step(body._to_tile, 0.9)
+	var reach := GridEntity.bend_reach(body._to_tile)
+	var expected := GridEntity.bent_position(none, open, body._to_tile, body._slides[0]["to"], 0.9, 0.0, reach)
+	_check(early.is_empty() and not late.is_empty() and body._bend_decided and body._bend_next == body._slides[0]["to"] and late[0].is_equal_approx(expected),
+			"a mirror's slide runs straight till its tail, then bends toward the slide queued to follow it (%s)" % [late])
+	body._bend_decided = false
+	body._bend_next = none
+	body._slides[0]["tick"] = 103.0
+	_check(body._bent_step(body._to_tile, 0.9).is_empty() and body._bend_decided and body._bend_next == none,
+			"a slide queued to start a tick late is no corner to bend toward: straight to the centre")
+	body._present = true
+	_check(body._bent_step(body._to_tile, 0.9).is_empty(), "a push is drawn straight")
+	body.free()

@@ -81,6 +81,15 @@ const PIP_REACH := 4.0
 ## How fast the shown facing turns toward where it should point: about
 ## 100 ms to come round (an exponential ease at this rate per second).
 const TURN_RATE := 30.0
+## A corner rounded as the body walks (decision 655): the bend round a
+## cell's centre reaches this far along the step before it and the step
+## after (half a step: midpoint to midpoint), and only this far in a
+## narrow way (a cell with a wall beside it, a 1-cell door edge), so the
+## body keeps nearer the cell it is on.
+const BEND_REACH := 0.5
+const BEND_REACH_NARROW := 0.25
+## No tile known: the step before or after the one shown (655).
+const UNKNOWN_TILE := Vector2i(-99999, -99999)
 ## A push not yet drawn this many ticks after it came is taken as over.
 const PUSH_SHOWN_TICKS := 14.0
 ## A refused or corrected step eases to a stop over this many ticks.
@@ -277,6 +286,14 @@ var _drawn_shown := -INF
 ## The facing as shown, an angle in grid space, turning toward the wanted
 ## one at TURN_RATE.
 var _shown_angle := NAN
+## 655: the tile the step before the one shown came from, when that step
+## was drawn bending into this one (so this one starts on the bend), else
+## UNKNOWN_TILE; and the tile this one bends toward at its end, settled as its
+## tail began (the next slide known by then, or not), never changed under
+## way, so the body never jumps onto or off a bend.
+var _prev_tile := UNKNOWN_TILE
+var _bend_next := UNKNOWN_TILE
+var _bend_decided := false
 # Mirrors only. A mirror is drawn display_delay_ticks in the past, so by the
 # time a tile change arrives the slide for the one before it is still on
 # screen. Changes wait here ({from, to, tick, duration}) until the display
@@ -505,7 +522,7 @@ func _process(delta: float) -> void:
 			position = _prediction.position()
 			_walk_shown_at = World.tick + World.tick_alpha
 			if _prediction.facing() != Vector2i.ZERO:
-				wanted = Vector2(_prediction.facing())
+				wanted = _prediction.shown_direction()  # 655: along its bend.
 		else:
 			# Mirrors are drawn slightly in the past, so a tile change is
 			# always known before its slide has to start.
@@ -541,6 +558,11 @@ func _process(delta: float) -> void:
 						slide["from_pos"] = Iso.local_to_grid(position)
 						for later: Dictionary in _slides:
 							later["tick"] = later["tick"] + late
+					# 655: this slide starts on the bend the last one ended on, if it did.
+					_prev_tile = _from_tile if _bend_decided and _bend_next == slide["to"] and slide["from"] == _to_tile \
+							and not slide.has("from_pos") else UNKNOWN_TILE
+					_bend_decided = false
+					_bend_next = UNKNOWN_TILE
 					_from_tile = slide["from"]
 					_to_tile = slide["to"]
 					_move_tick = slide["tick"]
@@ -561,13 +583,14 @@ func _process(delta: float) -> void:
 			var t := 1.0
 			if _move_duration > 0.0:
 				t = clampf((now - _move_tick) / _move_duration, 0.0, 1.0)
-			position = Iso.grid_to_local(_from_pos.lerp(Vector2(to), t))
+			var bent := _bent_step(to, t)  # 655: the corners rounded; [] for a slide drawn straight.
+			position = Iso.grid_to_local(bent[0] if not bent.is_empty() else _from_pos.lerp(Vector2(to), t))
 			var sliding := t < 1.0 and to != _from_tile
 			var knocked := sliding and _on_push_line(_from_tile, to)
 			stepping = sliding and not knocked
 			_note_push_shown(knocked, to, t)
 			if stepping:
-				wanted = Vector2(to - _from_tile)
+				wanted = bent[1] if not bent.is_empty() else Vector2(to - _from_tile)
 			elif aim != Vector2.ZERO:
 				wanted = aim
 	_turn_toward(wanted, delta)
@@ -710,6 +733,115 @@ func _world_slide_from(from: Vector2i, at_tick: float, duration: float) -> void:
 	_from_pos = Vector2(from)
 	_move_tick = at_tick
 	_move_duration = duration
+	# 655: a slide given straight (the host's own body, whose next step is
+	# not known) is drawn straight.
+	_prev_tile = UNKNOWN_TILE
+	_bend_next = UNKNOWN_TILE
+	_bend_decided = false
+
+
+## 655: where the slide to [param to] at [param t] of its time is drawn
+## with its corners rounded, and the way it points there: [position,
+## tangent] in grid units; [] for a slide drawn straight: a push, one from
+## off its cell's centre (a catch-up), a jump of more than a cell, or one
+## with no corner known at either end. The bend at the end is settled as
+## the tail begins (the next slide queued by then, joining straight on, or
+## not) and never changes under way.
+func _bent_step(to: Vector2i, t: float) -> Array:
+	var delta := to - _from_tile
+	if _present or _from_pos != Vector2(_from_tile) or maxi(absi(delta.x), absi(delta.y)) != 1:
+		_bend_decided = false
+		_bend_next = UNKNOWN_TILE
+		return []
+	var reach_out := bend_reach(to)
+	if t > 1.0 - reach_out and not _bend_decided:
+		_bend_decided = true
+		_bend_next = _next_slide_to(to)
+	if _prev_tile == UNKNOWN_TILE and _bend_next == UNKNOWN_TILE:
+		return []
+	var reach_in := bend_reach(_from_tile) if _prev_tile != UNKNOWN_TILE else 0.0
+	return [bent_position(_prev_tile, _from_tile, to, _bend_next, t, reach_in, reach_out),
+			bent_tangent(_prev_tile, _from_tile, to, _bend_next, t, reach_in, reach_out)]
+
+
+## 655: the tile the next queued slide leads to, when it joins straight on
+## from [param to] (a step of one cell, on the display clock, starting as
+## the slide shown ends), else UNKNOWN_TILE.
+func _next_slide_to(to: Vector2i) -> Vector2i:
+	if _slides.is_empty():
+		return UNKNOWN_TILE
+	var slide: Dictionary = _slides[0]
+	if slide.get("present", false) or slide.has("from_pos") or slide["from"] != to:
+		return UNKNOWN_TILE
+	if absf(float(slide["tick"]) - (_move_tick + _move_duration)) > 0.05:
+		return UNKNOWN_TILE
+	var delta: Vector2i = slide["to"] - to
+	if maxi(absi(delta.x), absi(delta.y)) != 1:
+		return UNKNOWN_TILE
+	return slide["to"]
+
+
+## 655: how far the bend round [param corner] reaches along the steps
+## either side of it: half a step, or a quarter in a narrow way (a cell
+## with a wall on any side: a 1-cell door edge), so the body keeps nearer
+## the cell it is on.
+static func bend_reach(corner: Vector2i) -> float:
+	for side: Vector2i in [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]:
+		if not World.is_walkable(corner + side):
+			return BEND_REACH_NARROW
+	return BEND_REACH
+
+
+## 655: where a body is on its step [param from] -> [param to] at
+## [param t] of the step's time, its corners rounded: the first
+## [param reach_in] of the step runs the bend round from (coming from the
+## step before, [param prev]), the last [param reach_out] the bend round
+## to (going on toward [param next]). Each bend is a quadratic with the
+## cell's centre as its control point, from the reach point on one step
+## to the reach point on the other, timed on each step's own time, so
+## every reach point is crossed when the straight line would cross it:
+## arrival times stay the server's, and a straight run is the straight
+## line at the straight pace. UNKNOWN_TILE at either end, or a reach of 0,
+## leaves that end straight. In grid units.
+static func bent_position(prev: Vector2i, from: Vector2i, to: Vector2i, next: Vector2i, t: float,
+		reach_in := BEND_REACH, reach_out := BEND_REACH) -> Vector2:
+	var a := Vector2(from)
+	var b := Vector2(to)
+	if prev != UNKNOWN_TILE and reach_in > 0.0 and t < reach_in:
+		return _bend_point(Vector2(prev), a, b, reach_in, 0.5 + t / (2.0 * reach_in))
+	if next != UNKNOWN_TILE and reach_out > 0.0 and t > 1.0 - reach_out:
+		return _bend_point(a, b, Vector2(next), reach_out, (t - 1.0 + reach_out) / (2.0 * reach_out))
+	return a.lerp(b, t)
+
+
+## 655: the way the body points on that step at [param t]: a unit vector
+## in grid units along the bend's tangent, else along the step.
+static func bent_tangent(prev: Vector2i, from: Vector2i, to: Vector2i, next: Vector2i, t: float,
+		reach_in := BEND_REACH, reach_out := BEND_REACH) -> Vector2:
+	var a := Vector2(from)
+	var b := Vector2(to)
+	var tangent := b - a
+	if prev != UNKNOWN_TILE and reach_in > 0.0 and t < reach_in:
+		tangent = _bend_slope(Vector2(prev), a, b, reach_in, 0.5 + t / (2.0 * reach_in))
+	elif next != UNKNOWN_TILE and reach_out > 0.0 and t > 1.0 - reach_out:
+		tangent = _bend_slope(a, b, Vector2(next), reach_out, (t - 1.0 + reach_out) / (2.0 * reach_out))
+	return tangent.normalized() if not tangent.is_zero_approx() else (b - a).normalized()
+
+
+## The quadratic round [param centre], from [param reach] of the way back
+## toward [param before] to [param reach] of the way on toward
+## [param after], at [param u] (0..1); and its slope there.
+static func _bend_point(before: Vector2, centre: Vector2, after: Vector2, reach: float, u: float) -> Vector2:
+	var p0 := centre.lerp(before, reach)
+	var p2 := centre.lerp(after, reach)
+	var v := 1.0 - u
+	return p0 * (v * v) + centre * (2.0 * u * v) + p2 * (u * u)
+
+
+static func _bend_slope(before: Vector2, centre: Vector2, after: Vector2, reach: float, u: float) -> Vector2:
+	var p0 := centre.lerp(before, reach)
+	var p2 := centre.lerp(after, reach)
+	return (centre - p0) * (2.0 * (1.0 - u)) + (p2 - centre) * (2.0 * u)
 
 
 func _world_note_exertion(on_tick: int) -> void:
