@@ -1573,9 +1573,11 @@ func _test_game_and_watch() -> void:
 	_check(str(sleep["ask"]) in spoken and pet._sleeping.has("asked_at"), "a hard day, by the fire: she asks her player to keep watch (%s)" % [spoken])
 	_say_to(pet, owner, "Yes, get some sleep.")
 	World.step()
-	_check(pet.order == "watch" and pet.current_intent == Companion.Intent.REST, "yes: she lies down to sleep (%s, %s)" % [pet.order, pet.intent_name()])
+	_check(pet.order == "watch" and pet.current_intent == Companion.Intent.SLEEP and pet.asleep,
+		"yes: she lies down to sleep, asleep on the wire (621 amended) (%s, %s)" % [pet.order, pet.intent_name()])
 	for i in int(sleep["sleep_ticks"]) + 2:
 		World.step()
+	_check(not pet.asleep, "woken: no longer asleep")
 	_check(pet.order == "" and pet.hp == pet.max_hp and "watched" in seen and Standing.score(record.companion, id) == 1,
 		"slept out with her player by: whole, and they kept watch, trust (hp %d, %s, %d)" % [pet.hp, seen, Standing.score(record.companion, id)])
 	# Left sleeping, and something comes.
@@ -1594,6 +1596,7 @@ func _test_game_and_watch() -> void:
 	World.step()
 	World.step()
 	_check(str(sleep["left_line"]) in spoken and "left_alone" in seen and pet.order == "", "her player gone and something came: she wakes, says so, and it costs her (%s)" % [seen])
+	_check(not pet.asleep, "woken by the fight: no longer asleep")
 	World.despawn(imp)
 	World._fire.erase(fire)
 	pet.deed.disconnect(on_deed)

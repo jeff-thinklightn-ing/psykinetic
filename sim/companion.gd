@@ -28,10 +28,10 @@ extends GridEntity
 ## her player said in the last ECHO_TICKS, or her own last SAID_REMEMBERED, are
 ## dropped.
 
-enum Intent { FOLLOW, HOLD, ATTACK, SHOVE, RETREAT, IDLE, YIELD, ERRAND, REVIVE, GUIDE, REST }
+enum Intent { FOLLOW, HOLD, ATTACK, SHOVE, RETREAT, IDLE, YIELD, ERRAND, REVIVE, GUIDE, REST, SLEEP }
 enum Stance { STAY_CLOSE, HOLD, PRESS, GUARD, PULL_BACK }
 
-const INTENT_NAMES: Array[String] = ["FOLLOW", "HOLD", "ATTACK", "SHOVE", "RETREAT", "IDLE", "YIELD", "ERRAND", "REVIVE", "GUIDE", "REST"]
+const INTENT_NAMES: Array[String] = ["FOLLOW", "HOLD", "ATTACK", "SHOVE", "RETREAT", "IDLE", "YIELD", "ERRAND", "REVIVE", "GUIDE", "REST", "SLEEP"]
 const STANCE_NAMES: Array[String] = ["STAY_CLOSE", "HOLD", "PRESS", "GUARD", "PULL_BACK"]
 const DEFAULT_STANCE := Stance.GUARD
 ## A bump this soon after the last one is the same bump (a held key).
@@ -607,6 +607,9 @@ var _game := {}
 ## Keeping watch (decision 621): {asked_at} while she waits for an answer,
 ## {until, left} while she sleeps (order "watch"), or {}.
 var _sleeping := {}
+## Asleep by the fire while her player keeps watch (621 amended: her intent
+## SLEEP), replicated so her body lies down on their client.
+var asleep := false
 ## A fight since she last slept, and the day she last asked for a watch.
 var _hard_day := false
 var _watch_day := -1
@@ -659,6 +662,7 @@ func _init() -> void:
 	# Her player's peer changes when they rejoin and she was waiting.
 	replicate("keeper_peer")
 	replicate("bond_step")  # Decision 555: her bond, read on her player's client.
+	replicate("asleep")  # 621 amended: her body lies down by the fire.
 	replicate("bond_why")
 	replicate("body")
 	mass = 75.0
@@ -1144,7 +1148,7 @@ func _watch_deeds() -> void:
 			deed.emit("leisure", "rested in town with you")
 	else:
 		_deeds["town"] = 0
-	if current_intent == Intent.REST:
+	if current_intent == Intent.REST or current_intent == Intent.SLEEP:
 		_deeds.merge({"heavy": 0, "warned_heavy": false, "mule_spent": false, "asked_rest": false}, true)
 	var filled := slots.size() - slots.count("")
 	if slots.is_empty() or float(filled) <= slots.size() * float(rules.get("heavy_share", 0.75)):
@@ -2536,6 +2540,8 @@ func doing() -> String:
 			action = "waiting"
 		Intent.REST:
 			action = "resting, as %s asked" % keeper_name()
+		Intent.SLEEP:
+			action = "asleep by the fire, while %s keeps watch" % keeper_name()
 		Intent.ERRAND:
 			action = "on your way to %s" % errand.get("words", "do what you were asked")
 		Intent.GUIDE:
@@ -3759,6 +3765,7 @@ func _act() -> void:
 		_fight_or(foe, Intent.HOLD)
 	else:
 		_choose(foe, low)
+	asleep = current_intent == Intent.SLEEP
 	if current_intent != before or intent_target != before_target:
 		print("[mind] %s: %s%s (%s)" % [name, intent_name(),
 			" " + String(intent_target.name) if intent_target != null else "", stance_name()])
@@ -3784,8 +3791,10 @@ func _choose(foe: GridEntity, low: bool) -> void:
 		current_intent = Intent.ERRAND
 	elif guide != null and guide.going():
 		current_intent = Intent.GUIDE  # Leading her player somewhere (decision 551).
-	elif (order == "rest" or order == "watch") and foe == null:
-		current_intent = Intent.REST  # Asked to rest (decision 616), or asleep while her player keeps watch (621).
+	elif order == "watch" and foe == null:
+		current_intent = Intent.SLEEP  # Asleep while her player keeps watch (621 amended).
+	elif order == "rest" and foe == null:
+		current_intent = Intent.REST  # Asked to rest (decision 616), awake.
 	elif bond_at_least("devoted") and stance != Stance.HOLD and stance != Stance.PULL_BACK and _at_keeper() != null:
 		# Devoted (decision 621, Jeff's "protects you aggressively"): she
 		# goes first at whatever is attacking her player.

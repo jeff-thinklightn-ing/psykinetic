@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Your companion asleep by the fire while you keep watch is now known to your game (a new "asleep" field), so her body can be shown lying down once its pose is drawn.
 - Mortally Wounded: the view drains to grey while you lie downed, as it was meant to, and the colour returns when you are up again (Jeff's v0.1.169 note).
 - The armour slot on the pack panel: the seventh box beside the hands, marked A, takes armour by a drag as a hand takes a weapon; hovering a piece of armour reads what it does (622, ui's side).
 - The town sheet: N, or a click on a town's row in the known world, opens a sheet saying how the town is doing in words: its name and stage, who holds it, its buildings standing, building, damaged and planned, the people seen on its ground by trade, the dole line, the season and day; economy's rows (treasury, officials, fed and hungry, needs, the sought, the next stage) join as they are sent (decision 624, ui's side).

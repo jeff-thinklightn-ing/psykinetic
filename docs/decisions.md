@@ -26297,3 +26297,24 @@ DownScreen (587) sits over the view's grey, but Client3D desaturated only on _mo
 over MOURN_SECONDS while World.is_downed(local player), back over MOURN_RETURN_SECONDS;
 the saturation drains to MOURN_SATURATION by the larger of the two; the pull-back stays
 death's. view_test _test_down_grey.
+## 621 amended: her sleep on the watch carried on the wire
+
+The coordinator's ask, 2026-10-23: her body lying by the fire while her
+player keeps watch. 621 (3) slept her under Intent.REST with nothing on
+the wire, so her player saw her standing.
+
+- Companion.Intent.SLEEP (appended, after REST): her intent while order is
+  "watch" and no foe is at her. REST stays 616's "rest", an awake wait.
+  The wake rules are 621 (3)'s, unchanged.
+- Companion.asleep: a replicated bool (SUBCLASS_REPLICATED), set each
+  choice as current_intent == SLEEP, so whatever ends the watch (a fight,
+  slept out, a new order, leaving) clears it. A bool rather than the
+  intent, so a client never reads the intent enum.
+- pc-character draws the pose (lying by the fire, a slow breath) from
+  Companion.asleep, its own landing; until then the body stands as before.
+- The day's rest deeds treat SLEEP as REST.
+
+companion_test _test_game_and_watch: asleep with SLEEP on "yes", cleared
+when slept out and when a fight wakes her. protocol_test. Wire, revision
+35 (one line under ## 35 in net/net.gd); the server takes it with the
+next cut. No new class_name.
