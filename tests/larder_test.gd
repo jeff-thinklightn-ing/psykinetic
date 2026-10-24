@@ -381,8 +381,9 @@ func _test_first_stores() -> void:
 	var summer := towns.founding_food(TOWN)
 	Season.year_phase = phase
 	Season.year_anchor = anchor
-	_check(spring == ceili(float(founding["per_head_day"]) * heads * 2 * Season.season_days)
-		and summer == ceili(float(founding["per_head_day"]) * heads * 2 * Season.season_days),
+	var margin := float(founding.get("margin_days", 0))
+	_check(spring == ceili(float(founding["per_head_day"]) * heads * (2 * Season.season_days + margin))
+		and summer == ceili(float(founding["per_head_day"]) * heads * (2 * Season.season_days + margin)),
 		"founded at spring's start: food for two seasons a head, to the autumn (%d); at summer's, two, to the winter's roots (%d)" % [spring, summer])
 	# Founded before its people are counted: topped up once they are here.
 	var had := work.stockpile.count(TOWN, "food")

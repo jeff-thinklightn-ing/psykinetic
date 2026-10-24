@@ -756,7 +756,8 @@ func _found(town: String) -> void:
 ## kind it can reap, counted from when its field can stand (now if it
 ## stands, else founding.field_days on): the autumn harvest if spring has
 ## more than a day left then (else next year's), or the winter's roots,
-## whichever comes first. 0 without a founding rule.
+## whichever comes first, and founding.margin_days more (a late crop, a
+## mouth more). 0 without a founding rule.
 func founding_food(town: String) -> int:
 	var rule: Dictionary = rules.get("founding", {})
 	if rule.is_empty():
@@ -768,7 +769,7 @@ func founding_food(town: String) -> int:
 	var year := floorf(field / 4.0) * 4.0
 	var harvest := year + 2.0 if field - year < 1.0 - 1.0 / days else year + 6.0
 	var roots := year + 3.0 if field - year < 3.0 else field
-	return ceili(float(rule.get("per_head_day", 1)) * heads * (minf(harvest, roots) - place) * days)
+	return ceili(float(rule.get("per_head_day", 1)) * heads * ((minf(harvest, roots) - place) * days + float(rule.get("margin_days", 0))))
 
 
 ## The food [param town]'s store keeps from its workshops (652 amended (2),
