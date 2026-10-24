@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Going back into a zone you have already visited no longer logs "Signal 'impacted' is already connected" twice for its breakables.
 - A ruin's stone footing now crumbles nearly to the ground in places and breaks open between its corners, instead of still ringing the ruin.
 - The doe carried across the shoulders has a near-black back over deeper fawn sides, so it stands apart from the bearer's tunic at a distance.
 - Hovering a building outside builder mode no longer shows its builder code: a town's building shows its name and how far it is built, and pillars, tables and other scenery show nothing.

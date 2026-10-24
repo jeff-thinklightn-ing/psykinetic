@@ -13924,7 +13924,8 @@ func _make_puppet(entity: GridEntity) -> Node3D:
 		if entity.max_hp > 0:
 			puppet.add_child(_make_bar(entity.max_hp, height + HP_BAR_ABOVE))
 	elif entity.is_breakable():
-		entity.impacted.connect(_on_impacted.bind(entity.get_instance_id()))
+		# Hooked once: a zone entered again builds its breakables' puppets again.
+		_hook(entity.impacted, _on_impacted.bind(entity.get_instance_id()))
 		_break_sounds[String(entity.name)] = SoundKit.breaking(entity)
 	if entity is Player or entity is Companion:
 		var light := OmniLight3D.new()

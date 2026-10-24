@@ -114,6 +114,7 @@ func _ready() -> void:
 	await _test_doors_swing()
 	await _test_door_states()
 	_test_art_puppets()
+	_test_breakable_hooked_once()
 	await _test_creature_puppets()
 	_test_piles()
 	_test_heard_as_monsters_hear()
@@ -6649,6 +6650,31 @@ func _test_art_puppets() -> void:
 	ArtKit._variants["prop.crate"] = 0
 	_check(Client3D.art_slot_for(crate) == "", "and back to its cube when the art is gone")
 	ArtKit.forget("prop.crate")
+
+
+## A zone entered again builds its puppets again (Main._repaint): a
+## breakable's impacted stays hooked once, never "already connected".
+func _test_breakable_hooked_once() -> void:
+	print("
+== a breakable's puppet made again (a zone entered again) hooks its impacted once ==")
+	var crate: GridEntity = null
+	for entity in World.get_entities():
+		if entity.is_breakable() and not entity.is_creature():
+			crate = entity
+			break
+	_check(crate != null, "the test room has a breakable")
+	if crate == null:
+		return
+	var hooked := func() -> int:
+		var count := 0
+		for connection: Dictionary in crate.get_signal_connection_list(&"impacted"):
+			if (connection["callable"] as Callable).get_object() == _rig:
+				count += 1
+		return count
+	var was: int = hooked.call()
+	for again in 2:
+		_rig._make_puppet(crate).free()
+	_check(was == 1 and hooked.call() == 1, "hooked once before and after two more puppets (%d, %d)" % [was, hooked.call()])
 
 
 ## The highest point drawn at a wall edge's middle (within [param reach] of
