@@ -30,6 +30,9 @@ extends Node
 ## --yaw=D turns it to D degrees; a shot leaves out the hints.
 ## --stand-in=1 draws the border's pine stands with PineStands' stand-in
 ## while their slot has no art (shots, to tune the packing).
+## --low=1 turns the low camera on (decision 623) and --scatter-reach=N sets
+## its scatter's reach (decision 653); the frames start with the scatter
+## round the view built.
 ## --season=NAME starts the year in that season (Season.NAMES).
 ## --hour=H starts the clock at that hour (0..24: 12 noon).
 ## --weather=KIND starts every region in that weather (Weather; rain's
@@ -65,6 +68,8 @@ var look := Vector2i(-1, -1)
 var shot := ""
 var shot_zoom := 0.0
 var shot_yaw := NAN
+var low := false
+var scatter_reach := 0.0
 const WALK_STEP := 0.3
 var _main: Node
 
@@ -106,7 +111,11 @@ func _ready() -> void:
 			"off": off.assign(pair[1].split(","))
 			"stand-in": PineStands.stand_in = pair[1] != "0"
 			"season": Net.start_season = pair[1].to_lower() if Season.NAMES.has(pair[1].to_lower()) else ""
+			"low": low = pair[1] != "0"
+			"scatter-reach": scatter_reach = pair[1].to_float()
 			"hour": Net.start_hour = fposmod(pair[1].to_float(), 24.0)
+	if low:
+		Net.set_camera_low(true, false)
 	var windowed := DisplayServer.get_name() != "headless"
 	print("BENCH size=%d cells (%d floor), monsters/room=%d, cells/monster=%s, players=%d, %s" % [size, size * size,
 		monsters, "every spot" if cells_per_monster <= 0.0 else str(cells_per_monster), players,
@@ -352,6 +361,18 @@ func _frames() -> void:
 		view._set_yaw(shot_yaw)
 	if shot != "" and _main.hint_panel != null:
 		_main.hint_panel.visible = false
+	# The scatter round the view built before the frames (decision 653): how
+	# long it took, and how much is drawn.
+	if view != null and "_scatter_chunks" in view:
+		if scatter_reach > 0.0:
+			view.scatter_reach_low = scatter_reach
+		await get_tree().process_frame
+		var built := Time.get_ticks_usec()
+		view._grow_scatter()
+		while view._scatter_step():
+			pass
+		print("BENCH scatter round the view (reach %.0f): built in %.1f ms; %s" % [view._scatter_reach(),
+			(Time.get_ticks_usec() - built) / 1000.0, _scatter_drawn(view)])
 	var home := host.tile if host != null else Vector2i.ZERO
 	var stepped := 0
 	var turn_total := 0
@@ -411,6 +432,8 @@ func _frames() -> void:
 		var drawn: int = _main.minimap.draws - map_draws
 		print("BENCH minimap: drawn %d times in %d frames, %.3f ms a draw, %.3f ms a frame" % [drawn, frames,
 			(_main.minimap.draw_usec - map_usec) / 1000.0 / maxi(drawn, 1), (_main.minimap.draw_usec - map_usec) / 1000.0 / frames])
+	if view != null and "_scatter_chunks" in view:
+		print("BENCH scatter after the frames: %s" % _scatter_drawn(view))
 	var times: Array[float] = []
 	for spike in spikes:
 		times.append(spike.x)
@@ -520,3 +543,15 @@ func _layout() -> Image:
 					south = door if at.x == ROOM / 2 else wall
 				image.set_pixel(x * 2, y * 2 + 1, south)
 	return image
+
+
+## How much scatter [param view] draws: chunks, nodes and instances.
+func _scatter_drawn(view: Node) -> String:
+	var nodes := 0
+	var instances := 0
+	for chunk: Vector2i in view._scatter_nodes:
+		for drawn: Node in view._scatter_nodes[chunk]:
+			if is_instance_valid(drawn) and not drawn.is_queued_for_deletion():
+				nodes += 1
+				instances += (drawn as MultiMeshInstance3D).multimesh.instance_count
+	return "%d chunks, %d MultiMeshes, %d instances" % [view._scattered.size(), nodes, instances]

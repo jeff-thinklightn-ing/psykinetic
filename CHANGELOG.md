@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- With the low camera on, grass, flowers, stones and roots now reach much further out and fade into the haze, so ground details no longer pop in near the player (653)
 - A new town keeps enough food to reach its first harvest: it starts with its people's food to the first autumn, and its caravans keep a month's food a head until the harvest is in. Officials come with the town's stage: a settlement pays none, the guard is paid from hamlet, the priest from village, and the lawspeaker is named and paid at the town stage.
 - A herder away on a drove now shows at the town they drove to, and a herder's fold or healer's hut is no longer run as a town of its own (no "is a settlement now" for a fold).
 - A body taken out of the world from another zone (a player leaving, say) is taken out of its own zone, so no freed body is left behind to throw errors when someone comes straight back through a link (657).

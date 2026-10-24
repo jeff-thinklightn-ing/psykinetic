@@ -27382,3 +27382,42 @@ Food (ruling (a)):
 Officials (ruling (b)): they come with the stages. official.<trade>.stage: the guard from hamlet, the priest from village, the lawspeaker from town (a settlement pays none). Below its stage an official is neither paid nor owed (Production.official_paid = Towns.official_paid). The lawspeaker is appointed on reaching the town stage (official "appoint"), no longer at 6 residents of its own; the town stage no longer needs a lawspeaker among its residents, which would have deadlocked. The priest still comes when the temple stands (396). A lawspeaker already seated in a town below that stage stays, unpaid. The wage rule (a share of tax and rent) waits for the 3-player soak.
 
 Tests: larder_test (first stores, the founding caravan), rescue_test (the lawspeaker at the town stage; a hamlet pays its guard, no priest or lawspeaker, nor owes them). Server only; protocol unchanged; no new class_name.
+
+## 653: the low camera's scatter reach
+
+Jeff: "clipping of ground details they should load in earlier." Under the low camera (623)
+the scatter was built only within World.NEAR_TILES (22) of the aim, so its edge popped in
+in plain sight, and built chunks were never freed and drawn to the far plane. Approved by
+the coordinator with perf's points (a cap by distance, faster builds with a backlog,
+benches with the scatter fully built).
+
+- **A reach of its own.** Client3D._scatter_reach(): under the low camera
+  scatter_reach_low (LOW_SCATTER_REACH, 90; map_bench --scatter-reach=N sets it), else the
+  screen's reach as before. NEAR_TILES still bounds bodies, clicks, puppets and shadows
+  (238); only the scatter looks further.
+- **A fade at the edge.** The swaying kinds' shader (scatter.gdshaderinc) takes
+  reach_fade (the aim, where the shrink starts and ends): past reach - SCATTER_FADE (16)
+  each plant sinks toward its root, gone at the reach. A shrink, not a discard, so the
+  early depth test is kept. The kinds that don't sway (stones, roots: a StandardMaterial3D)
+  get a visibility range ending at the reach with SCATTER_FADE of fade margin (fade self).
+  Ortho: no fade, no range.
+- **Freed past the reach.** A chunk whose middle lies SCATTER_KEEP (16) past the reach
+  and a chunk is freed (_unscatter, which _rescatter now shares) and made again when the
+  view comes back, so what is drawn is held by distance, not by the walk so far.
+- **Faster with a backlog.** With more than SCATTER_BACKLOG (8) steps due, steps go on
+  within SCATTER_BUDGET_USEC (2 ms) a frame; else one a frame as before.
+- **The bench.** map_bench --low=1 turns the low camera on, --scatter-reach=N sets the
+  reach; before the frames the scatter round the view is built in full (its time, chunks,
+  MultiMeshes and instances printed, and again after the frames).
+
+**The reach: 90** (the coordinator, on perf's bench: windowed, off-screen, low camera,
+noon, a 12-tile walk, three interleaved rounds). At the wilds square, reach 38 / 60 / 90 /
+120 drew 33 / 53 / 85 / 119 chunks (18.7k / 30.2k / 48.4k / 69.7k instances), the render
+GPU 1.4 / 1.6 / 1.9 / 2.3 ms a frame and the CPU 1.1 / 1.1 / 1.2 / 1.2 ms. A full build
+from nothing took about 250 ms, about 2 s of fill at the 2 ms budget. On the hills every
+reach was the same: the map is small enough that 38 covers it. 90 is the furthest within
+the +0.5 ms line, and it answers "load in earlier" best. **60 is the named fallback**
+should a laptop play test show the cost: a laptop GPU likely sees 2-3x the difference.
+SCATTER_KEEP 16 holds what stays drawn after a walk to about 1.3x the full build, and
+that band past the reach is shrunk to nothing, so it costs vertex work but no pixels.
+view_test _test_low_scatter. Protocol unchanged, no new class_name.

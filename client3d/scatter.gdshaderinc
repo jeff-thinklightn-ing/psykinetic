@@ -36,6 +36,10 @@ varying float straw_light;
 varying float trodden;
 // How far full wind bends a tip one unit up (in the mesh's own units).
 uniform float bend = 0.35;
+// The scatter's reach under the low camera (decision 653, Client3D._grow_scatter):
+// xy the aim on the ground, z where it starts to shrink into the ground, w
+// where it is gone; past z the plants sink toward their roots.
+uniform vec4 reach_fade = vec4(0.0, 0.0, 1e9, 1e9);
 // How much of a plant's height full snow buries, and how much that varies
 // from one to the next.
 const float SNOW_SINK = 0.7;
@@ -93,6 +97,7 @@ void vertex() {
 	float drift = fract(sin(dot(floor(at * 3.0), vec2(12.9898, 78.233))) * 43758.5453);
 	float buried = season.z * snow_cover * INSTANCE_CUSTOM.a * (SNOW_SINK + (drift - 0.5) * 2.0 * SNOW_SINK_SPREAD);
 	VERTEX.y -= buried / max(INSTANCE_CUSTOM.g, 0.001);
+	VERTEX *= 1.0 - smoothstep(reach_fade.z, reach_fade.w, distance(at, reach_fade.xy));
 }
 
 void fragment() {

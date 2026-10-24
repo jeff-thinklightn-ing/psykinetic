@@ -39,6 +39,7 @@ func _ready() -> void:
 	await _test_fight_fade()
 	_test_outdoor()
 	await _test_low_camera()
+	_test_low_scatter()
 	await _test_far_restart()
 	await _test_low_pick()
 	await _test_reach_ease()
@@ -4062,6 +4063,70 @@ func _test_low_camera() -> void:
 	Net.set_camera_low(low_was, false)
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
+
+## The low camera's scatter reach (decision 653): built out to
+## LOW_SCATTER_REACH of the aim, not NEAR_TILES (which still bounds the
+## rest), shrinking into the ground over its last SCATTER_FADE, the kinds
+## that don't sway fading by their draw distance; chunks left SCATTER_KEEP
+## past the reach freed; the ortho view as before.
+func _test_low_scatter() -> void:
+	print("\n== the low camera's scatter reach (653): out to LOW_SCATTER_REACH, faded, freed past it ==")
+	var low_was := Net.camera_low
+	Net.set_camera_low(true, false)
+	var wilds := Level.load_level("wilds")
+	_rig.rebuild(wilds["terrain"], wilds["centre"])
+	var aim := Vector2(_rig._camera_target.x, _rig._camera_target.z)
+	var reach: float = _rig._scatter_reach()
+	_check(is_equal_approx(reach, Client3D.LOW_SCATTER_REACH) and is_equal_approx(_rig._view_reach(), World.NEAR_TILES),
+			"the scatter's reach is LOW_SCATTER_REACH, the view's NEAR_TILES (%.0f, %.0f)" % [reach, _rig._view_reach()])
+	_rig._grow_scatter()
+	while _rig._scatter_step():
+		pass
+	_rig._grow_scatter()
+	var middle := func(chunk: Vector2i) -> float:
+		return (Vector2(chunk * Client3D.FLOOR_CHUNK) + Vector2.ONE * Client3D.FLOOR_CHUNK * 0.5).distance_to(aim)
+	var furthest := 0.0
+	var inside := true
+	for chunk: Vector2i in _rig._scattered:
+		furthest = maxf(furthest, middle.call(chunk))
+		inside = inside and middle.call(chunk) <= reach + Client3D.FLOOR_CHUNK
+	_check(inside and furthest > World.NEAR_TILES + Client3D.FLOOR_CHUNK,
+			"built out past NEAR_TILES, no further than the reach and a chunk (furthest middle %.0f)" % furthest)
+	var fade: Vector4 = Client3D._scatter_material("tuft").get_shader_parameter("reach_fade")
+	_check(fade.is_equal_approx(Vector4(aim.x, aim.y, reach - Client3D.SCATTER_FADE, reach)),
+			"the swaying kinds shrink away over the reach's last SCATTER_FADE (%s)" % fade)
+	var ranged := 0
+	var unranged := 0
+	for chunk: Vector2i in _rig._scatter_nodes:
+		for drawn: MultiMeshInstance3D in _rig._scatter_nodes[chunk]:
+			if not drawn.material_override is ShaderMaterial:
+				if is_equal_approx(drawn.visibility_range_end, reach) and is_equal_approx(drawn.visibility_range_end_margin, Client3D.SCATTER_FADE):
+					ranged += 1
+				else:
+					unranged += 1
+	_check(ranged > 0 and unranged == 0, "the stones and roots fade by their draw distance at the reach (%d, %d not)" % [ranged, unranged])
+	var built: int = _rig._scattered.size()
+	_rig.scatter_reach_low = 20.0
+	_rig._grow_scatter()
+	var kept := true
+	for chunk: Vector2i in _rig._scattered:
+		kept = kept and middle.call(chunk) <= 20.0 + Client3D.FLOOR_CHUNK + Client3D.SCATTER_KEEP
+	for chunk: Vector2i in _rig._scatter_nodes:
+		kept = kept and _rig._scattered.has(chunk)
+	_check(kept and _rig._scattered.size() < built,
+			"a shorter reach frees the chunks SCATTER_KEEP past it (%d of %d kept)" % [_rig._scattered.size(), built])
+	_rig.scatter_reach_low = Client3D.LOW_SCATTER_REACH
+	Net.set_camera_low(false, false)
+	_rig._grow_scatter()
+	fade = Client3D._scatter_material("tuft").get_shader_parameter("reach_fade")
+	var unfaded := true
+	for chunk: Vector2i in _rig._scatter_nodes:
+		for drawn: MultiMeshInstance3D in _rig._scatter_nodes[chunk]:
+			unfaded = unfaded and is_zero_approx(drawn.visibility_range_end)
+	_check(fade.z > 1e8 and unfaded and is_equal_approx(_rig._scatter_reach(), _rig._view_reach()),
+			"Off: the screen's reach, no fade, drawn as far as seen")
+	Net.set_camera_low(low_was, false)
+	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
 ## 623's hotfix, the half Jeff saw most (the draugr at his spawn, the
 ## castle's goblins dead on their feet with stale bars): under stone the

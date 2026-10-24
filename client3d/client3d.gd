@@ -420,6 +420,21 @@ const LOW_FOG := 0.012
 const LOW_AERIAL := 0.6
 const LOW_SHADOW_DISTANCE := 150.0
 const LOW_PITCH_MIN := 15.0
+## The scatter's own reach under the low camera (decision 653; Jeff:
+## "clipping of ground details they should load in earlier"): it is built
+## out to LOW_SCATTER_REACH of the aim (Client3D.scatter_reach_low, which
+## map_bench sets), not World.NEAR_TILES, and shrinks into the ground over
+## the last SCATTER_FADE of it, so its edge lies in the haze, not at the
+## player's feet. Bodies, clicks and shadows keep NEAR_TILES. Chunks
+## further than SCATTER_KEEP past the reach are freed, so what is drawn
+## is held by distance, not by how far the player has walked; with more
+## than SCATTER_BACKLOG steps due, steps go on within SCATTER_BUDGET_USEC
+## a frame, so a turn or a walk fills in quickly.
+const LOW_SCATTER_REACH := 90.0
+const SCATTER_FADE := 16.0
+const SCATTER_KEEP := 16.0
+const SCATTER_BACKLOG := 8
+const SCATTER_BUDGET_USEC := 2000
 ## Over hills (decision 525): how far back toward the camera the ground is
 ## looked at, how far under the line to the player (aimed RIDGE_AIM over
 ## their feet) it must stay, and how fast (degrees a second) the pitch
@@ -1788,6 +1803,10 @@ var _scatter_chunks: Dictionary[Vector2i, PackedInt32Array] = {}
 var _scattered: Dictionary[Vector2i, bool] = {}
 var _scatter_due: Array[Vector2i] = []
 var _scatter_aim := Vector2i(1 << 30, 0)
+var _scatter_reach_at := -1.0
+## The scatter's reach under the low camera (LOW_SCATTER_REACH; benches set
+## it).
+var scatter_reach_low := LOW_SCATTER_REACH
 ## Planned scatter still to make, a [chunk, kind, items] a frame.
 var _scatter_jobs: Array[Array] = []
 ## Tall grass (decision 508, terrain's side): its cells, and where each
@@ -5687,25 +5706,45 @@ func _add_forest() -> void:
 ## off the grid: per cell, by a hash of it, a number of each by the cell's
 ## ground (SCATTER_DENSITY; the forest's ring has its own), each at its own
 ## place in the cell, size, turn and lean, on the ground's height there.
-## One MultiMesh a chunk and kind, made when the view first comes near
-## the chunk (_grow_scatter, a chunk a frame), never again; no shadows;
-## nothing on water or fire. Visual only: the sim knows none of it.
+## One MultiMesh a chunk and kind, made when the view comes near the chunk
+## (_grow_scatter, a step a frame, more with a backlog) and freed when it
+## is left SCATTER_KEEP past the reach; no shadows; nothing on water or
+## fire. Visual only: the sim knows none of it.
 func _grow_scatter() -> void:
 	if _camera == null or _ground_cells.is_empty():
 		return
 	var aim := Vector2(_camera_target.x, _camera_target.z)
-	var reach := _view_reach() + FLOOR_CHUNK
+	var edge := _scatter_reach()
+	var reach := edge + FLOOR_CHUNK
+	if _scatter_sway != null:
+		_scatter_sway.set_shader_parameter("reach_fade", Vector4(aim.x, aim.y, edge - SCATTER_FADE, edge) if _low else Vector4(0, 0, 1e9, 1e9))
 	var key := Vector2i(floori(aim.x / FLOOR_CHUNK), floori(aim.y / FLOOR_CHUNK))
-	if key != _scatter_aim:
+	if key != _scatter_aim or edge != _scatter_reach_at:
+		if edge != _scatter_reach_at:
+			_scatter_reach_at = edge
+			for chunk: Vector2i in _scatter_nodes:
+				for drawn: Node in _scatter_nodes[chunk]:
+					_scatter_range(drawn)
 		_scatter_aim = key
 		_scatter_due.clear()
 		for chunk: Vector2i in _scatter_chunks:
-			if not _scattered.has(chunk) and (Vector2(chunk * FLOOR_CHUNK) + Vector2.ONE * FLOOR_CHUNK * 0.5).distance_to(aim) <= reach:
+			var away := (Vector2(chunk * FLOOR_CHUNK) + Vector2.ONE * FLOOR_CHUNK * 0.5).distance_to(aim)
+			if not _scattered.has(chunk) and away <= reach:
 				_scatter_due.append(chunk)
+			elif _scattered.has(chunk) and away > reach + SCATTER_KEEP:
+				_unscatter(chunk)
 		_scatter_due.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
 			return Vector2(a * FLOOR_CHUNK).distance_squared_to(aim) < Vector2(b * FLOOR_CHUNK).distance_squared_to(aim))
-	# One step a frame: a kind's MultiMesh of a chunk planned, or the
-	# next chunk's plan.
+	# A step a frame (a kind's MultiMesh of a chunk planned, or the next
+	# chunk's plan); with a backlog, steps until the frame's budget is spent.
+	var started := Time.get_ticks_usec()
+	var backlog := _scatter_jobs.size() + _scatter_due.size() > SCATTER_BACKLOG
+	while _scatter_step() and backlog and Time.get_ticks_usec() - started < SCATTER_BUDGET_USEC:
+		pass
+
+
+## One step of the scatter due; false with none left.
+func _scatter_step() -> bool:
 	if not _scatter_jobs.is_empty():
 		var job: Array = _scatter_jobs.pop_front()
 		_scatter_build(job[0], job[1], job[2])
@@ -5715,6 +5754,42 @@ func _grow_scatter() -> void:
 		var placed := _scatter_plan(chunk)
 		for kind: String in placed:
 			_scatter_jobs.append([chunk, kind, placed[kind]])
+	else:
+		return false
+	return true
+
+
+## How far from the aim the scatter is built: under the low camera its own
+## reach (decision 653), else what the screen shows.
+func _scatter_reach() -> float:
+	if _camera == null:
+		return INF
+	return scatter_reach_low if _low else _view_reach()
+
+
+## [param drawn]'s draw distance: the kinds that don't sway (their material
+## has no fade of its own) fade out by the camera's distance over the
+## reach's last SCATTER_FADE under the low camera; else drawn as far as seen.
+func _scatter_range(drawn: Node) -> void:
+	var instance := drawn as GeometryInstance3D
+	if instance == null or instance.material_override is ShaderMaterial:
+		return
+	instance.visibility_range_end = _scatter_reach_at if _low else 0.0
+	instance.visibility_range_end_margin = SCATTER_FADE if _low else 0.0
+	instance.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_SELF
+
+
+## [param chunk]'s scatter freed (made again when the view comes near).
+func _unscatter(chunk: Vector2i) -> void:
+	_scatter_jobs.assign(_scatter_jobs.filter(func(job: Array) -> bool: return job[0] != chunk))
+	_scattered.erase(chunk)
+	for drawn: Node in _scatter_nodes.get(chunk, []):
+		drawn.queue_free()
+	_scatter_nodes.erase(chunk)
+	for cell: Vector2i in _tall_where.keys():
+		if Vector2i(floori(cell.x / float(FLOOR_CHUNK)), floori(cell.y / float(FLOOR_CHUNK))) == chunk:
+			_tall_where.erase(cell)
+			_tall_flat.erase(cell)
 
 
 ## Every chunk's scatter now, near or not (tests, benches).
@@ -5773,6 +5848,7 @@ func _scatter_build(chunk: Vector2i, kind: String, items: Array) -> void:
 	drawn.multimesh = multimesh
 	drawn.material_override = _scatter_material(kind)
 	drawn.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_scatter_range(drawn)
 	_room.add_child(drawn)
 	if not _scatter_nodes.has(chunk):
 		_scatter_nodes[chunk] = []
@@ -6781,17 +6857,10 @@ func _set_ground_kind(cell: Vector2i, kind: String) -> void:
 ## [param chunk]'s scatter drawn again from its plan, if it was drawn (else
 ## when the view comes to it, as ever).
 func _rescatter(chunk: Vector2i) -> void:
-	_scatter_jobs.assign(_scatter_jobs.filter(func(job: Array) -> bool: return job[0] != chunk))
-	if not _scattered.has(chunk):
-		return
-	for drawn: Node in _scatter_nodes.get(chunk, []):
-		drawn.queue_free()
-	_scatter_nodes.erase(chunk)
-	for cell: Vector2i in _tall_where.keys():
-		if Vector2i(floori(cell.x / float(FLOOR_CHUNK)), floori(cell.y / float(FLOOR_CHUNK))) == chunk:
-			_tall_where.erase(cell)
-			_tall_flat.erase(cell)
-	_scatter_chunk(chunk)
+	var drawn := _scattered.has(chunk)
+	_unscatter(chunk)
+	if drawn:
+		_scatter_chunk(chunk)
 
 
 ## Whether [param slot] (dead wood: tree.stump, tree.log, tree.dead) is
