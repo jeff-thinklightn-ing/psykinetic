@@ -344,7 +344,9 @@ static func sample_barrow() -> Dictionary:
 	for torch: Vector2i in BARROW_TORCHES:
 		markers[torch] = "torch"
 	var layout := Level.image_from_rows(_lines(rows), markers, {"legend": BARROW_LEGEND})
-	var config := {"name": "The Barrow", "outdoor": false, "depth": 1, "walls": "stone", "floors": "stone", "grave_goods": true,
+	var config := {"name": "The Barrow", "outdoor": false, "depth": 1, "walls": "stone", "floors": "stone",
+		"music": "music.barrow",  # Its own music, Jeff's barrows-moody (668).
+		"grave_goods": true,
 		"buildings": [{"slot": "building.burial_table", "at": [HALL_TABLE.position.x, HALL_TABLE.position.y]}],  # The old king's table (580 step 3).
 		"starts": [[BARROW_START.x, BARROW_START.y]],
 		"spawn_points": {"from_wilds": [BARROW_FROM_WILDS.x, BARROW_FROM_WILDS.y], "from_below": [BARROW_FROM_BELOW.x, BARROW_FROM_BELOW.y]},

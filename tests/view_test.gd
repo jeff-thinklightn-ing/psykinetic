@@ -129,6 +129,7 @@ func _ready() -> void:
 	_test_heartbeat()
 	_test_bandaging()
 	_test_title_music()
+	_test_level_music()
 	_test_options_panel()
 
 	# Every sound stopped and let go before quitting: the audio server lets
@@ -322,6 +323,34 @@ func _test_heartbeat() -> void:
 
 ## Bandaging heard: a cloth ruffle from the bandager while it runs, soft
 ## when the patient mends, short when broken off.
+func _test_level_music() -> void:
+	print("
+== a level's own music: the barrow's, eased in on arrival, out on leaving (668) ==")
+	var music: Music = _rig.music
+	if music == null or Music.muted():
+		_check(true, "no music here (muted or none): skipped")
+		return
+	var level_was: Variant = _rig._terrain.get("level")
+	_rig._terrain["level"] = "barrow"
+	music._weigh(0.25)
+	var wanted := float(music.targets.get("music.barrow", 0.0))
+	_check(wanted >= 0.5 and float(music.targets.get("music.dungeon_base", 0.0)) == 0.0, "in the barrow: its own music wanted, less half the tension near (%.2f)" % wanted)
+	music._process(Music.LEVEL_FADE)
+	var player: AudioStreamPlayer = music.players.get("music.barrow")
+	_check(float(music.levels.get("music.barrow", 0.0)) > 0.9 * wanted and player != null and player.playing,
+		"eased in within %.1f s, playing (%.2f of %.2f)" % [Music.LEVEL_FADE, float(music.levels.get("music.barrow", 0.0)), wanted])
+	_rig._terrain["level"] = "barrow_deep"
+	music._weigh(0.25)
+	_check(music.targets.get("music.barrow") == 0.0, "gone below: wanted at 0, so it eases out")
+	music._process(Music.LEVEL_FADE * 2.0)
+	_check(float(music.levels.get("music.barrow", 1.0)) < Music.SILENT and not player.playing, "eased out and stopped")
+	if level_was == null:
+		_rig._terrain.erase("level")
+	else:
+		_rig._terrain["level"] = level_was
+	music._weigh(0.25)
+
+
 func _test_title_music() -> void:
 	print("
 == the title screen: music.title faded in with the main menu, out as the world loads (656) ==")

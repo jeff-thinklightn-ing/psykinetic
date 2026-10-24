@@ -29263,3 +29263,46 @@ ui the panel, enemy-ai the monsters' fight values. The coordinator approved the 
   world_map_test counts the dev levels out of "every level is reachable".
 
 New class_name: Tuning.
+## 668. A level's own music: barrows-moody in the barrow
+
+Jeff (2026-10-24, by way of the coordinator): "barrows-moody.wav is in for barrows 1st
+level music".
+
+- **A level key**: a level's level.json may name a music slot, `"music": "music.barrow"`
+  (levels/barrow only: not barrow_deep or barrow_lair). Music.level_music(level) reads it
+  from the registered config (a generated or edited level, Level.register) or else the
+  file, once per level; a name that is no slot reads as none. Regen's generated config is
+  the template's, so a regenerated barrow keeps it.
+- **Played by Music**: in a level with its own music, Music.weights puts that slot at the
+  ground's weight (1, less half the tension) in place of the zone's ground and melody,
+  always, not in phrases; the tension layers still rise over it. It starts from its
+  beginning, and eases in on arrival and out on leaving over LEVEL_FADE 1 s (95% of the
+  way), as the title's music does (656); the beds keep FADE_SECONDS. A level left keeps
+  its slot in the weights at 0 so it eases out. The view and its Music last across zones,
+  so the fade is heard.
+- **The slot, music.barrow**: music, a bed on the Music bus, flat, 0 dB. Its take is
+  Jeff's own work, in the repo at art/audio/music/music.barrow/music.barrow.ogg (963 KB),
+  named in the slot's "source" (by Jeff, Ableton Live, licence "own", 2026-10-24): not
+  third-party, so takes.json has no entry and THIRD_PARTY.md's generated block no line
+  (it lists own takes only when someone other than Jeff made them); docs/sound_status.md
+  lists it under own takes. No Sonniss file and nothing from any library went into it.
+- **The take**: his master, the second export (Jeff: "its loop should avoid the click";
+  48 kHz 24-bit stereo WAV, 42.67 s: 16 bars at 90 bpm, peak -7.3 dBFS) as Ogg Vorbis
+  quality 7 at its own level (no headroom needed), the same 2048000 frames, imported
+  looping at the file's end. The master stays in his folder, copied, never moved or
+  edited.
+- **The seam, by measure**: the first export (21.33 s) cut its last bar while sounding (a
+  step of 0.102 against at most 0.029 at its bar lines, a high-frequency burst 4 to 5 dB
+  above theirs, -20.5 to -28.5 dB rms across the wrap). The second wraps as its own bar
+  lines cross: the high-frequency burst at the wrap -42.1 dB against -42.8 to -43.1 at
+  theirs, the level -21.2 to -26.1 dB rms across it as at theirs (a drop of 3 to 6 dB at
+  half of them), the step 0.042 against 0.007 to 0.029 (the largest, but within the
+  track's own sample-to-sample motion: its second difference 0.037 against the track's
+  most, 0.056). So no click by measure; a listening file for Jeff in
+  C:/dev/review/sound/barrow.
+
+sound_kit_test: the barrow names music.barrow, the levels below none; Jeff's take; the
+weights in place of the dungeon's and under tension. view_test _test_level_music: in the
+barrow it is wanted, eased in within 1 s and playing; gone below, eased out and stopped.
+Client only, protocol unchanged, no new class_name.
+

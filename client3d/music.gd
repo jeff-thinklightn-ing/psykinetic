@@ -21,9 +21,15 @@ extends Node
 ## local player's death, a hostile's rout near; rate-limited (may_sting),
 ## the layers ducked for the stinger's length.
 ## With the Music slider at 0 no layer plays at all.
+## A level's own music (decision 668): a level whose level.json names a music
+## slot ("music": "music.barrow") plays it, from its start and always, in
+## place of the zone's ground and melody (the tension layers still rise over
+## it), eased in on arrival and out on leaving over LEVEL_FADE.
 
 ## Seconds a layer takes to ease most of the way to its new loudness.
 const FADE_SECONDS := 4.0
+## Seconds a level's own music takes to ease in or out (as the title's, 656).
+const LEVEL_FADE := 1.0
 ## Tension rises this fast (s to full) and, past its hold, falls this slowly.
 const TENSION_RISE := 1.5
 const TENSION_FALL := 10.0
@@ -64,6 +70,8 @@ const STINGS: Array[String] = ["discovery", "danger", "death", "victory"]
 ## Levels (World.zone's names) been in this session: a stinger on the
 ## first visit to each.
 static var _visited: Dictionary[String, bool] = {}
+## Level -> its own music slot ("" none), read from its level.json once.
+static var _level_music: Dictionary[String, String] = {}
 
 ## The view this plays for (its listener, zone and town).
 var view: Client3D
@@ -88,6 +96,8 @@ var _last_sting_of: Dictionary[String, float] = {}
 var _sting_player: AudioStreamPlayer
 var _since_weigh := INF
 var _zone_name := ""
+## Level music slots heard this session: eased out (to 0) once left.
+var _own_layers: Dictionary[String, bool] = {}
 
 
 func _ready() -> void:
@@ -102,9 +112,10 @@ func _process(delta: float) -> void:
 		_weigh(_since_weigh)
 		_since_weigh = 0.0
 	var ease := 1.0 - exp(-delta * 3.0 / FADE_SECONDS)
+	var level_ease := 1.0 - exp(-delta * 3.0 / LEVEL_FADE)
 	var duck := STING_DUCK_DB if _sting_player != null and _sting_player.playing else 0.0
 	for layer: String in targets:
-		var level := lerpf(float(levels.get(layer, 0.0)), targets[layer], ease)
+		var level := lerpf(float(levels.get(layer, 0.0)), targets[layer], level_ease if _own_layers.has(layer) else ease)
 		levels[layer] = level
 		_set_level(layer, level, duck)
 
@@ -203,8 +214,9 @@ static func step_tension(now: float, hold: float, target: float, delta: float) -
 
 ## How loud each layer should be (0..1) in [param zone] (ZONES) by
 ## [param day] (0 night .. 1 day), at [param level_tension] (0..1), in a
-## phrase or not ([param in_phrase]).
-static func weights(zone: String, day: float, level_tension: float, in_phrase: bool) -> Dictionary:
+## phrase or not ([param in_phrase]); a level's own music [param own] (668)
+## in place of the zone's ground and melody.
+static func weights(zone: String, day: float, level_tension: float, in_phrase: bool, own := "") -> Dictionary:
 	var out := {}
 	for name: String in ZONES:
 		out["music.%s_base" % name] = 0.0
@@ -217,6 +229,9 @@ static func weights(zone: String, day: float, level_tension: float, in_phrase: b
 	var high := clampf((level_tension - 0.5) / 0.5, 0.0, 1.0)
 	out["music.tension_high"] = high
 	out["music.tension_low"] = clampf(level_tension / TENSION_SUSPICIOUS, 0.0, 1.0) * (1.0 - high)
+	if own != "":
+		out[own] = 1.0 - 0.5 * level_tension
+		return out
 	if not in_phrase and level_tension <= 0.0:
 		return out
 	var ground := 1.0 - 0.5 * level_tension
@@ -275,9 +290,36 @@ func _weigh(delta: float) -> void:
 	var day := clampf((DayNight.daylight(steps) - DayNight.NIGHT) / (1.0 - DayNight.NIGHT), 0.0, 1.0)
 	var terrain_zone := str(view._terrain.get("zone", "outdoors" if view._outdoor else "indoors"))
 	var town: float = view.ambience._town_nearness(cell) if view.ambience != null else 0.0
-	targets.assign(by_take(weights(zone_of(terrain_zone, town, temple_nearness(view._terrain.get("buildings", []), cell)), day, tension, phrase_on)))
+	var own := level_music(str(view._terrain.get("level", "")))
+	if own != "":
+		_own_layers[own] = true
+	var wanted := weights(zone_of(terrain_zone, town, temple_nearness(view._terrain.get("buildings", []), cell)), day, tension, phrase_on, own)
+	for layer: String in _own_layers:
+		if not wanted.has(layer):
+			wanted[layer] = 0.0  # Left: eased out.
+	targets.assign(by_take(wanted))
 	if view.ambience != null:
 		view.ambience.duck_db = AMBIENCE_DUCK_DB * clampf((tension - 0.5) / 0.5, 0.0, 1.0)
+
+
+## Level [param level_name]'s own music slot (668): its level.json's "music"
+## when that names a slot, else "". The registered config (a generated or
+## edited level, Level.register) when there is one, else its file, read once.
+static func level_music(level_name: String) -> String:
+	if level_name.is_empty():
+		return ""
+	if Level._registered.has(level_name):
+		var slot := str(Level._registered[level_name].get("config", {}).get("music", ""))
+		return slot if SoundKit.has(slot) else ""
+	if not _level_music.has(level_name):
+		var slot := ""
+		var path := Level.folder_of(level_name) + "level.json"
+		if FileAccess.file_exists(path):
+			var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
+			if parsed is Dictionary:
+				slot = str(parsed.get("music", ""))
+		_level_music[level_name] = slot if SoundKit.has(slot) else ""
+	return _level_music[level_name]
 
 
 ## 0..1: how near [param cell] is to a temple among [param buildings]
@@ -324,4 +366,5 @@ func _set_level(layer: String, level: float, duck_db: float) -> void:
 		players[layer] = player
 	player.volume_db = SoundKit.volume_db(layer) + linear_to_db(level) + duck_db
 	if not player.playing and player.stream != null:  # A player let go (stream null) stays quiet.
-		player.play(rng.randf() * maxf(player.stream.get_length() - 1.0, 0.0))
+		# A level's own music from its start; the beds anywhere along.
+		player.play(0.0 if _own_layers.has(layer) else rng.randf() * maxf(player.stream.get_length() - 1.0, 0.0))

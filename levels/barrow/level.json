@@ -4,6 +4,7 @@
 	"depth": 1,
 	"walls": "stone",
 	"floors": "stone",
+	"music": "music.barrow",
 	"grave_goods": true,
 	"buildings": [
 		{

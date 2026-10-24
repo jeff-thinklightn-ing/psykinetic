@@ -332,6 +332,16 @@ func _test_music() -> void:
 			and fight["music.wilds_base"] == 0.5, "a fight: the high layer, the ground down, the melody out")
 	_check(Music.weights("wilds", 1.0, 0.5, true)["music.melody_wilds"] == 0.0 and Music.weights("wilds", 1.0, 0.3, true)["music.melody_wilds"] > 0.0,
 			"the melody leaves by half tension")
+	# 668: a level's own music, named in its level.json, in place of the zone's ground and melody.
+	_check(Music.level_music("barrow") == "music.barrow" and Music.level_music("barrow_deep") == "" and Music.level_music("") == "",
+			"the barrow's first level names its own music; the levels below none")
+	_check(str(SoundKit.files("music.barrow")[0]).ends_with("music.barrow/music.barrow.ogg") and SoundKit.filled_by("music.barrow") == "own",
+			"music.barrow plays Jeff's own take")
+	var own := Music.weights("dungeon", 1.0, 0.0, false, "music.barrow")
+	_check(own["music.barrow"] == 1.0 and own["music.dungeon_base"] == 0.0 and own["music.melody_dungeon"] == 0.0,
+			"a level's own music, even between phrases, the dungeon's ground and melody out")
+	var own_fight := Music.weights("dungeon", 1.0, 1.0, true, "music.barrow")
+	_check(own_fight["music.barrow"] == 0.5 and own_fight["music.tension_high"] == 1.0, "a fight over it: the high layer rises, the level's music down by half")
 	_check(Music.tension_from([]) == 0.0 and Music.tension_from([[Monster.Alert.SUSPICIOUS, true]]) == Music.TENSION_SUSPICIOUS
 			and Music.tension_from([[Monster.Alert.SUSPICIOUS, true], [Monster.Alert.FIGHTING, true]]) == 1.0
 			and Music.tension_from([[Monster.Alert.HUNTING, false], [Monster.Alert.FLEEING, true]]) == 0.0,
