@@ -29444,13 +29444,30 @@ it) and shield as Client3D holds them, standing (Idle, Idle_Tired) and through e
 fidget_with allows them, five builds, every quarter second: no vertex inside the trunk, the head
 or the left leg, none within ARMED_HEAD_CLEAR (0.12 m) of the head.
 
-**Step (b), next.** In-hand rests after about 8 s calm and standing: the two-handers head down,
-both hands stacked on the haft's end (Haft_Rest; HandReach off; the dormant draugr too); the spear
-grounded upright by the right foot (Spear_Rest); the hammer hanging at the side (Hammer_Rest);
-the bow low as today; two new fidgets for the armed, Fidget_LookRound (a look about, no hand up)
-and Fidget_Grip (the held hand resettling). Drawn again on its own swing or raise, a blow seen
-near it, a monster's alert at HUNTING or FIGHTING, or (a player, a companion) such a monster within
-6 cells; a swing from rest takes the piece to the hand at its start.
+**Step (b).** Client3D.RESTS: a piece that stays in hand rests after REST_STAND_SECONDS (2)
+standing and REST_SECONDS (8) with nothing rousing it, its upper clip (tools/humanoid_clips.py),
+the piece slid "grip" up in the hand (`_slide_held`) so its end meets the ground: the giant axe
+head down on the ground ahead at 60°, the right hand on its butt before the belly, the left hand
+over it (Haft_Rest; HandReach let go); the battle axe, 1.6 m, the same with the hands at the upper
+chest (Haft_Rest_High; slid up its haft instead, its butt came up into the chest); the spear
+grounded upright beside the right foot, the hand at the chest (Spear_Rest, slid 0.55); the hammer
+and the pick hanging at the side, the head down and out from the leg (Hang_Rest; the pick slid
+0.16 so a shorter body's doesn't touch). Each loop looks slowly about, the head alone (no
+Fidget_LookRound or Fidget_Grip: under a rest the upper layer holds the spine and head, so a
+fidget beneath only shifts the legs). Rousing (`_rest_of`, `_roused`): its own swing, raised
+guard or draw; a blow seen near it (`_combat_at`); a monster's own alert hunting or fighting;
+anyone else's, a monster so within REST_ROUSED_CELLS (6), looked for twice a second; and taking a
+piece up (a held change). Roused, the rest goes at once, the piece back as held, the left hand to
+grip_2 (the ready stance as before). A resting kind kneels or crouches in no fidget (KNEELS in
+ARMED_NOT: the piece is on the ground). Set down and taken up are heard (SoundKit.stow_slot,
+"662, sound's side": gear_stow, gear_draw), once sound's side is in: sound held (Jeff low on
+credits), this landed first, so Client3D looks stow_slot up on SoundKit's script and is silent
+without it. The bow stays low as it was (Bow_Idle).
+anim_rig_test `_test_rests` (each rest, five builds, through its loop: nothing inside the trunk,
+head or left leg, nothing within 0.12 m of the head; a grounded end within 0.2 m of the ground, a
+hung one off it); view_test `_test_rest` (the times put back: an axe at rest, its end on the
+ground, the left hand let go; a blow near it, then a monster hunting 5 cells off, take it up; the
+spear grounded, the hammer hung, the sword in hand till (c)).
 
 **Step (c), after art-kit's pieces.** The sword (gear.scabbard), dagger and knife (gear.sheath)
 sheathed on the left hip at a Hips socket of its own (the piece upright in its frame, hung about

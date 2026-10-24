@@ -509,6 +509,33 @@ CLIPS["Carry_Game_Loop"] = {"loop": True, "keys": [
 	(2.0, P("Idle_Loop", 0.0, GAME_HELD)),
 ]}
 
+# Held weapons at rest, out of a fight (662 (b); Jeff: "hold weapons should have different resting
+# animations ... definitely not scratching head or anything that sword goes near body"; the upper
+# layer, standing). Each loop looks slowly about, the head alone, so the rest is no statue and no
+# hand comes up. Client3D's RESTS slides each piece in the hand ("grip") so its end meets the
+# ground. A two-hander's haft head down: the right hand on its butt before the belly, the head
+# on the ground ahead, the left hand over the right (the coordinator: not on the shoulder, which
+# keeps the blade off the head).
+def haft_rested(up: float) -> list:
+	"""The right wrist [up] of its shoulder, the haft from it down to the ground ahead at 60°."""
+	return right_arm(0.4, -0.04, up, (-0.3, 0.3, -1.0)) + [("hand_r", ((0.0, -0.58, -1.0), (0.0, -1.0, 0.3)), GRASP),
+		("upperarm_l", ([("hand_r", (0.0, 0.0, 0.07), 1.0)], (1.0, 0.2, -0.6)), REACH), ("hand_l", Vector((-0.6, -0.3, -0.7)), AIM)]
+
+
+# The battle axe (1.6 m) held higher, at the upper chest, so its butt stays at the hands and its
+# head on the ground (slid up it, the butt came up into the chest).
+RESTS = {"Haft_Rest_Loop": haft_rested(-0.22), "Haft_Rest_High_Loop": haft_rested(-0.12),
+	# A spear grounded upright beside the right foot, the right hand on it at the chest's height.
+	"Spear_Rest_Loop": right_arm(0.12, 0.14, -0.3, (-0.3, 0.3, -1.0)) + [("hand_r", ((0.0, 0.0, 1.0), (0.0, -1.0, 0.0)), GRASP)],
+	# A hammer or a pick hanging at the side in the right hand, its head down, out from the leg.
+	"Hang_Rest_Loop": right_arm(0.1, 0.22, -0.55, (-0.3, 0.4, -0.2)) + [("hand_r", ((-0.28, -0.25, -1.0), (1.0, 0.0, -0.28)), GRASP)]}
+for _name, _held in RESTS.items():
+	CLIPS[_name] = {"loop": True, "keys": [
+		(0.0, P("Idle_Loop", 0.0, _held + [("Head", TURN, 12.0)])),
+		(2.5, P("Idle_Loop", 2.5, _held + [("Head", TURN, -10.0), ("Head", LIFT, -3.0), ("spine_02", LIFT, -1.5)])),
+		(5.0, P("Idle_Loop", 0.0, _held + [("Head", TURN, 12.0)])),
+	]}
+
 
 def args() -> list:
 	return sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []

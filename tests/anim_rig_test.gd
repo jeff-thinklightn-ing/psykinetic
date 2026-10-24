@@ -21,6 +21,7 @@ func _ready() -> void:
 	await _test_bow_clear()
 	await _test_work_clear()
 	await _test_armed_fidgets()
+	await _test_rests()
 	_test_warm_painted()
 	await _test_upper()
 	await _test_upper_timed()
@@ -581,6 +582,76 @@ func _test_armed_fidgets() -> void:
 				model.queue_free()
 				holder.queue_free()
 	_check(found.is_empty() and measured > 0, "each held kind clear of the body and %.2f m from the head, standing and through its fidgets, five builds, %d poses (%s)" % [Client3D.ARMED_HEAD_CLEAR, measured, "; ".join(found)])
+
+
+## Held weapons at rest (662 (b)): each of Client3D.RESTS as Client3D lays it (its upper clip over
+## Idle, the piece slid "grip" in the hand), five builds, through the loop: no vertex inside the
+## trunk, the head or the left leg, none within ARMED_HEAD_CLEAR of the head; a grounded piece's end
+## within REST_GROUND of the ground (a shorter build's axe bites into it a little), a hung one's off it.
+const REST_GROUND := 0.2
+func _test_rests() -> void:
+	print("== held weapons at rest: clear of the body, grounded ==")
+	var lib := load(CLIPS) as AnimationLibrary
+	var builds := [["man", "res://art/models/characters/human_m.glb", {}],
+		["man heavy", "res://art/models/characters/human_m.glb", {"heavy": 1.0}],
+		["man broad", "res://art/models/characters/human_m.glb", {"heavy": 0.6, "broad": 1.0}],
+		["man lean", "res://art/models/characters/human_m.glb", {"lean": 1.0, "narrow": 1.0}],
+		["woman", "res://art/models/characters/human_f.glb", {}]]
+	var found: Array[String] = []
+	var lows: Array[String] = []
+	for kind: String in Client3D.RESTS:
+		var rest: Dictionary = Client3D.RESTS[kind]
+		var hung := str(rest["upper"]) == "Hang_Rest"
+		for build: Array in builds:
+			var model := (load(build[1]) as PackedScene).instantiate() as Node3D
+			add_child(model)
+			for mesh: MeshInstance3D in model.find_children("*", "MeshInstance3D", true, false):
+				for key: String in build[2]:
+					var i := mesh.find_blend_shape_by_name(key)
+					if i >= 0:
+						mesh.set_blend_shape_value(i, build[2][key])
+			var holder := Node3D.new()
+			Client3D._attach_sockets(model, Client3D.HUMAN_SOCKETS, 1.0, holder)
+			var sockets: Dictionary = holder.get_meta("sockets")
+			var piece := ArtKit.instance(str(Items.def(kind).get("art", "item." + kind)))
+			piece.name = "Held"
+			if Client3D._edge_first(kind):
+				piece.basis = Client3D.HELD_EDGE_TURN
+			(sockets["hand_r"] as Node3D).add_child(piece)
+			Client3D._slide_held(sockets, float(rest.get("grip", 0.0)))
+			var rig := AnimRig.make(model, lib, 0.0, true, null)
+			rig.loop("Idle", 0.0, 0.0, true)
+			var worst := ""
+			var low := INF
+			for at: float in [0.0, 1.25, 2.5, 3.75]:
+				for i in 3:
+					rig.upper_at(str(rest["upper"]), at)
+					await get_tree().process_frame
+				var parts := _skinned_parts(model)
+				var points := PackedVector3Array()
+				for mesh: MeshInstance3D in piece.find_children("*", "MeshInstance3D", true, false):
+					for s in mesh.mesh.get_surface_count():
+						for v: Vector3 in mesh.mesh.surface_get_arrays(s)[Mesh.ARRAY_VERTEX]:
+							points.append(mesh.global_transform * v)
+				for p in points:
+					low = minf(low, p.y)
+				var trunk: Array = parts["trunk"]
+				var inside := _inside(points, trunk[0] + parts["head"][0] + parts["leg"][0], trunk[1] + parts["head"][1] + parts["leg"][1])
+				var near := INF
+				for p in points:
+					for h: Vector3 in parts["head"][0]:
+						near = minf(near, p.distance_squared_to(h))
+				near = sqrt(near)
+				if (inside > 0 or near < Client3D.ARMED_HEAD_CLEAR) and worst == "":
+					worst = "%s %s %.2f: %d inside, %.2f m from the head" % [build[0], kind, at, inside, near]
+			if worst != "":
+				found.append(worst)
+			if (hung and low < 0.03) or (not hung and absf(low) > REST_GROUND):
+				lows.append("%s %s %.2f" % [build[0], kind, low])
+			model.queue_free()
+			holder.queue_free()
+	_check(found.is_empty(), "each rest clear of the body and %.2f m from the head, five builds (%s)" % [Client3D.ARMED_HEAD_CLEAR, "; ".join(found)])
+	_check(lows.is_empty(), "each grounded piece's end within %.2f m of the ground, a hung one's off it, five builds (%s)" % [REST_GROUND, ", ".join(lows)])
 
 
 static func _box(points: PackedVector3Array) -> AABB:

@@ -111,6 +111,7 @@ func _ready() -> void:
 	_test_visible_work()
 	_test_head_socket()
 	await _test_two_hands()  # It lets frames run (the pose the modifiers leave): after the tests that read a pose unrun.
+	await _test_rest()
 	_test_goblins_differ()
 	_test_allies()
 	_test_barrow_dead()
@@ -6504,6 +6505,81 @@ func _test_two_hands() -> void:
 	_rig._process(0.0)
 	_check(reach == null or not reach.active, "a shield in the left: no reach")
 	_check(rig.upper_clip() == "", "nor the ready stance (%s)" % rig.upper_clip())
+	player.slots = was
+	_rig._process(0.0)
+
+
+## Held weapons rest out of a fight (662 (b)): a two-hander calm a while (the times put back,
+## not waited for) stands with its head down on the ground ahead, the left hand let go of grip_2;
+## a blow seen near it, or a monster hunting within REST_ROUSED_CELLS, takes it up again (the
+## ready stance, the left hand back); a spear grounded, a hammer hung; a sword stays in hand
+## (it sheathes, step (c)).
+func _test_rest() -> void:
+	print("
+== held weapons at rest (662 (b)) ==")
+	var player := _player()
+	var slots := player.slots
+	while slots.size() < Items.CARRIED:
+		slots.append("")
+	var was := slots.duplicate()
+	player.raised = ""
+	var id := player.get_instance_id()
+	for kind: String in ["giant_axe", "spear", "hammer", "sword"]:
+		slots[Items.RIGHT_HAND] = kind
+		slots[Items.LEFT_HAND] = ""
+		player.slots = slots
+		_rig._process(0.0)
+		var puppet: Node3D = _rig._puppets[id]
+		var rig := puppet.get_meta("rig") as AnimRig
+		var sockets: Dictionary = puppet.get_meta("sockets")
+		_check(rig.upper_clip() != str(Client3D.RESTS.get(kind, {}).get("upper", "-")), "%s just taken up: not at rest (%s)" % [kind, rig.upper_clip()])
+		var now := Time.get_ticks_msec()
+		puppet.set_meta("roused_at", now - 60000)
+		puppet.set_meta("stood_at", now - 60000)
+		_rig._combat_at.erase(id)
+		for i in 4:
+			_rig._process(0.0)
+			await get_tree().process_frame
+		var held := (sockets["hand_r"] as Node3D).get_node("Held") as Node3D
+		if not Client3D.RESTS.has(kind):
+			_check(rig.upper_clip() == "" and held.position == Vector3.ZERO, "%s: no rest of its own yet, in hand as held (%s)" % [kind, rig.upper_clip()])
+			continue
+		var low := INF
+		for mesh: MeshInstance3D in held.find_children("*", "MeshInstance3D", true, false):
+			for s in mesh.mesh.get_surface_count():
+				for v: Vector3 in mesh.mesh.surface_get_arrays(s)[Mesh.ARRAY_VERTEX]:
+					low = minf(low, (mesh.global_transform * v).y)
+		low -= puppet.global_position.y
+		_check(rig.upper_clip() == str(Client3D.RESTS[kind]["upper"]), "%s calm a while: at rest (%s)" % [kind, rig.upper_clip()])
+		if kind != "hammer":
+			_check(absf(low) < 0.15, "%s at rest: its end on the ground (%.2f m)" % [kind, low])
+		else:
+			_check(low > 0.05, "%s hung: its head off the ground (%.2f m)" % [kind, low])
+		if kind == "giant_axe":
+			var reach := puppet.get_meta("reach") as HandReach
+			_check(not reach.active, "the axe at rest: the left hand let go of grip_2")
+			_rig._combat_at[id] = Time.get_ticks_msec()
+			_rig._process(0.0)
+			_check(rig.upper_clip() == "Axe_Ready" and reach.active and held.position == Vector3.ZERO, "a blow seen near it: taken up, ready, both hands on it (%s)" % rig.upper_clip())
+			_rig._combat_at.erase(id)
+			puppet.set_meta("roused_at", Time.get_ticks_msec() - 60000)
+			_rig._process(0.0)
+			_check(rig.upper_clip() == "Haft_Rest", "calm again: at rest (%s)" % rig.upper_clip())
+			var free := Vector2i(-1, -1)
+			for dx in range(-5, 6):
+				for dy in range(-5, 6):
+					var t := player.tile + Vector2i(dx, dy)
+					if free == Vector2i(-1, -1) and absi(dx) + absi(dy) >= 2 and World.is_free(t) 							and Vector2(t).distance_to(Vector2(player.tile)) <= Client3D.REST_ROUSED_CELLS - 1.0:
+						free = t
+			var imp := _spawn_imp(free)
+			imp.alert = Monster.Alert.HUNTING
+			_rig._process(0.0)  # Its puppet made.
+			puppet.set_meta("roused_look_at", 0)
+			_rig._process(0.0)
+			_check(rig.upper_clip() == "Axe_Ready", "a monster hunting %.1f cells off: taken up (%s)" % [Vector2(free).distance_to(Vector2(player.tile)), rig.upper_clip()])
+			imp.alert = Monster.Alert.IDLE  # (Its puppet outlives it a frame.)
+			World.despawn(imp)
+			puppet.set_meta("roused_look_at", 0)  # Looked for again at once: nothing hunting now.
 	player.slots = was
 	_rig._process(0.0)
 

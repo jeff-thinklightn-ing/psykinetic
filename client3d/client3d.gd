@@ -910,9 +910,26 @@ const KOBOLD_FIDGETS := {"Idle_LookAround": 1, "Fidget_LookBack": 3, "Fidget_Sle
 ## through each, five builds: nothing inside the body, nothing within
 ## ARMED_HEAD_CLEAR of the head). A two-hander stands ready and doesn't fidget.
 const ARMED_FIDGETS: Array[String] = ["Fidget_Shift", "Fidget_LookBack", "Fixing_Kneeling", "PickUp_Kneeling", "Crouch_Idle"]
+## (A piece at rest on the ground, 662 (b), stays standing: no crouch or kneel over it.)
+const KNEELS: Array[String] = ["Crouch_Idle", "Fixing_Kneeling", "PickUp_Kneeling"]
 const ARMED_NOT := {"hammer": ["Crouch_Idle", "Fixing_Kneeling", "PickUp_Kneeling"], "shield": ["Fixing_Kneeling"],
-	"bow": ["Fixing_Kneeling"]}
+	"bow": ["Fixing_Kneeling"], "spear": KNEELS, "giant_axe": KNEELS, "battle_axe": KNEELS, "pick": KNEELS}
 const ARMED_HEAD_CLEAR := 0.12
+## Out of a fight (662 (b)), a piece that stays in hand rests: standing
+## REST_STAND_SECONDS with nothing rousing it for REST_SECONDS (a blow seen
+## near it, its own swing or raised guard or draw, its alert hunting or
+## fighting, or, not a monster, a monster so within REST_ROUSED_CELLS), its
+## right hand's kind plays its "upper" here, the piece slid "grip" up in the
+## hand so its end meets the ground (tools/humanoid_clips.py's rests; the
+## left hand empty or a shield on its arm). A two-hander's head down before
+## it, both hands on the butt (HandReach let go), a spear grounded upright,
+## a hammer or a pick hanging at the side. Roused, the rest goes at once and
+## the piece is back as it is held. (The blades sheathe, step (c).)
+const RESTS := {"giant_axe": {"upper": "Haft_Rest"}, "battle_axe": {"upper": "Haft_Rest_High"},
+	"spear": {"upper": "Spear_Rest", "grip": 0.55}, "hammer": {"upper": "Hang_Rest"}, "pick": {"upper": "Hang_Rest", "grip": 0.16}}
+const REST_SECONDS := 8.0
+const REST_STAND_SECONDS := 2.0
+const REST_ROUSED_CELLS := 6.0
 ## This run's: so a person's fidgets come at other moments each run.
 static var _session_seed := randi()
 const CLIP_TIRED := "Idle_Tired"
@@ -13714,6 +13731,8 @@ func _sync_held(entity: GridEntity, puppet: Node3D) -> void:
 			if own and hand == 0:
 				_grip(thing, work)
 			socket.add_child(thing)
+	if changed:
+		puppet.set_meta("roused_at", Time.get_ticks_msec())  # Taken up: at rest only REST_SECONDS on (662).
 	if changed and puppet.has_meta("reach"):
 		_sync_reach(puppet.get_meta("reach") as HandReach, sockets, ids)
 
@@ -13860,8 +13879,22 @@ func _sync_bow(entity: GridEntity, puppet: Node3D) -> void:
 		if want == "idle" and (puppet.get_meta("gaits", GAITS) as Array).any(
 				func(gait: Array) -> bool: return gait[0] == rig.base_clip()):
 			want = "carry"
-	elif puppet.has_meta("reach") and (puppet.get_meta("reach") as HandReach).active and rig.base_clip() == CLIP_IDLE:
+	var rest := _rest_of(entity, puppet, ids, rig, now) if want == "" else {}
+	var sockets: Dictionary = puppet.get_meta("sockets")
+	if not rest.is_empty():
+		want = "rest"
+		_slide_held(sockets, float(rest.get("grip", 0.0)))
+		if puppet.has_meta("reach") and (puppet.get_meta("reach") as HandReach).active:
+			(puppet.get_meta("reach") as HandReach).reach(false)
+	elif state == "rest":
+		# Roused: the piece back as it is held, the left hand to its grip_2.
+		_slide_held(sockets, 0.0)
+		if puppet.has_meta("reach"):
+			_sync_reach(puppet.get_meta("reach") as HandReach, sockets, ids)
+	if want == "" and puppet.has_meta("reach") and (puppet.get_meta("reach") as HandReach).active and rig.base_clip() == CLIP_IDLE:
 		want = "ready"  # Standing only: not over a gait, a lying body or a kneel.
+	if (want == "rest") != (state == "rest"):
+		_rest_sound(puppet, str(ids[0]), want != "rest")
 	if want == "draw":
 		var clip := str(moves.get("bow_draw", ""))
 		rig.upper_at(clip, bow_pull(entity) * rig.length(clip))
@@ -13875,12 +13908,84 @@ func _sync_bow(entity: GridEntity, puppet: Node3D) -> void:
 				rig.upper(str(moves.get("block", "")))
 			"ready":
 				rig.upper(str(moves.get("ready", "")))
+			"rest":
+				rig.upper(str(rest["upper"]))
 			"", "carry":
 				rig.upper_off()
 	puppet.set_meta("bow_state", want)
 	if bow != "":
 		_turn_carried(puppet, want == "carry", now)
 	_show_nocked(puppet, ids, want in ["draw", "hold"])
+
+
+## The rest [param puppet] stands at (662 (b)): RESTS' row for the piece in
+## its right hand ([param ids]), the left hand empty or a shield, once it has
+## stood REST_STAND_SECONDS (Idle, Idle_Tired or an armed fidget) and nothing
+## has roused it for REST_SECONDS; {} otherwise.
+func _rest_of(entity: GridEntity, puppet: Node3D, ids: Array, rig: AnimRig, now: int) -> Dictionary:
+	if entity.raised != "" or rig.striking() or _roused(entity, puppet, now):
+		puppet.set_meta("roused_at", now)
+	var standing := rig.base_clip() in [CLIP_IDLE, CLIP_TIRED] or rig.base_clip() in ARMED_FIDGETS
+	if not standing:
+		puppet.remove_meta("stood_at")
+	elif not puppet.has_meta("stood_at"):
+		puppet.set_meta("stood_at", now)
+	var rest: Dictionary = RESTS.get(str(ids[0]), {})
+	if rest.is_empty() or not rig.has(str(rest["upper"])) or not standing:
+		return {}
+	if str(ids[1]) != "" and "shield" not in Items.def(str(ids[1])).get("tags", []):
+		return {}
+	var roused := maxi(int(puppet.get_meta("roused_at", -(1 << 40))), int(_combat_at.get(int(puppet.get_meta("entity_id", 0)), -(1 << 40))))
+	if now - roused < int(REST_SECONDS * 1000.0) or now - int(puppet.get_meta("stood_at", now)) < int(REST_STAND_SECONDS * 1000.0):
+		return {}
+	return rest
+
+
+## Whether something rouses [param entity] from its rest: a monster's own
+## alert, hunting or fighting; anyone else's a monster so within
+## REST_ROUSED_CELLS (looked for twice a second).
+func _roused(entity: GridEntity, puppet: Node3D, now: int) -> bool:
+	if entity is Monster:
+		return (entity as Monster).alert in [Monster.Alert.HUNTING, Monster.Alert.FIGHTING]
+	if now < int(puppet.get_meta("roused_look_at", 0)):
+		return bool(puppet.get_meta("roused_seen", false))
+	puppet.set_meta("roused_look_at", now + 500)
+	var seen := false
+	for id: int in _puppets:
+		var other := instance_from_id(id) as Monster
+		if other != null and other.alert in [Monster.Alert.HUNTING, Monster.Alert.FIGHTING] 				and Vector2(other.tile).distance_to(Vector2(entity.tile)) <= REST_ROUSED_CELLS:
+			seen = true
+			break
+	puppet.set_meta("roused_seen", seen)
+	return seen
+
+
+## The right hand's piece slid [param grip] up in the hand along its length
+## (0: as it is held).
+static func _slide_held(sockets: Dictionary, grip: float) -> void:
+	var held := (sockets["hand_r"] as Node3D).get_node_or_null("Held") as Node3D
+	if held != null:
+		var at := held.basis * Vector3(0.0, -grip, 0.0)
+		if not held.position.is_equal_approx(at):
+			held.position = at
+
+
+## A piece set to rest or taken up again (662; sound's slots by its kind,
+## SoundKit.stow_slot: silent till sound's side of 662 is in, looked up
+## rather than called by name so this compiles without it).
+func _rest_sound(puppet: Node3D, id: String, drawing: bool) -> void:
+	if id != "" and _stow_slot_known():
+		sfx.play(str((SoundKit as Script).call("stow_slot", id, drawing)), puppet.position + Vector3.UP * 0.8)
+
+
+static var _has_stow_slot: Variant = null
+static func _stow_slot_known() -> bool:
+	if _has_stow_slot == null:
+		_has_stow_slot = false
+		for method: Dictionary in (SoundKit as Script).get_script_method_list():
+			if method["name"] == "stow_slot":
+				_has_stow_slot = true
+	return bool(_has_stow_slot)
 
 
 ## The bow as it's carried at a walk or run (462 amended (3)): a quarter turn
