@@ -5887,8 +5887,8 @@ func _test_attach_points() -> void:
 	_check(sockets.has_all(["hand_r", "hand_l", "back", "belt_l"]) and (sockets["hand_r"].get_parent() as BoneAttachment3D).bone_name == "RightHand",
 			"a person has hand, back and belt sockets on their bones")
 	var sword := (sockets["hand_r"] as Node3D).get_node_or_null("Held") as Node3D
-	var shield := (sockets["hand_l"] as Node3D).get_node_or_null("Held") as Node3D
-	_check(sword != null and shield != null, "a sword drawn in the right hand, a shield in the left")
+	var shield := (sockets["arm_l"] as Node3D).get_node_or_null("Held") as Node3D if sockets.has("arm_l") else null
+	_check(sword != null and shield != null, "a sword drawn in the right hand, a shield on the left arm")
 	if sword != null:
 		var skeleton := puppet.find_children("*", "Skeleton3D", true, false)[0] as Skeleton3D
 		# Where the socket puts it in the hand's pose now (the attachment follows
@@ -5911,9 +5911,15 @@ func _test_attach_points() -> void:
 		var edge: Vector3 = (grip.basis * sword.transform.basis).x.normalized()
 		var fingers: Vector3 = (bone.call("RightHand") as Transform3D).basis.y.normalized()
 		_check(edge.dot(fingers) > 0.9, "its edge along the fingers, toward the knuckles (%.2f)" % edge.dot(fingers))
+	_check(shield != null and shield.get_parent() == sockets.get("arm_l"), "the shield strapped on the left forearm, not in the hand")
 	if shield != null:
-		_check((sockets["hand_l"] as Node3D).global_basis.x.normalized().dot(shield.global_basis.z.normalized()) > 0.99,
-				"the shield's face (+z) out of the back of the hand")
+		# On the outside of the forearm (Jeff: "not inside"): its face out of the forearm's back (the bone's -X),
+		# its centre beyond it, the forearm between it and the body.
+		var forearm := (sockets["arm_l"] as Node3D).get_parent() as Node3D
+		var back := -forearm.global_basis.x.normalized()
+		var beyond := (shield.global_position - (sockets["arm_l"] as Node3D).global_position).dot(back)
+		_check(shield.global_basis.z.normalized().dot(back) > 0.99 and beyond > 0.04,
+				"the shield's face (+z) out of the back of the forearm, its centre %.3f m beyond it" % beyond)
 	hold.call(player, "", "shield")
 	_check((sockets["hand_r"] as Node3D).get_children().all(func(n: Node) -> bool: return n.is_queued_for_deletion()),
 			"the hand emptied: nothing drawn in it")

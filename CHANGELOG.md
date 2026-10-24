@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- A shield is strapped on the outside of the left forearm, its face out, instead of held out of the fist.
 - A held weapon or tool sits in the middle of the hand, not out at the end of it.
 ## v0.1.172
 

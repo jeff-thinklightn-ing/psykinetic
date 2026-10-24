@@ -755,6 +755,10 @@ static func _sockets(hand: float, hip: float, back: float, chest: float) -> Dict
 			Vector3(0.0, HAND_GRIP, HAND_PALM) * hand)],
 		"hand_l": ["LeftHand", Transform3D(Basis(Vector3(0, 0, -1), Vector3(-1, 0, 0), Vector3(0, 1, 0)),
 			Vector3(0.0, HAND_GRIP, HAND_PALM) * hand)],
+		# The left forearm's middle (_attach_sockets puts it there), in a shield's
+		# frame: its face (+z) out of the back of the forearm (the bone's -X), its
+		# +y along the forearm toward the wrist (+Y).
+		"arm_l": ["LeftLowerArm", Transform3D(Basis(Vector3(0, 0, 1), Vector3(0, 1, 0), Vector3(-1, 0, 0)), Vector3.ZERO)],
 		# Between the shoulder blades, a stowed thing's length up and over the right shoulder.
 		"back": ["UpperChest", Transform3D(Basis(Vector3(0, 0, -1), PI * 0.2), Vector3(0.0, chest, -back))],
 		# The left hip, a hung thing's length down.
@@ -12304,6 +12308,8 @@ static func _attach_sockets(scene: Node3D, sizes: Dictionary, model_scale: float
 		var socket := Node3D.new()
 		socket.name = name
 		socket.transform = table[name][1]
+		if name == "arm_l" and skeleton.find_bone("LeftHand") >= 0:
+			socket.position = skeleton.get_bone_rest(skeleton.find_bone("LeftHand")).origin * 0.5
 		socket.scale = Vector3.ONE / maxf(model_scale, 0.01)
 		on.add_child(socket)
 		made[name] = socket
@@ -12324,6 +12330,13 @@ static func _attach_sockets(scene: Node3D, sizes: Dictionary, model_scale: float
 ## fingers toward the knuckles, the way the hand swings. A shield keeps its
 ## own turn, the bow none; a work's tool is turned by its clip (GRASP).
 const HELD_EDGE_TURN := Basis(Vector3.UP, -PI * 0.5)
+## Where a shield's strap is in its own frame (art-kit's "strap" socket:
+## the forearm's axis at its middle, behind the back face), SHIELD_STRAP when
+## its slot names none.
+const SHIELD_STRAP := Vector3(0.0, -0.06, -0.075)
+static func _strap_of(art: String) -> Vector3:
+	var at: Variant = ArtKit.spec(art).get("sockets", {}).get("strap")
+	return Vector3(at[0], at[1], at[2]) if at is Array and at.size() == 3 else SHIELD_STRAP
 static func _edge_first(id: String) -> bool:
 	var tags: Array = Items.def(id).get("tags", [])
 	return "weapon" in tags and not "ranged" in tags and not "shield" in tags
@@ -12361,10 +12374,12 @@ func _sync_held(entity: GridEntity, puppet: Node3D) -> void:
 		var socket := sockets.get("hand_r" if hand == 0 else "hand_l") as Node3D
 		if socket == null:
 			continue
-		for old in socket.get_children():
-			# Out of the way now, so the new thing is the one named "Held".
-			socket.remove_child(old)
-			old.queue_free()
+		var places: Array = [socket] if hand == 0 or not sockets.has("arm_l") else [socket, sockets["arm_l"]]
+		for place: Node3D in places:
+			for old in place.get_children():
+				# Out of the way now, so the new thing is the one named "Held".
+				place.remove_child(old)
+				old.queue_free()
 		if id == "":
 			continue
 		var own := id.begins_with(ART_ID)
@@ -12372,10 +12387,16 @@ func _sync_held(entity: GridEntity, puppet: Node3D) -> void:
 		if ArtKit.has(art):
 			var thing := ArtKit.instance(art)
 			thing.name = "Held"
-			if not own and "shield" in Items.def(id).get("tags", []):
-				# A shield's face is its +z (art_style): a quarter turn about its
-				# grip's axis turns it out of the back of the hand, its thin side
-				# across the forearm.
+			if not own and "shield" in Items.def(id).get("tags", []) and sockets.has("arm_l"):
+				# Strapped on the outside of the forearm (451 amended (2); Jeff: "shield
+				# should be carried on the outside of arm, not inside"): the arm_l
+				# socket's frame is the shield's, so its strap point goes on the
+				# forearm's middle.
+				socket = sockets["arm_l"]
+				thing.position = -_strap_of(art)
+			elif not own and "shield" in Items.def(id).get("tags", []):
+				# A body with no forearm socket: out of the back of the hand, a quarter
+				# turn about its grip's axis (its face +z, art_style).
 				thing.basis = Basis(Vector3.UP, PI * 0.5)
 			elif not own and _edge_first(id):
 				thing.basis = HELD_EDGE_TURN

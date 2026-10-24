@@ -27624,3 +27624,21 @@ palm, so on a mitten a hilt sat three quarters of the way to its tip, at the pal
 view_test _test_attach_points: a held sword's grip 0.055 to 0.085 m out from the wrist (reads
 0.069), short of the knuckles, along the fist's axis. Client only, protocol unchanged, no new
 class_name.
+
+### Step 2: the shield on the outside of the forearm
+
+The shield was in the left hand's socket, turned a quarter, so it stood out of the back of the
+fist, inside the arm's line. It is now strapped on the left forearm.
+
+- **The arm_l socket:** on LeftLowerArm at its middle (half the hand's rest offset, set in
+  _attach_sockets). Its frame is the shield's: the face (+z) out of the forearm's back (the bone's
+  -X on every body, from the hand's -Z at rest: build/hand/frames.gd), +y along the forearm toward
+  the wrist, +x the bone's +Z.
+- **The strap:** the shield goes on with its strap point (art-kit's "strap" socket, 451 amended
+  (2) art-kit's side; SHIELD_STRAP (0, -0.06, -0.075) until its slot has one) at the socket. So
+  the forearm's axis passes 7.5 cm behind the face, and the left fist comes near its handle.
+- A body with no LeftLowerArm keeps the old turn in the hand. The bow is still held in the left
+  hand.
+
+view_test _test_attach_points: the shield under arm_l, not in the hand; its face along the
+forearm's back (dot > 0.99), its centre 0.075 m beyond the forearm. Client only.
