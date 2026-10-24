@@ -657,7 +657,9 @@ the anchor depth is counted from), the ambush a third of the way down
 (14 x 10, walled north and south, where the smith's guards fell: his cart
 and two crates as markers, and three of the guards where they fell, decor
 `"fallen_guard"` with a facing, 613 amended: one on his side toward the
-cart, one face down running north, one as he fell), and the great forge at
+cart, one face down running north, one face down toward the west wall;
+every guard faced, since a rolled yaw can run a body toward the camera and
+read as kneeling, 613 amended (2)), and the great forge at
 the deepest point (20 x 14, walled but for its north side): the forge 6 x 3
 against its south wall (`building.dwarven_forge`, solid and doorless,
 facing north into the room, the anvils along its front), the goblins'

@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The third fallen guard in the Dwarven Halls' ambush lies face down toward the west wall instead of a rolled pose that read as kneeling from the usual camera; every hand-laid body now has a facing (613 amended (2), dungeon's side).
 - The townsfolk's work pieces (566 amended, art-kit's side): a hoe, a shepherd's crook, sheep shears, a sack carried on the shoulder and a doe carried across the shoulders, for pc-character's work clips and npc's townsfolk at their work
 - The war hammer swings one-handed, the left hand kept low, instead of raising an empty left hand beside its haft.
 - Your own body rounds the corners of a held-key walk too (655 amended): the step shown bends toward the key you hold before the next step starts; let go and it settles to the cell's centre; a step the server refuses slides back. No corner, yours or anyone's, is cut by more than a quarter cell (a diagonal reversal reached further).

@@ -163,8 +163,10 @@ const HALLS_CRATES: Array[Vector2i] = [Vector2i(22, 31), Vector2i(27, 29)]
 const HALLS_RACK := Vector2i(50, 67)
 ## The smith's fallen guards (613 amended): [x, y, dx, dy, "fallen_guard",
 ## variant]; one on his side facing the cart he guarded, one face down
-## running north, one rolled; none on a marker's cell or in the ways in.
-const HALLS_GUARDS: Array = [[23, 30, 1, 0, "fallen_guard", 1], [26, 31, 0, -1, "fallen_guard", 2], [21, 29, 0, 0, "fallen_guard", 1]]
+## running north, one face down toward the west wall (613 amended (2): a
+## rolled yaw ran his body toward the usual camera and read as kneeling);
+## none on a marker's cell or in the ways in.
+const HALLS_GUARDS: Array = [[23, 30, 1, 0, "fallen_guard", 1], [26, 31, 0, -1, "fallen_guard", 2], [21, 29, -1, 0, "fallen_guard", 2]]
 
 
 ## Blank rows (void) for a level [param size] cells across, two pixels a cell.

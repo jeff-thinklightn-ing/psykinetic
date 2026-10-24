@@ -27813,3 +27813,15 @@ pieces wound outward, not items (no edge turn, 451 amended).
 
 Scripts in C:/dev/review/tools/make_work.py. art_kit_test passes. Client art only, protocol
 unchanged, no new class_name.
+## 613 amended (2), dungeon's side: the third guard turned
+
+The coordinator on the ambush still (2026-10-24): "the guard at the upper left, by the west wall,
+reads almost upright at this yaw, as if kneeling, because his body runs toward the camera. If he's
+flat, fine, but turn him a quarter so he lies across the view and all three read as fallen from
+the usual camera." He was the one guard laid with `(0, 0)`, his yaw rolled by the cell (658's
+flat rule), so his pose was whatever the roll gave. Now every guard has a facing: the third
+(21, 29) lies face down toward the west wall, `[21, 29, -1, 0, "fallen_guard", 2]`
+(`tools/plan_sheet.HALLS_GUARDS`, `levels/castle_halls` regenerated from it). The rule for a
+hand-laid body: give it a facing, so it reads the same from the usual camera in every generation;
+the rolled yaw stays for moss. level_test `_test_castle_halls_level`; docs/levels.md. Template
+only, nothing on the wire, no new class_name.

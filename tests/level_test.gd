@@ -2191,9 +2191,9 @@ func _test_castle_halls_level() -> void:
 		"the goblins' weapon rack stands 2 x 1 against the south wall east of the forge, solid, floor either side (%s)" % [rack])
 	var guards: Array = halls["terrain"]["decor"].filter(func(d: Dictionary) -> bool: return d["kind"] == "fallen_guard")
 	_check(halls["terrain"]["decor"].size() == 3 and guards.size() == 3 and guards[0]["cell"] == Vector2i(23, 30) and guards[0]["out"] == Vector2i(1, 0)
-		and guards[1]["out"] == Vector2i(0, -1) and guards[1]["variant"] == 2 and guards[2]["out"] == Vector2i.ZERO
+		and guards[1]["out"] == Vector2i(0, -1) and guards[1]["variant"] == 2 and guards[2]["out"] == Vector2i(-1, 0) and guards[2]["variant"] == 2
 		and guards.all(func(d: Dictionary) -> bool: return Level.in_anchors(Regen.config_of("castle_halls")["anchors"], d["cell"])),
-		"three of the smith's guards lie in the ambush: one on his side facing the cart, one face down running north, one as he fell (%s)" % [guards])
+		"three of the smith's guards lie in the ambush, each with a facing, so all read as fallen from the usual camera: one on his side facing the cart, one face down running north, one face down toward the west wall (%s)" % [guards])
 	_check(halls["entities"].size() == 5 and halls["links"][0]["cue"] == "up" and down[0]["cue"] == "down",
 		"the template's five markers alone stand in the halls (the cart, two crates, two chests); the stairs cue up and down (%d, %s, %s)" % [halls["entities"].size(), halls["links"][0]["cue"], down[0]["cue"]])
 
