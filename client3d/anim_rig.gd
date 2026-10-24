@@ -295,6 +295,13 @@ func upper_at(clip: String, seconds: float) -> void:
 	_apply()
 
 
+## The base layer held still on [param clip] at [param seconds] into it: a
+## pose to measure (anim_rig_test's held pieces through the fidgets, 662).
+func base_at(clip: String, seconds: float) -> void:
+	clip = _name(clip)
+	_to_base(clip, 0.0, 0.0, seconds, true)
+
+
 ## The upper layer's clip ("" for none) and its speed.
 func upper_clip() -> String:
 	return _upper_clip

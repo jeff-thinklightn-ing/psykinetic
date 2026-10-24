@@ -20,6 +20,7 @@ func _ready() -> void:
 	await _test_one_strike_clip()
 	await _test_bow_clear()
 	await _test_work_clear()
+	await _test_armed_fidgets()
 	_test_warm_painted()
 	await _test_upper()
 	await _test_upper_timed()
@@ -484,6 +485,110 @@ func _test_warm_painted() -> void:
 	piece = Client3D.warm_painted(models)
 	_check(piece.get_child_count() == 2, "a model without its paint passed over (%d warmed)" % piece.get_child_count())
 	piece.free()
+
+## Fidgets with a thing in hand (662; Jeff: "definitely not scratching head or anything that sword
+## goes near body"): each one-handed held kind as Client3D holds it (a blade edge first, the
+## shield strapped on the forearm, the bow low in the left with Bow_Idle over the arms), standing
+## (Idle, Idle_Tired) and through every fidget Client3D.fidget_with lets it play, five builds, every
+## quarter second: no vertex of it inside the trunk, the head or the left leg, none within
+## ARMED_HEAD_CLEAR of the head. And none of the scratch, the drink, the sleeve, the crossed arms,
+## the shrug, the talking with anything in hand.
+func _test_armed_fidgets() -> void:
+	print("== fidgets with a thing in hand: clear of the body and the head ==")
+	var lib := load(CLIPS) as AnimationLibrary
+	var builds := [["man", "res://art/models/characters/human_m.glb", {}],
+		["man heavy", "res://art/models/characters/human_m.glb", {"heavy": 1.0}],
+		["man broad", "res://art/models/characters/human_m.glb", {"heavy": 0.6, "broad": 1.0}],
+		["man lean", "res://art/models/characters/human_m.glb", {"lean": 1.0, "narrow": 1.0}],
+		["woman", "res://art/models/characters/human_f.glb", {}]]
+	var refused: Array[String] = []
+	for clip: String in ["Idle_LookAround", "Drink", "Fidget_Sleeve", "Fidget_ArmsCrossed", "Fidget_Shoulders", "Idle_Talking"]:
+		if Client3D.fidget_with(clip, ["sword", ""]) or not Client3D.fidget_with(clip, ["", ""]):
+			refused.append(clip)
+	_check(refused.is_empty(), "with a sword in hand none of the scratch, drink, sleeve, crossed arms, shrug, talking; empty-handed all (%s)" % [refused])
+	var found: Array[String] = []
+	var measured := 0
+	for kind: String in ["knife", "dagger", "sword", "hammer", "spear", "bow", "shield"]:
+		var left: bool = kind == "bow" or "shield" in Items.def(kind).get("tags", [])
+		var held := ["", kind] if left else [kind, ""]
+		var clips: Array[String] = ["Idle", "Idle_Tired"]
+		for clip: String in Client3D.ARMED_FIDGETS:
+			if Client3D.fidget_with(clip, held):
+				clips.append(clip)
+		for build: Array in builds:
+			for clip: String in clips:
+				var model := (load(build[1]) as PackedScene).instantiate() as Node3D
+				add_child(model)
+				for mesh: MeshInstance3D in model.find_children("*", "MeshInstance3D", true, false):
+					for key: String in build[2]:
+						var i := mesh.find_blend_shape_by_name(key)
+						if i >= 0:
+							mesh.set_blend_shape_value(i, build[2][key])
+				var holder := Node3D.new()
+				Client3D._attach_sockets(model, Client3D.HUMAN_SOCKETS, 1.0, holder)
+				var sockets: Dictionary = holder.get_meta("sockets")
+				var art := str(Items.def(kind).get("art", "item." + kind))
+				var piece := ArtKit.instance(art)
+				if "shield" in Items.def(kind).get("tags", []):
+					piece.position = -Client3D._strap_of(art)
+					(sockets["arm_l"] as Node3D).add_child(piece)
+				else:
+					if Client3D._edge_first(kind):
+						piece.basis = Client3D.HELD_EDGE_TURN
+					(sockets["hand_l" if left else "hand_r"] as Node3D).add_child(piece)
+				var rig := AnimRig.make(model, lib, 0.0, true, null)
+				var length := rig.length(clip)
+				var steps := maxi(1, ceili(length / 0.25))
+				var worst := ""
+				for k in steps + 1:
+					var at := minf(k * 0.25, length)
+					for i in 3:
+						rig.base_at(clip, at)
+						if kind == "bow":
+							rig.upper(str(Client3D.HUMANOID_MOVES["bow_idle"]))
+						await get_tree().process_frame
+					var parts := _skinned_parts(model)
+					var points := PackedVector3Array()
+					for mesh: MeshInstance3D in piece.find_children("*", "MeshInstance3D", true, false):
+						for s in mesh.mesh.get_surface_count():
+							for v: Vector3 in mesh.mesh.surface_get_arrays(s)[Mesh.ARRAY_VERTEX]:
+								points.append(mesh.global_transform * v)
+					# Only the piece's points within the body's box (and the head's, grown by the
+					# clearance) are measured against it: a point by point search of every pair
+					# takes minutes.
+					var trunk: Array = parts["trunk"]
+					var surface: PackedVector3Array = trunk[0] + parts["head"][0] + parts["leg"][0]
+					var body_box := _box(surface).grow(0.01)
+					var head_box := _box(parts["head"][0]).grow(Client3D.ARMED_HEAD_CLEAR)
+					var in_body := PackedVector3Array()
+					var by_head := PackedVector3Array()
+					for p in points:
+						if body_box.has_point(p):
+							in_body.append(p)
+						if head_box.has_point(p):
+							by_head.append(p)
+					var inside := _inside(in_body, surface, trunk[1] + parts["head"][1] + parts["leg"][1]) if not in_body.is_empty() else 0
+					var near := INF
+					for p in by_head:
+						for h: Vector3 in parts["head"][0]:
+							near = minf(near, p.distance_squared_to(h))
+					near = sqrt(near)
+					measured += 1
+					if (inside > 0 or near < Client3D.ARMED_HEAD_CLEAR) and worst == "":
+						worst = "%s %s %s %.2f: %d inside, %.2f m from the head" % [build[0], kind, clip, at, inside, near]
+				if worst != "":
+					found.append(worst)
+				model.queue_free()
+				holder.queue_free()
+	_check(found.is_empty() and measured > 0, "each held kind clear of the body and %.2f m from the head, standing and through its fidgets, five builds, %d poses (%s)" % [Client3D.ARMED_HEAD_CLEAR, measured, "; ".join(found)])
+
+
+static func _box(points: PackedVector3Array) -> AABB:
+	var box := AABB(points[0], Vector3.ZERO)
+	for p in points:
+		box = box.expand(p)
+	return box
+
 
 func _test_upper() -> void:
 	print("== the upper layer ==")

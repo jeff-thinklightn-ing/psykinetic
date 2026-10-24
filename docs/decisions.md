@@ -29410,3 +29410,55 @@ letting go of Shift changing nothing).
   and walking again; queued shown steps refused as the draw begins. items_test: a step while
   drawn refused, the draw kept.
 No new class_name.
+## 662. Held weapons rest out of a fight, and fidget clear of the body
+
+Jeff: "while we're working on weapons, hold weapons should have different resting animations, such
+for example, sheathing sword, definitely not scratching head or anything that sword goes near
+body." The coordinator approved pc-character's design in three steps under this number: (a) the
+fidgets filtered by what is in hand, with a test; (b) rest clips for what stays in hand; (c) the
+blades sheathed at the hip (art-kit's gear.scabbard and gear.sheath, "662, art-kit's side"), the
+shield on the back, the lantern moved to belt_r, with sound's draw and stow cues ("662, sound's
+side"). Stowing is a look only: no blow waits on a draw (the coordinator: if Jeff wants a cost to
+striking from the sheath, he'll say so).
+
+**The survey** (each held piece through each idle and fidget clip, a man, every 0.2 s): with a
+sword in hand the head scratch (Idle_LookAround, 0.06 m from the face), Drink (the hand to the
+mouth), Fidget_Sleeve, Fidget_ArmsCrossed and Fidget_Shoulders put the blade into the body
+(hundreds of its vertices inside), and Idle_Talking brings it to 0.13 m of the head; the dagger,
+knife, hammer and spear alike. Clean for every kind: Idle, Idle_Tired, Fidget_Shift,
+Fidget_LookBack, Fixing_Kneeling, PickUp_Kneeling, Crouch_Idle, but for the hammer crouching (its
+head 0.06 m from the face) and the shield kneeling (0.02 m); the test's five builds found more
+(below). A two-hander stands ready (Axe_Ready)
+and never fidgets; the bow's Bow_Idle holds the arms over a fidget.
+
+**Step (a).** `Client3D.fidget_with(clip, held)`: both hands empty, any of the model's fidgets;
+anything in either hand, only ARMED_FIDGETS (Fidget_Shift, Fidget_LookBack, Fixing_Kneeling,
+PickUp_Kneeling, Crouch_Idle) less ARMED_NOT for a held kind, as the test found them: the
+hammer's crouch and both kneels (its head 0.10 m from the face), the shield's Fixing_Kneeling,
+and the bow's (into the leg, the heavier builds). `_pick_fidget` draws only from those. Addressing someone with a thing
+in hand plays no Idle_Talking: it stands (the coordinator: calm, it stows first once (c) is in;
+mid-fight, no gesture at all). `AnimRig.base_at(clip, seconds)` holds the base layer on a pose to
+measure, as upper_at does the upper. anim_rig_test `_test_armed_fidgets`: none of the six with a
+sword in hand, all of them empty-handed; knife, dagger, sword, hammer, spear, bow (Bow_Idle over
+it) and shield as Client3D holds them, standing (Idle, Idle_Tired) and through each fidget
+fidget_with allows them, five builds, every quarter second: no vertex inside the trunk, the head
+or the left leg, none within ARMED_HEAD_CLEAR (0.12 m) of the head.
+
+**Step (b), next.** In-hand rests after about 8 s calm and standing: the two-handers head down,
+both hands stacked on the haft's end (Haft_Rest; HandReach off; the dormant draugr too); the spear
+grounded upright by the right foot (Spear_Rest); the hammer hanging at the side (Hammer_Rest);
+the bow low as today; two new fidgets for the armed, Fidget_LookRound (a look about, no hand up)
+and Fidget_Grip (the held hand resettling). Drawn again on its own swing or raise, a blow seen
+near it, a monster's alert at HUNTING or FIGHTING, or (a player, a companion) such a monster within
+6 cells; a swing from rest takes the piece to the hand at its start.
+
+**Step (c), after art-kit's pieces.** The sword (gear.scabbard), dagger and knife (gear.sheath)
+sheathed on the left hip at a Hips socket of its own (the piece upright in its frame, hung about
+25° with the hilt forward; the item seated at the piece's "mouth" socket turned end for end), a
+Sheathe clip and a Draw; the shield on the "back" socket; the lantern from belt_l to belt_r. Sound
+by SoundKit.stow_slot(id, drawing) at the moment a piece changes socket. Once both hands are
+empty, the full fidget set again.
+
+Who: players, companions, townsfolk with a weapon (guards), the barrow dead, goblins, orcs and
+kobolds. Client only (everything it goes by every client has: raised, alert, blows seen, its own
+swing), protocol unchanged.

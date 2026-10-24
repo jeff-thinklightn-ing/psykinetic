@@ -902,6 +902,17 @@ const HUMAN_FIDGETS := {"Idle_LookAround": 1, "Fidget_Shift": 3, "Fidget_LookBac
 const DEAD_FIDGETS := {"Idle_LookAround": 2, "Fidget_Shift": 2, "Fidget_LookBack": 1}
 const ORC_FIDGETS := {"Idle_LookAround": 1, "Fidget_Shoulders": 3, "Fidget_ArmsCrossed": 3, "Fidget_Shift": 2}
 const KOBOLD_FIDGETS := {"Idle_LookAround": 1, "Fidget_LookBack": 3, "Fidget_Sleeve": 3, "Fidget_Shift": 2}
+## With anything in hand (662; Jeff: "hold weapons should have different
+## resting animations ... definitely not scratching head or anything that
+## sword goes near body"), only these of its fidgets: no hand to the head or
+## the mouth, nothing across the chest; and of them none in ARMED_NOT for a
+## piece it holds (anim_rig_test _test_armed_fidgets measures each held kind
+## through each, five builds: nothing inside the body, nothing within
+## ARMED_HEAD_CLEAR of the head). A two-hander stands ready and doesn't fidget.
+const ARMED_FIDGETS: Array[String] = ["Fidget_Shift", "Fidget_LookBack", "Fixing_Kneeling", "PickUp_Kneeling", "Crouch_Idle"]
+const ARMED_NOT := {"hammer": ["Crouch_Idle", "Fixing_Kneeling", "PickUp_Kneeling"], "shield": ["Fixing_Kneeling"],
+	"bow": ["Fixing_Kneeling"]}
+const ARMED_HEAD_CLEAR := 0.12
 ## This run's: so a person's fidgets come at other moments each run.
 static var _session_seed := randi()
 const CLIP_TIRED := "Idle_Tired"
@@ -14368,21 +14379,36 @@ static func _pick_fidget(puppet: Node3D, rig: AnimRig) -> String:
 	var rng: RandomNumberGenerator = puppet.get_meta("fidget_rng", puppet.get_meta("rng", null))
 	var last := str(puppet.get_meta("last_fidget", ""))
 	var fidgets: Dictionary = puppet.get_meta("fidgets", FIDGETS)
+	var held: Array = puppet.get_meta("held", [])
 	var total := 0
 	for clip: String in fidgets:
-		if clip != last and rig.has(clip):
+		if clip != last and rig.has(clip) and fidget_with(clip, held):
 			total += int(fidgets[clip])
 	if total == 0:
 		return ""
 	var roll := rng.randi_range(1, total) if rng != null else 1
 	for clip: String in fidgets:
-		if clip == last or not rig.has(clip):
+		if clip == last or not rig.has(clip) or not fidget_with(clip, held):
 			continue
 		roll -= int(fidgets[clip])
 		if roll <= 0:
 			puppet.set_meta("last_fidget", clip)
 			return clip
 	return ""
+
+
+## Whether [param clip] may be fidgeted holding [param held] (the ids in each
+## hand, "" empty; a work's piece "art:<slot>"): any with both hands empty,
+## else only ARMED_FIDGETS, less the held kinds' ARMED_NOT (662).
+static func fidget_with(clip: String, held: Array) -> bool:
+	if held.all(func(id: Variant) -> bool: return str(id) == ""):
+		return true
+	if clip not in ARMED_FIDGETS:
+		return false
+	for id: Variant in held:
+		if clip in ARMED_NOT.get(str(id), []):
+			return false
+	return true
 
 
 ## Whether [param puppet]'s monster is sitting (Monster.Pose.SIT).
@@ -14851,8 +14877,9 @@ func _animate(puppet: Node3D) -> void:
 		# Turning where it stands (_standing_turn): its feet shuffle round.
 		rig.loop(CLIP_WALK, STAND_SHUFFLE_PACE)
 		return
-	if str(puppet.get_meta("addressing", "")) != "" and rig.has(CLIP_TALKING):
-		# Addressing someone (560): it talks to them.
+	if str(puppet.get_meta("addressing", "")) != "" and rig.has(CLIP_TALKING) and fidget_with(CLIP_TALKING, puppet.get_meta("held", [])):
+		# Addressing someone (560): it talks to them (with a thing in hand,
+		# no gestures: it stands, 662).
 		rig.loop(CLIP_TALKING, tempo)
 		return
 	var idle := _idle_clip(puppet)
