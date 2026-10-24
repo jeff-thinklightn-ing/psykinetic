@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Ruins look ruined: their walls are broken stubs, low rubble and gaps, half the floorboards are gone to bare earth with rubble, planks and weeds lying about, and a building that is gone leaves bare ground instead of flagstones.
 - Neglected buildings look right: a roof in disrepair sags gently instead of sinking through its walls, a ruin's rubble no longer has tall posts at its corners, a gone building leaves no floor behind, and a large camp's two tents stand side by side. A town wall knocked down to rubble also loses its posts.
 - With the low camera on, grass, flowers, stones and roots now reach much further out and fade into the haze, so ground details no longer pop in near the player (653)
 - A new town keeps enough food to reach its first harvest: it starts with its people's food to the first autumn, and its caravans keep a month's food a head until the harvest is in. Officials come with the town's stage: a settlement pays none, the guard is paid from hamlet, the priest from village, and the lawspeaker is named and paid at the town stage.

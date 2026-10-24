@@ -1881,6 +1881,18 @@ const WEED_EVERY := 2
 ## Weeds this far from an edge's middle (out of a building in disrepair,
 ## into a ruin's footprint).
 const WEED_OUT := 0.35
+## A ruin's wall edges, by their hash, one in RUIN_GAP_EVERY a gap, the
+## next RUIN_STUBS of every RUIN_GAP_EVERY a ragged stub ("broken"), the
+## rest a low bank of rubble; one of its floor's cells in RUIN_BOARDS_KEPT
+## keeps its boards, the rest bare ground.
+const RUIN_GAP_EVERY := 5
+const RUIN_STUBS := 2
+const RUIN_BOARDS_KEPT := 2
+## A ruin's litter, by a cell's hash, one in RUIN_LITTER_EVERY: a rubble
+## heap, fallen planks, a stone, a weed through the floor, in turn.
+const RUIN_LITTER_EVERY := 3
+## A ruin's wall edges (649): no post stands for them.
+var _ruin_edges: Dictionary[Vector3i, bool] = {}
 var _building_at: Dictionary[Vector2i, int] = {}
 ## Where a body stands on a cell whose piece has a stand point (580 step 3:
 ## the throne's "stand", [x, y up, z] in the piece's frame, turned by its
@@ -4409,6 +4421,7 @@ func _build_room() -> void:
 	_building_walls.clear()
 	_pad_cell.clear()
 	_plinths.clear()
+	_ruin_edges.clear()
 	# A damaged building's and a town wall's looks: the last map's out.
 	for key in _state_walls:
 		_wall_states.erase(key)
@@ -5183,10 +5196,12 @@ func _show_damage(building: Dictionary, damaged: bool) -> void:
 ## [param building] in decline (649; one look for every building, slot or
 ## kind, from its record's state, never a piece of its own): "disrepair"
 ## damaged (_show_damage: its roof broken or sagging, its walls broken here
-## and there), its lamps out, weeds at its foot; "ruin" its walls a low
-## bank of rubble (wall.<set>.rubble: the sim's walls are down, walked
-## over), no roof, door or parts, weeds in its footprint; "gone" none of it
-## drawn, no wall, post or door (terrain grows its floor back).
+## and there), its lamps out, weeds at its foot; "ruin" its walls ragged
+## stubs, low banks of rubble (wall.<set>.rubble) and gaps (_ruin_wall: the
+## sim's walls are down, walked over), no post, roof, door or parts, half its
+## floor's boards gone to bare ground, its stones, planks and weeds lying in
+## it (_weeds); "gone" none of it drawn, no wall, post or door, its plot bare
+## ground (terrain grows it back).
 func _show_decline(building: Dictionary, decline: String) -> void:
 	building["decline"] = decline
 	var node: Node3D = building["node"]
@@ -5214,17 +5229,19 @@ func _show_decline(building: Dictionary, decline: String) -> void:
 				if _window_code.has(key):
 					_window_code[key][2] = false
 				if down:
-					_set_wall_state(key, "rubble" if decline == Towns.RUIN else "plot")
+					_set_wall_state(key, _ruin_wall(key) if decline == Towns.RUIN else "plot")
+					_ruin_edges[key] = true
 					changed.append(key)
 			Terrain.Edge.DOOR:
 				if down:
 					_set_wall_state(key, "plot")
+					_ruin_edges[key] = true
 					if _doorways.has(key):
 						(_doorways[key] as Node3D).visible = false
 					changed.append(key)
+	if down:
+		_floor_gone(building, decline)
 	_weeds(building, decline != DECLINE_GONE)
-	if decline == DECLINE_GONE:
-		_floor_gone(building, true)
 	if not changed.is_empty():
 		rebuild_walls(changed)
 	_occluders_built = false
@@ -5251,13 +5268,14 @@ func _undo_decline(building: Dictionary) -> void:
 	for key: Vector3i in building.get("outline", Level.outline(building["rect"])) if not building.get("open_air", false) else []:
 		if _window_code.has(key):
 			_window_code[key][2] = true
+		_ruin_edges.erase(key)
 		if _wall_states.get(key, "") in ["rubble", "plot", "broken"]:
 			_set_wall_state(key, "window" if key in building.get("windows", []) else "")
 			changed.append(key)
 		if _doorways.has(key):
 			(_doorways[key] as Node3D).visible = true
 	_weeds(building, false)
-	_floor_gone(building, false)
+	_floor_gone(building, "")
 	if not changed.is_empty():
 		rebuild_walls(changed)
 
@@ -5273,24 +5291,56 @@ func _kind_sag(building: Dictionary) -> Transform3D:
 	return Transform3D(Basis.IDENTITY, middle + Vector3(0.0, -KIND_SAG_DROP, 0.0)) * turn * Transform3D(Basis.IDENTITY, -middle)
 
 
-## [param building]'s floor set (_floor_sets) taken out of the ground's
-## floor mask when it is gone (649: its cells drawn as their ground, for
-## terrain's regrowth), or put back; kept by the building meanwhile.
-func _floor_gone(building: Dictionary, gone: bool) -> void:
+## A wall edge of a ruin (649), by its hash: "plot" (a gap), "broken" (a
+## ragged stub) or "rubble" (a low bank), RUIN_GAP_EVERY and RUIN_STUBS.
+static func _ruin_wall(key: Vector3i) -> String:
+	var turn := posmod(_edge_hash(key), RUIN_GAP_EVERY)
+	return "plot" if turn == 0 else "broken" if turn <= RUIN_STUBS else "rubble"
+
+
+static func _edge_hash(key: Vector3i) -> int:
+	return (key.x * 73856093) ^ (key.y * 19349663) ^ (key.z * 83492791)
+
+
+static func _cell_hash(cell: Vector2i) -> int:
+	return absi((cell.x * 73856093) ^ (cell.y * 19349663)) >> 3
+
+
+## [param building]'s floor bared in [param decline] (649): gone, every
+## cell of its plot; a ruin, all but one in RUIN_BOARDS_KEPT by its hash:
+## its floor set (_floor_sets) out of the ground's floor mask and its ground
+## drawn as dirt, both kept by the building; "" puts them back.
+func _floor_gone(building: Dictionary, decline: String) -> void:
 	var was: Dictionary = building.get("floor_was", {})
-	if gone:
+	var grounds: Dictionary = building.get("ground_was", {})
+	var cells: Array[Vector2i] = []
+	if decline.is_empty():
+		for cell: Vector2i in grounds:
+			_set_ground_kind(cell, grounds[cell])
+		for cell: Vector2i in was:
+			_floor_sets[cell] = was[cell]
+		cells.assign(was.keys())
+		building.erase("floor_was")
+		building.erase("ground_was")
+	else:
 		for cell in Level.rect_cells(building["rect"]):
+			if decline == Towns.RUIN and posmod(_cell_hash(cell), RUIN_BOARDS_KEPT) == 0:
+				continue
 			if _floor_sets.has(cell):
 				was[cell] = _floor_sets[cell]
 				_floor_sets.erase(cell)
+				cells.append(cell)
+			var kind: String = _ground_kinds.get(cell, "dirt")
+			if kind != "dirt" and _grounds.has(cell):
+				grounds[cell] = kind
+				_set_ground_kind(cell, "dirt")
+				if not cells.has(cell):
+					cells.append(cell)
 		building["floor_was"] = was
-	else:
-		for cell: Vector2i in was:
-			_floor_sets[cell] = was[cell]
-		building.erase("floor_was")
-	if was.is_empty() or _floor_mask == null:
+		building["ground_was"] = grounds
+	if cells.is_empty() or _floor_mask == null:
 		return
-	for cell: Vector2i in was:
+	for cell in cells:
 		var at := cell - _mask_origin
 		if at.x < 0 or at.y < 0 or at.x >= _mask_size.x or at.y >= _mask_size.y:
 			continue
@@ -5300,8 +5350,9 @@ func _floor_gone(building: Dictionary, gone: bool) -> void:
 
 ## Weeds (art-kit's scatter.tuft, a plant.fern now and then) at
 ## [param building]'s foot in decline (649): by one outline edge in
-## WEED_EVERY (by its hash), out of its walls, or into a ruin's footprint;
-## taken away when [param on] is false. Held in the room, by the building.
+## WEED_EVERY (by its hash), out of its walls, or into a ruin's footprint,
+## and in a ruin its litter; taken away when [param on] is false. Held in
+## the room, by the building.
 func _weeds(building: Dictionary, on: bool) -> void:
 	var had: Variant = building.get("weeds")
 	if had is Node3D and is_instance_valid(had):
@@ -5328,6 +5379,21 @@ func _weeds(building: Dictionary, on: bool) -> void:
 		weed.position = Vector3(at.x, _elevation(cell), at.y)
 		weed.rotation.y = float(posmod(hash >> 8, 628)) * 0.01
 		holder.add_child(weed)
+	# A ruin's litter: by a cell's hash, one in RUIN_LITTER_EVERY lies a
+	# rubble heap, fallen planks, a stone or a weed through the floor.
+	var litter: Array[String] = ["building.rubble_heap", "prop.planks", "scatter.stone", "scatter.tuft"]
+	for cell in Level.rect_cells(rect) if ruin else []:
+		var roll := _cell_hash(cell)
+		if posmod(roll, RUIN_LITTER_EVERY) != 0:
+			continue
+		var slot: String = litter[posmod(roll >> 2, litter.size())]
+		if not ArtKit.has(slot):
+			continue
+		var piece := ArtKit.instance(slot)
+		var jitter := Vector2(posmod(roll >> 5, 7) - 3, posmod(roll >> 8, 7) - 3) * 0.08
+		piece.position = Vector3(cell.x + jitter.x, _elevation(cell), cell.y + jitter.y)
+		piece.rotation.y = float(posmod(roll >> 11, 628)) * 0.01
+		holder.add_child(piece)
 	_room.add_child(holder)
 	building["weeds"] = holder
 
@@ -10008,7 +10074,8 @@ func rebuild_walls(edges: Array[Vector3i]) -> void:
 	# A plot's edges (566) are none: no post stands on them; nor on a bank of
 	# rubble (a ruin's, 649; a town wall's at level 0), low as it is.
 	var kind_at := func(key: Vector3i) -> int:
-		return Terrain.Edge.OPEN if _wall_states.get(key) in ["plot", "rubble"] else _terrain["edges"].get(key, Terrain.Edge.OPEN)
+		return Terrain.Edge.OPEN if _wall_states.get(key) in ["plot", "rubble"] or _ruin_edges.has(key) \
+				else _terrain["edges"].get(key, Terrain.Edge.OPEN)
 	for vertex in vertices:
 		var built := WallEdge.edges_at_vertex(vertex).any(func(entry: Array) -> bool:
 				return kind_at.call(entry[0]) != Terrain.Edge.OPEN and _edge_drawn(entry[0], fences))
@@ -10892,7 +10959,8 @@ func _add_post(vertex: Vector2i) -> void:
 	# than a storey (a lean-to's, decision 489), so it stands no higher.
 	var tall := 0.0
 	for entry: Array in WallEdge.edges_at_vertex(vertex):
-		if _terrain["edges"].get(entry[0], Terrain.Edge.OPEN) != Terrain.Edge.OPEN and not _wall_states.get(entry[0]) in ["plot", "rubble"]:
+		if _terrain["edges"].get(entry[0], Terrain.Edge.OPEN) != Terrain.Edge.OPEN and not _wall_states.get(entry[0]) in ["plot", "rubble"] \
+				and not _ruin_edges.has(entry[0]):
 			tall = maxf(tall, _height_of(entry[0]))
 	if tall <= 0.0:
 		tall = WALL_HEIGHT

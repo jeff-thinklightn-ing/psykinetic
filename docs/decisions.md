@@ -27444,3 +27444,28 @@ showed four things, each mended:
 
 view_test _test_camp and _test_decline. Client only, protocol unchanged,
 no new class_name.
+
+## 649 amended (2), buildings' side: a ruin broken, a gone plot bare
+
+The coordinator, on the mended shots: gone still showed a patch of grey
+flagstones (the kind's stone ground under its floor set), and the ruin read
+as construction, a neat one-course ring round a whole plank floor. Both
+mended in the client:
+
+- A ruin's wall edges, by their hash (_ruin_wall): one in RUIN_GAP_EVERY (5)
+  a gap ("plot"), the next RUIN_STUBS (2) a ragged stub ("broken", the
+  topless wall's uneven heights), the rest a low bank of rubble. No post
+  stands for, or is held up by, a ruin's or a gone building's wall or door
+  edge (_ruin_edges), a stub's full height notwithstanding.
+- A ruin's floor: all but one cell in RUIN_BOARDS_KEPT (2), by its hash,
+  loses its boards (out of the floor mask) and its ground is drawn as dirt;
+  one cell in RUIN_LITTER_EVERY (3) has a rubble heap, fallen planks, a
+  stone or a weed on it, in the weeds' holder.
+- Gone: every cell of the plot loses its floor set and its ground is drawn
+  as dirt, so regrowth (Clearing.unbuild's felled cells, terrain's) starts
+  from bare ground. _floor_gone keeps both by the building; built again,
+  the floor, the ground kinds and the walls come back.
+
+view_test _test_decline (the ruin's mix of walls, its half floor and litter;
+gone all dirt; built again all floor). Client only, protocol unchanged, no
+new class_name.

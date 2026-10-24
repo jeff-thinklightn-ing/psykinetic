@@ -1845,19 +1845,28 @@ func _test_decline() -> void:
 				if _rig._posts.has(vertex) and not out.has(vertex):
 					out.append(vertex)
 		return out
-	_check(node.visible and house["roof"] == null and states.call("rubble") == walls.size() and not (node.get_node("parts") as Node3D).visible
-			and posts.call().is_empty(),
-			"a ruin: its walls a bank of rubble (%d of %d), no roof, no post standing over it (%s)" % [states.call("rubble"), walls.size(), posts.call()])
-	_rig.set_town("decline_town", {"house": {"state": "gone", "level": 0, "walls": false}})
 	var floored := func() -> int:
 		return Level.rect_cells(house["rect"]).filter(func(cell: Vector2i) -> bool: return _rig._floor_sets.has(cell)).size()
-	_check(not node.visible and states.call("plot") == walls.size() and not is_instance_valid(house.get("weeds")) and floored.call() == 0,
-			"gone: nothing of it drawn, its floor its ground's (%d of %d walls none, %d floor cells)" % [states.call("plot"), walls.size(), floored.call()])
+	var cells: int = Level.rect_cells(house["rect"]).size()
+	var dirt := func() -> int:
+		return Level.rect_cells(house["rect"]).filter(func(cell: Vector2i) -> bool: return _rig._ground_kinds.get(cell, "dirt") == "dirt").size()
+	var mix := [states.call("rubble"), states.call("broken"), states.call("plot")]
+	var litter: int = (house["weeds"] as Node3D).get_child_count() if is_instance_valid(house.get("weeds")) else 0
+	_check(node.visible and house["roof"] == null and mix[0] > 0 and mix[1] > 0 and mix[2] > 0 and mix[0] + mix[1] + mix[2] == walls.size()
+			and not (node.get_node("parts") as Node3D).visible and posts.call().is_empty(),
+			"a ruin: its walls rubble, stubs and gaps (%s of %d), no roof, no post standing over it (%s)" % [mix, walls.size(), posts.call()])
+	_check(floored.call() > 0 and floored.call() < cells and dirt.call() >= cells - floored.call()
+			and (not ArtKit.has("scatter.tuft") or litter > walls.size() / Client3D.WEED_EVERY / 2),
+			"a ruin's floor: boards on %d of %d cells, the rest bare ground; %d weeds and litter in it" % [floored.call(), cells, litter])
+	_rig.set_town("decline_town", {"house": {"state": "gone", "level": 0, "walls": false}})
+	_check(not node.visible and states.call("plot") == walls.size() and not is_instance_valid(house.get("weeds")) and floored.call() == 0
+			and dirt.call() == cells,
+			"gone: nothing of it drawn, its plot bare ground (%d of %d walls none, %d floor cells, %d of %d dirt)" % [states.call("plot"), walls.size(), floored.call(), dirt.call(), cells])
 	_rig.set_town("decline_town", {"house": {"state": Towns.STANDING, "level": 1}})
 	_check(node.visible and house["roof"] != null and house["decline"] == "" and not house["damaged"]
 			and states.call("plot") == 0 and states.call("rubble") == 0 and states.call("broken") == 0 and not is_instance_valid(house.get("weeds"))
-			and floored.call() > 0 and not posts.call().is_empty(),
-			"built again: whole, roofed, its walls, posts and floor back")
+			and floored.call() == cells and dirt.call() < cells and not posts.call().is_empty(),
+			"built again: whole, roofed, its walls, posts, floor and ground back (%d floor, %d dirt of %d)" % [floored.call(), dirt.call(), cells])
 	_rig.town_states.erase("decline_town")
 
 
