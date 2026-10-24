@@ -6005,6 +6005,13 @@ func _test_two_hands() -> void:
 			var along := left.global_basis.y.normalized().dot(axe.global_basis.y.normalized())
 			_check(off < 0.04 and along > 0.95, "%s: the left hand on its grip_2, %.3f m off, its fist along the haft (%.2f)" % [
 					"standing ready" if at < 0.0 else "Axe_Overhead at %.2f s" % at, off, along])
+	# A one-handed weapon never swings a two-handed clip (the war hammer did: its left hand came up
+	# beside the haft holding nothing).
+	var two_handed_clips := ["Axe_Overhead"]
+	var one_handed := (Client3D.HUMANOID_MOVES["strikes"] as Dictionary).keys().filter(func(id: String) -> bool:
+		return Items.exists(id) and int(Items.def(id).get("hands", 1)) < 2 and (Client3D.HUMANOID_MOVES["strikes"][id] as Array).any(
+				func(strike: Array) -> bool: return strike[0] in two_handed_clips))
+	_check(one_handed.is_empty(), "no one-handed weapon strikes with both hands (%s)" % [one_handed])
 	slots[Items.LEFT_HAND] = "shield"
 	player.slots = slots
 	_rig._process(0.0)

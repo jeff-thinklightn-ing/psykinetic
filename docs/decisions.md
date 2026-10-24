@@ -27776,3 +27776,15 @@ refuses (one correction, a slide back from the bend, no jump). view_test
 _test_bent_walk: a reversal cut exactly 0.25, a diagonal reversal capped
 to it, the capped bend still starting on the straight line at its moment.
 Client only; no wire change; no new class_name.
+
+### The war hammer swings one-handed
+
+The coordinator, on the hand pass's cut: the war hammer (hands 1) shared Axe_Overhead, now
+authored with both hands on the haft, so its left hand came up beside the haft holding nothing.
+HandReach never reached for it (hands 1, no grip_2); the clip did. Mace_Overhead (humanoid_clips'
+one_hand(): the right wrist placed, the piece's length and face given, the hand GRASPed so the face,
+an item's +x turned to the fingers, leads): raised over the right shoulder, brought down ahead, the
+left forearm kept forward at the waist; its contact, measured, 0.42 s. HUMANOID_MOVES' hammer
+strikes with it; the giant axe and the pick (hands 2) keep Axe_Overhead. No other one-handed weapon
+used it. view_test _test_two_hands: no one-handed weapon's strike is a two-handed clip. Client
+only, no new number (451 amended (2)).

@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The war hammer swings one-handed, the left hand kept low, instead of raising an empty left hand beside its haft.
 - Your own body rounds the corners of a held-key walk too (655 amended): the step shown bends toward the key you hold before the next step starts; let go and it settles to the cell's centre; a step the server refuses slides back. No corner, yours or anyone's, is cut by more than a quarter cell (a diagonal reversal reached further).
 - The title screen plays music: Jeff's first track, first-harmony, fades in with the main menu, plays on through the connect screen and fades out as the world loads (656).
 - A great axe is held in both hands: the left hand grips the haft above the right, standing ready and through the overhead swing.

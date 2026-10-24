@@ -144,7 +144,7 @@ CLIPS = {
 	]},
 }
 ## Each strike's striking bone, whose reach forward gives its contact.
-STRIKES = {"Axe_Overhead": "hand_r", "Dagger_Stab": "hand_r", "Spear_Thrust": "hand_r", "Shield_Bash": "hand_l",
+STRIKES = {"Axe_Overhead": "hand_r", "Mace_Overhead": "hand_r", "Dagger_Stab": "hand_r", "Spear_Thrust": "hand_r", "Shield_Bash": "hand_l",
 	"Sword_Attack": "hand_r", "Sword_Attack_Standing": "hand_r", "Punch_Jab": "hand_l", "Punch_Cross": "hand_r",
 	"Kick": "foot_r"}
 CONTACT = {}
@@ -391,6 +391,36 @@ CLIPS["Axe_Ready_Loop"] = {"loop": True, "keys": [
 	(0.0, P("Idle_Loop", 0.0, AXE_READY)),
 	(1.25, P("Idle_Loop", 1.25, AXE_READY + [("spine_02", LIFT, -2.0)])),
 	(2.5, P("Idle_Loop", 0.0, AXE_READY)),
+]}
+# The war hammer's blow, one-handed (the coordinator, on 451 amended (2)'s cut: Axe_Overhead put
+# the left hand up beside a one-handed haft, holding nothing): the right arm alone raises it over
+# the right shoulder and brings it down ahead, its face (an item's +x, turned to the fingers,
+# Client3D's HELD_EDGE_TURN) leading; the left forearm kept forward at the waist, out of its way.
+
+
+def one_hand(right: tuple, length: tuple, face: tuple, pole: tuple = (-1.0, 0.3, -0.5)) -> list:
+	"""The right wrist at [right] = (ahead, out to its right, up) of the shoulder, the held piece's
+	length along [length] and its face (toward the fingers) along [face], both in the body's axes."""
+	l = Vector(length).normalized()
+	f = Vector(face)
+	f = (f - l * f.dot(l)).normalized()
+	return right_arm(right[0], right[1], right[2], pole) + [("hand_r", (tuple(l), tuple(l.cross(f))), GRASP)]
+
+
+GUARDING_LEFT = [("upperarm_l", LIFT, 15.0), ("lowerarm_l", LIFT, 70.0), ("upperarm_l", TURN, -10.0)]
+MACE_READY = one_hand((0.22, 0.12, -0.32), (0.0, -0.5, 0.85), (0.0, -1.0, 0.0)) + GUARDING_LEFT
+MACE_UP = one_hand((0.02, 0.14, 0.32), (0.0, 0.55, 0.85), (0.0, 0.0, 1.0)) + GUARDING_LEFT + [
+	("spine_02", TURN, 14.0), ("spine_02", LIFT, 6.0)]
+MACE_SWING = one_hand((0.32, 0.1, 0.22), (0.0, -0.75, 0.65), (0.0, -0.65, -0.75)) + GUARDING_LEFT + [("spine_02", TURN, -4.0)]
+MACE_DOWN = one_hand((0.46, 0.06, -0.12), (0.0, -0.95, -0.3), (0.0, 0.3, -1.0)) + GUARDING_LEFT + [
+	("spine_02", TURN, -14.0), ("spine_01", LIFT, -10.0), ("spine_02", LIFT, -6.0)]
+CLIPS["Mace_Overhead"] = {"keys": [
+	(0.0, P("Idle_Loop", 0.0, MACE_READY)),
+	(0.3, P("Idle_Loop", 0.0, MACE_UP)),
+	(0.4, P("Idle_Loop", 0.0, MACE_SWING)),
+	(0.48, P("Idle_Loop", 0.0, MACE_DOWN, move=(0.0, -0.05, -0.03))),
+	(0.62, P("Idle_Loop", 0.0, MACE_DOWN, move=(0.0, -0.05, -0.03))),
+	(1.0, P("Idle_Loop", 0.0, MACE_READY)),
 ]}
 CLIPS["Axe_Overhead"] = {"keys": [
 	(0.0, P("Idle_Loop", 0.0, AXE_READY)),
