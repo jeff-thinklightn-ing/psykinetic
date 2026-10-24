@@ -27642,3 +27642,16 @@ fist, inside the arm's line. It is now strapped on the left forearm.
 
 view_test _test_attach_points: the shield under arm_l, not in the hand; its face along the
 forearm's back (dot > 0.99), its centre 0.075 m beyond the forearm. Client only.
+
+### Step 3: the block raises the shield in front
+
+Jeff: "shield block graphic should be raising shield in front of body, not sideways out." Block_Idle
+(and Shield_Bash, which starts and ends from it) is re-authored in tools/humanoid_clips.py's GUARD:
+the left upper arm out ahead and a little left, the forearm brought across in front of the chest
+(GUARD_ACROSS, rising a little toward the right), rolled so its back (the bone's -X, arm_l's face)
+is to the foe (GRASP on the forearm: -X toward GUARD_AHEAD); the right arm up and ready, the spine
+a little forward. One clip for players and companions (both play Block_Idle on the upper layer).
+
+view_test _test_attach_points: with a shield raised, after 0.6 s of the guard, the shield's face
+along the body's front (0.95), its centre 0.33 m ahead of the chest and within 0.3 m of its height.
+Client only, no new number (release's label).

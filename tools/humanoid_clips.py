@@ -52,9 +52,17 @@ def both(bone: str, axis: Vector, degrees: float, mirror: bool = True) -> list:
 	return [(bone + "_l", axis, degrees), (bone + "_r", right, degrees)]
 
 
-# The block: the shield arm (left) raised across the chest, forearm up; the weapon arm
-# (right) up and ready; a little crouched forward. Upper body (perf's layer); the legs idle.
-GUARD = [("upperarm_l", LIFT, 75.0), ("upperarm_l", TURN, -35.0), ("lowerarm_l", LIFT, 55.0),
+# The block (451 amended (2), step 3; Jeff: "shield block graphic should be raising shield in front
+# of body, not sideways out"): the shield is strapped on the outside of the left forearm (Client3D's
+# arm_l: its face out of the forearm's back, the bone's -X, as in Godot), so the forearm is brought
+# across in front of the chest, its back to the foe (GRASP on the forearm: the bone's -X toward
+# [side], ahead; its +Z along [length], so its +Y, the bone's length, lies across), the elbow out ahead and to the
+# left; the weapon arm (right) up and ready; a little crouched forward. Upper body (perf's layer);
+# the legs idle.
+GUARD_ACROSS = Vector((-1.0, 0.0, 0.25)).normalized()
+GUARD_AHEAD = Vector((0.0, -1.0, 0.0))
+GUARD = [("upperarm_l", Vector((0.35, -0.75, -0.28)), AIM),
+	("lowerarm_l", (tuple(-GUARD_AHEAD.cross(GUARD_ACROSS)), tuple(GUARD_AHEAD)), GRASP),
 	("upperarm_r", LIFT, 35.0), ("lowerarm_r", LIFT, 70.0), ("spine_02", LIFT, -8.0), ("Head", LIFT, 8.0)]
 
 # A two-handed hold, weapon up before the body: the stance the axe and spear start from.

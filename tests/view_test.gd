@@ -6073,6 +6073,25 @@ func _test_bow() -> void:
 	player.raised = "block"
 	_rig._process(0.0)
 	_check(rig.upper_clip() == "Block_Idle", "a shield raised: the guard (%s)" % rig.upper_clip())
+	# Raised in front of the body (451 amended (2), step 3; Jeff: "raising shield in front of body, not
+	# sideways out"): its face to the front, its centre ahead of the chest, about its height.
+	var guard_sockets: Dictionary = puppet.get_meta("sockets")
+	var raised_shield := (guard_sockets["arm_l"] as Node3D).get_node_or_null("Held") as Node3D if guard_sockets.has("arm_l") else null
+	_check(raised_shield != null, "the raised shield on the forearm")
+	if raised_shield != null:
+		rig.tree.advance(0.6)
+		var skeleton := puppet.find_children("*", "Skeleton3D", true, false)[0] as Skeleton3D
+		var pose := func(bone: String) -> Transform3D:
+			return skeleton.global_transform * skeleton.get_bone_global_pose(skeleton.find_bone(bone))
+		var arm_l := guard_sockets["arm_l"] as Node3D
+		var placed: Transform3D = pose.call("LeftLowerArm") * arm_l.transform * raised_shield.transform
+		var chest: Transform3D = pose.call("UpperChest")
+		var front := skeleton.global_basis.z.normalized()  # the body's front (the glTF's +Z)
+		var ahead := (placed.origin - chest.origin).dot(front) / skeleton.global_transform.basis.get_scale().y * float(puppet.get_meta("model_scale", 1.0))
+		var up := placed.origin.y - chest.origin.y
+		_check(placed.basis.z.normalized().dot(front) > 0.9 and ahead > 0.2 and absf(up) < 0.3,
+				"the guard raises it in front: its face to the front (%.2f), %.2f m ahead of the chest, %.2f m above it" % [
+				placed.basis.z.normalized().dot(front), ahead, up])
 	player.raised = ""
 	_rig._process(0.0)
 	_check(rig.upper_clip() == "", "lowered, nothing on the upper layer (%s)" % rig.upper_clip())
