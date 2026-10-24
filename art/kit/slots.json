@@ -1226,9 +1226,10 @@
 			"size": [0.761, 1.059, 0.761],
 			"middle": [0.121, 0, 0.121],
 			"base": 1.9,
+			"variants": 2,
 			"budget": 250,
-			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-23", "notes": "C:/dev/review/damp580/decor/make_damp.py web_corner: a spider's web cutting the cell's -x/-z corner, anchored on the two walls' faces (x -0.25, z -0.25) from 1.9 m to the top chord at 2.95 m, radials and a sagging spiral with gaps, two loose threads; strands 2 to 2.6 cm wide (read at the lair's 0.4 ambient from the game's camera), pale (f4efe6, b0aea6), every face both windings (decision 261: geometry, no alpha); 244 tris"},
-			"uses": "the damp lair's decor (Jeff: \"moss and spiderwebs for decor, no live plants\"; the coordinator's nod; dungeon places it): on a cell whose -x and -z edges are walls, the web in that corner, turned by facing to the corner wanted; not solid, above head height",
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-23", "notes": "C:/dev/review/damp580/decor/make_damp.py web_corner: a spider's web cutting the cell's -x/-z corner, anchored on the two walls' faces (x -0.25, z -0.25) from 1.9 m to the top chord at 2.95 m, radials and a sagging spiral with gaps, two loose threads; strands 2 to 2.6 cm wide (read at the lair's 0.4 ambient from the game's camera), pale (f4efe6, b0aea6), every face both windings (decision 261: geometry, no alpha); 244 tris; web_corner2: the same anchors, the hub moved up and out, a sector torn open, three loose threads; 224 tris"},
+			"uses": "the damp lair's decor (Jeff: \"moss and spiderwebs for decor, no live plants\"; the coordinator's nod; dungeon places it): on a cell whose -x and -z edges are walls, the web in that corner, turned by facing to the corner wanted; not solid, above head height (variants 1 and 2, as Level.DECOR_VARIANTS has them, decision 647)",
 			"grey": [
 				{"at": [0.121, 2.43, 0.121], "size": [0.761, 1.059, 0.761]}
 			]
@@ -1240,9 +1241,10 @@
 			"size": [0.03, 0.918, 0.804],
 			"middle": [0.285, 0, -0.005],
 			"base": 0.707,
+			"variants": 2,
 			"budget": 250,
-			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-23", "notes": "C:/dev/review/damp580/decor/make_damp.py web_niche: a spider's web across a niche's mouth, ten anchors round the opening just proud of the wall's face (x 0.27), the hub bellied out to 0.3, four spiral rings with broken gaps; strands 2 to 2.6 cm, pale, both windings (decision 261); 188 tris"},
-			"uses": "the damp lair's decor (Jeff: \"moss and spiderwebs for decor, no live plants\"; the coordinator's nod; dungeon places it): on a niche edge (wall.crypt.niche_a, its arch 0.6 x 0.75 at 0.85 to 1.6 m, or niche_c, its hollow 0.74 x 0.85 at 0.7 to 1.55 m), in the edge frame, the room on +x; not on a sealed variant or the open door; not solid",
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-23", "notes": "C:/dev/review/damp580/decor/make_damp.py web_niche: a spider's web across a niche's mouth, ten anchors round the opening just proud of the wall's face (x 0.27), the hub bellied out to 0.3, four spiral rings with broken gaps; strands 2 to 2.6 cm, pale, both windings (decision 261); 188 tris; web_niche2: the same anchors, the hub low and to one side, a torn sector, a broken strand hanging from the hub; 184 tris"},
+			"uses": "the damp lair's decor (Jeff: \"moss and spiderwebs for decor, no live plants\"; the coordinator's nod; dungeon places it): on a niche edge (wall.crypt.niche_a, its arch 0.6 x 0.75 at 0.85 to 1.6 m, or niche_c, its hollow 0.74 x 0.85 at 0.7 to 1.55 m), in the edge frame, the room on +x; not on a sealed variant or the open door; not solid (variants 1 and 2, as Level.DECOR_VARIANTS has them, decision 647)",
 			"grey": [
 				{"at": [0.285, 1.166, -0.005], "size": [0.03, 0.918, 0.804]}
 			]

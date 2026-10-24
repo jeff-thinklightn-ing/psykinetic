@@ -185,8 +185,8 @@ Drawn as a grey box (a texture slot: terrain's procedural colour).
 | `prop.torch` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
 | `prop.torch_post` | 1 | art-kit, by hand | own | 2026-10-19 |
 | `prop.wall_crack` | 1 | art-kit, by hand | own | 2026-10-22 |
-| `prop.web_corner` | 1 | art-kit, by hand | own | 2026-10-23 |
-| `prop.web_niche` | 1 | art-kit, by hand | own | 2026-10-23 |
+| `prop.web_corner` | 2 | art-kit, by hand | own | 2026-10-23 |
+| `prop.web_niche` | 2 | art-kit, by hand | own | 2026-10-23 |
 | `prop.woodpile` | 1 | art-kit, by hand | own | 2026-10-21 |
 | `rock.boulder` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
 | `rock.large` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
