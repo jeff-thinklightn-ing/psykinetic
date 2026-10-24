@@ -595,6 +595,9 @@ var town_panel: TownSheet
 var town_sheets: Dictionary = {}
 ## When (msec) each town's rows were last asked for (_ask_town_sheet).
 var _town_sheet_asked: Dictionary = {}
+## A talking monster's deals as buttons (629, ui's side): opened by his
+## "offers" message after E on him, watched by _update_deal.
+var deal_panel: DealPanel
 ## A town's rows are asked for again no sooner than this after the last ask (ms).
 const TOWN_SHEET_ASK_MSEC := 5000
 ## Each town's stage as its "town" message last said (591; "" before).
@@ -1029,6 +1032,7 @@ func _process(delta: float) -> void:
 		_client3d.telegraph_tick(World.tick)  # 602, ui's side: the telegraphs' fill.
 	_update_pack()
 	_update_talk()
+	_update_deal()
 	_update_bar()
 	var hud_began := Time.get_ticks_usec()
 	if compass != null:
@@ -1374,6 +1378,8 @@ func _open_talk(friend: GridEntity) -> void:
 	_talk_wanted = null
 	if friend is Resident:
 		_greet(friend)  # 560, ui's side: the click greets; the bar's Talk opens the say line.
+	elif talks_peaceably(friend):
+		_greet(friend)  # 629, ui's side: the greet speaks his deal; his "offers" message opens the deal window.
 	# A player or a companion (Jeff on v0.1.165: "click player still pulls up the
 	# chat window with their name"): the walk to them is the click's whole work;
 	# no window. Their bubble, clicked, opens the bar with Talk (_bubble_clicked).
@@ -1676,9 +1682,9 @@ func _tap_e(player: Player) -> void:
 			and (target is Chest or target is Cargo or _is_own_companion(target)):
 		_open_pack(player, target)
 		return
-	if is_instance_valid(target) and target.spawned and target is Resident \
+	if is_instance_valid(target) and target.spawned and (target is Resident or talks_peaceably(target)) \
 			and World.distance(player.tile, target.tile) <= HEARING_RANGE:
-		_open_talk(target)
+		_open_talk(target)  # A resident (560), or a peaceable talking monster (629, ui's side).
 		return
 	var door := _e_door
 	if is_instance_valid(door) and player.tile in Terrain.edge_cells(door.key):
@@ -8741,6 +8747,9 @@ func _build_talk() -> void:
 		connect("world_changed", _refresh_card)  # 618: her page follows the world message while open.
 	town_panel = TownSheet.new()
 	$HUD.add_child(town_panel)
+	deal_panel = DealPanel.new()
+	$HUD.add_child(deal_panel)
+	deal_panel.offered.connect(_offer_deal)  # 629, ui's side: a button sends his deal's id with its sum.
 	world_map_panel.town_clicked.connect(open_town)  # 624: a town's row on the map opens its sheet.
 	if has_signal("world_changed"):
 		connect("world_changed", _refresh_town)  # 624: the sheet follows the world message while open.
@@ -8958,6 +8967,42 @@ func _on_offers_message(data: Dictionary) -> void:
 	if pack_panel != null:
 		pack_panel.promised = owed
 	standing_title = str((data["standing"] as Dictionary).get("title", "")) if data.get("standing") is Dictionary else ""
+	# A talking monster's deals (629, ui's side): the window, while he is peaceable; empty closes it.
+	var who := get_node_or_null(str(data.get("entity", ""))) as GridEntity
+	if who is Monster and deal_panel != null:
+		if talks_peaceably(who) and data.get("offers") is Array:
+			deal_panel.show_deals(str(data.get("speaker", "")), data["offers"], gold, who.get_instance_id())
+		else:
+			deal_panel.close()
+
+
+## Whether [param entity] is a talking monster at peace (629, ui's side):
+## one whose talks and replicated peaceable (npc's 648) are true, so
+## E greets him and the deal window may open; false once he fights.
+func talks_peaceably(entity: GridEntity) -> bool:
+	return entity is Monster and (entity as Monster).talks and (entity as Monster).peaceable
+
+
+## A deal button pressed (629, ui's side): the "offer" command with his
+## deal's [param id] and [param amount] of gold, as a typed sum would send.
+func _offer_deal(id: String, amount: int) -> void:
+	var player := _local_player()
+	if player != null and not id.is_empty() and amount > 0:
+		World.command(player, "offer", {"id": id, "gold": amount})
+
+
+## The deal window watched (629, ui's side): closed when he is gone, no
+## longer peaceable or out of hearing; its buttons follow the purse.
+func _update_deal() -> void:
+	if deal_panel == null or not deal_panel.visible:
+		return
+	var who := instance_from_id(deal_panel.entity_id) as GridEntity
+	var player := _local_player()
+	if who == null or not is_instance_valid(who) or not who.spawned or not talks_peaceably(who) \
+			or player == null or World.distance(player.tile, who.tile) > HEARING_RANGE:
+		deal_panel.close()
+	elif deal_panel.purse != gold:
+		deal_panel.set_purse(gold)
 
 
 ## The HUD's words while an offer stands (536, ui's side): how to take it, and what it is.
@@ -12045,6 +12090,8 @@ func escape() -> void:
 		_close_bar()  # 560, ui's side: the talk bar, then the barter window.
 	elif barter_panel != null and barter_panel.is_open():
 		close_other()
+	elif deal_panel != null and deal_panel.visible:
+		deal_panel.close()  # 629, ui's side: the deal window.
 	elif card_page != null and card_page.visible:
 		card_page.visible = false  # 618: her card page.
 	elif town_panel != null and town_panel.visible:

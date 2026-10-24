@@ -37,6 +37,7 @@ func _ready() -> void:
 	_test_counter_panel()
 	_test_world_map()
 	_test_town_sheet()  # After the map's test: the sheet's names build the map's graph (place_words).
+	await _test_deal_window()
 	_test_access()
 	_test_keys()
 	_test_barter()
@@ -755,6 +756,74 @@ func _test_down_screen() -> void:
 
 ## The town status sheet (624, ui's side): the words from today's keys, N
 ## and the map's row, Esc, economy's rows by key.
+## A talking monster's deals as buttons (629, ui's side).
+func _test_deal_window() -> void:
+	print("== a talking monster's deals as buttons (629, ui's side): E greets him, his offers open the window, a button sends the offer ==")
+	var offers: Array = [{"id": "deal:7", "kind": "deal", "title": "Face the draugr", "words": "Return the gold.",
+		"what": {"offering": 8, "least": 8, "most": 32, "steps": [8, 16, 32]}, "accept": "give", "cost": 8}]
+	var steps: Array[int] = [8, 16, 32]
+	var cost_alone: Array[int] = [5]
+	_check(DealPanel.first_deal(offers) == offers[0] and DealPanel.first_deal([]).is_empty() and DealPanel.first_deal([{"id": "x", "words": "none"}]).is_empty()
+			and DealPanel.steps_of(offers[0]) == steps and DealPanel.steps_of({"cost": 5}) == cost_alone and DealPanel.step_words(16) == "16 gold"
+			and DealPanel.purse_words(20, steps) == "You have 20 gold." and DealPanel.purse_words(5, steps) == "You have 5 gold; he asks 8 at the least.",
+		"the first deal with steps, its sums least first (its cost alone without steps), a button's words, the purse line short or not")
+	var panel: DealPanel = _main.deal_panel
+	if panel == null:
+		_check(false, "the deal window exists")
+		return
+	panel.show_deals("the draugr", offers, 20, 0)
+	var buttons := panel._buttons.get_children()
+	_check(panel.visible and panel._title.text == "the draugr" and panel._words.text == "Return the gold." and buttons.size() == 3
+			and not buttons[0].disabled and not buttons[1].disabled and buttons[2].disabled,
+		"shown: his name, his words, a button a step, the ones a purse of 20 covers enabled (%d buttons)" % buttons.size())
+	panel.set_purse(40)
+	_check(not buttons[2].disabled, "the purse grown: the dearest button enabled")
+	var sent: Array = []
+	panel.offered.connect(func(id: String, amount: int) -> void: sent.append([id, amount]))
+	(buttons[1] as Button).pressed.emit()
+	_check(sent == [["deal:7", 16]], "a button offers the deal's id with its sum (%s)" % [sent])
+	panel.show_deals("the draugr", [], 20, 0)
+	_check(not panel.visible and panel.entity_id == 0, "empty offers (a pact on): closed")
+	_main.escape()
+	# The live path on the host: a seated draugr beside the player, E on him, the least sum, the pact.
+	var player: GridEntity = _main._local_player()
+	if player == null or not Net.is_authority():
+		print("  (no local player on the host: the live path skipped)")
+		return
+	var beside := Vector2i(-1, -1)
+	for near: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+		if World.is_walkable(player.tile + near) and World.get_entity_at(player.tile + near) == null:
+			beside = player.tile + near
+			break
+	if beside.x < 0:
+		print("  (no free cell beside the player: the live path skipped)")
+		return
+	var draugr: GridEntity = _main._spawn({"script": "res://sim/draugr.gd", "shape": "capsule", "name": "DealDraugr", "tile": beside,
+		"kind": "draugr", "props": Level.MONSTER_TYPES["draugr"].duplicate()})
+	if draugr == null:
+		_check(false, "a draugr spawned beside the player")
+		return
+	await get_tree().process_frame
+	await get_tree().process_frame
+	var least: int = int(Draugr.deals()[0]["gold"])
+	World.add_gold(player.player_id, least - World.gold_of(player.player_id), "the test purse")
+	_main.gold = least
+	_check(_main.talks_peaceably(draugr), "seated, the draugr talks peaceably (npc's 648)")
+	_main._open_talk(draugr)
+	_check(panel.visible and panel.entity_id == draugr.get_instance_id() and panel._buttons.get_child_count() == Draugr.deals().size()
+			and not (panel._buttons.get_child(0) as Button).disabled and (panel._buttons.get_child_count() < 2 or (panel._buttons.get_child(1) as Button).disabled),
+		"E on him: his offers open the window on him, a button a deal, the least one enabled for a purse of %d (%s)" % [least, panel.visible])
+	(panel._buttons.get_child(0) as Button).pressed.emit()
+	_main._update_deal()
+	_check(draugr.get("state") == Draugr.State.PACT and not draugr.peaceable and World.gold_of(player.player_id) == 0 and not panel.visible,
+		"the least sum pressed: his pact begins, the gold his, he is no longer peaceable and the window closes (%s, %s)" % [draugr.get("state"), panel.visible])
+	_main._open_talk(draugr)
+	_check(not panel.visible, "E on him in a pact: the window stays closed")
+	World.despawn(draugr)
+	await get_tree().process_frame
+	await get_tree().process_frame
+
+
 func _test_town_sheet() -> void:
 	print("== the town status sheet (624, ui's side): today's facts in words, N, the map's row, economy's rows by key ==")
 	_check(TownSheet.title_words("Held", "village") == "Held, a village" and TownSheet.title_words("Held", "") == "Held"

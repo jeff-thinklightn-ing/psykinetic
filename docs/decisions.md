@@ -26652,3 +26652,25 @@ before landing); the label from release.
   the town's residents away while it runs: a resident sync falling on its
   steps put one in earshot (it held by tick parity). Server only, protocol
   unchanged, no new class_name.
+## 629, ui's side. The draugr's deals as buttons
+
+Beside 629 (Jeff on v0.1.169: "no way to give gold to draugr"; the
+coordinator's ruling: E on a talking monster opens the talk as on a
+resident, his deals as buttons). Main.talks_peaceably: a Monster with
+offers_for whose replicated peaceable (npc's 648) is true. A tap of E over
+one within hearing, or a talk opened on one (Main._open_talk; combat's 648
+click reaches it), greets him as a resident is greeted (npc's "greet"
+command with his path, and the "offers" request). His "offers" message
+(Main._on_offers_message) opens DealPanel (render/deal_panel.gd, the
+shared theme): his name, the deal's words, one button for each sum in
+what.steps (least first; its cost alone without steps), enabled while the
+local purse (Main.gold) covers it, and a purse line that names his least
+when short. A button sends the "offer" command {id, gold: the step}, as a
+typed sum does, and his answer is spoken. Main._update_deal each frame:
+the window closes when he is gone, out of hearing or no longer peaceable
+(a pact begun, struck or provoked), and the buttons follow the purse; empty
+offers (a pact on) close it; Esc closes it first. No panel for residents
+(536 stands); the typed path stays. ui_test _test_deal_window: the words
+and buttons from a fed message, and the live path on the host (a seated
+draugr, E, the least sum, his pact, the window closed). Client only; no
+wire change; new class_name DealPanel.
