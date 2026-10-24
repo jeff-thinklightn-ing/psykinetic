@@ -59,7 +59,9 @@ The town is where the players and their companions belong. It is named Umbrage
 (Jeff, 2026-10-24: "i want to change the name of the village to Umbrage, it actually fits,
 the town is cursed because of the grave robbers and the economy that runs off the barrows
 gold"; it was named Held, 2026-10-18). Umbrage is cursed: everyone says so, and some say
-why, the grave robbers and an economy that runs off the barrow's gold. It lies in the Blood Rot's land, at a distance from the mine.
+why, the grave robbers and an economy that runs off the barrow's gold. The name belongs
+to the town and goes with it (Jeff, 2026-10-24: "the town that is near the barrows and has
+the curse is called Umbrage, even if it moves"). It lies in the Blood Rot's land, at a distance from the mine.
 
 In draft until Jeff checks the wording (2026-10-22): Umbrage sits in the Woodlands. Across the
 river stands the Old Tower, a broken-down castle the ancients lived in. It was conquered in
