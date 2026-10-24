@@ -1215,6 +1215,18 @@
 				{"at": [0.56, 0.923, 0.021], "size": [0.524, 1.846, 0.422]}
 			]
 		},
+		"prop.draugr_remains": {
+			"category": "props",
+			"type": "mesh",
+			"kind": "cell",
+			"size": [1.443, 0.363, 1.198],
+			"tolerance": 0.3,
+			"budget": 1200,
+			"sockets": {"axe_head": [0.709, 0.028, 0.288], "axe_butt": [-0.709, 0.093, -0.563]},
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-24", "notes": "C:/dev/review/draugr_remains/make_remains.py: his ragged dark cloak slumped in a folded heap (ridged noise) with a faint hoarfrost on its tops, the rotted mail hauberk spilling from under it with rust in its rings, his old gold-bronze crown of points with its amber tipped on its side (make_draugr.py's crown at 1.2, both windings), two bronze arm rings, and item.battle_axe's own mesh laid flat along the cell's diagonal (its head toward +x +z); the draugr's swatches; 1,044 tris"},
+			"uses": "the draugr's remains (Jeff: \"when draugr falls ... he probably leaves a pile of his clothes, his crown, his axe on the ground\"; the coordinator: him gone, his things left, no bones, no body; enemy-ai places it where he vanishes): 1 cell, not solid, origin the cell's middle on the floor, front +z. His axe is full size (1.6 m, as he carried it), so it reaches past the cell: about 0.21 m past the local +x and -x edges and 0.1 m past +z and -z; its two ends are the sockets axe_head and axe_butt, so the placer turns it to a facing with floor (no wall) at both",
+			"grey": [{"at": [0, 0.1815, 0], "size": [1.443, 0.363, 1.198]}]
+		},
 		"prop.footprints": {
 			"category": "props",
 			"type": "mesh",

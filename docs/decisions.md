@@ -29900,5 +29900,21 @@ that sword goes near body"); step (c) seats the item in a sheath, which is art-k
   down), its guard's lower face on the throat; item.sword's tip then sits at -0.59, item.dagger's at
   -0.19 and item.knife's at -0.15, inside. pc-character turns the piece at the hip (about 25 degrees,
   the bottom back) with a Hips socket of its own; the hang is its.
+## 573 amended (4), art-kit's side: the draugr's remains
+
+When the draugr vanishes (enemy-ai's side of 573 amended (4); Jeff: "when draugr falls ... he
+probably leaves a pile of his clothes, his crown, his axe on the ground"), what he leaves is
+prop.draugr_remains: him gone, his things left, no bones and no body (the coordinator).
+
+- **One cell, not solid**, origin the cell's middle on the floor, front +z: his ragged cloak
+  slumped in a folded heap with a faint hoarfrost on its tops, the rotted mail spilling from under
+  it, his crown of points tipped on its side, two bronze arm rings, and his own battle axe lying flat
+  along the cell's diagonal. 1,044 tris, budget 1200.
+- **The axe is item.battle_axe's own mesh at full size** (1.6 m, as he carried it, the coordinator's
+  ruling), so it reaches past the cell: about 0.21 m past the local +x and -x edges and 0.1 m past
+  +z and -z. Its two ends are the sockets axe_head and axe_butt, so the placer (enemy-ai) can turn
+  the pile to a facing with floor, not a wall, under both ends; facing as for buildings
+  (atan2(facing.x, facing.y), front +z).
+- Made by hand (C:/dev/review/draugr_remains/make_remains.py), the draugr's own swatches.
 
 Art and slots only: client only, protocol unchanged, no new class_name.
