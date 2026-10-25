@@ -130,7 +130,9 @@ func _ready() -> void:
 
 	# Every sound stopped and let go before quitting: the audio server lets
 	# a stopped sound's stream go a mix or two later, and one still held at
-	# exit is reported as a leak.
+	# exit is reported as a leak. The ambience stopped first: its next frame
+	# would start a bed again, on a stream let go.
+	_rig.ambience.set_process(false)
 	for player in _rig.find_children("*", "AudioStreamPlayer", true, false) + _rig.find_children("*", "AudioStreamPlayer3D", true, false):
 		player.stop()
 		player.stream = null
@@ -198,6 +200,11 @@ func _test_ambience_runs() -> void:
 	print("
 == the view's ambience weighs its beds from the listener ==")
 	_rig.sfx.listener = _rig._local_player().tile if _rig._local_player() != null else Vector2i(1, 1)
+	# From silence: the frames the tests before let run (660's rooms built
+	# over frames) played what their rooms weighed, still fading here.
+	for bed: String in _rig.ambience.players:
+		_rig.ambience.players[bed].stop()
+	_rig.ambience.levels.clear()
 	_rig.ambience._weigh()
 	_check(_rig.ambience.targets.size() == Ambience.BEDS.size(), "a weight for every bed (%s)" % [_rig.ambience.targets])
 	for i in 10:
