@@ -1,0 +1,19 @@
+{
+	"about": "How animation reads (combat's feel tuning, pc-character's side): each key is <script>.<constant>, its value the constant's, read where it is used (ArtKit.feel). The tuning panel changes them for a run (ArtKit.set_feel); a set Jeff saves comes back into this file. client3d.clip_blend and creature_view.blend take on bodies made after a change.",
+	"feel": {
+		"client3d.clip_blend": 0.15,
+		"client3d.clip_heavy_contact": 0.45,
+		"client3d.backpedal_clip_speed": 2.6,
+		"client3d.roll_speed": 1.6,
+		"client3d.down_tilt_speed": 9.0,
+		"client3d.shot_speed": 40.0,
+		"client3d.gait_rate": 1.0,
+		"anim_rig.strike_speed_min": 0.4,
+		"anim_rig.strike_speed_max": 3.0,
+		"art_kit.clip_contact": 0.5,
+		"creature_view.speed_min": 0.6,
+		"creature_view.speed_max": 1.8,
+		"creature_view.charge_speed": 1.4,
+		"creature_view.blend": 0.2
+	}
+}

@@ -101,7 +101,7 @@ func _init(creature_slot: String, art: Node3D, pose: Node3D) -> void:
 		library.get_animation(clips[clip]).loop_mode = Animation.LOOP_LINEAR if clip in LOOPED else Animation.LOOP_NONE
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash(slot) ^ art.get_instance_id()
-	rig = AnimRig.make(root if root != null else art, library, BLEND, false, rng)
+	rig = AnimRig.make(root if root != null else art, library, ArtKit.feel("creature_view.blend", BLEND), false, rng)
 	var idle := resolve("idle")
 	if idle != "":
 		rig.loop(idle)
@@ -159,10 +159,11 @@ func frame(puppet: Node3D, monster: Monster) -> void:
 	if _speed > WALKING:
 		var running := _speed > RUN_ABOVE or alert == Monster.Alert.FLEEING or now < _charge_until or now < _bolt_until
 		clip = "run" if running else "walk"
-		scale = clampf(_speed / (RUN_PACE if running else WALK_PACE), SPEED_MIN, SPEED_MAX)
+		scale = clampf(_speed / (RUN_PACE if running else WALK_PACE), ArtKit.feel("creature_view.speed_min", SPEED_MIN),
+				ArtKit.feel("creature_view.speed_max", SPEED_MAX))
 		if now < _charge_until:
 			clip = "charge" if clips.has("charge") else "run"
-			scale = maxf(scale, CHARGE_SPEED)
+			scale = maxf(scale, ArtKit.feel("creature_view.charge_speed", CHARGE_SPEED))
 	elif monster != null and monster.pose == Monster.Pose.SIT:
 		clip = "graze" if resolve("graze") != "" else "feed"
 	elif alert == Monster.Alert.SUSPICIOUS:
@@ -218,7 +219,7 @@ func _strike(lands_in: float) -> void:
 	if rig == null or animation == "" or _dead:
 		return
 	var length := rig.length(animation)
-	var contact := length * clampf(float(_contact.get("attack", CONTACT)), 0.0, 1.0)
+	var contact := length * clampf(float(_contact.get("attack", ArtKit.feel("art_kit.clip_contact", CONTACT))), 0.0, 1.0)
 	if lands_in < 0.0:
 		lands_in = contact
 	var speed := contact / lands_in if lands_in > 0.0 else 1.0

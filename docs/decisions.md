@@ -29792,3 +29792,26 @@ sneak and the robber at 10 at step 2.
 
 monster_test _test_archer_hold pins skeleton and guard at 4. Server sim (monsters.json), protocol
 unchanged, no new class_name.
+## 673 step 2, pc-character's side: the animation feel in art/kit/feel.json
+
+Combat's feel tuning (673; Jeff: "i need way to tune combat and animation feel that has a quicker
+feedback loop"), step 2: each tree moves its own constants to data, so the F11 panel can set them
+live. pc-character's are how a swing, a step or a hit reads. art/kit/feel.json holds them as
+{"feel": {"<script>.<constant>": value}}: client3d's clip_blend, clip_heavy_contact,
+backpedal_clip_speed, roll_speed, down_tilt_speed, shot_speed and a new gait_rate (every gait's
+clip played that much faster than its pace says, 1 as before: steps read quicker or slower);
+anim_rig's strike_speed_min and _max; art_kit's clip_contact; creature_view's speed_min,
+speed_max, charge_speed and blend. `ArtKit.feel(key, CONSTANT)` reads one where it is used (the
+file read once, a key it lacks the constant); `ArtKit.set_feel(key, value)` sets one for the run
+(null puts the file's back), so the next clip, step or blow takes it: one store, not a setter per
+script. The constants stay in the code as the values a key the file lacks falls back to, and
+anim_rig_test `_test_feel_moved` holds every value in the file to the constant it names (release:
+nothing seen changes by the move); a set Jeff saves comes back through the coordinator into the
+file and the constants with it. clip_blend (but a fidget's) and creature_view.blend are a rig's
+when it is made: they take on bodies made after a change. On combat's panel (673 step 1, F7) the
+feel is a registered source, not rows in a table: Main registers "feel" beside the camera's
+(`Tuning.register_source("feel", ArtKit.feel_value, ArtKit.set_feel_value, ArtKit.feel_fields)`), each
+key of the file a row "feel.<key>" in the Animation group with its range (ArtKit.FEEL_RANGES),
+owner pc-character, the two blends marked "spawn". anim_rig_test also sets strike_speed_max for a
+run and puts it back, and `_test_feel_source` lists, applies and resets through Tuning. Client
+only, protocol unchanged, no new class_name.

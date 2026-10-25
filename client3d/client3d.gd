@@ -966,6 +966,10 @@ const CLIP_IMPACT := "Hit_Stomach"
 const CLIP_ROLL := "Roll"
 const CLIP_LAND := "Jump_Land"
 const KNOCK_MIN_SECONDS := 0.45
+## Every gait's clip played this much faster than GAITS' paces say (1: the
+## feet keep to the ground; feel.json's "client3d.gait_rate", combat's
+## tuning: the steps read quicker or slower).
+const GAIT_RATE := 1.0
 ## The backpedal's pace at speed 1, as GAITS'; the roll is played this
 ## much faster, to fit a toss's short flight.
 const BACKPEDAL_CLIP_SPEED := 2.6
@@ -13217,7 +13221,7 @@ func _sync_down(entity: GridEntity, puppet: Node3D) -> void:
 			sfx.play("sfx.knockdown", puppet.position + Vector3.UP * 0.3)
 	var want := DOWN_TILT if lying else 0.0
 	if not is_equal_approx(body.rotation.x, want):
-		body.rotation.x = move_toward(body.rotation.x, want, get_process_delta_time() * DOWN_TILT_SPEED)
+		body.rotation.x = move_toward(body.rotation.x, want, get_process_delta_time() * ArtKit.feel("client3d.down_tilt_speed", DOWN_TILT_SPEED))
 
 
 ## Burning or bleeding (GridEntity.ailments; decision 375): its name
@@ -13663,10 +13667,10 @@ func _make_model(model: Dictionary, puppet: Node3D) -> Node3D:
 	if model.has("tint"):
 		_tint(scene, str(model["tint"]), puppet.get_meta("tint", Color.WHITE))
 	puppet.set_meta("gaits", model.get("gaits", GAITS))
-	puppet.set_meta("backpedal", float(model.get("backpedal", BACKPEDAL_CLIP_SPEED)))
+	puppet.set_meta("backpedal", float(model.get("backpedal", ArtKit.feel("client3d.backpedal_clip_speed", BACKPEDAL_CLIP_SPEED))))
 	puppet.set_meta("fidgets", model.get("fidgets", FIDGETS))
 	puppet.set_meta("moves", model.get("moves", {}))
-	var rig := AnimRig.make(scene, load(model["clips"]) as AnimationLibrary, CLIP_BLEND, true,
+	var rig := AnimRig.make(scene, load(model["clips"]) as AnimationLibrary, ArtKit.feel("client3d.clip_blend", CLIP_BLEND), true,
 			puppet.get_meta("rng") if puppet.has_meta("rng") else null)
 	rig.loop(CLIP_IDLE)
 	if model.has("sockets"):
@@ -15123,7 +15127,7 @@ func _animate(puppet: Node3D) -> void:
 	if speed > WALKING:
 		var gaits: Array = puppet.get_meta("gaits", GAITS)
 		var gait: Array = gaits[gait_for(rig.base_clip(), speed / pace, gaits)]
-		rig.loop(gait[0], clampf(speed / (float(gait[1]) * pace), 0.3, 3.0))
+		rig.loop(gait[0], clampf(speed / (float(gait[1]) * pace) * ArtKit.feel("client3d.gait_rate", GAIT_RATE), 0.3, 3.0))
 		return
 	var work: Dictionary = ACTIVITIES.get(str(puppet.get_meta("work", "")), {})
 	if speed <= WALKING and work.has("clip") and rig.has(str(work["clip"])):
@@ -15155,7 +15159,7 @@ func _animate(puppet: Node3D) -> void:
 ## the model busy with it till it ends (a fidget: dropped if it moves or a
 ## fight comes to it).
 static func _play_fidget(puppet: Node3D, rig: AnimRig, clip: String, now: int, tempo: float) -> void:
-	var seconds := rig.once(clip, tempo, CLIP_BLEND * 2.0)
+	var seconds := rig.once(clip, tempo, ArtKit.feel("client3d.clip_blend", CLIP_BLEND) * 2.0)
 	puppet.set_meta("fidgeting", true)
 	puppet.set_meta("busy_until", now + int(seconds * 1000.0))
 
@@ -15185,7 +15189,7 @@ func _knocked(puppet: Node3D, rig: AnimRig, speed: float, now: int) -> bool:
 		knock["started"] = now
 		if toss:
 			rig.cancel_strike()
-			puppet.set_meta("busy_until", now + int(rig.once(CLIP_ROLL, -ROLL_SPEED) * 1000.0))
+			puppet.set_meta("busy_until", now + int(rig.once(CLIP_ROLL, -ArtKit.feel("client3d.roll_speed", ROLL_SPEED)) * 1000.0))
 		else:
 			rig.cancel_strike()
 			rig.loop(CLIP_BACKPEDAL, 1.0, -1.0, true)
@@ -15200,7 +15204,7 @@ func _knocked(puppet: Node3D, rig: AnimRig, speed: float, now: int) -> bool:
 				return true
 		else:
 			if not toss:
-				rig.set_speed(clampf(speed / (float(puppet.get_meta("backpedal", BACKPEDAL_CLIP_SPEED)) * float(puppet.get_meta("pace", 1.0))), 1.0, 4.0))
+				rig.set_speed(clampf(speed / (float(puppet.get_meta("backpedal", ArtKit.feel("client3d.backpedal_clip_speed", BACKPEDAL_CLIP_SPEED))) * float(puppet.get_meta("pace", 1.0))), 1.0, 4.0))
 			var held := now < int(puppet.get_meta("busy_until", 0)) if toss else now - started < int(KNOCK_MIN_SECONDS * 1000.0)
 			# It doubles over when it gets there: a push back always, a toss
 			# if a wall or a door stopped it. One knocked where it stands holds.
@@ -15585,13 +15589,14 @@ func _on_shot(point: Vector2, struck: StringName, id: int) -> void:
 		stop.y = body.position.y + ARROW_CHEST * float(body.get_meta("model_scale", 1.0))
 	_stop_creak(puppet)
 	sfx.play("sfx.bow_loose", from)
-	var flight := 0.0 if from.distance_to(stop) < 0.1 else maxf(0.06, from.distance_to(stop) / SHOT_SPEED)
+	var shot_speed := ArtKit.feel("client3d.shot_speed", SHOT_SPEED)
+	var flight := 0.0 if from.distance_to(stop) < 0.1 else maxf(0.06, from.distance_to(stop) / shot_speed)
 	# Nothing struck short of a wall: on past the end into a short fall (Jeff: "after the full range
 	# it sags down and lands in ground, not hitting ground at its target like it does now").
 	var sags := body == null and landed in ["sfx.arrow_land", "sfx.arrow_water"]
 	var down := stop + along * ARROW_SAG
 	down.y = _ground_height(Vector2(down.x, down.z))
-	var falling := ARROW_SAG / SHOT_SPEED * ARROW_SAG_SLOW if sags else 0.0
+	var falling := ARROW_SAG / shot_speed * ARROW_SAG_SLOW if sags else 0.0
 	var end := down if sags else stop
 	var flying := {"end": to, "arrive": Time.get_ticks_msec() + roundi((flight + falling) * 1000.0), "heard": false}
 	_arrows.append(flying)
@@ -15806,9 +15811,10 @@ func _on_winding(_direction: Vector2i, ticks: int, id: int) -> void:
 	var seconds := ticks * World.TICK_DT
 	puppet.set_meta("fidgeting", false)
 	# Its contact as the wound-up blow lands, the rest at the same pace.
-	var after := (rig.length(CLIP_HEAVY) - CLIP_HEAVY_CONTACT) * seconds / CLIP_HEAVY_CONTACT
+	var contact := ArtKit.feel("client3d.clip_heavy_contact", CLIP_HEAVY_CONTACT)
+	var after := (rig.length(CLIP_HEAVY) - contact) * seconds / contact
 	var now := Time.get_ticks_msec()
-	puppet.set_meta("busy_until", now + int(rig.strike(CLIP_HEAVY, CLIP_HEAVY_CONTACT, seconds, after) * 1000.0))
+	puppet.set_meta("busy_until", now + int(rig.strike(CLIP_HEAVY, contact, seconds, after) * 1000.0))
 	puppet.set_meta("wound_until", now + int(seconds * 1000.0) + 400)
 
 

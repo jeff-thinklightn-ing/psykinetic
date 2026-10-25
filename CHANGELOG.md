@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The tuning panel (F7, practice and local host) has an Animation group: blend times, how fast swings, steps, rolls and falls play, and the gait rate, each applied as you move it (the two blends take on bodies made after).
 - The barrow's skeleton archers draw their bows fully before loosing: their arrows hit harder but come a little later.
 - The barrow's Hall is barred while the Ossuary's dead stand: clear every skeleton and grave guard (dead or laid to rest) and the way opens; if they rise again it shuts again, never on anyone already inside.
 - Crossing into a zone hitches less behind its card.

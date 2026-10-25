@@ -47,6 +47,15 @@ const PALETTE_NAME := "palette"
 ## "contact": this far through it (CreatureView strikes it so; ArtCheck
 ## checks a named one).
 const CLIP_CONTACT := 0.5
+## How animation reads (combat's feel tuning, step 2, pc-character's side):
+## FEEL's numbers by key ("<script>.<constant>"), each the value of a
+## constant in the script that reads it, `feel(key, CONSTANT)` at the moment
+## it is used, the constant the value a key FEEL lacks. `set_feel` changes
+## one for this run (the tuning panel, a local host): the next clip, step or
+## blow takes it. FEEL stays the source; a set Jeff saves comes back into it.
+const FEEL := "res://art/kit/feel.json"
+static var _feel: Dictionary = {}
+static var _feel_read := false
 ## The greys a placeholder is drawn in, by category: told apart, all plainly
 ## not art.
 const GREYS := {
@@ -126,6 +135,65 @@ static func _read(path: String) -> Dictionary:
 		push_error("ArtKit: %s is not a JSON object (%s)" % [path, FileAccess.get_open_error()])
 		return {}
 	return parsed
+
+
+## FEEL's [param key], or [param default] (the constant it stands for) when
+## FEEL has none.
+static func feel(key: String, default: float) -> float:
+	if not _feel_read:
+		_feel_read = true
+		_feel = (_read(FEEL).get("feel", {}) as Dictionary).duplicate()
+	return float(_feel.get(key, default))
+
+
+## [param key] set to [param value] for this run; [param value] null puts
+## FEEL's back.
+static func set_feel(key: String, value: Variant) -> void:
+	feel(key, 0.0)
+	if value == null:
+		var file: Dictionary = _read(FEEL).get("feel", {})
+		if file.has(key):
+			_feel[key] = file[key]
+		else:
+			_feel.erase(key)
+	else:
+		_feel[key] = float(value)
+
+
+## The feel on combat's tuning panel (673, F7; registered as Tuning's "feel"
+## source where the camera's is, Main): each key FEEL has, as "feel.<key>",
+## with its range (FEEL_RANGES). A rig's blend is read when the rig is made,
+## so client3d.clip_blend and creature_view.blend take on bodies made after a
+## change ("spawn"); the rest at the next clip, step or blow ("now").
+const FEEL_RANGES := {"client3d.clip_blend": [0.0, 0.5], "client3d.clip_heavy_contact": [0.2, 0.8],
+	"client3d.backpedal_clip_speed": [1.0, 5.0], "client3d.roll_speed": [0.5, 3.0], "client3d.down_tilt_speed": [1.0, 20.0],
+	"client3d.shot_speed": [10.0, 80.0], "client3d.gait_rate": [0.5, 2.0], "anim_rig.strike_speed_min": [0.1, 1.0],
+	"anim_rig.strike_speed_max": [1.0, 6.0], "art_kit.clip_contact": [0.1, 0.9], "creature_view.speed_min": [0.2, 1.0],
+	"creature_view.speed_max": [1.0, 3.0], "creature_view.charge_speed": [1.0, 3.0], "creature_view.blend": [0.0, 0.5]}
+const FEEL_ON_SPAWN: Array[String] = ["client3d.clip_blend", "creature_view.blend"]
+static func feel_fields() -> Array:
+	feel("", 0.0)
+	var rows := []
+	for key: String in _read(FEEL).get("feel", {}):
+		var span: Array = FEEL_RANGES.get(key, [0.0, 2.0 * float(_feel[key])])
+		rows.append({"path": "feel." + key, "group": "Animation", "min": span[0], "max": span[1],
+			"owner": "pc-character", "takes": "spawn" if key in FEEL_ON_SPAWN else "now"})
+	return rows
+
+
+## Tuning's getter and setter for "feel.<key>" paths: null and false for a key
+## FEEL lacks.
+static func feel_value(path: String) -> Variant:
+	var key := path.trim_prefix("feel.")
+	feel(key, 0.0)
+	return _feel.get(key) if path.begins_with("feel.") else null
+
+
+static func set_feel_value(path: String, value: Variant) -> bool:
+	if feel_value(path) == null or not (value is float or value is int):
+		return false
+	set_feel(path.trim_prefix("feel."), value)
+	return true
 
 
 static func slots() -> Dictionary:

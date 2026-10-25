@@ -227,8 +227,10 @@ func strike(clip: String, contact: float, lands_in: float, recover: float) -> fl
 	if contact < 0.0:
 		contact = length * CONTACT_DEFAULT
 	contact = clampf(contact, 0.0, length)
-	var before := clampf(contact / maxf(lands_in, 0.001), STRIKE_SPEED_MIN, STRIKE_SPEED_MAX)
-	_recover_speed = clampf((length - contact) / maxf(recover, 0.001), STRIKE_SPEED_MIN, STRIKE_SPEED_MAX)
+	var least := ArtKit.feel("anim_rig.strike_speed_min", STRIKE_SPEED_MIN)
+	var most := ArtKit.feel("anim_rig.strike_speed_max", STRIKE_SPEED_MAX)
+	var before := clampf(contact / maxf(lands_in, 0.001), least, most)
+	_recover_speed = clampf((length - contact) / maxf(recover, 0.001), least, most)
 	(_root.get_node("action_clip") as AnimationNodeAnimation).animation = clip
 	_action_clip = clip
 	_set_action_speed(before)

@@ -5698,7 +5698,7 @@ func _test_goblins_differ() -> void:
 	var heavy := big.get_meta("rig") as AnimRig
 	brute.winding.emit(Vector2i(-1, 0), Monster.WINDUP_TICKS)
 	_check(heavy.playing() == Client3D.CLIP_HEAVY
-			and is_equal_approx(heavy.speed(), Client3D.CLIP_HEAVY_CONTACT / (Monster.WINDUP_TICKS * World.TICK_DT)),
+			and is_equal_approx(heavy.speed(), ArtKit.feel("client3d.clip_heavy_contact", Client3D.CLIP_HEAVY_CONTACT) / (Monster.WINDUP_TICKS * World.TICK_DT)),
 			"a brute winding up swings, timed to connect as its blow lands (%s x%.2f)" % [heavy.playing(), heavy.speed()])
 	brute.swung.emit(Vector2i(-1, 0))
 	_check(heavy.playing() == Client3D.CLIP_HEAVY, "and the blow itself plays no other clip over it (%s)" % heavy.playing())
@@ -6946,7 +6946,7 @@ func _test_goblin() -> void:
 	_check(animator.playing() == Client3D.CLIP_ROLL and animator.speed() < 0.0
 			and absf(angle_difference(yaw, -Vector2(0, 1).angle())) < 0.05,
 			"tossed (-z): it rolls over backwards, facing whence it came (+z), yaw %.2f, speed %.2f" % [yaw, animator.speed()])
-	var roll := animator.length(Client3D.CLIP_ROLL) / Client3D.ROLL_SPEED
+	var roll := animator.length(Client3D.CLIP_ROLL) / ArtKit.feel("client3d.roll_speed", Client3D.ROLL_SPEED)
 	await _run_clock(roll)
 	_check(animator.playing() == Client3D.CLIP_LAND, "then lands (%s)" % animator.playing())
 	await _run_clock(1.4)
@@ -7446,7 +7446,8 @@ func _test_creature_puppets() -> void:
 	view.wind(0.6)
 	var length := rig.length(view.clips["attack"])
 	_check(rig.striking() and rig.playing() == view.clips["attack"]
-			and is_equal_approx(rig.speed(), clampf(length * CreatureView.CONTACT / 0.6, AnimRig.STRIKE_SPEED_MIN, AnimRig.STRIKE_SPEED_MAX)),
+			and is_equal_approx(rig.speed(), clampf(length * ArtKit.feel("art_kit.clip_contact", CreatureView.CONTACT) / 0.6,
+				ArtKit.feel("anim_rig.strike_speed_min", AnimRig.STRIKE_SPEED_MIN), ArtKit.feel("anim_rig.strike_speed_max", AnimRig.STRIKE_SPEED_MAX))),
 			"a wound-up blow strikes its headbutt, its middle landing in 0.6 s")
 	var wound := rig.speed()
 	view.swing()

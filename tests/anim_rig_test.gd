@@ -16,6 +16,8 @@ func _ready() -> void:
 	await _test_make()
 	await _test_loop()
 	await _test_held_hands_over()
+	_test_feel_moved()
+	_test_feel_source()
 	await _test_strike()
 	await _test_one_strike_clip()
 	await _test_bow_clear()
@@ -118,6 +120,51 @@ func _test_held_hands_over() -> void:
 	rig.get_parent().queue_free()
 
 
+## The animation feel moved to art/kit/feel.json (673 step 2, pc-character's side): every key names
+## a constant ("<script>.<constant>") whose value it holds, so the move changes nothing seen.
+func _test_feel_moved() -> void:
+	print("== the animation feel in art/kit/feel.json ==")
+	var scripts := {"client3d": Client3D, "anim_rig": AnimRig, "art_kit": ArtKit, "creature_view": CreatureView}
+	var file: Dictionary = (JSON.parse_string(FileAccess.get_file_as_string(ArtKit.FEEL)) as Dictionary).get("feel", {})
+	var off: Array[String] = []
+	for key: String in file:
+		var parts := key.split(".")
+		var script: Script = scripts.get(parts[0])
+		var constants := script.get_script_constant_map() if script != null else {}
+		var name := parts[1].to_upper() if parts.size() == 2 else ""
+		if not constants.has(name) or not is_equal_approx(float(constants[name]), float(file[key])):
+			off.append("%s %s (code %s)" % [key, file[key], constants.get(name, "none")])
+	_check(file.size() >= 14 and off.is_empty(), "each of feel.json's %d values the constant it names, as the code had it (%s)" % [file.size(), ", ".join(off)])
+
+
+## The feel on combat's tuning panel (673 step 2): ArtKit's source as Main
+## registers it, every key of feel.json a row in Animation, the rig blends
+## taking on bodies made after; a change read where it is used; reset to the
+## file's value; an unknown key nobody's.
+func _test_feel_source() -> void:
+	print("== the feel on the tuning panel ==")
+	var mode := Net.mode
+	Net.mode = Net.Mode.HOST
+	Tuning.register_source("feel", ArtKit.feel_value, ArtKit.set_feel_value, ArtKit.feel_fields)
+	var rows := {}
+	for row: Dictionary in Tuning.fields():
+		if str(row["path"]).begins_with("feel."):
+			rows[row["path"]] = row
+	var file: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(ArtKit.FEEL))["feel"]
+	var all_in := rows.size() == file.size()
+	for key: String in file:
+		var row: Dictionary = rows.get("feel." + key, {})
+		all_in = all_in and row.get("group") == "Animation" and row.get("kind") == "float" and row.get("owner") == "pc-character" 			and float(row.get("min", INF)) <= float(file[key]) and float(file[key]) <= float(row.get("max", -INF)) 			and row.get("takes") == ("spawn" if key in ["client3d.clip_blend", "creature_view.blend"] else "now")
+	_check(all_in, "each of feel.json's %d keys a row in Animation, its value in its range, the blends on spawn" % file.size())
+	_check(Tuning.apply("feel.client3d.gait_rate", 1.3) and is_equal_approx(ArtKit.feel("client3d.gait_rate", Client3D.GAIT_RATE), 1.3),
+		"gait_rate set to 1.3 from the panel: read where it's used")
+	_check(Tuning.reset("feel.client3d.gait_rate") and is_equal_approx(ArtKit.feel("client3d.gait_rate", 0.0), float(file["client3d.gait_rate"])),
+		"reset: the file's again")
+	_check(Tuning.value("feel.client3d.nothing") == null and not Tuning.apply("feel.client3d.nothing", 1.0), "a key the file lacks: no field")
+	Tuning._sources.erase("feel")
+	Net.mode = mode
+
+
 func _test_strike() -> void:
 	print("== a strike ==")
 	var rig := _goblin()
@@ -128,7 +175,8 @@ func _test_strike() -> void:
 	await _frames(2)
 	_check(rig.striking() and rig.playing() == "Punch_Jab" and is_equal_approx(rig.speed(), 0.5),
 		"struck so its contact (0.17 s in) lands in 0.34 s: half speed (x%.2f)" % rig.speed())
-	var recover := clampf((length - 0.17) / 0.6, AnimRig.STRIKE_SPEED_MIN, AnimRig.STRIKE_SPEED_MAX)
+	var recover := clampf((length - 0.17) / 0.6, ArtKit.feel("anim_rig.strike_speed_min", AnimRig.STRIKE_SPEED_MIN),
+		ArtKit.feel("anim_rig.strike_speed_max", AnimRig.STRIKE_SPEED_MAX))
 	await _seconds(0.45)
 	_check(is_equal_approx(rig.speed(), recover), "past its contact, the rest fitted to the recovery (x%.2f, wanted x%.2f)" % [rig.speed(), recover])
 	_check(rig.busy(), "busy till it is done (%.2f s in all)" % seconds)
@@ -136,7 +184,16 @@ func _test_strike() -> void:
 	_check(not rig.striking() and rig.playing() == "Idle", "then the idle under it again (%s)" % rig.playing())
 	rig.strike("Punch_Jab", 0.17, 0.001, 10.0)
 	await _frames(2)
-	_check(is_equal_approx(rig.speed(), AnimRig.STRIKE_SPEED_MAX), "hurried past what reads as a blow: kept to x%.1f (x%.2f)" % [AnimRig.STRIKE_SPEED_MAX, rig.speed()])
+	var most := ArtKit.feel("anim_rig.strike_speed_max", AnimRig.STRIKE_SPEED_MAX)
+	_check(is_equal_approx(rig.speed(), most), "hurried past what reads as a blow: kept to x%.1f (x%.2f)" % [most, rig.speed()])
+	rig.cancel_strike()
+	# The feel tuning (combat's panel): a value set for the run, taken by the next blow; put back.
+	ArtKit.set_feel("anim_rig.strike_speed_max", 1.5)
+	rig.strike("Punch_Jab", 0.17, 0.001, 10.0)
+	await _frames(2)
+	_check(is_equal_approx(rig.speed(), 1.5), "the most a blow is hurried set to x1.5 for the run: the next blow kept to it (x%.2f)" % rig.speed())
+	ArtKit.set_feel("anim_rig.strike_speed_max", null)
+	_check(is_equal_approx(ArtKit.feel("anim_rig.strike_speed_max", -1.0), AnimRig.STRIKE_SPEED_MAX), "and put back: feel.json's (x%.1f)" % ArtKit.feel("anim_rig.strike_speed_max", -1.0))
 	rig.cancel_strike()
 	rig.strike("Punch_Jab", -1.0, length * AnimRig.CONTACT_DEFAULT, 1.0)
 	await _frames(2)

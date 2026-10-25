@@ -2002,6 +2002,7 @@ func _show_3d() -> void:
 	if Tuning.allowed():
 		Tuning.register_source("camera", _camera_value, _set_camera_value, camera_fields)  # 673.
 		Tuning.register_source("monsters", Monster.tuning_value, Monster.set_tuning_value, Monster.tuning_fields)  # 673 step 2.
+		Tuning.register_source("feel", ArtKit.feel_value, ArtKit.set_feel_value, ArtKit.feel_fields)  # 673 step 2: art/kit/feel.json.
 
 
 # --- WASD ---------------------------------------------------------------------------
