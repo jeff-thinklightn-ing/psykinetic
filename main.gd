@@ -1149,7 +1149,7 @@ func _process(delta: float) -> void:
 	_drive_camera_keys(delta)
 	_update_pick()
 	_test_hover()
-	drive_stand_draw(Keys.held("stand") and not is_typing() and _cursor_item.is_empty())
+	drive_stand_draw(Keys.held("stand") and not is_typing() and _cursor_item.is_empty(), Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT))
 	_drive_wasd()
 	if not _stance.is_empty() and Net.controls != "wasd" and _local_player() != null:
 		_aim_at_cursor(_local_player())  # A raised shield or a drawn bow turns to the cursor.
@@ -1430,7 +1430,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		_release_toss(player)
 		return
 	if click.button_index == MOUSE_BUTTON_LEFT and not click.pressed:
-		_held_target = NONE  # 583 amended: the shot is the press's, not the release's.
+		_held_target = NONE
+		if _stance == "draw" and World.off_hand(player) == "draw":
+			_lower_off_hand(player)  # 583 amended (2): the release looses (Jeff: "release left click no longer fires").
 		return
 	if not click.pressed:
 		return
@@ -1447,8 +1449,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		target = remains_at(tile)  # A gone draugr's remains: a click talks to him (573 amended (4)).
 	# A bow in hand (583 amended; Jeff: "the point of shift is to stand
 	# firm and start nocking"): Shift (the stand key) held draws and stands
-	# the body firm (drive_stand_draw), a left press while drawn looses,
-	# and letting go of Shift lowers it, the arrow kept; a press with Shift
+	# the body firm (drive_stand_draw), a left release while drawn looses
+	# (583 amended (2); the press does nothing), and letting go of Shift
+	# with the left button up lowers it, the arrow kept; a press with Shift
 	# down before the draw is up draws too. A plain left click never attacks with a bow: it walks (a
 	# monster as the ground), talks to a friend or opens a chest
 	# (_click_with_bow; the coordinator's ruling). The right button with a
@@ -1459,7 +1462,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if World.off_hand(player) == "draw":
 		if click.button_index == MOUSE_BUTTON_LEFT:
 			if _stance == "draw":
-				_lower_off_hand(player)  # 583 amended: drawn, the press looses the aim's way (or cancels before draw_min).
+				pass  # 583 amended (2): drawn, the press waits; its release looses.
 			elif Keys.held_in(click, "stand"):
 				_raise_off_hand(player)  # The bow is the weapon: Shift draws, no stand swing.
 			else:
@@ -2149,15 +2152,16 @@ func _view_yaw() -> float:
 ## not typing, nothing on the cursor) and nothing raised draws at once,
 ## the server standing the body firm (World.stand_firm: its walk, route
 ## and queued steps dropped); let go while drawn, the bow is lowered, the
-## arrow kept, nothing loosed. After a shot with Shift still down the next
+## arrow kept, nothing loosed, unless [param left_down]: then the left
+## button's release looses (583 amended (2)). After a shot with Shift still down the next
 ## draw starts. Nothing without a bow and arrows in hand.
-func drive_stand_draw(held: bool) -> void:
+func drive_stand_draw(held: bool, left_down := false) -> void:
 	var player := _local_player()
 	if player == null or World.off_hand(player) != "draw":
 		return
 	if held and _stance.is_empty():
 		_raise_off_hand(player)
-	elif not held and _stance == "draw":
+	elif not held and not left_down and _stance == "draw":
 		World.command(player, "stance", {"kind": ""})
 		_stance = ""
 
@@ -12995,7 +12999,7 @@ func hint_lines() -> Array[String]:
 	for i in Net.phrases.size():
 		lines.append("%s\t%s" % [Keys.name_of("phrase_%d" % (i + 1)), Net.phrases[i]])
 	lines.append_array(["%s+LMB\tyour weapon's own move (a shield bashes)" % Keys.name_of("signature"), "RMB, shield\tblock toward the cursor while held",
-		"%s held, bow\tstand firm and draw: LMB looses, let go lowers it (arrow kept), walk keys turn" % Keys.name_of("stand"),
+		"%s held, bow\tstand firm and draw: LMB release looses, let go lowers it (arrow kept), walk keys turn" % Keys.name_of("stand"),
 		"%s\topen a chest, crate, cart, door; your companion's pack" % Keys.name_of("open"), "%s\tyour pack" % Keys.name_of("pack"),
 		"%s\tyour companion's card" % Keys.name_of("card"),
 		"%s\tthe town sheet" % Keys.name_of("town"),

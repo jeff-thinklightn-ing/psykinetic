@@ -30143,3 +30143,24 @@ within SHEATHE_HEAD (0.08 m) of the head, none in the shield's box, none within 
 of the left forearm. view_test `_test_sheathed` walks the timeline: sheathing in hand, a raise
 mid-sheathe cuts it, the swap at contact, sheathed, a blow near starts the Draw, in hand at the
 grip, done, a raise mid-draw cuts it. Client only, protocol unchanged, no new class_name.
+
+## 583 amended (2): the left release looses
+
+Jeff, v0.1.173: "release left click no longer fires, you have to left click to fire." With a bow
+drawn, the left button's release looses (Main._lower_off_hand), as before 583 amended; a left
+press while drawn does nothing. Shift still plants and draws (World.stand_firm), the body still
+takes no walk or step while drawn, and a plain left click still walks, talks or opens. Letting go
+of Shift lowers the bow (arrow kept) only while the left button is up (drive_stand_draw's
+left_down): Shift up with the left still held stays drawn, and the release looses. A Shift+left
+press draws; let go before draw_min it lets down, nothing loosed. controls_test
+`_test_bow_click_walks`. Client only, protocol unchanged, no new class_name.
+
+## 669 amended: the bow's drain and bands
+
+Jeff, v0.1.173: "stamina drain too much and damage at full range is probably too low for the
+amount of stamina and time used to hold to that." levels/items.json's bow: drain 2 → 1 a tick at
+or past full draw (20 → 10 stamina a second, a full 100 held 10 s); damage_at [0.8, 1.2, 1.6,
+1.2, 0.8, 0.4] → [0.8, 1.2, 1.6, 1.6, 1.2, 0.8], so the bands past full draw are 1.6 to 11 cells,
+1.2 to 13 and 0.8 to 15 (4/3/2 pips, was 3/2/1). Both stay F7 fields (items.bow.drain,
+items.bow.damage_at; 673). The server reads them from items.json: protocol unchanged, but the
+cut deploys the server. items_test, combat_test `_test_draw_held`, ui_test pips.

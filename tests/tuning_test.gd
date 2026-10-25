@@ -77,7 +77,7 @@ func _test_apply_and_reset() -> void:
 	Tuning.apply("combat.whiff_scale", 1.25)
 	_check(not Tuning.changes().has("combat.whiff_scale"), "set to the repo's own value: no change kept")
 	Tuning.reset_all()
-	_check(World.recover_at == 25 and World.moves["spin"]["windup"] == windup and int(Items.verb_of("bow")["drain"]) == 2
+	_check(World.recover_at == 25 and World.moves["spin"]["windup"] == windup and int(Items.verb_of("bow")["drain"]) == 1
 			and int(Items.verb_of("bow")["full"]) == 2 and is_equal_approx(float(Items.verb_of("bow")["draw_full"]), full_before)
 			and Tuning.changes().is_empty(), "reset all: every one back, nothing changed")
 
@@ -196,7 +196,7 @@ func _test_save_and_load() -> void:
 	var path := Tuning.save()
 	var data: Variant = JSON.parse_string(FileAccess.get_file_as_string(path)) if not path.is_empty() else null
 	_check(path.begins_with(Tuning.save_dir) and data is Dictionary and (data["changes"] as Dictionary).size() == 2
-			and int(data["changes"]["items.bow.drain"]["value"]) == 3 and int(data["changes"]["items.bow.drain"]["repo"]) == 2
+			and int(data["changes"]["items.bow.drain"]["value"]) == 3 and int(data["changes"]["items.bow.drain"]["repo"]) == 1
 			and data["version"] == Net.version, "the two changes, each with its repo value, and the build (%s)" % path)
 	var copy := Tuning.copy_to_review(path)
 	_check(not copy.is_empty() and FileAccess.file_exists(copy) and copy.begins_with(Tuning.review_dir), "copied for review (%s)" % copy)

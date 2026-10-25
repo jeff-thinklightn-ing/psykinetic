@@ -626,9 +626,9 @@ func _test_aim() -> void:
 	_check(Main.aim_point(origin, 0.0, 3.0) == Vector2(13.0, 10.0) and Main.aim_point(origin, PI * 0.5, 3.0).is_equal_approx(Vector2(10.0, 13.0)),
 		"x as 0, the grid's y as the second component")
 	var bow := Items.verb_of("bow")
-	_check(Main.aim_pips(bow, 0, 5) == 2 and Main.aim_pips(bow, 1, 7) == 3 and Main.aim_pips(bow, 2, 9) == 4 and Main.aim_pips(bow, 3, 11) == 3
-			and Main.aim_pips(bow, 4, 13) == 2 and Main.aim_pips(bow, 5, 15) == 1 and Main.aim_pips(bow, -1, 5) == 0 and Main.aim_pips({}, 2, 9) == 0,
-		"pips: the shot's strength at the aim's reach (decision 669): 2, 3, 4 drawing up, 3, 2, 1 in the bands; none before the draw counts or without a bow")
+	_check(Main.aim_pips(bow, 0, 5) == 2 and Main.aim_pips(bow, 1, 7) == 3 and Main.aim_pips(bow, 2, 9) == 4 and Main.aim_pips(bow, 3, 11) == 4
+			and Main.aim_pips(bow, 4, 13) == 3 and Main.aim_pips(bow, 5, 15) == 2 and Main.aim_pips(bow, -1, 5) == 0 and Main.aim_pips({}, 2, 9) == 0,
+		"pips: the shot's strength at the aim's reach (decision 669): 2, 3, 4 drawing up, 4, 3, 2 in the bands (669 amended); none before the draw counts or without a bow")
 	_check(Main.aim_fade(0) == 0.0 and absf(Main.aim_fade(100) - 0.5) < 0.001 and Main.aim_fade(400) == 1.0, "the arc fades in over its first fifth of a second")
 	# The cone of flight (combat's design, ui's side): the far end's points and the eased half-angle.
 	var ends := Client3D.cone_points(origin, 0.0, 5.0, deg_to_rad(25.0))

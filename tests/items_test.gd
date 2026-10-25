@@ -602,9 +602,9 @@ func _test_weapons() -> void:
 	var by_distance := []
 	for away in [1, 9, 10, 11, 12, 13, 14, 15]:
 		by_distance.append(Items.damage_for(bow_verb, 5, away))
-	_check(by_distance == [1.6, 1.6, 1.2, 1.2, 0.8, 0.8, 0.4, 0.4] and Items.damage_for(bow_verb, 0, 3) == 0.8 and Items.damage_for(bow_verb, 1, 6) == 1.2
-			and Items.damage_for(bow_verb, 3, 14) == 1.2,
-			"strength by the draw, then by the struck body's band past full draw: 0.8, 1.2, 1.6 drawing up; 1.6 within 9 cells, 1.2, 0.8, 0.4 in the bands out (%s)" % [by_distance])
+	_check(by_distance == [1.6, 1.6, 1.6, 1.6, 1.2, 1.2, 0.8, 0.8] and Items.damage_for(bow_verb, 0, 3) == 0.8 and Items.damage_for(bow_verb, 1, 6) == 1.2
+			and Items.damage_for(bow_verb, 3, 14) == 1.6,
+			"strength by the draw, then by the struck body's band past full draw: 0.8, 1.2, 1.6 drawing up; 1.6 within 11 cells, 1.2, 0.8 in the bands out (669 amended) (%s)" % [by_distance])
 	host.raised_tick = World.tick - 40
 	var cone := World.spread_of(host)
 	var strayed := true

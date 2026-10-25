@@ -364,7 +364,7 @@ func _test_draw_held() -> void:
 	_check(near.hp == 100 - roundi(blow * 1.6), "drawn to the last band, a body within 9 cells takes full strength (%d)" % (100 - near.hp))
 	World.despawn(near)
 	World.shoot(host, 0.0, 5)
-	_check(far.hp == 100 - roundi(blow * 0.4), "one 14 cells out, in the last band, takes the least (%d)" % (100 - far.hp))
+	_check(far.hp == 100 - roundi(blow * 0.8), "one 14 cells out, in the last band, takes the least (669 amended: 0.8) (%d)" % (100 - far.hp))
 	far.hp = 100
 	World.shoot(host, 0.0, 4)
 	_check(far.hp == 100, "drawn only to the second band (13 cells), the arrow falls short of it")
@@ -380,12 +380,12 @@ func _test_draw_held() -> void:
 	var on_loose := func(by: GridEntity, _angle: float, _step: int) -> void: shots.append(by)
 	World.draw_given_up.connect(on_given)
 	World.loosed.connect(on_loose)
-	host.stamina = 10
+	host.stamina = 5
 	World.step()
-	_check(host.stamina == 8 and host.raised == "draw", "at full draw, 2 a tick (%d)" % host.stamina)
+	_check(host.stamina == 4 and host.raised == "draw", "at full draw, 1 a tick (669 amended) (%d)" % host.stamina)
 	for i in 3:
 		World.step()
-	_check(host.stamina == 2 and host.raised == "draw", "none comes back while held (%d)" % host.stamina)
+	_check(host.stamina == 1 and host.raised == "draw", "none comes back while held (%d)" % host.stamina)
 	World.step()
 	_check(host.stamina == 0 and host.raised == "" and given == [host] and shots.is_empty(),
 			"at 0 the arms give out: the bow let down, nothing loosed (%s)" % [given])

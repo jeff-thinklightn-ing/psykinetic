@@ -650,7 +650,7 @@ func _test_click_uses_the_frame_pick() -> void:
 
 
 func _test_bow_click_walks() -> void:
-	print("\n== a bow in hand: a plain left click walks at once; Shift held draws and stands firm, a press looses, Shift up lets it down (583 amended) ==")
+	print("\n== a bow in hand: a plain left click walks at once; Shift held draws and stands firm, the left release looses, Shift up lets it down (583 amended (2)) ==")
 	var saved: String = Net.controls
 	Net.controls = "click"
 	var player := _place_player(Vector2i(11, 3))
@@ -675,17 +675,18 @@ func _test_bow_click_walks() -> void:
 	shift.pressed = true
 	_main._unhandled_input(shift)
 	_check(_main._stance == "draw" and player.raised == "draw" and not player.has_move_order, "Shift with the press: the bow drawn, no walk, no stand swing")
+	_main.drive_stand_draw(false, true)
+	_check(_main._stance == "draw" and player.raised == "draw", "Shift up with the left button still down: still drawn (583 amended (2))")
+	var again := InputEventMouseButton.new()
+	again.button_index = MOUSE_BUTTON_LEFT
+	again.pressed = true
+	_main._unhandled_input(again)
+	_check(_main._stance == "draw" and player.raised == "draw", "a press while drawn: nothing, still drawn (583 amended (2))")
 	var let_go := InputEventMouseButton.new()
 	let_go.button_index = MOUSE_BUTTON_LEFT
 	let_go.pressed = false
 	_main._unhandled_input(let_go)
-	_check(_main._stance == "draw" and player.raised == "draw", "the button let go: still drawn (the shot is a press's now)")
-	var loose := InputEventMouseButton.new()
-	loose.button_index = MOUSE_BUTTON_LEFT
-	loose.pressed = true
-	_main._unhandled_input(loose)
-	_check(_main._stance == "" and player.raised == "", "a press while drawn: loosed (or let down before draw_min), the bow lowered")
-	_main._unhandled_input(let_go)
+	_check(_main._stance == "" and player.raised == "", "the left release while drawn: loosed (or let down before draw_min), the bow lowered (583 amended (2))")
 	# Shift held, walking: the body stops where it stands and draws.
 	World.order_move(player, Vector2i(5, 3))
 	_check(player.has_move_order, "(walking to 5,3)")
@@ -747,9 +748,9 @@ func _test_friend_click() -> void:
 	_check(_main.context_hint_for(body) == "LMB  interact", "the hint says interact with hints=on (560; %s)" % _main.context_hint_for(body))
 	Net.hints = hints_were
 	_check("Shift+LMB	swing where you stand" in _main.hint_lines()
-			and "Shift held, bow	stand firm and draw: LMB looses, let go lowers it (arrow kept), walk keys turn" in _main.hint_lines()
+			and "Shift held, bow	stand firm and draw: LMB release looses, let go lowers it (arrow kept), walk keys turn" in _main.hint_lines()
 			and not _main.hint_lines().any(func(line: String) -> bool: return line.begins_with("RMB, bow")),
-			"the controls list: Shift+LMB swings where you stand; with a bow, Shift held stands firm and draws, LMB looses (583 amended)")
+			"the controls list: Shift+LMB swings where you stand; with a bow, Shift held stands firm and draws, LMB release looses (583 amended (2))")
 	player.has_move_order = false
 	_left(true)
 	_check(player.action_order == GridEntity.Order.SWING and not player.has_move_order and _main._talk_wanted == null,
