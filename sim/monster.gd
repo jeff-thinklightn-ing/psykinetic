@@ -97,6 +97,25 @@ const BACKSTAB_DAMAGE := 1
 ## is under half its hp.
 const PACE_SPREAD := 0.15
 const COOLDOWN_SPREAD := 2
+## The fight's feel as data (673 step 2, enemy-ai's side; combat's tuning
+## panel, Jeff: "i need way to tune combat and animation feel that has a
+## quicker feedback loop"): KINDS_PATH's "fight" block over these (the
+## constants above, its defaults), and a kind's row's own "fight" over that.
+## Each sets the var of its name (_apply_fight) at spawn: a change reaches
+## new spawns. flee_below by temper name.
+const FIGHT_DEFAULTS := {"windup_ticks": WINDUP_TICKS, "charge_range": CHARGE_RANGE, "charge_pace": CHARGE_PACE,
+	"dart_after_ticks": DART_AFTER_TICKS, "backstab_damage": BACKSTAB_DAMAGE, "pace_spread": PACE_SPREAD,
+	"cooldown_spread": COOLDOWN_SPREAD, "flank_patience_ticks": FLANK_PATIENCE_TICKS, "flee_ticks": FLEE_TICKS,
+	"flee_tiles": FLEE_TILES, "flee_near_tiles": FLEE_NEAR_TILES, "rout_hurt": ROUT_HURT,
+	"dread_flee_below": DREAD_FLEE_BELOW, "flee_below": {"bold": 0.15, "cautious": 0.35, "cowardly": 0.6}}
+## Each fight value's range on the tuning panel (673 step 2), by name
+## (flee_below's three share one).
+const FIGHT_SPANS := {"windup_ticks": [1, 30], "charge_range": [1, 10], "charge_pace": [0.1, 1.5],
+	"dart_after_ticks": [0, 20], "backstab_damage": [0, 10], "pace_spread": [0.0, 0.5], "cooldown_spread": [0, 10],
+	"flank_patience_ticks": [0, 100], "flee_ticks": [0, 300], "flee_tiles": [1, 20], "flee_near_tiles": [1, 20],
+	"rout_hurt": [0.0, 1.0], "dread_flee_below": [0.0, 1.0], "flee_below": [0.0, 1.0]}
+const FIGHT_INTS: Array[String] = ["windup_ticks", "charge_range", "dart_after_ticks", "backstab_damage",
+	"cooldown_spread", "flank_patience_ticks", "flee_ticks", "flee_tiles", "flee_near_tiles"]
 const REACTION_TICKS_MAX := 6
 const PAUSE_CHANCE_MAX := 0.12
 const PAUSE_TICKS := Vector2i(2, 6)
@@ -378,6 +397,7 @@ var _called_tick := -100000
 var _rout_tick := -1
 ## kinds(), read once.
 static var _kinds := {}
+static var _fight_block: Variant = null
 var _lead_guess := false
 var _lead_seen := NO_TILE
 var _evidence_tick := -1
@@ -394,6 +414,21 @@ var _idle_from := 0
 var _idle_path: Array[Vector2i] = []
 ## A HEAVY one closing its last CHARGE_RANGE at CHARGE_PACE (charging).
 var _charging := false
+## Its fight's feel (673 step 2: FIGHT_DEFAULTS, its kind's, fight_for).
+var windup_ticks := WINDUP_TICKS
+var charge_range := CHARGE_RANGE
+var charge_pace := CHARGE_PACE
+var dart_after_ticks := DART_AFTER_TICKS
+var backstab_damage := BACKSTAB_DAMAGE
+var pace_spread := PACE_SPREAD
+var cooldown_spread := COOLDOWN_SPREAD
+var flank_patience_ticks := FLANK_PATIENCE_TICKS
+var flee_ticks := FLEE_TICKS
+var flee_tiles := FLEE_TILES
+var flee_near_tiles := FLEE_NEAR_TILES
+var rout_hurt := ROUT_HURT
+var dread_flee_below := DREAD_FLEE_BELOW
+var flee_below := {Temper.BOLD: 0.15, Temper.CAUTIOUS: 0.35, Temper.COWARDLY: 0.6}
 ## Its kind's "picks_up" (decision 349): it takes up a weapon lying beside it.
 var picks_up := false
 var _pick_look_tick := -100000
@@ -545,14 +580,15 @@ func _settle_idle() -> void:
 ## name (a respawn, a restart). A monster of no kind is PLAIN, as it was.
 func _temper() -> void:
 	var kind := str(spawn_spec.get("kind", ""))
+	_apply_fight(fight_for(kind))
 	_pace = move_ticks
 	if not kinds().has(kind):
 		return
 	tactic = kinds()[kind]["tactic"]
 	_rng.seed = hash(String(name))
-	_pace = move_ticks * (1.0 + _rng.randf_range(-PACE_SPREAD, PACE_SPREAD))
+	_pace = move_ticks * (1.0 + _rng.randf_range(-pace_spread, pace_spread))
 	move_ticks = _pace
-	attack_ticks = maxi(4, attack_ticks + _rng.randi_range(-COOLDOWN_SPREAD, COOLDOWN_SPREAD))
+	attack_ticks = maxi(4, attack_ticks + _rng.randi_range(-cooldown_spread, cooldown_spread))
 	reaction_ticks = _rng.randi_range(0, REACTION_TICKS_MAX)
 	boldness = _rng.randf()
 	pause_chance = _rng.randf_range(0.0, PAUSE_CHANCE_MAX)
@@ -665,12 +701,12 @@ func _sim_tick() -> void:
 		if not can_strike:
 			return
 		if tactic == Tactic.FLANK and (_in_front() or not World.guarding(target, self).is_empty()) \
-				and _front_ticks < FLANK_PATIENCE_TICKS:
+				and _front_ticks < flank_patience_ticks:
 			_front_ticks += 1
 			var round_to := _pick_slot()
 			if round_to != NO_TILE and round_to != tile and _go_to(round_to):
 				return
-			if _front_ticks < FLANK_PATIENCE_TICKS:
+			if _front_ticks < flank_patience_ticks:
 				return
 		_strike()
 		return
@@ -687,9 +723,9 @@ func _sim_tick() -> void:
 		next_move_tick = World.tick + _rng.randi_range(PAUSE_TICKS.x, PAUSE_TICKS.y)
 		return
 	if tactic == Tactic.HEAVY:
-		_charging = World.distance(tile, target.tile) <= CHARGE_RANGE \
+		_charging = World.distance(tile, target.tile) <= charge_range \
 				and World.has_clear_line(tile, target.tile)
-		move_ticks = _pace * (CHARGE_PACE if _charging else 1.0)
+		move_ticks = _pace * (charge_pace if _charging else 1.0)
 	slot = _pick_slot()
 	if slot == NO_TILE or not _go_to(slot):
 		# Nowhere free beside it: as near as it can get.
@@ -893,15 +929,15 @@ func _strike() -> void:
 		Tactic.HEAVY:
 			move_ticks = _pace
 			var direction := target.tile - tile
-			_windup = {"target": target, "lands": World.tick + WINDUP_TICKS, "direction": direction, "from": tile}
+			_windup = {"target": target, "lands": World.tick + windup_ticks, "direction": direction, "from": tile}
 			World.face(self, direction)
-			_world_winding(direction, WINDUP_TICKS)
+			_world_winding(direction, windup_ticks)
 		Tactic.FLANK:
 			var behind := Vector2(tile - target.tile).dot(Vector2(target.facing)) < 0.0
-			World.try_attack(self, target, attack_damage + (BACKSTAB_DAMAGE if behind else 0))
+			World.try_attack(self, target, attack_damage + (backstab_damage if behind else 0))
 		_:
 			if World.try_attack(self, target) and tactic == Tactic.DART:
-				_dart_from = World.tick + DART_AFTER_TICKS
+				_dart_from = World.tick + dart_after_ticks
 				_dart_until = next_attack_tick - ceili(_pace)
 
 
@@ -1467,6 +1503,124 @@ static func dropped(drop: Variant, roll: RandomNumberGenerator) -> int:
 	return roll.randi_range(least, maxi(least, most))
 
 
+## The fight's feel for [param kind] (673 step 2): FIGHT_DEFAULTS, under
+## KINDS_PATH's "fight" block (fight_block, which the tuning panel sets),
+## under the kind's row's "fight".
+static func fight_for(kind: String) -> Dictionary:
+	var out := FIGHT_DEFAULTS.duplicate(true)
+	_merge_fight(out, fight_block())
+	var row: Dictionary = kinds().get(kind, {})
+	_merge_fight(out, row.get("fight", {}))
+	return out
+
+
+## KINDS_PATH's "fight" block as read (or set_fight_block's), {} for none.
+static func fight_block() -> Dictionary:
+	if _fight_block == null:
+		var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(KINDS_PATH)) if FileAccess.file_exists(KINDS_PATH) else null
+		_fight_block = (parsed["fight"] as Dictionary).duplicate(true) if parsed is Dictionary and parsed.get("fight") is Dictionary else {}
+	return _fight_block
+
+
+## The block set in place (the tuning panel's loader; null: read the file
+## again). Spawns from now on take it.
+static func set_fight_block(block: Variant) -> void:
+	_fight_block = (block as Dictionary).duplicate(true) if block is Dictionary else null
+
+
+## The tuning panel's source "monsters" (673 step 2; Tuning.register_source,
+## Main's): [param path] "monsters.fight.<name>" (flee_below's as
+## "monsters.fight.flee_below.<temper>") the block's value now, or
+## "monsters.<kind>.fight.<name>" a kind's own (null where it has none);
+## null for an unknown one.
+static func tuning_value(path: String) -> Variant:
+	var parts := path.split(".")
+	if parts.size() < 3 or parts[0] != "monsters":
+		return null
+	var given: Dictionary
+	var at := 2
+	if parts[1] == "fight":
+		given = fight_for("")
+	elif parts[2] == "fight" and kinds().has(parts[1]) and parts.size() >= 4:
+		given = kinds()[parts[1]].get("fight", {})
+		at = 3
+	else:
+		return null
+	var name := parts[at]
+	if not FIGHT_DEFAULTS.has(name):
+		return null
+	if name == "flee_below":
+		var temper_name := parts[at + 1] if parts.size() > at + 1 else ""
+		return given.get(name, {}).get(temper_name) if given.get(name) is Dictionary else null
+	return given.get(name)
+
+
+## Sets [param path] (tuning_value's) to [param value]: the block's key
+## merged and set (set_fight_block), or a kind's own in its row; false for
+## an unknown one. New spawns take it.
+static func set_tuning_value(path: String, value: Variant) -> bool:
+	var parts := path.split(".")
+	var at := 2 if parts.size() >= 3 and parts[1] == "fight" else 3
+	if parts.size() <= at or parts[0] != "monsters" or at == 3 and (parts[2] != "fight" or not kinds().has(parts[1])):
+		return false
+	var name := parts[at]
+	if not FIGHT_DEFAULTS.has(name) or not (value is int or value is float):
+		return false
+	var block: Dictionary = (fight_block() if at == 2 else kinds()[parts[1]].get("fight", {}) as Dictionary).duplicate(true)
+	if name == "flee_below":
+		if parts.size() <= at + 1 or not TEMPER_NAMES.has(parts[at + 1]):
+			return false
+		var by_temper: Dictionary = block.get(name, {}) if block.get(name) is Dictionary else {}
+		by_temper[parts[at + 1]] = float(value)
+		block[name] = by_temper
+	else:
+		block[name] = int(value) if name in FIGHT_INTS else float(value)
+	if at == 2:
+		set_fight_block(block)
+	else:
+		kinds()[parts[1]]["fight"] = block
+	return true
+
+
+## The panel's rows for the block (673 step 2): each value, its range,
+## enemy-ai's, taken by new spawns.
+static func tuning_fields() -> Array:
+	var out: Array = []
+	for name: String in FIGHT_DEFAULTS:
+		var span: Array = FIGHT_SPANS[name]
+		if name == "flee_below":
+			for temper_name: String in TEMPER_NAMES:
+				out.append({"path": "monsters.fight.flee_below." + temper_name, "group": "Monsters", "min": span[0], "max": span[1], "owner": "enemy-ai", "takes": "spawn"})
+		else:
+			out.append({"path": "monsters.fight." + name, "group": "Monsters", "min": span[0], "max": span[1], "owner": "enemy-ai", "takes": "spawn"})
+	return out
+
+
+static func _merge_fight(into: Dictionary, given: Variant) -> void:
+	if not given is Dictionary:
+		return
+	for key: String in given:
+		if not FIGHT_DEFAULTS.has(key):
+			push_warning("[monsters] fight: %s is none of %s" % [key, FIGHT_DEFAULTS.keys()])
+		elif key == "flee_below":
+			if given[key] is Dictionary:
+				for temper_name: String in given[key]:
+					if TEMPER_NAMES.has(temper_name):
+						into[key][temper_name] = float(given[key][temper_name])
+		else:
+			into[key] = int(given[key]) if key in FIGHT_INTS else float(given[key])
+
+
+## Sets its fight's vars from [param rules] (fight_for).
+func _apply_fight(rules: Dictionary) -> void:
+	for key: String in rules:
+		if key == "flee_below":
+			for temper_name: String in rules[key]:
+				flee_below[TEMPER_NAMES[temper_name]] = float(rules[key][temper_name])
+		else:
+			set(key, rules[key])
+
+
 static func kinds() -> Dictionary:
 	if _kinds.is_empty():
 		_kinds = read_kinds(KINDS_PATH)
@@ -1481,6 +1635,8 @@ static func read_kinds(path: String) -> Dictionary:
 		push_warning("[monsters] %s is missing or not a JSON object: no kinds" % path)
 		return out
 	for kind: String in parsed:
+		if kind == "fight":
+			continue  # Not a kind: the fight's feel (fight_block, 673 step 2).
 		var row: Variant = parsed[kind]
 		if not row is Dictionary:
 			push_warning("[monsters] %s: %s is not a kind" % [path, kind])
@@ -1516,6 +1672,7 @@ static func read_kinds(path: String) -> Dictionary:
 			"picks_up": bool(row.get("picks_up", false)), "art": str(row.get("art", "")),
 			"label": str(row.get("label", "")), "fearless": bool(row.get("fearless", false)),
 			"never_lies": bool(row.get("never_lies", false)),
+			"fight": (row["fight"] as Dictionary).duplicate(true) if row.get("fight") is Dictionary else {},
 			"keeps_room": bool(row.get("keeps_room", false)), "script": str(row.get("script", "")),
 			"call": int(row.get("call", Senses.NOISE_CALL)),
 			# Kept, or a peer reading the row never sees them: the client's
@@ -1676,9 +1833,9 @@ func _should_flee() -> bool:
 	if fearless:
 		return false
 	var dreaded := _dreads_target()
-	var below := float(FLEE_BELOW[temper])
+	var below := float(flee_below.get(temper, FLEE_BELOW[temper]))
 	if dreaded and temper == Temper.CAUTIOUS:
-		below = maxf(below, DREAD_FLEE_BELOW)
+		below = maxf(below, dread_flee_below)
 	if max_hp > 0 and hp < max_hp * below:
 		return true
 	if temper != Temper.COWARDLY:
@@ -1706,7 +1863,7 @@ func _flee(threat: Vector2i, routs := true) -> void:
 		_post = tile
 	alert = Alert.FLEEING
 	_flee_from = threat
-	_alert_until = World.tick + FLEE_TICKS
+	_alert_until = World.tick + flee_ticks
 	target = null
 	slot = NO_TILE
 	_drop_windup()
@@ -1722,8 +1879,8 @@ func _flee(threat: Vector2i, routs := true) -> void:
 ## near for FLEE_TICKS.
 func _flee_tick() -> void:
 	for entity in World.sought():
-		if World.distance(tile, entity.tile) <= FLEE_NEAR_TILES:
-			_alert_until = World.tick + FLEE_TICKS
+		if World.distance(tile, entity.tile) <= flee_near_tiles:
+			_alert_until = World.tick + flee_ticks
 			_flee_from = entity.tile
 			break
 	if World.tick >= _alert_until:
@@ -1748,7 +1905,7 @@ func _flee_goal() -> Vector2i:
 	var away := Vector2i(signi(tile.x - _flee_from.x), signi(tile.y - _flee_from.y))
 	if away == Vector2i.ZERO:
 		away = -facing
-	for n in range(FLEE_TILES, 0, -1):
+	for n in range(flee_tiles, 0, -1):
 		for way: Vector2i in [away, Vector2i(away.x, 0), Vector2i(0, away.y)]:
 			var at := tile + way * n
 			if way != Vector2i.ZERO and World.is_walkable(at) and World.is_free(at):
@@ -1806,7 +1963,7 @@ func _heard_rout() -> bool:
 		var source: Variant = noise["source"]
 		if source == self or not is_instance_valid(source) or not _same_side(source):
 			continue
-		if temper == Temper.COWARDLY or (max_hp > 0 and hp < max_hp * ROUT_HURT):
+		if temper == Temper.COWARDLY or (max_hp > 0 and hp < max_hp * rout_hurt):
 			_flee(noise["at"], false)
 			return true
 	return false

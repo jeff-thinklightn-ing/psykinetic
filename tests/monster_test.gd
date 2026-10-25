@@ -101,6 +101,8 @@ func _ready() -> void:
 	_test_room_guard()
 	_test_draugr()
 	_test_draugr_paid()
+	_test_fight_data()
+	_test_fight_panel()
 	_test_barrow_layers()
 	_test_draugr_mind()
 	_test_draugr_waves()
@@ -2364,6 +2366,86 @@ func _test_draugr_paid() -> void:
 	World.despawn(draugr)
 	World.despawn(player)
 	Level.unregister("mt_paidlair")
+
+
+## The panel's "monsters" source (673 step 2; Main registers it on a host):
+## its rows listed, a value set reaching the next spawn, reset back.
+func _test_fight_panel() -> void:
+	print("\n== the fight's feel on combat's tuning panel: the monsters source (673 step 2) ==")
+	var mode := Net.mode
+	Net.mode = Net.Mode.HOST
+	Monster.set_fight_block(null)
+	Tuning.register_source("monsters", Monster.tuning_value, Monster.set_tuning_value, Monster.tuning_fields)
+	var rows: Array = Tuning.fields().filter(func(r: Dictionary) -> bool: return str(r["path"]).begins_with("monsters."))
+	var windup: Array = rows.filter(func(r: Dictionary) -> bool: return r["path"] == "monsters.fight.windup_ticks")
+	_check(rows.size() == 16 and windup.size() == 1 and windup[0]["kind"] == "int" and windup[0]["takes"] == "spawn",
+		"16 rows listed, windup_ticks an int taken at spawn (%s)" % [windup])
+	_check(Tuning.apply("monsters.fight.windup_ticks", 9) and Tuning.apply("monsters.fight.flee_below.bold", 0.2),
+		"windup_ticks and the bold one's flee_below set")
+	var e := _build(["#####", "#.b.#", "#####"])
+	var brute := e["b"][0] as Monster
+	_check(brute.windup_ticks == 9 and is_equal_approx(brute.flee_below[Monster.Temper.BOLD], 0.2)
+		and is_equal_approx(brute.flee_below[Monster.Temper.COWARDLY], 0.6), "the next spawn fights with them, the rest as they were")
+	_check(Tuning.reset("monsters.fight.windup_ticks") and Tuning.reset("monsters.fight.flee_below.bold")
+		and Monster.fight_for("brute")["windup_ticks"] == 6 and is_equal_approx(Monster.fight_for("brute")["flee_below"]["bold"], 0.15),
+		"reset: the file's values again")
+	World.despawn(brute)
+	Tuning._sources.erase("monsters")
+	Monster.set_fight_block(null)
+	Net.mode = mode
+
+
+## The fight's feel as data (673 step 2; release: "the move must not change
+## any fight"): every kind's fight from levels/monsters.json is the old
+## in-code constants', its row's overrides included, and a spawned one
+## carries them; the tuning panel's block reaches new spawns, and null
+## reads the file again.
+func _test_fight_data() -> void:
+	print("\n== the fight's feel as data: every kind's as the constants were (673 step 2) ==")
+	Monster.set_fight_block(null)
+	var old := {"windup_ticks": 6, "charge_range": 4, "charge_pace": 0.5, "dart_after_ticks": 3, "backstab_damage": 1,
+		"pace_spread": 0.15, "cooldown_spread": 2, "flank_patience_ticks": 20, "flee_ticks": 60, "flee_tiles": 6,
+		"flee_near_tiles": 4, "rout_hurt": 0.7, "dread_flee_below": 0.5, "flee_below": {"bold": 0.15, "cautious": 0.35, "cowardly": 0.6}}
+	var differ: Array[String] = []
+	for kind: String in Monster.kinds():
+		var rules := Monster.fight_for(kind)
+		for key: String in old:
+			if str(rules.get(key)) != str(old[key]) or typeof(rules.get(key)) != typeof(old[key]):
+				differ.append("%s.%s: %s" % [kind, key, rules.get(key)])
+	_check(differ.is_empty() and Monster.kinds().size() > 10 and not Monster.kinds().has("fight"),
+		"each of %d kinds fights as the constants did, overrides included, and \"fight\" is no kind (%s)" % [Monster.kinds().size(), differ])
+	var rows: Array[String] = ["#####", "#.b.#", "#####"]
+	var e := _build(rows)
+	var brute := e["b"][0] as Monster
+	_check(brute.windup_ticks == Monster.WINDUP_TICKS and brute.charge_range == Monster.CHARGE_RANGE and is_equal_approx(brute.charge_pace, Monster.CHARGE_PACE)
+		and brute.flee_ticks == Monster.FLEE_TICKS and is_equal_approx(brute.flee_below[Monster.Temper.CAUTIOUS], 0.35),
+		"a spawned brute carries them (windup %d, charge %d)" % [brute.windup_ticks, brute.charge_range])
+	Monster.set_fight_block({"windup_ticks": 9, "flee_below": {"bold": 0.2}})
+	var later := Monster.fight_for("brute")
+	_check(later["windup_ticks"] == 9 and is_equal_approx(later["flee_below"]["bold"], 0.2) and is_equal_approx(later["flee_below"]["cowardly"], 0.6)
+		and brute.windup_ticks == Monster.WINDUP_TICKS, "the panel's block reaches new spawns, the rest as they were, the spawned one unchanged")
+	Monster.set_fight_block(null)
+	_check(Monster.fight_for("brute")["windup_ticks"] == 6, "null reads the file again")
+	# The tuning panel's source "monsters" (673 step 2; combat's Tuning.register_source).
+	var rows_listed := Monster.tuning_fields()
+	_check(rows_listed.size() == Monster.FIGHT_DEFAULTS.size() + 2 and rows_listed.all(func(r: Dictionary) -> bool:
+			return r["group"] == "Monsters" and r["owner"] == "enemy-ai" and r["takes"] == "spawn" and Monster.tuning_value(r["path"]) != null),
+		"the panel lists each fight value, flee_below by temper, every one read (%d rows)" % rows_listed.size())
+	_check(Monster.tuning_value("monsters.fight.windup_ticks") == 6 and Monster.tuning_value("monsters.fight.flee_below.cautious") == 0.35
+		and Monster.tuning_value("monsters.imp.fight.windup_ticks") == null and Monster.tuning_value("monsters.fight.nothing") == null
+		and Monster.tuning_value("monsters.nobody.fight.windup_ticks") == null, "each value read; a kind's own null where it has none, an unknown one null")
+	_check(Monster.set_tuning_value("monsters.fight.windup_ticks", 8.0) and Monster.set_tuning_value("monsters.fight.flee_below.bold", 0.3)
+		and Monster.set_tuning_value("monsters.imp.fight.windup_ticks", 12) and not Monster.set_tuning_value("monsters.fight.nothing", 1)
+		and not Monster.set_tuning_value("monsters.fight.flee_below.brave", 0.1),
+		"set through the source; an unknown one refused")
+	var imp_rules := Monster.fight_for("imp")
+	var brute_rules := Monster.fight_for("brute")
+	_check(brute_rules["windup_ticks"] == 8 and typeof(brute_rules["windup_ticks"]) == TYPE_INT and is_equal_approx(brute_rules["flee_below"]["bold"], 0.3)
+		and imp_rules["windup_ticks"] == 12 and Monster.tuning_value("monsters.imp.fight.windup_ticks") == 12,
+		"the block for every kind, an int kept an int, and the imp's own over it (%s, %s)" % [brute_rules["windup_ticks"], imp_rules["windup_ticks"]])
+	Monster.set_fight_block(null)
+	Monster.kinds()["imp"]["fight"] = {}
+	World.despawn(brute)
 
 
 func _test_draugr() -> void:

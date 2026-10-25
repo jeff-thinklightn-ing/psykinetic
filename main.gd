@@ -1986,6 +1986,7 @@ func _show_3d() -> void:
 	_show_towns()
 	if Tuning.allowed():
 		Tuning.register_source("camera", _camera_value, _set_camera_value, camera_fields)  # 673.
+		Tuning.register_source("monsters", Monster.tuning_value, Monster.set_tuning_value, Monster.tuning_fields)  # 673 step 2.
 
 
 # --- WASD ---------------------------------------------------------------------------

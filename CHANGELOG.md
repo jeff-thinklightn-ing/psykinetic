@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Monsters' fight timings (wind-up, charge, dart, flank, fleeing) are now read from levels/monsters.json instead of being fixed in code, ready for the fight-tuning panel; no fight plays differently.
 - Pay the draugr once and you may face him again as often as you like at the level you paid for, for no more gold, until you beat him; he offers "Face the draugr again" and never takes your gold twice.
 - Your companion now steps out of a boss's marked ground (the draugr's spin or charge) before the blow lands, if she can see him, and won't walk into it while it shows; devoted and standing over you downed, she stays and takes it.
 - Your companion no longer attacks a seated draugr you haven't challenged (back in his hall after a lost pact, or while you talk with him) or one at rest; in a pact you bought she still fights beside you.

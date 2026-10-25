@@ -29635,3 +29635,48 @@ World.paid_deal and World.deal_paid from it.
   refused; fought again at the level paid; won, spent), with stub hooks,
   skipped until npc's World.paid_deal is in.
 - Wire: none (the "offers" message carries any offer). No new class_name.
+## 673 step 2, enemy-ai's side: the monsters' fight feel as data
+
+Combat's feel tuning (673, the coordinator's approval of
+C:/dev/review/combat/tuning/design.md; Jeff: "i need way to tune combat and
+animation feel that has a quicker feedback loop"). Monster's fight constants
+move to levels/monsters.json, so the tuning panel can set them live. Release:
+"the move must not change any fight".
+
+- **The block**: a top-level "fight" block in levels/monsters.json holds
+  windup_ticks 6, charge_range 4, charge_pace 0.5, dart_after_ticks 3,
+  backstab_damage 1, pace_spread 0.15, cooldown_spread 2,
+  flank_patience_ticks 20, flee_ticks 60, flee_tiles 6, flee_near_tiles 4,
+  rout_hurt 0.7, dread_flee_below 0.5, and flee_below {bold 0.15, cautious
+  0.35, cowardly 0.6}.
+- **Overrides**: a kind's row may carry its own "fight" over the block.
+  read_kinds skips the block (it is no kind) and keeps a row's "fight".
+- **The reading**: Monster.fight_for(kind) gives FIGHT_DEFAULTS (the old
+  constants, kept as the defaults), under the block, under the row.
+  _temper sets the instance vars of the same names (windup_ticks and the
+  rest) at spawn, and the fight reads those.
+- **The panel's loader**: Monster.set_fight_block(dict) sets the block in
+  place; new spawns take it. null reads the file again.
+- **Unknown keys**: an unknown key is warned of and left out. Ints are kept
+  ints.
+- **The panel's source**: Tuning.register_source("monsters",
+  Monster.tuning_value, Monster.set_tuning_value, Monster.tuning_fields),
+  registered by Main beside the camera's when Tuning.allowed().
+  - Paths: "monsters.fight.<name>" (flee_below as
+    "monsters.fight.flee_below.<temper>"), and "monsters.<kind>.fight.<name>"
+    for a kind's own (null where it has none).
+  - The setter merges one key into the block and sets it (or into the kind's
+    row); unknown paths and non-numbers are refused.
+  - The lister gives the block's 16 rows, group "Monsters", owner enemy-ai,
+    takes "spawn", each with its range (FIGHT_SPANS).
+- **Left for later**: the draugr's own (spin, throw, closing, back-off,
+  fists) wait for combat's word after 573 amended (4).
+- **Tests**: monster_test _test_fight_data: every kind's fight from the file
+  equals the old constants, value and type, overrides included; "fight" is
+  no kind; a spawned brute carries them; the panel's block reaches new
+  spawns with the rest as before; null reads the file again.
+  _test_fight_panel: through Tuning on a host, the source's 16 rows listed
+  (windup_ticks an int taken at spawn), windup_ticks and flee_below.bold
+  applied reach the next spawn, and reset gives the file's values again.
+- **Wire**: none (server sim; a client's monsters carry the defaults). No
+  new class_name.
