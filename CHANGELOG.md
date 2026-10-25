@@ -7,6 +7,9 @@ notes (decision 324).
 
 ## Unreleased
 
+## v0.1.173
+
+- What goes over the network changes, so v0.1.172 and older can't join the server: update through the launcher first.
 - Out of a fight a sword goes into a scabbard on the left hip, a dagger or knife into a sheath there, and a shield onto the back; a raised guard, a blow near or a monster hunting near puts them back in hand at once. The lantern now hangs on the right hip (662 (c)).
 - The beaten draugr now leaves his remains where he fell: his cloak, mail, crown and battle axe in a heap on the floor until he rises again.
 - Infrastructure: the sample tower's door out is art-kit's dark-stone arch.
@@ -87,6 +90,7 @@ notes (decision 324).
 - Raising a shield brings it across in front of the chest, its face to the foe, instead of holding it out to the side.
 - A shield is strapped on the outside of the left forearm, its face out, instead of held out of the fist.
 - A held weapon or tool sits in the middle of the hand, not out at the end of it.
+
 ## v0.1.172
 
 - What goes over the network changes, so v0.1.171 and older can't join the server: update through the launcher first.
