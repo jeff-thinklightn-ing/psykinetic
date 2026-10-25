@@ -49,6 +49,7 @@ func _ready() -> void:
 	_test_daily()
 	_test_saved()
 	_test_bodies()
+	_test_leaks()
 	_test_records()
 	_test_taken()
 	_test_multiplier()
@@ -406,6 +407,51 @@ func _test_bodies() -> void:
 	var boar := _spawn({"tile": gone["home"], "kind": "boar", "group": "no_such_group", "zone": "meadow"}) as Animal
 	herds.retire(boar)
 	_check(herds.total("meadow", "boar") >= 1.0, "a body whose group is gone joins its kind's nearest, or a new one")
+
+
+## Jeff: "after removing wolf packs from the wilds there were 0 animals now"
+## (397 amended (2)): a body gone with no retire, kill or flight (a reset, a
+## regeneration, a restart that did not make it again) kept its out, and an
+## area with out_per_zone of them made no body again; reconcile, once a day
+## an area at its first recall, gives what is out beyond its bodies back.
+func _test_leaks() -> void:
+	print("\n== a body gone with no word: its out back in its count (397 amended (2)) ==")
+	var herds := _herds_at_zero()
+	herds.here = func() -> String: return "meadow"
+	herds.spawn = func(spec: Dictionary) -> Object:
+		var made_one := _spawn(spec) as Animal
+		made_one.spawned = true
+		return made_one
+	herds.free_near = func(cell: Vector2i, _reach: int) -> Vector2i: return cell
+	var live: Array = []
+	herds.bodies = func() -> Array: return live
+	var all := _sum(herds, "meadow")
+	var middle := Vector2i(SIZE / 2, SIZE / 2)
+	var before := _bodies.size()
+	herds.recall_near(middle, SIZE)
+	live.assign(_bodies.slice(before))
+	_check(live.size() == int(_rules["out_per_zone"]), "near someone, out_per_zone bodies made (%d)" % live.size())
+	live.clear()  # A room reset: every body gone, no retire.
+	var stalled := _bodies.size()
+	herds.recall_near(middle, SIZE)
+	_check(_bodies.size() == stalled, "the same day their out holds the zone full: none made (the wilds' 0 animals)")
+	herds._day += 1
+	herds.recall_near(middle, SIZE)
+	live.assign(_bodies.slice(stalled))
+	_check(live.size() == int(_rules["out_per_zone"]) and absf(_sum(herds, "meadow") - all) < 0.001,
+		"the next day the leaked out is back in the counts, and bodies are made again (%d), every animal counted" % live.size())
+	var group: Dictionary = herds.groups_in("meadow")[0]
+	group["out"] = int(group["out"]) + 3  # A saved body not made again at a restart.
+	var kept := float(group["count"])
+	_check(herds.reconcile("meadow") == 3 and float(group["count"]) == kept + 3.0 and absf(_sum(herds, "meadow") - all - 3.0) < 0.001
+		and herds.reconcile("meadow") == 0, "out with no body behind it goes back to its count, once; a body still out is kept out")
+	var gone := live.pop_back() as Animal  # A herd body kept as a record, not retired.
+	var id := str(gone.spawn_spec.get("group", ""))
+	var its: Dictionary = herds._groups[id]
+	var out_was := int(its["out"])
+	herds.fold_records("meadow", [{"entry": {"name": "r", "kind": str(gone.spawn_spec["kind"]), "tile": [gone.tile.x, gone.tile.y], "spawn": -1, "group": id}}])
+	_check(int(its["out"]) == out_was - 1 and herds.reconcile("meadow") == 0 and absf(_sum(herds, "meadow") - all - 3.0) < 0.001,
+		"a herd body folded back from a record takes its out with it: reconcile adds it no second time")
 
 
 func _test_records() -> void:

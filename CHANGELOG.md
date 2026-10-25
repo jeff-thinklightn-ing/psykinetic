@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Animals come back to the wilds: a herd's animals that vanished without being killed (a room reset, a restart) are counted back into the herd each day instead of being lost for good, and the server logs each area's herd numbers daily; an arrow that misses now lands with a thud, so game near where it falls runs off.
 - The draugr at rest no longer lies on the floor or asks for gold: beaten, he is gone, leaving his cloak, crown and axe where he fell (drawn once art-kit's piece lands); a click or E there tells you "He rests. Come back in N days.", no pact can be bought until he rises, and resetting the room no longer cuts his rest short. When his rest is over he stands again at his seat (or beside it if someone is standing on it).
 - The draugr is never knocked to the floor: a knockdown only staggers him. A server restart resets him: seated, whole, no pact or rest.
 - The barrow's dead no longer lie on the floor or sink into walls: a resting skeleton stands still on its own cell, turns straight to you when it sees you (no getting up), and after a chase walks back to the cell it was laid on and stands there.

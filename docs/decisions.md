@@ -29036,3 +29036,35 @@ cell freed; art-kit's prop.draugr_remains and its axe's reach. Replaces
   remains kept with the rest); view_test _test_barrow_dead (one holding no
   cell is not drawn; back, it eases in). Wire: gone, pile_at, pile_facing
   under 36; no new class_name.
+
+## 397 amended (2): herds' leaked bodies counted back, a missed arrow lands with a thud
+
+Jeff: "after removing wolf packs from the wilds there were 0 animals now". The box's journal
+showed the wilds seeded once (34 groups) and the cull taking only two wolf groups, so the rest
+had not gone: a group's "out" (bodies made and not yet back) only came down through retire,
+a kill or a flight, and a body that left any other way (a room reset, a regeneration, a saved
+body not made again at a restart, any despawn) kept its out for ever. Once an area's out
+reached out_per_zone (24), recall_near made nothing there again. The coordinator approved (a)
+and (d) of enemy-ai's four; numbers and placement unchanged, economy (on hold) reviews after.
+
+- **Herds.reconcile(area)**: counts the spawned animals of each group among the bodies in the
+  zone World is in (`bodies`, a Callable; unset, World.entities()) and puts any out beyond
+  them back into the group's count. recall_near calls it once a day an area, at its first
+  recall, so a body made today and wandering is never taken for a leak twice. It prints
+  `[herds] <area>: <n> leaked bodies back`, and the end of each day prints
+  `[herds] <area>: <groups> groups, kept <n>, out <n>` for every area, for release's grep
+  after a deploy. Economy's review: fold_records, folding a record that names a group still
+  held, lowers that group's out by one, as retire does, so reconcile never counts it back a
+  second time.
+- **A missed arrow lands with a thud** (World.shoot): a shot that hits nothing makes
+  Senses.NOISE_THUD_LIGHT (2) at the cell it fell on, by the archer, beside the bow's own
+  NOISE_BOW (3) at the archer. An Animal flees any noise that is not a step and not its herd's,
+  so game beside a miss bolts, as it would from a stone; a hit already made its own sound.
+- Sight, for the coordinator (unchanged): rabbit 7, boar 6, wolf 8, deer and stag 9; the bow
+  reaches 3, 5, 7, 9 cells by draw. A deer or stag sees a hunter at the bow's full reach, so
+  only a full draw from the edge of its sight lands before it runs.
+
+herds_test _test_leaks (24 made, the zone reset: stalled the same day, all 24 back the next,
+then 3 back after a second reset, then none, and a body folded back from a record not counted twice); monster_test _test_wild_shot_near (an ears-only
+rabbit nine cells from the archer grazes, a shot along the row past it falls beside it, it
+bolts). Narrow by request: herds.gd and World.shoot only. Protocol unchanged, no new class_name.

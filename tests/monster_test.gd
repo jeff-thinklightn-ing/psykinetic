@@ -86,6 +86,7 @@ func _ready() -> void:
 	_test_wild_kinds()
 	_test_wild_prey()
 	_test_wild_ears()
+	_test_wild_shot_near()
 	_test_wild_scent()
 	_test_wild_boar()
 	_test_wild_wolf()
@@ -1732,6 +1733,34 @@ func _test_wild_ears() -> void:
 	World.noise(rabbit.tile + Vector2i(-3, 0), Senses.NOISE_FIGHT, &"fight", null)
 	World.step()
 	_check(rabbit.alert == Monster.Alert.FLEEING, "a fight: it bolts")
+
+
+## A miss lands with a thud (397 amended (2); Jeff's hunting: "you want to
+## have distance"): game beside where the arrow fell bolts, far from the bow.
+func _test_wild_shot_near() -> void:
+	print("
+== a shot that misses lands with a thud: game beside it bolts, far from the bow ==")
+	Monster.idling = true
+	var e := _build(["######################", "#....................#", "#.m..................#", "#....................#",
+		"######################"])
+	var archer: Monster = e["m"][0]
+	archer.slots = PackedStringArray(["", "", "", "", "bow", "arrows"])
+	var verb := Items.verb_of("bow")
+	var step := (verb["steps"] as Array).size() - 1
+	var aim: Dictionary = World.shot_aim(archer, 0.0, int(verb["steps"][step]))
+	var fell: Vector2i = aim["cell"]
+	var spec := {"script": "res://sim/animal.gd", "shape": "capsule", "kind": "rabbit", "name": "ShotRabbit", "tile": fell + Vector2i(0, 1)}
+	var rabbit := EntityFactory.build(spec) as Animal
+	_room.add_child(rabbit)
+	World.spawn(rabbit, fell + Vector2i(0, 1))
+	rabbit.sight_range = 0  # Ears only.
+	_check(World.distance(archer.tile, rabbit.tile) > World.NOISE_BOW + 1, "the rabbit far beyond the bow's own noise (%d cells)" % World.distance(archer.tile, rabbit.tile))
+	World.step()
+	_check(rabbit.alert != Monster.Alert.FLEEING, "it grazes on")
+	_check(World.shoot(archer, 0.0, step) == null, "a shot along the row, past it")
+	World.step()
+	_check(rabbit.alert == Monster.Alert.FLEEING, "the arrow falls beside it with a thud: it bolts (%s)" % Monster.Alert.keys()[rabbit.alert])
+	World.despawn(rabbit)
 
 
 func _test_wild_scent() -> void:

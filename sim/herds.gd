@@ -62,6 +62,8 @@ var camps := Callable()
 var here := Callable()
 var spawn := Callable()
 var free_near := Callable()
+## () -> the bodies in the zone World is in (reconcile); unset, World's.
+var bodies := Callable()
 
 ## Group id -> group.
 var _groups: Dictionary = {}
@@ -85,6 +87,8 @@ var _budget: Dictionary = {}
 ## Camp id -> {want, got} today; and got / want over the last whole day.
 var _fed_today: Dictionary = {}
 var _fed: Dictionary = {}
+## Area -> the day its out was last reconciled with its bodies (reconcile).
+var _reconciled: Dictionary = {}
 
 
 func _init(saved := {}, with_areas := {}, with_rules := {}, with_clock := Callable(), with_holdings: Holdings = null) -> void:
@@ -560,6 +564,14 @@ func _daily(day: int) -> void:
 		each["home"] = _roam_cell(each, reach, draw)
 		if not may_home(str(each["area"]), str(each["species"]), each["home"]):
 			_rehome(each, draw)
+	# Each area's count, for release's grep (397 amended (2)): no names.
+	for area: String in _areas_with_groups():
+		var kept := 0.0
+		var out := 0
+		for each in groups_in(area):
+			kept += float(each["count"])
+			out += int(each["out"])
+		print("[herds] %s: %d groups, kept %d, out %d" % [area, groups_in(area).size(), roundi(kept), out])
 
 
 ## A rich cell of [param each]'s area within [param reach] of its home
@@ -616,6 +628,9 @@ func recall_near(at: Vector2i, reach: int) -> void:
 	if not spawn.is_valid():
 		return
 	var area := _here()
+	if int(_reconciled.get(area, -2)) != _day:
+		_reconciled[area] = _day
+		reconcile(area)
 	var groups := groups_in(area)
 	var room := int(rules.get("out_per_zone", 24))
 	for each in groups:
@@ -630,6 +645,33 @@ func recall_near(at: Vector2i, reach: int) -> void:
 			if not _make_body(each):
 				break
 			room -= 1
+
+
+## [param area]'s groups' out made what its bodies are (397 amended (2);
+## Jeff: "after removing wolf packs from the wilds there were 0 animals
+## now"): a body that left by no retire, kill or flight (a room reset, a
+## regeneration, a saved body not made again at a restart, any despawn)
+## kept its out for ever, and an area with out_per_zone of them made no
+## body again. What is out beyond the area's bodies now goes back into its
+## group's count. Asked for the zone World is in (its bodies are there),
+## once a day an area, at its first recall. How many came back.
+func reconcile(area: String) -> int:
+	var live := {}
+	var list: Array = bodies.call() if bodies.is_valid() else World.entities()
+	for body: Variant in list:
+		if is_instance_valid(body) and takes(body) and (body as Animal).spawned:
+			var id := str((body as Animal).spawn_spec.get("group", ""))
+			live[id] = int(live.get(id, 0)) + 1
+	var back := 0
+	for each in groups_in(area):
+		var extra := int(each["out"]) - int(live.get(each["id"], 0))
+		if extra > 0:
+			each["out"] = int(each["out"]) - extra
+			each["count"] = float(each["count"]) + extra
+			back += extra
+	if back > 0:
+		print("[herds] %s: %d leaked bodies back" % [area, back])
+	return back
 
 
 ## One of [param each]'s kept animals made a body near its home: false
@@ -730,6 +772,10 @@ func fold_records(area: String, records: Array) -> Array:
 		var tile: Variant = Snapshot.vector(entry.get("tile"))
 		var each := _group_for(str(entry.get("group", "")), area, species_of(kind), tile if tile is Vector2i else Vector2i.ZERO)
 		each["count"] = float(each["count"]) + 1.0
+		if each["id"] == str(entry.get("group", "")):
+			# Its group's body come back as a record: no longer out, as retire's (397
+			# amended (2); else reconcile counts it back a second time).
+			each["out"] = maxi(int(each["out"]) - 1, 0)
 	if culled > 0:
 		print("[herds] culled %d far records in %s: the level keeps none of their kind" % [culled, area])
 	return left

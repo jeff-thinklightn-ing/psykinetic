@@ -5201,6 +5201,11 @@ func shoot(by: GridEntity, angle: float, step: int, aimed := NAN) -> GridEntity:
 	by._world_set_facing(Vector2i(roundi(way.x), roundi(way.y)))
 	by._world_shot(aim["end"], aim["struck"])
 	noise(by.tile, NOISE_BOW, &"bow", by)
+	if hit == null:
+		# A miss lands with a thud where it stops (397 amended (2); Jeff's
+		# hunting: "you want to have distance"): game near it bolts, the shot
+		# heard where it fell, not only at the bow.
+		noise(aim["cell"], Senses.NOISE_THUD_LIGHT, &"thud", by)
 	if hit == null or not can_target(by, hit) or spares(by, hit) or not hit.is_breakable():
 		_log("shot: %s at %.2f rad, step %d, %s" % [by.name, angle, step, "nothing hit (%s at %s)" % [aim["struck"], aim["end"]] if hit == null else "stopped by %s" % hit.name])
 		return null
