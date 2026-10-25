@@ -9774,7 +9774,7 @@ func remains_at(cell: Vector2i) -> GridEntity:
 ## deal's [param id] and [param amount] of gold, as a typed sum would send.
 func _offer_deal(id: String, amount: int) -> void:
 	var player := _local_player()
-	if player != null and not id.is_empty() and amount > 0:
+	if player != null and not id.is_empty() and amount >= 0:  # 0: the free deal (548 amended, ui's side).
 		World.command(player, "offer", {"id": id, "gold": amount})
 
 

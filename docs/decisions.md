@@ -29719,3 +29719,21 @@ coordinator's design (C:/dev/review/combat/tuning/design.md) splits it.
   go.
 
 New class_name: TuningPanel.
+
+## 548 amended, ui's side. Face him again: the free deal's button
+
+Jeff's pick (2026-10-24): "as long as you paid once you get unlimited
+attempts". Npc keeps the record and enemy-ai the draugr's side. A player who
+has paid once is offered, in the same "offers" message and shape, a deal
+with no what.steps and a cost of 0 ({"id": "deal:<id>:again", "title":
+"Face the draugr again", "accept": "take", "cost": 0}). The DealPanel (629,
+ui's side) gives it one button with no sum, "Face him again"
+(DealPanel.AGAIN_WORDS), enabled whatever the purse. It sends the "offer"
+command with gold 0, as a step button sends its sum, and the server starts
+the pact without gold. DealPanel.steps_of gives [0] for such a deal: "cost"
+must be present and 0 with no steps, so an offer that names no cost stays
+a deal with no buttons. Main._offer_deal sends 0 now, where it refused
+anything under 1. Before this, the panel skipped the free deal, since it
+had no sum to show, so an older client shows no window for it. ui_test _test_deal_window covers the free deal's
+button, its words, its enabling with an empty purse, and the id sent with
+0. Client only; no wire change; no new class_name.

@@ -12,11 +12,17 @@ extends PanelContainer
 ## pact: Monster.peaceable, npc's 648), when the player leaves hearing,
 ## or by Esc; Main._update_deal watches. The typed path (a sum or a yes in
 ## earshot) stays. The look is the shared theme's (UiTheme, docs/ui_style.md).
+## A deal with no steps and a cost of 0 (548 amended, ui's side: the draugr
+## faced again by one who has paid once; Jeff: "as long as you paid once you
+## get unlimited attempts") is one button with no sum, AGAIN_WORDS, enabled
+## whatever the purse, sending gold 0 as a step button sends its sum.
 
 ## A button pressed: the deal's id and the gold it offers.
 signal offered(id: String, gold: int)
 
 const WIDTH := 620.0
+## The free deal's one button (548 amended, ui's side).
+const AGAIN_WORDS := "Face him again"
 
 ## The talking monster shown (his instance id), 0 for none.
 var entity_id := 0
@@ -76,7 +82,7 @@ func show_deals(speaker: String, offers: Array, gold: int, id: int) -> void:
 		child.queue_free()
 	for step in steps_of(deal):
 		var button := Button.new()
-		button.text = step_words(step)
+		button.text = AGAIN_WORDS if step == 0 else step_words(step)
 		button.focus_mode = Control.FOCUS_NONE
 		button.pressed.connect(_pressed.bind(str(deal.get("id", "")), step))
 		_buttons.add_child(button)
@@ -115,7 +121,8 @@ static func first_deal(offers: Array) -> Dictionary:
 	return {}
 
 
-## [param deal]'s sums of gold, least first: its what.steps, else its cost.
+## [param deal]'s sums of gold, least first: its what.steps, else its cost;
+## [0] for a free deal (no steps, "cost" given as 0: 548 amended, ui's side).
 static func steps_of(deal: Dictionary) -> Array[int]:
 	var out: Array[int] = []
 	var what: Variant = deal.get("what", {})
@@ -125,6 +132,8 @@ static func steps_of(deal: Dictionary) -> Array[int]:
 				out.append(int(step))
 	if out.is_empty() and int(deal.get("cost", 0)) > 0:
 		out.append(int(deal.get("cost", 0)))
+	if out.is_empty() and deal.has("cost") and int(deal["cost"]) == 0 and str(deal.get("id", "")) != "":
+		out.append(0)
 	out.sort()
 	return out
 

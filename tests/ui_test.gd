@@ -789,6 +789,21 @@ func _test_deal_window() -> void:
 	panel.offered.connect(func(id: String, amount: int) -> void: sent.append([id, amount]))
 	(buttons[1] as Button).pressed.emit()
 	_check(sent == [["deal:7", 16]], "a button offers the deal's id with its sum (%s)" % [sent])
+	# 548 amended, ui's side: paid once, faced again for nothing.
+	var again: Array = [{"id": "deal:7:again", "kind": "deal", "title": "Face the draugr again", "words": "Again, then.",
+		"what": {"level": "normal", "steps": []}, "accept": "take", "cost": 0}]
+	var free: Array[int] = [0]
+	_check(DealPanel.first_deal(again) == again[0] and DealPanel.steps_of(again[0]) == free and DealPanel.steps_of({"id": "x"}).is_empty()
+			and DealPanel.first_deal([{"id": "x", "words": "none", "cost": 0, "what": {"steps": [0]}}]) != {},
+		"a deal with no steps and cost 0 is one free step; one with no cost given is none")
+	panel.show_deals("the draugr", again, 0, 0)
+	var free_buttons := panel._buttons.get_children()
+	_check(panel.visible and free_buttons.size() == 1 and (free_buttons[0] as Button).text == "Face him again" and not free_buttons[0].disabled
+			and panel._purse.text == "You have 0 gold.",
+		"the free deal: one button, no sum, \"Face him again\", enabled with an empty purse (%d buttons)" % free_buttons.size())
+	sent.clear()
+	(free_buttons[0] as Button).pressed.emit()
+	_check(sent == [["deal:7:again", 0]], "and it offers the deal's id with gold 0 (%s)" % [sent])
 	panel.show_deals("the draugr", [], 20, 0)
 	_check(not panel.visible and panel.entity_id == 0, "empty offers (a pact on): closed")
 	_main.escape()
