@@ -444,6 +444,39 @@ func _test_talk_no_panel() -> void:
 		own.set("charge_room", 0)
 		_main.pack_panel._refresh()
 		_check(_main.pack_panel.charges_shown() == "", "unblessed: no line")
+	# 676, ui's side: the load line from physics' replicated parts, measured against the body's own mass.
+	_check(PackPanel.kg_words(16.0) == "16" and PackPanel.kg_words(5.6) == "5.6" and PackPanel.kg_words(21.64) == "21.6",
+		"kilograms to a tenth, a whole one without its .0")
+	_check(PackPanel.part_words("arms", 5.6, "slows the draw and the swing", 1.1) == "arms 5.6 kg: slows the draw and the swing (+10%)"
+		and PackPanel.part_words("arms", 1.6, "slows the draw and the swing", 1.0) == "arms 1.6 kg"
+		and PackPanel.part_words("body", 16.0, "slows the walk and the breath", 1.0 + 0.5 * 0.05) == "body 16 kg: slows the walk and the breath (+3%)",
+		"a part that slows says what and by how much; under the free share, its kg alone")
+	var bearer: GridEntity = load(Main.RESIDENT).new()
+	bearer.base_mass = 80.0
+	_check(PackPanel.load_lines(bearer).is_empty(), "carrying nothing: no load line")
+	bearer.load_arms = 5.6
+	bearer.load_body = 16.0
+	var plate := PackPanel.load_lines(bearer)
+	_check(plate.size() == 3 and plate[0] == "carrying 21.6 of 80 kg: %s" % World.load_band(bearer) and plate[1].begins_with("arms 5.6 kg")
+		and plate[2].begins_with("body 16 kg"), "plate on an 80 kg body: the total, its band, then the arms and the body (%s)" % [plate])
+	_check(World.load_free >= 0.2 or plate[0].ends_with(": burdened") and plate[1].begins_with("arms 5.6 kg: slows the draw and the swing (+")
+		and plate[2].begins_with("body 16 kg: slows the walk and the breath (+"), "past the free share, plate says what each part slows and by how much (%s)" % [plate])
+	bearer.load_arms = 1.6
+	bearer.load_body = 0.0
+	_check(PackPanel.load_lines(bearer) == PackedStringArray(["carrying 1.6 of 80 kg: light", "arms 1.6 kg"]) or World.load_free < 0.02,
+		"a bow and arrows: light, the arms' kg alone, no body line (%s)" % [PackPanel.load_lines(bearer)])
+	bearer.free()
+	if own != null and _main.pack_panel != null:
+		var arms_were: float = own.load_arms
+		var body_were: float = own.load_body
+		own.load_arms = 5.6
+		own.load_body = 16.0
+		_main.pack_panel._refresh()
+		_check(_main.pack_panel.weight_shown().begins_with("carrying 21.6 of ") and _main.pack_panel.load_shown().split("\n").size() == 2,
+			"the sheet shows the player's load and both parts (%s / %s)" % [_main.pack_panel.weight_shown(), _main.pack_panel.load_shown()])
+		own.load_arms = arms_were
+		own.load_body = body_were
+		_main.pack_panel._refresh()
 	_check(_main.standing_title.is_empty() and _main.pack_panel.promised.is_empty() and not _main.pack_panel._promised.visible,
 		"without the key nothing stands, and nothing is promised")
 	_check(Keys.DEFAULTS["yes"] == KEY_Y and Keys.WORDS.has("yes"), "Y says yes by default, in the Options' key rows")

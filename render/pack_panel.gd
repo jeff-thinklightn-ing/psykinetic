@@ -22,7 +22,8 @@ extends PanelContainer
 ## (UiTheme, docs/ui_style.md): the panel's box, a slot the Inset
 ## variation, a hand's HandSlot. Hover a slot for what its thing is
 ## (ItemTip: name, kind, strength, condition, kills, story); under the
-## player's row, what they carry weighs (the catalog's weights).
+## player's row, their load against their own mass, its band, and what the
+## arms' and the body's parts slow (decision 676, ui's side).
 
 ## A slot's box, the theme's "slot" constant square.
 static var SLOT_SIZE: Vector2 = Vector2.ONE * UiTheme.constant("slot")
@@ -95,6 +96,8 @@ var _other_row: HBoxContainer
 var _player_title: Label
 var _player_row: HBoxContainer
 var _weight: Label
+## The arms' and the body's lines under the load (676, ui's side).
+var _load: Label
 ## What the player has promised the townsfolk (open commissions, npc's
 ## "offers" with "open"; 536, ui's side): a caption in the foot, "Promised:
 ## Bring Bram home", nothing when none.
@@ -240,6 +243,10 @@ func _ready() -> void:
 	_weight = Label.new()
 	_weight.theme_type_variation = &"Caption"
 	column.add_child(_weight)
+	_load = Label.new()
+	_load.theme_type_variation = &"Caption"
+	_load.add_theme_color_override("font_color", UiTheme.color("text_dim"))
+	column.add_child(_load)
 	_promised = Label.new()
 	_promised.theme_type_variation = &"Caption"
 	_promised.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -269,9 +276,14 @@ func hide_tip() -> void:
 		tip.visible = false
 
 
-## "carrying 9.5 kg" for the player's things (tests).
+## "carrying 21.6 of 80 kg: burdened" for the player's load (tests).
 func weight_shown() -> String:
 	return _weight.text
+
+
+## The arms' and the body's lines, one a line (tests).
+func load_shown() -> String:
+	return _load.text
 
 
 func _title() -> Label:
@@ -359,6 +371,8 @@ func _signature() -> Array:
 	var who := player if is_instance_valid(player) else null
 	var opened := other if is_instance_valid(other) else null
 	var sig: Array = [who, opened, shown, icons != null, _icons_seen, promised.duplicate(), charges_of(who)]
+	if who != null:
+		sig.append_array([who.load_arms, who.load_body, World.load_free, World.load_heavy, World.load_overloaded])  # 676: F7's edges, live.
 	for entity in [who, opened]:
 		if entity != null:
 			sig.append(entity.slots.duplicate())
@@ -505,18 +519,48 @@ func _refresh() -> void:
 			_show_icon(box, icons.icon(item) if icons != null and not item.is_empty() else null)
 	if landed != null and sound.is_valid():
 		sound.call(SoundKit.opening(landed), landed)
-	var carried := 0.0
-	if is_instance_valid(player):
-		for item in player.slots:
-			carried += Items.weight_of(item)
-	_weight.text = "carrying %s kg" % str(snappedf(carried, 0.1)) if carried > 0.0 else ""
-	_weight.visible = carried > 0.0
+	var lines := load_lines(player) if is_instance_valid(player) else PackedStringArray()
+	_weight.text = lines[0] if not lines.is_empty() else ""
+	_weight.visible = not _weight.text.is_empty()
+	_load.text = "\n".join(lines.slice(1))
+	_load.visible = not _load.text.is_empty()
 	_promised.text = "Promised: %s" % ", ".join(promised) if not promised.is_empty() else ""
 	_promised.visible = not promised.is_empty()
 	var held := charges_of(player if is_instance_valid(player) else null)
 	_charges.text = charges_words(held[0], held[1])
 	_charges.visible = not _charges.text.is_empty()
 	_signature_shown = _signature()
+
+
+## [param who]'s load lines (decision 676, ui's side; physics' numbers,
+## replicated): what they carry against their own mass and its band, then
+## the arms' and the body's parts and what each slows; none carrying nothing.
+static func load_lines(who: GridEntity) -> PackedStringArray:
+	var arms := who.load_arms
+	var body := who.load_body
+	if arms + body <= 0.0:
+		return PackedStringArray()
+	var lines := PackedStringArray(["carrying %s of %s kg: %s" % [kg_words(arms + body), kg_words(World.load_capacity(who)), World.load_band(who)]])
+	if arms > 0.0:
+		lines.append(part_words("arms", arms, "slows the draw and the swing", World.arms_load(who)))
+	if body > 0.0:
+		lines.append(part_words("body", body, "slows the walk and the breath", World.walk_load(who)))
+	return lines
+
+
+## "arms 5.6 kg: slows the draw and the swing (+10%)"; under the free share
+## (a multiple of 1) the kg alone: "arms 1.6 kg".
+static func part_words(part: String, kilos: float, slows: String, multiple: float) -> String:
+	var percent := roundi(snappedf((multiple - 1.0) * 100.0, 0.01))  # x1.025 is +3%, not float's 2.4999.
+	if percent <= 0:
+		return "%s %s kg" % [part, kg_words(kilos)]
+	return "%s %s kg: %s (+%d%%)" % [part, kg_words(kilos), slows, percent]
+
+
+## Kilograms to a tenth, a whole number without its ".0": "16", "5.6".
+static func kg_words(kilos: float) -> String:
+	var tenth := snappedf(kilos, 0.1)
+	return str(roundi(tenth)) if is_equal_approx(tenth, roundf(tenth)) else str(tenth)
 
 
 ## The pack's line for the resurrection charges (573, ui's side): "charges

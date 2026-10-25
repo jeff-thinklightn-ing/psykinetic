@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The pack sheet shows your load: what you carry against your own weight and how burdened that is (light, burdened, heavy, overloaded), then what sits on your arms and on your body and what each slows (the draw and swing, the walk and breath).
 - Armour makes noise as you move: plate clanks loud enough to send game running from about five cells, mail jingles closer in, leather and robes are quiet; a monster that hears it comes to look (676, step 1b).
 - What you carry now weighs where it sits: armour's weight on the body slows the walk and the breath, weight on the arms slows the bow's draw and drains a held draw faster; a bow and arrows alone change nothing, plate walks a little slower and draws a tenth slower, mail barely; armour no longer speeds or slows the draw by itself (676).
 - The bow has a lob on the right mouse button: hold to aim at the sky and draw (a brass arc runs to a landing circle that narrows as you hold), let go to loose. It flies over walls and cover, lands after a moment (so a target can step out), and a hit knocks it down (677).

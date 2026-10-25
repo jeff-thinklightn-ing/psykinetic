@@ -30488,3 +30488,27 @@ grows as what the game hears. physics_test _test_clank: plate 5, mail 2,
 leather 0; twice the pace 10, half 3; a dummy 4 cells off hears plate's
 "step 4" and "clank 5", leather's nothing.
 
+## 676, ui's side: the pack sheet's load line
+
+Physics' items-as-mass step 1 (C:/dev/review/physics/items_as_mass.md,
+part 4): the pack sheet shows what the load is and what it does, from
+physics' replicated GridEntity.load_arms and load_body (kg, 0.1).
+
+- **The line:** "carrying 21.6 of 80 kg: burdened": the whole load against
+  World.load_capacity (the body's own mass) and World.load_band's word;
+  the band edges are F7's live load_free, load_heavy and load_overloaded,
+  never copied here.
+- **Under it,** one dim line a part carrying anything: "arms 5.6 kg: slows
+  the draw and the swing (+10%)", "body 16 kg: slows the walk and the
+  breath (+3%)", the percent from World.arms_load and World.walk_load; a
+  part under the free share (a multiple of 1) shows its kg alone ("arms 1.6
+  kg"), as it slows nothing. Nothing carried, no lines.
+- It replaces the old "carrying N kg" (the pack's catalog weights summed on
+  the client): the load already counts held, worn and packed things.
+- PackPanel.load_lines, part_words, kg_words (static, tested); the
+  signature redraws on the two parts and F7's edges changing.
+- **Tests:** ui_test: kg words; part words with and without a slowing;
+  nothing carried, plate on 80 kg (burdened, both parts), a bow (light,
+  the arms' kg alone); the sheet's own lines for the player.
+
+Client only; the wire is physics' 676 (rev 37). No new class_name.
