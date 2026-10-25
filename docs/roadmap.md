@@ -157,6 +157,7 @@ Owner: `companions` leads, with `maps` (the guide's travel over WorldRoutes and 
 ## How it plays (design rules — don't violate without asking Jeff)
 
 - **No classes, no XP treadmill.** What you carry and how you play decide what you're good at.
+- **Items are physical, not modifiers** (Jeff, 2026-10-25, after plate's range cap pinned his bow with nothing showing why: "items shouldnt have direct impacts, they should just form stats like weight/mass. and the impact falls out of the physics"). An item carries physical stats (mass, where it sits, coverage, hardness, a bow's draw weight); what it does to reach, draw, speed, stamina or deflection comes out of the physics, never a per-item multiplier or cap. Physics leads the redesign (C:/dev/review/physics/items_as_mass.md, with items and combat); armour's range_steps removed first as the stopgap.
 - **Weapons are verbs**, not damage tiers:
   - Hammer: knockback (high push force).
   - Sword & shield: block arc in facing direction absorbs damage and pushes at stamina cost; heavy hits break guard.
