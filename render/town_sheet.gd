@@ -7,7 +7,7 @@ extends PanelContainer
 ## it for that town; Esc or N closes it. It says how the town is doing in
 ## the game's words, no bars, numbers only where the sim already tells the
 ## player them. Step 1 reads what a client has today, by key name, nothing
-## stubbed: the heading "Held, a village" (the "town" message's "stage");
+## stubbed: the heading "Umbrage, a village" (the "town" message's "stage");
 ## who holds it (world_state "holdings", in the known world's words); its
 ## buildings from the "town" message ("Standing: the forge, the kitchen.
 ## Building: the temple, half built. Planned: the well."); its people from
@@ -124,7 +124,7 @@ func lines_shown() -> PackedStringArray:
 	return out
 
 
-## "Held, a village"; "Held" before the stages.
+## "Umbrage, a village"; "Umbrage" before the stages.
 static func title_words(town_name: String, stage: String) -> String:
 	var word := stage.strip_edges()
 	if word.is_empty():
@@ -228,10 +228,10 @@ static func when_words(season: String, day: int) -> String:
 
 ## Economy's rows (624, economy's side) from its "town_sheet" message, each
 ## only when its key is there: a why alone ("you don't know that town");
-## "Held is uneasy." (faction {name} and the mood stand-in); "Treasury: 150
+## "Umbrage is uneasy." (faction {name} and the mood stand-in); "Treasury: 150
 ## gold."; the officials, "unpaid" after one owed a wage; "3 fed by the
 ## town, 2 hungry, 1 sick."; "Needs: wood, badly (bring 20); herbs, a
-## little (bring 4)."; "Held seeks a smith and a healer."; "To be a
+## little (bring 4)."; "Umbrage seeks a smith and a healer."; "To be a
 ## village: 3 more people, a priest, 40 more gold."
 static func economy_lines(sheet: Dictionary) -> Array[String]:
 	var out: Array[String] = []

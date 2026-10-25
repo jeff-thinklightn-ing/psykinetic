@@ -1003,7 +1003,7 @@ func _test_door_note() -> void:
 
 func _test_town_sheet() -> void:
 	print("== the town status sheet (624, ui's side): today's facts in words, N, the map's row, economy's rows by key ==")
-	_check(TownSheet.title_words("Held", "village") == "Held, a village" and TownSheet.title_words("Held", "") == "Held"
+	_check(TownSheet.title_words("Umbrage", "village") == "Umbrage, a village" and TownSheet.title_words("Umbrage", "") == "Umbrage"
 			and TownSheet.title_words("Oakford", "inn town") == "Oakford, an inn town",
 		"the heading: the name and its stage, bare before the stages")
 	_check(TownSheet.held_words("the Blood Rot") == "Held by the Blood Rot." and TownSheet.held_words("") == "", "who holds it, in the map's words; nothing for nobody")
@@ -1019,19 +1019,19 @@ func _test_town_sheet() -> void:
 	_check(TownSheet.when_words("summer", 14) == "Summer, day 14." and TownSheet.when_words("", 3) == "Day 3.", "the season and the day")
 	_check(TownSheet.economy_lines({}).is_empty() and TownSheet.economy_lines({"why": "you don't know that town"}) == ["You don't know that town"],
 		"economy's rows: none before its message; a why alone")
-	var rows := TownSheet.economy_lines({"town": "wilds/held", "name": "Held", "mood": "uneasy", "treasury": 150,
+	var rows := TownSheet.economy_lines({"town": "wilds/held", "name": "Umbrage", "mood": "uneasy", "treasury": 150,
 		"officials": [{"name": "Hob", "trade": "priest", "paid": true}, {"name": "Tam", "trade": "guard", "paid": false}],
 		"dole": 3, "hungry": 2, "sick": 1, "needs": [{"id": "wood", "short": 0.8, "bring": 20}, {"id": "herbs", "short": 0.2, "bring": 4}],
 		"strain": {"days": 4, "of": 10, "why": "hunger"},
 		"sought": [{"trade": "smith"}, {"trade": "healer"}], "next_stage": {"stage": "village", "needs": [{"what": "people", "have": 5, "need": 8}, {"what": "priest", "have": 0, "need": 1}, {"what": "gold", "have": 110, "need": 150}]}})
-	_check(rows == ["Held is uneasy.", "Treasury: 150 gold.", "Officials: Hob the priest, Tam the guard (unpaid).", "3 fed by the town, 2 hungry, 1 sick.",
-			"Needs: wood, badly (bring 20); herbs, a little (bring 4).", "Held seeks a smith and a healer.", "To be a village: 3 more people, a priest and 40 more gold.",
+	_check(rows == ["Umbrage is uneasy.", "Treasury: 150 gold.", "Officials: Hob the priest, Tam the guard (unpaid).", "3 fed by the town, 2 hungry, 1 sick.",
+			"Needs: wood, badly (bring 20); herbs, a little (bring 4).", "Umbrage seeks a smith and a healer.", "To be a village: 3 more people, a priest and 40 more gold.",
 			"Strained 4 days of 10: hunger, the store short of food."],
 		"economy's rows by key: the mood, the treasury, the officials with unpaid, fed and hungry, needs worst first, the sought, the next stage, the strain (%s)" % [rows])
 	_check(TownSheet.strain_words({"days": 0, "of": 10, "why": ""}) == "" and TownSheet.strain_words({"days": 3, "of": 10, "why": ""}) == "Strained 3 days of 10."
 			and TownSheet.strain_words({"days": 1, "of": 10, "why": "too few people (3 of 8)"}) == "Strained 1 day of 10: too few people (3 of 8)."
 			and TownSheet.strain_words({"days": 7, "of": 10, "why": "the forge out of use"}) == "Strained 7 days of 10: the forge out of use."
-			and TownSheet.economy_lines({"town": "wilds/held", "name": "Held", "strain": {"days": 0, "of": 10, "why": ""}}).is_empty(),
+			and TownSheet.economy_lines({"town": "wilds/held", "name": "Umbrage", "strain": {"days": 0, "of": 10, "why": ""}}).is_empty(),
 		"the strain line (649, ui's side): none unstrained, the days alone without a reason (captives), economy's reason as it names it")
 	_check(TownSheet.join_and(["a smith"]) == "a smith" and TownSheet.join_and(["a", "b", "c"]) == "a, b and c"
 			and TownSheet.need_words({"what": "standing:walls", "have": 0, "need": 1}) == "the walls standing" and TownSheet.need_words({"what": "guard", "have": 0, "need": 2}) == "2 guards",
@@ -1469,7 +1469,7 @@ func _test_barter() -> void:
 	panel.trade_asked.connect(func(_shop: GridEntity, give: Array, take: Array, gold_balance: int) -> void: asked.append([give, take, gold_balance]))
 	var refusals: Array = []
 	panel.refused.connect(func(why: String) -> void: refusals.append(why))
-	var sample := {"shop": "", "town": "Held", "gold": 12,
+	var sample := {"shop": "", "town": "Umbrage", "gold": 12,
 		"goods": [{"uid": 101, "id": "sword", "price": 10}, {"uid": 102, "id": "bandaging_kit", "price": 1}],
 		"buys": {"hide": {"gold": 20, "up_to": 1}, "dagger": {"gold": 6, "up_to": 1}}, "fenced": {203: 3},
 		"pack": [{"slot": 0, "uid": 201, "id": "hide"}, {"slot": 1, "uid": 202, "id": "dagger"}, {"slot": 2, "uid": 204, "id": "hide"},
