@@ -284,6 +284,16 @@ def may_pass(job, ahead, running, free_ram_gb=None, free_commit_gb=None):
     return True
 
 
+def may_step_aside(job, behind):
+    """Whether [job], out of reach, may step to the back of the queue past
+    [behind] (the rows queued after it): never past a kind that excludes it
+    or that it excludes (394 amended (14)). A suite out of reach for its
+    first LEAN_AFTER_SECONDS stepped behind a bench, which became the head
+    and, excluding suites, held the landing for the whole bench."""
+    return not any(other.get("kind") in job.get("excludes", []) or job.get("kind") in other.get("excludes", [])
+        for other in behind)
+
+
 def should_stop(me, running, free_ram_gb):
     """Whether the watched job [me] stops its child: free RAM is under the
     margin and no running job started after it."""
@@ -847,7 +857,8 @@ def wait_turn(tree, kind, pid, watched):
             ok, why = decide(row, running, head, free_ram, free_gpu, free_commit)
             if not ok and head and out_of_reach(row, running, free_ram, free_commit):
                 why += "; out of reach even with no heavy job running (memory held outside the gate): jobs that fit go past it"
-                if place < len(queue):
+                behind = [dict(kinds().get(each["kind"], row), kind=each["kind"]) for each in queue[place:]]
+                if place < len(queue) and may_step_aside(dict(row, kind=kind), behind):
                     # Steps to the back itself: waiters started from an older
                     # heavy_job.py (a tree not yet rebased) don't know the
                     # rule above and would hold behind it (107 minutes,

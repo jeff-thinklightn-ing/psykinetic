@@ -8982,6 +8982,22 @@ a fail.
   killed under the gate once exited 0 and counted as a pass). An exit other
   than 0 is kept.
 
+Amended a fourteenth time (2026-10-25, release and perf): a job never steps
+behind a kind that excludes it. The rule from 2026-10-18 sends a job out of
+reach even with no heavy job running to the back of the queue, so waiters
+from an older heavy_job.py don't hold behind it. The full suite's estimate
+(15.4 + 8 GB) is now over what this machine has free when idle, so every
+suite is out of reach for its first LEAN_AFTER_SECONDS. In that window a
+suite stepped behind a bench queued after it (release saw combat's suite
+2nd at 207 s behind enemy-ai's bench at 19 s). The bench became the head,
+and since it excludes suites the landing would have waited for it.
+- may_step_aside: a job steps aside only if none of the rows behind it is a
+  kind it excludes or one that excludes it (either side's list). It still
+  steps behind kinds it runs beside, as before. This covers soaks and any
+  later kind.
+heavy_job_test covers the rule for a suite, a bench and a soak, and a waiter
+out of reach whose kind excludes benches keeping its place ahead of one.
+
 
 ## 395. UI sounds
 

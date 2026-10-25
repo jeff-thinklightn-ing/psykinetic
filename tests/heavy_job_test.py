@@ -95,6 +95,17 @@ check(gate.out_of_reach(mesh, [], 32.0) and gate.may_pass(capped, [mesh], [], 32
 check(not gate.out_of_reach(mesh, [dict(running(6, 6), kind="suite")], 32.0) and not gate.may_pass(import_row, [mesh], [dict(running(6, 6), kind="suite")], 32.0),
 	"but not when the running jobs' memory would make room: then first come again")
 check(gate.out_of_reach(mesh, [], 60.0, 20.0), "out of reach on commit too")
+# An out-of-reach suite stepped behind a bench queued after it, the bench
+# became the head and the landing waited for it (release, 2026-10-25).
+out_suite = dict(suite, kind="suite", excludes=["bench"])
+bench_queued = dict(gate.KINDS["bench"], kind="bench")
+soak_queued = dict(gate.KINDS["soak"], kind="soak")
+check(not gate.may_step_aside(out_suite, [dict(import_row), bench_queued]), "an out-of-reach suite never steps behind a bench")
+check(not gate.may_step_aside(dict(bench_queued), [dict(out_suite, excludes=[])]),
+	"nor a bench behind a suite, the exclusion said by the other side only")
+check(not gate.may_step_aside(dict(mesh, kind="soak", excludes=[]), [bench_queued]), "nor a soak behind a bench")
+check(gate.may_step_aside(mesh, [dict(import_row), soak_queued]), "but past kinds it runs beside, as before")
+check(gate.may_step_aside(out_suite, []), "and with none behind, nothing to keep")
 ok, why = gate.decide(suite, [], True, 60.0, None, 5.0)
 check(not ok and why.startswith("commit"), "60 GB RAM free but 5 GB commit: waits, saying commit (%s)" % why)
 check(gate.decide(suite, [], True, 60.0, None, 4.0 + gate.COMMIT_MARGIN_GB)[0], "commit at the estimate plus its margin starts")
@@ -259,6 +270,21 @@ check(order == ["old", "art"], "the job behind goes first in the queue's own ord
 for each in gate._entries("queue"):
     os.remove(gate._path("queue", each["file"]))
 big.join(5)
+# The same head with a bench behind it, the head's kind excluding benches
+# (394 amended (14)): it keeps its place, so the bench never becomes the head.
+table["trellis_mesh"] = dict(table["trellis_mesh"], excludes=["bench"])
+gate._write(gate._path("kinds.json"), table)
+kept = threading.Thread(target=lambda: gate.take("art2", "trellis_mesh", os.getpid()), daemon=True)
+kept.start()
+wait_for(lambda: queue_order() == ["art2"])
+gate._write(gate._path("queue", "%019d-later-1.json" % time.time_ns()), {"tree": "later", "kind": "bench", "pid": None,
+    "waiter": os.getpid(), "queued": time.time()})
+time.sleep(1.0)
+order = queue_order()
+check(order == ["art2", "later"], "an out-of-reach head never steps behind a kind it excludes: %s" % order)
+for each in gate._entries("queue"):
+    os.remove(gate._path("queue", each["file"]))
+kept.join(5)
 gate.POLL_SECONDS = real_poll
 gate.total_ram_gb = real_total
 check(stepped_aside(), "the log says it stepped aside")
