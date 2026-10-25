@@ -14,6 +14,7 @@ func _ready() -> void:
 	# The test room's monsters stay where they stand: these tests stage what
 	# they need beside them, and a wandering imp would join in.
 	Monster.idling = false
+	Companion.hold_tongue = false  # Her voice in a fight, for the sections that test it; _test_quiet has it on (decision 675).
 	_main = preload("res://main.tscn").instantiate()
 	_main.returns = false  # The old respawn (decision 396 is return_test's).
 	add_child(_main)
@@ -102,6 +103,7 @@ func _ready() -> void:
 	_test_knows_level()
 	_test_wild()
 	_test_seated_boss()
+	_test_quiet()
 	_test_dodge()
 	_test_bandage_words()
 	_test_plain_orders()  # Late: its many lines fill the capped party log and Tab panel.
@@ -110,6 +112,7 @@ func _ready() -> void:
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
+	Companion.hold_tongue = true
 	get_tree().quit(1 if _failures > 0 else 0)
 
 
@@ -2945,6 +2948,39 @@ func _test_plain_orders() -> void:
 	_check(pet.stance == Companion.Stance.HOLD and pet.order == "wait", "a voice answering PRESS to \"wait here\": she still waits (%s)" % pet.stance_name())
 	_say_to(pet, owner, "Follow me.")
 	pet.mind = ScriptedMind.new()
+
+
+func _test_quiet() -> void:
+	print("\n== she holds her tongue in combat, and for a breath after (decision 675; Jeff) ==")
+	_kill_monsters()
+	var owner := _player()
+	var pet := _companion()
+	_settle(pet)
+	Companion.hold_tongue = true
+	var spoken: Array[String] = []
+	var on_said := func(line: String) -> void: spoken.append(line)
+	pet.said.connect(on_said)
+	World.step()
+	_check(not pet.quiet() and pet._say("Calm here.", true) and spoken == ["Calm here."], "calm: she speaks")
+	spoken.clear()
+	var imp := _spawn_imp(_free_tile_between(pet, 2, 3))
+	imp.acts = false
+	World.step()
+	_check(pet.in_fight() and pet.quiet(), "a monster near: she holds her tongue")
+	_check(not pet._say("Behind you!", true) and spoken.is_empty(), "a line, even an always one: dropped")
+	pet._pending_voice = {"trigger": "x", "heard": "", "always": true, "phrase": false, "own": true, "report": false}
+	_say_to(pet, owner, "Isolde, how are you?")
+	World.step()
+	_check(spoken.is_empty(), "her player's words mid-fight: no answer (%s)" % [spoken])
+	World.despawn(imp)
+	World.step()
+	_check(pet.quiet() and pet._pending_voice.is_empty(), "the fight over: still quiet a breath, nothing kept waiting")
+	for i in Companion.QUIET_AFTER + 1:
+		World.step()
+	_check(not pet.quiet() and pet._say("That's done.", true) and spoken == ["That's done."], "%d ticks on: she may speak again" % Companion.QUIET_AFTER)
+	pet.said.disconnect(on_said)
+	Companion.hold_tongue = false
+	_settle(pet)
 
 
 func _test_seated_boss() -> void:

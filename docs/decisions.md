@@ -30255,3 +30255,36 @@ monster, body) as if the bubble were not there; no hover cursor or hint.
   reach opens the bar, a click elsewhere closes it.
 
 Client only, protocol unchanged, no new class_name.
+## 675. She holds her tongue in combat
+
+Jeff, 2026-10-25: "they should hold their tongue during combat";
+companions talked most while fighting, and their bubbles got in the way.
+The coordinator's approval, lifted from the archery hold for this one item.
+
+- Combat: Companion.in_fight() (a hostile, by her _hostile, within
+  COMBAT_RANGE of her or her player: a pact running counts, a seated or
+  resting draugr does not, 551 amended (2)), or her intent ATTACK, DODGE or
+  RETREAT; marked each tick (_note_fight). Quiet for QUIET_AFTER (30 ticks,
+  3 s) after the last such tick (Companion.quiet()).
+- Quiet, _say drops every line (an always one too, and an answer a model
+  sends back mid-fight) and _ask_voice asks no model: no talk call to
+  ollama. Her player's words to her mid-fight get no answer, dropped the
+  same. Orders are still obeyed by the hands, silently: no stock "Fine.",
+  no bandage refusal line (the order fails as before).
+- Dropped, never queued: a fight begun clears _pending_voice; nothing is
+  said when it is over but on her next ordinary moment. Her narration (her
+  voice's memory) still records the fight.
+- Each dropped line or ask is counted in the mind log: kind "voice",
+  trigger "say", "voice" or "heard", outcome "held tongue", no words, no
+  names or ids.
+- No fight call ("They've got you!") unless Jeff asks.
+- Companion.hold_tongue (static, true): companion_test's older sections
+  turn it off to test what her voice is told in a fight; _test_quiet has
+  it on.
+- Residents near a raid: the same rule fits npc's townsfolk; the
+  coordinator routes it after the hold.
+
+companion_test _test_quiet: calm, she speaks; a monster near, a line
+dropped and her player's words unanswered; the fight over, quiet a breath
+with nothing waiting; QUIET_AFTER on, she speaks. Server only, protocol
+unchanged, no new class_name.

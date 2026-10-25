@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Your companion holds her tongue in a fight: no speech bubbles while she or you are fighting, nor for three seconds after; she still does what you tell her, silently.
 - Speech bubbles no longer catch the mouse: a click over one walks to the ground or attacks the monster under it. Clicking a townsperson, a companion or another player in reach (or E) opens the Talk / Barter bar under them.
 - The mouse wheel zooms in closer on your character (to half the normal view; the low camera stays as before), and dragging with the middle button turns the camera freely and leaves it where you let go, in both control schemes; Ctrl with a middle drag pans the view, and the camera's angle is saved as you left it (671 amended).
 ## v0.1.174

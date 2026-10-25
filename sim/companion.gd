@@ -34,6 +34,8 @@ enum Stance { STAY_CLOSE, HOLD, PRESS, GUARD, PULL_BACK }
 const INTENT_NAMES: Array[String] = ["FOLLOW", "HOLD", "ATTACK", "SHOVE", "RETREAT", "IDLE", "YIELD", "ERRAND", "REVIVE", "GUIDE", "REST", "SLEEP", "DODGE"]
 const STANCE_NAMES: Array[String] = ["STAY_CLOSE", "HOLD", "PRESS", "GUARD", "PULL_BACK"]
 const DEFAULT_STANCE := Stance.GUARD
+## The last tick she or her player was in a fight (decision 675).
+var _fight_tick := -100000
 ## A bump this soon after the last one is the same bump (a held key).
 const BUMP_REPEAT_TICKS := 10
 ## How far ahead of her player, along the way they were going, counts as
@@ -47,6 +49,14 @@ const NONE := Vector2i(-1, -1)
 const DECISION_INTERVAL_TICKS := 30
 ## One line of speech per this many ticks, but to her player's words.
 const SPEECH_INTERVAL_TICKS := 50
+## She holds her tongue in combat (decision 675, Jeff: "they should hold
+## their tongue during combat"): no line and no voice asked while she or her
+## player fights (in_fight, or her intent ATTACK, DODGE or RETREAT), nor for
+## QUIET_AFTER ticks after (3 s).
+const QUIET_AFTER := 30
+## Off only for companion_test's older sections, which ask her voice in a
+## fight to test what it is told; _test_quiet has it on.
+static var hold_tongue := true
 const SIGHT_RANGE := 7
 ## GUARD fights a hostile this close to her or her player.
 const GUARD_RANGE := 3
@@ -1669,6 +1679,7 @@ func _sim_tick() -> void:
 	_calm()
 	_act()
 	_execute()
+	_note_fight()
 
 
 # --- Watching: what asks her mind ---------------------------------------------
@@ -2007,6 +2018,32 @@ func stalking() -> GridEntity:
 	return _stalked
 
 
+## Whether she holds her tongue now (decision 675): in a fight, or within
+## QUIET_AFTER ticks of one.
+func quiet() -> bool:
+	if not hold_tongue:
+		return false
+	_note_fight()
+	return World.tick - _fight_tick <= QUIET_AFTER
+
+
+## Marks this tick a fighting one when she or her player fights (decision
+## 675); a fight just begun drops what her voice had waiting.
+func _note_fight() -> void:
+	if _fight_tick == World.tick:
+		return
+	if in_fight() or current_intent == Intent.ATTACK or current_intent == Intent.DODGE or current_intent == Intent.RETREAT:
+		if World.tick - _fight_tick > QUIET_AFTER:
+			_pending_voice = {}
+		_fight_tick = World.tick
+
+
+## Counted in the mind log (decision 675): what she held back, by kind
+## ("say", "voice", "heard"), no words, no names.
+func _held_tongue(what: String) -> void:
+	_log({"kind": "voice", "trigger": what, "outcome": "held tongue", "note": ""})
+
+
 ## A hostile within COMBAT_RANGE of her or her player.
 func in_fight() -> bool:
 	return _hostile_within(COMBAT_RANGE)
@@ -2084,6 +2121,9 @@ func _ask_stance(trigger: String) -> void:
 ## [param report]: she tells how an errand went (what she tells is new).
 func _ask_voice(trigger: String, heard := "", always := false, phrase := false, own := true, report := false) -> void:
 	if mind == null:
+		return
+	if quiet():
+		_held_tongue("heard" if not heard.is_empty() else "voice")  # Dropped, never queued (decision 675).
 		return
 	if (heard.is_empty() or not own) and not always and World.tick - _last_speech_tick < SPEECH_INTERVAL_TICKS:
 		return  # She could not say it: the rate limit.
@@ -3501,6 +3541,9 @@ func _set_stance(wanted: int, serial: int, source: String) -> void:
 func _say(line: String, always: bool) -> bool:
 	if World.is_downed(self):
 		return false  # Downed (decision 544): no word.
+	if quiet():
+		_held_tongue("say")  # A fight (decision 675): dropped, an answer that came back mid-fight too.
+		return false
 	if not always and World.tick - _last_speech_tick < SPEECH_INTERVAL_TICKS:
 		return false
 	_last_speech_tick = World.tick
