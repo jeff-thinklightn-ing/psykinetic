@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- An arrow that reaches the end of its range curves gradually down into the ground instead of flying flat and dropping (583 amended (3)).
 - The bow draws about a fifth faster: full draw in 1.0 s (was 1.2), the full 15-cell stretch in 2.7 s (was 3.3) (669 amended (2)).
 - A bow stretches to its full 15 cells in any armour: plate no longer stops it at 5, and leather, mail and robes no longer cap it (622 amended).
 - When you draw your bow, your companion steps out of its cone of fire and keeps out of it until you loose or lower it.

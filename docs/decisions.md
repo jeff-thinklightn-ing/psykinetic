@@ -30338,3 +30338,17 @@ the full stretch (15 cells) to 27 ticks, 2.7 s (was 33, 3.3 s): about a fifth so
 narrows on the same steps. It stays an F7 field (items.bow.draw_steps; 673). items_test's range
 and cone by the hold; view_test's pose scrubbed by draw_full. Protocol unchanged, no new
 class_name; items.json is server data, so it needs a deploy.
+
+## 583 amended (3): a spent arrow arcs into the ground
+
+This bends "583, pc-character's side. The arrow on the string, its flight and its landing": the
+spent arrow's short fall, ARROW_SAG past its reach. Jeff, after the v0.1.175 bow test: "I also see
+the abrupt arrow drop at the range thats a little obvious". The arrow flew level to its reach, then
+turned down. Client3D._on_shot now flies a spent arrow, one striking nobody and nothing short of
+its reach, along one arc (Client3D.arc_at and arc_heading). It flies level for the first part,
+then dips ever steeper over the last ARROW_DIP (0.45) of its path, into the ground ARROW_SAG past
+its reach, nose in at the arc's angle, over the same flight-plus-fall time as before. Arrows into
+a body, wood or stone fly as they did. The cells the sim strikes are unchanged: this is the view
+only. view_test: the spent arrow still lands past its aim, nose down. A new check walks the arc:
+level halfway, dipping, never turning more than 8 degrees a twentieth. Client only, protocol
+unchanged, no new class_name.

@@ -1381,6 +1381,10 @@ const ARROW_CHEST := 1.1
 const ARROW_BURY := 0.12
 const ARROW_SAG := 1.8
 const ARROW_SAG_SLOW := 1.6
+## A spent arrow's arc (583 amended (3); Jeff: "the abrupt arrow drop at the range thats a
+## little obvious"): flown level for the first part of its path, it dips over the last
+## ARROW_DIP of it, gradually steeper, into the ground ARROW_SAG past its reach, nosed in.
+const ARROW_DIP := 0.45
 const ARROW_GLANCE := 0.5
 const ARROW_GLANCE_UP := 0.3
 const ARROW_GLANCE_TURN := 2.2
@@ -15913,9 +15917,24 @@ func _on_shot(point: Vector2, struck: StringName, id: int) -> void:
 	_fly_arrow(arrow)
 	_head_arrow(arrow, from, stop - from)
 	var tween := create_tween()
-	tween.tween_method(func(t: float) -> void: _head_arrow(arrow, from.lerp(stop, t), stop - from), 0.0, 1.0, flight)
-	if not sags:
+	if sags:
+		# Its range spent: one arc, level then dipping ever steeper over the last ARROW_DIP of it,
+		# to stand in the ground past its reach, nose first, at its angle; into water it's gone.
+		var flat := Vector3(down.x, from.y, down.z)
+		var drop := from.y - down.y
+		tween.tween_method(func(t: float) -> void: _head_arrow(arrow, arc_at(from, flat, drop, t), arc_heading(from, flat, drop, t)),
+			0.0, 1.0, flight + falling)
 		tween.tween_callback(_rest_arrow.bind(arrow))
+		if landed == "sfx.arrow_land":
+			var nose := arc_heading(from, flat, drop, 1.0)
+			tween.tween_callback(func() -> void: _head_arrow(arrow, down + nose.normalized() * ARROW_BURY, nose))
+			tween.tween_interval(SHOT_STUCK_SECONDS)
+		tween.tween_callback(func() -> void:
+			if is_instance_valid(arrow):
+				arrow.queue_free())
+		return
+	tween.tween_method(func(t: float) -> void: _head_arrow(arrow, from.lerp(stop, t), stop - from), 0.0, 1.0, flight)
+	tween.tween_callback(_rest_arrow.bind(arrow))
 	if body != null and shooter != null and World.spares(shooter, hit):
 		# A friend on the line (decision 456): it sticks in them a while,
 		# moving with them.
@@ -15939,22 +15958,23 @@ func _on_shot(point: Vector2, struck: StringName, id: int) -> void:
 				(-along).slerp(lying, t) + Vector3.UP * (1.0 - 2.0 * t) * 0.5), 0.0, 1.0, ARROW_GLANCE_SECONDS)
 		tween.tween_callback(func() -> void: _head_arrow(arrow, rest, lying))
 		tween.tween_interval(SHOT_STUCK_SECONDS)
-	else:
-		# Its range spent: on and down in a short fall, nose first, to stand in the ground at its
-		# angle; into water it's gone.
-		var drop := stop.y - down.y
-		tween.tween_method(func(t: float) -> void:
-			_head_arrow(arrow, stop + along * ARROW_SAG * t + Vector3.DOWN * drop * t * t,
-				along * ARROW_SAG + Vector3.DOWN * 2.0 * drop * t), 0.0, 1.0, falling)
-		tween.tween_callback(_rest_arrow.bind(arrow))
-		if landed == "sfx.arrow_land":
-			tween.tween_callback(func() -> void:
-				_head_arrow(arrow, down + (along * ARROW_SAG + Vector3.DOWN * 2.0 * drop).normalized() * ARROW_BURY,
-					along * ARROW_SAG + Vector3.DOWN * 2.0 * drop))
-			tween.tween_interval(SHOT_STUCK_SECONDS)
 	tween.tween_callback(func() -> void:
 		if is_instance_valid(arrow):
 			arrow.queue_free())
+
+
+## Where a spent arrow is [param t] of its way along its arc (ARROW_DIP) from
+## [param from] to [param flat] (its landing at the bow's height), falling
+## [param drop] metres by the end: level at first, then dipping ever steeper.
+static func arc_at(from: Vector3, flat: Vector3, drop: float, t: float) -> Vector3:
+	var u := maxf(0.0, t - (1.0 - ARROW_DIP)) / ARROW_DIP
+	return from.lerp(flat, t) + Vector3.DOWN * drop * u * u
+
+
+## The way a spent arrow heads [param t] along its arc (arc_at's slope).
+static func arc_heading(from: Vector3, flat: Vector3, drop: float, t: float) -> Vector3:
+	var u := maxf(0.0, t - (1.0 - ARROW_DIP)) / ARROW_DIP
+	return (flat - from) + Vector3.DOWN * drop * 2.0 * u / ARROW_DIP
 
 
 ## An arrow flying [param from] to [param end] over [param flight] seconds

@@ -792,6 +792,20 @@ func _test_bow_sounds() -> void:
 				"a spent arrow falls past where it was aimed (%.2f m on) and stands in the ground nose down (%.2f m off it, heading %s)" % [past, arrow.position.y - ground, arrow.transform.basis.y.normalized()])
 	else:
 		_check(false, "a spent arrow landed (%s, %d new)" % [expected, landed.size()])
+	# Its arc (583 amended (3); Jeff: "the abrupt arrow drop at the range thats a little obvious"):
+	# level, then dipping ever steeper, no sudden turn.
+	var a := Vector3(0, 1.4, 0)
+	var b := Vector3(12, 1.4, 0)
+	var dips := []
+	var turns := 0.0
+	for i in 21:
+		var t := i / 20.0
+		dips.append(snappedf(a.y - Client3D.arc_at(a, b, 1.4, t).y, 0.01))
+		if i > 0:
+			turns = maxf(turns, Client3D.arc_heading(a, b, 1.4, t).angle_to(Client3D.arc_heading(a, b, 1.4, t - 0.05)))
+	_check(dips[10] == 0.0 and dips[16] > 0.0 and dips[16] < 0.5 and is_equal_approx(dips[20], 1.4) and turns < deg_to_rad(8.0)
+			and Client3D.arc_heading(a, b, 1.4, 1.0).normalized().y < -0.3,
+			"a spent arrow's arc: level halfway, dipping over its last part, into the ground nose down, never turning more than 8 degrees a step (%s)" % [dips])
 	if wall.x >= 0:
 		arrows_before = _shot_arrows()
 		player._world_shot(Vector2(wall) + Vector2(wall - player.tile).normalized() * 0.5, &"stone")
