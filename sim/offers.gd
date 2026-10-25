@@ -1649,3 +1649,10 @@ static func voice_words(worker_id: String, player_id: String, player_name: Strin
 
 static func offer_as_ask(offer: Dictionary) -> Dictionary:
 	return {"sub": str(offer.get("what", {}).get("sub", "")), "what": offer.get("what", {}), "title": offer.get("title", "")}
+
+
+## Whether [param offer] is a deal already paid for (548 amended: the
+## draugr's "again" for one who paid): kind "deal", cost 0, no steps of
+## gold; taken with none, by a bare yes as well as a button.
+static func free_deal(offer: Dictionary) -> bool:
+	return str(offer.get("kind", "")) == "deal" and offer.has("cost") and int(offer["cost"]) == 0 and (offer.get("what", {}).get("steps", []) as Array).is_empty()

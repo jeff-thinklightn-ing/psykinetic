@@ -28398,3 +28398,31 @@ until the clips land. resident_test _test_field_work (the hunter's spot and
 facing, no catch no load, the catch carried; the rows, the hoe shown in the
 field only, the sack once; the herd's cells turning, the shearing by
 season), _test_herder (his fold, nothing at the buyer's).
+
+## 548 amended, npc's side. A paid deal holds for its payer until won
+
+Jeff, after dying in the draugr's fight on v0.1.172 and being asked for gold
+again (2026-10-24, the coordinator's (b)): "as long as you paid once you get
+unlimited attempts". 548's rule was that a pact lost by the challenger's
+death or leaving is lost with its gold, and nothing remembered the payment.
+Now the payer's deal is kept on their record: PlayerRecord.paid_deals, the
+draugr's zone -> {level, paid_step}, saved and loaded with the record
+(an entry naming no deal's level is dropped), so it outlives a death, a
+restart and a rejoin. The draugr reads and writes it through two World
+hooks Main sets, as charges_in: World.paid_deal(player id, zone) ->
+{level, paid_step} or {}, and World.deal_paid(player id, zone, level), ""
+erasing (Main.paid_deal_of, set_deal_paid); enemy-ai's side writes it when
+a pact is bought, keeps it when one is lost, erases it when he yields, and
+offers a payer only his free "again" deal (kind "deal", cost 0, no steps)
+at the paid level. The zone goes through Main.PAID_ZONE_MOVED
+(barrow_lair -> barrow_deep, dungeon's barrow_two_depths.md), so a deal
+bought before the redesign is the same deal after it. The talk side: a
+free deal (Offers.free_deal) is taken with no gold whatever sum is said
+(Main._monster_accepts), and a bare yes with nothing standing takes it at
+once rather than asking for the sum (629 amended's YES_TO_WHAT stays for a
+deal that wants gold). ui's side: one "Face him again" button with no sum.
+A line under revision 36: an old client's panel skips a free deal. A field
+added to the saved player record (paid_deals). resident_test
+_test_monster_talk: the yes and the sum take the free deal with no gold;
+the hooks, the zone remap, an unknown level refused, the save and load, a
+bad saved entry dropped, the win erasing it.

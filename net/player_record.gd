@@ -66,6 +66,14 @@ var barrow: Dictionary = {}
 ## "quest": his first errand, npc's). A hut brings back only a player in
 ## its care.
 var care: Dictionary = {}
+## The draugr's deals this player paid for and has not yet won (548 amended;
+## Jeff: "as long as you paid once you get unlimited attempts"): his zone ->
+## {level ("easy" | "normal" | "hard"), paid_step (World.steps when bought)}.
+## Kept when the pact is lost, erased when he yields; the draugr reads and
+## writes it through World.paid_deal and World.deal_paid (Main's).
+var paid_deals: Dictionary = {}
+## The levels a paid deal may name (Draugr.SCALE's).
+const PAID_LEVELS: Array[String] = ["easy", "normal", "hard"]
 ## The tally toward that care (584 amended (2); the pack holds four and
 ## nothing stacks): hut place id -> {herbs, antlers: handed so far toward
 ## the way in; brew_herbs, brew_antlers: toward npc's brew}, each cleared
@@ -114,6 +122,7 @@ func to_dict() -> Dictionary:
 		"barrow": barrow.duplicate(),
 		"care": care.duplicate(),
 		"care_given": care_given.duplicate(true),
+		"paid_deals": paid_deals.duplicate(true),
 		"caches": caches.duplicate(),
 	}
 
@@ -154,6 +163,12 @@ static func from_dict(entry: Variant) -> PlayerRecord:
 		for place: Variant in cared:
 			if str(cared[place]) in Economy.CARE_WAYS:
 				record.care[str(place)] = str(cared[place])
+	var paid: Variant = entry.get("paid_deals", {})
+	if paid is Dictionary:
+		for zone_name: Variant in paid:
+			var deal: Variant = paid[zone_name]
+			if deal is Dictionary and str(deal.get("level", "")) in PAID_LEVELS:
+				record.paid_deals[str(zone_name)] = {"level": str(deal["level"]), "paid_step": int(deal.get("paid_step", 0))}
 	var tallies: Variant = entry.get("care_given", {})
 	if tallies is Dictionary:
 		for place: Variant in tallies:

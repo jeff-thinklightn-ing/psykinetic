@@ -329,6 +329,10 @@ const HEARING_RANGE := Companion.HEARING_RANGE
 ## nothing to offer (a pact on).
 const YES_TO_WHAT := "Yes to what? Name your gold."
 const NOTHING_STANDS := "There is nothing between us to say yes to."
+## The draugr's zone before the barrow's redesign -> after (548 amended;
+## dungeon's barrow_two_depths.md: he stands in barrow_deep, barrow_lair
+## retires): a paid deal is keyed by the zone after, whichever he stands in.
+const PAID_ZONE_MOVED := {"barrow_lair": "barrow_deep"}
 ## A chat line that starts with this is party chat: to every player on the
 ## server, whatever their zone; no companion hears it.
 const PARTY_PREFIX := "/p "
@@ -3301,6 +3305,8 @@ func _boot() -> void:
 	World.spawn_spec = _spawn
 	World.bless = barrow_won  # The draugr laid to rest (decisions 548, 573).
 	World.charges_in = charges_in_zone  # His level at a pact's start (573).
+	World.paid_deal = paid_deal_of  # A payer's deal kept till won (548 amended).
+	World.deal_paid = set_deal_paid
 	# The wildlife's herds (decision 367): counts on the world tick, bodies
 	# near someone through the far tier's keepers.
 	World.herds = Herds.new(snapshot.get("herds", {}), Herds.areas_of(world_map), {}, World.steps_now, World.holdings)
@@ -6177,6 +6183,33 @@ func charges_in_zone(zone_name: String) -> int:
 		if World.peer_zone.get(peer, "") == zone_name:
 			total += World.totem_charges(World.totem_of(_peer_ids[peer]))
 	return total
+
+
+## The draugr's deal [param player_id] paid for in [param zone_name] and has
+## not won (548 amended; Jeff: "as long as you paid once you get unlimited
+## attempts"): their record's paid_deals entry, {} for none or no record.
+## The zone through PAID_ZONE_MOVED, so a deal bought before the barrow's
+## redesign is the same deal after it.
+func paid_deal_of(player_id: String, zone_name: String) -> Dictionary:
+	var record: PlayerRecord = _records.get(player_id)
+	if record == null:
+		return {}
+	return (record.paid_deals.get(str(PAID_ZONE_MOVED.get(zone_name, zone_name)), {}) as Dictionary).duplicate()
+
+
+## [param player_id]'s deal with the draugr in [param zone_name] paid for at
+## [param level] (kept on their record, so it outlives a death, a restart
+## and a rejoin), or won ([param level] "": erased). Nothing for a player
+## with no record or a level that is not a deal's.
+func set_deal_paid(player_id: String, zone_name: String, level: String) -> void:
+	var record: PlayerRecord = _records.get(player_id)
+	if record == null:
+		return
+	var key := str(PAID_ZONE_MOVED.get(zone_name, zone_name))
+	if level.is_empty():
+		record.paid_deals.erase(key)
+	elif level in PlayerRecord.PAID_LEVELS:
+		record.paid_deals[key] = {"level": level, "paid_step": World.steps}
 
 
 ## [param record]'s charges moved off the record onto a Draugr's Totem
@@ -10959,7 +10992,8 @@ func _monster_said(monster: GridEntity, player: Player, line: String) -> bool:
 		var offers: Array = monster.offers_for(player_id)
 		if offers.is_empty():
 			_say_plain(monster, name, NOTHING_STANDS)
-		elif amount > 0:
+		elif amount > 0 or Offers.free_deal(offers[0]):
+			# A sum, or a deal already paid for (548 amended: the draugr's "again"): a yes takes it.
 			_monster_accepts(monster, player, offers[0], amount)
 		else:
 			_say_plain(monster, name, YES_TO_WHAT)
@@ -10978,6 +11012,8 @@ func _monster_said(monster: GridEntity, player: Player, line: String) -> bool:
 func _monster_accepts(monster: GridEntity, player: Player, offer: Dictionary, gold: int) -> void:
 	var name := _display_name(monster)
 	var player_id := player.player_id
+	if Offers.free_deal(offer):
+		gold = 0  # Paid for already (548 amended): no purse asked, nothing taken, whatever sum was said.
 	if gold > World.gold_of(player_id):
 		_say_plain(monster, name, "You have but %d gold." % World.gold_of(player_id))
 		return

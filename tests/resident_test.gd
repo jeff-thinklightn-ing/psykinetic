@@ -1771,6 +1771,44 @@ func _test_monster_talk() -> void:
 	_main._player_said(player, "Draugr, here is 16")
 	World.step()
 	_check(talker.got == [16] and talker.pact and not _main._standing.has(Net.player_id), "a sum with nothing standing: his first deal taken with it (%s)" % [talker.got])
+	# A deal paid for already (548 amended; Jeff: "as long as you paid once you get unlimited attempts"): his free
+	# offer is taken by a bare yes with nothing standing, and by a sum said, with no gold either way.
+	talker.pact = false
+	talker.paid = true
+	talker.got.clear()
+	var purse := World.gold_of(Net.player_id)
+	spoken.clear()
+	_main._standing.clear()
+	_main._chat_tick.clear()
+	_main._player_said(player, "Yes.")
+	World.step()
+	_check(talker.got == [0] and talker.pact and World.gold_of(Net.player_id) == purse and not spoken.has(Main.YES_TO_WHAT),
+		"paid already: a bare yes takes his free deal, no gold asked or taken (%s, purse %d)" % [talker.got, World.gold_of(Net.player_id)])
+	talker.pact = false
+	talker.got.clear()
+	_main._chat_tick.clear()
+	_main._player_said(player, "Draugr, here is 16")
+	World.step()
+	_check(talker.got == [0] and World.gold_of(Net.player_id) == purse, "and a sum said to it reaches him as no gold (%s)" % [talker.got])
+	talker.paid = false
+	# The record (548 amended): Main keeps the payer's deal on their record through World's two hooks, by the zone
+	# after the barrow's redesign; it saves and loads with the record, and a win erases it.
+	var record: PlayerRecord = _main._records.get(Net.player_id)
+	_check(record != null and World.paid_deal.is_valid() and World.deal_paid.is_valid() and World.paid_deal.call(Net.player_id, "barrow_deep").is_empty(),
+		"(Main sets World's two hooks; nothing paid yet)")
+	World.deal_paid.call(Net.player_id, "barrow_lair", "normal")
+	var paid_deal: Dictionary = World.paid_deal.call(Net.player_id, "barrow_deep")
+	_check(paid_deal.get("level") == "normal" and int(paid_deal.get("paid_step", -1)) == World.steps and record.paid_deals.keys() == ["barrow_deep"]
+		and World.paid_deal.call(Net.player_id, "barrow_lair") == paid_deal, "paid in his old zone: kept by the zone after the redesign, read from either (%s)" % [record.paid_deals])
+	World.deal_paid.call(Net.player_id, "barrow_deep", "legendary")
+	_check(World.paid_deal.call(Net.player_id, "barrow_deep").get("level") == "normal", "a level that is no deal's is not kept")
+	var loaded := PlayerRecord.from_dict(JSON.parse_string(JSON.stringify(record.to_dict())))
+	_check(loaded.paid_deals == record.paid_deals, "it saves and loads with the record (%s)" % [loaded.paid_deals])
+	var bad := record.to_dict()
+	bad["paid_deals"] = {"barrow_deep": {"level": "nonsense"}, "x": 3}
+	_check(PlayerRecord.from_dict(bad).paid_deals.is_empty(), "a saved entry that is no deal is dropped on load")
+	World.deal_paid.call(Net.player_id, "barrow_deep", "")
+	_check(record.paid_deals.is_empty() and World.paid_deal.call("nobody", "barrow_deep").is_empty(), "won: erased; a player with no record has none")
 	Net.message_received.disconnect(mouth)
 	Net.message_received.disconnect(ear)
 	talker.pact = false

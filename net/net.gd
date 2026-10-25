@@ -386,6 +386,9 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## 36 (661): new command "view_ready" {zone}, a client's view of the zone built
 ## (Main.tell_view_ready); the server ends that player's arrival shelter. An old
 ## client never sends it, and the shelter runs its 6 s.
+## 36 (548 amended): the "offers" message may carry a talking monster's free deal
+## (kind "deal", cost 0, no what.steps: the draugr's "again" for one who paid);
+## an old client's panel skips it, and only the typed yes reaches it.
 const PROTOCOL_REVISION := 36
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]

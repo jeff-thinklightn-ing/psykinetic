@@ -495,6 +495,14 @@ var bless: Callable
 ## The charges the players in a zone hold, summed: (zone name) -> int;
 ## Main's charges_in_zone (573). Unset, none.
 var charges_in: Callable
+## The draugr's deal [param player_id] paid for in [param zone] and has not
+## won (548 amended): (player id, zone name) -> {level, paid_step}, {} for
+## none; Main's paid_deal_of, from the player's record. Unset, none.
+var paid_deal: Callable
+## The draugr's deal paid for, or won (548 amended): (player id, zone name,
+## level) -> void, the level "" erasing it; Main's set_deal_paid, on the
+## player's record. Unset, nothing is kept.
+var deal_paid: Callable
 ## Puts an entity of a spec ({kind, name, tile, props, idle...}) into the
 ## zone World is in, as a level's are (Main's _spawn); null if it cannot.
 ## Unset (a test that builds its own), nothing is spawned.
