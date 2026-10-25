@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- In the practice hall, F7 opens the tuning panel: every tunable number in a list by group with a slider or a typed value, changes marked with their own reset, Reset all, Save, Copy to review and Load; its Arena tab spawns any monster kind (fighting or standing) or a dummy where you next click, clears them, gives you any item, fills hp and stamina, resets the hall and sets the time scale (673).
 - Monsters' fight timings (wind-up, charge, dart, flank, fleeing) are now read from levels/monsters.json instead of being fixed in code, ready for the fight-tuning panel; no fight plays differently.
 - Pay the draugr once and you may face him again as often as you like at the level you paid for, for no more gold, until you beat him; he offers "Face the draugr again" and never takes your gold twice.
 - Your companion now steps out of a boss's marked ground (the draugr's spin or charge) before the blow lands, if she can see him, and won't walk into it while it shows; devoted and standing over you downed, she stays and takes it.

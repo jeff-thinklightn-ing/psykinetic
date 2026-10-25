@@ -652,6 +652,8 @@ var deal_panel: DealPanel
 ## server's word ("admin" after the join); _admin_refused counts the
 ## server's refusals (logged as a count, never who).
 var admin_panel: AdminPanel
+## Feel tuning's window (673, ui's side): F7 in a local host.
+var tuning_panel: TuningPanel
 var is_admin := false
 var _admin_refused := 0
 ## The notes pinned to doors (643, ui's side; npc's "notes" message): by
@@ -841,6 +843,13 @@ func _set_camera_value(path: String, value: Variant) -> bool:
 		return false
 	_client3d.set(key, value)
 	return true
+
+
+## The tuning panel's Reset the hall (673, ui's side): the zone laid again
+## from its map, as the console's "zone reset", the tuning kept.
+func _reset_hall() -> void:
+	if Tuning.allowed():
+		talk.add_line("Tuning", admin_command("zone reset %s" % World.zone.name), true, true)
 
 
 ## The practice hall's dummies (decision 673, Tuning.spawn_dummy), one at
@@ -1368,6 +1377,12 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	var click := event as InputEventMouseButton
 	if click == null:
+		return
+	if click.button_index == MOUSE_BUTTON_LEFT and click.pressed and tuning_panel != null and not tuning_panel.picking.is_empty():
+		var cell := _mouse_tile()
+		if cell != NONE:
+			tuning_panel.place(cell)  # 673, ui's side: the arena's spawn at the cell clicked.
+		get_viewport().set_input_as_handled()
 		return
 	if click.button_index == MOUSE_BUTTON_LEFT and click.pressed and _bubble_clicked():
 		get_viewport().set_input_as_handled()  # 560, ui's side: the greeting's bubble opens the talk bar.
@@ -9489,6 +9504,11 @@ func _build_talk() -> void:
 	admin_panel = AdminPanel.new()  # 672.
 	admin_panel.ran.connect(send_admin)
 	$HUD.add_child(admin_panel)
+	tuning_panel = TuningPanel.new()  # 673, ui's side.
+	tuning_panel.player = _local_player
+	tuning_panel.reset_hall.connect(_reset_hall)
+	tuning_panel_toggled.connect(tuning_panel.toggle)
+	$HUD.add_child(tuning_panel)
 	deal_panel.offered.connect(_offer_deal)  # 629, ui's side: a button sends his deal's id with its sum.
 	note_sheet = NoteSheet.new()  # 643, ui's side: a note on a door, read.
 	$HUD.add_child(note_sheet)
@@ -9650,7 +9670,7 @@ func _bubble_tile_px() -> float:
 ## The chat box is open: the game's keys are the box's.
 func is_typing() -> bool:
 	return _chat_box != null and _chat_box.visible or _builder_ui != null and _builder_ui.is_typing() \
-			or admin_panel != null and admin_panel.is_typing()
+			or admin_panel != null and admin_panel.is_typing() or tuning_panel != null and tuning_panel.is_typing()
 
 
 func _open_chat() -> void:
@@ -13095,8 +13115,12 @@ func _phrase_of(keycode: int) -> int:
 ## Esc: whatever is open closes first (the options, an open chest or
 ## companion's pack, the menu itself); with nothing open, the game menu.
 func escape() -> void:
-	if admin_panel != null and admin_panel.visible:
+	if tuning_panel != null and tuning_panel.visible and not tuning_panel.picking.is_empty():
+		tuning_panel.picking = ""  # 673, ui's side: a cell pick let go, the panel kept.
+	elif admin_panel != null and admin_panel.visible:
 		admin_panel.close()  # 672: the admin panel first.
+	elif tuning_panel != null and tuning_panel.visible:
+		tuning_panel.close()
 	elif _bar != null and _bar.visible:
 		_close_bar()  # 560, ui's side: the talk bar, then the barter window.
 	elif barter_panel != null and barter_panel.is_open():

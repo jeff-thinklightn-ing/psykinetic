@@ -29680,3 +29680,42 @@ move to levels/monsters.json, so the tuning panel can set them live. Release:
   applied reach the next spawn, and reset gives the file's values again.
 - **Wire**: none (server sim; a client's monsters carry the defaults). No
   new class_name.
+## 673, ui's side. The tuning panel
+
+Combat's 673 holds the fields (Tuning); ui builds the window to it, as the
+coordinator's design (C:/dev/review/combat/tuning/design.md) splits it.
+
+- **Where:** render/tuning_panel.gd (TuningPanel), on Main's HUD. F7 in a
+  local host (Main.tuning_key emits tuning_panel_toggled) toggles it; open()
+  does nothing unless Tuning.allowed(), so a joined client never shows it.
+  Esc lets an arena pick go first, then closes it (after the admin panel).
+  While a typed field has the keys the player does not walk (Main.is_typing).
+- **Fields tab:** a row for each of Tuning.fields(), under its group's
+  heading (a group with a field that takes at a spawn says "new spawns
+  only"), read afresh at each open so a tree's later source shows. The
+  control follows the kind: an int or float a slider over its min to max
+  (an int's step 1, a float's a 200th) with a typed number beside it, a bool
+  a checkbox, ints or floats a typed list ("4, 6, 8", commas or spaces).
+  A change goes through Tuning.apply at once; a refused one (a word, a
+  wrong length) changes nothing and says so. A changed row (Tuning.changes)
+  is marked "* " in rust with its Reset; Reset all, a filter by path, Save
+  (Tuning.save), Copy to review (the newest save, saved first if there are
+  changes, Tuning.copy_to_review) and Load (a pick of the saves in
+  Tuning.save_dir, newest first, Tuning.load_file).
+- **Arena tab:** a monsters.json kind (Monster.kinds) with Fights on or off,
+  "Spawn at a click" and "Dummy at a click": the next left click in the
+  world (Main._unhandled_input, before any other click) places it at the
+  cell under the cursor (Tuning.spawn_kind / spawn_dummy); Clear
+  (Tuning.clear); an item (Items.ids) given to the local player
+  (Tuning.give); Full hp and stamina (Tuning.full); Reset the hall (the
+  console's "zone reset" for this zone, the tuning kept, its dummies laid
+  again by place_dummies); the time keys' buttons and the scale shown.
+- **Wire:** none. A local host is the world, so the panel calls Tuning
+  directly; no message, command or replicated field.
+- **Tests:** ui_test _test_tuning_panel: a client's F7 opens nothing; a row
+  a field with its kind's control; typed numbers and lists; a change taken
+  and marked, a word refused, a row's reset and reset all; the filter; save,
+  then load in a scratch folder; the arena's pick waiting and Esc letting it
+  go.
+
+New class_name: TuningPanel.

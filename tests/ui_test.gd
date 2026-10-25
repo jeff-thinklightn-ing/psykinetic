@@ -42,6 +42,7 @@ func _ready() -> void:
 	_test_arrival_card()
 	_test_room_names()
 	_test_admin_panel()
+	_test_tuning_panel()
 	_test_access()
 	_test_keys()
 	_test_barter()
@@ -968,6 +969,67 @@ func _test_room_names() -> void:
 
 ## The admin panel (672): the console's shapes release's scripts read, the
 ## gate, the quest reset's card, the panel.
+## Feel tuning's window (673, ui's side): a row a field, its kind's
+## control, a change taken and marked, reset, save and load in a scratch
+## folder, the arena's pick at a cell; nothing away from a local host.
+func _test_tuning_panel() -> void:
+	print("== the tuning panel (673, ui's side): rows, apply, reset, save, load, the arena ==")
+	var panel: TuningPanel = _main.tuning_panel
+	if panel == null:
+		_check(false, "the tuning panel exists")
+		return
+	var mode := Net.mode
+	var kept_dir := Tuning.save_dir
+	Net.mode = Net.Mode.CLIENT
+	panel.open()
+	_check(not panel.visible, "a joined client: F7's panel does not open")
+	Net.mode = Net.Mode.HOST
+	Tuning.save_dir = preload("res://tests/test_ports.gd").scratch("tuning_saves")
+	DirAccess.make_dir_recursive_absolute(Tuning.save_dir)
+	for old in DirAccess.get_files_at(Tuning.save_dir):
+		DirAccess.remove_absolute(Tuning.save_dir.path_join(old))
+	_main.tuning_panel_toggled.emit()
+	_check(panel.visible and panel._rows.size() == Tuning.fields().size(), "F7: open, a row a field (%d of %d)" % [panel._rows.size(), Tuning.fields().size()])
+	var kinds := {}
+	for path: String in panel._rows:
+		var entry: Dictionary = panel._rows[path]
+		kinds[entry["kind"]] = entry["control"] if entry["control"] != null else entry["value"]
+	_check(kinds.get("float") is HSlider and kinds.get("int") is HSlider and kinds.get("bool") is CheckBox and kinds.get("ints") is LineEdit,
+			"a slider a number, a checkbox a bool, a typed line a list (%s)" % [kinds.keys()])
+	_check(TuningPanel.parse_typed("4, 8 12", "ints") == [4.0, 8.0, 12.0] and TuningPanel.parse_typed("x", "float") == null
+			and TuningPanel.parse_typed("0.5", "float") == 0.5 and TuningPanel.shown([4, 8]) == "4, 8",
+			"typed numbers and lists read and shown")
+	var was := World.swing_base
+	_check(panel.set_value("combat.swing_base", was + 2.0) and is_equal_approx(World.swing_base, was + 2.0) and panel.marked("combat.swing_base"),
+			"a change takes at once and its row is marked (%s)" % World.swing_base)
+	panel._typed("items.bow.steps", "4, 6, 8, 10, 12, 14")
+	_check(Items.verb_of("bow").get("steps") == [4, 6, 8, 10, 12, 14] and panel.marked("items.bow.steps"), "a typed list takes (%s)" % [Items.verb_of("bow").get("steps")])
+	panel._typed("combat.swing_base", "lots")
+	_check(is_equal_approx(World.swing_base, was + 2.0), "a word typed for a number changes nothing")
+	panel.reset("items.bow.steps")
+	_check(not panel.marked("items.bow.steps") and panel.marked("combat.swing_base"), "a row's reset: that one back, the other kept")
+	panel._filter.text = "swing_base"
+	panel._show_rows()
+	_check(panel.shown_rows() >= 1 and panel.shown_rows() < panel._rows.size(), "the filter narrows the rows (%d)" % panel.shown_rows())
+	panel._filter.text = ""
+	panel._show_rows()
+	var saved := panel.save()
+	_check(not saved.is_empty() and TuningPanel.saves().size() == 1, "save: one file in the save folder (%s)" % saved)
+	panel.reset_all()
+	_check(is_equal_approx(World.swing_base, was) and not panel.marked("combat.swing_base"), "reset all: the repo's values")
+	_check(panel.load_save(TuningPanel.saves()[0]) == 1 and is_equal_approx(World.swing_base, was + 2.0) and panel.marked("combat.swing_base"),
+			"load: the save's change back and marked")
+	panel.reset_all()
+	panel.pick("dummy")
+	_check(panel.picking == "dummy", "the arena's dummy waits for a cell")
+	_main.escape()
+	_check(panel.picking.is_empty() and panel.visible, "Esc lets the pick go, the panel kept")
+	panel.close()
+	_check(not panel.visible, "closed")
+	Tuning.save_dir = kept_dir
+	Net.mode = mode
+
+
 func _test_admin_panel() -> void:
 	print("== the admin panel (672): one dispatcher, the gate, quests reset, the panel ==")
 	# Release's scripts: stage.sh and deploy_box.ps1 read the protocol out of
