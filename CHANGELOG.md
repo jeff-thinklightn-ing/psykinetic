@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The dark elven tower's doors and its way arches are blue-black like its walls, no longer warm wood and grey stone (659 amended, art-kit's side).
 - Nine items that were grey boxes now look like themselves in a hand, on the ground or in a chest: the miner's pick, a folded hide of leather, a roast joint, the buckler, mail, plate and leather armour, the mage's robes and the steadying draught's clay flask (670).
 - When the draugr vanishes he can leave his things behind: a heap of his cloak and rotted mail, his crown tipped on its side, two arm rings and his great axe lying across the floor (573 amended (4), art-kit's side; drawn where enemy-ai places it).
 - A sword now has a leather scabbard and a dagger or knife a sheath, ready for the weapon to be put away at the hip (662, art-kit's side; drawn once pc-character's rest poses use them).

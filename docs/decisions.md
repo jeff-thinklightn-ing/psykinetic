@@ -29947,3 +29947,19 @@ leather_armour, robes, steadying_draught.
 Worn armour is still person_look's Armour_* parts, tinted by the item's colour: these are the
 pieces held, dropped, in a chest or in the pack. Art and slots only: client only, protocol
 unchanged, no new class_name.
+## 659 amended, art-kit's side: the dark set's doors and arch
+
+In dungeon's 659 step 2 stills the tower's way-arch cue and its rooms' doors drew in warm wood and
+grey stone against the blue-black set (dungeon; the coordinator approved both fixes).
+
+- **building.link_arch variant 3**: variant 2's stone arch with its faces moved to the palette's
+  row 8. A link names its cue's variant (as the tower's stairs name 3), so dungeon names 3 in the
+  tower's links; no code.
+- **door.single and door.double variant 2**: the same meshes (leaf and part names kept, so the
+  hinges, picks and states work as before) on row 8, the frame blue-black, the leaves darker, the
+  irons in the set's pale inlay colour. Client3D.DOOR_VARIANTS ({"dark": 2}) picks a doorway's
+  variant by its edge's wall set (_set_of) in _add_doorway; any other set's door stays variant 1.
+  The door node carries its variant as meta "variant".
+
+view_test _test_dark_set: a door in a dark wall is door.single variant 2, in a stone wall variant
+1. Client only, protocol unchanged, no new class_name.

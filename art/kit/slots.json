@@ -1027,6 +1027,7 @@
 			"kind": "edge",
 			"size": [0.5, 3.0, 1.0],
 			"budget": 600,
+			"variants": 2,
 			"uses": "a door on a cell edge: the frame in the wall, its leaf swinging with the Door (Client3D._add_doorway, _sync_doors); open and closed are the leaf's swing, the other states (decision 256) are state_<name> nodes, a broken door's on its open leaf. Its opening 0.8 x 2.4 m (decision 402, Jeff: the doors read too small beside a 1.75 m body): jambs 0.1 m, the lintel from 2.4 to 3.0 m, the leaf hinged at the -z jamb",
 			"states": ["locked", "barred", "broken"],
 			"parts": [
@@ -1038,7 +1039,7 @@
 				{"at": [0, 2.7, 0], "size": [0.5, 0.6, 0.8]}
 			],
 			"source": {"by": "art-kit", "tool": "blender", "license": "own", "date": "2026-10-17",
-				"notes": "a plank door by hand (a stand-in until Jeff picks a candidate): timber jambs and lintel, four planks, two battens, iron straps and latch; replaced the Kenney fill, whose frame could not open 0.8 x 2.4"}
+				"notes": "a plank door by hand (a stand-in until Jeff picks a candidate): timber jambs and lintel, four planks, two battens, iron straps and latch; replaced the Kenney fill, whose frame could not open 0.8 x 2.4; variant 2 the dark set's (659 amended, art-kit's side): this mesh with its faces moved to the palette's row 8 (blue-black, the pale inlay on its irons), C:/dev/review/tower/doors"}
 		},
 		"tree.broadleaf": {
 			"category": "trees",
@@ -1872,10 +1873,10 @@
 			"footprint": [3, 1],
 			"size": [3.05, 4.0, 0.9],
 			"tolerance": 0.2,
-			"variants": 2,
+			"variants": 3,
 			"materials": 2,
 			"budget": 1200,
-			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-22", "notes": "C:/dev/review/transitions/make_arch.py: variant 1 timber, two rough squared posts on stone pads leaning in a hair, a heavy lintel under a ridge cap of boards, knee braces, a weathered sign board with a dark arrow hung on two chains, an iron lantern hanging behind it, its flame the warm glow material (energy 1), 175 tris; variant 2 stone, two piers of coursed blocks each course its own, battered, a round arch of nine voussoirs proud of the wall with a lighter keystone, spandrels, a two-step coping, 336 tris"},
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-22", "notes": "C:/dev/review/transitions/make_arch.py: variant 1 timber, two rough squared posts on stone pads leaning in a hair, a heavy lintel under a ridge cap of boards, knee braces, a weathered sign board with a dark arrow hung on two chains, an iron lantern hanging behind it, its flame the warm glow material (energy 1), 175 tris; variant 2 stone, two piers of coursed blocks each course its own, battered, a round arch of nine voussoirs proud of the wall with a lighter keystone, spandrels, a two-step coping, 336 tris; variant 3 the dark set's (659 amended, art-kit's side): variant 2's stone arch with its faces moved to the palette's row 8 (blue-black), C:/dev/review/tower/doors"},
 			"uses": "a gate over a zone link (decision 589, maps' zone-transition cues, the coordinator approved; Jeff: \"descending/ascending steps, arches, etc.\"), 3 x 1 cells: the link the middle cell under it, the posts on the side cells; scenery only, placed by the loader from the link's data (the sim's walk unchanged), its posts thick at the cells' edges so they read solid; front +z the way out; variant 1 timber (the default), 2 stone (where a castle, town or barrow lies beyond)",
 			"grey": [
 				{"at": [0, 2.0, 0], "size": [3.05, 4.0, 0.9]}
@@ -2064,8 +2065,9 @@
 			"kind": "edge",
 			"size": [0.5, 3, 2],
 			"budget": 3600,
+			"variants": 2,
 			"uses": "a double door over two cell edges (2 m along z): the frame, two leaves hinged at its ends, swinging apart; open and closed are the leaves' swing; its opening 1.8 x 2.4 m, as door.single's 0.8 x 2.4 (decision 402)",
-			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/door.double/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; c1, budget 900 -> 3600): its 3600 mesh fitted to 0.5 x 3 x 2; leaf_a cut out hinged at z -0.9 and mirrored for leaf_b; colours projected from the concept onto wood and iron swatches; 3408 tris"},
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/door.double/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; c1, budget 900 -> 3600): its 3600 mesh fitted to 0.5 x 3 x 2; leaf_a cut out hinged at z -0.9 and mirrored for leaf_b; colours projected from the concept onto wood and iron swatches; 3408 tris; variant 2 the dark set's (659 amended, art-kit's side): this mesh with its faces moved to the palette's row 8 (blue-black, the pale inlay on its irons), C:/dev/review/tower/doors"},
 			"states": ["locked", "barred", "broken"],
 			"grey": [
 				{"at": [0, 1.5, -0.95], "size": [0.5, 3, 0.1]},

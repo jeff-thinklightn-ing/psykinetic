@@ -393,6 +393,9 @@ const SEASON_NEAR_META := &"season_near"
 ## A doorway's door.single (ArtKit): its frame, and its hinged leaf.
 const DOOR_FRAME := ^"Door/Body"
 const DOOR_LEAF := ^"Door/leaf"
+## A door's variant by its wall's set (659 amended): the dark tower's doors
+## in its blue-black; any other set's variant 1.
+const DOOR_VARIANTS := {"dark": 2}
 ## Near pieces blend only their nearest surface: every near piece's depth
 ## is drawn first (NEAR_DEPTH_SHADER, at NEAR_DEPTH_PRIORITY), then their
 ## colour where it matches (NEAR_PRIORITY). Plain alpha showed every face
@@ -12112,8 +12115,10 @@ func _add_doorway(key: Vector3i, pair := key) -> void:
 	doorway.name = "Door_%d_%d_%s" % [key.x, key.y, "e" if key.z == Terrain.EAST else "s"]
 	doorway.position = (_edge_midpoint(key) + _edge_midpoint(pair)) * 0.5 + Vector3(0.0, _edge_base(key), 0.0)
 	doorway.rotation.y = _edge_yaw(key)
-	var piece := ArtKit.instance("door.double" if double else "door.single")
+	var variant := int(DOOR_VARIANTS.get(_set_of(key), 1))
+	var piece := ArtKit.instance("door.double" if double else "door.single", variant)
 	piece.name = "Door"
+	piece.set_meta("variant", variant)
 	doorway.add_child(piece)
 	var keys: Array[Vector3i] = [key]
 	if double:

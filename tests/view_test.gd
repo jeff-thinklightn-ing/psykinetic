@@ -3343,6 +3343,16 @@ func _test_dark_set() -> void:
 	_check(material != null and (material.get_shader_parameter("floor_dark") as Color).is_equal_approx(Client3D.swatch(at.x, at.y))
 			and not _swatch_shared(at),
 			"the shader's floor_dark is its own swatch %s, no other set's" % [at])
+	# Its doors in its own variant (659 amended), any other set's variant 1.
+	var door := Vector3i(3, 3, Terrain.SOUTH)
+	for key in Level.outline(Rect2i(2, 2, 3, 2)):
+		map.set_edge(key, "door" if key == door else "wall")
+	for walls: String in ["dark", "stone"]:
+		_rig.rebuild(Level.parse(map.to_image(), map.to_height_image(), {"walls": walls, "floors": "dark"})["terrain"], Vector2i(4, 4))
+		var piece: Node3D = (_rig._doorways[door] as Node3D).get_node_or_null("Door") if _rig._doorways.has(door) else null
+		var want := 2 if walls == "dark" else 1
+		_check(piece != null and int(piece.get_meta("variant", 0)) == want and ArtKit.variant_count("door.single") >= 2,
+				"a %s wall's door is door.single variant %d (%s)" % [walls, want, piece.get_meta("variant", 0) if piece != null else "none"])
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
 
