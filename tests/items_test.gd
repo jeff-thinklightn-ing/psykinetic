@@ -581,23 +581,23 @@ func _test_weapons() -> void:
 	World.try_stance(host, "draw")
 	var reached := []
 	var stepped_to := []
-	for drawn in [3, 6, 7, 11, 12, 17, 18, 24, 25, 32, 33, 60]:
+	for drawn in [3, 5, 6, 9, 10, 14, 15, 20, 21, 26, 27, 60]:
 		host.raised_tick = World.tick - drawn
 		reached.append(World.range_of(host))
 		stepped_to.append(World.full_range_of(host))
 	_check(reached == [5, 5, 7, 7, 9, 9, 11, 11, 13, 13, 15, 15] and World.longest_range(host) == 15,
-			"range by the hold (decision 669): 5 cells at 3 ticks, 7 at 7, full draw's 9 at 12, then the bands, 11 at 18, 13 at 25, 15 at 33, held there (%s)" % [reached])
+			"range by the hold (decisions 669, 669 amended (2)): 5 cells at 3 ticks, 7 at 6, full draw's 9 at 10, then the bands, 11 at 15, 13 at 21, 15 at 27, held there (%s)" % [reached])
 	_check(stepped_to == [0, 0, 0, 0, 9, 9, 9, 9, 9, 9, 9, 9], "the full-strength edge shown from full draw on, at 9 cells (%s)" % [stepped_to])
-	host.raised_tick = World.tick - 6
-	_check(is_equal_approx(World.draw_of(host), 0.5), "drawn 6 ticks of full draw's 12: half the pull's pose (%.2f)" % World.draw_of(host))
+	host.raised_tick = World.tick - 5
+	_check(is_equal_approx(World.draw_of(host), 0.5), "drawn 5 ticks of full draw's 10: half the pull's pose (%.2f)" % World.draw_of(host))
 	var cones := []
 	for drawn in [0, 3, 5, 7, 9, 12, 18, 60]:
 		host.raised_tick = World.tick - drawn
 		cones.append(snappedf(rad_to_deg(World.spread_of(host)), 0.1))
 	var cones_ok := true
 	for i in cones.size():
-		cones_ok = cones_ok and is_equal_approx(cones[i], [20.0, 20.0, 15.0, 10.0, 7.6, 4.0, 4.0, 4.0][i])
-	_check(cones_ok, "the cone narrows with the draw (decisions 620, 669): 20 degrees till the first step, 10 at the second, 4 at full draw, lerped between, held at 4 past it (%s)" % [cones])
+		cones_ok = cones_ok and is_equal_approx(cones[i], [20.0, 20.0, 13.3, 8.5, 5.5, 4.0, 4.0, 4.0][i])
+	_check(cones_ok, "the cone narrows with the draw (decisions 620, 669): 20 degrees till the first step (3 ticks), 10 at the second (6), 4 at full draw (10), lerped between, held at 4 past it (%s)" % [cones])
 	var bow_verb := Items.verb_of("bow")
 	var by_distance := []
 	for away in [1, 9, 10, 11, 12, 13, 14, 15]:
@@ -692,7 +692,7 @@ func _test_weapons() -> void:
 		host.shot.disconnect(seen)
 		imp.hp = maxi(1, imp_hp - 7)  # Left as hurt as its shots here always left it: the tests after count on it.
 		World.try_stance(host, "draw")
-		host.raised_tick = World.tick - 30
+		host.raised_tick = World.tick - 24
 		var drawn_from := host.raised_tick
 		var stood := host.tile
 		var stepped := false

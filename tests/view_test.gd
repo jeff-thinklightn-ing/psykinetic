@@ -6850,8 +6850,8 @@ func _test_bow() -> void:
 	_check((on_string != null and on_string.is_visible_in_tree()) or not ArtKit.has("fx.arrow"),
 			"an arrow on the string, shown (Jeff: \"the arrow doesn't load into the bow with drawing\")")
 	# Scrubbed by the sim's draw (bow_pull): the nock by the ticks to draw_min,
-	# then the pull by draw_of (0.5 at 6 of the bow's 12 ticks to full draw,
-	# decision 669: a third of the way from draw_min's 0.25 to 1).
+	# then the pull by draw_of (from draw_min's 3 ticks to the bow's draw_full,
+	# decision 669).
 	var alpha := World.tick_alpha
 	World.tick_alpha = 0.0
 	var length := rig.length("Bow_Draw")
@@ -6861,8 +6861,9 @@ func _test_bow() -> void:
 		_rig._process(0.0)
 		poses.append(rig.upper_position() / length)
 	World.tick_alpha = alpha
-	var expected := [Client3D.BOW_NOCK_END * 2.0 / 3.0, Client3D.BOW_NOCK_END + (1.0 - Client3D.BOW_NOCK_END) / 3.0,
-			Client3D.BOW_NOCK_END + (1.0 - Client3D.BOW_NOCK_END) * 2.0 / 3.0]
+	var full := float(Items.verb_of("bow")["draw_full"])  # 10 ticks since 669 amended (2).
+	var expected := [Client3D.BOW_NOCK_END * 2.0 / 3.0, Client3D.BOW_NOCK_END + (1.0 - Client3D.BOW_NOCK_END) * 3.0 / (full - 3.0),
+			Client3D.BOW_NOCK_END + (1.0 - Client3D.BOW_NOCK_END) * 6.0 / (full - 3.0)]
 	_check(range(3).all(func(i: int) -> bool: return absf(poses[i] - expected[i]) < 0.02) and rig.upper_speed() == 0.0,
 			"the pose scrubbed by the draw: nocking before draw_min, then drawn back as draw_of grows (%s of the clip, expected %s)" % [poses, expected])
 	player.raised_tick = World.tick - 20

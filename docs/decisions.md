@@ -30328,3 +30328,13 @@ multiple (how fast the bow draws) stays until the redesign replaces it. 669's "a
 reach" bullet is withdrawn. items_test `_test_armour`: in plate, held long, the bow reaches 15
 cells at step 5. Protocol unchanged and no new class_name, but items.json is server data, so the
 cut needs a deploy.
+
+## 669 amended (2): the bow draws faster
+
+Jeff, after the v0.1.175 bow test: "drawing speed should be a little faster too ie the range cone
+extension". The bow's draw_steps in levels/items.json go from [4, 5, 6, 7, 8] to [3, 4, 5, 6, 6],
+with draw_min still 3. That brings full draw (9 cells) to 10 ticks, 1.0 s (was 12, 1.2 s), and
+the full stretch (15 cells) to 27 ticks, 2.7 s (was 33, 3.3 s): about a fifth sooner. The cone
+narrows on the same steps. It stays an F7 field (items.bow.draw_steps; 673). items_test's range
+and cone by the hold; view_test's pose scrubbed by draw_full. Protocol unchanged, no new
+class_name; items.json is server data, so it needs a deploy.

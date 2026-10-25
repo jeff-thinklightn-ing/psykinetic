@@ -2886,7 +2886,7 @@ func _test_archer_hold() -> void:
 			"an aim_spread under the bow's floor is raised to it, with a warning (%s)" % read["steady"]["aim_spread"])
 	# Three off, its first step reaches: the draw's cone says when it looses.
 	for hold: Array in [[0.0, 0, 3, "no hold: as soon as the draw reaches, 3 ticks"], [16.0, 0, 5, "16 degrees: on the way to the second step, 5 ticks"],
-			[6.0, 0, 11, "6 degrees: on the way to full draw, 11 ticks"], [2.0, 25, 25, "under the floor, capped at 25: at the cap, 25 ticks"]]:
+			[6.0, 0, 9, "6 degrees: on the way to full draw, 9 ticks (669 amended (2))"], [2.0, 25, 25, "under the floor, capped at 25: at the cap, 25 ticks"]]:
 		var e := _build(["##########", "#........#", "#..P..a..#", "#........#", "##########"])
 		var archer: Monster = e["a"][0]
 		_bold(archer)
