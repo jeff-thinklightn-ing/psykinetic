@@ -9,6 +9,7 @@ notes (decision 324).
 
 - The bow looses on the left button's release again (583 amended (2)): Shift plants and draws, let the left button go to shoot; Shift up with the left button held stays drawn.
 - The bow tires the arms half as fast (1 stamina a tick held at full draw, 10 s from full) and hits harder held past full draw: 1.6 to 11 cells, 1.2 to 13, 0.8 to 15 (4/3/2 pips; 669 amended).
+- A fleeing stag or deer far off now runs smoothly: it no longer runs a step, stops and runs again once it is more than about 22 cells from you.
 - Sheathing and drawing are seen: calm a while, a fighter turns to the left hip and slides the sword, dagger or knife home (the shield goes on the back as the blade goes in); roused by a fight near, they draw it before guarding. Raising a guard or striking cuts either at once, the blade straight to hand.
 - Animals left in an area when everyone leaves go back into their herds, so a town's hunters can hunt them again; they're made again when someone comes back.
 - The Character Lab compares and measures: Compare puts a second body beside the first (your export beside the game's), a line under each says the pace its feet want and how much they slide at the game's, marks on the floor show the planted toe, and Use measured tries the measured pace. The people's walk, jog and sprint paces are on the tuning panel (F7), unchanged (674 step 3).

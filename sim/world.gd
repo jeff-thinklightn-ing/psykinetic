@@ -1135,7 +1135,10 @@ func _thinks(entity: GridEntity, near: Array[Vector2i]) -> bool:
 ## near starts idling over WAKE_SPREAD_TICKS, not all on one tick.
 func _tier(entity: GridEntity, near: Array[Vector2i]) -> Tier:
 	var monster := entity as Monster
-	if near.is_empty() or monster.target != null:
+	# One fleeing keeps every tick as one with a target does (enemy-ai, Jeff's
+	# hunting: "the stag started to run and phase glitch while at a distance"):
+	# on MID past NEAR_TILES it stepped every MID_EVERY_TICKS, twice its pace.
+	if near.is_empty() or monster.target != null or monster.alert == Monster.Alert.FLEEING:
 		monster.tier = Tier.NEAR
 		monster.tier_tick = tick
 		monster.beyond_view = false

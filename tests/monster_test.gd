@@ -87,6 +87,7 @@ func _ready() -> void:
 	_test_wild_prey()
 	_test_wild_ears()
 	_test_wild_shot_near()
+	_test_far_pace()
 	_test_wild_scent()
 	_test_wild_boar()
 	_test_wild_wolf()
@@ -1766,6 +1767,48 @@ func _test_wild_shot_near() -> void:
 	World.step()
 	_check(rabbit.alert == Monster.Alert.FLEEING, "the arrow falls beside it with a thud: it bolts (%s)" % Monster.Alert.keys()[rabbit.alert])
 	World.despawn(rabbit)
+
+
+## Smooth where it is seen (Jeff's hunting: "the stag started to run and
+## phase glitch while at a distance"): past NEAR_TILES a monster on MID
+## stepped only on its every MID_EVERY_TICKS think, a cell at twice its
+## pace, the client's tween at its pace running and stopping. One fleeing
+## keeps every tick, as one with a target does: its steps come at its pace.
+func _test_far_pace() -> void:
+	print("%s== past %d cells, a fleeing stag steps at its own pace ==" % [char(10), World.NEAR_TILES])
+	Monster.idling = true
+	var rows: Array[String] = ["#".repeat(70)]
+	for y in 5:
+		rows.append("#" + ".".repeat(68) + "#")
+	rows.append("#".repeat(70))
+	var e := _build(rows)
+	var hunter := EntityFactory.build(SPECS["P"].merged({"name": "FarHunter"})) as GridEntity
+	_room.add_child(hunter)
+	World.spawn(hunter, Vector2i(2, 3))
+	var stag := EntityFactory.build({"script": "res://sim/animal.gd", "shape": "capsule", "kind": "stag", "name": "FarStag", "tile": Vector2i(12, 3)}) as Animal
+	_room.add_child(stag)
+	World.spawn(stag, Vector2i(12, 3))
+	stag._pace = 4.4  # Its run a little over MID_EVERY_TICKS (its kind's spread rolls about it): on MID, a cell in 8.
+	World.step()
+	var gaps: Array[int] = []
+	var last := stag.tile
+	var at := World.tick
+	var fled := true
+	for i in 120:
+		if i % 15 == 0 and stag.tile.x < 60:
+			World.noise(stag.tile - Vector2i(2, 0), Senses.NOISE_FIGHT, &"fight", hunter)  # Kept on the run.
+		World.step()
+		fled = fled and stag.alert == Monster.Alert.FLEEING
+		if stag.tile != last:
+			if fled and World.distance(stag.tile, hunter.tile) > World.NEAR_TILES + 1 and World.distance(stag.tile, hunter.tile) <= World.VIEW_TILES:
+				gaps.append(World.tick - at)
+			last = stag.tile
+			at = World.tick
+			fled = stag.alert == Monster.Alert.FLEEING  # A flee run out, it stands a moment: not counted.
+	_check(gaps.size() >= 4 and gaps.max() <= ceili(stag.move_ticks) + 1,
+		"fleeing past %d cells: a cell every %s ticks, its pace %.2f (no MID gap of %d)" % [World.NEAR_TILES, gaps, stag.move_ticks, 2 * World.MID_EVERY_TICKS])
+	World.despawn(stag)
+	World.despawn(hunter)
 
 
 func _test_wild_scent() -> void:

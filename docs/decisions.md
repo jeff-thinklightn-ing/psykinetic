@@ -30164,3 +30164,28 @@ or past full draw (20 → 10 stamina a second, a full 100 held 10 s); damage_at 
 1.2 to 13 and 0.8 to 15 (4/3/2 pips, was 3/2/1). Both stay F7 fields (items.bow.drain,
 items.bow.damage_at; 673). The server reads them from items.json: protocol unchanged, but the
 cut deploys the server. items_test, combat_test `_test_draw_held`, ui_test pips.
+## 238 amended: a fleeing monster keeps the full rate
+
+Jeff on v0.1.173, hunting: "for hunting stag, the stag started to run and phase glitch while at a
+distance". It bends 193's tiers. World._tier kept a monster on NEAR (it thinks every tick) only
+while it had a target or stood within NEAR_TILES (22, 238) of a player. Past that it went to MID,
+thinking every MID_EVERY_TICKS (4). A fleeing animal has no target, and a step lands only on a
+think, so on MID its pace p became ceil(p / 4) x 4 ticks a cell. The stag's run of about 4.4
+became 8. The client tweens each cell at its replicated move_ticks, so it ran a cell, stood, and
+ran again. There was also a stall of up to 15 ticks where the tier changed. The view reaches 24
+to 28 cells since the camera changes, so the 22 to 30 band is seen. With the bow's 9 to 15 cell
+shots (669), a stag sees the hunter at 9 and runs straight into that band.
+
+- **The rule**: a monster whose alert is FLEEING is NEAR, as one with a target is, wherever it
+  is. Its flee is short (flee_ticks, 60) and few flee at once, so it costs little.
+- **Ruled out**: network interest (about 36 cells, net/interest.gd), the client's puppet freeze
+  (Client3D._sync_puppets' reach, at least 30), herd retire and recall (FAR past 60, calm only),
+  and doubling back (after its flee it walks home, toward the hunter, at its idle pace).
+- **Next, after a bench**: a monster walking in the 22 to 30 band shows the same run and stop on
+  MID (an idle walk of 4.2 ticks a cell becomes 8, a brute's 5.6 becomes 8, a grazing stag's 6.9
+  becomes 8). Keeping walkers within VIEW_TILES on NEAR is built but waits for map_bench numbers
+  against 238's budget.
+
+monster_test _test_far_pace: a stag kept fleeing, its pace 4.4, steps every 4 or 5 ticks at 23 to
+30 cells; main gave 8 every step. Steps after a flee runs out and it stands a moment are not
+counted. Server only, protocol unchanged, no new class_name.
