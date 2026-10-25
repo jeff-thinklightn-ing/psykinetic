@@ -585,6 +585,17 @@
 			"name": "a ruined barn"
 		}
 	},
+	"rooms": {
+		"umbrage": {
+			"name": "Umbrage",
+			"rect": [
+				190,
+				191,
+				38,
+				41
+			]
+		}
+	},
 	"waters": [
 		{
 			"points": [
