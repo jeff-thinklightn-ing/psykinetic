@@ -17,8 +17,10 @@ extends PanelContainer
 ## Reset the practice hall (Main: the zone laid again, the tuning kept).
 signal reset_hall
 
-const WIDTH := 620.0
-const HEIGHT := 640.0
+## In the 3840 by 2160 base (project.godot): a row's path, slider, typed
+## number and reset on one line, and a long list of rows.
+const WIDTH := 1300.0
+const HEIGHT := 1500.0
 ## A slider's steps for a float field's range.
 const FLOAT_STEPS := 200.0
 const LIST_HINT := "numbers, comma-separated"
@@ -229,7 +231,7 @@ func _row_for(field: Dictionary) -> Control:
 	label.text = path
 	label.tooltip_text = "%s (%s, %s's)" % [path, kind, field.get("owner", "")]
 	label.mouse_filter = Control.MOUSE_FILTER_PASS
-	label.custom_minimum_size.x = 250.0
+	label.custom_minimum_size.x = 560.0
 	label.clip_text = true
 	line.add_child(label)
 	var entry := {"row": line, "kind": kind, "mark": label, "control": null, "value": null}
@@ -255,7 +257,7 @@ func _row_for(field: Dictionary) -> Control:
 			line.add_child(slider)
 			entry["control"] = slider
 			var typed := LineEdit.new()
-			typed.custom_minimum_size.x = 70.0
+			typed.custom_minimum_size.x = 170.0
 			typed.text_submitted.connect(func(text: String) -> void: _typed(path, text))
 			typed.focus_exited.connect(func() -> void: _show_value(path))
 			line.add_child(typed)

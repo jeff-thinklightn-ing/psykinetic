@@ -1120,6 +1120,9 @@ func _test_admin_panel() -> void:
 	panel._filter.text = "quests"
 	panel._show_help()
 	_check(panel._help.item_count == 1, "the filter narrows it (%d)" % panel._help.item_count)
+	_check(panel._help.get_item_text(0) == AdminPanel.command_of(str(panel._help.get_item_metadata(0))) and not panel._help.get_item_text(0).contains(": ")
+			and panel._help.get_item_tooltip(0).contains(": ") and AdminPanel.command_of("go <zone> [player]: you (or him) to a zone") == "go <zone> [player]",
+			"the list shows a command and its arguments, the whole line its tooltip (%s)" % panel._help.get_item_text(0))
 	panel.run("players")
 	panel.run("zones")
 	panel.run("zones")

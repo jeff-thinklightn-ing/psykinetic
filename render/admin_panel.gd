@@ -18,8 +18,10 @@ extends PanelContainer
 ## A line to run on the server (Main.send_admin).
 signal ran(line: String)
 
-const WIDTH := 760.0
-const HEIGHT := 560.0
+## In the 3840 by 2160 base (project.godot), room for the buttons, the help
+## list beside the replies, and the line.
+const WIDTH := 1500.0
+const HEIGHT := 1150.0
 const HISTORY := 30
 const CONFIRM_MSEC := 3000
 ## The hours the time buttons set.
@@ -207,14 +209,26 @@ func _show_help() -> void:
 	var wanted := _filter.text.strip_edges().to_lower()
 	for each: String in help_lines:
 		if wanted.is_empty() or each.to_lower().contains(wanted):
-			_help.add_item(each)
+			# The list shows the command and its arguments; the whole line is
+			# its tooltip, and shown in the replies when picked.
+			_help.add_item(command_of(each))
+			_help.set_item_tooltip(_help.item_count - 1, each)
+			_help.set_item_metadata(_help.item_count - 1, each)
 
 
-## A help line picked: its command, up to the first ":", in the line to fill in.
+## A help line's command and arguments: the text before its first ": ".
+static func command_of(line: String) -> String:
+	var colon := line.find(": ")
+	return (line.substr(0, colon) if colon > 0 else line).strip_edges()
+
+
+## A help line picked: its whole text in the replies, its command in the
+## line to fill in.
 func _help_picked(index: int) -> void:
-	var picked := _help.get_item_text(index)
-	var colon := picked.find(":")
-	_line.text = (picked.substr(0, colon) if colon > 0 else picked).strip_edges() + " "
+	var whole := str(_help.get_item_metadata(index))
+	_replies.append_text("[color=#%s]%s[/color]
+" % [UiTheme.color("text_dim").to_html(false), _escaped(whole)])
+	_line.text = command_of(whole) + " "
 	_line.grab_focus()
 	_line.caret_column = _line.text.length()
 
