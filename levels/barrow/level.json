@@ -303,6 +303,35 @@
 		},
 		"chests": 3
 	},
+	"rooms": {
+		"entrance": {
+			"name": "The First Hall",
+			"rect": [
+				27,
+				1,
+				26,
+				16
+			]
+		},
+		"altar": {
+			"name": "The Altar Room",
+			"rect": [
+				30,
+				24,
+				18,
+				14
+			]
+		},
+		"camp": {
+			"name": "The Robbers' Camp",
+			"rect": [
+				6,
+				42,
+				10,
+				8
+			]
+		}
+	},
 	"legend": {
 		"monster_skeleton": "#d8d0b0",
 		"monster_skeleton_guard": "#988c64",

@@ -7,6 +7,9 @@ notes (decision 324).
 
 ## Unreleased
 
+- The barrow is two depths now: the Hall of Fallen Souls is a great room at the far end of the Ossuary, sealed until the Ossuary's dead are all down, and the dark level below it is gone (anyone saved there wakes at the Ossuary's stair foot).
+- Tune: the Ossuary holds twelve skeletons and two grave guards, the guards by the Hall's door (drafts).
+- The barrow's first hall, altar room and robbers' camp, and the Hall of Fallen Souls, carry names for the on-entry card.
 - The barrow's dead are laid on open floor only, clear of every niche, grave and wall, and each one's home is the cell it was laid on (enemy-ai's side: it rests standing there); the next cut lays the barrow's three layers again.
 - The town sheet's strain line says when a fallen town is settling and how many calm days of the wait to rise again it has had, "Settling, 3 of 7 days calm." (649 amended (3), ui's side).
 - A town that falls back a stage now has to stay calm for a week before it can rise again, instead of flickering back up a moment later; its town sheet says how many calm days it has had.

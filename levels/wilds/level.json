@@ -91,7 +91,7 @@
 				217,
 				193
 			],
-			"to_map": "barrow_lair",
+			"to_map": "barrow_deep",
 			"to_spawn": "from_temple",
 			"sealed": "draugr"
 		},

@@ -467,6 +467,16 @@ static func generated_config(template_config: Dictionary, anchors: Array, genera
 		decor = config["decor"].filter(func(entry: Variant) -> bool:
 			return entry is Array and entry.size() == 6 and str(entry[4]) != "web_niche" and inside.call([entry[0], entry[1]]))
 	config["decor"] = decor
+	# The named rooms (666, ui's 665 cards): kept where their rect lies in an
+	# anchor, the one place a room keeps its walls through the generations.
+	if config.get("rooms") is Dictionary:
+		var rooms := {}
+		for key: Variant in config["rooms"]:
+			var entry: Variant = config["rooms"][key]
+			var rect: Variant = Level.town_wall_rect(entry) if entry is Dictionary and entry.get("rect") is Array else null
+			if rect != null and Level.in_anchors(anchors, rect.position) and Level.in_anchors(anchors, rect.end - Vector2i.ONE):
+				rooms[key] = entry
+		config["rooms"] = rooms
 	for key: String in ["town_walls", "roofs"]:
 		if config.get(key) is Array:
 			config[key] = config[key].filter(func(entry: Variant) -> bool:

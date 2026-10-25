@@ -51,6 +51,11 @@ const WORLD_PLANE := "res://levels/world_plane.json"
 const OVERLAY := "user://levels/"
 static var overlay_dir := OVERLAY
 const DEFAULT_MAP := "test_room"
+## Levels taken out of the game (666, dungeon's side; release: the box's
+## state is moved in code, never by hand): name -> [the zone, the cell] a
+## player saved there lands at. An overlay copy of one is ignored, and the
+## snapshot's state for it dropped (Main._boot, each with a count-only line).
+const RETIRED: Dictionary[String, Array] = {"barrow_lair": ["barrow_deep", Vector2i(49, 2)]}
 ## Grey per height level in height.png.
 const GREY_PER_LEVEL := 40
 const MAX_HEIGHT := 6
@@ -320,7 +325,7 @@ static func exists(level_name: String) -> bool:
 ## Whether level [param level_name] has been edited in the game: its files
 ## are in the overlay, which wins over DIR.
 static func overlaid(level_name: String) -> bool:
-	return not level_name.is_empty() and FileAccess.file_exists(overlay_dir + level_name + "/layout.png")
+	return not level_name.is_empty() and not RETIRED.has(level_name) and FileAccess.file_exists(overlay_dir + level_name + "/layout.png")
 
 
 ## The folder level [param level_name]'s files are read from: the overlay's

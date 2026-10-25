@@ -546,16 +546,17 @@ generator's own and passed as written. `tools/plan_sheet.tscn` draws a
 generation large, the anchors outlined (`--level=<name>` or
 `--sample=dwarven|old|barrow`, `--generation=n`, `--out=<png>`).
 
-The first real levels that regenerate are the barrow's three layers
+The first real levels that regenerate are the barrow's two depths
 (decision 580, Jeff's "crypt is still too cramped" and his answers on what
-each holds; 542 and 541 amended before it), one place to the players, the
-Barrow of the Fallen, three zones to the server, each laid again on its own
+each holds; 542 and 541 amended before it; two since 666, Jeff: "consolidate
+to two depths, barrow and ossuary"), one place to the players, the
+Barrow of the Fallen, two zones to the server, each laid again on its own
 in the barrow style every 3 days, every way five cells clear and every room
 8 x 7 or more (Jeff: "halls need to be at least 2 tiles wider than the
 walls"; a wall draws 0.5 m thick and 3 m tall, and across the camera's view
 hides about 2.5 cells behind it). The templates are written from
-`tools/plan_sheet`'s samples (`sample_barrow`, `sample_barrow_deep`,
-`sample_barrow_lair`), their twins.
+`tools/plan_sheet`'s samples (`sample_barrow`, `sample_barrow_deep`),
+their twins.
 
 - `levels/barrow`, "The Barrow", 80 x 60, `"layer": 1` (every room shallow:
   the town's newer tombs, square chambers with doors and torches): four
@@ -596,47 +597,65 @@ hides about 2.5 cells behind it). The templates are written from
   Runner's pack. The robbers (4) are sent near the altar; no dead walk it,
   and the generated level.json lists no graves and no niches for it.
 - `levels/barrow_deep`, "The Ossuary", 100 x 80, `"layer": 2` (the tombs
-  by depth): the ancient dead the town moved down (14, a draft number
-  Jeff tunes, spread a third to each depth band; decision 631; skeletons),
-  each standing on open floor in the galleries (631 amended, dungeon's
-  side, Jeff on v0.1.172: "skeletons still spawning in niches": a cell with
-  floor on all eight sides and no wall or door edge of its own, never an
-  alcove, a grave or a wall's foot; `Labyrinth._open_floor`, every
+  by depth): the ancient dead the town moved down, twelve skeletons and two
+  grave guards (666, drafts Jeff tunes; the skeletons spread a third to each
+  depth band, 631; the guards sent near the Hall, `"near": {"skeleton_guard":
+  "lair"}`), each standing on open floor in the galleries (631 amended,
+  dungeon's side, Jeff on v0.1.172: "skeletons still spawning in niches": a
+  cell with floor on all eight sides and no wall or door edge of its own,
+  never an alcove, a grave or a wall's foot; `Labyrinth._open_floor`, every
   generated monster of the barrow style), its laid cell its home (enemy-ai's
-  side: it rests there standing and walks back after a chase), and the niches
-  cut along the galleries' walls (608: shelves and columbarium cells, a
-  hollow here and there, about one wall cell in six, rock behind each; no
-  door among them). Two
-  anchors: the stair foot at the top (the link back up to "from_below")
-  and the stair room at the far side with the stair down (the link to the
-  hall's "from_above", "from_below" beside it).
-- `levels/barrow_lair`, "Hall of Fallen Souls", 100 x 80, `"layer": 3`
-  (every room deep: caverns, crooked ways, no doors, no torches; `"damp":
-  true` and `"ambient"` 0.03: no flame burns well there and the dark is
-  near total, environment's sim and terrain's look): the oldest
-  dead (6 skeletons) and, kept whole as the anchor `lair` (548's room he
-  keeps), the hall itself, 32 x 22, walled all round but for one door cell
-  in its north wall: six pillars 2 x 2 in two rows (art-kit's
-  `building.crypt_pillar`, solid doorless buildings; 580 step 3), the
-  round table at its middle (`building.round_table`, 3 x 3, solid) with
-  eight chairs round it (`building.hall_chair`, walked onto, `Level.OPEN_AIR`,
-  so a ghost sits and a player passes) and four broken tables along the
-  east and west walls (`building.broken_table`, 2 x 1 turned along the
-  wall, solid), the dais 12 x 4 at the far end one height level
-  up (the template's height.png; its front row twelve stairs, its sides
-  ledges, its back against the south wall) with the draugr on his throne
-  (`building.throne`, walked onto, at his cell facing the hall), and the
-  hidden exit behind the throne, the temple's sealed shortcut's end (540,
-  `draugr`, the spawn point "from_temple"); its one door, in the north wall,
-  shuts and locks behind the first player in while he sits (573 amended,
-  Jeff's puzzle: `Main._hold_hall_door` on the draugr's `hall_door` signal,
-  `World.hold_door` with a lock nobody holds, stone; his gold, his death or
-  one's own are the ways out; the sealed shortcut stays the blessed's way). The level's `"stills":
-  ["barrow_deep", "barrow"]` names the zones whose dead he stills when laid
-  to rest, and its `"dead"` key how the oldest dead differ (bold, seeing the
-  living in the dark, lying in no grave): enemy-ai's.
+  side: it rests there standing and walks back after a chase), and the
+  niches cut along the galleries' walls (608: shelves and columbarium cells,
+  a hollow here and there, about one wall cell in six, rock behind each; no
+  door among them). Two anchors: the stair foot at the top (the link back up
+  to "from_below") and, at the far south end, the Hall of Fallen Souls (666,
+  Jeff: "the hall just a big room off the ossuary"; the dark below's hall
+  moved whole), kept as the anchor `lair` (548's room he keeps), 32 x 22,
+  walled all round but for one door cell in its north wall: six pillars 2 x
+  2 in two rows (art-kit's `building.crypt_pillar`, solid doorless
+  buildings; 580 step 3), the round table at its middle
+  (`building.round_table`, 3 x 3, solid) with eight chairs round it
+  (`building.hall_chair`, walked onto, `Level.OPEN_AIR`, so a ghost sits and
+  a player passes) and four broken tables along the east and west walls
+  (`building.broken_table`, 2 x 1 turned along the wall, solid), the dais 12
+  x 4 at the far end one height level up (the template's height.png; its
+  front row twelve stairs, its sides ledges, its back against the south
+  wall) with the draugr on his throne (`building.throne`, walked onto, at
+  his cell facing the hall), and the hidden exit behind the throne, the
+  temple's sealed shortcut's end (540, `draugr`, the spawn point
+  "from_temple"). Its one door, in the north wall, is sealed while any of
+  the Ossuary's dead stands (666, Jeff: "they must be cleared to enter the
+  hall": enemy-ai's draugr says so by `ossuary_sealed`, true while a
+  skeleton or grave guard spawned in his zone stands, false when every one
+  is dead or laid at rest; `Main._seal_hall` holds the door with
+  `Main.DEAD_LOCK`, a key nobody holds, and E on it says "The dead bar the
+  way."), entry only: never while a living player stands inside, so the
+  dead rising never shut anyone in (a seal that waited takes hold within a
+  second of the hall emptying, `HALL_SEAL_EVERY`); and it shuts and locks
+  behind the first player in while he sits (573 amended, Jeff's puzzle:
+  `Main._hold_hall_door` on the draugr's `hall_door` signal, `World.hold_door`
+  with HALL_LOCK over any seal; his gold, his death or one's own are the
+  ways out; the sealed shortcut stays the blessed's way); let go, the seal
+  holds again by its own rule. The level's `"stills": ["barrow"]` names the
+  zone above whose dead he stills with his own when laid to rest
+  (enemy-ai's). The Hall is named on entering it (`"rooms"`, below).
+- `barrow_lair`, the dark below (580's layer 3), is retired (666): its
+  files are gone, and `Level.RETIRED` names its heir, the Ossuary's stair
+  foot (49, 2): a player saved there wakes there (`Main._move_off_retired`
+  at boot, offline or not), its snapshot zone, generation and rest are
+  dropped, and an overlay copy of it is ignored, each with one count-only
+  line ("[level] retired barrow_lair: N moved to barrow_deep, M saved
+  states dropped") for release to grep. Its damp, its near-black light and
+  its word on the oldest dead went with it.
+- The rooms named on entering them (666; ui's 665 card): a level.json's
+  `"rooms"`, key -> `{"name", "rect"}` (ui's `Level.rooms_from`): on the
+  barrow the first hall ("The First Hall"), the altar room ("The Altar
+  Room") and the camp ("The Robbers' Camp"), on the Ossuary the Hall of
+  Fallen Souls, each on its anchor's rect; drafts for lore. A generation
+  keeps a room whose rect lies inside an anchor (`Regen.generated_config`).
 
-Each layer's level.json carries `"depth"` (1, 2, 3 going down; the surface
+Each layer's level.json carries `"depth"` (1, 2 going down; the surface
 is 0): maps' zone-transition cues draw a link to a deeper level as a stair
 down and to a shallower one as a stair up from it. The block's `"layer"` and `"ways"` (3 or 5, an odd width) are the barrow
 style's own keys (`sim/level_gen/labyrinth.gd`): the brush of 541 amended
@@ -644,7 +663,7 @@ reaches two cells each side for five, carved ring by ring so a cell is
 only carved beside one already floor nearer in (a wider brush once left
 cells cut off behind a tomb's ring). The wilds hold the mound's door and
 the shortcut's other end (maps' side of 542; the shortcut's `to_map` is
-`barrow_lair`).
+`barrow_deep` since 666, maps' nod).
 The halls under the castle (613, dungeon's side; Jeff: the smith sought a
 great dwarven forge deep below, his hired guards were ambushed, and he is
 held there forging goblin weapons): `levels/castle_halls`, "The Dwarven
@@ -761,7 +780,7 @@ out, edge, kind, variant}]` (`out` the step out of the wall into the room,
 `wall.crypt.niche_<kind>` on the edge, +x toward the cell) and
 `World.niche_edges`; a bad one is said and left out. The first hall's 14 are
 the template's (`tools/plan_sheet.barrow_niches`), re-rolled each generation;
-the Ossuary's are generated (`Regen.niches_of`); the dark below has none. The
+the Ossuary's are generated (`Regen.niches_of`). The
 barrow's template holds
 enemy-ai's kinds by the level's own `"legend"` colours (skeleton, robber,
 three skeleton guards in the altar room, the draugr in his lair), Pip's niche

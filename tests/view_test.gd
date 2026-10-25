@@ -3252,8 +3252,8 @@ static func _swatch_shared(at: Vector2i) -> bool:
 ## corner web turned to its corner.
 func _test_lair() -> void:
 	print("
-== the Hall of Fallen Souls: its dais, its moss and webs ==")
-	var lair := Level.load_level("barrow_lair")
+== the Hall of Fallen Souls in the Ossuary (666): its dais, its moss and webs ==")
+	var lair := Level.load_level("barrow_deep")  # The Hall lies in the Ossuary since 666.
 	var terrain: Dictionary = lair["terrain"]
 	_rig.rebuild(terrain, lair["centre"])
 	var pieces: Array[Node] = _rig._room.find_children("Dais_*", "", false, false)

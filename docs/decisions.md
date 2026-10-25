@@ -28807,3 +28807,74 @@ and the clipping are enemy-ai's half, "631 amended, enemy-ai's side"; the two la
   list): a laid level keeps its old markers until it is laid again.
 
 Generator only, protocol unchanged, no new class_name.
+
+## 666. The barrow in two depths: the Ossuary with the Hall off it
+
+Jeff (2026-10-24, his decision through the coordinator): "consolidate to two depths, barrow and
+ossuary. barrow populated by robbers, the hall just a big room off the ossuary, when you enter the
+room, it says in the mid screen. same for entering zones. ossuary populated by skeletons and grave
+guards. they must be cleared to enter the hall. the hall becomes locked on a challenge. if you fail
+you forfeit gold and everything resets in the room but not the enemies you can still walk back
+down again to rechallenge as long as you paid once you get unlimited attempts." Dungeon led the
+design (C:/dev/review/dungeon/barrow_two_depths.md), the coordinator approved it with its answers;
+sides as "666, <tree>'s side": enemy-ai (the seal's signal, the fail reset, the free rechallenge,
+the restart), npc (the payer's record, paid_deals), ui (665, the name cards), maps (654 follows),
+lore (the lines and names). This is dungeon's side, step 1. Amends 580 (two layers, not three),
+573 amended (the seal beside the lock), 631 (the Ossuary's count).
+
+- **Two levels, the ids kept.** `barrow` ("The Barrow", layer 1, robbers) unchanged but for its
+  named rooms; `barrow_deep` ("The Ossuary", layer 2): its far anchor is now the Hall of Fallen
+  Souls, 580's hall moved whole (32 x 22 at (34, 56), against the south rim), still named `lair`
+  so Main._hall_doors and the draugr's room reading move nothing; its door at (49, 56) in the north
+  wall, the draugr at (49, 75), `from_temple` (49, 76), the sealed shortcut (49, 77) to the wilds'
+  `from_barrow_shortcut`; the pillars, the feast, the dais (height.png), the throne and the hall's
+  moss and webs as they were. The former stair room and its link down go. `"stills": ["barrow"]`.
+  The dark below's `"damp"`, `"ambient"` and `"dead"` keys went with it (environment told; its
+  tests build their own damp level).
+- **The Ossuary's dead.** Tune: `"monsters": {"skeleton": 12, "skeleton_guard": 2}` (drafts for
+  Jeff), the guards sent near the Hall (`"near": {"skeleton_guard": "lair"}`, nearest-first to its
+  centre: they stand by its door), the skeletons spread by band (631), all on open floor (631
+  amended). `"respawn_s"` 600 for both.
+- **The seal (entry only).** Main connects the draugr's `ossuary_sealed(sealed)` (enemy-ai's:
+  true while a skeleton or skeleton_guard spawned in his zone stands, sent on each change and at
+  his first tick) to `_seal_hall`, which holds the lair's door edge with `DEAD_LOCK`
+  ("ossuary_dead", a key nobody holds, stone; E on it says `DEAD_LINE`, "The dead bar the way.", a
+  draft for lore) while they stand and lets go when every one is down. It never holds while a
+  living player stands inside the hall (the coordinator: nobody is shut in by the dead rising; the
+  challenge's HALL_LOCK alone keeps anyone in), and never over HALL_LOCK; a seal that waited is
+  asked again every `HALL_SEAL_EVERY` (10) steps and takes hold once the hall is empty; when the
+  challenge lets go (`_hold_hall_door(false)`), the seal applies again by its own rule.
+- **Retired, in code.** Release touches nothing on the box by hand, and its `admin.sh move`
+  reaches online players only, so `Level.RETIRED` = {"barrow_lair": ["barrow_deep", (49, 2)]}:
+  at boot `Main._move_off_retired` moves every saved player in it (offline or not) to the heir's
+  cell (their companion's cell cleared, so she comes beside them) and drops its snapshot zone,
+  generation (`_regen`) and rest (`World.dead_rest`), with one count-only line ("[level] retired
+  barrow_lair: N moved to barrow_deep, M saved states dropped"); the boot never opens it; an
+  overlay copy is ignored (`Level.overlaid` is false for a retired name, so `names`, `exists` and
+  `regenerate` never see it). Release's one manual step after the deploy: a names-only listing,
+  then deleting the box's overlay folder `levels/barrow_lair`.
+- **The wilds' shortcut** (maps' nod in writing): its `to_map` is `barrow_deep`, `to_spawn`
+  `from_temple` as before. Maps' unlanded 654 follows: Held's sealed grave to barrow_deep /
+  from_temple, and `DEEP_SHORTCUT_LINK`'s `to_map` to "held" through write_levels.
+- **The rooms named** (ui's 665 card): `"rooms"` on the barrow (entrance "The First Hall", altar
+  "The Altar Room", camp "The Robbers' Camp") and the Ossuary (lair "The Hall of Fallen Souls"),
+  each its anchor's rect; drafts for lore. `Regen.generated_config` keeps a room whose rect lies
+  inside an anchor.
+- **Not dungeon's** (other sides under 666): the fail reset and the free rechallenge for a payer
+  (enemy-ai with npc's paid_deals; the deal fixed at the first payment, a higher payment replaces
+  it, never lowered), the restart that seats him at full and raises the stilled dead ("a fresh day
+  in the barrow"; dead_rest no longer saved), the card itself (ui), the lines (lore).
+- **Open**: the Hall lays no chests (it is an anchor) and the dark below's caverns are gone, so
+  the Hall's own loot table (`fallen_grave`, 622: mail and rare plate) has no chest left; the
+  Ossuary's chests roll `ossuary_grave` (mail). Asked of the coordinator and items: plate from the
+  draugr's win or a hand-laid chest in the Hall, or the Ossuary's deepest band rolling
+  `fallen_grave`.
+
+The cut: a full cut (level data both sides read); before the deploy, players checked; after it
+`regenerate now barrow` and `regenerate now barrow_deep`, the retired count grepped, the overlay
+folder deleted. Tests: labyrinth_test (the Ossuary with the Hall kept whole through two
+generations, twelve and two, the guards by its door, the dead on open floor, the dark below's
+keys gone), level_test (`_test_barrow_level` for two depths, the rooms, the retired table; the
+seal in `_test_hall_door`: held, lifted, entry only, waiting, under the challenge's lock; the
+retired move; the link cues), regen_test (the marked list), view_test (`_test_lair` reads the
+Ossuary). docs/levels.md. Protocol unchanged; no new class_name.

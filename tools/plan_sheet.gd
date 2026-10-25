@@ -10,8 +10,8 @@ extends Node
 ## --level names a level under levels/ (or the overlay) marked "regenerate";
 ## --sample draws the built-in sample halls (sample_halls) in that style,
 ## a 48 x 40 floor with a gatehouse, two halls and a deepest chamber for
-## anchors, or the sample barrow's layers (sample_barrow, sample_barrow_deep,
-## sample_barrow_lair; decision 580). A level with no "regenerate" is drawn
+## anchors, or the sample barrow's two depths (sample_barrow,
+## sample_barrow_deep; decisions 580, 666). A level with no "regenerate" is drawn
 ## as it stands, its own "anchors" outlined. Writes
 ## nothing but --out; the level is read, never written.
 
@@ -20,9 +20,11 @@ const ANCHORS := [{"rect": [2, 2, 6, 5], "name": "gatehouse"}, {"rect": [4, 18, 
 	{"rect": [37, 14, 7, 5], "name": "east hall"}, {"rect": [40, 33, 6, 5], "name": "deepest chamber"}]
 const OUTLINE := Color(0.25, 0.6, 1.0)
 ## The barrow in layers (decision 580, Jeff: "crypt is still too cramped",
-## and his answers on what each layer holds; 541 amended before it): three
-## levels, one place. Each sample is the real level's twin (levels/barrow,
-## levels/barrow_deep, levels/barrow_lair are written from them): the
+## and his answers on what each layer holds; 541 amended before it), two
+## depths since 666 (Jeff: "consolidate to two depths, barrow and ossuary...
+## the hall just a big room off the ossuary"): two levels, one place. Each
+## sample is the real level's twin (levels/barrow and levels/barrow_deep
+## are written from them): the
 ## sizes, the anchors with the sides they are walled on, the named cells.
 ## Every way is five cells clear and every room 8 x 7 or more (Jeff:
 ## "halls need to be at least 2 tiles wider than the walls").
@@ -62,70 +64,72 @@ const BARROW_NICHE := Vector2i(26, 28)
 const BARROW_PACK := Vector2i(7, 43)
 const BARROW_TORCHES: Array[Vector2i] = [Vector2i(30, 2), Vector2i(49, 2), Vector2i(30, 15), Vector2i(49, 15)]
 ## Layer 2, "barrow_deep", the Ossuary: the ancient dead the town moved
-## down, walking home; ways five wide and big rooms, the tombs and graves
-## along them; the stair foot at the top (the entrance the bands count
-## from) and the stair down at the far side.
+## down; ways five wide and big rooms, the tombs and graves along them; the
+## stair foot at the top (the entrance the bands count from) and, at the far
+## south end, the Hall of Fallen Souls (666; layer 3's hall until then)
+## kept whole through every generation as the anchor "lair": a castle hall
+## with pillars, the round table at its middle, the dais at the far end with
+## the draugr on his throne and the hidden way out behind it (the temple's
+## sealed shortcut); the one door in its north wall, sealed while the
+## Ossuary's dead stand (666) and locked behind a challenger (573 amended).
 const DEEP_SIZE := Vector2i(100, 80)
 const DEEP_ANCHORS := [
 	{"rect": [46, 1, 8, 6], "name": "entrance", "walled": ["north", "east", "west"]},
-	{"rect": [67, 40, 6, 6], "name": "stair", "walled": ["north", "east", "south"]}]
+	{"rect": [34, 56, 32, 22], "name": "lair", "walled": ["north", "east", "south", "west"]}]
 const DEEP_LINK_UP := Vector2i(49, 1)
 const DEEP_START := Vector2i(50, 2)
 const DEEP_FROM_ABOVE := Vector2i(49, 2)
-const DEEP_LINK_DOWN := Vector2i(70, 43)
-const DEEP_FROM_BELOW := Vector2i(69, 43)
-## Layer 3, "barrow_lair": the oldest dead, moved as far down as the town
-## dared; damp and dark caverns (every room deep: no doors, no torches),
-## and the Hall of Fallen Souls kept whole through every generation: a
-## castle hall with pillars, the round table at its middle, the dais at the
-## far end with the draugr on his throne and the hidden way out behind it
-## (the temple's sealed shortcut); the one door in its north wall.
-const LAIR_SIZE := Vector2i(100, 80)
-const LAIR_HALL := Rect2i(34, 44, 32, 22)
-const LAIR_ANCHORS := [
-	{"rect": [46, 1, 8, 6], "name": "entrance", "walled": ["north", "east", "west"]},
-	{"rect": [34, 44, 32, 22], "name": "lair", "walled": ["north", "east", "south", "west"]}]
-const LAIR_DOOR := Vector2i(49, 44)
-const LAIR_PILLARS: Array[Rect2i] = [Rect2i(39, 48, 2, 2), Rect2i(49, 48, 2, 2), Rect2i(59, 48, 2, 2),
-	Rect2i(39, 58, 2, 2), Rect2i(49, 58, 2, 2), Rect2i(59, 58, 2, 2)]
-const LAIR_TABLE := Rect2i(48, 52, 3, 3)
+## The Hall of Fallen Souls in the Ossuary (666: 580's hall moved whole, 12
+## cells further south than it lay in the dark below, against the south rim).
+const LAIR_HALL := Rect2i(34, 56, 32, 22)
+const LAIR_DOOR := Vector2i(49, 56)
+const LAIR_PILLARS: Array[Rect2i] = [Rect2i(39, 60, 2, 2), Rect2i(49, 60, 2, 2), Rect2i(59, 60, 2, 2),
+	Rect2i(39, 70, 2, 2), Rect2i(49, 70, 2, 2), Rect2i(59, 70, 2, 2)]
+const LAIR_TABLE := Rect2i(48, 64, 3, 3)
 ## The feast (580 step 3b): eight chairs on the ring round the table facing
 ## in, four broken tables against the east and west walls between the
 ## pillar rows (their long side along the wall, never a cell off it: 612).
-const LAIR_CHAIRS: Array = [[Vector2i(48, 51), Vector2i(0, 1)], [Vector2i(50, 51), Vector2i(0, 1)],
-	[Vector2i(48, 55), Vector2i(0, -1)], [Vector2i(50, 55), Vector2i(0, -1)],
-	[Vector2i(47, 52), Vector2i(1, 0)], [Vector2i(47, 54), Vector2i(1, 0)],
-	[Vector2i(51, 52), Vector2i(-1, 0)], [Vector2i(51, 54), Vector2i(-1, 0)]]
-const LAIR_BROKEN_TABLES: Array = [[Vector2i(34, 52), Vector2i(1, 0)], [Vector2i(34, 55), Vector2i(1, 0)],
-	[Vector2i(65, 52), Vector2i(-1, 0)], [Vector2i(65, 55), Vector2i(-1, 0)]]
+const LAIR_CHAIRS: Array = [[Vector2i(48, 63), Vector2i(0, 1)], [Vector2i(50, 63), Vector2i(0, 1)],
+	[Vector2i(48, 67), Vector2i(0, -1)], [Vector2i(50, 67), Vector2i(0, -1)],
+	[Vector2i(47, 64), Vector2i(1, 0)], [Vector2i(47, 66), Vector2i(1, 0)],
+	[Vector2i(51, 64), Vector2i(-1, 0)], [Vector2i(51, 66), Vector2i(-1, 0)]]
+const LAIR_BROKEN_TABLES: Array = [[Vector2i(34, 64), Vector2i(1, 0)], [Vector2i(34, 67), Vector2i(1, 0)],
+	[Vector2i(65, 64), Vector2i(-1, 0)], [Vector2i(65, 67), Vector2i(-1, 0)]]
 ## The dais (580 step 3): one height level up, its back row against the
 ## hall's south wall (no strip a cell wide behind it: 612), the row before it
 ## twelve stair cells, its sides ledges.
-const LAIR_DAIS := Rect2i(44, 62, 12, 4)
-const LAIR_STAIR_ROW := 61
-const LAIR_LINK_UP := Vector2i(49, 1)
-const LAIR_START := Vector2i(50, 2)
-const LAIR_FROM_ABOVE := Vector2i(49, 2)
-const LAIR_DRAUGR := Vector2i(49, 63)
-const LAIR_FROM_TEMPLE := Vector2i(49, 64)
-const LAIR_SHORTCUT_LINK := Vector2i(49, 65)
+const LAIR_DAIS := Rect2i(44, 74, 12, 4)
+const LAIR_STAIR_ROW := 73
+const LAIR_DRAUGR := Vector2i(49, 75)
+const LAIR_FROM_TEMPLE := Vector2i(49, 76)
+const LAIR_SHORTCUT_LINK := Vector2i(49, 77)
+## The Ossuary's end of the temple's sealed shortcut (maps' 654 points it at
+## Held): the link behind the throne and the spawn before it.
+const DEEP_SHORTCUT_LINK := LAIR_SHORTCUT_LINK
+const DEEP_FROM_TEMPLE := LAIR_FROM_TEMPLE
 ## The barrow's legend: enemy-ai's kinds (547, 548), the barrow's own level.json
 ## colours, never Level.LEGEND's.
 ## The first hall's own decor (647): webs in the two corners by the way
 ## in, where nobody walks, and a strip of moss at the south wall's foot.
 const BARROW_DECOR: Array = [[28, 1, -1, -1, "web_corner", 1], [51, 1, 1, -1, "web_corner", 2], [33, 16, 0, 1, "moss_strip", 1]]
-## The Hall of Fallen Souls' own decor (647; the damp hall): moss along
+## The Hall of Fallen Souls' own decor (647; the damp hall it was): moss along
 ## its walls' feet between the furniture, patches on its floor off the
 ## ways, webs in its four corners.
 const LAIR_DECOR: Array = [
-	[34, 44, -1, -1, "web_corner", 1], [65, 44, 1, -1, "web_corner", 2], [34, 65, -1, 1, "web_corner", 2], [65, 65, 1, 1, "web_corner", 1],
-	[34, 46, -1, 0, "moss_strip", 1], [34, 49, -1, 0, "moss_strip", 2], [34, 58, -1, 0, "moss_strip", 1], [34, 61, -1, 0, "moss_strip", 2],
-	[65, 47, 1, 0, "moss_strip", 2], [65, 50, 1, 0, "moss_strip", 1], [65, 59, 1, 0, "moss_strip", 2], [65, 62, 1, 0, "moss_strip", 1],
-	[37, 44, 0, -1, "moss_strip", 1], [43, 44, 0, -1, "moss_strip", 2], [56, 44, 0, -1, "moss_strip", 1], [62, 44, 0, -1, "moss_strip", 2],
-	[37, 65, 0, 1, "moss_strip", 2], [41, 65, 0, 1, "moss_strip", 1], [58, 65, 0, 1, "moss_strip", 1], [62, 65, 0, 1, "moss_strip", 2],
-	[37, 47, 0, 0, "moss_patch", 1], [44, 50, 0, 0, "moss_patch", 2], [55, 50, 0, 0, "moss_patch", 3], [62, 47, 0, 0, "moss_patch", 1],
-	[38, 58, 0, 0, "moss_patch", 2], [61, 58, 0, 0, "moss_patch", 3], [45, 57, 0, 0, "moss_patch", 1], [54, 57, 0, 0, "moss_patch", 2],
-	[40, 63, 0, 0, "moss_patch", 3], [59, 63, 0, 0, "moss_patch", 1]]
+	[34, 56, -1, -1, "web_corner", 1], [65, 56, 1, -1, "web_corner", 2], [34, 77, -1, 1, "web_corner", 2], [65, 77, 1, 1, "web_corner", 1],
+	[34, 58, -1, 0, "moss_strip", 1], [34, 61, -1, 0, "moss_strip", 2], [34, 70, -1, 0, "moss_strip", 1], [34, 73, -1, 0, "moss_strip", 2],
+	[65, 59, 1, 0, "moss_strip", 2], [65, 62, 1, 0, "moss_strip", 1], [65, 71, 1, 0, "moss_strip", 2], [65, 74, 1, 0, "moss_strip", 1],
+	[37, 56, 0, -1, "moss_strip", 1], [43, 56, 0, -1, "moss_strip", 2], [56, 56, 0, -1, "moss_strip", 1], [62, 56, 0, -1, "moss_strip", 2],
+	[37, 77, 0, 1, "moss_strip", 2], [41, 77, 0, 1, "moss_strip", 1], [58, 77, 0, 1, "moss_strip", 1], [62, 77, 0, 1, "moss_strip", 2],
+	[37, 59, 0, 0, "moss_patch", 1], [44, 62, 0, 0, "moss_patch", 2], [55, 62, 0, 0, "moss_patch", 3], [62, 59, 0, 0, "moss_patch", 1],
+	[38, 70, 0, 0, "moss_patch", 2], [61, 70, 0, 0, "moss_patch", 3], [45, 69, 0, 0, "moss_patch", 1], [54, 69, 0, 0, "moss_patch", 2],
+	[40, 75, 0, 0, "moss_patch", 3], [59, 75, 0, 0, "moss_patch", 1]]
+## The rooms named on entering (666, ui's 665 card): drafts for lore.
+const BARROW_ROOMS := {
+	"entrance": {"name": "The First Hall", "rect": [27, 1, 26, 16]},
+	"altar": {"name": "The Altar Room", "rect": [30, 24, 18, 14]},
+	"camp": {"name": "The Robbers' Camp", "rect": [6, 42, 10, 8]}}
+const DEEP_ROOMS := {"lair": {"name": "The Hall of Fallen Souls", "rect": [34, 56, 32, 22]}}
 const BARROW_LEGEND := {"monster_skeleton": "#d8d0b0", "monster_skeleton_guard": "#988c64", "monster_robber": "#8a5a2a", "monster_draugr": "#5a4636"}
 ## The Dwarven Halls under the castle (613, dungeon's side; Jeff: the smith
 ## sought a great dwarven forge deep below, his guards were ambushed, he is
@@ -350,6 +354,7 @@ static func sample_barrow() -> Dictionary:
 		"regenerate": {"generator": "labyrinth", "style": "barrow", "layer": 1, "ways": 5, "every_days": 3, "anchors": BARROW_ANCHORS,
 			"entrance": "entrance", "rooms": {"count": [8, 11], "size": [[8, 7], [14, 11]]}, "loops": 0.15,
 			"monsters": {"robber": 4}, "near": {"robber": "altar"}, "chests": 3},
+		"rooms": BARROW_ROOMS,  # The rooms named on entering them (666; ui's 665 cards; lore's words).
 		"legend": BARROW_LEGEND, "respawn_s": {"robber": 300, "skeleton_guard": 600}}
 	return {"layout": layout, "config": config}
 
@@ -374,66 +379,46 @@ static func barrow_niches() -> Array:
 	return out
 
 
-## Layer 2, the Ossuary: {layout, config}, DEEP_SIZE cells (decision 580).
+## Layer 2, the Ossuary: {layout, config}, DEEP_SIZE cells (decision 580),
+## the Hall of Fallen Souls its far anchor (666).
 static func sample_barrow_deep() -> Dictionary:
 	var rows := _blank_rows(DEEP_SIZE)
 	_lay_anchors(rows, DEEP_ANCHORS)
-	var markers := {DEEP_LINK_UP: "link", DEEP_START: "start", DEEP_LINK_DOWN: "link"}
-	var layout := Level.image_from_rows(_lines(rows), markers, {"legend": BARROW_LEGEND})
-	var config := {"name": "The Ossuary", "outdoor": false, "depth": 2, "walls": "stone", "floors": "stone", "grave_goods": true,
-		"loot": {"chest": "ossuary_grave"},  # Mail shirts among the dead's goods (622, dungeon's side).
-		"starts": [[DEEP_START.x, DEEP_START.y]],
-		"spawn_points": {"from_above": [DEEP_FROM_ABOVE.x, DEEP_FROM_ABOVE.y], "from_below": [DEEP_FROM_BELOW.x, DEEP_FROM_BELOW.y]},
-		"links": [{"at": [DEEP_LINK_UP.x, DEEP_LINK_UP.y], "to_map": "barrow", "to_spawn": "from_below"},
-			{"at": [DEEP_LINK_DOWN.x, DEEP_LINK_DOWN.y], "to_map": "barrow_lair", "to_spawn": "from_above"}],
-		"entities": [],
-		"regenerate": {"generator": "labyrinth", "style": "barrow", "layer": 2, "ways": 5, "every_days": 3, "anchors": DEEP_ANCHORS,
-			"entrance": "entrance", "rooms": {"count": [10, 14], "size": [[8, 7], [16, 12]]}, "loops": 0.15,
-			"monsters": {"skeleton": 14}, "chests": 5},  # 14 a draft (decision 631; Jeff: not enough skeletons), spread by band.
-		"legend": BARROW_LEGEND, "respawn_s": {"skeleton": 600}}
-	return {"layout": layout, "config": config}
-
-
-## Layer 3, the dark caverns and the Hall of Fallen Souls: {layout, config},
-## LAIR_SIZE cells (decision 580).
-static func sample_barrow_lair() -> Dictionary:
-	var rows := _blank_rows(LAIR_SIZE)
-	_lay_anchors(rows, LAIR_ANCHORS)
-	_edge(rows, LAIR_DOOR, "north", "+")  # The hall's one door, where the way comes in (held shut behind the first player in, 573 amended).
-	var markers := {LAIR_LINK_UP: "link", LAIR_START: "start", LAIR_SHORTCUT_LINK: "link", LAIR_DRAUGR: "monster_draugr"}
+	_edge(rows, LAIR_DOOR, "north", "+")  # The hall's one door, where the way comes in (sealed by the dead, 666; locked behind a challenger, 573 amended).
+	var markers := {DEEP_LINK_UP: "link", DEEP_START: "start", DEEP_SHORTCUT_LINK: "link", LAIR_DRAUGR: "monster_draugr"}
 	var heights := {}
 	for cell in Level.rect_cells(LAIR_DAIS):
 		heights[cell] = 1
 	for x in range(LAIR_DAIS.position.x, LAIR_DAIS.end.x):
 		markers[Vector2i(x, LAIR_STAIR_ROW)] = "stair"
 	var layout := Level.image_from_rows(_lines(rows), markers, {"legend": BARROW_LEGEND})
-	var pillars: Array = []
+	var pieces: Array = []
 	for pillar in LAIR_PILLARS:
-		pillars.append({"slot": "building.crypt_pillar", "at": [pillar.position.x, pillar.position.y]})
-	# The feast (3b): the round table in place of its rock block, the chairs
-	# round it, the broken tables against the walls, the throne at his cell
-	# facing the hall.
-	pillars.append({"slot": "building.round_table", "at": [LAIR_TABLE.position.x, LAIR_TABLE.position.y]})
+		pieces.append({"slot": "building.crypt_pillar", "at": [pillar.position.x, pillar.position.y]})
+	# The feast (580 step 3b): the round table, the chairs round it, the
+	# broken tables against the walls, the throne at his cell facing the hall.
+	pieces.append({"slot": "building.round_table", "at": [LAIR_TABLE.position.x, LAIR_TABLE.position.y]})
 	for chair: Array in LAIR_CHAIRS:
-		pillars.append({"slot": "building.hall_chair", "at": [chair[0].x, chair[0].y], "facing": [chair[1].x, chair[1].y]})
+		pieces.append({"slot": "building.hall_chair", "at": [chair[0].x, chair[0].y], "facing": [chair[1].x, chair[1].y]})
 	for table: Array in LAIR_BROKEN_TABLES:
-		pillars.append({"slot": "building.broken_table", "at": [table[0].x, table[0].y], "facing": [table[1].x, table[1].y]})
-	pillars.append({"slot": "building.throne", "at": [LAIR_DRAUGR.x, LAIR_DRAUGR.y], "facing": [0, -1]})
-	var config := {"name": "Hall of Fallen Souls", "outdoor": false, "depth": 3, "walls": "stone", "floors": "stone", "grave_goods": true,
-		"loot": {"chest": "fallen_grave"},  # Mail, and plate rare, with the oldest dead (622, dungeon's side).
-		"buildings": pillars,  # The six pillars and the feast (580 step 3).
-		"starts": [[LAIR_START.x, LAIR_START.y]],
-		"spawn_points": {"from_above": [LAIR_FROM_ABOVE.x, LAIR_FROM_ABOVE.y], "from_temple": [LAIR_FROM_TEMPLE.x, LAIR_FROM_TEMPLE.y]},
-		"links": [{"at": [LAIR_LINK_UP.x, LAIR_LINK_UP.y], "to_map": "barrow_deep", "to_spawn": "from_below"},
-			{"at": [LAIR_SHORTCUT_LINK.x, LAIR_SHORTCUT_LINK.y], "to_map": "wilds", "to_spawn": "from_barrow_shortcut", "sealed": "draugr"}],
+		pieces.append({"slot": "building.broken_table", "at": [table[0].x, table[0].y], "facing": [table[1].x, table[1].y]})
+	pieces.append({"slot": "building.throne", "at": [LAIR_DRAUGR.x, LAIR_DRAUGR.y], "facing": [0, -1]})
+	var config := {"name": "The Ossuary", "outdoor": false, "depth": 2, "walls": "stone", "floors": "stone", "grave_goods": true,
+		"loot": {"chest": "ossuary_grave"},  # Mail shirts among the dead's goods (622, dungeon's side).
+		"buildings": pieces,  # The Hall's six pillars and its feast (580 step 3).
+		"starts": [[DEEP_START.x, DEEP_START.y]],
+		"spawn_points": {"from_above": [DEEP_FROM_ABOVE.x, DEEP_FROM_ABOVE.y], "from_temple": [DEEP_FROM_TEMPLE.x, DEEP_FROM_TEMPLE.y]},
+		"links": [{"at": [DEEP_LINK_UP.x, DEEP_LINK_UP.y], "to_map": "barrow", "to_spawn": "from_below"},
+			{"at": [DEEP_SHORTCUT_LINK.x, DEEP_SHORTCUT_LINK.y], "to_map": "wilds", "to_spawn": "from_barrow_shortcut", "sealed": "draugr"}],
 		"entities": [{"at": [LAIR_DRAUGR.x, LAIR_DRAUGR.y], "name": "Draugr"}],
-		"regenerate": {"generator": "labyrinth", "style": "barrow", "layer": 3, "ways": 5, "every_days": 3, "anchors": LAIR_ANCHORS,
-			"entrance": "entrance", "rooms": {"count": [10, 14], "size": [[10, 8], [16, 12]]}, "loops": 0.15,
-			"monsters": {"skeleton": 6}, "chests": 4},
-		"stills": ["barrow_deep", "barrow"], "dead": {"temper": "bold", "sees_in_dark": true, "graves": false},
-		"damp": true, "ambient": 0.03,
-		"decor": LAIR_DECOR,  # The damp hall's moss and its cobwebbed corners (647).
-		"legend": BARROW_LEGEND, "respawn_s": {"skeleton": 600}}
+		"regenerate": {"generator": "labyrinth", "style": "barrow", "layer": 2, "ways": 5, "every_days": 3, "anchors": DEEP_ANCHORS,
+			"entrance": "entrance", "rooms": {"count": [10, 14], "size": [[8, 7], [16, 12]]}, "loops": 0.15,
+			# Tune: twelve and two (666, drafts for Jeff), the dead spread by band (631), the guards by the Hall's door.
+			"monsters": {"skeleton": 12, "skeleton_guard": 2}, "near": {"skeleton_guard": "lair"}, "chests": 5},
+		"stills": ["barrow"],  # The altar's guards above lie still with him (580).
+		"decor": LAIR_DECOR,  # The Hall's moss and its cobwebbed corners (647).
+		"rooms": DEEP_ROOMS,  # The Hall named on entering it (666; ui's 665 card).
+		"legend": BARROW_LEGEND, "respawn_s": {"skeleton": 600, "skeleton_guard": 600}}
 	return {"layout": layout, "height": Level.height_image(layout, heights), "config": config}
 
 
@@ -615,8 +600,6 @@ static func sample_halls(style: String) -> Dictionary:
 		return sample_barrow()
 	if style == "barrow_deep":
 		return sample_barrow_deep()
-	if style == "barrow_lair":
-		return sample_barrow_lair()
 	if style == "castle_halls":
 		return sample_castle_halls()
 	var rects: Array[Rect2i] = []

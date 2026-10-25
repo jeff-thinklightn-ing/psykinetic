@@ -3447,9 +3447,12 @@ func _boot() -> void:
 	_records.clear()
 	for record: PlayerRecord in snapshot["players"]:
 		_records[record.player_id] = record
+	_move_off_retired(snapshot)
 	var saved: Dictionary = snapshot["zones"]
 	var restored := 0
 	for zone_name: String in saved:
+		if Level.RETIRED.has(zone_name):
+			continue  # Dropped by _move_off_retired's count; never opened.
 		if not Level.exists(zone_name):
 			print("[state] the snapshot's zone %s is no map here; left out" % zone_name)
 			continue
@@ -3462,6 +3465,32 @@ func _boot() -> void:
 	World.enter(World.zones[default_zone()])
 	if Net.mode != Net.Mode.SERVER:
 		_admit(Net.local_id, Net.player_id, Net.player_name)
+
+
+## The players saved in a retired level (Level.RETIRED, 666) moved to its
+## heir's cell, offline or not, and the snapshot's zone, generation and rest
+## for it left out; one count-only line each, for release to grep.
+func _move_off_retired(snapshot: Dictionary) -> void:
+	for old: String in Level.RETIRED:
+		var to: Array = Level.RETIRED[old]
+		var moved := 0
+		for record: PlayerRecord in _records.values():
+			if record.zone == old:
+				record.zone = str(to[0])
+				record.tile = to[1]
+				record.companion["tile"] = null
+				moved += 1
+		var dropped := 0
+		if snapshot.get("zones") is Dictionary and snapshot["zones"].has(old):
+			dropped += 1
+		if _regen.has(old):
+			_regen.erase(old)
+			dropped += 1
+		if World.dead_rest.has(old):
+			World.dead_rest.erase(old)
+			dropped += 1
+		if moved > 0 or dropped > 0:
+			print("[level] retired %s: %d moved to %s, %d saved states dropped" % [old, moved, to[0], dropped])
 
 
 ## Loads zone [param zone_name] if it is not loaded yet: its map, its doors,
@@ -4722,6 +4751,10 @@ func _on_world_stepped() -> void:
 		# The clients' clocks, kept from drifting off the world's.
 		Net.broadcast("sky", sky_message())
 		_regenerate_due()
+	if Net.is_authority() and World.steps % HALL_SEAL_EVERY == 0:
+		for zone_name: String in _hall_seals:
+			if _hall_seals[zone_name]:
+				_apply_hall_seal(zone_name)  # A seal that waited for the hall to empty (666).
 
 
 ## The "sky" message: the world clock (DayNight.to_dict) and the server's
@@ -5942,6 +5975,12 @@ const HALL_LOCK := "draugr_hall"
 ## The hidden door's lock (608): the first hall's hidden niche, a key nobody
 ## holds; lifted by a press on it or a climb from below.
 const HIDDEN_LOCK := "hidden_niche"
+## How often a waiting seal on the hall is asked again (666): 1 s.
+const HALL_SEAL_EVERY := 10
+## The hall's door while the Ossuary's dead stand (666): a key nobody holds.
+const DEAD_LOCK := "ossuary_dead"
+## Said to one who tries the sealed hall door (666; a draft for lore).
+const DEAD_LINE := "The dead bar the way."
 ## The device's two halves (items' kinds, 544's items' side): minted no more
 ## since 573 (the charges are a count on the record); those held are keepsakes.
 
@@ -6350,10 +6389,7 @@ func _sync_charges(record: PlayerRecord) -> void:
 ## Souls, one in its north wall).
 func _hall_doors(zone_name: String) -> Array[Door]:
 	var out: Array[Door] = []
-	var rect := Rect2i()
-	for anchor: Dictionary in Regen.config_of(zone_name).get("anchors", []):
-		if str(anchor.get("name", "")) == "lair":
-			rect = anchor["rect"]
+	var rect := hall_lair_rect(zone_name)
 	if not rect.has_area():
 		return out
 	for door: Door in World.get_doors():
@@ -6381,6 +6417,61 @@ func _hold_hall_door(zone_name: String, held: bool) -> void:
 	World.enter(was)
 	if not doors.is_empty():
 		party_log.add("The hall's door shuts behind you." if held else "The hall's door opens.")
+	if not held:
+		_apply_hall_seal(zone_name)  # The challenge over, the dead's seal holds again by its own rule (666).
+
+
+## The zones whose hall the standing dead seal (666, dungeon's side; Jeff:
+## "they must be cleared to enter the hall"): zone name -> whether the
+## draugr's ossuary_sealed last said any of its dead stands.
+var _hall_seals: Dictionary[String, bool] = {}
+
+
+## The draugr's ossuary_sealed (666, enemy-ai's side: true while any
+## skeleton or grave guard spawned in his zone stands, false when every one
+## is dead or laid at rest): [param sealed] kept for [param zone_name] and
+## the hall's door held or let go by it (_apply_hall_seal).
+func _seal_hall(zone_name: String, sealed: bool) -> void:
+	_hall_seals[zone_name] = sealed
+	_apply_hall_seal(zone_name)
+
+
+## The dead's seal on zone [param zone_name]'s hall door (666): held shut
+## with DEAD_LOCK, a key nobody holds, while its dead stand, but entry only:
+## never while a living player stands inside the hall (nobody is shut in by
+## the dead rising behind them; the challenge's HALL_LOCK alone keeps anyone
+## in), and never over a challenge's lock. Let go when every one is down.
+## Asked again every few steps (_on_world_stepped) so a seal that waited
+## for the hall to empty takes hold once it has.
+func _apply_hall_seal(zone_name: String) -> void:
+	var zone: Zone = World.zones.get(zone_name)
+	if zone == null or not _hall_seals.has(zone_name):
+		return
+	var was := World.enter(zone)
+	var doors := _hall_doors(zone_name)
+	var rect := hall_lair_rect(zone_name)
+	var inside := false
+	for entity in World.entities():
+		if entity is Player and entity.spawned and entity.hp > 0 and rect.has_point(entity.tile):
+			inside = true
+	for door in doors:
+		if door.lock == HALL_LOCK:
+			continue
+		if _hall_seals[zone_name] and not inside:
+			if door.lock != DEAD_LOCK:
+				World.hold_door(door, true, DEAD_LOCK)
+		else:
+			World.hold_door(door, false, DEAD_LOCK)
+	World.enter(was)
+
+
+## The rect of zone [param zone_name]'s "lair" anchor (580's Hall of Fallen
+## Souls, an anchor of the Ossuary since 666); an empty rect for none.
+func hall_lair_rect(zone_name: String) -> Rect2i:
+	for anchor: Dictionary in Regen.config_of(zone_name).get("anchors", []):
+		if str(anchor.get("name", "")) == "lair":
+			return anchor["rect"]
+	return Rect2i()
 
 
 ## Server: [param entity] pressed on a burial niche's edge (World.niche_pressed,
@@ -8976,6 +9067,8 @@ func _on_command(entity: GridEntity, command_name: String, args: Dictionary) -> 
 			var held := World.door_on(key)
 			if held != null and not held.open and held.lock == HALL_LOCK and entity is Player:
 				Net.broadcast_to([entity.owner_peer], "party", {"from": "Server", "text": "The door is shut."})
+			elif held != null and not held.open and held.lock == DEAD_LOCK and entity is Player:
+				Net.broadcast_to([entity.owner_peer], "party", {"from": "Server", "text": DEAD_LINE})
 			if held != null and World.niche_edges.get(key, "") == "hidden" and not held.open:
 				_on_niche_pressed(entity, key)  # E at the hidden niche presses on it (608).
 				return
@@ -11199,6 +11292,9 @@ func _hook_talker(monster: GridEntity) -> void:
 	if monster.has_signal("hall_door"):
 		# The draugr's (573 amended): false shuts his hall's door, true opens it.
 		monster.connect("hall_door", func(open: bool) -> void: _hold_hall_door(monster.zone, not open))
+	if monster.has_signal("ossuary_sealed"):
+		# The draugr's (666): whether any of his zone's dead stands, the hall sealed while one does.
+		monster.connect("ossuary_sealed", func(sealed: bool) -> void: _seal_hall(monster.zone, sealed))
 	if monster.has_signal("said"):
 		# His unasked lines (573 amended: why one entered, the win, his respect).
 		monster.connect("said", func(text: String) -> void:
