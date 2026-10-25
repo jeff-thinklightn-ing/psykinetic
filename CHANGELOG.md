@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The Character Lab, for working on the player's body and its clips: one person on a grid under the game's views, any build, look, held thing and armour, any clip at any speed, paused, scrubbed or stepped, and a treadmill at the gait's pace (run it with C:/dev/review/character_lab/lab.cmd; local only).
 - The camera's feel (zoom speed, the peek and mourning pull-backs, the overhead and indoor pitches and their eases, the aim lead, the telegraph and hit flashes) is now read from art/kit/feel.json and listed in the F7 tuning panel's Camera group, so it can be tuned live in the practice hall (673).
 - The tuning panel (F7, practice and local host) has an Animation group: blend times, how fast swings, steps, rolls and falls play, and the gait rate, each applied as you move it (the two blends take on bodies made after).
 - The barrow's skeleton archers draw their bows fully before loosing: their arrows hit harder but come a little later.

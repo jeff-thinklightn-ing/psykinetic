@@ -29847,3 +29847,39 @@ combat the camera"); combat's step 1 left Main's "camera" source for it.
   ui's and combat's.
 
 Client only, protocol unchanged, no new class_name.
+
+## 674. The Character Lab: the player's body alone, its clips under a game camera
+
+Jeff: "i also need to work on the player model and run animations separately." Approved by the
+coordinator as three steps; this is step 1. A scene of its own, client3d/character_lab.tscn
+(class_name CharacterLab), run as `godot --path <checkout> --scene res://client3d/character_lab.tscn`
+(C:/dev/review/character_lab/lab.cmd starts it from the main checkout). It shows one person on a
+grid floor under the game's three views (keys 1, 2, 3: CAMERA_PITCH orthographic, the low
+camera's LOW_PITCH and LOW_FOV, the overhead OVERHEAD_PITCH), orbited by a drag and zoomed by the
+wheel. The body is made as Client3D makes a person's: `Client3D._make_model` (now static; it
+used nothing of the instance) on a puppet carrying a PersonLook from one of five builds (the
+man, heavy, broad and lean, the woman: anim_rig_test's) and the look's words typed in; what each
+hand holds by `Client3D._hold`, the loop that was inside `_sync_held` split out unchanged, and the
+second grip by `_sync_reach`; an armour by `PersonLook.wear`. So what the lab shows is what the
+game draws, and nothing in the game is copied into it. Any clip of the body's library loops on
+the base layer (the gaits and idles listed first), any on the upper layer over it, at a speed;
+Space pauses, "." steps a frame of 1/30 s, a bar scrubs (AnimRig.base_at). The treadmill runs
+the floor's grid under the body at the clip's gait pace as Client3D plays a gait: HUMAN_GAITS'
+(HUMAN_F_GAITS') pace times the look's stature and the speed, over feel.json's gait rate; a foot
+that slides on it says the pace is wrong.
+
+It is local only: it starts no World zone, opens no connection (Net and World load as autoloads
+and do nothing more) and writes no file, in the project (art/, levels/) or in user://. It opens a
+window, so it is under the windowed rule while Jeff is on the machine; lab_test runs it headless
+(each build made, keyed and holding; held, worn and emptied; the clip list; pause, scrub, step
+and resume; the treadmill's pace and floor).
+
+Steps 2 and 3 follow, each its own landing. Step 2: a drop folder, C:/dev/review/character_lab/drop
+(human_m.glb, human_f.glb, clips/*.glb), outside the repository and outside user://; a new or
+changed export goes through Godot's own import as `heavy_job run <tree> godot_import` (never a bare
+import, never from a script already holding a gate take) into the gitignored build/lab, and the
+lab loads it from there, a status line saying what it is doing; a dropped clip named as a game
+clip takes its place in the lab only. Step 3: two bodies side by side, the foot-slide readout,
+and the gait paces into feel.json for the tuning panel. Nothing the lab shows reaches the game
+but through pc-character's usual pipeline ("Copy to review" routed by the coordinator). Client
+only, protocol unchanged, new class_name CharacterLab.

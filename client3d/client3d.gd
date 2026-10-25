@@ -13656,7 +13656,7 @@ static func model_for(entity: GridEntity) -> Dictionary:
 ## its root playing its clips through an AnimRig of its own (decision 390),
 ## kept as the puppet's "rig"; its fight's clips (a model's "moves") as its
 ## "moves".
-func _make_model(model: Dictionary, puppet: Node3D) -> Node3D:
+static func _make_model(model: Dictionary, puppet: Node3D) -> Node3D:
 	var body := Node3D.new()
 	body.name = "Body"
 	var scene := (load(model["scene"]) as PackedScene).instantiate() as Node3D
@@ -13831,42 +13831,49 @@ func _sync_held(entity: GridEntity, puppet: Node3D) -> void:
 		changed = true
 		if hand == 1 and sockets.has("back"):
 			_let_go_stowed(sockets)
-		var socket := sockets.get("hand_r" if hand == 0 else "hand_l") as Node3D
-		if socket == null:
-			continue
-		var places: Array = [socket] if hand == 0 or not sockets.has("arm_l") else [socket, sockets["arm_l"]]
-		for place: Node3D in places:
-			for old in place.get_children():
-				# Out of the way now, so the new thing is the one named "Held".
-				place.remove_child(old)
-				old.queue_free()
-		if id == "":
-			continue
-		var own := id.begins_with(ART_ID)
-		var art := id.substr(ART_ID.length()) if own else str(Items.def(id).get("art", "item." + id))
-		if ArtKit.has(art):
-			var thing := ArtKit.instance(art)
-			thing.name = "Held"
-			if not own and "shield" in Items.def(id).get("tags", []) and sockets.has("arm_l"):
-				# Strapped on the outside of the forearm (451 amended (2); Jeff: "shield
-				# should be carried on the outside of arm, not inside"): the arm_l
-				# socket's frame is the shield's, so its strap point goes on the
-				# forearm's middle.
-				socket = sockets["arm_l"]
-				thing.position = -_strap_of(art)
-			elif not own and "shield" in Items.def(id).get("tags", []):
-				# A body with no forearm socket: out of the back of the hand, a quarter
-				# turn about its grip's axis (its face +z, art_style).
-				thing.basis = Basis(Vector3.UP, PI * 0.5)
-			elif not own and _edge_first(id):
-				thing.basis = HELD_EDGE_TURN
-			if own and hand == 0:
-				_grip(thing, work)
-			socket.add_child(thing)
+		_hold(sockets, hand, id, work)
 	if changed:
 		puppet.set_meta("roused_at", Time.get_ticks_msec())  # Taken up: at rest only REST_SECONDS on (662).
 	if changed and puppet.has_meta("reach"):
 		_sync_reach(puppet.get_meta("reach") as HandReach, sockets, ids)
+
+
+## [param id] (an item, or ART_ID and a work's own tool) put in [param hand]
+## (0 the right, 1 the left) at [param sockets], what was there let go
+## (_sync_held's, and the Character Lab's, decision 674).
+static func _hold(sockets: Dictionary, hand: int, id: String, work := {}) -> void:
+	var socket := sockets.get("hand_r" if hand == 0 else "hand_l") as Node3D
+	if socket == null:
+		return
+	var places: Array = [socket] if hand == 0 or not sockets.has("arm_l") else [socket, sockets["arm_l"]]
+	for place: Node3D in places:
+		for old in place.get_children():
+			# Out of the way now, so the new thing is the one named "Held".
+			place.remove_child(old)
+			old.queue_free()
+	if id == "":
+		return
+	var own := id.begins_with(ART_ID)
+	var art := id.substr(ART_ID.length()) if own else str(Items.def(id).get("art", "item." + id))
+	if ArtKit.has(art):
+		var thing := ArtKit.instance(art)
+		thing.name = "Held"
+		if not own and "shield" in Items.def(id).get("tags", []) and sockets.has("arm_l"):
+			# Strapped on the outside of the forearm (451 amended (2); Jeff: "shield
+			# should be carried on the outside of arm, not inside"): the arm_l
+			# socket's frame is the shield's, so its strap point goes on the
+			# forearm's middle.
+			socket = sockets["arm_l"]
+			thing.position = -_strap_of(art)
+		elif not own and "shield" in Items.def(id).get("tags", []):
+			# A body with no forearm socket: out of the back of the hand, a quarter
+			# turn about its grip's axis (its face +z, art_style).
+			thing.basis = Basis(Vector3.UP, PI * 0.5)
+		elif not own and _edge_first(id):
+			thing.basis = HELD_EDGE_TURN
+		if own and hand == 0:
+			_grip(thing, work)
+		socket.add_child(thing)
 
 
 ## The left hand brought to the right hand's piece's second grip (HandReach;
