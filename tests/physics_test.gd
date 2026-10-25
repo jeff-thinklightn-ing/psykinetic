@@ -45,6 +45,7 @@ func _ready() -> void:
 	_test_ground()
 	_test_rush_in_its_zone()
 	_test_load()
+	_test_clank()
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -613,6 +614,33 @@ func _test_load() -> void:
 	_check(World.load_band(player) == "heavy", "a sack of ore in the pack too: 31.6 of 80, heavy (%s)" % World.load_band(player))
 	World.put_item(player, player, 1, World.items.mint("ore_sack", "built"))
 	_check(World.load_band(player) == "overloaded", "two: 41.6 of 80, overloaded (%s)" % World.load_band(player))
+
+
+## A worn piece's clank (decision 676 step 1b): its material's cells a kg
+## times its kg at a walk: plate's 20 kg 0.25 a kg, 5 cells; mail's 10 kg
+## 0.2, 2; leather none. Its own &"clank" noise beside the step's, so prey
+## run from it (enemy-ai's) where a step only turns them.
+func _test_clank() -> void:
+	print("
+== a worn piece clanks by its material and kg: plate 5 cells, mail 2, leather none (676 1b) ==")
+	_check(World.armour_noise("plate_armour") == {"radius": 5, "kind": "plate"} and World.armour_noise("mail_armour") == {"radius": 2, "kind": "mail"}
+			and World.armour_noise("leather_armour") == {"radius": 0, "kind": "none"} and World.armour_noise("") == {"radius": 0, "kind": "none"},
+			"at a walk: plate %s, mail %s, leather %s" % [World.armour_noise("plate_armour"), World.armour_noise("mail_armour"), World.armour_noise("leather_armour")])
+	_check(int(World.armour_noise("plate_armour", 2.0)["radius"]) == 10 and int(World.armour_noise("plate_armour", 0.5)["radius"]) == 3,
+			"twice the pace, twice the noise (10); half, 3 (rounded)")
+	for worn: String in ["plate_armour", "leather_armour"]:
+		var e := _build(["##########", "#P....m..#", "##########"], 25.0)
+		var player: GridEntity = e["P"][0]
+		var dummy := e["m"][0] as Monster
+		World.put_item(player, player, Items.ARMOUR, World.items.mint(worn, "built"))
+		dummy.senses.heard.clear()
+		player.next_move_tick = 0
+		_check(World.try_move(player, Vector2i(1, 0)), "%s: a step east" % worn)
+		var kinds: Array = dummy.senses.heard.map(func(n: Dictionary) -> String: return "%s %d" % [n["kind"], n["radius"]])
+		# 4 cells off: leather's body (86 kg) steps 3 and reaches nobody there; plate's
+		# (100 kg) steps 4 (Senses.step_radius), and its clank (5 at its own pace, 2.56 ticks) too.
+		var want: Array = ["step 4", "clank 5"] if worn == "plate_armour" else []
+		_check(kinds == want, "%s: a dummy 4 cells off hears %s" % [worn, kinds])
 
 
 func _build(rows: Array[String], mass: float) -> Dictionary:

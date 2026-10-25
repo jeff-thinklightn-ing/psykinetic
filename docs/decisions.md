@@ -30466,3 +30466,25 @@ monster's load slows it as anyone's (a draugr's 7 kg axe sits under his
 arms' free share). Next, before the bow from energy: noise from a worn
 material as it moves.
 
+### 676, step 1b: the armour clank
+
+Jeff: "armor should add a clank sound that scares prey ... creatures run
+from noise." A worn piece's noise falls out of its material and its mass,
+not a per-item number: World.armour_noise(worn_id, pace) is {radius, kind},
+the material's cells a kg (clank_plate 0.25, clank_mail 0.2; leather and
+robes none) times its kg times the pace (a player's walk, CLANK_WALK_TICKS
+2.5 over the step's own ticks, 0 to 2), rounded, under CLANK_MAX 19 (below
+a shout: a monster goes to look, it does not hunt); kind "plate", "mail" or
+"none". try_move's step noise is unchanged, and a player's or a companion's
+step adds its own &"clank" noise at that radius (none at 0), once a step:
+plate 5 cells at a walk, mail 2. A stranger's &"step" only turns prey (a
+hunter can creep up); any other noise in reach makes them bolt (enemy-ai's
+side, its own commit), so plate scares game from 5 cells where leather
+reaches nobody. Weather and walls shorten it as every noise. clank_plate and
+clank_mail are in levels/physics.json and on F7 (group "Load"). Noises stay
+on the server: protocol unchanged. Sound's side plays it later from the same
+function on the client (Player.worn, the pace), so what the player hears
+grows as what the game hears. physics_test _test_clank: plate 5, mail 2,
+leather 0; twice the pace 10, half 3; a dummy 4 cells off hears plate's
+"step 4" and "clank 5", leather's nothing.
+

@@ -19,5 +19,7 @@
 	"load_k": 0.5,
 	"load_free": 0.15,
 	"load_heavy": 0.3,
-	"load_overloaded": 0.5
+	"load_overloaded": 0.5,
+	"clank_plate": 0.25,
+	"clank_mail": 0.2
 }

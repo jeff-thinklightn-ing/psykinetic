@@ -436,6 +436,16 @@ var moves := {
 const ARMS_SHARE := 0.2
 ## How much of the body's load a held draw's drain feels beside the arms'.
 const DRAIN_BODY_SHARE := 0.25
+## A worn piece's clank (decision 676 step 1b; Jeff: "armor should add a
+## clank sound that scares prey"): cells of noise a kg of its material makes
+## a step at a walk (armour_noise): plate clanks, mail jingles, leather and
+## cloth make none. Its own noise, &"clank", beside the step's.
+@export var clank_plate := 0.25
+@export var clank_mail := 0.2
+## The pace a clank is measured at: a player's walk, ticks a cell.
+const CLANK_WALK_TICKS := 2.5
+## Under a shout (Senses.NOISE_SHOUT): a monster goes to look, not to hunt.
+const CLANK_MAX := 19
 ## SHOVE_COST_BASE and SHOVE_COST_SCALE: a shove costs
 ## base + force x target_mass x scale stamina.
 @export var shove_cost_base := 5.0
@@ -4039,7 +4049,7 @@ func load_physics_rules(text: String) -> void:
 		if not field in ["shove_scale", "knockback_min_force", "slide_per_speed", "max_travel", "momentum_scale",
 				"momentum_ticks", "restitution", "impact_per_energy", "brace_restitution", "stun_ticks_base",
 				"stun_ticks_per_force", "knockback_stun_ticks", "lunge_ticks_per_cell", "lunge_min_speed", "rush_stop_speed", "swing_speed", "throw_speed",
-				"load_k", "load_free", "load_heavy", "load_overloaded"]:
+				"load_k", "load_free", "load_heavy", "load_overloaded", "clank_plate", "clank_mail"]:
 			push_warning("World: %s's %s is not a physics rule" % [PHYSICS_RULES, key])
 		elif (given is int or given is float) and float(given) >= 0.0:
 			set(field, int(given) if get(field) is int else float(given))
@@ -6284,7 +6294,21 @@ func try_move(entity: GridEntity, direction: Vector2i) -> bool:
 		entity.protected = false  # Moving ends spawn grace (a companion's shelter: her player's act does, 661).
 	if entity is Player or entity is Companion:
 		noise(entity.tile, Senses.step_radius(entity), &"step", entity)
+		var worn := entity.slots[Items.ARMOUR] if entity.slots.size() > Items.ARMOUR else ""
+		noise(entity.tile, int(armour_noise(worn, CLANK_WALK_TICKS / maxf(duration, 0.001))["radius"]), &"clank", entity)  # 676 1b: none at 0.
 	return true
+
+
+## The noise a worn [param worn_id] makes a step at [param pace] (a walk's
+## speed 1; decision 676 step 1b): {radius, kind}, its material's clank a kg
+## (clank_plate, clank_mail; leather and robes none) times its kg times the
+## pace, rounded, under CLANK_MAX; kind "plate", "mail", or "none" at 0. The
+## server's &"clank" noise and a client's sound read the same.
+func armour_noise(worn_id: String, pace := 1.0) -> Dictionary:
+	var look := str(Items.armour_of(worn_id).get("look", ""))
+	var per_kg := {"plate": clank_plate, "mail": clank_mail}.get(look, 0.0) as float
+	var radius := mini(roundi(per_kg * Items.weight_of(worn_id) * clampf(pace, 0.0, 2.0)), CLANK_MAX) if per_kg > 0.0 else 0
+	return {"radius": radius, "kind": look if radius > 0 else "none"}
 
 
 ## Whether [param at] is one of this zone's level links' cells (Fields
