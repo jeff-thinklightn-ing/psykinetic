@@ -906,6 +906,7 @@ func _rig() -> Client3D:
 	var rig: Client3D = preload("res://client3d/client3d.tscn").instantiate()
 	Net.camera_yaw = 0.0
 	Net.camera_zoom = 1.0
+	rig.indoor_view = false  # The test room is walled in (671): its pitch checks are the outdoor rules.
 	_main.add_child(rig)
 	rig.setup(_main._terrain)
 	rig.set_process(false)

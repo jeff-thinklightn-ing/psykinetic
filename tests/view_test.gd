@@ -19,6 +19,7 @@ func _ready() -> void:
 	add_child(_main)
 	_rig = preload("res://client3d/client3d.tscn").instantiate()
 	_main.add_child(_rig)
+	_rig.indoor_view = false  # The test room is walled in (671); _test_indoor_camera turns it on.
 	_rig.setup(_main._terrain)
 	_main._client3d = _rig
 	_rig.bubbles = _main.bubbles
@@ -39,6 +40,7 @@ func _ready() -> void:
 	await _test_fight_fade()
 	_test_outdoor()
 	await _test_low_camera()
+	_test_indoor_camera()
 	_test_low_scatter()
 	await _test_far_restart()
 	await _test_low_pick()
@@ -4350,6 +4352,14 @@ func _test_low_camera() -> void:
 	_rig.set_overhead(false)
 	_rig._ease_tilt(10.0)
 	_check(is_equal_approx(_rig.pitch, Client3D.LOW_PITCH), "and S, back to LOW_PITCH (%.0f)" % _rig.pitch)
+	_rig.indoor_view = true
+	_rig.inside_changed.emit(true, Rect2i(0, 0, 4, 4))
+	_rig._ease_tilt(1.0)
+	_check(_rig.indoors and is_equal_approx(_rig.pitch, Client3D.LOW_PITCH), "indoors under the low camera: it keeps its own pitch (671; %.0f)" % _rig.pitch)
+	_rig.inside_changed.emit(false, Rect2i())
+	_rig._fade_clock += Client3D.INSIDE_LEAVE_HOLD * 2.0
+	_rig._update_indoors()
+	_rig.indoor_view = false
 	Net.camera_overhead = overhead_was
 	Net.set_camera_low(false, false)
 	_check(not _rig.low_camera() and _rig._camera.projection == Camera3D.PROJECTION_ORTHOGONAL and is_equal_approx(_rig._camera.far, far_was)
@@ -4361,6 +4371,61 @@ func _test_low_camera() -> void:
 			"Off: the ortho view exactly as before (far, pitch, haze, shadows, distance)")
 	Net.set_camera_low(low_was, false)
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+
+
+## Indoors (671): top-down in a walled space, eased; out after a hold, so a
+## doorway never bobs it; the low camera keeps its own.
+func _test_indoor_camera() -> void:
+	print("
+== indoors (671): top-down in a walled space, out after a hold, never a bob ==")
+	var room := Rect2i(2, 2, 6, 5)
+	var overhead_was: bool = _rig.overhead
+	_rig.indoor_view = true
+	_rig.overhead = false
+	_rig.indoors = false
+	_rig._left_inside_at = -1.0
+	_rig._ease_pitch()
+	_rig._ease_tilt(10.0)
+	var outside := _rig.pitch
+	_rig.inside_changed.emit(true, room)
+	_rig._ease_tilt(Client3D.INSIDE_EASE_SECONDS * 0.5)
+	var going := _rig.pitch
+	_rig._ease_tilt(Client3D.INSIDE_EASE_SECONDS * 0.5)
+	_check(_rig.indoors and going > outside and going < Client3D.INSIDE_PITCH and is_equal_approx(_rig.pitch, Client3D.INSIDE_PITCH),
+			"in: eased to top-down (%.0f, %.1f half way)" % [_rig.pitch, going])
+	_rig.inside_changed.emit(true, Rect2i(8, 2, 4, 4))
+	_rig._ease_tilt(0.1)
+	_check(is_equal_approx(_rig.pitch, Client3D.INSIDE_PITCH), "room to room: still")
+	_rig.inside_changed.emit(false, Rect2i())
+	_rig._fade_clock += Client3D.INSIDE_LEAVE_HOLD * 0.5
+	_rig._update_indoors()
+	_rig.inside_changed.emit(true, room)
+	_rig._fade_clock += Client3D.INSIDE_LEAVE_HOLD
+	_rig._update_indoors()
+	_rig._ease_tilt(0.1)
+	_check(_rig.indoors and is_equal_approx(_rig.pitch, Client3D.INSIDE_PITCH), "a doorway out and back within the hold: no bob")
+	_rig.inside_changed.emit(false, Rect2i())
+	_rig._fade_clock += Client3D.INSIDE_LEAVE_HOLD * 0.9
+	_rig._update_indoors()
+	_check(_rig.indoors, "out, under the hold: still in")
+	_rig._fade_clock += Client3D.INSIDE_LEAVE_HOLD * 0.2
+	_rig._update_indoors()
+	_rig._ease_tilt(Client3D.INSIDE_EASE_SECONDS)
+	_check(not _rig.indoors and is_equal_approx(_rig.pitch, outside), "out past the hold: back to the view it had (%.0f)" % _rig.pitch)
+	_rig.set_overhead(true)
+	_rig._ease_tilt(1.0)
+	_rig.inside_changed.emit(true, room)
+	_rig.set_overhead(false)
+	_rig._ease_tilt(1.0)
+	_check(is_equal_approx(_rig.pitch, Client3D.INSIDE_PITCH) and not _rig.overhead, "S indoors: still top-down, the view to come back to set")
+	_rig.inside_changed.emit(false, Rect2i())
+	_rig._fade_clock += Client3D.INSIDE_LEAVE_HOLD * 2.0
+	_rig._update_indoors()
+	_rig._ease_tilt(1.0)
+	_check(is_equal_approx(_rig.pitch, Client3D.CAMERA_PITCH), "and out: the normal pitch, as S left it (%.0f)" % _rig.pitch)
+	_rig.set_overhead(overhead_was)
+	_rig._ease_tilt(1.0)
+	_rig.indoor_view = false
 
 
 ## The low camera's scatter reach (decision 653): built out to

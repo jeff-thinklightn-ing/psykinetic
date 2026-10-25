@@ -28729,3 +28729,27 @@ the "admin" and "admin_reply" messages, listed in net.gd. ui_test
 _test_admin_panel: the kept shapes, help's lines, the console's go and
 quests asking for a player, the gate, a giver's card reset, the panel's
 open, help, filter, history and confirm. New class_name AdminPanel.
+## 671, the indoor view
+
+The third part of 671, after buildings' side (inside_changed). Jeff:
+"going inside buildings should go into top down view and make roofs
+invisible", then "any space with enclosed walls would count as inside,
+ruins, castle, etc." Buildings works out the walled spaces and hides the
+roof; this is the camera's half. While the local player is in a walled
+space (Client3D.inside_changed true: a house's room, a castle's, a ruin
+inside its stubs, every room underground) the pitch eases to INSIDE_PITCH
+(88, not 90, where look_at has no up) over INSIDE_EASE_SECONDS (0.35) from
+wherever it is (rest_pitch). Out, the leave counts only after
+INSIDE_LEAVE_HOLD (0.5 s) outside (_update_indoors), so a doorway cell that
+reads open for a step, or a step out and back, never bobs the camera, and a
+room to the next room keeps it still (inside stays true, only the bounds
+change); then it eases back to the view it had. Yaw and zoom are untouched;
+W/S and the peek still set the view to come back to (overhead or not),
+which shows on leaving. The low camera keeps its own pitch indoors (the
+coordinator, until Jeff says otherwise). Underground, the whole level is
+walled spaces, so a barrow or the halls are seen top-down throughout.
+Client3D.indoor_view (true in the game) lets a test of the other pitches,
+in a walled test room, turn it off. view_test _test_indoor_camera (in,
+room to room, a doorway within the hold, out past it, S indoors, the low
+camera's own); controls_test's rig and view_test's turn it off. Client
+only; no wire change; no new class_name.

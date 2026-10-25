@@ -505,6 +505,18 @@ const PITCH_MAX := 85.0
 ## and the ease to it or back, eased in and out from wherever the pitch is.
 const OVERHEAD_PITCH := 82.0
 const PITCH_EASE_SECONDS := 0.3
+## Indoors (decision 671; Jeff: "going inside buildings should go into top
+## down view", then "any space with enclosed walls would count as inside,
+## ruins, castle, etc."): while the local player is in a space closed in by
+## walls (inside_changed, buildings' side) the camera eases to INSIDE_PITCH
+## over INSIDE_EASE_SECONDS, from wherever it is, and back on leaving; a
+## leave counts only after INSIDE_LEAVE_HOLD seconds outside, so a doorway
+## (or a step out and back) never bobs it, and a room to the next room keeps
+## it still. Not under the low camera, which stays its own; W/S and the peek
+## still set the view to come back to.
+const INSIDE_PITCH := 88.0
+const INSIDE_EASE_SECONDS := 0.35
+const INSIDE_LEAVE_HOLD := 0.5
 ## The pitch peek: the drag for all of it (screen px), the share of that
 ## which, let go, commits to the other pitch (671), how far it pulls back
 ## (ortho size), and the spring back.
@@ -1386,6 +1398,13 @@ var _pan_base := Vector3.ZERO
 var _pan_home := false
 ## The overhead view on (671; W, S, a committed peek; Net.camera_overhead).
 var overhead := false
+## Indoors now (671), and when the player was last seen leaving (_fade_clock;
+## -1 when not leaving).
+var indoors := false
+var _left_inside_at := -1.0
+## Whether being indoors tips the view (true in the game; a test of the
+## other pitches, in its walled test room, turns it off).
+var indoor_view := true
 ## The pitch easing to its rest (rest_pitch): from, how far along (1: at
 ## rest), over how long.
 var _tilt_from := CAMERA_PITCH
@@ -2144,6 +2163,8 @@ func setup(terrain: Dictionary, centre := Vector2i.ZERO) -> void:
 	pitch = rest_pitch()
 	if not Net.camera_low_changed.is_connected(_on_camera_low_changed):
 		Net.camera_low_changed.connect(_on_camera_low_changed)
+	if not inside_changed.is_connected(_on_inside_changed):
+		inside_changed.connect(_on_inside_changed)
 	zoom = clampf(Net.camera_zoom, ZOOM_MIN, ZOOM_MAX)
 	_zoom_to = zoom
 	_apply_size()
@@ -2161,6 +2182,7 @@ func _process(delta: float) -> void:
 	_sync_doors()
 	_ease_yaw(delta)
 	_ease_peek(delta)
+	_update_indoors()
 	_ease_tilt(delta)
 	_ease_zoom(delta)
 	_ease_pan(delta)
@@ -2531,7 +2553,32 @@ func low_camera() -> bool:
 ## The pitch at rest: OVERHEAD_PITCH with the overhead view on (671),
 ## else normal_pitch.
 func rest_pitch() -> float:
+	if indoors and indoor_view and not _low:
+		return INSIDE_PITCH  # 671: top-down inside a walled space.
 	return OVERHEAD_PITCH if overhead else normal_pitch()
+
+
+## Buildings' inside_changed (671): in, at once (a leave under way called
+## off); out, held INSIDE_LEAVE_HOLD first (_update_indoors).
+func _on_inside_changed(inside: bool, _rect: Rect2i) -> void:
+	if inside:
+		_left_inside_at = -1.0
+		if not indoors:
+			indoors = true
+			if not _peeking:
+				_ease_pitch(INSIDE_EASE_SECONDS)
+	elif indoors and _left_inside_at < 0.0:
+		_left_inside_at = _fade_clock
+
+
+## Each frame: out of a walled space for INSIDE_LEAVE_HOLD, the camera eases
+## back to the view it had.
+func _update_indoors() -> void:
+	if indoors and _left_inside_at >= 0.0 and _fade_clock - _left_inside_at >= INSIDE_LEAVE_HOLD:
+		indoors = false
+		_left_inside_at = -1.0
+		if not _peeking:
+			_ease_pitch(INSIDE_EASE_SECONDS)
 
 
 ## The normal pitch: LOW_PITCH under the low camera, CAMERA_PITCH else.
