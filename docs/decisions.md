@@ -29401,6 +29401,9 @@ revision 36, no bump (36 unreleased); a label, no number.
   `Regen.runes_of` rolls one along `RUNE_SHARE` 0.12 of the ways' wall feet outside the anchors
   for a tower-style generation (as `decor_of` rolls the barrow's moss), never a way's cell, a
   marker's or a spawn's. Drafts for Jeff.
+- **The arch** (follow-up, after art-kit's d9bf0ecf): the foot's door-out link names `"variant": 3`,
+  art-kit's dark-stone `building.link_arch`; level_test `_test_tower_levels` reads it. The doors need
+  nothing here: Client3D picks their variant 2 on dark wall edges (art-kit's side).
 
 Protocol: under 36 (net.gd's note): the pillar solid, the hatch open-air, terrain "lamps". Tests:
 labyrinth_test `_test_tower` (lamps and no torches, the set, runes rolled and placed, the hatch on

@@ -1965,7 +1965,8 @@ const CUE_SLOTS := {"arch": "building.link_arch", "waystones": "building.wayston
 ## way out: toward the edge it is on, or away from the open ground it is
 ## walked into from (an arch's or waystones': toward the map's nearest
 ## edge). "variant" as the link says (1: a timber arch, a stone
-## stair; 2: a stone arch, a timber stair or a ladder).
+## stair; 2: a stone arch, a timber stair or a ladder; 3: the dark
+## tower's, art-kit's dark-stone arch and stairs, 659 amended).
 static func link_cues(level: Dictionary, config: Dictionary) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	var size: Vector2i = level["size"]

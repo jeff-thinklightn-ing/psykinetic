@@ -744,7 +744,9 @@ solid and doorless; the top chamber stands four. `building.hatch_sealed`
 (1 x 1) is open-air, laid over the foot's sealed link. `rune_strip` is a wall
 decor kind (two variants): the chamber's north wall carries a line by hand,
 and each generation rolls one along `Regen.RUNE_SHARE` (0.12) of the ways'
-wall feet outside the anchors (`Regen.runes_of`).
+wall feet outside the anchors (`Regen.runes_of`). The foot's door out is
+art-kit's dark arch (`building.link_arch` variant 3, the link's `"variant"`),
+and the doors on dark walls draw `door.single`/`door.double` variant 2.
 
 Levels regenerate only on a server started with `--regenerate` (as raid
 groups with `--raids`, decision 328) or after the console's `regenerate on`

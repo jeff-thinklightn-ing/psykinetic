@@ -234,7 +234,7 @@ static func sample_tower(floor: int, floors: int, prefix := "lab_tower", across 
 	if floor == 1:
 		var door := Vector2i(c, across - 2)
 		markers[door] = "link"
-		links.append({"at": [door.x, door.y], "to_map": "%s_outside" % prefix, "to_spawn": "", "cue": "arch"})
+		links.append({"at": [door.x, door.y], "to_map": "%s_outside" % prefix, "to_spawn": "", "cue": "arch", "variant": 3})  # Art-kit's dark arch (d9bf0ecf).
 		spawns["from_outside"] = [c, across - 3]
 		start = Vector2i(c + 1, across - 3)
 		var hatch := Vector2i(c, 2)

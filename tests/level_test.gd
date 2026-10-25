@@ -2427,9 +2427,10 @@ func _test_tower_levels() -> void:
 		else:
 			_check(link_at.call(level, Vector2i(c - 1, c)).is_empty(), "the foot has no stair down")
 			var door: Dictionary = link_at.call(level, Vector2i(c, Sheet.TOWER_ACROSS - 2))
+			var arch: Array = level["terrain"]["link_cues"].filter(func(cue: Dictionary) -> bool: return cue["tile"] == Vector2i(c, Sheet.TOWER_ACROSS - 2))
 			_check(door.get("to_map") == "lt_tower_outside" and cue_at.call(level, Vector2i(c, Sheet.TOWER_ACROSS - 2)) == "arch"
-				and level["spawn_points"].get("from_outside") == Vector2i(c, Sheet.TOWER_ACROSS - 3),
-				"the foot's door out at the south edge is an arch with from_outside inside it (%s)" % [door])
+				and arch.size() == 1 and arch[0]["variant"] == 3 and level["spawn_points"].get("from_outside") == Vector2i(c, Sheet.TOWER_ACROSS - 3),
+				"the foot's door out at the south edge is the dark arch (variant 3) with from_outside inside it (%s)" % [door])
 			var hatch: Dictionary = link_at.call(level, Vector2i(c, 2))
 			_check(hatch.get("to_map") == "lt_tower_mine" and hatch.get("sealed") == "tower_mine" and cue_at.call(level, Vector2i(c, 2)) == "sealed",
 				"the mine's way down under the north wall is a sealed link (%s)" % [hatch])
