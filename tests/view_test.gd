@@ -6603,7 +6603,8 @@ func _test_rest() -> void:
 			_rig._process(0.0)
 			await get_tree().process_frame
 		if Client3D.SHEATHS.has(kind):
-			_check(rig.upper_clip() == "" and not (sockets["hand_r"] as Node3D).has_node("Held"), "%s calm a while: sheathed, not at rest in hand (_test_sheathed)" % kind)
+			_check(str(puppet.get_meta("bow_state")) in ["sheathing", "sheathed"] and rig.upper_clip() in ["Sheathe", ""],
+				"%s calm a while: sheathing, not at rest in hand (_test_sheathed) (%s)" % [kind, puppet.get_meta("bow_state")])
 			continue
 		var held := (sockets["hand_r"] as Node3D).get_node("Held") as Node3D
 		if not Client3D.RESTS.has(kind):
@@ -6710,9 +6711,11 @@ func _test_bow_back() -> void:
 
 ## The blades sheathed and the shield on the back out of a fight (662 (c)): a sword and a
 ## shield taken up, in hand, the sheath empty at the hip; calm a while (the times put back), the
-## sword in its sheath, the shield on the back, the upper layer off and both hands free to the
-## fidgets; a raised guard, both in hand at once; calm again, put away; the sword let go while
-## sheathed, the sheath gone with it and the shield's back socket emptied with the shield.
+## Sheathe clip, the blade still in hand till the hand meets the sheath (SHEATHE_CONTACT), then the
+## sword in its sheath and the shield on the back, and once the clip ends the upper layer off and
+## both hands free to the fidgets; a blow seen near, the Draw clip, back in hand at DRAW_GRIP; a
+## raised guard during either clip cuts it at once with both in hand (the coordinator's guard);
+## the sword let go while sheathed, the sheath gone with it and the shield's back socket emptied.
 func _test_sheathed() -> void:
 	print("== the blade at the hip, the shield on the back (662 (c)) ==")
 	var player := _player()
@@ -6735,22 +6738,53 @@ func _test_sheathed() -> void:
 	var sheath := (sockets["hip_l"] as Node3D).get_node_or_null("Sheath") as Node3D
 	_check(sheath != null and hand.has_node("Held") and arm.has_node("Held") and not sheath.has_node("Sheathed"),
 		"just taken up: the sword in hand, its scabbard empty at the hip, the shield on the arm")
-	puppet.set_meta("roused_at", Time.get_ticks_msec() - 60000)
-	_rig._combat_at.erase(id)
+	var calm := func() -> void:
+		player.raised = ""
+		puppet.set_meta("roused_at", Time.get_ticks_msec() - 60000)
+		_rig._combat_at.erase(id)
+	var since := func(ms: int) -> void:
+		puppet.set_meta("sheathe_at", Time.get_ticks_msec() - ms)
+		_rig._process(0.0)
+	calm.call()
 	_rig._process(0.0)
-	_check(sheath != null and sheath.has_node("Sheathed") and not hand.has_node("Held") and back.has_node("StowedShield") and not arm.has_node("Held")
-		and rig.upper_clip() == "" and puppet.get_meta("bow_state") == "sheathed",
-		"calm a while: the sword sheathed, the shield on the back (%s)" % puppet.get_meta("bow_state"))
-	_check(Client3D.in_hand(puppet) == ["", ""] and Client3D.fidget_with("Fidget_Shoulders", Client3D.in_hand(puppet)),
-		"both hands free to the fidgets: every fidget again")
+	_check(puppet.get_meta("bow_state") == "sheathing" and rig.upper_clip() == "Sheathe" and hand.has_node("Held") and not sheath.has_node("Sheathed"),
+		"calm a while: the Sheathe clip, the sword still in hand (%s, %s)" % [puppet.get_meta("bow_state"), rig.upper_clip()])
+	since.call(300)
 	player.raised = "block"
 	_rig._process(0.0)
-	_check(hand.has_node("Held") and arm.has_node("Held") and not back.has_node("StowedShield") and rig.upper_clip() == "Block_Idle",
-		"the guard raised: both in hand at once, guarding (%s)" % rig.upper_clip())
-	player.raised = ""
-	puppet.set_meta("roused_at", Time.get_ticks_msec() - 60000)
-	_rig._combat_at.erase(id)
+	_check(hand.has_node("Held") and arm.has_node("Held") and not sheath.has_node("Sheathed") and rig.upper_clip() == "Block_Idle",
+		"the guard raised mid-sheathe: cut at once, both in hand, guarding (%s)" % rig.upper_clip())
+	calm.call()
 	_rig._process(0.0)
+	since.call(int(Client3D.SHEATHE_CONTACT * 1000.0) + 50)
+	_check(sheath.has_node("Sheathed") and not hand.has_node("Held") and back.has_node("StowedShield") and not arm.has_node("Held")
+		and rig.upper_clip() == "Sheathe", "the hand at the sheath: the sword in it, the shield on the back, the clip playing on")
+	since.call(3000)
+	_check(sheath.has_node("Sheathed") and back.has_node("StowedShield") and rig.upper_clip() == "" and puppet.get_meta("bow_state") == "sheathed",
+		"the clip done: sheathed, the upper layer off (%s)" % puppet.get_meta("bow_state"))
+	_check(Client3D.in_hand(puppet) == ["", ""] and Client3D.fidget_with("Fidget_Shoulders", Client3D.in_hand(puppet)),
+		"both hands free to the fidgets: every fidget again")
+	_rig._combat_at[id] = Time.get_ticks_msec()
+	_rig._process(0.0)
+	_check(puppet.get_meta("bow_state") == "drawing" and rig.upper_clip() == "Draw" and sheath.has_node("Sheathed"),
+		"a blow seen near: the Draw clip, the sword still sheathed (%s, %s)" % [puppet.get_meta("bow_state"), rig.upper_clip()])
+	since.call(int(Client3D.DRAW_GRIP * 1000.0) + 50)
+	_check(hand.has_node("Held") and arm.has_node("Held") and not sheath.has_node("Sheathed") and rig.upper_clip() == "Draw",
+		"at the grip: the sword in hand, the shield on the arm, the clip playing on")
+	since.call(3000)
+	_check(rig.upper_clip() != "Draw" and str(puppet.get_meta("bow_state")) not in ["drawing", "sheathed"], "the clip done: as held (%s)" % puppet.get_meta("bow_state"))
+	calm.call()
+	_rig._process(0.0)
+	since.call(3000)
+	_rig._combat_at[id] = Time.get_ticks_msec()
+	_rig._process(0.0)
+	player.raised = "block"
+	_rig._process(0.0)
+	_check(hand.has_node("Held") and arm.has_node("Held") and not sheath.has_node("Sheathed") and not back.has_node("StowedShield")
+		and rig.upper_clip() == "Block_Idle", "the guard raised mid-draw: cut at once, both in hand, guarding (%s)" % rig.upper_clip())
+	calm.call()
+	_rig._process(0.0)
+	since.call(3000)
 	_check(sheath.has_node("Sheathed") and back.has_node("StowedShield"), "calm again: put away")
 	slots[Items.RIGHT_HAND] = "dagger"
 	slots[Items.LEFT_HAND] = ""

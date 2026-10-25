@@ -23,6 +23,7 @@ func _ready() -> void:
 	await _test_bow_clear()
 	await _test_bow_back()
 	await _test_sheathed()
+	await _test_sheathe_clips()
 	await _test_work_clear()
 	await _test_armed_fidgets()
 	await _test_rests()
@@ -454,6 +455,87 @@ func _test_sheathed() -> void:
 	_check(back_again, "drawn again, the blade in the hand and the shield on the arm as they were")
 
 
+## The Sheathe and Draw clips (662 (c)), the sword's and the short sheath's, on the five builds:
+## at the moment Client3D moves the blade (SHEATHE_CONTACT, DRAW_GRIP) the hand's grip within
+## SHEATHE_REACH of the sheath's mouth and the blade along its sleeve, so it doesn't jump; and
+## through the clip while the blade is in hand (the Sheathe to its contact, the Draw from its
+## grip), every 0.05 s, no more of it inside the trunk or the left leg than in the hand's own
+## held pose at rest (Idle), none of it within SHEATHE_HEAD of the head (the coordinator: the first
+## draw brought the hilt up across the face), none through the shield's box (the shield's forearm
+## swung out of the way) or within SHEATHE_ARM of that forearm.
+const SHEATHE_REACH := 0.04
+const SHEATHE_HEAD := 0.08
+const SHEATHE_ARM := 0.02
+func _test_sheathe_clips() -> void:
+	print("== the Sheathe and Draw clips ==")
+	var lib := load(CLIPS) as AnimationLibrary
+	var builds := [["man", "res://art/models/characters/human_m.glb", {}],
+		["man heavy", "res://art/models/characters/human_m.glb", {"heavy": 1.0}],
+		["man broad", "res://art/models/characters/human_m.glb", {"heavy": 0.6, "broad": 1.0}],
+		["man lean", "res://art/models/characters/human_m.glb", {"lean": 1.0, "narrow": 1.0}],
+		["woman", "res://art/models/characters/human_f.glb", {}]]
+	var off: Array[String] = []
+	var inside: Array[String] = []
+	var near: Array[String] = []
+	for kit: Array in [["sword", "shield"], ["dagger", "buckler"], ["knife", ""]]:
+		var kind: String = kit[0]
+		var clips: Array = Client3D.SHEATHE_CLIPS[Client3D.SHEATHS[kind][0]]
+		for build: Array in builds:
+			var model := (load(build[1]) as PackedScene).instantiate() as Node3D
+			add_child(model)
+			for mesh: MeshInstance3D in model.find_children("*", "MeshInstance3D", true, false):
+				for key: String in build[2]:
+					var i := mesh.find_blend_shape_by_name(key)
+					if i >= 0:
+						mesh.set_blend_shape_value(i, build[2][key])
+			var holder := Node3D.new()
+			Client3D._attach_sockets(model, Client3D.HUMAN_SOCKETS, 1.0, holder)
+			var sockets: Dictionary = holder.get_meta("sockets")
+			Client3D._hold(sockets, 0, kind)
+			Client3D._hold(sockets, 1, kit[1])
+			var rig := AnimRig.make(model, lib, 0.0, true, null)
+			rig.base_at("Idle", 0.0)
+			var sheath := (sockets["hip_l"] as Node3D).get_node("Sheath") as Node3D
+			var blade := (sockets["hand_r"] as Node3D).get_node("Held") as Node3D
+			var shield := (sockets["arm_l"] as Node3D).get_node_or_null("Held") as Node3D
+			rig.upper_off()
+			for i in 3:
+				await get_tree().process_frame
+			var parts := _skinned_parts(model)
+			var at_rest := _inside(_points(blade), parts["trunk"][0] + parts["leg"][0], parts["trunk"][1] + parts["leg"][1])
+			for moment: Array in [[clips[0], Client3D.SHEATHE_CONTACT], [clips[1], Client3D.DRAW_GRIP]]:
+				rig.upper_at(moment[0], moment[1])
+				for i in 3:
+					await get_tree().process_frame
+				var mouth := sheath.global_transform * (sheath.get_meta("mouth") as Vector3)
+				var gap := blade.global_position.distance_to(mouth)
+				var along := blade.global_basis.y.normalized().dot(-sheath.global_basis.y.normalized())
+				if gap > SHEATHE_REACH or along < 0.98:
+					off.append("%s %s %s %.3f m, %.2f" % [kind, build[0], moment[0], gap, along])
+			for span: Array in [[clips[0], 0.0, Client3D.SHEATHE_CONTACT], [clips[1], Client3D.DRAW_GRIP, rig.length(clips[1])]]:
+				var t: float = span[1]
+				while t <= float(span[2]) + 0.001:
+					rig.upper_at(span[0], t)
+					for i in 2:
+						await get_tree().process_frame
+					parts = _skinned_parts(model)
+					var points := _points(blade)
+					var n := _inside(points, parts["trunk"][0] + parts["leg"][0], parts["trunk"][1] + parts["leg"][1])
+					if n > at_rest:
+						inside.append("%s %s %s %.2f: %d (at rest %d)" % [kind, build[0], span[0], t, n, at_rest])
+					var head := _near(points, parts["head"][0], SHEATHE_HEAD)
+					var through := _through_shield(points, shield) if shield != null else 0
+					var arm := _near(points, parts["forearm"][0], SHEATHE_ARM)
+					if head + through + arm > 0:
+						near.append("%s %s %s %.2f: head %d, shield %d, forearm %d" % [kind, build[0], span[0], t, head, through, arm])
+					t += 0.05
+			model.queue_free()
+			holder.queue_free()
+	_check(off.is_empty(), "the grip at the sheath's mouth and the blade along its sleeve when it moves, five builds (%s)" % ", ".join(off))
+	_check(inside.is_empty(), "the blade in hand through both clips no deeper in the body than held at rest (%s)" % ", ".join(inside))
+	_check(near.is_empty(), "the blade in hand through both clips clear of the head, the shield and its forearm (%s)" % ", ".join(near))
+
+
 static func _points(piece: Node3D) -> PackedVector3Array:
 	var points := PackedVector3Array()
 	for mesh: MeshInstance3D in piece.find_children("*", "MeshInstance3D", true, false):
@@ -683,6 +765,30 @@ static func _inside(points: PackedVector3Array, surface: PackedVector3Array, nor
 				at = j
 		if at >= 0 and best < 0.0225 and (p - surface[at]).dot(normals[at]) < -0.004:
 			n += 1
+	return n
+
+
+## How many of [points] lie within the shield's own box (its meshes' bounds, in its frame).
+static func _through_shield(points: PackedVector3Array, shield: Node3D) -> int:
+	var n := 0
+	for mesh: MeshInstance3D in shield.find_children("*", "MeshInstance3D", true, false):
+		var box := mesh.get_aabb()
+		var into := mesh.global_transform.affine_inverse()
+		for p in points:
+			if box.has_point(into * p):
+				n += 1
+	return n
+
+
+## How many of [points] lie within [reach] of any of [surface] (an open mesh, the forearm's,
+## where inside can't be told).
+static func _near(points: PackedVector3Array, surface: PackedVector3Array, reach: float) -> int:
+	var n := 0
+	for p in points:
+		for q in surface:
+			if p.distance_squared_to(q) < reach * reach:
+				n += 1
+				break
 	return n
 
 

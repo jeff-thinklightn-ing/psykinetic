@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Sheathing and drawing are seen: calm a while, a fighter turns to the left hip and slides the sword, dagger or knife home (the shield goes on the back as the blade goes in); roused by a fight near, they draw it before guarding. Raising a guard or striking cuts either at once, the blade straight to hand.
 - Animals left in an area when everyone leaves go back into their herds, so a town's hunters can hunt them again; they're made again when someone comes back.
 - The Character Lab compares and measures: Compare puts a second body beside the first (your export beside the game's), a line under each says the pace its feet want and how much they slide at the game's, marks on the floor show the planted toe, and Use measured tries the measured pace. The people's walk, jog and sprint paces are on the tuning panel (F7), unchanged (674 step 3).
 ## v0.1.173

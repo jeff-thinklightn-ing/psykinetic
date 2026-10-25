@@ -30111,3 +30111,35 @@ coordinator approved retiring them when the zone falls asleep.
 monster_test _test_herd_sleeps calls Main's own _retire_sleeping on a bare Main: 4 bodies out, one
 wounded; asleep, none left, out 0, kept 4; a level's own deer stays. Server only, protocol
 unchanged, no new class_name.
+
+## 662 (c) amended: the Sheathe and Draw clips
+
+The follow-up 662 (c) named, as the coordinator approved it: upper-layer one-shots, the swap at the
+hand's contact, a raise or strike still instant, the Draw only when roused without a raise.
+tools/humanoid_clips.py authors Sheathe and Draw (the sword's scabbard) and Sheathe_Short and
+Draw_Short (the dagger's and knife's sheath) into goblin.res (Client3D.SHEATHE_CLIPS by sheath art):
+the chest turned to the left hip and the head down at it, the right hand to each sheath's mouth (as
+the hip_l socket puts it on the man standing, build/draw/mouth.gd) with the blade along its sleeve,
+the shield's forearm swung out to the left and ahead while the hand works there. The Sheathe lifts
+the blade out ahead, tips it down, brings its tip down the sleeve's line from above and ahead of the
+mouth, home at SHEATHE_CONTACT (0.5 s); the Draw takes the grip at DRAW_GRIP (0.25 s), pulls it up
+the sleeve and out ahead with the head up and away from the hilt, carries it out ahead and back to
+held.
+
+Client3D._sync_bow: calm with a sheathing kit (as 662 (c)), bow_state "sheathing" and the clip on
+the upper layer, the blade and shield still in hand; at SHEATHE_CONTACT the swap (`_sheathe`), and
+"sheathed" when the clip ends. Roused (a blow seen near, a monster hunting near) with no raise,
+"drawing": the Draw, the blade still sheathed, in hand at DRAW_GRIP, its hold as before when it
+ends. A raised guard or a strike during either clip cuts it at once, both in hand (no draw delay,
+as 662 rules). The stow sound plays when the blade actually moves (`_put_away` before and after).
+
+The coordinator's review of the first strip (C:/dev/review/rest662/sheathe_draw.png): the Draw's
+pull brought the hilt up across the face, and the Sheathe laid the blade flat across the shield's
+forearm; both fixed as above, and the test now watches the head, the shield and its forearm.
+anim_rig_test `_test_sheathe_clips` (sword and shield, dagger and buckler, knife; the five builds):
+at the moment the blade moves the grip within SHEATHE_REACH (0.04 m) of the mouth and along the
+sleeve; while in hand, every 0.05 s, no deeper in the trunk or left leg than held at rest, none
+within SHEATHE_HEAD (0.08 m) of the head, none in the shield's box, none within SHEATHE_ARM (0.02)
+of the left forearm. view_test `_test_sheathed` walks the timeline: sheathing in hand, a raise
+mid-sheathe cuts it, the swap at contact, sheathed, a blow near starts the Draw, in hand at the
+grip, done, a raise mid-draw cuts it. Client only, protocol unchanged, no new class_name.

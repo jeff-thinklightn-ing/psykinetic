@@ -536,6 +536,72 @@ for _name, _held in RESTS.items():
 		(5.0, P("Idle_Loop", 0.0, _held + [("Head", TURN, 12.0)])),
 	]}
 
+# A blade sheathed and drawn (662 (c); the upper layer, once): the right hand across the belly to
+# the left hip's sheath, the chest turned to it and the head down at it, the blade held along the
+# sheath (down its sleeve, the flat to the body) so it slides home; Client3D moves the blade from
+# hand to sheath at SHEATHE_CONTACT, from sheath to hand at DRAW_GRIP. Each sheath's mouth from the
+# pelvis and its sleeve, here's axes, as Client3D's hip_l socket puts them on the man standing
+# (build/draw/mouth.gd): the sword's scabbard, and the dagger's and knife's shorter sheath, less
+# where the first authoring's grip fell from it (build/draw/check.gd: 5 and 8 cm off, the arm's
+# reach solved to the wrist), so the grip meets the mouth. [1] is how far up the sleeve a draw
+# pulls the blade before turning its tip out ahead (the tip clear of the mouth); [2] the trunk bent
+# farther down to the short sheath's lower mouth.
+SHEATH_MOUTHS = {"": [Vector((0.299, -0.140, 0.143)), 0.6, []],
+	"_Short": [Vector((0.325, -0.083, -0.018)), 0.25, [("spine_01", LIFT, -13.0), ("spine_01", TILT, 6.0), ("spine_02", TILT, 4.0)]]}
+SHEATH_DOWN = Vector((0.078, 0.327, -0.942))
+SHEATH_FLAT = Vector((-0.973, 0.230, 0.0))
+# The chest turned and leant to the left hip, the right shoulder brought to it (the arm alone fell
+# 4 to 7 cm short, at full stretch).
+TURNED_TO_HIP = [("spine_02", TURN, 18.0), ("spine_03", TURN, 14.0), ("spine_02", LIFT, -8.0), ("spine_02", TILT, 7.0),
+	("Head", TURN, 16.0), ("Head", LIFT, -14.0)]
+# Pulling it out: the chest still turned, the head up and back from the hilt rising past it.
+PULLING = [("spine_02", TURN, 14.0), ("spine_03", TURN, 8.0), ("spine_02", TILT, 5.0), ("Head", TURN, -10.0), ("Head", LIFT, 6.0)]
+# The shield's forearm out to the left and ahead, clear of the hip, while the right hand works there.
+SHIELD_ASIDE = left_arm(0.35, 0.35, -0.3, (1.0, 0.3, -0.5))
+
+
+def at_sheath(mouth: Vector, up: float, ahead: float = 0.0, bent: list = (), turned: list = TURNED_TO_HIP) -> list:
+	"""The right hand holding the blade's grip [up] the sleeve's line from the sheath's mouth (and
+	[ahead] of it), the blade along the sleeve, the elbow out to the right and back."""
+	wrist = mouth - SHEATH_DOWN * up + Vector((0.0, -ahead, 0.0)) - holding(SHEATH_DOWN, SHEATH_FLAT)
+	return turned + list(bent) + SHIELD_ASIDE + [("upperarm_r", ([("pelvis", tuple(wrist), 1.0)], (-1.0, 0.4, -0.2)), REACH),
+		("hand_r", (tuple(SHEATH_DOWN), tuple(SHEATH_FLAT)), GRASP)]
+
+
+def blade_ahead(ahead: float, out: float, up: float, length: tuple) -> list:
+	"""The right wrist [ahead], [out] and [up] of its shoulder, the blade along [length], its flat
+	upright (the edge down the swing): carried out before the body, so turning it never sweeps it
+	through the body."""
+	return right_arm(ahead, out, up, (-1.0, 0.3, -0.4)) + [("hand_r", (length, (-1.0, 0.0, 0.0)), GRASP)]
+
+
+for _kind, (_mouth, _pull, _bent) in SHEATH_MOUTHS.items():
+	# Sheathing: the blade lifted out ahead (the heavier bellies), its tip turned down ahead and
+	# the shield's forearm swung out, the tip down the sleeve's line from above and ahead of the
+	# mouth (tipped straight across, it swept through the thighs), home at 0.5 s, a beat, back.
+	CLIPS["Sheathe" + _kind] = {"keys": [
+		(0.0, P("Idle_Loop", 0.0)),
+		(0.07, P("Idle_Loop", 0.07, blade_ahead(0.42, 0.15, -0.22, (0.0, -1.0, 0.2)))),
+		(0.15, P("Idle_Loop", 0.15, TURNED_TO_HIP + SHIELD_ASIDE + blade_ahead(0.35, 0.12, -0.3, (0.1, -0.75, -0.6)))),
+		(0.25, P("Idle_Loop", 0.25, at_sheath(_mouth, 0.3, 0.2, _bent))),
+		(0.35, P("Idle_Loop", 0.35, at_sheath(_mouth, 0.12, 0.05, _bent))),
+		(0.5, P("Idle_Loop", 0.5, at_sheath(_mouth, 0.0, 0.0, _bent))),
+		(0.6, P("Idle_Loop", 0.6, at_sheath(_mouth, 0.0, 0.0, _bent))),
+		(0.95, P("Idle_Loop", 0.95)),
+	]}
+	# Drawing: across to the grip by 0.25 s, pulled up along the sleeve and out ahead, the head up
+	# and away from the hilt (pulled straight up, it crossed the face), its tip out ahead and the
+	# hand to the right side (the idle holds it ahead and a little up, the wrist at the side), as held.
+	CLIPS["Draw" + _kind] = {"keys": [
+		(0.0, P("Idle_Loop", 0.0)),
+		(0.25, P("Idle_Loop", 0.25, at_sheath(_mouth, 0.0, 0.0, _bent))),
+		(0.42, P("Idle_Loop", 0.42, at_sheath(_mouth, _pull, 0.18, _bent, PULLING))),
+		(0.6, P("Idle_Loop", 0.6, SHIELD_ASIDE + blade_ahead(0.38, 0.12, -0.27, (0.0, -1.0, 0.25)))),
+		(0.8, P("Idle_Loop", 0.0, [("upperarm_r", LIFT, 30.0), ("upperarm_r", TILT, 18.0), ("lowerarm_r", LIFT, 15.0)])),
+		(0.9, P("Idle_Loop", 0.0, [("upperarm_r", LIFT, 12.0), ("upperarm_r", TILT, 12.0), ("lowerarm_r", LIFT, 6.0)])),
+		(1.0, P("Idle_Loop", 0.0)),
+	]}
+
 
 def args() -> list:
 	return sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []

@@ -14078,6 +14078,8 @@ func _sync_bow(entity: GridEntity, puppet: Node3D) -> void:
 	if want == "" and rest.is_empty() and calm and sheathes(ids):
 		want = "sheathed"  # The blade at the hip, the shield on the back (662 (c)).
 	var sockets: Dictionary = puppet.get_meta("sockets")
+	var away := _put_away(sockets)
+	want = _sheathing(entity, puppet, rig, sockets, ids, want, state, now)
 	if not rest.is_empty():
 		want = "rest"
 		_slide_held(sockets, float(rest.get("grip", 0.0)))
@@ -14094,8 +14096,6 @@ func _sync_bow(entity: GridEntity, puppet: Node3D) -> void:
 		_rest_sound(puppet, str(ids[0]), want != "rest")
 	if (want == "stowed") != (state == "stowed"):
 		_rest_sound(puppet, bow if bow != "" else str(ids[1]), want != "stowed")
-	if (want == "sheathed") != (state == "sheathed"):
-		_rest_sound(puppet, str(ids[0]) if str(ids[0]) != "" else str(ids[1]), want != "sheathed")
 	if want == "draw":
 		var clip := str(moves.get("bow_draw", ""))
 		rig.upper_at(clip, bow_pull(entity) * rig.length(clip))
@@ -14116,8 +14116,10 @@ func _sync_bow(entity: GridEntity, puppet: Node3D) -> void:
 	puppet.set_meta("bow_state", want)
 	if want == "stowed" or state == "stowed":
 		_stow_bow(sockets, want == "stowed")
-	if want == "sheathed" or state == "sheathed":
+	if want == "sheathed" or (state == "sheathed" and want != "drawing"):
 		_sheathe(sockets, want == "sheathed")
+	if _put_away(sockets) != away:  # Heard as the blade (else the shield) changes place.
+		_rest_sound(puppet, str(ids[0]) if str(ids[0]) != "" else str(ids[1]), away)
 	if bow != "":
 		_turn_carried(puppet, want == "carry", now)
 	_show_nocked(puppet, ids, want in ["draw", "hold"])
@@ -14315,6 +14317,62 @@ static func _sheathe(sockets: Dictionary, sheathed: bool) -> void:
 			shield.name = "StowedShield" if sheathed else "Held"
 			shield.transform = BACK_SHIELD if sheathed else Transform3D(Basis.IDENTITY, -shield.get_meta("strap", Vector3.ZERO))
 			(back if sheathed else arm).add_child(shield)
+
+
+## The blade sheathed and drawn by hand (662 (c)'s clips, humanoid_clips.py's Sheathe and Draw,
+## "_Short" for the short sheath; the upper layer, once): calm, a blade in the right hand plays
+## its sheath's Sheathe ("sheathing"), the blade (and a shield, to the back) moved at
+## SHEATHE_CONTACT, when the hand is at the sheath's mouth, and "sheathed" once it ends; roused
+## without a raise or a blow of its own (a monster hunting near, a blow seen near), Draw
+## ("drawing"), back in hand at DRAW_GRIP, its hold as before once it ends. A raise or its own
+## blow takes it at once, with no clip, and cuts either clip short with the blade in hand (the
+## coordinator: no blow waits on a draw). A shield alone, or a rig without the clips, is put away
+## and taken up at once as before.
+const SHEATHE_CLIPS := {"gear.scabbard": ["Sheathe", "Draw"], "gear.sheath": ["Sheathe_Short", "Draw_Short"]}
+const SHEATHE_CONTACT := 0.5
+const DRAW_GRIP := 0.25
+func _sheathing(entity: GridEntity, puppet: Node3D, rig: AnimRig, sockets: Dictionary, ids: Array, want: String,
+		state: String, now: int) -> String:
+	var clips := _sheathe_clips(rig, sockets, str(ids[0]))
+	var hasty := entity.raised != "" or rig.striking()
+	var since := (now - int(puppet.get_meta("sheathe_at", now))) / 1000.0
+	if state == "sheathing":
+		if want != "sheathed" or clips.is_empty():
+			_sheathe(sockets, false)  # Cut short: in hand at once.
+			return want
+		if since >= SHEATHE_CONTACT:
+			_sheathe(sockets, true)
+		return "sheathing" if since < rig.length(clips[0]) else "sheathed"
+	if state == "drawing":
+		if hasty or clips.is_empty() or since >= DRAW_GRIP:
+			_sheathe(sockets, false)
+		return "drawing" if not hasty and not clips.is_empty() and since < rig.length(clips[1]) else want
+	if clips.is_empty():
+		return want
+	if want == "sheathed" and state != "sheathed":
+		puppet.set_meta("sheathe_at", now)
+		rig.upper(clips[0], 1.0, true)
+		return "sheathing"
+	if state == "sheathed" and want == "" and not hasty:
+		puppet.set_meta("sheathe_at", now)
+		rig.upper(clips[1], 1.0, true)
+		return "drawing"
+	return want
+
+
+## The Sheathe and Draw clips for the sheath [param id] wears at the hip, [] when it wears none or
+## the rig lacks them.
+static func _sheathe_clips(rig: AnimRig, sockets: Dictionary, id: String) -> Array:
+	var clips: Array = SHEATHE_CLIPS.get(str(SHEATHS.get(id, ["", 0.0])[0]), [])
+	if clips.is_empty() or not sockets.has("hip_l") or not rig.has(clips[0]) or not rig.has(clips[1]):
+		return []
+	return clips
+
+
+## Whether a blade is in its sheath or a shield on the back.
+static func _put_away(sockets: Dictionary) -> bool:
+	var sheath := (sockets["hip_l"] as Node3D).get_node_or_null("Sheath") if sockets.has("hip_l") else null
+	return (sheath != null and sheath.has_node("Sheathed")) or (sockets.has("back") and (sockets["back"] as Node3D).has_node("StowedShield"))
 
 
 ## Whether the right hand's [param ids] and the left's put away together out
