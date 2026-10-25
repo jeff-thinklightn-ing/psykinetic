@@ -32,7 +32,9 @@ const HEARD_MAX := 8
 ## tried), "latch" (a lock or a bar worked), "thud" (something dropped or
 ## landing, light or heavy), "rummage" (a chest's things taken or put),
 ## "break" (a crate or a barrel smashed), "call" (a monster calling its
-## side for help), "rout" (a monster breaking and running). The sound of
+## side for help), "rout" (a monster breaking and running), "clank" (worn
+## armour, by its material and worn mass, beside a step: game bolts from it
+## where a step only turns it). The sound of
 ## each is played as
 ## far as it carries (the sound worktree's slots name these kinds).
 const NOISE_STEP := 3

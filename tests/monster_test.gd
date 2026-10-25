@@ -86,6 +86,7 @@ func _ready() -> void:
 	_test_wild_kinds()
 	_test_wild_prey()
 	_test_wild_ears()
+	_test_clank()
 	_test_wild_shot_near()
 	_test_far_pace()
 	_test_wild_scent()
@@ -1739,6 +1740,41 @@ func _test_wild_ears() -> void:
 	World.noise(rabbit.tile + Vector2i(-3, 0), Senses.NOISE_FIGHT, &"fight", null)
 	World.step()
 	_check(rabbit.alert == Monster.Alert.FLEEING, "a fight: it bolts")
+
+
+## Worn armour clanks (676 1b, physics' World.try_move; Jeff: "armor should
+## add a clank sound that scares prey"): its own kind beside the step, so
+## game bolts from it within its reach, turns only to a step, and a monster
+## goes to look.
+func _test_clank() -> void:
+	print("\n== a clank heard: game bolts, a monster goes to look; a step only turns it ==")
+	Monster.idling = true
+	var e := _build(["####################", "#P.................#", "#........r.........#", "#..................#",
+		"####################"], {"r": {"facing": Vector2i(1, 0)}})
+	var rabbit: Animal = e["r"][0]
+	var player: GridEntity = e["P"][0]
+	rabbit.sight_range = 0  # Sees nothing: ears only.
+	var off := rabbit.tile + Vector2i(-6, 0)
+	World.noise(off, 6, &"step", player)
+	World.step()
+	_check(rabbit.alert == Monster.Alert.SUSPICIOUS and rabbit.facing == Vector2i(-1, 0),
+			"a step 6 off, heard: it turns to it and stays (%s)" % Monster.Alert.keys()[rabbit.alert])
+	World.noise(off, 5, &"clank", player)
+	World.step()
+	_check(rabbit.alert != Monster.Alert.FLEEING, "a clank that carries 5, from 6 off: not heard (%s)" % Monster.Alert.keys()[rabbit.alert])
+	World.noise(off, 8, &"clank", player)
+	World.step()
+	_check(rabbit.alert == Monster.Alert.FLEEING, "a clank that carries 8: it bolts (%s)" % Monster.Alert.keys()[rabbit.alert])
+	Monster.idling = false
+	e = _build(["##########", "#........#", "#...b....#", "#........#", "#........#", "#.......P#", "##########"],
+			{"b": {"facing": Vector2i(0, -1)}})
+	var brute: Monster = e["b"][0]
+	brute.sight_range = 3
+	World.noise(Vector2i(8, 4), 8, &"clank", e["P"][0])
+	World.step()
+	_check(brute.alert == Monster.Alert.SUSPICIOUS and brute._lead == Vector2i(8, 4), "a monster hears it: it goes to look (%s, %s)" % [
+		Monster.Alert.keys()[brute.alert], brute._lead])
+	Monster.idling = true
 
 
 ## A miss lands with a thud (397 amended (2); Jeff's hunting: "you want to
