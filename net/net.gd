@@ -794,12 +794,17 @@ func _enter_tree() -> void:
 	player_name = tidy_name(player_name)
 
 
-## A random UUID v4, as a player identity.
+## A random UUID v4, as a player identity. From a generator of its own,
+## seeded by the process, the time and the global one: two clients came up
+## with one id from the global generator alone (net_test, 2026-10-20 and -25).
 static func new_uuid() -> String:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = (hash([OS.get_process_id(), Time.get_unix_time_from_system(), randi()]) << 32) \
+			^ hash([Time.get_ticks_usec(), randi(), OS.get_process_id()])
 	var bytes := PackedByteArray()
 	bytes.resize(16)
 	for i in 16:
-		bytes[i] = randi() & 0xFF
+		bytes[i] = rng.randi() & 0xFF
 	bytes[6] = (bytes[6] & 0x0F) | 0x40
 	bytes[8] = (bytes[8] & 0x3F) | 0x80
 	var hex := bytes.hex_encode()
