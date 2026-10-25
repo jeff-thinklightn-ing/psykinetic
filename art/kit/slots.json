@@ -1671,7 +1671,7 @@
 			"middle": [0, 0, 0.024],
 			"budget": 1200,
 			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-24", "notes": "C:/dev/review/graves/make_graves.py sealed: rough grey kerb stones round the grave, a capstone cracked across, its foot half sunk and tipped, two iron bands over it (the foot's rusted) pinned down at the kerb, earth heaped over both ends; 1092 tris"},
-			"uses": "the draugr's sealed way out of barrow_lair among the pauper's graves (654; the coordinator's nod; maps lays it over the sealed link's cell, which draws no cue of its own): 1 x 2 cells, front +z, an older stone-lined grave, shut and wrong among the paupers'; walked over (Level.OPEN_AIR), not solid",
+			"uses": "the draugr's sealed way out of barrow_deep (the Hall of Fallen Souls; barrow_lair until 666) among the pauper's graves (654; the coordinator's nod; maps lays it over the sealed link's cell, which draws no cue of its own): 1 x 2 cells, front +z, an older stone-lined grave, shut and wrong among the paupers'; walked over (Level.OPEN_AIR), not solid",
 			"grey": [
 				{"at": [0, 0.157, 0], "size": [1.0, 0.315, 1.95]}
 			]
