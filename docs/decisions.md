@@ -29075,6 +29075,16 @@ cell freed; art-kit's prop.draugr_remains and its axe's reach. Replaces
   cell is not drawn; back, it eases in). Wire: gone, pile_at, pile_facing
   under 36; no new class_name.
 
+The remains drawn (art-kit's prop.draugr_remains landed, 91f905e1; the same amendment, no label of
+its own): while he is gone, Client3D._sync_remains puts one REMAINS_PROP instance (one cell, not
+solid, its front +z, the axe along the diagonal) on pile_at, at that cell's ground height, turned
+atan2(pile_facing.x, pile_facing.y). His remains are kept by his entity id (_remains). They go
+(_drop_remains) when he holds his cell again, as his body eases in, and when his puppet goes.
+Nothing is drawn for one with no pile_at, or where the kit has no such prop. The axe reaches about
+0.21 m past the cell's local x sides, which _pile_way's floor-on-both-sides rule already allows
+for. view_test _test_barrow_dead: a Draugr gone, the remains on pile_at, turned (1, 0) to pi/2,
+with meshes; back, taken away. Client only, protocol unchanged, no new class_name.
+
 ## 397 amended (2): herds' leaked bodies counted back, a missed arrow lands with a thud
 
 Jeff: "after removing wolf packs from the wilds there were 0 animals now". The box's journal

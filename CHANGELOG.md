@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The beaten draugr now leaves his remains where he fell: his cloak, mail, crown and battle axe in a heap on the floor until he rises again.
 - Infrastructure: the sample tower's door out is art-kit's dark-stone arch.
 - The Character Lab takes your Blender exports live: drop human_m.glb, human_f.glb or clips/*.glb in C:/dev/review/character_lab/drop and the lab imports and shows them in the game's place, with a status line that says what is wrong with a bad export.
 - The dark elven tower's doors and its way arches are blue-black like its walls, no longer warm wood and grey stone (659 amended, art-kit's side).

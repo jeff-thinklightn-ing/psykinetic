@@ -1728,6 +1728,10 @@ var _door_hinges: Dictionary[Vector3i, Array] = {}
 var _door_states: Dictionary[Vector3i, Array] = {}
 ## Entity instance id -> its puppet.
 var _puppets: Dictionary[int, Node3D] = {}
+## The draugr's remains while he is gone at rest (573 amended (4)): his
+## entity id -> art-kit's REMAINS_PROP at his pile_at (_sync_remains).
+var _remains: Dictionary[int, Node3D] = {}
+const REMAINS_PROP := "prop.draugr_remains"
 var _hover: MeshInstance3D
 ## The ring at the feet of the body a standing swing would strike
 ## (stand_ring; the low-angle fight, combat's (c)).
@@ -12994,7 +12998,10 @@ func _sync_puppets() -> void:
 			puppet.set_meta("reach_in", false)
 			puppet.remove_meta("reach_at")
 			puppet.visible = false
+			_sync_remains(id, entity)
 			continue
+		if _remains.has(id):
+			_drop_remains(id)  # Back: his remains go as he eases in.
 		if _low or puppet.has_meta("reach_in"):
 			# The low camera sees past World.NEAR_TILES: a body out there is
 			# not drawn (it would stand still, unthinking, 238); one crossing
@@ -13055,11 +13062,44 @@ func _sync_puppets() -> void:
 			_entity_went(id)
 
 
+## Gone at rest (573 amended (4)): the draugr's remains (art-kit's one-cell
+## REMAINS_PROP, its front +z) lie on the cell he fell on, pile_at, turned
+## pile_facing as the buildings turn theirs (atan2(x, y)). Nothing drawn
+## for one with no pile_at, or with no such prop in the kit.
+func _sync_remains(id: int, entity: GridEntity) -> void:
+	var pile: Variant = entity.get("pile_at")
+	var facing: Variant = entity.get("pile_facing")
+	if not pile is Vector2i or not facing is Vector2i or not ArtKit.has(REMAINS_PROP):
+		return
+	var node: Node3D = _remains.get(id)
+	if node == null:
+		node = ArtKit.instance(REMAINS_PROP)
+		if node == null:
+			return
+		node.name = "Remains%d" % id
+		add_child(node)
+		_remains[id] = node
+	var at := Vector3(pile.x, _ground_height(Vector2(pile)), pile.y)
+	if node.position != at:
+		node.position = at
+	var yaw := atan2(float(facing.x), float(facing.y))
+	if not is_equal_approx(node.rotation.y, yaw):
+		node.rotation.y = yaw
+
+
+func _drop_remains(id: int) -> void:
+	var node: Node3D = _remains.get(id)
+	_remains.erase(id)
+	if node != null and is_instance_valid(node):
+		node.queue_free()
+
+
 ## The entity of puppet [param id] is gone: it falls if its death has come;
 ## otherwise it is kept still a moment in case its death is on its way.
 func _entity_went(id: int) -> void:
 	var puppet: Node3D = _puppets[id]
 	_puppets.erase(id)
+	_drop_remains(id)
 	_stop_creak(puppet)
 	if puppet == _outlined:
 		target(null)

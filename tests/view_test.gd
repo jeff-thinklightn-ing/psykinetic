@@ -5580,6 +5580,23 @@ func _test_barrow_dead() -> void:
 	_rig._process(0.0)
 	_check(hidden and draugr_puppet.visible and draugr_puppet.has_meta("reach_at"),
 			"gone, the draugr's body is not drawn; back, it eases in (hidden %s, shown %s)" % [hidden, draugr_puppet.visible])
+	# His remains (art-kit's prop.draugr_remains): while he is gone they lie on the cell he fell on,
+	# turned his pile_facing; back, they are taken away.
+	World.despawn(dead[2])  # His cell, for a draugr of his own script.
+	var draugr := _main._spawn({"script": "res://sim/draugr.gd", "shape": "capsule", "kind": "draugr", "name": "ViewDraugr", "tile": Vector2i(11, 6)}) as Draugr
+	draugr.pile_at = Vector2i(11, 7)
+	draugr.pile_facing = Vector2i(1, 0)
+	draugr.gone = true
+	_rig._process(0.0)
+	var remains: Node3D = _rig._remains.get(draugr.get_instance_id())
+	var at := Vector3(11, _rig._ground_height(Vector2(11, 7)), 7)
+	_check(remains != null and remains.position.is_equal_approx(at) and is_equal_approx(remains.rotation.y, atan2(1.0, 0.0))
+			and remains.find_children("*", "MeshInstance3D", true, false).size() > 0,
+			"gone, his remains lie on pile_at turned pile_facing (%s, %s)" % [remains.position if remains != null else null, remains.rotation.y if remains != null else null])
+	draugr.gone = false
+	_rig._process(0.0)
+	_check(remains != null and not _rig._remains.has(draugr.get_instance_id()) and remains.is_queued_for_deletion(), "back, his remains are taken away")
+	World.despawn(draugr)
 	# At rest (631 amended; Jeff: "lying down on ground, clipping through walls"): the skeleton and its
 	# guard stand on their cell at their idle, not tipped over, and every joint of the posed body (with a
 	# hand's breadth of flesh) stays inside the cell at all eight facings, so none crosses a wall edge.
