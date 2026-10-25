@@ -20,6 +20,18 @@ extends Node3D
 ## are imported through the gate and shown here in the game's place (LabDrop,
 ## client3d/lab_drop.gd; R takes the folder again); the line under the panel
 ## says what it is doing.
+##
+## Compared and measured (674 step 3): "Compare" puts a second body (B) beside
+## the first (A), SPACING apart across its way, its own build, look words and
+## source (the game's body and clips, or Jeff's drop export); the clip, speed,
+## pause, scrub, treadmill and held things are both's, started together. Under
+## the panel, each one's feet measured as it plays (LabFeet,
+## client3d/lab_feet.gd: the pace that keeps its planted foot still, and how
+## fast it slides at the table's pace), and its planted toe marked on the
+## floor, the marks riding the treadmill: a slide smears them, a good pace
+## stacks them. "Use measured" sets the gait's pace (feel.json's
+## client3d.gait.<clip>, gait_f for a woman, Client3D.paced) to the measured
+## one for this run: the lab writes no file, keeping it is feel.json's edit.
 
 ## The five builds the hand and rest tests check (anim_rig_test): a name,
 ## its body, its shape keys over the look's.
@@ -68,6 +80,27 @@ var run := 0.0
 var puppet: Node3D
 var rig: AnimRig
 var look: PersonLook
+## The second body, compared (674 step 3): its build, words, whether it is
+## Jeff's export (A always is when there is one), and it as made.
+const SPACING := 1.2
+var compare := false
+var body_b := 0
+var words_b := "seed=1"
+var own_b := false
+var puppet_b: Node3D
+var rig_b: AnimRig
+var look_b: PersonLook
+## Each side's foot meter (LabFeet), A's then B's (null without B).
+const LabFeet := preload("res://client3d/lab_feet.gd")
+var feet: Array = [null, null]
+## The planted toes' marks on the floor: one every MARK_SECONDS a foot is
+## planted, gone after MARK_LIFE.
+const MARK_SECONDS := 0.05
+const MARK_LIFE := 1.5
+var _marks: Array[Array] = []
+var _mark_at := 0.0
+var _mark_mesh: CylinderMesh
+var _read_at := 0
 var camera: Camera3D
 var floor_material: StandardMaterial3D
 var status: Label
@@ -131,37 +164,81 @@ static func _grid_texture() -> ImageTexture:
 	return ImageTexture.create_from_image(image)
 
 
-## The body again, as body, words, held and worn say.
+## The body again, as body, words, held and worn say; and B beside it when
+## comparing.
 func make_body() -> void:
-	if puppet != null:
-		remove_child(puppet)
-		puppet.queue_free()
-	var build: Array = BUILDS[body]
-	look = PersonLook.make(("body=%s " % build[1]) + words)
-	for key: String in build[2]:
-		look.keys[key] = build[2][key]
-	var model: Dictionary = (Client3D.HUMAN_F if look.body == &"female" else Client3D.HUMAN).duplicate()
-	if drop.bodies.has(String(look.body)):
-		model["scene"] = drop.bodies[String(look.body)]
-	if not drop.clip_names.is_empty():
-		model["clips"] = drop.clips_path()
-	puppet = Node3D.new()
-	puppet.name = "Person"
-	puppet.set_meta("look", look)
-	puppet.set_meta("model_scale", look.scale)
-	add_child(puppet)
-	puppet.add_child(Client3D._make_model(model, puppet))
+	for old: Node3D in [puppet, puppet_b]:
+		if old != null:
+			remove_child(old)
+			old.queue_free()
+	puppet_b = null
+	rig_b = null
+	look_b = null
+	puppet = _made(body, words, true, "Person")
 	rig = puppet.get_meta("rig") as AnimRig
-	var scene := puppet.get_node("Body/Model") as Node3D
+	look = puppet.get_meta("look") as PersonLook
+	if compare:
+		puppet_b = _made(body_b, words_b, own_b, "PersonB")
+		rig_b = puppet_b.get_meta("rig") as AnimRig
+		look_b = puppet_b.get_meta("look") as PersonLook
+		puppet.position.z = -SPACING * 0.5
+		puppet_b.position.z = SPACING * 0.5
+		_tag(puppet, "A", body, true)
+		_tag(puppet_b, "B", body_b, own_b)
+	feet = [LabFeet.new(puppet), LabFeet.new(puppet_b) if puppet_b != null else null]
+	play()
+	_say("%s, %s" % [BUILDS[body][0], words] + ("; B %s, %s" % [BUILDS[body_b][0], words_b] if compare else ""))
+
+
+## One body: BUILDS' [param index] in [param said] look words, Jeff's export
+## when [param own] and there is one, holding and wearing what the pickers say.
+func _made(index: int, said: String, own: bool, named: String) -> Node3D:
+	var build: Array = BUILDS[index]
+	var made_look := PersonLook.make(("body=%s " % build[1]) + said)
+	for key: String in build[2]:
+		made_look.keys[key] = build[2][key]
+	var model: Dictionary = (Client3D.HUMAN_F if made_look.body == &"female" else Client3D.HUMAN).duplicate()
+	if own and drop.bodies.has(String(made_look.body)):
+		model["scene"] = drop.bodies[String(made_look.body)]
+	if own and not drop.clip_names.is_empty():
+		model["clips"] = drop.clips_path()
+	var made := Node3D.new()
+	made.name = named
+	made.set_meta("look", made_look)
+	made.set_meta("model_scale", made_look.scale)
+	add_child(made)
+	made.add_child(Client3D._make_model(model, made))
+	var scene := made.get_node("Body/Model") as Node3D
 	if not worn.is_empty():
-		look.wear(scene, worn)
-	var sockets: Dictionary = puppet.get_meta("sockets", {})
+		made_look.wear(scene, worn)
+	var sockets: Dictionary = made.get_meta("sockets", {})
 	for hand in 2:
 		Client3D._hold(sockets, hand, held[hand], {})
-	if puppet.has_meta("reach"):
-		Client3D._sync_reach(puppet.get_meta("reach") as HandReach, sockets, held)
-	play()
-	_say("%s, %s" % [build[0], words])
+	if made.has_meta("reach"):
+		Client3D._sync_reach(made.get_meta("reach") as HandReach, sockets, held)
+	return made
+
+
+## Which body is which, over its head.
+func _tag(person: Node3D, side: String, index: int, own: bool) -> void:
+	var tag := Label3D.new()
+	tag.name = "Tag"
+	var of := person.get_meta("look") as PersonLook
+	var is_own := own and (drop.bodies.has(String(of.body)) or not drop.clip_names.is_empty())
+	tag.text = "%s: %s, %s" % [side, "yours" if is_own else "game", BUILDS[index][0]]
+	tag.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	tag.position.y = 2.1
+	tag.pixel_size = 0.004
+	person.add_child(tag)
+
+
+## The rigs playing, A's and B's.
+func rigs() -> Array[AnimRig]:
+	var all: Array[AnimRig] = []
+	for each: AnimRig in [rig, rig_b]:
+		if each != null:
+			all.append(each)
+	return all
 
 
 ## The clips the body has, the gaits and idles first.
@@ -182,22 +259,24 @@ func clips() -> PackedStringArray:
 ## The clip from its start (or held at [member at] while paused), the upper
 ## layer's over it.
 func play() -> void:
-	if rig == null:
-		return
-	if upper.is_empty():
-		rig.upper_off()
-	else:
-		rig.upper(upper, speed, true)
-	if paused:
-		rig.base_at(clip, at)
-	else:
-		rig.loop(clip, speed, 0.0, true)
+	for each in rigs():
+		if upper.is_empty():
+			each.upper_off()
+		else:
+			each.upper(upper, speed, true)
+		if paused:
+			each.base_at(clip, at)
+		else:
+			each.loop(clip, speed, 0.0, true)
+	_reset_feet()
 
 
 func set_speed(value: float) -> void:
 	speed = value
-	if not paused and rig != null:
-		rig.set_speed(speed)
+	if not paused:
+		for each in rigs():
+			each.set_speed(speed)
+	_reset_feet()
 
 
 func set_paused(value: bool) -> void:
@@ -206,16 +285,19 @@ func set_paused(value: bool) -> void:
 		return
 	if paused:
 		at = rig.position()
-		rig.base_at(clip, at)
-	else:
-		rig.set_speed(speed)  # From where it was held.
+	for each in rigs():
+		if paused:
+			each.base_at(clip, at)
+		else:
+			each.set_speed(speed)  # From where it was held.
 
 
 ## The clip held at [param seconds] (paused).
 func scrub(seconds: float) -> void:
 	paused = true
 	at = fposmod(seconds, maxf(rig.length(clip), FRAME))
-	rig.base_at(clip, at)
+	for each in rigs():
+		each.base_at(clip, at)
 
 
 func step() -> void:
@@ -223,15 +305,121 @@ func step() -> void:
 
 
 ## The treadmill's pace (metres a second): the clip's gait pace at this
-## speed, as Client3D plays a gait (speed / (pace * scale) * gait rate), or
-## 0 for a clip that isn't a gait.
-func pace() -> float:
-	var gaits: Array = Client3D.HUMAN_F_GAITS if look != null and look.body == &"female" else Client3D.HUMAN_GAITS
+## speed, as Client3D plays a gait (speed / (pace * scale) * gait rate; the
+## pace as feel.json has it, Client3D.paced), or 0 for a clip that isn't a
+## gait; A's, or B's ([param which] 1). The floor runs at A's.
+func pace(which := 0) -> float:
+	var of := look if which == 0 else look_b
+	if of == null:
+		return 0.0
+	var gaits := Client3D.paced(Client3D.HUMAN_F_GAITS if of.body == &"female" else Client3D.HUMAN_GAITS)
 	for gait: Array in gaits:
 		if gait[0] == clip:
 			var rate := ArtKit.feel("client3d.gait_rate", Client3D.GAIT_RATE)
-			return float(gait[1]) * look.scale * speed / maxf(rate, 0.01)
+			return float(gait[1]) * of.scale * speed / maxf(rate, 0.01)
 	return 0.0
+
+
+## The feel key of the clip's pace for side [param which]'s body, "" for a
+## clip that isn't a gait.
+func gait_key(which := 0) -> String:
+	var of := look if which == 0 else look_b
+	if of == null or is_zero_approx(pace(which)):
+		return ""
+	return ("client3d.gait_f." if of.body == &"female" else "client3d.gait.") + clip
+
+
+## Side [param which]'s gait pace set, for this run, to what its feet
+## measure (the table's value that gives the measured pace at this speed and
+## stature); the value set, or 0 with nothing to set.
+func use_measured(which := 0) -> float:
+	var key := gait_key(which)
+	var meter: Variant = feet[which]
+	if key.is_empty() or meter == null:
+		return 0.0
+	var measured: Dictionary = meter.measure(pace(which))
+	if measured.is_empty():
+		return 0.0
+	var of := look if which == 0 else look_b
+	var rate := ArtKit.feel("client3d.gait_rate", Client3D.GAIT_RATE)
+	var table := snappedf(float(measured["pace"]) * rate / maxf(of.scale * speed, 0.01), 0.01)
+	ArtKit.set_feel_value("feel." + key, table)
+	_reset_feet()
+	return table
+
+
+## Side [param which]'s readout line, and whether it shows red.
+func readout(which := 0) -> Array:
+	var meter: Variant = feet[which]
+	var side := "A" if which == 0 else "B"
+	if meter == null or (meter.toes as Array).is_empty():
+		return ["%s: no toes to measure" % side, false]
+	var at_pace := pace(which)
+	var measured: Dictionary = meter.measure(at_pace)
+	if measured.is_empty():
+		return ["%s: no planted foot yet" % side, false]
+	var shown := ""
+	if at_pace > 0.0:
+		shown = "%s: measured pace %.2f m/s, table %.2f; slide %.2f m/s (%d%%), 90th %.2f" % [side, measured["pace"], at_pace,
+			measured["slide"], roundi(100.0 * float(measured["slide"]) / at_pace), measured["slide_90"]]
+	else:
+		shown = "%s: standing; the planted foot moves %.2f m/s, 90th %.2f" % [side, measured["slide"], measured["slide_90"]]
+	return [shown, LabFeet.red(measured, at_pace)]
+
+
+## The feet's samples dropped (the clip, speed or body changed).
+func _reset_feet() -> void:
+	for meter: Variant in feet:
+		if meter != null:
+			meter.reset()
+
+
+## Each side's feet sampled [param delta] on, over the clip's last loop, and
+## its planted toe marked on the floor.
+func sample_feet(delta: float) -> void:
+	var window := (rig.length(clip) if rig != null else 1.0) / maxf(speed, 0.05)
+	_mark_at += delta
+	var marking := _mark_at >= MARK_SECONDS
+	if marking:
+		_mark_at = 0.0
+	for meter: Variant in feet:
+		if meter == null:
+			continue
+		meter.sample(delta, window)
+		if marking:
+			var toe: Variant = meter.planted_toe()
+			if toe != null:
+				_mark(toe)
+
+
+## A mark at [param toe], on the floor.
+func _mark(toe: Vector3) -> void:
+	if _mark_mesh == null:
+		_mark_mesh = CylinderMesh.new()
+		_mark_mesh.top_radius = 0.025
+		_mark_mesh.bottom_radius = 0.025
+		_mark_mesh.height = 0.004
+		var paint := StandardMaterial3D.new()
+		paint.albedo_color = Color(0.95, 0.75, 0.2)
+		paint.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		_mark_mesh.material = paint
+	var mark := MeshInstance3D.new()
+	mark.name = "Mark"
+	mark.mesh = _mark_mesh
+	mark.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	mark.position = Vector3(toe.x, 0.003, toe.z)
+	add_child(mark)
+	_marks.append([mark, 0.0])
+
+
+## The marks aged [param delta], riding the floor [param ran] metres back.
+func _age_marks(delta: float, ran: float) -> void:
+	for each: Array in _marks:
+		each[1] = float(each[1]) + delta
+		(each[0] as Node3D).position.x -= ran
+	while not _marks.is_empty() and float(_marks[0][1]) > MARK_LIFE:
+		(_marks[0][0] as Node3D).queue_free()
+		_marks.pop_front()
 
 
 func set_view(index: int) -> void:
@@ -256,8 +444,18 @@ func _place_camera() -> void:
 
 
 func _process(delta: float) -> void:
-	if treadmill and not paused:
-		run += pace() * delta
+	var ran := pace() * delta if treadmill and not paused else 0.0
+	run += ran
+	if not paused:
+		sample_feet(delta)
+	_age_marks(0.0 if paused else delta, ran)
+	if _ui.has("feet_a") and Time.get_ticks_msec() >= _read_at:
+		_read_at = Time.get_ticks_msec() + 250
+		for which in 2:
+			var label := _ui["feet_a" if which == 0 else "feet_b"] as Label
+			var line: Array = readout(which) if which == 0 or compare else ["", false]
+			label.text = str(line[0])
+			label.modulate = Color(1.0, 0.45, 0.4) if bool(line[1]) else Color.WHITE
 	# The floor runs under the body from its front (+X, as Body faces) to its back.
 	floor_material.uv1_offset = Vector3(fposmod(-run / FLOOR_CELL, 1.0), 0.0, 0.0) if treadmill else Vector3.ZERO
 	if _ui.has("scrub") and rig != null and not paused:
@@ -413,6 +611,43 @@ func _make_ui() -> void:
 	var pace_label := Label.new()
 	column.add_child(pace_label)
 	_ui["pace"] = pace_label
+	for which in 2:
+		var row := HBoxContainer.new()
+		var meter := Label.new()
+		meter.autowrap_mode = TextServer.AUTOWRAP_WORD
+		meter.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(meter)
+		var use := Button.new()
+		use.text = "Use measured"
+		use.pressed.connect(func() -> void:
+			var set_to := use_measured(which)
+			_say("%s set to %.2f for this run (keep it in art/kit/feel.json)" % [gait_key(which), set_to] if set_to > 0.0
+				else "nothing to set: not a gait, or no planted foot yet"))
+		row.add_child(use)
+		column.add_child(row)
+		_ui["feet_a" if which == 0 else "feet_b"] = meter
+	var versus := CheckBox.new()
+	versus.text = "Compare (B beside A)"
+	versus.toggled.connect(func(on: bool) -> void:
+		compare = on
+		make_body())
+	column.add_child(versus)
+	_ui["build_b"] = _picker(column, "B build", BUILDS.map(func(b: Array) -> String: return str(b[0])), func(i: int) -> void:
+		body_b = i
+		if compare:
+			make_body())
+	var line_b := LineEdit.new()
+	line_b.text = words_b
+	line_b.placeholder_text = "B's look words"
+	line_b.text_submitted.connect(func(text: String) -> void:
+		words_b = text
+		if compare:
+			make_body())
+	column.add_child(line_b)
+	_ui["source_b"] = _picker(column, "B is", ["the game's", "yours (the drop)"], func(i: int) -> void:
+		own_b = i == 1
+		if compare:
+			make_body())
 	var views := Label.new()
 	views.text = "1 normal, 2 low, 3 overhead; drag orbits, wheel zooms"
 	views.autowrap_mode = TextServer.AUTOWRAP_WORD

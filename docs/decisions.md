@@ -30042,3 +30042,46 @@ back; each tip inside its sleeve; drawn again, each as it was held). view_test `
 (taken up, calm, guard raised, calm again, let go while sheathed, a spear wears none), `_test_rest`'s
 sword now sheathes, the lantern on belt_r. The Sheathe and Draw clips the design names are a
 follow-up; the swap is at once, as the bow's. Client only, protocol unchanged, no new class_name.
+
+## 674 step 3: the Character Lab compares, measures the feet, and the gait paces in feel.json
+
+The coordinator approved the design (two guards: the paces' defaults exactly today's, a test that
+an untouched feel.json gives them; "Use measured" live only). Three parts.
+
+**Compare.** CharacterLab.compare puts a second body, B (puppet_b, rig_b, look_b; body_b, words_b,
+own_b), SPACING (1.2 m) across the way from A, each made by `_made` as A was (Client3D._make_model,
+_hold, wear); A is Jeff's export when the drop folder has one, B the game's or his ("B is"). The
+clip, upper clip, speed, pause, scrub, step and held things are both's (`rigs()`), so both play
+from the same moment; a Label3D over each head says "A: yours, man" or "B: game, woman". The floor
+runs at A's pace.
+
+**The feet, measured live.** client3d/lab_feet.gd (preloaded as CharacterLab.LabFeet, no
+class_name) takes tools/gait_pace.gd's measure (decision 160) on the body as the lab plays it, so it
+reads his exports too: each frame both toe bones' places; the lower toe within PLANTED_M (0.02 m)
+of its lowest over the window planted; its ground speed backwards along the body's front (the toes
+ahead of the feet at rest). Over the clip's last loop: the measured pace (the median planted ground
+speed, the floor's speed that keeps the foot still) and the slide at the table's pace (|ground
+speed - pace| over the planted samples: the median, its share of the pace, and the 90th, mostly a
+plant or lift). Red over SLIDE_RED (5%) of the pace, or STILL_RED (0.05 m/s) for a clip that
+stands. A mark (a flat yellow disc) at the planted toe every MARK_SECONDS (0.05), riding the
+treadmill, gone after MARK_LIFE (1.5 s): a slide smears them, a good pace stacks them. On the man's
+Jog_Short at speed 1 it reads 3.35 m/s against the table's 3.34 at his stature, slide 3%, so the
+live measure agrees with gait_pace's tables.
+
+**The gait paces in feel.json.** feel.json's "feel" gains client3d.gait.<clip> (the man's,
+HUMAN_GAITS, which the barrow's skeletons and ghost share) and client3d.gait_f.<clip> (the
+woman's, HUMAN_F_GAITS) for Walk, Jog_Short and Sprint_Short, each today's constant exactly, with
+ArtKit.FEEL_RANGES rows (Animation, "now"). `Client3D.paced(gaits)` gives those two tables with
+feel's paces (the constants' when feel lacks one), any other table as it is (the orc's, the
+kobold's, the draugr's own), worked out again only when ArtKit.feel_serial (counting set_feel's
+changes) moves; the gait choice and clip rate read through it, as does the lab's pace(). "Use
+measured" sets the gait's key, for this run, to the table value that gives the measured pace at
+this speed and stature (ArtKit.set_feel_value: Tuning.apply is a local host's, the lab is not
+one); the lab writes no file, keeping a value is the panel's save or feel.json's edit.
+
+lab_test `_test_compare` (B made, tagged, both playing and scrubbed together, gone with Compare
+off) and `_test_feet` (the jog stepped by hand two loops: the measured pace within 5% of the
+table's, the slide under the red line, the readout line, marks made, Use measured set and read by
+the treadmill, put back, nothing for an idle, the marks aged out); tuning_test
+`_test_gait_paces` (untouched, both tables exactly; a row each; his jog set, hers not; reset; the
+orc's as it is); anim_rig_test `_test_feel_moved` reads a gait key as its table's row. Client and tool only, protocol unchanged, no new class_name.

@@ -15320,7 +15320,7 @@ func _animate(puppet: Node3D) -> void:
 			puppet.set_meta("seated", false)
 			return
 	if speed > WALKING:
-		var gaits: Array = puppet.get_meta("gaits", GAITS)
+		var gaits := paced(puppet.get_meta("gaits", GAITS))
 		var gait: Array = gaits[gait_for(rig.base_clip(), speed / pace, gaits)]
 		rig.loop(gait[0], clampf(speed / (float(gait[1]) * pace) * ArtKit.feel("client3d.gait_rate", GAIT_RATE), 0.3, 3.0))
 		return
@@ -15453,6 +15453,29 @@ static func gait_for(current: String, speed: float, gaits: Array = GAITS) -> int
 		if speed > change * (1.0 / GAIT_HYSTERESIS if at >= i else GAIT_HYSTERESIS):
 			index = i
 	return index
+
+
+## [param gaits] with their paces as feel.json has them (674 step 3; the
+## Character Lab's "Use measured", the tuning panel's Animation rows): the
+## people's (HUMAN_GAITS, which the barrow's dead share, and HUMAN_F_GAITS)
+## by "client3d.gait.<clip>" and "client3d.gait_f.<clip>", the constants'
+## paces when feel.json lacks one (tuning_test: untouched, the same); any
+## other table as it is. Worked out again only when the feel changes.
+static var _paced := {}
+static var _paced_serial := -1
+static func paced(gaits: Array) -> Array:
+	var prefix := "client3d.gait." if gaits == HUMAN_GAITS else "client3d.gait_f." if gaits == HUMAN_F_GAITS else ""
+	if prefix.is_empty():
+		return gaits
+	if _paced_serial != ArtKit.feel_serial:
+		_paced_serial = ArtKit.feel_serial
+		_paced.clear()
+	if not _paced.has(prefix):
+		var own := []
+		for gait: Array in gaits:
+			own.append([gait[0], ArtKit.feel(prefix + str(gait[0]), float(gait[1]))])
+		_paced[prefix] = own
+	return _paced[prefix]
 
 
 ## True if [param clip] is one of GAITS'.

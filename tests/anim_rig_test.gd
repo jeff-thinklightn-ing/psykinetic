@@ -128,8 +128,15 @@ func _test_feel_moved() -> void:
 	var scripts := {"client3d": Client3D, "anim_rig": AnimRig, "art_kit": ArtKit, "creature_view": CreatureView}
 	var file: Dictionary = (JSON.parse_string(FileAccess.get_file_as_string(ArtKit.FEEL)) as Dictionary).get("feel", {})
 	var off: Array[String] = []
+	# The people's gait paces (674 step 3): a row of HUMAN_GAITS or HUMAN_F_GAITS by its clip.
+	var tables := {"client3d.gait": Client3D.HUMAN_GAITS, "client3d.gait_f": Client3D.HUMAN_F_GAITS}
 	for key: String in file:
 		var parts := key.split(".")
+		if parts.size() == 3 and tables.has(parts[0] + "." + parts[1]):
+			var rows: Array = (tables[parts[0] + "." + parts[1]] as Array).filter(func(gait: Array) -> bool: return gait[0] == parts[2])
+			if rows.is_empty() or not is_equal_approx(float(rows[0][1]), float(file[key])):
+				off.append("%s %s (table %s)" % [key, file[key], rows])
+			continue
 		var script: Script = scripts.get(parts[0])
 		var constants := script.get_script_constant_map() if script != null else {}
 		var name := parts[1].to_upper() if parts.size() == 2 else ""

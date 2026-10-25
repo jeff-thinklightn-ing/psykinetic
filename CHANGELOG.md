@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The Character Lab compares and measures: Compare puts a second body beside the first (your export beside the game's), a line under each says the pace its feet want and how much they slide at the game's, marks on the floor show the planted toe, and Use measured tries the measured pace. The people's walk, jog and sprint paces are on the tuning panel (F7), unchanged (674 step 3).
 ## v0.1.173
 
 - What goes over the network changes, so v0.1.172 and older can't join the server: update through the launcher first.

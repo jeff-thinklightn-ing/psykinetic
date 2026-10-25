@@ -98,6 +98,34 @@ func _test_source() -> void:
 	_check(Tuning.apply("fake.blend", 0.3) and is_equal_approx(_fake["blend"], 0.3), "set through its setter")
 	_check(Tuning.reset("fake.blend") and is_equal_approx(_fake["blend"], 0.15), "and reset")
 	Tuning._sources.erase("fake")
+	_test_gait_paces()
+
+
+## The people's gait paces in feel.json (674 step 3): untouched, the same as
+## Client3D's tables (the move changes no walk in game); a row each on the
+## panel; set from it, the gait's pace read where it's used; reset, the
+## table's again; another table (the orc's) as it is.
+func _test_gait_paces() -> void:
+	print("\n== the gait paces in feel.json, untouched the tables' ==")
+	var same := true
+	for table: Array in [Client3D.HUMAN_GAITS, Client3D.HUMAN_F_GAITS]:
+		var paced := Client3D.paced(table)
+		same = same and paced.size() == table.size()
+		for i in table.size():
+			same = same and paced[i][0] == table[i][0] and float(paced[i][1]) == float(table[i][1])
+	_check(same, "the man's and the woman's paces as HUMAN_GAITS and HUMAN_F_GAITS, exactly")
+	Tuning.register_source("feel", ArtKit.feel_value, ArtKit.set_feel_value, ArtKit.feel_fields)
+	var paths: Array = Tuning.fields().map(func(r: Dictionary) -> String: return str(r["path"]))
+	var listed := true
+	for clip: String in ["Walk", "Jog_Short", "Sprint_Short"]:
+		listed = listed and ("feel.client3d.gait." + clip) in paths and ("feel.client3d.gait_f." + clip) in paths
+	_check(listed, "a row each on the panel, his and hers")
+	_check(Tuning.apply("feel.client3d.gait.Jog_Short", 3.9) and is_equal_approx(float(Client3D.paced(Client3D.HUMAN_GAITS)[1][1]), 3.9)
+		and is_equal_approx(float(Client3D.paced(Client3D.HUMAN_F_GAITS)[1][1]), 3.44), "his jog set to 3.9: his read so, hers not")
+	_check(Tuning.reset("feel.client3d.gait.Jog_Short") and is_equal_approx(float(Client3D.paced(Client3D.HUMAN_GAITS)[1][1]), 3.63),
+		"reset: the table's again")
+	_check(Client3D.paced(Client3D.ORC_GAITS) == Client3D.ORC_GAITS, "the orc's table as it is")
+	Tuning._sources.erase("feel")
 
 
 func _test_refused() -> void:

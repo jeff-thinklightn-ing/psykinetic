@@ -27,6 +27,8 @@ func _ready() -> void:
 	_test_clips()
 	await _test_pause()
 	await _test_treadmill()
+	await _test_compare()
+	_test_feet()
 	_test_drop()
 	_clear(DROP)
 	_clear(OUT)
@@ -140,6 +142,73 @@ func _test_treadmill() -> void:
 	_lab._process(0.1)
 	_check(_lab.floor_material.uv1_offset == Vector3.ZERO, "off: the floor stands")
 	await get_tree().process_frame
+
+
+## Compared (674 step 3): B made beside A, its own build, tagged; the clip,
+## pause and scrub both's; Compare off, B gone.
+func _test_compare() -> void:
+	print("== two bodies compared ==")
+	_lab.compare = true
+	_lab.body_b = 4
+	_lab.make_body()
+	await get_tree().process_frame
+	var two := _lab.get_children().filter(func(n: Node) -> bool: return n.name in ["Person", "PersonB"] and not n.is_queued_for_deletion())
+	_check(two.size() == 2 and _lab.rig_b != null and _lab.look_b.body == &"female" and _lab.look.body == &"male",
+		"B beside A: A the man, B the woman (%d bodies)" % two.size())
+	_check(is_equal_approx(_lab.puppet.position.z, -CharacterLab.SPACING * 0.5) and is_equal_approx(_lab.puppet_b.position.z, CharacterLab.SPACING * 0.5),
+		"side by side, %.1f m apart across their way" % CharacterLab.SPACING)
+	var tag := _lab.puppet_b.get_node_or_null("Tag") as Label3D
+	_check(tag != null and tag.text == "B: game, woman", "B tagged over its head (%s)" % (tag.text if tag != null else "none"))
+	_lab.clip = "Jog_Short"
+	_lab.paused = false
+	_lab.play()
+	_check(_lab.rig.base_clip() == "Jog_Short" and _lab.rig_b.base_clip() == "Jog_Short", "both play the clip")
+	_lab.scrub(0.4)
+	_lab.rig.tree.advance(0.1)
+	_lab.rig_b.tree.advance(0.1)
+	_check(absf(_lab.rig.position() - 0.4) < 0.01 and absf(_lab.rig_b.position() - 0.4) < 0.01,
+		"scrubbed together (%.3f, %.3f)" % [_lab.rig.position(), _lab.rig_b.position()])
+	_lab.set_paused(false)
+	_check(_lab.readout(1)[0] != "", "B has a readout line")
+	_lab.compare = false
+	_lab.make_body()
+	await get_tree().process_frame
+	_check(_lab.puppet_b == null and _lab.feet[1] == null and is_zero_approx(_lab.puppet.position.z), "Compare off: B gone, A back in the middle")
+
+
+## The feet measured (674 step 3), stepped by hand a 1/120 s at a time over
+## two loops: the man's jog at its table's pace slides under LabFeet's red
+## line, its measured pace within 5% of the table's; the planted toe marked;
+## "Use measured" sets his jog's pace for this run, read by the treadmill.
+func _test_feet() -> void:
+	print("== the feet measured ==")
+	_lab.body = 0
+	_lab.clip = "Jog_Short"
+	_lab.set_speed(1.0)
+	_lab.paused = false
+	_lab.play()
+	var step := 1.0 / 120.0
+	var marks := _lab._marks.size()
+	for i in int(2.0 * _lab.rig.length("Jog_Short") / step):
+		_lab.rig.tree.advance(step)
+		_lab.sample_feet(step)
+	var measured: Dictionary = _lab.feet[0].measure(_lab.pace())
+	var table := _lab.pace()
+	_check(not measured.is_empty() and absf(float(measured["pace"]) - table) < 0.05 * table,
+		"measured pace %.2f m/s, the table's %.2f" % [float(measured.get("pace", 0.0)), table])
+	_check(not measured.is_empty() and not _lab.LabFeet.red(measured, table),
+		"slide %.3f m/s at the table's pace (under %d%%)" % [float(measured.get("slide", 0.0)), roundi(100 * _lab.LabFeet.SLIDE_RED)])
+	_check(str(_lab.readout(0)[0]).begins_with("A: measured pace"), "the readout line (%s)" % _lab.readout(0)[0])
+	_check(_lab._marks.size() > marks, "the planted toe marked on the floor (%d marks)" % (_lab._marks.size() - marks))
+	var set_to := _lab.use_measured(0)
+	_check(set_to > 0.0 and is_equal_approx(ArtKit.feel("client3d.gait.Jog_Short", 0.0), set_to)
+		and absf(_lab.pace() - set_to * _lab.look.scale) < 0.01, "Use measured: his jog's pace %.2f for this run, the treadmill at it" % set_to)
+	ArtKit.set_feel("client3d.gait.Jog_Short", null)
+	_check(is_equal_approx(ArtKit.feel("client3d.gait.Jog_Short", 0.0), 3.63), "put back: the file's")
+	_lab.clip = "Idle"
+	_check(_lab.use_measured(0) == 0.0, "an idle: nothing to set")
+	_lab._age_marks(CharacterLab.MARK_LIFE + 0.1, 0.0)
+	_check(_lab._marks.is_empty(), "the marks gone after their life")
 
 
 ## Jeff's exports (674 step 2), through the lab's own LabDrop with a stand-in
