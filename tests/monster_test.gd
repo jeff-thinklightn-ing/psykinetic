@@ -2781,8 +2781,8 @@ func _test_archer_hold() -> void:
 	Monster.idling = false
 	var kinds := Monster.kinds()
 	_check(is_equal_approx(float(kinds["imp"]["aim_spread"]), 16.0) and int(kinds["imp"]["aim_hold_max"]) == 12
-			and is_equal_approx(float(kinds["skeleton"]["aim_spread"]), 6.0) and float(kinds["wolf"]["aim_spread"]) == 0.0,
-			"the rows' holds read: imp 16/12, skeleton 6/30, none for a wolf")
+			and is_equal_approx(float(kinds["skeleton"]["aim_spread"]), 4.0) and is_equal_approx(float(kinds["skeleton_guard"]["aim_spread"]), 4.0) and float(kinds["wolf"]["aim_spread"]) == 0.0,
+			"the rows' holds read: imp 16/12, skeleton and guard 4/30 (full draw, 669), none for a wolf")
 	var folder: String = preload("res://tests/test_ports.gd").scratch("monster_test/")
 	DirAccess.make_dir_recursive_absolute(folder)
 	var path := folder + "aim_kinds.json"

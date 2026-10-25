@@ -29778,3 +29778,17 @@ monster_test _test_ossuary_sealed drives the real signal: true at the first tick
 a skeleton killed with the grave guard still standing stays true; the guard laid gives false; the
 guard risen gives true again. level_test's _seal_hall checks stay dungeon's. Server sim, protocol
 unchanged, no new class_name.
+
+## 620 amended, enemy-ai's side: the barrow's archers wait for full draw
+
+This amends "620, enemy-ai's side" (an archer's hold, and the cone's edges) for 669's draw.
+669 gave the bow three steps, with cones of 20, 10 and 4 degrees and strengths of 0.8, 1.2 and
+1.6, and a floor of 4 degrees at full draw. It left the monsters' holds for enemy-ai to tune
+("they now loose the first step at 0.8"). The skeleton's and the skeleton_guard's aim_spread of
+6 degrees fell between step 2 and full draw, so they loosed short of it. At 4 they wait for full
+draw, and their arrows strike at 1.6 inside 9 cells. aim_hold_max stays 30 ticks. The other kinds
+are unchanged: the brute at 25 still looses at step 1, the imp at 16 between steps 1 and 2, the
+sneak and the robber at 10 at step 2.
+
+monster_test _test_archer_hold pins skeleton and guard at 4. Server sim (monsters.json), protocol
+unchanged, no new class_name.

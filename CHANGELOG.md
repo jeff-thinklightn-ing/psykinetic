@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The barrow's skeleton archers draw their bows fully before loosing: their arrows hit harder but come a little later.
 - The barrow's Hall is barred while the Ossuary's dead stand: clear every skeleton and grave guard (dead or laid to rest) and the way opens; if they rise again it shuts again, never on anyone already inside.
 - Crossing into a zone hitches less behind its card.
 - A draugr you have paid once offers to be faced again for nothing: his deal window shows one "Face him again" button, with no sum, whatever your purse (548 amended, ui's side).

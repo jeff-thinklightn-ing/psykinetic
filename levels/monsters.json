@@ -89,7 +89,7 @@
 		"strength": 1,
 		"temperament": {"bold": 1, "cautious": 0, "cowardly": 0},
 		"fearless": true,
-		"aim_spread": 6,
+		"aim_spread": 4,
 		"aim_hold_max": 30
 	},
 	"skeleton_guard": {
@@ -104,7 +104,7 @@
 		"temperament": {"bold": 1, "cautious": 0, "cowardly": 0},
 		"fearless": true,
 		"keeps_room": true,
-		"aim_spread": 6,
+		"aim_spread": 4,
 		"aim_hold_max": 30
 	},
 	"robber": {
