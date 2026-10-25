@@ -15,6 +15,11 @@ extends Node3D
 ## slides on it says the pace is wrong. Keys: 1, 2, 3 the game's views
 ## (normal, low, overhead); drag to orbit, wheel to zoom; Space pauses, "."
 ## steps a frame.
+##
+## Jeff's own exports (674 step 2): a body or clips dropped in the drop folder
+## are imported through the gate and shown here in the game's place (LabDrop,
+## client3d/lab_drop.gd; R takes the folder again); the line under the panel
+## says what it is doing.
 
 ## The five builds the hand and rest tests check (anim_rig_test): a name,
 ## its body, its shape keys over the look's.
@@ -66,6 +71,12 @@ var look: PersonLook
 var camera: Camera3D
 var floor_material: StandardMaterial3D
 var status: Label
+## Jeff's exports, watched (674 step 2); its folders set before the lab is in the tree.
+const LabDrop := preload("res://client3d/lab_drop.gd")
+var drop := LabDrop.new()
+var drop_line: Label
+var _drop_at := 0
+var _drop_loaded := 0
 var _yaw := 45.0
 var _pitch := Client3D.CAMERA_PITCH
 var _zoom := 4.0
@@ -129,7 +140,11 @@ func make_body() -> void:
 	look = PersonLook.make(("body=%s " % build[1]) + words)
 	for key: String in build[2]:
 		look.keys[key] = build[2][key]
-	var model: Dictionary = Client3D.HUMAN_F if look.body == &"female" else Client3D.HUMAN
+	var model: Dictionary = (Client3D.HUMAN_F if look.body == &"female" else Client3D.HUMAN).duplicate()
+	if drop.bodies.has(String(look.body)):
+		model["scene"] = drop.bodies[String(look.body)]
+	if not drop.clip_names.is_empty():
+		model["clips"] = drop.clips_path()
 	puppet = Node3D.new()
 	puppet.name = "Person"
 	puppet.set_meta("look", look)
@@ -249,6 +264,17 @@ func _process(delta: float) -> void:
 		(_ui["scrub"] as HSlider).set_value_no_signal(rig.position() / maxf(rig.length(clip), FRAME))
 	if _ui.has("pace"):
 		(_ui["pace"] as Label).text = "treadmill %.2f m/s" % pace() if treadmill else ""
+	var now := Time.get_ticks_msec()
+	if now >= _drop_at:
+		_drop_at = now + 1000
+		drop.poll(now)
+		if drop_line != null:
+			drop_line.text = drop.status
+			drop_line.modulate = Color(1.0, 0.45, 0.4) if drop.bad else Color.WHITE
+		if drop.loaded != _drop_loaded:
+			_drop_loaded = drop.loaded
+			make_body()
+			_fill_clips()
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -274,6 +300,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_3: set_view(2)
 			KEY_SPACE: set_paused(not paused)
 			KEY_PERIOD: step()
+			KEY_R: drop.force()
 
 
 func _say(words_said: String) -> void:
@@ -340,11 +367,11 @@ func _make_ui() -> void:
 		worn = "" if i == 0 else wearable[i - 1]
 		make_body())
 	_ui["clip"] = _picker(column, "Clip", [], func(i: int) -> void:
-		clip = (_ui["clip"] as OptionButton).get_item_text(i)
+		clip = str((_ui["clip"] as OptionButton).get_item_metadata(i))
 		at = 0.0
 		play())
 	_ui["upper"] = _picker(column, "Upper body", [], func(i: int) -> void:
-		upper = "" if i == 0 else (_ui["upper"] as OptionButton).get_item_text(i)
+		upper = "" if i == 0 else str((_ui["upper"] as OptionButton).get_item_metadata(i))
 		play())
 	var speed_row := HBoxContainer.new()
 	var speed_label := Label.new()
@@ -393,6 +420,9 @@ func _make_ui() -> void:
 	status = Label.new()
 	status.autowrap_mode = TextServer.AUTOWRAP_WORD
 	column.add_child(status)
+	drop_line = Label.new()
+	drop_line.autowrap_mode = TextServer.AUTOWRAP_WORD
+	column.add_child(drop_line)
 	_fill_clips.call_deferred()
 
 
@@ -404,8 +434,11 @@ func _fill_clips() -> void:
 	upper_picker.clear()
 	upper_picker.add_item("(none)")
 	for each in clips():
-		clip_picker.add_item(each)
-		upper_picker.add_item(each)
+		var shown: String = each + " (yours)" if each in drop.clip_names else each
+		clip_picker.add_item(shown)
+		clip_picker.set_item_metadata(clip_picker.item_count - 1, each)
+		upper_picker.add_item(shown)
+		upper_picker.set_item_metadata(upper_picker.item_count - 1, each)
 		if each == clip:
 			clip_picker.select(clip_picker.item_count - 1)
 

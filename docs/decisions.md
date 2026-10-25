@@ -29963,3 +29963,37 @@ grey stone against the blue-black set (dungeon; the coordinator approved both fi
 
 view_test _test_dark_set: a door in a dark wall is door.single variant 2, in a stone wall variant
 1. Client only, protocol unchanged, no new class_name.
+
+## 674 step 2: the Character Lab's drop folder
+
+Jeff's Blender exports go into the running lab (the coordinator approved the design; release: under
+674). client3d/lab_drop.gd (no class_name; CharacterLab preloads it as LabDrop) watches
+C:/dev/review/character_lab/drop once a second: human_m.glb and human_f.glb are bodies, clips/*.glb
+are clips (any name, one or more actions, "_Loop" looping as the game's import does). A .gltf, .fbx,
+.blend or .obj there is named in the status line ("export as .glb") and left alone. A file is taken
+once its size and time have held still 2 s, and R takes the folder again. It is copied into the
+checkout's build/lab (gitignored: no export is ever committed) with a .glb.import written from
+tools/lab/glb.import.template (human_m.glb.import's settings: the UAL bone map onto
+SkeletonProfileHumanoid; animations on for clips), and the checkout's import runs as a process of
+its own through the resource gate: `python -B tools/heavy_job.py run <checkout folder> godot_import
+--expect 10 -- <godot> --headless --path <checkout> --import`, its output in build/lab/import.log.
+It is never a bare import and never nested (the lab holds no take), and the gate's own limit stops
+it. The lab polls it and never blocks. A gate stop is said ("the machine is busy") and tried once
+more.
+
+Each file is then loaded fresh (CACHE_MODE_IGNORE_DEEP) and checked: an armature with the humanoid
+bones after the retarget (else "bones ... not found: keep the UAL bone names and the armature named
+Armature"); for a body, a mesh named Body, 1.3 to 2.2 m tall (else "apply the scale"); for clips,
+an animation with tracks on the skeleton. Only a good one is kept in the cache (CACHE_MODE_REPLACE,
+so a second export at the same path is the new one): a bad one keeps the last good, says why in red,
+and its copy is removed. A good body becomes the lab's for its sex (the model's "scene"), and good
+clips are laid over the game's library in build/lab/lab_clips.res (the model's "clips"), shown in
+the pickers marked "(yours)". A clip named as a game clip takes its place in the lab only. Nothing
+is written to art/, levels/, user:// or the drop folder. lab_test `_test_drop` drives it with a
+stand-in import and load in a scratch drop folder and build/lab_test: the 2 s settle, the copy with
+its import settings, a body loaded and the lab's made again, unchanged not imported again, the four
+bad cases (no Body, the wrong bones, the scale, not a glTF) each said with the last good kept and
+the copy gone, an .fbx named, a gate stop tried again, a clip laid over the game's and marked in
+the picker. Checked once by hand through the real gate (human_m.glb and a UAL clip export: imported
+in about 10 s, the body and two clips loaded). Client and tool only, protocol unchanged, no new
+class_name.

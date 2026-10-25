@@ -8,10 +8,18 @@ extends Node
 
 var _failures := 0
 var _lab: CharacterLab
+## The drop folder and the import folder of its own (674 step 2): never Jeff's,
+## never the lab's build/lab.
+var DROP: String = preload("res://tests/test_ports.gd").scratch("lab_drop")
+const OUT := "res://build/lab_test"
 
 
 func _ready() -> void:
+	_clear(DROP)
+	_clear(OUT)
 	_lab = (load("res://client3d/character_lab.tscn") as PackedScene).instantiate() as CharacterLab
+	_lab.drop.drop = DROP
+	_lab.drop.out = OUT
 	add_child(_lab)
 	await get_tree().process_frame
 	await _test_builds()
@@ -19,6 +27,9 @@ func _ready() -> void:
 	_test_clips()
 	await _test_pause()
 	await _test_treadmill()
+	_test_drop()
+	_clear(DROP)
+	_clear(OUT)
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -129,3 +140,136 @@ func _test_treadmill() -> void:
 	_lab._process(0.1)
 	_check(_lab.floor_material.uv1_offset == Vector3.ZERO, "off: the floor stands")
 	await get_tree().process_frame
+
+
+## Jeff's exports (674 step 2), through the lab's own LabDrop with a stand-in
+## import and load: a file taken once settled; a body shown in the game's
+## place; a bad one (no Body, the wrong bones, the scale, not a glTF) keeping
+## the last good and saying why; an .fbx named; a gate stop tried again; clips
+## laid over the game's and marked "(yours)"; nothing written outside its folder.
+func _test_drop() -> void:
+	print("== the drop folder: Jeff's exports ==")
+	var drop = _lab.drop
+	var imports := [0]
+	var stop := [false]
+	drop.importer = func(done: Callable) -> void:
+		imports[0] += 1
+		done.call(not stop[0], "heavy_job: stopped after 10 min" if stop[0] else "")
+	var stand_in := {}
+	drop.loader = func(path: String, _keep: bool) -> Resource: return stand_in.get(path.get_file())
+	var body_at := DROP.path_join("human_m.glb")
+	stand_in["human_m.glb"] = load(Client3D.HUMAN["scene"])
+	_write(body_at, "one")
+	var t := 100000
+	drop.poll(t)
+	drop.poll(t + 1000)
+	_check(imports[0] == 0, "a file still being written (still under 2 s) not taken")
+	drop.poll(t + 2100)
+	var copy: String = OUT.path_join("human_m.glb")
+	var settings := FileAccess.get_file_as_string(copy + ".import")
+	_check(imports[0] == 1 and FileAccess.file_exists(copy) and "animation/import=false" in settings and "ual.tres" in settings,
+		"settled: copied with the body's import (the UAL bone map), imported once")
+	_check(drop.bodies.get("male") == Client3D.HUMAN["scene"] and not drop.bad and str(drop.status).begins_with("loaded"),
+		"loaded (%s)" % drop.status)
+	_lab.body = 0
+	_lab._drop_at = 0
+	_lab._process(0.0)
+	_check(_lab.drop_line.text == drop.status and _lab.puppet != null, "the status line under the panel, the body made again")
+	drop.poll(t + 6000)
+	_check(imports[0] == 1, "unchanged: not imported again")
+	var bad_cases := [[_scene(BONES_OK, false, 0.0), "no mesh named Body", "no Body"],
+		[_scene(["pelvis", "spine_01"], true, 1.75), "Hips", "the UAL names lost"],
+		[_scene(BONES_OK, true, 17.5), "17.50 m", "the scale not applied"],
+		[null, "import failed", "not a glTF"]]
+	for each: Array in bad_cases:
+		stand_in["human_m.glb"] = each[0]
+		_write(body_at, each[2])
+		t += 10000
+		drop.poll(t)
+		drop.poll(t + 2100)
+		_check(drop.bad and str(each[1]) in drop.status and drop.bodies.get("male") == Client3D.HUMAN["scene"] and not FileAccess.file_exists(copy),
+			"%s: said, the last good kept, the copy gone (%s)" % [each[2], drop.status])
+	_write(DROP.path_join("clips/walk.fbx"), "x")
+	drop.poll(t + 5000)
+	_check(drop.bad and "clips/walk.fbx" in drop.status and ".glb" in drop.status, "an .fbx named: export as .glb (%s)" % drop.status)
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(DROP.path_join("clips/walk.fbx")))
+	stand_in["run.glb"] = _scene(BONES_OK, false, 0.0, "My_Run")
+	_write(DROP.path_join("clips/run.glb"), "run")
+	stop[0] = true
+	t += 10000
+	drop.poll(t)
+	drop.poll(t + 2100)
+	_check(drop.bad and "busy" in drop.status, "the gate stopped the import: said (%s)" % drop.status)
+	stop[0] = false
+	drop.poll(t + 3000)
+	drop.poll(t + 5200)
+	var library := ResourceLoader.load(drop.clips_path(), "", ResourceLoader.CACHE_MODE_IGNORE) as AnimationLibrary if ResourceLoader.exists(drop.clips_path()) else null
+	_check(imports[0] == 7 and "My_Run" in drop.clip_names and library != null and library.has_animation("My_Run") and library.has_animation("Idle"),
+		"tried again: the clip laid over the game's (%d imports, %s)" % [imports[0], drop.status])
+	_lab._drop_at = 0
+	_lab._process(0.0)
+	var shown: Array[String] = []
+	var picker := _lab._ui["clip"] as OptionButton
+	for i in picker.item_count:
+		shown.append(picker.get_item_text(i))
+	_check("My_Run (yours)" in shown and _lab.rig.has("My_Run"), "the lab's body has it, marked (yours) in the picker")
+	_check(not DirAccess.dir_exists_absolute(ProjectSettings.globalize_path("res://build/lab")) or OUT != "res://build/lab",
+		"written only to its own folder, never build/lab")
+
+
+const BONES_OK := ["Hips", "Spine", "Chest", "UpperChest", "Neck", "Head", "LeftUpperArm", "LeftLowerArm",
+	"LeftHand", "RightUpperArm", "RightLowerArm", "RightHand", "LeftUpperLeg", "LeftLowerLeg", "LeftFoot",
+	"RightUpperLeg", "RightLowerLeg", "RightFoot"]
+
+
+## A stand-in import: a skeleton with [param bones], a Body [param tall] high
+## if [param body], an animation named [param clip] on the skeleton.
+static func _scene(bones: Array, body: bool, tall: float, clip := "") -> PackedScene:
+	var root := Node3D.new()
+	var skeleton := Skeleton3D.new()
+	skeleton.name = "GeneralSkeleton"
+	root.add_child(skeleton)
+	skeleton.owner = root
+	for bone: String in bones:
+		skeleton.add_bone(bone)
+	if body:
+		var mesh := MeshInstance3D.new()
+		mesh.name = "Body"
+		var box := BoxMesh.new()
+		box.size = Vector3(0.5, tall, 0.3)
+		mesh.mesh = box
+		skeleton.add_child(mesh)
+		mesh.owner = root
+	if clip != "":
+		var player := AnimationPlayer.new()
+		root.add_child(player)
+		player.owner = root
+		var animation := Animation.new()
+		var track := animation.add_track(Animation.TYPE_ROTATION_3D)
+		animation.track_set_path(track, "%GeneralSkeleton:Hips")
+		animation.rotation_track_insert_key(track, 0.0, Quaternion.IDENTITY)
+		var library := AnimationLibrary.new()
+		library.add_animation(clip, animation)
+		player.add_animation_library("", library)
+	var packed := PackedScene.new()
+	packed.pack(root)
+	root.free()
+	return packed
+
+
+static func _write(path: String, words: String) -> void:
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(path.get_base_dir()))
+	var file := FileAccess.open(path, FileAccess.WRITE)
+	file.store_string(words)
+	file.close()
+
+
+static func _clear(folder: String) -> void:
+	var at := ProjectSettings.globalize_path(folder)
+	if not DirAccess.dir_exists_absolute(at):
+		return
+	for sub in DirAccess.get_directories_at(at):
+		_clear(folder.path_join(sub))
+	for file in DirAccess.get_files_at(at):
+		DirAccess.remove_absolute(at.path_join(file))
+	DirAccess.remove_absolute(at)
