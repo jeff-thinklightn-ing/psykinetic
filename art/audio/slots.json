@@ -1445,7 +1445,7 @@
 				"tool": "Ableton Live",
 				"license": "own",
 				"date": "2026-10-25",
-				"notes": "Jeff's \"umbrage-theme\" (his master: 48 kHz 24-bit stereo WAV, 22.59 s, 8 bars at 85 bpm, peak -6.7 dBFS, rms -26.9; kept in his music folder, not the repo); Ogg Vorbis q7 at its own level, the same 1084236 frames; Jeff, 2026-10-25, by way of the coordinator: \"umbrage-theme wav has been done\""
+				"notes": "Jeff's \"umbrage-theme\" (his master, the second version: 48 kHz 24-bit stereo WAV, 85.33 s, 32 bars at 90 bpm, peak -3.6 dBFS, rms -25.6; kept in his music folder, not the repo); Ogg Vorbis q7 at its own level, the same 4096000 frames; Jeff, 2026-10-25, by way of the coordinator: \"umbrage-theme wav has been done\", then his update the same day"
 			}
 		},
 		"amb.torch_fire": {

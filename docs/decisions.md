@@ -29383,7 +29383,7 @@ of Umbrage's music; the name goes wherever the town stands.
   Music needs no change for either. Regen keeps an anchored room's entry whole, key and
   all.
 - **The slot, music.umbrage**: music, a bed on the Music bus, flat, 0 dB, Jeff's own take
-  in the repo at art/audio/music/music.umbrage/music.umbrage.ogg (565 KB; source by Jeff,
+  in the repo at art/audio/music/music.umbrage/music.umbrage.ogg (565 KB, since 2.57 MB: 668 amended (2), below; source by Jeff,
   Ableton Live, licence "own", 2026-10-25): no takes.json entry, no THIRD_PARTY line.
 - **The take**: his master (48 kHz 24-bit stereo WAV, 22.59 s: 8 bars at 85 bpm, peak
   -6.7 dBFS, rms -26.9, 7 dB under the barrow's) as Ogg Vorbis quality 7 at its own
@@ -30865,3 +30865,27 @@ voice sections count on. tests/foe_stub.gd is a Monster that would fight
 only the ones it is given.
 
 Server only, protocol unchanged, no new class_name.
+## 668 amended (2). Umbrage's music, Jeff's update
+
+Jeff (2026-10-25, by way of the coordinator): he has updated umbrage-theme.wav.
+music.umbrage's take is his second version, in place of the first (668
+amended); the slot, the room key and Music are unchanged.
+
+- **The take**: his master (48 kHz 24-bit stereo WAV, 85.33 s: 32 bars at 90
+  bpm, peak -3.6 dBFS, rms -25.6, 5.8 dB under barrows-moody's -19.8; the
+  first was 22.59 s, 8 bars at 85 bpm, rms -26.9, 7 dB under) as Ogg Vorbis
+  quality 7 at its own level, the same 4096000 frames, imported looping, at
+  art/audio/music/music.umbrage/music.umbrage.ogg (2.57 MB). His own work, so
+  no takes.json entry and no THIRD_PARTY line. The master stays in his
+  folder, copied, never moved or edited.
+- **The seam, by measure**: clean, the wrap as its own bar lines cross. Each
+  bar ends decayed and opens on a hit; at the wrap the high-frequency burst
+  is -51.2 dB against -59.4 to -39.3 at the 31 bar lines, the level -39.3 to
+  -17.7 dB rms across it against -40.8 to -31.4 into -18.5 to -17.5. The
+  step, 0.018, is above theirs (0.0001 to 0.008) but small beside the
+  track's own motion (its steps' 99.9th percentile 0.16; the second
+  difference at the wrap 0.019 against the track's 99th percentile 0.13), so
+  no click by measure. Listening files for Jeff in C:/dev/review/sound/umbrage.
+
+sound_kit_test and view_test unchanged and passing (the slot, the room key,
+the take's file). Client only, protocol unchanged, no new class_name.

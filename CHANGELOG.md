@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Umbrage's music is Jeff's updated umbrage-theme: a longer piece (1 min 25 s before it loops, was 23 s), a little louder than before (668 amended).
 - Townsfolk hold their tongue near a fight (675, npc's side): with a monster or beast that would fight them or the one they talk with within 4 cells, and for 3 s after, a resident hails nobody, says no word on a click, answers no words (no model asked), and drops lines already coming; trades and offers still go through silently.
 ## v0.1.179
 
