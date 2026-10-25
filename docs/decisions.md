@@ -8955,6 +8955,21 @@ heavy_job_test covers a take another process holds under another name (not
 adopted) and a run in a child process adopting its parent's take under
 another name.
 
+Amended a twelfth time (2026-10-24, release and perf): a lean landing's
+net_test runs its groups one after another. suite_lean2's estimate had crept
+to 11.8 GB over the day's lean landings (19.8 GB wanted), with 17.2 GB free
+and no heavy job running: perf's own 660 landing waited 26 minutes. (10)'s
+listing showed the peak in the second phase: net_test's four groups at
+once (decision 279) are fourteen headless Godots of about 0.5 GB.
+- With NET_TEST_SERIAL set, tests/net_test.sh and net_test.ps1 run the
+  groups (phases 1 and 2, 3, 4, 5) one after another, each still on its
+  own ports. land.sh and land.ps1 set it in a lean landing. net_test then
+  takes longer but still runs beside state_test, the longest of the three.
+- The lean estimate is a new row again, suite_lean3, seeded at 8 GB (release),
+  so the first serial run can start and record its own peak. Each new lean
+  shape takes a new name: an estimate rises at once but falls a fifth of
+  the way a run.
+
 
 ## 395. UI sounds
 

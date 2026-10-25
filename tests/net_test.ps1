@@ -283,6 +283,8 @@ $running = foreach ($group in $groups) {
 		-ArgumentList '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "`"$PSCommandPath`"", '-Phase', $group, '-Logs', "`"$logs`"" `
 		-RedirectStandardOutput (Join-Path $logs "phase-$group.out") -RedirectStandardError (Join-Path $logs "phase-$group.stderr")
 	$null = $process.Handle  # Without it Windows PowerShell may lose the exit code.
+	# With NET_TEST_SERIAL (a lean landing, 394 amended (12)) one after another.
+	if ($env:NET_TEST_SERIAL) { $process.WaitForExit() }
 	$process
 }
 $running | ForEach-Object { $_.WaitForExit() }

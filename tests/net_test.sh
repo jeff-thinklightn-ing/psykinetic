@@ -262,9 +262,15 @@ phase_5() {
 }
 
 # All the groups at once, each in a shell of its own (its instances and
-# helpers' state its own); what each printed (a wait given up) after.
+# helpers' state its own); what each printed (a wait given up) after. With
+# NET_TEST_SERIAL (a lean landing, 394 amended (12)) one after another: the
+# groups at once are fourteen Godots, a lean landing's peak.
 for group in phase_1_2 phase_3 phase_4 phase_5; do
-	( "$group" ) >"$LOGS/$group.out" 2>&1 &
+	if [ -n "${NET_TEST_SERIAL:-}" ]; then
+		( "$group" ) >"$LOGS/$group.out" 2>&1
+	else
+		( "$group" ) >"$LOGS/$group.out" 2>&1 &
+	fi
 done
 wait
 cat "$LOGS"/phase_*.out

@@ -61,6 +61,8 @@ Write-Output "$(if ($resolveOk) { 'PASS' } else { 'FAIL' })  changelog_resolve_t
 $parts = [ordered]@{ suite = 'run.ps1'; net_test = 'net_test.ps1'; state_test = 'state_test.ps1'; server_boot_test = 'server_boot_test.ps1' }
 $running = @{}
 $env:PSYKINETIC_TEST_JOBS = "$suiteJobs"  # Only the suite reads it.
+# A lean landing's net_test runs its groups one after another (394 amended (12)).
+if ($lean) { $env:NET_TEST_SERIAL = '1' }
 try {
 	foreach ($name in $parts.Keys) {
 		$process = Start-Process -FilePath 'powershell.exe' -NoNewWindow -PassThru `
@@ -73,6 +75,7 @@ try {
 	}
 } finally {
 	Remove-Item Env:PSYKINETIC_TEST_JOBS -ErrorAction SilentlyContinue
+	Remove-Item Env:NET_TEST_SERIAL -ErrorAction SilentlyContinue
 }
 $failed = @()
 if (-not $gateOk) {

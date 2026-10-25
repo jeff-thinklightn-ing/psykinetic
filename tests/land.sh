@@ -72,7 +72,8 @@ else
 	part suite env PSYKINETIC_TEST_JOBS="$suite_jobs" bash tests/run.sh &
 	sleep 0.3
 fi
-part net_test bash tests/net_test.sh &
+# A lean landing's net_test runs its groups one after another (394 amended (12)).
+part net_test env ${lean:+NET_TEST_SERIAL=1} bash tests/net_test.sh &
 sleep 0.3
 part state_test bash tests/state_test.sh &
 sleep 0.3

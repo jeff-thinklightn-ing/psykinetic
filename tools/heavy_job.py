@@ -61,14 +61,15 @@ A soak meant to run for hours says so with --expect; the soak kind's limit
 is its max_minutes (180) whatever its runs took (fixed_limit).
 
 A suite out of reach (memory held outside the gate) for LEAN_AFTER_SECONDS
-runs lean (394 amended (9), (10)): land.sh reads HEAVY_JOB_KIND,
-suite_lean2, and runs fewer scenes at once and its other parts (net_test,
-state_test, server_boot_test) after the suite, not beside it; under
-suite_lean2's own estimate, when that one is in reach. It is still a suite
-in running/ (its caps and exclusions, and an older heavy_job.py's, hold),
-marked "estimate": suite_lean2, whose row its peak and time update. (The
-first lean shape, fewer scenes alone, peaked at 13.8 GB, recorded as
-suite_lean: a new name so the new shape starts from a seed.) Maps' suite
+runs lean (394 amended (9), (10), (12)): land.sh reads HEAVY_JOB_KIND,
+suite_lean3, and runs fewer scenes at once and its other parts (net_test,
+state_test, server_boot_test) after the suite, not beside it, net_test's
+groups one after another; under suite_lean3's own estimate, when that one
+is in reach. It is still a suite in running/ (its caps and exclusions, and
+an older heavy_job.py's, hold), marked "estimate": suite_lean3, whose row
+its peak and time update. Each new lean shape takes a new name, so it
+starts from a seed: suite_lean (fewer scenes alone) recorded 13.8 GB,
+suite_lean2 (the parts after the suite) 11.8. Maps' suite
 waited 23 minutes at 18 GB free for 14.6 + 8 on 2026-10-24, about twenty
 sessions, a browser and Jeff's Ableton holding the rest.
 
@@ -113,7 +114,7 @@ LONG_HOLD_SECONDS = 3600
 ## Set by `run` for its command: the name of its running entry.
 HELD_ENV = "HEAVY_JOB_HELD"
 ## Set by `run` for its command: the kind whose estimate it runs under
-## (suite_lean2 for a lean suite, 394 amended (9), (10)).
+## (suite_lean3 for a lean suite, 394 amended (9), (10), (12)).
 KIND_ENV = "HEAVY_JOB_KIND"
 ## A job out of reach this long runs as its kind's lean variant, if any.
 LEAN_AFTER_SECONDS = 5 * 60
@@ -153,10 +154,10 @@ KINDS = {
     "trellis_mesh": {"ram_gb": 9.0, "gpu_gb": 12.0, "gpu": True},
     "comfy_batch": {"ram_gb": 6.0, "gpu_gb": 10.0, "gpu": True},
     "suite": {"ram_gb": 6.5, "gpu_gb": 0.0, "gpu": False, "max_running": 1, "excludes": ["bench"], "max_minutes": 90,
-        "lean": "suite_lean2"},  # tests/land.sh: 6.3 GB measured
-    # A suite run lean (394 amended (9), (10)): its estimate and runs only;
+        "lean": "suite_lean3"},  # tests/land.sh: 6.3 GB measured
+    # A suite run lean (394 amended (9), (10), (12)): its estimate and runs only;
     # it runs as a suite (lean_row), never as a kind of its own.
-    "suite_lean2": {"ram_gb": 9.0, "gpu_gb": 0.0, "gpu": False, "max_minutes": 90, "variant_of": "suite"},
+    "suite_lean3": {"ram_gb": 8.0, "gpu_gb": 0.0, "gpu": False, "max_minutes": 90, "variant_of": "suite"},
     "bench": {"ram_gb": 3.0, "gpu_gb": 0.0, "gpu": False, "max_running": 1, "excludes": ["suite", "soak"], "max_minutes": 90},
     "godot_import": {"ram_gb": 2.0, "gpu_gb": 0.0, "gpu": False, "max_minutes": 90},
     "godot_export": {"ram_gb": 3.0, "gpu_gb": 0.0, "gpu": False, "max_minutes": 90},
