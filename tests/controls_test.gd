@@ -745,7 +745,10 @@ func _test_friend_click() -> void:
 	Net.hints = true
 	_check(_main.context_hint_for(body) == "LMB  interact", "the hint says interact with hints=on (560; %s)" % _main.context_hint_for(body))
 	Net.hints = hints_were
-	_check("Shift+LMB	swing where you stand (a bow: draw)" in _main.hint_lines(), "the controls list says Shift+LMB swings where you stand, or draws a bow")
+	_check("Shift+LMB	swing where you stand" in _main.hint_lines()
+			and "Shift held, bow	stand firm and draw: LMB looses, let go lowers it (arrow kept), walk keys turn" in _main.hint_lines()
+			and not _main.hint_lines().any(func(line: String) -> bool: return line.begins_with("RMB, bow")),
+			"the controls list: Shift+LMB swings where you stand; with a bow, Shift held stands firm and draws, LMB looses (583 amended)")
 	player.has_move_order = false
 	_left(true)
 	_check(player.action_order == GridEntity.Order.SWING and not player.has_move_order and _main._talk_wanted == null,

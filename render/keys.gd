@@ -32,7 +32,7 @@ const WORDS := {
 	"lantern": "Lantern", "reset": "Reset the room", "options": "Options", "hints": "The controls list",
 	"debug": "Debug text", "fullscreen": "Fullscreen", "builder": "Builder mode",
 	"phrase_1": "Quick phrase 1", "phrase_2": "Quick phrase 2", "phrase_3": "Quick phrase 3", "phrase_4": "Quick phrase 4",
-	"stand": "Held with a click: swing where you stand, at whatever is there", "signature": "Held with a click: your weapon's own move (a shield bashes)",
+	"stand": "Held with a click: swing where you stand, at whatever is there; with a bow, held: stand firm and draw", "signature": "Held with a click: your weapon's own move (a shield bashes)",
 	"bandage": "A bandage on the cursor: click yourself or an ally", "screenshot": "Screenshot",
 	"yes": "Say yes to an offer that stands",
 	"card": "Your companion's card",

@@ -9623,7 +9623,7 @@ func context_hint_for(thing: Node) -> String:
 		# 560, ui's side (Jeff): the click interacts; they stop and address you.
 		return "LMB  interact   in bed with %s" % ailing if not ailing.is_empty() else "LMB  interact"
 	if thing is Monster and World.can_target(player, thing):
-		return "%s+LMB hold  draw, let go to shoot" % Keys.name_of("stand") if World.off_hand(player) == "draw" else "LMB  attack"
+		return "%s hold  draw   LMB  loose" % Keys.name_of("stand") if World.off_hand(player) == "draw" else "LMB  attack"
 	if thing is Player and thing != player:
 		return "LMB  talk   E hold  bandage"
 	return ""
@@ -12946,19 +12946,20 @@ func _on_world_ticked(tick: int) -> void:
 func hint_lines() -> Array[String]:
 	var lines: Array[String] = []
 	if Net.controls == "wasd":
-		lines.append_array(["%s\twalk" % Keys.walk_names(), "Mouse\taim", "LMB\tattack (far: walk); a friend: talk", "%s+LMB\tswing where you stand (a bow: draw)" % Keys.name_of("stand"),
+		lines.append_array(["%s\twalk" % Keys.walk_names(), "Mouse\taim", "LMB\tattack (far: walk); a friend: talk", "%s+LMB\tswing where you stand" % Keys.name_of("stand"),
 			"RMB\toff hand; empty: grab (drag to toss)"])
 		if _client3d != null:
 			lines.append_array(["MMB drag\tturn, look up / down", "Wheel\tzoom (MMB click: 1x)"])
 	else:
-		lines.append_array(["LMB\tmove / attack (hold to steer); a friend: talk", "%s+LMB\tswing where you stand (a bow: draw)" % Keys.name_of("stand"),
+		lines.append_array(["LMB\tmove / attack (hold to steer); a friend: talk", "%s+LMB\tswing where you stand" % Keys.name_of("stand"),
 			"RMB\toff hand; empty: shove (drag to toss)"])
 		if _client3d != null:
 			lines.append_array(["%s / %s\toverhead / normal view" % [Keys.name_of("forward"), Keys.name_of("back")],
 				"%s / %s\tturn" % [Keys.name_of("left"), Keys.name_of("right")], "MMB drag\tpan (springs back)", "Wheel\tzoom"])
 	for i in Net.phrases.size():
 		lines.append("%s\t%s" % [Keys.name_of("phrase_%d" % (i + 1)), Net.phrases[i]])
-	lines.append_array(["%s+LMB\tyour weapon's own move (a shield bashes)" % Keys.name_of("signature"), "RMB, shield\tblock toward the cursor while held","RMB, bow\tdraw; let go to shoot at the cursor",
+	lines.append_array(["%s+LMB\tyour weapon's own move (a shield bashes)" % Keys.name_of("signature"), "RMB, shield\tblock toward the cursor while held",
+		"%s held, bow\tstand firm and draw: LMB looses, let go lowers it (arrow kept), walk keys turn" % Keys.name_of("stand"),
 		"%s\topen a chest, crate, cart, door; your companion's pack" % Keys.name_of("open"), "%s\tyour pack" % Keys.name_of("pack"),
 		"%s\tyour companion's card" % Keys.name_of("card"),
 		"%s\tthe town sheet" % Keys.name_of("town"),
