@@ -628,6 +628,11 @@ const DODGE_LOOK := 12
 const DODGE_REACT := 2
 const DODGE_WARY := 2
 const DODGE_REACH := 3
+## Her player's bow cone (663 amended): the facing is the server's aim
+## while drawn, one of eight ways, so the cone is widened by half a way;
+## and reaches at least this far before the first step.
+const CONE_SLACK := PI / 8.0
+const CONE_LEAST := 3
 ## Telegraph id -> the tick she first saw it; the cells of those she sees
 ## (she steps into none while they show); where she dodges to; whose and
 ## what it was, for her narration.
@@ -4107,6 +4112,33 @@ func _execute() -> void:
 			pass
 
 
+## Her player drawing a bow (663 amended, Jeff: "nocking and aiming an
+## arrow should alert the companion to stay out of the firing cone"): the
+## cells of its cone into _danger (from their cell along their facing, the
+## server's aim while drawn, within World.spread_of plus CONE_SLACK, out to
+## World.range_of plus one and at least CONE_LEAST); whether her cell is
+## among them.
+func _in_line_of_fire() -> bool:
+	if not _alive(keeper) or keeper.raised != "draw" or keeper.zone != zone or keeper.facing == Vector2i.ZERO:
+		return false
+	var spread := World.spread_of(keeper)
+	if spread < 0.0:
+		return false
+	var reach := maxi(World.range_of(keeper) + 1, CONE_LEAST)
+	var aim := Vector2(keeper.facing).angle()
+	var mine := false
+	for dy in range(-reach, reach + 1):
+		for dx in range(-reach, reach + 1):
+			var way := Vector2(dx, dy)
+			if way == Vector2.ZERO or way.length() > reach + 0.5:
+				continue
+			if absf(angle_difference(aim, way.angle())) <= spread + CONE_SLACK:
+				var at := keeper.tile + Vector2i(dx, dy)
+				_danger[at] = true
+				mine = mine or at == tile
+	return mine
+
+
 ## The telegraphs showing in her zone whose source she sees (decision 663),
 ## each tick: their cells into _danger; the cell to dodge to when one
 ## landing within DODGE_LOOK covers hers and she has had her reaction's
@@ -4118,10 +4150,15 @@ func _read_telegraphs(fighting: GridEntity) -> Vector2i:
 	for id: int in _dodge_seen.keys():
 		if not shown.has(id):
 			_dodge_seen.erase(id)
-	if shown.is_empty():
-		return NONE
 	var react := DODGE_REACT + (DODGE_WARY if hangs_back() else 0)
 	var from: GridEntity = null
+	# Her player's drawn bow (663 amended): its cone is danger too,
+	# and in it she steps clear at once.
+	if _in_line_of_fire():
+		from = keeper
+		_dodge_from = "%s's line of fire" % keeper_name()
+	if shown.is_empty() and _danger.is_empty():
+		return NONE
 	for id: int in shown:
 		var data: Dictionary = shown[id]
 		if str(data.get("zone", "")) != zone:

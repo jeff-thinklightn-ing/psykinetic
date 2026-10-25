@@ -105,6 +105,7 @@ func _ready() -> void:
 	_test_seated_boss()
 	_test_quiet()
 	_test_dodge()
+	_test_firing_cone()
 	_test_bandage_words()
 	_test_plain_orders()  # Late: its many lines fill the capped party log and Tab panel.
 	_test_last_words()  # She dies in it: keep it last of those that need her.
@@ -3040,6 +3041,34 @@ func _test_dodge() -> void:
 	_check(pet._danger.is_empty(), "landed: nothing showing for her")
 	World.despawn(imp)
 	_kill_monsters()
+	_settle(pet)
+
+
+func _test_firing_cone() -> void:
+	print("\n== her player draws a bow: she keeps out of its cone (663 amended; Jeff) ==")
+	_kill_monsters()
+	var owner := _player()
+	var pet := _companion()
+	_settle(pet)
+	_put(owner, Vector2i(6, 6))
+	_put(pet, Vector2i(9, 6))
+	var kept := owner.slots.duplicate()
+	World.set_slots(owner, Items.tidy(["", "", "", "", "", ""], Items.CARRIED))
+	World.put_item(owner, owner, Player.RIGHT_HAND, World.items.mint("bow", "built"))
+	World.put_item(owner, owner, Player.LEFT_HAND, World.items.mint("arrows", "built"))
+	World.face(owner, Vector2i(1, 0))
+	_check(World.try_stance(owner, "draw"), "her player draws, facing her")
+	World.step()
+	_check(pet._danger.has(Vector2i(9, 6)) and pet.current_intent == Companion.Intent.DODGE,
+		"in the cone: she steps clear at once (%s)" % pet.intent_name())
+	for i in 12:
+		World.step()
+	var cone := pet._danger.duplicate()
+	_check(not cone.has(pet.tile) and not cone.is_empty(), "out of it, and stays out while they draw (%s)" % pet.tile)
+	World.try_stance(owner, "")
+	World.step()
+	_check(pet._danger.is_empty(), "the bow lowered: nothing to keep out of")
+	World.set_slots(owner, kept)
 	_settle(pet)
 
 

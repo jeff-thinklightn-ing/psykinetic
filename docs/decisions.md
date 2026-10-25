@@ -30288,3 +30288,29 @@ companion_test _test_quiet: calm, she speaks; a monster near, a line
 dropped and her player's words unanswered; the fight over, quiet a breath
 with nothing waiting; QUIET_AFTER on, she speaks. Server only, protocol
 unchanged, no new class_name.
+
+## 663 amended: she keeps out of her player's firing cone
+
+Jeff, 2026-10-25: "nocking and aiming an arrow should alert the companion
+to stay out of the firing cone." The coordinator's, through the archery
+hold; 663's step-clear rule with one more danger.
+
+- While her player draws (raised "draw", in her zone), Companion.
+  _in_line_of_fire puts their bow's cone in her danger: the cells from
+  their cell along their facing (the server's aim while drawn: the client
+  sends the cursor's turn as "face", one of eight ways) within World.
+  spread_of plus CONE_SLACK (PI / 8, half a way), out to World.range_of
+  plus one and at least CONE_LEAST (3) before the first step, so it grows
+  with the hold.
+- In it, she dodges at once (Intent.DODGE, no reaction ticks: her player's
+  draw is no surprise) by 663's choice of cell, from her player; out of it
+  she steps into none of it while they draw (663's hold), striking from
+  where she stands if she can.
+- Silently: DODGE is a fighting intent, so 675 holds her tongue; her voice
+  is told "You leap clear of <player>'s line of fire."
+- Devoted and standing over her downed player she stays, as in 663.
+- Her own player's bow only, not another player's.
+
+companion_test _test_firing_cone: drawn facing her, she dodges at once;
+out of it and kept out while drawn; lowered, nothing to keep out of.
+Server only, protocol unchanged, no new class_name.

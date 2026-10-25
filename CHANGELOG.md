@@ -7,6 +7,8 @@ notes (decision 324).
 
 ## Unreleased
 
+- When you draw your bow, your companion steps out of its cone of fire and keeps out of it until you loose or lower it.
+
 ## v0.1.175
 
 - Your companion holds her tongue in a fight: no speech bubbles while she or you are fighting, nor for three seconds after; she still does what you tell her, silently.
