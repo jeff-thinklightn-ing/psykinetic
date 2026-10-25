@@ -819,16 +819,25 @@ func tuning_key(key: InputEventKey) -> bool:
 
 
 ## Feel tuning's "camera" fields (decision 673): the view's own, on Client3D
-## while it runs (camera.<var>); ui's step 2 moves the rest of the view's
-## eases here, into art/kit/feel.json with pc-character's.
-const CAMERA_FIELDS := {"draw_pull_margin": [0.0, 5.0], "draw_pull_most": [1.0, 3.0], "draw_pull_rate": [1.0, 30.0]}
+## while it runs (camera.<var>): combat's draw pull, and (step 2, ui's) the
+## view's eases and pulls, whose repo values are art/kit/feel.json's
+## "camera" section (Client3D.load_camera_feel). Each with its range.
+const CAMERA_FIELDS := {"draw_pull_margin": [0.0, 5.0], "draw_pull_most": [1.0, 3.0], "draw_pull_rate": [1.0, 30.0],
+	"zoom_rate": [1.0, 40.0], "peek_pull_back": [1.0, 2.0], "peek_return_seconds": [0.05, 1.0],
+	"mourn_pull_back": [1.0, 2.5], "mourn_seconds": [0.5, 8.0], "mourn_return_seconds": [0.1, 2.0],
+	"reach_ease": [0.05, 2.0], "aim_lead_cells": [0.0, 8.0], "aim_cone_ease_ticks": [0.25, 6.0],
+	"telegraph_flash": [0.0, 1.0], "telegraph_flash_msec": [50, 1000], "flash_seconds": [0.02, 0.6],
+	"overhead_pitch": [60.0, 89.0], "pitch_ease_seconds": [0.05, 1.0],
+	"inside_pitch": [60.0, 89.5], "inside_ease_seconds": [0.05, 1.0], "inside_leave_hold": [0.0, 2.0]}
+## The camera fields combat's 673 added; the rest are ui's (673 step 2).
+const COMBAT_CAMERA_FIELDS: Array[String] = ["draw_pull_margin", "draw_pull_most", "draw_pull_rate"]
 
 
 static func camera_fields() -> Array:
 	var out := []
 	for key: String in CAMERA_FIELDS:
 		out.append({"path": "camera." + key, "group": "Camera", "min": CAMERA_FIELDS[key][0], "max": CAMERA_FIELDS[key][1],
-			"owner": "combat"})
+			"owner": "combat" if key in COMBAT_CAMERA_FIELDS else "ui"})
 	return out
 
 

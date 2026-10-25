@@ -14,6 +14,7 @@ var _rig: Client3D
 func _ready() -> void:
 	World.set_process(false)
 	Net.port = preload("res://tests/test_ports.gd").of(17791)  # Not 7777 (the editor may be hosting there), nor any other test's or eval's.
+	Client3D.feel_path = ""  # 673 step 2: the defaults, whatever the tuned file holds.
 	_main = preload("res://main.tscn").instantiate()
 	_main.returns = false  # The old respawn (decision 396 is return_test's).
 	add_child(_main)
@@ -41,6 +42,7 @@ func _ready() -> void:
 	_test_outdoor()
 	await _test_low_camera()
 	_test_indoor_camera()
+	_test_camera_feel()
 	_test_draw_pull()
 	_test_low_scatter()
 	await _test_far_restart()
@@ -4481,6 +4483,37 @@ func _test_low_camera() -> void:
 
 ## Indoors (671): top-down in a walled space, eased; out after a hold, so a
 ## doorway never bobs it; the low camera keeps its own.
+## The camera's feel from art/kit/feel.json (673 step 2): the repo's file
+## names only the view's vars, one of each, each a number; a file's key
+## sets its var (a whole number for an int one), its words and any other
+## key left alone; the tuning panel's camera source sets one live.
+func _test_camera_feel() -> void:
+	print("
+== the camera's feel from art/kit/feel.json (673 step 2) ==")
+	var data: Variant = JSON.parse_string(FileAccess.get_file_as_string("res://art/kit/feel.json"))
+	var section: Dictionary = data.get("camera", {}) if data is Dictionary else {}
+	var numbers := section.keys().filter(func(key: String) -> bool: return key != "about")
+	_check(numbers.size() == Client3D.CAMERA_FEEL.size() and Client3D.CAMERA_FEEL.all(func(key: String) -> bool: return section.get(key) is float or section.get(key) is int),
+			"the file's camera section: each of the view's %d vars, a number (%d)" % [Client3D.CAMERA_FEEL.size(), numbers.size()])
+	var kept := {}
+	for key in Client3D.CAMERA_FEEL:
+		kept[key] = _rig.get(key)
+	_check(_rig.load_camera_feel("res://art/kit/feel.json") == Client3D.CAMERA_FEEL.size(), "all of them read")
+	var scratch := preload("res://tests/test_ports.gd").scratch("camera_feel.json")
+	var file := FileAccess.open(scratch, FileAccess.WRITE)
+	file.store_string(JSON.stringify({"about": "x", "feel": {"client3d.clip_blend": 9}, "camera": {"about": "y", "overhead_pitch": 70, "telegraph_flash_msec": 120.6, "nothing": 3, "zoom_rate": "fast"}}))
+	file.close()
+	_check(_rig.load_camera_feel(scratch) == 2 and is_equal_approx(_rig.overhead_pitch, 70.0) and _rig.overhead_pitch is float
+			and _rig.telegraph_flash_msec == 121 and _rig.get("nothing") == null,
+			"a file's camera keys set their vars (%s, %s); words and other keys left alone" % [_rig.overhead_pitch, _rig.telegraph_flash_msec])
+	_rig.overhead = true
+	_check(is_equal_approx(_rig.rest_pitch(), 70.0) or _rig.indoors, "the overhead view rests at the file's pitch (%s)" % _rig.rest_pitch())
+	_rig.overhead = false
+	for key: String in kept:
+		_rig.set(key, kept[key])
+	DirAccess.remove_absolute(scratch)
+
+
 func _test_indoor_camera() -> void:
 	print("
 == indoors (671): top-down in a walled space, out after a hold, never a bob ==")

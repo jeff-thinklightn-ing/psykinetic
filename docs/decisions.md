@@ -29815,3 +29815,35 @@ key of the file a row "feel.<key>" in the Animation group with its range (ArtKit
 owner pc-character, the two blends marked "spawn". anim_rig_test also sets strike_speed_max for a
 run and puts it back, and `_test_feel_source` lists, applies and resets through Tuning. Client
 only, protocol unchanged, no new class_name.
+## 673 step 2, ui's side. The camera's feel as data
+
+The coordinator's design gives step 2 the view's eases and pulls ("ui and
+combat the camera"); combat's step 1 left Main's "camera" source for it.
+
+- **The file:** art/kit/feel.json's top-level "camera" section, ui's own
+  (pc-character's "feel" section and the top-level "about" are theirs; a
+  rebase conflict there is two keys, both kept). Seventeen numbers:
+  zoom_rate, peek_pull_back, peek_return_seconds, mourn_pull_back,
+  mourn_seconds, mourn_return_seconds, reach_ease, aim_lead_cells,
+  aim_cone_ease_ticks, telegraph_flash, telegraph_flash_msec,
+  flash_seconds, overhead_pitch, pitch_ease_seconds, inside_pitch,
+  inside_ease_seconds, inside_leave_hold; an "about" of its own.
+- **Client3D:** each is a var (the old constant's name in lower case, the
+  constant kept as its default) that the view reads instead.
+  load_camera_feel(path) at setup sets each key that names one
+  (CAMERA_FEEL) and holds a number, a whole number for an int one; words,
+  unknown keys and a missing file leave the defaults. The two static
+  helpers take the value as a parameter (lead_offset's most,
+  eased_spread's ticks), defaulting to the constant.
+- **Tuning:** Main.CAMERA_FIELDS gains the seventeen with ranges, owner ui
+  (combat's three draw-pull fields stay combat's), so the F7 panel sets
+  them live; a set Jeff likes is committed in the file's section.
+- **Tests:** controls_test, view_test and ui_test set Client3D.feel_path ""
+  so their timings use the defaults whatever the tuned file holds.
+  view_test _test_camera_feel: the repo's file names each var once as a
+  number and all read; a scratch file's keys set their vars (an int
+  rounded), its words and other sections left alone; the overhead view
+  rests at the file's pitch. ui_test: the twenty camera rows in the panel,
+  ui's and combat's.
+
+Client only, protocol unchanged, no new class_name.

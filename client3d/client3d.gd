@@ -1472,6 +1472,51 @@ var _left_inside_at := -1.0
 ## Whether being indoors tips the view (true in the game; a test of the
 ## other pitches, in its walled test room, turns it off).
 var indoor_view := true
+## Camera feel (673 step 2): the view's eases and pulls as vars, read at
+## setup from art/kit/feel.json's "camera" section (load_camera_feel), so the
+## tuning panel sets them live (Main's "camera" source) and a tuned set is
+## committed in the file; the constants are the defaults for a key the file
+## lacks. Tests set feel_path "" to keep the defaults.
+static var feel_path := "res://art/kit/feel.json"
+var zoom_rate := ZOOM_RATE
+var peek_pull_back := PEEK_PULL_BACK
+var peek_return_seconds := PEEK_RETURN_SECONDS
+var mourn_pull_back := MOURN_PULL_BACK
+var mourn_seconds := MOURN_SECONDS
+var mourn_return_seconds := MOURN_RETURN_SECONDS
+var reach_ease := REACH_EASE
+var aim_lead_cells := AIM_LEAD_CELLS
+var aim_cone_ease_ticks := AIM_CONE_EASE_TICKS
+var telegraph_flash := TELEGRAPH_FLASH
+var telegraph_flash_msec := TELEGRAPH_FLASH_MSEC
+var flash_seconds := FLASH_SECONDS
+var overhead_pitch := OVERHEAD_PITCH
+var pitch_ease_seconds := PITCH_EASE_SECONDS
+var inside_pitch := INSIDE_PITCH
+var inside_ease_seconds := INSIDE_EASE_SECONDS
+var inside_leave_hold := INSIDE_LEAVE_HOLD
+
+
+## The "camera" section of [param path] (feel_path) applied: each key that
+## names one of the vars above and holds a number; how many took.
+func load_camera_feel(path := feel_path) -> int:
+	if path.is_empty() or not FileAccess.file_exists(path):
+		return 0
+	var data: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
+	var section: Variant = data.get("camera") if data is Dictionary else null
+	if section is not Dictionary:
+		return 0
+	var took := 0
+	for key: String in section:
+		var given: Variant = section[key]
+		if key in CAMERA_FEEL and (given is float or given is int):
+			set(key, roundi(given) if get(key) is int else float(given))
+			took += 1
+	return took
+
+
+## The vars load_camera_feel and the tuning panel set.
+const CAMERA_FEEL: Array[String] = ["zoom_rate", "peek_pull_back", "peek_return_seconds", "mourn_pull_back", "mourn_seconds", "mourn_return_seconds", "reach_ease", "aim_lead_cells", "aim_cone_ease_ticks", "telegraph_flash", "telegraph_flash_msec", "flash_seconds", "overhead_pitch", "pitch_ease_seconds", "inside_pitch", "inside_ease_seconds", "inside_leave_hold"]
 ## The pitch easing to its rest (rest_pitch): from, how far along (1: at
 ## rest), over how long.
 var _tilt_from := CAMERA_PITCH
@@ -2145,6 +2190,7 @@ var _fade_clock := 0.0
 ## Builds the room and the rig. [param terrain] is Terrain.parse's result,
 ## the same the 2D view paints from.
 func setup(terrain: Dictionary, centre := Vector2i.ZERO) -> void:
+	load_camera_feel()  # 673 step 2.
 	_terrain = terrain
 	_centre = centre
 	_ring_mesh = _make_ring(0.42, 0.5)
@@ -2632,8 +2678,8 @@ func low_camera() -> bool:
 ## else normal_pitch.
 func rest_pitch() -> float:
 	if indoors and indoor_view and not _low:
-		return INSIDE_PITCH  # 671: top-down inside a walled space.
-	return OVERHEAD_PITCH if overhead else normal_pitch()
+		return inside_pitch  # 671: top-down inside a walled space.
+	return overhead_pitch if overhead else normal_pitch()
 
 
 ## Buildings' inside_changed (671): in, at once (a leave under way called
@@ -2644,7 +2690,7 @@ func _on_inside_changed(inside: bool, _rect: Rect2i) -> void:
 		if not indoors:
 			indoors = true
 			if not _peeking:
-				_ease_pitch(INSIDE_EASE_SECONDS)
+				_ease_pitch(inside_ease_seconds)
 	elif indoors and _left_inside_at < 0.0:
 		_left_inside_at = _fade_clock
 
@@ -2652,11 +2698,11 @@ func _on_inside_changed(inside: bool, _rect: Rect2i) -> void:
 ## Each frame: out of a walled space for INSIDE_LEAVE_HOLD, the camera eases
 ## back to the view it had.
 func _update_indoors() -> void:
-	if indoors and _left_inside_at >= 0.0 and _fade_clock - _left_inside_at >= INSIDE_LEAVE_HOLD:
+	if indoors and _left_inside_at >= 0.0 and _fade_clock - _left_inside_at >= inside_leave_hold:
 		indoors = false
 		_left_inside_at = -1.0
 		if not _peeking:
-			_ease_pitch(INSIDE_EASE_SECONDS)
+			_ease_pitch(inside_ease_seconds)
 
 
 ## The normal pitch: LOW_PITCH under the low camera, CAMERA_PITCH else.
@@ -2776,10 +2822,10 @@ func _follow(delta: float) -> void:
 	_local_name = String(player.name)
 	sfx.listener = player.tile  # Sounds are heard from here, as a monster there would.
 	_lead = Main.camera_lean(_lead, get_viewport(), yaw, delta)
-	_aim_lead = _aim_lead.lerp(_aim_lead_to, 1.0 - exp(-ZOOM_RATE * delta))
+	_aim_lead = _aim_lead.lerp(_aim_lead_to, 1.0 - exp(-zoom_rate * delta))
 	if _aim_lead_to == Vector3.ZERO and _aim_lead.length() < 0.001:
 		_aim_lead = Vector3.ZERO
-	_camera_target = _camera_ease.follow(puppet.position, delta) + lead_offset(_lead, _aim_lead) + pan
+	_camera_target = _camera_ease.follow(puppet.position, delta) + lead_offset(_lead, _aim_lead, aim_lead_cells) + pan
 	_ridge_pitch = move_toward(_ridge_pitch, ridge_pitch(puppet.position), RIDGE_EASE * delta)
 	_place_camera()
 	_update_sight(puppet.position, delta)
@@ -2897,8 +2943,8 @@ func _apply_size() -> void:
 ## The wheel's zoom, a pitch peek's and the mourning's pull-back, as one
 ## factor on the ortho size (and under the low camera, on its distance).
 func _size_factor() -> float:
-	return zoom * lerpf(1.0, PEEK_PULL_BACK, smoothstep(0.0, 1.0, _peek)) \
-			* lerpf(1.0, MOURN_PULL_BACK, smoothstep(0.0, 1.0, _mourn)) * _reach_pull
+	return zoom * lerpf(1.0, peek_pull_back, smoothstep(0.0, 1.0, _peek)) \
+			* lerpf(1.0, mourn_pull_back, smoothstep(0.0, 1.0, _mourn)) * _reach_pull
 
 
 ## How tall the view is at the camera's aim (ground units, straight across
@@ -2948,7 +2994,7 @@ func end_pan() -> void:
 func _ease_pan(delta: float) -> void:
 	if not _pan_home:
 		return
-	pan = pan.lerp(Vector3.ZERO, 1.0 - exp(-ZOOM_RATE * delta))
+	pan = pan.lerp(Vector3.ZERO, 1.0 - exp(-zoom_rate * delta))
 	if pan.length() < 0.001:
 		pan = Vector3.ZERO
 		_pan_home = false
@@ -3023,7 +3069,7 @@ func _ease_reach_pull(delta: float) -> void:
 func _ease_zoom(delta: float) -> void:
 	if is_equal_approx(zoom, _zoom_to):
 		return
-	zoom = lerpf(zoom, _zoom_to, 1.0 - exp(-ZOOM_RATE * delta))
+	zoom = lerpf(zoom, _zoom_to, 1.0 - exp(-zoom_rate * delta))
 	if absf(zoom - _zoom_to) < 0.0005:
 		zoom = _zoom_to
 	_apply_size()
@@ -3088,9 +3134,9 @@ func set_overhead(on: bool) -> void:
 
 
 ## The pitch eased to rest_pitch from where it is, over [param seconds].
-func _ease_pitch(seconds := PITCH_EASE_SECONDS) -> void:
+func _ease_pitch(seconds := -1.0) -> void:
 	_tilt_from = pitch
-	_tilt_seconds = seconds
+	_tilt_seconds = seconds if seconds >= 0.0 else pitch_ease_seconds
 	_tilt_t = 1.0 if is_equal_approx(pitch, rest_pitch()) else 0.0
 
 
@@ -3145,7 +3191,7 @@ func end_pitch_peek() -> void:
 func _ease_peek(delta: float) -> void:
 	if _peek_t >= 1.0:
 		return
-	_peek_t = minf(_peek_t + delta / PEEK_RETURN_SECONDS, 1.0)
+	_peek_t = minf(_peek_t + delta / peek_return_seconds, 1.0)
 	_set_peek(lerpf(_peek_from, 0.0, sin(_peek_t * PI * 0.5)))
 
 
@@ -3159,7 +3205,7 @@ func _set_peek(amount: float) -> void:
 		_place_camera()
 		return
 	var eased := smoothstep(0.0, 1.0, amount)
-	_set_pitch(lerpf(rest_pitch(), normal_pitch() if overhead else OVERHEAD_PITCH, eased))
+	_set_pitch(lerpf(rest_pitch(), normal_pitch() if overhead else overhead_pitch, eased))
 
 
 ## WASD: the middle button went down; the drag turns from the yaw now.
@@ -4131,10 +4177,10 @@ func telegraph_tick(tick: int) -> void:
 		var entry: Dictionary = _telegraphs[id]
 		var alpha: float
 		if int(entry["landed_at"]) >= 0:
-			if now - int(entry["landed_at"]) > TELEGRAPH_FLASH_MSEC:
+			if now - int(entry["landed_at"]) > telegraph_flash_msec:
 				telegraph_drop(id)
 				continue
-			alpha = TELEGRAPH_FLASH
+			alpha = telegraph_flash
 		else:
 			alpha = lerpf(TELEGRAPH_FAINT, TELEGRAPH_FULL, telegraph_fill(int(entry["from"]), int(entry["lands"]), tick))
 		for quad: MeshInstance3D in entry["quads"]:
@@ -4166,17 +4212,17 @@ func telegraphs_shown() -> int:
 ## The aim lead on or off: [param way] the aim's direction on the grid
 ## (unit), the target AIM_LEAD_CELLS that way while [param on].
 func aim_lead(way: Vector2, on: bool) -> void:
-	_aim_lead_to = Vector3(way.x, 0.0, way.y) * AIM_LEAD_CELLS if on and way.length() > 0.0 else Vector3.ZERO
+	_aim_lead_to = Vector3(way.x, 0.0, way.y) * aim_lead_cells if on and way.length() > 0.0 else Vector3.ZERO
 
 
 ## The view's offset from the archer: the WASD lean plus the aim lead, the
 ## two together held to AIM_LEAD_CELLS once the lead is on (the lean alone
 ## as ever when it is not).
-static func lead_offset(lean: Vector2, aim: Vector3) -> Vector3:
+static func lead_offset(lean: Vector2, aim: Vector3, most := AIM_LEAD_CELLS) -> Vector3:
 	var lean3 := Vector3(lean.x, 0.0, lean.y)
 	if aim == Vector3.ZERO:
 		return lean3
-	return (lean3 + aim).limit_length(AIM_LEAD_CELLS)
+	return (lean3 + aim).limit_length(most)
 
 
 ## The bow's aim while drawn: the arc round [param origin] (the archer's
@@ -4200,7 +4246,7 @@ func aim_arc(origin: Vector2, angle: float, radius: float, alpha: float, pips: i
 	if not _aim_arc.visible:
 		_aim_cone_shown = -1.0
 		return
-	_aim_cone_shown = eased_spread(_aim_cone_shown, spread, get_process_delta_time()) if cone else -1.0
+	_aim_cone_shown = eased_spread(_aim_cone_shown, spread, get_process_delta_time(), aim_cone_ease_ticks) if cone else -1.0
 	var span := _aim_cone_shown if cone else PI * 0.5
 	var lift := edge_lift()
 	var moved := absf(radius - _aim_arc_radius) > 0.01 or absf(angle - _aim_arc_angle) > 0.002 or absf(span - _aim_arc_span) > 0.0005 \
@@ -4255,10 +4301,10 @@ func edge_lift() -> float:
 ## The drawn half-angle this frame: [param target] at once from none
 ## ([param shown] below 0), else [param shown] eased toward it over
 ## AIM_CONE_EASE_TICKS of the sim's ticks ([param delta] seconds this frame).
-static func eased_spread(shown: float, target: float, delta: float) -> float:
+static func eased_spread(shown: float, target: float, delta: float, ticks := AIM_CONE_EASE_TICKS) -> float:
 	if shown < 0.0 or target < 0.0:
 		return target
-	return shown + (target - shown) * clampf(delta / (World.TICK_DT * AIM_CONE_EASE_TICKS), 0.0, 1.0)
+	return shown + (target - shown) * clampf(delta / (World.TICK_DT * ticks), 0.0, 1.0)
 
 
 ## The cone's far end: AIM_SEGMENTS + 1 grid points at [param radius] from
@@ -12867,7 +12913,7 @@ func _ease_reach(puppet: Node3D, within: bool, made: bool, now: int) -> void:
 		puppet.visible = true
 	if not puppet.has_meta("reach_at"):
 		return
-	var share := clampf((now - int(puppet.get_meta("reach_at"))) / (REACH_EASE * 1000.0), 0.0, 1.0)
+	var share := clampf((now - int(puppet.get_meta("reach_at"))) / (reach_ease * 1000.0), 0.0, 1.0)
 	if share >= 1.0:
 		puppet.remove_meta("reach_at")
 		_set_transparency(puppet, 0.0 if within else 1.0)
@@ -13329,7 +13375,7 @@ func _fall(puppet: Node3D, data: Dictionary) -> void:
 		var material := body.material_override as StandardMaterial3D
 		var glow := material.emission
 		material.emission = FLASH
-		create_tween().tween_property(material, "emission", glow, FLASH_SECONDS)
+		create_tween().tween_property(material, "emission", glow, flash_seconds)
 	var line := str(data.get("say", ""))
 	if not line.is_empty() and bubbles != null:
 		puppet.set_meta("bubble_height", 1.0)
@@ -13551,12 +13597,12 @@ func _update_mourning(delta: float) -> void:
 	if _mourning and _local_player() != null and _puppets.has(_local_player().get_instance_id()):
 		_mourning = false
 	var target := 1.0 if _mourning else 0.0
-	var seconds := MOURN_SECONDS if _mourning else MOURN_RETURN_SECONDS
+	var seconds := mourn_seconds if _mourning else mourn_return_seconds
 	var before := _mourn
 	_mourn = move_toward(_mourn, target, delta / seconds)
 	var downed := _local_player() != null and World.is_downed(_local_player())
 	var down_before := _down
-	_down = move_toward(_down, 1.0 if downed else 0.0, delta / (MOURN_SECONDS if downed else MOURN_RETURN_SECONDS))
+	_down = move_toward(_down, 1.0 if downed else 0.0, delta / (mourn_seconds if downed else mourn_return_seconds))
 	if is_equal_approx(before, _mourn) and _mourn == 0.0 and is_equal_approx(down_before, _down) and _down == 0.0:
 		return
 	_environment.adjustment_saturation = lerpf(1.0, MOURN_SATURATION, smoothstep(0.0, 1.0, maxf(_mourn, _down)))

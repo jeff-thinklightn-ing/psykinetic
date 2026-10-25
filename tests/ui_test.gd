@@ -15,6 +15,7 @@ var _main: Node
 func _ready() -> void:
 	World.set_process(false)
 	Net.port = preload("res://tests/test_ports.gd").of(17840)  # Its own, beside the other tests'.
+	Client3D.feel_path = ""  # 673 step 2: the defaults, whatever the tuned file holds.
 	_test_menu()
 	_test_connect_screen()
 	_test_game_menu()
@@ -1035,6 +1036,18 @@ func _test_tuning_panel() -> void:
 	_check(panel.load_save(TuningPanel.saves()[0]) == 1 and is_equal_approx(World.swing_base, was + 2.0) and panel.marked("combat.swing_base"),
 			"load: the save's change back and marked")
 	panel.reset_all()
+	# 673 step 2: the view's feel among the camera fields, ui's, set live.
+	Tuning.register_source("camera", _main._camera_value, _main._set_camera_value, Main.camera_fields)  # As Main does in a host.
+	var camera_rows := Tuning.fields().filter(func(row: Dictionary) -> bool: return str(row["path"]).begins_with("camera."))
+	var no_view := _main._client3d == null  # Without the 3D view a camera field has no value, so no kind.
+	_check(camera_rows.any(func(row: Dictionary) -> bool: return row["path"] == "camera.inside_pitch" and row["owner"] == "ui" and (no_view or row["kind"] == "float"))
+			and camera_rows.any(func(row: Dictionary) -> bool: return row["path"] == "camera.draw_pull_rate" and row["owner"] == "combat")
+			and camera_rows.any(func(row: Dictionary) -> bool: return row["path"] == "camera.telegraph_flash_msec" and (no_view or row["kind"] == "int"))
+			and camera_rows.size() == Main.CAMERA_FIELDS.size(), "the camera's feel in the panel, ui's (%d rows)" % camera_rows.size())
+	if _main._client3d != null:
+		_check(panel.set_value("camera.inside_pitch", 80.0) and is_equal_approx(_main._client3d.inside_pitch, 80.0), "a camera field set live (%s)" % _main._client3d.inside_pitch)
+		panel.reset_all()
+		_check(is_equal_approx(_main._client3d.inside_pitch, Client3D.INSIDE_PITCH), "and back")
 	panel.pick("dummy")
 	_check(panel.picking == "dummy", "the arena's dummy waits for a cell")
 	_main.escape()

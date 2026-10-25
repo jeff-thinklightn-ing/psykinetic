@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The camera's feel (zoom speed, the peek and mourning pull-backs, the overhead and indoor pitches and their eases, the aim lead, the telegraph and hit flashes) is now read from art/kit/feel.json and listed in the F7 tuning panel's Camera group, so it can be tuned live in the practice hall (673).
 - The tuning panel (F7, practice and local host) has an Animation group: blend times, how fast swings, steps, rolls and falls play, and the gait rate, each applied as you move it (the two blends take on bodies made after).
 - The barrow's skeleton archers draw their bows fully before loosing: their arrows hit harder but come a little later.
 - The barrow's Hall is barred while the Ossuary's dead stand: clear every skeleton and grave guard (dead or laid to rest) and the way opens; if they rise again it shuts again, never on anyone already inside.

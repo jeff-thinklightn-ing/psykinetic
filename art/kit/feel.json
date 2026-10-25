@@ -15,5 +15,25 @@
 		"creature_view.speed_max": 1.8,
 		"creature_view.charge_speed": 1.4,
 		"creature_view.blend": 0.2
+	},
+	"camera": {
+		"about": "ui's camera feel (673 step 2): Client3D's eases and pulls, read at setup; the tuning panel's \"camera\" fields.",
+		"zoom_rate": 14.0,
+		"peek_pull_back": 1.2,
+		"peek_return_seconds": 0.25,
+		"mourn_pull_back": 1.4,
+		"mourn_seconds": 3.0,
+		"mourn_return_seconds": 0.5,
+		"reach_ease": 0.5,
+		"aim_lead_cells": 4.0,
+		"aim_cone_ease_ticks": 1.0,
+		"telegraph_flash": 0.95,
+		"telegraph_flash_msec": 300,
+		"flash_seconds": 0.15,
+		"overhead_pitch": 82.0,
+		"pitch_ease_seconds": 0.3,
+		"inside_pitch": 88.0,
+		"inside_ease_seconds": 0.35,
+		"inside_leave_hold": 0.5
 	}
 }
