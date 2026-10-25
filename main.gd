@@ -1396,9 +1396,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			tuning_panel.place(cell)  # 673, ui's side: the arena's spawn at the cell clicked.
 		get_viewport().set_input_as_handled()
 		return
-	if click.button_index == MOUSE_BUTTON_LEFT and click.pressed and _bubble_clicked():
-		get_viewport().set_input_as_handled()  # 560, ui's side: the greeting's bubble opens the talk bar.
-		return
+	if click.button_index == MOUSE_BUTTON_LEFT and click.pressed and _bar != null and _bar.visible:
+		_close_bar()  # Any click closes the talk bar and goes on: a bubble takes none (560 amended).
 	if click.button_index in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN] and minimap != null and minimap.big:
 		# The big map open: the wheel zooms it instead.
 		if click.pressed:
@@ -1582,11 +1581,14 @@ func _open_talk(friend: GridEntity) -> void:
 	_talk_wanted = null
 	if friend is Resident:
 		_greet(friend)  # 560, ui's side: the click greets; the bar's Talk opens the say line.
+		_open_bar(friend)
 	elif talks_peaceably(friend):
 		_greet(friend)  # 629, ui's side: the greet speaks his deal; his "offers" message opens the deal window.
-	# A player or a companion (Jeff on v0.1.165: "click player still pulls up the
-	# chat window with their name"): the walk to them is the click's whole work;
-	# no window. Their bubble, clicked, opens the bar with Talk (_bubble_clicked).
+	elif is_friend(friend) and friend != _local_player():
+		# A player or a companion (Jeff on v0.1.165: "click player still pulls up the
+		# chat window with their name"): no window, only the talk bar under them,
+		# Talk (560 amended: the bubbles take no clicks, so the person's click opens it).
+		_open_bar(friend)
 
 
 ## The resident nearest [param player] in this zone, or null (560's shots).
@@ -1627,8 +1629,8 @@ func _greet_sample(player: Player, tried: int) -> void:
 ## A click on [param resident] in reach (560, ui's side; Jeff: "the npc
 ## stops, faces you, and addresses you"): npc's "greet" command, sent by
 ## name (the resident stops, turns and speaks one line through the spoken
-## path; npc's rules and cooldown); their bubble then opens the talk bar
-## (_bubble_clicked). The standing-offer read (536) is asked as before.
+## path; npc's rules and cooldown); _open_talk opens the talk bar under
+## them. The standing-offer read (536) is asked as before.
 func _greet(resident: GridEntity) -> void:
 	var player := _local_player()
 	if player == null or not is_instance_valid(resident):
@@ -1638,28 +1640,9 @@ func _greet(resident: GridEntity) -> void:
 	ask_offers(resident)
 
 
-## A left click over the greeted resident's bubble opens the talk bar under
-## it (true: the click is taken); any other click closes an open bar.
-func _bubble_clicked() -> bool:
-	if _bar != null and _bar.visible:
-		_close_bar()
-	if bubbles == null:
-		return false
-	var key := bubbles.key_under_mouse()
-	if key == 0:
-		return false
-	# Any friend's bubble (560 as Jeff asked on v0.1.165): a townsperson's, a
-	# companion's or another player's; Talk for all, Barter for a merchant or maker.
-	var who := instance_from_id(key) as GridEntity
-	if who == null or not is_instance_valid(who) or not who.spawned or who == _local_player() or not is_friend(who):
-		return false
-	_open_bar(who)
-	return true
-
-
 ## The talk bar (560, ui's side): the resident's name and two options,
 ## Talk (536's say line addressed to them) and Barter (the window, a
-## merchant's), under their bubble while it stands.
+## merchant's), under their bubble, else under them, while in hearing.
 func _open_bar(resident: GridEntity) -> void:
 	if _bar == null:
 		return
@@ -1677,17 +1660,25 @@ func _close_bar() -> void:
 	_bar_for = null
 
 
-## Each frame: the bar follows its resident's bubble, and goes with it.
+## Each frame: the bar follows its person's bubble, or with none the point
+## a bubble would hang from; it goes when they are off screen or out of hearing.
 func _update_bar() -> void:
 	if _bar == null or not _bar.visible:
 		return
 	if not is_instance_valid(_bar_for) or bubbles == null:
 		_close_bar()
 		return
-	var rect := bubbles.rect_of(_bar_for.get_instance_id())
-	if rect.size.y <= 0.0:
+	var player := _local_player()
+	if player != null and World.distance(player.tile, _bar_for.tile) > HEARING_RANGE:
 		_close_bar()
 		return
+	var rect := bubbles.rect_of(_bar_for.get_instance_id())
+	if rect.size.y <= 0.0:
+		var at: Variant = _bubble_anchor(_bar_for.get_instance_id())
+		if not at is Vector2:
+			_close_bar()
+			return
+		rect = Rect2(at, Vector2.ZERO)
 	_bar.reset_size()
 	_bar.global_position = Vector2(rect.position.x + rect.size.x * 0.5 - _bar.size.x * 0.5, rect.end.y + 8.0)
 

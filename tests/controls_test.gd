@@ -43,6 +43,7 @@ func _ready() -> void:
 	_test_bow_click_walks()
 	_test_friend_click()
 	_test_peaceable_click()
+	_test_bubble_click_goes_through()
 	_test_stand_and_signature()
 	_test_cursor_bandage()
 	_test_telegraph_message()
@@ -770,6 +771,16 @@ func _test_friend_click() -> void:
 	World.step()
 	_check(body.hp == hp and player.tile == Vector2i(11, 3), "out of reach: nothing struck, not a step taken")
 	_place_player(Vector2i(10, 5))
+	if not body.is_inside_tree():
+		_main.add_child(body)  # On screen, for the bar to stand under (the 2D view's anchor).
+	_main._pick_grid = Vector2(9.1, 6.1)
+	_left(false)
+	_check(_main._bar.visible and _main._bar_for == body, "beside them, a plain click opens the talk bar under them (560 amended)")
+	_main._pick_grid = Vector2(11.1, 3.1)
+	_left(false)
+	_check(not _main._bar.visible, "and a click elsewhere closes it")
+	_place_player(Vector2i(10, 5))
+	_main._pick_grid = Vector2(9.1, 6.1)
 	_left(true)
 	_wait_free(player)
 	World.step()
@@ -777,7 +788,50 @@ func _test_friend_click() -> void:
 	_check(body.hp < hp, "beside them, Shift+click strikes the friend that way (%d -> %d)" % [hp, body.hp])
 	player.action_order = GridEntity.Order.NONE
 	World.despawn(body)
+	body.queue_free()
 	Net.controls = saved
+
+## A speech bubble takes no clicks (560 amended; Jeff, through the
+## coordinator): a click over one goes to what is under it, the ground
+## walked to, a monster at war attacked.
+func _test_bubble_click_goes_through() -> void:
+	print("\n== a click over a speech bubble walks or attacks what is beneath (560 amended) ==")
+	var saved: String = Net.controls
+	Net.controls = "click"
+	var player := _place_player(Vector2i(11, 3))
+	var bubbles: SpeechBubbles = _main.bubbles
+	var anchor_was: Callable = bubbles.anchor_of
+	var speaker := Resident.new()
+	speaker.name = "Wynn"
+	_check(World.spawn(speaker, Vector2i(12, 4)), "(a resident speaks at 12,4)")
+	var key := speaker.get_instance_id()
+	bubbles.anchor_of = func(k: int) -> Variant: return bubbles.get_local_mouse_position() + Vector2(0.0, 12.0) if k == key else null
+	bubbles.show_line(key, "Fine weather for it.")
+	bubbles._layout()
+	_check(bubbles.key_under_mouse() == key and bubbles.mouse_filter == Control.MOUSE_FILTER_IGNORE,
+			"(the bubble is under the mouse, and takes no mouse)")
+	_main._pick_grid = Vector2(9.2, 6.1)
+	_left(false)
+	_check(player.has_move_order and player.move_order == Vector2i(9, 6) and not _main._bar.visible and _main._talk_wanted == null,
+			"the ground under the bubble: walked to, no talk bar (%s)" % player.move_order)
+	player.has_move_order = false
+	var occupant := World.get_entity_at(Vector2i(9, 6))
+	if occupant != null:
+		World.despawn(occupant)
+	var foe := EntityFactory.build({"script": "res://sim/monster.gd", "shape": "capsule", "name": "Foe", "tile": Vector2i(9, 6)}) as Monster
+	foe.sight_range = 0
+	_main.add_child(foe)
+	_check(World.spawn(foe, Vector2i(9, 6)), "(a monster stands under the bubble at 9,6)")
+	_left(false)
+	_check(player.action_order == GridEntity.Order.ATTACK and not _main._bar.visible, "a monster under it: attacked")
+	player.action_order = GridEntity.Order.NONE
+	player.has_move_order = false
+	World.despawn(foe)
+	foe.queue_free()
+	World.despawn(speaker)
+	bubbles.anchor_of = anchor_was
+	Net.controls = saved
+
 
 ## A plain left click on a talking monster at peace talks, as on a friend
 ## (decision 648; Jeff: "earlier i struck the draugr because left clicking

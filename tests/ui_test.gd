@@ -1761,8 +1761,7 @@ func _test_barter() -> void:
 	panel.close()
 	_check(panel.care_shown() == "", "closed: no care row")
 	_main._update_bar()
-	_check(not _main._bar.visible, "no bubble to sit under: the bar goes")
-	_check(not _main._bubble_clicked(), "a click with no bubble under the mouse opens nothing")
+	_check(not _main._bar.visible, "no bubble and nobody on screen to sit under: the bar goes")
 	# Jeff on v0.1.165: a click on a player opened the chat window with their name. Now nothing opens.
 	var own_body: GridEntity = _main._local_player()
 	if own_body != null and _main._chat_box != null:

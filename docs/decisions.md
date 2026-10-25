@@ -30225,3 +30225,33 @@ freely." The coordinator approved ui's design.
   middle drag pans; the wheel's 0.5 floor; saved yaw and zoom loads.
 
 Client only, protocol unchanged, no new class_name.
+
+## 560 amended. Speech bubbles take no clicks
+
+Jeff, through the coordinator: speech bubbles (companions, townsfolk,
+anyone) take no clicks; the click goes to whatever is under it (ground,
+monster, body) as if the bubble were not there; no hover cursor or hint.
+
+- **Before:** a left press over a friend's bubble opened the talk bar
+  (Talk; Barter for a maker or the merchant) and was taken
+  (Main._bubble_clicked). That was the only way to open the bar: for a
+  townsperson after the click's greet, for a companion and for another
+  player.
+- **Now:** Main._bubble_clicked is gone. A left press closes an open bar
+  and goes on to the click's own work. Talking to the person opens the bar
+  instead (Main._open_talk, by a click or E in reach): a townsperson is
+  greeted (npc's "greet") and the bar opens under them; a companion or
+  another player gets the bar alone (still no chat window, Jeff on
+  v0.1.165); a peaceable talker keeps its deal window (629). The chat key
+  still talks to anyone by name.
+- **The bar's place:** under the person's bubble while one stands, else
+  under the point a bubble would hang from (Main._bubble_anchor); it goes
+  when they are off screen or past HEARING_RANGE.
+- The bubbles were already MOUSE_FILTER_IGNORE and had no cursor or hint;
+  SpeechBubbles.key_under_mouse stays for tests.
+- **Tests:** controls_test _test_bubble_click_goes_through: a bubble over
+  the cursor, the click walks to the ground under it, then attacks a
+  monster there, no bar; _test_friend_click: a click on a townsperson in
+  reach opens the bar, a click elsewhere closes it.
+
+Client only, protocol unchanged, no new class_name.
