@@ -1976,23 +1976,21 @@ func _end_middle_drag() -> void:
 	_drag = Drag.UNDECIDED
 
 
-## Click scheme, 3D: the walk's forward/back keys tilt (forward up toward
-## top-down, back toward level) and left/right turn the camera while held
-## (W/S and A/D by default, the Options' bindings); letting go springs the
-## tilt back and settles the turn on a diamond (saved). The keys do nothing
-## else in this scheme (and nothing at all in 2D).
+## Click scheme, 3D: the walk's forward key puts the camera overhead and
+## back puts it to the normal pitch, to stay (671, Client3D.set_overhead;
+## saved), and left/right turn it while held (W/S and A/D by default, the
+## Options' bindings); letting go settles the turn on one of the eight
+## views (saved). The keys do nothing else in this scheme (and nothing at
+## all in 2D).
 func _drive_camera_keys(delta: float) -> void:
 	if _client3d == null or Net.controls != "click":
 		return
 	var keys := _held_key_names()
 	var tilt := float("w" in keys) - float("s" in keys)
 	var turn := float("d" in keys) - float("a" in keys)
-	if tilt != 0.0:
-		_client3d.tilt(tilt, delta)
-		_tilting = true
-	elif _tilting:
-		_tilting = false
-		_client3d.end_tilt()
+	if tilt != 0.0 and not _tilting:
+		_client3d.set_overhead(tilt > 0.0)  # 671: on the press, to stay.
+	_tilting = tilt != 0.0
 	if turn != 0.0:
 		_client3d.turn(turn, delta)
 		_turning = true
@@ -12591,7 +12589,7 @@ func hint_lines() -> Array[String]:
 		lines.append_array(["LMB\tmove / attack (hold to steer); a friend: talk", "%s+LMB\tswing where you stand (a bow: draw)" % Keys.name_of("stand"),
 			"RMB\toff hand; empty: shove (drag to toss)"])
 		if _client3d != null:
-			lines.append_array(["%s / %s\ttilt" % [Keys.name_of("forward"), Keys.name_of("back")],
+			lines.append_array(["%s / %s\toverhead / normal view" % [Keys.name_of("forward"), Keys.name_of("back")],
 				"%s / %s\tturn" % [Keys.name_of("left"), Keys.name_of("right")], "MMB drag\tpan (springs back)", "Wheel\tzoom"])
 	for i in Net.phrases.size():
 		lines.append("%s\t%s" % [Keys.name_of("phrase_%d" % (i + 1)), Net.phrases[i]])

@@ -33,7 +33,7 @@ func _ready() -> void:
 	_test_screen_lean()
 	_test_drag_and_freeze()
 	_test_diamonds()
-	_test_tilt_keys()
+	_test_overhead_keys()
 	_test_wheel_zoom()
 	_test_pitch_peek()
 	_test_middle_drag_axis()
@@ -217,7 +217,7 @@ func _test_screen_lean() -> void:
 
 
 func _test_drag_and_freeze() -> void:
-	print("\n== WASD: a middle drag turns freely and locks on the next diamond, never under a held key ==")
+	print("\n== WASD: a middle drag turns freely and locks on the next of the eight views (671), never under a held key ==")
 	var saved: String = Net.controls
 	Net.controls = "wasd"
 	var rig := _rig()
@@ -227,24 +227,24 @@ func _test_drag_and_freeze() -> void:
 	_check(is_equal_approx(rig.yaw, 20.0), "the drag turns it at once (%s)" % rig.yaw)
 	rig.end_drag()
 	_ease(rig)
-	_check(is_equal_approx(rig.yaw, 90.0) and is_equal_approx(Net.camera_yaw, 90.0),
-			"let go 20 round: on to the next diamond that way, and saved (%s)" % rig.yaw)
+	_check(is_equal_approx(rig.yaw, 45.0) and is_equal_approx(Net.camera_yaw, 45.0),
+			"let go 20 round: on to the next view that way, the square-on 45, and saved (%s)" % rig.yaw)
 	rig.begin_drag()
 	rig.drag(5.0)
 	rig.end_drag()
 	_ease(rig)
-	_check(is_equal_approx(rig.yaw, 90.0), "let go 5 round, under 10: back where it set off (%s)" % rig.yaw)
+	_check(is_equal_approx(rig.yaw, 45.0), "let go 5 round, under 10: back where it set off (%s)" % rig.yaw)
 	rig.begin_drag()
 	rig.drag(-100.0)
 	rig.end_drag()
 	_ease(rig)
-	_check(is_equal_approx(rig.yaw, -90.0), "100 the other way, past 0: on to -90 (%s)" % rig.yaw)
+	_check(is_equal_approx(rig.yaw, -90.0), "100 the other way, past 0 (to -55): on to -90 (%s)" % rig.yaw)
 	rig.begin_drag()
 	rig.drag(300.0)
 	rig.end_drag()
 	_ease(rig)
-	_check(is_equal_approx(rig.yaw, 270.0) and is_equal_approx(Net.camera_yaw, 270.0),
-			"300 round: as far as it goes, then the next diamond (%s)" % rig.yaw)
+	_check(is_equal_approx(rig.yaw, 225.0) and is_equal_approx(Net.camera_yaw, 225.0),
+			"300 round (to 210): as far as it goes, then the next view (%s)" % rig.yaw)
 	var start := rig.yaw
 	rig.set_frozen(true)
 	rig.begin_drag()
@@ -256,7 +256,7 @@ func _test_drag_and_freeze() -> void:
 	_check(is_equal_approx(rig.yaw, start), "nor does letting the button go (%s)" % rig.yaw)
 	rig.set_frozen(false)
 	_ease(rig)
-	_check(is_equal_approx(rig.yaw, start + 180.0), "the keys let go: it settles past where the drag was let go (%s)" % rig.yaw)
+	_check(is_equal_approx(rig.yaw, start + 135.0), "the keys let go: it settles past where the drag was let go (%s)" % rig.yaw)
 	start = rig.yaw
 	rig.begin_drag()
 	rig.set_frozen(true)
@@ -266,7 +266,7 @@ func _test_drag_and_freeze() -> void:
 	_check(is_equal_approx(rig.yaw, start + 40.0), "a drag held through a run applies when the keys are let go (%s)" % rig.yaw)
 	rig.end_drag()
 	_ease(rig)
-	_check(is_equal_approx(rig.yaw, start + 90.0), "and locks on the next diamond (%s)" % rig.yaw)
+	_check(is_equal_approx(rig.yaw, start + 45.0), "and locks on the next view (%s)" % rig.yaw)
 	rig.set_frozen(true)
 	rig._settle_on(rig._yaw_step + 90.0)
 	var held := rig.yaw
@@ -279,7 +279,7 @@ func _test_drag_and_freeze() -> void:
 
 
 func _test_diamonds() -> void:
-	print("\n== click: A/D turn freely, all the way round, and lock on the next diamond ==")
+	print("\n== click: A/D turn freely, all the way round, and lock on the next of the eight views (671) ==")
 	var saved: String = Net.controls
 	Net.controls = "click"
 	var rig := _rig()
@@ -289,7 +289,7 @@ func _test_diamonds() -> void:
 	_check(is_equal_approx(rig.yaw, 10.8), "D held 60 ms: 10.8 degrees at 180 a second (%s)" % rig.yaw)
 	var held := rig.yaw
 	rig.end_turn()
-	_check(is_equal_approx(rig._ease_to, 90.0), "let go 10.8 round: on to the next diamond (%s)" % rig._ease_to)
+	_check(is_equal_approx(rig._ease_to, 45.0), "let go 10.8 round: on to the next view, square-on at 45 (%s)" % rig._ease_to)
 	rig._ease_yaw(0.01)
 	_check(absf(rig.yaw - held - 1.8) < 0.1,
 			"the first frame after letting go still moves at the turning speed (%.2f degrees in 10 ms)" % (rig.yaw - held))
@@ -300,37 +300,37 @@ func _test_diamonds() -> void:
 		if rig.yaw < last - 0.0001:
 			steady = false
 		last = rig.yaw
-	_check(steady and is_equal_approx(rig.yaw, 90.0), "and slows onto it without stopping first (%s)" % rig.yaw)
-	_check(is_equal_approx(Net.camera_yaw, 90.0), "saved as that diamond (%s)" % Net.camera_yaw)
+	_check(steady and is_equal_approx(rig.yaw, 45.0), "and slows onto it without stopping first (%s)" % rig.yaw)
+	_check(is_equal_approx(Net.camera_yaw, 45.0), "saved as that view (%s)" % Net.camera_yaw)
 	for i in 250:
 		rig.turn(1.0, 0.01)
-	_check(is_equal_approx(rig.yaw, 540.0), "D held 2.5 s: 450 degrees round, no limit (%s)" % rig.yaw)
+	_check(is_equal_approx(rig.yaw, 495.0), "D held 2.5 s: 450 degrees round, no limit (%s)" % rig.yaw)
 	rig.end_turn()
 	_ease(rig)
-	_check(is_equal_approx(rig.yaw, 540.0) and is_equal_approx(Net.camera_yaw, 180.0),
-			"let go on a diamond: it stays, saved as %s" % Net.camera_yaw)
+	_check(is_equal_approx(rig.yaw, 495.0) and is_equal_approx(Net.camera_yaw, 135.0),
+			"let go on a view: it stays, saved as %s" % Net.camera_yaw)
 	for i in 5:
 		rig.turn(-1.0, 0.01)
 	rig.end_turn()
-	_check(is_equal_approx(rig._ease_to, 540.0), "A held 50 ms (9 degrees, under 10): back where it set off")
+	_check(is_equal_approx(rig._ease_to, 495.0), "A held 50 ms (9 degrees, under 10): back where it set off")
 	var furthest := rig.yaw
 	for i in 100:
 		rig._ease_yaw(0.01)
 		furthest = minf(furthest, rig.yaw)
-	_check(furthest < 531.0 and is_equal_approx(rig.yaw, 540.0),
-			"running on a little the way it went, then back (%.1f at most, ends %s)" % [furthest - 540.0, rig.yaw])
+	_check(furthest < 486.0 and is_equal_approx(rig.yaw, 495.0),
+			"running on a little the way it went, then back (%.1f at most, ends %s)" % [furthest - 495.0, rig.yaw])
 	for i in 30:
 		rig.turn(-1.0, 0.01)
 	rig.end_turn()
 	_ease(rig)
-	_check(is_equal_approx(rig.yaw, 450.0), "A held 300 ms (54 degrees): on to the next diamond that way (%s)" % rig.yaw)
-	_check(is_equal_approx(Client3D.settle_target(0.0, 5.0, 1.0), 0.0) and is_equal_approx(Client3D.settle_target(0.0, 12.0, 1.0), 90.0)
-			and is_equal_approx(Client3D.settle_target(0.0, 95.0, 1.0), 180.0) and is_equal_approx(Client3D.settle_target(90.0, 95.0, 1.0), 90.0) and is_equal_approx(Client3D.settle_target(0.0, -12.0, -1.0), -90.0)
+	_check(is_equal_approx(rig.yaw, 405.0), "A held 300 ms (54 degrees, to 441): on to the next view that way (%s)" % rig.yaw)
+	_check(is_equal_approx(Client3D.settle_target(0.0, 5.0, 1.0), 0.0) and is_equal_approx(Client3D.settle_target(0.0, 12.0, 1.0), 45.0)
+			and is_equal_approx(Client3D.settle_target(0.0, 95.0, 1.0), 135.0) and is_equal_approx(Client3D.settle_target(90.0, 95.0, 1.0), 90.0) and is_equal_approx(Client3D.settle_target(0.0, -12.0, -1.0), -45.0)
 			and is_equal_approx(Client3D.settle_target(0.0, 180.0, 1.0), 180.0),
-			"settle: under 10 back, else the next diamond ahead (0 to 95 goes on to 180; 90 to 95 is back), or the one it is on")
+			"settle: under 10 back, else the next view ahead (0 to 95 goes on to 135; 90 to 95 is back), or the one it is on")
 	_check(is_equal_approx(Net.saved_yaw("180", -1.0), 180.0) and is_equal_approx(Net.saved_yaw("-90", -1.0), 270.0)
-			and is_equal_approx(Net.saved_yaw("45", -1.0), 90.0) and is_equal_approx(Net.saved_yaw("", 90.0), 90.0),
-			"a saved diamond loads as it is (0..360); an old axis yaw rounds up; none keeps what it had")
+			and is_equal_approx(Net.saved_yaw("45", -1.0), 45.0) and is_equal_approx(Net.saved_yaw("100", -1.0), 90.0) and is_equal_approx(Net.saved_yaw("", 90.0), 90.0),
+			"a saved view loads as it is (0..360), a square-on one too; one between goes to the nearest; none keeps what it had")
 	Net.controls = saved
 	_free_rig(rig)
 
@@ -397,46 +397,45 @@ func _wheel(button: MouseButton) -> InputEventMouseButton:
 	return wheel
 
 
-func _test_tilt_keys() -> void:
-	print("\n== click: W/S tilt while held and spring back to 50 when let go ==")
+func _test_overhead_keys() -> void:
+	print("\n== click: W eases overhead and stays, S back to normal (671) ==")
 	var rig := _rig()
 	var yaw := rig.yaw
-	_check(is_equal_approx(rig.pitch, Client3D.CAMERA_PITCH), "it starts at 50 (%s)" % rig.pitch)
-	rig.tilt(1.0, 0.1)
-	_check(is_equal_approx(rig.pitch, Client3D.CAMERA_PITCH + 6.0), "W for 100 ms: 6 degrees up, 60 a second (%s)" % rig.pitch)
-	var last := rig.pitch
-	var slowest := INF
-	var fastest := 0.0
-	for i in 40:
-		rig.tilt(1.0, 0.05)
-		var moved := rig.pitch - last
-		if moved > 0.0:
-			slowest = minf(slowest, moved)
-			fastest = maxf(fastest, moved)
-		last = rig.pitch
-	_check(is_equal_approx(rig.pitch, Client3D.PITCH_MAX), "held on: it stops at the top, %s" % rig.pitch)
-	_check(slowest < fastest * 0.5, "slowing into the end (fastest %.2f, slowest %.2f a frame)" % [fastest, slowest])
-	_check(is_equal_approx(rig._camera.size, Client3D.CAMERA_SIZE), "the size never changes (%s)" % rig._camera.size)
-	rig.end_tilt()
-	rig._ease_tilt(Client3D.TILT_RETURN_SECONDS * 0.5)
-	_check(rig.pitch < Client3D.PITCH_MAX and rig.pitch > Client3D.CAMERA_PITCH, "let go: springing back (%s)" % rig.pitch)
-	rig._ease_tilt(Client3D.TILT_RETURN_SECONDS * 0.5)
-	_check(is_equal_approx(rig.pitch, Client3D.CAMERA_PITCH), "back at 50 at %d ms (%s)" % [
-			roundi(Client3D.TILT_RETURN_SECONDS * 1000.0), rig.pitch])
-	for i in 60:
-		rig.tilt(-1.0, 0.05)
-	_check(is_equal_approx(rig.pitch, Client3D.PITCH_MIN), "S: down to %s" % rig.pitch)
-	rig.end_tilt()
-	_ease(rig)
-	for i in 10:
+	var was: bool = Net.camera_overhead
+	_check(is_equal_approx(rig.pitch, Client3D.CAMERA_PITCH) and not rig.overhead, "it starts at 50, not overhead (%s)" % rig.pitch)
+	rig.set_overhead(true)
+	rig._ease_tilt(Client3D.PITCH_EASE_SECONDS * 0.1)
+	var early := rig.pitch - Client3D.CAMERA_PITCH
+	rig._ease_tilt(Client3D.PITCH_EASE_SECONDS * 0.4)
+	var half := rig.pitch
+	_check(early > 0.0 and early < (Client3D.OVERHEAD_PITCH - Client3D.CAMERA_PITCH) * 0.1 and is_equal_approx(half, (Client3D.CAMERA_PITCH + Client3D.OVERHEAD_PITCH) * 0.5),
+			"W: easing up, gently at first (%.2f in a tenth), half way at half the time (%.1f)" % [early, half])
+	rig._ease_tilt(Client3D.PITCH_EASE_SECONDS * 0.5)
+	_check(is_equal_approx(rig.pitch, Client3D.OVERHEAD_PITCH) and rig.overhead and Net.camera_overhead,
+			"overhead at %s after %d ms, saved" % [rig.pitch, roundi(Client3D.PITCH_EASE_SECONDS * 1000.0)])
+	for i in 20:
 		rig._ease_tilt(0.05)
-	_check(is_equal_approx(rig.pitch, Client3D.CAMERA_PITCH), "and back up to 50 when let go (%s)" % rig.pitch)
+	_check(is_equal_approx(rig.pitch, Client3D.OVERHEAD_PITCH), "and it stays there with no key held (%s)" % rig.pitch)
+	_check(is_equal_approx(rig._camera.size, Client3D.CAMERA_SIZE), "the size never changes (%s)" % rig._camera.size)
+	rig.set_overhead(false)
+	rig._ease_tilt(Client3D.PITCH_EASE_SECONDS * 0.5)
+	var going := rig.pitch
+	rig.set_overhead(true)
+	_check(is_equal_approx(rig.pitch, going), "S, then W half way back: it turns round from where it is, no snap (%.1f)" % rig.pitch)
+	rig._ease_tilt(Client3D.PITCH_EASE_SECONDS)
+	_check(is_equal_approx(rig.pitch, Client3D.OVERHEAD_PITCH), "and goes on up (%s)" % rig.pitch)
+	rig.set_overhead(false)
+	rig._ease_tilt(Client3D.PITCH_EASE_SECONDS)
+	_check(is_equal_approx(rig.pitch, Client3D.CAMERA_PITCH) and not rig.overhead and not Net.camera_overhead, "S: back at 50 to stay, saved (%s)" % rig.pitch)
+	rig.set_overhead(false)
+	_check(rig._tilt_t >= 1.0, "S at rest: nothing to ease")
 	_check(is_equal_approx(rig.yaw, yaw), "the yaw never moved (%s)" % rig.yaw)
+	Net.camera_overhead = was
 	_free_rig(rig)
 
 
 func _test_pitch_peek() -> void:
-	print("\n== a vertical middle drag tilts toward top-down and springs back ==")
+	print("\n== a vertical middle drag tilts toward the other pitch: springs back, or past a third commits (671) ==")
 	var rig := _rig()
 	_ease(rig)
 	var yaw := rig.yaw
@@ -447,26 +446,52 @@ func _test_pitch_peek() -> void:
 			"at rest: pitch %s, size %s" % [rig.pitch, rig._camera.size])
 	rig.begin_pitch_peek()
 	rig.pitch_peek(-Client3D.PEEK_DRAG_PX * 0.5)
-	_check(is_equal_approx(rig.pitch, (Client3D.CAMERA_PITCH + Client3D.PEEK_PITCH) * 0.5),
+	_check(is_equal_approx(rig.pitch, (Client3D.CAMERA_PITCH + Client3D.OVERHEAD_PITCH) * 0.5),
 			"half the drag: half way up, eased in and out (%s)" % rig.pitch)
 	var quarter := rig.pitch
 	rig.pitch_peek(-Client3D.PEEK_DRAG_PX * 0.25)
 	_check(rig.pitch < quarter and rig.pitch - Client3D.CAMERA_PITCH < (quarter - Client3D.CAMERA_PITCH) * 0.5,
 			"a quarter of it: less than half that, the ease starts gently (%s)" % rig.pitch)
-	rig.pitch_peek(Client3D.PEEK_DRAG_PX * 2.0)
-	_check(is_equal_approx(rig.pitch, Client3D.PEEK_PITCH)
+	rig.pitch_peek(Client3D.PEEK_DRAG_PX * 0.5)
+	_check(is_equal_approx(rig.pitch, Client3D.CAMERA_PITCH), "down the screen from the normal pitch: no tilt (%s)" % rig.pitch)
+	rig.pitch_peek(-Client3D.PEEK_DRAG_PX * 2.0)
+	_check(is_equal_approx(rig.pitch, Client3D.OVERHEAD_PITCH)
 			and is_equal_approx(rig._camera.size, Client3D.CAMERA_SIZE * Client3D.PEEK_PULL_BACK),
-			"past the full drag, either way: top-down at %s and pulled back to %s" % [rig.pitch, rig._camera.size])
+			"past the full drag up: overhead at %s and pulled back to %s" % [rig.pitch, rig._camera.size])
+	rig.pitch_peek(-Client3D.PEEK_DRAG_PX * Client3D.PEEK_COMMIT * 0.9)
 	_check(is_equal_approx(rig.yaw, yaw), "the yaw never moves (%s)" % rig.yaw)
 	rig._update_fade()
 	_check(rig._fade_key != fade_before, "at the full tilt, what fades is worked out again for that view")
 	rig.end_pitch_peek()
 	rig._ease_peek(Client3D.PEEK_RETURN_SECONDS * 0.5)
-	_check(rig.pitch > Client3D.CAMERA_PITCH and rig.pitch < Client3D.PEEK_PITCH, "let go: springing back (%s)" % rig.pitch)
+	_check(rig.pitch > Client3D.CAMERA_PITCH and rig.pitch < Client3D.OVERHEAD_PITCH and not rig.overhead,
+			"let go under a third of the drag: springing back (%s)" % rig.pitch)
 	rig._ease_peek(Client3D.PEEK_RETURN_SECONDS * 0.5)
 	_check(is_equal_approx(rig.pitch, Client3D.CAMERA_PITCH) and is_equal_approx(rig._camera.size, Client3D.CAMERA_SIZE),
 			"back at rest after %d ms (pitch %s, size %s)" % [roundi(Client3D.PEEK_RETURN_SECONDS * 1000.0), rig.pitch, rig._camera.size])
 	_check(is_equal_approx(rig.yaw, yaw) and is_equal_approx(Net.camera_yaw, saved), "yaw and saved yaw as they were")
+	var was: bool = Net.camera_overhead
+	rig.begin_pitch_peek()
+	rig.pitch_peek(-Client3D.PEEK_DRAG_PX * 0.5)
+	var at_let_go := rig.pitch
+	rig.end_pitch_peek()
+	_check(rig.overhead and Net.camera_overhead and is_equal_approx(rig.pitch, at_let_go), "let go past a third: overhead to stay, saved, from where it was (%.1f)" % rig.pitch)
+	for i in 10:
+		rig._ease_peek(0.05)
+		rig._ease_tilt(0.05)
+	_check(is_equal_approx(rig.pitch, Client3D.OVERHEAD_PITCH) and is_equal_approx(rig._camera.size, Client3D.CAMERA_SIZE),
+			"on up to %s, the pull back gone (size %s)" % [rig.pitch, rig._camera.size])
+	rig.begin_pitch_peek()
+	rig.pitch_peek(-Client3D.PEEK_DRAG_PX)
+	_check(is_equal_approx(rig.pitch, Client3D.OVERHEAD_PITCH), "overhead, up the screen: no tilt (%s)" % rig.pitch)
+	rig.pitch_peek(Client3D.PEEK_DRAG_PX * 0.5)
+	_check(is_equal_approx(rig.pitch, (Client3D.CAMERA_PITCH + Client3D.OVERHEAD_PITCH) * 0.5), "down the screen: half way back toward 50 (%s)" % rig.pitch)
+	rig.end_pitch_peek()
+	for i in 10:
+		rig._ease_peek(0.05)
+		rig._ease_tilt(0.05)
+	_check(is_equal_approx(rig.pitch, Client3D.CAMERA_PITCH) and not rig.overhead and not Net.camera_overhead, "let go: back to the normal pitch to stay (%s)" % rig.pitch)
+	Net.camera_overhead = was
 	_free_rig(rig)
 
 
@@ -568,9 +593,14 @@ func _test_schemes_are_inert_outside() -> void:
 	var pitch := rig.pitch
 	var yaw := rig.yaw
 	var size := rig._camera.size
+	var overhead_was: bool = Net.camera_overhead
 	_main._drive_camera_keys(0.1)
-	_check(rig.pitch > pitch and rig.yaw > yaw and is_equal_approx(rig._camera.size, size),
-			"click: W tilts up and D turns the camera; Q and E do nothing")
+	rig._ease_tilt(0.1)
+	_check(rig.overhead and rig.pitch > pitch and rig.yaw > yaw and is_equal_approx(rig._camera.size, size),
+			"click: W puts the view overhead (671) and D turns the camera; Q and E do nothing")
+	rig.set_overhead(false)
+	rig._ease_tilt(1.0)
+	Net.camera_overhead = overhead_was
 	Net.controls = "wasd"
 	pitch = rig.pitch
 	yaw = rig.yaw

@@ -556,7 +556,7 @@ var _settings_controls := ""
 ## is fullscreen. Applied at start, kept up to date, saved with the rest.
 var window_size := DEFAULT_WINDOW_SIZE
 var fullscreen := false
-## The 3D camera's diamond in degrees (a multiple of Client3D.ORBIT_STEP,
+## The 3D camera's resting view in degrees (a multiple of Client3D.ORBIT_STEP,
 ## 0..360), kept with the window settings; --test-yaw for a run.
 var camera_yaw := 0.0
 ## The 3D camera's wheel zoom, a factor on its default size, kept with the
@@ -564,6 +564,9 @@ var camera_yaw := 0.0
 var camera_zoom := 1.0
 ## The low-horizon camera trial (decision 623): settings.cfg camera=low.
 var camera_low := false
+## The 3D camera's overhead view (decision 671, W/S): settings.cfg
+## camera_overhead=on|off, off by default.
+var camera_overhead := false
 ## The HUD's list of controls shown (H toggles it); settings.cfg hints=on|off,
 ## off by default since the context hint (ui's step 3) says what the keys do.
 var hints := false
@@ -980,6 +983,7 @@ func _apply_access_settings() -> void:
 		if UiTheme.COLOUR_SETS.has(set):
 			colours = set
 		camera_low = str(settings.get("camera", "")).strip_edges() == "low"
+		camera_overhead = str(settings.get("camera_overhead", "")).strip_edges() == "on"
 		hinted_talk = str(settings.get("hinted_talk", "off")) == "on"
 		screenshot_dir = str(settings.get("screenshot_dir", "")).strip_edges()
 		hinted_shot = str(settings.get("hinted_shot", "off")) == "on"
@@ -1040,6 +1044,14 @@ func set_colours(value: String, save := true) -> void:
 		save_view_settings()
 
 
+## The overhead view (671) as W/S or a committed peek left it, written as
+## camera_overhead=on or off.
+func set_camera_overhead(value: bool) -> void:
+	camera_overhead = value
+	_settings_kept["camera_overhead"] = "on" if value else "off"
+	save_view_settings()
+
+
 ## The Options' Camera: the low-horizon trial (decision 623) on or off,
 ## applied to the 3D view at once (camera_low_changed) and written as
 ## camera=low or camera=high.
@@ -1053,9 +1065,9 @@ func set_camera_low(value: bool, save := true) -> void:
 		save_view_settings()
 
 
-## camera_yaw= as read from the settings file: only a diamond view is a
-## resting yaw, so an older file's axis-aligned one (a 45° step) goes to
-## the nearest diamond. [param otherwise] for a missing or bad value.
+## camera_yaw= as read from the settings file: one of the eight resting
+## views (671: a multiple of 45), anything between going to the nearest.
+## [param otherwise] for a missing or bad value.
 static func saved_yaw(text: String, otherwise: float) -> float:
 	if not text.strip_edges().is_valid_float():
 		return otherwise

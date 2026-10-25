@@ -25,7 +25,7 @@ const DEFAULTS := {
 }
 ## What each action is called in the Options, in the order shown.
 const WORDS := {
-	"forward": "Walk forward (click scheme: tilt the view up)", "back": "Walk back (click scheme: tilt it down)",
+	"forward": "Walk forward (click scheme: the view overhead)", "back": "Walk back (click scheme: the view back to normal)",
 	"left": "Walk left (click scheme: turn)", "right": "Walk right (click scheme: turn)",
 	"open": "Open a chest or a door; talk to someone", "pack": "Your pack", "pick_up": "Pick up",
 	"drop": "Put down", "throw": "Throw", "talk": "Talk", "talk_log": "Pin the talk box", "map": "Map",

@@ -28494,3 +28494,51 @@ arrival cell is in a named room, the room's name follows the zone's.
 ui_test _test_room_names: the section read with its warnings, room_at,
 say's cases, the player walking in, out and back. Client only; no wire
 change; no new class_name.
+
+## 671. Eight camera views and the overhead lock
+
+Jeff, after playing with the new camera: "now that we have this view it
+doesn't make sense to lock into 90 degree diagonals on ad. it could be
+broken into 45 degrees, W should go into nearly overhead view and lock
+that way, S to move back to normal angle. going inside buildings should go
+into top down view and make roofs invisible." The coordinator approved
+ui's design; the indoor part follows with buildings' enclosure ("671,
+buildings' side"). The bow's zoom-out with the reach is combat's (669),
+not this.
+
+Eight views. Client3D.ORBIT_STEP is 45, not 90: the yaw rests on the four
+diamonds and the four square-on views between them. The free turn, the
+TURN_COMMIT rule and the settles are as they were (A/D in the click
+scheme, the sideways middle drag in WASD), so a tap goes one view on, 45
+degrees. The saved yaw (camera_yaw=) keeps a multiple of 45 as it is, so
+an old file's square-on yaw is no longer rounded to a diamond. The wall
+cut, the see-through and the roofs read the camera's own direction
+(_update_fade on the camera's basis, the sight shader on _camera_offset),
+so they hold at any yaw; view_test's chunk-index check now runs over all
+eight views and the overhead pitch. Main.wasd_direction already maps the
+walk keys through the yaw, so on a square-on view W walks one straight
+grid step, where on a diamond it walks a grid diagonal: W stays up the
+screen, and the walk under it changes.
+
+The overhead lock. Click scheme: W eases the pitch to OVERHEAD_PITCH (82)
+over PITCH_EASE_SECONDS (0.3, eased in and out from wherever it is, so a
+turn back mid-ease goes on from there with no snap) and the camera stays
+there with no key held; S eases it back to the normal pitch (CAMERA_PITCH
+50, or LOW_PITCH under the low camera) the same way. This replaces the
+hold-to-tilt and spring-back (TILT_RATE, PITCH_MIN's floor, LOW_PITCH_MIN
+gone with it). The state is saved as camera_overhead=on|off
+(Net.camera_overhead, set_camera_overhead). WASD scheme, where W/S walk:
+the vertical middle drag peeks toward the other pitch (up the screen from
+the normal one, down it from overhead) as the peek did; let go past
+PEEK_COMMIT (a third of PEEK_DRAG_PX), it goes on to that pitch and stays
+(set_overhead), less and it springs back. Zoom stays on the wheel. The
+ridge rule (525) still lifts the pitch where a hill would hide the player.
+The overhead view shows less ground than 50 degrees does, so the view's
+reach stays inside World.NEAR_TILES. The key help and the hint list say
+"overhead / normal view".
+
+controls_test: the eight-view settles and saved yaws, W overhead and S
+back with the ease and its turn back, the peek's commit both ways, the
+keys through Main. view_test: the low camera's overhead and back; the
+chunk index at eight views. Client only; no wire change; no new
+class_name.

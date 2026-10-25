@@ -4260,11 +4260,14 @@ func _test_low_camera() -> void:
 			"a drag of the screen's height pans the frustum's height at the aim (%.1f)" % _rig._view_height())
 	_rig.end_pan()
 	_rig.pan = Vector3.ZERO
-	_rig.tilt(-1.0, 10.0)
-	_check(_rig.pitch < Client3D.PITCH_MIN and _rig.pitch >= Client3D.LOW_PITCH_MIN, "S tilts down to LOW_PITCH_MIN, under the ortho floor (%.0f)" % _rig.pitch)
-	_rig.end_tilt()
+	var overhead_was: bool = Net.camera_overhead
+	_rig.set_overhead(true)
 	_rig._ease_tilt(10.0)
-	_check(is_equal_approx(_rig.pitch, Client3D.LOW_PITCH), "and let go, back to LOW_PITCH")
+	_check(is_equal_approx(_rig.pitch, Client3D.OVERHEAD_PITCH), "W under the low camera: overhead too (671; %.0f)" % _rig.pitch)
+	_rig.set_overhead(false)
+	_rig._ease_tilt(10.0)
+	_check(is_equal_approx(_rig.pitch, Client3D.LOW_PITCH), "and S, back to LOW_PITCH (%.0f)" % _rig.pitch)
+	Net.camera_overhead = overhead_was
 	Net.set_camera_low(false, false)
 	_check(not _rig.low_camera() and _rig._camera.projection == Camera3D.PROJECTION_ORTHOGONAL and is_equal_approx(_rig._camera.far, far_was)
 			and is_equal_approx(_rig.pitch, Client3D.CAMERA_PITCH) and is_equal_approx(_rig._environment.fog_aerial_perspective, 0.0)
@@ -4907,14 +4910,15 @@ func _test_fade() -> void:
 					grazed += 1
 	_check(beside > 0 and grazed == 0, "beside a wall at their back, it never fades (%d of %d spots)" % [grazed, beside])
 	# The chunk index (310) finds what testing every piece finds: from
-	# every floor cell, the camera turned to each diamond and tilted.
+	# every floor cell, the camera turned to each of the eight views (671:
+	# the square-on ones too) and tilted, overhead among them.
 	var differ := 0
 	var asked := 0
 	var found := 0
 	for cell: Vector2i in floor_cells:
-		for turn in 4:
-			for tilt: float in [Client3D.PITCH_MIN, Client3D.CAMERA_PITCH, Client3D.PITCH_MAX]:
-				var flat_way := flat.rotated(turn * PI * 0.5)
+		for turn in 8:
+			for tilt: float in [Client3D.PITCH_MIN, Client3D.CAMERA_PITCH, Client3D.OVERHEAD_PITCH, Client3D.PITCH_MAX]:
+				var flat_way := flat.rotated(turn * PI * 0.25)
 				var way := Vector3(flat_way.x * cos(deg_to_rad(tilt)), sin(deg_to_rad(tilt)), flat_way.y * cos(deg_to_rad(tilt)))
 				var at := _rig.to_global(_rig._tile_position(cell))
 				var points: Array[Vector3] = []

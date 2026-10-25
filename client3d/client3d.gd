@@ -44,19 +44,22 @@ extends Node3D
 ## it eases back onto the player.
 ##
 ## Turning, in both schemes: the yaw turns freely, all the way round, and
-## rests only on the diamond views (multiples of ORBIT_STEP from 0). Let
-## go, it settles on the next diamond the way it was turning, or back on
-## the one it set off from if it turned less than TURN_COMMIT
-## (settle_target), and stays there; that diamond is saved in settings.cfg
-## (Net.camera_yaw). Click scheme: A/D turn at TURN_RATE while held, and
-## the settle starts at that speed so the release flows into it; W/S tilt
-## while held at TILT_RATE, between PITCH_MIN and PITCH_MAX, slowing into
-## either end, and spring back to CAMERA_PITCH over TILT_RETURN_SECONDS.
-## WASD scheme: a sideways middle drag turns, its settle eased out over
-## SETTLE_SECONDS; a vertical one is a pitch peek, tilting toward
-## PEEK_PITCH in proportion to the drag (full over PEEK_DRAG_PX, eased) and
-## springing back over PEEK_RETURN_SECONDS. The near/far rule reads only
-## the yaw, so the near walls stay see-through through any tilt.
+## rests only on the eight views (multiples of ORBIT_STEP, 45, from 0: the
+## four diamonds and the four square-on; decision 671). Let go, it settles
+## on the next one the way it was turning, or back on the one it set off
+## from if it turned less than TURN_COMMIT (settle_target), and stays
+## there; that view is saved in settings.cfg (Net.camera_yaw). Click
+## scheme: A/D turn at TURN_RATE while held, and the settle starts at that
+## speed so the release flows into it; W eases to OVERHEAD_PITCH and stays
+## there, S back to the resting pitch, over PITCH_EASE_SECONDS (671; saved,
+## Net.camera_overhead). WASD scheme: a sideways middle drag turns, its
+## settle eased out over SETTLE_SECONDS; a vertical one is a pitch peek
+## toward the other pitch (overhead from the normal one, up the screen;
+## the normal one from overhead, down it) in proportion to the drag (full
+## over PEEK_DRAG_PX, eased); let go past PEEK_COMMIT of it, the camera
+## goes on to that pitch and stays, as W/S do; less, it springs back over
+## PEEK_RETURN_SECONDS. The near/far rule reads the camera's own way, so the
+## near walls stay see-through at any yaw and tilt.
 ## While a movement key is held (frozen, set by Main) the yaw does not
 ## move at all; a drag meanwhile applies when the keys are let go. It
 ## follows the player; in WASD it leans toward the cursor as the 2D camera
@@ -409,8 +412,7 @@ const CAMERA_PITCH := 50.0
 ## size), seeing LOW_FAR out under LOW_FOG of haze over the look's own
 ## fog with LOW_AERIAL of the sky in it, the sun's shadows out to
 ## LOW_SHADOW_DISTANCE in two splits so the edge where they stop is not
-## in the middle of the view. The tilt's floor is LOW_PITCH_MIN; the ridge
-## rule (525) lifts it as before. Under stone, and with the toggle off, the
+## in the middle of the view. The ridge rule (525) lifts it as before. Under stone, and with the toggle off, the
 ## ortho camera exactly as before. What is drawn and known stays within
 ## World.NEAR_TILES (decision 238): a body beyond it is not drawn, a click
 ## past it lands at its edge on the way (within_near), the view's reach for
@@ -422,7 +424,6 @@ const LOW_FAR := 300.0
 const LOW_FOG := 0.012
 const LOW_AERIAL := 0.6
 const LOW_SHADOW_DISTANCE := 150.0
-const LOW_PITCH_MIN := 15.0
 ## The scatter's own reach under the low camera (decision 653; Jeff:
 ## "clipping of ground details they should load in earlier"): it is built
 ## out to LOW_SCATTER_REACH of the aim (Client3D.scatter_reach_low, which
@@ -461,8 +462,10 @@ const CAMERA_DISTANCE := 40.0
 ## Orthographic height in units: a 1.5-unit character, foreshortened by
 ## cos(CAMERA_PITCH), is about a twelfth of it.
 const CAMERA_SIZE := 12.0
-## The resting yaws are multiples of this: the diamond views.
-const ORBIT_STEP := 90.0
+## The resting yaws are multiples of this: the four diamond views and the
+## four square-on views between them (decision 671; Jeff: "it doesn't make
+## sense to lock into 90 degree diagonals").
+const ORBIT_STEP := 45.0
 ## The wheel's zoom: a factor on CAMERA_SIZE (smaller is nearer), this
 ## much a notch, held to ZOOM_MIN..ZOOM_MAX, eased toward at ZOOM_RATE (an
 ## exponential rate a second: a notch is all but done in a quarter second).
@@ -485,20 +488,21 @@ const TURN_COMMIT := 10.0
 ## A/D let go back to the diamond it set off from: the settle takes the
 ## time a stop from the turning speed would, plus this, for the turn back.
 const TURN_RETURN_EXTRA := 0.15
-## Click scheme keys: A/D turn this fast (degrees a second); W/S tilt this
-## fast between PITCH_MIN and PITCH_MAX, slowing over the last
-## TILT_EASE_DEGREES at either end, and the tilt springs back over
-## TILT_RETURN_SECONDS when they are let go.
+## Click scheme keys: A/D turn this fast (degrees a second).
 const TURN_RATE := 180.0
-const TILT_RATE := 60.0
+## The pitch's range (the near/far and roof checks are tried across it).
 const PITCH_MIN := 40.0
 const PITCH_MAX := 85.0
-const TILT_EASE_DEGREES := 8.0
-const TILT_RETURN_SECONDS := 0.25
-## The pitch peek: the tilt it goes to, the drag for all of it (screen
-## px), how far it pulls back (ortho size), and the spring back.
-const PEEK_PITCH := 85.0
+## The overhead view (decision 671; Jeff: "W should go into nearly overhead
+## view and lock that way, S to move back to normal angle"): its pitch,
+## and the ease to it or back, eased in and out from wherever the pitch is.
+const OVERHEAD_PITCH := 82.0
+const PITCH_EASE_SECONDS := 0.3
+## The pitch peek: the drag for all of it (screen px), the share of that
+## which, let go, commits to the other pitch (671), how far it pulls back
+## (ortho size), and the spring back.
 const PEEK_DRAG_PX := 300.0
+const PEEK_COMMIT := 1.0 / 3.0
 const PEEK_PULL_BACK := 1.2
 const PEEK_RETURN_SECONDS := 0.25
 const PLAYER_LIGHT_RANGE := 6.0
@@ -1362,11 +1366,17 @@ var _zoom_to := 1.0
 var pan := Vector3.ZERO
 var _pan_base := Vector3.ZERO
 var _pan_home := false
-## A W/S tilt springing back: from, and how far along (1: not springing).
+## The overhead view on (671; W, S, a committed peek; Net.camera_overhead).
+var overhead := false
+## The pitch easing to its rest (rest_pitch): from, how far along (1: at
+## rest), over how long.
 var _tilt_from := CAMERA_PITCH
 var _tilt_t := 1.0
+var _tilt_seconds := PITCH_EASE_SECONDS
 ## The pitch peek: held, how far in (0 at rest .. 1 full), and the spring
-## back's start and progress (1: not springing).
+## back's start and progress (1: not springing); whether it still sets the
+## pitch (false once let go past PEEK_COMMIT: the pitch eases on its own).
+var _peek_pitch := true
 var _peeking := false
 var _peek := 0.0
 var _peek_from := 0.0
@@ -2053,6 +2063,7 @@ func setup(terrain: Dictionary, centre := Vector2i.ZERO) -> void:
 	# The saved diamond, or --test-yaw exactly, for screenshots.
 	yaw = Net.camera_yaw
 	_yaw_step = nearest_diamond(yaw)
+	overhead = Net.camera_overhead
 	pitch = rest_pitch()
 	if not Net.camera_low_changed.is_connected(_on_camera_low_changed):
 		Net.camera_low_changed.connect(_on_camera_low_changed)
@@ -2438,14 +2449,15 @@ func low_camera() -> bool:
 	return _low
 
 
-## The pitch at rest: LOW_PITCH under the low camera, CAMERA_PITCH else.
+## The pitch at rest: OVERHEAD_PITCH with the overhead view on (671),
+## else normal_pitch.
 func rest_pitch() -> float:
+	return OVERHEAD_PITCH if overhead else normal_pitch()
+
+
+## The normal pitch: LOW_PITCH under the low camera, CAMERA_PITCH else.
+func normal_pitch() -> float:
 	return LOW_PITCH if _low else CAMERA_PITCH
-
-
-## The tilt's floor: LOW_PITCH_MIN under the low camera, PITCH_MIN else.
-func pitch_floor() -> float:
-	return LOW_PITCH_MIN if _low else PITCH_MIN
 
 
 ## The camera's distance from its target: CAMERA_DISTANCE; under the low
@@ -2795,31 +2807,31 @@ static func settle_target(from: float, degrees: float, direction: float) -> floa
 	return floorf(degrees / ORBIT_STEP + 0.0001) * ORBIT_STEP
 
 
-## Click scheme, W/S held: tilt [param direction] (1 up toward top-down,
-## -1 down toward level) for [param delta] seconds at TILT_RATE, slowing
-## over the last TILT_EASE_DEGREES before either end.
-func tilt(direction: float, delta: float) -> void:
-	if _peeking or direction == 0.0:
+## The overhead view on or off (671): click scheme W (on) or S (off), or
+## a pitch peek let go past PEEK_COMMIT. The pitch eases to its new rest
+## over PITCH_EASE_SECONDS from wherever it is (a turn back mid-ease goes
+## on from there, no snap), and stays; saved (Net.camera_overhead).
+func set_overhead(on: bool) -> void:
+	if _peeking:
 		return
-	_tilt_t = 1.0
-	var limit := PITCH_MAX if direction > 0.0 else pitch_floor()
-	var left := absf(limit - pitch)
-	var speed := TILT_RATE * clampf(left / TILT_EASE_DEGREES, 0.1, 1.0)
-	_set_pitch(move_toward(pitch, limit, speed * delta))
+	if overhead != on:
+		overhead = on
+		Net.set_camera_overhead(on)
+	_ease_pitch()
 
 
-## Click scheme, W/S let go: back to CAMERA_PITCH over
-## TILT_RETURN_SECONDS. Nothing is saved.
-func end_tilt() -> void:
+## The pitch eased to rest_pitch from where it is, over [param seconds].
+func _ease_pitch(seconds := PITCH_EASE_SECONDS) -> void:
 	_tilt_from = pitch
-	_tilt_t = 0.0
+	_tilt_seconds = seconds
+	_tilt_t = 1.0 if is_equal_approx(pitch, rest_pitch()) else 0.0
 
 
 func _ease_tilt(delta: float) -> void:
 	if _tilt_t >= 1.0:
 		return
-	_tilt_t = minf(_tilt_t + delta / TILT_RETURN_SECONDS, 1.0)
-	_set_pitch(lerpf(_tilt_from, rest_pitch(), sin(_tilt_t * PI * 0.5)))
+	_tilt_t = minf(_tilt_t + delta / _tilt_seconds, 1.0)
+	_set_pitch(lerpf(_tilt_from, rest_pitch(), smoothstep(0.0, 1.0, _tilt_t)))
 
 
 func _set_pitch(degrees: float) -> void:
@@ -2829,27 +2841,37 @@ func _set_pitch(degrees: float) -> void:
 
 
 ## The middle button went down on a vertical drag: a pitch peek from
-## wherever the camera is now (a spring back under way stops there).
+## wherever the camera is now (a spring back or a pitch ease under way
+## stops there).
 func begin_pitch_peek() -> void:
 	_peeking = true
+	_peek_pitch = true
 	_peek_t = 1.0
+	_tilt_t = 1.0
 
 
-## The peek is [param pixels] of vertical drag, either way: that share of
-## PEEK_DRAG_PX of the full tilt and pull back.
+## The peek is [param pixels] of vertical drag: up the screen (negative)
+## from the normal pitch, down it from overhead (671), that share of
+## PEEK_DRAG_PX of the full tilt toward the other pitch and pull back; the
+## other way, none.
 func pitch_peek(pixels: float) -> void:
 	if _peeking:
-		_set_peek(clampf(absf(pixels) / PEEK_DRAG_PX, 0.0, 1.0))
+		var toward := pixels if overhead else -pixels
+		_set_peek(clampf(toward / PEEK_DRAG_PX, 0.0, 1.0))
 
 
-## The middle button came up: back to the resting pitch and size over
-## PEEK_RETURN_SECONDS.
+## The middle button came up: past PEEK_COMMIT, on to the other pitch to
+## stay (set_overhead, 671), else back to the resting pitch; the size back
+## either way, over PEEK_RETURN_SECONDS.
 func end_pitch_peek() -> void:
 	if not _peeking:
 		return
 	_peeking = false
 	_peek_from = _peek
 	_peek_t = 0.0
+	if _peek >= PEEK_COMMIT:
+		_peek_pitch = false
+		set_overhead(not overhead)
 
 
 ## The spring back, a sine out.
@@ -2860,12 +2882,17 @@ func _ease_peek(delta: float) -> void:
 	_set_peek(lerpf(_peek_from, 0.0, sin(_peek_t * PI * 0.5)))
 
 
-## How far in the peek is, 0..1: the pitch and size it gives, eased in
-## and out (smoothstep), so the tilt starts and ends gently.
+## How far in the peek is, 0..1: the pitch (from the resting one toward
+## the other) and size it gives, eased in and out (smoothstep), so the tilt
+## starts and ends gently; once committed, the size alone.
 func _set_peek(amount: float) -> void:
 	_peek = amount
+	if not _peek_pitch:
+		_apply_size()
+		_place_camera()
+		return
 	var eased := smoothstep(0.0, 1.0, amount)
-	_set_pitch(lerpf(CAMERA_PITCH, PEEK_PITCH, eased))
+	_set_pitch(lerpf(rest_pitch(), normal_pitch() if overhead else OVERHEAD_PITCH, eased))
 
 
 ## WASD: the middle button went down; the drag turns from the yaw now.
@@ -2924,8 +2951,9 @@ func set_frozen(on: bool) -> void:
 		_settle_on(_drag_target())
 
 
-## The diamond view nearest [param degrees]; half way between two (an
-## axis view), the higher.
+## The resting view nearest [param degrees] (a multiple of ORBIT_STEP: a
+## diamond or, since 671, a square-on view); half way between two, the
+## higher.
 static func nearest_diamond(degrees: float) -> float:
 	return snappedf(degrees, ORBIT_STEP)
 
