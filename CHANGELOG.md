@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The barrow's Hall is barred while the Ossuary's dead stand: clear every skeleton and grave guard (dead or laid to rest) and the way opens; if they rise again it shuts again, never on anyone already inside.
 - Crossing into a zone hitches less behind its card.
 - A draugr you have paid once offers to be faced again for nothing: his deal window shows one "Face him again" button, with no sum, whatever your purse (548 amended, ui's side).
 - In the practice hall, F7 opens the tuning panel: every tunable number in a list by group with a slider or a typed value, changes marked with their own reset, Reset all, Save, Copy to review and Load; its Arena tab spawns any monster kind (fighting or standing) or a dummy where you next click, clears them, gives you any item, fills hp and stamina, resets the hall and sets the time scale (673).

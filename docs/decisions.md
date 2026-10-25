@@ -29757,3 +29757,24 @@ anything under 1. Before this, the panel skipped the free deal, since it
 had no sum to show, so an older client shows no window for it. ui_test _test_deal_window covers the free deal's
 button, its words, its enabling with an empty purse, and the id sent with
 0. Client only; no wire change; no new class_name.
+
+## 666, enemy-ai's side: the draugr says whether his zone's dead stand (ossuary_sealed)
+
+666 (dungeon's two depths) has Main connect the draugr's `ossuary_sealed(sealed)` to
+`_seal_hall`, which holds the Hall's door with DEAD_LOCK while the Ossuary's dead stand ("they
+must be cleared to enter the hall"). Until now the draugr had no such signal, so the Hall never
+sealed. Now he has it:
+
+- **The rule**: `sealed` is true while any of his zone's OSSUARY_KINDS (skeleton,
+  skeleton_guard) stands: hp left, not laid at rest, and not one of his own risen (his retinue
+  fights beside him in the Hall, not in the Ossuary). It is false once every one is dead or laid.
+- **When**: Draugr._tell_ossuary runs each sim tick, before anything else he does, gone or not.
+  It emits at his first tick and again only when the answer changes. Main hooks him at spawn
+  (_hook_talker), before that first tick.
+- **His rest** stills the zone's dead (_still_the_dead, laid), so while he rests the seal lets go
+  on its own. When his rest ends they rise and the seal holds again.
+
+monster_test _test_ossuary_sealed drives the real signal: true at the first tick and said once;
+a skeleton killed with the grave guard still standing stays true; the guard laid gives false; the
+guard risen gives true again. level_test's _seal_hall checks stay dungeon's. Server sim, protocol
+unchanged, no new class_name.

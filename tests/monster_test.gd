@@ -101,6 +101,7 @@ func _ready() -> void:
 	_test_room_guard()
 	_test_draugr()
 	_test_draugr_paid()
+	_test_ossuary_sealed()
 	_test_fight_data()
 	_test_fight_panel()
 	_test_barrow_layers()
@@ -2313,6 +2314,36 @@ func _test_room_guard() -> void:
 ## Paid once, fought again (548 amended; Jeff: "as long as you paid once you
 ## get unlimited attempts"): npc's record through World.paid_deal and
 ## World.deal_paid, stubbed here.
+## The barrow's seal (666, enemy-ai's side): the draugr says ossuary_sealed
+## at his first tick and on each change, true while a skeleton or grave
+## guard of his zone stands, false once every one is dead or laid.
+func _test_ossuary_sealed() -> void:
+	print("%s== the draugr's ossuary_sealed: sealed while his zone's dead stand (666) ==" % char(10))
+	Monster.idling = true
+	var e := _build(["###########", "#.........#", "#.k..u..g.#", "#.........#", "###########"])
+	var draugr := e["u"][0] as Draugr
+	var bones := e["k"][0] as Monster
+	var guard := e["g"][0] as Monster
+	var said: Array = []
+	draugr.ossuary_sealed.connect(func(sealed: bool) -> void: said.append(sealed))
+	World.step()
+	_check(said == [true], "his first tick: sealed, the dead stand (%s)" % [said])
+	World.step()
+	_check(said == [true], "said once, not each tick")
+	World.damage(bones, 9999, null)
+	World.step()
+	_check(said == [true], "one dead, the grave guard stands: still sealed (%s)" % [said])
+	guard.lay_down()
+	World.step()
+	_check(said == [true, false], "the guard laid at rest, none stands: unsealed (%s)" % [said])
+	guard.rise()
+	World.step()
+	_check(said == [true, false, true], "it rises: sealed again (%s)" % [said])
+	for body: GridEntity in [draugr, bones, guard]:
+		if is_instance_valid(body) and body.spawned:
+			World.despawn(body)
+
+
 func _test_draugr_paid() -> void:
 	print("\n== the draugr: paid once, a payer fights him again for no gold till won (548 amended) ==")
 	if not "paid_deal" in World:

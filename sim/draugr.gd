@@ -174,6 +174,15 @@ signal offer_withdrawn(player_id: String)
 signal hall_door(open: bool)
 ## A line he says unasked (Main's plain speech).
 signal said(text: String)
+## The barrow's seal (666, enemy-ai's side; dungeon's Hall below the
+## Ossuary): true while any OSSUARY_KINDS one spawned in his zone stands
+## (hp left, not laid at rest, not his risen), false once every one is down;
+## said at his first tick and on each change. Main holds the Hall's door.
+signal ossuary_sealed(sealed: bool)
+
+const OSSUARY_KINDS: Array[String] = ["skeleton", "skeleton_guard"]
+## What ossuary_sealed last said: -1 nothing yet, else 0 or 1.
+var _ossuary := -1
 
 
 func _ready() -> void:
@@ -215,6 +224,7 @@ func _sim_tick() -> void:
 	# What a client may read of him (648, npc's side): seated and unprovoked, or at rest (573 amended (3):
 	# his rest words), a click or E talks; in a pact, struck or provoked, it strikes.
 	peaceable = state == State.SEATED and _provoked == null and _struck_by() == null or state == State.AT_REST
+	_tell_ossuary()
 	if gone and state != State.AT_REST and not _come_back():
 		return  # His rest over, someone on his seat and every cell beside it: he waits, gone.
 	if state != State.AT_REST:
@@ -863,6 +873,20 @@ func _rise_again() -> void:
 	for entity in World.monsters():
 		if entity != self and entity is Monster and _is_dead(entity):
 			(entity as Monster).rise()
+
+
+## ossuary_sealed when what it says changes (or first): whether any of his
+## zone's OSSUARY_KINDS stands.
+func _tell_ossuary() -> void:
+	var stands := false
+	for entity in World.monsters():
+		if entity != self and entity is Monster and entity.hp > 0 and not (entity as Monster).laid \
+				and World.kind_of(entity) in OSSUARY_KINDS and not entity in _retinue:
+			stands = true
+			break
+	if int(stands) != _ossuary:
+		_ossuary = int(stands)
+		ossuary_sealed.emit(stands)
 
 
 ## Laid to rest: every one of the barrow's dead in his zone lies still
