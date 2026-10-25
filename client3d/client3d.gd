@@ -87,6 +87,13 @@ extends Node3D
 ## ripple a ring, the toss aim an arrow, all flat on the floor. All input
 ## is Main's; this view only answers its picks and draws what it is told.
 
+## The local player stepped into a space closed in by walls (_enclosed:
+## a room, a hall, a ruin's stubs, every room underground; not a gone
+## building's plot) or out of one (inside false): [param rect] the space's
+## bounds, an empty Rect2i outside. For ui's camera (inside_building as a
+## query).
+signal inside_changed(inside: bool, rect: Rect2i)
+
 ## A burning and a bleeding body's name (decision 375).
 const AIL_BURN := Color(1.0, 0.6, 0.25)
 const AIL_BLEED := Color(0.95, 0.3, 0.3)
@@ -672,6 +679,17 @@ const FADE_HEIGHTS: Array[float] = [0.3, 0.9, 1.5]
 ## How long a piece stays faded after it stops hiding them, so walking along
 ## a wall does not make it flicker.
 const FADE_HOLD := 0.4
+## A roof going off (the player in its building) or coming back eases its
+## transparency over this many seconds, then is shadow only or whole.
+const ROOF_FADE := 0.2
+## An opening in a wall this many edges wide or less, between walls along
+## one line, still closes a space in (_closes): a lone missing edge. Not
+## two, so that a two-cell way between buildings (passages are two cells)
+## stays open ground; doorways are door edges and close anyway.
+const ENCLOSED_GAP := 1
+## Outdoors, a space of more cells than this is open ground, walls or not
+## (a walled town, a fold); the biggest hall is well under it.
+const ENCLOSED_MOST := 1500
 ## The pieces that can fade are indexed by squares this many units across
 ## (_index_occluders), so the lines to the player are tested against those
 ## near them only, not every tree of a big map (310).
@@ -1986,6 +2004,21 @@ var _building_at: Dictionary[Vector2i, int] = {}
 ## yaw): the offset from the cell's middle; a cell not in it, its middle.
 var _stand_at: Dictionary[Vector2i, Vector3] = {}
 var _roofs_off: Dictionary[int, float] = {}
+## The fade clock at the roofs' last ease.
+var _roofs_clock := 0.0
+## The spaces closed in by walls (Jeff: "any space with enclosed walls
+## would count as inside, ruins, castle, etc."): each enclosed floor cell's
+## space, and each space's bounds; worked out again only when a wall
+## changes (_enclosed_dirty). The local player's space's bounds, as
+## inside_changed last told (empty, none).
+var _enclosed: Dictionary[Vector2i, int] = {}
+var _enclosed_rects: Array[Rect2i] = []
+var _enclosed_dirty := true
+## The wall edges changed since the spaces were last worked out (a plot
+## built, a wall felled): only the spaces beside them are worked out again.
+var _enclosed_changed: Array[Vector3i] = []
+var _floor_lookup: Dictionary[Vector2i, bool] = {}
+var _inside_rect := Rect2i()
 ## Town id -> {kind: {state, level}}, as Main was told (set_town).
 var town_states := {}
 ## Level -> its damaged roofs' indices, as Main was told (set_roofs,
@@ -4412,6 +4445,8 @@ func rebuild(terrain: Dictionary, centre: Vector2i, over_frames := false) -> voi
 	_building_at.clear()
 	_stand_at.clear()
 	_roofs_off.clear()
+	_enclosed_dirty = true
+	_floor_lookup.clear()
 	_runs.clear()
 	_water_bodies.clear()
 	_stream_ribbons.clear()
@@ -10892,6 +10927,7 @@ func _add_wall_runs(keys: Array[Vector3i]) -> void:
 ## the room's first frame is drawn costs seconds: 296; Godot's
 ## godotengine/godot#124579).
 func rebuild_walls(edges: Array[Vector3i]) -> void:
+	_enclosed_changed.append_array(edges)
 	if _room == null or BOX_WALLS:
 		return
 	var lines: Dictionary[Vector2i, bool] = {}
@@ -12048,7 +12084,7 @@ func _update_fade(force := false) -> void:
 	# A roof off draws nothing but its shadow, so the inside stays shaded.
 	for building in _buildings:
 		var roof: Node3D = building["roof"]
-		if roof == null or not building["off"]:
+		if roof == null or not building["off"] or float(building.get("roof_fade", 1.0)) < 1.0:
 			continue
 		_set_near(roof, false)
 		for node in _descendants(roof):
@@ -12091,8 +12127,20 @@ func _inside_walls(points: Array[Vector3], toward: Vector3) -> Dictionary[Node3D
 
 ## Which buildings' roofs are off: those the local player or their
 ## companion ([param points]) is inside, and for FADE_HOLD after they
-## leave. A roof back on is set as the fade has it. Whether any changed.
+## leave, each easing out or back over ROOF_FADE (_ease_roof). A roof back
+## on is set as the fade has it. The local player's (the first point's)
+## space closed in by walls (_enclosed) told by inside_changed when it
+## changes. Whether any roof went off or on.
 func _update_roofs(points: Array[Vector3]) -> bool:
+	var step := (_fade_clock - _roofs_clock) / ROOF_FADE
+	_roofs_clock = _fade_clock
+	if _enclosed_dirty:
+		_find_enclosed()
+	elif not _enclosed_changed.is_empty():
+		_find_enclosed(_enclosed_changed)
+	if not points.is_empty():
+		var mine := to_local(points[0])
+		_tell_inside(_enclosed.get(Vector2i(roundi(mine.x), roundi(mine.z)), -1))
 	if _buildings.is_empty():
 		return false
 	for point in points:
@@ -12106,13 +12154,164 @@ func _update_roofs(points: Array[Vector3]) -> bool:
 		if not off:
 			_roofs_off.erase(index)
 		var building := _buildings[index]
-		if off == building["off"]:
-			continue
-		building["off"] = off
-		changed = true
-		if not off and building["roof"] != null:
-			_set_near(building["roof"], _faded.has(building["roof"]))
+		if off != building["off"]:
+			building["off"] = off
+			changed = true
+			if not off and building["roof"] != null:
+				_set_near(building["roof"], _faded.has(building["roof"]))
+		_ease_roof(building, step)
 	return changed
+
+
+## [param space] the local player's space now (-1 none): inside_changed
+## if its bounds differ from the last told (spaces are numbered afresh
+## each time they are worked out).
+func _tell_inside(space: int) -> void:
+	var bounds: Rect2i = _enclosed_rects[space] if space >= 0 else Rect2i()
+	if bounds == _inside_rect:
+		return
+	_inside_rect = bounds
+	inside_changed.emit(space >= 0, bounds)
+
+
+## The bounds of the space closed in by walls the local player is in, an
+## empty Rect2i if none (as inside_changed last told).
+func inside_building() -> Rect2i:
+	return _inside_rect
+
+
+## Whether edge [param key] closes a space (_find_enclosed): a wall (_walled)
+## or an opening no wider than ENCLOSED_GAP between walls along one line.
+func _closes(key: Vector3i) -> bool:
+	if _walled(key):
+		return true
+	var step := Vector3i(0, 1, 0) if key.z == Terrain.EAST else Vector3i(1, 0, 0)
+	for before in ENCLOSED_GAP:
+		if not _walled(key - step * (before + 1)):
+			continue
+		for after in ENCLOSED_GAP - before:
+			if _walled(key + step * (after + 1)):
+				return true
+		return false
+	return false
+
+
+## Whether edge [param key] is a wall or door that closes a space: one the
+## terrain has, drawn (not a plot's or a frame's, 566), a ruin's stubs,
+## rubble and gaps too (649: its stubs still enclose), never a gone
+## building's; nor, outdoors, an edge off the floor (the land's outline,
+## drawn none). Reads _floor_lookup (_find_enclosed fills it).
+func _walled(key: Vector3i) -> bool:
+	if _terrain["edges"].get(key, Terrain.Edge.OPEN) == Terrain.Edge.OPEN:
+		return false
+	if _outdoor:
+		var sides := Terrain.edge_cells(key)
+		if not _floor_lookup.has(sides[0]) or not _floor_lookup.has(sides[1]):
+			return false
+	if _ruin_edges.has(key):
+		return not _gone_edge(key)
+	return not _unbuilt(key)
+
+
+## Whether [param key] is a gone building's edge (649): its walls none.
+func _gone_edge(key: Vector3i) -> bool:
+	for cell in Terrain.edge_cells(key):
+		var index: int = _building_at.get(cell, -1)
+		if index >= 0 and _buildings[index].get("decline", "") == DECLINE_GONE:
+			return true
+	return false
+
+
+## The spaces closed in by walls (_enclosed, _enclosed_rects): the floor
+## cells from which no way through edges that do not close (_closes) leads
+## off the floor, outdoors, nor reaches more than ENCLOSED_MOST cells (a
+## walled town is not a room). Underground every room is one. Outdoors only
+## the cells beside a wall are tried, and a way that opens marks all it
+## crossed as outside, so the open ground is crossed about once. Worked out
+## once per layout; after a wall change ([param changed] edges) only the
+## spaces beside them are dropped and the cells beside them and in those
+## spaces tried again (a dropped space's bounds left empty).
+func _find_enclosed(changed: Array[Vector3i] = []) -> void:
+	_enclosed_dirty = false
+	_enclosed_changed = []
+	if _floor_lookup.is_empty():
+		for cell: Vector2i in _terrain.get("floor", []):
+			_floor_lookup[cell] = true
+	var seeds: Array[Vector2i] = []
+	if not changed.is_empty():
+		var dropped: Dictionary[int, bool] = {}
+		for key in changed:
+			for cell in Terrain.edge_cells(key):
+				seeds.append(cell)
+				if _enclosed.has(cell):
+					dropped[_enclosed[cell]] = true
+		for cell: Vector2i in _enclosed.keys():
+			if dropped.has(_enclosed[cell]):
+				seeds.append(cell)
+				_enclosed.erase(cell)
+		for space in dropped:
+			_enclosed_rects[space] = Rect2i()
+	else:
+		_enclosed.clear()
+		_enclosed_rects.clear()
+		if _outdoor:
+			for key: Vector3i in _terrain["edges"]:
+				if _walled(key):
+					seeds.append_array(Terrain.edge_cells(key))
+		else:
+			seeds.assign(_floor_lookup.keys())
+	var sides: Array[Vector2i] = [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]
+	var outside: Dictionary[Vector2i, bool] = {}
+	for seed in seeds:
+		if not _floor_lookup.has(seed) or outside.has(seed) or _enclosed.has(seed):
+			continue
+		var seen: Dictionary[Vector2i, bool] = {seed: true}
+		var around: Array[Vector2i] = [seed]
+		var open := false
+		while not around.is_empty() and not open:
+			var at: Vector2i = around.pop_back()
+			for side in sides:
+				var next := at + side
+				if seen.has(next) or _closes(Terrain.edge_key(at, side)):
+					continue
+				if not _floor_lookup.has(next):
+					open = _outdoor
+					continue
+				if outside.has(next) or _outdoor and seen.size() >= ENCLOSED_MOST:
+					open = true
+					break
+				seen[next] = true
+				around.append(next)
+		if open:
+			outside.merge(seen)
+			continue
+		var space := _enclosed_rects.size()
+		var bounds := Rect2i(seed, Vector2i.ONE)
+		for cell: Vector2i in seen:
+			_enclosed[cell] = space
+			bounds = bounds.merge(Rect2i(cell, Vector2i.ONE))
+		_enclosed_rects.append(bounds)
+
+
+## [param building]'s roof eased [param step] (a share of ROOF_FADE) toward
+## off (its "off") or on: its meshes' transparency the share gone; all the
+## way off, shadow only (the inside stays shaded) and opaque again.
+func _ease_roof(building: Dictionary, step: float) -> void:
+	var roof: Node3D = building["roof"]
+	var gone: float = building.get("roof_fade", 0.0)
+	var to := 1.0 if building["off"] else 0.0
+	if roof == null or gone == to:
+		return
+	gone = move_toward(gone, to, maxf(step, 0.0))
+	if absf(gone - to) < 0.001:
+		gone = to  # The clock's sums fall a hair short.
+	building["roof_fade"] = gone
+	for node in _descendants(roof):
+		if node is GeometryInstance3D:
+			var mesh := node as GeometryInstance3D
+			mesh.transparency = gone if gone < 1.0 else 0.0
+			if gone >= 1.0:
+				mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY
 
 
 ## The pieces the lines from the camera to [param points] pass through,

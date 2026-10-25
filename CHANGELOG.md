@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- A roof now fades away smoothly when you step inside, instead of vanishing at once, and the game now knows when you are in any walled-in space (a room, a ruin, a castle hall, anywhere underground), ready for the indoor top-down view.
 - Crossing into another place no longer freezes the screen: the new place is put together over several frames and its ground fills in from what you can see outward, fading in rather than popping; your keys wait until it is ready behind the card naming where you are, and going back to one of the last three places you visited is quicker.
 - The camera rests on eight views, every 45 degrees: the four diagonal ones and four square-on ones between them; on a square-on view W walks one straight step (671).
 - Click scheme: W tips the camera to a nearly overhead view and keeps it there, S brings it back to the normal angle; in WASD a vertical middle drag past a third does the same (671).

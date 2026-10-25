@@ -1267,6 +1267,9 @@ func _test_buildings() -> void:
 	_check(not house["off"] and not hut["off"] and not _roof_shadow_only(house), "both outside: every roof on")
 	puppet.global_position = _rig.to_global(_rig._tile_position(Vector2i(4, 6)))
 	_rig._update_fade()
+	# Its roof eases off over ROOF_FADE.
+	_rig._fade_clock += Client3D.ROOF_FADE
+	_rig._update_fade()
 	_check(house["off"] and _roof_shadow_only(house), "the player inside the house: its roof draws only its shadow")
 	_check(not hut["off"] and not _roof_shadow_only(hut), "the hut's roof stays on")
 	# Its sides toward the camera fade, the others stay solid, at two yaws.
@@ -1351,6 +1354,9 @@ func _test_roofs() -> void:
 	if other != null:
 		other.global_position = outside
 	puppet.global_position = _rig.to_global(_rig._tile_position(Vector2i(6, 4)))
+	_rig._update_fade()
+	# Its roof eases off over ROOF_FADE.
+	_rig._fade_clock += Client3D.ROOF_FADE
 	_rig._update_fade()
 	_check(roofed["off"] and _roof_shadow_only(roofed), "the player under it: it draws only its shadow")
 	puppet.global_position = outside
@@ -1649,6 +1655,7 @@ func _test_kinds() -> void:
 	_test_plots()
 	_test_camp()
 	_test_decline()
+	_test_inside()
 
 
 ## A building being built (decision 566): its stages by its town record's
@@ -1997,6 +2004,70 @@ func _test_decline() -> void:
 	_rig.town_states.erase("decline_town")
 
 
+## Inside (Jeff: "going inside buildings should go into top down view and
+## make roofs invisible"; "any space with enclosed walls would count as
+## inside, ruins, castle, etc."): a space closed in by walls is inside, told
+## by inside_changed and inside_building for ui's camera; the roof over the
+## player eases off over ROOF_FADE, then is shadow only; a ruin's stubs still
+## enclose, a gone building's plot does not.
+func _test_inside() -> void:
+	print("\n== inside: a space closed in by walls, its roof eased off (Jeff's top-down view) ==")
+	var level := _kinds_level([["building_house_small", Vector2i(2, 2), false]])
+	_rig.rebuild(level["terrain"], Vector2i(4, 14))
+	var house: Dictionary = _rig._buildings[0]
+	house["use"] = "house"
+	house["town_id"] = "inside_town"
+	var rect: Rect2i = house["rect"]
+	var told: Array = []
+	var listen := func(inside: bool, bounds: Rect2i) -> void: told.append([inside, bounds])
+	_rig.inside_changed.connect(listen)
+	var at := func(cell: Vector2i) -> void:
+		_rig._update_roofs([_rig.to_global(Vector3(cell.x, 0.5, cell.y))])
+	var middle := rect.get_center()
+	at.call(Vector2i(20, 20))
+	_check(told.is_empty() and _rig.inside_building() == Rect2i(), "out on the grass: not inside (%s)" % [told])
+	at.call(middle)
+	_check(told.size() == 1 and told[0][0] and (told[0][1] as Rect2i).encloses(Rect2i(middle, Vector2i.ONE))
+			and rect.encloses(told[0][1]) and _rig.inside_building() == told[0][1],
+			"in the house: inside, the room's bounds %s within its rect %s" % [told.back(), rect])
+	var roof: Node3D = house["roof"]
+	var meshes: Array = _rig._descendants(roof).filter(func(node: Node) -> bool: return node is GeometryInstance3D)
+	_rig._fade_clock += Client3D.ROOF_FADE * 0.5
+	at.call(middle)
+	var half: float = (meshes[0] as GeometryInstance3D).transparency
+	_rig._fade_clock += Client3D.ROOF_FADE
+	at.call(middle)
+	_check(half > 0.2 and half < 0.9 and (meshes[0] as GeometryInstance3D).cast_shadow == GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY,
+			"its roof eased off (%.2f half way), then shadow only" % half)
+	_rig.set_town("inside_town", {"house": {"state": Towns.RUIN, "level": 0, "walls": false}})
+	at.call(middle)
+	_check(_rig.inside_building() != Rect2i(), "a ruin: its stubs still enclose, inside (%s)" % [_rig.inside_building()])
+	_rig.set_town("inside_town", {"house": {"state": "gone", "level": 0, "walls": false}})
+	at.call(middle)
+	_check(_rig.inside_building() == Rect2i() and not told.back()[0], "gone: its plot open ground, not inside (%s)" % [told.back()])
+	_rig.set_town("inside_town", {"house": {"state": Towns.STANDING, "level": 1}})
+	at.call(middle)
+	_check(_rig.inside_building() != Rect2i(), "built again: inside")
+	# A wall change works out only the spaces beside it: the same as afresh.
+	var partly: Dictionary = _rig._enclosed.duplicate()
+	var partly_rect: Rect2i = _rig._enclosed_rects[partly[middle]]
+	_rig._find_enclosed()
+	_check(partly.size() == _rig._enclosed.size() and partly_rect == _rig._enclosed_rects[_rig._enclosed[middle]],
+			"the spaces after the wall changes, worked out beside them: as afresh (%d cells, %s)" % [partly.size(), partly_rect])
+	at.call(Vector2i(20, 20))
+	var gone_from: int = told.size()
+	_check(not told.back()[0] and _rig.inside_building() == Rect2i(), "out again: told so (%d tellings)" % gone_from)
+	_rig._fade_clock += Client3D.FADE_HOLD + Client3D.ROOF_FADE * 2.0
+	at.call(Vector2i(20, 20))
+	_rig._fade_clock += Client3D.ROOF_FADE * 2.0
+	at.call(Vector2i(20, 20))
+	var back: GeometryInstance3D = _rig._descendants(house["roof"]).filter(func(node: Node) -> bool: return node is GeometryInstance3D)[0]
+	_check(back.transparency == 0.0 and back.cast_shadow != GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY,
+			"its roof back, whole, after FADE_HOLD")
+	_rig.inside_changed.disconnect(listen)
+	_rig.town_states.erase("inside_town")
+
+
 ## BuildingComposer (decision 489): a wing's walls drawn to its own lower
 ## eaves; one look made once, its copies sharing their meshes; a round
 ## hut's one cone; a ruin with no roof, its walls broken here and there.
@@ -2211,6 +2282,9 @@ func _test_building_states() -> void:
 	var puppet: Node3D = _rig._puppets[_player().get_instance_id()]
 	var was := puppet.global_position
 	puppet.global_position = _rig.to_global(_rig._tile_position(Vector2i(4, 6)))
+	_rig._update_fade()
+	# Its roof eases off over ROOF_FADE.
+	_rig._fade_clock += Client3D.ROOF_FADE
 	_rig._update_fade()
 	_check(house["off"] and _roof_shadow_only(house), "inside a damaged building: its roof draws only its shadow")
 	puppet.global_position = was

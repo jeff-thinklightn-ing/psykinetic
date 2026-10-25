@@ -28623,3 +28623,50 @@ without _seed_shades);
 _test_kept_fields: a second arrival is a hit with the same fields (corners, shore heights, the
 shore, depth, road and kinds images), a changed kind a miss whose room matches one built at once,
 and at most three kept. Client only, protocol unchanged, no new class_name.
+
+## 671, buildings' side: inside is a space closed in by walls; the roof eases off
+
+Jeff, after playing: "going inside buildings should go into top down view and
+make roofs invisible", then, correcting the rule: "any space with enclosed
+walls would count as inside, ruins, castle, etc." Ui's camera (671) tips to
+top-down on it; this side tells it when.
+
+- Client3D's signal inside_changed(inside, rect) and inside_building() ->
+  Rect2i are for the local player only (the first focus point). They are
+  told when the bounds of the space the player stands in change; rect is
+  empty outside. Ui reads only the bool.
+- A space is the floor cells (_find_enclosed) from which no way through edges
+  that do not close (_closes) leads off the floor outdoors, nor reaches more
+  than ENCLOSED_MOST (1500) cells outdoors, so a walled town or a fold is open
+  ground.
+  - An edge closes (_walled) when it is a wall or door the terrain has: drawn,
+    not a plot's or a frame's (566). A ruin's stubs, rubble and gaps close
+    too, since its stubs still enclose (649). A gone building's edges never
+    close, and neither do edges off the floor outdoors (the land's outline,
+    drawn none).
+  - A lone missing edge between walls along one line (ENCLOSED_GAP 1) also
+    closes. A two-cell way between buildings does not, and stays outside.
+  - Underground, every room is a space.
+- Outdoors only the cells beside a wall are tried. A way that opens marks
+  everything it crossed as outside, so open ground is crossed about once.
+- It is worked out on a layout's load. After a wall change (rebuild_walls's
+  edges: a plot built, a wall felled, a decline), only the spaces beside the
+  changed edges are dropped and the cells beside them tried again, never the
+  whole map.
+  - Full work-out on load, unlocked timings: wilds 11.5 to 18 ms, every other
+    level under 5 ms.
+  - A 30-edge change: wilds about 3 ms, elsewhere under 2 ms.
+- The roofs off (unchanged: the buildings the player or companion stands in,
+  for FADE_HOLD after) now ease over ROOF_FADE (0.2 s): their meshes'
+  transparency rises, then they are shadow only; back on, it falls again.
+  This replaces a cut under ui's 0.35 s camera tip.
+
+view_test _test_inside:
+- grass is outside; the house is inside, with its room's bounds;
+- the roof is half eased at half ROOF_FADE, then shadow only;
+- a ruin is inside; a gone plot is not; built again, it is inside;
+- a local refill equals one worked out afresh;
+- out again, the roof comes back whole after FADE_HOLD.
+
+The roof tests in _test_buildings and the damage test advance ROOF_FADE. Client
+only, protocol unchanged, no new class_name.
