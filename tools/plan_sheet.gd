@@ -103,6 +103,10 @@ const LAIR_STAIR_ROW := 73
 const LAIR_DRAUGR := Vector2i(49, 75)
 const LAIR_FROM_TEMPLE := Vector2i(49, 76)
 const LAIR_SHORTCUT_LINK := Vector2i(49, 77)
+## The Hall's reward (666, the coordinator): one chest on the dais beside the
+## throne, rolling the fallen_grave table (plate among it, 622), reached only
+## past the dead's seal and the draugr.
+const LAIR_CHEST := Vector2i(51, 75)
 ## The Ossuary's end of the temple's sealed shortcut (maps' 654 points it at
 ## Held): the link behind the throne and the spawn before it.
 const DEEP_SHORTCUT_LINK := LAIR_SHORTCUT_LINK
@@ -385,7 +389,7 @@ static func sample_barrow_deep() -> Dictionary:
 	var rows := _blank_rows(DEEP_SIZE)
 	_lay_anchors(rows, DEEP_ANCHORS)
 	_edge(rows, LAIR_DOOR, "north", "+")  # The hall's one door, where the way comes in (sealed by the dead, 666; locked behind a challenger, 573 amended).
-	var markers := {DEEP_LINK_UP: "link", DEEP_START: "start", DEEP_SHORTCUT_LINK: "link", LAIR_DRAUGR: "monster_draugr"}
+	var markers := {DEEP_LINK_UP: "link", DEEP_START: "start", DEEP_SHORTCUT_LINK: "link", LAIR_DRAUGR: "monster_draugr", LAIR_CHEST: "chest"}
 	var heights := {}
 	for cell in Level.rect_cells(LAIR_DAIS):
 		heights[cell] = 1
@@ -410,7 +414,7 @@ static func sample_barrow_deep() -> Dictionary:
 		"spawn_points": {"from_above": [DEEP_FROM_ABOVE.x, DEEP_FROM_ABOVE.y], "from_temple": [DEEP_FROM_TEMPLE.x, DEEP_FROM_TEMPLE.y]},
 		"links": [{"at": [DEEP_LINK_UP.x, DEEP_LINK_UP.y], "to_map": "barrow", "to_spawn": "from_below"},
 			{"at": [DEEP_SHORTCUT_LINK.x, DEEP_SHORTCUT_LINK.y], "to_map": "wilds", "to_spawn": "from_barrow_shortcut", "sealed": "draugr"}],
-		"entities": [{"at": [LAIR_DRAUGR.x, LAIR_DRAUGR.y], "name": "Draugr"}],
+		"entities": [{"at": [LAIR_DRAUGR.x, LAIR_DRAUGR.y], "name": "Draugr"}, {"at": [LAIR_CHEST.x, LAIR_CHEST.y], "loot": "fallen_grave"}],
 		"regenerate": {"generator": "labyrinth", "style": "barrow", "layer": 2, "ways": 5, "every_days": 3, "anchors": DEEP_ANCHORS,
 			"entrance": "entrance", "rooms": {"count": [10, 14], "size": [[8, 7], [16, 12]]}, "loops": 0.15,
 			# Tune: twelve and two (666, drafts for Jeff), the dead spread by band (631), the guards by the Hall's door.

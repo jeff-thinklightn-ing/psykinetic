@@ -757,7 +757,10 @@ its entry's props `"grave": false`. The Ossuary's and the Hall's generated
 chests roll their goods from `levels/loot.json` (`"loot": {"chest": ...}`
 in the template, kept by the generated level.json): `ossuary_grave` (a
 mail shirt in one chest in four, a dagger) and `fallen_grave` (plate in one
-in twenty, mail in one in four, a sword), the only loot that gives armour
+in twenty, mail in one in four, a sword; since 666 the Hall's one chest, laid
+by hand on the dais beside the throne, its entry's `"loot"`; a chest's roll
+is seeded by level, cell and a generated level's generation, so it rolls anew
+each generation), the only loot that gives armour
 (622, dungeon's side: mail and plate enter the world as grave goods;
 Snagfin fences them, economy's). The first layer's chests roll nothing.
 

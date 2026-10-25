@@ -2839,7 +2839,9 @@ static func _spec_for(marker: String, monster_types: Dictionary) -> Dictionary:
 ## monster's own kind, else "monster", which leaves wild animals out). A
 ## chest's empty slots are filled (a depot or a shop counter keeps none); a
 ## monster carries up to MONSTER_CARRIES. Seeded by the level's name and
-## [param at]: the same each time the level is built.
+## [param at], and a generated level's "generation" (666: the Hall's one
+## chest stands on the same cell every generation, its goods rolled anew):
+## the same each time the level is built.
 static func _stock(props: Dictionary, spec: Dictionary, entry: Dictionary, config: Dictionary, warnings: Array[String], at: Vector2i) -> void:
 	var script := str(spec.get("script", ""))
 	if script == CHEST and props.has("cache"):
@@ -2873,7 +2875,10 @@ static func _stock(props: Dictionary, spec: Dictionary, entry: Dictionary, confi
 	for slot in slots.size():
 		if slots[slot].is_empty():
 			empty.append(slot)
-	var rolled := Items.roll_loot(table, "%s:%d,%d" % [str(config.get("name", "")), at.x, at.y], empty.size())
+	var key := "%s:%d,%d" % [str(config.get("name", "")), at.x, at.y]
+	if config.has("generation"):
+		key += "#%d" % int(config["generation"])
+	var rolled := Items.roll_loot(table, key, empty.size())
 	for i in rolled.size():
 		slots[empty[i]] = rolled[i]
 	props["slots"] = slots

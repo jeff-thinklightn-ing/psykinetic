@@ -293,7 +293,7 @@ func _test_barrow() -> void:
 	var dead_by_band := [0, 0, 0]
 	for spec: Dictionary in level["entities"]:
 		var kind := str(spec.get("kind", spec["name"].rstrip("0123456789").to_lower()))
-		if kind == "chest":
+		if kind == "chest" and spec["tile"] != Sheet.LAIR_CHEST:
 			chest_depth += depth.call(spec["tile"])
 		elif kind == "skeleton":
 			# The generator's measure: the distance over the farthest the map reaches from the entrance.
@@ -302,9 +302,9 @@ func _test_barrow() -> void:
 				far = maxi(far, depth.call(corner))
 			var d := float(depth.call(spec["tile"])) / float(far)
 			dead_by_band[0 if d < Regen.BANDS[0] else (1 if d < Regen.BANDS[1] else 2)] += 1
-	_check(kinds.get("skeleton", 0) == 12 and kinds.get("skeleton_guard", 0) == 2 and kinds.get("chest", 0) == 5 and kinds.get("draugr", 0) == 1
+	_check(kinds.get("skeleton", 0) == 12 and kinds.get("skeleton_guard", 0) == 2 and kinds.get("chest", 0) == 6 and kinds.get("draugr", 0) == 1
 		and kinds.get("robber", 0) == 0 and not kinds.has("altar"),
-		"twelve skeletons and two grave guards (drafts, 666), five chests laid, the draugr kept on his throne; no robbers, no altar (%s)" % [kinds])
+		"twelve skeletons and two grave guards (drafts, 666), five chests laid and the Hall's own, the draugr kept on his throne; no robbers, no altar (%s)" % [kinds])
 	var guard_off := 0
 	for spec: Dictionary in level["entities"]:
 		if str(spec.get("kind", "")) == "skeleton_guard":
@@ -313,7 +313,7 @@ func _test_barrow() -> void:
 	_check(guard_off > 0 and guard_off <= 16, "the grave guards stand near the Hall's door (666: the farthest %d cells off)" % guard_off)
 	_check(_dead_at_walls(a, anchors).is_empty() and _dead_at_walls(b, anchors).is_empty(),
 		"the Ossuary's dead stand on open floor in both generations: never a niche, a grave or a wall's foot (631 amended; %s)" % [_dead_at_walls(a, anchors) + _dead_at_walls(b, anchors)])
-	if kinds.get("skeleton", 0) == 12 and kinds.get("chest", 0) == 5:
+	if kinds.get("skeleton", 0) == 12 and kinds.get("chest", 0) == 6:
 		# The dead a third to each band (decision 631): the shallow band's share
 		# shows up a few rooms in, not only at the far end.
 		_check(chest_depth / 5.0 > mean_floor and dead_by_band[0] >= 3 and dead_by_band[1] >= 3 and dead_by_band[2] >= 3,
@@ -368,8 +368,11 @@ func _test_barrow() -> void:
 	_check(_broad(a, floor_cells) * 10 >= floor_cells.size() * 8, "the ways are five wide: most floor cells have floor on two opposite sides (%d of %d)" % [_broad(a, floor_cells), floor_cells.size()])
 	# The Hall of Fallen Souls, the Ossuary's far anchor (666).
 	var in_hall := 0
+	var hall_chest := {}
 	for spec: Dictionary in level["entities"]:
-		if Sheet.LAIR_HALL.has_point(spec["tile"]) and str(spec.get("kind", "")) != "draugr":
+		if spec["tile"] == Sheet.LAIR_CHEST:
+			hall_chest = spec
+		elif Sheet.LAIR_HALL.has_point(spec["tile"]) and str(spec.get("kind", "")) != "draugr":
 			in_hall += 1
 	var pillars: Array = config.get("buildings", []).filter(func(b: Dictionary) -> bool: return b.get("slot", "") == "building.crypt_pillar")
 	var hall_doors := 0
@@ -379,8 +382,8 @@ func _test_barrow() -> void:
 			hall_doors += 1
 	_check(in_hall == 0 and hall_doors == 1 and a.walkable(Sheet.LAIR_DOOR) and a.walkable(Sheet.LAIR_DOOR - Vector2i(0, 1)) and pillars.size() == 6
 		and level["terrain"]["solid"].size() == 24 + 9 + 8 and level["terrain"]["stairs"].size() == 12 and level["buildings"].size() == 20
-		and config.get("rooms", {}).has("lair"),
-		"nothing is laid in the Hall; one door into it, the way reaching it from the north; the pillars, the round table and the broken tables solid, the chairs and throne walked onto, the dais's twelve stairs, the Hall's name kept for its card (%d pillars, %d solid, %d doors)" % [pillars.size(), level["terrain"]["solid"].size(), hall_doors])
+		and config.get("rooms", {}).has("lair") and str(hall_chest.get("script", "")) == Level.CHEST and Sheet.LAIR_DAIS.has_point(Sheet.LAIR_CHEST),
+		"nothing is laid in the Hall but its own chest on the dais beside the throne; one door into it, the way reaching it from the north; the pillars, the round table and the broken tables solid, the chairs and throne walked onto, the dais's twelve stairs, the Hall's name kept for its card (%d pillars, %d solid, %d doors)" % [pillars.size(), level["terrain"]["solid"].size(), hall_doors])
 	_check(not config.has("damp") and not config.has("ambient") and not config.has("dead") and config.get("stills", []) == ["barrow"],
 		"the dark below's keys left with it: no damp, no ambient, no word on the dead; his rest stills the barrow above (%s)" % [config.get("stills")])
 

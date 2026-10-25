@@ -28864,11 +28864,15 @@ lore (the lines and names). This is dungeon's side, step 1. Amends 580 (two laye
   (enemy-ai with npc's paid_deals; the deal fixed at the first payment, a higher payment replaces
   it, never lowered), the restart that seats him at full and raises the stilled dead ("a fresh day
   in the barrow"; dead_rest no longer saved), the card itself (ui), the lines (lore).
-- **Open**: the Hall lays no chests (it is an anchor) and the dark below's caverns are gone, so
-  the Hall's own loot table (`fallen_grave`, 622: mail and rare plate) has no chest left; the
-  Ossuary's chests roll `ossuary_grave` (mail). Asked of the coordinator and items: plate from the
-  draugr's win or a hand-laid chest in the Hall, or the Ossuary's deepest band rolling
-  `fallen_grave`.
+- **The Hall's chest** (the coordinator, after the open ask; items: nothing to change, the table
+  keyed by name only): the Hall lays no generated chests (it is an anchor) and the dark below's
+  caverns are gone, so its reward is one hand-laid chest on the dais beside the throne
+  (`plan_sheet.LAIR_CHEST` (51, 75)), its entry's `"loot": "fallen_grave"` (622: rare plate, mail,
+  a sword), reached only past the dead's seal and the draugr; grave goods by the level's key. The
+  Ossuary's generated chests roll `ossuary_grave` (mail). A chest's roll is seeded by level name
+  and cell, and now also by a generated level's `"generation"` (`Level._stock`), so a chest kept on
+  one cell through the generations rolls its goods anew each time; a template (no generation) rolls
+  as before.
 
 The cut: a full cut (level data both sides read); before the deploy, players checked; after it
 `regenerate now barrow` and `regenerate now barrow_deep`, the retired count grepped, the overlay

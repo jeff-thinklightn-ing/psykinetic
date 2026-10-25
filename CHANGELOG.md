@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The Hall of Fallen Souls keeps its reward: one chest on the dais beside the draugr's throne, rolling the old Hall's goods (rare plate, mail, a sword), reached only past the dead's seal and the draugr; its goods are rolled anew each time the Ossuary shifts.
 - The barrow is two depths now: the Hall of Fallen Souls is a great room at the far end of the Ossuary, sealed until the Ossuary's dead are all down, and the dark level below it is gone (anyone saved there wakes at the Ossuary's stair foot).
 - Tune: the Ossuary holds twelve skeletons and two grave guards, the guards by the Hall's door (drafts).
 - The barrow's first hall, altar room and robbers' camp, and the Hall of Fallen Souls, carry names for the on-entry card.

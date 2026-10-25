@@ -244,6 +244,13 @@
 				75
 			],
 			"name": "Draugr"
+		},
+		{
+			"at": [
+				51,
+				75
+			],
+			"loot": "fallen_grave"
 		}
 	],
 	"regenerate": {

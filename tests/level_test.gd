@@ -2008,8 +2008,8 @@ func _test_barrow_level() -> void:
 			if kind == "skeleton_guard" and marked:
 				guards_marked += 1
 	_check(kinds.get("skeleton_guard", 0) == 2 and kinds.get("draugr", 0) == 1 and kinds.get("altar", 0) == 1 and kinds.get("runner's pack", 0) == 1
-		and barrow["places"].has("niche") and barrow["entities"].size() == 4 and deep["entities"].size() == 1,
-		"the altar with its two guards, Pip's niche and the Runner's pack on the first layer, the draugr in his hall in the Ossuary (%s)" % [kinds])
+		and barrow["places"].has("niche") and barrow["entities"].size() == 4 and deep["entities"].size() == 2 and kinds.get("chest", 0) == 1,
+		"the altar with its two guards, Pip's niche and the Runner's pack on the first layer, the draugr in his hall in the Ossuary and its chest by the throne (%s)" % [kinds])
 	_check(grave_marked.get("Altar", false) and grave_marked.get("Draugr", false) and not grave_marked.get("Runner's pack", true) and guards_marked == 2,
 		"grave_goods marks the altar, the guards and the draugr as grave goods, the runner's pack exempt (%s)" % [grave_marked])
 	_check(barrow["links"].size() == 2 and barrow["links"][0]["to_map"] == "wilds" and barrow["links"][1]["to_map"] == "barrow_deep" and barrow["links"][1]["to_spawn"] == "from_above"
@@ -2094,12 +2094,13 @@ func _test_barrow_level() -> void:
 	# Armour as grave goods (622, dungeon's side): the Ossuary's chests roll
 	# mail shirts; every generated chest's goods carry the grave mark; nowhere
 	# else gives armour. The rolls are seeded by level and cell, so which
-	# generation gives what is fixed. (The Hall's own table, plate among it,
-	# laid in the dark below's caverns; the Hall lays no chest: 666's open ask.)
+	# generation gives what is fixed. The Hall's one chest, on the dais beside
+	# the throne, rolls its own table, plate among it (666, the coordinator).
 	var first_mail := 0
+	var first_plate := 0
 	var unmarked := 0
 	var chests_seen := 0
-	for generation in range(1, 13):
+	for generation in range(1, 25):
 		var laid := Regen.generate("barrow_deep", generation)
 		var parsed := Level.parse(laid["layout"], laid["height"], laid["config"])
 		for spec: Dictionary in parsed["entities"]:
@@ -2109,12 +2110,17 @@ func _test_barrow_level() -> void:
 			var props: Dictionary = spec.get("props", {})
 			if props.get("grave", false) != true:
 				unmarked += 1
-			if (props.get("slots", []) as Array).has("mail_armour") and first_mail == 0:
+			if spec["tile"] == Sheet.LAIR_CHEST:
+				if (props.get("slots", []) as Array).has("plate_armour") and first_plate == 0:
+					first_plate = generation
+			elif (props.get("slots", []) as Array).has("mail_armour") and first_mail == 0:
 				first_mail = generation
-		if first_mail > 0:
+		if first_mail > 0 and first_plate > 0:
 			break
-	_check(first_mail > 0 and unmarked == 0 and chests_seen >= 5,
-		"a generation places mail in the Ossuary, every chest's goods grave marked (first in generation %d; %d chests, %d unmarked)" % [first_mail, chests_seen, unmarked])
+	var hall_entry: Array = Level.template_config("barrow_deep").get("entities", []).filter(func(e: Dictionary) -> bool: return Vector2i(int(e["at"][0]), int(e["at"][1])) == Sheet.LAIR_CHEST)
+	_check(first_mail > 0 and unmarked == 0 and chests_seen >= 6 and hall_entry.size() == 1 and hall_entry[0].get("loot") == "fallen_grave",
+		"a generation places mail in the Ossuary, every chest's goods grave marked; the Hall's chest rolls fallen_grave (first mail in generation %d; %d chests, %d unmarked)" % [first_mail, chests_seen, unmarked])
+	_check(first_plate > 0, "a generation puts plate in the Hall's chest (first in generation %d of 24)" % first_plate)
 	var armour_elsewhere: Array[String] = []
 	for table: String in Items.loot_tables():
 		if table in ["ossuary_grave", "fallen_grave"]:
