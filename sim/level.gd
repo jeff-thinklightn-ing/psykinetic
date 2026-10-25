@@ -418,6 +418,12 @@ static func world_cell(plane: Dictionary, level_name: String, cell: Vector2i) ->
 ## Every level in the game: the folders under levels/ with a layout.png
 ## (prefabs left out; not the levels made in code), and those in the
 ## overlay (a level made in the game is only there), sorted.
+## Levels for development, which no way in the world reaches and none must
+## (decision 673: the practice hall, Net.PRACTICE_MAP, hosted on its own):
+## WorldMap's reach checks leave them out.
+const DEV_LEVELS: Array[String] = ["practice"]
+
+
 static func names() -> Array[String]:
 	var out: Array[String] = overlay_names()
 	for folder in ResourceLoader.list_directory(DIR):

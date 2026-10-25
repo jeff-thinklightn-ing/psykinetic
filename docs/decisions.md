@@ -29190,3 +29190,76 @@ raised_tick. Tests:
   nothing loosed, winded;
 - monster_test, ui_test and view_test: the new numbers.
 No new class_name.
+
+## 673. Feel tuning: live fields, slow time and a practice hall, in a local host
+
+Jeff: "i need way to tune combat and animation feel that has a quicker feedback loop." A number
+changed used to mean land, cut, deploy and play: hours. Combat leads; pc-character has the clips,
+ui the panel, enemy-ai the monsters' fight values. The coordinator approved the design
+(C:/dev/review/combat/tuning/design.md) as steps 1 to 3. This is step 1.
+
+- **Where:** only in a local host (Net Mode.HOST: the sim and the view in one process), by
+  Tuning.allowed. A joined client's keys do nothing (its numbers would be the server's), and a
+  server (the box) never runs any of it. Nothing reads a save at start-up: only the panel loads
+  one, on a click. No message, command or replicated field, so no wire change.
+- **Fields (Tuning):** a path whose first part is the source that reads and sets it:
+  - `combat.<key>` and `combat.moves.<move>.<key>` go through World.load_combat_rules and moves;
+  - `physics.<key>` goes through World.load_physics_rules, using physics.json's names;
+  - `items.<id>.<key>` is an item's verb, through the new Items.set_verb, which puts the row
+    through verb_from again, so a bow's ticks to full draw are worked out anew;
+  - a tree's own come through Tuning.register_source(prefix, get, set, list). Main registers
+    `camera.draw_pull_margin`, `_most` and `_rate` (Client3D's draw pull, now vars with the
+    constants as defaults). Step 2 adds pc-character's feel.json, ui's camera and enemy-ai's
+    `monsters.fight`.
+  - Tuning.fields() lists each one for the panel: group, kind (int, float, bool, ints, floats),
+    range, owner, and takes (now, or spawn for a value read when a body is made).
+  - apply() fits the value to the field's kind and refuses a word, a number under 0 or a wrong
+    shape. It keeps the repo's value the first time, for reset, reset_all and the save. Setting
+    a field to its repo value drops the change.
+- **Save:** save() writes only what changed, path to {value, repo}, with the build's version, to
+  user://tuning/<date_time>.json. copy_to_review() puts the file in C:/dev/review/tuning, and the
+  coordinator routes Jeff's sets to the owner trees, which commit his numbers in their data
+  files. The game never writes levels/ or art/. load_file() reads a save back in. Tests write
+  only under test_ports.gd's scratch().
+- **Time:** fixed keys, not the Options' (Main.tuning_key):
+  - F8 steps the time scale through 1, 0.5 and 0.25 (Engine.time_scale). World's tick runs off
+    _process's delta, so the sim, the clips and the eases slow together.
+  - F9 pauses: time_scale 0.
+  - "." while paused plays exactly one sim tick at the scale. World.pause_at_tick stops the
+    tick loop after it, sets time_scale 0 again and clears the accumulator, so no catch-up
+    burst follows.
+  - F7 emits Main.tuning_panel_toggled for ui's panel. F10 is ui's admin panel (672) and F11 is
+    fullscreen.
+- **The practice hall:** levels/practice, a 24 by 24 stone hall (written through the editor's LevelMap, its layout an image import as every level's) with a pillar to shoot past and
+  a walled side room behind a door.
+  - It's a dev level (Level.DEV_LEVELS): no link, border or world map reaches it, and WorldMap's
+    reach check leaves it out. It's content Jeff asked for, not part of the world.
+  - `--practice` (Net.practice) makes the process a host of its own there: 127.0.0.1, port
+    PRACTICE_PORT (DEFAULT_PORT + 73), no snapshot. The main menu's Practice button
+    (MainMenu.practice_pressed, Main.start_practice) starts one beside the game and closes the
+    game, so practice never mixes with the box.
+  - Main.place_dummies puts a dummy at each of the hall's `dummy...` spawn points, each time the
+    room is laid.
+- **The arena:**
+  - Tuning.spawn_dummy: a brute's body, Monster.practice_still (it never moves or strikes) and
+    never_dies (World.damage holds its hp at 1; full again after DUMMY_REFILL_TICKS, 3 s,
+    without a blow).
+  - spawn_kind(kind, at, fights): any monsters.json kind, standing passive or fighting.
+  - clear() removes only what the arena made.
+  - give(who, id): armour worn, a shield or arrows in the left hand, else the right; two hands
+    or a bow empty the left, and a bow comes with its arrows.
+  - full(who) restores hp and stamina.
+  - ui's panel calls these.
+- **Tests:** tuning_test covers:
+  - the fields and their kinds;
+  - apply, refusal and reset for each source, plus a registered one;
+  - a client and a server refused (no change, time left alone, no save written or read, Main
+    taking none of F7, F8, F9 or "."), and no script but Tuning's own calling load_file;
+  - a save holding only the changes beside the repo values, copied for review and read back;
+  - the scales, the pause, and a step of exactly one tick with nothing after it;
+  - the dummy held at 1 and full again, never moved, a passive kind and a fighting one, clear;
+  - give and full;
+  - the hall reached by no level, map or plane.
+  world_map_test counts the dev levels out of "every level is reachable".
+
+New class_name: Tuning.

@@ -222,7 +222,9 @@ func _test_levels() -> void:
 	for problem in problems:
 		print("    " + problem)
 	_check(problems.is_empty(), "the levels connect with no problems")
-	_check(world_map.reachable(Level.DEFAULT_MAP).size() == names.size(), "every level is reachable from %s" % Level.DEFAULT_MAP)
+	var dev := names.filter(func(level_name: String) -> bool: return level_name in Level.DEV_LEVELS)
+	_check(world_map.reachable(Level.DEFAULT_MAP).size() == names.size() - dev.size(),
+		"every level is reachable from %s, but the dev levels (%s), which none reach (decision 673)" % [Level.DEFAULT_MAP, dev])
 
 
 ## h_land: 20 x 10 cells of floor, (5, 8) void; its places: a goblin camp

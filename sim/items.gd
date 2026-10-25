@@ -695,6 +695,21 @@ static func verb_of(id: String) -> Dictionary:
 	return def(id).get("verb", {})
 
 
+## Feel tuning (decision 673): [param id]'s verb with [param key] set to
+## [param value], put through verb_from again as the catalog's would be
+## (a bow's ticks to full draw worked out anew); in this process only, the
+## file untouched (reset() reads it again). False for no verb or key.
+static func set_verb(id: String, key: String, value: Variant) -> bool:
+	var definition := def(id)
+	var verb: Variant = definition.get("verb", {})
+	if verb is not Dictionary or (verb as Dictionary).is_empty() or not (verb as Dictionary).has(key):
+		return false
+	var raw: Dictionary = (verb as Dictionary).duplicate(true)
+	raw[key] = value
+	definition["verb"] = verb_from(id, raw)
+	return true
+
+
 static func has_tag(id: String, tag: String) -> bool:
 	return tag in def(id).get("tags", [])
 

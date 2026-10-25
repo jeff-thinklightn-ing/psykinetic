@@ -306,6 +306,12 @@ var call_reach := Senses.NOISE_CALL
 ## on the way: one in its way, or one that struck it.
 var grave := NO_TILE
 var laid := false
+## The practice hall's (decision 673, Tuning): practice_still, it stands
+## where it is and never strikes or moves; never_dies, its hp held at 1 and
+## full again after Tuning.DUMMY_REFILL_TICKS without a blow (the dummy).
+## Server only, never saved: the arena makes them each time.
+var practice_still := false
+var never_dies := false
 var stilled := false
 var _provoked: GridEntity
 ## Who blocks its way home, since when and when last (decision 561).
@@ -2384,6 +2390,10 @@ func _woke_up() -> void:
 ## have in that time at its idle pace, by a real way (World.walk), and is
 ## back if it gets there. No hits.
 func _world_tick(seconds: float) -> void:
+	if practice_still:
+		if never_dies and hp < max_hp and World.tick - hurt_tick >= Tuning.DUMMY_REFILL_TICKS:
+			hp = max_hp
+		return
 	target = null
 	slot = NO_TILE
 	_drop_windup()

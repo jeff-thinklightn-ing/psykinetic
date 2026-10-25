@@ -2,6 +2,8 @@ extends Node
 ## Launch mode and ENet setup (autoload "Net").
 ##
 ##   --host                       listen server: runs the sim, has a local player (default)
+##   --practice                   a host of its own in the practice hall (decision 673): levels/practice,
+##                                on 127.0.0.1:PRACTICE_PORT, no snapshot; the menu's Practice starts one
 ##   --server                     dedicated: runs the sim, no local player, fine with --headless
 ##   --client --address=<ip>      connects to a server; runs no sim
 ##   --port=<n>                   default 7777
@@ -680,6 +682,10 @@ var test_minimap := false
 var test_ui_cost := false
 ## --menu: the main menu first, whatever the mode (MainMenu).
 var show_menu := false
+## --practice (decision 673): this process is the practice hall's own host.
+var practice := false
+const PRACTICE_MAP := "practice"
+const PRACTICE_PORT := DEFAULT_PORT + 73
 ## --test-show: HUD panels opened once the local player is in (Main._run_test_show).
 var test_show: PackedStringArray = []
 ## --raids: raid groups on from the start (World.raid_groups; the console can too).
@@ -1798,6 +1804,13 @@ func _parse_args() -> void:
 			"--host":
 				mode = Mode.HOST
 				_mode_given = true
+			"--practice":
+				mode = Mode.HOST
+				_mode_given = true
+				practice = true
+				map_name = PRACTICE_MAP
+				bind_address = "127.0.0.1"
+				port = PRACTICE_PORT
 			"--server":
 				mode = Mode.SERVER
 				_mode_given = true

@@ -432,6 +432,8 @@ func problems(from := "", factions: Factions = null) -> Array[String]:
 		var there := reachable(root)
 		var back := reachable(root, true)
 		for area_name: String in areas:
+			if area_name in Level.DEV_LEVELS and area_name not in there:
+				continue  # A dev level (decision 673): reached by no way, on purpose.
 			if area_name not in there:
 				out.append("%s: cannot be reached from %s" % [area_name, root])
 			elif area_name not in back:

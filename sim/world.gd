@@ -594,6 +594,9 @@ var _roster_current := false
 var _hits: Array[Hit] = []
 var _next_id := 1
 var _accumulator := 0.0
+## Feel tuning's frame step (decision 673): a tick to stop at, time held
+## again once it is played (Engine.time_scale 0); -1 for none.
+var pause_at_tick := -1
 
 ## Server: every loaded zone by name, and the one World is working on.
 var zones: Dictionary[String, Zone] = {}
@@ -840,6 +843,11 @@ func _process(delta: float) -> void:
 			Net.stats.record_tick(took, tick)
 			_note_slow(took, 0)
 			steps += 1
+			if pause_at_tick >= 0 and tick >= pause_at_tick:
+				pause_at_tick = -1  # 673: the step played; held again.
+				Engine.time_scale = 0.0
+				_accumulator = 0.0
+				break
 	# The frame before this one, less its ticks (timed above): slow for
 	# something outside the sim.
 	if frame_usec - _last_ticks_usec > SLOW_FRAME_USEC:
@@ -6299,6 +6307,8 @@ func damage(target: GridEntity, amount: int, source: GridEntity = null,
 	var lost := mini(amount, target.hp)
 	target.hp -= lost
 	target.hurt_tick = tick
+	if target.hp == 0 and target is Monster and (target as Monster).never_dies:
+		target.hp = 1  # The practice dummy (decision 673): held at 1, full again when let be.
 	if cause != &"fire":
 		var loud := float(Senses.NOISE_FIGHT)
 		if cause == &"attack" and is_instance_valid(source):

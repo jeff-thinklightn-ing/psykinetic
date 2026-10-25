@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Practice hall and live tuning (673): Practice on the main menu opens a hall of your own with training dummies that never die. There, F8 slows time (half, quarter), F9 pauses and "." steps one tick. The bow, swing, stamina, telegraph, knockback and camera numbers can be changed while you play (the panel, F7, comes with ui's next step) and saved for the trees to commit.
 - The bow now builds up as you draw: 2, 3, then full strength 4 at full draw (1.2 s, 9 cells); held past it the shot reaches farther (11, 13, 15 cells) but hits a target out there for less, and holding at full draw drains stamina until your arms give out and the bow lowers; the pips show the strength, a ring marks where full strength ends, and the camera eases out so the reach stays on screen (669).
 - When the draugr yields or is laid to rest, a spin, axe throw or charge he had begun is called off: nothing lands after he gives up (603 amended (3)).
 - Animals come back to the wilds: a herd's animals that vanished without being killed (a room reset, a restart) are counted back into the herd each day instead of being lost for good, and the server logs each area's herd numbers daily; an arrow that misses now lands with a thud, so game near where it falls runs off.

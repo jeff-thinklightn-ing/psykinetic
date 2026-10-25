@@ -697,6 +697,8 @@ signal world_changed
 ## [param data] {id, source, kind, shape, cells, from_tick, lands_tick,
 ## zone}; ended, landed or given up. For the views (ui's decal) and sounds.
 signal telegraph_started(id: int, data: Dictionary)
+## F7 in a local host (decision 673): the tuning panel (ui's) shown or hidden.
+signal tuning_panel_toggled
 signal telegraph_ended(id: int, landed: bool)
 ## Server: what each player's world map is told (WorldNews), and the tick
 ## it was last looked at.
@@ -791,6 +793,83 @@ func _ready() -> void:
 	_play()
 
 
+## Feel tuning's keys (decision 673), fixed (not the Options' to rebind)
+## and only in a local host (Tuning.allowed; a joined client's do nothing):
+## F7 the panel, F8 the next time scale, F9 pause, "." one tick on while
+## paused. Whether [param key] was one.
+func tuning_key(key: InputEventKey) -> bool:
+	if key == null or not key.pressed or key.echo or not Tuning.allowed():
+		return false
+	match key.keycode:
+		KEY_F7:
+			tuning_panel_toggled.emit()
+		KEY_F8:
+			talk.add_line("Tuning", "time x%s" % Tuning.cycle_scale(), true, true)
+		KEY_F9:
+			talk.add_line("Tuning", "paused: \".\" steps one tick" if Tuning.toggle_pause() else "time runs", true, true)
+		KEY_PERIOD:
+			if not Tuning.paused:
+				return false
+			Tuning.step_once()
+		_:
+			return false
+	return true
+
+
+## Feel tuning's "camera" fields (decision 673): the view's own, on Client3D
+## while it runs (camera.<var>); ui's step 2 moves the rest of the view's
+## eases here, into art/kit/feel.json with pc-character's.
+const CAMERA_FIELDS := {"draw_pull_margin": [0.0, 5.0], "draw_pull_most": [1.0, 3.0], "draw_pull_rate": [1.0, 30.0]}
+
+
+static func camera_fields() -> Array:
+	var out := []
+	for key: String in CAMERA_FIELDS:
+		out.append({"path": "camera." + key, "group": "Camera", "min": CAMERA_FIELDS[key][0], "max": CAMERA_FIELDS[key][1],
+			"owner": "combat"})
+	return out
+
+
+func _camera_value(path: String) -> Variant:
+	var key := path.get_slice(".", 1)
+	return _client3d.get(key) if _client3d != null and CAMERA_FIELDS.has(key) else null
+
+
+func _set_camera_value(path: String, value: Variant) -> bool:
+	var key := path.get_slice(".", 1)
+	if _client3d == null or not CAMERA_FIELDS.has(key):
+		return false
+	_client3d.set(key, value)
+	return true
+
+
+## The practice hall's dummies (decision 673, Tuning.spawn_dummy), one at
+## each of its level.json spawn_points named dummy...; the arena's others
+## gone with the room.
+func place_dummies() -> void:
+	Tuning.clear()
+	var config: Variant = JSON.parse_string(FileAccess.get_file_as_string("res://levels/%s/level.json" % Net.PRACTICE_MAP))
+	var points: Variant = config.get("spawn_points", {}) if config is Dictionary else {}
+	if points is not Dictionary:
+		return
+	for point: String in points:
+		var at: Variant = points[point]
+		if point.begins_with("dummy") and at is Array and (at as Array).size() == 2:
+			Tuning.spawn_dummy(Vector2i(int(at[0]), int(at[1])))
+
+
+## The practice hall (decision 673): a host of its own (--practice) started
+## beside this one and this one closed, so the menu's Practice never mixes
+## with the box; an exported game runs itself again, a project run Godot
+## on the project.
+func start_practice() -> void:
+	var args := PackedStringArray(["--practice"])
+	if not OS.has_feature("template"):
+		args = PackedStringArray(["--path", ProjectSettings.globalize_path("res://"), "--", "--practice"])
+	if OS.create_process(OS.get_executable_path(), args) > 0:
+		_quit_game()
+
+
 ## Play: online, by way of the connect screen for a client (the first run
 ## fills in the server's details first).
 func _play() -> void:
@@ -824,6 +903,7 @@ func _show_menu() -> void:
 	if main_menu == null:
 		main_menu = MainMenu.new()
 		main_menu.play_pressed.connect(_play)
+		main_menu.practice_pressed.connect(start_practice)
 		main_menu.options_pressed.connect(_menu_options)
 		main_menu.quit_pressed.connect(_quit_game)
 		add_child(main_menu)
@@ -1227,6 +1307,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if Keys.pressed(event, "debug"):
 		debug_overlay.visible = not debug_overlay.visible
+		return
+	if tuning_key(key):
+		get_viewport().set_input_as_handled()
 		return
 	if Keys.pressed(event, "fullscreen"):
 		Net.toggle_fullscreen()
@@ -1899,6 +1982,8 @@ func _show_3d() -> void:
 	_client3d.setup(_terrain, level_centre)
 	_client3d.bubbles = bubbles
 	_show_towns()
+	if Tuning.allowed():
+		Tuning.register_source("camera", _camera_value, _set_camera_value, camera_fields)  # 673.
 
 
 # --- WASD ---------------------------------------------------------------------------
@@ -3530,6 +3615,8 @@ func _open_zone(zone_name: String, saved := {}) -> Zone:
 		for slot in level_entities.size():
 			_spawn(_slot_spec(slot))
 	_test_herds()
+	if Net.practice and World.zone.name == Net.PRACTICE_MAP:
+		place_dummies()  # 673: the practice hall's dummies, each time the room is laid.
 	_restore_ground(saved.get("ground", []))
 	# The fixed heat and light now, with the doors in, not in a tick with
 	# a player waiting (perf: 1.5-3 s on a 256 dungeon's first tick).
@@ -4087,6 +4174,8 @@ func _start_level(from_snapshot := false, whole := true, with_saved := {}) -> vo
 		for slot in level_entities.size():
 			_spawn(_slot_spec(slot))
 	_test_herds()
+	if Net.practice and World.zone.name == Net.PRACTICE_MAP:
+		place_dummies()  # 673: the practice hall's dummies, each time the room is laid.
 	_restore_ground(saved.get("ground", []))
 	for peer in peers:
 		var id: String = ids[peer]

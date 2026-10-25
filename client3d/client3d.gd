@@ -1236,6 +1236,11 @@ const AIM_LEAD_CELLS := 4.0
 const DRAW_PULL_MARGIN := 1.5
 const DRAW_PULL_MOST := 1.8
 const DRAW_PULL_RATE := 7.5
+## The three as the view uses them, the constants their defaults: feel
+## tuning's (decision 673, the "camera" fields) set them while it runs.
+var draw_pull_margin := DRAW_PULL_MARGIN
+var draw_pull_most := DRAW_PULL_MOST
+var draw_pull_rate := DRAW_PULL_RATE
 ## A telegraph's fill: faint at its start, full as it lands; the landing
 ## flash's alpha and length.
 const TELEGRAPH_FAINT := 0.18
@@ -2916,9 +2921,9 @@ func aim_reach(cells: float, way: Vector2) -> void:
 	if cells <= 0.0 or _camera == null or way.length() < 0.001:
 		_reach_pull_to = 1.0
 		return
-	var ground := way.normalized() * (cells + DRAW_PULL_MARGIN) - Vector2(_aim_lead_to.x, _aim_lead_to.z)
+	var ground := way.normalized() * (cells + draw_pull_margin) - Vector2(_aim_lead_to.x, _aim_lead_to.z)
 	var point := Vector3(ground.x, 0.0, ground.y)
-	var most := DRAW_PULL_MOST
+	var most := draw_pull_most
 	if not _low:
 		most = minf(most, World.NEAR_TILES / maxf(_view_reach() / maxf(_reach_pull, 0.001), 0.001))
 	most = maxf(most, 1.0)
@@ -2963,7 +2968,7 @@ func reach_fits(point: Vector3, pull: float) -> bool:
 func _ease_reach_pull(delta: float) -> void:
 	if is_equal_approx(_reach_pull, _reach_pull_to):
 		return
-	_reach_pull = lerpf(_reach_pull, _reach_pull_to, 1.0 - exp(-DRAW_PULL_RATE * delta))
+	_reach_pull = lerpf(_reach_pull, _reach_pull_to, 1.0 - exp(-draw_pull_rate * delta))
 	if absf(_reach_pull - _reach_pull_to) < 0.0005:
 		_reach_pull = _reach_pull_to
 

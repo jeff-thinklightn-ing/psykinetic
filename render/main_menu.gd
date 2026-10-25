@@ -8,6 +8,8 @@ extends CanvasLayer
 ## 2160 units.
 
 signal play_pressed
+## The practice hall (decision 673): Main starts a host of its own there.
+signal practice_pressed
 signal options_pressed
 signal quit_pressed
 ## The dark backdrop, kept while the options show over it (418 amended: the
@@ -19,6 +21,7 @@ var column: VBoxContainer
 const BUTTON_WIDTH := 560.0
 
 var play: Button
+var practice: Button
 var options: Button
 var quit: Button
 var version: Label
@@ -53,6 +56,10 @@ func _ready() -> void:
 	column.add_child(gap)
 	play = _button("Play", play_pressed)
 	column.add_child(play)
+	practice = _button("Practice", practice_pressed)
+	practice.tooltip_text = "A hall of your own to try fights and tune them (F7 the numbers, F8 slower, F9 pause)"
+	practice.visible = FileAccess.file_exists("res://levels/%s/level.json" % Net.PRACTICE_MAP)
+	column.add_child(practice)
 	options = _button("Options", options_pressed)
 	column.add_child(options)
 	quit = _button("Quit", quit_pressed)
