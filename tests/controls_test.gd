@@ -218,7 +218,7 @@ func _test_screen_lean() -> void:
 
 
 func _test_drag_and_freeze() -> void:
-	print("\n== WASD: a middle drag turns freely and locks on the next of the eight views (671), never under a held key ==")
+	print("\n== WASD: a middle drag turns freely and stays where it is let go (671 amended), never under a held key ==")
 	var saved: String = Net.controls
 	Net.controls = "wasd"
 	var rig := _rig()
@@ -228,24 +228,24 @@ func _test_drag_and_freeze() -> void:
 	_check(is_equal_approx(rig.yaw, 20.0), "the drag turns it at once (%s)" % rig.yaw)
 	rig.end_drag()
 	_ease(rig)
-	_check(is_equal_approx(rig.yaw, 45.0) and is_equal_approx(Net.camera_yaw, 45.0),
-			"let go 20 round: on to the next view that way, the square-on 45, and saved (%s)" % rig.yaw)
+	_check(is_equal_approx(rig.yaw, 20.0) and is_equal_approx(Net.camera_yaw, 20.0),
+			"let go 20 round: it stays at 20, no snap, and is saved (%s)" % rig.yaw)
 	rig.begin_drag()
 	rig.drag(5.0)
 	rig.end_drag()
 	_ease(rig)
-	_check(is_equal_approx(rig.yaw, 45.0), "let go 5 round, under 10: back where it set off (%s)" % rig.yaw)
+	_check(is_equal_approx(rig.yaw, 25.0), "a small drag of 5 stays too (%s)" % rig.yaw)
 	rig.begin_drag()
 	rig.drag(-100.0)
 	rig.end_drag()
 	_ease(rig)
-	_check(is_equal_approx(rig.yaw, -90.0), "100 the other way, past 0 (to -55): on to -90 (%s)" % rig.yaw)
+	_check(is_equal_approx(rig.yaw, -75.0), "100 the other way, past 0: at -75 (%s)" % rig.yaw)
 	rig.begin_drag()
 	rig.drag(300.0)
 	rig.end_drag()
 	_ease(rig)
 	_check(is_equal_approx(rig.yaw, 225.0) and is_equal_approx(Net.camera_yaw, 225.0),
-			"300 round (to 210): as far as it goes, then the next view (%s)" % rig.yaw)
+			"300 round: at 225, saved (%s)" % rig.yaw)
 	var start := rig.yaw
 	rig.set_frozen(true)
 	rig.begin_drag()
@@ -257,7 +257,7 @@ func _test_drag_and_freeze() -> void:
 	_check(is_equal_approx(rig.yaw, start), "nor does letting the button go (%s)" % rig.yaw)
 	rig.set_frozen(false)
 	_ease(rig)
-	_check(is_equal_approx(rig.yaw, start + 135.0), "the keys let go: it settles past where the drag was let go (%s)" % rig.yaw)
+	_check(is_equal_approx(rig.yaw, start + 100.0), "the keys let go: it goes to where the drag was let go (%s)" % rig.yaw)
 	start = rig.yaw
 	rig.begin_drag()
 	rig.set_frozen(true)
@@ -267,7 +267,7 @@ func _test_drag_and_freeze() -> void:
 	_check(is_equal_approx(rig.yaw, start + 40.0), "a drag held through a run applies when the keys are let go (%s)" % rig.yaw)
 	rig.end_drag()
 	_ease(rig)
-	_check(is_equal_approx(rig.yaw, start + 45.0), "and locks on the next view (%s)" % rig.yaw)
+	_check(is_equal_approx(rig.yaw, start + 40.0), "and stays there (%s)" % rig.yaw)
 	rig.set_frozen(true)
 	rig._settle_on(rig._yaw_step + 90.0)
 	var held := rig.yaw
@@ -330,14 +330,14 @@ func _test_diamonds() -> void:
 			and is_equal_approx(Client3D.settle_target(0.0, 180.0, 1.0), 180.0),
 			"settle: under 10 back, else the next view ahead (0 to 95 goes on to 135; 90 to 95 is back), or the one it is on")
 	_check(is_equal_approx(Net.saved_yaw("180", -1.0), 180.0) and is_equal_approx(Net.saved_yaw("-90", -1.0), 270.0)
-			and is_equal_approx(Net.saved_yaw("45", -1.0), 45.0) and is_equal_approx(Net.saved_yaw("100", -1.0), 90.0) and is_equal_approx(Net.saved_yaw("", 90.0), 90.0),
-			"a saved view loads as it is (0..360), a square-on one too; one between goes to the nearest; none keeps what it had")
+			and is_equal_approx(Net.saved_yaw("45", -1.0), 45.0) and is_equal_approx(Net.saved_yaw("100", -1.0), 100.0) and is_equal_approx(Net.saved_yaw("", 90.0), 90.0),
+			"a saved yaw loads as it is (0..360), one between the views too (671 amended); none keeps what it had")
 	Net.controls = saved
 	_free_rig(rig)
 
 
 func _test_wheel_zoom() -> void:
-	print("\n== the mouse wheel zooms on the player in small eased steps, 0.8x to 1.1x, saved; a middle click does nothing ==")
+	print("\n== the mouse wheel zooms on the player in small eased steps, 0.5x (the low camera 0.8x) to 1.1x, saved; a middle click does nothing ==")
 	var saved: String = Net.controls
 	var rig := _rig()
 	_check(is_equal_approx(rig.zoom, 1.0) and is_equal_approx(rig._camera.size, Client3D.CAMERA_SIZE), "it starts at 1x")
@@ -355,7 +355,7 @@ func _test_wheel_zoom() -> void:
 			"there within half a second (size %.2f)" % rig._camera.size)
 	for i in 10:
 		rig.zoom_by(1)
-	_check(is_equal_approx(rig._zoom_to, Client3D.ZOOM_MIN), "in no nearer than %sx" % rig._zoom_to)
+	_check(is_equal_approx(rig._zoom_to, Client3D.ZOOM_MIN) and is_equal_approx(Client3D.ZOOM_MIN, 0.5), "in no nearer than %sx" % rig._zoom_to)
 	for i in 20:
 		rig.zoom_by(-1)
 	_check(is_equal_approx(rig._zoom_to, Client3D.ZOOM_MAX) and is_equal_approx(Net.camera_zoom, Client3D.ZOOM_MAX),
@@ -374,8 +374,8 @@ func _test_wheel_zoom() -> void:
 	_check(is_equal_approx(rig.zoom, Client3D.ZOOM_MAX) and is_equal_approx(Net.camera_zoom, Client3D.ZOOM_MAX) and is_equal_approx(rig.yaw, yaw)
 			and is_equal_approx(rig.pitch, pitch), "%s: a middle click leaves the zoom (and all else) as it was" % Net.controls)
 	_check(is_equal_approx(Net.saved_zoom("1.05", -1.0), 1.05) and is_equal_approx(Net.saved_zoom("2", -1.0), Client3D.ZOOM_MAX)
-			and is_equal_approx(Net.saved_zoom("0.6", -1.0), Client3D.ZOOM_MIN) and is_equal_approx(Net.saved_zoom("", 1.0), 1.0),
-			"a saved zoom loads held to 0.8..1.1; none keeps 1x")
+			and is_equal_approx(Net.saved_zoom("0.6", -1.0), 0.6) and is_equal_approx(Net.saved_zoom("0.3", -1.0), Client3D.ZOOM_MIN) and is_equal_approx(Net.saved_zoom("", 1.0), 1.0),
+			"a saved zoom loads held to 0.5..1.1; none keeps 1x")
 	Net.camera_zoom = 1.25
 	var again := _rig()
 	_free_rig(again)
@@ -522,12 +522,22 @@ func _test_middle_drag_axis() -> void:
 	for i in 10:
 		rig._ease_peek(0.05)
 	Net.controls = "click"
-	print("\n== click: a middle drag pans, the ground under the cursor kept under it, and springs back when let go ==")
+	yaw = rig.yaw
+	_main._begin_middle_drag(Vector2(500, 500))
+	_main._middle_drag(Vector2(60, 5))
+	_check(rig._dragging and is_equal_approx(rig.yaw, yaw + 60.0 * Main.DRAG_DEGREES_PER_PX) and rig.pan == Vector3.ZERO,
+			"click (671 amended): a sideways middle drag turns too, no pan (%s)" % rig.yaw)
+	_main._end_middle_drag()
+	_ease(rig)
+	_check(is_equal_approx(rig.yaw, yaw + 60.0 * Main.DRAG_DEGREES_PER_PX), "and stays where it is let go (%s)" % rig.yaw)
+	rig._settle_on(yaw)
+	_ease(rig)
+	print("\n== Ctrl with a middle drag pans, the ground under the cursor kept under it, and springs back when let go ==")
 	rig._sync_puppets()
 	rig._follow(0.0)
 	var ground := rig._camera_target
 	var at := rig._camera.unproject_position(rig.to_global(ground))
-	_main._begin_middle_drag(Vector2(500, 500))
+	_main._begin_middle_drag(Vector2(500, 500), true)
 	_main._middle_drag(Vector2(3, 2))
 	_check(rig.pan == Vector3.ZERO, "under %d px it is not yet a pan" % Main.DRAG_AXIS_PX)
 	_main._middle_drag(Vector2(120, 0))
@@ -548,14 +558,14 @@ func _test_middle_drag_axis() -> void:
 		rig._ease_pan(1.0 / 60.0)
 	rig._follow(0.0)
 	_check(rig.pan == Vector3.ZERO and rig._camera_target.is_equal_approx(_player_puppet(rig)), "on the player again within a second")
-	_main._begin_middle_drag(Vector2(500, 500))
+	_main._begin_middle_drag(Vector2(500, 500), true)
 	_main._middle_drag(Vector2(100000, 0))
 	_check(rig.pan.length() <= Client3D.PAN_MAX + 0.001, "never more than %d tiles off (%.2f)" % [Client3D.PAN_MAX, rig.pan.length()])
 	_main._end_middle_drag()
 	for i in 3:
 		rig._ease_pan(1.0 / 60.0)
 	var easing := rig.pan
-	_main._begin_middle_drag(Vector2(500, 500))
+	_main._begin_middle_drag(Vector2(500, 500), true)
 	_main._middle_drag(Vector2(0, 30))
 	rig._ease_pan(1.0 / 60.0)
 	_check(easing != Vector3.ZERO and rig.pan.distance_to(easing) < 2.0 and not rig._pan_home,
@@ -565,7 +575,7 @@ func _test_middle_drag_axis() -> void:
 		rig._ease_pan(1.0 / 60.0)
 	var before := rig.pitch
 	var zoom_to := rig._zoom_to
-	_main._begin_middle_drag(Vector2(500, 500))
+	_main._begin_middle_drag(Vector2(500, 500), true)
 	_main._middle_drag(Vector2(2, 1))
 	_main._end_middle_drag()
 	_check(is_equal_approx(rig.pitch, before) and rig._tilt_t >= 1.0 and is_equal_approx(rig._zoom_to, zoom_to) and rig.pan == Vector3.ZERO,

@@ -30189,3 +30189,39 @@ shots (669), a stag sees the hunter at 9 and runs straight into that band.
 monster_test _test_far_pace: a stag kept fleeing, its pace 4.4, steps every 4 or 5 ticks at 23 to
 30 cells; main gave 8 every step. Steps after a flee runs out and it stands a moment are not
 counted. Server only, protocol unchanged, no new class_name.
+## 671 amended. A nearer zoom and a free turn
+
+Jeff: "forest has a very nice atmosphere. it makes me want to zoom in a
+little more onto my character while in the clearings. i think mmb scroll
+should zoom in further - also think middle mouse drag should rotate camera
+freely." The coordinator approved ui's design.
+
+- **Zoom:** the wheel's nearest is ZOOM_MIN 0.5 (from 0.8) of the normal
+  view; the farthest stays ZOOM_MAX 1.1, so 238's reach is untouched. The
+  normal and overhead cameras are orthographic 40 units back, so a nearer
+  zoom only narrows the view: nothing clips; trees between camera and
+  player already go see-through and walls fade. The low camera is a
+  perspective one the wheel moves nearer, so it keeps LOW_ZOOM_MIN 0.8
+  (Client3D.zoom_min; turning it on lifts a nearer zoom to 0.8). A saved
+  zoom loads held to 0.5..1.1. Hair and face at 0.5 were not checked in a
+  shot (Jeff judges it in game; the cut checklist says so).
+- **Turn:** in both schemes a sideways middle drag turns the yaw freely
+  and it rests where it is let go (end_drag: _drag_target is the drag's
+  own yaw, no snap); a vertical one is the pitch peek as before, one axis
+  a drag. The click scheme's pan moves to Ctrl with a middle drag (Main
+  _drag_pan, from the press's ctrl_pressed), in either scheme. A/D (click
+  scheme) still settle on the next multiple of 45 the way they turn, or
+  back under TURN_COMMIT, from wherever the yaw is.
+- **Saved yaw:** the angle as it rests (Net.saved_yaw no longer rounds;
+  Client3D.wrapped_yaw, 0..360). Net keeps that call into Client3D: with
+  none (a constant read is inlined) the scenes segfaulted at quit, the
+  script's static materials torn down in another order.
+- **Unchanged:** WASD's walk keys are relative to the camera at any yaw,
+  the nearest of the eight grid directions (Main.wasd_direction); the
+  compass and minimap turn with the exact yaw each frame; the chunks in
+  view and the wall fade already follow any angle mid-turn.
+- **Tests:** controls_test: a drag rests where let go and is saved, frozen
+  keys hold it as before; a click-scheme sideways drag turns; Ctrl with a
+  middle drag pans; the wheel's 0.5 floor; saved yaw and zoom loads.
+
+Client only, protocol unchanged, no new class_name.

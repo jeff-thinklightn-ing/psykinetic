@@ -462,6 +462,8 @@ var _pick_grid := Vector2(NAN, NAN)
 enum Drag { UNDECIDED, TURN, PITCH, PAN }
 var _drag_from := Vector2(NAN, NAN)
 var _drag := Drag.UNDECIDED
+## The middle drag began with Ctrl held: a pan (671 amended).
+var _drag_pan := false
 ## Click scheme, 3D: W/S or A/D were held last frame (their release
 ## springs the tilt back and settles the turn).
 var _tilting := false
@@ -1411,7 +1413,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		# 3D only: a pitch peek, or in WASD a horizontal drag turns.
 		if _client3d != null:
 			if click.pressed:
-				_begin_middle_drag(Vector2(DisplayServer.mouse_get_position()))
+				_begin_middle_drag(Vector2(DisplayServer.mouse_get_position()), click.ctrl_pressed)
 			elif not is_nan(_drag_from.x):
 				_end_middle_drag()
 		return
@@ -2073,16 +2075,19 @@ func _drag_yaw() -> void:
 	_middle_drag(Vector2(DisplayServer.mouse_get_position()) - _drag_from)
 
 
-## The middle button went down at [param at] (screen px). What it is
-## waits on which way, if any, it moves.
-func _begin_middle_drag(at: Vector2) -> void:
+## The middle button went down at [param at] (screen px). With Ctrl
+## ([param pan]) it pans; otherwise what it is waits on which way, if any,
+## it moves.
+func _begin_middle_drag(at: Vector2, pan := false) -> void:
 	_drag_from = at
 	_drag = Drag.UNDECIDED
+	_drag_pan = pan
 
 
-## The drag is [param offset] (screen px) from where it went down. In the
-## click scheme it pans the view, which springs back onto the player when
-## let go; in WASD it is a turn or a pitch peek by the axis it first moves on.
+## The drag is [param offset] (screen px) from where it went down. With
+## Ctrl it pans the view, which springs back onto the player when let go;
+## otherwise, in either scheme (671 amended), it is a free turn or a pitch
+## peek by the axis it first moves on.
 func _middle_drag(offset: Vector2) -> void:
 	if _drag == Drag.PAN:
 		_client3d.pan_by(offset)
@@ -2090,7 +2095,7 @@ func _middle_drag(offset: Vector2) -> void:
 	if _drag == Drag.UNDECIDED:
 		if absf(offset.x) < DRAG_AXIS_PX and absf(offset.y) < DRAG_AXIS_PX:
 			return
-		if Net.controls == "click":
+		if _drag_pan:
 			_drag = Drag.PAN
 			_client3d.begin_pan()
 			_client3d.pan_by(offset)
@@ -12989,13 +12994,13 @@ func hint_lines() -> Array[String]:
 		lines.append_array(["%s\twalk" % Keys.walk_names(), "Mouse\taim", "LMB\tattack (far: walk); a friend: talk", "%s+LMB\tswing where you stand" % Keys.name_of("stand"),
 			"RMB\toff hand; empty: grab (drag to toss)"])
 		if _client3d != null:
-			lines.append_array(["MMB drag\tturn, look up / down", "Wheel\tzoom (MMB click: 1x)"])
+			lines.append_array(["MMB drag\tturn, look up / down", "Ctrl+MMB drag\tpan (springs back)", "Wheel\tzoom (MMB click: 1x)"])
 	else:
 		lines.append_array(["LMB\tmove / attack (hold to steer); a friend: talk", "%s+LMB\tswing where you stand" % Keys.name_of("stand"),
 			"RMB\toff hand; empty: shove (drag to toss)"])
 		if _client3d != null:
 			lines.append_array(["%s / %s\toverhead / normal view" % [Keys.name_of("forward"), Keys.name_of("back")],
-				"%s / %s\tturn" % [Keys.name_of("left"), Keys.name_of("right")], "MMB drag\tpan (springs back)", "Wheel\tzoom"])
+				"%s / %s\tturn" % [Keys.name_of("left"), Keys.name_of("right")], "MMB drag\tturn, look up / down", "Ctrl+MMB drag\tpan (springs back)", "Wheel\tzoom"])
 	for i in Net.phrases.size():
 		lines.append("%s\t%s" % [Keys.name_of("phrase_%d" % (i + 1)), Net.phrases[i]])
 	lines.append_array(["%s+LMB\tyour weapon's own move (a shield bashes)" % Keys.name_of("signature"), "RMB, shield\tblock toward the cursor while held",

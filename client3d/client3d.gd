@@ -37,20 +37,22 @@ extends Node3D
 ## of the screen: 0 matches the 2D diamond (+x down-right, +y down-left).
 ## The ortho size is CAMERA_SIZE times `zoom`, and times up to
 ## PEEK_PULL_BACK during a WASD pitch peek. The mouse wheel zooms in either
-## scheme, a ZOOM_STEP a notch between ZOOM_MIN and ZOOM_MAX, eased
-## (ZOOM_RATE), on the player. The zoom is saved (Net.camera_zoom). Click
-## scheme: a middle drag pans, sliding the view off the player (`pan`,
-## PAN_MAX at most) so the ground under the cursor stays under it; let go,
-## it eases back onto the player.
+## scheme, a ZOOM_STEP a notch between zoom_min() (ZOOM_MIN, or
+## LOW_ZOOM_MIN under the low camera) and ZOOM_MAX, eased (ZOOM_RATE), on
+## the player. The zoom is saved (Net.camera_zoom). Either scheme, Ctrl
+## with a middle drag pans, sliding the view off the player (`pan`, PAN_MAX
+## at most) so the ground under the cursor stays under it; let go, it eases
+## back onto the player.
 ##
-## Turning, in both schemes: the yaw turns freely, all the way round, and
-## rests only on the eight views (multiples of ORBIT_STEP, 45, from 0: the
-## four diamonds and the four square-on; decision 671). Let go, it settles
-## on the next one the way it was turning, or back on the one it set off
-## from if it turned less than TURN_COMMIT (settle_target), and stays
-## there; that view is saved in settings.cfg (Net.camera_yaw). Click
-## scheme: A/D turn at TURN_RATE while held, and the settle starts at that
-## speed so the release flows into it; W eases to OVERHEAD_PITCH and stays
+## Turning, in both schemes (671 amended; Jeff: "middle mouse drag should
+## rotate camera freely"): a sideways middle drag turns the yaw freely, all
+## the way round, and it stays where it is let go. Click scheme: A/D turn
+## at TURN_RATE while held and settle on the next of the eight views
+## (multiples of ORBIT_STEP, 45, from 0: the four diamonds and the four
+## square-on) the way they were turning, or back where they set off from
+## if they turned less than TURN_COMMIT (settle_target); the settle starts
+## at the turning speed so the release flows into it. The yaw it rests at
+## is saved in settings.cfg as it is (Net.camera_yaw). W eases to OVERHEAD_PITCH and stays
 ## there, S back to the resting pitch, over PITCH_EASE_SECONDS (671; saved,
 ## Net.camera_overhead). WASD scheme: a sideways middle drag turns, its
 ## settle eased out over SETTLE_SECONDS; a vertical one is a pitch peek
@@ -480,7 +482,11 @@ const ORBIT_STEP := 45.0
 ## much a notch, held to ZOOM_MIN..ZOOM_MAX, eased toward at ZOOM_RATE (an
 ## exponential rate a second: a notch is all but done in a quarter second).
 const ZOOM_STEP := 1.1
-const ZOOM_MIN := 0.8
+## 671 amended (Jeff: "zoom in a little more onto my character while in the
+## clearings"): 0.5, from 0.8. The low camera's wheel moves the camera
+## itself nearer, so it keeps LOW_ZOOM_MIN, short of the trees and walls.
+const ZOOM_MIN := 0.5
+const LOW_ZOOM_MIN := 0.8
 ## ZOOM_MAX keeps the view's widest reach (_view_reach: about 19 to 22
 ## tiles, wide screens and a peek the most) within World.NEAR_TILES, so what
 ## is on screen thinks every tick (decision 238).
@@ -2293,7 +2299,7 @@ func setup(terrain: Dictionary, centre := Vector2i.ZERO) -> void:
 	_listener.make_current()
 	# The saved diamond, or --test-yaw exactly, for screenshots.
 	yaw = Net.camera_yaw
-	_yaw_step = nearest_diamond(yaw)
+	_yaw_step = yaw  # 671 amended: the saved yaw as it is.
 	overhead = Net.camera_overhead
 	pitch = rest_pitch()
 	if not Net.camera_low_changed.is_connected(_on_camera_low_changed):
@@ -2739,6 +2745,9 @@ func _apply_camera_mode() -> void:
 	var low: bool = Net.camera_low and _outdoor
 	var was := _low
 	_low = low
+	if low and _zoom_to < LOW_ZOOM_MIN:
+		zoom = LOW_ZOOM_MIN  # The low camera keeps its own nearest (671 amended).
+		_zoom_to = LOW_ZOOM_MIN
 	if low:
 		_camera.projection = Camera3D.PROJECTION_PERSPECTIVE
 		_camera.fov = LOW_FOV
@@ -2972,7 +2981,7 @@ func _view_height() -> float:
 ## negative out): ZOOM_STEP a notch, held to ZOOM_MIN..ZOOM_MAX, eased
 ## there; saved. The camera is on the player, so that is the centre.
 func zoom_by(notches: int) -> void:
-	_zoom_to = clampf(_zoom_to / pow(ZOOM_STEP, notches), ZOOM_MIN, ZOOM_MAX)
+	_zoom_to = clampf(_zoom_to / pow(ZOOM_STEP, notches), zoom_min(), ZOOM_MAX)
 	_save_zoom()
 
 
@@ -3244,9 +3253,18 @@ func drag(degrees: float) -> void:
 		_set_yaw(_drag_base + degrees)
 
 
-## WASD: the middle button came up: settle as an A/D turn does, on the
-## next diamond the way it was dragged (or back, under TURN_COMMIT), now
-## or, if frozen, when the keys are let go.
+## [param degrees] as a saved yaw, 0..360 (Net.saved_yaw, _settle_on).
+static func wrapped_yaw(degrees: float) -> float:
+	return fposmod(degrees, 360.0)
+
+
+## The wheel's nearest: ZOOM_MIN, or LOW_ZOOM_MIN under the low camera.
+func zoom_min() -> float:
+	return LOW_ZOOM_MIN if _low else ZOOM_MIN
+
+
+## The middle button came up: the yaw rests where the drag left it (671
+## amended: no snap), now or, if frozen, when the keys are let go; saved.
 func end_drag() -> void:
 	if not _dragging:
 		return
@@ -3258,7 +3276,7 @@ func end_drag() -> void:
 
 
 func _drag_target() -> float:
-	return settle_target(nearest_diamond(_drag_base), _drag_base + _drag_offset, signf(_drag_offset))
+	return _drag_base + _drag_offset
 
 
 ## Main: a movement key is (not) held. Held, the yaw stops where it is;
@@ -3287,7 +3305,7 @@ static func nearest_diamond(degrees: float) -> float:
 ## settings file keeps.
 func _settle_on(step: float) -> void:
 	_yaw_step = step
-	Net.camera_yaw = fposmod(step, 360.0)
+	Net.camera_yaw = wrapped_yaw(step)
 	Net.save_view_settings()
 	_ease_toward(step)
 

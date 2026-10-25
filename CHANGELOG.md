@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The mouse wheel zooms in closer on your character (to half the normal view; the low camera stays as before), and dragging with the middle button turns the camera freely and leaves it where you let go, in both control schemes; Ctrl with a middle drag pans the view, and the camera's angle is saved as you left it (671 amended).
 ## v0.1.174
 
 - The bow looses on the left button's release again (583 amended (2)): Shift plants and draws, let the left button go to shoot; Shift up with the left button held stays drawn.

@@ -1109,13 +1109,16 @@ func set_camera_low(value: bool, save := true) -> void:
 		save_view_settings()
 
 
-## camera_yaw= as read from the settings file: one of the eight resting
-## views (671: a multiple of 45), anything between going to the nearest.
-## [param otherwise] for a missing or bad value.
+## camera_yaw= as read from the settings file: the yaw as it was left
+## (671 amended: a free turn rests anywhere), 0..360. [param otherwise]
+## for a missing or bad value.
 static func saved_yaw(text: String, otherwise: float) -> float:
 	if not text.strip_edges().is_valid_float():
 		return otherwise
-	return fposmod(Client3D.nearest_diamond(text.to_float()), 360.0)
+	# Through Client3D, not fposmod here: Net calling into Client3D keeps that
+	# script (and its static materials) alive until Net goes; without a call
+	# the scenes segfaulted at quit (671 amended).
+	return Client3D.wrapped_yaw(text.to_float())
 
 
 ## camera_zoom= as read from the settings file: held to the wheel's range
