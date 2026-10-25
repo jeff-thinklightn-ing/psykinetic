@@ -46,6 +46,7 @@ const PHYSICS_KEYS := {
 	"brace_restitution": [0.0, 1.0], "stun_ticks_base": [0, 30], "stun_ticks_per_speed": [0.0, 10.0],
 	"knockback_stun_ticks": [0, 30], "lunge_ticks_per_cell": [0.0, 5.0], "lunge_min_speed": [0.0, 10.0],
 	"rush_stop_speed": [0.0, 10.0], "swing_speed": [0.0, 20.0], "throw_speed": [0.0, 30.0],
+	"load_k": [0.0, 3.0], "load_free": [0.0, 1.0], "load_heavy": [0.0, 2.0], "load_overloaded": [0.0, 3.0],
 }
 ## physics.json's names where World's vars differ (as load_physics_rules).
 const PHYSICS_FIELDS := {"knockback_min_speed": "knockback_min_force", "stun_ticks_per_speed": "stun_ticks_per_force"}
@@ -87,7 +88,7 @@ static func fields() -> Array[Dictionary]:
 			if _number(values[key]):
 				out.append(_row("combat.moves.%s.%s" % [move, key], "Telegraphs and boss moves", _span(values[key]), "combat"))
 	for key: String in PHYSICS_KEYS:
-		out.append(_row("physics." + key, "Knockback and mass", PHYSICS_KEYS[key], "physics"))
+		out.append(_row("physics." + key, "Load" if key.begins_with("load_") else "Knockback and mass", PHYSICS_KEYS[key], "physics"))  # The load: 676.
 	for id in VERB_ITEMS:
 		var verb := Items.verb_of(id)
 		for key: String in verb:

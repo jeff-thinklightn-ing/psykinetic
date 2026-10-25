@@ -30419,3 +30419,50 @@ knockdown, one stepped out missed, a draugr staggered, roof and indoors refused,
 controls_test (RMB held lobs, the left button and Shift leave it, RMB let go looses, the controls
 line); view_test (the aim shown and hidden; the arrow above the bow mid-flight, down in the cell
 nose first).
+## 676. Items as mass, step 1: load_arms and load_body
+
+Jeff, testing the bow in plate: "items shouldnt have direct impacts, they
+should just form stats like weight/mass. and the impact falls out of the
+physics"; then "armor should add a clank sound that scares prey and mass
+that drains stamina from archery a little faster". The plan (physics'
+C:/dev/review/physics/items_as_mass.md, the coordinator's approval) takes
+the direct effects out step by step; this is the first: where the mass sits.
+
+World.load_of(entity) is {arms, body} in kg, to 0.1: what the hands hold and
+the armour's arm share on the arms, the rest of the armour and the pack on
+the body. An armour row says where its mass sits, "on": {arms, body} (676,
+items' side: leather 0.2/0.8, mail 0.25/0.75, plate 0.2/0.8, robes 0.1/0.9;
+none given, all on the body). _weigh sets GridEntity.load_arms and load_body
+as the slots change; a Player's and a Companion's replicate (revision 37),
+so a client's walk and draw read what the server's do and no held weight
+goes on the wire.
+
+One rule reads them, load_scale(kg, capacity) = 1 + load_k x max(0, kg /
+capacity - load_free), the capacity the body's own mass (load_capacity: its
+base mass; a client's spawned mass, the same) and the arms' ARMS_SHARE 0.2 of
+it (16 kg for an 80 kg body):
+- the walk: step_ticks x load_scale(load_body, the body's);
+- the draw: _draw_quick x load_scale(load_arms, the arms'), in place of the
+  armour's "draw" (gone from the rows: leather no longer draws quicker);
+- a held draw's drain (669): x 1 + load_k x (the arms' share past free +
+  DRAIN_BODY_SHARE 0.25 x the body's), carried as whole units a tick;
+- the breath: x 1 / load_scale(the whole load, the body's), in place of
+  622's 1 - armour kg / 100.
+The pack sheet's bands (ui's side) are the whole load's share: light under
+load_free, burdened under load_heavy, heavy under load_overloaded,
+overloaded past (World.load_band). load_k 0.5, load_free 0.15, load_heavy
+0.3 and load_overloaded 0.5 are in levels/physics.json and on F7
+(physics.load_*, group "Load"), so the slowdown and the bands move together.
+
+Numbers (physics_test _test_load): an 80 kg player with a bow and arrows
+(1.6 kg on the arms) walks 2.5 ticks a cell, draws to full in 10, drains 1 a
+tick and breathes as before. In plate (4 kg on the arms, 16 on the body):
+the walk 2.5625 (x 1.025), full draw 11 (x 1.1, today's plate draw kept),
+160 ticks held at full draw 177 stamina, the breath 1 / 1.06. 622's breath
+was harsher: mail's 10 kg is now under the free share (30 ticks from empty:
+60, was 54) and plate 58 (was 48); combat_test follows, and load_k and
+load_free are Jeff's to tune. Robes' "aura", which nothing read, is gone. A
+monster's load slows it as anyone's (a draugr's 7 kg axe sits under his
+arms' free share). Next, before the bow from energy: noise from a worn
+material as it moves.
+

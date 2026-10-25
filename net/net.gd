@@ -422,13 +422,17 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## sky), a "lob" command {at} looses it, GridEntity.lobbing replicates
 ## (SUBCLASS_REPLICATED) and GridEntity._net_lobbed {to, ticks} flies it; a lob's
 ## draw_step starts lob_draw_min in on both sides. An old client draws no lob.
+## 37 (676): Player and Companion replicate load_arms and load_body (kg, 0.1;
+## SUBCLASS_REPLICATED), the server's load; a client's walk (step_ticks) and
+## draw read them as the server's do, and the armour's "draw" is gone: an old
+## client predicts the wrong pace and pull.
 const PROTOCOL_REVISION := 37
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]
 ## Every kind of message (message, message_to, broadcast, broadcast_to).
 const MESSAGE_KINDS: Array[String] = ["admin", "admin_reply", "barter", "builder", "chat", "clearing", "counter", "death", "folds", "grass", "map", "notes", "offers", "party", "return", "roofs", "shop", "sky", "speech", "telegraph", "terrain", "town", "town_sheet", "world"]
 ## Properties entity subclasses add with replicate().
-const SUBCLASS_REPLICATED: Array[String] = ["activity", "addressing", "ailing", "ailments", "alert", "asleep", "body", "bond_step", "bond_why", "buffs", "channel_of", "channel_until", "charge_room", "charges", "down_until", "downed_until", "emit_light", "gone", "hands", "heart", "keeper_peer", "led_by", "led_to", "lobbing", "mending", "move_ticks", "peaceable", "person", "pile_at", "pile_facing", "pose", "raised", "raised_tick", "slot_counts", "slot_notes", "slots", "tending", "trade", "worn"]
+const SUBCLASS_REPLICATED: Array[String] = ["activity", "addressing", "ailing", "ailments", "alert", "asleep", "body", "bond_step", "bond_why", "buffs", "channel_of", "channel_until", "charge_room", "charges", "down_until", "downed_until", "emit_light", "gone", "hands", "heart", "keeper_peer", "led_by", "led_to", "load_arms", "load_body", "lobbing", "mending", "move_ticks", "peaceable", "person", "pile_at", "pile_facing", "pose", "raised", "raised_tick", "slot_counts", "slot_notes", "slots", "tending", "trade", "worn"]
 const SETTINGS_FILE := "settings.cfg"
 ## First launch: half the 3840x2160 base, windowed.
 const DEFAULT_WINDOW_SIZE := Vector2i(1920, 1080)

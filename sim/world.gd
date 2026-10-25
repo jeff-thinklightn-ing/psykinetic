@@ -421,6 +421,21 @@ var moves := {
 ## The pack's throw (try_throw, 606 amended): the thing's speed, cells a
 ## tick, its weight times this the impulse on a body it strikes.
 @export var throw_speed := 2.0
+## The load (decision 676; Jeff: items are physical, the effect falls out
+## of the physics): a load's share of what carries it (load_capacity) over
+## load_free slows what that part does by load_k a share over (load_scale):
+## the body's the walk, the arms' the draw, the whole the breath. The bands
+## the pack sheet names, as the whole load's share: light under load_free,
+## burdened under load_heavy, heavy under load_overloaded, overloaded past.
+@export var load_k := 0.5
+@export var load_free := 0.15
+@export var load_heavy := 0.3
+@export var load_overloaded := 0.5
+## What the arms carry against, as a share of the body's own mass: an 80 kg
+## body's arms 16 kg, so a bow and its arrows (1.6 kg) sit under load_free.
+const ARMS_SHARE := 0.2
+## How much of the body's load a held draw's drain feels beside the arms'.
+const DRAIN_BODY_SHARE := 0.25
 ## SHOVE_COST_BASE and SHOVE_COST_SCALE: a shove costs
 ## base + force x target_mass x scale stamina.
 @export var shove_cost_base := 5.0
@@ -2338,13 +2353,11 @@ func armour_turns(target: GridEntity, amount: int, stat: String) -> int:
 	return maxi(1, amount - roundi(amount * share))
 
 
-## The share of its breath [param entity]'s worn armour leaves it (decision
-## 622, combat's side): 1 - the armour's kg / 100, so plate's 20 kg
-## recovers 0.8 as fast; 1 with none.
-func armour_breath(entity: GridEntity) -> float:
-	if worn_armour(entity).is_empty():
-		return 1.0
-	return clampf(1.0 - Items.weight_of(entity.slots[Items.ARMOUR]) / 100.0, 0.0, 1.0)
+## The share of its breath [param entity]'s whole load leaves it (decision
+## 676, in place of 622's armour kg / 100): 1 over load_scale of the arms'
+## and the body's together against its own mass; 1 under load_free.
+func load_breath(entity: GridEntity) -> float:
+	return 1.0 / load_scale(entity.load_arms + entity.load_body, load_capacity(entity))
 
 
 ## A weapon (a thing with a verb) lying on [param monster]'s cell or a
@@ -2493,6 +2506,66 @@ func _weigh(entity: GridEntity) -> void:
 		for slot in entity.slots.size():
 			carried += Items.weight_of(entity.slots[slot]) * slot_count(entity, slot)  # Each unit (decision 619).
 	entity.mass = entity.base_mass + carried + buff(entity, "mass")
+	var load := load_of(entity)
+	entity.load_arms = load["arms"]
+	entity.load_body = load["body"]
+
+
+## What [param entity] carries where (decision 676), kg to 0.1: {arms: its
+## hands' things and its armour's arm share ("on": {arms, body} in the
+## armour's row; none given, all on the body), body: the rest of its armour
+## and its pack}. A chest carries nothing: it stands.
+func load_of(entity: GridEntity) -> Dictionary:
+	var arms := 0.0
+	var body := 0.0
+	if not entity is Chest:
+		for slot in entity.slots.size():
+			var kg := Items.weight_of(entity.slots[slot]) * slot_count(entity, slot)
+			if slot == Items.LEFT_HAND or slot == Items.RIGHT_HAND:
+				arms += kg
+			elif slot == Items.ARMOUR:
+				var share := clampf(float(Items.armour_of(entity.slots[slot]).get("on", {}).get("arms", 0.0)), 0.0, 1.0)
+				arms += kg * share
+				body += kg * (1.0 - share)
+			else:
+				body += kg
+	return {"arms": snappedf(arms, 0.1), "body": snappedf(body, 0.1)}
+
+
+## What [param entity]'s load is measured against (decision 676): its own
+## mass, without what it carries or has eaten (the base mass the server
+## takes; a client, which never weighs, has the spawned mass, the same).
+func load_capacity(entity: GridEntity) -> float:
+	return maxf(entity.base_mass if entity.base_mass > 0.0 else entity.mass, 1.0)
+
+
+## The multiple a load of [param kg] against [param capacity] kg slows what
+## it carries by (decision 676): 1 + load_k x its share past load_free; 1
+## under it.
+func load_scale(kg: float, capacity: float) -> float:
+	return 1.0 + load_k * maxf(0.0, kg / maxf(capacity, 0.001) - load_free)
+
+
+## [param entity]'s walk's multiple from its body's load (decision 676).
+func walk_load(entity: GridEntity) -> float:
+	return load_scale(entity.load_body, load_capacity(entity))
+
+
+## [param entity]'s draw's multiple from its arms' load (decision 676):
+## plate's arm share on top of a bow and arrows draws slower.
+func arms_load(entity: GridEntity) -> float:
+	return load_scale(entity.load_arms, load_capacity(entity) * ARMS_SHARE)
+
+
+## The band [param entity]'s whole load is in (decision 676), for the pack
+## sheet: "light", "burdened", "heavy" or "overloaded".
+func load_band(entity: GridEntity) -> String:
+	var share := (entity.load_arms + entity.load_body) / load_capacity(entity)
+	if share < load_free:
+		return "light"
+	if share < load_heavy:
+		return "burdened"
+	return "heavy" if share < load_overloaded else "overloaded"
 
 
 ## Takes everything out of [param container] at once (economy banking a
@@ -3965,7 +4038,8 @@ func load_physics_rules(text: String) -> void:
 		var given: Variant = data[key]
 		if not field in ["shove_scale", "knockback_min_force", "slide_per_speed", "max_travel", "momentum_scale",
 				"momentum_ticks", "restitution", "impact_per_energy", "brace_restitution", "stun_ticks_base",
-				"stun_ticks_per_force", "knockback_stun_ticks", "lunge_ticks_per_cell", "lunge_min_speed", "rush_stop_speed", "swing_speed", "throw_speed"]:
+				"stun_ticks_per_force", "knockback_stun_ticks", "lunge_ticks_per_cell", "lunge_min_speed", "rush_stop_speed", "swing_speed", "throw_speed",
+				"load_k", "load_free", "load_heavy", "load_overloaded"]:
 			push_warning("World: %s's %s is not a physics rule" % [PHYSICS_RULES, key])
 		elif (given is int or given is float) and float(given) >= 0.0:
 			set(field, int(given) if get(field) is int else float(given))
@@ -4316,12 +4390,30 @@ func _tend_draws() -> void:
 		var verb := Items.verb_of(drawn_with(entity))
 		if verb.is_empty() or int(verb.get("drain", 0)) <= 0 or draw_step(entity) < int(verb.get("full", 0)):
 			continue
-		entity.stamina = maxi(0, entity.stamina - int(verb["drain"]))
+		entity.stamina = maxi(0, entity.stamina - _carried(int(verb["drain"]) * draw_drain_load(entity), tick))  # The load drains it faster (676).
 		entity._world_note_exertion(tick)
 		if entity.stamina == 0:
 			entity.raised = ""
 			_log("draw: %s's arms give out; the bow let down" % entity.name)
 			draw_given_up.emit(entity)
+
+
+## The multiple a held draw's drain runs at from the load (decision 676;
+## Jeff: "mass that drains stamina from archery a little faster"): the
+## arms' share past load_free, and DRAIN_BODY_SHARE of the body's, by
+## load_k; 1 for a bow and arrows alone.
+func draw_drain_load(entity: GridEntity) -> float:
+	var capacity := load_capacity(entity)
+	var arms := maxf(0.0, entity.load_arms / (capacity * ARMS_SHARE) - load_free)
+	var body := maxf(0.0, entity.load_body / capacity - load_free)
+	return 1.0 + load_k * (arms + DRAIN_BODY_SHARE * body)
+
+
+## [param rate] (a fraction a tick, or more) as whole units on [param n]'s
+## count: a rate of 1.6 gives 1, 2, 2, 1, 2..., summing to the rate over
+## the ticks, with no state kept.
+static func _carried(rate: float, n: int) -> int:
+	return floori(rate * (n + 1)) - floori(rate * n)
 
 
 ## Whether [param by] is in the middle of something (decision 603): a move
@@ -5150,12 +5242,12 @@ func draw_of(entity: GridEntity) -> float:
 	return clampf(float(drawn) / draw_full_ticks(entity), 0.0, 1.0)
 
 
-## A quick bow (decision 365) draws in less time, and so does one drawn in
-## light armour, a heavy one in more (decision 622, step 2: the armour's "draw"):
-## its ticks' multiple.
+## A quick bow (decision 365) draws in less time, and one drawn by loaded
+## arms in more (decision 676: arms_load, the armour's arm share on top of
+## the bow and its arrows; it took the place of the armour's "draw"): its
+## ticks' multiple.
 func _draw_quick(entity: GridEntity) -> float:
-	return float(Items.strength_value(slot_strength(entity, drawn_slot(entity)), "draw", 1.0)) \
-		* float(worn_armour(entity).get("draw", 1.0))
+	return float(Items.strength_value(slot_strength(entity, drawn_slot(entity)), "draw", 1.0)) * arms_load(entity)
 
 
 ## The multiple of its bow's draw ticks [param entity] draws in (_draw_quick):
@@ -5167,7 +5259,7 @@ func draw_quick(entity: GridEntity) -> float:
 ## The last of its bow's steps [param entity] can reach (decisions 622
 ## step 2, 669): the bow's last step. Armour caps no reach (622 amended;
 ## Jeff: "items shouldnt have direct impacts, they should just form stats
-## like weight/mass"); its "draw" still scales the ticks.
+## like weight/mass"); the arms' load scales the ticks (676).
 func step_cap(entity: GridEntity) -> int:
 	return (Items.verb_of(drawn_with(entity)).get("steps", []) as Array).size() - 1
 
@@ -7806,7 +7898,7 @@ func _regen_stamina() -> void:
 		if entity.max_stamina > 0 and entity.stamina < entity.max_stamina \
 				and tick - entity.last_exertion_tick() > delay and tick % every == 0:
 			var breath := entity.stamina_regen_amount if entity.stamina_regen_amount > 0 else stamina_regen
-			var rate := breath * armour_breath(entity)
+			var rate := breath * load_breath(entity)
 			if rate < breath:
 				# The fraction carried by the breath's count: plate's 1.6 a
 				# breath gives 1, 2, 2, 1, 2..., with no state kept.
@@ -8252,6 +8344,7 @@ func step_ticks(entity: GridEntity, direction: Vector2i, from := NO_CELL) -> flo
 	if entity.winded:
 		ticks *= winded_move_scale  # Decision 597; winded replicates, so a client's prediction agrees.
 	ticks /= 1.0 + buff(entity, "speed")  # A stamina potion (decision 562); buffs replicate, so a client's prediction agrees.
+	ticks *= walk_load(entity)  # Its body's load (676); replicated, so a client's prediction agrees.
 	return ticks * ground_drag(from, direction)  # The ground (607), as a slide meets it.
 
 

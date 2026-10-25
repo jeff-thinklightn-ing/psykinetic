@@ -44,6 +44,7 @@ func _ready() -> void:
 	_test_pack_throw()
 	_test_ground()
 	_test_rush_in_its_zone()
+	_test_load()
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -564,6 +565,56 @@ func _test_rush_in_its_zone() -> void:
 
 ## A cell map as push_test's: '#' solid, '.' floor, 'P' player, 'm' a dummy
 ## monster of [param mass] kg (AI off, 50 hp), 'o' a 200 kg boulder.
+## The load (decision 676): what is carried where slows what that part
+## does. An 80 kg player with a bow and arrows walks, draws, drains and
+## breathes as before; in plate (20 kg: 4 on the arms, 16 on the body) the
+## walk takes 1.025 of its ticks, the draw 1.1, a held draw drains 1.10625
+## as fast and the breath comes back 1 / 1.06 as fast.
+func _test_load() -> void:
+	print("
+== the load: plate slows the walk, the draw, the drain and the breath; a bow alone nothing (676) ==")
+	var e := _build(["#########", "#P......#", "#########"], 25.0)
+	var player: GridEntity = e["P"][0]
+	World.put_item(player, player, Player.RIGHT_HAND, World.items.mint("bow", "built"))
+	World.put_item(player, player, Player.LEFT_HAND, World.items.mint("arrows", "built"))
+	var verb := Items.verb_of("bow")
+	var full := Items.step_ticks(verb, int(verb["full"]))
+	_check(is_equal_approx(player.load_arms, 1.6) and is_equal_approx(player.load_body, 0.0) and World.load_band(player) == "light",
+			"a bow and arrows: 1.6 kg on the arms, none on the body, light (%s, %s, %s)" % [player.load_arms, player.load_body, World.load_band(player)])
+	_check(is_equal_approx(World.step_ticks(player, Vector2i(1, 0)), player.move_ticks) and is_equal_approx(World.draw_full_ticks(player), full)
+			and is_equal_approx(World.draw_drain_load(player), 1.0) and is_equal_approx(World.load_breath(player), 1.0),
+			"and walks %s ticks a cell, draws in %s, drains and breathes as before" % [World.step_ticks(player, Vector2i(1, 0)), World.draw_full_ticks(player)])
+	World.put_item(player, player, Items.ARMOUR, World.items.mint("plate_armour", "built"))
+	_check(is_equal_approx(player.load_arms, 5.6) and is_equal_approx(player.load_body, 16.0) and World.load_band(player) == "burdened",
+			"in plate: 5.6 kg on the arms, 16 on the body, burdened (%s, %s, %s)" % [player.load_arms, player.load_body, World.load_band(player)])
+	_check(is_equal_approx(World.step_ticks(player, Vector2i(1, 0)), player.move_ticks * 1.025),
+			"the walk: 16 of 80 is 0.05 past the free 0.15, x 0.5: %s ticks a cell, not %s" % [World.step_ticks(player, Vector2i(1, 0)), player.move_ticks])
+	_check(is_equal_approx(World.draw_full_ticks(player), full * 1.1),
+			"the draw: 5.6 of the arms' 16 is 0.2 past: %s ticks to full draw, not %s" % [World.draw_full_ticks(player), full])
+	_check(is_equal_approx(World.draw_drain_load(player), 1.10625) and is_equal_approx(World.load_breath(player), 1.0 / 1.06),
+			"a held draw drains %s as fast; the breath comes back %.3f as fast" % [World.draw_drain_load(player), World.load_breath(player)])
+	var drained := 0
+	for n in 160:
+		drained += World._carried(World.draw_drain_load(player), n)
+	_check(drained == 177, "160 ticks held at full draw: %d stamina, not 160" % drained)
+	# A client never weighs: it reads the replicated kg against its spawned mass.
+	var mirror := Player.new()
+	mirror.load_body = player.load_body
+	mirror.load_arms = player.load_arms
+	_check(is_equal_approx(World.step_ticks(mirror, Vector2i(1, 0), Vector2i(1, 1)), World.step_ticks(player, Vector2i(1, 0), Vector2i(1, 1))),
+			"a client's body with the replicated load walks at the server's pace (%s)" % World.step_ticks(mirror, Vector2i(1, 0), Vector2i(1, 1)))
+	mirror.free()
+	World.load_k = 1.0
+	_check(is_equal_approx(World.step_ticks(player, Vector2i(1, 0)), player.move_ticks * 1.05), "load_k 1: the walk 1.05 (F7's physics.load_k)")
+	World.load_physics_rules(FileAccess.get_file_as_string(World.PHYSICS_RULES))
+	_check(is_equal_approx(World.load_k, 0.5) and is_equal_approx(World.load_free, 0.15) and is_equal_approx(World.load_heavy, 0.3)
+			and is_equal_approx(World.load_overloaded, 0.5), "physics.json: load_k 0.5, free 0.15, heavy 0.3, overloaded 0.5")
+	World.put_item(player, player, 0, World.items.mint("ore_sack", "built"))
+	_check(World.load_band(player) == "heavy", "a sack of ore in the pack too: 31.6 of 80, heavy (%s)" % World.load_band(player))
+	World.put_item(player, player, 1, World.items.mint("ore_sack", "built"))
+	_check(World.load_band(player) == "overloaded", "two: 41.6 of 80, overloaded (%s)" % World.load_band(player))
+
+
 func _build(rows: Array[String], mass: float) -> Dictionary:
 	World.reset()
 	if _room != null:

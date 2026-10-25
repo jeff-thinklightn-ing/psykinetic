@@ -225,6 +225,13 @@ var protected := false
 ## Winded (decision 597; World._regen_stamina): out of stamina, until back
 ## at World.recover_at. Slower steps, blows at half damage, no bash.
 var winded := false
+## Its load (decision 676, World.load_of): the kg it carries on the arms
+## (what its hands hold, its armour's arm share) and on the body (the rest
+## of its armour and its pack), to 0.1 kg. The server works them out as its
+## slots change; a player's and a companion's replicate, so a client's walk
+## and draw read what the server's do.
+var load_arms := 0.0
+var load_body := 0.0
 ## Server: whether its swings cost stamina (decision 597, World.swing_cost):
 ## players and companions; a monster by its kind's "swing_stamina".
 var pays_swings := true

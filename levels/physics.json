@@ -15,5 +15,9 @@
 	"lunge_min_speed": 0.5,
 	"rush_stop_speed": 0.1,
 	"swing_speed": 20.0,
-	"throw_speed": 2.0
+	"throw_speed": 2.0,
+	"load_k": 0.5,
+	"load_free": 0.15,
+	"load_heavy": 0.3,
+	"load_overloaded": 0.5
 }

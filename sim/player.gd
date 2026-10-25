@@ -74,6 +74,8 @@ func _init() -> void:
 	replicate("slot_notes")
 	replicate("slot_counts")
 	replicate("worn")
+	replicate("load_arms")
+	replicate("load_body")
 	replicate("mending")
 	replicate("buffs")
 	replicate("ailments")

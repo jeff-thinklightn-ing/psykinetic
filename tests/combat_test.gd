@@ -524,8 +524,10 @@ func _test_armour() -> void:
 			World._regen_stamina()
 		gained[worn if not worn.is_empty() else "none"] = host.stamina
 		World.tick = start
-	_check(gained == {"none": 60, "mail_armour": 54, "plate_armour": 48},
-			"30 ticks' breath from empty: 60 bare, mail (10 kg) 54, plate (20 kg) 48 (%s)" % [gained])
+	# The breath reads the whole load (676, in place of 622's armour kg / 100):
+	# mail's 10 of 80 is under the free 0.15; plate's 20 is 0.1 past, 1 / 1.05.
+	_check(gained == {"none": 60, "mail_armour": 60, "plate_armour": 58},
+			"30 ticks' breath from empty: 60 bare, mail (10 kg, under the free share) 60, plate (20 kg) 58 (%s)" % [gained])
 	_wear(host, "")
 
 
