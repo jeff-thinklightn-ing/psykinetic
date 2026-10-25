@@ -29068,3 +29068,17 @@ herds_test _test_leaks (24 made, the zone reset: stalled the same day, all 24 ba
 then 3 back after a second reset, then none, and a body folded back from a record not counted twice); monster_test _test_wild_shot_near (an ears-only
 rabbit nine cells from the archer grazes, a shot along the row past it falls beside it, it
 bolts). Narrow by request: herds.gd and World.shoot only. Protocol unchanged, no new class_name.
+
+Finished (economy's note (2), the coordinator's approval: the same fix, no label of its own): an
+area nobody came near kept its leaked out, and economy's spare() gives hunters and camps nothing
+from a group with out, so its hunting stayed shut till the next recall there. Zones never close
+once open (boot opens every zone the snapshot holds), so a herd body is only ever in an open
+zone's entities. reconcile moves from recall_near's first call of a day to the start of
+Herds._daily, before the day's budget (economy's ask: the animals back are hunted that day), for
+every area with out: an open zone's out beyond its spawned bodies goes back, as before, and an
+area whose zone is not open gives all its out back. Herds.bodies_in (area) -> its bodies or null
+(a test's); unset, World's own list for the zone World is in (a zone's entities are kept only
+while World is elsewhere), the zone's entities for another open one, null for none. A reset is
+caught at the next day's turn, as before. herds_test _test_leaks turns the day instead of
+recalling, and checks a zone not open (all out back, spare again) and the unset bodies;
+_test_taken's two bodies out are in the room.

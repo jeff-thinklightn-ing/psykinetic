@@ -62,8 +62,9 @@ var camps := Callable()
 var here := Callable()
 var spawn := Callable()
 var free_near := Callable()
-## () -> the bodies in the zone World is in (reconcile); unset, World's.
-var bodies := Callable()
+## (area) -> the bodies in that area's zone, or null when its zone is not
+## open (reconcile); unset, World.zones' entities.
+var bodies_in := Callable()
 
 ## Group id -> group.
 var _groups: Dictionary = {}
@@ -87,8 +88,6 @@ var _budget: Dictionary = {}
 ## Camp id -> {want, got} today; and got / want over the last whole day.
 var _fed_today: Dictionary = {}
 var _fed: Dictionary = {}
-## Area -> the day its out was last reconciled with its bodies (reconcile).
-var _reconciled: Dictionary = {}
 
 
 func _init(saved := {}, with_areas := {}, with_rules := {}, with_clock := Callable(), with_holdings: Holdings = null) -> void:
@@ -542,6 +541,11 @@ func _add_group(area: String, species: String, home: Vector2i, count: float) -> 
 ## Once a day: an empty group is gone, a big one splits, and each with no
 ## bodies out roams its home to a rich cell up to its species' roam away.
 func _daily(day: int) -> void:
+	for area: String in _areas_with_groups():
+		for each in groups_in(area):
+			if int(each["out"]) > 0:
+				reconcile(area)
+				break
 	var ids: Array = _groups.keys()
 	ids.sort()
 	var draw := RandomNumberGenerator.new()
@@ -628,9 +632,6 @@ func recall_near(at: Vector2i, reach: int) -> void:
 	if not spawn.is_valid():
 		return
 	var area := _here()
-	if int(_reconciled.get(area, -2)) != _day:
-		_reconciled[area] = _day
-		reconcile(area)
 	var groups := groups_in(area)
 	var room := int(rules.get("out_per_zone", 24))
 	for each in groups:
@@ -653,12 +654,14 @@ func recall_near(at: Vector2i, reach: int) -> void:
 ## regeneration, a saved body not made again at a restart, any despawn)
 ## kept its out for ever, and an area with out_per_zone of them made no
 ## body again. What is out beyond the area's bodies now goes back into its
-## group's count. Asked for the zone World is in (its bodies are there),
-## once a day an area, at its first recall. How many came back.
+## group's count. Zones never close once open (boot opens every saved
+## one), so a body is only ever in an open zone: an area whose zone is not
+## open gives all its out back. At each day's start (_daily), before the
+## day's budget, so hunters and camps have them that day. How many came back.
 func reconcile(area: String) -> int:
 	var live := {}
-	var list: Array = bodies.call() if bodies.is_valid() else World.entities()
-	for body: Variant in list:
+	var list: Variant = bodies_in.call(area) if bodies_in.is_valid() else _bodies_in(area)
+	for body: Variant in list if list is Array else []:
 		if is_instance_valid(body) and takes(body) and (body as Animal).spawned:
 			var id := str((body as Animal).spawn_spec.get("group", ""))
 			live[id] = int(live.get(id, 0)) + 1
@@ -672,6 +675,15 @@ func reconcile(area: String) -> int:
 	if back > 0:
 		print("[herds] %s: %d leaked bodies back" % [area, back])
 	return back
+
+
+## The bodies in [param area]'s open zone (World's own list for the zone it
+## is in: a zone's entities are kept only while World is elsewhere), null
+## when it is not open.
+static func _bodies_in(area: String) -> Variant:
+	if World.zone != null and World.zone.name == area:
+		return World.entities()
+	return (World.zones[area] as Zone).entities if World.zones.has(area) else null
 
 
 ## One of [param each]'s kept animals made a body near its home: false

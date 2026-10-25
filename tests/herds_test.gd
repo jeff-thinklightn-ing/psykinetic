@@ -222,7 +222,15 @@ func _test_taken() -> void:
 	var deer := herds._add_group("meadow", "deer", Vector2i(20, 20), 10.0)
 	var other := herds._add_group("meadow", "deer", Vector2i(24, 20), 10.0)
 	var near := herds._add_group("meadow", "deer", Vector2i(60, 60), 7.0)
-	near["out"] = 2  # A player is on these.
+	near["out"] = 2  # A player is on these: two bodies in the room.
+	var on_these: Array = []
+	for i in 2:
+		var body := Animal.new()
+		body.spawn_spec = {"group": near["id"], "kind": "deer"}
+		body.spawned = true
+		on_these.append(body)
+		_bodies.append(body)  # Freed with the rest at the end.
+	herds.bodies_in = func(area: String) -> Variant: return on_these if area == "meadow" else null
 	var least := float(_rules["species"]["deer"]["size"][0])
 	_check(is_equal_approx(herds.spare(deer), 10.0 - least) and herds.spare(near) == 0.0,
 		"a group spares what it has above its reserve (%.1f); one with bodies out nothing" % herds.spare(deer))
@@ -412,8 +420,9 @@ func _test_bodies() -> void:
 ## Jeff: "after removing wolf packs from the wilds there were 0 animals now"
 ## (397 amended (2)): a body gone with no retire, kill or flight (a reset, a
 ## regeneration, a restart that did not make it again) kept its out, and an
-## area with out_per_zone of them made no body again; reconcile, once a day
-## an area at its first recall, gives what is out beyond its bodies back.
+## area with out_per_zone of them made no body again; reconcile, at each
+## day's start, gives what is out beyond its bodies back, and a zone not
+## open all its out.
 func _test_leaks() -> void:
 	print("\n== a body gone with no word: its out back in its count (397 amended (2)) ==")
 	var herds := _herds_at_zero()
@@ -424,7 +433,8 @@ func _test_leaks() -> void:
 		return made_one
 	herds.free_near = func(cell: Vector2i, _reach: int) -> Vector2i: return cell
 	var live: Array = []
-	herds.bodies = func() -> Array: return live
+	var open := [true]
+	herds.bodies_in = func(area: String) -> Variant: return live if area == "meadow" and open[0] else null
 	var all := _sum(herds, "meadow")
 	var middle := Vector2i(SIZE / 2, SIZE / 2)
 	var before := _bodies.size()
@@ -436,6 +446,7 @@ func _test_leaks() -> void:
 	herds.recall_near(middle, SIZE)
 	_check(_bodies.size() == stalled, "the same day their out holds the zone full: none made (the wilds' 0 animals)")
 	herds._day += 1
+	herds._daily(herds._day)  # The day's turn: reconciled before its budget.
 	herds.recall_near(middle, SIZE)
 	live.assign(_bodies.slice(stalled))
 	_check(live.size() == int(_rules["out_per_zone"]) and absf(_sum(herds, "meadow") - all) < 0.001,
@@ -452,6 +463,25 @@ func _test_leaks() -> void:
 	herds.fold_records("meadow", [{"entry": {"name": "r", "kind": str(gone.spawn_spec["kind"]), "tile": [gone.tile.x, gone.tile.y], "spawn": -1, "group": id}}])
 	_check(int(its["out"]) == out_was - 1 and herds.reconcile("meadow") == 0 and absf(_sum(herds, "meadow") - all - 3.0) < 0.001,
 		"a herd body folded back from a record takes its out with it: reconcile adds it no second time")
+	_check(Herds._bodies_in("no_zone_here") == null and (World.zone == null or Herds._bodies_in(World.zone.name) == World.entities()),
+		"unset, the bodies come from World: its own list for the zone it is in, none for a zone not open")
+	open[0] = false  # A zone not open holds no bodies: all its out is a leak.
+	var outs := 0
+	for each in herds.groups_in("meadow"):
+		outs += int(each["out"])
+	var spared := func() -> float:
+		var sum := 0.0
+		for each in herds.groups_in("meadow"):
+			sum += herds.spare(each)
+		return sum
+	var spare_was: float = spared.call()
+	herds._day += 1
+	herds._daily(herds._day)
+	var outs_after := 0
+	for each in herds.groups_in("meadow"):
+		outs_after += int(each["out"])
+	_check(outs > 0 and outs_after == 0 and absf(_sum(herds, "meadow") - all - 3.0) < 0.001 and float(spared.call()) > spare_was,
+		"a zone not open: at the day's turn all its out (%d) back, every animal counted, and spare for hunters again (%.1f -> %.1f)" % [outs, spare_was, spared.call()])
 
 
 func _test_records() -> void:
