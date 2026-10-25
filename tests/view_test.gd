@@ -879,6 +879,22 @@ func _test_sounds_follow_events() -> void:
 			"trampled: only the step that flattened it rustles; none off the grass")
 	World._trampled_of(World.fields.level).erase(grass_at)
 	World._load_cover({"tall_grass": had_grass})
+	# 676 1b: worn armour heard with the step, plate's clank or mail's jingle; leather nothing.
+	var worn_was: String = player.worn
+	var from_tile := player.tile
+	var clanks: Dictionary[String, Array] = {}
+	for worn: String in ["plate_armour", "mail_armour", "leather_armour"]:
+		player.worn = worn
+		clanks[worn] = _heard(func() -> void: World._relocate(player, player.tile + Vector2i(0, 1)); _rig._process(0.0)).filter(
+				func(slot: String) -> bool: return slot.begins_with("sfx.armour_"))
+		World._relocate(player, from_tile)
+		_rig._process(0.0)
+	player.worn = worn_was
+	if SoundKit.files("sfx.armour_plate").is_empty() or SoundKit.files("sfx.armour_mail").is_empty():
+		_check(true, "the armour takes are not synced here: the clank unheard, skipped")
+	else:
+		_check(clanks["plate_armour"] == ["sfx.armour_plate"] and clanks["mail_armour"] == ["sfx.armour_mail"] and clanks["leather_armour"].is_empty(),
+				"a step in plate clanks, in mail jingles, in leather nothing more (%s)" % [clanks])
 	var pitch_light := _swing_pitch(imp)
 	var pitch_heavy := _swing_pitch(player)
 	_check(pitch_light > pitch_heavy, "an imp's swing is higher than a player's (%.2f, %.2f)" % [pitch_light, pitch_heavy])

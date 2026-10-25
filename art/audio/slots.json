@@ -189,6 +189,24 @@
 			"uses": "the bow's creak while it is held drawn, its pitch and level rising with World.draw_of (Client3D._sync_draw)",
 			"fallback": "sfx.bow_draw"
 		},
+		"sfx.armour_plate": {
+			"category": "movement",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": null,
+			"range": 5,
+			"volume_db": -14.0,
+			"uses": "plate armour worn, a step's clank (Client3D._step_sound, SoundKit.armour_slot): heard as far as physics' World.armour_noise carries it, louder at a run; beside the footstep, never in place of it"
+		},
+		"sfx.armour_mail": {
+			"category": "movement",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": null,
+			"range": 2,
+			"volume_db": -16.0,
+			"uses": "a mail shirt worn, a step's jingle (Client3D._step_sound, SoundKit.armour_slot): heard as far as physics' World.armour_noise carries it, louder at a run; beside the footstep, never in place of it"
+		},
 		"sfx.blade_draw": {
 			"category": "sfx",
 			"type": "oneshot",

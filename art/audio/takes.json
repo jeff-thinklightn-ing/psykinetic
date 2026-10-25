@@ -362,6 +362,73 @@
 				"sha256": "a738a92f4e4ee454e0707d23720e1f1a6737f6e51ce3acf6b7ef36bc9e908f09"
 			}
 		],
+		"sfx.armour_mail": [
+			{
+				"file": "sfx.armour_mail.ogg",
+				"from": "freesound",
+				"original": "freesound 192612: chain_rustle_med3.mp3 (from 0.15 s for 0.65 s)",
+				"sha256": "72a6ae05aae26e15509c825179e655faa8a535945462826282e17c550136d77e",
+				"by": "sgossner",
+				"url": "https://freesound.org/people/sgossner/sounds/192612/",
+				"license": "CC BY 4.0"
+			},
+			{
+				"file": "sfx.armour_mail.2.ogg",
+				"from": "freesound",
+				"original": "freesound 512134: Chainmail Rustle Sound (from 0 s for 0.4 s)",
+				"sha256": "0d1d7a31ac2ffc8fe86acffae4e1cdf588cfa33d9ecf28244cd26f7228483729",
+				"by": "BeezleFM",
+				"url": "https://freesound.org/people/BeezleFM/sounds/512134/",
+				"license": "CC BY 4.0"
+			},
+			{
+				"file": "sfx.armour_mail.3.ogg",
+				"from": "freesound",
+				"original": "freesound 384898: Knight Left Footstep Forest/Grass 3 (With Chainmail), high-passed at 1 kHz (from 0 s for 0.65 s)",
+				"sha256": "a03b9447197a9853025df500db9f5b7eac1e5714dbac536fe4026eeefa512f90",
+				"by": "Ali_6868",
+				"url": "https://freesound.org/people/Ali_6868/sounds/384898/",
+				"license": "CC0 1.0"
+			}
+		],
+		"sfx.armour_plate": [
+			{
+				"file": "sfx.armour_plate.ogg",
+				"from": "freesound",
+				"original": "freesound 209400: Plate Armor- Rustle 3 (from 0.12 s for 0.6 s)",
+				"sha256": "8c7ae260fb3c59371531b520b6699b8e17eb5fd0988eb93a50fb97c1bfbd9e9f",
+				"by": "sgossner",
+				"url": "https://freesound.org/people/sgossner/sounds/209400/",
+				"license": "CC BY 4.0"
+			},
+			{
+				"file": "sfx.armour_plate.2.ogg",
+				"from": "freesound",
+				"original": "freesound 209404: Plate Armor- Rustle 5 (from 0.14 s for 0.6 s)",
+				"sha256": "27714db8bff94fc63a7075fc8b84129930190d1dd8f62791a342eff0eafd0248",
+				"by": "sgossner",
+				"url": "https://freesound.org/people/sgossner/sounds/209404/",
+				"license": "CC BY 4.0"
+			},
+			{
+				"file": "sfx.armour_plate.3.ogg",
+				"from": "freesound",
+				"original": "freesound 209405: Plate Armor- Rustle 4 (from 0.28 s for 0.65 s)",
+				"sha256": "f680ed9c47d6cc5e65688141b2325f34022304e3e4d5555c9ea49152e5634df2",
+				"by": "sgossner",
+				"url": "https://freesound.org/people/sgossner/sounds/209405/",
+				"license": "CC BY 4.0"
+			},
+			{
+				"file": "sfx.armour_plate.4.ogg",
+				"from": "freesound",
+				"original": "freesound 770065: Footstep Armor - Knight, high-passed at 400 Hz (from 1.05 s for 0.35 s)",
+				"sha256": "ea3b9c4c945985772fdc76f5b0278d381855cc14fcf8bd9b27d64cd75430f7a9",
+				"by": "Vrymaa",
+				"url": "https://freesound.org/people/Vrymaa/sounds/770065/",
+				"license": "CC0 1.0"
+			}
+		],
 		"sfx.arrow_flight": [
 			{
 				"file": "sfx.arrow_flight.ogg",

@@ -1848,6 +1848,9 @@ const CHATTER_SECONDS := Vector2(8.0, 25.0)
 var _last_hp: Dictionary[int, int] = {}
 ## Entity instance id -> its tile as last seen, for footsteps.
 var _last_tile: Dictionary[int, Vector2i] = {}
+## Entity instance id -> when (ms) its last step was heard, for its pace
+## (worn armour's clank, 676 1b).
+var _last_step_ms: Dictionary[int, int] = {}
 ## Tall grass trampled just now (decision 508): cell -> when (ms), so the
 ## step that flattens it still rustles, whether the "grass" news comes
 ## before the step or after it.
@@ -13148,6 +13151,7 @@ func _entity_went(id: int) -> void:
 	_combat_at.erase(id)
 	_last_hp.erase(id)
 	_last_tile.erase(id)
+	_last_step_ms.erase(id)
 	_far.erase(id)
 	var entity_name: String = puppet.get_meta("entity_name", "")
 	if _pending_deaths.has(entity_name):
@@ -13207,8 +13211,27 @@ func _step_sound(entity: GridEntity, puppet: Node3D) -> void:
 		var ground: String = "water" if wet else _ground_kinds.get(entity.tile, "stone")
 		var creature := str(entity.spawn_spec.get("kind", "")) if entity is Monster else ""
 		sfx.play(SoundKit.footstep(ground, entity.mass, creature), puppet.position, 1.0, 0.0, Senses.step_radius(entity))
-		if rustles(entity.tile, _flattened.get(entity.tile, -FLATTENED_MS), Time.get_ticks_msec()):
+		var now := Time.get_ticks_msec()
+		if rustles(entity.tile, _flattened.get(entity.tile, -FLATTENED_MS), now):
 			sfx.play("sfx.grass_rustle", puppet.position, 1.0, 0.0, Senses.step_radius(entity))
+		var since := (now - int(_last_step_ms.get(id, -1000000))) / 1000.0
+		_last_step_ms[id] = now
+		_armour_sound(entity, puppet, since)
+
+
+## Worn armour heard with a step (676 1b; Jeff: worn armour clanks): plate's
+## clank or mail's jingle as far as World.armour_noise carries it (the
+## server's &"clank" noise, the one prey hear), louder the further it
+## carries; leather and robes nothing. [param since]: seconds since the
+## body's last step, its pace.
+func _armour_sound(entity: GridEntity, puppet: Node3D, since: float) -> void:
+	var worn: Variant = entity.get("worn")
+	if not worn is String or (worn as String).is_empty():
+		return
+	var heard: Dictionary = World.armour_noise(worn, SoundKit.step_pace(since))
+	var slot := SoundKit.armour_slot(str(heard["kind"]))
+	if slot != "":
+		sfx.play(slot, puppet.position, 1.0, SoundKit.armour_db(str(heard["kind"]), int(heard["radius"])), int(heard["radius"]))
 
 
 ## Whether a step into [param tile] rustles: standing tall grass (decision

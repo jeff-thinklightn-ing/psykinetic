@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Armour is heard as you move: plate clanks and a mail shirt jingles with each step, louder at a run and as far as the animals hear it; leather and robes stay quiet (676 step 1b, sound's side).
 - Walking into your own companion swaps places with her at once, so a walk past her no longer stutters or snaps back; not while she is fighting, dodging a blow or down (679).
 - The pack sheet shows your load: what you carry against your own weight and how burdened that is (light, burdened, heavy, overloaded), then what sits on your arms and on your body and what each slows (the draw and swing, the walk and breath).
 - Armour makes noise as you move: plate clanks loud enough to send game running from about five cells, mail jingles closer in, leather and robes are quiet; a monster that hears it comes to look (676, step 1b).

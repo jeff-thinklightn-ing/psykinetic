@@ -133,6 +133,22 @@ func _test_noises_are_the_sims() -> void:
 		for drawing: bool in [true, false]:
 			stowed = stowed and SoundKit.has(SoundKit.stow_slot(id, drawing)) and bool(SoundKit.spec(SoundKit.stow_slot(id, drawing)).get("positional", true))
 	_check(stowed, "the four rest slots are in the manifest, positional")
+	# 676 1b: worn armour's clank, by World.armour_noise's kind and radius.
+	_check(SoundKit.armour_slot("plate") == "sfx.armour_plate" and SoundKit.armour_slot("mail") == "sfx.armour_mail" and SoundKit.armour_slot("none") == ""
+			and SoundKit.has("sfx.armour_plate") and SoundKit.has("sfx.armour_mail") and SoundKit.positional("sfx.armour_plate"),
+			"plate clanks, mail jingles, the rest nothing; both slots positional")
+	_check(SoundKit.armour_db("plate", 5) == 0.0 and is_equal_approx(SoundKit.armour_db("plate", 10), 6.0) and is_equal_approx(SoundKit.armour_db("mail", 1), -6.0)
+			and SoundKit.armour_db("plate", 19) == SoundKit.ARMOUR_DB_RANGE.y and SoundKit.armour_db("mail", 0) == SoundKit.ARMOUR_DB_RANGE.x,
+			"as loud as its slot at a walk's radius, 6 dB a doubling, within %s" % SoundKit.ARMOUR_DB_RANGE)
+	_check(SoundKit.step_pace(0.0) == 1.0 and SoundKit.step_pace(SoundKit.ARMOUR_STANDING) == 1.0
+			and is_equal_approx(SoundKit.step_pace(World.CLANK_WALK_TICKS / World.TICK_RATE), 1.0) and is_equal_approx(SoundKit.step_pace(World.CLANK_WALK_TICKS / World.TICK_RATE / 2.0), 2.0)
+			and SoundKit.step_pace(0.01) == 2.0,
+			"pace from the time between steps: a walk 1, twice as quick 2 (capped), a first step or one from standing a walk")
+	var plate_walk: Dictionary = World.armour_noise("plate_armour", 1.0)
+	var plate_run: Dictionary = World.armour_noise("plate_armour", SoundKit.step_pace(World.CLANK_WALK_TICKS / World.TICK_RATE / 2.0))
+	_check(plate_walk["kind"] == "plate" and SoundKit.armour_db("plate", int(plate_walk["radius"])) == 0.0
+			and SoundKit.armour_db("plate", int(plate_run["radius"])) > 5.0 and World.armour_noise("leather_armour", 2.0)["kind"] == "none",
+			"physics' radii: plate at a walk as its slot (%s), louder at a run (%s); leather none" % [plate_walk, plate_run])
 	var light := ""
 	var heavy := ""
 	for id: String in Items.ids():

@@ -301,6 +301,43 @@ static func stow_slot(id: String, drawing: bool) -> String:
 	return "sfx.gear_draw" if drawing else "sfx.gear_stow"
 
 
+## Worn armour's slot by its noise kind (676 1b, World.armour_noise): plate's
+## clank, mail's jingle; "" for none (leather, robes, nothing worn).
+const ARMOUR_SLOTS: Dictionary[String, String] = {"plate": "sfx.armour_plate", "mail": "sfx.armour_mail"}
+## Each kind's radius at a walk with physics' first knobs (plate 20 kg x 0.25,
+## mail 10 kg x 0.2): its slot's own loudness. A step carrying twice as far
+## is ARMOUR_DB_PER_DOUBLING louder, within ARMOUR_DB_RANGE.
+const ARMOUR_WALK_RADIUS: Dictionary[String, float] = {"plate": 5.0, "mail": 2.0}
+const ARMOUR_DB_PER_DOUBLING := 6.0
+const ARMOUR_DB_RANGE := Vector2(-12.0, 6.0)
+## A step this long after the last (s) or more starts from standing: heard
+## at a walk.
+const ARMOUR_STANDING := 1.0
+
+
+static func armour_slot(kind: String) -> String:
+	return ARMOUR_SLOTS.get(kind, "")
+
+
+## dB over [param kind]'s slot for a step whose clank carries [param radius]
+## cells (World.armour_noise): 0 at its walk's radius, louder as it carries
+## further (a run, a heavier piece, physics' clank knobs turned up).
+static func armour_db(kind: String, radius: int) -> float:
+	var walk: float = ARMOUR_WALK_RADIUS.get(kind, 0.0)
+	if walk <= 0.0 or radius <= 0:
+		return ARMOUR_DB_RANGE.x
+	return clampf(ARMOUR_DB_PER_DOUBLING * log(radius / walk) / log(2.0), ARMOUR_DB_RANGE.x, ARMOUR_DB_RANGE.y)
+
+
+## A step's pace as the server reckons it (World.armour_noise: a walk 1, to
+## 2) from [param seconds] since the body's last step as the client saw it;
+## a first step, or one after standing, a walk.
+static func step_pace(seconds: float) -> float:
+	if seconds <= 0.0 or seconds >= ARMOUR_STANDING:
+		return 1.0
+	return clampf(World.CLANK_WALK_TICKS / (seconds * World.TICK_RATE), 0.0, 2.0)
+
+
 ## A person's voice slot for [param what] (effort_swing, effort_hurt,
 ## effort_lift, death), by its body (Player.body, Companion.body: male or
 ## female; decision 388); "" for anyone else.

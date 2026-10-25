@@ -30543,3 +30543,42 @@ dead end's swap no longer goes through YIELD. Wire: no new field; an old
 client predicts her cell blocked and is corrected, so it rides revision 37
 (676's, unshipped) with a line there.
 
+
+### 676, step 1b, sound's side: worn armour heard
+
+The clank the game hears is heard too: each step of a player or a companion
+in plate or mail plays its slot beside the footstep, never in its place.
+Client3D._step_sound calls World.armour_noise(worn, pace) on the client, the
+function the server's &"clank" noise comes from, so the two grow together
+and follow physics' F7 knobs: worn is the replicated Player.worn or
+Companion.worn, and pace is SoundKit.step_pace of the seconds since that
+body's last step as the client saw it (CLANK_WALK_TICKS over the step's
+ticks, 0 to 2; a first step, or one a second or more after the last, a
+walk). No new wire.
+
+- **The slots**: SoundKit.armour_slot(kind), sfx.armour_plate (a clank,
+  -14 dB) and sfx.armour_mail (a jingle, -16 dB); "none" (leather, robes,
+  nothing worn) plays nothing. Both are movement one-shots on the sfx bus,
+  positional, heard as far as the noise's radius carries (their "range", 5
+  and 2, is the walk's).
+- **Loudness by reach**: SoundKit.armour_db(kind, radius) is 0 dB at the
+  kind's walk radius with physics' first knobs (ARMOUR_WALK_RADIUS: plate 5,
+  mail 2) and 6 dB a doubling, within -12 to +6. So a run is 6 dB louder and
+  carries twice as far, and a knob turned up is heard louder; a knob at 0
+  silences it, as it silences the noise. Plate at a walk sits a little under
+  the footstep, mail lighter.
+- **The takes**: Freesound, each one's licence in takes.json and
+  THIRD_PARTY.md. Plate: sgossner's plate armour rustles 209400, 209404 and
+  209405 (CC BY 4.0) and one clank of Vrymaa's knight footsteps 770065 (CC0).
+  Mail: sgossner's chain rustle 192612 and BeezleFM's chainmail rustle 512134
+  (CC BY 4.0) and Ali_6868's chainmail footstep 384898 (CC0). The two
+  footstep recordings were high-passed (770065 at 400 Hz, 384898 at 1 kHz,
+  two passes each), so the boot is gone and only the metal is left; OGsoundFX's
+  chainmail walk loop (423147) was left out, half its energy the footfall.
+  Listening mixes for Jeff in C:/dev/review/sound/armour.
+
+sound_kit_test: the slots by kind, armour_db at a walk and by doubling and
+its range, step_pace, physics' radii giving plate 0 dB at a walk and louder
+at a run. view_test _test_sounds_follow_events: a player's step in plate clanks, in mail
+jingles, in leather nothing more. Client only, protocol unchanged, no new
+class_name.
