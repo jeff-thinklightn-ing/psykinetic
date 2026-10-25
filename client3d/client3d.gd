@@ -3425,6 +3425,23 @@ func _elevations() -> Dictionary:
 	return out
 
 
+const EIGHT_WAYS: Array[Vector2i] = [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1),
+		Vector2i(1, 1), Vector2i(1, -1), Vector2i(-1, 1), Vector2i(-1, -1)]
+
+
+## The ground's elevation (m) at each wooded cell on its outline (one of
+## its eight ways out of it): all the border reads (TerrainBorder._work's
+## frontier), not the whole land's (660: most of the border's time).
+func _edge_elevations() -> Dictionary:
+	var out := {}
+	for cell: Vector2i in _wooded:
+		for way: Vector2i in EIGHT_WAYS:
+			if not _wooded.has(cell + way):
+				out[cell] = _elevation(cell)
+				break
+	return out
+
+
 ## The water's surface at the ground's corner [param vertex] (decision 525):
 ## the mean of the surfaces of the water cells round it (a bridge's water at
 ## its bed), so a pond's is flat and a stream's slopes down its path. For a
@@ -5022,8 +5039,8 @@ func _descendants(node: Node) -> Array[Node]:
 ## The room's builders in order (decision 660): run in one go by
 ## _build_room, a frame apart by _build_room_over_frames.
 func _room_phases() -> Array[Callable]:
-	return [_phase_sets, _phase_land, _phase_ground, _build_water, _add_cliffs, _phase_lights,
-		_add_walls, _add_decor, _phase_forest, _phase_grown, _phase_border, _phase_glimpses,
+	return [_phase_sets, _phase_land, _phase_reach, _phase_edges, _phase_ground, _build_water, _add_cliffs, _phase_lights,
+		_add_walls, _add_decor, _phase_stands, _phase_forest, _phase_forest_edge, _phase_grown, _phase_border, _phase_glimpses,
 		_add_buildings, _phase_roofs, _phase_doors]
 
 
@@ -5107,9 +5124,18 @@ func _phase_land() -> void:
 		if not _grown_trunks.is_empty():
 			_wooded = _wooded.duplicate()
 			_wooded.merge(_grown_trunks)
+
+
+## The forest's reach from the land (660: the land's phase in three, each
+## a frame of its own under the card).
+func _phase_reach() -> void:
 	_forest_distance.clear()
 	if _outdoor:
 		_forest_distance = _measure_forest()
+
+
+## The forest's edge as curves, then what reads the land's whole.
+func _phase_edges() -> void:
 	_read_edges()
 	_read_field()
 	_sight_key = Vector4.INF  # A new ground: ask again whether it hides the player.
@@ -5142,10 +5168,22 @@ func _phase_lights() -> void:
 	_on_fields_changed()
 
 
+func _phase_stands() -> void:
+	if not _outdoor:
+		return
+	_add_forest_stands()
+
+
 func _phase_forest() -> void:
 	if not _outdoor:
 		return
 	_add_forest()
+
+
+func _phase_forest_edge() -> void:
+	if not _outdoor:
+		return
+	_add_forest_edge()
 	for cell: Vector2i in _clearing:
 		_dress_clearing(cell)
 
@@ -5168,7 +5206,7 @@ func _phase_border() -> void:
 	_border = TerrainBorder.new()
 	_border.name = "Border"
 	_room.add_child(_border)
-	_border.build(_wooded, _elevations(), 1.0, _forest_floor_colour(), FOREST_FLOOR_DEPTH, true, PineStands.drawn())
+	_border.build(_wooded, _edge_elevations(), 1.0, _forest_floor_colour(), FOREST_FLOOR_DEPTH, true, PineStands.drawn())
 
 
 func _phase_glimpses() -> void:
@@ -6408,19 +6446,33 @@ func _on_land(cell: Vector2i) -> bool:
 	return _clearing.has(cell) or _land.has(cell) and not _grown_back.has(cell)
 
 
-## Trees on the void around the land, and the forest floor under them.
+## The cells pine stands took (_add_stands), and the forest's bounds, kept
+## between the forest's phases (660: three, a frame apart under the card).
+var _stood: Dictionary[Vector2i, bool] = {}
+var _forest_low := Vector2i.ZERO
+var _forest_high := Vector2i.ZERO
+
+
+## Past the first ring, stands of pines once they are drawn (PineStands);
+## then (_add_forest) a tree of its own on each cell left between them.
+func _add_forest_stands() -> void:
+	_stood = {}
+	if _land.is_empty():
+		return
+	if PineStands.drawn():
+		_add_stands(_forest_distance, _stood)
+
+
+## Trees on the void around the land (then _add_forest_edge: the first
+## ring's and the forest floor under them).
 func _add_forest() -> void:
 	if _land.is_empty():
 		return
 	var distance := _forest_distance
 	var low := Vector2i(1 << 20, 1 << 20)
 	var high := -low
-	# Past the first ring, stands of pines once they are drawn (PineStands),
-	# and a tree of its own on each cell left between them.
-	var stood: Dictionary[Vector2i, bool] = {}
+	var stood := _stood
 	var stands := PineStands.drawn()
-	if stands:
-		_add_stands(distance, stood)
 	for cell: Vector2i in distance:
 		low = low.min(cell)
 		high = high.max(cell)
@@ -6459,7 +6511,17 @@ func _add_forest() -> void:
 			_room.add_child(rock)
 		elif roll < 0.33 + DEADWOOD_CHANCE:
 			_add_deadwood(cell, "tree.log" if _roll(cell, 58) < LOG_SHARE else "tree.stump", distance)
-	_add_edge_trees(distance, stood)
+	_forest_low = low
+	_forest_high = high
+
+
+## The first ring's trees from the edge's curve, and the forest floor.
+func _add_forest_edge() -> void:
+	if _land.is_empty():
+		return
+	var low := _forest_low
+	var high := _forest_high
+	_add_edge_trees(_forest_distance, _stood)
 	var floor_mesh := PlaneMesh.new()
 	floor_mesh.size = Vector2(high - low) + Vector2.ONE * 2.0
 	var forest_floor := MeshInstance3D.new()
@@ -8733,11 +8795,20 @@ func _stamp_near(curve: Dictionary, closed: bool, index: int, into: Dictionary, 
 	for k in points.size():
 		var reach := (widths[k] * 0.5 if not closed else 0.0) + CURVE_REACH
 		var point := points[k]
+		var within := reach + 0.71
+		# Each row only across the cells that can be within reach (660: the
+		# whole square was most of a forest's edges' time); the margin keeps
+		# every cell the gap test could pass.
+		var span := within + 0.01
 		for y in range(floori(point.y - reach), ceili(point.y + reach) + 1):
-			for x in range(floori(point.x - reach), ceili(point.x + reach) + 1):
+			var dy := absf(y - point.y)
+			if dy > span:
+				continue
+			var half := sqrt(span * span - dy * dy)
+			for x in range(maxi(floori(point.x - reach), floori(point.x - half)), mini(ceili(point.x + reach), ceili(point.x + half)) + 1):
 				var cell := Vector2i(x, y)
 				var gap := Vector2(cell).distance_to(point)
-				if gap <= reach + 0.71 and gap < float(gaps.get(cell, INF)):
+				if gap <= within and gap < gaps.get(cell, INF):
 					gaps[cell] = gap
 					nearest[cell] = k
 	for cell: Vector2i in nearest:
@@ -9125,6 +9196,12 @@ func _read_edges() -> void:
 		_edge_curves.append({"curve": curve, "closed": true})
 
 
+## A cell's four sides, and the corner each starts at (from its middle),
+## going round with the cell on the right (_outline_loops).
+const OUTLINE_SIDES: Array[Vector2i] = [Vector2i(0, -1), Vector2i(1, 0), Vector2i(0, 1), Vector2i(-1, 0)]
+const OUTLINE_CORNERS: Array[Vector2] = [Vector2(-0.5, -0.5), Vector2(0.5, -0.5), Vector2(0.5, 0.5), Vector2(-0.5, 0.5)]
+
+
 ## Every loop of the outline of [param cells] (their squares' outer edges,
 ## each loop going round with the cells on its right, y down), as the
 ## middles of its edges, so no corner of the grid is left. Where two cells
@@ -9134,19 +9211,22 @@ static func _outline_loops(cells: Dictionary) -> Array[PackedVector2Array]:
 	var leaving: Dictionary[Vector2, Array] = {}
 	var edges := 0
 	for cell: Vector2i in cells:
-		var x := float(cell.x)
-		var y := float(cell.y)
-		var corners: Array[Vector2] = [Vector2(x - 0.5, y - 0.5), Vector2(x + 0.5, y - 0.5), Vector2(x + 0.5, y + 0.5), Vector2(x - 0.5, y + 0.5)]
-		var sides: Array[Vector2i] = [Vector2i(0, -1), Vector2i(1, 0), Vector2i(0, 1), Vector2i(-1, 0)]
 		for k in 4:
-			if not cells.has(cell + sides[k]):
-				if not leaving.has(corners[k]):
-					leaving[corners[k]] = []
-				leaving[corners[k]].append(corners[(k + 1) % 4])
+			if not cells.has(cell + OUTLINE_SIDES[k]):
+				var corner := Vector2(cell) + OUTLINE_CORNERS[k]
+				if not leaving.has(corner):
+					leaving[corner] = []
+				leaving[corner].append(Vector2(cell) + OUTLINE_CORNERS[(k + 1) % 4])
 				edges += 1
 	var loops: Array[PackedVector2Array] = []
+	# Each loop starts at the first corner left (insertion order), read off
+	# one list of them: keys() a loop was a copy of them all a loop (660).
+	var starts := leaving.keys()
+	var first := 0
 	while edges > 0:
-		var start: Vector2 = leaving.keys()[0]
+		while not leaving.has(starts[first]):
+			first += 1
+		var start: Vector2 = starts[first]
 		var at := start
 		var way := Vector2.ZERO
 		var middles := PackedVector2Array()

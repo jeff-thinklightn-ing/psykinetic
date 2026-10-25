@@ -28642,6 +28642,26 @@ _test_kept_fields: a second arrival is a hit with the same fields (corners, shor
 shore, depth, road and kinds images), a changed kind a miss whose room matches one built at once,
 and at most three kept. Client only, protocol unchanged, no new class_name.
 
+660 amended (2026-10-25): a shorter worst frame under the card. On the wilds the land's phase
+took about 300 ms and the forest's about 170 ms, each one frame, and the border's about 105 ms.
+The room built is unchanged: every node's path and transform, each MultiMesh's buffer, the
+edges', waters', roads', ledges' and border's data hash the same as before on wilds, hills and
+held (perf's probe), and view_test's at-once check still holds.
+- The land's phase is three, a frame apart: _phase_land (the cells, glimpse plans, grown
+  trunks), _phase_reach (_measure_forest), _phase_edges (_read_edges, _read_field, ramps).
+- The forest's phase is three: _phase_stands (pine stands into _stood), _phase_forest (a tree a
+  cell; its bounds kept in _forest_low / _forest_high), _phase_forest_edge (the first ring's
+  trees, the forest floor, the clearings).
+- _outline_loops reads its corner list once (it copied every key out of the dictionary a loop:
+  78 loops on the wilds); _stamp_near searches each row only across the cells within reach, with
+  a margin over the gap test. The forest's edge: 142 to 95 ms.
+- The border gets only the wooded outline's elevations (_edge_elevations), all TerrainBorder's
+  worker reads, not the whole land's (66 288 cells, about 70 ms on the wilds).
+Bench (headless, wilds, main and this alternated, three crossings each, twice): the first
+crossing's worst frame 428-478 ms to 256-259, its lift unchanged (about 2.0 s, the fields on the
+worker); a crossing again, the lift 1128 to 1026 ms (means), its worst frame 251-287 to 204-241.
+Client only, protocol unchanged, no new class_name.
+
 ## 671, buildings' side: inside is a space closed in by walls; the roof eases off
 
 Jeff, after playing: "going inside buildings should go into top down view and
