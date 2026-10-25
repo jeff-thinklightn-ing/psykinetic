@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- A bow stretches to its full 15 cells in any armour: plate no longer stops it at 5, and leather, mail and robes no longer cap it (622 amended).
 - When you draw your bow, your companion steps out of its cone of fire and keeps out of it until you loose or lower it.
 
 ## v0.1.175

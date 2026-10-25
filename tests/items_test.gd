@@ -1733,7 +1733,7 @@ func _test_armour() -> void:
 	print("\n== armour: one slot, worn, never held (decision 622) ==")
 	_check(Items.CARRIED == 7 and Items.ARMOUR == 6 and Player.SLOTS == 7 and Companion.SLOTS == 7, "a seventh carried slot, the armour worn")
 	_check(Items.armour_of("mail_armour").get("look") == "mail" and Items.armour_of("robes").get("look") == "robes"
-			and Items.armour_of("knife").is_empty() and float(Items.armour_of("plate_armour")["range_steps"]) == 5.0,
+			and Items.armour_of("knife").is_empty() and not Items.armour_of("plate_armour").has("range_steps"),
 			"four kinds, each with its look and stats; a knife is not armour")
 	var odd := Items.read('{"items": [{"id": "cloak", "armour": {"look": "fur"}}]}')
 	_check(odd["cloak"]["armour"].is_empty(), "an unknown look is no armour (warned)")
@@ -1759,7 +1759,7 @@ func _test_armour() -> void:
 	_check(World.try_transfer(host, host, packed, host, Items.ARMOUR) and host.worn == "leather_armour"
 			and is_equal_approx(host.mass - bare, Items.weight_of("leather_armour")), "worn: its slot, worn says so, its weight carried")
 	_check(World.worn_armour(host).get("look") == "leather" and float(World.worn_armour(host)["draw"]) == 0.9, "worn_armour reads its stats")
-	# The bow under armour (decision 622, step 2): light draws quicker, heavy caps the reach.
+	# The bow under armour (decision 622, step 2): light draws quicker; none caps the reach (622 amended).
 	_give(host, "bow", Player.RIGHT_HAND)
 	_give(host, "arrows", Player.LEFT_HAND)
 	_check(World.try_stance(host, "draw"), "drawn in leather")
@@ -1772,9 +1772,9 @@ func _test_armour() -> void:
 			"the leather off, plate on")
 	World.try_stance(host, "draw")
 	host.raised_tick = World.tick - 100
-	_check(World.range_of(host) == 5 and World.longest_range(host) == 5 and World.draw_step(host) == 2 and is_equal_approx(World.draw_of(host), 1.0)
-			and Items.damage_for(Items.verb_of("bow"), World.draw_step(host), 5) == 1.6,
-			"in plate a bow reaches 5 cells at most, however long it is held, but comes to full draw, full strength within them (decision 669) (%d)" % World.range_of(host))
+	_check(World.range_of(host) == 15 and World.longest_range(host) == 15 and World.draw_step(host) == 5 and is_equal_approx(World.draw_of(host), 1.0)
+			and Items.damage_for(Items.verb_of("bow"), World.draw_step(host), 15) == 0.8,
+			"in plate a bow held long stretches to 15 cells, as with none: armour caps no reach (622 amended) (%d)" % World.range_of(host))
 	host.raised = ""
 	World.try_transfer(host, host, Items.ARMOUR, host, 3)
 	World.try_transfer(host, host, 2, host, Items.ARMOUR)

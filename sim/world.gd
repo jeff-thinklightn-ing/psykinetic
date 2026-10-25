@@ -2315,7 +2315,7 @@ func _refused(by: GridEntity, entity: GridEntity, slots: PackedStringArray) -> b
 
 ## The armour [param entity] wears (decision 622): Items.armour_of its
 ## armour slot's thing, {look, stats}; {} for none. What reads a stat
-## (combat's deflections, the bow's range_steps and draw) reads this.
+## (combat's deflections, the bow's draw) reads this.
 func worn_armour(entity: GridEntity) -> Dictionary:
 	if not is_instance_valid(entity) or entity.slots.size() <= Items.ARMOUR:
 		return {}
@@ -5140,13 +5140,6 @@ func draw_of(entity: GridEntity) -> float:
 	return clampf(float(drawn) / draw_full_ticks(entity), 0.0, 1.0)
 
 
-## The most cells [param entity]'s armour lets a bow reach (decision 622,
-## step 2: its "range_steps"); a big number with none.
-func reach_cap(entity: GridEntity) -> int:
-	var most: Variant = worn_armour(entity).get("range_steps")
-	return 1 << 20 if most == null else int(most)
-
-
 ## A quick bow (decision 365) draws in less time, and so does one drawn in
 ## light armour, a heavy one in more (decision 622, step 2: the armour's "draw"):
 ## its ticks' multiple.
@@ -5161,20 +5154,12 @@ func draw_quick(entity: GridEntity) -> float:
 	return _draw_quick(entity)
 
 
-## The last of its bow's steps [param entity] can reach in the armour it
-## wears (decisions 622 step 2, 669): the last whose cells its armour lets
-## a bow reach (reach_cap), but never short of full draw: armour caps the
-## reach, not the strength (a bow in mail still comes to full draw, its
-## reach cut to the cap); the bow's last step with none.
+## The last of its bow's steps [param entity] can reach (decisions 622
+## step 2, 669): the bow's last step. Armour caps no reach (622 amended;
+## Jeff: "items shouldnt have direct impacts, they should just form stats
+## like weight/mass"); its "draw" still scales the ticks.
 func step_cap(entity: GridEntity) -> int:
-	var verb := Items.verb_of(drawn_with(entity))
-	var steps: Array = verb.get("steps", [])
-	var cap := steps.size() - 1
-	var most := reach_cap(entity)
-	var full := int(verb.get("full", 0))
-	while cap > full and int(steps[cap]) > most:
-		cap -= 1
-	return cap
+	return (Items.verb_of(drawn_with(entity)).get("steps", []) as Array).size() - 1
 
 
 ## The ticks [param entity]'s bow takes to full draw (decision 669: its
@@ -5189,7 +5174,7 @@ func draw_full_ticks(entity: GridEntity) -> float:
 ## The step [param entity]'s drawn bow has reached (decisions 583, 669;
 ## Items.step_at over its ticks drawn, quickness counted): 0, the verb's
 ## first, at draw_min ticks, one more as each of its draw_steps passes,
-## held at the last its armour lets it reach (step_cap); -1 before
+## held at the bow's last (step_cap); -1 before
 ## draw_min or when not drawing.
 func draw_step(entity: GridEntity) -> int:
 	if not is_instance_valid(entity) or entity.raised != "draw":
@@ -5202,24 +5187,23 @@ func draw_step(entity: GridEntity) -> int:
 
 
 ## The cells a shot from [param entity]'s bow drawn to [param step]
-## reaches (decision 669): that step's, cut to its armour's cap
-## (reach_cap); 0 for no step.
+## reaches (decision 669): that step's; 0 for no step.
 func reach_at(entity: GridEntity, step: int) -> int:
 	var steps: Array = Items.verb_of(drawn_with(entity)).get("steps", [])
 	if step < 0 or steps.is_empty():
 		return 0
-	return mini(int(steps[mini(step, steps.size() - 1)]), reach_cap(entity))
+	return int(steps[mini(step, steps.size() - 1)])
 
 
-## The cells [param entity]'s drawn bow reaches now (its step's, its
-## armour's cap counted; decisions 583, 669); 0 before draw_min or when
+## The cells [param entity]'s drawn bow reaches now (its step's;
+## decisions 583, 669); 0 before draw_min or when
 ## not drawing. What the views show.
 func range_of(entity: GridEntity) -> int:
 	return reach_at(entity, draw_step(entity))
 
 
 ## The cells within which [param entity]'s drawn bow strikes at full
-## strength (decision 669): full draw's reach (its armour's cap counted),
+## strength (decision 669): full draw's reach,
 ## shown on the aim once it is drawn past full draw; 0 before full draw or
 ## when not drawing.
 func full_range_of(entity: GridEntity) -> int:
@@ -5237,8 +5221,7 @@ func shot_strength(entity: GridEntity, step: int, away: int) -> float:
 
 
 ## The cells the bow in [param entity]'s hands reaches at its longest step
-## its armour lets it reach (step_cap, reach_cap; decisions 622 step 2,
-## 669); 0 with none.
+## (step_cap; decisions 622 step 2, 669); 0 with none.
 func longest_range(entity: GridEntity) -> int:
 	var verb := Items.verb_of(drawn_with(entity))
 	if verb.is_empty() or (verb.get("steps", []) as Array).is_empty():

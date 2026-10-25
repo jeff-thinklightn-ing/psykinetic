@@ -29189,10 +29189,9 @@ harder: 1.5/1.2/1.0/0.8 at 3/5/7/9 cells) and 620 (the cone settled to 2° over 
   5 s past full draw. At 0 the arms give out: the bow is let down with the arrow kept and
   nothing loosed (World.draw_given_up; the archer is told "Your arms give out."), and the 0
   winds them (597). Lowering resets the draw as ever. A body that pays no stamina never drains.
-- **Armour caps the reach, not the strength** (622 step 2's range_steps): the draw still comes
-  to full draw (World.step_cap never stops short of it), and the reach is cut to the cap
-  (World.reach_cap, reach_at). Mail stops at 7 cells, plate at 5, with no bands past that,
-  and full strength within.
+- ~~**Armour caps the reach, not the strength**~~ (622 step 2's range_steps). Withdrawn by
+  "622 amended, bending 669": armour no longer caps the reach, World.reach_cap is gone, and
+  step_cap is the bow's last step.
 - **The aim** (ui's marker, read on the client from the replicated raised_tick, so it is the
   server's):
   - the arc at range_of;
@@ -30314,3 +30313,18 @@ hold; 663's step-clear rule with one more danger.
 companion_test _test_firing_cone: drawn facing her, she dodges at once;
 out of it and kept out while drawn; lowered, nothing to keep out of.
 Server only, protocol unchanged, no new class_name.
+## 622 amended: armour no longer caps the bow's reach
+
+622 amended, bending 669. Jeff tested the bow on v0.1.175 wearing plate, and the stretch never
+went past the first distance: "622, step 2, items' side" gives each armour a range_steps cap
+(leather 9, mail 7, plate 5, robes 9), which predates 669's stretch. Jeff's ruling:
+"items shouldnt have direct impacts, they should just form stats like weight/mass. and the impact
+falls out of the physics". Physics leads that redesign, with combat and items.
+
+This is the fast fix ahead of it. The four armours in levels/items.json lose range_steps, and
+World.reach_cap is removed. World.step_cap is now the bow's last step and reach_at is the step's
+own cells, so a bow in any armour stretches to 15 cells, as with none. The armour's "draw"
+multiple (how fast the bow draws) stays until the redesign replaces it. 669's "armour caps the
+reach" bullet is withdrawn. items_test `_test_armour`: in plate, held long, the bow reaches 15
+cells at step 5. Protocol unchanged and no new class_name, but items.json is server data, so the
+cut needs a deploy.

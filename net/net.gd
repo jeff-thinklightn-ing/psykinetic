@@ -352,7 +352,8 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## 35 (640, economy's side): the "folds" message {counts: {place id: sheep}}, a
 ## herder's fold's sheep at home, to the zone on a change and to a peer arriving.
 ## 35 (622, step 2): a drawn bow's step and draw time read the armour worn
-## (range_steps caps the step, draw scales the ticks), alike on client and server.
+## (range_steps caps the step, draw scales the ticks), alike on client and server;
+## since 622 amended, no armour caps the step.
 ## 35 (642): buffs may hold "steady", which narrows the cone (World.spread_of)
 ## on client and server alike.
 ## 35 (626): a player and a companion replicate tending (SUBCLASS_REPLICATED):
