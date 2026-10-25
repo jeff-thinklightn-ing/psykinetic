@@ -30,13 +30,27 @@ if (-not $env:HEAVY_JOB_INSIDE) {
 		exit 1
 	}
 	Write-Output "landing tests: through the heavy-job gate as $tree suite (decision 394)"
+	# The result line said again last, after the gate's own lines (its
+	# memory table): a check reading the log's tail reads the result. No
+	# result line written is a fail, whatever the exit (a killed run).
 	$env:HEAVY_JOB_INSIDE = '1'
+	$result = [IO.Path]::GetTempFileName()
+	$env:LAND_RESULT = $result
 	try {
 		& python $gate run $tree suite -- powershell.exe -NoProfile -ExecutionPolicy Bypass -File $PSCommandPath
-		exit $LASTEXITCODE
+		$code = $LASTEXITCODE
 	} finally {
 		Remove-Item Env:HEAVY_JOB_INSIDE -ErrorAction SilentlyContinue
+		Remove-Item Env:LAND_RESULT -ErrorAction SilentlyContinue
 	}
+	$line = (Get-Content $result -ErrorAction SilentlyContinue | Select-Object -First 1)
+	Remove-Item $result -ErrorAction SilentlyContinue
+	if (-not $line) { $line = "LANDING TESTS: FAIL (the gated run ended, exit $code, with no result)" }
+	Write-Output ''
+	Write-Output $line
+	if ($line.StartsWith('LANDING TESTS: PASS')) { exit $code }
+	if ($code -ne 0) { exit $code }
+	exit 1
 }
 . (Join-Path $PSScriptRoot 'jobs.ps1')
 $logs = Join-Path ([IO.Path]::GetTempPath()) ('psykinetic-land-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
@@ -124,8 +138,11 @@ Remove-Item $logs -Recurse -Force -ErrorAction SilentlyContinue
 $seconds = [int]((Get-Date) - $started).TotalSeconds
 Write-Output ''
 if ($failed.Count -eq 0) {
-	Write-Output "LANDING TESTS: PASS (suite, net_test, state_test, server_boot_test, heavy_job_test, changelog_check_test, changelog_resolve_test; ${seconds}s)"
-	exit 0
+	$line = "LANDING TESTS: PASS (suite, net_test, state_test, server_boot_test, heavy_job_test, changelog_check_test, changelog_resolve_test; ${seconds}s)"
+} else {
+	$line = "LANDING TESTS: FAIL ($($failed -join ', '); ${seconds}s)"
 }
-Write-Output "LANDING TESTS: FAIL ($($failed -join ', '); ${seconds}s)"
+Write-Output $line
+if ($env:LAND_RESULT) { Set-Content -Path $env:LAND_RESULT -Value $line -Encoding utf8 }
+if ($failed.Count -eq 0) { exit 0 }
 exit 1

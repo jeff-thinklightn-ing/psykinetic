@@ -27,7 +27,21 @@ if [ -z "${HEAVY_JOB_INSIDE:-}" ]; then
 	# the shared user:// logs folder (decision 664).
 	python -B tools/godot_log_check.py || { echo "LANDING TESTS: FAIL (a Godot launch without --log-file, decision 664: fix it as above)"; exit 1; }
 	echo "landing tests: through the heavy-job gate as $tree suite (decision 394)"
-	HEAVY_JOB_INSIDE=1 exec python tools/heavy_job.py run "$tree" suite -- bash tests/land.sh
+	# The result line said again last, after the gate's own lines (its
+	# memory table): a check reading the log's tail reads the result. No
+	# result line written is a fail, whatever the exit (a killed run).
+	result="$(mktemp -t psykinetic-result.XXXXXX)"
+	HEAVY_JOB_INSIDE=1 LAND_RESULT="$result" python tools/heavy_job.py run "$tree" suite -- bash tests/land.sh
+	code=$?
+	line="$(cat "$result" 2>/dev/null)"
+	rm -f "$result"
+	[ -n "$line" ] || line="LANDING TESTS: FAIL (the gated run ended, exit $code, with no result)"
+	echo
+	echo "$line"
+	case "$line" in
+		"LANDING TESTS: PASS"*) exit $code ;;
+		*) [ "$code" -ne 0 ] && exit $code; exit 1 ;;
+	esac
 fi
 . tests/jobs.sh
 LOGS="$(mktemp -d -t psykinetic-land.XXXXXX)"
@@ -114,8 +128,10 @@ if [ -n "$failed" ]; then
 fi
 echo
 if [ "$code" -eq 0 ]; then
-	echo "LANDING TESTS: PASS (suite, net_test, state_test, server_boot_test, heavy_job_test, changelog_check_test, changelog_resolve_test; $(( $(date +%s) - started ))s)"
+	line="LANDING TESTS: PASS (suite, net_test, state_test, server_boot_test, heavy_job_test, changelog_check_test, changelog_resolve_test; $(( $(date +%s) - started ))s)"
 else
-	echo "LANDING TESTS: FAIL ($failed; $(( $(date +%s) - started ))s)"
+	line="LANDING TESTS: FAIL ($failed; $(( $(date +%s) - started ))s)"
 fi
+echo "$line"
+[ -z "${LAND_RESULT:-}" ] || echo "$line" > "$LAND_RESULT"
 exit $code

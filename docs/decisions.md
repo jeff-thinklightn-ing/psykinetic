@@ -8970,6 +8970,18 @@ once (decision 279) are fourteen headless Godots of about 0.5 GB.
   shape takes a new name: an estimate rises at once but falls a fifth of
   the way a run.
 
+Amended a thirteenth time (2026-10-25, release and perf): a landing's result
+line is the last line it prints, and no result line is a fail. In a lean
+landing the gate printed its memory table (10) after "LANDING TESTS: PASS".
+Companions' script read only the log's last six lines and took a pass for
+a fail.
+- land.sh and land.ps1 no longer exec the gate. The inner run writes its
+  result line to LAND_RESULT, a temp file the outer run made. Once the gate's
+  lines are out, the outer run prints that line again, last.
+- An inner run that wrote no result line is a FAIL, whatever the exit (a run
+  killed under the gate once exited 0 and counted as a pass). An exit other
+  than 0 is kept.
+
 
 ## 395. UI sounds
 
