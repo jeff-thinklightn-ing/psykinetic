@@ -30085,3 +30085,29 @@ table's, the slide under the red line, the readout line, marks made, Use measure
 the treadmill, put back, nothing for an idle, the marks aged out); tuning_test
 `_test_gait_paces` (untouched, both tables exactly; a row each; his jog set, hers not; reset; the
 orc's as it is); anim_rig_test `_test_feel_moved` reads a gait key as its table's row. Client and tool only, protocol unchanged, no new class_name.
+## 397 amended (3): a zone asleep holds its herds as counts only
+
+After v0.1.173, the box's daily herd lines (release's grep) showed hills and forest with bodies
+out (21 and 20) and nobody online. Those bodies were real: the ones left standing when the last
+player walked out. They were never retired, because Main._retire_and_recall only runs in an awake
+zone (World.step steps a zone only while a player is in it), and nothing retired a zone's bodies
+as it fell asleep. A group with bodies out spares nothing to economy's hunters and camps
+(Herds.spare), so the hunting in an empty zone stayed shut by bodies nobody could see. The
+coordinator approved retiring them when the zone falls asleep.
+
+- **Main._retire_sleeping(zone)**, from World.zone_slept: every body in that zone that a keeper
+  takes (the herds' animals of a group) goes back through keeper.retire and _despawn_kept, the
+  same path the far tier uses: out down by one, count up by one, not a death, its slot neither
+  alive nor dead. Not one owned by a peer, kept by one, or in a raid (as _retirable). A level's
+  own animal (no group) is no keeper's and stays. It prints `[herds] <zone> asleep: <n> bodies back
+  into their counts`.
+- **Wounded or fleeing**: an animal goes back as a whole count, its hurt forgotten (the
+  coordinator: that is fine). Wolves too, their pack's count whole.
+- **The next visit** makes bodies again near the player (recall_near), as from any counts.
+- **Economy's side**: an empty zone's groups have out 0, so spare() gives them their surplus over
+  the reserve again, and the day's budget (taken after the day's reconcile, before the bodies
+  could come back) counts them.
+
+monster_test _test_herd_sleeps calls Main's own _retire_sleeping on a bare Main: 4 bodies out, one
+wounded; asleep, none left, out 0, kept 4; a level's own deer stays. Server only, protocol
+unchanged, no new class_name.

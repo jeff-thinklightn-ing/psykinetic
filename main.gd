@@ -776,7 +776,8 @@ func _ready() -> void:
 	World.zone_slept.connect(func(each: Zone) -> void:
 		for place_id: String in _towns_near.keys():
 			if str(World.holdings.place(place_id).get("area", "")) == each.name:
-				_towns_near.erase(place_id))
+				_towns_near.erase(place_id)
+		_retire_sleeping(each))
 	World.zone_woke.connect(func(each: Zone) -> void: _woken[each.name] = true)
 	if Net.test_exit_after > 0.0:
 		get_tree().create_timer(Net.test_exit_after).timeout.connect(_on_test_exit)
@@ -4524,6 +4525,31 @@ func _retire(monster: Monster) -> void:
 	var record := {"entry": entry, "route": route, "route_index": monster._route_index, "route_step": monster._route_step}
 	_despawn_kept(monster)
 	World.add_record(record)
+
+
+## Zone [param each] fallen asleep, nobody in it (397 amended (3)): every
+## body a keeper takes (the herds') goes back into its count at once, so a
+## sleeping zone holds counts only and its herds' spare is not shut by
+## bodies nobody sees; the next visit makes them again (recall_near). One
+## wounded or fleeing goes back whole. Nobody's own, none in a raid.
+func _retire_sleeping(each: Zone) -> void:
+	if not Net.is_authority() or World.keepers.is_empty():
+		return
+	var was := World.enter(each)
+	var back := 0
+	for entity: GridEntity in World.monsters().duplicate():
+		var monster := entity as Monster
+		if monster == null or not monster.spawned or monster.raid != "" or monster.owner_peer != 0 or monster.keeper_peer != 0:
+			continue
+		for keeper: Object in World.keepers:
+			if keeper.takes(monster):
+				keeper.retire(monster)
+				_despawn_kept(monster)
+				back += 1
+				break
+	World.enter(was)
+	if back > 0:
+		print("[herds] %s asleep: %d bodies back into their counts" % [each.name, back])
 
 
 ## [param monster] gone from the room but kept (a record, a keeper's): not

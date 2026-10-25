@@ -93,6 +93,7 @@ func _ready() -> void:
 	_test_wild_remains()
 	_test_kobold_dagger_and_pick()
 	_test_herd_hunt()
+	_test_herd_sleeps()
 	_test_wolf_den()
 	_test_lead_occupied()
 	_test_raid_townsfolk()
@@ -1852,6 +1853,53 @@ func _test_wild_wolf() -> void:
 	DayNight.reset()
 	_indoors()
 	Monster.idling = true
+
+## A zone fallen asleep (397 amended (3)): its herd bodies back into their
+## counts at once, through Main's zone_slept hook (_retire_sleeping), so a
+## sleeping zone holds counts only; a wounded one back whole; a level's own
+## animal (no group) stays.
+func _test_herd_sleeps() -> void:
+	print("%s== a zone asleep: its herd bodies back into their counts (397 amended (3)) ==" % char(10))
+	var e := _build(["##############", "#.............", "#.............", "#.............", "##############"])
+	var floor := {}
+	for cell in World.floor_cells():
+		floor[cell] = true
+	var herds := Herds.new({}, {"meadow": {"floor": floor, "outdoor": true}}, Production.read_rules().get("herds", {}), func() -> int: return 0)
+	World.herds = herds
+	World.keepers.append(herds)
+	herds.here = func() -> String: return "meadow"
+	herds.spawn = func(spec: Dictionary) -> GridEntity:
+		var body := EntityFactory.build(spec) as GridEntity
+		_room.add_child(body)
+		if not World.spawn(body, spec["tile"]):
+			body.free()
+			return null
+		return body
+	herds.free_near = func(cell: Vector2i, _reach: int) -> Vector2i:
+		for x in range(1, 13):
+			for y in range(1, 4):
+				if World.is_free(Vector2i(x, y)):
+					return Vector2i(x, y)
+		return cell
+	var deer := herds._add_group("meadow", "deer", Vector2i(7, 2), 4.0)
+	herds.recall_near(Vector2i(7, 2), 20)
+	var made := World.monsters().filter(func(m: GridEntity) -> bool: return m is Animal and str((m as Animal).spawn_spec.get("group", "")) == deer["id"])
+	_check(made.size() == 4 and int(deer["out"]) == 4 and float(deer["count"]) == 0.0, "4 bodies out, none kept (out %d)" % deer["out"])
+	World.damage(made[0], 2, null)  # Wounded, alive.
+	var plain := EntityFactory.build(Level._spec_for("monster_deer", Level.MONSTER_TYPES).merged({"name": "LevelDoe", "kind": "deer"})) as Animal
+	_room.add_child(plain)
+	World.spawn(plain, Vector2i(12, 3))
+	var host := Main.new()
+	host._retire_sleeping(World.zone)
+	var left := World.monsters().filter(func(m: GridEntity) -> bool: return m is Animal and m.spawned and (m as Animal).spawn_spec.has("group"))
+	_check(left.is_empty() and int(deer["out"]) == 0 and is_equal_approx(float(deer["count"]), 4.0),
+		"asleep: no body left, out 0, kept 4 (the wounded one whole) (out %d, kept %.1f)" % [deer["out"], deer["count"]])
+	_check(plain.spawned, "a level's own deer (no group) stays")
+	host.free()
+	World.despawn(plain)
+	World.keepers.erase(herds)
+	World.herds = null
+
 
 func _test_herd_hunt() -> void:
 	print("\n== a hunt (W4): a herd's bodies come out of the hunter's sight; a kill leaves the herd for good; a deer run off the east edge goes to the next area's herd ==")
