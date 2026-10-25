@@ -29306,3 +29306,38 @@ weights in place of the dungeon's and under tension. view_test _test_level_music
 barrow it is wanted, eased in within 1 s and playing; gone below, eased out and stopped.
 Client only, protocol unchanged, no new class_name.
 
+
+## 668 amended. A room's own music: umbrage-theme in Umbrage
+
+Jeff (2026-10-25, by way of the coordinator): "umbrage-theme wav has been done", the town
+of Umbrage's music; the name goes wherever the town stands.
+
+- **A room key**: a named room's entry in level.json "rooms" (665) may name a music slot
+  as a level may, `"music": "music.umbrage"` (the wilds' umbrage room only, for now).
+  Music.room_music(level, cell) reads it from the same config as level_music (the
+  registered one, else the file, read once), the room found by Level.rooms_from and
+  room_at as the room cards find it; ui's rooms_from is unchanged and does not carry the
+  key. While the listener is in such a room its slot is the own music, played and eased
+  as a level's (in place of the zone's ground and melody, from its start, LEVEL_FADE in
+  on entering and out on leaving), over the level's own music if that has one too.
+- **It goes with the town**: when Held step 2 (654) moves the town, maps carries the key
+  to the town's room or to its level (levels/held, "music" at the top) and drops it here;
+  Music needs no change for either. Regen keeps an anchored room's entry whole, key and
+  all.
+- **The slot, music.umbrage**: music, a bed on the Music bus, flat, 0 dB, Jeff's own take
+  in the repo at art/audio/music/music.umbrage/music.umbrage.ogg (565 KB; source by Jeff,
+  Ableton Live, licence "own", 2026-10-25): no takes.json entry, no THIRD_PARTY line.
+- **The take**: his master (48 kHz 24-bit stereo WAV, 22.59 s: 8 bars at 85 bpm, peak
+  -6.7 dBFS, rms -26.9, 7 dB under the barrow's) as Ogg Vorbis quality 7 at its own
+  level, the same 1084236 frames, imported looping. The master stays in his folder,
+  copied, never moved or edited.
+- **The seam, by measure**: clean, the wrap as its own bar lines. Each bar ends decayed
+  and opens on a hit; at the wrap the step is 0.0004 against 0.0002 to 0.0013 at the seven
+  bar lines, the high-frequency burst -42.4 dB against -50.3 to -42.6, the level -40.0 to
+  -18.2 dB rms across it against -39.5 to -35.8 into -18.5 to -17.6 (a rise of 21.8 dB
+  against 17.3 to 21.4). A listening file for Jeff in C:/dev/review/sound/umbrage.
+
+sound_kit_test: the wilds' Umbrage room names music.umbrage, outside it and a level
+without rooms none; Jeff's take. view_test _test_room_music: in the room it is wanted
+with the zone's ground out, eased in within 1 s and playing; out of the town, eased out
+and stopped. Client only, protocol unchanged, no new class_name.

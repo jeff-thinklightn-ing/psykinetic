@@ -24,7 +24,10 @@ extends Node
 ## A level's own music (decision 668): a level whose level.json names a music
 ## slot ("music": "music.barrow") plays it, from its start and always, in
 ## place of the zone's ground and melody (the tension layers still rise over
-## it), eased in on arrival and out on leaving over LEVEL_FADE.
+## it), eased in on arrival and out on leaving over LEVEL_FADE. A named room
+## may name one too (668 amended: the wilds' "umbrage" room, Jeff's
+## umbrage-theme, the town's music wherever it stands): played the same way
+## while the listener is in the room, over the level's own if it has one.
 
 ## Seconds a layer takes to ease most of the way to its new loudness.
 const FADE_SECONDS := 4.0
@@ -70,8 +73,8 @@ const STINGS: Array[String] = ["discovery", "danger", "death", "victory"]
 ## Levels (World.zone's names) been in this session: a stinger on the
 ## first visit to each.
 static var _visited: Dictionary[String, bool] = {}
-## Level -> its own music slot ("" none), read from its level.json once.
-static var _level_music: Dictionary[String, String] = {}
+## Level -> its level.json (empty for none), read once.
+static var _level_files: Dictionary[String, Dictionary] = {}
 
 ## The view this plays for (its listener, zone and town).
 var view: Client3D
@@ -290,7 +293,10 @@ func _weigh(delta: float) -> void:
 	var day := clampf((DayNight.daylight(steps) - DayNight.NIGHT) / (1.0 - DayNight.NIGHT), 0.0, 1.0)
 	var terrain_zone := str(view._terrain.get("zone", "outdoors" if view._outdoor else "indoors"))
 	var town: float = view.ambience._town_nearness(cell) if view.ambience != null else 0.0
-	var own := level_music(str(view._terrain.get("level", "")))
+	var level_name := str(view._terrain.get("level", ""))
+	var own := room_music(level_name, cell)
+	if own == "":
+		own = level_music(level_name)
 	if own != "":
 		_own_layers[own] = true
 	var wanted := weights(zone_of(terrain_zone, town, temple_nearness(view._terrain.get("buildings", []), cell)), day, tension, phrase_on, own)
@@ -303,23 +309,43 @@ func _weigh(delta: float) -> void:
 
 
 ## Level [param level_name]'s own music slot (668): its level.json's "music"
-## when that names a slot, else "". The registered config (a generated or
-## edited level, Level.register) when there is one, else its file, read once.
+## when that names a slot, else "".
 static func level_music(level_name: String) -> String:
-	if level_name.is_empty():
+	var slot := str(_config_of(level_name).get("music", ""))
+	return slot if SoundKit.has(slot) else ""
+
+
+## The music slot of the named room of level [param level_name] that holds
+## [param cell] (668 amended): the room's "music" in its level.json "rooms"
+## entry when that names a slot, else "" (no room there, or one without).
+static func room_music(level_name: String, cell: Vector2i) -> String:
+	var listed: Variant = _config_of(level_name).get("rooms", {})
+	if not listed is Dictionary or (listed as Dictionary).is_empty():
 		return ""
+	var warnings: Array[String] = []
+	var key := Level.room_at({"rooms": Level.rooms_from({"rooms": listed}, warnings)}, cell)
+	if key.is_empty() or not listed[key] is Dictionary:
+		return ""
+	var slot := str(listed[key].get("music", ""))
+	return slot if SoundKit.has(slot) else ""
+
+
+## Level [param level_name]'s config: the registered one (a generated or
+## edited level, Level.register) when there is one, else its level.json,
+## read once; {} for none.
+static func _config_of(level_name: String) -> Dictionary:
+	if level_name.is_empty():
+		return {}
 	if Level._registered.has(level_name):
-		var slot := str(Level._registered[level_name].get("config", {}).get("music", ""))
-		return slot if SoundKit.has(slot) else ""
-	if not _level_music.has(level_name):
-		var slot := ""
+		var config: Variant = Level._registered[level_name].get("config", {})
+		return config if config is Dictionary else {}
+	if not _level_files.has(level_name):
+		var parsed: Variant = null
 		var path := Level.folder_of(level_name) + "level.json"
 		if FileAccess.file_exists(path):
-			var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
-			if parsed is Dictionary:
-				slot = str(parsed.get("music", ""))
-		_level_music[level_name] = slot if SoundKit.has(slot) else ""
-	return _level_music[level_name]
+			parsed = JSON.parse_string(FileAccess.get_file_as_string(path))
+		_level_files[level_name] = parsed if parsed is Dictionary else {}
+	return _level_files[level_name]
 
 
 ## 0..1: how near [param cell] is to a temple among [param buildings]

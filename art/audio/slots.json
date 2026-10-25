@@ -1379,6 +1379,21 @@
 				"notes": "Jeff's \"barrows-moody\" (his master, the second export: 48 kHz 24-bit stereo WAV, 42.67 s, 16 bars at 90 bpm, peak -7.3 dBFS; kept in his music folder, not the repo); Ogg Vorbis q7 at its own level, the same 2048000 frames; Jeff, 2026-10-24, by way of the coordinator: \"barrows-moody.wav is in for barrows 1st level music\""
 			}
 		},
+		"music.umbrage": {
+			"category": "music",
+			"type": "bed",
+			"bus": "music",
+			"positional": false,
+			"volume_db": 0.0,
+			"uses": "the town of Umbrage (a room's or a level's \"music\", the wilds' umbrage room for now): played from its start in place of the zone's ground and melody while the player is in it, eased in on entering and out on leaving over 1 s (Music.room_music; decision 668 amended)",
+			"source": {
+				"by": "Jeff",
+				"tool": "Ableton Live",
+				"license": "own",
+				"date": "2026-10-25",
+				"notes": "Jeff's \"umbrage-theme\" (his master: 48 kHz 24-bit stereo WAV, 22.59 s, 8 bars at 85 bpm, peak -6.7 dBFS, rms -26.9; kept in his music folder, not the repo); Ogg Vorbis q7 at its own level, the same 1084236 frames; Jeff, 2026-10-25, by way of the coordinator: \"umbrage-theme wav has been done\""
+			}
+		},
 		"amb.torch_fire": {
 			"category": "ambience",
 			"type": "loop",

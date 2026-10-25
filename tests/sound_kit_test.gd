@@ -337,6 +337,12 @@ func _test_music() -> void:
 			"the barrow's first level names its own music; the levels below none")
 	_check(str(SoundKit.files("music.barrow")[0]).ends_with("music.barrow/music.barrow.ogg") and SoundKit.filled_by("music.barrow") == "own",
 			"music.barrow plays Jeff's own take")
+	# 668 amended: a named room's own music, the town of Umbrage's in the wilds.
+	_check(Music.room_music("wilds", Vector2i(200, 200)) == "music.umbrage" and Music.room_music("wilds", Vector2i(70, 202)) == ""
+			and Music.room_music("barrow", Vector2i(10, 10)) == "" and Music.room_music("", Vector2i.ZERO) == "",
+			"the wilds' Umbrage room names the town's music; outside it, and a level without rooms, none")
+	_check(str(SoundKit.files("music.umbrage")[0]).ends_with("music.umbrage/music.umbrage.ogg") and SoundKit.filled_by("music.umbrage") == "own",
+			"music.umbrage plays Jeff's own take")
 	var own := Music.weights("dungeon", 1.0, 0.0, false, "music.barrow")
 	_check(own["music.barrow"] == 1.0 and own["music.dungeon_base"] == 0.0 and own["music.melody_dungeon"] == 0.0,
 			"a level's own music, even between phrases, the dungeon's ground and melody out")

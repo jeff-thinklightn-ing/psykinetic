@@ -588,6 +588,7 @@
 	"rooms": {
 		"umbrage": {
 			"name": "Umbrage",
+			"music": "music.umbrage",
 			"rect": [
 				190,
 				191,

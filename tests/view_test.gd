@@ -130,6 +130,7 @@ func _ready() -> void:
 	_test_bandaging()
 	_test_title_music()
 	_test_level_music()
+	_test_room_music()
 	_test_options_panel()
 
 	# Every sound stopped and let go before quitting: the audio server lets
@@ -344,6 +345,38 @@ func _test_level_music() -> void:
 	_check(music.targets.get("music.barrow") == 0.0, "gone below: wanted at 0, so it eases out")
 	music._process(Music.LEVEL_FADE * 2.0)
 	_check(float(music.levels.get("music.barrow", 1.0)) < Music.SILENT and not player.playing, "eased out and stopped")
+	if level_was == null:
+		_rig._terrain.erase("level")
+	else:
+		_rig._terrain["level"] = level_was
+	music._weigh(0.25)
+
+
+func _test_room_music() -> void:
+	print("
+== a room's own music: Umbrage's in the wilds, eased in on entering, out on leaving (668 amended) ==")
+	var music: Music = _rig.music
+	if music == null or Music.muted():
+		_check(true, "no music here (muted or none): skipped")
+		return
+	var level_was: Variant = _rig._terrain.get("level")
+	var listener_was: Variant = _rig.sfx.listener
+	_rig._terrain["level"] = "wilds"
+	_rig.sfx.listener = Vector2i(200, 200)
+	music._weigh(0.25)
+	var wanted := float(music.targets.get("music.umbrage", 0.0))
+	_check(wanted >= 0.5 and float(music.targets.get("music.town_base", 0.0)) == 0.0 and float(music.targets.get("music.wilds_base", 0.0)) == 0.0,
+		"in Umbrage: the town's music wanted, the zone's ground out (%.2f)" % wanted)
+	music._process(Music.LEVEL_FADE)
+	var player: AudioStreamPlayer = music.players.get("music.umbrage")
+	_check(float(music.levels.get("music.umbrage", 0.0)) > 0.9 * wanted and player != null and player.playing,
+		"eased in within %.1f s, playing (%.2f of %.2f)" % [Music.LEVEL_FADE, float(music.levels.get("music.umbrage", 0.0)), wanted])
+	_rig.sfx.listener = Vector2i(70, 202)
+	music._weigh(0.25)
+	_check(music.targets.get("music.umbrage") == 0.0, "out of the town: wanted at 0, so it eases out")
+	music._process(Music.LEVEL_FADE * 2.0)
+	_check(float(music.levels.get("music.umbrage", 1.0)) < Music.SILENT and not player.playing, "eased out and stopped")
+	_rig.sfx.listener = listener_was
 	if level_was == null:
 		_rig._terrain.erase("level")
 	else:
