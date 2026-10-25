@@ -41,6 +41,7 @@ func _ready() -> void:
 	_test_door_note()
 	_test_arrival_card()
 	_test_room_names()
+	_test_admin_panel()
 	_test_access()
 	_test_keys()
 	_test_barter()
@@ -961,6 +962,85 @@ func _test_room_names() -> void:
 	_main._room_here = ""
 	_main._room_left_at.clear()
 	card.set_process(true)
+
+
+## The admin panel (672): the console's shapes release's scripts read, the
+## gate, the quest reset's card, the panel.
+func _test_admin_panel() -> void:
+	print("== the admin panel (672): one dispatcher, the gate, quests reset, the panel ==")
+	# Release's scripts: stage.sh and deploy_box.ps1 read the protocol out of
+	# "version" (sed 's/.*protocol \\([0-9a-f]*\\).*/'); deploy.sh needs "stop"
+	# and "restart" to answer starting "restarting"; "players" leads with a count.
+	var version: String = _main.admin_command("version")
+	var protocol := RegEx.create_from_string("protocol ([0-9a-f]+)").search(version)
+	_check(protocol != null and protocol.get_string(1) == Net.protocol(), "version: \"protocol <hex>\" as stage.sh and deploy_box read it (%s)" % version)
+	var stopping: String = _main.admin_command("stop 600 update")
+	_main.admin_command("restart cancel")
+	var restarting: String = _main.admin_command("restart 600 test")
+	var cancelled: String = _main.admin_command("restart cancel")
+	_check(stopping.begins_with("restarting") and restarting.begins_with("restarting") and cancelled == "restart cancelled",
+			"stop and restart answer starting \"restarting\", as deploy.sh tests (%s)" % stopping.left(30))
+	var players: String = _main.admin_command("players")
+	_check(RegEx.create_from_string("^\\d+ connected").search(players) != null, "players: its count line first (%s)" % players.get_slice("\n", 0))
+	var help: String = _main.admin_command("help")
+	var lines := AdminPanel.help_from(help)
+	_check(lines.size() == Main.CONSOLE_HELP.size() and lines.all(func(each: String) -> bool: return each.contains(":"))
+			and lines.any(func(each: String) -> bool: return each.begins_with("go <zone>"))
+			and lines.any(func(each: String) -> bool: return each.begins_with("quests reset")),
+			"help: one line a command, \"name args: what it does\", go and quests reset among them (%d)" % lines.size())
+	_check(_main.admin_command("go wilds").contains("name the player") and _main.admin_command("quests reset").contains("name the player"),
+			"from the console, go and quests reset ask for the player")
+	var me: Player = _main._local_player()
+	if me != null:
+		var all_reset: String = _main.admin_command("quests reset", me)
+		var giver_reset: String = _main.admin_command("quests reset Nobody Here", me)
+		var gone: String = _main.admin_command("go no_such_map", me)
+		_check(all_reset.contains("quests reset (") and giver_reset.begins_with("quests reset: no quest giver Nobody Here")
+				and gone.contains("no_such_map"),
+				"the panel's own player: all reset (%s), a giver not here named, go to no map refused (%s)" % [all_reset, gone])
+	# The gate: the host's own player, or an id on the list; nobody else.
+	var kept_admins: PackedStringArray = Net.admins
+	Net.admins = PackedStringArray()
+	_check(Main.admin_peer_allowed(Net.local_id, "") and not Main.admin_peer_allowed(4242, "someone") and not Main.admin_peer_allowed(4242, ""),
+			"no list: only the host's own player")
+	Net.admins = PackedStringArray(["someone"])
+	_check(Main.admin_peer_allowed(4242, "someone") and not Main.admin_peer_allowed(4243, "else"), "on the list: allowed; anyone else not")
+	Net.admins = kept_admins
+	# The quest reset's card: only that player's asks go.
+	var card := {"asks": [{"id": "a1", "by": "p1"}, {"id": "a2", "by": "p2"}, {"id": "a3", "by": "p1"}], "standing": {"p1": {"trust": 3}}}
+	var dropped := Main.card_without(card, "p1")
+	_check(dropped == (["a1", "a3"] as Array[String]) and (card["asks"] as Array).size() == 1 and card["standing"].has("p1"),
+			"a giver's card: that player's asks dropped (%s), the other's kept, his trust of them kept" % [dropped])
+	# The panel: F10 only for an admin; its line, history, confirm.
+	var panel: AdminPanel = _main.admin_panel
+	if panel == null:
+		_check(false, "the admin panel exists")
+		return
+	_check(_main.admin_allowed() == (_main._local_player() != null), "the host with a player of its own may open it")
+	var sent: Array[String] = []
+	var catch := func(line: String) -> void: sent.append(line)
+	panel.ran.connect(catch)
+	panel.help_lines = []
+	_main.open_admin()
+	_check(panel.visible and sent == (["help"] as Array[String]) and panel.zone == _main.zone_name_here(), "F10: open, the help asked for, the zone known (%s)" % [sent])
+	panel.on_reply({"line": "help", "text": help})
+	_check(panel._help.item_count == lines.size(), "the help reply fills the list (%d)" % panel._help.item_count)
+	panel._filter.text = "quests"
+	panel._show_help()
+	_check(panel._help.item_count == 1, "the filter narrows it (%d)" % panel._help.item_count)
+	panel.run("players")
+	panel.run("zones")
+	panel.run("zones")
+	_check(panel.history == (["players", "zones"] as Array[String]), "the typed lines kept, a repeat once (%s)" % [panel.history])
+	sent.clear()
+	panel.zone = "test_zone"
+	panel._reset_this_room()
+	_check(sent.is_empty() and panel._reset_room.text.contains("again"), "reset this room: pressed once, it asks again")
+	panel._reset_this_room()
+	_check(sent == (["zone reset test_zone"] as Array[String]), "pressed again: run (%s)" % [sent])
+	panel.ran.disconnect(catch)
+	panel.close()
+	_check(not panel.visible, "closed")
 
 
 func _test_door_note() -> void:

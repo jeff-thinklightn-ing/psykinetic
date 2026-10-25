@@ -386,6 +386,11 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## 36 (661): new command "view_ready" {zone}, a client's view of the zone built
 ## (Main.tell_view_ready); the server ends that player's arrival shelter. An old
 ## client never sends it, and the shelter runs its 6 s.
+## 36 (672): new command "admin" {line}, a console line from an admin's panel
+## (Main._admin_from: refused with "not allowed" unless the sender is the host
+## or on Net.admins); new messages "admin_reply" {line, text}, its answer, and
+## "admin" {admin: true}, sent to an admin right after they join (the join's
+## is_admin: only then does F10 open the panel).
 ## 36 (548 amended): the "offers" message may carry a talking monster's free deal
 ## (kind "deal", cost 0, no what.steps: the draugr's "again" for one who paid);
 ## an old client's panel skips it, and only the typed yes reaches it.
@@ -393,7 +398,7 @@ const PROTOCOL_REVISION := 36
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]
 ## Every kind of message (message, message_to, broadcast, broadcast_to).
-const MESSAGE_KINDS: Array[String] = ["barter", "builder", "chat", "clearing", "counter", "death", "folds", "grass", "map", "notes", "offers", "party", "return", "roofs", "shop", "sky", "speech", "telegraph", "terrain", "town", "town_sheet", "world"]
+const MESSAGE_KINDS: Array[String] = ["admin", "admin_reply", "barter", "builder", "chat", "clearing", "counter", "death", "folds", "grass", "map", "notes", "offers", "party", "return", "roofs", "shop", "sky", "speech", "telegraph", "terrain", "town", "town_sheet", "world"]
 ## Properties entity subclasses add with replicate().
 const SUBCLASS_REPLICATED: Array[String] = ["activity", "addressing", "ailing", "ailments", "alert", "asleep", "body", "bond_step", "bond_why", "buffs", "channel_of", "channel_until", "charge_room", "charges", "down_until", "downed_until", "emit_light", "hands", "heart", "keeper_peer", "led_by", "led_to", "mending", "move_ticks", "peaceable", "person", "pose", "raised", "raised_tick", "slot_counts", "slot_notes", "slots", "tending", "trade", "worn"]
 const SETTINGS_FILE := "settings.cfg"
@@ -473,6 +478,11 @@ var edit_size := LevelMap.NEW_SIZE
 ## (no key needed); --builder-model, --builder-effort, --builder-max-cost
 ## (dollars per request) for Claude. It needs ANTHROPIC_API_KEY or the stub.
 var builders: PackedStringArray = []
+## The admin panel (decision 672), server: --admins=<id,id> (or
+## PSYKINETIC_ADMIN_IDS, kept in the box's own /etc/psykinetic/env, never the
+## repo) the player ids whose panel commands run, besides a host's own
+## player; empty, none. Logged as a count only, never an id.
+var admins: PackedStringArray = []
 var builder_stub := false
 ## The lawspeaker (decision 448), server only: --lawspeaker=<haiku|sonnet|opus|off>
 ## (or PSYKINETIC_LAWSPEAKER) turns his daily rulings on through the Claude
@@ -728,6 +738,8 @@ func _enter_tree() -> void:
 		lawspeaker = OS.get_environment("PSYKINETIC_LAWSPEAKER").strip_edges().to_lower()
 	if OS.get_environment("PSYKINETIC_BUILDERS") != "":
 		_set_option("--builders", OS.get_environment("PSYKINETIC_BUILDERS"))
+	if OS.get_environment("PSYKINETIC_ADMIN_IDS") != "":
+		_set_option("--admins", OS.get_environment("PSYKINETIC_ADMIN_IDS"))
 	if OS.get_environment("PSYKINETIC_MIND_WHY") in ["1", "true", "on", "yes"]:
 		mind_why = true
 	if OS.get_environment("PSYKINETIC_PERCEPTION") != "":
@@ -1912,6 +1924,8 @@ func _set_option(key: String, value: String) -> void:
 				print("[net] --weather=%s: not one of %s" % [value, "|".join(Weather.KINDS.keys())])
 		"--builders":
 			builders = PackedStringArray(Array(value.split(",", false)).map(func(id: String) -> String: return id.strip_edges()))
+		"--admins":
+			admins = PackedStringArray(Array(value.split(",", false)).map(func(id: String) -> String: return id.strip_edges()).filter(func(id: String) -> bool: return not id.is_empty()))
 		"--builder-model":
 			builder_model = value.strip_edges()
 		"--builder-effort":

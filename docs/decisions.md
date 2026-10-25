@@ -28670,3 +28670,62 @@ view_test _test_inside:
 
 The roof tests in _test_buildings and the damage test advance ROOF_FADE. Client
 only, protocol unchanged, no new class_name.
+
+## 672. The admin panel
+
+Jeff: "i need a admin command list in game that i can reset quests, spawn
+in different zones, etc." and "i need to reset individual quest givers
+because hob is the one i wanted to test again." The coordinator approved
+ui's design; release keeps the box side.
+
+One dispatcher. The panel runs the server console's own commands
+(Main.admin_command, which stdin and the admin port use), never a second
+list. The client sends the "admin" command {line}; the server's
+Main._admin_from runs it with the sender as the caller and answers
+"admin_reply" {line, text}. "help" is now one line a command, "name args:
+what it does" (Main.CONSOLE_HELP), which the panel lists. The replies
+release's scripts read keep their shapes: "version" with "protocol <hex>"
+(stage.sh, deploy_box.ps1), "stop"/"restart" starting "restarting"
+(server/deploy.sh), "players" with its count line first (ship.ps1);
+ui_test pins them.
+
+The gate. The server decides: Net.admins, from --admins or
+PSYKINETIC_ADMIN_IDS (comma-separated player ids, in the box's own
+/etc/psykinetic/env beside the builder ids, set by Jeff with sudo, never
+in the repo), plus a host's own player. Every "admin" command is checked
+(Main.admin_peer_allowed); anyone else is answered only "not allowed". The
+journal says counts and kinds only: "[admin] N admins configured" at
+start, "[admin] refused N", "[admin] <verb> ran"; never an id, a name or
+the line. Right after an admin joins, the server sends them "admin"
+{admin: true} (the join's is_admin); only then, or on the host, does F10
+open the panel (Main.admin_allowed). A client that lies gains nothing.
+
+The panel (render/admin_panel.gd, AdminPanel): F10, Esc closes; the help
+lines with a filter (a line picked fills the typed line), the typed line
+with its history (Up/Down, the last 30, this session), the replies; buttons
+for go to a zone (every map, by its shown name), reset quests (all, or one
+of the zone's quest givers by name), reset this room (zone reset), regenerate
+this level (regenerate now), the hour (dawn, noon, dusk, night) and the
+weather. Reset and regenerate ask once: pressed again within 3 s they run.
+While its line has the keys the player does not walk (Main.is_typing).
+
+New commands, on the console too. "go <zone> [player]": zone move, the
+panel's own player without one. "quests reset [all|<giver>] [player]": the
+player's quests undone (npc's and companions' lists): a giver's (a resident
+by name in the player's zone) are his card's asks they took (and the
+record's mirror, PlayerRecord.commissions), his once-only care done for them
+(the medicine man's walk and brew, with the brew's herb and antler tally;
+Hob is one), the priest's told secrets, the standing offer if it is his;
+then the givers near them send their offers again. "all" is every giver's,
+plus the sought they lead (Towns.sought_lost, a led body taken away as one
+taken on the way is), the draugr's paid deals (the record only: a pact on
+ends by its own rules), and a companion held by raiders let go, to come at
+the next join (Jeff's pick open, decisions/quest-reset-captive.md; let go
+till he says). Their trust and the residents' memory of them, the healer's
+bought care, the barrow's blessing and the companion's story stay.
+
+Wire: under PROTOCOL_REVISION 36 (open, unshipped): the "admin" command and
+the "admin" and "admin_reply" messages, listed in net.gd. ui_test
+_test_admin_panel: the kept shapes, help's lines, the console's go and
+quests asking for a player, the gate, a giver's card reset, the panel's
+open, help, filter, history and confirm. New class_name AdminPanel.

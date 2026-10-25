@@ -648,6 +648,12 @@ var _town_sheet_asked: Dictionary = {}
 ## A talking monster's deals as buttons (629, ui's side): opened by his
 ## "offers" message after E on him, watched by _update_deal.
 var deal_panel: DealPanel
+## The admin panel (672): F10 for an admin (admin_allowed); is_admin is the
+## server's word ("admin" after the join); _admin_refused counts the
+## server's refusals (logged as a count, never who).
+var admin_panel: AdminPanel
+var is_admin := false
+var _admin_refused := 0
 ## The notes pinned to doors (643, ui's side; npc's "notes" message): by
 ## zone id, {tile: text}; a zone's list arrives whole and an empty one
 ## clears it. The sheet one is read on, and the word at the cursor over
@@ -1209,6 +1215,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if key != null and key.pressed and not key.echo and key.keycode == KEY_ESCAPE:
 		escape()
+		get_viewport().set_input_as_handled()
+		return
+	if key != null and key.pressed and not key.echo and key.keycode == KEY_F10 and admin_allowed():
+		open_admin()  # 672: the admin panel, for an admin only.
 		get_viewport().set_input_as_handled()
 		return
 	if Keys.pressed(event, "talk"):
@@ -4937,6 +4947,8 @@ func _join_player(peer: int, id: String, player_name: String, respawn := false, 
 		record.seen_generation[World.zone.name] = generation
 	_join_companion(record, player)
 	_on_gold_changed(id, World.gold_of(id))
+	if admin_peer_allowed(peer, id) and peer != Net.local_id:
+		Net.message_to(peer, "admin", {"admin": true})  # 672: their F10 opens the panel.
 
 
 # --- Towns -----------------------------------------------------------------------
@@ -9029,6 +9041,8 @@ func _on_command(entity: GridEntity, command_name: String, args: Dictionary) -> 
 		print("[world] %s reset the room" % who)
 		_start_level()
 		party_log.add("%s reset the room." % who)
+	elif command_name == "admin" and entity is Player:
+		_admin_from(entity as Player, str(args.get("line", "")))
 	elif command_name == "builder" and entity is Player:
 		var id: String = _peer_ids.get(entity.owner_peer, Net.player_id if entity.owner_peer == Net.local_id else "")
 		if _builder == null:
@@ -9233,6 +9247,9 @@ func _build_talk() -> void:
 	$HUD.add_child(town_panel)
 	deal_panel = DealPanel.new()
 	$HUD.add_child(deal_panel)
+	admin_panel = AdminPanel.new()  # 672.
+	admin_panel.ran.connect(send_admin)
+	$HUD.add_child(admin_panel)
 	deal_panel.offered.connect(_offer_deal)  # 629, ui's side: a button sends his deal's id with its sum.
 	note_sheet = NoteSheet.new()  # 643, ui's side: a note on a door, read.
 	$HUD.add_child(note_sheet)
@@ -9393,7 +9410,8 @@ func _bubble_tile_px() -> float:
 
 ## The chat box is open: the game's keys are the box's.
 func is_typing() -> bool:
-	return _chat_box != null and _chat_box.visible or _builder_ui != null and _builder_ui.is_typing()
+	return _chat_box != null and _chat_box.visible or _builder_ui != null and _builder_ui.is_typing() \
+			or admin_panel != null and admin_panel.is_typing()
 
 
 func _open_chat() -> void:
@@ -9923,6 +9941,13 @@ func _on_message(kind: String, data: Dictionary) -> void:
 	if kind == "builder":
 		if _builder_ui != null:
 			_builder_ui.on_message(data)
+		return
+	if kind == "admin":
+		is_admin = bool(data.get("admin", false))  # 672: the server says this player is an admin.
+		return
+	if kind == "admin_reply":
+		if admin_panel != null:
+			admin_panel.on_reply(data)
 		return
 	if kind == "return":
 		if data.has("all_fallen"):
@@ -12801,7 +12826,9 @@ func _phrase_of(keycode: int) -> int:
 ## Esc: whatever is open closes first (the options, an open chest or
 ## companion's pack, the menu itself); with nothing open, the game menu.
 func escape() -> void:
-	if _bar != null and _bar.visible:
+	if admin_panel != null and admin_panel.visible:
+		admin_panel.close()  # 672: the admin panel first.
+	elif _bar != null and _bar.visible:
 		_close_bar()  # 560, ui's side: the talk bar, then the barter window.
 	elif barter_panel != null and barter_panel.is_open():
 		close_other()
@@ -13646,6 +13673,8 @@ func _server_says(text: String) -> void:
 # TCP port (--admin-port), one command per line. See admin_command().
 
 func _start_console() -> void:
+	if Net.is_authority():
+		print("[admin] %d admins configured" % Net.admins.size())  # 672: a count, never who.
 	if Net.mode == Net.Mode.SERVER or Net.console:
 		_stdin_thread = Thread.new()
 		_stdin_thread.start(_read_stdin)
@@ -13736,8 +13765,315 @@ func _companion_command(words: PackedStringArray) -> String:
 	return "%s: %d facts, %d beliefs\n%s" % [record.companion.get("name", "?"), grown.facts.size(), grown.beliefs.size(), "\n".join(lines)]
 
 
-## One console command; the reply is what the operator sees.
-func admin_command(line: String) -> String:
+# --- The admin panel (672) ----------------------------------------------------------
+
+## Whether F10 opens the admin panel: the server said so, or this is the host
+## with a player of its own.
+func admin_allowed() -> bool:
+	return is_admin or Net.is_authority() and _local_player() != null
+
+
+## Server: whether [param peer] (player id [param id]) may run panel commands:
+## the host's own player, or an id on Net.admins.
+static func admin_peer_allowed(peer: int, id: String) -> bool:
+	return peer == Net.local_id or not id.is_empty() and id in Net.admins
+
+
+## F10: the panel, told the zone and its quest givers for its buttons.
+func open_admin() -> void:
+	if admin_panel == null:
+		return
+	if not admin_panel.visible:
+		admin_panel.zone = zone_name_here()
+		var names: Array[String] = []
+		for each: GridEntity in World.townsfolk():
+			var resident := each as Resident
+			if resident != null and resident.player_id.is_empty() and not resident.person.is_empty() and resident.person not in names:
+				names.append(resident.person)
+		names.sort()
+		admin_panel.givers = names
+	admin_panel.toggle()
+
+
+## The panel's line to the server, as the "admin" command.
+func send_admin(line: String) -> void:
+	var player := _local_player()
+	if player != null:
+		World.command(player, "admin", {"line": line})
+
+
+## Server: [param line] from [param player]'s panel: run as the console runs
+## it (admin_command, the player the caller) and answered with "admin_reply";
+## refused with "not allowed" for anyone else, counted in the journal.
+func _admin_from(player: Player, line: String) -> void:
+	var peer := player.owner_peer
+	var id: String = _peer_ids.get(peer, Net.player_id if peer == Net.local_id else "")
+	var text := ""
+	if not admin_peer_allowed(peer, id):
+		_admin_refused += 1
+		print("[admin] refused %d" % _admin_refused)
+		text = "not allowed"
+	else:
+		var words := line.strip_edges().split(" ", false)
+		print("[admin] %s ran" % (words[0].to_lower() if not words.is_empty() else "nothing"))
+		text = admin_command(line, player)
+	Net.message_to(peer, "admin_reply", {"line": line, "text": text})
+
+
+## The player called [param wanted] (as "players" lists them) and their id,
+## online or off: {player (null when away), id}; {} for none or two.
+func _admin_player(wanted: String) -> Dictionary:
+	var found: Array[Dictionary] = []
+	for id: String in _records:
+		var record: PlayerRecord = _records[id]
+		if record.name.to_lower() == wanted.to_lower():
+			found.append({"player": _player_of_id(id), "id": id})
+	for peer: int in _players:
+		var player: Player = _players[peer]
+		var id: String = _peer_ids.get(peer, Net.player_id if peer == Net.local_id else "")
+		if is_instance_valid(player) and player.name.to_lower() == wanted.to_lower() and not found.any(func(each: Dictionary) -> bool: return each["id"] == id):
+			found.append({"player": player, "id": id})
+	return found[0] if found.size() == 1 else {}
+
+
+## The spawned player whose id is [param id], or null.
+func _player_of_id(id: String) -> Player:
+	for peer: int in _players:
+		var player: Player = _players[peer]
+		if is_instance_valid(player) and player.spawned and _peer_ids.get(peer, Net.player_id if peer == Net.local_id else "") == id:
+			return player
+	return null
+
+
+## go <zone> [player]: the player (the panel's own, without one) and their
+## companion to that zone's first start, as zone move does.
+func _go_command(words: PackedStringArray, caller: Player) -> String:
+	if words.size() < 2:
+		return "go <zone> [player]"
+	var who := ""
+	if words.size() >= 3:
+		who = " ".join(words.slice(2))
+	elif caller != null:
+		var record: PlayerRecord = _records.get(_peer_ids.get(caller.owner_peer, Net.player_id if caller.owner_peer == Net.local_id else ""))
+		who = record.name if record != null else caller.name
+	else:
+		return "go <zone> <player>: from the console, name the player"
+	return _zone_command(PackedStringArray(["zone", "move", who, words[1]]))
+
+
+## quests reset [all|<giver>] [player] (672): the player's quests (the
+## panel's own player, without one) undone, all of them or one quest
+## giver's (a resident by name in the player's zone). Their trust, his
+## memory of them and their companion's story stay.
+func _quests_command(words: PackedStringArray, caller: Player) -> String:
+	if words.size() < 2 or words[1] != "reset":
+		return "quests reset [all|<giver>] [player]"
+	var rest := words.slice(2)
+	var target := {}
+	if not rest.is_empty():
+		var named := _admin_player(rest[rest.size() - 1])
+		if not named.is_empty() and (rest.size() > 1 or caller == null):
+			target = named
+			rest = rest.slice(0, rest.size() - 1)
+	if target.is_empty():
+		if caller == null:
+			return "quests reset [all|<giver>] <player>: from the console, name the player"
+		target = {"player": caller, "id": _peer_ids.get(caller.owner_peer, Net.player_id if caller.owner_peer == Net.local_id else "")}
+	var id: String = target["id"]
+	var record: PlayerRecord = _records.get(id)
+	if record == null:
+		return "quests reset: no record for that player"
+	var giver := " ".join(rest).strip_edges()
+	if giver.is_empty() or giver.to_lower() == "all":
+		return _quests_reset_all(record, id, target["player"])
+	var player: Player = target["player"]
+	var zone := player.zone if player != null else World.zone.name
+	var workers := _givers_named(giver, zone)
+	if workers.is_empty():
+		return "quests reset: no quest giver %s in %s" % [giver, zone]
+	if workers.size() > 1:
+		return "quests reset: %d in %s are called %s; not reset" % [workers.size(), zone, giver]
+	var cleared := _quests_reset_giver(record, id, workers[0])
+	_resend_offers(id, player)
+	return "%s: %s's quests reset (%s)" % [record.name, giver, ", ".join(cleared) if not cleared.is_empty() else "nothing was held"]
+
+
+## The worker ids of the residents called [param giver] in [param zone].
+func _givers_named(giver: String, zone: String) -> Array[String]:
+	var out: Array[String] = []
+	var was := World.zone
+	if World.zones.has(zone):
+		World.enter(World.zones[zone])
+	for each: GridEntity in World.townsfolk():
+		var resident := each as Resident
+		if resident != null and resident.player_id.is_empty() and resident.person.to_lower() == giver.to_lower() \
+				and not resident.worker_id.is_empty() and resident.worker_id not in out:
+			out.append(resident.worker_id)
+	World.enter(was)
+	return out
+
+
+## One giver's quests for player [param id] undone: his card's asks they
+## took (and the record's mirror of them), his once-only care done for
+## them (the medicine man's brew and walk, with the brew's tally), the
+## priest's told secrets, the standing offer if it is his. What was cleared.
+func _quests_reset_giver(record: PlayerRecord, id: String, worker_id: String) -> Array[String]:
+	var cleared: Array[String] = []
+	if World.production == null:
+		return cleared
+	var card := Townsfolk.card_of(World.production, worker_id)
+	var dropped := card_without(card, id)
+	if not dropped.is_empty():
+		cleared.append("%d asks" % dropped.size())
+		record.commissions = record.commissions.filter(func(entry: Variant) -> bool:
+			return not (entry is Dictionary and str(entry.get("id", "")) in dropped))
+	if card.get("care_done") is Dictionary and (card["care_done"] as Dictionary).has(id):
+		(card["care_done"] as Dictionary).erase(id)
+		cleared.append("care done")
+		if worker_id.begins_with("medicine_man:"):
+			care_clear(id, worker_id.trim_prefix("medicine_man:"), ["brew_herbs", "brew_antlers"])
+	World.production.set_card(worker_id, card)
+	if "priest" in World.production.worker(worker_id).get("trades", []) and _crypt_told.has(id):
+		_crypt_told.erase(id)
+		cleared.append("secrets told")
+	if _standing.has(id) and str(_standing[id].get("worker", "")) == worker_id:
+		_standing.erase(id)
+		cleared.append("the standing offer")
+	return cleared
+
+
+## [param card]'s asks taken by player [param id] taken out of it; their ids.
+static func card_without(card: Dictionary, id: String) -> Array[String]:
+	var dropped: Array[String] = []
+	var kept: Array = []
+	for entry: Variant in card.get("asks", []):
+		if entry is Dictionary and str(entry.get("by", "")) == id:
+			dropped.append(str(entry.get("id", "")))
+		else:
+			kept.append(entry)
+	if card.has("asks"):
+		card["asks"] = kept
+	return dropped
+
+
+## Every quest of player [param id] undone: each giver's (as
+## _quests_reset_giver), the standing offer, the sought they freed (sent back
+## to wait, a led one's body taken away), the draugr's paid deals, their
+## companion held by raiders let go (she comes at the next join).
+func _quests_reset_all(record: PlayerRecord, id: String, player: Player) -> String:
+	var cleared: Array[String] = []
+	var givers := 0
+	if World.production != null:
+		for worker_id: String in World.production.worker_ids():
+			if not _quests_reset_giver(record, id, worker_id).is_empty():
+				givers += 1
+	if givers > 0:
+		cleared.append("%d quest givers" % givers)
+	if not record.commissions.is_empty():
+		record.commissions = []
+	if _standing.erase(id):
+		cleared.append("the standing offer")
+	if _crypt_told.erase(id):
+		cleared.append("secrets told")
+	var sought := _sought_freed_by(id)
+	for each: String in sought:
+		_sought_back(each, id)
+	if not sought.is_empty():
+		cleared.append("%d sought" % sought.size())
+	if "paid_deals" in record and not (record.get("paid_deals") as Dictionary).is_empty():
+		record.set("paid_deals", {})
+		cleared.append("the draugr's paid deals")
+	if record.companion.has("taken"):
+		record.companion.erase("taken")  # Let go; she comes at the next join (Jeff's pick pending: quest-reset-captive).
+		record.companion["tile"] = null
+		cleared.append("companion let go by the raiders")
+	_resend_offers(id, player)
+	return "%s: quests reset (%s)" % [record.name, ", ".join(cleared) if not cleared.is_empty() else "nothing was held"]
+
+
+## The sought ids player [param id] is leading home.
+func _sought_freed_by(id: String) -> Array[String]:
+	var out: Array[String] = []
+	if World.towns == null:
+		return out
+	for town: String in World.towns._towns:
+		var held: Dictionary = World.towns._towns[town].get("sought", {})
+		for each: String in held:
+			if str(held[each].get("freed_by", "")) == id:
+				out.append(each)
+	return out
+
+
+## Sought [param sought_id] back to waiting (Towns.sought_lost), as one taken
+## on the way is (_resident_taken): its led body, in the leader's zone, taken
+## away, not killed.
+func _sought_back(sought_id: String, leader: String) -> void:
+	World.towns.sought_lost(sought_id)
+	var player := _player_of_id(leader)
+	if player == null or not World.zones.has(player.zone):
+		return
+	var was := World.enter(World.zones[player.zone])
+	for each: GridEntity in World.townsfolk():
+		var resident := each as Resident
+		if resident != null and resident.sought == sought_id and resident.escort_of == leader:
+			_travelling = true
+			World.despawn(resident)
+			_travelling = false
+	World.enter(was)
+
+
+## Player [param id]'s offers sent again by every quest giver in their zone,
+## if they are on.
+func _resend_offers(id: String, player: Player) -> void:
+	if player == null or not World.zones.has(player.zone):
+		return
+	var was := World.enter(World.zones[player.zone])
+	for each: GridEntity in World.townsfolk():
+		var resident := each as Resident
+		if resident != null and resident.player_id.is_empty() and not resident.worker_id.is_empty() \
+				and World.distance(resident.tile, player.tile) <= HEARING_RANGE:
+			_send_offers(resident, id, player.owner_peer)
+	World.enter(was)
+
+
+## The console's commands, one a line ("name args: what it does"), for
+## "help" and the admin panel's list (672). Other replies keep their shapes:
+## release's scripts read "version" (protocol <hex>), "stop"/"restart"
+## (starts "restarting") and "players" (its count line).
+const CONSOLE_HELP: Array[String] = [
+	"players: who is on, where, their hp",
+	"zones: each loaded zone, awake or asleep, and who is in it",
+	"go <zone> [player]: you (or that player) and the companion to that zone's start",
+	"quests reset [all|<giver>] [player]: your quests (or that player's) undone, all or one quest giver's here",
+	"zone reset <name>: that zone rebuilt from its map",
+	"zone move <player> <zone>: that player and their companion to that zone's start",
+	"move <player> <x> <y> [zone] | move <player> <building code> [zone]: a player to a cell",
+	"mark <player> <mark>|-<mark>: a mark on a player, or one taken off",
+	"reset: this room rebuilt from its map",
+	"respawn: every zone's dead brought back now",
+	"regenerate [on|off|now <level>]: the levels' regeneration",
+	"reload <zone>|all: a zone's map read again",
+	"raids [on|off|send <camp> <town>]: the raids",
+	"hour [<h>] | day_minutes [<m>]: the time of day, the day's length",
+	"season [<name>] | season_days [<n>]: the season, its length",
+	"weather [<kind>|auto|reload] [<minutes>] [<region>|all]: the weather",
+	"companions | companion facts <player> | companion forget <player> <id>: the companions",
+	"mind scripted|ollama | mind log on|off | mind last <name>: the residents' minds",
+	"perception list|grid|both: what the minds are told",
+	"transcript <name> [<date>]: a mind's talk",
+	"builder | builder export | builder drop <name>: builder mode",
+	"map: the map's name",
+	"net: the server's traffic and each peer's round trip",
+	"save: the world saved now",
+	"version: the build and its protocol",
+	"restart|stop [<seconds>] [<why>] | restart cancel: a restart, or calling it off",
+	"help: these lines",
+]
+
+
+## One console command; the reply is what the operator sees. [param caller]:
+## the player whose admin panel sent it (672), null from stdin and the port.
+func admin_command(line: String, caller: Player = null) -> String:
 	if not Net.is_authority():
 		return "not the authority"
 	var words := line.strip_edges().split(" ", false)
@@ -13756,6 +14092,10 @@ func admin_command(line: String) -> String:
 			return _weather_command(words)
 		"zone":
 			return _zone_command(words)
+		"go":
+			return _go_command(words, caller)
+		"quests":
+			return _quests_command(words, caller)
 		"builder":
 			if _builder != null:
 				return _builder.admin(words)
@@ -13875,9 +14215,7 @@ func admin_command(line: String) -> String:
 					peers.append("%s rtt %d ms" % [_players[peer].name, roundi(link.get_statistic(ENetPacketPeer.PEER_ROUND_TRIP_TIME))])
 			return "%s\n%s" % [Net.stats.server_text(), ", ".join(peers) if not peers.is_empty() else "no peers"]
 		"help":
-			return "reset | respawn | players | net | version | restart|stop [<seconds>] [<why>] | restart cancel | reload <zone>|all | raids [on|off|send <camp> <town>] | regenerate [on|off|now <level>] | companions | zones | zone reset <name> | zone move <player> <zone> | mark <player> <mark>|-<mark> | " \
-				+ "mind scripted|ollama | mind log on|off | mind last <name> | perception list|grid|both | " \
-				+ "transcript <name> [<date>] | companion facts <player> | companion forget <player> <id> | save | builder | builder export | builder drop <name> | hour [<h>] | day_minutes [<m>] | season [<name>] | season_days [<n>] | weather [<kind>|auto|reload] [<minutes>] [<region>|all]"
+			return "\n".join(CONSOLE_HELP)  # 672: one line a command.
 	return "unknown command %s (try help)" % words[0]
 
 
