@@ -201,7 +201,27 @@ static func _armour(id: String, value: Dictionary) -> Dictionary:
 	for key: Variant in value:
 		if key != "look" and (value[key] is float or value[key] is int):
 			out[str(key)] = float(value[key])
+	if value.has("on"):
+		var on := _worn_on(id, value["on"])
+		if not on.is_empty():
+			out["on"] = on
 	return out
+
+
+## Where a worn piece's mass sits (items-as-mass step 1; World.load_of reads
+## it): {arms, body}, shares of 0..1 that add to 1 (scaled to it if they
+## don't); {} with a warning for anything else, and the piece is then all
+## on the body.
+static func _worn_on(id: String, value: Variant) -> Dictionary:
+	if not value is Dictionary:
+		push_warning("Items: %s's armour \"on\" %s is not {arms, body}; all on the body" % [id, value])
+		return {}
+	var arms := float(value.get("arms", 0.0)) if (value.get("arms", 0.0) is float or value.get("arms", 0.0) is int) else -1.0
+	var body := float(value.get("body", 0.0)) if (value.get("body", 0.0) is float or value.get("body", 0.0) is int) else -1.0
+	if arms < 0.0 or body < 0.0 or arms + body <= 0.0:
+		push_warning("Items: %s's armour \"on\" %s needs arms and body shares of 0 or more; all on the body" % [id, value])
+		return {}
+	return {"arms": arms / (arms + body), "body": body / (arms + body)}
 
 
 ## [param id]'s armour (decision 622): {look, its stats}; {} for a thing

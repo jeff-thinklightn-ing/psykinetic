@@ -1737,6 +1737,15 @@ func _test_armour() -> void:
 			"four kinds, each with its look and stats; a knife is not armour")
 	var odd := Items.read('{"items": [{"id": "cloak", "armour": {"look": "fur"}}]}')
 	_check(odd["cloak"]["armour"].is_empty(), "an unknown look is no armour (warned)")
+	var shares := {"leather_armour": 0.2, "mail_armour": 0.25, "plate_armour": 0.2, "robes": 0.1}
+	var all_on := true
+	for id: String in shares:
+		var on: Dictionary = Items.armour_of(id).get("on", {})
+		all_on = all_on and is_equal_approx(float(on.get("arms", -1)), shares[id]) and is_equal_approx(float(on["arms"]) + float(on["body"]), 1.0)
+	_check(all_on, "each armour says where its mass sits, arms and body adding to 1 (items-as-mass step 1)")
+	var ons := Items.read('{"items": [{"id": "a", "armour": {"look": "mail", "on": {"arms": 1, "body": 3}}}, {"id": "b", "armour": {"look": "mail", "on": {"arms": -1}}}, {"id": "c", "armour": {"look": "mail", "on": "arms"}}]}')
+	_check(ons["a"]["armour"]["on"] == {"arms": 0.25, "body": 0.75} and not ons["b"]["armour"].has("on") and not ons["c"]["armour"].has("on"),
+			"shares not adding to 1 are scaled to it; a negative or a word is left out (all on the body, warned)")
 	var old := PlayerRecord.from_dict({"player_id": "old", "tile": [1, 1], "slots": ["knife", "", "", "", "sword", ""], "items": [0, 0, 0, 0, 0, 0]})
 	_check(old != null and old.slots.size() == Player.SLOTS and old.slots[Items.RIGHT_HAND] == "sword" and old.slots[Items.ARMOUR] == "",
 			"a six-slot record from before armour: the hands where they were, the armour slot empty (%s)" % [Array(old.slots)])
