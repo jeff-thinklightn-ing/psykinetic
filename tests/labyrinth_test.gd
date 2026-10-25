@@ -488,7 +488,9 @@ func _test_castle_halls() -> void:
 ## one-wide way, nothing carved outside the footprint, the stairs at the
 ## same cells on every floor with two clear cells round each stair and
 ## spawn, the sealed way down on the foot alone, the top chamber bare but
-## for its two torches, a chest a floor.
+## for its two lamps and four pillars, a chest a floor; in the dark set
+## (659 amended): cold lamps for torches, runes rolled along the ways, the
+## hatch over the sealed link.
 func _test_tower() -> void:
 	print("\n== the tower style (659): floors in an octagon, the shaft lining the stairs ==")
 	for set: Array in TOWERS:
@@ -530,8 +532,17 @@ func _test_tower() -> void:
 			for key: Vector3i in level["terrain"]["edges"]:
 				if level["terrain"]["edges"][key] == Terrain.Edge.DOOR:
 					doors += 1
-			_check(doors >= 3 and level["terrain"]["torches"].size() >= 3 and _kinds(level).get("chest", 0) == 1,
-				"%s: doors where the ways meet the rooms, torches along them, one chest (%d doors, %d torches, %s)" % [name, doors, level["terrain"]["torches"].size(), _kinds(level)])
+			var lamps: Array = level["terrain"]["lamps"]
+			_check(doors >= 3 and lamps.size() >= 3 and level["terrain"]["torches"].is_empty() and _kinds(level).get("chest", 0) == 1,
+				"%s: doors where the ways meet the rooms, cold lamps along them and no torch, one chest (%d doors, %d lamps, %s)" % [name, doors, lamps.size(), _kinds(level)])
+			var runes: Array = config.get("decor", []).filter(func(entry: Array) -> bool:
+				return entry[4] == "rune_strip" and not Level.in_anchors(anchors, Vector2i(int(entry[0]), int(entry[1]))))
+			var placed: int = level["terrain"]["decor"].filter(func(piece: Dictionary) -> bool: return piece["kind"] == "rune_strip").size()
+			_check(config["walls"] == "dark" and config["floors"] == "dark" and runes.size() >= 2 and placed >= runes.size(),
+				"%s: the dark set, runes rolled along the ways' walls and every one placed (%d rolled, %d placed)" % [name, runes.size(), placed])
+			var hatch: Array = level["buildings"].filter(func(b: Dictionary) -> bool: return b["slot"] == "building.hatch_sealed")
+			_check((hatch.size() == 1 and (hatch[0]["rect"] as Rect2i).position == Vector2i(c, 2) and a.walkable(Vector2i(c, 2))) if floor == 1 else hatch.is_empty(),
+				"%s: the sealed hatch lies over the mine's link, walked onto, on the foot alone (%s)" % [name, hatch])
 			# The stairs and the spawns beside them: the same cells on every
 			# floor, two clear cells round each, whatever the floor rolled.
 			var up_down := {}
@@ -562,10 +573,14 @@ func _test_tower() -> void:
 				"%s: the mine's way down is a sealed link under the north wall on the foot alone (%s)" % [name, sealed])
 			if floor == floors:
 				var chamber: Rect2i = anchors.filter(func(anchor: Dictionary) -> bool: return anchor["name"] == "chamber")[0]["rect"]
-				var lit: int = level["terrain"]["torches"].filter(func(cell: Vector2i) -> bool: return chamber.has_point(cell)).size()
+				var lit: int = lamps.filter(func(cell: Vector2i) -> bool: return chamber.has_point(cell)).size()
 				var things: int = level["entities"].filter(func(spec: Dictionary) -> bool: return chamber.has_point(spec["tile"])).size()
-				_check(lit == 2 and things == 0 and a.walkable(Vector2i(c, c - 3)) and a.edge(Terrain.edge_key(Vector2i(c, c - 3), Vector2i(0, 1))) != "wall",
-					"%s: the top chamber holds its two torches and nothing else, open onto the shaft (%d lit, %d things)" % [name, lit, things])
+				var pillars: int = level["buildings"].filter(func(b: Dictionary) -> bool: return b["slot"] == "building.dark_pillar").size()
+				var solid: int = level["terrain"]["solid"].filter(func(cell: Vector2i) -> bool: return chamber.has_point(cell)).size()
+				var wall_runes: int = level["terrain"]["decor"].filter(func(piece: Dictionary) -> bool: return piece["kind"] == "rune_strip" and chamber.has_point(piece["cell"])).size()
+				_check(lit == 2 and things == 0 and pillars == 4 and solid == 4 and wall_runes == chamber.size.x and a.walkable(Vector2i(c, c - 3))
+					and a.edge(Terrain.edge_key(Vector2i(c, c - 3), Vector2i(0, 1))) != "wall" and Regen.connected(a, anchors),
+					"%s: the top chamber holds its two lamps, four solid pillars, runes the length of its north wall and nothing else, open onto the shaft (%d lit, %d things, %d pillars, %d solid, %d runes)" % [name, lit, things, pillars, solid, wall_runes])
 
 
 ## How many of [param floor_cells] have floor on two opposite sides: the

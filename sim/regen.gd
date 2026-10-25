@@ -184,6 +184,8 @@ static func generate(level_name: String, generation: int) -> Dictionary:
 		# (generated_config), the rest rolled over the generation.
 		if barrow:
 			generated["decor"].append_array(decor_of(map, anchors, config, generated, seed, bool(made["config"].get("damp", false))))
+		elif str(config.get("style", "")) == "tower":
+			generated["decor"].append_array(runes_of(map, anchors, generated, seed))
 		return {"layout": map.to_image(), "height": height, "config": generated, "seed": seed, "tries": attempt + 1, "anchors": anchors}
 	push_warning("[regen] %s: no map of %d tries joined every anchor; the last one stands" % [level_name, TRIES])
 	return {}
@@ -329,6 +331,9 @@ const MOSS_DEEP_LAYER := 0.15
 const MOSS_FIRST_LAYER := 0.05
 const MOSS_DEEP := 1.5
 const MOSS_PATCH := 0.4
+## The share of the dark tower's wall feet with a line of runes (659
+## amended; a light roll, Jeff tunes).
+const RUNE_SHARE := 0.12
 const WEB_CORNER := 0.3
 const WEB_NICHE := 0.25
 
@@ -403,6 +408,45 @@ static func decor_of(map: LevelMap, anchors: Array, config: Dictionary, generate
 		if kept.has(cell) or rng.randf() >= WEB_NICHE:
 			continue
 		out.append([cell.x, cell.y, int(niche[2]), int(niche[3]), "web_niche", rng.randi_range(1, int(Level.DECOR_KINDS["web_niche"]["variants"]))])
+	return out
+
+
+## The dark tower's runes for a generation (659 amended): [[x, y, dx, dy,
+## "rune_strip", variant], ...] (Level.decor_from's shape), a strip along
+## RUNE_SHARE of the wall feet (a wall edge with rock behind it, never a
+## door) of [param map]'s floor outside [param anchors], one a cell, never a
+## cell the ways run through, a marker's, a spawn point's or one
+## [param generated] already decorates; rolled by an rng of [param seed]
+## and DECOR_SALT in a set order, variants by the roll. The chamber's own
+## are the template's, kept (generated_config).
+static func runes_of(map: LevelMap, anchors: Array, generated: Dictionary, seed: int) -> Array:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed ^ DECOR_SALT
+	var out: Array = []
+	var paths: Dictionary = map.extras.get("paths", {})
+	var taken := {}
+	for entry: Variant in generated.get("decor", []):
+		if entry is Array and (entry as Array).size() == 6:
+			taken[Vector2i(int(entry[0]), int(entry[1]))] = true
+	for value: Variant in generated.get("spawn_points", {}).values():
+		var at: Variant = Level._tile(value)
+		if at != null:
+			taken[at] = true
+	var cells: Array = map.cells.keys()
+	cells.sort_custom(func(a: Vector2i, b: Vector2i) -> bool: return a.y < b.y or a.y == b.y and a.x < b.x)
+	for cell: Vector2i in cells:
+		if not map.walkable(cell) or map.cell(cell) not in Level.GROUNDS or Level.in_anchors(anchors, cell) \
+				or paths.has(cell) or taken.has(cell):
+			continue
+		var sides: Array[Vector2i] = []
+		for direction: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+			var far := cell + direction
+			if map.in_bounds(far) and not map.walkable(far) and map.edge(Terrain.edge_key(cell, direction)) != "door":
+				sides.append(direction)
+		if sides.is_empty() or rng.randf() >= RUNE_SHARE:
+			continue
+		var side: Vector2i = sides[rng.randi_range(0, sides.size() - 1)]
+		out.append([cell.x, cell.y, side.x, side.y, "rune_strip", rng.randi_range(1, int(Level.DECOR_KINDS["rune_strip"]["variants"]))])
 	return out
 
 

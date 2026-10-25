@@ -188,8 +188,13 @@ const HALLS_GUARDS: Array = [[23, 30, 1, 0, "fallen_guard", 1], [26, 31, 0, -1, 
 ## out at its south edge and the mine's way down under the north wall, a
 ## sealed link; the top floor's shaft opens into the chamber. A sample in
 ## memory for the tests and the sheet: no real tower until Jeff places it.
+## In the dark set (659 amended, art-kit's e9c27912): wall.dark and
+## floor.dark, cold lamps for torches, the hatch laid over the sealed link,
+## the top chamber's four pillars and the runes along its north wall.
 const TOWER_FLOORS := 4
 const TOWER_ACROSS := 22
+## The top chamber's pillars, as offsets from the floor's middle cell.
+const TOWER_PILLARS: Array[Vector2i] = [Vector2i(-3, -7), Vector2i(2, -7), Vector2i(-3, -4), Vector2i(2, -4)]
 
 
 ## Floor [param floor] (1 the foot, [param floors] the top) of a sample
@@ -215,6 +220,8 @@ static func sample_tower(floor: int, floors: int, prefix := "lab_tower", across 
 	var markers := {}
 	var links: Array = []
 	var spawns := {}
+	var pieces: Array = []
+	var decor: Array = []
 	var start := Vector2i(c, c - 1)
 	if floor < floors:
 		markers[up] = "link"
@@ -233,13 +240,18 @@ static func sample_tower(floor: int, floors: int, prefix := "lab_tower", across 
 		var hatch := Vector2i(c, 2)
 		markers[hatch] = "link"
 		links.append({"at": [hatch.x, hatch.y], "to_map": "%s_mine" % prefix, "to_spawn": "", "sealed": "tower_mine", "cue": "sealed"})
+		pieces.append({"slot": "building.hatch_sealed", "at": [hatch.x, hatch.y]})
 	if floor == floors:
-		markers[Vector2i(c - 4, 3)] = "torch"
-		markers[Vector2i(c + 3, 3)] = "torch"
+		markers[Vector2i(c - 4, 3)] = "lamp_cold"
+		markers[Vector2i(c + 3, 3)] = "lamp_cold"
+		for offset in TOWER_PILLARS:
+			pieces.append({"slot": "building.dark_pillar", "at": [c + offset.x, c + offset.y]})
+		for x in range(c - 5, c + 5):
+			decor.append([x, 2, 0, -1, "rune_strip", 1 + x % 2])
 	markers[start] = "start"
 	var layout := Level.image_from_rows(_lines(rows), markers)
-	var config := {"name": "Sample tower, floor %d of %d" % [floor, floors], "outdoor": false, "walls": "stone", "floors": "stone",
-		"starts": [[start.x, start.y]], "spawn_points": spawns, "links": links,
+	var config := {"name": "Sample tower, floor %d of %d" % [floor, floors], "outdoor": false, "walls": "dark", "floors": "dark",
+		"starts": [[start.x, start.y]], "spawn_points": spawns, "links": links, "buildings": pieces, "decor": decor,
 		"regenerate": {"generator": "labyrinth", "style": "tower", "footprint": "octagon", "every_days": 3, "anchors": anchors,
 			"rooms": {"count": [4, 7], "size": [[3, 3], [7, 6]]}, "loops": 0.15, "chests": 1}}
 	return {"layout": layout, "config": config}

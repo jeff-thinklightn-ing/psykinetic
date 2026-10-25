@@ -93,10 +93,11 @@ const LEGEND := {
 	"chest": "#8c4a1c",
 	"torch": "#ffe000",
 	"lantern": "#fff0b0",
+	"lamp_cold": "#40e0d0",
 	"link": "#ff00ff",
 }
 const GROUNDS: Array[String] = ["stone", "grass", "dirt"]
-const MARKERS: Array[String] = ["start", "crate", "boulder", "cart", "chest", "torch", "lantern", "link"]
+const MARKERS: Array[String] = ["start", "crate", "boulder", "cart", "chest", "torch", "lantern", "lamp_cold", "link"]
 ## level.json "north": which way in layout.png is north.
 ## Map edges a level can have a neighbour across (level.json "neighbours"),
 ## each the way off the map it is.
@@ -128,7 +129,7 @@ const BUILDINGS := {"building.hut": Vector2i(3, 3), "building.house": Vector2i(4
 	"building.tower_ruin": Vector2i(3, 3), "building.rubble_heap": Vector2i(1, 1), "building.fallen_column": Vector2i(2, 1),
 	"building.burial_table": Vector2i(3, 2), "building.crypt_pillar": Vector2i(2, 2),
 	"building.round_table": Vector2i(3, 3), "building.hall_chair": Vector2i(1, 1), "building.broken_table": Vector2i(2, 1),
-	"building.throne": Vector2i(1, 1),
+	"building.throne": Vector2i(1, 1), "building.dark_pillar": Vector2i(1, 1), "building.hatch_sealed": Vector2i(1, 1),
 	"building.dwarven_forge": Vector2i(6, 3), "building.weapon_rack": Vector2i(2, 1)}
 ## The buildings that stand on water, not floor: no inside, no walls (a
 ## well: its water is what stops walkers, and sight passes over it).
@@ -138,8 +139,9 @@ const ON_WATER: Array[String] = ["building.well"]
 ## (the slot's own mesh draws it): they stop walkers, not sight, and are
 ## not drawn as walls; a gap in it is an open edge. The feast hall's chairs
 ## and the draugr's throne (580 step 3) are walked onto too: a seat is a
-## floor cell with a piece on it, no wall round it.
-const OPEN_AIR: Array[String] = ["building.field", "building.fold", "building.hall_chair", "building.throne"]
+## floor cell with a piece on it, no wall round it; so is the dark tower's
+## sealed hatch (659 amended), laid over the mine's sealed link.
+const OPEN_AIR: Array[String] = ["building.field", "building.fold", "building.hall_chair", "building.throne", "building.hatch_sealed"]
 ## A herder's fold (640), and how far from its holding's place cell it may
 ## stand (fold_near).
 const FOLD := "building.fold"
@@ -153,18 +155,19 @@ const FOLD_REACH := 6
 const SOLID: Array[String] = ["building.mound", "building.great_tree", "building.cairn", "building.standing_stone", "building.waystone",
 	"building.chopping_block", "building.woodpile", "building.tower_ruin", "building.rubble_heap", "building.fallen_column",
 	"building.burial_table", "building.crypt_pillar", "building.round_table", "building.broken_table",
-	"building.dwarven_forge", "building.weapon_rack"]
+	"building.dwarven_forge", "building.weapon_rack", "building.dark_pillar"]
 ## The solid buildings with no door (decision 567: the wilds' landmarks; 566
 ## amended: the work props, a chopping block and a woodpile a body stands
 ## beside; 600: the Old Tower's broken tower and fallen stone; 580 step 3: the
 ## crypt's burial table and pillars, the rock blocks they were; 613 amended:
 ## the Dwarven Halls' great forge the smith stands before and the goblins'
-## weapon rack, so no fight stands a body in the blades): every cell of
+## weapon rack, so no fight stands a body in the blades; 659 amended: the
+## dark tower's pillar): every cell of
 ## theirs out of the floor, none walked onto or into.
 const DOORLESS: Array[String] = ["building.great_tree", "building.cairn", "building.standing_stone", "building.waystone",
 	"building.chopping_block", "building.woodpile", "building.tower_ruin", "building.rubble_heap", "building.fallen_column",
 	"building.burial_table", "building.crypt_pillar", "building.round_table", "building.broken_table",
-	"building.dwarven_forge", "building.weapon_rack"]
+	"building.dwarven_forge", "building.weapon_rack", "building.dark_pillar"]
 ## solid_door_of's answer for a DOORLESS building.
 const NO_DOOR := Vector2i(-1, -1)
 ## A bridge (decision 505): a building entry {slot: "bridge", at, facing,
@@ -585,6 +588,7 @@ static func parse(layout: Image, height: Image, config: Dictionary, relief: Imag
 	var stair_cells: Array[Vector2i] = []
 	var torches: Array[Vector2i] = []
 	var lanterns: Array[Vector2i] = []
+	var lamps: Array[Vector2i] = []
 	var ground: Array[bool] = []
 	for meaning in names:
 		ground.append(meaning in GROUNDS)
@@ -631,6 +635,8 @@ static func parse(layout: Image, height: Image, config: Dictionary, relief: Imag
 					torches.append(cell)
 				"lantern":
 					lanterns.append(cell)
+				"lamp_cold":
+					lamps.append(cell)
 				_:
 					markers.append({"tile": cell, "marker": meaning})
 	# Whether each cell is walked on (ground, not water), and water, with a
@@ -743,7 +749,7 @@ static func parse(layout: Image, height: Image, config: Dictionary, relief: Imag
 		"terrain": {
 			"floor": floor_tiles, "fire": fire, "edges": edges, "outline": outline, "kinds": kinds, "water": water, "fords": fords,
 			"tall_grass": tall_grass, "slopes": slopes, "rocks": rocks,
-			"heights": heights, "stairs": stairs, "torches": torches, "lanterns": lanterns,
+			"heights": heights, "stairs": stairs, "torches": torches, "lanterns": lanterns, "lamps": lamps,
 			"relief": field, "relief_size": cells, "relief_given": given,
 			"ambient": clampf(float(config.get("ambient", DayNight.base_ambient(zone))), 0.0, 1.0),
 			"north": NORTHS.get(str(config.get("north", "up")), Vector2i(0, -1)),
@@ -1615,7 +1621,8 @@ const DECOR_KINDS: Dictionary[String, Dictionary] = {
 	"web_corner": {"sits": "corner", "variants": 2},
 	"web_niche": {"sits": "niche", "variants": 2},
 	"fallen_guard": {"sits": "flat", "variants": 2, "faced": true},
-	"grave_fence": {"sits": "edge", "variants": 3}}
+	"grave_fence": {"sits": "edge", "variants": 3},
+	"rune_strip": {"sits": "wall", "variants": 2}}
 
 
 ## level.json's "decor" (647; 658): [[x, y, dx, dy, kind, variant], ...],

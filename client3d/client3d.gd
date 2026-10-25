@@ -577,6 +577,19 @@ const FLOOR_LIGHT_HIGH := 0.7
 const WARM := Color(1.0, 0.5, 0.2)
 const WARM_MOST := 0.45
 const LANTERN := Color(1.0, 0.93, 0.7)
+## The dark tower's cold lamp (659 amended; environment's colour and pulse):
+## art-kit's prop.dark_lamp, its light at the slot's flame socket, no fire
+## drawn (the glass glows); a slow breath between LAMP_PULSE_LOW and full
+## over LAMP_PERIOD s, each lamp on its own phase, never a fire's flicker.
+const LAMP_COLD := Color(0.4, 0.8, 0.85)
+const LAMP_POST := "prop.dark_lamp"
+const LAMP_ENERGY := 3.0
+const LAMP_RANGE := 5.0
+## The cold light's falloff (OmniLight3D.omni_attenuation): flatter than a
+## torch's, so its pool reaches the dark floor round the stand.
+const LAMP_FALLOFF := 0.6
+const LAMP_PULSE_LOW := 0.9
+const LAMP_PERIOD := 4.0
 const AMBIENT := Color(0.05, 0.05, 0.07)
 const BACKGROUND := Color(0.02, 0.02, 0.025)
 const SUN := Color(0.6, 0.7, 1.0)
@@ -1784,6 +1797,8 @@ var _low := false
 ## it swings], flickered and faded by day each frame (_flicker_fires), on
 ## the view's own clock (_fire_time, accumulated frame time).
 var _fire_lights: Array[Array] = []
+## The cold lamps' lights (_add_lamp): [light, energy, phase].
+var _lamp_lights: Array[Array] = []
 var _fire_time := 0.0
 ## Outdoors: the sky, and the step of the day (SKY_STEPS) it shows, -1 for
 ## none yet.
@@ -4695,6 +4710,7 @@ func _phase_ground_over_frames(generation: int) -> bool:
 		_fill_jobs.append(["ground", chunk])
 	ground_filling = true  # The shade waits from here: the lights' phase asks for it.
 	_fire_lights.clear()
+	_lamp_lights.clear()
 	var fire: Array[Vector2i] = _terrain["fire"]
 	for cell: Vector2i in fire:
 		if _grounds.has(cell):
@@ -5078,6 +5094,7 @@ func _phase_land() -> void:
 func _phase_ground() -> void:
 	_build_ground(_terrain.get("kinds", {}))
 	_fire_lights.clear()
+	_lamp_lights.clear()
 	var fire: Array[Vector2i] = _terrain["fire"]
 	for cell: Vector2i in fire:
 		if _grounds.has(cell):
@@ -5090,6 +5107,8 @@ func _phase_lights() -> void:
 		_add_torch(cell)
 	for cell: Vector2i in _terrain.get("lanterns", []):
 		_add_lantern(cell)
+	for cell: Vector2i in _terrain.get("lamps", []):
+		_add_lamp(cell)
 	if not World.fields_changed_signal.is_connected(_on_fields_changed):
 		World.fields_changed_signal.connect(_on_fields_changed)
 	_on_fields_changed()
@@ -10967,6 +10986,37 @@ func _add_lantern(cell: Vector2i) -> void:
 	_room.add_child(light)
 
 
+## A cold lamp standing in its cell (659 amended): art-kit's prop.dark_lamp
+## (a slim stone post until it has art), its light at the slot's flame
+## socket, steady but for its slow breath (_flicker_fires); casts no
+## shadows.
+func _add_lamp(cell: Vector2i) -> void:
+	var at := _tile_position(cell)
+	var post: Node3D
+	var heart := Vector3(0.0, 1.5, 0.0)
+	if ArtKit.has(LAMP_POST) and ArtKit.filled_by(LAMP_POST) != "placeholder":
+		post = ArtKit.instance(LAMP_POST)
+		post.rotation.y = _roll(cell, 143) * TAU
+		var socket: Variant = Flames.socket_of(LAMP_POST)
+		if socket != null:
+			heart = socket
+	else:
+		post = _box(Vector3(0.08, 1.5, 0.08), _stone_opaque)
+	post.name = "Lamp_%d_%d" % [cell.x, cell.y]
+	post.position = at
+	_room.add_child(post)
+	var light := OmniLight3D.new()
+	light.name = "LampLight_%d_%d" % [cell.x, cell.y]
+	light.light_color = LAMP_COLD
+	light.light_energy = LAMP_ENERGY
+	light.omni_range = LAMP_RANGE
+	light.omni_attenuation = LAMP_FALLOFF
+	light.shadow_enabled = false
+	light.position = post.transform * heart
+	_room.add_child(light)
+	_lamp_lights.append([light, light.light_energy, _roll(cell, 144) * TAU])
+
+
 ## A torch standing in its cell: art-kit's prop.torch_post, its flame at
 ## the slot's socket (Flames, decision 523), or a stone post with the flame
 ## on its top until the slot has art; and its warm light, over the flame,
@@ -12121,9 +12171,13 @@ func _add_fire(cell: Vector2i) -> void:
 ## (Flames.day_share). World's light (Fields) is never touched: it stays
 ## steady for Senses.
 func _flicker_fires(delta: float) -> void:
-	if _fire_lights.is_empty():
+	if _fire_lights.is_empty() and _lamp_lights.is_empty():
 		return
 	_fire_time += delta
+	for lamp: Array in _lamp_lights:
+		var cold := lamp[0] as OmniLight3D
+		if is_instance_valid(cold):
+			cold.light_energy = float(lamp[1]) * lerpf(LAMP_PULSE_LOW, 1.0, 0.5 + 0.5 * sin(TAU * _fire_time / LAMP_PERIOD + float(lamp[2])))
 	var share := Flames.day_share(_look_daylight, _outdoor, World.fields.canopy_shade if World.fields != null else 0.0)
 	for fire: Array in _fire_lights:
 		var light := fire[0] as OmniLight3D

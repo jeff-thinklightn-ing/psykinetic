@@ -409,6 +409,10 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## (no draw_step, no spread_settle), and a client works its step, reach, cone and
 ## full-strength edge from them and raised_tick (World.draw_step, range_of,
 ## spread_of, full_range_of) as the server does; an old client draws the wrong aim.
+## 36 (659 amended, dungeon's side): building.dark_pillar is solid and doorless
+## (Level.SOLID, DOORLESS), building.hatch_sealed open-air (OPEN_AIR); a level's
+## "lamp_cold" marker is terrain "lamps", light with no heat in Fields on both
+## sides; an old client walks through a pillar and draws no lamp.
 const PROTOCOL_REVISION := 36
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]

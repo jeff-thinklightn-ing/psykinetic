@@ -79,6 +79,7 @@ func _ready() -> void:
 	_test_relief()
 	_test_sight()
 	_test_fire()
+	_test_cold_lamp()
 	await _test_wall_runs()
 	_test_cave_walls()
 	_test_scatter()
@@ -2523,6 +2524,46 @@ func _test_fire() -> void:
 	_check(_rig._fire_lights.size() == torches.size() + fire.filter(func(c: Vector2i) -> bool: return _rig._grounds.has(c)).size()
 			and energies.max() != energies.min() and World.light_at(cell) == before,
 			"each fire's drawn light flickers; World's light stays as it was (%s)" % [energies])
+	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+
+
+## The dark tower's cold lamps (659 amended): the sample tower's top floor
+## drawn, each lamp_cold marker art-kit's prop.dark_lamp (or its stand-in
+## post) with no fire on it, its light the cold colour at the slot's flame
+## socket, no shadows, breathing slowly between LAMP_PULSE_LOW and full
+## (never a fire's flicker); and the sim counting it as light, no heat.
+func _test_cold_lamp() -> void:
+	print("
+== the cold lamps: the dark tower's lights, drawn and in the sim ==")
+	var made := preload("res://tools/plan_sheet.gd").sample_tower(4, 4, "vt_tower")
+	var level := Level.parse(made["layout"], null, made["config"])
+	var terrain: Dictionary = level["terrain"]
+	var lamps: Array = terrain.get("lamps", [])
+	_check(lamps.size() == 2 and terrain["torches"].is_empty(), "the top chamber's two lamps parsed, no torch (%s)" % [lamps])
+	if lamps.is_empty():
+		return
+	_rig.rebuild(terrain, Vector2i(11, 11))
+	var drawn := true
+	for cell: Vector2i in lamps:
+		var post := _rig._room.get_node_or_null("Lamp_%d_%d" % [cell.x, cell.y]) as Node3D
+		var light := _rig._room.get_node_or_null("LampLight_%d_%d" % [cell.x, cell.y]) as OmniLight3D
+		drawn = drawn and post != null and post.find_children("Flame*", "", true, false).is_empty() and light != null
+		drawn = drawn and light.light_color == Client3D.LAMP_COLD and not light.shadow_enabled and light.omni_range == Client3D.LAMP_RANGE and light.position.y > 1.0
+	_check(drawn and _rig._lamp_lights.size() == 2, "each lamp stands with no flame, its light cold, unshadowed, at its heart")
+	var low := INF
+	var high := -INF
+	for i in 160:
+		_rig._flicker_fires(0.05)
+		var energy := (_rig._lamp_lights[0][0] as OmniLight3D).light_energy
+		low = minf(low, energy)
+		high = maxf(high, energy)
+	_check(low >= Client3D.LAMP_ENERGY * Client3D.LAMP_PULSE_LOW - 0.001 and high <= Client3D.LAMP_ENERGY + 0.001 and high - low > 0.05,
+		"the lamp breathes slowly, between %.2f and %.2f over its %d s (%.3f .. %.3f)" % [Client3D.LAMP_PULSE_LOW, 1.0, int(Client3D.LAMP_PERIOD), low, high])
+	var fields := Fields.new()
+	fields.load(terrain)
+	var sources: Array = fields._sources().filter(func(source: Array) -> bool: return source[1] == Fields.LAMP)
+	_check(sources.size() == 2 and float(Fields.LAMP["heat"]) == 0.0 and float(Fields.LAMP["light"]) > 0.0,
+		"the sim counts each lamp as light, no heat (%d sources)" % sources.size())
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
 

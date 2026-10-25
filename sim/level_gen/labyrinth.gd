@@ -153,7 +153,7 @@ static func generate(template: LevelMap, config: Dictionary, seed: int) -> Level
 	var widened := Tools.widen(map, anchors, carved, ring)
 	_wall_rooms(map, rooms, ends, paths, widened)
 	if not old:
-		_torches(map, anchors, rooms, corridors, depth)
+		_torches(map, anchors, rooms, corridors, depth, LIGHTS.get(style, "torch"))
 	_markers(map, anchors, rooms, corridors, ends, config, rng, depth)
 	map.extras["paths"] = paths
 	return map
@@ -763,9 +763,14 @@ static func _lonely(map: LevelMap, anchors: Array, at: Vector2i, from: Vector2i,
 	return true
 
 
-## Dwarven light: a torch on the cell inside each door, and one every
-## TORCH_EVERY corridor cells, never beside an anchor.
-static func _torches(map: LevelMap, anchors: Array, rooms: Array[Dictionary], corridors: Dictionary[Vector2i, bool], depth: Dictionary) -> void:
+## The marker a style's lights are laid as, when not "torch" (659
+## amended: the dark tower's cold lamps).
+const LIGHTS := {"tower": "lamp_cold"}
+
+
+## Dwarven light: a [param light] (a torch) on the cell inside each door,
+## and one every TORCH_EVERY corridor cells, never beside an anchor.
+static func _torches(map: LevelMap, anchors: Array, rooms: Array[Dictionary], corridors: Dictionary[Vector2i, bool], depth: Dictionary, light := "torch") -> void:
 	# Barrow: the town's tombs are lit, the shallow band alone.
 	var barrow := not depth.is_empty()
 	for room in rooms:
@@ -773,7 +778,7 @@ static func _torches(map: LevelMap, anchors: Array, rooms: Array[Dictionary], co
 			continue
 		for cell: Vector2i in room["doors"]:
 			if map.cell(cell) == FLOOR:
-				map.set_cell(cell, "torch")
+				map.set_cell(cell, light)
 	var i := 0
 	for cell in Tools.sorted_cells(corridors):
 		if barrow and _band_of(depth, cell) > 0:
@@ -783,7 +788,7 @@ static func _torches(map: LevelMap, anchors: Array, rooms: Array[Dictionary], co
 		var spot := _by_wall(map, cell) if barrow else cell
 		if i % TORCH_EVERY != 0 or map.cell(spot) != FLOOR or _beside_anchor(anchors, spot):
 			continue
-		map.set_cell(spot, "torch")
+		map.set_cell(spot, light)
 
 
 ## A floor cell beside [param cell] that touches rock (a wall to stand a

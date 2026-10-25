@@ -714,8 +714,8 @@ levels, `<tower>_1` the foot up to `<tower>_N` the top, each a small
 square level (the sample 22 cells across; the size is the template's) laid
 in the labyrinth's `"tower"` style: the dwarven rules with no great hall
 (rooms `[3, 3]` to `[7, 6]`, four to seven a floor, ways two wide, a door
-where a way meets a room, torches along the ways until art-kit's cold
-lamp), inside a footprint the block names (`"footprint": "octagon"` or
+where a way meets a room, cold lamps along the ways and inside the doors:
+`Labyrinth.LIGHTS`, the style's lights laid as `lamp_cold`), inside a footprint the block names (`"footprint": "octagon"` or
 `"round"`, inscribed in the level's size; `Labyrinth.footprint`), outside
 which nothing is ever carved: the floor's outline is the tower's wall. The
 stairs line up because the shaft is an anchor on every floor at the same
@@ -727,12 +727,24 @@ and spawn whatever the floor rolls. The foot has the door out at its south
 edge (cue `arch`, spawn `from_outside`) and the mine's way down under the
 north wall, a sealed link (cue `sealed`; the mark that opens it is lore's
 to name); the top floor's shaft opens into the chamber, 10 x 7 against the
-north wall, bare but for two torches. No real tower yet: the sample lives
+north wall, bare but for two lamps, four pillars and its runes. No real tower yet: the sample lives
 in `tools/plan_sheet.sample_tower(floor, floors, prefix, across)`,
 labyrinth_test lays it at two sizes (`_test_tower`), level_test walks its
 links (`_test_tower_levels`), and `write_tower_sheet` draws the floors in
-a row, the foot at the left (C:/dev/review/tower). Art-kit's dark set, the
-cold lamp, the dark pillar and the sealed hatch come with step 2.
+a row, the foot at the left (C:/dev/review/tower).
+
+The dark set (659 amended, art-kit's e9c27912): the sample's floors name
+`"walls": "dark"` and `"floors": "dark"`. A `lamp_cold` marker (legend
+`#40e0d0`) is terrain `"lamps"`: light with no heat in Fields (`Fields.LAMP`,
+light 0.8 over 4 cells; never quenched by the damp, it is no fire), drawn as
+`prop.dark_lamp` with a cold OmniLight (`Client3D.LAMP_COLD`, energy 3, range
+5, falloff 0.6 so its pool reaches the dark floor, no shadows) at the slot's flame socket and no flame, breathing slowly
+(0.9 to full over 4 s, environment's look). `building.dark_pillar` (1 x 1) is
+solid and doorless; the top chamber stands four. `building.hatch_sealed`
+(1 x 1) is open-air, laid over the foot's sealed link. `rune_strip` is a wall
+decor kind (two variants): the chamber's north wall carries a line by hand,
+and each generation rolls one along `Regen.RUNE_SHARE` (0.12) of the ways'
+wall feet outside the anchors (`Regen.runes_of`).
 
 Levels regenerate only on a server started with `--regenerate` (as raid
 groups with `--raids`, decision 328) or after the console's `regenerate on`

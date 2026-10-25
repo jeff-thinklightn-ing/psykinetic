@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Infrastructure: the tower's inside (sample only, no real tower yet) is drawn in the dark set: dark walls and floors, cold teal lamps that slowly breathe instead of torches, slender pillars in the top chamber, faint runes along the walls, and the sealed hatch over the mine's way down.
 - The town of Umbrage has its own music: Jeff's umbrage-theme plays while you are in the town in the wilds, fading in as you walk in and out as you leave, in place of the wilds' music (668 amended).
 - The barrow has its own music: Jeff's barrows-moody plays on the barrow's first level, fading in as you arrive and out as you leave (668).
 - Practice hall and live tuning (673): Practice on the main menu opens a hall of your own with training dummies that never die. There, F8 slows time (half, quarter), F9 pauses and "." steps one tick. The bow, swing, stamina, telegraph, knockback and camera numbers can be changed while you play (the panel, F7, comes with ui's next step) and saved for the trees to commit.

@@ -35,6 +35,9 @@ extends RefCounted
 const FIRE := {"heat": 10.0, "light": 0.8, "reach": 4}
 const TORCH := {"heat": 2.0, "light": 1.0, "reach": 5}
 const LANTERN := {"heat": 0.0, "light": 0.9, "reach": 4}
+## The dark tower's cold lamp (659 amended, terrain "lamps"): light, no
+## heat, never put out by the damp.
+const LAMP := {"heat": 0.0, "light": 0.8, "reach": 4}
 ## A carried light reaches this far; on a damp level (level.json "damp",
 ## the barrow's deepest) DAMP_REACH of it (carried_reach).
 const CARRIED_REACH := 4
@@ -90,6 +93,7 @@ var clearings: Array[Dictionary] = []
 var _fire: Array[Vector2i] = []
 var _torches: Array[Vector2i] = []
 var _lanterns: Array[Vector2i] = []
+var _lamps: Array[Vector2i] = []
 var _heat: Dictionary[Vector2i, float] = {}
 var _light: Dictionary[Vector2i, float] = {}
 var _dirty := true
@@ -127,6 +131,7 @@ func load(terrain: Dictionary) -> void:
 	_fire.assign(terrain.get("fire", []))
 	_torches.assign(terrain.get("torches", []))
 	_lanterns.assign(terrain.get("lanterns", []))
+	_lamps.assign(terrain.get("lamps", []))
 	ambient = clampf(float(terrain.get("ambient", 1.0)), 0.0, 1.0)
 	damp = bool(terrain.get("damp", false))
 	daylight = bool(terrain.get("daylight", false))
@@ -231,6 +236,8 @@ func _sources() -> Array:
 		sources.append([cell, TORCH])
 	for cell in _lanterns:
 		sources.append([cell, LANTERN])
+	for cell in _lamps:
+		sources.append([cell, LAMP])
 	_source_list = sources
 	return sources
 

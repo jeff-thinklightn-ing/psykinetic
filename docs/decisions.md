@@ -29341,3 +29341,36 @@ sound_kit_test: the wilds' Umbrage room names music.umbrage, outside it and a le
 without rooms none; Jeff's take. view_test _test_room_music: in the room it is wanted
 with the zone's ground out, eased in within 1 s and playing; out of the town, eased out
 and stopped. Client only, protocol unchanged, no new class_name.
+
+## 659 amended, dungeon's side: the tower's dark set (step 2)
+
+The coordinator: "the dark set named on the sample floors, the lamp lit (Flames plus a cool
+OmniLight, with environment's colour)", after art-kit's pieces (e9c27912). Release: under
+revision 36, no bump (36 unreleased); a label, no number.
+
+- **The set**: `tools/plan_sheet.sample_tower` names `"walls": "dark"`, `"floors": "dark"`.
+- **The cold lamp**: a new marker `lamp_cold` (`Level.LEGEND` `#40e0d0`, `Level.MARKERS`), parsed
+  as terrain `"lamps"`. The tower style lays it wherever the dwarven rules lay a torch
+  (`Labyrinth.LIGHTS`, `_torches`' `light`), the chamber's two by hand. It is real light, not a
+  look: `Fields.LAMP` (heat 0, light 0.8, reach 4) counts it beside the lanterns for Senses and
+  stealth (environment's question); the damp never quenches it (it is no fire). Drawn by
+  `Client3D._add_lamp`: art-kit's `prop.dark_lamp` (a slim post until it has art), an OmniLight
+  of `LAMP_COLD` (0.4, 0.8, 0.85; environment's), energy 3.0, range 5, `omni_attenuation` 0.6 (`LAMP_FALLOFF`; the coordinator: "a visible pool about 2 cells across": the dark flags drank energy 2), no shadows, at the slot's
+  flame socket (`Flames.socket_of`). No flame is drawn: a fire's quads and smoke in teal glass
+  read wrong, and the glass glows; the socket is the lamp's heart. The light breathes, not
+  flickers (environment: "flicker is the warm fire's language"): `LAMP_PULSE_LOW` 0.9 to full
+  over `LAMP_PERIOD` 4 s, a sine on the lamp's own phase, in `_flicker_fires`.
+- **The pieces**: `building.dark_pillar` 1 x 1 in `Level.BUILDINGS`, `SOLID` and `DOORLESS` (the
+  chamber's four, `TOWER_PILLARS`); `building.hatch_sealed` 1 x 1, `OPEN_AIR` (walked onto, no
+  walls), laid over the foot's sealed link as maps lays the grave's (654).
+- **The runes**: `rune_strip` a `"wall"` decor kind (`Level.DECOR_KINDS`, two variants). The
+  chamber's north wall carries ten by hand (kept through generations: an anchor's decor);
+  `Regen.runes_of` rolls one along `RUNE_SHARE` 0.12 of the ways' wall feet outside the anchors
+  for a tower-style generation (as `decor_of` rolls the barrow's moss), never a way's cell, a
+  marker's or a spawn's. Drafts for Jeff.
+
+Protocol: under 36 (net.gd's note): the pillar solid, the hatch open-air, terrain "lamps". Tests:
+labyrinth_test `_test_tower` (lamps and no torches, the set, runes rolled and placed, the hatch on
+the foot alone, the chamber's lamps, pillars solid, its runes), view_test `_test_cold_lamp` (drawn
+with no flame, cold, unshadowed, at the socket, the breath's range; Fields counts it, no heat).
+docs/levels.md. No new class_name.
