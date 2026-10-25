@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Out of a fight a sword goes into a scabbard on the left hip, a dagger or knife into a sheath there, and a shield onto the back; a raised guard, a blow near or a monster hunting near puts them back in hand at once. The lantern now hangs on the right hip (662 (c)).
 - The beaten draugr now leaves his remains where he fell: his cloak, mail, crown and battle axe in a heap on the floor until he rises again.
 - Infrastructure: the sample tower's door out is art-kit's dark-stone arch.
 - The Character Lab takes your Blender exports live: drop human_m.glb, human_f.glb or clips/*.glb in C:/dev/review/character_lab/drop and the lab imports and shows them in the game's place, with a status line that says what is wrong with a bad export.

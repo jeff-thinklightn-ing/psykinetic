@@ -30010,3 +30010,35 @@ the copy gone, an .fbx named, a gate stop tried again, a clip laid over the game
 the picker. Checked once by hand through the real gate (human_m.glb and a UAL clip export: imported
 in about 10 s, the body and two clips loaded). Client and tool only, protocol unchanged, no new
 class_name.
+
+## 662 (c): the blades sheathed at the hip, the shield on the back
+
+662's step (c), as designed there (the coordinator's approval), on art-kit's gear.scabbard and
+gear.sheath (7fe0afbf: upright in their own frame, the origin at the belt loop, a "mouth" socket).
+A sword, dagger or knife in the right hand wears its sheath (Client3D.SHEATHS: the sword's
+scabbard, the dagger's and knife's sheath) at a new "hip_l" socket on Hips, empty while the blade is
+drawn: `_hold` puts it there for the right hand (`_wear_sheath`), so the Character Lab shows it too.
+Calm (`_calm`, the bow on the back's test), with a blade or nothing in the right hand and a shield
+or nothing in the left, bow_state "sheathed": the blade into the sheath, its grip at the mouth turned
+end for end (blade down), the shield from the forearm onto the "back" socket (BACK_SHIELD, its face
+out), the upper layer off, both hands free to the fidgets (`in_hand`). A raised guard, a blow seen
+near or a monster hunting near puts both back in hand at once (no draw delay, as 662 rules); the
+nodes are moved, not made again. Let go while sheathed, each goes with its hand (`_wear_sheath`,
+`_let_go_stowed`). A spear, axe, hammer or pick keeps its rest (662 (b)) with a shield on the arm.
+The sound is SoundKit.stow_slot's, the blade's draw or sheathe. The lantern moves from belt_l to a
+new belt_r, the left hip being the sheath's.
+
+**The placement, measured** (build/sheath/probe.gd, the five builds of anim_rig_test standing and
+through the gaits): hip_l stands the sheath SHEATH_OUT (0.03 m) off the hip bone's side and
+SHEATH_UP (0.02) above it, tipped SHEATH_TILT (25°) with the hilt forward, z out from the hip; each
+sheath then its own way farther out, the scabbard 0.09 m (its length clear of the thigh swinging in
+the sprint, on the man, the lean man and the woman, past 0.075), the short sheath 0.06 (clear of the
+heavy build's hip, past 0.045). More tilt (up to 45°) did not clear the thigh. The shield on the back
+0.08 m off the socket (0.04 crossed the trunk in the jog and sprint, the heavier builds).
+
+anim_rig_test `_test_sheathed` (sword and shield, dagger and buckler, knife; the five builds; the
+gaits: nothing inside the trunk or the left leg at the hip, nothing inside the trunk or head on the
+back; each tip inside its sleeve; drawn again, each as it was held). view_test `_test_sheathed`
+(taken up, calm, guard raised, calm again, let go while sheathed, a spear wears none), `_test_rest`'s
+sword now sheathes, the lantern on belt_r. The Sheathe and Draw clips the design names are a
+follow-up; the swap is at once, as the bow's. Client only, protocol unchanged, no new class_name.

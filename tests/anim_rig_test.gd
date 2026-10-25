@@ -22,6 +22,7 @@ func _ready() -> void:
 	await _test_one_strike_clip()
 	await _test_bow_clear()
 	await _test_bow_back()
+	await _test_sheathed()
 	await _test_work_clear()
 	await _test_armed_fidgets()
 	await _test_rests()
@@ -372,6 +373,78 @@ func _test_bow_back() -> void:
 	Client3D.bow_back_face = face_was
 	_check(found.is_empty(), "the bow and quiver on the back clear of the body, both faces, five builds, the gaits (%s)" % ", ".join(found))
 	_check(crossed.is_empty(), "the bow through none of the quiver laid over it (%s)" % ", ".join(crossed))
+
+
+## The blades sheathed at the hip and the shields on the back (662 (c)), as Client3D._hold and
+## _sheathe put them: on the five builds, standing and through the gaits, no vertex of the sheath
+## or its blade inside the trunk or the left leg, none of the shield inside the trunk or the head;
+## each blade's tip inside its sheath's sleeve; drawn again, each back in the hand as it was.
+func _test_sheathed() -> void:
+	print("== the blades sheathed at the hip, the shield on the back ==")
+	var lib := load(CLIPS) as AnimationLibrary
+	var builds := [["man", "res://art/models/characters/human_m.glb", {}],
+		["man heavy", "res://art/models/characters/human_m.glb", {"heavy": 1.0}],
+		["man broad", "res://art/models/characters/human_m.glb", {"heavy": 0.6, "broad": 1.0}],
+		["man lean", "res://art/models/characters/human_m.glb", {"lean": 1.0, "narrow": 1.0}],
+		["woman", "res://art/models/characters/human_f.glb", {}]]
+	var poses := [["stand", "Idle", 1], ["walk", Client3D.HUMAN_GAITS[0][0], 1], ["walk", Client3D.HUMAN_GAITS[0][0], 2],
+		["jog", JOG, 1], ["jog", JOG, 2], ["sprint", SPRINT, 1], ["sprint", SPRINT, 2]]
+	var found: Array[String] = []
+	var tips: Array[String] = []
+	var back_again := true
+	for kit: Array in [["sword", "shield"], ["dagger", "buckler"], ["knife", ""]]:
+		for build: Array in builds:
+			for pose: Array in poses:
+				var model := (load(build[1]) as PackedScene).instantiate() as Node3D
+				add_child(model)
+				for mesh: MeshInstance3D in model.find_children("*", "MeshInstance3D", true, false):
+					for key: String in build[2]:
+						var i := mesh.find_blend_shape_by_name(key)
+						if i >= 0:
+							mesh.set_blend_shape_value(i, build[2][key])
+				var holder := Node3D.new()
+				Client3D._attach_sockets(model, Client3D.HUMAN_SOCKETS, 1.0, holder)
+				var sockets: Dictionary = holder.get_meta("sockets")
+				Client3D._hold(sockets, 0, kit[0])
+				Client3D._hold(sockets, 1, kit[1])
+				var hand := (sockets["hand_r"] as Node3D).get_node("Held") as Node3D
+				var held_at := hand.transform
+				var shield := (sockets["arm_l"] as Node3D).get_node_or_null("Held") as Node3D
+				var shield_at := shield.transform if shield != null else Transform3D()
+				Client3D._sheathe(sockets, true)
+				var sheath := (sockets["hip_l"] as Node3D).get_node("Sheath") as Node3D
+				var rng := RandomNumberGenerator.new()
+				rng.seed = int(pose[2])
+				var rig := AnimRig.make(model, lib, 0.0, true, rng)
+				rig.loop(pose[1], 0.0)
+				for i in 3:
+					await get_tree().process_frame
+				var parts := _skinned_parts(model)
+				var trunk: Array = parts["trunk"]
+				var at_hip := _inside(_points(sheath), trunk[0] + parts["leg"][0], trunk[1] + parts["leg"][1])
+				var on_back := _inside(_points(shield), trunk[0] + parts["head"][0], trunk[1] + parts["head"][1]) if shield != null else 0
+				if at_hip > 0 or on_back > 0 or hand.get_parent() != sheath or (shield != null and shield.get_parent() != sockets["back"]):
+					found.append("%s %s %s: hip %d, back %d" % [kit[0], build[0], pose[0], at_hip, on_back])
+				if build[0] == "man" and pose[0] == "stand":
+					# In the sheath's frame: the blade's lowest point above the sleeve's end.
+					var own := sheath.global_transform.affine_inverse()
+					var blade := _box(own * _points(hand))
+					var blade_points := _points(hand)
+					var sleeve_points := PackedVector3Array()
+					for p in _points(sheath):
+						if not blade_points.has(p):
+							sleeve_points.append(p)
+					var sleeve := _box(own * sleeve_points)
+					if blade.position.y < sleeve.position.y:
+						tips.append("%s %.3f below" % [kit[0], sleeve.position.y - blade.position.y])
+					Client3D._sheathe(sockets, false)
+					back_again = back_again and hand.get_parent() == sockets["hand_r"] and hand.transform.is_equal_approx(held_at) \
+						and (shield == null or (shield.get_parent() == sockets["arm_l"] and shield.transform.is_equal_approx(shield_at)))
+				model.queue_free()
+				holder.queue_free()
+	_check(found.is_empty(), "the sheathed blades and the shields on the back clear of the body, five builds, the gaits (%s)" % ", ".join(found))
+	_check(tips.is_empty(), "each blade's tip inside its sheath (%s)" % ", ".join(tips))
+	_check(back_again, "drawn again, the blade in the hand and the shield on the arm as they were")
 
 
 static func _points(piece: Node3D) -> PackedVector3Array:

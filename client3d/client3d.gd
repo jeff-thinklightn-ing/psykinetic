@@ -814,8 +814,13 @@ static func _sockets(hand: float, hip: float, back: float, chest: float) -> Dict
 		"arm_l": ["LeftLowerArm", Transform3D(Basis(Vector3(0, 0, 1), Vector3(0, 1, 0), Vector3(-1, 0, 0)), Vector3.ZERO)],
 		# Between the shoulder blades, a stowed thing's length up and over the right shoulder.
 		"back": ["UpperChest", Transform3D(Basis(Vector3(0, 0, -1), PI * 0.2), Vector3(0.0, chest, -back))],
-		# The left hip, a hung thing's length down.
-		"belt_l": ["Hips", Transform3D(Basis(Vector3(0, 0, 1), PI), Vector3(hip, 0.0, 0.0))],
+		# The right hip, a hung thing's length down (the lantern; the left is the sheath's, 662 (c)).
+		"belt_r": ["Hips", Transform3D(Basis(Vector3(0, 0, 1), PI), Vector3(-hip, 0.0, 0.0))],
+		# The left hip, in a sheath's frame (art-kit's gear.scabbard and gear.sheath): +y up the
+		# sleeve, tipped SHEATH_TILT with the hilt forward, z out from the hip, the blade's flat
+		# across x (along the body's front to back).
+		"hip_l": ["Hips", Transform3D(Basis(Vector3(0, 0, -1), Vector3(0, 1, 0), Vector3(1, 0, 0))
+			* Basis(Vector3(0, 0, 1), SHEATH_TILT), Vector3(hip + SHEATH_OUT, SHEATH_UP, 0.0))],
 	}
 const HUMAN_SOCKETS := {"hand": 1.0, "hip": 0.17, "back": 0.13, "chest": 0.04, "crown": true}
 const GOBLIN_SOCKETS := {"hand": 0.69, "hip": 0.19, "back": 0.16, "chest": 0.02}
@@ -13896,6 +13901,8 @@ static func _hold(sockets: Dictionary, hand: int, id: String, work := {}) -> voi
 			# Out of the way now, so the new thing is the one named "Held".
 			place.remove_child(old)
 			old.queue_free()
+	if hand == 0:
+		_wear_sheath(sockets, id)
 	if id == "":
 		return
 	var own := id.begins_with(ART_ID)
@@ -13910,6 +13917,7 @@ static func _hold(sockets: Dictionary, hand: int, id: String, work := {}) -> voi
 			# forearm's middle.
 			socket = sockets["arm_l"]
 			thing.position = -_strap_of(art)
+			thing.set_meta("strap", _strap_of(art))  # Back on the arm from the back (_sheathe).
 		elif not own and "shield" in Items.def(id).get("tags", []):
 			# A body with no forearm socket: out of the back of the hand, a quarter
 			# turn about its grip's axis (its face +z, art_style).
@@ -14067,6 +14075,8 @@ func _sync_bow(entity: GridEntity, puppet: Node3D) -> void:
 	if want in ["idle", "carry"] and calm:
 		want = "stowed"  # On the back (662 amended (d)), the hands free.
 	var rest := _rest_of(entity, puppet, ids, rig, now) if want == "" else {}
+	if want == "" and rest.is_empty() and calm and sheathes(ids):
+		want = "sheathed"  # The blade at the hip, the shield on the back (662 (c)).
 	var sockets: Dictionary = puppet.get_meta("sockets")
 	if not rest.is_empty():
 		want = "rest"
@@ -14084,6 +14094,8 @@ func _sync_bow(entity: GridEntity, puppet: Node3D) -> void:
 		_rest_sound(puppet, str(ids[0]), want != "rest")
 	if (want == "stowed") != (state == "stowed"):
 		_rest_sound(puppet, bow if bow != "" else str(ids[1]), want != "stowed")
+	if (want == "sheathed") != (state == "sheathed"):
+		_rest_sound(puppet, str(ids[0]) if str(ids[0]) != "" else str(ids[1]), want != "sheathed")
 	if want == "draw":
 		var clip := str(moves.get("bow_draw", ""))
 		rig.upper_at(clip, bow_pull(entity) * rig.length(clip))
@@ -14099,11 +14111,13 @@ func _sync_bow(entity: GridEntity, puppet: Node3D) -> void:
 				rig.upper(str(moves.get("ready", "")))
 			"rest":
 				rig.upper(str(rest["upper"]))
-			"", "carry", "stowed":
+			"", "carry", "stowed", "sheathed":
 				rig.upper_off()
 	puppet.set_meta("bow_state", want)
 	if want == "stowed" or state == "stowed":
 		_stow_bow(sockets, want == "stowed")
+	if want == "sheathed" or state == "sheathed":
+		_sheathe(sockets, want == "sheathed")
 	if bow != "":
 		_turn_carried(puppet, want == "carry", now)
 	_show_nocked(puppet, ids, want in ["draw", "hold"])
@@ -14221,16 +14235,96 @@ static func _stow_bow(sockets: Dictionary, stowed: bool) -> void:
 		quiver.position = face[1] if back.has_node("StowedBow") else Vector3.ZERO
 
 
-## The bow on the back let go with the left hand's thing (_sync_held).
+## The bow or the shield on the back let go with the left hand's thing (_sync_held).
 static func _let_go_stowed(sockets: Dictionary) -> void:
 	var back := sockets["back"] as Node3D
-	var bow := back.get_node_or_null("StowedBow")
-	if bow != null:
-		back.remove_child(bow)
-		bow.queue_free()
+	for name in ["StowedBow", "StowedShield"]:
+		var piece := back.get_node_or_null(name)
+		if piece != null:
+			back.remove_child(piece)
+			piece.queue_free()
 	var quiver := back.get_node_or_null("Quiver") as Node3D
 	if quiver != null:
 		quiver.position = Vector3.ZERO
+
+
+## The blades sheathed out of a fight (662 (c); Jeff: "sheathing sword,
+## definitely not scratching head or anything that sword goes near body"): a
+## blade in the right hand wears its sheath (SHEATHS, art-kit's) at the left
+## hip's "hip_l" socket, empty while it is drawn; calm (_calm, as the bow on
+## the back), the blade goes into it, seated grip first at the sheath's "mouth"
+## turned end for end (blade down), and a shield on the left arm goes onto the
+## "back" socket (BACK_SHIELD: its face out, its back off the shoulder
+## blades). Roused, both are back in hand at once (no draw delay, 662 rules).
+## The hip_l socket stands a sheath SHEATH_OUT off the hip's side, SHEATH_UP
+## from the Hips bone, tipped SHEATH_TILT, and each sheath its own way farther
+## out (SHEATHS' second: the scabbard's length clear of the thigh swinging in a
+## sprint, a short sheath of the heaviest build's hip); clear of the five
+## builds through the gaits (anim_rig_test; build/sheath/probe.gd swept them).
+const SHEATHS := {"sword": ["gear.scabbard", 0.09], "dagger": ["gear.sheath", 0.06], "knife": ["gear.sheath", 0.06]}
+const SHEATH_TILT := PI * 25.0 / 180.0
+const SHEATH_OUT := 0.03
+const SHEATH_UP := 0.02
+const SHEATH_MOUTH := Vector3(0.0, 0.16, 0.0)
+const BACK_SHIELD := Transform3D(Basis(Vector3.UP, PI), Vector3(0.0, -0.1, -0.08))
+static func _mouth_of(art: String) -> Vector3:
+	var at: Variant = ArtKit.spec(art).get("sockets", {}).get("mouth")
+	return Vector3(at[0], at[1], at[2]) if at is Array and at.size() == 3 else SHEATH_MOUTH
+
+
+## The sheath for [param id] in the right hand worn at the hip (none for
+## anything else), the old one and any blade in it let go.
+static func _wear_sheath(sockets: Dictionary, id: String) -> void:
+	var hip := sockets.get("hip_l") as Node3D
+	if hip == null:
+		return
+	var old := hip.get_node_or_null("Sheath")
+	if old != null:
+		hip.remove_child(old)
+		old.queue_free()
+	var art := str(SHEATHS.get(id, ["", 0.0])[0])
+	if art != "" and ArtKit.has(art):
+		var sheath := ArtKit.instance(art)
+		sheath.name = "Sheath"
+		sheath.position = Vector3(0.0, 0.0, float(SHEATHS[id][1]))
+		sheath.set_meta("mouth", _mouth_of(art))
+		hip.add_child(sheath)
+
+
+## The right hand's blade into its sheath ([param sheathed]) or out of it
+## into the hand, and the left arm's shield onto the back or off it.
+static func _sheathe(sockets: Dictionary, sheathed: bool) -> void:
+	var hand := sockets.get("hand_r") as Node3D
+	var sheath: Node3D = (sockets["hip_l"] as Node3D).get_node_or_null("Sheath") as Node3D if sockets.has("hip_l") else null
+	if hand != null and sheath != null:
+		var from := hand if sheathed else sheath
+		var blade := from.get_node_or_null("Held" if sheathed else "Sheathed") as Node3D
+		if blade != null:
+			from.remove_child(blade)
+			blade.name = "Sheathed" if sheathed else "Held"
+			blade.transform = Transform3D(Basis(Vector3(0, 0, 1), PI), sheath.get_meta("mouth")) if sheathed \
+				else Transform3D(HELD_EDGE_TURN, Vector3.ZERO)
+			(sheath if sheathed else hand).add_child(blade)
+	var arm := sockets.get("arm_l") as Node3D
+	var back := sockets.get("back") as Node3D
+	if arm != null and back != null:
+		var from := arm if sheathed else back
+		var shield := from.get_node_or_null("Held" if sheathed else "StowedShield") as Node3D
+		if shield != null:
+			from.remove_child(shield)
+			shield.name = "StowedShield" if sheathed else "Held"
+			shield.transform = BACK_SHIELD if sheathed else Transform3D(Basis.IDENTITY, -shield.get_meta("strap", Vector3.ZERO))
+			(back if sheathed else arm).add_child(shield)
+
+
+## Whether the right hand's [param ids] and the left's put away together out
+## of a fight (662 (c)): a sheathed blade or nothing in the right, a shield or
+## nothing in the left, not both empty.
+static func sheathes(ids: Array) -> bool:
+	var right := str(ids[0])
+	var left := str(ids[1])
+	var shield: bool = left != "" and "shield" in Items.def(left).get("tags", [])
+	return (right != "" or left != "") and (right == "" or SHEATHS.has(right)) and (left == "" or shield)
 
 
 ## The bow as it's carried at a walk or run (462 amended (3)): a quarter turn
@@ -14751,11 +14845,14 @@ static func _pick_fidget(puppet: Node3D, rig: AnimRig) -> String:
 ## hand, "" empty; a work's piece "art:<slot>"): any with both hands empty,
 ## else only ARMED_FIDGETS, less the held kinds' ARMED_NOT (662).
 ## What [param puppet]'s hands hold now: its "held", but a bow on its back
-## (662 amended (d)) out of the left.
+## (662 amended (d)) out of the left, and a sheathed blade and a shield on the
+## back (662 (c)) out of both.
 static func in_hand(puppet: Node3D) -> Array:
 	var held: Array = puppet.get_meta("held", [])
 	if str(puppet.get_meta("bow_state", "")) == "stowed" and held.size() == 2:
 		return [held[0], ""]
+	if str(puppet.get_meta("bow_state", "")) == "sheathed" and held.size() == 2:
+		return ["", ""]
 	return held
 
 
@@ -15579,7 +15676,7 @@ func _make_puppet(entity: GridEntity) -> Node3D:
 		light.position.y = height + 0.6
 		puppet.add_child(light)
 		# The lantern itself hangs at the belt (decision 451), the light above.
-		var belt: Node3D = (puppet.get_meta("sockets", {}) as Dictionary).get("belt_l")
+		var belt: Node3D = (puppet.get_meta("sockets", {}) as Dictionary).get("belt_r")
 		if belt != null:
 			belt.add_child(_hanging_lantern())
 	add_child(puppet)

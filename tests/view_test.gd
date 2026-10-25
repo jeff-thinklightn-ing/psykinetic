@@ -115,6 +115,7 @@ func _ready() -> void:
 	await _test_two_hands()  # It lets frames run (the pose the modifiers leave): after the tests that read a pose unrun.
 	await _test_rest()
 	_test_bow_back()
+	_test_sheathed()
 	_test_goblins_differ()
 	_test_allies()
 	_test_barrow_dead()
@@ -6462,8 +6463,8 @@ func _test_attach_points() -> void:
 	hold.call(player, "sword", "shield")
 	var puppet: Node3D = _rig._puppets[player.get_instance_id()]
 	var sockets: Dictionary = puppet.get_meta("sockets", {})
-	_check(sockets.has_all(["hand_r", "hand_l", "back", "belt_l"]) and (sockets["hand_r"].get_parent() as BoneAttachment3D).bone_name == "RightHand",
-			"a person has hand, back and belt sockets on their bones")
+	_check(sockets.has_all(["hand_r", "hand_l", "back", "belt_r", "hip_l"]) and (sockets["hand_r"].get_parent() as BoneAttachment3D).bone_name == "RightHand",
+			"a person has hand, back, belt and sheath sockets on their bones")
 	var sword := (sockets["hand_r"] as Node3D).get_node_or_null("Held") as Node3D
 	var shield := (sockets["arm_l"] as Node3D).get_node_or_null("Held") as Node3D if sockets.has("arm_l") else null
 	_check(sword != null and shield != null, "a sword drawn in the right hand, a shield on the left arm")
@@ -6502,7 +6503,7 @@ func _test_attach_points() -> void:
 	_check((sockets["hand_r"] as Node3D).get_children().all(func(n: Node) -> bool: return n.is_queued_for_deletion()),
 			"the hand emptied: nothing drawn in it")
 	hold.call(player, "", "")
-	_check((sockets["belt_l"] as Node3D).get_node_or_null("LanternBody") != null, "the lantern hangs at the belt")
+	_check((sockets["belt_r"] as Node3D).get_node_or_null("LanternBody") != null, "the lantern hangs at the right of the belt (the left is the sheath's, 662 (c))")
 	var imp := _spawn_imp(Vector2i(9, 6), "imp")
 	_rig._process(0.0)
 	hold.call(imp, "dagger", "")
@@ -6573,8 +6574,8 @@ func _test_two_hands() -> void:
 ## Held weapons rest out of a fight (662 (b)): a two-hander calm a while (the times put back,
 ## not waited for) stands with its head down on the ground ahead, the left hand let go of grip_2;
 ## a blow seen near it, or a monster hunting within REST_ROUSED_CELLS, takes it up again (the
-## ready stance, the left hand back); a spear grounded, a hammer hung; a sword stays in hand
-## (it sheathes, step (c)).
+## ready stance, the left hand back); a spear grounded, a hammer hung; a sword sheathed
+## (step (c), _test_sheathed).
 func _test_rest() -> void:
 	print("
 == held weapons at rest (662 (b)) ==")
@@ -6601,6 +6602,9 @@ func _test_rest() -> void:
 		for i in 4:
 			_rig._process(0.0)
 			await get_tree().process_frame
+		if Client3D.SHEATHS.has(kind):
+			_check(rig.upper_clip() == "" and not (sockets["hand_r"] as Node3D).has_node("Held"), "%s calm a while: sheathed, not at rest in hand (_test_sheathed)" % kind)
+			continue
 		var held := (sockets["hand_r"] as Node3D).get_node("Held") as Node3D
 		if not Client3D.RESTS.has(kind):
 			_check(rig.upper_clip() == "" and held.position == Vector3.ZERO, "%s: no rest of its own yet, in hand as held (%s)" % [kind, rig.upper_clip()])
@@ -6700,6 +6704,65 @@ func _test_bow_back() -> void:
 	player.slots = slots
 	_rig._process(0.0)
 	_check(not back.has_node("StowedBow") and back.get_node_or_null("Quiver") == null, "put away while on the back: gone from the back, and the quiver with it")
+	player.slots = was
+	_rig._process(0.0)
+
+
+## The blades sheathed and the shield on the back out of a fight (662 (c)): a sword and a
+## shield taken up, in hand, the sheath empty at the hip; calm a while (the times put back), the
+## sword in its sheath, the shield on the back, the upper layer off and both hands free to the
+## fidgets; a raised guard, both in hand at once; calm again, put away; the sword let go while
+## sheathed, the sheath gone with it and the shield's back socket emptied with the shield.
+func _test_sheathed() -> void:
+	print("== the blade at the hip, the shield on the back (662 (c)) ==")
+	var player := _player()
+	var slots := player.slots
+	while slots.size() < Items.CARRIED:
+		slots.append("")
+	var was := slots.duplicate()
+	slots[Items.RIGHT_HAND] = "sword"
+	slots[Items.LEFT_HAND] = "shield"
+	player.slots = slots
+	player.raised = ""
+	var id := player.get_instance_id()
+	_rig._process(0.0)
+	var puppet: Node3D = _rig._puppets[id]
+	var sockets: Dictionary = puppet.get_meta("sockets")
+	var rig := puppet.get_meta("rig") as AnimRig
+	var hand := sockets["hand_r"] as Node3D
+	var arm := sockets["arm_l"] as Node3D
+	var back := sockets["back"] as Node3D
+	var sheath := (sockets["hip_l"] as Node3D).get_node_or_null("Sheath") as Node3D
+	_check(sheath != null and hand.has_node("Held") and arm.has_node("Held") and not sheath.has_node("Sheathed"),
+		"just taken up: the sword in hand, its scabbard empty at the hip, the shield on the arm")
+	puppet.set_meta("roused_at", Time.get_ticks_msec() - 60000)
+	_rig._combat_at.erase(id)
+	_rig._process(0.0)
+	_check(sheath != null and sheath.has_node("Sheathed") and not hand.has_node("Held") and back.has_node("StowedShield") and not arm.has_node("Held")
+		and rig.upper_clip() == "" and puppet.get_meta("bow_state") == "sheathed",
+		"calm a while: the sword sheathed, the shield on the back (%s)" % puppet.get_meta("bow_state"))
+	_check(Client3D.in_hand(puppet) == ["", ""] and Client3D.fidget_with("Fidget_Shoulders", Client3D.in_hand(puppet)),
+		"both hands free to the fidgets: every fidget again")
+	player.raised = "block"
+	_rig._process(0.0)
+	_check(hand.has_node("Held") and arm.has_node("Held") and not back.has_node("StowedShield") and rig.upper_clip() == "Block_Idle",
+		"the guard raised: both in hand at once, guarding (%s)" % rig.upper_clip())
+	player.raised = ""
+	puppet.set_meta("roused_at", Time.get_ticks_msec() - 60000)
+	_rig._combat_at.erase(id)
+	_rig._process(0.0)
+	_check(sheath.has_node("Sheathed") and back.has_node("StowedShield"), "calm again: put away")
+	slots[Items.RIGHT_HAND] = "dagger"
+	slots[Items.LEFT_HAND] = ""
+	player.slots = slots
+	_rig._process(0.0)
+	var dagger_sheath := (sockets["hip_l"] as Node3D).get_node_or_null("Sheath") as Node3D
+	_check(not back.has_node("StowedShield") and hand.has_node("Held") and dagger_sheath != null and dagger_sheath != sheath
+		and not dagger_sheath.has_node("Sheathed"), "the sword and shield let go while put away: gone; a dagger in hand, its own sheath empty")
+	slots[Items.RIGHT_HAND] = "spear"
+	player.slots = slots
+	_rig._process(0.0)
+	_check((sockets["hip_l"] as Node3D).get_children().all(func(n: Node) -> bool: return n.is_queued_for_deletion()), "a spear: no sheath at the hip")
 	player.slots = was
 	_rig._process(0.0)
 
