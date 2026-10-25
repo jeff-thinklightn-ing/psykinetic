@@ -649,7 +649,7 @@ func _test_click_uses_the_frame_pick() -> void:
 
 
 func _test_bow_click_walks() -> void:
-	print("\n== a bow in hand: a plain left click walks at once; Shift with it draws (Jeff, 2026-10-22) ==")
+	print("\n== a bow in hand: a plain left click walks at once; Shift held draws and stands firm, a press looses, Shift up lets it down (583 amended) ==")
 	var saved: String = Net.controls
 	Net.controls = "click"
 	var player := _place_player(Vector2i(11, 3))
@@ -678,7 +678,46 @@ func _test_bow_click_walks() -> void:
 	let_go.button_index = MOUSE_BUTTON_LEFT
 	let_go.pressed = false
 	_main._unhandled_input(let_go)
-	_check(_main._stance == "", "let go (Shift up or down): the bow lowered (a cancel before draw_min, or the shot)")
+	_check(_main._stance == "draw" and player.raised == "draw", "the button let go: still drawn (the shot is a press's now)")
+	var loose := InputEventMouseButton.new()
+	loose.button_index = MOUSE_BUTTON_LEFT
+	loose.pressed = true
+	_main._unhandled_input(loose)
+	_check(_main._stance == "" and player.raised == "", "a press while drawn: loosed (or let down before draw_min), the bow lowered")
+	_main._unhandled_input(let_go)
+	# Shift held, walking: the body stops where it stands and draws.
+	World.order_move(player, Vector2i(5, 3))
+	_check(player.has_move_order, "(walking to 5,3)")
+	_main.drive_stand_draw(true)
+	_check(_main._stance == "draw" and player.raised == "draw" and not player.has_move_order,
+			"Shift held while walking: the walk dropped, the bow drawn at once")
+	var tile := player.tile
+	World.order_move(player, Vector2i(5, 3))
+	player.next_move_tick = 0
+	var moved := false
+	for direction: Vector2i in World.DIRECTIONS:
+		moved = moved or World.try_move(player, direction)
+	_check(not player.has_move_order and not moved and player.tile == tile,
+			"drawn, the server takes no walk ordered and no step: it stands firm")
+	_main.drive_stand_draw(true)
+	_check(_main._stance == "draw", "Shift still held: still drawn")
+	_main.drive_stand_draw(false)
+	_check(_main._stance == "" and player.raised == "" and player.slots[Player.LEFT_HAND] == "arrows",
+			"Shift let go: the bow let down, the arrow kept, nothing loosed")
+	player.next_move_tick = 0
+	var free_step := false
+	for direction: Vector2i in World.DIRECTIONS:
+		if not free_step and World.is_free(player.tile + direction):
+			free_step = World.try_move(player, direction)
+	_check(free_step, "let down: it walks again")
+	# Queued steps the client showed are refused when the draw stands it firm.
+	player.next_move_tick = World.tick + 100
+	player.queued_steps.append({"direction": Vector2i(1, 0), "predicted": true})
+	var refusals := player.refusals
+	World.try_stance(player, "draw")
+	_check(player.queued_steps.is_empty() and player.refusals == refusals + 1,
+			"steps queued and shown: dropped as the draw begins, the client told (refusals %d -> %d)" % [refusals, player.refusals])
+	World.try_stance(player, "")
 	player.has_move_order = false
 	World.items.end(World.take_item(player, player, Player.RIGHT_HAND), "gone")
 	World.items.end(World.take_item(player, player, Player.LEFT_HAND), "gone")

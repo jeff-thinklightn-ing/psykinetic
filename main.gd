@@ -1130,6 +1130,7 @@ func _process(delta: float) -> void:
 	_drive_camera_keys(delta)
 	_update_pick()
 	_test_hover()
+	drive_stand_draw(Keys.held("stand") and not is_typing() and _cursor_item.is_empty())
 	_drive_wasd()
 	if not _stance.is_empty() and Net.controls != "wasd" and _local_player() != null:
 		_aim_at_cursor(_local_player())  # A raised shield or a drawn bow turns to the cursor.
@@ -1404,9 +1405,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		_release_toss(player)
 		return
 	if click.button_index == MOUSE_BUTTON_LEFT and not click.pressed:
-		if _stance == "draw":
-			_lower_off_hand(player)  # Let go: the shot the aim's way, or a cancel before draw_min.
-		_held_target = NONE
+		_held_target = NONE  # 583 amended: the shot is the press's, not the release's.
 		return
 	if not click.pressed:
 		return
@@ -1421,10 +1420,11 @@ func _unhandled_input(event: InputEvent) -> void:
 		target = World.get_entity_at(tile)
 	if target == null:
 		target = remains_at(tile)  # A gone draugr's remains: a click talks to him (573 amended (4)).
-	# A bow in hand (Jeff, 2026-10-22: "just like shift+LMB to draw back,
-	# mouse to move only"): Shift (the stand key) with the left button draws
-	# at once and the release looses; letting go of Shift mid-draw changes
-	# nothing. A plain left click never attacks with a bow: it walks (a
+	# A bow in hand (583 amended; Jeff: "the point of shift is to stand
+	# firm and start nocking"): Shift (the stand key) held draws and stands
+	# the body firm (drive_stand_draw), a left press while drawn looses,
+	# and letting go of Shift lowers it, the arrow kept; a press with Shift
+	# down before the draw is up draws too. A plain left click never attacks with a bow: it walks (a
 	# monster as the ground), talks to a friend or opens a chest
 	# (_click_with_bow; the coordinator's ruling). The right button with a
 	# bow is combat's backstep to come, so it does nothing here. Right
@@ -1433,7 +1433,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	# E's (_press_e). Left: a chest is walked to.
 	if World.off_hand(player) == "draw":
 		if click.button_index == MOUSE_BUTTON_LEFT:
-			if Keys.held_in(click, "stand"):
+			if _stance == "draw":
+				_lower_off_hand(player)  # 583 amended: drawn, the press looses the aim's way (or cancels before draw_min).
+			elif Keys.held_in(click, "stand"):
 				_raise_off_hand(player)  # The bow is the weapon: Shift draws, no stand swing.
 			else:
 				_click_with_bow(player)
@@ -2114,6 +2116,25 @@ func _view_yaw() -> float:
 	return _client3d.yaw if _client3d != null else 0.0
 
 
+## The stand key with a bow, each frame (583 amended; Jeff: "holding down
+## shift while running allows you to move while aiming - the point of
+## shift is to stand firm and start nocking"): [param held] (Shift down,
+## not typing, nothing on the cursor) and nothing raised draws at once,
+## the server standing the body firm (World.stand_firm: its walk, route
+## and queued steps dropped); let go while drawn, the bow is lowered, the
+## arrow kept, nothing loosed. After a shot with Shift still down the next
+## draw starts. Nothing without a bow and arrows in hand.
+func drive_stand_draw(held: bool) -> void:
+	var player := _local_player()
+	if player == null or World.off_hand(player) != "draw":
+		return
+	if held and _stance.is_empty():
+		_raise_off_hand(player)
+	elif not held and _stance == "draw":
+		World.command(player, "stance", {"kind": ""})
+		_stance = ""
+
+
 ## WASD each frame: while a direction is held, the next step goes as the
 ## one on screen ends (and any click walk is dropped); standing still,
 ## the body faces the cursor.
@@ -2135,6 +2156,15 @@ func _drive_wasd() -> void:
 		_client3d.set_frozen(not keys.is_empty())
 	var direction := wasd_direction(key_vector(keys), _view_yaw())
 	_record_walk(player)
+	if _stance == "draw" or player.raised == "draw":
+		# 583 amended: drawn, the body stands firm; a walk key only turns it.
+		player.hint_step(Vector2i.ZERO)
+		player.aim = Vector2.ZERO
+		if direction == Vector2i.ZERO:
+			_aim_at_cursor(player)
+		else:
+			face_toward(player, direction)
+		return
 	player.hint_step(direction)  # 655 amended: the walk shown bends toward the step to come.
 	if direction == Vector2i.ZERO:
 		_aim_at_cursor(player)
@@ -2301,6 +2331,17 @@ func _aim_at_cursor(player: Player) -> void:
 	player.aim = cursor - Iso.local_to_grid(player.position)
 	var direction := grid_direction(player.aim)
 	if direction == Vector2i.ZERO or direction == player.facing or not player.ready_for_step():
+		return
+	if Time.get_ticks_msec() - _face_sent_at < FACE_SEND_INTERVAL * 1000.0:
+		return
+	_face_sent_at = Time.get_ticks_msec()
+	World.command(player, "face", {"dir": [direction.x, direction.y]})
+
+
+## The body turned [param direction]'s way (a walk key while drawn, 583
+## amended), as the cursor's turn is sent: a few times a second at most.
+func face_toward(player: Player, direction: Vector2i) -> void:
+	if direction == Vector2i.ZERO or direction == player.facing:
 		return
 	if Time.get_ticks_msec() - _face_sent_at < FACE_SEND_INTERVAL * 1000.0:
 		return

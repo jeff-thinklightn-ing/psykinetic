@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Bow: holding Shift now plants your feet and draws. You stop where you stand, the movement keys only turn you, a left click looses, and letting go of Shift lowers the bow and keeps the arrow. You can no longer walk while drawn (583 amended).
 - Infrastructure: the tower's inside (sample only, no real tower yet) is drawn in the dark set: dark walls and floors, cold teal lamps that slowly breathe instead of torches, slender pillars in the top chamber, faint runes along the walls, and the sealed hatch over the mine's way down.
 - The town of Umbrage has its own music: Jeff's umbrage-theme plays while you are in the town in the wilds, fading in as you walk in and out as you leave, in place of the wilds' music (668 amended).
 - The barrow has its own music: Jeff's barrows-moody plays on the barrow's first level, fading in as you arrive and out as you leave (668).

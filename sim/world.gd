@@ -253,9 +253,6 @@ const CLOCK_LEAD_MAX := 2.5
 const DIAGONAL_TICK_SCALE := 1.5
 ## A step into a ford (decision 505) takes this many times as long: wading.
 const FORD_TICK_SCALE := 2.0
-## A step with a bow drawn (decision 583: walking drawn, at half pace,
-## the draw kept) takes this many times as long.
-const DRAWN_TICK_SCALE := 2.0
 ## Tall grass (decision 508): the cover of a cell of it standing (0..1;
 ## Senses reads cover_at), a step into it so many times as long, and a body
 ## of TRAMPLE_MASS or more stepping off it flattens it for TRAMPLE_DAYS
@@ -5099,7 +5096,29 @@ func try_stance(by: GridEntity, kind: String) -> bool:
 	if by.raised != kind:
 		by.raised = kind
 		by.raised_tick = tick
+		if kind == "draw":
+			stand_firm(by)
 	return true
+
+
+## [param by] stopped where it stands (583 amended; Jeff: "the point of
+## shift is to stand firm and start nocking"): a walk ordered, its via
+## tiles and an attack walked to dropped, and a player's queued steps; a
+## step the client was already showing is refused to it, so its view comes
+## back to the cell it stands in.
+func stand_firm(by: GridEntity) -> void:
+	by.has_move_order = false
+	by.move_via.clear()
+	by.action_order = GridEntity.Order.NONE
+	by.action_target = null
+	if by is Player and not (by as Player).queued_steps.is_empty():
+		var player := by as Player
+		var shown := player.queued_steps.any(func(step: Dictionary) -> bool: return bool(step["predicted"]))
+		var first: Vector2i = player.queued_steps[0]["direction"]
+		player.queued_steps.clear()
+		if shown:
+			player.refusals += 1
+			report_move_refused(player, player.tile + first, player.refusals)
 
 
 ## How far [param entity]'s bow is drawn, 0 to 1: nothing until its verb's
@@ -6011,6 +6030,8 @@ func try_move(entity: GridEntity, direction: Vector2i) -> bool:
 		return false
 	if tick < entity.next_move_tick or is_stunned(entity):
 		return false
+	if entity.raised == "draw":
+		return false  # A drawn bow stands firm (583 amended; Jeff): no step till it is loosed or let down.
 	if _meets_brace(entity, entity.tile + direction, direction):
 		return false
 	# A level link's cell is a player's way out alone (decision 571): no
@@ -6355,8 +6376,8 @@ func damage(target: GridEntity, amount: int, source: GridEntity = null,
 func order_move(entity: GridEntity, target: Vector2i, via: Array[Vector2i] = []) -> void:
 	if not Net.is_authority():
 		return
-	if not entity.spawned:
-		return
+	if not entity.spawned or entity.raised == "draw":
+		return  # A drawn bow stands firm (583 amended): no walk ordered while it is drawn.
 	cancel_wind_up(entity)  # A move order gives a wind-up up (decision 392).
 	entity.move_order = target
 	entity.has_move_order = true
@@ -8110,8 +8131,6 @@ func step_ticks(entity: GridEntity, direction: Vector2i, from := NO_CELL) -> flo
 		from = entity.tile
 	if entity.winded:
 		ticks *= winded_move_scale  # Decision 597; winded replicates, so a client's prediction agrees.
-	if entity.raised == "draw":
-		ticks *= DRAWN_TICK_SCALE  # Walking drawn (decision 583); raised replicates, so a client's prediction agrees.
 	ticks /= 1.0 + buff(entity, "speed")  # A stamina potion (decision 562); buffs replicate, so a client's prediction agrees.
 	return ticks * ground_drag(from, direction)  # The ground (607), as a slide meets it.
 

@@ -23648,6 +23648,7 @@ coordinator's approval). This is the sim's shot.
 - Walking while drawn: allowed at half pace (DRAWN_TICK_SCALE in
   step_ticks, read by a client's prediction too); a step no longer
   spoils the draw. This is the coordinator's default until Jeff answers.
+  Jeff answered (583 amended): a drawn body stands firm and takes no step.
 - The "loose" command carries "angle"; "at" is still read as a fallback
   (ui sends both). Monster archers loose at the angle to their target once
   range_of covers its distance or reaches the longest step, and
@@ -29374,3 +29375,38 @@ labyrinth_test `_test_tower` (lamps and no torches, the set, runes rolled and pl
 the foot alone, the chamber's lamps, pillars solid, its runes), view_test `_test_cold_lamp` (drawn
 with no flame, cold, unshadowed, at the socket, the breath's range; Fields counts it, no heat).
 docs/levels.md. No new class_name.
+
+## 583 amended: Shift stands firm and draws
+
+Jeff, on v0.1.172: "holding down shift while running allows you to move while aiming - the
+point of shift is to stand firm and start nocking". The coordinator approved this binding.
+It replaces 583's walk while drawn (at half pace, World.DRAWN_TICK_SCALE, now gone) and amends
+ui's 2026-10-22 Shift+LMB binding (draw on Shift with the left press, loose on the release,
+letting go of Shift changing nothing).
+
+- **The keys (Main):** with a bow and arrows in hand:
+  - Shift held (the stand key; not while typing, nothing on the cursor) draws at once, each
+    frame through Main.drive_stand_draw. A Shift+left press before the draw is up draws too.
+  - A left press while drawn looses the aim's way (or lets down before draw_min). The left
+    release no longer looses.
+  - Letting go of Shift while drawn lowers the bow ("stance" ""), the arrow kept, nothing
+    loosed. With Shift still down after a shot, the next draw starts.
+  - While drawn, a walk key only turns the body (Main.face_toward, a "face" command at the
+    cursor's turn rate) and the aim follows the mouse. No step is predicted or sent, in either
+    scheme: the click scheme's keys stay the camera's (671), and its clicks are the bow's as above.
+- **The server (World):** a drawn body stands firm.
+  - try_move refuses a step while raised is "draw", and order_move refuses a walk ordered
+    while drawn.
+  - As a draw begins, try_stance calls World.stand_firm: the walk ordered, its via tiles and an
+    attack walked to dropped, and a player's queued steps cleared. If the client was already
+    showing one, the step is refused to it (report_move_refused, its refusal count), so its
+    view comes back to the cell it stands in. A client can't walk while drawing.
+- **Wire:** a line under PROTOCOL_REVISION 36. raised "draw" means standing now, so an old
+  client would predict drawn steps the server refuses. No new message or command.
+- **ui's side follows:** the controls help, the hints and the key list say the new binding.
+- **Tests:** controls_test _test_bow_click_walks: a plain click walks; Shift with the press
+  draws; the button let go stays drawn; a press looses; Shift held while walking drops the walk
+  and draws; drawn, no walk order and no step; let go of Shift, let down with the arrow kept,
+  and walking again; queued shown steps refused as the draw begins. items_test: a step while
+  drawn refused, the draw kept.
+No new class_name.

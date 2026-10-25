@@ -413,6 +413,10 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## (Level.SOLID, DOORLESS), building.hatch_sealed open-air (OPEN_AIR); a level's
 ## "lamp_cold" marker is terrain "lamps", light with no heat in Fields on both
 ## sides; an old client walks through a pillar and draws no lamp.
+## 36 (583 amended): raised "draw" now stands the body firm: the server takes no
+## step and no walk order from a drawn body (no half-pace walk, DRAWN_TICK_SCALE
+## gone) and drops its queued steps as the draw begins; an old client would
+## predict drawn steps the server refuses.
 const PROTOCOL_REVISION := 36
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]

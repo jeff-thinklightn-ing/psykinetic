@@ -693,20 +693,23 @@ func _test_weapons() -> void:
 		imp.hp = maxi(1, imp_hp - 7)  # Left as hurt as its shots here always left it: the tests after count on it.
 		World.try_stance(host, "draw")
 		host.raised_tick = World.tick - 30
-		var drawn_ticks := World.step_ticks(host, Vector2i(1, 0))
 		var drawn_from := host.raised_tick
+		var stood := host.tile
 		var stepped := false
+		var way := Vector2i.ZERO
 		for direction: Vector2i in World.DIRECTIONS:
 			if World.is_free(host.tile + direction):
 				host.next_move_tick = 0
+				way = direction
 				stepped = World.try_move(host, direction)
 				break
+		_check(not stepped and host.tile == stood and host.raised == "draw" and host.raised_tick == drawn_from and World.range_of(host) == 13,
+				"a step while drawn: refused, the body stands firm and the draw is kept (583 amended)")
+		# The step taken let down, as the tests after it have always had it.
 		host.raised = ""
-		var plain_ticks := World.step_ticks(host, Vector2i(1, 0))
+		host.next_move_tick = 0
+		World.try_move(host, way)
 		host.raised = "draw"
-		_check(stepped and host.raised == "draw" and host.raised_tick == drawn_from and World.range_of(host) == 13
-				and is_equal_approx(drawn_ticks, plain_ticks * World.DRAWN_TICK_SCALE),
-				"a step while drawn: the draw kept, at half pace (%.2f ticks a step, %.2f not drawn)" % [drawn_ticks, plain_ticks])
 		World.try_stance(host, "")
 		var quiver := World.quiver_check
 		World.quiver_check = func(_entity: GridEntity) -> bool: return false
