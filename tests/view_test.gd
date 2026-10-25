@@ -112,6 +112,7 @@ func _ready() -> void:
 	_test_head_socket()
 	await _test_two_hands()  # It lets frames run (the pose the modifiers leave): after the tests that read a pose unrun.
 	await _test_rest()
+	_test_bow_back()
 	_test_goblins_differ()
 	_test_allies()
 	_test_barrow_dead()
@@ -6580,6 +6581,65 @@ func _test_rest() -> void:
 			imp.alert = Monster.Alert.IDLE  # (Its puppet outlives it a frame.)
 			World.despawn(imp)
 			puppet.set_meta("roused_look_at", 0)  # Looked for again at once: nothing hunting now.
+	player.slots = was
+	_rig._process(0.0)
+
+
+func _test_bow_back() -> void:
+	print("
+== the bow on the back out of a fight (662 amended (d)) ==")
+	var player := _player()
+	var slots := player.slots
+	while slots.size() < Items.CARRIED:
+		slots.append("")
+	var was := slots.duplicate()
+	slots[Items.RIGHT_HAND] = "bow"
+	slots[Items.LEFT_HAND] = "arrows"
+	player.slots = slots
+	player.raised = ""
+	var id := player.get_instance_id()
+	_rig._process(0.0)
+	var puppet: Node3D = _rig._puppets[id]
+	var sockets: Dictionary = puppet.get_meta("sockets")
+	var rig := puppet.get_meta("rig") as AnimRig
+	var hand := sockets["hand_l"] as Node3D
+	var back := sockets["back"] as Node3D
+	_check(hand.has_node("Held") and puppet.get_meta("bow_state") == "idle", "just taken up: the bow in hand (%s)" % puppet.get_meta("bow_state"))
+	puppet.set_meta("roused_at", Time.get_ticks_msec() - 60000)
+	_rig._combat_at.erase(id)
+	_rig._process(0.0)
+	var quiver := back.get_node("Quiver") as Node3D
+	_check(not hand.has_node("Held") and back.has_node("StowedBow") and rig.upper_clip() == "",
+		"calm a while: the bow on the back, the hands free (%s)" % rig.upper_clip())
+	_check(quiver.position.is_equal_approx(Client3D.BOW_BACK[Client3D.bow_back_face][1]), "the quiver laid over it")
+	_check(Client3D.in_hand(puppet) == ["", ""] and Client3D.fidget_with("Fidget_Shoulders", Client3D.in_hand(puppet)),
+		"both hands empty to the fidgets (the arrows in the quiver): every fidget again")
+	rig.loop(str((puppet.get_meta("gaits") as Array)[1][0]))
+	_rig._sync_bow(player, puppet)
+	_check(back.has_node("StowedBow") and rig.upper_clip() == "", "running calm: still on the back")
+	rig.loop(Client3D.CLIP_IDLE)
+	player.raised = "draw"
+	player.raised_tick = World.tick
+	_rig._process(0.0)
+	_check(hand.has_node("Held") and not back.has_node("StowedBow") and rig.upper_clip() == "Bow_Draw" and quiver.position == Vector3.ZERO,
+		"a draw: in hand at once, drawing (%s)" % rig.upper_clip())
+	player.raised = ""
+	_rig._process(0.0)
+	_check(hand.has_node("Held"), "let go: still in hand, roused")
+	puppet.set_meta("roused_at", Time.get_ticks_msec() - 60000)
+	_rig._combat_at.erase(id)
+	_rig._process(0.0)
+	_check(back.has_node("StowedBow"), "calm again: on the back")
+	_rig._combat_at[id] = Time.get_ticks_msec()
+	_rig._process(0.0)
+	_check(hand.has_node("Held") and rig.upper_clip() == "Bow_Idle", "a blow seen near: in hand (%s)" % rig.upper_clip())
+	puppet.set_meta("roused_at", Time.get_ticks_msec() - 60000)
+	_rig._combat_at.erase(id)
+	_rig._process(0.0)
+	slots[Items.RIGHT_HAND] = ""
+	player.slots = slots
+	_rig._process(0.0)
+	_check(not back.has_node("StowedBow") and back.get_node_or_null("Quiver") == null, "put away while on the back: gone from the back, and the quiver with it")
 	player.slots = was
 	_rig._process(0.0)
 

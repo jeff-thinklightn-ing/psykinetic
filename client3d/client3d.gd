@@ -13699,6 +13699,8 @@ func _sync_held(entity: GridEntity, puppet: Node3D) -> void:
 			continue
 		held[hand] = id
 		changed = true
+		if hand == 1 and sockets.has("back"):
+			_let_go_stowed(sockets)
 		var socket := sockets.get("hand_r" if hand == 0 else "hand_l") as Node3D
 		if socket == null:
 			continue
@@ -13870,6 +13872,7 @@ func _sync_bow(entity: GridEntity, puppet: Node3D) -> void:
 	var state := str(puppet.get_meta("bow_state", ""))
 	var now := Time.get_ticks_msec()
 	var want := ""
+	var calm := _calm(entity, puppet, rig, now)  # Kept by every frame, a draw's too.
 	if entity.raised == "block":
 		want = "block"
 	elif bow != "" and entity.raised == "draw":
@@ -13879,6 +13882,8 @@ func _sync_bow(entity: GridEntity, puppet: Node3D) -> void:
 		if want == "idle" and (puppet.get_meta("gaits", GAITS) as Array).any(
 				func(gait: Array) -> bool: return gait[0] == rig.base_clip()):
 			want = "carry"
+	if want in ["idle", "carry"] and calm:
+		want = "stowed"  # On the back (662 amended (d)), the hands free.
 	var rest := _rest_of(entity, puppet, ids, rig, now) if want == "" else {}
 	var sockets: Dictionary = puppet.get_meta("sockets")
 	if not rest.is_empty():
@@ -13895,6 +13900,8 @@ func _sync_bow(entity: GridEntity, puppet: Node3D) -> void:
 		want = "ready"  # Standing only: not over a gait, a lying body or a kneel.
 	if (want == "rest") != (state == "rest"):
 		_rest_sound(puppet, str(ids[0]), want != "rest")
+	if (want == "stowed") != (state == "stowed"):
+		_rest_sound(puppet, bow if bow != "" else str(ids[1]), want != "stowed")
 	if want == "draw":
 		var clip := str(moves.get("bow_draw", ""))
 		rig.upper_at(clip, bow_pull(entity) * rig.length(clip))
@@ -13910,9 +13917,11 @@ func _sync_bow(entity: GridEntity, puppet: Node3D) -> void:
 				rig.upper(str(moves.get("ready", "")))
 			"rest":
 				rig.upper(str(rest["upper"]))
-			"", "carry":
+			"", "carry", "stowed":
 				rig.upper_off()
 	puppet.set_meta("bow_state", want)
+	if want == "stowed" or state == "stowed":
+		_stow_bow(sockets, want == "stowed")
 	if bow != "":
 		_turn_carried(puppet, want == "carry", now)
 	_show_nocked(puppet, ids, want in ["draw", "hold"])
@@ -13923,8 +13932,7 @@ func _sync_bow(entity: GridEntity, puppet: Node3D) -> void:
 ## stood REST_STAND_SECONDS (Idle, Idle_Tired or an armed fidget) and nothing
 ## has roused it for REST_SECONDS; {} otherwise.
 func _rest_of(entity: GridEntity, puppet: Node3D, ids: Array, rig: AnimRig, now: int) -> Dictionary:
-	if entity.raised != "" or rig.striking() or _roused(entity, puppet, now):
-		puppet.set_meta("roused_at", now)
+	var calm := _calm(entity, puppet, rig, now)
 	var standing := rig.base_clip() in [CLIP_IDLE, CLIP_TIRED] or rig.base_clip() in ARMED_FIDGETS
 	if not standing:
 		puppet.remove_meta("stood_at")
@@ -13935,10 +13943,19 @@ func _rest_of(entity: GridEntity, puppet: Node3D, ids: Array, rig: AnimRig, now:
 		return {}
 	if str(ids[1]) != "" and "shield" not in Items.def(str(ids[1])).get("tags", []):
 		return {}
-	var roused := maxi(int(puppet.get_meta("roused_at", -(1 << 40))), int(_combat_at.get(int(puppet.get_meta("entity_id", 0)), -(1 << 40))))
-	if now - roused < int(REST_SECONDS * 1000.0) or now - int(puppet.get_meta("stood_at", now)) < int(REST_STAND_SECONDS * 1000.0):
+	if not calm or now - int(puppet.get_meta("stood_at", now)) < int(REST_STAND_SECONDS * 1000.0):
 		return {}
 	return rest
+
+
+## Whether [param entity] has been calm REST_SECONDS (662 (b)): nothing raised,
+## no blow of its own, nothing rousing it (_roused) and no blow near it
+## (_combat_at) that long.
+func _calm(entity: GridEntity, puppet: Node3D, rig: AnimRig, now: int) -> bool:
+	if entity.raised != "" or rig.striking() or _roused(entity, puppet, now):
+		puppet.set_meta("roused_at", now)
+	var roused := maxi(int(puppet.get_meta("roused_at", -(1 << 40))), int(_combat_at.get(int(puppet.get_meta("entity_id", 0)), -(1 << 40))))
+	return now - roused >= int(REST_SECONDS * 1000.0)
 
 
 ## Whether something rouses [param entity] from its rest: a monster's own
@@ -13986,6 +14003,52 @@ static func _stow_slot_known() -> bool:
 			if method["name"] == "stow_slot":
 				_has_stow_slot = true
 	return bool(_has_stow_slot)
+
+
+## A bow on the back out of a fight (662 amended (d); Jeff: "have it on the
+## back so that the bow curve faces the body, it lies under the quiver in the
+## same direction"): on the quiver's "back" socket, along it, under it. Two
+## faces for Jeff to pick between (bow_back_face): "A" the string to the body,
+## the bow's back out, its limbs wrapping the body; "B" the bow's back to the
+## body (lower on it, its upper limb clear of the neck through the jog), its
+## limbs and string out. Either way the quiver is laid out over the bow, so
+## the two never cross. Each is [the bow's place in the socket, the quiver's
+## offset over it], measured on the man as built: his back at the socket's
+## z 0, the bow's grip 0.047 m deep before its back, its tips and string 0.205
+## behind it (build/bowback/profile.gd); clear of the five builds through the
+## gaits and standing, and of each other (anim_rig_test).
+const BOW_BACK := {
+	"A": [Transform3D(Basis(Vector3.UP, PI), Vector3(0.0, -0.1, -0.217)), Vector3(0.0, 0.0, -0.278)],
+	"B": [Transform3D(Basis.IDENTITY, Vector3(0.0, -0.2, -0.1)), Vector3(0.0, 0.0, -0.315)]}
+static var bow_back_face := "A"
+static func _stow_bow(sockets: Dictionary, stowed: bool) -> void:
+	var hand := sockets.get("hand_l") as Node3D
+	var back := sockets.get("back") as Node3D
+	if hand == null or back == null:
+		return
+	var face: Array = BOW_BACK[bow_back_face]
+	var from := hand if stowed else back
+	var bow := from.get_node_or_null("Held" if stowed else "StowedBow") as Node3D
+	if bow != null:
+		from.remove_child(bow)
+		bow.name = "StowedBow" if stowed else "Held"
+		bow.transform = face[0] if stowed else Transform3D.IDENTITY
+		(back if stowed else hand).add_child(bow)
+	var quiver := back.get_node_or_null("Quiver") as Node3D
+	if quiver != null:
+		quiver.position = face[1] if back.has_node("StowedBow") else Vector3.ZERO
+
+
+## The bow on the back let go with the left hand's thing (_sync_held).
+static func _let_go_stowed(sockets: Dictionary) -> void:
+	var back := sockets["back"] as Node3D
+	var bow := back.get_node_or_null("StowedBow")
+	if bow != null:
+		back.remove_child(bow)
+		bow.queue_free()
+	var quiver := back.get_node_or_null("Quiver") as Node3D
+	if quiver != null:
+		quiver.position = Vector3.ZERO
 
 
 ## The bow as it's carried at a walk or run (462 amended (3)): a quarter turn
@@ -14484,7 +14547,7 @@ static func _pick_fidget(puppet: Node3D, rig: AnimRig) -> String:
 	var rng: RandomNumberGenerator = puppet.get_meta("fidget_rng", puppet.get_meta("rng", null))
 	var last := str(puppet.get_meta("last_fidget", ""))
 	var fidgets: Dictionary = puppet.get_meta("fidgets", FIDGETS)
-	var held: Array = puppet.get_meta("held", [])
+	var held := in_hand(puppet)
 	var total := 0
 	for clip: String in fidgets:
 		if clip != last and rig.has(clip) and fidget_with(clip, held):
@@ -14505,6 +14568,15 @@ static func _pick_fidget(puppet: Node3D, rig: AnimRig) -> String:
 ## Whether [param clip] may be fidgeted holding [param held] (the ids in each
 ## hand, "" empty; a work's piece "art:<slot>"): any with both hands empty,
 ## else only ARMED_FIDGETS, less the held kinds' ARMED_NOT (662).
+## What [param puppet]'s hands hold now: its "held", but a bow on its back
+## (662 amended (d)) out of the left.
+static func in_hand(puppet: Node3D) -> Array:
+	var held: Array = puppet.get_meta("held", [])
+	if str(puppet.get_meta("bow_state", "")) == "stowed" and held.size() == 2:
+		return [held[0], ""]
+	return held
+
+
 static func fidget_with(clip: String, held: Array) -> bool:
 	if held.all(func(id: Variant) -> bool: return str(id) == ""):
 		return true
@@ -14982,7 +15054,7 @@ func _animate(puppet: Node3D) -> void:
 		# Turning where it stands (_standing_turn): its feet shuffle round.
 		rig.loop(CLIP_WALK, STAND_SHUFFLE_PACE)
 		return
-	if str(puppet.get_meta("addressing", "")) != "" and rig.has(CLIP_TALKING) and fidget_with(CLIP_TALKING, puppet.get_meta("held", [])):
+	if str(puppet.get_meta("addressing", "")) != "" and rig.has(CLIP_TALKING) and fidget_with(CLIP_TALKING, in_hand(puppet)):
 		# Addressing someone (560): it talks to them (with a thing in hand,
 		# no gestures: it stands, 662).
 		rig.loop(CLIP_TALKING, tempo)

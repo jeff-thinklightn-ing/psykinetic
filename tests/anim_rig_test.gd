@@ -19,6 +19,7 @@ func _ready() -> void:
 	await _test_strike()
 	await _test_one_strike_clip()
 	await _test_bow_clear()
+	await _test_bow_back()
 	await _test_work_clear()
 	await _test_armed_fidgets()
 	await _test_rests()
@@ -247,6 +248,82 @@ func _test_bow_clear() -> void:
 			holder.free()
 	_check(found.is_empty(), "no bow nor arm inside the body, five builds, carried, nocked, drawn, released (%s)" % ", ".join(found))
 	_check(anchors.is_empty(), "at full draw the string hand at the jaw, not behind the head (%s)" % ", ".join(anchors))
+
+
+## The bow on the back (662 amended (d)), each face: clear of the body through
+## the gaits and standing, five builds, and through none of the quiver's box
+## laid over it.
+func _test_bow_back() -> void:
+	print("== the bow on the back: clear of the body and the quiver ==")
+	var lib := load(CLIPS) as AnimationLibrary
+	var builds := [["man", "res://art/models/characters/human_m.glb", {}],
+		["man heavy", "res://art/models/characters/human_m.glb", {"heavy": 1.0}],
+		["man broad", "res://art/models/characters/human_m.glb", {"heavy": 0.6, "broad": 1.0}],
+		["man lean", "res://art/models/characters/human_m.glb", {"lean": 1.0, "narrow": 1.0}],
+		["woman", "res://art/models/characters/human_f.glb", {}]]
+	var poses := [["stand", "Idle", 1], ["walk", Client3D.HUMAN_GAITS[0][0], 1], ["walk", Client3D.HUMAN_GAITS[0][0], 2],
+		["jog", JOG, 1], ["jog", JOG, 2], ["sprint", SPRINT, 1], ["sprint", SPRINT, 2]]
+	var found: Array[String] = []
+	var crossed: Array[String] = []
+	var face_was := Client3D.bow_back_face
+	for face: String in Client3D.BOW_BACK:
+		Client3D.bow_back_face = face
+		for build: Array in builds:
+			for pose: Array in poses:
+				var model := (load(build[1]) as PackedScene).instantiate() as Node3D
+				add_child(model)
+				for mesh: MeshInstance3D in model.find_children("*", "MeshInstance3D", true, false):
+					for key: String in build[2]:
+						var i := mesh.find_blend_shape_by_name(key)
+						if i >= 0:
+							mesh.set_blend_shape_value(i, build[2][key])
+				var holder := Node3D.new()
+				Client3D._attach_sockets(model, Client3D.HUMAN_SOCKETS, 1.0, holder)
+				var sockets: Dictionary = holder.get_meta("sockets")
+				var bow := ArtKit.instance("item.bow")
+				bow.name = "Held"
+				(sockets["hand_l"] as Node3D).add_child(bow)
+				var quiver := ArtKit.instance(Client3D.QUIVER, 1)
+				quiver.name = "Quiver"
+				(sockets["back"] as Node3D).add_child(quiver)
+				Client3D._stow_bow(sockets, true)
+				var rng := RandomNumberGenerator.new()
+				rng.seed = int(pose[2])
+				var rig := AnimRig.make(model, lib, 0.0, true, rng)
+				rig.loop(pose[1], 0.0)
+				for i in 3:
+					await get_tree().process_frame
+				var parts := _skinned_parts(model)
+				var trunk: Array = parts["trunk"]
+				var points := _points(bow) + _points(quiver)
+				var inside := _inside(points, trunk[0] + parts["head"][0], trunk[1] + parts["head"][1])
+				if inside > 0 or bow.get_parent() != sockets["back"]:
+					var of_bow := _inside(_points(bow), trunk[0] + parts["head"][0], trunk[1] + parts["head"][1])
+					found.append("%s %s %s: bow %d, quiver %d" % [face, build[0], pose[0], of_bow, inside - of_bow])
+				if build[0] == "man" and pose[0] == "stand":
+					# In the back socket's frame: no point of the bow in the quiver's box.
+					var back := (sockets["back"] as Node3D).global_transform.affine_inverse()
+					var box := _box(back * _points(quiver)).grow(-0.005)
+					var through := 0
+					for p in back * _points(bow):
+						if box.has_point(p):
+							through += 1
+					if through > 0:
+						crossed.append("%s %d" % [face, through])
+				model.queue_free()
+				holder.queue_free()
+	Client3D.bow_back_face = face_was
+	_check(found.is_empty(), "the bow and quiver on the back clear of the body, both faces, five builds, the gaits (%s)" % ", ".join(found))
+	_check(crossed.is_empty(), "the bow through none of the quiver laid over it (%s)" % ", ".join(crossed))
+
+
+static func _points(piece: Node3D) -> PackedVector3Array:
+	var points := PackedVector3Array()
+	for mesh: MeshInstance3D in piece.find_children("*", "MeshInstance3D", true, false):
+		for s in mesh.mesh.get_surface_count():
+			for v: Vector3 in mesh.mesh.surface_get_arrays(s)[Mesh.ARRAY_VERTEX]:
+				points.append(mesh.global_transform * v)
+	return points
 
 
 ## The work's clips (566) with the tool in the right hand as Client3D sockets it: at moments along

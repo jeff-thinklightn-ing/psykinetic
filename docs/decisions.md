@@ -29479,3 +29479,31 @@ empty, the full fidget set again.
 Who: players, companions, townsfolk with a weapon (guards), the barrow dead, goblins, orcs and
 kobolds. Client only (everything it goes by every client has: raised, alert, blows seen, its own
 swing), protocol unchanged.
+
+## 662 amended (d): the bow on the back out of a fight
+
+Jeff: "also fix bow carrying so that bow is curved upward while walking, or just have it on the back
+so that the bow curve faces the body, it lies under the quiver in the same direction". The
+coordinator approved the back stow. Calm (662 (b)'s test, now `Client3D._calm`: nothing raised, no
+blow of its own, nothing hunting or fighting within REST_ROUSED_CELLS and no blow seen near it for
+REST_SECONDS), an archer's bow goes from the left hand onto the quiver's "back" socket, standing or
+walking (bow_state "stowed", the upper layer off). The hands are then free: `Client3D.in_hand` gives
+the fidgets the hands as they are, so every fidget comes back (the arrows are in the quiver). A
+draw, a blow seen near or a monster hunting near puts it back in the hand at once (no draw delay, as
+662 rules); the bow's node is moved between the sockets, not made again. Unequipped while on the
+back, it goes from there too (`_let_go_stowed`). The sound is SoundKit.stow_slot's, when sound's
+side is in.
+
+It lies along the quiver on the same diagonal, the quiver laid out over it (BOW_BACK, measured from
+the bow's depth along its length, build/bowback/profile.gd). Jeff's "the bow curve faces the body"
+reads two ways, so both are built and shown (C:/dev/review/rest662/bow_back.png) for him to pick:
+A, the string to the body and the bow's back out, its limbs wrapping the torso (the default,
+`Client3D.bow_back_face`); B, the bow's back to the body, its limbs and string out, set lower so
+its upper limb clears the neck through the jog. The one he doesn't pick is dropped. anim_rig_test
+`_test_bow_back`: both faces clear of the body and head on five builds, standing and through the
+walk, jog and sprint, and the bow through none of the quiver's box; view_test `_test_bow_back`:
+taken up in hand, calm on the back with the hands free, still there running, in hand at once on a
+draw, staying in hand when the draw is let go, calm again on the back, in hand on a blow seen near,
+and gone from the back when unequipped. Walking in a fight is as before (462 amended (3)); the bow
+turned curve up in the hand is held unless Jeff asks for it. Client only, protocol unchanged, no
+new class_name.

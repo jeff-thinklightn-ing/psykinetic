@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Out of a fight, an archer carries the bow on the back with the quiver laid over it, both hands free; it is back in hand the moment they draw or a fight comes near.
 - Out of a fight, people rest what they hold: a great axe or battle axe set head down on the ground before them with both hands on the butt, a spear grounded upright beside them, a hammer or pick hanging at their side; they take it up again when a fight comes near.
 - People holding a weapon or a shield no longer scratch their head, drink, brush a sleeve, cross their arms, shrug or wave their hands while talking: with something in hand they only shift their weight, look back, crouch or kneel, so no blade comes near the body or the face.
 - Bow: holding Shift now plants your feet and draws. You stop where you stand, the movement keys only turn you, a left click looses, and letting go of Shift lowers the bow and keeps the arrow. You can no longer walk while drawn (583 amended).
