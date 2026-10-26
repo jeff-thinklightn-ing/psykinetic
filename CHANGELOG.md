@@ -7,10 +7,13 @@ notes (decision 324).
 
 ## Unreleased
 
+## v0.1.181
+
 - Stopping is crisper: let go of the movement keys or the held mouse button and your character stands as its current step ends, without the slow slide back afterwards (a stop was about a quarter second; now about a tenth with the held button, a sixth with the keys). Letting go of a held-button walk also ends it right there, even when it had to route round your companion, instead of walking on several cells (683).
 - Arriving on open ground no longer stalls a quarter of a second as the first grass grows in.
 - Standing beside you, your companion steps out of the straight line you set off on instead of making you walk into her (678, companions' side, amended).
 - Your companion tends wounds unasked: once things are calm she bandages you if you are badly hurt or bleeding, then herself, and badly hurt she drinks a healing remedy she carries; she keeps her bandages and remedies rather than offering to give them away (681).
+
 ## v0.1.180
 
 - What goes over the network changes, so v0.1.179 and older can't join the server: update through the launcher first.
