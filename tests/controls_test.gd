@@ -717,6 +717,25 @@ func _test_bow_click_walks() -> void:
 	_main.drive_stand_draw(false)
 	_check(_main._stance == "" and player.raised == "" and player.slots[Player.LEFT_HAND] == "arrows",
 			"Shift let go: the bow let down, the arrow kept, nothing loosed")
+	# The right button with a bow (decision 677): held, the lob at the sky; let go, loosed.
+	var outdoor_was := World.fields.outdoor
+	World.fields.outdoor = true
+	var right := InputEventMouseButton.new()
+	right.button_index = MOUSE_BUTTON_RIGHT
+	right.pressed = true
+	_main._unhandled_input(right)
+	_check(_main._stance == "lob" and player.raised == "draw" and player.lobbing and not player.has_move_order, "RMB held with a bow: drawn at the sky, standing firm")
+	_main._unhandled_input(again)
+	_main._unhandled_input(let_go)
+	_main.drive_stand_draw(true)
+	_check(_main._stance == "lob" and player.lobbing, "the left button and Shift leave a lob alone")
+	player.raised_tick = World.tick - 40
+	var lobs := World._lobs.size()
+	right.pressed = false
+	_main._unhandled_input(right)
+	_check(_main._stance == "" and player.raised == "" and not player.lobbing and World._lobs.size() == lobs + 1, "RMB let go: lobbed at the cursor, the stance ended")
+	_main.drive_stand_draw(false)
+	World.fields.outdoor = outdoor_was
 	player.next_move_tick = 0
 	var free_step := false
 	for direction: Vector2i in World.DIRECTIONS:
@@ -760,8 +779,8 @@ func _test_friend_click() -> void:
 	Net.hints = hints_were
 	_check("Shift+LMB	swing where you stand" in _main.hint_lines()
 			and "Shift held, bow	stand firm and draw: LMB release looses, let go lowers it (arrow kept), walk keys turn" in _main.hint_lines()
-			and not _main.hint_lines().any(func(line: String) -> bool: return line.begins_with("RMB, bow")),
-			"the controls list: Shift+LMB swings where you stand; with a bow, Shift held stands firm and draws, LMB release looses (583 amended (2))")
+			and "RMB, bow	hold to aim at the sky, let go to lob onto the circle: over walls, knocks down" in _main.hint_lines(),
+			"the controls list: Shift+LMB swings where you stand; with a bow, Shift held stands firm and draws, LMB release looses (583 amended (2)); RMB lobs (677)")
 	player.has_move_order = false
 	_left(true)
 	_check(player.action_order == GridEntity.Order.SWING and not player.has_move_order and _main._talk_wanted == null,

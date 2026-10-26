@@ -79,6 +79,7 @@ func _init() -> void:
 	replicate("ailments")
 	replicate("raised")
 	replicate("raised_tick")
+	replicate("lobbing")  # Decision 677: the bow aimed at the sky.
 	replicate("down_until")
 	replicate("downed_until")  # Decision 544: downed, and bringing back the downed.
 	replicate("channel_of")

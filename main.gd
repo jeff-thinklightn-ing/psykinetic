@@ -1165,7 +1165,9 @@ func _process(delta: float) -> void:
 	var player := _local_player()
 	# One pick of the body under the cursor a frame, for the target and the hint both.
 	var under_mouse := _entity_under_mouse()
-	var drawing := player != null and player.raised == "draw"
+	var lobbing := player != null and player.raised == "draw" and player.lobbing
+	var drawing := player != null and player.raised == "draw" and not lobbing
+	_show_lob(player, lobbing)
 	_update_aim(player, drawing)
 	# The archery aim: the shot goes the aim's way to the arc's cell; the
 	# marker is the aim, so the hover square shows only without one.
@@ -1426,8 +1428,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 		return
 	if click.button_index == MOUSE_BUTTON_RIGHT and not click.pressed:
-		if _stance == "block":
-			_lower_off_hand(player)  # The draw is the left button's (Jeff, 2026-10-22).
+		if _stance == "block" or _stance == "lob":
+			_lower_off_hand(player)  # The draw is the left button's (Jeff, 2026-10-22); the lob the right's (677).
 		_release_toss(player)
 		return
 	if click.button_index == MOUSE_BUTTON_LEFT and not click.pressed:
@@ -1456,12 +1458,18 @@ func _unhandled_input(event: InputEvent) -> void:
 	# down before the draw is up draws too. A plain left click never attacks with a bow: it walks (a
 	# monster as the ground), talks to a friend or opens a chest
 	# (_click_with_bow; the coordinator's ruling). The right button with a
-	# bow is combat's backstep to come, so it does nothing here. Right
+	# bow is the lob (decision 677; Jeff: "right click hold and release to
+	# fire"): held, the bow aimed at the sky and drawn, the body firm; let
+	# go, loosed at the cursor (_lower_off_hand); one draw at a time. Right
 	# otherwise: the off hand (decision 329): a shield raised while held;
 	# empty-handed it shoves and tosses (below). Opening and bandaging are
 	# E's (_press_e). Left: a chest is walked to.
 	if World.off_hand(player) == "draw":
-		if click.button_index == MOUSE_BUTTON_LEFT:
+		if click.button_index == MOUSE_BUTTON_RIGHT and _stance.is_empty():
+			_raise_lob(player)
+		elif click.button_index == MOUSE_BUTTON_LEFT and _stance == "lob":
+			pass  # 677: lobbing, the left button waits.
+		elif click.button_index == MOUSE_BUTTON_LEFT:
 			if _stance == "draw":
 				pass  # 583 amended (2): drawn, the press waits; its release looses.
 			elif Keys.held_in(click, "stand"):
@@ -1800,6 +1808,32 @@ func _raise_off_hand(player: Player) -> bool:
 	return true
 
 
+## The right button pressed with a bow (decision 677): the lob, a draw aimed
+## at the sky (a "stance" command with "lob").
+func _raise_lob(player: Player) -> void:
+	_stance = "lob"
+	_toss_target = null
+	World.command(player, "stance", {"kind": "draw", "lob": true})
+
+
+## The lob's aim each frame while [param player] lobs (decision 677): the
+## brass arc from its nocked arrow to the cell under the cursor drawn in to
+## its reach (World.lob_aim), the ring of its circle (lob_radius), red where
+## it cannot come down (lob_open); hidden otherwise.
+func _show_lob(player: Player, lobbing: bool) -> void:
+	if _client3d == null:
+		return
+	if not lobbing:
+		_client3d.lob_aim(Vector3.ZERO, Vector2i.ZERO, 0.0, false, 0.0, false)
+		return
+	var cell := World.lob_aim(player, _mouse_tile())
+	var radius := World.lob_radius(player)
+	var puppet: Node3D = _client3d._puppets.get(player.get_instance_id())
+	var from: Vector3 = _client3d._bow_tip(puppet) if puppet != null else Vector3(player.tile.x, 1.1, player.tile.y)
+	var apex := float(Items.verb_of(World.drawn_with(player)).get("lob_apex", 0.25))
+	_client3d.lob_aim(from, cell, radius, World.lob_open(cell), apex, radius >= 0.0 and cell != player.tile)
+
+
 ## [param command_name] ("swing", "signature") toward the ground point under
 ## the cursor (decision 593); the server picks who is struck.
 func _send_at(player: Player, command_name: String) -> void:
@@ -1844,6 +1878,9 @@ func _lower_off_hand(player: Player) -> void:
 	if _stance == "draw":
 		var at := _aim_mark_cell if aim_drawn else _mouse_tile()
 		World.command(player, "loose", loose_args(aim_angle if aim_drawn else NAN, at))
+	elif _stance == "lob":
+		var at := _mouse_tile()
+		World.command(player, "lob", {"at": [at.x, at.y]})  # 677: the server draws it in to the reach.
 	elif _stance == "block":
 		World.command(player, "stance", {"kind": ""})
 	_stance = ""
@@ -2183,8 +2220,8 @@ func _drive_wasd() -> void:
 		_client3d.set_frozen(not keys.is_empty())
 	var direction := wasd_direction(key_vector(keys), _view_yaw())
 	_record_walk(player)
-	if _stance == "draw" or player.raised == "draw":
-		# 583 amended: drawn, the body stands firm; a walk key only turns it.
+	if _stance == "draw" or _stance == "lob" or player.raised == "draw":
+		# 583 amended: drawn, the body stands firm; a walk key only turns it (a lob too, 677).
 		player.hint_step(Vector2i.ZERO)
 		player.aim = Vector2.ZERO
 		if direction == Vector2i.ZERO:
@@ -9214,7 +9251,7 @@ func _on_command(entity: GridEntity, command_name: String, args: Dictionary) -> 
 	elif command_name == "stance" and entity is Player:
 		var stance := str(args.get("kind", ""))
 		var toward := _point_direction(entity, args)
-		if World.try_stance(entity, stance) and stance == "block" and toward != Vector2i.ZERO:
+		if World.try_stance(entity, stance, bool(args.get("lob", false))) and stance == "block" and toward != Vector2i.ZERO:
 			World.face(entity, toward)  # The shield toward the cursor (decision 593).
 	elif command_name == "signature" and entity is Player:
 		# Ctrl and a click (decision 593): the body that way, beside it.
@@ -9231,6 +9268,13 @@ func _on_command(entity: GridEntity, command_name: String, args: Dictionary) -> 
 				_start_channel(entity, on)
 			elif not World.try_bandage(entity, on):
 				_tell_bandage_refused(entity, on)
+	elif command_name == "lob" and entity is Player:
+		# Its "at" cell (decision 677): where the lob is aimed.
+		var at: Variant = args.get("at")
+		if at is Array and (at as Array).size() == 2:
+			World.try_lob(entity, Vector2i(int(at[0]), int(at[1])))
+		else:
+			World.try_stance(entity, "")
 	elif command_name == "loose" and entity is Player:
 		# Its "angle" (radians on the grid; decision 583), else the
 		# angle to its "at" cell.
@@ -12996,6 +13040,7 @@ func hint_lines() -> Array[String]:
 		lines.append("%s\t%s" % [Keys.name_of("phrase_%d" % (i + 1)), Net.phrases[i]])
 	lines.append_array(["%s+LMB\tyour weapon's own move (a shield bashes)" % Keys.name_of("signature"), "RMB, shield\tblock toward the cursor while held",
 		"%s held, bow\tstand firm and draw: LMB release looses, let go lowers it (arrow kept), walk keys turn" % Keys.name_of("stand"),
+		"RMB, bow\thold to aim at the sky, let go to lob onto the circle: over walls, knocks down",
 		"%s\topen a chest, crate, cart, door; your companion's pack" % Keys.name_of("open"), "%s\tyour pack" % Keys.name_of("pack"),
 		"%s\tyour companion's card" % Keys.name_of("card"),
 		"%s\tthe town sheet" % Keys.name_of("town"),

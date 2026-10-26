@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The bow has a lob on the right mouse button: hold to aim at the sky and draw (a brass arc runs to a landing circle that narrows as you hold), let go to loose. It flies over walls and cover, lands after a moment (so a target can step out), and a hit knocks it down (677).
 ## v0.1.176
 
 - An arrow that reaches the end of its range curves gradually down into the ground instead of flying flat and dropping (583 amended (3)).

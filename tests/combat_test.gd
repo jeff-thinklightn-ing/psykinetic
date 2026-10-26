@@ -44,6 +44,7 @@ func _ready() -> void:
 	_test_other_zone_waits()
 	_test_cone_spread()
 	_test_draw_held()
+	_test_lob()
 	_test_armour()
 
 	print("")
@@ -341,6 +342,89 @@ func _test_cone_spread() -> void:
 	_check(is_zero_approx(Items.spread_at(plain, 60.0)) and World.scatter(host, 0.5, 0.0) == 0.5,
 			"a bow verb without a spread: no cone, the aim flown")
 	host.raised = ""
+
+## The lob (decision 677; Jeff: "right click hold and release to fire. a hit
+## would cause a knock down impact"): a draw aimed at the sky, its first step
+## lob_draw_min in; its circle narrowing by the step; aimed in to the reach;
+## loosed for lob_cost; down lob_ticks later on whoever stands there then,
+## knocked down (a draugr staggered); one that stepped out is missed; never
+## onto a roof or a wall.
+func _test_lob() -> void:
+	print("\n== the lob: the bow at the sky, a circle, down on whoever stands there when it lands, knocked down (decision 677) ==")
+	var e := _build(["####################", "#P.......m....m....#", "####################"])
+	World.fields.outdoor = true
+	var host: GridEntity = e["P"][0]
+	var near: GridEntity = e["m"][0]  # 8 cells off.
+	var far: GridEntity = e["m"][1]  # 13 cells off.
+	_give(host, "bow")
+	World.put_item(host, host, Player.LEFT_HAND, World.items.mint("arrows", "built"))
+	var verb := Items.verb_of("bow")
+	_check(World.try_stance(host, "draw", true) and host.raised == "draw" and host.lobbing, "the right button with a bow: drawn, at the sky")
+	_check(not World.try_stance(host, "draw") and host.lobbing, "one draw at a time: a flat draw is refused while lobbing")
+	_check(not World.try_loose(host, 0.0) and host.raised == "draw", "nor does a flat loose let a lob go")
+	host.raised_tick = World.tick - 4
+	_check(World.draw_step(host) == -1 and World.lob_radius(host) < 0.0, "4 ticks in: before its first step (lob_draw_min %d)" % int(verb["lob_draw_min"]))
+	host.raised_tick = World.tick - 5
+	_check(World.draw_step(host) == 0 and is_equal_approx(World.lob_radius(host), 2.5), "5 ticks: the first step, a circle 2.5 cells across")
+	host.raised_tick = World.tick - 12
+	_check(World.draw_step(host) == 2 and is_equal_approx(World.lob_radius(host), 1.0) and World.lob_aim(host, Vector2i(19, 1)) == Vector2i(10, 1),
+			"full draw: 1 cell, and aimed past the reach it is drawn in to 9 cells (%s)" % World.lob_aim(host, Vector2i(19, 1)))
+	host.raised_tick = World.tick - 40
+	_check(is_equal_approx(World.lob_radius(host), 0.5), "held on: half a cell")
+	var landed := []
+	var on_landed := func(by: GridEntity, cell: Vector2i, hit: GridEntity) -> void: landed.append([cell, hit])
+	World.lob_landed.connect(on_landed)
+	host.stamina = 50
+	near.max_hp = 100
+	near.hp = 100
+	var blow := roundi(host.attack_damage * float(verb["damage"]) * float(verb["lob_damage"]))
+	var ticks := World.lob_ticks(verb, 8)
+	_check(World.try_lob(host, near.tile) and host.raised == "" and not host.lobbing and host.stamina == 50 - int(verb["lob_cost"]),
+			"let go: loosed, the stance ended, %d stamina paid (%d)" % [int(verb["lob_cost"]), host.stamina])
+	for i in ticks - 1:
+		World.step()
+	_check(near.hp == 100 and landed.is_empty(), "aloft %d ticks at 8 cells: nothing yet" % ticks)
+	World.step()
+	_check(near.hp == 100 - blow and World.is_down(near) and landed == [[near.tile, near]],
+			"down on it: %d (lob_damage %.1f at any reach) and knocked down" % [100 - near.hp, float(verb["lob_damage"])])
+	# One that steps out before it comes down is missed.
+	landed.clear()
+	far.max_hp = 100
+	far.hp = 100
+	World.try_stance(host, "draw", true)
+	host.raised_tick = World.tick - 60
+	var aimed := far.tile
+	_check(World.try_lob(host, aimed), "lobbed at the far one, 13 cells")
+	World._relocate(far, aimed + Vector2i(2, 0))
+	for i in World.lob_ticks(verb, 13):
+		World.step()
+	_check(far.hp == 100 and landed == [[aimed, null]], "it stepped out: missed, the arrow in the ground (%s)" % [landed])
+	# A draugr never lies: staggered.
+	(far as Monster).never_lies = true
+	World._relocate(far, aimed)
+	World.try_stance(host, "draw", true)
+	host.raised_tick = World.tick - 60
+	World.try_lob(host, aimed)
+	for i in World.lob_ticks(verb, 13):
+		World.step()
+	_check(far.hp < 100 and not World.is_down(far) and World.is_stunned(far), "one that never lies is staggered instead")
+	# Never onto a roof, nor before its first step.
+	World.fields._roofed[Vector2i(6, 1)] = true
+	World.try_stance(host, "draw", true)
+	host.raised_tick = World.tick - 60
+	_check(not World.try_lob(host, Vector2i(6, 1)) and host.raised == "" and not World.lob_open(Vector2i(6, 1)),
+			"under a roof: nothing loosed, the stance ended")
+	World.try_stance(host, "draw", true)
+	host.raised_tick = World.tick - 2
+	_check(not World.try_lob(host, Vector2i(5, 1)), "let go before its first step: nothing")
+	World.fields.outdoor = false
+	_check(not World.lob_open(Vector2i(5, 1)), "indoors: nowhere to come down")
+	World.lob_landed.disconnect(on_landed)
+	var a := Vector3(0, 1.4, 0)
+	var b := Vector3(10, 0, 0)
+	_check(World.lob_point(a, b, 0.0) == a and World.lob_point(a, b, 1.0) == b and World.lob_point(a, b, 0.5).y > 3.0,
+			"lob_point: from the bow to the ground, 2.5 m up at its middle over 10 m (%s)" % World.lob_point(a, b, 0.5))
+
 
 ## The bow held (decision 669): at full draw or past it the holder's
 ## stamina drains, none coming back, and at 0 the arms give out (the bow let

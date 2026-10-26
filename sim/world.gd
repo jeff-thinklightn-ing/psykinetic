@@ -108,6 +108,9 @@ signal loosed(by: GridEntity, angle: float, step: int)
 ## A bow held at full draw till the holder's stamina ran out (decision 669):
 ## let down, nothing loosed.
 signal draw_given_up(by: GridEntity)
+## [param by]'s lob (decision 677) came down on [param cell], striking
+## [param hit] (null for none).
+signal lob_landed(by: GridEntity, cell: Vector2i, hit: GridEntity)
 signal pile_gone(pile: GroundPile)
 ## [param target]'s guard met a blow or a shot from [param source]
 ## (decision 340): taken on it, or [param broken] by it.
@@ -1075,6 +1078,7 @@ func _step_zone() -> void:
 	_tend_wind_ups()  # Wound-up blows struck when due (decision 392).
 	_tend_boss_moves()  # A boss's spin, throw and charge (decision 603).
 	_tend_draws()  # A bow held at full draw tires the arms (decision 669).
+	_tend_lobs()  # Lobbed arrows come down when due (decision 677).
 	_resolve_hits()
 	t = part("hits", t)
 	# 3. Hazard tiles; what ails (burning, bleeding; decision 375).
@@ -5085,20 +5089,26 @@ func drawn_slot(entity: GridEntity) -> int:
 ## [param by] raises its off hand (the right button pressed): [param kind]
 ## "block" or "draw", as off_hand says it can; "" lowers it (released). A
 ## stance is only shown and kept: combat (the roadmap's weapons as verbs)
-## reads it. False if it holds nothing for it.
-func try_stance(by: GridEntity, kind: String) -> bool:
+## reads it. False if it holds nothing for it. A [param lob] draw (decision
+## 677, the right button) aims at the sky, loosed by try_lob; one drawn the
+## other way already is kept, false.
+func try_stance(by: GridEntity, kind: String, lob := false) -> bool:
 	if not Net.is_authority() or not is_instance_valid(by):
 		return false
 	if kind.is_empty():
 		by.raised = ""
+		by.lobbing = false
 		return true
 	if kind != off_hand(by) or kind == "draw" and not quiver_check.call(by):
 		return false
 	if kind == "block" and tick < by.guard_broken_until or is_stunned(by):
 		return false  # A broken guard comes back up only after a while; nothing is raised reeling or lying.
+	if by.raised == "draw" and kind == "draw" and by.lobbing != lob:
+		return false  # One draw at a time (677).
 	if by.raised != kind:
 		by.raised = kind
 		by.raised_tick = tick
+		by.lobbing = lob and kind == "draw"
 		if kind == "draw":
 			stand_firm(by)
 	return true
@@ -5182,7 +5192,10 @@ func draw_step(entity: GridEntity) -> int:
 	var verb := Items.verb_of(drawn_with(entity))
 	if verb.is_empty():
 		return -1
-	var step := Items.step_at(verb, float(tick - entity.raised_tick) / maxf(0.01, _draw_quick(entity)))
+	var held := float(tick - entity.raised_tick) / maxf(0.01, _draw_quick(entity))
+	if entity.lobbing:
+		held -= float(verb.get("lob_draw_min", verb["draw_min"])) - float(verb["draw_min"])  # 677: the lob's first step later.
+	var step := Items.step_at(verb, held)
 	return -1 if step < 0 else mini(step, step_cap(entity))
 
 
@@ -5262,7 +5275,7 @@ func scatter(by: GridEntity, angle: float, spread: float) -> float:
 ## 620), facing the aim; before the first step, nothing. The stance ends
 ## either way.
 func try_loose(by: GridEntity, angle: float) -> bool:
-	if not Net.is_authority() or not is_instance_valid(by) or by.raised != "draw" or not is_finite(angle):
+	if not Net.is_authority() or not is_instance_valid(by) or by.raised != "draw" or by.lobbing or not is_finite(angle):
 		return false
 	var step := draw_step(by)
 	var spread := spread_of(by)  # Before the stance ends: after it, none.
@@ -5274,6 +5287,127 @@ func try_loose(by: GridEntity, angle: float) -> bool:
 	loosed.emit(by, angle, step)
 	shoot(by, flown, step, angle)
 	return true
+
+
+## The radius in cells of the circle [param entity]'s lob comes down in
+## now (decision 677): its verb's lob_circle at its step; -1 when not
+## lobbing or before the first step.
+func lob_radius(entity: GridEntity) -> float:
+	if not is_instance_valid(entity) or entity.raised != "draw" or not entity.lobbing:
+		return -1.0
+	var step := draw_step(entity)
+	var circle: Array = Items.verb_of(drawn_with(entity)).get("lob_circle", [])
+	if step < 0 or circle.is_empty():
+		return -1.0
+	return float(circle[mini(step, circle.size() - 1)])
+
+
+## The cell [param entity]'s lob aimed at [param cell] is aimed at (decision
+## 677): that cell, drawn in along the line to the reach drawn so far
+## (range_of); its own cell before the first step.
+func lob_aim(entity: GridEntity, cell: Vector2i) -> Vector2i:
+	var reach := range_of(entity)
+	var way := Vector2(cell - entity.tile)
+	if reach <= 0:
+		return entity.tile
+	if way.length() > float(reach):
+		way = way.normalized() * float(reach)
+	return entity.tile + Vector2i(way.round())
+
+
+## Whether a lob may come down on [param cell] (decision 677): ground under
+## open sky, never a wall's cell, a roof's or indoors.
+func lob_open(cell: Vector2i) -> bool:
+	return is_walkable(cell) and fields.under_sky(cell)
+
+
+## Where an arrow lobbed from [param from] to [param to] is [param t] (0 to
+## 1) of its flight (decision 677; the views fly it, physics reads it): the
+## line between, lifted on a parabola [param apex] times the ground
+## covered at its height.
+static func lob_point(from: Vector3, to: Vector3, t: float, apex := 0.25) -> Vector3:
+	var flat := Vector2(to.x - from.x, to.z - from.z).length()
+	return from.lerp(to, t) + Vector3.UP * 4.0 * apex * flat * t * (1.0 - t)
+
+
+## The ticks an arrow lobbed [param cells] off by a bow of [param verb] is
+## aloft (decision 677): lob_flight plus lob_per_cell each cell, at least 1.
+static func lob_ticks(verb: Dictionary, cells: int) -> int:
+	return maxi(1, roundi((float(verb.get("lob_flight", 0.6)) + float(verb.get("lob_per_cell", 0.05)) * cells) * TICK_RATE))
+
+
+## Lobs in the air (decision 677; try_lob, _tend_lobs): {by, zone, cell,
+## at (the zone's tick it comes down), amount, down, slot}.
+var _lobs: Array[Dictionary] = []
+
+
+## [param by] lets its lobbed bow go (decision 677; Jeff: "right click hold
+## and release to fire"): aimed at [param cell] (lob_aim), it comes down in
+## a cell rolled in its circle (lob_radius; the aim if that one is closed),
+## lob_ticks later, when whoever stands there is struck (_tend_lobs). Its
+## loose costs lob_cost stamina. Before the first step, or with the aim
+## not open to the sky (lob_open), nothing, the arrow kept. The stance
+## ends either way.
+func try_lob(by: GridEntity, cell: Vector2i) -> bool:
+	if not Net.is_authority() or not is_instance_valid(by) or by.raised != "draw" or not by.lobbing:
+		return false
+	var verb := Items.verb_of(drawn_with(by))
+	var step := draw_step(by)
+	var aimed := lob_aim(by, cell)
+	var radius := lob_radius(by)
+	by.raised = ""
+	by.lobbing = false
+	if step < 0 or verb.is_empty() or aimed == by.tile or not lob_open(aimed):
+		return false
+	var roll := RandomNumberGenerator.new()
+	roll.seed = hash("lob/%d/%s/%d" % [shot_salt, by.name, tick])
+	var off := Vector2.from_angle(roll.randf() * TAU) * radius * sqrt(roll.randf())
+	var lands := aimed + Vector2i(off.round())
+	if not lob_open(lands):
+		lands = aimed
+	if by.max_stamina > 0 and by.pays_swings:
+		by.stamina = maxi(0, by.stamina - int(verb.get("lob_cost", 0)))
+		by._world_note_exertion(tick)
+	var ticks := lob_ticks(verb, distance(by.tile, lands))
+	var way := Vector2(lands - by.tile).normalized()
+	by._world_set_facing(Vector2i(roundi(way.x), roundi(way.y)))
+	_lobs.append({"by": by, "zone": zone.name, "cell": lands, "at": tick + ticks,
+		"amount": maxi(1, roundi(by.attack_damage * float(verb["damage"]) * float(verb.get("lob_damage", 1.0)))),
+		"down": int(verb.get("lob_down", 0)), "slot": drawn_slot(by)})
+	_log("lob: %s at %s, lands %s (circle %.1f, step %d) in %d ticks" % [by.name, aimed, lands, radius, step, ticks])
+	by._world_lobbed(lands, ticks)
+	noise(by.tile, NOISE_BOW, &"bow", by)
+	return true
+
+
+## Each tick, the lobs due in this zone come down (decision 677): whoever
+## stands on the cell then is struck by its lob's damage (no guard meets
+## it; armour's deflect_shot does) and knocked down lob_down ticks (a
+## draugr staggers: knock_down); a friend is spared, as by a flat shot.
+## Nobody there, a thud. lob_landed either way.
+func _tend_lobs() -> void:
+	for lob: Dictionary in _lobs.duplicate():
+		if lob["zone"] != zone.name or tick < int(lob["at"]):
+			continue
+		_lobs.erase(lob)
+		var by: GridEntity = lob["by"] if is_instance_valid(lob["by"]) else null
+		var cell: Vector2i = lob["cell"]
+		var hit := get_entity_at(cell)
+		if hit == null or by == null or hit == by or not can_target(by, hit) or spares(by, hit) or not hit.is_breakable():
+			noise(cell, Senses.NOISE_THUD_LIGHT, &"thud", by)
+			lob_landed.emit(by, cell, null)
+			continue
+		var amount := armour_turns(hit, int(lob["amount"]), "deflect_shot")
+		_log("lob: %s's hits %s at %s for %d" % [by.name, hit.name, cell, amount])
+		if amount > 0 and not is_sheltered(hit):
+			damage(hit, amount, by, &"shot")
+			if hit.is_creature():
+				_credit(by, int(lob["slot"]), "felled" if not _alive(hit) else "shot")
+				if not _alive(hit):
+					_felled_with(by, int(lob["slot"]), hit)
+			if _alive(hit):
+				knock_down(hit, by, int(lob["down"]))
+		lob_landed.emit(by, cell, hit)
 
 
 ## [param by]'s shot at [param angle], its bow drawn to [param step]

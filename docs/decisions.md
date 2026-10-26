@@ -30368,3 +30368,54 @@ a body, wood or stone fly as they did. The cells the sim strikes are unchanged: 
 only. view_test: the spent arrow still lands past its aim, nose down. A new check walks the arc:
 level halfway, dipping, never turning more than 8 degrees a twentieth. Client only, protocol
 unchanged, no new class_name.
+
+## 677. The bow's lob: the right-button arced shot
+
+Jeff: "for the right click ability of the bow, im thinking arced shot, where the bow is aimed up to
+the sky and you see an brass color arc drawn from the end of the arrow to the landing circle. it
+would be right click hold and release to fire. a hit would cause a knock down impact." Combat's
+design, approved by the coordinator. The unbuilt "backstep to come" on the right button with a bow
+is dropped.
+
+- **Input** (Main): with a bow and arrows in hand, holding the right button sends "stance"
+  {kind: "draw", lob: true}. The server raises "draw" with GridEntity.lobbing (replicated), and the
+  body stands firm as with Shift (World.stand_firm). Letting go sends "lob" {at: the cursor cell}.
+  One draw at a time: while lobbing, the left button and Shift do nothing, and a flat draw or
+  try_loose is refused; while flat-drawn, the right button does nothing.
+- **The draw** (World.draw_step): the same steps as the flat shot, its first lob_draw_min ticks in
+  (5, the flat's 3), the steps after as the flat draw's. Reach comes from reach_at/range_of, so a
+  later "bow from energy" step moves both shots together.
+- **The circle** (World.lob_radius): lob_circle cells by step, 2.5 at the first step, 1.75, 1.0
+  at full draw, then 0.5. World.lob_aim draws the cursor cell in along the line to the reach drawn
+  so far. try_lob rolls the landing cell in the circle (seeded like the flat shot's scatter), and
+  falls back to the aimed cell when the rolled one cannot take it.
+- **Over cover**: only the landing cell counts. Walls, cover and bodies between are flown over.
+  It comes down only on ground under open sky (World.lob_open: walkable and Fields.under_sky).
+  Never onto a wall's cell or a roof's, and nowhere indoors. There the loose does nothing and the
+  arrow is kept. The client draws the aim red over such a cell.
+- **Cost and harm**: the loose takes lob_cost stamina (8), on top of the flat draw's drain while
+  held. The damage is attack_damage x the bow's damage x lob_damage (1.2) at any reach, no bands.
+  No guard meets it; armour's deflect_shot does. A hit knocks down lob_down ticks (15) through
+  World.knock_down, so a draugr (never_lies) staggers. A friend is spared, as by a flat shot.
+- **Flight** (World.lob_ticks): lob_flight + lob_per_cell x cells seconds (0.6 + 0.05; 1.0 s at 8
+  cells, 1.35 s at 15). World._tend_lobs strikes whoever stands on the cell when it is due, in its
+  own zone, so a target that steps out is missed and one that steps in is struck. lob_landed
+  either way; nobody there, a thud.
+- **The arc**: World.lob_point(from, to, t, apex), static: the line between, lifted on a parabola
+  lob_apex (0.25) x the ground covered. Client3D flies the arrow on it (_on_lobbed, from
+  GridEntity._net_lobbed {to, ticks}), nosed into the ground at the end. Client3D.lob_aim draws the
+  brass arc (lob_arc_mesh, two crossed ribbons) from the nocked arrow to the cell and the ring of
+  its circle there. Physics reads lob_point. The spent flat arrow's dip (583 amended (3)) stays
+  its own client curve.
+- **Tuning**: every lob_* is a ranged-verb default (Items.VERBS), so it shows on F7 under
+  items.bow.
+- **Wire**: PROTOCOL_REVISION 37: the stance's "lob", the "lob" command, GridEntity.lobbing in
+  SUBCLASS_REPLICATED, and the _net_lobbed RPC. Needs the server deployed.
+- **Not yet**: the puppet's bow is drawn as for a flat shot, not aimed at the sky. The pose is
+  pc-character's to add (read raised "draw" and lobbing).
+
+Tests: combat_test `_test_lob` (stance, steps, circle, aim drawn in, cost, the landing tick, the
+knockdown, one stepped out missed, a draugr staggered, roof and indoors refused, lob_point);
+controls_test (RMB held lobs, the left button and Shift leave it, RMB let go looses, the controls
+line); view_test (the aim shown and hidden; the arrow above the bow mid-flight, down in the cell
+nose first).

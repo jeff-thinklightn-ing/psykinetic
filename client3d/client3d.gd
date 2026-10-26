@@ -1385,6 +1385,13 @@ const ARROW_SAG_SLOW := 1.6
 ## little obvious"): flown level for the first part of its path, it dips over the last
 ## ARROW_DIP of it, gradually steeper, into the ground ARROW_SAG past its reach, nosed in.
 const ARROW_DIP := 0.45
+## The lob's aim (decision 677, lob_aim): its arc's ribbons this wide, drawn in
+## this many pieces; the ring at least this many cells across its middle; red
+## where it cannot come down.
+const LOB_LINE := 0.05
+const LOB_PIECES := 32
+const LOB_RING_MIN := 0.35
+const LOB_CLOSED := Color(0.82, 0.26, 0.2)
 const ARROW_GLANCE := 0.5
 const ARROW_GLANCE_UP := 0.3
 const ARROW_GLANCE_TURN := 2.2
@@ -1762,6 +1769,14 @@ var _channel_ring: MeshInstance3D
 ## draw, a ring on the aim where full strength ends (_aim_full_mark).
 var _aim_arc: MeshInstance3D
 var _aim_mark: MeshInstance3D
+## The lob's aim (decision 677; Jeff: "you see an brass color arc drawn from
+## the end of the arrow to the landing circle"): the arc from the nocked
+## arrow up and down to the cell aimed at, and the ring on the ground there
+## as wide as the circle it comes down in; red over ground it cannot come
+## down on (World.lob_open). Made the first time it is shown (lob_aim).
+var _lob_arc: MeshInstance3D
+var _lob_ring: MeshInstance3D
+var _lob_key := []
 ## The full-strength edge on the aim (decision 669): drawn past full draw,
 ## where the bow's full draw reaches, so what lies beyond takes less.
 var _aim_full_mark: MeshInstance3D
@@ -15752,6 +15767,7 @@ func _make_puppet(entity: GridEntity) -> Node3D:
 		# Hooked once: a puppet made again (a body that came late) finds them hooked.
 		_hook(entity.swung, _on_swung.bind(id))
 		_hook(entity.shot, _on_shot.bind(id))
+		_hook(entity.lobbed, _on_lobbed.bind(id))
 		_hook(entity.winding, _on_winding.bind(id))
 		_hook(entity.guarded, _on_guarded.bind(id))
 		if entity is Player or entity is Companion:
@@ -15865,13 +15881,7 @@ func _on_shot(point: Vector2, struck: StringName, id: int) -> void:
 	if puppet == null or puppet.get_parent() == null:
 		return
 	_combat_at[id] = Time.get_ticks_msec()
-	# The bow's loose (decision 462): the release and the recovery, then idle.
-	if puppet.has_meta("rig") and str(puppet.get_meta("bow_state", "")) in ["draw", "hold"]:
-		var clip := str((puppet.get_meta("moves", {}) as Dictionary).get("bow_shoot", ""))
-		var rig := puppet.get_meta("rig") as AnimRig
-		rig.upper(clip, 1.0, true)
-		puppet.set_meta("bow_state", "loose")
-		puppet.set_meta("bow_until", Time.get_ticks_msec() + int(rig.length(clip) * 1000.0))
+	_bow_loosed(puppet)
 	var shooter := instance_from_id(id) as GridEntity
 	var from := _bow_tip(puppet)
 	var hit := World.get_entity_at(to) if struck == &"body" else null
@@ -15975,6 +15985,119 @@ static func arc_at(from: Vector3, flat: Vector3, drop: float, t: float) -> Vecto
 static func arc_heading(from: Vector3, flat: Vector3, drop: float, t: float) -> Vector3:
 	var u := maxf(0.0, t - (1.0 - ARROW_DIP)) / ARROW_DIP
 	return (flat - from) + Vector3.DOWN * drop * 2.0 * u / ARROW_DIP
+
+
+## The bow's loose on [param puppet] (decision 462): the release and the
+## recovery, then idle; a flat shot's (_on_shot) and a lob's (_on_lobbed).
+func _bow_loosed(puppet: Node3D) -> void:
+	if puppet.has_meta("rig") and str(puppet.get_meta("bow_state", "")) in ["draw", "hold"]:
+		var clip := str((puppet.get_meta("moves", {}) as Dictionary).get("bow_shoot", ""))
+		var rig := puppet.get_meta("rig") as AnimRig
+		rig.upper(clip, 1.0, true)
+		puppet.set_meta("bow_state", "loose")
+		puppet.set_meta("bow_until", Time.get_ticks_msec() + int(rig.length(clip) * 1000.0))
+
+
+## The way an arrow lobbed [param from] [param to] heads [param t] of its
+## flight (World.lob_point's slope; decision 677).
+static func lob_heading(from: Vector3, to: Vector3, t: float, apex := 0.25) -> Vector3:
+	var flat := Vector2(to.x - from.x, to.z - from.z).length()
+	return (to - from) + Vector3.UP * 4.0 * apex * flat * (1.0 - 2.0 * t)
+
+
+## A lob (World.try_lob, decision 677) loosed by the body [param id] to come
+## down on [param to] in [param ticks]: the bow's twang, and its arrow flies
+## World.lob_point's arc from the bow there, to stand in the ground nose
+## first (a body struck there is heard by its hurt); into water it's gone.
+func _on_lobbed(to: Vector2i, ticks: int, id: int) -> void:
+	var puppet: Node3D = _puppets.get(id)
+	if puppet == null or puppet.get_parent() == null:
+		return
+	_combat_at[id] = Time.get_ticks_msec()
+	_bow_loosed(puppet)
+	var shooter := instance_from_id(id) as GridEntity
+	var from := _bow_tip(puppet)
+	var ground := _tile_position(to)
+	var apex := float(Items.verb_of(World.drawn_with(shooter)).get("lob_apex", 0.25)) if shooter != null else 0.25
+	_stop_creak(puppet)
+	sfx.play("sfx.bow_loose", from)
+	var flight := maxf(0.05, float(ticks) / World.TICK_RATE)
+	var water := World.is_water(to)
+	get_tree().create_timer(flight).timeout.connect(func() -> void:
+		if is_instance_valid(sfx) and sfx.is_inside_tree() and World.get_entity_at(to) == null:
+			sfx.play("sfx.arrow_water" if water else "sfx.arrow_land", ground))
+	_whistle(from, ground, flight)
+	var arrow := _flying_arrow(shooter)
+	arrow.name = "LobArrow"
+	puppet.get_parent().add_child(arrow, true)
+	_fly_arrow(arrow)
+	_head_arrow(arrow, from, lob_heading(from, ground, 0.0, apex))
+	var tween := create_tween()
+	tween.tween_method(func(t: float) -> void: _head_arrow(arrow, World.lob_point(from, ground, t, apex), lob_heading(from, ground, t, apex)),
+		0.0, 1.0, flight)
+	tween.tween_callback(_rest_arrow.bind(arrow))
+	if not water:
+		var nose := lob_heading(from, ground, 1.0, apex)
+		tween.tween_callback(func() -> void: _head_arrow(arrow, ground + nose.normalized() * ARROW_BURY, nose))
+		tween.tween_interval(SHOT_STUCK_SECONDS)
+	tween.tween_callback(func() -> void:
+		if is_instance_valid(arrow):
+			arrow.queue_free())
+
+
+## The lob's aim shown (decision 677; Main, each frame while lobbing): the
+## brass arc from [param from] (the nocked arrow, puppet space) to
+## [param cell]'s ground on World.lob_point's [param apex], the ring there
+## [param radius] cells across its middle; red where it cannot come down
+## ([param open] false). Hidden when not [param show].
+func lob_aim(from: Vector3, cell: Vector2i, radius: float, open: bool, apex: float, show: bool) -> void:
+	if _lob_arc == null:
+		if not show:
+			return
+		_lob_arc = _make_flat(ArrayMesh.new(), Color(UiTheme.color("brass_bright"), 0.85))
+		_lob_ring = _make_flat(ArrayMesh.new(), Color(UiTheme.color("brass_bright"), 0.9))
+		add_child(_lob_arc)
+		add_child(_lob_ring)
+	_lob_arc.visible = show
+	_lob_ring.visible = show
+	if not show:
+		_lob_key = []
+		return
+	var colour: Color = UiTheme.color("brass_bright") if open else LOB_CLOSED
+	for flat: MeshInstance3D in [_lob_arc, _lob_ring]:
+		(flat.material_override as StandardMaterial3D).albedo_color = Color(colour, 0.85)
+	var ground := _tile_position(cell) + Vector3.UP * ON_FLOOR * 2.0
+	var key := [from.snapped(Vector3.ONE * 0.01), cell, snappedf(radius, 0.01), apex]
+	if key == _lob_key:
+		return
+	_lob_key = key
+	_lob_arc.mesh = lob_arc_mesh(from, ground, apex)
+	var base := _height_in(cell, Vector2(cell))
+	_lob_ring.mesh = _ground_arc_mesh(Vector2(cell), maxf(radius, LOB_RING_MIN), AIM_LINE, 0.0, PI, base)
+	_lob_ring.position = Vector3(cell.x, base + ON_FLOOR * 2.0, cell.y)
+
+
+## The lob's arc as two crossed ribbons LOB_LINE wide (one lying, one
+## standing, so it reads from any camera), LOB_PIECES pieces along
+## World.lob_point from [param from] to [param to].
+static func lob_arc_mesh(from: Vector3, to: Vector3, apex: float) -> ArrayMesh:
+	var surface := SurfaceTool.new()
+	surface.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for i in LOB_PIECES:
+		var a := World.lob_point(from, to, float(i) / LOB_PIECES, apex)
+		var b := World.lob_point(from, to, float(i + 1) / LOB_PIECES, apex)
+		var along := (b - a).normalized()
+		var flat := along.cross(Vector3.UP)
+		if flat.is_zero_approx():
+			flat = Vector3.RIGHT
+		flat = flat.normalized() * LOB_LINE * 0.5
+		var up := along.cross(flat).normalized() * LOB_LINE * 0.5
+		for across: Vector3 in [flat, up]:
+			var quad: Array[Vector3] = [a - across, b - across, b + across, a + across]
+			for j: int in [0, 1, 2, 0, 2, 3]:
+				surface.set_normal(Vector3.UP)
+				surface.add_vertex(quad[j])
+	return surface.commit()
 
 
 ## An arrow flying [param from] to [param end] over [param flight] seconds

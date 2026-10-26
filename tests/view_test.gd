@@ -806,6 +806,21 @@ func _test_bow_sounds() -> void:
 	_check(dips[10] == 0.0 and dips[16] > 0.0 and dips[16] < 0.5 and is_equal_approx(dips[20], 1.4) and turns < deg_to_rad(8.0)
 			and Client3D.arc_heading(a, b, 1.4, 1.0).normalized().y < -0.3,
 			"a spent arrow's arc: level halfway, dipping over its last part, into the ground nose down, never turning more than 8 degrees a step (%s)" % [dips])
+	# The lob (decision 677): its aim, a brass arc and the ring, then the arrow up and down onto the cell.
+	if open.x >= 0:
+		var tip: Vector3 = _rig._bow_tip(_rig._puppets[player.get_instance_id()])
+		_rig.lob_aim(tip, open, 1.0, true, 0.25, true)
+		_check(_rig._lob_arc.visible and _rig._lob_ring.visible and _rig._lob_arc.mesh.get_surface_count() == 1, "lobbing: the brass arc and the ring shown")
+		_rig.lob_aim(Vector3.ZERO, Vector2i.ZERO, 0.0, false, 0.0, false)
+		_check(not _rig._lob_arc.visible and not _rig._lob_ring.visible, "and hidden after")
+		player._world_lobbed(open, 6)
+		await get_tree().create_timer(0.3).timeout
+		var lofted := _rig.get_tree().root.find_child("LobArrow", true, false) as Node3D
+		var ground := _rig._tile_position(open)
+		_check(lofted != null and lofted.position.y > maxf(tip.y, ground.y), "a lob's arrow climbs above the bow and the ground it falls to (%s)" % [lofted.position if lofted != null else null])
+		await get_tree().create_timer(0.5).timeout
+		_check(lofted != null and is_instance_valid(lofted) and lofted.position.distance_to(ground) < 0.3 and lofted.transform.basis.y.normalized().y < -0.3,
+				"and comes down into the cell aimed at, nose down")
 	if wall.x >= 0:
 		arrows_before = _shot_arrows()
 		player._world_shot(Vector2(wall) + Vector2(wall - player.tile).normalized() * 0.5, &"stone")

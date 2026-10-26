@@ -30,6 +30,9 @@ signal swung(direction: Vector2i)
 ## (its range spent: it comes down past the point). Views draw the arrow.
 ## On every peer.
 signal shot(to: Vector2, struck: StringName)
+## Its bow lobbed an arrow (World.try_lob, decision 677) to come down on
+## [param to] in [param ticks]: views fly it there on its arc. On every peer.
+signal lobbed(to: Vector2i, ticks: int)
 ## A thing it held (Items id [param item_id]) was thrown down a line
 ## (World.hurl, decision 606) and came down at [param to]: views draw its
 ## flight with the thing's art. On every peer.
@@ -116,6 +119,9 @@ var buffs := {}
 var raised := ""
 ## The tick it was raised (World.tick): how long a bow has been drawn.
 var raised_tick := 0
+## Its raised "draw" aimed at the sky (decision 677: the lob, the right
+## button with a bow): World.try_lob looses it, not try_loose.
+var lobbing := false
 ## Server: until this tick a broken guard cannot be raised again
 ## (World._meet_guard, decision 340).
 var guard_broken_until := 0
@@ -924,6 +930,12 @@ func _world_shot(to: Vector2, struck: StringName) -> void:
 		_net_shot.rpc_id(peer, to, struck)
 
 
+func _world_lobbed(to: Vector2i, ticks: int) -> void:
+	lobbed.emit(to, ticks)
+	for peer in viewers():
+		_net_lobbed.rpc_id(peer, to, ticks)
+
+
 func _world_hurled(item_id: String, to: Vector2i) -> void:
 	hurled.emit(item_id, to)
 	for peer in viewers():
@@ -1323,6 +1335,11 @@ func _net_swung(direction: Vector2i) -> void:
 @rpc("authority", "call_remote", "reliable")
 func _net_shot(to: Vector2, struck: StringName) -> void:
 	shot.emit(to, struck)
+
+
+@rpc("authority", "call_remote", "reliable")
+func _net_lobbed(to: Vector2i, ticks: int) -> void:
+	lobbed.emit(to, ticks)
 
 
 @rpc("authority", "call_remote", "reliable")
