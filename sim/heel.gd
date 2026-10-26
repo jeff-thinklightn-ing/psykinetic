@@ -70,6 +70,14 @@ func follow(body: GridEntity, leader: GridEntity) -> void:
 		catching_up = true
 	if not catching_up:
 		_goal = NONE
+		# Settled, and his held line or order runs through her cell: she steps
+		# aside at once, else stays and his step swaps them (678, companions'
+		# side, amended; ui's bench: his straight line fell to a route round her).
+		var clear := keep_clear(leader)
+		if clear.has(body.tile):
+			var aside := _aside(body, leader, clear)
+			if aside != NONE:
+				step(body, aside, false, leader)
 		return
 	var walking := World.tick - _leader_moved <= WALKING_TICKS
 	var way := travel(leader)

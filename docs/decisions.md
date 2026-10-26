@@ -31111,3 +31111,32 @@ remedy first). The give section hands her a silver ring to give back,
 since her kit is no longer offered.
 
 Server only, protocol unchanged, no new class_name.
+
+
+## 678, companions' side, amended: she steps out of his held line
+
+ui's latency bench on v0.1.180 (0 swaps in 15 runs; own-body corrections 0
+in held runs, 1 a run in click runs, both with her within a cell): in one
+held round in six she stood in the straight line to the cursor, so his
+steer fell to a route round her. Her keep-clear sidestep (Heel._aside) ran
+only while she was catching up; settled beside him she stayed put, so a
+fresh click or held line through her cell found her in it. The
+coordinator: "settled and in his way, she steps aside at once into a free
+cell outside the keep-clear set; if there's none, she stays and the swap
+handles it".
+
+- **Settled, in his way** (Heel.follow, not catching up): her cell one of
+  keep_clear's (his queued WASD steps, his via cells, the line to his move
+  order, two along a walk), she steps to _aside's cell; none free, she
+  stays and his step swaps them (679).
+- It cannot beat the plan the client makes on the tick of his click (her
+  cell is still taken then); ui's side ends that route on letting go.
+
+companion_test _test_heel_leaves_his_line: settled two cells ahead on his
+line, east along row 8 and on a slant to (12, 5), he sets off with a
+client's straight via cells: swaps 2 before, 0 after; his straight line
+walked both times. _test_yields_when_bumped's step into her still lands on
+its tick; she is swapped to where he stood or has stepped aside, so it
+checks her beside him.
+
+Server only, protocol unchanged, no new class_name.

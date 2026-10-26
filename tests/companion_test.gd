@@ -107,6 +107,7 @@ func _ready() -> void:
 	_test_follow_without_backsteps()
 	_test_heel_keeps_clear()
 	_test_heel_on_the_line()
+	_test_heel_leaves_his_line()
 	_test_quiet()
 	_test_dodge()
 	_test_firing_cone()
@@ -2753,7 +2754,9 @@ func _test_yields_when_bumped() -> void:
 	_put(pet, Vector2i(10, 6))
 	World.order_step(owner, Vector2i(1, 0), owner.refusals, false)
 	World.step()
-	_check(owner.tile == Vector2i(10, 6) and pet.tile == Vector2i(9, 6), "the step into her lands on its tick: he at %s, she where he stood (%s)" % [owner.tile, pet.tile])
+	# She is swapped to where he stood, or (678, companions' side, amended)
+	# has stepped out of his way on the tick his step came.
+	_check(owner.tile == Vector2i(10, 6) and World.are_adjacent(pet.tile, owner.tile), "the step into her lands on its tick: he at %s, she beside him (%s)" % [owner.tile, pet.tile])
 	_check(mind.stance_asks.is_empty() and mind.voice_asks.is_empty(), "no mind asked")
 	World.order_step(owner, Vector2i(1, 0), owner.refusals, false)
 	for i in 3:
@@ -3295,6 +3298,56 @@ func _test_heel_keeps_clear() -> void:
 	print("  (stop dead and turn back, twenty runs: %d swaps, %d into a cell she had just taken, %d steps back, %d refusals of his steps; her step gaps %s)" % [count["swaps"], count["fresh"], count["backs"], refused, gaps])
 	_check(count["fresh"] == 0 and count["backs"] == 0, "she never steps into the cell he walks into: no swap into it, no step back (%d, %d)" % [count["fresh"], count["backs"]])
 	_check(refused == 0, "and none of his held steps is refused (%d)" % refused)
+	_put(owner, owner_was)
+	_put(pet, pet_was)
+	_settle(pet)
+
+
+func _test_heel_leaves_his_line() -> void:
+	print("\n== settled beside him, she steps out of the straight line he sets off on (678, companions' side, amended; ui's bench) ==")
+	_kill_monsters()
+	var owner := _player()
+	var pet := _companion()
+	_settle(pet)
+	var owner_was := owner.tile
+	var pet_was := pet.tile
+	var swaps := 0
+	var straight := 0
+	var runs := 0
+	# His line runs through her cell two ahead of him, east along row 8 and
+	# on a slant to (12, 5) (clear of the fire on row 5); he sets off as a
+	# click does (the client's straight via cells).
+	for run: Array in [[Vector2i(8, 8), Vector2i(12, 8)], [Vector2i(8, 7), Vector2i(12, 5)]]:
+		var her: Vector2i = run[0]
+		_put(owner, Vector2i(6, 8))
+		_put(pet, her)
+		pet.heel.catching_up = false
+		for i in 20:
+			World.step()
+		_check(not pet.heel.catching_up and pet.tile == her, "(settled at %s)" % pet.tile)
+		owner.move_order = run[1]
+		owner.move_via = World.line_cells(owner.tile, owner.move_order)
+		owner.has_move_order = true
+		var line: Array[Vector2i] = [owner.tile]
+		line.append_array(owner.move_via)
+		_check(her in line, "(his line %s runs through her cell)" % [line])
+		var walked: Array[Vector2i] = [owner.tile]
+		var held := pet.tile
+		for i in 60:
+			World.step()
+			if owner.tile != walked.back():
+				if owner.tile == held:
+					swaps += 1
+				walked.append(owner.tile)
+			held = pet.tile
+			if owner.tile == owner.move_order:
+				break
+		runs += 1
+		if walked == line:
+			straight += 1
+		print("  (her at %s: he walked %s; she is at %s)" % [her, walked, pet.tile])
+	_check(swaps == 0, "she was out of his way before he got there: no swap (%d)" % swaps)
+	_check(straight == runs, "and he walked his straight line, not round her (%d of %d)" % [straight, runs])
 	_put(owner, owner_was)
 	_put(pet, pet_was)
 	_settle(pet)

@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Standing beside you, your companion steps out of the straight line you set off on instead of making you walk into her (678, companions' side, amended).
 - Your companion tends wounds unasked: once things are calm she bandages you if you are badly hurt or bleeding, then herself, and badly hurt she drinks a healing remedy she carries; she keeps her bandages and remedies rather than offering to give them away (681).
 ## v0.1.180
 
