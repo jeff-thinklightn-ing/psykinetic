@@ -774,6 +774,15 @@ var test_hold_near := 0.0
 ## cursor three cells off the body, as Jeff steers, and lets go to stop.
 var test_latency := 0
 var test_latency_hold := false
+## --test-latency=N,kick (with a server's --test-kicks): N pushes taken while
+## walking free, each drawn frame watched for the view going back against the
+## slide (a rubber band) and its biggest move (Main._run_lat_kicks).
+var test_latency_kick := false
+## --test-kicks=S,v,v... (a server, 688 amended (2)): every S seconds each
+## player walking free is pushed back across its way, at the speeds given in
+## turn (2 if none), as blows do.
+var test_kicks := 0.0
+var test_kick_speeds: Array[float] = []
 var test_hold_route := false
 var test_hold_angle := 45.0
 var test_hold_far := sqrt(2.0)
@@ -1938,7 +1947,7 @@ func _parse_args() -> void:
 					"--builders", "--builder-model", "--builder-effort", "--builder-max-cost", "--lawspeaker", "--proposed", \
 					"--test-move", "--test-contest", "--test-reset", "--test-builder", "--test-exit-after", "--test-exit-on", "--test-wait-players", "--test-herds", "--test-hold", "--test-version", "--test-protocol", \
 					"--screenshot", "--test-show", "--test-hover", "--test-door", "--test-chest", "--test-click", "--test-fullscreen", "--test-azimuth", "--test-yaw", \
-					"--test-lag", "--test-steer", "--test-fight", "--test-chase", "--test-walk", "--tick-send-hz", "--test-hold-near", "--test-latency":
+					"--test-lag", "--test-steer", "--test-fight", "--test-chase", "--test-walk", "--tick-send-hz", "--test-hold-near", "--test-latency", "--test-kicks":
 				if not has_value and i + 1 < args.size():
 					i += 1
 					value = args[i]
@@ -1980,6 +1989,11 @@ func _set_option(key: String, value: String) -> void:
 		"--test-latency":
 			test_latency = maxi(value.get_slice(",", 0).to_int(), 0)
 			test_latency_hold = value.get_slice(",", 1) == "hold"
+			test_latency_kick = value.get_slice(",", 1) == "kick"
+		"--test-kicks":
+			test_kicks = maxf(value.get_slice(",", 0).to_float(), 0.0)
+			for part in value.split(",").slice(1):
+				test_kick_speeds.append(maxf(part.to_float(), 0.0))
 		"--test-hold-near":
 			test_hold_near = maxf(value.get_slice(",", 0).to_float(), 0.0)
 			for part in value.split(",").slice(1):

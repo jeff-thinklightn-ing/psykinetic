@@ -32043,3 +32043,44 @@ ctx, a name_of that echoes the id, a record with no name, and a named
 record, using a placeholder id.
 
 Server only, protocol unchanged, no new class_name.
+## 689 amended (2): a click on its own cell stops a free body where it stands
+
+The latency table's click stop on the box's link took 166-186 ms in half
+its rounds against 33 ms in the rest, offline as well, and the slow rounds
+had gone on 0.36-0.40 cells. A click on the cell the body is drawn in,
+which mid-walk is often the one ahead of the cell held (rounded past half
+way, held till 0.1 past the edge), routed the body on into it, to its
+centre. Main._free_route now takes a click on the cell held or the cell
+drawn in as a stop where it stands: a free body has no centre to finish.
+Grid walking is unchanged. controls_test: a click on the cell drawn in
+mid-walk stops it (0.54 cells on without this, none with).
+
+With it, two test-only flags for the kick-replay check (688 amended (2)
+through the proxy, before free_walk goes on): a server's
+--test-kicks=S,v,... pushes each player walking free back across its way
+every S seconds at the speeds given in turn (Main._run_test_kicks); a
+client's --test-latency=N,kick holds a walk key, turning at each push,
+and reports for N pushes the cells slid, the biggest move drawn in a
+frame, the own body's corrections, and the times the view went back with
+the key and then with the slide again (a rubber band;
+Main._run_lat_kicks).
+
+That check, through the proxy at the box's round trip (pushes at 1.23, a
+draugr's thrown axe, and 2.94, his spin on an exhausted player, while
+walking), found the own view rubber-banding: 15 bands in 6 pushes, jumps
+to 4.9 cells. Each frame's closed command was glided on the server's
+centre and replayed on each state while the server slid the body and
+dropped them. FreeNet.Own now holds while the server moves the body
+itself (physics' signals, no threshold, so a wall or a body stepping in
+front cannot set it off): from its body's `pushed` (Player connects it;
+Own.pushed drops what is pending and the open command and holds for
+World.push_slide_ticks(tiles), at least a tick: the server's playback,
+falls included), and while the replicated _reel_until, down_until or
+downed_until run (Own.held_by_server). Held, nothing is replayed or
+glided, and the server's centre is blended in up to 3 cells
+(HELD_BLEND_MAX). The hold, timed from the client's tick, ends about half
+a round trip after the server's playback: on the safe side. After: 0
+bands in 6 pushes; a blow's first tick can still show at once (up to 3
+cells in a frame), as the hit landing. free_net_test's push under lag now
+hears `pushed` at the lag and counts turns drawn. Client only, protocol
+unchanged, no new class_name.

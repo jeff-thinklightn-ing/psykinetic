@@ -235,6 +235,13 @@ func _test_kick_under_lag() -> void:
 	var sent := 0
 	var pushed_at := Vector2.INF
 	var slid_to := Vector2.INF
+	var tiles := 0
+	# What is drawn from the push on: its moves along x, east (+1) or west
+	# (-1), and the times it turns (a rubber band: back with the key held,
+	# then with the slide again).
+	var drawn_was := Vector2.INF
+	var drawn_way := 0
+	var turns := 0
 	var plan: Array[Array] = [[Vector2.RIGHT, 40], [Vector2.RIGHT, 50], [Vector2.ZERO, 80]]
 	for leg in plan:
 		for i in int(leg[1]):
@@ -251,12 +258,25 @@ func _test_kick_under_lag() -> void:
 				pushed_at = player.free_pos
 				World._push(pusher, player, Vector2(-1, 0.5), 2.0)
 				slid_to = player.free_kick_path[player.free_kick_path.size() - 1]
+				tiles = roundi(pushed_at.distance_to(slid_to))
+			if frame == 42 + lag:
+				own.pushed(tiles)  # The body's `pushed`, as a client hears it.
 			if frame % 6 == 0:
 				World.step()
 				player.pack_free()
 				to_client.append([frame + lag, player.free_state.duplicate()])
 			while not to_client.is_empty() and int(to_client[0][0]) <= frame:
 				own.confirm(player, FreeNet.unpack_state(to_client.pop_front()[1], World.tick))
+			if frame >= 42:
+				var drawn := own.shown(player)
+				if drawn_was != Vector2.INF and absf(drawn.x - drawn_was.x) > 0.002:
+					var way := 1 if drawn.x > drawn_was.x else -1
+					if drawn_way != 0 and way != drawn_way:
+						turns += 1
+					drawn_way = way
+				drawn_was = drawn
+	# The slide west, then east again once let go: a turn, two at most.
+	_check(turns <= 2, "drawn: the slide back and the walk on, no rubber band (%d turns)" % turns)
 	_check(slid_to.x < pushed_at.x - 1.5, "pushed west-south-west at 2 from %s: slid to %s" % [pushed_at, slid_to])
 	_check(player.free_pos.x > slid_to.x + 0.5, "walked east again after the slide (%s)" % player.free_pos)
 	_check(own.pending.is_empty() and own.shown(player).distance_to(player.free_pos) < 0.02,

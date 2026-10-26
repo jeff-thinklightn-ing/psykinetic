@@ -1210,6 +1210,17 @@ func _test_free_click() -> void:
 	arrived = _free_frames(player, 300, Vector2i(9, 3))
 	_check(midway.distance_to(Vector2(9, 6)) > 0.5 and arrived,
 			"a new click on the way (left (9, 6) for %s): went to (9, 3) instead (at %s)" % [midway, player.free_pos])
+	_main._move_click(player, Vector2i(4, 3))
+	_free_frames(player, 20)
+	var own: Variant = player.free_view
+	var was: Vector2 = own.shown(player)
+	_main._move_click(player, Vector2i(was.round()))  # The cell it is drawn in, as a player clicks it.
+	_free_frames(player, 2)
+	var stopped_at: Vector2 = own.shown(player)
+	_free_frames(player, 30)
+	_check(stopped_at.distance_to(was) < 0.15 and own.shown(player).distance_to(stopped_at) < 0.01,
+			"a click on its own cell mid-walk: stopped where it stood (from %s: went on %.2f, then %.3f)" % [
+			was, stopped_at.distance_to(was), own.shown(player).distance_to(stopped_at)])
 	World.set_free_walk(false)
 	player.free_view = null
 	Net.controls = saved

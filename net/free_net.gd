@@ -30,6 +30,8 @@ const USED_SCALE := 80.0
 ## A correction of the own body under this many cells is blended out over
 ## BLEND_SECONDS; a bigger one (a push, a link) is shown at once.
 const BLEND_MAX := 0.75
+## Held by the server (a push): its centre blended in however far, up to this.
+const HELD_BLEND_MAX := 3.0
 const BLEND_SECONDS := 0.1
 ## The most commands the own view keeps unacknowledged (a server gone
 ## quiet): past it the oldest go.
@@ -124,6 +126,12 @@ class Own:
 	## Commands closed since the last send, the newest SEND_REPEAT sent.
 	var sent: Array[Dictionary] = []
 	var corrections := 0
+	## The tick till which the server moves the body itself and drops its
+	## commands (688 amended (2)): a push's slide, from the body's `pushed`
+	## (pushed()), and after it the body's _reel_until, down_until and
+	## downed_until, each as the server sends them. Till then nothing is
+	## replayed on its centre, which is drawn as it comes, blended.
+	var hold_until := -1.0
 
 	## (FreeNet.quantise; here, where Own's own code reaches it.)
 	static func quantise(intent: Vector2) -> Vector2:
@@ -176,7 +184,8 @@ class Own:
 		pending.append(command)
 		if pending.size() > PENDING_MAX:
 			pending.pop_front()
-		_glide(entity, command)
+		if not held_by_server(entity):
+			_glide(entity, command)  # Held, the server drops it: the view stays on its centre.
 		sent.append(command)
 		while sent.size() > SEND_REPEAT:
 			sent.pop_front()
@@ -191,6 +200,7 @@ class Own:
 		var acked: int = state["acked"]
 		if not server.is_empty() and acked != int(server["acked"]) and not seq_after(acked, int(server["acked"])):
 			pending.clear()  # The count started again (a spawn, the switch): what was sent before is gone.
+		var overruled := held_by_server(entity)
 		server = state
 		while not pending.is_empty() and not seq_after(int(pending[0]["seq"]), acked):
 			pending.pop_front()
@@ -198,7 +208,7 @@ class Own:
 		base = state["pos"]
 		held = state["held"]
 		way = Vector2.ZERO
-		for i in pending.size():
+		for i in (0 if overruled else pending.size()):
 			var command: Dictionary = pending[i]
 			if i == 0 and int(command["seq"]) == (acked + 1) & 0xFFFF and float(state["used"]) > 0.0:
 				var rest := command.duplicate()
@@ -213,20 +223,36 @@ class Own:
 				if Net.test_latency > 0:
 					print("[latency] free correction %.3f cells at %s, %d pending" % [fresh.length(), base, pending.size()])
 			var off := error + fresh
-			error = off if off.length() < BLEND_MAX else Vector2.ZERO
+			# Overruled, the server's moves are drawn as they come: blended
+			# however far (a slide's first tick goes most of a cell).
+			error = off if off.length() < (HELD_BLEND_MAX if overruled else BLEND_MAX) else Vector2.ZERO
 
 	## Where to draw the body this frame, in cells.
 	func shown(entity: GridEntity) -> Vector2:
 		if base == Vector2.INF:
 			return entity.free_pos
 		var at := base
-		if open_intent != Vector2.ZERO and open_seconds > 0.0:
+		if open_intent != Vector2.ZERO and open_seconds > 0.0 and not held_by_server(entity):
 			at = World.free_glide(entity, base, open_intent, open_seconds * World.TICK_RATE, held)[0]
 		return at + error
 
 	## The way it is going now, cells a tick.
 	func going() -> Vector2:
 		return way if open_intent == Vector2.ZERO else open_intent * maxf(way.length(), 0.0001) / maxf(open_intent.length(), 0.0001)
+
+	## Its body pushed [param tiles] cells (the body's `pushed`, 688 amended
+	## (2)): the server slides it and drops what was sent, so that is dropped
+	## here too, and nothing is replayed till the slide is over (a push of
+	## under a cell: a tick).
+	func pushed(tiles: int) -> void:
+		hold_until = maxf(hold_until, World.tick + maxi(World.push_slide_ticks(tiles), 1))
+		pending.clear()
+		open_seconds = 0.0
+
+	## Whether the server is moving [param entity] itself now, dropping its
+	## commands: a push's slide, a stun, down or downed.
+	func held_by_server(entity: GridEntity) -> bool:
+		return World.tick < maxf(maxf(hold_until, entity._reel_until), maxf(entity.down_until, entity.downed_until))
 
 	func _glide(entity: GridEntity, command: Dictionary) -> void:
 		var glided: Array = World.free_glide(entity, base, command["intent"], float(command["ticks"]), held)

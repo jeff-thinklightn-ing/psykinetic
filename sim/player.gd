@@ -131,6 +131,13 @@ func _init() -> void:
 
 
 
+## Its own free body pushed (688 amended (2)): the view stops replaying
+## till the slide is over.
+func _free_pushed(tiles: int) -> void:
+	if free_view is FreeNet.Own:
+		(free_view as FreeNet.Own).pushed(tiles)
+
+
 ## The packed state of its free body heard (decision 689): one's own
 ## player's replay told what the server applied, another's mirror given a
 ## sample; empty, the view dropped (back on the grid).
@@ -146,6 +153,8 @@ func _free_heard() -> void:
 	if is_local():
 		if not free_view is FreeNet.Own:
 			free_view = FreeNet.Own.new()
+			if not pushed.is_connected(_free_pushed):
+				pushed.connect(_free_pushed)
 		(free_view as FreeNet.Own).confirm(self, state)
 	elif not Net.is_authority():
 		if not free_view is FreeNet.Mirror:

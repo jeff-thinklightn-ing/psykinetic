@@ -7,6 +7,8 @@ notes (decision 324).
 
 ## Unreleased
 
+- Free movement: clicking the spot you're standing on while walking stops you where you are, instead of walking on to the middle of that square (689 amended (2))
+- Free movement: when a blow knocks you back while you're walking, your character slides back smoothly instead of jerking back and forth (689 amended (2))
 - Security: a companion resting in town is no longer named after her player's id in what clients are sent, and a dedicated server refuses anyone claiming the dev host's id (691).
 - The server keeps its join token out of the process list (read from its environment, not its command line), its install folder is no longer writable by the server itself, and a builder-mode request stops at $1.00 of the API key (690).
 - Raiding groups wait for their routes after a level is laid again: a camp sends nobody and a group out stands where it is until its side's ways are worked out, instead of the server freezing to find one (raids are still off on the live server).

@@ -1188,6 +1188,7 @@ func _process(delta: float) -> void:
 	_update_pick()
 	_run_test_hold_near()
 	_run_test_latency()
+	_run_test_kicks()
 	_test_hover()
 	drive_stand_draw(Keys.held("stand") and not is_typing() and _cursor_item.is_empty(), Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT))
 	if not _free_drive(delta):
@@ -2734,8 +2735,12 @@ func _free_route(player: Player, tile: Vector2i) -> void:
 	var own := _free_own(player)
 	# From the cell the body is shown on (ahead of the server's claim), so
 	# the route never starts behind it.
-	var from := World.free_cell(player, own.shown(player)) if own != null else player.tile
-	if tile != NONE:
+	var shown: Vector2 = own.shown(player) if own != null else Vector2(player.tile)
+	var from := World.free_cell(player, shown) if own != null else player.tile
+	# A click on the cell it is on, held or drawn in (rounded: past half way
+	# into the next), stops it where it stands: a free body has no centre to
+	# finish (the latency table's click stop went on 0.4 cells into it).
+	if tile != NONE and tile != from and tile != Vector2i(shown.round()):
 		for cell: Vector2i in World.walk_path(from, tile, player):
 			path.append(cell)
 	_free["path"] = path
@@ -16143,6 +16148,9 @@ func _run_test_latency() -> void:
 			seen = Vector2(_client3d._camera_target.x, _client3d._camera_target.z)
 		_pick_grid = seen + _lat_hold
 	_lat_count(player)
+	if Net.test_latency_kick:
+		_run_lat_kicks(player, now, moved)
+		return
 	match _lat["phase"]:
 		"":
 			_lat["phase"] = "settle"
@@ -16209,7 +16217,84 @@ func _run_test_latency() -> void:
 			_lat_report()
 
 
-## Each frame (release's ask: Jeff, "sometimes she catches up into the
+## --test-latency=N,kick: walks east, then west after each push, holding
+## the key while the server's --test-kicks pushes it back across its way.
+## A push is the frames drawn going against the key held, from the first
+## until 0.4 s without one; with each: the cells slid, the biggest move in a
+## frame, the own body's corrections, and the times the view turned with
+## the key again and then back with the slide (a rubber band).
+func _run_lat_kicks(player: Player, now: int, moved: Vector2) -> void:
+	if _lat["phase"] == "":
+		_lat["phase"] = "kick"
+		_lat["dir"] = 1.0
+		_lat["at"] = now
+		_lat_keys = "d"
+	var own: Variant = player.free_view
+	var corrections: int = own.corrections if own != null else 0
+	var along: float = moved.x * float(_lat["dir"])
+	var row: Dictionary = _lat.get("row", {})
+	if row.is_empty():
+		if along < -0.02:
+			_lat["row"] = {"at": now, "last": now, "slid": -along, "leap": moved.length(), "frames": 1,
+					"bands": 0, "resumed": false, "corrections": corrections}
+		elif (now - int(_lat["at"])) / 1000.0 > 10000.0:
+			_lat["phase"] = "done"
+			print("[latency] kick: no push seen in 10 s")
+		return
+	row["frames"] += 1
+	row["leap"] = maxf(float(row["leap"]), moved.length())
+	if along < -0.002:
+		row["slid"] += -along
+		row["last"] = now
+		if row["resumed"]:
+			row["bands"] += 1
+			row["resumed"] = false
+	elif along > 0.002:
+		row["resumed"] = true
+	if now - int(row["last"]) > 400000:
+		row["corrections"] = corrections - int(row["corrections"])
+		row["ms"] = (int(row["last"]) - int(row["at"])) / 1000.0
+		_lat["rows"].append(row)
+		_lat["row"] = {}
+		_lat["at"] = now
+		_lat["dir"] = -float(_lat["dir"])
+		_lat_keys = "d" if float(_lat["dir"]) > 0.0 else "a"
+		if _lat["rows"].size() >= Net.test_latency:
+			_lat["phase"] = "done"
+			_lat_keys = ""
+			var bands := 0
+			for each: Dictionary in _lat["rows"]:
+				bands += int(each["bands"])
+				print("[latency] kick %d: slid %.2f cells over %.0f ms (%d frames), leap %.3f cells, %d own corrections, %d rubber bands" % [
+						_lat["rows"].find(each), each["slid"], each["ms"], each["frames"], each["leap"], each["corrections"], each["bands"]])
+			print("[latency] kicks: %d, rubber bands %d" % [_lat["rows"].size(), bands])
+
+
+## --test-kicks=S,v..., the authority: every S seconds each player walking
+## free is pushed back across its way, as a blow from ahead and aside, at the
+## next of the speeds given.
+var _test_kick_at := 0
+var _test_kicks_given := 0
+
+
+func _run_test_kicks() -> void:
+	if Net.test_kicks <= 0.0 or not Net.is_authority():
+		return
+	var now := Time.get_ticks_msec()
+	if now - _test_kick_at < Net.test_kicks * 1000.0:
+		return
+	_test_kick_at = now
+	var speeds: Array[float] = Net.test_kick_speeds if not Net.test_kick_speeds.is_empty() else [2.0]
+	var speed: float = speeds[_test_kicks_given % speeds.size()]
+	for entity in World.get_entities():
+		if entity is Player and entity.spawned and not (entity as Player).free_state.is_empty() 				and entity.free_way.length() > 0.01 and entity.free_kick_path.is_empty():
+			var back := -entity.free_way.normalized()
+			World._push(entity, entity, back + back.orthogonal() * 0.5, speed)
+			_test_kicks_given += 1
+			print("[kicks] pushed %s at %.1f from %s" % [entity.name, speed, entity.free_pos])
+
+
+
 ## same tile and bounces off"): the own body's corrections, those with the
 ## own companion within a cell, and swaps with her (679).
 func _lat_count(player: Player) -> void:
