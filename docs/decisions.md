@@ -31804,3 +31804,32 @@ lost the view ends on the server's centre; the switch). controls_test
 _test_free_click (one click and let go walks to its cell; a new click on the
 way redirects). The latency harness offline and over the box's link: see
 the landing message.
+## 688 amended (3): ground speed from the cell held, a substep at a time
+
+ui's 689 prototype showed its own body corrected by about 0.25 cells, two
+times in six, in the wilds (mixed ground). Two causes, both in the free
+glide:
+
+- **The cell a command starts from**: free_glide took each command's cell
+  as the body's tile, or the cell its centre rounds to when it is far off.
+  The server's body keeps the cell it holds from one command to the next
+  (FREE_HYSTERESIS past an edge before it changes), so a replay near an
+  edge read the speed of the wrong cell's ford, grass or slope.
+  free_glide(entity, from, intent, ticks, held) now takes the cell held at
+  [from] (the tile if not given) and returns it third: [centre, velocity,
+  held]. A replay passes each command the last one's.
+- **Where the speed changes**: the speed was read once per call, and then
+  once per substep, so it changed at whichever substep's end followed the
+  change of cell, and the server's bank splits a command elsewhere than a
+  client's replay of it whole. Now a substep is cut where the cell held
+  would change (_free_cell_exit), and the next one reads the new cell's
+  speed: the same place however the command is split.
+
+free_walk_test's replay used to compare only when the server had no
+command waiting, which, three commands to a tick's bank, it almost never
+did. It now steps till they are all applied and compares 13 times a room.
+On the old glide: 0.26 cells off across fords. Now: open ground and fords
+exactly, the cell held the server's each time; by walls under 0.01 (a
+circle rounding a convex corner goes a little otherwise as its substeps
+fall; allowed 0.02). Server and sim only, protocol unchanged, no new
+class_name; ui's FreeNet.Own passes held through.

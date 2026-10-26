@@ -159,7 +159,7 @@ var step_until := -100000.0
 ## decision 344).
 var last_step_tick := -100000
 ## The body's centre in cell units, Vector2(tile) the cell's centre
-## (decision 688): a free body's own (World.free_walk, World._free_move),
+## (decision 688): a free body's own (World.free_walk, World._free_glide),
 ## anyone else's its cell's centre. Any change of tile but a free body's
 ## own claim puts it there (_world_set_tile): a push, a lunge snaps it.
 var free_pos := Vector2.ZERO

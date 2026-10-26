@@ -76,6 +76,7 @@ func _ready() -> void:
 	_test_held()
 	_test_snap()
 	_test_glide()
+	_test_replay_matches()
 	_test_acks()
 	_test_walk_helper()
 	World.free_walk = false
@@ -300,6 +301,61 @@ func _test_glide() -> void:
 	_check(World.free_cell(player, Vector2(2.55, 3)) == Vector2i(2, 3) and World.free_cell(player, Vector2(2.65, 3)) == Vector2i(3, 3)
 			and World.free_cell(player, Vector2(1.4, 2.35)) == Vector2i(1, 2) and player.tile == Vector2i(2, 3),
 			"free_cell: (2, 3) at 0.55 east, (3, 3) at 0.65, (1, 2) diagonally past both, nothing claimed")
+
+
+## A client's replay (ui's 689): the commands glided one after another from
+## where the body began, each whole, against the server's own turns, which
+## split them by its bank, a claim between substeps.
+func _test_replay_matches() -> void:
+	print("\n== a replay of its commands ends where the server's body does ==")
+	for room: Array in [[OPEN, Vector2i(1, 2)], [WALLED, Vector2i(1, 1)], [CORNER, Vector2i(1, 1)], [OPEN, Vector2i(0, 0), "fords"]]:
+		var player := _build(room[0], room[1])
+		var fords := room.size() > 2
+		if fords:
+			# Mixed ground (688 amended (3)): fords on every other column, so
+			# a command's speed changes cell to cell, wherever the bank splits it.
+			for x in [1, 3, 5, 7]:
+				for y in 5:
+					World._fords[Vector2i(x, y)] = true
+		elif room[0] == OPEN:
+			_spawn("res://sim/monster.gd", "Dummy", Vector2i(4, 3))
+		var start := player.free_pos
+		var start_cell := player.tile
+		var room_name: String = "across fords" if fords else "open with a dummy" if room[0] == OPEN else "walled" if room[0] == WALLED else "at the corner"
+		var sent: Array[Array] = []
+		var worst := 0.0
+		var compared := 0
+		var cells_match := true
+		for i in 40:
+			var angle := 0.6 + 0.9 * sin(i * 0.37)
+			var intent := Vector2(cos(angle), sin(angle))
+			var seconds := 0.025 + 0.02 * float(i % 3)
+			sent.append([intent, seconds])
+			World.free_input(player, intent, seconds, i)
+			if i % 3 != 2:
+				continue
+			# A tick at a time till the bank has had them all, the split
+			# falling wherever it does.
+			for _tick in 4:
+				World.step()
+				if not player.free_inputs.is_empty():
+					continue
+				var replay := start
+				var held := start_cell
+				for command: Array in sent:
+					var glided: Array = World.free_glide(player, replay, command[0], command[1] * World.TICK_RATE, held)
+					replay = glided[0]
+					held = glided[2]
+				cells_match = cells_match and held == player.tile
+				worst = maxf(worst, replay.distance_to(player.free_pos))
+				compared += 1
+				break
+		# Open ground and fords exactly; by walls a hundredth or so, a circle
+		# rounding a corner going a little otherwise as its substeps fall.
+		var allowed := 0.02 if room[0] == WALLED or room[0] == CORNER else 0.001
+		_check(compared >= 10 and worst < allowed, "%s: 40 commands of 25 to 65 ms turning: the replay at most %.4f off the server (%d times)" % [
+				room_name, worst, compared])
+		_check(cells_match, "%s: the replay holds the server's cell each time" % room_name)
 
 
 func _test_acks() -> void:

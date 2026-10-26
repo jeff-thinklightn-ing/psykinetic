@@ -8293,9 +8293,12 @@ func tend_free_body(player: Player) -> void:
 ## [param intent] for [param ticks] (688 amended), touching nothing: no
 ## door opened, no crate shifted, no cell held, nothing told, whoever asks
 ## (a client's or a host's replay of its own commands, ui's 689). Its cell
-## is its tile as it stands. [centre, velocity in cells a tick].
-func free_glide(entity: GridEntity, from: Vector2, intent: Vector2, ticks: float) -> Array:
-	return _free_glide(entity, from, intent, ticks, false)
+## is [param held] (the cell it holds at [param from]; its tile if not
+## given): a replay of several commands passes each the last one's, as the
+## server's body holds its cell from one to the next (688 amended (3)).
+## [centre, velocity in cells a tick, the cell it would hold].
+func free_glide(entity: GridEntity, from: Vector2, intent: Vector2, ticks: float, held := NO_CELL) -> Array:
+	return _free_glide(entity, from, intent, ticks, false, held)
 
 
 ## A free body's move (688): at its walk's speed (1 / step_ticks the way it
@@ -8307,22 +8310,36 @@ func free_glide(entity: GridEntity, from: Vector2, intent: Vector2, ticks: float
 ## rather than stall; x first on a tie). With [param effects] (the server's
 ## own turn) it also faces its way, writes its free_pos, opens and shifts
 ## what it presses and holds the cell its centre is in (_free_claim), a
-## substep at a time. [centre, velocity].
-func _free_glide(entity: GridEntity, from: Vector2, intent: Vector2, ticks: float, effects: bool) -> Array:
+## substep at a time. [centre, velocity, cell held].
+func _free_glide(entity: GridEntity, from: Vector2, intent: Vector2, ticks: float, effects: bool, held := NO_CELL) -> Array:
+	if held == NO_CELL or effects:
+		held = entity.tile
 	if free_held(entity) or intent.length() < 0.001 or ticks <= 0.0:
-		return [from, Vector2.ZERO]
+		return [from, Vector2.ZERO, held]
 	var axis := _free_axis(intent)
-	var speed := 1.0 / maxf(step_ticks(entity, axis), 0.001)
-	var velocity := intent * speed
 	if effects:
 		var facing := Vector2i(signi(roundi(intent.x * 1.3)), signi(roundi(intent.y * 1.3)))
 		entity._world_set_facing(facing if facing != Vector2i.ZERO else axis)
 	var p := from
+	# The speed is read from the cell held, a substep at a time (688 amended
+	# (3)), so a command split across the server's bank goes as its client's
+	# replay of it whole does, however many cells it crosses.
+	var speed := 1.0
+	var velocity := Vector2.ZERO
 	var left := ticks
 	var guard := 0
-	while left > 0.0001 and guard < 64:
+	while left > 0.0001 and guard < 128:
+		speed = 1.0 / maxf(step_ticks(entity, axis, held), 0.001)
+		velocity = intent * speed
 		var dt := minf(left, FREE_SUBSTEP / velocity.length())
 		var move := velocity * dt
+		# Cut short where the cell held would change, so the speed changes
+		# there and not at whichever substep's end follows, which a split
+		# command's substeps would place elsewhere.
+		var cut := _free_cell_exit(p - Vector2(held), move)
+		if cut < 1.0:
+			dt *= cut
+			move *= cut
 		var to := _free_resolve(entity, p + move, intent, effects)
 		if to.distance_to(p) < 0.25 * move.length():
 			var other := Vector2i(axis.y, axis.x).abs()
@@ -8339,9 +8356,27 @@ func _free_glide(entity: GridEntity, from: Vector2, intent: Vector2, ticks: floa
 		if effects:
 			entity.free_pos = p
 			_free_claim(entity, 1.0 / speed)
+			held = entity.tile
+		else:
+			held = _free_cell_from(held, p)
 		left -= dt
 		guard += 1
-	return [p, velocity]
+	return [p, velocity, held]
+
+
+## The part of [param move] from [param off] (from the held cell's centre)
+## at which the centre just passes FREE_HYSTERESIS beyond that cell's edge
+## (688 amended (3)), 1 if it does not; never so little it barely moves.
+static func _free_cell_exit(off: Vector2, move: Vector2) -> float:
+	var limit := 0.5 + FREE_HYSTERESIS + 0.0005
+	var cut := 1.0
+	for i in 2:
+		if absf(move[i]) < 0.000001:
+			continue
+		var t := (signf(move[i]) * limit - off[i]) / move[i]
+		if t > 0.0 and t < cut:
+			cut = t
+	return cut if cut * move.length() > 0.0005 else 1.0
 
 
 ## The straight way [param intent] mostly points (688), x on a tie.
@@ -8356,7 +8391,11 @@ static func _free_axis(intent: Vector2) -> Vector2i:
 ## FREE_HYSTERESIS past that cell's edge on either axis, then the cell the
 ## centre is in. Others there are _free_claim's to wait on.
 func free_cell(entity: GridEntity, at: Vector2) -> Vector2i:
-	var held := entity.tile
+	return _free_cell_from(entity.tile, at)
+
+
+## free_cell's rule from [param held], whatever is held.
+static func _free_cell_from(held: Vector2i, at: Vector2) -> Vector2i:
 	var off := at - Vector2(held)
 	if absf(off.x) <= 0.5 + FREE_HYSTERESIS and absf(off.y) <= 0.5 + FREE_HYSTERESIS:
 		return held
