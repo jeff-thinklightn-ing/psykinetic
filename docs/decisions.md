@@ -31466,3 +31466,12 @@ wrong is put right, she stays; asked when willing, she leaves her work and
 goes with them, at cooling, her left words cleared, the party told.
 
 Server only, protocol unchanged, no new class_name.
+
+## 686, economy's side: who a town can spare, and one away pays nothing
+
+Companions' 686 (the coordinator's approval) lets a player recruit a town resident as a companion. Economy gives it two parts.
+
+- Towns.sole_needed(town, worker_id) -> String: "the only <trade>" when the resident is the town's only one, not away, of a trade it needs; otherwise "". A trade is needed when a standing or building kind uses it (rules' buildings[kind].trade: forge's smith, field's farmer), when the town's current stage counts it (its "trades"), or when an open build job uses it. Companions puts the reason in their voice.
+- While recruited, companions sets the worker away (Production.set_away), and back when they're home. Away already kept their job waiting and skipped their needs and bank turn. Now it also skips rent (Production._rent moves rent_due on and takes nothing) and the wage floor (Economy._floor_turn), since they neither sleep in town nor work for it. Both run again from the next turn after their return. One side effect: the town's alms runner away at the floor's turn misses that day's floor, which is rare and small.
+
+farm_test _test_recruit: the only smith and the only farmer can't go, a hauler can, a second smith frees either, the other smith away holds this one; away 3 days takes no rent and owes no floor, and back they run again. Server only: no wire change, no new class_name.

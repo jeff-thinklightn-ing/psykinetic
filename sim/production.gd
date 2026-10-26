@@ -1058,6 +1058,8 @@ func _rent(at: int) -> void:
 		if at < int(worker_record["rent_due"]) or outside(id):
 			continue
 		worker_record["rent_due"] = at + every
+		if bool(worker_record["away"]):
+			continue  # Not sleeping in town: no rent for that turn.
 		var pay := mini(rent, int(worker_record["purse"]))
 		if pay <= 0:
 			continue

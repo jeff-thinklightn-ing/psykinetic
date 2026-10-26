@@ -1217,7 +1217,9 @@ func _floor_turn() -> void:
 		for each: String in who["trades"]:
 			if trades.has(each):
 				trade = each
-		if days <= 0 or trade.is_empty() or str(who["town"]).is_empty():
+		# One away (gone with a player, a runner's errand) does no town work:
+		# the town owes them no floor for those days.
+		if days <= 0 or trade.is_empty() or str(who["town"]).is_empty() or bool(who.get("away", false)):
 			continue
 		var short := int(rule.get("gold", 0)) * days - earned
 		if short <= 0:

@@ -46,6 +46,7 @@ func _ready() -> void:
 	_test_stages()
 	_test_decline()
 	_test_settle()
+	_test_recruit()
 	_test_ruin_regrows()
 	_test_flock()
 	_test_butcher()
@@ -333,6 +334,44 @@ func _test_stages() -> void:
 ## coordinator's: no fall and rise a tick apart): decline.rise_after_days
 ## calm days in a row, a strain day starting them again; on the sheet's
 ## strain as settling; saved.
+## A resident a player would take along (companions' recruiting, the
+## coordinator's): the town's only holder of a trade it needs can't be
+## spared (Towns.sole_needed); one away pays no rent and is owed no wage
+## floor while gone, and both run again when they're back.
+func _test_recruit() -> void:
+	print("\n== a resident who can't be spared, one away with a player ==")
+	var towns := _towns(1, true)
+	towns._town(TOWN)["buildings"]["forge"] = {"kind": "forge", "level": 1, "state": Towns.STANDING, "since": 0, "job": 0}
+	towns.note_rescue(TOWN, "s1", "Bran", "smith")
+	towns.note_rescue(TOWN, "h1", "Ash", "hauler")
+	_check(towns.sole_needed(TOWN, "s1") == "the only smith" and towns.sole_needed(TOWN, "f1") == "the only farmer",
+		"the only smith and the only farmer can't go (%s, %s)" % [towns.sole_needed(TOWN, "s1"), towns.sole_needed(TOWN, "f1")])
+	_check(towns.sole_needed(TOWN, "h1") == "", "a hauler can (no kind of the town's needs one)")
+	towns.note_rescue(TOWN, "s2", "Cuth", "smith")
+	_check(towns.sole_needed(TOWN, "s1") == "", "a second smith: either may go")
+	towns.production.set_away("s2", true)
+	_check(towns.sole_needed(TOWN, "s1") == "the only smith", "the other smith away with a player: this one stays")
+	var work := towns.production
+	var economy := Economy.new({}, work.stockpile, work, func() -> int: return _now, _rules)
+	work.pay("h1", 10, "test")
+	work.set_away("h1", true)
+	var purse := int(work.worker("h1")["purse"])
+	var owed := int(work.worker("h1").get("owed", 0))
+	economy._floor_turn()
+	_now += 3 * DAY
+	work._rent(_now + int(_rules["rent_every"]) * 3)
+	economy._floor_turn()
+	_check(int(work.worker("h1")["purse"]) == purse and int(work.worker("h1").get("owed", 0)) == owed,
+		"away 3 days: no rent taken, no wage floor owed (purse %d, owed %d)" % [int(work.worker("h1")["purse"]), int(work.worker("h1").get("owed", 0))])
+	work.set_away("h1", false)
+	work._rent(_now + int(_rules["rent_every"]) * 6)
+	_now += DAY
+	economy._floor_turn()
+	_check(int(work.worker("h1")["purse"]) < purse + int(_rules["wage_floor"]["gold"]) + 1 and
+		(int(work.worker("h1")["purse"]) != purse or int(work.worker("h1").get("owed", 0)) != owed),
+		"back: rent and the floor run again (purse %d, owed %d)" % [int(work.worker("h1")["purse"]), int(work.worker("h1").get("owed", 0))])
+
+
 func _test_settle() -> void:
 	print("
 == a fallen town settles before it rises ==")

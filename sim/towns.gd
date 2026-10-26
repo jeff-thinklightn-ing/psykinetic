@@ -2453,6 +2453,41 @@ func threat_of(town: String) -> float:
 	return clampf(float(rules.get("raids", {}).get("threat_default", {}).get(safety, 0.0)), 0.0, 1.0)
 
 
+## Why resident [param worker_id] of [param town] can't be spared to follow
+## a player (companions' recruiting, the coordinator's): "the only <trade>"
+## when they are its only resident not away of a trade it needs (a standing
+## or building kind's trade, one its stage counts, a build's while one is
+## open); "" when they can go.
+func sole_needed(town: String, worker_id: String) -> String:
+	var who := production.worker(worker_id)
+	if who.is_empty() or worker_id not in residents(town):
+		return ""
+	var needed := {}
+	var kinds: Dictionary = rules.get("buildings", {})
+	for kind: String in kinds:
+		var trade := str(kinds[kind].get("trade", "")) if kinds[kind] is Dictionary else ""
+		if not trade.is_empty() and building(town, kind).get("state") in [STANDING, BUILDING]:
+			needed[trade] = true
+	for each: Variant in rules.get("stages", []):
+		if each is Dictionary and str(each.get("name", "")) == stage(town):
+			for trade: String in each.get("trades", {}):
+				needed[trade] = true
+	for id in production.jobs():
+		var job := production.job(id)
+		if job["kind"] == "build" and job["town"] == town and not str(job.get("trade", "")).is_empty():
+			needed[str(job["trade"])] = true
+	var trades: Array = who.get("trades", [])
+	for trade: String in trades:
+		if not needed.has(trade):
+			continue
+		var others := residents(town).filter(func(other: String) -> bool:
+			var them := production.worker(other)
+			return other != worker_id and not them.is_empty() and trade in them.get("trades", []) and not bool(them.get("away", false)))
+		if others.is_empty():
+			return "the only %s" % trade.replace("_", " ")
+	return ""
+
+
 ## [param town]'s defence against a raid now: its walls (standing, by
 ## level) and its residents in town, at rules' raids defence.
 func defence(town: String) -> float:
