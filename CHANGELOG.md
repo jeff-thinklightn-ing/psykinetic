@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The healing remedy heals now (682): drink it and you get back 1 hp a second for 20 seconds. A hit doesn't stop it, it runs beside a bandage, and a second one only restarts the time. Worth 6; the medicine man keeps 3. Draft numbers, tunable on F7 (effects.remedy.heal).
 - Umbrage's music is Jeff's updated umbrage-theme: a longer piece (1 min 25 s before it loops, was 23 s), a little louder than before (668 amended).
 - Townsfolk hold their tongue near a fight (675, npc's side): with a monster or beast that would fight them or the one they talk with within 4 cells, and for 3 s after, a resident hails nobody, says no word on a click, answers no words (no model asked), and drops lines already coming; trades and offers still go through silently.
 ## v0.1.179

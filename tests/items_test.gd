@@ -74,6 +74,7 @@ func _ready() -> void:
 	_test_curse()
 	_test_arrows()
 	_test_loot()
+	_test_remedy_heal()  # After the timed checks: its 400 ticks would shift them.
 	await _test_restart()
 	await _test_migration()
 	_test_rebuild()
@@ -529,6 +530,80 @@ func _test_steadying_draught() -> void:
 	_check(World.spread_of(host) == -1.0, "not drawing: no cone")
 	World.items.end(World.take_item(host, host, Player.RIGHT_HAND), "gone")
 	host.buffs = had
+
+
+func _test_remedy_heal() -> void:
+	print("
+== the remedy heals over time: 20 hp in 20 s, through a hit, beside a bandage (decision 682) ==")
+	var host := _player(Net.local_id)
+	var remedy := Items.def("remedy")
+	_check(Items.effects_of("remedy", remedy.get("effects", [])) == [{"kind": "heal", "amount": 1.0, "ticks": 200}]
+			and Items.value_of("remedy") == 6 and remedy["made"] == {"by": "medicine_man", "from": {"herbs": 2}, "steps": 600, "stock": 3},
+			"1 hp a second for 200 ticks; worth 6, a shelf of 3, still 2 herbs (%s)" % [remedy.get("effects")])
+	var had := host.buffs.duplicate(true)
+	var had_max := host.max_hp
+	host.max_hp = 100  # Room to heal 20 and more (a player's own is 20).
+	host.buffs = {}
+	host.mending = 0  # No bandaging or mending left from the tests before.
+	World._mending.erase(host)
+	World._bandaging.erase(host)
+	var had_tile := host.tile
+	host.hp = host.max_hp - 50
+	for ending: int in [0, 5]:  # Drunk on a tick ending in 0, then in 5: 20 hp either way (physics' check).
+		while World.tick % 10 != ending:
+			_steps(1)
+		host.hp = host.max_hp - 50
+		var slot := host.slots.find("")
+		_give(host, "remedy", slot)
+		_check(World.try_use(host, slot) and host.slots[slot].is_empty() and World.buff(host, "heal") == 1.0, "drunk from the pack: gone, healing")
+		var lasted := 0
+		while host.buffs.has("heal") and lasted < 400:
+			_steps(1)
+			lasted += 1
+		_check(host.hp == host.max_hp - 30 and lasted == 200,
+				"drunk on tick ...%d: 20 hp over its whole life, 200 ticks (%d hp, %d ticks)" % [ending, host.hp - (host.max_hp - 50), lasted])
+	World.add_buff(host, "heal", 1.0, 200)
+	_steps(50)
+	var before := host.hp
+	World.damage(host, 3)
+	_check(host.buffs.has("heal") and host.hp == before - 3, "a hit takes its hp and the heal goes on")
+	_steps(50)
+	_check(host.hp == before - 3 + 5, "5 more in the next 50 ticks (%d)" % host.hp)
+	host.hp = host.max_hp - 1
+	_steps(30)
+	_check(host.hp == host.max_hp, "never past full")
+	host.hp = 0
+	_steps(1)
+	_check(not host.buffs.has("heal"), "death ends it")
+	host.hp = host.max_hp - 40
+	host.buffs = {}
+	World.add_buff(host, "heal", 1.0, 200)
+	World.add_buff(host, "heal", 1.0, 200)
+	_check(World.buff(host, "heal") == 1.0, "a second only refreshes the time, not doubles the rate")
+	_steps(int(World.BANDAGE_CALM_TICKS) + 1)
+	var kit := _give(host, "bandaging_kit", 0) if host.slots[0].is_empty() else 0
+	for cell: Vector2i in _main._terrain["floor"]:  # Somewhere no monster from the tests before is near.
+		if World.bandage_refusal(host, host) != "not_safe":
+			break
+		if World.is_free(cell):
+			World._relocate(host, cell)
+	var why := World.bandage_refusal(host, host)
+	var started := World.try_bandage(host, host)
+	_steps(World.BANDAGE_TICKS + 1)
+	_check(started and host.mending == 2, "a bandage done beside it: the heal breaks no bandage (started %s %s, mending %d)" % [started, why, host.mending])
+	if kit != 0:
+		World.items.end(World.take_item(host, host, 0), "gone")
+	_check(Items.effect_value("effects.remedy.heal.amount") == 1.0 and Items.set_effect_value("effects.remedy.heal.ticks", 100)
+			and Items.def("remedy")["effects"][0]["ticks"] == 100 and not Items.set_effect_value("effects.remedy.heal.amount", -1)
+			and Items.effect_fields().any(func(row: Dictionary) -> bool: return row["path"] == "effects.remedy.heal.amount"),
+			"F7 tunes the heal: effects.remedy.heal.amount and .ticks")
+	Items.set_effect_value("effects.remedy.heal.ticks", 200)
+	host.buffs = had
+	host.mending = 0  # The bandage's mending, done with.
+	World._mending.erase(host)
+	World._relocate(host, had_tile)
+	host.max_hp = had_max
+	host.hp = host.max_hp
 
 
 func _test_weapons() -> void:

@@ -30889,3 +30889,38 @@ amended); the slot, the room key and Music are unchanged.
 
 sound_kit_test and view_test unchanged and passing (the slot, the room key,
 the take's file). Client only, protocol unchanged, no new class_name.
+## 682. The remedy heals over time: the "heal" buff
+
+No item healed hp, so Pip had nothing to drink mid-fight (economy's ask). Under the rule
+that items are physical, a herbal remedy healing over time is what the thing is, a body
+state like the steadying draught (642), not a stat multiple. Physics' rules, the
+coordinator's ruling.
+
+- **The remedy's row** (levels/items.json): effects [{"kind": "heal", "amount": 1.0,
+  "ticks": 200}], value 6 (was 4), the medicine man's shelf of 3 ("stock"); the recipe is
+  unchanged (2 herbs, 600 steps). It is still the sickness cure given to a resident (501).
+  The numbers are drafts.
+- **A new buff kind, heal** (Items.BUFF_KINDS, "Healing"): its amount is hp a second.
+  World._heal_tick, in the buff pass, gives it whole at TICK_RATE (_carried), so 1 a second
+  is 20 hp over the 200 ticks. add_buff keeps a heal's start as a third element
+  ([amount, end, start]), and it heals the ticks after its start through its end, so a
+  drink heals exactly amount x ticks whether the command ran before the tick's buff pass or
+  after (physics' review: counted from the start's own tick, a 201st tick gave 21). It never heals past max_hp, nor a downed body, and ends at
+  death. A hit does not stop it, and a bleed or a burn runs beside it. A second one keeps
+  add_buff's rule, the larger amount and the later end, so it refreshes the time and does
+  not add up.
+- **Not the bandage's mending.** That track (World._mending, the replicated mending) is
+  broken by any hurt and means "bandaged": try_bandage refuses a patient already mending,
+  and Pip's words read it. A remedy and a bandage run side by side, and the bandage stays
+  the calm-only one.
+- **F7 tunes it**: Items.effect_fields, effect_value and set_effect_value give
+  effects.<id>.<kind>.amount and .ticks for each thing with effects, registered in Main
+  beside the other sources.
+- Pip gets no special path. Her player gives her remedies the normal way and she drinks her
+  own (try_use); companions adds when she does (retreating under 0.35) after this lands.
+
+Wire: PROTOCOL_REVISION 38 (37 had shipped in v0.1.177). Buffs may hold "heal", a new key
+in a replicated value (release, after 642's precedent). items_test _test_remedy_heal (20
+hp over the buff's whole life of 200 ticks, drunk on a tick ending in 0 and in 5, from
+well under max_hp, through a hit, capped, ended at death, not
+doubled, a bandage finished beside it, the F7 paths). No new class_name.

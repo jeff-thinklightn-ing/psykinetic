@@ -5796,6 +5796,8 @@ func add_buff(entity: GridEntity, kind: String, amount: float, ticks: int) -> vo
 	var had: Array = now.get(kind, [])
 	now[kind] = [maxf(amount, float(had[0])) if not had.is_empty() else amount,
 		maxi(tick + ticks, int(had[1])) if not had.is_empty() else tick + ticks]
+	if kind == "heal":
+		now[kind].append(tick)  # Its start: the drink's own tick heals nothing (682), whichever runs first.
 	entity.buffs = now
 	_buffed[entity] = true
 	if kind == "mass":
@@ -5826,6 +5828,7 @@ func _fade_buffs() -> void:
 	for entity: GridEntity in _buffed.keys():
 		if entity.zone != zone.name:
 			continue
+		_heal_tick(entity)
 		var now: Dictionary = entity.buffs.duplicate(true)
 		var faded: Array[String] = []
 		for kind: String in entity.buffs:
@@ -5842,6 +5845,25 @@ func _fade_buffs() -> void:
 		for kind in faded:
 			_log("buff: %s's %s wore off" % [entity.name, kind])
 			buff_changed.emit(entity, kind, &"faded")
+
+
+## A heal buff on [param entity] (decision 682; physics' rules) gives its
+## amount in hp a second, whole hp at TICK_RATE (_carried: 1 a second is 20
+## over 200 ticks: the ticks after its start, on[2], to its end, so a drink
+## heals its amount x ticks whether it came before this pass or after),
+## never past max_hp (heal) nor to a downed body; a hit does not stop it
+## and a bleed or a burn runs beside it. At death it ends (this pass fades it).
+func _heal_tick(entity: GridEntity) -> void:
+	var on: Array = entity.buffs.get("heal", [])
+	if on.is_empty() or int(on[1]) < tick or on.size() > 2 and tick <= int(on[2]):  # Its last tick heals too, then this pass fades it.
+		return
+	if entity.hp <= 0:
+		var now: Dictionary = entity.buffs.duplicate(true)
+		now["heal"] = [on[0], tick]
+		entity.buffs = now
+		return
+	if not is_downed(entity):
+		heal(entity, _carried(float(on[0]) / TICK_RATE, tick))
 
 
 ## How many cells [param by] can throw [param id]: its strength over the

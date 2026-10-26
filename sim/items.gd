@@ -748,9 +748,51 @@ static func has_tag(id: String, tag: String) -> bool:
 ## mass (food: kg, heavier and harder to shove), aura (magic) and wits
 ## (social time), the last two read by whatever comes to use them
 ## (World.buff), speed (a fraction: steps that much faster,
-## World.step_ticks; decision 562), and steady (a fraction: a drawn bow's
-## cone that much narrower, World.spread_of; decision 642).
-const BUFF_KINDS := {"mass": "Fed", "aura": "Aura", "wits": "Wits", "speed": "Quick", "steady": "Steady"}
+## World.step_ticks; decision 562), steady (a fraction: a drawn bow's
+## cone that much narrower, World.spread_of; decision 642), and heal (hp a
+## second over its ticks, World's buff pass; decision 682).
+const BUFF_KINDS := {"mass": "Fed", "aura": "Aura", "wits": "Wits", "speed": "Quick", "steady": "Steady", "heal": "Healing"}
+
+
+## The F7 panel's rows for what consumed things give (decision 682: the
+## remedy's heal is a draft for Jeff and combat to tune): effects.<id>.<kind>.amount
+## and .ticks for each thing with effects (Tuning.register_source, Main).
+static func effect_fields() -> Array:
+	var out := []
+	for id: String in all():
+		for effect: Dictionary in def(id).get("effects", []):
+			for key: String in ["amount", "ticks"]:
+				var now := float(effect[key])
+				out.append({"path": "effects.%s.%s.%s" % [id, effect["kind"], key], "group": "Effects: " + id,
+					"min": 0, "max": maxf(4.0 * now, 1.0 if key == "amount" else 10.0), "owner": "items"})
+	return out
+
+
+## An effects.<id>.<kind>.<amount|ticks> path's value; null for none.
+static func effect_value(path: String) -> Variant:
+	var effect := _effect_at(path)
+	return effect.get(path.get_slice(".", 3)) if not effect.is_empty() else null
+
+
+## Sets an effects.<id>.<kind>.<amount|ticks> path, its kind kept (over 0,
+## as effects_of asks); false for none.
+static func set_effect_value(path: String, value: Variant) -> bool:
+	var effect := _effect_at(path)
+	var key := path.get_slice(".", 3)
+	if effect.is_empty() or not (value is int or value is float) or float(value) <= 0.0:
+		return false
+	effect[key] = int(value) if key == "ticks" else float(value)
+	return true
+
+
+static func _effect_at(path: String) -> Dictionary:
+	var parts := path.split(".")
+	if parts.size() != 4 or parts[0] != "effects" or parts[3] not in ["amount", "ticks"]:
+		return {}
+	for effect: Dictionary in def(parts[1]).get("effects", []):
+		if effect["kind"] == parts[2]:
+			return effect
+	return {}
 
 
 ## [param effects] as the catalog gives them, each {kind, amount, ticks},
