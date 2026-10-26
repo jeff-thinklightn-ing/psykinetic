@@ -290,10 +290,10 @@ static func perform(production: Production, town: String, at_inn: Array, at: int
 	var named := ""
 	# A listener's own deed, told back to them once.
 	for player_id: Variant in listeners:
-		var name := str(Offers._call(Offers.ctx, "name_of", [player_id]))
+		var name := Offers.name_of(Offers.ctx, str(player_id))
 		for each: Dictionary in memories:
 			var text := str(each.get("text", ""))
-			var theirs: bool = str(each.get("said_by", "")) == TownMemory.PLAYER + str(player_id) or (not name.is_empty() and name != "<null>" and text.contains(name))
+			var theirs: bool = str(each.get("said_by", "")) == TownMemory.PLAYER + str(player_id) or (name != Offers.TRAVELLER and text.contains(name))
 			if theirs and not each.get("sung_to", {}).has(str(player_id)):
 				entry = each
 				named = str(player_id)
@@ -336,7 +336,7 @@ static func perform(production: Production, town: String, at_inn: Array, at: int
 	# unless the first word is somebody's name (a deed starts with its doer).
 	var clean := text.strip_edges().trim_suffix(".")
 	var first := clean.get_slice(" ", 0).trim_suffix(",").trim_suffix("'s")
-	var known := listeners.map(func(id: Variant) -> String: return str(Offers._call(Offers.ctx, "name_of", [id])))
+	var known := listeners.map(func(id: Variant) -> String: return Offers.name_of(Offers.ctx, str(id)))
 	for id: String in production.worker_ids(town):
 		known.append(str(production.worker(id).get("name", "")))
 	if first not in known:
@@ -1534,8 +1534,8 @@ static func _mood_news(production: Production, town: String, log: Array, ids: Ar
 		if mood not in [MOOD_SULLEN, MOOD_APART] or why.is_empty() or int(_mood_told.get(id, -1)) == today:
 			continue
 		var player_id := str(who.get("origin", "")).trim_prefix(COMPANION)
-		var player_name := str(Offers._call(Offers.ctx, "name_of", [player_id])) if not player_id.is_empty() else ""
-		if player_name.is_empty() or player_name == "<null>":
+		var player_name := Offers.name_of(Offers.ctx, player_id)
+		if player_name == Offers.TRAVELLER:
 			continue
 		var entry := TownMemory.note(log, "%s is unhappy with %s: %s" % [str(who.get("name", id)), player_name, why.trim_suffix(".")], id, "", at)
 		_mood_told[id] = today
@@ -1651,9 +1651,7 @@ static func _pass(production: Production, town: String, place: String, members: 
 					newest = it
 					newest_id = player_id
 		if not newest.is_empty() and not newest.get("why", []).is_empty():
-			var player_name := str(Offers._call(Offers.ctx, "name_of", [newest_id]))
-			if player_name.is_empty() or player_name == "<null>":
-				player_name = newest_id
+			var player_name := Offers.name_of(Offers.ctx, newest_id)  # Never the id: it is the key to their record.
 			var said := "%s %s" % [player_name, str(newest["why"].back())]
 			if not Hearsay.holds(heard, said) and said not in told:
 				if not hearer_card.is_empty() and Standing.heard(hearer_card, newest_id, signi(int(newest["score"])), str(newest["why"].back()), teller_name, at):

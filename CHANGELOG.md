@@ -10,6 +10,7 @@ notes (decision 324).
 - Security: a companion resting in town is no longer named after her player's id in what clients are sent, and a dedicated server refuses anyone claiming the dev host's id (691).
 - The server keeps its join token out of the process list (read from its environment, not its command line), its install folder is no longer writable by the server itself, and a builder-mode request stops at $1.00 of the API key (690).
 - Raiding groups wait for their routes after a level is laid again: a camp sends nobody and a group out stands where it is until its side's ways are worked out, instead of the server freezing to find one (raids are still off on the live server).
+- A player the town has no record of is spoken of as "a traveller" in gossip, the chronicle, songs and the lawspeaker's words, never by the raw id behind their record (692).
 ## v0.1.183
 
 - What goes over the network changes, so v0.1.182 and older can't join the server: update through the launcher first.

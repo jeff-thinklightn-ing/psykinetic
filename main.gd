@@ -7987,7 +7987,7 @@ func _sync_residents() -> void:
 			_came_home(body)
 		elif not body.escort_of.is_empty() and Townsfolk.is_sick(World.production, body.worker_id) and _at_healers_hut(body):
 			# Walked to the healer (decision 501): the healer sees to them.
-			var by := str(Offers._call(Offers.ctx, "name_of", [body.escort_of]))
+			var by := Offers.name_of(Offers.ctx, body.escort_of)
 			if by.is_empty() or by == "<null>":
 				by = body.escort_name
 			Townsfolk.treat(World.production, body.worker_id, by, "the healer", body.escort_of)
@@ -8211,7 +8211,7 @@ func _sought_spoken(body: Resident, player_id: String, speaker: String, player: 
 ## signal), the card's fact, its arrival said to the one who led it; the
 ## body is one of the town's from the next sync.
 func _sought_home(body: Resident) -> void:
-	var by := str(Offers._call(Offers.ctx, "name_of", [body.escort_of]))
+	var by := Offers.name_of(Offers.ctx, body.escort_of)
 	if by.is_empty() or by == "<null>":
 		by = body.escort_name
 	var id := body.sought
@@ -8417,7 +8417,7 @@ func _at_towns_ground(body: Resident) -> bool:
 ## the notice, the pay, the standing), and the body is one of the town's
 ## again from the next sync.
 func _came_home(body: Resident) -> void:
-	var by := str(Offers._call(Offers.ctx, "name_of", [body.escort_of]))
+	var by := Offers.name_of(Offers.ctx, body.escort_of)
 	if by.is_empty() or by == "<null>":
 		by = body.escort_name
 	Townsfolk.came_home(World.production, body.worker_id, by)
@@ -8645,7 +8645,7 @@ func _offers_context() -> Dictionary:
 		"zone_of": _zone_of_player,
 		"name_of": func(player_id: String) -> String:
 			var record: PlayerRecord = _records.get(player_id)
-			return record.name if record != null else player_id,
+			return record.name if record != null and not record.name.is_empty() else Offers.TRAVELLER,  # Never the id: it is the key to their record.
 		"players_in": _players_in,
 		"memory": _town_memory,
 		"set_memory": _set_town_memory,

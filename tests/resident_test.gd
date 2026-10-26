@@ -58,6 +58,7 @@ func _ready() -> void:
 	_test_aloud()
 	_test_hails()
 	_test_greet()
+	_test_names_never_ids()
 	_test_crypt_secrets()
 	_test_offer_words()
 	_test_monster_talk()
@@ -2546,6 +2547,28 @@ func _test_quiet_near_hostile() -> void:
 		(body as Resident)._hide_until = -1  # The herder hid from it too.
 	World.step()  # Their own tick: out of hiding, so the town may let its bodies go.
 	World.despawn(mara)
+
+
+## A player with no record is "a traveller" wherever the town may repeat
+## it, never their id, the key to their record (the coordinator's security
+## fix): Main's ctx name_of, Offers.name_of, a record with no name.
+func _test_names_never_ids() -> void:
+	print("
+== an unknown player is a traveller, never their id ==")
+	var unknown := "p-unknown-placeholder"
+	var said: Variant = Offers._call(Offers.ctx, "name_of", [unknown])
+	_check(said == Offers.TRAVELLER, "Main's name_of, no record: a traveller (%s)" % said)
+	_check(Offers.name_of(Offers.ctx, unknown) == Offers.TRAVELLER and Offers.name_of(Offers.ctx, "") == Offers.TRAVELLER and Offers.name_of({}, unknown) == Offers.TRAVELLER,
+		"Offers.name_of: unknown, empty, no ctx: a traveller")
+	_check(Offers.name_of({"name_of": func(id: String) -> String: return id}, unknown) == Offers.TRAVELLER, "a name_of that echoes the id: still a traveller")
+	var record := PlayerRecord.new()
+	record.player_id = unknown
+	record.name = ""
+	_main._records[unknown] = record
+	_check(Offers.name_of(Offers.ctx, unknown) == Offers.TRAVELLER, "a record with no name: a traveller")
+	record.name = "Hal"
+	_check(Offers.name_of(Offers.ctx, unknown) == "Hal", "a named record: its name")
+	_main._records.erase(unknown)
 
 
 func _test_visible_work() -> void:

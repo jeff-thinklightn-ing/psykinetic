@@ -166,6 +166,19 @@ static func use_settings(given: Dictionary) -> void:
 		_settings.merge(given, true)
 
 
+## What a player is called where others will hear it: their record's name
+## (ctx "name_of"), else TRAVELLER, never their id, which is the key to
+## their record.
+const TRAVELLER := "a traveller"
+
+
+static func name_of(given: Dictionary, player_id: String) -> String:
+	var name: Variant = _call(given, "name_of", [player_id]) if not player_id.is_empty() else null
+	if not name is String or name.is_empty() or name == player_id:
+		return TRAVELLER
+	return name
+
+
 static func _call(given: Dictionary, key: String, args: Array = []) -> Variant:
 	var callable: Variant = given.get(key)
 	if callable is Callable and callable.is_valid():
@@ -538,7 +551,7 @@ static func chronicle_of(worker_id: String, town: String, given: Dictionary = ct
 	if log is Array:
 		for entry: Variant in log:
 			if entry is Dictionary and str(entry.get("said_by", "")).begins_with(TownMemory.PLAYER):
-				names.append(str(_call(given, "name_of", [str(entry["said_by"]).trim_prefix(TownMemory.PLAYER)])))
+				names.append(name_of(given, str(entry["said_by"]).trim_prefix(TownMemory.PLAYER)))
 	return TownMemory.chronicle(log if log is Array else [], town_name, keeper, func(id: String) -> String: return str(production.worker(id).get("name", id)),
 		lore if lore is Array else [], statuses if statuses is Dictionary else {}, town, int(rule.get("lines", 12)), int(rule.get("lore", 6)), names)
 
@@ -1102,7 +1115,7 @@ static func rescued(town: String, who_id: String, given: Dictionary = ctx) -> vo
 			thanked.append(str(production.worker(id).get("name", id)))
 			for player_id: String in rescuers:
 				_regard(production, id, player_id, Standing.setting("kin_home"), "brought %s home" % name)
-				Townsfolk.learn(production, id, "%s brought %s home." % [str(_call(given, "name_of", [player_id])), name])
+				Townsfolk.learn(production, id, "%s brought %s home." % [name_of(given, player_id), name])
 		if not thanked.is_empty() and asked.is_empty():
 			# Done with no ask taken: the notice and the pay, once per rescuer.
 			for player_id: String in rescuers:
@@ -1163,7 +1176,7 @@ static func camp_taken(camp_id: String, _from: String, to: String, given: Dictio
 						continue
 					for id: String in saw:
 						_regard(production, id, str(player_id), Standing.setting("met"), "cleared the camp of %s" % faction)
-						Townsfolk.learn(production, id, "%s cleared the camp of %s." % [str(_call(given, "name_of", [player_id])), faction])
+						Townsfolk.learn(production, id, "%s cleared the camp of %s." % [name_of(given, player_id), faction])
 					_notice(str(player_id), town, CAMP + ":" + camp_id, "The camp of %s is cleared; the town's thanks." % faction, CAMP, 1, given)
 	for pair: Array in _asks(production):
 		var ask: Dictionary = pair[1]
@@ -1342,8 +1355,8 @@ static func healed(town: String, who_id: String, player_id: String, player_name:
 		return
 	var who_name := str(production.worker(who_id).get("name", who_id))
 	var their := Townsfolk._their(Townsfolk.card_of(production, who_id))
-	var by_name := str(_call(given, "name_of", [player_id])) if not player_id.is_empty() else ""
-	if by_name.is_empty() or by_name == "<null>":
+	var by_name := name_of(given, player_id)
+	if by_name == TRAVELLER and not player_name.is_empty():
 		by_name = player_name
 	var paid_this := false
 	for pair: Array in _asks(production, town):

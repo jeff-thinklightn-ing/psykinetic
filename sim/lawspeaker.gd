@@ -269,7 +269,7 @@ static func apply(log: Array, rulings: Array, step: int, given: Dictionary = {},
 				if memory.is_empty():
 					entry["tier"] = TownMemory.BELIEF
 					entry["rest_until"] = step + rest
-					lines.append("the lawspeaker left %s as %s's talk" % [id, entry.get("said_by", "someone")])
+					lines.append("the lawspeaker left %s as %s's talk" % [id, _who(null, str(entry.get("said_by", "")))])  # A player as a traveller, never their id (692).
 					_settled(town, entry, "leave", "", step, given)
 					continue
 				var made := TownMemory.note(log, memory, SAID_BY, "", step)

@@ -32011,3 +32011,35 @@ player's id, her name is Resident_companion_..., her key kept on the
 server; the death and speech sent of her hold none; reserved_id refuses
 dev-host on a server only. Protocol unchanged (the names are not a
 replicated value's meaning; --print-protocol the same), no new class_name.
+Server only, protocol unchanged, no new class_name.
+
+## 692. A player with no record is "a traveller", never their id
+
+The coordinator, 2026-10-26: the box is internet-facing and a player's id
+is the key to their record. Offers ctx "name_of" fell back to the raw id
+for a player with no record, and that id flowed into what the town
+repeats: gossip (Townsfolk's hearsay of a standing, whose own fallback
+was the id too), learned facts (brought home, cleared the camp), the
+chronicle's names, the bard's listeners, and the lawspeaker's party_log
+line, which wrote the raw "player:" said_by when players' words are on.
+From there it went out to other players as hearsay and rumour offers.
+
+- **Main's ctx name_of:** returns the record's name, or "a traveller"
+  (Offers.TRAVELLER) for no record or a blank name. This is the word
+  TownMemory._name and Lawspeaker._who already used.
+- **Offers.name_of(given, player_id):** every reader goes through it,
+  not the raw ctx call. It gives TRAVELLER for no ctx, an empty id, a
+  blank name, or a name equal to the id. The readers are offers' facts,
+  chronicle and gift lines, Townsfolk's song, gossip and grievance, and
+  Main's escort words.
+- **Kept behaviour:** a grievance against an unnamed player is still not
+  written, as before. A song still doesn't treat "a traveller" in a
+  memory's text as a listener's own deed.
+- **The lawspeaker's "left as talk" line:** names its teller through
+  Lawspeaker._who, so a player is "a traveller".
+
+resident_test _test_names_never_ids covers no record, an empty id, no
+ctx, a name_of that echoes the id, a record with no name, and a named
+record, using a placeholder id.
+
+Server only, protocol unchanged, no new class_name.
