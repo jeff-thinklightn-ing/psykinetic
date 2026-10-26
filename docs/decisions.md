@@ -32290,3 +32290,24 @@ Wren in the other town; with a Wren in each, one more settles as someone
 else (a fresh name, no former entry); no name shown twice in any town.
 
 Server only, protocol unchanged, no new class_name.
+## 677 amended: a client aims its free body's lob and shots from its view
+
+Jeff on v0.1.184, free_walk on: "right click archery gives a red line with
+free move". World.shot_origin (688, combat's side) gave a free body's
+free_pos. Only the server moves free_pos; on a client the replicated tile
+leaves it where the body was placed (its join or respawn cell), while
+_free_heard turns the client's free_walk on. So the client measured the
+lob's aim from that cell: lob_aim clipped it to reach from there, the
+circle fell on walls and roofs, and lob_open showed it red; the plain
+shot's aim (Main._point_direction) leaned the same way.
+
+shot_origin on a client (not Net.is_authority()) now gives its own body's
+centre where its view draws it (689's FreeNet.Own.shown, once the view has
+the server's state), else the body's cell. The server's reckoning is
+unchanged: free_pos. Nothing on the wire changes; the server still resolves
+the lob and the shot from its own free_pos.
+
+combat_test _test_lob_aim_on_client: as a client, a body placed at (1, 1)
+and replicated to (7, 2): no view yet, its cell; a view at (7.3, 2.2),
+there; as the server, free_pos. Client only, protocol unchanged, no new
+class_name.

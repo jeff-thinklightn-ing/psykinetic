@@ -48,6 +48,7 @@ func _ready() -> void:
 	_test_draw_held()
 	_test_lob()
 	_test_free_blows()
+	_test_lob_aim_on_client()
 	_test_armour()
 
 	print("")
@@ -351,6 +352,32 @@ func _test_cone_spread() -> void:
 ## refused, and stops the body until its attack is ready again; a wind-up
 ## until it lands; shots and lobs start from its own centre (shot_origin),
 ## so an arrow from the edge of its cell flies that line.
+## A client's own free body aims its lob and shots from where its view
+## draws it, not from free_pos, which a client never moves (677 amended;
+## Jeff on v0.1.184: "right click archery gives a red line with free move":
+## aimed from the cell it joined on, the circle fell in the wall).
+func _test_lob_aim_on_client() -> void:
+	print("
+== a client's own free body aims from its view, not its stale free_pos (677 amended) ==")
+	var e := _build(["############", "#P.........#", "#..........#", "############"])
+	var host: Player = e["P"][0]
+	World.free_walk = true
+	host.tile = Vector2i(7, 2)  # Replicated there; free_pos left at the join cell (1, 1). Lob and shot aim both start at shot_origin.
+	host.free_pos = Vector2(1, 1)
+	var mode := Net.mode
+	Net.mode = Net.Mode.CLIENT
+	_check(World.shot_origin(host) == Vector2(7, 2), "no view yet: its cell (%s)" % World.shot_origin(host))
+	var own: RefCounted = (preload("res://net/free_net.gd") as GDScript).Own.new()
+	own.base = Vector2(7.3, 2.2)
+	own.held = host.tile
+	host.free_view = own
+	_check(World.shot_origin(host).distance_to(Vector2(7.3, 2.2)) < 0.01, "its view's centre (%s)" % World.shot_origin(host))
+	Net.mode = mode
+	_check(World.shot_origin(host) == Vector2(1, 1), "the server's own reckoning: free_pos")
+	host.free_view = null
+	World.free_walk = false
+
+
 func _test_free_blows() -> void:
 	print("\n== a free body: a swing mid-walk stops it for the blow; its shots fly from its own centre (688, combat's side) ==")
 	var e := _build(["############", "#P.........#", "#.........m#", "############"])

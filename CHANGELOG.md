@@ -6,6 +6,7 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+- The bow's lob no longer shows a red line under free walk (677 amended): the client aimed it from the cell you joined on, not where you stand, so the circle fell in walls; the plain shot's aim was skewed the same way.
 
 - A town's resident who trusts you will travel with you as your companion when asked ("come with me"), if nobody is with you; your companion away in her town stays there as one of its people, and can be asked back (686).
 - Free movement (--free-walk): after a respawn or rejoin your body no longer stays frozen until you leave the area; at worst it waits about a second (689 amended (3)).

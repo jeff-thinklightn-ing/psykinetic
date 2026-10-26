@@ -8238,9 +8238,20 @@ func _halt_for_blow(entity: GridEntity, until_tick: int) -> void:
 
 
 ## Where [param entity]'s shots and lobs start (688, combat's side): a free
-## body's own centre (free_pos), else its cell's.
+## body's own centre (free_pos), else its cell's. On a client free_pos is
+## not kept (a replicated tile leaves it where the body was placed), so
+## its own body's centre is where its view draws it (689's FreeNet.Own),
+## and any other's its cell's (677 amended: aimed from the join cell, the
+## lob's circle fell on walls and roofs and showed red).
 func shot_origin(entity: GridEntity) -> Vector2:
-	return entity.free_pos if free_body(entity) else Vector2(entity.tile)
+	if not free_body(entity):
+		return Vector2(entity.tile)
+	if Net.is_authority():
+		return entity.free_pos
+	var view: Variant = entity.get("free_view")
+	if view is FreeNet.Own and (view as FreeNet.Own).base != Vector2.INF:
+		return (view as FreeNet.Own).shown(entity)
+	return Vector2(entity.tile)
 
 
 ## Whether [param entity] moves as a free body (decision 688): a player,
