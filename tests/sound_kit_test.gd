@@ -103,6 +103,10 @@ func _test_noises_are_the_sims() -> void:
 	var shot := int(Items.VERBS["ranged"]["cells"])
 	for slot: String in ["sfx.arrow_hit_flesh", "sfx.arrow_hit_wood", "sfx.arrow_hit_stone", "sfx.arrow_land", "sfx.arrow_water"]:
 		_check(SoundKit.reach(slot) > shot, "%s heard past a bow's reach (%d cells, the bow %d)" % [slot, SoundKit.reach(slot), shot])
+	for slot: String in ["sfx.arrow_lob_rise", "sfx.arrow_lob_fall"]:
+		_check(SoundKit.positional(slot) and SoundKit.noise(slot) == "" and SoundKit.takes(slot).size() == 3,
+				"%s: placed, no noise for monsters (the loose is the bow's), three takes of its own" % slot)
+	_check(SoundKit.reach("sfx.arrow_lob_fall") >= 5, "a lob's falling whistle heard a few cells round where it lands (%d)" % SoundKit.reach("sfx.arrow_lob_fall"))
 	_check(SoundKit.footstep("grass", 80.0) == "sfx.footstep_grass_medium" and SoundKit.footstep("water", 25.0) == "sfx.footstep_water_small"
 			and SoundKit.footstep("mud", 120.0) == "sfx.footstep_stone_large", "a footstep by ground and body: grass medium, water small, unknown ground as stone")
 	_check(SoundKit.footstep("grass", 60.0, "deer") == "sfx.footstep_hooves" and SoundKit.footstep("stone", 30.0, "wolf") == "sfx.footstep_claws"

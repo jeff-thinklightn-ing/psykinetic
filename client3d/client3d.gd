@@ -1380,6 +1380,12 @@ const SHOT_SPEED := 40.0
 ## A shot that strikes nobody stands in the ground this long, and one that
 ## meets a friend sticks in them as long (decision 456).
 const SHOT_STUCK_SECONDS := 10.0
+## A lob's falling whistle starts this long before it lands, from where it will
+## land (decision 677: a body there can hear it and step out).
+const LOB_WARN_SECONDS := 0.5
+## A shot and its body's fall this close together are one knockdown hit: the
+## heavier blow (_knockdown_blow).
+const KNOCKDOWN_BLOW_MS := 500
 ## An arrow's flight (_on_shot): into a body this high on it (times its
 ## model's scale); its head this far into what it sticks in; past a spent range
 ## on this far, falling to the ground, ARROW_SAG_SLOW times slower than its
@@ -13343,6 +13349,8 @@ func _on_struck(_amount: int, cause: StringName, id: int) -> void:
 		var shot := instance_from_id(id) as GridEntity
 		sfx.play("sfx.arrow_hit_flesh", puppet.position + Vector3.UP * 0.8)
 		_pain(shot, puppet)
+		puppet.set_meta("shot_ms", Time.get_ticks_msec())
+		_knockdown_blow(puppet)
 	if puppet != null and cause == &"attack":
 		var struck := instance_from_id(id) as GridEntity
 		sfx.play(_struck_with(struck), puppet.position + Vector3.UP * 0.8)
@@ -13425,6 +13433,18 @@ func on_death(data: Dictionary) -> void:
 
 ## A monster's name with how alert it is (Monster.Alert): "?" looking into
 ## something, "!" after someone, "~" running.
+## A shot that knocks its body down (a lob's hit, decision 677) lands
+## heavier: a blunt blow over the arrow's, once, while it lies, when the hit
+## and the fall come within KNOCKDOWN_BLOW_MS of each other, whichever news
+## comes first.
+func _knockdown_blow(puppet: Node3D) -> void:
+	var shot := int(puppet.get_meta("shot_ms", -1000000))
+	var down := int(puppet.get_meta("down_ms", -1000000))
+	if bool(puppet.get_meta("lying", false)) and absi(shot - down) <= KNOCKDOWN_BLOW_MS and int(puppet.get_meta("blow_ms", -1)) != maxi(shot, down):
+		puppet.set_meta("blow_ms", maxi(shot, down))
+		sfx.play("sfx.hit_blunt_flesh", puppet.position + Vector3.UP * 0.6)
+
+
 ## Knocked down (GridEntity.down_until; decision 343): the body tips over
 ## to lie on the ground, and rises again when it wears off.
 func _sync_down(entity: GridEntity, puppet: Node3D) -> void:
@@ -13436,6 +13456,8 @@ func _sync_down(entity: GridEntity, puppet: Node3D) -> void:
 		puppet.set_meta("lying", lying)
 		if lying:
 			sfx.play("sfx.knockdown", puppet.position + Vector3.UP * 0.3)
+			puppet.set_meta("down_ms", Time.get_ticks_msec())
+			_knockdown_blow(puppet)
 	var want := DOWN_TILT if lying else 0.0
 	if not is_equal_approx(body.rotation.x, want):
 		body.rotation.x = move_toward(body.rotation.x, want, get_process_delta_time() * ArtKit.feel("client3d.down_tilt_speed", DOWN_TILT_SPEED))
@@ -16105,8 +16127,12 @@ func _on_lobbed(to: Vector2i, ticks: int, id: int) -> void:
 	var apex := float(Items.verb_of(World.drawn_with(shooter)).get("lob_apex", 0.25)) if shooter != null else 0.25
 	_stop_creak(puppet)
 	sfx.play("sfx.bow_loose", from)
+	sfx.play("sfx.arrow_lob_rise", from)  # Up it goes.
 	var flight := maxf(0.05, float(ticks) / World.TICK_RATE)
 	var water := World.is_water(to)
+	# Its last LOB_WARN_SECONDS a falling whistle from where it will land, so a
+	# body there hears it coming and can step out (decision 677).
+	_play_later("sfx.arrow_lob_fall", ground, maxf(flight - LOB_WARN_SECONDS, 0.0))
 	get_tree().create_timer(flight).timeout.connect(func() -> void:
 		if is_instance_valid(sfx) and sfx.is_inside_tree() and World.get_entity_at(to) == null:
 			sfx.play("sfx.arrow_water" if water else "sfx.arrow_land", ground))

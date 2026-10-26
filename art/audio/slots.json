@@ -321,6 +321,26 @@
 			"uses": "an arrow's whistle where it passes nearest the listener, as it passes, unless the listener loosed it (Client3D._on_shot)",
 			"fallback": "sfx.swing"
 		},
+		"sfx.arrow_lob_rise": {
+			"category": "combat",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": null,
+			"range": 4,
+			"volume_db": -14.0,
+			"uses": "a lob's arrow going up: the whoosh with the loose, at the bow (Client3D._on_lobbed; decision 677)",
+			"fallback": "sfx.arrow_flight"
+		},
+		"sfx.arrow_lob_fall": {
+			"category": "combat",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": null,
+			"range": 6,
+			"volume_db": -18.0,
+			"uses": "a lob's arrow coming down: a falling whistle swelling over its last LOB_WARN_SECONDS, from where it will land, so a body there can hear it coming and step out (Client3D._on_lobbed; decision 677)",
+			"fallback": "sfx.arrow_flight"
+		},
 		"sfx.knockback_stone": {
 			"category": "combat",
 			"type": "oneshot",

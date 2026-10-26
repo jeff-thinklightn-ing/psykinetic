@@ -6,6 +6,7 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+- The bow's lob sounds its arc: a whoosh as it goes up, a falling whistle from where it will land over its last half second (you can hear it coming and step out), its thud in the ground; a shot that knocks someone down lands with a heavier blow (677, sound's side).
 
 - The healing remedy heals now (682): drink it and you get back 1 hp a second for 20 seconds. A hit doesn't stop it, it runs beside a bandage, and a second one only restarts the time. Worth 6; the medicine man keeps 3. Draft numbers, tunable on F7 (effects.remedy.heal).
 - Umbrage's music is Jeff's updated umbrage-theme: a longer piece (1 min 25 s before it loops, was 23 s), a little louder than before (668 amended).

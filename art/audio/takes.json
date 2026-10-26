@@ -556,6 +556,64 @@
 				"license": "CC0 1.0"
 			}
 		],
+		"sfx.arrow_lob_fall": [
+			{
+				"file": "sfx.arrow_lob_fall.ogg",
+				"from": "freesound",
+				"original": "freesound 268914: falling whistle swish 1.wav, from 0.55 s for 0.55 s, swelling 24 dB over 0.45 s",
+				"sha256": "ab60bce23d139be7f625b2c93ed451ce70120c1a1b4510a4283273288946d750",
+				"by": "blukotek",
+				"url": "https://freesound.org/people/blukotek/sounds/268914/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.arrow_lob_fall.2.ogg",
+				"from": "freesound",
+				"original": "freesound 268914: falling whistle swish 1.wav, from 1.5 s for 0.55 s, swelling 24 dB over 0.45 s",
+				"sha256": "911e3a3a6d0d51d61c6805bb578de694a7b8a8d793ef84f5a5adc47dde6b2177",
+				"by": "blukotek",
+				"url": "https://freesound.org/people/blukotek/sounds/268914/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.arrow_lob_fall.3.ogg",
+				"from": "freesound",
+				"original": "freesound 268914: falling whistle swish 1.wav, from 2.2 s for 0.55 s, swelling 24 dB over 0.45 s",
+				"sha256": "140eeb30378f004eb62f7587bacb3d11805cd6125f034ceabe97245d46e73397",
+				"by": "blukotek",
+				"url": "https://freesound.org/people/blukotek/sounds/268914/",
+				"license": "CC0 1.0"
+			}
+		],
+		"sfx.arrow_lob_rise": [
+			{
+				"file": "sfx.arrow_lob_rise.ogg",
+				"from": "freesound",
+				"original": "freesound 427823: Whoosh #1 (from 0.1 s for 0.6 s)",
+				"sha256": "c6873bf6668d8148b6e3e3356c237954cc8f9d39ece26a0a1d5b7e0b736bdf76",
+				"by": "Kinoton",
+				"url": "https://freesound.org/people/Kinoton/sounds/427823/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.arrow_lob_rise.2.ogg",
+				"from": "freesound",
+				"original": "freesound 384908: Arrow Whoosh 1 (from 0 s for 0.5 s)",
+				"sha256": "d1e4690a708685003750ae3d264e80b6975c9ae9b1a90639022efaf2652a9f7a",
+				"by": "Ali_6868",
+				"url": "https://freesound.org/people/Ali_6868/sounds/384908/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.arrow_lob_rise.3.ogg",
+				"from": "freesound",
+				"original": "freesound 384909: Arrow Whoosh 2 (from 0 s for 0.55 s)",
+				"sha256": "c2854aa4934f2b03c250e7ef63288865f74b720fb6ce6d5a03d9bceb51829acc",
+				"by": "Ali_6868",
+				"url": "https://freesound.org/people/Ali_6868/sounds/384909/",
+				"license": "CC0 1.0"
+			}
+		],
 		"sfx.arrow_water": [
 			{
 				"file": "sfx.arrow_water.ogg",

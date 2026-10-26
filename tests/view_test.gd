@@ -699,6 +699,26 @@ func _test_bow_sounds() -> void:
 		after.append(entry[0])
 	_check(after.count("sfx.arrow_hit_flesh") == 1 and not after.any(func(slot: String) -> bool: return slot in ["sfx.arrow_land", "sfx.arrow_hit_stone", "sfx.arrow_hit_wood"]),
 			"as the arrow arrives: its hit on flesh, once, and no miss (%s)" % [after])
+	_check(not after.has("sfx.hit_blunt_flesh"), "a shot that leaves it standing: no heavier blow")
+	# A shot that knocks it down (a lob's hit, 677) lands heavier: the blunt blow
+	# with the arrow's and the fall, once, whichever news comes first.
+	var imp_id := imp.get_instance_id()
+	imp.down_until = World.tick + 15
+	var knocked := _heard(func() -> void:
+		_rig._on_struck(1, &"shot", imp_id)
+		_rig._process(0.0)
+		_rig._process(0.0))
+	_check(knocked.has("sfx.arrow_hit_flesh") and knocked.has("sfx.knockdown") and knocked.count("sfx.hit_blunt_flesh") == 1,
+			"a shot knocks it down: the arrow's hit, the fall and one heavier blow (%s)" % [knocked])
+	imp.down_until = 0
+	_rig._process(0.0)
+	_check(not _heard(func() -> void: _rig._on_struck(1, &"shot", imp_id)).has("sfx.hit_blunt_flesh"), "its next shot, standing: none")
+	imp.down_until = World.tick + 15
+	(_rig._puppets[imp_id] as Node3D).set_meta("shot_ms", Time.get_ticks_msec() - 2 * Client3D.KNOCKDOWN_BLOW_MS)
+	var shoved := _heard(func() -> void: _rig._process(0.0))
+	_check(shoved.has("sfx.knockdown") and not shoved.has("sfx.hit_blunt_flesh"), "knocked down long after a shot: only the fall (%s)" % [shoved])
+	imp.down_until = 0
+	_rig._process(0.0)
 	# A miss, heard by what stopped it.
 	var open := Vector2i(-1, -1)
 	var wall := Vector2i(-1, -1)
@@ -814,14 +834,23 @@ func _test_bow_sounds() -> void:
 		_check(_rig._lob_arc.visible and _rig._lob_ring.visible and _rig._lob_arc.mesh.get_surface_count() == 1, "lobbing: the brass arc and the ring shown")
 		_rig.lob_aim(Vector3.ZERO, Vector2i.ZERO, 0.0, false, 0.0, false)
 		_check(not _rig._lob_arc.visible and not _rig._lob_ring.visible, "and hidden after")
+		var lob_played := _rig.sfx.played.size()
+		var lob_unheard := _rig.sfx.unheard.size()
+		var lob_sounds := func() -> Array:
+			return _rig.sfx.played.slice(lob_played).map(func(entry: Array) -> String: return entry[0]) + _rig.sfx.unheard.slice(lob_unheard)
 		player._world_lobbed(open, 6)
+		_check(lob_sounds.call().has("sfx.bow_loose") and lob_sounds.call().has("sfx.arrow_lob_rise") and not lob_sounds.call().has("sfx.arrow_lob_fall"),
+				"a lob loosed: the twang and its whoosh up, its whistle not yet (%s)" % [lob_sounds.call()])
 		await get_tree().create_timer(0.3).timeout
+		_check(lob_sounds.call().count("sfx.arrow_lob_fall") == 1 and not lob_sounds.call().has("sfx.arrow_land"),
+				"its last %.1f s: the falling whistle, once, before it lands (%s)" % [Client3D.LOB_WARN_SECONDS, lob_sounds.call()])
 		var lofted := _rig.get_tree().root.find_child("LobArrow", true, false) as Node3D
 		var ground := _rig._tile_position(open)
 		_check(lofted != null and lofted.position.y > maxf(tip.y, ground.y), "a lob's arrow climbs above the bow and the ground it falls to (%s)" % [lofted.position if lofted != null else null])
 		await get_tree().create_timer(0.5).timeout
 		_check(lofted != null and is_instance_valid(lofted) and lofted.position.distance_to(ground) < 0.3 and lofted.transform.basis.y.normalized().y < -0.3,
 				"and comes down into the cell aimed at, nose down")
+		_check(lob_sounds.call().count("sfx.arrow_lob_fall") == 1 and lob_sounds.call().has("sfx.arrow_land"), "and thuds in (%s)" % [lob_sounds.call()])
 	if wall.x >= 0:
 		arrows_before = _shot_arrows()
 		player._world_shot(Vector2(wall) + Vector2(wall - player.tile).normalized() * 0.5, &"stone")

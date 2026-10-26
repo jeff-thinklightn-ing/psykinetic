@@ -30924,3 +30924,34 @@ in a replicated value (release, after 642's precedent). items_test _test_remedy_
 hp over the buff's whole life of 200 ticks, drunk on a tick ending in 0 and in 5, from
 well under max_hp, through a hit, capped, ended at death, not
 doubled, a bandage finished beside it, the F7 paths). No new class_name.
+
+## 677, sound's side. The lob heard: up, coming down, and a heavier blow
+
+The coordinator (2026-10-25, Jeff play-testing the bow most): a sound pass on
+677's arced shot, filling the gaps from the existing stores at the footfalls'
+loudness. Already there and kept: the draw's creak rising with the draw (475),
+the twang on any loose (sfx.bow_loose), the arrow landing (sfx.arrow_land, or
+sfx.arrow_water in water), the fly-by whistle past the listener and the body's
+fall on a knockdown (sfx.knockdown).
+
+- **Up**: sfx.arrow_lob_rise, a whoosh with the loose, at the bow
+  (Client3D._on_lobbed). Three CC0 takes (freesound 427823, 384908, 384909),
+  -14 dB, range 4.
+- **Coming down**: sfx.arrow_lob_fall, a falling whistle from the cell it will
+  land in, starting Client3D.LOB_WARN_SECONDS (0.5 s) before it lands, so a body
+  there can hear it and step out (677's miss). A lob flies at least 0.65 s
+  (lob_flight 0.6 plus 0.05 a cell), so the warning always fits. Three cuts of
+  one CC0 whistle (freesound 268914), each 0.55 s, swelling 24 dB over 0.45 s,
+  -18 dB, range 6: heard round where it lands, not across the field. Neither
+  slot is a noise for monsters; the loose's bow noise stands.
+- **A heavier blow**: a shot that knocks its body down plays sfx.hit_blunt_flesh
+  once over the arrow's hit, when the hit (Client3D._on_struck, cause shot) and
+  the body's fall (_sync_down) come within Client3D.KNOCKDOWN_BLOW_MS (500 ms)
+  of each other while it lies, whichever news comes first. A shot that leaves it
+  standing, or a fall with no shot near it, sounds as before.
+
+Loudness: slot level plus take rms comes to about -30 dB for both, beside the
+footsteps' -31. sound_kit_test (the slots placed, silent to monsters, three
+takes each) and view_test (the lob's rise at the loose, its whistle once before
+it lands, then its thud; the knockdown's one blow, none standing, none for a
+late fall). Client only, protocol unchanged, no new class_name.
