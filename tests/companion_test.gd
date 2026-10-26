@@ -15,6 +15,7 @@ func _ready() -> void:
 	# they need beside them, and a wandering imp would join in.
 	Monster.idling = false
 	Companion.hold_tongue = false  # Her voice in a fight, for the sections that test it; _test_quiet has it on (decision 675).
+	Companion.tends_unasked = false  # The older sections hurt bodies she would tend; _test_tends_unasked and _test_drinks_a_remedy have it on (decision 681).
 	_main = preload("res://main.tscn").instantiate()
 	_main.returns = false  # The old respawn (decision 396 is return_test's).
 	add_child(_main)
@@ -110,6 +111,8 @@ func _ready() -> void:
 	_test_dodge()
 	_test_firing_cone()
 	_test_bandage_words()
+	_test_tends_unasked()
+	_test_drinks_a_remedy()
 	_test_plain_orders()  # Late: its many lines fill the capped party log and Tab panel.
 	_test_last_words()  # She dies in it: keep it last of those that need her.
 	_test_old_record_gets_a_companion()
@@ -117,6 +120,7 @@ func _ready() -> void:
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	Companion.hold_tongue = true
+	Companion.tends_unasked = true
 	get_tree().quit(1 if _failures > 0 else 0)
 
 
@@ -992,19 +996,26 @@ func _test_errands() -> void:
 		"it is in her player's slots now, not the chest's or hers (%s)" % [owner.slots])
 	_check(told.size() == 1 and told[0] == "You brought Player the bandaging kit from the chest.", "and she tells it: %s" % [told])
 	_check(World.items.history(owner.slot_items[owner.slots.find(kit)]).size() > 0, "the kit's history follows it")
-	_check(World.try_transfer(owner, owner, owner.slots.find(kit), pet, World.free_slot_for(pet, kit)), "(Player hands it to her)")
+	# (A ring to give: her own bandaging kit she keeps off her offers, 681.)
+	var ring := "silver_ring"
+	var hers := pet.slots.duplicate()
+	hers[hers.find("")] = ring
+	World.set_slots(pet, hers)
 	for i in 21:
 		World.step()
 	offered = pet.can_do()
 	var give_at := _offer(offered, "give")
-	_check(give_at >= 0 and offered[give_at]["words"] == "give Player your bandaging kit", "what she carries, she can give her player: %s" % [_words(offered)])
+	_check(give_at >= 0 and offered[give_at]["words"] == "give Player your %s" % Items.name_of(ring), "what she carries, she can give her player: %s" % [_words(offered)])
 	mind.voice_answer = {"say": "Here.", "stance": "", "do": str(give_at + 1)}
 	_main._on_command(owner, "say", {"text": "%s, give me that back." % pet.name})
 	mind.clear()
 	mind.voice_answer = {"say": "", "stance": ""}
 	_step_until(func() -> bool: return pet.errand.is_empty(), 30)
-	_check(owner.slots.find(kit) != -1 and pet.slots.find(kit) == -1 and "You gave Player the bandaging kit." in mind.triggers("voice"),
+	_check(owner.slots.find(ring) != -1 and pet.slots.find(ring) == -1 and ("You gave Player the %s." % Items.name_of(ring)) in mind.triggers("voice"),
 		"[DO: n]: she hands it over (%s)" % [mind.triggers("voice")])
+	var theirs := owner.slots.duplicate()
+	theirs[theirs.find(ring)] = ""
+	World.set_slots(owner, theirs)
 	_check(pet._promises("I'll take the imps.", offered, -1)["line"] == "I'll take the imps.", "\"I'll take the imps.\" names no thing: no errand, and said")
 	_put(owner, chest.tile + Vector2i(1, 0))
 	World.try_transfer(owner, owner, owner.slots.find(kit), chest, 0)
@@ -3336,6 +3347,100 @@ func _test_heel_on_the_line() -> void:
 	_check(worst < 0.75, "she keeps to his line, never a cell off it (%.2f)" % worst)
 	_put(owner, owner_was)
 	_put(pet, pet_was)
+	_settle(pet)
+
+
+func _test_tends_unasked() -> void:
+	print("\n== she tends wounds unasked: her player first, then herself, calm only, nothing said (decision 681) ==")
+	Companion.tends_unasked = true
+	_kill_monsters()
+	var owner := _player()
+	var pet := _companion()
+	_settle(pet)
+	var says: Dictionary = CompanionCard.tables()["bandage_says"]
+	var spoken: Array[String] = []
+	var on_said := func(line: String) -> void: spoken.append(line)
+	pet.said.connect(on_said)
+	_put(owner, Vector2i(9, 7))
+	_put(pet, Vector2i(10, 9))
+	var slots_were := pet.slots.duplicate()
+	var hp_was := pet.hp
+	World.set_slots(pet, [])
+	owner.hp = owner.max_hp / 2
+	pet.hp = pet.max_hp / 2
+	owner.mending = 0
+	pet.mending = 0
+	var calm := func() -> void:
+		owner.hurt_tick = World.tick - World.BANDAGE_CALM_TICKS - 1
+		pet.hurt_tick = World.tick - World.BANDAGE_CALM_TICKS - 1
+	calm.call()
+	for i in Companion.TEND_EVERY * 3:
+		World.step()
+	_check(pet.errand.is_empty() and owner.mending == 0 and pet.mending == 0, "both hurt, no kit: nothing")
+	World.set_slots(pet, ["bandaging_kit"])
+	_check(not pet.can_do().any(func(each: Dictionary) -> bool: return each["verb"] == "give" and each["item"] == "bandaging_kit"),
+		"her bandaging kit is not among her give offers")
+	var imp := _spawn_imp(_free_tile_between(pet, 3, 4))
+	imp.acts = false
+	for i in Companion.TEND_EVERY * 3:
+		World.step()
+	_check(pet.errand.is_empty() and owner.mending == 0 and pet.mending == 0, "a kit, but a monster near: she leaves it")
+	World.despawn(imp)
+	calm.call()
+	pet._tend_after = 0
+	_step_until(func() -> bool: return owner.mending != 0, Companion.TEND_EVERY * 4 + 40)
+	_check(owner.mending != 0 and pet.mending == 0, "calm, a kit: her player bandaged first, unasked (player %d, she %d)" % [owner.mending, pet.mending])
+	_step_until(func() -> bool: return pet.mending != 0, World.BANDAGE_TICKS + Companion.TEND_EVERY * 4 + 60)
+	_check(owner.mending == 2 and pet.mending != 0, "then her own wounds (player %d, she %d)" % [owner.mending, pet.mending])
+	var lines := says.values().map(func(line: Variant) -> String: return str(line))
+	_check(not spoken.any(func(line: String) -> bool: return line in lines), "and nothing said of it (%s)" % [spoken])
+	pet.said.disconnect(on_said)
+	World.set_slots(pet, slots_were)
+	_step_until(func() -> bool: return pet.errand.is_empty(), World.BANDAGE_TICKS + 40)
+	owner.hp = owner.max_hp
+	owner.mending = 0
+	pet.hp = hp_was
+	pet.mending = 0
+	Companion.tends_unasked = false
+	_settle(pet)
+
+
+func _test_drinks_a_remedy() -> void:
+	print("\n== badly hurt, she drinks a remedy she carries; not with one healing her, and bandaging first when she bleeds (681, the remedy) ==")
+	Companion.tends_unasked = true
+	_kill_monsters()
+	var owner := _player()
+	var pet := _companion()
+	_settle(pet)
+	var slots_were := pet.slots.duplicate()
+	var hp_was := pet.hp
+	World.set_slots(pet, ["remedy", "remedy"])
+	_check(not pet.can_do().any(func(each: Dictionary) -> bool: return each["verb"] == "give" and each["item"] == "remedy"),
+		"her remedies are not among her give offers")
+	pet.hp = int(pet.max_hp * 0.5)
+	World.step()
+	_check(pet.slots.count("remedy") == 2 and World.buff(pet, "heal") == 0.0, "half her hp: she keeps them")
+	pet.hp = maxi(1, int(pet.max_hp * 0.3))
+	World.step()
+	_check(pet.slots.count("remedy") == 1 and World.buff(pet, "heal") > 0.0, "under 0.35: she drinks one (%d left, heal %.1f)" % [pet.slots.count("remedy"), World.buff(pet, "heal")])
+	for i in 5:
+		World.step()
+	_check(pet.slots.count("remedy") == 1, "while it heals her, not a second")
+	pet.buffs = {}
+	pet.hp = maxi(1, int(pet.max_hp * 0.3))
+	World.set_slots(pet, ["remedy", "bandaging_kit"])
+	World.afflict(pet, "bleed", 100, 50, 1)
+	pet.hurt_tick = World.tick - World.BANDAGE_CALM_TICKS - 1
+	pet.mending = 0
+	World.step()
+	_check(pet.slots.count("remedy") == 1, "bleeding, a bandage she can begin: not the remedy first")
+	World.cure(pet, "bleed")
+	pet.buffs = {}
+	World.set_slots(pet, slots_were)
+	pet.hp = hp_was
+	pet.mending = 0
+	_step_until(func() -> bool: return pet.errand.is_empty(), World.BANDAGE_TICKS + 40)
+	Companion.tends_unasked = false
 	_settle(pet)
 
 

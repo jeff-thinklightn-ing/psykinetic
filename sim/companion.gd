@@ -213,6 +213,15 @@ const SEARCH_RANGE := 8
 const SEARCH_NEAR := 2
 const SEARCH_WANDER := 3
 const ERRAND_TICKS := 200
+## Wounds seen to unasked (decision 681): looked at every TEND_EVERY ticks;
+## her player (then she) tended below TEND_BELOW of their hp, or bleeding;
+## after one that came to nothing, none again for TEND_BACKOFF ticks.
+const TEND_EVERY := 10
+const TEND_BELOW := 0.75
+const TEND_BACKOFF := 100
+## Under this share of her hp she drinks a remedy she carries (681, the
+## remedy: items' 682 "heal" buff).
+const REMEDY_BELOW := 0.35
 const ERRAND_BREAK := 4
 const ERRAND_BACK := 2
 const LOOK_AROUND := 2
@@ -602,6 +611,11 @@ var _stalked: GridEntity = null
 var errand := {}
 ## A plain order she hesitates over (decision 621): {read, text, at}, or {}.
 var _hesitant := {}
+## No unasked tending before this tick (decision 681).
+var _tend_after := 0
+## Off, she tends no wound and drinks no remedy unasked (decision 681): the
+## older companion_test sections, which hurt bodies she would tend.
+static var tends_unasked := true
 ## Main's (decision 621): whether a cell of her zone is on a road, and in a
 ## town; unset, never.
 var on_road := Callable()
@@ -1684,6 +1698,8 @@ func _sim_tick() -> void:
 	_watch_deeds()
 	_note_engaged()
 	_calm()
+	_tend_unasked()
+	_drink_if_low()
 	_act()
 	_execute()
 	_note_fight()
@@ -2049,6 +2065,72 @@ func _note_fight() -> void:
 ## ("say", "voice", "heard"), no words, no names.
 func _held_tongue(what: String) -> void:
 	_log({"kind": "voice", "trigger": what, "outcome": "held tongue", "note": ""})
+
+
+## Wounds seen to unasked (decision 681): calm, nothing near, her kit to
+## hand and nothing asked of her, her hands bandage her hurt player first,
+## then herself, through the bandage errand, narrated and not said. A
+## refusal she can wait out (hurt just now, not safe) waits; a patient
+## not to be bandaged (no wound, mending) is passed over.
+func _tend_unasked() -> void:
+	if not tends_unasked or World.tick % TEND_EVERY != 0 or World.tick < _tend_after:
+		return
+	if not errand.is_empty() or not order.is_empty() or not _hesitant.is_empty() or World.is_downed(keeper):
+		return
+	if World.bandage_kit(self) < 0 or not World.calm(self) or in_fight():
+		return
+	for patient: GridEntity in [keeper, self]:
+		if not _wants_tending(patient):
+			continue
+		if patient != self and (patient.zone != zone or World.distance(tile, patient.tile) > PERCEPTION_RANGE or not senses.sees(patient)):
+			continue
+		var no := World.bandage_refusal(self, patient)
+		if no == "hurt_now" or no == "not_safe" or no == "busy":
+			return
+		if no == "" or no == "not_beside":
+			var own := patient == self
+			_start_errand({"verb": "bandage", "patient": patient, "at": patient.tile, "unasked": true,
+				"words": "tend your own wounds" if own else "tend your player's wounds"}, _serial)
+			_narrate("Unasked, you set about bandaging %s." % ("your own wounds" if own else "%s's wounds" % keeper_name()))
+			return
+
+
+## Low (under REMEDY_BELOW of her hp), she drinks a remedy she carries
+## (681, the remedy; the coordinator: "she drinks it herself"): not while
+## one is still healing her (World.buff "heal"), nor with a blow wound up,
+## and bleeding with a bandage she could begin now, the bandage first.
+## Narrated, never said: it is mostly in a fight (675).
+func _drink_if_low() -> void:
+	if not tends_unasked or max_hp <= 0 or hp <= 0 or float(hp) >= REMEDY_BELOW * max_hp or World.buff(self, "heal") > 0.0:
+		return
+	if not World.winding(self).is_empty() or World.is_downed(self):
+		return
+	if ailments.has("bleed") and World.bandage_refusal(self, self) == "":
+		return
+	for slot in slots.size():
+		if is_remedy(slots[slot]) and World.try_use(self, slot):
+			_narrate("Badly hurt, you drank a healing remedy.")
+			_log({"kind": "errand", "companion": String(name), "mind": "hands", "trigger": "drink a remedy", "outcome": "done", "note": "hp %d of %d" % [hp, max_hp]})
+			return
+
+
+## Whether item [param id] is a remedy: used, it heals over time (an
+## effect of kind "heal", 682).
+static func is_remedy(id: String) -> bool:
+	if id.is_empty():
+		return false
+	for effect: Dictionary in Items.def(id).get("effects", []):
+		if str(effect.get("kind", "")) == "heal":
+			return true
+	return false
+
+
+## Whether [param patient] wants bandaging (decision 681): hurt, not
+## already mending, and under TEND_BELOW of their hp or bleeding.
+func _wants_tending(patient: GridEntity) -> bool:
+	if not _alive(patient) or patient.hp <= 0 or patient.hp >= patient.max_hp or patient.mending != 0:
+		return false
+	return float(patient.hp) < TEND_BELOW * patient.max_hp or patient.ailments.has("bleed")
 
 
 ## A hostile within COMBAT_RANGE of her or her player.
@@ -4538,7 +4620,7 @@ func can_do() -> Array[Dictionary]:
 	if to_them:
 		var given: Dictionary[String, bool] = {}
 		for id: String in slots:
-			if not id.is_empty() and not given.has(id):
+			if not id.is_empty() and not given.has(id) and Items.def(id).get("use") != "bandage" and not is_remedy(id):
 				given[id] = true
 				actions.append({"verb": "give", "item": id, "at": keeper.tile,
 					"words": "give %s your %s" % [keeper_name(), Items.name_of(id)]})
@@ -4842,6 +4924,8 @@ const BANDAGE_WHY := {"gone": "they were gone", "not_beside": "you could not rea
 ## words (companion_traits "bandage_says" by [param why]; "_self" for her
 ## own wound), at once (decision 625, Jeff: "Pip seems lazy at bandaging").
 func _say_bandage(why: String, patient: GridEntity) -> void:
+	if errand.get("unasked", false):
+		return  # Nobody asked: nothing to answer (decision 681).
 	var says: Dictionary = CompanionCard.tables().get("bandage_says", {})
 	var line := str(says.get(why + "_self", "")) if patient == self else ""
 	if line.is_empty():
@@ -5014,10 +5098,12 @@ static func _listed(things: Array[String]) -> String:
 ## Her errand is done: [param told] narrated, and her voice asked to tell it.
 func _report_errand(told: String) -> void:
 	_log({"kind": "errand", "companion": String(name), "mind": "hands", "trigger": errand.get("words", ""), "outcome": "done",
-		"note": told})
+		"note": "" if errand.get("unasked", false) else told})
+	var unasked: bool = errand.get("unasked", false)
 	errand = {}
 	_narrate(told)
-	_ask_voice(told, "", true, false, true, true)
+	if not unasked:  # Unasked tending is narrated only (decision 681).
+		_ask_voice(told, "", true, false, true, true)
 
 
 ## Her errand ends undone, because of [param why]; with [param tell] her
@@ -5026,9 +5112,12 @@ func _end_errand(why: String, tell: bool) -> void:
 	var told := "You did not %s: %s." % [str(errand.get("words", "do it")).get_slice(", ", 0), why]
 	_log({"kind": "errand", "companion": String(name), "mind": "hands", "trigger": errand.get("words", ""),
 		"outcome": "undone", "note": why})
+	var unasked: bool = errand.get("unasked", false)
 	errand = {}
 	_narrate(told)
-	if tell:
+	if unasked:
+		_tend_after = World.tick + TEND_BACKOFF  # Not straight back at it (decision 681).
+	elif tell:
 		_ask_voice(told, "", true, false, true, true)
 
 

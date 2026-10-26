@@ -31063,3 +31063,51 @@ sections moved with her: the attack's imp spawns on the nearest free cell,
 and the retreat waits 16 ticks, not 8, for her to close in.
 
 Server only, protocol unchanged, no new class_name.
+
+
+## 681: She tends wounds unasked
+
+Jeff's direction (companions are the centerpiece; the core verbs plain and
+reliable), from the box: after fights her player went on hurt while she
+carried a bandaging kit, since only her voice ever chose the bandage errand
+(and 675 now keeps it quiet through a fight's tail), and once her kit went
+to her player through a slot move she offered nothing against. The
+coordinator approved (a), (c), (d) and (e) of the design, and (b), the
+remedy, once items' 682 gave remedies a "heal" buff.
+
+- **Her hands tend unasked** (Companion._tend_unasked, every TEND_EVERY 10
+  ticks): calm (World.calm, nothing within COMBAT_RANGE), her kit to hand,
+  no errand, order or hesitation running, her player not downed. Her
+  player first, then herself: one wants it when hurt and not mending, and
+  under TEND_BELOW 0.75 of their hp or bleeding (_wants_tending); her player
+  only in her zone, within PERCEPTION_RANGE and seen. The bandage errand
+  does it (walk there, World.try_bandage, wait it out), marked unasked: a
+  refusal she can wait out (hurt just now, not safe, busy) waits, a patient
+  not to be bandaged is passed over.
+- **Narrated, not said**: nobody asked, so nothing is answered. _say_bandage
+  says no refusal or break-off line for an unasked errand, _report_errand
+  asks no voice, and the mind log's errand note is left empty. An unasked
+  errand that comes to nothing is not tried again for TEND_BACKOFF 100
+  ticks. The words logged name no player ("tend your player's wounds").
+- **Her kit and her remedies stay off her give offers** (can_do): handed
+  over, she could tend no one. An order ("give me your bandages") still
+  works.
+- **The remedy** (_drink_if_low, the coordinator's ruling): under
+  REMEDY_BELOW 0.35 of her hp she drinks one she carries (World.try_use on
+  its slot; Companion.is_remedy: an item with a "heal" effect), not while
+  one heals her (World.buff "heal"), not with a blow wound up, not downed,
+  and bleeding with a bandage she could begin now, the bandage first.
+  Narrated only: it is mostly in a fight (675). Her player gives her
+  remedies with the ordinary give.
+- **Companion.tends_unasked** (static, on): companion_test's older sections
+  hurt bodies she would tend, so they run with it off, as hold_tongue (675).
+
+companion_test _test_tends_unasked (both hurt, no kit: nothing; the kit not
+among her give offers; a monster near: nothing; calm: her player bandaged
+first, then herself; nothing said) and _test_drinks_a_remedy (remedies off
+the give offers; at half her hp she keeps them; under 0.35 she drinks one;
+not a second while it heals; bleeding with a bandage she can begin, not the
+remedy first). The give section hands her a silver ring to give back,
+since her kit is no longer offered.
+
+Server only, protocol unchanged, no new class_name.

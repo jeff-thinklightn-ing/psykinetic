@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Your companion tends wounds unasked: once things are calm she bandages you if you are badly hurt or bleeding, then herself, and badly hurt she drinks a healing remedy she carries; she keeps her bandages and remedies rather than offering to give them away (681).
 ## v0.1.180
 
 - What goes over the network changes, so v0.1.179 and older can't join the server: update through the launcher first.
