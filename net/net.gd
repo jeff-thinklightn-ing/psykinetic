@@ -10,7 +10,9 @@ extends Node
 ##   --bind=<ip>                  server/host: listen on this address only (game and status ports;
 ##                                default every address); tests' servers take 127.0.0.1, which
 ##                                Windows' firewall doesn't ask about
-##   --token=<string>             server: required; a peer must send it (Net.authenticate)
+##   --token=<string>             server: required (or PSYKINETIC_TOKEN, which the service uses so
+##                                the token stays out of the process list); a peer must send it
+##                                (Net.authenticate)
 ##                                within 5 s or it is disconnected. host: optional; without
 ##                                it anyone may join (local play). client: sent on connect
 ##   --state=<path>               server/host: JSON snapshot of entity state, written every
@@ -814,6 +816,7 @@ func _enter_tree() -> void:
 		mind_why = true
 	if OS.get_environment("PSYKINETIC_PERCEPTION") != "":
 		_set_option("--perception", OS.get_environment("PSYKINETIC_PERCEPTION"))
+	_token_from_env()
 	_parse_args()
 	if print_protocol:
 		print("PROTOCOL v%s %s" % [version, protocol()])
@@ -1785,7 +1788,7 @@ func start() -> void:
 		print("[net] client connecting to %s:%d" % [address, port])
 	else:
 		if mode == Mode.SERVER and token == "":
-			push_error("[net] --server needs --token=<string>: refusing to run an open server")
+			push_error("[net] --server needs a token (PSYKINETIC_TOKEN, or --token=<string>): refusing to run an open server")
 			get_tree().quit(1)
 			return
 		# No relay: clients talk to the server only, so the server never
@@ -1845,6 +1848,14 @@ func _on_connected_to_server() -> void:
 func _on_server_disconnected() -> void:
 	online = false
 	print("[net] server disconnected")
+
+
+## The token from PSYKINETIC_TOKEN, before _parse_args, so an explicit --token
+## still wins. The service passes it only in the environment: argv is readable
+## by every local process (ps, /proc/<pid>/cmdline). Decision 690.
+func _token_from_env() -> void:
+	if OS.get_environment("PSYKINETIC_TOKEN") != "":
+		token = OS.get_environment("PSYKINETIC_TOKEN")
 
 
 func _parse_args() -> void:

@@ -84,7 +84,8 @@ if [ "$graceful" -eq 1 ]; then
 	done
 fi
 
-sudo install -d -o psykinetic -g psykinetic "$INSTALL_DIR"
+# Root-owned: the service must not be able to replace its own binary (decision 690).
+sudo install -d -o root -g root "$INSTALL_DIR"
 sudo install -m 755 build/psykinetic-server.x86_64 "$INSTALL_DIR/psykinetic-server"
 sudo install -m 644 build/psykinetic-server.pck "$INSTALL_DIR/psykinetic-server.pck"
 

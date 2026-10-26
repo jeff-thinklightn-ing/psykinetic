@@ -31955,3 +31955,32 @@ free_net_test (with ui, its lag-and-loss proxy): pushed while walking east,
 the view ends on the server's centre with nothing left to replay, and the
 walk taken up after. Server and sim only, protocol unchanged, no new
 class_name.
+
+## 690: the server's token from the environment, /opt root-owned, a builder cost cap
+
+Jeff, 2026-10-26, from the host security review of the box (its handoff note on
+the box, ~/psykinetic-hardening-handoff.md): the server is internet-facing (a
+friend joins by IP and token), and the box now runs a systemd sandbox drop-in
+(/etc/systemd/system/psykinetic.service.d/hardening.conf, host-side, not in the
+repo, never removed or worked round: a feature it blocks changes it deliberately).
+Three changes:
+
+1. server/deploy.sh installs /opt/psykinetic as root:root, not the service user:
+   the service must not be able to replace its own binary. Each deploy until now
+   handed it back.
+2. The token leaves the command line. The unit ran --token=${PSYKINETIC_TOKEN},
+   which systemd expands into argv, readable by every local process (ps,
+   /proc/<pid>/cmdline). Net._token_from_env reads PSYKINETIC_TOKEN before
+   _parse_args, so an explicit --token still wins (stage.sh, tests); the unit's
+   ExecStart drops --token. EnvironmentFile is read by systemd before the sandbox
+   applies, so /etc/psykinetic being inaccessible to the process doesn't matter
+   (the old ${PSYKINETIC_TOKEN} expansion already proved the variable reaches the
+   environment). The refusal to run a server with no token stays. protocol_test
+   _test_token_from_env: the environment's token used with no flag, the flag
+   overriding it, nothing set leaving it alone. Afterwards Jeff rotates the token.
+3. ExecStart gains --builder-max-cost=1.00 (Jeff's amount; the code's default, now
+   explicit): a builder request stops at $1.00 of the API key.
+
+Server only (a unit change: release installs the unit, daemon-reload, deploy),
+protocol unchanged, no new class_name. docs/server.md and server/env.example
+updated.

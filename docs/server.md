@@ -21,10 +21,21 @@ reset it.
 The service runs:
 
 ```
-/opt/psykinetic/psykinetic-server --headless --server --port=7777 --state=/var/lib/psykinetic/world.json --token=${PSYKINETIC_TOKEN}
+/opt/psykinetic/psykinetic-server --headless --server --port=7777 --state=/var/lib/psykinetic/world.json
 ```
 
-with `PSYKINETIC_TOKEN` read from `/etc/psykinetic/env`.
+with `PSYKINETIC_TOKEN` read from `/etc/psykinetic/env` into the environment. The
+server takes its token from `PSYKINETIC_TOKEN` when no `--token` is given, so the
+token never appears in the process list (`ps`, `/proc/<pid>/cmdline`); an explicit
+`--token` still wins (local test servers, `server/stage.sh`). Decision 690.
+
+The box also runs a systemd sandbox drop-in,
+`/etc/systemd/system/psykinetic.service.d/hardening.conf` (host-side, not in the
+repo; `deploy.sh` leaves it alone): writes only under `/var/lib/psykinetic` and a
+private `/tmp`, `/etc/psykinetic` unreadable by the process (secrets arrive only as
+environment variables), no new privileges, a syscall filter. A feature that needs
+something it blocks changes the drop-in deliberately and says so; never work round
+it. `/opt/psykinetic` is root-owned, so the service can't replace its own binary.
 
 `--headless` is needed: the Dedicated Server export strips textures and
 other visuals from the `.pck` but the binary is a normal one, so without the
@@ -404,7 +415,8 @@ the client makes on its first run and keeps in `settings.cfg`; it is how the
 server knows a returning player. Deleting `settings.cfg` makes a new one, so
 that player starts over.
 
-`--server` refuses to start without `--token` (it logs why and exits 1).
+`--server` refuses to start without a token, from `PSYKINETIC_TOKEN` or `--token`
+(it logs why and exits 1).
 `--host` without a token is local play: anyone who connects is let in.
 
 To change the token: edit `/etc/psykinetic/env`, then

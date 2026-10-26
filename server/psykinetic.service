@@ -14,6 +14,8 @@ User=psykinetic
 Group=psykinetic
 WorkingDirectory=/opt/psykinetic
 # PSYKINETIC_TOKEN lives here, root-owned, mode 600. See server/env.example.
+# The server reads the token from the environment; it is never on the command
+# line, where any local process could read it (decision 690).
 EnvironmentFile=/etc/psykinetic/env
 # The Dedicated Server export strips visuals but is not headless by itself.
 # --admin-port is the console: server/admin.sh talks to it on localhost.
@@ -23,7 +25,9 @@ EnvironmentFile=/etc/psykinetic/env
 # level such as the barrow stays its bare template).
 # --lawspeaker picks the model for the towns' rulings (decision 448; Jeff,
 # 2026-10-18: haiku); its key is ANTHROPIC_API_KEY in the env file.
-ExecStart=/opt/psykinetic/psykinetic-server --headless --server --port=7777 --state=/var/lib/psykinetic/world.json --token=${PSYKINETIC_TOKEN} --admin-port=7778 --status-port=7779 --regenerate --lawspeaker=haiku
+# --builder-max-cost stops a builder request at $1.00 of the API key (Jeff,
+# 2026-10-26; decision 690).
+ExecStart=/opt/psykinetic/psykinetic-server --headless --server --port=7777 --state=/var/lib/psykinetic/world.json --admin-port=7778 --status-port=7779 --regenerate --lawspeaker=haiku --builder-max-cost=1.00
 # Creates /var/lib/psykinetic owned by the service user.
 StateDirectory=psykinetic
 # Godot keeps its own user data under $HOME; give it somewhere writable.

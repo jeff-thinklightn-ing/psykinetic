@@ -22,6 +22,7 @@ func _ready() -> void:
 	_test_versions()
 	_test_self_update()
 	_test_fingerprint()
+	_test_token_from_env()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -142,6 +143,27 @@ func _test_fingerprint() -> void:
 	_check("authenticate(hello)" in signatures and "rejected(reason,server_version)" in signatures,
 		"it takes each RPC with its arguments' names (%s)" % ", ".join(signatures))
 	_check(Net.protocol().length() == 12 and Net.protocol() == Net.protocol(), "a 12-character fingerprint, the same each time (%s)" % Net.protocol())
+
+
+## The service gives the token only in the environment (decision 690): it is
+## used when no --token is given, and an explicit --token, read after, wins.
+func _test_token_from_env() -> void:
+	print("== the token from PSYKINETIC_TOKEN ==")
+	var was_token := Net.token
+	var was_env := OS.get_environment("PSYKINETIC_TOKEN")
+	Net.token = ""
+	OS.set_environment("PSYKINETIC_TOKEN", "from-env")
+	Net._token_from_env()
+	_check(Net.token == "from-env", "no --token: the environment's token is used")
+	Net._set_option("--token", "from-flag")
+	_check(Net.token == "from-flag", "an explicit --token, read after, overrides it")
+	OS.unset_environment("PSYKINETIC_TOKEN")
+	Net.token = ""
+	Net._token_from_env()
+	_check(Net.token == "", "no PSYKINETIC_TOKEN: the token is left alone")
+	if was_env != "":
+		OS.set_environment("PSYKINETIC_TOKEN", was_env)
+	Net.token = was_token
 
 
 func _check(ok: bool, label: String) -> void:
