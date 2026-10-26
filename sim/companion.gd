@@ -766,6 +766,15 @@ func bumped(direction: Vector2i) -> bool:
 	return true
 
 
+## Her yield to a free-walking player (688) is over: she is on the cell she
+## stepped to and it is none he is about to cross (Heel.keep_clear). He
+## passes through her and walks on, so a whole DECISION_INTERVAL_TICKS
+## standing there left her five cells behind (689 step 3).
+func _yielded_free() -> bool:
+	return _alive(keeper) and World.free_body(keeper) and (_yield_tile == NONE or tile == _yield_tile) \
+			and keeper.tile != tile and not Heel.keep_clear(keeper).has(tile)
+
+
 ## She gets out of the way of her player going [param direction] (a bump,
 ## or "step out of the way": decision 391): to the nearest free cell off
 ## their path and off any doorway, else she and her player change places,
@@ -3916,7 +3925,7 @@ func _act() -> void:
 	_keep_quarry()
 	var foe := _adjacent_hostile()
 	var low := max_hp > 0 and float(hp) / max_hp < _retreat_below()
-	if current_intent == Intent.YIELD and World.tick < _yield_until and not (low and foe != null):
+	if current_intent == Intent.YIELD and World.tick < _yield_until and not (low and foe != null) and not _yielded_free():
 		return
 	intent_target = null
 	_door_hold = NONE

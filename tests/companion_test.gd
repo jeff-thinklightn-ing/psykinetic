@@ -109,6 +109,7 @@ func _ready() -> void:
 	_test_heel_on_the_line()
 	_test_heel_leaves_his_line()
 	_test_heel_no_way()
+	_test_heel_free_leader()
 	_test_quiet()
 	_test_dodge()
 	_test_firing_cone()
@@ -3318,6 +3319,84 @@ func _test_heel_keeps_clear() -> void:
 	print("  (stop dead and turn back, twenty runs: %d swaps, %d into a cell she had just taken, %d steps back, %d refusals of his steps; her step gaps %s)" % [count["swaps"], count["fresh"], count["backs"], refused, gaps])
 	_check(count["fresh"] == 0 and count["backs"] == 0, "she never steps into the cell he walks into: no swap into it, no step back (%d, %d)" % [count["fresh"], count["backs"]])
 	_check(refused == 0, "and none of his held steps is refused (%d)" % refused)
+	_put(owner, owner_was)
+	_put(pet, pet_was)
+	_settle(pet)
+
+
+func _test_heel_free_leader() -> void:
+	print("\n== a free-walking player (688): she keeps out of his way and off his heels, no bump, no step back (689 step 3, companions' side) ==")
+	_kill_monsters()
+	var owner := _player()
+	var pet := _companion()
+	_settle(pet)
+	var owner_was := owner.tile
+	var pet_was := pet.tile
+	World.free_walk = true
+	var count := {"bumps": 0, "backs": 0, "in_way": 0, "ticks": 0, "far": 0, "most": 0}  # (A lambda takes ints by value.)
+	var bumped := func(mover: GridEntity, occupant: GridEntity, _direction: Vector2i) -> void:
+		if mover == owner and occupant == pet:
+			count["bumps"] += 1
+	World.entity_bumped.connect(bumped)
+	var at := {"pet": pet.tile, "tick": -100}
+	var moves: Array[Vector2i] = []
+	# One tick held toward [intent]; then her: a step straight back within
+	# BOUNCE_TICKS, standing in a cell his centre crosses in the next cell
+	# and a half, more than STOP+1 from him.
+	var hold := func(intent: Vector2) -> void:
+		if intent != Vector2.ZERO:
+			World.free_input(owner, intent, World.TICK_DT)
+		World.step()
+		count["ticks"] += 1
+		if intent != Vector2.ZERO:
+			for d: float in [0.5, 1.0, 1.5]:
+				if World.free_cell(owner, owner.free_pos + intent.normalized() * d) == pet.tile:
+					count["in_way"] += 1
+					break
+		if World.distance(owner.tile, pet.tile) > Heel.STOP + 1:
+			count["far"] += 1
+		count["most"] = maxi(count["most"], World.distance(owner.tile, pet.tile))
+		if pet.tile != at["pet"]:
+			if moves.size() >= 2 and pet.tile == moves[moves.size() - 2] and World.tick - int(at["tick"]) <= BOUNCE_TICKS:
+				count["backs"] += 1
+			moves.append(pet.tile)
+			at["tick"] = World.tick
+		at["pet"] = pet.tile
+	# Runs on the open floor (rows 8 and 9 from x 3 to 12, row 7 from x 6;
+	# the fire at (6..8, 5)): east and back after a stop, east then turning
+	# back at once, a shallow slant up and back, a curve from east to north.
+	var runs: Array = [
+		[Vector2i(5, 9), Vector2i(3, 9), [[Vector2(1, 0), 16], [Vector2.ZERO, 8], [Vector2(-1, 0), 16]]],
+		[Vector2i(5, 8), Vector2i(3, 8), [[Vector2(1, 0), 16], [Vector2(-1, 0), 16]]],
+		[Vector2i(6, 9), Vector2i(4, 9), [[Vector2(1, -0.35), 14], [Vector2.ZERO, 6], [Vector2(-1, 0.35), 14]]],
+		[Vector2i(5, 9), Vector2i(3, 9), [[Vector2(1, 0), 10], [Vector2(1, -0.5), 4], [Vector2(0.6, -1), 4], [Vector2(0, -1), 12]]],
+		# She settled ahead: he walks straight at her and on past.
+		[Vector2i(4, 8), Vector2i(7, 8), [[Vector2(1, 0), 18]]],
+		# A diagonal up through the room's middle and straight back.
+		[Vector2i(6, 9), Vector2i(4, 9), [[Vector2(1, -1), 10], [Vector2(-1, 1), 10]]],
+	]
+	for run: Array in runs:
+		_kill_monsters()
+		_put(owner, run[0])
+		_put(pet, run[1])
+		pet.heel.catching_up = false
+		for i in 12:
+			World.step()
+		moves.clear()
+		at.merge({"pet": pet.tile, "tick": World.tick}, true)
+		for leg: Array in run[2]:
+			for i in int(leg[1]):
+				hold.call(leg[0])
+		for i in 16:
+			hold.call(Vector2.ZERO)
+	World.entity_bumped.disconnect(bumped)
+	World.free_walk = false
+	print("  (six runs, %d ticks: %d bumps of his into her, %d steps back, %d ticks in the cells he was about to cross, %d ticks more than %d away, %d at most)" % [
+		count["ticks"], count["bumps"], count["backs"], count["in_way"], count["far"], Heel.STOP + 1, count["most"]])
+	_check(count["bumps"] == 0 and count["backs"] == 0, "she is never in his way when he gets there, and never steps straight back (%d, %d)" % [count["bumps"], count["backs"]])
+	# A turn straight back onto her just-taken step may find her there a
+	# tick or two while her step's time runs: out before he arrives.
+	_check(count["in_way"] <= 4 and count["most"] <= Heel.STOP + 1, "she is out of the cells he is about to cross within a tick or two, and keeps up (%d, %d away at most)" % [count["in_way"], count["most"]])
 	_put(owner, owner_was)
 	_put(pet, pet_was)
 	_settle(pet)

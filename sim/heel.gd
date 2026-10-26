@@ -23,6 +23,10 @@ const WALKING_TICKS := 12
 ## How long after a step's end the leader still counts as walking on
 ## (travel, keep_clear): a held key's next step is due by then.
 const WALK_ON_TICKS := 3
+## How far ahead along a free leader's velocity his next cells are read
+## (free_cells, 688): two cells, about what he walks in the ticks she needs
+## to step aside.
+const FREE_AHEAD := 2.0
 ## How long after the leader's last step ends she waits on their
 ## footsteps before closing in to their heel (a stop, then a turn straight
 ## back, walked into her as she came up).
@@ -123,6 +127,10 @@ func follow(body: GridEntity, leader: GridEntity) -> void:
 		_on_trail = false
 	elif _on_trail and World.tick <= leader.step_until + SETTLE_TICKS and _serves(_goal, body, leader, way, avoid):
 		pass  # Stopped a moment ago: a turn straight back may come; she waits a cell back.
+	elif _on_trail and World.free_body(leader) and _serves(_goal, body, leader, way, avoid):
+		# A free body sets off any way at any tick (688): a footstep that
+		# serves is kept, not left for a cell nearer he may walk into.
+		_on_trail = false
 	elif _on_trail or not _serves(_goal, body, leader, way, avoid):
 		# They stopped (or a footstep went): their heel, a cell nearer.
 		_goal = cell(body, leader, avoid, way)
@@ -214,6 +222,8 @@ static func next_cells(leader: GridEntity) -> Array[Vector2i]:
 	var player := leader as Player
 	if player == null:
 		return next
+	if World.free_body(player):
+		return free_cells(player)
 	var at := player.tile
 	for queued: Dictionary in player.queued_steps.slice(0, 2):
 		at += queued["direction"] as Vector2i
@@ -222,6 +232,25 @@ static func next_cells(leader: GridEntity) -> Array[Vector2i]:
 		next.assign(player.move_via.slice(0, 2))
 	if next.is_empty() and player.has_move_order and player.move_order != player.tile:
 		next.assign(World.line_cells(player.tile, player.move_order).slice(0, 2))
+	return next
+
+
+## A free-walking leader's next cells (688; 689 sends no route, only the
+## way he is pressed): the cells his centre crosses within FREE_AHEAD cells
+## along his velocity, as World.free_cell would hold them, read every
+## FREE_HYSTERESIS so the corner of a cell his slant grazes counts (his
+## claim bumps her there), three at most so a graze keeps the cell after.
+static func free_cells(leader: GridEntity) -> Array[Vector2i]:
+	var next: Array[Vector2i] = []
+	if leader.free_way.length() < 0.001:
+		return next
+	var way := leader.free_way.normalized()
+	var d := World.FREE_HYSTERESIS
+	while d <= FREE_AHEAD and next.size() < 3:
+		var at := World.free_cell(leader, leader.free_pos + way * d)
+		if at != leader.tile and not next.has(at):
+			next.append(at)
+		d += World.FREE_HYSTERESIS
 	return next
 
 
@@ -235,7 +264,11 @@ static func walking_on(leader: GridEntity) -> bool:
 ## walk on, else their facing.
 static func travel(leader: GridEntity) -> Vector2i:
 	if walking_on(leader):
-		return Vector2i(signi(roundi(leader.step_velocity.x * 1000.0)), signi(roundi(leader.step_velocity.y * 1000.0)))
+		# A free body's slant counts as a diagonal only past half way to one
+		# (688): a shallow slant is the straight it mostly goes.
+		var v := leader.step_velocity.normalized()
+		var lean := 0.38 if World.free_body(leader) else 0.001
+		return Vector2i(signi(v.x) if absf(v.x) > lean else 0, signi(v.y) if absf(v.y) > lean else 0)
 	return leader.facing
 
 

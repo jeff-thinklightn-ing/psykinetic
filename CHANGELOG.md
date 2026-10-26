@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- With free movement on, your companion reads where you are heading and keeps out of it, steps aside without a second's stand, and keeps up on slants and turns (688, companions' side).
 - Free movement on the wire: your client's own body follows the server across fords and slow ground without small jumps back (689 amended)
 - Free movement (--free-walk): your own body no longer jumps back a step crossing fords, grass or slopes in the wilds (688 amended (3)).
 - Free movement on the wire (not switched on yet): with the server's free_walk on, your client sends where you mean to go each frame and shows your body moving at once, other players glide between the server's updates, one click walks you there and a held button steers round trees and walls; the admin turns it on or off live with free_walk on|off (689).

@@ -31846,4 +31846,36 @@ speed from the cell its centre rounded to, and a step from a ford onto open
 ground came out a little off: free_net_test's new case (150 ms each way,
 a third of packets lost, across fords on every other column) counted 11
 corrections before, none now. Client only, protocol unchanged, no new
+## 688, companions' side: Heel against a free leader
+
+The coordinator's ask for free movement (689 step 3): she follows a player
+whose body moves freely (688) as well as one on the grid, before free_walk is
+on for the box. 689 sends the server intents only, no route (ui), so his
+next cells come from his body.
+
+- **His next cells** (Heel.free_cells, next_cells for a free body): the
+  cells his centre crosses within FREE_AHEAD (2) cells along free_way, as
+  World.free_cell would hold them, read every FREE_HYSTERESIS, three at
+  most. Read coarser, his slant grazing the corner of her cell in a substep
+  was missed and his claim bumped her.
+- **His way** (travel): a free slant counts as a diagonal only past 0.38 (its
+  unit way's lesser part); a shallow slant is the straight it mostly goes.
+- **Stopping**: on his trail when a free body stops, she keeps a footstep
+  that still serves rather than taking a cell nearer, since he may set off
+  any way at any tick.
+- **Her yield** to a free player ends once she is on her yield cell and out
+  of his next cells (Companion._yielded_free), not after a whole
+  DECISION_INTERVAL_TICKS: he passes through her and walks on, and the
+  second's wait left her five cells behind.
+- The grid's following is unchanged.
+
+companion_test _test_heel_free_leader, six free-walk runs (a stop and turn
+back, a turn straight back, a shallow slant there and back, a curve east to
+north, settled ahead of him as he walks through, a diagonal and back): main's
+Heel on the first four, 1 bump, 3 ticks in his next cells, once 5 behind;
+now 0 bumps, 0 steps straight back, never more than 3 away, 2 ticks in his
+next cells (a diagonal turned straight back on her just-taken step; out
+before he arrives).
+
+Server only, nothing with the flag off, protocol unchanged, no new
 class_name.
