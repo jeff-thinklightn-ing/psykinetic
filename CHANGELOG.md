@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Raiding groups wait for their routes after a level is laid again: a camp sends nobody and a group out stands where it is until its side's ways are worked out, instead of the server freezing to find one (raids are still off on the live server).
 ## v0.1.183
 
 - What goes over the network changes, so v0.1.182 and older can't join the server: update through the launcher first.

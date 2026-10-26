@@ -12276,6 +12276,27 @@ from an area with none still finds another's; retired routes are let go
 once stopped. raid_groups_test, trade_routes_test, respawn_places_test,
 relief_test and townsfolk_test pass. Server only, protocol unchanged, no
 new class_name.
+Amended (2) (2026-10-26, the coordinator; maps, after perf's amendment
+left the raid groups' own ticks): nothing in WorldRaids asks a route of a
+side whose fields are not in. Raids route per faction layer
+(Factions.side), so WorldRaids.routes_in(side) asks that layer alone
+(routes that make no fields are always in; fields_in stands in for tests,
+as TradeRoutes'). Raids stay off on the box until this is live.
+- _send_some: a camp whose side is not in sends nothing that tick, so no
+  group is made without its route; it sends on a later tick.
+- _move: a group out whose side is not in holds where it is, its plan (its
+  legs, perhaps the retired routes') kept and not walked, since along()
+  over them could walk an area. It never breaks up for "no way on" while
+  the fields are made; that stays for a real lack of a route once in.
+- threat_of: _distance gives the steps last measured for that camp and
+  town (_steps, in memory, not saved) while the side is not in; with none
+  measured yet the camp adds no threat, as Holdings.ranked counts routes
+  not in as none.
+world_tick's _drop_retired still runs first, before the "if not on" return.
+raid_groups_test _test_fields_not_in: not in, the threat is the last
+measure and none without one, and no camp sends; in, it sends; not in
+again, the group holds its cell, walked and plan; in, it walks on. Server
+only, protocol unchanged, no new class_name.
 
 ## 466. A forest's canopy: trunks as void cells, a cover layer on every peer
 

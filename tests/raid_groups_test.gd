@@ -59,6 +59,7 @@ func _ready() -> void:
 	_test_new_map()
 	_test_saved()
 	_test_in_play()
+	_test_fields_not_in()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -356,6 +357,44 @@ func _test_in_play() -> void:
 
 
 ## World ticks till group [param id] is in play (or 30 of them).
+## While a side's distance fields are being made a route walks the world on
+## the main thread (465 amended (2)): no camp of that side sends, a group out
+## holds its cell and its plan, and the threat is the steps last measured.
+func _test_fields_not_in() -> void:
+	print("== routes whose fields are not in yet ==")
+	_fresh({})
+	_groups.set_on(true)
+	var ready := {"in": true}
+	_groups.fields_in = func(_side: String) -> bool: return ready["in"]
+	var threat := _groups.threat_of(TOWN)
+	ready["in"] = false
+	_check(threat > 0.0 and is_equal_approx(_groups.threat_of(TOWN), threat), "not in: the threat is the steps last measured (%.2f)" % threat)
+	_groups._steps.clear()
+	_check(_groups.threat_of(TOWN) == 0.0, "none measured yet: no threat from that camp")
+	_tick(20)
+	_check(_groups.groups.is_empty(), "and the camp sends nothing, however many ticks")
+	ready["in"] = true
+	for i in 20:
+		if not _groups.groups.is_empty():
+			break
+		_tick()
+	_check(_groups.groups.size() == 1, "in: it sends (%s)" % [_groups.groups.keys()])
+	var id: String = _groups.groups.keys()[0] if not _groups.groups.is_empty() else ""
+	_tick()
+	var group: Dictionary = _groups.groups.get(id, {})
+	var before: Array = [group.get("area"), group.get("cell"), group.get("walked")]
+	var plan: Array = _groups._legs.get(id, [])
+	ready["in"] = false
+	_tick(5)
+	group = _groups.groups.get(id, {})
+	_check(_groups.groups.has(id) and [group.get("area"), group.get("cell"), group.get("walked")] == before and _groups._legs.get(id, []) == plan and not plan.is_empty(),
+		"a group out holds where it is, its plan kept, not broken up (%s)" % [before])
+	ready["in"] = true
+	_tick()
+	_check(float(_groups.groups.get(id, {}).get("walked", 0.0)) > float(before[2]), "in again: it walks on")
+	_groups.fields_in = Callable()
+
+
 func _until_present(id: String) -> void:
 	for i in 30:
 		if _groups.groups.get(id, {}).get("state") == WorldRaids.PRESENT:

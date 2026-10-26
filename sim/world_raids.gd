@@ -75,6 +75,12 @@ var clock := func() -> int: return 0
 var rng := RandomNumberGenerator.new()
 ## Group id -> its route (WorldRoutes legs), made again when wanted.
 var _legs: Dictionary[String, Array] = {}
+## "camp id|town" -> the route steps last measured between them (threat_of,
+## while a faction's fields are not in; not saved).
+var _steps: Dictionary[String, float] = {}
+## (side) -> bool, in place of asking the routes whether that side's fields
+## are in (tests).
+var fields_in := Callable()
 
 
 func _init(map: WorldMap, with_holdings: Holdings, with_towns: Towns, saved := {}, with_rules := {}) -> void:
@@ -181,16 +187,33 @@ func threat_of(town: String) -> float:
 
 
 ## Route steps from [param camp] to [param town]'s place for the camp's
-## faction; -1 for no route.
+## faction; -1 for no route. While that side's fields are not in, the steps
+## last measured (-1 if none yet: no threat from it, as Holdings.ranked
+## counts such routes as none).
 func _distance(camp: Dictionary, town: String) -> float:
+	var side: String = holdings.factions.side(camp["faction"])
+	var key := "%s|%s" % [camp["id"], town]
+	if not routes_in(side):
+		return _steps.get(key, -1.0)
 	var place := holdings.place(town)
-	var legs := routes.route(camp["area"], camp["cell"], place["area"], place["cell"], holdings.factions.side(camp["faction"]))
-	if legs.is_empty():
-		return -1.0
-	var steps := 0.0
-	for leg: Dictionary in legs:
-		steps += float(leg["steps"])
+	var legs := routes.route(camp["area"], camp["cell"], place["area"], place["cell"], side)
+	var steps := -1.0
+	if not legs.is_empty():
+		steps = 0.0
+		for leg: Dictionary in legs:
+			steps += float(leg["steps"])
+	_steps[key] = steps
 	return steps
+
+
+## Whether [param side]'s distance fields are in (465 amended (2)): until
+## they are, a route asked of them walks the world on the main thread, so
+## no camp sends and no group moves on that side; routes that make no fields
+## are always in.
+func routes_in(side: String) -> bool:
+	if fields_in.is_valid():
+		return bool(fields_in.call(side))
+	return not routes.makes_fields() or routes.is_ready(side)
 
 
 ## Everything a world tick does: sending, then each group's move. Nothing
@@ -212,7 +235,7 @@ func _send_some() -> void:
 		busy_camps[group["from"]] = true
 		busy_towns[group["town"]] = true
 	for camp in camps():
-		if busy_camps.has(camp["id"]):
+		if busy_camps.has(camp["id"]) or not routes_in(holdings.factions.side(camp["faction"])):
 			continue
 		var best := ""
 		var best_threat := 0.0
@@ -291,6 +314,8 @@ func _move(id: String) -> void:
 	var group := groups[id]
 	if group["state"] == PRESENT:
 		return  # Raiders in play: World.raids has it.
+	if not routes_in(holdings.factions.side(group["faction"])):
+		return  # Holds where it is, its plan kept, till its side's fields are in.
 	var legs: Array = _legs.get(id, [])
 	if legs.is_empty():
 		legs = _route(id)
