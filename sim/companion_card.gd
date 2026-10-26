@@ -265,6 +265,8 @@ static func legacy_look(name: String) -> Dictionary:
 ## (her traits' "look", else a legacy one's fixed look); a card from before
 ## the look has seed and body alone, the rest the seed's.
 static func look_of(traits: Dictionary, seed: String) -> String:
+	if not str(traits.get("look_spec", "")).is_empty():
+		return str(traits["look_spec"])  # A town's resident come along (686): drawn as the town knew them.
 	var parts: Array[String] = ["seed=%d" % absi(hash("companion:" + seed)), "body=%s" % body_of(traits, seed)]
 	var look: Variant = traits.get("look", {})
 	if not look is Dictionary or look.is_empty():
@@ -290,6 +292,54 @@ static func body_of(traits: Dictionary, seed: String) -> StringName:
 		"she":
 			return &"female"
 	return &"male" if absi(hash("body:" + seed)) % 2 == 0 else &"female"
+
+
+## Traits for a town's resident who goes with player [param player_id]
+## (686): [param card] their resident card (ResidentCard), [param worker]
+## their worker (Production), [param words] their trade's words ("the
+## smith") and [param town] their town's name. Their name and resident
+## traits (KEYS) are theirs, a legacy one's fixed facts winning (one Pip);
+## what a resident card has not (a companion's other keys) is rolled by
+## "companion:<player id>:<worker id>"; their look the town's (look_spec,
+## no apron or trade garb), a legacy one's fixed; their leanings and
+## justice their mind's intellect, superstition and integrity; how_we_met
+## where they worked.
+static func from_resident(player_id: String, worker_id: String, card: Dictionary, worker: Dictionary, words: String, town: String) -> Dictionary:
+	var theirs: Dictionary = card.get("traits", {})
+	var name := str(theirs.get("name", worker.get("name", "")))
+	var traits := roll("%s:%s" % [player_id, worker_id], name)
+	var fixed: Dictionary = {}
+	if is_legacy(name) and tables()["legacy"][name].get("fixed") is Dictionary:
+		fixed = tables()["legacy"][name]["fixed"]
+	for key: String in ResidentCard.KEYS:
+		if not fixed.has(key) and theirs.has(key):
+			traits[key] = str(theirs[key])
+	var trades: Array = worker.get("trades", [])
+	var trade := str(trades[0]) if not trades.is_empty() else str(theirs.get("trade", ""))
+	if not fixed.has("profession"):
+		traits["profession"] = words
+		traits["trade"] = trade
+	var pronoun := str(traits.get("pronoun", "she"))
+	traits["body"] = {"she": "female", "he": "male"}.get(pronoun, "female" if absi(hash("body:" + worker_id)) % 2 == 1 else "male")
+	if legacy_look(name).is_empty():
+		traits["look_spec"] = ResidentCard.look_spec(card)
+		var look := {}
+		for key: String in LOOKS:
+			var word := str((card.get("look", {}) as Dictionary).get(key, ""))
+			if word == "bound up":
+				word = "bound"
+			if word in LOOKS[key]:
+				look[key] = word
+		traits["look"] = look
+	var leanings := {}
+	for key in LEANINGS:
+		leanings[key] = clampi(int(worker.get(key, 5)), 1, 10)
+	traits["leanings"] = leanings
+	traits.erase("justice")
+	traits["justice"] = justice(traits, player_id) if is_legacy(name) else clampi(int(worker.get("integrity", 5)), 1, 10)
+	var subject := pronoun if pronoun in ["she", "he", "they"] else "she"
+	traits["how_we_met"] = "{player} asked {pronoun} along in %s, where %s %s %s" % [town, subject, "were" if subject == "they" else "was", words]
+	return traits
 
 
 ## The how_we_met seed for her and [param player]: "Jeff found her hiding

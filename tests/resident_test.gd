@@ -71,6 +71,7 @@ func _ready() -> void:
 	_test_companion_hearsay()
 	_test_favour()
 	_test_parting()
+	_test_recruit()
 	_test_visible_work()
 	_test_field_work()
 	_test_quiet_near_hostile()  # Late: its steps move the hail tick's phase the voice tests count on.
@@ -1600,6 +1601,229 @@ func _test_parting() -> void:
 	# As she was.
 	record.companion = kept
 	record.companion.erase("resident")
+	_main.travel(Net.local_id, ROAD)
+	_main.travel(Net.local_id, TOWN)
+	pet = _companion()
+	_check(pet != null, "(restored)")
+	if pet != null:
+		_settle(pet)
+
+
+func _test_recruit() -> void:
+	print("\n== a resident who trusts a player goes with them; theirs away is handed to her town; asked home, back to their work (686) ==")
+	if World.zone.name != TOWN:
+		_main.travel(Net.local_id, TOWN)
+	var record: PlayerRecord = _main._records[Net.player_id]
+	var kept: Dictionary = record.companion.duplicate(true)
+	var kept_former := record.former.duplicate(true)
+	var owner := _player()
+	var pet := _companion()
+	_check(owner != null and pet != null, "(a player and a companion)")
+	if owner == null or pet == null:
+		return
+	var old_name := str(record.companion.get("name", ""))
+	World.towns.note_rescue(STORE, "rs-ada", "Ada", "cook")
+	World.towns.note_rescue(STORE, "rs-cy", "Cy", "cook")  # Two cooks: neither the town's only one.
+	World.towns.note_rescue(STORE, "rs-pia", "Pia", "priest")
+	_sync()
+	var ada := _body("rs-ada")
+	_check(ada != null, "(Ada the cook stands in the town)")
+	if ada == null:
+		return
+	var card := Townsfolk.card_of(World.production, "rs-ada")
+	var score := func(value: int) -> void:
+		Standing.set_score(card, Net.player_id, value, "test", World.steps)
+		World.production.set_card("rs-ada", card)
+	score.call(4)
+	var ask := func(body: Resident, line := "Come with me.") -> void:
+		var asker := _player()  # (Not owner: a lambda keeps the one it was made with, and travel makes another.)
+		_put(asker, _main._nearest_free(body.tile))
+		_main._chat_tick.clear()
+		_main._player_said(asker, "%s, %s" % [body.person, line])
+	ask.call(ada)
+	_check(not record.companion.has("from_worker") and "travels with them" in str(World.production.worker("rs-ada").get("asked", {}).get(Net.player_id, "")),
+		"his companion with him: Ada will not go, and her voice is told why (%s)" % [World.production.worker("rs-ada").get("asked", {})])
+	_check(_main.recruit_refusal(record, "rs-pia") == "with", "(the same for anyone)")
+	# He parts with his: she goes home to the town, parted.
+	_settle(pet)
+	_main._chat_tick.clear()
+	_main._player_said(owner, "%s, go home for a while." % pet.name)
+	World.step()
+	record.companion["leaving"]["until"] = World.tick
+	record.companion["leaving"]["from"] = World.tick - 1
+	World.step()
+	World.step()
+	_check(record.companion.get("parted") is Dictionary and not World.production.worker("companion:%s" % old_name).is_empty(), "(parted, resting in town)")
+	var old_bond := Standing.score(record.companion, Net.player_id)
+	_check(_main.recruit_refusal(record, "rs-pia") == "role", "the town's priest will not go")
+	score.call(1)
+	_sync()
+	ada = _body("rs-ada")
+	ask.call(ada)
+	_check(not record.companion.has("from_worker") and "do not trust them enough" in str(World.production.worker("rs-ada").get("asked", {}).get(Net.player_id, "")),
+		"Ada does not trust him enough yet: she stays, told why")
+	score.call(4)
+	ask.call(ada)
+	pet = _companion()
+	var former_id := str(record.former[0].get("worker", "")) if not record.former.is_empty() else ""
+	_check(str(record.companion.get("from_worker", "")) == "rs-ada" and record.companion.get("name") == "Ada" and pet != null and pet.name == "Ada" and pet.keeper == owner,
+		"trusted, Ada goes with him as his companion (%s)" % [record.companion.get("name")])
+	_check(Standing.score(record.companion, Net.player_id) == 2 and bool(World.production.worker("rs-ada").get("away", false))
+		and str(World.production.worker("rs-ada").get("asked", {}).get(Net.player_id, "")).is_empty(),
+		"her bond at bond_most (2), her work left (away), the refusal gone")
+	_check(record.companion["traits"].get("trade") == "cook" and str(record.companion["traits"].get("look_spec", "")).begins_with("seed=")
+		and str(record.companion.get("how_we_met", "")).contains("asked her along") or str(record.companion.get("how_we_met", "")).contains("asked him along")
+		or str(record.companion.get("how_we_met", "")).contains("asked them along"), "her card from the town's: a cook, drawn as the town knew her, met where she worked (%s)" % record.companion.get("how_we_met", ""))
+	_check(former_id.begins_with("settled:") and record.former[0]["companion"].get("name") == old_name and record.former[0]["companion"].get("parted") is Dictionary
+		and World.production.worker("companion:%s" % old_name).is_empty() and Standing.score(Townsfolk.card_of(World.production, former_id), Net.player_id) == old_bond,
+		"%s handed to her town: %s, her record kept as former, her card's standing her bond (%d)" % [old_name, former_id, old_bond])
+	_sync()
+	_check(_body("rs-ada") == null and _body(former_id) != null, "no body for Ada in town; one for %s as the town's own" % old_name)
+	var saved := PlayerRecord.from_dict(JSON.parse_string(JSON.stringify(record.to_dict())))
+	_check(saved.companion.get("from_worker") == "rs-ada" and saved.former.size() == record.former.size() and saved.former[0]["worker"] == former_id,
+		"kept through a save: where she came from, and the former one")
+	# Asked home, Ada goes back to her work.
+	_settle(pet)
+	_main._chat_tick.clear()
+	_main._player_said(owner, "Ada, go home for a while.")
+	World.step()
+	record.companion["leaving"]["until"] = World.tick
+	record.companion["leaving"]["from"] = World.tick - 1
+	World.step()
+	World.step()
+	_check(record.companion == {"solo": true} and not bool(World.production.worker("rs-ada").get("away", false)) and record.former[0]["worker"] == "rs-ada"
+		and record.former[0]["companion"].get("parted") is Dictionary and Standing.score(Townsfolk.card_of(World.production, "rs-ada"), Net.player_id) == 2,
+		"home: Ada back at her work, her card's standing her bond, his record nobody (%s)" % [record.companion])
+	_main.travel(Net.local_id, ROAD)
+	_main.travel(Net.local_id, TOWN)
+	_check(_companion() == null and bool(record.companion.get("solo", false)) and not record.companion.has("name"), "nobody with him: none given (%s)" % [record.companion])
+	owner = _player()
+	# Another player has her now: asked, she travels with someone else; his entry stays.
+	var other := PlayerRecord.new()
+	other.player_id = "rs-ada-other"
+	other.companion = {"name": "Ada", "from_worker": "rs-ada"}
+	_main._records[other.player_id] = other
+	_check(_main.recruit_refusal(record, "rs-ada") == "elsewhere" and not _main._former_of(record, "rs-ada").is_empty(), "out with another player: she travels with someone else; his former entry stays")
+	_main._records.erase(other.player_id)
+	# The former one who parted as a friend comes with no trust asked (the
+	# town's only one of her trade would stay: another comes first).
+	var her_trade := str(record.former[1]["companion"].get("traits", {}).get("trade", "cook")) if record.former.size() > 1 else "cook"
+	World.towns.note_rescue(STORE, "rs-twin", "Tamsin", her_trade)
+	_check(_main.recruit_refusal(record, former_id) == "", "(%s no longer the town's only %s)" % [old_name, her_trade])
+	var hers := Townsfolk.card_of(World.production, former_id)
+	Standing.set_score(hers, Net.player_id, 0, "test", World.steps)
+	World.production.set_card(former_id, hers)
+	_sync()
+	var her_body := _body(former_id)
+	_check(her_body != null, "(%s's body in town)" % old_name)
+	if her_body != null:
+		ask.call(her_body)
+		_check(record.companion.get("name") == old_name and str(record.companion.get("from_worker", "")) == former_id and Standing.score(record.companion, Net.player_id) == old_bond
+			and _main._former_of(record, former_id).is_empty() and _companion() != null and _companion().keeper == _player(),
+			"%s, parted as a friend, comes as she was, her bond as it was (%d)" % [old_name, Standing.score(record.companion, Net.player_id)])
+	# Two of one legacy name resting at once settle as two (the unique-name rule).
+	var wren_a := PlayerRecord.new()
+	wren_a.player_id = "rs-wren-a"
+	wren_a.companion = {"name": "Wren", "traits": {"name": "Wren", "trade": "cook"}, "parted": {"day": 1, "place": STORE},
+		"resident": {"place": STORE, "zone": TOWN, "trade": "cook"}}
+	var wren_b := PlayerRecord.new()
+	wren_b.player_id = "rs-wren-b"
+	wren_b.companion = wren_a.companion.duplicate(true)
+	var a_wren := wren_a.companion.duplicate(true)
+	World.towns.note_companion_in(STORE, "Wren", "cook", "rs-wren-a")
+	World.towns.note_companion_in(STORE, "Wren", "cook", "rs-wren-b")
+	_check(_main._hand_companion_over(wren_a) and _main._hand_companion_over(wren_b), "(both handed over)")
+	# The coordinator: never two Wrens side by side. The second goes to the
+	# next town with no Wren; with none (this world has one town), she
+	# settles as someone else, a fresh name, and is not his to ask back.
+	var ids: Array[String] = []
+	var shown := {}
+	var twice := false
+	for town: String in [STORE]:
+		for id: String in World.towns.residents(town):
+			var name := str(World.production.worker(id).get("name", ""))
+			twice = twice or shown.has("%s/%s" % [town, name])
+			shown["%s/%s" % [town, name]] = true
+	var first_id := str(wren_a.former[0].get("worker", "")) if not wren_a.former.is_empty() else ""
+	ids.append(first_id)
+	var towns := World.holdings.places_of(Stockpile.TOWN).filter(func(each: String) -> bool: return World.holdings.place(each).get("kind") == Stockpile.KIND)
+	if towns.size() > 1:
+		var second := str(wren_b.former[0].get("worker", "")) if not wren_b.former.is_empty() else ""
+		ids.append(second)
+		_check(first_id == "settled:Wren" and str(World.production.worker(second).get("name", "")) == "Wren" and str(World.production.worker(second).get("town", "")) != STORE,
+			"two Wrens: the second settles as Wren in another town (%s)" % [ids])
+	else:
+		var fresh := ""
+		for id: String in World.towns.residents(STORE):
+			if id.begins_with("settled:") and id != first_id and not id.begins_with("settled:Isolde") and str(World.production.worker(id).get("origin", "")) == "settled" and id != former_id:
+				fresh = id
+		ids.append(fresh)
+		_check(first_id == "settled:Wren" and wren_b.former.is_empty() and not fresh.is_empty() and str(World.production.worker(fresh).get("name", "")) != "Wren",
+			"two Wrens, one town: the second settles as someone else (%s, %s), not his to ask back" % [fresh, World.production.worker(fresh).get("name", "")])
+	# More, till a Wren lives in every town; then one more is someone else,
+	# a fresh name, with no former entry.
+	var wren_towns := {}
+	for id: String in ids:
+		wren_towns[str(World.production.worker(id).get("town", ""))] = true
+	var fresh := ""
+	for i in towns.size():
+		var more := PlayerRecord.new()
+		more.player_id = "rs-wren-%d" % i
+		more.companion = a_wren.duplicate(true)
+		var all_before := {}
+		for town: String in towns:
+			for id: String in World.towns.residents(town):
+				all_before[id] = true
+		if not _main._hand_companion_over(more):
+			break
+		var new_id := ""
+		for town: String in towns:
+			for id: String in World.towns.residents(town):
+				if not all_before.has(id):
+					new_id = id
+		ids.append(new_id)
+		if more.former.is_empty():
+			fresh = new_id
+			break
+		wren_towns[str(World.production.worker(new_id).get("town", ""))] = true
+	_check(wren_towns.size() == towns.size() and fresh.begins_with("settled:") and str(World.production.worker(fresh).get("name", "")) != "Wren",
+		"a Wren in each of %d towns; then one more settles as someone else (%s, %s), not to be asked back" % [towns.size(), fresh, World.production.worker(fresh).get("name", "")])
+	# One more resting with a worker of her own and a purse: moved to settle
+	# as someone else, her purse comes with her (economy).
+	var purse_wren := PlayerRecord.new()
+	purse_wren.player_id = "rs-wren-purse"
+	purse_wren.companion = a_wren.duplicate(true)
+	World.towns.note_companion_in(STORE, "Wren", "cook", purse_wren.player_id)
+	World.production.pay("companion:Wren", 7, "a test")
+	World.production.set_loan("companion:Wren", 12.0, true)
+	var known := {}
+	for id: String in World.towns.residents(STORE):
+		known[id] = true
+	_check(_main._hand_companion_over(purse_wren) and World.production.worker("companion:Wren").is_empty(), "(a Wren with a purse handed over)")
+	var paid := ""
+	for id: String in World.towns.residents(STORE):
+		if not known.has(id):
+			paid = id
+	ids.append(paid)
+	_check(not paid.is_empty() and int(World.production.worker(paid).get("purse", 0)) >= 7 and not "companion:Wren" in World.towns.residents(STORE),
+		"her purse comes with her (%s: %s)" % [paid, World.production.worker(paid).get("purse", 0)])
+	_check(is_equal_approx(float(World.production.worker(paid).get("loan", 0.0)), 12.0) and bool(World.production.worker(paid).get("working_off", false)),
+		"and her loan, never written off (%s, working it off %s)" % [World.production.worker(paid).get("loan", 0.0), World.production.worker(paid).get("working_off", false)])
+	shown.clear()
+	for town: String in towns:
+		for id: String in World.towns.residents(town):
+			var name := str(World.production.worker(id).get("name", ""))
+			twice = twice or shown.has("%s/%s" % [town, name])
+			shown["%s/%s" % [town, name]] = true
+	_check(not twice, "no name shown twice in any town")
+	# As it was.
+	for id: String in ids + [former_id, "rs-ada", "rs-cy", "rs-pia", "rs-twin"] as Array[String]:
+		if not World.production.worker(id).is_empty():
+			World.towns.died(str(World.production.worker(id).get("town", STORE)), id, "a test ends")
+	record.companion = kept
+	record.companion.erase("resident")
+	record.companion.erase("parted")
+	record.former = kept_former
 	_main.travel(Net.local_id, ROAD)
 	_main.travel(Net.local_id, TOWN)
 	pet = _companion()

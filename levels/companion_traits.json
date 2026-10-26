@@ -75,6 +75,18 @@
 		"_recruit": "Asking her back (581 amended (2)): her player, to her body in her town, with one of recruit_words as words of the line; willing (581 amended's gate open), she goes with them again, her bond set to rejoin_at (cooling: a fresh start, not warm); not, her resident voice answers, told why she left and what would bring her back. Drafts for Jeff.",
 		"rejoin_at": -1,
 		"_part": "Parting as friends (581 amended (3)): her player says one of part_words to her; at the next calm moment she goes home as one who leaves does, but marked parted: no bond lost, no wrong to put right, and asked in her town (recruit_words) she comes. Drafts for Jeff.",
+		"_recruit_resident": "Decision 686: a town's resident goes with one who asks (recruit_words) when their card trusts them (trusted_at; unforgiven_at for a former companion who left over a wrong not put right; none for one who parted as a friend) and nobody is with them; not the town's recruit_roles, one it only tolerates, its only one of a trade it needs, the sick, away or lost. One comes with a bond of their card's score, bond_most at most. Each refusal's sentence (recruit_asked) is given to their resident voice for the one who asked ({player}, {trade}, {companion}). A companion away in her town when another is recruited is handed to it for good; a record keeps former_most of them.",
+		"trusted_at": 3, "bond_most": 2, "former_most": 3, "unforgiven_at": 6,
+		"recruit_roles": ["lawspeaker", "priest", "medicine_man"],
+		"recruit_asked": {
+			"with": "{player} asked you to travel with them, but {companion} travels with them; you will not go while she does.",
+			"elsewhere": "{player} asked you to travel with them, but you travel with someone else now.",
+			"away": "{player} asked you to travel with them, but you cannot leave now.",
+			"role": "{player} asked you to travel with them, but the town needs you here; you will not leave it.",
+			"needed": "{player} asked you to travel with them, but you are the town's only {trade}, and it needs you; you will not leave it.",
+			"name": "{player} asked you to travel with them, but you would rather stay in the town for now.",
+			"trust": "{player} asked you to travel with them; you would go only with someone you trust, and you do not trust them enough yet."
+		},
 		"part_words": ["go home", "go back home", "head home", "go home for a while", "ill travel alone", "i will travel alone", "travel alone for a while", "we part here", "lets part here", "you can go home"],
 		"recruit_words": ["come with me", "come with us", "travel with me", "travel with us", "join me", "join us", "come back to me", "come along", "follow me", "walk with me again"],
 		"favour": {"gift": 1, "errand": 1, "reputation": 1},

@@ -44,6 +44,7 @@ func _ready() -> void:
 			"visit": {"from": 900}},
 		"leaving": {"deed": "harsh", "why": "shouted at you", "day": 2},
 		"parted": {"day": 5, "place": "t/store"},
+		"from_worker": "w-bram",
 	}
 	_player = {
 		"player_id": "p", "index": 2, "name": "Jeff", "body": &"female", "look": "", "tile": Vector2i(3, 4), "hp": 9, "stamina": 8,
@@ -54,10 +55,14 @@ func _ready() -> void:
 		"marks": ["draugr"] as Array[String], "barrow": {"best": "hard", "containers": ["c1"]}, "care": {"hut": "gold"},
 		"paid_deals": {"barrow": {"level": "easy", "paid_step": 40}}, "care_given": {"hut": {"herbs": 2}},
 		"caches": ["k1"] as Array[String],
+		"former": [{"companion": {"name": "Nix", "card": "", "hp": 0, "stamina": 0, "tile": null, "alive": true, "said": [],
+			"slots": Array(Items.tidy([], Companion.SLOTS)), "items": [], "parted": {"day": 2, "place": "t/store"},
+			"standing": {"p": {"score": 2, "met": 1, "since": 2, "why": ["travelled with you"], "own": true}}}, "worker": "settled:Nix"}],
 	}
 	_test_written_keys_have_samples()
 	_test_companion_round_trip()
 	_test_player_round_trip()
+	_test_solo_round_trip()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -124,6 +129,16 @@ func _test_player_round_trip() -> void:
 		if not _same(back.get(field), _player[field]):
 			lost.append("%s: %s, saved %s" % [field, back.get(field), _player[field]])
 	_check(lost.is_empty(), "every field kept as saved: %s" % [lost])
+
+
+func _test_solo_round_trip() -> void:
+	print("
+== nobody with them by their choice stays so through a save (686) ==")
+	var record := PlayerRecord.new()
+	record.player_id = "p"
+	record.companion = {"solo": true}
+	var back := PlayerRecord.from_dict(JSON.parse_string(JSON.stringify(record.to_dict())))
+	_check(back != null and back.companion == {"solo": true}, "solo kept, not given one again (%s)" % [back.companion if back != null else null])
 
 
 ## Whether [param a] and [param b] hold the same: numbers by value (JSON

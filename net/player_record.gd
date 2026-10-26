@@ -82,6 +82,10 @@ var care_given: Dictionary = {}
 ## The caches they have searched (decision 599: Chest.cache, a loot
 ## table's name): each gives a player its find once.
 var caches: Array[String] = []
+## Companions who travelled with this player once and were handed to a
+## town (686): {"companion": her record as she was, "worker": the town's
+## worker id she is now}, newest first, a few at most.
+var former: Array = []
 
 
 ## Copies the live state off the player's entity.
@@ -124,6 +128,7 @@ func to_dict() -> Dictionary:
 		"care_given": care_given.duplicate(true),
 		"paid_deals": paid_deals.duplicate(true),
 		"caches": caches.duplicate(),
+		"former": former.duplicate(true),
 	}
 
 
@@ -187,132 +192,151 @@ static func from_dict(entry: Variant) -> PlayerRecord:
 	var asks: Variant = entry.get("commissions", [])
 	record.commissions = asks.duplicate(true) if asks is Array else []
 	var pet: Variant = entry.get("companion", {})
-	if pet is Dictionary and pet.get("name") is String:
-		record.companion = {
-			"name": str(pet["name"]),
-			"card": str(pet.get("card", "")),
-			"hp": int(pet.get("hp", 0)),
-			"stamina": int(pet.get("stamina", 0)),
-			"tile": pet.get("tile"),
-			"alive": bool(pet.get("alive", true)),
-			"said": _lines(pet.get("said", [])),
-			"slots": Array(Items.tidy(pet.get("slots", []), Companion.SLOTS)),
-			"items": Array(_uids(pet.get("items", []))),
-		}
-		var traits: Variant = pet.get("traits")
-		if traits is Dictionary and not traits.is_empty():
-			var kept := {}
-			for key: Variant in traits:
-				# Her look and leanings are tables of their own (293
-				# amended, 442); every other trait is a word. One loaded
-				# before this kept them as text: read back as a table.
-				var value: Variant = traits[key]
-				if value is String and str(key) in TABLE_TRAITS:
-					value = JSON.parse_string(value) if value.begins_with("{") else null
-					if not value is Dictionary:
-						continue  # Not a table: her seed's again (CompanionCard.look_of, leaning).
-				# A number stays one (her justice, 581 amended); a word, a word.
-				kept[str(key)] = value.duplicate(true) if value is Dictionary else int(value) if value is float or value is int else str(value)
-			record.companion["traits"] = kept
-			record.companion["how_we_met"] = str(pet.get("how_we_met", ""))
-			record.companion["card_by"] = str(pet.get("card_by", "plain"))
-		# What has become true of her (decision 294), and talk not yet read for it.
-		var grown := CompanionFacts.from_record(pet.get("facts", []), pet.get("beliefs", []))
-		if not grown.facts.is_empty() or not grown.beliefs.is_empty():
-			record.companion["facts"] = grown.facts
-			record.companion["beliefs"] = grown.beliefs
-		var talk: Variant = pet.get("talk", [])
-		if talk is Array and not talk.is_empty():
-			record.companion["talk"] = Array(talk.map(func(line: Variant) -> String: return str(line)))
-		var resident: Variant = pet.get("resident")
-		if resident is Dictionary and str(resident.get("place", "")) != "" and str(resident.get("zone", "")) != "":
-			record.companion["resident"] = {"place": str(resident["place"]), "zone": str(resident["zone"]),
-				"trade": str(resident.get("trade", ""))}
-		var taken: Variant = pet.get("taken")
-		if taken is Dictionary and str(taken.get("by", "")) != "":
-			record.companion["taken"] = {"by": str(taken["by"]), "zone": str(taken.get("zone", "")), "at": int(taken.get("at", 0))}
-		# Her home town (381) and what she has heard (442): kept through a
-		# save, as written (they were dropped on load before).
-		var home: Variant = pet.get("home")
-		if home is Dictionary and str(home.get("zone", "")) != "":
-			record.companion["home"] = {"place": str(home.get("place", "")), "zone": str(home["zone"]), "trade": str(home.get("trade", ""))}
-		var heard: Variant = pet.get("heard")
-		if heard is Array and not heard.is_empty():
-			record.companion["heard"] = heard.filter(func(entry: Variant) -> bool: return entry is Dictionary).duplicate(true)
-		# Her bond with her player (444, Standing's entries) and its daily counts.
-		var standing: Variant = pet.get("standing")
-		if standing is Dictionary and not standing.is_empty():
-			record.companion["standing"] = standing.duplicate(true)
-		for key: String in ["bond_day", "bond_best"]:
-			if pet.get(key) is float or pet.get(key) is int:
-				record.companion[key] = int(pet[key])
-		# Her tiers' counts (decision 621): the half point carried, the deeds raised today.
-		if pet.get("bond_carry") is float or pet.get("bond_carry") is int:
-			record.companion["bond_carry"] = float(pet["bond_carry"])
-		var games: Variant = pet.get("games")
-		if games is Dictionary:
-			record.companion["games"] = {"hers": int(games.get("hers", 0)), "theirs": int(games.get("theirs", 0))}
-		var said: Variant = pet.get("bond_said")
-		if said is Dictionary:
-			record.companion["bond_said"] = {"day": int(said.get("day", -1)), "hurt": int(said.get("hurt", 0)), "sorry": int(said.get("sorry", 0))}
-		var today: Variant = pet.get("bond_today")
-		if today is Dictionary:
-			record.companion["bond_today"] = {"day": int(today.get("day", -1)), "deeds": Array(_strings(today.get("deeds", [])))}
-		# Her sickness (decision 501, npc's Townsfolk) and one ended, still to be told.
-		# Her marks (decision 544: "draugr", the draugr's blessing), as a player's.
-		var her_marks := _strings(pet.get("marks", []))
-		if not her_marks.is_empty():
-			record.companion["marks"] = Array(her_marks)
-		for key: String in ["sick", "was_sick"]:
-			var sick: Variant = pet.get(key)
-			if sick is Dictionary and not sick.is_empty():
-				record.companion[key] = _numbers(sick)
-		# Her focus (577) and its day's growth, her mood (555), and her
-		# leaving (581): gone home, or about to go, and the road she was
-		# warned off (581 amended). Dropped on load before: one who left
-		# came back with her player after a restart, her focus re-rolled.
-		var focus: Variant = pet.get("focus")
-		if focus is Dictionary and not focus.is_empty():
-			var kinds := {}
-			for kind: Variant in focus:
-				if focus[kind] is float or focus[kind] is int:
-					kinds[str(kind)] = float(focus[kind])
-			record.companion["focus"] = kinds
-		var focus_day: Variant = pet.get("focus_day")
-		if focus_day is Dictionary:
-			record.companion["focus_day"] = {"day": int(focus_day.get("day", -1)), "grown": float(focus_day.get("grown", 0.0))}
-		for key: String in ["mood", "warned_area"]:
-			if pet.get(key) is String and not str(pet[key]).is_empty():
-				record.companion[key] = str(pet[key])
-		var left: Variant = pet.get("left")
-		if left is Dictionary and not left.is_empty():
-			record.companion["left"] = _whole(left)
-		var parted: Variant = pet.get("parted")
-		if parted is Dictionary and not parted.is_empty():
-			record.companion["parted"] = _whole(parted)  # Parted as friends (581 amended (3)).
-		var leaving: Variant = pet.get("leaving")
-		if leaving is Dictionary and not leaving.is_empty():
-			# Her walk starts again (Main._leaving_tick): only what she leaves over.
-			record.companion["leaving"] = {"deed": str(leaving.get("deed", "")), "why": str(leaving.get("why", "")),
-				"day": int(leaving.get("day", 0))}
-		# Her roads (decision 551): where she has been with her player, and
-		# the dangers she lived through there.
-		var roads: Variant = pet.get("roads")
-		if roads is Dictionary:
-			var dangers: Array = []
-			for danger: Variant in roads.get("dangers", []):
-				if danger is Dictionary:
-					dangers.append(_numbers(danger))
-			# The areas she came through safely, and on which day (551 phase 2).
-			var passed := {}
-			var went: Variant = roads.get("passed", {})
-			if went is Dictionary:
-				for area: Variant in went:
-					if went[area] is float or went[area] is int:
-						passed[str(area)] = int(went[area])
-			record.companion["roads"] = {"areas": Array(_strings(roads.get("areas", []))),
-				"places": Array(_strings(roads.get("places", []))), "dangers": dangers, "passed": passed}
+	record.companion = companion_from(pet)
+	if record.companion.is_empty() and pet is Dictionary and bool(pet.get("solo", false)):
+		record.companion = {"solo": true}  # Nobody with them, by their choice (686): not given one again.
+	# Companions who travelled with them once (686): her record as she was,
+	# and the town's worker she is now.
+	var former: Variant = entry.get("former", [])
+	if former is Array:
+		for each: Variant in former:
+			if each is Dictionary and str(each.get("worker", "")) != "":
+				var hers := companion_from(each.get("companion", {}))
+				if not hers.is_empty():
+					record.former.append({"companion": hers, "worker": str(each["worker"])})
 	return record
+
+
+## A companion's record ([param pet], as saved) key by key, as written; {}
+## for none (no name). The player's companion and each former one (686).
+static func companion_from(pet: Variant) -> Dictionary:
+	if not (pet is Dictionary and pet.get("name") is String):
+		return {}
+	var out := {
+		"name": str(pet["name"]),
+		"card": str(pet.get("card", "")),
+		"hp": int(pet.get("hp", 0)),
+		"stamina": int(pet.get("stamina", 0)),
+		"tile": pet.get("tile"),
+		"alive": bool(pet.get("alive", true)),
+		"said": _lines(pet.get("said", [])),
+		"slots": Array(Items.tidy(pet.get("slots", []), Companion.SLOTS)),
+		"items": Array(_uids(pet.get("items", []))),
+	}
+	var traits: Variant = pet.get("traits")
+	if traits is Dictionary and not traits.is_empty():
+		var kept := {}
+		for key: Variant in traits:
+			# Her look and leanings are tables of their own (293
+			# amended, 442); every other trait is a word. One loaded
+			# before this kept them as text: read back as a table.
+			var value: Variant = traits[key]
+			if value is String and str(key) in TABLE_TRAITS:
+				value = JSON.parse_string(value) if value.begins_with("{") else null
+				if not value is Dictionary:
+					continue  # Not a table: her seed's again (CompanionCard.look_of, leaning).
+			# A number stays one (her justice, 581 amended); a word, a word.
+			kept[str(key)] = value.duplicate(true) if value is Dictionary else int(value) if value is float or value is int else str(value)
+		out["traits"] = kept
+		out["how_we_met"] = str(pet.get("how_we_met", ""))
+		out["card_by"] = str(pet.get("card_by", "plain"))
+	# What has become true of her (decision 294), and talk not yet read for it.
+	var grown := CompanionFacts.from_record(pet.get("facts", []), pet.get("beliefs", []))
+	if not grown.facts.is_empty() or not grown.beliefs.is_empty():
+		out["facts"] = grown.facts
+		out["beliefs"] = grown.beliefs
+	var talk: Variant = pet.get("talk", [])
+	if talk is Array and not talk.is_empty():
+		out["talk"] = Array(talk.map(func(line: Variant) -> String: return str(line)))
+	var resident: Variant = pet.get("resident")
+	if resident is Dictionary and str(resident.get("place", "")) != "" and str(resident.get("zone", "")) != "":
+		out["resident"] = {"place": str(resident["place"]), "zone": str(resident["zone"]),
+			"trade": str(resident.get("trade", ""))}
+	var taken: Variant = pet.get("taken")
+	if taken is Dictionary and str(taken.get("by", "")) != "":
+		out["taken"] = {"by": str(taken["by"]), "zone": str(taken.get("zone", "")), "at": int(taken.get("at", 0))}
+	# Her home town (381) and what she has heard (442): kept through a
+	# save, as written (they were dropped on load before).
+	var home: Variant = pet.get("home")
+	if home is Dictionary and str(home.get("zone", "")) != "":
+		out["home"] = {"place": str(home.get("place", "")), "zone": str(home["zone"]), "trade": str(home.get("trade", ""))}
+	var heard: Variant = pet.get("heard")
+	if heard is Array and not heard.is_empty():
+		out["heard"] = heard.filter(func(entry: Variant) -> bool: return entry is Dictionary).duplicate(true)
+	# Her bond with her player (444, Standing's entries) and its daily counts.
+	var standing: Variant = pet.get("standing")
+	if standing is Dictionary and not standing.is_empty():
+		out["standing"] = standing.duplicate(true)
+	for key: String in ["bond_day", "bond_best"]:
+		if pet.get(key) is float or pet.get(key) is int:
+			out[key] = int(pet[key])
+	# Her tiers' counts (decision 621): the half point carried, the deeds raised today.
+	if pet.get("bond_carry") is float or pet.get("bond_carry") is int:
+		out["bond_carry"] = float(pet["bond_carry"])
+	var games: Variant = pet.get("games")
+	if games is Dictionary:
+		out["games"] = {"hers": int(games.get("hers", 0)), "theirs": int(games.get("theirs", 0))}
+	var said: Variant = pet.get("bond_said")
+	if said is Dictionary:
+		out["bond_said"] = {"day": int(said.get("day", -1)), "hurt": int(said.get("hurt", 0)), "sorry": int(said.get("sorry", 0))}
+	var today: Variant = pet.get("bond_today")
+	if today is Dictionary:
+		out["bond_today"] = {"day": int(today.get("day", -1)), "deeds": Array(_strings(today.get("deeds", [])))}
+	# Her sickness (decision 501, npc's Townsfolk) and one ended, still to be told.
+	# Her marks (decision 544: "draugr", the draugr's blessing), as a player's.
+	var her_marks := _strings(pet.get("marks", []))
+	if not her_marks.is_empty():
+		out["marks"] = Array(her_marks)
+	for key: String in ["sick", "was_sick"]:
+		var sick: Variant = pet.get(key)
+		if sick is Dictionary and not sick.is_empty():
+			out[key] = _numbers(sick)
+	# Her focus (577) and its day's growth, her mood (555), and her
+	# leaving (581): gone home, or about to go, and the road she was
+	# warned off (581 amended). Dropped on load before: one who left
+	# came back with her player after a restart, her focus re-rolled.
+	var focus: Variant = pet.get("focus")
+	if focus is Dictionary and not focus.is_empty():
+		var kinds := {}
+		for kind: Variant in focus:
+			if focus[kind] is float or focus[kind] is int:
+				kinds[str(kind)] = float(focus[kind])
+		out["focus"] = kinds
+	var focus_day: Variant = pet.get("focus_day")
+	if focus_day is Dictionary:
+		out["focus_day"] = {"day": int(focus_day.get("day", -1)), "grown": float(focus_day.get("grown", 0.0))}
+	for key: String in ["mood", "warned_area", "from_worker"]:
+		if pet.get(key) is String and not str(pet[key]).is_empty():
+			out[key] = str(pet[key])
+	var left: Variant = pet.get("left")
+	if left is Dictionary and not left.is_empty():
+		out["left"] = _whole(left)
+	var parted: Variant = pet.get("parted")
+	if parted is Dictionary and not parted.is_empty():
+		out["parted"] = _whole(parted)  # Parted as friends (581 amended (3)).
+	var leaving: Variant = pet.get("leaving")
+	if leaving is Dictionary and not leaving.is_empty():
+		# Her walk starts again (Main._leaving_tick): only what she leaves over.
+		out["leaving"] = {"deed": str(leaving.get("deed", "")), "why": str(leaving.get("why", "")),
+			"day": int(leaving.get("day", 0))}
+	# Her roads (decision 551): where she has been with her player, and
+	# the dangers she lived through there.
+	var roads: Variant = pet.get("roads")
+	if roads is Dictionary:
+		var dangers: Array = []
+		for danger: Variant in roads.get("dangers", []):
+			if danger is Dictionary:
+				dangers.append(_numbers(danger))
+		# The areas she came through safely, and on which day (551 phase 2).
+		var passed := {}
+		var went: Variant = roads.get("passed", {})
+		if went is Dictionary:
+			for area: Variant in went:
+				if went[area] is float or went[area] is int:
+					passed[str(area)] = int(went[area])
+		out["roads"] = {"areas": Array(_strings(roads.get("areas", []))),
+			"places": Array(_strings(roads.get("places", []))), "dangers": dangers, "passed": passed}
+	return out
 
 
 ## [param entry] with JSON's floats made ints again (days, ticks), the rest kept.

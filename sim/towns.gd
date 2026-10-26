@@ -473,6 +473,27 @@ func note_companion_out(town: String, companion_name: String) -> void:
 	_note(town, "%s goes adventuring; its work waits" % companion_name)
 
 
+## Companion worker [param companion_id] out of every town's residents and
+## gone (686, companions' side): she is to settle in another town, one
+## with none of her name, so is seated there afresh. Each town she left is
+## seated again (as died does). Her purse, which goes with her worker:
+## the caller pays it to the worker she becomes. 0, and nothing done, for
+## no such worker or one not a companion's.
+func drop_companion(companion_id: String) -> int:
+	if not companion_id.begins_with("companion:") or production.worker(companion_id).is_empty():
+		return 0
+	var purse := int(production.worker(companion_id).get("purse", 0))
+	var left: Array[String] = []
+	for town: String in _towns:
+		if (_towns[town]["residents"] as Array).has(companion_id):
+			(_towns[town]["residents"] as Array).erase(companion_id)
+			left.append(town)
+	production.remove_worker(companion_id)
+	for town in left:
+		_seat(town)
+	return purse
+
+
 ## Companion worker [param companion_id] handed back for good (686, npc's
 ## side; Townsfolk.settle): a resident of her town as [param new_id],
 ## origin "settled" (room-exempt, as move_in has it; no old-age death),

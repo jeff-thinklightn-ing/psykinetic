@@ -32212,3 +32212,81 @@ free_net_test _test_resend: a first state heard before the body was its
 own makes no own view; 21 ticks standing write it again once, after 20, and
 the own view is made from it; the same centre and ack. Server only,
 protocol unchanged (the same state, more often), no new class_name.
+## 686. Recruiting a resident: one who trusts you goes with you
+
+The coordinator's approved design (companions' recruit note, its hand-over
+amendment, two test cases), with economy's side (Towns.sole_needed,
+Production.set_away: 4f115fc1) and npc's (set_asked, Standing.set_score,
+Townsfolk.settle). 581 amended (3), parting as friends, is its first half:
+a player changes companions without driving one away.
+
+- **The ask**: in their town, to a town's own resident's body, the
+  recruit_words of 581 amended (2) ("come with me"...). Main.recruit_refusal
+  says why not, in order: "with" (his companion is with him, resting
+  between trips, leaving or held: only one who left or parted is away),
+  "elsewhere" (out with another player), "away" (sick, away (a run, a drive,
+  a caravan clear it themselves), lost, sought, on another's errand),
+  "role" (the rules' recruit_roles: lawspeaker, priest, medicine man; or a
+  card marked outcast, one the town only tolerates), "needed" (economy's
+  Towns.sole_needed: its only one of a trade it needs), "name" (another
+  player's companion has that name: one Pip), "trust" (their card's score
+  for him under trusted_at, 3). A refusal's sentence (recruit_asked) goes to
+  their resident voice for him alone (Production.set_asked), which answers
+  as ever; erased when they come.
+- **Willing**: any companion of his away in her town is handed to it first
+  (below); the resident's work waits (set_away: no body, no wage or rent
+  floor, as economy's side); she comes as his companion, spawned beside
+  him. Her card (CompanionCard.from_resident): her name and resident traits,
+  a legacy name's fixed facts winning (one Pip); the rest rolled by
+  "companion:<player id>:<worker id>"; her look the town's (look_spec,
+  without apron or trade garb, used by look_of); leanings and justice from
+  her mind (intellect, superstition, integrity); how_we_met where she
+  worked. Her bond starts at her card's score, bond_most (2) at most; what
+  she heard is hers; from_worker keeps where she came from.
+- **The hand-over**: a companion away (left or parted), when he recruits
+  another, is the town's for good. One who was a resident goes back to her
+  worker (away no longer); any other is settled (Townsfolk.settle:
+  "settled:<name>", ":2" and on, an id only). Never two of one name side by
+  side (the coordinator): she settles in her town unless a resident there
+  bears her name, else the next town in order with none (Main._settle_place;
+  her worker moved by economy's file's new Towns.drop_companion, which seats
+  each town she left again and gives back her purse, paid to the worker
+  she becomes, her loan set on it: a debt is never written off); with one
+  of her name in every town she settles as someone else, a fresh name from
+  the companions' table (_fresh_name) and a card of her own, and no former
+  entry points at her. One with no worker in the town she settles in (she
+  never rested, or another of her name was settled from the worker they
+  shared: two legacy Wrens) is seated there first. Her card's standing toward
+  him is her bond (set_score); her record goes to PlayerRecord.former
+  ({companion, worker}, newest first, former_most 3), and his is
+  {"solo": true}: nobody with him, none given on joining.
+- **A recruited one parts or leaves** (581's walk home): back to her own
+  worker at once (Main._recruit_home), parted or left kept on her former
+  entry; he is solo.
+- **Asking a former one back** is this same ask to the town's worker she
+  is now: as she was, her former entry's record restored. Parted as a
+  friend, no trust is asked, her bond as it was; one who left starts again
+  at rejoin_at. A wrong not put right (a justice-driven one, 581 amended)
+  asks unforgiven_at (6) of her card instead of trusted_at: the repair hooks
+  read record.companion only, so a former one's wrong is answered by the
+  town's own standing (gifts, jobs, his name). Out with another player she
+  is "elsewhere", and his former entry stays (the coordinator's case 1).
+  The town's only one of a needed trade stays, former or not.
+- Not done: a recruited companion's death is not for good (a room's rebuild
+  brings her back), so Towns.died is not called for her; no fresh strangers
+  to hire; Wren and Nix seated as residents waits on Jeff.
+
+PlayerRecord: former, and a companion's from_worker and solo, kept through a
+save (companion_from, the companion's loader, serves both).
+record_keys_test samples them. resident_test _test_recruit: with his own
+companion with him, refused and told why; the priest's role; parted, under
+trust refused and told; trusted, Ada comes: bond 2, away, her card a cook
+drawn as the town knew her; his parted one settled:<name>, her record
+former, her card's standing her bond; no body for Ada, one for the settled;
+kept through a save; asked home, Ada back at her work, his record solo, none
+given; out with another, "elsewhere", his entry kept; the former one comes
+with no trust asked, her bond as it was; two Wrens: the second settles as
+Wren in the other town; with a Wren in each, one more settles as someone
+else (a fresh name, no former entry); no name shown twice in any town.
+
+Server only, protocol unchanged, no new class_name.

@@ -6161,6 +6161,8 @@ func _on_shop_message(data: Dictionary) -> void:
 func _join_companion(record: PlayerRecord, player: Player) -> void:
 	if not Net.companions:
 		return
+	if bool(record.companion.get("solo", false)):
+		return  # Nobody with them since theirs went home to her town (686): none given.
 	# Carried off by raiders (decision 314): held till she is freed.
 	if record.companion.has("taken"):
 		print("[net] %s's companion %s is held by raiders (%s); none spawned" % [record.name, record.companion.get("name", "?"),
@@ -6797,6 +6799,9 @@ func _gone_home(record: PlayerRecord, pet: Companion, id: String) -> void:
 	var going: Dictionary = record.companion.get("leaving", {})
 	var place := str(going.get("place", ""))
 	pet.leaving = false
+	if not str(record.companion.get("from_worker", "")).is_empty():
+		_recruit_home(record, pet, id, str(going.get("deed", "")), str(going.get("why", "")))
+		return
 	if not _rest_in_town(record, pet, id, place, false):
 		_travelling = true
 		World.despawn(pet)
@@ -6920,6 +6925,298 @@ func _recruit_said(body: Resident, player: Player, line: String) -> bool:
 		pet._ask_voice("%s asked you to travel with them again, and you agreed. You left them once because they %s; you have not forgotten it." % [
 			record.name, str(left.get("why", "wronged you")).trim_suffix(".")], "", true)
 	return true
+
+
+# --- Recruiting a resident (686) ----------------------------------------------
+
+## A recruit rule (companion_traits.json "leaving"): trusted_at, the score
+## a resident's card must hold toward one who asks; bond_most, the bond one
+## comes with at most; former_most, how many former companions a record
+## keeps; unforgiven_at, the score one who left over a wrong not put right
+## asks; recruit_roles, the trades a town will not let go; recruit_asked,
+## the sentence their resident voice is given for each refusal.
+static func recruit_rule(key: String, fallback: Variant) -> Variant:
+	return leaving_rules().get(key, fallback)
+
+
+## Why [param worker_id] ([param body]) would not go with [param record]'s
+## player now (686): "with" (one is with them already), "elsewhere" (out
+## with another player), "away" (sick, away, lost, sought, on another's
+## errand), "role" (the town's lawspeaker, priest or medicine man, or one
+## the town only tolerates), "needed" (its only one of a trade it needs:
+## economy's Towns.sole_needed), "name" (another's companion has the name),
+## "trust" (their card under trusted_at, or unforgiven_at for a former one
+## who left over a wrong not put right; a former one who parted as a friend
+## needs none); "" for willing.
+func recruit_refusal(record: PlayerRecord, worker_id: String, body: Resident = null) -> String:
+	var production := World.production
+	var worker := production.worker(worker_id) if production != null else {}
+	if worker.is_empty() or worker_id.begins_with(Townsfolk.COMPANION):
+		return "away"
+	var c := record.companion
+	if c.has("name") and not (c.get("left") is Dictionary or c.get("parted") is Dictionary) or c.has("leaving") or c.has("taken"):
+		return "with"
+	for other: PlayerRecord in _records.values():
+		if other != record and str(other.companion.get("from_worker", "")) == worker_id:
+			return "elsewhere"
+	if bool(worker.get("away", false)) or bool(worker.get("sick", false)) \
+			or body != null and (body.strayed or not body.sought.is_empty() or not body.escort_of.is_empty()):
+		return "away"
+	var trades: Array = worker.get("trades", [])
+	var card := Townsfolk.card_of(production, worker_id)
+	for trade: Variant in trades:
+		if str(trade) in recruit_rule("recruit_roles", ["lawspeaker", "priest", "medicine_man"]):
+			return "role"
+	if bool(card.get("outcast", false)):
+		return "role"
+	if World.towns != null and World.towns.has_method("sole_needed") and not World.towns.sole_needed(str(worker.get("town", "")), worker_id).is_empty():
+		return "needed"
+	var name := str(card.get("traits", {}).get("name", worker.get("name", "")))
+	for other: PlayerRecord in _records.values():
+		if other != record and str(other.companion.get("name", "")) == name:
+			return "name"
+	var hers: Dictionary = _former_of(record, worker_id).get("companion", {})
+	if hers.get("parted") is Dictionary:
+		return ""
+	var needs := int(recruit_rule("trusted_at", Standing.setting("trusted")))
+	var left: Variant = hers.get("left")
+	if left is Dictionary and not bool(left.get("repaired", false)) \
+			and CompanionCard.justice(hers.get("traits", {}), record.player_id) >= int(leaving_rules().get("justice_at", 7)):
+		needs = int(recruit_rule("unforgiven_at", 6))
+	return "" if Standing.score(card, record.player_id) >= needs else "trust"
+
+
+## [param record]'s former companion who is the town's [param worker_id]
+## now (686), {} for none.
+static func _former_of(record: PlayerRecord, worker_id: String) -> Dictionary:
+	for each: Dictionary in record.former:
+		if str(each.get("worker", "")) == worker_id:
+			return each
+	return {}
+
+
+## [param player] asked [param body], a town's own resident, to come with
+## them (686): willing (recruit_refusal ""), any companion of theirs away in
+## her town is handed to it (_hand_companion_over), and the resident leaves their
+## work (Production.set_away) and comes as their companion: a former one
+## as she was (one who left starts again at rejoin_at), else a new card
+## (CompanionCard.from_resident), the bond their card's score at most
+## bond_most. Not willing, their voice is told why (npc's set_asked) and
+## answers as ever. Whether they came.
+func _resident_recruit_said(body: Resident, player: Player, line: String) -> bool:
+	if not body.player_id.is_empty() or body.worker_id.is_empty() or World.production == null or not asks_to_come(line):
+		return false
+	var record: PlayerRecord = _records.get(player.player_id)
+	if record == null:
+		return false
+	var production := World.production
+	var worker_id := body.worker_id
+	var why := recruit_refusal(record, worker_id, body)
+	if not why.is_empty():
+		var asked: Dictionary = recruit_rule("recruit_asked", {})
+		var their_trades: Array = production.worker(worker_id).get("trades", [])
+		var said := str(asked.get(why, asked.get("trust", "{player} asked you to travel with them, and you would rather not."))) \
+				.replace("{player}", record.name).replace("{companion}", str(record.companion.get("name", "another"))) \
+				.replace("{trade}", str(their_trades[0]).replace("_", " ") if not their_trades.is_empty() else "worker")
+		production.set_asked(worker_id, record.player_id, said)
+		print("[bond] %s asked %s along: not now (%s)" % [record.name, body.person, why])
+		return false
+	var former := _former_of(record, worker_id)
+	if record.companion.has("name") and not _hand_companion_over(record):
+		print("[bond] %s asked %s along: %s could not be settled in her town" % [record.name, body.person, record.companion.get("name", "?")])
+		return false
+	var worker := production.worker(worker_id)
+	var card := Townsfolk.card_of(production, worker_id)
+	var town := str(worker.get("town", ""))
+	var trades: Array = worker.get("trades", [])
+	var trade := str(trades[0]) if not trades.is_empty() else ""
+	var hers: Dictionary
+	var bond := mini(Standing.score(card, record.player_id), int(recruit_rule("bond_most", 2)))
+	if not former.is_empty():
+		hers = (former["companion"] as Dictionary).duplicate(true)
+		record.former.erase(former)
+		if hers.get("left") is Dictionary:
+			bond = int(leaving_rules().get("rejoin_at", -1))
+		elif hers.get("parted") is Dictionary:
+			bond = Standing.score(hers, record.player_id)
+		for key: String in ["left", "parted", "leaving", "resident", "warned_area", "taken"]:
+			hers.erase(key)
+	else:
+		var traits := CompanionCard.from_resident(record.player_id, worker_id, card, worker, _trade_words(trade), _town_words(town))
+		hers = {"name": traits["name"], "traits": traits, "card": CompanionCard.plain_card(traits), "card_by": "plain",
+			"hp": 0, "stamina": 0, "tile": null, "alive": true}
+		var met := CompanionCard.met(traits, record.name)
+		hers["how_we_met"] = met.left(1).to_upper() + met.substr(1) + "."
+	Standing.set_score(hers, record.player_id, bond, "asked you to travel with them", World.steps)
+	hers["bond_best"] = maxi(int(hers.get("bond_best", bond)), bond)
+	hers["heard"] = worker.get("heard", []).duplicate(true)
+	hers["from_worker"] = worker_id
+	hers["tile"] = null
+	var zone := str(World.holdings.place(town).get("area", "")) if World.holdings != null and not town.is_empty() else ""
+	if not zone.is_empty():
+		hers["home"] = {"place": town, "zone": zone, "trade": trade}
+	record.companion = hers
+	production.set_away(worker_id, true)
+	production.set_asked(worker_id, record.player_id, "")
+	_travelling = true
+	World.despawn(body)
+	_travelling = false
+	_set_mood(record)
+	print("[bond] %s's new companion: %s, the %s of %s (%s)" % [record.name, hers["name"], trade, town, "again" if not former.is_empty() else "first time"])
+	party_log.add("%s leaves %s work in the town and goes with %s." % [body.person,
+		{"she": "her", "he": "his", "they": "their"}.get(str(hers.get("traits", {}).get("pronoun", "she")), "her"), _display_name(player)])
+	_join_companion(record, player)
+	var pet: Companion = _companions.get(record.player_id)
+	if is_instance_valid(pet) and pet.spawned:
+		pet._ask_voice("%s asked you to travel with them, and you agreed: you left your work in the town to go with them." % record.name, "", true)
+	return true
+
+
+## A trade's words for a card ("a smith"): the companions' profession
+## table's first for it, else the trade's own word.
+static func _trade_words(trade: String) -> String:
+	for each: Variant in CompanionCard.tables().get("profession", []):
+		if each is Dictionary and str(each.get("trade", "")) == trade:
+			return str(each.get("words", ""))
+	return "a %s" % trade.replace("_", " ") if not trade.is_empty() else "one of its people"
+
+
+## [param record]'s companion, away from them (resting, left or parted; or
+## a recruited one come home), handed to her town for good (686): one who
+## was a town's resident goes back to their own worker (away no longer);
+## any other is settled as one of its residents (npc's Townsfolk.settle:
+## "settled:<name>"). Their card's standing toward the player is her bond
+## (Standing.set_score), what she heard is theirs, her record goes to
+## record.former (newest first, former_most kept) and the record has
+## nobody ({"solo": true}). She settles in her town unless one of her
+## name lives there, else the next town with none (_settle_place), seated
+## there first if she has no worker in it (she never rested, or another of
+## her name was settled from the one they shared); with one of her name in
+## every town she settles as someone else (_fresh_name), no former entry.
+## False, and nothing changed, if there is still no worker for her.
+func _hand_companion_over(record: PlayerRecord) -> bool:
+	var production := World.production
+	if production == null or not record.companion.has("name"):
+		return false
+	var hers := record.companion
+	var fresh := ""
+	var worker_id := str(hers.get("from_worker", ""))
+	if not worker_id.is_empty():
+		if production.worker(worker_id).is_empty():
+			return false
+		production.set_away(worker_id, false)
+	else:
+		if World.towns == null:
+			return false
+		# Her town, unless one of her name lives there (the coordinator: no
+		# two Wrens side by side): the next town with none, else her town as
+		# someone else, a fresh name and a card of her own.
+		var who := _left_worker(record)
+		var name := str(hers["name"])
+		var town := str(production.worker(who).get("town", ""))
+		if town.is_empty():
+			town = str(hers.get("resident", hers.get("home", {})).get("place", ""))
+		if town.is_empty():
+			town = _first_town()
+		var place := _settle_place(name, town, who)
+		if place.is_empty():
+			place = town
+			fresh = _fresh_name(place)
+		var seat := fresh if not fresh.is_empty() else name
+		var purse := 0
+		var loan := 0.0
+		var working_off := false
+		if not production.worker(who).is_empty() and (str(production.worker(who).get("town", "")) != place or not fresh.is_empty()):
+			loan = float(production.worker(who).get("loan", 0.0))  # A debt is never written off (economy): it follows her.
+			working_off = bool(production.worker(who).get("working_off", false))
+			purse = World.towns.drop_companion(who)
+		var trade := str(hers.get("traits", {}).get("trade", ""))
+		if production.worker("companion:%s" % seat).is_empty() and not place.is_empty() and not trade.is_empty():
+			World.towns.note_companion_in(place, seat, trade, record.player_id)
+		worker_id = Townsfolk.settle(production, World.towns, "companion:%s" % seat)
+		if worker_id.is_empty():
+			return false
+		production.pay(worker_id, purse, "what the town owed: her own purse, carried from where she rested")  # (Not earnings.)
+		if loan > 0.0:
+			production.set_loan(worker_id, loan, working_off)
+	var card := Townsfolk.card_of(production, worker_id)
+	Standing.set_score(card, record.player_id, Standing.score(hers, record.player_id), "travelled with you", World.steps)
+	production.set_card(worker_id, card)
+	if hers.get("heard") is Array:
+		production.set_heard(worker_id, hers["heard"])
+	# Her resting body, if it stands: the town's body for the worker comes in its place.
+	for each: GridEntity in World.townsfolk().duplicate():
+		if (each as Resident).player_id == record.player_id:
+			_travelling = true
+			World.despawn(each)
+			_travelling = false
+	var kept := hers.duplicate(true)
+	kept.erase("resident")
+	kept.erase("from_worker")
+	if fresh.is_empty():
+		record.former.push_front({"companion": kept, "worker": worker_id})
+		record.former.resize(mini(record.former.size(), int(recruit_rule("former_most", 3))))
+	record.companion = {"solo": true}
+	print("[bond] %s's companion %s is the town's %s now%s" % [record.name, hers.get("name", "?"), worker_id,
+		" (another of her name lives in every town: someone else now, not to be asked back)" if not fresh.is_empty() else ""])
+	return true
+
+
+## The town (a store place id) [param name] may settle in (686): [param
+## first] unless a resident there other than [param besides] bears the
+## name, else the first of the towns in order (_first_town's) with none;
+## "" when every town has one.
+func _settle_place(name: String, first: String, besides: String) -> String:
+	var towns: Array[String] = []
+	if not first.is_empty():
+		towns.append(first)
+	if World.holdings != null:
+		var places := World.holdings.places_of(Stockpile.TOWN)
+		places.sort()
+		for each in places:
+			if each != first and World.holdings.place(each).get("kind") == Stockpile.KIND:
+				towns.append(each)
+	for town in towns:
+		var named := World.towns.residents(town).any(func(id: String) -> bool:
+			return id != besides and str(World.production.worker(id).get("name", "")) == name)
+		if not named:
+			return town
+	return ""
+
+
+## A name no resident of [param place] and no player's companion has, from
+## the companions' name table (686: one settled as someone else).
+func _fresh_name(place: String) -> String:
+	var used := {}
+	for id: String in World.towns.residents(place):
+		used[str(World.production.worker(id).get("name", ""))] = true
+	for other: PlayerRecord in _records.values():
+		used[str(other.companion.get("name", ""))] = true
+	for name: Variant in CompanionCard.tables().get("name", []):
+		if not used.has(str(name)) and World.production.worker("companion:%s" % name).is_empty():
+			return str(name)
+	return "Newcomer"
+
+
+## A recruited resident (686) home from [param record]'s player, parted as
+## a friend or having left over [param deed] ([param why]): out of the
+## world ([param pet], [param id]), back to their own worker (_hand_companion_over),
+## her leaving kept on her former entry for asking her back.
+func _recruit_home(record: PlayerRecord, pet: Companion, id: String, deed: String, why: String) -> void:
+	_travelling = true
+	World.despawn(pet)
+	_travelling = false
+	_companions.erase(id)
+	record.companion.erase("leaving")
+	var day := Townsfolk.day_of(World.steps)
+	var place := str(record.companion.get("home", {}).get("place", ""))
+	if deed == PARTED:
+		record.companion["parted"] = {"day": day, "place": place}
+	else:
+		record.companion["left"] = {"day": day, "deed": deed, "why": why, "place": place, "repaired": false}
+	var name := str(record.companion.get("name", "?"))
+	if not _hand_companion_over(record):
+		print("[bond] %s's companion %s went home, but has no worker there" % [record.name, name])
 
 
 ## Her town (a store place id) since she left [param record]'s player: her
@@ -10962,8 +11259,8 @@ func _player_said(player: Player, text: String, phrase := 0) -> void:
 	Net.broadcast_to(hearers(player.tile, earshot), "chat", {"entity": String(player.get_path()), "from": _display_name(player),
 		"to": to, "text": line})
 	if resident != null:
-		if _recruit_said(resident, player, line):
-			pass  # Their companion who left, asked and willing: she goes with them again (581 amended (2)).
+		if _recruit_said(resident, player, line) or _resident_recruit_said(resident, player, line):
+			pass  # Their companion who left, asked and willing, or a resident who trusts them: they go with them (581 amended (2), 686).
 		elif not _offer_said(resident, player, line):  # An ask for wares, work or news, or a word taking the offer standing (decision 536).
 			_ask_resident(resident, _display_name(player), line, player)
 		if hears:
