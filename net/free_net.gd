@@ -25,6 +25,11 @@ const COMMAND_MS_MAX := 255
 ## head command's ticks used (u8, 1/USED_SCALE), the server tick (u16), the
 ## cell it holds (s16 x, s16 y; the replay's starting cell, 688 amended (3)).
 const STATE_BYTES := 17
+## A body standing still has its state written again this often, in ticks
+## (about a second; its tick moves, so it replicates): a client that missed
+## the first (a body placed again, its first state taken before it knew the
+## body its own) hears it all the same, and walks.
+const STATE_RESEND_TICKS := 20
 const POS_SCALE := 1024.0
 const USED_SCALE := 80.0
 ## A correction of the own body under this many cells is blended out over

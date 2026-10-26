@@ -49,6 +49,7 @@ func _ready() -> void:
 	_test_kick_under_lag()
 	_test_companion_on_a_client()
 	_test_switch()
+	_test_resend()
 	World.free_walk = false
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -313,6 +314,38 @@ func _test_switch() -> void:
 	_check(World.get_entity_at(player.tile) == player, "(the cell its own)")
 	World.set_free_walk(true)
 	_check(not player.free_state.is_empty() and player.free_pos == Vector2(player.tile), "on again: from its cell's centre")
+
+
+## A body standing still has its state written again (689 amended (2),
+## Jeff's freeze in the barrow): a client whose first state of a body placed
+## again came before it knew the body its own (no view made), or was lost,
+## hears it within FreeNet.STATE_RESEND_TICKS and walks.
+func _test_resend() -> void:
+	print("
+== standing still, its state written again every second: a client that missed the first walks ==")
+	var player := _build(OPEN, Vector2i(2, 2))
+	player.owner_peer = 4242  # Not yet known as its own: the first state makes no own view.
+	World.step()
+	player.pack_free()
+	var first := player.free_state.duplicate()
+	_check(not first.is_empty() and not player.free_view is FreeNet.Own, "the first state heard before the body was its own: no own view")
+	player.owner_peer = Net.local_id
+	var writes := 0
+	var heard_at := -1
+	for i in FreeNet.STATE_RESEND_TICKS + 1:
+		var was := player.free_state.duplicate()
+		World.step()
+		player.pack_free()
+		if player.free_state != was:
+			writes += 1
+			if heard_at < 0:
+				heard_at = i + 1
+	_check(writes == 1 and heard_at == FreeNet.STATE_RESEND_TICKS, "standing %d ticks: written again once, after %d" % [
+			FreeNet.STATE_RESEND_TICKS + 1, heard_at])
+	_check(player.free_view is FreeNet.Own, "and its own view made from it: the client walks")
+	var unchanged := FreeNet.unpack_state(player.free_state, World.tick)
+	_check((unchanged["pos"] as Vector2) == player.free_pos and int(unchanged["acked"]) == player.free_acked & 0xFFFF,
+			"the same centre and ack, only its tick new")
 
 
 ## World stepped [param frames] frames with [param own] holding [param intent], a host's way.

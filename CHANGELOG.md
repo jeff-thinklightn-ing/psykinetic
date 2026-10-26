@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Free movement (--free-walk): after a respawn or rejoin your body no longer stays frozen until you leave the area; at worst it waits about a second (689 amended (3)).
 - Tell your companion to go home for a while and she parts as a friend, resting in her town; ask her there ("come with me") and she comes back, her bond as it was (581 amended (3)).
 - Recruiting a townsperson, npc's side (686): a resident who turns you down knows why when you speak to them again, a companion who comes home has your bond written onto their card, and a companion handed back for good becomes a settled resident of her town with her mind and what she has heard.
 ## v0.1.184

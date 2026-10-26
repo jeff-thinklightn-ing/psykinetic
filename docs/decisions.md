@@ -32186,3 +32186,29 @@ battle axe) on 80 kg rested, unarmoured players, on plate, and exhausted
 (printed); _test_spin
 moved to the same numbers. Server only, protocol unchanged, no new
 class_name.
+
+## 689 amended (3): a standing free body's state written again every second
+
+Jeff's free body froze in the barrow (2026-10-26 16:18): the room was reset,
+he respawned on the start cell and joined again on the same peer, and
+nothing he did moved it; the server's body stood on its cell, no command
+refused. A client drives the free body only once its body's free_state has
+made it an own view (Player._free_heard, while the body is known as its
+own); till then it walks the grid, whose steps and orders the server's
+free body clears every tick. Player.pack_free wrote only on a change, so a
+body placed again whose first state that client missed (or took before it
+knew the body its own) never sent another while it stood, and the client
+never left the grid.
+
+Now pack_free writes a standing body's state again once every
+FreeNet.STATE_RESEND_TICKS (20 ticks, about a second): the same centre and
+ack, its tick new, so it replicates as a change. About 17 bytes a second a
+standing player; a mirror takes it as a repeat where it was, the own
+replay as a state with nothing new. ui's client half makes the own view as
+soon as the body is known as its own, so it heals at once rather than
+within the second.
+
+free_net_test _test_resend: a first state heard before the body was its
+own makes no own view; 21 ticks standing write it again once, after 20, and
+the own view is made from it; the same centre and ack. Server only,
+protocol unchanged (the same state, more often), no new class_name.

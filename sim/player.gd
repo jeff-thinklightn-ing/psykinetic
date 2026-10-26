@@ -187,9 +187,11 @@ func _free_shown() -> Array:
 	return []
 
 
-## Server: its packed state after its turn (decision 689), written only
-## when the centre or what was applied changed, so a body standing still
-## sends nothing; empty off the free walk.
+## Server: its packed state after its turn (decision 689), written when the
+## centre or what was applied changed, and standing still once every
+## FreeNet.STATE_RESEND_TICKS (689 amended (2): a client that missed its
+## first state, its body placed again, was left on the grid, its steps
+## cleared, the body never moving); empty off the free walk.
 func pack_free() -> void:
 	if not World.free_body(self):
 		if not free_state.is_empty():
@@ -197,7 +199,8 @@ func pack_free() -> void:
 		return
 	var was := FreeNet.unpack_state(free_state, World.tick)
 	if not was.is_empty() and (was["pos"] as Vector2).distance_to(free_pos) < 0.5 / FreeNet.POS_SCALE \
-			and int(was["acked"]) == free_acked & 0xFFFF and absf(float(was["used"]) - free_used) < 0.5 / FreeNet.USED_SCALE and was["held"] == tile:
+			and int(was["acked"]) == free_acked & 0xFFFF and absf(float(was["used"]) - free_used) < 0.5 / FreeNet.USED_SCALE and was["held"] == tile \
+			and World.tick - int(was["tick"]) < FreeNet.STATE_RESEND_TICKS:
 		return
 	free_state = FreeNet.pack_state(free_pos, free_acked, free_used, World.tick, tile)
 
