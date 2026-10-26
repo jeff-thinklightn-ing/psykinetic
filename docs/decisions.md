@@ -30730,3 +30730,28 @@ clock that was itself catching up after the hitch.
   feed the trace of the remaining held-key corrections beside a companion.
 
 Client only, protocol unchanged, no new class_name.
+
+## 678 reverted: walking back to v0.1.176's
+
+Jeff on v0.1.177: movement got worse. A held click lags (the body keeps
+going after the cursor has moved behind it), and running a diagonal line
+the body doesn't face its travel. The fix needs about an hour, so for
+v0.1.178 678 is taken out whole (the coordinator's ruling):
+
+- **Reverted:** the held keys' DDA over the eight (Main.wasd_vector,
+  line_steps, _line_step), the string-pulled own routes (World.walk_path,
+  line_cells, _line_clear, in the prediction's plan and Player's re-path),
+  the own body's glide on the line (MovePrediction._glide, hint_line,
+  _line_of), the held-click steer within STEER_CELLS and _cancel_unbent,
+  --test-hold-near, and their tests (controls_test _test_straight_lines,
+  mirror_test's two line cases). The facing fault may sit in the glide,
+  not only the steer, so nothing of the walk is kept.
+- **Kept:** the hover square only while building (Main._building()); it
+  splits cleanly from the walk.
+- **Kept in history:** 678's entry above and its v0.1.177 CHANGELOG bullet
+  stay as shipped; this entry and a new bullet record the revert.
+- **Next:** ui re-lands a fixed 678 as a fresh commit on top of this one
+  (v0.1.179).
+
+Server and client: walk_path goes, so the server is redeployed with the
+cut. No wire change, protocol unchanged. No new class_name.
