@@ -486,6 +486,9 @@ var _walls: Array[WallEdge] = []
 ## to. Moving the cursor to another cell retargets; NONE when not held.
 const NONE := Vector2i(-1, -1)
 var _held_target := NONE
+## 683: the hold has steered the walk since its click (a step or a new
+## cell sent): letting go then ends the walk at the step under way.
+var _held_steered := false
 ## Decision 678: the held walk's line (a key, or the button held near the
 ## body): where it is anchored and its way (grid units); INF for none.
 var _walk_origin := Vector2.INF
@@ -1183,6 +1186,7 @@ func _process(delta: float) -> void:
 	_drive_camera_keys(delta)
 	_update_pick()
 	_run_test_hold_near()
+	_run_test_latency()
 	_test_hover()
 	drive_stand_draw(Keys.held("stand") and not is_typing() and _cursor_item.is_empty(), Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT))
 	_drive_wasd()
@@ -2174,6 +2178,8 @@ static func grid_direction(vector: Vector2) -> Vector2i:
 ## or ZQSD once bound in the Options) or from --test-walk while it runs
 ## (which names the letters).
 func _held_key_names() -> String:
+	if Net.test_latency > 0:
+		return _lat_keys
 	if not Net.test_walk.is_empty():
 		return _test_walk_keys()
 	if is_typing():
@@ -2594,6 +2600,7 @@ func _move_click(player: Player, tile: Vector2i, ripple_it := true) -> void:
 	_pack_wanted = null
 	_talk_wanted = null
 	_held_target = tile
+	_held_steered = false
 	if tile == NONE:
 		return
 	World.command_move(player, tile)
@@ -2647,6 +2654,8 @@ func _building() -> bool:
 ## ground under it would go round it.
 func _retarget_held() -> void:
 	if _held_target == NONE or not (Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) or _test_holding):
+		if _held_target != NONE and _held_steered:
+			_let_go_held()
 		_held_target = NONE
 		return
 	var player := _local_player()
@@ -2669,6 +2678,7 @@ func _retarget_held() -> void:
 		var direction := _line_step(player, cursor - body) if cursor.distance_to(body) > 0.5 else Vector2i.ZERO
 		player.hint_step(direction)
 		if direction != Vector2i.ZERO:
+			_held_steered = true
 			_send_held_step(player, direction)
 		return
 	_walk_origin = Vector2.INF
@@ -2685,6 +2695,28 @@ func _retarget_held() -> void:
 			or not held_replans(body, _held_target, tile, player.steps_planned())):
 		return
 	_move_click(player, tile, false)
+	_held_steered = true
+
+
+## 683 (the coordinator's latency table: a held walk let go with Pip in the
+## line went on 5.7 cells, on the route it had fallen to): a held walk let go
+## stops at the step under way, as a key's does. Its hint and line go at
+## once, so the step's tail is not bent toward a step never to come
+## (MovePrediction._let_go_bend), and a route planned past that step is cut
+## there. A click let go without steering walks on to its cell.
+func _let_go_held() -> void:
+	var player := _local_player()
+	if player == null:
+		return
+	_walk_origin = Vector2.INF
+	player.hint_step(Vector2i.ZERO)
+	player.hint_line(Vector2.INF, Vector2.ZERO)
+	# On a client the walk shown goes on past the step under way; on the
+	# authority (no prediction) the step's tile is the body's own and the
+	# route is its move order.
+	var under := player.shown_step_tile()
+	if player.walk_end() != under or player.has_move_order:
+		World.command_move(player, under)
 
 
 ## The cursor's point on the ground plane, in this node's space (the
@@ -15509,6 +15541,255 @@ func _run_test_hold_near() -> void:
 	if not _test_holding:
 		_test_holding = true
 		_move_click(player, _snap_to_floor(_pick_grid))
+
+
+## --test-latency (Net.test_latency): rounds of a start from standing (a
+## key, a click 8 cells east, or the left button held with the cursor
+## LAT_HOLD cells east of the body), a turn mid-walk (the key at right
+## angles, a click 8 cells north, or the held cursor swung north) and a stop
+## (the key let go, a click on the body's own cell, or the button let go),
+## each timed from the input to the first frame drawn with it: the body
+## moved 0.02 cells (a), its frame's way 15 degrees off the way before or its
+## facing 10 degrees (b), standing three frames (c); and to the response
+## done: at 80% of the walking pace (a), going within 20 degrees of the new
+## way (b). With each: the wait to the next tick, whether the prediction
+## drew it from the input's frame, when the server's tile followed, what was
+## left of the step under way, how far the body went on after a stop, and
+## the biggest move in one frame (a leap). At most 60 frames a second, as a
+## display shows them; a frame's time is when it began.
+const LAT_HOLD := 2.0
+var _lat_keys := ""
+var _lat := {"phase": "", "round": 0, "at": 0, "rows": [], "trail": []}
+## The held cursor's offset from the camera's point (ZERO: not held).
+var _lat_hold := Vector2.ZERO
+
+
+func _run_test_latency() -> void:
+	var player := _local_player()
+	if Net.test_latency <= 0 or player == null or World.tick < 30 or _lat["phase"] == "done":
+		return
+	Engine.max_fps = 60
+	var now := Time.get_ticks_usec()
+	var drawn := Iso.local_to_grid(player.position)
+	var moved: Vector2 = drawn - _lat.get("last", drawn)
+	_lat["last"] = drawn
+	var trail: Array = _lat["trail"]
+	trail.append([now, drawn])
+	while trail.size() > 2 and now - int(trail[0][0]) > 100000:
+		trail.pop_front()
+	var span := (now - int(trail[0][0])) / 1000000.0
+	var velocity: Vector2 = (drawn - trail[0][1]) / span if span > 0.05 else Vector2.ZERO
+	var ms := (now - int(_lat["at"])) / 1000.0
+	var keys := Net.controls == "wasd"
+	var hold := Net.test_latency_hold and not keys
+	if hold and _lat_hold != Vector2.ZERO:
+		var seen := drawn
+		if _client3d != null:
+			seen = Vector2(_client3d._camera_target.x, _client3d._camera_target.z)
+		_pick_grid = seen + _lat_hold
+	_lat_count(player)
+	match _lat["phase"]:
+		"":
+			_lat["phase"] = "settle"
+			_lat["at"] = now
+		"settle":
+			if ms > 1500.0 and moved.length() < 0.0005:
+				_lat_input(player, "start", now, drawn)
+				_lat_keys = "d"
+				if hold:
+					_lat_hold = Vector2(LAT_HOLD, 0.0)
+					_pick_grid = drawn + _lat_hold
+					_test_holding = true
+					_move_click(player, _snap_to_floor(_pick_grid))
+				elif not keys:
+					_move_click(player, player.tile + Vector2i(8, 0))
+				_lat_note_predicted(player)
+		"start":
+			_lat_watch(player, now, drawn, moved, velocity)
+			if _lat["row"].has("done_ms") and ms > 1200.0:
+				_lat["way"] = moved.normalized()
+				_lat["facing"] = player.shown_facing().angle()
+				_lat_input(player, "turn", now, drawn)
+				_lat_keys = "w"
+				if hold:
+					_lat_hold = Vector2(0.0, -LAT_HOLD)
+					_pick_grid = drawn + _lat_hold
+				elif not keys:
+					_move_click(player, Vector2i(drawn.round()) + Vector2i(0, -8))
+				_lat_note_predicted(player)
+		"turn":
+			_lat_watch(player, now, drawn, moved, velocity)
+			if ms > 1000.0:
+				_lat_turn_done()
+				_lat_input(player, "stop", now, drawn)
+				_lat_keys = ""
+				if hold:
+					_lat_hold = Vector2.ZERO
+					_test_holding = false
+				elif not keys:
+					_move_click(player, Vector2i(drawn.round()))
+				_lat_note_predicted(player)
+		"stop":
+			_lat_watch(player, now, drawn, moved, velocity)
+			if _lat["row"].has("shown_ms") and ms > 800.0:
+				_lat["rows"].append(_lat["row"])
+				_lat["round"] += 1
+				if _lat["round"] >= Net.test_latency:
+					_lat["phase"] = "done"
+					_lat_report()
+				else:
+					_lat["phase"] = "settle"
+					_lat["at"] = now
+	# A phase that never shows its input (a body stuck on something): given
+	# up after 4 s, kept as "never".
+	if _lat["phase"] in ["start", "turn", "stop"] and ms > 4000.0:
+		_lat["rows"].append(_lat["row"])
+		_lat["round"] += 1
+		_lat_keys = ""
+		_lat_hold = Vector2.ZERO
+		_test_holding = false
+		_lat["phase"] = "done" if _lat["round"] >= Net.test_latency else "settle"
+		_lat["at"] = now
+		if _lat["phase"] == "done":
+			_lat_report()
+
+
+## Each frame (release's ask: Jeff, "sometimes she catches up into the
+## same tile and bounces off"): the own body's corrections, those with the
+## own companion within a cell, and swaps with her (679).
+func _lat_count(player: Player) -> void:
+	var her: GridEntity = null
+	for entity in World.get_entities():
+		if _is_own_companion(entity) and entity.spawned:
+			her = entity
+			break
+	var total: int = Net.stats.corrections_total
+	var seen: int = _lat.get("corrections_seen", total)
+	if total > seen:
+		_lat["corrections"] = int(_lat.get("corrections", 0)) + total - seen
+		if her != null and World.distance(her.tile, player.tile) <= 1:
+			_lat["corrections_near"] = int(_lat.get("corrections_near", 0)) + total - seen
+	_lat["corrections_seen"] = total
+	if her != null:
+		if _lat.has("her_was") and player.tile == _lat["her_was"] and her.tile == _lat["me_was"] and player.tile != _lat["me_was"]:
+			_lat["swaps"] = int(_lat.get("swaps", 0)) + 1
+		_lat["her_was"] = her.tile
+		_lat["me_was"] = player.tile
+	_lat["companion"] = her != null
+
+
+## An input of [param kind] given now: its row, with the parts known now.
+func _lat_input(player: Player, kind: String, now: int, drawn: Vector2) -> void:
+	if _lat.has("row") and _lat["phase"] != "settle":
+		_lat["rows"].append(_lat["row"])
+	var row := {"kind": kind, "round": _lat["round"], "from": drawn, "tile": player.tile, "frames": 0,
+			"tick_wait_ms": (1.0 - World.tick_alpha) * World.TICK_DT * 1000.0}
+	var prediction: Variant = player.get("_prediction")
+	if prediction != null and prediction.is_active():
+		var step: Variant = prediction._current()
+		row["step_left_ms"] = maxf(step.start + step.duration - prediction._clock, 0.0) * World.TICK_DT * 1000.0
+	_lat["row"] = row
+	_lat["phase"] = kind
+	_lat["at"] = now
+
+
+## Right after the input's command: whether the prediction has a walk to draw from this frame on.
+func _lat_note_predicted(player: Player) -> void:
+	var prediction: Variant = player.get("_prediction")
+	_lat["row"]["predicted"] = prediction != null and prediction.is_active()
+
+
+func _lat_watch(player: Player, now: int, drawn: Vector2, moved: Vector2, velocity: Vector2) -> void:
+	var row: Dictionary = _lat["row"]
+	var ms := (now - int(_lat["at"])) / 1000.0
+	row["frames"] += 1
+	row["leap"] = maxf(float(row.get("leap", 0.0)), moved.length())
+	if not row.has("server_ms") and player.tile != row["tile"]:
+		row["server_ms"] = ms
+	var pace := World.TICK_RATE / player.move_ticks
+	match row["kind"]:
+		"start":
+			if not row.has("shown_ms") and drawn.distance_to(row["from"]) > 0.02:
+				row["shown_ms"] = ms
+				row["shown_frames"] = row["frames"]
+			if row.has("shown_ms") and not row.has("done_ms") and velocity.length() >= 0.8 * pace:
+				row["done_ms"] = ms
+		"turn":
+			var way: Vector2 = _lat["way"]
+			if not row.has("shown_ms"):
+				var off_way := moved.length() > 0.001 and absf(rad_to_deg(moved.angle_to(way))) > 15.0
+				var off_facing := absf(rad_to_deg(angle_difference(player.shown_facing().angle(), float(_lat["facing"])))) > 10.0
+				if off_way or off_facing:
+					row["shown_ms"] = ms
+					row["shown_frames"] = row["frames"]
+					row["by"] = "path" if off_way else "facing"
+			row.get_or_add("ways", []).append([ms, velocity])
+		"stop":
+			if row.has("shown_ms"):
+				return
+			if moved.length() < 0.0005:
+				row["still"] = int(row.get("still", 0)) + 1
+				if row["still"] == 1:
+					row["still_ms"] = ms
+					row["still_frames"] = row["frames"]
+				if row["still"] >= 3:
+					row["shown_ms"] = row["still_ms"]
+					row["shown_frames"] = row["still_frames"]
+					row["done_ms"] = row["still_ms"]
+					row["moved_on"] = drawn.distance_to(row["from"])
+			else:
+				row["still"] = 0
+
+
+func _lat_report() -> void:
+	print("[latency] %s%s, %d rounds; ms from the input to the first frame showing it (frames) / to the response done, the next tick's wait, predicted from the input's frame, the server's tile after, the step under way's rest, the biggest move in a frame" % [
+			Net.controls, " held" if Net.test_latency_hold and Net.controls != "wasd" else "", Net.test_latency])
+	var by_kind := {}
+	for row: Dictionary in _lat["rows"]:
+		if not row.has("kind"):
+			continue
+		by_kind.get_or_add(row["kind"], []).append(row)
+		print("[latency] %s %d: %s ms (%s frames)%s / done %s ms; tick wait %.0f ms; predicted %s; server %s ms; step left %s ms; leap %.3f cells%s" % [row["kind"], row["round"],
+				"%.0f" % row["shown_ms"] if row.has("shown_ms") else "never", row.get("shown_frames", "-"), " by " + row["by"] if row.has("by") else "",
+				"%.0f" % row["done_ms"] if row.has("done_ms") else "never",
+				row["tick_wait_ms"], row.get("predicted", "?"), "%.0f" % row["server_ms"] if row.has("server_ms") else "-",
+				"%.0f" % row["step_left_ms"] if row.has("step_left_ms") else "-", row.get("leap", 0.0),
+				"; went on %.2f cells" % row["moved_on"] if row.has("moved_on") else ""])
+	for kind: String in ["start", "turn", "stop"]:
+		for field: String in ["shown_ms", "done_ms"]:
+			var times: Array[float] = []
+			var never := 0
+			for row: Dictionary in by_kind.get(kind, []):
+				if row.has(field):
+					times.append(row[field])
+				else:
+					never += 1
+			times.sort()
+			if not times.is_empty():
+				print("[latency] %s %s: median %.0f ms, worst %.0f, best %.0f (%d, %d never)" % [kind, "shown" if field == "shown_ms" else "done",
+						times[times.size() / 2], times.back(), times.front(), times.size(), never])
+	print("[latency] own corrections %d (%d with her within a cell), swaps with her %d; a companion %s" % [
+			_lat.get("corrections", 0), _lat.get("corrections_near", 0), _lat.get("swaps", 0), "seen" if _lat.get("companion", false) else "none"])
+
+
+## The turn's response done: from the frame on which the walk goes, and
+## stays, within 20 degrees of the way it settles on at the phase's end (a
+## key's way is the screen's, a click's the grid's).
+func _lat_turn_done() -> void:
+	var row: Dictionary = _lat["row"]
+	var ways: Array = row.get("ways", [])
+	if ways.is_empty():
+		return
+	var last: Vector2 = ways.back()[1]
+	if last.length() < 0.5:
+		return
+	for i in range(ways.size() - 1, -1, -1):
+		var v: Vector2 = ways[i][1]
+		if v.length() < 0.5 or absf(rad_to_deg(v.angle_to(last))) > 20.0:
+			if i + 1 < ways.size():
+				row["done_ms"] = ways[i + 1][0]
+			return
+	row["done_ms"] = ways[0][0]
 
 
 ## --test-steer: hold-to-move with the cursor kept three cells from the

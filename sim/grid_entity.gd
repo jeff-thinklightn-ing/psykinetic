@@ -1135,6 +1135,14 @@ func ready_for_step() -> bool:
 	return _prediction == null or _prediction.ready_for_step()
 
 
+## 683: the tile of the step on screen now (the one under way), or the
+## entity's own.
+func shown_step_tile() -> Vector2i:
+	if _prediction != null and _prediction.is_active():
+		return _prediction.predicted_tile()
+	return tile
+
+
 ## Where the walk on screen ends: the last predicted step's tile, or the
 ## entity's own.
 func walk_end() -> Vector2i:

@@ -755,6 +755,14 @@ var test_chase := 0.0
 ## and "flip=S" (the cursor swung behind after S seconds; Jeff on v0.1.177:
 ## "i can move cursor behind me and character keeps going").
 var test_hold_near := 0.0
+## --test-latency=N (the coordinator's ask; Jeff on v0.1.179: "movement
+## isn't right yet"): N rounds of a start from standing, a turn mid-walk and
+## a stop, each timed from the input to the first frame that shows it, with
+## its parts (Main._run_test_latency); the controls' scheme picks keys or
+## clicks; ",hold" (--test-latency=N,hold) holds the left button with the
+## cursor three cells off the body, as Jeff steers, and lets go to stop.
+var test_latency := 0
+var test_latency_hold := false
 var test_hold_route := false
 var test_hold_angle := 45.0
 var test_hold_far := sqrt(2.0)
@@ -1898,7 +1906,7 @@ func _parse_args() -> void:
 					"--builders", "--builder-model", "--builder-effort", "--builder-max-cost", "--lawspeaker", "--proposed", \
 					"--test-move", "--test-contest", "--test-reset", "--test-builder", "--test-exit-after", "--test-exit-on", "--test-wait-players", "--test-herds", "--test-hold", "--test-version", "--test-protocol", \
 					"--screenshot", "--test-show", "--test-hover", "--test-door", "--test-chest", "--test-click", "--test-fullscreen", "--test-azimuth", "--test-yaw", \
-					"--test-lag", "--test-steer", "--test-fight", "--test-chase", "--test-walk", "--tick-send-hz", "--test-hold-near":
+					"--test-lag", "--test-steer", "--test-fight", "--test-chase", "--test-walk", "--tick-send-hz", "--test-hold-near", "--test-latency":
 				if not has_value and i + 1 < args.size():
 					i += 1
 					value = args[i]
@@ -1937,6 +1945,9 @@ func _set_option(key: String, value: String) -> void:
 			test_fight = maxf(value.to_float(), 0.0)
 		"--test-chase":
 			test_chase = maxf(value.to_float(), 0.0)
+		"--test-latency":
+			test_latency = maxi(value.get_slice(",", 0).to_int(), 0)
+			test_latency_hold = value.get_slice(",", 1) == "hold"
 		"--test-hold-near":
 			test_hold_near = maxf(value.get_slice(",", 0).to_float(), 0.0)
 			for part in value.split(",").slice(1):

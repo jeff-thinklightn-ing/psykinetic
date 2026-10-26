@@ -78,10 +78,31 @@ func _test_hinted_walk() -> void:
 	_check(wall["bends"] == 0 and not wall["settled"] and not wall["active"] and wall["rest"].distance_to(Vector2(wall["end"])) < 0.1 and wall["end"] == Vector2i(2, 19),
 			"a key held into a wall: no bend toward it, the body stops on the cell's centre (%s, %s)" % [wall["rest"], wall["end"]])
 	_test_paused_walk()
+	_test_let_go()
 	var refused := _drive([Vector2i(1, 0), Vector2i(1, 0), Vector2i(0, 1)], true, 2)
 	_check(refused["corrections"] == 1 and refused["bends"] == 2, "a third step the server refuses: one correction, the two before it bent (%d, %d)" % [refused["corrections"], refused["bends"]])
 	_check(refused["jump"] <= refused["frame"] * 1.5 and not refused["active"] and refused["rest"].distance_to(Vector2(refused["end"])) < 0.02 and refused["end"] == Vector2i(4, 20),
 			"the body slides back from the bend to the server's cell, no jump (%.3f cells a frame at most; rest %s, server %s)" % [refused["jump"], refused["rest"], refused["end"]])
+
+
+## 683 (the coordinator's latency table: a stop was the step's rest and a
+## 150 ms slide back after it): a key let go in the step's tail, bent toward
+## the step it hinted, stands on the centre as the step ends, with no settle;
+## let go after the step ended (the body coasting on the bend), the settle
+## is at the walking pace, under the old SETTLE_TICKS.
+func _test_let_go() -> void:
+	print("\n== 683: let go, the body stands as its step ends ==")
+	var east := [Vector2i(1, 0), Vector2i(1, 0), Vector2i(1, 0)]
+	var tail := _drive(east, true, -1, 1.0, 0.0, 0.8)
+	_check(not tail["settled"] and tail["corrections"] == 0 and tail["rest"].distance_to(Vector2(5, 20)) < 0.1 and tail["end"] == Vector2i(5, 20),
+			"let go at 80%% of the last step, bent toward the next: no settle, on the centre of %s (%s)" % [tail["end"], tail["rest"]])
+	_check(tail["last_move"] - tail["last_end"] <= 0.05, "and standing as the step ends (%.2f ticks after)" % (tail["last_move"] - tail["last_end"]))
+	_check(tail["jump"] <= tail["frame"] * 1.5, "no frame jumps as the bend lets go (%.3f cells, a frame's walk %.3f)" % [tail["jump"], tail["frame"]])
+	var late := _drive(east, true, -1, 1.0, 0.0, 1.1)
+	_check(late["settled"] and late["rest"].distance_to(Vector2(5, 20)) < 0.02 and not late["active"],
+			"let go just after the step ended, coasting on the bend: the settle brings it to the centre (%s)" % late["rest"])
+	_check(late["last_move"] - late["last_end"] <= 0.25 + MovePrediction.SETTLE_MIN_TICKS * 2.0,
+			"at the walking pace: standing %.2f ticks after the step's end (the old settle alone was %.1f)" % [late["last_move"] - late["last_end"], MovePrediction.SETTLE_TICKS])
 
 
 ## 543 amended, ui's side: the held walk against a server that cannot keep
@@ -122,8 +143,11 @@ func _test_paused_walk() -> void:
 ## frame (a straight step's walk in a frame), settled (a settle was shown),
 ## active (the prediction still active at the end), rest (where the body
 ## was last drawn), end (the server's tile at the end), paused (frames the
-## walk waited on the server), dropped (steps the server dropped)}.
-func _drive(dirs: Array, hold_on: bool, refuse_at := -1, slow := 1.0, hold_until := 0.0) -> Dictionary:
+## walk waited on the server), dropped (steps the server dropped),
+## last_move (the clock of the last frame the body moved on), last_end (the
+## last step's end, a settle aside)}. 683: held on, the key is let go at
+## [param release_t] of the last step's time (never if negative).
+func _drive(dirs: Array, hold_on: bool, refuse_at := -1, slow := 1.0, hold_until := 0.0, release_t := -1.0) -> Dictionary:
 	var player := _player()
 	World._relocate(player, Vector2i(2, 20))
 	for other in World.get_entities():
@@ -151,6 +175,8 @@ func _drive(dirs: Array, hold_on: bool, refuse_at := -1, slow := 1.0, hold_until
 	var jump := 0.0
 	var settled := false
 	var last_pos := Vector2(player.tile)
+	var last_move := 0.0
+	var last_end := 0.0
 	var total := 0.0
 	for direction: Vector2i in dirs:
 		total += World.step_ticks(player, direction)
@@ -167,15 +193,25 @@ func _drive(dirs: Array, hold_on: bool, refuse_at := -1, slow := 1.0, hold_until
 				print("    jump at %.2f: %s -> %s on %s->%s t %.2f (ease %s, settle %s, %d steps, bend %s/%s)" % [clock, last_pos, pos,
 						current.from, current.to, (clock - current.start) / current.duration, current.ease, current.settle, shown._steps.size(), current.bend_prev, current.bend_next])
 			jump = maxf(jump, pos.distance_to(last_pos))
+			if pos.distance_to(last_pos) > 0.0005:
+				last_move = clock
 			last_pos = pos
+			for i in range(shown._steps.size() - 1, -1, -1):
+				if not shown._steps[i].settle:
+					last_end = shown._steps[i].start + shown._steps[i].duration
+					break
 			player.position = shown.position()
 			if shown._steps.back().settle:
 				settled = true
 		# Main._drive_wasd: the key held told each frame; the step as the one shown ends.
 		var held: Vector2i = Vector2i.ZERO
+		var t_last := 0.0
+		if shown.is_active():
+			var under: MovePrediction.Step = shown._steps.back()
+			t_last = (clock - under.start) / under.duration
 		if sent_count < dirs.size():
 			held = dirs[sent_count]
-		elif hold_on:
+		elif hold_on and (release_t < 0.0 or t_last < release_t):
 			held = dirs.back()
 		shown.hint(held)
 		if sent_count < dirs.size() and shown.waiting_on_server():
@@ -230,7 +266,8 @@ func _drive(dirs: Array, hold_on: bool, refuse_at := -1, slow := 1.0, hold_until
 					elsewhere += 1
 				shown.rebase(reply[1], 2.0)
 	return {"corrections": corrections, "elsewhere": elsewhere, "bends": bends, "cut": cut, "jump": jump, "frame": FRAME * World.TICK_RATE / pace,
-			"settled": settled, "active": shown.is_active(), "rest": last_pos, "end": server_tile, "paused": paused, "dropped": dropped}
+			"settled": settled, "active": shown.is_active(), "rest": last_pos, "end": server_tile, "paused": paused, "dropped": dropped,
+			"last_move": last_move, "last_end": last_end}
 
 
 ## [param steps] WASD steps east held from (2, 20), a round trip of

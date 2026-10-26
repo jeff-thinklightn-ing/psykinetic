@@ -59,6 +59,9 @@ const REACH_SETTLE_TICKS := 1.5
 ## that step never came (the key let go): the body slides from where it is
 ## to the cell's centre over this long.
 const SETTLE_TICKS := 1.5
+## 683: the shortest settle; one at the walking pace takes a bend's apex
+## (0.18 cells) back in under half a tick.
+const SETTLE_MIN_TICKS := 0.3
 ## How far along the step hinted at the body may be drawn on (position) past
 ## the end of the step before it, waiting the frame for that step to come.
 const COAST_MAX := 0.5
@@ -103,6 +106,10 @@ class Step:
 	## 655 amended: the slide from a bend's apex back to the cell's centre
 	## after a walk that ended bent toward a step that never came.
 	var settle := false
+	## 683: its bend toward the held key's step let go (the key or button
+	## released before that step was sent): from this clock the bent tail is
+	## blended back onto the straight line, to the centre as the step ends.
+	var unbend_at := -1.0
 	## 678 amended: the order that planned it (MovePrediction._plan), so a
 	## walk planned again as it goes draws on the newest plan's line, not a
 	## line through an earlier plan's cells it has left.
@@ -469,7 +476,14 @@ func rebase(server_tile: Vector2i, blend_ticks: float) -> void:
 ## its deadline, which the caller must treat as a misprediction.
 func advance(delta: float) -> bool:
 	_clock += delta / World.TICK_DT
-	_glide_carry *= exp(-GLIDE_EASE * delta)  # 678: a jump in the pull eases out.
+	# 678: a jump in the pull eases out; 683: as the walk ends (no key or
+	# button holding it on), at the walking pace at least, so the body
+	# stands when its step does, not a slow creep after.
+	var eased := _glide_carry * exp(-GLIDE_EASE * delta)
+	if _ending():
+		var pace := float(World.TICK_RATE) / World.step_ticks(_entity, Vector2i.RIGHT, _entity.tile)
+		eased = _glide_carry.move_toward(Vector2.ZERO, maxf(_glide_carry.length() - eased.length(), pace * delta))
+	_glide_carry = eased
 	if not is_active():
 		return false
 	if _following != null and _has_target and not _into_goal:
@@ -514,7 +528,7 @@ func advance(delta: float) -> bool:
 				break  # The ones after it wait on it too.
 			return true
 	var last: Step = _steps.back()
-	if _clock >= last.start + last.duration and last.bend_next != GridEntity.UNKNOWN_TILE and not last.settle:
+	if _clock >= last.start + last.duration and last.bend_next != GridEntity.UNKNOWN_TILE and not last.settle and last.unbend_at < 0.0:
 		# 655 amended: ended bent toward the held key's step, which has not
 		# come. The key held a frame ago, its step comes this frame (Main
 		# reads the keys after the bodies are drawn): the body is drawn on
@@ -530,7 +544,10 @@ func advance(delta: float) -> bool:
 			settle.from_grid = Iso.local_to_grid(position())
 			settle.to_grid = Vector2(last.to)
 			settle.start = _clock
-			settle.duration = SETTLE_TICKS
+			# 683: back at the walking pace (eased out, so it starts quicker),
+			# SETTLE_TICKS at most: a bend's apex is a fifth of a cell off.
+			settle.duration = clampf(settle.from_grid.distance_to(settle.to_grid) * World.step_ticks(_entity, Vector2i.RIGHT, last.to),
+					SETTLE_MIN_TICKS, SETTLE_TICKS)
 			settle.ease = true
 			settle.started = true
 			settle.confirmed = true
@@ -571,8 +588,33 @@ func server_dropped_queue() -> void:
 ## as that one ends. A step's bend at its end is settled toward it when no
 ## planned step follows (_bent); nothing is shown or sent for it.
 func hint(direction: Vector2i) -> void:
+	if direction == Vector2i.ZERO and _hint != Vector2i.ZERO:
+		_let_go_bend()
 	_hint = direction
 	_hint_clock = _clock
+
+
+## 683: the key or held button let go while the step under way bends toward
+## the step it hinted at, which was never sent: that bend is blended back
+## onto the straight line over the step's rest (_bent), so the body stands on
+## the cell's centre as the step ends, with no slide back (the settle) after.
+func _let_go_bend() -> void:
+	if not is_active():
+		return
+	var last: Step = _steps.back()
+	if last.settle or not last.bend_decided or last.bend_next == GridEntity.UNKNOWN_TILE or last.unbend_at >= 0.0:
+		return
+	if _clock >= last.start + last.duration:
+		return  # Ended: the settle has it. (The last step bends only toward a hint.)
+	last.unbend_at = _clock
+
+
+## 683: the walk shown is ending: nothing holds it on (no key or held
+## button's step hinted, fresh) and no step is planned past the one under way.
+func _ending() -> bool:
+	if _hint != Vector2i.ZERO and _clock - _hint_clock <= HINT_FRESH_TICKS:
+		return false
+	return not is_active() or _current() == _steps.back()
 
 
 ## 678: the held walk's line, each frame it is held (INF: none).
@@ -724,6 +766,8 @@ func shown_direction() -> Vector2:
 		return GridEntity.bent_tangent(step.from, step.to, step.bend_next, GridEntity.UNKNOWN_TILE,
 				_coast_t(step, t), GridEntity.bend_reach(step.to), 0.0)
 	t = clampf(t, 0.0, 1.0)
+	if step.unbend_at >= 0.0:
+		return Vector2(step.to - step.from).normalized()  # 683: let go, straight on.
 	if not _bends(step):
 		# 678 amended (Jeff: "the body doesn't face the direction of
 		# travel"): a step drawn from where the body was (each new order
@@ -743,7 +787,8 @@ func shown_direction() -> Vector2:
 ## drawn on along that bend as that step would draw it (_coast_t), so the
 ## step joins it without a jump when it comes within the frame.
 func _coasts(step: Step, t: float) -> bool:
-	return t > 1.0 and step == _steps.back() and not step.settle and step.bend_next != GridEntity.UNKNOWN_TILE
+	return t > 1.0 and step == _steps.back() and not step.settle and step.bend_next != GridEntity.UNKNOWN_TILE \
+			and step.unbend_at < 0.0
 
 
 ## Where on the step hinted at (0..COAST_MAX of its own time) the body is,
@@ -777,7 +822,15 @@ func _bent(step: Step, t: float) -> Vector2:
 			# (advance) brings the body back when the key is let go first.
 			step.bend_next = step.to + _hint
 	var reach_in := GridEntity.bend_reach(step.from) if step.bend_prev != GridEntity.UNKNOWN_TILE else 0.0
-	return GridEntity.bent_position(step.bend_prev, step.from, step.to, step.bend_next, t, reach_in, reach_out)
+	var bent := GridEntity.bent_position(step.bend_prev, step.from, step.to, step.bend_next, t, reach_in, reach_out)
+	if step.unbend_at < 0.0:
+		return bent
+	# 683: let go: from the bent tail onto the straight line, smoothly, over
+	# the step's rest.
+	var straight := GridEntity.bent_position(step.bend_prev, step.from, step.to, GridEntity.UNKNOWN_TILE, t, reach_in, 0.0)
+	var rest := maxf(step.start + step.duration - step.unbend_at, 0.01)
+	var w := clampf((_clock - step.unbend_at) / rest, 0.0, 1.0)
+	return bent.lerp(straight, w * w * (3.0 - 2.0 * w))
 
 
 ## 678 amended: [param step] is one cell, a king's move.

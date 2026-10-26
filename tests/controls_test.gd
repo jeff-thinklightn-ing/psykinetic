@@ -710,7 +710,16 @@ func _test_straight_lines() -> void:
 	_main._held_sent_at = 0
 	_main._retarget_held()
 	_check(player.move_order == Vector2i(4, 6), "a step's time on, the new cell (%s)" % player.move_order)
+	# 683 (the latency table: let go with Pip in the line, a held walk's
+	# route went on 5.7 cells): a hold that steered, let go, stops at the
+	# step under way; a click let go without steering walks on.
 	_main._test_holding = false
+	_main._retarget_held()
+	_check(_main._held_target == Main.NONE and (not player.has_move_order or player.move_order == player.tile),
+			"let go after steering: the walk ends at the step under way, %s (it was going to (4, 6): %s)" % [player.tile, player.move_order])
+	_main._move_click(player, Vector2i(4, 3))
+	_main._retarget_held()
+	_check(player.has_move_order and player.move_order == Vector2i(4, 3), "a click let go at once still walks to its cell (%s)" % player.move_order)
 	_main._held_target = Main.NONE
 	player.has_move_order = false
 	Net.controls = saved

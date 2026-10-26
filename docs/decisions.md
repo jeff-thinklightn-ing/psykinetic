@@ -31161,5 +31161,59 @@ made them before the view grew its first grass.
   first draws, as made behind the card.
 - view_test _test_scatter: a room's build makes every kind's mesh (fails
   without this, all six unmade).
+## 683: Stops, turns and let-go land on the step under way
+
+The coordinator, on Jeff's "movement isn't right yet" after v0.1.179: stop
+guessing and measure the lag, from input to what is on screen. A headless
+client (--test-latency=N[,hold], Main._run_test_latency) times each input
+to the first frame that shows it and to the response done: full pace for
+a start, settled on the new way for a turn, standing for a stop. It covers
+a held button, a click and the keys, against v0.1.176 too. The box's
+round trip is 0 to 5 ms (Tailscale); a proxy at 1±1 ms each way matched
+direct to the frame, and every own-body response is predicted from the
+input's frame, so the 10 Hz tick wait never shows on the own body.
+
+On v0.1.180 (medians): a start 17 ms to the first frame, ~85 ms to full
+pace; a click's turn ~120 to 150 ms; a key's turn 283 ms, waiting for the
+step under way. A stop was the step's rest plus about 150 ms of creep:
+held 250, keys 283. The step's tail had bent toward a step that was never
+sent, then slid back over SETTLE_TICKS (1.5 ticks), and the walk's line
+offset (678's glide carry) eased out at 12/s after it. Held with Pip in the
+straight line, the steer fell to a route and letting go did not stop it:
+it went on 5.7 cells, standing after 1550 ms.
+
+- **A bend let go** (MovePrediction._let_go_bend): the hint dropping to
+  none while the step under way bends toward the step it hinted at blends
+  that bend back onto the straight line over the step's rest (Step.unbend_at,
+  _bent), so the body stands on the centre as the step ends, no settle after.
+- **The settle at the walking pace**: a settle that still happens (let go
+  after the step ended, coasting on the bend) takes its distance at the
+  pace (SETTLE_MIN_TICKS 0.3 at least, SETTLE_TICKS at most), not 1.5 ticks.
+- **The carry at the pace as the walk ends** (_ending: no fresh hint and
+  no step planned past the one under way): the glide carry eases at 12/s or
+  at the walking pace, whichever is quicker.
+- **A held walk let go ends at the step under way** (Main._let_go_held): if
+  the hold steered since its click (Main._held_steered: a step or a new cell
+  sent), button up clears the hint and the line and, when the walk shown
+  goes on past the step under way (GridEntity.shown_step_tile) or the
+  authority holds a move order, sends a move to that step's tile (an
+  existing order; no protocol change). A click let go without steering
+  walks on to its cell.
+
+A key's turn was not made quicker. Sending it mid-step and drawing it
+round the committed cell reached the new way only ~30 ms sooner: a body
+moving along the old way can curve off it only as fast as a bend's corner
+cut allows (655: a quarter cell), and the tail bend already starts as
+early as that rule lets it. The facing already turns at once. Quicker
+needs a deeper corner cut or the server letting a committed step go; the
+coordinator keeps the second off the table for now.
+
+Measured after (6 rounds a case, with companions): held stop 250 -> 67 ms
+(worst 1550 -> 167), keys stop 283 -> 167; 0 corrections, 0 swaps.
+prediction_test _test_let_go: let go at 80% of the last step, no settle,
+standing as the step ends; let go after it, standing 0.33 ticks after (the
+settle alone was 1.5). controls_test: let go after steering ends the walk
+at the step under way; a click let go walks on. The harness stays as a test
+option (Net.test_latency; Main._lat_*).
 
 Client only, protocol unchanged, no new class_name.
