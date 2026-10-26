@@ -41,6 +41,7 @@ func _ready() -> void:
 	_test_thief_hooks()
 	_test_scoundrel_hooks()
 	_test_delivery()
+	_test_hut_account()
 	_test_apprentice()
 	_test_contribute()
 	_test_caravan()
@@ -478,6 +479,42 @@ func _test_scoundrel_hooks() -> void:
 		work.tick()
 	_check(told.size() == 1 and told[0][0] == TOWN and told[0][1] == "s1" and stock.book.id_of(int(told[0][2])) == "ration"
 		and not told[0][3] and int(told[0][2]) in stock.all_items(), "made: the town, the maker and the ration's uid, before it is shelved (%s)" % [told])
+
+
+## A healer's hut (no town's store, no treasury; the box's huts waited for
+## ever, "its maker can't pay for the materials"): its medicine man makes a
+## remedy from the herbs he banked there, nothing bought, his purse 0 and the
+## hut's gold 0. A town's workshop still buys them.
+func _test_hut_account() -> void:
+	print("\n== a healer's hut works on its own account ==")
+	_now = 0
+	var clock := func() -> int: return _now
+	var stock := Stockpile.new({}, clock, ItemBook.new(clock))
+	var no_areas: Array[String] = []
+	var holdings := Holdings.new(WorldMap.build(no_areas), null, {}, clock)
+	const HUT := "lt/healers_hut@1,1"
+	holdings._places[HUT] = {"id": HUT, "area": "lt", "key": "healers_hut@1,1", "cell": Vector2i(1, 1), "name": "the healer's hut",
+		"kind": "healers_hut", "radius": 2, "worth": 0, "start": ""}
+	holdings._places[TOWN] = {"id": TOWN, "area": "lt", "key": "store", "cell": Vector2i(9, 9), "name": "the store",
+		"kind": Stockpile.KIND, "radius": 2, "worth": 0, "start": ""}
+	var work := Production.new({}, stock, holdings, clock, _rules)
+	var economy := Economy.new({}, stock, work, clock, _rules)
+	work.buy_materials = economy.buy_materials
+	for at: String in [HUT, TOWN]:
+		var id := "mm_" + at.get_slice("/", 1)
+		work.add_worker(id, "Hob", ["medicine_man"], at, "test", "steady")
+		work.set_loan(id, float(_rules["bank"]["cap"]))
+		work.add_workshop(at + ":hut", "medicine_man", at)
+		work.assign(at + ":hut", id)
+		stock.deposit(at, "herbs", 4)
+		work.order(at + ":hut", "remedy")
+	_now += World.WORLD_TICK_STEPS
+	work.tick()
+	var working := func(shop: String) -> bool: return work.jobs().any(func(job_id: int) -> bool:
+		return work.job(job_id)["workshop"] == shop and work.job(job_id)["state"] == "working")
+	_check(working.call(HUT + ":hut") and stock.count(HUT, "herbs") == 2 and stock.count(HUT, "gold") == 0,
+		"the hut's remedy started from its own herbs, nothing bought (herbs %d)" % stock.count(HUT, "herbs"))
+	_check(not working.call(TOWN + ":hut") and stock.count(TOWN, "herbs") == 4, "a town's medicine man at his loan cap still can't buy the town's herbs")
 
 
 ## Gathered, hauled and paid for (decision 498): a delivery bought at the

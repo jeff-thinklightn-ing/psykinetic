@@ -1712,6 +1712,10 @@ func _start(bid: Dictionary, cat: Dictionary) -> bool:
 	# tanner's leather while the inn waits on it), whatever its maker's purse.
 	var for_build: bool = bid["kind"] == "make" and _for_build(town, bid["recipe"], cat)
 	on_town = on_town or for_build
+	# A place that is no town's store (a healer's hut, 641) has no treasury:
+	# its maker works from what he banked there himself, nobody's to buy back.
+	on_town = on_town or (holdings != null and not holdings.place(town).is_empty()
+			and str(holdings.place(town).get("kind", "")) != Stockpile.KIND)
 	if buy_materials.is_valid() and bid["kind"] in ["make", "rework"] and not on_town:
 		var raws := {}
 		for what: String in needs:

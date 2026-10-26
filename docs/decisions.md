@@ -30955,3 +30955,10 @@ footsteps' -31. sound_kit_test (the slots placed, silent to monsters, three
 takes each) and view_test (the lob's rise at the loose, its whistle once before
 it lands, then its thud; the knockdown's one blow, none standing, none for a
 late fall). Client only, protocol unchanged, no new class_name.
+## 498 amended (2): a hut works on its own account
+
+The box's two healers' huts logged "waits for remedy: its maker can't pay for the materials" every production step, and they never made a remedy. Their medicine men bank the herbs they gather into the hut's own store as a plain deposit (main.gd _take_herbs, 502 amended), unpaid, since a hut has no treasury. To make a remedy, Production._start then had him buy those herbs back (Economy.buy_materials, 498) from a purse of 0, with a loan that would come from the hut store's gold, which is also 0. Neither 652 nor 649 caused it; it has stood since the huts got workshops (641).
+
+The coordinator's approval: a workshop whose place is no town's store (holdings kind isn't Stockpile.KIND: a healer's hut, Main's place workshops) works on its own account, like a town's meals. It takes its materials from its own store without buying them. He gathered them, he uses them, and nobody is owed. A medicine man in a town's workshop still buys the town's herbs.
+
+larder_test _test_hut_account: a hut with 4 herbs and a medicine man at his loan cap starts a remedy (2 herbs left, the hut's gold 0); a town's medicine man at his cap still can't. Server only: no wire change, no new class_name.
