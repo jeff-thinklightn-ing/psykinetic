@@ -30,6 +30,11 @@ func _ready() -> void:
 	_test_a_large_correction_slides_not_snaps()
 	_test_a_slow_step_overtaken_is_not_cut_short()
 	_test_the_display_clock_waits_out_a_stall()
+	_test_a_route_is_drawn_straight()
+	_test_a_held_line_is_drawn_straight()
+	_test_a_far_held_walk_faces_its_line()
+	_test_a_held_line_keeps_its_slope_under_a_shaking_hand()
+	_test_a_far_held_walk_turns_at_once()
 	_test_the_smooth_meter_names_who_went_back()
 	_test_a_standing_body_starts_without_leaps()
 
@@ -405,6 +410,7 @@ func _test_the_display_clock_waits_out_a_stall() -> void:
 	_check(back >= 0.0, "and never goes back (%.2f)" % back)
 
 
+
 ## Decision 678 (Jeff: "walking still wants to be on a diagonal and it
 ## doesn't fit with the new camera"): an open floor, 60 x 60 (the tests
 ## walk its far quarter, clear of the bodies the tests before left).
@@ -414,6 +420,236 @@ func _open_floor() -> void:
 		for y in 60:
 			floor_tiles.append(Vector2i(x, y))
 	World.mirror_terrain({"floor": floor_tiles, "fire": [], "edges": {}})
+
+
+## How far [param point] is off the line through [param origin] along [param along].
+static func _off_line(point: Vector2, origin: Vector2, along: Vector2) -> float:
+	return absf(along.normalized().cross(point - origin))
+
+
+func _test_a_route_is_drawn_straight() -> void:
+	print("\n== 678: a route across open ground is one straight line, and the body is drawn on it ==")
+	_open_floor()
+	var me := _me(Vector2i(32, 32))
+	var via := me.predict_move(Vector2i(44, 36))
+	var origin := Vector2(32, 32)
+	var along := Vector2(12, 4)
+	var worst_cell := 0.0
+	for cell in via:
+		worst_cell = maxf(worst_cell, _off_line(Vector2(cell), origin, along))
+	_check(via.size() == 12 and via.back() == Vector2i(44, 36) and worst_cell <= 0.5,
+			"12 steps, every cell within half a cell of the line, no staircase (worst %.2f; %s)" % [worst_cell, via])
+	_check(World.line_cells(Vector2i(0, 0), Vector2i(6, 2)) == [Vector2i(1, 0), Vector2i(2, 1), Vector2i(3, 1), Vector2i(4, 1), Vector2i(5, 2), Vector2i(6, 2)],
+			"line_cells: a king's move a step, the nearest cell to the line at each")
+	var worst := 0.0
+	var frames := 0
+	while me._prediction.is_active() and frames < 600:
+		me._prediction.advance(1.0 / 60.0)
+		if not me._prediction.is_active():
+			break
+		worst = maxf(worst, _off_line(Iso.local_to_grid(me._prediction.position()), origin, along))
+		frames += 1
+	var arrived := Iso.local_to_grid(me._prediction.position())
+	_check(frames > 60 and worst <= 0.1 and arrived.distance_to(Vector2(44, 36)) < 0.01,
+			"drawn within 0.1 cell of the line the whole way there (worst %.3f over %d frames; at %s)" % [worst, frames, arrived])
+	me._prediction.clear()
+	me.queue_free()
+
+
+func _test_a_held_line_is_drawn_straight() -> void:
+	print("\n== 678: a held key at 20 degrees walks a 20 degree line, drawn on it ==")
+	_open_floor()
+	var me := _me(Vector2i(33, 40))
+	var origin := Vector2(33, 40)
+	var along := Vector2.from_angle(deg_to_rad(20.0))
+	var steps := 0
+	var worst := 0.0
+	var worst_cell := 0.0
+	var frames := 0
+	var facing_off := 0.0
+	while steps < 10 and frames < 1200:
+		me._prediction.hint_line(origin, along)
+		# As Main._drive_wasd: the line's pick from the walk's end, hinted each frame.
+		var from: Vector2i = me._prediction._steps.back().to if me._prediction.is_active() else me.tile
+		var pick: Vector2i = Main.line_steps(from, origin, along)[0]
+		me._prediction.hint(pick)
+		if me._prediction.ready_for_step():
+			if me._prediction.step(pick):
+				steps += 1
+				worst_cell = maxf(worst_cell, _off_line(Vector2(from + pick), origin, along))
+		me._prediction.advance(1.0 / 60.0)
+		for shown in me._prediction._steps:
+			if not shown.confirmed and shown.started and me._prediction._clock >= shown.start + shown.duration:
+				me.tile = shown.to
+				me._prediction.reconcile(shown.to)  # The server takes it as shown.
+		if steps >= 3 and me._prediction.is_active():  # Under way: the first step from rest eases onto the line.
+			var off := _off_line(Iso.local_to_grid(me._prediction.position()), origin, along)
+			if off > 0.1:
+				var c: Variant = me._prediction._current()
+				print("off %.3f step %s->%s fg %s settle %s bends %s t %.2f n %d pull %s carry %s coast %s" % [off, c.from, c.to, c.from_grid, c.settle, me._prediction._bends(c), (me._prediction._clock - c.start) / c.duration, me._prediction._steps.size(), me._prediction._glide_last, me._prediction._glide_carry, me._prediction._coasting])
+			worst = maxf(worst, off)
+			# The facing as GridEntity turns it, against the line's 20 degrees.
+			me._turn_toward(me._prediction.shown_direction(), 1.0 / 60.0)
+			if steps >= 4:
+				facing_off = maxf(facing_off, absf(rad_to_deg(angle_difference(me.shown_facing().angle(), along.angle()))))
+		frames += 1
+	var end: Vector2i = me._prediction._steps.back().to if me._prediction.is_active() else me.tile
+	var angle := rad_to_deg(Vector2(end - Vector2i(33, 40)).angle())
+	_check(steps == 10 and worst_cell <= 0.5 and absf(angle - 20.0) < 4.0,
+			"ten steps, each cell within half a cell of the line, ending %.1f degrees on (%s; %d steps, %d frames, tile %s)" % [angle, end, steps, frames, me.tile])
+	_check(worst <= 0.1, "drawn within 0.1 cell of the line (worst %.3f)" % worst)
+	_check(facing_off <= 8.0, "and facing along it, not each step's way of the eight (%.1f degrees off at worst)" % facing_off)
+	var picks := Main.line_steps(Vector2i(0, 0), Vector2.ZERO, Vector2.from_angle(deg_to_rad(20.0)))
+	_check(picks[0] == Vector2i(1, 0) and picks[1] == Vector2i(1, 1), "at the line's start the straight step first, the diagonal the other (%s)" % [picks])
+	me._prediction.clear()
+	me.queue_free()
+
+
+## A walk held far (Main._retarget_held, the button down with the cursor
+## beyond STEER_CELLS): a new order each step to the cell [param ahead]
+## cells on from the body along the way [param way_at] gives for the frame
+## (the cursor's ground moving with the camera), the steps taken by the
+## server as shown. Frames of 60 a second; returns each frame's drawn point
+## (grid units) and the facing then (GridEntity's turn, radians).
+func _hold_far(me: GridEntity, ahead: float, frames: int, way_at: Callable) -> Array:
+	var drawn: Array = []
+	var ordered_for: Variant = null
+	var target := Vector2i(-1, -1)
+	for frame in frames:
+		var way: Vector2 = way_at.call(frame)
+		var current: Variant = me._prediction._current() if me._prediction.is_active() else null
+		var body := Iso.local_to_grid(me._prediction.position()) if me._prediction.is_active() else Vector2(me.tile)
+		var cell := Vector2i((body + way * ahead).round())
+		# As Main._retarget_held: at once when it turns the walk; else a step's
+		# time apart, when it drifts or the plan runs short.
+		if current == null or Main.held_turns(body, target, cell) 				or current != ordered_for and Main.held_replans(body, target, cell, me._prediction.steps_planned()):
+			me._prediction.order(cell)
+			target = cell
+			ordered_for = me._prediction._current()
+		me._prediction.advance(1.0 / 60.0)
+		for shown in me._prediction._steps:
+			if not shown.confirmed and shown.started and me._prediction._clock >= shown.start + shown.duration:
+				me.tile = shown.to
+				me._prediction.reconcile(shown.to)
+		if me._prediction.is_active():
+			me._turn_toward(me._prediction.shown_direction(), 1.0 / 60.0)
+			drawn.append([Iso.local_to_grid(me._prediction.position()), me.shown_facing().angle()])
+		else:
+			drawn.append([Vector2(me.tile), me.shown_facing().angle()])
+	return drawn
+
+
+## 678 amended (Jeff on v0.1.177: "now I run in a diagnonal line the body
+## doesn't face the direction of travel"): a walk held far at 20 degrees as
+## routes (Main's, where the straight way to the cursor is not open), planned
+## again as it goes (Main.held_replans), faces the way it goes, not the way
+## of each new plan's first step (drawn from where the body was, it faced its
+## own way of the eight: 0 or 45 degrees; 11.9 degrees off on average, 24.4
+## at worst). The worst left is where a plan hands over to the next.
+func _test_a_far_held_walk_faces_its_line() -> void:
+	print("
+== 678 amended: a walk held far as routes, planned again as it goes, faces the way it goes ==")
+	_open_floor()
+	var me := _me(Vector2i(31, 52))
+	var way := Vector2.from_angle(deg_to_rad(20.0))
+	var drawn := _hold_far(me, 6.0, 150, func(_frame: int) -> Vector2: return way)
+	var worst := 0.0
+	var total := 0.0
+	var counted := 0
+	for i in range(45, drawn.size()):
+		# The way travelled over the last quarter second, against the facing.
+		var travel: Vector2 = drawn[i][0] - drawn[i - 15][0]
+		if travel.length() < 0.5:
+			continue
+		var off := absf(rad_to_deg(angle_difference(drawn[i][1], travel.angle())))
+		worst = maxf(worst, off)
+		total += off
+		counted += 1
+	var walked: Vector2 = drawn.back()[0] - Vector2(31, 52)
+	_check(counted > 60 and worst <= 20.0 and total / counted <= 6.0,
+			"facing the way travelled: %.1f degrees off on average, %.1f at worst (%d frames; walked %s, %.0f degrees)" % [total / maxi(counted, 1), worst, counted, walked, rad_to_deg(walked.angle())])
+	me._prediction.clear()
+	me.queue_free()
+
+
+## 678 amended: the held button steering (Main._line_step, Main.line_anchor),
+## its way shifting a little every frame as a hand on the mouse and the
+## camera following make it: the walk keeps the line's slope, taking the
+## diagonals as they come (re-anchored on the walk's end cell each frame,
+## the line's first pick is the straight step every time: it walked
+## straight), and is drawn facing the way it goes.
+func _test_a_held_line_keeps_its_slope_under_a_shaking_hand() -> void:
+	print("
+== 678 amended: the held line keeps its slope while the way shakes a few degrees each frame ==")
+	_open_floor()
+	var me := _me(Vector2i(31, 45))
+	var origin := Vector2.INF
+	var way := Vector2.ZERO
+	var steps := 0
+	var frames := 0
+	var facing_off := 0.0
+	while steps < 12 and frames < 1200:
+		var along := Vector2.from_angle(deg_to_rad(20.0 + 4.0 * sin(frames * 0.7)))
+		var from: Vector2i = me._prediction._steps.back().to if me._prediction.is_active() else me.tile
+		var line := Main.line_anchor(origin, way, from, along)
+		origin = line[0]
+		way = line[1]
+		me._prediction.hint_line(origin, way)
+		var pick: Vector2i = Main.line_steps(from, origin, way)[0]
+		me._prediction.hint(pick)
+		if me._prediction.ready_for_step() and me._prediction.step(pick):
+			steps += 1
+		me._prediction.advance(1.0 / 60.0)
+		for shown in me._prediction._steps:
+			if not shown.confirmed and shown.started and me._prediction._clock >= shown.start + shown.duration:
+				me.tile = shown.to
+				me._prediction.reconcile(shown.to)
+		me._turn_toward(me._prediction.shown_direction(), 1.0 / 60.0)
+		if steps >= 4:
+			facing_off = maxf(facing_off, absf(rad_to_deg(angle_difference(me.shown_facing().angle(), deg_to_rad(20.0)))))
+		frames += 1
+	var end: Vector2i = me._prediction._steps.back().to if me._prediction.is_active() else me.tile
+	var angle := rad_to_deg(Vector2(end - Vector2i(31, 45)).angle())
+	_check(steps == 12 and absf(angle - 20.0) < 4.0, "twelve steps ending %.1f degrees on, not straight (%s)" % [angle, end])
+	_check(facing_off <= 12.0, "facing the way it goes: %.1f degrees off the line at worst" % facing_off)
+	me._prediction.clear()
+	me.queue_free()
+
+
+## 678 amended (Jeff on v0.1.177: "i can move cursor behind me and
+## character keeps going"): a walk held far east, the cursor swung behind in
+## a step's tail (its bend into the next settled): the step under way ends
+## and the next goes back; the one it bent into is not walked first (the
+## jitter's keep, only for a turn under TURN_KEEP), and nothing jumps.
+func _test_a_far_held_walk_turns_at_once() -> void:
+	print("
+== 678 amended: a walk held far turns back at once when the cursor swings behind ==")
+	_open_floor()
+	var me := _me(Vector2i(34, 57))
+	var flip := {"frame": -1, "x": 0.0}
+	var drawn := _hold_far(me, 6.0, 130, func(frame: int) -> Vector2:
+		if flip["frame"] < 0 and frame > 40 and me._prediction.is_active():
+			var step: Variant = me._prediction._current()
+			if (me._prediction._clock - step.start) / step.duration > 0.8 and step.bend_decided:
+				flip["frame"] = frame
+				flip["x"] = Iso.local_to_grid(me._prediction.position()).x
+		return Vector2.LEFT if flip["frame"] >= 0 else Vector2.RIGHT)
+	var furthest := -INF
+	var jump := 0.0
+	for i in drawn.size():
+		var at: Vector2 = drawn[i][0]
+		if i > 0:
+			jump = maxf(jump, at.distance_to(drawn[i - 1][0]))
+		if flip["frame"] >= 0 and i >= flip["frame"]:
+			furthest = maxf(furthest, at.x)
+	var on := furthest - float(flip["x"])
+	var end: Vector2 = drawn.back()[0]
+	_check(flip["frame"] >= 0 and on <= 0.4 and end.x < float(flip["x"]) - 1.0,
+			"swung behind with %.2f of a step left: on %.2f cells more at most, then back (ends at x %.2f)" % [
+				1.0 - fmod(float(flip["x"]), 1.0), on, end.x])
+	_check(jump <= 0.12, "never a jump: %.3f cells at most a frame (a step is 0.067)" % jump)
+	me._prediction.clear()
+	me.queue_free()
 
 
 ## 678's companion question (net_smooth.sh, --test-smooth): the meter says

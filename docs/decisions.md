@@ -30755,3 +30755,65 @@ v0.1.178 678 is taken out whole (the coordinator's ruling):
 
 Server and client: walk_path goes, so the server is redeployed with the
 cut. No wire change, protocol unchanged. No new class_name.
+
+## 678 again, amended: a held walk turns at once and faces the way it goes
+
+Jeff on v0.1.177: "movement got worse, its too delayed, i can move cursor
+behind me and character keeps going, now I run in a diagnonal line the body
+doesn't face the direction of travel." 678 was taken out of v0.1.178
+("678 reverted" above); this puts all of it back, with the fixes below,
+for v0.1.179. A
+headless probe (--test-hold-near, given an angle, a cursor distance and a
+swing behind: `--test-hold-near=6,angle=20,far=6,flip=3`) measured it on
+the wilds, a server and a click client: steering near the body was right
+(the step under way finished, 0.67 cells on, back in 0.33 s; facing 0.3
+degrees off the way travelled), but held farther, the routes went 1.4 to
+1.6 cells on after the swing, back only after 0.4 to 0.6 s, and the body
+faced 8 to 9 degrees off the way it went on average, 24 at worst.
+
+- **A turn goes at once:** held far, a new cell more than TURN_KEEP (45
+  degrees) off the way to the last one, seen from the body
+  (Main.held_turns), is sent at once, not a step's time later. And
+  MovePrediction.order keeps the step the one under way bends into (the
+  jitter's fix) only when the new target lies within TURN_KEEP of that
+  step's way; otherwise it drops that step too and bends the one under way
+  again toward the new plan. Whatever a new order changes on screen is
+  carried in the glide's carry and eased out, never jumped. A swing behind
+  in a step's tail now goes on 0.01 cells; no frame moves more than a
+  step's pace.
+- **Held far steers on the line where it can:** with the straight way to
+  the cursor's cell open (World._line_clear from the walk's end), the held
+  button steers along the line as it does near the body (STEER_CELLS), so
+  an open-ground run is one line, at the cursor's angle. Routes only where
+  that way is shut (walls, others, fire), walking round.
+- **A route held far is planned again less often:** each plan is a
+  straight line from where it starts; planned again every step, only each
+  line's first step was ever taken, the straight one, so the walk went
+  straighter than the cursor and the drawn body weaved between the plans'
+  lines. Now a new plan only when the cursor's way drifts HELD_DRIFT (12
+  degrees) off the last one's or fewer than HELD_PLAN_LEFT (3) of its
+  steps are left (Main.held_replans), a step's time apart at most, and at
+  once on a turn.
+- **A small change of the held way keeps the line's place:** the line was
+  anchored again on the walk's end cell at any change of way, and from a
+  cell the line's first pick is the straight step: a way shifting a degree
+  a frame (a hand on the mouse, the camera following) walked straight.
+  Under LINE_TURN (20 degrees) the line now goes on from the walk's point
+  on the old one (Main.line_anchor); a bigger turn, or the walk LINE_OFF
+  off the line, anchors a new one on the cell as before.
+- **The facing:** a step drawn from where the body was (each new order, a
+  key's turn) faced its own way of the eight, and the run of a route's line
+  was taken back through earlier plans' cells. Such a step now faces along
+  the line it is on too (MovePrediction._line_of, loose), and a route's line
+  is its own plan's (Step.plan), not one through cells the walk has left.
+- Tests: mirror_test _test_a_far_held_walk_faces_its_line (routes, 20
+  degrees, planned again as Main does: 4.4 degrees off the way travelled on
+  average, 17.6 at worst where a plan hands over; it was 11.9 and 24.4),
+  _test_a_held_line_keeps_its_slope_under_a_shaking_hand (the way shaking 4
+  degrees: 18.4 degrees walked, facing 2.7 off at worst),
+  _test_a_far_held_walk_turns_at_once (0.01 cells on, it was 0.95), and the
+  held line's facing; controls_test: held_turns, held_replans, line_anchor.
+
+Server and client: World.walk_path is back (the server's re-path and its
+via check), so the server is redeployed with the cut. No wire change,
+protocol unchanged. No new class_name.

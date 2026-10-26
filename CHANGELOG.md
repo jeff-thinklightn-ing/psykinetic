@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Walking goes straight where you point again (v0.1.177's straight lines, fixed): held keys and a held click walk the exact line to the cursor, not the nearest diagonal; with the button held, swinging the cursor behind you turns you on the next step, and your character faces the way it is actually going (678 again, amended).
 ## v0.1.178
 
 - Walking is back to how it was in v0.1.176: held keys keep to the eight directions, a held click follows the cursor as before, and your character faces the way it walks (v0.1.177's straight lines lagged behind a held click and turned the body off its travel on a diagonal; they return once fixed). The hover square still shows only while building.

@@ -1121,6 +1121,13 @@ func hint_step(direction: Vector2i) -> void:
 		_prediction.hint(direction)
 
 
+## 678: the held walk's straight line ([param origin], [param along] in grid
+## units; INF for none), so the own body is drawn on it, not cell to cell.
+func hint_line(origin: Vector2, along: Vector2) -> void:
+	if _prediction != null:
+		_prediction.hint_line(origin, along)
+
+
 ## Whether the local player's walk is ready for its next WASD step: the
 ## one on screen is ending. Always true without prediction (the server
 ## queues and times the steps itself).
@@ -1134,6 +1141,12 @@ func walk_end() -> Vector2i:
 	if _prediction != null and _prediction.is_active():
 		return _prediction._steps.back().to
 	return tile
+
+
+## 678 amended: the planned steps of the walk on screen not yet begun; 0
+## without prediction.
+func steps_planned() -> int:
+	return _prediction.steps_planned() if _prediction != null else 0
 
 
 ## Refusals of this entity's steps the client has heard of (see

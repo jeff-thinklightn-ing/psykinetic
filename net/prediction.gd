@@ -65,6 +65,17 @@ const COAST_MAX := 0.5
 ## A held key's hint older than this (no frame has read the keys since) is
 ## not bent toward.
 const HINT_FRESH_TICKS := 1.0
+## 678: the own body drawn on its walk's straight line, not cell to cell:
+## pulled onto it by at most this much (cells; the DDA keeps within half),
+## and a change of line (a new way, a corner of the route) eased out at
+## this rate a second rather than jumped.
+const GLIDE_MAX := 0.5
+const GLIDE_EASE := 12.0
+## 678 amended (Jeff on v0.1.177: "i can move cursor behind me and character
+## keeps going"): a new order whose target lies more than this off the way of
+## the step the one under way bends into drops that step too; under it, the
+## step is kept (the held-click jitter's fix).
+const TURN_KEEP := deg_to_rad(45.0)
 
 
 class Step:
@@ -92,6 +103,10 @@ class Step:
 	## 655 amended: the slide from a bend's apex back to the cell's centre
 	## after a walk that ended bent toward a step that never came.
 	var settle := false
+	## 678 amended: the order that planned it (MovePrediction._plan), so a
+	## walk planned again as it goes draws on the newest plan's line, not a
+	## line through an earlier plan's cells it has left.
+	var plan := 0
 
 
 var _entity: GridEntity
@@ -115,6 +130,15 @@ var _ended_tile := GridEntity.UNKNOWN_TILE
 ## and when on the clock.
 var _hint := Vector2i.ZERO
 var _hint_clock := -INF
+## 678: the held walk's line (hint_line), when told on the clock; the
+## line the glide last drew on and the part of a change of it still easing out.
+var _line_origin := Vector2.INF
+var _line_along := Vector2.ZERO
+var _line_clock := -INF
+var _glide_line: Array = []
+var _glide_carry := Vector2.ZERO
+## 678 amended: the orders given, counted (Step.plan).
+var _plan := 0
 ## The shown walk has ended bent toward the held key's step and been given
 ## the frame for that step to come, drawn on along the bend meanwhile
 ## (advance, position); the frame over, the settle starts.
@@ -165,7 +189,11 @@ func order(target: Vector2i, into_goal := true) -> Array[Vector2i]:
 	_has_target = true
 	_target = target
 	_into_goal = into_goal
-	cancel_unstarted()
+	# 678 amended: whatever the new plan changes on screen is eased out
+	# (_glide_carry), never jumped: a bend toward a dropped step undone.
+	var was := Iso.local_to_grid(position()) if is_active() else Vector2.INF
+	_plan += 1
+	_cancel_unbent(target)
 	var at: Vector2i = _entity.tile
 	var start := _clock
 	var drawn := Vector2.INF
@@ -183,6 +211,8 @@ func order(target: Vector2i, into_goal := true) -> Array[Vector2i]:
 	elif drawn == Vector2.INF:
 		drawn = _drawn()
 	_append_path(at, start, drawn)
+	if was != Vector2.INF and is_active():
+		_glide_carry += (was - Iso.local_to_grid(position())).limit_length(GLIDE_MAX)
 	return unconfirmed()
 
 
@@ -334,6 +364,41 @@ func waiting_on_server() -> bool:
 ## ahead): dropped and planned again, it would wait for a confirmation that
 ## had come and gone, and be pulled back at its deadline onto the very tile
 ## the server has ("predicted X, server has X: no confirmation").
+## A new order's cancel: the unstarted steps go, but not the one the step
+## on screen is already bending into (its bend settled as its tail began,
+## 655): dropping it left the body at the bend's end, half a step on toward
+## a cell no longer planned, and the new route set off from the centre, a
+## jump every re-order in a tail (the held-click jitter). The route goes on
+## from that step's end; the server walks it as one of the via tiles.
+## Unless [param target] turns the walk (TURN_KEEP; 678 amended): then that
+## step goes too, the one under way is bent again toward the new plan
+## (order eases the change), and the turn comes a step sooner.
+func _cancel_unbent(target := GridEntity.UNKNOWN_TILE) -> void:
+	while is_active() and not _steps.back().started and not _steps.back().confirmed:
+		var i := _steps.size() - 1
+		if i > 0 and _steps[i - 1].bend_decided and _steps[i - 1].bend_next == _steps[i].to:
+			if target == GridEntity.UNKNOWN_TILE or _keeps_way(_steps[i], target):
+				return
+			_steps[i - 1].bend_decided = false
+			_steps[i - 1].bend_next = GridEntity.UNKNOWN_TILE
+		_steps.pop_back()
+
+
+## 678 amended: whether [param target] lies within TURN_KEEP of [param step]'s way.
+static func _keeps_way(step: Step, target: Vector2i) -> bool:
+	var to := Vector2(target - step.from)
+	return to.length() > 0.01 and Vector2(step.to - step.from).normalized().dot(to.normalized()) >= cos(TURN_KEEP) - 0.0001
+
+
+## 678 amended: the steps planned and not begun.
+func steps_planned() -> int:
+	var count := 0
+	for step in _steps:
+		if not step.started:
+			count += 1
+	return count
+
+
 func cancel_unstarted() -> void:
 	while is_active() and not _steps.back().started and not _steps.back().confirmed:
 		_steps.pop_back()
@@ -404,6 +469,7 @@ func rebase(server_tile: Vector2i, blend_ticks: float) -> void:
 ## its deadline, which the caller must treat as a misprediction.
 func advance(delta: float) -> bool:
 	_clock += delta / World.TICK_DT
+	_glide_carry *= exp(-GLIDE_EASE * delta)  # 678: a jump in the pull eases out.
 	if not is_active():
 		return false
 	if _following != null and _has_target and not _into_goal:
@@ -509,6 +575,84 @@ func hint(direction: Vector2i) -> void:
 	_hint_clock = _clock
 
 
+## 678: the held walk's line, each frame it is held (INF: none).
+func hint_line(origin: Vector2, along: Vector2) -> void:
+	_line_origin = origin
+	_line_along = along.normalized()
+	_line_clock = _clock if origin != Vector2.INF else -INF
+
+
+## 678: the straight line [param step] is on, [origin, unit way] in grid
+## units, or [] for none: the held walk's (fresh, no order), else the run
+## of the planned route round it that keeps to two neighbouring ways of
+## the eight, both taken (a line string-pulled by World.walk_path; a run
+## of one way is a line already).
+func _line_of(step: Step, loose := false) -> Array:
+	if not _has_target:
+		if _line_origin != Vector2.INF and _clock - _line_clock <= HINT_FRESH_TICKS:
+			return [_line_origin, _line_along]
+		return []
+	var i := _steps.find(step)
+	if i < 0:
+		return []
+	var first := i
+	var last := i
+	var main := step.to - step.from
+	var other := Vector2i.ZERO
+	for way: int in [-1, 1]:
+		var j: int = i + way
+		while j >= 0 and j < _steps.size():
+			var s: Step = _steps[j]
+			var joined: bool = s.to == _steps[j + 1].from if way == -1 else s.from == _steps[j - 1].to
+			if not joined or s.settle or not (_bends(s) or loose and _one_cell(s)):
+				break
+			if way == -1 and s.plan != _steps[j + 1].plan:
+				break  # 678 amended: an earlier plan's line is not this one's.
+			var d := s.to - s.from
+			if d != main:
+				if other == Vector2i.ZERO and Vector2(d).normalized().dot(Vector2(main).normalized()) > 0.7:
+					other = d
+				elif d != other:
+					break
+			if way == -1:
+				first = j
+			else:
+				last = j
+			j += way
+	if other == Vector2i.ZERO:
+		return []
+	var origin := Vector2(_steps[first].from)
+	return [origin, (Vector2(_steps[last].to) - origin).normalized()]
+
+
+## 678: [param p], [param step]'s drawn point (grid units), pulled onto
+## the line it is on (_line_of), at most GLIDE_MAX; a change of line (a new
+## way, a route's next run, none) eased out over a few frames rather than
+## jumped. A step drawn from where the body was (a correction, a walk from
+## rest, a settle) is not pulled: it set off from the pulled point already.
+func _glide(p: Vector2, step: Step) -> Vector2:
+	if step.settle or not _bends(step):
+		_glide_line = []
+		_glide_carry = Vector2.ZERO
+		return p
+	var line := _line_of(step)
+	var pull := _pull(p, line)
+	if line != _glide_line:
+		_glide_carry += _pull(p, _glide_line) - pull
+		_glide_line = line
+	return p + pull + _glide_carry
+
+
+## 678: how far [param p] is moved onto [param line] ([origin, way]; []
+## none), GLIDE_MAX at most.
+static func _pull(p: Vector2, line: Array) -> Vector2:
+	if line.is_empty():
+		return Vector2.ZERO
+	var origin: Vector2 = line[0]
+	var along: Vector2 = line[1]
+	return (origin + along * along.dot(p - origin) - p).limit_length(GLIDE_MAX)
+
+
 ## The server is on [param server_tile]: the sent steps that took it there,
 ## followed from where it was, are taken; the rest it has still to walk. On
 ## a tile they do not lead to (a push, a step refused), none are known.
@@ -563,12 +707,12 @@ func position() -> Vector2:
 	var step := _current()
 	var t := (_clock - step.start) / step.duration
 	if _coasts(step, t):
-		return Iso.grid_to_local(GridEntity.bent_position(step.from, step.to, step.bend_next, GridEntity.UNKNOWN_TILE,
-				_coast_t(step, t), GridEntity.bend_reach(step.to), 0.0))
+		return Iso.grid_to_local(_glide(GridEntity.bent_position(step.from, step.to, step.bend_next, GridEntity.UNKNOWN_TILE,
+				_coast_t(step, t), GridEntity.bend_reach(step.to), 0.0), step))
 	t = clampf(t, 0.0, 1.0)
 	if step.ease:
 		t = 1.0 - (1.0 - t) * (1.0 - t)
-	return Iso.grid_to_local(_bent(step, t))
+	return Iso.grid_to_local(_glide(_bent(step, t), step))
 
 
 ## 655: the way the body points as drawn, a unit vector in grid units:
@@ -581,7 +725,15 @@ func shown_direction() -> Vector2:
 				_coast_t(step, t), GridEntity.bend_reach(step.to), 0.0)
 	t = clampf(t, 0.0, 1.0)
 	if not _bends(step):
-		return Vector2(step.to - step.from)
+		# 678 amended (Jeff: "the body doesn't face the direction of
+		# travel"): a step drawn from where the body was (each new order
+		# held far, a key's turn) is on the line too; facing its own way of
+		# the eight turned the body off it at every re-order.
+		var on := _line_of(step, true) if _one_cell(step) and not step.ease and not step.settle else []
+		return on[1] if not on.is_empty() else Vector2(step.to - step.from)
+	var line := _line_of(step)
+	if not line.is_empty():
+		return line[1]  # 678: facing along the line walked, not each step's way.
 	var reach_in := GridEntity.bend_reach(step.from) if step.bend_prev != GridEntity.UNKNOWN_TILE else 0.0
 	return GridEntity.bent_tangent(step.bend_prev, step.from, step.to, step.bend_next, t, reach_in, GridEntity.bend_reach(step.to))
 
@@ -628,6 +780,12 @@ func _bent(step: Step, t: float) -> Vector2:
 	return GridEntity.bent_position(step.bend_prev, step.from, step.to, step.bend_next, t, reach_in, reach_out)
 
 
+## 678 amended: [param step] is one cell, a king's move.
+static func _one_cell(step: Step) -> bool:
+	var delta := step.to - step.from
+	return maxi(absi(delta.x), absi(delta.y)) == 1
+
+
 ## 655: whether [param step] may be drawn on a bend: a step of one cell
 ## between two centres, not a correction's ease or a walk from rest.
 static func _bends(step: Step) -> bool:
@@ -663,7 +821,7 @@ func _append_path(at: Vector2i, start: float, drawn := Vector2.INF) -> void:
 	if not _has_target:
 		return
 	var latency := Net.rtt_ticks()
-	for next in World.find_path(at, _target, true, _entity):
+	for next in World.walk_path(at, _target, _entity):  # 678: the string pulled.
 		if next == _target and not _into_goal:
 			break
 		if _blocked(at, next - at):
@@ -677,6 +835,7 @@ func _append_path(at: Vector2i, start: float, drawn := Vector2.INF) -> void:
 		step.start = start
 		step.duration = World.step_ticks(_entity, next - at, at)
 		step.deadline = start + latency + RECONCILE_GRACE_TICKS
+		step.plan = _plan
 		_steps.append(step)
 		start += step.duration
 		at = next
@@ -687,7 +846,7 @@ func _append_path(at: Vector2i, start: float, drawn := Vector2.INF) -> void:
 func _shorter_way_from(i: int) -> bool:
 	if not is_walking_to_target() or _steps[_steps.size() - 1].to != _target:
 		return false
-	var way := World.find_path(_steps[i].from, _target, true, _entity)
+	var way := World.walk_path(_steps[i].from, _target, _entity)
 	return not way.is_empty() and way.size() + World.DETOUR_STEPS <= _steps.size() - i
 
 

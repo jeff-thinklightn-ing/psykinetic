@@ -485,6 +485,37 @@ var _walls: Array[WallEdge] = []
 ## to. Moving the cursor to another cell retargets; NONE when not held.
 const NONE := Vector2i(-1, -1)
 var _held_target := NONE
+## Decision 678: the held walk's line (a key, or the button held near the
+## body): where it is anchored and its way (grid units); INF for none.
+var _walk_origin := Vector2.INF
+var _walk_along := Vector2.ZERO
+## Off the line by more than this (cells; the DDA keeps within half), the
+## line is anchored again where the walk is.
+const LINE_OFF := 0.75
+## 678 amended: a change of the held way under this goes on from the walk's
+## point on the line it was on, rather than a new line from the walk's end
+## cell: from the cell, the line's first pick is the straight step every
+## time, and a way that shifts each frame (a hand on the mouse, the camera
+## following) walked straight, never taking the diagonals.
+const LINE_TURN := deg_to_rad(20.0)
+## The left button held with the cursor this near the body (cells) steers:
+## a walk the cursor's way on 678's line, one steady run, never a cell
+## reached and set off from again (Jeff: "placing the cursor to move on a
+## diagonal 1 square in front of me ... the run camera stutter").
+const STEER_CELLS := 2.5
+## 678 amended: held farther, the walk is planned again when the cursor's
+## way drifts HELD_DRIFT off the last plan's, or fewer than HELD_PLAN_LEFT
+## of its steps are left (each plan is a straight line from where it starts,
+## walked a few steps, so it keeps its slope: planned again every step, it
+## took only each line's first step, the straight one, and never the
+## diagonals), a straight step's time apart at most; at once on a turn
+## (held_turns).
+const HELD_DRIFT := deg_to_rad(12.0)
+const HELD_PLAN_LEFT := 3
+## When the held button last sent a new walk (Time msec): one a step's
+## time at most (the jitter fix; Jeff: "movement with the mouse and left
+## click seems slightly jumpy").
+var _held_sent_at := 0
 
 ## The 3D view (the default; see Net.renderer); the 2D nodes are hidden.
 var _client3d: Client3D
@@ -1150,6 +1181,7 @@ func _process(delta: float) -> void:
 	_drag_yaw()
 	_drive_camera_keys(delta)
 	_update_pick()
+	_run_test_hold_near()
 	_test_hover()
 	drive_stand_draw(Keys.held("stand") and not is_typing() and _cursor_item.is_empty(), Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT))
 	_drive_wasd()
@@ -2056,13 +2088,74 @@ func _show_3d() -> void:
 ## (D - A, W - S); W is up the screen, D to its right. Eight directions;
 ## ZERO for none. At yaw 0, the 2D view's, W is (-1, -1).
 static func wasd_direction(keys: Vector2, yaw_degrees: float) -> Vector2i:
+	return grid_direction(wasd_vector(keys, yaw_degrees))
+
+
+## The way [param keys] point on the ground at [param yaw_degrees], exact
+## (grid units, not rounded to the eight; decision 678's line).
+static func wasd_vector(keys: Vector2, yaw_degrees: float) -> Vector2:
 	var yaw := deg_to_rad(yaw_degrees)
 	# Up the screen is away from the camera along the ground; see
 	# Client3D._camera_offset, which puts the camera on the +x +z side.
 	var up := Vector3(-1, 0, -1).rotated(Vector3.UP, yaw)
 	var right := Vector3(1, 0, -1).rotated(Vector3.UP, yaw)
 	var along := up * keys.y + right * keys.x
-	return grid_direction(Vector2(along.x, along.z))
+	return Vector2(along.x, along.z)
+
+
+## Decision 678 (Jeff: "walking still wants to be on a diagonal and it
+## doesn't fit with the new camera"): the two of the eight steps either
+## side of [param along] from [param from], the one that leaves the body
+## nearer the line through [param origin] first (a DDA: over a few steps
+## the walk goes where it is pushed, not on the nearest diagonal); the
+## nearer to the way first on a tie. ZERO for no way.
+static func line_steps(from: Vector2i, origin: Vector2, along: Vector2) -> Array[Vector2i]:
+	if along.length() < 0.01:
+		var none: Array[Vector2i] = [Vector2i.ZERO, Vector2i.ZERO]
+		return none
+	var unit := along.normalized()
+	var octant := unit.angle() / (PI / 4.0)
+	var near_k := roundf(octant)
+	var other_k := floorf(octant) + 1.0 if near_k == floorf(octant) else floorf(octant)
+	var nearest := Vector2i(roundi(cos(near_k * PI / 4.0)), roundi(sin(near_k * PI / 4.0)))
+	var other := Vector2i(roundi(cos(other_k * PI / 4.0)), roundi(sin(other_k * PI / 4.0)))
+	var off_nearest := absf(unit.cross(Vector2(from + nearest) - origin))
+	var off_other := absf(unit.cross(Vector2(from + other) - origin))
+	var picks: Array[Vector2i] = [nearest, other]
+	if off_other < off_nearest - 0.0001:
+		picks = [other, nearest]
+	return picks
+
+
+## The held walk's next step along [param along] (decision 678): from the
+## walk's end, the line's pick, or the other where the pick's step is
+## walled. The line is anchored where the walk is when the way changes (a
+## key, the yaw) or the body is off it (a push, a walled pick taken round).
+func _line_step(player: Player, along: Vector2) -> Vector2i:
+	var from := player.walk_end()
+	var line := line_anchor(_walk_origin, _walk_along, from, along)
+	_walk_origin = line[0]
+	_walk_along = line[1]
+	player.hint_line(_walk_origin, _walk_along)
+	var picks := line_steps(from, _walk_origin, _walk_along)
+	if World._terrain_blocks_step(from, picks[0], true) and not World._terrain_blocks_step(from, picks[1], true):
+		return picks[1]
+	return picks[0]
+
+
+## The held walk's line [origin, unit way] for the way [param along], from
+## the line it was on ([param origin], [param way]; INF none) and the walk's
+## end [param from]: a new one from that cell when there was none, the way
+## turned LINE_TURN or more, or the walk is LINE_OFF off it (a push, a
+## walled pick taken round); a smaller change of way goes on from the walk's
+## point on the old line (678 amended).
+static func line_anchor(origin: Vector2, way: Vector2, from: Vector2i, along: Vector2) -> Array:
+	var unit := along.normalized()
+	if origin == Vector2.INF or unit.dot(way) < cos(LINE_TURN) or absf(way.cross(Vector2(from) - origin)) > LINE_OFF:
+		return [Vector2(from), unit]
+	if unit.dot(way) < 0.9999:
+		return [origin + way * way.dot(Vector2(from) - origin), unit]
+	return [origin, way]
 
 
 ## The nearest of the eight directions to [param vector] (grid units),
@@ -2220,7 +2313,13 @@ func _drive_wasd() -> void:
 	# under the hand; a middle drag meanwhile applies when they let go.
 	if _client3d != null:
 		_client3d.set_frozen(not keys.is_empty())
-	var direction := wasd_direction(key_vector(keys), _view_yaw())
+	var along := wasd_vector(key_vector(keys), _view_yaw())
+	var direction := Vector2i.ZERO
+	if along.length() < 0.01:
+		_walk_origin = Vector2.INF
+		player.hint_line(Vector2.INF, Vector2.ZERO)
+	else:
+		direction = _line_step(player, along)  # 678: on the line, not the nearest of the eight.
 	_record_walk(player)
 	if _stance == "draw" or _stance == "lob" or player.raised == "draw":
 		# 583 amended: drawn, the body stands firm; a walk key only turns it (a lob too, 677).
@@ -2237,6 +2336,12 @@ func _drive_wasd() -> void:
 		return
 	player.aim = Vector2.ZERO
 	_held_target = NONE
+	_send_held_step(player, direction)
+
+
+## A held walk's step [param direction] (a key, or the button steering,
+## 678), sent as the one on screen ends.
+func _send_held_step(player: Player, direction: Vector2i) -> void:
 	if not player.ready_for_step():
 		return
 	if Net.is_authority() and (not player.queued_steps.is_empty() or World.tick + 1 < player.next_move_tick):
@@ -2250,6 +2355,8 @@ func _drive_wasd() -> void:
 		if Time.get_ticks_msec() - _bump_sent_at < BUMP_SEND_INTERVAL * 1000.0:
 			return
 		_bump_sent_at = Time.get_ticks_msec()
+	if _test_holding:
+		_test_hold_counts["steps"] += 1
 	World.command_step(player, direction)
 
 
@@ -2481,17 +2588,50 @@ func _apply_azimuth() -> void:
 ## A move click: sends the player to [param tile] (NONE: nowhere near the
 ## floor, ignored) and ripples there. Holding the button keeps retargeting
 ## from _process as the cursor moves to other cells.
-func _move_click(player: Player, tile: Vector2i) -> void:
+func _move_click(player: Player, tile: Vector2i, ripple_it := true) -> void:
 	_pack_wanted = null
 	_talk_wanted = null
 	_held_target = tile
 	if tile == NONE:
 		return
 	World.command_move(player, tile)
+	_held_sent_at = Time.get_ticks_msec()
+	if _test_holding:
+		_test_hold_counts["orders"] += 1
+	if not ripple_it:
+		return
 	if _client3d != null:
 		_client3d.ripple(tile)
 	else:
 		ripple.start(Iso.tile_to_local(tile))
+
+
+## 678 amended: whether the straight way from the walk's end to [param tile]
+## is open (World._line_clear: walls, corners, others, fire).
+func _line_open(player: Player, tile: Vector2i) -> bool:
+	return tile != NONE and World._line_clear(player.walk_end(), tile, tile, player)
+
+
+## 678 amended: whether a held walk's new cell [param tile] lies more than
+## MovePrediction.TURN_KEEP off the way to the last one, [param was], seen
+## from the body at [param body] (grid units).
+static func held_turns(body: Vector2, was: Vector2i, tile: Vector2i) -> bool:
+	var before := Vector2(was) - body
+	var after := Vector2(tile) - body
+	if before.length() < 0.5 or after.length() < 0.5:
+		return true
+	return before.normalized().dot(after.normalized()) < cos(MovePrediction.TURN_KEEP)
+
+
+## 678 amended: whether a held walk, not turned, is planned again for the
+## new cell [param tile]: its way off the last plan's [param was] by more
+## than HELD_DRIFT, or under HELD_PLAN_LEFT of [param left] planned steps.
+static func held_replans(body: Vector2, was: Vector2i, tile: Vector2i, left: int) -> bool:
+	if left < HELD_PLAN_LEFT:
+		return true
+	var before := Vector2(was) - body
+	var after := Vector2(tile) - body
+	return before.length() < 0.5 or after.length() < 0.5 or before.normalized().dot(after.normalized()) < cos(HELD_DRIFT)
 
 
 ## Building (the builder's mode on): the hover square shows the cell.
@@ -2500,11 +2640,11 @@ func _building() -> bool:
 
 
 ## Left button held after a move click: when the cursor reaches another
-## cell, that is the new target, with its own ripple. Brought onto a
+## cell, that is the new target, no ripple, a step's time apart at most. Brought onto a
 ## monster, the hold is an attack on it instead (and ends): walking for the
 ## ground under it would go round it.
 func _retarget_held() -> void:
-	if _held_target == NONE or not Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+	if _held_target == NONE or not (Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) or _test_holding):
 		_held_target = NONE
 		return
 	var player := _local_player()
@@ -2516,9 +2656,33 @@ func _retarget_held() -> void:
 		_held_target = NONE
 		World.command_attack(player, foe)
 		return
-	var tile := _snap_to_floor(_mouse_grid())
-	if tile != NONE and tile != _held_target:
-		_move_click(player, tile)
+	var cursor := _mouse_grid()
+	var body := Iso.local_to_grid(player.position)
+	if not is_nan(cursor.x) and player.raised != "draw" and not Net.test_hold_route 			and (cursor.distance_to(body) <= STEER_CELLS or _line_open(player, _snap_to_floor(cursor))):
+		# 678: aimed near the body, the held button steers along the line;
+		# farther too while the straight way to the cursor is open (678
+		# amended: a route planned again as it went took each line's first
+		# step and weaved, its facing off the way it went), else a route.
+		player.enable_prediction()
+		var direction := _line_step(player, cursor - body) if cursor.distance_to(body) > 0.5 else Vector2i.ZERO
+		player.hint_step(direction)
+		if direction != Vector2i.ZERO:
+			_send_held_step(player, direction)
+		return
+	_walk_origin = Vector2.INF
+	player.hint_line(Vector2.INF, Vector2.ZERO)
+	var tile := _snap_to_floor(cursor)
+	if tile == NONE or tile == _held_target:
+		return
+	# A new walk at most once a straight step's time, no ripple: each one
+	# re-plans the route after the step under way (MovePrediction.order).
+	# One that turns the walk goes at once (678 amended; Jeff: "i can move
+	# cursor behind me and character keeps going").
+	var every := World.step_ticks(player, Vector2i.RIGHT, player.tile) * 1000.0 / World.TICK_RATE
+	if not held_turns(body, _held_target, tile) and (Time.get_ticks_msec() - _held_sent_at < every
+			or not held_replans(body, _held_target, tile, player.steps_planned())):
+		return
+	_move_click(player, tile, false)
 
 
 ## The cursor's point on the ground plane, in this node's space (the
@@ -15177,6 +15341,103 @@ func _run_test_contest(player: Player, tick: int) -> void:
 	World.command_move(player, Net.test_contest_tile)
 	print("[test] contest: %s at %s ordered to %s, now showing %s" % [
 		player.name, player.tile, Net.test_contest_tile, player.shown_tile()])
+
+
+## --test-hold-near (678; Jeff: "placing the cursor to move on a diagonal 1
+## square in front of me and if i keep that there the run camera stutter is
+## reproducible"): the left button held, the cursor still on screen a
+## diagonal cell ahead, so the ground under it moves with the camera; the
+## orders, the steps sent and the times the walk stood still on the way,
+## said at the end.
+var _test_holding := false
+var _test_hold_from := -1
+var _test_hold_counts := {"orders": 0, "steps": 0, "stops": 0}
+var _test_hold_walking := false
+## The drawn walk, measured (Jeff on v0.1.177: "the body doesn't face the
+## direction of travel"; "character keeps going"): [msec, grid] a frame, the
+## last quarter second; the facing's error against the way travelled; after
+## the flip, how far on the body went and when it came back.
+var _test_hold_trail: Array = []
+var _test_hold_facing := {"frames": 0, "sum": 0.0, "worst": 0.0, "off20": 0, "yaw_sum": 0.0, "yaw_worst": 0.0}
+var _test_hold_flip := {}
+
+
+func _test_hold_measure(player: Player, seconds: float) -> void:
+	var now := Time.get_ticks_msec()
+	var at := Iso.local_to_grid(player.position)
+	_test_hold_trail.append([now, at])
+	while _test_hold_trail.size() > 2 and now - int(_test_hold_trail[0][0]) > 250:
+		_test_hold_trail.pop_front()
+	var span := (now - int(_test_hold_trail[0][0])) / 1000.0
+	var travel: Vector2 = (at - _test_hold_trail[0][1]) / span if span > 0.15 else Vector2.ZERO
+	var turning := not _test_hold_flip.is_empty() and seconds - float(_test_hold_flip["at"]) < 0.75
+	if travel.length() > 2.0 and not turning:
+		var off := absf(rad_to_deg(angle_difference(player.shown_facing().angle(), travel.angle())))
+		_test_hold_facing["frames"] += 1
+		_test_hold_facing["sum"] += off
+		_test_hold_facing["worst"] = maxf(_test_hold_facing["worst"], off)
+		if off > 20.0:
+			_test_hold_facing["off20"] += 1
+		var puppet: Node3D = _client3d._puppets.get(player.get_instance_id()) if _client3d != null else null
+		var facing := puppet.get_node_or_null("Facing") as Node3D if puppet != null else null
+		if facing != null:
+			var yaw_off := absf(rad_to_deg(angle_difference(facing.rotation.y, -travel.angle())))
+			_test_hold_facing["yaw_sum"] += yaw_off
+			_test_hold_facing["yaw_worst"] = maxf(_test_hold_facing["yaw_worst"], yaw_off)
+	if _test_hold_flip.is_empty():
+		return
+	var way: Vector2 = _test_hold_flip["way"]
+	var from: Vector2 = _test_hold_flip["from"]
+	var on := (at - from).dot(way)
+	if on > _test_hold_flip["on"]:
+		_test_hold_flip["on"] = on
+		_test_hold_flip["on_at"] = seconds
+	elif _test_hold_flip["back_at"] < 0.0 and on < _test_hold_flip["on"] - 0.1:
+		_test_hold_flip["back_at"] = seconds
+
+
+func _run_test_hold_near() -> void:
+	var player := _local_player()
+	if Net.test_hold_near <= 0.0 or player == null or _test_hold_from == -2:
+		return
+	if _test_hold_from == -1:
+		if World.tick < 30:
+			return  # Settled in first.
+		_test_hold_from = Time.get_ticks_msec()
+	var seconds := (Time.get_ticks_msec() - _test_hold_from) / 1000.0
+	if seconds > Net.test_hold_near:
+		_test_holding = false
+		_test_hold_from = -2
+		print("[test] hold-near %.0f s%s: %d orders, %d steps sent, %d stops" % [Net.test_hold_near,
+				" (routes)" if Net.test_hold_route else "", _test_hold_counts["orders"], _test_hold_counts["steps"], _test_hold_counts["stops"]])
+		var f := _test_hold_facing
+		var frames := maxi(int(f["frames"]), 1)
+		print("[test] hold-near facing at %.0f degrees, %.1f cells: off the way travelled %.1f mean, %.1f worst, %d of %d frames over 20; the puppet's yaw %.1f mean, %.1f worst" % [
+				Net.test_hold_angle, Net.test_hold_far, f["sum"] / frames, f["worst"], f["off20"], f["frames"], f["yaw_sum"] / frames, f["yaw_worst"]])
+		if not _test_hold_flip.is_empty():
+			print("[test] hold-near flip at %.1f s: on %.2f cells more, for %.0f ms; back after %.0f ms" % [_test_hold_flip["at"],
+					_test_hold_flip["on"], (_test_hold_flip["on_at"] - _test_hold_flip["at"]) * 1000.0,
+					(_test_hold_flip["back_at"] - _test_hold_flip["at"]) * 1000.0 if _test_hold_flip["back_at"] >= 0.0 else -1.0])
+		return
+	var seen := Iso.local_to_grid(player.position)
+	if _client3d != null:
+		seen = Vector2(_client3d._camera_target.x, _client3d._camera_target.z)
+	var angle := Net.test_hold_angle
+	if Net.test_hold_flip > 0.0 and seconds >= Net.test_hold_flip:
+		if _test_hold_flip.is_empty():
+			_test_hold_flip = {"at": seconds, "from": Iso.local_to_grid(player.position), "way": Vector2.from_angle(deg_to_rad(angle)),
+					"on": 0.0, "on_at": seconds, "back_at": -1.0}
+		angle += 180.0  # Swung behind.
+	# Still on screen: the camera's point and the cursor's offset from it.
+	_pick_grid = seen + Vector2.from_angle(deg_to_rad(angle)) * Net.test_hold_far
+	_test_hold_measure(player, seconds)
+	var walking := player.ready_for_step() == false or player.walk_end() != player.tile
+	if _test_holding and _test_hold_walking and not walking:
+		_test_hold_counts["stops"] += 1
+	_test_hold_walking = walking
+	if not _test_holding:
+		_test_holding = true
+		_move_click(player, _snap_to_floor(_pick_grid))
 
 
 ## --test-steer: hold-to-move with the cursor kept three cells from the

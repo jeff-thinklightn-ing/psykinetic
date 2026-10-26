@@ -40,6 +40,7 @@ func _ready() -> void:
 	_test_middle_drag_axis()
 	_test_schemes_are_inert_outside()
 	_test_click_uses_the_frame_pick()
+	_test_straight_lines()
 	_test_bow_click_walks()
 	_test_friend_click()
 	_test_peaceable_click()
@@ -659,6 +660,60 @@ func _test_click_uses_the_frame_pick() -> void:
 	player.has_move_order = false
 	Net.controls = saved
 
+
+
+## Decision 678 (Jeff: "walking still wants to be on a diagonal and it
+## doesn't fit with the new camera"; and "placing the cursor to move on a
+## diagonal 1 square in front of me ... the run camera stutter").
+func _test_straight_lines() -> void:
+	print("\n== 678: a held key walks its exact line; the button held near steers; held far, a new walk a step's time apart ==")
+	var along := Main.wasd_vector(Main.key_vector("w"), 20.0)
+	var at := Vector2i.ZERO
+	var worst := 0.0
+	for i in 10:
+		at += Main.line_steps(at, Vector2.ZERO, along)[0]
+		worst = maxf(worst, absf(along.normalized().cross(Vector2(at))))
+	var turned := rad_to_deg(Vector2(at).angle_to(along))
+	_check(worst <= 0.5 and absf(turned) < 6.0 and Main.wasd_direction(Main.key_vector("w"), 20.0) == Vector2i(-1, -1),
+			"W at a 20 degree yaw: ten steps within half a cell of its line (worst %.2f), %.1f degrees off it at the end, not the diagonal" % [worst, turned])
+	# 678 amended (Jeff on v0.1.177: "i can move cursor behind me and character
+	# keeps going"; "the body doesn't face the direction of travel").
+	_check(Main.held_turns(Vector2.ZERO, Vector2i(6, 0), Vector2i(-6, 0)) and Main.held_turns(Vector2.ZERO, Vector2i(6, 0), Vector2i(3, 5))
+			and not Main.held_turns(Vector2.ZERO, Vector2i(6, 0), Vector2i(6, 2)),
+			"a held walk's cell swung behind or 59 degrees round turns it (sent at once); 18 degrees does not")
+	_check(Main.held_replans(Vector2.ZERO, Vector2i(6, 0), Vector2i(6, 2), 5) and not Main.held_replans(Vector2.ZERO, Vector2i(6, 0), Vector2i(6, 1), 5)
+			and Main.held_replans(Vector2.ZERO, Vector2i(6, 0), Vector2i(6, 1), 2),
+			"planned again when its way drifts 18 degrees, or the plan runs under three steps; not for 9.5 degrees with five left")
+	var line := Main.line_anchor(Vector2(0, 0.4), Vector2.RIGHT, Vector2i(5, 0), Vector2.from_angle(deg_to_rad(5.0)))
+	var anew := Main.line_anchor(Vector2(0, 0.4), Vector2.RIGHT, Vector2i(5, 0), Vector2.from_angle(deg_to_rad(30.0)))
+	_check(line[0].is_equal_approx(Vector2(5, 0.4)) and anew[0] == Vector2(5, 0),
+			"a held way shifted 5 degrees goes on from the walk's point on its line (%s); turned 30, a new line from the walk's cell (%s)" % [line[0], anew[0]])
+	var saved: String = Net.controls
+	Net.controls = "click"
+	var player := _place_player(Vector2i(11, 3))
+	_main._held_target = Vector2i(12, 4)
+	_main._test_holding = true
+	_main._pick_grid = Iso.local_to_grid(player.position) + Vector2(1.0, 1.0)
+	_main._retarget_held()
+	_check(not player.has_move_order and player.queued_steps.size() == 1 and player.queued_steps[0]["direction"] == Vector2i(1, 1),
+			"held a diagonal cell ahead: a step that way, no new walk to a cell (%s)" % [player.queued_steps])
+	player.queued_steps.clear()
+	_main._held_target = Vector2i(11, 3)
+	_main._held_sent_at = 0
+	_main._pick_grid = Vector2(4.1, 3.1)
+	_main._retarget_held()
+	var first := player.move_order
+	_main._pick_grid = Vector2(4.1, 6.1)
+	_main._retarget_held()
+	_check(player.has_move_order and first == Vector2i(4, 3) and player.move_order == first,
+			"held far: a walk there, and the cursor on another cell within a step's time sends none (%s)" % player.move_order)
+	_main._held_sent_at = 0
+	_main._retarget_held()
+	_check(player.move_order == Vector2i(4, 6), "a step's time on, the new cell (%s)" % player.move_order)
+	_main._test_holding = false
+	_main._held_target = Main.NONE
+	player.has_move_order = false
+	Net.controls = saved
 
 func _test_bow_click_walks() -> void:
 	print("\n== a bow in hand: a plain left click walks at once; Shift held draws and stands firm, the left release looses, Shift up lets it down (583 amended (2)) ==")
