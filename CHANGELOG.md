@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Ask a companion who left you to come with you again ("come with me") in her town: once she's willing she leaves her work and rejoins you, a little cool at first (581 amended (2)).
 - A companion who left you can be won back: gifts and jobs for her town warm her, she says why she left and what would bring her back, and a justice-minded one waits until you put the wrong right (581 amended).
 - A companion who can't reach you (across water, behind a locked door) waits a moment before looking for a way again instead of searching the whole zone every tick (685 amended).
 - The world no longer freezes for everyone for up to a second or two every few hours, when the barrow and the Dwarven Halls are laid anew: each is now made in the background and put in place one at a time (684).

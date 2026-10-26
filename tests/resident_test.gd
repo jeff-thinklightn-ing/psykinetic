@@ -1382,6 +1382,11 @@ func _test_favour() -> void:
 	var owner := _player()
 	_put(owner, _main._nearest_free(body.tile))
 	var score := func() -> int: return Standing.score(record.companion, Net.player_id)
+	# Asked back now, the wrong not put right: no (581 amended (2)).
+	_check(Main.asks_to_come("Will you come with me, %s?" % body.person) and Main.asks_to_come("Join us again.")
+		and not Main.asks_to_come("Where did you come from?") and not Main.asks_to_come("Rejoice!"), "the words that ask her along, and near misses")
+	_check(not _main._recruit_said(body, owner, "Come with me, %s." % body.person) and Main.has_left(record) and _companion() == null,
+		"asked back before the wrong is put right: she stays (her voice answers)")
 	# A gift, once a day; food starts a visit.
 	World.set_slots(body, ["ration"])
 	_main._on_handed(owner, body, "ration", 0)
@@ -1431,6 +1436,15 @@ func _test_favour() -> void:
 	_check(not _main._grave_given_back([uid]), "grave goods still carried: not given back")
 	World.items.place(uid, "%s@3,3" % ROAD)
 	_check(_main._grave_given_back([uid]), "laid on the ground where they were taken: given back")
+	# Asked back now, willing: she comes, at cooling (581 amended (2)).
+	_check(_main.favour_gate(record) == "", "(she would come: %s)" % _main.favour_gate(record))
+	_main._player_said(owner, "%s, will you come with me again?" % body.person)
+	pet = _companion()
+	_check(pet != null and pet.keeper == owner and not Main.has_left(record) and not record.companion.has("resident") and not body.spawned,
+		"asked back, willing: she leaves her work and goes with them (%s)" % [pet.name if pet != null else "none"])
+	_check(score.call() == -1 and pet != null and pet.bond_step == "cooling" and str(World.production.worker(who).get("left_why", "x")) == "",
+		"her bond starts again at cooling, her left words cleared (%d, %s)" % [score.call(), pet.bond_step if pet != null else ""])
+	_check("agrees to travel with" in " ".join(_main.party_log.last(4)), "the party told (%s)" % [_main.party_log.last(4)])
 	# As she was.
 	record.companion = kept
 	record.companion.erase("resident")

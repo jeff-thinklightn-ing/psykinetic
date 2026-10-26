@@ -31439,3 +31439,30 @@ a step; grave goods carried, then laid where taken.
 
 Server only, protocol unchanged, no new class_name. Step 3 (asked in her
 town, she comes back at cooling) is 581 amended (2).
+
+## 581 amended (2): asking her back
+
+Step 3 of 581 (the coordinator approved it with the design; leaving_design.md
+§5). In her town her player says to her body one of the rules'
+recruit_words ("come with me", "join us", ...; Main.asks_to_come, whole
+words of the line, near misses like "where did you come from" refused).
+
+- **Willing** (581 amended's Main.favour_gate is ""): Main._recruit_said,
+  before the offers and her resident voice: "left" (and warned_area)
+  cleared, her bond set to the rules' rejoin_at -1 (cooling: a fresh start,
+  not warm; bond_best held to it), her left words cleared (npc's set_left
+  with ""), the party told, and _join_companion's resting path takes her
+  from her work and her body in town. Her companion voice is told she agreed
+  and has not forgotten why she left.
+- **Not yet**: nothing is done; her resident voice answers as ever, told why
+  she left and what would bring her back (581 amended).
+- Rules: companion_traits.json "leaving" rejoin_at, recruit_words (drafts
+  for Jeff, in C:/dev/review/decisions/draft-companion-favour.md).
+- The recruit path for another companion (a resident like npc's Pip, or a
+  new one while she is away) stays a separate design.
+
+resident_test _test_favour: the words and near misses; asked before the
+wrong is put right, she stays; asked when willing, she leaves her work and
+goes with them, at cooling, her left words cleared, the party told.
+
+Server only, protocol unchanged, no new class_name.

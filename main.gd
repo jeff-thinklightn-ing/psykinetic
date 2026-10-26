@@ -6653,6 +6653,49 @@ static func _left_worker(record: PlayerRecord) -> String:
 	return "companion:%s" % record.companion.get("name", "")
 
 
+## Whether [param line] asks one to come along (581 amended (2)): one of
+## the rules' recruit_words, as words of the line.
+static func asks_to_come(line: String) -> bool:
+	var said := " %s " % line.to_lower().replace(",", " ").replace(".", " ").replace("?", " ").replace("!", " ")
+	for words: String in leaving_rules().get("recruit_words", []):
+		if (" %s " % words.to_lower()) in said:
+			return true
+	return false
+
+
+## [param player] asked [param body], their own companion's body in her
+## town, who left them, to come with them (581 amended (2)): willing
+## (favour_gate ""), she leaves her work and goes with them, her bond
+## started again at the rules' rejoin_at; not, her voice answers as ever,
+## told why she left and what would bring her back. Whether she came.
+func _recruit_said(body: Resident, player: Player, line: String) -> bool:
+	var record: PlayerRecord = _records.get(player.player_id)
+	if body.player_id != player.player_id or not has_left(record) or not asks_to_come(line):
+		return false
+	var gate := favour_gate(record)
+	if not gate.is_empty():
+		print("[bond] %s asked %s to come again: not yet (%s)" % [record.name, record.companion.get("name", "?"), gate])
+		return false
+	var left: Dictionary = record.companion["left"]
+	record.companion.erase("left")
+	record.companion.erase("warned_area")
+	var rejoin := int(leaving_rules().get("rejoin_at", -1))
+	Standing.bump(record.companion, record.player_id, rejoin - Standing.score(record.companion, record.player_id), "asked you back", World.steps)
+	record.companion["bond_best"] = mini(int(record.companion.get("bond_best", 0)), rejoin)
+	if World.production != null and World.production.has_method("set_left"):
+		World.production.call("set_left", _left_worker(record), "", "")
+	_set_mood(record)
+	print("[bond] %s's companion %s goes with them again (left over %s on day %s)" % [record.name, record.companion.get("name", "?"),
+		left.get("deed", "?"), left.get("day", "?")])
+	party_log.add("%s agrees to travel with %s again." % [body.person, _display_name(player)])
+	_join_companion(record, player)
+	var pet: Companion = _companions.get(record.player_id)
+	if is_instance_valid(pet) and pet.spawned:
+		pet._ask_voice("%s asked you to travel with them again, and you agreed. You left them once because they %s; you have not forgotten it." % [
+			record.name, str(left.get("why", "wronged you")).trim_suffix(".")], "", true)
+	return true
+
+
 ## Her town (a store place id) since she left [param record]'s player: her
 ## worker's, else her record's "left" place.
 func _left_town(record: PlayerRecord) -> String:
@@ -10690,7 +10733,9 @@ func _player_said(player: Player, text: String, phrase := 0) -> void:
 	Net.broadcast_to(hearers(player.tile, earshot), "chat", {"entity": String(player.get_path()), "from": _display_name(player),
 		"to": to, "text": line})
 	if resident != null:
-		if not _offer_said(resident, player, line):  # An ask for wares, work or news, or a word taking the offer standing (decision 536).
+		if _recruit_said(resident, player, line):
+			pass  # Their companion who left, asked and willing: she goes with them again (581 amended (2)).
+		elif not _offer_said(resident, player, line):  # An ask for wares, work or news, or a word taking the offer standing (decision 536).
 			_ask_resident(resident, _display_name(player), line, player)
 		if hears:
 			pet.overheard(_display_name(player), line, false)
