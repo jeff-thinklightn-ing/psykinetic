@@ -7,6 +7,9 @@ notes (decision 324).
 
 ## Unreleased
 
+## v0.1.177
+
+- What goes over the network changes, so v0.1.176 and older can't join the server: update through the launcher first.
 - Walking goes straight where you point: held keys follow the camera's exact angle instead of the nearest diagonal, a clicked walk across open ground is one straight line instead of a staircase, and your body is drawn gliding along it. Holding the left button just ahead of you now steers a steady run (no more stop-start stutter), holding it farther away no longer jerks the walk each time the cursor crosses a cell, and the square under the cursor only shows while building.
 - Armour is heard as you move: plate clanks and a mail shirt jingles with each step, louder at a run and as far as the animals hear it; leather and robes stay quiet (676 step 1b, sound's side).
 - Walking into your own companion swaps places with her at once, so a walk past her no longer stutters or snaps back; not while she is fighting, dodging a blow or down (679).
@@ -14,6 +17,7 @@ notes (decision 324).
 - Armour makes noise as you move: plate clanks loud enough to send game running from about five cells, mail jingles closer in, leather and robes are quiet; a monster that hears it comes to look (676, step 1b).
 - What you carry now weighs where it sits: armour's weight on the body slows the walk and the breath, weight on the arms slows the bow's draw and drains a held draw faster; a bow and arrows alone change nothing, plate walks a little slower and draws a tenth slower, mail barely; armour no longer speeds or slows the draw by itself (676).
 - The bow has a lob on the right mouse button: hold to aim at the sky and draw (a brass arc runs to a landing circle that narrows as you hold), let go to loose. It flies over walls and cover, lands after a moment (so a target can step out), and a hit knocks it down (677).
+
 ## v0.1.176
 
 - An arrow that reaches the end of its range curves gradually down into the ground instead of flying flat and dropping (583 amended (3)).
