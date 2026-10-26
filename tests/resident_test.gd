@@ -70,6 +70,7 @@ func _ready() -> void:
 	_test_companion_hearsay()
 	_test_visible_work()
 	_test_field_work()
+	_test_quiet_near_hostile()  # Late: its steps move the hail tick's phase the voice tests count on.
 	_test_bodies_only_near()  # Last: its resident would answer the voice tests.
 	_test_reset_keeps_rests()  # After it: a room reset puts the town back.
 
@@ -2256,6 +2257,100 @@ func _test_greet() -> void:
 	_main._resident_mind = null
 	_main._greet_at.clear()
 	_main._hail_at.clear()
+	World.despawn(mara)
+
+
+## A hostile near a townsperson or the one they talk with (675, npc's side):
+## no hail, no word on a click, no answer to words, an answer back dropped,
+## a waiting ask let go; quiet a breath after; each counted in the mind log.
+func _test_quiet_near_hostile() -> void:
+	print("\n== near a fight a townsperson holds their tongue, and a breath after (675, npc's side) ==")
+	for body: GridEntity in World.townsfolk().duplicate():
+		World.despawn(body)
+	for i in 14:
+		World.production.set_away("rs-folk%02d" % i, true)
+	World.production.set_away("rs-bram", true)
+	DayNight.set_hour(12.0)
+	_sync()
+	var mara := _body("rs-mara")
+	var player := _player()
+	_check(mara != null and player != null, "(Mara stands in the town)")
+	if mara == null or player == null:
+		return
+	var mind := VoiceMind.new()
+	_main._resident_mind = mind
+	var spoken: Array[String] = []
+	var heard := func(kind: String, data: Dictionary) -> void:
+		if kind == "speech":
+			spoken.append(str(data.get("text", "")))
+	Net.message_received.connect(heard)
+	var kept_card := Townsfolk.card_of(World.production, "rs-mara")
+	var kept: Array = [_main._greet_at, _main._hail_at, _main._hail_tried, _main._hail_heard, _main._hail_greetings].map(func(each: Dictionary) -> Dictionary: return each.duplicate(true))
+	var card := kept_card.duplicate(true)
+	card.erase("hails")
+	World.production.set_card("rs-mara", card)
+	for each: Dictionary in [_main._greet_at, _main._hail_at, _main._hail_tried, _main._hail_heard, _main._hail_greetings, _main._resident_fight_at]:
+		each.clear()
+	_main._resident_asks.clear()
+	_put(player, _main._nearest_free(mara.tile + Vector2i(1, 0)))
+	var foe := _main._spawn({"script": "res://tests/foe_stub.gd", "shape": "capsule", "name": "Foe", "tile": _main._nearest_free(player.tile + Vector2i(2, 0))}) as Monster
+	_check(foe != null and World.distance(foe.tile, player.tile) <= Companion.COMBAT_RANGE, "(a monster spawned beside them)")
+	if foe == null:
+		Net.message_received.disconnect(heard)
+		return
+	_check(not _main._resident_quiet(mara, player), "one that would fight nobody: she talks as ever")
+	_main._resident_asks.append({"body": mara.get_instance_id(), "ask": {"serial": 0, "trigger": "x", "speaker": "Mara"}, "at": World.tick, "player": "", "peer": -1})
+	foe.set("fights", [player])
+	_check(_main._resident_quiet(mara, player), "one that would fight the player she talks with: quiet")
+	_check(_main._resident_asks.is_empty() and str(MindLog.last.get("", {}).get("outcome", "")) == "held tongue"
+		and str(MindLog.last[""].get("trigger", "")) == "ask" and str(MindLog.last[""].get("say", "")).is_empty(), "the fight begun lets her waiting ask go, counted with no words")
+	World.command(player, "greet", {"resident": String(mara.get_path())})
+	_check(spoken.is_empty() and mara.addressing.is_empty() and _main._resident_asks.is_empty() and str(MindLog.last[""].get("trigger", "")) == "greet",
+		"clicked: no word, no turning, no hail brought forward (%s)" % [spoken])
+	_main._chat_tick.clear()
+	_main._player_said(player, "Mara, hello.")
+	var held_as := str(MindLog.last[""].get("trigger", ""))  # Read at once: her companion's own held lines share the key.
+	World.step()
+	_check(spoken.is_empty() and mind.asks.is_empty() and held_as == "heard", "the player's words: no ask of the mind, no answer (%s)" % [spoken])
+	_main._resident_says(mara, "Not now.", "", player)
+	_main._say_plain(mara, mara.person, "Hm.")
+	_check(spoken.is_empty(), "a word said without the mind: held too")
+	for i in Main.HAIL_CHECK_TICKS + 1:
+		World.step()
+	_check(_main._resident_asks.is_empty() and mind.asks.is_empty(), "no hail while it stands there")
+	var answered := mind.asks.size()
+	_main._resident_answered({"ask": {"trigger": "x", "speaker": "Mara"}, "body": mara.get_instance_id(), "player": player.player_id, "peer": player.owner_peer}, {"say": "Fine weather."}, "")
+	_check(spoken.is_empty() and str(MindLog.last[""].get("trigger", "")) == "voice" and mind.asks.size() == answered, "an answer back mid-fight: dropped")
+	foe.set("fights", [mara])
+	_put(player, _main._nearest_free(mara.tile + Vector2i(8, 0)))
+	_main._resident_fight_at.clear()
+	_check(_main._resident_quiet(mara, null), "one that would fight her, by her, the listener away: quiet")
+	World.despawn(foe)
+	_put(player, _main._nearest_free(mara.tile + Vector2i(1, 0)))
+	World.step()
+	_check(_main._resident_quiet(mara, player), "the monster gone: still quiet a breath")
+	for i in Companion.QUIET_AFTER + 1:
+		World.step()
+	_main._greet_at.clear()
+	_main._resident_asks.clear()
+	_main._resident_out.clear()
+	mara._hide_until = -1  # She hid from the monster that would fight her (Resident's own); out again.
+	mara.doing = Resident.Doing.SQUARE
+	_put(player, _main._nearest_free(mara.tile + Vector2i(1, 0)))
+	World.command(player, "greet", {"resident": String(mara.get_path())})
+	_check(not _main._resident_quiet(mara, player) and spoken.size() == 1 and not mara.addressing.is_empty(), "QUIET_AFTER on: clicked, her word again (%s)" % [spoken])
+	Net.message_received.disconnect(heard)
+	_main._resident_asks.clear()
+	_main._resident_mind = null
+	_main._resident_fight_at.clear()
+	for i in kept.size():
+		var each: Dictionary = [_main._greet_at, _main._hail_at, _main._hail_tried, _main._hail_heard, _main._hail_greetings][i]
+		each.clear()
+		each.merge(kept[i])
+	World.production.set_card("rs-mara", kept_card)
+	for body: GridEntity in World.townsfolk():
+		(body as Resident)._hide_until = -1  # The herder hid from it too.
+	World.step()  # Their own tick: out of hiding, so the town may let its bodies go.
 	World.despawn(mara)
 
 

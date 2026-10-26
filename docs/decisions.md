@@ -30817,3 +30817,51 @@ faced 8 to 9 degrees off the way it went on average, 24 at worst.
 Server and client: World.walk_path is back (the server's re-path and its
 via check), so the server is redeployed with the cut. No wire change,
 protocol unchanged. No new class_name.
+## 675, npc's side: townsfolk hold their tongue near a fight
+
+The coordinator, 2026-10-25, after 675: "Give residents the same rule: no
+hails and no resident voice lines while a hostile is within a few cells of
+them or of the listener, with a short calm tail after." The coordinator
+approved the design as written; release named it a side, not an amendment.
+
+- What counts as hostile: a spawned Monster (an Animal too) in the
+  resident's zone whose threatens() (enemy-ai's 551) is true for the
+  resident or for its listener. That covers a raider, a predator, a
+  charging boar, and a draugr only while he would fight. The reach is
+  Companion.COMBAT_RANGE (4 cells) from either. Main._fight_near.
+- Main._resident_quiet(body, listener) marks the tick a fight is near, in
+  _resident_fight_at by worker id. The resident is quiet for
+  Companion.QUIET_AFTER (30 ticks, 3 s) after the last such tick. Off
+  with Companion.hold_tongue, as 675's is.
+- Quiet, nothing is said:
+  - No hail (_hails_tick).
+  - On a click there is no greeting word, no "Not now.", no rumour or
+    shelter line, and they don't turn to face the player (_greeted).
+  - The player's words ask no mind, so there is no ollama call
+    (_ask_resident). What speaking does still happens: an errand done by
+    speaking, a strayed one's escort, the sick walked to the healer.
+  - A mind answer that comes back mid-fight is dropped
+    (_resident_answered). A hail's marks go back as for an unsaid line, so
+    it can be told later.
+  - An offer's spoken words are dropped (_speak_offer), and so are
+    _say_plain and _resident_says lines. The offer stands, the trade goes
+    through, and the panel is still sent.
+  - The bard's bubble is dropped. The inn's listeners still get the song.
+- A fight begun lets the resident's waiting ask go. Nothing is queued for
+  after.
+- Each held line is counted in the mind log: kind "voice", mind
+  "resident", trigger "greet", "heard", "voice", "say", "offer", "song" or
+  "ask", outcome "held tongue". No words, no names.
+- Hearing (claims asks) is unchanged. A body hiding from raiders was
+  already silent.
+
+resident_test _test_quiet_near_hostile covers: a monster that would fight
+nobody leaves her talking; one that would fight the player lets her ask
+go; the click, words, plain lines, hails and a late answer are all held;
+one that would fight her, the player away, also quiets her; once it is
+gone she stays quiet a breath, and after QUIET_AFTER her word comes on a
+click. It runs late, since its steps move the hail tick's phase that the
+voice sections count on. tests/foe_stub.gd is a Monster that would fight
+only the ones it is given.
+
+Server only, protocol unchanged, no new class_name.

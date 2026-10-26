@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Townsfolk hold their tongue near a fight (675, npc's side): with a monster or beast that would fight them or the one they talk with within 4 cells, and for 3 s after, a resident hails nobody, says no word on a click, answers no words (no model asked), and drops lines already coming; trades and offers still go through silently.
 ## v0.1.179
 
 - Walking goes straight where you point again (v0.1.177's straight lines, fixed): held keys and a held click walk the exact line to the cursor, not the nearest diagonal; with the button held, swinging the cursor behind you turns you on the next step, and your character faces the way it is actually going (678 again, amended).

@@ -265,6 +265,7 @@ var _hail_at: Dictionary = {}
 var _blow_at: Dictionary = {}
 var _mind_last_ticks := 0
 var _hail_tried: Dictionary = {}
+var _resident_fight_at: Dictionary = {}  # worker id -> the last tick a hostile was near them or their listener (675, npc's side)
 var _hail_heard: Dictionary = {}  # player id -> {cue text: day}: no two residents tell one player the same thing in a day
 var _hail_greetings: Dictionary = {}  # player id -> {day, n}: greetings by standing a player heard today, capped at hail.greetings_a_day
 var _notes: Dictionary = {}  # zone -> the "notes" list last sent (decision 643): the sought's door notes.
@@ -7993,9 +7994,12 @@ func _ask_resident(body: Resident, speaker: String, line: String, player: Player
 		if not card.is_empty() and Standing.met(card, player_id, World.production.now()):
 			World.production.set_card(body.worker_id, card)
 			body.first_words = true
-	_resident_asks = _resident_asks.filter(func(each: Dictionary) -> bool: return each["body"] != id)
-	_resident_asks.append({"body": id, "ask": body.voice_ask(speaker, line, _resident_serial), "at": World.tick,
-		"player": player_id, "peer": player.owner_peer if player != null else -1})
+	if _resident_quiet(body, player):
+		_held_tongue("heard")  # Words to them mid-fight get no answer (675, npc's side).
+	else:
+		_resident_asks = _resident_asks.filter(func(each: Dictionary) -> bool: return each["body"] != id)
+		_resident_asks.append({"body": id, "ask": body.voice_ask(speaker, line, _resident_serial), "at": World.tick,
+			"player": player_id, "peer": player.owner_peer if player != null else -1})
 	body.asked_by = ""
 	body.asked_by_name = ""
 	body.first_words = false
@@ -8549,6 +8553,9 @@ func _sung(town: String, song: Dictionary) -> void:
 	for entity: GridEntity in World.townsfolk():
 		var body := entity as Resident
 		if body != null and body.worker_id == str(song.get("bard", "")) and body.town == town:
+			if _resident_quiet(body):
+				_held_tongue("song")  # The inn hears the song; no bubble near a fight (675, npc's side).
+				continue
 			Net.broadcast_to(hearers(body.tile), "speech", {"entity": String(body.get_path()), "speaker": body.person, "text": str(song.get("spoken", ""))})
 			Transcript.record(body.person, body.person, "[sings] " + str(song.get("spoken", "")))
 
@@ -8974,9 +8981,13 @@ func _resident_answered(out: Dictionary, answer: Dictionary, error: String) -> v
 	var line := str(spoken["say"])
 	var aside := str(spoken["aside"])
 	var said := body != null and is_instance_valid(body) and body.spawned and not line.is_empty() and line != "..."
+	var held := said and _resident_quiet(body, _player_of_id(str(out.get("player", ""))))  # An answer back mid-fight (675, npc's side).
+	if held:
+		said = false
+		_held_tongue("voice")
 	MindLog.record({"kind": "voice", "companion": str(ask.get("speaker", "")), "mind": "resident", "trigger": ask.get("trigger", ""),
-		"prompt": "%s\n\n%s" % [ask.get("system", ""), ask.get("user", "")], "say": line, "aside": aside, "error": error,
-		"outcome": "said" if said else "not said"})
+		"prompt": "%s\n\n%s" % [ask.get("system", ""), ask.get("user", "")], "say": "" if held else line, "aside": "" if held else aside, "error": error,
+		"outcome": "held tongue" if held else ("said" if said else "not said")})
 	if not said:
 		if not str(ask.get("hail", "")).is_empty() and body != null and is_instance_valid(body) and World.production != null:
 			# A hail the mind did not answer (554 amended): its marks go back, so the thing can be said later today.
@@ -11534,7 +11545,10 @@ func _speak_offer(speaker: GridEntity, key: String, name: String, player: Player
 	_standing[player.player_id] = {"worker": key, "id": str(offer.get("id", "")), "title": str(offer.get("title", "")),
 		"at": World.steps, "zone": speaker.zone, "offer": offer.duplicate(true)}
 	MindLog.record({"kind": "offer", "companion": name, "mind": "resident" if speaker is Resident else "monster", "say": words, "outcome": "spoken"})
-	_say_plain(speaker, name, words, "[offer] ")
+	if speaker is Resident and _resident_quiet(speaker, player):
+		_held_tongue("offer")  # The offer stands, unspoken (675, npc's side).
+	else:
+		_say_plain(speaker, name, words, "[offer] ")
 	if speaker is Resident:
 		_send_offers(speaker, player.player_id, player.owner_peer)
 	else:
@@ -11544,6 +11558,9 @@ func _speak_offer(speaker: GridEntity, key: String, name: String, player: Player
 ## [param body] says [param words] with no mind asked: the transcript (with
 ## [param note]), the party log, those near, the speech bubble.
 func _say_plain(speaker: GridEntity, name: String, words: String, note := "") -> void:
+	if speaker is Resident and _resident_quiet(speaker):
+		_held_tongue("say")  # 675, npc's side.
+		return
 	Transcript.record(name, name, note + words)
 	party_log.add("%s said: \"%s\"" % [name, words])
 	if speaker is Resident:
@@ -11976,6 +11993,8 @@ func _hails_tick() -> void:
 			var player := other as Player
 			if player == null or not player.spawned or player.player_id.is_empty() or World.distance(player.tile, body.tile) > TALK_REACH:
 				continue
+			if _resident_quiet(body, player):
+				continue  # No hail near a fight (675, npc's side).
 			if _hail_now(body, player, rules, now_msec, now, day, sky):
 				return
 
@@ -11986,6 +12005,50 @@ func _hails_tick() -> void:
 func _hail_able(body: Resident) -> bool:
 	return body != null and is_instance_valid(body) and body.spawned and not body.strayed and body.escort_of.is_empty() and body.card.is_empty() \
 			and body.doing not in [Resident.Doing.HIDE, Resident.Doing.BED, Resident.Doing.STRAYED, Resident.Doing.ESCORT]
+
+
+## Whether [param body] holds its tongue now (675, npc's side): a hostile
+## within Companion.COMBAT_RANGE of it or of [param player] (its listener,
+## null for none), or within Companion.QUIET_AFTER ticks of one. A fight
+## just begun drops its ask still waiting for the mind.
+func _resident_quiet(body: Resident, player: GridEntity = null) -> bool:
+	if not Companion.hold_tongue or body == null or not is_instance_valid(body):
+		return false
+	var last := int(_resident_fight_at.get(body.worker_id, -100000))
+	if last != World.tick and _fight_near(body, player):
+		if World.tick - last > Companion.QUIET_AFTER:
+			var id := body.get_instance_id()
+			var waiting := _resident_asks.size()
+			_resident_asks = _resident_asks.filter(func(each: Dictionary) -> bool: return each["body"] != id)
+			if _resident_asks.size() < waiting:
+				_held_tongue("ask")
+		last = World.tick
+		_resident_fight_at[body.worker_id] = last
+	return World.tick - last <= Companion.QUIET_AFTER
+
+
+## A monster or beast within Companion.COMBAT_RANGE of [param body] or
+## [param player] that would fight either (enemy-ai's threatens, 551): a
+## raider, a predator, a charging boar, a draugr only while he would.
+func _fight_near(body: Resident, player: GridEntity) -> bool:
+	for entity in World.get_entities():
+		var monster := entity as Monster
+		if monster == null or not monster.spawned or monster.zone != body.zone:
+			continue
+		var listener := player != null and is_instance_valid(player)
+		var reach := Companion.COMBAT_RANGE
+		if World.distance(body.tile, monster.tile) > reach and not (listener and World.distance(player.tile, monster.tile) <= reach):
+			continue
+		if monster.threatens(body) or (listener and monster.threatens(player)):
+			return true
+	return false
+
+
+## A resident's line held back near a fight, counted in the mind log (675,
+## npc's side): by kind ("greet", "heard", "voice", "say", "offer", "song",
+## "ask"), no words, no names.
+func _held_tongue(what: String) -> void:
+	MindLog.record({"kind": "voice", "mind": "resident", "trigger": what, "outcome": "held tongue", "note": ""})
 
 
 ## The sky as a hail's cue: its sentence when there is weather in it or
@@ -12461,6 +12524,9 @@ func _greeted(player: Player, body: Resident) -> void:
 		if not body.addressing.is_empty():
 			body.address(player, int(float(rules.get("stop_seconds", 8)) * World.TICK_RATE))  # Turned to them again, nothing new said.
 		return
+	if _resident_quiet(body, player):
+		_held_tongue("greet")  # No word, no turning to them near a fight (675, npc's side).
+		return
 	_greet_at[key] = now_msec
 	var busy := false
 	for each: Dictionary in _resident_asks:
@@ -12497,6 +12563,10 @@ func _greeted(player: Player, body: Resident) -> void:
 ## neighbours' hearing, the "speech" message with [param aside] ("" for
 ## none), and the player's offers (536).
 func _resident_says(body: Resident, line: String, aside: String, player: Player) -> void:
+	if _resident_quiet(body, player):
+		_held_tongue("say")  # Held near a fight; the panel still comes (675, npc's side).
+		_send_offers(body, player.player_id, player.owner_peer)
+		return
 	Transcript.record(body.person, body.person, line)
 	if not aside.is_empty():
 		Transcript.record(body.person, body.person, "[aside] " + aside)
