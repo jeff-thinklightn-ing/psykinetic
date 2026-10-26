@@ -1189,7 +1189,16 @@ func _test_scatter() -> void:
 	print("\n== scatter off the grid by the ground, never on water; trees varied; the land runs into the forest floor ==")
 	var castle := Level.load_level("castle")
 	var terrain: Dictionary = castle["terrain"]
+	# Every kind's mesh made with the room's art, before the view grows any
+	# (the first tuft's art, made in _grow_scatter on arrival, was a 218 ms frame).
+	Client3D._scatter_meshes.clear()
+	Client3D._warmed = false
 	_rig.rebuild(terrain, castle["centre"])
+	var unmade: Array[String] = []
+	for kind: String in Client3D.SCATTER_SIZES:
+		if not Client3D._scatter_meshes.has(kind):
+			unmade.append(kind)
+	_check(unmade.is_empty(), "the room's build makes every scatter kind's mesh (not made: %s)" % [unmade])
 	_rig._scatter_all()
 	var water: Dictionary = {}
 	for cell: Vector2i in terrain["water"]:

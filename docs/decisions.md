@@ -31140,3 +31140,26 @@ its tick; she is swapped to where he stood or has stepped aside, so it
 checks her beside him.
 
 Server only, protocol unchanged, no new class_name.
+## 660 amended (2): the scatter meshes warmed behind the card
+
+The coordinator's request: the 249 ms Client3D._grow_scatter frame a moment
+after arriving in the wilds (perf's companion trace on v0.1.177). On its own
+the scatter is fast: a probe of every step, headless, windowed and on a fresh
+profile, found the plans and builds at 1 to 5 ms each, the spread over frames
+working as designed. Timers inside a real client found the one step: the first
+tuft MultiMesh, 221 ms, 218 of it in _scatter_mesh("tuft"), the kind's mesh
+made on first use (art-kit's scatter.tuft loaded, its colours baked from the
+palette). The scatter slots are not in _warm_art's WARM_CATEGORIES, so nothing
+made them before the view grew its first grass.
+- _warm_art, run once a process behind the card with the room's art, also
+  makes every scatter kind's mesh (SCATTER_SIZES, six kinds). A single load
+  can't be split over frames, so it moves under the card instead.
+- Measured in the same real-client run (wilds, off-screen client, fresh
+  profile): the warm-up takes 26.5 ms behind the card, and after arriving no
+  scatter frame is over 20 ms (before: 222.7 ms at tick 29). The same meshes
+  cost about eight times as much made mid-arrival, beside the renderer's
+  first draws, as made behind the card.
+- view_test _test_scatter: a room's build makes every kind's mesh (fails
+  without this, all six unmade).
+
+Client only, protocol unchanged, no new class_name.

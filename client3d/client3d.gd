@@ -6499,6 +6499,11 @@ static func _warm_art() -> void:
 		var spec: Dictionary = ArtKit.spec(slot)
 		if str(spec.get("type", "mesh")) == "mesh" and str(spec.get("category", "")) in WARM_CATEGORIES:
 			ArtKit.instance(slot).free()
+	# The scatter's meshes too: the first tuft's, made by _grow_scatter after
+	# an arrival (its art loaded and its colours read from the palette), was a
+	# 218 ms frame on the wilds.
+	for kind: String in SCATTER_SIZES:
+		_scatter_mesh(kind)
 
 
 ## Shader warm-ups (decision 495): what another part of the view will draw
