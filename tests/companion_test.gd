@@ -103,6 +103,7 @@ func _ready() -> void:
 	_test_knows_level()
 	_test_wild()
 	_test_seated_boss()
+	_test_follow_without_backsteps()
 	_test_quiet()
 	_test_dodge()
 	_test_firing_cone()
@@ -3062,6 +3063,84 @@ func _test_firing_cone() -> void:
 	World.step()
 	_check(pet._danger.is_empty(), "the bow lowered: nothing to keep out of")
 	World.set_slots(owner, kept)
+	_settle(pet)
+
+
+func _test_follow_without_backsteps() -> void:
+	print("\n== she follows a walking player with purpose: no steps back and forth (a regression check; ui's net_smooth trace cleared her follow) ==")
+	_kill_monsters()
+	var owner := _player()
+	var pet := _companion()
+	_settle(pet)
+	var owner_was := owner.tile
+	var pet_was := pet.tile
+	_put(owner, Vector2i(2, 2))
+	_put(pet, Vector2i(2, 4))
+	for i in 20:
+		World.step()
+	# A loop with turns, walked as a player walks (a step each time one is due).
+	var route: Array[Vector2i] = []
+	for leg: Array in [[Vector2i(1, 0), 9], [Vector2i(0, 1), 4], [Vector2i(-1, 0), 8], [Vector2i(0, -1), 3]]:
+		for i in int(leg[1]):
+			route.append(leg[0])
+	var last_step := Vector2i.ZERO
+	var last_at := -1000
+	var backsteps := 0
+	var steps := 0
+	var farthest := 0
+	var was := pet.tile
+	var ticks := 0
+	while not route.is_empty() and ticks < 600:
+		if World.tick >= owner.next_move_tick:
+			var way: Vector2i = route.front()
+			if World.try_move(owner, way):
+				route.pop_front()
+		if ticks % 3 == 1:
+			# The cursor's turn, sent as "face" a few times a second: not always the way they walk.
+			var looks: Array[Vector2i] = [Vector2i(1, 0), Vector2i(1, 1), Vector2i(0, 1), Vector2i(-1, 1), Vector2i(-1, 0), Vector2i(0, -1)]
+			World.face(owner, looks[(ticks / 3) % looks.size()])
+		World.step()
+		ticks += 1
+		farthest = maxi(farthest, World.distance(pet.tile, owner.tile))
+		if pet.tile != was:
+			var moved := pet.tile - was
+			steps += 1
+			if last_step != Vector2i.ZERO and World.tick - last_at <= 30 and moved.x * last_step.x + moved.y * last_step.y < 0:
+				backsteps += 1
+			last_step = moved
+			last_at = World.tick
+			was = pet.tile
+	for i in 40:
+		World.step()
+	var minutes := float(ticks) / (World.TICK_RATE * 60.0)
+	print("  (walked %d ticks: her %d steps, %d back, farthest %d)" % [ticks, steps, backsteps, farthest])
+	_check(backsteps <= 1, "walking with turns: at most one step back (%d of %d, %.0f a minute)" % [backsteps, steps, backsteps / maxf(minutes, 0.001)])
+	_check(route.is_empty() and steps >= 10, "her player walked the loop, and she went with them (%d left, her %d steps)" % [route.size(), steps])
+	_check(farthest <= Heel.START + 2 and World.distance(pet.tile, owner.tile) <= Heel.STOP + 1, "and she keeps her distance (farthest %d, at rest %d)" % [farthest, World.distance(pet.tile, owner.tile)])
+	# The test room's fire is (6..8, 5): the loop and the stand keep off it.
+	# Standing, the cursor turning them about (in game the facing follows the
+	# cursor, not the walk): she stays put, not round and round them.
+	_put(owner, Vector2i(6, 2))
+	_put(pet, Vector2i(4, 2))
+	for i in 30:
+		World.step()
+	var stood_at := pet.tile
+	var moves := 0
+	was = pet.tile
+	for i in 300:
+		if i % 4 == 0:
+			var looks: Array[Vector2i] = [Vector2i(0, 1), Vector2i(1, 0), Vector2i(0, -1), Vector2i(-1, 0), Vector2i(1, 1), Vector2i(-1, -1)]
+			World.face(owner, looks[(i / 4) % looks.size()])
+		World.step()
+		if pet.tile != was:
+			moves += 1
+			was = pet.tile
+	print("  (standing 300 ticks, the cursor turning: her %d steps)" % moves)
+	_check(moves <= 2, "her player standing, only their facing turning: she stays put (%d steps)" % moves)
+	_put(owner, owner_was)
+	_put(pet, pet_was)
+	owner.hp = owner.max_hp
+	pet.hp = pet.max_hp
 	_settle(pet)
 
 
