@@ -32,6 +32,8 @@ func _ready() -> void:
 	_test_the_display_clock_waits_out_a_stall()
 	_test_a_route_is_drawn_straight()
 	_test_a_held_line_is_drawn_straight()
+	_test_the_smooth_meter_names_who_went_back()
+	_test_a_standing_body_starts_without_leaps()
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -492,6 +494,63 @@ func _test_a_held_line_is_drawn_straight() -> void:
 	_check(picks[0] == Vector2i(1, 0) and picks[1] == Vector2i(1, 1), "at the line's start the straight step first, the diagonal the other (%s)" % [picks])
 	me._prediction.clear()
 	me.queue_free()
+
+
+## 678's companion question (net_smooth.sh, --test-smooth): the meter says
+## which bodies went back, whether their tile did (A, B, A), and swaps.
+func _test_the_smooth_meter_names_who_went_back() -> void:
+	print("\n== the smooth meter names the bodies that went back, and whether their tile did ==")
+	_open_floor()
+	var me: Player = _me(Vector2i(50, 50))
+	var other := _mirror("Wobbler", Vector2i(52, 50), 3)
+	var meter: RefCounted = preload("res://net/smooth_meter.gd").new()
+	var path: Array[Vector2i] = [Vector2i(52, 50), Vector2i(53, 50), Vector2i(52, 50)]
+	for cell in path:
+		other.tile = cell
+		for i in 12:
+			other.position = Iso.grid_to_local(Vector2(cell) + Vector2(0.1 * i if cell.x == 53 else -0.1 * i, 0.0))
+			meter.sample(me, Vector2.ZERO, 1.0 / 60.0)
+	var said: String = meter.bodies_report()
+	_check(said.begins_with("[smooth] by body: Wobbler (Monster)") and said.contains("1 tile back") and said.ends_with("swaps 0"),
+			"it names the monster, its tile back, no swap (%s)" % said)
+	other.queue_free()
+	me.queue_free()
+
+
+## Perf's trace on v0.1.177 (the coordinator's ask): a companion standing
+## since the join set off a cell a tick just after the client's worst
+## hitches; her first slides were due ticks before the display clock got to
+## them, and _catch_up drew them at twice the pace on a clock itself
+## catching up: six leaps of 0.47 tiles. A body that sets off from standing
+## is drawn from the display clock's now (re-anchored), never hurried.
+func _test_a_standing_body_starts_without_leaps() -> void:
+	print("\n== a body that sets off from standing, late, is drawn without leaps ==")
+	var hollis := _mirror("Hollis", Vector2i(40, 40), 1)
+	for i in 10:
+		_tick += 1
+		World._net_tick(_tick)
+		hollis._process(0.0)
+	# A hitch: three ticks pass, a step a tick arriving, no frame drawn.
+	for i in 3:
+		_tick += 1
+		World._net_tick(_tick)
+		hollis.tile += Vector2i(-1, 0)
+	var worst := 0.0
+	var last := Iso.local_to_grid(hollis.position)
+	for i in 14:
+		_tick += 1
+		World._net_tick(_tick)
+		if i < 3:
+			hollis.tile += Vector2i(-1, 0)
+		for sample in 6:  # 60 frames a second.
+			World.tick_alpha = float(sample) / 6.0
+			hollis._process(0.0)
+			var at := Iso.local_to_grid(hollis.position)
+			worst = maxf(worst, at.distance_to(last))
+			last = at
+	_check(worst <= 0.25, "no frame draws more than a quarter tile (largest %.3f; a cell a tick is 0.167)" % worst)
+	_check(Iso.local_to_grid(hollis.position).is_equal_approx(Vector2(34, 40)), "and it arrives (%s)" % Iso.local_to_grid(hollis.position))
+	hollis.queue_free()
 
 # --- helpers ------------------------------------------------------------------
 

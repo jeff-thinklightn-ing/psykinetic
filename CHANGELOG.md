@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Others who set off from standing just after a stall (a companion after a hitch) walk smoothly from where they stood instead of leaping half a tile a frame to catch up (680).
 - The armour clank and the footstep fall on your feet instead of once a cell: in time with the stride, slower at a walk (one every 0.39 s, was 0.25) and at a run (0.22 s, was 0.125), the two together (676 step 1b, sound's side, amended).
 ## v0.1.177
 

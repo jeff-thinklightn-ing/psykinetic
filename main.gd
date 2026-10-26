@@ -15569,6 +15569,7 @@ func _report_test() -> void:
 	_report_walk()
 	if _smooth_meter != null:
 		print(_smooth_meter.report())
+		print(_smooth_meter.bodies_report())
 		print("[smooth] rtt %.0f ms, %s" % [Net.rtt_ms(), Net.stats.client_text()])
 	if Net.screenshot_path != "":
 		var image := get_viewport().get_texture().get_image()

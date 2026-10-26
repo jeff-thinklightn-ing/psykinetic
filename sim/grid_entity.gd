@@ -581,6 +581,17 @@ func _process(delta: float) -> void:
 						slide["from_pos"] = Iso.local_to_grid(position)
 						for later: Dictionary in _slides:
 							later["tick"] = later["tick"] + late
+					elif not _present and not slide.get("present", false) and not slide.has("from_pos") \
+							and shown > slide["tick"] and _move_tick + _move_duration < float(slide["tick"]) - 0.01:
+						# Decision 680: set off from standing, late (a hitch, a burst
+						# after the stand): from the display clock's now, the
+						# slides after it as much later, never hurried
+						# (_catch_up drew it at twice the pace on a clock
+						# itself catching up: leaps of half a tile a frame).
+						var behind: float = shown - slide["tick"]
+						slide["tick"] = shown
+						for later: Dictionary in _slides:
+							later["tick"] = later["tick"] + behind
 					# 655: this slide starts on the bend the last one ended on, if it did.
 					_prev_tile = _from_tile if _bend_decided and _bend_next == slide["to"] and slide["from"] == _to_tile \
 							and not slide.has("from_pos") else UNKNOWN_TILE

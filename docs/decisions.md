@@ -30694,3 +30694,39 @@ the counts are printed) plays the two together, never more than once a
 cell, leather no clank. _test_sounds_follow_events: a step off from standing
 plays its footstep and its clank together. Client only, protocol unchanged,
 no new class_name.
+
+## 680. A late start is drawn from now: the mirror re-anchors (bending 350)
+
+The coordinator's ask, after perf's trace on v0.1.177: a companion (Hollis)
+standing since the join set off a cell a tick just after the client's worst
+hitches (515, 144 and 180 ms), and was drawn in six leaps of 0.47 tiles.
+Her first slides were due ticks before the display clock reached them, and
+350's _catch_up drew them at CATCH_UP_SPEED (twice the pace), on a display
+clock that was itself catching up after the hitch.
+
+- **Re-anchored, not hurried:** when the slide the mirror takes up is late
+  (its tick before the display clock's now) and the body stood since the
+  last slide ended (not a present push, nor a slide with its own
+  from_pos), the slide starts at now and every slide queued behind it moves
+  as much later. _catch_up then finds nothing late, so a start from
+  standing is drawn at the body's own pace. A body already walking still
+  catches up as 350 has it: there the lag is the display's, and the queue
+  has to stay near the server.
+- **The cost:** a body that set off during a hitch is drawn up to the
+  hitch's length further behind the server until it next stands. This is
+  the same delay a present push takes back (its "back to the display
+  clock" re-anchor, which this mirrors).
+- **The coordinator's other option,** capping the catch-up at 1.3x, was
+  not taken: it would slow every catch-up, including a walking body's.
+- mirror_test _test_a_standing_body_starts_without_leaps: a body standing
+  10 ticks, then a 3-tick hitch with a step a tick arriving and no frame
+  drawn, then 14 ticks at 60 frames a second. No drawn frame goes over a
+  quarter tile, and it arrives. Without this change the worst frame is
+  0.333.
+- With it, the smooth meter's per-body labels (net/smooth_meter.gd,
+  bodies_report; net_smooth.sh's third argument turns the server's
+  companions off): which body went back, whether its tile did (A, B, A: the
+  server's own), and how many went back just after a swap (679). These
+  feed the trace of the remaining held-key corrections beside a companion.
+
+Client only, protocol unchanged, no new class_name.
