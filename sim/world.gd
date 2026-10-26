@@ -380,7 +380,7 @@ var winded_regen_delay := 20
 ## Dictionary of its numbers (levels/combat.json's "moves"; drafts for Jeff).
 var moves := {
 	"spin": {"windup": 15, "length": 2.0, "half_angle": 150.0, "fists_length": 1.0, "damage_scale": 2.5,
-		"down_ticks": 15, "needs": 90, "leaves": 10, "weight_impulse": 20.0, "impulse_scale": 0.84},
+		"down_ticks": 15, "needs": 90, "leaves": 10, "weight_impulse": 20.0, "impulse_scale": 1.0},
 	"throw": {"windup": 12, "length": 8.0, "width": 1, "damage_scale": 2.0, "cost": 40, "speed": 14.0},
 	"charge": {"roar": 6, "cells": 12},
 }
@@ -4559,7 +4559,7 @@ func _spin_lands(by: GridEntity, shape: Dictionary) -> void:
 			amount = met[0]
 		damage(body, amount, by, &"attack")
 		if _alive(body):
-			apply_blow(by, body, {"impulse": impulse, "direction": Vector2(body.tile - by.tile)})
+			apply_blow(by, body, {"impulse": impulse, "direction": Vector2(body.tile - by.tile), "no_floor": true})  # It throws (603 amended (4)).
 		if _alive(body):
 			knock_down(body, by, int(move["down_ticks"]))
 		struck += 1
@@ -7611,8 +7611,9 @@ func _push(mover: GridEntity, first: GridEntity, way: Vector2, force: float, tos
 ## [param source] with [param blow]'s impulse (kg x speed; blow_impulse
 ## gives the default), along its direction (a Vector2 at any angle; ZERO,
 ## source to target), the source's momentum added, held to
-## knockback_min_force, then slid; its stagger the ticks stunned past the
-## slide (-1, knockback_stun_ticks). Damage is the caller's. Server only;
+## knockback_min_force (not with no_floor true: the draugr's spin, which
+## throws whoever it strikes, 603 amended (4)), then slid; its stagger the
+## ticks stunned past the slide (-1, knockback_stun_ticks). Damage is the caller's. Server only;
 ## at once, not queued. {moved, distance (cells), cells (each body's end),
 ## stopped_by, impact_damage (the target's), struck (bodies knocked on),
 ## knocked_down, speed}; emitted as blow_resolved.
@@ -7628,7 +7629,7 @@ func apply_blow(source: GridEntity, target: GridEntity, blow: Dictionary) -> Dic
 	var way := direction.normalized() * float(blow.get("impulse", 0.0)) / maxf(pushed_mass(target), 0.001) \
 			+ momentum_push(source, target, direction)
 	result["speed"] = way.length()
-	if way.length() >= knockback_min_force:
+	if way.length() >= knockback_min_force or bool(blow.get("no_floor", false)) and way.length() > 0.0:
 		_fill_slide(result, target, _push(source, target, way, way.length(), false, int(blow.get("stagger", -1))))
 	if not is_sheltered(target):
 		_rush_struck(target, way)  # A rush slowed or stopped (604).

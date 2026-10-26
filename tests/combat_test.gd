@@ -36,6 +36,7 @@ func _ready() -> void:
 	_test_telegraph_ground()
 	_test_telegraph_lifecycle()
 	_test_spin()
+	_test_spin_throws()
 	_test_spin_broken()
 	_test_dropped_moves()
 	_test_throw_and_charge()
@@ -729,11 +730,64 @@ func _boss(dummy: GridEntity) -> void:
 	World.set_slots(dummy, Items.tidy(["", "", "", "", "giant_axe", ""], Items.CARRIED))
 
 
+## The spin throws whoever it strikes (603 amended (4); physics: an 80 kg
+## rested player took 1.47, under knockback_min_force 1.5, and was never
+## moved): its blow skips the floor (apply_blow's no_floor) and impulse_scale
+## is 1.0, his 140 swing whole, so a rested,
+## unarmoured 80 kg player ahead is thrown, one beside swept into the wall
+## left at a sliver (3 of 20), and one in plate moves less: mass still
+## decides how far. The exhausted wall hit is printed for Jeff's checklist.
+func _test_spin_throws() -> void:
+	print("\n== the spin throws an 80 kg player, rested and bare; plate moves less (603 amended (4)) ==")
+	var cells := {}
+	for armour: String in ["", "plate_armour", "exhausted"]:
+		var e := _build(["##############", "#........P...#", "#.......PmP..#", "#............#", "##############"])  # Room ahead to show the distance.
+		var boss: GridEntity = e["m"][0]
+		_boss(boss)
+		boss.strength = 0  # The draugr's row: strength 0, his 7 kg battle axe, so the push is its swing alone (140: 1.75 on 80 kg, 1.40 on 100).
+		World.set_slots(boss, Items.tidy(["", "", "", "", "battle_axe", ""], Items.CARRIED))
+		var front: GridEntity = e["P"][1]
+		var side: GridEntity = e["P"][0]
+		for body: GridEntity in [front, side]:
+			body.base_mass = 80.0
+			if armour == "plate_armour":
+				World.put_item(body, body, Items.ARMOUR, World.items.mint(armour, "made"))
+			World._weigh(body)
+			body.stamina = 0 if armour == "exhausted" else body.max_stamina
+		var hp := side.hp
+		var from := front.tile
+		var speeds := {}  # A Dictionary: a lambda's ints are copies.
+		var heard := func(_source: GridEntity, target: GridEntity, result: Dictionary) -> void:
+			if target == front:
+				speeds["speed"] = float(result["speed"])
+		World.blow_resolved.connect(heard)
+		World.try_spin(boss)
+		for i in 16:
+			if armour == "exhausted":
+				for body: GridEntity in [front, side]:
+					body.stamina = 0  # Held there through the wind-up: they breathe back otherwise.
+			World.step()
+		World.blow_resolved.disconnect(heard)
+		cells[armour] = [World.distance(from, front.tile), float(speeds.get("speed", 0.0))]
+		print("    %s: %.1f kg, %d cell(s) at %.2f" % [armour if armour else "bare", front.mass, cells[armour][0], cells[armour][1]])
+		if armour.is_empty():
+			_check(is_equal_approx(front.mass, 80.0) and cells[armour][0] >= 2 and World.is_down(front),
+					"80 kg, rested, bare: thrown %d cells (%.2f) and knocked down" % [cells[armour][0], cells[armour][1]])
+			_check(side.spawned and side.hp == 3 and hp == 20, "the one beside, swept into the wall from full: left at a sliver (%d of %d)" % [side.hp, hp])
+		elif armour == "exhausted":
+			print("    exhausted (stamina 0), 80 kg, bare: thrown %d cells at %.2f; swept into the wall from %d: %s" % [cells[armour][0], cells[armour][1], hp,
+					"%d left" % side.hp if side.spawned and side.hp > 0 else "killed"])
+	_check(cells["plate_armour"][1] < World.knockback_min_force and cells["plate_armour"][1] < cells[""][1] and cells["plate_armour"][0] >= 1,
+			"in plate, heavier: under the floor, slower, yet thrown (%.3f, %d cells; bare %.3f, %d)" % [cells["plate_armour"][1], cells["plate_armour"][0], cells[""][1], cells[""][0]])
+
+
 func _test_spin() -> void:
 	print("\n== the spin: 1.5 s standing, the cone struck, the gap behind spared, then spent (decision 603) ==")
 	var e := _build(["#########", "#...P...#", "#..PmP..#", "#.......#", "#########"])
 	var boss: GridEntity = e["m"][0]
 	_boss(boss)
+	boss.strength = 0  # The draugr's row, his battle axe (603 amended (4)): the stronger test boss kills from full.
+	World.set_slots(boss, Items.tidy(["", "", "", "", "battle_axe", ""], Items.CARRIED))
 	var front: GridEntity = e["P"][1]  # (3,2), the way he faces.
 	var behind: GridEntity = e["P"][2]  # (5,2), straight behind.
 	var side: GridEntity = e["P"][0]  # (4,1), beside.

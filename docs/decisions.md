@@ -32084,3 +32084,33 @@ bands in 6 pushes; a blow's first tick can still show at once (up to 3
 cells in a frame), as the hit landing. free_net_test's push under lag now
 hears `pushed` at the lag and counts turns drawn. Client only, protocol
 unchanged, no new class_name.
+## 603 amended (4), combat's side: the spin throws whoever it strikes
+
+Physics found that on a rested, unarmoured 80 kg player the spin pushed at
+1.47, under knockback_min_force (1.5): it struck and knocked down but never
+moved them, so 603's sweep into a wall never happened in play. Two causes.
+603 tuned impulse_scale 0.84 as "about 150 of physics' 178", but the
+draugr's swing_impulse is 140 (strength 0, his 7 kg battle axe x
+swing_speed 20); the old spin test reached the sliver only because its
+boss had strength 6 and a giant axe. And the floor, meant for light taps,
+held back a blow that 603 says always throws.
+
+- apply_blow takes blow["no_floor"] (bool, default false): true skips
+  knockback_min_force, any push above zero slides (agreed with physics;
+  below one cell's reach it still moves nothing). Only the spin passes it;
+  launch, the axe throw and every other blow are as before.
+- impulse_scale 0.84 -> 1.0 (the coordinator's pick; 1.07, 603's 150,
+  left 1 of 20 at the wall): his swing whole, 140. A full-health 80 kg
+  player swept into a wall is left at a sliver (3 of 20, as Jeff's list
+  has it), the kill only on one already hurt. One ahead is thrown 2 cells
+  (1.75); in plate (100 kg) 1.40 and still thrown (under the floor, so
+  no_floor is what moves him). Exhausted (stamina 0, pushed_mass halved)
+  the same player is thrown 5 cells (3.50) and the wall kills from full:
+  printed by the test for Jeff's checklist, not asserted. F7 Tuning holds
+  the knob (Telegraphs and boss moves, combat.moves.spin.impulse_scale).
+
+combat_test _test_spin_throws: the real draugr's numbers (strength 0,
+battle axe) on 80 kg rested, unarmoured players, on plate, and exhausted
+(printed); _test_spin
+moved to the same numbers. Server only, protocol unchanged, no new
+class_name.

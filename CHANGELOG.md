@@ -6,6 +6,7 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+- The draugr's spin throws whoever it strikes (603 amended (4)): an 80 kg player in no armour was hit and knocked down but never moved, the push under the knockback floor; the spin now skips the floor and pushes with his whole swing (impulse_scale 0.84 to 1.0), so a player ahead is thrown 2 cells and one swept into a wall from full is left at 3 of 20; plate moves less; an exhausted player is thrown 5 cells and the wall kills from full. Tune it in F7 (Telegraphs and boss moves, combat.moves.spin.impulse_scale) if the throw feels too long.
 
 - Free movement: clicking the spot you're standing on while walking stops you where you are, instead of walking on to the middle of that square (689 amended (2))
 - Free movement: when a blow knocks you back while you're walking, your character slides back smoothly instead of jerking back and forth (689 amended (2))
