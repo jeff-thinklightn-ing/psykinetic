@@ -380,6 +380,40 @@ dropped.
 
 ---
 
+## The sepulcher and the Encolpion Amulet (Jeff, 2026-10-25, rough draft)
+
+Jeff's words, kept in docs/roadmap.md's barrow section; he called it a rough draft:
+
+> "instead of giving his totem, on defeat the chest is actually a sepulcher, spawns the armor and the knightly remains, return the remains to Aldous, for returning them to the altar in the temple you get the Encolpion Amulet, item text says 'Resurrection Charges: 5' the lore of that is that encases blessed ashes that protect the wearer. The connection is that the ossuary is beneath the temple, and the barrow is connected to the temple by the hidden pathway, the hall of the fallen is below the temple, the draugr has taken residence there, that and the undead keep Aldous out, the payments rule can still hold. The barrow has grave robbers at night time -- rough draft"
+
+Draft lines, each **[Jeff]** in his words, none agreed and none built until he answers
+C:/dev/review/decisions/barrow-sepulcher.md (four conflicts with the lines above, and who the
+knight was):
+
+- **[Jeff]** On the draugr's defeat, instead of giving his totem, the chest is a sepulcher. It
+  gives the armour and a knight's remains.
+- **[Jeff]** The remains are returned to Aldous, and for returning them to the altar in the
+  temple the returner gets the Encolpion Amulet.
+- **[Jeff]** The Encolpion Amulet encases blessed ashes that protect the wearer. Its item text
+  says "Resurrection Charges: 5" (items' words).
+- **[Jeff]** The Ossuary is beneath the temple, and the barrow is connected to the temple by the
+  hidden pathway. The Hall of Fallen Souls is below the temple, and the draugr has taken
+  residence there.
+- **[Jeff]** The draugr and the undead keep Aldous out. The payments rule can still hold.
+- **[Jeff]** The barrow has grave robbers at night.
+
+Where it meets earlier agreed lines (the decision file's four points):
+1. "The barrow lies a little outside town, not directly under the temple" against the Ossuary
+   and the Hall beneath the temple.
+2. Whether the temple above the Hall moves with the town to Held's map (held-move.md).
+3. The draugr's deal (beaten, he brings the fighter back without the temple's offering)
+   against the amulet's five charges.
+4. "instead of giving his totem" against crypt.totem (agreed) and the blessing that opens the
+   sealed way.
+Open: who the knight was.
+
+---
+
 ## Log
 
 - 2026-10-19: crypt under the temple, delve-again, small boss, gold offering until
@@ -429,3 +463,4 @@ dropped.
 - 2026-10-22, cont.: the old gods are war gods who power the draugr and send the dead back to battle; angered by the robbers, appeased by gold (Jeff).
 - 2026-10-22, cont.: the draugr's hall as a puzzle: the door shuts behind you, gold returned or his defeat opens it, the Draugr's Totem (Jeff, 573 amended).
 - 2026-10-22: the temple and town follow Theus, the homeland's one god; Psyke, the tribal god of war, empowers the draugr; Pip knows only enough for the job, paid for his silence and promised a holy knighthood of Theus (Jeff, B3).
+- 2026-10-25: Jeff's rough draft of the sepulcher, the knight's remains, the Encolpion Amulet and night robbers recorded as [Jeff] draft lines; nothing built till barrow-sepulcher.md is answered.
