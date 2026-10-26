@@ -118,15 +118,25 @@ func routes_now() -> WorldRoutes:
 func finish() -> void:
 	if _own_routes != null:
 		_own_routes.wait()
+	for each in _retired:
+		each.wait()
+	_retired.clear()
 
 
 ## The world as [param map] has it now (a level regenerated, 465): every
-## route and caravan's way made again when next wanted.
+## route and caravan's way made again when next wanted. Its own old routes
+## are retired, not waited for (465 amended), kept till their tasks stop.
 func use_map(map: WorldMap) -> void:
-	finish()
+	if _own_routes != null:
+		_own_routes.retire()
+		_retired.append(_own_routes)
 	world_map = map
 	_own_routes = null
 	_dirty()
+
+
+## Its own routes let go of whose tasks may still run (465 amended).
+var _retired: Array[WorldRoutes] = []
 
 
 func _dirty() -> void:
@@ -335,6 +345,7 @@ func _caravan_way(id: String) -> Dictionary:
 
 ## Every caravan's step, its raids, its arrival.
 func world_tick() -> void:
+	_retired = _retired.filter(func(each: WorldRoutes) -> bool: return each.busy())
 	if not routes_in():
 		return  # Not lost for want of a way not made yet: a tick's wait.
 	for id: String in caravans.keys():

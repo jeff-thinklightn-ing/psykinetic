@@ -186,7 +186,20 @@ func nearest(kinds: Array[String], area_name: String, cell: Vector2i, routes: Wo
 ## The places of [param kinds] that can be reached from [param cell] of
 ## [param area_name], nearest first, as [method nearest] measures: one
 ## routing for a caller that takes the first that suits it (decision 503).
+## Where ranked puts another area's places while the routes' fields are
+## not in: after every place of the same area (465 amended).
+const NOT_IN_STEPS := 1.0e9
+
+
 func ranked(kinds: Array[String], area_name: String, cell: Vector2i, routes: WorldRoutes = null) -> Array[String]:
+	# Routes whose fields are still being made (a level laid anew, the world
+	# just up) are not asked: a route asked of them walks the world on this
+	# thread, seconds each (465 amended). The same area's places by the crow,
+	# then every other area's, by id: something is still found (economy).
+	var not_in := routes != null and routes.makes_fields() and not routes.is_ready(WorldRoutes.OPEN)
+	var known: WorldRoutes = routes if not_in else null  # Areas a route could reach (none from one it lacks).
+	if not_in:
+		routes = null
 	var found: Array[Array] = []
 	for id in all_places():
 		var place: Dictionary = _places[id]
@@ -202,6 +215,8 @@ func ranked(kinds: Array[String], area_name: String, cell: Vector2i, routes: Wor
 				steps += float(leg["steps"])
 		elif place["area"] == area_name:
 			steps = Vector2(place["cell"] - cell).length()
+		elif not_in and known.has_area(area_name) and known.has_area(place["area"]):
+			steps = NOT_IN_STEPS
 		found.append([steps, id])
 	found.sort_custom(func(a: Array, b: Array) -> bool: return a[0] < b[0] or (a[0] == b[0] and a[1] < b[1]))
 	var out: Array[String] = []

@@ -216,6 +216,26 @@ func is_ready(faction: Variant = null) -> bool:
 	return true
 
 
+## Let go of without waiting for its fields (465 amended; a level laid
+## anew froze the box waiting for them): its tasks stop at their next
+## portal. Its holder keeps it until busy() is false, then drops it (freeing
+## routes waits for their tasks).
+func retire() -> void:
+	_shared.stopping = true
+
+
+## Whether [param area_name] is one of its areas (a route from or to one
+## that is not finds nothing).
+func has_area(area_name: String) -> bool:
+	return _areas.has(area_name)
+
+
+## Whether any of its tasks still runs, never waiting.
+func busy() -> bool:
+	_reap()
+	return not _tasks.is_empty()
+
+
 ## Waits for every distance field being made (tests and tools; the world
 ## tick asks is_ready instead).
 func wait() -> void:

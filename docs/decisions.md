@@ -12241,6 +12241,42 @@ holds what, held weakly on one place_taken connection (it connected once
 per routes, and a second set logged an engine error). raid_groups_test:
 a group under way when its camp's level is laid again without the way to
 the town breaks up.
+Amended (2026-10-26, the coordinator; perf, after 368 amended): a laid
+level never waits for the routes' fields, and nothing asks a route of fields
+not yet in. Main._apply_generation hands the new world map to
+World.raid_groups and World.trade (use_map), and each finish()ed first,
+waiting for its WorldRoutes' distance fields. The raid groups' routes are
+made even with raids off: trade's wagons use them (World.trade.get_routes)
+and so do companions' guides. Their fields take 46 to 52 s on the world's
+map here, and a use_map while they were being made waited 31 s. Laid 30 s
+apart, the second level waited for what the first one's map started, as
+368 amended found for the richness.
+- WorldRoutes.retire: its tasks stop at their next portal (Shared.stopping).
+  busy() says whether any still runs, never waiting.
+- WorldRaids.use_map and TradeRoutes.use_map retire their old routes and
+  keep them (_retired) until they are not busy, then drop them on a world
+  tick (freeing routes waits for their tasks). finish(), at quit, still
+  waits for all.
+- Holdings.ranked (a fallen player's place of return, a camp's home town)
+  does not ask routes that make fields but whose open layer is not in. It
+  ranks the same area's places as the crow flies, then every other area's
+  by id (NOT_IN_STEPS), so a fall in an area with none of its own still
+  finds one (economy). An area the routes lack still gets none, as a route
+  from it found none (resident_test's town, not on the world map). A route asked of fields not in walks the world on
+  the main thread, 5.6 s in one probe.
+  Trade already waits a tick for them (routes_in) and guides for
+  is_ready. The raid groups' own ticks still ask raw, as before (raids are
+  off on the box).
+After it, use_map takes 19 to 23 ms with the fields mid-way, and a retired
+set's tasks stop at once.
+regen_test: use_map does not wait for routes being made, and retires them;
+the routes asked next are new ones; trade waits for them; places ranked
+over routes not in come the same area's first, then the others', and one
+from an area with none still finds another's; retired routes are let go
+once stopped. raid_groups_test, trade_routes_test, respawn_places_test,
+relief_test and townsfolk_test pass. Server only, protocol unchanged, no
+new class_name.
+
 ## 466. A forest's canopy: trunks as void cells, a cover layer on every peer
 
 Jeff (2026-10-17, through the coordinator): "a forest zone - while walking

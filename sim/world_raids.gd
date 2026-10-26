@@ -100,17 +100,32 @@ static func _read_rules() -> Dictionary:
 func finish() -> void:
 	if _routes != null:
 		_routes.wait()
+	for each in _retired:
+		each.wait()
+	_retired.clear()
 
 
 ## The world as [param map] has it now (a level regenerated: decision 465):
-## the routes made on the old map waited for and dropped, made again when
-## next wanted, and every group's route with them, each going on from where
-## it is.
+## the routes made on the old map dropped, made again when next wanted, and
+## every group's route with them, each going on from where it is. The old
+## routes are retired, not waited for (465 amended: their fields take tens of
+## seconds, and waiting froze the box): kept till their tasks stop.
 func use_map(map: WorldMap) -> void:
-	finish()
+	if _routes != null:
+		_routes.retire()
+		_retired.append(_routes)
 	world_map = map
 	_routes = null
 	_legs.clear()
+
+
+## Routes let go of whose tasks may still run (use_map, 465 amended); each
+## dropped on a world tick once they have stopped.
+var _retired: Array[WorldRoutes] = []
+
+
+func _drop_retired() -> void:
+	_retired = _retired.filter(func(each: WorldRoutes) -> bool: return each.busy())
 
 
 ## World.raids' signals, so groups come back from play.
@@ -181,6 +196,7 @@ func _distance(camp: Dictionary, town: String) -> float:
 ## Everything a world tick does: sending, then each group's move. Nothing
 ## while off.
 func world_tick() -> void:
+	_drop_retired()
 	if not on:
 		return
 	_send_some()

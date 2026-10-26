@@ -66,6 +66,7 @@ func _ready() -> void:
 	_test_regenerate_now()
 	await _test_made_off_the_main_thread()
 	_test_richness_never_waited()
+	_test_routes_never_waited()
 
 	DirAccess.remove_absolute(Net.state_path)
 	Net.state_path = ""
@@ -538,7 +539,7 @@ func _test_richness_never_waited() -> void:
 	var t := Time.get_ticks_usec()
 	var ready := real.is_ready()
 	var asked_ms := (Time.get_ticks_usec() - t) / 1000.0
-	for i in 400:
+	for i in 6000:  # Up to 30 s: a busy machine (a suite beside it).
 		if ready:
 			break
 		OS.delay_msec(5)
@@ -546,6 +547,66 @@ func _test_richness_never_waited() -> void:
 	_check(ready and asked_ms < 5.0 and real.steps_from_mine(area, at) == 0.0,
 		"is_ready answers at once (%.2f ms), and the steps come in (%s at the mine, %s in %s of the map's %s)" % [
 			asked_ms, real.steps_from_mine(area, at), at, area, _main._world_map.areas.keys()])
+
+
+func _test_routes_never_waited() -> void:
+	print("
+== a laid generation never waits for the routes' fields (465 amended): retired, not waited for; none asked of fields not in ==")
+	var raids: WorldRaids = World.raid_groups
+	_check(raids != null and World.trade != null, "the world has raid groups and trade")
+	if raids == null or World.trade == null:
+		return
+	# The routes trade and guides ask of (the raid groups'), their fields
+	# being made: tens of seconds on the world's map.
+	var old: WorldRoutes = raids.routes
+	_check(old.makes_fields() and not old.is_ready(), "the routes' fields being made")
+	var t := Time.get_ticks_usec()
+	raids.use_map(WorldMap.build())
+	var ms := (Time.get_ticks_usec() - t) / 1000.0
+	_check(ms < 1000.0 and old._shared.stopping and raids._retired.has(old),
+		"use_map takes the new map without waiting for them (%.0f ms): they are told to stop and kept till they have" % ms)
+	var fresh: WorldRoutes = raids.routes
+	_check(fresh != old and not fresh.is_ready(), "the routes asked now are new ones, their fields not in")
+	_check(not World.trade.routes_in(), "trade waits a tick for them")
+	var kinds: Array[String] = ["stockpile", "temple", "healers_hut", "camp"]
+	var from: Dictionary = World.holdings.place(World.holdings.all_places()[0])
+	t = Time.get_ticks_usec()
+	var ranked := World.holdings.ranked(kinds, from["area"], from["cell"], fresh)
+	ms = (Time.get_ticks_usec() - t) / 1000.0
+	var same: Array[String] = World.holdings.ranked(kinds, from["area"], from["cell"], null)
+	var others: Array[String] = []
+	for id in World.holdings.all_places():
+		var place := World.holdings.place(id)
+		if place["kind"] in kinds and place["area"] != from["area"]:
+			others.append(id)
+	others.sort()
+	_check(ranked == same + others and ms < 200.0,
+		"places ranked over routes not in: the same area's by the crow, then every other area's, no route walked on the main thread (%.1f ms, %d + %d)" % [ms, same.size(), others.size()])
+	# A fall in an area with no such place of its own still finds another
+	# area's (economy); from an area the routes lack, as before, none.
+	var empty_area := ""
+	for name: String in _main._world_map.areas:
+		if World.holdings.ranked(kinds, name, Vector2i(1, 1), null).is_empty():
+			empty_area = name
+			break
+	var elsewhere := World.holdings.ranked(kinds, empty_area, Vector2i(1, 1), fresh)
+	_check(empty_area != "" and not elsewhere.is_empty(),
+		"from an area with none of its own (%s), other areas' are still found (%d)" % [empty_area, elsewhere.size()])
+	_check(World.holdings.ranked(kinds, "rg_nowhere", Vector2i(1, 1), fresh).is_empty(), "from an area the routes lack, none (as a route there finds none)")
+	for i in 6000:
+		if not old.busy():
+			break
+		OS.delay_msec(5)
+	raids.world_tick()
+	_check(not old.busy() and not raids._retired.has(old), "the old ones' tasks stop, and they are let go on a world tick")
+	# Let go of the new ones too, so quitting waits for nothing long.
+	raids.use_map(WorldMap.build())
+	for i in 6000:
+		if not fresh.busy():
+			break
+		OS.delay_msec(5)
+	raids.world_tick()
+	_check(raids._retired.is_empty(), "as are those")
 
 
 ## The slow ticks' regeneration run through (decision 684): each due level
