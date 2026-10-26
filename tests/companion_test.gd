@@ -2244,6 +2244,25 @@ func _test_leaving() -> void:
 		"gone home: a resident of her town (%s)" % [record.companion.get("left", {})])
 	_main._join_companion(record, owner)
 	_check(_companion() == null, "she no longer joins her player")
+	# Kept through a save and a load (dropped before: she came back after a restart).
+	record.companion["focus"] = {"fight": 50.5, "magic": 24.75, "stealth": 24.75}
+	record.companion["focus_day"] = {"day": 4, "grown": 1.5}
+	record.companion["mood"] = "apart"
+	record.companion["warned_area"] = "rs_road"
+	record.companion["left"]["grave"] = [12, 40]
+	record.companion["left"]["favour_today"] = {"day": 3, "kinds": ["gift"]}
+	record.companion["leaving"] = {"deed": "harsh", "why": "shouted at you", "day": 2, "from": 900, "until": 1500, "place": "x"}
+	var saved := PlayerRecord.from_dict(JSON.parse_string(JSON.stringify(record.to_dict())))
+	_check(saved.companion.get("left") == record.companion["left"] and typeof(saved.companion["left"]["grave"][0]) == TYPE_INT
+		and saved.companion.get("focus") == record.companion["focus"] and saved.companion.get("focus_day") == record.companion["focus_day"]
+		and saved.companion.get("mood") == "apart" and saved.companion.get("warned_area") == "rs_road",
+		"gone home, kept through a save and a load: left, focus, mood, the road she was warned off (%s)" % [saved.companion.get("left")])
+	_check(saved.companion.get("leaving") == {"deed": "harsh", "why": "shouted at you", "day": 2},
+		"one about to leave keeps what she leaves over; her walk starts again (%s)" % [saved.companion.get("leaving")])
+	record.companion.erase("leaving")
+	saved.companion.erase("leaving")
+	_main._join_companion(saved, owner)
+	_check(_companion() == null, "and loaded, she still does not join her player")
 	# As she was, for what follows.
 	record.companion = kept
 	record.companion.erase("resident")

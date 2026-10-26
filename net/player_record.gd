@@ -211,7 +211,8 @@ static func from_dict(entry: Variant) -> PlayerRecord:
 					value = JSON.parse_string(value) if value.begins_with("{") else null
 					if not value is Dictionary:
 						continue  # Not a table: her seed's again (CompanionCard.look_of, leaning).
-				kept[str(key)] = value.duplicate(true) if value is Dictionary else str(value)
+				# A number stays one (her justice, 581 amended); a word, a word.
+				kept[str(key)] = value.duplicate(true) if value is Dictionary else int(value) if value is float or value is int else str(value)
 			record.companion["traits"] = kept
 			record.companion["how_we_met"] = str(pet.get("how_we_met", ""))
 			record.companion["card_by"] = str(pet.get("card_by", "plain"))
@@ -266,6 +267,31 @@ static func from_dict(entry: Variant) -> PlayerRecord:
 			var sick: Variant = pet.get(key)
 			if sick is Dictionary and not sick.is_empty():
 				record.companion[key] = _numbers(sick)
+		# Her focus (577) and its day's growth, her mood (555), and her
+		# leaving (581): gone home, or about to go, and the road she was
+		# warned off (581 amended). Dropped on load before: one who left
+		# came back with her player after a restart, her focus re-rolled.
+		var focus: Variant = pet.get("focus")
+		if focus is Dictionary and not focus.is_empty():
+			var kinds := {}
+			for kind: Variant in focus:
+				if focus[kind] is float or focus[kind] is int:
+					kinds[str(kind)] = float(focus[kind])
+			record.companion["focus"] = kinds
+		var focus_day: Variant = pet.get("focus_day")
+		if focus_day is Dictionary:
+			record.companion["focus_day"] = {"day": int(focus_day.get("day", -1)), "grown": float(focus_day.get("grown", 0.0))}
+		for key: String in ["mood", "warned_area"]:
+			if pet.get(key) is String and not str(pet[key]).is_empty():
+				record.companion[key] = str(pet[key])
+		var left: Variant = pet.get("left")
+		if left is Dictionary and not left.is_empty():
+			record.companion["left"] = _whole(left)
+		var leaving: Variant = pet.get("leaving")
+		if leaving is Dictionary and not leaving.is_empty():
+			# Her walk starts again (Main._leaving_tick): only what she leaves over.
+			record.companion["leaving"] = {"deed": str(leaving.get("deed", "")), "why": str(leaving.get("why", "")),
+				"day": int(leaving.get("day", 0))}
 		# Her roads (decision 551): where she has been with her player, and
 		# the dangers she lived through there.
 		var roads: Variant = pet.get("roads")
@@ -293,6 +319,21 @@ static func _numbers(entry: Dictionary) -> Dictionary:
 		var value: Variant = entry[key]
 		kept[str(key)] = int(value) if value is float else value
 	return kept
+
+
+## [param value] with JSON's whole floats made ints again, all the way down
+## (days, ticks, uids in lists); other values kept.
+static func _whole(value: Variant) -> Variant:
+	if value is float and is_equal_approx(value, roundf(value)):
+		return int(value)
+	if value is Dictionary:
+		var kept := {}
+		for key: Variant in value:
+			kept[str(key)] = _whole(value[key])
+		return kept
+	if value is Array:
+		return Array(value).map(func(each: Variant) -> Variant: return _whole(each))
+	return value
 
 
 ## [param value] as ItemBook uids (0 for none), or none.

@@ -31475,3 +31475,36 @@ Companions' 686 (the coordinator's approval) lets a player recruit a town reside
 - While recruited, companions sets the worker away (Production.set_away), and back when they're home. Away already kept their job waiting and skipped their needs and bank turn. Now it also skips rent (Production._rent moves rent_due on and takes nothing) and the wage floor (Economy._floor_turn), since they neither sleep in town nor work for it. Both run again from the next turn after their return. One side effect: the town's alms runner away at the floor's turn misses that day's floor, which is rare and small.
 
 farm_test _test_recruit: the only smith and the only farmer can't go, a hauler can, a second smith frees either, the other smith away holds this one; away 3 days takes no rent and owes no floor, and back they run again. Server only: no wire change, no new class_name.
+## 687. A companion's saved keys survive a load
+
+PlayerRecord.from_dict rebuilds a player's companion key by key, and six keys
+the game writes were never read back: "left" and "leaving" (581), "focus" and
+"focus_day" (577), "mood" (555) and "warned_area" (581 amended). A save and a
+load dropped them, so on the box every restart (each deploy is one) brought a
+companion who had left back to her player, and threw away her focus's growth
+(re-rolled from her traits on the join). A companion's numeric trait (her
+justice, 581 amended) also came back as text; no effect yet, since a rolled
+one falls back to the same seeded roll and the legacy three are fixed.
+
+- from_dict reads them: focus as numbers, focus_day {day, grown}, mood and
+  warned_area as words, left whole (JSON's whole floats made ints all the
+  way down: days, ticks, the grave goods' uids), and a leaving in progress as
+  only what she leaves over (deed, why, day): her walk (from, until, place)
+  starts again on the next calm moment. A trait that is a number stays one.
+- **The guard** (the coordinator's ask): tests/record_keys_test. It scans the
+  source for every key written onto a companion (companion["key"] = ...) and
+  fails, naming it, on one with no sample in the test, so a new key must be
+  loaded and added; it fills a record with every sample, round-trips it
+  through to_dict, JSON and from_dict, and fails naming each key dropped or
+  changed; and the same for the player's own fields (every script variable
+  of PlayerRecord). Against the old from_dict it names all six and the trait.
+- Keys already lost in earlier restarts can't be brought back: a companion
+  who left and came back after a restart stays with her player until she
+  leaves again; a focus re-rolled grows again from there.
+
+companion_test _test_leaving: gone home, kept through a save and a load
+(left, focus, mood, the road she was warned off); one about to leave keeps
+what she leaves over; loaded, she still does not join her player.
+
+Server only, protocol unchanged, no new class_name. It must ship before the
+next deploy restarts the box (release holds the cut for it).
