@@ -466,6 +466,8 @@ const FREE_INPUTS_MAX := 64
 ## A free body pressing into its own companion bumps her at most this
 ## often, in ticks (688): her yield hears it.
 const FREE_BUMP_TICKS := 5
+## Free movement's wire (decision 689).
+const FreeNet := preload("res://net/free_net.gd")
 ## SHOVE_COST_BASE and SHOVE_COST_SCALE: a shove costs
 ## base + force x target_mass x scale stamina.
 @export var shove_cost_base := 5.0
@@ -6955,6 +6957,94 @@ func request_step(entity_path: NodePath, direction: Vector2i, epoch: int, predic
 		enter(was)
 
 
+## A free body's input commands from its client (decision 689;
+## FreeNet.pack_commands): the newest few, each seq taken once (take_free).
+## Unreliable: the next send repeats what one lost. A sender that does not
+## own the body, or a packet of the wrong shape, is dropped (logged once a
+## peer).
+@rpc("any_peer", "call_remote", "unreliable_ordered")
+func request_free(entity_path: NodePath, packed: PackedByteArray) -> void:
+	if Net.is_authority():
+		free_from(multiplayer.get_remote_sender_id(), entity_path, packed)
+
+
+## request_free's work, by [param sender] (free_net_test's way in): false
+## for one refused.
+func free_from(sender: int, entity_path: NodePath, packed: PackedByteArray) -> bool:
+	var entity := _entity_at_path(entity_path) if Net.is_peer_authenticated(sender) else null
+	if not entity is Player or entity.owner_peer != sender:
+		_free_refused(sender, "not its body: %s" % entity_path)
+		return false
+	var commands := FreeNet.unpack_commands(packed)
+	if commands.is_empty():
+		_free_refused(sender, "a packet of %d bytes" % packed.size())
+		return false
+	var was := enter_named(entity.zone)
+	take_free(entity as Player, commands)
+	enter(was)
+	return true
+
+
+## The most input commands a second a free body takes from its client
+## (decision 689): about 30 come; the rest are dropped.
+const FREE_COMMANDS_PER_SECOND := 40.0
+## Peers whose free commands were refused, logged once each (689).
+var _free_refused_peers: Dictionary[int, bool] = {}
+
+
+func _free_refused(peer: int, why: String) -> void:
+	if not _free_refused_peers.has(peer):
+		_free_refused_peers[peer] = true
+		_log("refused free commands from peer %d (%s); further ones dropped unlogged" % [peer, why])
+
+
+## [param commands] from [param player]'s client (decision 689), or a
+## host's own: each one newer than the last taken goes to free_input, at
+## most FREE_COMMANDS_PER_SECOND a second (by the clock, not the tick).
+## The speed is the bank's (688): no command moves it faster.
+func take_free(player: Player, commands: Array[Dictionary]) -> void:
+	if not free_body(player):
+		return
+	var now := Time.get_ticks_msec()
+	player.free_allowance = minf(player.free_allowance + (now - player.free_allowance_at) / 1000.0 * FREE_COMMANDS_PER_SECOND,
+			FREE_COMMANDS_PER_SECOND)
+	player.free_allowance_at = now
+	for command in commands:
+		var seq: int = command["seq"]
+		if player.free_seen >= 0 and not FreeNet.seq_after(seq, player.free_seen):
+			continue  # Taken already (each send repeats the last few).
+		if player.free_allowance < 1.0:
+			return
+		player.free_allowance -= 1.0
+		player.free_seen = seq
+		var intent: Vector2 = command["intent"]
+		free_input(player, intent.limit_length(1.0), float(command["ticks"]) / TICK_RATE, seq)
+
+
+## Turns free movement on or off for every player, at once (decision 689;
+## the admin's "free_walk on|off"): off, each body is put on the cell it
+## holds (a free body always holds its own) and walks the grid; on, each
+## starts at its cell's centre. What clients see follows Player.free_state.
+func set_free_walk(on: bool) -> void:
+	if free_walk == on:
+		return
+	free_walk = on
+	var zone_was := zone
+	for each: Zone in zones.values() if not zones.is_empty() else [zone]:
+		enter(each)
+		for entity in get_entities():
+			if entity is Player:
+				var player := entity as Player
+				free_drop(player)
+				player.free_pos = Vector2(player.tile)
+				player.free_way = Vector2.ZERO
+				player.free_seen = -1
+				player.free_acked = -1
+				player.free_used = 0.0
+				player.pack_free()
+	enter(zone_was)
+
+
 @rpc("any_peer", "call_remote", "reliable")
 func request_attack(entity_path: NodePath, target_path: NodePath, via: Array) -> void:
 	if not Net.is_authority():
@@ -8336,11 +8426,21 @@ func _free_off_edge(entity: GridEntity, p: Vector2, cell: Vector2i, direction: V
 ## passes through. With [param effects], pressing [param intent] into a
 ## pushable one beside its own cell shifts it a cell when its walk allows,
 ## and one on a link's cell is bumped as a refused step was.
+## Whether [param other] is [param entity]'s own companion, on any peer
+## (689): her keeper is the server's alone; a client knows her by her
+## keeper's peer, so its replay passes through her as the server does.
+static func _own_companion_of(other: GridEntity, entity: GridEntity) -> bool:
+	if not other is Companion:
+		return false
+	var her := other as Companion
+	return her.keeper == entity or her.keeper_peer != 0 and her.keeper_peer == entity.owner_peer
+
+
 func _free_off_cell(entity: GridEntity, p: Vector2, cell: Vector2i, intent: Vector2, effects := true) -> Vector2:
 	if cell == entity.tile:
 		return p
 	var other: GridEntity = _occupancy.get(cell)
-	if other == null or other == entity or other is Companion and (other as Companion).keeper == entity:
+	if other == null or other == entity or _own_companion_of(other, entity):
 		return p
 	var low := Vector2(cell) - Vector2(0.5, 0.5)
 	var nearest := p.clamp(low, low + Vector2.ONE)

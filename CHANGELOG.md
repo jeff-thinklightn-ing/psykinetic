@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Free movement on the wire (not switched on yet): with the server's free_walk on, your client sends where you mean to go each frame and shows your body moving at once, other players glide between the server's updates, one click walks you there and a held button steers round trees and walls; the admin turns it on or off live with free_walk on|off (689).
 - Laying the barrow and the Dwarven Halls anew no longer waits for the world's routes to be worked out again, which could freeze the world for many seconds; the new routes are made in the background (465 amended).
 - The world no longer freezes for everyone for about 17 seconds when the barrow and the Dwarven Halls are laid anew: the game's richness is worked out again in the background, the old answer standing meanwhile (368 amended).
 - Free movement (--free-walk): walking head on into a wall's corner now slides you off it instead of stopping you dead (688 amended).

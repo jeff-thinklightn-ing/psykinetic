@@ -577,6 +577,7 @@ var main_menu: MainMenu
 var connect_screen: ConnectScreen
 ## The title screen's music while the main menu shows (656), let go on Play; null otherwise.
 const TitleMusic := preload("res://client3d/title_music.gd")
+const FreeNet := preload("res://net/free_net.gd")
 var title_music: TitleMusic
 ## _go_online was called (Play once; Change server reconnects instead).
 var _went_online := false
@@ -1189,7 +1190,8 @@ func _process(delta: float) -> void:
 	_run_test_latency()
 	_test_hover()
 	drive_stand_draw(Keys.held("stand") and not is_typing() and _cursor_item.is_empty(), Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT))
-	_drive_wasd()
+	if not _free_drive(delta):
+		_drive_wasd()
 	if not _stance.is_empty() and Net.controls != "wasd" and _local_player() != null:
 		_aim_at_cursor(_local_player())  # A raised shield or a drawn bow turns to the cursor.
 	_check_bandage_hold()
@@ -2599,6 +2601,14 @@ func _apply_azimuth() -> void:
 func _move_click(player: Player, tile: Vector2i, ripple_it := true) -> void:
 	_pack_wanted = null
 	_talk_wanted = null
+	if _free_own(player) != null:
+		_free_route(player, tile)
+		if ripple_it and tile != NONE:
+			if _client3d != null:
+				_client3d.ripple(tile)
+			else:
+				ripple.start(Iso.tile_to_local(tile))
+		return
 	_held_target = tile
 	_held_steered = false
 	if tile == NONE:
@@ -2613,6 +2623,122 @@ func _move_click(player: Player, tile: Vector2i, ripple_it := true) -> void:
 		_client3d.ripple(tile)
 	else:
 		ripple.start(Iso.tile_to_local(tile))
+
+
+## Free movement, the own body (decision 689): each frame the way meant
+## (the keys', the held button's toward the cursor, or a click's route,
+## World.walk_path's cells steered along) goes to the own body's view
+## (FreeNet.Own), which shows it at once and closes a command every
+## FreeNet.SEND_SECONDS; those go to the server (World.request_free; a
+## host's straight to World.take_free).
+var _free := {"path": [], "held": false, "at": 0}
+## How long the button is held after a click before it steers to the
+## cursor rather than walking the click's route.
+const FREE_HOLD_SECONDS := 0.25
+
+
+## The own body's view while it is a free body, else null: a client's from
+## the server's first state of it, a host's made here.
+func _free_own(player: Player) -> FreeNet.Own:
+	if player == null:
+		return null
+	if player.free_view is FreeNet.Own:
+		return player.free_view
+	if Net.is_authority() and World.free_body(player):
+		player.free_view = FreeNet.Own.new()
+		return player.free_view
+	return null
+
+
+## Each frame: true when the own body is free (the grid's drive skipped).
+func _free_drive(delta: float) -> bool:
+	var player := _local_player()
+	var own := _free_own(player)
+	if own == null:
+		_free["path"] = []
+		return false
+	var intent := _free_intent(player, own)
+	if intent != Vector2.ZERO:
+		player.aim = Vector2.ZERO
+	elif Net.controls == "wasd" and (_free["path"] as Array).is_empty():
+		_aim_at_cursor(player)
+	var commands := own.hold(player, intent, minf(delta, 0.1))
+	if commands.is_empty():
+		return true
+	if Net.is_authority():
+		World.take_free(player, commands)
+	else:
+		World._to_server(&"request_free", [player.get_path(), FreeNet.pack_commands(commands)])
+	return true
+
+
+## The way the player means to go this frame, a unit vector or ZERO.
+func _free_intent(player: Player, own: FreeNet.Own) -> Vector2:
+	if is_typing():
+		return Vector2.ZERO
+	var at := own.shown(player)
+	if Net.controls == "wasd":
+		var along := wasd_vector(key_vector(_held_key_names()), _view_yaw())
+		if along.length() > 0.01:
+			_free["path"] = []
+			return along.normalized()
+	var held := Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) or _test_holding
+	if not held:
+		_free["held"] = false
+	# A click walks its route; the button still held past FREE_HOLD_SECONDS
+	# steers to the cursor instead (Jeff: "wasn't one click enough before?").
+	var steering: bool = _free["held"] and Time.get_ticks_msec() - int(_free["at"]) > FREE_HOLD_SECONDS * 1000.0
+	if steering and Net.controls != "wasd":
+		var cursor := _mouse_grid()
+		if not is_nan(cursor.x):
+			var way := cursor - at
+			var from := World.free_cell(player, at)
+			var goal := Vector2i(cursor.round())
+			if from == goal or World._line_clear(from, goal, goal, player):
+				_free["path"] = []  # In the open: straight at the cursor.
+				return way.normalized() if way.length() > 0.25 else Vector2.ZERO
+			# Something in the way (a tree, a wall): round it, as a held walk
+			# on the grid went, planned again as the cursor moves.
+			var now := Time.get_ticks_msec()
+			if goal != _free.get("goal", NONE) or now - int(_free.get("planned", 0)) > 300:
+				_free["goal"] = goal
+				_free["planned"] = now
+				var route: Array = []
+				for cell: Vector2i in World.walk_path(from, goal, player):
+					route.append(cell)
+				_free["path"] = route
+			if (_free["path"] as Array).is_empty():
+				return way.normalized() if way.length() > 0.25 else Vector2.ZERO
+	var path: Array = _free["path"]
+	# The line pulled: a cell passed by on the way to the next is not gone back for.
+	while path.size() >= 2 and at.distance_to(Vector2(path[1])) <= Vector2(path[0]).distance_to(Vector2(path[1])):
+		path.pop_front()
+	while not path.is_empty():
+		var next := Vector2(path[0])
+		var near := 0.05 if path.size() == 1 else 0.45
+		if at.distance_to(next) > near:
+			var way := next - at
+			# The last cell: slower as it comes, so it stops on the centre.
+			return way.normalized() * (clampf(way.length() * 4.0, 0.2, 1.0) if path.size() == 1 else 1.0)
+		path.pop_front()
+	return Vector2.ZERO
+
+
+## A click on [param tile]: its route (World.walk_path's cells), steered
+## along; the button held from here steers to the cursor instead.
+func _free_route(player: Player, tile: Vector2i) -> void:
+	_held_target = NONE
+	_free["held"] = true
+	_free["at"] = Time.get_ticks_msec()
+	var path: Array = []
+	var own := _free_own(player)
+	# From the cell the body is shown on (ahead of the server's claim), so
+	# the route never starts behind it.
+	var from := World.free_cell(player, own.shown(player)) if own != null else player.tile
+	if tile != NONE:
+		for cell: Vector2i in World.walk_path(from, tile, player):
+			path.append(cell)
+	_free["path"] = path
 
 
 ## 678 amended: whether the straight way from the walk's end to [param tile]
@@ -2653,6 +2779,8 @@ func _building() -> bool:
 ## monster, the hold is an attack on it instead (and ends): walking for the
 ## ground under it would go round it.
 func _retarget_held() -> void:
+	if _free_own(_local_player()) != null:
+		return  # A free body: the hold steers it (_free_intent).
 	if _held_target == NONE or not (Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) or _test_holding):
 		if _held_target != NONE and _held_steered:
 			_let_go_held()
@@ -3701,6 +3829,8 @@ func _boot() -> void:
 	World.steps = snapshot.get("steps", 0)
 	# Each regenerating level's generation (decision 465), before any zone opens.
 	_regen = Regen.states_from(snapshot.get("regen", {}))
+	# Free movement (decision 689): as the admin last left it, or --free-walk.
+	World.free_walk = Net.free_walk or bool(snapshot.get("free_walk", false))
 	# The draugr's rest over the barrow's dead (decision 580): none after a restart (573 amended (4);
 	# Jeff: "why does his health and status not reset on server restart"): he is back seated, whole,
 	# his dead awake. A room reset keeps it (_start_level); it is not saved.
@@ -5286,6 +5416,7 @@ func _save_state(wait := true) -> void:
 		"herds": World.herds.to_dict() if World.herds != null else {},
 		"items": World.items.to_dict(),
 		"regen": _regen,
+		"free_walk": World.free_walk,  # Decision 689: the admin's switch outlives a restart.
 		"sky": _sky_saved()}).duplicate(true)  # Its own: the sim goes on meanwhile.
 	_finish_saving()
 	_saver = Thread.new()
@@ -15176,6 +15307,16 @@ func admin_command(line: String, caller: Player = null) -> String:
 				count += _check_respawns(World.tick, true)
 			World.enter(was)
 			return "respawned %d" % count
+		"free_walk":
+			# Decision 689: free movement for every player, live (no release,
+			# no restart), kept in the --state file.
+			if words.size() >= 2 and words[1] in ["on", "off"]:
+				World.set_free_walk(words[1] == "on")
+				if Net.state_path != "":
+					_save_state()
+			elif words.size() >= 2:
+				return "usage: free_walk on|off (now %s)" % ("on" if World.free_walk else "off")
+			return "free walk %s" % ("on" if World.free_walk else "off")
 		"players":
 			var lines: Array[String] = []
 			for peer: int in _players:
@@ -16181,6 +16322,9 @@ func _lat_report() -> void:
 						times[times.size() / 2], times.back(), times.front(), times.size(), never])
 	print("[latency] own corrections %d (%d with her within a cell), swaps with her %d; a companion %s" % [
 			_lat.get("corrections", 0), _lat.get("corrections_near", 0), _lat.get("swaps", 0), "seen" if _lat.get("companion", false) else "none"])
+	var own := _free_own(_local_player())
+	if own != null:
+		print("[latency] free body: %d replay corrections" % own.corrections)
 
 
 ## The turn's response done: from the frame on which the walk goes, and

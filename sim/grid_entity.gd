@@ -553,7 +553,22 @@ func _process(delta: float) -> void:
 	elif _prediction != null and _prediction.take_route_changed():
 		_resend_walk()  # Planned again on the way: the server walks the new plan.
 	if spawned:
-		if _prediction != null and _prediction.is_active():
+		var free_at := _free_shown()
+		if not free_at.is_empty():
+			# A free body (decision 689): its own view (replay) or a mirror's
+			# (interpolated), not cell slides.
+			position = Iso.grid_to_local(free_at[0])
+			_slides.clear()
+			_move_duration = 0.0
+			_from_tile = tile
+			_to_tile = tile
+			var going: Vector2 = free_at[1]
+			stepping = going.length() > 0.05
+			if stepping:
+				wanted = going
+			elif aim != Vector2.ZERO:
+				wanted = aim
+		elif _prediction != null and _prediction.is_active():
 			# The local player's own walking: shown ahead of the server.
 			position = _prediction.position()
 			_walk_shown_at = World.tick + World.tick_alpha
@@ -648,6 +663,12 @@ func _process(delta: float) -> void:
 		_pip.position = _pip_rest + screen_facing.normalized() * PIP_REACH
 	_update_body()
 	_update_flash()
+
+
+## Where a free body is drawn this frame and the way it goes (decision
+## 689): [centre in cells, cells a tick], or [] to draw it by its cell.
+func _free_shown() -> Array:
+	return []
 
 
 ## Whether a slide from [param from] to [param to] goes along the last

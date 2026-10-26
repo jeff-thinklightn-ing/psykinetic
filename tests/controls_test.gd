@@ -49,6 +49,7 @@ func _ready() -> void:
 	_test_cursor_bandage()
 	_test_telegraph_message()
 	_test_item_keys()
+	_test_free_click()
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -1182,6 +1183,51 @@ func _player() -> Player:
 
 
 ## The host's player, moved to [param tile] with nothing queued.
+## Free movement (decision 689; Jeff on the prototype: "left click has to
+## be held down to move. wasn't one click enough before?"): one click and
+## let go walks the whole route to its cell; a new click on the way goes
+## there instead.
+func _test_free_click() -> void:
+	print("
+== a free body: one click let go walks to its cell; a new click redirects ==")
+	var saved: String = Net.controls
+	Net.controls = "click"
+	var player := _place_player(Vector2i(4, 3))
+	World.set_free_walk(true)
+	_main._test_holding = true
+	_main._move_click(player, Vector2i(9, 6))
+	_free_frames(player, 3)
+	_main._test_holding = false  # Let go at once: a click, not a hold.
+	var arrived := _free_frames(player, 300, Vector2i(9, 6))
+	_check(arrived, "one click let go: walked to (9, 6) (at %s, %s)" % [player.tile, player.free_pos])
+	_main._test_holding = true
+	_main._move_click(player, Vector2i(4, 3))
+	_free_frames(player, 3)
+	_main._test_holding = false
+	_free_frames(player, 30)
+	var midway := player.free_pos
+	_main._move_click(player, Vector2i(9, 3))
+	arrived = _free_frames(player, 300, Vector2i(9, 3))
+	_check(midway.distance_to(Vector2(9, 6)) > 0.5 and arrived,
+			"a new click on the way (left (9, 6) for %s): went to (9, 3) instead (at %s)" % [midway, player.free_pos])
+	World.set_free_walk(false)
+	player.free_view = null
+	Net.controls = saved
+
+
+## [param frames] sixtieths of a second of the free drive, World a tick
+## every six: true once the body stands on [param cell]'s centre.
+func _free_frames(player: Player, frames: int, cell := Main.NONE) -> bool:
+	for i in frames:
+		player.free_allowance = World.FREE_COMMANDS_PER_SECOND  # The test runs faster than the clock.
+		_main._free_drive(1.0 / 60.0)
+		if i % 6 == 5:
+			World.step()
+		if cell != Main.NONE and player.tile == cell and player.free_pos.distance_to(Vector2(cell)) < 0.06:
+			return true
+	return false
+
+
 func _place_player(tile: Vector2i) -> Player:
 	var player := _player()
 	player.queued_steps.clear()

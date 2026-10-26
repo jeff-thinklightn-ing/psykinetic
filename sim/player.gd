@@ -14,6 +14,7 @@ extends GridEntity
 ## (Items.RIGHT_HAND, LEFT_HAND) and the armour worn (Items.ARMOUR; decision
 ## 622), from the start, empty.
 const SLOTS := Items.CARRIED
+const FreeNet := preload("res://net/free_net.gd")
 const RIGHT_HAND := Items.RIGHT_HAND
 const LEFT_HAND := Items.LEFT_HAND
 ## Its lantern's light (GridEntity.emit_light) while lit.
@@ -46,6 +47,21 @@ var free_acked := -1
 var free_used := 0.0
 ## Server: the tick it last bumped its own companion as a free body (688).
 var free_bumped_tick := -100000
+## Its free body on the wire (decision 689; FreeNet.pack_state): the
+## server's centre, the last command applied and the tick; empty while it
+## walks the grid. Replicated. Each peer feeds its view from it (free_view).
+var free_state := PackedByteArray():
+	set(value):
+		free_state = value
+		_free_heard()
+## Client and host: the view of its free body, a FreeNet.Own for one's own
+## player (the replay), a FreeNet.Mirror for another's; null on the grid.
+var free_view: RefCounted = null
+## Server: the newest command seq taken from its client (World.take_free),
+## -1 for none yet, and its client's command allowance (World.FREE_COMMANDS_PER_SECOND).
+var free_seen := -1
+var free_allowance := 0.0
+var free_allowance_at := 0
 ## Server only: whose player this is (PlayerRecord.player_id), so the
 ## things it carries know (World.holder_key).
 var player_id := ""
@@ -111,7 +127,70 @@ func _init() -> void:
 	replicate("charges")  # Decision 573: the resurrection charges, and the most they may hold.
 	replicate("charge_room")
 	replicate("heart")  # Mortally Wounded: the heart while downed.
+	replicate("free_state")  # Decision 689: its free body's centre.
 
+
+
+## The packed state of its free body heard (decision 689): one's own
+## player's replay told what the server applied, another's mirror given a
+## sample; empty, the view dropped (back on the grid).
+func _free_heard() -> void:
+	if is_local() and not Net.is_authority():
+		World.free_walk = not free_state.is_empty()  # A client's own rules follow its body.
+	if free_state.is_empty():
+		free_view = null
+		return
+	var state := FreeNet.unpack_state(free_state, World.tick)
+	if state.is_empty():
+		return
+	if is_local():
+		if not free_view is FreeNet.Own:
+			free_view = FreeNet.Own.new()
+		(free_view as FreeNet.Own).confirm(self, state)
+	elif not Net.is_authority():
+		if not free_view is FreeNet.Mirror:
+			free_view = FreeNet.Mirror.new()
+		(free_view as FreeNet.Mirror).add(state)
+
+
+## Placed (a spawn, a respawn, a join): its client's commands count from
+## the start again (decision 689; its view on the client starts afresh).
+func _world_place(new_id: int, at: Vector2i) -> void:
+	super(new_id, at)
+	free_inputs.clear()
+	free_seen = -1
+	free_acked = -1
+	free_used = 0.0
+
+
+## Whether this is the player this peer plays.
+func is_local() -> bool:
+	return owner_peer == Net.local_id  # As Main._local_player.
+
+
+func _free_shown() -> Array:
+	if free_view is FreeNet.Own:
+		var own := free_view as FreeNet.Own
+		return [own.shown(self), own.going()]
+	if free_view is FreeNet.Mirror:
+		var drawn: Array = (free_view as FreeNet.Mirror).at(World.tick + World.tick_alpha - World.display_delay_ticks)
+		return drawn if drawn[0] != Vector2.INF else []
+	return []
+
+
+## Server: its packed state after its turn (decision 689), written only
+## when the centre or what was applied changed, so a body standing still
+## sends nothing; empty off the free walk.
+func pack_free() -> void:
+	if not World.free_body(self):
+		if not free_state.is_empty():
+			free_state = PackedByteArray()
+		return
+	var was := FreeNet.unpack_state(free_state, World.tick)
+	if not was.is_empty() and (was["pos"] as Vector2).distance_to(free_pos) < 0.5 / FreeNet.POS_SCALE \
+			and int(was["acked"]) == free_acked & 0xFFFF and absf(float(was["used"]) - free_used) < 0.5 / FreeNet.USED_SCALE and was["held"] == tile:
+		return
+	free_state = FreeNet.pack_state(free_pos, free_acked, free_used, World.tick, tile)
 
 
 ## L: its lantern covered (no light: it cannot be seen in the dark, nor see
@@ -125,6 +204,7 @@ func _sim_tick() -> void:
 		queued_steps.clear()
 		has_move_order = false
 		World.tend_free_body(self)
+		pack_free()
 		if action_order != Order.NONE:
 			_pursue_action()
 		return

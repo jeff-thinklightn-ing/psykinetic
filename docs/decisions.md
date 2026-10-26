@@ -31733,3 +31733,74 @@ crate it is not shifted; free_cell at 0.55, 0.65 and diagonally; acks:
 halves of 1 and 2 (acked 2, used 0), a tick of 3 (used 1), a halt (acked 4),
 a drawn bow (acked 5), 65 at once (the first, 10, acked). Server only,
 protocol unchanged, no new class_name.
+
+## 689: free movement's wire
+
+Step 2 of free movement (Jeff's pick 3; the coordinator's step list), on
+physics' free body (688, 688 amended) and combat's side. Nothing changes in
+play while the server's free_walk is off. Protocol revision 39.
+
+- **The flag, live.** The admin's `free_walk on|off` (Main.admin_command)
+  calls World.set_free_walk: no release, no restart, and it is kept in the
+  --state file ("free_walk"; --free-walk turns it on at start). Off puts
+  each body on the cell it holds (a free body always holds its own; its
+  companion's cell it only waits on), on starts each at its cell's centre;
+  the seqs and acks start over (as on any placing: a spawn, a respawn, a
+  join). The box stays off until Jeff says.
+- **No message for the flag.** It rides on each player's own replicated
+  Player.free_state: empty, the body walks the grid; not, it is free. A client
+  switches per body as its state arrives, and its own World.free_walk
+  follows its own body.
+- **Commands up.** The owning client closes a command every 1/30 s (the
+  intent quantised to int8s, how long in ms) and sends the newest four by
+  World.request_free, unreliable and ordered (FreeNet.pack_commands, 5 bytes
+  each), so a lost packet costs nothing; standing still sends nothing (the
+  last command goes as it stops and twice more). A host's own go straight to
+  World.take_free.
+- **What the server takes** (the game port is public): the sender must own
+  the body (else dropped, logged once a peer); a packet of the wrong size or
+  more than four is dropped; each seq once (wrapping at 65536); at most 40
+  commands a second by the clock (World.FREE_COMMANDS_PER_SECOND), the rest
+  dropped; each intent at most a unit long. The speed stays the bank's
+  (688): more commands never move it faster.
+- **State down.** Player.free_state (FreeNet.pack_state, 17 bytes): the centre in
+  1/1024 cells, the last command done with (Player.free_acked), the ticks
+  had of the next (free_used), the server tick's low bits and the cell it
+  holds (where the replay's ground speed starts, for physics' 688 amended
+  (3), in the same packet as the centre, never a tile from another). Packed after
+  the body's turn (Player.pack_free) only when the centre or the ack
+  changed, so a body standing still sends nothing.
+- **The own body by replay** (FreeNet.Own): the commands not yet done with
+  are replayed from the server's centre through World.free_glide, the code
+  the server moves it by, and the open command too, each frame: an input
+  shows the frame it is pressed. A correction under 0.75 cells is blended
+  out over 0.1 s; a bigger one (a push, a link) shows at once. A host's and
+  an offline player's own body take the same path. MovePrediction is not
+  used for a free body.
+- **Mirrors** (FreeNet.Mirror): another free player is drawn from the
+  states as they came, World.display_delay_ticks in the past, between the
+  two around it; one that stood still sets off from where it stood a tick
+  before its next state, not gliding all the while.
+- **Steering on the client.** A click plans World.walk_path from the cell
+  the body is shown on and steers along the pulled line, slowing onto the
+  last cell's centre. One click and let go walks the whole route (Jeff on
+  the prototype: "wasn't one click enough before?"); the button still held
+  past 0.25 s steers at the cursor instead, straight in the open and along a
+  route when something stands between (a tree, a wall), planned again as the
+  cursor moves. The keys' way is the intent as it is. Server routes and
+  steps are not sent for a free body.
+- **Her on a client.** A companion's keeper is the server's alone, so a
+  client's replay took its own companion for solid and the server passed
+  through her: corrections up to a cell over the box's link. The free body
+  knows her by World._own_companion_of: her keeper, or her keeper's peer.
+- **Drawing.** GridEntity._free_shown gives a free body's centre and way;
+  the body is drawn there, its cell slides dropped (Client3D reads the
+  position as ever).
+
+Tests: free_net_test (the wire both ways; the five hostile cases; the bank
+the only speed; the own view a frame after its input, no corrections on a
+walk, a turn and a stop; under 150 ms lag each way with every third packet
+lost the view ends on the server's centre; the switch). controls_test
+_test_free_click (one click and let go walks to its cell; a new click on the
+way redirects). The latency harness offline and over the box's link: see
+the landing message.
