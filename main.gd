@@ -3302,27 +3302,109 @@ func generation_of(level_name: String) -> int:
 	return int(_regen.get(level_name, {}).get("generation", 0))
 
 
-## Server, on the slow world tick: every regenerating level that is due
-## is laid again, unless its zone is awake.
+## Server, on the slow world tick: a regenerating level that is due, its
+## zone not awake, is made on _maker while the game goes on, and applied
+## on a later slow tick (decision 684): one level at a time, the next
+## started once the last is applied. Made all on one tick, the barrow's
+## layers and the castle's halls held every player 0.4 to 1.35 s.
 func _regenerate_due() -> void:
+	if not _making.is_empty():
+		if _maker != null and _maker.is_alive():
+			return
+		if not _apply_made():
+			return  # Its zone awake: it waits for the zone to sleep.
 	for level_name in Regen.marked_levels():
-		_regenerate_if_due(level_name)
+		if _start_making_if_due(level_name):
+			return
+
+
+## The generation being made off the main thread (decision 684):
+## {level, generation, config} while _maker makes it or its result waits
+## to be applied; {} with none. Regen.generate_prepared touches no node,
+## autoload or cache; what it returns is written and laid on the main thread.
+var _making := {}
+var _maker: Thread = null
+
+
+## Level [param level_name]'s next generation started on _maker if it is
+## due and nobody is in it (as _regenerate_if_due). True if one was started.
+func _start_making_if_due(level_name: String) -> bool:
+	if not _may_regenerate(level_name):
+		return false
+	var config := Regen.config_of(level_name)
+	var generation := generation_of(level_name) + 1
+	var prepared := Regen.prepare(level_name)
+	if prepared.is_empty():
+		_apply_generation(level_name, config, generation, {})  # Not made: it waits a period, as ever.
+		return false
+	_making = {"level": level_name, "generation": generation, "config": config}
+	_maker = Thread.new()
+	_maker.start(Regen.generate_prepared.bind(prepared, generation))
+	return true
+
+
+## The generation _maker made, laid now if its zone is not awake: true
+## when it was laid (or dropped, no longer the next: "regenerate now" laid
+## one meanwhile), false while it waits. Waits for _maker first.
+func _apply_made() -> bool:
+	if _making.is_empty():
+		return true
+	var level_name: String = _making["level"]
+	var zone: Zone = World.zones.get(level_name)
+	if zone != null and World.zone_awake(zone):
+		return false
+	var made := _join_maker()
+	var making := _making
+	_making = {}
+	if int(making["generation"]) != generation_of(level_name) + 1 or not Regen.may_write():
+		return true
+	_apply_generation(level_name, making["config"], int(making["generation"]), made)
+	return true
+
+
+## What _maker returned, once it has finished ({} with none running).
+func _join_maker() -> Dictionary:
+	if _maker == null:
+		return _making.get("made", {})
+	var made: Dictionary = _maker.wait_to_finish()
+	_maker = null
+	_making["made"] = made
+	return made
+
+
+## The generation being made let go, written nowhere (quitting): _maker
+## joined, its result dropped; the level is laid again when next due.
+func _drop_making() -> void:
+	if _maker != null:
+		_maker.wait_to_finish()
+		_maker = null
+	_making = {}
 
 
 ## Server: level [param level_name] laid again now if it regenerates, its
 ## time has come (Regen.due) and nobody is in it (its zone not open, or
 ## asleep). True if it was.
 func _regenerate_if_due(level_name: String) -> bool:
+	if not _may_regenerate(level_name):
+		return false
+	if _making.get("level", "") == level_name:
+		# Being made off the main thread (decision 684): that one, waited for.
+		var was := generation_of(level_name)
+		_apply_made()
+		return generation_of(level_name) > was
+	return _regenerate(level_name, Regen.config_of(level_name))
+
+
+## Whether level [param level_name] may be laid again now: a server's
+## regenerating level, its time come (Regen.due), nobody in it.
+func _may_regenerate(level_name: String) -> bool:
 	if not Net.is_authority() or not Regen.marked(level_name) or not Regen.may_write():
 		return false
-	var config := Regen.config_of(level_name)
 	var state: Dictionary = _regen.get(level_name, {"generation": 0, "at_step": 0})
-	if not Regen.due(state, config, World.steps):
+	if not Regen.due(state, Regen.config_of(level_name), World.steps):
 		return false
 	var zone: Zone = World.zones.get(level_name)
-	if zone != null and World.zone_awake(zone):
-		return false  # Never under anyone's feet: it waits for the zone to sleep.
-	return _regenerate(level_name, config)
+	return zone == null or not World.zone_awake(zone)  # Never under anyone's feet: it waits for the zone to sleep.
 
 
 ## Server: level [param level_name]'s next generation made (Regen.generate),
@@ -3333,11 +3415,16 @@ func _regenerate_if_due(level_name: String) -> bool:
 ## the anchors, or the overlay refuses it, the level stands as it is and
 ## waits a period again.
 func _regenerate(level_name: String, config: Dictionary) -> bool:
-	var state: Dictionary = _regen.get(level_name, {"generation": 0, "at_step": 0})
-	var generation := int(state["generation"]) + 1
-	var made := Regen.generate(level_name, generation)
+	var generation := generation_of(level_name) + 1
+	return _apply_generation(level_name, config, generation, Regen.generate(level_name, generation))
+
+
+## Generation [param generation] of [param level_name], [param made]
+## (Regen.generate's), written and laid: _regenerate's, or _maker's on the
+## main thread (decision 684). {} or a refused write: it waits a period.
+func _apply_generation(level_name: String, config: Dictionary, generation: int, made: Dictionary) -> bool:
 	if made.is_empty() or not Regen.write(level_name, made):
-		_regen[level_name] = {"generation": int(state["generation"]), "at_step": World.steps}
+		_regen[level_name] = {"generation": generation - 1, "at_step": World.steps}
 		return false
 	_regen[level_name] = {"generation": generation, "at_step": World.steps}
 	print("[regen] %s: generation %d (seed %d, %d of %d tries, every %d days)" % [level_name, generation, made["seed"], made["tries"],
@@ -3864,7 +3951,9 @@ func _boot() -> void:
 		if not Level.exists(zone_name):
 			print("[state] the snapshot's zone %s is no map here; left out" % zone_name)
 			continue
-		_open_zone(zone_name, saved[zone_name])
+		# Opened as saved: a level due is laid on the slow ticks after, one
+		# at a time off the main thread (decision 684), not all here at boot.
+		_open_zone(zone_name, saved[zone_name], false)
 		restored += saved[zone_name]["entities"].size()
 	_open_zone(default_zone())
 	if snapshot["ok"]:
@@ -3904,14 +3993,15 @@ func _move_off_retired(snapshot: Dictionary) -> void:
 ## Loads zone [param zone_name] if it is not loaded yet: its map, its doors,
 ## its level entities (as [param saved], a snapshot's section for it, has
 ## them, if it does). Zones stay loaded. Null for a map that is not there.
-func _open_zone(zone_name: String, saved := {}) -> Zone:
+## [param regenerate] false: a level due is not laid again first (boot).
+func _open_zone(zone_name: String, saved := {}, regenerate := true) -> Zone:
 	if World.zones.has(zone_name):
 		return World.zones[zone_name]
 	if not Level.exists(zone_name):
 		return null
 	# A regenerating level due is laid again before it opens (decision
 	# 465); the snapshot's section for it keeps only what sits in an anchor.
-	if _regenerate_if_due(zone_name) and not saved.is_empty():
+	if regenerate and _regenerate_if_due(zone_name) and not saved.is_empty():
 		var sifted := Regen.keep_section(saved, Regen.config_of(zone_name)["anchors"])
 		saved = sifted["kept"]
 		_lose_items(sifted["lost"], zone_name)
@@ -5292,6 +5382,8 @@ func _exit_tree() -> void:
 		_save_state()
 	# A periodic snapshot still being written finishes first (decision 360).
 	_finish_saving()
+	# A generation being made is let go, written nowhere (decision 684).
+	_drop_making()
 	# Routes still being made on pool tasks would crash a server on its way out.
 	if World.raid_groups != null:
 		World.raid_groups.finish()

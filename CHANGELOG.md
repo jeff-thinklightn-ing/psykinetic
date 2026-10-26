@@ -7,6 +7,8 @@ notes (decision 324).
 
 ## Unreleased
 
+- The world no longer freezes for everyone for up to a second or two every few hours, when the barrow and the Dwarven Halls are laid anew: each is now made in the background and put in place one at a time (684).
+
 ## v0.1.181
 
 - Stopping is crisper: let go of the movement keys or the held mouse button and your character stands as its current step ends, without the slow slide back afterwards (a stop was about a quarter second; now about a tenth with the held button, a sixth with the keys). Letting go of a held-button walk also ends it right there, even when it had to route round your companion, instead of walking on several cells (683).

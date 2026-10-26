@@ -9,7 +9,11 @@ extends Node
 ## says its generation; coming back at a newer generation is told; a player
 ## saved in what is now rock comes back at the nearest anchor's spawn, their
 ## companion beside them; an edited, unmarked level is never written over;
-## the castle is never marked. Run it with tests/run.ps1 or tests/run.sh.
+## the castle is never marked; a generation is made off the main thread
+## and laid on a later slow tick, the same bytes as one made on it, held
+## while its zone is awake, waited for by a player travelling in, and let
+## go unwritten by a quit (decision 684). Run it with tests/run.ps1 or
+## tests/run.sh.
 
 const BO := 2
 const BO_ID := "b0b0b0b0-0000-4000-8000-0000000000b1"
@@ -60,6 +64,7 @@ func _ready() -> void:
 	_test_saved()
 	_test_castle_never_marked()
 	_test_regenerate_now()
+	await _test_made_off_the_main_thread()
 
 	DirAccess.remove_absolute(Net.state_path)
 	Net.state_path = ""
@@ -248,7 +253,7 @@ func _test_travel_when_due() -> void:
 func _test_never_awake() -> void:
 	print("\n== never while awake: the host stands in it, its days are up ==")
 	World.steps += _period
-	_main._regenerate_due()
+	_regenerate_round()
 	_check(_main.generation_of("rg_halls") == 1, "due, but the host is in it: still generation 1")
 	for i in World.WORLD_TICK_STEPS:
 		World.step()
@@ -272,7 +277,7 @@ func _test_asleep_regenerates() -> void:
 	World.step()
 	_check(not World.zones["rg_halls"].awake, "the halls sleep")
 	var richness_before := World.richness
-	_main._regenerate_due()
+	_regenerate_round()
 	_check(World.richness != null and World.richness != richness_before and World.herds.richness == World.richness.richness,
 		"the game's richness is worked out again on the new floor, the herds pointed at it")
 	_check(World.raid_groups != null and World.raid_groups.world_map == _main._world_map and World.richness.world_map == _main._world_map,
@@ -322,7 +327,7 @@ func _test_returning_player_placed() -> void:
 	World.step()
 	World.step()
 	World.steps += _period
-	_main._regenerate_due()
+	_regenerate_round()
 	_check(_main.generation_of("rg_halls") == 3 and not World.zones["rg_halls"].awake, "the halls, asleep, are laid again: generation 3")
 	_main._admit(BO, BO_ID, "Bo")
 	bo = _player(BO)
@@ -342,7 +347,7 @@ func _test_edited_level_refused() -> void:
 	_check(not Regen.write("rg_edited", made), "the write is refused")
 	_check(FileAccess.get_file_as_string(Level.overlay_dir + "rg_edited/level.json") == before, "its level.json is as it was")
 	World.steps += _period
-	_main._regenerate_due()
+	_regenerate_round()
 	_check(_main.generation_of("rg_edited") == 0 and _main._regen["rg_edited"]["at_step"] == World.steps,
 		"the tick leaves it at generation 0 and waits a period before trying again")
 	_check(_main.generation_of("rg_halls") == 3, "the halls, with Bo just come in and the step not yet taken, stay as they are")
@@ -388,7 +393,105 @@ func _test_regenerate_now() -> void:
 	Net.regenerate = true
 
 
+func _test_made_off_the_main_thread() -> void:
+	print("
+== made off the main thread (684): the same bytes; laid on a later slow tick, never while awake; waited for; dropped unwritten ==")
+	# The same seed's generation on a worker thread and on the main thread:
+	# the test's halls and the real levels' generators alike. Godot's thread
+	# guards (a debug build) say so as an error if a generator touches a node.
+	var differ: Array[String] = []
+	for level_name in ["rg_halls", "barrow", "barrow_deep", "castle_halls"]:
+		var worker := Thread.new()
+		worker.start(Regen.generate_prepared.bind(Regen.prepare(level_name), 4))
+		var off_main: Dictionary = worker.wait_to_finish()
+		if off_main.is_empty() or _made_bytes(off_main) != _made_bytes(Regen.generate(level_name, 4)):
+			differ.append(level_name)
+	_check(differ.is_empty(), "each level's generation 4 made on a worker is byte for byte the one made on the main thread (differ: %s)" % [differ])
+
+	# Bo leaves; the halls sleep and come due, the other marked levels kept
+	# off the slow tick, so the halls are the one made.
+	_main._on_peer_disconnected(BO)
+	World.step()
+	World.step()
+	World.steps += _period
+	_only_due("rg_halls")
+	var written := Level.overlay_dir + "rg_halls/level.json"
+	var before := FileAccess.get_file_as_string(written)
+	_main._regenerate_due()
+	_check(_main._making.get("level", "") == "rg_halls" and _main._maker != null and _main.generation_of("rg_halls") == 3,
+		"the slow tick starts the halls' generation 4 on the worker; generation 3 stands meanwhile")
+	_check(FileAccess.get_file_as_string(written) == before, "nothing is written to the overlay while it is made")
+	_main._save_state()
+	_check(Snapshot.load(Net.state_path)["regen"].get("rg_halls", {}).get("generation") == 3.0, "a save meanwhile says generation 3")
+	_await_maker()
+	# Bo is back before the next slow tick: the made generation waits for him.
+	_main._admit(BO, BO_ID, "Bo")
+	_check(_player(BO) != null and _player(BO).zone == "rg_halls", "Bo comes back into the halls")
+	_main._regenerate_due()
+	_check(_main.generation_of("rg_halls") == 3 and _main._making.get("level", "") == "rg_halls" and FileAccess.get_file_as_string(written) == before,
+		"made, but Bo is in the halls: not laid, nothing written, it waits")
+	_main._on_peer_disconnected(BO)
+	World.step()
+	World.step()
+	_main._regenerate_due()
+	_check(_main.generation_of("rg_halls") == 4 and _main._making.is_empty() and _same_floor(Regen.generate("rg_halls", 4)["layout"]),
+		"the halls asleep again: generation 4 laid on the next slow tick, the zone on its map")
+
+	# A quit while one is made: the worker joined, the result dropped, nothing written.
+	World.steps += _period
+	_only_due("rg_halls")
+	before = FileAccess.get_file_as_string(written)
+	_main._regenerate_due()
+	_main._drop_making()
+	_check(_main._maker == null and _main._making.is_empty() and _main.generation_of("rg_halls") == 4 and FileAccess.get_file_as_string(written) == before,
+		"a quit while generation 5 is made joins the worker and writes nothing: generation 4 stands")
+
+	# A player travelling in while one is made waits for it and lands on it.
+	_main._regenerate_due()
+	_check(_main._making.get("level", "") == "rg_halls", "generation 5 is being made")
+	_check(_main.travel(Net.local_id, "rg_halls", "from_castle"), "the host goes down meanwhile")
+	await get_tree().process_frame
+	_check(_main._maker == null and _main._making.is_empty() and _main.generation_of("rg_halls") == 5
+		and _same_floor(Regen.generate("rg_halls", 5)["layout"]) and _player(Net.local_id).zone == "rg_halls",
+		"the travel waited for the worker: the host stands in generation 5, made once")
+	_main.travel(Net.local_id, "rg_castle", "from_halls")
+	await get_tree().process_frame
+
+
 # --- Helpers ----------------------------------------------------------------------
+
+## The slow ticks' regeneration run through (decision 684): each due level
+## made on Main's worker, then laid on the next slow tick, till none is left.
+func _regenerate_round() -> void:
+	for i in 8:
+		_main._regenerate_due()
+		if _main._making.is_empty():
+			return
+		_await_maker()
+
+
+## Every marked level but [param level_name] made not due (its period begun now).
+func _only_due(level_name: String) -> void:
+	for other in Regen.marked_levels():
+		if other != level_name:
+			_main._regen[other] = {"generation": _main.generation_of(other), "at_step": World.steps}
+
+
+## Waits for Main's worker to finish making (its result not yet laid).
+func _await_maker() -> void:
+	while _main._maker != null and _main._maker.is_alive():
+		OS.delay_msec(2)
+
+
+## What Regen.write writes of [param made], as bytes: its layout and height
+## as PNGs, its level.json's config, its seed and tries.
+static func _made_bytes(made: Dictionary) -> PackedByteArray:
+	var out := (made["layout"] as Image).save_png_to_buffer()
+	if made["height"] != null:
+		out.append_array((made["height"] as Image).save_png_to_buffer())
+	out.append_array(JSON.stringify([made["config"], made["seed"], made["tries"]], "", true).to_utf8_buffer())
+	return out
+
 
 func _player(peer: int) -> Player:
 	var player: Player = _main._players.get(peer)

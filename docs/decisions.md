@@ -31217,3 +31217,68 @@ at the step under way; a click let go walks on. The harness stays as a test
 option (Net.test_latency; Main._lat_*).
 
 Client only, protocol unchanged, no new class_name.
+
+## 684. Regeneration made off the main thread
+
+The coordinator asked perf for the server's ~290 ms join stall. That
+turned out to be local: a windowed client starting on the same machine
+starved the server for a frame. With a headless client the whole join took
+8 ms, and on the box the minute after a real join peaks at about 110 ms
+once. The box's real freezes, from its journal (timings and level names
+only), were all zone regenerations. Every 3 game days (4.5 h) barrow,
+barrow_deep and castle_halls (barrow_lair until its retirement in 666) were
+re-laid in one tick: 0.4 to 1.35 s, and 1.2 to 2.2 s at boot. It held
+every player in the world.
+
+Measured on the wilds' world with a private overlay, the zones open and
+asleep as on the box: Regen.generate is 85 to 95% of it (barrow 132 to
+168 ms, barrow_deep 360 to 1091 ms from one try, castle_halls 131 to
+139 ms). Rebuilding the zone takes 19 to 36 ms, WorldMap.build 26 to 33,
+the write 3 to 7, holdings and richness about 1. Spreading the levels over
+ticks alone would still leave barrow_deep's tick at up to 1.1 s.
+- Regen.generate is split: Regen.prepare (the main thread's part: the
+  template from Level's caches, its "regenerate" block, the generator
+  script loaded, the dictionaries copied for the worker) and
+  Regen.generate_prepared (the tries). The generators touch no node,
+  autoload or cache, only the template, LevelMap and Images.
+- Main._regenerate_due, on the slow world tick (every 30 s): a level due,
+  its zone not awake, is started on Main._maker (_start_making_if_due),
+  one at a time. The slow tick after it finishes applies it on the main
+  thread (_apply_made, then _apply_generation: the write, the open zone
+  rebuilt, WorldMap, holdings, raids, trade and richness, as before) and
+  starts the next. A result whose zone has woken meanwhile waits for it to
+  sleep. One that is no longer the next generation is dropped, because the
+  console's "regenerate now" laid one meanwhile.
+- _regenerate_if_due (travel, joining or opening a due level): a level
+  being made is waited for and laid then, made once. Any other due level is
+  made on the spot, as before; the travel card covers it.
+- Boot opens the saved zones as they were (_open_zone's regenerate false).
+  The levels that came due while the server was down are laid on the slow
+  ticks after, the same way.
+- A quit joins the worker and drops its result (_drop_making in
+  _exit_tree). Nothing is written to the overlay until the main thread
+  applies it, and a save meanwhile keeps the old generation, so the level
+  is laid again when next due.
+- Dungeon confirmed that the levels may be laid in any order and at any
+  spacing. Every cross-layer link (stairs, the sealed shortcut) sits in an
+  anchor that generations never move, the niche door is within the barrow
+  alone, and each level is seeded on its own.
+
+Locally (wilds, the three levels open and asleep): all three in one tick
+1166 to 1449 ms before. After, they are laid over 4 slow ticks, the worst
+tick 65 to 69 ms, and no frame over 20 ms while a worker runs.
+regen_test covers the rest:
+- the same seed gives byte-identical generations on a worker and on the
+  main thread (the test's halls, barrow, barrow_deep and castle_halls);
+- nothing is written while a generation is made, and a save meanwhile says
+  the old generation;
+- a result made while Bo comes back waits until the halls sleep, then is
+  laid;
+- a quit mid-generation writes nothing;
+- a travel in mid-generation waits for the worker and stands in the new
+  generation, made once.
+Godot's thread guards are on in this debug build (a probe touching a node
+from a worker printed their errors, which fail the suite), and regen_test
+runs clean under them.
+
+Server only, protocol unchanged, no new class_name.

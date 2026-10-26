@@ -136,6 +136,13 @@ static func states_from(saved: Variant) -> Dictionary:
 ## each other, TRIES seeds tried; {} when none did, or the level has no
 ## template or generator (said in a warning): the caller keeps the last map.
 static func generate(level_name: String, generation: int) -> Dictionary:
+	return generate_prepared(prepare(level_name), generation)
+
+
+## What generate needs that only the main thread may make (decision 684):
+## the template (Level's caches), its "regenerate" block and the generator
+## script loaded; {} (said in a warning) when the level can't be generated.
+static func prepare(level_name: String) -> Dictionary:
 	var made := Level.template(level_name)
 	var layout: Image = made["layout"]
 	if layout == null:
@@ -156,6 +163,23 @@ static func generate(level_name: String, generation: int) -> Dictionary:
 	# The first hall's niches (608): the template's list goes to the
 	# generator, which re-rolls them and moves the hidden door.
 	config["niches"] = made["config"].get("niches", [])
+	# The worker's own copies: Level keeps the template's dictionaries, which
+	# the main thread goes on reading (the images are only read, by both).
+	return {"level_name": level_name, "made": {"layout": layout, "height": made["height"], "config": made["config"].duplicate(true)},
+		"config": config.duplicate(true), "generator": generator}
+
+
+## Generation [param generation] made from [param prepared] (prepare's):
+## generate's tries, touching no node, autoload or cache, so Main runs it on
+## a worker thread (decision 684); {} for an empty [param prepared].
+static func generate_prepared(prepared: Dictionary, generation: int) -> Dictionary:
+	if prepared.is_empty():
+		return {}
+	var level_name: String = prepared["level_name"]
+	var made: Dictionary = prepared["made"]
+	var config: Dictionary = prepared["config"]
+	var generator: GDScript = prepared["generator"]
+	var layout: Image = made["layout"]
 	var template := LevelMap.from_image(layout, made["config"])
 	template.read_heights(made["height"])
 	var anchors: Array = config["anchors"]
