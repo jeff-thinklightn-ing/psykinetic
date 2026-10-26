@@ -43,6 +43,10 @@ const BUMP_REPEAT_TICKS := 10
 const YIELD_PATH_CELLS := 3
 ## A yield's cell is at most this many steps away.
 const YIELD_REACH := 2
+## The cells a yield's search closes at most (685): a way of YIELD_REACH
+## steps lies within the square two cells wider round her; unbounded, a
+## cell behind a wall had the search walk round the zone (332 ms worst).
+const YIELD_SEARCH_TILES := (2 * (YIELD_REACH + 2) + 1) * (2 * (YIELD_REACH + 2) + 1)
 const NO_ROOM_LINE := "There's no room for me to move."
 const NONE := Vector2i(-1, -1)
 ## How long a yield stands aside before her stance takes her back.
@@ -224,6 +228,11 @@ const TEND_BACKOFF := 100
 const REMEDY_BELOW := 0.35
 const ERRAND_BREAK := 4
 const ERRAND_BACK := 2
+## A door side her errand found no way to is not looked for again this
+## many ticks (685): searched each step, it walked the search round the zone.
+const ERRAND_RETRY_TICKS := 20
+## The door sides her errand found no way to: side -> the tick to look again.
+var _errand_no_way: Dictionary[Vector2i, int] = {}
 const LOOK_AROUND := 2
 ## A sentence promising something (PROMISE) that is one of her errands
 ## (_errand_verbs) is said only when it names exactly one thing she could
@@ -642,6 +651,9 @@ const DODGE_LOOK := 12
 const DODGE_REACT := 2
 const DODGE_WARY := 2
 const DODGE_REACH := 3
+## The cells a dodge's way is looked for in at most (685): the square two
+## cells wider than DODGE_REACH round her.
+const DODGE_SEARCH_TILES := (2 * (DODGE_REACH + 2) + 1) * (2 * (DODGE_REACH + 2) + 1)
 ## Her player's bow cone (663 amended): the facing is the server's aim
 ## while drawn, one of eight ways, so the cone is widened by half a way;
 ## and reaches at least this far before the first step.
@@ -4263,18 +4275,23 @@ func _read_telegraphs(fighting: GridEntity) -> Vector2i:
 			_dodge_from = "%s's %s" % [source.name, str(data.get("kind", "blow"))]
 	if from == null:
 		return NONE
-	var best := NONE
-	var best_score := 99999.0
+	var scored: Array[Array] = []
 	for cell in _cells_within(DODGE_REACH):
 		if _danger.has(cell) or not World.is_walkable(cell) or (cell != tile and not World.is_free(cell)):
 			continue
 		var score := World.distance(tile, cell) * 100.0 - World.distance(from.tile, cell)
 		if _alive(fighting) and World.can_melee(cell, fighting.tile):
 			score -= 50.0
-		if score < best_score:
-			best = cell
-			best_score = score
-	return best
+		scored.append([score, scored.size(), cell])
+	# The best she has a short way to (685): one behind a wall is no dodge,
+	# and its way searched each tick walked round the zone. Best first, so
+	# mostly one search.
+	scored.sort_custom(func(a: Array, b: Array) -> bool: return a[0] < b[0] or a[0] == b[0] and a[1] < b[1])
+	for each: Array in scored:
+		var cell: Vector2i = each[2]
+		if cell == tile or not World.find_path(tile, cell, false, null, DODGE_SEARCH_TILES).is_empty():
+			return cell
+	return NONE
 
 
 ## Her walk (decision 551) stops, or is at a way out, for [param why]:
@@ -4411,7 +4428,7 @@ func _find_yield_tile() -> Vector2i:
 			var cell := tile + Vector2i(dx, dy)
 			if cell == tile or line.has(cell) or doors.has(cell) or not World.is_free(cell) or World.is_burning(cell):
 				continue
-			var path := World.find_path(tile, cell)
+			var path := World.find_path(tile, cell, false, null, YIELD_SEARCH_TILES)
 			if path.is_empty() or path.size() > YIELD_REACH:
 				continue
 			var ahead := Vector2(cell - keeper.tile).dot(Vector2(direction))
@@ -4828,6 +4845,7 @@ func _start_errand(action: Dictionary, serial: int) -> void:
 			_log({"kind": "errand", "companion": String(name), "mind": "hands", "trigger": action["words"], "outcome": "set off"})
 			return
 	errand = action.duplicate()
+	_errand_no_way.clear()
 	errand["phase"] = "going"
 	errand["serial"] = serial
 	errand["until"] = World.tick + ERRAND_TICKS
@@ -4898,7 +4916,19 @@ func _errand_walk() -> bool:
 	match str(errand["verb"]):
 		"open", "close":
 			# The door's near side, or its far one if that is taken.
-			for side: Vector2i in [errand["at"]] + Terrain.edge_cells(errand["door"].key):
+			# One found to have no way is looked for again only after
+			# ERRAND_RETRY_TICKS, or when no other side has one (685).
+			var sides: Array[Vector2i] = [errand["at"]]
+			sides.append_array(Terrain.edge_cells(errand["door"].key))
+			var later: Array[Vector2i] = []
+			for side in sides:
+				if World.tick < int(_errand_no_way.get(side, 0)):
+					later.append(side)
+				elif not World.find_path(tile, side).is_empty():
+					return _step_toward(side, false)
+				else:
+					_errand_no_way[side] = World.tick + ERRAND_RETRY_TICKS
+			for side in later:
 				if not World.find_path(tile, side).is_empty():
 					return _step_toward(side, false)
 			return false

@@ -31282,3 +31282,54 @@ from a worker printed their errors, which fail the suite), and regen_test
 runs clean under them.
 
 Server only, protocol unchanged, no new class_name.
+
+## 685. Companions' short searches bounded
+
+A companion asked for short answers through World.find_path with no
+max_tiles. A search like that is unbounded A*, and a cell behind a wall or
+with no way to it walked the search round the whole zone. Over 400 yields
+from cells beside walls in the wilds, one yield's searches took 2.7 ms on
+average and 332 ms at worst. Bounded at 81 cells they take 0.28 ms on
+average and 1.9 ms at worst, and none of 6,852 short ways differ.
+
+- Her yield (_find_yield_tile: every cell within YIELD_REACH, kept only
+  for a way of YIELD_REACH steps or fewer) closes at most
+  YIELD_SEARCH_TILES, (2·(YIELD_REACH+2)+1)² = 81.
+- Her step aside out of her player's way (Heel._aside, wanting a one-step
+  way) closes at most ASIDE_SEARCH_TILES, 49.
+- Her dodge (_read_telegraphs, including the bow cone of 663 amended)
+  chose its cell by distance alone and then walked there by Heel.step's
+  unbounded search every tick. A cell behind a wall had her search round
+  the walls, and an unreachable one flooded the zone. The candidates are
+  now scored as before and taken best first, the first she has a way to
+  within DODGE_SEARCH_TILES, (2·(DODGE_REACH+2)+1)² = 121. A cell with no
+  short way is no dodge, since DODGE_LOOK's 12 ticks can't cover a detour,
+  so she takes the next-best one (the coordinator's (b)). Where today's
+  cell has a way of up to 6 steps the choice is the same.
+- Her door errand looked for a way to each of the door's sides every step,
+  near side first. A side with no way flooded the zone each step while she
+  walked to the far one. A side found with no way is skipped for
+  ERRAND_RETRY_TICKS (20) and asked again only when no other side has a
+  way, so the errand still ends "no way there" exactly when today's does.
+  The one change: she keeps to the far side for up to 2 s after the near
+  one opens up.
+
+The other per-tick callers were audited and left alone:
+- monsters' flee (bounded by IDLE_SEARCH_TILES);
+- leash and the swap (no search);
+- herd grazing and regrouping (Monster's idle, _about_search);
+- the heel and catch-up walks, players' and residents' routes, the guide's
+  leg fallback and main's shop and store checks (long answers, not short
+  ones).
+The step memo stays as it is: a cold memo makes the farthest walk 85 ms
+against 11 ms warm.
+
+path_bound_test checks every short way, bounded against unbounded, on the
+wilds and the castle from about 250 to 400 cells beside walls and doors:
+- yields: 0 of 12,374 ways of up to 2 steps differ;
+- steps aside: 0 of 4,295 one-step ways differ;
+- dodges: 0 of 24,349 ways of up to 6 steps differ;
+- nothing the bounded search finds differs from the unbounded way.
+With a yield bound of 6 it fails, so it catches a bound that is too small.
+
+Server only, protocol unchanged, no new class_name.

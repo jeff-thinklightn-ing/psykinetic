@@ -8,6 +8,7 @@ notes (decision 324).
 ## Unreleased
 
 - The world no longer freezes for everyone for up to a second or two every few hours, when the barrow and the Dwarven Halls are laid anew: each is now made in the background and put in place one at a time (684).
+- A companion stepping aside, dodging a blow or going to open a door no longer stalls the server looking for a way round walls: her short searches stop early, and a dodge picks a cell she can actually reach (685).
 
 ## v0.1.181
 

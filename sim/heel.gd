@@ -30,6 +30,9 @@ const SETTLE_TICKS := 6
 ## How many of the leader's footsteps are kept (_trail).
 const TRAIL_KEPT := 4
 const NONE := Vector2i(-1, -1)
+## The cells _aside's one-step search closes at most (685): a one-step way
+## lies within the 7 by 7 round her.
+const ASIDE_SEARCH_TILES := 49
 
 ## How far the leader gets before she sets off (START; a companion's bond
 ## moves it, decision 555).
@@ -156,7 +159,7 @@ static func _aside(body: GridEntity, leader: GridEntity, clear: Dictionary) -> V
 		var at := body.tile + way
 		if clear.has(at) or World.distance(at, leader.tile) > STOP or Companion.door_cells().has(at):
 			continue
-		if not (World.is_walkable(at) and World.is_free(at)) or World.find_path(body.tile, at).size() != 1:
+		if not (World.is_walkable(at) and World.is_free(at)) or World.find_path(body.tile, at, false, null, ASIDE_SEARCH_TILES).size() != 1:
 			continue
 		if best == NONE or World.distance(at, leader.tile) < World.distance(best, leader.tile):
 			best = at
