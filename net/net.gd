@@ -133,6 +133,7 @@ extends Node
 ##   --test-protocol=<s>          client: claim this build fingerprint instead of the real one
 ##   --test-lag=<seconds>         client: hold every order this long before sending it
 ##   --test-steer=<seconds>       hold-to-move with a cursor that swings a quarter turn this often
+##   --test-hold-near=<s>[,route] the left button held that long, the cursor kept a diagonal cell ahead (678)
 ##   --test-fight=<seconds>       strike at the nearest monster this often (closing in on it), between steering
 ##   --test-chase=<seconds>       hold-to-move on the nearest animal as drawn (a deer first) for this long, as a
 ##                                cursor kept on a fleeing deer does (tools/net_chase.sh)
@@ -745,6 +746,11 @@ var test_steer := 0.0
 var test_fight := 0.0
 ## --test-chase: seconds of chasing the nearest animal as drawn.
 var test_chase := 0.0
+## --test-hold-near: seconds of the left button held with the cursor kept
+## still on screen a diagonal cell ahead of the body (Jeff's repro, 678);
+## ",route" walks it as routes, without the steer.
+var test_hold_near := 0.0
+var test_hold_route := false
 ## --test-smooth: Main measures what it draws (net/smooth_meter.gd).
 var test_smooth := false
 ## --test-walk: [{"keys": "wd", "seconds": 1.0}, ...]
@@ -1884,7 +1890,7 @@ func _parse_args() -> void:
 					"--builders", "--builder-model", "--builder-effort", "--builder-max-cost", "--lawspeaker", "--proposed", \
 					"--test-move", "--test-contest", "--test-reset", "--test-builder", "--test-exit-after", "--test-exit-on", "--test-wait-players", "--test-herds", "--test-hold", "--test-version", "--test-protocol", \
 					"--screenshot", "--test-show", "--test-hover", "--test-door", "--test-chest", "--test-click", "--test-fullscreen", "--test-azimuth", "--test-yaw", \
-					"--test-lag", "--test-steer", "--test-fight", "--test-chase", "--test-walk", "--tick-send-hz":
+					"--test-lag", "--test-steer", "--test-fight", "--test-chase", "--test-walk", "--tick-send-hz", "--test-hold-near":
 				if not has_value and i + 1 < args.size():
 					i += 1
 					value = args[i]
@@ -1923,6 +1929,9 @@ func _set_option(key: String, value: String) -> void:
 			test_fight = maxf(value.to_float(), 0.0)
 		"--test-chase":
 			test_chase = maxf(value.to_float(), 0.0)
+		"--test-hold-near":
+			test_hold_near = maxf(value.get_slice(",", 0).to_float(), 0.0)
+			test_hold_route = value.get_slice(",", 1) == "route"
 		"--test-walk":
 			test_walk.clear()
 			for part in value.split(","):

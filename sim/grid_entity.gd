@@ -1110,6 +1110,13 @@ func hint_step(direction: Vector2i) -> void:
 		_prediction.hint(direction)
 
 
+## 678: the held walk's straight line ([param origin], [param along] in grid
+## units; INF for none), so the own body is drawn on it, not cell to cell.
+func hint_line(origin: Vector2, along: Vector2) -> void:
+	if _prediction != null:
+		_prediction.hint_line(origin, along)
+
+
 ## Whether the local player's walk is ready for its next WASD step: the
 ## one on screen is ending. Always true without prediction (the server
 ## queues and times the steps itself).

@@ -121,7 +121,7 @@ func _sim_tick() -> void:
 	if tile == move_order:
 		has_move_order = false
 		return
-	var path := World.find_path(tile, move_order, true)
+	var path := World.walk_path(tile, move_order)  # 678: straight where a line can go.
 	if path.is_empty():
 		has_move_order = false
 	elif not World.try_move(self, path[0] - tile):
@@ -168,7 +168,7 @@ func _walk_via() -> bool:
 		move_via.clear()
 		return false
 	if has_move_order and move_via.back() == move_order:
-		var own := World.find_path(tile, move_order, true)
+		var own := World.walk_path(tile, move_order)
 		if not own.is_empty() and own.size() + World.DETOUR_STEPS <= move_via.size():
 			move_via.clear()
 			return false

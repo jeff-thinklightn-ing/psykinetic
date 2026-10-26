@@ -9093,6 +9093,64 @@ func find_path(from: Vector2i, to: Vector2i, ignore_goal_occupant := false,
 	return path
 
 
+## A player's own way from [param from] to [param to] (decision 678;
+## Jeff: "walking still wants to be on a diagonal and it doesn't fit with
+## the new camera"): find_path's way with the string pulled, each run of it
+## that a straight line can take replaced by that line (line_cells), so a
+## clearing is crossed straight, not as a staircase of diagonals then
+## straights. A run grows while the line from its start to the next point
+## of the way is all steps the way could take (_line_clear: no wall or
+## corner refusal, nobody but [param ignore] or the goal's occupant, no
+## fire); never longer, as a line of n cells is n steps and the same
+## diagonals. Players' own routes only (the prediction's plan and
+## Player's re-path); monsters keep find_path.
+func walk_path(from: Vector2i, to: Vector2i, ignore: GridEntity = null) -> Array[Vector2i]:
+	var path := find_path(from, to, true, ignore)
+	if path.size() < 3:
+		return path
+	var pulled: Array[Vector2i] = []
+	var anchor := from
+	var i := 0
+	while i < path.size():
+		var j := i
+		while j + 1 < path.size() and _line_clear(anchor, path[j + 1], to, ignore):
+			j += 1
+		pulled.append_array(line_cells(anchor, path[j]))
+		anchor = path[j]
+		i = j + 1
+	return pulled
+
+
+## The cells of the straight line from [param a] to [param b] (decision
+## 678), b's included and a's not: one a step, each a king's move, the
+## nearest cell to the true line at each of the max(|dx|, |dy|) steps.
+static func line_cells(a: Vector2i, b: Vector2i) -> Array[Vector2i]:
+	var cells: Array[Vector2i] = []
+	var delta := b - a
+	var n := maxi(absi(delta.x), absi(delta.y))
+	for k in range(1, n + 1):
+		var t := float(k) / float(n)
+		cells.append(a + Vector2i(roundi(delta.x * t), roundi(delta.y * t)))
+	return cells
+
+
+## Whether every step of the line from [param a] to [param b] could be
+## walked as find_path walks (decision 678): the terrain lets it (walls,
+## corners, heights; doors open), nobody stands in it but [param ignore]
+## or whoever holds [param goal], and it is not on fire.
+func _line_clear(a: Vector2i, b: Vector2i, goal: Vector2i, ignore: GridEntity) -> bool:
+	var at := a
+	for next in line_cells(a, b):
+		if _terrain_blocks_step(at, next - at, true):
+			return false
+		if next != goal and _occupancy.has(next) and _occupancy[next] != ignore:
+			return false
+		if is_burning(next):
+			return false
+		at = next
+	return true
+
+
 ## What the terrain lets a walker who opens doors do stepping from
 ## [param from] the way DIRECTIONS[[param way]] points (PATH_STEP_*),
 ## worked out once a zone's terrain and remembered: walls, heights and

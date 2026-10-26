@@ -30582,3 +30582,75 @@ its range, step_pace, physics' radii giving plate 0 dB at a walk and louder
 at a run. view_test _test_sounds_follow_events: a player's step in plate clanks, in mail
 jingles, in leather nothing more. Client only, protocol unchanged, no new
 class_name.
+
+## 678. Straight lines over the tiles
+
+Jeff: "with the original tile system, walking still wants to be on a
+diagonal and it doesn't fit with the new camera"; the coordinator's option
+1, approved as ui designed it: the server stays on cells, but a walk goes
+and looks straight. Folded in, Jeff's "movement with the mouse and left
+click seems slightly jumpy ... it highlights a tile which is unneeded" and
+his repro ("placing the cursor to move on a diagonal 1 square in front of
+me and if i keep that there the run camera stutter is reproducible").
+
+- **Held keys (client):** the keys' way is the exact camera-relative angle
+  (Main.wasd_vector), not rounded to the eight. Each step is one of the two
+  of the eight either side of it, the one that leaves the body nearer the
+  line through where the walk was anchored (Main.line_steps, a DDA), so over
+  a few steps the walk goes where it is pushed. A walled pick takes the
+  other; the line is anchored again where the walk is when the way changes
+  (a key, the yaw) or the body is off it by LINE_OFF (a push, a walled pick
+  taken round). The steps are plain order_steps: nothing new on the wire or
+  in the server's prediction. The 655 hint is the line's next pick.
+- **Clicked routes (sim, players' own):** World.walk_path is find_path with
+  the string pulled: each run of the way that a straight line (line_cells,
+  the nearest cell to the true line at each of max(|dx|, |dy|) steps) can
+  take is replaced by it, a run growing while every step of its line is one
+  the way could take (_line_clear: no wall or corner refusal, nobody but the
+  walker or the goal's holder, no fire). Never longer: the same steps and
+  diagonals, so the same time. The prediction's plan and its shorter-way
+  check, Player's re-path and its via check use it; monsters and companions
+  keep find_path. A server change (the host's and a walk past the via
+  tiles), no wire change.
+- **The glide (client, own body):** the prediction draws the body on its
+  walk's line (MovePrediction._glide): the held line (hint_line, fresh), or
+  the run of the planned route round the step that keeps to two
+  neighbouring ways, both taken. The 655-bent point is pulled onto the line,
+  GLIDE_MAX half a cell at most; a change of line (a new way, the route's
+  next run, none) is eased out at GLIDE_EASE rather than jumped. A step
+  drawn from where the body was (a correction, a walk from rest, a settle)
+  is not pulled. The facing is the line's way. Others are drawn as 655 has
+  them; the cell stays the server's for everything.
+- **The held button near the body steers:** with the cursor within
+  STEER_CELLS of the body, the held left button walks the cursor's way on
+  the same line as a held key, one steady run, never a cell reached and
+  set off from again. Held farther, a new walk only when the cell changes
+  and a straight step's time apart at most, with no ripple.
+- **The jitter's cause:** every new cell under a held button was a new
+  order, and MovePrediction.order dropped the planned step after the one
+  under way; in its second half 655 had already bent the body toward that
+  step, so the body ended half a step on toward a cell no longer planned and
+  the new route set off from the centre: a jump at every re-order in a
+  step's tail. Now an order keeps the step the one under way bends into
+  (_cancel_unbent) and plans on from it; the server walks it as a via tile.
+  Jeff's repro was the worst case: the cell under a still cursor moving
+  with the camera, one step away, re-ordered every step.
+- **The hover square** shows only while building (Main._building) and where
+  a cell is the answer (the drawn bow's landing cell); in play the cursor is
+  enough. The lob's ring is its own.
+- **Tests:** mirror_test (where the prediction is driven by hand):
+  _test_a_route_is_drawn_straight (a 12 x 4 route, each cell within half a
+  cell of the line, drawn within 0.1), _test_a_held_line_is_drawn_straight
+  (a 20 degree line, ten steps, drawn within 0.1). controls_test
+  _test_straight_lines: W at a 20 degree yaw within half a cell of its line
+  over ten steps; the button held a diagonal cell ahead sends a step that
+  way, no walk to a cell; held far, one walk a step's time apart.
+- **Not here:** the companion stutter (net_smooth, clean, 60 s: a WASD
+  walker's corrections 8/min with companions, 0 without, 7 of them "no
+  confirmation", the server taking the step late beside her; every body
+  near drawn going back 82 and 157 frames/min against 18 and 31, not split
+  by body, so not yet hers): a step swapping with your own companion at
+  once to physics; which bodies go back, measured per body, next.
+
+No wire change, protocol unchanged; walk_path needs the server deployed.
+No new class_name.

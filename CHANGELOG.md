@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Walking goes straight where you point: held keys follow the camera's exact angle instead of the nearest diagonal, a clicked walk across open ground is one straight line instead of a staircase, and your body is drawn gliding along it. Holding the left button just ahead of you now steers a steady run (no more stop-start stutter), holding it farther away no longer jerks the walk each time the cursor crosses a cell, and the square under the cursor only shows while building.
 - Armour is heard as you move: plate clanks and a mail shirt jingles with each step, louder at a run and as far as the animals hear it; leather and robes stay quiet (676 step 1b, sound's side).
 - Walking into your own companion swaps places with her at once, so a walk past her no longer stutters or snaps back; not while she is fighting, dodging a blow or down (679).
 - The pack sheet shows your load: what you carry against your own weight and how burdened that is (light, burdened, heavy, overloaded), then what sits on your arms and on your body and what each slows (the draw and swing, the walk and breath).

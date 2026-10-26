@@ -30,6 +30,8 @@ func _ready() -> void:
 	_test_a_large_correction_slides_not_snaps()
 	_test_a_slow_step_overtaken_is_not_cut_short()
 	_test_the_display_clock_waits_out_a_stall()
+	_test_a_route_is_drawn_straight()
+	_test_a_held_line_is_drawn_straight()
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -402,6 +404,94 @@ func _test_the_display_clock_waits_out_a_stall() -> void:
 	_check(lead <= World.CLOCK_LEAD_MAX + 0.001, "stalled, it waits %.2f ticks past the last tick" % lead)
 	_check(back >= 0.0, "and never goes back (%.2f)" % back)
 
+
+
+## Decision 678 (Jeff: "walking still wants to be on a diagonal and it
+## doesn't fit with the new camera"): an open floor, 60 x 60 (the tests
+## walk its far quarter, clear of the bodies the tests before left).
+func _open_floor() -> void:
+	var floor_tiles: Array[Vector2i] = []
+	for x in 60:
+		for y in 60:
+			floor_tiles.append(Vector2i(x, y))
+	World.mirror_terrain({"floor": floor_tiles, "fire": [], "edges": {}})
+
+
+## How far [param point] is off the line through [param origin] along [param along].
+static func _off_line(point: Vector2, origin: Vector2, along: Vector2) -> float:
+	return absf(along.normalized().cross(point - origin))
+
+
+func _test_a_route_is_drawn_straight() -> void:
+	print("\n== 678: a route across open ground is one straight line, and the body is drawn on it ==")
+	_open_floor()
+	var me := _me(Vector2i(32, 32))
+	var via := me.predict_move(Vector2i(44, 36))
+	var origin := Vector2(32, 32)
+	var along := Vector2(12, 4)
+	var worst_cell := 0.0
+	for cell in via:
+		worst_cell = maxf(worst_cell, _off_line(Vector2(cell), origin, along))
+	_check(via.size() == 12 and via.back() == Vector2i(44, 36) and worst_cell <= 0.5,
+			"12 steps, every cell within half a cell of the line, no staircase (worst %.2f; %s)" % [worst_cell, via])
+	_check(World.line_cells(Vector2i(0, 0), Vector2i(6, 2)) == [Vector2i(1, 0), Vector2i(2, 1), Vector2i(3, 1), Vector2i(4, 1), Vector2i(5, 2), Vector2i(6, 2)],
+			"line_cells: a king's move a step, the nearest cell to the line at each")
+	var worst := 0.0
+	var frames := 0
+	while me._prediction.is_active() and frames < 600:
+		me._prediction.advance(1.0 / 60.0)
+		if not me._prediction.is_active():
+			break
+		worst = maxf(worst, _off_line(Iso.local_to_grid(me._prediction.position()), origin, along))
+		frames += 1
+	var arrived := Iso.local_to_grid(me._prediction.position())
+	_check(frames > 60 and worst <= 0.1 and arrived.distance_to(Vector2(44, 36)) < 0.01,
+			"drawn within 0.1 cell of the line the whole way there (worst %.3f over %d frames; at %s)" % [worst, frames, arrived])
+	me._prediction.clear()
+	me.queue_free()
+
+
+func _test_a_held_line_is_drawn_straight() -> void:
+	print("\n== 678: a held key at 20 degrees walks a 20 degree line, drawn on it ==")
+	_open_floor()
+	var me := _me(Vector2i(33, 40))
+	var origin := Vector2(33, 40)
+	var along := Vector2.from_angle(deg_to_rad(20.0))
+	var steps := 0
+	var worst := 0.0
+	var worst_cell := 0.0
+	var frames := 0
+	while steps < 10 and frames < 1200:
+		me._prediction.hint_line(origin, along)
+		# As Main._drive_wasd: the line's pick from the walk's end, hinted each frame.
+		var from: Vector2i = me._prediction._steps.back().to if me._prediction.is_active() else me.tile
+		var pick: Vector2i = Main.line_steps(from, origin, along)[0]
+		me._prediction.hint(pick)
+		if me._prediction.ready_for_step():
+			if me._prediction.step(pick):
+				steps += 1
+				worst_cell = maxf(worst_cell, _off_line(Vector2(from + pick), origin, along))
+		me._prediction.advance(1.0 / 60.0)
+		for shown in me._prediction._steps:
+			if not shown.confirmed and shown.started and me._prediction._clock >= shown.start + shown.duration:
+				me.tile = shown.to
+				me._prediction.reconcile(shown.to)  # The server takes it as shown.
+		if steps >= 3 and me._prediction.is_active():  # Under way: the first step from rest eases onto the line.
+			var off := _off_line(Iso.local_to_grid(me._prediction.position()), origin, along)
+			if off > 0.1:
+				var c: Variant = me._prediction._current()
+				print("off %.3f step %s->%s fg %s settle %s bends %s t %.2f n %d pull %s carry %s coast %s" % [off, c.from, c.to, c.from_grid, c.settle, me._prediction._bends(c), (me._prediction._clock - c.start) / c.duration, me._prediction._steps.size(), me._prediction._glide_last, me._prediction._glide_carry, me._prediction._coasting])
+			worst = maxf(worst, off)
+		frames += 1
+	var end: Vector2i = me._prediction._steps.back().to if me._prediction.is_active() else me.tile
+	var angle := rad_to_deg(Vector2(end - Vector2i(33, 40)).angle())
+	_check(steps == 10 and worst_cell <= 0.5 and absf(angle - 20.0) < 4.0,
+			"ten steps, each cell within half a cell of the line, ending %.1f degrees on (%s; %d steps, %d frames, tile %s)" % [angle, end, steps, frames, me.tile])
+	_check(worst <= 0.1, "drawn within 0.1 cell of the line (worst %.3f)" % worst)
+	var picks := Main.line_steps(Vector2i(0, 0), Vector2.ZERO, Vector2.from_angle(deg_to_rad(20.0)))
+	_check(picks[0] == Vector2i(1, 0) and picks[1] == Vector2i(1, 1), "at the line's start the straight step first, the diagonal the other (%s)" % [picks])
+	me._prediction.clear()
+	me.queue_free()
 
 # --- helpers ------------------------------------------------------------------
 
