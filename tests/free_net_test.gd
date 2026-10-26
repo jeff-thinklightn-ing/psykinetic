@@ -45,6 +45,7 @@ func _ready() -> void:
 	_test_bank()
 	_test_own_view()
 	_test_lag_and_loss()
+	_test_lag_across_fords()
 	_test_companion_on_a_client()
 	_test_switch()
 	World.free_walk = false
@@ -161,6 +162,32 @@ func _test_own_view() -> void:
 func _test_lag_and_loss() -> void:
 	print("\n== under lag and loss: the view ends where the server does ==")
 	var player := _build(WALLED, Vector2i(1, 2))
+	# North-east along the wall's south side, then up past its end.
+	var own := _lagged(player, [[Vector2(1, -1).normalized(), 150], [Vector2.UP, 40], [Vector2.ZERO, 80]])
+	_check(own.shown(player).distance_to(player.free_pos) < 0.02, "the view ends on the server's centre (%s, %s)" % [own.shown(player), player.free_pos])
+	_check(player.free_pos.y < 1.0, "the body slid along the wall and went up past its end (%s)" % player.free_pos)
+	_check(own.corrections <= 2, "corrections under a third lost: %d" % own.corrections)
+
+
+## Across fords (688 amended (3)): the replay carries the server's held cell,
+## so a command crossing from slow ground to open goes as the server's did.
+func _test_lag_across_fords() -> void:
+	print("
+== under lag and loss across fords: no corrections ==")
+	var player := _build(OPEN, Vector2i(0, 0))
+	for x in [1, 3, 5, 7]:
+		for y in 5:
+			World._fords[Vector2i(x, y)] = true
+	var own := _lagged(player, [[Vector2(1, 0.5).normalized(), 90], [Vector2(1, -0.3).normalized(), 60], [Vector2.ZERO, 80]])
+	World._fords.clear()
+	_check(player.free_pos.x > 4.0, "it crossed the fords (%s)" % player.free_pos)
+	_check(own.shown(player).distance_to(player.free_pos) < 0.02 and own.corrections == 0,
+			"the view ends on the server's centre, never corrected (%d, %s)" % [own.corrections, own.shown(player)])
+
+
+## Walks [param player] by [param plan] ([intent, frames]) through an Own,
+## 150 ms each way, every third packet lost; returns the Own.
+func _lagged(player: Player, plan: Array) -> FreeNet.Own:
 	player.owner_peer = 4242  # Not this peer's: its states come to `own` by hand, late.
 	var own := FreeNet.Own.new()
 	var to_server: Array[Array] = []  # [due frame, commands]
@@ -168,9 +195,7 @@ func _test_lag_and_loss() -> void:
 	var lag := 9  # Frames each way: 150 ms.
 	var frame := 0
 	var sent := 0
-	# North-east along the wall's south side, then up past its end.
-	var plan: Array[Array] = [[Vector2(1, -1).normalized(), 150], [Vector2.UP, 40], [Vector2.ZERO, 80]]
-	for leg in plan:
+	for leg: Array in plan:
 		for i in int(leg[1]):
 			frame += 1
 			var commands := own.hold(player, leg[0], FRAME)
@@ -187,9 +212,7 @@ func _test_lag_and_loss() -> void:
 				to_client.append([frame + lag, player.free_state.duplicate()])
 			while not to_client.is_empty() and int(to_client[0][0]) <= frame:
 				own.confirm(player, FreeNet.unpack_state(to_client.pop_front()[1], World.tick))
-	_check(own.shown(player).distance_to(player.free_pos) < 0.02, "the view ends on the server's centre (%s, %s)" % [own.shown(player), player.free_pos])
-	_check(player.free_pos.y < 1.0, "the body slid along the wall and went up past its end (%s)" % player.free_pos)
-	_check(own.corrections <= 2, "corrections under a third lost: %d" % own.corrections)
+	return own
 
 
 func _test_companion_on_a_client() -> void:

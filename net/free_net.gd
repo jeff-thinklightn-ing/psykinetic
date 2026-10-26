@@ -113,6 +113,8 @@ class Own:
 	var open_seconds := 0.0
 	## The centre after the server's state and the closed commands.
 	var base := Vector2.INF
+	## The cell held at base (688 amended (3)): the server's, from its state on.
+	var held := World.NO_CELL
 	## The way the last glide went, cells a tick.
 	var way := Vector2.ZERO
 	## What the view is off by and blends out (a small correction).
@@ -140,6 +142,7 @@ class Own:
 		error = error.move_toward(Vector2.ZERO, error.length() * minf(delta / BLEND_SECONDS, 1.0) + 0.0001)
 		if base == Vector2.INF:
 			base = entity.free_pos
+			held = entity.tile
 		var now := quantise(intent)
 		if now == Vector2.ZERO:
 			var out: Array[Dictionary] = []
@@ -193,6 +196,7 @@ class Own:
 			pending.pop_front()
 		var was := base
 		base = state["pos"]
+		held = state["held"]
 		way = Vector2.ZERO
 		for i in pending.size():
 			var command: Dictionary = pending[i]
@@ -217,7 +221,7 @@ class Own:
 			return entity.free_pos
 		var at := base
 		if open_intent != Vector2.ZERO and open_seconds > 0.0:
-			at = World.free_glide(entity, base, open_intent, open_seconds * World.TICK_RATE)[0]
+			at = World.free_glide(entity, base, open_intent, open_seconds * World.TICK_RATE, held)[0]
 		return at + error
 
 	## The way it is going now, cells a tick.
@@ -225,9 +229,10 @@ class Own:
 		return way if open_intent == Vector2.ZERO else open_intent * maxf(way.length(), 0.0001) / maxf(open_intent.length(), 0.0001)
 
 	func _glide(entity: GridEntity, command: Dictionary) -> void:
-		var glided: Array = World.free_glide(entity, base, command["intent"], float(command["ticks"]))
+		var glided: Array = World.free_glide(entity, base, command["intent"], float(command["ticks"]), held)
 		base = glided[0]
 		way = glided[1]
+		held = glided[2]
 
 
 ## Another's free body (a mirror): the server's states as they came, drawn

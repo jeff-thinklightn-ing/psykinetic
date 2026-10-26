@@ -31833,3 +31833,17 @@ exactly, the cell held the server's each time; by walls under 0.01 (a
 circle rounding a convex corner goes a little otherwise as its substeps
 fall; allowed 0.02). Server and sim only, protocol unchanged, no new
 class_name; ui's FreeNet.Own passes held through.
+
+## 689 amended: the own replay carries the server's held cell
+
+688 amended (3) gave World.free_glide the cell held at its start and back
+the cell held at its end, since ground speed is read from the held cell
+(hysteresis keeps it 0.1 past an edge). FreeNet.Own now keeps `held`
+beside `base`: the server's held cell from each state (Player.free_state
+already carries it, 689), passed into each replayed command's glide and
+taken back from it, and into the open command's. Without it a replay read
+speed from the cell its centre rounded to, and a step from a ford onto open
+ground came out a little off: free_net_test's new case (150 ms each way,
+a third of packets lost, across fords on every other column) counted 11
+corrections before, none now. Client only, protocol unchanged, no new
+class_name.
