@@ -280,6 +280,17 @@ func set_mood(worker_id: String, mood: String, why := "") -> void:
 		_workers[worker_id]["mood_why"] = why
 
 
+## Why a companion who left her player went, and what might bring her back
+## (581 amended, npc's side): two sentences companions' side writes ("You
+## left Jeff because ...", "You might go with them again if ..."), facts
+## for her resident prompt when her own player speaks to her; "" clears.
+## Nothing for an unknown id.
+func set_left(worker_id: String, why: String, back: String) -> void:
+	if _workers.has(worker_id):
+		_workers[worker_id]["left_why"] = why
+		_workers[worker_id]["left_back"] = back
+
+
 ## Worker [param worker_id]'s [param quality] of MIND, 1..10: a companion
 ## resting in town brings hers from her card (decision 442); nothing for an
 ## unknown id.

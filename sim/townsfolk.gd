@@ -907,6 +907,25 @@ static func _chance(worker_id: String, due: int) -> float:
 	return rng.randf()
 
 
+## The town's word of [param player_id] (581 amended, npc's side): the mean
+## Standing.score toward them over [param town]'s residents who have met
+## them (a card with their entry), companions skipped; 0.0 for none.
+static func reputation(production: Production, town: String, player_id: String) -> float:
+	if production == null or player_id.is_empty():
+		return 0.0
+	var total := 0
+	var count := 0
+	for id: String in production.worker_ids(town):
+		if id.begins_with(COMPANION):
+			continue
+		var card: Dictionary = production.worker(id).get("card", {})  # Stored only: no card is rolled to be asked.
+		if Standing.entry(card, player_id).is_empty():
+			continue
+		total += Standing.score(card, player_id)
+		count += 1
+	return float(total) / count if count > 0 else 0.0
+
+
 # --- Resident cards (decision 398) ---------------------------------------------------
 
 ## Resident [param worker_id]'s card (ResidentCard), from the worker record;

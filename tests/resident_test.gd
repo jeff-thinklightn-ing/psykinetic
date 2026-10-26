@@ -369,6 +369,39 @@ func _test_bodies_in_town() -> void:
 	var wren := _body("companion:rs-other")
 	_check(wren != null and wren.label == "Wren" and wren.player_id == "rs-other", "Wren, resting (no trade), stands in the town (%s)" % [wren.label if wren != null else "none"])
 	_check(_body("companion:" + Net.player_id) == null, "a companion out with her player has no body here")
+	if wren != null:
+		print("\n== one who left her player: why, and what might bring her back, told her only when that player speaks (581 amended, npc's side) ==")
+		# Her worker as Towns.note_companion_in seats one with a trade: "companion:<her name>", her player for its origin.
+		World.production.add_worker("companion:Wren", "Wren", ["cook"], STORE, "companion:rs-other")
+		World.production.set_left("companion:Wren", "You left Other because they let you bleed out.", "You might go with them again if the town spoke well of them.")
+		wren.asked_by = "rs-other"
+		var prompt: String = wren.system_for("Other")
+		_check(prompt.contains("You left Other because they let you bleed out.") and prompt.contains("You might go with them again if the town spoke well of them."),
+			"her own player speaks: both sentences, as written")
+		wren.asked_by = Net.player_id
+		_check(not wren.system_for("Player").contains("You left Other"), "another player: neither")
+		World.production.set_left("companion:Wren", "", "")
+		wren.asked_by = "rs-other"
+		_check(not wren.system_for("Other").contains("You left Other"), "cleared: neither")
+		wren.asked_by = ""
+		World.production.set_left("rs-nobody", "x", "y")
+		_check(World.production.worker("rs-nobody").is_empty(), "an unknown id: nothing")
+	print("\n== the town's word of a player: the mean standing of those who have met them (581 amended, npc's side) ==")
+	var met: Array[String] = []
+	for id: String in World.production.worker_ids(STORE):
+		if not id.begins_with(Townsfolk.COMPANION) and met.size() < 2:
+			met.append(id)
+	_check(Townsfolk.reputation(World.production, STORE, "rs-rep") == 0.0, "nobody has met them: 0.0")
+	var kept_cards: Array[Dictionary] = []
+	for i in met.size():
+		var card := Townsfolk.card_of(World.production, met[i])
+		kept_cards.append(card.duplicate(true))
+		card.get_or_add("standing", {})["rs-rep"] = {"score": 2 + i * 3, "met": 0, "since": 0, "why": [], "own": false}
+		World.production.set_card(met[i], card)
+	_check(met.size() == 2 and is_equal_approx(Townsfolk.reputation(World.production, STORE, "rs-rep"), 3.5), "two who met them, 2 and 5: 3.5, the rest not counted (%s)" % Townsfolk.reputation(World.production, STORE, "rs-rep"))
+	_check(Townsfolk.reputation(World.production, "rs_town/nowhere", "rs-rep") == 0.0 and Townsfolk.reputation(World.production, STORE, "") == 0.0, "another town, or no player: 0.0")
+	for i in met.size():
+		World.production.set_card(met[i], kept_cards[i])
 	World.entity_taken.emit(wren, "raid-10")
 	_check(not wren.spawned and other.companion.get("taken", {}).get("by", "") == "raid-10" and not other.companion.has("resident"),
 		"beaten down by raiders: held as her player's companion (%s)" % [other.companion.get("taken", {})])

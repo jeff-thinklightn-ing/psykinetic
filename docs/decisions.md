@@ -31356,3 +31356,37 @@ wall (no heel cell, no way), 100 ticks: 100 searches before, 5 after; put
 back within reach, she comes to him.
 
 Server only, protocol unchanged, no new class_name.
+
+## 581 amended, npc's side: what she left over, and the town's word
+
+Companions' 581 step 2 (winning back a companion who left; the coordinator
+approved it once the keys were agreed between the two trees) needs three
+things from npc's side. Two are built here; the third is companions' alone.
+
+- **Production.set_left(worker_id, why, back):** stores "left_why" and
+  "left_back" on her worker ("" clears; nothing for an unknown id).
+  Companions' side writes both when she leaves and each day she is away,
+  on the worker its set_mood uses: "companion:<her name>", whose origin is
+  "companion:<her player's id>" (Towns.note_companion_in).
+- **Her resident prompt (Resident.facts_now):** appends both sentences,
+  exactly as written, only when the one speaking to her body is her own
+  player (the body's player_id, the asked_by). It finds her worker by
+  origin == "companion:" + that id, since her body is keyed
+  "companion:<player id>" and her worker by name. They are facts, never
+  lines.
+- **Townsfolk.reputation(production, town, player_id) -> float:** the
+  mean Standing.score toward the player over the town's workers. It skips
+  "companion:" workers and anyone whose stored card has no entry for them
+  (never met). It reads stored cards only, rolling none, and returns 0.0
+  when nobody counts. Companions compares it daily with "fond".
+- **Her bond while away:** stays in record.companion["standing"].
+  Companions decays it; npc's daily decay of worker cards is untouched,
+  and companions doesn't read it for her bond.
+
+resident_test checks: her two sentences reach the prompt for her own
+player only, and are gone once cleared or when another player asks;
+set_left on an unknown id does nothing; reputation is 0.0 with nobody met,
+3.5 for scores 2 and 5 with the rest not counted, and 0.0 for another town
+or no player.
+
+Server only, protocol unchanged, no new class_name.

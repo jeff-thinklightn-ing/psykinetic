@@ -928,6 +928,16 @@ func facts_now() -> Array[String]:
 		var heard := Hearsay.prompt_words(World.production.worker(worker_id).get("heard", []))
 		if not heard.is_empty():
 			out.append(heard)
+	# A companion who left her player (581 amended, npc's side): why, and what
+	# might bring her back, only to that player; companions' words, as written.
+	if not player_id.is_empty() and player_id == asked_by and World.production != null:
+		for id: String in World.production.worker_ids():
+			var record := World.production.worker(id)
+			if str(record.get("origin", "")) != Townsfolk.COMPANION + player_id:
+				continue  # Her worker ("companion:<her name>") has her player for its origin.
+			for key: String in ["left_why", "left_back"]:
+				if not str(record.get(key, "")).is_empty():
+					out.append(str(record[key]))
 	# What it can offer the one speaking to it, and what they promised it
 	# (decision 435): facts, never lines.
 	if player_id.is_empty() and not asked_by.is_empty():
