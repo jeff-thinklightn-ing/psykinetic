@@ -287,6 +287,9 @@ static func from_dict(entry: Variant) -> PlayerRecord:
 		var left: Variant = pet.get("left")
 		if left is Dictionary and not left.is_empty():
 			record.companion["left"] = _whole(left)
+		var parted: Variant = pet.get("parted")
+		if parted is Dictionary and not parted.is_empty():
+			record.companion["parted"] = _whole(parted)  # Parted as friends (581 amended (3)).
 		var leaving: Variant = pet.get("leaving")
 		if leaving is Dictionary and not leaving.is_empty():
 			# Her walk starts again (Main._leaving_tick): only what she leaves over.

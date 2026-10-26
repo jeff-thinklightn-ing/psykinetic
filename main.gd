@@ -6168,6 +6168,12 @@ func _join_companion(record: PlayerRecord, player: Player) -> void:
 		Net.broadcast_to([player.owner_peer], "party", {"from": "Server", "text": "%s was carried off by raiders and is held by them still." % [
 			record.companion.get("name", "Your companion")]})
 		return
+	# Parted as friends (581 amended (3)): she rests in her town till asked there.
+	if record.companion.get("parted") is Dictionary:
+		var home := _town_words(str(record.companion["parted"].get("place", "")))
+		Net.broadcast_to([player.owner_peer], "party", {"from": "Server", "text": "%s went home to %s. Ask her there to travel with you again." % [
+			record.companion.get("name", "Your companion"), home]})
+		return
 	# Gone home, having left them (decision 581): she does not come.
 	if record.companion.has("left"):
 		var town := _town_words(str(record.companion["left"].get("place", "")))
@@ -6747,8 +6753,12 @@ func _begin_leaving(record: PlayerRecord, pet: Companion, going: Dictionary, pla
 	var town := _town_words(str(going["place"]))
 	if _guides.has(record.player_id):
 		_guide_done(pet, "moved")
-	pet._ask_voice("You are leaving %s for good, and going home to %s: they %s." % [record.name, town, str(going.get("why", "wronged you"))], "", true)
-	party_log.add("%s leaves you, and goes home to %s." % [pet.name, town])
+	if str(going.get("deed", "")) == PARTED:
+		pet._ask_voice("%s asked you to go home for a while, and you part as friends: you go home to %s, and will travel with them again when they ask." % [record.name, town], "", true)
+		party_log.add("%s goes home to %s; you part as friends." % [pet.name, town])
+	else:
+		pet._ask_voice("You are leaving %s for good, and going home to %s: they %s." % [record.name, town, str(going.get("why", "wronged you"))], "", true)
+		party_log.add("%s leaves you, and goes home to %s." % [pet.name, town])
 	_return_gear(record, pet, player)
 
 
@@ -6792,6 +6802,12 @@ func _gone_home(record: PlayerRecord, pet: Companion, id: String) -> void:
 		World.despawn(pet)
 		_travelling = false
 		_companions.erase(id)
+	if str(going.get("deed", "")) == PARTED:
+		# Parted as friends (581 amended (3)): no wrong to put right; asked, she comes.
+		record.companion["parted"] = {"day": Townsfolk.day_of(World.steps), "place": str(record.companion.get("resident", {}).get("place", place))}
+		record.companion.erase("leaving")
+		print("[bond] %s's companion %s parted with them and rests in %s" % [record.name, record.companion.get("name", "?"), record.companion["parted"]["place"]])
+		return
 	record.companion["left"] = {"day": Townsfolk.day_of(World.steps), "deed": str(going.get("deed", "")), "why": str(going.get("why", "")),
 		"place": str(record.companion.get("resident", {}).get("place", place)), "repaired": false,
 		"area": str(record.companion.get("warned_area", "")), "grave": going.get("grave", [])}
@@ -6823,6 +6839,37 @@ static func _left_worker(record: PlayerRecord) -> String:
 	return "companion:%s" % record.companion.get("name", "")
 
 
+## The deed a parting leaves over (581 amended (3)): no wrong, so no gate.
+const PARTED := "parted"
+
+
+## Whether [param line] asks her to go home for a while (581 amended (3)):
+## one of the rules' part_words, as words of the line.
+static func asks_to_part(line: String) -> bool:
+	var said := " %s " % line.to_lower().replace("'", "").replace(",", " ").replace(".", " ").replace("?", " ").replace("!", " ")
+	for words: String in leaving_rules().get("part_words", []):
+		if (" %s " % words.to_lower().replace("'", "")) in said:
+			return true
+	return false
+
+
+## [param player] asks [param pet], their companion with them, to go home
+## for a while (581 amended (3)): at the next calm moment she sets off as
+## one who leaves does (_leaving_tick), and rests in her home town marked
+## "parted": no bond lost, and asked there, she comes. Whether it was such
+## a word (one who is leaving, held or resting already, it is not).
+func _part_said(player: Player, pet: Companion, line: String) -> bool:
+	var record := _record_of(pet)
+	if record == null or not asks_to_part(line) or pet.keeper != player:
+		return false
+	for state: String in ["leaving", "left", "parted", "taken", "resident"]:
+		if record.companion.has(state):
+			return false
+	record.companion["leaving"] = {"deed": PARTED, "why": "", "day": Townsfolk.day_of(World.steps)}
+	print("[bond] %s asked their companion %s to go home for a while" % [record.name, pet.name])
+	return true
+
+
 ## Whether [param line] asks one to come along (581 amended (2)): one of
 ## the rules' recruit_words, as words of the line.
 static func asks_to_come(line: String) -> bool:
@@ -6840,6 +6887,15 @@ static func asks_to_come(line: String) -> bool:
 ## told why she left and what would bring her back. Whether she came.
 func _recruit_said(body: Resident, player: Player, line: String) -> bool:
 	var record: PlayerRecord = _records.get(player.player_id)
+	if record != null and body.player_id == player.player_id and record.companion.get("parted") is Dictionary and asks_to_come(line):
+		# Parted as friends (581 amended (3)): no gate, her bond as it was.
+		record.companion.erase("parted")
+		party_log.add("%s is glad to travel with %s again." % [body.person, _display_name(player)])
+		_join_companion(record, player)
+		var friend: Companion = _companions.get(record.player_id)
+		if is_instance_valid(friend) and friend.spawned:
+			friend._ask_voice("%s came to your town and asked you to travel with them again, and you were glad to." % record.name, "", true)
+		return true
 	if body.player_id != player.player_id or not has_left(record) or not asks_to_come(line):
 		return false
 	var gate := favour_gate(record)
@@ -10917,6 +10973,8 @@ func _player_said(player: Player, text: String, phrase := 0) -> void:
 		if hears:
 			pet.overheard(_display_name(player), line, false)
 	elif to != "":
+		if phrase == 0 and _part_said(player, pet, line):
+			return  # They part for a while (581 amended (3)): she answers as she sets off.
 		if phrase == 0:
 			_guide_said(player, pet, line)  # An ask to lead the way (decision 551).
 		pet.owner_spoke(line, phrase)

@@ -74,6 +74,8 @@
 		"return_at": -3, "justice_at": 7, "reputation_at": 3, "justice_reputation": 2,
 		"_recruit": "Asking her back (581 amended (2)): her player, to her body in her town, with one of recruit_words as words of the line; willing (581 amended's gate open), she goes with them again, her bond set to rejoin_at (cooling: a fresh start, not warm); not, her resident voice answers, told why she left and what would bring her back. Drafts for Jeff.",
 		"rejoin_at": -1,
+		"_part": "Parting as friends (581 amended (3)): her player says one of part_words to her; at the next calm moment she goes home as one who leaves does, but marked parted: no bond lost, no wrong to put right, and asked in her town (recruit_words) she comes. Drafts for Jeff.",
+		"part_words": ["go home", "go back home", "head home", "go home for a while", "ill travel alone", "i will travel alone", "travel alone for a while", "we part here", "lets part here", "you can go home"],
 		"recruit_words": ["come with me", "come with us", "travel with me", "travel with us", "join me", "join us", "come back to me", "come along", "follow me", "walk with me again"],
 		"favour": {"gift": 1, "errand": 1, "reputation": 1},
 		"visit_hours": 1, "visit_cells": 6,

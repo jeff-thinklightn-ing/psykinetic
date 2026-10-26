@@ -32087,6 +32087,32 @@ resident_test checks the refusal (only to the one who asked, kept across
 a save, erased), set_score (a stranger met then, clamped, own, the reason;
 set again; hearsay refused), and settle (settled:Sel with her trade, mind,
 hearing and card, in her place; settled:Sel:2 for another; "" for none).
+## 581 amended (3): parting as friends
+
+The coordinator approved recruiting another companion (686) in two landings;
+this is the first: a player can change companions without driving one away.
+
+- **The word** (Main.asks_to_part, the rules' part_words: "go home", "go home
+  for a while", "I'll travel alone for a while", "we part here"...; whole
+  words, near misses like "the road goes home" refused): said to her, with
+  her, and none of leaving, left, parted, held or resting already, it sets
+  her record's "leaving" with the deed "parted" (Main.PARTED; a deed, not a
+  flag, so 687's loader keeps it mid-walk). Her voice answers as she sets off,
+  not twice.
+- **Going**: 581's walk (_leaving_tick at a calm moment, her player's things
+  put down, to the nearest way out, then _rest_in_town in her home town), told
+  as a parting: "Wren goes home to Held; you part as friends."
+- **Home**: her record "parted" {day, place} instead of "left": no bond lost,
+  no favour gate, no left words. Her player joining is told where she went
+  and to ask her there. Asked in her town (recruit_words, 581 amended (2)),
+  she comes at once, glad, her bond as it was.
+- Kept through a save (PlayerRecord.from_dict; record_keys_test's sample).
+- 686 (recruiting a resident) builds on it: only while nobody is with him.
+
+resident_test _test_parting: the words and near misses; asked, she sets off at
+a calm moment as a friend; home, parted not left, her bond as it was, no
+gate; kept through a save; her player back, she does not just join; asked in
+her town she comes, glad.
 
 Server only, protocol unchanged, no new class_name.
 ## 689 amended (2): a click on its own cell stops a free body where it stands

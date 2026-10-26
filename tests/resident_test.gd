@@ -70,6 +70,7 @@ func _ready() -> void:
 	_test_houses()
 	_test_companion_hearsay()
 	_test_favour()
+	_test_parting()
 	_test_visible_work()
 	_test_field_work()
 	_test_quiet_near_hostile()  # Late: its steps move the hail tick's phase the voice tests count on.
@@ -1546,6 +1547,65 @@ func _test_no_id_in_names(wren: Resident, other: PlayerRecord) -> void:
 	other.player_id = kept_id
 	_main._records[kept_id] = other
 	_sync()
+
+
+func _test_parting() -> void:
+	print("\n== asked to go home for a while, she parts as a friend, and comes when asked in her town (581 amended (3)) ==")
+	if World.zone.name != TOWN:
+		_main.travel(Net.local_id, TOWN)
+	var record: PlayerRecord = _main._records[Net.player_id]
+	var kept: Dictionary = record.companion.duplicate(true)
+	var owner := _player()
+	var pet := _companion()
+	_check(owner != null and pet != null, "(a player and a companion)")
+	if owner == null or pet == null:
+		return
+	_check(Main.asks_to_part("Go home for a while, Wren.") and Main.asks_to_part("I'll travel alone for a while.")
+		and not Main.asks_to_part("The road goes home.") and not Main.asks_to_part("Where is home?"), "the words that part, and near misses")
+	_settle(pet)
+	_put(pet, _main._nearest_free(owner.tile))
+	record.companion["standing"] = {Net.player_id: {"score": 2, "why": ["bandaged your wounds"], "since": World.steps}}
+	_main._chat_tick.clear()
+	_main._player_said(owner, "%s, go home for a while." % pet.name)
+	_check(str(record.companion.get("leaving", {}).get("deed", "")) == Main.PARTED, "asked, she will go home (%s)" % [record.companion.get("leaving", {})])
+	World.step()
+	_check(pet.leaving and "you part as friends" in " ".join(_main.party_log.last(3)), "at a calm moment she says so and sets off (%s)" % [_main.party_log.last(3)])
+	record.companion["leaving"]["until"] = World.tick
+	record.companion["leaving"]["from"] = World.tick - 1
+	World.step()
+	World.step()
+	_check(not pet.spawned and record.companion.get("parted") is Dictionary and not record.companion.has("left") and record.companion.has("resident"),
+		"home: resting in her town, parted, not left (%s)" % [record.companion.get("parted")])
+	_check(Standing.score(record.companion, Net.player_id) == 2 and _main.favour_gate(record) == "", "her bond as it was, no gate (%d)" % Standing.score(record.companion, Net.player_id))
+	var saved := PlayerRecord.from_dict(JSON.parse_string(JSON.stringify(record.to_dict())))
+	_check(saved.companion.get("parted") == record.companion["parted"], "parted is kept through a save and a load")
+	_main.travel(Net.local_id, ROAD)
+	_main.travel(Net.local_id, TOWN)
+	_check(_companion() == null, "her player back in her town: she does not just join them")
+	owner = _player()
+	_sync()
+	var body: Resident = null
+	for each: GridEntity in World.townsfolk():
+		if (each as Resident).player_id == Net.player_id:
+			body = each
+	_check(body != null, "(her body in town)")
+	if body != null:
+		_put(owner, _main._nearest_free(body.tile))
+		_main._chat_tick.clear()
+		_main._player_said(owner, "%s, come with me." % body.person)
+		pet = _companion()
+		_check(pet != null and pet.keeper == owner and not record.companion.has("parted") and not record.companion.has("resident")
+			and Standing.score(record.companion, Net.player_id) == 2 and "glad to travel with" in " ".join(_main.party_log.last(4)),
+			"asked in her town, she comes, glad, her bond as it was (%s)" % [_main.party_log.last(4)])
+	# As she was.
+	record.companion = kept
+	record.companion.erase("resident")
+	_main.travel(Net.local_id, ROAD)
+	_main.travel(Net.local_id, TOWN)
+	pet = _companion()
+	_check(pet != null, "(restored)")
+	if pet != null:
+		_settle(pet)
 
 
 func _test_houses() -> void:

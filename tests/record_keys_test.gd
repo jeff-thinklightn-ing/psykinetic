@@ -43,6 +43,7 @@ func _ready() -> void:
 			"grave": [12, 40], "words": ["You left them.", "In time."], "favour_today": {"day": 3, "kinds": ["gift"]}, "checked": 3,
 			"visit": {"from": 900}},
 		"leaving": {"deed": "harsh", "why": "shouted at you", "day": 2},
+		"parted": {"day": 5, "place": "t/store"},
 	}
 	_player = {
 		"player_id": "p", "index": 2, "name": "Jeff", "body": &"female", "look": "", "tile": Vector2i(3, 4), "hp": 9, "stamina": 8,
