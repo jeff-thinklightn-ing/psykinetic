@@ -31879,3 +31879,58 @@ before he arrives).
 
 Server only, nothing with the flag off, protocol unchanged, no new
 class_name.
+
+## 688 amended (2): a push on a free body, decided at once, shown over the ticks after
+
+Till now a push on a free body (688) slid its cell a cell at a time, as any
+body's (592), and its centre snapped onto the cell it ended in. Now it
+slides from its centre, at any angle. The coordinator's ruling on the
+design: decide at once, show over the ticks, consistent with the grid's
+push and keeping its same-call results (apply_blow's, launch's, a lunge's
+and a ram's struck lists read them in the call).
+
+- **The trace** (World._free_slide, from _push for a free body not lofted):
+  its centre from its free_pos along the push's way, a substep at a time
+  through the free collision (_free_resolve; its own companion, whom it
+  walks through, a push meets), each cell's length costing its
+  ground_drag, as far as u x slide_per_speed cells (max_travel at most):
+  _push's reach, but not in whole cells. The cells its centre comes to hold
+  (_free_cell_from, the hysteresis) are taken on the way, so its tile, the
+  occupancy and what the call returns are all decided then.
+- **A wall** (a closed door, a step up, the edge of the walkable) met within
+  30 degrees of head on (FREE_GLANCE_COS 0.87) stops it, a radius short;
+  what speed it has left hurts as _push's does (impact_per_energy x 1/2 m
+  u^2). At more of a slant it slides along it, its speed scaled by the
+  sine, and the speed it lost into the wall (the glance) hurts the same way.
+- **A body met**: the hand-off as now (restitution; the one met goes on
+  from its cell along the way the slider was going). **Water** at the edge
+  stops it unhurt; **a drop** it goes off into the cell below and falls (the
+  fall hurts); **fire** stops a creature in it.
+- **Shown**: its free_pos does not move in the call. The path is kept
+  (GridEntity.free_kick_path, free_kick_at, free_kick_ticks:
+  push_slide_ticks of its cells) and shown a tick at a time, slowing
+  (1 - (1 - t)^2 along the path) by World._tend_free_kicks before anyone
+  acts, so a stunned body (which skips its turn) slides too; its own
+  zone's clock only (604 amended). Its state is packed each tick for its
+  client (ui's 689). While shown it is free_held, and what it sends is
+  dropped and acknowledged (free_drop), as a halt's is: the commands the
+  push overrode drop out of its client's replay. Any other move of its
+  tile (a relocate, a toss over the head) ends the showing there.
+
+Distances: on open ground from a cell's centre the cells are the grid's
+(east at 2: three). Into a wall it travels a radius less than to the cell's
+edge, so it meets it a little faster than a grid body does (head on at 2
+from a cell's length away: 1.2 left, 4 hurt, where the grid's 1.33 would
+be 5).
+
+free_walk_test: a speed of 2 from off a centre takes its cell at once and
+shows the slide over 6 ticks, each shorter, a command sent meanwhile
+acknowledged and not walked, steering after; the grid's and the free
+body's cells the same from a centre; head on into a wall, stopped a radius
+short, hurt by what was left; at a slant along a wall, never past it, the
+glance hurting; nearly head on, stopped; into a dummy, which goes on at the
+restitution share; into its own companion, met; off a ledge, a fall.
+free_net_test (with ui, its lag-and-loss proxy): pushed while walking east,
+the view ends on the server's centre with nothing left to replay, and the
+walk taken up after. Server and sim only, protocol unchanged, no new
+class_name.

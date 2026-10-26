@@ -46,6 +46,7 @@ func _ready() -> void:
 	_test_own_view()
 	_test_lag_and_loss()
 	_test_lag_across_fords()
+	_test_kick_under_lag()
 	_test_companion_on_a_client()
 	_test_switch()
 	World.free_walk = false
@@ -213,6 +214,53 @@ func _lagged(player: Player, plan: Array) -> FreeNet.Own:
 			while not to_client.is_empty() and int(to_client[0][0]) <= frame:
 				own.confirm(player, FreeNet.unpack_state(to_client.pop_front()[1], World.tick))
 	return own
+
+
+## A push on the own body under lag (688 amended (2), physics' with ui): the
+## server decides the slide at once and drops what the client had sent, so
+## the replay drops it too, and the view ends on the server's centre with
+## the walk taken up again after.
+func _test_kick_under_lag() -> void:
+	print("\n== pushed while walking, under lag and loss: the commands the slide overrode are dropped ==")
+	var player := _build(OPEN, Vector2i(3, 2))
+	player.owner_peer = 4242
+	var pusher := _spawn("res://sim/monster.gd", "Pusher", Vector2i(0, 0)) as Monster
+	pusher.acts = false
+	pusher.sight_range = 0
+	var own := FreeNet.Own.new()
+	var to_server: Array[Array] = []
+	var to_client: Array[Array] = []
+	var lag := 9
+	var frame := 0
+	var sent := 0
+	var pushed_at := Vector2.INF
+	var slid_to := Vector2.INF
+	var plan: Array[Array] = [[Vector2.RIGHT, 40], [Vector2.RIGHT, 50], [Vector2.ZERO, 80]]
+	for leg in plan:
+		for i in int(leg[1]):
+			frame += 1
+			var commands := own.hold(player, leg[0], FRAME)
+			if not commands.is_empty():
+				sent += 1
+				if sent % 3 != 0:
+					to_server.append([frame + lag, FreeNet.pack_commands(commands)])
+			while not to_server.is_empty() and int(to_server[0][0]) <= frame:
+				player.free_allowance = World.FREE_COMMANDS_PER_SECOND
+				World.take_free(player, FreeNet.unpack_commands(to_server.pop_front()[1]))
+			if frame == 42:
+				pushed_at = player.free_pos
+				World._push(pusher, player, Vector2(-1, 0.5), 2.0)
+				slid_to = player.free_kick_path[player.free_kick_path.size() - 1]
+			if frame % 6 == 0:
+				World.step()
+				player.pack_free()
+				to_client.append([frame + lag, player.free_state.duplicate()])
+			while not to_client.is_empty() and int(to_client[0][0]) <= frame:
+				own.confirm(player, FreeNet.unpack_state(to_client.pop_front()[1], World.tick))
+	_check(slid_to.x < pushed_at.x - 1.5, "pushed west-south-west at 2 from %s: slid to %s" % [pushed_at, slid_to])
+	_check(player.free_pos.x > slid_to.x + 0.5, "walked east again after the slide (%s)" % player.free_pos)
+	_check(own.pending.is_empty() and own.shown(player).distance_to(player.free_pos) < 0.02,
+			"the view ends on the server's centre, nothing left to replay (%s, %s)" % [own.shown(player), player.free_pos])
 
 
 func _test_companion_on_a_client() -> void:

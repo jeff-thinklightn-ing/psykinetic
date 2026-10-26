@@ -75,6 +75,11 @@ func _ready() -> void:
 	_test_door()
 	_test_held()
 	_test_snap()
+	_test_kick()
+	_test_kick_wall()
+	_test_kick_glance()
+	_test_kick_body()
+	_test_kick_fall()
 	_test_glide()
 	_test_replay_matches()
 	_test_acks()
@@ -270,11 +275,133 @@ func _test_snap() -> void:
 	_check(player.free_pos != Vector2(1, 2), "off its centre (%s)" % player.free_pos)
 	World._relocate(player, Vector2i(4, 3))
 	_check(player.free_pos == Vector2(4, 3), "relocated to (4, 3): its centre there (%s)" % player.free_pos)
-	_hold(player, Vector2(-0.2, 0.3), 1)
-	var dummy := _spawn("res://sim/monster.gd", "Dummy", Vector2i(3, 3))
+
+## A push on a free body (688 amended (2)): decided at once, its centre
+## traced from where it is; the cell taken then, the slide shown over the
+## ticks after, what it sends meanwhile dropped and acknowledged.
+func _test_kick() -> void:
+	print("\n== a push on a free body: decided at once, slid from its centre, shown over the ticks after ==")
+	var player := _build(OPEN, Vector2i(3, 3))
+	_hold(player, Vector2(1, 0.3), 2)
+	var from := player.free_pos
+	var dummy := _spawn("res://sim/monster.gd", "Dummy", Vector2i(1, 1))
 	var slid := World._push(dummy, player, Vector2(1, 0), 2.0)
-	_check(not slid.is_empty() and player.tile.x > 4 and player.free_pos == Vector2(player.tile),
-			"knocked east a speed of 2 from off its centre: to %s, snapped onto it (%s; impulses later, 688 amended (2))" % [player.tile, player.free_pos])
+	var reach := 2.0 * World.slide_per_speed
+	var end := Vector2(from.x + reach, from.y)
+	_check(slid.size() == 1 and player.tile == Vector2i(roundi(end.x), roundi(end.y)) and slid[0]["cells"] == player.tile.x - 4,
+			"a speed of 2 east from %s: its cell %s at once (%d cells), the centre %.2f on" % [from, player.tile, slid[0]["cells"], reach])
+	_check(player.free_pos == from and World.free_held(player), "the centre not yet moved, the body held while it is shown")
+	World.free_input(player, Vector2(-1, 0), World.TICK_DT, 7)
+	var ticks := World.push_slide_ticks(slid[0]["cells"])
+	var last := from.x
+	var slowing := true
+	var step_was := INF
+	for i in ticks:
+		World.step()
+		var step := player.free_pos.x - last
+		slowing = slowing and step <= step_was + 0.0001 and step >= 0.0
+		step_was = step
+		last = player.free_pos.x
+	_check(player.free_pos.distance_to(end) < 0.001 and slowing,
+			"after %d ticks: at %s (%s), each tick's slide shorter" % [ticks, player.free_pos, end])
+	_check(player.free_acked == 7 and player.free_inputs.is_empty(), "the command sent while it slid: dropped, acknowledged (7)")
+	_check(not World.free_held(player) or World.is_stunned(player), "the slide shown: held only by its stagger")
+	while World.is_stunned(player):
+		World.step()
+	_hold(player, Vector2(-1, 0), 3)
+	_check(player.free_pos.x < end.x - 1.0, "steered again after (%s)" % player.free_pos)
+	# The grid's cells, from a cell's centre: the same as a free body's.
+	var cells := []
+	for free in [false, true]:
+		var body := _build(OPEN, Vector2i(1, 2))
+		World.free_walk = free
+		var pusher := _spawn("res://sim/monster.gd", "Dummy", Vector2i(0, 0))
+		World._push(pusher, body, Vector2(1, 0), 2.0)
+		cells.append(body.tile)
+	World.free_walk = true
+	_check(cells[0] == cells[1], "from a cell's centre, east at 2: the grid's %s, the free body's %s" % cells)
+
+
+func _test_kick_wall() -> void:
+	print("\n== a free body pushed head on into a wall: stopped a radius off it, hurt by the speed it had left ==")
+	var player := _build(WALLED, Vector2i(2, 0))
+	player.hp = 100
+	var dummy := _spawn("res://sim/monster.gd", "Dummy", Vector2i(4, 0))
+	var slid := World._push(dummy, player, Vector2(0, 1), 2.0)
+	var travelled := 1.5 - World.FREE_RADIUS
+	var left := 2.0 - travelled / World.slide_per_speed
+	var hurt := roundi(World.impact_per_energy * 0.5 * World.pushed_mass(player) * left * left)
+	_check(player.tile == Vector2i(2, 1) and slid[0]["stopped_by"] == "wall" and slid[0]["impact"] == hurt,
+			"south at 2 from (2, 0): stopped in (2, 1) by the wall, %d hurt (%d: %.2f left)" % [slid[0]["impact"], hurt, left])
+	while not player.free_kick_path.is_empty():
+		World.step()
+	_check(absf(player.free_pos.y - travelled) < 0.001 and is_equal_approx(player.free_pos.x, 2.0),
+			"shown to %s, a radius short of the wall" % player.free_pos)
+
+
+func _test_kick_glance() -> void:
+	print("\n== a free body pushed at a slant into a wall slides along it ==")
+	var player := _build(WALLED, Vector2i(0, 1))
+	player.hp = 100
+	var dummy := _spawn("res://sim/monster.gd", "Dummy", Vector2i(4, 3))
+	var slid := World._push(dummy, player, Vector2(1, 0.4), 2.0)
+	var path := player.free_kick_path
+	var lowest := 0.0
+	for at in path:
+		lowest = maxf(lowest, at.y)
+	_check(player.tile.y == 1 and player.tile.x >= 2 and lowest <= 1.5 - World.FREE_RADIUS + 0.001,
+			"east-south-east at 2 from (0, 1): slid along the wall to %s, never past it (lowest %.3f)" % [player.tile, lowest])
+	_check(slid[0]["impact"] > 0, "the speed it lost into the wall hurts (%d)" % slid[0]["impact"])
+	var head_on := _build(WALLED, Vector2i(2, 0))
+	dummy = _spawn("res://sim/monster.gd", "Dummy", Vector2i(4, 3))
+	World._push(dummy, head_on, Vector2(0.2, 1), 2.0)
+	_check(head_on.tile == Vector2i(2, 1), "nearly head on (11 degrees): stopped, not slid (%s)" % head_on.tile)
+
+
+func _test_kick_body() -> void:
+	print("\n== a free body pushed into another hands its speed on ==")
+	var player := _build(OPEN, Vector2i(2, 2))
+	var dummy := _spawn("res://sim/monster.gd", "Dummy", Vector2i(5, 2))
+	dummy.hp = 100
+	var pusher := _spawn("res://sim/monster.gd", "Pusher", Vector2i(0, 0))
+	var slid := World._push(pusher, player, Vector2(1, 0), 3.0)
+	var travelled := 2.5 - World.FREE_RADIUS
+	var left := 3.0 - travelled / World.slide_per_speed
+	var m1 := World.pushed_mass(player)
+	var given := (1.0 + World.restitution) * m1 * left / (m1 + World.pushed_mass(dummy))
+	_check(slid.size() == 2 and slid[0]["stopped_by"] == dummy.name and player.tile == Vector2i(4, 2),
+			"east at 3 from (2, 2): stopped in (4, 2) by the dummy (%s)" % [slid[0]["stopped_by"]])
+	_check(slid[1]["body"] == dummy and dummy.tile.x == 5 + floori(given * World.slide_per_speed + 0.001),
+			"the dummy goes on at %.2f: to %s" % [given, dummy.tile])
+	var pip := _build(OPEN, Vector2i(2, 2))
+	var her := _spawn("res://sim/companion.gd", "Pip", Vector2i(4, 2)) as Companion
+	her.keeper = pip
+	pusher = _spawn("res://sim/monster.gd", "Pusher", Vector2i(0, 0))
+	World._push(pusher, pip, Vector2(1, 0), 2.0)
+	_check(pip.tile == Vector2i(3, 2), "its own companion it walks through, but a push meets her (%s)" % pip.tile)
+
+
+func _test_kick_fall() -> void:
+	print("\n== a free body pushed off a ledge falls ==")
+	World.reset()
+	World.free_walk = true
+	if _room != null:
+		_room.free()
+	_room = Node2D.new()
+	add_child(_room)
+	var terrain := Terrain.parse(OPEN)
+	var heights := {}
+	for x in 4:
+		for y in 5:
+			heights[Vector2i(x, y)] = 1
+	terrain["heights"] = heights
+	World.load_terrain(terrain)
+	var player := _spawn("res://sim/player.gd", "Player1", Vector2i(2, 2)) as Player
+	player.hp = 100
+	var dummy := _spawn("res://sim/monster.gd", "Dummy", Vector2i(0, 0))
+	var slid := World._push(dummy, player, Vector2(1, 0), 2.0)
+	_check(player.tile == Vector2i(4, 2) and str(slid[0]["stopped_by"]).begins_with("a fall"),
+			"east at 2 from (2, 2) on a ledge: off it into (4, 2), %s" % slid[0]["stopped_by"])
 
 
 func _test_glide() -> void:

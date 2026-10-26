@@ -167,6 +167,12 @@ var free_pos := Vector2.ZERO
 var free_way := Vector2.ZERO
 ## A free body takes no intent before this tick (World.halt, 688).
 var free_halt_until := 0
+## A free body's slide from a push (688 amended (2)): the centres its trace
+## went through, decided when it was pushed (its cell taken then), shown
+## from free_kick_at over free_kick_ticks, slowing; empty when none.
+var free_kick_path := PackedVector2Array()
+var free_kick_at := 0
+var free_kick_ticks := 0
 ## Set while World claims a free body's cell from its centre, which keeps
 ## its free_pos where it is (688).
 var _free_claiming := false
@@ -793,6 +799,7 @@ func _world_set_tile(to: Vector2i) -> void:
 	tile = to
 	if not _free_claiming:
 		free_pos = Vector2(to)
+		free_kick_path = PackedVector2Array()  # A slide being shown ends there (688 amended (2)).
 
 
 func _world_set_facing(direction: Vector2i) -> void:

@@ -466,6 +466,10 @@ const FREE_INPUTS_MAX := 64
 ## A free body pressing into its own companion bumps her at most this
 ## often, in ticks (688): her yield hears it.
 const FREE_BUMP_TICKS := 5
+## A free body pushed into a wall nearer head on than this (the cosine of
+## its way off the wall's normal; 30 degrees) is stopped by it; at more of a
+## slant it slides along it (688 amended (2)).
+const FREE_GLANCE_COS := 0.87
 ## Free movement's wire (decision 689).
 const FreeNet := preload("res://net/free_net.gd")
 ## SHOVE_COST_BASE and SHOVE_COST_SCALE: a shove costs
@@ -746,6 +750,9 @@ var _mending: Dictionary[GridEntity, Dictionary] = {}
 const STORY_LONGEST := 80
 ## Whoever is rushing (rush, decision 604): its state, for _tend_rushes.
 var _rushers: Dictionary[GridEntity, Dictionary] = {}
+## Free bodies whose push's slide is being shown (688 amended (2)), for
+## _tend_free_kicks.
+var _free_kicked: Dictionary[GridEntity, bool] = {}
 ## Whoever is winding up a blow (try_wind_up), for _tend_wind_ups.
 var _winders: Dictionary[GridEntity, bool] = {}
 
@@ -1106,6 +1113,7 @@ func _step_zone() -> void:
 	_take_roster()
 	_clear_links()
 	_tend_rushes()  # Each rush's next cell when due (decision 604).
+	_tend_free_kicks()  # Pushed free bodies' slides shown, stunned or not (688 amended (2)).
 	t = part("tiers, roster", t)
 	for entity in _actors:
 		# Not its turn by the tier it has, and that tier not due to be
@@ -1666,6 +1674,7 @@ func reset() -> void:
 	_occupancy.clear()
 	_hits.clear()
 	_rushers.clear()
+	_free_kicked.clear()
 	_grid_rect = Rect2i()
 	_grid_steps = PackedByteArray()
 	_floor.clear()
@@ -7391,7 +7400,10 @@ func _resolve_hits() -> void:
 ## by a body, the two collide: the one met goes on at
 ## (1 + restitution) m1 u / (m1 + m2) (and may knock on another), the
 ## energy lost is shared as impact. Off a drop it falls, and the fall is
-## what hurts. Nothing here knows what kind of entity it is pushing.
+## what hurts. Nothing here knows what kind of entity it is pushing. A free
+## body (688 amended (2)) slides from its centre, not a cell at a time
+## (_free_slide): the same reach, at any angle, sliding along a wall it
+## meets at a slant, and its slide is shown over the ticks after.
 ## [param toss]: the first body was tossed (aimed another way than straight
 ## on), for the views; what it knocks on is pushed. [param stagger]: the
 ## ticks a body that slid stays stunned past its slide (combat's; -1,
@@ -7453,7 +7465,31 @@ func _push(mover: GridEntity, first: GridEntity, way: Vector2, force: float, tos
 					max_tiles = 0
 		var door_hit: Door = null
 		var fall := 0
-		while tiles < max_tiles:
+		var glance := 0.0
+		var traced := false
+		if free_body(body) and not lofted:
+			var slid := _free_slide(body, line.normalized(), u)
+			traced = true
+			tiles = slid["cells"]
+			stopped = slid["stopped"]
+			collided = slid["collided"]
+			stopped_by = slid["stopped_by"]
+			blocker = slid["blocker"]
+			door_hit = slid["door"]
+			fall = slid["fall"]
+			glance = slid["glance"]
+			spent = (u - float(slid["speed"])) * slide_per_speed  # So what is left below is the speed it stopped at.
+			var going: Vector2 = slid["way"]
+			line = going / maxf(absf(going.x), absf(going.y))  # Whom it meets goes on its way now.
+			direction = Vector2i(roundi(line.x), roundi(line.y))
+			body.free_kick_path = slid["path"]
+			body.free_kick_at = tick
+			body.free_kick_ticks = push_slide_ticks(maxi(tiles, 1))
+			_free_kicked[body] = true
+			body.free_way = Vector2.ZERO
+			if body is Player:
+				free_drop(body as Player)  # What it sent is not walked: the slide overrides it.
+		while not traced and tiles < max_tiles:
 			var next: Vector2i = start + Vector2i((line * (tiles + 1)).round())
 			direction = next - body.tile
 			var cost := ground_drag(body.tile, direction)
@@ -7523,6 +7559,8 @@ func _push(mover: GridEntity, first: GridEntity, way: Vector2, force: float, tos
 			blocker_impact = impact
 		else:
 			impact = roundi(impact_per_energy * 0.5 * body_mass * remaining * remaining)
+		# A free body's slant into a wall it slid along: the speed it lost into it.
+		impact += roundi(impact_per_energy * 0.5 * body_mass * glance * glance)
 
 		if tiles > 0:
 			body._world_slide_from(start, tick, push_slide_ticks(tiles))
@@ -7537,7 +7575,7 @@ func _push(mover: GridEntity, first: GridEntity, way: Vector2, force: float, tos
 				against = &"body"
 			elif door_hit != null:
 				against = &"wood" if door_hit.body_material == GridEntity.BodyMaterial.WOOD else &"stone"
-			elif collided:
+			elif collided or glance > 0.0:
 				against = &"stone"
 			_impact(body, impact, mover, against)
 			if door_hit != null:
@@ -8253,10 +8291,11 @@ func halt(entity: GridEntity, until_tick: int) -> void:
 
 
 ## Whether [param entity]'s free body ignores its intent now (688): halted,
-## a bow drawn (it stands firm, 583 amended), stunned, lying or downed.
+## a bow drawn (it stands firm, 583 amended), stunned, lying or downed, or
+## a push's slide being shown (688 amended (2)).
 func free_held(entity: GridEntity) -> bool:
 	return tick < entity.free_halt_until or entity.raised == "draw" or is_stunned(entity) \
-			or is_down(entity) or is_downed(entity)
+			or is_down(entity) or is_downed(entity) or not entity.free_kick_path.is_empty()
 
 
 ## A free body's turn (688, from Player._sim_tick): a tick's more real time
@@ -8270,6 +8309,11 @@ func tend_free_body(player: Player) -> void:
 	if not Net.is_authority() or not player.spawned:
 		return
 	player.free_bank = minf(player.free_bank + 1.0, FREE_BANK_TICKS)
+	if not player.free_kick_path.is_empty():
+		# A push's slide being shown (688 amended (2), _tend_free_kicks): what
+		# it sends meanwhile is dropped, acknowledged, as a halt's is.
+		free_drop(player)
+		return
 	var was := player.free_pos
 	var way := Vector2.ZERO
 	while not player.free_inputs.is_empty() and player.free_bank > 0.001:
@@ -8410,7 +8454,9 @@ static func _free_cell_from(held: Vector2i, at: Vector2) -> Vector2i:
 ## [param effects], pressing [param intent] into a closed door it may open
 ## opens it; into a crate it shifts it a cell, at its walk's pace. A circle
 ## of FREE_RADIUS slides along what it meets and never cuts a corner.
-func _free_resolve(entity: GridEntity, at: Vector2, intent: Vector2, effects := true) -> Vector2:
+## Without [param pass_own] (a push's slide, 688 amended (2)) its own
+## companion is met as anyone is.
+func _free_resolve(entity: GridEntity, at: Vector2, intent: Vector2, effects := true, pass_own := true) -> Vector2:
 	var p := at
 	for _pass in 3:
 		var c := Vector2i(roundi(p.x), roundi(p.y))
@@ -8423,7 +8469,7 @@ func _free_resolve(entity: GridEntity, at: Vector2, intent: Vector2, effects := 
 					if out != p:
 						p = out
 						moved = true
-				var square := _free_off_cell(entity, p, cell, intent, effects)
+				var square := _free_off_cell(entity, p, cell, intent, effects, pass_own)
 				if square != p:
 					p = square
 					moved = true
@@ -8475,11 +8521,11 @@ static func _own_companion_of(other: GridEntity, entity: GridEntity) -> bool:
 	return her.keeper == entity or her.keeper_peer != 0 and her.keeper_peer == entity.owner_peer
 
 
-func _free_off_cell(entity: GridEntity, p: Vector2, cell: Vector2i, intent: Vector2, effects := true) -> Vector2:
+func _free_off_cell(entity: GridEntity, p: Vector2, cell: Vector2i, intent: Vector2, effects := true, pass_own := true) -> Vector2:
 	if cell == entity.tile:
 		return p
 	var other: GridEntity = _occupancy.get(cell)
-	if other == null or other == entity or _own_companion_of(other, entity):
+	if other == null or other == entity or pass_own and _own_companion_of(other, entity):
 		return p
 	var low := Vector2(cell) - Vector2(0.5, 0.5)
 	var nearest := p.clamp(low, low + Vector2.ONE)
@@ -8527,6 +8573,164 @@ func _free_claim(entity: GridEntity, duration: float) -> void:
 	entity._free_claiming = false
 	entity._world_slide_from(held, float(tick), duration)
 	_stepped_off(entity, held, duration)
+
+
+## A free body's slide from a push (688 amended (2)), decided at once as
+## _push's cells are: [param body]'s centre traced from its free_pos along
+## [param way] at speed [param u], a substep at a time through the free
+## collision (_free_resolve, its own companion met as anyone), each cell
+## crossed costing its ground_drag a cell's length, as far as
+## u x slide_per_speed cells (at most max_travel). The cells its centre
+## comes to hold are taken on the way (_free_cell_from). Met head on (within
+## FREE_GLANCE_COS of the wall's normal), a wall, a closed door or a step up
+## stops it; at a slant it goes on along it, its speed into it lost (the
+## glance, which hurts). A body met stops it (_push hands the speed on);
+## water at the edge stops it unhurt; a drop it goes off and falls; fire
+## stops a creature in it. {path (the centres, from its free_pos), cells,
+## speed (left at the end), stopped, collided, stopped_by, blocker, door,
+## fall, glance (the most speed it lost into a wall it slid along), way
+## (the way it was going at the end)}.
+func _free_slide(body: GridEntity, way: Vector2, u: float) -> Dictionary:
+	var dir := way.normalized()
+	var out := {"path": PackedVector2Array([body.free_pos]), "cells": 0, "speed": 0.0, "stopped": false,
+		"collided": false, "stopped_by": "nothing (force spent)", "blocker": null, "door": null, "fall": 0,
+		"glance": 0.0, "way": dir}
+	var speed := u
+	var p := body.free_pos
+	var travelled := 0.0
+	var guard := 0
+	while speed > 0.0001 and travelled < max_travel - 0.0001 and guard < 256:
+		guard += 1
+		var held := body.tile
+		var drag := ground_drag(held, _free_axis(dir))
+		var move := dir * minf(minf(FREE_SUBSTEP, speed * slide_per_speed / drag), max_travel - travelled)
+		move *= _free_cell_exit(p - Vector2(held), move)
+		var want := p + move
+		var to := _free_resolve(body, want, dir, false, false)
+		var gone := to.distance_to(p)
+		travelled += gone
+		speed = maxf(speed - gone * drag / slide_per_speed, 0.0)
+		p = to
+		out["path"].append(p)
+		var cell := _free_cell_from(body.tile, p)
+		if cell != body.tile and is_walkable(cell) and not _occupancy.has(cell):
+			body._free_claiming = true
+			_relocate(body, cell)
+			body._free_claiming = false
+			out["cells"] += 1
+			if is_burning(cell) and body.is_creature():
+				out["stopped"] = true
+				out["stopped_by"] = "fire"
+				break
+		if to.distance_to(want) < 0.001:
+			continue
+		# Something stopped it: what lies the way it was pressed.
+		var into := (want - to).normalized()
+		var met := _free_met(body, to, into)
+		if met != null:
+			out["stopped"] = true
+			out["collided"] = true
+			out["blocker"] = met
+			out["stopped_by"] = met.name
+			break
+		held = body.tile
+		var axis := _free_axis(into)
+		var next := held + axis
+		if is_water(next) and not edge_blocks(held, axis):
+			out["stopped"] = true
+			out["stopped_by"] = "water"
+			break
+		var drop := height_step(held, axis) if is_walkable(next) else 0
+		if drop > 0 and not edge_blocks(held, axis) and not _occupancy.has(next):
+			# Off a ledge: it falls, and the fall is what hurts.
+			body._free_claiming = true
+			_relocate(body, next)
+			body._free_claiming = false
+			out["path"].append(Vector2(next))
+			out["cells"] += 1
+			out["fall"] = drop
+			out["stopped"] = true
+			out["stopped_by"] = "a fall of %d" % drop
+			break
+		var door := _closed_door_across(held, axis)
+		var cosine := dir.dot(into)
+		var along := dir - into * cosine
+		if cosine >= FREE_GLANCE_COS or along.length() < 0.001:
+			out["stopped"] = true
+			out["collided"] = true
+			out["door"] = door
+			out["stopped_by"] = "a ledge" if drop < 0 else "wall" if door == null else door.name
+			break
+		out["glance"] = maxf(out["glance"], speed * cosine)
+		speed *= along.length()
+		dir = along.normalized()
+	out["speed"] = speed if out["stopped"] else 0.0
+	out["way"] = dir
+	return out
+
+
+## The body whose cell [param body]'s free circle at [param p] touches the
+## way [param into] points (688 amended (2)), its own companion too; null
+## for none.
+func _free_met(body: GridEntity, p: Vector2, into: Vector2) -> GridEntity:
+	var c := Vector2i(roundi(p.x), roundi(p.y))
+	var best: GridEntity = null
+	var best_dot := 0.0
+	for dx in [-1, 0, 1]:
+		for dy in [-1, 0, 1]:
+			var cell: Vector2i = c + Vector2i(dx, dy)
+			var other: GridEntity = _occupancy.get(cell)
+			if other == null or other == body or cell == body.tile:
+				continue
+			var low := Vector2(cell) - Vector2(0.5, 0.5)
+			if p.distance_to(p.clamp(low, low + Vector2.ONE)) > FREE_RADIUS + 0.01:
+				continue
+			var ahead := (Vector2(cell) - p).normalized().dot(into)
+			if ahead > best_dot:
+				best_dot = ahead
+				best = other
+	return best
+
+
+## Each pushed free body's slide in this zone shown a tick further (688
+## amended (2)), before anyone acts, whether it may act or not (a stunned
+## body skips its turn): what it sent meanwhile dropped and acknowledged,
+## its state packed for its client.
+func _tend_free_kicks() -> void:
+	for body: GridEntity in _free_kicked.keys():
+		if not _alive(body) or body.free_kick_path.is_empty():
+			_free_kicked.erase(body)
+			continue
+		if body.zone != zone.name:
+			continue  # Its own zone's clock shows it (604 amended's lesson).
+		var player := body as Player
+		free_drop(player)
+		_free_kick_show(player)
+		player.pack_free()
+
+
+## The slide decided for [param player]'s free body (688 amended (2)) shown
+## a tick further: its centre along the path, slowing to a stop over
+## free_kick_ticks; done, the path cleared.
+func _free_kick_show(player: Player) -> void:
+	var path := player.free_kick_path
+	var t := clampf(float(tick - player.free_kick_at) / maxf(player.free_kick_ticks, 1), 0.0, 1.0)
+	var length := 0.0
+	for i in range(1, path.size()):
+		length += path[i].distance_to(path[i - 1])
+	var left := length * (1.0 - (1.0 - t) * (1.0 - t))
+	var at := path[path.size() - 1]
+	for i in range(1, path.size()):
+		var piece := path[i].distance_to(path[i - 1])
+		if left <= piece:
+			at = path[i - 1].lerp(path[i], left / piece if piece > 0.0 else 1.0)
+			break
+		left -= piece
+	player.free_way = at - player.free_pos
+	player.free_pos = at
+	if t >= 1.0:
+		player.free_kick_path = PackedVector2Array()
+		player.free_way = Vector2.ZERO
 
 
 func _relocate(entity: GridEntity, to: Vector2i) -> void:

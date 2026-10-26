@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Free movement (--free-walk): a blow, shove or throw now slides you from where you stand at any angle, smoothly over a few ticks, and a slanting knock slides you along a wall instead of stopping you dead (688 amended (2)).
 - With free movement on, your companion reads where you are heading and keeps out of it, steps aside without a second's stand, and keeps up on slants and turns (688, companions' side).
 - Free movement on the wire: your client's own body follows the server across fords and slow ground without small jumps back (689 amended)
 - Free movement (--free-walk): your own body no longer jumps back a step crossing fords, grass or slopes in the wilds (688 amended (3)).
