@@ -108,6 +108,7 @@ func _ready() -> void:
 	_test_heel_keeps_clear()
 	_test_heel_on_the_line()
 	_test_heel_leaves_his_line()
+	_test_heel_no_way()
 	_test_quiet()
 	_test_dodge()
 	_test_firing_cone()
@@ -3299,6 +3300,38 @@ func _test_heel_keeps_clear() -> void:
 	_check(count["fresh"] == 0 and count["backs"] == 0, "she never steps into the cell he walks into: no swap into it, no step back (%d, %d)" % [count["fresh"], count["backs"]])
 	_check(refused == 0, "and none of his held steps is refused (%d)" % refused)
 	_put(owner, owner_was)
+	_put(pet, pet_was)
+	_settle(pet)
+
+
+func _test_heel_no_way() -> void:
+	print("\n== with no way to him she waits before asking again, not a search every tick (685 amended) ==")
+	_kill_monsters()
+	var owner := _player()
+	var pet := _companion()
+	_settle(pet)
+	var owner_was := owner.tile
+	var pet_was := pet.tile
+	# Inside the room's east wall: every cell within her heel's reach of
+	# him is wall, so no heel cell and no way to him.
+	_put(pet, Vector2i(11, 4))
+	World._relocate(owner, Vector2i(15, 3))
+	pet.heel.catching_up = true
+	var from := Heel.searches
+	for i in 100:
+		World.step()
+	var asked := Heel.searches - from
+	print("  (100 ticks with him out of reach: %d searches)" % asked)
+	_check(asked <= 8, "she asked for a way a few times, not every step (%d)" % asked)
+	World._relocate(owner, owner_was)
+	from = Heel.searches
+	var near := false
+	for i in 60:
+		World.step()
+		if World.distance(pet.tile, owner.tile) <= Heel.STOP:
+			near = true
+			break
+	_check(near, "and back within reach, she comes to him (%s, him %s)" % [pet.tile, owner.tile])
 	_put(pet, pet_was)
 	_settle(pet)
 

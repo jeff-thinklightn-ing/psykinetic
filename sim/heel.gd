@@ -29,6 +29,12 @@ const WALK_ON_TICKS := 3
 const SETTLE_TICKS := 6
 ## How many of the leader's footsteps are kept (_trail).
 const TRAIL_KEPT := 4
+## A heel goal found with no way (the leader across water, behind a locked
+## door, on a roof): she asks for a way again only after NO_WAY_TICKS, and
+## passes that cell over for NO_WAY_KEPT (685 amended): each unanswered
+## search walked the whole zone, every tick.
+const NO_WAY_TICKS := 20
+const NO_WAY_KEPT := 100
 const NONE := Vector2i(-1, -1)
 ## The cells _aside's one-step search closes at most (685): a one-step way
 ## lies within the 7 by 7 round her.
@@ -47,6 +53,12 @@ var _goal := NONE
 var _trail: Array[Vector2i] = []
 ## Her goal is one of their footsteps (_footstep), dropped when they stop.
 var _on_trail := false
+## Goals found with no way, each to the tick it may be tried again, and the
+## tick before which she asks for no way at all (685 amended).
+var _no_way: Dictionary[Vector2i, int] = {}
+var _no_way_until := -1
+## Ways asked for (step's searches), for tests and benches.
+static var searches := 0
 
 
 ## One tick of [param body] following [param leader]: still, or one step
@@ -85,6 +97,15 @@ func follow(body: GridEntity, leader: GridEntity) -> void:
 	var walking := World.tick - _leader_moved <= WALKING_TICKS
 	var way := travel(leader)
 	var clear := keep_clear(leader)
+	# Cells found with no way lately are passed over as goals (685 amended).
+	var avoid := clear
+	if not _no_way.is_empty():
+		avoid = clear.duplicate()
+		for at: Vector2i in _no_way.keys():
+			if World.tick >= _no_way[at]:
+				_no_way.erase(at)
+			else:
+				avoid[at] = true
 	# Beside her walking leader and out of their way she stays put while
 	# they go by (a turn back toward her): no step round to their new back
 	# and straight back again (678, companions' side).
@@ -93,18 +114,18 @@ func follow(body: GridEntity, leader: GridEntity) -> void:
 	# Walking on, she makes for their footsteps, so she goes along the line
 	# they walk (Jeff on v0.1.179: "Pip now does zig zag run behind me");
 	# else a heel cell, kept while it serves.
-	var footstep := _footstep(body, leader, clear) if walking_on(leader) else NONE
+	var footstep := _footstep(body, leader, avoid) if walking_on(leader) else NONE
 	if footstep != NONE:
 		_goal = footstep
 		_on_trail = true
 	elif clear.has(body.tile):
 		_goal = _aside(body, leader, clear)  # In their way: a step aside, not round them.
 		_on_trail = false
-	elif _on_trail and World.tick <= leader.step_until + SETTLE_TICKS and _serves(_goal, body, leader, way, clear):
+	elif _on_trail and World.tick <= leader.step_until + SETTLE_TICKS and _serves(_goal, body, leader, way, avoid):
 		pass  # Stopped a moment ago: a turn straight back may come; she waits a cell back.
-	elif _on_trail or not _serves(_goal, body, leader, way, clear):
+	elif _on_trail or not _serves(_goal, body, leader, way, avoid):
 		# They stopped (or a footstep went): their heel, a cell nearer.
-		_goal = cell(body, leader, clear, way)
+		_goal = cell(body, leader, avoid, way)
 		_on_trail = false
 	var heel := _goal
 	var ahead := ahead_of(body.tile - leader.tile, way) > 0
@@ -115,11 +136,19 @@ func follow(body: GridEntity, leader: GridEntity) -> void:
 	if not walking and not astray and (distance <= STOP and not ahead or heel == NONE and distance <= STOP):
 		catching_up = false
 		return
+	if World.tick < _no_way_until:
+		return  # No way a moment ago: she waits before asking again (685 amended).
+	var went := true
 	if heel != NONE:
-		step(body, heel, false, leader)
+		went = step(body, heel, false, leader)
 	elif distance > CLOSE:
 		# None free: as close as she can get; one that cannot get closer waits.
-		step(body, leader.tile, true, leader)
+		went = step(body, leader.tile, true, leader)
+	if not went:
+		_no_way_until = World.tick + NO_WAY_TICKS
+		if heel != NONE:
+			_no_way[heel] = World.tick + NO_WAY_KEPT  # Next time the next-best heel cell.
+		_goal = NONE
 
 
 ## The nearest of [param leader]'s last cells (their footsteps) a cell back
@@ -265,6 +294,7 @@ static func cell(body: GridEntity, leader: GridEntity, clear := {}, way := NONE)
 static func step(body: GridEntity, goal: Vector2i, occupied_goal_ok: bool, leader: GridEntity = null) -> bool:
 	if World.tick < body.next_move_tick:
 		return true
+	searches += 1
 	var path := World.find_path(body.tile, goal, occupied_goal_ok)
 	if path.is_empty():
 		return false

@@ -31333,3 +31333,26 @@ wilds and the castle from about 250 to 400 cells beside walls and doors:
 With a yield bound of 6 it fails, so it catches a bound that is too small.
 
 Server only, protocol unchanged, no new class_name.
+
+## 685 amended: a heel goal with no way waits before it is asked again
+
+The coordinator, after 685: a companion whose heel goal has no way (her
+player across water, behind a locked door, on a roof) asked find_path for
+it every tick she could move, and each unanswered search walks the whole
+zone. 685 bounded the short searches; Heel's own heel step was left.
+
+- **Hold** (Heel.follow): a heel step (Heel.step) that finds no way, to a
+  heel cell or to the player himself when none is free, makes her wait
+  NO_WAY_TICKS 20 (1 s) before she asks again.
+- **Next-best cell**: a heel cell found with no way is passed over as a
+  goal for NO_WAY_KEPT 100 ticks (Heel._no_way, beside keep_clear's cells
+  in the goal choice), so the next try is the next-best heel cell.
+- Reachable choices are unchanged: the memo only holds cells that had no
+  way, and the hold only follows a search that failed.
+- Heel.searches counts her searches, for tests and benches.
+
+companion_test _test_heel_no_way: her player stood inside the room's east
+wall (no heel cell, no way), 100 ticks: 100 searches before, 5 after; put
+back within reach, she comes to him.
+
+Server only, protocol unchanged, no new class_name.
