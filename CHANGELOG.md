@@ -6,8 +6,10 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
-- A town keeps the residents it can't spare: its only smith, farmer or cook (or a builder while a build is open) won't leave to follow a player, and one who does go pays no rent and draws no town wage while away (686, economy's side).
 
+## v0.1.182
+
+- A town keeps the residents it can't spare: its only smith, farmer or cook (or a builder while a build is open) won't leave to follow a player, and one who does go pays no rent and draws no town wage while away (686, economy's side).
 - A companion who left you no longer comes back after a server restart, and her fighting/magic/stealth focus keeps its growth; companions already affected by earlier restarts can't be restored (687).
 - Ask a companion who left you to come with you again ("come with me") in her town: once she's willing she leaves her work and rejoins you, a little cool at first (581 amended (2)).
 - A companion who left you can be won back: gifts and jobs for her town warm her, she says why she left and what would bring her back, and a justice-minded one waits until you put the wrong right (581 amended).
