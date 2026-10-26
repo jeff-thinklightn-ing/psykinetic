@@ -6266,7 +6266,7 @@ func try_move(entity: GridEntity, direction: Vector2i) -> bool:
 	var start := float(tick)
 	if tick - entity.next_move_tick < 1.0:
 		start = entity.next_move_tick
-	if not _shift(entity, entity, direction, entity.mass, duration, start):
+	if not _swap_with_own(entity, direction, duration, start) and not _shift(entity, entity, direction, entity.mass, duration, start):
 		var ahead: GridEntity = _occupancy.get(entity.tile + direction)
 		if ahead != null and ahead.is_creature() \
 				and not _terrain_blocks_step(entity.tile, direction, true):
@@ -7981,11 +7981,32 @@ func _shift(mover: GridEntity, entity: GridEntity, direction: Vector2i, push_bud
 	return true
 
 
+## A player's step into their own companion's cell (the swap rule; ui's
+## trace: held-key corrections beside her were steps the server took late,
+## waiting on her make_way or bump): they change places on this tick, the
+## step on its own clock from [param start], so it lands when the client's
+## prediction (MovePrediction._blocked: her cell open) showed it. Only their
+## own companion, alive, not downed, lying or stunned, not leaping clear of
+## a telegraph (Companion.Intent.DODGE) and not fighting (Intent.ATTACK: a
+## swap would pull her a cell off her foe; he bumps as before); never across
+## a wall, a closed door or a corner (swap_places). False, nothing done,
+## otherwise (decision 679).
+func _swap_with_own(entity: GridEntity, direction: Vector2i, duration: float, start: float) -> bool:
+	if not entity is Player:
+		return false
+	var pet := _occupancy.get(entity.tile + direction) as Companion
+	if pet == null or pet.keeper != entity or not _alive(pet) or is_downed(pet) or is_down(pet) or is_stunned(pet) 			or pet.current_intent in [Companion.Intent.DODGE, Companion.Intent.ATTACK]:
+		return false
+	return swap_places(entity, pet, duration, start)
+
+
 ## [param a] and [param b], side by side, change places at once, each
-## sliding over [param duration] ticks as a step: a companion making way
-## for her player where there is no room to step aside (Companion.bumped).
-## Both must be creatures, next to each other, with nothing between.
-func swap_places(a: GridEntity, b: GridEntity, duration: float) -> bool:
+## sliding over [param duration] ticks as a step from [param start] (this
+## tick when not given): a companion making way for her player where there
+## is no room to step aside (Companion.bumped), a player's step into her
+## (_swap_with_own). Both must be creatures, next to each other, with
+## nothing between.
+func swap_places(a: GridEntity, b: GridEntity, duration: float, start := -1.0) -> bool:
 	if not Net.is_authority() or not a.is_creature() or not b.is_creature() or not are_adjacent(a.tile, b.tile):
 		return false
 	var direction: Vector2i = b.tile - a.tile
@@ -7994,14 +8015,15 @@ func swap_places(a: GridEntity, b: GridEntity, duration: float) -> bool:
 		return false
 	var at: Vector2i = a.tile
 	var bt: Vector2i = b.tile
+	var from := float(tick) if start < 0.0 else start
 	_occupancy[at] = b
 	_occupancy[bt] = a
 	for each: Array in [[a, at, bt], [b, bt, at]]:
 		var entity: GridEntity = each[0]
 		entity._world_set_tile(each[2])
 		entity._world_note_moved(tick)
-		entity._world_slide_from(each[1], float(tick), duration)
-		entity.next_move_tick = tick + duration
+		entity._world_slide_from(each[1], from, duration)
+		entity.next_move_tick = from + duration
 	_log("swap: %s %s <-> %s %s" % [a.name, at, b.name, bt])
 	entity_moved.emit(a, at, bt)
 	entity_moved.emit(b, bt, at)

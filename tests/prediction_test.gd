@@ -45,6 +45,7 @@ func _ready() -> void:
 	var slow := _walk(3.0, 0.0, 20)
 	_check(slow["corrections"] == 0 and slow["stretched"] == 0, "a 300 ms round trip: none corrected (%d), none slower (%d)" % [slow["corrections"], slow["stretched"]])
 	_test_hinted_walk()
+	_test_through_her()
 	Net.test_lag = 0.0
 	Level.unregister("pt_field")
 	_main.load_map(Level.DEFAULT_MAP)
@@ -291,6 +292,90 @@ func _walk(rtt: float, held_back: float, steps: int) -> Dictionary:
 	# The prediction's clock and the server's ticks run together here.
 	var behind: float = server_took.back() - last_start if server_took.size() == steps else INF
 	return {"corrections": corrections, "stretched": stretched, "behind": behind, "step": pace}
+
+
+## The swap rule: a held walk east through the player's own companion, the
+## real World.try_move the server: the client shows the step into her cell
+## (her cell open to her own player), the server takes it on its tick and
+## they change places, so nothing is corrected, refused or late. Not
+## another's companion, not one downed, never across a wall's corner.
+func _test_through_her() -> void:
+	print("
+== a held walk through her own companion: swapped on the step's tick, nothing corrected or late (the swap rule) ==")
+	Net.test_lag = 0.4 * World.TICK_DT
+	var player := _player()
+	var pet: Companion = null
+	for other in World.get_entities():
+		if other is Companion and other.spawned and (other as Companion).keeper == player:
+			pet = other
+	_check(pet != null, "the host's companion is there")
+	if pet == null:
+		return
+	World._relocate(player, Vector2i(10, 24))
+	World._relocate(pet, Vector2i(12, 24))
+	var shown := MovePrediction.new(player)
+	var pace := World.step_ticks(player, Vector2i(1, 0))
+	var one_way := 0.2
+	var base := World.tick
+	var clock := 0.0
+	var sent: Array = []
+	var told: Array = []
+	var shown_at: Array[float] = []
+	var took_at: Array[float] = []
+	var corrections := 0
+	var refused := 0
+	var steps := 6
+	while clock < steps * pace * 2.0 + 20.0:
+		clock += FRAME * World.TICK_RATE
+		if shown.advance(FRAME):
+			corrections += 1
+			shown.rebase(player.tile, 2.0)
+		if shown_at.size() < steps and shown.ready_for_step() and shown.step(Vector2i(1, 0)):
+			shown_at.append((shown._steps.back() as MovePrediction.Step).start)
+			sent.append([clock + one_way, Vector2i(1, 0)])
+		while World.tick <= base + floori(clock):
+			if not sent.is_empty() and sent[0][0] <= World.tick - base and World.tick >= player.next_move_tick:
+				var due := player.next_move_tick
+				if World.try_move(player, sent[0][1]):
+					sent.pop_front()
+					took_at.append((due if World.tick - due < 1.0 else float(World.tick)) - base)  # Its clock kept within a tick, as try_move keeps it.
+					told.append([World.tick - base + one_way, player.tile])
+				else:
+					refused += 1
+			World.tick += 1
+		while not told.is_empty() and told[0][0] <= clock:
+			if shown.is_active() and not shown.reconcile(told.pop_front()[1]):
+				corrections += 1
+				shown.rebase(player.tile, 2.0)
+	var late := 0
+	for i in mini(shown_at.size(), took_at.size()):
+		if took_at[i] > shown_at[i] + one_way + 1.0:
+			late += 1
+	_check(took_at.size() == steps and player.tile == Vector2i(16, 24) and pet.tile == Vector2i(11, 24),
+			"6 steps east from (10, 24) through her at (12, 24): at %s, she at %s, where he stood" % [player.tile, pet.tile])
+	_check(corrections == 0 and refused == 0 and late == 0,
+			"none corrected, refused or late (%d, %d, %d)" % [corrections, refused, late])
+	# The server's rule alone: not another's, not downed, not round a wall's corner.
+	World._relocate(player, Vector2i(10, 24))
+	World._relocate(pet, Vector2i(11, 24))
+	player.next_move_tick = 0
+	pet.keeper = null
+	_check(not World.try_move(player, Vector2i(1, 0)) and pet.tile == Vector2i(11, 24), "another's companion (no keeper his): no swap")
+	pet.keeper = player
+	pet.downed_until = World.tick + 100
+	_check(not World.try_move(player, Vector2i(1, 0)) and pet.tile == Vector2i(11, 24), "she lies downed: no swap")
+	pet.downed_until = 0
+	pet.current_intent = Companion.Intent.ATTACK
+	_check(not World.try_move(player, Vector2i(1, 0)) and pet.tile == Vector2i(11, 24), "she fights (ATTACK): no swap off her foe")
+	pet.current_intent = Companion.Intent.FOLLOW
+	# The wall cell (2, 18): a diagonal from (2, 19) to (3, 18) cuts its corner.
+	World._relocate(player, Vector2i(2, 19))
+	World._relocate(pet, Vector2i(3, 18))
+	player.next_move_tick = 0
+	var cut := World._terrain_blocks_step(Vector2i(2, 19), Vector2i(1, -1), true)
+	_check(cut and not World.try_move(player, Vector2i(1, -1)) and pet.tile == Vector2i(3, 18) and player.tile == Vector2i(2, 19),
+			"round the wall's corner, where a step is blocked: no swap (%s)" % cut)
+	World._relocate(pet, Vector2i(2, 35))
 
 
 func _player() -> Player:

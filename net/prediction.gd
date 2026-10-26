@@ -707,6 +707,15 @@ func _replan_from(i: int) -> void:
 	_append_path(at, maxf(start, _clock))
 
 
+## Whether a step into [param occupant]'s cell swaps the walker with it, as
+## World._swap_with_own does: the walker's own companion (keeper_peer, which
+## replicates), not downed or lying (decision 679). Her dodge and her fight
+## are the server's alone; a swap it refuses then is corrected as any
+## refused step.
+func _swaps_with(occupant: GridEntity) -> bool:
+	return _entity is Player and occupant is Companion and occupant.keeper_peer == _entity.owner_peer 			and _entity.owner_peer != 0 and not World.is_downed(occupant) and not World.is_down(occupant)
+
+
 ## Would the server refuse this step? The same rule as World._shift, read
 ## off the replicated world: terrain in the way, or an occupant that cannot
 ## be walked into. Every other entity's current tile, where it is or is
@@ -721,6 +730,8 @@ func _blocked(from: Vector2i, direction: Vector2i, budget := _entity.mass) -> bo
 	var occupant := World.get_entity_at(to)
 	if occupant == null or occupant == _entity:
 		return false
+	if budget == _entity.mass and _swaps_with(occupant):
+		return false  # Her own player's step swaps them (World._swap_with_own).
 	if not occupant.pushable or occupant.mass > budget:
 		return true
 	return _blocked(to, direction, budget - occupant.mass)

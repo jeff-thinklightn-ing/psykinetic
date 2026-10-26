@@ -30512,3 +30512,34 @@ physics' replicated GridEntity.load_arms and load_body (kg, 0.1).
   the arms' kg alone); the sheet's own lines for the player.
 
 Client only; the wire is physics' 676 (rev 37). No new class_name.
+
+## 679. A step into your own companion swaps places
+
+Ui's trace (net_smooth, a held walk beside her): 7 of 8 held-key corrections
+a minute were "no confirmation", a step the server took late because a step
+into or through the player's own companion waited on her moving (the bump's
+step_aside, a click's make_way) on the server's tick, where the client had
+shown it at once. The coordinator's ruling: a sim rule. World.try_move, for
+a player, tries _swap_with_own before _shift: a step into their own
+companion's cell (Companion.keeper the player) swaps them on that tick
+through swap_places, which now takes the walk's start (a step's clock kept
+within a tick, as a plain step's), so the step lands when the prediction
+showed it and she takes his old cell, his heel (companions: her follow does
+not fight it). Not for another's companion, nor one downed, lying, stunned,
+leaping clear of a telegraph (Intent.DODGE) or fighting (Intent.ATTACK: a
+swap would pull her off her foe; companions' thought); he bumps then as
+before. Never across a wall, a closed door or a cut corner (swap_places'
+own checks). MovePrediction._blocked treats her cell as open to her own
+player (keeper_peer replicates; not downed or lying); her dodge and fight
+are the server's alone, a swap it refuses corrected as any refused step.
+The bump and step_aside stay for the refused cases and the click's make_way.
+
+prediction_test _test_through_her: a held walk of 6 steps east through her,
+the real try_move the server: he at (16, 24), she at (11, 24), none
+corrected, refused or late (before: the walk stopped at her); another's, one
+downed, one fighting and one round the wall's corner not swapped.
+companion_test: walking into her swaps them on the tick, no mind asked; the
+dead end's swap no longer goes through YIELD. Wire: no new field; an old
+client predicts her cell blocked and is corrected, so it rides revision 37
+(676's, unshipped) with a line there.
+

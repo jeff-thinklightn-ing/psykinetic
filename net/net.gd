@@ -426,6 +426,9 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## SUBCLASS_REPLICATED), the server's load; a client's walk (step_ticks) and
 ## draw read them as the server's do, and the armour's "draw" is gone: an old
 ## client predicts the wrong pace and pull.
+## 37 (679): a player's step into their own companion's cell swaps them on the
+## tick (World._swap_with_own), and MovePrediction treats her cell as open; an
+## old client predicts it blocked and is corrected.
 const PROTOCOL_REVISION := 37
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]

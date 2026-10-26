@@ -500,8 +500,8 @@ func _test_says_so_with_no_room() -> void:
 	World.order_step(owner, Vector2i(-1, 0), owner.refusals, false)
 	World.step()
 	pet.said.disconnect(listen)
-	_check(owner.tile == Vector2i(1, 8) and pet.tile == Vector2i(2, 8) and pet.current_intent == Companion.Intent.YIELD,
-			"at once: her player where she stood, she where they were (%s at %s, %s at %s)" % [owner.name, owner.tile, pet.name, pet.tile])
+	_check(owner.tile == Vector2i(1, 8) and pet.tile == Vector2i(2, 8),
+			"at once: her player where she stood, she where they were (the swap rule) (%s at %s, %s at %s)" % [owner.name, owner.tile, pet.name, pet.tile])
 	_check(heard.is_empty() and World.get_entity_at(Vector2i(1, 8)) == owner and World.get_entity_at(Vector2i(2, 8)) == pet,
 			"no word of it, and the grid knows them where they are (%s)" % [heard])
 	for i in 12:
@@ -2728,7 +2728,7 @@ func _test_native_ollama_endpoint() -> void:
 
 
 func _test_yields_when_bumped() -> void:
-	print("\n== walking into her: she steps out of the way at once, by the hands ==")
+	print("\n== walking into her: they change places on the step's tick (the swap rule), no mind asked ==")
 	_kill_monsters()
 	var owner := _player()
 	var pet := _companion()
@@ -2737,22 +2737,15 @@ func _test_yields_when_bumped() -> void:
 	_settle(pet)
 	_put(owner, Vector2i(9, 6))
 	_put(pet, Vector2i(10, 6))
-	var log_size: int = _main.party_log.size()
 	World.order_step(owner, Vector2i(1, 0), owner.refusals, false)
 	World.step()
-	_check(owner.tile == Vector2i(9, 6), "the step into her is refused")
-	_check(pet.current_intent == Companion.Intent.YIELD and mind.stance_asks.is_empty() and mind.voice_asks.is_empty(),
-			"YIELD on the spot, no mind asked (%s)" % pet.intent_name())
-	_check(_main.party_log.size() > log_size and "bumped into %s" % pet.name in _main.party_log.last(1)[0],
-			"the bump is in the party log (%s)" % [_main.party_log.last(1)])
-	for i in 4:
+	_check(owner.tile == Vector2i(10, 6) and pet.tile == Vector2i(9, 6), "the step into her lands on its tick: he at %s, she where he stood (%s)" % [owner.tile, pet.tile])
+	_check(mind.stance_asks.is_empty() and mind.voice_asks.is_empty(), "no mind asked")
+	World.order_step(owner, Vector2i(1, 0), owner.refusals, false)
+	for i in 3:
 		World.step()
-	var line: Array[Vector2i] = [Vector2i(10, 6), Vector2i(11, 6), Vector2i(12, 6)]
-	_check(pet.tile not in line and World.distance(pet.tile, Vector2i(10, 6)) == 1,
-			"she is one step off their line (at %s)" % pet.tile)
-	World.order_step(owner, Vector2i(1, 0), owner.refusals, false)
-	World.step()
-	_check(owner.tile == Vector2i(10, 6), "and they walk on through (%s)" % owner.tile)
+	_check(owner.tile == Vector2i(11, 6), "and they walk on (%s)" % owner.tile)
+	var log_size: int
 	print("\n== a left click on her beside you: she makes way, as for a bump ==")
 	_settle(pet)
 	_put(owner, Vector2i(9, 6))
