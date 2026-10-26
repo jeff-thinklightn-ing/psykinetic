@@ -7,6 +7,9 @@ notes (decision 324).
 
 ## Unreleased
 
+## v0.1.183
+
+- What goes over the network changes, so v0.1.182 and older can't join the server: update through the launcher first.
 - Free movement (--free-walk): a blow, shove or throw now slides you from where you stand at any angle, smoothly over a few ticks, and a slanting knock slides you along a wall instead of stopping you dead (688 amended (2)).
 - With free movement on, your companion reads where you are heading and keeps out of it, steps aside without a second's stand, and keeps up on slants and turns (688, companions' side).
 - Free movement on the wire: your client's own body follows the server across fords and slow ground without small jumps back (689 amended)
@@ -17,6 +20,7 @@ notes (decision 324).
 - Free movement (--free-walk): walking head on into a wall's corner now slides you off it instead of stopping you dead (688 amended).
 - Free movement, combat's part (not switched on yet): a swing or attack while moving stops you for the blow instead of being refused, and arrows and lobs fly from exactly where you stand (688).
 - Free movement, server side, off by default: started with --free-walk, a player's body moves freely in any direction, slides along walls and passes through their own companion, while the world stays on cells (688; the wire and the client follow in 689).
+
 ## v0.1.182
 
 - A town keeps the residents it can't spare: its only smith, farmer or cook (or a builder while a build is open) won't leave to follow a player, and one who does go pays no rent and draws no town wage while away (686, economy's side).
