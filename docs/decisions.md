@@ -7621,6 +7621,32 @@ ground thinned like open ground, the steps going on across an edge, no
 mine no thinning. Server only; no protocol change.
 
 
+Amended (2026-10-26, the coordinator; perf, from the box's journal): a
+richness made again is never waited for. At the first regeneration after
+684 deployed, the box froze 16.8 s and 16.9 s for everyone: barrow_deep and
+castle_halls laid 30 s apart, each in "after the tick". Each laid level
+calls Main._apply_generation. That did World.richness.finish(), which is
+WorkerThreadPool.wait_for_task_completion on the richness the last level
+started, then made and started a new one. The box's holdings have mines (no
+level's do, so no local or test world had steps to work out). Their steps,
+WorldRoutes.distances_from over every cell of every area, take 4.2 to 5.1 s
+here with 1 to 3 mines, and seemingly about 47 s on the box. barrow's
+richness was still being worked out when barrow_deep's apply waited for it.
+- Main._remake_richness: a laid generation makes a new WorldRichness on the
+  new world map and starts it. If one is already being made, the new one
+  is made after it, on the newest map (_richness_stale).
+- Main._swap_richness, each tick: once the new one's steps are in
+  (WorldRichness.is_ready, never waiting), World.richness becomes it and
+  Herds' richness points at it. Until then the old one answers Herds and
+  Forage, as economy agreed: a stale cell for a few ticks only means a game
+  home picked by the old map.
+- _exit_tree finishes both.
+regen_test: a generation laid while the richness in use is still being
+worked out is laid without waiting for it, the old one answering meanwhile.
+A second asked meanwhile waits its turn, and each is put in on the tick its
+steps are in, Herds pointed at it. is_ready answers at once and a mine's
+steps come in. Server only, protocol unchanged, no new class_name.
+
 ## 365. Names from long-time holders, and the strength they leave
 
 Gear (a thing with a verb, or tagged armour or tool) carried long by one named

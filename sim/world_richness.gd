@@ -67,6 +67,15 @@ func start() -> void:
 	_task = WorkerThreadPool.add_task(func() -> void: _steps = routes.distances_from(from), false, "world richness: steps from the mines")
 
 
+## Whether the steps are in (or there are none to work out), without
+## waiting: Main swaps a richness made again in only once it is (368
+## amended), the old one answering meanwhile.
+func is_ready() -> bool:
+	if _task >= 0 and WorkerThreadPool.is_task_completed(_task):
+		finish()
+	return _done
+
+
 ## Waits for the steps, if they are being worked out: before the server
 ## quits, and before the first richness.
 func finish() -> void:

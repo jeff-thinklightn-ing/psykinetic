@@ -65,6 +65,7 @@ func _ready() -> void:
 	_test_castle_never_marked()
 	_test_regenerate_now()
 	await _test_made_off_the_main_thread()
+	_test_richness_never_waited()
 
 	DirAccess.remove_absolute(Net.state_path)
 	Net.state_path = ""
@@ -278,6 +279,12 @@ func _test_asleep_regenerates() -> void:
 	_check(not World.zones["rg_halls"].awake, "the halls sleep")
 	var richness_before := World.richness
 	_regenerate_round()
+	# Worked out on a pool task, put in on a tick once its steps are in (368 amended).
+	for i in 40:
+		if _main._richness_next == null:
+			break
+		OS.delay_msec(5)
+		World.step()
 	_check(World.richness != null and World.richness != richness_before and World.herds.richness == World.richness.richness,
 		"the game's richness is worked out again on the new floor, the herds pointed at it")
 	_check(World.raid_groups != null and World.raid_groups.world_map == _main._world_map and World.richness.world_map == _main._world_map,
@@ -459,6 +466,87 @@ func _test_made_off_the_main_thread() -> void:
 
 
 # --- Helpers ----------------------------------------------------------------------
+
+## A richness whose steps are "being worked out" till the test says
+## (held); finish() notes that it was waited for instead of waiting.
+class HeldRichness extends WorldRichness:
+	var held := true
+	var waited := false
+
+	func _init(map: WorldMap, with_holdings: Holdings) -> void:
+		super(map, with_holdings)
+
+	func is_ready() -> bool:
+		return not held
+
+	func finish() -> void:
+		waited = true
+
+
+func _test_richness_never_waited() -> void:
+	print("
+== a laid generation never waits for the game's richness (368 amended; the box froze 17 s) ==")
+	_check(World.richness != null and World.holdings != null and World.herds != null, "the world has a richness, holdings and herds")
+	if World.richness == null or World.holdings == null or World.herds == null:
+		return
+	for i in 40:  # Any left by the tests before put in first.
+		if _main._richness_next == null:
+			break
+		OS.delay_msec(5)
+		World.step()
+	# The richness in use still working out its steps (on the box, tens of
+	# seconds with mines): a generation laid meanwhile does not wait for it.
+	var working := HeldRichness.new(_main._world_map, World.holdings)
+	World.richness = working
+	World.herds.richness = working.richness
+	World.steps += _period
+	_only_due("rg_halls")
+	var was: int = _main.generation_of("rg_halls")
+	_regenerate_round()
+	_check(_main.generation_of("rg_halls") == was + 1, "the halls laid anew (generation %d)" % _main.generation_of("rg_halls"))
+	_check(not working.waited, "without waiting for the richness in use")
+	_check(World.richness == working and World.herds.richness.get_object() == working,
+		"which goes on answering, Herds' richness reading it, while the new one is worked out")
+	var next: WorldRichness = _main._richness_next
+	_check(next != null and next != working and next.world_map == _main._world_map,
+		"the new one made on the new world map (%s, %s)" % [next, next.world_map == _main._world_map if next != null else null])
+	# Another laid while that one is worked out: made after it, on the newest map.
+	var held := HeldRichness.new(_main._world_map, World.holdings)
+	_main._richness_next = held
+	_main._remake_richness()
+	_check(_main._richness_next == held and _main._richness_stale, "one asked meanwhile waits its turn (no second task)")
+	World.step()
+	_check(World.richness == working, "not put in while its steps are out")
+	held.held = false
+	World.step()
+	_check(World.richness == held and World.herds.richness.get_object() == held and not held.waited,
+		"in once they are, Herds pointed at it, on the tick, unwaited")
+	var again: WorldRichness = _main._richness_next
+	_check(again != null and again != held and not _main._richness_stale, "and the one asked meanwhile started after it")
+	for i in 20:
+		if World.richness == again:
+			break
+		OS.delay_msec(5)
+		World.step()
+	_check(World.richness == again and _main._richness_next == null, "in, a few ticks on")
+	# WorldRichness's own: is_ready never waits; a mine's steps come in.
+	var real := WorldRichness.new(_main._world_map, World.holdings)
+	var area := "wilds"
+	var at := Vector2i(208, 205)  # The wilds' start.
+	real.mines.append({"area": area, "cell": at})
+	real.start()
+	var t := Time.get_ticks_usec()
+	var ready := real.is_ready()
+	var asked_ms := (Time.get_ticks_usec() - t) / 1000.0
+	for i in 400:
+		if ready:
+			break
+		OS.delay_msec(5)
+		ready = real.is_ready()
+	_check(ready and asked_ms < 5.0 and real.steps_from_mine(area, at) == 0.0,
+		"is_ready answers at once (%.2f ms), and the steps come in (%s at the mine, %s in %s of the map's %s)" % [
+			asked_ms, real.steps_from_mine(area, at), at, area, _main._world_map.areas.keys()])
+
 
 ## The slow ticks' regeneration run through (decision 684): each due level
 ## made on Main's worker, then laid on the next slow tick, till none is left.

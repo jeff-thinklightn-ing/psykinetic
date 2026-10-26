@@ -3449,14 +3449,44 @@ func _apply_generation(level_name: String, config: Dictionary, generation: int, 
 	if World.trade != null:
 		World.trade.use_map(_world_map)
 	if World.richness != null:
-		World.richness.finish()
-		World.richness = WorldRichness.new(_world_map, World.holdings)
-		World.richness.start()
-		if World.herds != null:
-			World.herds.richness = World.richness.richness
+		_remake_richness()
 	if World.forage != null:
 		World.forage.world_map = _world_map
 	return true
+
+
+## The game's richness worked out again on the world map now (368
+## amended): on a pool task, the old one answering Herds and Forage until
+## it is in (_swap_richness). Waiting for the old one's steps here froze the
+## box 17 s at a regeneration, its holdings having mines: their steps take
+## tens of seconds. One asked while one is being made is made after it, on
+## the newest map.
+func _remake_richness() -> void:
+	if _richness_next != null:
+		_richness_stale = true
+		return
+	_richness_next = WorldRichness.new(_world_map, World.holdings)
+	_richness_next.start()
+
+
+## The richness _remake_richness made, put in once its steps are in, and
+## Herds pointed at it; each tick, never waiting.
+func _swap_richness() -> void:
+	if _richness_next == null or not _richness_next.is_ready():
+		return
+	World.richness = _richness_next
+	_richness_next = null
+	if World.herds != null:
+		World.herds.richness = World.richness.richness
+	if _richness_stale:
+		_richness_stale = false
+		_remake_richness()
+
+
+## A richness being worked out (368 amended), and whether another is wanted
+## after it.
+var _richness_next: WorldRichness = null
+var _richness_stale := false
 
 
 ## Server: zone [param level_name], open and asleep, rebuilt on its new
@@ -5274,6 +5304,8 @@ func _finish_saving() -> void:
 ## Once every awake zone has stepped: the snapshot, every SNAPSHOT_EVERY_TICKS,
 ## written on a thread (decision 360).
 func _on_world_stepped() -> void:
+	if Net.is_authority():
+		_swap_richness()
 	if Net.is_authority() and World.steps % SNAPSHOT_EVERY_TICKS == 0:
 		_save_state(false)
 	if Net.is_authority() and World.steps % World.WORLD_TICK_STEPS == 0:
@@ -5391,6 +5423,8 @@ func _exit_tree() -> void:
 		World.trade.finish()
 	if World.richness != null:
 		World.richness.finish()
+	if _richness_next != null:
+		_richness_next.finish()
 	# The stdin thread runs this node's method: it must have stopped before
 	# the node goes, or the server crashes on its way out (one stopped within
 	# 2 s of starting found it still waiting out stdin's end; decision 299).
