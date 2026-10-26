@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Free movement, server side, off by default: started with --free-walk, a player's body moves freely in any direction, slides along walls and passes through their own companion, while the world stays on cells (688; the wire and the client follow in 689).
 ## v0.1.182
 
 - A town keeps the residents it can't spare: its only smith, farmer or cook (or a builder while a build is open) won't leave to follow a player, and one who does go pays no rent and draws no town wage while away (686, economy's side).

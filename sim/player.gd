@@ -30,6 +30,15 @@ var queued_steps: Array[Dictionary] = []
 ## older count and is dropped (see World.order_step): the client had
 ## already given that walk up.
 var refusals := 0
+## Server: a free body's input commands waiting (World.free_input, decision
+## 688): {intent, ticks}, applied in order against free_bank.
+var free_inputs: Array[Dictionary] = []
+## Server: the real time a free body may still move, in ticks (688): one
+## more each tick, at most World.FREE_BANK_TICKS, so more commands than
+## time cannot make it run fast.
+var free_bank := 0.0
+## Server: the tick it last bumped its own companion as a free body (688).
+var free_bumped_tick := -100000
 ## Server only: whose player this is (PlayerRecord.player_id), so the
 ## things it carries know (World.holder_key).
 var player_id := ""
@@ -104,6 +113,14 @@ func toggle_lantern() -> void:
 	emit_light = 0.0 if emit_light > 0.0 else LANTERN
 
 func _sim_tick() -> void:
+	if World.free_body(self):
+		# A free body (decision 688): its commands, not steps or routes.
+		queued_steps.clear()
+		has_move_order = false
+		World.tend_free_body(self)
+		if action_order != Order.NONE:
+			_pursue_action()
+		return
 	if not queued_steps.is_empty():
 		_take_queued_step()
 		return

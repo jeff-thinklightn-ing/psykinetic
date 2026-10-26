@@ -446,6 +446,26 @@ const DRAIN_BODY_SHARE := 0.25
 const CLANK_WALK_TICKS := 2.5
 ## Under a shout (Senses.NOISE_SHOUT): a monster goes to look, not to hunt.
 const CLANK_MAX := 19
+## Free movement (decision 688; Jeff's pick 3 of free-movement.md): a
+## player's body has a centre of its own (GridEntity.free_pos) and moves any
+## way at once, the world staying on cells. Off, the grid's steps as ever.
+var free_walk := false
+## A free body is a circle of this radius, in cells, against cell edges
+## and others' cells (688).
+const FREE_RADIUS := 0.3
+## How far past its cell's edge a free body's centre goes before it holds
+## the next cell (688): a body on a border does not flicker between two.
+const FREE_HYSTERESIS := 0.1
+## The most a free body moves between collision checks, in cells (688),
+## under its radius, so it never passes through an edge.
+const FREE_SUBSTEP := 0.2
+## The most real time a free body may bank, in ticks (688).
+const FREE_BANK_TICKS := 3.0
+## The most input commands waiting on one free body (688).
+const FREE_INPUTS_MAX := 64
+## A free body pressing into its own companion bumps her at most this
+## often, in ticks (688): her yield hears it.
+const FREE_BUMP_TICKS := 5
 ## SHOVE_COST_BASE and SHOVE_COST_SCALE: a shove costs
 ## base + force x target_mass x scale stamina.
 @export var shove_cost_base := 5.0
@@ -4030,6 +4050,7 @@ func _ready() -> void:
 	entity_pushed.connect(_on_pushed_for_stockpile)
 	entity_despawned.connect(func(entity: GridEntity) -> void: _pushed_by.erase(entity))
 	load_physics_rules(FileAccess.get_file_as_string(PHYSICS_RULES))
+	free_walk = Net.free_walk  # --free-walk (688).
 	load_combat_rules(FileAccess.get_file_as_string(COMBAT_RULES))
 
 
@@ -5222,6 +5243,8 @@ func try_stance(by: GridEntity, kind: String, lob := false) -> bool:
 ## step the client was already showing is refused to it, so its view comes
 ## back to the cell it stands in.
 func stand_firm(by: GridEntity) -> void:
+	if free_body(by):
+		halt(by, tick)  # A free body's walk stops where it is (688).
 	by.has_move_order = false
 	by.move_via.clear()
 	by.action_order = GridEntity.Order.NONE
@@ -6310,15 +6333,23 @@ func try_move(entity: GridEntity, direction: Vector2i) -> bool:
 	entity.step_velocity = Vector2(direction) / duration  # Its momentum (body_velocity).
 	entity.step_until = entity.next_move_tick
 	entity.last_step_tick = tick  # (A braced spear stands still: braced.)
-	_trample(entity, entity.tile - direction)
 	entity._world_set_facing(direction)
+	_stepped_off(entity, entity.tile - direction, duration)
+	return true
+
+
+## What a step does as [param entity] leaves [param left] for its tile
+## over [param duration] ticks (try_move; a free body's claim, 688): the
+## grass it left trampled, spawn grace ended, its footstep and its armour's
+## clank heard.
+func _stepped_off(entity: GridEntity, left: Vector2i, duration: float) -> void:
+	_trample(entity, left)
 	if entity.shelter_lead == null or not is_sheltered(entity):
 		entity.protected = false  # Moving ends spawn grace (a companion's shelter: her player's act does, 661).
 	if entity is Player or entity is Companion:
 		noise(entity.tile, Senses.step_radius(entity), &"step", entity)
 		var worn := entity.slots[Items.ARMOUR] if entity.slots.size() > Items.ARMOUR else ""
 		noise(entity.tile, int(armour_noise(worn, CLANK_WALK_TICKS / maxf(duration, 0.001))["radius"]), &"clank", entity)  # 676 1b: none at 0.
-	return true
 
 
 ## The noise a worn [param worn_id] makes a step at [param pace] (a walk's
@@ -8033,6 +8064,8 @@ func _swap_with_own(entity: GridEntity, direction: Vector2i, duration: float, st
 func swap_places(a: GridEntity, b: GridEntity, duration: float, start := -1.0) -> bool:
 	if not Net.is_authority() or not a.is_creature() or not b.is_creature() or not are_adjacent(a.tile, b.tile):
 		return false
+	if free_body(a) or free_body(b):
+		return false  # A free body passes through his own companion instead (688).
 	var direction: Vector2i = b.tile - a.tile
 	if _terrain_blocks_step(a.tile, direction, true) or _terrain_blocks_step(b.tile, -direction, true) \
 			or _closed_door_across(a.tile, direction) != null:
@@ -8052,6 +8085,217 @@ func swap_places(a: GridEntity, b: GridEntity, duration: float, start := -1.0) -
 	entity_moved.emit(a, at, bt)
 	entity_moved.emit(b, bt, at)
 	return true
+
+
+## Whether [param entity] moves as a free body (decision 688): a player,
+## while free_walk is on.
+func free_body(entity: GridEntity) -> bool:
+	return free_walk and entity is Player
+
+
+## Queues one input command for [param entity]'s free body (688): its
+## [param intent], a way of length up to 1 (shorter walks slower), held for
+## [param seconds]. Applied in order in its act (tend_free_body). Server only.
+func free_input(entity: GridEntity, intent: Vector2, seconds: float) -> void:
+	if not Net.is_authority() or not free_body(entity) or not is_finite(intent.x) or not is_finite(intent.y):
+		return
+	var player := entity as Player
+	if player.free_inputs.size() >= FREE_INPUTS_MAX:
+		player.free_inputs.pop_front()
+	player.free_inputs.append({"intent": intent.limit_length(1.0), "ticks": clampf(seconds * TICK_RATE, 0.0, FREE_BANK_TICKS)})
+
+
+## [param entity]'s free body stops where it is and takes no intent before
+## [param until_tick] (688; combat's attacks and wind-ups, stand_firm): its
+## velocity and its waiting commands are dropped.
+func halt(entity: GridEntity, until_tick: int) -> void:
+	entity.free_halt_until = maxi(entity.free_halt_until, until_tick)
+	entity.free_way = Vector2.ZERO
+	if entity is Player:
+		(entity as Player).free_inputs.clear()
+
+
+## Whether [param entity]'s free body ignores its intent now (688): halted,
+## a bow drawn (it stands firm, 583 amended), stunned, lying or downed.
+func free_held(entity: GridEntity) -> bool:
+	return tick < entity.free_halt_until or entity.raised == "draw" or is_stunned(entity) \
+			or is_down(entity) or is_downed(entity)
+
+
+## A free body's turn (688, from Player._sim_tick): a tick's more real time
+## banked, its commands applied in order while the bank lasts, each moving
+## the body (_free_move). A body that moved has stepped (last_step_tick: a
+## spear braced only standing still) and carries its velocity as a step's
+## momentum (step_velocity, step_until).
+func tend_free_body(player: Player) -> void:
+	if not Net.is_authority() or not player.spawned:
+		return
+	player.free_bank = minf(player.free_bank + 1.0, FREE_BANK_TICKS)
+	var was := player.free_pos
+	var way := Vector2.ZERO
+	while not player.free_inputs.is_empty() and player.free_bank > 0.001:
+		var command: Dictionary = player.free_inputs[0]
+		var ticks := minf(float(command["ticks"]), player.free_bank)
+		way = _free_move(player, command["intent"], ticks)
+		player.free_bank -= ticks
+		command["ticks"] = float(command["ticks"]) - ticks
+		if float(command["ticks"]) <= 0.001:
+			player.free_inputs.pop_front()
+	player.free_way = way
+	if player.free_pos.distance_to(was) > 0.01:
+		player.last_step_tick = tick
+		player.step_velocity = way
+		player.step_until = tick + 1.0
+
+
+## Moves [param entity]'s free body by [param intent] for [param ticks]
+## (688): at its walk's speed (1 / step_ticks the way it mostly goes, from
+## its cell: load, winded, the speed buff and the ground count, and a
+## diagonal costs what a straight does), a substep at a time, each pushed
+## out of what is solid (_free_resolve) and then holding the cell its
+## centre is in (_free_claim). Its velocity, cells a tick.
+func _free_move(entity: GridEntity, intent: Vector2, ticks: float) -> Vector2:
+	if free_held(entity) or intent.length() < 0.001 or ticks <= 0.0:
+		return Vector2.ZERO
+	var axis := _free_axis(intent)
+	var speed := 1.0 / maxf(step_ticks(entity, axis), 0.001)
+	var velocity := intent * speed
+	var facing := Vector2i(signi(roundi(intent.x * 1.3)), signi(roundi(intent.y * 1.3)))
+	entity._world_set_facing(facing if facing != Vector2i.ZERO else axis)
+	var left := ticks
+	var guard := 0
+	while left > 0.0001 and guard < 64:
+		var dt := minf(left, FREE_SUBSTEP / velocity.length())
+		entity.free_pos = _free_resolve(entity, entity.free_pos + velocity * dt, intent)
+		_free_claim(entity, 1.0 / speed)
+		left -= dt
+		guard += 1
+	return velocity
+
+
+## The straight way [param intent] mostly points (688).
+static func _free_axis(intent: Vector2) -> Vector2i:
+	if absf(intent.x) >= absf(intent.y):
+		return Vector2i(signi(roundi(signf(intent.x))), 0)
+	return Vector2i(0, signi(roundi(signf(intent.y))))
+
+
+## [param at] for [param entity]'s free body, pushed out of what is solid
+## to it (688): the edges a step from the side its centre is on could not
+## cross (_terrain_blocks_step: a wall, a closed door, a step up, the edge
+## of the walkable), and the cells others hold (a monster, another player,
+## a crate; never its own companion, whom it passes through). Pressing
+## [param intent] into a closed door it may open opens it; into a crate it
+## shifts it a cell, at its walk's pace. A circle of FREE_RADIUS slides
+## along what it meets and never cuts a corner.
+func _free_resolve(entity: GridEntity, at: Vector2, intent: Vector2) -> Vector2:
+	var p := at
+	for _pass in 3:
+		var c := Vector2i(roundi(p.x), roundi(p.y))
+		var moved := false
+		for dx in [-1, 0, 1]:
+			for dy in [-1, 0, 1]:
+				var cell: Vector2i = c + Vector2i(dx, dy)
+				for direction: Vector2i in [Vector2i(1, 0), Vector2i(0, 1)]:
+					var out := _free_off_edge(entity, p, cell, direction, intent)
+					if out != p:
+						p = out
+						moved = true
+				var square := _free_off_cell(entity, p, cell, intent)
+				if square != p:
+					p = square
+					moved = true
+		if not moved:
+			break
+	return p
+
+
+## [param p] pushed off the edge between [param cell] and the cell
+## [param direction] (east or south) of it, if that edge is solid from the
+## side [param p] is on and the circle reaches it (688).
+func _free_off_edge(entity: GridEntity, p: Vector2, cell: Vector2i, direction: Vector2i, intent: Vector2) -> Vector2:
+	var across := direction.x  # 1: the edge is vertical, at x = cell.x + 0.5.
+	var line := (cell.x if across == 1 else cell.y) + 0.5
+	var along := p.y if across == 1 else p.x
+	var middle := float(cell.y if across == 1 else cell.x)
+	var offset := (p.x if across == 1 else p.y) - line
+	var nearest := clampf(along, middle - 0.5, middle + 0.5)
+	var gap := Vector2(offset, along - nearest) if across == 1 else Vector2(along - nearest, offset)
+	if gap.length() >= FREE_RADIUS:
+		return p
+	var side := cell if offset < 0.0 else cell + direction
+	var way := direction if offset < 0.0 else -direction
+	if not _terrain_blocks_step(side, way):
+		return p
+	var door := _closed_door_across(side, way)
+	if door != null and intent.dot(Vector2(way)) > 0.0 and may_open(entity, door):
+		_set_door(door, true, entity)
+		if not _terrain_blocks_step(side, way):
+			return p
+	if gap.length() < 0.00001:
+		return p - Vector2(way) * FREE_RADIUS
+	return p + gap.normalized() * (FREE_RADIUS - gap.length())
+
+
+## [param p] pushed out of [param cell], if another holds it that
+## [param entity]'s free body may not pass (688): its own companion it
+## passes through. Pressing [param intent] into a pushable one beside its
+## own cell shifts it a cell when its walk allows.
+func _free_off_cell(entity: GridEntity, p: Vector2, cell: Vector2i, intent: Vector2) -> Vector2:
+	if cell == entity.tile:
+		return p
+	var other: GridEntity = _occupancy.get(cell)
+	if other == null or other == entity or other is Companion and (other as Companion).keeper == entity:
+		return p
+	var low := Vector2(cell) - Vector2(0.5, 0.5)
+	var nearest := p.clamp(low, low + Vector2.ONE)
+	var gap := p - nearest
+	if gap.length() >= FREE_RADIUS:
+		return p
+	var axis := _free_axis(intent)
+	if entity is Player and is_link_cell(cell) and tick - (entity as Player).free_bumped_tick >= FREE_BUMP_TICKS:
+		(entity as Player).free_bumped_tick = tick
+		link_bumped.emit(entity, cell)  # A body on a link's cell never shuts the way (571).
+	if other.pushable and cell == entity.tile + axis and tick >= entity.next_move_tick:
+		var duration := step_ticks(entity, axis)
+		if _shift(entity, other, axis, entity.mass, duration, float(tick)):
+			entity.next_move_tick = tick + duration
+			return p
+	if gap.length() > 0.00001:
+		return p + gap.normalized() * (FREE_RADIUS - gap.length())
+	# Its centre inside the cell (it took the cell under the body): out by
+	# the nearest face.
+	var into := p - Vector2(cell)
+	if absf(into.x) >= absf(into.y):
+		return Vector2(cell.x + signf(into.x) * (0.5 + FREE_RADIUS), p.y)
+	return Vector2(p.x, cell.y + signf(into.y) * (0.5 + FREE_RADIUS))
+
+
+## [param entity]'s free body holds the cell its centre is in, once the
+## centre is FREE_HYSTERESIS past its own cell's edge (688), as a step there
+## would: the cell claimed (_relocate: entity_moved, interest, links), slid
+## for the views over [param duration], and the step's grass, grace, noise
+## and clank (_stepped_off). Its own companion's cell it waits on, bumping
+## her (entity_bumped, every FREE_BUMP_TICKS) so she yields.
+func _free_claim(entity: GridEntity, duration: float) -> void:
+	var held := entity.tile
+	var off := entity.free_pos - Vector2(held)
+	if absf(off.x) <= 0.5 + FREE_HYSTERESIS and absf(off.y) <= 0.5 + FREE_HYSTERESIS:
+		return
+	var cell := Vector2i(roundi(entity.free_pos.x), roundi(entity.free_pos.y))
+	if cell == held or not is_walkable(cell):
+		return
+	var other: GridEntity = _occupancy.get(cell)
+	if other != null and other != entity:
+		if other is Companion and entity is Player and tick - (entity as Player).free_bumped_tick >= FREE_BUMP_TICKS:
+			(entity as Player).free_bumped_tick = tick
+			entity_bumped.emit(entity, other, (cell - held).clamp(Vector2i(-1, -1), Vector2i(1, 1)))
+		return
+	entity._free_claiming = true
+	_relocate(entity, cell)
+	entity._free_claiming = false
+	entity._world_slide_from(held, float(tick), duration)
+	_stepped_off(entity, held, duration)
 
 
 func _relocate(entity: GridEntity, to: Vector2i) -> void:

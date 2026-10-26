@@ -554,6 +554,9 @@ var companions := true
 ## a real level (Monster.idling, Monster.noticing): without it, test_room's
 ## imps hunted net_test's players under load.
 var still_monsters := false
+## --free-walk: players' bodies move freely (World.free_walk, decision 688),
+## on whoever is the authority; the grid's steps without it.
+var free_walk := false
 ## --no-player-reset turns this off: any player may rebuild the room with R.
 ## On while the game is only being tested; the console's reset always works.
 var player_reset := true
@@ -1871,6 +1874,8 @@ func _parse_args() -> void:
 				console = true
 			"--no-companions":
 				companions = false
+			"--free-walk":
+				free_walk = true
 			"--still-monsters":
 				still_monsters = true
 				Monster.idling = false

@@ -31508,3 +31508,74 @@ what she leaves over; loaded, she still does not join her player.
 
 Server only, protocol unchanged, no new class_name. It must ship before the
 next deploy restarts the box (release holds the cut for it).
+
+
+## 688. The free body: a player's centre of its own, the world on cells
+
+Jeff on v0.1.182: "you can now tell that the pc character is running on a
+grid, the mouse move directions is very unreponsive"; his pick 3 of
+free-movement.md, ui's study (C:/dev/review/ui/free-movement-study.md) and
+the coordinator's rulings. This is the server's body, behind a flag
+(World.free_walk, Net's --free-walk); the grid's steps stay the default until
+Jeff signs off, and the wire is ui's 689.
+
+- **The body**: GridEntity.free_pos, the centre in cell units (Vector2(tile)
+  a cell's centre), and free_way, its velocity in cells a tick. Every body
+  has a free_pos (its cell's centre) so shots and lobs may read one origin;
+  only a player's moves on its own (World.free_body: a Player, the flag on).
+- **Input**: World.free_input(entity, intent, seconds) queues a command, an
+  intent of length up to 1 (shorter walks slower) held for its dt. The
+  player's act (Player._sim_tick, World.tend_free_body) applies them in order
+  against a bank of real time, a tick more each tick and FREE_BANK_TICKS (3)
+  at most, so more commands than time never walk faster. Queued steps and
+  move orders are the grid's and are dropped; an action order is pursued as
+  before.
+- **Speed**: 1 / step_ticks the way the intent mostly points, from its cell:
+  load (676), winded, the speed buff and the ground (607) all count. A
+  diagonal costs what a straight does (the coordinator's ruling; the grid's
+  3.75 ticks a diagonal step is gone for a free body).
+- **Collision**: a circle of FREE_RADIUS 0.3 moved a substep (at most 0.2
+  cell) at a time and pushed out of what is solid: an edge a step from the
+  side its centre is on could not cross (_terrain_blocks_step: a wall, a
+  closed door, a step up, the walkable's edge; one-way where a height is),
+  and the cells others hold (a monster, another player, a crate). It slides
+  along what it meets; at two walls' corner it stops a radius off it, so it
+  never cuts a corner. A closed door pressed into is opened if it may; a
+  crate pressed into is shifted a cell (_shift) at the walk's pace; a body
+  on a link's cell is bumped as a refused step was (link_bumped, 571).
+- **One cell held**: the body holds the cell its centre is in once the
+  centre is FREE_HYSTERESIS (0.1) past its own cell's edge, so a body on a
+  border does not flicker. The claim is a step: _relocate (entity_moved:
+  interest, links, the log), a slide for the views, and _stepped_off (the
+  grass, spawn grace, the footstep and the clank, its pace from the speed),
+  taken out of try_move for both.
+- **Its own companion never blocks him** (the coordinator's ruling): her
+  cell is not solid to him and he passes through; while his centre is in
+  her cell his claim waits, bumping her (entity_bumped, every
+  FREE_BUMP_TICKS) so her yield hears it. swap_places refuses a free body,
+  so 679's swap is retired for it.
+- **Halt**: World.halt(entity, until_tick) drops the velocity and the
+  waiting commands and takes no intent before that tick (combat's attacks
+  and wind-ups; stand_firm halts at once). No intent is taken with a bow
+  drawn (583 amended), stunned, lying or downed (free_held).
+- **A step is any move**: last_step_tick is set on any tick the body moved
+  over 0.01 cell, so a spear is braced only standing still; step_velocity
+  and step_until carry the velocity as a step's momentum (592).
+- **Pushes snap**: any change of tile but the body's own claim
+  (_world_set_tile: a push, a lunge, a rush, a relocate, a spawn) puts its
+  centre on the cell's centre. Impulses on a free body come later (688
+  amended).
+
+tests/walk.gd, the walk-to helper: Walk.to(entity, cell) walks a body there
+either way, a grid step at a time along walk_path or a free body's command a
+tick toward the path's next cell. tests/free_walk_test: the flag off as
+before; 10 ticks east 4 cells, south-east 4 too, half an intent half; the
+claim at 0.65 past, not at 0.55, and not back at 0.55; 30 commands of a
+second after 10 idle ticks walk 3 ticks' worth; a monster's cell stops it
+at 3.2 and it slides past its corner; through its own companion to (5, 2),
+her cell never his, she bumped, no swap; a crate shifted ahead to (6, 2); a
+wall's slide at y 1.2; a corner never cut; a door opened and walked
+through; halted, drawn, stand_firm; inching counts as a step; a relocate and
+a knock snap it; the helper round a wall either way. Wire: none with the
+flag off (free_pos and free_way are not replicated; ui's 689 packs them),
+protocol unchanged; no new class_name.

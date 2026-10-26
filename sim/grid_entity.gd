@@ -154,9 +154,22 @@ var tending := ""
 var step_velocity := Vector2.ZERO
 ## Server: the tick (maybe fractional) that step ends.
 var step_until := -100000.0
-## Server: the tick it last took a step (World.try_move): a spear is braced
-## standing still (World.braced, decision 344).
+## Server: the tick it last took a step (World.try_move), or moved at all
+## as a free body (688): a spear is braced standing still (World.braced,
+## decision 344).
 var last_step_tick := -100000
+## The body's centre in cell units, Vector2(tile) the cell's centre
+## (decision 688): a free body's own (World.free_walk, World._free_move),
+## anyone else's its cell's centre. Any change of tile but a free body's
+## own claim puts it there (_world_set_tile): a push, a lunge snaps it.
+var free_pos := Vector2.ZERO
+## A free body's velocity in cells a tick (688); zero standing.
+var free_way := Vector2.ZERO
+## A free body takes no intent before this tick (World.halt, 688).
+var free_halt_until := 0
+## Set while World claims a free body's cell from its centre, which keeps
+## its free_pos where it is (688).
+var _free_claiming := false
 ## Server: the tick it was last hurt (World.damage); out of combat after a while.
 var hurt_tick := -100000
 @export var body_material := BodyMaterial.FLESH
@@ -740,6 +753,8 @@ func _update_body() -> void:
 func _world_place(new_id: int, at: Vector2i) -> void:
 	id = new_id
 	tile = at
+	free_pos = Vector2(at)
+	free_way = Vector2.ZERO
 	_from_tile = at
 	_move_duration = 0
 	hp = max_hp
@@ -755,6 +770,8 @@ func _world_place(new_id: int, at: Vector2i) -> void:
 
 func _world_set_tile(to: Vector2i) -> void:
 	tile = to
+	if not _free_claiming:
+		free_pos = Vector2(to)
 
 
 func _world_set_facing(direction: Vector2i) -> void:
