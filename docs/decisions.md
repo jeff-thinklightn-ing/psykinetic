@@ -31984,3 +31984,30 @@ Three changes:
 Server only (a unit change: release installs the unit, daemon-reload, deploy),
 protocol unchanged, no new class_name. docs/server.md and server/env.example
 updated.
+## 691. No player's id in what a client is sent of a resting companion; no remote dev-host
+
+The coordinator, for Jeff's box hardening (690): the server is reachable
+from the internet, and a player's id is the key to their record and to
+builder and admin rights. Two holes.
+
+- **A resting companion's body** (decision 333 amended) was named from her
+  worker key, "Resident_" + "companion:<player id>", so her player's whole
+  id went to every client who saw her: in the spawn spec's name, in the
+  "death" message (the entity's name) and in every "speech" (its path).
+  She is now named by her player's index, as their own body is
+  ("Resident_companion_<index>"; Godot makes it unique while a despawned
+  body's name is held). Resident.worker_id and player_id keep the real key,
+  server side only (neither is replicated). A town's own residents keep
+  their worker ids in their names: none is a player's id.
+- **The dev host's fixed id**: a host or server run from the project plays
+  as Net.DEV_PLAYER_ID ("dev-host"). On a dedicated server nobody plays it,
+  and a remote hello claiming it would have got its record. Now
+  Net.reserved_id refuses it on a dedicated server ("reserved player id");
+  a host's own id, and every other, are as before.
+
+resident_test _test_no_id_in_names: a resting companion whose player has an
+id of the usual length (a made-up one): no body's name or path holds any
+player's id, her name is Resident_companion_..., her key kept on the
+server; the death and speech sent of her hold none; reserved_id refuses
+dev-host on a server only. Protocol unchanged (the names are not a
+replicated value's meaning; --print-protocol the same), no new class_name.

@@ -370,6 +370,7 @@ func _test_bodies_in_town() -> void:
 	var wren := _body("companion:rs-other")
 	_check(wren != null and wren.label == "Wren" and wren.player_id == "rs-other", "Wren, resting (no trade), stands in the town (%s)" % [wren.label if wren != null else "none"])
 	_check(_body("companion:" + Net.player_id) == null, "a companion out with her player has no body here")
+	_test_no_id_in_names(wren, other)
 	if wren != null:
 		print("\n== one who left her player: why, and what might bring her back, told her only when that player speaks (581 amended, npc's side) ==")
 		# Her worker as Towns.note_companion_in seats one with a trade: "companion:<her name>", her player for its origin.
@@ -1454,6 +1455,45 @@ func _test_favour() -> void:
 	_check(pet != null, "(restored)")
 	if pet != null:
 		_settle(pet)
+
+
+## Nothing a client is sent about a resting companion names her player's id
+## (691: the id is the key to their record and their rights): every body's
+## node name and path (each spawn spec's name; "death" sends the name,
+## "speech" the path); a dedicated server refuses a remote "dev-host".
+func _test_no_id_in_names(wren: Resident, other: PlayerRecord) -> void:
+	print("
+== a resting companion's body names no player's id; a server refuses a remote dev-host (691) ==")
+	var kept_id := other.player_id
+	# A made-up id of the usual length, swapped in for the test's short one.
+	var secret := "0000aaaa-placeholder-id-not-real-1234"
+	_main._records.erase(kept_id)
+	other.player_id = secret
+	_main._records[secret] = other
+	if wren != null:
+		World.despawn(wren)
+	_sync()
+	var body := _body("companion:" + secret)
+	_check(body != null and body.player_id == secret, "(her body, her player's key kept on the server)")
+	var leaks: Array[String] = []
+	for entity: GridEntity in World.get_entities():
+		for record: PlayerRecord in _main._records.values():
+			if record.player_id.length() >= 8 and (record.player_id in String(entity.name) or record.player_id in String(entity.get_path())):
+				leaks.append(String(entity.name))
+	_check(leaks.is_empty() and body != null and String(body.name).begins_with("Resident_companion_"),  # (Her index, or one more while a despawned body's name is still held.)
+		"no body's name or path holds a player's id (%s; hers %s)" % [leaks, body.name if body != null else ""])
+	if body != null:
+		var death := {"entity": String(body.name)}
+		var speech := {"entity": String(body.get_path()), "speaker": body.person}
+		_check(not secret in JSON.stringify(death) and not secret in JSON.stringify(speech), "nor the death or speech sent of her")
+	_check(Net.reserved_id(Net.DEV_PLAYER_ID, Net.Mode.SERVER) and not Net.reserved_id(Net.DEV_PLAYER_ID, Net.Mode.HOST)
+		and not Net.reserved_id(secret, Net.Mode.SERVER), "a dedicated server refuses a remote dev-host; a host's own, or any other id, is not refused")
+	if body != null:
+		World.despawn(body)
+	_main._records.erase(secret)
+	other.player_id = kept_id
+	_main._records[kept_id] = other
+	_sync()
 
 
 func _test_houses() -> void:

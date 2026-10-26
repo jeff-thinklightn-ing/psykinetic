@@ -1492,6 +1492,8 @@ func authenticate(hello: Dictionary) -> void:
 		_reject(peer, "authentication failed", "empty token" if offered == "" else "wrong token")
 	elif id.is_empty() or id.length() > 64:
 		_reject(peer, "authentication failed", "bad player id")
+	elif reserved_id(id, mode):
+		_reject(peer, "authentication failed", "reserved player id")
 	elif id in _authenticated.values():
 		_reject(peer, "already connected", "already connected as %s" % id.left(8))
 	elif _authenticated.size() >= max_players:
@@ -1503,6 +1505,14 @@ func authenticate(hello: Dictionary) -> void:
 		_bodies[id] = tidy_body(hello.get("body", ""))
 		_looks[id] = tidy_look(hello.get("look", ""))
 		_admit(peer, id, player_name_given)
+
+
+## Whether a remote hello may not claim [param id] in [param run_mode]
+## (691): on a dedicated server, the dev host's own fixed id
+## (DEV_PLAYER_ID), which nobody plays from outside, so nobody can claim
+## the record and rights it holds.
+static func reserved_id(id: String, run_mode: int) -> bool:
+	return run_mode == Mode.SERVER and id == DEV_PLAYER_ID
 
 
 func _on_peer_connected(peer: int) -> void:
