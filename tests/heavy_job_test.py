@@ -116,6 +116,13 @@ older, newer = running(4, 4, started=10.0), running(9, 9, started=20.0)
 check(not gate.should_stop(older, [older, newer], 5.0), "under the margin, the older job keeps on")
 check(gate.should_stop(newer, [older, newer], 5.0), "the newest stops")
 check(not gate.should_stop(newer, [older, newer], 9.0), "above the margin, nothing stops")
+check(gate.should_stop(newer, [older, newer], 30.0, gate.COMMIT_STOP_GB - 0.5), "RAM to spare but free commit under COMMIT_STOP_GB: the newest stops (394 amended (16))")
+check(not gate.should_stop(older, [older, newer], 30.0, gate.COMMIT_STOP_GB - 0.5), "and the older keeps on")
+check(not gate.should_stop(newer, [older, newer], 30.0, gate.COMMIT_STOP_GB + 0.5), "above it, nothing stops")
+check(gate.short_of_memory(30.0, 1.0) == "commit" and gate.short_of_memory(5.0, 1.0) == "RAM" and gate.short_of_memory(30.0, None) == "",
+	"what it is short of is named, RAM first; no commit known, RAM alone")
+lean3 = dict(suite, ram_gb=7.2, commit_gb=6.1)
+check(gate.decide(lean3, [], True, 15.9, None, 13.3)[0], "today's baseline (15.9 GB RAM, 13.3 GB commit free): a lean suite starts (394 amended (16))")
 
 print("== estimates ==")
 check(gate.updated_estimate(4.0, 6.0) == 6.0, "a higher peak: up to it at once")

@@ -9014,6 +9014,23 @@ heavy_job_test: a lean ticket is judged lean, and a suite or bench behind a
 lean suite in reach no longer goes past it, while one behind a full suite
 out of reach still does.
 
+Amended a sixteenth time (2026-10-26, the coordinator; release's report):
+commit is guarded during the run, not only at its start. Physics' suite for
+688 (free movement, top priority) waited 1 h 54 min, out of reach with
+nothing running. 15.9 GB of RAM was free, against a lean suite's
+7.2 + 8, but only 13.3 GB of commit, against its 6.1 + 8: 0.8 GB short.
+The 25 sessions' MCP servers held 13.3 GB of commit, and nothing was stale.
+The in-run watch looked only at RAM, so the start margin was commit's only
+guard, and at today's baseline it kept every suite out.
+- COMMIT_MARGIN_GB 8 to 4, to start a job. RAM's MARGIN_GB stays 8.
+- COMMIT_STOP_GB 2: free commit under it for LOW_WATCHES watches running
+  stops the newest gated job and queues it again, as free RAM under the
+  margin does (short_of_memory, should_stop). The stop line names which ran
+  short, and a commit stop goes in the daily summary.
+A lean suite now starts at today's baseline and leaves about 7 GB of commit
+free while it runs. heavy_job_test: the commit watch stops the newest job
+only, says what ran short, and today's baseline starts a lean suite.
+
 
 ## 395. UI sounds
 

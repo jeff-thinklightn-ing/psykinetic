@@ -104,9 +104,14 @@ import time
 
 STATE_DIR = os.environ.get("HEAVY_JOBS_DIR", r"C:\dev\psykinetic-trees\heavy_jobs")
 MARGIN_GB = 8.0
-## Commit (RAM and pagefile, 100 GB here) kept free: past it allocations
-## fail and programs crash.
-COMMIT_MARGIN_GB = 8.0
+## Commit (RAM and pagefile, 100 GB here) kept free to start a job: past
+## it allocations fail and programs crash. 4, not 8 (394 amended (16)): with
+## a session's MCP servers holding 13 GB of commit, 8 kept even a lean suite
+## out for hours while RAM had room; COMMIT_STOP_GB guards the run instead.
+COMMIT_MARGIN_GB = 4.0
+## Free commit under this many watches running (LOW_WATCHES) stops the
+## newest job, as free RAM under MARGIN_GB does (394 amended (16)).
+COMMIT_STOP_GB = 2.0
 MAX_RUNNING = 3
 ## A job holding the gate this long is flagged in status, the log and the
 ## summary (a bench held 588 minutes on 2026-10-17 before anyone saw it).
@@ -309,10 +314,21 @@ def may_step_aside(job, behind):
         for other in behind)
 
 
-def should_stop(me, running, free_ram_gb):
+def short_of_memory(free_ram_gb, free_commit_gb=None):
+    """What a running job is short of: "RAM" under MARGIN_GB, "commit" under
+    COMMIT_STOP_GB (394 amended (16)), else ""."""
+    if free_ram_gb < MARGIN_GB:
+        return "RAM"
+    if free_commit_gb is not None and free_commit_gb < COMMIT_STOP_GB:
+        return "commit"
+    return ""
+
+
+def should_stop(me, running, free_ram_gb, free_commit_gb=None):
     """Whether the watched job [me] stops its child: free RAM is under the
-    margin and no running job started after it."""
-    if free_ram_gb >= MARGIN_GB:
+    margin, or free commit under COMMIT_STOP_GB, and no running job started
+    after it."""
+    if not short_of_memory(free_ram_gb, free_commit_gb):
         return False
     return all(each["started"] <= me["started"] for each in running)
 
@@ -984,6 +1000,7 @@ def run(tree, kind, command, expect_minutes=None):
         child = subprocess.Popen(command, env=dict(os.environ, **{HELD_ENV: name, KIND_ENV: estimate}), creationflags=flags)
         job = Job(child)
         peak, low, stopped, long_logged = 0.0, 0, False, False
+        short_of = ""
         gpu_peak, commit_peak, at_once = 0.0, 0.0, 0.0
         # What held the memory at its peak (394 amended (10)): the listing
         # taken when the commit last rose past the one before.
@@ -1029,10 +1046,12 @@ def run(tree, kind, command, expect_minutes=None):
                 long_logged = True
                 log("long", tree, kind, "still running after %.0f min" % (LONG_HOLD_SECONDS / 60))
                 print("heavy_job: %s %s has held the gate %.0f min" % (tree, kind, LONG_HOLD_SECONDS / 60), file=sys.stderr)
-            free = free_ram_gb()
-            low = low + 1 if free < MARGIN_GB else 0
-            if (adopted is None and low >= LOW_WATCHES and entry is not None and should_stop(entry, running, free)
+            free, free_commit = _memory()
+            short = short_of_memory(free, free_commit)
+            low = low + 1 if short else 0
+            if (adopted is None and low >= LOW_WATCHES and entry is not None and should_stop(entry, running, free, free_commit)
                     and child.poll() is None):
+                short_of = short
                 job.stop()
                 child.wait()
                 stopped = True
@@ -1089,9 +1108,10 @@ def run(tree, kind, command, expect_minutes=None):
             keep_listing(tree, kind, listed, listed_gb, commit_peak)
             return shell_code(code)
         restarts += 1
-        log("stopped", tree, kind, "free RAM under %.0f GB after %.0f s (peak %.1f GB); restart %d of %d" % (
-            MARGIN_GB, duration, peak, restarts, MAX_RESTARTS))
-        print("heavy_job: %s %s stopped: free RAM under %.0f GB, the newest job; queued again" % (tree, kind, MARGIN_GB), file=sys.stderr)
+        under = "free commit under %.0f GB" % COMMIT_STOP_GB if short_of == "commit" else "free RAM under %.0f GB" % MARGIN_GB
+        log("stopped", tree, kind, "%s after %.0f s (peak %.1f GB); restart %d of %d" % (
+            under, duration, peak, restarts, MAX_RESTARTS))
+        print("heavy_job: %s %s stopped: %s, the newest job; queued again" % (tree, kind, under), file=sys.stderr)
         if restarts > MAX_RESTARTS:
             return 75
 
