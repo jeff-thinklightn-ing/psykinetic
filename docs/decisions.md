@@ -30994,3 +30994,56 @@ prediction_test _test_through_her: she reels from a stun: no swap, and the
 prediction shows him stopped; the stun over, her cell open again; she fights
 (ATTACK), she dodges (DODGE): swapped all the same. Wire: no new field
 (holds_ground not needed), protocol unchanged; no new class_name.
+
+
+## 678, companions' side: she follows on the pulled line
+
+Jeff on v0.1.179: "Pip now does zig zag run behind me in the wilds", and
+"sometimes she catches up into the same tile and bounces off, causing visual
+effect that seems like the screen is jerking" (the coordinator's ruling: her
+moves never take her player's cell or the one he steps into, her goal is
+kept rather than picked again each tick, and she runs the line he walks).
+678 string-pulled the player's own route; her follow (Heel, decision 485)
+still stepped find_path's eight-way first cell toward a heel cell picked
+afresh each tick behind his facing, so on a slant she stair-stepped a cell
+off his line, the heel flipped sides when he turned, and her catch-up could
+take the cell he was walking into on the tick of his step, which the swap
+(679) then sent straight back.
+
+- **His way kept clear** (Heel.keep_clear): his cell, the next two of his
+  way (WASD steps queued, the via cells, else the line to his move order;
+  Heel.next_cells) and, while he walks on (WALK_ON_TICKS 3 after a step's
+  end), two cells along his last step. No heel goal is one of them, and a
+  step into one waits: she stops short rather than bump. Heel.step takes
+  the leader; Companion._step_toward passes her player for every move but a
+  dodge (663), so errands keep clear too.
+- **His footsteps** (_footstep): walking on, she makes for the cells he
+  left (the trail, TRAIL_KEPT 4), a cell back from him (so a turn straight
+  back does not walk into her), only one nearer him than she is. His step
+  due this tick and not yet taken counts as taken, so she sets off with it.
+- **Beside him and out of his way she stays put** while he walks by (a turn
+  back toward her), and standing in his way she steps aside to the nearest
+  clear cell (_aside), not round to his new back.
+- **The goal kept** (_serves): a heel cell is picked again only when it
+  stops serving (more than STOP from him, taken, in his way, or ahead of
+  where he goes: Heel.travel, his last step's way while walking on, else
+  his facing). Stopped, she waits on his footstep SETTLE_TICKS 6, then closes
+  to his heel as before.
+- **The pulled line** (Heel.step): a way of 3 cells or more, its goal one
+  she may stand on, is World.walk_path's, so off his footsteps she goes
+  straight too.
+
+companion_test _test_heel_keeps_clear: twenty runs east, a stop of 0 to 4
+ticks, then back west, north-west, south-west, north, or a turn and on
+again, his steps queued ahead as a client sends them. Before, after: swaps
+4, 0; swaps into a cell she had just taken (the bounce) 1, 0; steps straight
+back within 6 ticks 24, 0; refusals of his steps 0, 0. Her step gaps follow
+his pace (his 2.5 ticks a step on that ground: 2, 3, 3), no stop-go.
+_test_heel_on_the_line: a slant at 20 degrees and back; her widest drift off
+his line 1.40 cells before, 0.59 after (a 20 degree line still alternates
+straight and diagonal steps; the mirror draws them as softly bent slides,
+and a line glide for mirrors is ui's if that still shows). Two older
+sections moved with her: the attack's imp spawns on the nearest free cell,
+and the retreat waits 16 ticks, not 8, for her to close in.
+
+Server only, protocol unchanged, no new class_name.

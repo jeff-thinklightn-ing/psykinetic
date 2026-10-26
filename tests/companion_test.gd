@@ -104,6 +104,8 @@ func _ready() -> void:
 	_test_wild()
 	_test_seated_boss()
 	_test_follow_without_backsteps()
+	_test_heel_keeps_clear()
+	_test_heel_on_the_line()
 	_test_quiet()
 	_test_dodge()
 	_test_firing_cone()
@@ -137,7 +139,7 @@ func _test_follows_through_the_passage() -> void:
 func _test_attacks_a_hostile_in_range() -> void:
 	print("\n== attacks a monster that comes within range ==")
 	var pet := _companion()
-	var imp := _spawn_imp(Vector2i(10, 11))
+	var imp := _spawn_imp(_main._nearest_free(Vector2i(10, 11)))  # (Where she stands now and then: she walks a cell back of him, 678 companions' side.)
 	_step_until(func() -> bool: return pet.current_intent == Companion.Intent.ATTACK, 40)
 	_check(pet.current_intent == Companion.Intent.ATTACK and pet.intent_target == imp, "intent is ATTACK on the imp (%s)" % pet.intent_name())
 	_step_until(func() -> bool: return imp.hp < imp.max_hp, 40)
@@ -2552,7 +2554,7 @@ func _test_retreats_on_low_hp() -> void:
 	var owner := _player()
 	var pet := _companion()
 	_walk_to(owner, Vector2i(8, 12))
-	for i in 8:
+	for i in 16:  # She waits a cell back a moment, then closes in (678, companions' side).
 		World.step()
 	pet.hp = 5
 	World.step()
@@ -3200,6 +3202,140 @@ func _test_bandage_words() -> void:
 	World.set_slots(pet, slots_were)
 	owner.hp = owner.max_hp
 	owner.mending = 0
+	_settle(pet)
+
+
+## [param owner] walks [param route] (directions) as a held key walks: a
+## step queued ahead, as the client sends it (predicted), so each is taken
+## the tick it falls due. [param watch] is called after every tick.
+func _walk_held(owner: Player, route: Array[Vector2i], watch: Callable, limit := 400) -> void:
+	for i in limit:
+		if route.is_empty() and owner.queued_steps.is_empty() and World.tick >= owner.next_move_tick:
+			return
+		if not route.is_empty() and owner.queued_steps.is_empty():
+			owner.queued_steps.append({"direction": route.pop_front(), "predicted": true})
+		World.step()
+		watch.call()
+
+
+const BOUNCE_TICKS := 6
+
+
+func _test_heel_keeps_clear() -> void:
+	print("\n== catching up she keeps out of the cell her player walks into: no swap, no bounce, no refusal (678, companions' side; Jeff: \"she catches up into the same tile and bounces off\") ==")
+	_kill_monsters()
+	var owner := _player()
+	var pet := _companion()
+	_settle(pet)
+	var owner_was := owner.tile
+	var pet_was := pet.tile
+	var refusals_were := owner.refusals
+	var count := {"swaps": 0, "fresh": 0, "backs": 0}  # (A lambda takes ints by value.)
+	var moves: Array[Vector2i] = []
+	var at := {"owner": owner.tile, "pet": pet.tile, "tick": -100}  # Kept the one dictionary: the lambda holds it.
+	var gaps: Array[int] = []
+	var watch := func() -> void:
+		if owner.tile != at["owner"] and owner.tile == at["pet"]:
+			# He stepped into the cell she held: a swap (679). Into one she
+			# had only just taken (within 3 ticks) is the bounce Jeff saw: her
+			# step drawn in, then straight back out.
+			count["swaps"] += 1
+			if World.tick - int(at["tick"]) <= 3:
+				count["fresh"] += 1
+		if pet.tile != at["pet"] and owner.tile != at["pet"]:
+			# A step straight back within BOUNCE_TICKS of the one before: the
+			# bounce (a later one is following him after he turned).
+			if moves.size() >= 2 and pet.tile == moves[moves.size() - 2] and World.tick - int(at["tick"]) <= BOUNCE_TICKS:
+				count["backs"] += 1
+			moves.append(pet.tile)
+			gaps.append(World.tick - int(at["tick"]))
+			at["tick"] = World.tick
+		at["owner"] = owner.tile
+		at["pet"] = pet.tile
+	var east := Vector2i(1, 0)
+	var west := Vector2i(-1, 0)
+	# Runs east along row 8 (the room's widest open floor, clear of the
+	# fire on row 5), her two cells behind; a stop of 0 to 4 ticks; then
+	# back, west, north-west, south-west, north, or a turn and on again.
+	var backs: Array = [[west, west, west, west, west], [Vector2i(-1, -1), west, west, west], [Vector2i(-1, 1), west, west, west],
+		[Vector2i(0, -1), Vector2i(0, -1), west, west], [west, west, east, east]]
+	for pause in [0, 1, 2, 4]:
+		for back: Array in backs:
+			_kill_monsters()
+			_put(owner, Vector2i(6, 8))
+			_put(pet, Vector2i(4, 8))
+			for i in 12:
+				World.step()
+			moves.clear()
+			at.merge({"owner": owner.tile, "pet": pet.tile, "tick": World.tick}, true)
+			var route: Array[Vector2i] = []
+			for i in 6:
+				route.append(east)
+			_walk_held(owner, route, watch)
+			for i in pause:
+				World.step()
+				watch.call()
+			route.assign(back)
+			_walk_held(owner, route, watch)
+			for i in 12:
+				World.step()
+				watch.call()
+	var refused := owner.refusals - refusals_were
+	print("  (stop dead and turn back, twenty runs: %d swaps, %d into a cell she had just taken, %d steps back, %d refusals of his steps; her step gaps %s)" % [count["swaps"], count["fresh"], count["backs"], refused, gaps])
+	_check(count["fresh"] == 0 and count["backs"] == 0, "she never steps into the cell he walks into: no swap into it, no step back (%d, %d)" % [count["fresh"], count["backs"]])
+	_check(refused == 0, "and none of his held steps is refused (%d)" % refused)
+	_put(owner, owner_was)
+	_put(pet, pet_was)
+	_settle(pet)
+
+
+func _test_heel_on_the_line() -> void:
+	print("\n== following a player on a slanting line she walks the line, not a staircase (678, companions' side; Jeff: \"Pip now does zig zag run behind me\") ==")
+	_kill_monsters()
+	var owner := _player()
+	var pet := _companion()
+	_settle(pet)
+	var owner_was := owner.tile
+	var pet_was := pet.tile
+	var worst := 0.0
+	var turns := 0
+	var cells := 0
+	# A slant across the room's open floor and back, clear of the fire on
+	# row 5 and the wall west of (6, 7).
+	for run: Array in [[Vector2i(4, 9), Vector2i(12, 6), Vector2i(3, 9)], [Vector2i(12, 6), Vector2i(4, 9), Vector2i(12, 5)]]:
+		var start: Vector2i = run[0]
+		var end: Vector2i = run[1]
+		_put(owner, start)
+		_put(pet, run[2])
+		for i in 12:
+			World.step()
+		var route: Array[Vector2i] = []
+		var from := start
+		for cell in World.line_cells(start, end):
+			route.append(cell - from)
+			from = cell
+		var trail: Array[Vector2i] = [pet.tile]
+		var watch := func() -> void:
+			if pet.tile != trail.back():
+				trail.append(pet.tile)
+		_walk_held(owner, route, watch)
+		for i in 20:
+			World.step()
+			watch.call()
+		# Her drift: how far each cell she took lies off the line he walked
+		# (a staircase leaves it by a cell and more), from her third step on.
+		var line := Vector2(end - start).normalized()
+		for k in range(2, trail.size()):
+			var off := Vector2(trail[k] - start)
+			worst = maxf(worst, absf(off.x * line.y - off.y * line.x))
+		for k in range(2, trail.size()):
+			if trail[k] - trail[k - 1] != trail[k - 1] - trail[k - 2]:
+				turns += 1
+		cells += trail.size() - 1
+	print("  (a slant and back: her widest drift off his line %.2f cells; %d turns in %d steps)" % [worst, turns, cells])
+	_check(worst < 0.75, "she keeps to his line, never a cell off it (%.2f)" % worst)
+	_put(owner, owner_was)
+	_put(pet, pet_was)
 	_settle(pet)
 
 

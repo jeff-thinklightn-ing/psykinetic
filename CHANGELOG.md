@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Your companion follows in your footsteps: on a slant she runs your line instead of zig-zagging, and catching up she keeps out of the cell you are stepping into, so she no longer bounces into you and back (678, companions' side).
 - Walking into your companion while she fights or dodges now swaps places as it looks like it will, and a stunned companion stops you cleanly; neither snaps your character back (679 amended).
 - A healer's hut's medicine man now makes remedies from the herbs he gathers: he no longer has to buy them back from his own hut, which has no gold, so both huts' remedies (and draughts) are made again (498 amended (2)).
 - The bow's lob sounds its arc: a whoosh as it goes up, a falling whistle from where it will land over its last half second (you can hear it coming and step out), its thud in the ground; a shot that knocks someone down lands with a heavier blow (677, sound's side).

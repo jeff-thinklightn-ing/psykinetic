@@ -4480,9 +4480,11 @@ static func _ahead_of(offset: Vector2i, facing: Vector2i) -> int:
 	return Heel.ahead_of(offset, facing)
 
 
-## One A* step toward [param goal]. False if there is no way there.
+## One step toward [param goal] (Heel.step): never into a cell her player
+## is walking into (678, companions' side), save leaping clear of a blow.
+## False if there is no way there.
 func _step_toward(goal: Vector2i, occupied_goal_ok: bool) -> bool:
-	return Heel.step(self, goal, occupied_goal_ok)
+	return Heel.step(self, goal, occupied_goal_ok, keeper if current_intent != Intent.DODGE else null)
 
 
 # --- Errands: what she does when asked ------------------------------------------
