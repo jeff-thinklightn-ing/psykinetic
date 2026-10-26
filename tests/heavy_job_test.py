@@ -322,6 +322,21 @@ check(not gate.goes_lean(full, lean, after, [dict(running(14.6, 10.0), kind="sui
     "nor while a suite running will give its memory back (a wait on the gate, not outside it)")
 check(not gate.goes_lean(full, lean, after, [], 12.0, 20.2), "nor when the lean one is out of reach too")
 check(not gate.goes_lean(full, None, after, [], 18.3, 20.2), "nor with no lean variant")
+# Companions' lean take, judged by those behind it at the full suite's
+# estimate, looked out of reach: sound's suite and then economy's went past
+# it as each running suite ended (release, 2026-10-25; 394 amended (15)).
+went_lean = {"kind": "suite", "estimate": "suite_lean3"}
+check(gate.queued_row(table, went_lean, full)["ram_gb"] == 8.0, "a ticket that went lean is judged by the lean estimate")
+check(gate.queued_row(table, {"kind": "suite"}, full)["ram_gb"] == 14.6 and gate.queued_row(table, {"kind": "suite", "estimate": "suite"}, full)["ram_gb"] == 14.6,
+    "one that did not, by its kind's")
+check(gate.queued_row(table, {"kind": "made_up"}, full)["kind"] == "made_up", "a kind the table lacks: the default row, its own kind")
+behind_suite = dict(lean)
+check(not gate.may_pass(behind_suite, [gate.queued_row(table, went_lean, full)], [], 18.3, 20.2),
+    "a suite queued behind a lean suite in reach no longer goes past it")
+check(not gate.may_pass(dict(gate.KINDS["bench"], kind="bench"), [gate.queued_row(table, went_lean, full)], [], 18.3, 20.2),
+    "nor a bench")
+check(gate.may_pass(behind_suite, [gate.queued_row(table, {"kind": "suite"}, full)], [], 18.3, 20.2),
+    "as it did past the full suite, out of reach (the rule for a job held by memory outside the gate)")
 check(not gate.decide(lean, [dict(running(1, 1), kind="bench")], True, 60.0, None)[0]
     and not gate.decide(lean, [dict(running(1, 1), kind="suite")], True, 60.0, None)[0],
     "a lean suite still never beside a bench or another suite")

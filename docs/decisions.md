@@ -8998,6 +8998,22 @@ and since it excludes suites the landing would have waited for it.
 heavy_job_test covers the rule for a suite, a bench and a soak, and a waiter
 out of reach whose kind excludes benches keeping its place ahead of one.
 
+Amended a fifteenth time (2026-10-25, release and perf): a waiter is judged
+by its own estimate. Each waiter judged the rows queued ahead of it (and
+behind, for stepping aside) from kinds.json by kind alone, ignoring the
+"estimate" its ticket holds once it goes lean. Companions' suite went lean
+at 300 s (suite_lean3, 7.1 GB) but was seen by those behind it as a full
+suite, 15.4 + 8 GB, out of reach at about 16 GB free, so may_pass let them
+past it. When the bench running ended, sound's suite, queued after it, was
+granted; when sound's ended, economy's. Companions waited 27 minutes as
+first in the queue and only won when it happened to look first.
+- queued_row: the row a queued ticket is judged by, its kind's, or its lean
+  variant's once the ticket says it went lean. wait_turn builds both ahead
+  and behind with it.
+heavy_job_test: a lean ticket is judged lean, and a suite or bench behind a
+lean suite in reach no longer goes past it, while one behind a full suite
+out of reach still does.
+
 
 ## 395. UI sounds
 

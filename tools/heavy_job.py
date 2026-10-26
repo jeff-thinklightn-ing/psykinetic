@@ -235,6 +235,21 @@ def lean_row(table, kind):
     return row
 
 
+def queued_row(table, entry, default):
+    """The row the queue [entry] is judged by, by those queued beside it:
+    its kind's from [table] ([default] for a kind it lacks), or its lean
+    variant's once its ticket says it went lean (394 amended (15)). Judged
+    at the full suite's 15.4 + 8 GB, companions' lean take looked out of
+    reach to the suites behind it, which went past it each time the one
+    running ended (sound's, then economy's, 2026-10-25)."""
+    kind = entry["kind"]
+    if entry.get("estimate", kind) != kind and kind in table:
+        lean = lean_row(table, kind)
+        if lean is not None and lean["estimate"] == entry["estimate"]:
+            return lean
+    return dict(table.get(kind, default), kind=kind)
+
+
 def goes_lean(row, lean, waited_s, running, free_ram_gb, free_commit_gb=None):
     """Whether a job of [row] waiting [waited_s] runs as [lean] (its lean
     variant, or None): out of reach that long, and the lean one in reach.
@@ -836,7 +851,8 @@ def wait_turn(tree, kind, pid, watched):
                     tree, kind, pid), file=sys.stderr)
                 raise SystemExit(3)
             place = next((i for i, each in enumerate(queue) if each["file"] == ticket), 0) + 1
-            ahead = [dict(kinds().get(each["kind"], row), kind=each["kind"]) for each in queue[:place - 1]]
+            table = kinds()
+            ahead = [queued_row(table, each, row) for each in queue[:place - 1]]
             # First in the queue, or every job before it waits on its own
             # kind alone (may_pass): an import is not held behind a suite
             # waiting for a suite.
@@ -857,7 +873,7 @@ def wait_turn(tree, kind, pid, watched):
             ok, why = decide(row, running, head, free_ram, free_gpu, free_commit)
             if not ok and head and out_of_reach(row, running, free_ram, free_commit):
                 why += "; out of reach even with no heavy job running (memory held outside the gate): jobs that fit go past it"
-                behind = [dict(kinds().get(each["kind"], row), kind=each["kind"]) for each in queue[place:]]
+                behind = [queued_row(table, each, row) for each in queue[place:]]
                 if place < len(queue) and may_step_aside(dict(row, kind=kind), behind):
                     # Steps to the back itself: waiters started from an older
                     # heavy_job.py (a tree not yet rebased) don't know the
