@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Free movement, combat's part (not switched on yet): a swing or attack while moving stops you for the blow instead of being refused, and arrows and lobs fly from exactly where you stand (688).
 - Free movement, server side, off by default: started with --free-walk, a player's body moves freely in any direction, slides along walls and passes through their own companion, while the world stays on cells (688; the wire and the client follow in 689).
 ## v0.1.182
 

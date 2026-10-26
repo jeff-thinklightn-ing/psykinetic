@@ -31579,3 +31579,40 @@ through; halted, drawn, stand_firm; inching counts as a step; a relocate and
 a knock snap it; the helper round a wall either way. Wire: none with the
 flag off (free_pos and free_way are not replicated; ui's 689 packs them),
 protocol unchanged; no new class_name.
+
+## 688, combat's side: blows and shots from a free body
+
+ui's design, physics' free body (688): while World.free_walk is on, a player's body has a float
+centre, GridEntity.free_pos. Combat's side, agreed with ui:
+
+- **A blow stops the body; it is no longer refused mid-step.** A free body never sets
+  next_move_tick, so the grid's mid-step refusals pass it. In their place,
+  World._halt_for_blow(entity, until) calls physics' World.halt.
+  - A swing (try_swing), a blow or a shove (_try_hit) and a door's bash (try_bash_door) hold the
+    body until next_attack_tick.
+  - A wind-up (try_wind_up) holds it until it lands.
+  - A shield bash (try_bash) holds it until bash_moment_until.
+  - While held, the walk keys do nothing (World.free_held). A body on the grid is unchanged.
+- **Shots and lobs start from the body's own centre.** World.shot_origin(entity) is free_pos for
+  a free body, else the cell's centre.
+  - shot_ray takes it as an optional origin and starts its walk across cell sides from there.
+    shot_aim passes it, so the server's shot and the client's aim read the same line.
+  - lob_aim draws the aim in to the reach from it.
+  - Main._point_direction (swing, shove and shield toward the cursor) aims from it.
+  - The cells counted for reach are still World.distance's.
+- **Melee keeps cell adjacency**, with no change to any number: can_melee, in_reach and
+  is_behind read player.tile, the one cell a free body claims.
+- **Physics' side.** A brace reads last_step_tick, which physics sets on any movement over
+  0.01 cell. A lunge, a rush, a push or a relocate snaps free_pos to the cell's centre first.
+  stand_firm halts a free body.
+- **Diagonals cost the same as straights** under free walk. A flank to is_behind and
+  kite-and-shoot get easier; this is to be re-checked in play.
+
+combat_test `_test_free_blows`:
+- a swing mid-walk is taken and stops the body;
+- the walk keys do nothing until the attack is ready, then it walks on;
+- an arrow from the bottom edge of its cell strikes a body in the row below that a centre shot
+  misses;
+- the lob drawn in from the body's centre.
+
+Protocol unchanged, no new class_name. It changes nothing in play until free_walk is turned on.

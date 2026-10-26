@@ -16,6 +16,7 @@ const SPECS := {
 	"P": {"script": "res://sim/player.gd", "shape": "capsule"},
 	"m": {"script": "res://sim/monster.gd", "shape": "capsule"},
 }
+const Walk := preload("res://tests/walk.gd")
 const NAMES := {"P": "Player", "m": "Dummy"}
 
 var _failures := 0
@@ -45,6 +46,7 @@ func _ready() -> void:
 	_test_cone_spread()
 	_test_draw_held()
 	_test_lob()
+	_test_free_blows()
 	_test_armour()
 
 	print("")
@@ -342,6 +344,55 @@ func _test_cone_spread() -> void:
 	_check(is_zero_approx(Items.spread_at(plain, 60.0)) and World.scatter(host, 0.5, 0.0) == 0.5,
 			"a bow verb without a spread: no cone, the aim flown")
 	host.raised = ""
+
+## A free body's blows and shots (688, combat's side; ui: "an attack or
+## swing stops the body for its windup"): a swing mid-walk is taken, not
+## refused, and stops the body until its attack is ready again; a wind-up
+## until it lands; shots and lobs start from its own centre (shot_origin),
+## so an arrow from the edge of its cell flies that line.
+func _test_free_blows() -> void:
+	print("\n== a free body: a swing mid-walk stops it for the blow; its shots fly from its own centre (688, combat's side) ==")
+	var e := _build(["############", "#P.........#", "#.........m#", "############"])
+	var host: GridEntity = e["P"][0]
+	var foe: GridEntity = e["m"][0]
+	World.free_walk = true
+	host.free_pos = Vector2(host.tile)
+	_check(World.free_body(host) and not World.free_body(foe), "(free_walk: the player a free body, the monster on its cells)")
+	for i in 3:
+		Walk.toward(host, Vector2i(6, 1))
+		World.step()
+	_check(host.free_way.length() > 0.0, "(walking: %s cells a tick)" % host.free_way)
+	host.next_attack_tick = 0
+	_check(World.try_swing(host, Vector2i.RIGHT) and host.free_way == Vector2.ZERO and World.free_held(host),
+			"a swing mid-walk: taken, not refused, and the body stops")
+	var stood := host.free_pos
+	World.free_input(host, Vector2.RIGHT, World.TICK_DT)
+	World.step()
+	_check(host.free_pos == stood, "it stands for the blow: the walk keys do nothing (%s)" % host.free_pos)
+	while World.tick < host.next_attack_tick:
+		World.step()
+	World.free_input(host, Vector2.RIGHT, World.TICK_DT)
+	World.step()
+	_check(host.free_pos.x > stood.x and not World.free_held(host), "its attack ready again: it walks on (%s)" % host.free_pos)
+	# Shots from its own centre: drawn at the bottom edge of its cell, a shallow line crosses into the row below.
+	_give(host, "bow")
+	World.put_item(host, host, Player.LEFT_HAND, World.items.mint("arrows", "built"))
+	World._relocate(host, Vector2i(1, 1))
+	host.free_pos = Vector2(1.0, 1.45)
+	var angle := atan2(0.1, 8.0)
+	var from_edge := World.shot_aim(host, angle, 9)
+	var from_centre := World.shot_ray(host.tile, angle, 9)
+	_check(World.shot_origin(host) == host.free_pos and from_edge["hit"] == foe and not foe.tile in from_centre["cells"],
+			"from where it stands in its cell: the arrow on that line strikes the one in the row below, as one from the cell's centre would not (%s)" % [from_edge["hit"]])
+	World.fields.outdoor = true
+	World.try_stance(host, "draw", true)
+	host.raised_tick = World.tick - 12  # Full draw: 9 cells.
+	_check(World.lob_aim(host, Vector2i(10, 1)) == Vector2i((host.free_pos + Vector2(9.0, 0.0)).round()),
+			"a lob is drawn in to its reach from the body's own centre (%s)" % World.lob_aim(host, Vector2i(10, 1)))
+	World.try_stance(host, "")
+	World.free_walk = false
+	World.fields.outdoor = false
+
 
 ## The lob (decision 677; Jeff: "right click hold and release to fire. a hit
 ## would cause a knock down impact"): a draw aimed at the sky, its first step

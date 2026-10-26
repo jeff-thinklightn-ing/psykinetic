@@ -10002,7 +10002,7 @@ static func _point_direction(entity: GridEntity, args: Dictionary) -> Vector2i:
 	var point := Vector2(float(raw[0]), float(raw[1]))
 	if not point.is_finite():
 		return Vector2i.ZERO
-	return grid_direction(point - Vector2(entity.tile))
+	return grid_direction(point - World.shot_origin(entity))  # A free body's own centre (688).
 
 
 ## The talk panel (Tab) and the chat box (Enter), on the HUD.

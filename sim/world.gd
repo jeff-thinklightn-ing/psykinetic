@@ -2107,6 +2107,7 @@ func try_bash_door(entity: GridEntity, key: Vector3i, amount: int) -> bool:
 		return false
 	var direction: Vector2i = (sides[1] if entity.tile == sides[0] else sides[0]) - entity.tile
 	entity.next_attack_tick = tick + entity.attack_ticks
+	_halt_for_blow(entity, entity.next_attack_tick)
 	entity._world_set_facing(direction)
 	entity._world_swung(direction)
 	_hit_door(door, amount, entity)
@@ -5432,12 +5433,13 @@ func lob_radius(entity: GridEntity) -> float:
 ## (range_of); its own cell before the first step.
 func lob_aim(entity: GridEntity, cell: Vector2i) -> Vector2i:
 	var reach := range_of(entity)
-	var way := Vector2(cell - entity.tile)
+	var start := shot_origin(entity)  # A free body's centre (688).
+	var way := Vector2(cell) - start
 	if reach <= 0:
 		return entity.tile
 	if way.length() > float(reach):
 		way = way.normalized() * float(reach)
-	return entity.tile + Vector2i(way.round())
+	return Vector2i((start + way).round())
 
 
 ## Whether a lob may come down on [param cell] (decision 677): ground under
@@ -5672,9 +5674,9 @@ func shot_aim(by: GridEntity, angle: float, cells := -1) -> Dictionary:
 	var verb := Items.verb_of(drawn_with(by))
 	if verb.is_empty() or not is_finite(angle):
 		return {}
-	var ray := shot_ray(by.tile, angle, int(verb["cells"]) if cells < 0 else cells)
+	var start := shot_origin(by)
+	var ray := shot_ray(by.tile, angle, int(verb["cells"]) if cells < 0 else cells, start)
 	var out := {"end": ray["end"], "cell": by.tile, "hit": null, "struck": ray["struck"]}
-	var start := Vector2(by.tile)
 	var way := Vector2.from_angle(angle)
 	for cell: Vector2i in ray["cells"]:
 		out["cell"] = cell
@@ -5699,10 +5701,12 @@ func shot_aim(by: GridEntity, angle: float, cells := -1) -> Dictionary:
 ## A wall edge or a closed door is crossed as sight is
 ## (_sight_crosses_edge); over relief (decision 525) the arrow flies from
 ## the eye toward the aim height over the range's end, and ground above
-## that stops it.
-func shot_ray(from: Vector2i, angle: float, cells: int) -> Dictionary:
+## that stops it. [param origin]: where in [param from] it starts, a free
+## body's centre (688, combat's side; shot_origin); the cell's centre if not
+## given.
+func shot_ray(from: Vector2i, angle: float, cells: int, origin := Vector2(NAN, NAN)) -> Dictionary:
 	var out: Array[Vector2i] = []
-	var start := Vector2(from)
+	var start := origin if origin.is_finite() else Vector2(from)
 	var result := {"cells": out, "end": start, "struck": &"ground"}
 	if cells <= 0 or not is_finite(angle):
 		return result
@@ -5711,7 +5715,9 @@ func shot_ray(from: Vector2i, angle: float, cells: int) -> Dictionary:
 	var reach := float(cells) / maxf(absf(way.x), absf(way.y))
 	var s := Vector2i(1 if way.x > 0.0 else -1, 1 if way.y > 0.0 else -1)
 	var delta := Vector2(INF if way.x == 0.0 else 1.0 / absf(way.x), INF if way.y == 0.0 else 1.0 / absf(way.y))
-	var next := delta * 0.5  # The ray's length to the first cell side across, each axis.
+	# The ray's length to the first cell side across, each axis (half a cell from the centre).
+	var next := Vector2(INF if way.x == 0.0 else (float(from.x) + 0.5 * s.x - start.x) / way.x,
+		INF if way.y == 0.0 else (float(from.y) + 0.5 * s.y - start.y) / way.y)
 	var top := height_at(from)
 	var eye := elevation_at(from) + Relief.EYE_M
 	var aim_at: Vector2i = Vector2i((start + way * reach).round())
@@ -6393,6 +6399,7 @@ func try_swing(entity: GridEntity, direction: Vector2i, paid := false) -> bool:
 	if tick < entity.next_attack_tick or tick < entity.next_move_tick:
 		return false
 	entity.next_attack_tick = tick + attack_ticks_of(entity)
+	_halt_for_blow(entity, entity.next_attack_tick)
 	entity._world_set_facing(direction)
 	entity.protected = false
 	if not paid:
@@ -6471,6 +6478,7 @@ func try_wind_up(by: GridEntity, target: GridEntity) -> bool:
 		return false
 	var direction := (target.tile - by.tile).clamp(Vector2i(-1, -1), Vector2i(1, 1))
 	by.wind_up = {"target": target, "lands": tick + ticks, "direction": direction, "from": by.tile}
+	_halt_for_blow(by, tick + ticks)
 	_pay_swing(by, false)  # Paid as it begins; given up, not refunded (decision 597).
 	_winders[by] = true
 	by._world_set_facing(direction)
@@ -6573,6 +6581,7 @@ func try_bash(by: GridEntity, target: GridEntity) -> bool:
 		by.stamina -= int(verb["bash_stamina"])
 	by.next_bash_tick = tick + int(verb["bash_ticks"])
 	by.bash_moment_until = tick + int(verb["bash_stagger"])
+	_halt_for_blow(by, by.bash_moment_until)  # A free body stands for its bash (688).
 	by._world_set_facing(aim)
 	by._world_swung(aim)
 	entity_swung.emit(by, aim)
@@ -7157,6 +7166,7 @@ func _try_hit(attacker: GridEntity, target: GridEntity, hit_damage: int, is_shov
 	# damage (twice from behind with a dagger) and its force.
 	var verb := {} if is_shove else blow_verb(attacker)
 	attacker.next_attack_tick = tick + attack_ticks_of(attacker) if not is_shove else tick + attacker.attack_ticks
+	_halt_for_blow(attacker, attacker.next_attack_tick)
 	attacker._world_set_facing(target.tile - attacker.tile)
 	if not is_shove:
 		attacker._world_swung(aim)
@@ -8085,6 +8095,21 @@ func swap_places(a: GridEntity, b: GridEntity, duration: float, start := -1.0) -
 	entity_moved.emit(a, at, bt)
 	entity_moved.emit(b, bt, at)
 	return true
+
+
+## A free body (688, combat's side; ui: "an attack or swing stops the body
+## for its windup") stands where it is from its blow, swing, shove, door's
+## bash or wind-up until [param until_tick] (halt), where a body on the grid
+## is refused mid-step. Nothing for a body on the grid.
+func _halt_for_blow(entity: GridEntity, until_tick: int) -> void:
+	if free_body(entity):
+		halt(entity, until_tick)
+
+
+## Where [param entity]'s shots and lobs start (688, combat's side): a free
+## body's own centre (free_pos), else its cell's.
+func shot_origin(entity: GridEntity) -> Vector2:
+	return entity.free_pos if free_body(entity) else Vector2(entity.tile)
 
 
 ## Whether [param entity] moves as a free body (decision 688): a player,
