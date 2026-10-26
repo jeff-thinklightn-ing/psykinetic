@@ -69,7 +69,24 @@
 	"leaving": {
 		"_note": "Decision 581 (Jeff: 'companion keeps their blessings and abilities but goes back to their home town to live and work their vocation ... would never become an enemy'): at the bottom step (apart) she leaves her player, at the next calm moment; on the last straw (its deed, when her bond is at or below its step) too, even dead, when she is next back. She walks to the zone's nearest way out for at most walk_s, gone there or once out of their sight, and lives in her home town as a resident. Drafts for Jeff.",
 		"last_straw": {"deed": "let_bleed", "at": "sullen"},
-		"walk_s": 30
+		"walk_s": 30,
+		"_favour": "Winning her back (581 amended, Jeff: 'based on their personality, come back if you build favor back up with them, say your reputation improves, if they are justice driven, and you repair that'): while she is away her bond fades toward nothing (Standing.decay) and moves only by what reaches her town, once a game day each: favour's gift (on a visit), errand (a job for her town) and reputation (her town's residents' mean standing toward them at reputation_at or above, Townsfolk.reputation; times justice_reputation for the justice-driven). She goes with them again (581 amended (2)) at return_at or above, and, at justice_at or more (CompanionCard.justice), once the deed she left over is put right: repairs, by deed (else reputation): temple (their blessing spent on another in her town), visit (food brought her, then visit_hours near her, within visit_cells), grave (the grave goods back where they were taken, or in a temple's store), camp (a hostile camp in the area she warned of taken). words: her two sentences for her resident voice (npc's set_left), %s her player. All drafts for Jeff.",
+		"return_at": -3, "justice_at": 7, "reputation_at": 3, "justice_reputation": 2,
+		"favour": {"gift": 1, "errand": 1, "reputation": 1},
+		"visit_hours": 1, "visit_cells": 6,
+		"repairs": {"let_bleed": "temple", "left_alone": "visit", "grave": "grave", "warned": "camp"},
+		"words": {
+			"why": "You left %s because they %s.",
+			"time": "You might go with %s again, in time, or if the people here came to speak well of them.",
+			"ready": "You would go with %s again, if they asked you.",
+			"repair": {
+				"reputation": "You might go with %s again if the people here came to speak well of them.",
+				"temple": "You might go with %s again if you saw them spend their blessing on someone here, as they would not on you.",
+				"visit": "You might go with %s again if they came and sat with you a while, and brought you something to eat.",
+				"grave": "You might go with %s again if they gave the grave goods back to the dead.",
+				"camp": "You might go with %s again if the camp on the road you warned them of were taken."
+			}
+		}
 	},
 	"focus": {
 		"_note": "Her focus (decision 577, Jeff's: 'what combination of fighting, magic, and stealth they tend to use ... a spider chart where you only have say 100% focus, and growing positively can pull from the others'): fight, magic and stealth on her record (record.companion['focus']), summing to 100, none under floor. Rolled from even, moved by her profession and temper (lean), the legacy three fixed; grown by what she does (grow: event -> [focus, points]), each gain taken from the other two in proportion, at most daily_cap points a game day. lean_at: the share from which she leans one way (her voice told so; a new lean is a fact). multiplier: [base, per share] for Companion.focus_of (0.8 + 0.4 x share / 100), what enemy-ai reads. All drafts for Jeff.",
@@ -93,13 +110,13 @@
 		"_note": "Companions from before the roll, kept (Jeff): a companion with one of these names keeps it, and her 'fixed' facts are seeds the roll keeps, the rest rolled round them; a new roll never gives the name. Keys of 'fixed' replace the rolled trait of that name; others ('who', 'aspiration', 'though': what stands against the aspiration) are added to what the card is written from. 'look' is her fixed look (decision 293 amended, for 419); 'leanings' her intellect and superstition (decision 442; drafts for Jeff). They rest in town between trips: when their player leaves the game they go to the town's stockpile and wait (decision 293).",
 		"Pip": {"fixed": {"pronoun": "he", "who": "a young man", "aspiration": "wants to become a squire", "though": "no one has been knighted in ages"},
 			"look": {"build": "lean", "stature": "middling", "age": "young", "posture": "straight", "shoulders": "narrow", "hair": "cropped", "hair_colour": "fair", "beard": "none"},
-			"leanings": {"intellect": 4, "superstition": 2}},
+			"leanings": {"intellect": 4, "superstition": 2}, "justice": 3},
 		"Wren": {"fixed": {"pronoun": "she", "who": "a woman"},
 			"look": {"build": "lean", "stature": "middling", "age": "grown", "posture": "straight", "shoulders": "narrow", "hair": "bound", "hair_colour": "chestnut", "beard": "none"},
-			"leanings": {"intellect": 7, "superstition": 4}},
+			"leanings": {"intellect": 7, "superstition": 4}, "justice": 7},
 		"Nix": {"fixed": {"pronoun": "she", "who": "a woman"},
 			"look": {"build": "middling", "stature": "short", "age": "grown", "posture": "straight", "shoulders": "middling", "hair": "cropped", "hair_colour": "black", "beard": "none"},
-			"leanings": {"intellect": 8, "superstition": 3}}
+			"leanings": {"intellect": 8, "superstition": 3}, "justice": 5}
 	},
 	"pronoun": ["she", "she", "he", "he", "they"],
 	"birthplace": ["a fishing village on a grey coast", "the hill farms", "a mining town in the north", "the lower streets of an old city", "a river barge that never stopped long", "a forest hamlet of charcoal burners", "a crossroads inn", "a walled market town"],

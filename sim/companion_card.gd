@@ -75,6 +75,7 @@ static func roll(player_id: String, keep_name := "", taken: Array[String] = []) 
 	traits["body"] = String(body_of(traits, player_id))
 	traits["look"] = roll_look(player_id, traits)
 	traits["leanings"] = roll_leanings(player_id, traits)
+	traits["justice"] = justice(traits, player_id)
 	return traits
 
 
@@ -195,6 +196,24 @@ static func leaning(traits: Dictionary, seed: String, key: String) -> int:
 	return 1 + absi(hash("%s:%s" % [key, seed])) % 10
 
 
+## How much she wants a wrong put right, not just forgotten, 1..10 (581
+## amended): at the table's leaving "justice_at" or more, one who left her
+## player comes back only once the wrong she left over is repaired. A
+## plain card field ("justice"), read only through here: a legacy one's
+## fixed, else her traits', else rolled by [param seed] (her player's id),
+## the same every time, so a card from before has it with nothing saved.
+static func justice(traits: Dictionary, seed: String) -> int:
+	var name := str(traits.get("name", ""))
+	if is_legacy(name):
+		var fixed: Variant = tables()["legacy"][name].get("justice")
+		if fixed is int or fixed is float:
+			return clampi(int(fixed), 1, 10)
+	var own: Variant = traits.get("justice")
+	if own is int or own is float:
+		return clampi(int(own), 1, 10)
+	return 1 + absi(hash("justice:%s" % seed)) % 10
+
+
 ## How she looks (pc-character's look keys, agreed with npc): each key's
 ## values, her look rolled from them with her traits; what is not here
 ## (headwear, apron, skin) the view takes from her seed.
@@ -310,7 +329,7 @@ static func facts(traits: Dictionary, player: String) -> String:
 	var lines: Array[String] = ["Name: %s" % traits.get("name", "")]
 	# Fixed facts beyond the table's own (who she is, what she wants).
 	for key: String in traits:
-		if key not in KEYS and key not in ["name", "trade", "body", "look", "leanings"]:
+		if key not in KEYS and key not in ["name", "trade", "body", "look", "leanings", "justice"]:
 			lines.append("%s: %s" % [key.capitalize(), traits[key]])
 	for key in KEYS:
 		if key == "how_we_met":

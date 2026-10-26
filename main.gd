@@ -6573,6 +6573,7 @@ func _begin_leaving(record: PlayerRecord, pet: Companion, going: Dictionary, pla
 	going["from"] = World.tick
 	going["until"] = World.tick + roundi(float(leaving_rules().get("walk_s", 30)) * World.TICK_RATE)
 	going["place"] = _home_place(record)
+	going["grave"] = _grave_carried(pet)
 	var town := _town_words(str(going["place"]))
 	if _guides.has(record.player_id):
 		_guide_done(pet, "moved")
@@ -6622,9 +6623,203 @@ func _gone_home(record: PlayerRecord, pet: Companion, id: String) -> void:
 		_travelling = false
 		_companions.erase(id)
 	record.companion["left"] = {"day": Townsfolk.day_of(World.steps), "deed": str(going.get("deed", "")), "why": str(going.get("why", "")),
-		"place": str(record.companion.get("resident", {}).get("place", place))}
+		"place": str(record.companion.get("resident", {}).get("place", place)), "repaired": false,
+		"area": str(record.companion.get("warned_area", "")), "grave": going.get("grave", [])}
 	record.companion.erase("leaving")
+	_favour_words(record)
 	print("[bond] %s's companion %s left them and lives in %s" % [record.name, record.companion.get("name", "?"), record.companion["left"]["place"]])
+
+
+## The grave goods [param pet] carries (555 amended), their uids: given back
+## to the dead, they repair the deed she left over (581 amended).
+func _grave_carried(pet: Companion) -> Array:
+	var out := []
+	for slot in pet.slots.size():
+		var uid := World.slot_uid(pet, slot)
+		if uid != 0 and _grave_goods(uid):
+			out.append(uid)
+	return out
+
+
+# --- Winning her back (581 amended) -------------------------------------------
+
+## Whether [param record]'s companion left them and lives in a town.
+static func has_left(record: PlayerRecord) -> bool:
+	return record != null and record.companion.get("left") is Dictionary
+
+
+## Her worker id in town ("companion:<her name>", as _rest_in_town keys it).
+static func _left_worker(record: PlayerRecord) -> String:
+	return "companion:%s" % record.companion.get("name", "")
+
+
+## Her town (a store place id) since she left [param record]'s player: her
+## worker's, else her record's "left" place.
+func _left_town(record: PlayerRecord) -> String:
+	var worker := World.production.worker(_left_worker(record)) if World.production != null else {}
+	var town := str(worker.get("town", ""))
+	return town if not town.is_empty() else str(record.companion.get("left", {}).get("place", ""))
+
+
+## Whether she wants the wrong put right, not just time (581 amended):
+## her card's justice (CompanionCard.justice) at the rules' justice_at.
+func _justice_driven(record: PlayerRecord) -> bool:
+	return CompanionCard.justice(record.companion.get("traits", {}), record.player_id) >= int(leaving_rules().get("justice_at", 7))
+
+
+## How [param deed] (the one she left over) is put right: the rules'
+## repairs, else the town's word of them ("reputation").
+static func repair_of(deed: String) -> String:
+	return str((leaving_rules().get("repairs", {}) as Dictionary).get(deed, "reputation"))
+
+
+## What still keeps her from going with [param record]'s player again
+## (581 amended): "time" (her bond under the rules' return_at), "repair"
+## (justice-driven, the wrong not put right), "" for nothing: asked, she
+## comes (581 amended (2)).
+func favour_gate(record: PlayerRecord) -> String:
+	if not has_left(record):
+		return ""
+	if _justice_driven(record) and not bool(record.companion["left"].get("repaired", false)):
+		return "repair"
+	if Standing.score(record.companion, record.player_id) < int(leaving_rules().get("return_at", -3)):
+		return "time"
+	return ""
+
+
+## Her favour moved by [param kind] (the rules' "favour": gift, errand,
+## reputation) for [param why] (a clause, "they"), once a game day each.
+## Whether it moved.
+func _favour(record: PlayerRecord, kind: String, why: String) -> bool:
+	if not has_left(record):
+		return false
+	var left: Dictionary = record.companion["left"]
+	var day := Townsfolk.day_of(World.steps)
+	var today: Dictionary = left.get("favour_today", {})
+	if int(today.get("day", -1)) != day:
+		today = {"day": day, "kinds": []}
+	if kind in today["kinds"]:
+		return false
+	var delta := int((leaving_rules().get("favour", {}) as Dictionary).get(kind, 0))
+	if kind == "reputation" and _justice_driven(record):
+		delta *= int(leaving_rules().get("justice_reputation", 2))
+	if delta == 0:
+		return false
+	today["kinds"].append(kind)
+	left["favour_today"] = today
+	Standing.bump(record.companion, record.player_id, delta, why, World.steps)
+	print("[bond] %s's companion %s, away: %s (%+d, %d)" % [record.name, record.companion.get("name", "?"), why, delta,
+		Standing.score(record.companion, record.player_id)])
+	_favour_words(record)
+	return true
+
+
+## The wrong she left over put right (581 amended): [param how] the
+## deed's repair kind; nothing for another kind, or put right already.
+func _favour_repaired(record: PlayerRecord, how: String) -> void:
+	if not has_left(record):
+		return
+	var left: Dictionary = record.companion["left"]
+	if bool(left.get("repaired", false)) or repair_of(str(left.get("deed", ""))) != how:
+		return
+	left["repaired"] = true
+	print("[bond] %s's companion %s, away: the wrong put right (%s)" % [record.name, record.companion.get("name", "?"), how])
+	_favour_words(record)
+
+
+## Her two sentences for her resident voice while she is away (581
+## amended, npc's Production.set_left): why she left, and what would bring
+## her back, in her terms; facts, never lines, told only to her player.
+func _favour_words(record: PlayerRecord) -> void:
+	if World.production == null or not has_left(record):
+		return
+	var left: Dictionary = record.companion["left"]
+	var words: Dictionary = leaving_rules().get("words", {})
+	var why := str(words.get("why", "You left %s because they %s.")) % [record.name, str(left.get("why", "wronged you")).trim_suffix(".")]
+	var back := ""
+	match favour_gate(record):
+		"repair":
+			var kind := repair_of(str(left.get("deed", "")))
+			back = str((words.get("repair", {}) as Dictionary).get(kind, words.get("time", ""))) % record.name
+		"time":
+			back = str(words.get("time", "")) % record.name
+		_:
+			back = str(words.get("ready", "")) % record.name
+	left["words"] = [why, back]
+	var who := _left_worker(record)
+	if World.production.has_method("set_left"):
+		World.production.call("set_left", who, why, back)
+
+
+## On the world tick (581 amended): each companion away from her player
+## once a game day: her bond fades toward nothing (Standing.decay, owner
+## only), her town's word of them moves her, and puts right a wrong the
+## town can vouch for; a visit with food that lasted the rules' hour; her
+## grave goods given back to the dead.
+func _favour_tick() -> void:
+	var day := Townsfolk.day_of(World.steps)
+	for id: String in _records:
+		var record: PlayerRecord = _records[id]
+		if not has_left(record):
+			continue
+		var left: Dictionary = record.companion["left"]
+		_favour_visit(record, left)
+		if not (left.get("grave", []) as Array).is_empty() and _grave_given_back(left["grave"]):
+			_favour_repaired(record, "grave")
+		if int(left.get("checked", -1)) == day:
+			continue
+		left["checked"] = day
+		if not Standing.decay(record.companion, World.steps).is_empty():
+			_favour_words(record)
+		var town := _left_town(record)
+		if World.production != null and not town.is_empty() \
+				and Townsfolk.reputation(World.production, town, id) >= float(leaving_rules().get("reputation_at", 3)):
+			_favour(record, "reputation", "are spoken well of in your town")
+			_favour_repaired(record, "reputation")
+
+
+## A visit (581 amended): her player brought her food (_on_handed) and
+## stays near her body, in her zone, the rules' visit_hours: the
+## "visit" repair. Gone from beside her, the visit ends.
+func _favour_visit(record: PlayerRecord, left: Dictionary) -> void:
+	var visit: Variant = left.get("visit")
+	if not visit is Dictionary:
+		return
+	var player: Player = _players.get(_peer_of(record.player_id))
+	var body: Resident = null
+	for each: GridEntity in World.entities():
+		if each is Resident and (each as Resident).player_id == record.player_id:
+			body = each
+	if body == null or not is_instance_valid(player) or not player.spawned or player.zone != body.zone \
+			or World.distance(player.tile, body.tile) > int(leaving_rules().get("visit_cells", 6)):
+		left.erase("visit")
+		return
+	var hour := maxi(DayNight.day_steps, 1) / 24.0
+	if World.steps - int(visit.get("from", World.steps)) >= roundi(hour * float(leaving_rules().get("visit_hours", 1))):
+		left.erase("visit")
+		_favour_repaired(record, "visit")
+
+
+## Whether every one of [param uids] (grave goods) is back with the dead
+## (581 amended): carried by nobody, on the ground where it was taken, or
+## laid in a temple's store.
+func _grave_given_back(uids: Array) -> bool:
+	for uid: int in uids:
+		var history := World.items.history(uid)
+		if history.is_empty():
+			continue  # Gone from the book: nothing to give back.
+		if not str(history.get("holder", "")).is_empty():
+			return false
+		var at := World.items.at_of(uid)
+		var taken := ""
+		for event: Dictionary in history.get("events", []):
+			if str(event.get("kind", "")) == "grave goods":
+				taken = str(event.get("zone", ""))
+		var temple: bool = at.begins_with("stockpile:") and World.holdings != null \
+				and World.holdings.place(at.trim_prefix("stockpile:")).get("kind") == "temple"
+		if not temple and (taken.is_empty() or not at.begins_with(taken + "@")):
+			return false
+	return true
 
 
 ## Her home town's store place: her record's "home" if it is still a town's
@@ -7280,6 +7475,8 @@ func _on_channel(by: GridEntity, body: GridEntity, state: StringName) -> void:
 			return
 		_sync_charges(record)
 		World.raise_downed(body, roundi(body.max_hp * float(_field_rules().get("hp", 0.5))))
+		if by is Player and has_left(record) and body.zone == str(World.holdings.place(_left_town(record)).get("area", "")):
+			_favour_repaired(record, "temple")  # Their blessing spent on another in her town (581 amended).
 		party_log.add("%s brought %s back (%d charges left)." % [_display_name(by), _display_name(body), _uses_left(record)])
 		for pet: Companion in _companions.values():
 			if is_instance_valid(pet) and pet.spawned and (pet == by or pet == body or pet.keeper == body):
@@ -8382,6 +8579,9 @@ func _players_in(area: String) -> Array:
 func _on_handed(by: GridEntity, to: GridEntity, item: String, uid: int) -> void:
 	var player := by as Player
 	var body := to as Resident
+	if player != null and body != null and body.player_id == player.player_id and not player.player_id.is_empty():
+		_favour_given(player, body, item)
+		return
 	if player == null or body == null or player.player_id.is_empty() or not body.player_id.is_empty() or World.production == null:
 		return
 	var slot := body.slots.find(item)
@@ -8399,6 +8599,26 @@ func _on_handed(by: GridEntity, to: GridEntity, item: String, uid: int) -> void:
 	var line := Offers.gift(player.player_id, _display_name(player), body.worker_id, item)
 	if not line.is_empty():
 		party_log.add(line)
+
+
+## Server: [param player] put [param item] into the hands of their own
+## companion's body in town, who left them (581 amended): a gift moves her
+## (once a day), food starts a visit (_favour_visit); the thing goes to her
+## town's store, as a resident's gift does. Nothing for one who did not leave.
+func _favour_given(player: Player, body: Resident, item: String) -> void:
+	var record: PlayerRecord = _records.get(player.player_id)
+	if not has_left(record):
+		return
+	var slot := body.slots.find(item)
+	if slot >= 0 and World.stockpile != null and not body.town.is_empty():
+		var taken := _out_of_hands(body, slot)
+		if taken != 0:
+			World.stockpile.bank(body.town, taken, body.person, "a gift from %s" % _display_name(player), body.zone, body.tile, "banked", "player:" + player.player_id)
+	var thing := Companion._a(Items.name_of(item).to_lower())
+	if str(Items.def(item).get("use", "")) == "eat":
+		record.companion["left"]["visit"] = {"from": World.steps}
+	_favour(record, "gift", "brought you %s" % thing)
+	party_log.add("%s gives %s %s." % [_display_name(player), body.person, thing])
 
 
 ## Server: what a resident holds in [param slot] leaves its hands (banked, or a
@@ -8724,6 +8944,8 @@ func _on_commission_asked(player_id: String, ask: Dictionary) -> void:
 ## told [param line]; economy paid them [param _paid] already.
 func _on_commission_done(player_id: String, ask: Dictionary, line: String, _paid: int) -> void:
 	var record: PlayerRecord = _records.get(player_id)
+	if has_left(record) and str(ask.get("town", "")) == _left_town(record):
+		_favour(record, "errand", "did a job for your town")  # 581 amended.
 	if record != null:
 		record.commissions = record.commissions.filter(func(each: Variant) -> bool:
 			return not each is Dictionary or str(each.get("id", "")) != str(ask.get("id", "")))
@@ -11436,6 +11658,19 @@ func _on_place_taken(id: String, from: String, to: String) -> void:
 	if World.towns != null and World.holdings.place(id).get("kind") == "camp":
 		World.towns.camp_taken(id, from, to)
 	_bond_cleared(id, from, to)
+	_favour_camp(id, from, to)
+
+
+## A camp taken from a side hostile to the town in the area she warned her
+## player of and left over (581 amended): the "camp" repair.
+func _favour_camp(id: String, from: String, to: String) -> void:
+	var factions := World.holdings.factions if World.holdings != null else null
+	if factions == null or not factions.hostile(from, "town") or factions.hostile(to, "town"):
+		return
+	var area := str(World.holdings.place(id).get("area", ""))
+	for record: PlayerRecord in _records.values():
+		if has_left(record) and not area.is_empty() and str(record.companion["left"].get("area", "")) == area:
+			_favour_repaired(record, "camp")
 
 
 ## A place taken from a side hostile to the town by one that is not (555
@@ -11592,7 +11827,10 @@ func _bond_warned(pet: Companion) -> void:
 		var entry: Dictionary = refused[key]
 		if int(entry.get("day", -1)) == day and str(entry.get("area", "")) == pet.zone and not entry.get("walked", false):
 			entry["walked"] = true
-			_bond(_record_of(pet), "warned", "ignored your warning and took you there")
+			var record := _record_of(pet)
+			if record != null:
+				record.companion["warned_area"] = pet.zone  # Which road, if she leaves over it (581 amended).
+			_bond(record, "warned", "ignored your warning and took you there")
 
 
 ## Each temple counter in the zone shows what is held for the first player
@@ -13295,6 +13533,8 @@ func _on_world_ticked(tick: int) -> void:
 		_tend_hearts()  # Mortally Wounded: the downed's hearts, and all of them fallen.
 		_all_fallen_tick()
 		_leaving_tick()  # A companion leaving her player (decision 581).
+		if tick % World.WORLD_TICK_STEPS == 0:
+			_favour_tick()  # Winning back one who left (581 amended).
 		_check_respawns(tick)
 		t = World.part("respawns", t)
 		if tick % CAMP_CHECK_TICKS == 0:

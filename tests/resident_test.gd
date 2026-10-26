@@ -68,6 +68,7 @@ func _ready() -> void:
 	_test_hearsay()
 	_test_houses()
 	_test_companion_hearsay()
+	_test_favour()
 	_test_visible_work()
 	_test_field_work()
 	_test_quiet_near_hostile()  # Late: its steps move the hail tick's phase the voice tests count on.
@@ -1332,6 +1333,112 @@ func _test_companion_hearsay() -> void:
 	record.companion["heard"] = []
 	if pet != null:
 		pet.heard = []
+		_settle(pet)
+
+
+func _test_favour() -> void:
+	print("\n== one who left her player is won back by what reaches her town (581 amended) ==")
+	if World.zone.name != TOWN:
+		_main.travel(Net.local_id, TOWN)
+	var record: PlayerRecord = _main._records[Net.player_id]
+	var kept: Dictionary = record.companion.duplicate(true)
+	var pet := _companion()
+	_check(pet != null, "(a companion)")
+	if pet == null:
+		return
+	# Her justice: a plain card field, through one accessor.
+	_check(CompanionCard.justice({"name": "Wren"}, "old") == 7 and CompanionCard.justice({"name": "Nix"}, "old") == 5
+		and CompanionCard.justice({"name": "Pip"}, "old") == 3, "Wren, Nix and Pip have theirs fixed (7, 5, 3)")
+	var rolled := CompanionCard.roll("justice-test")
+	_check(int(rolled.get("justice", 0)) == CompanionCard.justice(rolled, "justice-test") and int(rolled["justice"]) == CompanionCard.justice({}, "justice-test")
+		and "Justice" not in CompanionCard.facts(rolled, "Jeff"), "rolled with her card, the same from her seed, and kept out of her card's writing")
+	# She rests in town and has left them: let bleed out, justice-driven.
+	_put(pet, _town_cell(Vector2i(-1, -1)))
+	_told_to_stay(pet)
+	_main.travel(Net.local_id, ROAD)
+	var who := "companion:%s" % _pet_name()
+	_check(not World.production.worker(who).is_empty(), "(she works in the town: %s)" % who)
+	record.companion["traits"]["justice"] = 8
+	record.companion["standing"] = {Net.player_id: {"score": -7, "why": ["let you bleed out"], "since": World.steps}}
+	record.companion["left"] = {"day": 0, "deed": "let_bleed", "why": "let you bleed out", "place": STORE, "repaired": false, "area": "", "grave": []}
+	_main._favour_words(record)
+	_main.travel(Net.local_id, TOWN)
+	_check(_companion() == null, "back in her town, she does not join them")
+	var left: Dictionary = record.companion["left"]
+	_check(_main.favour_gate(record) == "repair", "justice-driven, the wrong not put right: she will not come (%s)" % _main.favour_gate(record))
+	var words: Array = left.get("words", [])
+	_check(words.size() == 2 and "because they let you bleed out." in str(words[0]) and "blessing" in str(words[1])
+		and str(World.production.worker(who).get("left_why", "")) == str(words[0]) and str(World.production.worker(who).get("left_back", "")) == str(words[1]),
+		"her two sentences, on her worker for her voice: %s" % [words])
+	_sync()
+	var body: Resident = null
+	for each: GridEntity in World.townsfolk():
+		if (each as Resident).player_id == Net.player_id:
+			body = each
+	_check(body != null, "(her body in town)")
+	if body == null:
+		record.companion = kept
+		return
+	var owner := _player()
+	_put(owner, _main._nearest_free(body.tile))
+	var score := func() -> int: return Standing.score(record.companion, Net.player_id)
+	# A gift, once a day; food starts a visit.
+	World.set_slots(body, ["ration"])
+	_main._on_handed(owner, body, "ration", 0)
+	_check(score.call() == -6 and left.get("visit") is Dictionary and body.slots.find("ration") < 0, "a meal brought her: +1, a visit begun (%d)" % score.call())
+	World.set_slots(body, ["ration"])
+	_main._on_handed(owner, body, "ration", 0)
+	_check(score.call() == -6, "a second gift the same day: nothing more (%d)" % score.call())
+	# A job for her town, once a day; one elsewhere, nothing.
+	_main._on_commission_done(Net.player_id, {"id": "x", "town": "elsewhere"}, "", 0)
+	_main._on_commission_done(Net.player_id, {"id": "y", "town": STORE}, "", 0)
+	_main._on_commission_done(Net.player_id, {"id": "z", "town": STORE}, "", 0)
+	_check(score.call() == -5, "a job done for her town: +1, once a day (%d)" % score.call())
+	# A repair of another kind does nothing; the visit, an hour beside her, is the left_alone deed's.
+	_main._favour_repaired(record, "visit")
+	_check(not bool(left["repaired"]), "a repair of another kind than her deed's: not put right")
+	left["deed"] = "left_alone"
+	left["visit"] = {"from": World.steps - DayNight.day_steps}
+	_main._favour_tick()
+	_check(bool(left["repaired"]) and not left.has("visit"), "left alone: an hour beside her with food, put right")
+	_check(_main.favour_gate(record) == "time" and "in time" in str(left["words"][1]), "put right but still cold: in time (%s)" % [left["words"]])
+	# Her town's word of them: their residents' standing at fond, +1 a day, doubled for her.
+	for id: String in World.production.worker_ids(STORE):
+		if id.begins_with("companion:"):
+			continue
+		var card := Townsfolk.card_of(World.production, id)
+		if not card.is_empty():
+			Standing.bump(card, Net.player_id, 5, "helped the town", World.production.now())
+			World.production.set_card(id, card)
+	left["checked"] = -1
+	_main._favour_tick()
+	_check(score.call() == -3 and _main.favour_gate(record) == "" and "if they asked you" in str(left["words"][1]),
+		"spoken well of in her town: +2 (justice), and she would go with them again (%d, %s)" % [score.call(), left["words"]])
+	# Time: her bond fades toward nothing while she is away.
+	record.companion["standing"][Net.player_id]["since"] = World.steps - 11 * DayNight.day_steps
+	left["checked"] = -1
+	for id: String in World.production.worker_ids(STORE):
+		var card := Townsfolk.card_of(World.production, id)
+		if not card.is_empty() and card.get("standing", {}).has(Net.player_id):
+			card["standing"].erase(Net.player_id)
+			World.production.set_card(id, card)
+	_main._favour_tick()
+	_check(score.call() == -2, "ten days on, it fades a step toward nothing (%d)" % score.call())
+	# Grave goods given back: on the ground where they were taken.
+	var uid := World.items.mint("dagger", "stocked", "", World.zone.name, owner.tile)
+	World.items.mark_grave(uid, "Altar", ROAD, Vector2i(3, 3))
+	World.items.place(uid, "player:" + Net.player_id, "player:" + Net.player_id, "Player")
+	_check(not _main._grave_given_back([uid]), "grave goods still carried: not given back")
+	World.items.place(uid, "%s@3,3" % ROAD)
+	_check(_main._grave_given_back([uid]), "laid on the ground where they were taken: given back")
+	# As she was.
+	record.companion = kept
+	record.companion.erase("resident")
+	_main.travel(Net.local_id, ROAD)
+	_main.travel(Net.local_id, TOWN)
+	pet = _companion()
+	_check(pet != null, "(restored)")
+	if pet != null:
 		_settle(pet)
 
 

@@ -31390,3 +31390,52 @@ set_left on an unknown id does nothing; reputation is 0.0 with nobody met,
 or no player.
 
 Server only, protocol unchanged, no new class_name.
+
+## 581 amended: winning her back
+
+Step 2 of 581 (the coordinator approved C:/dev/review/companions/leaving_design.md
+§4, keys agreed with npc). Jeff: "companions could, based on their personality,
+come back if you build favor back up with them, say your reputation improves,
+if they are justice driven, and you repair that".
+
+- **Justice** (CompanionCard.justice): a plain card field, traits "justice"
+  1..10, read only through that accessor (the coordinator: so Jeff's
+  convictions sketch can absorb it later); legacy Wren 7, Nix 5, Pip 3;
+  rolled by her player's id for the rest, the same every time; kept out of
+  the card's writing. No other axes.
+- **While she is away** (record.companion "left"), on the world tick, once a
+  game day: her bond fades (Standing.decay on record.companion, owner only;
+  npc's decay of her worker card untouched); her town's word of them
+  (npc's Townsfolk.reputation at reputation_at) +1, x justice_reputation for
+  the justice-driven. Gifts handed to her body in town by her player (Main
+  _on_handed, which ignored a companion's body before) +1 and banked as a
+  resident's gift; food starts a visit. A job done for her town (Main
+  _on_commission_done, the ask's town her worker's) +1. Each kind once a day
+  (left "favour_today").
+- **The gate** (Main.favour_gate): "repair" for the justice-driven until the
+  deed she left over is put right, "time" under return_at, "" when she would
+  come (step 3 reads it). Repairs by deed (rules "repairs", else
+  "reputation"): temple (a field return channelled by her player in her
+  town's area), visit (food, then visit_hours within visit_cells of her
+  body), grave (her grave goods, noted as she set off, carried by nobody and
+  on the ground in the zone they were taken from, or in a temple's store),
+  camp (a camp taken from a side hostile to the town in the area she warned
+  of; _bond_warned notes the area), reputation.
+- **Her two sentences** (Main._favour_words, npc's Production.set_left on
+  "companion:<her name>"): why she left, what would bring her back, in her
+  terms (rules "words"); npc's resident prompt tells them only to her own
+  player. Rewritten as anything moves.
+- Rules: companion_traits.json "leaving": return_at -3, justice_at 7,
+  reputation_at 3, justice_reputation 2, favour {gift, errand, reputation 1},
+  visit_hours 1, visit_cells 6, repairs, words. Drafts for Jeff, one file:
+  C:/dev/review/decisions/draft-companion-favour.md.
+
+resident_test _test_favour: the fixed and rolled justice; left and justice-
+driven, she won't come and says why (her worker carries both sentences); a
+meal +1 once a day and a visit begun; a job for her town +1 once a day; a
+repair of the wrong kind does nothing; an hour's visit puts left_alone
+right, then "in time"; her town's word +2, and she would come; ten days fade
+a step; grave goods carried, then laid where taken.
+
+Server only, protocol unchanged, no new class_name. Step 3 (asked in her
+town, she comes back at cooling) is 581 amended (2).
