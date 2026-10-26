@@ -8008,16 +8008,18 @@ func _shift(mover: GridEntity, entity: GridEntity, direction: Vector2i, push_bud
 ## waiting on her make_way or bump): they change places on this tick, the
 ## step on its own clock from [param start], so it lands when the client's
 ## prediction (MovePrediction._blocked: her cell open) showed it. Only their
-## own companion, alive, not downed, lying or stunned, not leaping clear of
-## a telegraph (Companion.Intent.DODGE) and not fighting (Intent.ATTACK: a
-## swap would pull her a cell off her foe; he bumps as before); never across
-## a wall, a closed door or a corner (swap_places). False, nothing done,
-## otherwise (decision 679).
+## own companion, alive, not downed, lying or stunned, each of which his
+## client sees (MovePrediction._swaps_with); dodging or fighting she swaps
+## all the same (679 amended: her intent is the server's alone, and a
+## refusal the client cannot foresee snaps his own body back; a wind-up she
+## began is given up, moved off its cell, and a blow lands from where she
+## now stands or misses); never across a wall, a closed door or a corner
+## (swap_places). False, nothing done, otherwise (decision 679).
 func _swap_with_own(entity: GridEntity, direction: Vector2i, duration: float, start: float) -> bool:
 	if not entity is Player:
 		return false
 	var pet := _occupancy.get(entity.tile + direction) as Companion
-	if pet == null or pet.keeper != entity or not _alive(pet) or is_downed(pet) or is_down(pet) or is_stunned(pet) 			or pet.current_intent in [Companion.Intent.DODGE, Companion.Intent.ATTACK]:
+	if pet == null or pet.keeper != entity or not _alive(pet) or is_downed(pet) or is_down(pet) or is_stunned(pet):
 		return false
 	return swap_places(entity, pet, duration, start)
 

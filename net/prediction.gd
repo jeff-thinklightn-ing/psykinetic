@@ -868,11 +868,14 @@ func _replan_from(i: int) -> void:
 
 ## Whether a step into [param occupant]'s cell swaps the walker with it, as
 ## World._swap_with_own does: the walker's own companion (keeper_peer, which
-## replicates), not downed or lying (decision 679). Her dodge and her fight
-## are the server's alone; a swap it refuses then is corrected as any
-## refused step.
+## replicates), not downed, lying or reeling from a stun (_reel_until, which
+## her _net_stunned sets here as the server's stun does; decisions 679, 679
+## amended). Dodging or fighting she swaps all the same, so nothing the
+## client cannot see refuses it.
 func _swaps_with(occupant: GridEntity) -> bool:
-	return _entity is Player and occupant is Companion and occupant.keeper_peer == _entity.owner_peer 			and _entity.owner_peer != 0 and not World.is_downed(occupant) and not World.is_down(occupant)
+	return _entity is Player and occupant is Companion and occupant.keeper_peer == _entity.owner_peer \
+			and _entity.owner_peer != 0 and not World.is_downed(occupant) and not World.is_down(occupant) \
+			and World.tick >= occupant._reel_until
 
 
 ## Would the server refuse this step? The same rule as World._shift, read

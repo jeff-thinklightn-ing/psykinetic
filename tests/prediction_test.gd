@@ -365,9 +365,29 @@ func _test_through_her() -> void:
 	pet.downed_until = World.tick + 100
 	_check(not World.try_move(player, Vector2i(1, 0)) and pet.tile == Vector2i(11, 24), "she lies downed: no swap")
 	pet.downed_until = 0
-	pet.current_intent = Companion.Intent.ATTACK
-	_check(not World.try_move(player, Vector2i(1, 0)) and pet.tile == Vector2i(11, 24), "she fights (ATTACK): no swap off her foe")
+	# Dodging or fighting she swaps all the same (679 amended): the client
+	# cannot see her intent, so a refusal there would snap his body back.
+	for intent: int in [Companion.Intent.ATTACK, Companion.Intent.DODGE]:
+		World._relocate(player, Vector2i(10, 24))
+		World._relocate(pet, Vector2i(11, 24))
+		player.next_move_tick = 0
+		pet.current_intent = intent
+		_check(World.try_move(player, Vector2i(1, 0)) and player.tile == Vector2i(11, 24) and pet.tile == Vector2i(10, 24),
+				"she %s: swapped all the same, he at %s, she at %s" % ["fights (ATTACK)" if intent == Companion.Intent.ATTACK else "dodges (DODGE)", player.tile, pet.tile])
 	pet.current_intent = Companion.Intent.FOLLOW
+	World._relocate(player, Vector2i(10, 24))
+	World._relocate(pet, Vector2i(11, 24))
+	player.next_move_tick = 0
+	# Stunned (679 amended): the server refuses and the prediction knows it
+	# (_reel_until, set on a client by _net_stunned), so nothing is corrected.
+	var predicted := MovePrediction.new(player)
+	pet._world_stunned(World.tick + 30, 30)
+	_check(not predicted._swaps_with(pet) and predicted._blocked(player.tile, Vector2i(1, 0))
+			and not World.try_move(player, Vector2i(1, 0)) and pet.tile == Vector2i(11, 24),
+			"she reels from a stun: no swap, and the prediction shows him stopped")
+	pet._world_stunned(0, 0)
+	pet._reel_until = 0.0
+	_check(predicted._swaps_with(pet) and not predicted._blocked(player.tile, Vector2i(1, 0)), "the stun over: her cell open to him again")
 	# The wall cell (2, 18): a diagonal from (2, 19) to (3, 18) cuts its corner.
 	World._relocate(player, Vector2i(2, 19))
 	World._relocate(pet, Vector2i(3, 18))

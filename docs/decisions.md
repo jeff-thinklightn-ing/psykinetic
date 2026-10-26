@@ -30962,3 +30962,35 @@ The box's two healers' huts logged "waits for remedy: its maker can't pay for th
 The coordinator's approval: a workshop whose place is no town's store (holdings kind isn't Stockpile.KIND: a healer's hut, Main's place workshops) works on its own account, like a town's meals. It takes its materials from its own store without buying them. He gathered them, he uses them, and nobody is owed. A medicine man in a town's workshop still buys the town's herbs.
 
 larder_test _test_hut_account: a hut with 4 herbs and a medicine man at his loan cap starts a remedy (2 herbs left, the hut's gold 0); a town's medicine man at his cap still can't. Server only: no wire change, no new class_name.
+
+
+## 679 amended: the prediction knows when she won't swap
+
+Jeff on v0.1.179: "sometimes she catches up into the same tile and bounces
+off, causing visual effect that seems like the screen is jerking". Two
+causes, read against swap_places and MovePrediction._swaps_with. The first,
+her catch-up step taking the cell he is walking into on the tick of his
+step (the swap then sends her straight back, the client drawing her into
+his cell and out), is companions' to fix: her follow keeps clear of his
+next cells. The second is this one: the server refused a swap the client
+could not foresee, and his predicted body snapped back.
+
+- **Stunned**: MovePrediction._swaps_with now reads her stun as the server
+  does, through _reel_until (her _net_stunned sets it on a client, World's
+  stun on the server). A stunned companion's cell is blocked on both sides.
+- **Dodging or fighting** (the coordinator's ruling, companions'
+  recommendation): no longer excluded. Her intent (Companion.current_intent)
+  is the server's alone and does not replicate, and a refused step of his
+  own body is worse than her being pulled a cell off her foe or out of her
+  dodge. A wind-up she began is given up, as any wind-up whose winder is
+  moved off its cell (_tend_wind_ups); a blow she queued lands from where
+  she now stands or misses. Her blows only ever aim at her foe, so none
+  falls on him.
+
+The rest of 679 stands: not another's companion, nor one downed or lying;
+never across a wall, a closed door or a cut corner.
+
+prediction_test _test_through_her: she reels from a stun: no swap, and the
+prediction shows him stopped; the stun over, her cell open again; she fights
+(ATTACK), she dodges (DODGE): swapped all the same. Wire: no new field
+(holds_ground not needed), protocol unchanged; no new class_name.
