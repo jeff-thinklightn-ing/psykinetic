@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The armour clank and the footstep fall on your feet instead of once a cell: in time with the stride, slower at a walk (one every 0.39 s, was 0.25) and at a run (0.22 s, was 0.125), the two together (676 step 1b, sound's side, amended).
 ## v0.1.177
 
 - What goes over the network changes, so v0.1.176 and older can't join the server: update through the launcher first.

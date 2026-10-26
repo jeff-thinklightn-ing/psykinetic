@@ -66,11 +66,14 @@ func _measure() -> void:
 		var lows: Array[float] = [INF, INF]
 		var heights: Array = []
 		var speeds: Array = []
+		var toe_heights := [[], []]  # Each toe's [seconds, height] a frame.
 		var t := 0.0
 		while t < length:
 			animator.advance(STEP)
 			t += STEP
 			var now := [_at(skeleton, toes[0]), _at(skeleton, toes[1])]
+			for foot in 2:
+				toe_heights[foot].append([t, now[foot].y])
 			var planted := 0 if now[0].y <= now[1].y else 1
 			lows[planted] = minf(lows[planted], now[planted].y)
 			heights.append([planted, now[planted].y])
@@ -87,6 +90,20 @@ func _measure() -> void:
 		var n := samples.size()
 		print("  %-10s pace %.2f m/s (middle half %.2f .. %.2f), %d frames planted of %d, clip %.2f s" % [
 			clip, samples[n / 2], samples[n / 4], samples[n * 3 / 4], n, heights.size(), length])
+		# Its footfalls (Client3D.GAIT_FOOTFALLS): each moment a toe comes down
+		# to within PLANTED_M of its lowest, as a share of the clip.
+		var falls: Array[String] = []
+		for foot in 2:
+			var low := INF
+			for each: Array in toe_heights[foot]:
+				low = minf(low, float(each[1]))
+			var count: int = toe_heights[foot].size()
+			for i in count:
+				var down := float(toe_heights[foot][i][1]) <= low + PLANTED_M
+				var was_down := float(toe_heights[foot][(i - 1 + count) % count][1]) <= low + PLANTED_M
+				if down and not was_down:
+					falls.append("%s %.3f" % ["left" if foot == 0 else "right", float(toe_heights[foot][i][0]) / length])
+		print("  %-10s footfalls (share of the clip): %s" % [clip, ", ".join(falls)])
 	quit()
 
 

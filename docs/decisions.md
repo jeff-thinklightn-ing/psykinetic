@@ -30554,7 +30554,8 @@ and follow physics' F7 knobs: worn is the replicated Player.worn or
 Companion.worn, and pace is SoundKit.step_pace of the seconds since that
 body's last step as the client saw it (CLANK_WALK_TICKS over the step's
 ticks, 0 to 2; a first step, or one a second or more after the last, a
-walk). No new wire.
+walk). No new wire. (Once a cell, as first landed; now on the body's
+footfalls, the footstep with it: 676 step 1b, sound's side, amended, below.)
 
 - **The slots**: SoundKit.armour_slot(kind), sfx.armour_plate (a clank,
   -14 dB) and sfx.armour_mail (a jingle, -16 dB); "none" (leather, robes,
@@ -30654,3 +30655,42 @@ me and if i keep that there the run camera stutter is reproducible").
 
 No wire change, protocol unchanged; walk_path needs the server deployed.
 No new class_name.
+### 676 step 1b, sound's side, amended: the clank on the footfall
+
+Jeff on the first mixes: "the running ones go a little too fast, the walking
+ones are approximately running speed". The game had it too: the clank and
+the footstep came once a cell, and a person covers 4 cells a second at a
+walk, quicker than its feet fall. Now both fall on the drawn body's own
+footfalls, together (the coordinator: "so step and clank land together").
+
+- **Footfalls from the clips**: GAIT_FOOTFALLS, each gait clip's footfalls
+  as a share of the clip, measured by tools/gait_pace.gd (which now prints
+  them: each moment a toe comes down to within PLANTED_M of its low): Walk
+  0.081 and 0.581, Jog_Short 0.027 and 0.532, Sprint_Short 0.044 and 0.587,
+  the two human bodies alike within 0.005. Played at HUMAN_GAITS' paces as
+  _animate plays the clip.
+- **Client3D._footfall_sounds**, each frame for a body with a rig: its base
+  clip's place (AnimRig.base_position, the base layer's under a strike)
+  against the last frame's; a footfall passed over (the clip wrapping too)
+  plays the last cell's footstep slot (_step_slot) and the armour's clank
+  (World.armour_noise at that cell's pace) together. A body with no cell for
+  FOOTFALL_MOVING_MS 1 s has stopped: its gait's last frames step no more.
+- **The cell's step**: _step_sound still reads the ground, the rustle and
+  the pace each cell; it plays the footstep and the clank itself only when
+  the body is not in a gait with footfalls (a step off from standing, a body
+  drawn without a rig, a creature's own clips), so a first step is heard at
+  once. The &"step" and &"clank" noises stay once a cell on the server.
+- **The cadence**: at a walk (4 cells a second, the jog clip at x1.18) a
+  footfall every 0.39 s, was 0.25; at twice that (the sprint at x1.54) every
+  0.22 s, was 0.125; a loaded 1.5 cells a second (the walk clip) every
+  0.39 s. Review mixes remade at that timing in C:/dev/review/sound/armour.
+
+view_test _test_armour_footfalls: each gait clip run through three cycles a
+frame at a time plays the footstep and the clank together at its two
+footfalls a cycle and nowhere else; stopped, its last footfalls are silent;
+the cadence at a player's paces printed; a headless 3 s walk, jog and sprint
+in plate and mail (the body moved by teleports, so its drawn gait wavers and
+the counts are printed) plays the two together, never more than once a
+cell, leather no clank. _test_sounds_follow_events: a step off from standing
+plays its footstep and its clank together. Client only, protocol unchanged,
+no new class_name.

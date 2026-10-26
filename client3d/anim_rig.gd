@@ -366,8 +366,12 @@ func speed() -> float:
 
 ## Seconds into the clip on top.
 func position() -> float:
-	if striking():
-		return _action_time()
+	return _action_time() if striking() else base_position()
+
+
+## Seconds into the base layer's clip, whatever plays over it (a gait's
+## footfalls go on under a strike).
+func base_position() -> float:
 	var at: Variant = tree.get("parameters/%s/current_position" % _slot_name(_slot))
 	# Before the tree has played a frame of it: where it was started.
 	return float(at) if at != null and float(at) > 0.0 else float(_base_seek[_slot])

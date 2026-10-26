@@ -31,6 +31,7 @@ func _ready() -> void:
 	await _test_hp_bars()
 	_test_sounds_follow_events()
 	await _test_bow_sounds()
+	await _test_armour_footfalls()
 	await _test_monster_death()
 	await _test_companion_death()
 	await _test_down_grey()
@@ -879,28 +880,135 @@ func _test_sounds_follow_events() -> void:
 			"trampled: only the step that flattened it rustles; none off the grass")
 	World._trampled_of(World.fields.level).erase(grass_at)
 	World._load_cover({"tall_grass": had_grass})
-	# 676 1b: worn armour heard with the step, plate's clank or mail's jingle; leather nothing.
+	# 676 1b amended: a step off from standing is its own footfall, the footstep and the clank
+	# together; once in its gait the feet give both (_test_armour_footfalls).
 	var worn_was: String = player.worn
 	var from_tile := player.tile
-	var clanks: Dictionary[String, Array] = {}
-	for worn: String in ["plate_armour", "mail_armour", "leather_armour"]:
-		player.worn = worn
-		clanks[worn] = _heard(func() -> void: World._relocate(player, player.tile + Vector2i(0, 1)); _rig._process(0.0)).filter(
-				func(slot: String) -> bool: return slot.begins_with("sfx.armour_"))
-		World._relocate(player, from_tile)
-		_rig._process(0.0)
+	player.worn = "plate_armour"
+	var off := _heard(func() -> void: World._relocate(player, player.tile + Vector2i(0, 1)); _rig._process(0.0)).filter(
+			func(slot: String) -> bool: return slot.begins_with("sfx.armour_") or slot.begins_with("sfx.footstep"))
+	World._relocate(player, from_tile)
+	_rig._process(0.0)
 	player.worn = worn_was
-	if SoundKit.files("sfx.armour_plate").is_empty() or SoundKit.files("sfx.armour_mail").is_empty():
-		_check(true, "the armour takes are not synced here: the clank unheard, skipped")
-	else:
-		_check(clanks["plate_armour"] == ["sfx.armour_plate"] and clanks["mail_armour"] == ["sfx.armour_mail"] and clanks["leather_armour"].is_empty(),
-				"a step in plate clanks, in mail jingles, in leather nothing more (%s)" % [clanks])
+	_check(off.size() == 2 and off[0].begins_with("sfx.footstep") and off[1] == "sfx.armour_plate",
+			"a step off from standing in plate: its footstep and its clank together (%s)" % [off])
 	var pitch_light := _swing_pitch(imp)
 	var pitch_heavy := _swing_pitch(player)
 	_check(pitch_light > pitch_heavy, "an imp's swing is higher than a player's (%.2f, %.2f)" % [pitch_light, pitch_heavy])
 	World.despawn(imp)
 	_rig._process(0.0)
 
+
+## 676 1b (Jeff on the first mixes: "the walking ones are approximately
+## running speed"): worn armour clanks on the body's own footfalls, from its
+## gait clip (Client3D.GAIT_FOOTFALLS), at a walk, a jog and a sprint, not
+## once a cell. A headless walk of 3 s at each, the clanks counted against
+## the clip's footfalls and the cells stepped.
+func _test_armour_footfalls() -> void:
+	print("
+== worn armour clanks on the body's footfalls, at its gait, not once a cell (676 1b) ==")
+	_check(Client3D.footfall_between(0.0, 0.1, [0.081]) and not Client3D.footfall_between(0.1, 0.5, [0.081, 0.581])
+			and Client3D.footfall_between(0.9, 0.05, [0.027]) and not Client3D.footfall_between(0.3, 0.3, [0.3]),
+			"a footfall passed between two frames' places, round the clip's end too; standing still none")
+	var player := _player()
+	var puppet: Node3D = _rig._puppets.get(player.get_instance_id()) if player != null else null
+	if puppet == null or not puppet.has_meta("rig") or SoundKit.files("sfx.armour_plate").is_empty() or SoundKit.files("sfx.armour_mail").is_empty():
+		_check(true, "no drawn player or the armour takes are not synced here: skipped")
+		return
+	var rig := puppet.get_meta("rig") as AnimRig
+	var worn_was: String = player.worn
+	var from := player.tile
+	# The cadence a player's steps give (cells a second: loaded, its walk at
+	# World.CLANK_WALK_TICKS, twice that), as _animate plays the gait.
+	for cells: float in [1.5, World.TICK_RATE / World.CLANK_WALK_TICKS, 2.0 * World.TICK_RATE / World.CLANK_WALK_TICKS]:
+		var table: Array = Client3D.paced(puppet.get_meta("gaits", Client3D.GAITS))
+		var gait: Array = table[Client3D.gait_for("", cells / float(puppet.get_meta("pace", 1.0)), table)]
+		var rate := clampf(cells / (float(gait[1]) * float(puppet.get_meta("pace", 1.0))) * ArtKit.feel("client3d.gait_rate", Client3D.GAIT_RATE), 0.3, 3.0)
+		print("  %.1f cells a second: %s at x%.2f, a footfall every %.2f s (a cell every %.2f s)" % [cells, gait[0], rate, rig.length(str(gait[0])) / 2.0 / rate, 1.0 / cells])
+	# Each gait clip run through three cycles a frame (1/60 s) at a time:
+	# a clank exactly at each footfall, two a cycle, and the game's cadence
+	# at a player's own paces (walk, jog, sprint), from the gait table.
+	player.worn = "plate_armour"
+	_rig._step_slot[player.get_instance_id()] = "sfx.footstep_stone_medium"
+	var pace: float = puppet.get_meta("pace", 1.0)
+	var gaits: Array = Client3D.paced(puppet.get_meta("gaits", Client3D.GAITS))
+	for gait: Array in gaits:
+		var clip := str(gait[0])
+		var length := rig.length(clip)
+		var heard_at: Array[float] = []
+		if puppet.has_meta("footfall_at"):
+			puppet.remove_meta("footfall_at")
+		var together := true
+		for frame in int(length * 3.0 * 60.0):
+			rig.base_at(clip, frame / 60.0)
+			rig.tree.advance(0.0)
+			_rig._last_step_ms[player.get_instance_id()] = Time.get_ticks_msec()  # Still moving.
+			var before := _rig.sfx.played.size()
+			_rig._footfall_sounds(player, puppet, rig)
+			var now_heard := _rig.sfx.played.slice(before).map(func(entry: Array) -> String: return str(entry[0]))
+			if not now_heard.is_empty():
+				heard_at.append(fposmod(frame / 60.0, length) / length)
+				together = together and now_heard == ["sfx.footstep_stone_medium", "sfx.armour_plate"]
+		var falls: Array = Client3D.GAIT_FOOTFALLS[clip]
+		var on_falls := heard_at.all(func(share: float) -> bool: return falls.any(func(fall: float) -> bool: return share >= fall and share - fall < 1.5 / 60.0 / length))
+		print("  %s: %d clanks in 3 cycles, at %s of the clip" % [clip, heard_at.size(), heard_at.map(func(share: float) -> String: return "%.3f" % share)])
+		_check(heard_at.size() == 6 and on_falls and together, "%s: the footstep and the clank together at each of its two footfalls a cycle, none between (%d)" % [clip, heard_at.size()])
+	# Stopped (no cell for FOOTFALL_MOVING_MS): its gait's last frames step no more.
+	_rig._last_step_ms[player.get_instance_id()] = Time.get_ticks_msec() - Client3D.FOOTFALL_MOVING_MS - 1
+	var stopped_before := _rig.sfx.played.size()
+	for frame in 60:
+		rig.base_at("Jog_Short", frame / 60.0)
+		rig.tree.advance(0.0)
+		_rig._footfall_sounds(player, puppet, rig)
+	_check(_rig.sfx.played.size() == stopped_before, "stopped: the gait's last footfalls are silent")
+	var hear_was: bool = _rig.sfx.hear_everything
+	_rig.sfx.hear_everything = true
+	# Each: the worn piece, seconds a cell, and its slot. The drawn body's own
+	# footfalls are counted beside it, frame by frame, from its gait clip.
+	for each: Array in [["plate_armour", 0.8, "sfx.armour_plate"], ["plate_armour", 0.25, "sfx.armour_plate"],
+			["plate_armour", 0.15, "sfx.armour_plate"], ["mail_armour", 0.25, "sfx.armour_mail"], ["leather_armour", 0.25, ""]]:
+		player.worn = each[0]
+		var before := _rig.sfx.played.size()
+		var start := Time.get_ticks_msec()
+		var cells := 0
+		var falls := 0
+		var clank_ms: Array[int] = []
+		var clips: Dictionary[String, int] = {}
+		var was := ["", 0.0]
+		while Time.get_ticks_msec() - start < 3000:
+			var seconds := (Time.get_ticks_msec() - start) / 1000.0
+			if seconds >= cells * float(each[1]):
+				cells += 1
+				World._relocate(player, from + Vector2i(cells % 24 if cells % 24 <= 12 else 24 - cells % 24, 0))
+			var heard_before := _rig.sfx.played.size()
+			await get_tree().process_frame
+			for entry: Array in _rig.sfx.played.slice(heard_before):
+				if str(entry[0]).begins_with("sfx.armour_"):
+					clank_ms.append(Time.get_ticks_msec() - start)
+			var clip := rig.base_clip()
+			clips[clip] = int(clips.get(clip, 0)) + 1
+			var length := rig.length(clip)
+			var at := fposmod(rig.base_position(), length) / length if length > 0.0 else 0.0
+			if was[0] == clip and Client3D.footfall_between(float(was[1]), at, Client3D.GAIT_FOOTFALLS.get(clip, [])):
+				falls += 1
+			was = [clip, at]
+		var clanks := _rig.sfx.played.slice(before).filter(func(entry: Array) -> bool: return str(entry[0]).begins_with("sfx.armour_"))
+		var footsteps := _rig.sfx.played.slice(before).filter(func(entry: Array) -> bool: return str(entry[0]).begins_with("sfx.footstep"))
+		var right_slot := clanks.all(func(entry: Array) -> bool: return entry[0] == each[2])
+		print("  %s, a cell every %.2f s: %d cells, %d footfalls drawn, %d footsteps, %d clanks at %s ms; clips by frames %s" % [
+				each[0], each[1], cells, falls, footsteps.size(), clanks.size(), clank_ms, clips])
+		if each[2] == "":
+			_check(clanks.is_empty() and falls > 0 and footsteps.size() <= cells, "%s: no clank, footsteps no more than a cell's (%d, %d footfalls)" % [each[0], footsteps.size(), falls])
+		else:
+			# Live, the body moved by teleports (World._relocate): its drawn gait wavers, so
+			# the count against its footfalls is printed; the clips' own are checked above.
+			_check(right_slot and falls > 0 and clanks.size() == footsteps.size() and clanks.size() <= cells,
+					"%s, a cell every %.2f s: the footstep and the clank together, no more than a cell's (%d footsteps, %d clanks, %d footfalls, %d cells)" % [
+					each[0], each[1], footsteps.size(), clanks.size(), falls, cells])
+		World._relocate(player, from)
+		await _frames(30)
+	player.worn = worn_was
+	_rig.sfx.hear_everything = hear_was
 
 func _test_monster_death() -> void:
 	print("\n== a monster's death: it falls, lies, sinks; its tile is free at once ==")

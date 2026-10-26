@@ -1032,6 +1032,14 @@ const DRAUGR_SCALE := 1.2
 const DRAUGR_GAITS: Array[Array] = [[CLIP_WALK, 0.94 * DRAUGR_SCALE], ["Jog_Short", 3.63 * DRAUGR_SCALE], ["Sprint_Short", 5.55 * DRAUGR_SCALE]]
 const DRAUGR_SOCKETS := {"hand": DRAUGR_SCALE, "hip": 0.17 * DRAUGR_SCALE, "back": 0.13 * DRAUGR_SCALE, "chest": 0.04 * DRAUGR_SCALE}
 const HUMAN_F_GAITS: Array[Array] = [[CLIP_WALK, 0.89], ["Jog_Short", 3.44], ["Sprint_Short", 5.27]]
+## A body whose last cell came this long ago (ms) or more has stopped: its
+## gait's last frames step no more.
+const FOOTFALL_MOVING_MS := 1000
+## The gait clips' footfalls, each a share of its clip where a toe comes down
+## (tools/gait_pace.gd; the two bodies' within 0.005): the footstep and worn
+## armour's clank play on them (676 1b amended), at the body's own steps,
+## not the cells'.
+const GAIT_FOOTFALLS: Dictionary[String, Array] = {CLIP_WALK: [0.081, 0.581], "Jog_Short": [0.027, 0.532], "Sprint_Short": [0.044, 0.587]}
 ## The human bodies' one material, shared: each body's parts' colours are its
 ## instance's (HUMAN_PARTS, from its mesh's extras; the tunic the player's).
 const HUMAN_MATERIAL := preload("res://art/models/characters/human_body.tres")
@@ -1848,9 +1856,13 @@ const CHATTER_SECONDS := Vector2(8.0, 25.0)
 var _last_hp: Dictionary[int, int] = {}
 ## Entity instance id -> its tile as last seen, for footsteps.
 var _last_tile: Dictionary[int, Vector2i] = {}
-## Entity instance id -> when (ms) its last step was heard, for its pace
-## (worn armour's clank, 676 1b).
+## Entity instance id -> when (ms) its last step was heard, and the pace
+## that gave (SoundKit.step_pace), for worn armour's clank (676 1b).
 var _last_step_ms: Dictionary[int, int] = {}
+var _step_pace: Dictionary[int, float] = {}
+## Entity instance id -> its last cell's footstep slot, played on its
+## drawn body's footfalls (_footfall_sounds).
+var _step_slot: Dictionary[int, String] = {}
 ## Tall grass trampled just now (decision 508): cell -> when (ms), so the
 ## step that flattens it still rustles, whether the "grass" news comes
 ## before the step or after it.
@@ -13092,6 +13104,7 @@ func _sync_puppets() -> void:
 				body.rotation.y = yaw
 			(puppet.get_meta("rig") as AnimRig).every = _pose_every(puppet)
 			_animate(puppet)
+			_footfall_sounds(entity, puppet, puppet.get_meta("rig") as AnimRig)
 		elif puppet.has_meta("creature_view"):
 			var body := puppet.get_node("Body") as Node3D
 			if not is_equal_approx(body.rotation.y, yaw):
@@ -13152,6 +13165,8 @@ func _entity_went(id: int) -> void:
 	_last_hp.erase(id)
 	_last_tile.erase(id)
 	_last_step_ms.erase(id)
+	_step_pace.erase(id)
+	_step_slot.erase(id)
 	_far.erase(id)
 	var entity_name: String = puppet.get_meta("entity_name", "")
 	if _pending_deaths.has(entity_name):
@@ -13210,28 +13225,74 @@ func _step_sound(entity: GridEntity, puppet: Node3D) -> void:
 		var wet := World.is_water(entity.tile) or World.is_ford(entity.tile)
 		var ground: String = "water" if wet else _ground_kinds.get(entity.tile, "stone")
 		var creature := str(entity.spawn_spec.get("kind", "")) if entity is Monster else ""
-		sfx.play(SoundKit.footstep(ground, entity.mass, creature), puppet.position, 1.0, 0.0, Senses.step_radius(entity))
+		_step_slot[id] = SoundKit.footstep(ground, entity.mass, creature)
+		# A body already in a gait with footfalls steps on them (_footfall_sounds);
+		# otherwise (standing off, or no feet drawn) the cell's step is the footfall.
+		var rig := puppet.get_meta("rig") as AnimRig if puppet.has_meta("rig") else null
+		var on_feet := rig != null and GAIT_FOOTFALLS.has(rig.base_clip())
+		if not on_feet:
+			sfx.play(_step_slot[id], puppet.position, 1.0, 0.0, Senses.step_radius(entity))
 		var now := Time.get_ticks_msec()
 		if rustles(entity.tile, _flattened.get(entity.tile, -FLATTENED_MS), now):
 			sfx.play("sfx.grass_rustle", puppet.position, 1.0, 0.0, Senses.step_radius(entity))
 		var since := (now - int(_last_step_ms.get(id, -1000000))) / 1000.0
 		_last_step_ms[id] = now
-		_armour_sound(entity, puppet, since)
+		_step_pace[id] = SoundKit.step_pace(since)
+		if not on_feet:
+			_armour_sound(entity, puppet, _step_pace[id])
 
 
-## Worn armour heard with a step (676 1b; Jeff: worn armour clanks): plate's
-## clank or mail's jingle as far as World.armour_noise carries it (the
-## server's &"clank" noise, the one prey hear), louder the further it
-## carries; leather and robes nothing. [param since]: seconds since the
-## body's last step, its pace.
-func _armour_sound(entity: GridEntity, puppet: Node3D, since: float) -> void:
+## Worn armour heard with a footfall (676 1b; Jeff: worn armour clanks):
+## plate's clank or mail's jingle as far as World.armour_noise carries it
+## (the server's &"clank" noise, the one prey hear), louder the further it
+## carries; leather and robes nothing. [param pace]: its last step's
+## (SoundKit.step_pace).
+func _armour_sound(entity: GridEntity, puppet: Node3D, pace: float) -> void:
 	var worn: Variant = entity.get("worn")
 	if not worn is String or (worn as String).is_empty():
 		return
-	var heard: Dictionary = World.armour_noise(worn, SoundKit.step_pace(since))
+	var heard: Dictionary = World.armour_noise(worn, pace)
 	var slot := SoundKit.armour_slot(str(heard["kind"]))
 	if slot != "":
 		sfx.play(slot, puppet.position, 1.0, SoundKit.armour_db(str(heard["kind"]), int(heard["radius"])), int(heard["radius"]))
+
+
+## The footstep and worn armour at the body's own footfalls (676 1b amended;
+## Jeff on the first mixes: "the walking ones are approximately running
+## speed"): each frame the gait clip's place is compared with the last, and
+## a footfall of GAIT_FOOTFALLS passed over (the clip wrapping too) plays
+## the last cell's footstep and the armour's clank together, at that step's
+## pace, while the body still moves (a cell within FOOTFALL_MOVING_MS).
+## Standing, or a clip with no footfalls, none: _step_sound plays the cell's.
+func _footfall_sounds(entity: GridEntity, puppet: Node3D, rig: AnimRig) -> void:
+	var clip := rig.base_clip()
+	var length := rig.length(clip)
+	var falls: Array = GAIT_FOOTFALLS.get(clip, [])
+	if falls.is_empty() or length <= 0.0:
+		if puppet.has_meta("footfall_at"):
+			puppet.remove_meta("footfall_at")
+		return
+	var at := fposmod(rig.base_position(), length) / length
+	var was: Variant = puppet.get_meta("footfall_at") if puppet.has_meta("footfall_at") else null
+	puppet.set_meta("footfall_at", [clip, at])
+	if not (was is Array and was[0] == clip and footfall_between(float(was[1]), at, falls)):
+		return
+	var id := entity.get_instance_id()
+	if Time.get_ticks_msec() - int(_last_step_ms.get(id, -1000000)) > FOOTFALL_MOVING_MS:
+		return
+	if _step_slot.has(id):
+		sfx.play(_step_slot[id], puppet.position, 1.0, 0.0, Senses.step_radius(entity))
+	_armour_sound(entity, puppet, float(_step_pace.get(id, 1.0)))
+
+
+## Whether a share of a clip in [param falls] lies after [param from] and up
+## to [param to], going forward (past the clip's end round to its start when
+## [param to] is less).
+static func footfall_between(from: float, to: float, falls: Array) -> bool:
+	for fall: float in falls:
+		if (from < fall and fall <= to) if from <= to else (fall > from or fall <= to):
+			return true
+	return false
 
 
 ## Whether a step into [param tile] rustles: standing tall grass (decision
