@@ -1011,6 +1011,34 @@ static func _found_among(production: Production, worker_id: String, card: Dictio
 		production.set_card(other, theirs)
 
 
+## A companion's worker [param worker_id] ("companion:<her name>") made a
+## resident of her town for good (686, npc's side): companions' hand-over
+## when a recruited one parts or leaves, or her player recruits another.
+## A new worker "settled:<name>" (a number after it when that is taken)
+## by Towns.settle_companion, with her mind and what she has heard; a
+## resident card rolled for them. The new id, "" when she is no worker.
+static func settle(production: Production, towns: Towns, worker_id: String) -> String:
+	if production == null or towns == null or not worker_id.begins_with(COMPANION):
+		return ""
+	var who := production.worker(worker_id)
+	if who.is_empty():
+		return ""
+	var base := "settled:%s" % str(who.get("name", worker_id.trim_prefix(COMPANION)))
+	var new_id := base
+	var n := 2
+	while not production.worker(new_id).is_empty():
+		new_id = "%s:%d" % [base, n]
+		n += 1
+	if not towns.settle_companion(worker_id, new_id):
+		return ""
+	for quality: String in Production.MIND:
+		if who.has(quality):
+			production.set_mind(new_id, quality, int(who[quality]))
+	production.set_heard(new_id, who.get("heard", []))
+	production.set_card(new_id, card_of(production, new_id))
+	return new_id
+
+
 ## Grows the cards from the town's events: Towns.raided (a neighbour
 ## carried off, witnessed), Towns.rescued (home again), and
 ## Production.loan_changed. Once per instance.

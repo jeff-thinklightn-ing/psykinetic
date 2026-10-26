@@ -938,6 +938,11 @@ func facts_now() -> Array[String]:
 			for key: String in ["left_why", "left_back"]:
 				if not str(record.get(key, "")).is_empty():
 					out.append(str(record[key]))
+	# Why they would not travel with the one asking (686, npc's side); companions' words, as written.
+	if not asked_by.is_empty() and World.production != null:
+		var refused := str(World.production.worker(worker_id).get("asked", {}).get(asked_by, ""))
+		if not refused.is_empty():
+			out.append(refused)
 	# What it can offer the one speaking to it, and what they promised it
 	# (decision 435): facts, never lines.
 	if player_id.is_empty() and not asked_by.is_empty():

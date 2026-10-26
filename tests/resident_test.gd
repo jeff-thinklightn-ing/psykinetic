@@ -405,6 +405,57 @@ func _test_bodies_in_town() -> void:
 	_check(Townsfolk.reputation(World.production, "rs_town/nowhere", "rs-rep") == 0.0 and Townsfolk.reputation(World.production, STORE, "") == 0.0, "another town, or no player: 0.0")
 	for i in met.size():
 		World.production.set_card(met[i], kept_cards[i])
+	print("\n== asked to travel, refused: why, told only to the one who asked; a bond written back to the card (686, npc's side) ==")
+	var asked_body: Resident = null
+	for entity: GridEntity in World.townsfolk():
+		if not (entity as Resident).worker_id.begins_with(Townsfolk.COMPANION):
+			asked_body = entity as Resident
+	_check(asked_body != null, "(a townsperson stands in the town)")
+	if asked_body != null:
+		var asked_id := asked_body.worker_id
+		World.production.set_asked(asked_id, "rs-rep", "Rep asked you to travel with them; you would go only with someone you trust.")
+		World.production.set_asked(asked_id, "rs-else", "Else asked you too; you are the town's only smith and cannot leave.")
+		asked_body.asked_by = "rs-rep"
+		var asked_prompt: String = asked_body.system_for("Rep")
+		_check(asked_prompt.contains("you would go only with someone you trust.") and not asked_prompt.contains("Else asked you"), "the one who asked: their refusal only")
+		var copy := Production.new()
+		copy.from_dict(JSON.parse_string(JSON.stringify(World.production.to_dict())))
+		_check(str(copy.worker(asked_id).get("asked", {}).get("rs-else", "")).begins_with("Else asked you"), "kept across a save")
+		World.production.set_asked(asked_id, "rs-rep", "")
+		_check(not asked_body.system_for("Rep").contains("someone you trust"), "erased: gone")
+		asked_body.asked_by = ""
+		World.production.set_asked(asked_id, "rs-else", "")
+		var bond := {}
+		var it := Standing.set_score(bond, "rs-rep", 99, "she travelled with them.", 40)
+		_check(int(it["score"]) == Standing.setting("most") and int(it["met"]) == 40 and bool(it["own"]) and it["why"] == ["she travelled with them"],
+			"set_score on a stranger: met then, clamped, their own, the reason kept (%s)" % [it])
+		Standing.set_score(bond, "rs-rep", -2, "they let her bleed", 50)
+		_check(Standing.score(bond, "rs-rep") == -2 and Standing.entry(bond, "rs-rep")["why"].size() == 2 and int(Standing.entry(bond, "rs-rep")["met"]) == 40,
+			"set again: the score replaced, reasons added, met kept")
+		_check(not Standing.heard(bond, "rs-rep", 1, "x", "y", 60), "hearsay leaves it be")
+	print("\n== a companion handed back for good: a resident of her town, settled (686, npc's side) ==")
+	World.towns.note_companion_in(STORE, "Sel", "cook", "rs-sel")
+	World.production.set_heard("companion:Sel", [{"text": "x"}])
+	World.production.set_mind("companion:Sel", "intellect", 9)
+	World.production.pay("companion:Sel", 7, "what the town owed: a test")
+	World.production.set_owed("companion:Sel", 4)
+	World.production.set_loan("companion:Sel", 3.0, true)
+	var settled := Townsfolk.settle(World.production, World.towns, "companion:Sel")
+	var as_worker := World.production.worker(settled)
+	_check(settled == "settled:Sel" and str(as_worker.get("origin", "")) == "settled" and str(as_worker.get("town", "")) == STORE and as_worker.get("trades", []) == ["cook"],
+		"Sel settles: settled:Sel, of the town, her trade (%s %s)" % [settled, as_worker.get("origin", "")])
+	_check(World.production.worker("companion:Sel").is_empty() and settled in World.towns.residents(STORE) and not "companion:Sel" in World.towns.residents(STORE),
+		"her companion worker gone; the new one in her place among the residents")
+	_check(int(as_worker.get("intellect", 0)) == 9 and as_worker.get("heard", []).size() == 1 and not Townsfolk.card_of(World.production, settled).is_empty(),
+		"her mind and her hearing kept; a resident card rolled")
+	_check(int(as_worker.get("purse", 0)) == 7 and int(as_worker.get("owed", 0)) == 4 and is_equal_approx(float(as_worker.get("loan", 0.0)), 3.0) and bool(as_worker.get("working_off", false)),
+		"her purse, what the town owes her and her loan go with her (%s %s %s)" % [as_worker.get("purse"), as_worker.get("owed"), as_worker.get("loan")])
+	World.towns.note_companion_in(STORE, "Sel", "cook", "rs-sel2")
+	var again := Townsfolk.settle(World.production, World.towns, "companion:Sel")
+	_check(again == "settled:Sel:2", "another Sel: settled:Sel:2 (%s)" % again)
+	_check(Townsfolk.settle(World.production, World.towns, "companion:Nobody") == "" and Townsfolk.settle(World.production, World.towns, "rs-mara") == "", "no such companion, or not one: \"\"")
+	for id: String in [settled, again]:
+		World.towns.died(STORE, id, "a test ends")
 	World.entity_taken.emit(wren, "raid-10")
 	_check(not wren.spawned and other.companion.get("taken", {}).get("by", "") == "raid-10" and not other.companion.has("resident"),
 		"beaten down by raiders: held as her player's companion (%s)" % [other.companion.get("taken", {})])

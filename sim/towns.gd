@@ -473,6 +473,35 @@ func note_companion_out(town: String, companion_name: String) -> void:
 	_note(town, "%s goes adventuring; its work waits" % companion_name)
 
 
+## Companion worker [param companion_id] handed back for good (686, npc's
+## side; Townsfolk.settle): a resident of her town as [param new_id],
+## origin "settled" (room-exempt, as move_in has it; no old-age death),
+## working her trades, in her place among the residents; the companion
+## worker gone. False when she is no worker or [param new_id] is one.
+func settle_companion(companion_id: String, new_id: String) -> bool:
+	var who := production.worker(companion_id)
+	if who.is_empty() or not production.worker(new_id).is_empty():
+		return false
+	var town := str(who.get("town", ""))
+	var name := str(who.get("name", new_id))
+	if not production.add_worker(new_id, name, who.get("trades", []), town, "settled"):
+		return false
+	# Her purse, what the town owes her and any loan go with her (not earned anew).
+	production.pay(new_id, int(who.get("purse", 0)), "what the town owed: %s's own purse, settling" % name)
+	production.set_owed(new_id, int(who.get("owed", 0)))
+	production.set_loan(new_id, float(who.get("loan", 0.0)), bool(who.get("working_off", false)))
+	var record := _town(town)
+	var at: int = record["residents"].find(companion_id)
+	if at >= 0:
+		record["residents"][at] = new_id
+	else:
+		record["residents"].append(new_id)
+	production.remove_worker(companion_id)
+	_note(town, "%s settles in the town for good" % name)
+	_seat(town)
+	return true
+
+
 # --- Choosing upgrades ---------------------------------------------------------------
 
 ## The world tick (after Production's): each town with experience to spend

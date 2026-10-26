@@ -95,6 +95,23 @@ static func bump(card: Dictionary, player_id: String, delta: int, why: String, s
 	return it.duplicate(true)
 
 
+## [param player_id]'s score on [param card] set to [param score] (686,
+## npc's side: a companion's bond written back to the card when they come
+## home), clamped as bump clamps, with [param why] remembered; met at
+## [param step] if a stranger. Their own event, so hearsay leaves it be.
+static func set_score(card: Dictionary, player_id: String, score: int, why: String, step: int) -> Dictionary:
+	if player_id.is_empty():
+		return {}
+	met(card, player_id, step)
+	var it: Dictionary = card["standing"][player_id]
+	var most := setting("most")
+	it["score"] = clampi(score, -most, most)
+	it["since"] = step
+	it["own"] = true
+	_remember(it, why)
+	return it.duplicate(true)
+
+
 ## Hearsay of [param player_id] from [param from] at [param step], leaning
 ## [param sign] (+1 or -1): moves the score only for one with no event of
 ## their own with that player, and never past heard_most either way.

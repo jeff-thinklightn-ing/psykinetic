@@ -291,6 +291,20 @@ func set_left(worker_id: String, why: String, back: String) -> void:
 		_workers[worker_id]["left_back"] = back
 
 
+## Why worker [param worker_id] would not go with [param player_id] when
+## asked to travel with them (686, npc's side): a sentence companions'
+## side writes, a fact for their prompt when that player speaks to them;
+## "" erases that player's. Nothing for an unknown id.
+func set_asked(worker_id: String, player_id: String, why: String) -> void:
+	if not _workers.has(worker_id) or player_id.is_empty():
+		return
+	var asked: Dictionary = _workers[worker_id].get_or_add("asked", {})
+	if why.is_empty():
+		asked.erase(player_id)
+	else:
+		asked[player_id] = why
+
+
 ## Worker [param worker_id]'s [param quality] of MIND, 1..10: a companion
 ## resting in town brings hers from her card (decision 442); nothing for an
 ## unknown id.
@@ -1881,6 +1895,14 @@ func from_dict(saved: Dictionary) -> void:
 			# npc's card of them, kept as it is.
 			if entry.get("card") is Dictionary:
 				_workers[id]["card"] = entry["card"].duplicate(true)
+			# Companions' sentences for the prompt (581 amended, 686; npc's side).
+			for key: String in ["left_why", "left_back"]:
+				if entry.get(key) is String and not entry[key].is_empty():
+					_workers[id][key] = entry[key]
+			if entry.get("asked") is Dictionary:
+				for player_id: Variant in entry["asked"]:
+					if entry["asked"][player_id] is String and not entry["asked"][player_id].is_empty():
+						_workers[id].get_or_add("asked", {})[str(player_id)] = entry["asked"][player_id]
 			var last: Variant = entry.get("last_trade", {})
 			if last is Dictionary and not last.is_empty():
 				_workers[id]["last_trade"] = {"step": int(last.get("step", 0)), "what": str(last.get("what", "")),

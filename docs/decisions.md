@@ -32041,6 +32041,52 @@ From there it went out to other players as hearsay and rumour offers.
 resident_test _test_names_never_ids covers no record, an empty id, no
 ctx, a name_of that echoes the id, a record with no name, and a named
 record, using a placeholder id.
+## 686, npc's side: a refusal, a bond written back, a companion settled
+
+Companions' 686 lets a player recruit a trusted resident as a companion.
+The coordinator approved it; these keys were agreed between companions
+and npc, and economy's side (Towns.sole_needed, no rent or wage floor
+while away) was checked for overlap. npc's side:
+
+- **Production.set_asked(worker_id, player_id, why):** a refusal sentence
+  per player, in worker["asked"][player_id] ("" erases that player's).
+  Companions writes it when a resident turns them down. The resident
+  prompt (Resident.facts_now) appends it, as written, only when that
+  player is the one speaking.
+- **Standing.set_score(card, player_id, score, why, step):** sets the
+  score, clamped as bump clamps, and remembers why. It makes the entry if
+  the player is a stranger, and marks it their own so hearsay leaves it
+  be. Companions uses it to write a recruit's bond back to their card
+  when they come home (card_of, set_score, Production.set_card).
+- **Townsfolk.settle(production, towns, worker_id) -> String:** a
+  companion's worker ("companion:<name>") becomes a resident of her town
+  for good. Through Towns.settle_companion (new; economy's file, told) it
+  makes a new worker "settled:<name>" (":2" and on when that is taken),
+  origin "settled" (room-exempt, no old-age death, as Snagfin's). The new
+  worker takes her trade and her place among the residents, and the
+  companion worker is removed. Her mind and what she has heard are
+  copied, and a resident card is rolled. Her purse (paid as "what the
+  town owed", so not earned anew), what the town owes her and any loan
+  go with her (economy and companions pointed out that remove_worker
+  would lose them). It returns the new id, or "".
+  Companions calls it at every hand-over (a recruited one parts or
+  leaves, or her player recruits another while she is away) instead of
+  clearing her origin. Almost everything in town keys on the
+  "companion:" id prefix: cards, gossip, sickness, kin, bodies (only from
+  player records). So a cleared origin would have left her a bodiless
+  worker.
+- **Kept across a restart:** Production.from_dict keeps "left_why",
+  "left_back" (581 amended) and "asked" on a worker.
+- **Away while recruited:** companions' production.set_away is enough on
+  npc's side (no body, no hail, no gossip, no runs). Companions refuses
+  residents who are strayed, sought, escorting, on a drive or caravan, or
+  on a run, since those paths clear "away" on their own. Pip's runner is
+  unchanged: only record.companion counts as out with a player.
+
+resident_test checks the refusal (only to the one who asked, kept across
+a save, erased), set_score (a stranger met then, clamped, own, the reason;
+set again; hearsay refused), and settle (settled:Sel with her trade, mind,
+hearing and card, in her place; settled:Sel:2 for another; "" for none).
 
 Server only, protocol unchanged, no new class_name.
 ## 689 amended (2): a click on its own cell stops a free body where it stands

@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Recruiting a townsperson, npc's side (686): a resident who turns you down knows why when you speak to them again, a companion who comes home has your bond written onto their card, and a companion handed back for good becomes a settled resident of her town with her mind and what she has heard.
 ## v0.1.184
 
 - The draugr's spin throws whoever it strikes (603 amended (4)): an 80 kg player in no armour was hit and knocked down but never moved, the push under the knockback floor; the spin now skips the floor and pushes with his whole swing (impulse_scale 0.84 to 1.0), so a player ahead is thrown 2 cells and one swept into a wall from full is left at 3 of 20; plate moves less; an exhausted player is thrown 5 cells and the wall kills from full. Tune it in F7 (Telegraphs and boss moves, combat.moves.spin.impulse_scale) if the throw feels too long.
