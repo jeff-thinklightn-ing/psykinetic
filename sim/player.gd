@@ -37,6 +37,13 @@ var free_inputs: Array[Dictionary] = []
 ## more each tick, at most World.FREE_BANK_TICKS, so more commands than
 ## time cannot make it run fast.
 var free_bank := 0.0
+## Server: the seq of the last command it is done with, applied or dropped
+## (688 amended, World._free_acked): -1 for none. Its client replays only
+## those after it (ui's 689).
+var free_acked := -1
+## Server: the ticks the head command has had so far (688 amended); 0 for
+## none.
+var free_used := 0.0
 ## Server: the tick it last bumped its own companion as a free body (688).
 var free_bumped_tick := -100000
 ## Server only: whose player this is (PlayerRecord.player_id), so the

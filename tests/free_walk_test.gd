@@ -44,6 +44,15 @@ const CORNER: Array[String] = [
 	"       ",
 	". . . .",
 ]
+## Walls on the east and south edges of (1, 1), meeting at its corner: a
+## pocket heading south-east.
+const POCKET: Array[String] = [
+	". . . .",
+	"       ",
+	". .#. .",
+	"  #    ",
+	". . . .",
+]
 
 var _failures := 0
 var _room: Node2D
@@ -66,6 +75,8 @@ func _ready() -> void:
 	_test_door()
 	_test_held()
 	_test_snap()
+	_test_glide()
+	_test_acks()
 	_test_walk_helper()
 	World.free_walk = false
 
@@ -167,6 +178,15 @@ func _test_own_companion() -> void:
 	_check(player.free_pos.is_equal_approx(Vector2(5, 2)) and player.tile == Vector2i(5, 2) and pet.tile == Vector2i(3, 2),
 			"10 ticks east through her at (3, 2): at (5, 2), she where she was (%s)" % player.free_pos)
 	_check(Vector2i(3, 2) not in held and _bumps >= 1, "her cell never his; she was bumped %d times (%s)" % [_bumps, held])
+	World._relocate(player, Vector2i(1, 2))
+	var paces: Array[float] = []
+	for i in 10:
+		var was := player.free_pos.x
+		World.free_input(player, Vector2(1, 0), World.TICK_DT)
+		World.step()
+		paces.append(snappedf(player.free_pos.x - was, 0.001))
+	_check(paces.all(func(pace: float) -> bool: return is_equal_approx(pace, 0.4)),
+			"through her again: 0.4 a tick every tick, no slowing on her, only the claim waits (%s)" % [paces])
 	_check(not World.swap_places(player, pet, 2.5), "no swap for a free body (679 retired for it)")
 
 
@@ -189,11 +209,23 @@ func _test_wall_slide() -> void:
 
 
 func _test_corner() -> void:
-	print("\n== two walls meeting at a corner: no diagonal through it ==")
+	print("\n== two walls meeting at a corner: no diagonal through it, and no stall on it ==")
 	var player := _build(CORNER, Vector2i(1, 1))
-	_hold(player, Vector2(1, 1).normalized(), 20)
-	_check(player.tile == Vector2i(1, 1) and player.free_pos.distance_to(Vector2(1.5, 1.5)) >= World.FREE_RADIUS - 0.001,
-			"20 ticks south-east at the corner: still (1, 1), a radius off it (%s)" % player.free_pos)
+	var held: Array[Vector2i] = []
+	var nearest := INF
+	for i in 20:
+		World.free_input(player, Vector2(1, 1).normalized(), World.TICK_DT)
+		World.step()
+		held.append(player.tile)
+		nearest = minf(nearest, player.free_pos.distance_to(Vector2(1.5, 1.5)))
+	_check(Vector2i(2, 2) not in held and nearest >= World.FREE_RADIUS - 0.001,
+			"20 ticks south-east at it: never (2, 2) through it, never nearer than a radius (%.3f)" % nearest)
+	_check(player.tile.x >= 3,
+			"head on at the corner it slides off east (x first on a tie, 688 amended), not stalled: at %s (%s)" % [player.tile, player.free_pos])
+	player = _build(POCKET, Vector2i(1, 1))
+	_hold(player, Vector2(1, 1).normalized(), 10)
+	_check(player.tile == Vector2i(1, 1) and player.free_pos.is_equal_approx(Vector2(1.2, 1.2)),
+			"into a pocket, walls east and south of (1, 1): stopped a radius off both (%s)" % player.free_pos)
 
 
 func _test_door() -> void:
@@ -241,7 +273,60 @@ func _test_snap() -> void:
 	var dummy := _spawn("res://sim/monster.gd", "Dummy", Vector2i(3, 3))
 	var slid := World._push(dummy, player, Vector2(1, 0), 2.0)
 	_check(not slid.is_empty() and player.tile.x > 4 and player.free_pos == Vector2(player.tile),
-			"knocked east a speed of 2 from off its centre: to %s, snapped onto it (%s; impulses later, 688 amended)" % [player.tile, player.free_pos])
+			"knocked east a speed of 2 from off its centre: to %s, snapped onto it (%s; impulses later, 688 amended (2))" % [player.tile, player.free_pos])
+
+
+func _test_glide() -> void:
+	print("\n== free_glide: the same move, touching nothing (688 amended; a client's replay) ==")
+	var player := _build(WALLED, Vector2i(1, 1))
+	var glided: Array = World.free_glide(player, player.free_pos, Vector2(1, 1).normalized(), 6.0)
+	_check(player.free_pos == Vector2(1, 1) and player.tile == Vector2i(1, 1) and player.free_way == Vector2.ZERO,
+			"6 ticks south-east glided from (1, 1): the body where it was")
+	_hold(player, Vector2(1, 1).normalized(), 6)
+	_check((glided[0] as Vector2).distance_to(player.free_pos) < 0.001 and (glided[1] as Vector2).is_equal_approx(player.free_way),
+			"the server's own 6 ticks end where the glide said: %s, %s" % [glided[0], player.free_pos])
+	player = _build(WALLED, Vector2i(2, 3))
+	var door := Door.build({"script": "res://sim/door.gd", "name": "Door", "edge": [DOOR_KEY.x, DOOR_KEY.y, DOOR_KEY.z], "props": {"max_hp": 20}})
+	_room.add_child(door)
+	glided = World.free_glide(player, player.free_pos, Vector2(1, 0), 6.0)
+	_check(not door.open and is_equal_approx((glided[0] as Vector2).x, 2.2),
+			"glided into the closed door: it stays shut, the glide stops a radius off it (%s)" % glided[0])
+	var crate := EntityFactory.build({"script": "res://sim/pushable.gd", "shape": "sphere", "name": "Crate", "props": {"mass": 20.0}})
+	_room.add_child(crate)
+	World.spawn(crate, Vector2i(2, 2))
+	glided = World.free_glide(player, player.free_pos, Vector2(0, -1), 6.0)
+	_check(crate.tile == Vector2i(2, 2) and is_equal_approx((glided[0] as Vector2).y, 2.8),
+			"glided into a crate: not shifted, stopped a radius off it (%s)" % glided[0])
+	_check(World.free_cell(player, Vector2(2.55, 3)) == Vector2i(2, 3) and World.free_cell(player, Vector2(2.65, 3)) == Vector2i(3, 3)
+			and World.free_cell(player, Vector2(1.4, 2.35)) == Vector2i(1, 2) and player.tile == Vector2i(2, 3),
+			"free_cell: (2, 3) at 0.55 east, (3, 3) at 0.65, (1, 2) diagonally past both, nothing claimed")
+
+
+func _test_acks() -> void:
+	print("\n== the server's ack: each command done with, applied or dropped (688 amended) ==")
+	var player := _build(OPEN, Vector2i(1, 2))
+	_check(player.free_acked == -1 and player.free_used == 0.0, "none yet: -1, 0")
+	for seq in [1, 2]:
+		World.free_input(player, Vector2(1, 0), World.TICK_DT * 0.5, seq)
+	World.free_input(player, Vector2(1, 0), World.TICK_DT * 2.5, 3)
+	World.step()
+	_check(player.free_acked == 2 and is_equal_approx(player.free_used, 0.0) and player.free_inputs.size() == 1,
+			"half a tick each of 1 and 2, then 3 not begun this tick's bank: acked 2, used 0 (%d, %s)" % [player.free_acked, player.free_used])
+	World.step()
+	_check(player.free_acked == 2 and is_equal_approx(player.free_used, 1.0), "a tick of 3's 2.5: acked 2, used 1 (%s)" % player.free_used)
+	World.free_input(player, Vector2(1, 0), World.TICK_DT, 4)
+	World.halt(player, World.tick + 1)
+	_check(player.free_acked == 4 and player.free_used == 0.0 and player.free_inputs.is_empty(), "halted: 3 and 4 dropped, acked 4")
+	World.step()
+	World.free_input(player, Vector2(1, 0), World.TICK_DT, 5)
+	player.raised = "draw"
+	World.step()
+	_check(player.free_acked == 5, "a bow drawn: 5's time spent standing, acked 5 all the same")
+	player.raised = ""
+	for seq in World.FREE_INPUTS_MAX + 1:
+		World.free_input(player, Vector2(1, 0), World.TICK_DT, 10 + seq)
+	_check(player.free_acked == 10 and player.free_inputs.size() == World.FREE_INPUTS_MAX,
+			"%d sent at once: the first dropped and acked (%d)" % [World.FREE_INPUTS_MAX + 1, player.free_acked])
 
 
 func _test_walk_helper() -> void:

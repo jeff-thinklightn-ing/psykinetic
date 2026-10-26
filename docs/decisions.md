@@ -31564,7 +31564,7 @@ Jeff signs off, and the wire is ui's 689.
 - **Pushes snap**: any change of tile but the body's own claim
   (_world_set_tile: a push, a lunge, a rush, a relocate, a spawn) puts its
   centre on the cell's centre. Impulses on a free body come later (688
-  amended).
+  amended (2)).
 
 tests/walk.gd, the walk-to helper: Walk.to(entity, cell) walks a body there
 either way, a grid step at a time along walk_path or a free body's command a
@@ -31616,3 +31616,41 @@ combat_test `_test_free_blows`:
 - the lob drawn in from the body's centre.
 
 Protocol unchanged, no new class_name. It changes nothing in play until free_walk is turned on.
+
+## 688 amended: a pure glide, the server's ack, no stall at a corner
+
+What ui's 689 (the wire, the client's replay) needs of 688's body, and what
+its prototype found.
+
+- **free_glide(entity, from, intent, ticks) -> [centre, velocity]**: the
+  body's move, touching nothing: no free_pos written, no door opened, no
+  crate shifted, no cell held, nothing told, whoever calls it (a host's
+  replay runs on the same Player as the server). The server's own turn runs
+  the same routine (_free_glide) with its effects on, so the two cannot
+  drift. Its cell is the tile as it stands; on a client a closed door and a
+  crate stay solid till the server opens or shifts them.
+- **free_cell(entity, at) -> Vector2i**: the cell a centre at `at` would
+  hold (the tile, till FREE_HYSTERESIS past its edge on either axis), pure;
+  _free_claim reads it.
+- **The ack**: free_input takes the client's seq. Player.free_acked is the
+  seq of the last command done with and Player.free_used the ticks the head
+  one has had. Every command the server drops counts as done (ui: else a
+  halted body runs on in the view): halt's drop, the FREE_INPUTS_MAX
+  overflow, a held body's command (its time spent standing), and a spawn
+  (World.spawn drops what was sent before: free_drop).
+- **No stall at a corner**: a substep that keeps under a quarter of its move
+  (head on at a wall's outside corner, where the push-out sent it straight
+  back) is tried along the way the intent mostly points alone, then the
+  other, x first on a tie: it slides off. An inside pocket, both ways
+  blocked, still stops it.
+- **Pushes as impulses** are now 688 amended (2).
+
+free_walk_test: through its own companion 0.4 a tick every tick (no slowing
+on her, only the claim waits); head on at the corner it slides off east to
+(3, 3), never (2, 2) through it, never nearer than a radius; a pocket stops
+it at (1.2, 1.2); 6 glided ticks leave the body where it was and end where
+the server's own 6 do (2.807, 1.2); glided into a door it stays shut, into a
+crate it is not shifted; free_cell at 0.55, 0.65 and diagonally; acks:
+halves of 1 and 2 (acked 2, used 0), a tick of 3 (used 1), a halt (acked 4),
+a drawn bow (acked 5), 65 at once (the first, 10, acked). Server only,
+protocol unchanged, no new class_name.
