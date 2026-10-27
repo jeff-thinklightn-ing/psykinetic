@@ -33412,3 +33412,25 @@ player leader:
 No change under free walk, which has been the default for a day; the grid
 branch was dead in play. companion_test (both modes) and resident_test
 pass. Server only, protocol unchanged, no new class_name.
+
+## 603 amended, enemy-ai's side: a companion holding him no longer stops his throw
+
+The coordinator, from four trailer takes (the pact, a sword, the Ossuary
+hall): the draugr spun once, then never threw his axe in 50 to 80 s, the
+player standing off; with Jeff's "Draugr is too easy". Measured in the
+real barrow_deep, the pact taken, the player six off on the throw's whole
+line: alone, he throws on the first tick; with the player's companion
+beside him he never did in 600 ticks. His target was hers (the nearest),
+never in the throw's band, and a throw waited while any foe stood beside
+him, so a party whose companion tanks him while the player stands back saw
+only his blows at her.
+Now a companion beside him does not hold his throw (a player beside him
+still does: Draugr._foe_beside(true)), and he throws at his target or, if
+it is not so placed, the nearest player THROW_NEAR to THROW_FAR off whose
+throw line meets them first (_throw_mark). The coordinator's "never at one
+closing on him" is kept for each of them (_foes_were, its own step nearer
+within CLOSING_TICKS; his target's alone before).
+draugr_fight_test _test_real_throw on barrow_deep as it loads: the player
+six off, he throws; his companion beside him, he throws; another player
+beside him, no throw in 200 ticks. Server only, protocol unchanged, no new
+class_name.

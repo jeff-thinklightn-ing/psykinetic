@@ -43,6 +43,7 @@ func _ready() -> void:
 		get_tree().quit(0)
 		return
 	_play_through()
+	_test_real_throw()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -147,6 +148,85 @@ func _play_through() -> void:
 	World.reset()
 	_room.free()
 	Level.unregister(LEVEL)
+
+
+## The trailer's takes (the coordinator, 2026-10-27; Jeff: "Draugr is too
+## easy"): in the real barrow_deep, the pact taken, the player six off on a
+## clear line, he throws; his mind left to choose its own target.
+func _test_real_throw() -> void:
+	for beside in ["", "companion", "player"]:
+		print("
+== barrow_deep: the player six off on a clear line%s ==" % {"": ": he throws", "companion": ", his companion beside the draugr: he throws (603 amended)", "player": ", another player beside the draugr: no throw"}[beside])
+		Monster.idling = true
+		var level := Level.load_level("barrow_deep")
+		World.reset()
+		_room = Node2D.new()
+		add_child(_room)
+		World.load_terrain(level["terrain"])
+		World.zone.name = "barrow_deep"
+		var lair := Vector2i(49, 75)  # His seat, as in the takes.
+		var stand := Vector2i(-1, -1)
+		var draugr := EntityFactory.build(SPECS["u"].merged({"name": "Draugr1", "tile": lair,
+			"props": Level.MONSTER_TYPES["draugr"].duplicate()})) as Draugr
+		_room.add_child(draugr)
+		World.spawn(draugr, lair)
+		for cell: Vector2i in level["terrain"]["floor"]:  # Six off, the throw's whole line clear to it.
+			if World.distance(cell, lair) == 6 and World.is_free(cell) 					and World.telegraph_cells(World._throw_shape(draugr, cell)).has(cell):
+				stand = cell
+				break
+		var row: Dictionary = Monster.kinds()["draugr"]
+		draugr.max_stamina = 100
+		draugr.stamina = 100
+		draugr.pays_swings = true
+		draugr.stamina_regen_every = int(row.get("stamina_regen_every", 1))
+		draugr.stamina_regen_amount = int(row.get("stamina_regen", 0))
+		draugr.blows = row.get("blows", {})
+		draugr.slots = Items.tidy(["", "", "", "", "", ""], Items.CARRIED)
+		var axe := "battle_axe" if Items.exists("battle_axe") else "giant_axe"
+		World.set_slots(draugr, Items.tidy(["", "", "", "", axe, ""], Items.CARRIED))
+		var player := EntityFactory.build(SPECS["P"].merged({"name": "Player1"})) as Player
+		player.player_id = "p1"
+		_room.add_child(player)
+		World.spawn(player, stand)
+		player.max_hp = 100000
+		player.hp = player.max_hp
+		if beside == "companion":
+			var pet := EntityFactory.build({"script": "res://sim/companion.gd", "shape": "capsule", "name": "Isolde", "props": {"max_hp": 100000}}) as Companion
+			_room.add_child(pet)
+			World.spawn(pet, lair + Vector2i(0, -1))
+			pet.keeper = player
+			pet.acts = false
+		elif beside == "player":
+			var other := EntityFactory.build(SPECS["P"].merged({"name": "Player2"})) as Player
+			other.player_id = "p2"
+			_room.add_child(other)
+			World.spawn(other, lair + Vector2i(0, -1))
+			other.max_hp = 100000
+			other.hp = other.max_hp
+		var was_economy := World.economy
+		World.economy = Economy.new({"purses": {"p1": 200}})
+		var line: Variant = World.axe_line_hit(draugr, stand)
+		draugr.accept_offer(player, draugr.offers_for("p1")[0], 20)
+		var targets := {}
+		_shown.clear()
+		_ended.clear()
+		World.telegraph_started.connect(_on_shown)
+		World.telegraph_ended.connect(_on_ended)
+		var thrown := _until(200 if beside == "player" else 600, func() -> bool:
+			player.free_pos = Vector2(stand)  # He stands where he is.
+			if beside == "player":
+				draugr.next_move_tick = World.tick + 10  # And he holds his seat, the other beside him.
+			if draugr.target != null:
+				targets[String(draugr.target.name)] = true
+			return str(World.axe_state(draugr)["where"]) != "hand")
+		World.telegraph_started.disconnect(_on_shown)
+		World.telegraph_ended.disconnect(_on_ended)
+		_check(thrown != (beside == "player"), "the axe %s (his line to the player hits %s; targets %s; at %s, the player %s, %d cells)" % ["kept in hand 200 ticks" if not thrown else "thrown",
+				line.name if line is GridEntity else line, targets.keys(), draugr.tile, player.tile, World.distance(draugr.tile, player.tile)])
+		World.economy = was_economy
+		World.dead_rest.clear()
+		World.reset()
+		_room.free()
 
 
 ## The draugr's mind's constant [param name] (enemy-ai's, read by name so

@@ -75,9 +75,11 @@ const COMING_TICKS := 10
 ## off till no longer winded; his dead rise in waves as his hp passes
 ## each wave's "at" (and the next wave early at a back-off); he spins at 2 or more foes the sweep
 ## would catch, or 1 that struck him twice within STRUCK_TWICE_TICKS; he
-## throws at a foe THROW_NEAR to THROW_FAR off with none beside him, never
-## at one closing on him (nearer within CLOSING_TICKS, the coordinator's
-## ruling: a thrown axe always leaves a real charge to make); he charges to
+## throws at a foe THROW_NEAR to THROW_FAR off with no player beside him (a
+## companion holding him does not stop it, 603 amended, enemy-ai's side: the challenger
+## standing back while she tanks him), his target or any player so placed,
+## never at one closing on him (nearer within CLOSING_TICKS, the
+## coordinator's ruling: a thrown axe always leaves a real charge to make); he charges to
 ## his thrown axe; disarmed, his fists.
 const BACK_OFF_STAMINA := 10
 ## His waves of the dead, the fight's difficulty (Jeff: "the waves are what
@@ -148,10 +150,9 @@ var _risen_left := 0
 var _waves_passed := 0
 var _next_spin := 0
 var _next_throw := 0
-## His target's last cell, and till when it counts as closing on him.
-var _target_was := Vector2i.ZERO
-var _target_was_of: GridEntity = null
-var _closing_until := 0
+## Each foe he might throw at: {entity: [its last cell, till when it counts
+## as closing on him]} (603 amended, enemy-ai's side: his target's alone before).
+var _foes_were := {}
 var backing_off := false
 ## His fist blows since he was disarmed, and the attack he last counted.
 var _fists := 0
@@ -343,18 +344,36 @@ func _special_tick() -> bool:
 	if str(axe.get("where", "")) == "ground" and not bool(World.call("is_disarmed", self)):
 		if bool(World.call("try_axe_charge", self)):
 			return true
-	var d := World.distance(tile, target.tile)
-	# Its own step nearer him (his toward it is not its closing).
-	if _target_was_of == target and target.tile != _target_was and d < World.distance(tile, _target_was):
-		_closing_until = World.tick + CLOSING_TICKS
-	_target_was = target.tile
-	_target_was_of = target
-	if str(axe.get("where", "")) == "hand" and not winded and World.tick >= _next_throw and not _foe_beside() and World.tick >= _closing_until:
-		if d >= THROW_NEAR and d <= THROW_FAR and World.call("axe_line_hit", self, target.tile) == target:
-			if bool(World.call("try_axe_throw", self, target.tile)):
-				_next_throw = World.tick + THROW_EVERY_TICKS
-				return true
+	var at := _throw_mark()
+	if str(axe.get("where", "")) == "hand" and not winded and World.tick >= _next_throw and not _foe_beside(true) and at != null:
+		if bool(World.call("try_axe_throw", self, at.tile)):
+			_next_throw = World.tick + THROW_EVERY_TICKS
+			return true
 	return false
+
+
+## Whom he would throw at (603 amended, enemy-ai's side): his target, else the nearest
+## player, THROW_NEAR to THROW_FAR off, not closing on him, his throw's line
+## meeting them first; null for none. Each foe's step is watched here (its
+## own step nearer him is its closing; his toward it is not).
+func _throw_mark() -> GridEntity:
+	var marks: Array[GridEntity] = [target]
+	for entity in World.sought():
+		if entity is Player and entity != target and World.distance(tile, entity.tile) <= THROW_FAR + 2:
+			marks.append(entity)
+	var seen := {}
+	var best: GridEntity = null
+	for foe in marks:
+		var was: Array = _foes_were.get(foe, [foe.tile, 0])
+		var until: int = was[1]
+		var d := World.distance(tile, foe.tile)
+		if foe.tile != was[0] and d < World.distance(tile, was[0]):
+			until = World.tick + CLOSING_TICKS
+		seen[foe] = [foe.tile, until]
+		if best == null and World.tick >= until and d >= THROW_NEAR and d <= THROW_FAR 				and World.call("axe_line_hit", self, foe.tile) == foe:
+			best = foe
+	_foes_were = seen
+	return best
 
 
 ## Disarmed: a step for his axe where it lies (combat's World takes it up
@@ -376,10 +395,12 @@ func _walk_for_axe(axe: Dictionary) -> bool:
 	return true
 
 
-## Whether a foe stands beside him (a throw then waits for the blow).
-func _foe_beside() -> bool:
+## Whether a foe stands beside him (a throw then waits for the blow);
+## [param players_only]: a player (a companion holding him does not stop
+## his throw, 603 amended, enemy-ai's side).
+func _foe_beside(players_only := false) -> bool:
 	for entity in World.sought():
-		if World.distance(tile, entity.tile) <= 1 and entity != self and (entity is Player or entity is Companion):
+		if World.distance(tile, entity.tile) <= 1 and entity != self and (entity is Player or entity is Companion and not players_only):
 			return true
 	return false
 
@@ -666,8 +687,7 @@ func start_pact(player: Player, level: String) -> void:
 			_raise_wave()
 	_next_spin = World.tick
 	_next_throw = World.tick
-	_target_was_of = null
-	_closing_until = 0
+	_foes_were.clear()
 	backing_off = false
 	_struck_at.clear()
 
