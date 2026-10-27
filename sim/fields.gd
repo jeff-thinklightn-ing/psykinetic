@@ -80,6 +80,10 @@ var town_buildings: Array[Dictionary] = []
 ## Its level links' cells (terrain "links_at", decision 571): no body but a
 ## player stands on one, nothing is put down on one. {cell: true}.
 var link_cells: Dictionary[Vector2i, bool] = {}
+## Of those, the ways out a routed band runs for (terrain "ways_out",
+## decision 702): a dungeon's (one with a depth) alone, none hidden, closed
+## or sealed.
+var way_out_cells: Array[Vector2i] = []
 ## The wall edges on an open-air building's outline (Level.OPEN_AIR,
 ## decision 452): a fence, which sight crosses (World.edge_blocks_sight).
 var fences: Dictionary[Vector3i, bool] = {}
@@ -161,6 +165,7 @@ func load(terrain: Dictionary) -> void:
 	link_cells.clear()
 	for cell: Vector2i in terrain.get("links_at", []):
 		link_cells[cell] = true
+	way_out_cells.assign(terrain.get("ways_out", []))
 	for roof: Dictionary in terrain.get("roofs", []):
 		roofs.append(roof["rect"])
 	# A town's laid plots' buildings too (591 step 2, Clearing.lay_plots).

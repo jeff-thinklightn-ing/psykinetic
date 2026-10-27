@@ -32982,3 +32982,31 @@ and draugr, sampled every 0.05 s:
   across or up and down. Measured: at most 0.14 m.
 
 Client only, protocol unchanged, no new class_name.
+
+## 702: a routed monster indoors runs for the way out and leaves
+
+Jeff on v0.1.187, the robbers' rout: "they dont know where to run to, they
+should run to the entrance or they have a hidden backdoor". The
+coordinator's ruling: run for the level's way out, not past the player, and
+leave the level there; outdoors the flee stays; no new level content.
+A dungeon's ways out (a level with a "depth": the barrow, its deep, the
+Dwarven Halls) are its links but those hidden, closed or sealed (terrain
+"ways_out", Fields.way_out_cells, World.ways_out): in the barrow, the
+entrance up to the wilds, never the hidden way down. Other levels have
+none (test_room's imps, the practice hall, a town: the flee as ever). A monster routed
+(Monster._flee, of itself or by a rout heard) where World.outdoor is false,
+of a kind not "bound" and no animal, picks the nearest way out by its path
+(a search of up to ESCAPE_SEARCH_TILES, 1000, cells) whose path never comes
+within ESCAPE_CLEAR_TILES (2) of its nearest seen foe nearer than it stood
+(_pick_way_out). It runs for it till it is beside it, without the flee's
+recovery (_escape_tick), and there leaves the level: World.despawn, as one
+that got away, not dead. Nothing drops, the band's purse (580) keeps its
+share, and its spawn comes back after its delay like any. A way barred
+since: another, or the plain flee. No way out: the plain flee.
+"bound" (monsters.json) is set on the skeleton, skeleton_guard and draugr:
+the barrow's own never leave it.
+monster_test _test_rout_way_out, on the barrow as it loads: three robbers
+routed 8 to 10 cells in, the player deeper, make for the entrance (40, 1)
+and are gone beside it by tick 57; a skeleton routed beside them stays; a
+robber routed under the sky flees as ever. Server only, protocol unchanged,
+no new class_name.

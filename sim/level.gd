@@ -994,6 +994,10 @@ static func _place(level: Dictionary, markers: Array[Dictionary], config: Dictio
 	level["links"] = links
 	# Where they are, for the terrain's readers (World keeps them clear, 571).
 	level["terrain"]["links_at"] = links.map(func(link: Dictionary) -> Vector2i: return link["tile"])
+	# A dungeon's (level.json "depth") ways out, for a routed band to run for
+	# (decision 702): none hidden, closed or sealed. Elsewhere, none.
+	level["terrain"]["ways_out"] = links.filter(func(link: Dictionary) -> bool:
+		return int(config.get("depth", 0)) > 0 and not link["hidden"] and not link["closed"] 				and str(link["sealed"]).is_empty()).map(func(link: Dictionary) -> Vector2i: return link["tile"])
 	level["centre"] = centre if centre != null else starts[0] if not starts.is_empty() else Vector2i.ZERO
 	level["display_name"] = str(config.get("name", ""))
 

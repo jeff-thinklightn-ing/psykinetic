@@ -94,6 +94,7 @@ func _ready() -> void:
 	_test_wild_shot_near()
 	_test_far_pace()
 	_test_strike_cells()
+	_test_rout_way_out()
 	_test_wild_scent()
 	_test_wild_boar()
 	_test_wild_wolf()
@@ -1984,6 +1985,72 @@ func _test_strike_cells() -> void:
 	_check(struck_at >= 0 and struck_at < 60 and longest <= ceili(robber.move_ticks) + 1 and from != Vector2i(5, 4),
 			"struck on tick %d from %s (%.2f off), at most %d ticks beside it out of reach (its pace %.1f)" % [struck_at, from, Vector2(from).distance_to(Vector2(6.58, 4.0)), longest, robber.move_ticks])
 	World.despawn(robber)
+	World.despawn(player)
+
+
+## Routed in a dungeon (decision 702; Jeff on v0.1.187: "they dont know
+## where to run to, they should run to the entrance"): robbers broken deep
+## in the barrow run for its entrance, the link up to the wilds (never the
+## hidden way down to the deep), and leave by it, gone, not dead; a skeleton
+## (bound) and a robber outdoors flee as ever.
+func _test_rout_way_out() -> void:
+	print("%s== routed robbers run for the barrow's entrance and are gone by it ==" % char(10))
+	Monster.idling = false
+	var level := Level.load_level("barrow")
+	var entrance := Vector2i(40, 1)
+	_check(level["links"].any(func(l: Dictionary) -> bool: return l["tile"] == entrance and l["to_map"] == "wilds"),
+			"the barrow's entrance, the link to the wilds, at %s" % entrance)
+	var e := _build(["###"])
+	World.load_terrain(level["terrain"])
+	_check(World.ways_out() == [entrance] and World.is_link_cell(Vector2i(52, 16)),
+			"its ways out %s: the entrance alone, the hidden way down not among them" % [World.ways_out()])
+	var path: Array[Vector2i] = []
+	for cell: Vector2i in level["terrain"]["floor"]:  # The deepest way in from the entrance.
+		var way := World.find_path(entrance + Vector2i(0, 1), cell)
+		if way.size() > path.size() and not World.is_link_cell(cell):
+			path = way
+	_check(path.size() >= 13, "a way in from the entrance %d cells deep" % path.size())
+	var player := EntityFactory.build(SPECS["P"].merged({"name": "Router"})) as GridEntity
+	_room.add_child(player)
+	World.spawn(player, path[11])
+	var gone: Dictionary = {}
+	var left := func(entity: GridEntity) -> void:
+		gone[String(entity.name)] = entity.tile
+	World.entity_despawned.connect(left)
+	var robbers: Array[Monster] = []
+	for i in 3:
+		var robber := EntityFactory.build(SPECS["x"].merged({"name": "Fleer%d" % i, "props": Monster.bodies()["robber"]})) as Monster
+		_room.add_child(robber)
+		World.spawn(robber, path[9 - i])
+		robbers.append(robber)
+	var bones := EntityFactory.build(SPECS["k"].merged({"name": "Bones", "props": Monster.bodies()["skeleton"]})) as Monster
+	_room.add_child(bones)
+	World.spawn(bones, path[12])
+	for robber in robbers:
+		robber._flee(player.tile)
+	bones._flee(player.tile)
+	var ways := robbers.map(func(r: Monster) -> Vector2i: return r._way_out)
+	var ticks := 0
+	for i in 400:
+		World.step()
+		ticks += 1
+		if gone.size() >= robbers.size():
+			break
+	_check(ways == [entrance, entrance, entrance] and gone.size() == 3 			and gone.values().all(func(at: Vector2i) -> bool: return World.distance(at, entrance) <= 1),
+			"three robbers routed 8 to 10 cells in, the player deeper: making for %s, gone beside it by tick %d (%s)" % [ways, ticks, gone])
+	_check(bones._way_out == Monster.NO_TILE and bones.spawned and not gone.has("Bones"),
+			"a skeleton routed beside them (bound to its barrow): no way out, still there at %s" % bones.tile)
+	World.entity_despawned.disconnect(left)
+	World.outdoor = true
+	var outside := EntityFactory.build(SPECS["x"].merged({"name": "Outside", "props": Monster.bodies()["robber"]})) as Monster
+	_room.add_child(outside)
+	World.spawn(outside, path[3])
+	outside._flee(player.tile)
+	_check(outside._way_out == Monster.NO_TILE and outside.alert == Monster.Alert.FLEEING,
+			"a robber routed under the sky: the plain flee, no way out sought")
+	World.outdoor = false
+	World.despawn(outside)
+	World.despawn(bones)
 	World.despawn(player)
 
 

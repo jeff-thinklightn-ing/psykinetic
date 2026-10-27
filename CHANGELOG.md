@@ -6,6 +6,7 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+- Routed robbers in a barrow now run for the entrance and get away by it (gone, not dead: no drops, and they come back later); the barrow's undead never leave. Outdoors they flee as before (702).
 
 - A spear strikes with a straight jab along the facing, its point driven out about two cells, instead of a sideways slash, for players, companions and monsters alike (344 amended).
 - A companion holding a spear strikes from its full reach, two cells off, instead of walking in next to the monster (699, companions' side).

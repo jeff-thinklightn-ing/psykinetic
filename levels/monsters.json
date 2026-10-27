@@ -80,6 +80,7 @@
 		"drops": [{"item": "hide", "count": [1, 1]}]
 	},
 	"skeleton": {
+		"bound": true,
 		"label": "Skeleton",
 		"body": {"mass": 30.0, "move_ticks": 4.0, "max_hp": 6, "sight_range": 5},
 		"tactic": "plain",
@@ -94,6 +95,7 @@
 		"aim_hold_max": 30
 	},
 	"skeleton_guard": {
+		"bound": true,
 		"label": "Barrow guard",
 		"body": {"mass": 45.0, "move_ticks": 4.0, "max_hp": 10, "attack_damage": 2, "sight_range": 5},
 		"tactic": "plain",
@@ -125,6 +127,7 @@
 		"aim_hold_max": 25
 	},
 	"draugr": {
+		"bound": true,
 		"label": "Draugr",
 		"script": "res://sim/draugr.gd",
 		"never_lies": true,

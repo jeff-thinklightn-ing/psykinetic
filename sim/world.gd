@@ -6440,6 +6440,13 @@ func is_link_cell(at: Vector2i) -> bool:
 	return fields.link_cells.has(at)
 
 
+## This zone's ways out (decision 702): a dungeon's (level.json "depth")
+## level links' cells but those hidden, closed or sealed, which a routed
+## band runs for; none elsewhere.
+func ways_out() -> Array[Vector2i]:
+	return fields.way_out_cells
+
+
 ## Each body but a player that finds itself on a level link's cell (spawned
 ## or saved there, pushed on) steps off it, the first free way (decision
 ## 571), when its step's timer lets it; a link's cell is a player's way out.

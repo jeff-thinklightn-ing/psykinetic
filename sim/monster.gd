@@ -91,6 +91,13 @@ const BAND_MIN := 3
 const FLEE_TICKS := 60
 const FLEE_TILES := 6
 const FLEE_NEAR_TILES := 4
+## A routed one indoors (decision 702; Jeff: "they should run to the
+## entrance") runs for a way out its path search finds looking at no more
+## than this many cells (a whole barrow), one whose path never brings it
+## within ESCAPE_CLEAR_TILES of its foe nearer than it was (not past the
+## player).
+const ESCAPE_SEARCH_TILES := 1000
+const ESCAPE_CLEAR_TILES := 2
 ## A call for help (Senses.NOISE_CALL) at most so often; a rout
 ## (Senses.NOISE_ROUT) breaks a cautious one under ROUT_HURT of its hp.
 const CALL_EVERY_TICKS := 100
@@ -426,6 +433,8 @@ var leash := LEASH
 ## Fleeing from; when it last called for help; the newest noise it has
 ## looked at for a rout.
 var _flee_from := NO_TILE
+## The way out it runs for, routed indoors (decision 702), or NO_TILE.
+var _way_out := NO_TILE
 var _called_tick := -100000
 var _rout_tick := -1
 ## kinds(), read once.
@@ -465,6 +474,9 @@ var dread_flee_below := DREAD_FLEE_BELOW
 var flee_below := {Temper.BOLD: 0.15, Temper.CAUTIOUS: 0.35, Temper.COWARDLY: 0.6}
 ## Its kind's "picks_up" (decision 349): it takes up a weapon lying beside it.
 var picks_up := false
+## Its kind's "bound" (decision 702): of its level, never leaving it (the
+## undead of a barrow); one not bound, routed indoors, runs for a way out.
+var bound := false
 var _pick_look_tick := -100000
 var _idle_path_to := NO_TILE
 ## How often it thinks (World.Tier), and the tick that was worked out (-1:
@@ -554,6 +566,7 @@ func _ready() -> void:
 		opens_doors = bool(opens) if opens != null else bool(row.get("opens_doors", true))
 		door_force = int(row.get("door_force", 1))
 		picks_up = bool(row.get("picks_up", false))
+		bound = bool(row.get("bound", false))
 		fearless = bool(row.get("fearless", false))
 		never_lies = bool(row.get("never_lies", false))
 		# A sought's guard keeps its room too (613, enemy-ai's side; Main._stand_band's props).
@@ -1813,7 +1826,7 @@ static func read_kinds(path: String) -> Dictionary:
 			"purse": _purse(row.get("purse")),
 			"yields": (row.get("yields", []) as Array).duplicate(true) if row.get("yields") is Array else [],
 			"wields": (row["wields"] as Dictionary).duplicate() if row.get("wields") is Dictionary else {},
-			"picks_up": bool(row.get("picks_up", false)), "art": str(row.get("art", "")),
+			"picks_up": bool(row.get("picks_up", false)), "bound": bool(row.get("bound", false)), "art": str(row.get("art", "")),
 			"label": str(row.get("label", "")), "fearless": bool(row.get("fearless", false)),
 			"never_lies": bool(row.get("never_lies", false)),
 			"fight": (row["fight"] as Dictionary).duplicate(true) if row.get("fight") is Dictionary else {},
@@ -2046,6 +2059,9 @@ func _flee(threat: Vector2i, routs := true) -> void:
 	_bash_key = NO_DOOR
 	_lead = NO_TILE
 	move_ticks = _pace
+	_way_out = NO_TILE
+	if not World.outdoor and not bound and _wary and not self is Animal:
+		_way_out = _pick_way_out(_foe_cell(threat))
 	if routs:
 		_cry(&"rout", Senses.NOISE_ROUT)
 
@@ -2054,6 +2070,9 @@ func _flee(threat: Vector2i, routs := true) -> void:
 ## away from it; recovering (SUSPICIOUS, then back) once nobody has been
 ## near for FLEE_TICKS.
 func _flee_tick() -> void:
+	if _way_out != NO_TILE:
+		_escape_tick()
+		return
 	for entity in World.sought():
 		if World.distance(tile, entity.tile) <= flee_near_tiles:
 			_alert_until = World.tick + flee_ticks
@@ -2070,6 +2089,61 @@ func _flee_tick() -> void:
 		if _bash_free():
 			return  # Shoved off: away next.
 		next_move_tick = World.tick + CHASE_RETRY_TICKS  # Cornered: a moment, then again.
+
+
+## Routed indoors (decision 702): on for its way out till it is beside it,
+## and gone from the level by it, as one who got away (not dead: no drops,
+## the band's purse kept, its spawn back after its time like any). A way
+## barred since: another, or the plain flee.
+func _escape_tick() -> void:
+	if World.distance(tile, _way_out) <= 1 and World.can_melee(tile, _way_out):
+		print("[monster] %s got away by %s, step %d" % [name, _way_out, World.tick])
+		World.despawn(self)
+		return
+	if World.is_stunned(self) or World.tick < next_move_tick:
+		return
+	if _idle_step(_way_out, ESCAPE_SEARCH_TILES):
+		return
+	_way_out = _pick_way_out(_foe_cell(_flee_from))
+	if _way_out == NO_TILE:
+		_alert_until = World.tick + flee_ticks  # No way out: it flees as ever.
+	next_move_tick = World.tick + CHASE_RETRY_TICKS
+
+
+## The cell of the nearest foe it can see, else [param fallback] (a rout
+## heard is where the one who broke was, not the foe).
+func _foe_cell(fallback: Vector2i) -> Vector2i:
+	var best := fallback
+	var best_d := INF
+	for entity in World.sought():
+		var d := float(World.distance(tile, entity.tile))
+		if d <= sight_range and d < best_d:
+			best = entity.tile
+			best_d = d
+	return best
+
+
+## The nearest way out by its path (World.ways_out) that does not take it
+## past [param foe]: no cell of it within ESCAPE_CLEAR_TILES of the foe and
+## nearer it than where it stands. NO_TILE when there is none.
+func _pick_way_out(foe: Vector2i) -> Vector2i:
+	var best := NO_TILE
+	var best_size := INF
+	var start := World.distance(tile, foe)
+	for at in World.ways_out():
+		var path: Array[Vector2i] = [] if World.distance(tile, at) <= 1 				else World.find_path(tile, at, false, null, ESCAPE_SEARCH_TILES, false, {}, opens_doors_now())
+		if path.is_empty() and World.distance(tile, at) > 1 or path.size() >= best_size:
+			continue
+		var past := false
+		for cell in path:
+			var d := World.distance(cell, foe)
+			if d <= ESCAPE_CLEAR_TILES and d < start:
+				past = true
+				break
+		if not past:
+			best = at
+			best_size = path.size()
+	return best
 
 
 ## Where it runs to: its post if that is farther from the threat than it
