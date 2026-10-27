@@ -432,6 +432,15 @@ func _test_sky_bow() -> void:
 		_check(at["half"] > at["flat"] + 10.0 and at["half"] < at["sky"] - 10.0,
 			"%s: half mixed, between (%.1f of %.1f..%.1f)" % [build[0], at["half"], at["flat"], at["sky"]])
 		_check(absf(at["let go"] - at["flat"]) < 1.0 and rig.sky_amount() == 0.0, "%s: let go, the flat draw again (%.1f)" % [build[0], at["let go"]])
+		# A flatter arc (lob_apex tuned in F7): mixed Client3D.sky_share of the way, the arrow at its launch.
+		for apex: float in [0.1, 0.18]:
+			rig.upper_at("Bow_Draw", 1.0)
+			rig.sky("Bow_Draw_Sky", Client3D.sky_share(apex))
+			await _frames(3)
+			var want := rad_to_deg(atan(4.0 * apex))
+			_check(absf(pitch.call() - want) <= SKY_AIM, "%s: lob_apex %.2f, mixed %.2f, the arrow %.1f deg up (it leaves at %.1f)" % [
+				build[0], apex, Client3D.sky_share(apex), pitch.call(), want])
+		rig.sky("", 0.0)
 		model.queue_free()
 	var rig := _goblin()
 	rig.loop("Idle")

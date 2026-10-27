@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- A lob's draw follows the arc: with a flatter arc set in tuning (F7, lob_apex) the bow is aimed lower, at the angle the arrow leaves at (677, pc-character's side, amended).
 - Drawing a bow for a lob, you aim it up at the sky, 45 degrees, the angle the arrow leaves at; switching between a lob and a flat shot mid-draw blends smoothly (677, pc-character's side).
 - Free movement: dying or travelling while knocked back no longer carries the slide to where you reappear (688 amended (6)).
 - Your companion no longer stutter-steps between fighting and following, or between leaping clear and stepping back into a blow's way (or your bow line), and a fighting stance you gave her lasts past a short lull; the three holds are on the F7 tuning panel under Companions (706).

@@ -33280,3 +33280,22 @@ Tests:
   it starts where the upper clip is.
 
 Client only, protocol unchanged, no new class_name.
+## 677, pc-character's side, amended. The sky pose follows lob_apex
+
+Combat's note: lob_apex is an F7 Tuning field (the bow verb's, default
+0.25), so the arc can change in play. The sky pose now follows it rather
+than a fixed 45 degrees.
+
+Client3D._sky_bow reads the drawn bow's verb live, Items.verb_of(
+World.drawn_with(entity)).get("lob_apex", 0.25). It eases the sky mix
+toward sky_share(apex) = atan(4 x apex) / SKY_POSE (45), capped at 1. The
+arrow rises about that share of the sky clips' angle when mixed: half
+mixed measured 22 of 44. So a flatter arc is drawn lower. A steeper arc
+than the clips' is drawn at theirs, and the default is unchanged.
+
+anim_rig_test _test_sky_bow, man and woman: at lob_apex 0.10 and 0.18,
+mixed sky_share of the way, the arrow is within SKY_AIM (5 degrees) of
+the launch. Measured 20.7 and 20.9 against 21.8, and 34.4 and 34.7
+against 35.8.
+
+Client only, protocol unchanged, no new class_name.
