@@ -32724,3 +32724,31 @@ hut and the waystone are not. Logging out by the well, she stays at her
 trade in the town; back on the road, one line says where she is; back in
 the town, she goes with them again. Server only, protocol unchanged, no new
 class_name.
+
+## 697, ui's side: the client chases what it clicked to strike
+
+Jeff on v0.1.186 in the barrow: "left click on grave robber does move to
+them, but quite choppy ... the chop makes the fight hard". The attack
+order walked a free body by the server's grid steps (Player._pursue_action:
+try_move, snapping free_pos centre to centre), which its client never
+predicted. Combat's side holds the order for a free body, no step, struck
+once in reach, given up 4 s after the order (Player.FREE_CHASE_TICKS). The
+client now walks it there:
+- A left click on a creature, or a shove let go, with a free body starts
+  a chase (Main._free_chase_start): each frame a route to the target's
+  cell from where the body is shown, planned again when its tile changes,
+  steered as a click route (with 689 amended (5)'s straight line), and
+  ended within a cell of it (World.distance of the shown cell), where the
+  server strikes; the target gone, untargetable or elsewhere ends it too.
+- The attack order is sent again each FREE_CHASE_RESEND_MS (1 s) while
+  more than two cells off (the 4 s counts from the order), never nearer, so
+  a late one cannot reach the server after the strike and swing again
+  (combat's edge). A shove is not sent again (its toss predicted once).
+- The player's own key, click or held steer gives the chase up
+  (_free_taken_over, which also takes over a companion's lead, 695).
+And the server's refused free commands are logged once each by peer and
+reason (the body's path among them), then at 100 and 1000, not once a
+peer: one after a travel shows (the coordinator, on the box's "not its
+body: .../wilds/Player1" line). controls_test _test_free_chase: walked a
+cell from the imp and struck; a click elsewhere gives it up. Client, plus
+the server's log line; protocol unchanged, no new class_name.

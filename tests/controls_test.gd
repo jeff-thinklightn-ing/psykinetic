@@ -55,6 +55,7 @@ func _ready() -> void:
 	_test_free_click()
 	_test_guide_route()
 	_test_free_pull()
+	_test_free_chase()
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -1200,6 +1201,42 @@ func _test_free_pull() -> void:
 	var cells := path.size()
 	_main._free_pull(player, path, Vector2(4.4, 3.3))
 	_check(cells >= 5 and path.size() == 1 and path[0] == Vector2i(9, 3), "from off its centre: straight at (9, 3) (%d cells to %s)" % [cells, path])
+
+
+## A click on a creature with a free body (697, ui's side; Jeff: "quite
+## choppy"): the order holds (combat's side), the client walks the body a
+## cell from it, and the server strikes.
+func _test_free_chase() -> void:
+	print("
+== a click on an imp with a free body: walked to it, then struck ==")
+	var player := _place_player(Vector2i(4, 3))
+	World.set_free_walk(true)
+	var imp := _main._spawn({"script": "res://sim/monster.gd", "shape": "capsule",
+		"name": "ChaseImp", "tile": Vector2i(9, 3), "props": {"mass": 40.0}}) as Monster
+	imp.sight_range = 0
+	var hp := imp.hp
+	# Whole and standing, whatever an earlier test left (a downing or a stun holds a free body).
+	player.hp = player.max_hp
+	player.stunned_until_tick = 0
+	player.downed_until = 0
+	player.down_until = 0
+	player.free_halt_until = 0
+	_free_frames(player, 2)
+	World.command_attack(player, imp)
+	_main._free_chase_start(player, imp)
+	var frames := 0
+	while frames < 400 and imp.hp == hp:
+		_free_frames(player, 6)
+		frames += 6
+	_free_frames(player, 2)  # The client's next frame sees it in reach.
+	_check(imp.hp < hp and World.distance(player.tile, imp.tile) <= 1 and _main._free["chase"] == null,
+			"walked a cell from it and struck (%d -> %d, at %s, %d frames)" % [hp, imp.hp, player.free_pos, frames])
+	_main._free_chase_start(player, imp)
+	_main._move_click(player, Vector2i(4, 3))
+	_check(_main._free["chase"] == null, "a click elsewhere: the chase given up")
+	World.despawn(imp)
+	World.set_free_walk(false)
+	player.free_view = null
 
 
 ## Guide under free walk (695, ui's side): her route ("guide_route" in the

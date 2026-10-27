@@ -7026,14 +7026,18 @@ func free_from(sender: int, entity_path: NodePath, packed: PackedByteArray) -> b
 ## The most input commands a second a free body takes from its client
 ## (decision 689): about 30 come; the rest are dropped.
 const FREE_COMMANDS_PER_SECOND := 40.0
-## Peers whose free commands were refused, logged once each (689).
-var _free_refused_peers: Dictionary[int, bool] = {}
+## Free commands refused, by peer and reason (a body's path among them),
+## counted; logged the first time each, then at 100 and 1000 (689; 697:
+## once a body, not once a peer, so one after a travel shows).
+var _free_refused_peers: Dictionary[String, int] = {}
 
 
 func _free_refused(peer: int, why: String) -> void:
-	if not _free_refused_peers.has(peer):
-		_free_refused_peers[peer] = true
-		_log("refused free commands from peer %d (%s); further ones dropped unlogged" % [peer, why])
+	var key := "%d %s" % [peer, why]
+	var count: int = _free_refused_peers.get(key, 0) + 1
+	_free_refused_peers[key] = count
+	if count in [1, 100, 1000]:
+		_log("refused free commands from peer %d (%s)%s" % [peer, why, "" if count == 1 else ", %d times" % count])
 
 
 ## [param commands] from [param player]'s client (decision 689), or a

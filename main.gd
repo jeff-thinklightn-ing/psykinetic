@@ -1558,6 +1558,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			# floor if the click was off it.
 			if targetable and target.is_creature():
 				World.command_attack(player, target)
+				_free_chase_start(player, target)
 			else:
 				_move_click(player, tile if target != null else _snap_to_floor(_mouse_grid()))
 		MOUSE_BUTTON_RIGHT:
@@ -2640,13 +2641,15 @@ func _move_click(player: Player, tile: Vector2i, ripple_it := true) -> void:
 ## (FreeNet.Own), which shows it at once and closes a command every
 ## FreeNet.SEND_SECONDS; those go to the server (World.request_free; a
 ## host's straight to World.take_free).
-var _free := {"path": [], "held": false, "at": 0}
+var _free := {"path": [], "held": false, "at": 0, "chase": null}
 ## How long the button is held after a click before it steers to the
 ## cursor rather than walking the click's route.
 const FREE_HOLD_SECONDS := 0.25
 ## How far along its route a free body looks for a cell in clear line
 ## (_free_pull, 689 amended (5)): a few line checks a frame at most.
 const FREE_PULL_CELLS := 12
+## How often a chase sends its attack order again while out of reach (697).
+const FREE_CHASE_RESEND_MS := 1000
 
 
 ## The own body's view while it is a free body, else null: a client's from
@@ -2698,7 +2701,7 @@ func _free_intent(player: Player, own: FreeNet.Own) -> Vector2:
 	if Net.controls == "wasd":
 		var along := wasd_vector(key_vector(_held_key_names()), _view_yaw())
 		if along.length() > 0.01:
-			_guide_taken_over(player)
+			_free_taken_over(player)
 			_free["path"] = []
 			return along.normalized()
 	var held := Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) or _test_holding
@@ -2708,7 +2711,7 @@ func _free_intent(player: Player, own: FreeNet.Own) -> Vector2:
 	# steers to the cursor instead (Jeff: "wasn't one click enough before?").
 	var steering: bool = _free["held"] and Time.get_ticks_msec() - int(_free["at"]) > FREE_HOLD_SECONDS * 1000.0
 	if steering and Net.controls != "wasd":
-		_guide_taken_over(player)
+		_free_taken_over(player)
 		var cursor := _mouse_grid()
 		if not is_nan(cursor.x):
 			var way := cursor - at
@@ -2729,6 +2732,7 @@ func _free_intent(player: Player, own: FreeNet.Own) -> Vector2:
 				_free["path"] = route
 			if (_free["path"] as Array).is_empty():
 				return way.normalized() if way.length() > 0.25 else Vector2.ZERO
+	_free_chase(player, at)
 	var path: Array = _free["path"]
 	_free_pull(player, path, at)
 	while not path.is_empty():
@@ -2784,6 +2788,64 @@ func _guide_route(route: Dictionary) -> void:
 	_free["guided"] = true
 
 
+## A click on a creature to strike, or a shove let go, with a free body
+## (697, ui's side; Jeff on v0.1.186: "left click on grave robber does move
+## to them, but quite choppy"): the server's order holds and never steps a
+## free body (combat's side), so the client walks it there, a route to the
+## target's cell planned again as it moves (_free_chase), and stops a cell
+## from it, where the server strikes.
+func _free_chase_start(player: Player, target: GridEntity, shove := false) -> void:
+	if _free_own(player) == null:
+		return
+	_free_taken_over(player)
+	_free["chase"] = target
+	_free["chase_shove"] = shove
+	_free["chase_tile"] = NONE
+	_free["chase_sent"] = Time.get_ticks_msec()
+
+
+## Each frame of a chase (697): over a cell from the target or the target
+## gone, done; its tile moved, the route planned again; the attack order
+## sent again each FREE_CHASE_RESEND_MS while more than two cells off (the
+## server drops one 4 s old: Player.FREE_CHASE_TICKS), never nearer, so a
+## late one cannot land after the strike and swing again.
+func _free_chase(player: Player, at: Vector2) -> void:
+	var foe: Variant = _free.get("chase")
+	if foe == null:
+		return
+	if not is_instance_valid(foe) or not (foe as GridEntity).spawned or (foe as GridEntity).zone != player.zone 			or not World.can_target(player, foe):
+		_free["chase"] = null
+		_free["path"] = []
+		return
+	var target := foe as GridEntity
+	var cell := World.free_cell(player, at)
+	var apart := World.distance(cell, target.tile)
+	if apart <= 1:
+		_free["chase"] = null
+		_free["path"] = []
+		return
+	if target.tile != _free["chase_tile"]:
+		_free["chase_tile"] = target.tile
+		var route: Array = []
+		for step: Vector2i in World.walk_path(cell, target.tile, player):
+			route.append(step)
+		_free["path"] = route
+	var now := Time.get_ticks_msec()
+	if not _free["chase_shove"] and apart > 2 and now - int(_free["chase_sent"]) >= FREE_CHASE_RESEND_MS:
+		_free["chase_sent"] = now
+		if Net.is_authority():
+			World.order_attack(player, target)
+		else:
+			World._to_server(&"request_attack", [player.get_path(), target.get_path(), []])
+
+
+## The player's own key, click or held steer (697): a chase given up, and
+## a lead taken over.
+func _free_taken_over(player: Player) -> void:
+	_free["chase"] = null
+	_guide_taken_over(player)
+
+
 ## The player's own key, click or held steer while she leads (695): her
 ## route dropped and the server told (the "guide" command's stop "moved":
 ## it cannot tell his input from her route's, both come as request_free).
@@ -2797,7 +2859,7 @@ func _guide_taken_over(player: Player) -> void:
 ## A click on [param tile]: its route (World.walk_path's cells), steered
 ## along; the button held from here steers to the cursor instead.
 func _free_route(player: Player, tile: Vector2i) -> void:
-	_guide_taken_over(player)
+	_free_taken_over(player)
 	_held_target = NONE
 	_free["held"] = true
 	_free["at"] = Time.get_ticks_msec()
@@ -2975,6 +3037,7 @@ func _release_toss(player: Player) -> void:
 	_toss_target = null
 	if is_instance_valid(target) and target.spawned:
 		World.command_shove(player, target, direction)
+		_free_chase_start(player, target, true)
 
 
 ## Grid direction the current right-button drag points along, by screen angle,
