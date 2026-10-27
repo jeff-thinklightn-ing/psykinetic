@@ -765,14 +765,16 @@ func _test_free_chase() -> void:
 				"%s: %d blows, at centres %s apart (reach by bodies: at most %.2f); back-and-forth steps %d" % [kind, hits.size(), hits, reach, turns])
 
 
-## Kiting (the audit, 3; reported to the coordinator, not changed): a free
-## body walks 0.4 cells a tick any way, a diagonal no slower; a grid
-## walker's diagonal costs 1.5 its pace. Circling at 4 cells, no kind is as
-## quick (a sneak's 3.0 the nearest, a player's 2.5), and none lands a blow. This pins what is so:
-## a change that answers kiting turns it.
+## Kiting (the audit, 3): a free body walks 0.4 cells a tick any way, a
+## diagonal no slower; a grid walker's diagonal costs 1.5 its pace, and no
+## kind is as quick (a sneak's 3.0 the nearest, a player's 2.5). Circling at
+## 4 cells once drew no blow; now a chaser leads the circle (the coordinator,
+## lead-the-target: where it will be, at its own pace) and a brute (its
+## wind-up on where he will be) and a robber land blows. Walking straight
+## away still escapes: no speed changed.
 func _test_free_kite() -> void:
 	print("
-== kiting: a free body circling a grid walker at 4 (as found, reported) ==")
+== kiting: a chaser leads a free body circling at 4; walking away still escapes ==")
 	for kind: String in ["imp", "brute", "robber", "sneak"]:
 		var player := _sturdy(_build(_open(24, 24), Vector2i(12, 8)))
 		var foe := EntityFactory.build({"script": "res://sim/monster.gd", "shape": "capsule", "name": "Foe", "kind": kind, "tile": Vector2i(12, 12), "temperament": "bold", "props": Monster.bodies()[kind]}) as Monster
@@ -788,7 +790,22 @@ func _test_free_kite() -> void:
 			World.step()
 			if i > 50:
 				near = minf(near, player.free_pos.distance_to(Vector2(foe.tile)))
-		_check(player.hp == player.max_hp, "%s (its pace %.1f): no blow in 400 ticks of circling; nearest %.2f" % [kind, foe._pace, near])
+		var struck := player.hp < player.max_hp
+		if kind in ["brute", "robber"]:
+			_check(struck, "%s (its pace %.1f): leads the circle and lands a blow (%d hp lost; nearest %.2f)" % [kind, foe._pace, player.max_hp - player.hp, near])
+		else:
+			print("  ..  %s (its pace %.1f): %d hp lost; nearest %.2f" % [kind, foe._pace, player.max_hp - player.hp, near])
+	var player := _sturdy(_build(_open(60, 9), Vector2i(6, 4)))
+	var foe := EntityFactory.build({"script": "res://sim/monster.gd", "shape": "capsule", "name": "Foe", "kind": "robber", "tile": Vector2i(3, 4), "temperament": "bold", "props": Monster.bodies()["robber"]}) as Monster
+	_room.add_child(foe)
+	World.spawn(foe, Vector2i(3, 4))
+	foe.sight_range = 30
+	foe.senses.cone_cos = -1.0
+	for i in 120:
+		World.free_input(player, Vector2(1, 0), World.TICK_DT)
+		World.step()
+	_check(player.hp == player.max_hp and player.free_pos.x - foe.tile.x > 5.0,
+			"walking straight away from a robber 3 cells off: no blow, %.1f cells clear after 120 ticks" % (player.free_pos.x - foe.tile.x))
 
 
 func _sturdy(player: Player) -> Player:

@@ -137,6 +137,15 @@ const HOLD_BACK_RANGE := 3
 ## How far a free target's centre moves before it works out its strike cells
 ## again (decision 699, enemy-ai's side).
 const STRIKE_REPLAN := 0.3
+## How far ahead, in ticks, it leads a moving free body (lead-the-target):
+## past this it makes for where it will be then.
+const LEAD_MAX_TICKS := 24
+## The most a free body's way may be read to turn in a tick (radians) when
+## it leads a circling one.
+const LEAD_TURN_MAX := 0.3
+## It leads a free body this many ticks ahead for each tick the body has
+## held its course.
+const LEAD_STEADY_FACTOR := 2
 ## Looking out is skipped while the nearest player or companion was, at the
 ## tier's last measure, this much beyond its sight: more than anyone walks,
 ## or is shoved, in World.TIER_EVERY_TICKS.
@@ -290,6 +299,12 @@ var pause_chance := 0.0
 var slot := NO_TILE
 ## Its last World.strike_cells against a free target, and where from (699).
 var _strike_plan := {}
+## Its free target's way when it last led it, and the tick (lead-the-target).
+var _lead_way := Vector2.ZERO
+var _lead_tick := -1
+var _lead_turn := 0.0
+## How many ticks its free target has held its course (lead-the-target).
+var _lead_steady := 0
 var _pace := 0.0
 var _rng := RandomNumberGenerator.new()
 var _noticed_tick := 0
@@ -714,7 +729,7 @@ func _sim_tick() -> void:
 	if World.tick - _noticed_tick < reaction_ticks:
 		return  # Sizing it up.
 	var can_strike := World.tick >= next_attack_tick and World.tick >= next_move_tick
-	if _in_strike_reach(target):
+	if _in_strike_reach(target) or can_strike and _meets_in_stride():
 		if tactic == Tactic.DART and World.tick < _dart_until:
 			if World.tick >= _dart_from:
 				_step_out()
@@ -953,6 +968,10 @@ func _strike() -> void:
 		Tactic.HEAVY:
 			move_ticks = _pace
 			var direction := World.melee_way(self, target)
+			if not _in_strike_reach(target):
+				# Wound up on where it will be (lead-the-target): that way.
+				var to := _run_on(windup_ticks)[-1] - World.body_centre(self)
+				direction = Vector2i(roundi(cos(snappedf(to.angle(), PI / 4.0))), roundi(sin(snappedf(to.angle(), PI / 4.0))))
 			_windup = {"target": target, "lands": World.tick + windup_ticks, "direction": direction, "from": tile}
 			World.face(self, direction)
 			_world_winding(direction, windup_ticks)
@@ -1064,14 +1083,72 @@ func _in_strike_reach(other: GridEntity) -> bool:
 	return World.can_melee(tile, other.tile)
 
 
-## The cells it could strike its free target from (World.strike_cells,
-## decision 699), worked out again only when the target's centre has moved
-## STRIKE_REPLAN cells since, or its target or its own cell changed.
+## The cells it could strike its free target from (World.strike_cells_at,
+## decision 699) where it will meet it (_lead_centre), worked out again only
+## when that has moved STRIKE_REPLAN cells since, or its target or its own
+## cell changed.
 func _strike_cells() -> Array[Vector2i]:
-	var centre := World.body_centre(target)
+	var centre := _lead_centre()
 	if _strike_plan.get("target") != target or _strike_plan.get("from") != tile 			or (_strike_plan["centre"] as Vector2).distance_to(centre) > STRIKE_REPLAN:
-		_strike_plan = {"target": target, "from": tile, "centre": centre, "cells": World.strike_cells(self, target)}
+		_strike_plan = {"target": target, "from": tile, "centre": centre, "cells": World.strike_cells_at(self, centre, target)}
 	return _strike_plan["cells"]
+
+
+## Where to meet its moving free target (lead-the-target): its centre run
+## on (_run_on) to the first point it can itself be in reach of by then at
+## its own pace, a diagonal its 1.5; LEAD_MAX_TICKS on at most. A target
+## standing still: where it stands.
+func _lead_centre() -> Vector2:
+	var reach := World.reach_limit(self) - 0.5  # From a cell's middle: a little short of the limit.
+	var path := _run_on(LEAD_MAX_TICKS)
+	for k in range(1, path.size()):
+		var off := (path[k] - Vector2(tile)).abs()
+		var cells := maxf(0.0, maxf(off.x, off.y) - reach)
+		var slant := minf(cells, minf(off.x, off.y))
+		if (cells - slant + 1.5 * slant) * move_ticks <= k:
+			return path[k]
+	return path[-1]
+
+
+## Its free target's centre now and on each of the next [param ticks] ticks
+## (lead-the-target): run on along its way, turning as it has been turning
+## (a circle stays a circle), stopping short of a wall; no farther ahead
+## than LEAD_STEADY_FACTOR times the ticks it has held that course. A target standing
+## still, or on the grid: only where it is.
+func _run_on(ticks: int) -> PackedVector2Array:
+	var at := World.body_centre(target)
+	var out := PackedVector2Array([at])
+	var way := target.free_way if World.free_body(target) else Vector2.ZERO
+	var since := World.tick - _lead_tick
+	if since > 0:
+		var turn := 0.0
+		if since <= 4 and _lead_way.length() > 0.01 and way.length() > 0.01:
+			turn = _lead_way.angle_to(way) / since
+		# A course held (straight, or turning as it was) is led far; a jink
+		# starts it again, so a zig-zag is not chased side to side.
+		_lead_steady = _lead_steady + since if absf(turn - _lead_turn) <= LEAD_TURN_MAX and absf(turn) <= LEAD_TURN_MAX else 0
+		_lead_turn = clampf(turn, -LEAD_TURN_MAX, LEAD_TURN_MAX)
+		_lead_way = way
+		_lead_tick = World.tick
+	if way.length() < 0.05:
+		return out
+	for k in mini(ticks, LEAD_STEADY_FACTOR * _lead_steady):
+		way = way.rotated(_lead_turn)
+		if not World.is_walkable(Vector2i((at + way).round())):
+			break
+		at += way
+		out.append(at)
+	return out
+
+
+## HEAVY against a moving free body (lead-the-target): whether, wound up
+## now, its blow would land on where the body will be as it falls, from
+## where it stands (World.strike_cells_at holds its cell).
+func _meets_in_stride() -> bool:
+	if tactic != Tactic.HEAVY or not World.free_body(target) or target.free_way.length() < 0.05:
+		return false
+	var path := _run_on(windup_ticks)
+	return path.size() > windup_ticks and World.strike_cells_at(self, path[-1], target).has(tile)
 
 
 ## Where its arrow is aimed (699): from where its shots start to its

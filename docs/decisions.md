@@ -32890,3 +32890,28 @@ monster_test _test_strike_cells (struck on tick 24 from (6, 3), 1.16 off;
 never more than its pace beside it out of reach); free_walk_test
 _test_free_chase now bounds blows by World.reach_limit (all at or under
 1.43). Server only, protocol unchanged, no new class_name.
+
+## 700: a chaser leads a free body
+
+The coordinator's free-walk audit (3), kiting: a free player circling a
+grid walker at 4 cells drew no blow in 400 ticks from any kind, since none
+is as quick (a player 2.5 ticks a cell any way, a grid walker's diagonal
+1.5 its pace). The ruling: lead-the-target only, no speed changed, and
+walking straight away still escapes.
+Against a moving free body a monster makes for the strike cells
+(World.strike_cells_at, 699) about where it will meet it
+(Monster._lead_centre): the body's centre run on along its way, turning as
+it has been turning so a circle stays a circle, never into a wall
+(_run_on), to the first point it can be in reach of by then at its own
+pace, a diagonal its 1.5. It leads no farther ahead than LEAD_STEADY_FACTOR
+(2) ticks for each tick the body has held its course, LEAD_MAX_TICKS (24)
+at most; a jink (a turn changed by more than LEAD_TURN_MAX, 0.3 radians a
+tick) starts that again, so a zig-zag is not chased side to side. A HEAVY
+monster (the brute) winds up on where the body will be as its blow falls
+(_meets_in_stride), facing that way; the blow still lands only if the body
+is in reach then (699), so a change of course dodges it.
+free_walk_test _test_free_kite: circling at 4, a brute and a robber land
+blows (2 and 20 hp; an imp 9, a sneak 33); walking straight away from a
+robber 3 cells off, no blow, 36 cells clear in 120 ticks. _test_free_chase's
+zig-zag: no more than one step back and forth (the imp's dart aside).
+Server only, protocol unchanged, no new class_name.
