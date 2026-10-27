@@ -7,16 +7,18 @@ notes (decision 324).
 
 ## Unreleased
 
+## v0.1.187
+
 - Camera: walking into a house goes top-down for you again even when your companion is outside (671 amended (3))
 - Free movement: clicking a monster to fight walks you to it smoothly, following it as it moves, and strikes when you reach it (697)
 - Tests: a rebuilt room's old pieces are let go at the frame's end, so a busy machine no longer logs a free error mid-build (660 amended (3)).
 - Leaving the game anywhere in the wilds' town (by the well, the starts, the huts), not only right at the store, now has your companion stay in town at her trade, with one line on joining that says where she is (694 amended).
 - Free movement: clicking a new spot while walking turns you onto the new way at once (about 60 ms, was about half a second), and steering with the held mouse button follows as quickly (689 amended (5))
 - Clicking a monster under free walk no longer walks you to it in jerks from cell to cell (697, combat's side): the server holds the attack while your client walks you there, strikes once you are beside it, and gives up after 4 s out of reach.
-
 - A band of monsters counts its own (698; Jeff in the barrow: four grave robbers scattered without a fight): three or more that outnumber you now close in together instead of standing off, and break only when the odds turn or when badly hurt, not at the first hit or rout. This holds everywhere, not just the barrow: any group of three or more monsters that outnumbers you (imps in a room, a castle pack) now closes in rather than holding back, so fights are harder; a pair holds back as before, and nobody goes for a player in the moments after he comes back. The band size is monsters.fight.band_min on the F7 panel.
 - Free movement (--free-walk): pressing into the barrow's burial niches works again (the hidden door opens), and walking into the map's edge takes you to the next area as on the grid (688 amended (4)).
 - Ask your companion to go and look ('go look north', 'check out that door', 'have a look ahead'): she walks over until she can see it, comes back and tells you what was there, and remembers it; something coming at her turns her back, and she tells you that too (696).
+
 ## v0.1.186
 
 - What goes over the network changes, so v0.1.185 and older can't join the server: update through the launcher first.
