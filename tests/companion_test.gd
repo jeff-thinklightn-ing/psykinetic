@@ -120,6 +120,7 @@ func _ready() -> void:
 	_test_look_asked()
 	_test_reset_free()
 	_test_spear_reach()
+	_test_order_holds()
 	_test_quiet()
 	_test_dodge()
 	_test_firing_cone()
@@ -3350,6 +3351,54 @@ func _test_heel_keeps_clear() -> void:
 ## Her approach on World.strike_cells (decision 699, companions' side): with
 ## a spear she stops where its reach strikes, two cells off, and strikes,
 ## by the same in_reach a blow lands by.
+## Minimum holds on her orders (decision 706; the box journal: DODGE and
+## FOLLOW six times in six seconds, ATTACK and FOLLOW five in one, the
+## model's stance undone by calm two seconds on): the rules' "holds",
+## tunable on F7 (companions.holds.<key>).
+func _test_order_holds() -> void:
+	print("
+== her orders hold a moment: the foe kept, a dodge stood, calm waited for (706) ==")
+	_kill_monsters()
+	var pet := _companion()
+	_settle(pet)
+	var foe_ticks := Companion.hold_ticks("foe_ticks")
+	_check(foe_ticks > 0 and Companion.hold_ticks("dodge_ticks") > 0 and Companion.hold_ticks("calm_ticks") > 0, "(the rules' holds: %d, %d, %d)" % [
+		Companion.hold_ticks("dodge_ticks"), foe_ticks, Companion.hold_ticks("calm_ticks")])
+	# The foe: its going for her flickers; her fight does not, for a moment.
+	var imp := _spawn_imp(_main._nearest_free(pet.tile + Vector2i(2, 0)))
+	pet._fight_or(imp, Companion.Intent.FOLLOW)
+	pet._fight_or(null, Companion.Intent.FOLLOW)
+	_check(pet.current_intent == Companion.Intent.ATTACK and pet.intent_target == imp, "it stops going for her a tick: she keeps on at it (%s)" % pet.intent_name())
+	pet._held_foe_tick = World.tick - foe_ticks
+	pet._fight_or(null, Companion.Intent.FOLLOW)
+	_check(pet.current_intent == Companion.Intent.FOLLOW, "longer than the hold: she lets it be (%s)" % pet.intent_name())
+	_kill_monsters()
+	# The dodge: clear of a blow, she stands clear a moment.
+	pet.current_intent = Companion.Intent.DODGE
+	pet._dodge_to = pet.tile
+	pet._dodged_tick = World.tick
+	pet._act()
+	_check(pet.current_intent == Companion.Intent.DODGE, "the blow's way reads clear: she stands clear a moment (%s)" % pet.intent_name())
+	pet._dodged_tick = World.tick - Companion.hold_ticks("dodge_ticks")
+	pet._act()
+	_check(pet.current_intent != Companion.Intent.DODGE, "then follows on (%s)" % pet.intent_name())
+	# Calm: a lull in a fight is no calm.
+	pet._set_stance(Companion.Stance.PRESS, pet._serial + 1, "ollama")
+	pet._fight_seen_tick = World.tick
+	pet._calm()
+	_check(pet.stance == Companion.Stance.PRESS, "the fight just over: the stance she was given holds (%s)" % pet.stance_name())
+	pet._fight_seen_tick = World.tick - Companion.hold_ticks("calm_ticks")
+	pet._calm()
+	_check(pet.stance == Companion.Stance.GUARD, "quiet for the hold: calm, she guards again (%s)" % pet.stance_name())
+	# On F7: the panel's source.
+	_check(CompanionCard.tuning_fields().any(func(f: Dictionary) -> bool: return f["path"] == "companions.holds.foe_ticks")
+		and CompanionCard.set_tuning_value("companions.holds.foe_ticks", 5) and Companion.hold_ticks("foe_ticks") == 5
+		and not CompanionCard.set_tuning_value("companions.holds._note", 1) and CompanionCard.tuning_value("companions.nope.x") == null,
+		"the holds are on the tuning panel, set at once")
+	CompanionCard.set_tuning_value("companions.holds.foe_ticks", foe_ticks)
+	_settle(pet)
+
+
 func _test_spear_reach() -> void:
 	print("
 == with a spear she strikes from where its reach strikes, two cells off (699) ==")

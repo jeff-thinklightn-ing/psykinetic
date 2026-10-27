@@ -2101,6 +2101,7 @@ func _show_3d() -> void:
 		Tuning.register_source("monsters", Monster.tuning_value, Monster.set_tuning_value, Monster.tuning_fields)  # 673 step 2.
 		Tuning.register_source("feel", ArtKit.feel_value, ArtKit.set_feel_value, ArtKit.feel_fields)  # 673 step 2: art/kit/feel.json.
 		Tuning.register_source("effects", Items.effect_value, Items.set_effect_value, Items.effect_fields)  # 682: the remedy's heal.
+		Tuning.register_source("companions", CompanionCard.tuning_value, CompanionCard.set_tuning_value, CompanionCard.tuning_fields)  # 706: her holds.
 
 
 # --- WASD ---------------------------------------------------------------------------

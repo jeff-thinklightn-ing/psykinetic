@@ -608,6 +608,13 @@ var _wolf_warned_tick := -100000
 ## The wild animal "Get them!" marked (decision 332), or null: hostile to
 ## her as a monster is, till it dies, is out of sight or the call lapses.
 var _quarry: GridEntity = null
+## Her last foe and when it last went for her or hers (_fight_or, 706).
+var _held_foe: GridEntity = null
+var _held_foe_tick := -1000000
+## When a blow last came down on her cell (the dodge hold, 706).
+var _dodged_tick := -1000000
+## When she last saw a fight near (the calm hold, 706).
+var _fight_seen_tick := -1000000
 ## How far her foe's centre moves before she works out where to strike it
 ## from again (decision 699, as a monster does).
 const STRIKE_REPLAN := 0.3
@@ -2123,8 +2130,13 @@ func heard_words() -> String:
 ## standing instruction: she guards, following her player, without asking
 ## anyone.
 func _calm() -> void:
-	if in_fight() or not standing_instruction().is_empty() or not order.is_empty():
+	if in_fight():
+		_fight_seen_tick = World.tick
 		return
+	if not standing_instruction().is_empty() or not order.is_empty():
+		return
+	if World.tick - _fight_seen_tick < hold_ticks("calm_ticks"):
+		return  # Calm a moment first (706): a lull in a fight is no calm.
 	if stance != Stance.GUARD:
 		_serial += 1
 		var was := stance_name()
@@ -4111,7 +4123,15 @@ func _act() -> void:
 	if guide != null and guide.going() and (foe != null or low):
 		_guide_ends("danger" if foe != null else "hurt")
 	var dodge := _read_telegraphs(before_target)
-	if dodge != NONE and not _stands_over():
+	if dodge != NONE:
+		_dodged_tick = World.tick
+	if dodge == NONE and before == Intent.DODGE and World.tick - _dodged_tick < hold_ticks("dodge_ticks") \
+			and foe == null and not low and not _stands_over() and not _reviving():
+		# Clear of it a moment (706): not back into a blow's way, or her
+		# player's bow line, the tick it reads clear.
+		current_intent = Intent.DODGE
+		intent_target = before_target
+	elif dodge != NONE and not _stands_over():
 		# A blow coming down on her cell (decision 663): clear of it first.
 		# Devoted over her downed player she stays and takes it.
 		_dodge_to = dodge
@@ -4303,8 +4323,19 @@ func turns_down(by: GridEntity, uid: int, back: int) -> String:
 
 
 func _fight_or(foe: GridEntity, otherwise: Intent) -> void:
+	if foe != null:
+		_held_foe = foe
+		_held_foe_tick = World.tick
+	elif _alive(_held_foe) and World.tick - _held_foe_tick < hold_ticks("foe_ticks") and _hostile(_held_foe) \
+			and World.distance(tile, _held_foe.tile) <= SIGHT_RANGE and not _out_of_reach(_held_foe) and senses.sees(_held_foe):
+		foe = _held_foe  # Kept a moment (706): its going for us flickers, her fight does not.
 	current_intent = Intent.ATTACK if foe != null else otherwise
 	intent_target = foe
+
+
+## A hold (decision 706) from the rules' "holds" table, in ticks.
+static func hold_ticks(key: String) -> int:
+	return int(CompanionCard.tables().get("holds", {}).get(key, 0))
 
 
 ## Below REFLEX_BELOW of her hp with a hostile next to her.

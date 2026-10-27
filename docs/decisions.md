@@ -33172,3 +33172,35 @@ combat_test _test_free_wind_up_given_up: a full step sideways and back and
 aside give it up, nothing struck, the body walking; pressing on and a lean
 of 0.42 aside keep it, and it lands. Server only, protocol unchanged, no
 new class_name.
+
+## 706. Minimum holds on a companion's orders
+
+The box journal of Jeff's v0.1.187 play (09:03-09:31) shows her orders
+flapping:
+- "DODGE (GUARD)" and "FOLLOW (GUARD)" six times in 09:03:50-56. She was
+  clear of a blow's way, or his bow line (663 amended), and followed back
+  into it the tick it read clear.
+- "ATTACK Robber3" and "FOLLOW" five times within a second. A foe counts
+  only while it goes for her or her player, and a band's robber's target
+  flickers (698).
+- The model's stance (STAY_CLOSE, then PRESS) set back to GUARD by calm two
+  seconds later. Calm took the first lull in a fight for the fight's end.
+
+Seen in play, the first two are stutter-stepping between fighting and
+following. The slow ticks of the same morning were 704's, not these.
+
+Three holds, the rules' "holds" table (companion_traits.json), in ticks,
+on the tuning panel (F7) as the "companions" source
+(CompanionCard.tuning_value, set_tuning_value, tuning_fields), taking at
+once:
+- **dodge_ticks (10):** clear of a blow coming down, she stands clear this
+  long before following back (Companion._dodged_tick). A foe at her, low
+  hp, standing over her downed player or reviving them come first.
+- **foe_ticks (20):** her foe (Companion._held_foe) is kept this long after
+  it last went for her or hers, while it is hostile, within SIGHT_RANGE,
+  seen and not out of reach (_fight_or).
+- **calm_ticks (30):** calm sets her stance back to GUARD only after this
+  long with nothing hostile near (Companion._fight_seen_tick).
+
+companion_test _test_order_holds (each hold kept, then let go; the panel's
+source), both modes. Server only, protocol unchanged, no new class_name.

@@ -10,6 +10,12 @@
 		"talk_lines": 3,
 		"quiet_seconds": 60
 	},
+	"holds": {
+		"_note": "Minimum holds on her orders (decision 706; the box journal: DODGE and FOLLOW six times in six seconds, ATTACK and FOLLOW five in one, a stance the model set undone by calm two seconds on). dodge_ticks: once clear of a blow coming down, she stands clear this long before following back. foe_ticks: her foe is kept this long after it last went for her or her player, while it is near, hostile and in her sight. calm_ticks: calm sets her stance back to GUARD only after this long with nothing hostile near. Ticks (ten a second); tunable on F7 as companions.holds.<key>.",
+		"dodge_ticks": 10,
+		"foe_ticks": 20,
+		"calm_ticks": 30
+	},
 	"look": {
 		"_note": "Asked to look (decision 696): her player's words (look_words, whole words; a bearing in them, a compass point, ahead, behind, left or right of them, or the door) send her to the nearest walkable cell that way within her sight's range and beyond more that she cannot see (the darkest first), or the far side of the nearest shut door she sees; she walks till she sees it, within near of it, takes in what is within near of it, and comes back; what she saw is a fact on her card, and her voice is told it. scout_minutes: how long what she scouted stays among what she knows now.",
 		"look_words": ["go look", "go and look", "go check", "go and check", "check out", "check over", "check that", "take a look", "have a look", "go see", "go and see", "scout", "look around there", "see what's", "see what is", "find out what"],

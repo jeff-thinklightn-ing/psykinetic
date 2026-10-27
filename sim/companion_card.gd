@@ -30,6 +30,35 @@ static func tables() -> Dictionary:
 	return _tables
 
 
+## The tuning panel's source "companions" (decision 706; Tuning.register_source,
+## Main's): companions.holds.<key>, the rules' "holds" table (in this
+## process; the trees put Jeff's numbers in companion_traits.json).
+static func tuning_value(path: String) -> Variant:
+	var parts := path.split(".")
+	if parts.size() != 3 or parts[0] != "companions" or parts[1] != "holds" or parts[2].begins_with("_"):
+		return null
+	return tables().get("holds", {}).get(parts[2])
+
+
+## Sets a companions.holds.<key> path (tuning_value's), at least 0 ticks;
+## false for an unknown one.
+static func set_tuning_value(path: String, value: Variant) -> bool:
+	if tuning_value(path) == null or not (value is int or value is float) or float(value) < 0.0:
+		return false
+	tables()["holds"][path.get_slice(".", 2)] = int(value)
+	return true
+
+
+## The panel's rows for the holds (706): ticks, companions', taken at once.
+static func tuning_fields() -> Array:
+	var out := []
+	for key: String in tables().get("holds", {}):
+		if not key.begins_with("_"):
+			out.append({"path": "companions.holds." + key, "group": "Companions: holds", "kind": "int",
+				"min": 0, "max": 100, "owner": "companions"})
+	return out
+
+
 ## Whether [param name] is one of the companions from before the roll
 ## (the table's "legacy": Wren, Nix), kept as they are; they rest in town
 ## between trips.
