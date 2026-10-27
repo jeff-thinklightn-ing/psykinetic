@@ -32,9 +32,6 @@ var _damage_log: Array[Dictionary] = []
 
 func _ready() -> void:
 	World.set_process(false)
-	# The grid's steps: free walk is the default (decision 693).
-	Net.free_walk = false
-	World.free_walk = false
 	World.entity_damaged.connect(func(entity: GridEntity, amount: int, source: GridEntity, cause: StringName) -> void:
 		_damage_log.append({"entity": entity, "amount": amount, "source": source, "cause": cause, "tick": World.tick}))
 
@@ -250,8 +247,9 @@ func _test_windup() -> void:
 	var swings := []
 	brute.swung.connect(func(direction: Vector2i) -> void: swings.append(direction))
 	World.step()
-	World.order_step(player, Vector2i(-1, 0), 0, false)
 	for i in Monster.WINDUP_TICKS:
+		if i < 3:
+			World.free_input(player, Vector2(-1, 0), World.TICK_DT)  # A step back, out of its reach (699).
 		World.step()
 	_check(_damage_log.filter(func(d: Dictionary) -> bool: return d["source"] == brute).is_empty() and swings.size() == 1,
 			"stepped out of reach in time: a whiff (%d swings, player at %s)" % [swings.size(), player.tile])
@@ -1083,10 +1081,12 @@ func _test_hearing() -> void:
 	World.step()
 	_check(brute.target == null, "behind it, unseen")
 	var moved := false
+	var start := player.tile
 	for i in 5:
 		if not moved:
-			moved = World.try_move(player, Vector2i(0, -1))
+			World.free_input(player, Vector2(0, -1), World.TICK_DT)  # Walked free: a cell's claim is a step.
 		World.step()
+		moved = player.tile != start
 	_check(moved and not brute.senses.heard.is_empty() and brute.senses.heard.back()["kind"] == &"step",
 			"its step is heard (%s)" % [brute.senses.heard])
 	_check(brute.target == player, "it turned to the noise, and saw them (facing %s)" % [brute.facing])
@@ -1408,7 +1408,12 @@ func _test_locks() -> void:
 	var door: Door = World.door_on(SPLIT_DOOR)
 	door.lock = "keep"
 	_check(door.state() == "locked", "shut with a lock: locked")
-	_check(not World.try_toggle_door(player, SPLIT_DOOR) and not World.try_move(player, Vector2i(1, 0)) and not door.open,
+	var by_hand := World.try_toggle_door(player, SPLIT_DOOR)
+	var held := player.tile
+	for i in 4:
+		World.free_input(player, Vector2(1, 0), World.TICK_DT)  # Walking free into it.
+		World.step()
+	_check(not by_hand and player.tile == held and not door.open,
 			"no key: it will not open, by hand or walking into it")
 	_check(listener.senses.heard.back()["kind"] == &"door_rattle", "and the rattle is heard")
 	var was := World.key_check
@@ -1955,7 +1960,6 @@ func _test_strike_cells() -> void:
 		rows.append("#..........#")
 	rows.append("############")
 	var e := _build(rows)
-	World.free_walk = true
 	var player := EntityFactory.build(SPECS["P"].merged({"name": "BackOfCell"})) as Player
 	_room.add_child(player)
 	World.spawn(player, Vector2i(6, 4))
@@ -1981,7 +1985,6 @@ func _test_strike_cells() -> void:
 			longest = maxi(longest, waited)
 		else:
 			waited = 0
-	World.free_walk = false
 	_check(struck_at >= 0 and struck_at < 60 and longest <= ceili(robber.move_ticks) + 1 and from != Vector2i(5, 4),
 			"struck on tick %d from %s (%.2f off), at most %d ticks beside it out of reach (its pace %.1f)" % [struck_at, from, Vector2(from).distance_to(Vector2(6.58, 4.0)), longest, robber.move_ticks])
 	World.despawn(robber)
@@ -3736,7 +3739,7 @@ func _test_two_zones_charge() -> void:
 		if charged and not World.boss_busy(draugr) and str(World.axe_state(draugr)["where"]) == "hand":
 			if at == Vector2i.ZERO:
 				at = draugr.tile
-				_move_to(a, Vector2i(2, 3))  # The player off across his hall.
+				World._relocate(a, Vector2i(2, 3))  # The player off across his hall.
 			elif draugr.tile != at:
 				stepped = true
 				break
