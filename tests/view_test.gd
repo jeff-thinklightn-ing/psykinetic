@@ -3272,6 +3272,39 @@ func _test_niches() -> void:
 			_rig._show_hidden_niche(door_key, false)
 			_check(off and draft.emitting and (hidden.get_node("Cracked") as Node3D).visible,
 					"the draft stops when the niche's door opens and comes back when it shuts")
+			# 608 amended (2): opened from shut as drawn, it gives way: the dust,
+			# and the slab (art-kit's, else a stand-in here) shudders, grinds
+			# back, slides into the wall and is hidden; opened again with no
+			# shut between, nothing replays.
+			var parts: Array = _rig._hidden_niches[door_key]
+			var stand_in: Node3D = null
+			if parts[3] == null:
+				stand_in = Node3D.new()
+				stand_in.name = "Slab"
+				stand_in.visible = false
+				hidden.add_child(stand_in)
+				parts[3] = stand_in
+			var slab := parts[3] as Node3D
+			var dust := parts[4] as GPUParticles3D
+			_rig._show_hidden_niche(door_key, true)
+			var tween := slab.get_meta(&"tween") as Tween if slab.has_meta(&"tween") else null
+			_check(dust.emitting and dust.one_shot and slab.visible and tween != null and tween.is_valid()
+					and is_equal_approx(slab.position.x, Client3D.SLAB_FACE_X),
+					"found as it is drawn: the dust bursts and the slab stands flush in the doorway, moving")
+			tween.custom_step(Client3D.SLAB_SHUDDER + Client3D.SLAB_BACK_SECONDS + 0.01)
+			var back := slab.position
+			tween.custom_step(Client3D.SLAB_SLIDE_SECONDS)
+			_check(is_equal_approx(back.x, Client3D.SLAB_FACE_X - Client3D.SLAB_BACK) and absf(back.z) < 0.02
+					and is_equal_approx(slab.position.z, Client3D.SLAB_SLIDE) and not slab.visible,
+					"it grinds back %.2f m, then slides %.2f m along the wall into it and is hidden (%s, %s)" % [Client3D.SLAB_BACK, Client3D.SLAB_SLIDE, back, slab.position])
+			dust.emitting = false
+			_rig._show_hidden_niche(door_key, true)
+			_check(not dust.emitting and not slab.visible, "shown open again, it does not give way twice")
+			_rig._show_hidden_niche(door_key, false)
+			_check(not slab.visible and is_equal_approx(slab.position.x, Client3D.SLAB_FACE_X), "shut again, the slab is back in place, hidden behind the cracked wall")
+			if stand_in != null:
+				parts[3] = null
+				stand_in.free()
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
 

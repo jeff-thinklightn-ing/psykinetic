@@ -34419,3 +34419,41 @@ protocol_test _test_token_credential: read and trimmed, credential over
 env, a directory without the file falls to env, a blank credential and a
 blank env each give no token. Server only, protocol unchanged, no new
 class_name.
+## 608 amended (2), dungeon's side: the niche slab gives way
+
+The coordinator, from Jeff's trailer footage: the hidden niche's opening
+(Main._on_niche_pressed) barely showed at normal zoom; make the moment read.
+It was a swap at once, wall.crypt.cracked for wall.crypt.niche_open, the
+latter with its slab baked in, swung out into the room. Now (Client3D, client
+only):
+- art-kit's side splits the slab out: prop.niche_slab, the doorway's panel
+  carrying cracked's face over it (the arched niche, its shroud, its lip), so
+  open + slab is cracked and the swap does not show; niche_open is the
+  doorway and steps alone, a pocket slot in its +z jamb.
+- Client3D._show_hidden_niche: shut to open while drawn (its last shown
+  state, kept per niche, never a door already open when the map is drawn),
+  _slab_gives: the slab flush in the doorway (SLAB_FACE_X) shudders
+  (SLAB_SHUDDER, SLAB_JITTER), grinds back SLAB_BACK (0.13 m, its lip behind
+  the wall's face), slides SLAB_SLIDE (0.65 m, past the jamb) along +z within
+  the wall's depth, and is hidden: about 1.1 s. Shut again, it is back in
+  place and hidden behind the cracked wall.
+- Dust (_make_slab_dust): one shot of soft grey puffs from the doorway's
+  face, half at once and half trickling through the slide, out into the room.
+- Sound's side: sfx.slab_grind, its takes timed to the motion, played at the
+  doorway (guarded by SoundKit.has).
+- Without the slab's art, the swap is at once with the dust and the sound;
+  without the sound, it is silent. Either side may land first.
+view_test: a stand-in slab, stepped through its tween: flush, back 0.13,
+along 0.65 and hidden; no replay while open; back in place when shut.
+- Seen, server side (found recording the clip): a free body's press on the
+  shut niche took the stair behind it at once. `World._step_refused` bumped
+  a link across any closed door, as if the stepper would open it, and the
+  hidden door is locked (no key opens it), so the link took the player down
+  before the press had found the niche, and the slab was never seen. Now a
+  shut door the stepper may not open (World.may_open: locked, no key) shuts
+  the way to a link as it shuts the step. And the one who finds it stands
+  (World.halt) for NICHE_FOUND_HOLD, 11 ticks (the shudder, grind and
+  slide's 1.1 s), so a press's carry does not walk them down the stair before
+  it has given way; then the way is open. level_test: held after the find,
+  pressing on, still before it; no link bump through the locked slab.
+Client and server, protocol unchanged, no new class_name.

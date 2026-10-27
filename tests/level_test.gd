@@ -2010,6 +2010,34 @@ func _test_hidden_niche() -> void:
 		and _main.party_log.last(1) == ["The slab swings aside: a stair goes down into the dark."],
 		"pressing into the hidden niche finds it: the lock lifted, the door open, and said (%s)" % [_main.party_log.last(1)])
 	_check(World.hidden_niche()["open"], "the marker says open")
+	# 608 amended (2): the finder stands while the slab gives way, pressing
+	# on or not; the stair behind is not taken through the shut slab.
+	_check(World.free_held(player), "the finder is held while the slab gives way")
+	_hold_free(player, Vector2(0, -1), 5)
+	_check(player.tile == Vector2i(6, 1) and World.zone.name == "lt_niche", "pressing on, held: still before it, the stair not yet taken (%s)" % [player.tile])
+	# 608 amended (2): a shut, locked door before a link shuts the way: the
+	# press finds the niche (again, here: held anew), it never takes the
+	# stair through the slab.
+	door.open = false
+	door.lock = "hidden_niche"
+	var taken: Array = []
+	var on_bump := func(by: GridEntity, at: Vector2i) -> void: taken.append(at)
+	World.link_bumped.connect(on_bump)
+	World._step_refused(player, Vector2i(0, -1))
+	_check(taken.is_empty(), "a step at the link through the locked slab is no bump on the link (%s)" % [taken])
+	# The same through a free body's press (_free_pressed), free walk on.
+	_hold_free(player, Vector2(0, 0), Main.NICHE_FOUND_HOLD)
+	door.open = false
+	door.lock = "hidden_niche"
+	for i in 10:
+		_hold_free(player, Vector2(0, -1), 1)
+		if door.open:
+			break
+	World.link_bumped.disconnect(on_bump)
+	_check(World.free_walk and taken.is_empty() and door.open and player.tile == Vector2i(6, 1) and World.zone.name == "lt_niche",
+		"pressed with free walk on: the slab found, the stair behind it not taken through it (%s, %s)" % [taken, player.tile])
+	_check(door.open and door.lock.is_empty(), "the press found it again")
+	_hold_free(player, Vector2(0, 0), Main.NICHE_FOUND_HOLD)
 	# 608 amended: found, no draft, not even in a new generation; laid again
 	# with the door shut, it is felt again.
 	_main._regen["lt_niche"] = {"generation": 1, "at_step": 0}

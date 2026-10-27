@@ -6629,9 +6629,12 @@ func _step_refused(entity: GridEntity, direction: Vector2i) -> void:
 	elif not is_walkable(entity.tile + direction):
 		walked_off.emit(entity, direction)
 	# Someone on a link's cell does not shut the way: a player who
-	# steps at it takes the link all the same (decision 571).
+	# steps at it takes the link all the same (decision 571). A shut door
+	# they may not open (locked, no key: the hidden niche's slab, 608
+	# amended (2)) does shut it.
+	var shut := _closed_door_across(entity.tile, direction)
 	if entity is Player and is_link_cell(entity.tile + direction) \
-			and not _terrain_blocks_step(entity.tile, direction, true):
+			and not _terrain_blocks_step(entity.tile, direction, true) and (shut == null or may_open(entity, shut)):
 		link_bumped.emit(entity, entity.tile + direction)
 	# A step into a burial niche's edge that stops it presses on the
 	# niche (608): the hidden door's slab gives to a press, nothing else.

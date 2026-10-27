@@ -6975,6 +6975,10 @@ const HALL_LOCK := "draugr_hall"
 ## The hidden door's lock (608): the first hall's hidden niche, a key nobody
 ## holds; lifted by a press on it or a climb from below.
 const HIDDEN_LOCK := "hidden_niche"
+## How long the one who finds it stands while the slab gives way (608
+## amended (2)): Client3D's shudder, grind back and slide, 1.1 s, so the
+## press's carry does not take them down the stair before it is seen.
+const NICHE_FOUND_HOLD := 11
 ## How often a waiting seal on the hall is asked again (666): 1 s.
 const HALL_SEAL_EVERY := 10
 ## The hall's door while the Ossuary's dead stand (666): a key nobody holds.
@@ -8103,6 +8107,7 @@ func _on_niche_pressed(entity: GridEntity, key: Vector3i) -> void:
 		_told_niche.erase(peer)
 		World.hold_door(door, false, HIDDEN_LOCK)
 		door.open = true
+		World.halt(entity, World.tick + NICHE_FOUND_HOLD)
 		party_log.add("The slab swings aside: a stair goes down into the dark.")
 		print("[level] %s found the hidden door at %s in %s" % [_display_name(entity), Terrain.edge_cells(key)[0], World.zone.name])
 		return

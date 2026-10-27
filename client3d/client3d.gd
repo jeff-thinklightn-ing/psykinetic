@@ -329,6 +329,30 @@ const DAIS_EDGE := "dais.edge"
 const DAIS_STEPS := "dais.steps"
 const DAIS_STEPS_REACH := 0.624
 const NICHE_OPEN := "wall.crypt.niche_open"
+## The hidden niche giving way (608 amended (2); the coordinator, from
+## Jeff's trailer: "make the moment read"): art-kit's prop.niche_slab, the
+## doorway's panel, flush in the open piece's doorway (its room face at
+## SLAB_FACE_X) the moment the door opens while drawn; it shudders
+## (SLAB_SHUDDER s, SLAB_JITTER m), grinds back SLAB_BACK m into the wall
+## (SLAB_BACK_SECONDS), slides SLAB_SLIDE m along it (+z) into the solid
+## wall beside the doorway (SLAB_SLIDE_SECONDS) and is hidden there; dust
+## bursts and trickles from the doorway (SLAB_DUST_*) and sound's
+## sfx.slab_grind plays at its middle. Without the slab's art the swap is
+## at once, with the dust and the sound; a door found before it was drawn
+## shows the end alone.
+const NICHE_SLAB := "prop.niche_slab"
+const SLAB_SOUND := "sfx.slab_grind"
+const SLAB_FACE_X := 0.25
+const SLAB_SHUDDER := 0.15
+const SLAB_JITTER := 0.01
+const SLAB_BACK := 0.13
+const SLAB_BACK_SECONDS := 0.3
+const SLAB_SLIDE := 0.65
+const SLAB_SLIDE_SECONDS := 0.65
+const SLAB_DUST_PUFFS := 28
+const SLAB_DUST_SIZE := 0.4
+const SLAB_DUST_ALPHA := 0.55
+const SLAB_DUST_SECONDS := 1.6
 ## The hidden niche's footprints (608 amended, terrain's side): art-kit's
 ## flat dust mesh on its entry cell, +x toward the wall; left when found.
 const NICHE_FOOTPRINTS := "prop.footprints"
@@ -10785,9 +10809,20 @@ func _add_hidden_niche(key: Vector3i) -> void:
 	holder.add_child(found)
 	var draft := _make_draft()
 	holder.add_child(draft)
+	# Its slab and dust (608 amended (2)), shown as it gives way.
+	var slab: Node3D = null
+	if ArtKit.has(NICHE_SLAB):
+		slab = ArtKit.instance(NICHE_SLAB)
+		slab.name = "Slab"
+		slab.position = Vector3(SLAB_FACE_X, 0.0, 0.0)
+		slab.visible = false
+		holder.add_child(slab)
+	var dust := _make_slab_dust()
+	holder.add_child(dust)
 	_room.add_child(holder)
 	_walls[key] = holder
-	_hidden_niches[key] = [shut, found, draft]
+	# [shut, found, draft, slab or null, dust, last shown: -1 none yet, 0 shut, 1 open].
+	_hidden_niches[key] = [shut, found, draft, slab, dust, -1]
 	_doors_due[key] = true
 	# Its footprints (608 amended): on the entry cell, going to the wall
 	# (+x along -out) and one back, on the floor; there whether found or not.
@@ -10801,11 +10836,95 @@ func _add_hidden_niche(key: Vector3i) -> void:
 
 
 ## The hidden niche on [param key] shut or [param opened]: the cracked wall
-## and its draft, or the open niche (its last puffs fade as they go).
+## and its draft, or the open niche (its last puffs fade as they go). Opened
+## from shut as it is drawn, it gives way (608 amended (2), _slab_gives).
 func _show_hidden_niche(key: Vector3i, opened: bool) -> void:
-	(_hidden_niches[key][0] as Node3D).visible = not opened
-	(_hidden_niches[key][1] as Node3D).visible = opened
-	(_hidden_niches[key][2] as GPUParticles3D).emitting = not opened
+	var parts: Array = _hidden_niches[key]
+	var gives: bool = opened and int(parts[5]) == 0
+	parts[5] = 1 if opened else 0
+	(parts[0] as Node3D).visible = not opened
+	(parts[1] as Node3D).visible = opened
+	(parts[2] as GPUParticles3D).emitting = not opened
+	var slab := parts[3] as Node3D
+	if slab != null:
+		var moving := slab.get_meta(&"tween") as Tween if slab.has_meta(&"tween") else null
+		if moving != null and moving.is_valid():
+			moving.kill()
+		slab.position = Vector3(SLAB_FACE_X, 0.0, 0.0)
+		slab.visible = false
+	if gives:
+		_slab_gives(parts)
+
+
+## The hidden niche's slab giving way (608 amended (2)): the dust, the
+## sound, and the slab's shudder, grind back and slide into the wall.
+func _slab_gives(parts: Array) -> void:
+	var dust := parts[4] as GPUParticles3D
+	dust.restart()
+	dust.emitting = true
+	if SoundKit.has(SLAB_SOUND):
+		sfx.play(SLAB_SOUND, dust.global_position)
+	var slab := parts[3] as Node3D
+	if slab == null:
+		return
+	slab.visible = true
+	var tween := slab.create_tween()
+	slab.set_meta(&"tween", tween)
+	for i in 3:
+		tween.tween_property(slab, "position:z", SLAB_JITTER * (1.0 if i % 2 == 0 else -1.0), SLAB_SHUDDER / 4.0)
+	tween.tween_property(slab, "position:z", 0.0, SLAB_SHUDDER / 4.0)
+	tween.tween_property(slab, "position:x", SLAB_FACE_X - SLAB_BACK, SLAB_BACK_SECONDS) \
+			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	tween.tween_property(slab, "position:z", SLAB_SLIDE, SLAB_SLIDE_SECONDS) \
+			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	tween.tween_callback(slab.hide)
+
+
+## The dust of the slab giving way (608 amended (2)): in its holder's frame
+## (+x into the room, z along the wall), one shot of soft grey puffs from
+## the doorway's face, half at once and half trickling as it slides, out
+## into the room, sinking. Lit as the draft is.
+func _make_slab_dust() -> GPUParticles3D:
+	var dust := GPUParticles3D.new()
+	dust.name = "SlabDust"
+	dust.amount = SLAB_DUST_PUFFS
+	dust.lifetime = SLAB_DUST_SECONDS
+	dust.one_shot = true
+	dust.explosiveness = 0.5
+	dust.emitting = false
+	dust.local_coords = true
+	dust.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	dust.transform_align = GPUParticles3D.TRANSFORM_ALIGN_Z_BILLBOARD
+	dust.visibility_aabb = AABB(Vector3(-0.5, -0.5, -1.5), Vector3(2.5, 3.0, 3.0))
+	dust.position = Vector3(SLAB_FACE_X + 0.05, 0.95, 0.0)
+	var process := ParticleProcessMaterial.new()
+	process.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_BOX
+	process.emission_box_extents = Vector3(0.05, 0.9, 0.35)
+	process.direction = Vector3(1.0, 0.2, 0.0)
+	process.spread = 55.0
+	process.initial_velocity_min = 0.2
+	process.initial_velocity_max = 0.6
+	process.gravity = Vector3(0.0, -0.25, 0.0)
+	process.damping_min = 0.3
+	process.damping_max = 0.6
+	process.scale_min = 0.5
+	process.scale_max = 1.0
+	var swell := Curve.new()
+	swell.add_point(Vector2(0.0, 0.4))
+	swell.add_point(Vector2(1.0, 1.4))
+	var swell_texture := CurveTexture.new()
+	swell_texture.curve = swell
+	process.scale_curve = swell_texture
+	var fade := Gradient.new()
+	fade.set_color(0, Color(0.75, 0.72, 0.66, 0.0))
+	fade.set_color(1, Color(0.75, 0.72, 0.66, 0.0))
+	fade.add_point(0.15, Color(0.75, 0.72, 0.66, SLAB_DUST_ALPHA))
+	var fade_texture := GradientTexture1D.new()
+	fade_texture.gradient = fade
+	process.color_ramp = fade_texture
+	dust.process_material = process
+	dust.draw_pass_1 = _soft_puff(SLAB_DUST_SIZE)
+	return dust
 
 
 ## The draft out of a hidden niche (608 amended, environment's side): in

@@ -6,6 +6,8 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+
+- The barrow's hidden niche now gives way where you can see it: the slab shudders, grinds back and slides aside into the wall in a burst of dust, with the grinding of stone; you stand a moment while it gives way. Pressing on the shut niche no longer drops you straight down the stair behind it before it opens.
 - Items: the Encolpion Amulet, the holy remains and the Tomb Sledge have art of their own (a small bronze reliquary cross with a pale inlay and a red stone, a linen bundle of bones bound with cords, a heavy iron-headed sledge on a long haft); the amulet no longer draws as the Draugr's Totem.
 - The sword swings like a sword (338 amended): forehand and backhand slashes in turn, each wound up for a moment and settling back to a guard at the right shoulder before the next, played at about their own pace instead of three times too fast.
 
