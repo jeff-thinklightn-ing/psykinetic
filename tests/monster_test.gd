@@ -93,6 +93,7 @@ func _ready() -> void:
 	_test_band_stands()
 	_test_wild_shot_near()
 	_test_far_pace()
+	_test_strike_cells()
 	_test_wild_scent()
 	_test_wild_boar()
 	_test_wild_wolf()
@@ -1939,6 +1940,51 @@ func _test_far_pace() -> void:
 		"a brute walking home %d cells off, in view: a cell every %s ticks, its pace %.2f" % [World.distance(walker.tile, hunter.tile), gaps, walker.move_ticks])
 	World.despawn(walker)
 	World.despawn(hunter)
+
+
+## A free body standing at the back of its cell (decision 699, enemy-ai's
+## side): the cell beside it is out of reach by bodies, so a robber makes for
+## a strike cell (World.strike_cells) and strikes from there, never waiting
+## at the neighbour it could once strike from.
+func _test_strike_cells() -> void:
+	print("%s== a robber closes on a free body at the back of its cell from a strike cell ==" % char(10))
+	Monster.idling = false
+	var rows: Array[String] = ["############"]
+	for y in 7:
+		rows.append("#..........#")
+	rows.append("############")
+	var e := _build(rows)
+	World.free_walk = true
+	var player := EntityFactory.build(SPECS["P"].merged({"name": "BackOfCell"})) as Player
+	_room.add_child(player)
+	World.spawn(player, Vector2i(6, 4))
+	player.free_pos = Vector2(6.58, 4.0)  # Its cell still (6, 4); (5, 4) is 1.58 off.
+	var robber := EntityFactory.build(SPECS["x"].merged({"name": "Closer", "temperament": "bold", "props": Monster.bodies()["robber"]})) as Monster
+	_room.add_child(robber)
+	World.spawn(robber, Vector2i(2, 4))
+	robber.sight_range = 12
+	robber.senses.cone_cos = -1.0
+	var struck_at := -1
+	var from := World.NO_CELL
+	var waited := 0
+	var longest := 0
+	for i in 80:
+		var hp := player.hp
+		player.free_pos = Vector2(6.58, 4.0)
+		World.step()
+		if player.hp < hp and struck_at < 0:
+			struck_at = i
+			from = robber.tile
+		if World.are_adjacent(robber.tile, player.tile) and not World.in_reach(robber, player):
+			waited += 1
+			longest = maxi(longest, waited)
+		else:
+			waited = 0
+	World.free_walk = false
+	_check(struck_at >= 0 and struck_at < 60 and longest <= ceili(robber.move_ticks) + 1 and from != Vector2i(5, 4),
+			"struck on tick %d from %s (%.2f off), at most %d ticks beside it out of reach (its pace %.1f)" % [struck_at, from, Vector2(from).distance_to(Vector2(6.58, 4.0)), longest, robber.move_ticks])
+	World.despawn(robber)
+	World.despawn(player)
 
 
 func _test_wild_scent() -> void:

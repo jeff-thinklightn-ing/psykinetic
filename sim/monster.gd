@@ -134,6 +134,9 @@ const PAUSE_CHANCE_MAX := 0.12
 const PAUSE_TICKS := Vector2i(2, 6)
 const HOLD_BACK_BELOW := 0.3
 const HOLD_BACK_RANGE := 3
+## How far a free target's centre moves before it works out its strike cells
+## again (decision 699, enemy-ai's side).
+const STRIKE_REPLAN := 0.3
 ## Looking out is skipped while the nearest player or companion was, at the
 ## tier's last measure, this much beyond its sight: more than anyone walks,
 ## or is shoved, in World.TIER_EVERY_TICKS.
@@ -285,6 +288,8 @@ var boldness := 1.0
 var pause_chance := 0.0
 ## The tile beside its target it is making for (NO_TILE: none).
 var slot := NO_TILE
+## Its last World.strike_cells against a free target, and where from (699).
+var _strike_plan := {}
 var _pace := 0.0
 var _rng := RandomNumberGenerator.new()
 var _noticed_tick := 0
@@ -689,10 +694,14 @@ func _sim_tick() -> void:
 		"block":
 			_guard_tick()
 	if tactic == Tactic.PLAIN:
-		if World.can_melee(tile, target.tile):
+		if _in_strike_reach(target):
 			if not _bash_guard():
 				_blow()
 		elif World.tick >= next_move_tick:
+			if World.free_body(target):
+				slot = _pick_slot()
+				if slot != NO_TILE and _go_to(slot):
+					return  # To a cell it can strike a free body from (699).
 			var path := World.find_path(tile, target.tile, true, null, CHASE_SEARCH_TILES, false, {}, opens_doors_now())
 			if not path.is_empty():
 				World.try_move(self, path[0] - tile)
@@ -705,7 +714,7 @@ func _sim_tick() -> void:
 	if World.tick - _noticed_tick < reaction_ticks:
 		return  # Sizing it up.
 	var can_strike := World.tick >= next_attack_tick and World.tick >= next_move_tick
-	if World.can_melee(tile, target.tile):
+	if _in_strike_reach(target):
 		if tactic == Tactic.DART and World.tick < _dart_until:
 			if World.tick >= _dart_from:
 				_step_out()
@@ -789,7 +798,7 @@ func _shoot_tick() -> bool:
 	if raised != "draw":
 		World.try_stance(self, "draw")
 	elif World.range_of(self) >= mini(d, World.longest_range(self)) and _aimed() 			and _cone_clear(World.spread_of(self)):
-		World.try_loose(self, Vector2(target.tile - tile).angle())
+		World.try_loose(self, _aim_angle())
 	return true
 
 
@@ -813,7 +822,7 @@ func _aimed() -> bool:
 func _cone_clear(spread: float) -> bool:
 	if spread <= 0.0:
 		return true
-	var aim := Vector2(target.tile - tile).angle()
+	var aim := _aim_angle()
 	var d := World.distance(tile, target.tile)
 	for edge in [aim - spread, aim + spread]:
 		var hit: Variant = World.shot_aim(self, edge, d).get("hit")
@@ -881,7 +890,7 @@ func _bash_free() -> bool:
 	if not World.bash_ready(self):
 		return false
 	for entity in World.sought():
-		if World.can_melee(tile, entity.tile) and World.try_bash(self, entity):
+		if _in_strike_reach(entity) and World.try_bash(self, entity):
 			return true
 	return false
 
@@ -914,7 +923,7 @@ func _clear_shot() -> bool:
 			cells = int(verb["cells"])
 	if World.distance(tile, target.tile) > cells or target.tile == tile:
 		return false
-	if World.shot_aim(self, Vector2(target.tile - tile).angle(), cells).get("hit") != target:
+	if World.shot_aim(self, _aim_angle(), cells).get("hit") != target:
 		return false
 	# A friend inside even its narrowest cone (decision 620): no shot from here.
 	return _cone_clear(deg_to_rad(float(Items.verb_of(World.drawn_with(self)).get("spread_floor", 0.0))))
@@ -943,12 +952,12 @@ func _strike() -> void:
 	match tactic:
 		Tactic.HEAVY:
 			move_ticks = _pace
-			var direction := target.tile - tile
+			var direction := World.melee_way(self, target)
 			_windup = {"target": target, "lands": World.tick + windup_ticks, "direction": direction, "from": tile}
 			World.face(self, direction)
 			_world_winding(direction, windup_ticks)
 		Tactic.FLANK:
-			var behind := Vector2(tile - target.tile).dot(Vector2(target.facing)) < 0.0
+			var behind := (World.body_centre(self) - World.body_centre(target)).dot(Vector2(target.facing)) < 0.0
 			World.try_attack(self, target, attack_damage + (backstab_damage if behind else 0))
 		_:
 			if World.try_attack(self, target) and tactic == Tactic.DART:
@@ -969,7 +978,7 @@ func _wind_on() -> void:
 	var aimed: Variant = _windup["target"]
 	var direction: Vector2i = _windup["direction"]
 	_windup = {}
-	if is_instance_valid(aimed) and (aimed as GridEntity).spawned and World.can_melee(tile, (aimed as GridEntity).tile):
+	if is_instance_valid(aimed) and (aimed as GridEntity).spawned and _in_strike_reach(aimed as GridEntity):
 		World.try_attack(self, aimed as GridEntity)
 	else:
 		World.try_swing(self, direction)
@@ -1016,16 +1025,23 @@ func _pick_slot() -> Vector2i:
 	var best := NO_TILE
 	var best_score := INF
 	var facing := Vector2(target.facing).normalized()
-	for direction in World.DIRECTIONS:
-		var at := target.tile + direction
-		if claimed.has(at) or not World.is_walkable(at) or not World.can_melee(at, target.tile):
+	var centre := World.body_centre(target)
+	var free := World.free_body(target)
+	var cells: Array[Vector2i] = []
+	if free:
+		cells = _strike_cells()  # Where it can strike a free body from (699).
+	else:
+		for direction in World.DIRECTIONS:
+			cells.append(target.tile + direction)
+	for at in cells:
+		if claimed.has(at) or not World.is_walkable(at) or not free and not World.can_melee(at, target.tile):
 			continue
 		var occupant := World.get_entity_at(at)
 		if occupant != null and occupant != self:
 			continue
 		var score := float(World.distance(tile, at))
 		if tactic == Tactic.FLANK:
-			score += 3.0 * Vector2(direction).normalized().dot(facing)
+			score += 3.0 * (Vector2(at) - centre).normalized().dot(facing)
 		if at == tile or at == slot:
 			score -= 0.5
 		if score < best_score:
@@ -1036,7 +1052,32 @@ func _pick_slot() -> Vector2i:
 
 ## FLANK: beside its target's front (where it faces, or either side of it).
 func _in_front() -> bool:
-	return Vector2(tile - target.tile).normalized().dot(Vector2(target.facing).normalized()) > 0.5
+	return (World.body_centre(self) - World.body_centre(target)).normalized().dot(Vector2(target.facing).normalized()) > 0.5
+
+
+## Whether it can strike [param other] from where it stands (decision 699,
+## enemy-ai's side): beside it on the grid, as ever; by the bodies'
+## reach (World.in_reach) where a free body is in it.
+func _in_strike_reach(other: GridEntity) -> bool:
+	if World.free_body(other) or World.free_body(self):
+		return World.in_reach(self, other)
+	return World.can_melee(tile, other.tile)
+
+
+## The cells it could strike its free target from (World.strike_cells,
+## decision 699), worked out again only when the target's centre has moved
+## STRIKE_REPLAN cells since, or its target or its own cell changed.
+func _strike_cells() -> Array[Vector2i]:
+	var centre := World.body_centre(target)
+	if _strike_plan.get("target") != target or _strike_plan.get("from") != tile 			or (_strike_plan["centre"] as Vector2).distance_to(centre) > STRIKE_REPLAN:
+		_strike_plan = {"target": target, "from": tile, "centre": centre, "cells": World.strike_cells(self, target)}
+	return _strike_plan["cells"]
+
+
+## Where its arrow is aimed (699): from where its shots start to its
+## target's body (a free body's centre; on the grid, its cell's).
+func _aim_angle() -> float:
+	return (World.body_centre(target) - World.shot_origin(self)).angle()
 
 
 ## [param need] others already at its target, or its target under half its hp.
@@ -1044,6 +1085,17 @@ func _target_beset(need := 1) -> bool:
 	if target.max_hp > 0 and target.hp * 2 < target.max_hp:
 		return true
 	var at := 0
+	if World.free_body(target):
+		# A free body's: those in reach of its centre (699), the cells round it.
+		var middle := Vector2i(World.body_centre(target).round())
+		for dy in range(-2, 3):
+			for dx in range(-2, 3):
+				var other := World.get_entity_at(middle + Vector2i(dx, dy))
+				if other != null and other != self and other is Monster and World.in_reach(other, target):
+					at += 1
+					if at >= need:
+						return true
+		return false
 	for direction in World.DIRECTIONS:
 		# The cells round it, not every monster (perf: most hold back now).
 		var other := World.get_entity_at(target.tile + direction)

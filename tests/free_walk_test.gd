@@ -727,12 +727,13 @@ func _test_free_dodge() -> void:
 
 
 ## A monster's blows on a free body that walks away and zig-zags (the
-## audit, 2): reach is still cell to cell (688, combat's side), so a blow
-## lands up to 0.6 of a cell past adjacency while the claim lags; no dance at
-## a cell's border (a dart's in and out is its tactic).
+## audit, 2): reach by bodies (699), so no blow lands past World.reach_limit
+## between the centres, and the monster closes on strike cells (699,
+## enemy-ai's side) rather than waiting out of reach; no dance at a cell's
+## border (a dart's in and out is its tactic).
 func _test_free_chase() -> void:
 	print("
-== a monster after a free body: blows within its cell's reach, no dance at a border ==")
+== a monster after a free body: blows within reach by bodies, no dance at a border ==")
 	for kind: String in ["imp", "brute", "skeleton", "robber"]:
 		var player := _sturdy(_build(_open(24, 9), Vector2i(4, 4)))
 		var foe := EntityFactory.build({"script": "res://sim/monster.gd", "shape": "capsule", "name": "Foe", "kind": kind, "tile": Vector2i(2, 4), "temperament": "bold", "props": Monster.bodies()[kind]}) as Monster
@@ -759,9 +760,9 @@ func _test_free_chase() -> void:
 				last_way = d
 				last_tile = foe.tile
 		World.entity_damaged.disconnect(hurt)
-		var reach := Vector2(1.5 + World.FREE_HYSTERESIS, 1.5 + World.FREE_HYSTERESIS).length()  # Diagonal, the claim's lag on both axes.
+		var reach := World.reach_limit(foe) + 0.005  # The hits are snapped to 0.01.
 		_check(not hits.is_empty() and hits.max() <= reach and (turns <= 1 or kind == "imp"),
-				"%s: %d blows, at centres %s apart (cell reach and the lag: at most %.2f); back-and-forth steps %d" % [kind, hits.size(), hits, reach, turns])
+				"%s: %d blows, at centres %s apart (reach by bodies: at most %.2f); back-and-forth steps %d" % [kind, hits.size(), hits, reach, turns])
 
 
 ## Kiting (the audit, 3; reported to the coordinator, not changed): a free

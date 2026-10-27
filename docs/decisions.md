@@ -32867,3 +32867,26 @@ free_walk_test's dodges by the centre's cell (the spin struck at x 4.3 and
 the centres. Server only bar ui's chase stop, protocol unchanged, no new
 class_name. Enemy-ai's side (monster.gd's approach on strike_cells) ships
 in the same deploy.
+
+## 699, enemy-ai's side: monsters close on strike cells
+
+Combat's side (54f70afb) measures melee reach by bodies where a free body is
+in it, so the cell beside a free body standing at the back of its own is out
+of reach: a monster that walked there, as it did, waited (on main a robber
+stood 65 ticks beside such a player and never struck). Now, against a free
+target, Monster._pick_slot chooses among World.strike_cells (the cells it can
+strike that body's centre from, nearest it first), with FLANK's lean and the
+pack's claimed slots as before; PLAIN monsters make for one too.
+World.strike_cells is worked out again only when the target's centre has
+moved STRIKE_REPLAN (0.3) since, or the target or its own cell changed
+(_strike_cells). "In reach" (_in_strike_reach) is World.in_reach where a free
+body is in it, can_melee on the grid as ever: the strike, the wound-up blow
+as it lands, the bash. The heavy wind-up's way is World.melee_way, the
+backstab's and the flanker's "in front" read the centres, an archer aims at a
+free body's centre (_aim_angle), and "others at it" (_target_beset) counts
+those in reach of it. Sight, flee, leash, home, hold-back range and the
+band's spacing (698) stay on cells. On the grid everything is as before.
+monster_test _test_strike_cells (struck on tick 24 from (6, 3), 1.16 off;
+never more than its pace beside it out of reach); free_walk_test
+_test_free_chase now bounds blows by World.reach_limit (all at or under
+1.43). Server only, protocol unchanged, no new class_name.
