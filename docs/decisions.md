@@ -32678,3 +32678,28 @@ held steer's turn 83 (343 in the 5-round run) to 67 and 64; the grid's
 turn (17) unchanged. Rounds that never start are the harness walking off
 to the map's edge after a few rounds, the same before. controls_test
 _test_free_pull. Client only, protocol unchanged, no new class_name.
+## 694 amended. Town ground is the whole town, not the store's few cells
+
+Jeff on v0.1.186: he logged out three times by the wilds' well and the
+starts, (205..213, 205..213), and each time Pip "was waiting" and followed
+again. 694 asked Stockpile.place_at, which covers only the store place's
+radius: 4 cells round (210, 200). The well is seven cells off it.
+
+- Main._town_ground(zone, cell) is the town's ground. That is the store's
+  own ground as before, or any named room of the zone's level (its
+  "rooms": Umbrage, the wilds' town, 190..227 x 191..231) that contains
+  both the cell and a store the town holds. That rect is the settled area
+  the level already names for the town's arrival card and music.
+- The level's rooms are read from the open zone's level, else an open
+  zone's, else loaded once and kept (_rooms_read).
+- It is used at logout (a legacy companion rests in town only on town
+  ground), by _stay_in_town's place, and by Companion.in_town.
+- The healer's hut out by the trees and the waystone stay outside the
+  town.
+
+resident_test _test_wilds_town_ground, on the wilds' real cells: the store,
+the well, the starts, a hut and the forge are town ground, and the healer's
+hut and the waystone are not. Logging out by the well, she stays at her
+trade in the town; back on the road, one line says where she is; back in
+the town, she goes with them again. Server only, protocol unchanged, no new
+class_name.

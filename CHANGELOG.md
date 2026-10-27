@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Leaving the game anywhere in the wilds' town (by the well, the starts, the huts), not only right at the store, now has your companion stay in town at her trade, with one line on joining that says where she is (694 amended).
 - Free movement: clicking a new spot while walking turns you onto the new way at once (about 60 ms, was about half a second), and steering with the held mouse button follows as quickly (689 amended (5))
 - Clicking a monster under free walk no longer walks you to it in jerks from cell to cell (697, combat's side): the server holds the attack while your client walks you there, strikes once you are beside it, and gives up after 4 s out of reach.
 

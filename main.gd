@@ -147,6 +147,8 @@ const ARRIVAL_SHELTER_TICKS := 60
 const SHELTER_COOLDOWN_MSEC := 30000
 ## Commands that keep an arrival's shelter (decision 661): talk and looking.
 ## Any other ends it at once, so nobody stands untouchable doing things.
+## Levels' named rooms read for a zone not open (_rooms_of), by zone.
+var _rooms_read := {}
 ## By peer: when their companion's whereabouts were last told
 ## (_tell_whereabouts), msec.
 var _where_told := {}
@@ -6430,7 +6432,7 @@ func _join_companion(record: PlayerRecord, player: Player) -> void:
 	pet.felt.connect(_bond_felt.bind(pet))
 	pet.played.connect(_bond_played.bind(pet))
 	pet.on_road = _on_road
-	pet.in_town = func(cell: Vector2i) -> bool: return World.holdings != null and not Stockpile.place_at(World.holdings, World.zone.name, cell).is_empty()
+	pet.in_town = func(cell: Vector2i) -> bool: return not _town_ground(World.zone.name, cell).is_empty()
 	if int(record.companion.get("hp", 0)) > 0:
 		World.restore(pet, int(record.companion["hp"]), int(record.companion.get("stamina", pet.max_stamina)), pet.facing)
 	_companions[record.player_id] = pet
@@ -10335,11 +10337,50 @@ func _fill_home(record: PlayerRecord) -> void:
 	record.companion["home"] = {"place": place, "zone": zone, "trade": trade}
 
 
+## The town store place whose town takes in [param cell] of zone
+## [param zone_name], or "" (694 amended: Jeff logged out in the wilds'
+## town square, nine cells from the store, and Pip did not rest): the
+## store's own ground (Stockpile.place_at), or a named room of the level
+## (its "rooms", as the town's name and music have it: Umbrage, the wilds'
+## town) that takes in both the cell and a store the town holds.
+func _town_ground(zone_name: String, cell: Vector2i) -> String:
+	if World.holdings == null:
+		return ""
+	var place := Stockpile.place_at(World.holdings, zone_name, cell)
+	if not place.is_empty():
+		return place
+	var rooms := _rooms_of(zone_name)
+	for key: String in rooms:
+		var rects: Array = rooms[key].get("rects", [])
+		if not rects.any(func(rect: Rect2i) -> bool: return rect.has_point(cell)):
+			continue
+		for id in World.holdings.places_in(zone_name):
+			var each := World.holdings.place(id)
+			if each["kind"] == Stockpile.KIND and World.holdings.holder(id) == Stockpile.TOWN \
+					and rects.any(func(rect: Rect2i) -> bool: return rect.has_point(each["cell"])):
+				return id
+	return ""
+
+
+## Zone [param zone_name]'s level's named rooms (Level.room_at's): the
+## level open now, an open zone's, else read once and kept.
+func _rooms_of(zone_name: String) -> Dictionary:
+	if World.zone != null and World.zone.name == zone_name and level.get("rooms") is Dictionary:
+		return level["rooms"]
+	var zone: Zone = World.zones.get(zone_name)
+	if zone != null and zone.main.get("level", {}).get("rooms") is Dictionary:
+		return zone.main["level"]["rooms"]
+	if not _rooms_read.has(zone_name):
+		var read := Level.load_level(zone_name) if Level.exists(zone_name) else {}
+		_rooms_read[zone_name] = read.get("rooms", {}) if read.get("rooms") is Dictionary else {}
+	return _rooms_read[zone_name]
+
+
 func _stay_in_town(record: PlayerRecord, pet: Companion) -> bool:
 	if World.towns == null or World.holdings == null or record.companion.is_empty():
 		return false
 	var pet_name := String(record.companion.get("name", pet.name))
-	var place := Stockpile.place_at(World.holdings, World.zone.name, pet.tile)
+	var place := _town_ground(pet.zone, pet.tile)
 	var trade := str(record.companion.get("traits", {}).get("trade", ""))
 	if place.is_empty() or trade.is_empty():
 		return false
@@ -12184,7 +12225,7 @@ func _leave(peer: int, player: Player, id: String) -> void:
 		# player left on its ground (Jeff's barrow: a deploy's restart mid-dungeon
 		# sent Pip home); elsewhere she waits, as any companion, and is beside
 		# them when they are back.
-		var town_ground := Stockpile.place_at(World.holdings, pet.zone, pet.tile) if World.holdings != null else ""
+		var town_ground := _town_ground(pet.zone, pet.tile)
 		if record != null and not _stay_in_town(record, pet) and CompanionCard.is_legacy(str(record.companion.get("name", ""))) \
 				and not town_ground.is_empty():
 			_rest_in_town(record, pet, id, town_ground)

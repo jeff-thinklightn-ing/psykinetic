@@ -41,6 +41,7 @@ func _ready() -> void:
 	_test_stays_when_told()
 	_test_stays_when_left()
 	_test_goes_when_not_told()
+	_test_wilds_town_ground()
 	_test_legacy_rests_in_town()
 	_test_taken_by_raiders()
 	_test_bodies_in_town()
@@ -233,6 +234,48 @@ func _test_goes_when_not_told() -> void:
 	var record: PlayerRecord = _main._records[Net.player_id]
 	_check(_companion() != null and not record.companion.has("resident"), "told to stay off the town's ground: she goes with them")
 	_main.travel(Net.local_id, TOWN)
+
+
+## The wilds' town (Umbrage, a named room of the level) is town ground
+## all over, not only the store's few cells (694 amended: Jeff logged out
+## by the well and Pip did not rest).
+func _test_wilds_town_ground() -> void:
+	print("\n== the whole of the wilds' town is town ground, not only the store's few cells (694 amended) ==")
+	var store: Dictionary = World.holdings.place("wilds/store") if World.holdings != null else {}
+	_check(not store.is_empty() and World.holdings.holder("wilds/store") == Stockpile.TOWN, "(the wilds' store, held by the town)")
+	_check(Stockpile.place_at(World.holdings, "wilds", Vector2i(210, 207)).is_empty(), "(by the well, (210, 207), is off the store's own ground)")
+	for cell: Vector2i in [Vector2i(210, 200), Vector2i(210, 207), Vector2i(208, 211), Vector2i(213, 209), Vector2i(204, 217), Vector2i(220, 205)]:
+		_check(_main._town_ground("wilds", cell) == "wilds/store", "town ground at %s: the store, the well, the starts, a hut, the forge" % cell)
+	_check(_main._town_ground("wilds", Vector2i(151, 233)).is_empty() and _main._town_ground("wilds", Vector2i(128, 128)).is_empty(),
+		"the healer's hut out by the trees and the waystone are not the town")
+	# Jeff's logout: by the well, Nix along; back on the road, told where she is.
+	var record: PlayerRecord = _main._records[Net.player_id]
+	var was: String = record.companion["name"]
+	record.companion["name"] = "Nix"
+	var told: Array[String] = []
+	var note := func(kind: String, data: Dictionary) -> void:
+		if kind == "party":
+			told.append(str(data.get("text", "")))
+	Net.message_received.connect(note)
+	_main.travel(Net.local_id, "wilds")
+	var pet := _companion()
+	_check(World.zone.name == "wilds" and pet != null, "(her player and she are in the wilds)")
+	if pet != null:
+		_put(_player(), _main._nearest_free(Vector2i(210, 207)))
+		_put(pet, _main._nearest_free(Vector2i(211, 208)))
+		_main._on_peer_disconnected(Net.local_id)
+		_check(record.companion.get("resident", {}).get("place", "") == "wilds/store",
+			"gone by the well: she stays in the town, at her trade (%s)" % [record.companion.get("resident", {})])
+		World.enter_named(ROAD)
+		told.clear()
+		_main._join_player(Net.local_id, Net.player_id, Net.player_name)
+		_check(_companion() == null and told.any(func(line: String) -> bool: return line.begins_with("Nix is ") and "Go to" in line),
+			"back on the road: one line says where she is (%s)" % [told])
+		_main.travel(Net.local_id, "wilds")
+		_check(_companion() != null and not record.companion.has("resident"), "in the wilds' town she goes with them again")
+		_main.travel(Net.local_id, TOWN)
+	Net.message_received.disconnect(note)
+	record.companion["name"] = was
 
 
 func _test_legacy_rests_in_town() -> void:
